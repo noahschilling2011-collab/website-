@@ -54,19 +54,27 @@ meridian/
 └── docker-compose.yml      # Lokale Umgebung: Gateway, Postgres/PostGIS, Redis, Valhalla, Photon, Martin
 ```
 
-## Schnellstart (lokal)
+## Schnellstart (lokal) — ein Befehl, kein Docker
 
 ```bash
-# 1. Umgebung starten (DB, Cache, Routing, Geocoding, Tile-Server, Gateway)
 cd meridian
-cp services/gateway/.env.example services/gateway/.env
-docker compose up --build
-
-# 2. Web-App
-cd apps/web
 npm install
-npm run dev            # http://localhost:5173  (spricht mit Gateway auf :8090)
+npm run dev            # startet Gateway (:8090) + Web-App (:5173) zusammen
+# → http://localhost:5173 öffnen
 ```
+
+`npm run dev` nutzt öffentliche Dev-Datenquellen, sodass **Suche & Routing sofort
+mit echten Daten** funktionieren (kein Setup nötig). Eine Klick-für-Klick-
+Testanleitung steht in [`TESTING.md`](TESTING.md).
+
+<details><summary>Alternativ: volle Umgebung mit Docker (Postgres/Redis + eigene Dienste)</summary>
+
+```bash
+cp services/gateway/.env.example services/gateway/.env
+docker compose up --build      # Gateway :8090, Postgres, Redis
+cd apps/web && npm install && npm run dev
+```
+</details>
 
 Das Gateway läuft **auch ohne** externe Routing/Geocoding-Dienste: Fehlt Valhalla
 oder Photon, liefern die Services deterministische Fallback-Daten (Luftlinie,

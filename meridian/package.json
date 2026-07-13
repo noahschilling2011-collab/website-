@@ -10,6 +10,7 @@
     "apps/web"
   ],
   "scripts": {
+    "dev": "node scripts/dev.mjs",
     "dev:gateway": "npm run dev -w @meridian/gateway",
     "dev:web": "npm run dev -w @meridian/web",
     "test": "npm run test -w @meridian/gateway",
