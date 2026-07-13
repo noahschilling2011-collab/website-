@@ -1,0 +1,9 @@
+{
+  "name": "@meridian/shared",
+  "version": "1.0.0",
+  "description": "Geteilte Typen und Utilities für Meridian",
+  "type": "module",
+  "main": "src/types.ts",
+  "types": "src/types.ts",
+  "license": "MIT"
+}

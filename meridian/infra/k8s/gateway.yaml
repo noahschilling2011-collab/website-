@@ -1,0 +1,58 @@
+# Meridian Gateway — Deployment + Service + HPA (Beispiel).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: meridian-gateway
+  labels: { app: meridian-gateway }
+spec:
+  replicas: 3
+  selector:
+    matchLabels: { app: meridian-gateway }
+  template:
+    metadata:
+      labels: { app: meridian-gateway }
+    spec:
+      containers:
+        - name: gateway
+          image: registry.example.com/meridian/gateway:1.0.0
+          ports: [{ containerPort: 8090 }]
+          envFrom:
+            - secretRef: { name: meridian-gateway-secrets }
+          readinessProbe:
+            httpGet: { path: /health, port: 8090 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: 8090 }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests: { cpu: "250m", memory: "256Mi" }
+            limits: { cpu: "1", memory: "512Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: meridian-gateway
+spec:
+  selector: { app: meridian-gateway }
+  ports:
+    - port: 80
+      targetPort: 8090
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: meridian-gateway
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: meridian-gateway
+  minReplicas: 3
+  maxReplicas: 60
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 65 }

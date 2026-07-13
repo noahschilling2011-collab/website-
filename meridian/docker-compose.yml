@@ -1,0 +1,72 @@
+# Lokale Meridian-Umgebung.
+# Kern (gateway + postgres + redis) startet sofort.
+# valhalla/photon/martin sind auskommentiert — einschalten, sobald Datenextrakte
+# vorbereitet sind (siehe docs/DATA_SOURCES.md). Ohne sie nutzt das Gateway Fallbacks.
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    ports:
+      - "8090:8090"
+    environment:
+      PORT: 8090
+      NODE_ENV: development
+      CORS_ORIGINS: "*"
+      POSTGRES_URL: postgres://meridian:meridian@postgres:5432/meridian
+      REDIS_URL: redis://redis:6379
+      # VALHALLA_URL: http://valhalla:8002
+      # PHOTON_URL: http://photon:2322
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: meridian
+      POSTGRES_PASSWORD: meridian
+      POSTGRES_DB: meridian
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meridian"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+
+  # --- Optionale Datendienste (siehe docs/DATA_SOURCES.md) ---
+  #
+  # valhalla:
+  #   image: ghcr.io/gis-ops/docker-valhalla/valhalla:latest
+  #   ports: ["8002:8002"]
+  #   volumes: ["./data/valhalla:/custom_files"]   # germany.osm.pbf hierher legen
+  #
+  # photon:
+  #   image: rtuszik/photon-docker:latest
+  #   ports: ["2322:2322"]
+  #   volumes: ["./data/photon:/photon/photon_data"]
+  #
+  # martin:                                        # Vektorkachel-Server
+  #   image: ghcr.io/maplibre/martin:latest
+  #   ports: ["3000:3000"]
+  #   command: ["--pmtiles", "/tiles/germany.pmtiles"]
+  #   volumes: ["./data/tiles:/tiles"]
+
+volumes:
+  pgdata:
+  redisdata:
