@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MapView, type ViewMode } from './components/MapView';
 import { StreetView } from './components/StreetView';
 import { Assistant } from './components/Assistant';
 import { Account } from './components/Account';
+import { Share } from './components/Share';
+import { Design } from './components/Design';
+import { loadDesign } from './lib/design';
 import { captureOAuthRedirect, isLoggedIn } from './lib/auth';
+import { subscribeLive, updatePosition, type LivePosition } from './lib/social';
 import { search, route as routeApi, type AssistantAction, type LonLat, type Place, type RouteResponse } from './lib/api';
 
 const MODES = [
@@ -44,10 +48,41 @@ export function App() {
 
   const [showAccount, setShowAccount] = useState(false);
   const [loggedIn, setLoggedIn] = useState(isLoggedIn());
+  const [showShare, setShowShare] = useState(false);
+  const [people, setPeople] = useState<Record<string, LivePosition>>({});
+  const [sharing, setSharing] = useState(false);
+  const watchRef = useRef<number | null>(null);
+
+  const [showDesign, setShowDesign] = useState(false);
+  const [design, setDesign] = useState(() => loadDesign().filter);
+
   useEffect(() => {
     if (captureOAuthRedirect()) setShowAccount(true);
     setLoggedIn(isLoggedIn());
   }, []);
+
+  // Echtzeit-Positionen der Freunde empfangen (SSE)
+  useEffect(() => {
+    if (!loggedIn) return;
+    const es = subscribeLive((p) => setPeople((prev) => ({ ...prev, [p.userId]: p })));
+    return () => es?.close();
+  }, [loggedIn]);
+
+  // Eigene Position senden, solange die Freigabe aktiv ist
+  useEffect(() => {
+    if (!sharing || !navigator.geolocation) return;
+    watchRef.current = navigator.geolocation.watchPosition(
+      (pos) => updatePosition(pos.coords.latitude, pos.coords.longitude, pos.coords.heading ?? undefined).catch(() => {}),
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 5000 },
+    );
+    return () => {
+      if (watchRef.current !== null) navigator.geolocation.clearWatch(watchRef.current);
+      watchRef.current = null;
+    };
+  }, [sharing]);
+
+  const peopleList = Object.values(people).map((p) => ({ id: p.userId, name: p.name, color: p.color, lat: p.lat, lon: p.lon }));
 
   async function planRoute(f: Place, t: Place, opts?: { mode?: string; preference?: string; avoid?: string[] }) {
     setLoading(true);
@@ -210,6 +245,14 @@ export function App() {
               👁 Street View
             </button>
           </div>
+          <div className="ctl-group">
+            <button className={sharing ? 'ctl on wide' : 'ctl wide'} onClick={() => setShowShare(true)}>
+              {sharing ? '📍 Teilt live' : '👥 Teilen'}
+            </button>
+          </div>
+          <div className="ctl-group">
+            <button className="ctl wide" onClick={() => setShowDesign(true)}>🎨 Design</button>
+          </div>
         </div>
 
         {interaction === 'streetview' && !svLoc && (
@@ -223,6 +266,8 @@ export function App() {
           viewMode={viewMode}
           threeD={threeD}
           mapillaryToken={MAPILLARY_TOKEN}
+          people={peopleList}
+          design={design}
           onMapClick={onMapClick}
         />
 
@@ -240,6 +285,8 @@ export function App() {
       </div>
 
       {showAccount && <Account onClose={() => setShowAccount(false)} onAuthChange={() => setLoggedIn(isLoggedIn())} />}
+      {showShare && <Share onClose={() => setShowShare(false)} onSharingChange={setSharing} />}
+      {showDesign && <Design current={design} onApply={(f) => setDesign(f)} onClose={() => setShowDesign(false)} />}
     </div>
   );
 }

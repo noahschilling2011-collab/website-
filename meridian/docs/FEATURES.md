@@ -55,9 +55,13 @@ Jede Wunschfunktion ist hier einem **Modul**, einer **Datenquelle** und einer
 ## Gemeinschaft
 | Funktion | Reife | Modul / Umsetzung |
 | --- | --- | --- |
+| Freunde live teilen / Standortfreigabe | ✅ | `social` — `/v1/friends`, `/v1/share/start`, SSE `/v1/live/stream`; Freunde-Marker live auf der Karte |
+| Standortfreigabe per Link (auch für Nicht-Nutzer) | ✅ | `/v1/share/start` → Code/Link; öffentlich `/v1/live/share/:code` |
+| Gruppenreisen | 🔵 | Gruppen-Datenmodell + geteilte Live-Positionen (Erweiterung von `social`) |
 | Gefahren per Sprache melden | ✅ | `reports` — `/v1/reports` POST; Assistant-Intent `report` |
 | KI prüft Glaubwürdigkeit | ✅ | `scoreCredibility`: Korroboration (k nahe Meldungen), Reputationsgewicht, Alter, optionale LLM-Plausibilität |
 | Live-Infos (Unfall/Tier/Sperrung) | ✅ | `/v1/reports?bbox=` liefert aktive, glaubwürdige Meldungen als Layer |
+| Bewertungen / Fotos von Orten | 🔵 | POI-Bewertungen + Foto-Upload (Object Storage) — Roadmap |
 
 ## Zukunft
 | Funktion | Reife | Modul / Umsetzung |
@@ -67,10 +71,13 @@ Jede Wunschfunktion ist hier einem **Modul**, einer **Datenquelle** und einer
 | Indoor-Navigation | 🔵 | IMDF/OGC-Indoor-Daten, BLE/UWB-Positionierung; Indoor-Tiles + Routing-Graph |
 | Offline ohne Internet | 🔵→v8 | PMTiles + Offline-Valhalla-Tiles + lokaler Suchindex; nahtloser Wechsel |
 
-## Premium: Persönlicher KI-Begleiter
+## Premium
 | Funktion | Reife | Modul / Umsetzung |
 | --- | --- | --- |
+| Eigene Karten-Designs | ✅ | `Design`-Panel: 7 Vorlagen (Nacht/Mono/Retro/Natur/…) + eigene Regler (Farbton/Sättigung/Helligkeit/Kontrast/Invert), live auf die Karte, lokal gespeichert |
 | Proaktives Briefing („In 15 Min. losfahren …") | 🟡 | `/v1/assistant/briefing`: ETA + Verkehr/Vorhersage + Parkplatz + (opt.) Kalender → Handlungsempfehlung + vorbereitete Route |
+| Erweiterte KI / weltweite Offline-Karten / unbegrenzter Cloud-Speicher | 🔵 | Tarif-Gating + Feature-Flags; Offline = v8 (PMTiles-Regionen) |
+| Frühzeitiger Zugriff auf neue Funktionen | 🔵 | Feature-Flags pro Konto (Beta-Kanal) |
 
 **Beispiel-Antwort** (`/v1/assistant/briefing`):
 > „Du musst in 15 Minuten losfahren, sonst kommst du wegen eines Unfalls auf der

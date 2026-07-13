@@ -92,6 +92,16 @@ Chiffrat), DSGVO-Export und Konto-Löschung. Läuft ohne DB (In-Memory, swap-fä
 gegen `db/migrations/003_accounts.sql`) und ohne externe Krypto-Libs. Details:
 [`docs/ACCOUNTS.md`](docs/ACCOUNTS.md).
 
+### Freunde, Live-Standort & Karten-Designs
+Über der Karte: **👥 Teilen** und **🎨 Design**.
+- **Live-Standort teilen:** Freunde per E-Mail einladen, Live-Position in Echtzeit
+  teilen (SSE-Stream, Freunde erscheinen als Marker auf der Karte) oder per Link
+  auch mit Nicht-Nutzern (`/v1/share/start` → öffentlicher Code). Backend mit zwei
+  Nutzern verifiziert: Freund empfängt die Position live.
+- **Eigene Karten-Designs (Premium):** 7 Vorlagen (Nacht, Mono, Retro, Natur,
+  Kontrast, Blaupause…) plus eigener Editor (Farbton/Sättigung/Helligkeit/Kontrast/
+  Invert) — live angewandt, lokal gespeichert.
+
 ### KI-Assistent, Reiseplanung & Gemeinschaft
 Unten links auf der Karte: der **Sprachassistent** („🎙 Assistent"). Er versteht
 natürliche Befehle per Text **oder Stimme** (Web Speech API, Deutsch) und führt sie aus:

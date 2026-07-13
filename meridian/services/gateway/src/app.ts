@@ -11,6 +11,7 @@ import { styleRoutes } from './routes/style.js';
 import { assistantRoutes } from './routes/assistant.js';
 import { communityRoutes } from './routes/community.js';
 import { authRoutes } from './routes/auth.js';
+import { socialRoutes } from './routes/social.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -36,6 +37,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(assistantRoutes);
   await app.register(communityRoutes);
   await app.register(authRoutes);
+  await app.register(socialRoutes);
 
   return app;
 }

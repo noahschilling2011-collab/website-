@@ -6,6 +6,14 @@ import type { LonLat, Route } from '../lib/api';
 
 export type ViewMode = 'streets' | 'satellite';
 
+export interface Person {
+  id: string;
+  name: string;
+  color: string;
+  lat: number;
+  lon: number;
+}
+
 interface Props {
   from?: LonLat;
   to?: LonLat;
@@ -13,13 +21,16 @@ interface Props {
   viewMode: ViewMode;
   threeD: boolean;
   mapillaryToken?: string;
+  people?: Person[];
+  design?: string; // CSS-Filter für das Karten-Design
   onMapClick?: (lonlat: LonLat) => void;
 }
 
-export function MapView({ from, to, route, viewMode, threeD, mapillaryToken, onMapClick }: Props) {
+export function MapView({ from, to, route, viewMode, threeD, mapillaryToken, people, design, onMapClick }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MlMap | null>(null);
   const markers = useRef<Marker[]>([]);
+  const peopleMarkers = useRef<Map<string, Marker>>(new Map());
   const clickCb = useRef(onMapClick);
   clickCb.current = onMapClick;
 
@@ -109,6 +120,46 @@ export function MapView({ from, to, route, viewMode, threeD, mapillaryToken, onM
       if (pt) markers.current.push(new maplibregl.Marker({ color }).setLngLat(pt).addTo(m));
     }
   }, [from, to]);
+
+  // Karten-Design (CSS-Filter auf dem Canvas). Der Canvas existiert sofort nach
+  // Konstruktion — unabhängig vom Tile-Load.
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    try {
+      m.getCanvas().style.filter = design && design !== 'none' ? design : '';
+    } catch {
+      /* Canvas noch nicht bereit */
+    }
+  }, [design]);
+
+  // Live-Positionen von Freunden (eigene Marker mit Initiale)
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    const seen = new Set<string>();
+    for (const p of people ?? []) {
+      seen.add(p.id);
+      let mk = peopleMarkers.current.get(p.id);
+      if (!mk) {
+        const el = document.createElement('div');
+        el.className = 'friend-marker';
+        el.style.background = p.color;
+        el.textContent = p.name.charAt(0).toUpperCase();
+        el.title = p.name;
+        mk = new maplibregl.Marker({ element: el }).setLngLat([p.lon, p.lat]).addTo(m);
+        peopleMarkers.current.set(p.id, mk);
+      } else {
+        mk.setLngLat([p.lon, p.lat]);
+      }
+    }
+    for (const [id, mk] of peopleMarkers.current) {
+      if (!seen.has(id)) {
+        mk.remove();
+        peopleMarkers.current.delete(id);
+      }
+    }
+  }, [people]);
 
   // Route zeichnen + einpassen
   useEffect(() => {

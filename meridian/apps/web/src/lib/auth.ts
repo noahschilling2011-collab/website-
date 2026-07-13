@@ -77,7 +77,7 @@ async function raw(path: string, init?: RequestInit, withAuth = false): Promise<
 }
 
 // Authentifizierter Fetch mit einmaligem Refresh bei 401.
-async function authFetch<T>(path: string, init?: RequestInit): Promise<T> {
+export async function authFetch<T>(path: string, init?: RequestInit): Promise<T> {
   let res = await raw(path, init, true);
   if (res.status === 401 && getRefresh()) {
     const ok = await tryRefresh();

@@ -199,3 +199,30 @@ body { background: var(--bg); color: var(--text); -webkit-font-smoothing: antial
 .device em { display: block; color: var(--muted); font-style: normal; font-size: 12px; margin-top: 2px; }
 .ghost.sm { width: auto; padding: 7px 12px; margin: 0; font-size: 13px; }
 .logout { margin-top: 16px; }
+
+/* --- Live-Sharing / Freunde --- */
+.friend-marker { width: 30px; height: 30px; border-radius: 50%; color: #fff; font-weight: 700; font-size: 14px;
+  display: flex; align-items: center; justify-content: center; border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.3); cursor: pointer; }
+.share-box { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 16px; }
+.share-box.on { border-color: #30d158; background: rgba(48,209,88,0.08); }
+.share-active { margin-top: 8px; }
+.share-link { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
+.share-link code { flex: 1; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.share-link button { padding: 8px 12px; font-size: 13px; font-weight: 600; border: 1px solid var(--line); background: var(--bg); color: var(--accent); border-radius: 8px; cursor: pointer; }
+.add-friend { display: flex; gap: 6px; }
+.add-friend input { flex: 1; margin-bottom: 0; }
+.primary.sm { width: auto; padding: 10px 14px; font-size: 13px; }
+.fdot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: middle; margin-right: 4px; }
+
+/* --- Karten-Design (Premium) --- */
+.premium { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #fff;
+  background: linear-gradient(135deg, #bf5af2, #0a84ff); padding: 2px 7px; border-radius: 10px; margin-left: 6px; vertical-align: middle; }
+.swatches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.swatch-card { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 6px; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 12px; cursor: pointer; }
+.swatch-card.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.swatch { width: 100%; height: 44px; border-radius: 8px; }
+.sliders { display: flex; flex-direction: column; gap: 12px; }
+.slider label { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.slider label em { color: var(--muted); font-style: normal; }
+.slider input[type=range] { width: 100%; accent-color: var(--accent); }

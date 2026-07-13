@@ -408,6 +408,22 @@ export function oauthUpsert(input: { provider: string; sub: string; email?: stri
   return { user: publicUser(user), tokens, sessionId: session.id };
 }
 
+// ---- Nachschlage-Helfer (für andere Module, z. B. Freunde) ----
+export function lookupByEmail(email: string): { id: string; name: string } | null {
+  const uid = emailIndex.get(email.trim().toLowerCase());
+  const u = uid ? users.get(uid) : undefined;
+  return u ? { id: u.id, name: u.name } : null;
+}
+export function nameOf(userId: string): string {
+  return users.get(userId)?.name ?? 'Nutzer';
+}
+export function avatarOf(userId: string): string {
+  return users.get(userId)?.avatarColor ?? '#8a8a8e';
+}
+export function userExists(userId: string): boolean {
+  return users.has(userId);
+}
+
 // ---- Gastmodus (flüchtiges Konto ohne Anmeldung) ----
 export function createGuest(ctx: LoginCtx) {
   const user: User = {
