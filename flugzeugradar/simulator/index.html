@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flugzeugradar – Simulator (IT.3 Geheimagent, oder was?)</title>
+<style>
+  /* ============================================================
+     Flugzeugradar-Simulator — sieht aus wie das ESP32-Display,
+     läuft aber im Browser. Zum Testen ohne Hardware!
+     ============================================================ */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0f0a;
+    color: #cfe8cf;
+    font-family: "Courier New", monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+  }
+  h1 { color: #ff4444; font-size: 1.2rem; letter-spacing: 2px; margin-bottom: 2px; }
+  h2 { color: #33ff66; font-size: 1rem; letter-spacing: 4px; margin-bottom: 12px; }
+  .einstellungen {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    justify-content: center; margin-bottom: 14px;
+    background: #101810; border: 1px solid #1e3a1e; padding: 10px; border-radius: 8px;
+  }
+  .einstellungen label { font-size: .8rem; }
+  .einstellungen input[type=number] {
+    width: 90px; background: #060a06; color: #33ff66;
+    border: 1px solid #2a4a2a; padding: 5px; font-family: inherit; border-radius: 4px;
+  }
+  button {
+    background: #123a12; color: #33ff66; border: 1px solid #2a6a2a;
+    padding: 6px 14px; font-family: inherit; cursor: pointer; border-radius: 4px;
+  }
+  button:hover { background: #1a521a; }
+  .buehne { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  canvas { background: #000; border: 2px solid #1e3a1e; border-radius: 8px; }
+  .panel {
+    width: 220px; background: #000; border: 2px solid #1e3a1e; border-radius: 8px;
+    padding: 12px; font-size: .8rem;
+  }
+  .panel h3 { color: #ff4444; font-size: .85rem; margin-bottom: 8px; letter-spacing: 1px; }
+  .panel hr { border: 0; border-top: 1px solid #1e3a1e; margin: 8px 0; }
+  .kontakt { padding: 3px 0; border-bottom: 1px dotted #142814; cursor: default; }
+  .kontakt b { color: #fff; }
+  .status { margin-top: 10px; font-size: .75rem; color: #6a8a6a; }
+  .fehler { color: #ff6666; }
+  .legende span { display: inline-block; margin-right: 10px; }
+  .punkt { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; }
+</style>
+</head>
+<body>
+
+<h1>* TOP SECRET *</h1>
+<h2>FLUGZEUGRADAR — SIMULATOR</h2>
+
+<div class="einstellungen">
+  <label>Breitengrad <input type="number" id="lat" step="0.0001" value="51.3397"></label>
+  <label>Längengrad <input type="number" id="lon" step="0.0001" value="12.3731"></label>
+  <label>Radius (NM) <input type="number" id="radius" min="1" max="250" value="40"></label>
+  <button id="standortBtn" title="GPS des Geräts verwenden">📍 Mein Standort</button>
+  <button id="startBtn">▶ Radar starten</button>
+  <label><input type="checkbox" id="demo"> Demo-Modus (ohne Internet)</label>
+</div>
+
+<div class="buehne">
+  <canvas id="radar" width="480" height="480"></canvas>
+  <div class="panel">
+    <h3>GEHEIM-RADAR</h3>
+    <div>ZIELE: <b id="anzahl">0</b> &nbsp;·&nbsp; RADIUS: <b id="radiusAnzeige">40 NM</b></div>
+    <hr>
+    <div class="legende">
+      <span><span class="punkt" style="background:#ff9900"></span>&lt; 10.000 ft</span>
+      <span><span class="punkt" style="background:#ffee00"></span>&lt; 25.000 ft</span>
+      <span><span class="punkt" style="background:#33ff66"></span>Reiseflug</span>
+    </div>
+    <hr>
+    <div id="liste">Noch keine Daten – Radar starten!</div>
+    <div class="status" id="status"></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Dies ist dieselbe Logik wie im ESP32-Sketch, nur in JavaScript.
+// Datenquelle: api.adsb.lol (kostenlos, echte Live-Flugdaten)
+// ============================================================
+const canvas = document.getElementById("radar");
+const ctx = canvas.getContext("2d");
+const CX = canvas.width / 2, CY = canvas.height / 2, R = canvas.width / 2 - 12;
+
+let flugzeuge = [];        // aktuelle Kontakte
+let sweep = 0;             // Winkel des Suchstrahls (Grad, 0 = Norden)
+let laeuft = false;
+let abfrageTimer = null;
+
+const eingabe = id => parseFloat(document.getElementById(id).value);
+
+// ---------- Mathe: Grad -> Kilometer -> Pixel ----------
+function kmVersatz(lat, lon, homeLat, homeLon) {
+  const dxOst  = (lon - homeLon) * 111.32 * Math.cos(homeLat * Math.PI / 180);
+  const dyNord = (lat - homeLat) * 110.574;
+  return { dxOst, dyNord, dist: Math.hypot(dxOst, dyNord) };
+}
+
+// ---------- Live-Daten vom ADS-B-Server holen ----------
+async function holeFlugdaten() {
+  const lat = eingabe("lat"), lon = eingabe("lon"), radius = eingabe("radius");
+  document.getElementById("radiusAnzeige").textContent = radius + " NM";
+
+  if (document.getElementById("demo").checked) {  // Demo: erfundene Flugzeuge
+    erzeugeDemoDaten(lat, lon, radius);
+    return;
+  }
+  try {
+    const url = `https://api.adsb.lol/v2/point/${lat}/${lon}/${radius}`;
+    const antwort = await fetch(url);
+    if (!antwort.ok) throw new Error("Server-Code " + antwort.status);
+    const daten = await antwort.json();
+
+    flugzeuge = (daten.ac || [])
+      .filter(ac => ac.lat !== undefined && ac.lon !== undefined)
+      .map(ac => ({
+        rufzeichen: (ac.flight || ac.hex || "???").trim(),
+        lat: ac.lat, lon: ac.lon,
+        hoehe: typeof ac.alt_baro === "number" ? ac.alt_baro : -1,
+        knoten: ac.gs || 0,
+        kurs: ac.track || 0,
+        dist: kmVersatz(ac.lat, ac.lon, lat, lon).dist
+      }))
+      .sort((a, b) => a.dist - b.dist);
+
+    setzeStatus(`Live-Daten OK — ${new Date().toLocaleTimeString("de-DE")}`);
+  } catch (e) {
+    setzeStatus("Fehler beim Datenholen: " + e.message + " → Tipp: Demo-Modus ankreuzen", true);
+  }
+  aktualisiereListe();
+}
+
+// ---------- Demo-Modus: zufaellige, aber realistische Flugzeuge ----------
+function erzeugeDemoDaten(lat, lon, radius) {
+  if (flugzeuge.length === 0 || !flugzeuge[0].demo) {
+    const namen = ["DLH4KA", "RYR81T", "EWG7YP", "AFR29U", "BAW956", "WZZ3D", "UAE47", "SWR11X"];
+    flugzeuge = namen.map(n => ({
+      rufzeichen: n, demo: true,
+      lat: lat + (Math.random() - 0.5) * radius / 40,
+      lon: lon + (Math.random() - 0.5) * radius / 25,
+      hoehe: 2000 + Math.floor(Math.random() * 36000),
+      knoten: 250 + Math.floor(Math.random() * 250),
+      kurs: Math.floor(Math.random() * 360),
+      dist: 0
+    }));
+  }
+  // Flugzeuge in ihre Flugrichtung weiterbewegen
+  for (const f of flugzeuge) {
+    const schritt = f.knoten * 0.0005;
+    f.lat += Math.cos(f.kurs * Math.PI / 180) * schritt / 60;
+    f.lon += Math.sin(f.kurs * Math.PI / 180) * schritt / 60;
+    f.dist = kmVersatz(f.lat, f.lon, lat, lon).dist;
+  }
+  flugzeuge.sort((a, b) => a.dist - b.dist);
+  setzeStatus("Demo-Modus aktiv (erfundene Flugzeuge)");
+  aktualisiereListe();
+}
+
+// ---------- Radar zeichnen (laeuft ~60x pro Sekunde) ----------
+function zeichne() {
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Nachleuchten des Suchstrahls
+  for (let i = 60; i >= 0; i--) {
+    const w = (sweep - i * 1.2 - 90) * Math.PI / 180;
+    ctx.strokeStyle = `rgba(0,255,80,${(1 - i / 60) * 0.25})`;
+    ctx.beginPath();
+    ctx.moveTo(CX, CY);
+    ctx.lineTo(CX + Math.cos(w) * R, CY + Math.sin(w) * R);
+    ctx.stroke();
+  }
+
+  // Ringe + Fadenkreuz
+  ctx.strokeStyle = "#0c5a1e";
+  for (let i = 1; i <= 4; i++) {
+    ctx.beginPath(); ctx.arc(CX, CY, R * i / 4, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.moveTo(CX - R, CY); ctx.lineTo(CX + R, CY);
+  ctx.moveTo(CX, CY - R); ctx.lineTo(CX, CY + R);
+  ctx.stroke();
+
+  // Himmelsrichtungen
+  ctx.fillStyle = "#1f8a3a"; ctx.font = "13px Courier New"; ctx.textAlign = "center";
+  ctx.fillText("N", CX, 16); ctx.fillText("S", CX, canvas.height - 6);
+  ctx.fillText("W", 10, CY + 4); ctx.fillText("O", canvas.width - 10, CY + 4);
+
+  // Flugzeuge
+  const homeLat = eingabe("lat"), homeLon = eingabe("lon");
+  const reichweiteKm = eingabe("radius") * 1.852;
+  for (const f of flugzeuge) {
+    const { dxOst, dyNord, dist } = kmVersatz(f.lat, f.lon, homeLat, homeLon);
+    if (dist > reichweiteKm) continue;
+    const x = CX + dxOst / reichweiteKm * R;
+    const y = CY - dyNord / reichweiteKm * R;
+
+    // Farbe nach Flughoehe (wie auf dem ESP32)
+    let farbe = "#33ff66";
+    if (f.hoehe < 0) farbe = "#888";
+    else if (f.hoehe < 10000) farbe = "#ff9900";
+    else if (f.hoehe < 25000) farbe = "#ffee00";
+
+    // Dreieck in Flugrichtung
+    const w = (f.kurs - 90) * Math.PI / 180;
+    ctx.fillStyle = farbe;
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(w) * 9, y + Math.sin(w) * 9);
+    ctx.lineTo(x + Math.cos(w + 2.5) * 7, y + Math.sin(w + 2.5) * 7);
+    ctx.lineTo(x + Math.cos(w - 2.5) * 7, y + Math.sin(w - 2.5) * 7);
+    ctx.closePath(); ctx.fill();
+
+    ctx.fillStyle = "#fff"; ctx.textAlign = "left"; ctx.font = "11px Courier New";
+    ctx.fillText(f.rufzeichen, x + 12, y + 4);
+  }
+
+  // Heller Suchstrahl + Mittelpunkt
+  const w = (sweep - 90) * Math.PI / 180;
+  ctx.strokeStyle = "#33ff66"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(CX, CY);
+  ctx.lineTo(CX + Math.cos(w) * R, CY + Math.sin(w) * R); ctx.stroke();
+  ctx.lineWidth = 1;
+  ctx.fillStyle = "#33ff66";
+  ctx.beginPath(); ctx.arc(CX, CY, 4, 0, Math.PI * 2); ctx.fill();
+
+  if (laeuft) sweep = (sweep + 1.5) % 360;
+  requestAnimationFrame(zeichne);
+}
+
+// ---------- Info-Leiste ----------
+function aktualisiereListe() {
+  document.getElementById("anzahl").textContent = flugzeuge.length;
+  const liste = document.getElementById("liste");
+  if (flugzeuge.length === 0) { liste.textContent = "Keine Flugzeuge im Radius."; return; }
+  liste.innerHTML = flugzeuge.slice(0, 10).map(f =>
+    `<div class="kontakt"><b>${f.rufzeichen}</b> · ${f.dist.toFixed(1)} km · ` +
+    (f.hoehe >= 0 ? `${f.hoehe.toLocaleString("de-DE")} ft` : "am Boden") +
+    ` · ${f.knoten} kt</div>`
+  ).join("");
+}
+
+function setzeStatus(text, istFehler = false) {
+  const el = document.getElementById("status");
+  el.textContent = text;
+  el.className = "status" + (istFehler ? " fehler" : "");
+}
+
+// ---------- Knoepfe ----------
+document.getElementById("startBtn").addEventListener("click", () => {
+  laeuft = true;
+  holeFlugdaten();
+  clearInterval(abfrageTimer);
+  abfrageTimer = setInterval(holeFlugdaten, 15000);  // alle 15 s wie der ESP32
+  document.getElementById("startBtn").textContent = "⟳ Neu laden";
+});
+
+document.getElementById("standortBtn").addEventListener("click", () => {
+  if (!navigator.geolocation) { setzeStatus("Kein GPS verfügbar.", true); return; }
+  navigator.geolocation.getCurrentPosition(pos => {
+    document.getElementById("lat").value = pos.coords.latitude.toFixed(4);
+    document.getElementById("lon").value = pos.coords.longitude.toFixed(4);
+    setzeStatus("Standort übernommen – jetzt Radar starten!");
+  }, () => setzeStatus("Standort-Zugriff abgelehnt.", true));
+});
+
+zeichne();  // Zeichenschleife starten (Radar dreht erst nach "Start")
+</script>
+</body>
+</html>
