@@ -133,30 +133,47 @@ async function holeFlugdaten() {
 
     setzeStatus(`Live-Daten OK — ${new Date().toLocaleTimeString("de-DE")}`);
   } catch (e) {
-    setzeStatus("Fehler beim Datenholen: " + e.message + " → Tipp: Demo-Modus ankreuzen", true);
+    setzeStatus("Keine Verbindung zu den Flugdaten (" + e.message +
+                "). Internet/Firewall pruefen – oder Demo-Modus ankreuzen.", true);
   }
   aktualisiereListe();
 }
 
+// fetch mit Zeitlimit – damit ein langsamer/toter Server die Kette nicht blockiert
+async function fetchMitTimeout(url, ms = 8000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try { return await fetch(url, { signal: ctrl.signal }); }
+  finally { clearTimeout(t); }
+}
+
 // Holt die echten Flugdaten von adsb.lol.
 // Ein Browser darf fremde Server nur abfragen, wenn diese CORS erlauben.
-// Klappt der direkte Weg nicht, laden wir ueber einen CORS-Proxy nach –
-// so laeuft der Simulator zuverlaessig. (Der ESP32 braucht das NICHT,
-// weil er kein Browser ist und direkt zugreifen darf.)
+// adsb.lol tut das nicht immer -> wir probieren der Reihe nach mehrere Wege:
+// erst direkt, dann ueber mehrere kostenlose CORS-Proxys. Der erste, der
+// klappt, gewinnt. So laeuft der Simulator auch, wenn ein Proxy gerade down
+// ist. (Der ESP32 braucht das alles NICHT, er ist kein Browser.)
 async function ladeLiveDaten(lat, lon, radius) {
-  const pfad = `v2/lat/${lat}/lon/${lon}/dist/${radius}`;
-  const direkt = `https://api.adsb.lol/${pfad}`;
-  try {
-    const r = await fetch(direkt, { headers: { "Accept": "application/json" } });
-    if (!r.ok) throw new Error("Server-Code " + r.status);
-    return await r.json();
-  } catch (e) {
-    // Vermutlich CORS-Sperre des Browsers -> ueber Proxy erneut versuchen
-    const proxy = "https://api.allorigins.win/raw?url=" + encodeURIComponent(direkt);
-    const r = await fetch(proxy);
-    if (!r.ok) throw new Error("Proxy-Code " + r.status);
-    return await r.json();
+  const ziel = `https://api.adsb.lol/v2/lat/${lat}/lon/${lon}/dist/${radius}`;
+  const wege = [
+    ziel,                                                                   // 1) direkt
+    "https://corsproxy.io/?url=" + encodeURIComponent(ziel),                // 2) Proxy
+    "https://api.allorigins.win/raw?url=" + encodeURIComponent(ziel),       // 3) Proxy
+    "https://api.codetabs.com/v1/proxy/?quest=" + encodeURIComponent(ziel), // 4) Proxy
+  ];
+  let letzterFehler;
+  for (const weg of wege) {
+    try {
+      const r = await fetchMitTimeout(weg);
+      if (!r.ok) { letzterFehler = new Error("Code " + r.status); continue; }
+      const daten = await r.json();
+      console.log("Flugdaten geladen ueber:", weg.split("?")[0]);
+      return daten;
+    } catch (e) {
+      letzterFehler = e;
+    }
   }
+  throw letzterFehler || new Error("Alle Verbindungswege fehlgeschlagen");
 }
 
 // ---------- Demo-Modus: zufaellige, aber realistische Flugzeuge ----------
