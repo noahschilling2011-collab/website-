@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import maplibregl, { type Map as MlMap, Marker } from 'maplibre-gl';
-import { STREETS_STYLE, TERRAIN_SOURCE, satelliteStyle } from '../lib/mapStyle';
+import { STREETS_STYLE, TERRAIN_SOURCE, satelliteStyle, demoStyle } from '../lib/mapStyle';
 import { decodePolyline } from '../lib/polyline';
 import type { LonLat, Route } from '../lib/api';
 
@@ -37,15 +37,46 @@ export function MapView({ from, to, route, viewMode, threeD, mapillaryToken, peo
   // Karte einmalig erstellen
   useEffect(() => {
     if (!container.current || map.current) return;
-    const m = new maplibregl.Map({
-      container: container.current,
-      style: STREETS_STYLE,
-      center: [10.45, 51.16],
-      zoom: 5.4,
-      pitch: 0,
-      maxPitch: 85,
-      attributionControl: { compact: true },
+
+    let m: MlMap;
+    try {
+      m = new maplibregl.Map({
+        container: container.current,
+        style: STREETS_STYLE,
+        center: [10.45, 51.16],
+        zoom: 5.4,
+        pitch: 0,
+        maxPitch: 85,
+        attributionControl: { compact: true },
+      });
+    } catch {
+      // WebGL nicht verfügbar -> verständliche Meldung statt leerer Fläche.
+      container.current.innerHTML =
+        '<div class="map-error"><b>Karte kann nicht angezeigt werden</b>' +
+        'Dein Browser oder deine Grafik unterstützt kein WebGL. Bitte einen aktuellen ' +
+        'Chrome oder Edge verwenden und „Hardwarebeschleunigung“ in den Browser-Einstellungen aktivieren.</div>';
+      return;
+    }
+
+    // Notfall: Lädt die Vektorkarte nicht (Firewall/Blocker/langsames Netz),
+    // automatisch auf eine einfache Rasterkarte (OpenStreetMap) umschalten.
+    let loaded = false;
+    let fellBack = false;
+    const useRaster = () => {
+      if (loaded || fellBack) return;
+      fellBack = true;
+      try {
+        m.setStyle(demoStyle);
+      } catch {
+        /* ignore */
+      }
+    };
+    m.on('load', () => {
+      loaded = true;
     });
+    m.on('error', () => useRaster());
+    const fallbackTimer = setTimeout(useRaster, 7000);
+
     m.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
     m.addControl(
       new maplibregl.GeolocateControl({ trackUserLocation: true, positionOptions: { enableHighAccuracy: true } }),
@@ -58,6 +89,7 @@ export function MapView({ from, to, route, viewMode, threeD, mapillaryToken, peo
     });
     map.current = m;
     return () => {
+      clearTimeout(fallbackTimer);
       m.remove();
       map.current = null;
     };

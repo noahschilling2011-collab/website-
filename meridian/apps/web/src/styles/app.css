@@ -226,3 +226,8 @@ body { background: var(--bg); color: var(--text); -webkit-font-smoothing: antial
 .slider label { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
 .slider label em { color: var(--muted); font-style: normal; }
 .slider input[type=range] { width: 100%; accent-color: var(--accent); }
+
+/* Karten-Fehler (kein WebGL) */
+.map-error { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 32px; gap: 8px; color: var(--text); background: var(--panel); font-size: 15px; line-height: 1.5; }
+.map-error b { font-size: 18px; display: block; margin-bottom: 6px; }
