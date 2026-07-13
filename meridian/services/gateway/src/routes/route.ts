@@ -15,6 +15,7 @@ const routeBody = z.object({
   departAt: z.string().datetime().optional(),
   alternatives: z.number().min(1).max(4).default(3),
   include: z.array(z.string()).default([]),
+  avoid: z.array(z.string()).optional(),
 });
 
 export async function routeRoutes(app: FastifyInstance): Promise<void> {
@@ -26,6 +27,7 @@ export async function routeRoutes(app: FastifyInstance): Promise<void> {
       waypoints: body.waypoints as LonLat[],
       preference: body.preference,
       alternatives: body.alternatives,
+      avoid: body.avoid,
     });
 
     const wantWeather = body.include.includes('weather');

@@ -8,6 +8,8 @@ import { healthRoutes } from './routes/health.js';
 import { searchRoutes } from './routes/search.js';
 import { routeRoutes } from './routes/route.js';
 import { styleRoutes } from './routes/style.js';
+import { assistantRoutes } from './routes/assistant.js';
+import { communityRoutes } from './routes/community.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -30,6 +32,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(searchRoutes);
   await app.register(routeRoutes);
   await app.register(styleRoutes);
+  await app.register(assistantRoutes);
+  await app.register(communityRoutes);
 
   return app;
 }

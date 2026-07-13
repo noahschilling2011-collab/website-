@@ -4,7 +4,17 @@ export type LonLat = [number, number]; // [lon, lat] (GeoJSON-Konvention)
 
 export type TravelMode = 'auto' | 'bicycle' | 'pedestrian' | 'transit';
 export type RoutePreference = 'fastest' | 'comfortable' | 'eco' | 'scenic';
-export type PoiCategory = 'fuel' | 'charging' | 'restaurant' | 'hotel' | 'parking';
+export type PoiCategory =
+  | 'fuel'
+  | 'charging'
+  | 'restaurant'
+  | 'hotel'
+  | 'parking'
+  | 'attraction'
+  | 'viewpoint'
+  | 'cafe'
+  | 'supermarket'
+  | 'pharmacy';
 
 export interface Place {
   id: string;

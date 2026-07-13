@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { MapView, type ViewMode } from './components/MapView';
 import { StreetView } from './components/StreetView';
-import { search, route as routeApi, type LonLat, type Place, type RouteResponse } from './lib/api';
+import { Assistant } from './components/Assistant';
+import { search, route as routeApi, type AssistantAction, type LonLat, type Place, type RouteResponse } from './lib/api';
 
 const MODES = [
   { id: 'auto', label: 'Auto', icon: '🚗' },
@@ -39,21 +40,43 @@ export function App() {
   const [threeD, setThreeD] = useState(false);
   const [svLoc, setSvLoc] = useState<LonLat | null>(null);
 
-  async function plan() {
-    if (!from || !to) return;
+  async function planRoute(f: Place, t: Place, opts?: { mode?: string; preference?: string; avoid?: string[] }) {
     setLoading(true);
     try {
       const r = await routeApi({
-        mode,
-        preference: pref,
-        waypoints: [from.center, to.center],
+        mode: opts?.mode ?? mode,
+        preference: opts?.preference ?? pref,
+        waypoints: [f.center, t.center],
         alternatives: 3,
         include: ['weather', 'poi:fuel', 'poi:charging'],
+        avoid: opts?.avoid,
       });
       setResp(r);
     } finally {
       setLoading(false);
     }
+  }
+
+  function plan() {
+    if (from && to) planRoute(from, to);
+  }
+
+  // --- Assistent-Aktionen ---
+  function onNavigate(dest: Place, opts: { preference?: string; avoid?: string[]; mode?: string }) {
+    setTo(dest);
+    if (opts.mode) setMode(opts.mode);
+    if (opts.preference) setPref(opts.preference);
+    if (from) planRoute(from, dest, opts);
+  }
+  function onUi(ui: NonNullable<AssistantAction['ui']>) {
+    if (ui.view) setViewMode(ui.view);
+    if (ui.threeD !== undefined) setThreeD(ui.threeD);
+    if (ui.streetView) setInteraction('streetview');
+  }
+  function onSetPref(opts: { preference?: string; avoid?: string[]; mode?: string }) {
+    if (opts.preference) setPref(opts.preference);
+    if (opts.mode) setMode(opts.mode);
+    if (from && to) planRoute(from, to, opts);
   }
 
   function onMapClick(ll: LonLat) {
@@ -192,6 +215,16 @@ export function App() {
         />
 
         {svLoc && <StreetView location={svLoc} token={MAPILLARY_TOKEN} onClose={() => setSvLoc(null)} />}
+
+        <Assistant
+          from={from}
+          to={to}
+          hasRoute={Boolean(resp)}
+          near={from?.center ?? to?.center}
+          onNavigate={onNavigate}
+          onUi={onUi}
+          onSetPref={onSetPref}
+        />
       </div>
     </div>
   );

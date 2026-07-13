@@ -41,6 +41,7 @@ export interface RouteOptions {
   waypoints: LonLat[];
   preference: RoutePreference;
   alternatives: number;
+  avoid?: string[]; // z.B. ['motorway'] für „ohne Autobahn"
 }
 
 export async function computeRoutes(opts: RouteOptions): Promise<Route[]> {
@@ -55,12 +56,17 @@ export async function computeRoutes(opts: RouteOptions): Promise<Route[]> {
 }
 
 async function viaValhalla(opts: RouteOptions): Promise<Route[]> {
-  const body = {
+  const costing = COSTING[opts.mode];
+  const body: Record<string, unknown> = {
     locations: opts.waypoints.map(([lon, lat]) => ({ lon, lat })),
-    costing: COSTING[opts.mode],
+    costing,
     alternates: Math.max(0, opts.alternatives - 1),
     directions_options: { units: 'kilometers', language: 'de-DE' },
   };
+  // „ohne Autobahn": Autobahnnutzung im Kostenmodell abwerten.
+  if (opts.avoid?.includes('motorway') && (costing === 'auto' || costing === 'bicycle')) {
+    body.costing_options = { [costing]: { use_highways: 0 } };
+  }
   const res = await fetchJson<ValhallaResponse>(
     'valhalla',
     `${config.upstreams.valhalla}/route`,

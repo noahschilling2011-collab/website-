@@ -10,6 +10,11 @@ const OSM_FILTER: Record<Exclude<PoiCategory, 'charging'>, string> = {
   restaurant: 'node["amenity"="restaurant"]',
   hotel: 'node["tourism"="hotel"]',
   parking: 'node["amenity"="parking"]',
+  attraction: 'node["tourism"="attraction"]',
+  viewpoint: 'node["tourism"="viewpoint"]',
+  cafe: 'node["amenity"="cafe"]',
+  supermarket: 'node["shop"="supermarket"]',
+  pharmacy: 'node["amenity"="pharmacy"]',
 };
 
 interface OverpassEl {

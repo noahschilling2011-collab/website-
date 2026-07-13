@@ -50,6 +50,59 @@ export function route(body: {
   preference: string;
   alternatives?: number;
   include?: string[];
+  avoid?: string[];
 }): Promise<RouteResponse> {
   return json('/v1/route', { method: 'POST', body: JSON.stringify(body) });
+}
+
+// --- Assistent ---
+export interface AssistantAction {
+  type: 'navigate' | 'search' | 'add_stop' | 'set_pref' | 'ui' | 'plan_trip' | 'briefing' | 'report' | 'none';
+  place?: Place;
+  destinationQuery?: string;
+  category?: string;
+  alongRoute?: boolean;
+  cheapest?: boolean;
+  avoid?: string[];
+  mode?: string;
+  preference?: string;
+  ui?: { view?: 'streets' | 'satellite'; threeD?: boolean; streetView?: boolean };
+  reportKind?: string;
+}
+export interface AssistantResult {
+  reply: string;
+  action: AssistantAction;
+}
+export interface AssistantContext {
+  near?: LonLat;
+  from?: Place;
+  to?: Place;
+  hasRoute?: boolean;
+}
+
+export function assistantCommand(text: string, context?: AssistantContext): Promise<AssistantResult> {
+  return json('/v1/assistant/command', { method: 'POST', body: JSON.stringify({ text, context }) });
+}
+
+export interface TripItem {
+  kind: string;
+  title: string;
+  etaMinutes: number;
+  note?: string;
+}
+export interface TripPlan {
+  summary: { distanceKm: number; drivingMinutes: number; stops: number };
+  items: TripItem[];
+}
+export function planTrip(waypoints: LonLat[], budget?: string): Promise<TripPlan> {
+  return json('/v1/trip/plan', { method: 'POST', body: JSON.stringify({ waypoints, budget }) });
+}
+
+export interface Briefing {
+  message: string;
+  leaveInMinutes: number | null;
+  etaMinutes: number;
+}
+export function briefing(from: Place, to: Place, arriveBy?: string): Promise<Briefing> {
+  return json('/v1/assistant/briefing', { method: 'POST', body: JSON.stringify({ from, to, arriveBy }) });
 }
