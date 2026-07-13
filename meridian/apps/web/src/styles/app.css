@@ -28,7 +28,32 @@ html, body, #root { height: 100%; margin: 0; }
 body { background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
 
 .app { display: flex; height: 100%; }
-.map { flex: 1; height: 100%; }
+.stage { flex: 1; position: relative; overflow: hidden; }
+.map { position: absolute; inset: 0; }
+
+/* Ansicht-Steuerung (schwebend über der Karte) */
+.mapctl { position: absolute; top: 14px; right: 14px; z-index: 3; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+.ctl-group { display: flex; background: var(--panel); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+.ctl { padding: 9px 14px; font-size: 13px; font-weight: 600; border: none; background: transparent; color: var(--text); cursor: pointer; }
+.ctl + .ctl { border-left: 1px solid var(--line); }
+.ctl.on { background: var(--accent); color: #fff; }
+.ctl.wide { padding: 9px 16px; }
+
+.hint { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 3;
+  background: var(--panel); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--line); border-radius: 20px; padding: 8px 16px; font-size: 13px; box-shadow: var(--shadow); }
+
+/* Street-View-Panel */
+.sv { position: absolute; left: 0; right: 0; bottom: 0; height: 46%; z-index: 4; background: #000; box-shadow: 0 -8px 30px rgba(0,0,0,0.4); }
+.sv-bar { position: absolute; top: 0; left: 0; right: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 14px; color: #fff; font-size: 13px; font-weight: 600; background: linear-gradient(rgba(0,0,0,0.55), transparent); }
+.sv-bar button { background: rgba(255,255,255,0.2); border: none; color: #fff; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 14px; }
+.sv-canvas { position: absolute; inset: 0; }
+.sv-msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center;
+  color: #fff; padding: 24px; font-size: 14px; line-height: 1.5; }
+.sv-msg a { color: #6cb6ff; }
+.sv-msg code { background: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 6px; }
 
 .panel {
   width: 380px;

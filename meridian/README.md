@@ -16,13 +16,13 @@ dokumentieren wir konkrete, einbindbare Datenquellen und APIs (siehe
 
 | Bereich | Umsetzung in Meridian |
 | --- | --- |
-| Eigene interaktive Weltkarte | MapLibre GL + Vektorkacheln aus OpenStreetMap (OpenMapTiles/Planetiler) |
+| Eigene interaktive Weltkarte | MapLibre GL + Vektorkacheln aus OpenStreetMap (Dev: OpenFreeMap ohne Key) ✅ |
 | Extrem präzises GPS | Client-Sensorfusion + Map-Matching (Valhalla `trace_attributes`), SBAS/RTK-fähig |
-| KI-Routenplanung (Auto/Rad/Fuß/ÖPNV) | Valhalla (multimodal) + OpenTripPlanner (GTFS) + KI-Reranking |
+| KI-Routenplanung (Auto/Rad/Fuß/ÖPNV) | Valhalla (multimodal) + OpenTripPlanner (GTFS) + KI-Reranking ✅ |
 | Echtzeit-Verkehr, Staus, Baustellen, Unfälle | Ingest-Pipeline für TomTom/HERE/MDM + eigenes Floating-Car-Data |
-| 3D-Städte & realistische Gebäude | OSM `building`+`height` Extrusion, optional Google Photorealistic 3D Tiles |
-| Satellitenansicht | Esri World Imagery / Sentinel-2 / MapTiler Satellite (Layer-Umschalter) |
-| Street-View-ähnlich | Mapillary (offene, crowdgesourcte Straßenbilder) |
+| 3D-Städte & realistische Gebäude | OSM `building`+`height`-Extrusion + Terrarium-Gelände, Kamera-Neigung ✅ |
+| Satellitenansicht | Esri World Imagery / Sentinel-2 / MapTiler Satellite (Layer-Umschalter) ✅ |
+| Street-View-ähnlich | Mapillary (offene Straßenbilder), Klick-auf-Karte-Viewer ✅ |
 | Offline-Karten | PMTiles/MBTiles-Regionen, MapLibre Offline, Routing-Tiles lokal |
 | Sprachsteuerung & -führung | STT (Whisper) → NLU (LLM) → Intent; TTS-Ansagen |
 | KI wählt schnellste/angenehmste Route | Learned-Ranking + LLM-Erklärung (`ai-router`) |
@@ -72,6 +72,14 @@ Das Gateway läuft **auch ohne** externe Routing/Geocoding-Dienste: Fehlt Valhal
 oder Photon, liefern die Services deterministische Fallback-Daten (Luftlinie,
 Demo-POIs), sodass die App sofort startklar ist. Für Produktionsdaten die in
 [`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md) beschriebenen Extrakte laden.
+
+### Karten-Ansichten im Web-Client
+Oben rechts auf der Karte: **Karte ⇄ Satellit**, **2D ⇄ 3D** (Gebäude-Extrusion +
+Gelände-Relief + Kamera-Neigung) und **Street View**. Basiskarte und 3D-Gebäude
+kommen im Dev-Modus schlüssellos von OpenFreeMap; Satellit von Esri World Imagery.
+Street View nutzt Mapillary — dafür einen kostenlosen Token in
+`apps/web/.env` (`VITE_MAPILLARY_TOKEN`) setzen; ohne Token bleiben Karte und 3D
+voll nutzbar. Konfiguration: [`apps/web/.env.example`](apps/web/.env.example).
 
 ## Dokumentation
 

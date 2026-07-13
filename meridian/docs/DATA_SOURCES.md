@@ -18,6 +18,12 @@ eingebunden wird**. Proprietäre Optionen sind als Upgrade markiert.
   ```
 - **Servieren:** [Martin](https://martin.maplibre.org) (Postgres/PMTiles) oder
   TileServer-GL. Client bezieht Kacheln direkt vom CDN.
+- **Ohne eigenes Setup (Dev):** [OpenFreeMap](https://openfreemap.org) liefert
+  fertige Vektorkacheln **kostenlos und ohne API-Key** (OpenMapTiles-Schema, inkl.
+  Gebäudehöhen für 3D). Der Web-Client nutzt das als Standard; für Produktion auf
+  den eigenen Tile-Server umstellen (`VITE_STREETS_STYLE=/v1/style/streets.json`).
+- **3D-Gelände:** Terrarium-DEM (Mapzen/Tilezen, AWS Open Data, kein Key) als
+  `raster-dem`-Quelle → MapLibre `setTerrain`. Im Web-Client bereits verdrahtet.
 
 ## 2. Satellitenansicht (Upgrade / offen)
 - **Offen:** **Sentinel-2** (ESA, Copernicus, kostenlos) über AWS Open Data oder

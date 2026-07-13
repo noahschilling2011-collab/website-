@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { MapView } from './components/MapView';
+import { MapView, type ViewMode } from './components/MapView';
+import { StreetView } from './components/StreetView';
 import { search, route as routeApi, type LonLat, type Place, type RouteResponse } from './lib/api';
 
 const MODES = [
@@ -15,6 +16,10 @@ const PREFS = [
   { id: 'scenic', label: 'Landschaft' },
 ];
 
+const MAPILLARY_TOKEN = import.meta.env.VITE_MAPILLARY_TOKEN as string | undefined;
+
+type Interaction = 'none' | 'from' | 'to' | 'streetview';
+
 function fmtDuration(s: number): string {
   const h = Math.floor(s / 3600);
   const m = Math.round((s % 3600) / 60);
@@ -27,8 +32,12 @@ export function App() {
   const [mode, setMode] = useState('auto');
   const [pref, setPref] = useState('fastest');
   const [resp, setResp] = useState<RouteResponse | undefined>();
-  const [picking, setPicking] = useState<'from' | 'to' | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const [interaction, setInteraction] = useState<Interaction>('none');
+  const [viewMode, setViewMode] = useState<ViewMode>('streets');
+  const [threeD, setThreeD] = useState(false);
+  const [svLoc, setSvLoc] = useState<LonLat | null>(null);
 
   async function plan() {
     if (!from || !to) return;
@@ -47,11 +56,25 @@ export function App() {
     }
   }
 
-  function onPick(ll: LonLat) {
-    const place: Place = { id: 'pin', name: `${ll[1].toFixed(4)}, ${ll[0].toFixed(4)}`, center: ll };
-    if (picking === 'from') setFrom(place);
-    else if (picking === 'to') setTo(place);
-    setPicking(null);
+  function onMapClick(ll: LonLat) {
+    if (interaction === 'from') {
+      setFrom({ id: 'pin', name: `${ll[1].toFixed(4)}, ${ll[0].toFixed(4)}`, center: ll });
+      setInteraction('none');
+    } else if (interaction === 'to') {
+      setTo({ id: 'pin', name: `${ll[1].toFixed(4)}, ${ll[0].toFixed(4)}`, center: ll });
+      setInteraction('none');
+    } else if (interaction === 'streetview') {
+      setSvLoc(ll); // Modus bleibt aktiv → weitere Punkte anklickbar
+    }
+  }
+
+  function toggleStreetView() {
+    if (interaction === 'streetview') {
+      setInteraction('none');
+      setSvLoc(null);
+    } else {
+      setInteraction('streetview');
+    }
   }
 
   const rec = resp?.routes[resp.recommended];
@@ -63,8 +86,8 @@ export function App() {
           <span className="logo">◎</span> Meridian
         </header>
 
-        <PlaceField label="Start" value={from} onSelect={setFrom} onPin={() => setPicking('from')} active={picking === 'from'} />
-        <PlaceField label="Ziel" value={to} onSelect={setTo} onPin={() => setPicking('to')} active={picking === 'to'} />
+        <PlaceField label="Start" value={from} onSelect={setFrom} onPin={() => setInteraction('from')} active={interaction === 'from'} />
+        <PlaceField label="Ziel" value={to} onSelect={setTo} onPin={() => setInteraction('to')} active={interaction === 'to'} />
 
         <div className="segment">
           {MODES.map((m) => (
@@ -133,10 +156,43 @@ export function App() {
           </div>
         )}
 
-        <footer className="attrib">© OpenStreetMap-Mitwirkende · Meridian</footer>
+        <footer className="attrib">© OpenStreetMap-Mitwirkende · 3D-Gebäude © OSM · Bilder © Mapillary/Esri</footer>
       </div>
 
-      <MapView from={from?.center} to={to?.center} route={rec} onPick={onPick} />
+      <div className="stage">
+        {/* Ansicht-Steuerung */}
+        <div className="mapctl">
+          <div className="ctl-group">
+            <button className={viewMode === 'streets' ? 'ctl on' : 'ctl'} onClick={() => setViewMode('streets')}>Karte</button>
+            <button className={viewMode === 'satellite' ? 'ctl on' : 'ctl'} onClick={() => setViewMode('satellite')}>Satellit</button>
+          </div>
+          <div className="ctl-group">
+            <button className={!threeD ? 'ctl on' : 'ctl'} onClick={() => setThreeD(false)}>2D</button>
+            <button className={threeD ? 'ctl on' : 'ctl'} onClick={() => setThreeD(true)}>3D</button>
+          </div>
+          <div className="ctl-group">
+            <button className={interaction === 'streetview' ? 'ctl on wide' : 'ctl wide'} onClick={toggleStreetView}>
+              👁 Street View
+            </button>
+          </div>
+        </div>
+
+        {interaction === 'streetview' && !svLoc && (
+          <div className="hint">Auf die Karte tippen, um dort ins Street View zu schauen.</div>
+        )}
+
+        <MapView
+          from={from?.center}
+          to={to?.center}
+          route={rec}
+          viewMode={viewMode}
+          threeD={threeD}
+          mapillaryToken={MAPILLARY_TOKEN}
+          onMapClick={onMapClick}
+        />
+
+        {svLoc && <StreetView location={svLoc} token={MAPILLARY_TOKEN} onClose={() => setSvLoc(null)} />}
+      </div>
     </div>
   );
 }
@@ -172,11 +228,7 @@ function PlaceField({
     <div className="field">
       <label>{label}</label>
       <div className="field-row">
-        <input
-          placeholder={value?.name ?? 'Ort suchen …'}
-          value={q}
-          onChange={(e) => onChange(e.target.value)}
-        />
+        <input placeholder={value?.name ?? 'Ort suchen …'} value={q} onChange={(e) => onChange(e.target.value)} />
         <button className={active ? 'pin on' : 'pin'} title="Auf Karte wählen" onClick={onPin}>
           📍
         </button>
