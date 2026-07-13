@@ -34,10 +34,13 @@ Unser ESP32 fragt so eine Datenbank ab: **[api.adsb.lol](https://api.adsb.lol)**
 — kostenlos, ohne Anmeldung, ohne API-Key. Die Abfrage lautet einfach:
 
 ```
-https://api.adsb.lol/v2/point/<Breitengrad>/<Längengrad>/<Radius in NM>
+https://api.adsb.lol/v2/lat/<Breitengrad>/lon/<Längengrad>/dist/<Radius in NM>
 ```
 
-Zurück kommt eine JSON-Liste aller Flugzeuge im Umkreis. Die rechnen wir in
+Zum Ausprobieren im Browser (Beispiel Leipzig, 40 NM):
+<https://api.adsb.lol/v2/lat/51.3397/lon/12.3731/dist/40>
+
+Zurück kommt eine JSON-Liste (Feld `ac`) aller Flugzeuge im Umkreis. Die rechnen wir in
 Bildschirm-Koordinaten um und zeichnen sie aufs Radar. Geheimagenten-Mathe:
 
 - 1 Breitengrad ≈ 110,6 km (Nord/Süd)

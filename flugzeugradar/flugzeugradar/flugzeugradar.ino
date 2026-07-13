@@ -153,9 +153,10 @@ void loop() {
 bool holeFlugdaten() {
   if (WiFi.status() != WL_CONNECTED) return false;
 
-  // Web-Adresse zusammenbauen: Position + Radius
+  // Web-Adresse zusammenbauen: .../v2/lat/<LAT>/lon/<LON>/dist/<NM>
+  // (offizielles adsb.lol-Format, gibt alle Flugzeuge im Umkreis zurueck)
   char url[128];
-  snprintf(url, sizeof(url), "https://api.adsb.lol/v2/point/%.4f/%.4f/%d",
+  snprintf(url, sizeof(url), "https://api.adsb.lol/v2/lat/%.4f/lon/%.4f/dist/%d",
            (double)HOME_LAT, (double)HOME_LON, (int)RADAR_RADIUS_NM);
   Serial.println(String("Frage ab: ") + url);
 
@@ -165,7 +166,9 @@ bool holeFlugdaten() {
   HTTPClient http;
   http.useHTTP10(true);   // wichtig, damit wir die Antwort als Strom lesen koennen
   http.setTimeout(10000);
+  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
   if (!http.begin(client, url)) return false;
+  http.setUserAgent("Flugzeugradar-ESP32/1.0");  // manche Server verlangen einen
 
   int code = http.GET();
   if (code != 200) {
