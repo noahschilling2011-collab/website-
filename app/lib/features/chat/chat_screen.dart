@@ -50,6 +50,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
 
     return Scaffold(
+      drawer: const _HistoryDrawer(),
       appBar: AppBar(
         title: const Text('KI-Chat'),
         actions: [
@@ -126,6 +127,48 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _HistoryDrawer extends ConsumerWidget {
+  const _HistoryDrawer();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final conversations = ref.watch(conversationsProvider);
+    return Drawer(
+      child: SafeArea(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Padding(
+            padding: const EdgeInsets.all(NexusTokens.s4),
+            child: Text('Verlauf', style: Theme.of(context).textTheme.titleLarge),
+          ),
+          Expanded(
+            child: conversations.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('$e')),
+              data: (items) => items.isEmpty
+                  ? const Center(child: Text('Noch keine Unterhaltungen'))
+                  : ListView.builder(
+                      itemCount: items.length,
+                      itemBuilder: (context, i) {
+                        final c = items[i];
+                        return ListTile(
+                          leading: const Icon(Icons.chat_bubble_outline),
+                          title: Text(c.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          subtitle: Text(c.provider),
+                          onTap: () {
+                            Navigator.pop(context);
+                            ref.read(chatControllerProvider.notifier).loadConversation(c.id, c.provider);
+                          },
+                        );
+                      },
+                    ),
+            ),
+          ),
+        ]),
       ),
     );
   }

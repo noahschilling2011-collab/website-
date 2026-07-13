@@ -34,6 +34,10 @@ Alle Endpunkte außer `/api/auth/*` und `/health` erfordern
 | POST | `/documents/write` | `{topic, kind, language?, tone?, length?}` → `{document}` (Markdown) |
 | POST | `/presentations` | `{topic, slideCount?}` → `{presentation: {title, slides[]}}` |
 | POST | `/mindmaps` | `{topic}` → `{mindmap: {label, children[]}}` |
+| POST | `/code` | `{action: explain\|fix\|refactor\|generate\|review\|test, instruction, code?, language?}` → `{result}` — KI-Code-Assistent |
+| POST | `/summarize/pdf` | multipart (`file` = PDF) → `{summary, characters}` — echte Textextraktion + Zusammenfassung |
+| POST | `/ocr` | multipart (`file` = PNG/JPEG/WebP/GIF) → `{text}` — Texterkennung inkl. Handschrift |
+| POST | `/transcribe` | multipart (`file` = Audio, `language?`) → `{text}` — Whisper-Transkription (Sprachchat) |
 | POST | `/media/image` · `/media/video` · `/media/music` | `{prompt}` → `202 {job}` |
 | GET | `/jobs/:id` | Job-Status: `queued → running → done/failed`, `output.url` |
 
@@ -57,7 +61,15 @@ Rollen: `owner > admin > editor > member > viewer`.
 - `GET/PATCH /api/users/me`, `POST /api/users/me/devices` (Push-Token, FCM)
 - `POST /api/analytics/events` — `{name, properties?}`
 - Admin (Rolle `admin`): `GET /api/admin/dashboard`, `GET /api/admin/users?q=`,
-  `PATCH /api/admin/users/:id/role`, `GET /api/admin/audit`
+  `PATCH /api/admin/users/:id/role`, `GET /api/admin/audit`,
+  `POST /api/admin/notify` (`{title, body, userId?}` — Push an einen oder alle Nutzer)
+
+## Push-Benachrichtigungen
+
+FCM HTTP v1: `FCM_SERVICE_ACCOUNT_JSON` mit dem Service-Account-Key setzen.
+Geräte registrieren sich über `POST /api/users/me/devices`. Automatische
+Pushes: Aufgaben-Zuweisung an andere Nutzer; manuell über `/api/admin/notify`.
+Ungültige Tokens werden automatisch aus `devices` entfernt.
 
 ## GraphQL — `POST /graphql`
 

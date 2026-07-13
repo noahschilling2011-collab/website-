@@ -9,6 +9,7 @@ import { asyncHandler } from '../../utils/asyncHandler.js';
 import { requireAdmin, requireAuth } from '../../middleware/auth.js';
 import { validateBody } from '../../middleware/validate.js';
 import { AppError } from '../../utils/errors.js';
+import { pushConfigured, sendPushToUser } from '../notifications/push.service.js';
 
 export const analyticsRouter = Router();
 analyticsRouter.use(requireAuth);
@@ -73,4 +74,19 @@ adminRouter.patch('/users/:id/role', validateBody(z.object({ role: z.enum(['user
 
 adminRouter.get('/audit', asyncHandler(async (_req, res) => {
   res.json({ entries: await query('SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 500') });
+}));
+
+/** Sends a push notification to one user or (userId omitted) to everyone with a device. */
+adminRouter.post('/notify', validateBody(z.object({
+  userId: z.string().uuid().optional(),
+  title: z.string().min(1).max(200),
+  body: z.string().min(1).max(1000),
+})), asyncHandler(async (req, res) => {
+  if (!pushConfigured()) throw AppError.badRequest('FCM_SERVICE_ACCOUNT_JSON not configured', 'push_unconfigured');
+  const targets = req.body.userId
+    ? [{ user_id: req.body.userId }]
+    : await query<{ user_id: string }>('SELECT DISTINCT user_id FROM devices');
+  await Promise.all(targets.map((t) =>
+    sendPushToUser(t.user_id, { title: req.body.title, body: req.body.body })));
+  res.json({ sent: targets.length });
 }));

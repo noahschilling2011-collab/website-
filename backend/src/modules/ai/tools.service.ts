@@ -20,7 +20,21 @@ async function run(provider: ProviderName | undefined, system: string, user: str
   return result.content;
 }
 
-/** Fetches a web page and strips tags to plain text (best effort, no headless browser). */
+/** Strips HTML to readable plain text (best effort, no headless browser). */
+export function stripHtml(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Fetches a web page and strips tags to plain text. */
 export async function fetchPageText(url: string): Promise<string> {
   let parsed: URL;
   try {
@@ -31,13 +45,7 @@ export async function fetchPageText(url: string): Promise<string> {
   if (!['http:', 'https:'].includes(parsed.protocol)) throw AppError.badRequest('Only http(s) URLs allowed');
   const res = await fetch(parsed, { headers: { 'user-agent': 'NexusAI/1.0 (+summarizer)' } });
   if (!res.ok) throw new AppError(502, 'fetch_failed', `Fetch failed: ${res.status}`);
-  const html = await res.text();
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return stripHtml(await res.text());
 }
 
 export async function summarizeUrl(url: string, provider?: ProviderName, language = 'de'): Promise<string> {
@@ -101,7 +109,29 @@ export async function createMindmap(topic: string, provider?: ProviderName, lang
   return parseJson(raw);
 }
 
-function parseJson<T>(raw: string): T {
+export type CodeAction = 'explain' | 'fix' | 'refactor' | 'generate' | 'review' | 'test';
+
+/** AI code assistant used by the in-app code editor. */
+export async function codeAssist(
+  input: { code?: string; instruction: string; language?: string; action: CodeAction },
+  provider?: ProviderName,
+): Promise<string> {
+  const lang = input.language ?? 'auto-detect';
+  const systemByAction: Record<CodeAction, string> = {
+    explain: `Explain the given ${lang} code clearly and concisely in the user's language. Structure: purpose, how it works, pitfalls.`,
+    fix: `Fix bugs in the given ${lang} code. Output the corrected code in a fenced block, then a short list of what was wrong.`,
+    refactor: `Refactor the given ${lang} code for readability and performance without changing behavior. Output the refactored code in a fenced block, then a summary of changes.`,
+    generate: `Write ${lang} code for the user's request. Output production-quality code in a fenced block with brief usage notes.`,
+    review: `Review the given ${lang} code like a senior engineer: correctness, security, performance, style. Ordered by severity.`,
+    test: `Write thorough unit tests for the given ${lang} code using the ecosystem's standard test framework. Output only the test code in a fenced block.`,
+  };
+  const user = input.code
+    ? `${input.instruction}\n\n\`\`\`${input.language ?? ''}\n${input.code}\n\`\`\``
+    : input.instruction;
+  return run(provider, systemByAction[input.action], user);
+}
+
+export function parseJson<T>(raw: string): T {
   const cleaned = raw.replace(/^```(json)?/m, '').replace(/```\s*$/m, '').trim();
   try {
     return JSON.parse(cleaned) as T;

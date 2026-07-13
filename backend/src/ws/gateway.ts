@@ -3,11 +3,13 @@
  * token and join a per-user room; CRUD services publish sync events so
  * every device of a user stays consistent (cloud sync / offline queue).
  *
- * Horizontal scaling: attach the Redis adapter (socket.io/redis-adapter)
- * so events reach users connected to other pods.
+ * Horizontal scaling: when Redis is reachable, the Redis adapter is
+ * attached so events reach users connected to other pods.
  */
 import type { Server as HttpServer } from 'node:http';
 import { Server } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
+import { redis } from '../db/redis.js';
 import { verifyAccessToken } from '../middleware/auth.js';
 import { logger } from '../utils/logger.js';
 
@@ -18,6 +20,15 @@ export function initWebSocket(httpServer: HttpServer): Server {
     cors: { origin: '*' },
     path: '/ws',
   });
+
+  if (redis.status === 'ready' || redis.status === 'connecting' || redis.status === 'connect') {
+    const pubClient = redis.duplicate();
+    const subClient = redis.duplicate();
+    io.adapter(createAdapter(pubClient, subClient));
+    logger.info('Socket.IO Redis adapter attached (multi-pod fan-out enabled)');
+  } else {
+    logger.warn('Redis not connected — Socket.IO running single-node only');
+  }
 
   io.use((socket, next) => {
     try {

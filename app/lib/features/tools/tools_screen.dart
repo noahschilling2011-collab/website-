@@ -1,5 +1,7 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/providers.dart';
 import '../../core/theme/tokens.dart';
@@ -15,11 +17,15 @@ class ToolsScreen extends ConsumerWidget {
     final tools = <_Tool>[
       _Tool('Webseite zusammenfassen', Icons.language, _promptKind.url, '/api/ai/summarize/url', 'summary'),
       _Tool('YouTube analysieren', Icons.play_circle_outline, _promptKind.url, '/api/ai/summarize/youtube', 'summary'),
-      _Tool('Text/PDF zusammenfassen', Icons.description_outlined, _promptKind.longText, '/api/ai/summarize/text', 'summary'),
+      _Tool('Text zusammenfassen', Icons.description_outlined, _promptKind.longText, '/api/ai/summarize/text', 'summary'),
+      _Tool('PDF analysieren', Icons.picture_as_pdf_outlined, _promptKind.uploadPdf, '/api/ai/summarize/pdf', 'summary'),
+      _Tool('OCR: Bild → Text', Icons.document_scanner_outlined, _promptKind.uploadImage, '/api/ai/ocr', 'text'),
+      _Tool('Audio transkribieren', Icons.mic_outlined, _promptKind.uploadAudio, '/api/ai/transcribe', 'text'),
       _Tool('Übersetzen', Icons.translate, _promptKind.translate, '/api/ai/translate', 'translation'),
       _Tool('Dokument schreiben', Icons.edit_note, _promptKind.document, '/api/ai/documents/write', 'document'),
       _Tool('Präsentation erstellen', Icons.co_present_outlined, _promptKind.topic, '/api/ai/presentations', 'presentation'),
       _Tool('Mindmap generieren', Icons.account_tree_outlined, _promptKind.topic, '/api/ai/mindmaps', 'mindmap'),
+      _Tool('Code-Editor & KI-Assistent', Icons.code, _promptKind.navigateCode, '', ''),
       _Tool('Bild generieren', Icons.image_outlined, _promptKind.media, '/api/ai/media/image', 'job'),
       _Tool('Video generieren', Icons.movie_outlined, _promptKind.media, '/api/ai/media/video', 'job'),
       _Tool('Musik generieren', Icons.music_note_outlined, _promptKind.media, '/api/ai/media/music', 'job'),
@@ -42,7 +48,7 @@ class ToolsScreen extends ConsumerWidget {
   }
 }
 
-enum _promptKind { url, longText, translate, document, topic, media }
+enum _promptKind { url, longText, translate, document, topic, media, uploadPdf, uploadImage, uploadAudio, navigateCode }
 
 class _Tool {
   const _Tool(this.title, this.icon, this.kind, this.endpoint, this.resultKey);
@@ -58,7 +64,71 @@ class _ToolCard extends ConsumerWidget {
 
   final _Tool tool;
 
+  static const _uploadKinds = {_promptKind.uploadPdf, _promptKind.uploadImage, _promptKind.uploadAudio};
+
+  Future<void> _runUpload(BuildContext context, WidgetRef ref) async {
+    final picked = await FilePicker.platform.pickFiles(
+      withData: true,
+      type: switch (tool.kind) {
+        _promptKind.uploadPdf => FileType.custom,
+        _promptKind.uploadImage => FileType.image,
+        _ => FileType.custom,
+      },
+      allowedExtensions: switch (tool.kind) {
+        _promptKind.uploadPdf => ['pdf'],
+        _promptKind.uploadAudio => ['mp3', 'm4a', 'wav', 'webm', 'ogg'],
+        _ => null,
+      },
+    );
+    final file = picked?.files.firstOrNull;
+    if (file == null || file.bytes == null || !context.mounted) return;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    String result;
+    try {
+      final res = await ref
+          .read(apiClientProvider)
+          .postMultipart(tool.endpoint, bytes: file.bytes!, filename: file.name);
+      final value = res[tool.resultKey];
+      result = value is String ? value : value.toString();
+    } catch (e) {
+      result = 'Fehler: $e';
+    }
+    if (!context.mounted) return;
+    Navigator.pop(context);
+    _showResult(context, result);
+  }
+
+  void _showResult(BuildContext context, String result) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        builder: (context, scroll) => SingleChildScrollView(
+          controller: scroll,
+          padding: const EdgeInsets.all(NexusTokens.s5),
+          child: SelectableText(result),
+        ),
+      ),
+    );
+  }
+
   Future<void> _run(BuildContext context, WidgetRef ref) async {
+    if (tool.kind == _promptKind.navigateCode) {
+      context.go('/tools/code');
+      return;
+    }
+    if (_uploadKinds.contains(tool.kind)) {
+      await _runUpload(context, ref);
+      return;
+    }
     final input = TextEditingController();
     final extra = TextEditingController();
     final confirmed = await showDialog<bool>(
@@ -78,7 +148,7 @@ class _ToolCard extends ConsumerWidget {
                 _promptKind.translate => 'Text',
                 _promptKind.document => 'Thema / Auftrag',
                 _promptKind.topic => 'Thema',
-                _promptKind.media => 'Prompt',
+                _ => 'Prompt',
               },
             ),
           ),
@@ -105,7 +175,7 @@ class _ToolCard extends ConsumerWidget {
       _promptKind.translate => {'text': input.text, 'targetLanguage': extra.text.trim()},
       _promptKind.document => {'topic': input.text, 'kind': extra.text.trim().isEmpty ? 'Dokument' : extra.text.trim()},
       _promptKind.topic => {'topic': input.text},
-      _promptKind.media => {'prompt': input.text},
+      _ => {'prompt': input.text},
     };
 
     showDialog<void>(
@@ -123,20 +193,7 @@ class _ToolCard extends ConsumerWidget {
     }
     if (!context.mounted) return;
     Navigator.pop(context); // close spinner
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.6,
-        builder: (context, scroll) => SingleChildScrollView(
-          controller: scroll,
-          padding: const EdgeInsets.all(NexusTokens.s5),
-          child: SelectableText(result),
-        ),
-      ),
-    );
+    _showResult(context, result);
   }
 
   @override

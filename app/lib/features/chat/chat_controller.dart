@@ -63,6 +63,7 @@ class ChatController extends Notifier<ChatState> {
         final res = await api.post('/api/ai/conversations', {'provider': state.provider});
         conversationId = (res['conversation'] as Map)['id'] as String;
         state = state.copyWith(conversationId: conversationId);
+        ref.invalidate(conversationsProvider);
       }
 
       state = state.copyWith(
@@ -89,6 +90,36 @@ class ChatController extends Notifier<ChatState> {
   }
 
   void newConversation() => state = ChatState(provider: state.provider);
+
+  /// Opens an existing conversation from the history list.
+  Future<void> loadConversation(String id, String provider) async {
+    final api = ref.read(apiClientProvider);
+    final res = await api.get('/api/ai/conversations/$id/messages');
+    final messages = (res['messages'] as List)
+        .cast<Map<String, dynamic>>()
+        .map((m) => ChatMessage(role: m['role'] as String, content: m['content'] as String))
+        .toList();
+    state = ChatState(conversationId: id, provider: provider, messages: messages);
+  }
 }
 
 final chatControllerProvider = NotifierProvider<ChatController, ChatState>(ChatController.new);
+
+class ConversationSummary {
+  const ConversationSummary({required this.id, required this.title, required this.provider});
+
+  final String id;
+  final String title;
+  final String provider;
+}
+
+/// History list for the chat drawer.
+final conversationsProvider = FutureProvider<List<ConversationSummary>>((ref) async {
+  final res = await ref.watch(apiClientProvider).get('/api/ai/conversations');
+  return (res['conversations'] as List).cast<Map<String, dynamic>>().map((c) =>
+      ConversationSummary(
+        id: c['id'] as String,
+        title: c['title'] as String,
+        provider: c['provider'] as String,
+      )).toList();
+});

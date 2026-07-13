@@ -6,6 +6,18 @@ import { requireAuth } from '../../middleware/auth.js';
 import { validateBody } from '../../middleware/validate.js';
 import { AppError } from '../../utils/errors.js';
 import { publishToUser } from '../../ws/gateway.js';
+import { sendPushToUser } from '../notifications/push.service.js';
+import { logger } from '../../utils/logger.js';
+
+/** Notify an assignee (other than the actor) about their new task. */
+function notifyAssignee(actorId: string, task: { assignee_id?: string | null; title?: string }): void {
+  const assignee = task.assignee_id;
+  if (!assignee || assignee === actorId) return;
+  void sendPushToUser(assignee, {
+    title: 'Neue Aufgabe für dich',
+    body: task.title ?? 'Dir wurde eine Aufgabe zugewiesen',
+  }).catch((err) => logger.warn({ err: (err as Error).message }, 'Task push failed'));
+}
 
 const taskSchema = z.object({
   title: z.string().min(1).max(500),
@@ -39,6 +51,7 @@ tasksRouter.post('/', validateBody(taskSchema), asyncHandler(async (req, res) =>
       b.priority ?? null, b.dueAt ?? null, b.assigneeId ?? null],
   );
   publishToUser(req.user!.id, 'task.created', task);
+  notifyAssignee(req.user!.id, task as { assignee_id?: string | null; title?: string });
   res.status(201).json({ task });
 }));
 
@@ -58,6 +71,7 @@ tasksRouter.patch('/:id', validateBody(taskSchema.partial()), asyncHandler(async
   );
   if (!task) throw AppError.notFound('Task not found');
   publishToUser(req.user!.id, 'task.updated', task);
+  if (b.assigneeId) notifyAssignee(req.user!.id, task as { assignee_id?: string | null; title?: string });
   res.json({ task });
 }));
 

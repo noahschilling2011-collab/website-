@@ -1,13 +1,23 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { z } from 'zod';
 import * as chat from './chat.service.js';
 import * as tools from './tools.service.js';
 import * as media from './media.service.js';
+import { transcribeAudio } from './speech.service.js';
+import { ocrImage } from './ocr.service.js';
+import { extractPdfText } from './pdf.service.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { requireAuth } from '../../middleware/auth.js';
 import { validateBody } from '../../middleware/validate.js';
 import { rateLimit } from '../../middleware/rateLimit.js';
+import { AppError } from '../../utils/errors.js';
 import type { ProviderName } from './providers/index.js';
+
+const memoryUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 },
+});
 
 export const aiRouter = Router();
 aiRouter.use(requireAuth);
@@ -102,6 +112,42 @@ aiRouter.post('/mindmaps',
   asyncHandler(async (req, res) => {
     res.json({ mindmap: await tools.createMindmap(req.body.topic, req.body.provider, req.body.language) });
   }));
+
+aiRouter.post('/code',
+  validateBody(z.object({
+    instruction: z.string().min(1).max(10_000),
+    code: z.string().max(200_000).optional(),
+    language: z.string().max(50).optional(),
+    action: z.enum(['explain', 'fix', 'refactor', 'generate', 'review', 'test']),
+    provider: providerSchema,
+  })),
+  asyncHandler(async (req, res) => {
+    const { provider, ...input } = req.body;
+    res.json({ result: await tools.codeAssist(input, provider) });
+  }));
+
+// ---------- Uploads: PDF, OCR, Speech ----------
+
+/** PDF analysieren: extract text, then summarize. Field name: "file". */
+aiRouter.post('/summarize/pdf', memoryUpload.single('file'), asyncHandler(async (req, res) => {
+  if (!req.file) throw AppError.badRequest('No file uploaded (field name: "file")');
+  const text = await extractPdfText(req.file.buffer);
+  const language = typeof req.body.language === 'string' ? req.body.language : undefined;
+  res.json({ summary: await tools.summarizeText(text, undefined, language), characters: text.length });
+}));
+
+/** OCR: extract text from an image (photo, scan, screenshot). Field name: "file". */
+aiRouter.post('/ocr', memoryUpload.single('file'), asyncHandler(async (req, res) => {
+  if (!req.file) throw AppError.badRequest('No file uploaded (field name: "file")');
+  res.json(await ocrImage(req.file.buffer, req.file.mimetype));
+}));
+
+/** Speech-to-text (voice chat transcription). Field name: "file". */
+aiRouter.post('/transcribe', memoryUpload.single('file'), asyncHandler(async (req, res) => {
+  if (!req.file) throw AppError.badRequest('No file uploaded (field name: "file")');
+  const language = typeof req.body.language === 'string' ? req.body.language : undefined;
+  res.json(await transcribeAudio(req.file.buffer, req.file.originalname, language));
+}));
 
 // ---------- Media generation ----------
 

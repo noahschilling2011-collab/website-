@@ -58,16 +58,21 @@ Die API-Basis-URL wird per `--dart-define=API_BASE_URL=http://localhost:8080` ge
 | Bild-/Video-/Musik-Generierung | ✅ API-Anbindung | `backend/src/modules/ai/media` |
 | Dateimanager & Cloud-Sync | ✅ implementiert | `backend/src/modules/files` |
 | Analytics-Dashboard & Admin-Panel-API | ✅ implementiert | `backend/src/modules/analytics`, `admin` |
+| OCR (Bild → Text, inkl. Handschrift) | ✅ implementiert | `backend/src/modules/ai/ocr.service.ts` |
+| Audio-Transkription (Whisper, Sprachchat-Basis) | ✅ implementiert | `backend/src/modules/ai/speech.service.ts` |
+| PDF-Analyse mit echter Textextraktion | ✅ implementiert | `backend/src/modules/ai/pdf.service.ts` |
+| Code-Editor mit Syntax-Highlighting + KI-Assistent | ✅ implementiert | `app/lib/features/code`, `POST /api/ai/code` |
+| Push-Benachrichtigungen (FCM HTTP v1) | ✅ implementiert | `backend/src/modules/notifications` |
+| Auto-Token-Refresh & Chat-Verlauf in der App | ✅ implementiert | `app/lib/core/network`, `app/lib/features/chat` |
 | WebSockets (Echtzeit-Sync, Präsenz) | ✅ implementiert | `backend/src/ws` |
 | Dark/Light Mode, Material 3 + iOS-Design | ✅ implementiert | `app/lib/core/theme` |
 | Offline-Modus (lokaler Cache + Sync-Queue) | ✅ implementiert | `app/lib/core/storage` |
 
-### Roadmap (Grundgerüst vorhanden, Feature noch nicht implementiert)
+### Roadmap (noch nicht implementiert)
 
-Sprachchat mit Echtzeit-Transkription, OCR, Bildschirmaufnahme,
-Code-Editor mit Live-Vorschau, Home-Screen-Widgets sowie der serverseitige
-Push-Versand (FCM) sind als Datenmodell/Job-Typen bzw. Endpunkt-Hooks
-vorbereitet (`ai_jobs.kind`, `devices`-Tabelle), aber noch nicht umgesetzt.
+Audio-*Aufnahme*-UI in der App (die Transkriptions-API ist fertig,
+Audiodateien lassen sich bereits hochladen), Bildschirmaufnahme,
+Live-Vorschau für HTML/CSS/JS im Code-Editor sowie Home-Screen-Widgets.
 
 Details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/API.md`](docs/API.md), [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md), [`docs/SETUP.md`](docs/SETUP.md), [`docs/SCALING.md`](docs/SCALING.md).
 
