@@ -67,8 +67,9 @@ body { background: var(--bg); color: var(--text); -webkit-font-smoothing: antial
   z-index: 2;
 }
 
-.brand { display: flex; align-items: center; gap: 8px; font-size: 22px; font-weight: 700; margin: 4px 0 18px; letter-spacing: -0.02em; }
+.brand { display: flex; align-items: center; justify-content: space-between; font-size: 22px; font-weight: 700; margin: 4px 0 18px; letter-spacing: -0.02em; }
 .logo { color: var(--accent); font-size: 26px; }
+.account-btn { font-size: 14px; font-weight: 600; padding: 7px 12px; border-radius: 20px; border: 1px solid var(--line); background: var(--bg); color: var(--accent); cursor: pointer; }
 
 .field { margin-bottom: 10px; }
 .field label { font-size: 12px; color: var(--muted); font-weight: 600; margin-left: 4px; }
@@ -148,3 +149,53 @@ body { background: var(--bg); color: var(--text); -webkit-font-smoothing: antial
 .as-send { background: var(--accent); color: #fff; }
 .as-send:disabled { opacity: 0.4; cursor: default; }
 @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+
+/* --- Konto-Modal --- */
+.modal-backdrop { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,0.4); backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center; padding: 20px; }
+.modal { width: 440px; max-width: 100%; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); }
+.modal-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 18px; border-bottom: 1px solid var(--line); font-size: 17px; }
+.modal-head button { background: none; border: none; font-size: 16px; color: var(--muted); cursor: pointer; }
+.modal-body { padding: 18px; overflow-y: auto; }
+.modal-body input { width: 100%; padding: 12px 14px; margin-bottom: 10px; font-size: 15px; color: var(--text);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; outline: none; }
+.modal-body input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.modal-body button.primary { width: 100%; padding: 13px; font-size: 15px; font-weight: 600; color: #fff; background: var(--accent); border: none; border-radius: 12px; cursor: pointer; }
+.modal-body button.primary:disabled { opacity: 0.45; }
+.modal-body button.ghost { width: 100%; padding: 11px; margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--accent); background: transparent; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
+.modal-body button.danger { width: 100%; padding: 11px; margin-top: 8px; font-size: 14px; font-weight: 600; color: #ff3b30; background: transparent; border: 1px solid rgba(255,59,48,0.4); border-radius: 12px; cursor: pointer; }
+.tabs, .acct-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.tabs button, .acct-tabs button { flex: 1; padding: 9px; font-size: 13px; font-weight: 600; border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 10px; cursor: pointer; }
+.tabs button.on, .acct-tabs button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.oauth { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.oauth button { padding: 11px; font-size: 14px; font-weight: 600; border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 12px; cursor: pointer; }
+.divider { text-align: center; border-top: 1px solid var(--line); margin: 6px 0 14px; }
+.divider span { position: relative; top: -11px; background: var(--bg); padding: 0 10px; font-size: 12px; color: var(--muted); }
+.err { color: #ff3b30; font-size: 13px; margin-bottom: 10px; }
+.profile-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.avatar { width: 52px; height: 52px; border-radius: 50%; color: #fff; font-size: 22px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.pname { font-size: 17px; font-weight: 700; }
+.pmail { font-size: 13px; color: var(--muted); }
+.tabpane { display: flex; flex-direction: column; }
+.tabpane label { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+.tabpane h4 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 18px 0 8px; }
+.small { font-size: 12px; }
+.dim { color: var(--muted); }
+.row2 { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.pill { font-size: 11px; padding: 3px 9px; border-radius: 12px; background: var(--line); color: var(--muted); }
+.pill.on { background: rgba(48,209,88,0.18); color: #30d158; }
+.switch { width: 46px; height: 28px; border-radius: 16px; border: none; background: var(--line); position: relative; cursor: pointer; }
+.switch.on { background: #30d158; }
+.switch .knob { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform 0.15s; }
+.switch.on .knob { transform: translateX(18px); }
+.secret { display: block; padding: 10px; margin: 8px 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font-family: monospace; font-size: 14px; letter-spacing: 1px; word-break: break-all; }
+.codes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.codes code { padding: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; font-size: 13px; text-align: center; }
+.log { list-style: none; padding: 0; margin: 0; }
+.log li { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.log em { color: var(--muted); font-style: normal; font-size: 12px; }
+.device { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.device em { display: block; color: var(--muted); font-style: normal; font-size: 12px; margin-top: 2px; }
+.ghost.sm { width: auto; padding: 7px 12px; margin: 0; font-size: 13px; }
+.logout { margin-top: 16px; }

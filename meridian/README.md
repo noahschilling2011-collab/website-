@@ -81,6 +81,17 @@ Street View nutzt Mapillary — dafür einen kostenlosen Token in
 `apps/web/.env` (`VITE_MAPILLARY_TOKEN`) setzen; ohne Token bleiben Karte und 3D
 voll nutzbar. Konfiguration: [`apps/web/.env.example`](apps/web/.env.example).
 
+### Konto & Sicherheit
+Oben im Panel: **Anmelden**. Vollständiges Konto-System mit E-Mail/Passwort
+(scrypt), **Social Login** (Google/Apple/Microsoft, config-gated), **2FA (TOTP)** mit
+Backup-Codes, **Passkey/WebAuthn-Flow**, **Geräteverwaltung** mit Fern-Abmeldung,
+Auto-Sperre nach Fehlversuchen, **Login-Warnung bei neuem Gerät**, rotierende
+Refresh-Tokens mit **Reuse-Detection**, **Sicherheitsprotokoll**, **Datenschutz-
+Dashboard** (Berechtigungen einzeln), **E2E-Vault** (WebCrypto, Server sieht nur
+Chiffrat), DSGVO-Export und Konto-Löschung. Läuft ohne DB (In-Memory, swap-fähig
+gegen `db/migrations/003_accounts.sql`) und ohne externe Krypto-Libs. Details:
+[`docs/ACCOUNTS.md`](docs/ACCOUNTS.md).
+
 ### KI-Assistent, Reiseplanung & Gemeinschaft
 Unten links auf der Karte: der **Sprachassistent** („🎙 Assistent"). Er versteht
 natürliche Befehle per Text **oder Stimme** (Web Speech API, Deutsch) und führt sie aus:
@@ -100,7 +111,7 @@ Vollständige Einordnung aller Wunschfunktionen: [`docs/FEATURES.md`](docs/FEATU
 ## Dokumentation
 
 - [Architektur](docs/ARCHITECTURE.md) · [Datenquellen & APIs](docs/DATA_SOURCES.md)
-- [**Erweiterte Funktionen (Feature-Mapping)**](docs/FEATURES.md)
+- [**Erweiterte Funktionen (Feature-Mapping)**](docs/FEATURES.md) · [**Konto & Sicherheit**](docs/ACCOUNTS.md)
 - [Datenbank](docs/DATABASE.md) · [API](docs/API.md) · [KI-Module](docs/AI.md)
 - [Sicherheit & Datenschutz](docs/SECURITY.md) · [Skalierung](docs/SCALING.md)
 - [Entwicklungsplan v1.0 → v10.0](docs/ROADMAP.md)

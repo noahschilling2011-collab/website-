@@ -36,6 +36,14 @@ export const config = {
 
   jwtSecret: env.JWT_SECRET ?? 'dev-secret-change-me',
   requestTimeoutMs: 8000,
+
+  appUrl: env.APP_URL ?? 'http://localhost:5173',
+  rpId: env.RP_ID ?? 'localhost', // WebAuthn Relying-Party-ID
+  oauth: {
+    google: { clientId: env.GOOGLE_CLIENT_ID ?? '', clientSecret: env.GOOGLE_CLIENT_SECRET ?? '' },
+    microsoft: { clientId: env.MS_CLIENT_ID ?? '', clientSecret: env.MS_CLIENT_SECRET ?? '', tenant: env.MS_TENANT ?? 'common' },
+    apple: { clientId: env.APPLE_CLIENT_ID ?? '' },
+  },
 };
 
 export type Config = typeof config;

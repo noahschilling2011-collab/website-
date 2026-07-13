@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MapView, type ViewMode } from './components/MapView';
 import { StreetView } from './components/StreetView';
 import { Assistant } from './components/Assistant';
+import { Account } from './components/Account';
+import { captureOAuthRedirect, isLoggedIn } from './lib/auth';
 import { search, route as routeApi, type AssistantAction, type LonLat, type Place, type RouteResponse } from './lib/api';
 
 const MODES = [
@@ -39,6 +41,13 @@ export function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('streets');
   const [threeD, setThreeD] = useState(false);
   const [svLoc, setSvLoc] = useState<LonLat | null>(null);
+
+  const [showAccount, setShowAccount] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(isLoggedIn());
+  useEffect(() => {
+    if (captureOAuthRedirect()) setShowAccount(true);
+    setLoggedIn(isLoggedIn());
+  }, []);
 
   async function planRoute(f: Place, t: Place, opts?: { mode?: string; preference?: string; avoid?: string[] }) {
     setLoading(true);
@@ -106,7 +115,10 @@ export function App() {
     <div className="app">
       <div className="panel">
         <header className="brand">
-          <span className="logo">◎</span> Meridian
+          <span><span className="logo">◎</span> Meridian</span>
+          <button className="account-btn" onClick={() => setShowAccount(true)} title="Konto">
+            {loggedIn ? '👤' : 'Anmelden'}
+          </button>
         </header>
 
         <PlaceField label="Start" value={from} onSelect={setFrom} onPin={() => setInteraction('from')} active={interaction === 'from'} />
@@ -226,6 +238,8 @@ export function App() {
           onSetPref={onSetPref}
         />
       </div>
+
+      {showAccount && <Account onClose={() => setShowAccount(false)} onAuthChange={() => setLoggedIn(isLoggedIn())} />}
     </div>
   );
 }
