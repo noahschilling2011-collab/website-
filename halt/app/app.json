@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "HALT",
+    "slug": "halt",
+    "scheme": "halt",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0b0d12",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0b0d12"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.halt.mobile"
+    },
+    "android": {
+      "package": "app.halt.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#0b0d12"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
