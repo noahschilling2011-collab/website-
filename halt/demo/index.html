@@ -304,7 +304,9 @@ function backendUrl(){
 async function api(path, opts={}){
   const base = backendUrl();
   if(!base) throw new Error('Kein Backend verbunden. Trag die URL unter Einstellungen → Live ein.');
-  const res = await fetch(base+path, {headers:{'Content-Type':'application/json'}, ...opts});
+  const headers = {'Content-Type':'application/json', ...(opts.headers||{})};
+  if(S.session && S.session.token) headers.Authorization = 'Bearer '+S.session.token;
+  const res = await fetch(base+path, {...opts, headers});
   const data = await res.json().catch(()=>({}));
   if(!res.ok) throw new Error(data.error || ('HTTP '+res.status));
   return data;
@@ -610,16 +612,7 @@ function val(id){ const e=document.getElementById(id); return e?e.value:''; }
 function act(a, d){
   switch(a){
     case 'auth-toggle': S._email=val('email'); S.authMode = S.authMode==='signup'?'signin':'signup'; render(); break;
-    case 'auth-submit': {
-      const email=val('email'), pw=val('pw');
-      const ee=V.email(email); if(ee) return showErr('autherr',ee);
-      if(S.authMode==='signup'){ const pe=V.password(pw); if(pe) return showErr('autherr',pe); }
-      else if(!pw) return showErr('autherr','Bitte Passwort eingeben.');
-      S.session={email:email.trim().toLowerCase()}; S._email='';
-      if(S.authMode==='signup'){ S.person=null; go('welcome'); }
-      else { S.locked = !!S.pinHash; go(S.person?'app':'welcome'); }
-      break; }
-    case 'auth-toggle2': break;
+    case 'auth-submit': authSubmit(); break;
     case 'go': if(d.s==='pinsetup'){ S.pinBuf=''; S.pinStage='enter'; S.pinFirst=''; S._pinerr=''; } go(d.s); break;
     case 'person-next': { const n=val('pname').trim(); if(!n) return showErr('perr','Bitte einen Namen eingeben.'); S.person=n; go('contacts'); break; }
     case 'add-contact': { const name=val('cname').trim(), phone=val('cphone').trim(), rel=val('crel').trim();
@@ -678,6 +671,33 @@ async function liveLoad(){
   }catch(e){ S.screen='app'; render(); toast('⚠️ '+e.message); }
 }
 function showErr(id,msg){ const e=document.getElementById(id); if(e){ e.textContent=msg; e.style.display='block'; } }
+
+async function authSubmit(){
+  const email=val('email'), pw=val('pw');
+  const ee=V.email(email); if(ee) return showErr('autherr',ee);
+  if(S.authMode==='signup'){ const pe=V.password(pw); if(pe) return showErr('autherr',pe); }
+  else if(!pw) return showErr('autherr','Bitte Passwort eingeben.');
+
+  const proceed = () => {
+    S._email='';
+    if(S.authMode==='signup'){ S.person=null; go('welcome'); }
+    else { S.locked = !!S.pinHash; go(S.person?'app':'welcome'); }
+  };
+
+  if(backendUrl()){
+    // Real, server-side account.
+    try{
+      const path = S.authMode==='signup' ? '/auth/signup' : '/auth/login';
+      const r = await api(path, {method:'POST', body:JSON.stringify({email, password:pw})});
+      S.session = {email:r.email, token:r.token};
+      proceed();
+    }catch(e){ showErr('autherr', e.message); }
+    return;
+  }
+  // Offline demo fallback (no backend connected).
+  S.session = {email:email.trim().toLowerCase()};
+  proceed();
+}
 
 function pinKey(dg){
   if(S.pinBuf.length>=6) return;

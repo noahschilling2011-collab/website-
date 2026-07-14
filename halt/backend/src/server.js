@@ -16,10 +16,13 @@ import { createGoCardlessClient } from './gocardless.js';
 import { mapGoCardlessResponse } from './mapTransactions.js';
 import { runScan } from './notify.js';
 import { fileSeenStore } from './store.js';
+import { createAuth } from './auth.js';
 import { SEED } from './seed.js';
 
 const app = express();
 app.use(express.json());
+
+const auth = createAuth(new URL('../data/users.json', import.meta.url).pathname);
 
 // CORS — so the HALT web app can call this backend from anywhere (incl. a file://
 // page during testing). The API holds no data that isn't already the caller's.
@@ -46,6 +49,28 @@ const wrap = (fn) => (req, res) => fn(req, res).catch((e) => {
 
 app.get('/favicon.ico', (_req, res) => res.sendStatus(204));
 
+// ── Account sign-up / login (real, server-side) ──────────────────────────────
+const authRoute = (fn) => (req, res) => {
+  try {
+    res.json(fn(req.body?.email, req.body?.password));
+  } catch (e) {
+    res.status(e.status || 400).json({ error: e.message });
+  }
+};
+app.post('/auth/signup', authRoute((email, password) => auth.signup(email, password)));
+app.post('/auth/login', authRoute((email, password) => auth.login(email, password)));
+app.get('/auth/me', (req, res) => {
+  const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  const email = auth.verify(token);
+  if (!email) return res.status(401).json({ error: 'Nicht angemeldet.' });
+  res.json({ email });
+});
+app.post('/auth/logout', (req, res) => {
+  const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  auth.logout(token);
+  res.json({ ok: true });
+});
+
 app.get('/health', (_req, res) => {
   res.json({
     ok: true,
@@ -54,6 +79,7 @@ app.get('/health', (_req, res) => {
     gocardless: gocardlessConfigured(),
     alertChannel: config.alertChannel,
     alertPhoneSet: Boolean(config.alertPhone),
+    users: auth.count(),
   });
 });
 
