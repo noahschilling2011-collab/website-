@@ -60,6 +60,23 @@ Diese drei brauchen Lizenzen/Zugangsdaten und sind bewusst als **markierte Integ
 Die App-Logik drumherum (entscheiden → benachrichtigen → protokollieren) ist echt — nur die zwei
 ausgehenden Leitungen sind Platzhalter.
 
+## Sicherheit & Datenschutz
+
+Weil HALT Finanzbewegungen einer schutzbedürftigen Person verarbeitet, gibt es eine echte
+Sicherheitsschicht — vollständig in **`SECURITY.md`** dokumentiert (Bedrohungsmodell + DSGVO):
+
+- **Anmeldung**: E-Mail/Passwort mit Regeln, als austauschbare Schicht (`authService.ts`) —
+  lokal lauffähig jetzt, **Supabase**-Andockpunkt für Produktion (Passwörter dann serverseitig
+  mit Argon2id).
+- **App-Sperre**: 6-stelliger PIN + Face ID / Fingerabdruck, Hash im Hardware-Keychain,
+  eskalierende Brute-Force-Sperre (`appLock.ts`, `lockPolicy.ts`, `hash.ts`).
+- **Auto-Sperre** beim Backgrounding + **Privatsphäre-Overlay** (keine Kontodaten im App-Switcher).
+- **Keine Secrets in der App** (PSD2-/Twilio-Token nur serverseitig).
+- **Recht auf Löschung**: „Konto & alle Daten löschen" wiped Keychain + Session.
+
+Alle sicherheitskritischen reinen Funktionen sind getestet (Validierung, Sperr-Policy,
+Hash-Vergleich) — Teil der `npm test`-Suite.
+
 ## Architektur — bewusst für 100 Nutzer, nicht für Millionen
 
 - **Expo Router** (dateibasiertes Routing) · **Zustand** für State · keine Persistenz-Ceremony.
