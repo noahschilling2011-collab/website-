@@ -614,10 +614,10 @@ function act(a, d){
     case 'auth-toggle': S._email=val('email'); S.authMode = S.authMode==='signup'?'signin':'signup'; render(); break;
     case 'auth-submit': authSubmit(); break;
     case 'go': if(d.s==='pinsetup'){ S.pinBuf=''; S.pinStage='enter'; S.pinFirst=''; S._pinerr=''; } go(d.s); break;
-    case 'person-next': { const n=val('pname').trim(); if(!n) return showErr('perr','Bitte einen Namen eingeben.'); S.person=n; go('contacts'); break; }
+    case 'person-next': { const n=val('pname').trim(); if(!n) return showErr('perr','Bitte einen Namen eingeben.'); S.person=n; syncProfile(); go('contacts'); break; }
     case 'add-contact': { const name=val('cname').trim(), phone=val('cphone').trim(), rel=val('crel').trim();
-      if(!name||!phone){ toast('Name und Telefon nötig.'); return; } S.contacts.push({name,phone,relation:rel}); render(); break; }
-    case 'rm-contact': S.contacts.splice(+d.i,1); render(); break;
+      if(!name||!phone){ toast('Name und Telefon nötig.'); return; } S.contacts.push({name,phone,relation:rel}); syncProfile(); render(); break; }
+    case 'rm-contact': S.contacts.splice(+d.i,1); syncProfile(); render(); break;
     case 'connect-scan': runScan(); break;
     case 'tab': S.tab=d.t; S.screen='app'; render(); break;
     case 'open-alert': S.modal=d.id; render(); break;
@@ -672,6 +672,26 @@ async function liveLoad(){
 }
 function showErr(id,msg){ const e=document.getElementById(id); if(e){ e.textContent=msg; e.style.display='block'; } }
 
+// Persist the user's profile server-side (no-op offline). Fire-and-forget.
+async function syncProfile(){
+  if(!backendUrl() || !(S.session && S.session.token)) return;
+  try{ await api('/me/profile',{method:'PUT',body:JSON.stringify({person:S.person, contacts:S.contacts})}); }catch(e){}
+}
+async function loadAlerts(){
+  try{
+    const r = await api('/me/alerts'); const al = r.alerts||[];
+    S.alerts = al.map(a=>({transactionId:a.transactionId, assessment:a, transaction:a.transaction, summary:(a.signals&&a.signals[0]?a.signals[0].message:'')}));
+    S.transactions = al.map(a=>a.transaction).filter(Boolean);
+    S.assessments = al;
+  }catch(e){}
+}
+function applyScanResult(r){
+  S.transactions = r.transactions || (r.alerts||[]).map(a=>a.transaction);
+  S.assessments = r.assessments || (r.alerts||[]);
+  S.alerts = (r.alerts||[]).map(a=>({transactionId:a.transactionId, assessment:a, transaction:a.transaction, summary:(a.signals&&a.signals[0]?a.signals[0].message:'')}));
+  S.tab='activity'; S.screen='app'; render();
+}
+
 async function authSubmit(){
   const email=val('email'), pw=val('pw');
   const ee=V.email(email); if(ee) return showErr('autherr',ee);
@@ -685,12 +705,21 @@ async function authSubmit(){
   };
 
   if(backendUrl()){
-    // Real, server-side account.
+    // Real, server-side account with per-user data (row-level security).
     try{
       const path = S.authMode==='signup' ? '/auth/signup' : '/auth/login';
       const r = await api(path, {method:'POST', body:JSON.stringify({email, password:pw})});
       S.session = {email:r.email, token:r.token};
-      proceed();
+      S._email='';
+      // Load THIS user's own profile + alerts from the server.
+      S.person=null; S.contacts=[]; S.alerts=[]; S.transactions=[]; S.assessments=[];
+      try{
+        const p = await api('/me/profile');
+        S.person = p.person || null;
+        S.contacts = Array.isArray(p.contacts) ? p.contacts : [];
+      }catch(e){}
+      if(S.person){ await loadAlerts(); S.locked = !!S.pinHash; go('app'); }
+      else { go('welcome'); }
     }catch(e){ showErr('autherr', e.message); }
     return;
   }
@@ -720,10 +749,22 @@ function pinKey(dg){
   }
 }
 
-function runScan(){
+async function runScan(){
   app.innerHTML = `<div class="center"><div class="scan"></div><h2>Verbinde & prüfe…</h2>
-    <p class="muted">Umsätze werden über den (simulierten) Bankzugang geladen und bewertet.</p></div>`;
+    <p class="muted">Umsätze werden geladen und bewertet.</p></div>`;
   tabSlot.innerHTML='';
+  // When connected to a backend: run the per-user scan on the server (which may
+  // really alert this user's own contact). Offline: run locally.
+  if(backendUrl() && S.session && S.session.token){
+    await syncProfile();
+    try{
+      const r = await api('/demo-scan',{method:'POST',body:'{}'});
+      applyScanResult(r);
+      const n=(r.alerts||[]).length;
+      setTimeout(()=>toast(n?`🔔 ${n} verdächtige Bewegung(en) — Vertrauensperson${r.dryRun?' würde':' wurde'} benachrichtigt.`:'Keine Auffälligkeiten.'),300);
+      return;
+    }catch(e){ toast('⚠️ '+e.message); S.screen='app'; render(); return; }
+  }
   setTimeout(()=>{
     S.transactions = SEED.slice();
     S.assessments = assessFeed(S.transactions);

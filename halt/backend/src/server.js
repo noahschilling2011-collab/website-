@@ -10,19 +10,31 @@
 //   GET  /connect/callback           landing page after consent
 
 import express from 'express';
+import { fileURLToPath } from 'node:url';
 import { config, twilioConfigured, gocardlessConfigured, isDryRun } from './config.js';
 import { twilioSender, dryRunSender } from './twilio.js';
 import { createGoCardlessClient } from './gocardless.js';
 import { mapGoCardlessResponse } from './mapTransactions.js';
 import { runScan } from './notify.js';
-import { fileSeenStore } from './store.js';
 import { createAuth } from './auth.js';
+import { createUserData } from './userData.js';
 import { SEED } from './seed.js';
 
 const app = express();
 app.use(express.json());
 
 const auth = createAuth(new URL('../data/users.json', import.meta.url).pathname);
+const userData = createUserData(new URL('../data/userdata.json', import.meta.url).pathname);
+
+// Every data endpoint derives the userId from the verified token — NEVER from the
+// request body. This is the row-level-security boundary.
+function requireAuth(req, res, next) {
+  const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  const email = auth.verify(token);
+  if (!email) return res.status(401).json({ error: 'Nicht angemeldet.' });
+  req.userId = email;
+  next();
+}
 
 // CORS — so the HALT web app can call this backend from anywhere (incl. a file://
 // page during testing). The API holds no data that isn't already the caller's.
@@ -39,7 +51,6 @@ app.use((req, res, next) => {
 app.use(express.static(new URL('../../demo', import.meta.url).pathname));
 
 const sender = twilioConfigured() ? twilioSender(config.twilio) : dryRunSender();
-const seen = fileSeenStore(new URL('../data/notified.json', import.meta.url).pathname);
 const gc = gocardlessConfigured() ? createGoCardlessClient(config.gocardless) : null;
 
 const wrap = (fn) => (req, res) => fn(req, res).catch((e) => {
@@ -83,47 +94,71 @@ app.get('/health', (_req, res) => {
   });
 });
 
-// Prove the alarm path works — rings/texts YOUR phone. The first thing to try.
-app.post('/test-alert', wrap(async (req, res) => {
-  if (!config.alertPhone) return res.status(400).json({ error: 'ALERT_PHONE fehlt in .env' });
+// ── Per-user profile (protected person + trusted contacts) ───────────────────
+app.get('/me/profile', requireAuth, (req, res) => {
+  res.json(userData.getProfile(req.userId));
+});
+app.put('/me/profile', requireAuth, (req, res) => {
+  res.json(userData.setProfile(req.userId, req.body || {}));
+});
+app.get('/me/alerts', requireAuth, (req, res) => {
+  res.json({ alerts: userData.getAlerts(req.userId) });
+});
+
+// Where THIS user's alerts go: their own first trusted contact, else the
+// operator's ALERT_PHONE fallback. (On a Twilio trial the number must be verified.)
+const destFor = (uid) => userData.alertPhone(uid) || config.alertPhone || null;
+
+// Prove the alarm path works — rings the user's own trusted contact.
+app.post('/test-alert', requireAuth, wrap(async (req, res) => {
+  const to = destFor(req.userId);
+  if (!to) return res.status(400).json({ error: 'Keine Zielnummer: trag eine Vertrauensperson ein (oder ALERT_PHONE).' });
   const message = req.body?.message || 'Test von HALT: Wenn du das bekommst, funktioniert dein Alarm.';
   const results = {};
-  if (config.alertChannel !== 'call') results.sms = await sender.sms(config.alertPhone, message);
-  if (config.alertChannel !== 'sms') results.call = await sender.call(config.alertPhone, message);
-  res.json({ sent: true, dryRun: isDryRun(), to: config.alertPhone, results });
+  if (config.alertChannel !== 'call') results.sms = await sender.sms(to, message);
+  if (config.alertChannel !== 'sms') results.call = await sender.call(to, message);
+  res.json({ sent: true, dryRun: isDryRun(), to, results });
 }));
 
 // Full alert path on the seed history (includes an ongoing crypto scam).
-app.post('/demo-scan', wrap(async (_req, res) => {
+app.post('/demo-scan', requireAuth, wrap(async (req, res) => {
   const result = await runScan(SEED, {
-    sender, seen, to: config.alertPhone, channel: config.alertChannel,
+    sender, seen: userData.seenStore(req.userId), to: destFor(req.userId), channel: config.alertChannel,
   });
+  userData.setAlerts(req.userId, result.alerts);
   res.json({ dryRun: isDryRun(), ...result });
 }));
 
 // ── Real bank connection (GoCardless) ─────────────────────────────────────────
-app.post('/connect/start', wrap(async (_req, res) => {
+app.post('/connect/start', requireAuth, wrap(async (req, res) => {
   if (!gc) return res.status(400).json({ error: 'GoCardless nicht konfiguriert (siehe .env)' });
   const r = await gc.createRequisition({
     institutionId: config.gocardless.institutionId,
     redirect: config.gocardless.redirectUrl,
   });
+  userData.setRequisition(req.userId, r.id);
   res.json({ requisitionId: r.id, link: r.link, status: r.status });
 }));
 
-app.get('/connect/status/:id', wrap(async (req, res) => {
+app.get('/connect/status/:id', requireAuth, wrap(async (req, res) => {
+  // Ownership first — reject a requisition this user didn't create, regardless
+  // of provider config (don't even leak whether GoCardless is set up).
+  if (userData.getRequisition(req.userId) !== req.params.id) {
+    return res.status(403).json({ error: 'Kein Zugriff auf diese Verbindung.' });
+  }
   if (!gc) return res.status(400).json({ error: 'GoCardless nicht konfiguriert' });
   const r = await gc.getRequisition(req.params.id);
   res.json({ status: r.status, accounts: r.accounts ?? [] });
 }));
 
-app.post('/scan/:accountId', wrap(async (req, res) => {
+app.post('/scan/:accountId', requireAuth, wrap(async (req, res) => {
   if (!gc) return res.status(400).json({ error: 'GoCardless nicht konfiguriert' });
   const raw = await gc.getTransactions(req.params.accountId);
   const transactions = mapGoCardlessResponse(raw);
   const result = await runScan(transactions, {
-    sender, seen, to: config.alertPhone, channel: config.alertChannel,
+    sender, seen: userData.seenStore(req.userId), to: destFor(req.userId), channel: config.alertChannel,
   });
+  userData.setAlerts(req.userId, result.alerts);
   res.json({ dryRun: isDryRun(), ...result });
 }));
 
@@ -134,11 +169,16 @@ app.get('/connect/callback', (_req, res) => {
   );
 });
 
-const port = config.port;
-app.listen(port, () => {
-  console.log(`HALT backend läuft auf http://localhost:${port}`);
-  console.log(`  Twilio:     ${twilioConfigured() ? 'konfiguriert' : 'DRY_RUN (keine Zugangsdaten)'}`);
-  console.log(`  GoCardless: ${gocardlessConfigured() ? 'konfiguriert' : 'nicht konfiguriert'}`);
-});
+// Only bind a port when run directly (node src/server.js) — not when imported by
+// a test, which starts its own ephemeral listener.
+const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+if (isMain) {
+  const port = config.port;
+  app.listen(port, () => {
+    console.log(`HALT backend läuft auf http://localhost:${port}`);
+    console.log(`  Twilio:     ${twilioConfigured() ? 'konfiguriert' : 'DRY_RUN (keine Zugangsdaten)'}`);
+    console.log(`  GoCardless: ${gocardlessConfigured() ? 'konfiguriert' : 'nicht konfiguriert'}`);
+  });
+}
 
 export { app };
