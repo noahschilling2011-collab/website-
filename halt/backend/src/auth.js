@@ -49,7 +49,8 @@ export function createAuth(usersPath) {
       users = {};
     }
   }
-  const tokens = new Map(); // token -> email
+  const tokens = new Map(); // token -> { email, exp }
+  const TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 
   const persist = () => {
     if (!usersPath) return;
@@ -58,7 +59,7 @@ export function createAuth(usersPath) {
   };
   const issueToken = (email) => {
     const token = randomBytes(32).toString('hex');
-    tokens.set(token, email);
+    tokens.set(token, { email, exp: Date.now() + TOKEN_TTL_MS });
     return token;
   };
 
@@ -98,7 +99,13 @@ export function createAuth(usersPath) {
     },
 
     verify(token) {
-      return tokens.get(token) || null;
+      const rec = tokens.get(token);
+      if (!rec) return null;
+      if (Date.now() > rec.exp) {
+        tokens.delete(token); // expired
+        return null;
+      }
+      return rec.email;
     },
 
     logout(token) {

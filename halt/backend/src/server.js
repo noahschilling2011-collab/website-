@@ -19,11 +19,24 @@ import { runScan } from './notify.js';
 import { createAuth } from './auth.js';
 import { createUserData } from './userData.js';
 import { createOAuth } from './oauth.js';
+import { securityHeaders, cors, rateLimit } from './security.js';
 import { SEED } from './seed.js';
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false })); // Apple posts the callback as a form
+app.set('trust proxy', 1); // correct client IP behind Render's proxy (for rate limiting)
+app.use(securityHeaders);
+const corsOrigins = (process.env.CORS_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean);
+app.use(cors(corsOrigins));
+app.use(express.json({ limit: '32kb' }));
+app.use(express.urlencoded({ extended: false, limit: '32kb' })); // Apple posts the callback as a form
+
+// Throttle the account endpoints against brute force / abuse.
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30, message: 'Zu viele Anmeldeversuche. Bitte in ein paar Minuten erneut.' });
+// Throttle anything that can trigger an outbound SMS/call, per user, so the
+// backend can't be turned into an SMS/robocall relay.
+const outboundLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 12, key: (req) => `u:${req.userId}`, message: 'Zu viele Alarm-Aktionen. Bitte später erneut.' });
+
+const UUID_RE = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
 
 const auth = createAuth(new URL('../data/users.json', import.meta.url).pathname);
 const userData = createUserData(new URL('../data/userdata.json', import.meta.url).pathname);
@@ -39,16 +52,6 @@ function requireAuth(req, res, next) {
   next();
 }
 
-// CORS — so the HALT web app can call this backend from anywhere (incl. a file://
-// page during testing). The API holds no data that isn't already the caller's.
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
-  res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  if (req.method === 'OPTIONS') return res.sendStatus(204);
-  next();
-});
-
 // Serve the HALT web app itself, so the deployed backend URL *is* the whole app.
 // Open that URL on your phone and everything works — no terminal, no separate host.
 app.use(express.static(new URL('../../demo', import.meta.url).pathname));
@@ -57,8 +60,8 @@ const sender = twilioConfigured() ? twilioSender(config.twilio) : dryRunSender()
 const gc = gocardlessConfigured() ? createGoCardlessClient(config.gocardless) : null;
 
 const wrap = (fn) => (req, res) => fn(req, res).catch((e) => {
-  console.error(e);
-  res.status(500).json({ error: e.message });
+  console.error(e); // full detail server-side only
+  res.status(500).json({ error: 'Serverfehler. Bitte später erneut.' }); // generic to client
 });
 
 app.get('/favicon.ico', (_req, res) => res.sendStatus(204));
@@ -71,8 +74,8 @@ const authRoute = (fn) => (req, res) => {
     res.status(e.status || 400).json({ error: e.message });
   }
 };
-app.post('/auth/signup', authRoute((email, password) => auth.signup(email, password)));
-app.post('/auth/login', authRoute((email, password) => auth.login(email, password)));
+app.post('/auth/signup', authLimiter, authRoute((email, password) => auth.signup(email, password)));
+app.post('/auth/login', authLimiter, authRoute((email, password) => auth.login(email, password)));
 app.get('/auth/me', (req, res) => {
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   const email = auth.verify(token);
@@ -157,10 +160,11 @@ app.get('/me/alerts', requireAuth, (req, res) => {
 const destFor = (uid) => userData.alertPhone(uid) || config.alertPhone || null;
 
 // Prove the alarm path works — rings the user's own trusted contact.
-app.post('/test-alert', requireAuth, wrap(async (req, res) => {
+// Message is fixed server-side (not client-controlled) to prevent abuse.
+app.post('/test-alert', requireAuth, outboundLimiter, wrap(async (req, res) => {
   const to = destFor(req.userId);
   if (!to) return res.status(400).json({ error: 'Keine Zielnummer: trag eine Vertrauensperson ein (oder ALERT_PHONE).' });
-  const message = req.body?.message || 'Test von HALT: Wenn du das bekommst, funktioniert dein Alarm.';
+  const message = 'Test von HALT: Wenn du das bekommst, funktioniert dein Alarm.';
   const results = {};
   if (config.alertChannel !== 'call') results.sms = await sender.sms(to, message);
   if (config.alertChannel !== 'sms') results.call = await sender.call(to, message);
@@ -168,7 +172,7 @@ app.post('/test-alert', requireAuth, wrap(async (req, res) => {
 }));
 
 // Full alert path on the seed history (includes an ongoing crypto scam).
-app.post('/demo-scan', requireAuth, wrap(async (req, res) => {
+app.post('/demo-scan', requireAuth, outboundLimiter, wrap(async (req, res) => {
   const result = await runScan(SEED, {
     sender, seen: userData.seenStore(req.userId), to: destFor(req.userId), channel: config.alertChannel,
   });
@@ -198,9 +202,18 @@ app.get('/connect/status/:id', requireAuth, wrap(async (req, res) => {
   res.json({ status: r.status, accounts: r.accounts ?? [] });
 }));
 
-app.post('/scan/:accountId', requireAuth, wrap(async (req, res) => {
+app.post('/scan/:accountId', requireAuth, outboundLimiter, wrap(async (req, res) => {
   if (!gc) return res.status(400).json({ error: 'GoCardless nicht konfiguriert' });
-  const raw = await gc.getTransactions(req.params.accountId);
+  const accountId = req.params.accountId;
+  if (!UUID_RE.test(accountId)) return res.status(400).json({ error: 'Ungültige Konto-ID.' });
+  // Authorize: the account must belong to THIS user's own requisition (no IDOR).
+  const reqId = userData.getRequisition(req.userId);
+  if (!reqId) return res.status(403).json({ error: 'Kein verbundenes Konto.' });
+  const requisition = await gc.getRequisition(reqId);
+  if (!(requisition.accounts || []).includes(accountId)) {
+    return res.status(403).json({ error: 'Kein Zugriff auf dieses Konto.' });
+  }
+  const raw = await gc.getTransactions(accountId);
   const transactions = mapGoCardlessResponse(raw);
   const result = await runScan(transactions, {
     sender, seen: userData.seenStore(req.userId), to: destFor(req.userId), channel: config.alertChannel,

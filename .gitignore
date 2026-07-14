@@ -6,6 +6,9 @@ coverage/
 .env
 .env.local
 
+# Backend runtime data (users, tokens, per-user rows) — never commit
+data/
+
 # Flutter / Dart
 app/.dart_tool/
 app/.flutter-plugins*

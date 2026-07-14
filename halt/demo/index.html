@@ -7,10 +7,12 @@
 <meta name="description" content="Klickbare Demo der HALT-App: der Geld-Trigger, der Betrug stoppt, bevor das Geld weg ist." />
 <style>
   :root{
-    --bg:#0b0d12; --bg-soft:#12151d; --card:#161a24; --border:#232838;
-    --text:#eef1f7; --muted:#9aa3b5; --brand:#ff5a4d; --brand-soft:#ff8a80;
+    --bg:#0a0b10; --bg-soft:#12141d; --card:#161926; --card2:#1b1f2e; --border:#262b3b;
+    --text:#f1f3f9; --muted:#9aa3b8; --brand:#ff5a4d; --brand2:#ff8a3d; --brand-soft:#ffb0a5;
     --accent:#4dd4ac; --watch:#f5b74d; --alert:#ff5a4d; --ok:#4dd4ac;
-    --ring:rgba(255,90,77,.35); --radius:16px;
+    --ring:rgba(255,90,77,.32); --radius:18px;
+    --grad-brand:linear-gradient(135deg,#ff6a4d 0%,#ff4d6d 55%,#ff8a3d 130%);
+    --shadow:0 18px 40px -22px rgba(0,0,0,.75);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;height:100%}
@@ -52,46 +54,53 @@
   @keyframes pop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
 
   .pad{padding:18px 20px 28px}
-  h2{font-size:26px;font-weight:800;letter-spacing:-.5px;margin:0 0 6px}
-  .muted{color:var(--muted);font-size:15px;line-height:1.5}
+  h2{font-size:27px;font-weight:800;letter-spacing:-.6px;margin:0 0 6px;line-height:1.15}
+  .muted{color:var(--muted);font-size:15px;line-height:1.55}
   .small{font-size:13px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+  .card{background:linear-gradient(180deg,var(--card2),var(--card));border:1px solid var(--border);
+    border-radius:var(--radius);padding:16px;box-shadow:var(--shadow)}
   .row{display:flex;align-items:center;gap:12px}
   .between{display:flex;align-items:center;justify-content:space-between}
 
-  .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:52px;border-radius:999px;
-    font-size:16px;font-weight:700;border:1px solid transparent;cursor:pointer;font-family:inherit;transition:transform .1s,opacity .1s}
-  .btn:active{transform:scale(.98)}
-  .btn.primary{background:var(--brand);color:#fff}
-  .btn.ghost{background:transparent;color:var(--text);border-color:var(--border)}
-  .btn.danger{background:transparent;color:var(--brand);border-color:var(--brand)}
-  .btn[disabled]{opacity:.45;pointer-events:none}
+  .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:54px;border-radius:16px;
+    font-size:16px;font-weight:700;border:1px solid transparent;cursor:pointer;font-family:inherit;letter-spacing:.2px;
+    transition:transform .12s cubic-bezier(.2,.8,.2,1),box-shadow .2s,opacity .1s,background .2s}
+  .btn:active{transform:scale(.975)}
+  .btn.primary{background:var(--grad-brand);color:#fff;box-shadow:0 10px 26px -10px var(--ring),inset 0 1px 0 rgba(255,255,255,.18)}
+  .btn.primary:hover{box-shadow:0 16px 34px -10px var(--ring);transform:translateY(-1px)}
+  .btn.ghost{background:rgba(255,255,255,.03);color:var(--text);border-color:var(--border)}
+  .btn.ghost:hover{border-color:#3a4157;background:rgba(255,255,255,.06)}
+  .btn.danger{background:transparent;color:var(--brand);border-color:rgba(255,90,77,.5)}
+  .btn.danger:hover{background:rgba(255,90,77,.08)}
+  .btn[disabled]{opacity:.4;pointer-events:none;box-shadow:none}
 
-  input{width:100%;height:52px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
-    padding:0 16px;color:var(--text);font-size:16px;font-family:inherit;outline:none}
+  input{width:100%;height:54px;background:var(--bg-soft);border:1px solid var(--border);border-radius:14px;
+    padding:0 16px;color:var(--text);font-size:16px;font-family:inherit;outline:none;transition:border .15s,box-shadow .15s}
   input:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--ring)}
   textarea{width:100%;min-height:120px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
     padding:14px 16px;color:var(--text);font-size:15px;font-family:inherit;outline:none;resize:none}
   .err{color:var(--brand);font-size:14px;margin-top:10px}
   .link{color:var(--brand);font-weight:700;cursor:pointer}
 
-  .logo-sm{display:flex;align-items:center;gap:9px;font-weight:800;font-size:19px}
-  .logo-sm .d{width:12px;height:12px;border-radius:50%;background:var(--brand)}
+  .logo-sm{display:flex;align-items:center;gap:9px;font-weight:800;font-size:19px;letter-spacing:.3px}
+  .logo-sm .d{width:12px;height:12px;border-radius:50%;background:var(--grad-brand);box-shadow:0 0 0 4px var(--ring),0 0 14px var(--brand)}
 
   /* list rows */
-  .tx{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--border);cursor:pointer}
+  .tx{display:flex;align-items:center;gap:12px;padding:15px 4px;border-bottom:1px solid var(--border);cursor:pointer;
+    border-radius:12px;transition:background .12s}
   .tx:last-child{border-bottom:0}
+  .tx:hover{background:rgba(255,255,255,.03)}
   .tx .name{font-weight:600;font-size:15px}
-  .tx .amt{font-weight:700;font-size:15px;text-align:right}
-  .badge{display:inline-flex;align-items:center;gap:6px;border:1px solid;border-radius:999px;padding:3px 9px;font-size:11px;font-weight:700}
-  .badge .dot{width:7px;height:7px;border-radius:50%}
+  .tx .amt{font-weight:700;font-size:15px;text-align:right;letter-spacing:.2px}
+  .badge{display:inline-flex;align-items:center;gap:6px;border:1px solid;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:800;letter-spacing:.3px}
+  .badge .dot{width:7px;height:7px;border-radius:50%;box-shadow:0 0 8px currentColor}
 
   /* tab bar */
-  .tabbar{display:flex;border-top:1px solid var(--border);background:var(--bg-soft)}
-  .tab{flex:1;padding:10px 0 22px;text-align:center;cursor:pointer;color:var(--muted);font-size:11px;font-weight:600}
-  .tab .ic{font-size:21px;display:block;margin-bottom:3px;opacity:.6}
+  .tabbar{display:flex;border-top:1px solid var(--border);background:linear-gradient(180deg,rgba(18,20,29,.6),var(--bg-soft));backdrop-filter:blur(8px)}
+  .tab{flex:1;padding:11px 0 22px;text-align:center;cursor:pointer;color:var(--muted);font-size:11px;font-weight:600;transition:color .15s}
+  .tab .ic{font-size:21px;display:block;margin-bottom:3px;opacity:.55;transition:opacity .15s,transform .15s}
   .tab.active{color:var(--brand)}
-  .tab.active .ic{opacity:1}
+  .tab.active .ic{opacity:1;transform:translateY(-1px)}
   .tab .badge-n{position:relative}
   .tab .count{position:absolute;top:-6px;right:-12px;background:var(--brand);color:#fff;font-size:10px;
     min-width:16px;height:16px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;padding:0 4px}
@@ -101,17 +110,17 @@
   .dots .dt{width:14px;height:14px;border-radius:50%;border:1.6px solid var(--brand)}
   .dots .dt.on{background:var(--brand)}
   .keys{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;max-width:260px;margin:0 auto}
-  .key{height:72px;border-radius:50%;background:var(--card);border:1px solid var(--border);font-size:26px;font-weight:700;
-    color:var(--text);cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center}
-  .key:active{opacity:.6}
+  .key{height:72px;border-radius:22px;background:linear-gradient(180deg,var(--card2),var(--card));border:1px solid var(--border);font-size:26px;font-weight:700;
+    color:var(--text);cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;transition:transform .1s,background .1s}
+  .key:active{transform:scale(.93);background:var(--brand);color:#fff}
   .key.blank{background:transparent;border:0;cursor:default}
 
   .center{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:24px}
-  .hero-dot{width:16px;height:16px;border-radius:50%;background:var(--brand);box-shadow:0 0 0 5px var(--ring);margin-bottom:18px}
+  .hero-dot{width:18px;height:18px;border-radius:50%;background:var(--grad-brand);box-shadow:0 0 0 6px var(--ring),0 0 22px var(--brand);margin-bottom:18px}
 
   .step{display:flex;gap:12px;align-items:flex-start;margin-bottom:14px}
-  .step .n{width:30px;height:30px;border-radius:9px;background:var(--card);border:1px solid var(--border);
-    display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--brand);flex:none}
+  .step .n{width:32px;height:32px;border-radius:10px;background:linear-gradient(180deg,var(--card2),var(--card));border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--brand);flex:none;box-shadow:var(--shadow)}
 
   .scan{width:120px;height:120px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--brand);
     animation:spin 1s linear infinite;margin:20px auto}
@@ -335,7 +344,7 @@ function badge(level){
   const l = level==='alert'?'Alarm':level==='watch'?'Beobachten':'Unauffällig';
   return `<span class="badge" style="color:${c};border-color:${c};background:${c}22"><span class="dot" style="background:${c}"></span>${l}</span>`;
 }
-function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 let providersFetched=false;
 function ensureProviders(){
@@ -468,9 +477,9 @@ function tActivity(){
   const sorted = [...S.transactions].sort((a,b)=>new Date(b.date)-new Date(a.date));
   const open = S.alerts.filter(a=>!S.resolved[a.transactionId]).length;
   const rows = sorted.map(tx=>{ const a=byId[tx.id]; const lvl=a?a.level:'ok';
-    return `<div class="tx" data-action="${lvl!=='ok'?'open-alert':''}" data-id="${tx.id}">
+    return `<div class="tx" data-action="${lvl!=='ok'?'open-alert':''}" data-id="${esc(tx.id)}">
       <div style="flex:1"><div class="name">${esc(tx.payeeName)}</div>
-        <div class="muted small">${new Date(tx.date).toLocaleDateString('de-DE',{day:'2-digit',month:'short'})} · ${CAT_DE[tx.category]}</div></div>
+        <div class="muted small">${new Date(tx.date).toLocaleDateString('de-DE',{day:'2-digit',month:'short'})} · ${CAT_DE[tx.category]||esc(tx.category)}</div></div>
       <div><div class="amt">${tx.amount<0?'+':'−'}${eur(Math.abs(tx.amount))}</div>${lvl!=='ok'?'<div style="text-align:right;margin-top:5px">'+badge(lvl)+'</div>':''}</div>
     </div>`; }).join('');
   return `<div class="pad">
@@ -488,10 +497,10 @@ function tAlerts(){
   if(!sorted.length) return `<div class="pad"><h2>Warnungen</h2>
     <div class="card"><b>Alles ruhig.</b><div class="muted" style="margin-top:4px">Keine ungewöhnlichen Bewegungen. Genau so soll es sein.</div></div></div>`;
   const cards = sorted.map(a=>{ const done=S.resolved[a.transactionId];
-    return `<div class="card" style="margin-bottom:12px;${done?'opacity:.55':''}" data-action="open-alert" data-id="${a.transactionId}">
+    return `<div class="card" style="margin-bottom:12px;${done?'opacity:.55':''}" data-action="open-alert" data-id="${esc(a.transactionId)}">
       <div class="between" style="margin-bottom:8px">${badge(a.assessment.level)}<span class="muted small">Score ${a.assessment.score}</span></div>
       <b>${eur(a.transaction.amount)} an ${esc(a.transaction.payeeName)}</b>
-      <div class="muted small" style="margin-top:4px">${esc(a.assessment.signals[0].message)}</div>
+      <div class="muted small" style="margin-top:4px">${esc(a.assessment.signals[0]?.message||'Ungewöhnliche Bewegung.')}</div>
       ${done?`<div class="small" style="color:var(--accent);margin-top:8px">✓ ${done==='handled'?'Erledigt':'Als unkritisch markiert'}</div>`:''}
     </div>`; }).join('');
   return `<div class="pad"><h2>Warnungen</h2>${cards}</div>`;
@@ -592,7 +601,7 @@ function mAlert(id){
         ${badge(a.level)}
         <div style="font-size:40px;font-weight:800;color:${c};margin-top:14px">${eur(tx.amount)}</div>
         <div style="font-size:17px;margin-top:2px">an ${esc(tx.payeeName)}</div>
-        <div class="muted small" style="margin-top:4px">${new Date(tx.date).toLocaleString('de-DE')} · ${CAT_DE[tx.category]}</div>
+        <div class="muted small" style="margin-top:4px">${new Date(tx.date).toLocaleString('de-DE')} · ${CAT_DE[tx.category]||esc(tx.category)}</div>
       </div>
       <div class="muted small" style="margin-bottom:6px">Warum HALT gewarnt hat</div>
       <div class="card" style="margin-bottom:16px">
@@ -602,8 +611,8 @@ function mAlert(id){
         <div class="muted small" style="margin-bottom:12px">HALT sagt nicht, ob das Betrug ist — das kannst nur du beurteilen. Ruf am besten kurz an, bevor Geld weg ist.</div>
         ${contact?`<button class="btn primary" data-action="call" data-p="${esc(contact.phone)}">${esc(contact.name)} anrufen</button>`:''}
       </div>
-      <button class="btn ghost" style="margin-bottom:10px" data-action="resolve" data-id="${id}" data-r="handled">Ich kümmere mich darum</button>
-      <button class="btn ghost" data-action="resolve" data-id="${id}" data-r="dismissed">Alles in Ordnung — war bekannt</button>
+      <button class="btn ghost" style="margin-bottom:10px" data-action="resolve" data-id="${esc(id)}" data-r="handled">Ich kümmere mich darum</button>
+      <button class="btn ghost" data-action="resolve" data-id="${esc(id)}" data-r="dismissed">Alles in Ordnung — war bekannt</button>
       <div style="height:20px"></div>
     </div></div>`;
 }
