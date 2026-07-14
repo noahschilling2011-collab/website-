@@ -1,96 +1,78 @@
-# Nexus AI — All-in-One KI-Produktivitätsplattform
+# Klassenraum
 
-Enterprise-Plattform für iOS, Android und Web: KI-Chat (GPT / Claude / Gemini), Inhalte generieren, Dokumente analysieren, Aufgaben, Kalender, Notizen, Team-Workspaces u. v. m.
+Schulverwaltungs-Webapp für **eine** Schule: Stundenplan, Noten, Hausaufgaben,
+Nachrichten, Fehlzeiten. Rollen: Schüler, Lehrer, Admin.
 
-## Monorepo-Struktur
+Stack: **Vite + React + TypeScript + Tailwind** · **Supabase** (Postgres + Auth + RLS) · **Netlify**.
 
-```
-.
-├── app/                  # Flutter-App (iOS, Android, Web) — Clean Architecture + MVVM
-├── backend/              # Node.js/TypeScript API — REST + GraphQL + WebSockets
-├── infra/
-│   └── k8s/              # Kubernetes-Manifeste (Deployments, HPA, Ingress, ...)
-├── docs/                 # Architektur-, API-, Setup- und Design-System-Dokumentation
-├── docker-compose.yml    # Lokale Entwicklungsumgebung (API, PostgreSQL, Redis)
-└── .github/workflows/    # CI/CD-Pipelines
-```
+> Aktueller Stand: **Phase 0 (Fundament)** — Login, Rollen, geschütztes Dashboard.
+> Details & nächste Phasen: siehe [`CLAUDE.md`](./CLAUDE.md) und [`STATUS.md`](./STATUS.md).
 
-## Schnellstart
+---
 
-### Backend + Web-App (lokal, mit Docker)
+## Setup (einmalig, ~10 Min.)
 
+### 1. Supabase-Projekt anlegen
+1. Auf [supabase.com](https://supabase.com) einloggen → **New project**.
+2. Projektname z. B. `klassenraum`, Region Europe, DB-Passwort merken.
+3. Warten bis das Projekt fertig ist.
+
+### 2. Datenbank-Migration einspielen
+1. Supabase-Dashboard → **SQL Editor** → **New query**.
+2. Inhalt von [`supabase/migrations/0000_phase0_init.sql`](./supabase/migrations/0000_phase0_init.sql) einfügen → **Run**.
+3. Das legt `profiles`, `classes`, `class_members`, den Rollen-Enum, den Signup-Trigger und **alle RLS-Policies** an.
+
+### 3. Keys holen
+Supabase-Dashboard → **Project Settings → API**:
+- **Project URL** → `VITE_SUPABASE_URL`
+- **anon public** key → `VITE_SUPABASE_ANON_KEY`
+- **service_role** key → `SUPABASE_SERVICE_ROLE_KEY` (⚠️ nur lokal, s. u.)
+
+### 4. Lokal starten
 ```bash
-cp backend/.env.example backend/.env      # API-Keys eintragen
-docker compose up --build
-# Web-App:  http://localhost:8080          (Single-File-App, backend/public/index.html)
-# API:      http://localhost:8080/api      ·  GraphQL: http://localhost:8080/graphql
-```
-
-Die Web-App (`backend/public/index.html`) ist eine einzelne HTML-Datei ohne
-Build-Schritt: Login/Registrierung inkl. 2FA, KI-Chat mit Streaming und
-Provider-Wahl, KI-Werkzeuge, Aufgaben, Notizen, Kalender — responsive
-(Bottom-Navigation auf dem Handy), Dark/Light Mode, automatischer
-Token-Refresh. Sie läuft auch von einem anderen Host aus:
-`index.html?api=http://<backend-host>:8080` öffnen.
-
-### Backend (ohne Docker)
-
-```bash
-cd backend
+cp .env.example .env      # dann die drei Keys eintragen
 npm install
-npm run migrate     # Datenbankschema anlegen (POSTGRES_URL muss gesetzt sein)
-npm run dev
+npm run dev               # http://localhost:5173
 ```
 
-### Flutter-App
-
+### 5. Demo-Daten seeden
+Legt 1 Admin, 2 Lehrer, 10 Schüler (Fantasienamen) und die Klasse `9b` an:
 ```bash
-cd app
-flutter pub get
-flutter run -d chrome                     # Web
-flutter run                               # iOS/Android (Gerät/Simulator)
+npm run seed
 ```
+Login für alle Demo-Accounts: Passwort `klassenraum-demo-2026`.
+- Schüler: `student01@klassenraum.test` … `student10@klassenraum.test`
+- Lehrer: `mueller@klassenraum.test`, `schmidt@klassenraum.test`
+- Admin: `admin@klassenraum.test`
 
-Die API-Basis-URL wird per `--dart-define=API_BASE_URL=http://localhost:8080` gesetzt (Standard: `http://localhost:8080`).
-
-## Feature-Überblick
-
-| Bereich | Status | Modul |
-|---|---|---|
-| KI-Chat (GPT, Claude, Gemini, Streaming) | ✅ implementiert | `backend/src/modules/ai`, `app/lib/features/chat` |
-| Auth: JWT, Refresh, 2FA (TOTP), Biometrie-Hook | ✅ implementiert | `backend/src/modules/auth`, `app/lib/features/auth` |
-| Aufgaben, Notizen, Kalender | ✅ implementiert | jeweilige Module in Backend + App |
-| Team-Workspaces, Rollen & Rechte (RBAC) | ✅ implementiert | `backend/src/modules/workspaces` |
-| PDF-/Webseiten-/YouTube-Zusammenfassung | ✅ implementiert | `backend/src/modules/ai/tools` |
-| Übersetzer (100+ Sprachen), Dokumente schreiben | ✅ implementiert | `backend/src/modules/ai/tools` |
-| Bild-/Video-/Musik-Generierung | ✅ API-Anbindung | `backend/src/modules/ai/media` |
-| Dateimanager & Cloud-Sync | ✅ implementiert | `backend/src/modules/files` |
-| Analytics-Dashboard & Admin-Panel-API | ✅ implementiert | `backend/src/modules/analytics`, `admin` |
-| OCR (Bild → Text, inkl. Handschrift) | ✅ implementiert | `backend/src/modules/ai/ocr.service.ts` |
-| Audio-Transkription (Whisper, Sprachchat-Basis) | ✅ implementiert | `backend/src/modules/ai/speech.service.ts` |
-| PDF-Analyse mit echter Textextraktion | ✅ implementiert | `backend/src/modules/ai/pdf.service.ts` |
-| Code-Editor mit Syntax-Highlighting + KI-Assistent | ✅ implementiert | `app/lib/features/code`, `POST /api/ai/code` |
-| Push-Benachrichtigungen (FCM HTTP v1) | ✅ implementiert | `backend/src/modules/notifications` |
-| Auto-Token-Refresh & Chat-Verlauf in der App | ✅ implementiert | `app/lib/core/network`, `app/lib/features/chat` |
-| WebSockets (Echtzeit-Sync, Präsenz) | ✅ implementiert | `backend/src/ws` |
-| Dark/Light Mode, Material 3 + iOS-Design | ✅ implementiert | `app/lib/core/theme` |
-| Offline-Modus (lokaler Cache + Sync-Queue) | ✅ implementiert | `app/lib/core/storage` |
-
-### Roadmap (noch nicht implementiert)
-
-Audio-*Aufnahme*-UI in der App (die Transkriptions-API ist fertig,
-Audiodateien lassen sich bereits hochladen), Bildschirmaufnahme,
-Live-Vorschau für HTML/CSS/JS im Code-Editor sowie Home-Screen-Widgets.
-
-Details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/API.md`](docs/API.md), [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md), [`docs/SETUP.md`](docs/SETUP.md), [`docs/SCALING.md`](docs/SCALING.md).
-
-## Tests
-
+### 6. RLS-Test (Pflicht vor jedem Deploy)
 ```bash
-cd backend && npm test          # Unit- & Integrationstests (Vitest)
-cd app && flutter test          # Unit- & Widget-Tests
+npm run rls-test
 ```
+Loggt sich als Schüler A ein und beweist, dass er **keine** fremden Profile /
+Mitgliedschaften lesen und **keine** Klasse anlegen kann. Exit-Code 0 = grün.
 
-## Lizenz
+### 7. Deploy auf Netlify
+1. [netlify.com](https://netlify.com) → **Add new site → Import from Git** → dieses Repo.
+2. Build wird aus [`netlify.toml`](./netlify.toml) gelesen (`npm run build`, Publish `dist`).
+3. **Site settings → Environment variables**: `VITE_SUPABASE_URL` und
+   `VITE_SUPABASE_ANON_KEY` eintragen. **Nicht** den service_role-Key!
+4. Deploy. Fertig — Login als Schüler und als Lehrer testen.
 
-Proprietär — alle Rechte vorbehalten.
+---
+
+## ⚠️ Sicherheit
+- Der **`anon key` ist öffentlich** und landet by design im Browser. Die Sicherheit
+  liegt **ausschließlich** in den RLS-Policies der Datenbank.
+- Der **`service_role`-Key umgeht RLS** und darf **nie** ins Frontend/Netlify/Git.
+  Er wird nur lokal von `seed.ts` benutzt und steht in der (git-ignorierten) `.env`.
+- Vor jedem Deploy: `npm run rls-test` muss grün sein.
+
+## Befehle
+| Befehl | Zweck |
+|---|---|
+| `npm run dev` | Dev-Server |
+| `npm run build` | Produktions-Build (`dist/`) |
+| `npm run typecheck` | TypeScript prüfen |
+| `npm run seed` | Demo-Daten anlegen (lokal, service_role) |
+| `npm run rls-test` | RLS-Sicherheitstest |

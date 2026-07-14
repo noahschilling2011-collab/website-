@@ -1,19 +1,19 @@
-# Node
+# Dependencies
 node_modules/
+
+# Build output
 dist/
 coverage/
-*.log
+*.tsbuildinfo
+
+# Env — enthält Keys, NIE committen
 .env
 .env.local
+.env.*.local
 
-# Flutter / Dart
-app/.dart_tool/
-app/.flutter-plugins*
-app/build/
-app/.packages
-app/ios/Pods/
-app/android/.gradle/
-app/**/*.g.dart.bak
+# Logs
+*.log
+npm-debug.log*
 
 # OS / IDE
 .DS_Store
