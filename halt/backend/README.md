@@ -9,6 +9,21 @@ Alarm **wirklich** deine Nummer an / schickt eine SMS — über Twilio.
 > du dessen ausdrückliche Einwilligung + eine DSGVO-Rechtsgrundlage hast — und als Minderjähriger
 > einen erwachsenen Träger (Verantwortlichen). Siehe `../app/SECURITY.md`.
 
+## Alles in der App — ohne Terminal (empfohlen)
+
+Das Backend **serviert die App selbst**: die veröffentlichte Backend-URL *ist* die ganze App.
+Du machst nichts am Terminal — du klickst nur.
+
+1. **Ein-Klick deployen** (Render, gratis): In Render **New → Blueprint → dieses Repo wählen** →
+   Render liest `render.yaml` automatisch.
+2. **Schlüssel eintragen** — im Render-Dashboard unter **Environment** (nicht in der App!):
+   `ALERT_PHONE`, `TWILIO_*`, und (für die Bank) `GOCARDLESS_*`.
+3. **App öffnen**: die Render-URL (z. B. `https://halt-backend.onrender.com`) **im Handy-Browser** öffnen.
+   → In der App: **Einstellungen → Live → „Test-Alarm an mein Handy"** ruft dich echt an.
+   → **Konto verbinden → „Echtes Konto verbinden (Live)"** startet die Bank-Sandbox.
+
+Die geheimen Schlüssel liegen so **nur beim Hoster**, nie in der App — genau das ist die Sicherheit.
+
 ## Läuft sofort — ganz ohne Accounts (DRY_RUN)
 
 ```bash

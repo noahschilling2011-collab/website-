@@ -21,6 +21,20 @@ import { SEED } from './seed.js';
 const app = express();
 app.use(express.json());
 
+// CORS — so the HALT web app can call this backend from anywhere (incl. a file://
+// page during testing). The API holds no data that isn't already the caller's.
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
+// Serve the HALT web app itself, so the deployed backend URL *is* the whole app.
+// Open that URL on your phone and everything works — no terminal, no separate host.
+app.use(express.static(new URL('../../demo', import.meta.url).pathname));
+
 const sender = twilioConfigured() ? twilioSender(config.twilio) : dryRunSender();
 const seen = fileSeenStore(new URL('../data/notified.json', import.meta.url).pathname);
 const gc = gocardlessConfigured() ? createGoCardlessClient(config.gocardless) : null;
@@ -29,6 +43,8 @@ const wrap = (fn) => (req, res) => fn(req, res).catch((e) => {
   console.error(e);
   res.status(500).json({ error: e.message });
 });
+
+app.get('/favicon.ico', (_req, res) => res.sendStatus(204));
 
 app.get('/health', (_req, res) => {
   res.json({

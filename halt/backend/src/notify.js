@@ -44,5 +44,8 @@ export async function runScan(transactions, opts) {
     newlyDelivered: delivered.length,
     delivered,
     alerts: escalated.map((a) => ({ ...a, transaction: byId.get(a.transactionId) })),
+    // Full feed so a client can render everything, not just the alerts.
+    transactions,
+    assessments: assessments.map((a) => ({ ...a, transaction: byId.get(a.transactionId) })),
   };
 }

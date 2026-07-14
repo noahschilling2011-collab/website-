@@ -284,7 +284,7 @@ let S = load() || fresh();
 if(S.pinHash && S.session){ S.locked = true; S.pinBuf=''; }
 function fresh(){ return {screen:'auth', authMode:'signin', session:null, pinHash:null, lock:{failedAttempts:0,lockedUntil:null},
   locked:false, person:null, contacts:[], transactions:[], assessments:[], alerts:[], resolved:{}, tab:'activity',
-  pinBuf:'', pinStage:'enter', pinFirst:'', modal:null}; }
+  pinBuf:'', pinStage:'enter', pinFirst:'', modal:null, backend:'', reqId:'', live:null}; }
 function load(){ try{ return JSON.parse(localStorage.getItem(LS)); }catch(e){ return null; } }
 function save(){ const {pinBuf,...rest}=S; localStorage.setItem(LS, JSON.stringify({...rest,pinBuf:''})); }
 function hash(s){ let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))>>>0; return 'h'+h.toString(16); }
@@ -292,6 +292,23 @@ function hash(s){ let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCode
 const app = document.getElementById('app');
 const tabSlot = document.getElementById('tabbar-slot');
 const now = () => Date.now();
+
+// ── Live backend (the "brain" that holds the secrets and really sends) ─────────
+// If the app is served BY the backend, it talks to it automatically (same origin).
+// Otherwise you can paste your backend URL in Einstellungen → Live.
+function backendUrl(){
+  if(S.backend) return S.backend.replace(/\/+$/,'');
+  if(location.protocol.startsWith('http')) return location.origin;
+  return '';
+}
+async function api(path, opts={}){
+  const base = backendUrl();
+  if(!base) throw new Error('Kein Backend verbunden. Trag die URL unter Einstellungen → Live ein.');
+  const res = await fetch(base+path, {headers:{'Content-Type':'application/json'}, ...opts});
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || ('HTTP '+res.status));
+  return data;
+}
 
 function go(screen){ S.screen=screen; S.pinBuf=''; render(); }
 function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg;
@@ -315,7 +332,7 @@ function render(){
 
   const R = {
     auth:vAuth, welcome:vWelcome, person:vPerson, contacts:vContacts, connect:vConnect,
-    app:vApp, lock:vLock, pinsetup:vPinSetup,
+    app:vApp, lock:vLock, pinsetup:vPinSetup, livewait:vLiveWait,
   };
   app.innerHTML = (R[S.screen]||vWelcome)();
   tabSlot.innerHTML = (S.screen==='app' && !S.locked) ? tabbar() : '';
@@ -385,6 +402,17 @@ function vContacts(){
     <button class="btn primary" data-action="go" data-s="connect" ${S.contacts.length?'':'disabled'}>${S.contacts.length?'Weiter':'Mindestens eine Person'}</button>
   </div>`;
 }
+function vLiveWait(){
+  return `<div class="pad" style="padding-top:26px">
+    <h2>Im Bank-Fenster bestätigen</h2>
+    <p class="muted" style="margin:8px 0 18px">Es hat sich ein Fenster geöffnet. Melde dich dort an und stimme zu.
+    Bei der <b>Sandbox-Testbank</b> darfst du beliebige Werte eingeben. Danach hier weiter:</p>
+    <button class="btn primary" data-action="live-load">Konten laden & prüfen</button>
+    <div style="height:10px"></div>
+    <button class="btn ghost" data-action="go" data-s="app">Abbrechen</button>
+    <div class="demoflag" style="margin-top:16px">Kein Fenster aufgegangen? Erlaube Pop-ups — oder tippe „Konten laden", nachdem du im anderen Tab bestätigt hast.</div>
+  </div>`;
+}
 function vConnect(){
   return `<div class="pad" style="padding-top:26px">
     <h2>Konto sicher verbinden</h2>
@@ -393,8 +421,11 @@ function vConnect(){
       ${['Nur Lesezugriff auf Kontoumsätze','Kein Zugriff auf das Geld','Einwilligung jederzeit widerrufbar','Verarbeitung in der EU (DSGVO)']
         .map(t=>`<div class="row" style="margin:8px 0"><span style="color:var(--accent);font-weight:800">✓</span><span>${t}</span></div>`).join('')}
     </div>
-    <div class="demoflag" style="margin-bottom:16px">Demo: simuliert. Echt läuft es über einen lizenzierten Anbieter (Tink/finAPI). HALT hält keine Banklizenz.</div>
-    <button class="btn primary" data-action="connect-scan">Konto verbinden & prüfen</button>
+    <div class="demoflag" style="margin-bottom:16px">Zwei Wege: „Demo" nimmt Beispiel-Umsätze (offline). „Echtes Konto" nutzt dein verbundenes Backend + Bank-Sandbox.</div>
+    <button class="btn primary" data-action="connect-scan">Demo-Konto prüfen</button>
+    <div style="height:10px"></div>
+    <button class="btn ghost" data-action="live-connect" ${backendUrl()?'':'disabled'}>🔗 Echtes Konto verbinden (Live)</button>
+    ${backendUrl()?'':'<div class="muted small" style="margin-top:8px">Für „Live" zuerst unter Einstellungen → Live ein Backend verbinden.</div>'}
   </div>`;
 }
 
@@ -412,7 +443,7 @@ function tActivity(){
     return `<div class="tx" data-action="${lvl!=='ok'?'open-alert':''}" data-id="${tx.id}">
       <div style="flex:1"><div class="name">${esc(tx.payeeName)}</div>
         <div class="muted small">${new Date(tx.date).toLocaleDateString('de-DE',{day:'2-digit',month:'short'})} · ${CAT_DE[tx.category]}</div></div>
-      <div><div class="amt">−${eur(tx.amount)}</div>${lvl!=='ok'?'<div style="text-align:right;margin-top:5px">'+badge(lvl)+'</div>':''}</div>
+      <div><div class="amt">${tx.amount<0?'+':'−'}${eur(Math.abs(tx.amount))}</div>${lvl!=='ok'?'<div style="text-align:right;margin-top:5px">'+badge(lvl)+'</div>':''}</div>
     </div>`; }).join('');
   return `<div class="pad">
     <div class="muted small">Geschützt</div><h2>${esc(S.person)}</h2>
@@ -452,6 +483,17 @@ function tSettings(){
       ${S.pinHash?'<button class="btn ghost" data-action="pin-remove">App-Sperre entfernen</button>'
         :'<button class="btn primary" data-action="go" data-s="pinsetup">App-Sperre einrichten</button>'}
     </div>
+    <div class="muted small" style="margin:16px 0 6px">Live — echtes Backend</div>
+    <div class="card">
+      <div class="between"><div><b>Verbindung</b><div class="muted small">${liveLabel()}</div></div></div>
+      <div style="height:10px"></div>
+      <input id="beurl" placeholder="Backend-URL (z. B. https://halt.onrender.com)" value="${esc(S.backend||'')}" />
+      <div style="height:8px"></div>
+      <button class="btn ghost" data-action="save-backend">Speichern & prüfen</button>
+      <div style="height:8px"></div>
+      <button class="btn primary" data-action="test-alert" ${backendUrl()?'':'disabled'}>📱 Test-Alarm an mein Handy</button>
+      <div class="muted small" style="margin-top:8px">Schickt eine echte SMS/Anruf an die Nummer, die im Backend (.env) als ALERT_PHONE steht.</div>
+    </div>
     <div class="muted small" style="margin:16px 0 6px">Konto</div>
     <div class="card"><b>${esc(S.session.email)}</b><div class="muted small" style="margin:4px 0 12px">Angemeldet</div>
       <button class="btn ghost" data-action="signout">Abmelden</button></div>
@@ -459,6 +501,11 @@ function tSettings(){
     <button class="btn danger" data-action="wipe">Konto & alle Daten löschen</button>
     <div style="height:20px"></div>
   </div>`;
+}
+function liveLabel(){
+  if(!backendUrl()) return 'Nicht verbunden (Demo-Modus)';
+  if(S.live && S.live.ok) return `Verbunden${S.live.twilio?' · Twilio aktiv':' · Twilio im Test (DRY_RUN)'}`;
+  return `Backend: ${backendUrl()}`;
 }
 function tabbar(){
   const open = S.alerts.filter(a=>!S.resolved[a.transactionId]).length;
@@ -592,7 +639,43 @@ function act(a, d){
     case 'pin-key': pinKey(d.d); break;
     case 'pin-back': S.pinBuf=S.pinBuf.slice(0,-1); render(); break;
     case 'biometric': if(lockGate(S.lock,now()).allowed){ S.locked=false; S.lock={failedAttempts:0,lockedUntil:null}; toast('✓ Per Biometrie entsperrt'); render(); } break;
+    case 'save-backend': saveBackend(); break;
+    case 'test-alert': liveTestAlert(); break;
+    case 'live-connect': liveConnect(); break;
+    case 'live-load': liveLoad(); break;
   }
+}
+
+async function saveBackend(){
+  S.backend = (val('beurl')||'').trim(); S.live=null;
+  try{ const h = await api('/health'); S.live = h; toast(h.twilio?'✓ Verbunden — Twilio aktiv':'✓ Verbunden — Twilio im Test (DRY_RUN)'); }
+  catch(e){ toast('⚠️ '+e.message); }
+  render();
+}
+async function liveTestAlert(){
+  try{ const r = await api('/test-alert',{method:'POST',body:'{}'});
+    toast(r.dryRun?'DRY_RUN: Backend hat noch keine Twilio-Daten — nichts real gesendet.':`✓ Gesendet an ${r.to}. Schau auf dein Handy!`); }
+  catch(e){ toast('⚠️ '+e.message); }
+}
+async function liveConnect(){
+  try{ const r = await api('/connect/start',{method:'POST',body:'{}'});
+    S.reqId = r.requisitionId; if(r.link) window.open(r.link,'_blank');
+    S.screen='livewait'; render(); }
+  catch(e){ toast('⚠️ '+e.message); }
+}
+async function liveLoad(){
+  try{
+    const st = await api('/connect/status/'+encodeURIComponent(S.reqId));
+    if(!st.accounts || !st.accounts.length){ toast('Noch nicht verbunden — im anderen Tab bestätigen, dann erneut.'); return; }
+    app.innerHTML = `<div class="center"><div class="scan"></div><h2>Umsätze prüfen…</h2></div>`; tabSlot.innerHTML='';
+    const r = await api('/scan/'+encodeURIComponent(st.accounts[0]),{method:'POST',body:'{}'});
+    S.transactions = r.transactions || (r.alerts||[]).map(a=>a.transaction);
+    S.assessments = r.assessments || (r.alerts||[]);
+    S.alerts = (r.alerts||[]).map(a=>({transactionId:a.transactionId, assessment:a, transaction:a.transaction, summary:(a.signals&&a.signals[0]?a.signals[0].message:'')}));
+    S.tab='activity'; S.screen='app'; render();
+    const n=S.alerts.length;
+    toast(n?`🔔 ${n} verdächtige Bewegung(en) im echten Konto — Vertrauensperson${r.dryRun?' würde':' wurde'} benachrichtigt.`:'Echtes Konto geprüft — keine Auffälligkeiten.');
+  }catch(e){ S.screen='app'; render(); toast('⚠️ '+e.message); }
 }
 function showErr(id,msg){ const e=document.getElementById(id); if(e){ e.textContent=msg; e.style.display='block'; } }
 

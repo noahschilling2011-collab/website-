@@ -21,7 +21,10 @@ export const config = {
     secretKey: e.GOCARDLESS_SECRET_KEY || '',
     // Fixed test bank with fake data — use this to test end-to-end safely.
     institutionId: e.GOCARDLESS_INSTITUTION_ID || 'SANDBOXFINANCE_SFIN0000',
-    redirectUrl: e.GOCARDLESS_REDIRECT_URL || 'http://localhost:8080/connect/callback',
+    // Auto-detect the public URL on Render; else fall back to localhost.
+    redirectUrl:
+      e.GOCARDLESS_REDIRECT_URL ||
+      (e.RENDER_EXTERNAL_URL ? `${e.RENDER_EXTERNAL_URL}/connect/callback` : 'http://localhost:8080/connect/callback'),
     country: e.GOCARDLESS_COUNTRY || 'DE',
   },
 

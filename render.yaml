@@ -1,0 +1,30 @@
+# One-click deploy of the HALT backend (which also serves the app) to Render.
+# In Render: New → Blueprint → pick this repo → it reads this file.
+# Then paste your secrets in the Render dashboard (Environment) — never in the app.
+services:
+  - type: web
+    name: halt-backend
+    runtime: node
+    rootDir: halt/backend
+    plan: free
+    buildCommand: npm install
+    startCommand: node src/server.js
+    envVars:
+      - key: ALERT_PHONE      # your OWN verified phone, e.g. +4915112345678
+        sync: false
+      - key: ALERT_CHANNEL
+        value: both
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM      # your Twilio number
+        sync: false
+      - key: GOCARDLESS_SECRET_ID
+        sync: false
+      - key: GOCARDLESS_SECRET_KEY
+        sync: false
+      - key: GOCARDLESS_INSTITUTION_ID
+        value: SANDBOXFINANCE_SFIN0000
+      - key: GOCARDLESS_COUNTRY
+        value: DE
