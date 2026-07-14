@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>HALT — App-Demo</title>
+<meta name="description" content="Klickbare Demo der HALT-App: der Geld-Trigger, der Betrug stoppt, bevor das Geld weg ist." />
+<style>
+  :root{
+    --bg:#0b0d12; --bg-soft:#12151d; --card:#161a24; --border:#232838;
+    --text:#eef1f7; --muted:#9aa3b5; --brand:#ff5a4d; --brand-soft:#ff8a80;
+    --accent:#4dd4ac; --watch:#f5b74d; --alert:#ff5a4d; --ok:#4dd4ac;
+    --ring:rgba(255,90,77,.35); --radius:16px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:
+      radial-gradient(900px 500px at 80% -10%, #1b1030, transparent 60%),
+      radial-gradient(900px 600px at -10% 110%, #06201c, transparent 55%),
+      #05060a;
+    color:var(--text); display:flex; align-items:center; justify-content:center;
+    min-height:100dvh; padding:24px; gap:40px; flex-wrap:wrap;
+  }
+  /* Desktop pitch text next to the phone */
+  .pitch{max-width:340px; display:none}
+  @media(min-width:900px){ .pitch{display:block} }
+  .pitch .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:22px;margin-bottom:20px}
+  .pitch .logo .d{width:13px;height:13px;border-radius:50%;background:var(--brand);box-shadow:0 0 0 4px var(--ring)}
+  .pitch h1{font-size:34px;line-height:1.12;letter-spacing:-1px;margin:0 0 16px}
+  .pitch h1 .hl{color:var(--brand)}
+  .pitch p{color:var(--muted);line-height:1.6;font-size:16px}
+  .pitch .tag{margin-top:22px;display:inline-flex;gap:8px;align-items:center;font-size:12px;color:var(--brand-soft);
+    border:1px solid var(--border);background:var(--bg-soft);padding:6px 12px;border-radius:999px;text-transform:uppercase;letter-spacing:1px}
+
+  /* Phone frame */
+  .phone{
+    width:390px; max-width:100%; height:844px; max-height:calc(100dvh - 48px);
+    background:var(--bg); border-radius:44px; position:relative; overflow:hidden;
+    border:1px solid #2a2f40;
+    box-shadow:0 40px 120px -30px rgba(0,0,0,.9), inset 0 0 0 8px #0a0c11, inset 0 0 0 9px #1c2130;
+  }
+  .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:150px;height:30px;background:#05060a;border-radius:0 0 18px 18px;z-index:60}
+  .statusbar{position:absolute;top:0;left:0;right:0;height:52px;display:flex;align-items:flex-end;justify-content:space-between;
+    padding:0 26px 6px;font-size:13px;font-weight:600;color:var(--text);z-index:55;pointer-events:none}
+  .screenwrap{position:absolute;inset:0;padding-top:52px;display:flex;flex-direction:column}
+
+  .screen{flex:1;overflow-y:auto;animation:fade .28s ease both}
+  .screen::-webkit-scrollbar{width:0}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  @keyframes pop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
+
+  .pad{padding:18px 20px 28px}
+  h2{font-size:26px;font-weight:800;letter-spacing:-.5px;margin:0 0 6px}
+  .muted{color:var(--muted);font-size:15px;line-height:1.5}
+  .small{font-size:13px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+  .row{display:flex;align-items:center;gap:12px}
+  .between{display:flex;align-items:center;justify-content:space-between}
+
+  .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:52px;border-radius:999px;
+    font-size:16px;font-weight:700;border:1px solid transparent;cursor:pointer;font-family:inherit;transition:transform .1s,opacity .1s}
+  .btn:active{transform:scale(.98)}
+  .btn.primary{background:var(--brand);color:#fff}
+  .btn.ghost{background:transparent;color:var(--text);border-color:var(--border)}
+  .btn.danger{background:transparent;color:var(--brand);border-color:var(--brand)}
+  .btn[disabled]{opacity:.45;pointer-events:none}
+
+  input{width:100%;height:52px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+    padding:0 16px;color:var(--text);font-size:16px;font-family:inherit;outline:none}
+  input:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--ring)}
+  textarea{width:100%;min-height:120px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+    padding:14px 16px;color:var(--text);font-size:15px;font-family:inherit;outline:none;resize:none}
+  .err{color:var(--brand);font-size:14px;margin-top:10px}
+  .link{color:var(--brand);font-weight:700;cursor:pointer}
+
+  .logo-sm{display:flex;align-items:center;gap:9px;font-weight:800;font-size:19px}
+  .logo-sm .d{width:12px;height:12px;border-radius:50%;background:var(--brand)}
+
+  /* list rows */
+  .tx{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--border);cursor:pointer}
+  .tx:last-child{border-bottom:0}
+  .tx .name{font-weight:600;font-size:15px}
+  .tx .amt{font-weight:700;font-size:15px;text-align:right}
+  .badge{display:inline-flex;align-items:center;gap:6px;border:1px solid;border-radius:999px;padding:3px 9px;font-size:11px;font-weight:700}
+  .badge .dot{width:7px;height:7px;border-radius:50%}
+
+  /* tab bar */
+  .tabbar{display:flex;border-top:1px solid var(--border);background:var(--bg-soft)}
+  .tab{flex:1;padding:10px 0 22px;text-align:center;cursor:pointer;color:var(--muted);font-size:11px;font-weight:600}
+  .tab .ic{font-size:21px;display:block;margin-bottom:3px;opacity:.6}
+  .tab.active{color:var(--brand)}
+  .tab.active .ic{opacity:1}
+  .tab .badge-n{position:relative}
+  .tab .count{position:absolute;top:-6px;right:-12px;background:var(--brand);color:#fff;font-size:10px;
+    min-width:16px;height:16px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;padding:0 4px}
+
+  /* pin pad */
+  .dots{display:flex;gap:14px;justify-content:center;margin:22px 0}
+  .dots .dt{width:14px;height:14px;border-radius:50%;border:1.6px solid var(--brand)}
+  .dots .dt.on{background:var(--brand)}
+  .keys{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;max-width:260px;margin:0 auto}
+  .key{height:72px;border-radius:50%;background:var(--card);border:1px solid var(--border);font-size:26px;font-weight:700;
+    color:var(--text);cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center}
+  .key:active{opacity:.6}
+  .key.blank{background:transparent;border:0;cursor:default}
+
+  .center{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:24px}
+  .hero-dot{width:16px;height:16px;border-radius:50%;background:var(--brand);box-shadow:0 0 0 5px var(--ring);margin-bottom:18px}
+
+  .step{display:flex;gap:12px;align-items:flex-start;margin-bottom:14px}
+  .step .n{width:30px;height:30px;border-radius:9px;background:var(--card);border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--brand);flex:none}
+
+  .scan{width:120px;height:120px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--brand);
+    animation:spin 1s linear infinite;margin:20px auto}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .pill{display:inline-block;padding:2px 10px;border-radius:999px;background:var(--bg-soft);border:1px solid var(--border);font-size:12px;color:var(--muted)}
+  .toast{position:absolute;left:16px;right:16px;bottom:16px;background:#000;border:1px solid var(--border);border-radius:14px;
+    padding:14px 16px;z-index:80;animation:pop .25s ease both;font-size:14px}
+  .overlay{position:absolute;inset:0;background:var(--bg);z-index:70;display:flex;flex-direction:column;align-items:center;justify-content:center;animation:fade .2s}
+  .divider{height:1px;background:var(--border);margin:18px 0}
+  .demoflag{font-size:12px;color:var(--muted);border:1px dashed var(--border);border-radius:12px;padding:12px;line-height:1.5}
+</style>
+</head>
+<body>
+
+<div class="pitch">
+  <div class="logo"><span class="d"></span> HALT</div>
+  <h1>Die Notbremse zwischen deinen Eltern und einem <span class="hl">Betrug</span>.</h1>
+  <p>Diese Demo läuft komplett im Browser. Melde dich an, verbinde ein (simuliertes) Konto — und sieh, wie die echte Regel-Engine die verdächtigen Bewegungen findet und Alarm schlägt.</p>
+  <p style="margin-top:14px" class="small">Tipp: Beim „Konto verbinden" lädt HALT eine Beispiel-Historie mit einer laufenden Betrugsmasche (Krypto-Zahlungen). Genau die soll auffallen.</p>
+  <span class="tag">● Klickbarer Prototyp</span>
+</div>
+
+<div class="phone">
+  <div class="notch"></div>
+  <div class="statusbar"><span>9:41</span><span>HALT ·  100%</span></div>
+  <div class="screenwrap">
+    <div id="app" class="screen"></div>
+    <div id="tabbar-slot"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+// ─────────────────────────────────────────────────────────────────────────────
+// HALT risk engine — faithful JS port of src/lib/ruleEngine.ts (the tested one).
+// ─────────────────────────────────────────────────────────────────────────────
+const HIGH_RISK = new Set(['crypto','precious_metals','gift_card','money_remittance']);
+const W = { low:15, medium:35, high:60 };
+const ESCALATE = 60, WATCH = 30;
+const eur = n => n.toLocaleString('de-DE') + ' €';
+const ibanCountry = i => (i||'').trim().slice(0,2).toUpperCase();
+function median(a){ if(!a.length) return 0; const s=[...a].sort((x,y)=>x-y); const m=Math.floor(s.length/2);
+  return s.length%2 ? s[m] : (s[m-1]+s[m])/2; }
+
+function buildBaseline(history){
+  const out = history.filter(t=>t.amount>0);
+  const amts = out.map(t=>t.amount);
+  const homeCountries = new Set(out.map(t=>ibanCountry(t.payeeIban)).filter(Boolean));
+  return {
+    knownPayees:new Set(out.map(t=>t.payeeIban).filter(Boolean)),
+    maxOutgoing: amts.length?Math.max(...amts):0,
+    medianOutgoing: median(amts),
+    hasHighRiskHistory: out.some(t=>HIGH_RISK.has(t.category)),
+    homeCountries: homeCountries.size?homeCountries:new Set(['DE']),
+  };
+}
+const CAT_LABEL = { crypto:'eine Krypto-Börse', precious_metals:'einen Gold-/Edelmetallhändler',
+  gift_card:'Geschenkkarten', money_remittance:'einen Bargeld-Transferdienst' };
+
+function rules(tx, b, recent){
+  const out = [];
+  if(HIGH_RISK.has(tx.category)){
+    const first=!b.hasHighRiskHistory;
+    out.push({rule:'high_risk_category',severity:'high',message: first
+      ? `Erste Zahlung überhaupt an ${CAT_LABEL[tx.category]} — ein klassischer Weg, Betrugsgeld unwiderruflich abfließen zu lassen.`
+      : `Zahlung an ${CAT_LABEL[tx.category]}.`});
+  }
+  if(!b.knownPayees.has(tx.payeeIban)){
+    const big = tx.amount > Math.max(b.medianOutgoing*4,500);
+    out.push({rule:'new_payee',severity:big?'high':'low',message: big
+      ? `${eur(tx.amount)} an einen völlig neuen Empfänger (${tx.payeeName}) — deutlich über dem üblichen Rahmen.`
+      : `Neuer Empfänger: ${tx.payeeName}.`});
+  }
+  if(b.maxOutgoing>0 && tx.amount > b.maxOutgoing*1.5){
+    out.push({rule:'unusual_amount',severity:'high',
+      message:`${eur(tx.amount)} ist mehr als das 1,5-fache der bisher höchsten Zahlung (${eur(b.maxOutgoing)}).`});
+  }
+  const country = ibanCountry(tx.payeeIban);
+  if(country && !b.homeCountries.has(country)){
+    out.push({rule:'foreign_country',severity: tx.amount>300?'medium':'low',
+      message:`Zahlung ins Ausland (${country}), untypisch für dieses Konto.`});
+  }
+  const newRecent = recent.filter(t=>!b.knownPayees.has(t.payeeIban)).length + (b.knownPayees.has(tx.payeeIban)?0:1);
+  if(newRecent>=3){
+    out.push({rule:'velocity',severity:'high',
+      message:`${newRecent} Zahlungen an neue Empfänger innerhalb kurzer Zeit — typisches Muster unter Anleitung eines Betrügers.`});
+  }
+  if(tx.category==='cash_withdrawal'){
+    const total = recent.filter(t=>t.category==='cash_withdrawal').reduce((s,t)=>s+t.amount,0)+tx.amount;
+    if(total>=Math.max(b.medianOutgoing*5,1000)){
+      out.push({rule:'cash_spike',severity:'high',
+        message:`${eur(total)} Bargeld in kurzer Zeit abgehoben — weit über dem Üblichen. Bargeldübergabe ist eine häufige Betrugsmasche.`});
+    }
+  }
+  return out;
+}
+function levelOf(score){ return score>=ESCALATE?'alert':score>=WATCH?'watch':'ok'; }
+function assess(tx, b, recent=[]){
+  if(tx.amount<=0) return {transactionId:tx.id,signals:[],score:0,level:'ok',shouldEscalate:false};
+  const signals = rules(tx,b,recent);
+  const weights = signals.map(s=>W[s.severity]).sort((a,c)=>c-a);
+  let score=0; weights.forEach((w,i)=> score += i===0?w:w*0.5);
+  score = Math.min(100, Math.round(score));
+  const level = levelOf(score);
+  return {transactionId:tx.id,signals,score,level,shouldEscalate:level==='alert'};
+}
+function assessFeed(history, windowHours=24){
+  const b = buildBaseline(history);
+  const asc = [...history].sort((a,c)=>new Date(a.date)-new Date(c.date));
+  const res = asc.map((tx,idx)=>{
+    const t0 = new Date(tx.date).getTime();
+    const recent = asc.slice(0,idx).filter(t=> t.amount>0 && t0-new Date(t.date).getTime() <= windowHours*3600000);
+    return assess(tx,b,recent);
+  });
+  return res.reverse();
+}
+
+// ── Message-check heuristic (port of messageCheck.ts) ─────────────────────────
+const RED = [
+  [/\b(sofort|dringend|umgehend|innerhalb von \d+ (minuten|stunden))\b/i,'Zeitdruck — Betrüger drängen zur Eile.'],
+  [/\b(krypto|bitcoin|wallet|gutschein|guthabenkarte|steam|google play|amazon-karte)\b/i,'Ungewöhnliche Zahlungsart (Krypto/Geschenkkarten) — kaum rückholbar.'],
+  [/\b(geheim|niemandem sagen|nicht verraten|unter uns)\b/i,'Aufforderung zur Geheimhaltung — ein starkes Warnzeichen.'],
+  [/\b(enkel|neffe|nichte)\b[\s\S]*\b(geld|not|unfall|kaution)\b/i,'Klassischer Enkeltrick.'],
+  [/\b(microsoft|paypal|amazon|bank|zoll|polizei|europol)\b[\s\S]*\b(konto|gesperrt|verifizieren|bestätigen)\b/i,'Angebliche Behörde/Firma will Konto „verifizieren".'],
+  [/\b(neue nummer|handy kaputt|schreib mir auf whatsapp)\b/i,'„Neue Nummer" — beliebter Einstieg für Betrug per Messenger.'],
+  [/https?:\/\/\S+/i,'Enthält einen Link — nicht ungeprüft anklicken.'],
+];
+function checkMessage(text){
+  const reasons = RED.filter(([re])=>re.test(text)).map(([,r])=>r);
+  return { level: reasons.length>=2?'alert':reasons.length===1?'watch':'ok', reasons };
+}
+
+// ── validation (port of validation.ts) ────────────────────────────────────────
+const V = {
+  email:v=>{v=v.trim(); if(!v)return'Bitte E-Mail-Adresse eingeben.'; if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v))return'Das sieht nicht wie eine gültige E-Mail aus.'; return null;},
+  password:v=>{ if(v.length<10)return'Mindestens 10 Zeichen.'; if(!/[a-zA-Z]/.test(v))return'Mindestens ein Buchstabe.'; if(!/[0-9]/.test(v))return'Mindestens eine Zahl.'; return null;},
+  pin:v=>{ if(!/^\d{6}$/.test(v))return'Der PIN muss aus 6 Ziffern bestehen.'; if(/^(\d)\1{5}$/.test(v))return'Keine 6 gleichen Ziffern.'; if(v==='123456'||v==='654321')return'Zu leicht zu erraten.'; return null;},
+};
+
+// ── lockout policy (port of lockPolicy.ts) ────────────────────────────────────
+const FREE=3, MAXA=10;
+function backoffMs(f){ if(f<=FREE)return 0; const s=[30000,60000,300000,900000]; return s[Math.min(f-FREE-1,s.length-1)]; }
+function lockGate(st,now){ if(st.failedAttempts>=MAXA)return{allowed:false,remainingMs:0,mustReset:true};
+  if(st.lockedUntil&&now<st.lockedUntil)return{allowed:false,remainingMs:st.lockedUntil-now,mustReset:false};
+  return{allowed:true,remainingMs:0,mustReset:false}; }
+
+// ── seed data (port of mockBank.ts) ───────────────────────────────────────────
+const SEED = [
+  {id:'h1',date:'2026-06-01T08:12:00Z',amount:42.5,payeeName:'REWE Markt',payeeIban:'DE11111111111111111111',category:'groceries'},
+  {id:'h2',date:'2026-06-02T07:00:00Z',amount:89.9,payeeName:'Stadtwerke',payeeIban:'DE22222222222222222222',category:'utilities'},
+  {id:'h3',date:'2026-06-05T14:30:00Z',amount:31.2,payeeName:'Apotheke Sonne',payeeIban:'DE33333333333333333333',category:'retail'},
+  {id:'h4',date:'2026-06-09T10:05:00Z',amount:200,payeeName:'Enkel Max',payeeIban:'DE44444444444444444444',category:'transfer'},
+  {id:'h5',date:'2026-06-12T16:20:00Z',amount:60,payeeName:'ATM Sparkasse',payeeIban:'DE55555555555555555555',category:'cash_withdrawal'},
+  {id:'h6',date:'2026-06-18T09:45:00Z',amount:54.1,payeeName:'REWE Markt',payeeIban:'DE11111111111111111111',category:'groceries'},
+  {id:'h7',date:'2026-06-25T11:00:00Z',amount:75,payeeName:'Friseur Schmidt',payeeIban:'DE66666666666666666666',category:'retail'},
+  {id:'s1',date:'2026-07-11T13:10:00Z',amount:480,payeeName:'BitTrade Ltd',payeeIban:'LT991111222233334444',category:'crypto'},
+  {id:'s2',date:'2026-07-12T15:40:00Z',amount:1500,payeeName:'BitTrade Ltd',payeeIban:'LT991111222233334444',category:'crypto'},
+  {id:'s3',date:'2026-07-13T09:20:00Z',amount:3200,payeeName:'Secure Wallet SA',payeeIban:'ES881111222233334444',category:'crypto'},
+];
+const CAT_DE = {groceries:'Lebensmittel',utilities:'Nebenkosten',retail:'Einkauf',transfer:'Überweisung',
+  cash_withdrawal:'Bargeld',crypto:'Krypto',precious_metals:'Edelmetall',gift_card:'Geschenkkarte',money_remittance:'Geldtransfer',other:'Sonstiges'};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// State + persistence
+// ─────────────────────────────────────────────────────────────────────────────
+const LS='halt_demo_v1';
+let S = load() || fresh();
+// Cold start locks when a PIN is set — mirrors the real app's bootstrap.
+if(S.pinHash && S.session){ S.locked = true; S.pinBuf=''; }
+function fresh(){ return {screen:'auth', authMode:'signin', session:null, pinHash:null, lock:{failedAttempts:0,lockedUntil:null},
+  locked:false, person:null, contacts:[], transactions:[], assessments:[], alerts:[], resolved:{}, tab:'activity',
+  pinBuf:'', pinStage:'enter', pinFirst:'', modal:null}; }
+function load(){ try{ return JSON.parse(localStorage.getItem(LS)); }catch(e){ return null; } }
+function save(){ const {pinBuf,...rest}=S; localStorage.setItem(LS, JSON.stringify({...rest,pinBuf:''})); }
+function hash(s){ let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))>>>0; return 'h'+h.toString(16); }
+
+const app = document.getElementById('app');
+const tabSlot = document.getElementById('tabbar-slot');
+const now = () => Date.now();
+
+function go(screen){ S.screen=screen; S.pinBuf=''; render(); }
+function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg;
+  document.querySelector('.phone').appendChild(t); setTimeout(()=>t.remove(),2600); }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Render
+// ─────────────────────────────────────────────────────────────────────────────
+function badge(level){
+  const c = level==='alert'?'var(--alert)':level==='watch'?'var(--watch)':'var(--ok)';
+  const l = level==='alert'?'Alarm':level==='watch'?'Beobachten':'Unauffällig';
+  return `<span class="badge" style="color:${c};border-color:${c};background:${c}22"><span class="dot" style="background:${c}"></span>${l}</span>`;
+}
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function render(){
+  // Gate: not signed in -> auth; locked -> lock
+  if(!S.session){ S.screen='auth'; }
+  else if(S.locked && S.pinHash){ S.screen='lock'; }
+  else if(S.screen==='auth'||S.screen==='lock'){ S.screen = S.person ? 'app' : 'welcome'; }
+
+  const R = {
+    auth:vAuth, welcome:vWelcome, person:vPerson, contacts:vContacts, connect:vConnect,
+    app:vApp, lock:vLock, pinsetup:vPinSetup,
+  };
+  app.innerHTML = (R[S.screen]||vWelcome)();
+  tabSlot.innerHTML = (S.screen==='app' && !S.locked) ? tabbar() : '';
+  if(S.modal){ app.insertAdjacentHTML('beforeend', S.modal==='check'?mCheck():mAlert(S.modal)); }
+  save();
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+function vAuth(){
+  const su = S.authMode==='signup';
+  return `<div class="pad" style="padding-top:40px">
+    <div class="logo-sm" style="margin-bottom:34px"><span class="d"></span> HALT</div>
+    <h2>${su?'Konto erstellen':'Willkommen zurück'}</h2>
+    <p class="muted" style="margin-bottom:22px">${su?'Deine Daten sind verschlüsselt und liegen in der EU.':'Melde dich an, um fortzufahren.'}</p>
+    <input id="email" type="email" placeholder="E-Mail" autocomplete="email" value="${esc(S._email||'')}" />
+    <div style="height:12px"></div>
+    <input id="pw" type="password" placeholder="${su?'Passwort (mind. 10 Zeichen)':'Passwort'}" />
+    <div id="autherr" class="err" style="display:none"></div>
+    <div style="height:22px"></div>
+    <button class="btn primary" data-action="auth-submit">${su?'Registrieren':'Anmelden'}</button>
+    <p class="muted" style="text-align:center;margin-top:22px">
+      ${su?'Schon ein Konto? ':'Noch kein Konto? '}<span class="link" data-action="auth-toggle">${su?'Anmelden':'Registrieren'}</span>
+    </p>
+    <div class="divider"></div>
+    <div class="demoflag">Demo: Passwörter werden hier nur lokal geprüft. In der echten App hasht der Server (Argon2id) — der Client ist nie die Autorität.</div>
+  </div>`;
+}
+
+// ── Welcome / onboarding ──────────────────────────────────────────────────────
+function vWelcome(){
+  return `<div class="pad" style="padding-top:34px">
+    <div class="logo-sm" style="margin-bottom:26px"><span class="d"></span> HALT</div>
+    <h2 style="font-size:30px;line-height:1.15">Die Notbremse zwischen deinen Eltern und einem Betrug.</h2>
+    <p class="muted" style="margin:14px 0 26px">Ausgelöst vom Konto, nicht vom Zweifel des Opfers. Du entscheidest — nicht die App.</p>
+    <div class="step"><div class="n">1</div><div><b>Wen schützt du?</b><div class="muted small">Richte HALT für einen geliebten Menschen ein.</div></div></div>
+    <div class="step"><div class="n">2</div><div><b>Wer wird gewarnt?</b><div class="muted small">Bis zu drei Vertrauenspersonen.</div></div></div>
+    <div class="step"><div class="n">3</div><div><b>Konto verbinden</b><div class="muted small">Sicherer Lesezugriff (PSD2).</div></div></div>
+    <div style="height:20px"></div>
+    <button class="btn primary" data-action="go" data-s="person">Los geht's</button>
+  </div>`;
+}
+function vPerson(){
+  return `<div class="pad" style="padding-top:26px">
+    <h2>Wen möchtest du schützen?</h2>
+    <p class="muted" style="margin-bottom:22px">Nur für deinen Überblick. Z. B. „Mama" oder „Opa Werner".</p>
+    <input id="pname" placeholder="Name der Person" value="${esc(S.person||'')}" />
+    <div id="perr" class="err" style="display:none"></div>
+    <div style="height:22px"></div>
+    <button class="btn primary" data-action="person-next">Weiter</button>
+  </div>`;
+}
+function vContacts(){
+  const list = S.contacts.map((c,i)=>`<div class="card" style="margin-bottom:10px" class="between">
+    <div class="between"><div><b>${esc(c.name)}</b><div class="muted small">${esc(c.phone)}${c.relation?' · '+esc(c.relation):''}</div></div>
+    <span class="link" data-action="rm-contact" data-i="${i}">Entfernen</span></div></div>`).join('');
+  return `<div class="pad" style="padding-top:26px">
+    <h2>Wer wird gewarnt?</h2>
+    <p class="muted" style="margin-bottom:18px">Diese Personen bekommen sofort eine Nachricht — bei echtem Alarm einen Anruf.</p>
+    ${list}
+    <div class="card" style="margin-top:6px">
+      <input id="cname" placeholder="Name" /><div style="height:10px"></div>
+      <input id="cphone" placeholder="Telefonnummer" /><div style="height:10px"></div>
+      <input id="crel" placeholder="Beziehung (optional)" /><div style="height:14px"></div>
+      <button class="btn ghost" data-action="add-contact">Vertrauensperson hinzufügen</button>
+    </div>
+    <div style="height:16px"></div>
+    <button class="btn primary" data-action="go" data-s="connect" ${S.contacts.length?'':'disabled'}>${S.contacts.length?'Weiter':'Mindestens eine Person'}</button>
+  </div>`;
+}
+function vConnect(){
+  return `<div class="pad" style="padding-top:26px">
+    <h2>Konto sicher verbinden</h2>
+    <p class="muted" style="margin-bottom:18px">${esc(S.person||'Die Person')} gibt einmalig ihre Einwilligung. HALT sieht nur die Umsätze — nie das Geld.</p>
+    <div class="card" style="margin-bottom:14px">
+      ${['Nur Lesezugriff auf Kontoumsätze','Kein Zugriff auf das Geld','Einwilligung jederzeit widerrufbar','Verarbeitung in der EU (DSGVO)']
+        .map(t=>`<div class="row" style="margin:8px 0"><span style="color:var(--accent);font-weight:800">✓</span><span>${t}</span></div>`).join('')}
+    </div>
+    <div class="demoflag" style="margin-bottom:16px">Demo: simuliert. Echt läuft es über einen lizenzierten Anbieter (Tink/finAPI). HALT hält keine Banklizenz.</div>
+    <button class="btn primary" data-action="connect-scan">Konto verbinden & prüfen</button>
+  </div>`;
+}
+
+// ── Main app ──────────────────────────────────────────────────────────────────
+function vApp(){
+  if(S.tab==='activity') return tActivity();
+  if(S.tab==='alerts') return tAlerts();
+  return tSettings();
+}
+function tActivity(){
+  const byId = Object.fromEntries(S.assessments.map(a=>[a.transactionId,a]));
+  const sorted = [...S.transactions].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const open = S.alerts.filter(a=>!S.resolved[a.transactionId]).length;
+  const rows = sorted.map(tx=>{ const a=byId[tx.id]; const lvl=a?a.level:'ok';
+    return `<div class="tx" data-action="${lvl!=='ok'?'open-alert':''}" data-id="${tx.id}">
+      <div style="flex:1"><div class="name">${esc(tx.payeeName)}</div>
+        <div class="muted small">${new Date(tx.date).toLocaleDateString('de-DE',{day:'2-digit',month:'short'})} · ${CAT_DE[tx.category]}</div></div>
+      <div><div class="amt">−${eur(tx.amount)}</div>${lvl!=='ok'?'<div style="text-align:right;margin-top:5px">'+badge(lvl)+'</div>':''}</div>
+    </div>`; }).join('');
+  return `<div class="pad">
+    <div class="muted small">Geschützt</div><h2>${esc(S.person)}</h2>
+    ${open?`<div class="card" style="border-color:var(--brand);margin:14px 0" data-action="tab" data-t="alerts">
+      <b style="color:var(--brand)">${open} offene ${open===1?'Warnung':'Warnungen'}</b>
+      <div class="muted small" style="margin-top:4px">Tippen, um sie anzusehen →</div></div>`:''}
+    <div class="card" style="margin-top:14px;padding:2px 16px">${rows}</div>
+    <div style="height:14px"></div>
+    <button class="btn ghost" data-action="modal" data-m="check">Verdächtige Nachricht prüfen</button>
+  </div>`;
+}
+function tAlerts(){
+  const sorted = [...S.alerts].sort((a,b)=>b.assessment.score-a.assessment.score);
+  if(!sorted.length) return `<div class="pad"><h2>Warnungen</h2>
+    <div class="card"><b>Alles ruhig.</b><div class="muted" style="margin-top:4px">Keine ungewöhnlichen Bewegungen. Genau so soll es sein.</div></div></div>`;
+  const cards = sorted.map(a=>{ const done=S.resolved[a.transactionId];
+    return `<div class="card" style="margin-bottom:12px;${done?'opacity:.55':''}" data-action="open-alert" data-id="${a.transactionId}">
+      <div class="between" style="margin-bottom:8px">${badge(a.assessment.level)}<span class="muted small">Score ${a.assessment.score}</span></div>
+      <b>${eur(a.transaction.amount)} an ${esc(a.transaction.payeeName)}</b>
+      <div class="muted small" style="margin-top:4px">${esc(a.assessment.signals[0].message)}</div>
+      ${done?`<div class="small" style="color:var(--accent);margin-top:8px">✓ ${done==='handled'?'Erledigt':'Als unkritisch markiert'}</div>`:''}
+    </div>`; }).join('');
+  return `<div class="pad"><h2>Warnungen</h2>${cards}</div>`;
+}
+function tSettings(){
+  const cs = S.contacts.map((c,i)=>`<div style="padding:8px 0;${i?'border-top:1px solid var(--border)':''}">
+    <b>${esc(c.name)}</b><div class="muted small">${esc(c.phone)}${c.relation?' · '+esc(c.relation):''}</div></div>`).join('') || '<span class="muted">Keine.</span>';
+  return `<div class="pad"><h2>Einstellungen</h2>
+    <div class="muted small" style="margin:12px 0 6px">Geschützte Person</div>
+    <div class="card"><b>${esc(S.person)}</b><div class="muted small" style="margin-top:4px">Konto verbunden · Lesezugriff</div></div>
+    <div class="muted small" style="margin:16px 0 6px">Alarm-Kreis (${S.contacts.length})</div>
+    <div class="card">${cs}</div>
+    <div class="muted small" style="margin:16px 0 6px">Sicherheit</div>
+    <div class="card">
+      <div class="between"><div><b>App-Sperre (PIN + Biometrie)</b><div class="muted small">${S.pinHash?'Aktiv':'Nicht eingerichtet'}</div></div></div>
+      <div style="height:12px"></div>
+      ${S.pinHash?'<button class="btn ghost" data-action="pin-remove">App-Sperre entfernen</button>'
+        :'<button class="btn primary" data-action="go" data-s="pinsetup">App-Sperre einrichten</button>'}
+    </div>
+    <div class="muted small" style="margin:16px 0 6px">Konto</div>
+    <div class="card"><b>${esc(S.session.email)}</b><div class="muted small" style="margin:4px 0 12px">Angemeldet</div>
+      <button class="btn ghost" data-action="signout">Abmelden</button></div>
+    <div style="height:16px"></div>
+    <button class="btn danger" data-action="wipe">Konto & alle Daten löschen</button>
+    <div style="height:20px"></div>
+  </div>`;
+}
+function tabbar(){
+  const open = S.alerts.filter(a=>!S.resolved[a.transactionId]).length;
+  const t=(id,ic,label,extra='')=>`<div class="tab ${S.tab===id?'active':''}" data-action="tab" data-t="${id}">
+    <span class="ic badge-n">${ic}${extra}</span>${label}</div>`;
+  return `<div class="tabbar">
+    ${t('activity','📈','Aktivität')}
+    ${t('alerts','🔔','Warnungen', open?`<span class="count">${open}</span>`:'')}
+    ${t('settings','⚙️','Konto')}
+  </div>`;
+}
+
+// ── Lock + PIN setup ──────────────────────────────────────────────────────────
+function pinDots(n){ return `<div class="dots">${Array.from({length:6},(_,i)=>`<span class="dt ${i<n?'on':''}"></span>`).join('')}</div>`; }
+function pinKeys(extraLeft=''){
+  const k=d=>`<button class="key" data-action="pin-key" data-d="${d}">${d}</button>`;
+  return `<div class="keys">${['1','2','3','4','5','6','7','8','9'].map(k).join('')}
+    ${extraLeft||'<span class="key blank"></span>'}${k('0')}
+    <button class="key" data-action="pin-back">⌫</button></div>`;
+}
+function vLock(){
+  const g = lockGate(S.lock, now());
+  let msg = g.mustReset?'Zu viele Fehlversuche. Bitte neu anmelden.':
+    (!g.allowed && g.remainingMs>0)?`Zu viele Versuche. Bitte ${Math.ceil(g.remainingMs/1000)}s warten.`:'';
+  return `<div class="center">
+    <div class="hero-dot"></div><h2>HALT entsperren</h2>
+    <p class="muted" style="margin:6px 0">Gib deinen 6-stelligen PIN ein.</p>
+    ${pinDots(S.pinBuf.length)}
+    ${msg?`<div class="err" style="margin-bottom:10px">${msg}</div>`:''}
+    ${pinKeys('<button class="key" data-action="biometric" title="Biometrie">☑</button>')}
+    <p class="muted small" style="margin-top:18px">Demo-PIN, den du beim Einrichten gewählt hast.</p>
+  </div>`;
+}
+function vPinSetup(){
+  const t = S.pinStage==='enter'?'App-Sperre einrichten':'PIN bestätigen';
+  const s = S.pinStage==='enter'?'Wähle einen 6-stelligen PIN.':'Gib denselben PIN noch einmal ein.';
+  return `<div class="center">
+    <h2>${t}</h2><p class="muted" style="margin:6px 0">${s}</p>
+    ${pinDots(S.pinBuf.length)}
+    ${S._pinerr?`<div class="err" style="margin-bottom:10px">${S._pinerr}</div>`:''}
+    ${pinKeys()}
+    <p class="link" style="margin-top:20px" data-action="go" data-s="app">Später</p>
+  </div>`;
+}
+
+// ── Modals ────────────────────────────────────────────────────────────────────
+function mAlert(id){
+  const tx = S.transactions.find(t=>t.id===id); const a = S.assessments.find(x=>x.transactionId===id);
+  if(!tx||!a) return '';
+  const c = a.level==='alert'?'var(--alert)':a.level==='watch'?'var(--watch)':'var(--ok)';
+  const contact = S.contacts[0];
+  return `<div class="overlay" style="justify-content:flex-start;overflow-y:auto">
+    <div class="pad" style="width:100%">
+      <div class="between"><span class="pill">Warnung</span><span class="link" data-action="close-modal">Schließen</span></div>
+      <div style="text-align:center;margin:18px 0">
+        ${badge(a.level)}
+        <div style="font-size:40px;font-weight:800;color:${c};margin-top:14px">${eur(tx.amount)}</div>
+        <div style="font-size:17px;margin-top:2px">an ${esc(tx.payeeName)}</div>
+        <div class="muted small" style="margin-top:4px">${new Date(tx.date).toLocaleString('de-DE')} · ${CAT_DE[tx.category]}</div>
+      </div>
+      <div class="muted small" style="margin-bottom:6px">Warum HALT gewarnt hat</div>
+      <div class="card" style="margin-bottom:16px">
+        ${a.signals.map(s=>`<div class="row" style="margin:8px 0;align-items:flex-start"><span style="width:8px;height:8px;border-radius:50%;background:${c};margin-top:7px;flex:none"></span><span class="small">${esc(s.message)}</span></div>`).join('')}
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="muted small" style="margin-bottom:12px">HALT sagt nicht, ob das Betrug ist — das kannst nur du beurteilen. Ruf am besten kurz an, bevor Geld weg ist.</div>
+        ${contact?`<button class="btn primary" data-action="call" data-p="${esc(contact.phone)}">${esc(contact.name)} anrufen</button>`:''}
+      </div>
+      <button class="btn ghost" style="margin-bottom:10px" data-action="resolve" data-id="${id}" data-r="handled">Ich kümmere mich darum</button>
+      <button class="btn ghost" data-action="resolve" data-id="${id}" data-r="dismissed">Alles in Ordnung — war bekannt</button>
+      <div style="height:20px"></div>
+    </div></div>`;
+}
+function mCheck(){
+  const r = S._checkResult;
+  return `<div class="overlay" style="justify-content:flex-start;overflow-y:auto">
+    <div class="pad" style="width:100%">
+      <div class="between"><span class="pill">Nachricht prüfen</span><span class="link" data-action="close-modal">Schließen</span></div>
+      <h2 style="margin-top:16px">Nachricht prüfen</h2>
+      <p class="muted" style="margin-bottom:14px">Füg eine verdächtige SMS oder WhatsApp ein. HALT sucht nach Betrugsmustern.</p>
+      <textarea id="msg" placeholder="Nachricht hier einfügen…">${esc(S._msg||'')}</textarea>
+      <div style="height:12px"></div>
+      <button class="btn primary" data-action="run-check">Prüfen</button>
+      ${r?`<div class="card" style="margin-top:16px;${r.level!=='ok'?'border-color:var(--brand)':''}">
+        ${badge(r.level)}
+        ${r.level==='ok'?'<div class="small" style="margin-top:10px">Keine typischen Betrugsmuster gefunden. Trotzdem: bei Geldforderungen immer persönlich nachfragen.</div>'
+        :'<div style="margin-top:10px"><b class="small">Das ist aufgefallen:</b>'+r.reasons.map(x=>`<div class="row" style="margin-top:6px"><span style="color:var(--brand)">•</span><span class="small">${esc(x)}</span></div>`).join('')+'<div class="muted small" style="margin-top:10px">Im Zweifel: nicht antworten, nichts zahlen, mit einer Vertrauensperson sprechen.</div></div>'}
+      </div>`:''}
+      <div style="height:20px"></div>
+    </div></div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Actions
+// ─────────────────────────────────────────────────────────────────────────────
+document.querySelector('.phone').addEventListener('click', e=>{
+  const el = e.target.closest('[data-action]'); if(!el) return;
+  const d = el.dataset; act(d.action, d);
+});
+function val(id){ const e=document.getElementById(id); return e?e.value:''; }
+
+function act(a, d){
+  switch(a){
+    case 'auth-toggle': S._email=val('email'); S.authMode = S.authMode==='signup'?'signin':'signup'; render(); break;
+    case 'auth-submit': {
+      const email=val('email'), pw=val('pw');
+      const ee=V.email(email); if(ee) return showErr('autherr',ee);
+      if(S.authMode==='signup'){ const pe=V.password(pw); if(pe) return showErr('autherr',pe); }
+      else if(!pw) return showErr('autherr','Bitte Passwort eingeben.');
+      S.session={email:email.trim().toLowerCase()}; S._email='';
+      if(S.authMode==='signup'){ S.person=null; go('welcome'); }
+      else { S.locked = !!S.pinHash; go(S.person?'app':'welcome'); }
+      break; }
+    case 'auth-toggle2': break;
+    case 'go': if(d.s==='pinsetup'){ S.pinBuf=''; S.pinStage='enter'; S.pinFirst=''; S._pinerr=''; } go(d.s); break;
+    case 'person-next': { const n=val('pname').trim(); if(!n) return showErr('perr','Bitte einen Namen eingeben.'); S.person=n; go('contacts'); break; }
+    case 'add-contact': { const name=val('cname').trim(), phone=val('cphone').trim(), rel=val('crel').trim();
+      if(!name||!phone){ toast('Name und Telefon nötig.'); return; } S.contacts.push({name,phone,relation:rel}); render(); break; }
+    case 'rm-contact': S.contacts.splice(+d.i,1); render(); break;
+    case 'connect-scan': runScan(); break;
+    case 'tab': S.tab=d.t; S.screen='app'; render(); break;
+    case 'open-alert': S.modal=d.id; render(); break;
+    case 'modal': if(d.m==='check'){ S._msg=''; S._checkResult=null; } S.modal=d.m; render(); break;
+    case 'close-modal': S.modal=null; render(); break;
+    case 'run-check': S._msg=val('msg'); S._checkResult=checkMessage(S._msg); render(); break;
+    case 'call': toast('☎️ Demo: würde '+d.p+' anrufen.'); break;
+    case 'resolve': S.resolved[d.id]=d.r; S.modal=null; render(); break;
+    case 'signout': S.session=null; S.locked=false; go('auth'); break;
+    case 'pin-remove': S.pinHash=null; S.lock={failedAttempts:0,lockedUntil:null}; render(); break;
+    case 'wipe': if(confirm('Konto, PIN und alle lokalen Daten unwiderruflich löschen?')){ localStorage.removeItem(LS); S=fresh(); render(); } break;
+    case 'pin-key': pinKey(d.d); break;
+    case 'pin-back': S.pinBuf=S.pinBuf.slice(0,-1); render(); break;
+    case 'biometric': if(lockGate(S.lock,now()).allowed){ S.locked=false; S.lock={failedAttempts:0,lockedUntil:null}; toast('✓ Per Biometrie entsperrt'); render(); } break;
+  }
+}
+function showErr(id,msg){ const e=document.getElementById(id); if(e){ e.textContent=msg; e.style.display='block'; } }
+
+function pinKey(dg){
+  if(S.pinBuf.length>=6) return;
+  S.pinBuf += dg;
+  if(S.pinBuf.length<6){ render(); return; }
+  const entered = S.pinBuf;
+  if(S.screen==='pinsetup'){
+    if(S.pinStage==='enter'){ const v=V.pin(entered); if(v){ S._pinerr=v; S.pinBuf=''; render(); return; }
+      S.pinFirst=entered; S.pinBuf=''; S.pinStage='confirm'; S._pinerr=''; render(); return; }
+    if(entered!==S.pinFirst){ S._pinerr='Die PINs stimmen nicht überein.'; S.pinBuf=''; S.pinStage='enter'; S.pinFirst=''; render(); return; }
+    S.pinHash=hash(entered); S.pinBuf=''; S.pinStage='enter'; S._pinerr=''; toast('✓ App-Sperre aktiv'); go('app'); return;
+  }
+  if(S.screen==='lock'){
+    const g = lockGate(S.lock, now());
+    if(!g.allowed){ S.pinBuf=''; render(); return; }
+    if(hash(entered)===S.pinHash){ S.locked=false; S.lock={failedAttempts:0,lockedUntil:null}; S.pinBuf=''; render(); }
+    else { S.lock.failedAttempts++; const w=backoffMs(S.lock.failedAttempts); S.lock.lockedUntil = w>0?now()+w:null;
+      if(S.lock.failedAttempts>=MAXA){ S.pinHash=null; S.locked=false; S.session=null; toast('Zu viele Fehlversuche — neu anmelden.'); }
+      S.pinBuf=''; render(); }
+  }
+}
+
+function runScan(){
+  app.innerHTML = `<div class="center"><div class="scan"></div><h2>Verbinde & prüfe…</h2>
+    <p class="muted">Umsätze werden über den (simulierten) Bankzugang geladen und bewertet.</p></div>`;
+  tabSlot.innerHTML='';
+  setTimeout(()=>{
+    S.transactions = SEED.slice();
+    S.assessments = assessFeed(S.transactions);
+    const byId = Object.fromEntries(S.transactions.map(t=>[t.id,t]));
+    S.alerts = S.assessments.filter(a=>a.shouldEscalate).map(a=>({transactionId:a.transactionId, assessment:a,
+      transaction:byId[a.transactionId], summary:a.signals[0]?a.signals[0].message:''}));
+    S.tab='activity'; S.screen='app'; render();
+    const n=S.alerts.length;
+    setTimeout(()=>toast(n?`🔔 ${n} verdächtige ${n===1?'Bewegung':'Bewegungen'} gefunden — Vertrauensperson würde jetzt benachrichtigt.`:'Keine Auffälligkeiten.'),400);
+  }, 1600);
+}
+
+render();
+</script>
+</body>
+</html>
