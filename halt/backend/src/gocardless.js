@@ -49,10 +49,16 @@ export function createGoCardlessClient({ secretId, secretKey }) {
     listInstitutions: (country = 'DE') => api(`/institutions/?country=${encodeURIComponent(country)}`),
 
     // Returns { id, link, status }. Send the user to `link` to grant consent.
-    createRequisition: ({ institutionId, redirect, reference = 'halt-demo' }) =>
+    // `reference` must be unique per requisition, so default to a fresh one.
+    createRequisition: ({ institutionId, redirect, reference }) =>
       api('/requisitions/', {
         method: 'POST',
-        body: { redirect, institution_id: institutionId, reference, user_language: 'DE' },
+        body: {
+          redirect,
+          institution_id: institutionId,
+          reference: reference || `halt-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+          user_language: 'DE',
+        },
       }),
 
     // After consent, status becomes "LN" and `accounts` is populated.
