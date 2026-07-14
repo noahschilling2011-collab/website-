@@ -16,6 +16,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev || npm install --omit=dev
 COPY --from=build /app/dist ./dist
 COPY migrations ./migrations
+COPY public ./public
 EXPOSE 8080
 USER node
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://localhost:8080/health || exit 1

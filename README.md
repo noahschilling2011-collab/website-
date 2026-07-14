@@ -17,13 +17,21 @@ Enterprise-Plattform für iOS, Android und Web: KI-Chat (GPT / Claude / Gemini),
 
 ## Schnellstart
 
-### Backend (lokal, mit Docker)
+### Backend + Web-App (lokal, mit Docker)
 
 ```bash
 cp backend/.env.example backend/.env      # API-Keys eintragen
 docker compose up --build
-# API: http://localhost:8080  ·  GraphQL: http://localhost:8080/graphql
+# Web-App:  http://localhost:8080          (Single-File-App, backend/public/index.html)
+# API:      http://localhost:8080/api      ·  GraphQL: http://localhost:8080/graphql
 ```
+
+Die Web-App (`backend/public/index.html`) ist eine einzelne HTML-Datei ohne
+Build-Schritt: Login/Registrierung inkl. 2FA, KI-Chat mit Streaming und
+Provider-Wahl, KI-Werkzeuge, Aufgaben, Notizen, Kalender — responsive
+(Bottom-Navigation auf dem Handy), Dark/Light Mode, automatischer
+Token-Refresh. Sie läuft auch von einem anderen Host aus:
+`index.html?api=http://<backend-host>:8080` öffnen.
 
 ### Backend (ohne Docker)
 

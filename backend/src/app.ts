@@ -22,7 +22,18 @@ export function createApp(): express.Express {
   const app = express();
 
   app.set('trust proxy', 1);
-  app.use(helmet());
+  // CSP allows the inline script/styles of the single-file web app in public/.
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'", 'https:', 'wss:'],
+      },
+    },
+  }));
   app.use(cors({ origin: config.corsOrigin === '*' ? true : config.corsOrigin.split(',') }));
   app.use(express.json({ limit: '10mb' }));
   app.use(pinoHttp({
@@ -32,6 +43,9 @@ export function createApp(): express.Express {
 
   // Liveness/readiness for load balancers and Kubernetes probes.
   app.get('/health', (_req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
+
+  // Single-file web app (website + installable PWA-style client).
+  app.use(express.static('public', { index: 'index.html', maxAge: '5m' }));
 
   app.use('/api/auth', authRouter);
   app.use('/api/users', usersRouter);
