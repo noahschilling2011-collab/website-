@@ -54,6 +54,28 @@ test('weak or invalid input is rejected', () => {
   assert.throws(() => auth.signup('a@b.de', 'nurbuchstaben'), /Buchstabe/);
 });
 
+test('oauth upsert creates a passwordless account, then reuses it', () => {
+  const auth = freshAuth();
+  const r1 = auth.upsertOAuth('Noah@Gmail.com', 'google');
+  assert.equal(r1.email, 'noah@gmail.com');
+  assert.equal(auth.verify(r1.token), 'noah@gmail.com');
+  assert.equal(auth.count(), 1);
+  const r2 = auth.upsertOAuth('noah@gmail.com', 'google'); // same person, second login
+  assert.equal(auth.count(), 1);
+  assert.ok(r2.token && r2.token !== r1.token);
+});
+
+test('oauth login cannot be used to bypass a password (still separate accounts by email)', () => {
+  const auth = freshAuth();
+  auth.signup('a@b.de', 'meinpasswort1');
+  // Same email via oauth links to the existing account, does not reset the password.
+  const r = auth.upsertOAuth('a@b.de', 'google');
+  assert.equal(r.email, 'a@b.de');
+  assert.equal(auth.count(), 1);
+  // password login still works with the original password
+  assert.ok(auth.login('a@b.de', 'meinpasswort1').token);
+});
+
 test('logout invalidates the token', () => {
   const auth = freshAuth();
   const { token } = auth.signup('a@b.de', 'meinpasswort1');

@@ -89,6 +89,17 @@ npm run demo-scan   # 3 Krypto-Alarme -> 3 SMS + 3 Anrufe an deine Nummer
 Wenn die Engine in den Umsätzen etwas Verdächtiges findet, **klingelt dein Handy** — mit echten
 (Sandbox-)Daten, über denselben Code, den du später auf eine echte Bank umstellst.
 
+## Anmeldung mit Google (optional, gratis)
+
+1. In der **Google Cloud Console** einen OAuth-Client (Typ „Web") anlegen.
+2. Als „Authorized redirect URI" `<APP_URL>/auth/google/callback` eintragen
+   (z. B. `https://halt-backend.onrender.com/auth/google/callback`).
+3. `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` in `.env` / im Render-Dashboard setzen.
+   → In der App erscheint automatisch „Weiter mit Google".
+
+**Apple** funktioniert genauso, braucht aber ein **Apple-Developer-Konto (99 €/Jahr)** — der Code
+ist als Gerüst vorbereitet (`APPLE_*`-Variablen), bleibt aber aus, bis du das Konto hast.
+
 ## Endpunkte
 
 | Methode | Pfad | Zweck |

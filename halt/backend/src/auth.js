@@ -72,6 +72,20 @@ export function createAuth(usersPath) {
       return { email: key, token: issueToken(key) };
     },
 
+    // Social login: find-or-create a passwordless account for a verified email.
+    upsertOAuth(email, provider) {
+      const key = String(email || '').trim().toLowerCase();
+      if (!key) throw httpError(400, 'Keine E-Mail vom Anbieter.');
+      if (!users[key]) {
+        users[key] = { provider };
+        persist();
+      } else if (!users[key].provider && !users[key].passwordHash) {
+        users[key].provider = provider;
+        persist();
+      }
+      return { email: key, token: issueToken(key) };
+    },
+
     login(email, password) {
       const key = String(email || '').trim().toLowerCase();
       const user = users[key];

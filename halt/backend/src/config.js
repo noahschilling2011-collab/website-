@@ -28,6 +28,21 @@ export const config = {
     country: e.GOCARDLESS_COUNTRY || 'DE',
   },
 
+  // Public base URL of this backend (for OAuth redirects). Auto-detects on Render.
+  appUrl: e.APP_URL || e.RENDER_EXTERNAL_URL || `http://localhost:${e.PORT ?? '8080'}`,
+
+  // Social login. Each provider needs credentials you register once.
+  oauth: {
+    google: { clientId: e.GOOGLE_CLIENT_ID || '', clientSecret: e.GOOGLE_CLIENT_SECRET || '' },
+    // Apple needs a paid Apple Developer account ($99/yr) — scaffolded, off by default.
+    apple: {
+      clientId: e.APPLE_CLIENT_ID || '', // your Services ID, e.g. app.halt.login
+      teamId: e.APPLE_TEAM_ID || '',
+      keyId: e.APPLE_KEY_ID || '',
+      privateKey: (e.APPLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+    },
+  },
+
   // Where alerts go. Your OWN (verified) number for testing.
   alertPhone: e.ALERT_PHONE || '',
 
@@ -40,6 +55,12 @@ export const twilioConfigured = () =>
 
 export const gocardlessConfigured = () =>
   Boolean(config.gocardless.secretId && config.gocardless.secretKey);
+
+export const googleConfigured = () =>
+  Boolean(config.oauth.google.clientId && config.oauth.google.clientSecret);
+
+export const appleConfigured = () =>
+  Boolean(config.oauth.apple.clientId && config.oauth.apple.privateKey);
 
 /** DRY_RUN when we can't actually send — logic still runs, nothing goes out. */
 export const isDryRun = () => !twilioConfigured();

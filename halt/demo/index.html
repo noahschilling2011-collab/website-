@@ -282,6 +282,17 @@ const LS='halt_demo_v1';
 let S = load() || fresh();
 // Cold start locks when a PIN is set — mirrors the real app's bootstrap.
 if(S.pinHash && S.session){ S.locked = true; S.pinBuf=''; }
+// Returning from a social login: the backend put the token in the URL fragment.
+(function(){
+  const h = location.hash || '';
+  if(h.includes('token=') || h.includes('error=')){
+    const q = new URLSearchParams(h.slice(1));
+    const tk=q.get('token'), em=q.get('email'), er=q.get('error');
+    if(tk){ S.session={email:em||'', token:tk}; S.locked=false; S._oauthLoggedIn=true; }
+    else if(er){ S._oauthError=er; }
+    try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){}
+  }
+})();
 function fresh(){ return {screen:'auth', authMode:'signin', session:null, pinHash:null, lock:{failedAttempts:0,lockedUntil:null},
   locked:false, person:null, contacts:[], transactions:[], assessments:[], alerts:[], resolved:{}, tab:'activity',
   pinBuf:'', pinStage:'enter', pinFirst:'', modal:null, backend:'', reqId:'', live:null}; }
@@ -326,7 +337,15 @@ function badge(level){
 }
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
+let providersFetched=false;
+function ensureProviders(){
+  if(providersFetched || !backendUrl()) return;
+  providersFetched=true;
+  api('/auth/providers').then(p=>{ S.providers=p; render(); }).catch(()=>{});
+}
+
 function render(){
+  if(S.screen==='auth') ensureProviders();
   // Gate: not signed in -> auth; locked -> lock
   if(!S.session){ S.screen='auth'; }
   else if(S.locked && S.pinHash){ S.screen='lock'; }
@@ -355,6 +374,13 @@ function vAuth(){
     <div id="autherr" class="err" style="display:none"></div>
     <div style="height:22px"></div>
     <button class="btn primary" data-action="auth-submit">${su?'Registrieren':'Anmelden'}</button>
+    ${(S.providers && (S.providers.google||S.providers.apple)) ? `
+      <div class="row" style="align-items:center;gap:10px;margin:18px 0">
+        <div style="flex:1;height:1px;background:var(--border)"></div><span class="muted small">oder</span><div style="flex:1;height:1px;background:var(--border)"></div>
+      </div>
+      ${S.providers.google?`<button class="btn ghost" data-action="oauth" data-p="google" style="margin-bottom:10px"> Weiter mit Google</button>`:''}
+      ${S.providers.apple?`<button class="btn ghost" data-action="oauth" data-p="apple"> Weiter mit Apple</button>`:''}
+    ` : ''}
     <p class="muted" style="text-align:center;margin-top:22px">
       ${su?'Schon ein Konto? ':'Noch kein Konto? '}<span class="link" data-action="auth-toggle">${su?'Anmelden':'Registrieren'}</span>
     </p>
@@ -613,6 +639,7 @@ function act(a, d){
   switch(a){
     case 'auth-toggle': S._email=val('email'); S.authMode = S.authMode==='signup'?'signin':'signup'; render(); break;
     case 'auth-submit': authSubmit(); break;
+    case 'oauth': if(backendUrl()){ window.location.href = backendUrl()+'/auth/'+d.p+'/start'; } break;
     case 'go': if(d.s==='pinsetup'){ S.pinBuf=''; S.pinStage='enter'; S.pinFirst=''; S._pinerr=''; } go(d.s); break;
     case 'person-next': { const n=val('pname').trim(); if(!n) return showErr('perr','Bitte einen Namen eingeben.'); S.person=n; syncProfile(); go('contacts'); break; }
     case 'add-contact': { const name=val('cname').trim(), phone=val('cphone').trim(), rel=val('crel').trim();
@@ -777,7 +804,20 @@ async function runScan(){
   }, 1600);
 }
 
-render();
+async function boot(){
+  if(S._oauthLoggedIn && backendUrl() && S.session && S.session.token){
+    S._oauthLoggedIn=false;
+    S.person=null; S.contacts=[]; S.alerts=[]; S.transactions=[]; S.assessments=[];
+    try{ const p=await api('/me/profile'); S.person=p.person||null; S.contacts=Array.isArray(p.contacts)?p.contacts:[]; }catch(e){}
+    if(S.person){ await loadAlerts(); S.locked=!!S.pinHash; S.screen='app'; } else { S.screen='welcome'; }
+    render();
+    toast('✓ Angemeldet');
+    return;
+  }
+  render();
+  if(S._oauthError){ toast('⚠️ '+S._oauthError); S._oauthError=null; }
+}
+boot();
 </script>
 </body>
 </html>

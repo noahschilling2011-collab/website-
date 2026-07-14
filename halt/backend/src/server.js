@@ -11,20 +11,23 @@
 
 import express from 'express';
 import { fileURLToPath } from 'node:url';
-import { config, twilioConfigured, gocardlessConfigured, isDryRun } from './config.js';
+import { config, twilioConfigured, gocardlessConfigured, googleConfigured, appleConfigured, isDryRun } from './config.js';
 import { twilioSender, dryRunSender } from './twilio.js';
 import { createGoCardlessClient } from './gocardless.js';
 import { mapGoCardlessResponse } from './mapTransactions.js';
 import { runScan } from './notify.js';
 import { createAuth } from './auth.js';
 import { createUserData } from './userData.js';
+import { createOAuth } from './oauth.js';
 import { SEED } from './seed.js';
 
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: false })); // Apple posts the callback as a form
 
 const auth = createAuth(new URL('../data/users.json', import.meta.url).pathname);
 const userData = createUserData(new URL('../data/userdata.json', import.meta.url).pathname);
+const oauth = createOAuth(config);
 
 // Every data endpoint derives the userId from the verified token — NEVER from the
 // request body. This is the row-level-security boundary.
@@ -80,6 +83,50 @@ app.post('/auth/logout', (req, res) => {
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   auth.logout(token);
   res.json({ ok: true });
+});
+
+// Which login methods this deployment offers — the app shows only these buttons.
+app.get('/auth/providers', (_req, res) => {
+  res.json({ password: true, google: googleConfigured(), apple: appleConfigured() });
+});
+
+// After social login we bounce back to the app with the token in the URL fragment
+// (never a query string — fragments aren't sent to servers or logged).
+const backToApp = (res, params) =>
+  res.redirect(`${config.appUrl}/#${new URLSearchParams(params).toString()}`);
+
+// ── Google ────────────────────────────────────────────────────────────────────
+app.get('/auth/google/start', (_req, res) => {
+  if (!googleConfigured()) return res.status(400).json({ error: 'Google-Login ist nicht konfiguriert.' });
+  const state = oauth.newState(Date.now());
+  res.redirect(oauth.googleStartUrl(state));
+});
+
+app.get('/auth/google/callback', wrap(async (req, res) => {
+  if (!googleConfigured()) return res.status(400).json({ error: 'Google-Login ist nicht konfiguriert.' });
+  const { code, state } = req.query;
+  if (!code || !oauth.consumeState(state, Date.now())) {
+    return backToApp(res, { error: 'Anmeldung abgelaufen oder ungültig. Bitte erneut.' });
+  }
+  try {
+    const { email, provider } = await oauth.googleExchange(String(code), Date.now());
+    const { token } = auth.upsertOAuth(email, provider);
+    backToApp(res, { token, email });
+  } catch (e) {
+    backToApp(res, { error: e.message });
+  }
+}));
+
+// ── Apple (scaffold; needs a paid Apple Developer account) ───────────────────
+app.get('/auth/apple/start', (_req, res) => {
+  if (!appleConfigured()) return res.status(400).json({ error: 'Apple-Login braucht ein Apple-Developer-Konto und ist nicht konfiguriert.' });
+  const state = oauth.newState(Date.now());
+  res.redirect(oauth.appleStartUrl(state));
+});
+app.post('/auth/apple/callback', (req, res) => {
+  // Apple posts { code, state, ... }. Exchanging it needs an ES256 client secret
+  // signed with your Apple key — intentionally not shipped untested.
+  backToApp(res, { error: 'Apple-Login ist noch nicht fertig eingerichtet.' });
 });
 
 app.get('/health', (_req, res) => {
