@@ -14,8 +14,13 @@ Alarm **wirklich** deine Nummer an / schickt eine SMS — über Twilio.
 Das Backend **serviert die App selbst**: die veröffentlichte Backend-URL *ist* die ganze App.
 Du machst nichts am Terminal — du klickst nur.
 
-1. **Ein-Klick deployen** (Render, gratis): In Render **New → Blueprint → dieses Repo wählen** →
-   Render liest `render.yaml` automatisch.
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/noahschilling2011-collab/website-)
+
+> Beim Render-Blueprint-Schritt den Branch **`claude/halt-fraud-strategy-kgq7g9`** auswählen
+> (dort liegt die `render.yaml`).
+
+1. **Ein-Klick deployen** (Render, gratis): Button oben, oder in Render **New → Blueprint →
+   dieses Repo + Branch wählen** → Render liest `render.yaml` automatisch.
 2. **Schlüssel eintragen** — im Render-Dashboard unter **Environment** (nicht in der App!):
    `ALERT_PHONE`, `TWILIO_*`, und (für die Bank) `GOCARDLESS_*`.
 3. **App öffnen**: die Render-URL (z. B. `https://halt-backend.onrender.com`) **im Handy-Browser** öffnen.
