@@ -10,10 +10,12 @@ test('two users have fully isolated profiles', () => {
   assert.equal(d.getProfile('b@x').person, 'Opa B');
 });
 
-test('alert destination is this user\'s own first contact', () => {
+test('alert destination is this user\'s own first VERIFIED contact', () => {
   const d = createUserData(null);
   d.setProfile('a@x', { person: 'Oma A', contacts: [{ name: 'T', phone: '+49111' }] });
   d.setProfile('b@x', { person: 'Opa B', contacts: [] });
+  assert.equal(d.alertPhone('a@x'), null); // exists but unverified -> no alerts
+  d.markPhoneVerified('a@x', '+49111');
   assert.equal(d.alertPhone('a@x'), '+49111');
   assert.equal(d.alertPhone('b@x'), null);
 });

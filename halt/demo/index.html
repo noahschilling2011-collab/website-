@@ -304,7 +304,7 @@ if(S.pinHash && S.session){ S.locked = true; S.pinBuf=''; }
 })();
 function fresh(){ return {screen:'auth', authMode:'signin', session:null, pinHash:null, lock:{failedAttempts:0,lockedUntil:null},
   locked:false, person:null, contacts:[], transactions:[], assessments:[], alerts:[], resolved:{}, tab:'activity',
-  pinBuf:'', pinStage:'enter', pinFirst:'', modal:null, backend:'', reqId:'', live:null}; }
+  pinBuf:'', pinStage:'enter', pinFirst:'', modal:null, backend:'', reqId:'', live:null, verifiedPhones:[], _vp:null}; }
 function load(){ try{ return JSON.parse(localStorage.getItem(LS)); }catch(e){ return null; } }
 function save(){ const {pinBuf,...rest}=S; localStorage.setItem(LS, JSON.stringify({...rest,pinBuf:''})); }
 function hash(s){ let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))>>>0; return 'h'+h.toString(16); }
@@ -421,13 +421,27 @@ function vPerson(){
     <button class="btn primary" data-action="person-next">Weiter</button>
   </div>`;
 }
+const normPhone = p => String(p||'').replace(/[\s\-()/]/g,'');
+const isVerified = p => (S.verifiedPhones||[]).includes(normPhone(p));
 function vContacts(){
-  const list = S.contacts.map((c,i)=>`<div class="card" style="margin-bottom:10px" class="between">
+  const live = !!(backendUrl() && S.session && S.session.token);
+  const list = S.contacts.map((c,i)=>{
+    const pend = S._vp && normPhone(S._vp)===normPhone(c.phone);
+    let verifyUi = '';
+    if(live){
+      if(isVerified(c.phone)) verifyUi = `<div class="small" style="color:var(--accent);margin-top:8px">✓ Nummer bestätigt — empfängt Alarme</div>`;
+      else if(pend) verifyUi = `<div style="margin-top:12px"><input id="vpcode" placeholder="6-stelliger Code aus der SMS" inputmode="numeric" maxlength="6" />
+        <div style="height:8px"></div><button class="btn primary" data-action="vp-confirm" data-phone="${esc(c.phone)}">Code bestätigen</button></div>`;
+      else verifyUi = `<div class="small" style="color:var(--watch);margin-top:8px">Noch nicht bestätigt — bekommt noch keine Alarme.
+        <span class="link" data-action="vp-request" data-phone="${esc(c.phone)}">Code senden</span></div>`;
+    }
+    return `<div class="card" style="margin-bottom:10px">
     <div class="between"><div><b>${esc(c.name)}</b><div class="muted small">${esc(c.phone)}${c.relation?' · '+esc(c.relation):''}</div></div>
-    <span class="link" data-action="rm-contact" data-i="${i}">Entfernen</span></div></div>`).join('');
+    <span class="link" data-action="rm-contact" data-i="${i}">Entfernen</span></div>${verifyUi}</div>`;
+  }).join('');
   return `<div class="pad" style="padding-top:26px">
     <h2>Wer wird gewarnt?</h2>
-    <p class="muted" style="margin-bottom:18px">Diese Personen bekommen sofort eine Nachricht — bei echtem Alarm einen Anruf.</p>
+    <p class="muted" style="margin-bottom:18px">Diese Personen bekommen sofort eine Nachricht — bei echtem Alarm einen Anruf.${live?' Jede Nummer wird per SMS-Code bestätigt, bevor sie Alarme empfängt.':''}</p>
     ${list}
     <div class="card" style="margin-top:6px">
       <input id="cname" placeholder="Name" /><div style="height:10px"></div>
@@ -669,6 +683,8 @@ function act(a, d){
     case 'pin-back': S.pinBuf=S.pinBuf.slice(0,-1); render(); break;
     case 'biometric': if(lockGate(S.lock,now()).allowed){ S.locked=false; S.lock={failedAttempts:0,lockedUntil:null}; toast('✓ Per Biometrie entsperrt'); render(); } break;
     case 'save-backend': saveBackend(); break;
+    case 'vp-request': vpRequest(d.phone); break;
+    case 'vp-confirm': vpConfirm(d.phone); break;
     case 'test-alert': liveTestAlert(); break;
     case 'live-connect': liveConnect(); break;
     case 'live-load': liveLoad(); break;
@@ -707,6 +723,24 @@ async function liveLoad(){
   }catch(e){ S.screen='app'; render(); toast('⚠️ '+e.message); }
 }
 function showErr(id,msg){ const e=document.getElementById(id); if(e){ e.textContent=msg; e.style.display='block'; } }
+
+async function vpRequest(phone){
+  try{
+    const r = await api('/me/verify-phone/request',{method:'POST',body:JSON.stringify({phone})});
+    S._vp = phone;
+    toast(r.devCode ? `Test-Modus: Dein Code ist ${r.devCode}` : '✓ Code per SMS gesendet.');
+    render();
+  }catch(e){ toast('⚠️ '+e.message); }
+}
+async function vpConfirm(phone){
+  try{
+    await api('/me/verify-phone/confirm',{method:'POST',body:JSON.stringify({phone, code:val('vpcode')})});
+    S.verifiedPhones = [...(S.verifiedPhones||[]), normPhone(phone)];
+    S._vp = null;
+    toast('✓ Nummer bestätigt — empfängt jetzt Alarme.');
+    render();
+  }catch(e){ toast('⚠️ '+e.message); }
+}
 
 // Persist the user's profile server-side (no-op offline). Fire-and-forget.
 async function syncProfile(){
@@ -753,6 +787,7 @@ async function authSubmit(){
         const p = await api('/me/profile');
         S.person = p.person || null;
         S.contacts = Array.isArray(p.contacts) ? p.contacts : [];
+        S.verifiedPhones = Array.isArray(p.verifiedPhones) ? p.verifiedPhones : [];
       }catch(e){}
       if(S.person){ await loadAlerts(); S.locked = !!S.pinHash; go('app'); }
       else { go('welcome'); }
@@ -817,7 +852,7 @@ async function boot(){
   if(S._oauthLoggedIn && backendUrl() && S.session && S.session.token){
     S._oauthLoggedIn=false;
     S.person=null; S.contacts=[]; S.alerts=[]; S.transactions=[]; S.assessments=[];
-    try{ const p=await api('/me/profile'); S.person=p.person||null; S.contacts=Array.isArray(p.contacts)?p.contacts:[]; }catch(e){}
+    try{ const p=await api('/me/profile'); S.person=p.person||null; S.contacts=Array.isArray(p.contacts)?p.contacts:[]; S.verifiedPhones=Array.isArray(p.verifiedPhones)?p.verifiedPhones:[]; }catch(e){}
     if(S.person){ await loadAlerts(); S.locked=!!S.pinHash; S.screen='app'; } else { S.screen='welcome'; }
     render();
     toast('✓ Angemeldet');

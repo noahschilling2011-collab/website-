@@ -10,8 +10,10 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 function emptyUser() {
-  return { profile: { person: null, contacts: [] }, requisitionId: null, seen: [], alerts: [] };
+  return { profile: { person: null, contacts: [] }, requisitionId: null, seen: [], alerts: [], verifiedPhones: [] };
 }
+
+const normPhone = (p) => String(p || '').replace(/[\s\-()/]/g, '');
 
 export function createUserData(path) {
   let db = {};
@@ -45,8 +47,29 @@ export function createUserData(path) {
       return r.profile;
     },
 
-    /** First trusted contact's phone — where this user's alerts should go. */
-    alertPhone: (uid) => row(uid).profile.contacts?.[0]?.phone || null,
+    /** First VERIFIED trusted contact's phone — where this user's alerts go.
+     *  Unverified numbers never receive anything (abuse prevention). */
+    alertPhone: (uid) => {
+      const r = row(uid);
+      const verified = new Set((r.verifiedPhones || []).map(normPhone));
+      const hit = (r.profile.contacts || []).find((c) => verified.has(normPhone(c.phone)));
+      return hit?.phone || null;
+    },
+
+    markPhoneVerified: (uid, phone) => {
+      const r = row(uid);
+      if (!r.verifiedPhones) r.verifiedPhones = [];
+      const p = normPhone(phone);
+      if (!r.verifiedPhones.map(normPhone).includes(p)) {
+        r.verifiedPhones.push(p);
+        persist();
+      }
+    },
+
+    isPhoneVerified: (uid, phone) =>
+      (row(uid).verifiedPhones || []).map(normPhone).includes(normPhone(phone)),
+
+    getVerifiedPhones: (uid) => [...(row(uid).verifiedPhones || [])],
 
     setRequisition: (uid, id) => {
       row(uid).requisitionId = id;

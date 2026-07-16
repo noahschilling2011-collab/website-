@@ -19,6 +19,7 @@ import { runScan } from './notify.js';
 import { createAuth } from './auth.js';
 import { createUserData } from './userData.js';
 import { createOAuth } from './oauth.js';
+import { createPhoneVerify } from './phoneVerify.js';
 import { securityHeaders, cors, rateLimit } from './security.js';
 import { SEED } from './seed.js';
 
@@ -41,6 +42,7 @@ const UUID_RE = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{1
 const auth = createAuth(new URL('../data/users.json', import.meta.url).pathname);
 const userData = createUserData(new URL('../data/userdata.json', import.meta.url).pathname);
 const oauth = createOAuth(config);
+const phoneVerify = createPhoneVerify();
 
 // Every data endpoint derives the userId from the verified token — NEVER from the
 // request body. This is the row-level-security boundary.
@@ -60,6 +62,8 @@ const sender = twilioConfigured() ? twilioSender(config.twilio) : dryRunSender()
 const gc = gocardlessConfigured() ? createGoCardlessClient(config.gocardless) : null;
 
 const wrap = (fn) => (req, res) => fn(req, res).catch((e) => {
+  // Intentional 4xx errors carry a safe, user-facing message.
+  if (e.status && e.status < 500) return res.status(e.status).json({ error: e.message });
   console.error(e); // full detail server-side only
   res.status(500).json({ error: 'Serverfehler. Bitte später erneut.' }); // generic to client
 });
@@ -146,7 +150,7 @@ app.get('/health', (_req, res) => {
 
 // ── Per-user profile (protected person + trusted contacts) ───────────────────
 app.get('/me/profile', requireAuth, (req, res) => {
-  res.json(userData.getProfile(req.userId));
+  res.json({ ...userData.getProfile(req.userId), verifiedPhones: userData.getVerifiedPhones(req.userId) });
 });
 app.put('/me/profile', requireAuth, (req, res) => {
   res.json(userData.setProfile(req.userId, req.body || {}));
@@ -154,6 +158,22 @@ app.put('/me/profile', requireAuth, (req, res) => {
 app.get('/me/alerts', requireAuth, (req, res) => {
   res.json({ alerts: userData.getAlerts(req.userId) });
 });
+
+// ── Contact phone verification (abuse prevention) ─────────────────────────────
+// A number only ever receives alerts after its owner proved control via SMS code.
+app.post('/me/verify-phone/request', requireAuth, outboundLimiter, wrap(async (req, res) => {
+  const phone = req.body?.phone;
+  const code = phoneVerify.requestCode(req.userId, phone, Date.now());
+  await sender.sms(phone, `HALT-Bestätigungscode: ${code}. Gilt 10 Minuten.`);
+  // In DRY_RUN (no Twilio yet) return the code so the flow is testable in-app.
+  res.json({ sent: true, dryRun: isDryRun(), ...(isDryRun() ? { devCode: code } : {}) });
+}));
+
+app.post('/me/verify-phone/confirm', requireAuth, wrap(async (req, res) => {
+  phoneVerify.verifyCode(req.userId, req.body?.phone, req.body?.code, Date.now());
+  userData.markPhoneVerified(req.userId, req.body?.phone);
+  res.json({ verified: true });
+}));
 
 // Where THIS user's alerts go: their own first trusted contact, else the
 // operator's ALERT_PHONE fallback. (On a Twilio trial the number must be verified.)
