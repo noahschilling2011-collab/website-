@@ -20,6 +20,7 @@ import { createAuth } from './auth.js';
 import { createUserData } from './userData.js';
 import { createOAuth } from './oauth.js';
 import { createPhoneVerify } from './phoneVerify.js';
+import { createMonitor } from './monitor.js';
 import { securityHeaders, cors, rateLimit } from './security.js';
 import { SEED } from './seed.js';
 
@@ -60,6 +61,21 @@ app.use(express.static(new URL('../../demo', import.meta.url).pathname));
 
 const sender = twilioConfigured() ? twilioSender(config.twilio) : dryRunSender();
 const gc = gocardlessConfigured() ? createGoCardlessClient(config.gocardless) : null;
+
+// Continuous monitoring: sweep all connected accounts on a conservative
+// interval (GoCardless free tier ≈ 4 reads/account/day → default 6h).
+const monitorIntervalH = Math.max(1, Number.parseFloat(process.env.MONITOR_INTERVAL_HOURS || '6'));
+const monitor = createMonitor({
+  userData,
+  gc,
+  sender,
+  mapResponse: mapGoCardlessResponse,
+  runScan,
+  channel: config.alertChannel,
+  fallbackPhone: config.alertPhone || null,
+  intervalMs: monitorIntervalH * 3600 * 1000,
+  log: console.log,
+});
 
 const wrap = (fn) => (req, res) => fn(req, res).catch((e) => {
   // Intentional 4xx errors carry a safe, user-facing message.
@@ -145,6 +161,7 @@ app.get('/health', (_req, res) => {
     alertChannel: config.alertChannel,
     alertPhoneSet: Boolean(config.alertPhone),
     users: auth.count(),
+    monitor: monitor.status(),
   });
 });
 
@@ -254,10 +271,12 @@ app.get('/connect/callback', (_req, res) => {
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (isMain) {
   const port = config.port;
+  if (gc) monitor.start(); // continuous monitoring only makes sense with a bank link
   app.listen(port, () => {
     console.log(`HALT backend läuft auf http://localhost:${port}`);
     console.log(`  Twilio:     ${twilioConfigured() ? 'konfiguriert' : 'DRY_RUN (keine Zugangsdaten)'}`);
     console.log(`  GoCardless: ${gocardlessConfigured() ? 'konfiguriert' : 'nicht konfiguriert'}`);
+    console.log(`  Monitoring: ${gc ? `aktiv (alle ${monitorIntervalH}h)` : 'aus (keine Bank verbunden)'}`);
   });
 }
 

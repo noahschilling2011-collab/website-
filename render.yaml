@@ -28,3 +28,5 @@ services:
         value: SANDBOXFINANCE_SFIN0000
       - key: GOCARDLESS_COUNTRY
         value: DE
+      - key: MONITOR_INTERVAL_HOURS   # bank scans/day per account are limited (~4)
+        value: "6"

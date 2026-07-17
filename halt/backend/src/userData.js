@@ -95,6 +95,9 @@ export function createUserData(path) {
       },
     }),
 
+    /** All user ids with data — the monitor sweeps over these. */
+    userIds: () => Object.keys(db),
+
     /** Total users with data — for diagnostics only. */
     count: () => Object.keys(db).length,
   };

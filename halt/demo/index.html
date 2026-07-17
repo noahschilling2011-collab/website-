@@ -555,7 +555,13 @@ function tSettings(){
 }
 function liveLabel(){
   if(!backendUrl()) return 'Nicht verbunden (Demo-Modus)';
-  if(S.live && S.live.ok) return `Verbunden${S.live.twilio?' · Twilio aktiv':' · Twilio im Test (DRY_RUN)'}`;
+  if(S.live && S.live.ok){
+    let s = `Verbunden${S.live.twilio?' · Twilio aktiv':' · Twilio im Test (DRY_RUN)'}`;
+    const mon = S.live.monitor;
+    if(mon && mon.enabled) s += ` · 🛡️ Auto-Überwachung alle ${mon.intervalHours}h`;
+    else if(S.live.gocardless===false) s += ' · Auto-Überwachung startet mit Bankverbindung';
+    return s;
+  }
   return `Backend: ${backendUrl()}`;
 }
 function tabbar(){

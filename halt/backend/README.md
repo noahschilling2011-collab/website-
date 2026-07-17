@@ -100,6 +100,18 @@ Wenn die Engine in den Umsätzen etwas Verdächtiges findet, **klingelt dein Han
 **Apple** funktioniert genauso, braucht aber ein **Apple-Developer-Konto (99 €/Jahr)** — der Code
 ist als Gerüst vorbereitet (`APPLE_*`-Variablen), bleibt aber aus, bis du das Konto hast.
 
+## Automatische Überwachung
+
+Sobald GoCardless konfiguriert ist, prüft das Backend **von selbst** alle verbundenen Konten
+(Standard: alle 6 Stunden, `MONITOR_INTERVAL_HOURS`) und eskaliert neue Alarme an die
+**bestätigte** Vertrauensperson — auch wenn niemand die App öffnet. Doppelte Alarme für dieselbe
+Bewegung gibt es nie (Dedupe pro Nutzer).
+
+> Warum 6 Stunden? Die GoCardless-Gratis-Stufe erlaubt grob **4 Umsatz-Abfragen pro Konto pro
+> Tag**. 6 h = exakt 4/Tag. Nicht niedriger stellen, sonst blockt die Bank-API.
+
+Status siehst du in `GET /health` (`monitor`) und in der App unter **Einstellungen → Live**.
+
 ## Endpunkte
 
 | Methode | Pfad | Zweck |
