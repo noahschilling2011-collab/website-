@@ -50,8 +50,19 @@ function DataService.load(player: Player)
 		return store:GetAsync(keyFor(player.UserId))
 	end)
 
+	-- Waehrend GetAsync yieldet, kann der Spieler gegangen und der Plot neu
+	-- vergeben worden sein — dann nichts mehr in diesen Plot schreiben.
+	if PlotService.getPlotByOwner(player.UserId) ~= plot or plot.state ~= state then
+		return
+	end
+
 	if not ok then
-		warn("[MiniCity] Laden fehlgeschlagen fuer " .. player.Name .. " - starte mit leerer Stadt")
+		-- Nie ueberschreiben, was wir nicht lesen konnten: Speichern fuer diese
+		-- Sitzung sperren, sonst wuerde der Autosave den echten Spielstand
+		-- mit einer leeren Stadt ersetzen.
+		state.saveBlocked = true
+		warn("[MiniCity] Laden fehlgeschlagen fuer " .. player.Name
+			.. " - Start mit leerer Stadt, Speichern fuer diese Sitzung deaktiviert")
 		EconomyService.refresh(player.UserId)
 		return
 	end
@@ -84,20 +95,33 @@ local function buildPayload(state)
 	}
 end
 
-function DataService.save(player: Player): boolean
+-- Synchroner Zustands-Snapshot (kein Yield). nil, wenn nichts zu speichern ist
+-- oder das Laden fehlschlug (saveBlocked).
+function DataService.snapshot(player: Player)
 	local state = PlotService.getState(player.UserId)
-	if not state then
-		return false
+	if not state or state.saveBlocked then
+		return nil
 	end
-	local payload = buildPayload(state)
+	return buildPayload(state)
+end
+
+function DataService.savePayload(userId: number, payload): boolean
 	local ok = withRetry(function()
-		store:SetAsync(keyFor(player.UserId), payload)
+		store:SetAsync(keyFor(userId), payload)
 		return true
 	end)
 	if not ok then
-		warn("[MiniCity] Speichern fehlgeschlagen fuer " .. player.Name)
+		warn("[MiniCity] Speichern fehlgeschlagen fuer UserId " .. userId)
 	end
 	return ok
+end
+
+function DataService.save(player: Player): boolean
+	local payload = DataService.snapshot(player)
+	if not payload then
+		return false
+	end
+	return DataService.savePayload(player.UserId, payload)
 end
 
 function DataService.saveAll()

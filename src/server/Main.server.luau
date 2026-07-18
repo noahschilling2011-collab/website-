@@ -50,20 +50,38 @@ local function onPlayerAdded(player: Player)
 			PlotService.spawnPlayer(player)
 		end)
 	end)
+	if player.Character then
+		PlotService.spawnPlayer(player)
+	end
 
 	-- Gespeicherte Stadt laden (baut Gebaeude wieder auf + refresh)
 	DataService.load(player)
 
-	-- Falls Character schon existiert
-	if player.Character then
-		PlotService.spawnPlayer(player)
-	end
+	-- Sync-Burst nach dem Join: RemoteEvents puffern nicht — feuert der erste
+	-- StateSync, bevor die Client-Skripte lauschen, waere die UI sonst bis zum
+	-- naechsten Einkommens-Tick leer.
+	task.spawn(function()
+		for _ = 1, 6 do
+			task.wait(1)
+			if player.Parent == nil then
+				return
+			end
+			EconomyService.sync(player.UserId)
+		end
+	end)
 end
 
 local function onPlayerRemoving(player: Player)
-	DataService.save(player)
+	-- Snapshot synchron ziehen und den Plot sofort freigeben; erst danach
+	-- (yieldend) speichern. So kann ein schneller Rejoin nie mit einem noch
+	-- belegten Plot oder einem halb freigegebenen Zustand kollidieren.
+	local userId = player.UserId
+	local payload = DataService.snapshot(player)
 	PlotService.release(player)
-	PlacementService.clearPlayer(player.UserId)
+	PlacementService.clearPlayer(userId)
+	if payload then
+		DataService.savePayload(userId, payload)
+	end
 end
 
 Players.PlayerAdded:Connect(onPlayerAdded)

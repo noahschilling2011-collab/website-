@@ -136,16 +136,21 @@ local function placeInternal(plot, state, itemId: string, cellX: number, cellZ: 
 		return false, "Kein Strassenanschluss"
 	end
 
-	-- Model bauen und platzieren
+	-- Model bauen und platzieren. Attribute vor dem Parenting setzen, damit der
+	-- Client sie ab ChildAdded vollstaendig sieht (Grid-Spiegel der Ghost-Vorschau).
 	local guid = HttpService:GenerateGUID(false)
 	local model = item.build()
 	model:SetAttribute("BuildingGuid", guid)
 	model:SetAttribute("ItemId", itemId)
 	model:SetAttribute("OwnerUserId", state.ownerUserId)
-	model.Parent = plot.buildingsFolder
+	model:SetAttribute("CellX", cellX)
+	model:SetAttribute("CellZ", cellZ)
+	model:SetAttribute("Rot", rot)
+	model:SetAttribute("IsRoad", item.isRoad)
 
 	local center = PlotService.cellsToWorldCenter(plot, cellX, cellZ, w, d)
 	model:PivotTo(CFrame.new(center) * CFrame.Angles(0, rot * math.pi / 2, 0))
+	model.Parent = plot.buildingsFolder
 
 	-- Zustand aktualisieren
 	for _, key in cells do
@@ -175,11 +180,13 @@ end
 -- Oeffentliche Handler
 -- ----------------------------------------------------------------------------
 
+-- Echte endliche Zahl (NaN/inf wuerden CFrame und den DataStore-Save korrumpieren)
+local function isFiniteNumber(n: any): boolean
+	return type(n) == "number" and n == n and n ~= math.huge and n ~= -math.huge
+end
+
 function PlacementService.handlePlace(player: Player, itemId: any, cellX: any, cellZ: any, rot: any): (boolean, string?)
-	if type(itemId) ~= "string" or type(cellX) ~= "number" or type(cellZ) ~= "number" or type(rot) ~= "number" then
-		return false, "Ungueltige Eingabe"
-	end
-	if cellX ~= cellX or cellZ ~= cellZ or rot ~= rot then -- NaN
+	if type(itemId) ~= "string" or not isFiniteNumber(cellX) or not isFiniteNumber(cellZ) or not isFiniteNumber(rot) then
 		return false, "Ungueltige Eingabe"
 	end
 	if not allowAction(player.UserId) then

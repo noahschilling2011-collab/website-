@@ -19,6 +19,7 @@ export type CityState = {
 	population: number,
 	incomePerTick: number,
 	unlockedItems: { string },
+	saveBlocked: boolean, -- true, wenn das Laden fehlschlug: dann nie speichern
 }
 
 type Plot = {
@@ -104,7 +105,7 @@ function PlotService.init()
 		signPart.Parent = plotsFolder
 		local gui = Instance.new("BillboardGui")
 		gui.Name = "Label"
-		gui.Size = UDim2.fromScale(10, 3)
+		gui.Size = UDim2.fromScale(3, 1.2)
 		gui.StudsOffset = Vector3.new(0, 3, 0)
 		gui.AlwaysOnTop = true
 		gui.Parent = signPart
@@ -182,6 +183,7 @@ function PlotService.assign(player: Player): Plot?
 				population = 0,
 				incomePerTick = 0,
 				unlockedItems = {},
+				saveBlocked = false,
 			}
 			plot.signLabel.Text = player.Name .. "s Stadt"
 			return plot

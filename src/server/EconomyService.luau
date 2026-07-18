@@ -107,8 +107,12 @@ function EconomyService.start()
 			task.wait(Config.IncomeTickInterval)
 			for _, player in Players:GetPlayers() do
 				local state = PlotService.getState(player.UserId)
-				if state and state.incomePerTick > 0 then
-					state.cash += state.incomePerTick
+				if state then
+					if state.incomePerTick > 0 then
+						state.cash += state.incomePerTick
+					end
+					-- Immer syncen (auch ohne Einkommen): RemoteEvents puffern
+					-- nicht, ein frueh verpasster Sync heilt sich so von selbst.
 					EconomyService.sync(player.UserId)
 				end
 			end
