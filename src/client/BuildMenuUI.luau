@@ -47,12 +47,17 @@ function BuildMenuUI.create(parentGui: ScreenGui, callbacks)
 	self.buttons = {} :: { [string]: { btn: TextButton, stroke: UIStroke } }
 	self.unlocked = {} :: { [string]: boolean }
 
+	-- Umbrechendes Grid: 6 Spalten, Item-Buttons + 3 Steuer-Buttons
+	local columns = 6
+	local totalButtons = #Items.List + 3
+	local rows = math.ceil(totalButtons / columns)
+	local cellW, cellH, gap = 96, 56, 6
+
 	local bar = Instance.new("Frame")
 	bar.Name = "BuildBar"
 	bar.AnchorPoint = Vector2.new(0.5, 1)
 	bar.Position = UDim2.new(0.5, 0, 1, -12)
-	bar.Size = UDim2.fromOffset(0, 76)
-	bar.AutomaticSize = Enum.AutomaticSize.X
+	bar.Size = UDim2.fromOffset(columns * cellW + (columns - 1) * gap + 16, rows * cellH + (rows - 1) * gap + 12)
 	bar.BackgroundColor3 = Color3.fromRGB(20, 22, 28)
 	bar.BackgroundTransparency = 0.2
 	bar.BorderSizePixel = 0
@@ -66,10 +71,12 @@ function BuildMenuUI.create(parentGui: ScreenGui, callbacks)
 	pad.PaddingTop = UDim.new(0, 6)
 	pad.PaddingBottom = UDim.new(0, 6)
 	pad.Parent = bar
-	local layout = Instance.new("UIListLayout")
+	local layout = Instance.new("UIGridLayout")
+	layout.CellSize = UDim2.fromOffset(cellW, cellH)
+	layout.CellPadding = UDim2.fromOffset(gap, gap)
 	layout.FillDirection = Enum.FillDirection.Horizontal
-	layout.Padding = UDim.new(0, 6)
-	layout.VerticalAlignment = Enum.VerticalAlignment.Center
+	layout.FillDirectionMaxCells = columns
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = bar
 

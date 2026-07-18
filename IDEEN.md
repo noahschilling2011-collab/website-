@@ -18,7 +18,10 @@ Nichts hiervon ist im Code umgesetzt oder vorbereitet (Scope-Regel v0.2).
 ## Weitere Ideen für später
 - Straßenanschluss auch bei Abriss neu prüfen (verwaiste Gebäude markieren/deaktivieren).
 - Sticky-Unlocks über Persistenz (freigeschaltete Items bleiben nach Abriss frei).
-- Mehr Gebäudetypen als reine Katalog-Einträge (Park, Fabrik, Hafen).
+- Mehr Gebäudetypen als reine Katalog-Einträge (Hafen, Stadion, Kraftwerk …).
+  Park, Fabrik und U-Bahn-Station sind seit v0.3 drin.
+- Fahrende U-Bahnen/Züge (sichtbare Mini-Bahn zwischen Stationen) — wie
+  Verkehr/Flugzeuge bewusst kein Prototyp-Inhalt.
 - Straßen-Auto-Connect-Optik (Kurven/Kreuzungen) rein visuell.
 - Einkommens-Multiplikatoren durch Nachbarschaft (Geschäft neben Wohnhaus).
 - DataStore-Session-Locking (`UpdateAsync` + Lock-Feld) gegen Cross-Server-Races.

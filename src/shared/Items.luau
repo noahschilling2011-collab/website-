@@ -84,6 +84,13 @@ local C_RAIL = Color3.fromRGB(200, 200, 205)
 local C_TERMINAL = Color3.fromRGB(210, 210, 220)
 local C_PLANE = Color3.fromRGB(235, 235, 240)
 local C_STRIP = Color3.fromRGB(70, 70, 75)
+local C_GRASS = Color3.fromRGB(110, 170, 90)
+local C_TRUNK = Color3.fromRGB(100, 70, 45)
+local C_LEAF = Color3.fromRGB(70, 150, 70)
+local C_UBLUE = Color3.fromRGB(0, 90, 170)
+local C_FACTORY = Color3.fromRGB(160, 150, 140)
+local C_ROOFDARK = Color3.fromRGB(90, 95, 100)
+local C_BRICK = Color3.fromRGB(150, 80, 60)
 
 -- ----------------------------------------------------------------------------
 -- Model-Builder pro Item
@@ -177,6 +184,67 @@ local function buildAirport(): Model
 	return m
 end
 
+local function buildPark(): Model
+	local m = newModel("Park")
+	-- Rasenflaeche (1x1 Zelle)
+	newPart(m, Vector3.new(CELL, 0.3, CELL), CFrame.new(0, 0.15, 0), C_GRASS, Enum.Material.Grass)
+	-- Zwei Baeume: Stamm + Kugelkrone
+	for _, pos in { Vector3.new(-1, 0, -0.8), Vector3.new(1.1, 0, 0.9) } do
+		newPart(m, Vector3.new(0.4, 1.6, 0.4), CFrame.new(pos.X, 1.1, pos.Z), C_TRUNK)
+		local crown = newPart(m, Vector3.new(1.6, 1.6, 1.6), CFrame.new(pos.X, 2.6, pos.Z), C_LEAF)
+		crown.Shape = Enum.PartType.Ball
+	end
+	-- Parkbank
+	newPart(m, Vector3.new(1.2, 0.5, 0.4), CFrame.new(0.2, 0.55, -0.9), Color3.fromRGB(140, 100, 60))
+	return m
+end
+
+local function buildSubway(): Model
+	local m = newModel("UBahnStation")
+	-- Footprint 2x1 -> 8 breit (X), 4 tief (Z). Dunkler Vorplatz
+	newPart(m, Vector3.new(8, 0.3, 4), CFrame.new(0, 0.15, 0), C_ROAD)
+	-- Treppenabgang: dunkler Schacht mit Gelaendern
+	newPart(m, Vector3.new(3, 0.4, 2), CFrame.new(-2, 0.35, 0), Color3.fromRGB(20, 20, 24))
+	newPart(m, Vector3.new(3, 0.7, 0.2), CFrame.new(-2, 0.75, 1.05), C_RAIL)
+	newPart(m, Vector3.new(3, 0.7, 0.2), CFrame.new(-2, 0.75, -1.05), C_RAIL)
+	-- Eingangshaeuschen mit flachem Dach
+	newPart(m, Vector3.new(3.4, 2.6, 3.4), CFrame.new(1.8, 1.6, 0), C_TERMINAL)
+	newPart(m, Vector3.new(3.8, 0.3, 3.8), CFrame.new(1.8, 3.05, 0), Color3.fromRGB(120, 130, 150))
+	-- Blaues U-Schild auf Mast
+	newPart(m, Vector3.new(0.2, 2.6, 0.2), CFrame.new(-3.2, 1.6, 1.5), C_RAIL)
+	local sign = newPart(m, Vector3.new(1.4, 1.4, 0.3), CFrame.new(-3.2, 3.4, 1.5), C_UBLUE, Enum.Material.Neon)
+	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+		local gui = Instance.new("SurfaceGui")
+		gui.Face = face
+		local lbl = Instance.new("TextLabel")
+		lbl.Size = UDim2.fromScale(1, 1)
+		lbl.BackgroundTransparency = 1
+		lbl.Text = "U"
+		lbl.TextColor3 = Color3.new(1, 1, 1)
+		lbl.TextScaled = true
+		lbl.Font = Enum.Font.GothamBold
+		lbl.Parent = gui
+		gui.Parent = sign
+	end
+	return m
+end
+
+local function buildFactory(): Model
+	local m = newModel("Fabrik")
+	-- Footprint 3x2 -> 12 breit (X), 8 tief (Z). Halle
+	newPart(m, Vector3.new(11, 5, 7), CFrame.new(0, 2.5, 0), C_FACTORY)
+	-- Sheddach (Saegezahn) aus drei Keilen, Zaehne entlang X
+	for i = -1, 1 do
+		newWedge(m, Vector3.new(7, 1.8, 3.6), CFrame.new(i * 3.6, 5.9, 0) * CFrame.Angles(0, math.pi / 2, 0), C_ROOFDARK)
+	end
+	-- Schornstein + Lueftung
+	newPart(m, Vector3.new(1, 6, 1), CFrame.new(4.5, 8, 2.5), C_BRICK)
+	newPart(m, Vector3.new(1.4, 0.8, 1.4), CFrame.new(-4, 5.4, -2), C_RAIL)
+	-- Tor
+	newPart(m, Vector3.new(3, 2.6, 0.2), CFrame.new(0, 1.3, 3.55), Color3.fromRGB(70, 70, 75))
+	return m
+end
+
 -- ----------------------------------------------------------------------------
 -- Katalog
 -- ----------------------------------------------------------------------------
@@ -184,9 +252,12 @@ end
 Items.List = {
 	{ id = "road", name = "Strasse", footprint = { w = 1, d = 1 }, price = 10, income = 0, residents = 0, isRoad = true, unlockPop = Config.Unlocks.Strasse, build = buildRoad },
 	{ id = "house", name = "Wohnhaus", footprint = { w = 2, d = 2 }, price = 100, income = 5, residents = 4, isRoad = false, unlockPop = Config.Unlocks.Wohnhaus, build = buildHouse },
+	{ id = "park", name = "Park", footprint = { w = 1, d = 1 }, price = 75, income = 0, residents = 2, isRoad = false, unlockPop = Config.Unlocks.Park, build = buildPark },
 	{ id = "shop", name = "Geschaeft", footprint = { w = 2, d = 2 }, price = 250, income = 15, residents = 0, isRoad = false, unlockPop = Config.Unlocks.Geschaeft, build = buildShop },
 	{ id = "tower", name = "Hochhaus", footprint = { w = 3, d = 3 }, price = 1000, income = 30, residents = 20, isRoad = false, unlockPop = Config.Unlocks.Hochhaus, build = buildTower },
+	{ id = "subway", name = "U-Bahn-Station", footprint = { w = 2, d = 1 }, price = 750, income = 25, residents = 0, isRoad = false, unlockPop = Config.Unlocks.UBahn, build = buildSubway },
 	{ id = "highway", name = "Autobahn", footprint = { w = 1, d = 2 }, price = 150, income = 0, residents = 0, isRoad = true, unlockPop = Config.Unlocks.Autobahn, build = buildHighway },
+	{ id = "factory", name = "Fabrik", footprint = { w = 3, d = 2 }, price = 2000, income = 70, residents = 0, isRoad = false, unlockPop = Config.Unlocks.Fabrik, build = buildFactory },
 	{ id = "airport", name = "Flughafen", footprint = { w = 8, d = 5 }, price = 10000, income = 250, residents = 0, isRoad = false, unlockPop = Config.Unlocks.Flughafen, build = buildAirport },
 }
 

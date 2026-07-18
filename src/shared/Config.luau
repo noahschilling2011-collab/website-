@@ -27,9 +27,12 @@ Config.RateLimit = 5 -- max. Platz-/Abriss-Aktionen pro Sekunde und Spieler
 Config.Unlocks = {
 	Strasse = 0,
 	Wohnhaus = 0,
+	Park = 0,
 	Geschaeft = 10,
 	Hochhaus = 25,
+	UBahn = 35,
 	Autobahn = 50,
+	Fabrik = 60,
 	Flughafen = 100,
 }
 
