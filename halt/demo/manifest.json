@@ -1,0 +1,17 @@
+{
+  "name": "HALT — Die Notbremse gegen Betrug",
+  "short_name": "HALT",
+  "description": "Warnt deine Familie, bevor ein geliebter Mensch unter Manipulation sein Geld verliert.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0b10",
+  "theme_color": "#0a0b10",
+  "lang": "de",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

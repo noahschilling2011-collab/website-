@@ -3,8 +3,15 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-<title>HALT — App-Demo</title>
-<meta name="description" content="Klickbare Demo der HALT-App: der Geld-Trigger, der Betrug stoppt, bevor das Geld weg ist." />
+<title>HALT — Die Notbremse gegen Betrug</title>
+<meta name="description" content="HALT warnt deine Familie, bevor ein geliebter Mensch unter Manipulation sein Geld verliert." />
+<meta name="theme-color" content="#0a0b10" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" type="image/png" href="icon-192.png" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="HALT" />
 <style>
   :root{
     --bg:#0a0b10; --bg-soft:#12141d; --card:#161926; --card2:#1b1f2e; --border:#262b3b;
@@ -127,6 +134,10 @@
   @keyframes spin{to{transform:rotate(360deg)}}
 
   .pill{display:inline-block;padding:2px 10px;border-radius:999px;background:var(--bg-soft);border:1px solid var(--border);font-size:12px;color:var(--muted)}
+  .btn:focus-visible,.key:focus-visible,.tab:focus-visible,.link:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:8px}
+  .steps-progress{display:flex;gap:8px;margin-bottom:18px}
+  .steps-progress .sp{height:4px;flex:1;border-radius:2px;background:var(--border);transition:background .3s}
+  .steps-progress .sp.done{background:var(--grad-brand)}
   .toast{position:absolute;left:16px;right:16px;bottom:16px;background:#000;border:1px solid var(--border);border-radius:14px;
     padding:14px 16px;z-index:80;animation:pop .25s ease both;font-size:14px}
   .overlay{position:absolute;inset:0;background:var(--bg);z-index:70;display:flex;flex-direction:column;align-items:center;justify-content:center;animation:fade .2s}
@@ -411,8 +422,13 @@ function vWelcome(){
     <button class="btn primary" data-action="go" data-s="person">Los geht's</button>
   </div>`;
 }
+function progressBar(step){
+  return `<div class="steps-progress" role="progressbar" aria-valuenow="${step}" aria-valuemin="1" aria-valuemax="3" aria-label="Schritt ${step} von 3">
+    ${[1,2,3].map(i=>`<span class="sp ${i<=step?'done':''}"></span>`).join('')}</div>`;
+}
 function vPerson(){
   return `<div class="pad" style="padding-top:26px">
+    ${progressBar(1)}
     <h2>Wen möchtest du schützen?</h2>
     <p class="muted" style="margin-bottom:22px">Nur für deinen Überblick. Z. B. „Mama" oder „Opa Werner".</p>
     <input id="pname" placeholder="Name der Person" value="${esc(S.person||'')}" />
@@ -440,6 +456,7 @@ function vContacts(){
     <span class="link" data-action="rm-contact" data-i="${i}">Entfernen</span></div>${verifyUi}</div>`;
   }).join('');
   return `<div class="pad" style="padding-top:26px">
+    ${progressBar(2)}
     <h2>Wer wird gewarnt?</h2>
     <p class="muted" style="margin-bottom:18px">Diese Personen bekommen sofort eine Nachricht — bei echtem Alarm einen Anruf.${live?' Jede Nummer wird per SMS-Code bestätigt, bevor sie Alarme empfängt.':''}</p>
     ${list}
@@ -466,6 +483,7 @@ function vLiveWait(){
 }
 function vConnect(){
   return `<div class="pad" style="padding-top:26px">
+    ${progressBar(3)}
     <h2>Konto sicher verbinden</h2>
     <p class="muted" style="margin-bottom:18px">${esc(S.person||'Die Person')} gibt einmalig ihre Einwilligung. HALT sieht nur die Umsätze — nie das Geld.</p>
     <div class="card" style="margin-bottom:14px">
@@ -497,7 +515,8 @@ function tActivity(){
       <div><div class="amt">${tx.amount<0?'+':'−'}${eur(Math.abs(tx.amount))}</div>${lvl!=='ok'?'<div style="text-align:right;margin-top:5px">'+badge(lvl)+'</div>':''}</div>
     </div>`; }).join('');
   return `<div class="pad">
-    <div class="muted small">Geschützt</div><h2>${esc(S.person)}</h2>
+    <div class="between"><div><div class="muted small">Geschützt</div><h2>${esc(S.person)}</h2></div>
+      <span class="link small" data-action="connect-scan" role="button" aria-label="Kontobewegungen aktualisieren">↻ Aktualisieren</span></div>
     ${open?`<div class="card" style="border-color:var(--brand);margin:14px 0" data-action="tab" data-t="alerts">
       <b style="color:var(--brand)">${open} offene ${open===1?'Warnung':'Warnungen'}</b>
       <div class="muted small" style="margin-top:4px">Tippen, um sie anzusehen →</div></div>`:''}
@@ -578,10 +597,10 @@ function tabbar(){
 // ── Lock + PIN setup ──────────────────────────────────────────────────────────
 function pinDots(n){ return `<div class="dots">${Array.from({length:6},(_,i)=>`<span class="dt ${i<n?'on':''}"></span>`).join('')}</div>`; }
 function pinKeys(extraLeft=''){
-  const k=d=>`<button class="key" data-action="pin-key" data-d="${d}">${d}</button>`;
+  const k=d=>`<button class="key" data-action="pin-key" data-d="${d}" aria-label="Ziffer ${d}">${d}</button>`;
   return `<div class="keys">${['1','2','3','4','5','6','7','8','9'].map(k).join('')}
     ${extraLeft||'<span class="key blank"></span>'}${k('0')}
-    <button class="key" data-action="pin-back">⌫</button></div>`;
+    <button class="key" data-action="pin-back" aria-label="Ziffer löschen">⌫</button></div>`;
 }
 function vLock(){
   const g = lockGate(S.lock, now());
@@ -769,10 +788,22 @@ function applyScanResult(r){
 }
 
 async function authSubmit(){
+  if(S._authBusy) return;
   const email=val('email'), pw=val('pw');
   const ee=V.email(email); if(ee) return showErr('autherr',ee);
   if(S.authMode==='signup'){ const pe=V.password(pw); if(pe) return showErr('autherr',pe); }
   else if(!pw) return showErr('autherr','Bitte Passwort eingeben.');
+  S._authBusy=true;
+  const btn=document.querySelector('[data-action="auth-submit"]');
+  if(btn){ btn.disabled=true; btn.textContent='Bitte warten…'; }
+  try{ await authSubmitInner(email,pw); }
+  finally {
+    S._authBusy=false;
+    const b2=document.querySelector('[data-action="auth-submit"]');
+    if(b2){ b2.disabled=false; b2.textContent = S.authMode==='signup'?'Registrieren':'Anmelden'; }
+  }
+}
+async function authSubmitInner(email,pw){
 
   const proceed = () => {
     S._email='';
@@ -868,6 +899,20 @@ async function boot(){
   if(S._oauthError){ toast('⚠️ '+S._oauthError); S._oauthError=null; }
 }
 boot();
+
+// ── App-quality touches ───────────────────────────────────────────────────────
+// Installable PWA: register the service worker (only when served over http/s).
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+// Keyboard support: Enter submits the login; digits/Backspace drive the PIN pad.
+document.addEventListener('keydown', (e)=>{
+  if(S.screen==='auth' && e.key==='Enter'){ e.preventDefault(); authSubmit(); return; }
+  if(S.screen==='lock' || S.screen==='pinsetup'){
+    if(/^[0-9]$/.test(e.key)){ pinKey(e.key); }
+    else if(e.key==='Backspace'){ S.pinBuf=S.pinBuf.slice(0,-1); render(); }
+  }
+});
 </script>
 </body>
 </html>
