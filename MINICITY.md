@@ -32,8 +32,10 @@ rojo serve            # oder: rojo build -o MiniCity.rbxlx
 ```
 
 In Studio: Rojo-Plugin verbinden → Play. Persistenz braucht ein veröffentlichtes
-Spiel oder aktiviertes „Studio Access to API Services" (sonst startet man mit
-leerer Stadt, ohne Fehler).
+Spiel oder aktiviertes „Studio Access to API Services". Schlägt das **Laden**
+fehl, startet die Sitzung mit leerer Stadt und das Speichern bleibt für diese
+Sitzung deaktiviert — so wird ein echter Spielstand nie mit einer leeren Stadt
+überschrieben.
 
 ## Katalog (v0.2)
 
@@ -52,8 +54,9 @@ Neues Item = neuer Eintrag in `src/shared/Items.luau`, kein neuer Code.
 ## Steuerung
 
 - Item im Baumenü (unten) wählen → Ghost folgt der Maus/dem Finger.
-- **R** = 90° drehen.
-- Klick/Tap = platzieren (grün gültig, rot ungültig).
+- **R** oder „Drehen"-Knopf = 90° drehen.
+- Klick/Tap = platzieren. Der Ghost spiegelt die Server-Regeln:
+  grün = gültig, rot = Zelle belegt, kein Straßenanschluss oder zu wenig Geld.
 - **Abriss**-Knopf → eigenes Gebäude anklicken (50 % Rückerstattung).
 - **Abbrechen** verlässt Bau-/Abriss-Modus.
 

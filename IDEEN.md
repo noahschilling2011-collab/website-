@@ -21,5 +21,6 @@ Nichts hiervon ist im Code umgesetzt oder vorbereitet (Scope-Regel v0.2).
 - Mehr Gebäudetypen als reine Katalog-Einträge (Park, Fabrik, Hafen).
 - Straßen-Auto-Connect-Optik (Kurven/Kreuzungen) rein visuell.
 - Einkommens-Multiplikatoren durch Nachbarschaft (Geschäft neben Wohnhaus).
+- DataStore-Session-Locking (`UpdateAsync` + Lock-Feld) gegen Cross-Server-Races.
 - Bevölkerungs-Zufriedenheit als weicher Faktor.
 - Sound/Feedback beim Platzieren.

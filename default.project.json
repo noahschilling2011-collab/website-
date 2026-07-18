@@ -23,10 +23,10 @@
         }
       }
     },
-    "Workspace": {
-      "$className": "Workspace",
+    "Players": {
+      "$className": "Players",
       "$properties": {
-        "FilteringEnabled": true
+        "MaxPlayers": 6
       }
     },
     "Lighting": {

@@ -38,6 +38,9 @@ local menu = BuildMenuUI.create(screen, {
 			controller:setDemolish()
 		end
 	end,
+	onRotate = function()
+		controller:rotate()
+	end,
 	onCancel = function()
 		controller:cancel()
 	end,
@@ -54,6 +57,7 @@ local prevUnlocked = nil :: { [string]: boolean }?
 local function onState(state)
 	hud:update(state)
 	menu:update(state)
+	controller:onState(state)
 
 	-- Freischalt-Meldungen (nicht beim ersten Sync)
 	local currentSet = {}

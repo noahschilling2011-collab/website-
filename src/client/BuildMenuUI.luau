@@ -85,8 +85,16 @@ function BuildMenuUI.create(parentGui: ScreenGui, callbacks)
 		self.buttons[item.id] = { btn = btn, stroke = stroke }
 	end
 
+	-- Drehen-Button (fuer Touch; Tastatur nutzt R)
+	local rotate = makeButton(bar, #Items.List + 1)
+	rotate.BackgroundColor3 = Color3.fromRGB(70, 72, 80)
+	rotate.Text = "Drehen (R)"
+	rotate.Activated:Connect(function()
+		self.callbacks.onRotate()
+	end)
+
 	-- Abriss-Button
-	local demolish = makeButton(bar, #Items.List + 1)
+	local demolish = makeButton(bar, #Items.List + 2)
 	demolish.BackgroundColor3 = COL_DEMOLISH
 	demolish.Text = "Abriss\n(50% zurueck)"
 	demolish.Activated:Connect(function()
@@ -96,12 +104,15 @@ function BuildMenuUI.create(parentGui: ScreenGui, callbacks)
 	self.demolishStroke = demolish:FindFirstChildOfClass("UIStroke") :: UIStroke
 
 	-- Abbrechen-Button
-	local cancel = makeButton(bar, #Items.List + 2)
+	local cancel = makeButton(bar, #Items.List + 3)
 	cancel.BackgroundColor3 = Color3.fromRGB(70, 72, 80)
 	cancel.Text = "Abbrechen"
 	cancel.Activated:Connect(function()
 		self.callbacks.onCancel()
 	end)
+
+	-- Bis zum ersten StateSync: alles als gesperrt anzeigen statt leerer Buttons
+	self:update({ unlockedItems = {} })
 
 	return self
 end

@@ -61,6 +61,8 @@ local function newModel(name: string): Model
 	anchor.Size = Vector3.new(0.2, 0.2, 0.2)
 	anchor.Transparency = 1
 	anchor.CanCollide = false
+	anchor.CanQuery = false
+	anchor.CanTouch = false
 	anchor.Anchored = true
 	anchor.CFrame = CFrame.new(0, 0, 0)
 	anchor.Parent = model
@@ -98,9 +100,11 @@ local function buildHouse(): Model
 	local m = newModel("Wohnhaus")
 	-- Baukoerper 8x8 Footprint -> 6x6 Grundriss, 5 hoch
 	newPart(m, Vector3.new(6, 5, 6), CFrame.new(0, 2.5, 0), C_HOUSE)
-	-- Prismendach (Giebel) aus zwei Keilen, Firstlinie entlang X
-	newWedge(m, Vector3.new(6, 2.5, 3), CFrame.new(0, 6.25, 1.5) * CFrame.Angles(0, 0, 0), C_ROOF)
-	newWedge(m, Vector3.new(6, 2.5, 3), CFrame.new(0, 6.25, -1.5) * CFrame.Angles(0, math.pi, 0), C_ROOF)
+	-- Prismendach (Giebel) aus zwei Keilen, Firstlinie entlang X.
+	-- WedgePart: die hohe Kante liegt auf der lokalen +Z-Seite; beide Keile
+	-- drehen ihre hohe Kante zur Hausmitte (z=0), damit ein First entsteht.
+	newWedge(m, Vector3.new(6, 2.5, 3), CFrame.new(0, 6.25, 1.5) * CFrame.Angles(0, math.pi, 0), C_ROOF)
+	newWedge(m, Vector3.new(6, 2.5, 3), CFrame.new(0, 6.25, -1.5), C_ROOF)
 	-- Tuer
 	newPart(m, Vector3.new(1.2, 2, 0.2), CFrame.new(0, 1, 3.0), Color3.fromRGB(90, 55, 35))
 	return m
@@ -127,11 +131,9 @@ local function buildTower(): Model
 	}
 	for _, lvl in levels do
 		newPart(m, lvl.size, CFrame.new(0, lvl.y, 0), C_TOWER)
-		-- Fenster-Streifen (Glas-Baender) an allen vier Seiten je Etage
-		local half = lvl.size.X / 2
+		-- Fenster-Streifen (Glas-Baender) rund um jede Etage
 		for _, band in { -2, 0, 2 } do
-			local by = lvl.y + band
-			newPart(m, Vector3.new(lvl.size.X + 0.1, 1.2, lvl.size.Z + 0.1), CFrame.new(0, by, 0), C_GLASS, Enum.Material.Glass)
+			newPart(m, Vector3.new(lvl.size.X + 0.1, 1.2, lvl.size.Z + 0.1), CFrame.new(0, lvl.y + band, 0), C_GLASS, Enum.Material.Glass)
 		end
 	end
 	return m
