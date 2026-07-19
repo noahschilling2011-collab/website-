@@ -1,0 +1,1502 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#FFFC00">
+<title>SnapClone</title>
+<style>
+  /* ============ RESET & BASE ============ */
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --snap-yellow: #FFFC00;
+    --snap-blue: #0FADFF;
+    --snap-purple: #7A3FF2;
+    --snap-red: #F23C57;
+    --snap-green: #26D07C;
+    --dark: #16191C;
+    --gray: #F2F3F5;
+    --gray-2: #C6CBD2;
+    --text-mute: #8E9AAB;
+    --nav-h: 76px;
+    --top-h: 58px;
+  }
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    color: #16191C;
+    user-select: none;
+  }
+  #app {
+    position: relative;
+    width: 100%;
+    max-width: 480px;
+    height: 100dvh;
+    margin: 0 auto;
+    overflow: hidden;
+    background: #000;
+    box-shadow: 0 0 60px rgba(0,0,0,.5);
+  }
+
+  /* ============ SCREEN SLIDER ============ */
+  #slider {
+    display: flex;
+    width: 500%;
+    height: 100%;
+    transition: transform .38s cubic-bezier(.4,.01,.2,1);
+    will-change: transform;
+  }
+  .screen {
+    width: 20%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .screen-scroll { height: 100%; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+
+  /* ============ BOTTOM NAV ============ */
+  #bottomnav {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: var(--nav-h);
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 8px calc(env(safe-area-inset-bottom, 0px));
+    z-index: 50;
+    transition: background .3s, color .3s;
+    pointer-events: auto;
+  }
+  #bottomnav.dark-nav { background: linear-gradient(to top, rgba(0,0,0,.55), rgba(0,0,0,0)); }
+  #bottomnav.light-nav { background: #fff; border-top: 1px solid #eee; }
+  .nav-btn {
+    background: none; border: none; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; width: 56px; height: 56px; position: relative;
+    color: #fff; opacity: .78; transition: opacity .2s, transform .2s;
+  }
+  .light-nav .nav-btn { color: #767d88; }
+  .nav-btn.active { opacity: 1; transform: translateY(-1px); }
+  .light-nav .nav-btn.active { color: #16191C; }
+  .nav-btn svg { width: 27px; height: 27px; }
+  .nav-btn .cam-ring {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 3px solid currentColor;
+  }
+  .nav-badge {
+    position: absolute; top: 4px; right: 8px;
+    min-width: 18px; height: 18px; border-radius: 9px;
+    background: var(--snap-red); color: #fff;
+    font-size: 11px; font-weight: 700; display: flex;
+    align-items: center; justify-content: center; padding: 0 5px;
+  }
+
+  /* ============ CAMERA SCREEN ============ */
+  #cameraScreen { background: #000; }
+  #camVideo {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; z-index: 1; background: #000;
+  }
+  #camVideo.mirror { transform: scaleX(-1); }
+  #camFallback {
+    position: absolute; inset: 0; z-index: 1;
+    background: linear-gradient(135deg, #7A3FF2, #F23C57, #FF9E00, #0FADFF);
+    background-size: 400% 400%;
+    animation: gradShift 12s ease infinite;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; color: rgba(255,255,255,.9);
+  }
+  @keyframes gradShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  #camFallback .fb-ghost { width: 90px; height: 90px; opacity: .9; margin-bottom: 14px; filter: drop-shadow(0 4px 12px rgba(0,0,0,.3)); animation: floaty 3s ease-in-out infinite; }
+  @keyframes floaty { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-12px);} }
+  #camFallback p { font-size: 14px; font-weight: 600; letter-spacing: .3px; }
+  #camFallback small { font-size: 12px; opacity: .8; margin-top: 6px; max-width: 240px; text-align:center; line-height:1.5;}
+
+  .lens-layer {
+    position: absolute; inset: 0; z-index: 2; pointer-events: none;
+    transition: backdrop-filter .3s;
+  }
+  /* VHS scanlines overlay */
+  #vhsOverlay {
+    position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0;
+    transition: opacity .3s;
+    background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,.25) 3px, rgba(0,0,0,0) 4px);
+    mix-blend-mode: multiply;
+  }
+  #vhsOverlay::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, rgba(255,0,80,.08), rgba(0,255,200,.06));
+    animation: vhsJitter .3s steps(2) infinite;
+  }
+  @keyframes vhsJitter { 0%{transform:translateX(0);} 50%{transform:translateX(1px);} 100%{transform:translateX(-1px);} }
+  #vignetteOverlay {
+    position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0;
+    transition: opacity .3s;
+    background: radial-gradient(circle at center, transparent 45%, rgba(0,0,0,.85) 100%);
+  }
+
+  /* Camera Top bar */
+  .cam-top {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 20;
+    padding: calc(env(safe-area-inset-top,0px) + 12px) 14px 0;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .cam-avatar {
+    width: 42px; height: 42px; border-radius: 50%;
+    background: linear-gradient(135deg,#FFD200,#F7971E);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 16px; cursor: pointer;
+    border: 2px solid rgba(255,255,255,.6); flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(0,0,0,.3);
+  }
+  .cam-search {
+    flex: 1; height: 40px; border-radius: 20px;
+    background: rgba(0,0,0,.35); backdrop-filter: blur(8px);
+    display: flex; align-items: center; gap: 8px; padding: 0 14px;
+    color: rgba(255,255,255,.85); font-size: 14px; font-weight: 600;
+  }
+  .cam-search svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .cam-icon {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(0,0,0,.35); backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0; color: #fff; transition: transform .15s;
+  }
+  .cam-icon:active { transform: scale(.9); }
+  .cam-icon svg { width: 22px; height: 22px; }
+  .cam-icon.flash-on { background: var(--snap-yellow); color: #16191C; }
+
+  /* Lens carousel */
+  #lensCarousel {
+    position: absolute; left: 0; right: 0; bottom: 128px; z-index: 20;
+    display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory;
+    padding: 0 calc(50% - 32px); scrollbar-width: none;
+  }
+  #lensCarousel::-webkit-scrollbar { display: none; }
+  .lens-item {
+    flex-shrink: 0; scroll-snap-align: center;
+    width: 58px; height: 58px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; cursor: pointer;
+    background: rgba(0,0,0,.3); backdrop-filter: blur(6px);
+    border: 2px solid rgba(255,255,255,.35);
+    transition: transform .2s, border-color .2s, width .2s, height .2s;
+    color: #fff; position: relative;
+  }
+  .lens-item.active {
+    width: 68px; height: 68px;
+    border-color: var(--snap-yellow); border-width: 3px;
+    transform: scale(1.02);
+  }
+  .lens-item .lens-name {
+    position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%);
+    font-size: 10px; font-weight: 700; color: #fff; white-space: nowrap;
+    text-shadow: 0 1px 3px rgba(0,0,0,.6); opacity: 0;
+    transition: opacity .2s;
+  }
+  .lens-item.active .lens-name { opacity: 1; }
+
+  /* Shutter */
+  .shutter-wrap {
+    position: absolute; left: 0; right: 0; bottom: 42px; z-index: 20;
+    display: flex; align-items: center; justify-content: center; gap: 54px;
+  }
+  #shutterBtn {
+    width: 82px; height: 82px; border-radius: 50%;
+    background: transparent; border: 6px solid #fff; cursor: pointer;
+    position: relative; transition: transform .12s;
+    box-shadow: 0 0 0 2px rgba(0,0,0,.15);
+  }
+  #shutterBtn::after {
+    content: ""; position: absolute; inset: 6px; border-radius: 50%;
+    background: rgba(255,255,255,.15); transition: background .12s;
+  }
+  #shutterBtn:active { transform: scale(.93); }
+  #shutterBtn:active::after { background: rgba(255,255,255,.4); }
+  .side-slot { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; }
+  .memories-btn {
+    width: 46px; height: 46px; border-radius: 12px; cursor: pointer;
+    background: rgba(255,255,255,.18); backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid rgba(255,255,255,.3);
+  }
+  .memories-btn svg { width: 24px; height: 24px; color: #fff; }
+
+  /* Flash effect */
+  #flashFx {
+    position: absolute; inset: 0; background: #fff; z-index: 60;
+    opacity: 0; pointer-events: none;
+  }
+  #flashFx.fire { animation: flashAnim .4s ease; }
+  @keyframes flashAnim { 0%{opacity:.95;} 100%{opacity:0;} }
+
+  /* ============ SNAP EDITOR ============ */
+  #editor {
+    position: absolute; inset: 0; z-index: 100; background: #000;
+    display: none; flex-direction: column;
+  }
+  #editor.open { display: flex; }
+  #editCanvasWrap { position: absolute; inset: 0; }
+  #editImg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .edit-top {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 10;
+    padding: calc(env(safe-area-inset-top,0px) + 12px) 12px 0;
+    display: flex; justify-content: space-between; align-items: flex-start;
+  }
+  .edit-tool {
+    width: 42px; height: 42px; border-radius: 50%;
+    background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: #fff;
+  }
+  .edit-tool svg { width: 24px; height: 24px; }
+  .edit-tools-right { display: flex; flex-direction: column; gap: 12px; }
+
+  #snapText {
+    position: absolute; left: 0; right: 0; top: 45%; z-index: 8;
+    text-align: center; padding: 12px 0;
+    background: rgba(0,0,0,.35); color: #fff;
+    font-size: 22px; font-weight: 600; outline: none;
+    cursor: grab; touch-action: none; word-break: break-word;
+    min-height: 46px;
+  }
+  #snapText:empty::before { content: "Tippe zum Schreiben…"; opacity: .6; }
+  #snapText.dragging { cursor: grabbing; }
+
+  .timer-pill {
+    position: absolute; left: 14px; bottom: 96px; z-index: 10;
+    background: rgba(0,0,0,.45); border-radius: 22px; padding: 8px 14px;
+    display: flex; align-items: center; gap: 8px; color: #fff; cursor: pointer;
+  }
+  .timer-pill svg { width: 22px; height: 22px; }
+  .timer-pill span { font-weight: 700; font-size: 15px; }
+  .timer-slider-wrap {
+    position: absolute; left: 14px; right: 14px; bottom: 150px; z-index: 11;
+    background: rgba(0,0,0,.6); border-radius: 16px; padding: 14px 16px;
+    display: none; color: #fff;
+  }
+  .timer-slider-wrap.show { display: block; }
+  .timer-slider-wrap label { font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; margin-bottom: 8px; }
+  .timer-slider-wrap input[type=range] { width: 100%; accent-color: var(--snap-yellow); }
+
+  .send-bar {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 10;
+    padding: 14px 14px calc(env(safe-area-inset-bottom,0px) + 14px);
+    display: flex; justify-content: flex-end;
+  }
+  #sendToBtn {
+    background: #fff; color: #16191C; border: none; cursor: pointer;
+    padding: 12px 20px; border-radius: 26px; font-weight: 700; font-size: 15px;
+    display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.3);
+    transition: transform .15s;
+  }
+  #sendToBtn:active { transform: scale(.95); }
+  #sendToBtn svg { width: 20px; height: 20px; }
+
+  /* ============ SEND-TO SHEET ============ */
+  .sheet-backdrop {
+    position: absolute; inset: 0; z-index: 200; background: rgba(0,0,0,.5);
+    display: none; align-items: flex-end;
+  }
+  .sheet-backdrop.open { display: flex; }
+  .sheet {
+    width: 100%; max-height: 78%; background: #fff; border-radius: 20px 20px 0 0;
+    display: flex; flex-direction: column; transform: translateY(100%);
+    transition: transform .32s cubic-bezier(.2,.8,.2,1); overflow: hidden;
+  }
+  .sheet-backdrop.open .sheet { transform: translateY(0); }
+  .sheet-handle { width: 40px; height: 4px; border-radius: 2px; background: #d5d9df; margin: 10px auto 6px; }
+  .sheet-title { font-size: 18px; font-weight: 800; padding: 6px 20px 12px; }
+  .sheet-list { flex: 1; overflow-y: auto; padding: 0 8px; }
+  .friend-row {
+    display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+    border-radius: 12px; cursor: pointer;
+  }
+  .friend-row:active { background: var(--gray); }
+  .friend-avatar {
+    width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 17px;
+  }
+  .friend-meta { flex: 1; min-width: 0; }
+  .friend-name { font-weight: 700; font-size: 15px; }
+  .friend-sub { font-size: 12px; color: var(--text-mute); margin-top: 2px; }
+  .checkbox {
+    width: 26px; height: 26px; border-radius: 50%; border: 2px solid #c6cbd2;
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    transition: background .15s, border-color .15s;
+  }
+  .checkbox.checked { background: var(--snap-blue); border-color: var(--snap-blue); }
+  .checkbox svg { width: 16px; height: 16px; color: #fff; opacity: 0; transition: opacity .15s; }
+  .checkbox.checked svg { opacity: 1; }
+  .sheet-footer { padding: 12px 16px calc(env(safe-area-inset-bottom,0px) + 12px); border-top: 1px solid #eee; }
+  #confirmSend {
+    width: 100%; background: var(--snap-blue); color: #fff; border: none;
+    padding: 14px; border-radius: 26px; font-weight: 800; font-size: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: transform .15s, opacity .2s;
+  }
+  #confirmSend:disabled { opacity: .4; }
+  #confirmSend:active:not(:disabled) { transform: scale(.98); }
+
+  /* ============ LIGHT LIST SCREENS (Chat/Stories/Spotlight) ============ */
+  .list-header {
+    position: sticky; top: 0; z-index: 10; background: #fff;
+    padding: calc(env(safe-area-inset-top,0px) + 14px) 16px 10px;
+    display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #f0f1f3;
+  }
+  .lh-avatar {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: linear-gradient(135deg,#FFD200,#F7971E);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 15px;
+  }
+  .lh-title { font-size: 22px; font-weight: 800; flex: 1; }
+  .lh-icon { width: 30px; height: 30px; color: #16191C; }
+  .lh-icon svg { width: 100%; height: 100%; }
+
+  .list-body { padding-bottom: calc(var(--nav-h) + 12px); }
+
+  .chat-row {
+    display: flex; align-items: center; gap: 12px; padding: 12px 16px; cursor: pointer;
+    transition: background .15s;
+  }
+  .chat-row:active { background: var(--gray); }
+  .chat-avatar {
+    width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0; position: relative;
+    display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 19px;
+  }
+  .chat-avatar .presence {
+    position: absolute; bottom: 0; right: 0; width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid #fff; background: var(--snap-green);
+  }
+  .chat-info { flex: 1; min-width: 0; }
+  .chat-name { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 6px; }
+  .chat-status { font-size: 13px; color: var(--text-mute); margin-top: 3px; display: flex; align-items: center; gap: 6px; }
+  .status-square { width: 13px; height: 13px; border-radius: 3px; flex-shrink: 0; }
+  .status-icon { width: 15px; height: 15px; flex-shrink: 0; }
+  .chat-status.newsnap { color: var(--snap-red); font-weight: 700; }
+  .chat-status.newchat { color: var(--snap-blue); font-weight: 700; }
+  .streak { font-size: 13px; color: var(--text-mute); font-weight: 700; display: flex; align-items: center; gap: 2px; margin-left: auto; padding-left: 8px; }
+  .chat-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .chat-time { font-size: 12px; color: var(--gray-2); }
+
+  /* ============ STORIES ============ */
+  .stories-friends-title { font-size: 16px; font-weight: 800; padding: 16px 16px 6px; }
+  .story-strip { display: flex; gap: 14px; overflow-x: auto; padding: 8px 16px 14px; scrollbar-width: none; }
+  .story-strip::-webkit-scrollbar { display: none; }
+  .my-story-tile, .story-tile {
+    flex-shrink: 0; width: 76px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer;
+  }
+  .story-ring {
+    width: 66px; height: 66px; border-radius: 50%; padding: 3px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .story-ring.unseen { background: linear-gradient(135deg, var(--snap-red), var(--snap-purple)); }
+  .story-ring.seen { background: #d5d9df; }
+  .story-ring.mine { background: #eceef1; }
+  .story-inner {
+    width: 100%; height: 100%; border-radius: 50%; border: 2px solid #fff;
+    display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 22px;
+    overflow: hidden; position: relative;
+  }
+  .story-add {
+    position: absolute; bottom: -2px; right: -2px; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--snap-blue); border: 2px solid #fff; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700;
+  }
+  .story-label { font-size: 12px; font-weight: 600; color: #16191C; max-width: 74px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .disc-title { font-size: 16px; font-weight: 800; padding: 6px 16px 10px; }
+  .disc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 16px; }
+  .disc-card {
+    aspect-ratio: 3/4.4; border-radius: 12px; overflow: hidden; position: relative; cursor: pointer;
+    display: flex; align-items: flex-end; padding: 10px; color: #fff;
+  }
+  .disc-card .disc-name { font-weight: 800; font-size: 13px; text-shadow: 0 1px 4px rgba(0,0,0,.5); z-index: 2; }
+  .disc-card .disc-pub { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,.35); padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; z-index: 2; }
+  .disc-card::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,.55), transparent 55%); z-index: 1; }
+
+  /* ============ SPOTLIGHT ============ */
+  #spotlightScreen { background: #000; }
+  .spot-feed { height: 100%; overflow-y: auto; scroll-snap-type: y mandatory; }
+  .spot-item {
+    height: 100%; scroll-snap-align: start; position: relative;
+    display: flex; align-items: flex-end; padding: 0 0 calc(var(--nav-h) + 20px) 16px;
+  }
+  .spot-bg { position: absolute; inset: 0; z-index: 1; }
+  .spot-overlay { position: absolute; inset: 0; z-index: 2; background: linear-gradient(to top, rgba(0,0,0,.55), transparent 45%); }
+  .spot-content { position: relative; z-index: 3; color: #fff; max-width: 74%; }
+  .spot-user { font-weight: 800; font-size: 15px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  .spot-user .su-ava { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; border: 1.5px solid #fff; }
+  .spot-cap { font-size: 14px; line-height: 1.4; }
+  .spot-actions { position: absolute; right: 12px; bottom: calc(var(--nav-h) + 30px); z-index: 3; display: flex; flex-direction: column; gap: 20px; align-items: center; color: #fff; }
+  .spot-act { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; }
+  .spot-act svg { width: 30px; height: 30px; }
+  .spot-header { position: absolute; top: calc(env(safe-area-inset-top,0px) + 14px); left: 0; right: 0; z-index: 5; text-align: center; color: #fff; font-weight: 800; font-size: 18px; text-shadow: 0 1px 4px rgba(0,0,0,.4); }
+
+  /* ============ MAP ============ */
+  #mapScreen { background: #E8EDF0; }
+  .map-canvas { position: absolute; inset: 0; overflow: hidden; }
+  .map-canvas::before {
+    content: ""; position: absolute; inset: -20%;
+    background:
+      linear-gradient(115deg, transparent 48%, #cdd8dd 48%, #cdd8dd 52%, transparent 52%),
+      linear-gradient(25deg, transparent 48%, #cdd8dd 48%, #cdd8dd 52%, transparent 52%),
+      linear-gradient(200deg, transparent 47%, #d7e6c8 47%, #d7e6c8 53%, transparent 53%);
+    background-size: 180px 180px, 220px 220px, 300px 300px;
+    opacity: .8;
+  }
+  .map-canvas::after {
+    content: ""; position: absolute; top: 30%; left: 10%; width: 60%; height: 40%;
+    background: radial-gradient(ellipse, #b9dcf0 0%, #b9dcf0 60%, transparent 70%);
+    border-radius: 50%; opacity: .7;
+  }
+  .bitmoji-pin {
+    position: absolute; z-index: 4; transform: translate(-50%,-50%);
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+  }
+  .bitmoji-pin .bm-face {
+    width: 44px; height: 44px; border-radius: 50%; border: 3px solid #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+    color: #fff; font-weight: 700; box-shadow: 0 3px 8px rgba(0,0,0,.25);
+  }
+  .bitmoji-pin .bm-name { font-size: 10px; font-weight: 700; background: #fff; padding: 1px 7px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+  .map-topbar {
+    position: absolute; top: calc(env(safe-area-inset-top,0px) + 14px); left: 14px; right: 14px; z-index: 6;
+    display: flex; gap: 10px; align-items: center;
+  }
+  .map-search { flex: 1; height: 42px; border-radius: 21px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.12); display: flex; align-items: center; gap: 8px; padding: 0 14px; color: var(--text-mute); font-weight: 600; font-size: 14px; }
+  .map-search svg { width: 18px; height: 18px; }
+  .map-me {
+    position: absolute; bottom: calc(var(--nav-h) + 20px); left: 50%; transform: translateX(-50%); z-index: 6;
+    background: #fff; padding: 8px 18px; border-radius: 22px; box-shadow: 0 3px 10px rgba(0,0,0,.15);
+    font-weight: 700; font-size: 13px; color: #16191C; display: flex; align-items: center; gap: 8px;
+  }
+  .map-me .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--snap-blue); }
+
+  /* ============ SNAP VIEWER (received snap countdown) ============ */
+  #snapViewer {
+    position: absolute; inset: 0; z-index: 300; background: #000; display: none;
+    flex-direction: column;
+  }
+  #snapViewer.open { display: flex; }
+  #snapViewer .sv-media { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  #snapViewer .sv-media img { width: 100%; height: 100%; object-fit: cover; }
+  .sv-gradient { position: absolute; inset: 0; }
+  .sv-caption { position: absolute; left: 0; right: 0; text-align: center; color: #fff; font-size: 22px; font-weight: 600; padding: 12px; background: rgba(0,0,0,.35); z-index: 3; }
+  .sv-timer {
+    position: absolute; top: calc(env(safe-area-inset-top,0px) + 16px); right: 16px; z-index: 5;
+    width: 44px; height: 44px; border-radius: 50%; background: rgba(0,0,0,.4);
+    display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: 18px;
+  }
+  .sv-hint { position: absolute; bottom: calc(env(safe-area-inset-bottom,0px) + 24px); left: 0; right: 0; text-align: center; color: rgba(255,255,255,.7); font-size: 12px; z-index: 5; }
+  .sv-from { position: absolute; top: calc(env(safe-area-inset-top,0px) + 18px); left: 16px; z-index: 5; color: #fff; font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .sv-from .svf-ava { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+
+  /* ============ STORY VIEWER ============ */
+  #storyViewer {
+    position: absolute; inset: 0; z-index: 300; background: #000; display: none;
+  }
+  #storyViewer.open { display: block; }
+  .story-progress { position: absolute; top: calc(env(safe-area-inset-top,0px) + 10px); left: 8px; right: 8px; z-index: 10; display: flex; gap: 4px; }
+  .sp-seg { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,.35); overflow: hidden; }
+  .sp-seg .sp-fill { height: 100%; width: 0; background: #fff; }
+  .story-viewer-head { position: absolute; top: calc(env(safe-area-inset-top,0px) + 24px); left: 14px; right: 14px; z-index: 10; display: flex; align-items: center; gap: 10px; color: #fff; }
+  .svh-ava { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; border: 1.5px solid rgba(255,255,255,.5); }
+  .svh-name { font-weight: 700; font-size: 15px; }
+  .svh-time { font-size: 12px; opacity: .8; margin-left: 4px; }
+  .svh-close { margin-left: auto; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .svh-close svg { width: 24px; height: 24px; }
+  .story-media { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 30px; font-weight: 800; text-align: center; padding: 40px; }
+  .story-nav { position: absolute; top: 0; bottom: 0; width: 33%; z-index: 8; }
+  .story-nav.left { left: 0; }
+  .story-nav.right { right: 0; }
+  .story-cap { position: absolute; bottom: 90px; left: 20px; right: 20px; z-index: 9; color: #fff; text-align: center; font-size: 18px; font-weight: 600; text-shadow: 0 1px 6px rgba(0,0,0,.5); }
+
+  /* ============ TOAST ============ */
+  #toast {
+    position: absolute; bottom: calc(var(--nav-h) + 24px); left: 50%; transform: translateX(-50%) translateY(20px);
+    background: rgba(22,25,28,.94); color: #fff; padding: 12px 22px; border-radius: 26px;
+    font-size: 14px; font-weight: 600; z-index: 400; opacity: 0; pointer-events: none;
+    transition: opacity .25s, transform .25s; white-space: nowrap; max-width: 90%;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ============ PERMISSION PROMPT ============ */
+  #permPrompt {
+    position: absolute; inset: 0; z-index: 250; background: rgba(0,0,0,.75);
+    display: none; align-items: center; justify-content: center; padding: 30px;
+    backdrop-filter: blur(4px);
+  }
+  #permPrompt.show { display: flex; }
+  .perm-card {
+    background: #fff; border-radius: 22px; padding: 28px 24px; text-align: center; max-width: 320px; width: 100%;
+  }
+  .perm-card .pc-ghost { width: 70px; height: 70px; margin: 0 auto 16px; }
+  .perm-card h3 { font-size: 19px; font-weight: 800; margin-bottom: 8px; }
+  .perm-card p { font-size: 14px; color: var(--text-mute); line-height: 1.5; margin-bottom: 20px; }
+  .perm-card button {
+    width: 100%; border: none; border-radius: 26px; padding: 14px; font-weight: 800; font-size: 15px; cursor: pointer; margin-bottom: 10px;
+  }
+  .pc-allow { background: var(--snap-yellow); color: #16191C; }
+  .pc-skip { background: var(--gray); color: #16191C; }
+
+  /* scrollbar hide for light screens */
+  .screen-scroll::-webkit-scrollbar { width: 0; }
+
+  /* small util */
+  .fade-in { animation: fadeIn .3s ease; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .empty-hint { text-align: center; color: var(--text-mute); font-size: 13px; padding: 30px 20px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ================= SLIDER ================= -->
+  <div id="slider">
+
+    <!-- SCREEN 0: MAP -->
+    <section class="screen" id="mapScreen">
+      <div class="map-canvas"></div>
+      <div class="map-topbar">
+        <div class="map-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+          Ort oder Freunde suchen
+        </div>
+      </div>
+      <div id="mapPins"></div>
+      <div class="map-me"><span class="dot"></span> Dein Standort · Live</div>
+    </section>
+
+    <!-- SCREEN 1: CHAT -->
+    <section class="screen" id="chatScreen" style="background:#fff">
+      <div class="screen-scroll">
+        <div class="list-header">
+          <div class="lh-avatar" id="chatHeaderAva">DU</div>
+          <div class="lh-title">Chat</div>
+          <div class="lh-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+          </div>
+        </div>
+        <div class="list-body" id="chatList"></div>
+      </div>
+    </section>
+
+    <!-- SCREEN 2: CAMERA -->
+    <section class="screen" id="cameraScreen">
+      <video id="camVideo" autoplay playsinline muted></video>
+      <div id="camFallback">
+        <svg class="fb-ghost" viewBox="0 0 100 100"></svg>
+        <p>Kamera nicht aktiv</p>
+        <small id="fallbackMsg">Tippe auf den Auslöser für einen Schnappschuss – oder erlaube die Kamera oben.</small>
+      </div>
+      <div class="lens-layer" id="lensLayer"></div>
+      <div id="vhsOverlay"></div>
+      <div id="vignetteOverlay"></div>
+
+      <div class="cam-top">
+        <div class="cam-avatar" id="camAvatar">DU</div>
+        <div class="cam-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+          Suchen
+        </div>
+        <div class="cam-icon" id="flashBtn" title="Blitz">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L4.5 13.5H11l-1 8.5 8.5-11.5H12z"/></svg>
+        </div>
+        <div class="cam-icon" id="flipBtn" title="Kamera wechseln">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h3l2-2h8l2 2h3v12H3z"/><path d="M9 13a3 3 0 106 0 3 3 0 00-6 0z"/><path d="M20 9l1.5-1.5M20 9l-1.5-1.5" stroke-linecap="round"/></svg>
+        </div>
+      </div>
+
+      <div id="lensCarousel"></div>
+
+      <div class="shutter-wrap">
+        <div class="side-slot">
+          <div class="memories-btn" id="memoriesBtn" title="Erinnerungen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="14" height="14" rx="2"/><path d="M7 8h.01M7 12h6M7 15h4"/><path d="M17 8h2a2 2 0 012 2v8a2 2 0 01-2 2H9a2 2 0 01-2-2"/></svg>
+          </div>
+        </div>
+        <button id="shutterBtn" aria-label="Foto aufnehmen"></button>
+        <div class="side-slot"></div>
+      </div>
+
+      <div id="flashFx"></div>
+    </section>
+
+    <!-- SCREEN 3: STORIES -->
+    <section class="screen" id="storiesScreen" style="background:#fff">
+      <div class="screen-scroll">
+        <div class="list-header">
+          <div class="lh-avatar" id="storyHeaderAva">DU</div>
+          <div class="lh-title">Stories</div>
+          <div class="lh-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 4v2M12 18v2M4 12H2M22 12h-2M6 6l1.5 1.5M18 18l-1.5-1.5M6 18l1.5-1.5M18 6l-1.5 1.5"/></svg>
+          </div>
+        </div>
+        <div class="list-body">
+          <div class="stories-friends-title">Freunde</div>
+          <div class="story-strip" id="storyStrip"></div>
+          <div class="disc-title">Discover</div>
+          <div class="disc-grid" id="discGrid"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCREEN 4: SPOTLIGHT -->
+    <section class="screen" id="spotlightScreen">
+      <div class="spot-header">Spotlight</div>
+      <div class="spot-feed" id="spotFeed"></div>
+    </section>
+
+  </div>
+
+  <!-- ================= BOTTOM NAV ================= -->
+  <div id="bottomnav" class="dark-nav">
+    <button class="nav-btn" data-screen="0">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>
+    </button>
+    <button class="nav-btn" data-screen="1">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+      <span class="nav-badge" id="chatBadge" style="display:none">0</span>
+    </button>
+    <button class="nav-btn active" data-screen="2">
+      <span class="cam-ring"></span>
+    </button>
+    <button class="nav-btn" data-screen="3">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+    </button>
+    <button class="nav-btn" data-screen="4">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21.4 8 14 2 9.4h7.6z"/></svg>
+    </button>
+  </div>
+
+  <!-- ================= EDITOR ================= -->
+  <div id="editor">
+    <div id="editCanvasWrap">
+      <img id="editImg" alt="Snap">
+    </div>
+    <div class="edit-top">
+      <div class="edit-tool" id="editClose">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round"/></svg>
+      </div>
+      <div class="edit-tools-right">
+        <div class="edit-tool" id="textToolBtn" title="Text">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V5h16v2M9 5v14M15 19H9"/></svg>
+        </div>
+        <div class="edit-tool" id="saveToolBtn" title="Speichern">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <div id="snapText" contenteditable="true"></div>
+
+    <div class="timer-slider-wrap" id="timerSliderWrap">
+      <label>Anzeigedauer <span id="timerVal">3s</span></label>
+      <input type="range" id="timerRange" min="1" max="10" value="3">
+    </div>
+    <div class="timer-pill" id="timerPill">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg>
+      <span id="timerPillVal">3</span>
+    </div>
+
+    <div class="send-bar">
+      <button id="sendToBtn">
+        Senden an
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ================= SEND-TO SHEET ================= -->
+  <div class="sheet-backdrop" id="sendSheet">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Senden an…</div>
+      <div class="sheet-list" id="sendFriendList"></div>
+      <div class="sheet-footer">
+        <button id="confirmSend" disabled>
+          Senden
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= SNAP VIEWER ================= -->
+  <div id="snapViewer">
+    <div class="sv-media" id="svMedia"></div>
+    <div class="sv-from" id="svFrom"></div>
+    <div class="sv-timer" id="svTimer">3</div>
+    <div class="sv-caption" id="svCaption" style="display:none"></div>
+    <div class="sv-hint">Loslassen schließt den Snap · dann ist er für immer weg</div>
+  </div>
+
+  <!-- ================= STORY VIEWER ================= -->
+  <div id="storyViewer">
+    <div class="story-progress" id="storyProgress"></div>
+    <div class="story-viewer-head">
+      <div class="svh-ava" id="svhAva">A</div>
+      <div class="svh-name" id="svhName">Name</div>
+      <div class="svh-time" id="svhTime">2h</div>
+      <div class="svh-close" id="storyClose">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round"/></svg>
+      </div>
+    </div>
+    <div class="story-media" id="storyMedia"></div>
+    <div class="story-cap" id="storyCap"></div>
+    <div class="story-nav left" id="storyPrev"></div>
+    <div class="story-nav right" id="storyNext"></div>
+  </div>
+
+  <!-- ================= PERMISSION PROMPT ================= -->
+  <div id="permPrompt">
+    <div class="perm-card">
+      <svg class="pc-ghost" viewBox="0 0 100 100"></svg>
+      <h3>Kamera aktivieren</h3>
+      <p>SnapClone möchte deine Kamera nutzen, um Snaps aufzunehmen. Alles bleibt lokal auf deinem Gerät.</p>
+      <button class="pc-allow" id="permAllow">Kamera erlauben</button>
+      <button class="pc-skip" id="permSkip">Ohne Kamera fortfahren</button>
+    </div>
+  </div>
+
+  <!-- ================= TOAST ================= -->
+  <div id="toast"></div>
+
+  <canvas id="snapCanvas" style="display:none"></canvas>
+</div>
+
+<script>
+/* ============================================================
+   SNAPCLONE — Single-file Snapchat clone
+   ============================================================ */
+(function(){
+  "use strict";
+
+  /* ---------- Ghost SVG (rebuilt logo) ---------- */
+  const GHOST_PATH = "M50 8c-11.5 0-19.8 8.7-20.3 20.4-.1 2.4 0 5.2 .1 7.7-.6 .3-1.4 .5-2.2 .3-1.4-.4-2.3-1.6-3.4-1.6-1.3 0-2.6 .9-2.7 2.3-.1 1.7 1.6 2.4 3.2 3 1.3 .5 2.9 1 3.1 2 .1 .6-.2 1.4-.8 2.4-.1 .1-2.6 5.9-8.2 6.8-.8 .1-1.4 .8-1.3 1.6 0 .3 .1 .5 .2 .7 .8 1.8 4 2.6 6.7 3 .2 .6 .4 1.5 .5 2 .1 .6 .3 1.3 1.1 1.3 .3 0 .7-.1 1.2-.2 1.1-.2 2.5-.5 4.3-.1 1 .2 1.9 .8 3 1.6 1.9 1.3 4 2.8 7.4 2.8s5.6-1.5 7.5-2.8c1.1-.8 2-1.4 3-1.6 1.8-.4 3.2-.1 4.3 .1 .5 .1 .9 .2 1.2 .2 .6 0 1-.4 1.1-1.3 .1-.5 .3-1.4 .5-2 2.7-.4 5.9-1.2 6.7-3 .1-.2 .2-.5 .2-.7 .1-.8-.5-1.5-1.3-1.6-5.6-.9-8.1-6.7-8.2-6.8-.6-1-.9-1.8-.8-2.4 .2-1 1.8-1.5 3.1-2 1.6-.6 3.3-1.3 3.2-3-.1-1.3-1.3-2.3-2.6-2.3-1.1 0-2 1.2-3.5 1.6-.7 .2-1.5 0-2.1-.3 .1-2.5 .2-5.3 .1-7.7C69.8 16.7 61.5 8 50 8z";
+  document.querySelectorAll('.fb-ghost').forEach(s=>{
+    s.innerHTML = '<path fill="#fff" d="'+GHOST_PATH+'"/>';
+  });
+  document.querySelectorAll('.pc-ghost').forEach(s=>{
+    s.innerHTML = '<path fill="#FFFC00" stroke="#16191C" stroke-width="2" d="'+GHOST_PATH+'"/>';
+  });
+
+  /* ---------- Data ---------- */
+  const AVATAR_COLORS = ['#F23C57','#7A3FF2','#0FADFF','#26D07C','#FF9E00','#FF5FA2','#00C2B8','#8E7CFF','#FF6B6B','#38B6FF'];
+  function avaColor(seed){ let h=0; for(let i=0;i<seed.length;i++) h=(h*31+seed.charCodeAt(i))%AVATAR_COLORS.length; return AVATAR_COLORS[h]; }
+  function initials(name){ const p=name.trim().split(/\s+/); return (p[0][0]+(p[1]?p[1][0]:'')).toUpperCase(); }
+
+  const FRIEND_DEFS = [
+    { id:'f1', name:'Mia Berg',    streak:214, status:'newsnap',  time:'jetzt' },
+    { id:'f2', name:'Leon Kaiser', streak:87,  status:'sent',     time:'2m' },
+    { id:'f3', name:'Emma Vogel',  streak:365, status:'newchat',  time:'5m' },
+    { id:'f4', name:'Ben Roth',    streak:12,  status:'opened',   time:'14m' },
+    { id:'f5', name:'Lena Frank',  streak:501, status:'received', time:'28m' },
+    { id:'f6', name:'Noah Weber',  streak:3,   status:'delivered',time:'1h' },
+    { id:'f7', name:'Sara Klein',  streak:158, status:'newsnap',  time:'2h' },
+    { id:'f8', name:'Tim Wolf',    streak:44,  status:'opened',   time:'3h' },
+    { id:'f9', name:'Zoe Hahn',    streak:27,  status:'sent',     time:'5h' },
+    { id:'f10',name:'Paul Sommer', streak:9,   status:'received', time:'Gestern' },
+  ];
+
+  const STORY_DEFS = [
+    { id:'s1', name:'Mia Berg',   slides:['Sonnenuntergang 🌅','Am Strand 🏖️','Gute Nacht ✨'], grad:'linear-gradient(135deg,#FF9E00,#F23C57)', time:'2h', seen:false },
+    { id:'s2', name:'Emma Vogel', slides:['Neues Café ☕','So lecker!'], grad:'linear-gradient(135deg,#7A3FF2,#0FADFF)', time:'4h', seen:false },
+    { id:'s3', name:'Ben Roth',   slides:['Gym time 💪','Leg day 😅','Fertig!'], grad:'linear-gradient(135deg,#26D07C,#00C2B8)', time:'6h', seen:true },
+    { id:'s4', name:'Lena Frank', slides:['Roadtrip 🚗','Berge! 🏔️'], grad:'linear-gradient(135deg,#0FADFF,#7A3FF2)', time:'8h', seen:false },
+    { id:'s5', name:'Tim Wolf',   slides:['Konzert 🎸','Wahnsinn!!'], grad:'linear-gradient(135deg,#F23C57,#FF5FA2)', time:'11h', seen:true },
+  ];
+
+  const DISCOVER = [
+    { pub:'Sports', name:'Top 10 Tore der Woche', grad:'linear-gradient(135deg,#0FADFF,#26D07C)' },
+    { pub:'Food',   name:'5-Minuten Pasta Rezepte', grad:'linear-gradient(135deg,#FF9E00,#F23C57)' },
+    { pub:'News',   name:'Das steckt dahinter', grad:'linear-gradient(135deg,#16191C,#7A3FF2)' },
+    { pub:'Comedy', name:'Fails die dich lachen lassen', grad:'linear-gradient(135deg,#FF5FA2,#7A3FF2)' },
+    { pub:'Tech',   name:'Neue Gadgets 2026', grad:'linear-gradient(135deg,#00C2B8,#0FADFF)' },
+    { pub:'Travel', name:'Versteckte Orte', grad:'linear-gradient(135deg,#26D07C,#FF9E00)' },
+  ];
+
+  const SPOTLIGHT = [
+    { user:'@dance_king',   cap:'Neue Choreo 🔥 #fyp', grad:'linear-gradient(160deg,#7A3FF2,#F23C57)', likes:'12.4k' },
+    { user:'@foodie.laura', cap:'POV: Du bestellst Dessert 🍰', grad:'linear-gradient(160deg,#FF9E00,#FF5FA2)', likes:'8.1k' },
+    { user:'@travel.max',   cap:'Sonnenaufgang über den Alpen 🏔️', grad:'linear-gradient(160deg,#0FADFF,#26D07C)', likes:'24.7k' },
+    { user:'@petclips',     cap:'Er dachte er wäre unsichtbar 🐱', grad:'linear-gradient(160deg,#26D07C,#00C2B8)', likes:'55.2k' },
+  ];
+
+  /* ---------- localStorage persistence ---------- */
+  const LS_KEY = 'snapclone_state_v1';
+  let store = { streaks:{}, received:[], storySeen:{}, myStorySlides:[], snapCounter:0 };
+  function loadStore(){
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if(raw){ store = Object.assign(store, JSON.parse(raw)); }
+    } catch(e){}
+    FRIEND_DEFS.forEach(f=>{ if(store.streaks[f.id]==null) store.streaks[f.id]=f.streak; });
+    STORY_DEFS.forEach(s=>{ if(store.storySeen[s.id]==null) store.storySeen[s.id]=s.seen; });
+  }
+  function saveStore(){ try { localStorage.setItem(LS_KEY, JSON.stringify(store)); } catch(e){} }
+  loadStore();
+
+  /* ---------- Lenses ---------- */
+  const LENSES = [
+    { id:'normal',  name:'Normal',   emoji:'😎', filter:'none' },
+    { id:'bw',      name:'B&W',      emoji:'⚫', filter:'grayscale(1) contrast(1.1)' },
+    { id:'sepia',   name:'Sepia',    emoji:'🟤', filter:'sepia(0.85) contrast(1.05)' },
+    { id:'invert',  name:'Invert',   emoji:'🔀', filter:'invert(1) hue-rotate(180deg)' },
+    { id:'hue',     name:'Hue',      emoji:'🌈', filter:'hue-rotate(120deg) saturate(1.6)' },
+    { id:'vhs',     name:'VHS',      emoji:'📼', filter:'saturate(1.5) contrast(1.2) hue-rotate(-8deg)', vhs:true },
+    { id:'thermo',  name:'Thermo',   emoji:'🌡️', filter:'invert(0.9) hue-rotate(150deg) saturate(4) contrast(1.4) brightness(1.1)' },
+    { id:'vignette',name:'Fokus',    emoji:'🎯', filter:'contrast(1.15) saturate(1.2)', vignette:true },
+    { id:'cool',    name:'Kühl',     emoji:'❄️', filter:'hue-rotate(-25deg) saturate(1.3) brightness(1.05)' },
+    { id:'warm',    name:'Warm',     emoji:'🔥', filter:'sepia(0.35) saturate(1.5) hue-rotate(-10deg) brightness(1.05)' },
+  ];
+  let currentLensIndex = 0;
+
+  /* ---------- toast ---------- */
+  let toastT;
+  function toast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastT);
+    toastT = setTimeout(()=>t.classList.remove('show'), 2200);
+  }
+
+  /* ---------- Screen navigation ---------- */
+  const slider = document.getElementById('slider');
+  const navBtns = Array.from(document.querySelectorAll('.nav-btn'));
+  const bottomnav = document.getElementById('bottomnav');
+  let currentScreen = 2;
+  function isDarkNav(idx){ return idx===2 || idx===4; }
+
+  function goToScreen(idx){
+    idx = Math.max(0, Math.min(4, idx));
+    currentScreen = idx;
+    slider.style.transform = 'translateX(-'+(idx*20)+'%)';
+    navBtns.forEach(b=> b.classList.toggle('active', +b.dataset.screen===idx));
+    if(isDarkNav(idx)){ bottomnav.classList.add('dark-nav'); bottomnav.classList.remove('light-nav'); }
+    else { bottomnav.classList.add('light-nav'); bottomnav.classList.remove('dark-nav'); }
+    if(idx===2) ensureCamera();
+  }
+  navBtns.forEach(b=> b.addEventListener('click', ()=> goToScreen(+b.dataset.screen)));
+
+  /* ---------- Swipe handling ---------- */
+  let touchStartX=0, touchStartY=0, touchActive=false;
+  const appEl = document.getElementById('app');
+  function anyOverlayOpen(){
+    return document.getElementById('editor').classList.contains('open') ||
+           document.getElementById('snapViewer').classList.contains('open') ||
+           document.getElementById('storyViewer').classList.contains('open') ||
+           document.getElementById('sendSheet').classList.contains('open') ||
+           document.getElementById('permPrompt').classList.contains('show');
+  }
+  appEl.addEventListener('touchstart', e=>{
+    if(anyOverlayOpen()) return;
+    touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY; touchActive=true;
+  }, {passive:true});
+  appEl.addEventListener('touchend', e=>{
+    if(!touchActive) return; touchActive=false;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    if(Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)*1.4){
+      if(dx < 0) goToScreen(currentScreen+1);
+      else goToScreen(currentScreen-1);
+    }
+  }, {passive:true});
+
+  /* ---------- CAMERA ---------- */
+  const video = document.getElementById('camVideo');
+  const fallback = document.getElementById('camFallback');
+  const vhsOverlay = document.getElementById('vhsOverlay');
+  const vignetteOverlay = document.getElementById('vignetteOverlay');
+  let stream = null;
+  let facing = 'user';
+  let cameraState = 'idle'; // idle | requesting | active | denied | unavailable
+  let camPromptShown = false;
+
+  function applyLens(){
+    const lens = LENSES[currentLensIndex];
+    video.style.filter = lens.filter;
+    fallback.style.filter = lens.filter;
+    vhsOverlay.style.opacity = lens.vhs ? '1' : '0';
+    vignetteOverlay.style.opacity = lens.vignette ? '1' : '0';
+  }
+
+  function setFallbackVisible(show, msg){
+    fallback.style.display = show ? 'flex' : 'none';
+    video.style.display = show ? 'none' : 'block';
+    if(msg) document.getElementById('fallbackMsg').textContent = msg;
+  }
+
+  async function startCamera(){
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      cameraState='unavailable';
+      setFallbackVisible(true, 'Kamera wird von diesem Browser nicht unterstützt. Der Auslöser nimmt trotzdem einen Snapshot auf.');
+      return;
+    }
+    cameraState='requesting';
+    try {
+      if(stream){ stream.getTracks().forEach(t=>t.stop()); }
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: facing, width:{ideal:1280}, height:{ideal:720} },
+        audio: false
+      });
+      video.srcObject = stream;
+      video.classList.toggle('mirror', facing==='user');
+      cameraState='active';
+      setFallbackVisible(false);
+      try { await video.play(); } catch(e){}
+    } catch(err){
+      if(err && (err.name==='NotAllowedError' || err.name==='SecurityError')){
+        cameraState='denied';
+        setFallbackVisible(true, 'Kamerazugriff verweigert. Der animierte Hintergrund dient als Leinwand – Snaps funktionieren trotzdem.');
+      } else if(err && err.name==='NotFoundError'){
+        cameraState='unavailable';
+        setFallbackVisible(true, 'Keine Kamera gefunden. Der Auslöser nimmt den animierten Hintergrund auf.');
+      } else {
+        cameraState='unavailable';
+        setFallbackVisible(true, 'Kamera nicht verfügbar. Der Auslöser funktioniert trotzdem.');
+      }
+    }
+  }
+
+  function ensureCamera(){
+    if(cameraState==='active' || cameraState==='requesting') return;
+    if(cameraState==='denied' || cameraState==='unavailable') return;
+    if(!camPromptShown) showPermPrompt();
+  }
+
+  const permPrompt = document.getElementById('permPrompt');
+  function showPermPrompt(){ camPromptShown=true; permPrompt.classList.add('show'); }
+  document.getElementById('permAllow').addEventListener('click', ()=>{
+    permPrompt.classList.remove('show');
+    startCamera();
+  });
+  document.getElementById('permSkip').addEventListener('click', ()=>{
+    permPrompt.classList.remove('show');
+    cameraState='denied';
+    setFallbackVisible(true, 'Ohne Kamera – der animierte Hintergrund ist deine Leinwand. Snaps funktionieren trotzdem.');
+  });
+
+  document.getElementById('flipBtn').addEventListener('click', ()=>{
+    facing = facing==='user' ? 'environment' : 'user';
+    if(cameraState==='active') startCamera();
+    else toast(facing==='user' ? 'Frontkamera' : 'Rückkamera');
+  });
+
+  let flashOn = false;
+  const flashBtn = document.getElementById('flashBtn');
+  flashBtn.addEventListener('click', ()=>{
+    flashOn = !flashOn;
+    flashBtn.classList.toggle('flash-on', flashOn);
+    toast(flashOn ? 'Blitz an ⚡' : 'Blitz aus');
+  });
+
+  /* ---------- Lens carousel ---------- */
+  const lensCarousel = document.getElementById('lensCarousel');
+  function renderLenses(){
+    lensCarousel.innerHTML='';
+    LENSES.forEach((l,i)=>{
+      const el = document.createElement('div');
+      el.className = 'lens-item' + (i===currentLensIndex?' active':'');
+      el.innerHTML = l.emoji + '<span class="lens-name">'+l.name+'</span>';
+      el.addEventListener('click', ()=>{
+        currentLensIndex = i;
+        renderLenses();
+        applyLens();
+        el.scrollIntoView({behavior:'smooth', inline:'center', block:'nearest'});
+      });
+      lensCarousel.appendChild(el);
+    });
+  }
+
+  /* ---------- Shutter → capture ---------- */
+  const canvas = document.getElementById('snapCanvas');
+  const flashFx = document.getElementById('flashFx');
+  let capturedDataUrl = null;
+
+  function captureSnap(){
+    const W = 720, H = 1280;
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    const lens = LENSES[currentLensIndex];
+
+    ctx.save();
+    ctx.filter = lens.filter==='none' ? 'none' : lens.filter;
+
+    if(cameraState==='active' && video.videoWidth){
+      const vw = video.videoWidth, vh = video.videoHeight;
+      const scale = Math.max(W/vw, H/vh);
+      const dw = vw*scale, dh = vh*scale;
+      const dx = (W-dw)/2, dy = (H-dh)/2;
+      if(facing==='user'){
+        ctx.translate(W,0); ctx.scale(-1,1);
+        ctx.drawImage(video, W-dx-dw, dy, dw, dh);
+      } else {
+        ctx.drawImage(video, dx, dy, dw, dh);
+      }
+    } else {
+      ctx.filter='none';
+      const g = ctx.createLinearGradient(0,0,W,H);
+      const cols=['#7A3FF2','#F23C57','#FF9E00','#0FADFF'];
+      cols.forEach((c,i)=> g.addColorStop(i/(cols.length-1), c));
+      ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+      ctx.globalAlpha=.9; ctx.fillStyle='rgba(255,255,255,.9)';
+      ctx.font='bold 220px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('👻', W/2, H/2);
+      ctx.globalAlpha=1;
+      // re-apply lens filter over gradient for consistency
+      ctx.filter = lens.filter==='none' ? 'none' : lens.filter;
+      ctx.drawImage(canvas,0,0);
+    }
+    ctx.restore();
+
+    if(lens.vhs){
+      ctx.save();
+      ctx.globalAlpha=.25; ctx.fillStyle='#000';
+      for(let y=0;y<H;y+=4){ ctx.fillRect(0,y,W,1.5); }
+      ctx.restore();
+    }
+    if(lens.vignette){
+      const rg = ctx.createRadialGradient(W/2,H/2,W*0.28, W/2,H/2,W*0.75);
+      rg.addColorStop(0,'rgba(0,0,0,0)');
+      rg.addColorStop(1,'rgba(0,0,0,0.85)');
+      ctx.fillStyle=rg; ctx.fillRect(0,0,W,H);
+    }
+
+    capturedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+    return capturedDataUrl;
+  }
+
+  document.getElementById('shutterBtn').addEventListener('click', ()=>{
+    if(flashOn){ flashFx.classList.remove('fire'); void flashFx.offsetWidth; flashFx.classList.add('fire'); }
+    setTimeout(()=>{
+      captureSnap();
+      openEditor(capturedDataUrl);
+    }, flashOn ? 180 : 0);
+  });
+
+  /* ---------- EDITOR ---------- */
+  const editor = document.getElementById('editor');
+  const editImg = document.getElementById('editImg');
+  const snapText = document.getElementById('snapText');
+  const timerPill = document.getElementById('timerPill');
+  const timerSliderWrap = document.getElementById('timerSliderWrap');
+  const timerRange = document.getElementById('timerRange');
+  let snapTimer = 3;
+
+  function openEditor(dataUrl){
+    editImg.src = dataUrl;
+    snapText.textContent = '';
+    snapText.style.top = '45%';
+    editor.classList.add('open');
+  }
+  function closeEditor(){
+    editor.classList.remove('open');
+    timerSliderWrap.classList.remove('show');
+  }
+  document.getElementById('editClose').addEventListener('click', closeEditor);
+
+  document.getElementById('textToolBtn').addEventListener('click', ()=>{
+    snapText.focus();
+    const r=document.createRange(); r.selectNodeContents(snapText); r.collapse(false);
+    const s=getSelection(); s.removeAllRanges(); s.addRange(r);
+  });
+  document.getElementById('saveToolBtn').addEventListener('click', ()=>{
+    if(!capturedDataUrl) return;
+    const a=document.createElement('a');
+    a.href = capturedDataUrl; a.download = 'snap.jpg'; a.click();
+    toast('In Erinnerungen gespeichert 💾');
+  });
+
+  timerPill.addEventListener('click', ()=> timerSliderWrap.classList.toggle('show'));
+  timerRange.addEventListener('input', ()=>{
+    snapTimer = +timerRange.value;
+    document.getElementById('timerVal').textContent = snapTimer+'s';
+    document.getElementById('timerPillVal').textContent = snapTimer;
+  });
+
+  /* Draggable text bar (touch + mouse) */
+  let dragging=false, dragOffsetY=0;
+  function dragStart(clientY){
+    dragging=true; snapText.classList.add('dragging');
+    const rect = snapText.getBoundingClientRect();
+    dragOffsetY = clientY - rect.top;
+  }
+  function dragMove(clientY){
+    if(!dragging) return;
+    const parent = editor.getBoundingClientRect();
+    let top = clientY - parent.top - dragOffsetY;
+    top = Math.max(60, Math.min(parent.height-160, top));
+    snapText.style.top = top+'px';
+  }
+  function dragEnd(){ dragging=false; snapText.classList.remove('dragging'); }
+
+  snapText.addEventListener('touchstart', e=>{ dragStart(e.touches[0].clientY); }, {passive:true});
+  window.addEventListener('touchmove', e=>{ if(dragging){ dragMove(e.touches[0].clientY); } }, {passive:false});
+  window.addEventListener('touchend', dragEnd);
+  let mouseDragArmed=false;
+  snapText.addEventListener('mousedown', e=>{ mouseDragArmed=true; dragStart(e.clientY); });
+  window.addEventListener('mousemove', e=>{ if(dragging && mouseDragArmed) dragMove(e.clientY); });
+  window.addEventListener('mouseup', ()=>{ mouseDragArmed=false; dragEnd(); });
+
+  /* ---------- SEND-TO SHEET ---------- */
+  const sendSheet = document.getElementById('sendSheet');
+  const sendFriendList = document.getElementById('sendFriendList');
+  const confirmSend = document.getElementById('confirmSend');
+  let selectedFriends = new Set();
+
+  function updateConfirmLabel(){
+    confirmSend.disabled = selectedFriends.size===0;
+    confirmSend.childNodes[0].textContent = selectedFriends.size ? ('Senden an '+selectedFriends.size+' ') : 'Senden ';
+  }
+
+  function renderSendList(){
+    sendFriendList.innerHTML='';
+    FRIEND_DEFS.forEach(f=>{
+      const row=document.createElement('div');
+      row.className='friend-row';
+      const checked = selectedFriends.has(f.id);
+      row.innerHTML =
+        '<div class="friend-avatar" style="background:'+avaColor(f.id)+'">'+initials(f.name)+'</div>'+
+        '<div class="friend-meta">'+
+          '<div class="friend-name">'+f.name+'</div>'+
+          '<div class="friend-sub">🔥 '+store.streaks[f.id]+' · Streak</div>'+
+        '</div>'+
+        '<div class="checkbox'+(checked?' checked':'')+'">'+
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
+        '</div>';
+      const cb = row.querySelector('.checkbox');
+      row.addEventListener('click', ()=>{
+        if(selectedFriends.has(f.id)){ selectedFriends.delete(f.id); cb.classList.remove('checked'); }
+        else { selectedFriends.add(f.id); cb.classList.add('checked'); }
+        updateConfirmLabel();
+      });
+      sendFriendList.appendChild(row);
+    });
+  }
+  document.getElementById('sendToBtn').addEventListener('click', ()=>{
+    selectedFriends.clear();
+    renderSendList();
+    updateConfirmLabel();
+    sendSheet.classList.add('open');
+  });
+  sendSheet.addEventListener('click', e=>{ if(e.target===sendSheet) sendSheet.classList.remove('open'); });
+
+  confirmSend.addEventListener('click', ()=>{
+    const caption = snapText.textContent.trim();
+    const ids = Array.from(selectedFriends);
+    ids.forEach(id=>{
+      store.streaks[id] = (store.streaks[id]||0)+1;
+      // Simulate the friend snapping you back so the vanish mechanic is demoable
+      store.snapCounter++;
+      store.received.push({
+        id: 'snap_'+store.snapCounter,
+        from: id,
+        img: capturedDataUrl,
+        caption: caption,
+        timer: snapTimer
+      });
+    });
+    // also add to my story
+    if(capturedDataUrl){ store.myStorySlides.push(caption || 'Mein Snap 📸'); }
+    saveStore();
+    sendSheet.classList.remove('open');
+    closeEditor();
+    renderChatList();
+    renderStories();
+    updateChatBadge();
+    toast(ids.length===1 ? 'Snap gesendet ✓' : ('Snap an '+ids.length+' Freunde gesendet ✓'));
+    goToScreen(1);
+  });
+
+  /* ---------- CHAT LIST ---------- */
+  const chatList = document.getElementById('chatList');
+  const STATUS_META = {
+    newsnap:  { label:'Neuer Snap', square:'#F23C57' },
+    newchat:  { label:'Neuer Chat', square:'#0FADFF', cls:'newchat' },
+    received: { label:'Empfangen',  square:'#7A3FF2' },
+    sent:     { label:'Gesendet',   arrow:'sent' },
+    delivered:{ label:'Zugestellt', arrow:'delivered' },
+    opened:   { label:'Geöffnet',   arrow:'opened' },
+  };
+  function arrowSVG(type){
+    if(type==='opened'){
+      return '<svg class="status-icon" viewBox="0 0 24 24" fill="none" stroke="#8E9AAB" stroke-width="2"><path d="M2 11l9-9v5c6 0 9 4 9 9-2.5-3-5-4-9-4v5z"/></svg>';
+    }
+    const col = type==='delivered' ? '#0FADFF' : '#F23C57';
+    return '<svg class="status-icon" viewBox="0 0 24 24" fill="'+col+'"><path d="M2 11l9-9v5c6 0 9 4 9 9-2.5-3-5-4-9-4v5z"/></svg>';
+  }
+  function friendReceivedCount(fid){ return store.received.filter(s=>s.from===fid).length; }
+
+  function renderChatList(){
+    chatList.innerHTML='';
+    FRIEND_DEFS.forEach(f=>{
+      const newCount = friendReceivedCount(f.id);
+      const hasNew = newCount>0;
+      const meta = hasNew ? STATUS_META.newsnap : STATUS_META[f.status];
+      const streak = store.streaks[f.id];
+      const row = document.createElement('div');
+      row.className='chat-row';
+      let statusInner='';
+      if(hasNew){
+        statusInner = '<span class="status-square" style="background:#F23C57"></span> Neuer Snap · tippen zum Öffnen';
+      } else if(meta.square){
+        statusInner = '<span class="status-square" style="background:'+meta.square+'"></span> '+meta.label;
+      } else if(meta.arrow){
+        statusInner = arrowSVG(meta.arrow)+' '+meta.label;
+      } else {
+        statusInner = meta.label;
+      }
+      const statusCls = hasNew ? 'chat-status newsnap' : (meta.cls==='newchat'?'chat-status newchat':'chat-status');
+      row.innerHTML =
+        '<div class="chat-avatar" style="background:'+avaColor(f.id)+'">'+initials(f.name)+'</div>'+
+        '<div class="chat-info">'+
+          '<div class="chat-name">'+f.name+'</div>'+
+          '<div class="'+statusCls+'">'+statusInner+'</div>'+
+        '</div>'+
+        '<div class="chat-right">'+
+          '<div class="chat-time">'+f.time+'</div>'+
+          '<div class="streak">'+streak+' 🔥</div>'+
+        '</div>';
+      row.addEventListener('click', ()=>{
+        if(friendReceivedCount(f.id)>0){ openReceivedSnap(f.id); }
+        else { toast('Chat mit '+f.name.split(' ')[0]+' geöffnet'); }
+      });
+      chatList.appendChild(row);
+    });
+  }
+
+  function updateChatBadge(){
+    const count = store.received.length;
+    const badge = document.getElementById('chatBadge');
+    if(count>0){ badge.style.display='flex'; badge.textContent = count>9?'9+':count; }
+    else badge.style.display='none';
+  }
+
+  /* ---------- RECEIVED SNAP VIEWER (core vanish mechanic) ---------- */
+  const snapViewer = document.getElementById('snapViewer');
+  const svMedia = document.getElementById('svMedia');
+  const svTimer = document.getElementById('svTimer');
+  const svCaption = document.getElementById('svCaption');
+  const svFrom = document.getElementById('svFrom');
+  let svInterval=null, svRemaining=0, svPaused=false, svCurrentSnapId=null;
+
+  function openReceivedSnap(fid){
+    const snap = store.received.find(s=>s.from===fid);
+    if(!snap) return;
+    svCurrentSnapId = snap.id;
+    const friend = FRIEND_DEFS.find(f=>f.id===fid);
+    if(snap.img){
+      svMedia.innerHTML = '<img src="'+snap.img+'" alt="snap">';
+    } else {
+      svMedia.innerHTML = '<div class="sv-gradient" style="background:linear-gradient(135deg,#7A3FF2,#F23C57)"></div>';
+    }
+    svFrom.innerHTML = '<span class="svf-ava" style="background:'+avaColor(fid)+'">'+initials(friend.name)+'</span> '+friend.name.split(' ')[0];
+    if(snap.caption){ svCaption.style.display='block'; svCaption.textContent = snap.caption; svCaption.style.top='42%'; }
+    else svCaption.style.display='none';
+
+    svRemaining = snap.timer || 3;
+    svTimer.textContent = svRemaining;
+    snapViewer.classList.add('open');
+    svPaused=false;
+    clearInterval(svInterval);
+    svInterval = setInterval(()=>{
+      if(svPaused) return;
+      svRemaining--;
+      svTimer.textContent = Math.max(0,svRemaining);
+      if(svRemaining<=0){ consumeSnap(); }
+    }, 1000);
+  }
+
+  function consumeSnap(){
+    if(!svCurrentSnapId) return;
+    clearInterval(svInterval);
+    store.received = store.received.filter(s=>s.id!==svCurrentSnapId);
+    saveStore();
+    snapViewer.classList.remove('open');
+    svMedia.innerHTML='';
+    renderChatList();
+    updateChatBadge();
+    toast('Snap ist verschwunden 👻');
+    svCurrentSnapId=null;
+  }
+
+  // hold to pause, release to close (consume)
+  snapViewer.addEventListener('touchstart', ()=>{ svPaused=true; }, {passive:true});
+  snapViewer.addEventListener('touchend', ()=>{ svPaused=false; consumeSnap(); });
+  snapViewer.addEventListener('mousedown', ()=>{ svPaused=true; });
+  snapViewer.addEventListener('mouseup', ()=>{ svPaused=false; consumeSnap(); });
+
+  /* ---------- STORIES ---------- */
+  const storyStrip = document.getElementById('storyStrip');
+  const discGrid = document.getElementById('discGrid');
+
+  function renderStories(){
+    storyStrip.innerHTML='';
+    const mine = document.createElement('div');
+    mine.className='my-story-tile';
+    mine.innerHTML =
+      '<div class="story-ring mine">'+
+        '<div class="story-inner" style="background:linear-gradient(135deg,#FFD200,#F7971E)">DU'+
+          '<span class="story-add">+</span>'+
+        '</div>'+
+      '</div>'+
+      '<div class="story-label">Meine Story</div>';
+    mine.addEventListener('click', ()=>{
+      if(store.myStorySlides.length){
+        playStory({name:'Meine Story', slides:store.myStorySlides, grad:'linear-gradient(135deg,#FFD200,#F7971E)', time:'jetzt', mine:true});
+      } else { toast('Nimm einen Snap auf, um deine Story zu füllen 📸'); goToScreen(2); }
+    });
+    storyStrip.appendChild(mine);
+
+    STORY_DEFS.forEach(s=>{
+      const seen = store.storySeen[s.id];
+      const tile=document.createElement('div');
+      tile.className='story-tile';
+      tile.innerHTML=
+        '<div class="story-ring '+(seen?'seen':'unseen')+'">'+
+          '<div class="story-inner" style="background:'+s.grad+'">'+initials(s.name)+'</div>'+
+        '</div>'+
+        '<div class="story-label">'+s.name.split(' ')[0]+'</div>';
+      tile.addEventListener('click', ()=> playStory(s));
+      storyStrip.appendChild(tile);
+    });
+
+    discGrid.innerHTML='';
+    DISCOVER.forEach(d=>{
+      const c=document.createElement('div');
+      c.className='disc-card';
+      c.style.background=d.grad;
+      c.innerHTML='<div class="disc-pub">'+d.pub+'</div><div class="disc-name">'+d.name+'</div>';
+      c.addEventListener('click', ()=> toast('Öffne: '+d.name));
+      discGrid.appendChild(c);
+    });
+  }
+
+  /* ---------- STORY VIEWER ---------- */
+  const storyViewer = document.getElementById('storyViewer');
+  const storyProgress = document.getElementById('storyProgress');
+  const storyMedia = document.getElementById('storyMedia');
+  const storyCap = document.getElementById('storyCap');
+  let storySlides=[], storyIdx=0, storyTimer=null, storyCurrent=null;
+  const STORY_DURATION=3500;
+
+  function playStory(story){
+    storyCurrent=story;
+    storySlides = story.slides;
+    storyIdx=0;
+    storyProgress.innerHTML='';
+    storySlides.forEach(()=>{
+      const seg=document.createElement('div'); seg.className='sp-seg';
+      seg.innerHTML='<div class="sp-fill"></div>'; storyProgress.appendChild(seg);
+    });
+    document.getElementById('svhAva').textContent = story.mine ? 'DU' : initials(story.name);
+    document.getElementById('svhAva').style.background = story.mine ? 'linear-gradient(135deg,#FFD200,#F7971E)' : avaColor(story.name);
+    document.getElementById('svhName').textContent = story.name;
+    document.getElementById('svhTime').textContent = story.time;
+    storyViewer.classList.add('open');
+    if(!story.mine){ store.storySeen[story.id]=true; saveStore(); }
+    showStorySlide(0);
+  }
+
+  function showStorySlide(i){
+    storyIdx=i;
+    const slide = storySlides[i];
+    storyMedia.style.background = storyCurrent.grad;
+    storyCap.textContent = typeof slide==='string' ? slide : (slide.cap||'');
+    const fills = storyProgress.querySelectorAll('.sp-fill');
+    fills.forEach((f,idx)=>{ f.style.transition='none'; f.style.width = idx<i?'100%':'0%'; });
+    void storyProgress.offsetWidth;
+    const cur = fills[i];
+    if(cur){ cur.style.transition='width '+STORY_DURATION+'ms linear'; cur.style.width='100%'; }
+    clearTimeout(storyTimer);
+    storyTimer = setTimeout(nextStorySlide, STORY_DURATION);
+  }
+  function nextStorySlide(){
+    if(storyIdx < storySlides.length-1) showStorySlide(storyIdx+1);
+    else closeStory();
+  }
+  function prevStorySlide(){ showStorySlide(Math.max(0,storyIdx-1)); }
+  function closeStory(){
+    clearTimeout(storyTimer);
+    storyViewer.classList.remove('open');
+    renderStories();
+    storyCurrent=null;
+  }
+  document.getElementById('storyClose').addEventListener('click', closeStory);
+  document.getElementById('storyNext').addEventListener('click', nextStorySlide);
+  document.getElementById('storyPrev').addEventListener('click', prevStorySlide);
+
+  /* ---------- SPOTLIGHT ---------- */
+  const spotFeed = document.getElementById('spotFeed');
+  function renderSpotlight(){
+    spotFeed.innerHTML='';
+    SPOTLIGHT.forEach(s=>{
+      const item=document.createElement('div');
+      item.className='spot-item';
+      item.innerHTML=
+        '<div class="spot-bg" style="background:'+s.grad+'"></div>'+
+        '<div class="spot-overlay"></div>'+
+        '<div class="spot-content">'+
+          '<div class="spot-user"><span class="su-ava" style="background:rgba(255,255,255,.25)">'+s.user[1].toUpperCase()+'</span>'+s.user+'</div>'+
+          '<div class="spot-cap">'+s.cap+'</div>'+
+        '</div>'+
+        '<div class="spot-actions">'+
+          '<div class="spot-act"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-8-5.3-10-11c-1-3 1-6 4-6 2 0 3.3 1.3 4 2.3.7-1 2-2.3 4-2.3 3 0 5 3 4 6-2 5.7-10 11-10 11z"/></svg>'+s.likes+'</div>'+
+          '<div class="spot-act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.5 8.5 0 01-8.5 8.5 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7A8.38 8.38 0 014 11.5 8.5 8.5 0 1121 11.5z"/></svg>Chat</div>'+
+          '<div class="spot-act"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>Teilen</div>'+
+        '</div>';
+      spotFeed.appendChild(item);
+    });
+  }
+
+  /* ---------- MAP pins ---------- */
+  function renderMap(){
+    const pins = document.getElementById('mapPins');
+    pins.innerHTML='';
+    const positions=[[28,34],[62,28],[45,52],[75,58],[20,66],[55,72]];
+    FRIEND_DEFS.slice(0,6).forEach((f,i)=>{
+      const p=positions[i];
+      const pin=document.createElement('div');
+      pin.className='bitmoji-pin';
+      pin.style.left=p[0]+'%'; pin.style.top=p[1]+'%';
+      pin.innerHTML='<div class="bm-face" style="background:'+avaColor(f.id)+'">'+initials(f.name)+'</div><div class="bm-name">'+f.name.split(' ')[0]+'</div>';
+      pin.addEventListener('click', ()=> toast(f.name+' war zuletzt hier aktiv'));
+      pins.appendChild(pin);
+    });
+  }
+
+  /* ---------- INIT ---------- */
+  function init(){
+    renderLenses();
+    applyLens();
+    renderChatList();
+    renderStories();
+    renderSpotlight();
+    renderMap();
+    updateChatBadge();
+    goToScreen(2);
+    setTimeout(()=>{ if(cameraState==='idle') showPermPrompt(); }, 600);
+  }
+  init();
+
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.hidden){
+      if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; if(cameraState==='active') cameraState='idle'; }
+    } else {
+      if(currentScreen===2 && cameraState==='idle' && camPromptShown) startCamera();
+    }
+  });
+
+})();
+</script>
+</body>
+</html>
