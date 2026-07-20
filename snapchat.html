@@ -547,6 +547,129 @@
   .pc-allow { background: var(--snap-yellow); color: #16191C; }
   .pc-skip { background: var(--gray); color: #16191C; }
 
+  /* ============ CHAT THREAD (Feature A) ============ */
+  #chatThread {
+    position: absolute; inset: 0; z-index: 150; background: #fff;
+    display: flex; flex-direction: column;
+    transform: translateX(100%); transition: transform .3s cubic-bezier(.3,.7,.2,1);
+    will-change: transform;
+  }
+  #chatThread.open { transform: translateX(0); }
+  .ct-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: calc(env(safe-area-inset-top,0px) + 12px) 14px 10px;
+    border-bottom: 1px solid #f0f1f3; flex-shrink: 0;
+  }
+  .ct-back { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #16191C; margin-left: -6px; flex-shrink: 0; }
+  .ct-back svg { width: 26px; height: 26px; }
+  .ct-ava { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 16px; flex-shrink: 0; }
+  .ct-meta { flex: 1; min-width: 0; }
+  .ct-name { font-weight: 800; font-size: 16px; }
+  .ct-streak { font-size: 12px; color: var(--text-mute); font-weight: 700; margin-top: 1px; }
+  .ct-cam { width: 38px; height: 38px; border-radius: 50%; background: var(--gray); display: flex; align-items: center; justify-content: center; cursor: pointer; color: #16191C; flex-shrink: 0; transition: transform .12s; }
+  .ct-cam:active { transform: scale(.9); }
+  .ct-cam svg { width: 22px; height: 22px; }
+  .ct-body { flex: 1; overflow-y: auto; padding: 12px 12px 16px; display: flex; flex-direction: column; gap: 2px; }
+  .ct-body::-webkit-scrollbar { width: 0; }
+  .ct-daysep { text-align: center; font-size: 11px; color: var(--text-mute); font-weight: 700; margin: 14px 0 8px; text-transform: uppercase; letter-spacing: .5px; }
+  .msg-row { display: flex; margin-top: 2px; }
+  .msg-row.me { justify-content: flex-end; }
+  .bubble { max-width: 76%; padding: 9px 13px; border-radius: 18px; font-size: 15px; line-height: 1.35; word-break: break-word; }
+  .msg-row.them .bubble { background: var(--gray); color: #16191C; border-bottom-left-radius: 5px; }
+  .msg-row.me .bubble { background: var(--snap-blue); color: #fff; border-bottom-right-radius: 5px; }
+  .msg-status { font-size: 10px; color: var(--text-mute); text-align: right; margin: 3px 4px 6px 0; font-weight: 600; }
+  .snap-bubble {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: linear-gradient(135deg, var(--snap-red), var(--snap-purple));
+    color: #fff; padding: 11px 15px; border-radius: 16px; border-bottom-left-radius: 5px;
+    font-weight: 700; font-size: 14px; cursor: pointer; max-width: 76%;
+  }
+  .snap-bubble svg { width: 20px; height: 20px; flex-shrink: 0; }
+  .typing-row { display: flex; margin-top: 4px; }
+  .typing { background: var(--gray); border-radius: 16px; border-bottom-left-radius: 5px; padding: 12px 15px; display: flex; gap: 4px; align-items: center; }
+  .typing span { width: 7px; height: 7px; border-radius: 50%; background: #b3bbc6; animation: typedot 1.2s infinite; }
+  .typing span:nth-child(2) { animation-delay: .2s; }
+  .typing span:nth-child(3) { animation-delay: .4s; }
+  @keyframes typedot { 0%,60%,100% { transform: translateY(0); opacity: .5; } 30% { transform: translateY(-5px); opacity: 1; } }
+  .ct-input { display: flex; align-items: center; gap: 8px; padding: 8px 12px calc(env(safe-area-inset-bottom,0px) + 8px); border-top: 1px solid #f0f1f3; flex-shrink: 0; }
+  .ct-input input { flex: 1; border: none; background: var(--gray); border-radius: 22px; padding: 11px 16px; font-size: 15px; outline: none; color: #16191C; }
+  .ct-send { width: 40px; height: 40px; border-radius: 50%; border: none; background: var(--snap-blue); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: transform .12s, opacity .2s; }
+  .ct-send:disabled { opacity: .35; }
+  .ct-send:active:not(:disabled) { transform: scale(.9); }
+  .ct-send svg { width: 20px; height: 20px; }
+  .chat-preview { font-size: 13px; color: var(--text-mute); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chat-preview.unread { color: #16191C; font-weight: 700; }
+  .chat-preview.newsnap { color: var(--snap-red); font-weight: 700; }
+  .row-unread { min-width: 20px; height: 20px; border-radius: 10px; background: var(--snap-blue); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 6px; }
+
+  /* ============ SPOTLIGHT 2.0 (Feature B) ============ */
+  #spotChips {
+    position: absolute; top: calc(env(safe-area-inset-top,0px) + 12px); left: 0; right: 0; z-index: 15;
+    display: flex; gap: 8px; overflow-x: auto; padding: 0 14px; scrollbar-width: none;
+  }
+  #spotChips::-webkit-scrollbar { display: none; }
+  .spot-chip {
+    flex-shrink: 0; padding: 6px 14px; border-radius: 16px;
+    background: rgba(0,0,0,.4); backdrop-filter: blur(6px);
+    color: rgba(255,255,255,.85); font-weight: 700; font-size: 14px; cursor: pointer;
+    position: relative; white-space: nowrap; border: 1px solid rgba(255,255,255,.15);
+    transition: color .2s;
+  }
+  .spot-chip.active { color: #fff; }
+  .spot-chip.active::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: -4px; height: 3px; border-radius: 2px; background: var(--snap-yellow); }
+  .spot-fallback {
+    position: absolute; inset: 0; z-index: 1;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: #fff; text-align: center; padding: 30px;
+  }
+  .spot-fallback .sf-emoji { font-size: 78px; margin-bottom: 14px; filter: drop-shadow(0 4px 12px rgba(0,0,0,.3)); animation: floaty 3s ease-in-out infinite; }
+  .spot-fallback .sf-cap { font-size: 16px; font-weight: 700; max-width: 260px; line-height: 1.4; text-shadow: 0 1px 6px rgba(0,0,0,.3); }
+  .spot-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 2; background: transparent; opacity: 0; transition: opacity .4s; }
+  .spot-video.ready { opacity: 1; }
+  .spot-overlay { z-index: 3; }
+  .spot-content { z-index: 4; }
+  .spot-actions { z-index: 4; }
+  .spot-tag { display: inline-block; background: rgba(255,255,255,.2); padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; margin-top: 8px; }
+  .spot-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; z-index: 6; background: rgba(255,255,255,.2); }
+  .spot-progress .sp-bar { height: 100%; width: 0; background: #fff; }
+  .spot-mute {
+    position: absolute; top: calc(env(safe-area-inset-top,0px) + 54px); right: 14px; z-index: 7;
+    width: 38px; height: 38px; border-radius: 50%; background: rgba(0,0,0,.4);
+    display: flex; align-items: center; justify-content: center; color: #fff; cursor: pointer;
+  }
+  .spot-mute svg { width: 22px; height: 22px; }
+  .spot-pause { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: 0; transition: opacity .2s; }
+  .spot-pause.show { opacity: 1; }
+  .spot-pause svg { width: 76px; height: 76px; color: rgba(255,255,255,.85); filter: drop-shadow(0 2px 8px rgba(0,0,0,.4)); }
+  .spot-act.liked { color: var(--snap-red); }
+  .spot-act .heart-fill { transition: transform .15s; }
+  .spot-act.liked .heart-fill { animation: heartBeat .3s; }
+  @keyframes heartBeat { 0%{transform:scale(1);} 50%{transform:scale(1.3);} 100%{transform:scale(1);} }
+  .heart-pop {
+    position: absolute; z-index: 9; font-size: 88px; pointer-events: none;
+    transform: translate(-50%,-50%) scale(0); animation: heartPop .8s ease forwards;
+  }
+  @keyframes heartPop {
+    0% { transform: translate(-50%,-50%) scale(0) rotate(-15deg); opacity: 0; }
+    25% { transform: translate(-50%,-50%) scale(1.15) rotate(8deg); opacity: 1; }
+    60% { transform: translate(-50%,-50%) scale(1) rotate(-4deg); opacity: 1; }
+    100% { transform: translate(-50%,-58%) scale(1.05) rotate(0); opacity: 0; }
+  }
+
+  /* ============ COMMENTS SHEET ============ */
+  .cmt-list { flex: 1; overflow-y: auto; padding: 4px 16px 8px; }
+  .cmt { display: flex; gap: 10px; padding: 9px 0; }
+  .cmt-ava { width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 13px; }
+  .cmt-body { flex: 1; min-width: 0; }
+  .cmt-user { font-weight: 700; font-size: 13px; color: var(--text-mute); }
+  .cmt-text { font-size: 14px; color: #16191C; margin-top: 1px; word-break: break-word; }
+  .cmt-like { font-size: 11px; color: var(--text-mute); display: flex; flex-direction: column; align-items: center; gap: 3px; flex-shrink: 0; padding-top: 2px; }
+  .cmt-like svg { width: 15px; height: 15px; }
+  .cmt-input { display: flex; align-items: center; gap: 8px; padding: 10px 14px calc(env(safe-area-inset-bottom,0px) + 10px); border-top: 1px solid #eee; }
+  .cmt-input input { flex: 1; border: none; background: var(--gray); border-radius: 20px; padding: 10px 14px; outline: none; font-size: 14px; color: #16191C; }
+  .cmt-input button { border: none; background: none; color: var(--snap-blue); font-weight: 800; font-size: 15px; cursor: pointer; padding: 0 6px; }
+  .cmt-input button:disabled { opacity: .4; }
+
   /* scrollbar hide for light screens */
   .screen-scroll::-webkit-scrollbar { width: 0; }
 
@@ -651,7 +774,7 @@
 
     <!-- SCREEN 4: SPOTLIGHT -->
     <section class="screen" id="spotlightScreen">
-      <div class="spot-header">Spotlight</div>
+      <div id="spotChips"></div>
       <div class="spot-feed" id="spotFeed"></div>
     </section>
 
@@ -756,6 +879,43 @@
     <div class="story-nav right" id="storyNext"></div>
   </div>
 
+  <!-- ================= CHAT THREAD (Feature A) ================= -->
+  <div id="chatThread">
+    <div class="ct-header">
+      <div class="ct-back" id="ctBack">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="ct-ava" id="ctAva">A</div>
+      <div class="ct-meta">
+        <div class="ct-name" id="ctName">Name</div>
+        <div class="ct-streak" id="ctStreak">🔥 0</div>
+      </div>
+      <div class="ct-cam" id="ctCam" title="Snap senden">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      </div>
+    </div>
+    <div class="ct-body" id="ctBody"></div>
+    <div class="ct-input">
+      <input type="text" id="ctText" placeholder="Nachricht senden…" autocomplete="off">
+      <button class="ct-send" id="ctSend" disabled aria-label="Senden">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ================= COMMENTS SHEET ================= -->
+  <div class="sheet-backdrop" id="commentSheet">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title" id="commentTitle">Kommentare</div>
+      <div class="cmt-list" id="commentList"></div>
+      <div class="cmt-input">
+        <input type="text" id="commentText" placeholder="Kommentar hinzufügen…" autocomplete="off">
+        <button id="commentPost" disabled>Posten</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ================= PERMISSION PROMPT ================= -->
   <div id="permPrompt">
     <div class="perm-card">
@@ -824,12 +984,67 @@
     { pub:'Travel', name:'Versteckte Orte', grad:'linear-gradient(135deg,#26D07C,#FF9E00)' },
   ];
 
-  const SPOTLIGHT = [
-    { user:'@dance_king',   cap:'Neue Choreo 🔥 #fyp', grad:'linear-gradient(160deg,#7A3FF2,#F23C57)', likes:'12.4k' },
-    { user:'@foodie.laura', cap:'POV: Du bestellst Dessert 🍰', grad:'linear-gradient(160deg,#FF9E00,#FF5FA2)', likes:'8.1k' },
-    { user:'@travel.max',   cap:'Sonnenaufgang über den Alpen 🏔️', grad:'linear-gradient(160deg,#0FADFF,#26D07C)', likes:'24.7k' },
-    { user:'@petclips',     cap:'Er dachte er wäre unsichtbar 🐱', grad:'linear-gradient(160deg,#26D07C,#00C2B8)', likes:'55.2k' },
+  /* ---------- SPOTLIGHT 2.0 video feed data ----------
+     Real, verified mixkit clips. URL pattern: assets.mixkit.co/videos/<id>/<id>-720.mp4
+     Every clip has an animated-gradient + emoji fallback (onerror / no-src). */
+  const SPOT_CATS = [
+    { id:'fuer',   label:'Für dich' },
+    { id:'comedy', label:'Comedy' },
+    { id:'sport',  label:'Sport' },
+    { id:'gaming', label:'Gaming' },
+    { id:'food',   label:'Food' },
+    { id:'tiere',  label:'Tiere' },
+    { id:'travel', label:'Travel' },
+    { id:'musik',  label:'Musik' },
   ];
+  const CAT_GRAD = {
+    comedy:'linear-gradient(160deg,#7A3FF2,#F23C57)',
+    sport: 'linear-gradient(160deg,#0FADFF,#26D07C)',
+    gaming:'linear-gradient(160deg,#16191C,#7A3FF2)',
+    food:  'linear-gradient(160deg,#FF9E00,#F23C57)',
+    tiere: 'linear-gradient(160deg,#26D07C,#00C2B8)',
+    travel:'linear-gradient(160deg,#0FADFF,#7A3FF2)',
+    musik: 'linear-gradient(160deg,#FF5FA2,#7A3FF2)',
+  };
+  const CAT_LABEL = { comedy:'Comedy', sport:'Sport', gaming:'Gaming', food:'Food', tiere:'Tiere', travel:'Travel', musik:'Musik' };
+  const SPOT_VIDEOS = [
+    // Comedy
+    { vid:4024,  cat:'comedy', user:'@lisa.lacht',  cap:'Wenn Montag anruft und du einfach nicht rangehst 😂 #relatable', emoji:'😂' },
+    { vid:4185,  cat:'comedy', user:'@der_marc',    cap:'POV: du erzählst eine Story die dir keiner glaubt 🤥😅 #fyp', emoji:'🤣' },
+    { vid:4567,  cat:'comedy', user:'@kevin.k',     cap:'Niemand: … Ich um 3 Uhr nachts: 🕺 #random', emoji:'😆' },
+    { vid:43737, cat:'comedy', user:'@nina.vibes',  cap:'Die Reaktion meiner Mama jedes einzelne Mal 😩😂 #comedy', emoji:'😹' },
+    // Sport
+    { vid:40758, cat:'sport',  user:'@flow.rider',  cap:'Ein Move, den ich 200x geübt hab 🛹 #skate #sport', emoji:'🛹' },
+    { vid:40881, cat:'sport',  user:'@baller.tim',  cap:'Letzte Minute, letzter Schuss ⚽🔥 #football', emoji:'⚽' },
+    { vid:40957, cat:'sport',  user:'@ride.or.die', cap:'Trails am frühen Morgen, nichts geht drüber 🚵 #mtb', emoji:'🚵' },
+    { vid:45874, cat:'sport',  user:'@coach.k',     cap:'Kein Tag ohne Bewegung 💪 #workout #sport', emoji:'🏋️' },
+    // Gaming
+    { vid:9757,  cat:'gaming', user:'@neon.play',   cap:'Setup-Check ✅ RGB an, Welt aus 🎮 #gaming', emoji:'🎮' },
+    { vid:42620, cat:'gaming', user:'@pixel.max',   cap:'Loading… mein ganzes Leben in einem Clip 👾 #gamer', emoji:'👾' },
+    { vid:43524, cat:'gaming', user:'@techie.on',   cap:'Neues Gadget getestet – Kopf explodiert 🤯 #tech', emoji:'💻' },
+    { vid:46635, cat:'gaming', user:'@streamqueen', cap:'Ranked-Grind bis die Sonne aufgeht 🕹️ #gaming', emoji:'🕹️' },
+    // Food
+    { vid:4589,  cat:'food',   user:'@kochliebe',   cap:'60 Sekunden, ein Traum aus Teig 🍝 #food', emoji:'🍝' },
+    { vid:42944, cat:'food',   user:'@sweet.sofia', cap:'Dessert-ASMR gefällig? 🍰✨ #foodie', emoji:'🍰' },
+    { vid:43935, cat:'food',   user:'@grill.papa',  cap:'Freitag heißt: anfeuern 🔥🍖 #bbq', emoji:'🍔' },
+    { vid:44001, cat:'food',   user:'@veggie.vibes',cap:'Bunt, frisch, fertig in 5 Minuten 🥗 #healthy', emoji:'🥗' },
+    // Tiere
+    { vid:1466,  cat:'tiere',  user:'@wuff.wuff',   cap:'Er hat den „Wer ist ein guter Junge"-Blick drauf 🐶 #dogs', emoji:'🐶' },
+    { vid:4681,  cat:'tiere',  user:'@miez.mau',    cap:'Katzenlogik: dein Platz = mein Platz 🐱 #cats', emoji:'🐱' },
+    { vid:4814,  cat:'tiere',  user:'@wildlife.de', cap:'Einfach mal kurz die Natur genießen 🦋 #tiere', emoji:'🦋' },
+    { vid:45581, cat:'tiere',  user:'@farmlife',    cap:'Guten Morgen von der Weide 🐴☀️ #animals', emoji:'🐴' },
+    // Travel
+    { vid:4642,  cat:'travel', user:'@fernweh.jo',  cap:'Dieser Ausblick war jeden Schritt wert 🏔️ #travel', emoji:'🏔️' },
+    { vid:41576, cat:'travel', user:'@roadtrip.lena',cap:'Kurven, Berge, Freiheit 🚗🌄 #roadtrip', emoji:'🚗' },
+    { vid:43150, cat:'travel', user:'@sea.you',     cap:'Salzwasser heilt einfach alles 🌊 #beach #travel', emoji:'🏝️' },
+    { vid:50267, cat:'travel', user:'@cityhopper',  cap:'Nachts wird die Stadt erst richtig lebendig 🌃 #citylife', emoji:'🌆' },
+    // Musik
+    { vid:337,   cat:'musik',  user:'@beat.bina',   cap:'Wenn der Drop kommt 🎧🔥 #musik', emoji:'🎧' },
+    { vid:4188,  cat:'musik',  user:'@vinyl.vic',   cap:'Analog ist einfach ein Vibe 🎶 #music', emoji:'🎶' },
+    { vid:40367, cat:'musik',  user:'@danza',       cap:'Ein Takt und die Beine machen den Rest 💃 #dance', emoji:'💃' },
+    { vid:46893, cat:'musik',  user:'@liveklang',   cap:'Nichts wie ein Konzert unter freiem Himmel 🎸✨ #live', emoji:'🎸' },
+  ];
+  function spotUrl(vid){ return 'https://assets.mixkit.co/videos/'+vid+'/'+vid+'-720.mp4'; }
 
   /* ---------- localStorage persistence ---------- */
   const LS_KEY = 'snapclone_state_v1';
@@ -844,6 +1059,129 @@
   }
   function saveStore(){ try { localStorage.setItem(LS_KEY, JSON.stringify(store)); } catch(e){} }
   loadStore();
+
+  /* ---------- Date helpers (browser Date is available here) ---------- */
+  function two(n){ return n<10 ? '0'+n : ''+n; }
+  function fmtClock(ts){ const d=new Date(ts); return two(d.getHours())+':'+two(d.getMinutes()); }
+  function dayKey(ts){ const d=new Date(ts); return d.getFullYear()+'-'+two(d.getMonth()+1)+'-'+two(d.getDate()); }
+  function todayKey(){ return dayKey(Date.now()); }
+  function fmtDaySep(ts){
+    const dk=dayKey(ts);
+    if(dk===todayKey()) return 'Heute';
+    if(dk===dayKey(Date.now()-86400000)) return 'Gestern';
+    const d=new Date(ts);
+    return ['So','Mo','Di','Mi','Do','Fr','Sa'][d.getDay()]+' '+two(d.getDate())+'.'+two(d.getMonth()+1)+'.';
+  }
+
+  /* ---------- Friend personalities + bot answer pools ---------- */
+  const PERSONALITIES = {
+    f1: { // Mia — Emoji-Spammerin
+      greet:['Heyyy 🥰🥰','Hiii 💛✨','Na du 😍🙌','Ahh hey!! 🫶🔥'],
+      question:['Ohh gute Frage 🤔💭','Hmm weiß nicht so genau 😅💗','Ich glaub ja?? 😳🙈','Sag DU es mir 😂💅'],
+      laugh:['HAHAHA 😂😂😂','ich sterb 💀💀','so gut 🤣🔥','stoppp 😩😂'],
+      emojiReply:['😍😍😍','🔥🔥🔥','🥰💛✨','😂🙌💯'],
+      fallback:['omg jaaa 🙌','voll süß 🥰','bin dabei 💛','erzähl mehr!! 👀','so cute 😭','yesss 🔥'],
+      seed:[['them','Heyyy wie läuft dein Tag?? 🥰'],['me','Ganz ok, bei dir?'],['them','Suuuper 💛✨ hab so nen guten Kaffee 😍☕']]
+    },
+    f2: { // Leon — chill Gamer
+      greet:['ey was geht','yo','hey alter','na bro'],
+      question:['kommt drauf an lol','glaub schon','müsste man testen','keine ahnung ehrlich'],
+      laugh:['ha, ja','lol','stark','richtig gut xD'],
+      emojiReply:['👾','same','🎮','nice'],
+      fallback:['zock grad noch ne runde','bin gleich afk','lan bei mir am we?','hab ranked gewonnen ez','einfach chillig','joa passt'],
+      seed:[['me','Zockst du heut Abend?'],['them','klar, so ab 8 bin ich online'],['me','sick, bis dann'],['them','ez 👾']]
+    },
+    f3: { // Emma — stellt Gegenfragen
+      greet:['Hey! Und wie gehts DIR?','Hi 😊 was machst du grade?','Na? Schon was vor heute?'],
+      question:['Interessant – warum fragst du?','Hmm, was denkst du denn selbst?','Und was wäre dir lieber?','Gute Frage… wie kommst du darauf?'],
+      laugh:['Haha, was war denn so lustig?','😄 erzähl, was ist passiert?','Xd und dann?'],
+      emojiReply:['Was bedeutet das? 😅','Übersetz mal für mich 😄','Oha – gut oder schlecht? 🤔'],
+      fallback:['Und wie war der Rest deines Tages?','Was hast du danach gemacht?','Erzähl mal mehr!','Wie fühlst du dich damit?','Was meinst du genau?','Und was kommt als nächstes?'],
+      seed:[['them','Hey, wie war eigentlich dein Wochenende?'],['me','War entspannt, viel geschlafen'],['them','Klingt gut! Und was hast du sonst so gemacht? 😊']]
+    },
+    f4: { // Ben — Gym-Bro
+      greet:['Ayy Bruder 💪','Was geht Champ','Yo Legende','Na, schon trainiert heute?'],
+      question:['Nur wenn du dabei Gains machst 💪','Klar, no pain no gain Bruder','Kommt auf dein Mindset an 🔥','Frag dich lieber: sind das Ausreden? 😤'],
+      laugh:['Hahaha stark Bruder 💪','Gym-Humor xD','Bester 😂'],
+      emojiReply:['💪💪💪','Beast Mode 🔥','Let’s go 🏋️'],
+      fallback:['Push Day heute, brutal 🔥','Hast du schon Protein gehabt?','Wir gehen zusammen Bankdrücken 💪','Leg Day nicht skippen Bruder 😤','Disziplin schlägt Talent','1 Wiederholung noch, immer 🔥'],
+      seed:[['them','Bruder, warst du heute schon im Gym? 💪'],['me','Noch nicht, gleich'],['them','Beast 🔥 vergiss die Beine nicht!']]
+    },
+    f5: { // Lena — Wanderlust / Travel
+      greet:['Heyy ✈️','Hola! 🌍','Servus, alles gut bei dir?','Hi! Grüße von unterwegs 🏔️'],
+      question:['Kommt drauf an wo du bist 😄','Reisen macht immer Sinn ✈️','Ich würd einfach losfahren 🌅','Hast du schon nen Reisepass? 😉'],
+      laugh:['Hahaha herrlich 😄','So lustig, wie im Urlaub 🌴','😂 richtig gut'],
+      emojiReply:['🌍✨','Fernweh 🥺✈️','Traumhaft 🌅'],
+      fallback:['Ich will unbedingt wieder ans Meer 🌊','Nächster Trip: Portugal ✈️','Der Sonnenuntergang gestern… wow 🌅','Pack die Wanderschuhe ein 🥾','Reisen ist die beste Therapie 💛','Wohin solls als nächstes gehen?'],
+      seed:[['them','Ich plane grad einen Roadtrip 🚗✈️'],['me','Wohin gehts?'],['them','Vielleicht Norwegen! Kommst du mit? 🏔️']]
+    },
+    f6: { // Noah — sarkastisch/trocken
+      greet:['Na endlich meldet sich wer','Oh, ein Lebenszeichen','Servus.','Ah, du also'],
+      question:['Frag lieber jemanden Schlaueren','Wow, tiefgründig um die Uhrzeit','Was denkst du wohl 🙃','Google weiß das besser als ich'],
+      laugh:['Ha. Ha.','Zum Brüllen komisch 🙃','Ja witzig, echt jetzt'],
+      emojiReply:['Sehr aussagekräftig 🙃','Aha.','Beeindruckend.'],
+      fallback:['Klingt anstrengend, viel Erfolg','Ich tu mal so als ob mich das überrascht','Typisch','Na wenn du meinst','Erzähl mir mehr… oder auch nicht','Läuft bei dir 🙃'],
+      seed:[['them','Und, schon was Produktives gemacht heute?'],['me','Nein lol'],['them','Wusste ichs doch 🙃']]
+    },
+    f7: { // Sara — herzlich / supportive
+      greet:['Hey du 💗 schön von dir zu hören!','Hii! Wie gehts dir wirklich?','Na Süße/r 🥰','Hey! Ich hab grad an dich gedacht 💛'],
+      question:['Was auch immer du entscheidest, ich unterstütz dich 💗','Hör auf dein Herz 🥰','Du schaffst das, ganz sicher!','Erzähl, ich hör dir zu 💛'],
+      laugh:['Hahah du machst mir den Tag 💗','😄 so schön mit dir zu schreiben','Ich lach mich weg 🥰'],
+      emojiReply:['💗💗','Aww 🥰','Sending love 💛'],
+      fallback:['Pass gut auf dich auf 💗','Ich bin stolz auf dich!','Melde dich wenn was ist, ja? 🥰','Du bist ein Schatz 💛','Alles wird gut, versprochen','Denk dran zu trinken 💧💗'],
+      seed:[['them','Hey 💗 wie fühlst du dich heute?'],['me','Eigentlich ganz gut'],['them','Das freut mich soo 🥰 du verdienst nur Gutes 💛']]
+    },
+    f8: { // Tim — einsilbig
+      greet:['jo','na','hey','moin'],
+      question:['vllt','kA','jain','nö'],
+      laugh:['lol','xd','haha','jo'],
+      emojiReply:['👍','😐','ok','k'],
+      fallback:['ok','jo','passt','mhm','klar','stimmt'],
+      seed:[['me','Wollen wir am Wochenende was machen?'],['them','jo'],['me','Cool, was denn?'],['them','mal schauen']]
+    },
+    f9: { // Zoe — Party / Musik
+      greet:['HEYYY 🎉','Yooo 🕺','Na, schon in Feierlaune? 🍾','Hey Superstar 🎶'],
+      question:['Nur wenn danach getanzt wird 💃','Lauf einfach mit dem Beat 🎶','Frag mich nach Mitternacht nochmal 😜','Kommt auf die Playlist an 🎧'],
+      laugh:['HAHA ikonisch 😂🎉','Ich feier dich 🕺','So gut, Bild geht viral 😂'],
+      emojiReply:['🎶🔥','Vibe ✨','🕺💃'],
+      fallback:['Neuer Song auf Repeat 🎧🔥','Wir gehen am Wochenende raus, oder? 🎉','Hab die perfekte Playlist gebaut 🎶','Tanzen heilt alles 💃','Festival-Tickets sind da 🎪','Dreh die Musik lauter 🔊'],
+      seed:[['them','Neue Playlist ist FERTIG 🎶🔥'],['me','Schick mal!'],['them','Kommt gleich – wird dich umhauen 🕺✨']]
+    },
+    f10: { // Paul — Foodie
+      greet:['Servus! Schon gegessen? 🍝','Hey! Ich koch grad 👨‍🍳','Na, Hunger? 😋','Hi! Rate was es heute gibt 🍕'],
+      question:['Die Antwort ist immer: Pizza 🍕','Kommt drauf an worauf du Appetit hast 😋','Erst essen, dann entscheiden 🍝','Hast du das mit Käse probiert? 🧀'],
+      laugh:['Haha köstlich 😂🍕','So gut wie ne warme Lasagne 😋','😂 ich lach und esse'],
+      emojiReply:['😋🍕','Lecker 🤤','🍜🔥'],
+      fallback:['Hab heute Pasta gemacht, ein Traum 🍝','Kennst du ein gutes Rezept? 👨‍🍳','Meal Prep für die Woche ist fertig 🥘','Dessert geht immer 🍰','Ich bräuchte jetzt einen Snack 🤤','Neues Café entdeckt, mega ☕'],
+      seed:[['them','Ich hab heute selbst Pizza gemacht 🍕'],['me','Neid! Wie war sie?'],['them','Perfekt knusprig 😋 nächstes Mal für dich mit 👨‍🍳']]
+    }
+  };
+
+  /* ---------- v2 migration: chat + spotlight fields ---------- */
+  function seedChats(){
+    let base = Date.now() - 26*3600*1000; // start ~yesterday
+    FRIEND_DEFS.forEach((f,fi)=>{
+      const p = PERSONALITIES[f.id];
+      const arr = [];
+      let t = base + fi*47*60*1000;
+      (p.seed||[]).forEach((m)=>{
+        t += (6 + Math.floor(Math.random()*40))*60*1000;
+        arr.push({ who:m[0], text:m[1], ts:t, status:(m[0]==='me'?'gelesen':undefined) });
+      });
+      store.messages[f.id] = arr;
+    });
+  }
+  function migrateStore(){
+    if(!store.messages) store.messages = {};
+    if(!store.unread) store.unread = {};
+    if(!store.streakDate) store.streakDate = {};
+    if(!store.spotLikes) store.spotLikes = {};
+    if(!store.spotComments) store.spotComments = {};
+    if(store.seeded !== true){ seedChats(); store.seeded = true; }
+    FRIEND_DEFS.forEach(f=>{ if(!store.messages[f.id]) store.messages[f.id]=[]; if(store.unread[f.id]==null) store.unread[f.id]=0; });
+    saveStore();
+  }
+  migrateStore();
 
   /* ---------- Lenses ---------- */
   const LENSES = [
@@ -884,6 +1222,8 @@
     if(isDarkNav(idx)){ bottomnav.classList.add('dark-nav'); bottomnav.classList.remove('light-nav'); }
     else { bottomnav.classList.add('light-nav'); bottomnav.classList.remove('dark-nav'); }
     if(idx===2) ensureCamera();
+    if(idx===4){ if(typeof playSpotActive==='function') playSpotActive(); }
+    else { if(typeof pauseSpotAll==='function') pauseSpotAll(); }
   }
   navBtns.forEach(b=> b.addEventListener('click', ()=> goToScreen(+b.dataset.screen)));
 
@@ -895,6 +1235,8 @@
            document.getElementById('snapViewer').classList.contains('open') ||
            document.getElementById('storyViewer').classList.contains('open') ||
            document.getElementById('sendSheet').classList.contains('open') ||
+           document.getElementById('chatThread').classList.contains('open') ||
+           document.getElementById('commentSheet').classList.contains('open') ||
            document.getElementById('permPrompt').classList.contains('show');
   }
   appEl.addEventListener('touchstart', e=>{
@@ -1184,6 +1526,7 @@
   }
   document.getElementById('sendToBtn').addEventListener('click', ()=>{
     selectedFriends.clear();
+    if(preselectRecipient) selectedFriends.add(preselectRecipient);
     renderSendList();
     updateConfirmLabel();
     sendSheet.classList.add('open');
@@ -1202,11 +1545,13 @@
         from: id,
         img: capturedDataUrl,
         caption: caption,
-        timer: snapTimer
+        timer: snapTimer,
+        ts: Date.now()
       });
     });
     // also add to my story
     if(capturedDataUrl){ store.myStorySlides.push(caption || 'Mein Snap 📸'); }
+    preselectRecipient = null;
     saveStore();
     sendSheet.classList.remove('open');
     closeEditor();
@@ -1219,66 +1564,185 @@
 
   /* ---------- CHAT LIST ---------- */
   const chatList = document.getElementById('chatList');
-  const STATUS_META = {
-    newsnap:  { label:'Neuer Snap', square:'#F23C57' },
-    newchat:  { label:'Neuer Chat', square:'#0FADFF', cls:'newchat' },
-    received: { label:'Empfangen',  square:'#7A3FF2' },
-    sent:     { label:'Gesendet',   arrow:'sent' },
-    delivered:{ label:'Zugestellt', arrow:'delivered' },
-    opened:   { label:'Geöffnet',   arrow:'opened' },
-  };
-  function arrowSVG(type){
-    if(type==='opened'){
-      return '<svg class="status-icon" viewBox="0 0 24 24" fill="none" stroke="#8E9AAB" stroke-width="2"><path d="M2 11l9-9v5c6 0 9 4 9 9-2.5-3-5-4-9-4v5z"/></svg>';
-    }
-    const col = type==='delivered' ? '#0FADFF' : '#F23C57';
-    return '<svg class="status-icon" viewBox="0 0 24 24" fill="'+col+'"><path d="M2 11l9-9v5c6 0 9 4 9 9-2.5-3-5-4-9-4v5z"/></svg>';
-  }
   function friendReceivedCount(fid){ return store.received.filter(s=>s.from===fid).length; }
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
   function renderChatList(){
     chatList.innerHTML='';
     FRIEND_DEFS.forEach(f=>{
-      const newCount = friendReceivedCount(f.id);
-      const hasNew = newCount>0;
-      const meta = hasNew ? STATUS_META.newsnap : STATUS_META[f.status];
+      const snapCount = friendReceivedCount(f.id);
+      const unread = store.unread[f.id]||0;
       const streak = store.streaks[f.id];
+      const msgs = store.messages[f.id]||[];
+      const last = msgs.length ? msgs[msgs.length-1] : null;
+
+      let previewText, previewCls;
+      if(snapCount>0){
+        previewText = '📸 Neuer Snap · tippen zum Öffnen';
+        previewCls = 'chat-preview newsnap';
+      } else if(last){
+        previewText = (last.who==='me'?'Du: ':'') + last.text;
+        previewCls = 'chat-preview' + (unread>0?' unread':'');
+      } else {
+        previewText = 'Sag Hallo 👋';
+        previewCls = 'chat-preview';
+      }
+      const timeLabel = last ? fmtClock(last.ts) : f.time;
+
       const row = document.createElement('div');
       row.className='chat-row';
-      let statusInner='';
-      if(hasNew){
-        statusInner = '<span class="status-square" style="background:#F23C57"></span> Neuer Snap · tippen zum Öffnen';
-      } else if(meta.square){
-        statusInner = '<span class="status-square" style="background:'+meta.square+'"></span> '+meta.label;
-      } else if(meta.arrow){
-        statusInner = arrowSVG(meta.arrow)+' '+meta.label;
-      } else {
-        statusInner = meta.label;
-      }
-      const statusCls = hasNew ? 'chat-status newsnap' : (meta.cls==='newchat'?'chat-status newchat':'chat-status');
       row.innerHTML =
         '<div class="chat-avatar" style="background:'+avaColor(f.id)+'">'+initials(f.name)+'</div>'+
         '<div class="chat-info">'+
           '<div class="chat-name">'+f.name+'</div>'+
-          '<div class="'+statusCls+'">'+statusInner+'</div>'+
+          '<div class="'+previewCls+'">'+escapeHtml(previewText)+'</div>'+
         '</div>'+
         '<div class="chat-right">'+
-          '<div class="chat-time">'+f.time+'</div>'+
-          '<div class="streak">'+streak+' 🔥</div>'+
+          '<div class="chat-time">'+timeLabel+'</div>'+
+          (unread>0 ? '<div class="row-unread">'+(unread>9?'9+':unread)+'</div>' : '<div class="streak">'+streak+' 🔥</div>')+
         '</div>';
-      row.addEventListener('click', ()=>{
-        if(friendReceivedCount(f.id)>0){ openReceivedSnap(f.id); }
-        else { toast('Chat mit '+f.name.split(' ')[0]+' geöffnet'); }
-      });
+      row.addEventListener('click', ()=> openThread(f.id));
       chatList.appendChild(row);
     });
   }
 
   function updateChatBadge(){
-    const count = store.received.length;
+    let unread=0; FRIEND_DEFS.forEach(f=> unread += (store.unread[f.id]||0));
+    const count = store.received.length + unread;
     const badge = document.getElementById('chatBadge');
     if(count>0){ badge.style.display='flex'; badge.textContent = count>9?'9+':count; }
     else badge.style.display='none';
+  }
+
+  /* ---------- CHAT THREAD + LOCAL BOT ENGINE ---------- */
+  const chatThread = document.getElementById('chatThread');
+  const ctBody = document.getElementById('ctBody');
+  const ctText = document.getElementById('ctText');
+  const ctSend = document.getElementById('ctSend');
+  let activeThread = null;
+  let preselectRecipient = null;
+  const botLastText = {};
+  const botBusy = {};
+
+  function openThread(fid){
+    activeThread = fid;
+    const f = FRIEND_DEFS.find(x=>x.id===fid);
+    store.unread[fid] = 0; saveStore();
+    const ava = document.getElementById('ctAva');
+    ava.textContent = initials(f.name); ava.style.background = avaColor(fid);
+    document.getElementById('ctName').textContent = f.name;
+    document.getElementById('ctStreak').textContent = '🔥 ' + (store.streaks[fid]||0) + ' Streak';
+    renderThread();
+    chatThread.classList.add('open');
+    ctText.value=''; ctSend.disabled=true;
+    renderChatList(); updateChatBadge();
+    setTimeout(()=>{ ctBody.scrollTop = ctBody.scrollHeight; }, 60);
+  }
+  function closeThread(){ chatThread.classList.remove('open'); activeThread = null; }
+  document.getElementById('ctBack').addEventListener('click', closeThread);
+
+  document.getElementById('ctCam').addEventListener('click', ()=>{
+    const fid = activeThread;
+    const f = FRIEND_DEFS.find(x=>x.id===fid);
+    preselectRecipient = fid;
+    closeThread();
+    goToScreen(2);
+    toast('Snap für '+(f?f.name.split(' ')[0]:'Freund')+' – Auslöser drücken 📸');
+  });
+
+  function threadTypingHTML(){
+    return '<div class="typing-row"><div class="typing"><span></span><span></span><span></span></div></div>';
+  }
+  function renderThread(){
+    const fid = activeThread; if(!fid) return;
+    const msgs = (store.messages[fid]||[]).slice().sort((a,b)=>a.ts-b.ts);
+    let html=''; let lastDay=null; let lastMeIdx=-1;
+    msgs.forEach((m,i)=>{ if(m.who==='me') lastMeIdx=i; });
+    msgs.forEach((m,i)=>{
+      const dk = dayKey(m.ts);
+      if(dk!==lastDay){ html += '<div class="ct-daysep">'+fmtDaySep(m.ts)+' · '+fmtClock(m.ts)+'</div>'; lastDay=dk; }
+      html += '<div class="msg-row '+(m.who==='me'?'me':'them')+'"><div class="bubble">'+escapeHtml(m.text)+'</div></div>';
+      if(m.who==='me' && i===lastMeIdx && !botBusy[fid]){
+        html += '<div class="msg-status">'+(m.status==='gelesen'?'Gelesen':'Zugestellt')+'</div>';
+      }
+    });
+    store.received.filter(s=>s.from===fid).forEach(()=>{
+      html += '<div class="msg-row them"><div class="snap-bubble"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg> Neuer Snap · tippen</div></div>';
+    });
+    if(botBusy[fid]) html += threadTypingHTML();
+    ctBody.innerHTML = html;
+    ctBody.querySelectorAll('.snap-bubble').forEach(b=> b.addEventListener('click', ()=> openReceivedSnap(fid)));
+    ctBody.scrollTop = ctBody.scrollHeight;
+  }
+
+  ctText.addEventListener('input', ()=>{ ctSend.disabled = ctText.value.trim().length===0; });
+  ctText.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); doSend(); } });
+  ctSend.addEventListener('click', doSend);
+
+  function doSend(){
+    const fid = activeThread; if(!fid) return;
+    const text = ctText.value.trim(); if(!text) return;
+    store.messages[fid].push({ who:'me', text, ts:Date.now(), status:'zugestellt' });
+    if(store.streakDate[fid] !== todayKey()){
+      store.streaks[fid] = (store.streaks[fid]||0) + 1;
+      store.streakDate[fid] = todayKey();
+      document.getElementById('ctStreak').textContent = '🔥 ' + store.streaks[fid] + ' Streak';
+    }
+    saveStore();
+    ctText.value=''; ctSend.disabled=true;
+    renderThread(); renderChatList(); updateChatBadge();
+    scheduleBotReply(fid);
+  }
+
+  function isEmojiOnly(text){
+    const stripped = text.replace(/[\p{Extended_Pictographic}️‍\s]/gu,'');
+    return text.trim().length>0 && stripped.length===0;
+  }
+  function pickReply(fid, pool){
+    if(!pool || !pool.length) return '👍';
+    if(pool.length===1) return pool[0];
+    let t, tries=0;
+    do { t = pool[Math.floor(Math.random()*pool.length)]; tries++; } while(t===botLastText[fid] && tries<8);
+    botLastText[fid]=t; return t;
+  }
+  function botReplyText(fid, userText){
+    const p = PERSONALITIES[fid]; const t = userText.toLowerCase();
+    let pool;
+    if(isEmojiOnly(userText)) pool = p.emojiReply;
+    else if(/(^|\s)(hi+|hallo|hey+|moin|servus|na|yo|hallöchen)(\s|!|\?|$)/.test(t)) pool = p.greet;
+    else if(/(lol|haha|hehe|lmao|xd|rofl)/.test(t) || /😂|🤣/.test(userText)) pool = p.laugh;
+    else if(userText.includes('?')) pool = p.question;
+    else pool = p.fallback;
+    return pickReply(fid, pool);
+  }
+  function markMeRead(fid){ (store.messages[fid]||[]).forEach(m=>{ if(m.who==='me') m.status='gelesen'; }); }
+  function deliverBotMessage(fid, text){
+    store.messages[fid].push({ who:'them', text, ts:Date.now() });
+    markMeRead(fid);
+    if(activeThread!==fid){ store.unread[fid] = (store.unread[fid]||0)+1; }
+    saveStore();
+    if(activeThread===fid) renderThread();
+    renderChatList(); updateChatBadge();
+  }
+  function scheduleBotReply(fid){
+    if(botBusy[fid]) return;
+    botBusy[fid]=true;
+    if(activeThread===fid) renderThread(); // show typing indicator
+    const lastUser = store.messages[fid].slice().reverse().find(m=>m.who==='me');
+    const userText = lastUser ? lastUser.text : '';
+    const delay = 1000 + Math.random()*3000;
+    setTimeout(()=>{
+      const followUp = Math.random() < 0.2;
+      botBusy[fid] = followUp;               // keep typing on if a 2nd message is coming
+      deliverBotMessage(fid, botReplyText(fid, userText));
+      if(followUp){
+        if(activeThread===fid) renderThread();
+        setTimeout(()=>{
+          botBusy[fid]=false;
+          deliverBotMessage(fid, pickReply(fid, PERSONALITIES[fid].fallback));
+        }, 900 + Math.random()*2500);
+      }
+    }, delay);
   }
 
   /* ---------- RECEIVED SNAP VIEWER (core vanish mechanic) ---------- */
@@ -1325,6 +1789,7 @@
     svMedia.innerHTML='';
     renderChatList();
     updateChatBadge();
+    if(activeThread) renderThread();
     toast('Snap ist verschwunden 👻');
     svCurrentSnapId=null;
   }
@@ -1435,28 +1900,231 @@
   document.getElementById('storyNext').addEventListener('click', nextStorySlide);
   document.getElementById('storyPrev').addEventListener('click', prevStorySlide);
 
-  /* ---------- SPOTLIGHT ---------- */
+  /* ---------- SPOTLIGHT 2.0 — TikTok-style video feed ---------- */
   const spotFeed = document.getElementById('spotFeed');
-  function renderSpotlight(){
-    spotFeed.innerHTML='';
-    SPOTLIGHT.forEach(s=>{
+  const MUTE_ICON = '<path d="M11 5L6 9H2v6h4l5 4z"/><path d="M22 9l-5 5M17 9l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>';
+  const UNMUTE_ICON = '<path d="M11 5L6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 010 7M18.5 5.5a9 9 0 010 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>';
+  let spotCat = 'fuer';
+  let spotItems = [];
+  let spotActive = 0;
+  let spotMuted = true;
+  let spotIO = null;
+  // "Für dich": shuffled once per session (seed = session load)
+  const sessionOrder = (function(){
+    const a = SPOT_VIDEOS.map((_,i)=>i);
+    for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=a[i]; a[i]=a[j]; a[j]=t; }
+    return a;
+  })();
+  function spotList(cat){
+    if(cat==='fuer') return sessionOrder.map(i=>SPOT_VIDEOS[i]);
+    return SPOT_VIDEOS.filter(v=>v.cat===cat);
+  }
+
+  function hashInt(x){ let h=2166136261; const s=''+x; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return (h>>>0); }
+  function seededLikes(vid){ return 1500 + (hashInt(vid) % 92000); }
+  function getLike(vid){ if(!store.spotLikes[vid]) store.spotLikes[vid]={ liked:false, count:seededLikes(vid) }; return store.spotLikes[vid]; }
+  function formatK(n){ return n>=1000 ? (n/1000).toFixed(n>=10000?0:1).replace('.0','')+'k' : ''+n; }
+
+  const CMT_USERS = ['lena_2001','maxpower','die_julia','tom.b','sarah.k','flo.rian','mimi','ben_w','nina.m','david_','anna.k','jonas','laura.b','pauli','kev'];
+  const CMT_GENERIC = ['Wie geil ist das denn 😍','Nicht dein Ernst 😂','Sofort gespeichert!','Wie hast du das gemacht??','Ich feier das so 🔥','Krass 👏','Das brauch ich auch','Zu gut 😭','Warum sieht das so einfach aus lol','Bester Content heute'];
+  const CMT_CAT = {
+    comedy:['Ich lieg am Boden 😂😂','Warum bin ich das 💀','Grade laut gelacht 🤣','Viel zu real'],
+    sport:['Was für ein Move! 🔥','Respekt, hartes Training 💪','Absolute Goals 🏆','Wie viele Versuche? 😅'],
+    gaming:['Setup ist der Wahnsinn 🎮','Welches Game ist das?','GG 👾','Skill pur 🕹️'],
+    food:['Mir läuft das Wasser im Mund zusammen 🤤','Rezept bitte!! 🍝','Sieht sooo lecker aus 😋','Jetzt hab ich Hunger, danke'],
+    tiere:['So süß, ich sterbe 🥺','Awww 🐶','Bester Boy 💛','Herz geschmolzen 😍'],
+    travel:['Wo ist das?? 😍','Direkt auf die Bucketlist ✈️','Traumhaft 🌅','Nimm mich mit!'],
+    musik:['Track im Ohr für den Rest des Tages 🎶','Wie heißt der Song?','Gänsehaut 🔥','Läuft auf Repeat 🎧'],
+  };
+  function fakeComments(v){
+    const h=hashInt(v.vid); const pool=(CMT_CAT[v.cat]||[]).concat(CMT_GENERIC);
+    const n=3+(h%3); const out=[];
+    for(let i=0;i<n;i++){ out.push({ user:CMT_USERS[(h+i*7)%CMT_USERS.length], text:pool[(h+i*13)%pool.length], likes:(h+i*29)%240 }); }
+    return out;
+  }
+
+  /* --- chips --- */
+  function renderChips(){
+    const c=document.getElementById('spotChips'); c.innerHTML='';
+    SPOT_CATS.forEach(cat=>{
+      const el=document.createElement('div');
+      el.className='spot-chip'+(cat.id===spotCat?' active':'');
+      el.textContent=cat.label;
+      el.addEventListener('click', ()=>{ el.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'}); setSpotCat(cat.id); });
+      c.appendChild(el);
+    });
+  }
+  function setSpotCat(id){
+    if(id===spotCat){ spotFeed.scrollTo({top:0,behavior:'smooth'}); return; }
+    spotCat=id; renderChips(); renderSpotFeed();
+  }
+
+  /* --- feed --- */
+  function renderSpotFeed(){
+    if(spotIO){ spotIO.disconnect(); spotIO=null; }
+    spotFeed.innerHTML=''; spotItems=[];
+    const list=spotList(spotCat);
+    list.forEach((v,i)=>{
+      const grad=CAT_GRAD[v.cat]; const like=getLike(v.vid);
+      const cmtCount=fakeComments(v).length + ((store.spotComments[v.vid]||[]).length);
       const item=document.createElement('div');
       item.className='spot-item';
       item.innerHTML=
-        '<div class="spot-bg" style="background:'+s.grad+'"></div>'+
+        '<div class="spot-fallback" style="background:'+grad+'"><div class="sf-emoji">'+v.emoji+'</div><div class="sf-cap">'+escapeHtml(v.cap)+'</div></div>'+
+        '<video class="spot-video" muted loop playsinline webkit-playsinline preload="metadata"></video>'+
         '<div class="spot-overlay"></div>'+
+        '<div class="spot-pause"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>'+
+        '<div class="spot-mute"><svg viewBox="0 0 24 24" fill="currentColor">'+(spotMuted?MUTE_ICON:UNMUTE_ICON)+'</svg></div>'+
         '<div class="spot-content">'+
-          '<div class="spot-user"><span class="su-ava" style="background:rgba(255,255,255,.25)">'+s.user[1].toUpperCase()+'</span>'+s.user+'</div>'+
-          '<div class="spot-cap">'+s.cap+'</div>'+
+          '<div class="spot-user"><span class="su-ava" style="background:'+avaColor(v.user)+'">'+v.user[1].toUpperCase()+'</span>'+v.user+'</div>'+
+          '<div class="spot-cap">'+escapeHtml(v.cap)+'</div>'+
+          '<div class="spot-tag">#'+CAT_LABEL[v.cat]+'</div>'+
         '</div>'+
         '<div class="spot-actions">'+
-          '<div class="spot-act"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-8-5.3-10-11c-1-3 1-6 4-6 2 0 3.3 1.3 4 2.3.7-1 2-2.3 4-2.3 3 0 5 3 4 6-2 5.7-10 11-10 11z"/></svg>'+s.likes+'</div>'+
-          '<div class="spot-act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.5 8.5 0 01-8.5 8.5 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7A8.38 8.38 0 014 11.5 8.5 8.5 0 1121 11.5z"/></svg>Chat</div>'+
-          '<div class="spot-act"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>Teilen</div>'+
-        '</div>';
+          '<div class="spot-act like'+(like.liked?' liked':'')+'"><svg class="heart-fill" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-8-5.3-10-11c-1-3 1-6 4-6 2 0 3.3 1.3 4 2.3.7-1 2-2.3 4-2.3 3 0 5 3 4 6-2 5.7-10 11-10 11z"/></svg><span class="like-count">'+formatK(like.count)+'</span></div>'+
+          '<div class="spot-act comment"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.5 8.5 0 01-8.5 8.5 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7A8.38 8.38 0 014 11.5 8.5 8.5 0 1121 11.5z"/></svg><span class="cmt-count">'+cmtCount+'</span></div>'+
+          '<div class="spot-act share"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>Teilen</div>'+
+        '</div>'+
+        '<div class="spot-progress"><div class="sp-bar"></div></div>';
+      const video=item.querySelector('.spot-video');
+      video.dataset.url=spotUrl(v.vid);
+      video.addEventListener('loadeddata', ()=> video.classList.add('ready'));
+      video.addEventListener('playing', ()=> video.classList.add('ready'));
+      video.addEventListener('error', ()=> video.classList.remove('ready'));
+      video.addEventListener('timeupdate', ()=>{ if(video.duration){ item.querySelector('.sp-bar').style.width=(video.currentTime/video.duration*100)+'%'; } });
+      setupSpotTap(item, video, v);
+      item.querySelector('.like').addEventListener('click', e=>{ e.stopPropagation(); toggleLike(v,item); });
+      item.querySelector('.comment').addEventListener('click', e=>{ e.stopPropagation(); openComments(v,item); });
+      item.querySelector('.share').addEventListener('click', e=>{ e.stopPropagation(); shareVideo(v); });
+      item.querySelector('.spot-mute').addEventListener('click', e=>{ e.stopPropagation(); toggleMute(); });
+      spotItems.push({ el:item, video, data:v, index:i });
       spotFeed.appendChild(item);
     });
+    spotFeed.scrollTop=0; spotActive=0;
+    setupSpotIO();
+    manageSpotLoad(0);
+    if(currentScreen===4) playSpotActive();
   }
+
+  function setupSpotIO(){
+    if(spotIO) spotIO.disconnect();
+    spotIO=new IntersectionObserver((entries)=>{
+      entries.forEach(en=>{
+        if(en.isIntersecting && en.intersectionRatio>=0.6){
+          const idx=spotItems.findIndex(s=>s.el===en.target);
+          if(idx>=0 && idx!==spotActive) setSpotActive(idx);
+        }
+      });
+    }, { root:spotFeed, threshold:[0.6] });
+    spotItems.forEach(s=> spotIO.observe(s.el));
+  }
+  function setSpotActive(idx){ spotActive=idx; manageSpotLoad(idx); if(currentScreen===4) playSpotActive(); }
+
+  // Only active ±1 keep a src → never more than 3 videos loaded (performance rule)
+  function manageSpotLoad(active){
+    spotItems.forEach((s,i)=>{
+      const v=s.video;
+      if(Math.abs(i-active)<=1){
+        if(!v.getAttribute('src')){ v.setAttribute('src', v.dataset.url); v.muted=spotMuted; v.load(); }
+      } else {
+        if(v.getAttribute('src')){ v.pause(); v.removeAttribute('src'); v.load(); v.classList.remove('ready'); s.el.querySelector('.sp-bar').style.width='0%'; }
+      }
+    });
+  }
+  function playSpotActive(){
+    spotItems.forEach((s,i)=>{
+      if(i===spotActive){ s.video.muted=spotMuted; const p=s.video.play(); if(p&&p.catch) p.catch(()=>{}); s.el.querySelector('.spot-pause').classList.remove('show'); }
+      else { s.video.pause(); }
+    });
+  }
+  function pauseSpotAll(){ spotItems.forEach(s=> s.video.pause()); }
+
+  /* --- tap: single = play/pause, double = like + heart pop --- */
+  function setupSpotTap(item, video, v){
+    let lastTap=0, singleTimer=null;
+    item.addEventListener('click', (e)=>{
+      const now=Date.now();
+      if(now-lastTap<300){
+        clearTimeout(singleTimer); lastTap=0;
+        if(!getLike(v.vid).liked) toggleLike(v,item);
+        heartPop(item, e.clientX, e.clientY);
+      } else {
+        lastTap=now;
+        singleTimer=setTimeout(()=> togglePlay(video,item), 280);
+      }
+    });
+  }
+  function togglePlay(video, item){
+    const pauseEl=item.querySelector('.spot-pause');
+    if(video.paused){ const p=video.play(); if(p&&p.catch) p.catch(()=>{}); pauseEl.classList.remove('show'); }
+    else { video.pause(); pauseEl.classList.add('show'); }
+  }
+  function heartPop(item, cx, cy){
+    const r=item.getBoundingClientRect();
+    const h=document.createElement('div');
+    h.className='heart-pop'; h.textContent='❤️';
+    h.style.left=((cx||r.left+r.width/2)-r.left)+'px';
+    h.style.top=((cy||r.top+r.height/2)-r.top)+'px';
+    item.appendChild(h);
+    setTimeout(()=>h.remove(), 800);
+  }
+  function toggleLike(v, item){
+    const like=getLike(v.vid);
+    like.liked=!like.liked; like.count += like.liked?1:-1;
+    saveStore();
+    item.querySelector('.like').classList.toggle('liked', like.liked);
+    item.querySelector('.like-count').textContent=formatK(like.count);
+  }
+  function toggleMute(){
+    spotMuted=!spotMuted;
+    spotItems.forEach(s=>{ s.video.muted=spotMuted; s.el.querySelector('.spot-mute svg').innerHTML = spotMuted?MUTE_ICON:UNMUTE_ICON; });
+    toast(spotMuted?'Stumm 🔇':'Ton an 🔊');
+  }
+  function shareVideo(v){
+    const url='https://snapclone.app/spot/'+v.vid;
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(url).then(()=>toast('Link kopiert 🔗')).catch(()=>toast('Link kopiert 🔗'));
+    } else { toast('Link kopiert 🔗'); }
+  }
+
+  /* --- comments sheet --- */
+  const commentSheet=document.getElementById('commentSheet');
+  const commentList=document.getElementById('commentList');
+  const commentText=document.getElementById('commentText');
+  const commentPost=document.getElementById('commentPost');
+  let commentVideo=null, commentItemEl=null;
+  function openComments(v, item){
+    commentVideo=v; commentItemEl=item;
+    renderComments();
+    commentText.value=''; commentPost.disabled=true;
+    commentSheet.classList.add('open');
+  }
+  function renderComments(){
+    const v=commentVideo;
+    const all=fakeComments(v).concat((store.spotComments[v.vid]||[]).map(t=>({user:'du',text:t,likes:0,me:true})));
+    document.getElementById('commentTitle').textContent=all.length+' Kommentare';
+    commentList.innerHTML=all.map(c=>
+      '<div class="cmt"><div class="cmt-ava" style="background:'+avaColor(c.user)+'">'+(c.me?'DU':c.user[0].toUpperCase())+'</div>'+
+      '<div class="cmt-body"><div class="cmt-user">'+(c.me?'du':'@'+c.user)+'</div><div class="cmt-text">'+escapeHtml(c.text)+'</div></div>'+
+      '<div class="cmt-like"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-8-5.3-10-11c-1-3 1-6 4-6 2 0 3.3 1.3 4 2.3.7-1 2-2.3 4-2.3 3 0 5 3 4 6-2 5.7-10 11-10 11z"/></svg>'+(c.likes||0)+'</div></div>'
+    ).join('');
+  }
+  commentText.addEventListener('input', ()=>{ commentPost.disabled=commentText.value.trim().length===0; });
+  commentText.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); postComment(); } });
+  commentPost.addEventListener('click', postComment);
+  function postComment(){
+    const v=commentVideo; if(!v) return;
+    const t=commentText.value.trim(); if(!t) return;
+    if(!store.spotComments[v.vid]) store.spotComments[v.vid]=[];
+    store.spotComments[v.vid].push(t);
+    saveStore();
+    commentText.value=''; commentPost.disabled=true;
+    renderComments();
+    if(commentItemEl){ const cc=commentItemEl.querySelector('.cmt-count'); if(cc) cc.textContent=fakeComments(v).length+store.spotComments[v.vid].length; }
+  }
+  commentSheet.addEventListener('click', e=>{ if(e.target===commentSheet) commentSheet.classList.remove('open'); });
+
+  function initSpotlight(){ renderChips(); renderSpotFeed(); }
 
   /* ---------- MAP pins ---------- */
   function renderMap(){
@@ -1480,7 +2148,7 @@
     applyLens();
     renderChatList();
     renderStories();
-    renderSpotlight();
+    initSpotlight();
     renderMap();
     updateChatBadge();
     goToScreen(2);
@@ -1491,8 +2159,10 @@
   document.addEventListener('visibilitychange', ()=>{
     if(document.hidden){
       if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; if(cameraState==='active') cameraState='idle'; }
+      pauseSpotAll();
     } else {
       if(currentScreen===2 && cameraState==='idle' && camPromptShown) startCamera();
+      if(currentScreen===4) playSpotActive();
     }
   });
 
