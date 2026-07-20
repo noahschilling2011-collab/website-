@@ -1,0 +1,2015 @@
+<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4"><Item class="ServerScriptService" referent="RBX15"><Properties><string name="Name">ServerScriptService</string></Properties><Item class="Folder" referent="RBX14"><Properties><string name="Name">MiniCity</string></Properties><Item class="Script" referent="RBX1"><Properties><string name="Name">Main</string><ProtectedString name="Source">-- Main.server.luau
+-- Einstiegspunkt Server: initialisiert Plots, verdrahtet Remotes, verwaltet
+-- Join/Leave, Persistenz-Autosave und den Einkommens-Tick.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("MiniCity")
+local Config = require(Shared:WaitForChild("Config"))
+local Remotes = require(Shared:WaitForChild("Remotes"))
+
+local modules = script.Parent
+local PlotService = require(modules.PlotService)
+local PlacementService = require(modules.PlacementService)
+local EconomyService = require(modules.EconomyService)
+local DataService = require(modules.DataService)
+
+-- Welt aufbauen
+PlotService.init()
+EconomyService.start()
+
+-- Remotes verdrahten
+local placeItem = Remotes.PlaceItem()
+local demolishItem = Remotes.DemolishItem()
+
+placeItem.OnServerInvoke = function(player, itemId, cellX, cellZ, rot)
+	return PlacementService.handlePlace(player, itemId, cellX, cellZ, rot)
+end
+
+demolishItem.OnServerInvoke = function(player, guid)
+	return PlacementService.handleDemolish(player, guid)
+end
+
+-- ----------------------------------------------------------------------------
+-- Join / Leave
+-- ----------------------------------------------------------------------------
+
+local function onPlayerAdded(player: Player)
+	EconomyService.setupLeaderstats(player)
+
+	local plot = PlotService.assign(player)
+	if not plot then
+		warn("[MiniCity] Kein freier Plot fuer " .. player.Name)
+		return
+	end
+
+	-- Character am eigenen Plot spawnen (auch bei Respawn)
+	player.CharacterAdded:Connect(function()
+		task.defer(function()
+			PlotService.spawnPlayer(player)
+		end)
+	end)
+	if player.Character then
+		PlotService.spawnPlayer(player)
+	end
+
+	-- Gespeicherte Stadt laden (baut Gebaeude wieder auf + refresh)
+	DataService.load(player)
+
+	-- Sync-Burst nach dem Join: RemoteEvents puffern nicht — feuert der erste
+	-- StateSync, bevor die Client-Skripte lauschen, waere die UI sonst bis zum
+	-- naechsten Einkommens-Tick leer.
+	task.spawn(function()
+		for _ = 1, 6 do
+			task.wait(1)
+			if player.Parent == nil then
+				return
+			end
+			EconomyService.sync(player.UserId)
+		end
+	end)
+end
+
+local function onPlayerRemoving(player: Player)
+	-- Snapshot synchron ziehen und den Plot sofort freigeben; erst danach
+	-- (yieldend) speichern. So kann ein schneller Rejoin nie mit einem noch
+	-- belegten Plot oder einem halb freigegebenen Zustand kollidieren.
+	local userId = player.UserId
+	local payload = DataService.snapshot(player)
+	PlotService.release(player)
+	PlacementService.clearPlayer(userId)
+	if payload then
+		DataService.savePayload(userId, payload)
+	end
+end
+
+Players.PlayerAdded:Connect(onPlayerAdded)
+Players.PlayerRemoving:Connect(onPlayerRemoving)
+
+-- Falls Spieler bereits vor dem Skript da waren
+for _, player in Players:GetPlayers() do
+	task.spawn(onPlayerAdded, player)
+end
+
+-- ----------------------------------------------------------------------------
+-- Autosave + Shutdown
+-- ----------------------------------------------------------------------------
+
+task.spawn(function()
+	while true do
+		task.wait(Config.SaveInterval)
+		DataService.saveAll()
+	end
+end)
+
+game:BindToClose(function()
+	DataService.saveAll()
+	task.wait(2)
+end)
+</ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX2"><Properties><string name="Name">DataService</string><ProtectedString name="Source">--!strict
+-- DataService.luau
+-- Persistenz via DataStoreService. Key: city_v1_&lt;UserId&gt;.
+-- Gespeichert: cash, buildings = {{id, cellX, cellZ, rot}}, dataVersion.
+-- Einwohner/Einkommen werden beim Laden aus den Gebaeuden neu berechnet.
+-- Alle Zugriffe in pcall mit einem Retry.
+
+local DataStoreService = game:GetService("DataStoreService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("MiniCity")
+local Config = require(Shared:WaitForChild("Config"))
+
+local PlotService = require(script.Parent.PlotService)
+local PlacementService = require(script.Parent.PlacementService)
+local EconomyService = require(script.Parent.EconomyService)
+
+local DataService = {}
+
+local store = DataStoreService:GetDataStore(Config.DataStoreName)
+
+local function keyFor(userId: number): string
+	return Config.DataKeyPrefix .. userId
+end
+
+-- pcall mit genau einem Retry
+local function withRetry(fn): (boolean, any)
+	local ok, result = pcall(fn)
+	if ok then
+		return true, result
+	end
+	task.wait(1)
+	ok, result = pcall(fn)
+	return ok, result
+end
+
+-- ----------------------------------------------------------------------------
+-- Laden
+-- ----------------------------------------------------------------------------
+
+-- Laedt die gespeicherte Stadt in den (frisch zugewiesenen) Plot-State.
+function DataService.load(player: Player)
+	local plot = PlotService.getPlotByOwner(player.UserId)
+	if not plot or not plot.state then
+		return
+	end
+	local state = plot.state
+
+	local ok, data = withRetry(function()
+		return store:GetAsync(keyFor(player.UserId))
+	end)
+
+	-- Waehrend GetAsync yieldet, kann der Spieler gegangen und der Plot neu
+	-- vergeben worden sein — dann nichts mehr in diesen Plot schreiben.
+	if PlotService.getPlotByOwner(player.UserId) ~= plot or plot.state ~= state then
+		return
+	end
+
+	if not ok then
+		-- Nie ueberschreiben, was wir nicht lesen konnten: Speichern fuer diese
+		-- Sitzung sperren, sonst wuerde der Autosave den echten Spielstand
+		-- mit einer leeren Stadt ersetzen.
+		state.saveBlocked = true
+		warn("[MiniCity] Laden fehlgeschlagen fuer " .. player.Name
+			.. " - Start mit leerer Stadt, Speichern fuer diese Sitzung deaktiviert")
+		EconomyService.refresh(player.UserId)
+		return
+	end
+
+	if type(data) == "table" and type(data.buildings) == "table" then
+		state.cash = tonumber(data.cash) or Config.StartingCash
+		for _, b in data.buildings do
+			if type(b) == "table" and type(b.id) == "string" then
+				PlacementService.loadBuilding(plot, state, b.id, tonumber(b.cellX) or 0, tonumber(b.cellZ) or 0, tonumber(b.rot) or 0)
+			end
+		end
+	end
+
+	EconomyService.refresh(player.UserId)
+end
+
+-- ----------------------------------------------------------------------------
+-- Speichern
+-- ----------------------------------------------------------------------------
+
+local function buildPayload(state)
+	local buildings = {}
+	for _, b in state.buildings do
+		table.insert(buildings, { id = b.id, cellX = b.cellX, cellZ = b.cellZ, rot = b.rot })
+	end
+	return {
+		cash = math.floor(state.cash),
+		buildings = buildings,
+		dataVersion = Config.DataVersion,
+	}
+end
+
+-- Synchroner Zustands-Snapshot (kein Yield). nil, wenn nichts zu speichern ist
+-- oder das Laden fehlschlug (saveBlocked).
+function DataService.snapshot(player: Player)
+	local state = PlotService.getState(player.UserId)
+	if not state or state.saveBlocked then
+		return nil
+	end
+	return buildPayload(state)
+end
+
+function DataService.savePayload(userId: number, payload): boolean
+	local ok = withRetry(function()
+		store:SetAsync(keyFor(userId), payload)
+		return true
+	end)
+	if not ok then
+		warn("[MiniCity] Speichern fehlgeschlagen fuer UserId " .. userId)
+	end
+	return ok
+end
+
+function DataService.save(player: Player): boolean
+	local payload = DataService.snapshot(player)
+	if not payload then
+		return false
+	end
+	return DataService.savePayload(player.UserId, payload)
+end
+
+function DataService.saveAll()
+	for _, player in game:GetService("Players"):GetPlayers() do
+		DataService.save(player)
+	end
+end
+
+return DataService
+</ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX3"><Properties><string name="Name">EconomyService</string><ProtectedString name="Source">--!strict
+-- EconomyService.luau
+-- Berechnet Einwohner/Einkommen/Unlocks aus den Gebaeuden, verwaltet leaderstats,
+-- schickt StateSync und laeuft den Einkommens-Tick (nur serverseitig).
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Shared = ReplicatedStorage:WaitForChild("MiniCity")
+local Config = require(Shared:WaitForChild("Config"))
+local Remotes = require(Shared:WaitForChild("Remotes"))
+local Items = require(Shared:WaitForChild("Items"))
+
+local PlotService = require(script.Parent.PlotService)
+local UnlockService = require(script.Parent.UnlockService)
+
+local EconomyService = {}
+
+local stateSync = Remotes.StateSync()
+
+-- ----------------------------------------------------------------------------
+-- leaderstats
+-- ----------------------------------------------------------------------------
+
+function EconomyService.setupLeaderstats(player: Player)
+	local ls = Instance.new("Folder")
+	ls.Name = "leaderstats"
+	local money = Instance.new("IntValue")
+	money.Name = "Geld"
+	money.Parent = ls
+	local pop = Instance.new("IntValue")
+	pop.Name = "Einwohner"
+	pop.Parent = ls
+	ls.Parent = player
+end
+
+local function updateLeaderstats(player: Player, state)
+	local ls = player:FindFirstChild("leaderstats")
+	if not ls then
+		return
+	end
+	local money = ls:FindFirstChild("Geld") :: IntValue?
+	local pop = ls:FindFirstChild("Einwohner") :: IntValue?
+	if money then
+		money.Value = math.floor(state.cash)
+	end
+	if pop then
+		pop.Value = state.population
+	end
+end
+
+-- ----------------------------------------------------------------------------
+-- Neuberechnung + Sync
+-- ----------------------------------------------------------------------------
+
+function EconomyService.recompute(state)
+	local population = 0
+	local income = 0
+	for _, b in state.buildings do
+		local item = Items.get(b.id)
+		if item then
+			population += item.residents
+			income += item.income
+		end
+	end
+	state.population = population
+	state.incomePerTick = income
+	state.unlockedItems = UnlockService.computeUnlocked(population)
+end
+
+function EconomyService.sync(userId: number)
+	local state = PlotService.getState(userId)
+	if not state then
+		return
+	end
+	local player = Players:GetPlayerByUserId(userId)
+	if not player then
+		return
+	end
+	updateLeaderstats(player, state)
+	stateSync:FireClient(player, {
+		cash = math.floor(state.cash),
+		population = state.population,
+		incomePerTick = state.incomePerTick,
+		unlockedItems = state.unlockedItems,
+	})
+end
+
+-- Neuberechnen und synchronisieren in einem Schritt.
+function EconomyService.refresh(userId: number)
+	local state = PlotService.getState(userId)
+	if not state then
+		return
+	end
+	EconomyService.recompute(state)
+	EconomyService.sync(userId)
+end
+
+-- ----------------------------------------------------------------------------
+-- Einkommens-Tick
+-- ----------------------------------------------------------------------------
+
+function EconomyService.start()
+	task.spawn(function()
+		while true do
+			task.wait(Config.IncomeTickInterval)
+			for _, player in Players:GetPlayers() do
+				local state = PlotService.getState(player.UserId)
+				if state then
+					if state.incomePerTick &gt; 0 then
+						state.cash += state.incomePerTick
+					end
+					-- Immer syncen (auch ohne Einkommen): RemoteEvents puffern
+					-- nicht, ein frueh verpasster Sync heilt sich so von selbst.
+					EconomyService.sync(player.UserId)
+				end
+			end
+		end
+	end)
+end
+
+return EconomyService
+</ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX4"><Properties><string name="Name">PlacementService</string><ProtectedString name="Source">--!strict
+-- PlacementService.luau
+-- Server-autoritatives Platzieren und Abreissen. Validiert JEDE Aktion:
+-- eigener Plot, Zellen frei, genug Geld, Item freigeschaltet, innerhalb der Grenzen,
+-- Strassenanschluss. Rate-Limit 5 Aktionen/s. Client liefert nur Zell-Koordinaten;
+-- der Server clamped und rechnet die Weltposition selbst.
+
+local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("MiniCity")
+local Config = require(Shared:WaitForChild("Config"))
+local Items = require(Shared:WaitForChild("Items"))
+
+local PlotService = require(script.Parent.PlotService)
+local UnlockService = require(script.Parent.UnlockService)
+local EconomyService = require(script.Parent.EconomyService)
+
+local PlacementService = {}
+
+local cellKey = PlotService.cellKey
+
+-- ----------------------------------------------------------------------------
+-- Rate-Limit (Token pro Spieler in gleitendem 1s-Fenster)
+-- ----------------------------------------------------------------------------
+
+local actionTimes: { [number]: { number } } = {}
+
+local function allowAction(userId: number): boolean
+	local now = os.clock()
+	local times = actionTimes[userId]
+	if not times then
+		times = {}
+		actionTimes[userId] = times
+	end
+	-- alte Eintraege entfernen
+	local kept = {}
+	for _, t in times do
+		if now - t &lt; 1 then
+			table.insert(kept, t)
+		end
+	end
+	actionTimes[userId] = kept
+	if #kept &gt;= Config.RateLimit then
+		return false
+	end
+	table.insert(kept, now)
+	return true
+end
+
+function PlacementService.clearPlayer(userId: number)
+	actionTimes[userId] = nil
+end
+
+-- ----------------------------------------------------------------------------
+-- Hilfsfunktionen
+-- ----------------------------------------------------------------------------
+
+-- Belegte Zellschluessel fuer einen Footprint an (cellX, cellZ) mit Dimensionen w,d.
+local function footprintCells(cellX: number, cellZ: number, w: number, d: number): { string }
+	local cells = {}
+	for i = 0, w - 1 do
+		for j = 0, d - 1 do
+			table.insert(cells, cellKey(cellX + i, cellZ + j))
+		end
+	end
+	return cells
+end
+
+-- Hat mindestens eine Footprint-Zelle einen orthogonal angrenzenden Strassen-Nachbarn?
+local function hasRoadAdjacency(state, cellX: number, cellZ: number, w: number, d: number): boolean
+	local dirs = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
+	for i = 0, w - 1 do
+		for j = 0, d - 1 do
+			local cx, cz = cellX + i, cellZ + j
+			for _, dir in dirs do
+				local nx, nz = cx + dir[1], cz + dir[2]
+				if state.roadCells[cellKey(nx, nz)] then
+					return true
+				end
+			end
+		end
+	end
+	return false
+end
+
+-- ----------------------------------------------------------------------------
+-- Kern-Platzierung
+-- ----------------------------------------------------------------------------
+
+type PlaceOpts = {
+	checkUnlock: boolean,
+	checkCash: boolean,
+	checkRoad: boolean,
+	deduct: boolean,
+}
+
+local function placeInternal(plot, state, itemId: string, cellX: number, cellZ: number, rot: number, opts: PlaceOpts): (boolean, string?)
+	local item = Items.get(itemId)
+	if not item then
+		return false, "Unbekanntes Item"
+	end
+
+	rot = math.floor(rot) % 4
+	local w, d = Items.footprintFor(item, rot)
+
+	if w &gt; Config.GridCells or d &gt; Config.GridCells then
+		return false, "Passt nicht in den Plot"
+	end
+
+	-- Server clamped die Eck-Zelle, damit der Footprint immer in den Grenzen liegt
+	cellX = math.clamp(math.floor(cellX), 0, Config.GridCells - w)
+	cellZ = math.clamp(math.floor(cellZ), 0, Config.GridCells - d)
+
+	local cells = footprintCells(cellX, cellZ, w, d)
+
+	-- Zellen frei?
+	for _, key in cells do
+		if state.occupancy[key] then
+			return false, "Zelle belegt"
+		end
+	end
+
+	-- Freigeschaltet?
+	if opts.checkUnlock and not UnlockService.isUnlocked(itemId, state.population) then
+		return false, "Item nicht freigeschaltet"
+	end
+
+	-- Genug Geld?
+	if opts.checkCash and state.cash &lt; item.price then
+		return false, "Zu wenig Geld"
+	end
+
+	-- Strassenanschluss (nur Nicht-Strassen)?
+	if opts.checkRoad and not item.isRoad and not hasRoadAdjacency(state, cellX, cellZ, w, d) then
+		return false, "Kein Strassenanschluss"
+	end
+
+	-- Model bauen und platzieren. Attribute vor dem Parenting setzen, damit der
+	-- Client sie ab ChildAdded vollstaendig sieht (Grid-Spiegel der Ghost-Vorschau).
+	local guid = HttpService:GenerateGUID(false)
+	local model = item.build()
+	model:SetAttribute("BuildingGuid", guid)
+	model:SetAttribute("ItemId", itemId)
+	model:SetAttribute("OwnerUserId", state.ownerUserId)
+	model:SetAttribute("CellX", cellX)
+	model:SetAttribute("CellZ", cellZ)
+	model:SetAttribute("Rot", rot)
+	model:SetAttribute("IsRoad", item.isRoad)
+
+	local center = PlotService.cellsToWorldCenter(plot, cellX, cellZ, w, d)
+	model:PivotTo(CFrame.new(center) * CFrame.Angles(0, rot * math.pi / 2, 0))
+	model.Parent = plot.buildingsFolder
+
+	-- Zustand aktualisieren
+	for _, key in cells do
+		state.occupancy[key] = guid
+		if item.isRoad then
+			state.roadCells[key] = true
+		end
+	end
+	state.buildings[guid] = {
+		id = itemId,
+		cellX = cellX,
+		cellZ = cellZ,
+		rot = rot,
+		cells = cells,
+		isRoad = item.isRoad,
+		model = model,
+	}
+
+	if opts.deduct then
+		state.cash -= item.price
+	end
+
+	return true
+end
+
+-- ----------------------------------------------------------------------------
+-- Oeffentliche Handler
+-- ----------------------------------------------------------------------------
+
+-- Echte endliche Zahl (NaN/inf wuerden CFrame und den DataStore-Save korrumpieren)
+local function isFiniteNumber(n: any): boolean
+	return type(n) == "number" and n == n and n ~= math.huge and n ~= -math.huge
+end
+
+function PlacementService.handlePlace(player: Player, itemId: any, cellX: any, cellZ: any, rot: any): (boolean, string?)
+	if type(itemId) ~= "string" or not isFiniteNumber(cellX) or not isFiniteNumber(cellZ) or not isFiniteNumber(rot) then
+		return false, "Ungueltige Eingabe"
+	end
+	if not allowAction(player.UserId) then
+		return false, "Zu schnell"
+	end
+	local plot = PlotService.getPlotByOwner(player.UserId)
+	if not plot or not plot.state then
+		return false, "Kein Plot"
+	end
+	local ok, err = placeInternal(plot, plot.state, itemId, cellX, cellZ, rot, {
+		checkUnlock = true,
+		checkCash = true,
+		checkRoad = true,
+		deduct = true,
+	})
+	if ok then
+		EconomyService.refresh(player.UserId)
+	end
+	return ok, err
+end
+
+function PlacementService.handleDemolish(player: Player, guid: any): (boolean, string?)
+	if type(guid) ~= "string" then
+		return false, "Ungueltige Eingabe"
+	end
+	if not allowAction(player.UserId) then
+		return false, "Zu schnell"
+	end
+	local plot = PlotService.getPlotByOwner(player.UserId)
+	if not plot or not plot.state then
+		return false, "Kein Plot"
+	end
+	local state = plot.state
+	local building = state.buildings[guid]
+	if not building then
+		return false, "Gebaeude nicht gefunden"
+	end
+
+	local item = Items.get(building.id)
+	if item then
+		state.cash += math.floor(item.price * Config.RefundRatio)
+	end
+
+	for _, key in building.cells do
+		state.occupancy[key] = nil
+		if building.isRoad then
+			state.roadCells[key] = nil
+		end
+	end
+	if building.model then
+		building.model:Destroy()
+	end
+	state.buildings[guid] = nil
+
+	EconomyService.refresh(player.UserId)
+	return true
+end
+
+-- Vertrauenswuerdiges Platzieren beim Laden gespeicherter Staedte (keine Checks/Abzug).
+function PlacementService.loadBuilding(plot, state, itemId: string, cellX: number, cellZ: number, rot: number): boolean
+	local ok = placeInternal(plot, state, itemId, cellX, cellZ, rot, {
+		checkUnlock = false,
+		checkCash = false,
+		checkRoad = false,
+		deduct = false,
+	})
+	return ok
+end
+
+return PlacementService
+</ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX5"><Properties><string name="Name">PlotService</string><ProtectedString name="Source">--!strict
+-- PlotService.luau
+-- Erzeugt die 6 Plots, weist sie bei Join zu, gibt sie bei Leave frei und
+-- haelt den kompletten Stadt-Zustand (CityState) je Plot.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("MiniCity")
+local Config = require(Shared:WaitForChild("Config"))
+
+local PlotService = {}
+
+export type CityState = {
+	ownerUserId: number,
+	cash: number,
+	buildings: { [string]: any }, -- guid -&gt; {id, cellX, cellZ, rot, cells, isRoad, model}
+	occupancy: { [string]: string }, -- "x_z" -&gt; guid
+	roadCells: { [string]: boolean }, -- "x_z" -&gt; true
+	population: number,
+	incomePerTick: number,
+	unlockedItems: { string },
+	saveBlocked: boolean, -- true, wenn das Laden fehlschlug: dann nie speichern
+}
+
+type Plot = {
+	index: number,
+	center: Vector3,
+	plate: Part,
+	buildingsFolder: Folder,
+	signLabel: TextLabel,
+	ownerUserId: number, -- 0 = frei
+	state: CityState?,
+}
+
+local plots: { Plot } = {}
+local playerToPlot: { [number]: number } = {} -- userId -&gt; plot index
+
+local plotsFolder: Folder
+
+-- ----------------------------------------------------------------------------
+-- Welt aufbauen
+-- ----------------------------------------------------------------------------
+
+local function cellKey(x: number, z: number): string
+	return x .. "_" .. z
+end
+PlotService.cellKey = cellKey
+
+local function plotCenter(index: number): Vector3
+	local col = (index - 1) % Config.PlotColumns
+	local row = (index - 1) // Config.PlotColumns
+	local spacing = Config.PlotSize + Config.PlotGap
+	return Vector3.new(col * spacing, 0, row * spacing)
+end
+
+function PlotService.init()
+	plotsFolder = Instance.new("Folder")
+	plotsFolder.Name = "Plots"
+	plotsFolder.Parent = workspace
+
+	-- Grosse Bodenflaeche unter allen Plots
+	local spacing = Config.PlotSize + Config.PlotGap
+	local totalW = Config.PlotColumns * spacing
+	local rows = math.ceil(Config.PlotCount / Config.PlotColumns)
+	local totalD = rows * spacing
+	local ground = Instance.new("Part")
+	ground.Name = "Ground"
+	ground.Anchored = true
+	ground.Size = Vector3.new(totalW + 60, 1, totalD + 60)
+	ground.Position = Vector3.new((totalW - spacing) / 2, -0.5, (totalD - spacing) / 2)
+	ground.Color = Color3.fromRGB(90, 120, 80)
+	ground.Material = Enum.Material.Grass
+	ground.TopSurface = Enum.SurfaceType.Smooth
+	ground.Parent = plotsFolder
+
+	for i = 1, Config.PlotCount do
+		local center = plotCenter(i)
+		local plate = Instance.new("Part")
+		plate.Name = "PlotPlate"
+		plate.Anchored = true
+		plate.Size = Vector3.new(Config.PlotSize, Config.PlotSurfaceY, Config.PlotSize)
+		plate.Position = Vector3.new(center.X, Config.PlotSurfaceY / 2, center.Z)
+		plate.Color = Color3.fromRGB(120, 125, 120)
+		plate.Material = Enum.Material.Concrete
+		plate.TopSurface = Enum.SurfaceType.Smooth
+		plate:SetAttribute("PlotIndex", i)
+		plate:SetAttribute("OwnerUserId", 0)
+		plate.Parent = plotsFolder
+
+		-- Umrandung
+		local border = Instance.new("SelectionBox")
+		border.Adornee = plate
+		border.Color3 = Color3.fromRGB(255, 220, 120)
+		border.LineThickness = 0.3
+		border.Transparency = 0.2
+		border.Parent = plate
+
+		-- Namensschild
+		local signPart = Instance.new("Part")
+		signPart.Name = "PlotSign"
+		signPart.Anchored = true
+		signPart.Size = Vector3.new(6, 3, 1)
+		signPart.Position = Vector3.new(center.X, 2, center.Z - Config.PlotSize / 2 - 1)
+		signPart.Color = Color3.fromRGB(60, 60, 70)
+		signPart.Parent = plotsFolder
+		local gui = Instance.new("BillboardGui")
+		gui.Name = "Label"
+		gui.Size = UDim2.fromScale(3, 1.2)
+		gui.StudsOffset = Vector3.new(0, 3, 0)
+		gui.AlwaysOnTop = true
+		gui.Parent = signPart
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.fromScale(1, 1)
+		label.BackgroundTransparency = 1
+		label.TextColor3 = Color3.fromRGB(255, 255, 255)
+		label.TextStrokeTransparency = 0.4
+		label.TextScaled = true
+		label.Font = Enum.Font.GothamBold
+		label.Text = "Freier Plot " .. i
+		label.Parent = gui
+
+		local folder = Instance.new("Folder")
+		folder.Name = "Buildings_" .. i
+		folder.Parent = plotsFolder
+
+		plots[i] = {
+			index = i,
+			center = center,
+			plate = plate,
+			buildingsFolder = folder,
+			signLabel = label,
+			ownerUserId = 0,
+			state = nil,
+		}
+	end
+end
+
+-- ----------------------------------------------------------------------------
+-- Zugriff
+-- ----------------------------------------------------------------------------
+
+function PlotService.getPlotByOwner(userId: number): Plot?
+	local idx = playerToPlot[userId]
+	if idx then
+		return plots[idx]
+	end
+	return nil
+end
+
+function PlotService.getState(userId: number): CityState?
+	local plot = PlotService.getPlotByOwner(userId)
+	return plot and plot.state or nil
+end
+
+function PlotService.getCornerXZ(plot: Plot): (number, number)
+	return plot.center.X - Config.PlotSize / 2, plot.center.Z - Config.PlotSize / 2
+end
+
+-- Weltmittelpunkt eines Footprints (Boden) auf Basis Eck-Zelle + Dimensionen.
+function PlotService.cellsToWorldCenter(plot: Plot, cellX: number, cellZ: number, w: number, d: number): Vector3
+	local cornerX, cornerZ = PlotService.getCornerXZ(plot)
+	local x = cornerX + (cellX + w / 2) * Config.CellSize
+	local z = cornerZ + (cellZ + d / 2) * Config.CellSize
+	return Vector3.new(x, Config.PlotSurfaceY, z)
+end
+
+-- ----------------------------------------------------------------------------
+-- Zuweisung / Freigabe
+-- ----------------------------------------------------------------------------
+
+function PlotService.assign(player: Player): Plot?
+	for _, plot in plots do
+		if plot.ownerUserId == 0 then
+			plot.ownerUserId = player.UserId
+			playerToPlot[player.UserId] = plot.index
+			plot.plate:SetAttribute("OwnerUserId", player.UserId)
+			plot.state = {
+				ownerUserId = player.UserId,
+				cash = Config.StartingCash,
+				buildings = {},
+				occupancy = {},
+				roadCells = {},
+				population = 0,
+				incomePerTick = 0,
+				unlockedItems = {},
+				saveBlocked = false,
+			}
+			plot.signLabel.Text = player.Name .. "s Stadt"
+			return plot
+		end
+	end
+	return nil
+end
+
+function PlotService.release(player: Player)
+	local plot = PlotService.getPlotByOwner(player.UserId)
+	if not plot then
+		return
+	end
+	-- Alle Gebaeude-Modelle entfernen (Plot leeren)
+	plot.buildingsFolder:ClearAllChildren()
+	plot.ownerUserId = 0
+	plot.state = nil
+	plot.plate:SetAttribute("OwnerUserId", 0)
+	playerToPlot[player.UserId] = nil
+	plot.signLabel.Text = "Freier Plot " .. plot.index
+end
+
+function PlotService.spawnPlayer(player: Player)
+	local plot = PlotService.getPlotByOwner(player.UserId)
+	if not plot then
+		return
+	end
+	local char = player.Character or player.CharacterAdded:Wait()
+	local hrp = char:WaitForChild("HumanoidRootPart", 5) :: BasePart?
+	if hrp then
+		hrp.CFrame = CFrame.new(plot.center.X, Config.PlotSurfaceY + 6, plot.center.Z)
+	end
+end
+
+return PlotService
+</ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX6"><Properties><string name="Name">UnlockService</string><ProtectedString name="Source">--!strict
+-- UnlockService.luau
+-- Bestimmt anhand der Einwohnerzahl, welche Katalog-Items freigeschaltet sind.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("MiniCity")
+local Items = require(Shared:WaitForChild("Items"))
+
+local UnlockService = {}
+
+-- Liste der Item-Ids, die bei gegebener Einwohnerzahl freigeschaltet sind.
+function UnlockService.computeUnlocked(population: number): { string }
+	local unlocked = {}
+	for _, item in Items.List do
+		if population &gt;= item.unlockPop then
+			table.insert(unlocked, item.id)
+		end
+	end
+	return unlocked
+end
+
+-- Ist ein einzelnes Item bei dieser Einwohnerzahl freigeschaltet?
+function UnlockService.isUnlocked(itemId: string, population: number): boolean
+	local item = Items.get(itemId)
+	if not item then
+		return false
+	end
+	return population &gt;= item.unlockPop
+end
+
+return UnlockService
+</ProtectedString></Properties></Item></Item></Item><Item class="ReplicatedStorage" referent="RBX17"><Properties><string name="Name">ReplicatedStorage</string></Properties><Item class="Folder" referent="RBX16"><Properties><string name="Name">MiniCity</string></Properties><Item class="ModuleScript" referent="RBX7"><Properties><string name="Name">Config</string><ProtectedString name="Source">--!strict
+-- Config.luau
+-- Zentrale Stelle fuer alle globalen Tuning-Zahlen von MiniCity.
+-- Per-Item-Katalogwerte (Preis, Einkommen, Einwohner, Footprint) leben datengetrieben
+-- in Items.luau; hier stehen die globalen Zahlen und die Unlock-Schwellen.
+
+local Config = {}
+
+-- Plot / Grid
+Config.PlotSize = 128 -- Studs Kantenlaenge eines Plots
+Config.PlotCount = 6 -- Grundstuecke pro Server
+Config.CellSize = 4 -- Studs pro Rasterzelle
+Config.GridCells = Config.PlotSize // Config.CellSize -- 32x32 Zellen pro Plot
+Config.PlotSurfaceY = 0.6 -- Welthoehe der Plot-Oberflaeche (Gebaeude sitzen hier auf)
+Config.PlotColumns = 3 -- Anordnung der Plots: 3 Spalten x 2 Reihen
+Config.PlotGap = 32 -- Luecke zwischen zwei Plots in Studs
+
+-- Oekonomie
+Config.StartingCash = 500
+Config.IncomeTickInterval = 10 -- Sekunden zwischen Einkommens-Ticks
+Config.RefundRatio = 0.5 -- Rueckerstattung beim Abriss
+
+-- Anti-Missbrauch
+Config.RateLimit = 5 -- max. Platz-/Abriss-Aktionen pro Sekunde und Spieler
+
+-- Unlock-Schwellen (Einwohnerzahl). Items.luau referenziert diese Werte.
+Config.Unlocks = {
+	Strasse = 0,
+	Wohnhaus = 0,
+	Park = 0,
+	Geschaeft = 10,
+	Hochhaus = 25,
+	UBahn = 35,
+	Autobahn = 50,
+	Fabrik = 60,
+	Flughafen = 100,
+}
+
+-- Persistenz
+Config.DataVersion = 1
+Config.SaveInterval = 120 -- Sekunden zwischen Autosaves
+Config.DataStoreName = "MiniCity"
+Config.DataKeyPrefix = "city_v1_"
+
+return Config
+</ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX8"><Properties><string name="Name">Items</string><ProtectedString name="Source">--!strict
+-- Items.luau
+-- Kompletter Katalog der Fertiggebaeude, datengetrieben inkl. Model-Builder.
+-- Neues Item = neuer Eintrag in Items.List, kein neuer Code an anderer Stelle.
+--
+-- Jeder Eintrag:
+--   id              eindeutiger String
+--   name            Anzeigename
+--   footprint       {w, d} in Zellen (Breite entlang X, Tiefe entlang Z) bei rot=0
+--   price           Kaufpreis
+--   income          Einkommen pro Tick
+--   residents       Einwohner
+--   isRoad          true = zaehlt als Strassenanschluss und braucht selbst keinen
+--   unlockPop       ab wievielen Einwohnern freigeschaltet
+--   build()         baut das Model (zentriert auf XZ=0, Boden bei y=0), PrimaryPart gesetzt
+
+local Config = require(script.Parent.Config)
+
+local CELL = Config.CellSize
+
+local Items = {}
+
+-- ----------------------------------------------------------------------------
+-- Bau-Helfer
+-- ----------------------------------------------------------------------------
+
+local function newPart(parent: Instance, size: Vector3, cf: CFrame, color: Color3, material: Enum.Material?): Part
+	local p = Instance.new("Part")
+	p.Anchored = true
+	p.CanCollide = true
+	p.Size = size
+	p.CFrame = cf
+	p.Color = color
+	p.Material = material or Enum.Material.SmoothPlastic
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.Parent = parent
+	return p
+end
+
+local function newWedge(parent: Instance, size: Vector3, cf: CFrame, color: Color3): WedgePart
+	local w = Instance.new("WedgePart")
+	w.Anchored = true
+	w.CanCollide = true
+	w.Size = size
+	w.CFrame = cf
+	w.Color = color
+	w.Material = Enum.Material.SmoothPlastic
+	w.Parent = parent
+	return w
+end
+
+-- Erzeugt ein Model mit unsichtbarem Anker als PrimaryPart im Ursprung (0,0,0).
+-- Der Anker markiert den Footprint-Mittelpunkt auf Bodenhoehe; PivotTo rotiert
+-- das gesamte Model sauber um diesen Punkt.
+local function newModel(name: string): Model
+	local model = Instance.new("Model")
+	model.Name = name
+	local anchor = Instance.new("Part")
+	anchor.Name = "Anchor"
+	anchor.Size = Vector3.new(0.2, 0.2, 0.2)
+	anchor.Transparency = 1
+	anchor.CanCollide = false
+	anchor.CanQuery = false
+	anchor.CanTouch = false
+	anchor.Anchored = true
+	anchor.CFrame = CFrame.new(0, 0, 0)
+	anchor.Parent = model
+	model.PrimaryPart = anchor
+	return model
+end
+
+-- Farben
+local C_ROAD = Color3.fromRGB(55, 55, 60)
+local C_LINE = Color3.fromRGB(240, 200, 40)
+local C_HOUSE = Color3.fromRGB(214, 170, 120)
+local C_ROOF = Color3.fromRGB(150, 60, 45)
+local C_SHOP = Color3.fromRGB(90, 160, 200)
+local C_SIGN = Color3.fromRGB(230, 70, 70)
+local C_TOWER = Color3.fromRGB(120, 130, 145)
+local C_GLASS = Color3.fromRGB(140, 205, 235)
+local C_HWY = Color3.fromRGB(45, 45, 50)
+local C_RAIL = Color3.fromRGB(200, 200, 205)
+local C_TERMINAL = Color3.fromRGB(210, 210, 220)
+local C_PLANE = Color3.fromRGB(235, 235, 240)
+local C_STRIP = Color3.fromRGB(70, 70, 75)
+local C_GRASS = Color3.fromRGB(110, 170, 90)
+local C_TRUNK = Color3.fromRGB(100, 70, 45)
+local C_LEAF = Color3.fromRGB(70, 150, 70)
+local C_UBLUE = Color3.fromRGB(0, 90, 170)
+local C_FACTORY = Color3.fromRGB(160, 150, 140)
+local C_ROOFDARK = Color3.fromRGB(90, 95, 100)
+local C_BRICK = Color3.fromRGB(150, 80, 60)
+
+-- ----------------------------------------------------------------------------
+-- Model-Builder pro Item
+-- ----------------------------------------------------------------------------
+
+local function buildRoad(): Model
+	local m = newModel("Strasse")
+	newPart(m, Vector3.new(CELL, 0.4, CELL), CFrame.new(0, 0.2, 0), C_ROAD)
+	newPart(m, Vector3.new(0.6, 0.42, CELL), CFrame.new(0, 0.21, 0), C_LINE)
+	return m
+end
+
+local function buildHouse(): Model
+	local m = newModel("Wohnhaus")
+	-- Baukoerper 8x8 Footprint -&gt; 6x6 Grundriss, 5 hoch
+	newPart(m, Vector3.new(6, 5, 6), CFrame.new(0, 2.5, 0), C_HOUSE)
+	-- Prismendach (Giebel) aus zwei Keilen, Firstlinie entlang X.
+	-- WedgePart: die hohe Kante liegt auf der lokalen +Z-Seite; beide Keile
+	-- drehen ihre hohe Kante zur Hausmitte (z=0), damit ein First entsteht.
+	newWedge(m, Vector3.new(6, 2.5, 3), CFrame.new(0, 6.25, 1.5) * CFrame.Angles(0, math.pi, 0), C_ROOF)
+	newWedge(m, Vector3.new(6, 2.5, 3), CFrame.new(0, 6.25, -1.5), C_ROOF)
+	-- Tuer
+	newPart(m, Vector3.new(1.2, 2, 0.2), CFrame.new(0, 1, 3.0), Color3.fromRGB(90, 55, 35))
+	return m
+end
+
+local function buildShop(): Model
+	local m = newModel("Geschaeft")
+	-- Flache Box 6x6, 3 hoch
+	newPart(m, Vector3.new(6, 3, 6), CFrame.new(0, 1.5, 0), C_SHOP)
+	-- Schild-Part vorne oben
+	newPart(m, Vector3.new(5, 1.4, 0.4), CFrame.new(0, 3.7, 3.0), C_SIGN, Enum.Material.Neon)
+	-- Schaufenster
+	newPart(m, Vector3.new(4.5, 1.6, 0.2), CFrame.new(0, 1.3, 3.05), C_GLASS, Enum.Material.Glass)
+	return m
+end
+
+local function buildTower(): Model
+	local m = newModel("Hochhaus")
+	-- Drei gestapelte Boxen, ~25 Studs hoch
+	local levels = {
+		{ size = Vector3.new(10, 8, 10), y = 4 },
+		{ size = Vector3.new(9, 8, 9), y = 12 },
+		{ size = Vector3.new(8, 8, 8), y = 20 },
+	}
+	for _, lvl in levels do
+		newPart(m, lvl.size, CFrame.new(0, lvl.y, 0), C_TOWER)
+		-- Fenster-Streifen (Glas-Baender) rund um jede Etage
+		for _, band in { -2, 0, 2 } do
+			newPart(m, Vector3.new(lvl.size.X + 0.1, 1.2, lvl.size.Z + 0.1), CFrame.new(0, lvl.y + band, 0), C_GLASS, Enum.Material.Glass)
+		end
+	end
+	return m
+end
+
+local function buildHighway(): Model
+	local m = newModel("Autobahn")
+	-- Footprint 1x2 -&gt; 4 breit, 8 lang
+	newPart(m, Vector3.new(CELL, 0.5, CELL * 2), CFrame.new(0, 0.25, 0), C_HWY)
+	-- Gestrichelter Mittelstreifen
+	for _, z in { -2.4, 0, 2.4 } do
+		newPart(m, Vector3.new(0.4, 0.52, 1.4), CFrame.new(0, 0.26, z), C_LINE)
+	end
+	-- Leitplanken links/rechts
+	newPart(m, Vector3.new(0.3, 0.8, CELL * 2), CFrame.new(-1.85, 0.65, 0), C_RAIL)
+	newPart(m, Vector3.new(0.3, 0.8, CELL * 2), CFrame.new(1.85, 0.65, 0), C_RAIL)
+	return m
+end
+
+local function buildAirport(): Model
+	local m = newModel("Flughafen")
+	-- Footprint 8x5 -&gt; 32 breit (X), 20 tief (Z)
+	-- Landebahn (Asphaltstreifen)
+	newPart(m, Vector3.new(28, 0.4, 7), CFrame.new(0, 0.2, -4), C_STRIP)
+	-- Gestrichelte Mittellinie der Landebahn
+	for i = -3, 3 do
+		newPart(m, Vector3.new(2, 0.42, 0.5), CFrame.new(i * 4, 0.21, -4), Color3.fromRGB(230, 230, 230))
+	end
+	-- Mini-Terminal
+	newPart(m, Vector3.new(9, 4, 6), CFrame.new(-9, 2, 6.5), C_TERMINAL)
+	newPart(m, Vector3.new(9.2, 0.4, 6.2), CFrame.new(-9, 4.2, 6.5), Color3.fromRGB(120, 130, 150))
+	newPart(m, Vector3.new(1, 3, 1), CFrame.new(-13, 5.5, 6.5), Color3.fromRGB(120, 130, 150)) -- Tower
+	-- Statisches Flugzeug (~6 Parts)
+	local px, pz = 6, -4
+	newPart(m, Vector3.new(2, 2, 12), CFrame.new(px, 2, pz), C_PLANE) -- Rumpf
+	newPart(m, Vector3.new(12, 0.4, 3), CFrame.new(px, 2, pz), C_PLANE) -- Tragflaechen
+	newPart(m, Vector3.new(5, 0.3, 1.6), CFrame.new(px, 2.4, pz - 5), C_PLANE) -- Hoehenleitwerk
+	newPart(m, Vector3.new(0.4, 2.4, 2), CFrame.new(px, 3, pz - 5), C_PLANE) -- Seitenleitwerk
+	newPart(m, Vector3.new(1.6, 1.6, 2), CFrame.new(px, 2, pz + 6), Color3.fromRGB(120, 205, 235)) -- Nase/Cockpit
+	newPart(m, Vector3.new(1, 1, 2), CFrame.new(px, 1, pz + 2), Color3.fromRGB(60, 60, 65)) -- Fahrwerk
+	return m
+end
+
+local function buildPark(): Model
+	local m = newModel("Park")
+	-- Rasenflaeche (1x1 Zelle)
+	newPart(m, Vector3.new(CELL, 0.3, CELL), CFrame.new(0, 0.15, 0), C_GRASS, Enum.Material.Grass)
+	-- Zwei Baeume: Stamm + Kugelkrone
+	for _, pos in { Vector3.new(-1, 0, -0.8), Vector3.new(1.1, 0, 0.9) } do
+		newPart(m, Vector3.new(0.4, 1.6, 0.4), CFrame.new(pos.X, 1.1, pos.Z), C_TRUNK)
+		local crown = newPart(m, Vector3.new(1.6, 1.6, 1.6), CFrame.new(pos.X, 2.6, pos.Z), C_LEAF)
+		crown.Shape = Enum.PartType.Ball
+	end
+	-- Parkbank
+	newPart(m, Vector3.new(1.2, 0.5, 0.4), CFrame.new(0.2, 0.55, -0.9), Color3.fromRGB(140, 100, 60))
+	return m
+end
+
+local function buildSubway(): Model
+	local m = newModel("UBahnStation")
+	-- Footprint 2x1 -&gt; 8 breit (X), 4 tief (Z). Dunkler Vorplatz
+	newPart(m, Vector3.new(8, 0.3, 4), CFrame.new(0, 0.15, 0), C_ROAD)
+	-- Treppenabgang: dunkler Schacht mit Gelaendern
+	newPart(m, Vector3.new(3, 0.4, 2), CFrame.new(-2, 0.35, 0), Color3.fromRGB(20, 20, 24))
+	newPart(m, Vector3.new(3, 0.7, 0.2), CFrame.new(-2, 0.75, 1.05), C_RAIL)
+	newPart(m, Vector3.new(3, 0.7, 0.2), CFrame.new(-2, 0.75, -1.05), C_RAIL)
+	-- Eingangshaeuschen mit flachem Dach
+	newPart(m, Vector3.new(3.4, 2.6, 3.4), CFrame.new(1.8, 1.6, 0), C_TERMINAL)
+	newPart(m, Vector3.new(3.8, 0.3, 3.8), CFrame.new(1.8, 3.05, 0), Color3.fromRGB(120, 130, 150))
+	-- Blaues U-Schild auf Mast
+	newPart(m, Vector3.new(0.2, 2.6, 0.2), CFrame.new(-3.2, 1.6, 1.5), C_RAIL)
+	local sign = newPart(m, Vector3.new(1.4, 1.4, 0.3), CFrame.new(-3.2, 3.4, 1.5), C_UBLUE, Enum.Material.Neon)
+	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+		local gui = Instance.new("SurfaceGui")
+		gui.Face = face
+		local lbl = Instance.new("TextLabel")
+		lbl.Size = UDim2.fromScale(1, 1)
+		lbl.BackgroundTransparency = 1
+		lbl.Text = "U"
+		lbl.TextColor3 = Color3.new(1, 1, 1)
+		lbl.TextScaled = true
+		lbl.Font = Enum.Font.GothamBold
+		lbl.Parent = gui
+		gui.Parent = sign
+	end
+	return m
+end
+
+local function buildFactory(): Model
+	local m = newModel("Fabrik")
+	-- Footprint 3x2 -&gt; 12 breit (X), 8 tief (Z). Halle
+	newPart(m, Vector3.new(11, 5, 7), CFrame.new(0, 2.5, 0), C_FACTORY)
+	-- Sheddach (Saegezahn) aus drei Keilen, Zaehne entlang X
+	for i = -1, 1 do
+		newWedge(m, Vector3.new(7, 1.8, 3.6), CFrame.new(i * 3.6, 5.9, 0) * CFrame.Angles(0, math.pi / 2, 0), C_ROOFDARK)
+	end
+	-- Schornstein + Lueftung
+	newPart(m, Vector3.new(1, 6, 1), CFrame.new(4.5, 8, 2.5), C_BRICK)
+	newPart(m, Vector3.new(1.4, 0.8, 1.4), CFrame.new(-4, 5.4, -2), C_RAIL)
+	-- Tor
+	newPart(m, Vector3.new(3, 2.6, 0.2), CFrame.new(0, 1.3, 3.55), Color3.fromRGB(70, 70, 75))
+	return m
+end
+
+-- ----------------------------------------------------------------------------
+-- Katalog
+-- ----------------------------------------------------------------------------
+
+Items.List = {
+	{ id = "road", name = "Strasse", footprint = { w = 1, d = 1 }, price = 10, income = 0, residents = 0, isRoad = true, unlockPop = Config.Unlocks.Strasse, build = buildRoad },
+	{ id = "house", name = "Wohnhaus", footprint = { w = 2, d = 2 }, price = 100, income = 5, residents = 4, isRoad = false, unlockPop = Config.Unlocks.Wohnhaus, build = buildHouse },
+	{ id = "park", name = "Park", footprint = { w = 1, d = 1 }, price = 75, income = 0, residents = 2, isRoad = false, unlockPop = Config.Unlocks.Park, build = buildPark },
+	{ id = "shop", name = "Geschaeft", footprint = { w = 2, d = 2 }, price = 250, income = 15, residents = 0, isRoad = false, unlockPop = Config.Unlocks.Geschaeft, build = buildShop },
+	{ id = "tower", name = "Hochhaus", footprint = { w = 3, d = 3 }, price = 1000, income = 30, residents = 20, isRoad = false, unlockPop = Config.Unlocks.Hochhaus, build = buildTower },
+	{ id = "subway", name = "U-Bahn-Station", footprint = { w = 2, d = 1 }, price = 750, income = 25, residents = 0, isRoad = false, unlockPop = Config.Unlocks.UBahn, build = buildSubway },
+	{ id = "highway", name = "Autobahn", footprint = { w = 1, d = 2 }, price = 150, income = 0, residents = 0, isRoad = true, unlockPop = Config.Unlocks.Autobahn, build = buildHighway },
+	{ id = "factory", name = "Fabrik", footprint = { w = 3, d = 2 }, price = 2000, income = 70, residents = 0, isRoad = false, unlockPop = Config.Unlocks.Fabrik, build = buildFactory },
+	{ id = "airport", name = "Flughafen", footprint = { w = 8, d = 5 }, price = 10000, income = 250, residents = 0, isRoad = false, unlockPop = Config.Unlocks.Flughafen, build = buildAirport },
+}
+
+-- Schneller Zugriff per id
+Items.ById = {}
+for _, item in Items.List do
+	Items.ById[item.id] = item
+end
+
+function Items.get(id: string)
+	return Items.ById[id]
+end
+
+-- Footprint-Dimensionen unter Beruecksichtigung der Rotation (0..3 = 0/90/180/270 Grad).
+-- Bei 90/270 Grad tauschen Breite und Tiefe.
+function Items.footprintFor(item, rot: number): (number, number)
+	local w, d = item.footprint.w, item.footprint.d
+	if rot % 2 == 1 then
+		return d, w
+	end
+	return w, d
+end
+
+return Items
+</ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX9"><Properties><string name="Name">Remotes</string><ProtectedString name="Source">--!strict
+-- Remotes.luau
+-- Einziger Ort, der die Remotes erstellt (Server) bzw. holt (Client).
+-- Contract (exakt diese, keine weiteren):
+--   PlaceItem(itemId, cellX, cellZ, rot) -&gt; (ok: boolean, errMsg: string?)   [RemoteFunction]
+--   DemolishItem(buildingGuid) -&gt; (ok: boolean, errMsg: string?)            [RemoteFunction]
+--   StateSync {cash, population, incomePerTick, unlockedItems}              [RemoteEvent, Server-&gt;Client]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local FOLDER_NAME = "MiniCityRemotes"
+local isServer = RunService:IsServer()
+
+local Remotes = {}
+
+local function getFolder(): Folder
+	if isServer then
+		local folder = ReplicatedStorage:FindFirstChild(FOLDER_NAME)
+		if not folder then
+			folder = Instance.new("Folder")
+			folder.Name = FOLDER_NAME
+			folder.Parent = ReplicatedStorage
+		end
+		return folder :: Folder
+	else
+		return ReplicatedStorage:WaitForChild(FOLDER_NAME) :: Folder
+	end
+end
+
+local function ensure(name: string, className: string): Instance
+	local folder = getFolder()
+	if isServer then
+		local remote = folder:FindFirstChild(name)
+		if not remote then
+			remote = Instance.new(className)
+			remote.Name = name
+			remote.Parent = folder
+		end
+		return remote
+	else
+		return folder:WaitForChild(name)
+	end
+end
+
+function Remotes.PlaceItem(): RemoteFunction
+	return ensure("PlaceItem", "RemoteFunction") :: RemoteFunction
+end
+
+function Remotes.DemolishItem(): RemoteFunction
+	return ensure("DemolishItem", "RemoteFunction") :: RemoteFunction
+end
+
+function Remotes.StateSync(): RemoteEvent
+	return ensure("StateSync", "RemoteEvent") :: RemoteEvent
+end
+
+return Remotes
+</ProtectedString></Properties></Item></Item></Item><Item class="StarterPlayer" referent="RBX20"><Properties><string name="Name">StarterPlayer</string></Properties><Item class="StarterPlayerScripts" referent="RBX19"><Properties><string name="Name">StarterPlayerScripts</string></Properties><Item class="Folder" referent="RBX18"><Properties><string name="Name">MiniCity</string></Properties><Item class="LocalScript" referent="RBX10"><Properties><string name="Name">Main</string><ProtectedString name="Source">-- Main.client.luau
+-- Einstiegspunkt Client: baut HUD + Baumenue, initialisiert den PlacementController
+-- und verarbeitet StateSync (HUD-Update, Freischalt-Meldungen, Menue-Zustand).
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("MiniCity")
+local Items = require(Shared:WaitForChild("Items"))
+local Remotes = require(Shared:WaitForChild("Remotes"))
+
+local modules = script.Parent
+local HUD = require(modules.HUD)
+local BuildMenuUI = require(modules.BuildMenuUI)
+local PlacementController = require(modules.PlacementController)
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local screen = Instance.new("ScreenGui")
+screen.Name = "MiniCityUI"
+screen.ResetOnSpawn = false
+screen.IgnoreGuiInset = false
+screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screen.Parent = playerGui
+
+local hud = HUD.create(screen)
+
+local controller
+local menu = BuildMenuUI.create(screen, {
+	onSelectItem = function(itemId)
+		controller:setItem(itemId)
+	end,
+	onToggleDemolish = function()
+		if controller.mode == "demolish" then
+			controller:cancel()
+		else
+			controller:setDemolish()
+		end
+	end,
+	onRotate = function()
+		controller:rotate()
+	end,
+	onCancel = function()
+		controller:cancel()
+	end,
+})
+
+controller = PlacementController.create({ hud = hud, menu = menu })
+
+-- ----------------------------------------------------------------------------
+-- StateSync
+-- ----------------------------------------------------------------------------
+
+local prevUnlocked = nil :: { [string]: boolean }?
+
+local function onState(state)
+	hud:update(state)
+	menu:update(state)
+	controller:onState(state)
+
+	-- Freischalt-Meldungen (nicht beim ersten Sync)
+	local currentSet = {}
+	for _, id in state.unlockedItems or {} do
+		currentSet[id] = true
+	end
+	if prevUnlocked then
+		for id in currentSet do
+			if not prevUnlocked[id] then
+				local item = Items.get(id)
+				if item then
+					hud:toast(item.name .. " freigeschaltet!")
+				end
+			end
+		end
+	end
+	prevUnlocked = currentSet
+end
+
+Remotes.StateSync().OnClientEvent:Connect(onState)
+</ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX11"><Properties><string name="Name">BuildMenuUI</string><ProtectedString name="Source">--!strict
+-- BuildMenuUI.luau
+-- Baumenue als Leiste aus Item-Buttons. Gesperrte Items ausgegraut mit
+-- Freischalt-Bedingung. Enthaelt zusaetzlich Abriss- und Abbrechen-Knopf.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("MiniCity")
+local Items = require(Shared:WaitForChild("Items"))
+
+local BuildMenuUI = {}
+BuildMenuUI.__index = BuildMenuUI
+
+local COL_UNLOCKED = Color3.fromRGB(45, 90, 140)
+local COL_LOCKED = Color3.fromRGB(55, 58, 64)
+local COL_SELECTED = Color3.fromRGB(70, 150, 220)
+local COL_DEMOLISH = Color3.fromRGB(150, 60, 60)
+local COL_DEMOLISH_ON = Color3.fromRGB(210, 80, 80)
+
+local function makeButton(parent: Instance, layoutOrder: number): TextButton
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.fromOffset(96, 64)
+	btn.LayoutOrder = layoutOrder
+	btn.BackgroundColor3 = COL_LOCKED
+	btn.BorderSizePixel = 0
+	btn.AutoButtonColor = false
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btn.TextStrokeTransparency = 0.6
+	btn.Font = Enum.Font.GothamMedium
+	btn.TextSize = 13
+	btn.TextWrapped = true
+	btn.Text = ""
+	btn.Parent = parent
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 6)
+	corner.Parent = btn
+	local stroke = Instance.new("UIStroke")
+	stroke.Thickness = 0
+	stroke.Color = COL_SELECTED
+	stroke.Parent = btn
+	return btn
+end
+
+function BuildMenuUI.create(parentGui: ScreenGui, callbacks)
+	local self = setmetatable({}, BuildMenuUI)
+	self.callbacks = callbacks
+	self.buttons = {} :: { [string]: { btn: TextButton, stroke: UIStroke } }
+	self.unlocked = {} :: { [string]: boolean }
+
+	-- Umbrechendes Grid: 6 Spalten, Item-Buttons + 3 Steuer-Buttons
+	local columns = 6
+	local totalButtons = #Items.List + 3
+	local rows = math.ceil(totalButtons / columns)
+	local cellW, cellH, gap = 96, 56, 6
+
+	local bar = Instance.new("Frame")
+	bar.Name = "BuildBar"
+	bar.AnchorPoint = Vector2.new(0.5, 1)
+	bar.Position = UDim2.new(0.5, 0, 1, -12)
+	bar.Size = UDim2.fromOffset(columns * cellW + (columns - 1) * gap + 16, rows * cellH + (rows - 1) * gap + 12)
+	bar.BackgroundColor3 = Color3.fromRGB(20, 22, 28)
+	bar.BackgroundTransparency = 0.2
+	bar.BorderSizePixel = 0
+	bar.Parent = parentGui
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = bar
+	local pad = Instance.new("UIPadding")
+	pad.PaddingLeft = UDim.new(0, 8)
+	pad.PaddingRight = UDim.new(0, 8)
+	pad.PaddingTop = UDim.new(0, 6)
+	pad.PaddingBottom = UDim.new(0, 6)
+	pad.Parent = bar
+	local layout = Instance.new("UIGridLayout")
+	layout.CellSize = UDim2.fromOffset(cellW, cellH)
+	layout.CellPadding = UDim2.fromOffset(gap, gap)
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.FillDirectionMaxCells = columns
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = bar
+
+	-- Item-Buttons
+	for i, item in Items.List do
+		local btn = makeButton(bar, i)
+		local stroke = btn:FindFirstChildOfClass("UIStroke") :: UIStroke
+		btn.Activated:Connect(function()
+			if self.unlocked[item.id] then
+				self.callbacks.onSelectItem(item.id)
+			end
+		end)
+		self.buttons[item.id] = { btn = btn, stroke = stroke }
+	end
+
+	-- Drehen-Button (fuer Touch; Tastatur nutzt R)
+	local rotate = makeButton(bar, #Items.List + 1)
+	rotate.BackgroundColor3 = Color3.fromRGB(70, 72, 80)
+	rotate.Text = "Drehen (R)"
+	rotate.Activated:Connect(function()
+		self.callbacks.onRotate()
+	end)
+
+	-- Abriss-Button
+	local demolish = makeButton(bar, #Items.List + 2)
+	demolish.BackgroundColor3 = COL_DEMOLISH
+	demolish.Text = "Abriss\n(50% zurueck)"
+	demolish.Activated:Connect(function()
+		self.callbacks.onToggleDemolish()
+	end)
+	self.demolishBtn = demolish
+	self.demolishStroke = demolish:FindFirstChildOfClass("UIStroke") :: UIStroke
+
+	-- Abbrechen-Button
+	local cancel = makeButton(bar, #Items.List + 3)
+	cancel.BackgroundColor3 = Color3.fromRGB(70, 72, 80)
+	cancel.Text = "Abbrechen"
+	cancel.Activated:Connect(function()
+		self.callbacks.onCancel()
+	end)
+
+	-- Bis zum ersten StateSync: alles als gesperrt anzeigen statt leerer Buttons
+	self:update({ unlockedItems = {} })
+
+	return self
+end
+
+-- Aktualisiert Freischalt-Zustaende anhand von state.unlockedItems + population.
+function BuildMenuUI:update(state)
+	local unlockedSet = {}
+	for _, id in state.unlockedItems or {} do
+		unlockedSet[id] = true
+	end
+	self.unlocked = unlockedSet
+
+	for _, item in Items.List do
+		local entry = self.buttons[item.id]
+		local btn = entry.btn
+		if unlockedSet[item.id] then
+			btn.BackgroundColor3 = COL_UNLOCKED
+			btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+			btn.Text = string.format("%s\n%d $", item.name, item.price)
+		else
+			btn.BackgroundColor3 = COL_LOCKED
+			btn.TextColor3 = Color3.fromRGB(150, 150, 155)
+			btn.Text = string.format("%s\n[ab %d Einw.]", item.name, item.unlockPop)
+		end
+	end
+end
+
+-- Hebt den aktiven Bau-Button hervor (id) oder den Abriss-Modus.
+function BuildMenuUI:setActive(kind: string, id: string?)
+	for itemId, entry in self.buttons do
+		entry.stroke.Thickness = (kind == "build" and itemId == id) and 2 or 0
+	end
+	if kind == "demolish" then
+		self.demolishStroke.Thickness = 2
+		self.demolishBtn.BackgroundColor3 = COL_DEMOLISH_ON
+	else
+		self.demolishStroke.Thickness = 0
+		self.demolishBtn.BackgroundColor3 = COL_DEMOLISH
+	end
+end
+
+return BuildMenuUI
+</ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX12"><Properties><string name="Name">HUD</string><ProtectedString name="Source">--!strict
+-- HUD.luau
+-- Zeigt Geld, Einwohner und Einkommen/Tick. Blendet Freischalt-Meldungen ein.
+
+local TweenService = game:GetService("TweenService")
+
+local HUD = {}
+HUD.__index = HUD
+
+local function makeLabel(parent: Instance, order: number): TextLabel
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(1, -16, 0, 26)
+	lbl.Position = UDim2.new(0, 8, 0, 8 + order * 28)
+	lbl.BackgroundTransparency = 1
+	lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+	lbl.TextStrokeTransparency = 0.5
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.Font = Enum.Font.GothamBold
+	lbl.TextSize = 20
+	lbl.Text = ""
+	lbl.Parent = parent
+	return lbl
+end
+
+function HUD.create(parentGui: ScreenGui)
+	local self = setmetatable({}, HUD)
+
+	local panel = Instance.new("Frame")
+	panel.Name = "StatsPanel"
+	panel.Size = UDim2.fromOffset(240, 98)
+	panel.Position = UDim2.fromOffset(12, 12)
+	panel.BackgroundColor3 = Color3.fromRGB(25, 28, 34)
+	panel.BackgroundTransparency = 0.25
+	panel.BorderSizePixel = 0
+	panel.Parent = parentGui
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 8)
+	corner.Parent = panel
+
+	self.cashLabel = makeLabel(panel, 0)
+	self.popLabel = makeLabel(panel, 1)
+	self.incomeLabel = makeLabel(panel, 2)
+
+	-- Toast-Container (Bildschirmmitte oben)
+	self.toastLabel = Instance.new("TextLabel")
+	self.toastLabel.Size = UDim2.fromOffset(420, 44)
+	self.toastLabel.Position = UDim2.new(0.5, -210, 0, 90)
+	self.toastLabel.BackgroundColor3 = Color3.fromRGB(40, 120, 60)
+	self.toastLabel.BackgroundTransparency = 1
+	self.toastLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	self.toastLabel.TextTransparency = 1
+	self.toastLabel.Font = Enum.Font.GothamBold
+	self.toastLabel.TextSize = 22
+	self.toastLabel.Text = ""
+	self.toastLabel.BorderSizePixel = 0
+	self.toastLabel.Parent = parentGui
+	local tc = Instance.new("UICorner")
+	tc.CornerRadius = UDim.new(0, 8)
+	tc.Parent = self.toastLabel
+
+	self:update({ cash = 0, population = 0, incomePerTick = 0 })
+	return self
+end
+
+function HUD:update(state)
+	self.cashLabel.Text = string.format("Geld: %d $", state.cash or 0)
+	self.popLabel.Text = string.format("Einwohner: %d", state.population or 0)
+	self.incomeLabel.Text = string.format("Einkommen: +%d $ / Tick", state.incomePerTick or 0)
+end
+
+function HUD:toast(text: string, color: Color3?)
+	local lbl = self.toastLabel
+	lbl.Text = text
+	lbl.BackgroundColor3 = color or Color3.fromRGB(40, 120, 60)
+	TweenService:Create(lbl, TweenInfo.new(0.25), { TextTransparency = 0, BackgroundTransparency = 0.1 }):Play()
+	task.delay(2.2, function()
+		if lbl.Text == text then
+			TweenService:Create(lbl, TweenInfo.new(0.5), { TextTransparency = 1, BackgroundTransparency = 1 }):Play()
+		end
+	end)
+end
+
+return HUD
+</ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX13"><Properties><string name="Name">PlacementController</string><ProtectedString name="Source">--!strict
+-- PlacementController.luau
+-- Ghost-Preview folgt Maus/Touch (gruen = gueltig, rot = ungueltig),
+-- R oder Drehen-Knopf = 90 Grad drehen, Klick/Tap = platzieren.
+-- Abriss-Modus: eigenes Gebaeude anklicken -&gt; Server-Abriss.
+--
+-- Der Client schickt nur Zell-Koordinaten. Fuer die Ghost-Farbe spiegelt er die
+-- Server-Regeln (Belegung, Strassenanschluss, Geld) lokal aus den Zell-Attributen
+-- der replizierten Gebaeude-Modelle — die Autoritaet bleibt beim Server.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local Shared = ReplicatedStorage:WaitForChild("MiniCity")
+local Config = require(Shared:WaitForChild("Config"))
+local Items = require(Shared:WaitForChild("Items"))
+local Remotes = require(Shared:WaitForChild("Remotes"))
+
+local player = Players.LocalPlayer
+local mouse = player:GetMouse()
+
+local placeItem = Remotes.PlaceItem()
+local demolishItem = Remotes.DemolishItem()
+
+local GHOST_GREEN = Color3.fromRGB(80, 220, 90)
+local GHOST_RED = Color3.fromRGB(220, 80, 80)
+
+local ORTHO_DIRS = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
+
+local PlacementController = {}
+PlacementController.__index = PlacementController
+
+local function cellKey(x: number, z: number): string
+	return x .. "_" .. z
+end
+
+-- ----------------------------------------------------------------------------
+-- Konstruktion
+-- ----------------------------------------------------------------------------
+
+function PlacementController.create(deps)
+	local self = setmetatable({}, PlacementController)
+	self.hud = deps.hud
+	self.menu = deps.menu
+
+	self.mode = "none" -- "none" | "build" | "demolish"
+	self.itemId = nil :: string?
+	self.rot = 0
+	self.ghost = nil :: Model?
+	self.ghostParts = {} :: { BasePart }
+	self.lastCell = nil :: { x: number, z: number }?
+	self.lastState = nil -- letzter StateSync (fuer den Geld-Check der Vorschau)
+
+	-- Lokaler Spiegel der Belegungs-/Strassen-Map des eigenen Plots
+	self.occ = {} :: { [string]: boolean }
+	self.road = {} :: { [string]: boolean }
+	self.gridDirty = true
+	self.watchedFolder = nil :: Folder?
+
+	self.ghostFolder = Instance.new("Folder")
+	self.ghostFolder.Name = "MiniCityGhost"
+	self.ghostFolder.Parent = workspace
+
+	-- Plots existieren ab Server-Start; einmalig cachen
+	self.plotsFolder = workspace:WaitForChild("Plots")
+	self.plates = {} :: { BasePart }
+	for _, child in self.plotsFolder:GetChildren() do
+		if child.Name == "PlotPlate" and child:IsA("BasePart") then
+			table.insert(self.plates, child)
+		end
+	end
+
+	RunService.RenderStepped:Connect(function()
+		self:onRender()
+	end)
+
+	UserInputService.InputBegan:Connect(function(input, gameProcessed)
+		self:onInput(input, gameProcessed)
+	end)
+
+	return self
+end
+
+-- ----------------------------------------------------------------------------
+-- Eigener Plot / Grid-Spiegel
+-- ----------------------------------------------------------------------------
+
+function PlacementController:ownPlate(): BasePart?
+	for _, plate in self.plates do
+		if plate:GetAttribute("OwnerUserId") == player.UserId then
+			return plate
+		end
+	end
+	return nil
+end
+
+function PlacementController:ownBuildingsFolder(): Folder?
+	local plate = self:ownPlate()
+	if not plate then
+		return nil
+	end
+	local idx = plate:GetAttribute("PlotIndex")
+	local folder = self.plotsFolder:FindFirstChild("Buildings_" .. tostring(idx))
+	if folder and folder:IsA("Folder") then
+		return folder
+	end
+	return nil
+end
+
+function PlacementController:watchFolder(folder: Folder)
+	if self.watchedFolder == folder then
+		return
+	end
+	self.watchedFolder = folder
+	self.gridDirty = true
+	folder.ChildAdded:Connect(function()
+		self.gridDirty = true
+	end)
+	folder.ChildRemoved:Connect(function()
+		self.gridDirty = true
+	end)
+end
+
+-- Baut occ/road aus den Zell-Attributen der replizierten Modelle neu auf.
+function PlacementController:refreshGrid()
+	local occ = {}
+	local road = {}
+	local folder = self.watchedFolder
+	if folder then
+		for _, m in folder:GetChildren() do
+			if m:IsA("Model") then
+				local id = m:GetAttribute("ItemId")
+				local cx = m:GetAttribute("CellX")
+				local cz = m:GetAttribute("CellZ")
+				local rot = m:GetAttribute("Rot")
+				local item = nil
+				if type(id) == "string" then
+					item = Items.get(id)
+				end
+				if item and type(cx) == "number" and type(cz) == "number" and type(rot) == "number" then
+					local w, d = Items.footprintFor(item, rot)
+					local isRoad = m:GetAttribute("IsRoad") == true
+					for i = 0, w - 1 do
+						for j = 0, d - 1 do
+							local key = cellKey(cx + i, cz + j)
+							occ[key] = true
+							if isRoad then
+								road[key] = true
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	self.occ = occ
+	self.road = road
+	self.gridDirty = false
+end
+
+-- Spiegelt die Server-Validierung fuer die Ghost-Farbe: Zellen frei,
+-- Strassenanschluss (ausser bei Strassen/Autobahn), genug Geld.
+function PlacementController:isPlacementValid(item, cellX: number, cellZ: number, w: number, d: number): boolean
+	for i = 0, w - 1 do
+		for j = 0, d - 1 do
+			if self.occ[cellKey(cellX + i, cellZ + j)] then
+				return false
+			end
+		end
+	end
+	if not item.isRoad then
+		local touchesRoad = false
+		for i = 0, w - 1 do
+			if touchesRoad then
+				break
+			end
+			for j = 0, d - 1 do
+				if touchesRoad then
+					break
+				end
+				for _, dir in ORTHO_DIRS do
+					if self.road[cellKey(cellX + i + dir[1], cellZ + j + dir[2])] then
+						touchesRoad = true
+						break
+					end
+				end
+			end
+		end
+		if not touchesRoad then
+			return false
+		end
+	end
+	if self.lastState and self.lastState.cash &lt; item.price then
+		return false
+	end
+	return true
+end
+
+-- ----------------------------------------------------------------------------
+-- Modus-Wechsel
+-- ----------------------------------------------------------------------------
+
+function PlacementController:clearGhost()
+	if self.ghost then
+		self.ghost:Destroy()
+		self.ghost = nil
+	end
+	self.ghostParts = {}
+	self.lastCell = nil
+end
+
+function PlacementController:setItem(itemId: string)
+	local item = Items.get(itemId)
+	if not item then
+		return
+	end
+	self.mode = "build"
+	self.itemId = itemId
+	self:clearGhost()
+
+	local model = item.build()
+	model.Name = "Ghost"
+	for _, descendant in model:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			descendant.CanCollide = false
+			descendant.CanQuery = false
+			descendant.CanTouch = false
+			if descendant.Name ~= "Anchor" then
+				descendant.Transparency = 0.5
+				table.insert(self.ghostParts, descendant)
+			end
+		end
+	end
+	model.Parent = self.ghostFolder
+	self.ghost = model
+
+	self.menu:setActive("build", itemId)
+end
+
+function PlacementController:setDemolish()
+	self.mode = "demolish"
+	self.itemId = nil
+	self:clearGhost()
+	self.menu:setActive("demolish", nil)
+end
+
+function PlacementController:cancel()
+	self.mode = "none"
+	self.itemId = nil
+	self:clearGhost()
+	self.menu:setActive("none", nil)
+end
+
+function PlacementController:rotate()
+	if self.mode == "build" then
+		self.rot = (self.rot + 1) % 4
+	end
+end
+
+-- Wird von Main.client bei jedem StateSync aufgerufen.
+function PlacementController:onState(state)
+	self.lastState = state
+	-- Faellt die Einwohnerzahl (Abriss), kann das gewaehlte Item wieder gesperrt sein
+	if self.mode == "build" and self.itemId then
+		local stillUnlocked = false
+		for _, id in state.unlockedItems or {} do
+			if id == self.itemId then
+				stillUnlocked = true
+				break
+			end
+		end
+		if not stillUnlocked then
+			self:cancel()
+		end
+	end
+end
+
+-- ----------------------------------------------------------------------------
+-- Raycast / Zell-Berechnung
+-- ----------------------------------------------------------------------------
+
+-- Plot-Platte unter dem Zeiger. Gibt (plate, worldPosition) zurueck.
+function PlacementController:raycastPlate(): (BasePart?, Vector3?)
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = self.plates
+	local ray = mouse.UnitRay
+	local result = workspace:Raycast(ray.Origin, ray.Direction * 2000, params)
+	if result then
+		return result.Instance :: BasePart, result.Position
+	end
+	return nil, nil
+end
+
+-- Eck-Zelle aus einer Weltposition auf der eigenen Platte (Footprint zentriert).
+function PlacementController:cellFromWorld(plate: BasePart, worldPos: Vector3, w: number, d: number): (number, number)
+	local cornerX = plate.Position.X - Config.PlotSize / 2
+	local cornerZ = plate.Position.Z - Config.PlotSize / 2
+	local rawX = (worldPos.X - cornerX) / Config.CellSize
+	local rawZ = (worldPos.Z - cornerZ) / Config.CellSize
+	local cellX = math.clamp(math.floor(rawX - w / 2), 0, Config.GridCells - w)
+	local cellZ = math.clamp(math.floor(rawZ - d / 2), 0, Config.GridCells - d)
+	return cellX, cellZ
+end
+
+-- ----------------------------------------------------------------------------
+-- Render / Ghost-Update
+-- ----------------------------------------------------------------------------
+
+function PlacementController:setGhostColor(color: Color3)
+	for _, part in self.ghostParts do
+		part.Color = color
+	end
+end
+
+function PlacementController:onRender()
+	if self.mode ~= "build" or not self.ghost or not self.itemId then
+		return
+	end
+	local item = Items.get(self.itemId)
+	local w, d = Items.footprintFor(item, self.rot)
+
+	local plate, worldPos = self:raycastPlate()
+	local ownPlate = plate ~= nil and plate:GetAttribute("OwnerUserId") == player.UserId
+	if not plate or not worldPos or not ownPlate then
+		-- Nicht ueber dem eigenen Plot: Ghost verstecken, kein Platzierungsziel
+		for _, part in self.ghostParts do
+			part.Transparency = 1
+		end
+		self.lastCell = nil
+		return
+	end
+
+	local folder = self:ownBuildingsFolder()
+	if folder then
+		self:watchFolder(folder)
+	end
+	if self.gridDirty then
+		self:refreshGrid()
+	end
+
+	for _, part in self.ghostParts do
+		part.Transparency = 0.5
+	end
+
+	local cellX, cellZ = self:cellFromWorld(plate, worldPos, w, d)
+	self.lastCell = { x = cellX, z = cellZ }
+
+	local cornerX = plate.Position.X - Config.PlotSize / 2
+	local cornerZ = plate.Position.Z - Config.PlotSize / 2
+	local centerX = cornerX + (cellX + w / 2) * Config.CellSize
+	local centerZ = cornerZ + (cellZ + d / 2) * Config.CellSize
+	self.ghost:PivotTo(CFrame.new(centerX, Config.PlotSurfaceY, centerZ) * CFrame.Angles(0, self.rot * math.pi / 2, 0))
+
+	local valid = self:isPlacementValid(item, cellX, cellZ, w, d)
+	self:setGhostColor(valid and GHOST_GREEN or GHOST_RED)
+end
+
+-- ----------------------------------------------------------------------------
+-- Aktionen
+-- ----------------------------------------------------------------------------
+
+function PlacementController:tryPlace()
+	if not self.itemId or not self.lastCell then
+		return
+	end
+	local ok, err = placeItem:InvokeServer(self.itemId, self.lastCell.x, self.lastCell.z, self.rot)
+	if not ok then
+		self.hud:toast(err or "Platzieren fehlgeschlagen", Color3.fromRGB(160, 60, 60))
+	end
+end
+
+function PlacementController:tryDemolish()
+	local folder = self:ownBuildingsFolder()
+	if not folder then
+		return
+	end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = { folder }
+	local ray = mouse.UnitRay
+	local result = workspace:Raycast(ray.Origin, ray.Direction * 2000, params)
+	if not result then
+		return
+	end
+	local model = result.Instance:FindFirstAncestorWhichIsA("Model")
+	if not model then
+		return
+	end
+	local guid = model:GetAttribute("BuildingGuid")
+	if type(guid) ~= "string" then
+		return
+	end
+	local ok, err = demolishItem:InvokeServer(guid)
+	if not ok then
+		self.hud:toast(err or "Abriss fehlgeschlagen", Color3.fromRGB(160, 60, 60))
+	end
+end
+
+-- ----------------------------------------------------------------------------
+-- Eingabe
+-- ----------------------------------------------------------------------------
+
+function PlacementController:onInput(input: InputObject, gameProcessed: boolean)
+	if gameProcessed then
+		return
+	end
+	if input.KeyCode == Enum.KeyCode.R then
+		self:rotate()
+		return
+	end
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		if self.mode == "build" then
+			self:tryPlace()
+		elseif self.mode == "demolish" then
+			self:tryDemolish()
+		end
+	end
+end
+
+return PlacementController
+</ProtectedString></Properties></Item></Item></Item></Item><Item class="Players" referent="RBX21"><Properties><string name="Name">Players</string><int name="MaxPlayers">6</int></Properties></Item></roblox>
