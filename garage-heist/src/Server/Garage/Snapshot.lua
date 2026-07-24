@@ -20,23 +20,26 @@ local function partEntry(data, carIndex: number, slotId: string, ownerUserId: nu
 	local part = ProfileOps.GetPart(data, carIndex, slotId)
 	local repair = data.repairs[ProfileOps.RepairKey(carIndex, slotId)]
 	local tier = part and part.tier or 0
+	local subTier = part and (part.subTier or 0) or 0
 	local tierDef = part and PartCatalog.GetTier(slotId, tier)
-	local nextTier = repair and (repair.tier + 1) or (tier + 1)
-	local nextDef = PartCatalog.GetTier(slotId, nextTier)
+	-- Waehrend einer Reparatur gibt es keinen naechsten Kauf zu zeigen.
+	local purchase = (not repair) and ProfileOps.NextPurchase(data, carIndex, slotId) or nil
 
 	return {
 		slotId = slotId,
 		slotName = slotDef.displayName,
 		tier = tier,
+		subTier = subTier,
+		maxSubTier = Config.SUBTIER_COUNT,
 		tierName = tierDef and tierDef.name or "leer",
-		rate = part and PartCatalog.GetRate(slotId, tier) or 0,
+		rate = ProfileOps.PartRate(part),
 		stolen = part ~= nil and part.originalOwner ~= ownerUserId,
-		repair = repair and { endsAt = repair.endsAt, tier = repair.tier } or nil,
-		nextTier = nextDef and nextTier or nil,
-		nextName = nextDef and nextDef.name or nil,
-		nextCost = nextDef and nextDef.cost or nil,
-		nextTime = nextDef and nextDef.time or nil,
-		nextRate = nextDef and nextDef.rate or nil,
+		inTransit = part ~= nil and part.inTransit ~= nil,
+		repair = repair and { endsAt = repair.endsAt, tier = repair.tier, kind = repair.kind } or nil,
+		nextKind = purchase and purchase.kind or nil,
+		nextName = purchase and purchase.name or nil,
+		nextCost = purchase and purchase.cost or nil,
+		nextTime = purchase and purchase.time or nil,
 	}
 end
 
@@ -45,6 +48,7 @@ function Snapshot.Build(player: Player, data, extra)
 	local levelDef, level = ProfileOps.GarageLevelDef(data)
 	local nextLevelDef = Config.GARAGE_LEVELS[level + 1]
 
+	local canRebirth, rebirthReason = ProfileOps.CanRebirth(data)
 	local cars = {}
 	for carIndex, car in data.cars do
 		local carDef = CarCatalog.Get(car.carId)
@@ -71,7 +75,7 @@ function Snapshot.Build(player: Player, data, extra)
 			slotName = slotDef and slotDef.displayName or part.slotId,
 			tier = part.tier,
 			tierName = tierDef and tierDef.name or "?",
-			sellValue = math.floor(PartCatalog.GetValue(part.slotId, part.tier) * Config.SELL_REFUND),
+			sellValue = math.floor(ProfileOps.PartValue(part) * Config.SELL_REFUND),
 			installCarIndex = ProfileOps.FindEmptySlot(data, part.slotId),
 		})
 	end
@@ -79,6 +83,7 @@ function Snapshot.Build(player: Player, data, extra)
 		return a.sellValue > b.sellValue
 	end)
 
+	local carSlots = ProfileOps.CarSlots(data)
 	local shopCars = {}
 	for _, carId in CarCatalog.Order do
 		local carDef = CarCatalog.Get(carId)
@@ -98,13 +103,19 @@ function Snapshot.Build(player: Player, data, extra)
 			level = level,
 			label = levelDef.label,
 			rateMult = levelDef.rateMult,
-			carSlots = levelDef.carSlots,
+			carSlots = carSlots,
 			nextCost = nextLevelDef and nextLevelDef.cost or nil,
 			nextLabel = nextLevelDef and nextLevelDef.label or nil,
 			nextRateMult = nextLevelDef and nextLevelDef.rateMult or nil,
 			nextCarSlots = nextLevelDef and nextLevelDef.carSlots or nil,
 		},
 		cars = cars,
+		rebirth = {
+			count = data.rebirths or 0,
+			can = canRebirth,
+			reason = rebirthReason,
+			bonus = Config.REBIRTH_MULT,
+		},
 		looseParts = loose,
 		shopCars = shopCars,
 		stats = {

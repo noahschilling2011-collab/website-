@@ -12,6 +12,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CarCatalog = require(Shared.CarCatalog)
+local Config = require(Shared.Config)
 local PartCatalog = require(Shared.PartCatalog)
 local Util = require(Shared.Util)
 
@@ -100,7 +101,8 @@ local function buildBillboard(parent, height)
 end
 
 -- carState = { carId = "...", parts = { [slotId] = part } }
-function CarBuilder.Build(carState, carIndex: number, ownerUserId: number, cframe: CFrame, parent: Instance)
+-- options.rebirths schaltet ab Config.REBIRTH_PAINT_AT den exklusiven Lack frei.
+function CarBuilder.Build(carState, carIndex: number, ownerUserId: number, cframe: CFrame, parent: Instance, options)
 	local carDef = CarCatalog.Get(carState.carId) or CarCatalog.Get(CarCatalog.STARTER)
 	local model = Instance.new("Model")
 	model.Name = ("Car%d_%d"):format(carIndex, ownerUserId)
@@ -110,10 +112,17 @@ function CarBuilder.Build(carState, carIndex: number, ownerUserId: number, cfram
 
 	local paintPart = carState.parts.paint
 	local bodyColor = carDef.baseColor
+	local paintSlot = PartCatalog.GetSlot("paint")
+	local exclusivePaint = false
 	if paintPart then
 		local tierDef = PartCatalog.GetTier("paint", paintPart.tier)
 		if tierDef then
 			bodyColor = tierDef.color
+		end
+		local rebirths = (options and options.rebirths) or 0
+		if rebirths >= Config.REBIRTH_PAINT_AT and paintPart.tier >= PartCatalog.TierCount("paint") then
+			bodyColor = paintSlot.rebirthColor
+			exclusivePaint = true
 		end
 	end
 
@@ -124,7 +133,7 @@ function CarBuilder.Build(carState, carIndex: number, ownerUserId: number, cfram
 		cframe * CFrame.new(0, bodyY, 0),
 		bodyColor,
 		model,
-		paintPart and Enum.Material.Metal or Enum.Material.CorrodedMetal
+		exclusivePaint and Enum.Material.Neon or (paintPart and Enum.Material.Metal or Enum.Material.CorrodedMetal)
 	)
 	body.CanCollide = true
 	model.PrimaryPart = body
@@ -140,6 +149,7 @@ function CarBuilder.Build(carState, carIndex: number, ownerUserId: number, cfram
 
 	local prompts = {}
 	local slotParts = {}
+	local anchors = { paint = body }
 
 	if paintPart then
 		tagPart(body, "paint", paintPart, ownerUserId, carIndex)
@@ -168,6 +178,7 @@ function CarBuilder.Build(carState, carIndex: number, ownerUserId: number, cfram
 			table.insert(wheels, wheel)
 		end
 	end
+	anchors.tires = wheels[1]
 	if tirePart then
 		for _, wheel in wheels do
 			tagPart(wheel, "tires", tirePart, ownerUserId, carIndex)
@@ -200,6 +211,7 @@ function CarBuilder.Build(carState, carIndex: number, ownerUserId: number, cfram
 			statePart and Enum.Material.Metal or Enum.Material.ForceField,
 			statePart and 0 or 0.6
 		)
+		anchors[slotId] = instance
 		if statePart then
 			tagPart(instance, slotId, statePart, ownerUserId, carIndex)
 			prompts[slotId] = addStealPrompt(instance, slotId, statePart, ownerUserId, carIndex)
@@ -216,6 +228,9 @@ function CarBuilder.Build(carState, carIndex: number, ownerUserId: number, cfram
 		body = body,
 		prompts = prompts,
 		slotParts = slotParts,
+		-- Ankerpunkte fuer den Reparatur-Balken. Existieren auch fuer leere
+		-- Slots, weil dort der Platzhalter steht.
+		anchors = anchors,
 		billboard = billboard,
 		carIndex = carIndex,
 	}

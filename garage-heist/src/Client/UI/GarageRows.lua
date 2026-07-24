@@ -86,11 +86,19 @@ function GarageRows.Slot(parent, order, car, part, cash)
 	else
 		info = "leer - bringt nichts ein"
 	end
-	if part.stolen then
+	if part.inTransit then
+		info = "wird gerade weggetragen"
+	elseif part.stolen then
 		info ..= "  (geklaut)"
 	end
 
-	local subLabel = twoLines(frame, ("%s - %s"):format(part.slotName, part.tierName), info)
+	-- Feinabstimmung als Punkte hinter dem Namen: Motor - Big Block V8 ..
+	local title = ("%s - %s"):format(part.slotName, part.tierName)
+	if (part.subTier or 0) > 0 then
+		title ..= " " .. string.rep("+", part.subTier)
+	end
+
+	local subLabel = twoLines(frame, title, info)
 
 	if part.repair then
 		table.insert(GarageRows.repairLabels, { label = subLabel, endsAt = part.repair.endsAt })
@@ -99,15 +107,19 @@ function GarageRows.Slot(parent, order, car, part, cash)
 		end)
 	elseif part.nextCost then
 		local affordable = cash >= part.nextCost
+		local prefix = part.nextKind == "sub" and "Fein " or ""
 		GarageRows.Action(
 			frame,
-			("%s  %ds"):format(Util.FormatCash(part.nextCost), part.nextTime),
+			("%s%s  %ds"):format(prefix, Util.FormatCash(part.nextCost), part.nextTime),
 			affordable and Theme.Colors.good or Theme.Colors.panelAlt,
 			affordable,
 			function()
 				Remotes.Get("RequestBuyPart"):FireServer(car.carIndex, part.slotId)
 			end
 		)
+		if part.nextName then
+			subLabel.Text ..= ("   ->  %s"):format(part.nextName)
+		end
 	else
 		GarageRows.Action(frame, "Maximum", Theme.Colors.panelAlt, false)
 	end
@@ -145,6 +157,25 @@ function GarageRows.ShopCar(parent, order, car, snapshot, carSlots)
 		function()
 			Remotes.Get("RequestBuyCar"):FireServer(car.carId)
 		end
+	)
+	return frame
+end
+
+-- Rebirth-Zeile. Nur sichtbar, wenn die Bedingung erfuellt ist - sonst steht
+-- hier, was noch fehlt.
+function GarageRows.Rebirth(parent, order, rebirth, onConfirm)
+	local frame = GarageRows.Row(parent, order, 62)
+	twoLines(
+		frame,
+		("Rebirth %d  (dauerhaft +%d%% Rate)"):format(rebirth.count, math.floor(rebirth.bonus * 100)),
+		rebirth.can and "Alles zurueck auf Anfang - der Bonus bleibt." or rebirth.reason
+	)
+	GarageRows.Action(
+		frame,
+		rebirth.can and "Rebirth" or "gesperrt",
+		Theme.Colors.heist,
+		rebirth.can,
+		onConfirm
 	)
 	return frame
 end

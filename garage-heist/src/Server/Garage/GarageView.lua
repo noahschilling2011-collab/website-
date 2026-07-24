@@ -33,12 +33,21 @@ function GarageView.RenderCars(view, player: Player, data, onStealPrompt)
 	for carIndex, carState in data.cars do
 		local pad = view.plot.carPads[carIndex]
 		if pad then
-			local refs = CarBuilder.Build(carState, carIndex, player.UserId, pad, view.plot.model)
+			-- Teile, die gerade weggetragen werden, sind am Auto nicht mehr dran.
+			local visible = { carId = carState.carId, parts = {} }
+			for slotId, part in carState.parts do
+				if not part.inTransit then
+					visible.parts[slotId] = part
+				end
+			end
+			local refs = CarBuilder.Build(visible, carIndex, player.UserId, pad, view.plot.model, {
+				rebirths = data.rebirths or 0,
+			})
 			view.cars[carIndex] = refs
 			for slotId, prompt in refs.prompts do
 				prompt.Enabled = view.stealEnabled == true
 				prompt.Triggered:Connect(function(thief)
-					onStealPrompt(thief, player, carIndex, slotId, prompt)
+					onStealPrompt(thief, carIndex, slotId, prompt)
 				end)
 			end
 		end
@@ -52,8 +61,8 @@ function GarageView.UpdateBillboards(view, data)
 		if carState then
 			local carDef = CarCatalog.Get(carState.carId)
 			local sum = 0
-			for slotId, part in carState.parts do
-				sum += PartCatalog.GetRate(slotId, part.tier)
+			for _, part in carState.parts do
+				sum += ProfileOps.PartRate(part) -- unterwegs = 0
 			end
 			sum *= carDef and carDef.rateMult or 1
 			local missing = 0

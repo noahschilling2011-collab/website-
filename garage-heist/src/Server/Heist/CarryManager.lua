@@ -17,6 +17,7 @@ local PartCatalog = require(Shared.PartCatalog)
 local Remotes = require(Shared.Remotes)
 
 local PartVisual = require(script.Parent.PartVisual)
+local StealTarget = require(script.Parent.StealTarget)
 
 local CarryManager = {}
 CarryManager.__index = CarryManager
@@ -24,8 +25,8 @@ CarryManager.__index = CarryManager
 function CarryManager.new(services)
 	local self = setmetatable({}, CarryManager)
 	self.Services = services
-	self.carrying = {} -- [userId] = { part, model, weld, victimUserId }
-	self.dropped = {} -- [model] = { part, prompt }
+	self.carrying = {} -- [userId] = { part, model, weld, target }
+	self.dropped = {} -- [model] = { part, prompt, target }
 	self.tackleCooldown = {}
 	return self
 end
@@ -50,7 +51,7 @@ function CarryManager:_pushState(player: Player)
 	Remotes.Get("CarryState"):FireClient(player, { part = payload })
 end
 
-function CarryManager:StartCarry(player: Player, part, victimUserId: number?)
+function CarryManager:StartCarry(player: Player, part, target)
 	if self.carrying[player.UserId] then
 		return false
 	end
@@ -64,6 +65,8 @@ function CarryManager:StartCarry(player: Player, part, victimUserId: number?)
 	model.CFrame = root.CFrame * CFrame.new(0, 0.6, -2.4)
 	model.Parent = workspace
 
+	self.Services.EffectService:AttachTrail(model)
+
 	local weld = Instance.new("Weld")
 	weld.Part0 = root
 	weld.Part1 = model
@@ -74,7 +77,7 @@ function CarryManager:StartCarry(player: Player, part, victimUserId: number?)
 		part = part,
 		model = model,
 		weld = weld,
-		victimUserId = victimUserId,
+		target = target,
 	}
 
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -113,14 +116,14 @@ function CarryManager:Drop(player: Player, reason: string?)
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	local position = root and (root.Position + Vector3.new(0, -1.5, 0)) or Vector3.new(0, 5, 0)
 	self:_clearCarry(player)
-	self:SpawnDropped(entry.part, position)
+	self:SpawnDropped(entry.part, position, entry.target)
 	if reason then
 		self.Services.EconomyService:Notify(player, reason, "bad")
 	end
 	return true
 end
 
-function CarryManager:SpawnDropped(part, position: Vector3)
+function CarryManager:SpawnDropped(part, position: Vector3, target)
 	local model = PartVisual.Build(part)
 	model.Anchored = true
 	model.CFrame = CFrame.new(position)
@@ -134,7 +137,7 @@ function CarryManager:SpawnDropped(part, position: Vector3)
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = model
 
-	self.dropped[model] = { part = part, prompt = prompt }
+	self.dropped[model] = { part = part, prompt = prompt, target = target }
 
 	prompt.Triggered:Connect(function(player)
 		local entry = self.dropped[model]
@@ -147,7 +150,7 @@ function CarryManager:SpawnDropped(part, position: Vector3)
 		end
 		self.dropped[model] = nil
 		model:Destroy()
-		self:StartCarry(player, entry.part, nil)
+		self:StartCarry(player, entry.part, entry.target)
 	end)
 	return model
 end
@@ -162,17 +165,15 @@ function CarryManager:TryDeposit(player: Player, plotIndex: number)
 		return false
 	end
 	self:_clearCarry(player)
-	local _, message = self.Services.GarageService:GiveStolenPart(player, entry.part)
+	local plot = self.Services.GarageService.plots[plotIndex]
+	self.Services.EffectService:Deposit(plot and plot.lootBay)
+	local _, message = self.Services.GarageService:GiveStolenPart(player, entry.part, entry.target)
 	self.Services.EconomyService:Notify(player, message or "Teil abgeliefert.", "good")
-
-	local victim = entry.victimUserId and Players:GetPlayerByUserId(entry.victimUserId)
-	if victim then
-		self.Services.EconomyService:Notify(
-			victim,
-			("%s hat dein Teil in die eigene Garage geschleppt."):format(player.DisplayName),
-			"bad"
-		)
-	end
+	StealTarget.NotifyVictim(
+		self.Services,
+		entry.target,
+		("%s hat dein Teil in die eigene Garage geschleppt."):format(player.DisplayName)
+	)
 	return true
 end
 
@@ -212,6 +213,9 @@ function CarryManager:Tackle(player: Player)
 	end
 	self:Drop(bestPlayer, ("%s hat dir das Teil aus der Hand geschlagen."):format(player.DisplayName))
 	self.Services.EconomyService:Notify(player, ("Treffer! %s liegt das Teil vor den Fuessen."):format(bestPlayer.DisplayName), "good")
+	self.Services.EffectService:Sound("tackle", root.Position)
+	self.Services.EffectService:Shake(bestPlayer, Config.TACKLE_SHAKE)
+	self.Services.EffectService:Shake(player, Config.TACKLE_SHAKE * 0.5)
 end
 
 -- Alles einsammeln, was noch herumliegt oder getragen wird: zurueck zum
@@ -232,11 +236,8 @@ function CarryManager:ReturnEverything()
 		if player then
 			local entry = self:_clearCarry(player)
 			if entry then
-				if not self.Services.GarageService:ReturnPart(entry.part) then
-					self.Services.EconomyService:Notify(player, "Das Fenster ist zu - das Teil ist weg.", "bad")
-				else
-					self.Services.EconomyService:Notify(player, "Zu spaet abgeliefert. Das Teil ist zurueck beim Besitzer.", "bad")
-				end
+				self:_returnOrDiscard(entry.part, entry.target)
+				self.Services.EconomyService:Notify(player, "Zu spaet abgeliefert - das Teil ist weg.", "bad")
 			end
 		else
 			self.carrying[userId] = nil
@@ -245,10 +246,18 @@ function CarryManager:ReturnEverything()
 	for _, model in droppedModels do
 		local entry = self.dropped[model]
 		if entry then
-			self.Services.GarageService:ReturnPart(entry.part)
+			self:_returnOrDiscard(entry.part, entry.target)
 		end
 		self.dropped[model] = nil
 		model:Destroy()
+	end
+end
+
+-- Spielerteile gehen an den Besitzer zurueck. Leerstand-Gut hat keinen
+-- Besitzer und verschwindet ersatzlos.
+function CarryManager:_returnOrDiscard(part, target)
+	if StealTarget.IsPlayer(target) then
+		self.Services.GarageService:ClearInTransit(target.player, part.uid)
 	end
 end
 
@@ -256,7 +265,7 @@ function CarryManager:HandleLeave(player: Player)
 	local entry = self:_clearCarry(player)
 	self.tackleCooldown[player.UserId] = nil
 	if entry then
-		self.Services.GarageService:ReturnPart(entry.part)
+		self:_returnOrDiscard(entry.part, entry.target)
 	end
 end
 

@@ -28,12 +28,14 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
 local Remotes = require(Shared.Remotes)
 
 local Server = script.Parent.Parent
 local ProfileOps = require(Server.Data.ProfileOps)
 local ProfileTemplate = require(Server.Data.ProfileTemplate)
 local PurchaseEffects = require(Server.Monetization.PurchaseEffects)
+local Throttle = require(Server.Garage.Throttle)
 
 local MonetizationService = {}
 MonetizationService.Name = "MonetizationService"
@@ -86,10 +88,12 @@ function MonetizationService:Start()
 		end
 	end)
 
-	Remotes.Get("RequestPromptPurchase").OnServerEvent:Connect(function(player, kind, key)
+	-- Kaufdialoge duerfen nicht spammbar sein: sonst kann ein Client den
+	-- Spieler mit Roblox-Popups zuschuetten.
+	Throttle.Connect("RequestPromptPurchase", Config.PROMPT_COOLDOWN, function(player, kind, key)
 		self:_prompt(player, kind, key)
 	end)
-	Remotes.Get("RequestInstantRepair").OnServerEvent:Connect(function(player, carIndex, slotId)
+	Throttle.Connect("RequestInstantRepair", Config.PROMPT_COOLDOWN, function(player, carIndex, slotId)
 		self:_requestInstantRepair(player, carIndex, slotId)
 	end)
 
@@ -252,10 +256,6 @@ function MonetizationService:_processReceipt(receiptInfo)
 
 	self.Services.GarageService:Sync(player, data)
 	return Enum.ProductPurchaseDecision.PurchaseGranted
-end
-
-function MonetizationService:GetCatalog()
-	return CATALOG
 end
 
 return MonetizationService

@@ -38,17 +38,18 @@ function GarageRequests.BuyPart(services, player: Player, data, carIndex, slotId
 		return false, "Da wird gerade schon geschraubt."
 	end
 
-	local nextTier = ProfileOps.CurrentTier(data, carIndex, slotId) + 1
-	local tierDef = PartCatalog.GetTier(slotId, nextTier)
-	if not tierDef then
+	local purchase = ProfileOps.NextPurchase(data, carIndex, slotId)
+	if not purchase then
 		return false, "Hoechste Stufe ist schon verbaut."
 	end
-	if not services.EconomyService:TrySpend(player, tierDef.cost) then
-		return false, ("Zu wenig Cash: %s noetig."):format(Util.FormatCash(tierDef.cost))
+	if not services.EconomyService:TrySpend(player, purchase.cost, "Part") then
+		return false, ("Zu wenig Cash: %s noetig."):format(Util.FormatCash(purchase.cost))
 	end
 
-	ProfileOps.StartRepair(data, carIndex, slotId, nextTier, os.time() + tierDef.time)
-	return true, ("%s wird eingebaut (%ds)."):format(tierDef.name, tierDef.time)
+	ProfileOps.StartRepair(data, carIndex, slotId, purchase, os.time() + purchase.time)
+	services.EffectService:LocalSound(player, "purchase")
+	services.TelemetryService:Funnel(player, "firstPart")
+	return true, ("%s wird eingebaut (%ds)."):format(purchase.name, purchase.time)
 end
 
 -- Wird nur nach einem bestaetigten Robux-Kauf aufgerufen.
@@ -73,7 +74,7 @@ function GarageRequests.BuyCar(services, player: Player, data, carId)
 	if #data.cars >= slots then
 		return false, ("Kein Stellplatz frei (%d/%d). Erst die Garage ausbauen."):format(#data.cars, slots)
 	end
-	if carDef.cost > 0 and not services.EconomyService:TrySpend(player, carDef.cost) then
+	if carDef.cost > 0 and not services.EconomyService:TrySpend(player, carDef.cost, "Car") then
 		return false, ("Zu wenig Cash: %s noetig."):format(Util.FormatCash(carDef.cost))
 	end
 	table.insert(data.cars, { carId = carId, parts = {} })
@@ -86,11 +87,22 @@ function GarageRequests.UpgradeGarage(services, player: Player, data)
 	if not nextDef then
 		return false, "Die Garage ist voll ausgebaut."
 	end
-	if not services.EconomyService:TrySpend(player, nextDef.cost) then
+	if not services.EconomyService:TrySpend(player, nextDef.cost, "Garage") then
 		return false, ("Zu wenig Cash: %s noetig."):format(Util.FormatCash(nextDef.cost))
 	end
 	data.garageLevel = level + 1
 	return true, ("Garage ausgebaut: %s (x%.2f Rate)."):format(nextDef.label, nextDef.rateMult)
+end
+
+-- Rebirth: alles auf Anfang, dafuer dauerhaft mehr Rate.
+function GarageRequests.Rebirth(services, player: Player, data)
+	local ok, reason = ProfileOps.CanRebirth(data)
+	if not ok then
+		return false, reason
+	end
+	local count = ProfileOps.Rebirth(data)
+	services.TelemetryService:Award(player, "FirstRebirth")
+	return true, ("Rebirth %d. Dauerhaft +%d%% Rate."):format(count, math.floor(Config.REBIRTH_MULT * count * 100))
 end
 
 function GarageRequests.SellLoosePart(services, player: Player, data, uid)
@@ -101,9 +113,9 @@ function GarageRequests.SellLoosePart(services, player: Player, data, uid)
 	if not part then
 		return false, "Das Teil liegt nicht in deiner Garage."
 	end
-	local value = math.floor(PartCatalog.GetValue(part.slotId, part.tier) * Config.SELL_REFUND)
+	local value = math.floor(ProfileOps.PartValue(part) * Config.SELL_REFUND)
 	ProfileOps.TakeLoosePart(data, uid)
-	services.EconomyService:AddCash(player, value)
+	services.EconomyService:AddCash(player, value, "Heist")
 	return true, ("Verkauft fuer %s."):format(Util.FormatCash(value))
 end
 
@@ -129,12 +141,7 @@ function GarageRequests.InstallLoosePart(services, player: Player, data, uid, ca
 	end
 
 	ProfileOps.TakeLoosePart(data, uid)
-	ProfileOps.SetPart(data, carIndex, part.slotId, {
-		uid = part.uid,
-		slotId = part.slotId,
-		tier = part.tier,
-		originalOwner = part.originalOwner,
-	})
+	ProfileOps.SetPart(data, carIndex, part.slotId, ProfileOps.ClonePart(part))
 	local tierDef = PartCatalog.GetTier(part.slotId, part.tier)
 	return true, ("%s eingebaut."):format(tierDef and tierDef.name or part.slotId)
 end

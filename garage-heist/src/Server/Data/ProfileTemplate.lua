@@ -15,7 +15,10 @@ local CarCatalog = require(Shared.CarCatalog)
 
 local ProfileTemplate = {}
 
-ProfileTemplate.SCHEMA_VERSION = 1
+-- 2 = Teile haben eine Feinabstimmung (part.subTier) und es gibt Rebirths.
+-- Alte Profile brauchen keine Migration: subTier wird ueberall als
+-- `part.subTier or 0` gelesen, rebirths fuellt Util.Reconcile nach.
+ProfileTemplate.SCHEMA_VERSION = 2
 ProfileTemplate.MAX_RECEIPTS = 60
 
 function ProfileTemplate.New()
@@ -28,9 +31,11 @@ function ProfileTemplate.New()
 		firstJoin = 0,
 
 		garageLevel = 1,
+		rebirths = 0,
+		preferredPlot = 0, -- zuletzt belegte Box, wird bevorzugt wieder vergeben
 
 		-- cars ist ein dichtes Array. cars[i].parts[slotId] = Teil oder nil.
-		-- Teil = { uid, tier, originalOwner }
+		-- Teil = { uid, slotId, tier, subTier, originalOwner, mult? }
 		cars = {
 			{ carId = CarCatalog.STARTER, parts = {} },
 		},

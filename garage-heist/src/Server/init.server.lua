@@ -7,6 +7,7 @@
 	- GarageService vor HeistService, weil der Heist die Plots braucht.
 ]]
 
+local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
@@ -15,10 +16,47 @@ local Remotes = require(Shared.Remotes)
 
 Remotes.Init()
 
+-- Abenddaemmerung: passt zum Thema und kaschiert die einfache Geometrie.
+local function setupLighting()
+	Lighting.Technology = Enum.Technology.Future
+	Lighting.ClockTime = 18.5
+	Lighting.Brightness = 2
+	Lighting.ExposureCompensation = 0.15
+	Lighting.OutdoorAmbient = Color3.fromRGB(70, 70, 90)
+	Lighting.Ambient = Color3.fromRGB(45, 45, 60)
+	Lighting.GlobalShadows = true
+	Lighting.FogEnd = 900
+
+	local atmosphere = Instance.new("Atmosphere")
+	atmosphere.Density = 0.35
+	atmosphere.Offset = 0.2
+	atmosphere.Haze = 1.4
+	atmosphere.Color = Color3.fromRGB(190, 180, 175)
+	atmosphere.Decay = Color3.fromRGB(105, 95, 110)
+	atmosphere.Parent = Lighting
+
+	local bloom = Instance.new("BloomEffect")
+	bloom.Intensity = 0.5
+	bloom.Size = 20
+	bloom.Threshold = 1.1
+	bloom.Parent = Lighting
+
+	local correction = Instance.new("ColorCorrectionEffect")
+	correction.Contrast = 0.1
+	correction.Saturation = -0.05
+	correction.TintColor = Color3.fromRGB(255, 246, 240)
+	correction.Parent = Lighting
+end
+
+setupLighting()
+
 local START_ORDER = {
+	"TelemetryService",
+	"EffectService",
 	"MonetizationService",
 	"EconomyService",
 	"GarageService",
+	"DerelictService",
 	"HeistService",
 	"DailyRewardService",
 	"LeaderboardService",

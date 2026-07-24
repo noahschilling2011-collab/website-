@@ -12,30 +12,14 @@ local Remotes = require(Shared.Remotes)
 
 local GarageRequests = require(script.Parent.GarageRequests)
 local Snapshot = require(script.Parent.Snapshot)
+local Throttle = require(script.Parent.Throttle)
 
 local RequestRouter = {}
 
 local REQUEST_COOLDOWN = 0.15
 
-local function throttled(garage, player: Player, key: string): boolean
-	local now = os.clock()
-	local perPlayer = garage._cooldowns[player.UserId]
-	if not perPlayer then
-		perPlayer = {}
-		garage._cooldowns[player.UserId] = perPlayer
-	end
-	if now - (perPlayer[key] or 0) < REQUEST_COOLDOWN then
-		return true
-	end
-	perPlayer[key] = now
-	return false
-end
-
 local function bind(garage, name: string, handler)
-	Remotes.Get(name).OnServerEvent:Connect(function(player, ...)
-		if throttled(garage, player, name) then
-			return
-		end
+	Throttle.Connect(name, REQUEST_COOLDOWN, function(player, ...)
 		local data = garage.Services.DataService:Get(player)
 		if not data then
 			return
@@ -61,6 +45,9 @@ function RequestRouter.Bind(garage)
 	end)
 	bind(garage, "RequestUpgradeGarage", function(player, data)
 		return GarageRequests.UpgradeGarage(services, player, data)
+	end)
+	bind(garage, "RequestRebirth", function(player, data)
+		return GarageRequests.Rebirth(services, player, data)
 	end)
 	bind(garage, "RequestSellLoosePart", function(player, data, uid)
 		return GarageRequests.SellLoosePart(services, player, data, uid)

@@ -40,8 +40,4 @@ function Signal:Fire(...)
 	end
 end
 
-function Signal:DisconnectAll()
-	table.clear(self._handlers)
-end
-
 return Signal

@@ -1,9 +1,10 @@
 # Garage Heist
 
 Tycoon-Werkstatt mit Klau-Fenster. Du reparierst Schrottautos Teil fuer Teil,
-verbaute Teile werfen Cash pro Sekunde ab - auch offline. Alle 8 Minuten gehen
-fuer 60 Sekunden alle Garagentore auf und jeder kann jedem Teile abmontieren und
-wegschleppen.
+verbaute Teile werfen Cash pro Sekunde ab - auch offline. Alle 3,5 Minuten gehen
+fuer 75 Sekunden alle Garagentore auf und jeder kann jedem Teile abmontieren und
+wegschleppen. Freie Boxen werden dabei zu Leerstand-Garagen, damit der Heist auch
+bei einem einzigen Spieler im Server stattfindet.
 
 Kein Fahrverhalten, keine Quests, keine NPCs, keine Map ausserhalb des
 Garagenhofs. Autos sind Deko-Objekte mit Werten.
@@ -20,8 +21,8 @@ Die Datei wird aus `src/` erzeugt. Nach Aenderungen am Code neu bauen:
 python3 tools/build_rbxlx.py
 ```
 
-Das Skript prueft dabei, dass jede der 40 Quelldateien unveraendert in der
-Place-Datei steckt, und bricht ab, wenn etwas nicht passt.
+Das Skript prueft dabei, dass jede Quelldatei unveraendert in der Place-Datei
+steckt, und bricht ab, wenn etwas nicht passt.
 
 **Mit Rojo (besser, wenn du weiterentwickelst):**
 
@@ -40,27 +41,16 @@ ReplicatedStorage / ServerScriptService / StarterPlayerScripts.
 aussehen, weil die Module sich ueber `script.Parent` finden:
 
 ```
-ReplicatedStorage/
-  Shared/                      (Folder)
-    Config, CarCatalog, PartCatalog, Remotes, Signal, Util   (ModuleScripts)
-
-ServerScriptService/
-  Server                       (Script,  Inhalt: src/Server/init.server.lua)
-    Data/     ProfileTemplate, ProfileOps, SessionStore
-    Garage/   GarageRequests, GarageView, RequestRouter, Snapshot
-    Heist/    CarryManager, DismountManager
-    Monetization/ PurchaseEffects
-    Services/ DataService, EconomyService, GarageService, HeistService,
-              MonetizationService, DailyRewardService, LeaderboardService
-    World/    CarBuilder, DoorController, PlotBuilder
-
-StarterPlayer/StarterPlayerScripts/
-  Client                       (LocalScript, Inhalt: src/Client/init.client.lua)
-    Store                      (ModuleScript)
-    Controllers/ InputController
-    UI/       Theme, Toast, HUD, GarageMenu, ShopMenu, DailyPanel,
-              DismountBar, InfoPanel
+ReplicatedStorage/Shared/                (Folder, alle Dateien aus src/Shared)
+ServerScriptService/Server               (Script, Inhalt src/Server/init.server.lua)
+  Data/ Garage/ Heist/ Monetization/ Services/ World/   (Folder je Unterordner)
+StarterPlayer/StarterPlayerScripts/Client (LocalScript, src/Client/init.client.lua)
+  Store (ModuleScript), Controllers/, UI/
 ```
+
+Jede `.lua`-Datei wird zum ModuleScript gleichen Namens, jeder Ordner zum Folder.
+Die Module finden sich ueber `script.Parent`, deshalb muss die Schachtelung
+stimmen. Der Generator oben macht genau das - von Hand ist es reine Fleissarbeit.
 
 **Vor dem ersten Test:**
 
@@ -74,11 +64,19 @@ StarterPlayer/StarterPlayerScripts/
 
 1. Schrottauto steht in der eigenen Box. Vier leere Slots: Motor, Reifen, Lack, Turbo.
 2. An der Werkbank (oder Taste `G`) Teile kaufen. Jedes kostet Cash und braucht Zeit.
+   Zwischen zwei Stufen liegen je zwei kleine Feinabstimmungen, damit der Kauftakt
+   dicht bleibt - sie sind Ratenzahlung, kein Aufpreis: der Stufensprung wird
+   entsprechend guenstiger.
 3. Verbaute Teile bringen Cash/Sekunde in die Garagenkasse. Kasse leeren am gruenen Pult.
-4. Alle 8 Minuten: 60 Sekunden Klau-Fenster. Fremdes Teil 4 Sekunden abmontieren,
-   tragen, auf das blaue Pad in der eigenen Box stellen. Wer getroffen wird (`F`),
-   verliert es an den Boden.
+4. Alle 3,5 Minuten: 75 Sekunden Klau-Fenster, das erste 45 Sekunden nach Serverstart.
+   Fremdes Teil 4 Sekunden abmontieren, tragen, auf das blaue Pad in der eigenen
+   Box stellen. Wer getroffen wird (`F`), verliert es an den Boden.
+   **Freie Boxen sind waehrend des Fensters Leerstand-Garagen** mit bestuecktem
+   Auto - deshalb funktioniert der Heist auch, wenn du allein im Server bist.
+   Leerstand-Teile bringen nur 60 % ihres Werts, echte Spieler bleiben lohnender.
 5. Cash geht in bessere Teile, mehr Autos, groessere Garage. Zurueck zu 2.
+6. Garage voll ausgebaut und alle Teile auf Stufe 4? Dann **Rebirth**: alles zurueck
+   auf Anfang, dauerhaft +25 % Rate pro Durchgang, ab dem ersten ein Stellplatz mehr.
 
 **Steuerung:** `E` Prompts, `G` Werkstatt, `F` Rempeln, `Q` Teil ablegen.
 
@@ -104,16 +102,33 @@ StarterPlayer/StarterPlayerScripts/
 
 | Was | Wo |
 |---|---|
-| Alle Zahlen (Preise, Zeiten, Fenster, Deckel) | `src/Shared/Config.lua` |
+| Alle Zahlen (Preise, Zeiten, Fenster, Deckel, Rebirth, Badges) | `src/Shared/Config.lua` |
 | Teile-Stufen, Kosten, Raten, Aussehen | `src/Shared/PartCatalog.lua` |
 | Autos | `src/Shared/CarCatalog.lua` |
 | Produkt-IDs | oben in `src/Server/Services/MonetizationService.lua` |
-| Was im Dashboard anzulegen ist | `docs/MONETIZATION.md` |
-| Abnahme-Tests pro Phase | `docs/TESTPLAN.md` |
+| Klang-IDs (alle leer) | `src/Shared/SoundCatalog.lua` |
+| **Jede ID, die du selbst anlegen musst** | `docs/SETUP.md` |
+| Warum die Preise so stehen | `docs/MONETIZATION.md` |
+| Abnahme-Tests | `docs/TESTPLAN.md` |
+
+## Wie ein Teil den Besitzer wechselt
+
+Der heikelste Pfad des Spiels, deshalb an einer Stelle (`Garage/TheftOps.lua`):
+
+1. **Abmontiert** - das Teil bleibt im Profil des Opfers stehen und wird nur als
+   `inTransit` markiert. Es zaehlt nicht mehr zur Rate, ist aber nicht weg.
+2. **Abgeliefert** - jetzt wird es beim Opfer entfernt, und das Opfer bekommt
+   25 % des Werts als Versicherung sofort gutgeschrieben.
+3. **Nicht abgeliefert** (Fenster vorbei, gerempelt, jemand fliegt raus) - die
+   Markierung faellt, das Teil laeuft wieder normal.
+
+Dadurch kann ein Teil weder verschwinden noch doppelt existieren. Ist das Opfer
+beim Abliefern nicht mehr im Server, geht der Dieb leer aus - das ist der Preis
+dafuer, dass es beim Opfer garantiert erhalten bleibt.
 
 ## Bewusst weggelassen
 
 - Cross-Server-Rangliste (OrderedDataStore): die Rangliste ist serverlokal.
-- Klauen bei Offline-Spielern: nur wer im Server ist, hat eine Garage im Server.
+- Klauen bei Offline-Spielern: dafuer gibt es die Leerstand-Garagen.
 - Fahrbare Autos, Charakter-Customizing, Quests, Story, NPCs, Map.
 - Teams, Chat-Filter-Umgehungen, eigene Kamera - nichts davon dient dem Loop.

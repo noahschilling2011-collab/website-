@@ -11,15 +11,16 @@ local Theme = require(script.Parent.Theme)
 
 local DismountBar = {}
 
-function DismountBar.Init(root: ScreenGui)
+function DismountBar.Init(root: Frame)
 	local frame = Theme.panel({
 		Name = "DismountBar",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.72),
-		Size = UDim2.new(0, 340, 0, 64),
+		Size = UDim2.new(0.7, 0, 0, 64),
 		Visible = false,
 		Parent = root,
 	})
+	Theme.constrain(frame, Vector2.new(240, 64), Vector2.new(340, 64))
 	Theme.padding(10).Parent = frame
 
 	local label = Theme.label({

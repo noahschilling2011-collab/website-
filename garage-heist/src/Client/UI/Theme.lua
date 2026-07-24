@@ -4,7 +4,17 @@
 	UI-Dateien kurz genug, um sie noch lesen zu koennen.
 ]]
 
+local Workspace = game:GetService("Workspace")
+
 local Theme = {}
+
+-- Zwei Schwellen: schmal (Handy hochkant) und flach (Handy quer). Beides
+-- verkleinert die Oberflaeche, damit die Leiste oben und die Knoepfe unten
+-- gleichzeitig Platz haben.
+local NARROW_WIDTH = 600
+local NARROW_SCALE = 0.75
+local SHORT_HEIGHT = 500
+local SHORT_SCALE = 0.6
 
 Theme.Colors = {
 	bg = Color3.fromRGB(18, 18, 22),
@@ -95,20 +105,81 @@ function Theme.panel(props): Frame
 	return frame
 end
 
-local root: ScreenGui? = nil
+-- Begrenzt eine in Skalen definierte Flaeche, damit sie auf grossen Schirmen
+-- nicht aufgeblasen und auf kleinen nicht unlesbar wird.
+function Theme.constrain(instance: GuiObject, minSize: Vector2?, maxSize: Vector2?)
+	local constraint = Instance.new("UISizeConstraint")
+	if minSize then
+		constraint.MinSize = minSize
+	end
+	if maxSize then
+		constraint.MaxSize = maxSize
+	end
+	constraint.Parent = instance
+	return instance
+end
 
-function Theme.Root(playerGui: Instance): ScreenGui
+local root: Frame? = nil
+
+-- Liefert die Flaeche, in die alle UI-Module zeichnen.
+--
+-- Wichtig: UIScale wirkt nur auf GuiObjects, nicht auf eine ScreenGui. Deshalb
+-- liegt zwischen ScreenGui und UI eine Container-Flaeche. Sie wird um 1/scale
+-- groesser gemacht und danach um `scale` verkleinert - unterm Strich deckt sie
+-- exakt den Bildschirm ab, nur ist alles darin kleiner. So bleiben rechts und
+-- unten verankerte Elemente da, wo sie hingehoeren.
+function Theme.Root(playerGui: Instance): Frame
 	if root and root.Parent then
 		return root
 	end
-	root = Theme.create("ScreenGui", {
+
+	local screen = Theme.create("ScreenGui", {
 		Name = "GarageHeistUI",
 		ResetOnSpawn = false,
-		IgnoreGuiInset = false,
+		-- Auf Touch liegt oben die Roblox-Leiste; wir zeichnen selbst darunter
+		-- und brauchen die volle Flaeche.
+		IgnoreGuiInset = true,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		Parent = playerGui,
-	}) :: ScreenGui
-	return root :: ScreenGui
+	})
+
+	local container = Theme.create("Frame", {
+		Name = "Layer",
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		Parent = screen,
+	}) :: Frame
+
+	local scale = Instance.new("UIScale")
+	scale.Parent = container
+
+	local camera = Workspace.CurrentCamera
+	local function fit()
+		local viewport = camera and camera.ViewportSize or Vector2.new(1280, 720)
+		local factor = 1
+		if viewport.X < NARROW_WIDTH then
+			factor = NARROW_SCALE
+		end
+		if viewport.Y < SHORT_HEIGHT then
+			factor = math.min(factor, SHORT_SCALE)
+		end
+		scale.Scale = factor
+		container.Size = UDim2.fromScale(1 / factor, 1 / factor)
+	end
+
+	local function watch()
+		camera = Workspace.CurrentCamera
+		fit()
+		if camera then
+			camera:GetPropertyChangedSignal("ViewportSize"):Connect(fit)
+		end
+	end
+
+	watch()
+	Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(watch)
+
+	root = container
+	return container
 end
 
 return Theme

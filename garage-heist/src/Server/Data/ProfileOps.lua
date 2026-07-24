@@ -13,6 +13,8 @@ local Config = require(Shared.Config)
 local PartCatalog = require(Shared.PartCatalog)
 local Util = require(Shared.Util)
 
+local PartOps = require(script.Parent.PartOps)
+
 local ProfileOps = {}
 
 function ProfileOps.RepairKey(carIndex: number, slotId: string): string
@@ -24,6 +26,14 @@ function ProfileOps.GarageLevelDef(data)
 	return Config.GARAGE_LEVELS[level], level
 end
 
+-- Teil-Ebene liegt in PartOps. Die alten Namen bleiben, damit die Aufrufer
+-- unveraendert bleiben.
+ProfileOps.PartRate = PartOps.Rate
+ProfileOps.PartValue = PartOps.Value
+ProfileOps.ClonePart = PartOps.Clone
+ProfileOps.FindPartByUid = PartOps.FindByUid
+ProfileOps.ClearAllInTransit = PartOps.ClearAllInTransit
+
 -- Cash pro Sekunde ohne Gamepass-Multiplikator.
 function ProfileOps.ComputeBaseRate(data): number
 	local levelDef = ProfileOps.GarageLevelDef(data)
@@ -32,13 +42,14 @@ function ProfileOps.ComputeBaseRate(data): number
 		local carDef = CarCatalog.Get(car.carId)
 		if carDef then
 			local carSum = 0
-			for slotId, part in car.parts do
-				carSum += PartCatalog.GetRate(slotId, part.tier)
+			for _, part in car.parts do
+				carSum += ProfileOps.PartRate(part)
 			end
 			total += carSum * carDef.rateMult
 		end
 	end
-	return total * levelDef.rateMult
+	-- Rebirth wirkt dauerhaft und multiplikativ auf alles.
+	return total * levelDef.rateMult * (1 + Config.REBIRTH_MULT * (data.rebirths or 0))
 end
 
 -- Summe aller Teile- und Autokosten. Basis fuer "teuerste Garage".
@@ -49,12 +60,12 @@ function ProfileOps.GarageValue(data): number
 		if carDef then
 			total += carDef.cost
 		end
-		for slotId, part in car.parts do
-			total += PartCatalog.GetValue(slotId, part.tier)
+		for _, part in car.parts do
+			total += ProfileOps.PartValue(part)
 		end
 	end
 	for _, part in data.looseParts do
-		total += PartCatalog.GetValue(part.slotId, part.tier)
+		total += ProfileOps.PartValue(part)
 	end
 	local _, level = ProfileOps.GarageLevelDef(data)
 	for i = 1, level do
@@ -66,11 +77,6 @@ end
 function ProfileOps.GetPart(data, carIndex: number, slotId: string)
 	local car = data.cars[carIndex]
 	return car and car.parts[slotId] or nil
-end
-
-function ProfileOps.CurrentTier(data, carIndex: number, slotId: string): number
-	local part = ProfileOps.GetPart(data, carIndex, slotId)
-	return part and part.tier or 0
 end
 
 function ProfileOps.SetPart(data, carIndex: number, slotId: string, part)
@@ -92,22 +98,57 @@ function ProfileOps.RemovePart(data, carIndex: number, slotId: string)
 	return part
 end
 
-function ProfileOps.NewPart(slotId: string, tier: number, originalOwner: number)
+-- Der naechste Kauf fuer diesen Slot. Die Leiter ist streng:
+-- leer -> T1 -> T1 fein 1 -> T1 fein 2 -> T2 -> ... -> T4 fein 2 (Ende).
+-- Gibt nil zurueck, wenn nichts mehr geht.
+function ProfileOps.NextPurchase(data, carIndex: number, slotId: string)
+	local part = ProfileOps.GetPart(data, carIndex, slotId)
+	local tier = part and part.tier or 0
+	local subTier = part and (part.subTier or 0) or 0
+
+	if tier <= 0 then
+		local def = PartCatalog.GetTier(slotId, 1)
+		if not def then
+			return nil
+		end
+		return {
+			kind = "tier",
+			tier = 1,
+			subTier = 0,
+			cost = def.cost,
+			time = def.time,
+			name = def.name,
+		}
+	end
+
+	if subTier < Config.SUBTIER_COUNT then
+		local def = PartCatalog.GetTier(slotId, tier)
+		return {
+			kind = "sub",
+			tier = tier,
+			subTier = subTier + 1,
+			cost = PartCatalog.SubStepCost(slotId, tier),
+			time = PartCatalog.SubStepTime(slotId, tier),
+			name = ("%s - Feinabstimmung %d"):format(def.name, subTier + 1),
+		}
+	end
+
+	local nextDef = PartCatalog.GetTier(slotId, tier + 1)
+	if not nextDef then
+		return nil
+	end
 	return {
-		uid = Util.NewUid(),
-		slotId = slotId,
-		tier = tier,
-		originalOwner = originalOwner,
+		kind = "tier",
+		tier = tier + 1,
+		subTier = 0,
+		cost = PartCatalog.TierUpgradeCost(slotId, tier, subTier),
+		time = nextDef.time,
+		name = nextDef.name,
 	}
 end
 
 function ProfileOps.AddLoosePart(data, part)
-	data.looseParts[part.uid] = {
-		uid = part.uid,
-		slotId = part.slotId,
-		tier = part.tier,
-		originalOwner = part.originalOwner,
-	}
+	data.looseParts[part.uid] = ProfileOps.ClonePart(part)
 end
 
 function ProfileOps.TakeLoosePart(data, uid: string)
@@ -126,10 +167,13 @@ function ProfileOps.FindEmptySlot(data, slotId: string): number?
 	return nil
 end
 
-function ProfileOps.StartRepair(data, carIndex: number, slotId: string, tier: number, endsAt: number)
+function ProfileOps.StartRepair(data, carIndex: number, slotId: string, purchase, endsAt: number)
 	data.repairs[ProfileOps.RepairKey(carIndex, slotId)] = {
-		tier = tier,
+		tier = purchase.tier,
+		subTier = purchase.subTier,
+		kind = purchase.kind,
 		endsAt = endsAt,
+		startedAt = os.time(),
 		carIndex = carIndex,
 		slotId = slotId,
 	}
@@ -143,7 +187,15 @@ function ProfileOps.FinishRepair(data, carIndex: number, slotId: string, ownerUs
 		return nil
 	end
 	data.repairs[key] = nil
-	local part = ProfileOps.NewPart(slotId, repair.tier, ownerUserId)
+
+	-- Feinabstimmung veraendert das vorhandene Teil, ein Tier-Sprung ersetzt es.
+	local existing = ProfileOps.GetPart(data, carIndex, slotId)
+	if repair.kind == "sub" and existing then
+		existing.subTier = repair.subTier or ((existing.subTier or 0) + 1)
+		return existing
+	end
+
+	local part = PartOps.New(slotId, repair.tier, ownerUserId, repair.subTier)
 	ProfileOps.SetPart(data, carIndex, slotId, part)
 	return part
 end
@@ -164,7 +216,39 @@ end
 
 function ProfileOps.CarSlots(data): number
 	local levelDef = ProfileOps.GarageLevelDef(data)
-	return levelDef.carSlots
+	local bonus = ((data.rebirths or 0) >= Config.REBIRTH_EXTRA_SLOT_AT) and 1 or 0
+	return levelDef.carSlots + bonus
+end
+
+-- Rebirth ist erst moeglich, wenn die Garage voll ausgebaut ist und jedes Auto
+-- auf jedem Slot die hoechste Stufe traegt.
+function ProfileOps.CanRebirth(data): (boolean, string)
+	local _, level = ProfileOps.GarageLevelDef(data)
+	if level < #Config.GARAGE_LEVELS then
+		return false, "Garage muss voll ausgebaut sein."
+	end
+	for carIndex in data.cars do
+		for _, slotId in PartCatalog.SlotOrder do
+			local part = ProfileOps.GetPart(data, carIndex, slotId)
+			if not part or part.tier < PartCatalog.TierCount(slotId) then
+				return false, "Alle Teile muessen auf der hoechsten Stufe sein."
+			end
+		end
+	end
+	return true, "Bereit."
+end
+
+-- Setzt den Fortschritt zurueck, behaelt Rebirth-Zaehler, Statistik und
+-- alles, was mit Robux gekauft wurde (Gamepasses liegen ohnehin bei Roblox).
+function ProfileOps.Rebirth(data)
+	data.rebirths = (data.rebirths or 0) + 1
+	data.cars = { { carId = CarCatalog.STARTER, parts = {} } }
+	data.garageLevel = 1
+	data.cash = Config.START_CASH
+	data.pile = 0
+	data.looseParts = {}
+	data.repairs = {}
+	return data.rebirths
 end
 
 -- Setzt den Tageszaehler zurueck, wenn ein neuer UTC-Tag begonnen hat.

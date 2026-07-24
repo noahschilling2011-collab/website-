@@ -18,6 +18,7 @@ local Remotes = require(Shared.Remotes)
 local Util = require(Shared.Util)
 
 local ProfileOps = require(script.Parent.Parent.Data.ProfileOps)
+local Throttle = require(script.Parent.Parent.Garage.Throttle)
 
 local EconomyService = {}
 EconomyService.Name = "EconomyService"
@@ -43,7 +44,7 @@ function EconomyService:Start()
 		self._offlineRunning[player.UserId] = nil
 	end)
 
-	Remotes.Get("RequestCollect").OnServerEvent:Connect(function(player)
+	Throttle.Connect("RequestCollect", Config.COLLECT_COOLDOWN, function(player)
 		self:Collect(player)
 	end)
 
@@ -157,6 +158,7 @@ function EconomyService:_applyOffline(player: Player, data)
 
 	data.cash += earned
 	data.stats.totalEarned += earned
+	self.Services.TelemetryService:Economy(player, "source", earned, data.cash, "Idle")
 	local away = now - last
 	local capped = away > Config.OFFLINE_CAP_SECONDS
 	self:Notify(
@@ -181,26 +183,29 @@ function EconomyService:Collect(player: Player)
 	end
 	data.pile -= amount
 	data.cash += amount
+	self.Services.TelemetryService:Economy(player, "source", amount, data.cash, "Idle")
 	self:Push(player, true)
 	self:Notify(player, ("Kasse geleert: %s"):format(Util.FormatCash(amount)), "cash")
 	return true
 end
 
-function EconomyService:AddCash(player: Player, amount: number, reason: string?)
+-- `source` landet in der Analytik ("Idle", "Heist", "Daily", "Robux").
+function EconomyService:AddCash(player: Player, amount: number, source: string?, notifyText: string?)
 	local data = self.Services.DataService:Get(player)
 	if not data or amount <= 0 then
 		return false
 	end
 	data.cash += amount
+	self.Services.TelemetryService:Economy(player, "source", amount, data.cash, source or "Gameplay")
 	self:Push(player, true)
-	if reason then
-		self:Notify(player, ("+%s %s"):format(Util.FormatCash(amount), reason), "cash")
+	if notifyText then
+		self:Notify(player, ("+%s %s"):format(Util.FormatCash(amount), notifyText), "cash")
 	end
 	return true
 end
 
 -- Einzige erlaubte Art, Geld auszugeben. Gibt false zurueck, wenn es nicht reicht.
-function EconomyService:TrySpend(player: Player, amount: number): boolean
+function EconomyService:TrySpend(player: Player, amount: number, sink: string?): boolean
 	local data = self.Services.DataService:Get(player)
 	if not data then
 		return false
@@ -210,6 +215,7 @@ function EconomyService:TrySpend(player: Player, amount: number): boolean
 		return false
 	end
 	data.cash -= amount
+	self.Services.TelemetryService:Economy(player, "sink", amount, data.cash, sink or "Gameplay")
 	self:Push(player, true)
 	return true
 end
@@ -225,6 +231,9 @@ function EconomyService:Push(player: Player, force: boolean?)
 		return
 	end
 	self._lastPush[player.UserId] = now
+	if data.cash >= Config.BADGE_RICH_AT then
+		self.Services.TelemetryService:Award(player, "Rich")
+	end
 	Remotes.Get("CashUpdate"):FireClient(player, {
 		cash = math.floor(data.cash),
 		pile = math.floor(data.pile),

@@ -4,6 +4,8 @@
 	Teil am Auto aussieht. Der Server rechnet ausschliesslich mit diesen Werten.
 ]]
 
+local Config = require(script.Parent.Config)
+
 local PartCatalog = {}
 
 PartCatalog.SlotOrder = { "engine", "tires", "paint", "turbo" }
@@ -35,6 +37,8 @@ PartCatalog.Slots = {
 		displayName = "Lack",
 		mount = "body", -- faerbt die Karosserie
 		size = Vector3.new(1.4, 1.4, 1.4),
+		-- Exklusiv ab Config.REBIRTH_PAINT_AT auf der hoechsten Lackstufe.
+		rebirthColor = Color3.fromRGB(255, 120, 30),
 		tiers = {
 			{ name = "Grundierung", cost = 120, time = 6, rate = 0.5, color = Color3.fromRGB(150, 150, 155) },
 			{ name = "Zweischicht", cost = 800, time = 18, rate = 1.8, color = Color3.fromRGB(200, 60, 60) },
@@ -67,9 +71,48 @@ function PartCatalog.GetTier(slotId, tier)
 	return slot.tiers[tier]
 end
 
--- Wert eines Teils = Summe aller Stufenkosten bis einschliesslich `tier`.
--- Gebraucht fuer Leaderboard ("teuerste Garage") und Verkaufserloes.
-function PartCatalog.GetValue(slotId, tier)
+function PartCatalog.TierCount(slotId): number
+	local slot = PartCatalog.Slots[slotId]
+	return slot and #slot.tiers or 0
+end
+
+-- Preis einer Zwischenstufe: ein Anteil des naechsten Tier-Preises. Auf der
+-- hoechsten Stufe gibt es keinen naechsten Sprung, deshalb der eigene Faktor.
+function PartCatalog.SubStepCost(slotId, tier): number
+	local slot = PartCatalog.Slots[slotId]
+	if not slot or not slot.tiers[tier] then
+		return 0
+	end
+	local nextDef = slot.tiers[tier + 1]
+	local base = nextDef and nextDef.cost or (slot.tiers[tier].cost * Config.SUBTIER_TOP_COST_MULT)
+	return math.floor(base * Config.SUBTIER_COST_SHARE)
+end
+
+function PartCatalog.SubStepTime(slotId, tier): number
+	local def = PartCatalog.GetTier(slotId, tier)
+	if not def then
+		return Config.SUBTIER_MIN_TIME
+	end
+	return math.max(Config.SUBTIER_MIN_TIME, math.floor(def.time * Config.SUBTIER_TIME_SHARE))
+end
+
+-- Preis des Tier-Sprungs abzueglich der schon gezahlten Zwischenstufen.
+-- Dadurch kostet der Weg von Tier n nach n+1 in Summe genau so viel wie vorher.
+function PartCatalog.TierUpgradeCost(slotId, fromTier: number, subTier: number): number
+	local nextDef = PartCatalog.GetTier(slotId, fromTier + 1)
+	if not nextDef then
+		return 0
+	end
+	if fromTier <= 0 then
+		return nextDef.cost
+	end
+	local paid = PartCatalog.SubStepCost(slotId, fromTier) * math.min(subTier, Config.SUBTIER_COUNT)
+	return math.max(0, nextDef.cost - paid)
+end
+
+-- Wert eines Teils = Summe aller Stufenkosten bis einschliesslich `tier`,
+-- plus die bezahlten Zwischenstufen. Gebraucht fuer Leaderboard und Verkauf.
+function PartCatalog.GetValue(slotId, tier, subTier)
 	local slot = PartCatalog.Slots[slotId]
 	if not slot then
 		return 0
@@ -78,12 +121,16 @@ function PartCatalog.GetValue(slotId, tier)
 	for i = 1, math.min(tier, #slot.tiers) do
 		total += slot.tiers[i].cost
 	end
+	total += PartCatalog.SubStepCost(slotId, tier) * (subTier or 0)
 	return total
 end
 
-function PartCatalog.GetRate(slotId, tier)
+function PartCatalog.GetRate(slotId, tier, subTier)
 	local def = PartCatalog.GetTier(slotId, tier)
-	return def and def.rate or 0
+	if not def then
+		return 0
+	end
+	return def.rate * (1 + Config.SUBTIER_RATE_BONUS * (subTier or 0))
 end
 
 function PartCatalog.IsValidSlot(slotId)

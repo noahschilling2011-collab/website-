@@ -14,15 +14,16 @@ local Theme = require(script.Parent.Theme)
 
 local ShopMenu = {}
 
-function ShopMenu.Init(root: ScreenGui)
+function ShopMenu.Init(root: Frame)
 	local window = Theme.panel({
 		Name = "ShopMenu",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.new(0, 520, 0, 470),
+		Size = UDim2.new(0.9, 0, 0.8, 0),
 		Visible = false,
 		Parent = root,
 	})
+	Theme.constrain(window, Vector2.new(300, 260), Vector2.new(520, 470))
 	Theme.padding(14).Parent = window
 
 	Theme.label({

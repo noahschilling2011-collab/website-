@@ -8,19 +8,15 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
 local Util = require(Shared.Util)
 
 local GarageRequests = require(script.Parent.Parent.Garage.GarageRequests)
 
 local PurchaseEffects = {}
 
--- Bewusst so gewaehlt, dass auch das groesste Paket den Loop nicht ersetzt:
--- das teuerste Garagen-Upgrade kostet 260k, der Supersportler 75k.
-PurchaseEffects.CASH_AMOUNTS = {
-	CashSmall = 5000,
-	CashMedium = 30000,
-	CashLarge = 150000,
-}
+-- Betraege stehen in Config.CASH_PACKS.
+PurchaseEffects.CASH_AMOUNTS = Config.CASH_PACKS
 
 function PurchaseEffects.GrantCash(services, player: Player, data, key: string): boolean
 	local amount = PurchaseEffects.CASH_AMOUNTS[key]
@@ -28,6 +24,7 @@ function PurchaseEffects.GrantCash(services, player: Player, data, key: string):
 		return false
 	end
 	data.cash += amount
+	services.TelemetryService:Economy(player, "source", amount, data.cash, "Robux")
 	services.EconomyService:Push(player, true)
 	services.EconomyService:Notify(player, ("Cash-Paket gutgeschrieben: %s"):format(Util.FormatCash(amount)), "good")
 	return true

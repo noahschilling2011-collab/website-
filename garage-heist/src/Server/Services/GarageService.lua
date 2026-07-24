@@ -12,15 +12,16 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
-local PartCatalog = require(Shared.PartCatalog)
 local Remotes = require(Shared.Remotes)
 
 local Server = script.Parent.Parent
-local GarageRequests = require(Server.Garage.GarageRequests)
+local StealTarget = require(Server.Heist.StealTarget)
 local GarageView = require(Server.Garage.GarageView)
+local GarageTicks = require(Server.Garage.GarageTicks)
+local TheftOps = require(Server.Garage.TheftOps)
+local RepairView = require(Server.Garage.RepairView)
 local RequestRouter = require(Server.Garage.RequestRouter)
 local Snapshot = require(Server.Garage.Snapshot)
-local DoorController = require(Server.World.DoorController)
 local PlotBuilder = require(Server.World.PlotBuilder)
 local ProfileOps = require(Server.Data.ProfileOps)
 
@@ -35,7 +36,6 @@ function GarageService:Init(services)
 	self.plots = {}
 	self.plotOwner = {}
 	self.views = {}
-	self._cooldowns = {}
 end
 
 function GarageService:Start()
@@ -66,20 +66,7 @@ function GarageService:Start()
 
 	RequestRouter.Bind(self)
 
-	task.spawn(function()
-		while true do
-			task.wait(1)
-			self:_repairTick()
-		end
-	end)
-	task.spawn(function()
-		while true do
-			task.wait(0.5)
-			DoorController.Tick(self.plots, self.plotOwner, function(index)
-				return self.Services.HeistService:IsPlotOpen(index)
-			end)
-		end
-	end)
+	GarageTicks.Start(self)
 end
 
 function GarageService:_setup(player: Player, data)
@@ -87,7 +74,8 @@ function GarageService:_setup(player: Player, data)
 	-- geworden sind, fuer die gesamte Abwesenheit mit.
 	self.Services.EconomyService:EnsureOfflineApplied(player, data)
 
-	local plotIndex = self:_claimPlot(player)
+	ProfileOps.ClearAllInTransit(data)
+	local plotIndex = self:_claimPlot(player, data)
 	if not plotIndex then
 		player:Kick("Alle Garagen sind belegt. Bitte einem anderen Server beitreten.")
 		return
@@ -124,12 +112,23 @@ function GarageService:_placeCharacter(player: Player, character: Model)
 	end
 end
 
-function GarageService:_claimPlot(player: Player): number?
+function GarageService:_claimPlot(player: Player, data): number?
+	-- Erst die Box von letztem Mal, damit die Garage nicht wandert.
+	local preferred = data and data.preferredPlot or 0
+	if preferred >= 1 and preferred <= Config.PLOT_COUNT and not self.plotOwner[preferred] then
+		self.plotOwner[preferred] = player.UserId
+		player:SetAttribute("PlotIndex", preferred)
+		self.Services.DerelictService:Release(preferred)
+		return preferred
+	end
 	for index = 1, Config.PLOT_COUNT do
 		if not self.plotOwner[index] then
 			self.plotOwner[index] = player.UserId
 			-- Der Client braucht das, um die eigene Werkbank zu erkennen.
 			player:SetAttribute("PlotIndex", index)
+			-- Falls hier gerade ein Leerstand-Auto steht: abraeumen, sonst
+			-- ueberlagert es das Auto des neuen Besitzers.
+			self.Services.DerelictService:Release(index)
 			return index
 		end
 	end
@@ -139,10 +138,10 @@ end
 function GarageService:_teardown(player: Player)
 	local view = self.views[player.UserId]
 	self.views[player.UserId] = nil
-	self._cooldowns[player.UserId] = nil
 	if not view then
 		return
 	end
+	RepairView.Clear(view)
 	for _, refs in view.cars do
 		if refs.billboard and refs.billboard.part then
 			refs.billboard.part:Destroy()
@@ -154,10 +153,6 @@ function GarageService:_teardown(player: Player)
 	view.plot.sign.value.Text = ""
 	view.plot.sign.rate.Text = ""
 	self.plotOwner[view.plotIndex] = nil
-end
-
-function GarageService:GetView(userId: number)
-	return self.views[userId]
 end
 
 function GarageService:GetOwnerOfPlot(plotIndex: number): number?
@@ -175,9 +170,12 @@ function GarageService:Refresh(player: Player, data)
 	if not data or not view then
 		return
 	end
-	GarageView.RenderCars(view, player, data, function(thief, victim, carIndex, slotId, prompt)
-		self.Services.HeistService:OnStealPrompt(thief, victim, carIndex, slotId, prompt)
+	GarageView.RenderCars(view, player, data, function(thief, carIndex, slotId, prompt)
+		self.Services.HeistService:OnStealPrompt(thief, StealTarget.Player(player), carIndex, slotId, prompt)
 	end)
+	-- Die alten Balken hingen an den eben zerstoerten Modellen.
+	view.repairBars = nil
+	RepairView.Sync(view, data)
 	self:Sync(player, data)
 end
 
@@ -188,6 +186,7 @@ function GarageService:Sync(player: Player, data)
 	end
 	local view = self.views[player.UserId]
 	local rate = self.Services.EconomyService:GetRate(player, data)
+	data.preferredPlot = view and view.plotIndex or data.preferredPlot
 	if view then
 		GarageView.UpdateSign(view, player, data, rate)
 		GarageView.UpdateBillboards(view, data)
@@ -211,82 +210,17 @@ function GarageService:SetStealEnabledFor(userId: number, enabled: boolean)
 	end
 end
 
--- Teil aus einem fremden Auto loesen. Nur der HeistService ruft das auf,
--- nachdem er Fenster, Entfernung und Besitz geprueft hat.
-function GarageService:TakePart(victim: Player, carIndex: number, slotId: string)
-	local data = self.Services.DataService:Get(victim)
-	if not data then
-		return nil
-	end
-	local part = ProfileOps.RemovePart(data, carIndex, slotId)
-	if not part then
-		return nil
-	end
-	data.stats.partsLost += 1
-	self:Refresh(victim, data)
-	return part
+-- Besitzwechsel von Teilen liegt komplett in Garage/TheftOps.
+function GarageService:TakePart(victim: Player, thief: Player, carIndex: number, slotId: string)
+	return TheftOps.Take(self, victim, thief, carIndex, slotId)
 end
 
--- Diebesgut in der eigenen Garage abliefern.
-function GarageService:GiveStolenPart(thief: Player, part)
-	local data = self.Services.DataService:Get(thief)
-	if not data then
-		return false, "Profil nicht geladen."
-	end
-	ProfileOps.RollDailyStats(data)
-	data.stats.stolenToday += 1
-	data.stats.totalStolen += 1
-	local ok, message = GarageRequests.DepositStolenPart(self.Services, thief, data, part)
-	self:Refresh(thief, data)
-	return ok, message
+function GarageService:GiveStolenPart(thief: Player, part, target)
+	return TheftOps.Deposit(self, thief, part, target)
 end
 
--- Fenster vorbei oder Dieb weg: Teil geht zurueck an den urspruenglichen
--- Besitzer, sofern der noch auf dem Server ist.
-function GarageService:ReturnPart(part): boolean
-	local owner = Players:GetPlayerByUserId(part.originalOwner)
-	if not owner then
-		return false
-	end
-	local data = self.Services.DataService:Get(owner)
-	if not data then
-		return false
-	end
-	GarageRequests.DepositStolenPart(self.Services, owner, data, part)
-	data.stats.partsLost = math.max(0, data.stats.partsLost - 1)
-	self:Refresh(owner, data)
-	local tierDef = PartCatalog.GetTier(part.slotId, part.tier)
-	self.Services.EconomyService:Notify(
-		owner,
-		("%s ist zurueck in deiner Garage."):format(tierDef and tierDef.name or part.slotId),
-		"good"
-	)
-	return true
-end
-
-function GarageService:_repairTick()
-	local now = os.time()
-	self.Services.DataService:ForEachProfile(function(player, data)
-		if not self.Services.EconomyService:IsSettled(player) then
-			return
-		end
-		local due = ProfileOps.RepairsDueBefore(data, now)
-		if #due == 0 then
-			return
-		end
-		for _, repair in due do
-			local part = ProfileOps.FinishRepair(data, repair.carIndex, repair.slotId, player.UserId)
-			if part then
-				local tierDef = PartCatalog.GetTier(part.slotId, part.tier)
-				self.Services.EconomyService:Notify(
-					player,
-					("%s ist eingebaut."):format(tierDef and tierDef.name or part.slotId),
-					"good"
-				)
-			end
-		end
-		self:Refresh(player, data)
-	end)
+function GarageService:ClearInTransit(victim: Player, uid: string)
+	return TheftOps.Clear(self, victim, uid)
 end
 
 return GarageService

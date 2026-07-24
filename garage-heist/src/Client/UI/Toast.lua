@@ -21,13 +21,13 @@ local KIND_COLORS = {
 	info = Theme.Colors.sub,
 }
 
-function Toast.Init(root: ScreenGui)
+function Toast.Init(root: Frame)
 	local container = Theme.create("Frame", {
 		Name = "Toasts",
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.new(0, 16, 1, -16),
-		Size = UDim2.new(0, 340, 0, 260),
+		Position = UDim2.new(0, 16, 1, -186),
+		Size = UDim2.new(0.34, 0, 0.24, 0),
 		Parent = root,
 	}, {
 		Theme.create("UIListLayout", {
@@ -36,6 +36,7 @@ function Toast.Init(root: ScreenGui)
 			SortOrder = Enum.SortOrder.LayoutOrder,
 		}),
 	})
+	Theme.constrain(container, Vector2.new(190, 110), Vector2.new(300, 220))
 	Toast._container = container
 	Toast._counter = 0
 	return Toast

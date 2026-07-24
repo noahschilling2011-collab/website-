@@ -10,18 +10,19 @@ local Theme = require(script.Parent.Theme)
 local InfoPanel = {}
 InfoPanel.__index = InfoPanel
 
-function InfoPanel.new(root: ScreenGui, title: string, position: UDim2, size: UDim2)
+function InfoPanel.new(root: Frame, title: string, position: UDim2, size: UDim2, anchor: Vector2?)
 	local self = setmetatable({}, InfoPanel)
 
 	self.window = Theme.panel({
 		Name = title,
-		AnchorPoint = Vector2.new(1, 0.5),
+		AnchorPoint = anchor or Vector2.new(1, 0),
 		Position = position,
 		Size = size,
 		BackgroundTransparency = 0.05,
 		Visible = false,
 		Parent = root,
 	})
+	Theme.constrain(self.window, Vector2.new(210, 150), Vector2.new(320, 340))
 	Theme.padding(12).Parent = self.window
 
 	Theme.label({

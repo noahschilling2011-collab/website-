@@ -1,10 +1,8 @@
-# Was du im Creator Dashboard anlegen musst
+# Monetarisierung: was verkauft wird und warum es die Balance haelt
 
-Alle IDs stehen als `0` oben in `src/Server/Services/MonetizationService.lua`.
-Solange dort `0` steht, erscheint der Eintrag im Shop als **"nicht eingerichtet"**
-und ist nicht anklickbar. Nichts stuerzt ab, nichts wird verschenkt.
-
-Anlegen, ID kopieren, oben eintragen - fertig. Sonst musst du keine Datei anfassen.
+> **Die Liste zum Abarbeiten steht in `docs/SETUP.md`** - dort stehen alle IDs,
+> die du im Creator Dashboard anlegen und eintragen musst, inklusive Badges und
+> Klaengen. Diese Datei hier erklaert die Produkte und die Balance dahinter.
 
 ## Gamepasses (Creator Dashboard > Experience > Monetization > Passes)
 

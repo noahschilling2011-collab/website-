@@ -24,6 +24,7 @@ local TO_CLIENT = {
 	"DailyState", -- {streak, canClaim, nextInSeconds}
 	"LeaderboardUpdate", -- {richest = {...}, thieves = {...}}
 	"ShopState", -- {vip, autoCollect, garageLock}
+	"Effect", -- {kind = "sound"|"shake", ...} - reine Praesentation
 }
 
 -- Client -> Server (alles wird serverseitig geprueft)
@@ -32,6 +33,7 @@ local TO_SERVER = {
 	"RequestInstantRepair", -- (carIndex, slotId)  -> loest den Robux-Kauf aus
 	"RequestBuyCar", -- (carId)
 	"RequestUpgradeGarage", -- ()
+	"RequestRebirth", -- ()
 	"RequestSellLoosePart", -- (uid)
 	"RequestInstallLoosePart", -- (uid, carIndex)
 	"RequestCollect", -- ()

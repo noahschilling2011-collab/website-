@@ -17,8 +17,10 @@ local Remotes = require(Shared.Remotes)
 local Util = require(Shared.Util)
 
 local Server = script.Parent.Parent
+local Throttle = require(Server.Garage.Throttle)
 local CarryManager = require(Server.Heist.CarryManager)
 local DismountManager = require(Server.Heist.DismountManager)
+local ProfileOps = require(Server.Data.ProfileOps)
 
 local HeistService = {}
 HeistService.Name = "HeistService"
@@ -39,10 +41,10 @@ function HeistService:Init(services)
 end
 
 function HeistService:Start()
-	Remotes.Get("RequestTackle").OnServerEvent:Connect(function(player)
+	Throttle.Connect("RequestTackle", Config.TACKLE_COOLDOWN, function(player)
 		self.Carry:Tackle(player)
 	end)
-	Remotes.Get("RequestDropPart").OnServerEvent:Connect(function(player)
+	Throttle.Connect("RequestDropPart", Config.DROP_COOLDOWN, function(player)
 		self.Carry:Drop(player, "Teil abgelegt.")
 	end)
 
@@ -199,8 +201,16 @@ function HeistService:_open()
 		end
 	end
 
+	-- Freie Plots werden zu Zielen, damit auch ein einzelner Spieler klauen kann.
+	self.Services.DerelictService:Populate()
+
+	for _, player in Players:GetPlayers() do
+		self.Services.TelemetryService:Funnel(player, "firstWindow")
+	end
+
 	self:_pushState()
-	self:_announce("Klau-Fenster offen! 60 Sekunden.", "heist")
+	self:_announce(("Klau-Fenster offen! %d Sekunden."):format(Config.HEIST_WINDOW), "heist")
+	self.Services.EffectService:LocalSoundAll("windowOpen")
 	self:_sendRadar()
 end
 
@@ -214,6 +224,7 @@ function HeistService:_close()
 		self.Services.GarageService:SetStealEnabledFor(player.UserId, false)
 	end
 	self.Carry:ReturnEverything()
+	self.Services.DerelictService:Clear()
 
 	self:_pushState()
 	self:_announce("Fenster zu. Tore sind verriegelt.", "info")
@@ -223,9 +234,10 @@ function HeistService:_announce(text: string, kind: string)
 	Remotes.Get("Notify"):FireAllClients({ text = text, kind = kind })
 end
 
-function HeistService:OnStealPrompt(thief: Player, victim: Player, carIndex: number, slotId: string, prompt: ProximityPrompt)
+-- `target` ist ein StealTarget (Spieler oder Leerstand).
+function HeistService:OnStealPrompt(thief: Player, target, carIndex: number, slotId: string, prompt: ProximityPrompt)
 	local anchor = prompt.Parent
-	self.Dismount:Start(thief, victim, carIndex, slotId, anchor and anchor:IsA("BasePart") and anchor or nil)
+	self.Dismount:Start(thief, target, carIndex, slotId, anchor and anchor:IsA("BasePart") and anchor or nil)
 end
 
 -- Heist Radar: eine Ladung zeigt fuer ein Fenster die wertvollsten Teile.
@@ -248,7 +260,7 @@ function HeistService:_topParts()
 					plotIndex = self.Services.GarageService:GetPlotIndexOf(owner),
 					slotName = PartCatalog.GetSlot(slotId).displayName,
 					tierName = (PartCatalog.GetTier(slotId, part.tier) or {}).name or "?",
-					value = PartCatalog.GetValue(slotId, part.tier),
+					value = ProfileOps.PartValue(part),
 					carIndex = carIndex,
 				})
 			end

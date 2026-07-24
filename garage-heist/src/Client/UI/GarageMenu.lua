@@ -7,21 +7,26 @@
 	Der Client haelt keinen eigenen Spielstand.
 ]]
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Remotes = require(ReplicatedStorage:WaitForChild("Shared").Remotes)
+
 local Store = require(script.Parent.Parent.Store)
 local GarageRows = require(script.Parent.GarageRows)
 local Theme = require(script.Parent.Theme)
 
 local GarageMenu = {}
 
-function GarageMenu.Init(root: ScreenGui)
+function GarageMenu.Init(root: Frame)
 	local window = Theme.panel({
 		Name = "GarageMenu",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.new(0, 640, 0, 520),
+		Size = UDim2.new(0.92, 0, 0.86, 0),
 		Visible = false,
 		Parent = root,
 	})
+	Theme.constrain(window, Vector2.new(300, 260), Vector2.new(640, 520))
 	Theme.padding(14).Parent = window
 
 	Theme.label({
@@ -57,6 +62,7 @@ function GarageMenu.Init(root: ScreenGui)
 
 	GarageMenu._window = window
 	GarageMenu._scroll = scroll
+	GarageMenu._confirm = GarageMenu._buildConfirm(root)
 
 	Store.Changed:Connect(function(key)
 		if key == "snapshot" and window.Visible then
@@ -71,6 +77,69 @@ function GarageMenu.Init(root: ScreenGui)
 		end
 	end)
 	return GarageMenu
+end
+
+-- Bestaetigungsdialog fuer alles, was nicht rueckgaengig zu machen ist.
+function GarageMenu._buildConfirm(root: Frame)
+	local frame = Theme.panel({
+		Name = "Confirm",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.new(0.8, 0, 0.34, 0),
+		Visible = false,
+		ZIndex = 20,
+		Parent = root,
+	})
+	Theme.constrain(frame, Vector2.new(280, 170), Vector2.new(420, 210))
+	Theme.padding(16).Parent = frame
+
+	local text = Theme.label({
+		Size = UDim2.new(1, 0, 0, 100),
+		TextWrapped = true,
+		TextSize = 16,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		ZIndex = 21,
+		Parent = frame,
+	})
+	local yes = Theme.button({
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 0, 1, 0),
+		Size = UDim2.new(0.48, 0, 0, 40),
+		BackgroundColor3 = Theme.Colors.heist,
+		TextSize = 16,
+		Text = "Ja, durchziehen",
+		ZIndex = 21,
+		Parent = frame,
+	})
+	local no = Theme.button({
+		AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.new(1, 0, 1, 0),
+		Size = UDim2.new(0.48, 0, 0, 40),
+		TextSize = 16,
+		Text = "Abbrechen",
+		ZIndex = 21,
+		Parent = frame,
+	})
+
+	local confirm = { frame = frame, text = text }
+	no.Activated:Connect(function()
+		frame.Visible = false
+	end)
+	yes.Activated:Connect(function()
+		frame.Visible = false
+		if confirm.action then
+			confirm.action()
+			confirm.action = nil
+		end
+	end)
+	return confirm
+end
+
+function GarageMenu.Ask(message: string, action)
+	local confirm = GarageMenu._confirm
+	confirm.text.Text = message
+	confirm.action = action
+	confirm.frame.Visible = true
 end
 
 function GarageMenu.SetVisible(visible: boolean)
@@ -106,6 +175,22 @@ function GarageMenu.Render()
 	local garage = snapshot.garage
 	GarageRows.Header(scroll, nextOrder(), ("Garage: %s (Stufe %d)"):format(garage.label, garage.level))
 	GarageRows.Garage(scroll, nextOrder(), garage, snapshot.cash)
+
+	local rebirth = snapshot.rebirth
+	if rebirth and (rebirth.can or rebirth.count > 0) then
+		GarageRows.Header(scroll, nextOrder(), "Rebirth")
+		GarageRows.Rebirth(scroll, nextOrder(), rebirth, function()
+			GarageMenu.Ask(
+				("Rebirth %d ausloesen?\n\nAutos, Teile, Garage und Cash gehen zurueck auf Anfang.\nDauerhaft bleibt: +%d%% Rate."):format(
+					rebirth.count + 1,
+					math.floor(rebirth.bonus * (rebirth.count + 1) * 100)
+				),
+				function()
+					Remotes.Get("RequestRebirth"):FireServer()
+				end
+			)
+		end)
+	end
 
 	for _, car in snapshot.cars do
 		GarageRows.Header(scroll, nextOrder(), ("%s (Rate x%.2f)"):format(car.displayName, car.rateMult))

@@ -101,8 +101,12 @@ function DataService:_load(player: Player)
 	end
 
 	if not ok then
-		warn(("[DataService] Laden fuer %s fehlgeschlagen: %s"):format(player.Name, tostring(payload)))
-		player:Kick("Dein Spielstand konnte nicht geladen werden. Bitte in ein paar Sekunden neu beitreten.")
+		local reason = tostring(payload)
+		warn(("[DataService] Laden fuer %s fehlgeschlagen: %s"):format(player.Name, reason))
+		local text = if reason == "session-locked" or reason == "timeout"
+			then "Dein Spielstand haengt noch in einer alten Session fest. Bitte in etwa einer Minute neu beitreten."
+			else "Dein Spielstand konnte nicht geladen werden (Roblox-Datenspeicher gestoert). Bitte in ein paar Minuten neu versuchen."
+		player:Kick(text)
 		return
 	end
 

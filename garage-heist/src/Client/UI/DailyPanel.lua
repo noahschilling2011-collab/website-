@@ -15,15 +15,16 @@ local Theme = require(script.Parent.Theme)
 
 local DailyPanel = {}
 
-function DailyPanel.Init(root: ScreenGui)
+function DailyPanel.Init(root: Frame)
 	local window = Theme.panel({
 		Name = "DailyPanel",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.new(0, 620, 0, 260),
+		Size = UDim2.new(0.94, 0, 0.42, 0),
 		Visible = false,
 		Parent = root,
 	})
+	Theme.constrain(window, Vector2.new(320, 240), Vector2.new(620, 280))
 	Theme.padding(14).Parent = window
 
 	Theme.label({
@@ -111,7 +112,8 @@ function DailyPanel.Render()
 		local isNext = daily.canClaim and day == daily.nextStreak
 		local box = Theme.panel({
 			BackgroundColor3 = isNext and Theme.Colors.accent or (claimed and Theme.Colors.good or Theme.Colors.panelAlt),
-			Size = UDim2.new(0, 80, 1, 0),
+			-- Sieben Kaesten teilen sich die Breite, statt 7x80 px zu verlangen.
+			Size = UDim2.new(1 / #daily.rewards, -6, 1, 0),
 			LayoutOrder = day,
 			Parent = refs.strip,
 		})

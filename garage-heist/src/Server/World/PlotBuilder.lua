@@ -8,9 +8,14 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
-local Config = require(ReplicatedStorage:WaitForChild("Shared").Config)
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Audio = require(Shared.Audio)
+local Config = require(Shared.Config)
 
 local PlotBuilder = {}
+
+local CLOSED_LIGHT = Color3.fromRGB(80, 150, 255)
+local OPEN_LIGHT = Color3.fromRGB(235, 60, 90)
 
 local WALL_HEIGHT = Config.PLOT_HEIGHT
 local WALL_THICK = 2
@@ -175,6 +180,23 @@ function PlotBuilder.Build(index: number, parent: Instance)
 
 	local sign = makeSign(model, base * CFrame.new(0, DOOR_HEIGHT + 2.4, halfDepth + 1.2), Vector3.new(24, 6, 0.4))
 
+	-- Neonleiste ueber dem Tor plus Licht. Die Farbe sagt aus der Ferne, ob
+	-- die Garage gerade offen ist.
+	local strip = makePart({
+		Name = "NeonStrip",
+		Size = Vector3.new(DOOR_WIDTH, 0.6, 0.6),
+		CFrame = base * CFrame.new(0, DOOR_HEIGHT + 0.9, halfDepth + 0.6),
+		Color = CLOSED_LIGHT,
+		Material = Enum.Material.Neon,
+		CanCollide = false,
+		Parent = model,
+	})
+	local light = Instance.new("PointLight")
+	light.Brightness = 2.5
+	light.Range = 34
+	light.Color = CLOSED_LIGHT
+	light.Parent = strip
+
 	local register = makePad(
 		model,
 		base * CFrame.new(-halfWidth + 5, 1.5, halfDepth - 6),
@@ -240,6 +262,8 @@ function PlotBuilder.Build(index: number, parent: Instance)
 		doorOpenCFrame = doorOpen,
 		doorIsOpen = false,
 		sign = sign,
+		strip = strip,
+		light = light,
 		register = register,
 		workbench = workbench,
 		lootBay = lootBay,
@@ -253,6 +277,11 @@ function PlotBuilder.SetDoor(plot, open: boolean)
 		return
 	end
 	plot.doorIsOpen = open
+
+	local lightColor = open and OPEN_LIGHT or CLOSED_LIGHT
+	plot.strip.Color = lightColor
+	plot.light.Color = lightColor
+	Audio.PlayAt("doorOpen", plot.door.Position)
 	local goalCFrame = open and plot.doorOpenCFrame or plot.doorClosedCFrame
 	local goalSize = open and Vector3.new(DOOR_WIDTH, 0.8, 1) or Vector3.new(DOOR_WIDTH, DOOR_HEIGHT, 1)
 	local tween = TweenService:Create(

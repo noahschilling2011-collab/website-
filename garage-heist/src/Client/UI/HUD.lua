@@ -6,8 +6,11 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Audio = require(Shared.Audio)
+local Config = require(Shared.Config)
 local Remotes = require(Shared.Remotes)
 local Util = require(Shared.Util)
 
@@ -27,8 +30,10 @@ local function pill(parent, name, anchor, position, size)
 	})
 end
 
-function HUD.Init(root: ScreenGui, callbacks)
-	local cashPill = pill(root, "CashPill", Vector2.new(0, 0), UDim2.new(0, 16, 0, 16), UDim2.new(0, 240, 0, 78))
+function HUD.Init(root: Frame, callbacks)
+	-- Reihenfolge oben: Heist-Anzeige mittig, Cash links darunter, Knoepfe
+	-- rechts daneben. Auf 390 px Breite ueberschneidet sich damit nichts.
+	local cashPill = pill(root, "CashPill", Vector2.new(0, 0), UDim2.new(0, 16, 0, 70), UDim2.new(0, 200, 0, 70))
 	Theme.padding(10).Parent = cashPill
 
 	local cashLabel = Theme.label({
@@ -50,8 +55,8 @@ function HUD.Init(root: ScreenGui, callbacks)
 	local collectButton = Theme.button({
 		Name = "Collect",
 		AnchorPoint = Vector2.new(0, 0),
-		Position = UDim2.new(0, 16, 0, 102),
-		Size = UDim2.new(0, 240, 0, 42),
+		Position = UDim2.new(0, 16, 0, 148),
+		Size = UDim2.new(0, 200, 0, 38),
 		BackgroundColor3 = Theme.Colors.accent,
 		TextColor3 = Color3.fromRGB(25, 20, 10),
 		TextSize = 17,
@@ -67,9 +72,10 @@ function HUD.Init(root: ScreenGui, callbacks)
 		root,
 		"HeistPill",
 		Vector2.new(0.5, 0),
-		UDim2.new(0.5, 0, 0, 16),
-		UDim2.new(0, 300, 0, 52)
+		UDim2.new(0.5, 0, 0, 8),
+		UDim2.new(0.5, 0, 0, 48)
 	)
+	Theme.constrain(heistPill, Vector2.new(230, 48), Vector2.new(300, 48))
 	local heistLabel = Theme.label({
 		Text = "Klau-Fenster: -",
 		Size = UDim2.new(1, 0, 1, 0),
@@ -83,8 +89,8 @@ function HUD.Init(root: ScreenGui, callbacks)
 		Name = "Buttons",
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -16, 0, 16),
-		Size = UDim2.new(0, 150, 0, 200),
+		Position = UDim2.new(1, -16, 0, 70),
+		Size = UDim2.new(0, 130, 0, 200),
 		Parent = root,
 	}, { Theme.list(Enum.FillDirection.Vertical, 8) })
 
@@ -110,10 +116,11 @@ function HUD.Init(root: ScreenGui, callbacks)
 		Name = "CarryBar",
 		AnchorPoint = Vector2.new(0.5, 1),
 		Position = UDim2.new(0.5, 0, 1, -20),
-		Size = UDim2.new(0, 420, 0, 96),
+		Size = UDim2.new(0.8, 0, 0, 96),
 		Visible = false,
 		Parent = root,
 	})
+	Theme.constrain(carryBar, Vector2.new(260, 96), Vector2.new(420, 96))
 	Theme.padding(10).Parent = carryBar
 
 	local carryLabel = Theme.label({
@@ -138,8 +145,8 @@ function HUD.Init(root: ScreenGui, callbacks)
 
 	local tackleButton = Theme.button({
 		Name = "Tackle",
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -130),
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 16, 1, -130),
 		Size = UDim2.new(0, 220, 0, 44),
 		BackgroundColor3 = Theme.Colors.heist,
 		TextSize = 16,
@@ -151,8 +158,20 @@ function HUD.Init(root: ScreenGui, callbacks)
 		Remotes.Get("RequestTackle"):FireServer()
 	end)
 
+	local flash = Theme.create("Frame", {
+		Name = "Flash",
+		BackgroundColor3 = Theme.Colors.heist,
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = 0,
+		Visible = false,
+		Parent = root,
+	})
+
 	HUD._refs = {
 		cash = cashLabel,
+		flash = flash,
 		rate = rateLabel,
 		collect = collectButton,
 		heist = heistPill,
@@ -187,6 +206,11 @@ function HUD.Update()
 	refs.collect.Visible = (not cash.autoCollect) and cash.pile >= 1
 	refs.collect.Text = ("Kasse leeren: %s"):format(Util.FormatCash(cash.pile))
 
+	if Store.heist.open and not HUD._wasOpen then
+		HUD.Flash()
+	end
+	HUD._wasOpen = Store.heist.open
+
 	local carry = Store.carry
 	refs.carryBar.Visible = carry ~= nil
 	if carry then
@@ -214,10 +238,42 @@ function HUD.UpdateTimer()
 	if heist.open then
 		refs.heist.BackgroundColor3 = Theme.Colors.heist
 		refs.heistLabel.Text = ("KLAU-FENSTER OFFEN  %s"):format(Util.FormatTime(heist.endsAt - now))
+		return
+	end
+
+	local remaining = heist.nextAt - now
+	refs.heistLabel.Text = ("Klau-Fenster in %s"):format(Util.FormatTime(remaining))
+
+	-- Ein Tick pro Sekunde in den letzten fuenf.
+	local whole = math.ceil(remaining)
+	if whole <= 5 and whole >= 1 and HUD._lastTick ~= whole then
+		HUD._lastTick = whole
+		Audio.PlayLocal("countdown")
+	elseif whole > 5 then
+		HUD._lastTick = nil
+	end
+	if remaining <= Config.HEIST_PULSE_AT and remaining > 0 then
+		-- Letzte Sekunden: pulsierend auf die Heist-Farbe ziehen.
+		local pulse = (math.sin(os.clock() * 6) + 1) / 2
+		refs.heist.BackgroundColor3 = Theme.Colors.panel:Lerp(Theme.Colors.heist, pulse)
 	else
 		refs.heist.BackgroundColor3 = Theme.Colors.panel
-		refs.heistLabel.Text = ("Klau-Fenster in %s"):format(Util.FormatTime(heist.nextAt - now))
 	end
+end
+
+-- Kurzer Vollbild-Impuls, wenn das Fenster aufgeht.
+function HUD.Flash()
+	local refs = HUD._refs
+	if not refs or not refs.flash then
+		return
+	end
+	refs.flash.Visible = true
+	refs.flash.BackgroundTransparency = 0.45
+	local tween = TweenService:Create(refs.flash, TweenInfo.new(0.7), { BackgroundTransparency = 1 })
+	tween:Play()
+	tween.Completed:Connect(function()
+		refs.flash.Visible = false
+	end)
 end
 
 return HUD

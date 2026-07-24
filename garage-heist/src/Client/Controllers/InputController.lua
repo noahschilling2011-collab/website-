@@ -1,9 +1,13 @@
 --[[
 	InputController
-	Tastatur, Touch-Knoepfe und ProximityPrompts. Schickt ausschliesslich
-	Absichten an den Server, nie Ergebnisse.
+	Tastenkuerzel und ProximityPrompts. Schickt ausschliesslich Absichten an den
+	Server, nie Ergebnisse.
 
 	G - Werkstatt   F - Rempeln   Q - Teil ablegen   E - Prompt (Roblox-Standard)
+
+	Hier entstehen bewusst KEINE Touch-Knoepfe (createTouchButton = false):
+	Rempeln, Ablegen und die Menues haengen auf Touch an den HUD-Knoepfen, und
+	ContextActionService wuerde sonst einen zweiten Satz daneben legen.
 ]]
 
 local ContextActionService = game:GetService("ContextActionService")

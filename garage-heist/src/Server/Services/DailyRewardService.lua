@@ -14,6 +14,8 @@ local Config = require(Shared.Config)
 local Remotes = require(Shared.Remotes)
 local Util = require(Shared.Util)
 
+local Throttle = require(script.Parent.Parent.Garage.Throttle)
+
 local DailyRewardService = {}
 DailyRewardService.Name = "DailyRewardService"
 
@@ -32,7 +34,7 @@ function DailyRewardService:Start()
 		end)
 	end)
 
-	Remotes.Get("RequestClaimDaily").OnServerEvent:Connect(function(player)
+	Throttle.Connect("RequestClaimDaily", Config.CLAIM_COOLDOWN, function(player)
 		self:Claim(player)
 	end)
 
@@ -93,7 +95,7 @@ function DailyRewardService:Claim(player: Player)
 	data.daily.streak = state.nextStreak
 	data.daily.lastDay = Util.UtcDay()
 	local reward = Config.DAILY_REWARDS[math.clamp(data.daily.streak, 1, STREAK_LENGTH)]
-	self.Services.EconomyService:AddCash(player, reward)
+	self.Services.EconomyService:AddCash(player, reward, "Daily")
 	self.Services.EconomyService:Notify(
 		player,
 		("Tag %d der Kette: %s"):format(data.daily.streak, Util.FormatCash(reward)),

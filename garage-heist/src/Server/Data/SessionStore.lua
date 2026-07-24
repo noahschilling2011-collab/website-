@@ -65,7 +65,9 @@ end
 
 -- Fuehrt UpdateAsync mit Retry aus. `transform` darf nil zurueckgeben, um den
 -- Schreibvorgang abzubrechen (z.B. weil ein fremder Lock aktiv ist).
-function SessionStore:_update(key: string, transform: (any) -> any): (boolean, any, string?)
+-- `deadline` ist ein os.clock()-Zeitpunkt. Ist er ueberschritten, wird nicht
+-- mehr weiterprobiert.
+function SessionStore:_update(key: string, transform: (any) -> any, deadline: number?): (boolean, any, string?)
 	if self._mock then
 		local current = self._mockData[key]
 		local result = transform(current)
@@ -78,6 +80,9 @@ function SessionStore:_update(key: string, transform: (any) -> any): (boolean, a
 
 	local lastError = "unknown"
 	for attempt = 1, Config.LOAD_ATTEMPTS do
+		if deadline and os.clock() >= deadline then
+			return false, nil, "timeout"
+		end
 		local aborted = false
 		local ok, result = pcall(function()
 			return self._store:UpdateAsync(key, function(old)
@@ -96,7 +101,11 @@ function SessionStore:_update(key: string, transform: (any) -> any): (boolean, a
 		end
 		lastError = tostring(result)
 		warn(("[SessionStore] UpdateAsync Versuch %d/%d fehlgeschlagen: %s"):format(attempt, Config.LOAD_ATTEMPTS, lastError))
-		task.wait(Config.RETRY_BASE_WAIT * 2 ^ (attempt - 1))
+		local wait = Config.RETRY_BASE_WAIT * 2 ^ (attempt - 1)
+		if deadline then
+			wait = math.min(wait, math.max(0, deadline - os.clock()))
+		end
+		task.wait(wait)
 	end
 	return false, nil, lastError
 end
@@ -112,7 +121,11 @@ end
 -- Laedt das Profil und nimmt den Lock. Gibt (true, payload) oder (false, grund).
 function SessionStore:Load(userId: number)
 	local key = self:_key(userId)
+	local deadline = os.clock() + Config.LOAD_TOTAL_BUDGET
 	for attempt = 1, Config.LOAD_ATTEMPTS do
+		if os.clock() >= deadline then
+			return false, "timeout"
+		end
 		local ok, entry, err = self:_update(key, function(old)
 			if lockIsForeign(old) then
 				return nil -- anderer Server haelt den Lock, spaeter erneut versuchen
@@ -120,7 +133,7 @@ function SessionStore:Load(userId: number)
 			local fresh = old or {}
 			fresh.lock = { jobId = JOB_ID, at = os.time() }
 			return fresh
-		end)
+		end, deadline)
 		if ok and entry then
 			return true, entry.payload
 		end
@@ -128,7 +141,7 @@ function SessionStore:Load(userId: number)
 			return false, "datastore: " .. tostring(err)
 		end
 		warn(("[SessionStore] Profil %d ist von einer anderen Session gesperrt (Versuch %d)"):format(userId, attempt))
-		task.wait(Config.RETRY_BASE_WAIT * attempt)
+		task.wait(math.min(Config.RETRY_BASE_WAIT * attempt, math.max(0, deadline - os.clock())))
 	end
 	return false, "session-locked"
 end
