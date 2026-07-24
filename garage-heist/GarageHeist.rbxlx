@@ -1,0 +1,5638 @@
+<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">
+<External>null</External>
+<External>nil</External>
+<Item class="ReplicatedStorage" referent="RBX1">
+<Properties><string name="Name">ReplicatedStorage</string></Properties>
+<Item class="Folder" referent="RBX2">
+<Properties><string name="Name">Shared</string></Properties>
+<Item class="ModuleScript" referent="RBX3">
+<Properties><string name="Name">CarCatalog</string><ProtectedString name="Source"><![CDATA[--[[
+	CarCatalog
+	Autos sind Deko-Objekte mit Werten. Kein Fahrverhalten, keine Seats,
+	kein VehicleSeat. Nur Groesse, Farbe, Preis und ein Ratenmultiplikator.
+]]
+
+local CarCatalog = {}
+
+CarCatalog.Order = { "scrap_sedan", "hatchback", "muscle", "supercar" }
+
+CarCatalog.Cars = {
+	scrap_sedan = {
+		displayName = "Schrott-Limousine",
+		cost = 0,
+		rateMult = 1.0,
+		bodySize = Vector3.new(5.2, 1.6, 11.0),
+		roofSize = Vector3.new(4.6, 1.4, 5.0),
+		roofOffset = Vector3.new(0, 2.6, 0.6),
+		baseColor = Color3.fromRGB(120, 116, 110),
+		wheelbase = 3.4,
+		track = 2.9,
+	},
+	hatchback = {
+		displayName = "Kompakt-Hatch",
+		cost = 3000,
+		rateMult = 1.25,
+		bodySize = Vector3.new(5.0, 1.7, 9.6),
+		roofSize = Vector3.new(4.4, 1.6, 5.4),
+		roofOffset = Vector3.new(0, 2.7, 0.4),
+		baseColor = Color3.fromRGB(90, 140, 120),
+		wheelbase = 3.0,
+		track = 2.8,
+	},
+	muscle = {
+		displayName = "Muscle Coupe",
+		cost = 15000,
+		rateMult = 1.6,
+		bodySize = Vector3.new(5.8, 1.6, 12.4),
+		roofSize = Vector3.new(4.8, 1.3, 4.6),
+		roofOffset = Vector3.new(0, 2.5, 1.2),
+		baseColor = Color3.fromRGB(150, 60, 60),
+		wheelbase = 3.9,
+		track = 3.2,
+	},
+	supercar = {
+		displayName = "Supersportler",
+		cost = 75000,
+		rateMult = 2.2,
+		bodySize = Vector3.new(6.0, 1.2, 12.8),
+		roofSize = Vector3.new(4.4, 1.0, 4.0),
+		roofOffset = Vector3.new(0, 2.0, 1.6),
+		baseColor = Color3.fromRGB(230, 190, 40),
+		wheelbase = 4.1,
+		track = 3.3,
+	},
+}
+
+function CarCatalog.Get(carId)
+	return CarCatalog.Cars[carId]
+end
+
+function CarCatalog.IsValid(carId)
+	return CarCatalog.Cars[carId] ~= nil
+end
+
+CarCatalog.STARTER = "scrap_sedan"
+
+return CarCatalog
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX4">
+<Properties><string name="Name">Config</string><ProtectedString name="Source"><![CDATA[--[[
+	Config
+	Jede Zahl, an der man drehen kann, steht hier. Sonst nirgends.
+]]
+
+local Config = {}
+
+-- Wirtschaft ---------------------------------------------------------------
+Config.START_CASH = 250 -- reicht fuer das billigste Teil (Reifen T1 = 100) plus Puffer
+Config.OFFLINE_CAP_SECONDS = 8 * 60 * 60 -- Deckel fuer Offline-Einnahmen
+Config.OFFLINE_RATE = 1.0 -- Offline zaehlt voll (Faktor bleibt trotzdem einstellbar)
+Config.PILE_CAP_SECONDS = 2 * 60 * 60 -- so lange laeuft der Kassen-Stapel online voll, dann stoppt er
+Config.ACCRUAL_TICK = 1 -- Sekunden zwischen Einkommens-Ticks
+Config.CASH_PUSH_INTERVAL = 1 -- Sekunden zwischen Cash-Updates an den Client
+Config.SELL_REFUND = 0.5 -- Anteil des Teilewerts beim Verkauf loser Teile
+
+-- Speichern ----------------------------------------------------------------
+Config.AUTOSAVE_INTERVAL = 60
+Config.DATASTORE_NAME = "GarageHeist_Profiles_v1"
+Config.SESSION_LOCK_TIMEOUT = 90 -- danach gilt ein Lock als verwaist
+Config.LOAD_ATTEMPTS = 6
+Config.RETRY_BASE_WAIT = 2
+
+-- Klau-Fenster -------------------------------------------------------------
+Config.HEIST_INTERVAL = 8 * 60 -- alle 8 Minuten
+Config.HEIST_WINDOW = 60 -- 60 Sekunden offen
+Config.HEIST_FIRST_DELAY = 150 -- erstes Fenster erst nach 2,5 Minuten Serverlaufzeit
+Config.HEIST_WARN_AT = { 60, 15 } -- Vorwarnungen in Sekunden vor Fensteroeffnung
+Config.DISMOUNT_TIME = 4 -- Sekunden Abmontieren
+Config.DISMOUNT_MAX_DISTANCE = 16 -- bricht ab, wenn der Dieb weiter weg ist
+Config.TACKLE_RANGE = 12
+Config.TACKLE_COOLDOWN = 4
+Config.CARRY_WALKSPEED = 12
+Config.NORMAL_WALKSPEED = 16
+Config.DROPPED_PART_PICKUP_DISTANCE = 8
+Config.GARAGE_LOCK_WINDOW = 20 -- Gamepass: eigenes Tor faellt nach 20s wieder zu
+
+-- Plots --------------------------------------------------------------------
+Config.PLOT_COUNT = 12
+Config.PLOT_WIDTH = 46
+Config.PLOT_DEPTH = 54
+Config.PLOT_HEIGHT = 18
+Config.PLOTS_PER_ROW = 6
+Config.PLOT_GAP = 10
+Config.ROW_GAP = 110
+Config.BASE_HEIGHT = 0
+
+-- Garagen-Stufen -----------------------------------------------------------
+Config.GARAGE_LEVELS = {
+	{ cost = 0, rateMult = 1.00, carSlots = 1, label = "Blechbude" },
+	{ cost = 2500, rateMult = 1.15, carSlots = 2, label = "Werkstatt" },
+	{ cost = 14000, rateMult = 1.35, carSlots = 2, label = "Tuning-Shop" },
+	{ cost = 65000, rateMult = 1.60, carSlots = 3, label = "Rennstall" },
+	{ cost = 260000, rateMult = 2.00, carSlots = 4, label = "Werk" },
+}
+
+-- Monetarisierung ----------------------------------------------------------
+Config.VIP_RATE_MULT = 2.0
+Config.RADAR_TOP_COUNT = 5
+
+-- Daily Reward -------------------------------------------------------------
+Config.DAILY_REWARDS = { 250, 500, 900, 1500, 2600, 4200, 8000 }
+
+-- Leaderboard --------------------------------------------------------------
+Config.LEADERBOARD_REFRESH = 5
+
+return Config
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX5">
+<Properties><string name="Name">PartCatalog</string><ProtectedString name="Source"><![CDATA[--[[
+	PartCatalog
+	Vier Slots, je vier Stufen. Kosten, Reparaturzeit, Cash/Sekunde und wie das
+	Teil am Auto aussieht. Der Server rechnet ausschliesslich mit diesen Werten.
+]]
+
+local PartCatalog = {}
+
+PartCatalog.SlotOrder = { "engine", "tires", "paint", "turbo" }
+
+PartCatalog.Slots = {
+	engine = {
+		displayName = "Motor",
+		mount = "hood", -- sitzt sichtbar auf der Motorhaube
+		size = Vector3.new(2.8, 1.1, 2.0),
+		tiers = {
+			{ name = "Rostiger Reihenvierer", cost = 150, time = 6, rate = 0.6, color = Color3.fromRGB(105, 95, 88) },
+			{ name = "Ueberholter V6", cost = 900, time = 20, rate = 2.2, color = Color3.fromRGB(70, 120, 160) },
+			{ name = "Big Block V8", cost = 5200, time = 60, rate = 7.5, color = Color3.fromRGB(190, 120, 40) },
+			{ name = "Prototyp-Hybrid", cost = 28000, time = 180, rate = 24, color = Color3.fromRGB(120, 230, 190) },
+		},
+	},
+	tires = {
+		displayName = "Reifen",
+		mount = "wheels", -- vier Raeder statt eines Teils
+		size = Vector3.new(0.9, 2.2, 2.2),
+		tiers = {
+			{ name = "Notrad-Satz", cost = 100, time = 6, rate = 0.4, color = Color3.fromRGB(45, 45, 48) },
+			{ name = "Allwetter", cost = 700, time = 18, rate = 1.6, color = Color3.fromRGB(30, 30, 34) },
+			{ name = "Semi-Slicks", cost = 4200, time = 55, rate = 5.5, color = Color3.fromRGB(24, 24, 28) },
+			{ name = "Renn-Slicks", cost = 22000, time = 170, rate = 18, color = Color3.fromRGB(16, 16, 20) },
+		},
+	},
+	paint = {
+		displayName = "Lack",
+		mount = "body", -- faerbt die Karosserie
+		size = Vector3.new(1.4, 1.4, 1.4),
+		tiers = {
+			{ name = "Grundierung", cost = 120, time = 6, rate = 0.5, color = Color3.fromRGB(150, 150, 155) },
+			{ name = "Zweischicht", cost = 800, time = 18, rate = 1.8, color = Color3.fromRGB(200, 60, 60) },
+			{ name = "Perleffekt", cost = 4600, time = 55, rate = 6.0, color = Color3.fromRGB(60, 90, 220) },
+			{ name = "Chrom-Wrap", cost = 25000, time = 175, rate = 20, color = Color3.fromRGB(235, 235, 240) },
+		},
+	},
+	turbo = {
+		displayName = "Turbo",
+		mount = "spoiler", -- Fluegel am Heck
+		size = Vector3.new(3.2, 0.4, 0.9),
+		tiers = {
+			{ name = "Gebrauchtlader", cost = 200, time = 8, rate = 0.9, color = Color3.fromRGB(120, 120, 128) },
+			{ name = "Twin-Scroll", cost = 1200, time = 24, rate = 3.0, color = Color3.fromRGB(200, 170, 60) },
+			{ name = "Kompressor", cost = 6800, time = 70, rate = 9.5, color = Color3.fromRGB(230, 110, 30) },
+			{ name = "Anti-Lag-Kit", cost = 36000, time = 200, rate = 30, color = Color3.fromRGB(240, 60, 90) },
+		},
+	},
+}
+
+function PartCatalog.GetSlot(slotId)
+	return PartCatalog.Slots[slotId]
+end
+
+function PartCatalog.GetTier(slotId, tier)
+	local slot = PartCatalog.Slots[slotId]
+	if not slot then
+		return nil
+	end
+	return slot.tiers[tier]
+end
+
+-- Wert eines Teils = Summe aller Stufenkosten bis einschliesslich `tier`.
+-- Gebraucht fuer Leaderboard ("teuerste Garage") und Verkaufserloes.
+function PartCatalog.GetValue(slotId, tier)
+	local slot = PartCatalog.Slots[slotId]
+	if not slot then
+		return 0
+	end
+	local total = 0
+	for i = 1, math.min(tier, #slot.tiers) do
+		total += slot.tiers[i].cost
+	end
+	return total
+end
+
+function PartCatalog.GetRate(slotId, tier)
+	local def = PartCatalog.GetTier(slotId, tier)
+	return def and def.rate or 0
+end
+
+function PartCatalog.IsValidSlot(slotId)
+	return PartCatalog.Slots[slotId] ~= nil
+end
+
+return PartCatalog
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX6">
+<Properties><string name="Name">Remotes</string><ProtectedString name="Source"><![CDATA[--[[
+	Remotes
+	Erzeugt die RemoteEvents/-Functions auf dem Server und wartet auf dem Client
+	darauf. Ein einziger Ort, an dem der Name eines Remotes steht.
+
+	Wichtig: Der Client ruft hier nur ab. Jede Anfrage wird im jeweiligen Service
+	auf dem Server validiert (Besitz, Cash, Fenster offen, Entfernung).
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local FOLDER_NAME = "GarageHeistRemotes"
+
+-- Server -> Client
+local TO_CLIENT = {
+	"ProfileSync", -- kompletter Zustand der eigenen Garage
+	"CashUpdate", -- {cash, pile, rate}
+	"HeistState", -- {open, endsAt, nextAt, lockedUntil}
+	"Notify", -- {text, kind}
+	"CarryState", -- {part = {...} | nil}
+	"DismountProgress", -- {state = "start"|"cancel"|"done", duration, label}
+	"RadarPing", -- Liste der wertvollsten Teile im Server
+	"DailyState", -- {streak, canClaim, nextInSeconds}
+	"LeaderboardUpdate", -- {richest = {...}, thieves = {...}}
+	"ShopState", -- {vip, autoCollect, garageLock}
+}
+
+-- Client -> Server (alles wird serverseitig geprueft)
+local TO_SERVER = {
+	"RequestBuyPart", -- (carIndex, slotId)
+	"RequestInstantRepair", -- (carIndex, slotId)  -> loest den Robux-Kauf aus
+	"RequestBuyCar", -- (carId)
+	"RequestUpgradeGarage", -- ()
+	"RequestSellLoosePart", -- (uid)
+	"RequestInstallLoosePart", -- (uid, carIndex)
+	"RequestCollect", -- ()
+	"RequestClaimDaily", -- ()
+	"RequestTackle", -- ()
+	"RequestDropPart", -- ()
+	"RequestPromptPurchase", -- (kind, key) -> Server kennt die IDs, nicht der Client
+}
+
+local FUNCTIONS = {
+	"GetSnapshot", -- Erstzustand beim Beitreten
+}
+
+local Remotes = {}
+
+local function getFolder()
+	if RunService:IsServer() then
+		local folder = ReplicatedStorage:FindFirstChild(FOLDER_NAME)
+		if not folder then
+			folder = Instance.new("Folder")
+			folder.Name = FOLDER_NAME
+			folder.Parent = ReplicatedStorage
+		end
+		for _, name in TO_CLIENT do
+			if not folder:FindFirstChild(name) then
+				local ev = Instance.new("RemoteEvent")
+				ev.Name = name
+				ev.Parent = folder
+			end
+		end
+		for _, name in TO_SERVER do
+			if not folder:FindFirstChild(name) then
+				local ev = Instance.new("RemoteEvent")
+				ev.Name = name
+				ev.Parent = folder
+			end
+		end
+		for _, name in FUNCTIONS do
+			if not folder:FindFirstChild(name) then
+				local fn = Instance.new("RemoteFunction")
+				fn.Name = name
+				fn.Parent = folder
+			end
+		end
+		return folder
+	end
+	return ReplicatedStorage:WaitForChild(FOLDER_NAME, 30)
+end
+
+local cachedFolder = nil
+
+function Remotes.Get(name)
+	if not cachedFolder then
+		cachedFolder = getFolder()
+	end
+	assert(cachedFolder, "Remotes-Ordner nicht gefunden")
+	local remote = cachedFolder:FindFirstChild(name)
+	if not remote and RunService:IsClient() then
+		remote = cachedFolder:WaitForChild(name, 20)
+	end
+	assert(remote, ("Remote '%s' existiert nicht"):format(name))
+	return remote
+end
+
+-- Nur auf dem Server aufrufen: legt alle Remotes an.
+function Remotes.Init()
+	assert(RunService:IsServer(), "Remotes.Init nur auf dem Server")
+	cachedFolder = getFolder()
+	return cachedFolder
+end
+
+return Remotes
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX7">
+<Properties><string name="Name">Signal</string><ProtectedString name="Source"><![CDATA[--[[
+	Signal
+	Minimaler Ersatz fuer BindableEvents, damit Services sich gegenseitig
+	benachrichtigen koennen, ohne sich zu kennen. Kein Tabellen-Serialisieren,
+	Handler laufen in eigenen Threads.
+]]
+
+local Signal = {}
+Signal.__index = Signal
+
+function Signal.new()
+	return setmetatable({ _handlers = {} }, Signal)
+end
+
+function Signal:Connect(fn)
+	assert(type(fn) == "function", "Signal:Connect erwartet eine Funktion")
+	local handlers = self._handlers
+	table.insert(handlers, fn)
+	local connection = {
+		Connected = true,
+	}
+	function connection:Disconnect()
+		if not self.Connected then
+			return
+		end
+		self.Connected = false
+		local index = table.find(handlers, fn)
+		if index then
+			table.remove(handlers, index)
+		end
+	end
+	return connection
+end
+
+function Signal:Fire(...)
+	-- Kopie, damit ein Disconnect waehrend des Feuerns nichts kaputt macht.
+	local snapshot = table.clone(self._handlers)
+	for _, fn in snapshot do
+		task.spawn(fn, ...)
+	end
+end
+
+function Signal:DisconnectAll()
+	table.clear(self._handlers)
+end
+
+return Signal
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX8">
+<Properties><string name="Name">Util</string><ProtectedString name="Source"><![CDATA[--[[
+	Util
+	Kleinkram, den Server und Client beide brauchen. Nichts davon trifft
+	Entscheidungen ueber Geld.
+]]
+
+local HttpService = game:GetService("HttpService")
+
+local Util = {}
+
+local SUFFIXES = { "", "K", "M", "B", "T" }
+
+-- 1234 -> "1,2K"
+function Util.FormatCash(amount: number): string
+	amount = math.floor(tonumber(amount) or 0)
+	local negative = amount < 0
+	amount = math.abs(amount)
+	local index = 1
+	local value = amount
+	while value >= 1000 and index < #SUFFIXES do
+		value /= 1000
+		index += 1
+	end
+	local text
+	if index == 1 then
+		text = string.format("%d", value)
+	elseif value < 100 then
+		text = string.format("%.1f", value):gsub("%.", ",")
+	else
+		text = string.format("%d", value)
+	end
+	return (negative and "-$" or "$") .. text .. SUFFIXES[index]
+end
+
+-- 0.75 -> "0,8/s"
+function Util.FormatRate(rate: number): string
+	rate = tonumber(rate) or 0
+	if rate >= 100 then
+		return Util.FormatCash(rate) .. "/s"
+	end
+	return "$" .. (string.format("%.1f", rate):gsub("%.", ",")) .. "/s"
+end
+
+-- 95 -> "1:35", 7500 -> "2h 05m"
+function Util.FormatTime(seconds: number): string
+	seconds = math.max(0, math.floor(tonumber(seconds) or 0))
+	if seconds >= 3600 then
+		return string.format("%dh %02dm", math.floor(seconds / 3600), math.floor((seconds % 3600) / 60))
+	end
+	return string.format("%d:%02d", math.floor(seconds / 60), seconds % 60)
+end
+
+function Util.DeepCopy(source)
+	if type(source) ~= "table" then
+		return source
+	end
+	local copy = {}
+	for key, value in pairs(source) do
+		copy[key] = Util.DeepCopy(value)
+	end
+	return copy
+end
+
+-- Fuellt fehlende Felder aus einer Vorlage nach, ohne vorhandene zu ueberschreiben.
+-- Damit ueberleben alte Profile ein Schema-Update.
+function Util.Reconcile(data, template)
+	if type(data) ~= "table" then
+		return Util.DeepCopy(template)
+	end
+	for key, value in pairs(template) do
+		if data[key] == nil then
+			data[key] = Util.DeepCopy(value)
+		elseif type(value) == "table" and type(data[key]) == "table" then
+			Util.Reconcile(data[key], value)
+		end
+	end
+	return data
+end
+
+function Util.NewUid(): string
+	return HttpService:GenerateGUID(false)
+end
+
+-- Tag seit Epoch in UTC. Basis fuer die Daily-Kette.
+function Util.UtcDay(timestamp: number?): number
+	return math.floor((timestamp or os.time()) / 86400)
+end
+
+function Util.SafeNumber(value, fallback: number): number
+	local number = tonumber(value)
+	if not number or number ~= number or number == math.huge or number == -math.huge then
+		return fallback
+	end
+	return number
+end
+
+return Util
+]]></ProtectedString></Properties>
+</Item>
+</Item>
+</Item>
+<Item class="ServerScriptService" referent="RBX9">
+<Properties><string name="Name">ServerScriptService</string></Properties>
+<Item class="Script" referent="RBX10">
+<Properties><string name="Name">Server</string><ProtectedString name="Source"><![CDATA[--[[
+	Garage Heist - Server-Bootstrap
+
+	Startreihenfolge ist Absicht:
+	- DataService laeuft ZULETZT los, damit alle anderen Services schon an
+	  ProfileLoaded haengen, bevor das erste Profil geladen wird.
+	- GarageService vor HeistService, weil der Heist die Plots braucht.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Remotes = require(Shared.Remotes)
+
+Remotes.Init()
+
+local START_ORDER = {
+	"MonetizationService",
+	"EconomyService",
+	"GarageService",
+	"HeistService",
+	"DailyRewardService",
+	"LeaderboardService",
+	"DataService",
+}
+
+local services = {}
+for _, name in START_ORDER do
+	services[name] = require(script.Services[name])
+end
+
+for _, name in START_ORDER do
+	local service = services[name]
+	if service.Init then
+		service:Init(services)
+	end
+end
+
+-- Boden und Notfall-Spawn. Die eigentlichen Spawnpunkte liegen in den Garagen,
+-- hierher faellt nur, wer beitritt bevor sein Profil geladen ist.
+local ground = Instance.new("Part")
+ground.Name = "Ground"
+ground.Anchored = true
+ground.Size = Vector3.new(900, 2, 620)
+ground.CFrame = CFrame.new(0, -1, 0)
+ground.Color = Color3.fromRGB(58, 60, 64)
+ground.Material = Enum.Material.Asphalt
+ground.TopSurface = Enum.SurfaceType.Smooth
+ground.Parent = Workspace
+
+local spawnPad = Instance.new("SpawnLocation")
+spawnPad.Name = "LobbySpawn"
+spawnPad.Anchored = true
+spawnPad.Size = Vector3.new(12, 1, 12)
+spawnPad.CFrame = CFrame.new(0, 0.5, 26)
+spawnPad.Color = Color3.fromRGB(90, 200, 130)
+spawnPad.Material = Enum.Material.Neon
+spawnPad.Duration = 0
+spawnPad.Parent = Workspace
+
+for _, name in START_ORDER do
+	local service = services[name]
+	if service.Start then
+		local ok, err = pcall(function()
+			service:Start()
+		end)
+		if not ok then
+			warn(("[Bootstrap] %s:Start() ist gescheitert: %s"):format(name, tostring(err)))
+		end
+	end
+end
+
+print("[Garage Heist] Server bereit.")
+]]></ProtectedString></Properties>
+<Item class="Folder" referent="RBX11">
+<Properties><string name="Name">Data</string></Properties>
+<Item class="ModuleScript" referent="RBX12">
+<Properties><string name="Name">ProfileOps</string><ProtectedString name="Source"><![CDATA[--[[
+	ProfileOps
+	Reine Datenoperationen auf einem Profil. Keine Instances, keine Remotes,
+	keine Zeitschleifen - dadurch kann sowohl die Online-Logik (GarageService)
+	als auch die Offline-Abrechnung (EconomyService) exakt dasselbe rechnen.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+
+local CarCatalog = require(Shared.CarCatalog)
+local Config = require(Shared.Config)
+local PartCatalog = require(Shared.PartCatalog)
+local Util = require(Shared.Util)
+
+local ProfileOps = {}
+
+function ProfileOps.RepairKey(carIndex: number, slotId: string): string
+	return tostring(carIndex) .. ":" .. slotId
+end
+
+function ProfileOps.GarageLevelDef(data)
+	local level = math.clamp(data.garageLevel or 1, 1, #Config.GARAGE_LEVELS)
+	return Config.GARAGE_LEVELS[level], level
+end
+
+-- Cash pro Sekunde ohne Gamepass-Multiplikator.
+function ProfileOps.ComputeBaseRate(data): number
+	local levelDef = ProfileOps.GarageLevelDef(data)
+	local total = 0
+	for _, car in data.cars do
+		local carDef = CarCatalog.Get(car.carId)
+		if carDef then
+			local carSum = 0
+			for slotId, part in car.parts do
+				carSum += PartCatalog.GetRate(slotId, part.tier)
+			end
+			total += carSum * carDef.rateMult
+		end
+	end
+	return total * levelDef.rateMult
+end
+
+-- Summe aller Teile- und Autokosten. Basis fuer "teuerste Garage".
+function ProfileOps.GarageValue(data): number
+	local total = 0
+	for _, car in data.cars do
+		local carDef = CarCatalog.Get(car.carId)
+		if carDef then
+			total += carDef.cost
+		end
+		for slotId, part in car.parts do
+			total += PartCatalog.GetValue(slotId, part.tier)
+		end
+	end
+	for _, part in data.looseParts do
+		total += PartCatalog.GetValue(part.slotId, part.tier)
+	end
+	local _, level = ProfileOps.GarageLevelDef(data)
+	for i = 1, level do
+		total += Config.GARAGE_LEVELS[i].cost
+	end
+	return total
+end
+
+function ProfileOps.GetPart(data, carIndex: number, slotId: string)
+	local car = data.cars[carIndex]
+	return car and car.parts[slotId] or nil
+end
+
+function ProfileOps.CurrentTier(data, carIndex: number, slotId: string): number
+	local part = ProfileOps.GetPart(data, carIndex, slotId)
+	return part and part.tier or 0
+end
+
+function ProfileOps.SetPart(data, carIndex: number, slotId: string, part)
+	local car = data.cars[carIndex]
+	if not car then
+		return false
+	end
+	car.parts[slotId] = part
+	return true
+end
+
+function ProfileOps.RemovePart(data, carIndex: number, slotId: string)
+	local car = data.cars[carIndex]
+	if not car then
+		return nil
+	end
+	local part = car.parts[slotId]
+	car.parts[slotId] = nil
+	return part
+end
+
+function ProfileOps.NewPart(slotId: string, tier: number, originalOwner: number)
+	return {
+		uid = Util.NewUid(),
+		slotId = slotId,
+		tier = tier,
+		originalOwner = originalOwner,
+	}
+end
+
+function ProfileOps.AddLoosePart(data, part)
+	data.looseParts[part.uid] = {
+		uid = part.uid,
+		slotId = part.slotId,
+		tier = part.tier,
+		originalOwner = part.originalOwner,
+	}
+end
+
+function ProfileOps.TakeLoosePart(data, uid: string)
+	local part = data.looseParts[uid]
+	data.looseParts[uid] = nil
+	return part
+end
+
+-- Erstes Auto, dessen Slot `slotId` frei ist (und nicht in Reparatur).
+function ProfileOps.FindEmptySlot(data, slotId: string): number?
+	for index in data.cars do
+		if not ProfileOps.GetPart(data, index, slotId) and not data.repairs[ProfileOps.RepairKey(index, slotId)] then
+			return index
+		end
+	end
+	return nil
+end
+
+function ProfileOps.StartRepair(data, carIndex: number, slotId: string, tier: number, endsAt: number)
+	data.repairs[ProfileOps.RepairKey(carIndex, slotId)] = {
+		tier = tier,
+		endsAt = endsAt,
+		carIndex = carIndex,
+		slotId = slotId,
+	}
+end
+
+-- Reparatur abschliessen: altes Teil faellt weg, neues wird eingebaut.
+function ProfileOps.FinishRepair(data, carIndex: number, slotId: string, ownerUserId: number)
+	local key = ProfileOps.RepairKey(carIndex, slotId)
+	local repair = data.repairs[key]
+	if not repair then
+		return nil
+	end
+	data.repairs[key] = nil
+	local part = ProfileOps.NewPart(slotId, repair.tier, ownerUserId)
+	ProfileOps.SetPart(data, carIndex, slotId, part)
+	return part
+end
+
+-- Alle Reparaturen, die bis `until` fertig sind - aufsteigend nach Endzeit.
+function ProfileOps.RepairsDueBefore(data, untilTime: number)
+	local due = {}
+	for _, repair in data.repairs do
+		if repair.endsAt <= untilTime then
+			table.insert(due, repair)
+		end
+	end
+	table.sort(due, function(a, b)
+		return a.endsAt < b.endsAt
+	end)
+	return due
+end
+
+function ProfileOps.CarSlots(data): number
+	local levelDef = ProfileOps.GarageLevelDef(data)
+	return levelDef.carSlots
+end
+
+-- Setzt den Tageszaehler zurueck, wenn ein neuer UTC-Tag begonnen hat.
+function ProfileOps.RollDailyStats(data)
+	local today = Util.UtcDay()
+	if data.stats.stolenDay ~= today then
+		data.stats.stolenDay = today
+		data.stats.stolenToday = 0
+	end
+end
+
+return ProfileOps
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX13">
+<Properties><string name="Name">ProfileTemplate</string><ProtectedString name="Source"><![CDATA[--[[
+	ProfileTemplate
+	Das Schema eines Spielerprofils. Alles, was der Server ueber einen Spieler
+	weiss, steht hier drin - und nur hier.
+
+	Neue Felder duerfen ergaenzt werden: Util.Reconcile fuellt sie bei alten
+	Profilen beim Laden nach.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+
+local Config = require(Shared.Config)
+local CarCatalog = require(Shared.CarCatalog)
+
+local ProfileTemplate = {}
+
+ProfileTemplate.SCHEMA_VERSION = 1
+ProfileTemplate.MAX_RECEIPTS = 60
+
+function ProfileTemplate.New()
+	return {
+		schemaVersion = ProfileTemplate.SCHEMA_VERSION,
+
+		cash = Config.START_CASH,
+		pile = 0, -- verdientes, noch nicht abgeholtes Cash (Kasse in der Garage)
+		lastOnline = 0, -- os.time() beim letzten Verlassen; 0 = noch nie gespielt
+		firstJoin = 0,
+
+		garageLevel = 1,
+
+		-- cars ist ein dichtes Array. cars[i].parts[slotId] = Teil oder nil.
+		-- Teil = { uid, tier, originalOwner }
+		cars = {
+			{ carId = CarCatalog.STARTER, parts = {} },
+		},
+
+		-- Laufende Reparaturen: repairs["1:engine"] = { endsAt = <os.time>, tier = <n> }
+		-- Das Geld ist beim Kauf schon abgebucht, deshalb muss das persistent sein.
+		repairs = {},
+
+		-- Geklaute oder ausgebaute Teile ohne Einbauplatz: looseParts[uid] = { slotId, tier, originalOwner }
+		looseParts = {},
+
+		stats = {
+			stolenToday = 0,
+			stolenDay = 0, -- UTC-Tag, auf den sich stolenToday bezieht
+			totalStolen = 0,
+			partsLost = 0,
+			totalEarned = 0,
+		},
+
+		daily = {
+			streak = 0,
+			lastDay = 0, -- UTC-Tag der letzten Abholung
+		},
+
+		-- Idempotenz fuer ProcessReceipt
+		receipts = {},
+		receiptOrder = {},
+
+		-- Einmalige Effekte aus Developer Products
+		pendingRadar = 0, -- Anzahl gekaufter, noch nicht verbrauchter Radar-Ladungen
+	}
+end
+
+return ProfileTemplate
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX14">
+<Properties><string name="Name">SessionStore</string><ProtectedString name="Source"><![CDATA[--[[
+	SessionStore
+	DataStore-Zugriff mit Session-Lock und Retry-Backoff.
+
+	Ablage pro Key: { lock = { jobId, at }, payload = <Profil> }
+
+	Regeln:
+	- Laden nimmt den Lock. Haelt ihn ein anderer Server und ist er frisch,
+	  wird gewartet und erneut versucht - nicht geladen.
+	- Speichern prueft den Lock. Wurde er uebernommen, wird NICHT geschrieben,
+	  damit zwei Server sich nicht gegenseitig ueberschreiben.
+	- Ohne DataStore-Zugriff (Studio ohne API Services) faellt der Store auf
+	  einen In-Memory-Modus zurueck, damit man trotzdem testen kann. Das wird
+	  laut in die Konsole geschrieben.
+]]
+
+local DataStoreService = game:GetService("DataStoreService")
+local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage:WaitForChild("Shared").Config)
+
+local JOB_ID = if game.JobId ~= "" then game.JobId else "studio-" .. HttpService:GenerateGUID(false)
+
+local SessionStore = {}
+SessionStore.__index = SessionStore
+
+function SessionStore.new(storeName: string)
+	local self = setmetatable({}, SessionStore)
+	self._mock = false
+	self._mockData = {}
+	self._name = storeName
+
+	local ok, store = pcall(function()
+		return DataStoreService:GetDataStore(storeName)
+	end)
+	if ok and store then
+		self._store = store
+		local probeOk, err = pcall(function()
+			return store:GetAsync("__probe__")
+		end)
+		if not probeOk then
+			self:_enterMock(tostring(err))
+		end
+	else
+		self:_enterMock(tostring(store))
+	end
+	return self
+end
+
+function SessionStore:_enterMock(reason: string)
+	self._mock = true
+	warn(("[SessionStore] Kein DataStore-Zugriff (%s). Fallback auf In-Memory - "):format(reason)
+		.. "Fortschritt wird NICHT gespeichert. In Studio: Game Settings > Security > "
+		.. "'Enable Studio Access to API Services' aktivieren.")
+end
+
+function SessionStore:IsMock(): boolean
+	return self._mock
+end
+
+function SessionStore:_key(userId: number): string
+	return "player_" .. tostring(userId)
+end
+
+-- Fuehrt UpdateAsync mit Retry aus. `transform` darf nil zurueckgeben, um den
+-- Schreibvorgang abzubrechen (z.B. weil ein fremder Lock aktiv ist).
+function SessionStore:_update(key: string, transform: (any) -> any): (boolean, any, string?)
+	if self._mock then
+		local current = self._mockData[key]
+		local result = transform(current)
+		if result == nil then
+			return false, nil, "aborted"
+		end
+		self._mockData[key] = result
+		return true, result
+	end
+
+	local lastError = "unknown"
+	for attempt = 1, Config.LOAD_ATTEMPTS do
+		local aborted = false
+		local ok, result = pcall(function()
+			return self._store:UpdateAsync(key, function(old)
+				local transformed = transform(old)
+				if transformed == nil then
+					aborted = true
+				end
+				return transformed
+			end)
+		end)
+		if ok and not aborted then
+			return true, result
+		end
+		if aborted then
+			return false, nil, "aborted"
+		end
+		lastError = tostring(result)
+		warn(("[SessionStore] UpdateAsync Versuch %d/%d fehlgeschlagen: %s"):format(attempt, Config.LOAD_ATTEMPTS, lastError))
+		task.wait(Config.RETRY_BASE_WAIT * 2 ^ (attempt - 1))
+	end
+	return false, nil, lastError
+end
+
+local function lockIsForeign(entry): boolean
+	local lock = entry and entry.lock
+	if not lock or lock.jobId == JOB_ID then
+		return false
+	end
+	return (os.time() - (lock.at or 0)) < Config.SESSION_LOCK_TIMEOUT
+end
+
+-- Laedt das Profil und nimmt den Lock. Gibt (true, payload) oder (false, grund).
+function SessionStore:Load(userId: number)
+	local key = self:_key(userId)
+	for attempt = 1, Config.LOAD_ATTEMPTS do
+		local ok, entry, err = self:_update(key, function(old)
+			if lockIsForeign(old) then
+				return nil -- anderer Server haelt den Lock, spaeter erneut versuchen
+			end
+			local fresh = old or {}
+			fresh.lock = { jobId = JOB_ID, at = os.time() }
+			return fresh
+		end)
+		if ok and entry then
+			return true, entry.payload
+		end
+		if err ~= "aborted" then
+			return false, "datastore: " .. tostring(err)
+		end
+		warn(("[SessionStore] Profil %d ist von einer anderen Session gesperrt (Versuch %d)"):format(userId, attempt))
+		task.wait(Config.RETRY_BASE_WAIT * attempt)
+	end
+	return false, "session-locked"
+end
+
+-- Schreibt das Profil. `release = true` gibt den Lock frei.
+function SessionStore:Save(userId: number, payload, release: boolean?)
+	local key = self:_key(userId)
+	local ok, _, err = self:_update(key, function(old)
+		if lockIsForeign(old) then
+			return nil -- Lock wurde uebernommen: nicht ueberschreiben
+		end
+		local entry = old or {}
+		entry.payload = payload
+		if release then
+			entry.lock = nil
+		else
+			entry.lock = { jobId = JOB_ID, at = os.time() }
+		end
+		return entry
+	end)
+	if not ok then
+		if err == "aborted" then
+			warn(("[SessionStore] Speichern fuer %d abgebrochen: fremder Session-Lock"):format(userId))
+		else
+			warn(("[SessionStore] Speichern fuer %d fehlgeschlagen: %s"):format(userId, tostring(err)))
+		end
+	end
+	return ok
+end
+
+return SessionStore
+]]></ProtectedString></Properties>
+</Item>
+</Item>
+<Item class="Folder" referent="RBX15">
+<Properties><string name="Name">Garage</string></Properties>
+<Item class="ModuleScript" referent="RBX16">
+<Properties><string name="Name">GarageRequests</string><ProtectedString name="Source"><![CDATA[--[[
+	GarageRequests
+	Jede Aktion, die der Client anfragen kann. Reihenfolge ist immer gleich:
+	Profil da? Gehoert ihm das? Ist der Wunsch ueberhaupt gueltig? Reicht das
+	Geld? Erst dann wird etwas veraendert.
+
+	Gibt (ok, meldung) zurueck. Das Rendern uebernimmt der GarageService.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local CarCatalog = require(Shared.CarCatalog)
+local Config = require(Shared.Config)
+local PartCatalog = require(Shared.PartCatalog)
+local Util = require(Shared.Util)
+
+local ProfileOps = require(script.Parent.Parent.Data.ProfileOps)
+
+local GarageRequests = {}
+
+local function validCarIndex(data, carIndex): boolean
+	if type(carIndex) ~= "number" or carIndex % 1 ~= 0 then
+		return false
+	end
+	return data.cars[carIndex] ~= nil
+end
+
+function GarageRequests.BuyPart(services, player: Player, data, carIndex, slotId)
+	if not validCarIndex(data, carIndex) then
+		return false, "Dieses Auto gehoert dir nicht."
+	end
+	if type(slotId) ~= "string" or not PartCatalog.IsValidSlot(slotId) then
+		return false, "Unbekannter Teile-Slot."
+	end
+	local key = ProfileOps.RepairKey(carIndex, slotId)
+	if data.repairs[key] then
+		return false, "Da wird gerade schon geschraubt."
+	end
+
+	local nextTier = ProfileOps.CurrentTier(data, carIndex, slotId) + 1
+	local tierDef = PartCatalog.GetTier(slotId, nextTier)
+	if not tierDef then
+		return false, "Hoechste Stufe ist schon verbaut."
+	end
+	if not services.EconomyService:TrySpend(player, tierDef.cost) then
+		return false, ("Zu wenig Cash: %s noetig."):format(Util.FormatCash(tierDef.cost))
+	end
+
+	ProfileOps.StartRepair(data, carIndex, slotId, nextTier, os.time() + tierDef.time)
+	return true, ("%s wird eingebaut (%ds)."):format(tierDef.name, tierDef.time)
+end
+
+-- Wird nur nach einem bestaetigten Robux-Kauf aufgerufen.
+function GarageRequests.FinishRepairNow(services, player: Player, data, carIndex, slotId): boolean
+	if not validCarIndex(data, carIndex) or not PartCatalog.IsValidSlot(slotId) then
+		return false
+	end
+	local repair = data.repairs[ProfileOps.RepairKey(carIndex, slotId)]
+	if not repair then
+		return false
+	end
+	repair.endsAt = os.time()
+	return true
+end
+
+function GarageRequests.BuyCar(services, player: Player, data, carId)
+	if type(carId) ~= "string" or not CarCatalog.IsValid(carId) then
+		return false, "Dieses Auto gibt es nicht."
+	end
+	local carDef = CarCatalog.Get(carId)
+	local slots = ProfileOps.CarSlots(data)
+	if #data.cars >= slots then
+		return false, ("Kein Stellplatz frei (%d/%d). Erst die Garage ausbauen."):format(#data.cars, slots)
+	end
+	if carDef.cost > 0 and not services.EconomyService:TrySpend(player, carDef.cost) then
+		return false, ("Zu wenig Cash: %s noetig."):format(Util.FormatCash(carDef.cost))
+	end
+	table.insert(data.cars, { carId = carId, parts = {} })
+	return true, ("%s steht in der Garage."):format(carDef.displayName)
+end
+
+function GarageRequests.UpgradeGarage(services, player: Player, data)
+	local _, level = ProfileOps.GarageLevelDef(data)
+	local nextDef = Config.GARAGE_LEVELS[level + 1]
+	if not nextDef then
+		return false, "Die Garage ist voll ausgebaut."
+	end
+	if not services.EconomyService:TrySpend(player, nextDef.cost) then
+		return false, ("Zu wenig Cash: %s noetig."):format(Util.FormatCash(nextDef.cost))
+	end
+	data.garageLevel = level + 1
+	return true, ("Garage ausgebaut: %s (x%.2f Rate)."):format(nextDef.label, nextDef.rateMult)
+end
+
+function GarageRequests.SellLoosePart(services, player: Player, data, uid)
+	if type(uid) ~= "string" then
+		return false, "Ungueltiges Teil."
+	end
+	local part = data.looseParts[uid]
+	if not part then
+		return false, "Das Teil liegt nicht in deiner Garage."
+	end
+	local value = math.floor(PartCatalog.GetValue(part.slotId, part.tier) * Config.SELL_REFUND)
+	ProfileOps.TakeLoosePart(data, uid)
+	services.EconomyService:AddCash(player, value)
+	return true, ("Verkauft fuer %s."):format(Util.FormatCash(value))
+end
+
+function GarageRequests.InstallLoosePart(services, player: Player, data, uid, carIndex)
+	if type(uid) ~= "string" then
+		return false, "Ungueltiges Teil."
+	end
+	local part = data.looseParts[uid]
+	if not part then
+		return false, "Das Teil liegt nicht in deiner Garage."
+	end
+	if carIndex == nil then
+		carIndex = ProfileOps.FindEmptySlot(data, part.slotId)
+	end
+	if not validCarIndex(data, carIndex) then
+		return false, "Kein passendes Auto."
+	end
+	if ProfileOps.GetPart(data, carIndex, part.slotId) then
+		return false, "Der Platz ist belegt. Erst das alte Teil ersetzen."
+	end
+	if data.repairs[ProfileOps.RepairKey(carIndex, part.slotId)] then
+		return false, "An dem Platz wird gerade geschraubt."
+	end
+
+	ProfileOps.TakeLoosePart(data, uid)
+	ProfileOps.SetPart(data, carIndex, part.slotId, {
+		uid = part.uid,
+		slotId = part.slotId,
+		tier = part.tier,
+		originalOwner = part.originalOwner,
+	})
+	local tierDef = PartCatalog.GetTier(part.slotId, part.tier)
+	return true, ("%s eingebaut."):format(tierDef and tierDef.name or part.slotId)
+end
+
+-- Abgeliefertes Diebesgut: passt es in einen freien Slot, wird es eingebaut,
+-- sonst liegt es lose in der Garage und kann verkauft werden.
+function GarageRequests.DepositStolenPart(services, player: Player, data, part)
+	ProfileOps.AddLoosePart(data, part)
+	local carIndex = ProfileOps.FindEmptySlot(data, part.slotId)
+	if carIndex then
+		local ok, message = GarageRequests.InstallLoosePart(services, player, data, part.uid, carIndex)
+		if ok then
+			return true, message
+		end
+	end
+	local tierDef = PartCatalog.GetTier(part.slotId, part.tier)
+	return true, ("%s liegt jetzt in deiner Garage (kein freier Platz)."):format(tierDef and tierDef.name or part.slotId)
+end
+
+return GarageRequests
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX17">
+<Properties><string name="Name">GarageView</string><ProtectedString name="Source"><![CDATA[--[[
+	GarageView
+	Haelt die sichtbare Welt am Profil dran: Autos neu bauen, Schild und
+	Billboards beschriften, Klau-Prompts verdrahten.
+
+	Der Zustand liegt immer im Profil. Diese Datei liest ihn nur ab.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local CarCatalog = require(Shared.CarCatalog)
+local PartCatalog = require(Shared.PartCatalog)
+local Util = require(Shared.Util)
+
+local Server = script.Parent.Parent
+local CarBuilder = require(Server.World.CarBuilder)
+local ProfileOps = require(Server.Data.ProfileOps)
+
+local GarageView = {}
+
+-- Baut alle Autos eines Spielers neu. Wird nach jeder Zustandsaenderung
+-- aufgerufen (Kauf, Reparatur fertig, Teil geklaut, Teil abgeliefert).
+function GarageView.RenderCars(view, player: Player, data, onStealPrompt)
+	for _, carRefs in view.cars do
+		if carRefs.billboard and carRefs.billboard.part then
+			carRefs.billboard.part:Destroy()
+		end
+		carRefs.model:Destroy()
+	end
+	table.clear(view.cars)
+
+	for carIndex, carState in data.cars do
+		local pad = view.plot.carPads[carIndex]
+		if pad then
+			local refs = CarBuilder.Build(carState, carIndex, player.UserId, pad, view.plot.model)
+			view.cars[carIndex] = refs
+			for slotId, prompt in refs.prompts do
+				prompt.Enabled = view.stealEnabled == true
+				prompt.Triggered:Connect(function(thief)
+					onStealPrompt(thief, player, carIndex, slotId, prompt)
+				end)
+			end
+		end
+	end
+	GarageView.UpdateBillboards(view, data)
+end
+
+function GarageView.UpdateBillboards(view, data)
+	for carIndex, refs in view.cars do
+		local carState = data.cars[carIndex]
+		if carState then
+			local carDef = CarCatalog.Get(carState.carId)
+			local sum = 0
+			for slotId, part in carState.parts do
+				sum += PartCatalog.GetRate(slotId, part.tier)
+			end
+			sum *= carDef and carDef.rateMult or 1
+			local missing = 0
+			for _, slotId in PartCatalog.SlotOrder do
+				if not carState.parts[slotId] then
+					missing += 1
+				end
+			end
+			refs.billboard.title.Text = carDef and carDef.displayName or carState.carId
+			refs.billboard.sub.Text = if missing > 0
+				then ("%s  -  %d Teile fehlen"):format(Util.FormatRate(sum), missing)
+				else Util.FormatRate(sum)
+		end
+	end
+end
+
+function GarageView.UpdateSign(view, player: Player, data, rate: number)
+	local sign = view.plot.sign
+	sign.name.Text = player.DisplayName .. "s Garage"
+	sign.value.Text = "Wert " .. Util.FormatCash(ProfileOps.GarageValue(data))
+	sign.rate.Text = Util.FormatRate(rate)
+end
+
+-- Klau-Prompts an/aus. Wird vom HeistService gesteuert, nicht vom Client.
+function GarageView.SetStealEnabled(view, enabled: boolean)
+	view.stealEnabled = enabled
+	for _, refs in view.cars do
+		for _, prompt in refs.prompts do
+			prompt.Enabled = enabled
+		end
+	end
+end
+
+return GarageView
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX18">
+<Properties><string name="Name">RequestRouter</string><ProtectedString name="Source"><![CDATA[--[[
+	RequestRouter
+	Bindet die Client-Remotes an GarageRequests. Jede Verbindung laeuft durch
+	dieselbe Schleuse: Drosselung, Profil vorhanden, Ergebnis melden, Welt neu
+	zeichnen. Kein Handler bekommt Rohdaten ungeprueft weitergereicht.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Remotes = require(Shared.Remotes)
+
+local GarageRequests = require(script.Parent.GarageRequests)
+local Snapshot = require(script.Parent.Snapshot)
+
+local RequestRouter = {}
+
+local REQUEST_COOLDOWN = 0.15
+
+local function throttled(garage, player: Player, key: string): boolean
+	local now = os.clock()
+	local perPlayer = garage._cooldowns[player.UserId]
+	if not perPlayer then
+		perPlayer = {}
+		garage._cooldowns[player.UserId] = perPlayer
+	end
+	if now - (perPlayer[key] or 0) < REQUEST_COOLDOWN then
+		return true
+	end
+	perPlayer[key] = now
+	return false
+end
+
+local function bind(garage, name: string, handler)
+	Remotes.Get(name).OnServerEvent:Connect(function(player, ...)
+		if throttled(garage, player, name) then
+			return
+		end
+		local data = garage.Services.DataService:Get(player)
+		if not data then
+			return
+		end
+		local ok, message = handler(player, data, ...)
+		if message then
+			garage.Services.EconomyService:Notify(player, message, ok and "good" or "bad")
+		end
+		if ok then
+			garage:Refresh(player, data)
+		end
+	end)
+end
+
+function RequestRouter.Bind(garage)
+	local services = garage.Services
+
+	bind(garage, "RequestBuyPart", function(player, data, carIndex, slotId)
+		return GarageRequests.BuyPart(services, player, data, carIndex, slotId)
+	end)
+	bind(garage, "RequestBuyCar", function(player, data, carId)
+		return GarageRequests.BuyCar(services, player, data, carId)
+	end)
+	bind(garage, "RequestUpgradeGarage", function(player, data)
+		return GarageRequests.UpgradeGarage(services, player, data)
+	end)
+	bind(garage, "RequestSellLoosePart", function(player, data, uid)
+		return GarageRequests.SellLoosePart(services, player, data, uid)
+	end)
+	bind(garage, "RequestInstallLoosePart", function(player, data, uid, carIndex)
+		return GarageRequests.InstallLoosePart(services, player, data, uid, carIndex)
+	end)
+
+	Remotes.Get("GetSnapshot").OnServerInvoke = function(player)
+		local data = services.DataService:Wait(player, 20)
+		if not data then
+			return nil
+		end
+		return Snapshot.Build(player, data, {
+			rate = services.EconomyService:GetRate(player, data),
+			passes = services.MonetizationService:GetOwnership(player),
+		})
+	end
+end
+
+return RequestRouter
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX19">
+<Properties><string name="Name">Snapshot</string><ProtectedString name="Source"><![CDATA[--[[
+	Snapshot
+	Baut aus einem Profil das Paket, das der Client zum Anzeigen bekommt.
+	Reine Lesefunktion - hier wird nichts veraendert und nichts entschieden.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local CarCatalog = require(Shared.CarCatalog)
+local Config = require(Shared.Config)
+local PartCatalog = require(Shared.PartCatalog)
+
+local ProfileOps = require(script.Parent.Parent.Data.ProfileOps)
+
+local Snapshot = {}
+
+local function partEntry(data, carIndex: number, slotId: string, ownerUserId: number)
+	local slotDef = PartCatalog.GetSlot(slotId)
+	local part = ProfileOps.GetPart(data, carIndex, slotId)
+	local repair = data.repairs[ProfileOps.RepairKey(carIndex, slotId)]
+	local tier = part and part.tier or 0
+	local tierDef = part and PartCatalog.GetTier(slotId, tier)
+	local nextTier = repair and (repair.tier + 1) or (tier + 1)
+	local nextDef = PartCatalog.GetTier(slotId, nextTier)
+
+	return {
+		slotId = slotId,
+		slotName = slotDef.displayName,
+		tier = tier,
+		tierName = tierDef and tierDef.name or "leer",
+		rate = part and PartCatalog.GetRate(slotId, tier) or 0,
+		stolen = part ~= nil and part.originalOwner ~= ownerUserId,
+		repair = repair and { endsAt = repair.endsAt, tier = repair.tier } or nil,
+		nextTier = nextDef and nextTier or nil,
+		nextName = nextDef and nextDef.name or nil,
+		nextCost = nextDef and nextDef.cost or nil,
+		nextTime = nextDef and nextDef.time or nil,
+		nextRate = nextDef and nextDef.rate or nil,
+	}
+end
+
+function Snapshot.Build(player: Player, data, extra)
+	extra = extra or {}
+	local levelDef, level = ProfileOps.GarageLevelDef(data)
+	local nextLevelDef = Config.GARAGE_LEVELS[level + 1]
+
+	local cars = {}
+	for carIndex, car in data.cars do
+		local carDef = CarCatalog.Get(car.carId)
+		local parts = {}
+		for _, slotId in PartCatalog.SlotOrder do
+			table.insert(parts, partEntry(data, carIndex, slotId, player.UserId))
+		end
+		table.insert(cars, {
+			carIndex = carIndex,
+			carId = car.carId,
+			displayName = carDef and carDef.displayName or car.carId,
+			rateMult = carDef and carDef.rateMult or 1,
+			parts = parts,
+		})
+	end
+
+	local loose = {}
+	for uid, part in data.looseParts do
+		local slotDef = PartCatalog.GetSlot(part.slotId)
+		local tierDef = PartCatalog.GetTier(part.slotId, part.tier)
+		table.insert(loose, {
+			uid = uid,
+			slotId = part.slotId,
+			slotName = slotDef and slotDef.displayName or part.slotId,
+			tier = part.tier,
+			tierName = tierDef and tierDef.name or "?",
+			sellValue = math.floor(PartCatalog.GetValue(part.slotId, part.tier) * Config.SELL_REFUND),
+			installCarIndex = ProfileOps.FindEmptySlot(data, part.slotId),
+		})
+	end
+	table.sort(loose, function(a, b)
+		return a.sellValue > b.sellValue
+	end)
+
+	local shopCars = {}
+	for _, carId in CarCatalog.Order do
+		local carDef = CarCatalog.Get(carId)
+		table.insert(shopCars, {
+			carId = carId,
+			displayName = carDef.displayName,
+			cost = carDef.cost,
+			rateMult = carDef.rateMult,
+		})
+	end
+
+	return {
+		cash = math.floor(data.cash),
+		pile = math.floor(data.pile),
+		rate = extra.rate or ProfileOps.ComputeBaseRate(data),
+		garage = {
+			level = level,
+			label = levelDef.label,
+			rateMult = levelDef.rateMult,
+			carSlots = levelDef.carSlots,
+			nextCost = nextLevelDef and nextLevelDef.cost or nil,
+			nextLabel = nextLevelDef and nextLevelDef.label or nil,
+			nextRateMult = nextLevelDef and nextLevelDef.rateMult or nil,
+			nextCarSlots = nextLevelDef and nextLevelDef.carSlots or nil,
+		},
+		cars = cars,
+		looseParts = loose,
+		shopCars = shopCars,
+		stats = {
+			stolenToday = data.stats.stolenToday,
+			totalStolen = data.stats.totalStolen,
+			partsLost = data.stats.partsLost,
+			garageValue = ProfileOps.GarageValue(data),
+		},
+		passes = extra.passes or {},
+	}
+end
+
+return Snapshot
+]]></ProtectedString></Properties>
+</Item>
+</Item>
+<Item class="Folder" referent="RBX20">
+<Properties><string name="Name">Heist</string></Properties>
+<Item class="ModuleScript" referent="RBX21">
+<Properties><string name="Name">CarryManager</string><ProtectedString name="Source"><![CDATA[--[[
+	CarryManager
+	Was mit einem abmontierten Teil passiert, solange es niemandem gehoert:
+	tragen, fallen lassen, aufheben, abliefern.
+
+	Besitzwechsel passiert erst beim Abliefern in der eigenen Garage. Bis dahin
+	haelt der Server das Teil in der Hand - im Wortsinn: es haengt am Charakter
+	und ist beim Tod, beim Verlassen oder beim Fenster-Ende wieder weg.
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local PartCatalog = require(Shared.PartCatalog)
+local Remotes = require(Shared.Remotes)
+
+local PartVisual = require(script.Parent.PartVisual)
+
+local CarryManager = {}
+CarryManager.__index = CarryManager
+
+function CarryManager.new(services)
+	local self = setmetatable({}, CarryManager)
+	self.Services = services
+	self.carrying = {} -- [userId] = { part, model, weld, victimUserId }
+	self.dropped = {} -- [model] = { part, prompt }
+	self.tackleCooldown = {}
+	return self
+end
+
+function CarryManager:IsCarrying(player: Player): boolean
+	return self.carrying[player.UserId] ~= nil
+end
+
+function CarryManager:_pushState(player: Player)
+	local entry = self.carrying[player.UserId]
+	local payload = nil
+	if entry then
+		local tierDef = PartCatalog.GetTier(entry.part.slotId, entry.part.tier)
+		local slotDef = PartCatalog.GetSlot(entry.part.slotId)
+		payload = {
+			slotId = entry.part.slotId,
+			slotName = slotDef and slotDef.displayName or entry.part.slotId,
+			tierName = tierDef and tierDef.name or "Teil",
+			tier = entry.part.tier,
+		}
+	end
+	Remotes.Get("CarryState"):FireClient(player, { part = payload })
+end
+
+function CarryManager:StartCarry(player: Player, part, victimUserId: number?)
+	if self.carrying[player.UserId] then
+		return false
+	end
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not root then
+		return false
+	end
+
+	local model = PartVisual.Build(part)
+	model.CFrame = root.CFrame * CFrame.new(0, 0.6, -2.4)
+	model.Parent = workspace
+
+	local weld = Instance.new("Weld")
+	weld.Part0 = root
+	weld.Part1 = model
+	weld.C0 = CFrame.new(0, 0.6, -2.4)
+	weld.Parent = model
+
+	self.carrying[player.UserId] = {
+		part = part,
+		model = model,
+		weld = weld,
+		victimUserId = victimUserId,
+	}
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.WalkSpeed = Config.CARRY_WALKSPEED
+	end
+	self:_pushState(player)
+	return true
+end
+
+function CarryManager:_clearCarry(player: Player)
+	local entry = self.carrying[player.UserId]
+	if not entry then
+		return nil
+	end
+	self.carrying[player.UserId] = nil
+	if entry.model then
+		entry.model:Destroy()
+	end
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.WalkSpeed = Config.NORMAL_WALKSPEED
+	end
+	self:_pushState(player)
+	return entry
+end
+
+-- Teil faellt zu Boden und kann von jedem aufgehoben werden.
+function CarryManager:Drop(player: Player, reason: string?)
+	local entry = self.carrying[player.UserId]
+	if not entry then
+		return false
+	end
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	local position = root and (root.Position + Vector3.new(0, -1.5, 0)) or Vector3.new(0, 5, 0)
+	self:_clearCarry(player)
+	self:SpawnDropped(entry.part, position)
+	if reason then
+		self.Services.EconomyService:Notify(player, reason, "bad")
+	end
+	return true
+end
+
+function CarryManager:SpawnDropped(part, position: Vector3)
+	local model = PartVisual.Build(part)
+	model.Anchored = true
+	model.CFrame = CFrame.new(position)
+	model.Parent = workspace
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "Aufheben"
+	prompt.ObjectText = "Herrenloses Teil"
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = Config.DROPPED_PART_PICKUP_DISTANCE
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = model
+
+	self.dropped[model] = { part = part, prompt = prompt }
+
+	prompt.Triggered:Connect(function(player)
+		local entry = self.dropped[model]
+		if not entry or not self.Services.HeistService:IsOpen() then
+			return
+		end
+		if self:IsCarrying(player) then
+			self.Services.EconomyService:Notify(player, "Du traegst schon ein Teil.", "bad")
+			return
+		end
+		self.dropped[model] = nil
+		model:Destroy()
+		self:StartCarry(player, entry.part, nil)
+	end)
+	return model
+end
+
+-- Abgabe im eigenen Plot. Wird vom Touched-Event des Abgabe-Pads gerufen.
+function CarryManager:TryDeposit(player: Player, plotIndex: number)
+	local entry = self.carrying[player.UserId]
+	if not entry then
+		return false
+	end
+	if self.Services.GarageService:GetOwnerOfPlot(plotIndex) ~= player.UserId then
+		return false
+	end
+	self:_clearCarry(player)
+	local _, message = self.Services.GarageService:GiveStolenPart(player, entry.part)
+	self.Services.EconomyService:Notify(player, message or "Teil abgeliefert.", "good")
+
+	local victim = entry.victimUserId and Players:GetPlayerByUserId(entry.victimUserId)
+	if victim then
+		self.Services.EconomyService:Notify(
+			victim,
+			("%s hat dein Teil in die eigene Garage geschleppt."):format(player.DisplayName),
+			"bad"
+		)
+	end
+	return true
+end
+
+-- Rempler: wer nah genug an einem Traeger steht, schlaegt ihm das Teil aus der Hand.
+function CarryManager:Tackle(player: Player)
+	if not self.Services.HeistService:IsOpen() then
+		return
+	end
+	local now = os.clock()
+	if now - (self.tackleCooldown[player.UserId] or 0) < Config.TACKLE_COOLDOWN then
+		return
+	end
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not root then
+		return
+	end
+	self.tackleCooldown[player.UserId] = now
+
+	local bestPlayer, bestDistance = nil, Config.TACKLE_RANGE
+	for userId in self.carrying do
+		if userId ~= player.UserId then
+			local other = Players:GetPlayerByUserId(userId)
+			local otherRoot = other and other.Character and other.Character:FindFirstChild("HumanoidRootPart")
+			if otherRoot then
+				local distance = (otherRoot.Position - root.Position).Magnitude
+				if distance <= bestDistance then
+					bestPlayer, bestDistance = other, distance
+				end
+			end
+		end
+	end
+
+	if not bestPlayer then
+		self.Services.EconomyService:Notify(player, "Niemand in Reichweite.", "info")
+		return
+	end
+	self:Drop(bestPlayer, ("%s hat dir das Teil aus der Hand geschlagen."):format(player.DisplayName))
+	self.Services.EconomyService:Notify(player, ("Treffer! %s liegt das Teil vor den Fuessen."):format(bestPlayer.DisplayName), "good")
+end
+
+-- Alles einsammeln, was noch herumliegt oder getragen wird: zurueck zum
+-- urspruenglichen Besitzer.
+function CarryManager:ReturnEverything()
+	-- Erst Schluessel einsammeln: die Schleifen veraendern beide Tabellen.
+	local carriers = {}
+	for userId in self.carrying do
+		table.insert(carriers, userId)
+	end
+	local droppedModels = {}
+	for model in self.dropped do
+		table.insert(droppedModels, model)
+	end
+
+	for _, userId in carriers do
+		local player = Players:GetPlayerByUserId(userId)
+		if player then
+			local entry = self:_clearCarry(player)
+			if entry then
+				if not self.Services.GarageService:ReturnPart(entry.part) then
+					self.Services.EconomyService:Notify(player, "Das Fenster ist zu - das Teil ist weg.", "bad")
+				else
+					self.Services.EconomyService:Notify(player, "Zu spaet abgeliefert. Das Teil ist zurueck beim Besitzer.", "bad")
+				end
+			end
+		else
+			self.carrying[userId] = nil
+		end
+	end
+	for _, model in droppedModels do
+		local entry = self.dropped[model]
+		if entry then
+			self.Services.GarageService:ReturnPart(entry.part)
+		end
+		self.dropped[model] = nil
+		model:Destroy()
+	end
+end
+
+function CarryManager:HandleLeave(player: Player)
+	local entry = self:_clearCarry(player)
+	self.tackleCooldown[player.UserId] = nil
+	if entry then
+		self.Services.GarageService:ReturnPart(entry.part)
+	end
+end
+
+function CarryManager:HandleDeath(player: Player)
+	if self.carrying[player.UserId] then
+		self:Drop(player, "Du hast das Teil fallen lassen.")
+	end
+end
+
+return CarryManager
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX22">
+<Properties><string name="Name">DismountManager</string><ProtectedString name="Source"><![CDATA[--[[
+	DismountManager
+	Vier Sekunden schrauben. Der Server misst die Zeit, prueft waehrenddessen
+	weiter Entfernung, Fenster und ob das Teil ueberhaupt noch dran ist. Der
+	Client zeichnet nur den Balken - er kann den Vorgang nicht abkuerzen.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local PartCatalog = require(Shared.PartCatalog)
+local Remotes = require(Shared.Remotes)
+
+local ProfileOps = require(script.Parent.Parent.Data.ProfileOps)
+
+local DismountManager = {}
+DismountManager.__index = DismountManager
+
+local CHECK_STEP = 0.2
+
+function DismountManager.new(services, carry)
+	return setmetatable({
+		Services = services,
+		Carry = carry,
+		active = {},
+	}, DismountManager)
+end
+
+local function rootOf(player: Player)
+	local character = player.Character
+	return character and character:FindFirstChild("HumanoidRootPart") or nil
+end
+
+function DismountManager:_progress(thief: Player, state: string, duration: number?, label: string?)
+	Remotes.Get("DismountProgress"):FireClient(thief, {
+		state = state,
+		duration = duration,
+		label = label,
+	})
+end
+
+-- Alles, was stimmen muss - vor dem Start und waehrend der vier Sekunden.
+function DismountManager:_check(thief: Player, victim: Player, carIndex: number, slotId: string, anchor: BasePart?)
+	if not self.Services.HeistService:IsOpen() then
+		return false, "Das Klau-Fenster ist zu."
+	end
+	if thief == victim then
+		return false, "Das ist deine eigene Garage."
+	end
+	local victimPlot = self.Services.GarageService:GetPlotIndexOf(victim)
+	if not victimPlot or not self.Services.HeistService:IsPlotOpen(victimPlot) then
+		return false, "Diese Garage ist verriegelt."
+	end
+	local victimData = self.Services.DataService:Get(victim)
+	if not victimData or not ProfileOps.GetPart(victimData, carIndex, slotId) then
+		return false, "Da ist nichts mehr."
+	end
+	if self.Carry:IsCarrying(thief) then
+		return false, "Erst abliefern, dann weiterklauen."
+	end
+	local root = rootOf(thief)
+	if not root then
+		return false, "Kein Charakter."
+	end
+	if anchor and (anchor.Position - root.Position).Magnitude > Config.DISMOUNT_MAX_DISTANCE then
+		return false, "Zu weit weg."
+	end
+	return true
+end
+
+function DismountManager:Start(thief: Player, victim: Player, carIndex: number, slotId: string, anchor: BasePart?)
+	if self.active[thief.UserId] then
+		return
+	end
+	local ok, reason = self:_check(thief, victim, carIndex, slotId, anchor)
+	if not ok then
+		self.Services.EconomyService:Notify(thief, reason, "bad")
+		return
+	end
+
+	local tierDef = PartCatalog.GetTier(slotId, ProfileOps.CurrentTier(self.Services.DataService:Get(victim), carIndex, slotId))
+	local label = tierDef and tierDef.name or slotId
+	local token = (self._token or 0) + 1
+	self._token = token
+	self.active[thief.UserId] = token
+	self:_progress(thief, "start", Config.DISMOUNT_TIME, label)
+	self.Services.EconomyService:Notify(
+		victim,
+		("%s schraubt an deinem Auto!"):format(thief.DisplayName),
+		"bad"
+	)
+
+	task.spawn(function()
+		local elapsed = 0
+		while elapsed < Config.DISMOUNT_TIME do
+			task.wait(CHECK_STEP)
+			elapsed += CHECK_STEP
+			if self.active[thief.UserId] ~= token then
+				return -- abgebrochen (Cancel, Tod, Fenster zu)
+			end
+			local stillOk, why = self:_check(thief, victim, carIndex, slotId, anchor)
+			if not stillOk then
+				self.active[thief.UserId] = nil
+				self:_progress(thief, "cancel")
+				self.Services.EconomyService:Notify(thief, why, "bad")
+				return
+			end
+		end
+
+		self.active[thief.UserId] = nil
+		local part = self.Services.GarageService:TakePart(victim, carIndex, slotId)
+		if not part then
+			self:_progress(thief, "cancel")
+			return
+		end
+		self:_progress(thief, "done")
+		if not self.Carry:StartCarry(thief, part, victim.UserId) then
+			-- Charakter ist im letzten Moment weg: Teil faellt an Ort und Stelle.
+			local root = rootOf(thief)
+			self.Carry:SpawnDropped(part, root and root.Position or anchor and anchor.Position or Vector3.new(0, 5, 0))
+			return
+		end
+		self.Services.EconomyService:Notify(thief, ("%s abmontiert - ab in deine Garage!"):format(label), "good")
+		self.Services.EconomyService:Notify(
+			victim,
+			("%s hat dir %s abmontiert!"):format(thief.DisplayName, label),
+			"bad"
+		)
+	end)
+end
+
+function DismountManager:Cancel(thief: Player)
+	if self.active[thief.UserId] then
+		self.active[thief.UserId] = nil
+		self:_progress(thief, "cancel")
+	end
+end
+
+return DismountManager
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX23">
+<Properties><string name="Name">PartVisual</string><ProtectedString name="Source"><![CDATA[--[[
+	PartVisual
+	Das sichtbare Objekt fuer ein Teil, das gerade niemandem gehoert - getragen
+	oder auf dem Boden. Nur Aussehen; wem es gehoert, steht im Profil.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local PartCatalog = require(ReplicatedStorage:WaitForChild("Shared").PartCatalog)
+
+local PartVisual = {}
+
+function PartVisual.Build(part): Part
+	local slotDef = PartCatalog.GetSlot(part.slotId)
+	local tierDef = PartCatalog.GetTier(part.slotId, part.tier)
+
+	local instance = Instance.new("Part")
+	instance.Name = "StolenPart"
+	instance.Size = Vector3.new(
+		math.min(slotDef.size.X, 3),
+		math.min(slotDef.size.Y, 2),
+		math.min(slotDef.size.Z, 3)
+	)
+	instance.Color = tierDef and tierDef.color or Color3.fromRGB(200, 200, 200)
+	instance.Material = Enum.Material.Metal
+	instance.CanCollide = false
+	instance.Massless = true
+	instance:SetAttribute("PartUid", part.uid)
+
+	local gui = Instance.new("BillboardGui")
+	gui.Size = UDim2.fromScale(7, 1.6)
+	gui.StudsOffset = Vector3.new(0, 2, 0)
+	gui.AlwaysOnTop = true
+	gui.MaxDistance = 120
+	gui.Parent = instance
+
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.fromScale(1, 1)
+	label.Font = Enum.Font.GothamBold
+	label.TextScaled = true
+	label.TextColor3 = Color3.fromRGB(255, 220, 120)
+	label.TextStrokeTransparency = 0.4
+	label.Text = tierDef and tierDef.name or part.slotId
+	label.Parent = gui
+
+	return instance
+end
+
+return PartVisual
+]]></ProtectedString></Properties>
+</Item>
+</Item>
+<Item class="Folder" referent="RBX24">
+<Properties><string name="Name">Monetization</string></Properties>
+<Item class="ModuleScript" referent="RBX25">
+<Properties><string name="Name">PurchaseEffects</string><ProtectedString name="Source"><![CDATA[--[[
+	PurchaseEffects
+	Was ein Developer Product konkret tut. Jede Funktion gibt true zurueck,
+	wenn sie sauber durchgelaufen ist - nur dann wird der Receipt als
+	verarbeitet abgehakt.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Util = require(Shared.Util)
+
+local GarageRequests = require(script.Parent.Parent.Garage.GarageRequests)
+
+local PurchaseEffects = {}
+
+-- Bewusst so gewaehlt, dass auch das groesste Paket den Loop nicht ersetzt:
+-- das teuerste Garagen-Upgrade kostet 260k, der Supersportler 75k.
+PurchaseEffects.CASH_AMOUNTS = {
+	CashSmall = 5000,
+	CashMedium = 30000,
+	CashLarge = 150000,
+}
+
+function PurchaseEffects.GrantCash(services, player: Player, data, key: string): boolean
+	local amount = PurchaseEffects.CASH_AMOUNTS[key]
+	if not amount then
+		return false
+	end
+	data.cash += amount
+	services.EconomyService:Push(player, true)
+	services.EconomyService:Notify(player, ("Cash-Paket gutgeschrieben: %s"):format(Util.FormatCash(amount)), "good")
+	return true
+end
+
+function PurchaseEffects.InstantRepair(services, player: Player, data, target): boolean
+	if not target then
+		services.EconomyService:Notify(player, "Keine laufende Reparatur - Kauf nicht angewendet.", "bad")
+		return false
+	end
+	local ok = GarageRequests.FinishRepairNow(services, player, data, target.carIndex, target.slotId)
+	if not ok then
+		services.EconomyService:Notify(player, "Die Reparatur ist schon fertig.", "bad")
+		return false
+	end
+	services.EconomyService:Notify(player, "Reparatur uebersprungen.", "good")
+	return true
+end
+
+function PurchaseEffects.HeistRadar(services, player: Player, data): boolean
+	-- Die Ladung liegt im Profil, nicht im Serverspeicher: wer nach dem Kauf
+	-- rausfliegt, bekommt sie beim naechsten Fenster trotzdem.
+	services.HeistService:GrantRadar(player, data)
+	return true
+end
+
+return PurchaseEffects
+]]></ProtectedString></Properties>
+</Item>
+</Item>
+<Item class="Folder" referent="RBX26">
+<Properties><string name="Name">Services</string></Properties>
+<Item class="ModuleScript" referent="RBX27">
+<Properties><string name="Name">DailyRewardService</string><ProtectedString name="Source"><![CDATA[--[[
+	DailyRewardService
+	Sieben-Tage-Kette auf UTC-Tagen. Ein verpasster Tag setzt die Kette auf 1
+	zurueck. Nach Tag 7 faengt sie wieder bei 1 an.
+
+	Die Tagesgrenze rechnet der Server. Der Client bekommt nur, ob abgeholt
+	werden kann und wie lange es noch dauert.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Remotes = require(Shared.Remotes)
+local Util = require(Shared.Util)
+
+local DailyRewardService = {}
+DailyRewardService.Name = "DailyRewardService"
+
+local STREAK_LENGTH = #Config.DAILY_REWARDS
+
+function DailyRewardService:Init(services)
+	self.Services = services
+end
+
+function DailyRewardService:Start()
+	self.Services.DataService.ProfileLoaded:Connect(function(player, data)
+		task.delay(1.5, function()
+			if player.Parent then
+				self:Push(player, data)
+			end
+		end)
+	end)
+
+	Remotes.Get("RequestClaimDaily").OnServerEvent:Connect(function(player)
+		self:Claim(player)
+	end)
+
+	task.spawn(function()
+		while true do
+			task.wait(60)
+			self.Services.DataService:ForEachProfile(function(player, data)
+				self:Push(player, data)
+			end)
+		end
+	end)
+end
+
+function DailyRewardService:_state(data)
+	local today = Util.UtcDay()
+	local lastDay = data.daily.lastDay or 0
+	local canClaim = lastDay < today
+	local streak = data.daily.streak or 0
+	local nextStreak
+	if lastDay == today - 1 then
+		nextStreak = (streak % STREAK_LENGTH) + 1
+	else
+		nextStreak = 1
+	end
+	if not canClaim then
+		nextStreak = streak
+	end
+	local secondsToMidnight = ((today + 1) * 86400) - os.time()
+	return {
+		streak = streak,
+		canClaim = canClaim,
+		nextStreak = nextStreak,
+		reward = Config.DAILY_REWARDS[math.clamp(nextStreak, 1, STREAK_LENGTH)],
+		rewards = Config.DAILY_REWARDS,
+		nextInSeconds = secondsToMidnight,
+	}
+end
+
+function DailyRewardService:Push(player: Player, data)
+	data = data or self.Services.DataService:Get(player)
+	if not data then
+		return
+	end
+	Remotes.Get("DailyState"):FireClient(player, self:_state(data))
+end
+
+function DailyRewardService:Claim(player: Player)
+	local data = self.Services.DataService:Get(player)
+	if not data then
+		return false
+	end
+	local state = self:_state(data)
+	if not state.canClaim then
+		self.Services.EconomyService:Notify(player, "Heute schon abgeholt. Morgen wieder.", "info")
+		return false
+	end
+
+	data.daily.streak = state.nextStreak
+	data.daily.lastDay = Util.UtcDay()
+	local reward = Config.DAILY_REWARDS[math.clamp(data.daily.streak, 1, STREAK_LENGTH)]
+	self.Services.EconomyService:AddCash(player, reward)
+	self.Services.EconomyService:Notify(
+		player,
+		("Tag %d der Kette: %s"):format(data.daily.streak, Util.FormatCash(reward)),
+		"good"
+	)
+	self:Push(player, data)
+	self.Services.GarageService:Sync(player, data)
+	return true
+end
+
+return DailyRewardService
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX28">
+<Properties><string name="Name">DataService</string><ProtectedString name="Source"><![CDATA[--[[
+	DataService
+	Besitzt alle Profile der Spieler auf diesem Server. Kein anderer Service
+	fasst den DataStore an.
+
+	- Laden mit Session-Lock (SessionStore). Schlaegt das Laden fehl, wird der
+	  Spieler gekickt statt mit einem leeren Profil weiterzuspielen.
+	- Autosave alle 60s (haelt gleichzeitig den Lock frisch).
+	- BindToClose speichert alle offenen Profile beim Herunterfahren.
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Signal = require(Shared.Signal)
+local Util = require(Shared.Util)
+
+local Data = script.Parent.Parent.Data
+local ProfileTemplate = require(Data.ProfileTemplate)
+local SessionStore = require(Data.SessionStore)
+
+local DataService = {}
+DataService.Name = "DataService"
+
+DataService.ProfileLoaded = Signal.new() -- (player, data)
+
+local profiles: { [number]: any } = {}
+local loading: { [number]: boolean } = {}
+
+function DataService:Init()
+	self._store = SessionStore.new(Config.DATASTORE_NAME)
+end
+
+function DataService:Start()
+	Players.PlayerAdded:Connect(function(player)
+		self:_load(player)
+	end)
+	for _, player in Players:GetPlayers() do
+		task.spawn(function()
+			self:_load(player)
+		end)
+	end
+
+	Players.PlayerRemoving:Connect(function(player)
+		self:_release(player)
+	end)
+
+	task.spawn(function()
+		while true do
+			task.wait(Config.AUTOSAVE_INTERVAL)
+			for _, player in Players:GetPlayers() do
+				local data = profiles[player.UserId]
+				if data then
+					data.lastOnline = os.time()
+					self._store:Save(player.UserId, data, false)
+				end
+			end
+		end
+	end)
+
+	game:BindToClose(function()
+		if RunService:IsStudio() and self._store:IsMock() then
+			return
+		end
+		local pending = 0
+		for _, player in Players:GetPlayers() do
+			local data = profiles[player.UserId]
+			if data then
+				pending += 1
+				task.spawn(function()
+					self:_release(player)
+					pending -= 1
+				end)
+			end
+		end
+		local deadline = os.clock() + 25
+		while pending > 0 and os.clock() < deadline do
+			task.wait(0.1)
+		end
+	end)
+end
+
+function DataService:_load(player: Player)
+	if profiles[player.UserId] or loading[player.UserId] then
+		return
+	end
+	loading[player.UserId] = true
+
+	local ok, payload = self._store:Load(player.UserId)
+	loading[player.UserId] = nil
+
+	if not player.Parent then
+		-- Spieler ist waehrend des Ladens gegangen: Lock wieder freigeben.
+		if ok then
+			self._store:Save(player.UserId, payload or ProfileTemplate.New(), true)
+		end
+		return
+	end
+
+	if not ok then
+		warn(("[DataService] Laden fuer %s fehlgeschlagen: %s"):format(player.Name, tostring(payload)))
+		player:Kick("Dein Spielstand konnte nicht geladen werden. Bitte in ein paar Sekunden neu beitreten.")
+		return
+	end
+
+	local data = Util.Reconcile(payload or ProfileTemplate.New(), ProfileTemplate.New())
+	data.schemaVersion = ProfileTemplate.SCHEMA_VERSION
+	if data.firstJoin == 0 then
+		data.firstJoin = os.time()
+	end
+
+	profiles[player.UserId] = data
+	self.ProfileLoaded:Fire(player, data)
+end
+
+function DataService:_release(player: Player)
+	local data = profiles[player.UserId]
+	if not data then
+		return
+	end
+	data.lastOnline = os.time()
+	profiles[player.UserId] = nil
+	self._store:Save(player.UserId, data, true)
+end
+
+-- Gibt das Profil zurueck oder nil, wenn es (noch) nicht geladen ist.
+function DataService:Get(player: Player)
+	return profiles[player.UserId]
+end
+
+-- Wartet bis zu `timeout` Sekunden auf das Profil.
+function DataService:Wait(player: Player, timeout: number?)
+	local deadline = os.clock() + (timeout or 15)
+	while os.clock() < deadline do
+		local data = profiles[player.UserId]
+		if data then
+			return data
+		end
+		if not player.Parent then
+			return nil
+		end
+		task.wait(0.1)
+	end
+	return nil
+end
+
+function DataService:ForEachProfile(callback: (Player, any) -> ())
+	for _, player in Players:GetPlayers() do
+		local data = profiles[player.UserId]
+		if data then
+			callback(player, data)
+		end
+	end
+end
+
+-- Nur fuer Tests/Debug: erzwingt ein Speichern.
+function DataService:SaveNow(player: Player)
+	local data = profiles[player.UserId]
+	if not data then
+		return false
+	end
+	data.lastOnline = os.time()
+	return self._store:Save(player.UserId, data, false)
+end
+
+function DataService:IsMock(): boolean
+	return self._store:IsMock()
+end
+
+return DataService
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX29">
+<Properties><string name="Name">EconomyService</string><ProtectedString name="Source"><![CDATA[--[[
+	EconomyService
+	Einziger Ort, an dem sich Cash veraendert. Der Client bekommt Zahlen nur
+	zum Anzeigen - er schickt nie einen Betrag, er fragt nur nach Aktionen.
+
+	Online: jede Sekunde wandert rate * dt in die Garagenkasse (gedeckelt).
+	        Mit Auto-Collect landet es direkt auf dem Konto.
+	Offline: beim Laden wird die Abwesenheit abgerechnet, exakt segmentiert an
+	        Reparaturen, die waehrenddessen fertig wurden, und bei 8h gekappt.
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Remotes = require(Shared.Remotes)
+local Util = require(Shared.Util)
+
+local ProfileOps = require(script.Parent.Parent.Data.ProfileOps)
+
+local EconomyService = {}
+EconomyService.Name = "EconomyService"
+
+function EconomyService:Init(services)
+	self.Services = services
+	self._lastPush = {}
+	self._offlineDone = {}
+	self._offlineRunning = {}
+end
+
+function EconomyService:Start()
+	local DataService = self.Services.DataService
+
+	DataService.ProfileLoaded:Connect(function(player, data)
+		self:EnsureOfflineApplied(player, data)
+		self:Push(player, true)
+	end)
+
+	Players.PlayerRemoving:Connect(function(player)
+		self._lastPush[player.UserId] = nil
+		self._offlineDone[player.UserId] = nil
+		self._offlineRunning[player.UserId] = nil
+	end)
+
+	Remotes.Get("RequestCollect").OnServerEvent:Connect(function(player)
+		self:Collect(player)
+	end)
+
+	task.spawn(function()
+		while true do
+			local dt = task.wait(Config.ACCRUAL_TICK)
+			self:_tick(dt)
+		end
+	end)
+end
+
+-- Cash/Sekunde inkl. Gamepass-Multiplikator.
+function EconomyService:GetRate(player: Player, data): number
+	data = data or self.Services.DataService:Get(player)
+	if not data then
+		return 0
+	end
+	local rate = ProfileOps.ComputeBaseRate(data)
+	if self.Services.MonetizationService:HasPass(player, "VIP") then
+		rate *= Config.VIP_RATE_MULT
+	end
+	return rate
+end
+
+function EconomyService:_tick(dt: number)
+	local DataService = self.Services.DataService
+	DataService:ForEachProfile(function(player, data)
+		local rate = self:GetRate(player, data)
+		if rate <= 0 then
+			return
+		end
+		local earned = rate * dt
+		data.stats.totalEarned += earned
+		if self.Services.MonetizationService:HasPass(player, "AutoCollect") then
+			data.cash += earned
+		else
+			local cap = rate * Config.PILE_CAP_SECONDS
+			data.pile = math.min(data.pile + earned, cap)
+		end
+		self:Push(player)
+	end)
+end
+
+-- Genau einmal pro Session. GarageService ruft das ebenfalls auf, bevor es
+-- fertige Reparaturen einbaut - sonst haengt die Offline-Summe an der
+-- Reihenfolge zweier Signal-Handler.
+function EconomyService:EnsureOfflineApplied(player: Player, data)
+	local id = player.UserId
+	if self._offlineDone[id] then
+		return
+	end
+	if self._offlineRunning[id] then
+		local deadline = os.clock() + 20
+		while self._offlineRunning[id] and os.clock() < deadline do
+			task.wait(0.05)
+		end
+		return
+	end
+	self._offlineRunning[id] = true
+	local ok, err = pcall(function()
+		self:_applyOffline(player, data)
+	end)
+	self._offlineRunning[id] = nil
+	self._offlineDone[id] = true
+	if not ok then
+		warn(("[EconomyService] Offline-Abrechnung fuer %s fehlgeschlagen: %s"):format(player.Name, tostring(err)))
+	end
+end
+
+-- Erst wenn das true ist, darf jemand anders an data.repairs ran.
+function EconomyService:IsSettled(player: Player): boolean
+	return self._offlineDone[player.UserId] == true
+end
+
+function EconomyService:_applyOffline(player: Player, data)
+	local now = os.time()
+	local last = data.lastOnline
+	if last <= 0 or now <= last then
+		data.lastOnline = now
+		return
+	end
+
+	-- Gamepass-Besitz vor der Rechnung sicherstellen (VIP verdoppelt die Rate).
+	self.Services.MonetizationService:RefreshOwnership(player)
+
+	local capEnd = last + Config.OFFLINE_CAP_SECONDS
+	local segmentEnd = math.min(now, capEnd)
+	local cursor = last
+	local total = 0
+	local multiplier = self.Services.MonetizationService:HasPass(player, "VIP") and Config.VIP_RATE_MULT or 1
+
+	-- Reparaturen, die waehrend der Abwesenheit fertig wurden, aendern die Rate
+	-- mittendrin. Deshalb wird pro Abschnitt gerechnet.
+	for _, repair in ProfileOps.RepairsDueBefore(data, now) do
+		local boundary = math.min(repair.endsAt, segmentEnd)
+		if boundary > cursor then
+			total += ProfileOps.ComputeBaseRate(data) * multiplier * (boundary - cursor)
+			cursor = boundary
+		end
+		ProfileOps.FinishRepair(data, repair.carIndex, repair.slotId, player.UserId)
+	end
+	if segmentEnd > cursor then
+		total += ProfileOps.ComputeBaseRate(data) * multiplier * (segmentEnd - cursor)
+	end
+
+	local earned = math.floor(total * Config.OFFLINE_RATE)
+	data.lastOnline = now
+	if earned <= 0 then
+		return
+	end
+
+	data.cash += earned
+	data.stats.totalEarned += earned
+	local away = now - last
+	local capped = away > Config.OFFLINE_CAP_SECONDS
+	self:Notify(
+		player,
+		("Offline-Einnahmen: %s fuer %s%s"):format(
+			Util.FormatCash(earned),
+			Util.FormatTime(math.min(away, Config.OFFLINE_CAP_SECONDS)),
+			capped and " (Deckel: 8h)" or ""
+		),
+		"cash"
+	)
+end
+
+function EconomyService:Collect(player: Player)
+	local data = self.Services.DataService:Get(player)
+	if not data then
+		return false
+	end
+	local amount = math.floor(data.pile)
+	if amount <= 0 then
+		return false
+	end
+	data.pile -= amount
+	data.cash += amount
+	self:Push(player, true)
+	self:Notify(player, ("Kasse geleert: %s"):format(Util.FormatCash(amount)), "cash")
+	return true
+end
+
+function EconomyService:AddCash(player: Player, amount: number, reason: string?)
+	local data = self.Services.DataService:Get(player)
+	if not data or amount <= 0 then
+		return false
+	end
+	data.cash += amount
+	self:Push(player, true)
+	if reason then
+		self:Notify(player, ("+%s %s"):format(Util.FormatCash(amount), reason), "cash")
+	end
+	return true
+end
+
+-- Einzige erlaubte Art, Geld auszugeben. Gibt false zurueck, wenn es nicht reicht.
+function EconomyService:TrySpend(player: Player, amount: number): boolean
+	local data = self.Services.DataService:Get(player)
+	if not data then
+		return false
+	end
+	amount = math.max(0, math.floor(Util.SafeNumber(amount, 0)))
+	if data.cash < amount then
+		return false
+	end
+	data.cash -= amount
+	self:Push(player, true)
+	return true
+end
+
+function EconomyService:Push(player: Player, force: boolean?)
+	local data = self.Services.DataService:Get(player)
+	if not data then
+		return
+	end
+	local now = os.clock()
+	local last = self._lastPush[player.UserId] or 0
+	if not force and now - last < Config.CASH_PUSH_INTERVAL then
+		return
+	end
+	self._lastPush[player.UserId] = now
+	Remotes.Get("CashUpdate"):FireClient(player, {
+		cash = math.floor(data.cash),
+		pile = math.floor(data.pile),
+		rate = self:GetRate(player, data),
+		autoCollect = self.Services.MonetizationService:HasPass(player, "AutoCollect"),
+	})
+end
+
+function EconomyService:Notify(player: Player, text: string, kind: string?)
+	Remotes.Get("Notify"):FireClient(player, { text = text, kind = kind or "info" })
+end
+
+return EconomyService
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX30">
+<Properties><string name="Name">GarageService</string><ProtectedString name="Source"><![CDATA[--[[
+	GarageService
+	Verteilt Plots, haelt Welt und Profil synchron, besitzt die einzige
+	Schnittstelle, ueber die Teile den Besitzer wechseln.
+
+	Pruefung der Client-Wuensche: GarageRequests + RequestRouter.
+	Rendern: GarageView. Geometrie: World/*.
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local PartCatalog = require(Shared.PartCatalog)
+local Remotes = require(Shared.Remotes)
+
+local Server = script.Parent.Parent
+local GarageRequests = require(Server.Garage.GarageRequests)
+local GarageView = require(Server.Garage.GarageView)
+local RequestRouter = require(Server.Garage.RequestRouter)
+local Snapshot = require(Server.Garage.Snapshot)
+local DoorController = require(Server.World.DoorController)
+local PlotBuilder = require(Server.World.PlotBuilder)
+local ProfileOps = require(Server.Data.ProfileOps)
+
+local GarageService = {}
+GarageService.Name = "GarageService"
+
+local DOOR_COLOR = Color3.fromRGB(160, 90, 40)
+local DOOR_COLOR_VIP = Color3.fromRGB(232, 190, 62)
+
+function GarageService:Init(services)
+	self.Services = services
+	self.plots = {}
+	self.plotOwner = {}
+	self.views = {}
+	self._cooldowns = {}
+end
+
+function GarageService:Start()
+	local folder = Instance.new("Folder")
+	folder.Name = "Garages"
+	folder.Parent = workspace
+	self.folder = folder
+
+	for index = 1, Config.PLOT_COUNT do
+		local plot = PlotBuilder.Build(index, folder)
+		self.plots[index] = plot
+		local prompt = plot.register:FindFirstChildOfClass("ProximityPrompt")
+		if prompt then
+			prompt.Triggered:Connect(function(player)
+				if self.plotOwner[index] == player.UserId then
+					self.Services.EconomyService:Collect(player)
+				end
+			end)
+		end
+	end
+
+	self.Services.DataService.ProfileLoaded:Connect(function(player, data)
+		self:_setup(player, data)
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		self:_teardown(player)
+	end)
+
+	RequestRouter.Bind(self)
+
+	task.spawn(function()
+		while true do
+			task.wait(1)
+			self:_repairTick()
+		end
+	end)
+	task.spawn(function()
+		while true do
+			task.wait(0.5)
+			DoorController.Tick(self.plots, self.plotOwner, function(index)
+				return self.Services.HeistService:IsPlotOpen(index)
+			end)
+		end
+	end)
+end
+
+function GarageService:_setup(player: Player, data)
+	-- Erst abrechnen, dann bauen: sonst zaehlen Teile, die offline fertig
+	-- geworden sind, fuer die gesamte Abwesenheit mit.
+	self.Services.EconomyService:EnsureOfflineApplied(player, data)
+
+	local plotIndex = self:_claimPlot(player)
+	if not plotIndex then
+		player:Kick("Alle Garagen sind belegt. Bitte einem anderen Server beitreten.")
+		return
+	end
+
+	self.views[player.UserId] = {
+		plotIndex = plotIndex,
+		plot = self.plots[plotIndex],
+		cars = {},
+		stealEnabled = false,
+	}
+
+	if player.Character then
+		task.spawn(function()
+			self:_placeCharacter(player, player.Character)
+		end)
+	end
+	player.CharacterAdded:Connect(function(character)
+		self:_placeCharacter(player, character)
+	end)
+
+	self:Refresh(player, data)
+end
+
+function GarageService:_placeCharacter(player: Player, character: Model)
+	local view = self.views[player.UserId]
+	if not view then
+		return
+	end
+	character:WaitForChild("HumanoidRootPart", 8)
+	task.wait(0.1)
+	if character.Parent then
+		character:PivotTo(view.plot.spawnCFrame)
+	end
+end
+
+function GarageService:_claimPlot(player: Player): number?
+	for index = 1, Config.PLOT_COUNT do
+		if not self.plotOwner[index] then
+			self.plotOwner[index] = player.UserId
+			-- Der Client braucht das, um die eigene Werkbank zu erkennen.
+			player:SetAttribute("PlotIndex", index)
+			return index
+		end
+	end
+	return nil
+end
+
+function GarageService:_teardown(player: Player)
+	local view = self.views[player.UserId]
+	self.views[player.UserId] = nil
+	self._cooldowns[player.UserId] = nil
+	if not view then
+		return
+	end
+	for _, refs in view.cars do
+		if refs.billboard and refs.billboard.part then
+			refs.billboard.part:Destroy()
+		end
+		refs.model:Destroy()
+	end
+	view.plot.door.Color = DOOR_COLOR
+	view.plot.sign.name.Text = "Freie Box"
+	view.plot.sign.value.Text = ""
+	view.plot.sign.rate.Text = ""
+	self.plotOwner[view.plotIndex] = nil
+end
+
+function GarageService:GetView(userId: number)
+	return self.views[userId]
+end
+
+function GarageService:GetOwnerOfPlot(plotIndex: number): number?
+	return self.plotOwner[plotIndex]
+end
+
+function GarageService:GetPlotIndexOf(player: Player): number?
+	local view = self.views[player.UserId]
+	return view and view.plotIndex or nil
+end
+
+function GarageService:Refresh(player: Player, data)
+	data = data or self.Services.DataService:Get(player)
+	local view = self.views[player.UserId]
+	if not data or not view then
+		return
+	end
+	GarageView.RenderCars(view, player, data, function(thief, victim, carIndex, slotId, prompt)
+		self.Services.HeistService:OnStealPrompt(thief, victim, carIndex, slotId, prompt)
+	end)
+	self:Sync(player, data)
+end
+
+function GarageService:Sync(player: Player, data)
+	data = data or self.Services.DataService:Get(player)
+	if not data then
+		return
+	end
+	local view = self.views[player.UserId]
+	local rate = self.Services.EconomyService:GetRate(player, data)
+	if view then
+		GarageView.UpdateSign(view, player, data, rate)
+		GarageView.UpdateBillboards(view, data)
+		-- VIP-Tor: reine Optik, wird auch genau so verkauft.
+		local vip = self.Services.MonetizationService:HasPass(player, "VIP")
+		view.plot.door.Color = vip and DOOR_COLOR_VIP or DOOR_COLOR
+	end
+	Remotes.Get("ProfileSync"):FireClient(
+		player,
+		Snapshot.Build(player, data, {
+			rate = rate,
+			passes = self.Services.MonetizationService:GetOwnership(player),
+		})
+	)
+end
+
+function GarageService:SetStealEnabledFor(userId: number, enabled: boolean)
+	local view = self.views[userId]
+	if view then
+		GarageView.SetStealEnabled(view, enabled)
+	end
+end
+
+-- Teil aus einem fremden Auto loesen. Nur der HeistService ruft das auf,
+-- nachdem er Fenster, Entfernung und Besitz geprueft hat.
+function GarageService:TakePart(victim: Player, carIndex: number, slotId: string)
+	local data = self.Services.DataService:Get(victim)
+	if not data then
+		return nil
+	end
+	local part = ProfileOps.RemovePart(data, carIndex, slotId)
+	if not part then
+		return nil
+	end
+	data.stats.partsLost += 1
+	self:Refresh(victim, data)
+	return part
+end
+
+-- Diebesgut in der eigenen Garage abliefern.
+function GarageService:GiveStolenPart(thief: Player, part)
+	local data = self.Services.DataService:Get(thief)
+	if not data then
+		return false, "Profil nicht geladen."
+	end
+	ProfileOps.RollDailyStats(data)
+	data.stats.stolenToday += 1
+	data.stats.totalStolen += 1
+	local ok, message = GarageRequests.DepositStolenPart(self.Services, thief, data, part)
+	self:Refresh(thief, data)
+	return ok, message
+end
+
+-- Fenster vorbei oder Dieb weg: Teil geht zurueck an den urspruenglichen
+-- Besitzer, sofern der noch auf dem Server ist.
+function GarageService:ReturnPart(part): boolean
+	local owner = Players:GetPlayerByUserId(part.originalOwner)
+	if not owner then
+		return false
+	end
+	local data = self.Services.DataService:Get(owner)
+	if not data then
+		return false
+	end
+	GarageRequests.DepositStolenPart(self.Services, owner, data, part)
+	data.stats.partsLost = math.max(0, data.stats.partsLost - 1)
+	self:Refresh(owner, data)
+	local tierDef = PartCatalog.GetTier(part.slotId, part.tier)
+	self.Services.EconomyService:Notify(
+		owner,
+		("%s ist zurueck in deiner Garage."):format(tierDef and tierDef.name or part.slotId),
+		"good"
+	)
+	return true
+end
+
+function GarageService:_repairTick()
+	local now = os.time()
+	self.Services.DataService:ForEachProfile(function(player, data)
+		if not self.Services.EconomyService:IsSettled(player) then
+			return
+		end
+		local due = ProfileOps.RepairsDueBefore(data, now)
+		if #due == 0 then
+			return
+		end
+		for _, repair in due do
+			local part = ProfileOps.FinishRepair(data, repair.carIndex, repair.slotId, player.UserId)
+			if part then
+				local tierDef = PartCatalog.GetTier(part.slotId, part.tier)
+				self.Services.EconomyService:Notify(
+					player,
+					("%s ist eingebaut."):format(tierDef and tierDef.name or part.slotId),
+					"good"
+				)
+			end
+		end
+		self:Refresh(player, data)
+	end)
+end
+
+return GarageService
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX31">
+<Properties><string name="Name">HeistService</string><ProtectedString name="Source"><![CDATA[--[[
+	HeistService
+	Der globale Timer. Alle 8 Minuten geht fuer 60 Sekunden jedes Garagentor
+	auf. Der Server entscheidet, wann - der Client bekommt nur Zeitstempel und
+	rechnet daraus seinen Countdown.
+
+	Garage Lock (Gamepass) schliesst das eigene Tor nach 20 Sekunden wieder.
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local PartCatalog = require(Shared.PartCatalog)
+local Remotes = require(Shared.Remotes)
+local Util = require(Shared.Util)
+
+local Server = script.Parent.Parent
+local CarryManager = require(Server.Heist.CarryManager)
+local DismountManager = require(Server.Heist.DismountManager)
+
+local HeistService = {}
+HeistService.Name = "HeistService"
+
+local function now(): number
+	return workspace:GetServerTimeNow()
+end
+
+function HeistService:Init(services)
+	self.Services = services
+	self.Carry = CarryManager.new(services)
+	self.Dismount = DismountManager.new(services, self.Carry)
+	self.open = false
+	self.openUntil = 0
+	self.nextOpenAt = now() + Config.HEIST_FIRST_DELAY
+	self.plotClosesAt = {}
+	self._warned = {}
+end
+
+function HeistService:Start()
+	Remotes.Get("RequestTackle").OnServerEvent:Connect(function(player)
+		self.Carry:Tackle(player)
+	end)
+	Remotes.Get("RequestDropPart").OnServerEvent:Connect(function(player)
+		self.Carry:Drop(player, "Teil abgelegt.")
+	end)
+
+	Players.PlayerAdded:Connect(function(player)
+		self:_bindCharacter(player)
+		task.delay(1, function()
+			if player.Parent then
+				self:_pushState(player)
+			end
+		end)
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		self.Dismount:Cancel(player)
+		self.Carry:HandleLeave(player)
+	end)
+	for _, player in Players:GetPlayers() do
+		self:_bindCharacter(player)
+	end
+
+	task.spawn(function()
+		-- Abgabe-Pads: liegt in der Verantwortung des Servers, nicht des Clients.
+		task.wait(1)
+		self:_bindLootBays()
+	end)
+
+	task.spawn(function()
+		while true do
+			task.wait(0.25)
+			self:_tick()
+		end
+	end)
+end
+
+function HeistService:_bindCharacter(player: Player)
+	local function hook(character)
+		local humanoid = character:WaitForChild("Humanoid", 10)
+		if humanoid then
+			humanoid.Died:Connect(function()
+				self.Dismount:Cancel(player)
+				self.Carry:HandleDeath(player)
+			end)
+		end
+	end
+	if player.Character then
+		task.spawn(hook, player.Character)
+	end
+	player.CharacterAdded:Connect(hook)
+end
+
+function HeistService:_bindLootBays()
+	local garage = self.Services.GarageService
+	for index, plot in garage.plots do
+		local debounce = {}
+		plot.lootBay.Touched:Connect(function(hit)
+			local character = hit.Parent
+			local player = character and Players:GetPlayerFromCharacter(character)
+			if not player then
+				return
+			end
+			if os.clock() - (debounce[player.UserId] or 0) < 0.5 then
+				return
+			end
+			debounce[player.UserId] = os.clock()
+			self.Carry:TryDeposit(player, index)
+		end)
+	end
+end
+
+function HeistService:IsOpen(): boolean
+	return self.open
+end
+
+function HeistService:IsPlotOpen(plotIndex: number): boolean
+	if not self.open then
+		return false
+	end
+	local closesAt = self.plotClosesAt[plotIndex]
+	if closesAt and now() >= closesAt then
+		return false
+	end
+	return true
+end
+
+function HeistService:GetState()
+	return {
+		open = self.open,
+		endsAt = self.openUntil,
+		nextAt = self.nextOpenAt,
+		serverTime = now(),
+		windowLength = Config.HEIST_WINDOW,
+	}
+end
+
+function HeistService:_pushState(player: Player?)
+	local remote = Remotes.Get("HeistState")
+	local state = self:GetState()
+	if player then
+		remote:FireClient(player, state)
+	else
+		remote:FireAllClients(state)
+	end
+end
+
+function HeistService:_tick()
+	local current = now()
+	if self.open then
+		if current >= self.openUntil then
+			self:_close()
+			return
+		end
+		-- Verriegelte Garagen: Prompts ausschalten, sobald die 20s um sind.
+		for plotIndex, closesAt in self.plotClosesAt do
+			if current >= closesAt and not self._warned["locked" .. plotIndex] then
+				self._warned["locked" .. plotIndex] = true
+				local ownerId = self.Services.GarageService:GetOwnerOfPlot(plotIndex)
+				if ownerId then
+					self.Services.GarageService:SetStealEnabledFor(ownerId, false)
+				end
+			end
+		end
+		return
+	end
+
+	local remaining = self.nextOpenAt - current
+	for _, mark in Config.HEIST_WARN_AT do
+		local key = "warn" .. mark
+		if remaining <= mark and not self._warned[key] then
+			self._warned[key] = true
+			self:_announce(("Klau-Fenster in %s"):format(Util.FormatTime(math.max(0, math.floor(remaining)))), "info")
+		end
+	end
+	if current >= self.nextOpenAt then
+		self:_open()
+	end
+end
+
+function HeistService:_open()
+	self.open = true
+	self.openUntil = now() + Config.HEIST_WINDOW
+	self.nextOpenAt = self.openUntil + (Config.HEIST_INTERVAL - Config.HEIST_WINDOW)
+	table.clear(self._warned)
+	table.clear(self.plotClosesAt)
+
+	local garage = self.Services.GarageService
+	for _, player in Players:GetPlayers() do
+		local plotIndex = garage:GetPlotIndexOf(player)
+		if plotIndex then
+			local locked = self.Services.MonetizationService:HasPass(player, "GarageLock")
+			self.plotClosesAt[plotIndex] = locked and (now() + Config.GARAGE_LOCK_WINDOW) or self.openUntil
+			garage:SetStealEnabledFor(player.UserId, true)
+			if locked then
+				self.Services.EconomyService:Notify(player, "Garage Lock: dein Tor faellt in 20s wieder zu.", "good")
+			end
+		end
+	end
+
+	self:_pushState()
+	self:_announce("Klau-Fenster offen! 60 Sekunden.", "heist")
+	self:_sendRadar()
+end
+
+function HeistService:_close()
+	self.open = false
+	table.clear(self._warned)
+	table.clear(self.plotClosesAt)
+
+	for _, player in Players:GetPlayers() do
+		self.Dismount:Cancel(player)
+		self.Services.GarageService:SetStealEnabledFor(player.UserId, false)
+	end
+	self.Carry:ReturnEverything()
+
+	self:_pushState()
+	self:_announce("Fenster zu. Tore sind verriegelt.", "info")
+end
+
+function HeistService:_announce(text: string, kind: string)
+	Remotes.Get("Notify"):FireAllClients({ text = text, kind = kind })
+end
+
+function HeistService:OnStealPrompt(thief: Player, victim: Player, carIndex: number, slotId: string, prompt: ProximityPrompt)
+	local anchor = prompt.Parent
+	self.Dismount:Start(thief, victim, carIndex, slotId, anchor and anchor:IsA("BasePart") and anchor or nil)
+end
+
+-- Heist Radar: eine Ladung zeigt fuer ein Fenster die wertvollsten Teile.
+function HeistService:GrantRadar(player: Player, data)
+	data.pendingRadar += 1
+	if self.open then
+		self:_consumeRadar(player, data)
+	else
+		self.Services.EconomyService:Notify(player, "Heist Radar ist scharf - er meldet sich beim naechsten Fenster.", "good")
+	end
+end
+
+function HeistService:_topParts()
+	local entries = {}
+	self.Services.DataService:ForEachProfile(function(owner, data)
+		for carIndex, car in data.cars do
+			for slotId, part in car.parts do
+				table.insert(entries, {
+					owner = owner.DisplayName,
+					plotIndex = self.Services.GarageService:GetPlotIndexOf(owner),
+					slotName = PartCatalog.GetSlot(slotId).displayName,
+					tierName = (PartCatalog.GetTier(slotId, part.tier) or {}).name or "?",
+					value = PartCatalog.GetValue(slotId, part.tier),
+					carIndex = carIndex,
+				})
+			end
+		end
+	end)
+	table.sort(entries, function(a, b)
+		return a.value > b.value
+	end)
+	while #entries > Config.RADAR_TOP_COUNT do
+		table.remove(entries)
+	end
+	return entries
+end
+
+function HeistService:_consumeRadar(player: Player, data)
+	if (data.pendingRadar or 0) <= 0 then
+		return
+	end
+	data.pendingRadar -= 1
+	Remotes.Get("RadarPing"):FireClient(player, self:_topParts())
+end
+
+function HeistService:_sendRadar()
+	self.Services.DataService:ForEachProfile(function(player, data)
+		if (data.pendingRadar or 0) > 0 then
+			self:_consumeRadar(player, data)
+		end
+	end)
+end
+
+return HeistService
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX32">
+<Properties><string name="Name">LeaderboardService</string><ProtectedString name="Source"><![CDATA[--[[
+	LeaderboardService
+	Zwei Ranglisten fuer diesen Server: teuerste Garage und meiste geklaute
+	Teile heute. Beides steht auf einer Tafel im Hof und zusaetzlich in der
+	Roblox-Spielerliste (leaderstats).
+
+	Serverlokal und bewusst so: eine globale OrderedDataStore-Rangliste braucht
+	Moderation und Cross-Server-Sync und gehoert nicht in die erste Version.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Remotes = require(Shared.Remotes)
+local Util = require(Shared.Util)
+
+local ProfileOps = require(script.Parent.Parent.Data.ProfileOps)
+
+local LeaderboardService = {}
+LeaderboardService.Name = "LeaderboardService"
+
+local TOP_COUNT = 8
+
+function LeaderboardService:Init(services)
+	self.Services = services
+end
+
+function LeaderboardService:Start()
+	self:_buildBoard()
+
+	self.Services.DataService.ProfileLoaded:Connect(function(player, data)
+		self:_ensureLeaderstats(player, data)
+	end)
+
+	task.spawn(function()
+		while true do
+			task.wait(Config.LEADERBOARD_REFRESH)
+			self:_refresh()
+		end
+	end)
+end
+
+function LeaderboardService:_ensureLeaderstats(player: Player, data)
+	local stats = player:FindFirstChild("leaderstats")
+	if not stats then
+		stats = Instance.new("Folder")
+		stats.Name = "leaderstats"
+		stats.Parent = player
+	end
+	local cash = stats:FindFirstChild("Cash") or Instance.new("IntValue")
+	cash.Name = "Cash"
+	cash.Parent = stats
+	local stolen = stats:FindFirstChild("Geklaut") or Instance.new("IntValue")
+	stolen.Name = "Geklaut"
+	stolen.Parent = stats
+end
+
+local function makeColumn(gui, xScale, title)
+	local frame = Instance.new("Frame")
+	frame.BackgroundTransparency = 1
+	frame.Position = UDim2.fromScale(xScale, 0.02)
+	frame.Size = UDim2.fromScale(0.48, 0.96)
+	frame.Parent = gui
+
+	local header = Instance.new("TextLabel")
+	header.BackgroundTransparency = 1
+	header.Size = UDim2.fromScale(1, 0.14)
+	header.Font = Enum.Font.GothamBold
+	header.TextScaled = true
+	header.TextColor3 = Color3.fromRGB(255, 210, 90)
+	header.Text = title
+	header.Parent = frame
+
+	local body = Instance.new("TextLabel")
+	body.BackgroundTransparency = 1
+	body.Position = UDim2.fromScale(0, 0.16)
+	body.Size = UDim2.fromScale(1, 0.84)
+	body.Font = Enum.Font.Gotham
+	body.TextXAlignment = Enum.TextXAlignment.Left
+	body.TextYAlignment = Enum.TextYAlignment.Top
+	body.TextScaled = false
+	body.TextSize = 28
+	body.TextColor3 = Color3.fromRGB(240, 240, 245)
+	body.Text = "-"
+	body.Parent = frame
+
+	return body
+end
+
+function LeaderboardService:_buildBoard()
+	local board = Instance.new("Part")
+	board.Name = "Leaderboard"
+	board.Anchored = true
+	board.Size = Vector3.new(34, 18, 1)
+	board.CFrame = CFrame.new(0, 10, 0)
+	board.Color = Color3.fromRGB(24, 24, 28)
+	board.Material = Enum.Material.SmoothPlastic
+	board.Parent = workspace
+
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Front
+	gui.CanvasSize = Vector2.new(900, 500)
+	gui.LightInfluence = 0
+	gui.Parent = board
+
+	local back = Instance.new("SurfaceGui")
+	back.Face = Enum.NormalId.Back
+	back.CanvasSize = Vector2.new(900, 500)
+	back.LightInfluence = 0
+	back.Parent = board
+
+	self.labels = {
+		richest = makeColumn(gui, 0.01, "Teuerste Garage"),
+		thieves = makeColumn(gui, 0.51, "Meiste geklaute Teile heute"),
+		richestBack = makeColumn(back, 0.01, "Teuerste Garage"),
+		thievesBack = makeColumn(back, 0.51, "Meiste geklaute Teile heute"),
+	}
+end
+
+local function renderList(entries, formatValue)
+	if #entries == 0 then
+		return "noch niemand"
+	end
+	local lines = {}
+	for rank, entry in entries do
+		table.insert(lines, ("%d. %s  %s"):format(rank, entry.name, formatValue(entry.value)))
+	end
+	return table.concat(lines, "\n")
+end
+
+function LeaderboardService:_refresh()
+	local richest, thieves = {}, {}
+
+	self.Services.DataService:ForEachProfile(function(player, data)
+		ProfileOps.RollDailyStats(data)
+		table.insert(richest, { name = player.DisplayName, value = ProfileOps.GarageValue(data) })
+		table.insert(thieves, { name = player.DisplayName, value = data.stats.stolenToday })
+
+		local stats = player:FindFirstChild("leaderstats")
+		if stats then
+			local cash = stats:FindFirstChild("Cash")
+			local stolen = stats:FindFirstChild("Geklaut")
+			if cash then
+				cash.Value = math.floor(math.min(data.cash, 2 ^ 31 - 1))
+			end
+			if stolen then
+				stolen.Value = data.stats.stolenToday
+			end
+		end
+	end)
+
+	local function sortAndTrim(list)
+		table.sort(list, function(a, b)
+			return a.value > b.value
+		end)
+		while #list > TOP_COUNT do
+			table.remove(list)
+		end
+	end
+	sortAndTrim(richest)
+	sortAndTrim(thieves)
+
+	local richestText = renderList(richest, Util.FormatCash)
+	local thievesText = renderList(thieves, function(value)
+		return ("%d Teile"):format(value)
+	end)
+
+	if self.labels then
+		self.labels.richest.Text = richestText
+		self.labels.richestBack.Text = richestText
+		self.labels.thieves.Text = thievesText
+		self.labels.thievesBack.Text = thievesText
+	end
+
+	Remotes.Get("LeaderboardUpdate"):FireAllClients({ richest = richest, thieves = thieves })
+end
+
+return LeaderboardService
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX33">
+<Properties><string name="Name">MonetizationService</string><ProtectedString name="Source"><![CDATA[--[[
+	MonetizationService
+
+	=========================================================================
+	PRODUKT-IDS - HIER EINTRAGEN, sonst nirgends.
+	Alles auf 0 = im Creator Dashboard noch nicht angelegt. Ein Produkt mit
+	ID 0 wird nie zum Kauf angeboten, es erscheint nur als "nicht eingerichtet".
+	Die Liste zum Anlegen steht in docs/MONETIZATION.md.
+	=========================================================================
+]]
+
+local GAMEPASS_IDS = {
+	VIP = 0, -- doppelte Cash-Rate + eigenes Garagen-Tor
+	AutoCollect = 0, -- Cash landet direkt auf dem Konto
+	GarageLock = 0, -- eigenes Klau-Fenster nur 20 statt 60 Sekunden
+}
+
+local PRODUCT_IDS = {
+	CashSmall = 0, -- 5.000 Cash
+	CashMedium = 0, -- 30.000 Cash
+	CashLarge = 0, -- 150.000 Cash
+	InstantRepair = 0, -- ueberspringt eine laufende Reparatur
+	HeistRadar = 0, -- zeigt ein Fenster lang die wertvollsten Teile
+}
+
+local MarketplaceService = game:GetService("MarketplaceService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Remotes = require(Shared.Remotes)
+
+local Server = script.Parent.Parent
+local ProfileOps = require(Server.Data.ProfileOps)
+local ProfileTemplate = require(Server.Data.ProfileTemplate)
+local PurchaseEffects = require(Server.Monetization.PurchaseEffects)
+
+local MonetizationService = {}
+MonetizationService.Name = "MonetizationService"
+
+-- Anzeigetexte fuer den Shop. Preise sind Empfehlungen und muessen im
+-- Dashboard identisch gesetzt werden - der Server verkauft nichts selbst.
+local CATALOG = {
+	{ kind = "pass", key = "VIP", title = "VIP", desc = "Doppelte Cash-Rate + goldenes Tor.", robux = 199 },
+	{ kind = "pass", key = "AutoCollect", title = "Auto-Collect", desc = "Cash ohne Einsammeln.", robux = 149 },
+	{ kind = "pass", key = "GarageLock", title = "Garage Lock", desc = "Dein Tor faellt nach 20s zu.", robux = 249 },
+	{ kind = "product", key = "CashSmall", title = "Cash-Paket S", desc = "5.000 Cash", robux = 25 },
+	{ kind = "product", key = "CashMedium", title = "Cash-Paket M", desc = "30.000 Cash", robux = 99 },
+	{ kind = "product", key = "CashLarge", title = "Cash-Paket L", desc = "150.000 Cash", robux = 399 },
+	{ kind = "product", key = "InstantRepair", title = "Instant Repair", desc = "Reparatur sofort fertig.", robux = 19 },
+	{ kind = "product", key = "HeistRadar", title = "Heist Radar", desc = "Top-Teile im naechsten Fenster.", robux = 49 },
+}
+
+function MonetizationService:Init(services)
+	self.Services = services
+	self.owned = {}
+	self.pendingRepair = {}
+end
+
+function MonetizationService:Start()
+	self.Services.DataService.ProfileLoaded:Connect(function(player)
+		task.spawn(function()
+			self:RefreshOwnership(player)
+			self:PushShop(player)
+		end)
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		self.owned[player.UserId] = nil
+		self.pendingRepair[player.UserId] = nil
+	end)
+
+	MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, passId, wasPurchased)
+		if not wasPurchased then
+			return
+		end
+		for key, id in GAMEPASS_IDS do
+			if id == passId and id ~= 0 then
+				local cache = self.owned[player.UserId]
+				if cache then
+					cache[key] = true
+				end
+				self.Services.EconomyService:Notify(player, ("%s ist aktiv."):format(key), "good")
+				self:PushShop(player)
+				self.Services.GarageService:Sync(player)
+			end
+		end
+	end)
+
+	Remotes.Get("RequestPromptPurchase").OnServerEvent:Connect(function(player, kind, key)
+		self:_prompt(player, kind, key)
+	end)
+	Remotes.Get("RequestInstantRepair").OnServerEvent:Connect(function(player, carIndex, slotId)
+		self:_requestInstantRepair(player, carIndex, slotId)
+	end)
+
+	MarketplaceService.ProcessReceipt = function(receiptInfo)
+		return self:_processReceipt(receiptInfo)
+	end
+end
+
+function MonetizationService:RefreshOwnership(player: Player)
+	local cache = self.owned[player.UserId] or {}
+	for key, id in GAMEPASS_IDS do
+		if id == 0 then
+			cache[key] = false
+		else
+			local ok, owns = pcall(function()
+				return MarketplaceService:UserOwnsGamePassAsync(player.UserId, id)
+			end)
+			if ok then
+				cache[key] = owns == true
+			else
+				-- Abfrage kaputt: alten Stand behalten, nicht raten.
+				cache[key] = cache[key] == true
+				warn(("[Monetization] Gamepass-Abfrage %s fehlgeschlagen: %s"):format(key, tostring(owns)))
+			end
+		end
+	end
+	self.owned[player.UserId] = cache
+	return cache
+end
+
+function MonetizationService:HasPass(player: Player, key: string): boolean
+	local cache = self.owned[player.UserId]
+	if not cache then
+		return false
+	end
+	return cache[key] == true
+end
+
+function MonetizationService:GetOwnership(player: Player)
+	return self.owned[player.UserId] or {}
+end
+
+function MonetizationService:PushShop(player: Player)
+	local entries = {}
+	for _, item in CATALOG do
+		local id = item.kind == "pass" and GAMEPASS_IDS[item.key] or PRODUCT_IDS[item.key]
+		table.insert(entries, {
+			kind = item.kind,
+			key = item.key,
+			title = item.title,
+			desc = item.desc,
+			robux = item.robux,
+			configured = id ~= 0,
+			owned = item.kind == "pass" and self:HasPass(player, item.key) or false,
+		})
+	end
+	Remotes.Get("ShopState"):FireClient(player, entries)
+end
+
+function MonetizationService:_prompt(player: Player, kind, key)
+	if type(kind) ~= "string" or type(key) ~= "string" then
+		return
+	end
+	local id = (kind == "pass") and GAMEPASS_IDS[key] or PRODUCT_IDS[key]
+	if not id then
+		return
+	end
+	if id == 0 then
+		self.Services.EconomyService:Notify(player, "Dieses Produkt ist noch nicht eingerichtet.", "bad")
+		return
+	end
+	if kind == "pass" then
+		if self:HasPass(player, key) then
+			self.Services.EconomyService:Notify(player, "Hast du schon.", "info")
+			return
+		end
+		MarketplaceService:PromptGamePassPurchase(player, id)
+	else
+		MarketplaceService:PromptProductPurchase(player, id)
+	end
+end
+
+function MonetizationService:_requestInstantRepair(player: Player, carIndex, slotId)
+	local data = self.Services.DataService:Get(player)
+	if not data or type(carIndex) ~= "number" or type(slotId) ~= "string" then
+		return
+	end
+	if not data.repairs[ProfileOps.RepairKey(carIndex, slotId)] then
+		self.Services.EconomyService:Notify(player, "Da laeuft keine Reparatur.", "bad")
+		return
+	end
+	self.pendingRepair[player.UserId] = { carIndex = carIndex, slotId = slotId }
+	self:_prompt(player, "product", "InstantRepair")
+end
+
+function MonetizationService:_apply(player: Player, data, key: string): boolean
+	if PurchaseEffects.CASH_AMOUNTS[key] then
+		return PurchaseEffects.GrantCash(self.Services, player, data, key)
+	elseif key == "InstantRepair" then
+		local target = self.pendingRepair[player.UserId]
+		local ok = PurchaseEffects.InstantRepair(self.Services, player, data, target)
+		if ok then
+			self.pendingRepair[player.UserId] = nil
+		end
+		return ok
+	elseif key == "HeistRadar" then
+		return PurchaseEffects.HeistRadar(self.Services, player, data)
+	end
+	return false
+end
+
+function MonetizationService:_processReceipt(receiptInfo)
+	local player = Players:GetPlayerByUserId(receiptInfo.PlayerId)
+	if not player then
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+	local data = self.Services.DataService:Get(player)
+	if not data then
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+
+	local purchaseId = tostring(receiptInfo.PurchaseId)
+	-- Idempotenz: schon verbucht -> nur bestaetigen, nicht nochmal gutschreiben.
+	if data.receipts[purchaseId] then
+		return Enum.ProductPurchaseDecision.PurchaseGranted
+	end
+
+	local productKey = nil
+	for key, id in PRODUCT_IDS do
+		if id ~= 0 and id == receiptInfo.ProductId then
+			productKey = key
+			break
+		end
+	end
+	if not productKey then
+		warn(("[Monetization] Unbekannte ProductId %d - nicht verbucht."):format(receiptInfo.ProductId))
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+
+	if not self:_apply(player, data, productKey) then
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+
+	data.receipts[purchaseId] = os.time()
+	table.insert(data.receiptOrder, purchaseId)
+	while #data.receiptOrder > ProfileTemplate.MAX_RECEIPTS do
+		local oldest = table.remove(data.receiptOrder, 1)
+		data.receipts[oldest] = nil
+	end
+
+	-- Erst wenn der Receipt persistent ist, gilt der Kauf als erledigt.
+	if not self.Services.DataService:SaveNow(player) then
+		data.receipts[purchaseId] = nil
+		local index = table.find(data.receiptOrder, purchaseId)
+		if index then
+			table.remove(data.receiptOrder, index)
+		end
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+
+	self.Services.GarageService:Sync(player, data)
+	return Enum.ProductPurchaseDecision.PurchaseGranted
+end
+
+function MonetizationService:GetCatalog()
+	return CATALOG
+end
+
+return MonetizationService
+]]></ProtectedString></Properties>
+</Item>
+</Item>
+<Item class="Folder" referent="RBX34">
+<Properties><string name="Name">World</string></Properties>
+<Item class="ModuleScript" referent="RBX35">
+<Properties><string name="Name">CarBuilder</string><ProtectedString name="Source"><![CDATA[--[[
+	CarBuilder
+	Baut ein Auto als Deko-Modell: keine VehicleSeats, keine Motoren, keine
+	Physik. Verbaute Teile sind sichtbar, fehlende Teile als durchsichtiger
+	Platzhalter - man sieht auf einen Blick, was der Karre fehlt.
+
+	Jedes verbaute Teil traegt ein ProximityPrompt zum Abmontieren. Das ist
+	standardmaessig aus und wird nur vom HeistService eingeschaltet.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local CarCatalog = require(Shared.CarCatalog)
+local PartCatalog = require(Shared.PartCatalog)
+local Util = require(Shared.Util)
+
+local CarBuilder = {}
+
+local GHOST_COLOR = Color3.fromRGB(220, 70, 70)
+
+local function makePart(name, size, cframe, color, parent, material, transparency)
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = true
+	p.Size = size
+	p.CFrame = cframe
+	p.Color = color
+	p.Material = material or Enum.Material.SmoothPlastic
+	p.Transparency = transparency or 0
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.Parent = parent
+	return p
+end
+
+local function tagPart(instance, slotId, part, ownerUserId, carIndex)
+	instance:SetAttribute("SlotId", slotId)
+	instance:SetAttribute("CarIndex", carIndex)
+	instance:SetAttribute("OwnerUserId", ownerUserId)
+	if part then
+		instance:SetAttribute("PartUid", part.uid)
+		instance:SetAttribute("Tier", part.tier)
+	end
+end
+
+local function addStealPrompt(anchor, slotId, part, ownerUserId, carIndex)
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "StealPrompt"
+	prompt.ActionText = "Abmontieren"
+	local tierDef = PartCatalog.GetTier(slotId, part.tier)
+	prompt.ObjectText = tierDef and tierDef.name or slotId
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 12
+	prompt.RequiresLineOfSight = false
+	prompt.Enabled = false
+	prompt.Parent = anchor
+	tagPart(prompt, slotId, part, ownerUserId, carIndex)
+	return prompt
+end
+
+local function buildBillboard(parent, height)
+	local attachment = Instance.new("Part")
+	attachment.Name = "Label"
+	attachment.Anchored = true
+	attachment.CanCollide = false
+	attachment.Transparency = 1
+	attachment.Size = Vector3.new(0.2, 0.2, 0.2)
+	attachment.CFrame = parent.CFrame * CFrame.new(0, height, 0)
+	attachment.Parent = parent.Parent
+
+	local gui = Instance.new("BillboardGui")
+	gui.Size = UDim2.fromScale(9, 2.2)
+	gui.AlwaysOnTop = false
+	gui.MaxDistance = 90
+	gui.Parent = attachment
+
+	local title = Instance.new("TextLabel")
+	title.BackgroundTransparency = 1
+	title.Size = UDim2.fromScale(1, 0.55)
+	title.Font = Enum.Font.GothamBold
+	title.TextScaled = true
+	title.TextColor3 = Color3.fromRGB(255, 255, 255)
+	title.TextStrokeTransparency = 0.4
+	title.Parent = gui
+
+	local sub = Instance.new("TextLabel")
+	sub.BackgroundTransparency = 1
+	sub.Position = UDim2.fromScale(0, 0.55)
+	sub.Size = UDim2.fromScale(1, 0.45)
+	sub.Font = Enum.Font.Gotham
+	sub.TextScaled = true
+	sub.TextColor3 = Color3.fromRGB(140, 235, 170)
+	sub.TextStrokeTransparency = 0.5
+	sub.Parent = gui
+
+	return { part = attachment, title = title, sub = sub }
+end
+
+-- carState = { carId = "...", parts = { [slotId] = part } }
+function CarBuilder.Build(carState, carIndex: number, ownerUserId: number, cframe: CFrame, parent: Instance)
+	local carDef = CarCatalog.Get(carState.carId) or CarCatalog.Get(CarCatalog.STARTER)
+	local model = Instance.new("Model")
+	model.Name = ("Car%d_%d"):format(carIndex, ownerUserId)
+	model:SetAttribute("OwnerUserId", ownerUserId)
+	model:SetAttribute("CarIndex", carIndex)
+	model.Parent = parent
+
+	local paintPart = carState.parts.paint
+	local bodyColor = carDef.baseColor
+	if paintPart then
+		local tierDef = PartCatalog.GetTier("paint", paintPart.tier)
+		if tierDef then
+			bodyColor = tierDef.color
+		end
+	end
+
+	local bodyY = 1.2
+	local body = makePart(
+		"Body",
+		carDef.bodySize,
+		cframe * CFrame.new(0, bodyY, 0),
+		bodyColor,
+		model,
+		paintPart and Enum.Material.Metal or Enum.Material.CorrodedMetal
+	)
+	body.CanCollide = true
+	model.PrimaryPart = body
+
+	makePart(
+		"Roof",
+		carDef.roofSize,
+		cframe * CFrame.new(carDef.roofOffset.X, carDef.roofOffset.Y, carDef.roofOffset.Z),
+		bodyColor:Lerp(Color3.new(0, 0, 0), 0.25),
+		model,
+		Enum.Material.SmoothPlastic
+	)
+
+	local prompts = {}
+	local slotParts = {}
+
+	if paintPart then
+		tagPart(body, "paint", paintPart, ownerUserId, carIndex)
+		prompts.paint = addStealPrompt(body, "paint", paintPart, ownerUserId, carIndex)
+		slotParts.paint = { body }
+	end
+
+	-- Reifen -------------------------------------------------------------
+	local tirePart = carState.parts.tires
+	local tireDef = tirePart and PartCatalog.GetTier("tires", tirePart.tier)
+	local wheelColor = tireDef and tireDef.color or GHOST_COLOR
+	local wheelSize = PartCatalog.GetSlot("tires").size
+	local wheels = {}
+	for _, xSign in { -1, 1 } do
+		for _, zSign in { -1, 1 } do
+			local wheel = makePart(
+				"Wheel",
+				wheelSize,
+				cframe * CFrame.new(xSign * carDef.track, wheelSize.Y / 2, zSign * carDef.wheelbase),
+				wheelColor,
+				model,
+				Enum.Material.Rubber,
+				tirePart and 0 or 0.65
+			)
+			wheel.Shape = Enum.PartType.Cylinder
+			table.insert(wheels, wheel)
+		end
+	end
+	if tirePart then
+		for _, wheel in wheels do
+			tagPart(wheel, "tires", tirePart, ownerUserId, carIndex)
+		end
+		prompts.tires = addStealPrompt(wheels[1], "tires", tirePart, ownerUserId, carIndex)
+		slotParts.tires = wheels
+	end
+
+	-- Motor und Turbo ----------------------------------------------------
+	-- Die Position haengt an der Karosserie, nicht an festen Zahlen: sonst
+	-- steckt der Motor im Supersportler im Blech statt auf der Haube.
+	local bodyTop = bodyY + carDef.bodySize.Y / 2
+	local halfLength = carDef.bodySize.Z / 2
+	for _, slotId in { "engine", "turbo" } do
+		local slotDef = PartCatalog.GetSlot(slotId)
+		local statePart = carState.parts[slotId]
+		local tier = statePart and PartCatalog.GetTier(slotId, statePart.tier)
+		local offset
+		if slotDef.mount == "spoiler" then
+			offset = Vector3.new(0, bodyTop + slotDef.size.Y / 2 + 0.25, halfLength - slotDef.size.Z / 2 - 0.4)
+		else
+			offset = Vector3.new(0, bodyTop + slotDef.size.Y / 2 - 0.2, -(halfLength - slotDef.size.Z / 2 - 0.7))
+		end
+		local instance = makePart(
+			slotDef.displayName,
+			slotDef.size,
+			cframe * CFrame.new(offset),
+			tier and tier.color or GHOST_COLOR,
+			model,
+			statePart and Enum.Material.Metal or Enum.Material.ForceField,
+			statePart and 0 or 0.6
+		)
+		if statePart then
+			tagPart(instance, slotId, statePart, ownerUserId, carIndex)
+			prompts[slotId] = addStealPrompt(instance, slotId, statePart, ownerUserId, carIndex)
+			slotParts[slotId] = { instance }
+		end
+	end
+
+	local billboard = buildBillboard(body, carDef.bodySize.Y / 2 + 3.6)
+	billboard.title.Text = carDef.displayName
+	billboard.sub.Text = Util.FormatRate(0)
+
+	return {
+		model = model,
+		body = body,
+		prompts = prompts,
+		slotParts = slotParts,
+		billboard = billboard,
+		carIndex = carIndex,
+	}
+end
+
+return CarBuilder
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX36">
+<Properties><string name="Name">DoorController</string><ProtectedString name="Source"><![CDATA[--[[
+	DoorController
+	Das Garagentor ist kein Deko-Objekt: es geht auf, wenn der Besitzer davor
+	steht, und waehrend des Klau-Fensters fuer alle. Sonst bleibt es zu und man
+	kommt nicht rein.
+]]
+
+local Players = game:GetService("Players")
+
+local PlotBuilder = require(script.Parent.PlotBuilder)
+
+local DoorController = {}
+
+local OWNER_OPEN_DISTANCE = 26
+
+local function ownerIsNear(plot, userId: number): boolean
+	local player = Players:GetPlayerByUserId(userId)
+	local character = player and player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not root then
+		return false
+	end
+	return (root.Position - plot.doorClosedCFrame.Position).Magnitude < OWNER_OPEN_DISTANCE
+end
+
+-- `isPlotOpen(plotIndex)` kommt vom HeistService und beruecksichtigt den
+-- Garage-Lock-Gamepass.
+function DoorController.Tick(plots, plotOwner, isPlotOpen)
+	for index, plot in plots do
+		local open = isPlotOpen(index)
+		if not open then
+			local ownerId = plotOwner[index]
+			open = ownerId ~= nil and ownerIsNear(plot, ownerId)
+		end
+		PlotBuilder.SetDoor(plot, open)
+	end
+end
+
+return DoorController
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX37">
+<Properties><string name="Name">PlotBuilder</string><ProtectedString name="Source"><![CDATA[--[[
+	PlotBuilder
+	Baut eine Garage aus Parts. Alles, was hier entsteht, hat eine Funktion:
+	Tor (geht auf), Kasse (Cash abholen), Werkbank (Menue), Abgabe-Pad
+	(geklaute Teile abliefern), Schild (Name + Wert). Keine Deko ohne Wirkung.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+
+local Config = require(ReplicatedStorage:WaitForChild("Shared").Config)
+
+local PlotBuilder = {}
+
+local WALL_HEIGHT = Config.PLOT_HEIGHT
+local WALL_THICK = 2
+local DOOR_WIDTH = 26
+local DOOR_HEIGHT = 13
+
+local function makePart(props): Part
+	local p = Instance.new("Part")
+	p.Anchored = true
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.Material = props.Material or Enum.Material.Concrete
+	p.Size = props.Size
+	p.CFrame = props.CFrame
+	p.Color = props.Color or Color3.fromRGB(120, 120, 125)
+	p.Name = props.Name or "Part"
+	if props.CanCollide ~= nil then
+		p.CanCollide = props.CanCollide
+	end
+	if props.Transparency then
+		p.Transparency = props.Transparency
+	end
+	p.Parent = props.Parent
+	return p
+end
+
+local function makeSign(parent, cframe, size)
+	local board = makePart({
+		Name = "Sign",
+		Size = size,
+		CFrame = cframe,
+		Color = Color3.fromRGB(30, 30, 34),
+		Material = Enum.Material.SmoothPlastic,
+		Parent = parent,
+	})
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Front
+	gui.CanvasSize = Vector2.new(600, 200)
+	gui.LightInfluence = 0
+	gui.Parent = board
+
+	local function label(name, posScale, sizeScale, textSize, color)
+		local l = Instance.new("TextLabel")
+		l.Name = name
+		l.BackgroundTransparency = 1
+		l.Position = UDim2.fromScale(0, posScale)
+		l.Size = UDim2.fromScale(1, sizeScale)
+		l.Font = Enum.Font.GothamBold
+		l.TextScaled = true
+		l.TextColor3 = color
+		l.Text = ""
+		l.Parent = gui
+		return l
+	end
+
+	return {
+		board = board,
+		name = label("NameLabel", 0.02, 0.42, 40, Color3.fromRGB(255, 255, 255)),
+		value = label("ValueLabel", 0.46, 0.28, 28, Color3.fromRGB(120, 230, 160)),
+		rate = label("RateLabel", 0.72, 0.26, 24, Color3.fromRGB(200, 200, 210)),
+	}
+end
+
+local function makePad(parent, cframe, size, color, name, promptText, promptObject)
+	local pad = makePart({
+		Name = name,
+		Size = size,
+		CFrame = cframe,
+		Color = color,
+		Material = Enum.Material.Neon,
+		CanCollide = false,
+		Parent = parent,
+	})
+	if promptText then
+		local prompt = Instance.new("ProximityPrompt")
+		prompt.ActionText = promptText
+		prompt.ObjectText = promptObject or ""
+		prompt.HoldDuration = 0
+		prompt.MaxActivationDistance = 12
+		prompt.RequiresLineOfSight = false
+		prompt.Parent = pad
+	end
+	return pad
+end
+
+-- Weltposition eines Plots. Reihe 0 schaut nach +Z, Reihe 1 nach -Z.
+function PlotBuilder.GetPlotCFrame(index: number): CFrame
+	local zeroBased = index - 1
+	local row = math.floor(zeroBased / Config.PLOTS_PER_ROW)
+	local column = zeroBased % Config.PLOTS_PER_ROW
+	local totalWidth = Config.PLOTS_PER_ROW * (Config.PLOT_WIDTH + Config.PLOT_GAP)
+	local x = -totalWidth / 2 + (Config.PLOT_WIDTH + Config.PLOT_GAP) * (column + 0.5)
+	local z = (row == 0) and -(Config.ROW_GAP / 2 + Config.PLOT_DEPTH / 2)
+		or (Config.ROW_GAP / 2 + Config.PLOT_DEPTH / 2)
+	local rotation = (row == 0) and CFrame.identity or CFrame.Angles(0, math.pi, 0)
+	return CFrame.new(x, Config.BASE_HEIGHT, z) * rotation
+end
+
+function PlotBuilder.Build(index: number, parent: Instance)
+	local base = PlotBuilder.GetPlotCFrame(index)
+	local model = Instance.new("Model")
+	model.Name = "Plot" .. index
+	model:SetAttribute("PlotIndex", index)
+	model.Parent = parent
+
+	local halfWidth = Config.PLOT_WIDTH / 2
+	local halfDepth = Config.PLOT_DEPTH / 2
+
+	local floor = makePart({
+		Name = "Floor",
+		Size = Vector3.new(Config.PLOT_WIDTH, 1, Config.PLOT_DEPTH),
+		CFrame = base * CFrame.new(0, -0.5, 0),
+		Color = Color3.fromRGB(70, 70, 76),
+		Material = Enum.Material.Slate,
+		Parent = model,
+	})
+	model.PrimaryPart = floor
+
+	makePart({
+		Name = "BackWall",
+		Size = Vector3.new(Config.PLOT_WIDTH, WALL_HEIGHT, WALL_THICK),
+		CFrame = base * CFrame.new(0, WALL_HEIGHT / 2, -halfDepth),
+		Parent = model,
+	})
+	for _, side in { -1, 1 } do
+		makePart({
+			Name = "SideWall",
+			Size = Vector3.new(WALL_THICK, WALL_HEIGHT, Config.PLOT_DEPTH),
+			CFrame = base * CFrame.new(side * halfWidth, WALL_HEIGHT / 2, 0),
+			Parent = model,
+		})
+	end
+
+	-- Front mit Toroeffnung: zwei Pfeiler plus Sturz.
+	local pillarWidth = (Config.PLOT_WIDTH - DOOR_WIDTH) / 2
+	for _, side in { -1, 1 } do
+		makePart({
+			Name = "FrontPillar",
+			Size = Vector3.new(pillarWidth, WALL_HEIGHT, WALL_THICK),
+			CFrame = base * CFrame.new(side * (halfWidth - pillarWidth / 2), WALL_HEIGHT / 2, halfDepth),
+			Parent = model,
+		})
+	end
+	makePart({
+		Name = "Lintel",
+		Size = Vector3.new(DOOR_WIDTH, WALL_HEIGHT - DOOR_HEIGHT, WALL_THICK),
+		CFrame = base * CFrame.new(0, DOOR_HEIGHT + (WALL_HEIGHT - DOOR_HEIGHT) / 2, halfDepth),
+		Parent = model,
+	})
+
+	local doorClosed = base * CFrame.new(0, DOOR_HEIGHT / 2, halfDepth)
+	local door = makePart({
+		Name = "Door",
+		Size = Vector3.new(DOOR_WIDTH, DOOR_HEIGHT, 1),
+		CFrame = doorClosed,
+		Color = Color3.fromRGB(160, 90, 40),
+		Material = Enum.Material.DiamondPlate,
+		Parent = model,
+	})
+	-- Offen = zusammengerollt unter dem Sturz, nicht durchs Dach geschoben.
+	local doorOpen = base * CFrame.new(0, DOOR_HEIGHT - 0.4, halfDepth)
+
+	local sign = makeSign(model, base * CFrame.new(0, DOOR_HEIGHT + 2.4, halfDepth + 1.2), Vector3.new(24, 6, 0.4))
+
+	local register = makePad(
+		model,
+		base * CFrame.new(-halfWidth + 5, 1.5, halfDepth - 6),
+		Vector3.new(4, 3, 4),
+		Color3.fromRGB(90, 220, 120),
+		"CashRegister",
+		"Kasse leeren",
+		"Garagenkasse"
+	)
+	register.CanCollide = true
+
+	local workbench = makePad(
+		model,
+		base * CFrame.new(halfWidth - 5, 1.5, halfDepth - 6),
+		Vector3.new(4, 3, 6),
+		Color3.fromRGB(230, 170, 60),
+		"Workbench",
+		"Werkstatt oeffnen",
+		"Werkbank"
+	)
+	workbench.CanCollide = true
+	workbench:SetAttribute("PlotIndex", index)
+	register:SetAttribute("PlotIndex", index)
+
+	local lootBay = makePad(
+		model,
+		base * CFrame.new(0, 0.15, halfDepth - 5),
+		Vector3.new(12, 0.3, 6),
+		Color3.fromRGB(80, 160, 255),
+		"LootBay",
+		nil,
+		nil
+	)
+
+	local carPads = {}
+	local padLocal = {
+		CFrame.new(-11.5, 0, -13),
+		CFrame.new(11.5, 0, -13),
+		CFrame.new(-11.5, 0, 5),
+		CFrame.new(11.5, 0, 5),
+	}
+	for i, offset in padLocal do
+		local padCFrame = base * offset
+		makePart({
+			Name = "CarPad" .. i,
+			Size = Vector3.new(8, 0.2, 14),
+			CFrame = padCFrame * CFrame.new(0, 0.1, 0),
+			Color = Color3.fromRGB(52, 52, 58),
+			Material = Enum.Material.Metal,
+			CanCollide = false,
+			Parent = model,
+		})
+		carPads[i] = padCFrame
+	end
+
+	return {
+		index = index,
+		model = model,
+		cframe = base,
+		floor = floor,
+		door = door,
+		doorClosedCFrame = doorClosed,
+		doorOpenCFrame = doorOpen,
+		doorIsOpen = false,
+		sign = sign,
+		register = register,
+		workbench = workbench,
+		lootBay = lootBay,
+		carPads = carPads,
+		spawnCFrame = base * CFrame.new(0, 3, halfDepth - 14),
+	}
+end
+
+function PlotBuilder.SetDoor(plot, open: boolean)
+	if plot.doorIsOpen == open then
+		return
+	end
+	plot.doorIsOpen = open
+	local goalCFrame = open and plot.doorOpenCFrame or plot.doorClosedCFrame
+	local goalSize = open and Vector3.new(DOOR_WIDTH, 0.8, 1) or Vector3.new(DOOR_WIDTH, DOOR_HEIGHT, 1)
+	local tween = TweenService:Create(
+		plot.door,
+		TweenInfo.new(0.9, Enum.EasingStyle.Quad),
+		{ CFrame = goalCFrame, Size = goalSize }
+	)
+	tween:Play()
+end
+
+return PlotBuilder
+]]></ProtectedString></Properties>
+</Item>
+</Item>
+</Item>
+</Item>
+<Item class="StarterPlayer" referent="RBX38">
+<Properties><string name="Name">StarterPlayer</string></Properties>
+<Item class="StarterPlayerScripts" referent="RBX39">
+<Properties><string name="Name">StarterPlayerScripts</string></Properties>
+<Item class="LocalScript" referent="RBX40">
+<Properties><string name="Name">Client</string><ProtectedString name="Source"><![CDATA[--[[
+	Garage Heist - Client-Bootstrap
+
+	Der Client baut die Oberflaeche, hoert auf die Remotes und schickt
+	Anfragen. Er rechnet nichts aus, was mit Geld zu tun hat - alle Zahlen in
+	diesem Ordner sind Kopien vom Server.
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Remotes = require(Shared.Remotes)
+local Util = require(Shared.Util)
+
+local Store = require(script.Store)
+local Theme = require(script.UI.Theme)
+local Toast = require(script.UI.Toast)
+local HUD = require(script.UI.HUD)
+local GarageMenu = require(script.UI.GarageMenu)
+local ShopMenu = require(script.UI.ShopMenu)
+local DailyPanel = require(script.UI.DailyPanel)
+local DismountBar = require(script.UI.DismountBar)
+local InfoPanel = require(script.UI.InfoPanel)
+local InputController = require(script.Controllers.InputController)
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local root = Theme.Root(playerGui)
+
+Toast.Init(root)
+GarageMenu.Init(root)
+ShopMenu.Init(root)
+DailyPanel.Init(root)
+DismountBar.Init(root)
+
+local leaderPanel = InfoPanel.new(root, "Rangliste", UDim2.new(1, -16, 0.5, 0), UDim2.new(0, 300, 0, 300))
+local radarPanel = InfoPanel.new(root, "Heist Radar", UDim2.new(1, -16, 0.5, 320), UDim2.new(0, 300, 0, 190))
+
+local function renderLeaderboard()
+	local board = Store.leaderboard
+	local lines = { "-- Teuerste Garage --" }
+	for rank, entry in board.richest do
+		table.insert(lines, ("%d. %s  %s"):format(rank, entry.name, Util.FormatCash(entry.value)))
+	end
+	table.insert(lines, "")
+	table.insert(lines, "-- Geklaute Teile heute --")
+	for rank, entry in board.thieves do
+		table.insert(lines, ("%d. %s  %d"):format(rank, entry.name, entry.value))
+	end
+	leaderPanel:SetLines(lines)
+end
+
+HUD.Init(root, {
+	toggleGarage = function()
+		GarageMenu.Toggle()
+	end,
+	toggleShop = function()
+		ShopMenu.Toggle()
+	end,
+	toggleDaily = function()
+		DailyPanel.Toggle()
+	end,
+	toggleLeaderboard = function()
+		leaderPanel:Toggle()
+		if leaderPanel:IsVisible() then
+			renderLeaderboard()
+		end
+	end,
+})
+
+InputController.Start({ garage = GarageMenu })
+
+-- Remotes -----------------------------------------------------------------
+Remotes.Get("ProfileSync").OnClientEvent:Connect(function(snapshot)
+	Store.Set("snapshot", snapshot)
+end)
+
+Remotes.Get("CashUpdate").OnClientEvent:Connect(function(payload)
+	Store.Set("cash", payload)
+end)
+
+Remotes.Get("HeistState").OnClientEvent:Connect(function(payload)
+	Store.Set("heist", payload)
+end)
+
+Remotes.Get("Notify").OnClientEvent:Connect(function(payload)
+	Toast.Show(payload.text, payload.kind)
+end)
+
+Remotes.Get("CarryState").OnClientEvent:Connect(function(payload)
+	Store.Set("carry", payload and payload.part or nil)
+end)
+
+Remotes.Get("DismountProgress").OnClientEvent:Connect(function(payload)
+	DismountBar.Handle(payload)
+end)
+
+Remotes.Get("DailyState").OnClientEvent:Connect(function(payload)
+	Store.Set("daily", payload)
+end)
+
+Remotes.Get("ShopState").OnClientEvent:Connect(function(payload)
+	Store.Set("shop", payload)
+end)
+
+Remotes.Get("LeaderboardUpdate").OnClientEvent:Connect(function(payload)
+	Store.Set("leaderboard", payload)
+	if leaderPanel:IsVisible() then
+		renderLeaderboard()
+	end
+end)
+
+Remotes.Get("RadarPing").OnClientEvent:Connect(function(entries)
+	local lines = {}
+	for rank, entry in entries do
+		table.insert(lines, ("%d. %s: %s (%s)"):format(rank, entry.owner, entry.tierName, Util.FormatCash(entry.value)))
+	end
+	radarPanel:SetLines(lines)
+	radarPanel:ShowFor(75)
+end)
+
+-- Erststart ---------------------------------------------------------------
+local function looksBrandNew(snapshot): boolean
+	if not snapshot then
+		return false
+	end
+	for _, car in snapshot.cars do
+		for _, part in car.parts do
+			if part.tier > 0 or part.repair then
+				return false
+			end
+		end
+	end
+	return true
+end
+
+task.spawn(function()
+	-- Beim Start kann der Server den Handler noch nicht gesetzt haben.
+	local snapshot
+	for attempt = 1, 4 do
+		local ok, result = pcall(function()
+			return Remotes.Get("GetSnapshot"):InvokeServer()
+		end)
+		if ok and result then
+			snapshot = result
+			break
+		end
+		task.wait(attempt)
+	end
+	if snapshot then
+		Store.Set("snapshot", snapshot)
+		Store.Set("cash", {
+			cash = snapshot.cash,
+			pile = snapshot.pile,
+			rate = snapshot.rate,
+			autoCollect = snapshot.passes and snapshot.passes.AutoCollect or false,
+		})
+		if looksBrandNew(snapshot) then
+			-- Ziel: erster Kauf in unter 60 Sekunden. Deshalb geht das Menue
+			-- von allein auf und sagt, was zu tun ist.
+			GarageMenu.SetVisible(true)
+			Toast.Show("Deine Karre ist Schrott. Kauf das erste Teil - Reifen kosten 100.", "cash")
+			Toast.Show("Verbaute Teile bringen Cash pro Sekunde, auch wenn du offline bist.", "info")
+		end
+	end
+end)
+]]></ProtectedString></Properties>
+<Item class="Folder" referent="RBX41">
+<Properties><string name="Name">Controllers</string></Properties>
+<Item class="ModuleScript" referent="RBX42">
+<Properties><string name="Name">InputController</string><ProtectedString name="Source"><![CDATA[--[[
+	InputController
+	Tastatur, Touch-Knoepfe und ProximityPrompts. Schickt ausschliesslich
+	Absichten an den Server, nie Ergebnisse.
+
+	G - Werkstatt   F - Rempeln   Q - Teil ablegen   E - Prompt (Roblox-Standard)
+]]
+
+local ContextActionService = game:GetService("ContextActionService")
+local Players = game:GetService("Players")
+local ProximityPromptService = game:GetService("ProximityPromptService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Remotes = require(ReplicatedStorage:WaitForChild("Shared").Remotes)
+
+local InputController = {}
+
+function InputController.Start(ui)
+	-- Werkbank in der eigenen Garage oeffnet das Menue. Der Prompt selbst
+	-- macht auf dem Server nichts - er ist der Griff, nicht die Tuer.
+	ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
+		local parent = prompt.Parent
+		if not parent or player ~= Players.LocalPlayer then
+			return
+		end
+		-- Nur die eigene Werkbank oeffnet das Menue.
+		if parent.Name == "Workbench" and parent:GetAttribute("PlotIndex") == player:GetAttribute("PlotIndex") then
+			ui.garage.SetVisible(true)
+		end
+	end)
+
+	ContextActionService:BindAction("GarageHeist_Menu", function(_, state)
+		if state == Enum.UserInputState.Begin then
+			ui.garage.Toggle()
+		end
+		return Enum.ContextActionResult.Pass
+	end, false, Enum.KeyCode.G)
+
+	ContextActionService:BindAction("GarageHeist_Tackle", function(_, state)
+		if state == Enum.UserInputState.Begin then
+			Remotes.Get("RequestTackle"):FireServer()
+		end
+		return Enum.ContextActionResult.Pass
+	end, false, Enum.KeyCode.F)
+
+	ContextActionService:BindAction("GarageHeist_Drop", function(_, state)
+		if state == Enum.UserInputState.Begin then
+			Remotes.Get("RequestDropPart"):FireServer()
+		end
+		return Enum.ContextActionResult.Pass
+	end, false, Enum.KeyCode.Q)
+
+	return InputController
+end
+
+return InputController
+]]></ProtectedString></Properties>
+</Item>
+</Item>
+<Item class="Folder" referent="RBX43">
+<Properties><string name="Name">UI</string></Properties>
+<Item class="ModuleScript" referent="RBX44">
+<Properties><string name="Name">DailyPanel</string><ProtectedString name="Source"><![CDATA[--[[
+	DailyPanel
+	Sieben Kaesten, einer pro Tag. Welcher Tag dran ist und ob abgeholt werden
+	darf, entscheidet der Server.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Remotes = require(Shared.Remotes)
+local Util = require(Shared.Util)
+
+local Store = require(script.Parent.Parent.Store)
+local Theme = require(script.Parent.Theme)
+
+local DailyPanel = {}
+
+function DailyPanel.Init(root: ScreenGui)
+	local window = Theme.panel({
+		Name = "DailyPanel",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.new(0, 620, 0, 260),
+		Visible = false,
+		Parent = root,
+	})
+	Theme.padding(14).Parent = window
+
+	Theme.label({
+		Text = "Taegliche Belohnung",
+		Size = UDim2.new(1, -40, 0, 30),
+		Font = Enum.Font.GothamBold,
+		TextSize = 24,
+		Parent = window,
+	})
+	local close = Theme.button({
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, 0, 0, 0),
+		Size = UDim2.new(0, 34, 0, 30),
+		Text = "X",
+		Parent = window,
+	})
+	close.Activated:Connect(function()
+		DailyPanel.SetVisible(false)
+	end)
+
+	local strip = Theme.create("Frame", {
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, 0, 0, 44),
+		Size = UDim2.new(1, 0, 0, 110),
+		Parent = window,
+	}, { Theme.list(Enum.FillDirection.Horizontal, 6) })
+
+	local status = Theme.label({
+		Position = UDim2.new(0, 0, 0, 160),
+		Size = UDim2.new(1, 0, 0, 22),
+		TextColor3 = Theme.Colors.sub,
+		TextSize = 14,
+		Parent = window,
+	})
+
+	local claim = Theme.button({
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, 0),
+		Size = UDim2.new(0, 260, 0, 42),
+		BackgroundColor3 = Theme.Colors.good,
+		TextColor3 = Color3.fromRGB(15, 30, 20),
+		TextSize = 17,
+		Text = "Abholen",
+		Parent = window,
+	})
+	claim.Activated:Connect(function()
+		Remotes.Get("RequestClaimDaily"):FireServer()
+	end)
+
+	DailyPanel._refs = { window = window, strip = strip, status = status, claim = claim }
+
+	Store.Changed:Connect(function(key)
+		if key == "daily" and window.Visible then
+			DailyPanel.Render()
+		end
+	end)
+	return DailyPanel
+end
+
+function DailyPanel.SetVisible(visible: boolean)
+	DailyPanel._refs.window.Visible = visible
+	if visible then
+		DailyPanel.Render()
+	end
+end
+
+function DailyPanel.Toggle()
+	DailyPanel.SetVisible(not DailyPanel._refs.window.Visible)
+end
+
+function DailyPanel.Render()
+	local daily = Store.daily
+	local refs = DailyPanel._refs
+	if not daily then
+		return
+	end
+	for _, child in refs.strip:GetChildren() do
+		if not child:IsA("UIListLayout") then
+			child:Destroy()
+		end
+	end
+
+	for day, reward in daily.rewards do
+		local claimed = day <= daily.streak and not (daily.canClaim and day == daily.nextStreak)
+		local isNext = daily.canClaim and day == daily.nextStreak
+		local box = Theme.panel({
+			BackgroundColor3 = isNext and Theme.Colors.accent or (claimed and Theme.Colors.good or Theme.Colors.panelAlt),
+			Size = UDim2.new(0, 80, 1, 0),
+			LayoutOrder = day,
+			Parent = refs.strip,
+		})
+		Theme.label({
+			Text = ("Tag %d"):format(day),
+			Size = UDim2.new(1, 0, 0, 26),
+			Position = UDim2.new(0, 0, 0, 12),
+			TextXAlignment = Enum.TextXAlignment.Center,
+			Font = Enum.Font.GothamBold,
+			TextColor3 = Color3.fromRGB(20, 20, 24),
+			TextSize = 15,
+			Parent = box,
+		})
+		Theme.label({
+			Text = Util.FormatCash(reward),
+			Size = UDim2.new(1, 0, 0, 24),
+			Position = UDim2.new(0, 0, 0, 44),
+			TextXAlignment = Enum.TextXAlignment.Center,
+			TextColor3 = Color3.fromRGB(20, 20, 24),
+			TextSize = 15,
+			Parent = box,
+		})
+	end
+
+	if daily.canClaim then
+		refs.status.Text = ("Kette: %d Tage. Heute gibt es Tag %d."):format(daily.streak, daily.nextStreak)
+		refs.claim.Text = ("Abholen: %s"):format(Util.FormatCash(daily.reward))
+		refs.claim.BackgroundColor3 = Theme.Colors.good
+		refs.claim.Active = true
+	else
+		refs.status.Text = ("Kette: %d Tage. Ein verpasster Tag setzt zurueck."):format(daily.streak)
+		refs.claim.Text = ("Naechster Tag in %s"):format(Util.FormatTime(daily.nextInSeconds))
+		refs.claim.BackgroundColor3 = Theme.Colors.panelAlt
+		refs.claim.Active = false
+	end
+end
+
+return DailyPanel
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX45">
+<Properties><string name="Name">DismountBar</string><ProtectedString name="Source"><![CDATA[--[[
+	DismountBar
+	Der Fortschrittsbalken beim Abmontieren. Der Balken ist reine Anzeige: der
+	Server misst die vier Sekunden selbst und schickt "start", "cancel" oder
+	"done". Wer hier herumpfuscht, klaut trotzdem nichts schneller.
+]]
+
+local RunService = game:GetService("RunService")
+
+local Theme = require(script.Parent.Theme)
+
+local DismountBar = {}
+
+function DismountBar.Init(root: ScreenGui)
+	local frame = Theme.panel({
+		Name = "DismountBar",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.72),
+		Size = UDim2.new(0, 340, 0, 64),
+		Visible = false,
+		Parent = root,
+	})
+	Theme.padding(10).Parent = frame
+
+	local label = Theme.label({
+		Text = "Abmontieren ...",
+		Size = UDim2.new(1, 0, 0, 20),
+		TextXAlignment = Enum.TextXAlignment.Center,
+		Font = Enum.Font.GothamBold,
+		TextSize = 15,
+		Parent = frame,
+	})
+
+	local track = Theme.create("Frame", {
+		BackgroundColor3 = Theme.Colors.panelAlt,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0, 0, 0, 26),
+		Size = UDim2.new(1, 0, 0, 16),
+		Parent = frame,
+	}, { Theme.corner(8) })
+
+	local fill = Theme.create("Frame", {
+		BackgroundColor3 = Theme.Colors.accent,
+		BorderSizePixel = 0,
+		Size = UDim2.new(0, 0, 1, 0),
+		Parent = track,
+	}, { Theme.corner(8) })
+
+	DismountBar._refs = { frame = frame, label = label, fill = fill }
+	DismountBar._endsAt = 0
+	DismountBar._duration = 0
+
+	RunService.RenderStepped:Connect(function()
+		if not frame.Visible then
+			return
+		end
+		local remaining = math.max(0, DismountBar._endsAt - os.clock())
+		local progress = DismountBar._duration > 0 and (1 - remaining / DismountBar._duration) or 0
+		fill.Size = UDim2.new(math.clamp(progress, 0, 1), 0, 1, 0)
+	end)
+	return DismountBar
+end
+
+function DismountBar.Handle(payload)
+	local refs = DismountBar._refs
+	if not refs or type(payload) ~= "table" then
+		return
+	end
+	if payload.state == "start" then
+		DismountBar._duration = payload.duration or 4
+		DismountBar._endsAt = os.clock() + DismountBar._duration
+		refs.label.Text = ("Abmontieren: %s"):format(payload.label or "Teil")
+		refs.fill.Size = UDim2.new(0, 0, 1, 0)
+		refs.frame.Visible = true
+	else
+		refs.frame.Visible = false
+	end
+end
+
+return DismountBar
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX46">
+<Properties><string name="Name">GarageMenu</string><ProtectedString name="Source"><![CDATA[--[[
+	GarageMenu
+	Die Werkstatt: Teile kaufen, laufende Reparaturen sehen, geklaute Teile
+	einbauen oder verkaufen, Autos und Garage ausbauen.
+
+	Der Inhalt wird komplett aus dem letzten Snapshot des Servers gezeichnet.
+	Der Client haelt keinen eigenen Spielstand.
+]]
+
+local Store = require(script.Parent.Parent.Store)
+local GarageRows = require(script.Parent.GarageRows)
+local Theme = require(script.Parent.Theme)
+
+local GarageMenu = {}
+
+function GarageMenu.Init(root: ScreenGui)
+	local window = Theme.panel({
+		Name = "GarageMenu",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.new(0, 640, 0, 520),
+		Visible = false,
+		Parent = root,
+	})
+	Theme.padding(14).Parent = window
+
+	Theme.label({
+		Name = "Title",
+		Text = "Werkstatt",
+		Size = UDim2.new(1, -40, 0, 30),
+		Font = Enum.Font.GothamBold,
+		TextSize = 24,
+		Parent = window,
+	})
+	local close = Theme.button({
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, 0, 0, 0),
+		Size = UDim2.new(0, 34, 0, 30),
+		Text = "X",
+		Parent = window,
+	})
+	close.Activated:Connect(function()
+		GarageMenu.SetVisible(false)
+	end)
+
+	local scroll = Theme.create("ScrollingFrame", {
+		Name = "Content",
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0, 0, 0, 40),
+		Size = UDim2.new(1, 0, 1, -40),
+		CanvasSize = UDim2.new(),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		ScrollBarThickness = 6,
+		Parent = window,
+	}, { Theme.list(Enum.FillDirection.Vertical, 8) })
+
+	GarageMenu._window = window
+	GarageMenu._scroll = scroll
+
+	Store.Changed:Connect(function(key)
+		if key == "snapshot" and window.Visible then
+			GarageMenu.Render()
+		end
+	end)
+
+	task.spawn(function()
+		while true do
+			task.wait(0.25)
+			GarageRows.TickRepairs()
+		end
+	end)
+	return GarageMenu
+end
+
+function GarageMenu.SetVisible(visible: boolean)
+	GarageMenu._window.Visible = visible
+	if visible then
+		GarageMenu.Render()
+	end
+end
+
+function GarageMenu.Toggle()
+	GarageMenu.SetVisible(not GarageMenu._window.Visible)
+end
+
+function GarageMenu.Render()
+	local snapshot = Store.snapshot
+	local scroll = GarageMenu._scroll
+	if not snapshot or not scroll then
+		return
+	end
+	table.clear(GarageRows.repairLabels)
+	for _, child in scroll:GetChildren() do
+		if not child:IsA("UIListLayout") then
+			child:Destroy()
+		end
+	end
+
+	local order = 0
+	local function nextOrder()
+		order += 1
+		return order
+	end
+
+	local garage = snapshot.garage
+	GarageRows.Header(scroll, nextOrder(), ("Garage: %s (Stufe %d)"):format(garage.label, garage.level))
+	GarageRows.Garage(scroll, nextOrder(), garage, snapshot.cash)
+
+	for _, car in snapshot.cars do
+		GarageRows.Header(scroll, nextOrder(), ("%s (Rate x%.2f)"):format(car.displayName, car.rateMult))
+		for _, part in car.parts do
+			GarageRows.Slot(scroll, nextOrder(), car, part, snapshot.cash)
+		end
+	end
+
+	if #snapshot.looseParts > 0 then
+		GarageRows.Header(scroll, nextOrder(), "Lose Teile in der Garage")
+		for _, part in snapshot.looseParts do
+			GarageRows.LoosePart(scroll, nextOrder(), part)
+		end
+	end
+
+	GarageRows.Header(scroll, nextOrder(), ("Autos (%d/%d Stellplaetze)"):format(#snapshot.cars, garage.carSlots))
+	for _, car in snapshot.shopCars do
+		if car.cost > 0 then
+			GarageRows.ShopCar(scroll, nextOrder(), car, snapshot, garage.carSlots)
+		end
+	end
+end
+
+return GarageMenu
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX47">
+<Properties><string name="Name">GarageRows</string><ProtectedString name="Source"><![CDATA[--[[
+	GarageRows
+	Die einzelnen Zeilen im Werkstatt-Menue. Jede Zeile schickt beim Klick genau
+	eine Anfrage an den Server und zeigt sonst nur das an, was im Snapshot steht.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Remotes = require(Shared.Remotes)
+local Util = require(Shared.Util)
+
+local Theme = require(script.Parent.Theme)
+
+local GarageRows = {}
+
+-- Labels laufender Reparaturen, damit der Countdown tickt.
+GarageRows.repairLabels = {}
+
+function GarageRows.Row(parent, order, height)
+	local frame = Theme.panel({
+		BackgroundColor3 = Theme.Colors.panelAlt,
+		Size = UDim2.new(1, 0, 0, height or 56),
+		LayoutOrder = order,
+		Parent = parent,
+	})
+	Theme.padding(8).Parent = frame
+	return frame
+end
+
+function GarageRows.Action(parent, text, color, enabled, callback)
+	local button = Theme.button({
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, 0, 0.5, 0),
+		Size = UDim2.new(0, 168, 0, 36),
+		BackgroundColor3 = enabled and color or Color3.fromRGB(60, 62, 68),
+		TextColor3 = enabled and Color3.fromRGB(20, 18, 12) or Theme.Colors.sub,
+		TextSize = 14,
+		Text = text,
+		Parent = parent,
+	})
+	if enabled and callback then
+		button.Activated:Connect(callback)
+	end
+	return button
+end
+
+function GarageRows.Header(parent, order, text)
+	return Theme.label({
+		Text = text,
+		Size = UDim2.new(1, 0, 0, 28),
+		Font = Enum.Font.GothamBold,
+		TextSize = 18,
+		TextColor3 = Theme.Colors.accent,
+		LayoutOrder = order,
+		Parent = parent,
+	})
+end
+
+local function twoLines(frame, title, subtitle)
+	Theme.label({
+		Text = title,
+		Size = UDim2.new(1, -180, 0, 20),
+		Font = Enum.Font.GothamBold,
+		TextSize = 15,
+		Parent = frame,
+	})
+	return Theme.label({
+		Text = subtitle,
+		Position = UDim2.new(0, 0, 0, 22),
+		Size = UDim2.new(1, -180, 0, 18),
+		TextColor3 = Theme.Colors.sub,
+		TextSize = 13,
+		Parent = frame,
+	})
+end
+
+function GarageRows.Slot(parent, order, car, part, cash)
+	local frame = GarageRows.Row(parent, order)
+
+	local info
+	if part.repair then
+		info = "wird eingebaut ..."
+	elseif part.tier > 0 then
+		info = ("Stufe %d  -  %s"):format(part.tier, Util.FormatRate(part.rate))
+	else
+		info = "leer - bringt nichts ein"
+	end
+	if part.stolen then
+		info ..= "  (geklaut)"
+	end
+
+	local subLabel = twoLines(frame, ("%s - %s"):format(part.slotName, part.tierName), info)
+
+	if part.repair then
+		table.insert(GarageRows.repairLabels, { label = subLabel, endsAt = part.repair.endsAt })
+		GarageRows.Action(frame, "Sofort fertig (R$)", Theme.Colors.accent, true, function()
+			Remotes.Get("RequestInstantRepair"):FireServer(car.carIndex, part.slotId)
+		end)
+	elseif part.nextCost then
+		local affordable = cash >= part.nextCost
+		GarageRows.Action(
+			frame,
+			("%s  %ds"):format(Util.FormatCash(part.nextCost), part.nextTime),
+			affordable and Theme.Colors.good or Theme.Colors.panelAlt,
+			affordable,
+			function()
+				Remotes.Get("RequestBuyPart"):FireServer(car.carIndex, part.slotId)
+			end
+		)
+	else
+		GarageRows.Action(frame, "Maximum", Theme.Colors.panelAlt, false)
+	end
+	return frame
+end
+
+function GarageRows.LoosePart(parent, order, part)
+	local frame = GarageRows.Row(parent, order)
+	twoLines(
+		frame,
+		("%s - %s"):format(part.slotName, part.tierName),
+		part.installCarIndex and "passt in ein freies Auto" or "kein freier Platz"
+	)
+	if part.installCarIndex then
+		GarageRows.Action(frame, "Einbauen", Theme.Colors.good, true, function()
+			Remotes.Get("RequestInstallLoosePart"):FireServer(part.uid, part.installCarIndex)
+		end)
+	else
+		GarageRows.Action(frame, ("Verkaufen %s"):format(Util.FormatCash(part.sellValue)), Theme.Colors.accent, true, function()
+			Remotes.Get("RequestSellLoosePart"):FireServer(part.uid)
+		end)
+	end
+	return frame
+end
+
+function GarageRows.ShopCar(parent, order, car, snapshot, carSlots)
+	local frame = GarageRows.Row(parent, order)
+	twoLines(frame, car.displayName, ("Rate x%.2f"):format(car.rateMult))
+	local canBuy = snapshot.cash >= car.cost and #snapshot.cars < carSlots
+	GarageRows.Action(
+		frame,
+		Util.FormatCash(car.cost),
+		canBuy and Theme.Colors.good or Theme.Colors.panelAlt,
+		canBuy,
+		function()
+			Remotes.Get("RequestBuyCar"):FireServer(car.carId)
+		end
+	)
+	return frame
+end
+
+function GarageRows.Garage(parent, order, garage, cash)
+	local frame = GarageRows.Row(parent, order)
+	Theme.label({
+		Text = ("Rate x%.2f  -  %d Stellplaetze"):format(garage.rateMult, garage.carSlots),
+		Size = UDim2.new(1, -180, 1, 0),
+		TextSize = 14,
+		Parent = frame,
+	})
+	if garage.nextCost then
+		local affordable = cash >= garage.nextCost
+		GarageRows.Action(
+			frame,
+			("Ausbauen %s"):format(Util.FormatCash(garage.nextCost)),
+			affordable and Theme.Colors.good or Theme.Colors.panelAlt,
+			affordable,
+			function()
+				Remotes.Get("RequestUpgradeGarage"):FireServer()
+			end
+		)
+	else
+		GarageRows.Action(frame, "Voll ausgebaut", Theme.Colors.panelAlt, false)
+	end
+	return frame
+end
+
+-- endsAt kommt als Unix-Zeit vom Server, os.time() ist dieselbe Basis.
+function GarageRows.TickRepairs()
+	for _, entry in GarageRows.repairLabels do
+		if entry.label.Parent then
+			entry.label.Text = ("wird eingebaut - noch %ds"):format(math.ceil(math.max(0, entry.endsAt - os.time())))
+		end
+	end
+end
+
+return GarageRows
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX48">
+<Properties><string name="Name">HUD</string><ProtectedString name="Source"><![CDATA[--[[
+	HUD
+	Cash, Rate, Kasse, Heist-Countdown, Trage-Anzeige und die Knoepfe fuer die
+	Menues. Alle Zahlen kommen fertig vom Server.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Remotes = require(Shared.Remotes)
+local Util = require(Shared.Util)
+
+local Store = require(script.Parent.Parent.Store)
+local Theme = require(script.Parent.Theme)
+
+local HUD = {}
+
+local function pill(parent, name, anchor, position, size)
+	return Theme.panel({
+		Name = name,
+		AnchorPoint = anchor,
+		Position = position,
+		Size = size,
+		BackgroundTransparency = 0.05,
+		Parent = parent,
+	})
+end
+
+function HUD.Init(root: ScreenGui, callbacks)
+	local cashPill = pill(root, "CashPill", Vector2.new(0, 0), UDim2.new(0, 16, 0, 16), UDim2.new(0, 240, 0, 78))
+	Theme.padding(10).Parent = cashPill
+
+	local cashLabel = Theme.label({
+		Text = "$0",
+		Size = UDim2.new(1, 0, 0, 34),
+		Font = Enum.Font.GothamBold,
+		TextSize = 30,
+		Parent = cashPill,
+	})
+	local rateLabel = Theme.label({
+		Text = "$0,0/s",
+		Position = UDim2.new(0, 0, 0, 36),
+		Size = UDim2.new(1, 0, 0, 20),
+		TextColor3 = Theme.Colors.good,
+		TextSize = 16,
+		Parent = cashPill,
+	})
+
+	local collectButton = Theme.button({
+		Name = "Collect",
+		AnchorPoint = Vector2.new(0, 0),
+		Position = UDim2.new(0, 16, 0, 102),
+		Size = UDim2.new(0, 240, 0, 42),
+		BackgroundColor3 = Theme.Colors.accent,
+		TextColor3 = Color3.fromRGB(25, 20, 10),
+		TextSize = 17,
+		Visible = false,
+		Text = "Kasse leeren",
+		Parent = root,
+	})
+	collectButton.Activated:Connect(function()
+		Remotes.Get("RequestCollect"):FireServer()
+	end)
+
+	local heistPill = pill(
+		root,
+		"HeistPill",
+		Vector2.new(0.5, 0),
+		UDim2.new(0.5, 0, 0, 16),
+		UDim2.new(0, 300, 0, 52)
+	)
+	local heistLabel = Theme.label({
+		Text = "Klau-Fenster: -",
+		Size = UDim2.new(1, 0, 1, 0),
+		TextXAlignment = Enum.TextXAlignment.Center,
+		Font = Enum.Font.GothamBold,
+		TextSize = 20,
+		Parent = heistPill,
+	})
+
+	local buttonColumn = Theme.create("Frame", {
+		Name = "Buttons",
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -16, 0, 16),
+		Size = UDim2.new(0, 150, 0, 200),
+		Parent = root,
+	}, { Theme.list(Enum.FillDirection.Vertical, 8) })
+
+	local function menuButton(text, order, callback)
+		local button = Theme.button({
+			Size = UDim2.new(1, 0, 0, 40),
+			TextSize = 16,
+			LayoutOrder = order,
+			Text = text,
+			Parent = buttonColumn,
+		})
+		button.Activated:Connect(callback)
+		return button
+	end
+
+	menuButton("Werkstatt", 1, callbacks.toggleGarage)
+	menuButton("Shop", 2, callbacks.toggleShop)
+	local dailyButton = menuButton("Taeglich", 3, callbacks.toggleDaily)
+	menuButton("Rangliste", 4, callbacks.toggleLeaderboard)
+
+	-- Trage-Leiste ------------------------------------------------------
+	local carryBar = Theme.panel({
+		Name = "CarryBar",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -20),
+		Size = UDim2.new(0, 420, 0, 96),
+		Visible = false,
+		Parent = root,
+	})
+	Theme.padding(10).Parent = carryBar
+
+	local carryLabel = Theme.label({
+		Text = "",
+		Size = UDim2.new(1, 0, 0, 40),
+		TextXAlignment = Enum.TextXAlignment.Center,
+		Font = Enum.Font.GothamBold,
+		TextSize = 17,
+		TextWrapped = true,
+		Parent = carryBar,
+	})
+	local dropButton = Theme.button({
+		Position = UDim2.new(0, 0, 0, 44),
+		Size = UDim2.new(0.48, 0, 0, 34),
+		TextSize = 15,
+		Text = "Ablegen",
+		Parent = carryBar,
+	})
+	dropButton.Activated:Connect(function()
+		Remotes.Get("RequestDropPart"):FireServer()
+	end)
+
+	local tackleButton = Theme.button({
+		Name = "Tackle",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -130),
+		Size = UDim2.new(0, 220, 0, 44),
+		BackgroundColor3 = Theme.Colors.heist,
+		TextSize = 16,
+		Visible = false,
+		Text = "Rempeln (F)",
+		Parent = root,
+	})
+	tackleButton.Activated:Connect(function()
+		Remotes.Get("RequestTackle"):FireServer()
+	end)
+
+	HUD._refs = {
+		cash = cashLabel,
+		rate = rateLabel,
+		collect = collectButton,
+		heist = heistPill,
+		heistLabel = heistLabel,
+		carryBar = carryBar,
+		carryLabel = carryLabel,
+		tackle = tackleButton,
+		daily = dailyButton,
+	}
+
+	Store.Changed:Connect(function()
+		HUD.Update()
+	end)
+	RunService.Heartbeat:Connect(function()
+		HUD._accumulator = (HUD._accumulator or 0) + 1
+		if HUD._accumulator % 10 == 0 then
+			HUD.UpdateTimer()
+		end
+	end)
+	HUD.Update()
+	return HUD
+end
+
+function HUD.Update()
+	local refs = HUD._refs
+	if not refs then
+		return
+	end
+	local cash = Store.cash
+	refs.cash.Text = Util.FormatCash(cash.cash)
+	refs.rate.Text = Util.FormatRate(cash.rate)
+	refs.collect.Visible = (not cash.autoCollect) and cash.pile >= 1
+	refs.collect.Text = ("Kasse leeren: %s"):format(Util.FormatCash(cash.pile))
+
+	local carry = Store.carry
+	refs.carryBar.Visible = carry ~= nil
+	if carry then
+		refs.carryLabel.Text = ("Du traegst: %s (%s)\nAb in deine Garage - auf das blaue Pad!"):format(
+			carry.tierName,
+			carry.slotName
+		)
+	end
+	refs.tackle.Visible = Store.heist.open and carry == nil
+
+	if Store.daily then
+		refs.daily.BackgroundColor3 = Store.daily.canClaim and Theme.Colors.good or Theme.Colors.panelAlt
+		refs.daily.TextColor3 = Store.daily.canClaim and Color3.fromRGB(15, 30, 20) or Theme.Colors.text
+	end
+	HUD.UpdateTimer()
+end
+
+function HUD.UpdateTimer()
+	local refs = HUD._refs
+	if not refs then
+		return
+	end
+	local heist = Store.heist
+	local now = workspace:GetServerTimeNow()
+	if heist.open then
+		refs.heist.BackgroundColor3 = Theme.Colors.heist
+		refs.heistLabel.Text = ("KLAU-FENSTER OFFEN  %s"):format(Util.FormatTime(heist.endsAt - now))
+	else
+		refs.heist.BackgroundColor3 = Theme.Colors.panel
+		refs.heistLabel.Text = ("Klau-Fenster in %s"):format(Util.FormatTime(heist.nextAt - now))
+	end
+end
+
+return HUD
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX49">
+<Properties><string name="Name">InfoPanel</string><ProtectedString name="Source"><![CDATA[--[[
+	InfoPanel
+	Eine schlichte Liste mit Titel. Wird zweimal benutzt: fuer die Rangliste
+	(dauerhaft ein-/ausblendbar) und fuer den Heist Radar (blendet sich nach
+	dem Fenster selbst aus).
+]]
+
+local Theme = require(script.Parent.Theme)
+
+local InfoPanel = {}
+InfoPanel.__index = InfoPanel
+
+function InfoPanel.new(root: ScreenGui, title: string, position: UDim2, size: UDim2)
+	local self = setmetatable({}, InfoPanel)
+
+	self.window = Theme.panel({
+		Name = title,
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = position,
+		Size = size,
+		BackgroundTransparency = 0.05,
+		Visible = false,
+		Parent = root,
+	})
+	Theme.padding(12).Parent = self.window
+
+	Theme.label({
+		Text = title,
+		Size = UDim2.new(1, 0, 0, 24),
+		Font = Enum.Font.GothamBold,
+		TextSize = 18,
+		TextColor3 = Theme.Colors.accent,
+		Parent = self.window,
+	})
+
+	self.body = Theme.create("Frame", {
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, 0, 0, 30),
+		Size = UDim2.new(1, 0, 1, -30),
+		Parent = self.window,
+	}, { Theme.list(Enum.FillDirection.Vertical, 4) })
+
+	return self
+end
+
+function InfoPanel:SetLines(lines: { string })
+	for _, child in self.body:GetChildren() do
+		if not child:IsA("UIListLayout") then
+			child:Destroy()
+		end
+	end
+	if #lines == 0 then
+		Theme.label({
+			Text = "nichts zu melden",
+			Size = UDim2.new(1, 0, 0, 20),
+			TextColor3 = Theme.Colors.sub,
+			TextSize = 14,
+			Parent = self.body,
+		})
+		return
+	end
+	for index, line in lines do
+		Theme.label({
+			Text = line,
+			Size = UDim2.new(1, 0, 0, 20),
+			TextSize = 14,
+			LayoutOrder = index,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			Parent = self.body,
+		})
+	end
+end
+
+function InfoPanel:SetVisible(visible: boolean)
+	self.window.Visible = visible
+end
+
+function InfoPanel:Toggle()
+	self.window.Visible = not self.window.Visible
+end
+
+function InfoPanel:IsVisible(): boolean
+	return self.window.Visible
+end
+
+-- Blendet sich nach `seconds` selbst aus, sofern nicht vorher neu gesetzt.
+function InfoPanel:ShowFor(seconds: number)
+	self.window.Visible = true
+	self._token = (self._token or 0) + 1
+	local token = self._token
+	task.delay(seconds, function()
+		if self._token == token then
+			self.window.Visible = false
+		end
+	end)
+end
+
+return InfoPanel
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX50">
+<Properties><string name="Name">ShopMenu</string><ProtectedString name="Source"><![CDATA[--[[
+	ShopMenu
+	Zeigt Gamepasses und Developer Products. Der Client kennt keine Produkt-IDs
+	- er schickt nur den Schluessel, der Server loest den Kaufdialog aus.
+	Produkte, die im Dashboard noch nicht existieren, sind ausgegraut.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Remotes = require(ReplicatedStorage:WaitForChild("Shared").Remotes)
+
+local Store = require(script.Parent.Parent.Store)
+local Theme = require(script.Parent.Theme)
+
+local ShopMenu = {}
+
+function ShopMenu.Init(root: ScreenGui)
+	local window = Theme.panel({
+		Name = "ShopMenu",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.new(0, 520, 0, 470),
+		Visible = false,
+		Parent = root,
+	})
+	Theme.padding(14).Parent = window
+
+	Theme.label({
+		Text = "Shop",
+		Size = UDim2.new(1, -40, 0, 30),
+		Font = Enum.Font.GothamBold,
+		TextSize = 24,
+		Parent = window,
+	})
+	local close = Theme.button({
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, 0, 0, 0),
+		Size = UDim2.new(0, 34, 0, 30),
+		Text = "X",
+		Parent = window,
+	})
+	close.Activated:Connect(function()
+		ShopMenu.SetVisible(false)
+	end)
+
+	local scroll = Theme.create("ScrollingFrame", {
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0, 0, 0, 40),
+		Size = UDim2.new(1, 0, 1, -40),
+		CanvasSize = UDim2.new(),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		ScrollBarThickness = 6,
+		Parent = window,
+	}, { Theme.list(Enum.FillDirection.Vertical, 8) })
+
+	ShopMenu._window = window
+	ShopMenu._scroll = scroll
+
+	Store.Changed:Connect(function(key)
+		if key == "shop" and window.Visible then
+			ShopMenu.Render()
+		end
+	end)
+	return ShopMenu
+end
+
+function ShopMenu.SetVisible(visible: boolean)
+	ShopMenu._window.Visible = visible
+	if visible then
+		ShopMenu.Render()
+	end
+end
+
+function ShopMenu.Toggle()
+	ShopMenu.SetVisible(not ShopMenu._window.Visible)
+end
+
+function ShopMenu.Render()
+	local scroll = ShopMenu._scroll
+	for _, child in scroll:GetChildren() do
+		if not child:IsA("UIListLayout") then
+			child:Destroy()
+		end
+	end
+
+	local order = 0
+	for _, item in Store.shop do
+		order += 1
+		local frame = Theme.panel({
+			BackgroundColor3 = Theme.Colors.panelAlt,
+			Size = UDim2.new(1, 0, 0, 64),
+			LayoutOrder = order,
+			Parent = scroll,
+		})
+		Theme.padding(8).Parent = frame
+
+		Theme.label({
+			Text = item.title .. (item.kind == "pass" and "  (Gamepass)" or ""),
+			Size = UDim2.new(1, -150, 0, 22),
+			Font = Enum.Font.GothamBold,
+			TextSize = 16,
+			Parent = frame,
+		})
+		Theme.label({
+			Text = item.desc,
+			Position = UDim2.new(0, 0, 0, 24),
+			Size = UDim2.new(1, -150, 0, 20),
+			TextColor3 = Theme.Colors.sub,
+			TextSize = 13,
+			Parent = frame,
+		})
+
+		local text, enabled, color
+		if item.owned then
+			text, enabled, color = "Gekauft", false, Theme.Colors.panelAlt
+		elseif not item.configured then
+			text, enabled, color = "nicht eingerichtet", false, Theme.Colors.panelAlt
+		else
+			text, enabled, color = ("R$ %d"):format(item.robux), true, Theme.Colors.accent
+		end
+
+		local button = Theme.button({
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, 0, 0.5, 0),
+			Size = UDim2.new(0, 140, 0, 38),
+			BackgroundColor3 = color,
+			TextColor3 = enabled and Color3.fromRGB(20, 18, 12) or Theme.Colors.sub,
+			TextSize = 15,
+			Text = text,
+			Parent = frame,
+		})
+		if enabled then
+			button.Activated:Connect(function()
+				Remotes.Get("RequestPromptPurchase"):FireServer(item.kind, item.key)
+			end)
+		end
+	end
+end
+
+return ShopMenu
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX51">
+<Properties><string name="Name">Theme</string><ProtectedString name="Source"><![CDATA[--[[
+	Theme
+	Farben, Schriften und ein winziger Instance-Builder. Damit bleiben die
+	UI-Dateien kurz genug, um sie noch lesen zu koennen.
+]]
+
+local Theme = {}
+
+Theme.Colors = {
+	bg = Color3.fromRGB(18, 18, 22),
+	panel = Color3.fromRGB(30, 31, 36),
+	panelAlt = Color3.fromRGB(43, 45, 52),
+	accent = Color3.fromRGB(245, 166, 35),
+	good = Color3.fromRGB(90, 215, 130),
+	bad = Color3.fromRGB(235, 80, 80),
+	heist = Color3.fromRGB(225, 60, 90),
+	text = Color3.fromRGB(240, 240, 245),
+	sub = Color3.fromRGB(168, 172, 182),
+}
+
+function Theme.create(className: string, props: { [string]: any }?, children: { Instance }?): Instance
+	local instance = Instance.new(className)
+	if props then
+		local parent = props.Parent
+		props.Parent = nil
+		for key, value in props do
+			(instance :: any)[key] = value
+		end
+		if children then
+			for _, child in children do
+				child.Parent = instance
+			end
+		end
+		if parent then
+			instance.Parent = parent
+		end
+	elseif children then
+		for _, child in children do
+			child.Parent = instance
+		end
+	end
+	return instance
+end
+
+function Theme.corner(radius: number?): UICorner
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, radius or 8)
+	return corner
+end
+
+function Theme.padding(amount: number): UIPadding
+	local padding = Instance.new("UIPadding")
+	local offset = UDim.new(0, amount)
+	padding.PaddingTop = offset
+	padding.PaddingBottom = offset
+	padding.PaddingLeft = offset
+	padding.PaddingRight = offset
+	return padding
+end
+
+function Theme.list(direction: Enum.FillDirection?, gap: number?): UIListLayout
+	local layout = Instance.new("UIListLayout")
+	layout.FillDirection = direction or Enum.FillDirection.Vertical
+	layout.Padding = UDim.new(0, gap or 6)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	return layout
+end
+
+function Theme.label(props): TextLabel
+	props.BackgroundTransparency = props.BackgroundTransparency or 1
+	props.Font = props.Font or Enum.Font.Gotham
+	props.TextColor3 = props.TextColor3 or Theme.Colors.text
+	props.TextXAlignment = props.TextXAlignment or Enum.TextXAlignment.Left
+	props.Text = props.Text or ""
+	return Theme.create("TextLabel", props) :: TextLabel
+end
+
+function Theme.button(props): TextButton
+	props.BackgroundColor3 = props.BackgroundColor3 or Theme.Colors.panelAlt
+	props.Font = props.Font or Enum.Font.GothamBold
+	props.TextColor3 = props.TextColor3 or Theme.Colors.text
+	props.AutoButtonColor = true
+	props.BorderSizePixel = 0
+	props.Text = props.Text or ""
+	local button = Theme.create("TextButton", props) :: TextButton
+	Theme.corner(8).Parent = button
+	return button
+end
+
+function Theme.panel(props): Frame
+	props.BackgroundColor3 = props.BackgroundColor3 or Theme.Colors.panel
+	props.BorderSizePixel = 0
+	local frame = Theme.create("Frame", props) :: Frame
+	Theme.corner(12).Parent = frame
+	return frame
+end
+
+local root: ScreenGui? = nil
+
+function Theme.Root(playerGui: Instance): ScreenGui
+	if root and root.Parent then
+		return root
+	end
+	root = Theme.create("ScreenGui", {
+		Name = "GarageHeistUI",
+		ResetOnSpawn = false,
+		IgnoreGuiInset = false,
+		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+		Parent = playerGui,
+	}) :: ScreenGui
+	return root :: ScreenGui
+end
+
+return Theme
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX52">
+<Properties><string name="Name">Toast</string><ProtectedString name="Source"><![CDATA[--[[
+	Toast
+	Kurzmeldungen unten links. Der Server schickt Text und Art, der Client
+	zeigt sie an - mehr passiert hier nicht.
+]]
+
+local TweenService = game:GetService("TweenService")
+
+local Theme = require(script.Parent.Theme)
+
+local Toast = {}
+
+local MAX_VISIBLE = 5
+local LIFETIME = 5
+
+local KIND_COLORS = {
+	good = Theme.Colors.good,
+	bad = Theme.Colors.bad,
+	cash = Theme.Colors.accent,
+	heist = Theme.Colors.heist,
+	info = Theme.Colors.sub,
+}
+
+function Toast.Init(root: ScreenGui)
+	local container = Theme.create("Frame", {
+		Name = "Toasts",
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 16, 1, -16),
+		Size = UDim2.new(0, 340, 0, 260),
+		Parent = root,
+	}, {
+		Theme.create("UIListLayout", {
+			Padding = UDim.new(0, 6),
+			VerticalAlignment = Enum.VerticalAlignment.Bottom,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+		}),
+	})
+	Toast._container = container
+	Toast._counter = 0
+	return Toast
+end
+
+function Toast.Show(text: string, kind: string?)
+	local container = Toast._container
+	if not container then
+		return
+	end
+	Toast._counter += 1
+
+	local frame = Theme.panel({
+		Name = "Toast",
+		BackgroundColor3 = Theme.Colors.panel,
+		BackgroundTransparency = 0.08,
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		LayoutOrder = Toast._counter,
+		Parent = container,
+	})
+	Theme.padding(10).Parent = frame
+
+	Theme.create("Frame", {
+		BackgroundColor3 = KIND_COLORS[kind or "info"] or Theme.Colors.sub,
+		BorderSizePixel = 0,
+		Size = UDim2.new(0, 4, 1, 0),
+		Parent = frame,
+	}, { Theme.corner(2) })
+
+	Theme.label({
+		Text = text,
+		Position = UDim2.new(0, 12, 0, 0),
+		Size = UDim2.new(1, -12, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		TextWrapped = true,
+		TextSize = 15,
+		Font = Enum.Font.GothamMedium,
+		Parent = frame,
+	})
+
+	local children = container:GetChildren()
+	local toasts = {}
+	for _, child in children do
+		if child:IsA("Frame") then
+			table.insert(toasts, child)
+		end
+	end
+	if #toasts > MAX_VISIBLE then
+		table.sort(toasts, function(a, b)
+			return a.LayoutOrder < b.LayoutOrder
+		end)
+		for index = 1, #toasts - MAX_VISIBLE do
+			toasts[index]:Destroy()
+		end
+	end
+
+	task.delay(LIFETIME, function()
+		if frame.Parent then
+			local tween = TweenService:Create(frame, TweenInfo.new(0.35), { BackgroundTransparency = 1 })
+			tween:Play()
+			tween.Completed:Wait()
+			frame:Destroy()
+		end
+	end)
+end
+
+return Toast
+]]></ProtectedString></Properties>
+</Item>
+</Item>
+<Item class="ModuleScript" referent="RBX53">
+<Properties><string name="Name">Store</string><ProtectedString name="Source"><![CDATA[--[[
+	Store
+	Der Client haelt genau eine Kopie dessen, was der Server geschickt hat.
+	Nichts hier wird berechnet - insbesondere kein Cash. Wer etwas will,
+	schickt eine Anfrage und wartet auf das naechste Update.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Signal = require(Shared.Signal)
+
+local Store = {}
+
+Store.snapshot = nil -- Garage, Autos, Teile, Preise
+Store.cash = { cash = 0, pile = 0, rate = 0, autoCollect = false }
+Store.heist = { open = false, endsAt = 0, nextAt = 0 }
+Store.daily = nil
+Store.shop = {}
+Store.carry = nil
+Store.leaderboard = { richest = {}, thieves = {} }
+
+Store.Changed = Signal.new() -- (was: string)
+
+function Store.Set(key: string, value)
+	Store[key] = value
+	Store.Changed:Fire(key)
+end
+
+return Store
+]]></ProtectedString></Properties>
+</Item>
+</Item>
+</Item>
+</Item>
+</roblox>

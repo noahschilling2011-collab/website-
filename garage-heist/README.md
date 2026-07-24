@@ -10,7 +10,20 @@ Garagenhofs. Autos sind Deko-Objekte mit Werten.
 
 ## In Studio bekommen
 
-**Mit Rojo (empfohlen):**
+**Der schnelle Weg - eine Datei:** `GarageHeist.rbxlx` in Studio oeffnen
+(Doppelklick oder `File > Open from File`). Alles liegt sofort an der richtigen
+Stelle, kein Rojo noetig. Danach `File > Publish to Roblox As...`.
+
+Die Datei wird aus `src/` erzeugt. Nach Aenderungen am Code neu bauen:
+
+```bash
+python3 tools/build_rbxlx.py
+```
+
+Das Skript prueft dabei, dass jede der 40 Quelldateien unveraendert in der
+Place-Datei steckt, und bricht ab, wenn etwas nicht passt.
+
+**Mit Rojo (besser, wenn du weiterentwickelst):**
 
 ```bash
 # einmalig
@@ -23,7 +36,7 @@ rojo serve
 In Studio das Rojo-Plugin oeffnen, `Connect`. Fertig - `src/` landet in
 ReplicatedStorage / ServerScriptService / StarterPlayerScripts.
 
-**Ohne Rojo:** die Ordner von Hand nachbauen. Die Struktur muss exakt so
+**Von Hand nachbauen** (falls du beides nicht willst): Die Struktur muss exakt so
 aussehen, weil die Module sich ueber `script.Parent` finden:
 
 ```
