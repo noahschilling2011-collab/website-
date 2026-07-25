@@ -116,8 +116,8 @@ niemand ins Leere faellt, egal was danach schiefgeht.
   schickt Absichten.
 - **Ein Zustand, eine Quelle.** Das Profil ist die Wahrheit; die Welt wird daraus
   neu gezeichnet (`GarageView`), nie umgekehrt.
-- **Getrennte Zustaendigkeiten.** Keine Datei ueber 300 Zeilen, kein Service, der
-  zwei Dinge tut. Reine Datenoperationen liegen in `Data/ProfileOps.lua`, damit
+- **Getrennte Zustaendigkeiten.** Kein Service, der zwei Dinge tut; jede Datei
+  ausser den beiden Geometrie-Buildern bleibt unter 300 Zeilen. Reine Datenoperationen liegen in `Data/ProfileOps.lua`, damit
   Online- und Offline-Rechnung nachweislich dieselbe Formel benutzen.
 - **DataStore mit Session-Lock.** `Data/SessionStore.lua` nimmt beim Laden einen
   Lock (`UpdateAsync`), schreibt nur, solange er ihm gehoert, und gibt ihn beim
