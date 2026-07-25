@@ -149,6 +149,8 @@ function GarageService:_teardown(player: Player)
 		refs.model:Destroy()
 	end
 	view.plot.door.Color = DOOR_COLOR
+	-- Sonst behaelt eine freie Box die Optik des letzten Besitzers.
+	PlotBuilder.ApplyLevel(view.plot, 1)
 	view.plot.sign.name.Text = "Freie Box"
 	view.plot.sign.value.Text = ""
 	view.plot.sign.rate.Text = ""

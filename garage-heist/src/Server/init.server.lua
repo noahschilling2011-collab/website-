@@ -87,11 +87,21 @@ local function buildWorld()
 	ground.Name = "Ground"
 	ground.Anchored = true
 	ground.Size = Vector3.new(900, 2, 620)
-	ground.CFrame = CFrame.new(0, -1, 0)
-	ground.Color = Color3.fromRGB(58, 60, 64)
+	-- Oberkante bei -0,05 statt 0: Baseplate, Ground und jeder Garagenboden
+	-- lagen exakt koplanar auf y = 0 und haben bei jeder Kamerabewegung
+	-- geflimmert (Z-Fighting).
+	ground.CFrame = CFrame.new(0, -1.05, 0)
+	ground.Color = Color3.fromRGB(38, 40, 45)
 	ground.Material = Enum.Material.Asphalt
 	ground.TopSurface = Enum.SurfaceType.Smooth
 	ground.Parent = Workspace
+
+	-- Erst jetzt weg: scheitert die Zeile darueber, steht wenigstens noch die
+	-- Grundplatte aus der Place-Datei und niemand faellt ins Leere.
+	local baseplate = Workspace:FindFirstChild("Baseplate")
+	if baseplate then
+		baseplate:Destroy()
+	end
 
 	local spawnPad = Instance.new("SpawnLocation")
 	spawnPad.Name = "LobbySpawn"

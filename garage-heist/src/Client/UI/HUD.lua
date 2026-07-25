@@ -201,7 +201,15 @@ function HUD.Update()
 		return
 	end
 	local cash = Store.cash
-	refs.cash.Text = Util.FormatCash(cash.cash)
+	-- Der hochzaehlende Zaehler ist bei einem Idle-Spiel das Kernfeedback.
+	local previous = HUD._lastCash or cash.cash
+	if math.abs(cash.cash - previous) > 0.5 then
+		Theme.countTo(refs.cash, previous, cash.cash, Util.FormatCash, 0.35)
+		Theme.pop(refs.cash, 0.06)
+	else
+		refs.cash.Text = Util.FormatCash(cash.cash)
+	end
+	HUD._lastCash = cash.cash
 	refs.rate.Text = Util.FormatRate(cash.rate)
 	refs.collect.Visible = (not cash.autoCollect) and cash.pile >= 1
 	refs.collect.Text = ("Kasse leeren: %s"):format(Util.FormatCash(cash.pile))

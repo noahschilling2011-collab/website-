@@ -138,6 +138,13 @@ niemand ins Leere faellt, egal was danach schiefgeht.
 | **Jede ID, die du selbst anlegen musst** | `docs/SETUP.md` |
 | Warum die Preise so stehen | `docs/MONETIZATION.md` |
 | Abnahme-Tests | `docs/TESTPLAN.md` |
+| Design-Teardown und was als Naechstes ansteht | `docs/DESIGN.md` |
+
+**Bekannte Abweichung von der 300-Zeilen-Regel:** `World/PlotBuilder.lua` (749)
+und `World/CarBuilder.lua` (566) sind Geometrie-Dateien - eine lange Liste von
+Parts, keine Logik. Sie liegen bewusst ueber dem Limit, weil ein Aufteilen die
+Bauanleitung auseinanderreissen wuerde, ohne etwas lesbarer zu machen. Jede
+andere Datei bleibt unter 300.
 
 ## Wie ein Teil den Besitzer wechselt
 

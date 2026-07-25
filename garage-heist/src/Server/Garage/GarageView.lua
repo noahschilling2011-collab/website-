@@ -15,6 +15,7 @@ local Util = require(Shared.Util)
 
 local Server = script.Parent.Parent
 local CarBuilder = require(Server.World.CarBuilder)
+local PlotBuilder = require(Server.World.PlotBuilder)
 local ProfileOps = require(Server.Data.ProfileOps)
 
 local GarageView = {}
@@ -80,6 +81,9 @@ function GarageView.UpdateBillboards(view, data)
 end
 
 function GarageView.UpdateSign(view, player: Player, data, rate: number)
+	-- Akzentfarbe, Deckenlicht und Bodenmarkierung haengen an der Garagenstufe.
+	-- Ohne das sieht ein 260k-Ausbau aus wie der Anfangszustand.
+	PlotBuilder.ApplyLevel(view.plot, data.garageLevel or 1)
 	local sign = view.plot.sign
 	sign.name.Text = player.DisplayName .. "s Garage"
 	sign.value.Text = "Wert " .. Util.FormatCash(ProfileOps.GarageValue(data))

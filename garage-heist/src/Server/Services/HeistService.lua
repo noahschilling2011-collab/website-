@@ -1,8 +1,8 @@
 --[[
 	HeistService
-	Der globale Timer. Alle 8 Minuten geht fuer 60 Sekunden jedes Garagentor
-	auf. Der Server entscheidet, wann - der Client bekommt nur Zeitstempel und
-	rechnet daraus seinen Countdown.
+	Der globale Timer. Der Takt steht in Config (HEIST_INTERVAL / HEIST_WINDOW),
+	aktuell alle 3,5 Minuten fuer 75 Sekunden. Der Server entscheidet, wann -
+	der Client bekommt nur Zeitstempel und rechnet daraus seinen Countdown.
 
 	Garage Lock (Gamepass) schliesst das eigene Tor nach 20 Sekunden wieder.
 ]]
