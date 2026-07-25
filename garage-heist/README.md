@@ -60,6 +60,34 @@ stimmen. Der Generator oben macht genau das - von Hand ist es reine Fleissarbeit
 2. `Game Settings > Places > Max Players` auf **12 oder weniger** setzen. Es gibt
    `Config.PLOT_COUNT = 12` Garagen; wer keine bekommt, wird gekickt.
 
+## Die Welt entsteht beim Play, nicht im Editor
+
+**Im Bearbeitungsmodus siehst du nur eine Grundplatte - das ist richtig so.**
+Boden, die zwoelf Garagen, Tore, Schilder, Autos und die Ranglisten-Tafel baut
+der Server beim Start aus Code (`World/PlotBuilder.lua`, `World/CarBuilder.lua`).
+Es gibt bewusst keine vorgebaute Map: der Zustand kommt aus dem Profil, und die
+Welt wird daraus gezeichnet - nicht umgekehrt.
+
+Druecke **Play**. Danach steht in der Konsole (View > Output) genau eine Zeile:
+
+```
+[Garage Heist] Server bereit: 10/10 Services, 12 Garagen gebaut.
+```
+
+### Wenn nichts kommt
+
+| Was in der Konsole steht | Was los ist |
+|---|---|
+| gar keine `[Garage Heist]`-Zeile | Das Server-Skript laeuft nicht. Liegt `Server` wirklich in `ServerScriptService` und ist es ein `Script` (nicht LocalScript, nicht deaktiviert)? |
+| `... 12 Garagen gebaut`, aber du siehst nichts | Du stehst woanders. Der Spawn liegt bei `0, 0, 26`, die Garagen links und rechts davon. Kamera zuruecksetzen oder neu spawnen. |
+| `[Garage Heist] <Service>:Start() ist gescheitert: …` | Genau dieser Service ist ausgefallen, der Rest laeuft weiter. Die Meldung nennt Datei und Zeile. |
+| `0 Garagen gebaut` | `GarageService:Start()` ist gescheitert - die Zeile darueber sagt warum. |
+| `[SessionStore] Kein DataStore-Zugriff` | API Services sind aus (Punkt 1 oben). Das Spiel laeuft, speichert aber nicht. |
+
+Jeder Startschritt laeuft in einem eigenen `pcall`: ein Fehler in einem Service
+nimmt die anderen nicht mit, und der Boden wird als Allererstes gebaut - damit
+niemand ins Leere faellt, egal was danach schiefgeht.
+
 ## Der Loop
 
 1. Schrottauto steht in der eigenen Box. Vier leere Slots: Motor, Reifen, Lack, Turbo.

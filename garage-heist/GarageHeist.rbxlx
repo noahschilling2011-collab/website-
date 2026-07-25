@@ -1,11 +1,13 @@
 <roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">
 <External>null</External>
 <External>nil</External>
-<Item class="ReplicatedStorage" referent="RBX1">
+<Item class="Lighting" referent="RBX1"><Properties><string name="Name">Lighting</string><token name="Technology">4</token><float name="ClockTime">18.5</float><float name="Brightness">2</float><float name="ExposureCompensation">0.15</float><bool name="GlobalShadows">true</bool><float name="FogEnd">900</float><Color3 name="Ambient"><R>0.176471</R><G>0.176471</G><B>0.235294</B></Color3><Color3 name="OutdoorAmbient"><R>0.274510</R><G>0.274510</G><B>0.352941</B></Color3></Properties></Item>
+<Item class="Workspace" referent="RBX2"><Properties><string name="Name">Workspace</string></Properties><Item class="Terrain" referent="RBX3"><Properties><string name="Name">Terrain</string></Properties></Item><Item class="Part" referent="RBX4"><Properties><string name="Name">Baseplate</string><bool name="Anchored">true</bool><bool name="Locked">true</bool><Vector3 name="size"><X>1024</X><Y>16</Y><Z>1024</Z></Vector3><CoordinateFrame name="CFrame"><X>0</X><Y>-8</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame></Properties></Item></Item>
+<Item class="ReplicatedStorage" referent="RBX5">
 <Properties><string name="Name">ReplicatedStorage</string></Properties>
-<Item class="Folder" referent="RBX2">
+<Item class="Folder" referent="RBX6">
 <Properties><string name="Name">Shared</string></Properties>
-<Item class="ModuleScript" referent="RBX3">
+<Item class="ModuleScript" referent="RBX7">
 <Properties><string name="Name">Audio</string><ProtectedString name="Source"><![CDATA[--[[
 	Audio
 	Duenner Wrapper um SoundCatalog. Fehlt eine ID, passiert nichts - kein
@@ -63,7 +65,7 @@ end
 return Audio
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX4">
+<Item class="ModuleScript" referent="RBX8">
 <Properties><string name="Name">CarCatalog</string><ProtectedString name="Source"><![CDATA[--[[
 	CarCatalog
 	Autos sind Deko-Objekte mit Werten. Kein Fahrverhalten, keine Seats,
@@ -134,7 +136,7 @@ CarCatalog.STARTER = "scrap_sedan"
 return CarCatalog
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX5">
+<Item class="ModuleScript" referent="RBX9">
 <Properties><string name="Name">Config</string><ProtectedString name="Source"><![CDATA[--[[
 	Config
 	Jede Zahl, an der man drehen kann, steht hier. Sonst nirgends.
@@ -267,7 +269,7 @@ Config.LEADERBOARD_REFRESH = 5
 return Config
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX6">
+<Item class="ModuleScript" referent="RBX10">
 <Properties><string name="Name">PartCatalog</string><ProtectedString name="Source"><![CDATA[--[[
 	PartCatalog
 	Vier Slots, je vier Stufen. Kosten, Reparaturzeit, Cash/Sekunde und wie das
@@ -410,7 +412,7 @@ end
 return PartCatalog
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX7">
+<Item class="ModuleScript" referent="RBX11">
 <Properties><string name="Name">Remotes</string><ProtectedString name="Source"><![CDATA[--[[
 	Remotes
 	Erzeugt die RemoteEvents/-Functions auf dem Server und wartet auf dem Client
@@ -521,7 +523,7 @@ end
 return Remotes
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX8">
+<Item class="ModuleScript" referent="RBX12">
 <Properties><string name="Name">Signal</string><ProtectedString name="Source"><![CDATA[--[[
 	Signal
 	Minimaler Ersatz fuer BindableEvents, damit Services sich gegenseitig
@@ -567,7 +569,7 @@ end
 return Signal
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX9">
+<Item class="ModuleScript" referent="RBX13">
 <Properties><string name="Name">SoundCatalog</string><ProtectedString name="Source"><![CDATA[--[[
 	SoundCatalog
 	Alle Klaenge des Spiels an einer Stelle.
@@ -620,7 +622,7 @@ end
 return SoundCatalog
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX10">
+<Item class="ModuleScript" referent="RBX14">
 <Properties><string name="Name">Util</string><ProtectedString name="Source"><![CDATA[--[[
 	Util
 	Kleinkram, den Server und Client beide brauchen. Nichts davon trifft
@@ -722,9 +724,9 @@ return Util
 </Item>
 </Item>
 </Item>
-<Item class="ServerScriptService" referent="RBX11">
+<Item class="ServerScriptService" referent="RBX15">
 <Properties><string name="Name">ServerScriptService</string></Properties>
-<Item class="Script" referent="RBX12">
+<Item class="Script" referent="RBX16">
 <Properties><string name="Name">Server</string><ProtectedString name="Source"><![CDATA[--[[
 	Garage Heist - Server-Bootstrap
 
@@ -732,6 +734,12 @@ return Util
 	- DataService laeuft ZULETZT los, damit alle anderen Services schon an
 	  ProfileLoaded haengen, bevor das erste Profil geladen wird.
 	- GarageService vor HeistService, weil der Heist die Plots braucht.
+
+	Grundregel dieser Datei: KEIN Schritt darf die restlichen mitreissen. Die
+	Welt (Boden, Spawn, Garagen) entsteht hier zur Laufzeit - stirbt der
+	Bootstrap vorher an einer Kleinigkeit, sieht der Spieler gar nichts mehr.
+	Deshalb laeuft jeder Abschnitt in einem eigenen pcall und meldet sich
+	einzeln in der Konsole.
 ]]
 
 local Lighting = game:GetService("Lighting")
@@ -741,18 +749,44 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared.Remotes)
 
-Remotes.Init()
+local function step(label: string, fn)
+	local ok, err = pcall(fn)
+	if not ok then
+		warn(("[Garage Heist] %s ist gescheitert: %s"):format(label, tostring(err)))
+	end
+	return ok
+end
+
+step("Remotes anlegen", function()
+	Remotes.Init()
+end)
 
 -- Abenddaemmerung: passt zum Thema und kaschiert die einfache Geometrie.
+--
+-- Lighting.Technology wird hier BEWUSST NICHT gesetzt: die Eigenschaft ist
+-- nicht skriptbar. Sie steht in der Place-Datei (GarageHeist.rbxlx) bzw. in
+-- default.project.json und laesst sich in Studio unter Lighting > Technology
+-- auf "Future" stellen. Jede einzelne Zuweisung haengt zusaetzlich in einem
+-- eigenen pcall, damit eine kuenftige Roblox-Aenderung nicht wieder das ganze
+-- Spiel lahmlegt.
 local function setupLighting()
-	Lighting.Technology = Enum.Technology.Future
-	Lighting.ClockTime = 18.5
-	Lighting.Brightness = 2
-	Lighting.ExposureCompensation = 0.15
-	Lighting.OutdoorAmbient = Color3.fromRGB(70, 70, 90)
-	Lighting.Ambient = Color3.fromRGB(45, 45, 60)
-	Lighting.GlobalShadows = true
-	Lighting.FogEnd = 900
+	local values = {
+		ClockTime = 18.5,
+		Brightness = 2,
+		ExposureCompensation = 0.15,
+		OutdoorAmbient = Color3.fromRGB(70, 70, 90),
+		Ambient = Color3.fromRGB(45, 45, 60),
+		GlobalShadows = true,
+		FogEnd = 900,
+	}
+	for property, value in values do
+		local ok = pcall(function()
+			(Lighting :: any)[property] = value
+		end)
+		if not ok then
+			warn(("[Garage Heist] Lighting.%s liess sich nicht setzen (uebersprungen)."):format(property))
+		end
+	end
 
 	local atmosphere = Instance.new("Atmosphere")
 	atmosphere.Density = 0.35
@@ -775,7 +809,33 @@ local function setupLighting()
 	correction.Parent = Lighting
 end
 
-setupLighting()
+-- Boden und Notfall-Spawn. Die eigentlichen Spawnpunkte liegen in den Garagen,
+-- hierher faellt nur, wer beitritt bevor sein Profil geladen ist.
+local function buildWorld()
+	local ground = Instance.new("Part")
+	ground.Name = "Ground"
+	ground.Anchored = true
+	ground.Size = Vector3.new(900, 2, 620)
+	ground.CFrame = CFrame.new(0, -1, 0)
+	ground.Color = Color3.fromRGB(58, 60, 64)
+	ground.Material = Enum.Material.Asphalt
+	ground.TopSurface = Enum.SurfaceType.Smooth
+	ground.Parent = Workspace
+
+	local spawnPad = Instance.new("SpawnLocation")
+	spawnPad.Name = "LobbySpawn"
+	spawnPad.Anchored = true
+	spawnPad.Size = Vector3.new(12, 1, 12)
+	spawnPad.CFrame = CFrame.new(0, 0.5, 26)
+	spawnPad.Color = Color3.fromRGB(90, 200, 130)
+	spawnPad.Material = Enum.Material.Neon
+	spawnPad.Duration = 0
+	spawnPad.Parent = Workspace
+end
+
+-- Zuerst der Boden: wer beitritt, bevor der Rest steht, faellt sonst ins Leere.
+step("Welt bauen", buildWorld)
+step("Lighting einstellen", setupLighting)
 
 local START_ORDER = {
 	"TelemetryService",
@@ -791,56 +851,53 @@ local START_ORDER = {
 }
 
 local services = {}
+local loaded = {}
 for _, name in START_ORDER do
-	services[name] = require(script.Services[name])
+	local ok, module = pcall(function()
+		return require(script.Services[name])
+	end)
+	if ok then
+		services[name] = module
+		table.insert(loaded, name)
+	else
+		warn(("[Garage Heist] %s liess sich nicht laden: %s"):format(name, tostring(module)))
+	end
 end
 
-for _, name in START_ORDER do
+for _, name in loaded do
 	local service = services[name]
 	if service.Init then
-		service:Init(services)
+		step(name .. ":Init()", function()
+			service:Init(services)
+		end)
 	end
 end
 
--- Boden und Notfall-Spawn. Die eigentlichen Spawnpunkte liegen in den Garagen,
--- hierher faellt nur, wer beitritt bevor sein Profil geladen ist.
-local ground = Instance.new("Part")
-ground.Name = "Ground"
-ground.Anchored = true
-ground.Size = Vector3.new(900, 2, 620)
-ground.CFrame = CFrame.new(0, -1, 0)
-ground.Color = Color3.fromRGB(58, 60, 64)
-ground.Material = Enum.Material.Asphalt
-ground.TopSurface = Enum.SurfaceType.Smooth
-ground.Parent = Workspace
-
-local spawnPad = Instance.new("SpawnLocation")
-spawnPad.Name = "LobbySpawn"
-spawnPad.Anchored = true
-spawnPad.Size = Vector3.new(12, 1, 12)
-spawnPad.CFrame = CFrame.new(0, 0.5, 26)
-spawnPad.Color = Color3.fromRGB(90, 200, 130)
-spawnPad.Material = Enum.Material.Neon
-spawnPad.Duration = 0
-spawnPad.Parent = Workspace
-
-for _, name in START_ORDER do
+for _, name in loaded do
 	local service = services[name]
 	if service.Start then
-		local ok, err = pcall(function()
+		step(name .. ":Start()", function()
 			service:Start()
 		end)
-		if not ok then
-			warn(("[Bootstrap] %s:Start() ist gescheitert: %s"):format(name, tostring(err)))
-		end
 	end
 end
 
-print("[Garage Heist] Server bereit.")
+-- Sichtbarer Beweis, dass die Welt steht. Fehlt diese Zeile in der Konsole,
+-- ist der Bootstrap vorher gestorben und die Zeile darueber sagt, woran.
+local plotCount = 0
+local garages = Workspace:FindFirstChild("Garages")
+if garages then
+	plotCount = #garages:GetChildren()
+end
+print(("[Garage Heist] Server bereit: %d/%d Services, %d Garagen gebaut."):format(
+	#loaded,
+	#START_ORDER,
+	plotCount
+))
 ]]></ProtectedString></Properties>
-<Item class="Folder" referent="RBX13">
+<Item class="Folder" referent="RBX17">
 <Properties><string name="Name">Data</string></Properties>
-<Item class="ModuleScript" referent="RBX14">
+<Item class="ModuleScript" referent="RBX18">
 <Properties><string name="Name">PartOps</string><ProtectedString name="Source"><![CDATA[--[[
 	PartOps
 	Alles, was ein einzelnes Teil betrifft. Aus ProfileOps ausgelagert, damit
@@ -929,7 +986,7 @@ end
 return PartOps
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX15">
+<Item class="ModuleScript" referent="RBX19">
 <Properties><string name="Name">ProfileOps</string><ProtectedString name="Source"><![CDATA[--[[
 	ProfileOps
 	Reine Datenoperationen auf einem Profil. Keine Instances, keine Remotes,
@@ -1195,7 +1252,7 @@ end
 return ProfileOps
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX16">
+<Item class="ModuleScript" referent="RBX20">
 <Properties><string name="Name">ProfileTemplate</string><ProtectedString name="Source"><![CDATA[--[[
 	ProfileTemplate
 	Das Schema eines Spielerprofils. Alles, was der Server ueber einen Spieler
@@ -1270,7 +1327,7 @@ end
 return ProfileTemplate
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX17">
+<Item class="ModuleScript" referent="RBX21">
 <Properties><string name="Name">SessionStore</string><ProtectedString name="Source"><![CDATA[--[[
 	SessionStore
 	DataStore-Zugriff mit Session-Lock und Retry-Backoff.
@@ -1449,9 +1506,9 @@ return SessionStore
 ]]></ProtectedString></Properties>
 </Item>
 </Item>
-<Item class="Folder" referent="RBX18">
+<Item class="Folder" referent="RBX22">
 <Properties><string name="Name">Garage</string></Properties>
-<Item class="ModuleScript" referent="RBX19">
+<Item class="ModuleScript" referent="RBX23">
 <Properties><string name="Name">GarageRequests</string><ProtectedString name="Source"><![CDATA[--[[
 	GarageRequests
 	Jede Aktion, die der Client anfragen kann. Reihenfolge ist immer gleich:
@@ -1618,7 +1675,7 @@ end
 return GarageRequests
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX20">
+<Item class="ModuleScript" referent="RBX24">
 <Properties><string name="Name">GarageTicks</string><ProtectedString name="Source"><![CDATA[--[[
 	GarageTicks
 	Die drei periodischen Schleifen der Garage, aus dem GarageService
@@ -1706,7 +1763,7 @@ end
 return GarageTicks
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX21">
+<Item class="ModuleScript" referent="RBX25">
 <Properties><string name="Name">GarageView</string><ProtectedString name="Source"><![CDATA[--[[
 	GarageView
 	Haelt die sichtbare Welt am Profil dran: Autos neu bauen, Schild und
@@ -1808,7 +1865,7 @@ end
 return GarageView
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX22">
+<Item class="ModuleScript" referent="RBX26">
 <Properties><string name="Name">RepairView</string><ProtectedString name="Source"><![CDATA[--[[
 	RepairView
 	Fortschrittsbalken direkt am Teil, solange daran geschraubt wird. Die
@@ -1930,7 +1987,7 @@ end
 return RepairView
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX23">
+<Item class="ModuleScript" referent="RBX27">
 <Properties><string name="Name">RequestRouter</string><ProtectedString name="Source"><![CDATA[--[[
 	RequestRouter
 	Bindet die Client-Remotes an GarageRequests. Jede Verbindung laeuft durch
@@ -2004,7 +2061,7 @@ end
 return RequestRouter
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX24">
+<Item class="ModuleScript" referent="RBX28">
 <Properties><string name="Name">Snapshot</string><ProtectedString name="Source"><![CDATA[--[[
 	Snapshot
 	Baut aus einem Profil das Paket, das der Client zum Anzeigen bekommt.
@@ -2138,7 +2195,7 @@ end
 return Snapshot
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX25">
+<Item class="ModuleScript" referent="RBX29">
 <Properties><string name="Name">TheftOps</string><ProtectedString name="Source"><![CDATA[--[[
 	TheftOps
 	Besitzwechsel von Teilen - der heikelste Teil des Spiels, deshalb an einer
@@ -2248,7 +2305,7 @@ end
 return TheftOps
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX26">
+<Item class="ModuleScript" referent="RBX30">
 <Properties><string name="Name">Throttle</string><ProtectedString name="Source"><![CDATA[--[[
 	Throttle
 	Drosselung fuer JEDE Client->Server-Verbindung. Vorher lief nur ein Teil der
@@ -2305,9 +2362,9 @@ return Throttle
 ]]></ProtectedString></Properties>
 </Item>
 </Item>
-<Item class="Folder" referent="RBX27">
+<Item class="Folder" referent="RBX31">
 <Properties><string name="Name">Heist</string></Properties>
-<Item class="ModuleScript" referent="RBX28">
+<Item class="ModuleScript" referent="RBX32">
 <Properties><string name="Name">CarryManager</string><ProtectedString name="Source"><![CDATA[--[[
 	CarryManager
 	Was mit einem abmontierten Teil passiert, solange es niemandem gehoert:
@@ -2588,7 +2645,7 @@ end
 return CarryManager
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX29">
+<Item class="ModuleScript" referent="RBX33">
 <Properties><string name="Name">DismountManager</string><ProtectedString name="Source"><![CDATA[--[[
 	DismountManager
 	Vier Sekunden schrauben. Der Server misst die Zeit, prueft waehrenddessen
@@ -2736,7 +2793,7 @@ end
 return DismountManager
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX30">
+<Item class="ModuleScript" referent="RBX34">
 <Properties><string name="Name">PartVisual</string><ProtectedString name="Source"><![CDATA[--[[
 	PartVisual
 	Das sichtbare Objekt fuer ein Teil, das gerade niemandem gehoert - getragen
@@ -2789,7 +2846,7 @@ end
 return PartVisual
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX31">
+<Item class="ModuleScript" referent="RBX35">
 <Properties><string name="Name">StealTarget</string><ProtectedString name="Source"><![CDATA[--[[
 	StealTarget
 	Ein Klau-Ziel ist entweder ein Spieler oder eine Leerstand-Garage. Damit
@@ -2867,9 +2924,9 @@ return StealTarget
 ]]></ProtectedString></Properties>
 </Item>
 </Item>
-<Item class="Folder" referent="RBX32">
+<Item class="Folder" referent="RBX36">
 <Properties><string name="Name">Monetization</string></Properties>
-<Item class="ModuleScript" referent="RBX33">
+<Item class="ModuleScript" referent="RBX37">
 <Properties><string name="Name">PurchaseEffects</string><ProtectedString name="Source"><![CDATA[--[[
 	PurchaseEffects
 	Was ein Developer Product konkret tut. Jede Funktion gibt true zurueck,
@@ -2927,9 +2984,9 @@ return PurchaseEffects
 ]]></ProtectedString></Properties>
 </Item>
 </Item>
-<Item class="Folder" referent="RBX34">
+<Item class="Folder" referent="RBX38">
 <Properties><string name="Name">Services</string></Properties>
-<Item class="ModuleScript" referent="RBX35">
+<Item class="ModuleScript" referent="RBX39">
 <Properties><string name="Name">DailyRewardService</string><ProtectedString name="Source"><![CDATA[--[[
 	DailyRewardService
 	Sieben-Tage-Kette auf UTC-Tagen. Ein verpasster Tag setzt die Kette auf 1
@@ -3041,7 +3098,7 @@ end
 return DailyRewardService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX36">
+<Item class="ModuleScript" referent="RBX40">
 <Properties><string name="Name">DataService</string><ProtectedString name="Source"><![CDATA[--[[
 	DataService
 	Besitzt alle Profile der Spieler auf diesem Server. Kein anderer Service
@@ -3221,7 +3278,7 @@ end
 return DataService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX37">
+<Item class="ModuleScript" referent="RBX41">
 <Properties><string name="Name">DerelictService</string><ProtectedString name="Source"><![CDATA[--[[
 	DerelictService
 	Freie Plots sind waehrend des Klau-Fensters keine leeren Boxen, sondern
@@ -3435,7 +3492,7 @@ end
 return DerelictService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX38">
+<Item class="ModuleScript" referent="RBX42">
 <Properties><string name="Name">EconomyService</string><ProtectedString name="Source"><![CDATA[--[[
 	EconomyService
 	Einziger Ort, an dem sich Cash veraendert. Der Client bekommt Zahlen nur
@@ -3687,7 +3744,7 @@ end
 return EconomyService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX39">
+<Item class="ModuleScript" referent="RBX43">
 <Properties><string name="Name">EffectService</string><ProtectedString name="Source"><![CDATA[--[[
 	EffectService
 	Funken, Partikel, Klaenge, Kamera-Wackler. Nichts hiervon entscheidet
@@ -3805,7 +3862,7 @@ end
 return EffectService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX40">
+<Item class="ModuleScript" referent="RBX44">
 <Properties><string name="Name">GarageService</string><ProtectedString name="Source"><![CDATA[--[[
 	GarageService
 	Verteilt Plots, haelt Welt und Profil synchron, besitzt die einzige
@@ -4034,7 +4091,7 @@ end
 return GarageService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX41">
+<Item class="ModuleScript" referent="RBX45">
 <Properties><string name="Name">HeistService</string><ProtectedString name="Source"><![CDATA[--[[
 	HeistService
 	Der globale Timer. Alle 8 Minuten geht fuer 60 Sekunden jedes Garagentor
@@ -4331,7 +4388,7 @@ end
 return HeistService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX42">
+<Item class="ModuleScript" referent="RBX46">
 <Properties><string name="Name">LeaderboardService</string><ProtectedString name="Source"><![CDATA[--[[
 	LeaderboardService
 	Zwei Ranglisten fuer diesen Server: teuerste Garage und meiste geklaute
@@ -4513,7 +4570,7 @@ end
 return LeaderboardService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX43">
+<Item class="ModuleScript" referent="RBX47">
 <Properties><string name="Name">MonetizationService</string><ProtectedString name="Source"><![CDATA[--[[
 	MonetizationService
 
@@ -4777,7 +4834,7 @@ end
 return MonetizationService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX44">
+<Item class="ModuleScript" referent="RBX48">
 <Properties><string name="Name">TelemetryService</string><ProtectedString name="Source"><![CDATA[--[[
 	TelemetryService
 	Onboarding-Funnel, Economy-Events und Badges.
@@ -4917,9 +4974,9 @@ return TelemetryService
 ]]></ProtectedString></Properties>
 </Item>
 </Item>
-<Item class="Folder" referent="RBX45">
+<Item class="Folder" referent="RBX49">
 <Properties><string name="Name">World</string></Properties>
-<Item class="ModuleScript" referent="RBX46">
+<Item class="ModuleScript" referent="RBX50">
 <Properties><string name="Name">CarBuilder</string><ProtectedString name="Source"><![CDATA[--[[
 	CarBuilder
 	Baut ein Auto als Deko-Modell: keine VehicleSeats, keine Motoren, keine
@@ -5161,7 +5218,7 @@ end
 return CarBuilder
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX47">
+<Item class="ModuleScript" referent="RBX51">
 <Properties><string name="Name">DoorController</string><ProtectedString name="Source"><![CDATA[--[[
 	DoorController
 	Das Garagentor ist kein Deko-Objekt: es geht auf, wenn der Besitzer davor
@@ -5203,7 +5260,7 @@ end
 return DoorController
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX48">
+<Item class="ModuleScript" referent="RBX52">
 <Properties><string name="Name">PlotBuilder</string><ProtectedString name="Source"><![CDATA[--[[
 	PlotBuilder
 	Baut eine Garage aus Parts. Alles, was hier entsteht, hat eine Funktion:
@@ -5504,11 +5561,11 @@ return PlotBuilder
 </Item>
 </Item>
 </Item>
-<Item class="StarterPlayer" referent="RBX49">
+<Item class="StarterPlayer" referent="RBX53">
 <Properties><string name="Name">StarterPlayer</string></Properties>
-<Item class="StarterPlayerScripts" referent="RBX50">
+<Item class="StarterPlayerScripts" referent="RBX54">
 <Properties><string name="Name">StarterPlayerScripts</string></Properties>
-<Item class="LocalScript" referent="RBX51">
+<Item class="LocalScript" referent="RBX55">
 <Properties><string name="Name">Client</string><ProtectedString name="Source"><![CDATA[--[[
 	Garage Heist - Client-Bootstrap
 
@@ -5730,9 +5787,9 @@ task.spawn(function()
 	end
 end)
 ]]></ProtectedString></Properties>
-<Item class="Folder" referent="RBX52">
+<Item class="Folder" referent="RBX56">
 <Properties><string name="Name">Controllers</string></Properties>
-<Item class="ModuleScript" referent="RBX53">
+<Item class="ModuleScript" referent="RBX57">
 <Properties><string name="Name">EffectController</string><ProtectedString name="Source"><![CDATA[--[[
 	EffectController
 	Nimmt die Effekt-Anweisungen des Servers entgegen: lokale Klaenge und den
@@ -5795,7 +5852,7 @@ end
 return EffectController
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX54">
+<Item class="ModuleScript" referent="RBX58">
 <Properties><string name="Name">InputController</string><ProtectedString name="Source"><![CDATA[--[[
 	InputController
 	Tastenkuerzel und ProximityPrompts. Schickt ausschliesslich Absichten an den
@@ -5859,9 +5916,9 @@ return InputController
 ]]></ProtectedString></Properties>
 </Item>
 </Item>
-<Item class="Folder" referent="RBX55">
+<Item class="Folder" referent="RBX59">
 <Properties><string name="Name">UI</string></Properties>
-<Item class="ModuleScript" referent="RBX56">
+<Item class="ModuleScript" referent="RBX60">
 <Properties><string name="Name">DailyPanel</string><ProtectedString name="Source"><![CDATA[--[[
 	DailyPanel
 	Sieben Kaesten, einer pro Tag. Welcher Tag dran ist und ob abgeholt werden
@@ -6018,7 +6075,7 @@ end
 return DailyPanel
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX57">
+<Item class="ModuleScript" referent="RBX61">
 <Properties><string name="Name">DismountBar</string><ProtectedString name="Source"><![CDATA[--[[
 	DismountBar
 	Der Fortschrittsbalken beim Abmontieren. Der Balken ist reine Anzeige: der
@@ -6102,7 +6159,7 @@ end
 return DismountBar
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX58">
+<Item class="ModuleScript" referent="RBX62">
 <Properties><string name="Name">GarageMenu</string><ProtectedString name="Source"><![CDATA[--[[
 	GarageMenu
 	Die Werkstatt: Teile kaufen, laufende Reparaturen sehen, geklaute Teile
@@ -6322,7 +6379,7 @@ end
 return GarageMenu
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX59">
+<Item class="ModuleScript" referent="RBX63">
 <Properties><string name="Name">GarageRows</string><ProtectedString name="Source"><![CDATA[--[[
 	GarageRows
 	Die einzelnen Zeilen im Werkstatt-Menue. Jede Zeile schickt beim Klick genau
@@ -6542,7 +6599,7 @@ end
 return GarageRows
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX60">
+<Item class="ModuleScript" referent="RBX64">
 <Properties><string name="Name">HUD</string><ProtectedString name="Source"><![CDATA[--[[
 	HUD
 	Cash, Rate, Kasse, Heist-Countdown, Trage-Anzeige und die Knoepfe fuer die
@@ -6824,7 +6881,7 @@ end
 return HUD
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX61">
+<Item class="ModuleScript" referent="RBX65">
 <Properties><string name="Name">InfoPanel</string><ProtectedString name="Source"><![CDATA[--[[
 	InfoPanel
 	Eine schlichte Liste mit Titel. Wird zweimal benutzt: fuer die Rangliste
@@ -6926,7 +6983,7 @@ end
 return InfoPanel
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX62">
+<Item class="ModuleScript" referent="RBX66">
 <Properties><string name="Name">ShopMenu</string><ProtectedString name="Source"><![CDATA[--[[
 	ShopMenu
 	Zeigt Gamepasses und Developer Products. Der Client kennt keine Produkt-IDs
@@ -7071,7 +7128,7 @@ end
 return ShopMenu
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX63">
+<Item class="ModuleScript" referent="RBX67">
 <Properties><string name="Name">Theme</string><ProtectedString name="Source"><![CDATA[--[[
 	Theme
 	Farben, Schriften und ein winziger Instance-Builder. Damit bleiben die
@@ -7259,7 +7316,7 @@ end
 return Theme
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX64">
+<Item class="ModuleScript" referent="RBX68">
 <Properties><string name="Name">Toast</string><ProtectedString name="Source"><![CDATA[--[[
 	Toast
 	Kurzmeldungen unten links. Der Server schickt Text und Art, der Client
@@ -7370,7 +7427,7 @@ return Toast
 ]]></ProtectedString></Properties>
 </Item>
 </Item>
-<Item class="ModuleScript" referent="RBX65">
+<Item class="ModuleScript" referent="RBX69">
 <Properties><string name="Name">Store</string><ProtectedString name="Source"><![CDATA[--[[
 	Store
 	Der Client haelt genau eine Kopie dessen, was der Server geschickt hat.

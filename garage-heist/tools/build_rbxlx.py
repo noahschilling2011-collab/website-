@@ -93,6 +93,74 @@ def build_directory(directory: pathlib.Path, name: str, lines: list[str]) -> Non
     lines.append("</Item>")
 
 
+def color3(name: str, r: int, g: int, b: int) -> str:
+    return (f'<Color3 name="{name}"><R>{r / 255:.6f}</R>'
+            f'<G>{g / 255:.6f}</G><B>{b / 255:.6f}</B></Color3>')
+
+
+def lighting_item() -> str:
+    """Lighting als Place-Eigenschaft.
+
+    Lighting.Technology ist NICHT skriptbar - sie muss in der Place-Datei
+    stehen. Enum.Technology.Future hat den Wert 4. Die uebrigen Werte setzt
+    zusaetzlich der Bootstrap zur Laufzeit; hier stehen sie, damit die Place
+    schon im Bearbeitungsmodus richtig aussieht.
+    """
+    return (
+        open_item("Lighting")
+        + "<Properties>"
+        + '<string name="Name">Lighting</string>'
+        + '<token name="Technology">4</token>'
+        + '<float name="ClockTime">18.5</float>'
+        + '<float name="Brightness">2</float>'
+        + '<float name="ExposureCompensation">0.15</float>'
+        + '<bool name="GlobalShadows">true</bool>'
+        + '<float name="FogEnd">900</float>'
+        + color3("Ambient", 45, 45, 60)
+        + color3("OutdoorAmbient", 70, 70, 90)
+        + "</Properties>"
+        + "</Item>"
+    )
+
+
+def workspace_item() -> str:
+    """Workspace mit Terrain und einer Grundplatte.
+
+    Die eigentliche Welt (Boden, 12 Garagen, Spawn) baut der Server zur
+    Laufzeit - im Bearbeitungsmodus ist hier deshalb absichtlich fast nichts.
+    Die Grundplatte hat zwei Aufgaben: Studio zeigt beim Oeffnen etwas statt
+    einer schwarzen Leere, und wenn der Server-Bootstrap doch einmal scheitert,
+    faellt niemand ins Nichts. Sie liegt bei y = -8 und damit unter dem
+    Laufzeit-Boden bei y = 0.
+    """
+    return (
+        open_item("Workspace")
+        + "<Properties>"
+        + '<string name="Name">Workspace</string>'
+        + "</Properties>"
+        + open_item("Terrain")
+        + "<Properties>"
+        + '<string name="Name">Terrain</string>'
+        + "</Properties>"
+        + "</Item>"
+        + open_item("Part")
+        + "<Properties>"
+        + '<string name="Name">Baseplate</string>'
+        + '<bool name="Anchored">true</bool>'
+        + '<bool name="Locked">true</bool>'
+        + '<Vector3 name="size"><X>1024</X><Y>16</Y><Z>1024</Z></Vector3>'
+        + '<CoordinateFrame name="CFrame">'
+        + "<X>0</X><Y>-8</Y><Z>0</Z>"
+        + "<R00>1</R00><R01>0</R01><R02>0</R02>"
+        + "<R10>0</R10><R11>1</R11><R12>0</R12>"
+        + "<R20>0</R20><R21>0</R21><R22>1</R22>"
+        + "</CoordinateFrame>"
+        + "</Properties>"
+        + "</Item>"
+        + "</Item>"
+    )
+
+
 def build() -> str:
     lines = [
         '<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" '
@@ -100,6 +168,8 @@ def build() -> str:
         'xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">',
         "<External>null</External>",
         "<External>nil</External>",
+        lighting_item(),
+        workspace_item(),
     ]
 
     lines.append(open_item("ReplicatedStorage"))
