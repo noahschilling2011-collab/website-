@@ -29,8 +29,10 @@ local COMMANDS = {
 function AdminPanel.Init(root: Frame)
 	local toggle = Theme.button({
 		Name = "AdminToggle",
+		-- Oben links ueber der Cash-Anzeige. Der Platz darunter gehoert dem
+		-- Radar-Panel, deshalb nicht dorthin.
 		AnchorPoint = Vector2.new(0, 0),
-		Position = UDim2.new(0, 16, 0, 196),
+		Position = UDim2.new(0, 16, 0, 20),
 		Size = UDim2.new(0, 96, 0, 30),
 		BackgroundColor3 = Theme.Colors.heist,
 		TextSize = 13,
@@ -41,9 +43,10 @@ function AdminPanel.Init(root: Frame)
 
 	local window = Theme.panel({
 		Name = "AdminPanel",
-		AnchorPoint = Vector2.new(0, 0),
-		Position = UDim2.new(0, 16, 0, 232),
-		Size = UDim2.new(0, 210, 0, 0),
+		-- Als Modal in der Mitte: links ist kein Platz, ohne etwas zu verdecken.
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.new(0, 220, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Visible = false,
 		ZIndex = 25,

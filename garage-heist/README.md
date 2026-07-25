@@ -71,7 +71,7 @@ Welt wird daraus gezeichnet - nicht umgekehrt.
 Druecke **Play**. Danach steht in der Konsole (View > Output) genau eine Zeile:
 
 ```
-[Garage Heist] Server bereit: 10/10 Services, 12 Garagen gebaut.
+[Garage Heist] Server bereit: 11/11 Services, 12 Garagen gebaut.
 ```
 
 ### Wenn nichts kommt
@@ -143,7 +143,7 @@ niemand ins Leere faellt, egal was danach schiefgeht.
 
 ## Admin-Werkzeuge
 
-Links unten erscheint ein roter **ADMIN**-Knopf - aber nur, wenn der Server dich
+Oben links erscheint ein roter **ADMIN**-Knopf - aber nur, wenn der Server dich
 als Admin fuehrt. Dahinter: Cash geben, alles auf Maximum, Garagenstufe setzen,
 Klau-Fenster sofort oeffnen oder schliessen, Radar-Ladung, Rebirth erzwingen,
 Profil zuruecksetzen.
