@@ -25,6 +25,7 @@ local TO_CLIENT = {
 	"LeaderboardUpdate", -- {richest = {...}, thieves = {...}}
 	"ShopState", -- {vip, autoCollect, garageLock}
 	"Effect", -- {kind = "sound"|"shake", ...} - reine Praesentation
+	"AdminState", -- {isAdmin} - entscheidet, ob das Admin-Panel ueberhaupt existiert
 }
 
 -- Client -> Server (alles wird serverseitig geprueft)
@@ -41,6 +42,7 @@ local TO_SERVER = {
 	"RequestTackle", -- ()
 	"RequestDropPart", -- ()
 	"RequestPromptPurchase", -- (kind, key) -> Server kennt die IDs, nicht der Client
+	"AdminCommand", -- (command, value) -> nur fuer Admins, serverseitig geprueft
 }
 
 local FUNCTIONS = {

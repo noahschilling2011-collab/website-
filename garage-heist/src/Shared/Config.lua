@@ -114,6 +114,12 @@ Config.RADAR_TOP_COUNT = 5
 -- Daily Reward -------------------------------------------------------------
 Config.DAILY_REWARDS = { 250, 500, 900, 1500, 2600, 4200, 8000 }
 
+-- Admin -------------------------------------------------------------------
+-- Der Besitzer des Spiels ist automatisch Admin, ohne Eintrag. In Studio ist
+-- jeder Admin (eigener Rechner). Hier kommen nur zusaetzliche Tester rein -
+-- UserId, nicht Benutzername.
+Config.ADMIN_USER_IDS = {}
+
 -- Badges -------------------------------------------------------------------
 -- Platzhalter. Im Creator Dashboard anlegen und hier eintragen, siehe
 -- docs/SETUP.md. Solange 0 drinsteht, wird kein Badge vergeben.

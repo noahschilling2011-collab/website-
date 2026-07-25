@@ -234,6 +234,19 @@ function HeistService:_announce(text: string, kind: string)
 	Remotes.Get("Notify"):FireAllClients({ text = text, kind = kind })
 end
 
+-- Nur fuer Admin-Werkzeuge: Fenster sofort oeffnen bzw. schliessen.
+function HeistService:ForceOpen()
+	if not self.open then
+		self:_open()
+	end
+end
+
+function HeistService:ForceClose()
+	if self.open then
+		self:_close()
+	end
+end
+
 -- `target` ist ein StealTarget (Spieler oder Leerstand).
 function HeistService:OnStealPrompt(thief: Player, target, carIndex: number, slotId: string, prompt: ProximityPrompt)
 	local anchor = prompt.Parent

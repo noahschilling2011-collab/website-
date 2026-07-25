@@ -253,6 +253,12 @@ Config.RADAR_TOP_COUNT = 5
 -- Daily Reward -------------------------------------------------------------
 Config.DAILY_REWARDS = { 250, 500, 900, 1500, 2600, 4200, 8000 }
 
+-- Admin -------------------------------------------------------------------
+-- Der Besitzer des Spiels ist automatisch Admin, ohne Eintrag. In Studio ist
+-- jeder Admin (eigener Rechner). Hier kommen nur zusaetzliche Tester rein -
+-- UserId, nicht Benutzername.
+Config.ADMIN_USER_IDS = {}
+
 -- Badges -------------------------------------------------------------------
 -- Platzhalter. Im Creator Dashboard anlegen und hier eintragen, siehe
 -- docs/SETUP.md. Solange 0 drinsteht, wird kein Badge vergeben.
@@ -440,6 +446,7 @@ local TO_CLIENT = {
 	"LeaderboardUpdate", -- {richest = {...}, thieves = {...}}
 	"ShopState", -- {vip, autoCollect, garageLock}
 	"Effect", -- {kind = "sound"|"shake", ...} - reine Praesentation
+	"AdminState", -- {isAdmin} - entscheidet, ob das Admin-Panel ueberhaupt existiert
 }
 
 -- Client -> Server (alles wird serverseitig geprueft)
@@ -456,6 +463,7 @@ local TO_SERVER = {
 	"RequestTackle", -- ()
 	"RequestDropPart", -- ()
 	"RequestPromptPurchase", -- (kind, key) -> Server kennt die IDs, nicht der Client
+	"AdminCommand", -- (command, value) -> nur fuer Admins, serverseitig geprueft
 }
 
 local FUNCTIONS = {
@@ -623,6 +631,117 @@ return SoundCatalog
 ]]></ProtectedString></Properties>
 </Item>
 <Item class="ModuleScript" referent="RBX14">
+<Properties><string name="Name">TrackPath</string><ProtectedString name="Source"><![CDATA[--[[
+	TrackPath
+	Die Rennstrecke als reine Mathematik: ein Oval (Stadionform) mit zwei
+	langen Geraden in X, zwei kurzen in Z und vier Viertelkreisen.
+
+	Liegt in Shared, weil zwei Seiten dieselbe Kurve brauchen:
+	- der Server baut die Geometrie darauf (RaceTrack)
+	- jeder Client bewegt seinen eigenen Verkehr darauf (TrafficController)
+
+	Masse sind auf die Garagen abgestimmt. Die Plots stehen in zwei Reihen bei
+	z = +/-82 (Tiefe 54, also z von 55 bis 109) und x von -163 bis 163.
+
+	HOEHE 44 ist kein Zufall: von der Mitte des Hofs aus streift die Sichtlinie
+	ueber ein 18 Studs hohes Garagendach bei z = 55 auf Augenhoehe 5 bei
+	z = 140 die Hoehe 36. Alles darunter waere hinter dem Dach versteckt. Bei
+	44 sieht man die Autos von ueberall im Hof - genau darum geht es.
+]]
+
+local TrackPath = {}
+
+TrackPath.HALF_LENGTH = 265 -- halbe Ausdehnung in X
+TrackPath.HALF_WIDTH = 140 -- halbe Ausdehnung in Z
+TrackPath.RADIUS = 70 -- Eckradius
+TrackPath.HEIGHT = 44 -- Fahrbahnhoehe ueber Grund
+TrackPath.ROAD_WIDTH = 30
+TrackPath.LANES = { -9.5, 0, 9.5 } -- Spurmitten quer zur Fahrtrichtung
+
+local L = TrackPath.HALF_LENGTH
+local W = TrackPath.HALF_WIDTH
+local R = TrackPath.RADIUS
+local Y = TrackPath.HEIGHT
+
+local STRAIGHT_X = 2 * (L - R)
+local STRAIGHT_Z = 2 * (W - R)
+local ARC = math.pi * R / 2
+
+TrackPath.LENGTH = 2 * STRAIGHT_X + 2 * STRAIGHT_Z + 4 * ARC
+
+-- Vector2.X = Welt-X, Vector2.Y = Welt-Z.
+-- Reihenfolge im Uhrzeigersinn von oben, Start auf der vorderen Geraden.
+-- Der Winkel phi laeuft durchgehend von +90 auf -270 herunter, damit jede
+-- Ecke nahtlos an die vorherige anschliesst.
+local SEGMENTS = {
+	{ kind = "line", len = STRAIGHT_X, from = Vector2.new(-(L - R), W), dir = Vector2.new(1, 0) },
+	{ kind = "arc", len = ARC, center = Vector2.new(L - R, W - R), from = 90 },
+	{ kind = "line", len = STRAIGHT_Z, from = Vector2.new(L, W - R), dir = Vector2.new(0, -1) },
+	{ kind = "arc", len = ARC, center = Vector2.new(L - R, -(W - R)), from = 0 },
+	{ kind = "line", len = STRAIGHT_X, from = Vector2.new(L - R, -W), dir = Vector2.new(-1, 0) },
+	{ kind = "arc", len = ARC, center = Vector2.new(-(L - R), -(W - R)), from = -90 },
+	{ kind = "line", len = STRAIGHT_Z, from = Vector2.new(-L, -(W - R)), dir = Vector2.new(0, 1) },
+	{ kind = "arc", len = ARC, center = Vector2.new(-(L - R), W - R), from = -180 },
+}
+
+TrackPath.Segments = SEGMENTS
+
+-- CFrame an der Bogenlaenge s. Die LookVector zeigt in Fahrtrichtung, die
+-- RightVector quer nach aussen - Spurversatz also einfach mit
+--   TrackPath.At(s) * CFrame.new(spur, 0, 0)
+function TrackPath.At(s: number): CFrame
+	local remaining = s % TrackPath.LENGTH
+	for _, seg in SEGMENTS do
+		if remaining < seg.len then
+			local pos, dir
+			if seg.kind == "line" then
+				pos = seg.from + seg.dir * remaining
+				dir = seg.dir
+			else
+				local phi = math.rad(seg.from - (remaining / seg.len) * 90)
+				pos = seg.center + Vector2.new(math.cos(phi), math.sin(phi)) * R
+				dir = Vector2.new(math.sin(phi), -math.cos(phi))
+			end
+			local point = Vector3.new(pos.X, Y, pos.Y)
+			return CFrame.lookAt(point, point + Vector3.new(dir.X, 0, dir.Y))
+		end
+		remaining -= seg.len
+	end
+	-- Rundungsrest am Ende: zurueck auf den Anfang.
+	return TrackPath.At(0)
+end
+
+-- Grobe Punktliste fuer Bauzwecke: gibt Mittelpunkt und Laenge jedes
+-- Bauabschnitts zurueck. Geraden bleiben ein einziges Part, Boegen werden
+-- in `arcSteps` Stuecke zerlegt.
+function TrackPath.BuildSpans(arcSteps: number?)
+	local steps = arcSteps or 14
+	local spans = {}
+	local cursor = 0
+	for _, seg in SEGMENTS do
+		if seg.kind == "line" then
+			table.insert(spans, { s = cursor + seg.len / 2, len = seg.len, straight = true })
+			cursor += seg.len
+		else
+			local piece = seg.len / steps
+			for i = 0, steps - 1 do
+				table.insert(spans, {
+					s = cursor + piece * (i + 0.5),
+					-- Ueberlappung, sonst klaffen zwischen den Bogenstuecken Fugen.
+					len = piece + 1.2,
+					straight = false,
+				})
+			end
+			cursor += seg.len
+		end
+	end
+	return spans
+end
+
+return TrackPath
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX15">
 <Properties><string name="Name">Util</string><ProtectedString name="Source"><![CDATA[--[[
 	Util
 	Kleinkram, den Server und Client beide brauchen. Nichts davon trifft
@@ -724,9 +843,9 @@ return Util
 </Item>
 </Item>
 </Item>
-<Item class="ServerScriptService" referent="RBX15">
+<Item class="ServerScriptService" referent="RBX16">
 <Properties><string name="Name">ServerScriptService</string></Properties>
-<Item class="Script" referent="RBX16">
+<Item class="Script" referent="RBX17">
 <Properties><string name="Name">Server</string><ProtectedString name="Source"><![CDATA[--[[
 	Garage Heist - Server-Bootstrap
 
@@ -748,6 +867,7 @@ local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared.Remotes)
+local RaceTrack = require(script.World.RaceTrack)
 
 local function step(label: string, fn)
 	local ok, err = pcall(fn)
@@ -796,11 +916,17 @@ local function setupLighting()
 	atmosphere.Decay = Color3.fromRGB(105, 95, 110)
 	atmosphere.Parent = Lighting
 
+	-- Die Szene hat seit Strecke und Neon deutlich mehr leuchtende Flaechen.
 	local bloom = Instance.new("BloomEffect")
-	bloom.Intensity = 0.5
-	bloom.Size = 20
-	bloom.Threshold = 1.1
+	bloom.Intensity = 0.85
+	bloom.Size = 24
+	bloom.Threshold = 0.95
 	bloom.Parent = Lighting
+
+	local rays = Instance.new("SunRaysEffect")
+	rays.Intensity = 0.06
+	rays.Spread = 0.9
+	rays.Parent = Lighting
 
 	local correction = Instance.new("ColorCorrectionEffect")
 	correction.Contrast = 0.1
@@ -845,6 +971,9 @@ end
 
 -- Zuerst der Boden: wer beitritt, bevor der Rest steht, faellt sonst ins Leere.
 step("Welt bauen", buildWorld)
+step("Rennstrecke bauen", function()
+	RaceTrack.Build(Workspace)
+end)
 step("Lighting einstellen", setupLighting)
 
 local START_ORDER = {
@@ -857,6 +986,7 @@ local START_ORDER = {
 	"HeistService",
 	"DailyRewardService",
 	"LeaderboardService",
+	"AdminService",
 	"DataService",
 }
 
@@ -905,9 +1035,9 @@ print(("[Garage Heist] Server bereit: %d/%d Services, %d Garagen gebaut."):forma
 	plotCount
 ))
 ]]></ProtectedString></Properties>
-<Item class="Folder" referent="RBX17">
+<Item class="Folder" referent="RBX18">
 <Properties><string name="Name">Data</string></Properties>
-<Item class="ModuleScript" referent="RBX18">
+<Item class="ModuleScript" referent="RBX19">
 <Properties><string name="Name">PartOps</string><ProtectedString name="Source"><![CDATA[--[[
 	PartOps
 	Alles, was ein einzelnes Teil betrifft. Aus ProfileOps ausgelagert, damit
@@ -996,7 +1126,7 @@ end
 return PartOps
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX19">
+<Item class="ModuleScript" referent="RBX20">
 <Properties><string name="Name">ProfileOps</string><ProtectedString name="Source"><![CDATA[--[[
 	ProfileOps
 	Reine Datenoperationen auf einem Profil. Keine Instances, keine Remotes,
@@ -1262,7 +1392,7 @@ end
 return ProfileOps
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX20">
+<Item class="ModuleScript" referent="RBX21">
 <Properties><string name="Name">ProfileTemplate</string><ProtectedString name="Source"><![CDATA[--[[
 	ProfileTemplate
 	Das Schema eines Spielerprofils. Alles, was der Server ueber einen Spieler
@@ -1337,7 +1467,7 @@ end
 return ProfileTemplate
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX21">
+<Item class="ModuleScript" referent="RBX22">
 <Properties><string name="Name">SessionStore</string><ProtectedString name="Source"><![CDATA[--[[
 	SessionStore
 	DataStore-Zugriff mit Session-Lock und Retry-Backoff.
@@ -1516,9 +1646,9 @@ return SessionStore
 ]]></ProtectedString></Properties>
 </Item>
 </Item>
-<Item class="Folder" referent="RBX22">
+<Item class="Folder" referent="RBX23">
 <Properties><string name="Name">Garage</string></Properties>
-<Item class="ModuleScript" referent="RBX23">
+<Item class="ModuleScript" referent="RBX24">
 <Properties><string name="Name">GarageRequests</string><ProtectedString name="Source"><![CDATA[--[[
 	GarageRequests
 	Jede Aktion, die der Client anfragen kann. Reihenfolge ist immer gleich:
@@ -1685,7 +1815,7 @@ end
 return GarageRequests
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX24">
+<Item class="ModuleScript" referent="RBX25">
 <Properties><string name="Name">GarageTicks</string><ProtectedString name="Source"><![CDATA[--[[
 	GarageTicks
 	Die drei periodischen Schleifen der Garage, aus dem GarageService
@@ -1773,7 +1903,7 @@ end
 return GarageTicks
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX25">
+<Item class="ModuleScript" referent="RBX26">
 <Properties><string name="Name">GarageView</string><ProtectedString name="Source"><![CDATA[--[[
 	GarageView
 	Haelt die sichtbare Welt am Profil dran: Autos neu bauen, Schild und
@@ -1879,7 +2009,7 @@ end
 return GarageView
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX26">
+<Item class="ModuleScript" referent="RBX27">
 <Properties><string name="Name">RepairView</string><ProtectedString name="Source"><![CDATA[--[[
 	RepairView
 	Fortschrittsbalken direkt am Teil, solange daran geschraubt wird. Die
@@ -2001,7 +2131,7 @@ end
 return RepairView
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX27">
+<Item class="ModuleScript" referent="RBX28">
 <Properties><string name="Name">RequestRouter</string><ProtectedString name="Source"><![CDATA[--[[
 	RequestRouter
 	Bindet die Client-Remotes an GarageRequests. Jede Verbindung laeuft durch
@@ -2075,7 +2205,7 @@ end
 return RequestRouter
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX28">
+<Item class="ModuleScript" referent="RBX29">
 <Properties><string name="Name">Snapshot</string><ProtectedString name="Source"><![CDATA[--[[
 	Snapshot
 	Baut aus einem Profil das Paket, das der Client zum Anzeigen bekommt.
@@ -2209,7 +2339,7 @@ end
 return Snapshot
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX29">
+<Item class="ModuleScript" referent="RBX30">
 <Properties><string name="Name">TheftOps</string><ProtectedString name="Source"><![CDATA[--[[
 	TheftOps
 	Besitzwechsel von Teilen - der heikelste Teil des Spiels, deshalb an einer
@@ -2319,7 +2449,7 @@ end
 return TheftOps
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX30">
+<Item class="ModuleScript" referent="RBX31">
 <Properties><string name="Name">Throttle</string><ProtectedString name="Source"><![CDATA[--[[
 	Throttle
 	Drosselung fuer JEDE Client->Server-Verbindung. Vorher lief nur ein Teil der
@@ -2376,9 +2506,9 @@ return Throttle
 ]]></ProtectedString></Properties>
 </Item>
 </Item>
-<Item class="Folder" referent="RBX31">
+<Item class="Folder" referent="RBX32">
 <Properties><string name="Name">Heist</string></Properties>
-<Item class="ModuleScript" referent="RBX32">
+<Item class="ModuleScript" referent="RBX33">
 <Properties><string name="Name">CarryManager</string><ProtectedString name="Source"><![CDATA[--[[
 	CarryManager
 	Was mit einem abmontierten Teil passiert, solange es niemandem gehoert:
@@ -2659,7 +2789,7 @@ end
 return CarryManager
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX33">
+<Item class="ModuleScript" referent="RBX34">
 <Properties><string name="Name">DismountManager</string><ProtectedString name="Source"><![CDATA[--[[
 	DismountManager
 	Vier Sekunden schrauben. Der Server misst die Zeit, prueft waehrenddessen
@@ -2807,7 +2937,7 @@ end
 return DismountManager
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX34">
+<Item class="ModuleScript" referent="RBX35">
 <Properties><string name="Name">PartVisual</string><ProtectedString name="Source"><![CDATA[--[[
 	PartVisual
 	Das sichtbare Objekt fuer ein Teil, das gerade niemandem gehoert - getragen
@@ -2860,7 +2990,7 @@ end
 return PartVisual
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX35">
+<Item class="ModuleScript" referent="RBX36">
 <Properties><string name="Name">StealTarget</string><ProtectedString name="Source"><![CDATA[--[[
 	StealTarget
 	Ein Klau-Ziel ist entweder ein Spieler oder eine Leerstand-Garage. Damit
@@ -2938,9 +3068,9 @@ return StealTarget
 ]]></ProtectedString></Properties>
 </Item>
 </Item>
-<Item class="Folder" referent="RBX36">
+<Item class="Folder" referent="RBX37">
 <Properties><string name="Name">Monetization</string></Properties>
-<Item class="ModuleScript" referent="RBX37">
+<Item class="ModuleScript" referent="RBX38">
 <Properties><string name="Name">PurchaseEffects</string><ProtectedString name="Source"><![CDATA[--[[
 	PurchaseEffects
 	Was ein Developer Product konkret tut. Jede Funktion gibt true zurueck,
@@ -2998,9 +3128,184 @@ return PurchaseEffects
 ]]></ProtectedString></Properties>
 </Item>
 </Item>
-<Item class="Folder" referent="RBX38">
+<Item class="Folder" referent="RBX39">
 <Properties><string name="Name">Services</string></Properties>
-<Item class="ModuleScript" referent="RBX39">
+<Item class="ModuleScript" referent="RBX40">
+<Properties><string name="Name">AdminService</string><ProtectedString name="Source"><![CDATA[--[[
+	AdminService
+	Werkzeuge zum Testen: Cash setzen, Garage hochziehen, Fenster sofort
+	oeffnen, Profil zuruecksetzen.
+
+	WER IST ADMIN:
+	1. Der Besitzer des Spiels (game.CreatorId) - du musst nichts eintragen.
+	2. Wer in Config.ADMIN_USER_IDS steht (fuer Freunde/Tester).
+	3. In Roblox Studio jeder - dort spielst du auf deinem eigenen Rechner,
+	   und ohne das koenntest du im Studio-Test nichts pruefen.
+
+	Im veroeffentlichten Spiel kommt also ausser dir niemand ran, solange du
+	niemanden in ADMIN_USER_IDS eintraegst.
+
+	Sicherheitsregel: der Client schickt nur den Befehlsnamen. Jede Pruefung
+	passiert hier. Ein manipulierter Client kann das Remote feuern so oft er
+	will - ohne Adminrecht passiert nichts.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local PartCatalog = require(Shared.PartCatalog)
+local Remotes = require(Shared.Remotes)
+local Util = require(Shared.Util)
+
+local Server = script.Parent.Parent
+local ProfileOps = require(Server.Data.ProfileOps)
+local ProfileTemplate = require(Server.Data.ProfileTemplate)
+local Throttle = require(Server.Garage.Throttle)
+
+local AdminService = {}
+AdminService.Name = "AdminService"
+
+local COMMAND_COOLDOWN = 0.3
+local MAX_CASH_GRANT = 1e9
+
+function AdminService:Init(services)
+	self.Services = services
+end
+
+function AdminService:Start()
+	Throttle.Connect("AdminCommand", COMMAND_COOLDOWN, function(player, command, value)
+		self:_run(player, command, value)
+	end)
+
+	self.Services.DataService.ProfileLoaded:Connect(function(player)
+		-- Der Client baut das Panel nur, wenn hier true ankommt.
+		Remotes.Get("AdminState"):FireClient(player, { isAdmin = self:IsAdmin(player) })
+	end)
+end
+
+function AdminService:IsAdmin(player: Player): boolean
+	if RunService:IsStudio() then
+		return true
+	end
+	if game.CreatorType == Enum.CreatorType.User and player.UserId == game.CreatorId then
+		return true
+	end
+	for _, userId in Config.ADMIN_USER_IDS do
+		if userId == player.UserId then
+			return true
+		end
+	end
+	return false
+end
+
+local COMMANDS = {}
+
+COMMANDS.cash = function(self, player, data, value)
+	local amount = math.clamp(math.floor(Util.SafeNumber(value, 10000)), 1, MAX_CASH_GRANT)
+	self.Services.EconomyService:AddCash(player, amount, "Admin")
+	return ("+%s Cash."):format(Util.FormatCash(amount))
+end
+
+COMMANDS.level = function(self, player, data, value)
+	local level = math.clamp(math.floor(Util.SafeNumber(value, 5)), 1, #Config.GARAGE_LEVELS)
+	data.garageLevel = level
+	return ("Garage auf Stufe %d (%s)."):format(level, Config.GARAGE_LEVELS[level].label)
+end
+
+-- Alle Slots aller Autos auf die hoechste Stufe. Damit ist Rebirth testbar,
+-- ohne drei Stunden zu spielen.
+COMMANDS.max = function(self, player, data)
+	for carIndex in data.cars do
+		for _, slotId in PartCatalog.SlotOrder do
+			ProfileOps.SetPart(data, carIndex, slotId, {
+				uid = Util.NewUid(),
+				slotId = slotId,
+				tier = PartCatalog.TierCount(slotId),
+				subTier = Config.SUBTIER_COUNT,
+				originalOwner = player.UserId,
+			})
+		end
+	end
+	data.repairs = {}
+	data.garageLevel = #Config.GARAGE_LEVELS
+	return "Alle Teile auf Maximum, Garage voll ausgebaut."
+end
+
+COMMANDS.rebirth = function(self, player, data)
+	local count = ProfileOps.Rebirth(data)
+	return ("Rebirth %d erzwungen."):format(count)
+end
+
+COMMANDS.heist = function(self)
+	self.Services.HeistService:ForceOpen()
+	return "Klau-Fenster geoeffnet."
+end
+
+COMMANDS.close = function(self)
+	self.Services.HeistService:ForceClose()
+	return "Klau-Fenster geschlossen."
+end
+
+COMMANDS.radar = function(self, player, data)
+	self.Services.HeistService:GrantRadar(player, data)
+	return "Radar-Ladung gutgeschrieben."
+end
+
+-- Setzt das Profil auf den Auslieferungszustand. Praktisch, um das Onboarding
+-- immer wieder von vorne zu sehen.
+COMMANDS.reset = function(self, player, data)
+	local fresh = ProfileTemplate.New()
+	fresh.firstJoin = data.firstJoin
+	fresh.preferredPlot = data.preferredPlot
+	for key in data do
+		data[key] = nil
+	end
+	for key, value in fresh do
+		data[key] = value
+	end
+	return "Profil zurueckgesetzt."
+end
+
+function AdminService:_run(player: Player, command, value)
+	if not self:IsAdmin(player) then
+		warn(("[Admin] %s (%d) hat '%s' versucht, ist aber kein Admin."):format(
+			player.Name,
+			player.UserId,
+			tostring(command)
+		))
+		return
+	end
+	if type(command) ~= "string" then
+		return
+	end
+	local handler = COMMANDS[command]
+	if not handler then
+		self.Services.EconomyService:Notify(player, ("Unbekannter Befehl: %s"):format(command), "bad")
+		return
+	end
+	local data = self.Services.DataService:Get(player)
+	if not data then
+		return
+	end
+
+	local ok, message = pcall(handler, self, player, data, value)
+	if not ok then
+		warn(("[Admin] Befehl '%s' ist gescheitert: %s"):format(command, tostring(message)))
+		self.Services.EconomyService:Notify(player, "Befehl gescheitert - siehe Konsole.", "bad")
+		return
+	end
+
+	self.Services.GarageService:Refresh(player, data)
+	self.Services.EconomyService:Push(player, true)
+	self.Services.EconomyService:Notify(player, "[Admin] " .. tostring(message), "good")
+end
+
+return AdminService
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX41">
 <Properties><string name="Name">DailyRewardService</string><ProtectedString name="Source"><![CDATA[--[[
 	DailyRewardService
 	Sieben-Tage-Kette auf UTC-Tagen. Ein verpasster Tag setzt die Kette auf 1
@@ -3112,7 +3417,7 @@ end
 return DailyRewardService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX40">
+<Item class="ModuleScript" referent="RBX42">
 <Properties><string name="Name">DataService</string><ProtectedString name="Source"><![CDATA[--[[
 	DataService
 	Besitzt alle Profile der Spieler auf diesem Server. Kein anderer Service
@@ -3292,7 +3597,7 @@ end
 return DataService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX41">
+<Item class="ModuleScript" referent="RBX43">
 <Properties><string name="Name">DerelictService</string><ProtectedString name="Source"><![CDATA[--[[
 	DerelictService
 	Freie Plots sind waehrend des Klau-Fensters keine leeren Boxen, sondern
@@ -3506,7 +3811,7 @@ end
 return DerelictService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX42">
+<Item class="ModuleScript" referent="RBX44">
 <Properties><string name="Name">EconomyService</string><ProtectedString name="Source"><![CDATA[--[[
 	EconomyService
 	Einziger Ort, an dem sich Cash veraendert. Der Client bekommt Zahlen nur
@@ -3758,7 +4063,7 @@ end
 return EconomyService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX43">
+<Item class="ModuleScript" referent="RBX45">
 <Properties><string name="Name">EffectService</string><ProtectedString name="Source"><![CDATA[--[[
 	EffectService
 	Funken, Partikel, Klaenge, Kamera-Wackler. Nichts hiervon entscheidet
@@ -3876,7 +4181,7 @@ end
 return EffectService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX44">
+<Item class="ModuleScript" referent="RBX46">
 <Properties><string name="Name">GarageService</string><ProtectedString name="Source"><![CDATA[--[[
 	GarageService
 	Verteilt Plots, haelt Welt und Profil synchron, besitzt die einzige
@@ -4107,7 +4412,7 @@ end
 return GarageService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX45">
+<Item class="ModuleScript" referent="RBX47">
 <Properties><string name="Name">HeistService</string><ProtectedString name="Source"><![CDATA[--[[
 	HeistService
 	Der globale Timer. Der Takt steht in Config (HEIST_INTERVAL / HEIST_WINDOW),
@@ -4344,6 +4649,19 @@ function HeistService:_announce(text: string, kind: string)
 	Remotes.Get("Notify"):FireAllClients({ text = text, kind = kind })
 end
 
+-- Nur fuer Admin-Werkzeuge: Fenster sofort oeffnen bzw. schliessen.
+function HeistService:ForceOpen()
+	if not self.open then
+		self:_open()
+	end
+end
+
+function HeistService:ForceClose()
+	if self.open then
+		self:_close()
+	end
+end
+
 -- `target` ist ein StealTarget (Spieler oder Leerstand).
 function HeistService:OnStealPrompt(thief: Player, target, carIndex: number, slotId: string, prompt: ProximityPrompt)
 	local anchor = prompt.Parent
@@ -4404,7 +4722,7 @@ end
 return HeistService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX46">
+<Item class="ModuleScript" referent="RBX48">
 <Properties><string name="Name">LeaderboardService</string><ProtectedString name="Source"><![CDATA[--[[
 	LeaderboardService
 	Zwei Ranglisten fuer diesen Server: teuerste Garage und meiste geklaute
@@ -4586,7 +4904,7 @@ end
 return LeaderboardService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX47">
+<Item class="ModuleScript" referent="RBX49">
 <Properties><string name="Name">MonetizationService</string><ProtectedString name="Source"><![CDATA[--[[
 	MonetizationService
 
@@ -4850,7 +5168,7 @@ end
 return MonetizationService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX48">
+<Item class="ModuleScript" referent="RBX50">
 <Properties><string name="Name">TelemetryService</string><ProtectedString name="Source"><![CDATA[--[[
 	TelemetryService
 	Onboarding-Funnel, Economy-Events und Badges.
@@ -4990,9 +5308,9 @@ return TelemetryService
 ]]></ProtectedString></Properties>
 </Item>
 </Item>
-<Item class="Folder" referent="RBX49">
+<Item class="Folder" referent="RBX51">
 <Properties><string name="Name">World</string></Properties>
-<Item class="ModuleScript" referent="RBX50">
+<Item class="ModuleScript" referent="RBX52">
 <Properties><string name="Name">CarBuilder</string><ProtectedString name="Source"><![CDATA[--[[
 	CarBuilder (Visual-Rewrite)
 
@@ -5561,7 +5879,7 @@ end
 return CarBuilder
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX51">
+<Item class="ModuleScript" referent="RBX53">
 <Properties><string name="Name">DoorController</string><ProtectedString name="Source"><![CDATA[--[[
 	DoorController
 	Das Garagentor ist kein Deko-Objekt: es geht auf, wenn der Besitzer davor
@@ -5603,7 +5921,7 @@ end
 return DoorController
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX52">
+<Item class="ModuleScript" referent="RBX54">
 <Properties><string name="Name">PlotBuilder</string><ProtectedString name="Source"><![CDATA[--[[
 	PlotBuilder (Visual-Rewrite)
 
@@ -6355,14 +6673,413 @@ end
 return PlotBuilder
 ]]></ProtectedString></Properties>
 </Item>
+<Item class="ModuleScript" referent="RBX55">
+<Properties><string name="Name">RaceTrack</string><ProtectedString name="Source"><![CDATA[--[[
+	RaceTrack
+	Baut alles ausserhalb der Garagen:
+
+	1. Eine erhoehte Rennstrecke (Stadionoval, 44 Studs hoch) rund um den
+	   Garagenhof. Fahrbahn, Leitplanken, Neonkante, Stuetzpfeiler, zwei
+	   Torbogen mit Schriftzug an den Enden des Hofs.
+	2. Deckung im Hof: Container, Rampen, Leitplanken, Lichtmasten.
+
+	Punkt 2 ist der eigentliche Spielbaustein. Der Hof war vorher eine
+	leere Asphaltflaeche von 900 x 620 - waehrend des Klau-Fensters heisst
+	das freie Sichtlinie ueber die ganze Karte und Rempeln ohne Gegenwehr.
+	Container brechen die Sichtlinien, Rampen geben Hoehe. Die Flaechen
+	direkt vor den Toren (z zwischen -30 und 30) bleiben frei, damit
+	niemand vor der eigenen Ausfahrt haengenbleibt.
+
+	Die Strecke selbst ist reine Kulisse: kein CanCollide, kein Gameplay.
+	Die Autos darauf baut jeder Client fuer sich (TrafficController), damit
+	nichts davon ueber das Netzwerk repliziert wird.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local TrackPath = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("TrackPath"))
+
+local RaceTrack = {}
+
+local C = {
+	road = Color3.fromRGB(30, 32, 38),
+	roadEdge = Color3.fromRGB(196, 200, 210),
+	rail = Color3.fromRGB(88, 94, 104),
+	neon = Color3.fromRGB(56, 214, 255),
+	neonWarm = Color3.fromRGB(245, 166, 35),
+	pillar = Color3.fromRGB(62, 66, 74),
+	container = {
+		Color3.fromRGB(158, 62, 54),
+		Color3.fromRGB(46, 96, 128),
+		Color3.fromRGB(196, 148, 44),
+		Color3.fromRGB(64, 108, 78),
+		Color3.fromRGB(72, 76, 86),
+	},
+	steel = Color3.fromRGB(126, 132, 142),
+	dark = Color3.fromRGB(20, 21, 26),
+}
+
+local function part(props): Part
+	local p = Instance.new("Part")
+	p.Anchored = true
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.Size = props.Size
+	p.CFrame = props.CFrame
+	p.Color = props.Color or C.rail
+	p.Material = props.Material or Enum.Material.Concrete
+	p.Name = props.Name or "Part"
+	p.CanCollide = if props.CanCollide ~= nil then props.CanCollide else false
+	p.CastShadow = if props.CastShadow ~= nil then props.CastShadow else false
+	p.Transparency = props.Transparency or 0
+	p.Parent = props.Parent
+	return p
+end
+
+-- Fahrbahn, Planken, Neonkante ------------------------------------------
+local function buildRoad(folder)
+	local width = TrackPath.ROAD_WIDTH
+	for _, span in TrackPath.BuildSpans(14) do
+		local cf = TrackPath.At(span.s)
+
+		part({
+			Name = "Road",
+			Size = Vector3.new(width, 1.6, span.len),
+			CFrame = cf,
+			Color = C.road,
+			Material = Enum.Material.Asphalt,
+			CastShadow = true,
+			Parent = folder,
+		})
+
+		for _, side in { -1, 1 } do
+			part({
+				Name = "Rail",
+				Size = Vector3.new(1.1, 3.2, span.len),
+				CFrame = cf * CFrame.new(side * (width / 2 + 0.5), 1.6, 0),
+				Color = C.rail,
+				Material = Enum.Material.Metal,
+				Parent = folder,
+			})
+			-- Leuchtende Oberkante. Das ist aus dem Hof heraus das Einzige,
+			-- was man von der Strecke im Detail erkennt - deshalb bekommt
+			-- sie die Aufmerksamkeit und nicht die Fahrbahn.
+			part({
+				Name = "RailGlow",
+				Size = Vector3.new(1.3, 0.35, span.len),
+				CFrame = cf * CFrame.new(side * (width / 2 + 0.5), 3.35, 0),
+				Color = side < 0 and C.neon or C.neonWarm,
+				Material = Enum.Material.Neon,
+				Parent = folder,
+			})
+		end
+
+		-- Randmarkierung auf der Fahrbahn
+		for _, side in { -1, 1 } do
+			part({
+				Name = "EdgeLine",
+				Size = Vector3.new(0.9, 0.08, span.len),
+				CFrame = cf * CFrame.new(side * (width / 2 - 1.6), 0.84, 0),
+				Color = C.roadEdge,
+				Material = Enum.Material.SmoothPlastic,
+				Parent = folder,
+			})
+		end
+
+		-- Unterseite: dunkler Traeger, damit die Fahrbahn von unten nicht
+		-- wie ein schwebendes Brett aussieht.
+		part({
+			Name = "Girder",
+			Size = Vector3.new(width - 4, 2.2, span.len),
+			CFrame = cf * CFrame.new(0, -1.9, 0),
+			Color = C.dark,
+			Material = Enum.Material.Metal,
+			Parent = folder,
+		})
+	end
+
+	-- Mittelstriche nur auf den Geraden: auf den Boegen waeren es hundert
+	-- zusaetzliche Parts fuer einen Effekt, den niemand sieht.
+	local dashStep = 26
+	for _, seg in TrackPath.Segments do
+		if seg.kind == "line" then
+			-- Direkt entlang der Geraden laufen statt den Startversatz aus
+			-- BuildSpans zurueckzurechnen.
+			for offset = 8, seg.len - 8, dashStep do
+				local pos2 = seg.from + seg.dir * offset
+				local point = Vector3.new(pos2.X, TrackPath.HEIGHT + 0.85, pos2.Y)
+				local look = point + Vector3.new(seg.dir.X, 0, seg.dir.Y)
+				for _, lane in { -4.75, 4.75 } do
+					part({
+						Name = "Dash",
+						Size = Vector3.new(0.7, 0.08, 12),
+						CFrame = CFrame.lookAt(point, look) * CFrame.new(lane, 0, 0),
+						Color = C.roadEdge,
+						Material = Enum.Material.SmoothPlastic,
+						Parent = folder,
+					})
+				end
+			end
+		end
+	end
+end
+
+local function buildPillars(folder)
+	local step = 62
+	local count = math.floor(TrackPath.LENGTH / step)
+	for i = 0, count - 1 do
+		local cf = TrackPath.At(i * step)
+		local pos = cf.Position
+		local height = TrackPath.HEIGHT - 3.2
+
+		part({
+			Name = "PillarCap",
+			Size = Vector3.new(TrackPath.ROAD_WIDTH + 5, 2.4, 6),
+			CFrame = cf * CFrame.new(0, -3.4, 0),
+			Color = C.pillar,
+			Material = Enum.Material.Concrete,
+			CastShadow = true,
+			Parent = folder,
+		})
+		part({
+			Name = "Pillar",
+			Size = Vector3.new(7, height, 7),
+			CFrame = CFrame.new(pos.X, height / 2, pos.Z),
+			Color = C.pillar,
+			Material = Enum.Material.Concrete,
+			CanCollide = true,
+			CastShadow = true,
+			Parent = folder,
+		})
+		part({
+			Name = "PillarFoot",
+			Size = Vector3.new(11, 1.6, 11),
+			CFrame = CFrame.new(pos.X, 0.8, pos.Z),
+			Color = C.dark,
+			Material = Enum.Material.Concrete,
+			Parent = folder,
+		})
+		-- Schmaler Leuchtstreifen die Saeule hoch. Bei Daemmerung zieht das
+		-- den Blick nach oben zur Strecke.
+		part({
+			Name = "PillarGlow",
+			Size = Vector3.new(0.5, height - 6, 0.5),
+			CFrame = CFrame.new(pos.X, height / 2, pos.Z + 3.6),
+			Color = C.neon,
+			Material = Enum.Material.Neon,
+			Parent = folder,
+		})
+	end
+end
+
+-- Zwei Torbogen an den Enden der Hofachse. Der Hof laeuft in X, also blickt
+-- man aus dem Hof genau auf x = +/-265 - dort steht der Schriftzug.
+local function buildGantries(folder)
+	for _, side in { -1, 1 } do
+		local x = side * TrackPath.HALF_LENGTH
+		local towerHeight = TrackPath.HEIGHT + 22
+
+		for _, zSide in { -1, 1 } do
+			part({
+				Name = "GantryTower",
+				Size = Vector3.new(6, towerHeight, 6),
+				CFrame = CFrame.new(x, towerHeight / 2, zSide * (TrackPath.ROAD_WIDTH / 2 + 6)),
+				Color = C.pillar,
+				Material = Enum.Material.Metal,
+				CanCollide = true,
+				CastShadow = true,
+				Parent = folder,
+			})
+		end
+
+		local beamY = TrackPath.HEIGHT + 17
+		part({
+			Name = "GantryBeam",
+			Size = Vector3.new(6, 9, TrackPath.ROAD_WIDTH + 18),
+			CFrame = CFrame.new(x, beamY, 0),
+			Color = C.dark,
+			Material = Enum.Material.Metal,
+			CastShadow = true,
+			Parent = folder,
+		})
+		part({
+			Name = "GantryGlow",
+			Size = Vector3.new(6.4, 0.6, TrackPath.ROAD_WIDTH + 18),
+			CFrame = CFrame.new(x, beamY - 4.8, 0),
+			Color = C.neonWarm,
+			Material = Enum.Material.Neon,
+			Parent = folder,
+		})
+
+		local board = part({
+			Name = "GantrySign",
+			Size = Vector3.new(0.4, 8, TrackPath.ROAD_WIDTH + 16),
+			CFrame = CFrame.new(x - side * 3.3, beamY, 0),
+			Color = C.dark,
+			Material = Enum.Material.SmoothPlastic,
+			Parent = folder,
+		})
+		local gui = Instance.new("SurfaceGui")
+		-- Nach innen zum Hof: -X-Seite bei side = 1, +X-Seite bei side = -1.
+		gui.Face = side > 0 and Enum.NormalId.Left or Enum.NormalId.Right
+		gui.CanvasSize = Vector2.new(900, 160)
+		gui.LightInfluence = 0
+		gui.Parent = board
+		local label = Instance.new("TextLabel")
+		label.BackgroundTransparency = 1
+		label.Size = UDim2.fromScale(1, 1)
+		label.Font = Enum.Font.Michroma
+		label.TextScaled = true
+		label.TextColor3 = Color3.fromRGB(245, 166, 35)
+		label.Text = "GARAGE HEIST"
+		label.Parent = gui
+	end
+end
+
+-- Deckung im Hof --------------------------------------------------------
+-- Plotmitten liegen bei x = -140, -84, -28, 28, 84, 140. Alles hier steht in
+-- den Luecken dazwischen und bleibt bei |z| <= 22, damit vor jedem Tor
+-- mindestens 30 Studs frei bleiben.
+local CONTAINERS = {
+	{ x = -112, z = -16, rot = 0, stack = 1 },
+	{ x = -84, z = 14, rot = 90, stack = 1 },
+	{ x = -56, z = -18, rot = 0, stack = 2 },
+	{ x = -14, z = 16, rot = 90, stack = 1 },
+	{ x = 14, z = -16, rot = 90, stack = 1 },
+	{ x = 56, z = 18, rot = 0, stack = 2 },
+	{ x = 84, z = -14, rot = 90, stack = 1 },
+	{ x = 112, z = 16, rot = 0, stack = 1 },
+	{ x = -168, z = 0, rot = 90, stack = 2 },
+	{ x = 168, z = 0, rot = 90, stack = 2 },
+}
+
+local function buildYard(folder)
+	for index, spec in CONTAINERS do
+		local color = C.container[(index - 1) % #C.container + 1]
+		local rotation = CFrame.Angles(0, math.rad(spec.rot), 0)
+		for level = 1, spec.stack do
+			local y = 5.2 + (level - 1) * 10.4
+			local body = part({
+				Name = "Container",
+				Size = Vector3.new(28, 10, 10),
+				CFrame = CFrame.new(spec.x, y, spec.z) * rotation,
+				Color = level > 1 and color:Lerp(Color3.new(0, 0, 0), 0.2) or color,
+				Material = Enum.Material.CorrodedMetal,
+				CanCollide = true,
+				CastShadow = true,
+				Parent = folder,
+			})
+			-- Rippen laengs: ohne die ist ein Container eine bunte Kiste.
+			for i = -3, 3 do
+				part({
+					Name = "ContainerRib",
+					Size = Vector3.new(0.5, 9.4, 10.3),
+					CFrame = body.CFrame * CFrame.new(i * 3.6, 0, 0),
+					Color = color:Lerp(Color3.new(0, 0, 0), 0.35),
+					Material = Enum.Material.Metal,
+					Parent = folder,
+				})
+			end
+		end
+
+		-- Rampe an jeden zweiten Container: erst dadurch wird die Deckung zu
+		-- einer Entscheidung ("oben rum oder aussen rum") statt zu einer Wand.
+		if index % 2 == 1 then
+			local ramp = Instance.new("WedgePart")
+			ramp.Name = "Ramp"
+			ramp.Anchored = true
+			ramp.CanCollide = true
+			ramp.CastShadow = false
+			ramp.Size = Vector3.new(9, 10.2, 16)
+			ramp.CFrame = CFrame.new(spec.x, 5.1, spec.z) * rotation * CFrame.new(0, 0, 20)
+			ramp.Color = C.steel
+			ramp.Material = Enum.Material.DiamondPlate
+			ramp.Parent = folder
+		end
+	end
+
+	-- Leitplanken quer: kurze Sichtblocker auf Huefthoehe.
+	for _, spec in { { x = -28, z = 0 }, { x = 28, z = 0 }, { x = -140, z = 6 }, { x = 140, z = -6 } } do
+		part({
+			Name = "Barrier",
+			Size = Vector3.new(16, 4, 2.4),
+			CFrame = CFrame.new(spec.x, 2, spec.z),
+			Color = Color3.fromRGB(178, 180, 186),
+			Material = Enum.Material.Concrete,
+			CanCollide = true,
+			CastShadow = true,
+			Parent = folder,
+		})
+		part({
+			Name = "BarrierStripe",
+			Size = Vector3.new(16.2, 0.5, 2.6),
+			CFrame = CFrame.new(spec.x, 3.4, spec.z),
+			Color = C.neonWarm,
+			Material = Enum.Material.Neon,
+			Parent = folder,
+		})
+	end
+
+	-- Lichtmasten. Vier Stueck, mit echtem Licht - das ist der Unterschied
+	-- zwischen "dunkler Hof" und "beleuchtetes Gelaende".
+	for _, spec in { { x = -196, z = 0 }, { x = 196, z = 0 }, { x = 0, z = -40 }, { x = 0, z = 40 } } do
+		part({
+			Name = "MastPole",
+			Size = Vector3.new(2.2, 34, 2.2),
+			CFrame = CFrame.new(spec.x, 17, spec.z),
+			Color = C.pillar,
+			Material = Enum.Material.Metal,
+			CanCollide = true,
+			CastShadow = true,
+			Parent = folder,
+		})
+		local head = part({
+			Name = "MastHead",
+			Size = Vector3.new(11, 1.6, 5),
+			CFrame = CFrame.new(spec.x, 34.4, spec.z),
+			Color = Color3.fromRGB(255, 244, 214),
+			Material = Enum.Material.Neon,
+			Parent = folder,
+		})
+		local lamp = Instance.new("SurfaceLight")
+		lamp.Face = Enum.NormalId.Bottom
+		lamp.Angle = 130
+		lamp.Range = 90
+		lamp.Brightness = 2.6
+		lamp.Shadows = false
+		lamp.Color = Color3.fromRGB(255, 240, 208)
+		lamp.Parent = head
+	end
+end
+
+function RaceTrack.Build(parent: Instance)
+	local folder = Instance.new("Folder")
+	folder.Name = "RaceTrack"
+	folder.Parent = parent
+
+	buildRoad(folder)
+	buildPillars(folder)
+	buildGantries(folder)
+
+	local yard = Instance.new("Folder")
+	yard.Name = "Yard"
+	yard.Parent = parent
+	buildYard(yard)
+
+	return folder
+end
+
+return RaceTrack
+]]></ProtectedString></Properties>
 </Item>
 </Item>
 </Item>
-<Item class="StarterPlayer" referent="RBX53">
+</Item>
+<Item class="StarterPlayer" referent="RBX56">
 <Properties><string name="Name">StarterPlayer</string></Properties>
-<Item class="StarterPlayerScripts" referent="RBX54">
+<Item class="StarterPlayerScripts" referent="RBX57">
 <Properties><string name="Name">StarterPlayerScripts</string></Properties>
-<Item class="LocalScript" referent="RBX55">
+<Item class="LocalScript" referent="RBX58">
 <Properties><string name="Name">Client</string><ProtectedString name="Source"><![CDATA[--[[
 	Garage Heist - Client-Bootstrap
 
@@ -6387,6 +7104,7 @@ local ShopMenu = require(script.UI.ShopMenu)
 local DailyPanel = require(script.UI.DailyPanel)
 local DismountBar = require(script.UI.DismountBar)
 local InfoPanel = require(script.UI.InfoPanel)
+local AdminPanel = require(script.UI.AdminPanel)
 local EffectController = require(script.Controllers.EffectController)
 local InputController = require(script.Controllers.InputController)
 
@@ -6425,6 +7143,7 @@ GarageMenu.Init(root)
 ShopMenu.Init(root)
 DailyPanel.Init(root)
 DismountBar.Init(root)
+AdminPanel.Init(root)
 
 -- Beide Panels haengen rechts: die Rangliste unter der Knopfleiste, das Radar
 -- darunter mit Abstand zur Trage-Leiste. Groessen in Skalen, damit im
@@ -6490,6 +7209,19 @@ end)
 
 Remotes.Get("CashUpdate").OnClientEvent:Connect(function(payload)
 	Store.Set("cash", payload)
+
+	-- Das Werkstatt-Menue rechnet Kaufbarkeit gegen snapshot.cash. Der
+	-- Snapshot kommt aber nur bei einer Zustandsaenderung (Kauf, Reparatur,
+	-- Diebstahl) - Kasse leeren und Tagesbelohnung schicken nur ein
+	-- CashUpdate. Ohne diese Zeilen steht im HUD 206 und der 150er-Knopf ist
+	-- trotzdem grau. Reine Anzeige: der Kauf wird auf dem Server ohnehin neu
+	-- geprueft.
+	local snapshot = Store.snapshot
+	if snapshot and snapshot.cash ~= payload.cash then
+		snapshot.cash = payload.cash
+		snapshot.pile = payload.pile
+		Store.Set("snapshot", snapshot)
+	end
 end)
 
 Remotes.Get("HeistState").OnClientEvent:Connect(function(payload)
@@ -6533,20 +7265,9 @@ Remotes.Get("RadarPing").OnClientEvent:Connect(function(entries)
 end)
 
 -- Erststart ---------------------------------------------------------------
-local function looksBrandNew(snapshot): boolean
-	if not snapshot then
-		return false
-	end
-	for _, car in snapshot.cars do
-		for _, part in car.parts do
-			if part.tier > 0 or part.repair then
-				return false
-			end
-		end
-	end
-	return true
-end
-
+-- Die Einfuehrung uebernimmt Onboarding: Intro-Karte, Zielbalken, Weltmarker.
+-- Ein Menue, das sich von allein ueber die Karte legt, waere schlechter als
+-- ein Marker, der auf die Werkbank zeigt.
 task.spawn(function()
 	-- Beim Start kann der Server den Handler noch nicht gesetzt haben.
 	local snapshot
@@ -6565,28 +7286,20 @@ task.spawn(function()
 		loadingLabel.Text = "Spielstand kommt nicht an. Verlasse das Spiel und tritt neu bei."
 		return
 	end
-	if snapshot then
-		hideLoading()
-		Store.Set("snapshot", snapshot)
-		Store.Set("cash", {
-			cash = snapshot.cash,
-			pile = snapshot.pile,
-			rate = snapshot.rate,
-			autoCollect = snapshot.passes and snapshot.passes.AutoCollect or false,
-		})
-		if looksBrandNew(snapshot) then
-			-- Ziel: erster Kauf in unter 60 Sekunden. Deshalb geht das Menue
-			-- von allein auf und sagt, was zu tun ist.
-			GarageMenu.SetVisible(true)
-			Toast.Show("Deine Karre ist Schrott. Kauf das erste Teil - Reifen kosten 100.", "cash")
-			Toast.Show("Verbaute Teile bringen Cash pro Sekunde, auch wenn du offline bist.", "info")
-		end
-	end
+
+	hideLoading()
+	Store.Set("snapshot", snapshot)
+	Store.Set("cash", {
+		cash = snapshot.cash,
+		pile = snapshot.pile,
+		rate = snapshot.rate,
+		autoCollect = snapshot.passes and snapshot.passes.AutoCollect or false,
+	})
 end)
 ]]></ProtectedString></Properties>
-<Item class="Folder" referent="RBX56">
+<Item class="Folder" referent="RBX59">
 <Properties><string name="Name">Controllers</string></Properties>
-<Item class="ModuleScript" referent="RBX57">
+<Item class="ModuleScript" referent="RBX60">
 <Properties><string name="Name">EffectController</string><ProtectedString name="Source"><![CDATA[--[[
 	EffectController
 	Nimmt die Effekt-Anweisungen des Servers entgegen: lokale Klaenge und den
@@ -6649,7 +7362,7 @@ end
 return EffectController
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX58">
+<Item class="ModuleScript" referent="RBX61">
 <Properties><string name="Name">InputController</string><ProtectedString name="Source"><![CDATA[--[[
 	InputController
 	Tastenkuerzel und ProximityPrompts. Schickt ausschliesslich Absichten an den
@@ -6712,10 +7425,358 @@ end
 return InputController
 ]]></ProtectedString></Properties>
 </Item>
+<Item class="ModuleScript" referent="RBX62">
+<Properties><string name="Name">TrafficController</string><ProtectedString name="Source"><![CDATA[--[[
+	TrafficController
+	Der Verkehr auf der Rennstrecke - komplett clientseitig.
+
+	Warum clientseitig: 22 Autos, die dauerhaft fahren, waeren serverseitig
+	22 replizierte Objekte mit CFrame-Updates in jedem Frame, an jeden Spieler,
+	fuer reine Kulisse. Das ist die teuerste Art, nichts zu erreichen.
+	Vom Client gebaute Instanzen werden nie zum Server repliziert - der Verkehr
+	kostet den Server exakt null und jeder sieht trotzdem dasselbe Bild, weil
+	alle dieselbe Kurve aus TrackPath abfahren.
+
+	Preis dieser Entscheidung: der Verkehr ist nicht synchron zwischen
+	Spielern und man kann nicht mit ihm interagieren. Fuer Kulisse egal.
+	Wenn du je willst, dass die Autos etwas TUN (Verfolgungsjagd, Hindernis),
+	muss das auf den Server - dann aber mit deutlich weniger Autos.
+
+	Fahrverhalten: drei Spuren, jede mit eigener Grundgeschwindigkeit.
+	Innerhalb einer Spur haelt jedes Auto Abstand zum Vordermann und bremst,
+	wenn es zu dicht wird. Dadurch entstehen Pulks und Luecken statt einer
+	Perlenkette mit exakt gleichem Abstand.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local TrackPath = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("TrackPath"))
+
+local TrafficController = {}
+
+-- Stellschraube: erste Zahl, die man runterdreht, wenn es auf Handys ruckelt.
+local CARS_PER_LANE = 8
+local MIN_GAP = 30 -- Studs, ab hier wird gebremst
+local LANE_SPEEDS = { 74, 96, 122 } -- aussen langsam, innen schnell
+
+local PALETTE = {
+	Color3.fromRGB(232, 68, 62),
+	Color3.fromRGB(58, 148, 232),
+	Color3.fromRGB(245, 196, 62),
+	Color3.fromRGB(238, 240, 246),
+	Color3.fromRGB(52, 200, 158),
+	Color3.fromRGB(178, 92, 240),
+	Color3.fromRGB(38, 42, 52),
+	Color3.fromRGB(255, 132, 40),
+}
+
+local function piece(model, name, size, offset, color, material)
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Size = size
+	p.CFrame = CFrame.new(offset)
+	p.Color = color
+	p.Material = material or Enum.Material.SmoothPlastic
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.Parent = model
+	return p
+end
+
+-- Ein Verkehrsauto. Front zeigt nach -Z, passend zur LookVector der
+-- Strecken-CFrame.
+local function buildCar(color: Color3, folder: Instance)
+	local model = Instance.new("Model")
+	model.Name = "TrafficCar"
+
+	local body = piece(model, "Body", Vector3.new(5, 1.7, 11.2), Vector3.new(0, 1.5, 0), color, Enum.Material.Metal)
+	body.Reflectance = 0.08
+	model.PrimaryPart = body
+
+	piece(
+		model,
+		"Roof",
+		Vector3.new(4.3, 1.5, 5.2),
+		Vector3.new(0, 3, 0.7),
+		color:Lerp(Color3.new(0, 0, 0), 0.35),
+		Enum.Material.SmoothPlastic
+	)
+	piece(
+		model,
+		"Glass",
+		Vector3.new(4.1, 1.2, 1.1),
+		Vector3.new(0, 3, -2),
+		Color3.fromRGB(26, 30, 40),
+		Enum.Material.Glass
+	)
+
+	for _, x in { -2.6, 2.6 } do
+		for _, z in { -3.4, 3.4 } do
+			local wheel =
+				piece(model, "Wheel", Vector3.new(0.9, 2.2, 2.2), Vector3.new(x, 1.1, z), Color3.fromRGB(20, 20, 24), Enum.Material.Rubber)
+			wheel.Shape = Enum.PartType.Cylinder
+		end
+	end
+
+	for _, x in { -1.6, 1.6 } do
+		piece(
+			model,
+			"Head",
+			Vector3.new(1.3, 0.5, 0.3),
+			Vector3.new(x, 1.6, -5.7),
+			Color3.fromRGB(255, 248, 220),
+			Enum.Material.Neon
+		)
+		piece(
+			model,
+			"Tail",
+			Vector3.new(1.3, 0.4, 0.3),
+			Vector3.new(x, 1.7, 5.7),
+			Color3.fromRGB(255, 48, 48),
+			Enum.Material.Neon
+		)
+	end
+
+	-- Leuchtspur hinter dem Auto. Bei Daemmerung macht das aus 22 fahrenden
+	-- Kisten einen Streifen Licht, den man aus dem ganzen Hof sieht.
+	local a0 = Instance.new("Attachment")
+	a0.Position = Vector3.new(-2.1, -0.3, 5.5)
+	a0.Parent = body
+	local a1 = Instance.new("Attachment")
+	a1.Position = Vector3.new(2.1, -0.3, 5.5)
+	a1.Parent = body
+
+	local trail = Instance.new("Trail")
+	trail.Attachment0 = a0
+	trail.Attachment1 = a1
+	trail.Lifetime = 0.4
+	trail.MinLength = 0
+	trail.FaceCamera = true
+	trail.LightEmission = 1
+	trail.LightInfluence = 0
+	trail.Color = ColorSequence.new(color)
+	trail.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.35),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	trail.WidthScale = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	trail.Parent = body
+
+	model.Parent = folder
+	return model
+end
+
+function TrafficController.Start()
+	if TrafficController._running then
+		return TrafficController
+	end
+	TrafficController._running = true
+
+	-- Vom Client erzeugt: existiert nur lokal, wird nie repliziert.
+	local folder = Instance.new("Folder")
+	folder.Name = "LocalTraffic"
+	folder.Parent = Workspace
+
+	local lanes = {}
+	local paletteIndex = 0
+
+	for laneIndex, laneOffset in TrackPath.LANES do
+		local cars = {}
+		local spacing = TrackPath.LENGTH / CARS_PER_LANE
+		for i = 1, CARS_PER_LANE do
+			paletteIndex += 1
+			local color = PALETTE[(paletteIndex - 1) % #PALETTE + 1]
+			local base = LANE_SPEEDS[laneIndex] or 90
+			cars[i] = {
+				model = buildCar(color, folder),
+				-- Versatz je Spur, damit die Spuren nicht in Reih und Glied stehen.
+				s = (i - 1) * spacing + laneIndex * 19,
+				speed = base,
+				target = base * (0.88 + math.random() * 0.26),
+				offset = laneOffset,
+			}
+		end
+		lanes[laneIndex] = cars
+	end
+
+	TrafficController._folder = folder
+	TrafficController._lanes = lanes
+
+	TrafficController._connection = RunService.Heartbeat:Connect(function(dt)
+		-- Grosse dt-Werte (Tab war im Hintergrund) wuerden Autos durch den
+		-- Vordermann teleportieren. Deckeln.
+		local step = math.min(dt, 0.1)
+		for _, cars in lanes do
+			local count = #cars
+			for i, car in cars do
+				-- Vordermann ist der naechsthoehere Index, mit Umlauf.
+				local leader = cars[i % count + 1]
+				local gap = (leader.s - car.s) % TrackPath.LENGTH
+				local desired = car.target
+				if gap < MIN_GAP then
+					desired = math.min(desired, leader.speed * (gap / MIN_GAP))
+				end
+				car.speed += (desired - car.speed) * math.min(1, step * 3)
+				car.s = (car.s + car.speed * step) % TrackPath.LENGTH
+
+				local base = TrackPath.At(car.s)
+				-- Kurvenneigung: Vergleich mit einem Punkt vier Studs voraus.
+				-- Positiv = Rechtskurve, das Auto legt sich nach innen.
+				local ahead = TrackPath.At(car.s + 4)
+				local turn = base.RightVector:Dot(ahead.LookVector)
+				car.model:PivotTo(base * CFrame.new(car.offset, 0, 0) * CFrame.Angles(0, 0, -turn * 0.4))
+			end
+		end
+	end)
+
+	return TrafficController
+end
+
+-- Notausschalter. Blendet den Verkehr aus und stoppt die Schleife; ein
+-- erneutes Einschalten baut ihn wieder auf.
+function TrafficController.SetEnabled(enabled: boolean)
+	if enabled then
+		if not TrafficController._running then
+			TrafficController.Start()
+		elseif TrafficController._folder then
+			TrafficController._folder.Parent = Workspace
+		end
+		return
+	end
+	if TrafficController._connection then
+		TrafficController._connection:Disconnect()
+		TrafficController._connection = nil
+	end
+	if TrafficController._folder then
+		TrafficController._folder:Destroy()
+		TrafficController._folder = nil
+	end
+	TrafficController._lanes = nil
+	TrafficController._running = false
+end
+
+return TrafficController
+]]></ProtectedString></Properties>
 </Item>
-<Item class="Folder" referent="RBX59">
+</Item>
+<Item class="Folder" referent="RBX63">
 <Properties><string name="Name">UI</string></Properties>
-<Item class="ModuleScript" referent="RBX60">
+<Item class="ModuleScript" referent="RBX64">
+<Properties><string name="Name">AdminPanel</string><ProtectedString name="Source"><![CDATA[--[[
+	AdminPanel
+	Wird nur gebaut, wenn der Server sagt, dass dieser Spieler Admin ist. Der
+	Client entscheidet das nicht selbst - und selbst wenn jemand das Panel
+	nachbaut, prueft der Server jeden einzelnen Befehl noch einmal.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Remotes = require(ReplicatedStorage:WaitForChild("Shared").Remotes)
+
+local Theme = require(script.Parent.Theme)
+
+local AdminPanel = {}
+
+-- Reihenfolge = Reihenfolge im Panel.
+local COMMANDS = {
+	{ key = "cash", label = "+10.000 Cash", value = 10000 },
+	{ key = "cash", label = "+1.000.000", value = 1000000 },
+	{ key = "max", label = "Alles auf Max" },
+	{ key = "level", label = "Garage Stufe 5", value = 5 },
+	{ key = "heist", label = "Fenster oeffnen" },
+	{ key = "close", label = "Fenster schliessen" },
+	{ key = "radar", label = "Radar-Ladung" },
+	{ key = "rebirth", label = "Rebirth erzwingen" },
+	{ key = "reset", label = "Profil zuruecksetzen" },
+}
+
+function AdminPanel.Init(root: Frame)
+	local toggle = Theme.button({
+		Name = "AdminToggle",
+		AnchorPoint = Vector2.new(0, 0),
+		Position = UDim2.new(0, 16, 0, 196),
+		Size = UDim2.new(0, 96, 0, 30),
+		BackgroundColor3 = Theme.Colors.heist,
+		TextSize = 13,
+		Text = "ADMIN",
+		Visible = false,
+		Parent = root,
+	})
+
+	local window = Theme.panel({
+		Name = "AdminPanel",
+		AnchorPoint = Vector2.new(0, 0),
+		Position = UDim2.new(0, 16, 0, 232),
+		Size = UDim2.new(0, 210, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Visible = false,
+		ZIndex = 25,
+		Parent = root,
+	})
+	Theme.padding(10).Parent = window
+	Theme.create("UIListLayout", {
+		Padding = UDim.new(0, 5),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Parent = window,
+	})
+
+	Theme.label({
+		Text = "Admin-Werkzeuge",
+		Size = UDim2.new(1, 0, 0, 20),
+		Font = Enum.Font.GothamBold,
+		TextSize = 14,
+		TextColor3 = Theme.Colors.heist,
+		LayoutOrder = 0,
+		ZIndex = 26,
+		Parent = window,
+	})
+
+	for index, entry in COMMANDS do
+		local button = Theme.button({
+			Size = UDim2.new(1, 0, 0, 30),
+			TextSize = 13,
+			LayoutOrder = index,
+			Text = entry.label,
+			ZIndex = 26,
+			Parent = window,
+		})
+		button.Activated:Connect(function()
+			Remotes.Get("AdminCommand"):FireServer(entry.key, entry.value)
+		end)
+	end
+
+	toggle.Activated:Connect(function()
+		window.Visible = not window.Visible
+	end)
+
+	AdminPanel._toggle = toggle
+	AdminPanel._window = window
+
+	Remotes.Get("AdminState").OnClientEvent:Connect(function(payload)
+		local isAdmin = type(payload) == "table" and payload.isAdmin == true
+		toggle.Visible = isAdmin
+		if not isAdmin then
+			window.Visible = false
+		end
+	end)
+
+	return AdminPanel
+end
+
+return AdminPanel
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX65">
 <Properties><string name="Name">DailyPanel</string><ProtectedString name="Source"><![CDATA[--[[
 	DailyPanel
 	Sieben Kaesten, einer pro Tag. Welcher Tag dran ist und ob abgeholt werden
@@ -6872,7 +7933,7 @@ end
 return DailyPanel
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX61">
+<Item class="ModuleScript" referent="RBX66">
 <Properties><string name="Name">DismountBar</string><ProtectedString name="Source"><![CDATA[--[[
 	DismountBar
 	Der Fortschrittsbalken beim Abmontieren. Der Balken ist reine Anzeige: der
@@ -6956,7 +8017,7 @@ end
 return DismountBar
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX62">
+<Item class="ModuleScript" referent="RBX67">
 <Properties><string name="Name">GarageMenu</string><ProtectedString name="Source"><![CDATA[--[[
 	GarageMenu
 	Die Werkstatt: Teile kaufen, laufende Reparaturen sehen, geklaute Teile
@@ -7119,6 +8180,9 @@ function GarageMenu.Render()
 		return
 	end
 	table.clear(GarageRows.repairLabels)
+	-- Die Liste wird jetzt auch bei jeder Cash-Aenderung neu gezeichnet.
+	-- Ohne das Merken der Position springt sie dabei nach oben.
+	local scrollPosition = scroll.CanvasPosition
 	for _, child in scroll:GetChildren() do
 		if not child:IsA("UIListLayout") then
 			child:Destroy()
@@ -7166,6 +8230,11 @@ function GarageMenu.Render()
 	end
 
 	GarageRows.Header(scroll, nextOrder(), ("Autos (%d/%d Stellplaetze)"):format(#snapshot.cars, garage.carSlots))
+	task.defer(function()
+		if scroll.Parent then
+			scroll.CanvasPosition = scrollPosition
+		end
+	end)
 	for _, car in snapshot.shopCars do
 		if car.cost > 0 then
 			GarageRows.ShopCar(scroll, nextOrder(), car, snapshot, garage.carSlots)
@@ -7176,7 +8245,7 @@ end
 return GarageMenu
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX63">
+<Item class="ModuleScript" referent="RBX68">
 <Properties><string name="Name">GarageRows</string><ProtectedString name="Source"><![CDATA[--[[
 	GarageRows
 	Die einzelnen Zeilen im Werkstatt-Menue. Jede Zeile schickt beim Klick genau
@@ -7396,7 +8465,7 @@ end
 return GarageRows
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX64">
+<Item class="ModuleScript" referent="RBX69">
 <Properties><string name="Name">HUD</string><ProtectedString name="Source"><![CDATA[--[[
 	HUD
 	Cash, Rate, Kasse, Heist-Countdown, Trage-Anzeige und die Knoepfe fuer die
@@ -7686,7 +8755,7 @@ end
 return HUD
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX65">
+<Item class="ModuleScript" referent="RBX70">
 <Properties><string name="Name">InfoPanel</string><ProtectedString name="Source"><![CDATA[--[[
 	InfoPanel
 	Eine schlichte Liste mit Titel. Wird zweimal benutzt: fuer die Rangliste
@@ -7788,7 +8857,403 @@ end
 return InfoPanel
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX66">
+<Item class="ModuleScript" referent="RBX71">
+<Properties><string name="Name">Onboarding</string><ProtectedString name="Source"><![CDATA[--[[
+	Onboarding
+	Erklaert das Spiel in den ersten zwei Minuten - und hoert danach auf.
+
+	Vorher gab es zwei Toasts beim Erststart. Toasts verschwinden nach ein
+	paar Sekunden; wer in dem Moment gerade woanders hinschaut, hat das Spiel
+	nie erklaert bekommen. Roblox-Spieler lesen keine Textwaende, also:
+
+	1. Eine Karte beim allerersten Beitritt. Drei Saetze, ein Knopf.
+	2. Danach ein kleiner Zielbalken unten, der genau EINE Aufgabe zeigt und
+	   sich mit dem Spielstand weiterschaltet.
+	3. Dazu ein Marker in der Welt ueber dem Ding, das gemeint ist - durch
+	   Waende sichtbar, damit "Werkbank" nicht gesucht werden muss.
+
+	Der Balken verschwindet dauerhaft, sobald drei Teile verbaut sind.
+
+	EINSCHRAENKUNG: der Fortschritt lebt nur in dieser Sitzung. Der Client
+	kann nichts speichern. Wer neu beitritt und schon Teile hat, bekommt den
+	Balken gar nicht erst zu sehen (weil die Bedingung nicht mehr passt) -
+	die Intro-Karte aber schon wieder, falls das Auto komplett leer ist.
+	Sauber waere ein Feld `tutorialDone` im Profil.
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+
+local Store = require(script.Parent.Parent.Store)
+local Theme = require(script.Parent.Theme)
+
+local Onboarding = {}
+
+local STEPS = {
+	buy = {
+		text = "Geh zur WERKBANK und kauf dein erstes Teil",
+		hint = "Reifen kosten 100.",
+		target = "Workbench",
+		color = Theme.Colors.accent,
+	},
+	collect = {
+		text = "Dein Geld liegt in der KASSE",
+		hint = "Ohne Abholen laeuft sie irgendwann voll.",
+		target = "CashRegister",
+		color = Theme.Colors.good,
+	},
+	heist = {
+		text = "ALLE TORE SIND OFFEN",
+		hint = "Rein in eine fremde Garage, Teil abmontieren, zurueck aufs blaue Pad.",
+		target = nil,
+		color = Theme.Colors.heist,
+	},
+	grow = {
+		text = "Bau weiter aus",
+		hint = "Jedes Teil bringt mehr pro Sekunde - auch waehrend du offline bist.",
+		target = "Workbench",
+		color = Theme.Colors.accent,
+	},
+}
+
+-- Zustand ---------------------------------------------------------------
+local state = {
+	introShown = false,
+	collectDone = false,
+	sawFullPile = false,
+	heistShown = 0,
+	finished = false,
+	current = nil,
+}
+
+local refs = {}
+
+local function countParts(): (number, boolean)
+	local snapshot = Store.snapshot
+	if not snapshot then
+		return 0, false
+	end
+	local installed, repairing = 0, false
+	for _, car in snapshot.cars do
+		for _, slot in car.parts do
+			if slot.tier > 0 then
+				installed += 1
+			end
+			if slot.repair then
+				repairing = true
+			end
+		end
+	end
+	return installed, repairing
+end
+
+local function decideStep(): string?
+	if state.finished then
+		return nil
+	end
+	local installed, repairing = countParts()
+
+	if installed == 0 and not repairing then
+		return "buy"
+	end
+
+	local cash = Store.cash
+	if not state.collectDone and not cash.autoCollect then
+		if cash.pile >= 8 then
+			state.sawFullPile = true
+			return "collect"
+		end
+		if state.sawFullPile and cash.pile < 2 then
+			state.collectDone = true
+		end
+	end
+
+	if Store.heist.open and state.heistShown < 2 then
+		return "heist"
+	end
+
+	if installed >= 3 then
+		state.finished = true
+		return nil
+	end
+	return "grow"
+end
+
+-- Weltmarker ------------------------------------------------------------
+local function ownPlot(): Model?
+	local player = Players.LocalPlayer
+	local index = player:GetAttribute("PlotIndex")
+	if not index then
+		return nil
+	end
+	local garages = Workspace:FindFirstChild("Garages")
+	if not garages then
+		return nil
+	end
+	return garages:FindFirstChild("Plot" .. index) :: Model?
+end
+
+local function ensureMarker()
+	if refs.marker and refs.marker.Parent then
+		return refs.marker
+	end
+	-- Vom Client erzeugt, also rein lokal.
+	local anchor = Instance.new("Part")
+	anchor.Name = "OnboardingMarker"
+	anchor.Anchored = true
+	anchor.CanCollide = false
+	anchor.CanQuery = false
+	anchor.CanTouch = false
+	anchor.CastShadow = false
+	anchor.Transparency = 1
+	anchor.Size = Vector3.new(0.2, 0.2, 0.2)
+	anchor.Parent = Workspace
+
+	local beam = Instance.new("Part")
+	beam.Name = "OnboardingBeam"
+	beam.Anchored = true
+	beam.CanCollide = false
+	beam.CanQuery = false
+	beam.CanTouch = false
+	beam.CastShadow = false
+	beam.Size = Vector3.new(3.4, 14, 3.4)
+	beam.Shape = Enum.PartType.Cylinder
+	beam.Material = Enum.Material.Neon
+	beam.Transparency = 0.55
+	beam.Parent = Workspace
+
+	local gui = Instance.new("BillboardGui")
+	gui.Size = UDim2.fromScale(10, 2.4)
+	gui.StudsOffset = Vector3.new(0, 1.2, 0)
+	gui.AlwaysOnTop = true
+	gui.MaxDistance = 300
+	gui.Parent = anchor
+
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.fromScale(1, 1)
+	label.Font = Enum.Font.Michroma
+	label.TextScaled = true
+	label.TextStrokeTransparency = 0.3
+	label.TextColor3 = Theme.Colors.accent
+	label.Parent = gui
+
+	refs.marker = anchor
+	refs.markerBeam = beam
+	refs.markerLabel = label
+	return anchor
+end
+
+local function setMarker(targetName: string?, text: string, color: Color3)
+	if not targetName then
+		if refs.marker then
+			refs.marker.Parent = nil
+			refs.markerBeam.Parent = nil
+		end
+		return
+	end
+	local plot = ownPlot()
+	local target = plot and plot:FindFirstChild(targetName)
+	if not target or not target:IsA("BasePart") then
+		if refs.marker then
+			refs.marker.Parent = nil
+			refs.markerBeam.Parent = nil
+		end
+		return
+	end
+
+	ensureMarker()
+	refs.marker.Parent = Workspace
+	refs.markerBeam.Parent = Workspace
+	refs.marker.Position = target.Position + Vector3.new(0, 8.5, 0)
+	-- Zylinder liegt entlang X, deshalb aufrichten.
+	refs.markerBeam.CFrame = CFrame.new(target.Position + Vector3.new(0, 7, 0))
+		* CFrame.Angles(0, 0, math.rad(90))
+	refs.markerBeam.Color = color
+	refs.markerLabel.Text = text
+	refs.markerLabel.TextColor3 = color
+end
+
+-- Intro-Karte -----------------------------------------------------------
+local function showIntro(root: Frame)
+	if state.introShown then
+		return
+	end
+	state.introShown = true
+
+	local card = Theme.panel({
+		Name = "Intro",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.new(0.8, 0, 0, 320),
+		ZIndex = 40,
+		Parent = root,
+	})
+	Theme.constrain(card, Vector2.new(300, 320), Vector2.new(460, 320))
+	Theme.padding(20).Parent = card
+	Theme.glow(card, Theme.Colors.accent)
+
+	Theme.label({
+		Text = "GARAGE HEIST",
+		Size = UDim2.new(1, 0, 0, 34),
+		Font = Theme.Fonts.display,
+		TextSize = 24,
+		TextColor3 = Theme.Colors.accent,
+		ZIndex = 41,
+		Parent = card,
+	})
+
+	local lines = {
+		"Bau Teile in deine Karre. Jedes Teil macht Geld pro Sekunde - auch wenn du offline bist.",
+		"Alle 3 Minuten gehen ALLE Tore auf. Dann kannst du bei anderen Teile abmontieren und mitnehmen.",
+		"Wer dich unterwegs rempelt, kriegt das Teil. Also: schnell rein, schnell raus.",
+	}
+	for index, text in lines do
+		Theme.label({
+			Text = ("%d.  %s"):format(index, text),
+			Position = UDim2.new(0, 0, 0, 46 + (index - 1) * 68),
+			Size = UDim2.new(1, 0, 0, 62),
+			TextSize = 15,
+			TextWrapped = true,
+			TextYAlignment = Enum.TextYAlignment.Top,
+			TextColor3 = Theme.Colors.text,
+			ZIndex = 41,
+			Parent = card,
+		})
+	end
+
+	local ok = Theme.button({
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, 0),
+		Size = UDim2.new(0.7, 0, 0, 44),
+		BackgroundColor3 = Theme.Colors.accent,
+		TextColor3 = Theme.Colors.ink,
+		TextSize = 17,
+		Text = "Los geht's",
+		ZIndex = 41,
+		Parent = card,
+	})
+	ok.Activated:Connect(function()
+		local tween = TweenService:Create(card, TweenInfo.new(0.2), { BackgroundTransparency = 1 })
+		tween:Play()
+		tween.Completed:Connect(function()
+			card:Destroy()
+		end)
+	end)
+
+	Theme.pop(card, 0.12)
+end
+
+-- Zielbalken ------------------------------------------------------------
+function Onboarding.Init(root: Frame)
+	-- Unten mittig, ueber dem Rempeln-Knopf. Oben ist auf schmalen Schirmen
+	-- kein Platz: dort stehen schon Cash links, Heist-Pille mittig und die
+	-- Knopfleiste rechts.
+	local bar = Theme.panel({
+		Name = "Objective",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -190),
+		Size = UDim2.new(0.62, 0, 0, 56),
+		Visible = false,
+		ZIndex = 12,
+		Parent = root,
+	})
+	Theme.constrain(bar, Vector2.new(240, 56), Vector2.new(400, 56))
+	Theme.padding(9).Parent = bar
+
+	local title = Theme.label({
+		Text = "",
+		Size = UDim2.new(1, 0, 0, 20),
+		Font = Theme.Fonts.bodyBold,
+		TextSize = 15,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		ZIndex = 13,
+		Parent = bar,
+	})
+	local hint = Theme.label({
+		Text = "",
+		Position = UDim2.new(0, 0, 0, 21),
+		Size = UDim2.new(1, 0, 0, 18),
+		TextSize = 12,
+		TextWrapped = true,
+		TextColor3 = Theme.Colors.sub,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		ZIndex = 13,
+		Parent = bar,
+	})
+	local glow = Theme.glow(bar, Theme.Colors.accent)
+
+	refs.bar = bar
+	refs.title = title
+	refs.hint = hint
+	refs.glow = glow
+
+	local function refresh()
+		local key = decideStep()
+		if key == state.current then
+			-- Marker nachziehen, falls der Plot erst jetzt zugewiesen wurde.
+			if key then
+				local step = STEPS[key]
+				setMarker(step.target, step.text, step.color)
+			end
+			return
+		end
+		state.current = key
+
+		if not key then
+			bar.Visible = false
+			setMarker(nil, "", Theme.Colors.accent)
+			return
+		end
+
+		local step = STEPS[key]
+		if key == "heist" then
+			state.heistShown += 1
+		end
+		bar.Visible = true
+		title.Text = step.text
+		title.TextColor3 = step.color
+		hint.Text = step.hint
+		glow.Color = step.color
+		setMarker(step.target, step.text, step.color)
+		Theme.pop(bar, 0.1)
+	end
+
+	Store.Changed:Connect(function(changedKey)
+		if changedKey == "snapshot" and not state.introShown then
+			local installed = countParts()
+			if installed == 0 then
+				showIntro(root)
+			else
+				-- Wer schon Teile hat, braucht keine Erklaerung mehr.
+				state.introShown = true
+			end
+		end
+		refresh()
+	end)
+
+	-- Der Marker muss auch dann auftauchen, wenn der Plot erst nach dem
+	-- ersten Snapshot zugewiesen wird.
+	Players.LocalPlayer:GetAttributeChangedSignal("PlotIndex"):Connect(refresh)
+
+	-- Leichter Puls auf dem Weltmarker, damit er nicht wie Deko wirkt.
+	RunService.Heartbeat:Connect(function()
+		if refs.markerBeam and refs.markerBeam.Parent then
+			local pulse = (math.sin(os.clock() * 4) + 1) / 2
+			refs.markerBeam.Transparency = 0.4 + pulse * 0.35
+		end
+	end)
+
+	refresh()
+	return Onboarding
+end
+
+return Onboarding
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX72">
 <Properties><string name="Name">ShopMenu</string><ProtectedString name="Source"><![CDATA[--[[
 	ShopMenu
 	Zeigt Gamepasses und Developer Products. Der Client kennt keine Produkt-IDs
@@ -7933,7 +9398,7 @@ end
 return ShopMenu
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX67">
+<Item class="ModuleScript" referent="RBX73">
 <Properties><string name="Name">Theme</string><ProtectedString name="Source"><![CDATA[--[[
 	Theme (Visual-Rewrite)
 
@@ -8217,7 +9682,7 @@ end
 return Theme
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX68">
+<Item class="ModuleScript" referent="RBX74">
 <Properties><string name="Name">Toast</string><ProtectedString name="Source"><![CDATA[--[[
 	Toast
 	Kurzmeldungen unten links. Der Server schickt Text und Art, der Client
@@ -8328,7 +9793,7 @@ return Toast
 ]]></ProtectedString></Properties>
 </Item>
 </Item>
-<Item class="ModuleScript" referent="RBX69">
+<Item class="ModuleScript" referent="RBX75">
 <Properties><string name="Name">Store</string><ProtectedString name="Source"><![CDATA[--[[
 	Store
 	Der Client haelt genau eine Kopie dessen, was der Server geschickt hat.

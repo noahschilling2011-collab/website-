@@ -22,6 +22,7 @@ local ShopMenu = require(script.UI.ShopMenu)
 local DailyPanel = require(script.UI.DailyPanel)
 local DismountBar = require(script.UI.DismountBar)
 local InfoPanel = require(script.UI.InfoPanel)
+local AdminPanel = require(script.UI.AdminPanel)
 local EffectController = require(script.Controllers.EffectController)
 local InputController = require(script.Controllers.InputController)
 
@@ -60,6 +61,7 @@ GarageMenu.Init(root)
 ShopMenu.Init(root)
 DailyPanel.Init(root)
 DismountBar.Init(root)
+AdminPanel.Init(root)
 
 -- Beide Panels haengen rechts: die Rangliste unter der Knopfleiste, das Radar
 -- darunter mit Abstand zur Trage-Leiste. Groessen in Skalen, damit im
@@ -125,6 +127,19 @@ end)
 
 Remotes.Get("CashUpdate").OnClientEvent:Connect(function(payload)
 	Store.Set("cash", payload)
+
+	-- Das Werkstatt-Menue rechnet Kaufbarkeit gegen snapshot.cash. Der
+	-- Snapshot kommt aber nur bei einer Zustandsaenderung (Kauf, Reparatur,
+	-- Diebstahl) - Kasse leeren und Tagesbelohnung schicken nur ein
+	-- CashUpdate. Ohne diese Zeilen steht im HUD 206 und der 150er-Knopf ist
+	-- trotzdem grau. Reine Anzeige: der Kauf wird auf dem Server ohnehin neu
+	-- geprueft.
+	local snapshot = Store.snapshot
+	if snapshot and snapshot.cash ~= payload.cash then
+		snapshot.cash = payload.cash
+		snapshot.pile = payload.pile
+		Store.Set("snapshot", snapshot)
+	end
 end)
 
 Remotes.Get("HeistState").OnClientEvent:Connect(function(payload)
@@ -168,20 +183,9 @@ Remotes.Get("RadarPing").OnClientEvent:Connect(function(entries)
 end)
 
 -- Erststart ---------------------------------------------------------------
-local function looksBrandNew(snapshot): boolean
-	if not snapshot then
-		return false
-	end
-	for _, car in snapshot.cars do
-		for _, part in car.parts do
-			if part.tier > 0 or part.repair then
-				return false
-			end
-		end
-	end
-	return true
-end
-
+-- Die Einfuehrung uebernimmt Onboarding: Intro-Karte, Zielbalken, Weltmarker.
+-- Ein Menue, das sich von allein ueber die Karte legt, waere schlechter als
+-- ein Marker, der auf die Werkbank zeigt.
 task.spawn(function()
 	-- Beim Start kann der Server den Handler noch nicht gesetzt haben.
 	local snapshot
@@ -200,21 +204,13 @@ task.spawn(function()
 		loadingLabel.Text = "Spielstand kommt nicht an. Verlasse das Spiel und tritt neu bei."
 		return
 	end
-	if snapshot then
-		hideLoading()
-		Store.Set("snapshot", snapshot)
-		Store.Set("cash", {
-			cash = snapshot.cash,
-			pile = snapshot.pile,
-			rate = snapshot.rate,
-			autoCollect = snapshot.passes and snapshot.passes.AutoCollect or false,
-		})
-		if looksBrandNew(snapshot) then
-			-- Ziel: erster Kauf in unter 60 Sekunden. Deshalb geht das Menue
-			-- von allein auf und sagt, was zu tun ist.
-			GarageMenu.SetVisible(true)
-			Toast.Show("Deine Karre ist Schrott. Kauf das erste Teil - Reifen kosten 100.", "cash")
-			Toast.Show("Verbaute Teile bringen Cash pro Sekunde, auch wenn du offline bist.", "info")
-		end
-	end
+
+	hideLoading()
+	Store.Set("snapshot", snapshot)
+	Store.Set("cash", {
+		cash = snapshot.cash,
+		pile = snapshot.pile,
+		rate = snapshot.rate,
+		autoCollect = snapshot.passes and snapshot.passes.AutoCollect or false,
+	})
 end)

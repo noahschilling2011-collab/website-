@@ -139,6 +139,24 @@ niemand ins Leere faellt, egal was danach schiefgeht.
 | Warum die Preise so stehen | `docs/MONETIZATION.md` |
 | Abnahme-Tests | `docs/TESTPLAN.md` |
 | Design-Teardown und was als Naechstes ansteht | `docs/DESIGN.md` |
+| Rennstrecke, Verkehr, Onboarding | `docs/EINBAU-Strecke.md` |
+
+## Admin-Werkzeuge
+
+Links unten erscheint ein roter **ADMIN**-Knopf - aber nur, wenn der Server dich
+als Admin fuehrt. Dahinter: Cash geben, alles auf Maximum, Garagenstufe setzen,
+Klau-Fenster sofort oeffnen oder schliessen, Radar-Ladung, Rebirth erzwingen,
+Profil zuruecksetzen.
+
+Admin ist:
+1. **Du** - der Besitzer des Spiels (`game.CreatorId`), ohne dass du etwas
+   eintragen musst.
+2. Wer in `Config.ADMIN_USER_IDS` steht (fuer Tester, UserId nicht Name).
+3. Jeder in Roblox Studio - sonst koenntest du im Studio-Test nichts pruefen.
+
+Im veroeffentlichten Spiel kommt ausser dir also niemand ran. Der Client
+schickt nur den Befehlsnamen; `AdminService:IsAdmin` entscheidet, und zwar auf
+dem Server. Ein nachgebautes Panel bringt nichts.
 
 **Bekannte Abweichung von der 300-Zeilen-Regel:** `World/PlotBuilder.lua` (749)
 und `World/CarBuilder.lua` (566) sind Geometrie-Dateien - eine lange Liste von

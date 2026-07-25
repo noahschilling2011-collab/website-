@@ -19,6 +19,7 @@ local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared.Remotes)
+local RaceTrack = require(script.World.RaceTrack)
 
 local function step(label: string, fn)
 	local ok, err = pcall(fn)
@@ -67,11 +68,17 @@ local function setupLighting()
 	atmosphere.Decay = Color3.fromRGB(105, 95, 110)
 	atmosphere.Parent = Lighting
 
+	-- Die Szene hat seit Strecke und Neon deutlich mehr leuchtende Flaechen.
 	local bloom = Instance.new("BloomEffect")
-	bloom.Intensity = 0.5
-	bloom.Size = 20
-	bloom.Threshold = 1.1
+	bloom.Intensity = 0.85
+	bloom.Size = 24
+	bloom.Threshold = 0.95
 	bloom.Parent = Lighting
+
+	local rays = Instance.new("SunRaysEffect")
+	rays.Intensity = 0.06
+	rays.Spread = 0.9
+	rays.Parent = Lighting
 
 	local correction = Instance.new("ColorCorrectionEffect")
 	correction.Contrast = 0.1
@@ -116,6 +123,9 @@ end
 
 -- Zuerst der Boden: wer beitritt, bevor der Rest steht, faellt sonst ins Leere.
 step("Welt bauen", buildWorld)
+step("Rennstrecke bauen", function()
+	RaceTrack.Build(Workspace)
+end)
 step("Lighting einstellen", setupLighting)
 
 local START_ORDER = {
@@ -128,6 +138,7 @@ local START_ORDER = {
 	"HeistService",
 	"DailyRewardService",
 	"LeaderboardService",
+	"AdminService",
 	"DataService",
 }
 

@@ -160,6 +160,9 @@ function GarageMenu.Render()
 		return
 	end
 	table.clear(GarageRows.repairLabels)
+	-- Die Liste wird jetzt auch bei jeder Cash-Aenderung neu gezeichnet.
+	-- Ohne das Merken der Position springt sie dabei nach oben.
+	local scrollPosition = scroll.CanvasPosition
 	for _, child in scroll:GetChildren() do
 		if not child:IsA("UIListLayout") then
 			child:Destroy()
@@ -207,6 +210,11 @@ function GarageMenu.Render()
 	end
 
 	GarageRows.Header(scroll, nextOrder(), ("Autos (%d/%d Stellplaetze)"):format(#snapshot.cars, garage.carSlots))
+	task.defer(function()
+		if scroll.Parent then
+			scroll.CanvasPosition = scrollPosition
+		end
+	end)
 	for _, car in snapshot.shopCars do
 		if car.cost > 0 then
 			GarageRows.ShopCar(scroll, nextOrder(), car, snapshot, garage.carSlots)
