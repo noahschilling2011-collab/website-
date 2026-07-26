@@ -19,7 +19,7 @@ Store.daily = nil
 Store.shop = {}
 Store.carry = nil -- Liste der getragenen Teile, nil = Haende frei
 Store.alarm = nil -- {level, direction?, position?, thief?} - nur waehrend des Fensters
-Store.leaderboard = { richest = {}, thieves = {} }
+Store.leaderboard = { richest = {}, thieves = {}, dyno = {} }
 
 Store.Changed = Signal.new() -- (was: string)
 

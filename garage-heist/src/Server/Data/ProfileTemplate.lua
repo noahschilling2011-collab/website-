@@ -53,6 +53,9 @@ function ProfileTemplate.New()
 			totalStolen = 0,
 			partsLost = 0,
 			totalEarned = 0,
+			-- Beste je gemessene Pruefstandsleistung. Util.Reconcile setzt das
+			-- Feld bei alten Profilen auf 0 nach.
+			bestDyno = 0,
 		},
 
 		daily = {

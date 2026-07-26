@@ -226,6 +226,37 @@ function ProfileOps.RepairsDueBefore(data, untilTime: number)
 	return due
 end
 
+--[[
+	Leistung eines Autos auf dem Pruefstand.
+
+	Reine Rechnung auf Profildaten, damit Server und Rangliste dieselbe Zahl
+	benutzen. Eingang ist die Rate des Teils (skaliert ueber Stufe und
+	Feinabstimmung), gewichtet nach Config.DYNO_WEIGHTS, mal dem
+	Ratenmultiplikator des Autos. Ein Teil, das gerade weggetragen wird, zaehlt
+	nicht - PartRate gibt dafuer 0 zurueck.
+]]
+function ProfileOps.DynoPower(data, carIndex: number): number
+	local car = data.cars[carIndex]
+	if not car then
+		return 0
+	end
+	local total = 0
+	for slotId, part in car.parts do
+		total += ProfileOps.PartRate(part) * (Config.DYNO_WEIGHTS[slotId] or 0)
+	end
+	local carDef = CarCatalog.Get(car.carId)
+	return math.floor(total * (carDef and carDef.rateMult or 1))
+end
+
+-- Bestes Auto der Garage. Das ist der Wert, der in die Rangliste geht.
+function ProfileOps.BestDynoPower(data): number
+	local best = 0
+	for carIndex in data.cars do
+		best = math.max(best, ProfileOps.DynoPower(data, carIndex))
+	end
+	return best
+end
+
 function ProfileOps.CarSlots(data): number
 	local levelDef = ProfileOps.GarageLevelDef(data)
 	-- Ueber die Freischaltungstabelle statt ueber eine Zahlenschwelle im Code.

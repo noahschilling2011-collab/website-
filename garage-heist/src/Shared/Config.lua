@@ -70,6 +70,22 @@ Config.REPAIR_PERFECT_HALF = 0.07 -- halbe Breite des Kerns
 Config.REPAIR_LATENCY_TOLERANCE = 0.18
 Config.REPAIR_TICK_COOLDOWN = 0.35
 
+-- Pruefstand ---------------------------------------------------------------
+-- Die Luecke zwischen "Renn-Slicks kaufen" und "nie fahren". Auto auf den
+-- Pruefstand, Leistung wird aus den verbauten Teilen gerechnet, Ergebnis geht
+-- in die Serverrangliste. Kein Fahrverhalten - das waere ein eigenes Projekt
+-- (siehe docs/DESIGN.md).
+--
+-- Gewichte greifen auf die Cash-Rate des Teils zu, weil die schon ueber Stufe
+-- UND Feinabstimmung skaliert. Lack zaehlt bewusst 0: er ist Deko, und das
+-- soll man am Ergebnis merken.
+Config.DYNO_WEIGHTS = { engine = 3.2, tires = 1.4, turbo = 2.6, paint = 0 }
+Config.DYNO_SPIN_TIME = 3 -- Sekunden Hochdrehen, bevor das Ergebnis steht
+Config.DYNO_COOLDOWN = 8
+-- Auszahlung je gemessener Leistung. Bewusst klein: der Pruefstand ist eine
+-- Bestenliste, keine zweite Einnahmequelle.
+Config.DYNO_REWARD_PER_PS = 0.8
+
 -- Rebirth ------------------------------------------------------------------
 Config.REBIRTH_MULT = 0.25 -- +25 % Rate je Rebirth, dauerhaft
 Config.REBIRTH_EXTRA_SLOT_AT = 1 -- ab diesem Rebirth ein zusaetzlicher Stellplatz

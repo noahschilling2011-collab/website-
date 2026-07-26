@@ -13,8 +13,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Remotes = require(Shared.Remotes)
+local Util = require(Shared.Util)
 
 local Server = script.Parent.Parent
+local Throttle = require(Server.Garage.Throttle)
 local StealTarget = require(Server.Heist.StealTarget)
 local GarageView = require(Server.Garage.GarageView)
 local GarageTicks = require(Server.Garage.GarageTicks)
@@ -53,6 +55,20 @@ function GarageService:Start()
 				if self.plotOwner[index] == player.UserId then
 					self.Services.EconomyService:Collect(player)
 				end
+			end)
+		end
+
+		-- Pruefstand. Nur der Besitzer, gedrosselt wie jede andere Anfrage.
+		local dynoPrompt = plot.dyno and plot.dyno:FindFirstChildOfClass("ProximityPrompt")
+		if dynoPrompt then
+			dynoPrompt.Triggered:Connect(function(player)
+				if self.plotOwner[index] ~= player.UserId then
+					return
+				end
+				if Throttle.Blocked(player, "Dyno", Config.DYNO_COOLDOWN) then
+					return
+				end
+				self:RunDyno(player, plot)
 			end)
 		end
 	end
@@ -234,6 +250,65 @@ function GarageService:SetStealEnabledFor(userId: number, enabled: boolean)
 	if view then
 		GarageView.SetStealEnabled(view, enabled)
 	end
+end
+
+--[[
+	Pruefstand: misst die Leistung des staerksten Autos in dieser Garage.
+
+	Der Wert kommt aus ProfileOps.DynoPower - der Client bekommt nur das
+	Ergebnis. Die Wartezeit ist reine Inszenierung; entschieden ist alles schon
+	beim Druecken, damit ein Verbindungsabbruch waehrenddessen nichts kaputt
+	macht.
+]]
+function GarageService:RunDyno(player: Player, plot)
+	local data = self.Services.DataService:Get(player)
+	if not data then
+		return
+	end
+	local power = ProfileOps.BestDynoPower(data)
+	if power <= 0 then
+		self.Services.EconomyService:Notify(player, "Da ist nichts zu messen - bau erst ein Teil ein.", "bad")
+		return
+	end
+
+	local label = plot.dynoLabel
+	task.spawn(function()
+		if label then
+			for step = 1, Config.DYNO_SPIN_TIME * 4 do
+				if not label.Parent then
+					return
+				end
+				label.Text = ("%d PS"):format(math.floor(power * (step / (Config.DYNO_SPIN_TIME * 4))))
+				task.wait(0.25)
+			end
+			label.Text = ("%d PS"):format(power)
+		end
+	end)
+
+	local record = power > (data.stats.bestDyno or 0)
+	if record then
+		data.stats.bestDyno = power
+	end
+	-- Kleine Auszahlung, damit Messen nicht nur Zierde ist. Nur beim Rekord,
+	-- sonst waere der Pruefstand ein Knopf zum Gelddrucken.
+	if record then
+		local reward = math.floor(power * Config.DYNO_REWARD_PER_PS)
+		if reward > 0 then
+			self.Services.EconomyService:AddCash(player, reward, "Dyno")
+		end
+		self.Services.EconomyService:Notify(
+			player,
+			("Neuer Rekord: %d PS (+%s)."):format(power, Util.FormatCash(reward)),
+			"good"
+		)
+	else
+		self.Services.EconomyService:Notify(
+			player,
+			("%d PS - dein Rekord steht bei %d."):format(power, data.stats.bestDyno or 0),
+			"info"
+		)
+	end
+	self:Sync(player, data)
 end
 
 -- Besitzwechsel von Teilen liegt komplett in Garage/TheftOps.

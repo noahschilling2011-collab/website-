@@ -623,6 +623,50 @@ function PlotBuilder.Build(index: number, parent: Instance)
 	bayLabel.Text = "ABGABE"
 	bayLabel.Parent = bayGui
 
+	-- Pruefstand -----------------------------------------------------------
+	-- Liegt im freien Streifen zwischen Abgabe-Pad (z ab 19) und den vorderen
+	-- Stellplaetzen (z bis 12). Die 10x6 passen dort ohne Ueberschneidung, und
+	-- man laeuft auf dem Weg zur Werkbank ohnehin darueber.
+	local dyno = makePad(
+		model,
+		base * CFrame.new(0, 0.15, halfDepth - 11.5),
+		Vector3.new(10, 0.3, 6),
+		Color3.fromRGB(255, 140, 60),
+		"Dyno",
+		"Leistung messen",
+		"Pruefstand"
+	)
+	dyno:SetAttribute("PlotIndex", index)
+	for _, spec in
+		{
+			{ Vector3.new(11, 0.14, 0.6), CFrame.new(0, 0, 3.2) },
+			{ Vector3.new(11, 0.14, 0.6), CFrame.new(0, 0, -3.2) },
+		}
+	do
+		decal({
+			Name = "DynoRoller",
+			Size = spec[1],
+			CFrame = base * CFrame.new(0, 0.12, halfDepth - 11.5) * spec[2],
+			Color = C.steel,
+			Material = Enum.Material.Metal,
+			Parent = model,
+		})
+	end
+	local dynoGui = Instance.new("BillboardGui")
+	dynoGui.Size = UDim2.fromScale(9, 2)
+	dynoGui.StudsOffset = Vector3.new(0, 3, 0)
+	dynoGui.MaxDistance = 60
+	dynoGui.Parent = dyno
+	local dynoLabel = Instance.new("TextLabel")
+	dynoLabel.BackgroundTransparency = 1
+	dynoLabel.Size = UDim2.fromScale(1, 1)
+	dynoLabel.Font = Enum.Font.Michroma
+	dynoLabel.TextScaled = true
+	dynoLabel.TextColor3 = Color3.fromRGB(255, 170, 90)
+	dynoLabel.TextStrokeTransparency = 0.4
+	dynoLabel.Text = "PRUEFSTAND"
+	dynoLabel.Parent = dynoGui
+
 	-- Stellplaetze ---------------------------------------------------------
 	local carPads = {}
 	local padLocal = {
@@ -685,6 +729,8 @@ function PlotBuilder.Build(index: number, parent: Instance)
 		register = register,
 		workbench = workbench,
 		lootBay = lootBay,
+		dyno = dyno,
+		dynoLabel = dynoLabel,
 		carPads = carPads,
 		spawnCFrame = base * CFrame.new(0, 3, halfDepth - 14),
 		trim = trim,

@@ -60,7 +60,7 @@ local function makeColumn(gui, xScale, title)
 	local frame = Instance.new("Frame")
 	frame.BackgroundTransparency = 1
 	frame.Position = UDim2.fromScale(xScale, 0.02)
-	frame.Size = UDim2.fromScale(0.48, 0.96)
+	frame.Size = UDim2.fromScale(0.31, 0.96)
 	frame.Parent = gui
 
 	local header = Instance.new("TextLabel")
@@ -110,11 +110,14 @@ function LeaderboardService:_buildBoard()
 	back.LightInfluence = 0
 	back.Parent = board
 
+	-- Drei Spalten seit v8; die Breite in makeColumn ist entsprechend schmaler.
 	self.labels = {
 		richest = makeColumn(gui, 0.01, "Teuerste Garage"),
-		thieves = makeColumn(gui, 0.51, "Meiste geklaute Teile heute"),
+		thieves = makeColumn(gui, 0.34, "Geklaute Teile heute"),
+		dyno = makeColumn(gui, 0.67, "Staerkstes Auto"),
 		richestBack = makeColumn(back, 0.01, "Teuerste Garage"),
-		thievesBack = makeColumn(back, 0.51, "Meiste geklaute Teile heute"),
+		thievesBack = makeColumn(back, 0.34, "Geklaute Teile heute"),
+		dynoBack = makeColumn(back, 0.67, "Staerkstes Auto"),
 	}
 end
 
@@ -130,12 +133,15 @@ local function renderList(entries, formatValue)
 end
 
 function LeaderboardService:_refresh()
-	local richest, thieves = {}, {}
+	local richest, thieves, dyno = {}, {}, {}
 
 	self.Services.DataService:ForEachProfile(function(player, data)
 		ProfileOps.RollDailyStats(data)
 		table.insert(richest, { name = player.DisplayName, value = ProfileOps.GarageValue(data) })
 		table.insert(thieves, { name = player.DisplayName, value = data.stats.stolenToday })
+		-- Bestwert vom Pruefstand. Wer nie gemessen hat, steht mit 0 drin und
+		-- faellt beim Sortieren nach unten.
+		table.insert(dyno, { name = player.DisplayName, value = data.stats.bestDyno or 0 })
 
 		local stats = player:FindFirstChild("leaderstats")
 		if stats then
@@ -160,10 +166,15 @@ function LeaderboardService:_refresh()
 	end
 	sortAndTrim(richest)
 	sortAndTrim(thieves)
+	sortAndTrim(dyno)
 
 	local richestText = renderList(richest, Util.FormatCash)
 	local thievesText = renderList(thieves, function(value)
 		return ("%d Teile"):format(value)
+	end)
+
+	local dynoText = renderList(dyno, function(value)
+		return ("%d PS"):format(value)
 	end)
 
 	if self.labels then
@@ -171,9 +182,11 @@ function LeaderboardService:_refresh()
 		self.labels.richestBack.Text = richestText
 		self.labels.thieves.Text = thievesText
 		self.labels.thievesBack.Text = thievesText
+		self.labels.dyno.Text = dynoText
+		self.labels.dynoBack.Text = dynoText
 	end
 
-	Remotes.Get("LeaderboardUpdate"):FireAllClients({ richest = richest, thieves = thieves })
+	Remotes.Get("LeaderboardUpdate"):FireAllClients({ richest = richest, thieves = thieves, dyno = dyno })
 end
 
 return LeaderboardService

@@ -209,6 +209,22 @@ Config.REPAIR_PERFECT_HALF = 0.07 -- halbe Breite des Kerns
 Config.REPAIR_LATENCY_TOLERANCE = 0.18
 Config.REPAIR_TICK_COOLDOWN = 0.35
 
+-- Pruefstand ---------------------------------------------------------------
+-- Die Luecke zwischen "Renn-Slicks kaufen" und "nie fahren". Auto auf den
+-- Pruefstand, Leistung wird aus den verbauten Teilen gerechnet, Ergebnis geht
+-- in die Serverrangliste. Kein Fahrverhalten - das waere ein eigenes Projekt
+-- (siehe docs/DESIGN.md).
+--
+-- Gewichte greifen auf die Cash-Rate des Teils zu, weil die schon ueber Stufe
+-- UND Feinabstimmung skaliert. Lack zaehlt bewusst 0: er ist Deko, und das
+-- soll man am Ergebnis merken.
+Config.DYNO_WEIGHTS = { engine = 3.2, tires = 1.4, turbo = 2.6, paint = 0 }
+Config.DYNO_SPIN_TIME = 3 -- Sekunden Hochdrehen, bevor das Ergebnis steht
+Config.DYNO_COOLDOWN = 8
+-- Auszahlung je gemessener Leistung. Bewusst klein: der Pruefstand ist eine
+-- Bestenliste, keine zweite Einnahmequelle.
+Config.DYNO_REWARD_PER_PS = 0.8
+
 -- Rebirth ------------------------------------------------------------------
 Config.REBIRTH_MULT = 0.25 -- +25 % Rate je Rebirth, dauerhaft
 Config.REBIRTH_EXTRA_SLOT_AT = 1 -- ab diesem Rebirth ein zusaetzlicher Stellplatz
@@ -1513,6 +1529,37 @@ function ProfileOps.RepairsDueBefore(data, untilTime: number)
 	return due
 end
 
+--[[
+	Leistung eines Autos auf dem Pruefstand.
+
+	Reine Rechnung auf Profildaten, damit Server und Rangliste dieselbe Zahl
+	benutzen. Eingang ist die Rate des Teils (skaliert ueber Stufe und
+	Feinabstimmung), gewichtet nach Config.DYNO_WEIGHTS, mal dem
+	Ratenmultiplikator des Autos. Ein Teil, das gerade weggetragen wird, zaehlt
+	nicht - PartRate gibt dafuer 0 zurueck.
+]]
+function ProfileOps.DynoPower(data, carIndex: number): number
+	local car = data.cars[carIndex]
+	if not car then
+		return 0
+	end
+	local total = 0
+	for slotId, part in car.parts do
+		total += ProfileOps.PartRate(part) * (Config.DYNO_WEIGHTS[slotId] or 0)
+	end
+	local carDef = CarCatalog.Get(car.carId)
+	return math.floor(total * (carDef and carDef.rateMult or 1))
+end
+
+-- Bestes Auto der Garage. Das ist der Wert, der in die Rangliste geht.
+function ProfileOps.BestDynoPower(data): number
+	local best = 0
+	for carIndex in data.cars do
+		best = math.max(best, ProfileOps.DynoPower(data, carIndex))
+	end
+	return best
+end
+
 function ProfileOps.CarSlots(data): number
 	local levelDef = ProfileOps.GarageLevelDef(data)
 	-- Ueber die Freischaltungstabelle statt ueber eine Zahlenschwelle im Code.
@@ -1658,6 +1705,9 @@ function ProfileTemplate.New()
 			totalStolen = 0,
 			partsLost = 0,
 			totalEarned = 0,
+			-- Beste je gemessene Pruefstandsleistung. Util.Reconcile setzt das
+			-- Feld bei alten Profilen auf 0 nach.
+			bestDyno = 0,
 		},
 
 		daily = {
@@ -4826,8 +4876,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Remotes = require(Shared.Remotes)
+local Util = require(Shared.Util)
 
 local Server = script.Parent.Parent
+local Throttle = require(Server.Garage.Throttle)
 local StealTarget = require(Server.Heist.StealTarget)
 local GarageView = require(Server.Garage.GarageView)
 local GarageTicks = require(Server.Garage.GarageTicks)
@@ -4866,6 +4918,20 @@ function GarageService:Start()
 				if self.plotOwner[index] == player.UserId then
 					self.Services.EconomyService:Collect(player)
 				end
+			end)
+		end
+
+		-- Pruefstand. Nur der Besitzer, gedrosselt wie jede andere Anfrage.
+		local dynoPrompt = plot.dyno and plot.dyno:FindFirstChildOfClass("ProximityPrompt")
+		if dynoPrompt then
+			dynoPrompt.Triggered:Connect(function(player)
+				if self.plotOwner[index] ~= player.UserId then
+					return
+				end
+				if Throttle.Blocked(player, "Dyno", Config.DYNO_COOLDOWN) then
+					return
+				end
+				self:RunDyno(player, plot)
 			end)
 		end
 	end
@@ -5047,6 +5113,65 @@ function GarageService:SetStealEnabledFor(userId: number, enabled: boolean)
 	if view then
 		GarageView.SetStealEnabled(view, enabled)
 	end
+end
+
+--[[
+	Pruefstand: misst die Leistung des staerksten Autos in dieser Garage.
+
+	Der Wert kommt aus ProfileOps.DynoPower - der Client bekommt nur das
+	Ergebnis. Die Wartezeit ist reine Inszenierung; entschieden ist alles schon
+	beim Druecken, damit ein Verbindungsabbruch waehrenddessen nichts kaputt
+	macht.
+]]
+function GarageService:RunDyno(player: Player, plot)
+	local data = self.Services.DataService:Get(player)
+	if not data then
+		return
+	end
+	local power = ProfileOps.BestDynoPower(data)
+	if power <= 0 then
+		self.Services.EconomyService:Notify(player, "Da ist nichts zu messen - bau erst ein Teil ein.", "bad")
+		return
+	end
+
+	local label = plot.dynoLabel
+	task.spawn(function()
+		if label then
+			for step = 1, Config.DYNO_SPIN_TIME * 4 do
+				if not label.Parent then
+					return
+				end
+				label.Text = ("%d PS"):format(math.floor(power * (step / (Config.DYNO_SPIN_TIME * 4))))
+				task.wait(0.25)
+			end
+			label.Text = ("%d PS"):format(power)
+		end
+	end)
+
+	local record = power > (data.stats.bestDyno or 0)
+	if record then
+		data.stats.bestDyno = power
+	end
+	-- Kleine Auszahlung, damit Messen nicht nur Zierde ist. Nur beim Rekord,
+	-- sonst waere der Pruefstand ein Knopf zum Gelddrucken.
+	if record then
+		local reward = math.floor(power * Config.DYNO_REWARD_PER_PS)
+		if reward > 0 then
+			self.Services.EconomyService:AddCash(player, reward, "Dyno")
+		end
+		self.Services.EconomyService:Notify(
+			player,
+			("Neuer Rekord: %d PS (+%s)."):format(power, Util.FormatCash(reward)),
+			"good"
+		)
+	else
+		self.Services.EconomyService:Notify(
+			player,
+			("%d PS - dein Rekord steht bei %d."):format(power, data.stats.bestDyno or 0),
+			"info"
+		)
+	end
+	self:Sync(player, data)
 end
 
 -- Besitzwechsel von Teilen liegt komplett in Garage/TheftOps.
@@ -5496,7 +5621,7 @@ local function makeColumn(gui, xScale, title)
 	local frame = Instance.new("Frame")
 	frame.BackgroundTransparency = 1
 	frame.Position = UDim2.fromScale(xScale, 0.02)
-	frame.Size = UDim2.fromScale(0.48, 0.96)
+	frame.Size = UDim2.fromScale(0.31, 0.96)
 	frame.Parent = gui
 
 	local header = Instance.new("TextLabel")
@@ -5546,11 +5671,14 @@ function LeaderboardService:_buildBoard()
 	back.LightInfluence = 0
 	back.Parent = board
 
+	-- Drei Spalten seit v8; die Breite in makeColumn ist entsprechend schmaler.
 	self.labels = {
 		richest = makeColumn(gui, 0.01, "Teuerste Garage"),
-		thieves = makeColumn(gui, 0.51, "Meiste geklaute Teile heute"),
+		thieves = makeColumn(gui, 0.34, "Geklaute Teile heute"),
+		dyno = makeColumn(gui, 0.67, "Staerkstes Auto"),
 		richestBack = makeColumn(back, 0.01, "Teuerste Garage"),
-		thievesBack = makeColumn(back, 0.51, "Meiste geklaute Teile heute"),
+		thievesBack = makeColumn(back, 0.34, "Geklaute Teile heute"),
+		dynoBack = makeColumn(back, 0.67, "Staerkstes Auto"),
 	}
 end
 
@@ -5566,12 +5694,15 @@ local function renderList(entries, formatValue)
 end
 
 function LeaderboardService:_refresh()
-	local richest, thieves = {}, {}
+	local richest, thieves, dyno = {}, {}, {}
 
 	self.Services.DataService:ForEachProfile(function(player, data)
 		ProfileOps.RollDailyStats(data)
 		table.insert(richest, { name = player.DisplayName, value = ProfileOps.GarageValue(data) })
 		table.insert(thieves, { name = player.DisplayName, value = data.stats.stolenToday })
+		-- Bestwert vom Pruefstand. Wer nie gemessen hat, steht mit 0 drin und
+		-- faellt beim Sortieren nach unten.
+		table.insert(dyno, { name = player.DisplayName, value = data.stats.bestDyno or 0 })
 
 		local stats = player:FindFirstChild("leaderstats")
 		if stats then
@@ -5596,10 +5727,15 @@ function LeaderboardService:_refresh()
 	end
 	sortAndTrim(richest)
 	sortAndTrim(thieves)
+	sortAndTrim(dyno)
 
 	local richestText = renderList(richest, Util.FormatCash)
 	local thievesText = renderList(thieves, function(value)
 		return ("%d Teile"):format(value)
+	end)
+
+	local dynoText = renderList(dyno, function(value)
+		return ("%d PS"):format(value)
 	end)
 
 	if self.labels then
@@ -5607,9 +5743,11 @@ function LeaderboardService:_refresh()
 		self.labels.richestBack.Text = richestText
 		self.labels.thieves.Text = thievesText
 		self.labels.thievesBack.Text = thievesText
+		self.labels.dyno.Text = dynoText
+		self.labels.dynoBack.Text = dynoText
 	end
 
-	Remotes.Get("LeaderboardUpdate"):FireAllClients({ richest = richest, thieves = thieves })
+	Remotes.Get("LeaderboardUpdate"):FireAllClients({ richest = richest, thieves = thieves, dyno = dyno })
 end
 
 return LeaderboardService
@@ -7540,6 +7678,50 @@ function PlotBuilder.Build(index: number, parent: Instance)
 	bayLabel.Text = "ABGABE"
 	bayLabel.Parent = bayGui
 
+	-- Pruefstand -----------------------------------------------------------
+	-- Liegt im freien Streifen zwischen Abgabe-Pad (z ab 19) und den vorderen
+	-- Stellplaetzen (z bis 12). Die 10x6 passen dort ohne Ueberschneidung, und
+	-- man laeuft auf dem Weg zur Werkbank ohnehin darueber.
+	local dyno = makePad(
+		model,
+		base * CFrame.new(0, 0.15, halfDepth - 11.5),
+		Vector3.new(10, 0.3, 6),
+		Color3.fromRGB(255, 140, 60),
+		"Dyno",
+		"Leistung messen",
+		"Pruefstand"
+	)
+	dyno:SetAttribute("PlotIndex", index)
+	for _, spec in
+		{
+			{ Vector3.new(11, 0.14, 0.6), CFrame.new(0, 0, 3.2) },
+			{ Vector3.new(11, 0.14, 0.6), CFrame.new(0, 0, -3.2) },
+		}
+	do
+		decal({
+			Name = "DynoRoller",
+			Size = spec[1],
+			CFrame = base * CFrame.new(0, 0.12, halfDepth - 11.5) * spec[2],
+			Color = C.steel,
+			Material = Enum.Material.Metal,
+			Parent = model,
+		})
+	end
+	local dynoGui = Instance.new("BillboardGui")
+	dynoGui.Size = UDim2.fromScale(9, 2)
+	dynoGui.StudsOffset = Vector3.new(0, 3, 0)
+	dynoGui.MaxDistance = 60
+	dynoGui.Parent = dyno
+	local dynoLabel = Instance.new("TextLabel")
+	dynoLabel.BackgroundTransparency = 1
+	dynoLabel.Size = UDim2.fromScale(1, 1)
+	dynoLabel.Font = Enum.Font.Michroma
+	dynoLabel.TextScaled = true
+	dynoLabel.TextColor3 = Color3.fromRGB(255, 170, 90)
+	dynoLabel.TextStrokeTransparency = 0.4
+	dynoLabel.Text = "PRUEFSTAND"
+	dynoLabel.Parent = dynoGui
+
 	-- Stellplaetze ---------------------------------------------------------
 	local carPads = {}
 	local padLocal = {
@@ -7602,6 +7784,8 @@ function PlotBuilder.Build(index: number, parent: Instance)
 		register = register,
 		workbench = workbench,
 		lootBay = lootBay,
+		dyno = dyno,
+		dynoLabel = dynoLabel,
 		carPads = carPads,
 		spawnCFrame = base * CFrame.new(0, 3, halfDepth - 14),
 		trim = trim,
@@ -8761,6 +8945,11 @@ local function renderLeaderboard()
 	table.insert(lines, "-- Geklaute Teile heute --")
 	for rank, entry in board.thieves do
 		table.insert(lines, ("%d. %s  %d"):format(rank, entry.name, entry.value))
+	end
+	table.insert(lines, "")
+	table.insert(lines, "-- Staerkstes Auto --")
+	for rank, entry in board.dyno or {} do
+		table.insert(lines, ("%d. %s  %d PS"):format(rank, entry.name, entry.value))
 	end
 	leaderPanel:SetLines(lines)
 end
@@ -11690,7 +11879,7 @@ Store.daily = nil
 Store.shop = {}
 Store.carry = nil -- Liste der getragenen Teile, nil = Haende frei
 Store.alarm = nil -- {level, direction?, position?, thief?} - nur waehrend des Fensters
-Store.leaderboard = { richest = {}, thieves = {} }
+Store.leaderboard = { richest = {}, thieves = {}, dyno = {} }
 
 Store.Changed = Signal.new() -- (was: string)
 

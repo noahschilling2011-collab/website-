@@ -97,6 +97,11 @@ local function renderLeaderboard()
 	for rank, entry in board.thieves do
 		table.insert(lines, ("%d. %s  %d"):format(rank, entry.name, entry.value))
 	end
+	table.insert(lines, "")
+	table.insert(lines, "-- Staerkstes Auto --")
+	for rank, entry in board.dyno or {} do
+		table.insert(lines, ("%d. %s  %d PS"):format(rank, entry.name, entry.value))
+	end
 	leaderPanel:SetLines(lines)
 end
 
