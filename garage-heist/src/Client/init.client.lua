@@ -21,6 +21,7 @@ local GarageMenu = require(script.UI.GarageMenu)
 local ShopMenu = require(script.UI.ShopMenu)
 local DailyPanel = require(script.UI.DailyPanel)
 local DismountBar = require(script.UI.DismountBar)
+local RepairMinigame = require(script.UI.RepairMinigame)
 local InfoPanel = require(script.UI.InfoPanel)
 local AdminPanel = require(script.UI.AdminPanel)
 local EffectController = require(script.Controllers.EffectController)
@@ -61,6 +62,7 @@ GarageMenu.Init(root)
 ShopMenu.Init(root)
 DailyPanel.Init(root)
 DismountBar.Init(root)
+RepairMinigame.Init(root)
 AdminPanel.Init(root)
 
 -- Beide Panels haengen rechts: die Rangliste unter der Knopfleiste, das Radar
@@ -116,7 +118,7 @@ HUD.Init(root, {
 	end,
 })
 
-InputController.Start({ garage = GarageMenu })
+InputController.Start({ garage = GarageMenu, repairMinigame = RepairMinigame })
 EffectController.Start()
 
 -- Remotes -----------------------------------------------------------------

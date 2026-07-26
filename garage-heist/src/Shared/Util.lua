@@ -86,6 +86,16 @@ function Util.UtcDay(timestamp: number?): number
 	return math.floor((timestamp or os.time()) / 86400)
 end
 
+-- Markerposition des Reparatur-Minispiels als Dreieckswelle: 0 -> 1 -> 0.
+-- Steht in Shared, weil Client und Server exakt dieselbe Zahl brauchen. `now`
+-- kommt von Workspace:GetServerTimeNow() - der einzigen Uhr, die auf beiden
+-- Seiten denselben Wert hat. Kein Startzeitpunkt noetig: die Welle laeuft frei
+-- durch, alle Reparaturen teilen sich dieselbe Phase.
+function Util.RepairMarker(now: number, sweep: number): number
+	local phase = (now % sweep) / sweep
+	return if phase < 0.5 then phase * 2 else (1 - phase) * 2
+end
+
 function Util.SafeNumber(value, fallback: number): number
 	local number = tonumber(value)
 	if not number or number ~= number or number == math.huge or number == -math.huge then

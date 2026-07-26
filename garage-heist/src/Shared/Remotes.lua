@@ -32,6 +32,7 @@ local TO_CLIENT = {
 local TO_SERVER = {
 	"RequestBuyPart", -- (carIndex, slotId)
 	"RequestInstantRepair", -- (carIndex, slotId)  -> loest den Robux-Kauf aus
+	"RequestRepairTick", -- (carIndex, slotId, position) -> Minispiel, Server rechnet nach
 	"RequestBuyCar", -- (carId)
 	"RequestUpgradeGarage", -- ()
 	"RequestRebirth", -- ()

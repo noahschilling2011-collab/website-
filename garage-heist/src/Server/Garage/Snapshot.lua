@@ -35,7 +35,14 @@ local function partEntry(data, carIndex: number, slotId: string, ownerUserId: nu
 		rate = ProfileOps.PartRate(part),
 		stolen = part ~= nil and part.originalOwner ~= ownerUserId,
 		inTransit = part ~= nil and part.inTransit ~= nil,
-		repair = repair and { endsAt = repair.endsAt, tier = repair.tier, kind = repair.kind } or nil,
+		-- `hits` treibt das Minispiel: der Client blendet die Leiste aus, sobald
+		-- die Runden aufgebraucht sind. Gezaehlt wird auf dem Server.
+		repair = repair and {
+			endsAt = repair.endsAt,
+			tier = repair.tier,
+			kind = repair.kind,
+			hits = repair.hits or 0,
+		} or nil,
 		nextKind = purchase and purchase.kind or nil,
 		nextName = purchase and purchase.name or nil,
 		nextCost = purchase and purchase.cost or nil,

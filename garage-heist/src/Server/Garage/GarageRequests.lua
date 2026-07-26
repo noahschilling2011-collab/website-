@@ -8,6 +8,7 @@
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CarCatalog = require(Shared.CarCatalog)
@@ -57,6 +58,72 @@ function GarageRequests.BuyPart(services, player: Player, data, carIndex, slotId
 	services.EffectService:LocalSound(player, "purchase")
 	services.TelemetryService:Funnel(player, "firstPart")
 	return true, ("%s wird eingebaut (%ds)."):format(purchase.name, purchase.time)
+end
+
+--[[
+	Ein Schlag im Reparatur-Minispiel.
+
+	Der Client meldet, wo der Marker aus seiner Sicht stand. Der Server rechnet
+	die Position aus derselben Formel noch einmal aus und nimmt die Meldung nur
+	an, wenn sie innerhalb von REPAIR_LATENCY_TOLERANCE dazu passt - sonst
+	rechnet er mit seinem eigenen Wert. Ein manipulierter Client kann damit
+	hoechstens so gut sein wie jemand, der perfekt spielt.
+
+	Die harte Grenze ist die Rundenzahl: nach REPAIR_MINIGAME_ROUNDS Schlaegen
+	ist Schluss, egal wie sie ausgingen. Maximal erreichbar sind also
+	ROUNDS * (HIT_REDUCTION + PERFECT_BONUS) der Restzeit - nie 0.
+
+	Gibt (ok, meldung) NICHT im ueblichen Sinn zurueck: bei 3 Schlaegen pro
+	Reparatur waere ein Toast je Schlag Laerm. Rueckgabe ist (ok, nil).
+]]
+function GarageRequests.RepairTick(services, player: Player, data, carIndex, slotId, claimedPos)
+	if not validCarIndex(data, carIndex) or type(slotId) ~= "string" or not PartCatalog.IsValidSlot(slotId) then
+		return false
+	end
+	local repair = data.repairs[ProfileOps.RepairKey(carIndex, slotId)]
+	if not repair then
+		return false
+	end
+	if (repair.hits or 0) >= Config.REPAIR_MINIGAME_ROUNDS then
+		return false
+	end
+
+	-- Nah genug an der eigenen Werkbank? Ohne das spielt man es quer ueber die
+	-- Karte, waehrend man in einer fremden Garage steht.
+	local view = services.GarageService.views[player.UserId]
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not view or not root then
+		return false
+	end
+	if (view.plot.workbench.Position - (root :: BasePart).Position).Magnitude > Config.REPAIR_MINIGAME_RANGE then
+		return false
+	end
+
+	local serverPos = Util.RepairMarker(Workspace:GetServerTimeNow(), Config.REPAIR_SWEEP)
+	local position = serverPos
+	local claimed = tonumber(claimedPos)
+	if claimed and claimed == claimed and math.abs(claimed - serverPos) <= Config.REPAIR_LATENCY_TOLERANCE then
+		position = math.clamp(claimed, 0, 1)
+	end
+
+	repair.hits = (repair.hits or 0) + 1
+
+	local offset = math.abs(position - 0.5)
+	local reduction = 0
+	if offset <= Config.REPAIR_PERFECT_HALF then
+		reduction = Config.REPAIR_HIT_REDUCTION + Config.REPAIR_PERFECT_BONUS
+	elseif offset <= Config.REPAIR_ZONE_HALF then
+		reduction = Config.REPAIR_HIT_REDUCTION
+	end
+	if reduction <= 0 then
+		return false
+	end
+
+	local remaining = math.max(0, repair.endsAt - os.time())
+	repair.endsAt -= remaining * reduction
+	services.EffectService:LocalSound(player, "purchase")
+	return true
 end
 
 -- Wird nur nach einem bestaetigten Robux-Kauf aufgerufen.

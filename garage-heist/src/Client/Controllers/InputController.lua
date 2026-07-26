@@ -47,6 +47,15 @@ function InputController.Start(ui)
 		return Enum.ContextActionResult.Pass
 	end, false, Enum.KeyCode.F)
 
+	-- Reparatur-Minispiel. Der Handler prueft selbst, ob gerade etwas laeuft -
+	-- ein Druck ins Leere kostet nichts.
+	ContextActionService:BindAction("GarageHeist_Repair", function(_, state)
+		if state == Enum.UserInputState.Begin and ui.repairMinigame then
+			ui.repairMinigame.Hit()
+		end
+		return Enum.ContextActionResult.Pass
+	end, false, Enum.KeyCode.R)
+
 	ContextActionService:BindAction("GarageHeist_Drop", function(_, state)
 		if state == Enum.UserInputState.Begin then
 			Remotes.Get("RequestDropPart"):FireServer()

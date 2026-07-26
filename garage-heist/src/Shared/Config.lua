@@ -49,6 +49,27 @@ Config.SUBTIER_TIME_SHARE = 0.5 -- Reparaturzeit im Verhaeltnis zur Tier-Zeit
 Config.SUBTIER_MIN_TIME = 4
 Config.SUBTIER_TOP_COST_MULT = 2.5 -- auf der hoechsten Stufe gibt es keinen Sprung mehr
 
+-- Reparatur-Minispiel ------------------------------------------------------
+-- Wer an der Werkbank stehen bleibt, kann den Timer verkuerzen. Wer weggeht,
+-- verliert nichts - der Timer laeuft wie bisher ab. Belohnen, nicht bestrafen.
+--
+-- Der Marker laeuft als Dreieckswelle ueber Util.RepairMarker und haengt nur an
+-- Workspace:GetServerTimeNow(). Damit rechnen Client und Server dieselbe
+-- Position aus, ohne dass ein Startzeitpunkt uebertragen werden muss.
+Config.REPAIR_MINIGAME_ROUNDS = 3
+Config.REPAIR_HIT_REDUCTION = 0.12 -- Anteil der RESTzeit je Treffer
+Config.REPAIR_PERFECT_BONUS = 0.08 -- zusaetzlich, wenn der Kern getroffen wird
+Config.REPAIR_MINIGAME_RANGE = 18 -- Studs zur Werkbank, sonst zaehlt der Klick nicht
+Config.REPAIR_SWEEP = 1.8 -- Sekunden fuer einen kompletten Hin- und Rueckweg
+Config.REPAIR_ZONE_HALF = 0.20 -- halbe Breite der gruenen Zone (0..1 um die Mitte)
+Config.REPAIR_PERFECT_HALF = 0.07 -- halbe Breite des Kerns
+-- Wie weit die vom Client gemeldete Position von der serverseitig berechneten
+-- abweichen darf. Das ist der Lag-Ausgleich: innerhalb dieser Spanne zaehlt die
+-- Client-Angabe, ausserhalb rechnet der Server mit seinem eigenen Wert weiter.
+-- Luegen bringt also nichts, hoher Ping kostet aber auch nichts.
+Config.REPAIR_LATENCY_TOLERANCE = 0.18
+Config.REPAIR_TICK_COOLDOWN = 0.35
+
 -- Rebirth ------------------------------------------------------------------
 Config.REBIRTH_MULT = 0.25 -- +25 % Rate je Rebirth, dauerhaft
 Config.REBIRTH_EXTRA_SLOT_AT = 1 -- ab diesem Rebirth ein zusaetzlicher Stellplatz

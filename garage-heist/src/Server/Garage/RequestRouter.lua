@@ -8,6 +8,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
 local Remotes = require(Shared.Remotes)
 
 local GarageRequests = require(script.Parent.GarageRequests)
@@ -54,6 +55,20 @@ function RequestRouter.Bind(garage)
 	end)
 	bind(garage, "RequestInstallLoosePart", function(player, data, uid, carIndex)
 		return GarageRequests.InstallLoosePart(services, player, data, uid, carIndex)
+	end)
+
+	-- Eigene Bindung statt bind(): das Minispiel feuert bis zu dreimal pro
+	-- Reparatur und braucht weder einen Toast je Schlag noch ein volles
+	-- Refresh der Welt. Der Snapshot geht trotzdem raus, sonst sieht der
+	-- Spieler die verkuerzte Restzeit nicht.
+	Throttle.Connect("RequestRepairTick", Config.REPAIR_TICK_COOLDOWN, function(player, carIndex, slotId, position)
+		local data = services.DataService:Get(player)
+		if not data then
+			return
+		end
+		if GarageRequests.RepairTick(services, player, data, carIndex, slotId, position) then
+			garage:Sync(player, data)
+		end
 	end)
 
 	Remotes.Get("GetSnapshot").OnServerInvoke = function(player)
