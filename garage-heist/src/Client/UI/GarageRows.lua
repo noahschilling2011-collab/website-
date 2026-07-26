@@ -105,6 +105,11 @@ function GarageRows.Slot(parent, order, car, part, cash)
 		GarageRows.Action(frame, "Sofort fertig (R$)", Theme.Colors.accent, true, function()
 			Remotes.Get("RequestInstantRepair"):FireServer(car.carIndex, part.slotId)
 		end)
+	elseif part.nextKind == "locked" then
+		-- Kein toter Kaufknopf, sondern die Ansage, wo das Teil herkommt. Der
+		-- Server hat die Stufe gesperrt; hier wird sie nur erklaert.
+		GarageRows.Action(frame, "nur als Beute", Theme.Colors.heist, false)
+		subLabel.Text ..= ("   ->  %s: aus einer fremden Box holen"):format(part.nextName or "Prototyp")
 	elseif part.nextCost then
 		local affordable = cash >= part.nextCost
 		local prefix = part.nextKind == "sub" and "Fein " or ""

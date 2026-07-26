@@ -164,6 +164,17 @@ Config.SELL_REFUND = 0.5 -- Anteil des Teilewerts beim Verkauf loser Teile
 -- Beklautwerden soll wehtun, aber nicht bestrafen: das Opfer bekommt einen
 -- Teil des Werts sofort als Cash - erst wenn das Teil wirklich abgeliefert ist.
 Config.INSURANCE_RATE = 0.25
+-- Ein Prototyp laesst sich nicht nachkaufen, nur zurueckholen. Sein Verlust ist
+-- damit echter Fortschrittsverlust und nicht bloss ein Rueckschritt in der
+-- Kasse - deshalb der deutlich hoehere Satz.
+Config.INSURANCE_RATE_T4 = 0.6
+
+-- Hoechste Stufe, die im Werkstatt-Menue kaufbar ist. Alles darueber gibt es
+-- ausschliesslich aus fremden oder verlassenen Garagen. Das ist der Kern von
+-- v8: vorher war der Heist optional, weil Cash von selbst tickt und bis T4
+-- alles bezahlbar war. Jetzt fuehrt der einzige Weg ins Endgame durch das
+-- Klau-Fenster.
+Config.MAX_PURCHASABLE_TIER = 3
 
 -- Zwischenstufen ("Feinabstimmung") ---------------------------------------
 -- Zwischen zwei Tiers liegen zwei kleine Kaeufe. Sie sind KEIN Extra, sondern
@@ -181,6 +192,12 @@ Config.SUBTIER_TOP_COST_MULT = 2.5 -- auf der hoechsten Stufe gibt es keinen Spr
 Config.REBIRTH_MULT = 0.25 -- +25 % Rate je Rebirth, dauerhaft
 Config.REBIRTH_EXTRA_SLOT_AT = 1 -- ab diesem Rebirth ein zusaetzlicher Stellplatz
 Config.REBIRTH_PAINT_AT = 3 -- ab hier exklusiver Lack
+-- Rebirth verlangt "alles auf der hoechsten Stufe". Bis v7 war das T4. Seit T4
+-- nur noch Beute ist, haenge das an MAX_PURCHASABLE_TIER: sonst braeuchte ein
+-- Rebirth bis zu 16 geklaute Prototypen, bei einem T4 pro
+-- DERELICT_T4_COOLDOWN also Stunden - der Rebirth-Loop waere praktisch tot.
+-- Wer die alte Haerte will, setzt hier 4.
+Config.REBIRTH_REQUIRED_TIER = 3
 
 -- Speichern ----------------------------------------------------------------
 Config.AUTOSAVE_INTERVAL = 60
@@ -217,9 +234,15 @@ Config.GARAGE_LOCK_WINDOW = 20 -- Gamepass: eigenes Tor faellt nach 20s wieder z
 Config.DERELICT_VALUE_MULT = 0.6 -- Leerstand-Teile bringen weniger als geklaute Spielerteile
 Config.DERELICT_MIN_PARTS = 1
 Config.DERELICT_MAX_PARTS = 4
-Config.DERELICT_MAX_TIER = 3 -- nie T4, damit Neulinge nicht sofort das Endgame abgreifen
+Config.DERELICT_MAX_TIER = 4 -- seit v8 auch T4, aber nur ueber die Schranken unten
 -- Ab welchem Median-Garagenwert der anwesenden Spieler welche Stufe auftaucht.
-Config.DERELICT_TIER_STEPS = { 0, 8000, 40000 }
+Config.DERELICT_TIER_STEPS = { 0, 8000, 40000, 150000 }
+-- T4 im Leerstand haengt an drei Schranken, damit daraus keine Farm wird:
+-- oberste Stufe von DERELICT_TIER_STEPS erreicht, Cooldown abgelaufen, Wurf
+-- gewonnen. Und dann liegt hoechstens EIN Prototyp im ganzen Server, in genau
+-- einer Box. Der Cooldown laeuft in Serverzeit - Rejoin hilft nicht.
+Config.DERELICT_T4_CHANCE = 0.35
+Config.DERELICT_T4_COOLDOWN = 600
 
 -- Plots --------------------------------------------------------------------
 Config.PLOT_COUNT = 12
@@ -1291,6 +1314,18 @@ function ProfileOps.NextPurchase(data, carIndex: number, slotId: string)
 	if not nextDef then
 		return nil
 	end
+	-- Oberhalb von MAX_PURCHASABLE_TIER gibt es keinen Kauf mehr. Wir geben die
+	-- Stufe trotzdem zurueck statt nil: nil hiesse "Maximum erreicht", und dann
+	-- koennte die Zeile im Menue nicht sagen, was noch fehlt und woher es kommt.
+	-- Ohne cost/time - wer das ignoriert, kauft nichts, sondern rechnet mit nil.
+	if tier + 1 > Config.MAX_PURCHASABLE_TIER then
+		return {
+			kind = "locked",
+			tier = tier + 1,
+			subTier = 0,
+			name = nextDef.name,
+		}
+	end
 	return {
 		kind = "tier",
 		tier = tier + 1,
@@ -1384,7 +1419,11 @@ function ProfileOps.CanRebirth(data): (boolean, string)
 	for carIndex in data.cars do
 		for _, slotId in PartCatalog.SlotOrder do
 			local part = ProfileOps.GetPart(data, carIndex, slotId)
-			if not part or part.tier < PartCatalog.TierCount(slotId) then
+			-- Seit v8 gegen REBIRTH_REQUIRED_TIER statt gegen die absolute
+			-- Spitze: T4 ist nur noch Beute, ein Rebirth darf nicht an
+			-- 16 geklauten Prototypen haengen. Begruendung steht in Config.
+			local needed = math.min(Config.REBIRTH_REQUIRED_TIER, PartCatalog.TierCount(slotId))
+			if not part or part.tier < needed then
 				return false, "Alle Teile muessen auf der hoechsten Stufe sein."
 			end
 		end
@@ -1717,6 +1756,13 @@ function GarageRequests.BuyPart(services, player: Player, data, carIndex, slotId
 	local purchase = ProfileOps.NextPurchase(data, carIndex, slotId)
 	if not purchase then
 		return false, "Hoechste Stufe ist schon verbaut."
+	end
+	-- Muss VOR TrySpend stehen: ein gesperrter Eintrag hat keinen Preis.
+	if purchase.kind == "locked" then
+		return false,
+			("Prototypen gibt's nicht im Handel. %s holst du dir im Klau-Fenster aus einer fremden Box."):format(
+				purchase.name
+			)
 	end
 	if not services.EconomyService:TrySpend(player, purchase.cost, "Part") then
 		return false, ("Zu wenig Cash: %s noetig."):format(Util.FormatCash(purchase.cost))
@@ -2417,16 +2463,23 @@ function TheftOps.Commit(garage, victim: Player, uid: string): boolean
 	if not part then
 		return false
 	end
-	local payout = math.floor(ProfileOps.PartValue(part) * Config.INSURANCE_RATE)
+	-- Stufe vor dem Entfernen lesen: danach zeigt `part` nur noch auf eine
+	-- Tabelle, die nicht mehr im Profil haengt.
+	local isPrototype = part.tier > Config.MAX_PURCHASABLE_TIER
+	local rate = isPrototype and Config.INSURANCE_RATE_T4 or Config.INSURANCE_RATE
+	local payout = math.floor(ProfileOps.PartValue(part) * rate)
 	ProfileOps.RemovePart(data, carIndex, slotId)
 	data.stats.partsLost += 1
 	if payout > 0 then
 		garage.Services.EconomyService:AddCash(victim, payout, "Heist")
-		garage.Services.EconomyService:Notify(
-			victim,
-			("Teil weg - Versicherung zahlt %s."):format(Util.FormatCash(payout)),
-			"cash"
-		)
+		-- Beim Prototyp muss dranstehen, dass Nachkaufen nicht geht - sonst
+		-- sucht das Opfer den Kaufknopf, den es seit v8 nicht mehr gibt.
+		local message = if isPrototype
+			then ("Prototyp weg! Versicherung zahlt %s - nachkaufen kannst du ihn nicht, nur zurueckholen."):format(
+				Util.FormatCash(payout)
+			)
+			else ("Teil weg - Versicherung zahlt %s."):format(Util.FormatCash(payout))
+		garage.Services.EconomyService:Notify(victim, message, "cash")
 	end
 	garage:Refresh(victim, data)
 	return true
@@ -3656,6 +3709,10 @@ DerelictService.Name = "DerelictService"
 function DerelictService:Init(services)
 	self.Services = services
 	self.plots = {} -- [plotIndex] = { state = {carId, parts}, refs = <CarBuilder-Refs> }
+	-- Serverzeit des letzten ausgespielten Prototyps. Bewusst nur hier und
+	-- nicht im Profil: der Cooldown gilt fuer den Server, nicht pro Spieler -
+	-- sonst umgeht ihn eine zweite Person am selben Ort.
+	self.lastT4At = 0
 end
 
 function DerelictService:Start() end
@@ -3681,8 +3738,28 @@ function DerelictService:_targetTier(): number
 	return math.clamp(tier, 1, Config.DERELICT_MAX_TIER)
 end
 
+-- Darf in diesem Fenster ueberhaupt ein Prototyp auftauchen? Drei Schranken,
+-- alle auf dem Server. Der Wurf steht bewusst zuletzt: faellt er negativ aus,
+-- laeuft der Cooldown nicht an und das naechste Fenster wuerfelt neu.
+function DerelictService:_rollT4(baseTier: number): boolean
+	if baseTier < #Config.DERELICT_TIER_STEPS then
+		return false
+	end
+	local now = os.time()
+	if now - (self.lastT4At or 0) < Config.DERELICT_T4_COOLDOWN then
+		return false
+	end
+	if math.random() >= Config.DERELICT_T4_CHANCE then
+		return false
+	end
+	self.lastT4At = now
+	return true
+end
+
 -- Prozedurale Bestueckung: 1-4 Teile, Stufe um +/-1 gestreut.
-function DerelictService:_makeState(baseTier: number)
+-- `t4Slot` bekommt der Aufrufer aus _rollT4 - hoechstens ein Slot im ganzen
+-- Fenster, sonst haette eine einzige Box vier Prototypen.
+function DerelictService:_makeState(baseTier: number, withT4: boolean?)
 	local slots = table.clone(PartCatalog.SlotOrder)
 	for index = #slots, 2, -1 do
 		local swap = math.random(index)
@@ -3690,10 +3767,17 @@ function DerelictService:_makeState(baseTier: number)
 	end
 
 	local count = math.random(Config.DERELICT_MIN_PARTS, Config.DERELICT_MAX_PARTS)
+	-- slots ist schon gemischt, also ist der erste Eintrag ein zufaelliger Slot.
+	local t4Slot = withT4 and slots[1] or nil
 	local parts = {}
 	for index = 1, count do
 		local slotId = slots[index]
-		local tier = math.clamp(baseTier + math.random(-1, 1), 1, Config.DERELICT_MAX_TIER)
+		-- Der Streuwurf bleibt unter der Kaufgrenze: alles darueber ist
+		-- Prototyp und kommt ausschliesslich ueber t4Slot ins Spiel.
+		local tier = math.clamp(baseTier + math.random(-1, 1), 1, Config.MAX_PURCHASABLE_TIER)
+		if slotId == t4Slot then
+			tier = Config.DERELICT_MAX_TIER
+		end
 		parts[slotId] = {
 			uid = Util.NewUid(),
 			slotId = slotId,
@@ -3716,32 +3800,48 @@ function DerelictService:Populate()
 	local garage = self.Services.GarageService
 	local baseTier = self:_targetTier()
 
+	-- Erst sammeln, dann bestuecken: der Prototyp soll in einer zufaelligen
+	-- freien Box liegen und nicht immer in der ersten, die die Schleife trifft.
+	-- _rollT4 setzt den Cooldown, deshalb erst fragen, wenn es ueberhaupt eine
+	-- Box gibt, in die das Teil passt.
+	local free = {}
 	for plotIndex, plot in garage.plots do
 		if not garage:GetOwnerOfPlot(plotIndex) and not self.plots[plotIndex] then
-			local state = self:_makeState(baseTier)
-			local pad = plot.carPads[1]
-			local refs = CarBuilder.Build(state, 1, 0, pad, plot.model)
-
-			for slotId, prompt in refs.prompts do
-				prompt.Enabled = true
-				prompt.ObjectText = "Leerstand"
-				prompt.Triggered:Connect(function(thief)
-					self.Services.HeistService:OnStealPrompt(
-						thief,
-						StealTarget.Derelict(plotIndex),
-						1,
-						slotId,
-						prompt
-					)
-				end)
-			end
-
-			plot.sign.name.Text = "Leerstand - offen"
-			plot.sign.value.Text = ("%d Teile"):format(self:_countParts(state))
-			plot.sign.rate.Text = "kein Besitzer"
-
-			self.plots[plotIndex] = { state = state, refs = refs }
+			table.insert(free, { index = plotIndex, plot = plot })
 		end
+	end
+	local t4Index = nil
+	if #free > 0 and self:_rollT4(baseTier) then
+		t4Index = free[math.random(#free)].index
+	end
+
+	for _, entry in free do
+		local plotIndex, plot = entry.index, entry.plot
+		local state = self:_makeState(baseTier, plotIndex == t4Index)
+		local pad = plot.carPads[1]
+		local refs = CarBuilder.Build(state, 1, 0, pad, plot.model)
+
+		for slotId, prompt in refs.prompts do
+			prompt.Enabled = true
+			prompt.ObjectText = "Leerstand"
+			prompt.Triggered:Connect(function(thief)
+				self.Services.HeistService:OnStealPrompt(
+					thief,
+					StealTarget.Derelict(plotIndex),
+					1,
+					slotId,
+					prompt
+				)
+			end)
+		end
+
+		plot.sign.name.Text = "Leerstand - offen"
+		plot.sign.value.Text = ("%d Teile"):format(self:_countParts(state))
+		-- Der Prototyp muss auffindbar sein, sonst laeuft der Spieler an der
+		-- einzigen Box vorbei, die im Fenster zaehlt.
+		plot.sign.rate.Text = if plotIndex == t4Index then "PROTOTYP an Bord" else "kein Besitzer"
+
+		self.plots[plotIndex] = { state = state, refs = refs }
 	end
 end
 
@@ -9108,6 +9208,11 @@ function GarageRows.Slot(parent, order, car, part, cash)
 		GarageRows.Action(frame, "Sofort fertig (R$)", Theme.Colors.accent, true, function()
 			Remotes.Get("RequestInstantRepair"):FireServer(car.carIndex, part.slotId)
 		end)
+	elseif part.nextKind == "locked" then
+		-- Kein toter Kaufknopf, sondern die Ansage, wo das Teil herkommt. Der
+		-- Server hat die Stufe gesperrt; hier wird sie nur erklaert.
+		GarageRows.Action(frame, "nur als Beute", Theme.Colors.heist, false)
+		subLabel.Text ..= ("   ->  %s: aus einer fremden Box holen"):format(part.nextName or "Prototyp")
 	elseif part.nextCost then
 		local affordable = cash >= part.nextCost
 		local prefix = part.nextKind == "sub" and "Fein " or ""

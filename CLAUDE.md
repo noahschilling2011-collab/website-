@@ -29,6 +29,11 @@ rempelt, lässt ihn das Teil fallen. Das Opfer bekommt 25 % Versicherung.
 Fortschritt: bessere Teile → mehr Autos (bis 75 k) → Garagenstufe (bis 260 k) →
 Rebirth (+25 % dauerhaft).
 
+**Stufe 4 ist seit v8 nicht kaufbar** (`Config.MAX_PURCHASABLE_TIER = 3`). Die
+vier Prototypen gibt es ausschließlich als Beute aus fremden oder verlassenen
+Garagen. Das ist der Grund, warum der Heist überhaupt gespielt wird — vorher war
+er optional, weil Cash von selbst tickt.
+
 Neue Spieler landen in einer Werkhalle am Westende des Hofs (`World/SpawnHall`)
 und laufen von dort selbst los. Wer schon etwas verbaut hat, kommt direkt an
 seiner Box heraus.
@@ -126,6 +131,11 @@ anderen hängen erst an `ProfileLoaded`).
 - Der Verkehr auf der Rennstrecke (`TrafficController`) läuft rein
   clientseitig und wird nie repliziert. Nicht auf den Server verschieben,
   ohne die Anzahl drastisch zu senken.
+- `ProfileOps.NextPurchase` ist der **einzige** Ort, der entscheidet, was als
+  Nächstes kaufbar ist — `GarageRequests.BuyPart` und `Snapshot` hängen beide
+  daran. Es gibt drei `kind`-Werte: `"tier"`, `"sub"` und `"locked"`. `locked`
+  hat **kein** `cost`/`time`; wer das ignoriert, rechnet mit `nil`. Jeder neue
+  Aufrufer muss `locked` vor dem Bezahlen abfangen.
 - `AdminService:IsAdmin` entscheidet **auf dem Server** (Studio, `game.CreatorId`,
   `Config.ADMIN_USER_IDS`). Das Panel auf dem Client ist reine Anzeige; jeder
   Befehl wird noch einmal geprüft.

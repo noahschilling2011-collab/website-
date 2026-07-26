@@ -32,6 +32,10 @@ DerelictService.Name = "DerelictService"
 function DerelictService:Init(services)
 	self.Services = services
 	self.plots = {} -- [plotIndex] = { state = {carId, parts}, refs = <CarBuilder-Refs> }
+	-- Serverzeit des letzten ausgespielten Prototyps. Bewusst nur hier und
+	-- nicht im Profil: der Cooldown gilt fuer den Server, nicht pro Spieler -
+	-- sonst umgeht ihn eine zweite Person am selben Ort.
+	self.lastT4At = 0
 end
 
 function DerelictService:Start() end
@@ -57,8 +61,28 @@ function DerelictService:_targetTier(): number
 	return math.clamp(tier, 1, Config.DERELICT_MAX_TIER)
 end
 
+-- Darf in diesem Fenster ueberhaupt ein Prototyp auftauchen? Drei Schranken,
+-- alle auf dem Server. Der Wurf steht bewusst zuletzt: faellt er negativ aus,
+-- laeuft der Cooldown nicht an und das naechste Fenster wuerfelt neu.
+function DerelictService:_rollT4(baseTier: number): boolean
+	if baseTier < #Config.DERELICT_TIER_STEPS then
+		return false
+	end
+	local now = os.time()
+	if now - (self.lastT4At or 0) < Config.DERELICT_T4_COOLDOWN then
+		return false
+	end
+	if math.random() >= Config.DERELICT_T4_CHANCE then
+		return false
+	end
+	self.lastT4At = now
+	return true
+end
+
 -- Prozedurale Bestueckung: 1-4 Teile, Stufe um +/-1 gestreut.
-function DerelictService:_makeState(baseTier: number)
+-- `t4Slot` bekommt der Aufrufer aus _rollT4 - hoechstens ein Slot im ganzen
+-- Fenster, sonst haette eine einzige Box vier Prototypen.
+function DerelictService:_makeState(baseTier: number, withT4: boolean?)
 	local slots = table.clone(PartCatalog.SlotOrder)
 	for index = #slots, 2, -1 do
 		local swap = math.random(index)
@@ -66,10 +90,17 @@ function DerelictService:_makeState(baseTier: number)
 	end
 
 	local count = math.random(Config.DERELICT_MIN_PARTS, Config.DERELICT_MAX_PARTS)
+	-- slots ist schon gemischt, also ist der erste Eintrag ein zufaelliger Slot.
+	local t4Slot = withT4 and slots[1] or nil
 	local parts = {}
 	for index = 1, count do
 		local slotId = slots[index]
-		local tier = math.clamp(baseTier + math.random(-1, 1), 1, Config.DERELICT_MAX_TIER)
+		-- Der Streuwurf bleibt unter der Kaufgrenze: alles darueber ist
+		-- Prototyp und kommt ausschliesslich ueber t4Slot ins Spiel.
+		local tier = math.clamp(baseTier + math.random(-1, 1), 1, Config.MAX_PURCHASABLE_TIER)
+		if slotId == t4Slot then
+			tier = Config.DERELICT_MAX_TIER
+		end
 		parts[slotId] = {
 			uid = Util.NewUid(),
 			slotId = slotId,
@@ -92,32 +123,48 @@ function DerelictService:Populate()
 	local garage = self.Services.GarageService
 	local baseTier = self:_targetTier()
 
+	-- Erst sammeln, dann bestuecken: der Prototyp soll in einer zufaelligen
+	-- freien Box liegen und nicht immer in der ersten, die die Schleife trifft.
+	-- _rollT4 setzt den Cooldown, deshalb erst fragen, wenn es ueberhaupt eine
+	-- Box gibt, in die das Teil passt.
+	local free = {}
 	for plotIndex, plot in garage.plots do
 		if not garage:GetOwnerOfPlot(plotIndex) and not self.plots[plotIndex] then
-			local state = self:_makeState(baseTier)
-			local pad = plot.carPads[1]
-			local refs = CarBuilder.Build(state, 1, 0, pad, plot.model)
-
-			for slotId, prompt in refs.prompts do
-				prompt.Enabled = true
-				prompt.ObjectText = "Leerstand"
-				prompt.Triggered:Connect(function(thief)
-					self.Services.HeistService:OnStealPrompt(
-						thief,
-						StealTarget.Derelict(plotIndex),
-						1,
-						slotId,
-						prompt
-					)
-				end)
-			end
-
-			plot.sign.name.Text = "Leerstand - offen"
-			plot.sign.value.Text = ("%d Teile"):format(self:_countParts(state))
-			plot.sign.rate.Text = "kein Besitzer"
-
-			self.plots[plotIndex] = { state = state, refs = refs }
+			table.insert(free, { index = plotIndex, plot = plot })
 		end
+	end
+	local t4Index = nil
+	if #free > 0 and self:_rollT4(baseTier) then
+		t4Index = free[math.random(#free)].index
+	end
+
+	for _, entry in free do
+		local plotIndex, plot = entry.index, entry.plot
+		local state = self:_makeState(baseTier, plotIndex == t4Index)
+		local pad = plot.carPads[1]
+		local refs = CarBuilder.Build(state, 1, 0, pad, plot.model)
+
+		for slotId, prompt in refs.prompts do
+			prompt.Enabled = true
+			prompt.ObjectText = "Leerstand"
+			prompt.Triggered:Connect(function(thief)
+				self.Services.HeistService:OnStealPrompt(
+					thief,
+					StealTarget.Derelict(plotIndex),
+					1,
+					slotId,
+					prompt
+				)
+			end)
+		end
+
+		plot.sign.name.Text = "Leerstand - offen"
+		plot.sign.value.Text = ("%d Teile"):format(self:_countParts(state))
+		-- Der Prototyp muss auffindbar sein, sonst laeuft der Spieler an der
+		-- einzigen Box vorbei, die im Fenster zaehlt.
+		plot.sign.rate.Text = if plotIndex == t4Index then "PROTOTYP an Bord" else "kein Besitzer"
+
+		self.plots[plotIndex] = { state = state, refs = refs }
 	end
 end
 

@@ -42,6 +42,13 @@ function GarageRequests.BuyPart(services, player: Player, data, carIndex, slotId
 	if not purchase then
 		return false, "Hoechste Stufe ist schon verbaut."
 	end
+	-- Muss VOR TrySpend stehen: ein gesperrter Eintrag hat keinen Preis.
+	if purchase.kind == "locked" then
+		return false,
+			("Prototypen gibt's nicht im Handel. %s holst du dir im Klau-Fenster aus einer fremden Box."):format(
+				purchase.name
+			)
+	end
 	if not services.EconomyService:TrySpend(player, purchase.cost, "Part") then
 		return false, ("Zu wenig Cash: %s noetig."):format(Util.FormatCash(purchase.cost))
 	end

@@ -50,16 +50,23 @@ function TheftOps.Commit(garage, victim: Player, uid: string): boolean
 	if not part then
 		return false
 	end
-	local payout = math.floor(ProfileOps.PartValue(part) * Config.INSURANCE_RATE)
+	-- Stufe vor dem Entfernen lesen: danach zeigt `part` nur noch auf eine
+	-- Tabelle, die nicht mehr im Profil haengt.
+	local isPrototype = part.tier > Config.MAX_PURCHASABLE_TIER
+	local rate = isPrototype and Config.INSURANCE_RATE_T4 or Config.INSURANCE_RATE
+	local payout = math.floor(ProfileOps.PartValue(part) * rate)
 	ProfileOps.RemovePart(data, carIndex, slotId)
 	data.stats.partsLost += 1
 	if payout > 0 then
 		garage.Services.EconomyService:AddCash(victim, payout, "Heist")
-		garage.Services.EconomyService:Notify(
-			victim,
-			("Teil weg - Versicherung zahlt %s."):format(Util.FormatCash(payout)),
-			"cash"
-		)
+		-- Beim Prototyp muss dranstehen, dass Nachkaufen nicht geht - sonst
+		-- sucht das Opfer den Kaufknopf, den es seit v8 nicht mehr gibt.
+		local message = if isPrototype
+			then ("Prototyp weg! Versicherung zahlt %s - nachkaufen kannst du ihn nicht, nur zurueckholen."):format(
+				Util.FormatCash(payout)
+			)
+			else ("Teil weg - Versicherung zahlt %s."):format(Util.FormatCash(payout))
+		garage.Services.EconomyService:Notify(victim, message, "cash")
 	end
 	garage:Refresh(victim, data)
 	return true

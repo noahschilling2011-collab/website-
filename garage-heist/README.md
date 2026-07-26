@@ -104,8 +104,14 @@ niemand ins Leere faellt, egal was danach schiefgeht.
    **Freie Boxen sind waehrend des Fensters Leerstand-Garagen** mit bestuecktem
    Auto - deshalb funktioniert der Heist auch, wenn du allein im Server bist.
    Leerstand-Teile bringen nur 60 % ihres Werts, echte Spieler bleiben lohnender.
-5. Cash geht in bessere Teile, mehr Autos, groessere Garage. Zurueck zu 2.
-6. Garage voll ausgebaut und alle Teile auf Stufe 4? Dann **Rebirth**: alles zurueck
+5. **Stufe 4 gibt es nicht zu kaufen.** Prototyp-Hybrid, Renn-Slicks, Chrom-Wrap
+   und Anti-Lag-Kit stehen in keinem Menue - die holst du dir im Klau-Fenster aus
+   einer fremden oder verlassenen Box. Damit ist der Heist der einzige Weg ins
+   Endgame und nicht mehr optional. Im Leerstand taucht hoechstens **ein**
+   Prototyp gleichzeitig auf, fruehestens ab einem Garagenwert von 150k und nur
+   alle `DERELICT_T4_COOLDOWN` Sekunden. Die Box zeigt es auf ihrem Schild an.
+6. Cash geht in bessere Teile, mehr Autos, groessere Garage. Zurueck zu 2.
+7. Garage voll ausgebaut und alle Teile auf Stufe 3? Dann **Rebirth**: alles zurueck
    auf Anfang, dauerhaft +25 % Rate pro Durchgang, ab dem ersten ein Stellplatz mehr.
 
 **Steuerung:** `E` Prompts, `G` Werkstatt, `F` Rempeln, `Q` Teil ablegen.

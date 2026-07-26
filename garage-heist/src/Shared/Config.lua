@@ -25,6 +25,17 @@ Config.SELL_REFUND = 0.5 -- Anteil des Teilewerts beim Verkauf loser Teile
 -- Beklautwerden soll wehtun, aber nicht bestrafen: das Opfer bekommt einen
 -- Teil des Werts sofort als Cash - erst wenn das Teil wirklich abgeliefert ist.
 Config.INSURANCE_RATE = 0.25
+-- Ein Prototyp laesst sich nicht nachkaufen, nur zurueckholen. Sein Verlust ist
+-- damit echter Fortschrittsverlust und nicht bloss ein Rueckschritt in der
+-- Kasse - deshalb der deutlich hoehere Satz.
+Config.INSURANCE_RATE_T4 = 0.6
+
+-- Hoechste Stufe, die im Werkstatt-Menue kaufbar ist. Alles darueber gibt es
+-- ausschliesslich aus fremden oder verlassenen Garagen. Das ist der Kern von
+-- v8: vorher war der Heist optional, weil Cash von selbst tickt und bis T4
+-- alles bezahlbar war. Jetzt fuehrt der einzige Weg ins Endgame durch das
+-- Klau-Fenster.
+Config.MAX_PURCHASABLE_TIER = 3
 
 -- Zwischenstufen ("Feinabstimmung") ---------------------------------------
 -- Zwischen zwei Tiers liegen zwei kleine Kaeufe. Sie sind KEIN Extra, sondern
@@ -42,6 +53,12 @@ Config.SUBTIER_TOP_COST_MULT = 2.5 -- auf der hoechsten Stufe gibt es keinen Spr
 Config.REBIRTH_MULT = 0.25 -- +25 % Rate je Rebirth, dauerhaft
 Config.REBIRTH_EXTRA_SLOT_AT = 1 -- ab diesem Rebirth ein zusaetzlicher Stellplatz
 Config.REBIRTH_PAINT_AT = 3 -- ab hier exklusiver Lack
+-- Rebirth verlangt "alles auf der hoechsten Stufe". Bis v7 war das T4. Seit T4
+-- nur noch Beute ist, haenge das an MAX_PURCHASABLE_TIER: sonst braeuchte ein
+-- Rebirth bis zu 16 geklaute Prototypen, bei einem T4 pro
+-- DERELICT_T4_COOLDOWN also Stunden - der Rebirth-Loop waere praktisch tot.
+-- Wer die alte Haerte will, setzt hier 4.
+Config.REBIRTH_REQUIRED_TIER = 3
 
 -- Speichern ----------------------------------------------------------------
 Config.AUTOSAVE_INTERVAL = 60
@@ -78,9 +95,15 @@ Config.GARAGE_LOCK_WINDOW = 20 -- Gamepass: eigenes Tor faellt nach 20s wieder z
 Config.DERELICT_VALUE_MULT = 0.6 -- Leerstand-Teile bringen weniger als geklaute Spielerteile
 Config.DERELICT_MIN_PARTS = 1
 Config.DERELICT_MAX_PARTS = 4
-Config.DERELICT_MAX_TIER = 3 -- nie T4, damit Neulinge nicht sofort das Endgame abgreifen
+Config.DERELICT_MAX_TIER = 4 -- seit v8 auch T4, aber nur ueber die Schranken unten
 -- Ab welchem Median-Garagenwert der anwesenden Spieler welche Stufe auftaucht.
-Config.DERELICT_TIER_STEPS = { 0, 8000, 40000 }
+Config.DERELICT_TIER_STEPS = { 0, 8000, 40000, 150000 }
+-- T4 im Leerstand haengt an drei Schranken, damit daraus keine Farm wird:
+-- oberste Stufe von DERELICT_TIER_STEPS erreicht, Cooldown abgelaufen, Wurf
+-- gewonnen. Und dann liegt hoechstens EIN Prototyp im ganzen Server, in genau
+-- einer Box. Der Cooldown laeuft in Serverzeit - Rejoin hilft nicht.
+Config.DERELICT_T4_CHANCE = 0.35
+Config.DERELICT_T4_COOLDOWN = 600
 
 -- Plots --------------------------------------------------------------------
 Config.PLOT_COUNT = 12

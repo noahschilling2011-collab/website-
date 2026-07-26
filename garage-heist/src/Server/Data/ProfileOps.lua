@@ -137,6 +137,18 @@ function ProfileOps.NextPurchase(data, carIndex: number, slotId: string)
 	if not nextDef then
 		return nil
 	end
+	-- Oberhalb von MAX_PURCHASABLE_TIER gibt es keinen Kauf mehr. Wir geben die
+	-- Stufe trotzdem zurueck statt nil: nil hiesse "Maximum erreicht", und dann
+	-- koennte die Zeile im Menue nicht sagen, was noch fehlt und woher es kommt.
+	-- Ohne cost/time - wer das ignoriert, kauft nichts, sondern rechnet mit nil.
+	if tier + 1 > Config.MAX_PURCHASABLE_TIER then
+		return {
+			kind = "locked",
+			tier = tier + 1,
+			subTier = 0,
+			name = nextDef.name,
+		}
+	end
 	return {
 		kind = "tier",
 		tier = tier + 1,
@@ -230,7 +242,11 @@ function ProfileOps.CanRebirth(data): (boolean, string)
 	for carIndex in data.cars do
 		for _, slotId in PartCatalog.SlotOrder do
 			local part = ProfileOps.GetPart(data, carIndex, slotId)
-			if not part or part.tier < PartCatalog.TierCount(slotId) then
+			-- Seit v8 gegen REBIRTH_REQUIRED_TIER statt gegen die absolute
+			-- Spitze: T4 ist nur noch Beute, ein Rebirth darf nicht an
+			-- 16 geklauten Prototypen haengen. Begruendung steht in Config.
+			local needed = math.min(Config.REBIRTH_REQUIRED_TIER, PartCatalog.TierCount(slotId))
+			if not part or part.tier < needed then
 				return false, "Alle Teile muessen auf der hoechsten Stufe sein."
 			end
 		end
