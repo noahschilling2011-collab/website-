@@ -1,0 +1,55 @@
+{
+  "name": "GarageHeist",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "Shared": {
+        "$path": "src/Shared"
+      }
+    },
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "Server": {
+        "$path": "src/Server"
+      }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "Client": {
+          "$path": "src/Client"
+        }
+      }
+    },
+    "Workspace": {
+      "$className": "Workspace",
+      "$properties": {
+        "FilteringEnabled": true,
+        "StreamingEnabled": false
+      }
+    },
+    "Lighting": {
+      "$className": "Lighting",
+      "$properties": {
+        "Technology": "Future",
+        "Ambient": [
+          0.176,
+          0.176,
+          0.235
+        ],
+        "OutdoorAmbient": [
+          0.275,
+          0.275,
+          0.353
+        ],
+        "Brightness": 2,
+        "ClockTime": 18.5,
+        "ExposureCompensation": 0.15,
+        "GlobalShadows": true,
+        "FogEnd": 900
+      }
+    }
+  }
+}
