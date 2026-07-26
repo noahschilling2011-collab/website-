@@ -18,8 +18,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
 local Remotes = require(Shared.Remotes)
+local Throttle = require(script.Garage.Throttle)
 local RaceTrack = require(script.World.RaceTrack)
+local FencePad = require(script.World.FencePad)
 local SpawnHall = require(script.World.SpawnHall)
 
 local function step(label: string, fn)
@@ -138,6 +141,11 @@ step("Werkhalle bauen", function()
 	hall = SpawnHall.Build(Workspace)
 end)
 
+local fence
+step("Hehler bauen", function()
+	fence = FencePad.Build(Workspace)
+end)
+
 step("Lighting einstellen", setupLighting)
 
 local START_ORDER = {
@@ -186,9 +194,30 @@ for _, name in loaded do
 	end
 end
 
--- Erst jetzt: GarageService muss gestartet sein, sonst kennt es die Plots noch
--- nicht. Scheitert der Schritt, steht die Halle trotzdem - man laeuft dann
--- eben zu Fuss.
+-- Ab hier wird verdrahtet, was einen gestarteten Service braucht. Scheitert
+-- ein Schritt, steht das Gebaeude trotzdem - es reagiert dann nur nicht.
+--
+-- Der Hehler haengt am CarryManager des HeistService, den es vor der
+-- Start()-Schleife noch nicht gibt. Drosselung ueber Throttle, obwohl der
+-- Prompt kein Remote ist: zweimal Druecken in derselben Sekunde soll nicht
+-- zweimal auszahlen.
+step("Hehler verdrahten", function()
+	local heist = services.HeistService
+	if not fence or not fence.prompt or not heist then
+		return
+	end
+	fence.prompt.Triggered:Connect(function(player)
+		if Throttle.Blocked(player, "Fence", Config.FENCE_COOLDOWN) then
+			return
+		end
+		local ok, message = heist.Carry:Fence(player)
+		if message then
+			services.EconomyService:Notify(player, message, ok and "good" or "bad")
+		end
+	end)
+end)
+
+-- GarageService muss gestartet sein, sonst kennt es die Plots noch nicht.
 step("Werkhalle verdrahten", function()
 	local garageService = services.GarageService
 	if hall and hall.warpPrompt and garageService then

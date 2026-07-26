@@ -169,7 +169,26 @@ function HUD.Init(root: Frame, callbacks)
 		Parent = root,
 	})
 
+	-- Alarmzeile direkt unter der Heist-Pille: die einzige Meldung, die den
+	-- Bestohlenen mitten im Fenster wirklich interessiert.
+	local alarmLabel = Theme.label({
+		Name = "Alarm",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 58),
+		Size = UDim2.new(0.6, 0, 0, 20),
+		Font = Theme.Fonts.bodyBold,
+		TextSize = 14,
+		TextScaled = false,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		TextStrokeTransparency = 0.4,
+		TextColor3 = Theme.Colors.accent,
+		Visible = false,
+		ZIndex = 12,
+		Parent = root,
+	})
+
 	HUD._refs = {
+		alarm = alarmLabel,
 		cash = cashLabel,
 		flash = flash,
 		rate = rateLabel,
@@ -222,12 +241,34 @@ function HUD.Update()
 	local carry = Store.carry
 	refs.carryBar.Visible = carry ~= nil
 	if carry then
-		refs.carryLabel.Text = ("Du traegst: %s (%s)\nAb in deine Garage - auf das blaue Pad!"):format(
-			carry.tierName,
-			carry.slotName
+		-- Seit v8 koennen es mehrere sein. Namen untereinander, damit die Zeile
+		-- bei zwei Teilen nicht aus dem Kasten laeuft.
+		local names = {}
+		for _, part in carry do
+			table.insert(names, ("%s (%s)"):format(part.tierName, part.slotName))
+		end
+		refs.carryLabel.Text = ("Du traegst: %s\nEigenes Pad = einbauen, Hehler in der Hofmitte = Cash."):format(
+			table.concat(names, " + ")
 		)
 	end
 	refs.tackle.Visible = Store.heist.open and carry == nil
+
+	-- Alarm der eigenen Garage. Stufe 0 blendet die Zeile aus.
+	local alarm = Store.alarm
+	local level = alarm and alarm.level or 0
+	refs.alarm.Visible = level > 0
+	if level > 0 then
+		local detail
+		if alarm.position then
+			detail = ("%s ist drin - Position auf der Karte"):format(alarm.thief or "Jemand")
+		elseif alarm.direction then
+			detail = ("Jemand ist drin - Richtung %s"):format(alarm.direction)
+		else
+			detail = "Jemand ist in deiner Box"
+		end
+		refs.alarm.Text = ("ALARM %d/%d  -  %s"):format(level, #Config.ALARM_STEPS, detail)
+		refs.alarm.TextColor3 = if level >= #Config.ALARM_STEPS then Theme.Colors.heist else Theme.Colors.accent
+	end
 
 	if Store.daily then
 		refs.daily.BackgroundColor3 = Store.daily.canClaim and Theme.Colors.good or Theme.Colors.panelAlt

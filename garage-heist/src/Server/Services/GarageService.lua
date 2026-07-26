@@ -245,6 +245,21 @@ function GarageService:GiveStolenPart(thief: Player, part, target)
 	return TheftOps.Deposit(self, thief, part, target)
 end
 
+-- Schreibt den Besitzwechsel beim Opfer fest, ohne dass der Dieb das Teil
+-- bekommt. Nur der Hehler braucht das: dort loest sich das Teil auf und der
+-- Dieb wird stattdessen in Cash bezahlt.
+function GarageService:CommitTheft(victim: Player, uid: string): boolean
+	return TheftOps.Commit(self, victim, uid)
+end
+
+-- Kurs des Hehlers. Steht hier und nicht im CarryManager, weil er von
+-- Freischaltungen des Spielers abhaengt - und die kennt der Server ueber das
+-- Profil, nicht der Heist.
+function GarageService:FenceRate(player: Player): number
+	local data = self.Services.DataService:Get(player)
+	return ProfileOps.FenceRate(data)
+end
+
 function GarageService:ClearInTransit(victim: Player, uid: string)
 	return TheftOps.Clear(self, victim, uid)
 end

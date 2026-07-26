@@ -106,6 +106,29 @@ Config.TACKLE_RANGE = 12
 Config.TACKLE_COOLDOWN = 4
 Config.TACKLE_SHAKE = 1.6 -- Staerke des Kamera-Wacklers beim Treffer
 Config.CARRY_WALKSPEED = 12
+-- Zwei Teile gleichzeitig sind moeglich, aber teuer: jedes weitere kostet
+-- Tempo, und ein Rempler wirft ALLE auf einmal aus der Hand. Gier gegen Risiko.
+Config.CARRY_MAX_PARTS = 2
+Config.CARRY_SECOND_PENALTY = 2 -- Studs/s weniger je zusaetzlich getragenem Teil
+-- Ohne diese Spanne ist ein Traeger (12) gegen einen Verfolger (16) chancenlos:
+-- der Verfolger braucht nur alle TACKLE_COOLDOWN Sekunden erneut zu druecken.
+-- Der Wert ist geraten und gehoert im Playtest gemessen.
+Config.TACKLE_IMMUNITY = 3
+
+-- Alarm --------------------------------------------------------------------
+-- Jedes Teil, das in derselben Garage abmontiert wird, hebt deren Alarmstufe.
+-- Der Zustand lebt nur waehrend des Fensters und steht NICHT im Profil.
+-- Stufe 1: der Besitzer bekommt die Richtung. Stufe 2: die Position.
+-- Stufe 3: alle im Server sehen es.
+Config.ALARM_STEPS = { 1, 2, 4 } -- abmontierte Teile, ab denen die jeweilige Stufe gilt
+Config.ALARM_DECAY = 25 -- Sekunden ohne neuen Diebstahl, bis eine Stufe faellt
+
+-- Hehler -------------------------------------------------------------------
+-- Abgabepunkt mitten im Hof. Sofort Cash statt das Teil selbst - die
+-- Entscheidung auf dem Rueckweg, besonders mit einem Prototyp in der Hand.
+Config.FENCE_RATE = 0.7
+Config.FENCE_POSITION = Vector3.new(0, 0, 0)
+Config.FENCE_COOLDOWN = 0.5
 Config.NORMAL_WALKSPEED = 16
 Config.DROPPED_PART_PICKUP_DISTANCE = 8
 Config.GARAGE_LOCK_WINDOW = 20 -- Gamepass: eigenes Tor faellt nach 20s wieder zu

@@ -26,6 +26,7 @@ local TO_CLIENT = {
 	"ShopState", -- {vip, autoCollect, garageLock}
 	"Effect", -- {kind = "sound"|"shake", ...} - reine Praesentation
 	"AdminState", -- {isAdmin} - entscheidet, ob das Admin-Panel ueberhaupt existiert
+	"AlarmUpdate", -- {level, plotIndex, direction?, position?, owner?} - Heist-Alarm
 }
 
 -- Client -> Server (alles wird serverseitig geprueft)

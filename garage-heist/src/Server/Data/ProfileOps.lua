@@ -234,6 +234,12 @@ end
 
 -- Rebirth ist erst moeglich, wenn die Garage voll ausgebaut ist und jedes Auto
 -- auf jedem Slot die hoechste Stufe traegt.
+-- Kurs beim Hehler. Rebirth-Freischaltungen koennen ihn anheben; ohne Profil
+-- gilt der Grundkurs.
+function ProfileOps.FenceRate(data): number
+	return Config.FENCE_RATE
+end
+
 function ProfileOps.CanRebirth(data): (boolean, string)
 	local _, level = ProfileOps.GarageLevelDef(data)
 	if level < #Config.GARAGE_LEVELS then

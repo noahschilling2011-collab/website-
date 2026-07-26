@@ -245,6 +245,29 @@ Config.TACKLE_RANGE = 12
 Config.TACKLE_COOLDOWN = 4
 Config.TACKLE_SHAKE = 1.6 -- Staerke des Kamera-Wacklers beim Treffer
 Config.CARRY_WALKSPEED = 12
+-- Zwei Teile gleichzeitig sind moeglich, aber teuer: jedes weitere kostet
+-- Tempo, und ein Rempler wirft ALLE auf einmal aus der Hand. Gier gegen Risiko.
+Config.CARRY_MAX_PARTS = 2
+Config.CARRY_SECOND_PENALTY = 2 -- Studs/s weniger je zusaetzlich getragenem Teil
+-- Ohne diese Spanne ist ein Traeger (12) gegen einen Verfolger (16) chancenlos:
+-- der Verfolger braucht nur alle TACKLE_COOLDOWN Sekunden erneut zu druecken.
+-- Der Wert ist geraten und gehoert im Playtest gemessen.
+Config.TACKLE_IMMUNITY = 3
+
+-- Alarm --------------------------------------------------------------------
+-- Jedes Teil, das in derselben Garage abmontiert wird, hebt deren Alarmstufe.
+-- Der Zustand lebt nur waehrend des Fensters und steht NICHT im Profil.
+-- Stufe 1: der Besitzer bekommt die Richtung. Stufe 2: die Position.
+-- Stufe 3: alle im Server sehen es.
+Config.ALARM_STEPS = { 1, 2, 4 } -- abmontierte Teile, ab denen die jeweilige Stufe gilt
+Config.ALARM_DECAY = 25 -- Sekunden ohne neuen Diebstahl, bis eine Stufe faellt
+
+-- Hehler -------------------------------------------------------------------
+-- Abgabepunkt mitten im Hof. Sofort Cash statt das Teil selbst - die
+-- Entscheidung auf dem Rueckweg, besonders mit einem Prototyp in der Hand.
+Config.FENCE_RATE = 0.7
+Config.FENCE_POSITION = Vector3.new(0, 0, 0)
+Config.FENCE_COOLDOWN = 0.5
 Config.NORMAL_WALKSPEED = 16
 Config.DROPPED_PART_PICKUP_DISTANCE = 8
 Config.GARAGE_LOCK_WINDOW = 20 -- Gamepass: eigenes Tor faellt nach 20s wieder zu
@@ -492,6 +515,7 @@ local TO_CLIENT = {
 	"ShopState", -- {vip, autoCollect, garageLock}
 	"Effect", -- {kind = "sound"|"shake", ...} - reine Praesentation
 	"AdminState", -- {isAdmin} - entscheidet, ob das Admin-Panel ueberhaupt existiert
+	"AlarmUpdate", -- {level, plotIndex, direction?, position?, owner?} - Heist-Alarm
 }
 
 -- Client -> Server (alles wird serverseitig geprueft)
@@ -922,8 +946,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
 local Remotes = require(Shared.Remotes)
+local Throttle = require(script.Garage.Throttle)
 local RaceTrack = require(script.World.RaceTrack)
+local FencePad = require(script.World.FencePad)
 local SpawnHall = require(script.World.SpawnHall)
 
 local function step(label: string, fn)
@@ -1042,6 +1069,11 @@ step("Werkhalle bauen", function()
 	hall = SpawnHall.Build(Workspace)
 end)
 
+local fence
+step("Hehler bauen", function()
+	fence = FencePad.Build(Workspace)
+end)
+
 step("Lighting einstellen", setupLighting)
 
 local START_ORDER = {
@@ -1090,9 +1122,30 @@ for _, name in loaded do
 	end
 end
 
--- Erst jetzt: GarageService muss gestartet sein, sonst kennt es die Plots noch
--- nicht. Scheitert der Schritt, steht die Halle trotzdem - man laeuft dann
--- eben zu Fuss.
+-- Ab hier wird verdrahtet, was einen gestarteten Service braucht. Scheitert
+-- ein Schritt, steht das Gebaeude trotzdem - es reagiert dann nur nicht.
+--
+-- Der Hehler haengt am CarryManager des HeistService, den es vor der
+-- Start()-Schleife noch nicht gibt. Drosselung ueber Throttle, obwohl der
+-- Prompt kein Remote ist: zweimal Druecken in derselben Sekunde soll nicht
+-- zweimal auszahlen.
+step("Hehler verdrahten", function()
+	local heist = services.HeistService
+	if not fence or not fence.prompt or not heist then
+		return
+	end
+	fence.prompt.Triggered:Connect(function(player)
+		if Throttle.Blocked(player, "Fence", Config.FENCE_COOLDOWN) then
+			return
+		end
+		local ok, message = heist.Carry:Fence(player)
+		if message then
+			services.EconomyService:Notify(player, message, ok and "good" or "bad")
+		end
+	end)
+end)
+
+-- GarageService muss gestartet sein, sonst kennt es die Plots noch nicht.
 step("Werkhalle verdrahten", function()
 	local garageService = services.GarageService
 	if hall and hall.warpPrompt and garageService then
@@ -1443,6 +1496,12 @@ end
 
 -- Rebirth ist erst moeglich, wenn die Garage voll ausgebaut ist und jedes Auto
 -- auf jedem Slot die hoechste Stufe traegt.
+-- Kurs beim Hehler. Rebirth-Freischaltungen koennen ihn anheben; ohne Profil
+-- gilt der Grundkurs.
+function ProfileOps.FenceRate(data): number
+	return Config.FENCE_RATE
+end
+
 function ProfileOps.CanRebirth(data): (boolean, string)
 	local _, level = ProfileOps.GarageLevelDef(data)
 	if level < #Config.GARAGE_LEVELS then
@@ -2708,6 +2767,173 @@ return Throttle
 <Item class="Folder" referent="RBX32">
 <Properties><string name="Name">Heist</string></Properties>
 <Item class="ModuleScript" referent="RBX33">
+<Properties><string name="Name">AlarmState</string><ProtectedString name="Source"><![CDATA[--[[
+	AlarmState
+	Wie laut es in einer Garage gerade zugeht.
+
+	Jedes abmontierte Teil hebt den Zaehler der betroffenen Box. Aus dem Zaehler
+	folgt ueber Config.ALARM_STEPS die Stufe, und die Stufe entscheidet, wieviel
+	der Bestohlene ueber den Dieb erfaehrt:
+
+		1  Richtung        "kommt von Sueden"
+		2  Position        genaue Koordinate, der Marker steht auf dem Dieb
+		3  serverweit      alle sehen es
+
+	Damit ist Klauen eine Abwaegung: das vierte Teil aus derselben Box ist das
+	wertvollste und das gefaehrlichste.
+
+	Der Zustand steht BEWUSST nicht im Profil. Er gehoert zum laufenden Fenster,
+	nicht zum Spielstand - beim Schliessen wird er ersatzlos weggeworfen.
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Remotes = require(Shared.Remotes)
+
+local AlarmState = {}
+AlarmState.__index = AlarmState
+
+function AlarmState.new(services)
+	local self = setmetatable({}, AlarmState)
+	self.Services = services
+	self.plots = {} -- [plotIndex] = { count, level, lastAt, thief }
+	return self
+end
+
+local function levelFor(count: number): number
+	local level = 0
+	for step, threshold in Config.ALARM_STEPS do
+		if count >= threshold then
+			level = step
+		end
+	end
+	return level
+end
+
+-- Himmelsrichtung vom Bestohlenen zum Dieb. Auf Stufe 1 ist das alles, was er
+-- bekommt - genug, um loszulaufen, zu wenig, um sicher zu treffen.
+local function directionText(from: Vector3, to: Vector3): string
+	local delta = to - from
+	if delta.Magnitude < 1 then
+		return "direkt bei dir"
+	end
+	local vertical = if delta.Z < 0 then "Norden" else "Sueden"
+	local horizontal = if delta.X < 0 then "Westen" else "Osten"
+	-- Nur die dominante Achse nennen, sonst klingt jede Meldung gleich.
+	if math.abs(delta.X) > math.abs(delta.Z) * 1.6 then
+		return horizontal
+	end
+	if math.abs(delta.Z) > math.abs(delta.X) * 1.6 then
+		return vertical
+	end
+	return ("%s%s"):format(vertical, horizontal:lower())
+end
+
+function AlarmState:Level(plotIndex: number?): number
+	if not plotIndex then
+		return 0
+	end
+	local entry = self.plots[plotIndex]
+	return entry and entry.level or 0
+end
+
+-- Wird gerufen, wenn ein Teil wirklich abmontiert wurde - nicht schon beim
+-- Ansetzen. Ein abgebrochener Versuch loest keinen Alarm aus.
+function AlarmState:Raise(plotIndex: number?, thief: Player)
+	if not plotIndex then
+		return
+	end
+	local entry = self.plots[plotIndex]
+	if not entry then
+		entry = { count = 0, level = 0, lastAt = 0 }
+		self.plots[plotIndex] = entry
+	end
+	entry.count += 1
+	entry.lastAt = os.clock()
+	entry.thief = thief
+	local level = levelFor(entry.count)
+	if level ~= entry.level then
+		entry.level = level
+		self:_announce(plotIndex, entry)
+	end
+	self:_push(plotIndex, entry)
+end
+
+-- Eine Stufe faellt nach ALARM_DECAY Sekunden ohne neuen Diebstahl. Der
+-- Zaehler faellt auf die Schwelle der neuen Stufe zurueck, nicht auf 0 - sonst
+-- wartet man einfach ab und faengt bei null wieder an.
+function AlarmState:Tick()
+	local now = os.clock()
+	for plotIndex, entry in self.plots do
+		if entry.level > 0 and now - entry.lastAt >= Config.ALARM_DECAY then
+			entry.level -= 1
+			entry.count = Config.ALARM_STEPS[entry.level] or 0
+			entry.lastAt = now
+			self:_push(plotIndex, entry)
+		end
+	end
+end
+
+function AlarmState:Clear()
+	for plotIndex in self.plots do
+		self:_send(self.Services.GarageService:GetOwnerOfPlot(plotIndex), { level = 0, plotIndex = plotIndex })
+	end
+	self.plots = {}
+end
+
+function AlarmState:_send(userId: number?, payload)
+	if not userId then
+		return
+	end
+	local player = Players:GetPlayerByUserId(userId)
+	if player then
+		Remotes.Get("AlarmUpdate"):FireClient(player, payload)
+	end
+end
+
+-- Auf Stufe 3 wird es oeffentlich: das ist der Preis dafuer, eine Box
+-- komplett auszuraeumen.
+function AlarmState:_announce(plotIndex: number, entry)
+	if entry.level < #Config.ALARM_STEPS then
+		return
+	end
+	local ownerId = self.Services.GarageService:GetOwnerOfPlot(plotIndex)
+	local owner = ownerId and Players:GetPlayerByUserId(ownerId)
+	local text = if owner
+		then ("Grossalarm in Box %d - %s wird ausgeraeumt!"):format(plotIndex, owner.DisplayName)
+		else ("Grossalarm in Box %d - da raeumt jemand einen Leerstand leer!"):format(plotIndex)
+	for _, player in Players:GetPlayers() do
+		self.Services.EconomyService:Notify(player, text, "bad")
+	end
+end
+
+function AlarmState:_push(plotIndex: number, entry)
+	local ownerId = self.Services.GarageService:GetOwnerOfPlot(plotIndex)
+	if not ownerId then
+		return -- Leerstand hat niemanden, dem man etwas melden koennte
+	end
+	local owner = Players:GetPlayerByUserId(ownerId)
+	local ownerRoot = owner and owner.Character and owner.Character:FindFirstChild("HumanoidRootPart")
+	local thief = entry.thief
+	local thiefRoot = thief and thief.Parent and thief.Character and thief.Character:FindFirstChild("HumanoidRootPart")
+
+	local payload = { level = entry.level, plotIndex = plotIndex, count = entry.count }
+	if entry.level >= 2 and thiefRoot then
+		payload.position = (thiefRoot :: BasePart).Position
+		payload.thief = thief.DisplayName
+	elseif entry.level >= 1 and thiefRoot and ownerRoot then
+		payload.direction = directionText((ownerRoot :: BasePart).Position, (thiefRoot :: BasePart).Position)
+	end
+	self:_send(ownerId, payload)
+end
+
+return AlarmState
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX34">
 <Properties><string name="Name">CarryManager</string><ProtectedString name="Source"><![CDATA[--[[
 	CarryManager
 	Was mit einem abmontierten Teil passiert, solange es niemandem gehoert:
@@ -2726,6 +2952,9 @@ local Config = require(Shared.Config)
 local PartCatalog = require(Shared.PartCatalog)
 local Remotes = require(Shared.Remotes)
 
+local Util = require(Shared.Util)
+
+local ProfileOps = require(script.Parent.Parent.Data.ProfileOps)
 local PartVisual = require(script.Parent.PartVisual)
 local StealTarget = require(script.Parent.StealTarget)
 
@@ -2735,34 +2964,61 @@ CarryManager.__index = CarryManager
 function CarryManager.new(services)
 	local self = setmetatable({}, CarryManager)
 	self.Services = services
-	self.carrying = {} -- [userId] = { part, model, weld, target }
+	-- [userId] = Liste von { part, model, weld, target }. Seit v8 duerfen es
+	-- Config.CARRY_MAX_PARTS Stueck sein; leere Listen werden auf nil gesetzt,
+	-- damit "for userId in self.carrying" weiter "traegt gerade" bedeutet.
+	self.carrying = {}
 	self.dropped = {} -- [model] = { part, prompt, target }
 	self.tackleCooldown = {}
+	self.immunity = {} -- [userId] = os.clock() des letzten Treffers
 	return self
 end
 
+function CarryManager:List(player: Player)
+	return self.carrying[player.UserId] or {}
+end
+
 function CarryManager:IsCarrying(player: Player): boolean
-	return self.carrying[player.UserId] ~= nil
+	return #self:List(player) > 0
+end
+
+function CarryManager:CanCarryMore(player: Player): boolean
+	return #self:List(player) < Config.CARRY_MAX_PARTS
 end
 
 function CarryManager:_pushState(player: Player)
-	local entry = self.carrying[player.UserId]
-	local payload = nil
-	if entry then
+	local parts = {}
+	for _, entry in self:List(player) do
 		local tierDef = PartCatalog.GetTier(entry.part.slotId, entry.part.tier)
 		local slotDef = PartCatalog.GetSlot(entry.part.slotId)
-		payload = {
+		table.insert(parts, {
 			slotId = entry.part.slotId,
 			slotName = slotDef and slotDef.displayName or entry.part.slotId,
 			tierName = tierDef and tierDef.name or "Teil",
 			tier = entry.part.tier,
-		}
+		})
 	end
-	Remotes.Get("CarryState"):FireClient(player, { part = payload })
+	Remotes.Get("CarryState"):FireClient(player, { parts = parts })
+end
+
+-- Tempo faellt mit jedem weiteren Teil. Wer zwei traegt, ist deutlich
+-- langsamer als ein Verfolger - das ist der Preis fuer die doppelte Beute.
+function CarryManager:_applySpeed(player: Player)
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then
+		return
+	end
+	local count = #self:List(player)
+	if count <= 0 then
+		humanoid.WalkSpeed = Config.NORMAL_WALKSPEED
+		return
+	end
+	humanoid.WalkSpeed = math.max(4, Config.CARRY_WALKSPEED - (count - 1) * Config.CARRY_SECOND_PENALTY)
 end
 
 function CarryManager:StartCarry(player: Player, part, target)
-	if self.carrying[player.UserId] then
+	if not self:CanCarryMore(player) then
 		return false
 	end
 	local character = player.Character
@@ -2771,8 +3027,17 @@ function CarryManager:StartCarry(player: Player, part, target)
 		return false
 	end
 
+	local list = self.carrying[player.UserId]
+	if not list then
+		list = {}
+		self.carrying[player.UserId] = list
+	end
+	-- Zweites Teil seitlich versetzt, sonst stecken beide ineinander.
+	local slot = #list
+	local offset = CFrame.new(slot * 1.7 - (Config.CARRY_MAX_PARTS - 1) * 0.85, 0.6, -2.4)
+
 	local model = PartVisual.Build(part)
-	model.CFrame = root.CFrame * CFrame.new(0, 0.6, -2.4)
+	model.CFrame = root.CFrame * offset
 	model.Parent = workspace
 
 	self.Services.EffectService:AttachTrail(model)
@@ -2780,53 +3045,54 @@ function CarryManager:StartCarry(player: Player, part, target)
 	local weld = Instance.new("Weld")
 	weld.Part0 = root
 	weld.Part1 = model
-	weld.C0 = CFrame.new(0, 0.6, -2.4)
+	weld.C0 = offset
 	weld.Parent = model
 
-	self.carrying[player.UserId] = {
+	table.insert(list, {
 		part = part,
 		model = model,
 		weld = weld,
 		target = target,
-	}
+	})
 
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	if humanoid then
-		humanoid.WalkSpeed = Config.CARRY_WALKSPEED
-	end
+	self:_applySpeed(player)
 	self:_pushState(player)
 	return true
 end
 
+-- Nimmt ALLE getragenen Teile aus der Hand und gibt sie als Liste zurueck.
+-- Es gibt bewusst kein "nur eins ablegen": ein Rempler wirft alles, und beim
+-- Abliefern will man ohnehin alles los werden.
 function CarryManager:_clearCarry(player: Player)
-	local entry = self.carrying[player.UserId]
-	if not entry then
-		return nil
+	local list = self.carrying[player.UserId]
+	if not list or #list == 0 then
+		return {}
 	end
 	self.carrying[player.UserId] = nil
-	if entry.model then
-		entry.model:Destroy()
+	for _, entry in list do
+		if entry.model then
+			entry.model:Destroy()
+		end
 	end
-	local character = player.Character
-	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if humanoid then
-		humanoid.WalkSpeed = Config.NORMAL_WALKSPEED
-	end
+	self:_applySpeed(player)
 	self:_pushState(player)
-	return entry
+	return list
 end
 
 -- Teil faellt zu Boden und kann von jedem aufgehoben werden.
 function CarryManager:Drop(player: Player, reason: string?)
-	local entry = self.carrying[player.UserId]
-	if not entry then
+	if not self:IsCarrying(player) then
 		return false
 	end
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	local position = root and (root.Position + Vector3.new(0, -1.5, 0)) or Vector3.new(0, 5, 0)
-	self:_clearCarry(player)
-	self:SpawnDropped(entry.part, position, entry.target)
+	local list = self:_clearCarry(player)
+	-- Faecherfoermig ablegen, sonst liegen zwei Teile exakt uebereinander und
+	-- man kann nur eines aufheben.
+	for index, entry in list do
+		self:SpawnDropped(entry.part, position + Vector3.new((index - 1) * 3, 0, 0), entry.target)
+	end
 	if reason then
 		self.Services.EconomyService:Notify(player, reason, "bad")
 	end
@@ -2854,8 +3120,8 @@ function CarryManager:SpawnDropped(part, position: Vector3, target)
 		if not entry or not self.Services.HeistService:IsOpen() then
 			return
 		end
-		if self:IsCarrying(player) then
-			self.Services.EconomyService:Notify(player, "Du traegst schon ein Teil.", "bad")
+		if not self:CanCarryMore(player) then
+			self.Services.EconomyService:Notify(player, "Du hast die Haende voll.", "bad")
 			return
 		end
 		self.dropped[model] = nil
@@ -2867,24 +3133,69 @@ end
 
 -- Abgabe im eigenen Plot. Wird vom Touched-Event des Abgabe-Pads gerufen.
 function CarryManager:TryDeposit(player: Player, plotIndex: number)
-	local entry = self.carrying[player.UserId]
-	if not entry then
+	if not self:IsCarrying(player) then
 		return false
 	end
 	if self.Services.GarageService:GetOwnerOfPlot(plotIndex) ~= player.UserId then
 		return false
 	end
-	self:_clearCarry(player)
+	local list = self:_clearCarry(player)
 	local plot = self.Services.GarageService.plots[plotIndex]
 	self.Services.EffectService:Deposit(plot and plot.lootBay)
-	local _, message = self.Services.GarageService:GiveStolenPart(player, entry.part, entry.target)
-	self.Services.EconomyService:Notify(player, message or "Teil abgeliefert.", "good")
-	StealTarget.NotifyVictim(
-		self.Services,
-		entry.target,
-		("%s hat dein Teil in die eigene Garage geschleppt."):format(player.DisplayName)
-	)
+	for _, entry in list do
+		local _, message = self.Services.GarageService:GiveStolenPart(player, entry.part, entry.target)
+		self.Services.EconomyService:Notify(player, message or "Teil abgeliefert.", "good")
+		StealTarget.NotifyVictim(
+			self.Services,
+			entry.target,
+			("%s hat dein Teil in die eigene Garage geschleppt."):format(player.DisplayName)
+		)
+	end
 	return true
+end
+
+--[[
+	Alles beim Hehler verticken. Der Server rechnet den Betrag aus dem
+	Teilewert; der Client schickt nur die Absicht.
+
+	Reihenfolge ist wichtig: erst den Besitzwechsel beim Opfer festschreiben
+	(Commit entfernt das Teil und zahlt dessen Versicherung), dann den Dieb
+	bezahlen. Schlaegt der Commit fehl - Opfer ist weg -, gibt es auch kein
+	Geld, sonst entstuende Cash aus einem Teil, das nie den Besitzer gewechselt
+	hat.
+]]
+function CarryManager:Fence(player: Player)
+	if not self.Services.HeistService:IsOpen() then
+		return false, "Der Hehler macht nur waehrend des Fensters auf."
+	end
+	if not self:IsCarrying(player) then
+		return false, "Du traegst nichts."
+	end
+	local list = self:_clearCarry(player)
+	local total = 0
+	local sold = 0
+	for _, entry in list do
+		local value = ProfileOps.PartValue(entry.part)
+		local ok = true
+		if StealTarget.IsPlayer(entry.target) then
+			local victim = entry.target.player
+			ok = victim.Parent ~= nil and self.Services.GarageService:CommitTheft(victim, entry.part.uid)
+		end
+		if ok then
+			total += math.floor(value * self.Services.GarageService:FenceRate(player))
+			sold += 1
+			StealTarget.NotifyVictim(
+				self.Services,
+				entry.target,
+				("%s hat dein Teil beim Hehler verticken lassen."):format(player.DisplayName)
+			)
+		end
+	end
+	if sold == 0 then
+		return false, "Der Besitzer ist weg - der Hehler zahlt nichts."
+	end
+	self.Services.EconomyService:AddCash(player, total, "Fence")
+	return true, ("%d Teil(e) verticken lassen: %s."):format(sold, Util.FormatCash(total))
 end
 
 -- Rempler: wer nah genug an einem Traeger steht, schlaegt ihm das Teil aus der Hand.
@@ -2896,6 +3207,7 @@ function CarryManager:Tackle(player: Player)
 	if now - (self.tackleCooldown[player.UserId] or 0) < Config.TACKLE_COOLDOWN then
 		return
 	end
+	self.immunity = self.immunity or {}
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	if not root then
@@ -2904,8 +3216,10 @@ function CarryManager:Tackle(player: Player)
 	self.tackleCooldown[player.UserId] = now
 
 	local bestPlayer, bestDistance = nil, Config.TACKLE_RANGE
-	for userId in self.carrying do
-		if userId ~= player.UserId then
+	for userId, list in self.carrying do
+		-- Wer gerade getroffen wurde, ist kurz unantastbar. Ohne das haelt ein
+		-- Verfolger den Traeger dauerhaft am Boden: 16 gegen 12 Studs/s.
+		if userId ~= player.UserId and #list > 0 and now - (self.immunity[userId] or 0) >= Config.TACKLE_IMMUNITY then
 			local other = Players:GetPlayerByUserId(userId)
 			local otherRoot = other and other.Character and other.Character:FindFirstChild("HumanoidRootPart")
 			if otherRoot then
@@ -2921,7 +3235,8 @@ function CarryManager:Tackle(player: Player)
 		self.Services.EconomyService:Notify(player, "Niemand in Reichweite.", "info")
 		return
 	end
-	self:Drop(bestPlayer, ("%s hat dir das Teil aus der Hand geschlagen."):format(player.DisplayName))
+	self.immunity[bestPlayer.UserId] = now
+	self:Drop(bestPlayer, ("%s hat dir alles aus der Hand geschlagen."):format(player.DisplayName))
 	self.Services.EconomyService:Notify(player, ("Treffer! %s liegt das Teil vor den Fuessen."):format(bestPlayer.DisplayName), "good")
 	self.Services.EffectService:Sound("tackle", root.Position)
 	self.Services.EffectService:Shake(bestPlayer, Config.TACKLE_SHAKE)
@@ -2944,10 +3259,12 @@ function CarryManager:ReturnEverything()
 	for _, userId in carriers do
 		local player = Players:GetPlayerByUserId(userId)
 		if player then
-			local entry = self:_clearCarry(player)
-			if entry then
-				self:_returnOrDiscard(entry.part, entry.target)
-				self.Services.EconomyService:Notify(player, "Zu spaet abgeliefert - das Teil ist weg.", "bad")
+			local list = self:_clearCarry(player)
+			if #list > 0 then
+				for _, entry in list do
+					self:_returnOrDiscard(entry.part, entry.target)
+				end
+				self.Services.EconomyService:Notify(player, "Zu spaet abgeliefert - alles weg.", "bad")
 			end
 		else
 			self.carrying[userId] = nil
@@ -2972,23 +3289,26 @@ function CarryManager:_returnOrDiscard(part, target)
 end
 
 function CarryManager:HandleLeave(player: Player)
-	local entry = self:_clearCarry(player)
+	local list = self:_clearCarry(player)
 	self.tackleCooldown[player.UserId] = nil
-	if entry then
+	if self.immunity then
+		self.immunity[player.UserId] = nil
+	end
+	for _, entry in list do
 		self:_returnOrDiscard(entry.part, entry.target)
 	end
 end
 
 function CarryManager:HandleDeath(player: Player)
-	if self.carrying[player.UserId] then
-		self:Drop(player, "Du hast das Teil fallen lassen.")
+	if self:IsCarrying(player) then
+		self:Drop(player, "Du hast alles fallen lassen.")
 	end
 end
 
 return CarryManager
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX34">
+<Item class="ModuleScript" referent="RBX35">
 <Properties><string name="Name">DismountManager</string><ProtectedString name="Source"><![CDATA[--[[
 	DismountManager
 	Vier Sekunden schrauben. Der Server misst die Zeit, prueft waehrenddessen
@@ -3050,8 +3370,10 @@ function DismountManager:_check(thief: Player, target, carIndex: number, slotId:
 	if not part or part.inTransit then
 		return false, "Da ist nichts mehr."
 	end
-	if self.Carry:IsCarrying(thief) then
-		return false, "Erst abliefern, dann weiterklauen."
+	-- Seit v8 sind Config.CARRY_MAX_PARTS Teile erlaubt. Ohne diese Zeile
+	-- blockte schon das erste, und das zweite waere nie erreichbar gewesen.
+	if not self.Carry:CanCarryMore(thief) then
+		return false, "Du hast die Haende voll - erst abliefern."
 	end
 	local root = rootOf(thief)
 	if not root then
@@ -3111,6 +3433,8 @@ function DismountManager:Start(thief: Player, target, carIndex: number, slotId: 
 			return
 		end
 		self:_progress(thief, "done")
+		-- Erst jetzt Alarm: ein abgebrochener Versuch soll nichts ausloesen.
+		self.Services.HeistService.Alarm:Raise(StealTarget.PlotIndex(self.Services, target), thief)
 		if not self.Carry:StartCarry(thief, taken, target) then
 			-- Charakter ist im letzten Moment weg: Teil faellt an Ort und Stelle.
 			local root = rootOf(thief)
@@ -3136,7 +3460,7 @@ end
 return DismountManager
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX35">
+<Item class="ModuleScript" referent="RBX36">
 <Properties><string name="Name">PartVisual</string><ProtectedString name="Source"><![CDATA[--[[
 	PartVisual
 	Das sichtbare Objekt fuer ein Teil, das gerade niemandem gehoert - getragen
@@ -3189,7 +3513,7 @@ end
 return PartVisual
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX36">
+<Item class="ModuleScript" referent="RBX37">
 <Properties><string name="Name">StealTarget</string><ProtectedString name="Source"><![CDATA[--[[
 	StealTarget
 	Ein Klau-Ziel ist entweder ein Spieler oder eine Leerstand-Garage. Damit
@@ -3267,9 +3591,9 @@ return StealTarget
 ]]></ProtectedString></Properties>
 </Item>
 </Item>
-<Item class="Folder" referent="RBX37">
+<Item class="Folder" referent="RBX38">
 <Properties><string name="Name">Monetization</string></Properties>
-<Item class="ModuleScript" referent="RBX38">
+<Item class="ModuleScript" referent="RBX39">
 <Properties><string name="Name">PurchaseEffects</string><ProtectedString name="Source"><![CDATA[--[[
 	PurchaseEffects
 	Was ein Developer Product konkret tut. Jede Funktion gibt true zurueck,
@@ -3327,9 +3651,9 @@ return PurchaseEffects
 ]]></ProtectedString></Properties>
 </Item>
 </Item>
-<Item class="Folder" referent="RBX39">
+<Item class="Folder" referent="RBX40">
 <Properties><string name="Name">Services</string></Properties>
-<Item class="ModuleScript" referent="RBX40">
+<Item class="ModuleScript" referent="RBX41">
 <Properties><string name="Name">AdminService</string><ProtectedString name="Source"><![CDATA[--[[
 	AdminService
 	Werkzeuge zum Testen: Cash setzen, Garage hochziehen, Fenster sofort
@@ -3503,7 +3827,7 @@ end
 return AdminService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX41">
+<Item class="ModuleScript" referent="RBX42">
 <Properties><string name="Name">DailyRewardService</string><ProtectedString name="Source"><![CDATA[--[[
 	DailyRewardService
 	Sieben-Tage-Kette auf UTC-Tagen. Ein verpasster Tag setzt die Kette auf 1
@@ -3615,7 +3939,7 @@ end
 return DailyRewardService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX42">
+<Item class="ModuleScript" referent="RBX43">
 <Properties><string name="Name">DataService</string><ProtectedString name="Source"><![CDATA[--[[
 	DataService
 	Besitzt alle Profile der Spieler auf diesem Server. Kein anderer Service
@@ -3795,7 +4119,7 @@ end
 return DataService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX43">
+<Item class="ModuleScript" referent="RBX44">
 <Properties><string name="Name">DerelictService</string><ProtectedString name="Source"><![CDATA[--[[
 	DerelictService
 	Freie Plots sind waehrend des Klau-Fensters keine leeren Boxen, sondern
@@ -4056,7 +4380,7 @@ end
 return DerelictService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX44">
+<Item class="ModuleScript" referent="RBX45">
 <Properties><string name="Name">EconomyService</string><ProtectedString name="Source"><![CDATA[--[[
 	EconomyService
 	Einziger Ort, an dem sich Cash veraendert. Der Client bekommt Zahlen nur
@@ -4308,7 +4632,7 @@ end
 return EconomyService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX45">
+<Item class="ModuleScript" referent="RBX46">
 <Properties><string name="Name">EffectService</string><ProtectedString name="Source"><![CDATA[--[[
 	EffectService
 	Funken, Partikel, Klaenge, Kamera-Wackler. Nichts hiervon entscheidet
@@ -4426,7 +4750,7 @@ end
 return EffectService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX46">
+<Item class="ModuleScript" referent="RBX47">
 <Properties><string name="Name">GarageService</string><ProtectedString name="Source"><![CDATA[--[[
 	GarageService
 	Verteilt Plots, haelt Welt und Profil synchron, besitzt die einzige
@@ -4674,6 +4998,21 @@ function GarageService:GiveStolenPart(thief: Player, part, target)
 	return TheftOps.Deposit(self, thief, part, target)
 end
 
+-- Schreibt den Besitzwechsel beim Opfer fest, ohne dass der Dieb das Teil
+-- bekommt. Nur der Hehler braucht das: dort loest sich das Teil auf und der
+-- Dieb wird stattdessen in Cash bezahlt.
+function GarageService:CommitTheft(victim: Player, uid: string): boolean
+	return TheftOps.Commit(self, victim, uid)
+end
+
+-- Kurs des Hehlers. Steht hier und nicht im CarryManager, weil er von
+-- Freischaltungen des Spielers abhaengt - und die kennt der Server ueber das
+-- Profil, nicht der Heist.
+function GarageService:FenceRate(player: Player): number
+	local data = self.Services.DataService:Get(player)
+	return ProfileOps.FenceRate(data)
+end
+
 function GarageService:ClearInTransit(victim: Player, uid: string)
 	return TheftOps.Clear(self, victim, uid)
 end
@@ -4681,7 +5020,7 @@ end
 return GarageService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX47">
+<Item class="ModuleScript" referent="RBX48">
 <Properties><string name="Name">HeistService</string><ProtectedString name="Source"><![CDATA[--[[
 	HeistService
 	Der globale Timer. Der Takt steht in Config (HEIST_INTERVAL / HEIST_WINDOW),
@@ -4702,6 +5041,7 @@ local Util = require(Shared.Util)
 
 local Server = script.Parent.Parent
 local Throttle = require(Server.Garage.Throttle)
+local AlarmState = require(Server.Heist.AlarmState)
 local CarryManager = require(Server.Heist.CarryManager)
 local DismountManager = require(Server.Heist.DismountManager)
 local ProfileOps = require(Server.Data.ProfileOps)
@@ -4716,6 +5056,8 @@ end
 function HeistService:Init(services)
 	self.Services = services
 	self.Carry = CarryManager.new(services)
+	-- Alarm gehoert zum laufenden Fenster, nicht zum Spielstand.
+	self.Alarm = AlarmState.new(services)
 	self.Dismount = DismountManager.new(services, self.Carry)
 	self.open = false
 	self.openUntil = 0
@@ -4835,6 +5177,7 @@ end
 function HeistService:_tick()
 	local current = now()
 	if self.open then
+		self.Alarm:Tick()
 		if current >= self.openUntil then
 			self:_close()
 			return
@@ -4908,6 +5251,7 @@ function HeistService:_close()
 		self.Services.GarageService:SetStealEnabledFor(player.UserId, false)
 	end
 	self.Carry:ReturnEverything()
+	self.Alarm:Clear()
 	self.Services.DerelictService:Clear()
 
 	self:_pushState()
@@ -4991,7 +5335,7 @@ end
 return HeistService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX48">
+<Item class="ModuleScript" referent="RBX49">
 <Properties><string name="Name">LeaderboardService</string><ProtectedString name="Source"><![CDATA[--[[
 	LeaderboardService
 	Zwei Ranglisten fuer diesen Server: teuerste Garage und meiste geklaute
@@ -5173,7 +5517,7 @@ end
 return LeaderboardService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX49">
+<Item class="ModuleScript" referent="RBX50">
 <Properties><string name="Name">MonetizationService</string><ProtectedString name="Source"><![CDATA[--[[
 	MonetizationService
 
@@ -5437,7 +5781,7 @@ end
 return MonetizationService
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX50">
+<Item class="ModuleScript" referent="RBX51">
 <Properties><string name="Name">TelemetryService</string><ProtectedString name="Source"><![CDATA[--[[
 	TelemetryService
 	Onboarding-Funnel, Economy-Events und Badges.
@@ -5577,9 +5921,9 @@ return TelemetryService
 ]]></ProtectedString></Properties>
 </Item>
 </Item>
-<Item class="Folder" referent="RBX51">
+<Item class="Folder" referent="RBX52">
 <Properties><string name="Name">World</string></Properties>
-<Item class="ModuleScript" referent="RBX52">
+<Item class="ModuleScript" referent="RBX53">
 <Properties><string name="Name">CarBuilder</string><ProtectedString name="Source"><![CDATA[--[[
 	CarBuilder v2
 
@@ -6262,7 +6606,7 @@ end
 return CarBuilder
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX53">
+<Item class="ModuleScript" referent="RBX54">
 <Properties><string name="Name">DoorController</string><ProtectedString name="Source"><![CDATA[--[[
 	DoorController
 	Das Garagentor ist kein Deko-Objekt: es geht auf, wenn der Besitzer davor
@@ -6304,7 +6648,170 @@ end
 return DoorController
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX54">
+<Item class="ModuleScript" referent="RBX55">
+<Properties><string name="Name">FencePad</string><ProtectedString name="Source"><![CDATA[--[[
+	FencePad
+	Der Hehler: ein Abgabepunkt mitten im Hof.
+
+	Wer hier abliefert, bekommt sofort Config.FENCE_RATE des Teilewerts als
+	Cash - kann es aber nicht einbauen. Wer bis nach Hause traegt, bekommt das
+	Teil selbst. Das ist die Entscheidung: sicheres Geld jetzt gegen echten
+	Fortschritt spaeter, und sie faellt genau dann, wenn es wehtut - mit einem
+	Prototyp in der Hand und einem Verfolger im Nacken.
+
+	Absichtlich in der Hofmitte (Config.FENCE_POSITION), also auf dem Weg von
+	niemandem und in Reichweite von allen. Der Umweg ist der Preis.
+
+	Das Modul baut nur die Geometrie und gibt den Prompt zurueck; wer daran
+	haengt, entscheidet der Bootstrap.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage:WaitForChild("Shared").Config)
+
+local FencePad = {}
+
+local C = {
+	deck = Color3.fromRGB(26, 28, 34),
+	edge = Color3.fromRGB(255, 45, 85),
+	post = Color3.fromRGB(96, 100, 110),
+	steel = Color3.fromRGB(126, 132, 142),
+}
+
+local function part(props): Part
+	local p = Instance.new("Part")
+	p.Anchored = true
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.Size = props.Size
+	p.CFrame = props.CFrame
+	p.Color = props.Color or C.post
+	p.Material = props.Material or Enum.Material.Metal
+	p.Name = props.Name or "Part"
+	p.CanCollide = if props.CanCollide ~= nil then props.CanCollide else false
+	p.CastShadow = if props.CastShadow ~= nil then props.CastShadow else false
+	p.Parent = props.Parent
+	return p
+end
+
+function FencePad.Build(parent: Instance)
+	local origin = Config.FENCE_POSITION
+	local model = Instance.new("Model")
+	model.Name = "FencePad"
+	model.Parent = parent
+
+	-- Plattform. Flach genug, dass sie im Klau-Fenster niemanden aufhaelt.
+	local deck = part({
+		Name = "Deck",
+		Size = Vector3.new(16, 0.6, 16),
+		CFrame = CFrame.new(origin + Vector3.new(0, 0.3, 0)),
+		Color = C.deck,
+		Material = Enum.Material.DiamondPlate,
+		CanCollide = true,
+		Parent = model,
+	})
+	for _, spec in
+		{
+			{ Vector3.new(17, 0.3, 1), Vector3.new(0, 0, 8.2) },
+			{ Vector3.new(17, 0.3, 1), Vector3.new(0, 0, -8.2) },
+			{ Vector3.new(1, 0.3, 17), Vector3.new(8.2, 0, 0) },
+			{ Vector3.new(1, 0.3, 17), Vector3.new(-8.2, 0, 0) },
+		}
+	do
+		part({
+			Name = "Edge",
+			Size = spec[1],
+			CFrame = CFrame.new(origin + spec[2] + Vector3.new(0, 0.5, 0)),
+			Color = C.edge,
+			Material = Enum.Material.Neon,
+			Parent = model,
+		})
+	end
+
+	-- Bude: vier Pfosten, ein Dach, ein Tresen. Reicht, damit es nach etwas
+	-- aussieht und nicht nach einem zweiten Abgabe-Pad.
+	for _, spec in { { -1, -1 }, { -1, 1 }, { 1, -1 }, { 1, 1 } } do
+		part({
+			Name = "Post",
+			Size = Vector3.new(0.8, 9, 0.8),
+			CFrame = CFrame.new(origin + Vector3.new(spec[1] * 7, 4.5, spec[2] * 7)),
+			CanCollide = true,
+			CastShadow = true,
+			Parent = model,
+		})
+	end
+	part({
+		Name = "Roof",
+		Size = Vector3.new(17, 0.8, 17),
+		CFrame = CFrame.new(origin + Vector3.new(0, 9.4, 0)),
+		Color = C.deck,
+		CastShadow = true,
+		Parent = model,
+	})
+	local counter = part({
+		Name = "Counter",
+		Size = Vector3.new(11, 3.4, 2.4),
+		CFrame = CFrame.new(origin + Vector3.new(0, 2.3, -5)),
+		Color = C.steel,
+		CanCollide = true,
+		Parent = model,
+	})
+
+	local sign = part({
+		Name = "Sign",
+		Size = Vector3.new(12, 3, 0.4),
+		CFrame = CFrame.new(origin + Vector3.new(0, 7.4, -6.4)),
+		Color = C.deck,
+		Material = Enum.Material.SmoothPlastic,
+		Parent = model,
+	})
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Back
+	gui.CanvasSize = Vector2.new(500, 130)
+	gui.LightInfluence = 0
+	gui.Parent = sign
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.fromScale(1, 1)
+	label.Font = Enum.Font.Michroma
+	label.TextScaled = true
+	label.TextColor3 = C.edge
+	label.Text = "HEHLER"
+	label.Parent = gui
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "FencePrompt"
+	prompt.ActionText = "Verticken"
+	prompt.ObjectText = "Hehler"
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 14
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = counter
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Size = UDim2.fromScale(16, 3)
+	billboard.StudsOffset = Vector3.new(0, 7, 0)
+	billboard.MaxDistance = 220
+	billboard.Parent = deck
+	local hint = Instance.new("TextLabel")
+	hint.BackgroundTransparency = 1
+	hint.Size = UDim2.fromScale(1, 1)
+	hint.Font = Enum.Font.GothamBold
+	hint.TextScaled = true
+	hint.TextColor3 = C.edge
+	hint.TextStrokeTransparency = 0.4
+	-- Der Kurs steht dran, sonst ist die Entscheidung ein Blindflug.
+	hint.Text = ("HEHLER - %d%% sofort, dafuer weg"):format(math.floor(Config.FENCE_RATE * 100))
+	hint.Parent = billboard
+
+	return { model = model, prompt = prompt, deck = deck, hint = hint }
+end
+
+return FencePad
+]]></ProtectedString></Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX56">
 <Properties><string name="Name">PlotBuilder</string><ProtectedString name="Source"><![CDATA[--[[
 	PlotBuilder (Visual-Rewrite)
 
@@ -7056,7 +7563,7 @@ end
 return PlotBuilder
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX55">
+<Item class="ModuleScript" referent="RBX57">
 <Properties><string name="Name">RaceTrack</string><ProtectedString name="Source"><![CDATA[--[[
 	RaceTrack
 	Baut alles ausserhalb der Garagen:
@@ -7464,7 +7971,7 @@ end
 return RaceTrack
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX56">
+<Item class="ModuleScript" referent="RBX58">
 <Properties><string name="Name">SpawnHall</string><ProtectedString name="Source"><![CDATA[--[[
 	SpawnHall
 	Die grosse Werkhalle, in der neue Spieler landen.
@@ -8048,11 +8555,11 @@ return SpawnHall
 </Item>
 </Item>
 </Item>
-<Item class="StarterPlayer" referent="RBX57">
+<Item class="StarterPlayer" referent="RBX59">
 <Properties><string name="Name">StarterPlayer</string></Properties>
-<Item class="StarterPlayerScripts" referent="RBX58">
+<Item class="StarterPlayerScripts" referent="RBX60">
 <Properties><string name="Name">StarterPlayerScripts</string></Properties>
-<Item class="LocalScript" referent="RBX59">
+<Item class="LocalScript" referent="RBX61">
 <Properties><string name="Name">Client</string><ProtectedString name="Source"><![CDATA[--[[
 	Garage Heist - Client-Bootstrap
 
@@ -8208,7 +8715,15 @@ Remotes.Get("Notify").OnClientEvent:Connect(function(payload)
 end)
 
 Remotes.Get("CarryState").OnClientEvent:Connect(function(payload)
-	Store.Set("carry", payload and payload.part or nil)
+	-- Seit v8 eine Liste: man kann Config.CARRY_MAX_PARTS Teile gleichzeitig
+	-- tragen. Leere Liste = nichts in der Hand.
+	local parts = payload and payload.parts
+	Store.Set("carry", (parts and #parts > 0) and parts or nil)
+end)
+
+Remotes.Get("AlarmUpdate").OnClientEvent:Connect(function(payload)
+	-- Stufe 0 heisst "Alarm vorbei"; das HUD blendet die Zeile dann aus.
+	Store.Set("alarm", (payload and (payload.level or 0) > 0) and payload or nil)
 end)
 
 Remotes.Get("DismountProgress").OnClientEvent:Connect(function(payload)
@@ -8272,9 +8787,9 @@ task.spawn(function()
 	})
 end)
 ]]></ProtectedString></Properties>
-<Item class="Folder" referent="RBX60">
+<Item class="Folder" referent="RBX62">
 <Properties><string name="Name">Controllers</string></Properties>
-<Item class="ModuleScript" referent="RBX61">
+<Item class="ModuleScript" referent="RBX63">
 <Properties><string name="Name">EffectController</string><ProtectedString name="Source"><![CDATA[--[[
 	EffectController
 	Nimmt die Effekt-Anweisungen des Servers entgegen: lokale Klaenge und den
@@ -8337,7 +8852,7 @@ end
 return EffectController
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX62">
+<Item class="ModuleScript" referent="RBX64">
 <Properties><string name="Name">InputController</string><ProtectedString name="Source"><![CDATA[--[[
 	InputController
 	Tastenkuerzel und ProximityPrompts. Schickt ausschliesslich Absichten an den
@@ -8409,7 +8924,7 @@ end
 return InputController
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX63">
+<Item class="ModuleScript" referent="RBX65">
 <Properties><string name="Name">TrafficController</string><ProtectedString name="Source"><![CDATA[--[[
 	TrafficController
 	Der Verkehr auf der Rennstrecke - komplett clientseitig.
@@ -8653,9 +9168,9 @@ return TrafficController
 ]]></ProtectedString></Properties>
 </Item>
 </Item>
-<Item class="Folder" referent="RBX64">
+<Item class="Folder" referent="RBX66">
 <Properties><string name="Name">UI</string></Properties>
-<Item class="ModuleScript" referent="RBX65">
+<Item class="ModuleScript" referent="RBX67">
 <Properties><string name="Name">AdminPanel</string><ProtectedString name="Source"><![CDATA[--[[
 	AdminPanel
 	Wird nur gebaut, wenn der Server sagt, dass dieser Spieler Admin ist. Der
@@ -8763,7 +9278,7 @@ end
 return AdminPanel
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX66">
+<Item class="ModuleScript" referent="RBX68">
 <Properties><string name="Name">DailyPanel</string><ProtectedString name="Source"><![CDATA[--[[
 	DailyPanel
 	Sieben Kaesten, einer pro Tag. Welcher Tag dran ist und ob abgeholt werden
@@ -8920,7 +9435,7 @@ end
 return DailyPanel
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX67">
+<Item class="ModuleScript" referent="RBX69">
 <Properties><string name="Name">DismountBar</string><ProtectedString name="Source"><![CDATA[--[[
 	DismountBar
 	Der Fortschrittsbalken beim Abmontieren. Der Balken ist reine Anzeige: der
@@ -9004,7 +9519,7 @@ end
 return DismountBar
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX68">
+<Item class="ModuleScript" referent="RBX70">
 <Properties><string name="Name">GarageMenu</string><ProtectedString name="Source"><![CDATA[--[[
 	GarageMenu
 	Die Werkstatt: Teile kaufen, laufende Reparaturen sehen, geklaute Teile
@@ -9232,7 +9747,7 @@ end
 return GarageMenu
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX69">
+<Item class="ModuleScript" referent="RBX71">
 <Properties><string name="Name">GarageRows</string><ProtectedString name="Source"><![CDATA[--[[
 	GarageRows
 	Die einzelnen Zeilen im Werkstatt-Menue. Jede Zeile schickt beim Klick genau
@@ -9457,7 +9972,7 @@ end
 return GarageRows
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX70">
+<Item class="ModuleScript" referent="RBX72">
 <Properties><string name="Name">HUD</string><ProtectedString name="Source"><![CDATA[--[[
 	HUD
 	Cash, Rate, Kasse, Heist-Countdown, Trage-Anzeige und die Knoepfe fuer die
@@ -9629,7 +10144,26 @@ function HUD.Init(root: Frame, callbacks)
 		Parent = root,
 	})
 
+	-- Alarmzeile direkt unter der Heist-Pille: die einzige Meldung, die den
+	-- Bestohlenen mitten im Fenster wirklich interessiert.
+	local alarmLabel = Theme.label({
+		Name = "Alarm",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 58),
+		Size = UDim2.new(0.6, 0, 0, 20),
+		Font = Theme.Fonts.bodyBold,
+		TextSize = 14,
+		TextScaled = false,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		TextStrokeTransparency = 0.4,
+		TextColor3 = Theme.Colors.accent,
+		Visible = false,
+		ZIndex = 12,
+		Parent = root,
+	})
+
 	HUD._refs = {
+		alarm = alarmLabel,
 		cash = cashLabel,
 		flash = flash,
 		rate = rateLabel,
@@ -9682,12 +10216,34 @@ function HUD.Update()
 	local carry = Store.carry
 	refs.carryBar.Visible = carry ~= nil
 	if carry then
-		refs.carryLabel.Text = ("Du traegst: %s (%s)\nAb in deine Garage - auf das blaue Pad!"):format(
-			carry.tierName,
-			carry.slotName
+		-- Seit v8 koennen es mehrere sein. Namen untereinander, damit die Zeile
+		-- bei zwei Teilen nicht aus dem Kasten laeuft.
+		local names = {}
+		for _, part in carry do
+			table.insert(names, ("%s (%s)"):format(part.tierName, part.slotName))
+		end
+		refs.carryLabel.Text = ("Du traegst: %s\nEigenes Pad = einbauen, Hehler in der Hofmitte = Cash."):format(
+			table.concat(names, " + ")
 		)
 	end
 	refs.tackle.Visible = Store.heist.open and carry == nil
+
+	-- Alarm der eigenen Garage. Stufe 0 blendet die Zeile aus.
+	local alarm = Store.alarm
+	local level = alarm and alarm.level or 0
+	refs.alarm.Visible = level > 0
+	if level > 0 then
+		local detail
+		if alarm.position then
+			detail = ("%s ist drin - Position auf der Karte"):format(alarm.thief or "Jemand")
+		elseif alarm.direction then
+			detail = ("Jemand ist drin - Richtung %s"):format(alarm.direction)
+		else
+			detail = "Jemand ist in deiner Box"
+		end
+		refs.alarm.Text = ("ALARM %d/%d  -  %s"):format(level, #Config.ALARM_STEPS, detail)
+		refs.alarm.TextColor3 = if level >= #Config.ALARM_STEPS then Theme.Colors.heist else Theme.Colors.accent
+	end
 
 	if Store.daily then
 		refs.daily.BackgroundColor3 = Store.daily.canClaim and Theme.Colors.good or Theme.Colors.panelAlt
@@ -9747,7 +10303,7 @@ end
 return HUD
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX71">
+<Item class="ModuleScript" referent="RBX73">
 <Properties><string name="Name">InfoPanel</string><ProtectedString name="Source"><![CDATA[--[[
 	InfoPanel
 	Eine schlichte Liste mit Titel. Wird zweimal benutzt: fuer die Rangliste
@@ -9849,7 +10405,7 @@ end
 return InfoPanel
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX72">
+<Item class="ModuleScript" referent="RBX74">
 <Properties><string name="Name">Onboarding</string><ProtectedString name="Source"><![CDATA[--[[
 	Onboarding
 	Erklaert das Spiel in den ersten zwei Minuten - und hoert danach auf.
@@ -10245,7 +10801,7 @@ end
 return Onboarding
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX73">
+<Item class="ModuleScript" referent="RBX75">
 <Properties><string name="Name">RepairMinigame</string><ProtectedString name="Source"><![CDATA[--[[
 	RepairMinigame
 	Die Leiste, mit der man eine laufende Reparatur verkuerzt. Optik nach dem
@@ -10458,7 +11014,7 @@ end
 return RepairMinigame
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX74">
+<Item class="ModuleScript" referent="RBX76">
 <Properties><string name="Name">ShopMenu</string><ProtectedString name="Source"><![CDATA[--[[
 	ShopMenu
 	Zeigt Gamepasses und Developer Products. Der Client kennt keine Produkt-IDs
@@ -10603,7 +11159,7 @@ end
 return ShopMenu
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX75">
+<Item class="ModuleScript" referent="RBX77">
 <Properties><string name="Name">Theme</string><ProtectedString name="Source"><![CDATA[--[[
 	Theme (Visual-Rewrite)
 
@@ -10887,7 +11443,7 @@ end
 return Theme
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX76">
+<Item class="ModuleScript" referent="RBX78">
 <Properties><string name="Name">Toast</string><ProtectedString name="Source"><![CDATA[--[[
 	Toast
 	Kurzmeldungen unten links. Der Server schickt Text und Art, der Client
@@ -10998,7 +11554,7 @@ return Toast
 ]]></ProtectedString></Properties>
 </Item>
 </Item>
-<Item class="ModuleScript" referent="RBX77">
+<Item class="ModuleScript" referent="RBX79">
 <Properties><string name="Name">Store</string><ProtectedString name="Source"><![CDATA[--[[
 	Store
 	Der Client haelt genau eine Kopie dessen, was der Server geschickt hat.
@@ -11018,7 +11574,8 @@ Store.cash = { cash = 0, pile = 0, rate = 0, autoCollect = false }
 Store.heist = { open = false, endsAt = 0, nextAt = 0 }
 Store.daily = nil
 Store.shop = {}
-Store.carry = nil
+Store.carry = nil -- Liste der getragenen Teile, nil = Haende frei
+Store.alarm = nil -- {level, direction?, position?, thief?} - nur waehrend des Fensters
 Store.leaderboard = { richest = {}, thieves = {} }
 
 Store.Changed = Signal.new() -- (was: string)

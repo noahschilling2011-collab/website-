@@ -153,7 +153,15 @@ Remotes.Get("Notify").OnClientEvent:Connect(function(payload)
 end)
 
 Remotes.Get("CarryState").OnClientEvent:Connect(function(payload)
-	Store.Set("carry", payload and payload.part or nil)
+	-- Seit v8 eine Liste: man kann Config.CARRY_MAX_PARTS Teile gleichzeitig
+	-- tragen. Leere Liste = nichts in der Hand.
+	local parts = payload and payload.parts
+	Store.Set("carry", (parts and #parts > 0) and parts or nil)
+end)
+
+Remotes.Get("AlarmUpdate").OnClientEvent:Connect(function(payload)
+	-- Stufe 0 heisst "Alarm vorbei"; das HUD blendet die Zeile dann aus.
+	Store.Set("alarm", (payload and (payload.level or 0) > 0) and payload or nil)
 end)
 
 Remotes.Get("DismountProgress").OnClientEvent:Connect(function(payload)

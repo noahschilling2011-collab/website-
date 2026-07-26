@@ -18,6 +18,7 @@ local Util = require(Shared.Util)
 
 local Server = script.Parent.Parent
 local Throttle = require(Server.Garage.Throttle)
+local AlarmState = require(Server.Heist.AlarmState)
 local CarryManager = require(Server.Heist.CarryManager)
 local DismountManager = require(Server.Heist.DismountManager)
 local ProfileOps = require(Server.Data.ProfileOps)
@@ -32,6 +33,8 @@ end
 function HeistService:Init(services)
 	self.Services = services
 	self.Carry = CarryManager.new(services)
+	-- Alarm gehoert zum laufenden Fenster, nicht zum Spielstand.
+	self.Alarm = AlarmState.new(services)
 	self.Dismount = DismountManager.new(services, self.Carry)
 	self.open = false
 	self.openUntil = 0
@@ -151,6 +154,7 @@ end
 function HeistService:_tick()
 	local current = now()
 	if self.open then
+		self.Alarm:Tick()
 		if current >= self.openUntil then
 			self:_close()
 			return
@@ -224,6 +228,7 @@ function HeistService:_close()
 		self.Services.GarageService:SetStealEnabledFor(player.UserId, false)
 	end
 	self.Carry:ReturnEverything()
+	self.Alarm:Clear()
 	self.Services.DerelictService:Clear()
 
 	self:_pushState()

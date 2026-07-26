@@ -59,8 +59,10 @@ function DismountManager:_check(thief: Player, target, carIndex: number, slotId:
 	if not part or part.inTransit then
 		return false, "Da ist nichts mehr."
 	end
-	if self.Carry:IsCarrying(thief) then
-		return false, "Erst abliefern, dann weiterklauen."
+	-- Seit v8 sind Config.CARRY_MAX_PARTS Teile erlaubt. Ohne diese Zeile
+	-- blockte schon das erste, und das zweite waere nie erreichbar gewesen.
+	if not self.Carry:CanCarryMore(thief) then
+		return false, "Du hast die Haende voll - erst abliefern."
 	end
 	local root = rootOf(thief)
 	if not root then
@@ -120,6 +122,8 @@ function DismountManager:Start(thief: Player, target, carIndex: number, slotId: 
 			return
 		end
 		self:_progress(thief, "done")
+		-- Erst jetzt Alarm: ein abgebrochener Versuch soll nichts ausloesen.
+		self.Services.HeistService.Alarm:Raise(StealTarget.PlotIndex(self.Services, target), thief)
 		if not self.Carry:StartCarry(thief, taken, target) then
 			-- Charakter ist im letzten Moment weg: Teil faellt an Ort und Stelle.
 			local root = rootOf(thief)

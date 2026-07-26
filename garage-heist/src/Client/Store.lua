@@ -17,7 +17,8 @@ Store.cash = { cash = 0, pile = 0, rate = 0, autoCollect = false }
 Store.heist = { open = false, endsAt = 0, nextAt = 0 }
 Store.daily = nil
 Store.shop = {}
-Store.carry = nil
+Store.carry = nil -- Liste der getragenen Teile, nil = Haende frei
+Store.alarm = nil -- {level, direction?, position?, thief?} - nur waehrend des Fensters
 Store.leaderboard = { richest = {}, thieves = {} }
 
 Store.Changed = Signal.new() -- (was: string)
