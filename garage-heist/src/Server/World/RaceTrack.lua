@@ -122,22 +122,20 @@ local function buildRoad(folder)
 		})
 	end
 
-	-- Mittelstriche nur auf den Geraden: auf den Boegen waeren es hundert
-	-- zusaetzliche Parts fuer einen Effekt, den niemand sieht.
+	-- Mittelstriche nur auf den ebenen Geraden. Seit v9 ueber TrackPath.At()
+	-- statt ueber die 2D-Segmentdaten: eine Gerade kann jetzt steigen, und ein
+	-- Strich auf fester Hoehe 44 haenge sonst mitten in der Luft.
 	local dashStep = 26
+	local cursor = 0
 	for _, seg in TrackPath.Segments do
-		if seg.kind == "line" then
-			-- Direkt entlang der Geraden laufen statt den Startversatz aus
-			-- BuildSpans zurueckzurechnen.
+		if seg.kind == "line" and seg.rise == 0 then
 			for offset = 8, seg.len - 8, dashStep do
-				local pos2 = seg.from + seg.dir * offset
-				local point = Vector3.new(pos2.X, TrackPath.HEIGHT + 0.85, pos2.Y)
-				local look = point + Vector3.new(seg.dir.X, 0, seg.dir.Y)
+				local cf = TrackPath.At(cursor + offset)
 				for _, lane in { -4.75, 4.75 } do
 					part({
 						Name = "Dash",
 						Size = Vector3.new(0.7, 0.08, 12),
-						CFrame = CFrame.lookAt(point, look) * CFrame.new(lane, 0, 0),
+						CFrame = cf * CFrame.new(lane, 0.85, 0),
 						Color = C.roadEdge,
 						Material = Enum.Material.SmoothPlastic,
 						Parent = folder,
@@ -145,6 +143,7 @@ local function buildRoad(folder)
 				end
 			end
 		end
+		cursor += seg.len
 	end
 end
 
@@ -152,47 +151,85 @@ local function buildPillars(folder)
 	local step = 62
 	local count = math.floor(TrackPath.LENGTH / step)
 	for i = 0, count - 1 do
-		local cf = TrackPath.At(i * step)
-		local pos = cf.Position
-		local height = TrackPath.HEIGHT - 3.2
+		local s = i * step
+		-- Unter einem Looping oder einer stark gekippten Stelle steht kein
+		-- Pfeiler: er muesste schraeg in die Fahrbahn stossen.
+		if TrackPath.IsUpright(s) then
+			local cf = TrackPath.At(s)
+			local pos = cf.Position
+			-- Hoehe kommt aus der Kurve, nicht mehr aus der Konstanten: seit v9
+			-- steigt die Fahrbahn auf der Kuppe auf 62.
+			local height = pos.Y - 3.2
 
-		part({
-			Name = "PillarCap",
-			Size = Vector3.new(TrackPath.ROAD_WIDTH + 5, 2.4, 6),
-			CFrame = cf * CFrame.new(0, -3.4, 0),
-			Color = C.pillar,
-			Material = Enum.Material.Concrete,
-			CastShadow = true,
-			Parent = folder,
-		})
-		part({
-			Name = "Pillar",
-			Size = Vector3.new(7, height, 7),
-			CFrame = CFrame.new(pos.X, height / 2, pos.Z),
-			Color = C.pillar,
-			Material = Enum.Material.Concrete,
-			CanCollide = true,
-			CastShadow = true,
-			Parent = folder,
-		})
-		part({
-			Name = "PillarFoot",
-			Size = Vector3.new(11, 1.6, 11),
-			CFrame = CFrame.new(pos.X, 0.8, pos.Z),
-			Color = C.dark,
-			Material = Enum.Material.Concrete,
-			Parent = folder,
-		})
-		-- Schmaler Leuchtstreifen die Saeule hoch. Bei Daemmerung zieht das
-		-- den Blick nach oben zur Strecke.
-		part({
-			Name = "PillarGlow",
-			Size = Vector3.new(0.5, height - 6, 0.5),
-			CFrame = CFrame.new(pos.X, height / 2, pos.Z + 3.6),
-			Color = C.neon,
-			Material = Enum.Material.Neon,
-			Parent = folder,
-		})
+			part({
+				Name = "PillarCap",
+				Size = Vector3.new(TrackPath.ROAD_WIDTH + 5, 2.4, 6),
+				CFrame = cf * CFrame.new(0, -3.4, 0),
+				Color = C.pillar,
+				Material = Enum.Material.Concrete,
+				CastShadow = true,
+				Parent = folder,
+			})
+			part({
+				Name = "Pillar",
+				Size = Vector3.new(7, height, 7),
+				CFrame = CFrame.new(pos.X, height / 2, pos.Z),
+				Color = C.pillar,
+				Material = Enum.Material.Concrete,
+				CanCollide = true,
+				CastShadow = true,
+				Parent = folder,
+			})
+			part({
+				Name = "PillarFoot",
+				Size = Vector3.new(11, 1.6, 11),
+				CFrame = CFrame.new(pos.X, 0.8, pos.Z),
+				Color = C.dark,
+				Material = Enum.Material.Concrete,
+				Parent = folder,
+			})
+			-- Schmaler Leuchtstreifen die Saeule hoch. Bei Daemmerung zieht das
+			-- den Blick nach oben zur Strecke.
+			part({
+				Name = "PillarGlow",
+				Size = Vector3.new(0.5, height - 6, 0.5),
+				CFrame = CFrame.new(pos.X, height / 2, pos.Z + 3.6),
+				Color = C.neon,
+				Material = Enum.Material.Neon,
+				Parent = folder,
+			})
+		end
+	end
+end
+
+-- Traeger fuer den Looping. Ohne den haengt ein 44 Studs hoher Ring in der
+-- Luft; mit ihm sieht er nach Bauwerk aus. Rein optisch, keine Kollision.
+local function buildLoopFrame(folder)
+	for _, seg in TrackPath.Segments do
+		if seg.kind == "loop" then
+			local base = Vector3.new(seg.from.X, seg.y0, seg.from.Y)
+			local top = base.Y + 2 * TrackPath.LOOP_RADIUS
+			for _, side in { -1, 1 } do
+				part({
+					Name = "LoopMast",
+					Size = Vector3.new(2, top, 2),
+					CFrame = CFrame.new(base.X, top / 2, base.Z + side * (TrackPath.ROAD_WIDTH / 2 + 3)),
+					Color = C.pillar,
+					Material = Enum.Material.Metal,
+					CanCollide = true,
+					CastShadow = true,
+					Parent = folder,
+				})
+			end
+			part({
+				Name = "LoopRing",
+				Size = Vector3.new(1.2, 1.2, TrackPath.ROAD_WIDTH + 8),
+				CFrame = CFrame.new(base.X, top + 1, base.Z),
+				Color = C.neonWarm,
+				Material = Enum.Material.Neon,
+				Parent = folder,
+			})
+		end
 	end
 end
 
@@ -392,6 +429,7 @@ function RaceTrack.Build(parent: Instance)
 
 	buildRoad(folder)
 	buildPillars(folder)
+	buildLoopFrame(folder)
 	buildGantries(folder)
 
 	local yard = Instance.new("Folder")

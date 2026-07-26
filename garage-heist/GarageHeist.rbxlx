@@ -209,6 +209,21 @@ Config.REPAIR_PERFECT_HALF = 0.07 -- halbe Breite des Kerns
 Config.REPAIR_LATENCY_TOLERANCE = 0.18
 Config.REPAIR_TICK_COOLDOWN = 0.35
 
+-- Rennstrecke: 3D-Elemente ------------------------------------------------
+-- Die Grundmasse des Ovals (HALF_LENGTH, RADIUS, HEIGHT ...) stehen weiter in
+-- Shared/TrackPath, weil Server UND Client dieselbe Kurve rechnen und das
+-- Modul dafuer eigenstaendig bleiben soll. Hier stehen nur die Elemente, an
+-- denen man beim Bauen dreht.
+--
+-- Die Strecke wird NICHT groesser - sie bekommt nur Elemente. Laenge ist keine
+-- Entscheidung, Elemente sind welche.
+Config.TRACK_CREST_RISE = 18 -- Kuppe auf der Nordgeraden, danach wieder runter
+Config.TRACK_CREST_LENGTH = 90 -- Laenge je Rampenhaelfte
+Config.TRACK_BANK_DEGREES = 22 -- Querneigung in den vier Boegen
+Config.TRACK_LOOP_RADIUS = 22 -- Looping auf der Suedgeraden
+Config.TRACK_LOOP_OFFSET = 100 -- Abstand vom Beginn der Suedgeraden
+Config.TRACK_LOOP_STEPS = 30 -- Bauabschnitte im Looping (Geometrie, nicht Fahren)
+
 -- Pruefstand ---------------------------------------------------------------
 -- Die Luecke zwischen "Renn-Slicks kaufen" und "nie fahren". Auto auf den
 -- Pruefstand, Leistung wird aus den verbauten Teilen gerechnet, Ergebnis geht
@@ -766,12 +781,18 @@ return SoundCatalog
 <Item class="ModuleScript" referent="RBX14">
 <Properties><string name="Name">TrackPath</string><ProtectedString name="Source"><![CDATA[--[[
 	TrackPath
-	Die Rennstrecke als reine Mathematik: ein Oval (Stadionform) mit zwei
-	langen Geraden in X, zwei kurzen in Z und vier Viertelkreisen.
+	Die Rennstrecke als reine Mathematik. Seit v9 dreidimensional: die Kurve
+	kann steigen, sich querneigen und einen Looping schlagen.
 
 	Liegt in Shared, weil zwei Seiten dieselbe Kurve brauchen:
 	- der Server baut die Geometrie darauf (RaceTrack)
 	- jeder Client bewegt seinen eigenen Verkehr darauf (TrafficController)
+
+	WICHTIG: TrackPath.At(s) gibt weiterhin genau ein CFrame zurueck - nur eines,
+	das jetzt auch kippen und kopfueber stehen kann. Die Signatur bleibt, sonst
+	brechen RaceTrack und TrafficController gleichzeitig. Der Verkehr faehrt die
+	neue Strecke ohne eine Zeile Aenderung ab; das ist der kostenlose Test, ob
+	die Kurve stimmt.
 
 	Masse sind auf die Garagen abgestimmt. Die Plots stehen in zwei Reihen bei
 	z = +/-82 (Tiefe 54, also z von 55 bis 109) und x von -163 bis 163.
@@ -779,15 +800,25 @@ return SoundCatalog
 	HOEHE 44 ist kein Zufall: von der Mitte des Hofs aus streift die Sichtlinie
 	ueber ein 18 Studs hohes Garagendach bei z = 55 auf Augenhoehe 5 bei
 	z = 140 die Hoehe 36. Alles darunter waere hinter dem Dach versteckt. Bei
-	44 sieht man die Autos von ueberall im Hof - genau darum geht es.
+	44 sieht man die Autos von ueberall im Hof - genau darum geht es. Die
+	Elemente gehen von dieser Hoehe AUS und kehren zu ihr zurueck.
+
+	Segmentarten:
+	  line   Gerade in der XZ-Ebene, optional mit Hoehenaenderung (rise)
+	  arc    Viertelkreis, optional mit Querneigung (bank)
+	  loop   senkrechter Kreis um die Querachse; verbraucht Bogenlaenge, aber
+	         keine XZ-Strecke - er endet dort, wo er anfing
 ]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
 
 local TrackPath = {}
 
 TrackPath.HALF_LENGTH = 265 -- halbe Ausdehnung in X
 TrackPath.HALF_WIDTH = 140 -- halbe Ausdehnung in Z
 TrackPath.RADIUS = 70 -- Eckradius
-TrackPath.HEIGHT = 44 -- Fahrbahnhoehe ueber Grund
+TrackPath.HEIGHT = 44 -- Grundhoehe der Fahrbahn ueber Grund
 TrackPath.ROAD_WIDTH = 30
 TrackPath.LANES = { -9.5, 0, 9.5 } -- Spurmitten quer zur Fahrtrichtung
 
@@ -800,24 +831,134 @@ local STRAIGHT_X = 2 * (L - R)
 local STRAIGHT_Z = 2 * (W - R)
 local ARC = math.pi * R / 2
 
-TrackPath.LENGTH = 2 * STRAIGHT_X + 2 * STRAIGHT_Z + 4 * ARC
+local CREST = Config.TRACK_CREST_RISE
+local CREST_LEN = Config.TRACK_CREST_LENGTH
+local BANK = math.rad(Config.TRACK_BANK_DEGREES)
+local LOOP_R = Config.TRACK_LOOP_RADIUS
+local LOOP_LEN = 2 * math.pi * LOOP_R
+local LOOP_AT = Config.TRACK_LOOP_OFFSET
+
+TrackPath.LOOP_RADIUS = LOOP_R
+TrackPath.TOP_HEIGHT = Y + math.max(CREST, 2 * LOOP_R) -- hoechster Punkt, fuer Bauzwecke
 
 -- Vector2.X = Welt-X, Vector2.Y = Welt-Z.
 -- Reihenfolge im Uhrzeigersinn von oben, Start auf der vorderen Geraden.
 -- Der Winkel phi laeuft durchgehend von +90 auf -270 herunter, damit jede
 -- Ecke nahtlos an die vorherige anschliesst.
-local SEGMENTS = {
-	{ kind = "line", len = STRAIGHT_X, from = Vector2.new(-(L - R), W), dir = Vector2.new(1, 0) },
-	{ kind = "arc", len = ARC, center = Vector2.new(L - R, W - R), from = 90 },
-	{ kind = "line", len = STRAIGHT_Z, from = Vector2.new(L, W - R), dir = Vector2.new(0, -1) },
-	{ kind = "arc", len = ARC, center = Vector2.new(L - R, -(W - R)), from = 0 },
-	{ kind = "line", len = STRAIGHT_X, from = Vector2.new(L - R, -W), dir = Vector2.new(-1, 0) },
-	{ kind = "arc", len = ARC, center = Vector2.new(-(L - R), -(W - R)), from = -90 },
-	{ kind = "line", len = STRAIGHT_Z, from = Vector2.new(-L, -(W - R)), dir = Vector2.new(0, 1) },
-	{ kind = "arc", len = ARC, center = Vector2.new(-(L - R), W - R), from = -180 },
-}
+local SEGMENTS = {}
+
+local function line(len: number, fromX: number, fromZ: number, dirX: number, dirZ: number, rise: number?)
+	table.insert(SEGMENTS, {
+		kind = "line",
+		len = len,
+		from = Vector2.new(fromX, fromZ),
+		dir = Vector2.new(dirX, dirZ),
+		rise = rise or 0,
+		bank = 0,
+	})
+end
+
+local function arc(centerX: number, centerZ: number, fromDeg: number)
+	table.insert(SEGMENTS, {
+		kind = "arc",
+		len = ARC,
+		center = Vector2.new(centerX, centerZ),
+		from = fromDeg,
+		rise = 0,
+		bank = BANK,
+	})
+end
+
+local function loop(atX: number, atZ: number, dirX: number, dirZ: number)
+	table.insert(SEGMENTS, {
+		kind = "loop",
+		len = LOOP_LEN,
+		from = Vector2.new(atX, atZ),
+		dir = Vector2.new(dirX, dirZ),
+		rise = 0,
+		bank = 0,
+	})
+end
+
+-- Nordgerade mit Kuppe in der Mitte: hoch, wieder runter, netto null.
+local restNorth = STRAIGHT_X - 2 * CREST_LEN
+line(restNorth / 2, -(L - R), W, 1, 0)
+line(CREST_LEN, -(L - R) + restNorth / 2, W, 1, 0, CREST)
+line(CREST_LEN, -(L - R) + restNorth / 2 + CREST_LEN, W, 1, 0, -CREST)
+line(restNorth / 2, (L - R) - restNorth / 2, W, 1, 0)
+
+arc(L - R, W - R, 90)
+line(STRAIGHT_Z, L, W - R, 0, -1)
+arc(L - R, -(W - R), 0)
+
+-- Suedgerade mit Looping. Der Looping verbraucht Bogenlaenge, aber keine
+-- XZ-Strecke - die Gerade bleibt deshalb insgesamt STRAIGHT_X lang.
+line(LOOP_AT, L - R, -W, -1, 0)
+loop((L - R) - LOOP_AT, -W, -1, 0)
+line(STRAIGHT_X - LOOP_AT, (L - R) - LOOP_AT, -W, -1, 0)
+
+arc(-(L - R), -(W - R), -90)
+line(STRAIGHT_Z, -L, -(W - R), 0, 1)
+arc(-(L - R), W - R, -180)
+
+-- Starthoehe je Segment einmal vorrechnen, statt bei jedem At() die Liste
+-- aufzusummieren. Die Kette MUSS sich schliessen, sonst haette die Strecke
+-- nach einer Runde eine Stufe.
+local cursorY = Y
+for _, seg in SEGMENTS do
+	seg.y0 = cursorY
+	cursorY += seg.rise
+end
+assert(math.abs(cursorY - Y) < 1e-6, "TrackPath: die Hoehen summieren sich nicht auf null")
 
 TrackPath.Segments = SEGMENTS
+
+local length = 0
+for _, seg in SEGMENTS do
+	length += seg.len
+end
+TrackPath.LENGTH = length
+
+-- Glaettung 0 -> 1 mit waagerechter Tangente an beiden Enden. Ohne die haette
+-- jede Rampe am Anfang und Ende einen Knick.
+local function smooth(t: number): number
+	return t * t * (3 - 2 * t)
+end
+
+-- Querneigung: 0 an beiden Segmentenden, voll in der Mitte. Ein Bogen geht
+-- damit sauber aus der Geraden heraus und wieder hinein.
+local function bankProfile(t: number): number
+	local ramp = 0.25
+	if t < ramp then
+		return smooth(t / ramp)
+	elseif t > 1 - ramp then
+		return smooth((1 - t) / ramp)
+	end
+	return 1
+end
+
+--[[
+	Der Looping als senkrechter Kreis in der Ebene aus Fahrtrichtung und Hoehe.
+
+	theta = 0 ist der Einstieg unten, theta = pi der Scheitel. Die Formeln sind
+	so gewaehlt, dass Ein- und Ausstieg exakt derselbe Punkt mit derselben
+	Ausrichtung sind - sonst haette die Strecke dort eine Kante.
+
+	Vorwaerts und Oben stehen in jedem theta senkrecht aufeinander (das Skalar-
+	produkt kuerzt sich zu null), deshalb ist CFrame.lookAt hier immer definiert.
+]]
+local function loopFrame(seg, t: number): CFrame
+	local theta = t * math.pi * 2
+	local dir = Vector3.new(seg.dir.X, 0, seg.dir.Y)
+	local up = Vector3.new(0, 1, 0)
+	local base = Vector3.new(seg.from.X, seg.y0, seg.from.Y)
+	local center = base + up * LOOP_R
+
+	local position = center - up * (LOOP_R * math.cos(theta)) + dir * (LOOP_R * math.sin(theta))
+	local forward = dir * math.cos(theta) + up * math.sin(theta)
+	local carUp = up * math.cos(theta) - dir * math.sin(theta)
+	return CFrame.lookAt(position, position + forward, carUp)
+end
 
 -- CFrame an der Bogenlaenge s. Die LookVector zeigt in Fahrtrichtung, die
 -- RightVector quer nach aussen - Spurversatz also einfach mit
@@ -826,17 +967,39 @@ function TrackPath.At(s: number): CFrame
 	local remaining = s % TrackPath.LENGTH
 	for _, seg in SEGMENTS do
 		if remaining < seg.len then
+			local t = remaining / seg.len
+			if seg.kind == "loop" then
+				return loopFrame(seg, t)
+			end
+
 			local pos, dir
 			if seg.kind == "line" then
 				pos = seg.from + seg.dir * remaining
 				dir = seg.dir
 			else
-				local phi = math.rad(seg.from - (remaining / seg.len) * 90)
+				local phi = math.rad(seg.from - t * 90)
 				pos = seg.center + Vector2.new(math.cos(phi), math.sin(phi)) * R
 				dir = Vector2.new(math.sin(phi), -math.cos(phi))
 			end
-			local point = Vector3.new(pos.X, Y, pos.Y)
-			return CFrame.lookAt(point, point + Vector3.new(dir.X, 0, dir.Y))
+
+			-- Hoehe geglaettet, Steigung ist deren Ableitung. Der Anstieg ist
+			-- flach genug, dass der Unterschied zwischen Grundriss- und
+			-- Bahnlaenge unter zwei Prozent bleibt; das wird bewusst ignoriert,
+			-- damit s eine einfache Zahl bleibt.
+			local y = seg.y0 + seg.rise * smooth(t)
+			local slope = seg.rise * 6 * t * (1 - t) / seg.len
+
+			local point = Vector3.new(pos.X, y, pos.Y)
+			local forward = Vector3.new(dir.X, slope, dir.Y).Unit
+			local frame = CFrame.lookAt(point, point + forward)
+
+			if seg.bank ~= 0 then
+				-- Drehung um die lokale Z-Achse kippt die Fahrbahn. Positiv hebt
+				-- die rechte Seite - und rechts ist in allen vier Boegen aussen,
+				-- weil der Kurs im Uhrzeigersinn laeuft.
+				frame *= CFrame.Angles(0, 0, seg.bank * bankProfile(t))
+			end
+			return frame
 		end
 		remaining -= seg.len
 	end
@@ -845,30 +1008,42 @@ function TrackPath.At(s: number): CFrame
 end
 
 -- Grobe Punktliste fuer Bauzwecke: gibt Mittelpunkt und Laenge jedes
--- Bauabschnitts zurueck. Geraden bleiben ein einziges Part, Boegen werden
--- in `arcSteps` Stuecke zerlegt.
+-- Bauabschnitts zurueck. Nur eine ebene Gerade bleibt ein einziges Part;
+-- alles, was sich kruemmt, kippt oder steigt, wird zerlegt.
 function TrackPath.BuildSpans(arcSteps: number?)
 	local steps = arcSteps or 14
 	local spans = {}
 	local cursor = 0
 	for _, seg in SEGMENTS do
-		if seg.kind == "line" then
-			table.insert(spans, { s = cursor + seg.len / 2, len = seg.len, straight = true })
-			cursor += seg.len
+		local pieces
+		if seg.kind == "loop" then
+			pieces = Config.TRACK_LOOP_STEPS
+		elseif seg.kind == "line" and seg.rise == 0 then
+			pieces = 1
 		else
-			local piece = seg.len / steps
-			for i = 0, steps - 1 do
-				table.insert(spans, {
-					s = cursor + piece * (i + 0.5),
-					-- Ueberlappung, sonst klaffen zwischen den Bogenstuecken Fugen.
-					len = piece + 1.2,
-					straight = false,
-				})
-			end
-			cursor += seg.len
+			pieces = steps
 		end
+
+		local piece = seg.len / pieces
+		for i = 0, pieces - 1 do
+			table.insert(spans, {
+				s = cursor + piece * (i + 0.5),
+				-- Ueberlappung, sonst klaffen zwischen den Stuecken Fugen.
+				len = if pieces > 1 then piece + 1.2 else piece,
+				straight = pieces == 1,
+				kind = seg.kind,
+			})
+		end
+		cursor += seg.len
 	end
 	return spans
+end
+
+-- Steht die Fahrbahn an dieser Stelle normal auf dem Boden? Der Streckenbau
+-- benutzt das, um unter einem Looping keine Stuetzpfeiler zu setzen.
+function TrackPath.IsUpright(s: number): boolean
+	local frame = TrackPath.At(s)
+	return frame.UpVector.Y > 0.9
 end
 
 return TrackPath
@@ -8181,22 +8356,20 @@ local function buildRoad(folder)
 		})
 	end
 
-	-- Mittelstriche nur auf den Geraden: auf den Boegen waeren es hundert
-	-- zusaetzliche Parts fuer einen Effekt, den niemand sieht.
+	-- Mittelstriche nur auf den ebenen Geraden. Seit v9 ueber TrackPath.At()
+	-- statt ueber die 2D-Segmentdaten: eine Gerade kann jetzt steigen, und ein
+	-- Strich auf fester Hoehe 44 haenge sonst mitten in der Luft.
 	local dashStep = 26
+	local cursor = 0
 	for _, seg in TrackPath.Segments do
-		if seg.kind == "line" then
-			-- Direkt entlang der Geraden laufen statt den Startversatz aus
-			-- BuildSpans zurueckzurechnen.
+		if seg.kind == "line" and seg.rise == 0 then
 			for offset = 8, seg.len - 8, dashStep do
-				local pos2 = seg.from + seg.dir * offset
-				local point = Vector3.new(pos2.X, TrackPath.HEIGHT + 0.85, pos2.Y)
-				local look = point + Vector3.new(seg.dir.X, 0, seg.dir.Y)
+				local cf = TrackPath.At(cursor + offset)
 				for _, lane in { -4.75, 4.75 } do
 					part({
 						Name = "Dash",
 						Size = Vector3.new(0.7, 0.08, 12),
-						CFrame = CFrame.lookAt(point, look) * CFrame.new(lane, 0, 0),
+						CFrame = cf * CFrame.new(lane, 0.85, 0),
 						Color = C.roadEdge,
 						Material = Enum.Material.SmoothPlastic,
 						Parent = folder,
@@ -8204,6 +8377,7 @@ local function buildRoad(folder)
 				end
 			end
 		end
+		cursor += seg.len
 	end
 end
 
@@ -8211,47 +8385,85 @@ local function buildPillars(folder)
 	local step = 62
 	local count = math.floor(TrackPath.LENGTH / step)
 	for i = 0, count - 1 do
-		local cf = TrackPath.At(i * step)
-		local pos = cf.Position
-		local height = TrackPath.HEIGHT - 3.2
+		local s = i * step
+		-- Unter einem Looping oder einer stark gekippten Stelle steht kein
+		-- Pfeiler: er muesste schraeg in die Fahrbahn stossen.
+		if TrackPath.IsUpright(s) then
+			local cf = TrackPath.At(s)
+			local pos = cf.Position
+			-- Hoehe kommt aus der Kurve, nicht mehr aus der Konstanten: seit v9
+			-- steigt die Fahrbahn auf der Kuppe auf 62.
+			local height = pos.Y - 3.2
 
-		part({
-			Name = "PillarCap",
-			Size = Vector3.new(TrackPath.ROAD_WIDTH + 5, 2.4, 6),
-			CFrame = cf * CFrame.new(0, -3.4, 0),
-			Color = C.pillar,
-			Material = Enum.Material.Concrete,
-			CastShadow = true,
-			Parent = folder,
-		})
-		part({
-			Name = "Pillar",
-			Size = Vector3.new(7, height, 7),
-			CFrame = CFrame.new(pos.X, height / 2, pos.Z),
-			Color = C.pillar,
-			Material = Enum.Material.Concrete,
-			CanCollide = true,
-			CastShadow = true,
-			Parent = folder,
-		})
-		part({
-			Name = "PillarFoot",
-			Size = Vector3.new(11, 1.6, 11),
-			CFrame = CFrame.new(pos.X, 0.8, pos.Z),
-			Color = C.dark,
-			Material = Enum.Material.Concrete,
-			Parent = folder,
-		})
-		-- Schmaler Leuchtstreifen die Saeule hoch. Bei Daemmerung zieht das
-		-- den Blick nach oben zur Strecke.
-		part({
-			Name = "PillarGlow",
-			Size = Vector3.new(0.5, height - 6, 0.5),
-			CFrame = CFrame.new(pos.X, height / 2, pos.Z + 3.6),
-			Color = C.neon,
-			Material = Enum.Material.Neon,
-			Parent = folder,
-		})
+			part({
+				Name = "PillarCap",
+				Size = Vector3.new(TrackPath.ROAD_WIDTH + 5, 2.4, 6),
+				CFrame = cf * CFrame.new(0, -3.4, 0),
+				Color = C.pillar,
+				Material = Enum.Material.Concrete,
+				CastShadow = true,
+				Parent = folder,
+			})
+			part({
+				Name = "Pillar",
+				Size = Vector3.new(7, height, 7),
+				CFrame = CFrame.new(pos.X, height / 2, pos.Z),
+				Color = C.pillar,
+				Material = Enum.Material.Concrete,
+				CanCollide = true,
+				CastShadow = true,
+				Parent = folder,
+			})
+			part({
+				Name = "PillarFoot",
+				Size = Vector3.new(11, 1.6, 11),
+				CFrame = CFrame.new(pos.X, 0.8, pos.Z),
+				Color = C.dark,
+				Material = Enum.Material.Concrete,
+				Parent = folder,
+			})
+			-- Schmaler Leuchtstreifen die Saeule hoch. Bei Daemmerung zieht das
+			-- den Blick nach oben zur Strecke.
+			part({
+				Name = "PillarGlow",
+				Size = Vector3.new(0.5, height - 6, 0.5),
+				CFrame = CFrame.new(pos.X, height / 2, pos.Z + 3.6),
+				Color = C.neon,
+				Material = Enum.Material.Neon,
+				Parent = folder,
+			})
+		end
+	end
+end
+
+-- Traeger fuer den Looping. Ohne den haengt ein 44 Studs hoher Ring in der
+-- Luft; mit ihm sieht er nach Bauwerk aus. Rein optisch, keine Kollision.
+local function buildLoopFrame(folder)
+	for _, seg in TrackPath.Segments do
+		if seg.kind == "loop" then
+			local base = Vector3.new(seg.from.X, seg.y0, seg.from.Y)
+			local top = base.Y + 2 * TrackPath.LOOP_RADIUS
+			for _, side in { -1, 1 } do
+				part({
+					Name = "LoopMast",
+					Size = Vector3.new(2, top, 2),
+					CFrame = CFrame.new(base.X, top / 2, base.Z + side * (TrackPath.ROAD_WIDTH / 2 + 3)),
+					Color = C.pillar,
+					Material = Enum.Material.Metal,
+					CanCollide = true,
+					CastShadow = true,
+					Parent = folder,
+				})
+			end
+			part({
+				Name = "LoopRing",
+				Size = Vector3.new(1.2, 1.2, TrackPath.ROAD_WIDTH + 8),
+				CFrame = CFrame.new(base.X, top + 1, base.Z),
+				Color = C.neonWarm,
+				Material = Enum.Material.Neon,
+				Parent = folder,
+			})
+		end
 	end
 end
 
@@ -8451,6 +8663,7 @@ function RaceTrack.Build(parent: Instance)
 
 	buildRoad(folder)
 	buildPillars(folder)
+	buildLoopFrame(folder)
 	buildGantries(folder)
 
 	local yard = Instance.new("Folder")

@@ -70,6 +70,21 @@ Config.REPAIR_PERFECT_HALF = 0.07 -- halbe Breite des Kerns
 Config.REPAIR_LATENCY_TOLERANCE = 0.18
 Config.REPAIR_TICK_COOLDOWN = 0.35
 
+-- Rennstrecke: 3D-Elemente ------------------------------------------------
+-- Die Grundmasse des Ovals (HALF_LENGTH, RADIUS, HEIGHT ...) stehen weiter in
+-- Shared/TrackPath, weil Server UND Client dieselbe Kurve rechnen und das
+-- Modul dafuer eigenstaendig bleiben soll. Hier stehen nur die Elemente, an
+-- denen man beim Bauen dreht.
+--
+-- Die Strecke wird NICHT groesser - sie bekommt nur Elemente. Laenge ist keine
+-- Entscheidung, Elemente sind welche.
+Config.TRACK_CREST_RISE = 18 -- Kuppe auf der Nordgeraden, danach wieder runter
+Config.TRACK_CREST_LENGTH = 90 -- Laenge je Rampenhaelfte
+Config.TRACK_BANK_DEGREES = 22 -- Querneigung in den vier Boegen
+Config.TRACK_LOOP_RADIUS = 22 -- Looping auf der Suedgeraden
+Config.TRACK_LOOP_OFFSET = 100 -- Abstand vom Beginn der Suedgeraden
+Config.TRACK_LOOP_STEPS = 30 -- Bauabschnitte im Looping (Geometrie, nicht Fahren)
+
 -- Pruefstand ---------------------------------------------------------------
 -- Die Luecke zwischen "Renn-Slicks kaufen" und "nie fahren". Auto auf den
 -- Pruefstand, Leistung wird aus den verbauten Teilen gerechnet, Ergebnis geht
