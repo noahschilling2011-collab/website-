@@ -74,6 +74,31 @@ Config.REPAIR_TICK_COOLDOWN = 0.35
 Config.REBIRTH_MULT = 0.25 -- +25 % Rate je Rebirth, dauerhaft
 Config.REBIRTH_EXTRA_SLOT_AT = 1 -- ab diesem Rebirth ein zusaetzlicher Stellplatz
 Config.REBIRTH_PAINT_AT = 3 -- ab hier exklusiver Lack
+
+-- Was jeder Rebirth AUFMACHT. Der Multiplikator laeuft zusaetzlich weiter, aber
+-- der Grund fuer den naechsten Durchgang ist ab v8 eine neue Faehigkeit und
+-- keine groessere Zahl. Als Tabelle, damit im Code nirgends `if rebirths >= 4`
+-- steht und das Menue vorab anzeigen kann, was als Naechstes kommt.
+--
+-- Jeder Eintrag: label = was im Menue steht, plus die Felder, die der Server
+-- ausliest. Wer eine Freischaltung ergaenzt, ergaenzt sie HIER und liest sie
+-- ueber ProfileOps.Unlocks aus.
+Config.REBIRTH_UNLOCKS = {
+	{ label = "Ein zusaetzlicher Stellplatz", extraCarSlot = true },
+	{ label = "Hehler zahlt besser", fenceRate = 0.85 },
+	{ label = "Exklusiver Lack auf Stufe 4", exclusivePaint = true },
+	{ label = "Nachtschicht: ein langes Fenster pro Sitzung", nightShift = true },
+	-- Der zweite Plot fehlt bewusst: dafuer muesste das View-Modell von
+	-- "ein Plot je Spieler" auf "mehrere" umgestellt werden (GarageService,
+	-- Snapshot, GarageView, DerelictService). Das ist ein eigener Auftrag und
+	-- nichts, was man ohne Studio-Test einbaut.
+}
+
+-- Nachtschicht: einmal je Serverlauf laeuft ein Fenster laenger und die Beute
+-- ist mehr wert. Ausgeloest vom HeistService, sobald ein Spieler mit der
+-- Freischaltung im Server ist.
+Config.NIGHT_SHIFT_WINDOW = 150 -- statt HEIST_WINDOW
+Config.NIGHT_SHIFT_VALUE_MULT = 1.5 -- Leerstand-Teile sind in dieser Nacht mehr wert
 -- Rebirth verlangt "alles auf der hoechsten Stufe". Bis v7 war das T4. Seit T4
 -- nur noch Beute ist, haenge das an MAX_PURCHASABLE_TIER: sonst braeuchte ein
 -- Rebirth bis zu 16 geklaute Prototypen, bei einem T4 pro

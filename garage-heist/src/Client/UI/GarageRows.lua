@@ -170,10 +170,21 @@ end
 -- hier, was noch fehlt.
 function GarageRows.Rebirth(parent, order, rebirth, onConfirm)
 	local frame = GarageRows.Row(parent, order, 62)
+	-- Der Anreiz ist die Freischaltung, nicht die Prozentzahl - also steht sie
+	-- vorne. Text kommt fertig aus dem Snapshot.
+	local subtitle
+	if rebirth.nextUnlock then
+		subtitle = ("Schaltet frei: %s"):format(rebirth.nextUnlock)
+		if not rebirth.can then
+			subtitle ..= ("  -  %s"):format(rebirth.reason)
+		end
+	else
+		subtitle = rebirth.can and "Alles zurueck auf Anfang - der Bonus bleibt." or rebirth.reason
+	end
 	twoLines(
 		frame,
 		("Rebirth %d  (dauerhaft +%d%% Rate)"):format(rebirth.count, math.floor(rebirth.bonus * 100)),
-		rebirth.can and "Alles zurueck auf Anfang - der Bonus bleibt." or rebirth.reason
+		subtitle
 	)
 	GarageRows.Action(
 		frame,

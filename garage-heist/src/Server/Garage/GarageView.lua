@@ -43,6 +43,7 @@ function GarageView.RenderCars(view, player: Player, data, onStealPrompt)
 			end
 			local refs = CarBuilder.Build(visible, carIndex, player.UserId, pad, view.plot.model, {
 				rebirths = data.rebirths or 0,
+				exclusivePaint = ProfileOps.Unlocks(data).exclusivePaint,
 			})
 			view.cars[carIndex] = refs
 			for slotId, prompt in refs.prompts do

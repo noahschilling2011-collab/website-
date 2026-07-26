@@ -82,7 +82,7 @@ end
 -- Prozedurale Bestueckung: 1-4 Teile, Stufe um +/-1 gestreut.
 -- `t4Slot` bekommt der Aufrufer aus _rollT4 - hoechstens ein Slot im ganzen
 -- Fenster, sonst haette eine einzige Box vier Prototypen.
-function DerelictService:_makeState(baseTier: number, withT4: boolean?)
+function DerelictService:_makeState(baseTier: number, withT4: boolean?, valueMult: number?)
 	local slots = table.clone(PartCatalog.SlotOrder)
 	for index = #slots, 2, -1 do
 		local swap = math.random(index)
@@ -107,7 +107,7 @@ function DerelictService:_makeState(baseTier: number, withT4: boolean?)
 			tier = tier,
 			subTier = 0,
 			originalOwner = 0,
-			mult = Config.DERELICT_VALUE_MULT,
+			mult = Config.DERELICT_VALUE_MULT * (valueMult or 1),
 		}
 	end
 
@@ -119,7 +119,8 @@ function DerelictService:_makeState(baseTier: number, withT4: boolean?)
 end
 
 -- Wird vom HeistService beim Oeffnen des Fensters gerufen.
-function DerelictService:Populate()
+-- `valueMult` hebt den Wert der Beute an (Nachtschicht). 1 = normal.
+function DerelictService:Populate(valueMult: number?)
 	local garage = self.Services.GarageService
 	local baseTier = self:_targetTier()
 
@@ -140,7 +141,7 @@ function DerelictService:Populate()
 
 	for _, entry in free do
 		local plotIndex, plot = entry.index, entry.plot
-		local state = self:_makeState(baseTier, plotIndex == t4Index)
+		local state = self:_makeState(baseTier, plotIndex == t4Index, valueMult)
 		local pad = plot.carPads[1]
 		local refs = CarBuilder.Build(state, 1, 0, pad, plot.model)
 

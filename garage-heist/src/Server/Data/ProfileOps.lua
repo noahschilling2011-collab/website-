@@ -228,18 +228,48 @@ end
 
 function ProfileOps.CarSlots(data): number
 	local levelDef = ProfileOps.GarageLevelDef(data)
-	local bonus = ((data.rebirths or 0) >= Config.REBIRTH_EXTRA_SLOT_AT) and 1 or 0
+	-- Ueber die Freischaltungstabelle statt ueber eine Zahlenschwelle im Code.
+	local bonus = ProfileOps.Unlocks(data).extraCarSlot and 1 or 0
 	return levelDef.carSlots + bonus
 end
 
--- Rebirth ist erst moeglich, wenn die Garage voll ausgebaut ist und jedes Auto
--- auf jedem Slot die hoechste Stufe traegt.
--- Kurs beim Hehler. Rebirth-Freischaltungen koennen ihn anheben; ohne Profil
--- gilt der Grundkurs.
-function ProfileOps.FenceRate(data): number
-	return Config.FENCE_RATE
+--[[
+	Alle Freischaltungen, die dieses Profil erreicht hat, zu einer Tabelle
+	verschmolzen. Spaetere Eintraege ueberschreiben fruehere - so gilt bei
+	Zahlenwerten (fenceRate) automatisch der beste erreichte.
+
+	Damit steht nirgends im Code `if rebirths >= 4`; wer eine Faehigkeit
+	braucht, fragt Unlocks(data).nightShift.
+]]
+function ProfileOps.Unlocks(data)
+	local unlocked = {}
+	local count = data and data.rebirths or 0
+	for index, entry in Config.REBIRTH_UNLOCKS do
+		if index > count then
+			break
+		end
+		for key, value in entry do
+			if key ~= "label" then
+				unlocked[key] = value
+			end
+		end
+	end
+	return unlocked
 end
 
+-- Was der naechste Rebirth bringt. nil = es gibt nichts mehr aufzumachen.
+function ProfileOps.NextUnlock(data): string?
+	local entry = Config.REBIRTH_UNLOCKS[(data and data.rebirths or 0) + 1]
+	return entry and entry.label or nil
+end
+
+-- Kurs beim Hehler. Rebirth 2 hebt ihn an; ohne Profil gilt der Grundkurs.
+function ProfileOps.FenceRate(data): number
+	return ProfileOps.Unlocks(data).fenceRate or Config.FENCE_RATE
+end
+
+-- Rebirth ist erst moeglich, wenn die Garage voll ausgebaut ist und jedes Auto
+-- auf jedem Slot die hoechste kaufbare Stufe traegt.
 function ProfileOps.CanRebirth(data): (boolean, string)
 	local _, level = ProfileOps.GarageLevelDef(data)
 	if level < #Config.GARAGE_LEVELS then

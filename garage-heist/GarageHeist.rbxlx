@@ -213,6 +213,31 @@ Config.REPAIR_TICK_COOLDOWN = 0.35
 Config.REBIRTH_MULT = 0.25 -- +25 % Rate je Rebirth, dauerhaft
 Config.REBIRTH_EXTRA_SLOT_AT = 1 -- ab diesem Rebirth ein zusaetzlicher Stellplatz
 Config.REBIRTH_PAINT_AT = 3 -- ab hier exklusiver Lack
+
+-- Was jeder Rebirth AUFMACHT. Der Multiplikator laeuft zusaetzlich weiter, aber
+-- der Grund fuer den naechsten Durchgang ist ab v8 eine neue Faehigkeit und
+-- keine groessere Zahl. Als Tabelle, damit im Code nirgends `if rebirths >= 4`
+-- steht und das Menue vorab anzeigen kann, was als Naechstes kommt.
+--
+-- Jeder Eintrag: label = was im Menue steht, plus die Felder, die der Server
+-- ausliest. Wer eine Freischaltung ergaenzt, ergaenzt sie HIER und liest sie
+-- ueber ProfileOps.Unlocks aus.
+Config.REBIRTH_UNLOCKS = {
+	{ label = "Ein zusaetzlicher Stellplatz", extraCarSlot = true },
+	{ label = "Hehler zahlt besser", fenceRate = 0.85 },
+	{ label = "Exklusiver Lack auf Stufe 4", exclusivePaint = true },
+	{ label = "Nachtschicht: ein langes Fenster pro Sitzung", nightShift = true },
+	-- Der zweite Plot fehlt bewusst: dafuer muesste das View-Modell von
+	-- "ein Plot je Spieler" auf "mehrere" umgestellt werden (GarageService,
+	-- Snapshot, GarageView, DerelictService). Das ist ein eigener Auftrag und
+	-- nichts, was man ohne Studio-Test einbaut.
+}
+
+-- Nachtschicht: einmal je Serverlauf laeuft ein Fenster laenger und die Beute
+-- ist mehr wert. Ausgeloest vom HeistService, sobald ein Spieler mit der
+-- Freischaltung im Server ist.
+Config.NIGHT_SHIFT_WINDOW = 150 -- statt HEIST_WINDOW
+Config.NIGHT_SHIFT_VALUE_MULT = 1.5 -- Leerstand-Teile sind in dieser Nacht mehr wert
 -- Rebirth verlangt "alles auf der hoechsten Stufe". Bis v7 war das T4. Seit T4
 -- nur noch Beute ist, haenge das an MAX_PURCHASABLE_TIER: sonst braeuchte ein
 -- Rebirth bis zu 16 geklaute Prototypen, bei einem T4 pro
@@ -1490,18 +1515,48 @@ end
 
 function ProfileOps.CarSlots(data): number
 	local levelDef = ProfileOps.GarageLevelDef(data)
-	local bonus = ((data.rebirths or 0) >= Config.REBIRTH_EXTRA_SLOT_AT) and 1 or 0
+	-- Ueber die Freischaltungstabelle statt ueber eine Zahlenschwelle im Code.
+	local bonus = ProfileOps.Unlocks(data).extraCarSlot and 1 or 0
 	return levelDef.carSlots + bonus
 end
 
--- Rebirth ist erst moeglich, wenn die Garage voll ausgebaut ist und jedes Auto
--- auf jedem Slot die hoechste Stufe traegt.
--- Kurs beim Hehler. Rebirth-Freischaltungen koennen ihn anheben; ohne Profil
--- gilt der Grundkurs.
-function ProfileOps.FenceRate(data): number
-	return Config.FENCE_RATE
+--[[
+	Alle Freischaltungen, die dieses Profil erreicht hat, zu einer Tabelle
+	verschmolzen. Spaetere Eintraege ueberschreiben fruehere - so gilt bei
+	Zahlenwerten (fenceRate) automatisch der beste erreichte.
+
+	Damit steht nirgends im Code `if rebirths >= 4`; wer eine Faehigkeit
+	braucht, fragt Unlocks(data).nightShift.
+]]
+function ProfileOps.Unlocks(data)
+	local unlocked = {}
+	local count = data and data.rebirths or 0
+	for index, entry in Config.REBIRTH_UNLOCKS do
+		if index > count then
+			break
+		end
+		for key, value in entry do
+			if key ~= "label" then
+				unlocked[key] = value
+			end
+		end
+	end
+	return unlocked
 end
 
+-- Was der naechste Rebirth bringt. nil = es gibt nichts mehr aufzumachen.
+function ProfileOps.NextUnlock(data): string?
+	local entry = Config.REBIRTH_UNLOCKS[(data and data.rebirths or 0) + 1]
+	return entry and entry.label or nil
+end
+
+-- Kurs beim Hehler. Rebirth 2 hebt ihn an; ohne Profil gilt der Grundkurs.
+function ProfileOps.FenceRate(data): number
+	return ProfileOps.Unlocks(data).fenceRate or Config.FENCE_RATE
+end
+
+-- Rebirth ist erst moeglich, wenn die Garage voll ausgebaut ist und jedes Auto
+-- auf jedem Slot die hoechste kaufbare Stufe traegt.
 function ProfileOps.CanRebirth(data): (boolean, string)
 	local _, level = ProfileOps.GarageLevelDef(data)
 	if level < #Config.GARAGE_LEVELS then
@@ -2178,6 +2233,7 @@ function GarageView.RenderCars(view, player: Player, data, onStealPrompt)
 			end
 			local refs = CarBuilder.Build(visible, carIndex, player.UserId, pad, view.plot.model, {
 				rebirths = data.rebirths or 0,
+				exclusivePaint = ProfileOps.Unlocks(data).exclusivePaint,
 			})
 			view.cars[carIndex] = refs
 			for slotId, prompt in refs.prompts do
@@ -2574,6 +2630,9 @@ function Snapshot.Build(player: Player, data, extra)
 			can = canRebirth,
 			reason = rebirthReason,
 			bonus = Config.REBIRTH_MULT,
+			-- Was der naechste Durchgang aufmacht. Ohne diese Zeile ist Rebirth
+			-- ein Knopf, hinter dem nur eine groessere Zahl steht.
+			nextUnlock = ProfileOps.NextUnlock(data),
 		},
 		looseParts = loose,
 		shopCars = shopCars,
@@ -4204,7 +4263,7 @@ end
 -- Prozedurale Bestueckung: 1-4 Teile, Stufe um +/-1 gestreut.
 -- `t4Slot` bekommt der Aufrufer aus _rollT4 - hoechstens ein Slot im ganzen
 -- Fenster, sonst haette eine einzige Box vier Prototypen.
-function DerelictService:_makeState(baseTier: number, withT4: boolean?)
+function DerelictService:_makeState(baseTier: number, withT4: boolean?, valueMult: number?)
 	local slots = table.clone(PartCatalog.SlotOrder)
 	for index = #slots, 2, -1 do
 		local swap = math.random(index)
@@ -4229,7 +4288,7 @@ function DerelictService:_makeState(baseTier: number, withT4: boolean?)
 			tier = tier,
 			subTier = 0,
 			originalOwner = 0,
-			mult = Config.DERELICT_VALUE_MULT,
+			mult = Config.DERELICT_VALUE_MULT * (valueMult or 1),
 		}
 	end
 
@@ -4241,7 +4300,8 @@ function DerelictService:_makeState(baseTier: number, withT4: boolean?)
 end
 
 -- Wird vom HeistService beim Oeffnen des Fensters gerufen.
-function DerelictService:Populate()
+-- `valueMult` hebt den Wert der Beute an (Nachtschicht). 1 = normal.
+function DerelictService:Populate(valueMult: number?)
 	local garage = self.Services.GarageService
 	local baseTier = self:_targetTier()
 
@@ -4262,7 +4322,7 @@ function DerelictService:Populate()
 
 	for _, entry in free do
 		local plotIndex, plot = entry.index, entry.plot
-		local state = self:_makeState(baseTier, plotIndex == t4Index)
+		local state = self:_makeState(baseTier, plotIndex == t4Index, valueMult)
 		local pad = plot.carPads[1]
 		local refs = CarBuilder.Build(state, 1, 0, pad, plot.model)
 
@@ -5208,9 +5268,36 @@ function HeistService:_tick()
 	end
 end
 
+--[[
+	Nachtschicht (Rebirth-Freischaltung): einmal je Serverlauf laeuft ein
+	Fenster laenger und die Leerstand-Beute ist mehr wert.
+
+	Bedingung ist bewusst "irgendjemand im Server hat es freigeschaltet", nicht
+	"jeder": das Fenster ist ein Serverereignis und laesst sich nicht pro
+	Spieler unterschiedlich lang machen. Wer den Rebirth hat, bringt die Nacht
+	also fuer alle mit - das ist der Angeberwert der Freischaltung.
+]]
+function HeistService:_nightShiftDue(): boolean
+	if self.nightShiftUsed then
+		return false
+	end
+	for _, player in Players:GetPlayers() do
+		local data = self.Services.DataService:Get(player)
+		if data and ProfileOps.Unlocks(data).nightShift then
+			return true
+		end
+	end
+	return false
+end
+
 function HeistService:_open()
 	self.open = true
-	self.openUntil = now() + Config.HEIST_WINDOW
+	self.night = self:_nightShiftDue()
+	if self.night then
+		self.nightShiftUsed = true
+	end
+	local window = self.night and Config.NIGHT_SHIFT_WINDOW or Config.HEIST_WINDOW
+	self.openUntil = now() + window
 	self.nextOpenAt = self.openUntil + (Config.HEIST_INTERVAL - Config.HEIST_WINDOW)
 	table.clear(self._warned)
 	table.clear(self.plotClosesAt)
@@ -5229,20 +5316,31 @@ function HeistService:_open()
 	end
 
 	-- Freie Plots werden zu Zielen, damit auch ein einzelner Spieler klauen kann.
-	self.Services.DerelictService:Populate()
+	self.Services.DerelictService:Populate(self.night and Config.NIGHT_SHIFT_VALUE_MULT or 1)
 
 	for _, player in Players:GetPlayers() do
 		self.Services.TelemetryService:Funnel(player, "firstWindow")
 	end
 
 	self:_pushState()
-	self:_announce(("Klau-Fenster offen! %d Sekunden."):format(Config.HEIST_WINDOW), "heist")
+	if self.night then
+		self:_announce(
+			("NACHTSCHICHT! %d Sekunden offen und die Beute ist %d%% mehr wert."):format(
+				window,
+				math.floor((Config.NIGHT_SHIFT_VALUE_MULT - 1) * 100)
+			),
+			"heist"
+		)
+	else
+		self:_announce(("Klau-Fenster offen! %d Sekunden."):format(window), "heist")
+	end
 	self.Services.EffectService:LocalSoundAll("windowOpen")
 	self:_sendRadar()
 end
 
 function HeistService:_close()
 	self.open = false
+	self.night = false
 	table.clear(self._warned)
 	table.clear(self.plotClosesAt)
 
@@ -6474,8 +6572,13 @@ function CarBuilder.Build(carState, carIndex: number, ownerUserId: number, cfram
 		if tierDef then
 			bodyColor = tierDef.color
 		end
+		-- exclusivePaint kommt aus Config.REBIRTH_UNLOCKS und wird vom Aufrufer
+		-- durchgereicht; rebirths bleibt als Rueckfallweg fuer Aufrufer, die
+		-- die Freischaltungen nicht kennen (DerelictService baut ohne options).
 		local rebirths = (options and options.rebirths) or 0
-		if rebirths >= Config.REBIRTH_PAINT_AT and paintTier >= PartCatalog.TierCount("paint") then
+		local unlocked = (options and options.exclusivePaint)
+			or rebirths >= Config.REBIRTH_PAINT_AT
+		if unlocked and paintTier >= PartCatalog.TierCount("paint") then
 			bodyColor = paintSlot.rebirthColor
 			exclusivePaint = true
 		end
@@ -9920,10 +10023,21 @@ end
 -- hier, was noch fehlt.
 function GarageRows.Rebirth(parent, order, rebirth, onConfirm)
 	local frame = GarageRows.Row(parent, order, 62)
+	-- Der Anreiz ist die Freischaltung, nicht die Prozentzahl - also steht sie
+	-- vorne. Text kommt fertig aus dem Snapshot.
+	local subtitle
+	if rebirth.nextUnlock then
+		subtitle = ("Schaltet frei: %s"):format(rebirth.nextUnlock)
+		if not rebirth.can then
+			subtitle ..= ("  -  %s"):format(rebirth.reason)
+		end
+	else
+		subtitle = rebirth.can and "Alles zurueck auf Anfang - der Bonus bleibt." or rebirth.reason
+	end
 	twoLines(
 		frame,
 		("Rebirth %d  (dauerhaft +%d%% Rate)"):format(rebirth.count, math.floor(rebirth.bonus * 100)),
-		rebirth.can and "Alles zurueck auf Anfang - der Bonus bleibt." or rebirth.reason
+		subtitle
 	)
 	GarageRows.Action(
 		frame,

@@ -548,8 +548,13 @@ function CarBuilder.Build(carState, carIndex: number, ownerUserId: number, cfram
 		if tierDef then
 			bodyColor = tierDef.color
 		end
+		-- exclusivePaint kommt aus Config.REBIRTH_UNLOCKS und wird vom Aufrufer
+		-- durchgereicht; rebirths bleibt als Rueckfallweg fuer Aufrufer, die
+		-- die Freischaltungen nicht kennen (DerelictService baut ohne options).
 		local rebirths = (options and options.rebirths) or 0
-		if rebirths >= Config.REBIRTH_PAINT_AT and paintTier >= PartCatalog.TierCount("paint") then
+		local unlocked = (options and options.exclusivePaint)
+			or rebirths >= Config.REBIRTH_PAINT_AT
+		if unlocked and paintTier >= PartCatalog.TierCount("paint") then
 			bodyColor = paintSlot.rebirthColor
 			exclusivePaint = true
 		end

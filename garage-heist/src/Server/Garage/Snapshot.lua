@@ -122,6 +122,9 @@ function Snapshot.Build(player: Player, data, extra)
 			can = canRebirth,
 			reason = rebirthReason,
 			bonus = Config.REBIRTH_MULT,
+			-- Was der naechste Durchgang aufmacht. Ohne diese Zeile ist Rebirth
+			-- ein Knopf, hinter dem nur eine groessere Zahl steht.
+			nextUnlock = ProfileOps.NextUnlock(data),
 		},
 		looseParts = loose,
 		shopCars = shopCars,

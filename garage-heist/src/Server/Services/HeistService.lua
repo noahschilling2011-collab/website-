@@ -185,9 +185,36 @@ function HeistService:_tick()
 	end
 end
 
+--[[
+	Nachtschicht (Rebirth-Freischaltung): einmal je Serverlauf laeuft ein
+	Fenster laenger und die Leerstand-Beute ist mehr wert.
+
+	Bedingung ist bewusst "irgendjemand im Server hat es freigeschaltet", nicht
+	"jeder": das Fenster ist ein Serverereignis und laesst sich nicht pro
+	Spieler unterschiedlich lang machen. Wer den Rebirth hat, bringt die Nacht
+	also fuer alle mit - das ist der Angeberwert der Freischaltung.
+]]
+function HeistService:_nightShiftDue(): boolean
+	if self.nightShiftUsed then
+		return false
+	end
+	for _, player in Players:GetPlayers() do
+		local data = self.Services.DataService:Get(player)
+		if data and ProfileOps.Unlocks(data).nightShift then
+			return true
+		end
+	end
+	return false
+end
+
 function HeistService:_open()
 	self.open = true
-	self.openUntil = now() + Config.HEIST_WINDOW
+	self.night = self:_nightShiftDue()
+	if self.night then
+		self.nightShiftUsed = true
+	end
+	local window = self.night and Config.NIGHT_SHIFT_WINDOW or Config.HEIST_WINDOW
+	self.openUntil = now() + window
 	self.nextOpenAt = self.openUntil + (Config.HEIST_INTERVAL - Config.HEIST_WINDOW)
 	table.clear(self._warned)
 	table.clear(self.plotClosesAt)
@@ -206,20 +233,31 @@ function HeistService:_open()
 	end
 
 	-- Freie Plots werden zu Zielen, damit auch ein einzelner Spieler klauen kann.
-	self.Services.DerelictService:Populate()
+	self.Services.DerelictService:Populate(self.night and Config.NIGHT_SHIFT_VALUE_MULT or 1)
 
 	for _, player in Players:GetPlayers() do
 		self.Services.TelemetryService:Funnel(player, "firstWindow")
 	end
 
 	self:_pushState()
-	self:_announce(("Klau-Fenster offen! %d Sekunden."):format(Config.HEIST_WINDOW), "heist")
+	if self.night then
+		self:_announce(
+			("NACHTSCHICHT! %d Sekunden offen und die Beute ist %d%% mehr wert."):format(
+				window,
+				math.floor((Config.NIGHT_SHIFT_VALUE_MULT - 1) * 100)
+			),
+			"heist"
+		)
+	else
+		self:_announce(("Klau-Fenster offen! %d Sekunden."):format(window), "heist")
+	end
 	self.Services.EffectService:LocalSoundAll("windowOpen")
 	self:_sendRadar()
 end
 
 function HeistService:_close()
 	self.open = false
+	self.night = false
 	table.clear(self._warned)
 	table.clear(self.plotClosesAt)
 
