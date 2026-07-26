@@ -63,8 +63,9 @@ stimmen. Der Generator oben macht genau das - von Hand ist es reine Fleissarbeit
 ## Die Welt entsteht beim Play, nicht im Editor
 
 **Im Bearbeitungsmodus siehst du nur eine Grundplatte - das ist richtig so.**
-Boden, die zwoelf Garagen, Tore, Schilder, Autos und die Ranglisten-Tafel baut
-der Server beim Start aus Code (`World/PlotBuilder.lua`, `World/CarBuilder.lua`).
+Boden, die zwoelf Garagen, Tore, Schilder, Autos, die Rennstrecke, die
+Spawn-Werkhalle und die Ranglisten-Tafel baut der Server beim Start aus Code
+(`World/PlotBuilder.lua`, `World/CarBuilder.lua`, `World/SpawnHall.lua`).
 Es gibt bewusst keine vorgebaute Map: der Zustand kommt aus dem Profil, und die
 Welt wird daraus gezeichnet - nicht umgekehrt.
 
@@ -79,7 +80,8 @@ Druecke **Play**. Danach steht in der Konsole (View > Output) genau eine Zeile:
 | Was in der Konsole steht | Was los ist |
 |---|---|
 | gar keine `[Garage Heist]`-Zeile | Das Server-Skript laeuft nicht. Liegt `Server` wirklich in `ServerScriptService` und ist es ein `Script` (nicht LocalScript, nicht deaktiviert)? |
-| `... 12 Garagen gebaut`, aber du siehst nichts | Du stehst woanders. Der Spawn liegt bei `0, 0, 26`, die Garagen links und rechts davon. Kamera zuruecksetzen oder neu spawnen. |
+| `... 12 Garagen gebaut`, aber du siehst nichts | Du stehst in der Werkhalle bei `-243, 0, 0` - das ist so gewollt, solange du noch nichts verbaut hast. Nach +X aus der Halle laufen oder am Ausgang das Warp-Pad nehmen. |
+| `[Garage Heist] Werkhalle bauen ist gescheitert: …` | Die Halle fehlt, der Spawn liegt aber trotzdem dort: du stehst auf leerem Asphalt. Die Meldung nennt Datei und Zeile. |
 | `[Garage Heist] <Service>:Start() ist gescheitert: …` | Genau dieser Service ist ausgefallen, der Rest laeuft weiter. Die Meldung nennt Datei und Zeile. |
 | `0 Garagen gebaut` | `GarageService:Start()` ist gescheitert - die Zeile darueber sagt warum. |
 | `[SessionStore] Kein DataStore-Zugriff` | API Services sind aus (Punkt 1 oben). Das Spiel laeuft, speichert aber nicht. |
@@ -158,8 +160,9 @@ Im veroeffentlichten Spiel kommt ausser dir also niemand ran. Der Client
 schickt nur den Befehlsnamen; `AdminService:IsAdmin` entscheidet, und zwar auf
 dem Server. Ein nachgebautes Panel bringt nichts.
 
-**Bekannte Abweichung von der 300-Zeilen-Regel:** `World/PlotBuilder.lua` (749)
-und `World/CarBuilder.lua` (566) sind Geometrie-Dateien - eine lange Liste von
+**Bekannte Abweichung von der 300-Zeilen-Regel:** `World/PlotBuilder.lua` (749),
+`World/CarBuilder.lua` (680), `World/SpawnHall.lua` (578) und
+`World/RaceTrack.lua` (405) sind Geometrie-Dateien - eine lange Liste von
 Parts, keine Logik. Sie liegen bewusst ueber dem Limit, weil ein Aufteilen die
 Bauanleitung auseinanderreissen wuerde, ohne etwas lesbarer zu machen. Jede
 andere Datei bleibt unter 300.

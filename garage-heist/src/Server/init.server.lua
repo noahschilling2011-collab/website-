@@ -20,6 +20,7 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared.Remotes)
 local RaceTrack = require(script.World.RaceTrack)
+local SpawnHall = require(script.World.SpawnHall)
 
 local function step(label: string, fn)
 	local ok, err = pcall(fn)
@@ -114,7 +115,10 @@ local function buildWorld()
 	spawnPad.Name = "LobbySpawn"
 	spawnPad.Anchored = true
 	spawnPad.Size = Vector3.new(12, 1, 12)
-	spawnPad.CFrame = CFrame.new(0, 0.5, 26)
+	-- In der Werkhalle am Westende der Hofachse, Blickrichtung +X zum Ausgang.
+	-- Der Wert ist SpawnHall.SPAWN_CFRAME; hier fest eingetragen, damit
+	-- buildWorld nicht von der Halle abhaengt (sie wird erst danach gebaut).
+	spawnPad.CFrame = CFrame.new(-243, 0.5, 0) * CFrame.Angles(0, math.rad(-90), 0)
 	spawnPad.Color = Color3.fromRGB(90, 200, 130)
 	spawnPad.Material = Enum.Material.Neon
 	spawnPad.Duration = 0
@@ -126,6 +130,14 @@ step("Welt bauen", buildWorld)
 step("Rennstrecke bauen", function()
 	RaceTrack.Build(Workspace)
 end)
+
+-- Der Bootstrap braucht das Ergebnis weiter unten, um das Warp-Pad an
+-- GarageService zu haengen.
+local hall
+step("Werkhalle bauen", function()
+	hall = SpawnHall.Build(Workspace)
+end)
+
 step("Lighting einstellen", setupLighting)
 
 local START_ORDER = {
@@ -173,6 +185,18 @@ for _, name in loaded do
 		end)
 	end
 end
+
+-- Erst jetzt: GarageService muss gestartet sein, sonst kennt es die Plots noch
+-- nicht. Scheitert der Schritt, steht die Halle trotzdem - man laeuft dann
+-- eben zu Fuss.
+step("Werkhalle verdrahten", function()
+	local garageService = services.GarageService
+	if hall and hall.warpPrompt and garageService then
+		hall.warpPrompt.Triggered:Connect(function(player)
+			garageService:SendToPlot(player)
+		end)
+	end
+end)
 
 -- Sichtbarer Beweis, dass die Welt steht. Fehlt diese Zeile in der Konsole,
 -- ist der Bootstrap vorher gestorben und die Zeile darueber sagt, woran.

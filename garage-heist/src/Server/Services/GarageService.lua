@@ -100,15 +100,39 @@ function GarageService:_setup(player: Player, data)
 	self:Refresh(player, data)
 end
 
-function GarageService:_placeCharacter(player: Player, character: Model)
+-- Neulinge landen einmal in der Werkhalle und laufen selbst zur Box; wer schon
+-- etwas verbaut hat, kommt wie bisher direkt an seiner Garage raus. Ohne diese
+-- Unterscheidung sieht die Halle niemand: der Teleport feuert 0,1 s nach jedem
+-- Spawn.
+function GarageService:_placeCharacter(player: Player, character: Model, force: boolean?)
 	local view = self.views[player.UserId]
 	if not view then
 		return
 	end
 	character:WaitForChild("HumanoidRootPart", 8)
 	task.wait(0.1)
-	if character.Parent then
-		character:PivotTo(view.plot.spawnCFrame)
+	if not character.Parent then
+		return
+	end
+
+	if not force and not view.leftHall then
+		local data = self.Services.DataService:Get(player)
+		if data and ProfileOps.GarageValue(data) <= 0 then
+			return -- bleibt auf dem LobbySpawn in der Halle
+		end
+	end
+
+	view.leftHall = true
+	character:PivotTo(view.plot.spawnCFrame)
+end
+
+-- Wird vom Warp-Pad in der Werkhalle aufgerufen.
+function GarageService:SendToPlot(player: Player)
+	local character = player.Character
+	if character then
+		task.spawn(function()
+			self:_placeCharacter(player, character, true)
+		end)
 	end
 end
 

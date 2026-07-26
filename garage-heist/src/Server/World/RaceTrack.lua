@@ -273,7 +273,11 @@ local CONTAINERS = {
 	{ x = 56, z = 18, rot = 0, stack = 2 },
 	{ x = 84, z = -14, rot = 90, stack = 1 },
 	{ x = 112, z = 16, rot = 0, stack = 1 },
-	{ x = -168, z = 0, rot = 90, stack = 2 },
+	-- Nicht auf z = 0: seit die Werkhalle bei x = -252..-178 steht, laeuft jeder
+	-- neue Spieler genau hier heraus. Auf der Achse stand die Kiste 5 Studs vor
+	-- dem Ausgang und hat den Blick in den Hof zugemauert. Seitlich versetzt ist
+	-- sie Deckung statt Wand.
+	{ x = -168, z = -16, rot = 90, stack = 2 },
 	{ x = 168, z = 0, rot = 90, stack = 2 },
 }
 
@@ -346,7 +350,12 @@ local function buildYard(folder)
 
 	-- Lichtmasten. Vier Stueck, mit echtem Licht - das ist der Unterschied
 	-- zwischen "dunkler Hof" und "beleuchtetes Gelaende".
-	for _, spec in { { x = -196, z = 0 }, { x = 196, z = 0 }, { x = 0, z = -40 }, { x = 0, z = 40 } } do
+	-- Der westliche Mast stand urspruenglich bei (-196, 0). Dort steht seit
+	-- diesem Stand die Werkhalle: ein 34 Studs hoher Betonmast waere mitten
+	-- durch Boden, Laufweg und Dach gegangen. Die Halle bringt eigenes Licht
+	-- mit, also rueckt der Mast nach draussen an den westlichen Hofrand und
+	-- leuchtet dort den Weg vom Hallenausgang zu den ersten Boxen aus.
+	for _, spec in { { x = -130, z = 30 }, { x = 196, z = 0 }, { x = 0, z = -40 }, { x = 0, z = 40 } } do
 		part({
 			Name = "MastPole",
 			Size = Vector3.new(2.2, 34, 2.2),

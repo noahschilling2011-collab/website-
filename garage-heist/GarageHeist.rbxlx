@@ -868,6 +868,7 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared.Remotes)
 local RaceTrack = require(script.World.RaceTrack)
+local SpawnHall = require(script.World.SpawnHall)
 
 local function step(label: string, fn)
 	local ok, err = pcall(fn)
@@ -962,7 +963,10 @@ local function buildWorld()
 	spawnPad.Name = "LobbySpawn"
 	spawnPad.Anchored = true
 	spawnPad.Size = Vector3.new(12, 1, 12)
-	spawnPad.CFrame = CFrame.new(0, 0.5, 26)
+	-- In der Werkhalle am Westende der Hofachse, Blickrichtung +X zum Ausgang.
+	-- Der Wert ist SpawnHall.SPAWN_CFRAME; hier fest eingetragen, damit
+	-- buildWorld nicht von der Halle abhaengt (sie wird erst danach gebaut).
+	spawnPad.CFrame = CFrame.new(-243, 0.5, 0) * CFrame.Angles(0, math.rad(-90), 0)
 	spawnPad.Color = Color3.fromRGB(90, 200, 130)
 	spawnPad.Material = Enum.Material.Neon
 	spawnPad.Duration = 0
@@ -974,6 +978,14 @@ step("Welt bauen", buildWorld)
 step("Rennstrecke bauen", function()
 	RaceTrack.Build(Workspace)
 end)
+
+-- Der Bootstrap braucht das Ergebnis weiter unten, um das Warp-Pad an
+-- GarageService zu haengen.
+local hall
+step("Werkhalle bauen", function()
+	hall = SpawnHall.Build(Workspace)
+end)
+
 step("Lighting einstellen", setupLighting)
 
 local START_ORDER = {
@@ -1021,6 +1033,18 @@ for _, name in loaded do
 		end)
 	end
 end
+
+-- Erst jetzt: GarageService muss gestartet sein, sonst kennt es die Plots noch
+-- nicht. Scheitert der Schritt, steht die Halle trotzdem - man laeuft dann
+-- eben zu Fuss.
+step("Werkhalle verdrahten", function()
+	local garageService = services.GarageService
+	if hall and hall.warpPrompt and garageService then
+		hall.warpPrompt.Triggered:Connect(function(player)
+			garageService:SendToPlot(player)
+		end)
+	end
+end)
 
 -- Sichtbarer Beweis, dass die Welt steht. Fehlt diese Zeile in der Konsole,
 -- ist der Bootstrap vorher gestorben und die Zeile darueber sagt, woran.
@@ -4284,15 +4308,39 @@ function GarageService:_setup(player: Player, data)
 	self:Refresh(player, data)
 end
 
-function GarageService:_placeCharacter(player: Player, character: Model)
+-- Neulinge landen einmal in der Werkhalle und laufen selbst zur Box; wer schon
+-- etwas verbaut hat, kommt wie bisher direkt an seiner Garage raus. Ohne diese
+-- Unterscheidung sieht die Halle niemand: der Teleport feuert 0,1 s nach jedem
+-- Spawn.
+function GarageService:_placeCharacter(player: Player, character: Model, force: boolean?)
 	local view = self.views[player.UserId]
 	if not view then
 		return
 	end
 	character:WaitForChild("HumanoidRootPart", 8)
 	task.wait(0.1)
-	if character.Parent then
-		character:PivotTo(view.plot.spawnCFrame)
+	if not character.Parent then
+		return
+	end
+
+	if not force and not view.leftHall then
+		local data = self.Services.DataService:Get(player)
+		if data and ProfileOps.GarageValue(data) <= 0 then
+			return -- bleibt auf dem LobbySpawn in der Halle
+		end
+	end
+
+	view.leftHall = true
+	character:PivotTo(view.plot.spawnCFrame)
+end
+
+-- Wird vom Warp-Pad in der Werkhalle aufgerufen.
+function GarageService:SendToPlot(player: Player)
+	local character = player.Character
+	if character then
+		task.spawn(function()
+			self:_placeCharacter(player, character, true)
+		end)
 	end
 end
 
@@ -5312,27 +5360,33 @@ return TelemetryService
 <Properties><string name="Name">World</string></Properties>
 <Item class="ModuleScript" referent="RBX52">
 <Properties><string name="Name">CarBuilder</string><ProtectedString name="Source"><![CDATA[--[[
-	CarBuilder (Visual-Rewrite)
+	CarBuilder v2
 
-	Gleiche oeffentliche API:
+	Gleiche oeffentliche API wie v1:
 		CarBuilder.Build(carState, carIndex, ownerUserId, cframe, parent, options)
 		-> { model, body, prompts, slotParts, anchors, billboard, carIndex }
 
-	Kernaenderung gegenueber vorher: die Stufe eines Teils ist AM AUTO
-	ablesbar, nicht nur im Menue. Vorher waren T1 und T4 dieselbe Kiste in
-	einer anderen Farbe - der Spieler zahlt 36.000 fuer den Anti-Lag-Kit und
-	sieht nichts. Jetzt waechst mit jeder Stufe Geometrie dazu:
+	Was v1 noch fehlte: eine Silhouette. Ein Auto erkennt man nicht an
+	Einzelteilen, sondern an der Linie von der Nase ueber die Frontscheibe
+	zum Heck. v1 hatte zwei gestapelte Kisten - alles was jetzt dazukommt,
+	arbeitet an dieser Linie:
 
-		Motor  T1..T4  flacher Deckel -> Haubenausschnitt -> Kompressor mit
-		               Ansaugtrichter -> zusaetzliche Ladeluftkuehler
-		Reifen T1..T4  Stahlfelge -> Felge mit Speichen -> breiterer Reifen
-		               -> Neonfelge
-		Turbo  T1..T4  Lippe -> Fluegel -> Doppelfluegel mit Stuetzen ->
-		               Neon-Fluegel
-		Lack   T1..T4  matt -> lackiert -> Metallic -> Chrom + Underglow
+		Motorhaube    faellt nach vorn ab
+		Frontscheibe  liegt schraeg, nicht senkrecht
+		Seitenscheibe schliesst das Dach zur Karosserie
+		Heckscheibe   faellt nach hinten ab
+		Heckdeckel    faellt nach hinten ab
+		Kotfluegel    ueber jedem Rad, damit die Raeder dazugehoeren
+		Kuehlergrill, Splitter, Diffusor, Leuchtenband, Spiegel, Auspuff
 
-	Fehlende Teile bleiben durchsichtige Platzhalter: auf einen Blick sieht
-	man, was der Karre fehlt. Das war vorher schon richtig.
+	KEINE WedgeParts mehr. In v1 hingen Front- und Heckscheibe an
+	WedgePart-Ausrichtung, und die beiden waren ausserdem vertauscht (die
+	"Windshield" sass hinten). Schraege Flaechen sind jetzt duenne Quader mit
+	ausgerechnetem Winkel - das laesst sich nachrechnen statt ausprobieren.
+
+	Teilezahl: rund 63 pro Auto (v1: 51). Gegenfinanziert ueber die Speichen,
+	die von vier auf zwei bis drei pro Rad runtergehen - die sieht bei einem
+	stehenden Auto ohnehin niemand.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -5346,8 +5400,13 @@ local Util = require(Shared.Util)
 local CarBuilder = {}
 
 local GHOST_COLOR = Color3.fromRGB(220, 70, 70)
-local GLASS_COLOR = Color3.fromRGB(28, 32, 42)
+local GLASS_COLOR = Color3.fromRGB(24, 28, 38)
 local CHROME = Color3.fromRGB(206, 212, 224)
+local NEAR_BLACK = Color3.fromRGB(16, 17, 21)
+
+-- Front zeigt nach -Z, Heck nach +Z.
+local RAKE_FRONT = 2.4 -- Laenge, ueber die die Frontscheibe faellt
+local RAKE_REAR = 2.0
 
 local function makePart(name, size, cframe, color, parent, material, transparency)
 	local p = Instance.new("Part")
@@ -5367,19 +5426,29 @@ local function makePart(name, size, cframe, color, parent, material, transparenc
 	return p
 end
 
-local function makeWedge(name, size, cframe, color, parent, material, transparency)
-	local w = Instance.new("WedgePart")
-	w.Name = name
-	w.Anchored = true
-	w.CanCollide = false
-	w.CastShadow = false
-	w.Size = size
-	w.CFrame = cframe
-	w.Color = color
-	w.Material = material or Enum.Material.SmoothPlastic
-	w.Transparency = transparency or 0
-	w.Parent = parent
-	return w
+--[[
+	Schraege Flaeche zwischen zwei Punkten der YZ-Ebene. X bleibt die Breite.
+
+	Die lokale Z-Achse eines Parts zeigt nach CFrame.Angles(a, 0, 0) auf
+	(0, -sin a, cos a). Gewuenscht ist (0, dy, dz)/len, also a = -atan2(dy, dz).
+	Damit steht der Winkel fest und muss nicht geraten werden.
+]]
+local function slab(parent, name, cframe, width, thickness, fromY, fromZ, toY, toZ, color, material, transparency)
+	local dy, dz = toY - fromY, toZ - fromZ
+	local length = math.sqrt(dy * dy + dz * dz)
+	if length < 0.05 then
+		return nil
+	end
+	local angle = -math.atan2(dy, dz)
+	return makePart(
+		name,
+		Vector3.new(width, thickness, length),
+		cframe * CFrame.new(0, (fromY + toY) / 2, (fromZ + toZ) / 2) * CFrame.Angles(angle, 0, 0),
+		color,
+		parent,
+		material,
+		transparency
+	)
 end
 
 local function tagPart(instance, slotId, part, ownerUserId, carIndex)
@@ -5407,25 +5476,15 @@ local function addStealPrompt(anchor, slotId, part, ownerUserId, carIndex)
 	return prompt
 end
 
--- Das Schild haengt jetzt IM Modell. Vorher lag es daneben und musste
--- ueberall extra zerstoert werden - eine Leak-Quelle bei jedem Rebuild.
 local function buildBillboard(model, body, height)
-	local attachment = Instance.new("Part")
-	attachment.Name = "Label"
-	attachment.Anchored = true
-	attachment.CanCollide = false
-	attachment.CanQuery = false
-	attachment.CastShadow = false
-	attachment.Transparency = 1
-	attachment.Size = Vector3.new(0.2, 0.2, 0.2)
-	attachment.CFrame = body.CFrame * CFrame.new(0, height, 0)
-	attachment.Parent = model
+	local anchor = makePart("Label", Vector3.new(0.2, 0.2, 0.2), body.CFrame * CFrame.new(0, height, 0), CHROME, model)
+	anchor.Transparency = 1
+	anchor.CanQuery = false
 
 	local gui = Instance.new("BillboardGui")
 	gui.Size = UDim2.fromScale(9, 2.4)
-	gui.AlwaysOnTop = false
 	gui.MaxDistance = 90
-	gui.Parent = attachment
+	gui.Parent = anchor
 
 	local title = Instance.new("TextLabel")
 	title.BackgroundTransparency = 1
@@ -5446,92 +5505,220 @@ local function buildBillboard(model, body, height)
 	sub.TextStrokeTransparency = 0.45
 	sub.Parent = gui
 
-	return { part = attachment, title = title, sub = sub }
+	return { part = anchor, title = title, sub = sub }
 end
 
--- Karosserie-Details, die es vorher gar nicht gab: Scheiben, Schweller,
--- Stossfaenger, Scheinwerfer. Kosten sechs Parts und machen aus zwei Kisten
--- ein Auto.
-local function buildBodyDetails(model, cframe, carDef, bodyY, bodyColor)
-	local halfLength = carDef.bodySize.Z / 2
-	local bodyTop = bodyY + carDef.bodySize.Y / 2
+-- Alles, was die Silhouette macht -----------------------------------------
+local function buildShell(model, cf, def, bodyY, bodyColor, bodyMaterial, paintTier)
+	local halfLen = def.bodySize.Z / 2
+	local halfWide = def.bodySize.X / 2
+	local bodyTop = bodyY + def.bodySize.Y / 2
+	local bodyBottom = bodyY - def.bodySize.Y / 2
+	local roofTop = def.roofOffset.Y + def.roofSize.Y / 2
+	local roofFront = def.roofOffset.Z - def.roofSize.Z / 2
+	local roofBack = def.roofOffset.Z + def.roofSize.Z / 2
 	local dark = bodyColor:Lerp(Color3.new(0, 0, 0), 0.55)
+	local glassTop = math.max(roofTop - 0.25, bodyTop + 0.25)
 
-	-- Schweller: dunkler Streifen unten laengs. Setzt das Auto optisch auf
-	-- die Raeder statt es schweben zu lassen.
+	-- Glasflaechen. Frontscheibe faellt nach VORN (-Z) ab, Heckscheibe nach
+	-- hinten - in v1 war das vertauscht.
+	slab(
+		model,
+		"Windshield",
+		cf,
+		def.roofSize.X - 0.15,
+		0.16,
+		bodyTop,
+		roofFront - RAKE_FRONT,
+		glassTop,
+		roofFront,
+		GLASS_COLOR,
+		Enum.Material.Glass,
+		0.32
+	)
+	slab(
+		model,
+		"RearGlass",
+		cf,
+		def.roofSize.X - 0.15,
+		0.16,
+		glassTop,
+		roofBack,
+		bodyTop,
+		roofBack + RAKE_REAR,
+		GLASS_COLOR,
+		Enum.Material.Glass,
+		0.32
+	)
+	-- Seitenscheiben schliessen das Dach an die Karosserie an. Ohne sie
+	-- schwebt das Dach ueber einer Luecke.
+	for _, side in { -1, 1 } do
+		makePart(
+			"SideGlass",
+			Vector3.new(0.14, glassTop - bodyTop, def.roofSize.Z),
+			cf * CFrame.new(side * (def.roofSize.X / 2 - 0.05), (bodyTop + glassTop) / 2, def.roofOffset.Z),
+			GLASS_COLOR,
+			model,
+			Enum.Material.Glass,
+			0.32
+		)
+	end
+
+	-- Haube und Heckdeckel: leichter Abfall nach aussen.
+	slab(
+		model,
+		"Hood",
+		cf,
+		def.bodySize.X - 0.3,
+		0.35,
+		bodyTop - 0.1,
+		roofFront - RAKE_FRONT,
+		bodyTop - 0.55,
+		-halfLen + 0.3,
+		bodyColor,
+		bodyMaterial
+	)
+	slab(
+		model,
+		"Deck",
+		cf,
+		def.bodySize.X - 0.3,
+		0.35,
+		bodyTop - 0.1,
+		roofBack + RAKE_REAR,
+		bodyTop - 0.4,
+		halfLen - 0.3,
+		bodyColor,
+		bodyMaterial
+	)
+
+	-- Schweller
 	for _, side in { -1, 1 } do
 		makePart(
 			"Sill",
-			Vector3.new(0.5, 0.7, carDef.bodySize.Z * 0.72),
-			cframe * CFrame.new(side * (carDef.bodySize.X / 2 - 0.1), bodyY - carDef.bodySize.Y / 2 + 0.15, 0),
+			Vector3.new(0.5, 0.7, def.bodySize.Z * 0.66),
+			cf * CFrame.new(side * (halfWide - 0.05), bodyBottom + 0.2, 0),
 			dark,
-			model,
-			Enum.Material.SmoothPlastic
+			model
 		)
 	end
 
-	-- Stossfaenger vorn und hinten
-	for _, z in { -1, 1 } do
+	-- Kotfluegel ueber jedem Rad plus dunkler Radkasten dahinter.
+	local wheelDia = PartCatalog.GetSlot("tires").size.Y
+	for _, xSide in { -1, 1 } do
+		for _, zSide in { -1, 1 } do
+			makePart(
+				"Fender",
+				Vector3.new(0.55, 1.0, wheelDia + 1.9),
+				cf * CFrame.new(xSide * (def.track - 0.15), bodyY + 0.45, zSide * def.wheelbase),
+				dark,
+				model,
+				Enum.Material.SmoothPlastic
+			)
+		end
 		makePart(
-			"Bumper",
-			Vector3.new(carDef.bodySize.X + 0.2, 0.9, 0.8),
-			cframe * CFrame.new(0, bodyY - 0.3, z * (halfLength - 0.3)),
-			dark,
-			model,
-			Enum.Material.SmoothPlastic
+			"WheelWell",
+			Vector3.new(0.35, 2.0, wheelDia + 0.8),
+			cf * CFrame.new(xSide * (halfWide - 0.25), bodyY, -def.wheelbase),
+			NEAR_BLACK,
+			model
 		)
 	end
 
-	-- Scheiben: Front- und Heckscheibe als Keile am Dach.
-	local roofY = carDef.roofOffset.Y
-	local roofHalf = carDef.roofSize.Z / 2
-	makeWedge(
-		"Windshield",
-		Vector3.new(carDef.roofSize.X - 0.2, carDef.roofSize.Y, 1.8),
-		cframe
-			* CFrame.new(carDef.roofOffset.X, roofY - 0.1, carDef.roofOffset.Z + roofHalf + 0.85)
-			* CFrame.Angles(0, math.pi, 0),
-		GLASS_COLOR,
+	-- Nase: Grill, Splitter, Scheinwerfer, Leuchtenband hinten.
+	makePart(
+		"Grille",
+		Vector3.new(def.bodySize.X * 0.46, 0.9, 0.35),
+		cf * CFrame.new(0, bodyY + 0.05, -(halfLen + 0.1)),
+		NEAR_BLACK,
 		model,
-		Enum.Material.Glass,
-		0.35
+		Enum.Material.DiamondPlate
 	)
-	makeWedge(
-		"RearGlass",
-		Vector3.new(carDef.roofSize.X - 0.2, carDef.roofSize.Y, 1.6),
-		cframe * CFrame.new(carDef.roofOffset.X, roofY - 0.1, carDef.roofOffset.Z - roofHalf - 0.75),
-		GLASS_COLOR,
+	for i = -1, 1 do
+		makePart(
+			"GrilleSlat",
+			Vector3.new(def.bodySize.X * 0.44, 0.12, 0.42),
+			cf * CFrame.new(0, bodyY + 0.05 + i * 0.28, -(halfLen + 0.13)),
+			dark,
+			model,
+			Enum.Material.Metal
+		)
+	end
+	makePart(
+		"Splitter",
+		Vector3.new(def.bodySize.X + 0.4, 0.28, 1.8),
+		cf * CFrame.new(0, bodyBottom - 0.15, -(halfLen - 0.6)),
+		NEAR_BLACK,
+		model
+	)
+	makePart(
+		"Diffuser",
+		Vector3.new(def.bodySize.X + 0.2, 0.3, 1.6),
+		cf * CFrame.new(0, bodyBottom - 0.12, halfLen - 0.6),
+		NEAR_BLACK,
 		model,
-		Enum.Material.Glass,
-		0.35
+		Enum.Material.DiamondPlate
 	)
-
-	-- Scheinwerfer vorn (Motor sitzt hinten in diesem Modell: -Z ist vorn)
 	for _, side in { -1, 1 } do
 		makePart(
 			"Headlight",
-			Vector3.new(1.5, 0.6, 0.3),
-			cframe * CFrame.new(side * (carDef.bodySize.X / 2 - 1.1), bodyY + 0.15, -(halfLength + 0.05)),
-			Color3.fromRGB(255, 246, 214),
-			model,
-			Enum.Material.Neon
-		)
-		makePart(
-			"Taillight",
-			Vector3.new(1.5, 0.45, 0.3),
-			cframe * CFrame.new(side * (carDef.bodySize.X / 2 - 1.1), bodyY + 0.2, halfLength + 0.05),
-			Color3.fromRGB(235, 45, 55),
+			Vector3.new(1.6, 0.5, 0.3),
+			cf * CFrame.new(side * (halfWide - 1.05), bodyTop - 0.4, -(halfLen + 0.08)),
+			Color3.fromRGB(255, 248, 216),
 			model,
 			Enum.Material.Neon
 		)
 	end
+	-- Durchgehendes Leuchtenband statt zwei Punkten: das ist der Unterschied
+	-- zwischen "alt" und "neu" an einem Autoheck.
+	makePart(
+		"TailBar",
+		Vector3.new(def.bodySize.X * 0.82, 0.34, 0.26),
+		cf * CFrame.new(0, bodyTop - 0.4, halfLen + 0.08),
+		Color3.fromRGB(240, 40, 52),
+		model,
+		Enum.Material.Neon
+	)
 
-	return bodyTop, halfLength
+	-- Aussenspiegel. Zwei Teile pro Seite, und das Auto liest sich sofort
+	-- als Auto statt als Kiste.
+	for _, side in { -1, 1 } do
+		makePart(
+			"MirrorArm",
+			Vector3.new(0.6, 0.16, 0.16),
+			cf * CFrame.new(side * (halfWide + 0.3), bodyTop + 0.05, roofFront + 0.4),
+			dark,
+			model
+		)
+		makePart(
+			"MirrorHead",
+			Vector3.new(0.28, 0.42, 0.55),
+			cf * CFrame.new(side * (halfWide + 0.62), bodyTop + 0.12, roofFront + 0.4),
+			paintTier >= 3 and CHROME or dark,
+			model,
+			paintTier >= 3 and Enum.Material.Metal or Enum.Material.SmoothPlastic
+		)
+	end
+
+	-- Auspuff, immer vorhanden. Die Turbo-Stufe legt spaeter noch welche nach.
+	for _, side in { -1, 1 } do
+		local pipe = makePart(
+			"Tailpipe",
+			Vector3.new(0.85, 0.62, 0.62),
+			cf * CFrame.new(side * 1.3, bodyBottom - 0.05, halfLen + 0.25) * CFrame.Angles(0, math.rad(90), 0),
+			CHROME,
+			model,
+			Enum.Material.Metal
+		)
+		pipe.Shape = Enum.PartType.Cylinder
+	end
+
+	return bodyTop, halfLen
 end
 
--- Rad inkl. Felge. Die Felge waechst mit der Reifenstufe - das ist der
--- billigste sichtbare Fortschritt im ganzen Spiel.
-local function buildWheel(model, cframe, carDef, xSign, zSign, tier, tierDef)
+-- Rad mit Felge. Speichenzahl bewusst niedrig: an einem stehenden Auto
+-- kostet jede weitere Speiche Parts und bringt nichts.
+local function buildWheel(model, cf, def, xSign, zSign, tier, tierDef)
 	local wheelSize = PartCatalog.GetSlot("tires").size
 	local width = wheelSize.X + (tier and (tier - 1) * 0.22 or 0)
 	local diameter = wheelSize.Y + (tier and (tier - 1) * 0.18 or 0)
@@ -5539,28 +5726,25 @@ local function buildWheel(model, cframe, carDef, xSign, zSign, tier, tierDef)
 	local wheel = makePart(
 		"Wheel",
 		Vector3.new(width, diameter, diameter),
-		cframe * CFrame.new(xSign * carDef.track, diameter / 2, zSign * carDef.wheelbase),
+		cf * CFrame.new(xSign * def.track, diameter / 2, zSign * def.wheelbase),
 		tierDef and tierDef.color or GHOST_COLOR,
 		model,
 		Enum.Material.Rubber,
 		tierDef and 0 or 0.65
 	)
 	wheel.Shape = Enum.PartType.Cylinder
-
 	if not tierDef then
 		return wheel, {}
 	end
 
 	local extras = {}
-	-- Felge: hell, leicht nach aussen versetzt.
-	local rimColor = if tier >= 4 then Color3.fromRGB(120, 240, 255) elseif tier == 3 then CHROME else Color3.fromRGB(
-		150,
-		155,
-		165
-	)
+	local rimColor = if tier >= 4
+		then Color3.fromRGB(120, 240, 255)
+		elseif tier == 3 then CHROME
+		else Color3.fromRGB(150, 155, 165)
 	local rim = makePart(
 		"Rim",
-		Vector3.new(width * 0.45, diameter * 0.62, diameter * 0.62),
+		Vector3.new(width * 0.46, diameter * 0.64, diameter * 0.64),
 		wheel.CFrame * CFrame.new(xSign * width * 0.32, 0, 0),
 		rimColor,
 		model,
@@ -5569,33 +5753,46 @@ local function buildWheel(model, cframe, carDef, xSign, zSign, tier, tierDef)
 	rim.Shape = Enum.PartType.Cylinder
 	table.insert(extras, rim)
 
-	-- Ab T2 Speichen. Vier duenne Balken reichen, um die Felge zu lesen.
 	if tier >= 2 then
-		for i = 0, 3 do
-			local spoke = makePart(
-				"Spoke",
-				Vector3.new(width * 0.42, diameter * 0.56, 0.28),
-				wheel.CFrame
-					* CFrame.new(xSign * width * 0.33, 0, 0)
-					* CFrame.Angles(math.rad(i * 45), 0, 0),
-				rimColor,
-				model,
-				Enum.Material.Metal
+		local spokes = tier >= 4 and 3 or 2
+		for i = 0, spokes - 1 do
+			table.insert(
+				extras,
+				makePart(
+					"Spoke",
+					Vector3.new(width * 0.42, diameter * 0.58, 0.3),
+					wheel.CFrame * CFrame.new(xSign * width * 0.33, 0, 0) * CFrame.Angles(math.rad(i * 180 / spokes), 0, 0),
+					rimColor,
+					model,
+					Enum.Material.Metal
+				)
 			)
-			table.insert(extras, spoke)
 		end
+	end
+	-- Bremsscheibe: dunkler Ring hinter der Felge, sichtbar nur bei den
+	-- breiten Stufen - genau da, wo man hinschaut.
+	if tier >= 3 then
+		local disc = makePart(
+			"Brake",
+			Vector3.new(width * 0.3, diameter * 0.5, diameter * 0.5),
+			wheel.CFrame * CFrame.new(xSign * width * 0.1, 0, 0),
+			Color3.fromRGB(58, 60, 66),
+			model,
+			Enum.Material.Metal
+		)
+		disc.Shape = Enum.PartType.Cylinder
+		table.insert(extras, disc)
 	end
 
 	return wheel, extras
 end
 
--- Motoraufbau auf der Haube. Waechst mit der Stufe.
-local function buildEngine(model, cframe, slotDef, tier, tierDef, mountCFrame)
+local function buildEngine(model, slotDef, tier, tierDef, mount)
 	local parts = {}
 	local main = makePart(
 		slotDef.displayName,
 		slotDef.size,
-		mountCFrame,
+		mount,
 		tierDef and tierDef.color or GHOST_COLOR,
 		model,
 		tierDef and Enum.Material.Metal or Enum.Material.ForceField,
@@ -5604,8 +5801,6 @@ local function buildEngine(model, cframe, slotDef, tier, tierDef, mountCFrame)
 	if not tierDef then
 		return main, parts
 	end
-
-	-- T2+: Ventildeckel laengs
 	if tier >= 2 then
 		for _, side in { -1, 1 } do
 			table.insert(
@@ -5613,7 +5808,7 @@ local function buildEngine(model, cframe, slotDef, tier, tierDef, mountCFrame)
 				makePart(
 					"ValveCover",
 					Vector3.new(0.7, 0.4, slotDef.size.Z * 0.8),
-					mountCFrame * CFrame.new(side * 0.85, slotDef.size.Y / 2 + 0.2, 0),
+					mount * CFrame.new(side * 0.85, slotDef.size.Y / 2 + 0.2, 0),
 					tierDef.color:Lerp(Color3.new(1, 1, 1), 0.25),
 					model,
 					Enum.Material.Metal
@@ -5621,21 +5816,18 @@ local function buildEngine(model, cframe, slotDef, tier, tierDef, mountCFrame)
 			)
 		end
 	end
-	-- T3+: Ansaugtrichter mittig, deutlich sichtbar ueber der Haube
 	if tier >= 3 then
 		local horn = makePart(
 			"Intake",
 			Vector3.new(1.5, 1.5, 1.5),
-			mountCFrame * CFrame.new(0, slotDef.size.Y / 2 + 0.85, 0),
+			mount * CFrame.new(0, slotDef.size.Y / 2 + 0.85, 0) * CFrame.Angles(0, 0, math.rad(90)),
 			CHROME,
 			model,
 			Enum.Material.Metal
 		)
 		horn.Shape = Enum.PartType.Cylinder
-		horn.CFrame = mountCFrame * CFrame.new(0, slotDef.size.Y / 2 + 0.85, 0) * CFrame.Angles(0, 0, math.rad(90))
 		table.insert(parts, horn)
 	end
-	-- T4: Ladeluftkuehler links und rechts, leuchtend
 	if tier >= 4 then
 		for _, side in { -1, 1 } do
 			table.insert(
@@ -5643,7 +5835,7 @@ local function buildEngine(model, cframe, slotDef, tier, tierDef, mountCFrame)
 				makePart(
 					"Intercooler",
 					Vector3.new(0.5, 0.9, 1.8),
-					mountCFrame * CFrame.new(side * 1.9, 0.1, 0),
+					mount * CFrame.new(side * 1.9, 0.1, 0),
 					tierDef.color,
 					model,
 					Enum.Material.Neon
@@ -5654,14 +5846,13 @@ local function buildEngine(model, cframe, slotDef, tier, tierDef, mountCFrame)
 	return main, parts
 end
 
--- Heckfluegel. Ab T3 doppelstoeckig, ab T4 leuchtend.
-local function buildTurbo(model, cframe, slotDef, tier, tierDef, mountCFrame)
+local function buildTurbo(model, slotDef, tier, tierDef, mount)
 	local parts = {}
 	local width = slotDef.size.X + (tierDef and (tier - 1) * 0.35 or 0)
 	local main = makePart(
 		slotDef.displayName,
 		Vector3.new(width, slotDef.size.Y, slotDef.size.Z),
-		mountCFrame,
+		mount,
 		tierDef and tierDef.color or GHOST_COLOR,
 		model,
 		tierDef and Enum.Material.Metal or Enum.Material.ForceField,
@@ -5670,67 +5861,47 @@ local function buildTurbo(model, cframe, slotDef, tier, tierDef, mountCFrame)
 	if not tierDef then
 		return main, parts
 	end
-
-	-- Stuetzen: ohne sie schwebt der Fluegel.
 	for _, side in { -1, 1 } do
 		table.insert(
 			parts,
 			makePart(
 				"WingMount",
 				Vector3.new(0.35, 0.9, 0.5),
-				mountCFrame * CFrame.new(side * (width / 2 - 0.6), -0.6, 0),
+				mount * CFrame.new(side * (width / 2 - 0.6), -0.6, 0),
 				tierDef.color:Lerp(Color3.new(0, 0, 0), 0.3),
 				model,
 				Enum.Material.Metal
 			)
 		)
 	end
-	-- T3+: zweites Element darueber
 	if tier >= 3 then
 		table.insert(
 			parts,
 			makePart(
 				"WingUpper",
 				Vector3.new(width * 0.9, slotDef.size.Y * 0.8, slotDef.size.Z * 0.7),
-				mountCFrame * CFrame.new(0, 0.9, -0.15),
+				mount * CFrame.new(0, 0.9, -0.15),
 				tierDef.color,
 				model,
 				tier >= 4 and Enum.Material.Neon or Enum.Material.Metal
 			)
 		)
 	end
-	-- T4: Auspuffendrohre. Das ist der "das Ding ist fertig"-Marker.
-	if tier >= 4 then
-		for _, side in { -1, 1 } do
-			local pipe = makePart(
-				"Exhaust",
-				Vector3.new(1.2, 0.8, 0.8),
-				mountCFrame * CFrame.new(side * 1.6, -2.1, 0.6) * CFrame.Angles(0, 0, math.rad(90)),
-				CHROME,
-				model,
-				Enum.Material.Metal
-			)
-			pipe.Shape = Enum.PartType.Cylinder
-			table.insert(parts, pipe)
-		end
-	end
 	return main, parts
 end
 
--- carState = { carId = "...", parts = { [slotId] = part } }
--- options.rebirths schaltet ab Config.REBIRTH_PAINT_AT den exklusiven Lack frei.
 function CarBuilder.Build(carState, carIndex: number, ownerUserId: number, cframe: CFrame, parent: Instance, options)
-	local carDef = CarCatalog.Get(carState.carId) or CarCatalog.Get(CarCatalog.STARTER)
+	local def = CarCatalog.Get(carState.carId) or CarCatalog.Get(CarCatalog.STARTER)
 	local model = Instance.new("Model")
 	model.Name = ("Car%d_%d"):format(carIndex, ownerUserId)
 	model:SetAttribute("OwnerUserId", ownerUserId)
 	model:SetAttribute("CarIndex", carIndex)
 	model.Parent = parent
 
-	-- Lack --------------------------------------------------------------
+	-- Lack ---------------------------------------------------------------
 	local paintPart = carState.parts.paint
 	local paintTier = paintPart and paintPart.tier or 0
-	local bodyColor = carDef.baseColor
+	local bodyColor = def.baseColor
 	local paintSlot = PartCatalog.GetSlot("paint")
 	local exclusivePaint = false
 	if paintPart then
@@ -5745,23 +5916,19 @@ function CarBuilder.Build(carState, carIndex: number, ownerUserId: number, cfram
 		end
 	end
 
-	-- Material nach Lackstufe. Rost -> Lack -> Metallic -> Chrom.
-	local bodyMaterial = Enum.Material.CorrodedMetal
-	local bodyReflectance = 0
+	local bodyMaterial, bodyReflectance = Enum.Material.CorrodedMetal, 0
 	if exclusivePaint then
 		bodyMaterial = Enum.Material.Neon
 	elseif paintTier >= 4 then
-		bodyMaterial = Enum.Material.Foil
-		bodyReflectance = 0.4
+		bodyMaterial, bodyReflectance = Enum.Material.Foil, 0.4
 	elseif paintTier == 3 then
-		bodyMaterial = Enum.Material.Metal
-		bodyReflectance = 0.15
+		bodyMaterial, bodyReflectance = Enum.Material.Metal, 0.15
 	elseif paintTier >= 1 then
 		bodyMaterial = Enum.Material.SmoothPlastic
 	end
 
 	local bodyY = 1.2
-	local body = makePart("Body", carDef.bodySize, cframe * CFrame.new(0, bodyY, 0), bodyColor, model, bodyMaterial)
+	local body = makePart("Body", def.bodySize, cframe * CFrame.new(0, bodyY, 0), bodyColor, model, bodyMaterial)
 	body.Reflectance = bodyReflectance
 	body.CanCollide = true
 	body.CastShadow = true
@@ -5769,22 +5936,21 @@ function CarBuilder.Build(carState, carIndex: number, ownerUserId: number, cfram
 
 	makePart(
 		"Roof",
-		carDef.roofSize,
-		cframe * CFrame.new(carDef.roofOffset.X, carDef.roofOffset.Y, carDef.roofOffset.Z),
+		def.roofSize,
+		cframe * CFrame.new(def.roofOffset.X, def.roofOffset.Y, def.roofOffset.Z),
 		bodyColor:Lerp(Color3.new(0, 0, 0), 0.25),
 		model,
 		bodyMaterial
 	)
 
-	local bodyTop, halfLength = buildBodyDetails(model, cframe, carDef, bodyY, bodyColor)
+	local bodyTop, halfLen = buildShell(model, cframe, def, bodyY, bodyColor, bodyMaterial, paintTier)
 
-	-- Underglow ab der hoechsten Lackstufe.
 	if paintTier >= 4 then
 		for _, side in { -1, 1 } do
 			makePart(
 				"Underglow",
-				Vector3.new(0.4, 0.2, carDef.bodySize.Z * 0.8),
-				cframe * CFrame.new(side * (carDef.bodySize.X / 2 - 0.4), 0.25, 0),
+				Vector3.new(0.4, 0.2, def.bodySize.Z * 0.8),
+				cframe * CFrame.new(side * (def.bodySize.X / 2 - 0.4), 0.25, 0),
 				exclusivePaint and paintSlot.rebirthColor or bodyColor,
 				model,
 				Enum.Material.Neon
@@ -5792,8 +5958,7 @@ function CarBuilder.Build(carState, carIndex: number, ownerUserId: number, cfram
 		end
 	end
 
-	local prompts = {}
-	local slotParts = {}
+	local prompts, slotParts = {}, {}
 	local anchors = { paint = body }
 
 	if paintPart then
@@ -5802,14 +5967,14 @@ function CarBuilder.Build(carState, carIndex: number, ownerUserId: number, cfram
 		slotParts.paint = { body }
 	end
 
-	-- Reifen -------------------------------------------------------------
+	-- Reifen ---------------------------------------------------------------
 	local tirePart = carState.parts.tires
 	local tireTier = tirePart and tirePart.tier or nil
 	local tireDef = tirePart and PartCatalog.GetTier("tires", tirePart.tier)
 	local wheels = {}
 	for _, xSign in { -1, 1 } do
 		for _, zSign in { -1, 1 } do
-			local wheel, extras = buildWheel(model, cframe, carDef, xSign, zSign, tireTier, tireDef)
+			local wheel, extras = buildWheel(model, cframe, def, xSign, zSign, tireTier, tireDef)
 			table.insert(wheels, wheel)
 			for _, extra in extras do
 				table.insert(wheels, extra)
@@ -5825,25 +5990,22 @@ function CarBuilder.Build(carState, carIndex: number, ownerUserId: number, cfram
 		slotParts.tires = wheels
 	end
 
-	-- Motor und Turbo ----------------------------------------------------
+	-- Motor und Turbo ------------------------------------------------------
 	for _, slotId in { "engine", "turbo" } do
 		local slotDef = PartCatalog.GetSlot(slotId)
 		local statePart = carState.parts[slotId]
 		local tier = statePart and statePart.tier or nil
 		local tierDef = statePart and PartCatalog.GetTier(slotId, statePart.tier)
-		local offset
-		if slotDef.mount == "spoiler" then
-			offset = Vector3.new(0, bodyTop + slotDef.size.Y / 2 + 0.25, halfLength - slotDef.size.Z / 2 - 0.4)
-		else
-			offset = Vector3.new(0, bodyTop + slotDef.size.Y / 2 - 0.2, -(halfLength - slotDef.size.Z / 2 - 0.7))
-		end
-		local mountCFrame = cframe * CFrame.new(offset)
+		local offset = if slotDef.mount == "spoiler"
+			then Vector3.new(0, bodyTop + slotDef.size.Y / 2 + 0.25, halfLen - slotDef.size.Z / 2 - 0.4)
+			else Vector3.new(0, bodyTop + slotDef.size.Y / 2 - 0.2, -(halfLen - slotDef.size.Z / 2 - 0.7))
+		local mount = cframe * CFrame.new(offset)
 
 		local main, extras
 		if slotDef.mount == "spoiler" then
-			main, extras = buildTurbo(model, cframe, slotDef, tier, tierDef, mountCFrame)
+			main, extras = buildTurbo(model, slotDef, tier, tierDef, mount)
 		else
-			main, extras = buildEngine(model, cframe, slotDef, tier, tierDef, mountCFrame)
+			main, extras = buildEngine(model, slotDef, tier, tierDef, mount)
 		end
 
 		anchors[slotId] = main
@@ -5861,8 +6023,8 @@ function CarBuilder.Build(carState, carIndex: number, ownerUserId: number, cfram
 		end
 	end
 
-	local billboard = buildBillboard(model, body, carDef.bodySize.Y / 2 + 4.2)
-	billboard.title.Text = carDef.displayName
+	local billboard = buildBillboard(model, body, def.bodySize.Y / 2 + 4.2)
+	billboard.title.Text = def.displayName
 	billboard.sub.Text = Util.FormatRate(0)
 
 	return {
@@ -6949,7 +7111,11 @@ local CONTAINERS = {
 	{ x = 56, z = 18, rot = 0, stack = 2 },
 	{ x = 84, z = -14, rot = 90, stack = 1 },
 	{ x = 112, z = 16, rot = 0, stack = 1 },
-	{ x = -168, z = 0, rot = 90, stack = 2 },
+	-- Nicht auf z = 0: seit die Werkhalle bei x = -252..-178 steht, laeuft jeder
+	-- neue Spieler genau hier heraus. Auf der Achse stand die Kiste 5 Studs vor
+	-- dem Ausgang und hat den Blick in den Hof zugemauert. Seitlich versetzt ist
+	-- sie Deckung statt Wand.
+	{ x = -168, z = -16, rot = 90, stack = 2 },
 	{ x = 168, z = 0, rot = 90, stack = 2 },
 }
 
@@ -7022,7 +7188,12 @@ local function buildYard(folder)
 
 	-- Lichtmasten. Vier Stueck, mit echtem Licht - das ist der Unterschied
 	-- zwischen "dunkler Hof" und "beleuchtetes Gelaende".
-	for _, spec in { { x = -196, z = 0 }, { x = 196, z = 0 }, { x = 0, z = -40 }, { x = 0, z = 40 } } do
+	-- Der westliche Mast stand urspruenglich bei (-196, 0). Dort steht seit
+	-- diesem Stand die Werkhalle: ein 34 Studs hoher Betonmast waere mitten
+	-- durch Boden, Laufweg und Dach gegangen. Die Halle bringt eigenes Licht
+	-- mit, also rueckt der Mast nach draussen an den westlichen Hofrand und
+	-- leuchtet dort den Weg vom Hallenausgang zu den ersten Boxen aus.
+	for _, spec in { { x = -130, z = 30 }, { x = 196, z = 0 }, { x = 0, z = -40 }, { x = 0, z = 40 } } do
 		part({
 			Name = "MastPole",
 			Size = Vector3.new(2.2, 34, 2.2),
@@ -7072,14 +7243,595 @@ end
 return RaceTrack
 ]]></ProtectedString></Properties>
 </Item>
+<Item class="ModuleScript" referent="RBX56">
+<Properties><string name="Name">SpawnHall</string><ProtectedString name="Source"><![CDATA[--[[
+	SpawnHall
+	Die grosse Werkhalle, in der neue Spieler landen.
+
+	WICHTIG ZUR LAGE: die Halle steht NICHT in der Hofmitte, sondern am
+	westlichen Ende der Hofachse bei x = -215. Zwei Gruende:
+
+	1. Der Hof zwischen den Garagenreihen ist die Klau-Arena. Da stehen jetzt
+	   Container und Rampen als Deckung - ein Gebaeude mittendrin nimmt genau
+	   die Flaeche weg, die das Klau-Fenster interessant macht.
+	2. Vom Hallenausgang laeuft man die Hofachse entlang. Dabei sieht man in
+	   einem Schwenk: Container, beide Garagenreihen, die Strecke darueber und
+	   am anderen Ende den Torbogen. Das sind die besten fuenfzehn Sekunden,
+	   die das Spiel zu bieten hat, und sie passieren von allein.
+
+	Die Halle ist KEINE Schleuse. Sie ist nach +X komplett offen, hat kein Tor
+	und keine Bedingung. Wer weiterlaufen will, laeuft weiter; wer es eilig
+	hat, nimmt das Warp-Pad am Ausgang.
+
+	Drei Stationen erklaeren die Schleife in der Reihenfolge, in der man an
+	ihnen vorbeikommt. Dazu ein voll ausgebautes Auto auf der Hebebuehne -
+	das ist das Ziel, und es steht am Anfang, nicht am Ende.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local PartCatalog = require(Shared.PartCatalog)
+
+local CarBuilder = require(script.Parent.CarBuilder)
+
+local SpawnHall = {}
+
+-- Hallenmasse. Die Rueckwand bei x = -252 haelt 13 Studs Abstand zur
+-- Streckengeraden bei x = -265; kein Pfeiler und kein Torbogenfuss landet
+-- innerhalb der Halle.
+local CENTER_X = -215
+local HALF_DEPTH = 37 -- entlang X
+local HALF_WIDTH = 62 -- entlang Z
+local HEIGHT = 30
+local WALL = 2
+
+SpawnHall.SPAWN_CFRAME = CFrame.new(CENTER_X - HALF_DEPTH + 9, 0.5, 0) * CFrame.Angles(0, math.rad(-90), 0)
+
+local C = {
+	floor = Color3.fromRGB(46, 48, 55),
+	paint = Color3.fromRGB(204, 208, 218),
+	wallLow = Color3.fromRGB(40, 43, 50),
+	wallHigh = Color3.fromRGB(96, 100, 110),
+	ceiling = Color3.fromRGB(28, 30, 36),
+	steel = Color3.fromRGB(126, 132, 142),
+	truss = Color3.fromRGB(58, 62, 72),
+	accent = Color3.fromRGB(245, 166, 35),
+	neon = Color3.fromRGB(56, 214, 255),
+	good = Color3.fromRGB(74, 222, 128),
+	heist = Color3.fromRGB(255, 45, 85),
+	dark = Color3.fromRGB(18, 19, 24),
+	rubber = Color3.fromRGB(24, 24, 28),
+}
+
+local function part(props): Part
+	local p = Instance.new("Part")
+	p.Anchored = true
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.Size = props.Size
+	p.CFrame = props.CFrame
+	p.Color = props.Color or C.wallHigh
+	p.Material = props.Material or Enum.Material.Concrete
+	p.Name = props.Name or "Part"
+	p.CanCollide = if props.CanCollide ~= nil then props.CanCollide else false
+	p.CastShadow = if props.CastShadow ~= nil then props.CastShadow else false
+	p.Transparency = props.Transparency or 0
+	if props.Shape then
+		p.Shape = props.Shape
+	end
+	p.Parent = props.Parent
+	return p
+end
+
+-- Grosse Tafel an der Wand. Zwei Zeilen, nicht mehr - wer drei Absaetze
+-- schreibt, hat schon verloren.
+local function board(parent, cframe, size, number, title, text, color)
+	part({
+		Name = "BoardFrame",
+		Size = Vector3.new(size.X + 0.8, size.Y + 0.8, 0.3),
+		CFrame = cframe * CFrame.new(0, 0, -0.15),
+		Color = C.steel,
+		Material = Enum.Material.Metal,
+		Parent = parent,
+	})
+	local face = part({
+		Name = "Board",
+		Size = size,
+		CFrame = cframe,
+		Color = C.dark,
+		Material = Enum.Material.SmoothPlastic,
+		Parent = parent,
+	})
+
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Front
+	gui.CanvasSize = Vector2.new(700, 320)
+	gui.LightInfluence = 0
+	gui.Parent = face
+
+	local num = Instance.new("TextLabel")
+	num.BackgroundTransparency = 1
+	num.Position = UDim2.fromScale(0.04, 0.04)
+	num.Size = UDim2.fromScale(0.16, 0.34)
+	num.Font = Enum.Font.Michroma
+	num.TextScaled = true
+	num.TextXAlignment = Enum.TextXAlignment.Left
+	num.TextColor3 = color
+	num.Text = number
+	num.Parent = gui
+
+	local head = Instance.new("TextLabel")
+	head.BackgroundTransparency = 1
+	head.Position = UDim2.fromScale(0.21, 0.04)
+	head.Size = UDim2.fromScale(0.75, 0.34)
+	head.Font = Enum.Font.Michroma
+	head.TextScaled = true
+	head.TextXAlignment = Enum.TextXAlignment.Left
+	head.TextColor3 = Color3.fromRGB(245, 247, 252)
+	head.Text = title
+	head.Parent = gui
+
+	local body = Instance.new("TextLabel")
+	body.BackgroundTransparency = 1
+	body.Position = UDim2.fromScale(0.04, 0.44)
+	body.Size = UDim2.fromScale(0.92, 0.5)
+	body.Font = Enum.Font.GothamBold
+	body.TextScaled = true
+	body.TextWrapped = true
+	body.TextXAlignment = Enum.TextXAlignment.Left
+	body.TextYAlignment = Enum.TextYAlignment.Top
+	body.TextColor3 = Color3.fromRGB(168, 176, 192)
+	body.Text = text
+	body.Parent = gui
+
+	-- Leuchtkante unten in der Stationsfarbe.
+	part({
+		Name = "BoardGlow",
+		Size = Vector3.new(size.X + 0.8, 0.4, 0.5),
+		CFrame = cframe * CFrame.new(0, -size.Y / 2 - 0.4, 0),
+		Color = color,
+		Material = Enum.Material.Neon,
+		Parent = parent,
+	})
+	return face
+end
+
+local function buildStructure(model)
+	local depth = HALF_DEPTH * 2
+	local width = HALF_WIDTH * 2
+
+	part({
+		Name = "Floor",
+		Size = Vector3.new(depth, 1, width),
+		CFrame = CFrame.new(CENTER_X, -0.5, 0),
+		Color = C.floor,
+		Material = Enum.Material.Concrete,
+		CanCollide = true,
+		Parent = model,
+	})
+
+	-- Rueckwand und beide Seitenwaende. Nach +X bleibt die Halle offen.
+	part({
+		Name = "BackWall",
+		Size = Vector3.new(WALL, HEIGHT, width),
+		CFrame = CFrame.new(CENTER_X - HALF_DEPTH, HEIGHT / 2, 0),
+		Color = C.wallHigh,
+		CanCollide = true,
+		CastShadow = true,
+		Parent = model,
+	})
+	for _, side in { -1, 1 } do
+		part({
+			Name = "SideWall",
+			Size = Vector3.new(depth, HEIGHT, WALL),
+			CFrame = CFrame.new(CENTER_X, HEIGHT / 2, side * HALF_WIDTH),
+			Color = C.wallHigh,
+			CanCollide = true,
+			CastShadow = true,
+			Parent = model,
+		})
+		part({
+			Name = "WallBase",
+			Size = Vector3.new(depth - 0.4, 6, 0.5),
+			CFrame = CFrame.new(CENTER_X, 3, side * (HALF_WIDTH - WALL / 2 - 0.25)),
+			Color = C.wallLow,
+			Material = Enum.Material.Metal,
+			Parent = model,
+		})
+	end
+	-- Portalrahmen am offenen Ende, damit die Halle eine Kante hat.
+	part({
+		Name = "PortalBeam",
+		Size = Vector3.new(3, 5, width),
+		CFrame = CFrame.new(CENTER_X + HALF_DEPTH, HEIGHT - 2.5, 0),
+		Color = C.truss,
+		Material = Enum.Material.Metal,
+		CastShadow = true,
+		Parent = model,
+	})
+
+	-- Dach mit Lichtschacht in der Mitte, gleiche Loesung wie in den Garagen:
+	-- CanCollide = false, damit die Kamera von oben hereinschaut, aber
+	-- CastShadow = true, damit es drinnen nach Innenraum aussieht.
+	local gap = 22
+	local slab = (width - gap) / 2
+	for _, side in { -1, 1 } do
+		part({
+			Name = "Ceiling",
+			Size = Vector3.new(depth, 1, slab),
+			CFrame = CFrame.new(CENTER_X, HEIGHT - 0.5, side * (gap / 2 + slab / 2)),
+			Color = C.ceiling,
+			Material = Enum.Material.Metal,
+			CastShadow = true,
+			Parent = model,
+		})
+	end
+
+	-- Fachwerktraeger quer. Das ist das Bauteil, das eine Halle gross
+	-- aussehen laesst: sichtbare Konstruktion statt glatter Decke.
+	for i = 0, 5 do
+		local x = CENTER_X - HALF_DEPTH + 7 + i * 12
+		part({
+			Name = "TrussChord",
+			Size = Vector3.new(1.4, 1.4, width - 2),
+			CFrame = CFrame.new(x, HEIGHT - 2, 0),
+			Color = C.truss,
+			Material = Enum.Material.Metal,
+			Parent = model,
+		})
+		part({
+			Name = "TrussChord",
+			Size = Vector3.new(1.2, 1.2, width - 2),
+			CFrame = CFrame.new(x, HEIGHT - 6, 0),
+			Color = C.truss,
+			Material = Enum.Material.Metal,
+			Parent = model,
+		})
+		for d = -4, 4 do
+			part({
+				Name = "TrussWeb",
+				Size = Vector3.new(0.7, 5, 0.7),
+				CFrame = CFrame.new(x, HEIGHT - 4, d * 13) * CFrame.Angles(math.rad(d % 2 == 0 and 22 or -22), 0, 0),
+				Color = C.truss,
+				Material = Enum.Material.Metal,
+				Parent = model,
+			})
+		end
+	end
+
+	-- Vier Hallenstrahler. Range grosszuegig, Shadows aus - bei zwoelf
+	-- Garagen plus Strecke ist das Lichtbudget schon knapp.
+	for i = 0, 3 do
+		local x = CENTER_X - HALF_DEPTH + 12 + i * 17
+		local bar = part({
+			Name = "HallLight",
+			Size = Vector3.new(3.4, 0.5, width - 26),
+			CFrame = CFrame.new(x, HEIGHT - 7.5, 0),
+			Color = Color3.fromRGB(255, 246, 224),
+			Material = Enum.Material.Neon,
+			Parent = model,
+		})
+		local lamp = Instance.new("SurfaceLight")
+		lamp.Face = Enum.NormalId.Bottom
+		lamp.Angle = 150
+		lamp.Range = 60
+		lamp.Brightness = 2.4
+		lamp.Shadows = false
+		lamp.Parent = bar
+	end
+end
+
+local function buildFloorGraphics(model)
+	-- Pfeilkette zum Ausgang. Wer nichts liest, folgt trotzdem den Pfeilen.
+	for i = 0, 5 do
+		local x = CENTER_X - 22 + i * 11
+		for _, side in { -1, 1 } do
+			part({
+				Name = "Chevron",
+				Size = Vector3.new(7, 0.06, 1.5),
+				CFrame = CFrame.new(x, 0.04, side * 2.6) * CFrame.Angles(0, math.rad(side * 28), 0),
+				Color = C.accent,
+				Material = Enum.Material.SmoothPlastic,
+				Transparency = 0.15 + i * 0.05,
+				Parent = model,
+			})
+		end
+	end
+	-- Randmarkierung ringsum
+	for _, side in { -1, 1 } do
+		part({
+			Name = "FloorLine",
+			Size = Vector3.new(HALF_DEPTH * 2 - 6, 0.05, 0.6),
+			CFrame = CFrame.new(CENTER_X, 0.04, side * (HALF_WIDTH - 8)),
+			Color = C.paint,
+			Material = Enum.Material.SmoothPlastic,
+			Parent = model,
+		})
+	end
+end
+
+local function buildStations(model)
+	local wallZ = -(HALF_WIDTH - WALL / 2 - 0.4)
+	local facing = CFrame.Angles(0, 0, 0) -- Tafeln schauen nach +Z in die Halle
+
+	board(
+		model,
+		CFrame.new(CENTER_X - 22, 11, wallZ) * facing,
+		Vector3.new(21, 9.6, 0.4),
+		"1",
+		"TEILE EINBAUEN",
+		"Motor, Reifen, Lack, Turbo. Jedes verbaute Teil bringt Cash pro Sekunde - auch wenn du offline bist.",
+		C.accent
+	)
+	board(
+		model,
+		CFrame.new(CENTER_X + 2, 11, wallZ) * facing,
+		Vector3.new(21, 9.6, 0.4),
+		"2",
+		"KASSE LEEREN",
+		"Das Geld sammelt sich in deiner Garage. Hol es ab, bevor die Kasse voll ist.",
+		C.good
+	)
+	board(
+		model,
+		CFrame.new(CENTER_X + 26, 11, wallZ) * facing,
+		Vector3.new(21, 9.6, 0.4),
+		"3",
+		"KLAUEN",
+		("Alle %d Minuten gehen ALLE Tore auf. Teil abmontieren, heimtragen, einbauen. Wer dich rempelt, kriegt es."):format(
+			math.floor(Config.HEIST_INTERVAL / 60)
+		),
+		C.heist
+	)
+
+	-- Grosser Schriftzug an der Rueckwand.
+	local sign = part({
+		Name = "HallSign",
+		Size = Vector3.new(0.4, 12, 74),
+		CFrame = CFrame.new(CENTER_X - HALF_DEPTH + WALL / 2 + 0.3, 21, 0),
+		Color = C.dark,
+		Material = Enum.Material.SmoothPlastic,
+		Parent = model,
+	})
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Right
+	gui.CanvasSize = Vector2.new(1200, 200)
+	gui.LightInfluence = 0
+	gui.Parent = sign
+	local title = Instance.new("TextLabel")
+	title.BackgroundTransparency = 1
+	title.Size = UDim2.fromScale(1, 0.68)
+	title.Font = Enum.Font.Michroma
+	title.TextScaled = true
+	title.TextColor3 = C.accent
+	title.Text = "GARAGE HEIST"
+	title.Parent = gui
+	local sub = Instance.new("TextLabel")
+	sub.BackgroundTransparency = 1
+	sub.Position = UDim2.fromScale(0, 0.68)
+	sub.Size = UDim2.fromScale(1, 0.32)
+	sub.Font = Enum.Font.GothamBold
+	sub.TextScaled = true
+	sub.TextColor3 = Color3.fromRGB(150, 158, 175)
+	sub.Text = "Bau auf. Pass auf. Klau zurueck."
+	sub.Parent = gui
+end
+
+-- Werkstattatmosphaere an der gegenueberliegenden Wand.
+local function buildProps(model)
+	local wallZ = HALF_WIDTH - WALL / 2 - 0.5
+
+	part({
+		Name = "ToolBoard",
+		Size = Vector3.new(30, 9, 0.4),
+		CFrame = CFrame.new(CENTER_X - 12, 9, wallZ),
+		Color = Color3.fromRGB(58, 44, 34),
+		Material = Enum.Material.WoodPlanks,
+		Parent = model,
+	})
+	for i = 0, 13 do
+		part({
+			Name = "Tool",
+			Size = Vector3.new(0.45, 2.4 + (i % 4) * 0.8, 0.45),
+			CFrame = CFrame.new(CENTER_X - 25.5 + i * 2.1, 10.4, wallZ - 0.5),
+			Color = C.steel,
+			Material = Enum.Material.Metal,
+			Parent = model,
+		})
+	end
+	-- Regal mit Reifen
+	for rack = 0, 2 do
+		for layer = 0, 3 do
+			part({
+				Name = "TyreStack",
+				Size = Vector3.new(1.2, 3.6, 3.6),
+				CFrame = CFrame.new(CENTER_X + 14 + rack * 6, 0.8 + layer * 1.25, wallZ - 3)
+					* CFrame.Angles(0, 0, math.rad(90)),
+				Color = C.rubber,
+				Material = Enum.Material.Rubber,
+				Shape = Enum.PartType.Cylinder,
+				Parent = model,
+			})
+		end
+	end
+	for _, spec in
+		{
+			{ x = CENTER_X - 30, c = Color3.fromRGB(60, 110, 90) },
+			{ x = CENTER_X - 25, c = Color3.fromRGB(150, 60, 48) },
+		}
+	do
+		part({
+			Name = "Barrel",
+			Size = Vector3.new(4, 2.8, 2.8),
+			CFrame = CFrame.new(spec.x, 2, wallZ - 3.5) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = spec.c,
+			Material = Enum.Material.Metal,
+			CanCollide = true,
+			Parent = model,
+		})
+	end
+end
+
+-- Hebebuehne mit einem voll ausgebauten Auto. Das Ziel steht am Anfang.
+local function buildShowcase(model)
+	local baseCF = CFrame.new(CENTER_X + 4, 0, 26) * CFrame.Angles(0, math.rad(210), 0)
+
+	part({
+		Name = "LiftBase",
+		Size = Vector3.new(20, 1.2, 20),
+		CFrame = CFrame.new(CENTER_X + 4, 0.6, 26),
+		Color = C.dark,
+		Material = Enum.Material.DiamondPlate,
+		CanCollide = true,
+		Parent = model,
+	})
+	part({
+		Name = "LiftRing",
+		Size = Vector3.new(21, 0.3, 21),
+		CFrame = CFrame.new(CENTER_X + 4, 1.25, 26),
+		Color = C.neon,
+		Material = Enum.Material.Neon,
+		Parent = model,
+	})
+	for _, spec in { { -1, -1 }, { -1, 1 }, { 1, -1 }, { 1, 1 } } do
+		part({
+			Name = "LiftArm",
+			Size = Vector3.new(1.6, 3.4, 1.6),
+			CFrame = CFrame.new(CENTER_X + 4 + spec[1] * 6, 2.9, 26 + spec[2] * 7),
+			Color = C.steel,
+			Material = Enum.Material.Metal,
+			CanCollide = true,
+			Parent = model,
+		})
+	end
+
+	local demo = { carId = "supercar", parts = {} }
+	for _, slotId in PartCatalog.SlotOrder do
+		demo.parts[slotId] = {
+			uid = "showroom_" .. slotId,
+			slotId = slotId,
+			tier = PartCatalog.TierCount(slotId),
+			subTier = 0,
+			originalOwner = 0,
+		}
+	end
+
+	local refs = CarBuilder.Build(demo, 1, 0, baseCF * CFrame.new(0, 4.6, 0), model, { rebirths = 0 })
+	-- Ein Showroom-Auto ist kein Klauziel: die Prompts kommen weg, sonst
+	-- haengt an einem Deko-Modell ein Griff ohne Funktion.
+	for _, prompt in refs.prompts do
+		prompt:Destroy()
+	end
+	refs.billboard.title.Text = "Supersportler - voll ausgebaut"
+	refs.billboard.sub.Text = "Das ist das Ziel."
+
+	-- Vier Strahler auf das Auto.
+	for _, spec in { { -1, -1 }, { -1, 1 }, { 1, -1 }, { 1, 1 } } do
+		local can = part({
+			Name = "Spot",
+			Size = Vector3.new(1.8, 1.2, 1.8),
+			CFrame = CFrame.new(CENTER_X + 4 + spec[1] * 9, HEIGHT - 9, 26 + spec[2] * 9),
+			Color = Color3.fromRGB(255, 250, 235),
+			Material = Enum.Material.Neon,
+			Parent = model,
+		})
+		local light = Instance.new("SpotLight")
+		light.Face = Enum.NormalId.Bottom
+		light.Angle = 70
+		light.Range = 40
+		light.Brightness = 2
+		light.Shadows = false
+		light.Parent = can
+	end
+end
+
+-- Warp-Pad am Ausgang. Ohne das laeuft ein Spieler, der das Spiel schon
+-- kennt, jedes Mal bis zu 350 Studs zu seiner Garage.
+local function buildWarpPad(model)
+	local pos = Vector3.new(CENTER_X + HALF_DEPTH - 8, 0, 0)
+
+	local pad = part({
+		Name = "WarpPad",
+		Size = Vector3.new(12, 0.4, 12),
+		CFrame = CFrame.new(pos + Vector3.new(0, 0.2, 0)),
+		Color = C.neon,
+		Material = Enum.Material.Neon,
+		CanCollide = false,
+		Parent = model,
+	})
+	for _, spec in
+		{
+			{ Vector3.new(13, 0.25, 0.8), Vector3.new(0, 0, 6.4) },
+			{ Vector3.new(13, 0.25, 0.8), Vector3.new(0, 0, -6.4) },
+			{ Vector3.new(0.8, 0.25, 13), Vector3.new(6.4, 0, 0) },
+			{ Vector3.new(0.8, 0.25, 13), Vector3.new(-6.4, 0, 0) },
+		}
+	do
+		part({
+			Name = "WarpEdge",
+			Size = spec[1],
+			CFrame = CFrame.new(pos + spec[2] + Vector3.new(0, 0.15, 0)),
+			Color = Color3.fromRGB(180, 235, 255),
+			Material = Enum.Material.Neon,
+			Parent = model,
+		})
+	end
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "GarageWarp"
+	prompt.ActionText = "Zur Garage"
+	prompt.ObjectText = "Direkt hin"
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 14
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = pad
+
+	local gui = Instance.new("BillboardGui")
+	gui.Size = UDim2.fromScale(14, 3)
+	gui.StudsOffset = Vector3.new(0, 5, 0)
+	gui.MaxDistance = 160
+	gui.Parent = pad
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.fromScale(1, 1)
+	label.Font = Enum.Font.Michroma
+	label.TextScaled = true
+	label.TextColor3 = C.neon
+	label.TextStrokeTransparency = 0.35
+	label.Text = "ZU DEINER GARAGE"
+	label.Parent = gui
+
+	return pad, prompt
+end
+
+function SpawnHall.Build(parent: Instance)
+	local model = Instance.new("Model")
+	model.Name = "SpawnHall"
+	model.Parent = parent
+
+	buildStructure(model)
+	buildFloorGraphics(model)
+	buildStations(model)
+	buildProps(model)
+	buildShowcase(model)
+	local pad, prompt = buildWarpPad(model)
+
+	return { model = model, warpPad = pad, warpPrompt = prompt, spawnCFrame = SpawnHall.SPAWN_CFRAME }
+end
+
+return SpawnHall
+]]></ProtectedString></Properties>
 </Item>
 </Item>
 </Item>
-<Item class="StarterPlayer" referent="RBX56">
+</Item>
+<Item class="StarterPlayer" referent="RBX57">
 <Properties><string name="Name">StarterPlayer</string></Properties>
-<Item class="StarterPlayerScripts" referent="RBX57">
+<Item class="StarterPlayerScripts" referent="RBX58">
 <Properties><string name="Name">StarterPlayerScripts</string></Properties>
-<Item class="LocalScript" referent="RBX58">
+<Item class="LocalScript" referent="RBX59">
 <Properties><string name="Name">Client</string><ProtectedString name="Source"><![CDATA[--[[
 	Garage Heist - Client-Bootstrap
 
@@ -7297,9 +8049,9 @@ task.spawn(function()
 	})
 end)
 ]]></ProtectedString></Properties>
-<Item class="Folder" referent="RBX59">
+<Item class="Folder" referent="RBX60">
 <Properties><string name="Name">Controllers</string></Properties>
-<Item class="ModuleScript" referent="RBX60">
+<Item class="ModuleScript" referent="RBX61">
 <Properties><string name="Name">EffectController</string><ProtectedString name="Source"><![CDATA[--[[
 	EffectController
 	Nimmt die Effekt-Anweisungen des Servers entgegen: lokale Klaenge und den
@@ -7362,7 +8114,7 @@ end
 return EffectController
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX61">
+<Item class="ModuleScript" referent="RBX62">
 <Properties><string name="Name">InputController</string><ProtectedString name="Source"><![CDATA[--[[
 	InputController
 	Tastenkuerzel und ProximityPrompts. Schickt ausschliesslich Absichten an den
@@ -7425,7 +8177,7 @@ end
 return InputController
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX62">
+<Item class="ModuleScript" referent="RBX63">
 <Properties><string name="Name">TrafficController</string><ProtectedString name="Source"><![CDATA[--[[
 	TrafficController
 	Der Verkehr auf der Rennstrecke - komplett clientseitig.
@@ -7669,9 +8421,9 @@ return TrafficController
 ]]></ProtectedString></Properties>
 </Item>
 </Item>
-<Item class="Folder" referent="RBX63">
+<Item class="Folder" referent="RBX64">
 <Properties><string name="Name">UI</string></Properties>
-<Item class="ModuleScript" referent="RBX64">
+<Item class="ModuleScript" referent="RBX65">
 <Properties><string name="Name">AdminPanel</string><ProtectedString name="Source"><![CDATA[--[[
 	AdminPanel
 	Wird nur gebaut, wenn der Server sagt, dass dieser Spieler Admin ist. Der
@@ -7779,7 +8531,7 @@ end
 return AdminPanel
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX65">
+<Item class="ModuleScript" referent="RBX66">
 <Properties><string name="Name">DailyPanel</string><ProtectedString name="Source"><![CDATA[--[[
 	DailyPanel
 	Sieben Kaesten, einer pro Tag. Welcher Tag dran ist und ob abgeholt werden
@@ -7936,7 +8688,7 @@ end
 return DailyPanel
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX66">
+<Item class="ModuleScript" referent="RBX67">
 <Properties><string name="Name">DismountBar</string><ProtectedString name="Source"><![CDATA[--[[
 	DismountBar
 	Der Fortschrittsbalken beim Abmontieren. Der Balken ist reine Anzeige: der
@@ -8020,7 +8772,7 @@ end
 return DismountBar
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX67">
+<Item class="ModuleScript" referent="RBX68">
 <Properties><string name="Name">GarageMenu</string><ProtectedString name="Source"><![CDATA[--[[
 	GarageMenu
 	Die Werkstatt: Teile kaufen, laufende Reparaturen sehen, geklaute Teile
@@ -8248,7 +9000,7 @@ end
 return GarageMenu
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX68">
+<Item class="ModuleScript" referent="RBX69">
 <Properties><string name="Name">GarageRows</string><ProtectedString name="Source"><![CDATA[--[[
 	GarageRows
 	Die einzelnen Zeilen im Werkstatt-Menue. Jede Zeile schickt beim Klick genau
@@ -8468,7 +9220,7 @@ end
 return GarageRows
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX69">
+<Item class="ModuleScript" referent="RBX70">
 <Properties><string name="Name">HUD</string><ProtectedString name="Source"><![CDATA[--[[
 	HUD
 	Cash, Rate, Kasse, Heist-Countdown, Trage-Anzeige und die Knoepfe fuer die
@@ -8758,7 +9510,7 @@ end
 return HUD
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX70">
+<Item class="ModuleScript" referent="RBX71">
 <Properties><string name="Name">InfoPanel</string><ProtectedString name="Source"><![CDATA[--[[
 	InfoPanel
 	Eine schlichte Liste mit Titel. Wird zweimal benutzt: fuer die Rangliste
@@ -8860,7 +9612,7 @@ end
 return InfoPanel
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX71">
+<Item class="ModuleScript" referent="RBX72">
 <Properties><string name="Name">Onboarding</string><ProtectedString name="Source"><![CDATA[--[[
 	Onboarding
 	Erklaert das Spiel in den ersten zwei Minuten - und hoert danach auf.
@@ -9256,7 +10008,7 @@ end
 return Onboarding
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX72">
+<Item class="ModuleScript" referent="RBX73">
 <Properties><string name="Name">ShopMenu</string><ProtectedString name="Source"><![CDATA[--[[
 	ShopMenu
 	Zeigt Gamepasses und Developer Products. Der Client kennt keine Produkt-IDs
@@ -9401,7 +10153,7 @@ end
 return ShopMenu
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX73">
+<Item class="ModuleScript" referent="RBX74">
 <Properties><string name="Name">Theme</string><ProtectedString name="Source"><![CDATA[--[[
 	Theme (Visual-Rewrite)
 
@@ -9685,7 +10437,7 @@ end
 return Theme
 ]]></ProtectedString></Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX74">
+<Item class="ModuleScript" referent="RBX75">
 <Properties><string name="Name">Toast</string><ProtectedString name="Source"><![CDATA[--[[
 	Toast
 	Kurzmeldungen unten links. Der Server schickt Text und Art, der Client
@@ -9796,7 +10548,7 @@ return Toast
 ]]></ProtectedString></Properties>
 </Item>
 </Item>
-<Item class="ModuleScript" referent="RBX75">
+<Item class="ModuleScript" referent="RBX76">
 <Properties><string name="Name">Store</string><ProtectedString name="Source"><![CDATA[--[[
 	Store
 	Der Client haelt genau eine Kopie dessen, was der Server geschickt hat.

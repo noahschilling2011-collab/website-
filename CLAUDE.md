@@ -29,7 +29,11 @@ rempelt, lässt ihn das Teil fallen. Das Opfer bekommt 25 % Versicherung.
 Fortschritt: bessere Teile → mehr Autos (bis 75 k) → Garagenstufe (bis 260 k) →
 Rebirth (+25 % dauerhaft).
 
-Umfang: ~9.600 Zeilen Luau, 56 ModuleScripts, 1 Server-Script, 1 LocalScript.
+Neue Spieler landen in einer Werkhalle am Westende des Hofs (`World/SpawnHall`)
+und laufen von dort selbst los. Wer schon etwas verbaut hat, kommt direkt an
+seiner Box heraus.
+
+Umfang: ~10.400 Zeilen Luau, 57 ModuleScripts, 1 Server-Script, 1 LocalScript.
 Die gesamte Welt entsteht zur Laufzeit aus Code — in der `.rbxlx` liegt nur ein
 Baseplate.
 
@@ -86,8 +90,7 @@ ServerScriptService/Server/
   Garage/     Snapshot, GarageView, RepairView, GarageRequests, RequestRouter,
               GarageTicks, TheftOps, Throttle
   Heist/      CarryManager, DismountManager, StealTarget, PartVisual
-  World/      PlotBuilder, CarBuilder, DoorController, RaceTrack
-              (SpawnHall ist vorgesehen, liegt aber noch nicht im Projekt)
+  World/      PlotBuilder, CarBuilder, DoorController, RaceTrack, SpawnHall
 
 StarterPlayerScripts/Client.lua       Bootstrap: UI, Remote-Handler
 StarterPlayerScripts/Client/
@@ -126,6 +129,17 @@ anderen hängen erst an `ProfileLoaded`).
 - `AdminService:IsAdmin` entscheidet **auf dem Server** (Studio, `game.CreatorId`,
   `Config.ADMIN_USER_IDS`). Das Panel auf dem Client ist reine Anzeige; jeder
   Befehl wird noch einmal geprüft.
+- Der `LobbySpawn` liegt **in** der Werkhalle (`-243, 0.5, 0` =
+  `SpawnHall.SPAWN_CFRAME`). `GarageService:_placeCharacter` lässt genau dann
+  jemanden dort stehen, wenn `ProfileOps.GarageValue(data) <= 0` ist und
+  `view.leftHall` noch nicht gesetzt wurde. Wer den Spawn verschiebt, muss die
+  Halle mitverschieben — sonst spawnen Neulinge im Nichts. Das Warp-Pad ruft
+  `GarageService:SendToPlot` auf; verdrahtet wird es im Bootstrap **nach** der
+  `Start()`-Schleife, weil `GarageService` die Plots vorher nicht kennt.
+- Die Halle belegt `x = -252..-178`, `z = ±62`. Der Hof-Aufbau in `RaceTrack`
+  (Container, Rampen, Lichtmasten) muss um diesen Block herum passen — beim
+  Einbau der Halle standen ein Lichtmast mitten darin und ein Container 5 Studs
+  vor dem Ausgang.
 
 ---
 
@@ -134,7 +148,8 @@ anderen hängen erst an `ProfileLoaded`).
 **Erledigt:** Wirtschaft, Speichern mit Session-Lock, Heist-Schleife, Diebstahl
 und Versicherung, Leerstandsgaragen, Tagesbelohnung, Rangliste, Rebirth,
 Garagenoptik nach Stufe, erhöhte Rennstrecke mit clientseitigem Verkehr,
-Deckung im Hof, Onboarding-Ziele, Admin-Werkzeuge.
+Deckung im Hof, Spawn-Werkhalle mit Drei-Stationen-Erklärung und Warp-Pad,
+Onboarding-Ziele, Admin-Werkzeuge.
 
 **Offen, nach Wirkung sortiert:**
 
@@ -154,11 +169,10 @@ Deckung im Hof, Onboarding-Ziele, Admin-Werkzeuge.
 4. **Tutorial-Fortschritt wird nicht gespeichert.** `Onboarding` merkt sich den
    Stand nur für die Sitzung. Sauber wäre ein Feld `tutorialDone` in
    `ProfileTemplate`.
-5. **Spawn-Werkhalle fehlt.** `World/SpawnHall.lua` und die dazugehörigen
-   Patches (Halle bauen + verdrahten, `LobbySpawn` auf `(-243, 0.5, 0)`,
-   `GarageService:_placeCharacter` mit `force`/`view.leftHall` plus
-   `SendToPlot`) sind spezifiziert, aber nicht eingebaut. Die Patches gehören
-   zusammen: ohne `SpawnHall.lua` landen neue Spieler im Nichts.
+5. **Tutorial-Fortschritt der Halle ist nicht gespeichert.** `view.leftHall`
+   lebt nur in der Sitzung. Wer noch nichts verbaut hat und stirbt, landet
+   wieder in der Halle — inhaltlich richtig, aber ein Feld im Profil wäre
+   sauberer (siehe Punkt 4).
 6. **Rennstrecke ist nicht betretbar.** Reine Kulisse. Wenn sie bespielbar
    werden soll (hochkommen, oben klauen), braucht es Zugang, Kollision und
    serverseitigen Verkehr — das ist ein eigenes Projekt.
