@@ -294,9 +294,16 @@ function ProfileOps.NextUnlock(data): string?
 	return entry and entry.label or nil
 end
 
--- Kurs beim Hehler. Rebirth 2 hebt ihn an; ohne Profil gilt der Grundkurs.
+-- Kurs beim Hehler. Rebirth 2 hebt ihn dauerhaft an, ein Kettentag zeitlich
+-- befristet. Beides addiert sich; ohne Profil gilt der Grundkurs.
 function ProfileOps.FenceRate(data): number
-	return ProfileOps.Unlocks(data).fenceRate or Config.FENCE_RATE
+	local base = ProfileOps.Unlocks(data).fenceRate or Config.FENCE_RATE
+	if data and (data.fenceBonusUntil or 0) > os.time() then
+		base += Config.DAILY_UNLOCKS[3].fenceBonus
+	end
+	-- Ueber 1.0 waere der Hehler lohnender als das Teil selbst - dann traegt
+	-- niemand mehr nach Hause und der halbe Heist-Loop faellt weg.
+	return math.min(base, 0.95)
 end
 
 -- Rebirth ist erst moeglich, wenn die Garage voll ausgebaut ist und jedes Auto

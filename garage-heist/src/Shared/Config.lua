@@ -221,7 +221,29 @@ Config.CASH_PACKS = {
 Config.RADAR_TOP_COUNT = 5
 
 -- Daily Reward -------------------------------------------------------------
-Config.DAILY_REWARDS = { 250, 500, 900, 1500, 2600, 4200, 8000 }
+--[[
+	Tagesbelohnung. Bis v8 waren das feste Betraege {250 ... 8000} - ein Spieler
+	mit ausgebauter T3-Garage verdient die 8000 im Leerlauf in unter einer
+	Minute. Eine Belohnung, die weniger wert ist als eine Minute Nichtstun, ist
+	kein Grund wiederzukommen.
+
+	Seit v9 sind es Minuten der EIGENEN Rate: damit skaliert die Kette mit dem
+	Spieler mit. DAILY_MIN_CASH ist der Boden fuer Tag 1 eines Neulings, dessen
+	Rate noch bei 0 liegt - ohne den bekaeme er null.
+]]
+Config.DAILY_RATE_MINUTES = { 3, 4, 6, 9, 13, 18, 25 }
+Config.DAILY_MIN_CASH = { 250, 500, 900, 1500, 2600, 4200, 8000 }
+
+-- Was ein Kettentag AUFMACHT, zusaetzlich zum Cash. Nach dem Muster von
+-- REBIRTH_UNLOCKS: Tabelle statt `if streak == 7` im Code.
+-- Tag 7 ist bewusst keine Zahl, sondern das Einzige im Spiel, das man nicht
+-- kaufen kann - der Hinweis auf den naechsten Prototyp.
+Config.DAILY_UNLOCKS = {
+	[3] = { label = "Hehler zahlt heute besser", fenceBonus = 0.15 },
+	[5] = { label = "Eine Reparatur sofort fertig", instantRepair = 1 },
+	[7] = { label = "Prototyp-Hinweis: die naechste Box mit T4 wird dir gemeldet", t4Hint = 1 },
+}
+Config.DAILY_FENCE_DURATION = 45 * 60 -- Sekunden, in denen der Hehler-Bonus gilt
 
 -- Admin -------------------------------------------------------------------
 -- Der Besitzer des Spiels ist automatisch Admin, ohne Eintrag. In Studio ist

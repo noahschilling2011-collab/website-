@@ -138,6 +138,8 @@ function DerelictService:Populate(valueMult: number?)
 	if #free > 0 and self:_rollT4(baseTier) then
 		t4Index = free[math.random(#free)].index
 	end
+	-- Merken, damit der HeistService den Tag-7-Hinweis ausliefern kann.
+	self.t4Index = t4Index
 
 	for _, entry in free do
 		local plotIndex, plot = entry.index, entry.plot
@@ -167,6 +169,11 @@ function DerelictService:Populate(valueMult: number?)
 
 		self.plots[plotIndex] = { state = state, refs = refs }
 	end
+end
+
+-- In welcher Box liegt in diesem Fenster der Prototyp? nil = in keiner.
+function DerelictService:GetT4Plot(): number?
+	return self.t4Index
 end
 
 function DerelictService:_countParts(state): number

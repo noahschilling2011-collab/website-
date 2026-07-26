@@ -124,7 +124,31 @@ function MonetizationService:RefreshOwnership(player: Player)
 	return cache
 end
 
+--[[
+	ENTSCHEIDUNG zu den Admin-Grants (v9 Phase B):
+
+	self.owned ist ein Laufzeit-Cache, der beim Beitreten aus dem
+	MarketplaceService befuellt wird. Ein Grant, der nur diesen Cache setzt,
+	ist nach dem naechsten Beitritt weg.
+
+	Ich schreibe ihn deshalb ZUSAETZLICH ins Profil (data.adminGrants) und
+	pruefe ihn hier mit. Grund: das Interessanteste am Testen eines Passes ist
+	genau das Verhalten ueber einen Rejoin hinweg - VIP-Rate, Offline-Rechnung,
+	Tor-Optik. Ein Grant, der beim Neuladen verschwindet, kann das nicht
+	pruefen. Der Befehl "unlockall" nimmt alles wieder weg.
+
+	Preis dieser Entscheidung: wer in ADMIN_USER_IDS steht, kann sich bezahlte
+	Inhalte dauerhaft selbst geben. Das steht so in der README.
+]]
+function MonetizationService:_granted(player: Player, key: string): boolean
+	local data = self.Services.DataService and self.Services.DataService:Get(player)
+	return data ~= nil and data.adminGrants ~= nil and data.adminGrants[key] == true
+end
+
 function MonetizationService:HasPass(player: Player, key: string): boolean
+	if self:_granted(player, key) then
+		return true
+	end
 	local cache = self.owned[player.UserId]
 	if not cache then
 		return false
@@ -132,8 +156,28 @@ function MonetizationService:HasPass(player: Player, key: string): boolean
 	return cache[key] == true
 end
 
+-- Was das Shop-Menue als "hast du schon" anzeigt. Grants gehoeren dazu, sonst
+-- sieht ein Admin nicht, dass sein Befehl gewirkt hat.
 function MonetizationService:GetOwnership(player: Player)
-	return self.owned[player.UserId] or {}
+	local merged = {}
+	for key, value in self.owned[player.UserId] or {} do
+		merged[key] = value
+	end
+	local data = self.Services.DataService and self.Services.DataService:Get(player)
+	for key, value in (data and data.adminGrants) or {} do
+		merged[key] = value
+	end
+	return merged
+end
+
+-- Alle Schluessel, die ein Grant setzen kann. Wird vom AdminService gelesen,
+-- damit die Liste nicht doppelt gepflegt werden muss.
+function MonetizationService:AllKeys(): { string }
+	local keys = {}
+	for _, item in CATALOG do
+		table.insert(keys, item.key)
+	end
+	return keys
 end
 
 function MonetizationService:PushShop(player: Player)
@@ -183,6 +227,22 @@ function MonetizationService:_requestInstantRepair(player: Player, carIndex, slo
 	end
 	if not data.repairs[ProfileOps.RepairKey(carIndex, slotId)] then
 		self.Services.EconomyService:Notify(player, "Da laeuft keine Reparatur.", "bad")
+		return
+	end
+	-- Guthaben aus der Tageskette geht vor. Sonst muesste jemand, der die
+	-- Ladung geschenkt bekommen hat, trotzdem den Robux-Dialog wegklicken.
+	if (data.instantRepairCharges or 0) > 0 then
+		-- Derselbe Pfad wie beim Robux-Kauf, nur ohne Dialog. Zwei Wege zum
+		-- selben Ergebnis waeren zwei Stellen, an denen es kaputtgehen kann.
+		local ok = PurchaseEffects.InstantRepair(self.Services, player, data, { carIndex = carIndex, slotId = slotId })
+		if ok then
+			data.instantRepairCharges -= 1
+			self.Services.EconomyService:Notify(
+				player,
+				("Sofort fertig - Guthaben verbraucht (%d uebrig)."):format(data.instantRepairCharges),
+				"good"
+			)
+		end
 		return
 	end
 	self.pendingRepair[player.UserId] = { carIndex = carIndex, slotId = slotId }

@@ -58,6 +58,15 @@ function ProfileTemplate.New()
 			bestDyno = 0,
 		},
 
+		-- Guthaben aus der Tageskette. Util.Reconcile setzt sie bei alten
+		-- Profilen auf 0/nil nach - kein Schemawechsel noetig.
+		instantRepairCharges = 0,
+		-- Vom Admin-Befehl gesetzte Pass-/Produktrechte. Leer bei jedem
+		-- normalen Spieler; MonetizationService:HasPass prueft es zusaetzlich.
+		adminGrants = {},
+		pendingT4Hint = 0,
+		fenceBonusUntil = 0, -- os.time, bis wann der Hehler-Bonus laeuft
+
 		daily = {
 			streak = 0,
 			lastDay = 0, -- UTC-Tag der letzten Abholung

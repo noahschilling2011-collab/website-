@@ -360,7 +360,29 @@ Config.CASH_PACKS = {
 Config.RADAR_TOP_COUNT = 5
 
 -- Daily Reward -------------------------------------------------------------
-Config.DAILY_REWARDS = { 250, 500, 900, 1500, 2600, 4200, 8000 }
+--[[
+	Tagesbelohnung. Bis v8 waren das feste Betraege {250 ... 8000} - ein Spieler
+	mit ausgebauter T3-Garage verdient die 8000 im Leerlauf in unter einer
+	Minute. Eine Belohnung, die weniger wert ist als eine Minute Nichtstun, ist
+	kein Grund wiederzukommen.
+
+	Seit v9 sind es Minuten der EIGENEN Rate: damit skaliert die Kette mit dem
+	Spieler mit. DAILY_MIN_CASH ist der Boden fuer Tag 1 eines Neulings, dessen
+	Rate noch bei 0 liegt - ohne den bekaeme er null.
+]]
+Config.DAILY_RATE_MINUTES = { 3, 4, 6, 9, 13, 18, 25 }
+Config.DAILY_MIN_CASH = { 250, 500, 900, 1500, 2600, 4200, 8000 }
+
+-- Was ein Kettentag AUFMACHT, zusaetzlich zum Cash. Nach dem Muster von
+-- REBIRTH_UNLOCKS: Tabelle statt `if streak == 7` im Code.
+-- Tag 7 ist bewusst keine Zahl, sondern das Einzige im Spiel, das man nicht
+-- kaufen kann - der Hinweis auf den naechsten Prototyp.
+Config.DAILY_UNLOCKS = {
+	[3] = { label = "Hehler zahlt heute besser", fenceBonus = 0.15 },
+	[5] = { label = "Eine Reparatur sofort fertig", instantRepair = 1 },
+	[7] = { label = "Prototyp-Hinweis: die naechste Box mit T4 wird dir gemeldet", t4Hint = 1 },
+}
+Config.DAILY_FENCE_DURATION = 45 * 60 -- Sekunden, in denen der Hehler-Bonus gilt
 
 -- Admin -------------------------------------------------------------------
 -- Der Besitzer des Spiels ist automatisch Admin, ohne Eintrag. In Studio ist
@@ -1597,9 +1619,16 @@ function ProfileOps.NextUnlock(data): string?
 	return entry and entry.label or nil
 end
 
--- Kurs beim Hehler. Rebirth 2 hebt ihn an; ohne Profil gilt der Grundkurs.
+-- Kurs beim Hehler. Rebirth 2 hebt ihn dauerhaft an, ein Kettentag zeitlich
+-- befristet. Beides addiert sich; ohne Profil gilt der Grundkurs.
 function ProfileOps.FenceRate(data): number
-	return ProfileOps.Unlocks(data).fenceRate or Config.FENCE_RATE
+	local base = ProfileOps.Unlocks(data).fenceRate or Config.FENCE_RATE
+	if data and (data.fenceBonusUntil or 0) > os.time() then
+		base += Config.DAILY_UNLOCKS[3].fenceBonus
+	end
+	-- Ueber 1.0 waere der Hehler lohnender als das Teil selbst - dann traegt
+	-- niemand mehr nach Hause und der halbe Heist-Loop faellt weg.
+	return math.min(base, 0.95)
 end
 
 -- Rebirth ist erst moeglich, wenn die Garage voll ausgebaut ist und jedes Auto
@@ -1709,6 +1738,15 @@ function ProfileTemplate.New()
 			-- Feld bei alten Profilen auf 0 nach.
 			bestDyno = 0,
 		},
+
+		-- Guthaben aus der Tageskette. Util.Reconcile setzt sie bei alten
+		-- Profilen auf 0/nil nach - kein Schemawechsel noetig.
+		instantRepairCharges = 0,
+		-- Vom Admin-Befehl gesetzte Pass-/Produktrechte. Leer bei jedem
+		-- normalen Spieler; MonetizationService:HasPass prueft es zusaetzlich.
+		adminGrants = {},
+		pendingT4Hint = 0,
+		fenceBonusUntil = 0, -- os.time, bis wann der Hehler-Bonus laeuft
 
 		daily = {
 			streak = 0,
@@ -3864,6 +3902,31 @@ COMMANDS.max = function(self, player, data)
 	return "Alle Teile auf Maximum, Garage voll ausgebaut."
 end
 
+--[[
+	Alles freischalten, was im Shop steht. Produkte wie CashSmall sind
+	Einmalkaeufe und haben keinen Besitzzustand - der Grant wirkt deshalb nur
+	auf die Paesse (VIP, AutoCollect, GarageLock) und auf die Anzeige. Fuer
+	Cash gibt es den cash-Befehl, fuer die Reparatur das Guthaben aus Tag 5.
+
+	Die Rechte landen im Profil, ueberleben also einen Rejoin. Begruendung
+	steht in MonetizationService.
+]]
+COMMANDS.unlockall = function(self, player, data)
+	data.adminGrants = data.adminGrants or {}
+	for _, key in self.Services.MonetizationService:AllKeys() do
+		data.adminGrants[key] = true
+	end
+	self.Services.MonetizationService:PushShop(player)
+	return "Alle Paesse und Produkte freigeschaltet."
+end
+
+-- Gegenstueck, damit man den Kaufzustand wieder testen kann.
+COMMANDS.lockall = function(self, player, data)
+	data.adminGrants = {}
+	self.Services.MonetizationService:PushShop(player)
+	return "Alle Admin-Freischaltungen zurueckgenommen."
+end
+
 COMMANDS.rebirth = function(self, player, data)
 	local count = ProfileOps.Rebirth(data)
 	return ("Rebirth %d erzwungen."):format(count)
@@ -3958,7 +4021,25 @@ local Throttle = require(script.Parent.Parent.Garage.Throttle)
 local DailyRewardService = {}
 DailyRewardService.Name = "DailyRewardService"
 
-local STREAK_LENGTH = #Config.DAILY_REWARDS
+local STREAK_LENGTH = #Config.DAILY_RATE_MINUTES
+
+--[[
+	Belohnung fuer einen Kettentag.
+
+	Cash sind Minuten der EIGENEN Rate, mit einem Boden fuer Neulinge, deren
+	Rate noch bei 0 liegt. Damit ist Tag 7 fuer einen ausgebauten Spieler
+	weiterhin etwas wert - vorher waren es feste 8000, die er im Leerlauf in
+	unter einer Minute verdient.
+
+	Reine Rechnung, kein Zustand: der Aufrufer entscheidet, ob ausgezahlt wird.
+]]
+local function rewardFor(services, player: Player, data, streak: number)
+	local index = math.clamp(streak, 1, STREAK_LENGTH)
+	local minutes = Config.DAILY_RATE_MINUTES[index]
+	local rate = services.EconomyService:GetRate(player, data)
+	local cash = math.max(math.floor(rate * minutes * 60), Config.DAILY_MIN_CASH[index])
+	return cash, minutes, Config.DAILY_UNLOCKS[index]
+end
 
 function DailyRewardService:Init(services)
 	self.Services = services
@@ -3987,7 +4068,7 @@ function DailyRewardService:Start()
 	end)
 end
 
-function DailyRewardService:_state(data)
+function DailyRewardService:_state(player: Player, data)
 	local today = Util.UtcDay()
 	local lastDay = data.daily.lastDay or 0
 	local canClaim = lastDay < today
@@ -4002,12 +4083,23 @@ function DailyRewardService:_state(data)
 		nextStreak = streak
 	end
 	local secondsToMidnight = ((today + 1) * 86400) - os.time()
+
+	-- Der Client zeigt nur an, was hier drinsteht - gerechnet wird auf dem
+	-- Server. Deshalb wandert die fertige Betragsliste mit, nicht die Formel.
+	local preview = {}
+	for index = 1, STREAK_LENGTH do
+		local cash = rewardFor(self.Services, player, data, index)
+		local unlock = Config.DAILY_UNLOCKS[index]
+		preview[index] = { cash = cash, label = unlock and unlock.label or nil }
+	end
+
 	return {
 		streak = streak,
 		canClaim = canClaim,
 		nextStreak = nextStreak,
-		reward = Config.DAILY_REWARDS[math.clamp(nextStreak, 1, STREAK_LENGTH)],
-		rewards = Config.DAILY_REWARDS,
+		reward = preview[math.clamp(nextStreak, 1, STREAK_LENGTH)].cash,
+		nextLabel = preview[math.clamp(nextStreak, 1, STREAK_LENGTH)].label,
+		rewards = preview,
 		nextInSeconds = secondsToMidnight,
 	}
 end
@@ -4017,7 +4109,7 @@ function DailyRewardService:Push(player: Player, data)
 	if not data then
 		return
 	end
-	Remotes.Get("DailyState"):FireClient(player, self:_state(data))
+	Remotes.Get("DailyState"):FireClient(player, self:_state(player, data))
 end
 
 function DailyRewardService:Claim(player: Player)
@@ -4025,7 +4117,7 @@ function DailyRewardService:Claim(player: Player)
 	if not data then
 		return false
 	end
-	local state = self:_state(data)
+	local state = self:_state(player, data)
 	if not state.canClaim then
 		self.Services.EconomyService:Notify(player, "Heute schon abgeholt. Morgen wieder.", "info")
 		return false
@@ -4033,13 +4125,35 @@ function DailyRewardService:Claim(player: Player)
 
 	data.daily.streak = state.nextStreak
 	data.daily.lastDay = Util.UtcDay()
-	local reward = Config.DAILY_REWARDS[math.clamp(data.daily.streak, 1, STREAK_LENGTH)]
+
+	local reward, minutes, unlock = rewardFor(self.Services, player, data, data.daily.streak)
 	self.Services.EconomyService:AddCash(player, reward, "Daily")
 	self.Services.EconomyService:Notify(
 		player,
-		("Tag %d der Kette: %s"):format(data.daily.streak, Util.FormatCash(reward)),
+		("Tag %d der Kette: %s (%d Minuten deiner Rate)"):format(
+			data.daily.streak,
+			Util.FormatCash(reward),
+			minutes
+		),
 		"good"
 	)
+
+	-- Freischaltungen aus der Tabelle. Jede schreibt genau ein Profilfeld -
+	-- kein `if streak == 7` im Code.
+	if unlock then
+		if unlock.fenceBonus then
+			data.fenceBonusUntil = os.time() + Config.DAILY_FENCE_DURATION
+		end
+		if unlock.instantRepair then
+			data.instantRepairCharges = (data.instantRepairCharges or 0) + unlock.instantRepair
+		end
+		if unlock.t4Hint then
+			-- Die Ladung wartet, bis wirklich ein Prototyp auftaucht. Ein
+			-- Hinweis auf ein Fenster ohne T4 waere kein Hinweis.
+			data.pendingT4Hint = (data.pendingT4Hint or 0) + unlock.t4Hint
+		end
+		self.Services.EconomyService:Notify(player, unlock.label, "good")
+	end
 	self:Push(player, data)
 	self.Services.GarageService:Sync(player, data)
 	return true
@@ -4369,6 +4483,8 @@ function DerelictService:Populate(valueMult: number?)
 	if #free > 0 and self:_rollT4(baseTier) then
 		t4Index = free[math.random(#free)].index
 	end
+	-- Merken, damit der HeistService den Tag-7-Hinweis ausliefern kann.
+	self.t4Index = t4Index
 
 	for _, entry in free do
 		local plotIndex, plot = entry.index, entry.plot
@@ -4398,6 +4514,11 @@ function DerelictService:Populate(valueMult: number?)
 
 		self.plots[plotIndex] = { state = state, refs = refs }
 	end
+end
+
+-- In welcher Box liegt in diesem Fenster der Prototyp? nil = in keiner.
+function DerelictService:GetT4Plot(): number?
+	return self.t4Index
 end
 
 function DerelictService:_countParts(state): number
@@ -5446,6 +5567,7 @@ function HeistService:_open()
 	for _, player in Players:GetPlayers() do
 		self.Services.TelemetryService:Funnel(player, "firstWindow")
 	end
+	self:_deliverT4Hints()
 
 	self:_pushState()
 	if self.night then
@@ -5461,6 +5583,30 @@ function HeistService:_open()
 	end
 	self.Services.EffectService:LocalSoundAll("windowOpen")
 	self:_sendRadar()
+end
+
+--[[
+	Tag 7 der Kette: die Box mit dem Prototyp wird gemeldet.
+
+	Die Ladung wird nur verbraucht, wenn es in diesem Fenster ueberhaupt einen
+	Prototyp gibt - sonst wartet sie auf das naechste. Ein Hinweis auf nichts
+	waere kein Hinweis, und die Belohnung soll garantiert sein.
+]]
+function HeistService:_deliverT4Hints()
+	local plotIndex = self.Services.DerelictService:GetT4Plot()
+	if not plotIndex then
+		return
+	end
+	self.Services.DataService:ForEachProfile(function(player, data)
+		if (data.pendingT4Hint or 0) > 0 then
+			data.pendingT4Hint -= 1
+			self.Services.EconomyService:Notify(
+				player,
+				("Dein Hinweis: der Prototyp liegt in Box %d."):format(plotIndex),
+				"good"
+			)
+		end
+	end)
 end
 
 function HeistService:_close()
@@ -5880,7 +6026,31 @@ function MonetizationService:RefreshOwnership(player: Player)
 	return cache
 end
 
+--[[
+	ENTSCHEIDUNG zu den Admin-Grants (v9 Phase B):
+
+	self.owned ist ein Laufzeit-Cache, der beim Beitreten aus dem
+	MarketplaceService befuellt wird. Ein Grant, der nur diesen Cache setzt,
+	ist nach dem naechsten Beitritt weg.
+
+	Ich schreibe ihn deshalb ZUSAETZLICH ins Profil (data.adminGrants) und
+	pruefe ihn hier mit. Grund: das Interessanteste am Testen eines Passes ist
+	genau das Verhalten ueber einen Rejoin hinweg - VIP-Rate, Offline-Rechnung,
+	Tor-Optik. Ein Grant, der beim Neuladen verschwindet, kann das nicht
+	pruefen. Der Befehl "unlockall" nimmt alles wieder weg.
+
+	Preis dieser Entscheidung: wer in ADMIN_USER_IDS steht, kann sich bezahlte
+	Inhalte dauerhaft selbst geben. Das steht so in der README.
+]]
+function MonetizationService:_granted(player: Player, key: string): boolean
+	local data = self.Services.DataService and self.Services.DataService:Get(player)
+	return data ~= nil and data.adminGrants ~= nil and data.adminGrants[key] == true
+end
+
 function MonetizationService:HasPass(player: Player, key: string): boolean
+	if self:_granted(player, key) then
+		return true
+	end
 	local cache = self.owned[player.UserId]
 	if not cache then
 		return false
@@ -5888,8 +6058,28 @@ function MonetizationService:HasPass(player: Player, key: string): boolean
 	return cache[key] == true
 end
 
+-- Was das Shop-Menue als "hast du schon" anzeigt. Grants gehoeren dazu, sonst
+-- sieht ein Admin nicht, dass sein Befehl gewirkt hat.
 function MonetizationService:GetOwnership(player: Player)
-	return self.owned[player.UserId] or {}
+	local merged = {}
+	for key, value in self.owned[player.UserId] or {} do
+		merged[key] = value
+	end
+	local data = self.Services.DataService and self.Services.DataService:Get(player)
+	for key, value in (data and data.adminGrants) or {} do
+		merged[key] = value
+	end
+	return merged
+end
+
+-- Alle Schluessel, die ein Grant setzen kann. Wird vom AdminService gelesen,
+-- damit die Liste nicht doppelt gepflegt werden muss.
+function MonetizationService:AllKeys(): { string }
+	local keys = {}
+	for _, item in CATALOG do
+		table.insert(keys, item.key)
+	end
+	return keys
 end
 
 function MonetizationService:PushShop(player: Player)
@@ -5939,6 +6129,22 @@ function MonetizationService:_requestInstantRepair(player: Player, carIndex, slo
 	end
 	if not data.repairs[ProfileOps.RepairKey(carIndex, slotId)] then
 		self.Services.EconomyService:Notify(player, "Da laeuft keine Reparatur.", "bad")
+		return
+	end
+	-- Guthaben aus der Tageskette geht vor. Sonst muesste jemand, der die
+	-- Ladung geschenkt bekommen hat, trotzdem den Robux-Dialog wegklicken.
+	if (data.instantRepairCharges or 0) > 0 then
+		-- Derselbe Pfad wie beim Robux-Kauf, nur ohne Dialog. Zwei Wege zum
+		-- selben Ergebnis waeren zwei Stellen, an denen es kaputtgehen kann.
+		local ok = PurchaseEffects.InstantRepair(self.Services, player, data, { carIndex = carIndex, slotId = slotId })
+		if ok then
+			data.instantRepairCharges -= 1
+			self.Services.EconomyService:Notify(
+				player,
+				("Sofort fertig - Guthaben verbraucht (%d uebrig)."):format(data.instantRepairCharges),
+				"good"
+			)
+		end
 		return
 	end
 	self.pendingRepair[player.UserId] = { carIndex = carIndex, slotId = slotId }
@@ -9488,6 +9694,8 @@ local COMMANDS = {
 	{ key = "close", label = "Fenster schliessen" },
 	{ key = "radar", label = "Radar-Ladung" },
 	{ key = "rebirth", label = "Rebirth erzwingen" },
+	{ key = "unlockall", label = "Alle Paesse an" },
+	{ key = "lockall", label = "Alle Paesse aus" },
 	{ key = "reset", label = "Profil zuruecksetzen" },
 }
 
@@ -9701,7 +9909,9 @@ function DailyPanel.Render()
 			Parent = box,
 		})
 		Theme.label({
-			Text = Util.FormatCash(reward),
+			-- rewards ist seit v9 eine Liste von {cash, label}; der Betrag kommt
+			-- fertig vom Server, hier wird nichts gerechnet.
+			Text = Util.FormatCash(reward.cash),
 			Size = UDim2.new(1, 0, 0, 24),
 			Position = UDim2.new(0, 0, 0, 44),
 			TextXAlignment = Enum.TextXAlignment.Center,
@@ -9709,11 +9919,28 @@ function DailyPanel.Render()
 			TextSize = 15,
 			Parent = box,
 		})
+		-- Tage mit Freischaltung bekommen eine dritte Zeile. Ohne die sieht man
+		-- Tag 7 nicht an, dass dort das Wertvollste im Spiel liegt.
+		if reward.label then
+			Theme.label({
+				Text = reward.label,
+				Size = UDim2.new(1, -8, 0, 30),
+				Position = UDim2.new(0, 4, 0, 68),
+				TextXAlignment = Enum.TextXAlignment.Center,
+				TextYAlignment = Enum.TextYAlignment.Top,
+				TextWrapped = true,
+				TextColor3 = Color3.fromRGB(35, 35, 40),
+				TextSize = 11,
+				Parent = box,
+			})
+		end
 	end
 
 	if daily.canClaim then
 		refs.status.Text = ("Kette: %d Tage. Heute gibt es Tag %d."):format(daily.streak, daily.nextStreak)
-		refs.claim.Text = ("Abholen: %s"):format(Util.FormatCash(daily.reward))
+		refs.claim.Text = if daily.nextLabel
+			then ("Abholen: %s + %s"):format(Util.FormatCash(daily.reward), daily.nextLabel)
+			else ("Abholen: %s"):format(Util.FormatCash(daily.reward))
 		refs.claim.BackgroundColor3 = Theme.Colors.good
 		refs.claim.Active = true
 	else

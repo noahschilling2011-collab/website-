@@ -23,6 +23,8 @@ local COMMANDS = {
 	{ key = "close", label = "Fenster schliessen" },
 	{ key = "radar", label = "Radar-Ladung" },
 	{ key = "rebirth", label = "Rebirth erzwingen" },
+	{ key = "unlockall", label = "Alle Paesse an" },
+	{ key = "lockall", label = "Alle Paesse aus" },
 	{ key = "reset", label = "Profil zuruecksetzen" },
 }
 

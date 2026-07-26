@@ -99,6 +99,31 @@ COMMANDS.max = function(self, player, data)
 	return "Alle Teile auf Maximum, Garage voll ausgebaut."
 end
 
+--[[
+	Alles freischalten, was im Shop steht. Produkte wie CashSmall sind
+	Einmalkaeufe und haben keinen Besitzzustand - der Grant wirkt deshalb nur
+	auf die Paesse (VIP, AutoCollect, GarageLock) und auf die Anzeige. Fuer
+	Cash gibt es den cash-Befehl, fuer die Reparatur das Guthaben aus Tag 5.
+
+	Die Rechte landen im Profil, ueberleben also einen Rejoin. Begruendung
+	steht in MonetizationService.
+]]
+COMMANDS.unlockall = function(self, player, data)
+	data.adminGrants = data.adminGrants or {}
+	for _, key in self.Services.MonetizationService:AllKeys() do
+		data.adminGrants[key] = true
+	end
+	self.Services.MonetizationService:PushShop(player)
+	return "Alle Paesse und Produkte freigeschaltet."
+end
+
+-- Gegenstueck, damit man den Kaufzustand wieder testen kann.
+COMMANDS.lockall = function(self, player, data)
+	data.adminGrants = {}
+	self.Services.MonetizationService:PushShop(player)
+	return "Alle Admin-Freischaltungen zurueckgenommen."
+end
+
 COMMANDS.rebirth = function(self, player, data)
 	local count = ProfileOps.Rebirth(data)
 	return ("Rebirth %d erzwungen."):format(count)

@@ -128,7 +128,9 @@ function DailyPanel.Render()
 			Parent = box,
 		})
 		Theme.label({
-			Text = Util.FormatCash(reward),
+			-- rewards ist seit v9 eine Liste von {cash, label}; der Betrag kommt
+			-- fertig vom Server, hier wird nichts gerechnet.
+			Text = Util.FormatCash(reward.cash),
 			Size = UDim2.new(1, 0, 0, 24),
 			Position = UDim2.new(0, 0, 0, 44),
 			TextXAlignment = Enum.TextXAlignment.Center,
@@ -136,11 +138,28 @@ function DailyPanel.Render()
 			TextSize = 15,
 			Parent = box,
 		})
+		-- Tage mit Freischaltung bekommen eine dritte Zeile. Ohne die sieht man
+		-- Tag 7 nicht an, dass dort das Wertvollste im Spiel liegt.
+		if reward.label then
+			Theme.label({
+				Text = reward.label,
+				Size = UDim2.new(1, -8, 0, 30),
+				Position = UDim2.new(0, 4, 0, 68),
+				TextXAlignment = Enum.TextXAlignment.Center,
+				TextYAlignment = Enum.TextYAlignment.Top,
+				TextWrapped = true,
+				TextColor3 = Color3.fromRGB(35, 35, 40),
+				TextSize = 11,
+				Parent = box,
+			})
+		end
 	end
 
 	if daily.canClaim then
 		refs.status.Text = ("Kette: %d Tage. Heute gibt es Tag %d."):format(daily.streak, daily.nextStreak)
-		refs.claim.Text = ("Abholen: %s"):format(Util.FormatCash(daily.reward))
+		refs.claim.Text = if daily.nextLabel
+			then ("Abholen: %s + %s"):format(Util.FormatCash(daily.reward), daily.nextLabel)
+			else ("Abholen: %s"):format(Util.FormatCash(daily.reward))
 		refs.claim.BackgroundColor3 = Theme.Colors.good
 		refs.claim.Active = true
 	else

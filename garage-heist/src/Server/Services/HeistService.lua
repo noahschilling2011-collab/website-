@@ -238,6 +238,7 @@ function HeistService:_open()
 	for _, player in Players:GetPlayers() do
 		self.Services.TelemetryService:Funnel(player, "firstWindow")
 	end
+	self:_deliverT4Hints()
 
 	self:_pushState()
 	if self.night then
@@ -253,6 +254,30 @@ function HeistService:_open()
 	end
 	self.Services.EffectService:LocalSoundAll("windowOpen")
 	self:_sendRadar()
+end
+
+--[[
+	Tag 7 der Kette: die Box mit dem Prototyp wird gemeldet.
+
+	Die Ladung wird nur verbraucht, wenn es in diesem Fenster ueberhaupt einen
+	Prototyp gibt - sonst wartet sie auf das naechste. Ein Hinweis auf nichts
+	waere kein Hinweis, und die Belohnung soll garantiert sein.
+]]
+function HeistService:_deliverT4Hints()
+	local plotIndex = self.Services.DerelictService:GetT4Plot()
+	if not plotIndex then
+		return
+	end
+	self.Services.DataService:ForEachProfile(function(player, data)
+		if (data.pendingT4Hint or 0) > 0 then
+			data.pendingT4Hint -= 1
+			self.Services.EconomyService:Notify(
+				player,
+				("Dein Hinweis: der Prototyp liegt in Box %d."):format(plotIndex),
+				"good"
+			)
+		end
+	end)
 end
 
 function HeistService:_close()
