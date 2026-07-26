@@ -34,7 +34,6 @@ local Throttle = require(Server.Garage.Throttle)
 local AdminService = {}
 AdminService.Name = "AdminService"
 
-local COMMAND_COOLDOWN = 0.3
 local MAX_CASH_GRANT = 1e9
 
 function AdminService:Init(services)
@@ -42,7 +41,7 @@ function AdminService:Init(services)
 end
 
 function AdminService:Start()
-	Throttle.Connect("AdminCommand", COMMAND_COOLDOWN, function(player, command, value)
+	Throttle.Connect("AdminCommand", Config.ADMIN_COMMAND_COOLDOWN, function(player, command, value)
 		self:_run(player, command, value)
 	end)
 

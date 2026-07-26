@@ -20,6 +20,7 @@ Config.COLLECT_COOLDOWN = 0.3
 Config.CLAIM_COOLDOWN = 1
 Config.DROP_COOLDOWN = 0.5
 Config.PROMPT_COOLDOWN = 1.5
+Config.ADMIN_COMMAND_COOLDOWN = 0.3
 Config.SELL_REFUND = 0.5 -- Anteil des Teilewerts beim Verkauf loser Teile
 -- Beklautwerden soll wehtun, aber nicht bestrafen: das Opfer bekommt einen
 -- Teil des Werts sofort als Cash - erst wenn das Teil wirklich abgeliefert ist.
