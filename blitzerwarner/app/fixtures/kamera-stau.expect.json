@@ -1,0 +1,13 @@
+{
+  "beschreibung": "Langsame Annäherung unter 5 m/s und 60 s Stillstand an der Kamera — kein Dauerfeuer",
+  "kameras": [
+    {
+      "lat": 48.7712,
+      "lon": 9.18517,
+      "dir": 90,
+      "max": 30,
+      "type": "speed"
+    }
+  ],
+  "erwarteteWarnungen": 1
+}

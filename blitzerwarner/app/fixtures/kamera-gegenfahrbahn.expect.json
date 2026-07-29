@@ -1,0 +1,13 @@
+{
+  "beschreibung": "Fahrt nach Osten, Kamera am Weg blickt nach Westen (dir 270) — Gegenverkehr",
+  "kameras": [
+    {
+      "lat": 48.7712,
+      "lon": 9.19159,
+      "dir": 270,
+      "max": 80,
+      "type": "speed"
+    }
+  ],
+  "erwarteteWarnungen": 0
+}

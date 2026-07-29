@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Fahrt nach Norden mit Kurs 359 Grad, Kamera voraus — prüft den Winkel-Nulldurchgang
+
+Synthetisch erzeugt von src/replay/make-fixtures.ts — nicht von Hand ändern,
+sondern den Generator anpassen und neu erzeugen.
+-->
+<gpx version="1.1" creator="static-blitzerwarner-fixtures">
+  <trk>
+    <trkseg>
+      <trkpt lat="48.771200" lon="9.183400">
+        <time>2026-07-29T10:00:00.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.771450" lon="9.183393">
+        <time>2026-07-29T10:00:01.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.771700" lon="9.183387">
+        <time>2026-07-29T10:00:02.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.771950" lon="9.183380">
+        <time>2026-07-29T10:00:03.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.772200" lon="9.183374">
+        <time>2026-07-29T10:00:04.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.772450" lon="9.183367">
+        <time>2026-07-29T10:00:05.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.772700" lon="9.183360">
+        <time>2026-07-29T10:00:06.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.772950" lon="9.183354">
+        <time>2026-07-29T10:00:07.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.773200" lon="9.183347">
+        <time>2026-07-29T10:00:08.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.773450" lon="9.183340">
+        <time>2026-07-29T10:00:09.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.773700" lon="9.183334">
+        <time>2026-07-29T10:00:10.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.773950" lon="9.183327">
+        <time>2026-07-29T10:00:11.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.774200" lon="9.183321">
+        <time>2026-07-29T10:00:12.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.774450" lon="9.183314">
+        <time>2026-07-29T10:00:13.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.774700" lon="9.183307">
+        <time>2026-07-29T10:00:14.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.774950" lon="9.183301">
+        <time>2026-07-29T10:00:15.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.775200" lon="9.183294">
+        <time>2026-07-29T10:00:16.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.775450" lon="9.183287">
+        <time>2026-07-29T10:00:17.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.775700" lon="9.183281">
+        <time>2026-07-29T10:00:18.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.775949" lon="9.183274">
+        <time>2026-07-29T10:00:19.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.776199" lon="9.183268">
+        <time>2026-07-29T10:00:20.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.776449" lon="9.183261">
+        <time>2026-07-29T10:00:21.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.776699" lon="9.183254">
+        <time>2026-07-29T10:00:22.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.776949" lon="9.183248">
+        <time>2026-07-29T10:00:23.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.777199" lon="9.183241">
+        <time>2026-07-29T10:00:24.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.777449" lon="9.183234">
+        <time>2026-07-29T10:00:25.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.777699" lon="9.183228">
+        <time>2026-07-29T10:00:26.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.777949" lon="9.183221">
+        <time>2026-07-29T10:00:27.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.778199" lon="9.183215">
+        <time>2026-07-29T10:00:28.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.778449" lon="9.183208">
+        <time>2026-07-29T10:00:29.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+      <trkpt lat="48.778699" lon="9.183201">
+        <time>2026-07-29T10:00:30.000Z</time>
+        <speed>27.80</speed>
+        <course>359.0</course>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>
