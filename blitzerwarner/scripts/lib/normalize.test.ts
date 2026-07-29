@@ -80,6 +80,108 @@ test('normalize: Elemente ohne Koordinate werden übersprungen', () => {
   assert.equal(cams.length, 0);
 });
 
+test('normalize: Relation nutzt den device-Node, nicht den Mittelpunkt', () => {
+  // Der Mittelpunkt einer Enforcement-Relation ist der Schwerpunkt aller
+  // Mitglieder — inklusive der überwachten Straße — und liegt damit oft
+  // deutlich neben der Kamera.
+  const cams = normalize([
+    {
+      type: 'relation', id: 1,
+      center: { lat: 48.780, lon: 9.180 },
+      tags: { type: 'enforcement', enforcement: 'maxspeed', maxspeed: '80' },
+      members: [
+        { type: 'node', ref: 100, role: 'device' },
+        { type: 'way', ref: 200, role: 'from' },
+      ],
+    },
+    { type: 'node', id: 100, lat: 48.775, lon: 9.180, tags: { 'camera:direction': '90' } },
+  ]);
+  assert.equal(cams.length, 1, 'device-Node ist kein eigener speed_camera-Node');
+  assert.equal(cams[0].lat, 48.775, 'Position kommt vom device-Node');
+  assert.equal(cams[0].dir, 90, 'Richtung vom Node');
+  assert.equal(cams[0].max, 80, 'maxspeed ergänzt aus der Relation');
+  assert.equal(cams[0].src, 'relation');
+});
+
+test('normalize: Abschnittskontrolle mit zwei Kameras ergibt zwei Einträge', () => {
+  const cams = normalize([
+    {
+      type: 'relation', id: 1,
+      center: { lat: 48.78, lon: 9.18 },
+      tags: { type: 'enforcement', enforcement: 'average_speed' },
+      members: [
+        { type: 'node', ref: 100, role: 'device' },
+        { type: 'node', ref: 101, role: 'device' },
+      ],
+    },
+    { type: 'node', id: 100, lat: 48.770, lon: 9.18 },
+    { type: 'node', id: 101, lat: 48.790, lon: 9.18 },
+  ]);
+  assert.equal(cams.length, 2, 'an beiden Enden muss gewarnt werden');
+  assert.deepEqual(cams.map((c) => c.lat).sort(), [48.77, 48.79]);
+});
+
+test('normalize: Mittelpunkt nur als Notbehelf ohne device-Node', () => {
+  const cams = normalize([
+    {
+      type: 'relation', id: 1,
+      center: { lat: 48.78, lon: 9.18 },
+      tags: { type: 'enforcement', enforcement: 'maxspeed' },
+      members: [{ type: 'way', ref: 200, role: 'from' }],
+    },
+  ]);
+  assert.equal(cams.length, 1);
+  assert.equal(cams[0].lat, 48.78);
+});
+
+test('normalize: device-Node ohne Koordinate fällt auf den Mittelpunkt zurück', () => {
+  // Kommt vor, wenn der referenzierte Node nicht mitgeliefert wurde.
+  const cams = normalize([
+    {
+      type: 'relation', id: 1,
+      center: { lat: 48.78, lon: 9.18 },
+      tags: { type: 'enforcement', enforcement: 'maxspeed' },
+      members: [{ type: 'node', ref: 999, role: 'device' }],
+    },
+  ]);
+  assert.equal(cams.length, 1);
+  assert.equal(cams[0].lat, 48.78);
+});
+
+test('normalize: device-Nodes ohne speed_camera-Tag zählen nicht doppelt', () => {
+  // Der device-Node wird von der Query mitgeliefert, ist aber selbst kein
+  // highway=speed_camera. Er darf nur über seine Relation eingehen.
+  const cams = normalize([
+    {
+      type: 'relation', id: 1,
+      center: { lat: 48.78, lon: 9.18 },
+      tags: { type: 'enforcement', enforcement: 'maxspeed' },
+      members: [{ type: 'node', ref: 100, role: 'device' }],
+    },
+    { type: 'node', id: 100, lat: 48.775, lon: 9.18, tags: { man_made: 'surveillance' } },
+  ]);
+  assert.equal(cams.length, 1);
+});
+
+test('normalize: device-Node MIT speed_camera-Tag ergibt zwei deckungsgleiche Einträge', () => {
+  // Beide Einträge liegen exakt aufeinander; der Dedupe fasst sie zusammen.
+  const elements: OverpassElement[] = [
+    {
+      type: 'relation', id: 1,
+      center: { lat: 48.78, lon: 9.18 },
+      tags: { type: 'enforcement', enforcement: 'maxspeed', maxspeed: '80' },
+      members: [{ type: 'node', ref: 100, role: 'device' }],
+    },
+    { type: 'node', id: 100, lat: 48.775, lon: 9.18, tags: { highway: 'speed_camera' } },
+  ];
+  const cams = normalize(elements);
+  assert.equal(cams.length, 2);
+  assert.deepEqual([...new Set(cams.map((c) => c.src))].sort(), ['node', 'relation']);
+  const merged = dedupe(cams);
+  assert.equal(merged.length, 1, 'deckungsgleich -> eine Anlage');
+  assert.equal(merged[0].max, 80);
+});
+
 test('normalize: irrelevante Enforcement-Relationen werden verworfen', () => {
   // type=enforcement gibt es auch für Maut, Zufahrtsbeschränkungen usw.
   const cams = normalize([

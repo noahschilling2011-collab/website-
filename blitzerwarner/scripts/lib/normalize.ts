@@ -126,32 +126,90 @@ export function parseType(tags: Record<string, string>): CameraType {
 
 const round5 = (n: number) => Math.round(n * 1e5) / 1e5;
 
-/** OSM-Elemente in das flache Camera-Format überführen. */
+/** Trägt diese Enforcement-Relation überhaupt eine Verkehrsüberwachung? */
+function isRelevantEnforcement(tags: Record<string, string>): boolean {
+  const enforcement = (tags['enforcement'] ?? '').toLowerCase();
+  // type=enforcement gibt es auch für Maut, Höhen- und Gewichtsbeschränkungen
+  // sowie Zufahrtskontrollen. Das sind keine Blitzer.
+  return ['maxspeed', 'average_speed', 'traffic_signals'].some((r) =>
+    enforcement.includes(r),
+  );
+}
+
+/**
+ * OSM-Elemente in das flache Camera-Format überführen.
+ *
+ * Für Enforcement-Relationen wird der Standort der als `device` referenzierten
+ * Nodes verwendet, nicht der Mittelpunkt der Relation. Der Mittelpunkt ist der
+ * Schwerpunkt aller Mitglieder, also inklusive der überwachten Straße, und
+ * liegt entsprechend oft neben der Kamera. Nur wenn eine Relation keinen
+ * device-Node hat (oder dieser nicht mitgeliefert wurde), bleibt der
+ * Mittelpunkt als Notbehelf.
+ *
+ * Eine Abschnittskontrolle mit Kameras an beiden Enden ergibt dadurch auch
+ * zwei Einträge statt einem in der Streckenmitte.
+ */
 export function normalize(elements: OverpassElement[]): RawCamera[] {
   const cameras: RawCamera[] = [];
 
+  // Nachschlagetabelle für die Mitglieder-Auflösung.
+  const nodesById = new Map<number, OverpassElement>();
   for (const el of elements) {
-    const tags = el.tags ?? {};
-    const lat = el.lat ?? el.center?.lat;
-    const lon = el.lon ?? el.center?.lon;
-    if (lat == null || lon == null) continue;
-
-    // Enforcement-Relationen ohne relevanten enforcement-Wert (z. B.
-    // enforcement=toll oder =access) sind für uns keine Blitzer.
-    if (el.type === 'relation') {
-      const enforcement = (tags['enforcement'] ?? '').toLowerCase();
-      const relevant = ['maxspeed', 'average_speed', 'traffic_signals'];
-      if (!relevant.some((r) => enforcement.includes(r))) continue;
+    if (el.type === 'node' && el.lat != null && el.lon != null) {
+      nodesById.set(el.id, el);
     }
+  }
 
+  const add = (
+    lat: number,
+    lon: number,
+    tags: Record<string, string>,
+    src: 'node' | 'relation',
+  ) => {
     cameras.push({
       lat: round5(lat),
       lon: round5(lon),
       dir: parseDirection(tags),
       max: parseMaxspeed(tags),
       type: parseType(tags),
-      src: el.type === 'relation' ? 'relation' : 'node',
+      src,
     });
+  };
+
+  for (const el of elements) {
+    const tags = el.tags ?? {};
+
+    if (el.type === 'relation') {
+      if (!isRelevantEnforcement(tags)) continue;
+
+      const devices = (el.members ?? []).filter(
+        (m) => m.role === 'device' && m.type === 'node',
+      );
+
+      let placed = 0;
+      for (const member of devices) {
+        const node = nodesById.get(member.ref);
+        if (!node?.lat || !node?.lon) continue;
+        // Tags des Nodes gewinnen — er trägt die genauere Richtung und oft
+        // ein eigenes maxspeed. Die Relation ergänzt, was dort fehlt.
+        add(node.lat, node.lon, { ...tags, ...(node.tags ?? {}) }, 'relation');
+        placed++;
+      }
+
+      if (placed === 0 && el.center) {
+        add(el.center.lat, el.center.lon, tags, 'relation');
+      }
+      continue;
+    }
+
+    // Reine Kamera-Nodes. Device-Nodes einer Relation, die zusätzlich als
+    // highway=speed_camera getaggt sind, kommen hier ein zweites Mal vor —
+    // beide Einträge liegen dann exakt aufeinander und der Dedupe fasst sie
+    // zusammen.
+    if (el.type === 'node' && tags['highway'] === 'speed_camera') {
+      if (el.lat == null || el.lon == null) continue;
+      add(el.lat, el.lon, tags, 'node');
+    }
   }
 
   return cameras;

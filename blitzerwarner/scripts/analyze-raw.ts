@@ -62,27 +62,17 @@ console.log(`\nNormalisiert: ${cams.length}`);
 type Pair = { d: number; nodeAndRelation: boolean; dirConflict: boolean };
 const pairs: Pair[] = [];
 
-// Herkunft mitführen, um Node/Relation-Paare von Node/Node-Paaren zu trennen.
-const origins: ('node' | 'relation')[] = [];
-for (const el of res.elements) {
-  const lat = el.lat ?? el.center?.lat;
-  const lon = el.lon ?? el.center?.lon;
-  if (lat == null || lon == null) continue;
-  if (el.type === 'relation') {
-    const e = (el.tags?.enforcement ?? '').toLowerCase();
-    if (!['maxspeed', 'average_speed', 'traffic_signals'].some((r) => e.includes(r))) continue;
-  }
-  origins.push(el.type === 'relation' ? 'relation' : 'node');
-}
-
+// Die Herkunft steht direkt am normalisierten Eintrag (src) — sie hier noch
+// einmal aus den Rohelementen zu rekonstruieren ginge schief, seit eine
+// Relation je device-Node einen eigenen Eintrag erzeugt.
 for (let i = 0; i < cams.length; i++) {
   for (let j = i + 1; j < cams.length; j++) {
-    const d = haversine(cams[i].lat, cams[i].lon, cams[j].lat, cams[j].lon);
-    if (d > DEDUPE_RADIUS_M) continue;
     const a = cams[i], b = cams[j];
+    const d = haversine(a.lat, a.lon, b.lat, b.lon);
+    if (d > DEDUPE_RADIUS_M) continue;
     pairs.push({
       d,
-      nodeAndRelation: origins[i] !== origins[j],
+      nodeAndRelation: a.src !== b.src,
       dirConflict: a.dir != null && b.dir != null && bearingDelta(a.dir, b.dir) > 45,
     });
   }

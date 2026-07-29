@@ -21,6 +21,12 @@ export const MIRRORS = [
   'https://overpass.osm.jp/api/interpreter',
 ];
 
+export type OverpassMember = {
+  type: 'node' | 'way' | 'relation';
+  ref: number;
+  role: string;
+};
+
 export type OverpassElement = {
   type: 'node' | 'way' | 'relation';
   id: number;
@@ -28,6 +34,8 @@ export type OverpassElement = {
   lon?: number;
   center?: { lat: number; lon: number };
   tags?: Record<string, string>;
+  /** Nur bei Relationen, wenn mit `out body` abgefragt. */
+  members?: OverpassMember[];
 };
 
 export type OverpassResponse = {

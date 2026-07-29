@@ -61,10 +61,23 @@ export function regionsFor(countries: string[]): Region[] {
 /**
  * Overpass-Query für ein Gebiet.
  *
- * `out center tags` liefert für Relationen den Mittelpunkt und für Nodes
- * die Koordinate — beides, was die Normalisierung braucht.
+ * Geliefert werden drei Dinge:
+ *  1. alle `highway=speed_camera`-Nodes,
+ *  2. alle Enforcement-Relationen mit Mitgliederliste (`body`) und
+ *     Mittelpunkt (`center`),
+ *  3. die als `device` referenzierten Nodes dieser Relationen.
+ *
+ * Punkt 3 ist der Grund für die zweite Zeile am Ende. Der Mittelpunkt einer
+ * Enforcement-Relation ist NICHT der Kamerastandort, sondern der Schwerpunkt
+ * aller Mitglieder — inklusive der überwachten Straßenabschnitte. Gemessen an
+ * Baden-Württemberg liegt er im Median 12 m daneben, bei 263 von 1565
+ * Relationen aber mehr als 30 m, im Extremfall 1394 m. Solche Einträge
+ * werden vom Dedupe nicht mehr mit der echten Kamera zusammengefasst und
+ * erzeugen Warnungen an Stellen, an denen nichts steht.
+ *
+ * Mit den device-Nodes sitzt der Eintrag exakt auf der Kamera.
  */
-export function queryFor(region: Region, timeoutSec = 600): string {
+export function queryFor(region: Region, timeoutSec = 900): string {
   const areaSelector = region.code.includes('-')
     ? `area["ISO3166-2"="${region.code}"]`
     : `area["ISO3166-1"="${region.code}"][admin_level=2]`;
@@ -75,5 +88,7 @@ ${areaSelector}->.a;
   node["highway"="speed_camera"](area.a);
   relation["type"="enforcement"](area.a);
 );
-out center tags;`;
+out body center;
+node(r:"device");
+out body;`;
 }
