@@ -306,6 +306,27 @@ test('cellKey: jede Zellgrenze in einem realistischen Bereich ist stabil', () =>
   }
 });
 
+test('cellKey: Nulldurchgang von Längen- und Breitengrad', () => {
+  // Math.floor rundet bei negativen Zahlen nach unten, das ist hier richtig
+  // — aber leicht zu verwechseln mit Math.trunc, das zur Null hin rundet.
+  // Mit trunc lägen -0.01 und +0.01 in derselben Zelle.
+  assert.equal(cellKey(0, 0), '0.00,0.00');
+  assert.notEqual(cellKey(0.01, 0.01), cellKey(-0.01, -0.01), 'Nullzelle nicht doppelt belegt');
+  assert.equal(cellKey(-0.01, 0.01), '-0.05,0.00');
+  assert.equal(cellKey(0.01, -0.01), '0.00,-0.05');
+  assert.equal(cellKey(-0.05, -0.05), '-0.05,-0.05', 'negative Zellgrenze');
+  assert.equal(cellKey(-0.06, -0.06), '-0.10,-0.10');
+});
+
+test('neighbourKeys: über den Nullmeridian hinweg lückenlos', () => {
+  // Eine Kamera knapp östlich des Nullmeridians muss von westlich davon
+  // gefunden werden. Relevant für Frankreich/Spanien (Spec Abschnitt 10.1).
+  const grid = buildGrid([cam(48.0, 0.001)]);
+  const keys = neighbourKeys(48.0, -0.001);
+  const gefunden = keys.flatMap((k) => grid[k] ?? []);
+  assert.equal(gefunden.length, 1, 'Kamera östlich des Nullmeridians nicht gefunden');
+});
+
 test('neighbourKeys: 3x3-Nachbarschaft passt zum Gitter', () => {
   const keys = neighbourKeys(48.77, 9.82);
   assert.equal(keys.length, 9);
@@ -342,16 +363,70 @@ test('buildGrid: Ausgabe ist deterministisch', () => {
 });
 
 test('haversine: bekannte Distanzen', () => {
-  // 0.01° Breite ≈ 1111 m
-  assert.ok(Math.abs(haversine(48.0, 9.0, 48.01, 9.0) - 1111) < 5);
+  // Ein Breitengrad entspricht überall rund 111,19 km (bei Erdradius 6371 km:
+  // 6371000 * pi/180 = 111194,9 m). 0,01 Grad also ~1111,9 m.
+  assert.ok(Math.abs(haversine(48.0, 9.0, 48.01, 9.0) - 1111.9) < 1);
+  assert.ok(Math.abs(haversine(0, 0, 1, 0) - 111194.9) < 10, 'ein Breitengrad');
   assert.equal(haversine(48.0, 9.0, 48.0, 9.0), 0);
+
+  // Ein Längengrad schrumpft mit cos(Breite): bei 48 Grad ~74,4 km.
+  const erwartet = 111194.9 * Math.cos((48 * Math.PI) / 180);
+  assert.ok(
+    Math.abs(haversine(48, 9, 48, 10) - erwartet) < 60,
+    `Längengrad bei 48 Grad: ${haversine(48, 9, 48, 10).toFixed(0)} statt ~${erwartet.toFixed(0)}`,
+  );
+});
+
+test('haversine: Nulldurchgang von Längen- und Breitengrad', () => {
+  // Beidseits des Nullmeridians bzw. des Äquators darf sich die Distanz
+  // nicht verdoppeln oder auf null fallen — klassischer Vorzeichenfehler.
+  const ueberNullmeridian = haversine(48, -0.005, 48, 0.005);
+  const gleicheSpanneDaneben = haversine(48, 9.995, 48, 10.005);
+  assert.ok(
+    Math.abs(ueberNullmeridian - gleicheSpanneDaneben) < 1,
+    'Distanz über den Nullmeridian weicht ab',
+  );
+
+  const ueberAequator = haversine(-0.005, 9, 0.005, 9);
+  assert.ok(Math.abs(ueberAequator - 1111.9) < 2, 'Distanz über den Äquator');
+});
+
+test('haversine: Symmetrie', () => {
+  assert.equal(haversine(48.775, 9.18, 48.9, 9.3), haversine(48.9, 9.3, 48.775, 9.18));
 });
 
 test('bearingDelta: kürzeste Differenz über den Nullpunkt', () => {
-  assert.equal(bearingDelta(10, 350), 20);
+  // Der naive Ausdruck |a - b| rechnet hier 340 statt 20 und würde jede
+  // Kamera an einer ungefähr nach Norden führenden Strasse verwerfen —
+  // die Warnung fiele lautlos aus. Genau dieser Fall:
+  assert.equal(bearingDelta(350, 10), 20);
+  assert.equal(bearingDelta(10, 350), 20, 'symmetrisch');
+
+  // Die Fälle aus der Qualitätsvorgabe, Abschnitt 6a.
+  assert.equal(bearingDelta(0, 359), 1);
+  assert.equal(bearingDelta(359, 0), 1);
+  assert.equal(bearingDelta(180, 180), 0);
+  assert.equal(bearingDelta(90, 270), 180, 'exakte Gegenrichtung');
   assert.equal(bearingDelta(0, 180), 180);
   assert.equal(bearingDelta(90, 90), 0);
-  assert.equal(bearingDelta(350, 10), 20);
+});
+
+test('bearingDelta: Wertebereich und Symmetrie über den gesamten Kreis', () => {
+  for (let a = 0; a < 360; a += 7) {
+    for (let b = 0; b < 360; b += 11) {
+      const d = bearingDelta(a, b);
+      assert.ok(d >= 0 && d <= 180, `${a}/${b} ergibt ${d}, ausserhalb 0..180`);
+      assert.equal(d, bearingDelta(b, a), `${a}/${b} ist nicht symmetrisch`);
+    }
+  }
+});
+
+test('bearingDelta: verträgt Winkel ausserhalb 0..360', () => {
+  // GPS-Kurse und OSM-Tags kommen nicht immer normalisiert an.
+  assert.equal(bearingDelta(370, 10), 0);
+  assert.equal(bearingDelta(-10, 350), 0);
+  assert.equal(bearingDelta(-90, 270), 0);
+  assert.equal(bearingDelta(720, 0), 0);
 });
 
 test('CELL_SIZE passt zum Schlüsselformat', () => {
