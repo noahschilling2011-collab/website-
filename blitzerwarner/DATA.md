@@ -103,6 +103,57 @@ Erfasst werden zwei OSM-Objekttypen:
 Enforcement-Relationen mit anderen Werten (`toll`, `maxheight`, `maxweight`,
 `access`, `oneway`) werden verworfen — das sind keine Blitzer.
 
+### Geprüft: Es gibt keine weiteren Blitzer unter anderen Tags
+
+Blitzer werden in OSM nicht einheitlich getaggt, also lag die Frage nahe, ob
+unter anderen Schlüsseln noch Anlagen liegen, die die Pipeline übersieht.
+Erhoben mit `explore-tagging.ts`, bewertet mit `assess-candidates.ts`
+(Baden-Württemberg, Abgleich gegen den gebauten Datensatz, Radius 30 m):
+
+| Variante | Treffer | davon neu | Ergebnis |
+|---|---:|---:|---|
+| `node[enforcement]` | 11 | 0 | Zusatztag auf bekannten Kameras |
+| `node[speed_camera]` | 60 | 0 | Zusatztag auf bekannten Kameras |
+| `node[surveillance:type=ALPR]` | 57 | 57 | **keine Blitzer**, siehe unten |
+| `node[man_made=surveillance][surveillance:zone=traffic]` | 424 | 419 | **keine Blitzer**, siehe unten |
+| `way[highway=speed_camera]` | 0 | — | existiert nicht |
+| `node[man_made=surveillance][enforcement]` | 0 | — | existiert nicht |
+| `node[device=speed_camera]` | 0 | — | existiert nicht |
+
+**Ergebnis: keine einzige zusätzliche Anlage.** Die beiden bestehenden
+Selektoren erfassen alles, was in OSM als Blitzer erfasst ist.
+
+Die ersten beiden Varianten sind Zusatz-Tags: Jeder einzelne Treffer liegt
+innerhalb von 30 m einer bereits bekannten Kamera.
+
+Die beiden grossen Töpfe sehen nur nach Ausbeute aus. Was tatsächlich
+dahintersteckt, zeigen die Tags der neuen Kandidaten:
+
+- **ALPR** (Kennzeichenerfassung) ist überwiegend Parkhaus-Infrastruktur —
+  30 von 57 tragen `surveillance:zone=parking`, dazu Betreiber wie
+  „Parkdepot GmbH" und Objekte wie „Parkhaus Lohgerbe". Der Rest ist
+  Fahrzeiterfassung der Stadt Stuttgart zur Reisezeitmessung
+  (`note=Fahrzeiterfassung (B27-Weinsteige)`). Kennzeichen lesen heisst
+  nicht Geschwindigkeit messen, und keine dieser Anlagen verschickt Bussgelder.
+- **`surveillance:zone=traffic`** ist Verkehrsbeobachtung. Grösster Betreiber
+  ist die Strassenverkehrszentrale Baden-Württemberg (65 Objekte), dazu die
+  Autobahn GmbH und Städte. 73 sind schwenkbar (`camera:type=panning`), 68
+  Dome-Kameras — Bauformen, die für eine Geschwindigkeitsmessung technisch
+  nicht taugen. Unter den Beispielen findet sich eine
+  „Haltestellenüberwachung Europaplatz". Kein einziges Objekt trägt ein
+  `enforcement`-Tag.
+
+Zusätzlich als Kontrollgruppe gezählt: **168 `highway=speed_display`** in
+Baden-Württemberg. Das sind Dialog-Displays („Sie fahren 47"), die nichts
+ahnden. Sie stehen exemplarisch für die Falle: Eine breit gefasste Abfrage
+hätte den Datensatz um mehrere hundert Einträge „wachsen" lassen und die App
+dabei schlechter gemacht — jeder Fehlalarm entwertet auch die richtigen
+Warnungen.
+
+Diese Erhebung gilt für Baden-Württemberg und den Datenstand unten. Bei
+einem späteren Update lohnt sich eine Wiederholung, weil sich
+Tagging-Konventionen in OSM ändern.
+
 ### Warum der Relations-Mittelpunkt nicht der Kamerastandort ist
 
 Naheliegend wäre, für eine Enforcement-Relation den von Overpass gelieferten
