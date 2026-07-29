@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "name": "Static",
+    "slug": "static-blitzerwarner",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#000000",
+    "primaryColor": "#FF3B30",
+    "assetBundlePatterns": ["assets/**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "de.static.blitzerwarner",
+      "infoPlist": {
+        "UIBackgroundModes": ["location", "audio"],
+        "NSLocationWhenInUseUsageDescription": "Die App vergleicht deine Position mit einer offline gespeicherten Liste stationärer Blitzer, um dich rechtzeitig per Ansage zu warnen. Deine Position verlässt das Gerät nicht — es gibt keinen Server.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Die Warnung muss auch bei ausgeschaltetem Display funktionieren, weil das Gerät während der Fahrt in der Halterung liegt. Dafür wird die Position im Hintergrund benötigt. Sie wird ausschließlich auf dem Gerät verarbeitet und nicht übertragen — die App stellt zur Laufzeit keine Netzwerkverbindung her.",
+        "NSLocationAlwaysUsageDescription": "Die Warnung muss auch bei ausgeschaltetem Display funktionieren. Die Position wird ausschließlich auf dem Gerät verarbeitet und nicht übertragen.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "de.static.blitzerwarner",
+      "adaptiveIcon": {
+        "backgroundColor": "#000000"
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "POST_NOTIFICATIONS",
+        "WAKE_LOCK",
+        "VIBRATE"
+      ],
+      "blockedPermissions": ["ACCESS_MEDIA_LOCATION"]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Die Warnung muss auch bei ausgeschaltetem Display funktionieren. Die Position wird ausschließlich auf dem Gerät verarbeitet.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#FF3B30"
+        }
+      ]
+    ],
+    "extra": {
+      "hinweis": "Die App macht zur Laufzeit keine Netzwerk-Requests. Das ist prüfbar und ein Alleinstellungsmerkmal."
+    }
+  }
+}
