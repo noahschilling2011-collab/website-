@@ -116,8 +116,9 @@ function main() {
 
   if (existsSync(STATS_FILE)) {
     const stats = JSON.parse(readFileSync(STATS_FILE, 'utf8'));
-    console.log('Code   Gebiet                   Kameras   /1000km²   Richtung   maxspeed');
-    console.log('─'.repeat(74));
+    console.log('Alle Zahlen nach Deduplizierung. "roh" = OSM-Treffer davor.\n');
+    console.log('Code   Gebiet                   Anlagen      roh   /1000km²   Richtung   maxspeed');
+    console.log('─'.repeat(82));
     for (const r of stats.perRegion) {
       const area = AREA_KM2[r.code];
       const density = area ? ((r.cameras / area) * 1000).toFixed(1) : '—';
@@ -125,13 +126,20 @@ function main() {
       const maxPct = r.cameras ? `${Math.round((r.withMaxspeed / r.cameras) * 100)} %` : '—';
       console.log(
         `${r.code.padEnd(6)} ${r.name.padEnd(24)} ${String(r.cameras).padStart(6)} ` +
-        `${density.padStart(10)} ${dirPct.padStart(10)} ${maxPct.padStart(10)}` +
+        `${String(r.raw ?? '—').padStart(8)} ${density.padStart(10)} ` +
+        `${dirPct.padStart(10)} ${maxPct.padStart(10)}` +
         (r.error ? '   FEHLER' : ''),
       );
     }
-    console.log('─'.repeat(74));
+    console.log('─'.repeat(82));
     console.log(`vor Dedupe: ${stats.totalBeforeDedupe}, danach: ${stats.totalAfterDedupe} ` +
       `(${stats.removedByDedupe} zusammengefasst)`);
+    // Die Summe der Gebietszahlen darf minimal über der globalen liegen:
+    // Anlagen auf einer Landesgrenze werden global noch einmal gefasst.
+    const sumRegions = stats.perRegion.reduce((n: number, r: { cameras: number }) => n + r.cameras, 0);
+    if (sumRegions !== stats.totalAfterDedupe) {
+      console.log(`Summe der Gebiete: ${sumRegions} (${sumRegions - stats.totalAfterDedupe} grenzüberschreitende Dubletten)`);
+    }
   } else {
     console.log('Keine Statistikdatei — build-dataset erneut ausführen.');
   }

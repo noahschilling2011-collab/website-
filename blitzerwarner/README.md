@@ -32,7 +32,7 @@ mit einschlägiger Qualifikation prüfen.
 
 | Phase | Inhalt | Status |
 |---|---|---|
-| 1 | Datenpipeline | Datensatz gebaut, Trefferquote noch offen — siehe DATA.md |
+| 1 | Datenpipeline | 6073 Anlagen für Deutschland, Trefferquote noch offen — siehe DATA.md |
 | 2 | Background-Tracking | offen |
 | 3 | Warnlogik + Replay-Test | offen |
 | 4 | UI + Ansage | offen |

@@ -1,0 +1,196 @@
+{
+  "generatedFrom": "2026-07-29T15:18:06Z",
+  "countries": [
+    "DE"
+  ],
+  "totalBeforeDedupe": 10232,
+  "totalAfterDedupe": 6073,
+  "removedByDedupe": 4159,
+  "cells": 2517,
+  "withDirection": 1553,
+  "withMaxspeed": 5148,
+  "byType": {
+    "speed": 5477,
+    "red_light": 145,
+    "both": 451
+  },
+  "perRegion": [
+    {
+      "code": "DE-BW",
+      "name": "Baden-Württemberg",
+      "country": "DE",
+      "cameras": 1727,
+      "raw": 3020,
+      "withDirection": 271,
+      "withMaxspeed": 1436,
+      "redLight": 114,
+      "error": null
+    },
+    {
+      "code": "DE-BY",
+      "name": "Bayern",
+      "country": "DE",
+      "cameras": 167,
+      "raw": 247,
+      "withDirection": 50,
+      "withMaxspeed": 95,
+      "redLight": 38,
+      "error": null
+    },
+    {
+      "code": "DE-BE",
+      "name": "Berlin",
+      "country": "DE",
+      "cameras": 79,
+      "raw": 136,
+      "withDirection": 26,
+      "withMaxspeed": 72,
+      "redLight": 26,
+      "error": null
+    },
+    {
+      "code": "DE-BB",
+      "name": "Brandenburg",
+      "country": "DE",
+      "cameras": 274,
+      "raw": 431,
+      "withDirection": 57,
+      "withMaxspeed": 238,
+      "redLight": 6,
+      "error": null
+    },
+    {
+      "code": "DE-HB",
+      "name": "Bremen",
+      "country": "DE",
+      "cameras": 66,
+      "raw": 103,
+      "withDirection": 14,
+      "withMaxspeed": 21,
+      "redLight": 33,
+      "error": null
+    },
+    {
+      "code": "DE-HH",
+      "name": "Hamburg",
+      "country": "DE",
+      "cameras": 52,
+      "raw": 88,
+      "withDirection": 15,
+      "withMaxspeed": 46,
+      "redLight": 12,
+      "error": null
+    },
+    {
+      "code": "DE-HE",
+      "name": "Hessen",
+      "country": "DE",
+      "cameras": 983,
+      "raw": 1673,
+      "withDirection": 246,
+      "withMaxspeed": 907,
+      "redLight": 83,
+      "error": null
+    },
+    {
+      "code": "DE-MV",
+      "name": "Mecklenburg-Vorpommern",
+      "country": "DE",
+      "cameras": 152,
+      "raw": 227,
+      "withDirection": 29,
+      "withMaxspeed": 133,
+      "redLight": 17,
+      "error": null
+    },
+    {
+      "code": "DE-NI",
+      "name": "Niedersachsen",
+      "country": "DE",
+      "cameras": 715,
+      "raw": 1165,
+      "withDirection": 199,
+      "withMaxspeed": 580,
+      "redLight": 90,
+      "error": null
+    },
+    {
+      "code": "DE-NW",
+      "name": "Nordrhein-Westfalen",
+      "country": "DE",
+      "cameras": 1109,
+      "raw": 1722,
+      "withDirection": 409,
+      "withMaxspeed": 977,
+      "redLight": 72,
+      "error": null
+    },
+    {
+      "code": "DE-RP",
+      "name": "Rheinland-Pfalz",
+      "country": "DE",
+      "cameras": 108,
+      "raw": 166,
+      "withDirection": 22,
+      "withMaxspeed": 85,
+      "redLight": 13,
+      "error": null
+    },
+    {
+      "code": "DE-SL",
+      "name": "Saarland",
+      "country": "DE",
+      "cameras": 63,
+      "raw": 121,
+      "withDirection": 10,
+      "withMaxspeed": 50,
+      "redLight": 6,
+      "error": null
+    },
+    {
+      "code": "DE-SN",
+      "name": "Sachsen",
+      "country": "DE",
+      "cameras": 313,
+      "raw": 641,
+      "withDirection": 119,
+      "withMaxspeed": 282,
+      "redLight": 53,
+      "error": null
+    },
+    {
+      "code": "DE-ST",
+      "name": "Sachsen-Anhalt",
+      "country": "DE",
+      "cameras": 65,
+      "raw": 122,
+      "withDirection": 17,
+      "withMaxspeed": 58,
+      "redLight": 5,
+      "error": null
+    },
+    {
+      "code": "DE-SH",
+      "name": "Schleswig-Holstein",
+      "country": "DE",
+      "cameras": 95,
+      "raw": 172,
+      "withDirection": 33,
+      "withMaxspeed": 71,
+      "redLight": 23,
+      "error": null
+    },
+    {
+      "code": "DE-TH",
+      "name": "Thüringen",
+      "country": "DE",
+      "cameras": 107,
+      "raw": 198,
+      "withDirection": 36,
+      "withMaxspeed": 98,
+      "redLight": 6,
+      "error": null
+    }
+  ],
+  "failedRegions": []
+}

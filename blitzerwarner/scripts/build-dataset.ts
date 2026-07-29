@@ -123,19 +123,25 @@ async function main() {
   const deduped = dedupe(all);
   const grid = buildGrid(deduped);
 
-  // Statistik pro Gebiet auf Basis der deduplizierten Daten wäre
-  // mehrdeutig (welchem Land gehört ein Grenzfall?), daher zählen wir hier
-  // die Rohtreffer pro Gebiet und weisen die Dedupe-Differenz global aus.
-  const perRegion = results.map((r) => ({
-    code: r.region.code,
-    name: r.region.name,
-    country: r.region.country,
-    cameras: r.cameras.length,
-    withDirection: r.cameras.filter((c) => c.dir != null).length,
-    withMaxspeed: r.cameras.filter((c) => c.max != null).length,
-    redLight: r.cameras.filter((c) => c.type !== 'speed').length,
-    error: r.error ?? null,
-  }));
+  // Pro Gebiet ebenfalls deduplizieren. Die Rohzahl zu berichten wäre
+  // irreführend — sie zählt jede doppelt erfasste Anlage mit und liegt in
+  // der Grössenordnung 70 % zu hoch. Die Summe der Gebietszahlen kann
+  // minimal über der globalen Zahl liegen: Anlagen direkt auf einer
+  // Landesgrenze werden global noch einmal zusammengefasst.
+  const perRegion = results.map((r) => {
+    const cams = dedupe(r.cameras);
+    return {
+      code: r.region.code,
+      name: r.region.name,
+      country: r.region.country,
+      cameras: cams.length,
+      raw: r.cameras.length,
+      withDirection: cams.filter((c) => c.dir != null).length,
+      withMaxspeed: cams.filter((c) => c.max != null).length,
+      redLight: cams.filter((c) => c.type !== 'speed').length,
+      error: r.error ?? null,
+    };
+  });
 
   const countries: Record<string, { bbox: [number, number, number, number] | null; count: number }> = {};
   for (const country of args.countries) {

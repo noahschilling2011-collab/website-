@@ -131,6 +131,20 @@ test('dedupe: ab dem dritten Eintrag am selben Ort keine Richtungsübernahme', (
   assert.equal(result[0].dir, null);
 });
 
+test('dedupe: verändert die Eingabe nicht', () => {
+  // Sonst liefert ein zweiter Lauf über dieselben Objekte — etwa für die
+  // Statistik pro Bundesland — andere Zahlen als der erste.
+  const input = [
+    cam(48.77500, 9.18000, { max: 50, src: 'node' }),
+    cam(48.77510, 9.18000, { dir: 90, src: 'relation' }),
+  ];
+  const before = JSON.stringify(input);
+  const first = dedupe(input);
+  assert.equal(JSON.stringify(input), before, 'Eingabe muss unverändert bleiben');
+  const second = dedupe(input);
+  assert.deepEqual(second, first, 'zweiter Lauf muss dasselbe liefern');
+});
+
 test('dedupe: getrennte Anlagen bleiben getrennt', () => {
   // ~111 m auseinander, deutlich über dem 30-m-Radius
   const result = dedupe([cam(48.77500, 9.18000), cam(48.77600, 9.18000)]);

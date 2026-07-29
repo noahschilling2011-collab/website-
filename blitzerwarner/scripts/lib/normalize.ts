@@ -261,11 +261,16 @@ export function dedupe(cameras: RawCamera[]): Camera[] {
 
     if (merged) continue;
 
-    result.push(cam);
-    const key = bucketKey(cam.lat, cam.lon);
+    // Kopie ablegen, nicht das Original: Zusammenfassen verändert den
+    // behaltenen Eintrag, und die Eingabe darf davon nichts mitbekommen —
+    // sonst liefert ein zweiter dedupe-Lauf über dieselben Objekte (etwa
+    // für die Statistik pro Bundesland) andere Ergebnisse als der erste.
+    const kept = { ...cam };
+    result.push(kept);
+    const key = bucketKey(kept.lat, kept.lon);
     const bucket = buckets.get(key);
-    if (bucket) bucket.push(cam);
-    else buckets.set(key, [cam]);
+    if (bucket) bucket.push(kept);
+    else buckets.set(key, [kept]);
   }
 
   // src/mergedOnce sind Bau-Interna und gehören nicht in den Datensatz.
