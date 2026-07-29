@@ -237,6 +237,62 @@ macht das Produkt kaputt.
    60 %, der Rest liegt bei 78–96 %. In diesen beiden Ländern wird die Ansage
    also oft ohne Tempoangabe auskommen müssen.
 
+## Tempolimit-Datensatz (Spec 4b, Phase 6)
+
+Zweiter, völlig anders dimensionierter Datensatz: `maxspeed` auf
+Strassensegmenten, für das Map-Matching. Die Spec befürchtet, dass ein
+Bundesland allein dreistellige MB ergibt, und sieht dann eine Reduktion auf
+`motorway + trunk + primary + secondary` vor.
+
+**Mengengerüst Baden-Württemberg** (`npx tsx scripts/count-speedlimits.ts DE-BW`),
+gezählt sind Wege mit gesetztem `maxspeed` und deren Stützpunkte:
+
+| Klasse | Wege | Stützpunkte | Punkte/Weg |
+|---|---:|---:|---:|
+| motorway | 5 657 | 29 994 | 5,3 |
+| trunk | 5 613 | 24 484 | 4,4 |
+| primary | 28 874 | 118 198 | 4,1 |
+| secondary | 58 094 | 329 289 | 5,7 |
+| tertiary | 51 538 | 334 332 | 6,5 |
+| unclassified | 18 557 | 143 230 | 7,7 |
+| residential | 185 484 | 1 131 998 | 6,1 |
+| **Summe** | **353 817** | **2 111 525** | 6,0 |
+| davon reduziert | 98 238 | 501 965 | 5,1 |
+
+Nicht die Wegzahl bestimmt die Dateigrösse, sondern die Stützpunktzahl —
+ein Weg kann zwei Punkte haben oder zweihundert.
+
+**Überschlag im Rohformat** (2 × Float32 pro Punkt, 4 Byte Kopf pro Weg,
+ohne Vereinfachung, ohne Kachel-Overhead):
+
+- voller Satz: **17,5 MB**
+- reduziert: **4,2 MB**
+
+**Ergebnis: Die Reduktion ist nicht nötig.** 17,5 MB für ein Bundesland
+liegen weit unter der dreistelligen Grenze, ab der die Spec zurückrudern
+wollte — und das ist der Wert *vor* Douglas-Peucker. Die App kann also auch
+in der Stadt ein Tempolimit anzeigen, nicht nur auf Autobahn und Landstrasse.
+
+Hochgerechnet auf Deutschland (Baden-Württemberg ist rund ein Zehntel der
+Fläche, bei überdurchschnittlicher Strassendichte) liegt der volle Satz in
+der Grössenordnung 150–250 MB. Als App-Bundle unmöglich, als
+Nachlade-Datensatz pro Bundesland genau das, was Spec 4b vorsieht.
+
+**Was dieser Überschlag noch nicht enthält** — und warum die Phase-6-DoD zu
+Recht eine gemessene Zahl verlangt:
+
+1. Douglas-Peucker entfernt Punkte auf geraden Abschnitten. Wie viel, hängt
+   am Strassenverlauf; auf Autobahnen viel, in Wohngebieten wenig.
+2. Kachelung nach dem 0,05-Grad-Gitter zerschneidet Wege an Kachelgrenzen.
+   Jeder Schnitt kostet einen zusätzlichen Stützpunkt und einen weiteren
+   Wegkopf. Bei einer Autobahn, die zwanzig Kacheln durchquert, ist das
+   spürbar.
+3. Pro Kachel kommt ein Dateikopf dazu, und der Dateisystem-Overhead bei
+   mehreren tausend kleinen Dateien ist nicht null.
+
+Punkt 2 ist der, der den Überschlag am ehesten sprengt. Gemessen wird beim
+Build.
+
 ## Trefferquote gegen bekannte Standorte
 
 **Noch nicht gemessen.**
