@@ -9,6 +9,12 @@ ehrliche Store-Beschreibung später.
 
 **OSM-Datenstand: 29.07.2026.** Zahlen aus `npm run verify-dataset`.
 
+> **Die folgenden Zahlen stammen noch aus dem Build vor der
+> device-Node-Korrektur** (siehe „Warum der Relations-Mittelpunkt nicht der
+> Kamerastandort ist"). Sie enthalten damit die falsch positionierten
+> Relations-Einträge und fallen zu hoch aus. Der neu gebaute Datensatz
+> ersetzt sie.
+
 ## Deutschland gesamt
 
 | | |
@@ -84,6 +90,43 @@ Erfasst werden zwei OSM-Objekttypen:
 
 Enforcement-Relationen mit anderen Werten (`toll`, `maxheight`, `maxweight`,
 `access`, `oneway`) werden verworfen — das sind keine Blitzer.
+
+### Warum der Relations-Mittelpunkt nicht der Kamerastandort ist
+
+Naheliegend wäre, für eine Enforcement-Relation den von Overpass gelieferten
+Mittelpunkt (`out center`) zu nehmen. Das ist falsch: Der Mittelpunkt ist der
+Schwerpunkt **aller** Mitglieder, also inklusive der überwachten
+Straßenabschnitte (`from`, `to`, `force`). Er liegt damit systematisch neben
+der Kamera.
+
+Nachgemessen an Baden-Württemberg — Abstand zwischen Relations-Mittelpunkt
+und dem tatsächlichen `device`-Node, 1454 vergleichbare Relationen:
+
+| Abstand | Anzahl |
+|---|---:|
+| ≤ 10 m | 638 |
+| 10–30 m | 549 |
+| 30–100 m | 237 |
+| 100–300 m | 25 |
+| 1394 m | 1 |
+
+Median 12 m, p90 44 m, p99 118 m.
+
+Die ersten beiden Zeilen sind harmlos — was innerhalb von 30 m liegt, fasst
+der Dedupe ohnehin mit der echten Kamera zusammen. **Die 263 Relationen
+darüber sind das Problem:** Sie werden nicht zusammengefasst und landen als
+zusätzlicher, falsch positionierter Eintrag im Datensatz, während die echte
+Kamera separat daneben steht. Das erzeugt Warnungen an Stellen, an denen
+nichts steht — und in der Nähe einer echten Anlage ist das besonders
+tückisch, weil es wie ein plausibler Treffer aussieht.
+
+Die Pipeline löst deshalb die `device`-Mitglieder der Relation auf und
+verwendet deren Koordinaten. Der Mittelpunkt bleibt nur als Notbehelf für
+Relationen ohne verwertbaren device-Node (in BW 24 von 1478).
+
+Nebeneffekt, der ebenfalls stimmt: Eine Abschnittskontrolle mit Kameras an
+beiden Enden ergibt jetzt **zwei** Einträge an den richtigen Stellen statt
+einem in der Streckenmitte, wo keine Kamera steht.
 
 ## Deduplizierung
 
