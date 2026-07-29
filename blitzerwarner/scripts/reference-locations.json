@@ -1,0 +1,24 @@
+{
+  "_readme": [
+    "Bekannte stationäre Blitzer aus einer vom Datensatz UNABHÄNGIGEN Quelle.",
+    "Dient dazu, die Trefferquote der OSM-Daten zu messen (Phase-1-DoD).",
+    "",
+    "Diese Datei ist bewusst leer. Sie darf NICHT aus OpenStreetMap, aus dem",
+    "gebauten Datensatz oder aus dem Gedächtnis befüllt werden — dann misst",
+    "der Test sich selbst. Zulässige Quellen sind z. B. Pressemeldungen,",
+    "Mitteilungen von Städten und Landkreisen, oder eigene Beobachtung vor Ort.",
+    "",
+    "Koordinaten am besten aus einem Kartendienst ablesen, 5 Nachkommastellen.",
+    "10 Standorte reichen für eine erste Aussage; je mehr, desto belastbarer.",
+    "Sinnvoll gemischt: Grossstadt, Kleinstadt, Landstrasse, Autobahn.",
+    "",
+    "Danach: npm run verify-dataset — die Trefferquote gehört nach DATA.md."
+  ],
+  "_schema": {
+    "name": "Beschreibung des Standorts, z. B. 'B14 Stuttgart Richtung Zentrum'",
+    "lat": "Breitengrad, Zahl",
+    "lon": "Längengrad, Zahl",
+    "source": "Woher stammt die Information? Pflichtangabe."
+  },
+  "locations": []
+}

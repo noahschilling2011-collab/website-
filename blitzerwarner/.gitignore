@@ -1,0 +1,4 @@
+node_modules/
+.overpass-cache/
+assets/data/cameras.partial.json
+*.log
