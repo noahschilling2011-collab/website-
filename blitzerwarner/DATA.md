@@ -9,23 +9,17 @@ ehrliche Store-Beschreibung später.
 
 **OSM-Datenstand: 29.07.2026.** Zahlen aus `npm run verify-dataset`.
 
-> **Die folgenden Zahlen stammen noch aus dem Build vor der
-> device-Node-Korrektur** (siehe „Warum der Relations-Mittelpunkt nicht der
-> Kamerastandort ist"). Sie enthalten damit die falsch positionierten
-> Relations-Einträge und fallen zu hoch aus. Der neu gebaute Datensatz
-> ersetzt sie.
-
 ## Deutschland gesamt
 
 | | |
 |---|---|
-| Anlagen nach Deduplizierung | **6073** |
-| OSM-Rohtreffer davor | 10232 |
-| Gitterzellen belegt | 2517 |
-| mit Tempolimit | 5148 (84,8 %) |
-| mit Fahrtrichtung | 1553 (25,6 %) |
-| Rotlicht / kombiniert | 596 |
-| Dateigrösse | 430 KB |
+| Anlagen nach Deduplizierung | **5053** |
+| OSM-Rohtreffer davor | 14102 |
+| Gitterzellen belegt | 2502 |
+| mit Tempolimit | 4398 (87,0 %) |
+| mit Fahrtrichtung | 1816 (35,9 %) |
+| Rotlicht / kombiniert | 641 |
+| Dateigrösse | 362 KB |
 
 ## Pro Bundesland
 
@@ -33,32 +27,50 @@ Alle Zahlen nach Deduplizierung.
 
 | Code | Bundesland | Anlagen | roh | /1000 km² | Richtung | maxspeed |
 |---|---|---:|---:|---:|---:|---:|
-| DE-BW | Baden-Württemberg | 1727 | 3020 | 48,3 | 16 % | 83 % |
-| DE-NW | Nordrhein-Westfalen | 1109 | 1722 | 32,5 | 37 % | 88 % |
-| DE-HE | Hessen | 983 | 1673 | 46,6 | 25 % | 92 % |
-| DE-NI | Niedersachsen | 715 | 1165 | 15,0 | 28 % | 81 % |
-| DE-SN | Sachsen | 313 | 641 | 17,0 | 38 % | 90 % |
-| DE-BB | Brandenburg | 274 | 431 | 9,2 | 21 % | 87 % |
-| DE-BY | Bayern | 167 | 247 | 2,4 | 30 % | 57 % |
-| DE-MV | Mecklenburg-Vorpommern | 152 | 227 | 6,5 | 19 % | 88 % |
-| DE-RP | Rheinland-Pfalz | 108 | 166 | 5,4 | 20 % | 79 % |
-| DE-TH | Thüringen | 107 | 198 | 6,6 | 34 % | 92 % |
-| DE-SH | Schleswig-Holstein | 95 | 172 | 6,0 | 35 % | 75 % |
-| DE-BE | Berlin | 79 | 136 | 88,7 | 33 % | 91 % |
-| DE-HB | Bremen | 66 | 103 | 157,1 | 21 % | 32 % |
-| DE-ST | Sachsen-Anhalt | 65 | 122 | 3,2 | 26 % | 89 % |
-| DE-SL | Saarland | 63 | 121 | 24,5 | 16 % | 79 % |
-| DE-HH | Hamburg | 52 | 88 | 68,9 | 29 % | 88 % |
+| DE-BW | Baden-Württemberg | 1509 | 4044 | 42,2 | 21 % | 86 % |
+| DE-NW | Nordrhein-Westfalen | 926 | 2414 | 27,1 | 46 % | 90 % |
+| DE-HE | Hessen | 835 | 2297 | 39,5 | 36 % | 94 % |
+| DE-NI | Niedersachsen | 549 | 1689 | 11,5 | 42 % | 86 % |
+| DE-SN | Sachsen | 282 | 888 | 15,3 | 56 % | 88 % |
+| DE-BB | Brandenburg | 219 | 592 | 7,4 | 30 % | 89 % |
+| DE-BY | Bayern | 132 | 320 | 1,9 | 43 % | 60 % |
+| DE-MV | Mecklenburg-Vorpommern | 104 | 313 | 4,5 | 34 % | 92 % |
+| DE-RP | Rheinland-Pfalz | 86 | 229 | 4,3 | 29 % | 85 % |
+| DE-SH | Schleswig-Holstein | 80 | 235 | 5,1 | 54 % | 81 % |
+| DE-TH | Thüringen | 78 | 272 | 4,8 | 55 % | 94 % |
+| DE-BE | Berlin | 56 | 195 | 62,9 | 68 % | 96 % |
+| DE-SL | Saarland | 54 | 162 | 21,0 | 22 % | 78 % |
+| DE-HB | Bremen | 52 | 150 | 123,8 | 33 % | 35 % |
+| DE-ST | Sachsen-Anhalt | 52 | 183 | 2,5 | 44 % | 87 % |
+| DE-HH | Hamburg | 41 | 119 | 54,3 | 41 % | 88 % |
 
-Die Summe der Gebietszahlen (6075) liegt zwei über der Gesamtzahl: zwei
+Die Summe der Gebietszahlen (5055) liegt zwei über der Gesamtzahl: zwei
 Anlagen direkt auf einer Landesgrenze werden global noch einmal
 zusammengefasst.
 
+### Warum die Zahl gegenüber dem ersten Build gesunken ist
+
+Der erste Build lieferte 6073 Anlagen, dieser 5053. Die Differenz ist kein
+Datenverlust, sondern die Korrektur der Kamerapositionen: Vorher standen die
+über 30 m versetzten Relations-Einträge als zusätzlicher Geisterblitzer neben
+der echten Anlage. Jetzt sitzen sie auf dem tatsächlichen Kamera-Node,
+fallen mit ihr zusammen und werden zusammengefasst.
+
+Zwei Kennzahlen belegen, dass es eine Verbesserung und keine Verschlechterung
+ist:
+
+- Die **Fahrtrichtung** ist von 25,6 % auf 35,9 % gestiegen. Die Relationen
+  erben jetzt die Tags ihres Kamera-Nodes, und dort steht die Richtung.
+- Das **Tempolimit** ist von 84,8 % auf 87,0 % gestiegen, aus demselben Grund.
+
+Wären beim Zusammenfassen echte Anlagen verlorengegangen, müssten diese
+Quoten fallen statt steigen.
+
 ### Die regionalen Unterschiede sind gewaltig
 
-Baden-Württemberg hat **48,3 Anlagen pro 1000 km², Bayern 2,4** — Faktor 20
+Baden-Württemberg hat **42,2 Anlagen pro 1000 km², Bayern 1,9** — Faktor 22
 zwischen den beiden grössten Flächenländern. Baden-Württemberg allein stellt
-28 % aller Einträge in Deutschland.
+30 % aller Einträge in Deutschland.
 
 Der Verdacht lag nahe, dass die Gebietsauswahl für Bayern kaputt ist.
 Gegengeprüft mit `npx tsx scripts/crosscheck-region.ts DE-BY`: die Abfrage
@@ -133,7 +145,7 @@ einem in der Streckenmitte, wo keine Kamera steht.
 Sehr viele Anlagen sind in OSM **doppelt** erfasst: einmal als Kamera-Node und
 einmal als Enforcement-Relation für dieselbe Anlage. Zusammengefasst wird alles
 innerhalb von 30 m, sofern die Richtungsangaben sich nicht widersprechen.
-Bundesweit fallen dadurch 10232 Rohtreffer auf 6073 Anlagen — **41 % der
+Bundesweit fallen dadurch 14102 Rohtreffer auf 5053 Anlagen — **64 % der
 Rohzahl sind Dubletten**.
 
 Das ist der Grund für den grossen Unterschied zwischen Rohtreffern und
@@ -152,12 +164,12 @@ macht das Produkt kaputt.
 
 1. **Die Abdeckung ist lückenhaft und regional sehr unterschiedlich.** OSM wird
    ehrenamtlich gepflegt; wo niemand Blitzer einträgt, stehen keine drin. Der
-   Faktor 20 zwischen Baden-Württemberg und Bayern (siehe oben) ist das
+   Faktor 22 zwischen Baden-Württemberg und Bayern (siehe oben) ist das
    deutlichste Beispiel. Die Datenqualität ist nachweislich schlechter als bei
    kommerziellen Anbietern.
-2. **Die Fahrtrichtung fehlt bei 74 % der Einträge.** Nur 1553 von 6073
+2. **Die Fahrtrichtung fehlt bei 64 % der Einträge.** Nur 1816 von 5053
    Anlagen tragen eine verwertbare Richtung. Schritt (e) des Warnalgorithmus
-   — Kameras der Gegenrichtung aussortieren — greift damit bei drei von vier
+   — Kameras der Gegenrichtung aussortieren — greift damit bei zwei von drei
    Kameras überhaupt nicht. Die gesamte Last liegt auf dem Peilungsfilter
    (Schritt d), der nur die Richtung vom Fahrzeug zur Kamera kennt. Auf
    Parallelstraßen und bei Gegenfahrbahnen führt das zu Fehlalarmen. Der
@@ -170,8 +182,8 @@ macht das Produkt kaputt.
 4. **`maxspeed` ist nicht immer die für den Blitzer geltende Grenze.** Bei
    Abschnittskontrollen und richtungsabhängigen Limits kann die Ansage eine
    falsche Zahl nennen. Im Zweifel lieber ohne Tempoangabe ansagen.
-   Auffällig: Bremen hat nur bei 32 % der Anlagen ein Tempolimit, Bayern bei
-   57 %, der Rest liegt bei 75–92 %. In diesen beiden Ländern wird die Ansage
+   Auffällig: Bremen hat nur bei 35 % der Anlagen ein Tempolimit, Bayern bei
+   60 %, der Rest liegt bei 78–96 %. In diesen beiden Ländern wird die Ansage
    also oft ohne Tempoangabe auskommen müssen.
 
 ## Trefferquote gegen bekannte Standorte
