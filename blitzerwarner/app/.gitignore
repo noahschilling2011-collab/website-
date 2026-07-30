@@ -1,0 +1,19 @@
+node_modules/
+
+# Expo-Build-Artefakte
+.expo/
+dist/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Von expo prebuild erzeugt — gehört nicht ins Repo, sonst driften die
+# Konfigurationen in app.json und in den nativen Projekten auseinander.
+ios/
+android/
+
+*.log

@@ -1,96 +1,103 @@
-# Nexus AI — All-in-One KI-Produktivitätsplattform
+# Static — Offline-Warner für stationäre Blitzer
 
-Enterprise-Plattform für iOS, Android und Web: KI-Chat (GPT / Claude / Gemini), Inhalte generieren, Dokumente analysieren, Aufgaben, Kalender, Notizen, Team-Workspaces u. v. m.
+Warnt per Sprachansage und Ton vor **stationären** Blitzern. Läuft im
+Hintergrund bei ausgeschaltetem Display. Kein Backend, kein Account, keine
+Werbung, **keine Netzwerk-Requests zur Laufzeit**.
 
-## Monorepo-Struktur
+**Diese App warnt nicht vor mobilen Messstellen.** Das ist eine
+Produktentscheidung, keine Lücke: Mobile Blitzer brauchen eine
+Crowd-Datenbank, und die lässt sich ohne Nutzerbasis nicht aufbauen.
+
+Gewonnen wird auf vier Achsen: Akku, Datenschutz, Offline-Fähigkeit,
+Einfachheit. Auf Datenqualität verliert das Projekt gegen kommerzielle
+Anbieter — was drin ist und was fehlt, steht offen in
+[blitzerwarner/DATA.md](blitzerwarner/DATA.md).
+
+## Rechtlicher Hinweis
+
+§ 23 Abs. 1c StVO verbietet dem Fahrzeugführer Betrieb und betriebsbereites
+Mitführen von Geräten, die Verkehrsüberwachungsmaßnahmen anzeigen. Verstoß:
+75 € und 1 Punkt (BKat Nr. 247). Nach OLG Karlsruhe, Beschl. v. 07.02.2023,
+Az. 2 ORbs 35 Ss 9/23, liegt eine Ordnungswidrigkeit des Fahrers auch dann
+vor, wenn der **Beifahrer** die App bedient und der Fahrer sich die Warnung
+zunutze macht.
+
+Die App schaltet die Warnfunktion in Deutschland, Österreich und der Schweiz
+daher automatisch ab und zeigt dort einen nicht abschaltbaren Hinweis. Tacho
+und Tempolimit-Anzeige laufen weiter.
+
+Das ist keine Rechtsberatung. Vor einer Store-Veröffentlichung muss das jemand
+mit einschlägiger Qualifikation prüfen.
+
+## Aufbau
 
 ```
-.
-├── app/                  # Flutter-App (iOS, Android, Web) — Clean Architecture + MVVM
-├── backend/              # Node.js/TypeScript API — REST + GraphQL + WebSockets
-├── infra/
-│   └── k8s/              # Kubernetes-Manifeste (Deployments, HPA, Ingress, ...)
-├── docs/                 # Architektur-, API-, Setup- und Design-System-Dokumentation
-├── docker-compose.yml    # Lokale Entwicklungsumgebung (API, PostgreSQL, Redis)
-└── .github/workflows/    # CI/CD-Pipelines
+blitzerwarner/
+├── scripts/            Datenpipeline (Node, läuft VOR dem App-Build)
+│   ├── build-dataset.ts        OSM abfragen, normalisieren, deduplizieren, kacheln
+│   ├── verify-dataset.ts       Integrität, Abdeckung, Stichprobe
+│   ├── count-speedlimits.ts    Mengengerüst für den Tempolimit-Datensatz
+│   ├── explore-tagging.ts      welche OSM-Taggings es überhaupt gibt
+│   ├── assess-candidates.ts    bringt eine Tagging-Variante echte Blitzer?
+│   └── crosscheck-region.ts    auffällige Gebietszahl gegenprüfen
+├── assets/data/        der gebaute Datensatz (cameras.json)
+├── app/                Expo-App (React Native, TypeScript)
+│   ├── src/config.ts           JEDE Zahl der App, jede mit Begründung
+│   ├── src/core/               Geometrie, Warnlogik, Tacho, Länder-Gate, Daten
+│   ├── src/audio/              Warnton, Ansagetexte, Wiedergabe, Audio-Routen
+│   ├── src/location/           Background-Task, Akku-Strategie, Watchdog
+│   ├── src/replay/             Replay-Harness — GPX rein, Warnungen raus
+│   ├── src/ui/                 vier Screens
+│   ├── fixtures/               Referenz-Tracks mit Erwartungen
+│   └── tests/                  165 Tests, kein Netz, kein Gerät nötig
+├── DATA.md             Datenlage, ehrlich
+└── CARPLAY.md          warum es keine CarPlay-Oberfläche gibt
 ```
 
-## Schnellstart
-
-### Backend + Web-App (lokal, mit Docker)
+## Loslegen
 
 ```bash
-cp backend/.env.example backend/.env      # API-Keys eintragen
-docker compose up --build
-# Web-App:  http://localhost:8080          (Single-File-App, backend/public/index.html)
-# API:      http://localhost:8080/api      ·  GraphQL: http://localhost:8080/graphql
-```
-
-Die Web-App (`backend/public/index.html`) ist eine einzelne HTML-Datei ohne
-Build-Schritt: Login/Registrierung inkl. 2FA, KI-Chat mit Streaming und
-Provider-Wahl, KI-Werkzeuge, Aufgaben, Notizen, Kalender — responsive
-(Bottom-Navigation auf dem Handy), Dark/Light Mode, automatischer
-Token-Refresh. Sie läuft auch von einem anderen Host aus:
-`index.html?api=http://<backend-host>:8080` öffnen.
-
-### Backend (ohne Docker)
-
-```bash
-cd backend
+# Datenpipeline
+cd blitzerwarner
 npm install
-npm run migrate     # Datenbankschema anlegen (POSTGRES_URL muss gesetzt sein)
-npm run dev
-```
+npm run build-dataset                        # alle 16 Bundesländer
+npm run verify-dataset                       # prüfen
+npm test                                     # Unit-Tests
 
-### Flutter-App
-
-```bash
+# App
 cd app
-flutter pub get
-flutter run -d chrome                     # Web
-flutter run                               # iOS/Android (Gerät/Simulator)
+npm install
+npm test                                     # 165 Tests
+npm run replay:all                           # Replay-Suite (Phase-3-DoD)
+npx expo run:android                         # braucht Development Build
 ```
 
-Die API-Basis-URL wird per `--dart-define=API_BASE_URL=http://localhost:8080` gesetzt (Standard: `http://localhost:8080`).
+Hintergrund-Location läuft **nicht** in Expo Go. Es braucht einen Development
+Build (`eas build --profile development`).
 
-## Feature-Überblick
+## Stand
 
-| Bereich | Status | Modul |
+| Phase | Inhalt | Status |
 |---|---|---|
-| KI-Chat (GPT, Claude, Gemini, Streaming) | ✅ implementiert | `backend/src/modules/ai`, `app/lib/features/chat` |
-| Auth: JWT, Refresh, 2FA (TOTP), Biometrie-Hook | ✅ implementiert | `backend/src/modules/auth`, `app/lib/features/auth` |
-| Aufgaben, Notizen, Kalender | ✅ implementiert | jeweilige Module in Backend + App |
-| Team-Workspaces, Rollen & Rechte (RBAC) | ✅ implementiert | `backend/src/modules/workspaces` |
-| PDF-/Webseiten-/YouTube-Zusammenfassung | ✅ implementiert | `backend/src/modules/ai/tools` |
-| Übersetzer (100+ Sprachen), Dokumente schreiben | ✅ implementiert | `backend/src/modules/ai/tools` |
-| Bild-/Video-/Musik-Generierung | ✅ API-Anbindung | `backend/src/modules/ai/media` |
-| Dateimanager & Cloud-Sync | ✅ implementiert | `backend/src/modules/files` |
-| Analytics-Dashboard & Admin-Panel-API | ✅ implementiert | `backend/src/modules/analytics`, `admin` |
-| OCR (Bild → Text, inkl. Handschrift) | ✅ implementiert | `backend/src/modules/ai/ocr.service.ts` |
-| Audio-Transkription (Whisper, Sprachchat-Basis) | ✅ implementiert | `backend/src/modules/ai/speech.service.ts` |
-| PDF-Analyse mit echter Textextraktion | ✅ implementiert | `backend/src/modules/ai/pdf.service.ts` |
-| Code-Editor mit Syntax-Highlighting + KI-Assistent | ✅ implementiert | `app/lib/features/code`, `POST /api/ai/code` |
-| Push-Benachrichtigungen (FCM HTTP v1) | ✅ implementiert | `backend/src/modules/notifications` |
-| Auto-Token-Refresh & Chat-Verlauf in der App | ✅ implementiert | `app/lib/core/network`, `app/lib/features/chat` |
-| WebSockets (Echtzeit-Sync, Präsenz) | ✅ implementiert | `backend/src/ws` |
-| Dark/Light Mode, Material 3 + iOS-Design | ✅ implementiert | `app/lib/core/theme` |
-| Offline-Modus (lokaler Cache + Sync-Queue) | ✅ implementiert | `app/lib/core/storage` |
+| 1 | Datenpipeline | 5053 Anlagen, Trefferquote offen (braucht Referenzdaten) |
+| 2 | Background-Tracking | Code steht, Gerätetest offen |
+| 3 | Warnlogik + Replay-Test | **fertig**, 5 Tracks grün |
+| 4 | UI + Ansage | Code steht, Gerätetest offen |
+| 5 | Tacho | Code steht, Vergleichsprotokoll offen |
+| 6 | Tempolimit-Datensatz | Mengengerüst gemessen, Build offen |
+| 7 | Map-Matching | offen |
+| 8 | Meldefunktion (OSM-Notes) | offen |
+| 9 | Store-Vorbereitung | offen |
 
-### Roadmap (noch nicht implementiert)
+Was ohne echtes Gerät nicht abschließbar ist: 20 Minuten lückenloses Tracking
+bei ausgeschaltetem Display, Akkumessung gegen das Ziel von unter 3 %/h, und
+das Vergleichsprotokoll gegen den Auto-Tacho.
 
-Audio-*Aufnahme*-UI in der App (die Transkriptions-API ist fertig,
-Audiodateien lassen sich bereits hochladen), Bildschirmaufnahme,
-Live-Vorschau für HTML/CSS/JS im Code-Editor sowie Home-Screen-Widgets.
+## Lizenz und Attribution
 
-Details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/API.md`](docs/API.md), [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md), [`docs/SETUP.md`](docs/SETUP.md), [`docs/SCALING.md`](docs/SCALING.md).
+Blitzerdaten aus **OpenStreetMap**, © OpenStreetMap-Mitwirkende, lizenziert
+unter der **Open Database License (ODbL) 1.0**. Der erzeugte Datensatz ist eine
+abgeleitete Datenbank; Share-Alike ist vor einer Veröffentlichung im Detail zu
+prüfen. Die Attribution ist in der App sichtbar.
 
-## Tests
-
-```bash
-cd backend && npm test          # Unit- & Integrationstests (Vitest)
-cd app && flutter test          # Unit- & Widget-Tests
-```
-
-## Lizenz
-
-Proprietär — alle Rechte vorbehalten.
+Code: MIT.
