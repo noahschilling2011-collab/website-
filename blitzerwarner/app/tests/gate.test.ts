@@ -131,3 +131,36 @@ test('Zonenmodus gibt es nur, wo er auch begründet ist', () => {
   const zonen = EINTRAEGE.filter(([, e]) => e.modus === 'zone').map(([c]) => c);
   assert.deepEqual(zonen, ['FR'], 'Zonenmodus derzeit nur für Frankreich');
 });
+
+test('Zonenmodus erlaubt KEINE Punktwarnung', () => {
+  // Die Regression, die dieser Test verhindert: warnungErlaubt() liefert für
+  // Frankreich true, weil 'zone' ungleich 'aus' ist. Ein Ja/Nein-Gate im
+  // Background-Task hätte daraus Punktwarnungen mit Entfernungsansage
+  // gemacht — genau das, was in Frankreich seit 03.01.2012 verboten ist
+  // (bis 1500 Euro, Einziehung des Geräts).
+  //
+  // Der Task fragt deshalb warnmodus() und warnt nur bei 'punkt'. Solange
+  // Phase C fehlt, wird in Frankreich gar nicht gewarnt — keine Warnung
+  // statt einer verbotenen.
+  assert.equal(warnmodus('FR'), 'zone');
+  assert.notEqual(warnmodus('FR'), 'punkt');
+
+  // warnungErlaubt() bleibt absichtlich true: Es beantwortet die Frage
+  // "wird hier überhaupt gewarnt", nicht "wie". Wer entscheidet, WAS
+  // ausgegeben wird, muss warnmodus() fragen.
+  assert.equal(warnungErlaubt('FR'), true);
+});
+
+test('nur der Punktmodus darf eine Entfernung ansagen', () => {
+  // Zusammenfassung der Regel als Test, damit sie beim Bauen von Phase C
+  // nicht verlorengeht.
+  for (const [code, e] of EINTRAEGE) {
+    const darfEntfernungAnsagen = warnmodus(code) === 'punkt';
+    if (e.modus === 'zone') {
+      assert.equal(darfEntfernungAnsagen, false, `${code}: Zone darf keine Entfernung`);
+    }
+    if (e.modus === 'aus' || e.status !== 'belegt') {
+      assert.equal(darfEntfernungAnsagen, false, `${code}: darf gar nicht warnen`);
+    }
+  }
+});

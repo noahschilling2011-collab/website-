@@ -18,7 +18,7 @@ import { aktualisiere, createStrategyState, vorgabeFuer, type StrategyState } fr
 import { createWatchdogState, meldeFix, starte, stoppe, type WatchdogState } from './watchdog';
 import { gebeWarnung, sageAnsage } from '../audio/player';
 import { landwechselText } from '../audio/announce';
-import { aktualisiereLand, createLandZustand, leseLand, type LandStatus, type LandZustand } from '../core/country';
+import { aktualisiereLand, createLandZustand, leseLand, warnmodus, type LandStatus, type LandZustand } from '../core/country';
 import type { Fix, Settings } from '../types';
 
 export const LOCATION_TASK = 'blitzerwarner-location';
@@ -40,6 +40,8 @@ type TaskLaufzeit = {
   landZustand: LandZustand;
   /** Zuletzt gemeldeter Zustand, um Wechsel zu bemerken. */
   warnungWarErlaubt: boolean | null;
+  /** Wurde der fehlende Zonenmodus schon ins Protokoll geschrieben? */
+  zonenModusGemeldet: boolean;
 };
 
 const STANDARD_SETTINGS: Settings = {
@@ -61,6 +63,7 @@ const laufzeit: TaskLaufzeit = {
   letzterFix: null,
   landZustand: createLandZustand(),
   warnungWarErlaubt: null,
+  zonenModusGemeldet: false,
 };
 
 /** Von der UI aufzurufen, wenn der Nutzer Einstellungen ändert. */
@@ -124,7 +127,32 @@ async function verarbeite(fix: Fix): Promise<void> {
   //    unsymmetrische Hysterese, die an Grenzfahrten das Flackern verhindert
   //    und im Zweifel abschaltet statt einzuschalten.
   const landStatus = aktualisiereLand(laufzeit.landZustand, fix);
-  const darfWarnen = landStatus.warnungErlaubt;
+
+  /*
+   * Der Warnmodus, nicht bloss ein Ja/Nein.
+   *
+   * Wichtig, und zwar rechtlich: 'zone' ist NICHT dasselbe wie 'punkt'.
+   * Frankreich erlaubt seit 03.01.2012 nur den Hinweis auf einen
+   * Gefahrenbereich; die Punktwarnung mit Entfernungsansage ist dort
+   * verboten, bis 1500 Euro und Einziehung des Geräts.
+   *
+   * Solange das Zonenverhalten (Phase C) nicht gebaut ist, wird im
+   * Zonenmodus GAR NICHT gewarnt. Das ist die sichere Richtung: keine
+   * Warnung statt einer verbotenen. Ein Ja/Nein-Gate hätte hier
+   * Punktwarnungen ausgegeben, weil 'zone' ungleich 'aus' ist.
+   */
+  const modus = warnmodus(landStatus.land);
+  const darfPunktWarnen = modus === 'punkt';
+  const darfWarnen = darfPunktWarnen;
+
+  if (modus === 'zone' && !laufzeit.zonenModusGemeldet) {
+    laufzeit.zonenModusGemeldet = true;
+    errorLog.warn(
+      'warnung',
+      `Zonenmodus für ${landStatus.land ?? 'unbekannt'} noch nicht umgesetzt — ` +
+      'es wird hier nicht gewarnt (Phase C offen)',
+    );
+  }
 
   if (laufzeit.warnungWarErlaubt !== darfWarnen) {
     // Beim Grenzübertritt eine kurze Ansage (Spec 10.1). Beim allerersten
@@ -228,6 +256,7 @@ export async function starteTracking(settings: Settings): Promise<boolean> {
   laufzeit.strategy = createStrategyState();
   laufzeit.landZustand = createLandZustand();
   laufzeit.warnungWarErlaubt = null;
+  laufzeit.zonenModusGemeldet = false;
 
   const start = vorgabeFuer('leerlauf');
 
