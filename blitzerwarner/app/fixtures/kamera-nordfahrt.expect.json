@@ -1,0 +1,13 @@
+{
+  "beschreibung": "Fahrt nach Norden mit Kurs 359 Grad, Kamera voraus — prüft den Winkel-Nulldurchgang",
+  "kameras": [
+    {
+      "lat": 48.7766,
+      "lon": 9.18326,
+      "dir": 359,
+      "max": 100,
+      "type": "speed"
+    }
+  ],
+  "erwarteteWarnungen": 1
+}

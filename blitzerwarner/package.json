@@ -1,0 +1,19 @@
+{
+  "name": "blitzerwarner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Offline-Warner für stationäre Blitzer. Keine Community-Daten, kein Backend, keine Werbung.",
+  "license": "MIT",
+  "scripts": {
+    "build-dataset": "tsx scripts/build-dataset.ts",
+    "verify-dataset": "tsx scripts/verify-dataset.ts",
+    "test": "tsx --test scripts/lib/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

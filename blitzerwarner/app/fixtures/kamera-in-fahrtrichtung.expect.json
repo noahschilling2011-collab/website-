@@ -1,0 +1,13 @@
+{
+  "beschreibung": "Fahrt nach Osten, Kamera 600 m voraus auf der Strecke, Tempo 80 getaggt",
+  "kameras": [
+    {
+      "lat": 48.7712,
+      "lon": 9.19159,
+      "dir": 90,
+      "max": 80,
+      "type": "speed"
+    }
+  ],
+  "erwarteteWarnungen": 1
+}

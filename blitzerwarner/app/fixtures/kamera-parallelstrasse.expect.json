@@ -1,0 +1,13 @@
+{
+  "beschreibung": "Fahrt nach Osten, Kamera 250 m seitlich auf einer Parallelstrasse, ohne Richtungsangabe",
+  "kameras": [
+    {
+      "lat": 48.77345,
+      "lon": 9.18886,
+      "dir": null,
+      "max": 50,
+      "type": "speed"
+    }
+  ],
+  "erwarteteWarnungen": 0
+}

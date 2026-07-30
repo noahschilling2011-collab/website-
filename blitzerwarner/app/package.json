@@ -1,0 +1,38 @@
+{
+  "name": "static-blitzerwarner-app",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start --dev-client",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "replay": "tsx src/replay/replay.ts",
+    "replay:all": "tsx src/replay/replay.ts --all",
+    "sync-dataset": "cp ../assets/data/cameras.json assets/data/cameras.json"
+  },
+  "dependencies": {
+    "expo": "~52.0.0",
+    "expo-av": "~15.0.0",
+    "expo-constants": "~17.0.0",
+    "expo-haptics": "~14.0.0",
+    "expo-keep-awake": "~14.0.0",
+    "expo-location": "~18.0.0",
+    "expo-notifications": "~0.29.0",
+    "expo-speech": "~13.0.0",
+    "expo-status-bar": "~2.0.0",
+    "expo-task-manager": "~12.0.0",
+    "react": "18.3.1",
+    "react-native": "0.76.5",
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@types/react": "~18.3.12",
+    "typescript": "^5.7.2",
+    "tsx": "^4.19.2",
+    "@types/node": "^22.10.2"
+  }
+}
