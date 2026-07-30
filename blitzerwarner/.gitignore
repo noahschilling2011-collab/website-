@@ -3,3 +3,4 @@ node_modules/
 assets/data/cameras.partial.json
 *.log
 .natural-earth-cache/
+assets/data/cameras.DE.json

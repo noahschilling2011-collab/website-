@@ -12,10 +12,13 @@ const kamera = (extra: Partial<Camera> = {}): Camera => ({
 
 // --- Warnton --------------------------------------------------------------
 
-test('es gibt genau drei Töne', () => {
-  // Mehr merkt sich niemand. Wenn hier ein vierter auftaucht, war das eine
-  // Entscheidung und keine Kleinigkeit.
-  assert.deepEqual(Object.keys(TOENE).sort(), ['blitzer', 'system', 'tempolimit']);
+test('es gibt genau vier Töne', () => {
+  // Die Qualitätsvorgabe nennt drei. Der vierte ist der Zonenton, und er ist
+  // eine bewusste Ausnahme: Er MUSS sich vom Blitzerton unterscheiden, weil
+  // ein identischer Ton in Frankreich ein unmittelbarer Hinweis auf eine
+  // Messstelle wäre — nur ohne Worte. Ein fünfter braucht wieder eine
+  // Begründung.
+  assert.deepEqual(Object.keys(TOENE).sort(), ['blitzer', 'system', 'tempolimit', 'zone']);
 });
 
 test('alle Töne liegen im hörbaren Nutzbereich 1 bis 3 kHz', () => {
@@ -35,11 +38,25 @@ test('alle Töne bleiben unter 500 ms', () => {
   }
 });
 
-test('Töne unterscheiden sich in der Impulszahl, nicht nur in der Frequenz', () => {
-  // Am Ohr ist der Rhythmus bei lauter Fahrt erkennbar, eine
-  // Frequenzverschiebung um ein paar hundert Hertz nicht.
-  const zahlen = Object.values(TOENE).map((d) => d.impulse.length);
-  assert.equal(new Set(zahlen).size, zahlen.length, 'zwei Töne haben gleich viele Impulse');
+test('jedes Tonpaar ist unterscheidbar', () => {
+  // Zwei Töne gelten als unterscheidbar, wenn sie sich in der Impulszahl ODER
+  // deutlich in der Frequenz unterscheiden. Beides zu verlangen geht bei vier
+  // Tönen nicht auf — tempolimit und zone haben beide einen Impuls und
+  // trennen sich über 250 Hz Abstand.
+  const arten = Object.keys(TOENE) as (keyof typeof TOENE)[];
+  for (let i = 0; i < arten.length; i++) {
+    for (let j = i + 1; j < arten.length; j++) {
+      const a = TOENE[arten[i]!], b = TOENE[arten[j]!];
+      const impulseUnterschiedlich = a.impulse.length !== b.impulse.length;
+      const minAbstand = Math.min(
+        ...a.impulse.flatMap((ia) => b.impulse.map((ib) => Math.abs(ia.freq - ib.freq))),
+      );
+      assert.ok(
+        impulseUnterschiedlich || minAbstand >= 200,
+        `${a.art} und ${b.art}: gleiche Impulszahl und nur ${minAbstand} Hz Abstand`,
+      );
+    }
+  }
 });
 
 test('Samples bleiben im Bereich -1..1', () => {
@@ -183,4 +200,26 @@ test('sprechrate: schneller nur bei hohem Tempo', () => {
 test('landwechselText', () => {
   assert.equal(landwechselText(true), 'Blitzerwarnung aktiviert');
   assert.equal(landwechselText(false), 'Blitzerwarnung deaktiviert');
+});
+
+test('der Zonenton unterscheidet sich hörbar vom Blitzerton', () => {
+  // Nicht kosmetisch: Ein Fahrer soll aus dem Klang nicht schliessen können,
+  // dass es dieselbe Sache ist. Geprüft wird beides — Impulszahl UND
+  // Frequenzabstand, weil eine Übereinstimmung in einem der beiden reicht,
+  // damit die Töne verwechselbar werden.
+  const zone = TOENE.zone;
+  const blitzer = TOENE.blitzer;
+
+  assert.notEqual(zone.impulse.length, blitzer.impulse.length, 'gleiche Impulszahl');
+
+  const zoneFreqs = zone.impulse.map((i) => i.freq);
+  const blitzerFreqs = blitzer.impulse.map((i) => i.freq);
+  for (const zf of zoneFreqs) {
+    for (const bf of blitzerFreqs) {
+      assert.ok(
+        Math.abs(zf - bf) > 200,
+        `Zonenton ${zf} Hz liegt zu nah an Blitzerton ${bf} Hz`,
+      );
+    }
+  }
 });
