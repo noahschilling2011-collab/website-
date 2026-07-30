@@ -228,6 +228,29 @@ if (istHauptmodul()) {
   for (const name of namen) {
     try {
       const { fixes, erwartung } = ladeFixture(name);
+
+      // Zonen-Tracks gehen durch pruefeZonen(). Ohne diese Verzweigung würde
+      // die CLI sie durch die Punktlogik schicken, dort null Warnungen finden
+      // und eine Abweichung melden, die keine ist — ein Werkzeug, das lügt,
+      // ist schlimmer als keines.
+      if (erwartung.zonen) {
+        const zErg = replayZonen(fixes, erwartung.zonen);
+        const ok = zErg.ansagen === erwartung.erwarteteWarnungen;
+        console.log('─'.repeat(70));
+        console.log(`${name} — ${erwartung.beschreibung}`);
+        console.log(`  Punkte:            ${fixes.length}`);
+        console.log(`  Modus:             Zone (keine Entfernung, keine Richtung)`);
+        console.log(
+          `  Ansagen:           ${zErg.ansagen}  (erwartet ` +
+          `${erwartung.erwarteteWarnungen})  ${ok ? 'OK' : 'ABWEICHUNG'}`,
+        );
+        if (zErg.ersterEintrittIndex !== null) {
+          console.log(`  Eintritt bei Punkt ${zErg.ersterEintrittIndex}`);
+        }
+        if (!ok) alleOk = false;
+        continue;
+      }
+
       const erg = replay(fixes, erwartung.kameras, erwartung.settings);
       const ok = berichte(`${name} — ${erwartung.beschreibung}`, erg, erwartung.erwarteteWarnungen);
       if (!ok) alleOk = false;
