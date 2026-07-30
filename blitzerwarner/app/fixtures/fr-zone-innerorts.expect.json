@@ -1,0 +1,12 @@
+{
+  "beschreibung": "Frankreich, innerorts: eine Zone mit 150 m Radius um eine Anlage 500 m voraus. Erwartet genau eine Ansage, Eintritt mindestens 130 m vor der Anlage.",
+  "kameras": [],
+  "zonen": [
+    {
+      "lat": 48.5734,
+      "lon": 7.7589,
+      "r": 150
+    }
+  ],
+  "erwarteteWarnungen": 1
+}

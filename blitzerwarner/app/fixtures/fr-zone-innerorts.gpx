@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Frankreich, innerorts: eine Zone mit 150 m Radius um eine Anlage 500 m voraus. Erwartet genau eine Ansage, Eintritt mindestens 130 m vor der Anlage.
+
+Synthetisch erzeugt von src/replay/make-fixtures.ts — nicht von Hand ändern,
+sondern den Generator anpassen und neu erzeugen.
+-->
+<gpx version="1.1" creator="static-blitzerwarner-fixtures">
+  <trk>
+    <trkseg>
+      <trkpt lat="48.573400" lon="7.752100">
+        <time>2026-07-29T10:00:00.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.752289">
+        <time>2026-07-29T10:00:01.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.752478">
+        <time>2026-07-29T10:00:02.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.752667">
+        <time>2026-07-29T10:00:03.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.752856">
+        <time>2026-07-29T10:00:04.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.753045">
+        <time>2026-07-29T10:00:05.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.753234">
+        <time>2026-07-29T10:00:06.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.753422">
+        <time>2026-07-29T10:00:07.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.753611">
+        <time>2026-07-29T10:00:08.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.753800">
+        <time>2026-07-29T10:00:09.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.753989">
+        <time>2026-07-29T10:00:10.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.754178">
+        <time>2026-07-29T10:00:11.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.754367">
+        <time>2026-07-29T10:00:12.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.754556">
+        <time>2026-07-29T10:00:13.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.754745">
+        <time>2026-07-29T10:00:14.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.754934">
+        <time>2026-07-29T10:00:15.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.755123">
+        <time>2026-07-29T10:00:16.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.755312">
+        <time>2026-07-29T10:00:17.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.755501">
+        <time>2026-07-29T10:00:18.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.755690">
+        <time>2026-07-29T10:00:19.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.755879">
+        <time>2026-07-29T10:00:20.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.756067">
+        <time>2026-07-29T10:00:21.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.756256">
+        <time>2026-07-29T10:00:22.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.756445">
+        <time>2026-07-29T10:00:23.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.756634">
+        <time>2026-07-29T10:00:24.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.756823">
+        <time>2026-07-29T10:00:25.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.757012">
+        <time>2026-07-29T10:00:26.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.757201">
+        <time>2026-07-29T10:00:27.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.757390">
+        <time>2026-07-29T10:00:28.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.757579">
+        <time>2026-07-29T10:00:29.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.757768">
+        <time>2026-07-29T10:00:30.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.757957">
+        <time>2026-07-29T10:00:31.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.758146">
+        <time>2026-07-29T10:00:32.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.758335">
+        <time>2026-07-29T10:00:33.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.758524">
+        <time>2026-07-29T10:00:34.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.758712">
+        <time>2026-07-29T10:00:35.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.758901">
+        <time>2026-07-29T10:00:36.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.759090">
+        <time>2026-07-29T10:00:37.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.759279">
+        <time>2026-07-29T10:00:38.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.759468">
+        <time>2026-07-29T10:00:39.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.759657">
+        <time>2026-07-29T10:00:40.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.759846">
+        <time>2026-07-29T10:00:41.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.760035">
+        <time>2026-07-29T10:00:42.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.760224">
+        <time>2026-07-29T10:00:43.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.760413">
+        <time>2026-07-29T10:00:44.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.760602">
+        <time>2026-07-29T10:00:45.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.760791">
+        <time>2026-07-29T10:00:46.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.760980">
+        <time>2026-07-29T10:00:47.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.761169">
+        <time>2026-07-29T10:00:48.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.761357">
+        <time>2026-07-29T10:00:49.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.761546">
+        <time>2026-07-29T10:00:50.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.761735">
+        <time>2026-07-29T10:00:51.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.761924">
+        <time>2026-07-29T10:00:52.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.762113">
+        <time>2026-07-29T10:00:53.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.762302">
+        <time>2026-07-29T10:00:54.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.762491">
+        <time>2026-07-29T10:00:55.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573400" lon="7.762680">
+        <time>2026-07-29T10:00:56.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573399" lon="7.762869">
+        <time>2026-07-29T10:00:57.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573399" lon="7.763058">
+        <time>2026-07-29T10:00:58.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573399" lon="7.763247">
+        <time>2026-07-29T10:00:59.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+      <trkpt lat="48.573399" lon="7.763436">
+        <time>2026-07-29T10:01:00.000Z</time>
+        <speed>13.90</speed>
+        <course>90.0</course>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>

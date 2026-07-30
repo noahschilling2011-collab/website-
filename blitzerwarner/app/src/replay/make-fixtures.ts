@@ -175,6 +175,92 @@ const V = 27.8;
   });
 }
 
+// --- Zonen-Tracks (Phase C.4, Frankreich) --------------------------------
+//
+// Die Zonen werden hier so gerechnet, wie build-zones.ts sie erzeugen würde:
+// Radius = halbe Mindestlänge. Bewusst NICHT aus dem echten FR-Datensatz —
+// ein Test, dessen Erwartung von fremden Daten abhängt, ändert sein Ergebnis,
+// wenn OSM sich ändert.
+
+// Irgendwo in Frankreich, weit weg von Zellgrenzen.
+const FR_LAT = 48.5734;
+const FR_LON = 7.7521;
+
+// --- 6. Autobahnzone ------------------------------------------------------
+{
+  // 130 km/h = 36,1 m/s. Autobahn: Mindestlänge 4000 m, Radius 2000 m.
+  // Die Kamera sitzt 3000 m voraus; die Zone beginnt damit 1000 m nach dem
+  // Start und der Eintritt liegt 2000 m vor der Anlage.
+  const V_AUTOBAHN = 36.1;
+  const punkte = fahrt(FR_LAT, FR_LON, 90, V_AUTOBAHN, 110);
+  const [kLat, kLon] = ziel(FR_LAT, FR_LON, 90, 3000);
+  fixtures.push({
+    name: 'fr-zone-autobahn',
+    punkte,
+    erwartung: {
+      beschreibung:
+        'Frankreich, Autobahn: eine Zone mit 2000 m Radius um eine Anlage 3000 m ' +
+        'voraus. Erwartet genau eine Ansage, Eintritt mindestens 1800 m vor der Anlage.',
+      kameras: [],
+      zonen: [{ lat: Math.round(kLat * 1e5) / 1e5, lon: Math.round(kLon * 1e5) / 1e5, r: 2000 }],
+      erwarteteWarnungen: 1,
+    },
+  });
+}
+
+// --- 7. Innerortszone -----------------------------------------------------
+{
+  // 50 km/h = 13,9 m/s. Innerorts: Mindestlänge 300 m, Radius 150 m.
+  const V_STADT = 13.9;
+  const punkte = fahrt(FR_LAT, FR_LON, 90, V_STADT, 60);
+  const [kLat, kLon] = ziel(FR_LAT, FR_LON, 90, 500);
+  fixtures.push({
+    name: 'fr-zone-innerorts',
+    punkte,
+    erwartung: {
+      beschreibung:
+        'Frankreich, innerorts: eine Zone mit 150 m Radius um eine Anlage 500 m ' +
+        'voraus. Erwartet genau eine Ansage, Eintritt mindestens 130 m vor der Anlage.',
+      kameras: [],
+      zonen: [{ lat: Math.round(kLat * 1e5) / 1e5, lon: Math.round(kLon * 1e5) / 1e5, r: 150 }],
+      erwarteteWarnungen: 1,
+    },
+  });
+}
+
+// --- 8. Zwei Anlagen, eine Zone -------------------------------------------
+{
+  // Zwei Anlagen 600 m auseinander auf einer Landstrasse. Einzeln hätte jede
+  // 1000 m Radius; die Zonen überlappen deutlich und werden von build-zones.ts
+  // zu einer zusammengefasst. Erwartet wird EINE Ansage für beide — das ist
+  // der Fall, den die Regelung ausdrücklich zulässt.
+  const V_LAND = 25;
+  const punkte = fahrt(FR_LAT, FR_LON, 90, V_LAND, 120);
+  const [a1, o1] = ziel(FR_LAT, FR_LON, 90, 2000);
+  const [a2, o2] = ziel(FR_LAT, FR_LON, 90, 2600);
+  // Zusammengefasst: Mittelpunkt zwischen beiden, Radius deckt beide ab.
+  const [mLat, mLon] = ziel(FR_LAT, FR_LON, 90, 2300);
+  fixtures.push({
+    name: 'fr-zwei-kameras-eine-zone',
+    punkte,
+    erwartung: {
+      beschreibung:
+        'Frankreich, Landstrasse: zwei Anlagen 600 m auseinander, deren Zonen zu ' +
+        'einer zusammengefasst sind. Erwartet genau EINE Ansage für beide.',
+      kameras: [],
+      zonen: [{
+        lat: Math.round(mLat * 1e5) / 1e5,
+        lon: Math.round(mLon * 1e5) / 1e5,
+        r: 1300,
+      }],
+      erwarteteWarnungen: 1,
+    },
+  });
+  // Die beiden Einzelpositionen stehen nur im Kommentar, nicht in der
+  // Erwartungsdatei — dieselbe Regel wie bei der Zonendatei selbst.
+  void a1; void o1; void a2; void o2;
+}
+
 // --- schreiben ------------------------------------------------------------
 
 mkdirSync(FIXTURES, { recursive: true });

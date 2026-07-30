@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 
 import { parseGpx, toFixes } from './gpx';
 import { cellKey } from '../core/geo';
+import { createZonenZustand, pruefeZonen, type Zone as ZoneFixture } from '../core/zone';
 import { createTripState, evaluate, warnDistance } from '../core/warn';
 import type { Camera, Evaluation, Fix, Settings, SkipReason } from '../types';
 
@@ -30,6 +31,15 @@ const FIXTURES = join(APP_ROOT, 'fixtures');
 export type ReplayErwartung = {
   beschreibung: string;
   kameras: Camera[];
+  /**
+   * Zonen statt Kameras — für Tracks im Zonenmodus (Frankreich).
+   *
+   * Ist das Feld gesetzt, läuft der Track durch pruefeZonen() statt durch
+   * evaluate(). Beides in einem Track zu mischen wäre falsch: Ein Land hat
+   * genau einen Modus, und ein Track, der beides prüft, prüft keinen von
+   * beiden richtig.
+   */
+  zonen?: ZoneFixture[];
   /** Wie viele Warnungen der Track auslösen MUSS. */
   erwarteteWarnungen: number;
   /** Optional: Einstellungen, falls abweichend. */
@@ -65,6 +75,31 @@ export function gridFrom(kameras: Camera[]): Record<string, Camera[]> {
     (grid[key] ??= []).push(k);
   }
   return grid;
+}
+
+/**
+ * Einen Zonen-Track abspielen.
+ *
+ * Gibt zurück, wie viele Zonen-Ansagen ausgelöst wurden und bei welchem
+ * Punktindex — daraus lässt sich prüfen, ob der Eintritt früh genug kam.
+ */
+export function replayZonen(
+  fixes: Fix[],
+  zonen: readonly ZoneFixture[],
+): { ansagen: number; ersterEintrittIndex: number | null } {
+  const zustand = createZonenZustand();
+  let ansagen = 0;
+  let ersterEintrittIndex: number | null = null;
+
+  for (let i = 0; i < fixes.length; i++) {
+    const fix = fixes[i]!;
+    const erg = pruefeZonen(fix.lat, fix.lon, zonen, zustand);
+    if (erg.betreten) {
+      ansagen++;
+      if (ersterEintrittIndex === null) ersterEintrittIndex = i;
+    }
+  }
+  return { ansagen, ersterEintrittIndex };
 }
 
 /** Einen Track abspielen. */

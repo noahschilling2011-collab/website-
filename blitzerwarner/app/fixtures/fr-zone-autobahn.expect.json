@@ -1,0 +1,12 @@
+{
+  "beschreibung": "Frankreich, Autobahn: eine Zone mit 2000 m Radius um eine Anlage 3000 m voraus. Erwartet genau eine Ansage, Eintritt mindestens 1800 m vor der Anlage.",
+  "kameras": [],
+  "zonen": [
+    {
+      "lat": 48.57339,
+      "lon": 7.79288,
+      "r": 2000
+    }
+  ],
+  "erwarteteWarnungen": 1
+}
