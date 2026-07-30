@@ -91,4 +91,13 @@ export type Settings = {
    */
   /** Faktor aus der Tacho-Kalibrierung, 1.0 = nicht kalibriert. */
   tachoFaktor: number;
+  /**
+   * Fahrtenschreiber für die Testfahrt. Standardmässig AUS.
+   *
+   * Der einzige Schalter der App, der eine vollständige Bewegungsspur
+   * entstehen lässt — also genau das, was die App sonst nicht tut. Deshalb
+   * aus, deshalb ein eigener Hinweistext, und deshalb wird das Protokoll
+   * beim Ausschalten gelöscht statt nur nicht mehr fortgeschrieben.
+   */
+  fahrtprotokoll: boolean;
 };

@@ -221,6 +221,51 @@ export const ERROR_LOG = {
 } as const;
 
 /**
+ * Fahrtenschreiber — die Instrumentierung für die Testfahrt (Phasen 2, 4, 5).
+ *
+ * Bewusst NICHT das Fehlerprotokoll erweitert: Das fasst 200 Einträge und ist
+ * für Fehler gedacht. Im Annäherungsmodus kommt alle 25 m eine Position; bei
+ * 100 km/h wäre es damit nach drei Minuten voll und hätte die Fehler
+ * verdrängt, wegen derer es existiert.
+ *
+ * Standardmässig AUS. Der Fahrtenschreiber schreibt eine vollständige
+ * Bewegungsspur — genau das, was die App laut README nicht tut. Er hat
+ * deshalb einen eigenen Schalter, und das Protokoll wird beim Ausschalten
+ * gelöscht.
+ */
+export const FAHRTPROTOKOLL = {
+  /**
+   * Wie viele Positionen der Ringpuffer hält.
+   *
+   * Der dichteste real vorkommende Takt ist der Annäherungsmodus:
+   * BATTERY.APPROACH_DISTANCE_INTERVAL_M = 25 m, bei 130 km/h (36 m/s) also
+   * alle 0,7 s. 10000 Einträge decken damit knapp zwei Stunden ab — und das
+   * ist der ungünstigste Fall, weil der Annäherungsmodus nur in der Nähe
+   * einer Anlage läuft. Für die geforderten 20 Minuten ist das reichlich.
+   *
+   * Nach oben begrenzt der Speicher: Ein Eintrag sind zehn Felder, im
+   * JS-Objekt grob 150 Byte. 10000 Einträge sind rund 1,5 MB im
+   * Hintergrund-Task — vertretbar, das Zehnfache nicht.
+   */
+  MAX_EINTRAEGE: 10_000,
+
+  /**
+   * Ab diesem Abstand zweier Positionen gilt die Lücke als Lücke.
+   *
+   * An WATCHDOG.STALE_AFTER_MS gekoppelt und bewusst DEUTLICH darunter: Der
+   * Watchdog schlägt nach 90 s Stille Alarm. Eine Lücke von 40 s meldet er
+   * nie — für die Frage "lückenloses Tracking über 20 Minuten" ist sie aber
+   * genau das Ereignis, das gesucht wird. Ein Drittel der Watchdog-Schwelle
+   * fängt die Beinahe-Ausfälle, von denen der Fahrer sonst nichts erfährt.
+   *
+   * Nach unten ist die Grenze der Leerlauftakt: BATTERY.IDLE_DISTANCE_INTERVAL_M
+   * = 200 m, im Stadtverkehr bei 30 km/h also alle 24 s. Eine Schwelle darunter
+   * meldete normalen Betrieb als Lücke.
+   */
+  LUECKE_AB_MS: WATCHDOG.STALE_AFTER_MS / 3,
+} as const;
+
+/**
  * Wie darf in einem Land gewarnt werden?
  *
  * 'punkt' — Warnung an der Position der Anlage, mit Entfernungsansage.

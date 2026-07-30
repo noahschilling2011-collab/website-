@@ -28,6 +28,8 @@ export const STANDARD_SETTINGS: Settings = {
   motorradModus: false,
   haptik: false,
   tachoFaktor: 1,
+  // Aus. Siehe types.ts — hier entsteht eine Bewegungsspur.
+  fahrtprotokoll: false,
 };
 
 /**

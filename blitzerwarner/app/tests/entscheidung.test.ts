@@ -15,19 +15,14 @@ import assert from 'node:assert/strict';
 import type { Warnmodus } from '../src/config';
 import { entscheide, type Aktion, type Eingang } from '../src/core/entscheidung';
 import { cellKey } from '../src/core/geo';
+import { STANDARD_SETTINGS } from '../src/core/settings';
 import { createTripState } from '../src/core/warn';
 import { createZonenZustand, type Zone } from '../src/core/zone';
 import type { Camera, Fix, Settings } from '../src/types';
 
-const SETTINGS: Settings = {
-  warnDistanceFactor: 1,
-  sprachansage: true,
-  lautstaerke: 1,
-  rotlichtblitzer: true,
-  motorradModus: false,
-  haptik: false,
-  tachoFaktor: 1,
-};
+// Die Standardwerte, damit ein neues Feld in Settings hier nicht vergessen
+// wird — der Typcheck fängt es sonst erst, wenn jemand die Liste anfasst.
+const SETTINGS: Settings = { ...STANDARD_SETTINGS };
 
 const MODI: Warnmodus[] = ['punkt', 'zone', 'aus'];
 

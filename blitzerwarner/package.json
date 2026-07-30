@@ -8,6 +8,8 @@
   "scripts": {
     "build-dataset": "tsx scripts/build-dataset.ts",
     "verify-dataset": "tsx scripts/verify-dataset.ts",
+    "build-zones": "tsx scripts/build-zones.ts",
+    "analyze-drive": "tsx scripts/analyze-drive.ts",
     "test": "tsx --test scripts/lib/*.test.ts",
     "typecheck": "tsc --noEmit"
   },

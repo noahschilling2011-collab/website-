@@ -7,18 +7,43 @@
  * sonst zu Recht einen Ein-Stern-Review. Lieber vorher enttäuschen als
  * nachher.
  */
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 
 import { STRINGS } from '../strings';
 import { GEWICHT, SCHRIFT, TOUCH, palette, type ThemeMode } from './theme';
 import { datasetOrNull } from '../core/dataset';
 import { errorLog } from '../core/log';
+import { useApp } from '../state/store';
+import { fahrtprotokollAlsCsv, fahrtprotokollAnzahl } from '../location/task';
 
 type Props = { mode: ThemeMode; onZurueck: () => void };
 
 export default function InfoScreen({ mode, onZurueck }: Props) {
   const farben = palette(mode);
   const dataset = datasetOrNull();
+  const fahrtprotokollAn = useApp((s) => s.settings.fahrtprotokoll);
+
+  /**
+   * Das Fahrtprotokoll ans System übergeben.
+   *
+   * Share und nicht Zwischenablage: Eine CSV mit mehreren tausend Zeilen in
+   * die Zwischenablage zu legen ist auf beiden Systemen unzuverlässig, und
+   * der Nutzer müsste sie danach irgendwo einfügen. Das Share-Sheet lässt ihn
+   * ein Ziel wählen — Mail an sich selbst, Dateien, eine Tabelle.
+   *
+   * Die App verschickt dabei NICHTS von sich aus. Sie übergibt Text an das
+   * System; wohin er geht, entscheidet der Nutzer. Das Produktversprechen
+   * "keine Netzwerk-Requests zur Laufzeit" bleibt damit unangetastet.
+   */
+  function teileFahrtprotokoll(): void {
+    try {
+      const csv = fahrtprotokollAlsCsv();
+      void Share.share({ message: csv, title: STRINGS.einstellungen.fahrtprotokollExport })
+        .catch((err) => errorLog.error('start', 'Fahrtprotokoll konnte nicht geteilt werden', err));
+    } catch (err) {
+      errorLog.error('start', 'Fahrtprotokoll konnte nicht erzeugt werden', err);
+    }
+  }
 
   /**
    * Der einzige Ort in der App, an dem eine URL geöffnet wird — und das
@@ -109,6 +134,38 @@ export default function InfoScreen({ mode, onZurueck }: Props) {
           {STRINGS.onboarding.rechtKeineBeratung}
         </Text>
       </View>
+
+      {/*
+        Nur sichtbar, wenn der Fahrtenschreiber eingeschaltet ist. Ein Knopf,
+        der ein leeres Protokoll teilt, wäre genau die Sorte UI-Element, die
+        eine Funktion behauptet, die gerade nicht läuft.
+      */}
+      {fahrtprotokollAn && (
+        <View style={[stil.karte, { borderColor: farben.linie, backgroundColor: farben.flaeche }]}>
+          <Text style={[stil.kartenTitel, { color: farben.text }]}>
+            {STRINGS.einstellungen.feld.fahrtprotokoll.titel}
+          </Text>
+          <Text style={[stil.klein, { color: farben.textSekundaer }]}>
+            {STRINGS.einstellungen.fahrtprotokollHilfe}
+          </Text>
+          <Text style={[stil.klein, { color: farben.textLeise }]}>
+            {STRINGS.einstellungen.fahrtprotokollAkkuHinweis}
+          </Text>
+          <Pressable
+            onPress={teileFahrtprotokoll}
+            disabled={fahrtprotokollAnzahl() === 0}
+            style={[stil.link, { borderColor: farben.linie }]}
+            accessibilityRole="button"
+            accessibilityLabel={STRINGS.einstellungen.fahrtprotokollExport}
+          >
+            <Text style={[stil.linkText, { color: farben.text }]}>
+              {fahrtprotokollAnzahl() === 0
+                ? STRINGS.einstellungen.fahrtprotokollLeer
+                : `${STRINGS.einstellungen.fahrtprotokollExport} (${fahrtprotokollAnzahl()})`}
+            </Text>
+          </Pressable>
+        </View>
+      )}
 
       <Pressable
         onPress={onZurueck}

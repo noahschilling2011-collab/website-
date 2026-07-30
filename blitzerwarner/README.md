@@ -32,14 +32,48 @@ mit einschlägiger Qualifikation prüfen.
 
 | Phase | Inhalt | Status |
 |---|---|---|
-| 1 | Datenpipeline | 5053 Anlagen für Deutschland, Trefferquote noch offen — siehe DATA.md |
-| 2 | Background-Tracking | offen |
-| 3 | Warnlogik + Replay-Test | offen |
-| 4 | UI + Ansage | offen |
-| 5 | Store-Vorbereitung | offen |
+| 1 | Datenpipeline | gebaut. 5053 Anlagen für Deutschland; Trefferquote gegen unabhängige Quellen offen — siehe DATA.md |
+| 2 | Background-Tracking | gebaut, **auf dem Gerät nicht abgenommen**. Messbar mit dem Fahrtenschreiber, siehe unten |
+| 3 | Warnlogik + Replay-Test | gebaut. 9 Fixture-Tracks, `npm run replay:all` |
+| 4 | UI + Ansage | gebaut, **auf dem Gerät nicht abgenommen** |
+| 5 | Akku unter 3 %/h | **nicht gemessen**. Messbar mit dem Fahrtenschreiber |
+| 6 | Tempolimit-Datensatz | nicht gebaut. Nur das Mengengerüst gemessen (`scripts/count-speedlimits.ts`) |
+| 7 | Map-Matching | nicht gebaut |
+| 8 | Meldefunktion | nicht gebaut, und ohne Backend auch nicht vorgesehen |
+| 9 | Store-Vorbereitung | offen |
+| A | Europa-Datensatz | Mengengerüst gemessen (124 Gebiete), Ausbau offen |
+| B | Länder-Gate | gebaut. Umrisse generiert, Grenz-Hysterese am Messtrack nachgezogen |
+| C | Zonenmodus Frankreich | gebaut und im Hintergrund-Task verdrahtet |
 
-Es existiert noch **keine** React-Native-App. Zuerst musste feststehen, ob
-überhaupt genug Daten da sind, damit das Produkt Sinn ergibt.
+**Was heisst "auf dem Gerät nicht abgenommen":** Der Code läuft und ist
+getestet, aber drei Dinge lassen sich nur im Auto messen — 20 Minuten
+lückenloses Tracking bei ausgeschaltetem Display, der Akkuverbrauch, und der
+Vergleich gegen den Fahrzeugtacho. Dafür gibt es jetzt eine Instrumentierung.
+
+### Eine Testfahrt, alle drei Messwerte
+
+1. In der App: **Einstellungen → Diagnose → Fahrt aufzeichnen** einschalten.
+   Standardmässig aus — hier entsteht als einzigem Ort der App eine
+   vollständige Bewegungsspur. Sie bleibt im Arbeitsspeicher und wird beim
+   Ausschalten gelöscht.
+2. Akkustand notieren, fahren (mindestens 20 Minuten, für die Akkufrage besser
+   eine Stunde), Akkustand notieren.
+3. **Info → Fahrtprotokoll teilen** — CSV an sich selbst schicken.
+4. Die beiden Akkuwerte in die vorbereiteten Zeilen im Kopf der Datei
+   eintragen.
+5. `npm run analyze-drive -- fahrt.csv`
+
+Das Skript gibt Fixanzahl, jede Lücke über der Schwelle mit Dauer und
+Zeitpunkt, den Zeitanteil je Akku-Strategie und je Warnmodus, die Anzahl
+Warnungen sowie mittlere und maximale Genauigkeit aus — und rechnet den
+Akkuverbrauch gegen das 3-%/h-Ziel.
+
+**Automatische Akkuerfassung:** absichtlich nicht gebaut. Die dafür nötige
+Abhängigkeit wäre `expo-battery`; die für Expo SDK 52 vorgesehene Version ist
+`~9.0.1` (aus `bundledNativeModules.json` von `expo@52.0.0`, nicht geraten).
+Sie ist hier nicht aufgenommen worden, weil ein natives Modul ohne Gerätebau
+nicht prüfbar ist und der manuelle Weg die Frage genauso beantwortet. Wer sie
+später hinzunimmt, hat die Versionsfrage damit schon geklärt.
 
 ## Datenpipeline
 

@@ -261,6 +261,14 @@ const EINSTELLUNG_FELD: Record<keyof Settings, Feldtext> = {
     titel: 'Vibration',
     hilfe: 'Kurzes Signal zusätzlich zur Ansage.',
   },
+  fahrtprotokoll: {
+    titel: 'Fahrt aufzeichnen',
+    hilfe:
+      'Schreibt für eine Testfahrt jede Position mit, um Aussetzer und ' +
+      'Akkuverbrauch messen zu können. Die Aufzeichnung bleibt auf dem Gerät, ' +
+      'liegt nur im Arbeitsspeicher und wird beim Ausschalten gelöscht. Im ' +
+      'Alltag nicht nötig.',
+  },
   tachoFaktor: {
     titel: 'Tacho-Kalibrierung',
     hilfe:
@@ -477,6 +485,18 @@ export const STRINGS = {
     abschnittRecht: 'Recht und Lizenz',
     abschnittDiagnose: 'Diagnose',
     fehlerprotokoll: 'Fehlerprotokoll',
+    fahrtprotokollExport: 'Fahrtprotokoll teilen',
+    fahrtprotokollVerweis:
+      'Die Aufzeichnung lässt sich unter "Info" als CSV weitergeben.',
+    fahrtprotokollLeer: 'Noch keine Positionen aufgezeichnet',
+    fahrtprotokollHilfe:
+      'Gibt die Aufzeichnung als CSV weiter — an eine Tabelle, eine Notiz oder ' +
+      'per Mail an sich selbst. Die App verschickt nichts von sich aus; sie ' +
+      'übergibt den Text an das System und der Nutzer entscheidet, wohin.',
+    fahrtprotokollAkkuHinweis:
+      'Für die Akkumessung: Akkustand vor und nach der Fahrt aus den ' +
+      'Systemeinstellungen ablesen und in die vorbereiteten Zeilen im Kopf der ' +
+      'Datei eintragen.',
     fehlerprotokollLoeschen: 'Fehlerprotokoll löschen',
     fehlerprotokollHilfe:
       'Bleibt auf dem Gerät. Wird nirgendwohin übertragen, weil es nichts gibt, ' +

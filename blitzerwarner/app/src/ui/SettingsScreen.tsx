@@ -26,7 +26,10 @@ export default function SettingsScreen({ mode, onZurueck }: Props) {
   const dataset = datasetOrNull();
 
   const schalter = (
-    key: keyof Pick<Settings, 'sprachansage' | 'rotlichtblitzer' | 'motorradModus' | 'haptik'>,
+    key: keyof Pick<
+      Settings,
+      'sprachansage' | 'rotlichtblitzer' | 'motorradModus' | 'haptik' | 'fahrtprotokoll'
+    >,
     text: { titel: string; hilfe?: string },
   ) => (
     <View style={[stil.zeile, { borderColor: farben.linie }]}>
@@ -142,6 +145,19 @@ export default function SettingsScreen({ mode, onZurueck }: Props) {
       <Text style={[stil.abschnitt, { color: farben.textLeise }]}>
         {STRINGS.einstellungen.abschnittDiagnose}
       </Text>
+      {/*
+        Der Fahrtenschreiber steht in der Diagnose und nicht bei der Warnung:
+        Er ist kein Fahrkomfort, sondern ein Messwerkzeug. Standardmässig aus,
+        weil hier als einzigem Ort der App eine vollständige Bewegungsspur
+        entsteht.
+      */}
+      {schalter('fahrtprotokoll', STRINGS.einstellungen.feld.fahrtprotokoll)}
+      {settings.fahrtprotokoll && (
+        <Text style={[stil.hilfe, { color: farben.textLeise }]}>
+          {STRINGS.einstellungen.fahrtprotokollVerweis}
+        </Text>
+      )}
+
       <View style={[stil.karte, { borderColor: farben.linie, backgroundColor: farben.flaeche }]}>
         <Text style={[stil.label, { color: farben.text }]}>
           {STRINGS.einstellungen.fehlerprotokoll}

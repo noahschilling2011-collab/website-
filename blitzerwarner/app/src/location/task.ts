@@ -14,10 +14,17 @@ import * as TaskManager from 'expo-task-manager';
 import { errorLog } from '../core/log';
 import { datasetOrNull } from '../core/dataset';
 import { createTripState, distanceToNearest, type TripState } from '../core/warn';
-import { entscheide } from '../core/entscheidung';
+import { entscheide, type Aktion } from '../core/entscheidung';
+import {
+  alsCsv, createFahrtprotokoll, eintraege as protokollEintraege, leere, schreibe,
+  type Fahrtprotokoll,
+} from '../core/fahrtprotokoll';
 import { createZonenZustand, type ZonenZustand } from '../core/zone';
 import { brauchtZonen, zonenFehler, zonenOderNull } from '../core/zonendaten';
-import { aktualisiere, createStrategyState, vorgabeFuer, type StrategyState } from './strategy';
+import {
+  aktualisiere, createStrategyState, vorgabeFuer,
+  type Modus as StrategieModus, type StrategyState,
+} from './strategy';
 import { createWatchdogState, meldeFix, starte, stoppe, type WatchdogState } from './watchdog';
 import { gebeWarnung, gebeZonenhinweis, sageAnsage } from '../audio/player';
 import { landwechselText } from '../audio/announce';
@@ -68,6 +75,12 @@ type TaskLaufzeit = {
    * 200 Einträge und wäre in einer Minute voll.
    */
   zonenAusfallGemeldet: Set<string>;
+  /**
+   * Fahrtenschreiber. Liegt hier und nicht im Store, weil der Task in einem
+   * eigenen JS-Kontext läuft — ein React-State wäre von hier nicht
+   * erreichbar, und aufgezeichnet wird genau hier.
+   */
+  fahrtprotokoll: Fahrtprotokoll;
 };
 
 const laufzeit: TaskLaufzeit = {
@@ -81,11 +94,29 @@ const laufzeit: TaskLaufzeit = {
   warnungWarErlaubt: null,
   zonen: createZonenZustand(),
   zonenAusfallGemeldet: new Set(),
+  fahrtprotokoll: createFahrtprotokoll(),
 };
 
 /** Von der UI aufzurufen, wenn der Nutzer Einstellungen ändert. */
 export function setzeSettings(settings: Settings): void {
+  // Ausschalten LÖSCHT. Wer den Fahrtenschreiber abschaltet, will die Spur
+  // los sein und nicht bloss keine neue mehr — sonst läge sie bis zum
+  // nächsten App-Neustart weiter im Speicher.
+  if (laufzeit.settings.fahrtprotokoll && !settings.fahrtprotokoll) {
+    leere(laufzeit.fahrtprotokoll);
+    errorLog.info('einstellungen', 'Fahrtprotokoll abgeschaltet und gelöscht');
+  }
   laufzeit.settings = settings;
+}
+
+/** Das Fahrtprotokoll als CSV, für den Teilen-Knopf. */
+export function fahrtprotokollAlsCsv(): string {
+  return alsCsv(laufzeit.fahrtprotokoll);
+}
+
+/** Wie viele Positionen aufgezeichnet sind. Für die Beschriftung des Knopfs. */
+export function fahrtprotokollAnzahl(): number {
+  return protokollEintraege(laufzeit.fahrtprotokoll).length;
 }
 
 export function watchdogState(): WatchdogState {
@@ -119,6 +150,39 @@ function alsFix(ort: Location.LocationObject): Fix {
     accuracy: ort.coords.accuracy ?? null,
     t: ort.timestamp,
   };
+}
+
+/**
+ * Eine Position im Fahrtprotokoll festhalten, falls es eingeschaltet ist.
+ *
+ * Kein stiller Fehlschlag: Wirft der Schreiber, ist das ein Fehler wie jeder
+ * andere — aber er darf die Warnung nicht mitreissen. Der Fahrtenschreiber
+ * ist Diagnose, die Warnung ist der Zweck der App.
+ */
+function zeichneAuf(
+  fix: Fix,
+  naechsteM: number | null,
+  warnmodusJetzt: Warnmodus,
+  strategie: StrategieModus,
+  aktion: Aktion,
+): void {
+  if (!laufzeit.settings.fahrtprotokoll) return;
+  try {
+    schreibe(laufzeit.fahrtprotokoll, {
+      t: fix.t,
+      lat: fix.lat,
+      lon: fix.lon,
+      speed: fix.speed,
+      accuracy: fix.accuracy,
+      course: fix.course,
+      strategie,
+      warnmodus: warnmodusJetzt,
+      naechsteM,
+      gewarnt: aktion.art !== 'nichts',
+    });
+  } catch (err) {
+    errorLog.error('hintergrund', 'Fahrtprotokoll konnte nicht geschrieben werden', err);
+  }
 }
 
 /**
@@ -194,14 +258,24 @@ async function verarbeite(fix: Fix): Promise<void> {
     await konfiguriereUpdates(vorgabe.genauigkeit, vorgabe.distanceIntervalM);
   }
 
-  if (!darfWarnen) return;
-
   /*
-   * 4. Die Entscheidung. Bewusst als reine Funktion ausgelagert
-   *    (core/entscheidung.ts): Welche Logik bei welchem Modus greift, ist
-   *    genau die Stelle, an der Frankreich stumm blieb — beide Bausteine
-   *    waren in Ordnung, die Verdrahtung nicht. Sie steckte hier zwischen
-   *    expo-Aufrufen und war damit nicht prüfbar.
+   * 4. Die Entscheidung.
+   *
+   * Kein `if (!darfWarnen) return;` mehr davor. Zwei Gründe:
+   *
+   *  - entscheide() beantwortet den Fall 'aus' selbst und liefert
+   *    { nichts, land_gesperrt }. Ein zweites Gate davor wäre ein zweiter
+   *    Ort, an dem "darf hier gewarnt werden" entschieden wird.
+   *  - Der Fahrtenschreiber muss auch in Deutschland aufzeichnen. Dort ist
+   *    der Modus 'aus' — und dort findet die Testfahrt statt. Mit dem
+   *    vorzeitigen return hätte er im gesamten Kerngebiet der App keine
+   *    einzige Zeile geschrieben, und die Phasen 2, 4 und 5 wären
+   *    weiterhin unmessbar geblieben.
+   *
+   * Bewusst als reine Funktion ausgelagert (core/entscheidung.ts): Welche
+   * Logik bei welchem Modus greift, ist genau die Stelle, an der Frankreich
+   * stumm blieb — beide Bausteine waren in Ordnung, die Verdrahtung nicht.
+   * Sie steckte hier zwischen expo-Aufrufen und war damit nicht prüfbar.
    */
   const zonen = brauchtZonen(landStatus.land) && landStatus.land !== null
     ? zonenOderNull(landStatus.land)
@@ -215,7 +289,13 @@ async function verarbeite(fix: Fix): Promise<void> {
     zonenZustand: laufzeit.zonen,
   });
 
-  // 5. Ausführen. Ab hier nur noch Plattform, keine Entscheidung mehr.
+  // 5. Aufzeichnen, BEVOR ausgeführt wird. Die Ansage dauert je nach Text
+  //    über eine Sekunde; käme der Eintrag danach, wäre der gemessene
+  //    Fixabstand um die Ansagedauer verfälscht — und genau dieser Abstand
+  //    ist der Messwert für Phase 2.
+  zeichneAuf(fix, naechste, modus, vorgabe.modus, aktion);
+
+  // 6. Ausführen. Ab hier nur noch Plattform, keine Entscheidung mehr.
   switch (aktion.art) {
     case 'punktwarnung':
       await gebeWarnung(aktion.camera, aktion.distanzM, {
@@ -324,6 +404,10 @@ export async function starteTracking(settings: Settings): Promise<boolean> {
   laufzeit.warnungWarErlaubt = null;
   laufzeit.zonen = createZonenZustand();
   laufzeit.zonenAusfallGemeldet = new Set();
+  // Eine neue Fahrt, ein neues Protokoll. Zwei Fahrten in einer Datei wären
+  // für die Lückenmessung wertlos: Die Pause dazwischen sähe aus wie ein
+  // Aussetzer.
+  leere(laufzeit.fahrtprotokoll);
 
   const start = vorgabeFuer('leerlauf');
 
