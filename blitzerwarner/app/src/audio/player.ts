@@ -110,7 +110,9 @@ export async function gebeWarnung(
       language: 'de-DE',
       rate: sprechrate(opts.speedKmh),
       volume: Math.max(0, Math.min(1, opts.lautstaerke)),
-      onError: (err) => errorLog.error('audio', 'Sprachausgabe fehlgeschlagen', err),
+      // Geklammert, weil errorLog.error() einen LogEntry zurückgibt und
+      // expo-speech hier void erwartet.
+      onError: (err) => { errorLog.error('audio', 'Sprachausgabe fehlgeschlagen', err); },
     });
   } catch (err) {
     errorLog.error('audio', 'Sprachausgabe konnte nicht gestartet werden', err);
