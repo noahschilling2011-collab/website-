@@ -62,7 +62,12 @@ export type SkipReason =
   | 'nicht_voraus'
   | 'gegenrichtung'
   | 'bereits_gewarnt'
-  | 'typ_abgeschaltet';
+  | 'typ_abgeschaltet'
+  /**
+   * Die letzte Ansage liegt noch nicht lange genug zurück. Kein Verwerfen —
+   * die Warnung kommt beim nächsten Fix, der den Abstand einhält.
+   */
+  | 'ansage_zu_dicht';
 
 export type Evaluation = {
   warning: Warning | null;

@@ -536,6 +536,86 @@ und danach kommt keiner. Das Laden der Zonendatei hängt am
 länderweisen Datensatzformat (Phase A.4) und ist dort vermerkt. Bis dahin
 bleibt es bei „gar nicht warnen", der sicheren Richtung.
 
+## Anlagen, die dicht beieinander stehen
+
+Aus dem Lesen des Codes kam die Vermutung, `evaluate()` könne zwei Ansagen
+kurz hintereinander auslösen: Vermerkt wird nur die **nächstgelegene** Anlage
+als gewarnt, eine zweite gleichzeitig in Reichweite bleibt unvermerkt und
+löst beim nächsten Fix eine eigene Warnung aus.
+
+**Nachgemessen** bei 100 km/h und 25 m Fixtakt (Annäherungsmodus):
+
+| Abstand der Anlagen | Abstand der Ansagen | Bewertung |
+|---|---|---|
+| 20 m | 0,9 s | schneidet ineinander |
+| 50 m | 1,8 s | schneidet ineinander |
+| 100 m | 3,6 s | grenzwertig |
+| 250 m | 9,0 s | **richtig so** |
+| 600 m | 21,6 s | richtig so |
+
+Die Vermutung stimmt, aber nicht in der vermuteten Ausprägung. Bei 250 m —
+dem Fall, mit dem die Prüfung angeregt wurde — ist das Verhalten **korrekt**:
+zwei Anlagen, zwei Warnungen, jede bei ihrer eigenen Entfernung. Erst
+unterhalb von rund 100 m beginnt die zweite Ansage, bevor die erste zu Ende
+ist.
+
+### Wie oft das real vorkommt
+
+Gezählt im deutschen Datensatz (5053 Anlagen, alle Paare):
+
+| Abstand | Paare |
+|---|---|
+| unter 25 m | 107 |
+| unter 50 m | 344 |
+| unter 100 m | 518 |
+| unter 200 m | 727 |
+| unter 350 m | 935 |
+
+Der engste gemessene Abstand ist 0 m — dieselbe Position, unterschiedliche
+Blickrichtung. Das sind meist beide Fahrtrichtungen derselben Messstelle, die
+das Dedupe absichtlich getrennt hält (siehe oben, Richtungsvererbung).
+
+344 Paare unter 50 m sind kein Randfall. Die Vermutung war damit belegt und
+nicht bloss plausibel.
+
+### Was daraus folgt
+
+`WARN.MIN_ANSAGE_ABSTAND_MS = 4000`. Zwei gesprochene Warnungen halten
+mindestens vier Sekunden Abstand.
+
+**In Zeit und nicht in Metern**, weil das Problem die Dauer der Ansage ist und
+die nicht vom Tempo abhängt. Eine Schwelle in Metern wäre auf der Autobahn zu
+klein und in der Stadt zu gross.
+
+**Keine Warnung geht verloren.** Die zweite wird nicht verworfen, sondern
+verschoben: Sie kommt, sobald der Abstand eingehalten ist, dann eben bei
+kürzerer Entfernung. Am Track `zwei-anlagen-dicht` gemessen — aus 316 m
+werden 235 m. Die naheliegende Alternative, beim Warnen gleich alle Anlagen
+in der Nähe als abgehandelt zu vermerken, wäre die falsche Antwort gewesen:
+Sie hätte bei 250 m Abstand eine echte zweite Anlage verschluckt.
+
+### Wie das geprüft bleibt
+
+Zwei Fixture-Tracks, `zwei-anlagen-weit` (250 m) und `zwei-anlagen-dicht`
+(30 m). Beide erwarten **zwei** Warnungen — der Prüfpunkt ist nicht die Zahl,
+sondern der Abstand. Die Fixture-Erwartung hat dafür ein Feld
+`minAnsageAbstandS`, und `npm run replay:all` nennt den gemessenen Wert:
+
+```
+zwei-anlagen-dicht   Ansageabstand: 4.0 s  (mindestens 4 s)  OK
+zwei-anlagen-weit    Ansageabstand: 9.0 s  (mindestens 4 s)  OK
+```
+
+Ein reiner Zähltest hätte hier nichts gemerkt: Zwei Ansagen 0,9 s auseinander
+sind gezählt genauso zwei wie zwei Ansagen 9 s auseinander.
+
+### Nebenbefund
+
+Der Test „Kamera wird nach ausreichender Entfernung wieder scharf" gab allen
+drei Positionen denselben Zeitstempel, obwohl zwischen ihnen 1,6 km liegen.
+Das fiel erst mit der neuen Regel auf. Eine Rundfahrt in null Sekunden gibt es
+nicht; der Test führt jetzt die Zeit mit.
+
 ## Trefferquote gegen bekannte Standorte
 
 **Noch nicht gemessen.**

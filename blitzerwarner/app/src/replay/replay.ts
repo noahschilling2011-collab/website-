@@ -67,6 +67,15 @@ export type ReplayErwartung = {
   };
   /** Wie viele Warnungen der Track auslösen MUSS. */
   erwarteteWarnungen: number;
+  /**
+   * Mindestabstand zwischen zwei Ansagen in Sekunden.
+   *
+   * Für Tracks, bei denen nicht die ZAHL der Warnungen der Prüfpunkt ist,
+   * sondern ihr ABSTAND. Zwei Ansagen 0,9 s auseinander schneiden ineinander
+   * — gezählt werden es trotzdem zwei, ein reiner Zähltest merkt davon
+   * nichts.
+   */
+  minAnsageAbstandS?: number;
   /** Optional: Einstellungen, falls abweichend. */
   settings?: Partial<Settings>;
 };
@@ -261,8 +270,27 @@ function istHauptmodul(): boolean {
   }
 }
 
-function berichte(name: string, erg: ReplayErgebnis, erwartet: number | null): boolean {
-  const ok = erwartet == null || erg.warnungen.length === erwartet;
+/**
+ * Der kleinste Abstand zwischen zwei aufeinanderfolgenden Ansagen, in
+ * Sekunden. null bei weniger als zwei Warnungen.
+ */
+export function kleinsterAnsageAbstandS(erg: ReplayErgebnis): number | null {
+  if (erg.warnungen.length < 2) return null;
+  let kleinster = Number.POSITIVE_INFINITY;
+  for (let i = 1; i < erg.warnungen.length; i++) {
+    const d = (erg.warnungen[i]!.t - erg.warnungen[i - 1]!.t) / 1000;
+    if (d < kleinster) kleinster = d;
+  }
+  return kleinster;
+}
+
+function berichte(
+  name: string,
+  erg: ReplayErgebnis,
+  erwartet: number | null,
+  minAbstandS?: number,
+): boolean {
+  let ok = erwartet == null || erg.warnungen.length === erwartet;
   console.log('─'.repeat(70));
   console.log(`${name}`);
   console.log(`  Punkte:            ${erg.punkte}`);
@@ -272,6 +300,20 @@ function berichte(name: string, erg: ReplayErgebnis, erwartet: number | null): b
   );
   for (const w of erg.warnungen) {
     console.log(`    bei ${w.distance.toFixed(0)} m, Tempo ${w.max ?? 'unbekannt'}`);
+  }
+
+  if (minAbstandS != null) {
+    const kleinster = kleinsterAnsageAbstandS(erg);
+    if (kleinster === null) {
+      console.log(`  Ansageabstand:     — (weniger als zwei Warnungen)`);
+    } else {
+      const abstandOk = kleinster >= minAbstandS;
+      if (!abstandOk) ok = false;
+      console.log(
+        `  Ansageabstand:     ${kleinster.toFixed(1)} s  (mindestens ${minAbstandS} s)  ` +
+        `${abstandOk ? 'OK' : 'ZU DICHT — die Ansagen schneiden ineinander'}`,
+      );
+    }
   }
   const gruende = Object.entries(erg.gruende).sort((a, b) => b[1] - a[1]);
   if (gruende.length) {
@@ -375,7 +417,12 @@ if (istHauptmodul()) {
       }
 
       const erg = replay(fixes, erwartung.kameras, erwartung.settings);
-      const ok = berichte(`${name} — ${erwartung.beschreibung}`, erg, erwartung.erwarteteWarnungen);
+      const ok = berichte(
+        `${name} — ${erwartung.beschreibung}`,
+        erg,
+        erwartung.erwarteteWarnungen,
+        erwartung.minAnsageAbstandS,
+      );
       if (!ok) alleOk = false;
     } catch (err) {
       console.error(`${name}: FEHLER — ${(err as Error).message}`);

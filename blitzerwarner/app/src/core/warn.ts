@@ -18,10 +18,15 @@ export type TripState = {
    * wieder scharf sind. Schlüssel ist die gerundete Koordinate.
    */
   gewarnt: Map<string, { wiederScharf: boolean }>;
+  /**
+   * Zeitstempel der letzten ausgelösten Warnung, für WARN.MIN_ANSAGE_ABSTAND_MS.
+   * null = in dieser Fahrt noch nicht gewarnt.
+   */
+  letzteAnsageT: number | null;
 };
 
 export function createTripState(): TripState {
-  return { gewarnt: new Map() };
+  return { gewarnt: new Map(), letzteAnsageT: null };
 }
 
 export function cameraKey(c: Camera): string {
@@ -130,7 +135,31 @@ export function evaluate(
 
   if (!beste) return { warning: null, skipped };
 
+  /*
+   * Zwei Ansagen dürfen sich nicht überschneiden.
+   *
+   * Der Fall, gegen den das steht: Zwei Anlagen liegen gleichzeitig in
+   * Reichweite. Vermerkt wird nur die nächstgelegene, die zweite löst
+   * deshalb beim nächsten Fix eine eigene Warnung aus — im Annäherungsmodus
+   * bei 100 km/h also 0,9 s später. Gemessen an Paaren mit 20 bis 50 m
+   * Abstand, und davon gibt es im deutschen Datensatz 344.
+   *
+   * DIE KAMERA WIRD NICHT VERMERKT. Sie ist nicht abgehandelt, sondern
+   * verschoben: Sobald der Abstand eingehalten ist, kommt ihre Warnung — dann
+   * bei kürzerer Entfernung. Sie hier zu vermerken hiesse, die zweite Anlage
+   * stillschweigend zu verschlucken, und das ist bei 250 m Abstand (9 s, zwei
+   * getrennte Warnungen) genau die falsche Antwort.
+   */
+  if (
+    state.letzteAnsageT !== null &&
+    fix.t - state.letzteAnsageT < WARN.MIN_ANSAGE_ABSTAND_MS
+  ) {
+    note(beste.camera, 'ansage_zu_dicht', beste.distance);
+    return { warning: null, skipped };
+  }
+
   state.gewarnt.set(cameraKey(beste.camera), { wiederScharf: false });
+  state.letzteAnsageT = fix.t;
   return {
     warning: { camera: beste.camera, distance: beste.distance, t: fix.t },
     skipped,

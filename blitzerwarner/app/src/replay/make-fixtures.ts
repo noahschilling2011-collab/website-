@@ -297,6 +297,70 @@ const FR_LON = 7.7521;
   });
 }
 
+// --- 10./11. Zwei Anlagen hintereinander ----------------------------------
+{
+  /*
+   * Die Vermutung, die dahinterstand: evaluate() vermerkt nur die
+   * NÄCHSTGELEGENE Anlage als gewarnt. Liegen zwei gleichzeitig in
+   * Reichweite, bleibt die zweite unvermerkt und löst beim nächsten Fix eine
+   * eigene Warnung aus — werden daraus zwei Ansagen in kurzem Abstand?
+   *
+   * Nachgemessen bei 100 km/h. Beide Tracks fahren dieselbe Strecke, sie
+   * unterscheiden sich nur im Abstand der beiden Anlagen:
+   *
+   *   250 m Abstand -> zwei Ansagen, 9,0 s auseinander.  RICHTIG SO.
+   *    30 m Abstand -> zwei Ansagen, 0,9 s auseinander.  ZU DICHT.
+   *
+   * Die Vermutung stimmt also, aber nicht in der vermuteten Ausprägung: Bei
+   * 250 m ist das Verhalten korrekt — zwei Anlagen, zwei Warnungen, jede bei
+   * ihrer eigenen Entfernung. Erst unter rund 100 m schneidet die zweite
+   * Ansage in die erste.
+   *
+   * Beide Fälle stehen deshalb als Track hier: einer, der zwei Warnungen
+   * verlangt, und einer, der eine verlangt. Ein Track allein liesse offen,
+   * ob die Regel zu scharf oder zu lasch ist.
+   */
+  const START_LAT = 48.6;
+  const START_LON = 9.0;
+  const V = 27.8;
+  const punkte = fahrt(START_LAT, START_LON, 90, V, 60);
+  const [ersteLat, ersteLon] = ziel(START_LAT, START_LON, 90, 900);
+
+  /*
+   * BEIDE Tracks erwarten ZWEI Warnungen. Der Unterschied liegt im Abstand,
+   * und deshalb ist die Warnungszahl hier nicht der Prüfpunkt.
+   *
+   * Die zweite Anlage wird nicht verschluckt, sondern verschoben, bis
+   * WARN.MIN_ANSAGE_ABSTAND_MS eingehalten ist — sie kommt dann bei kürzerer
+   * Entfernung. Sie zu unterdrücken wäre die falsche Antwort: Bei 250 m sind
+   * zwei getrennte Warnungen richtig, und eine Regel, die das nicht
+   * unterscheidet, verschluckt eine echte Anlage.
+   */
+  for (const [name, abstandM, erwartet, was] of [
+    ['zwei-anlagen-weit', 250, 2, 'weit genug auseinander für zwei Ansagen'],
+    ['zwei-anlagen-dicht', 30, 2, 'zu dicht — die zweite Ansage wird verschoben'],
+  ] as const) {
+    const [zweiteLat, zweiteLon] = ziel(ersteLat, ersteLon, 90, abstandM);
+    fixtures.push({
+      name,
+      punkte,
+      erwartung: {
+        beschreibung:
+          `Zwei Anlagen ${abstandM} m hintereinander in Fahrtrichtung, ` +
+          `${(V * 3.6).toFixed(0)} km/h — ${was}`,
+        kameras: [
+          { lat: ersteLat, lon: ersteLon, dir: null, max: 100, type: 'speed' },
+          { lat: zweiteLat, lon: zweiteLon, dir: null, max: 100, type: 'speed' },
+        ],
+        erwarteteWarnungen: erwartet,
+        // Der eigentliche Prüfpunkt. 4 s ist WARN.MIN_ANSAGE_ABSTAND_MS;
+        // gemessen wurden vor der Regel 0,9 s beim dichten Paar.
+        minAnsageAbstandS: 4,
+      },
+    });
+  }
+}
+
 // --- schreiben ------------------------------------------------------------
 
 mkdirSync(FIXTURES, { recursive: true });

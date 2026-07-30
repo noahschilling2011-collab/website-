@@ -50,6 +50,50 @@ export const WARN = {
    * haben. Verhindert Dauerfeuer im Stau vor der Kamera.
    */
   REARM_DISTANCE_FACTOR: 2,
+
+  /**
+   * Mindestabstand zwischen zwei gesprochenen Warnungen, in Millisekunden.
+   *
+   * DER ANLASS, GEMESSEN
+   *
+   * evaluate() vermerkt nur die NÄCHSTGELEGENE Anlage als gewarnt. Liegen
+   * zwei gleichzeitig in Reichweite, bleibt die zweite unvermerkt und löst
+   * beim nächsten Fix eine eigene Warnung aus. Gemessen bei 100 km/h und
+   * 25 m Fixtakt (Annäherungsmodus):
+   *
+   *   Abstand der Anlagen    Abstand der Ansagen
+   *          20 m                  0,9 s
+   *          50 m                  1,8 s
+   *         100 m                  3,6 s
+   *         250 m                  9,0 s
+   *
+   * Bei 250 m ist das RICHTIG — zwei Anlagen, zwei Warnungen, jede bei ihrer
+   * eigenen Entfernung. Bei 20 bis 50 m schneidet die zweite Ansage in die
+   * erste, und der Fahrer versteht keine von beiden.
+   *
+   * Im deutschen Datensatz sind das keine Einzelfälle: 107 Paare liegen unter
+   * 25 m, 344 unter 50 m, 518 unter 100 m — meist beide Fahrtrichtungen
+   * derselben Messstelle.
+   *
+   * WARUM ZEIT UND NICHT ENTFERNUNG
+   *
+   * Das Problem ist die Dauer der Ansage, und die hängt nicht vom Tempo ab.
+   * Eine Schwelle in Metern wäre auf der Autobahn zu klein und in der Stadt
+   * zu gross.
+   *
+   * WOHER DIE 4000
+   *
+   * Ton (260 ms) + AUDIO.WAKEUP_DELAY_MS (300 ms) + die gesprochene Ansage
+   * "Blitzer, dreihundertfünfzig Meter, Tempo hundert" (rund 2,5 s) ergeben
+   * gut 3 Sekunden. 4000 ms lassen Luft für längere Texte
+   * ("Blitzer und Rotlicht, ...").
+   *
+   * KEINE WARNUNG GEHT VERLOREN. Die zweite wird nicht verworfen, sondern
+   * verschoben: Sie kommt, sobald der Abstand eingehalten ist, dann eben bei
+   * kürzerer Entfernung. Bei 100 km/h sind 4 s rund 111 m — aus 330 m werden
+   * 219 m, und das ist immer noch eine brauchbare Vorwarnung.
+   */
+  MIN_ANSAGE_ABSTAND_MS: 4000,
 } as const;
 
 /** Akku-Strategie, Spec Abschnitt 6. */

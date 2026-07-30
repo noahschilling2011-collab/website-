@@ -1,0 +1,21 @@
+{
+  "beschreibung": "Zwei Anlagen 250 m hintereinander in Fahrtrichtung, 100 km/h — weit genug auseinander für zwei Ansagen",
+  "kameras": [
+    {
+      "lat": 48.59999935154224,
+      "lon": 9.012239148892387,
+      "dir": null,
+      "max": 100,
+      "type": "speed"
+    },
+    {
+      "lat": 48.59999930150691,
+      "lon": 9.015638912456811,
+      "dir": null,
+      "max": 100,
+      "type": "speed"
+    }
+  ],
+  "erwarteteWarnungen": 2,
+  "minAnsageAbstandS": 4
+}
