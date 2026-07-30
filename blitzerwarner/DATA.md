@@ -428,6 +428,114 @@ Frankreich warnt im Zonenmodus. Alle anderen Länder warnen nicht.
 Ein Test hält diese Liste fest. Wächst sie, muss jemand die Quelle
 nachgelesen haben.
 
+## Wann die App den Grenzübertritt merkt (Phase B.4)
+
+Die Gate-Tabelle sagt, **was** in einem Land erlaubt ist. Sie sagt nicht,
+**wann** die App merkt, dass es soweit ist. Das entscheidet die Hysterese in
+`app/src/core/country.ts`, und der Wert dafür war bis B.4 ein Behelf.
+
+### Gemessen, nicht geschätzt
+
+Messtrack: `app/fixtures/grenze-kehl-strasbourg.gpx` — Europabrücke von Kehl
+nach Strasbourg, 381 Punkte, 13,9 m/s, ein Fix je etwa 14 m. Die Stelle ist
+ausgesucht, nicht bequem: Die Grenze verläuft dort im Rhein, quer zur
+Fahrtrichtung, Deutschland verbietet die Warnung, Frankreich erlaubt sie in
+Zonenform. Ein Fehler in beide Richtungen hat Folgen.
+
+Gemessen wurde, wie weit hinter der Grenze der Moduswechsel `aus -> zone`
+greift:
+
+| `MINDESTABSTAND_GRENZE_M` | Wechsel liegt hinter der Grenze |
+|---|---|
+| 3000 m (alter Wert) | 2988 m |
+| 2000 m | 1988 m |
+| 1000 m | 987 m |
+| 600 m | 598 m |
+| **400 m (neu)** | **389 m** |
+| 300 m | 292 m |
+
+Die Spec fordert 0 bis 500 m hinter der Grenze. Der alte Wert lag um Faktor
+sechs daneben — er schaltete die Zonenwarnung erst mitten in Strasbourg frei.
+Er stammte aus der Zeit der handeingetragenen Umrisse, deren Fehler unbekannt
+war.
+
+### Warum 400 m und nicht 500 m
+
+Der neue Wert ist **abgeleitet, nicht gewählt**: das Doppelte von
+`TOLERANZ_GRENZE_M` (200 m), der Vereinfachungstoleranz der generierten
+Umrisse an Landgrenzen.
+
+- **Untergrenze.** Ein Schwellwert unterhalb des Vereinfachungsfehlers prüft
+  gegen den eigenen Fehler und damit nichts. Liegt die generierte Linie um die
+  volle Toleranz nach Osten verschoben, dann liegt die tatsächliche Grenze
+  200 m westlich von ihr — ein Wechsel 200 m hinter der Linie wäre ein Wechsel
+  genau *auf* der Grenze. Erst 400 m stellen sicher, dass die Position auch im
+  schlechtesten Fall der Vereinfachung im neuen Land liegt.
+- **Obergrenze.** 500 m ist das geforderte Fenster. Ein Schwellwert genau dort
+  hätte keine Luft mehr für den Fixabstand (14 m) und die fünf bestätigenden
+  Fixes (70 m).
+
+Der Wert ist im Code an `TOLERANZ_GRENZE_M` gekoppelt. Wird die Toleranz im
+Generator geändert, wandert der Schwellwert mit, und `tests/grenze.test.ts`
+schlägt an, falls das Fenster dabei reisst.
+
+### Was die Messung nebenbei gefunden hat
+
+**Der Grenzübertritt nach Frankreich wurde nicht angesagt.** Der
+Hintergrund-Task verglich `darfPunktWarnen`, ein Ja/Nein. Beim Wechsel von
+`aus` auf `zone` bleibt dieser Wert in beiden Fällen `false` — der Wechsel
+fiel also stillschweigend aus. Gemessen: ein Moduswechsel, null Ansagen. Der
+Task vergleicht jetzt den Modus.
+
+**Die Ansage hätte in Frankreich ein verbotenes Wort enthalten.**
+`landwechselText` lautete in beiden Richtungen „Blitzerwarnung aktiviert /
+deaktiviert". „Blitzer" steht auf `VERBOTENE_ZONENWOERTER` — es beim Übertritt
+nach Frankreich zu sagen, benennt die Gefahr. Jetzt pro Modus ein eigener
+Text: „Blitzerwarnung aktiviert" nur im Punktmodus, „Hinweise aktiviert" im
+Zonenmodus, „Warnung deaktiviert" beim Abschalten. Der Ausschalttext ist
+absichtlich neutral, weil er beim Verlassen Frankreichs gesprochen wird und
+damit unter Umständen noch auf französischem Gebiet.
+
+**Der Replay meldete grün, ohne zu prüfen.** Der Grenztrack hat keine Kameras.
+`npm run replay:all` schickte ihn durch die Punktlogik, fand null Warnungen,
+erwartete null und meldete „OK" — ein grünes Ergebnis für eine Prüfung, die
+nicht stattgefunden hat. Die Fixture-Erwartung hat jetzt ein Feld
+`landwechsel`, und die CLI führt für solche Tracks die Landeslogik aus und
+nennt die gemessene Zahl:
+
+```
+grenze-kehl-strasbourg
+  Modus:             Landeserkennung (Grenzübertritt)
+  Moduswechsel:      zone  (erwartet zone)  OK
+    Fix  99: aus -> zone, 389 m hinter der Datengrenze
+  Gründe:
+    bestaetigt           353x
+    grenznah             24x
+    wartet_bestaetigung  4x
+```
+
+Die Gründe belegen, dass die richtige Bremse greift: 24 Fixes wurden wegen
+Grenznähe gehalten, nur 4 vom Fixzähler. Bremste allein der Zähler, käme der
+Wechsel schon 70 m hinter der Grenze — innerhalb des Vereinfachungsfehlers und
+damit möglicherweise davor.
+
+### Was weiter offen ist
+
+Die Umrisse sind gegen **Natural Earth** gemessen, nicht gegen die
+tatsächliche Grenze. `scripts/reference-locations.json` ist bewusst leer, und
+eine unabhängige Grenzreferenz gibt es im Projekt nicht. Der Abstand von 389 m
+ist also ein Abstand zur *Datengrenze*; wie weit die von der tatsächlichen
+Grenze abweicht, ist durch die Vereinfachungstoleranz nach oben abgeschätzt,
+aber nicht gemessen. Genau deshalb ist der Schwellwert das Doppelte der
+Toleranz und nicht das Einfache.
+
+**Der Zonenmodus ist im Hintergrund-Task noch nicht verdrahtet.** `core/zone.ts`
+und der Replay decken ihn ab, aber `location/task.ts` gibt in Frankreich noch
+keine Zonenansage aus — es wird dort also angesagt, dass Hinweise aktiv sind,
+und danach kommt keiner. Das Laden der Zonendatei hängt am
+länderweisen Datensatzformat (Phase A.4) und ist dort vermerkt. Bis dahin
+bleibt es bei „gar nicht warnen", der sicheren Richtung.
+
 ## Trefferquote gegen bekannte Standorte
 
 **Noch nicht gemessen.**

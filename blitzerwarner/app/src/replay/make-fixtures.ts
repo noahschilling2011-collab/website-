@@ -261,6 +261,42 @@ const FR_LON = 7.7521;
   void a1; void o1; void a2; void o2;
 }
 
+// --- 9. Grenzfahrt Kehl nach Strasbourg (B.4) -----------------------------
+{
+  // Über die Europabrücke, Deutschland nach Frankreich. Der Track prüft nicht
+  // die Warnlogik, sondern die LANDESERKENNUNG samt Hysterese — deshalb keine
+  // Kameras und keine Zonen in der Erwartung.
+  //
+  // Die Fahrt beginnt gut 2 km östlich des Rheins in Kehl und endet 3 km
+  // westlich in Strasbourg. 50 km/h, 1 s Abstand, also rund 14 m je Punkt —
+  // fein genug, um den Umschaltpunkt auf wenige Meter zu bestimmen.
+  const KEHL_LAT = 48.5745;
+  const KEHL_LON = 7.8150;
+  const punkte = fahrt(KEHL_LAT, KEHL_LON, 270, 13.9, 380);
+  fixtures.push({
+    name: 'grenze-kehl-strasbourg',
+    punkte,
+    erwartung: {
+      beschreibung:
+        'Fahrt über die Europabrücke, Deutschland nach Frankreich. Prüft die ' +
+        'Landeserkennung: genau ein Moduswechsel, kein Flattern, und der ' +
+        'Wechsel liegt NACH der Grenze, nicht davor.',
+      kameras: [],
+      erwarteteWarnungen: 0,
+      // Ohne dieses Feld schickt die CLI den Track durch die Punktlogik,
+      // findet dort null Kameras und meldet "0 von 0 erwartet, OK" — ein
+      // grünes Ergebnis für eine Prüfung, die nicht gelaufen ist.
+      landwechsel: {
+        // Deutschland ist 'aus', Frankreich 'zone'. Genau ein Wechsel.
+        modi: ['zone'],
+        // Aus der Spec: der Wechsel liegt zwischen 0 und 500 m hinter der
+        // Grenze. Gemessen werden 389 m.
+        maxHinterGrenzeM: 500,
+      },
+    },
+  });
+}
+
 // --- schreiben ------------------------------------------------------------
 
 mkdirSync(FIXTURES, { recursive: true });

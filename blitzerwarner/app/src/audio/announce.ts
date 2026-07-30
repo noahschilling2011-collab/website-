@@ -5,7 +5,7 @@
  * dass eine TTS-Stimme im Spiel ist. Was die Stimme daraus macht, lässt sich
  * nur am Gerät prüfen — dass der Text stimmt, hier.
  */
-import { AUDIO } from '../config';
+import { AUDIO, type Warnmodus } from '../config';
 import type { Camera } from '../types';
 
 /**
@@ -96,9 +96,40 @@ export function sprechrate(speedKmh: number | null): number {
   return speedKmh > AUDIO.FAST_SPEECH_ABOVE_KMH ? AUDIO.FAST_SPEECH_RATE : 1;
 }
 
-/** Ansage für den Grenzübertritt, Spec Abschnitt 10.1. */
-export function landwechselText(warnungAktiv: boolean): string {
-  return warnungAktiv ? 'Blitzerwarnung aktiviert' : 'Blitzerwarnung deaktiviert';
+/**
+ * Ansage für den Grenzübertritt, Spec Abschnitt 10.1.
+ *
+ * WARUM DIE ANSAGE DEN MODUS KENNT UND NICHT BLOSS EIN JA/NEIN
+ *
+ * Die frühere Fassung nahm ein Boolean und sagte in beiden Richtungen
+ * "Blitzerwarnung". Zwei Fehler steckten darin, und beide zeigten sich erst
+ * am Grenztrack (fixtures/grenze-kehl-strasbourg.gpx):
+ *
+ *  1. Der Aufrufer im Hintergrund-Task übergab `darfPunktWarnen`. Beim
+ *     Übertritt nach Frankreich wechselt der Modus von 'aus' auf 'zone',
+ *     `darfPunktWarnen` bleibt aber in beiden Fällen false — der Wechsel
+ *     wurde also gar nicht angesagt. Der Fahrer erfuhr nicht, dass die App
+ *     jetzt etwas tut.
+ *  2. Das Wort "Blitzerwarnung" steht auf VERBOTENE_ZONENWOERTER. Es im
+ *     Zonenmodus zu sagen, benennt die Gefahr — genau das, was Frankreich
+ *     seit 03.01.2012 untersagt.
+ *
+ * Deshalb pro Modus ein eigener Text. Der Ausschalttext ist absichtlich
+ * neutral formuliert: Er wird beim Übertritt aus Frankreich heraus gesprochen
+ * und damit unter Umständen noch auf französischem Gebiet.
+ */
+export const LANDWECHSEL_ANSAGE = {
+  punkt: 'Blitzerwarnung aktiviert',
+  /**
+   * Kein Wort aus VERBOTENE_ZONENWOERTER. Ein Test prüft das — die Liste
+   * steht weiter unten in dieser Datei und kann wachsen.
+   */
+  zone: 'Hinweise aktiviert',
+  aus: 'Warnung deaktiviert',
+} as const satisfies Record<Warnmodus, string>;
+
+export function landwechselText(modus: Warnmodus): string {
+  return LANDWECHSEL_ANSAGE[modus];
 }
 
 // --- Zonenmodus (Frankreich, Spec Phase C) --------------------------------

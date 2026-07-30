@@ -15,6 +15,7 @@ import { LAENDER_GATE, type LandCode, type Warnmodus } from '../config';
 import type { Fix } from '../types';
 import { distanceToSegment } from './geo';
 import {
+  TOLERANZ_GRENZE_M,
   UMRISSE,
   UMRISS_CODES,
   type Punkt,
@@ -45,13 +46,38 @@ export const LAND_HYSTERESE = {
   /**
    * Und so weit muss die Position von der nächsten Landgrenze entfernt sein.
    *
-   * Der Wert hängt direkt an der Güte der Umrisse: Er muss grösser sein als
-   * deren Fehler, sonst prüft er nichts. Mit den handeingetragenen Linien
-   * (country-data.DATENQUALITAET) ist er ein Behelf; mit generierten
-   * Umrissen, deren Fehler unter 500 m liegt, kann er auf rund 1000 m sinken
-   * und die Warnung damit näher an der Grenze wieder freigeben.
+   * DER WERT IST ABGELEITET, NICHT GEWÄHLT: das Doppelte der
+   * Vereinfachungstoleranz der Umrisse an Landgrenzen. Er muss grösser sein
+   * als deren Fehler, sonst prüft er sich selbst; und er darf nicht viel
+   * grösser sein, sonst bleibt die Warnung weit hinter der Grenze noch aus.
+   *
+   * Warum das Doppelte und nicht das Einfache: Liegt die generierte Linie um
+   * die volle Toleranz nach Osten verschoben, dann liegt die tatsächliche
+   * Grenze 200 m westlich von ihr — ein Wechsel 200 m hinter der Linie wäre
+   * dann ein Wechsel genau AUF der Grenze. Erst 400 m stellen sicher, dass
+   * die Position auch im schlechtesten Fall der Vereinfachung im neuen Land
+   * liegt.
+   *
+   * GEMESSEN an fixtures/grenze-kehl-strasbourg.gpx (Europabrücke Kehl ->
+   * Strasbourg, 13,9 m/s, ein Fix je 14 m):
+   *
+   *   Schwellwert   Wechsel liegt hinter der Grenze
+   *      3000 m                 2988 m
+   *      2000 m                 1988 m
+   *      1000 m                  987 m
+   *       400 m                  389 m
+   *
+   * Der frühere Wert 3000 m schaltete die Zonenwarnung erst drei Kilometer
+   * hinter dem Rhein frei — mitten in Strasbourg. Er stammte aus der Zeit der
+   * handeingetragenen Linien, deren Fehler unbekannt war. Mit 400 m fällt der
+   * Wechsel auf 389 m hinter der Grenze und damit in das geforderte Fenster
+   * von 0 bis 500 m.
+   *
+   * Die Kopplung an TOLERANZ_GRENZE_M ist Absicht: Wird die Toleranz im
+   * Generator geändert, wandert dieser Schwellwert mit, und der Test in
+   * tests/gate.test.ts schlägt an, falls das Fenster dabei gerissen wird.
    */
-  MINDESTABSTAND_GRENZE_M: 3000,
+  MINDESTABSTAND_GRENZE_M: 2 * TOLERANZ_GRENZE_M,
 
   /**
    * Fixes, die ungenauer sind als das, entscheiden nicht über das Land.

@@ -19,6 +19,7 @@ import { createWatchdogState, meldeFix, starte, stoppe, type WatchdogState } fro
 import { gebeWarnung, sageAnsage } from '../audio/player';
 import { landwechselText } from '../audio/announce';
 import { aktualisiereLand, createLandZustand, leseLand, warnmodus, type LandStatus, type LandZustand } from '../core/country';
+import type { Warnmodus } from '../config';
 import type { Fix, Settings } from '../types';
 
 export const LOCATION_TASK = 'blitzerwarner-location';
@@ -38,7 +39,15 @@ type TaskLaufzeit = {
   letzterFix: Fix | null;
   /** Landerkennung mit Hysterese gegen Flackern an der Grenze. */
   landZustand: LandZustand;
-  /** Zuletzt gemeldeter Zustand, um Wechsel zu bemerken. */
+  /**
+   * Zuletzt gemeldeter Warnmodus, um Wechsel zu bemerken. null = noch kein
+   * Fix verarbeitet; daran hängt, dass der erste Fix keine Ansage auslöst.
+   */
+  letzterModus: Warnmodus | null;
+  /**
+   * Ob beim letzten Moduswechsel Punktwarnungen erlaubt waren. Nur für das
+   * Protokoll und die UI — die Entscheidung fällt `modus`, nicht dieser Wert.
+   */
   warnungWarErlaubt: boolean | null;
   /** Wurde der fehlende Zonenmodus schon ins Protokoll geschrieben? */
   zonenModusGemeldet: boolean;
@@ -62,6 +71,7 @@ const laufzeit: TaskLaufzeit = {
   settings: { ...STANDARD_SETTINGS },
   letzterFix: null,
   landZustand: createLandZustand(),
+  letzterModus: null,
   warnungWarErlaubt: null,
   zonenModusGemeldet: false,
 };
@@ -149,24 +159,37 @@ async function verarbeite(fix: Fix): Promise<void> {
     laufzeit.zonenModusGemeldet = true;
     errorLog.warn(
       'warnung',
-      `Zonenmodus für ${landStatus.land ?? 'unbekannt'} noch nicht umgesetzt — ` +
-      'es wird hier nicht gewarnt (Phase C offen)',
+      `Zonenmodus für ${landStatus.land ?? 'unbekannt'} ist im Task noch nicht ` +
+      'verdrahtet — core/zone.ts und der Replay decken ihn ab, der ' +
+      'Hintergrund-Task gibt hier aber noch keine Zonenansage aus. Es wird ' +
+      'deshalb gar nicht gewarnt; das ist die sichere Richtung.',
     );
   }
 
-  if (laufzeit.warnungWarErlaubt !== darfWarnen) {
+  /*
+   * Der Grenzübertritt wird am MODUS erkannt, nicht an einem Ja/Nein.
+   *
+   * Die frühere Fassung verglich `darfPunktWarnen`. Beim Übertritt nach
+   * Frankreich wechselt der Modus von 'aus' auf 'zone' — `darfPunktWarnen`
+   * bleibt dabei in beiden Fällen false, der Wechsel fiel also stillschweigend
+   * aus. Gemessen am Grenztrack (fixtures/grenze-kehl-strasbourg.gpx): ein
+   * Moduswechsel, null Ansagen. Der Fahrer erfuhr nicht, dass die App jetzt
+   * etwas tut.
+   */
+  if (laufzeit.letzterModus !== modus) {
     // Beim Grenzübertritt eine kurze Ansage (Spec 10.1). Beim allerersten
     // Fix wird nichts angesagt — da hat der Nutzer die App gerade gestartet
     // und braucht keine Meldung über einen Wechsel, der keiner war.
-    const erstmalig = laufzeit.warnungWarErlaubt === null;
+    const erstmalig = laufzeit.letzterModus === null;
+    laufzeit.letzterModus = modus;
     laufzeit.warnungWarErlaubt = darfWarnen;
     errorLog.info(
       'position',
       `Land ${landStatus.umriss ?? 'unbestimmt'} (${landStatus.grund}), ` +
-      `Warnung ${darfWarnen ? 'erlaubt' : 'gesperrt'}`,
+      `Warnmodus ${modus}`,
     );
     if (!erstmalig) {
-      await sageAnsage(landwechselText(darfWarnen), laufzeit.settings.lautstaerke);
+      await sageAnsage(landwechselText(modus), laufzeit.settings.lautstaerke);
     }
   }
 
@@ -255,6 +278,7 @@ export async function starteTracking(settings: Settings): Promise<boolean> {
   laufzeit.trip = createTripState();
   laufzeit.strategy = createStrategyState();
   laufzeit.landZustand = createLandZustand();
+  laufzeit.letzterModus = null;
   laufzeit.warnungWarErlaubt = null;
   laufzeit.zonenModusGemeldet = false;
 

@@ -3,7 +3,14 @@ import assert from 'node:assert/strict';
 
 import { AUDIO } from '../src/config';
 import { TOENE, alsWav, dauerMs, erzeugeSamples } from '../src/audio/tone';
-import { ansageText, landwechselText, rundeEntfernung, sprechrate, zahlAlsWort } from '../src/audio/announce';
+import {
+  ansageText,
+  enthaeltVerbotenesZonenwort,
+  landwechselText,
+  rundeEntfernung,
+  sprechrate,
+  zahlAlsWort,
+} from '../src/audio/announce';
 import type { Camera } from '../src/types';
 
 const kamera = (extra: Partial<Camera> = {}): Camera => ({
@@ -197,9 +204,33 @@ test('sprechrate: schneller nur bei hohem Tempo', () => {
   assert.equal(sprechrate(AUDIO.FAST_SPEECH_ABOVE_KMH + 10), AUDIO.FAST_SPEECH_RATE);
 });
 
-test('landwechselText', () => {
-  assert.equal(landwechselText(true), 'Blitzerwarnung aktiviert');
-  assert.equal(landwechselText(false), 'Blitzerwarnung deaktiviert');
+test('landwechselText kennt alle drei Warnmodi', () => {
+  assert.equal(landwechselText('punkt'), 'Blitzerwarnung aktiviert');
+  assert.equal(landwechselText('zone'), 'Hinweise aktiviert');
+  assert.equal(landwechselText('aus'), 'Warnung deaktiviert');
+
+  // Kein Modus fällt durch. Ein neuer Modus in config ohne Text hier wäre
+  // eine stumme Grenzfahrt.
+  for (const modus of ['punkt', 'zone', 'aus'] as const) {
+    assert.ok(landwechselText(modus).length > 5, modus);
+  }
+});
+
+test('die Ansage beim Wechsel in den Zonenmodus nennt die Gefahr nicht', () => {
+  // Der Fehler, den dieser Test verhindert: Der alte Text lautete in beiden
+  // Richtungen "Blitzerwarnung". Beim Übertritt nach Frankreich wäre damit
+  // genau das Wort gefallen, das die dortige Regelung untersagt.
+  //
+  // Auch der Ausschalttext wird geprüft: Er wird beim Verlassen Frankreichs
+  // gesprochen und damit unter Umständen noch auf französischem Gebiet.
+  for (const modus of ['zone', 'aus'] as const) {
+    const treffer = enthaeltVerbotenesZonenwort(landwechselText(modus));
+    assert.equal(treffer, null, `${modus}: verbotenes Wort "${treffer}"`);
+  }
+
+  // Gegenprobe: Der Punktmodus darf und soll es benennen — dort ist die
+  // Punktwarnung erlaubt, und ein vager Text wäre schlechter.
+  assert.notEqual(enthaeltVerbotenesZonenwort(landwechselText('punkt')), null);
 });
 
 test('der Zonenton unterscheidet sich hörbar vom Blitzerton', () => {

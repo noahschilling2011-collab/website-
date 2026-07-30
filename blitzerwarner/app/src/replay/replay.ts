@@ -19,7 +19,14 @@ import { dirname, join, basename, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { parseGpx, toFixes } from './gpx';
-import { cellKey } from '../core/geo';
+import { cellKey, haversine } from '../core/geo';
+import { aktualisiereLand, createLandZustand, erkenneUmriss, warnmodus } from '../core/country';
+import { LAENDER_GATE, type LandCode, type Warnmodus } from '../config';
+
+/** Kennt die Gate-Tabelle diesen Umrisscode? */
+function istGateLand(code: string): code is LandCode {
+  return Object.prototype.hasOwnProperty.call(LAENDER_GATE.LAENDER, code);
+}
 import { createZonenZustand, pruefeZonen, type Zone as ZoneFixture } from '../core/zone';
 import { createTripState, evaluate, warnDistance } from '../core/warn';
 import type { Camera, Evaluation, Fix, Settings, SkipReason } from '../types';
@@ -40,6 +47,24 @@ export type ReplayErwartung = {
    * beiden richtig.
    */
   zonen?: ZoneFixture[];
+  /**
+   * Erwarteter Verlauf des Warnmodus — für Tracks, die einen Grenzübertritt
+   * prüfen (B.4).
+   *
+   * Ohne dieses Feld liefe ein Grenztrack durch die Punktlogik, fände dort
+   * null Kameras und würde als "0 Warnungen, erwartet 0, OK" gemeldet. Das
+   * ist ein grünes Ergebnis für eine Prüfung, die nicht stattgefunden hat —
+   * die schlimmste Sorte Testergebnis.
+   */
+  landwechsel?: {
+    /** Erwartete Moduswechsel in der Reihenfolge des Tracks. */
+    modi: Warnmodus[];
+    /**
+     * Höchstabstand des Wechsels hinter der Datengrenze, in Metern. Der
+     * Wechsel DAVOR ist immer ein Fehler und wird ohne Angabe geprüft.
+     */
+    maxHinterGrenzeM: number;
+  };
   /** Wie viele Warnungen der Track auslösen MUSS. */
   erwarteteWarnungen: number;
   /** Optional: Einstellungen, falls abweichend. */
@@ -100,6 +125,51 @@ export function replayZonen(
     }
   }
   return { ansagen, ersterEintrittIndex };
+}
+
+/**
+ * Einen Grenztrack abspielen und die Moduswechsel messen.
+ *
+ * Gemessen wird gegen die DATENGRENZE — den Punkt, an dem die Umrisse das
+ * Land wechseln. Die tatsächliche Grenze liegt davon höchstens den
+ * Vereinfachungsfehler der Umrisse entfernt (TOLERANZ_GRENZE_M); genau
+ * deshalb ist der Schwellwert der Hysterese das Doppelte davon.
+ */
+export function replayLand(fixes: Fix[]): {
+  wechsel: { index: number; von: Warnmodus; nach: Warnmodus; hinterGrenzeM: number | null }[];
+  gruende: Record<string, number>;
+} {
+  const zustand = createLandZustand();
+  const gruende: Record<string, number> = {};
+
+  // Wo wechseln die Daten das Land? Kann mehrfach vorkommen; für jeden
+  // Moduswechsel zählt der letzte Datenwechsel davor.
+  const datenwechsel: number[] = [];
+  for (let i = 1; i < fixes.length; i++) {
+    const a = erkenneUmriss(fixes[i - 1]!.lat, fixes[i - 1]!.lon);
+    const b = erkenneUmriss(fixes[i]!.lat, fixes[i]!.lon);
+    if (a !== b) datenwechsel.push(i);
+  }
+
+  const wechsel: ReturnType<typeof replayLand>['wechsel'] = [];
+  let modus = warnmodus(null);
+
+  for (let i = 0; i < fixes.length; i++) {
+    const status = aktualisiereLand(zustand, fixes[i]!);
+    gruende[status.grund] = (gruende[status.grund] ?? 0) + 1;
+    const jetzt = warnmodus(status.land);
+    if (jetzt === modus) continue;
+
+    const letzter = [...datenwechsel].reverse().find((d) => d <= i) ?? null;
+    const hinterGrenzeM =
+      letzter === null
+        ? null
+        : haversine(fixes[i]!.lat, fixes[i]!.lon, fixes[letzter]!.lat, fixes[letzter]!.lon);
+    wechsel.push({ index: i, von: modus, nach: jetzt, hinterGrenzeM });
+    modus = jetzt;
+  }
+
+  return { wechsel, gruende };
 }
 
 /** Einen Track abspielen. */
@@ -247,6 +317,59 @@ if (istHauptmodul()) {
         if (zErg.ersterEintrittIndex !== null) {
           console.log(`  Eintritt bei Punkt ${zErg.ersterEintrittIndex}`);
         }
+        if (!ok) alleOk = false;
+        continue;
+      }
+
+      // Grenztracks gehen durch die Landeslogik. Sonst meldet die CLI ein
+      // grünes Ergebnis für eine Prüfung, die nicht gelaufen ist.
+      if (erwartung.landwechsel) {
+        const { modi, maxHinterGrenzeM } = erwartung.landwechsel;
+        const lErg = replayLand(fixes);
+        console.log('─'.repeat(70));
+        console.log(`${name} — ${erwartung.beschreibung}`);
+        console.log(`  Punkte:            ${fixes.length}`);
+        console.log(`  Modus:             Landeserkennung (Grenzübertritt)`);
+
+        // Das Land am ersten Fix. Nur damit lässt sich ein Wechsel ohne
+        // vorangehenden Datenwechsel als richtig oder falsch einordnen.
+        const startUmriss = erkenneUmriss(fixes[0]!.lat, fixes[0]!.lon);
+        const startLand = startUmriss !== null && istGateLand(startUmriss) ? startUmriss : null;
+
+        const gemessen = lErg.wechsel.map((w) => w.nach);
+        let ok = gemessen.length === modi.length && gemessen.every((m, i) => m === modi[i]);
+        console.log(
+          `  Moduswechsel:      ${gemessen.join(' -> ') || '(keine)'}  ` +
+          `(erwartet ${modi.join(' -> ')})  ${ok ? 'OK' : 'ABWEICHUNG'}`,
+        );
+        for (const w of lErg.wechsel) {
+          const abstand = w.hinterGrenzeM;
+          const zuWeit = abstand !== null && abstand > maxHinterGrenzeM;
+          // 0 m heisst: auf demselben Fix wie der Datenwechsel. Das ist beim
+          // Abschalten richtig und beim Einschalten zu früh.
+          // 'null' heisst: vor diesem Wechsel lag kein Datenwechsel. Das ist
+          // nur dann in Ordnung, wenn der Track von Anfang an in diesem Land
+          // lief — sonst hat die App eingeschaltet, ohne je eine Grenze
+          // überfahren zu haben.
+          const ohneGrenze =
+            abstand === null && w.nach !== 'aus' && warnmodus(startLand) !== w.nach;
+          const zuFrueh =
+            (abstand !== null && w.nach !== 'aus' && abstand === 0) || ohneGrenze;
+          if (zuWeit || zuFrueh) ok = false;
+          console.log(
+            `    Fix ${String(w.index).padStart(3)}: ${w.von} -> ${w.nach}` +
+            (abstand === null ? '' : `, ${abstand.toFixed(0)} m hinter der Datengrenze`) +
+            (zuWeit ? `  ZU WEIT (max ${maxHinterGrenzeM} m)` : '') +
+            (zuFrueh
+              ? abstand === null
+                ? '  ZU FRÜH (eingeschaltet ohne Grenzübertritt)'
+                : '  ZU FRÜH (noch im alten Land)'
+              : ''),
+          );
+        }
+        const g = Object.entries(lErg.gruende).sort((a, b) => b[1] - a[1]);
+        console.log('  Gründe:');
+        for (const [grund, n] of g) console.log(`    ${grund.padEnd(20)} ${n}x`);
         if (!ok) alleOk = false;
         continue;
       }
