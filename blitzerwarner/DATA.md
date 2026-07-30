@@ -293,6 +293,67 @@ Recht eine gemessene Zahl verlangt:
 Punkt 2 ist der, der den Überschlag am ehesten sprengt. Gemessen wird beim
 Build.
 
+## Frankreich und der Zonenmodus (Phase C)
+
+**4012 Anlagen**, aus 11708 OSM-Rohtreffern, OSM-Stand 30.07.2026, 298 KB.
+Mit Fahrtrichtung 39,6 %, mit Tempolimit 83,9 %, Rotlicht oder kombiniert 693.
+
+In Frankreich darf die App nicht punktgenau warnen. Seit dem 03.01.2012 ist
+der deutliche und unmittelbare Hinweis auf eine Messstelle verboten; erlaubt
+ist nur der allgemeine Hinweis auf einen Gefahrenbereich mit Mindestlänge —
+300 m innerorts, 2000 m auf Land- und Nebenstrassen, 4000 m auf Autobahnen.
+Verstoss: bis 1500 Euro, Einziehung des Geräts.
+
+`scripts/build-zones.ts` erzeugt daraus `cameras.FR.zones.json`:
+
+| | |
+|---|---|
+| Anlagen | 4012 |
+| Zonen | **2579** (1433 zusammengefasst) |
+| kleinster Radius | 150 m |
+| grösster Radius | 5998 m |
+| Dateigrösse | 101 KB |
+
+Die Zonendatei enthält **ausschliesslich Mittelpunkt und Radius**. Nicht die
+Zahl der enthaltenen Anlagen, nicht ihre Koordinaten, nicht ihren Typ, nicht
+ihr Tempolimit. Aus einer Zone mit einer einzigen Anlage liesse sich sonst
+deren Position zurückrechnen, und der Radius wäre Dekoration. Ein Test
+durchsucht den Rohtext der Datei nach solchen Feldern.
+
+### Die Annahme: Strassentyp aus maxspeed
+
+Der Zonenradius hängt am Strassentyp, und den kennt der Datensatz nicht. Er
+trägt nur `maxspeed`. Abgeleitet wird:
+
+| maxspeed | angenommener Typ | Radius |
+|---|---|---:|
+| ≤ 50 | innerorts | 150 m |
+| 60–90 | Landstrasse | 1000 m |
+| ≥ 100 | Autobahn | 2000 m |
+| unbekannt | Autobahn | 2000 m |
+
+**Das ist eine Annahme, keine Messung.** Sie irrt sich bei einer innerorts
+gelegenen Schnellstrasse mit Tempo 70 und bei einer Landstrasse mit Tempo 50.
+Bei unbekanntem Tempolimit gilt bewusst die längste Zone — in Frankreich
+betrifft das 644 der 4012 Anlagen. Im Zweifel die unschärfere Zone, weil eine
+zu kurze Zone der rechtlich problematische Fall ist und eine zu lange nur der
+unpräzise.
+
+**Der saubere Weg** wäre der `highway`-Tag der zugehörigen Strasse. Der steht
+heute nicht im Datensatz, weil die Pipeline nur die Kamera-Objekte holt und
+nicht die Strassen, auf denen sie stehen. Das nachzuziehen hiesse, für jede
+Anlage die nächstgelegene Strasse zu bestimmen — machbar zur Build-Zeit, aber
+eine eigene Aufgabe. Offener Punkt.
+
+### Was beim Bauen aufgefallen ist
+
+Das Zusammenfassen überlappender Zonen kaskadierte: Werden A und B zu einer
+grösseren Zone, überlappt die anschliessend C, wird grösser, überlappt D. An
+Deutschland gemessen entstand so eine Zone mit **85 km Radius**. Die Regelung
+erlaubt das Zusammenfassen zwei dicht aufeinanderfolgender Zonen, nicht eine
+Kette durch halb Europa — und als Hinweis wäre eine 85-km-Zone wertlos.
+Obergrenze jetzt 6000 m, das Anderthalbfache der längsten Mindestlänge.
+
 ## Offene Rechtsfragen
 
 Diese Liste ist Teil des Datenstands, nicht Beiwerk: Über das Länder-Gate
