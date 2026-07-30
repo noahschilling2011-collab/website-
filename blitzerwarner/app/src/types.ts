@@ -79,7 +79,16 @@ export type Settings = {
   rotlichtblitzer: boolean;
   motorradModus: boolean;
   haptik: boolean;
-  tempolimitWarnung: boolean;
+  /*
+   * Hier stand `tempolimitWarnung`. Entfernt, weil der Schalter nichts tat:
+   * SPEED_LIMIT_ALERT in config.ts wurde von keinem Modul gelesen, und der
+   * Tempolimit-Datensatz aus Phase 6 existiert nicht. Ein Schalter, der
+   * nichts tut, ist schlimmer als eine fehlende Funktion — er behauptet
+   * gegenueber dem Fahrer, die App ueberwache sein Tempolimit.
+   *
+   * Kommt die Funktion, kommt das Feld zurueck. leseSettings() in
+   * state/store.ts verwirft den gespeicherten Wert, ohne zu werfen.
+   */
   /** Faktor aus der Tacho-Kalibrierung, 1.0 = nicht kalibriert. */
   tachoFaktor: number;
 };

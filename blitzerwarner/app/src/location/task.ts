@@ -23,6 +23,7 @@ import { gebeWarnung, gebeZonenhinweis, sageAnsage } from '../audio/player';
 import { landwechselText } from '../audio/announce';
 import { aktualisiereLand, createLandZustand, leseLand, warnmodus, type LandStatus, type LandZustand } from '../core/country';
 import type { Warnmodus } from '../config';
+import { STANDARD_SETTINGS } from '../core/settings';
 import type { Fix, Settings } from '../types';
 
 export const LOCATION_TASK = 'blitzerwarner-location';
@@ -67,17 +68,6 @@ type TaskLaufzeit = {
    * 200 Einträge und wäre in einer Minute voll.
    */
   zonenAusfallGemeldet: Set<string>;
-};
-
-const STANDARD_SETTINGS: Settings = {
-  warnDistanceFactor: 1,
-  sprachansage: true,
-  lautstaerke: 1,
-  rotlichtblitzer: true,
-  motorradModus: false,
-  haptik: false,
-  tempolimitWarnung: false,
-  tachoFaktor: 1,
 };
 
 const laufzeit: TaskLaufzeit = {

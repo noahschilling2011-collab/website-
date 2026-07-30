@@ -107,40 +107,6 @@ export const SPEEDO_TOLERANCE = {
   GEPRUEFT_AM: null as string | null,
 } as const;
 
-/** Über-Limit-Warnung, Spec Abschnitt 8b. */
-export const SPEED_LIMIT_ALERT = {
-  /** Standardmässig aus. Wer sie will, schaltet sie ein. */
-  DEFAULT_ENABLED: false,
-
-  /** Erst ab Limit + dieser Toleranz. */
-  THRESHOLD_KMH: 5,
-
-  /** Und erst nach so langer ununterbrochener Überschreitung. */
-  SUSTAINED_MS: 5000,
-} as const;
-
-/** Map-Matching, Spec Abschnitt 8b. */
-export const MAP_MATCHING = {
-  /** Suchradius um die Position. */
-  SEARCH_RADIUS_M: 25,
-
-  /**
-   * Gewicht der Winkelabweichung im Score, in Metern pro Grad.
-   * Der Score addiert Meter und Grad, deshalb braucht der Winkelanteil
-   * eine Einheit — sonst vergleicht man Äpfel mit Birnen.
-   */
-  ANGLE_WEIGHT_M_PER_DEG: 2.0,
-
-  /** Oberhalb dieses Scores gilt kein Kandidat als brauchbar. */
-  MAX_SCORE: 120,
-
-  /** Ein anderer Kandidat muss so viel besser sein, um zu gewinnen. */
-  HYSTERESIS_RATIO: 0.8,
-
-  /** Und das über so viele Updates in Folge. */
-  HYSTERESIS_UPDATES: 2,
-} as const;
-
 /** Watchdog, Qualitätsvorgabe Abschnitt 1b. */
 export const WATCHDOG = {
   /** Wie oft der Vordergrund prüft, ob der Hintergrund-Task noch lebt. */
@@ -169,7 +135,77 @@ export const AUDIO = {
   FAST_SPEECH_RATE: 1.15,
 } as const;
 
-/** Meldefunktion, Spec Abschnitt 9. */
+// --- Noch nicht gebaut ----------------------------------------------------
+//
+// Die Zahlen unter dieser Überschrift steuern NICHTS. Sie gehören zu
+// Funktionen, die geplant, aber nicht gebaut sind — kein Modul importiert
+// sie. Sie stehen hier und nicht in einer Notiz, weil die Begründungen
+// erarbeitet sind und beim Bauen gebraucht werden.
+//
+// Der Grund für die Überschrift: Ein Konfigblock sieht aus wie ein
+// Stellparameter. Wer SPEED_LIMIT_ALERT.THRESHOLD_KMH von 5 auf 10 setzt und
+// nichts merkt, sucht den Fehler bei sich. Die Trennung sagt vorher, dass es
+// nichts zu merken gibt.
+//
+// tests/config.test.ts hält das durch: Jeder exportierte Block über dieser
+// Linie muss von mindestens einem Modul gelesen werden.
+//
+// Was noch fehlt, steht jeweils im Block. Der Schalter für die
+// Tempolimit-Warnung ist aus der UI entfernt worden — ein Schalter, der
+// nichts tut, behauptet gegenüber dem Fahrer eine Überwachung, die es nicht
+// gibt.
+
+/**
+ * Über-Limit-Warnung, Spec Abschnitt 8b. NICHT GEBAUT.
+ *
+ * Setzt den Tempolimit-Datensatz aus Phase 6 voraus, den es nicht gibt:
+ * scripts/count-speedlimits.ts hat nur das Mengengerüst gemessen. Ohne
+ * flächendeckende Limits an den Strassen — nicht nur an den Kameras — meldete
+ * sich die Warnung an zufälligen Stellen und schwiege an den übrigen.
+ */
+export const SPEED_LIMIT_ALERT = {
+  /** Standardmässig aus. Wer sie will, schaltet sie ein. */
+  DEFAULT_ENABLED: false,
+
+  /** Erst ab Limit + dieser Toleranz. */
+  THRESHOLD_KMH: 5,
+
+  /** Und erst nach so langer ununterbrochener Überschreitung. */
+  SUSTAINED_MS: 5000,
+} as const;
+/**
+ * Map-Matching, Spec Abschnitt 8b (Phase 7). NICHT GEBAUT.
+ *
+ * Braucht ein Strassennetz im App-Paket. Der Datensatz enthält heute nur
+ * Punkte, keine Wege.
+ */
+export const MAP_MATCHING = {
+  /** Suchradius um die Position. */
+  SEARCH_RADIUS_M: 25,
+
+  /**
+   * Gewicht der Winkelabweichung im Score, in Metern pro Grad.
+   * Der Score addiert Meter und Grad, deshalb braucht der Winkelanteil
+   * eine Einheit — sonst vergleicht man Äpfel mit Birnen.
+   */
+  ANGLE_WEIGHT_M_PER_DEG: 2.0,
+
+  /** Oberhalb dieses Scores gilt kein Kandidat als brauchbar. */
+  MAX_SCORE: 120,
+
+  /** Ein anderer Kandidat muss so viel besser sein, um zu gewinnen. */
+  HYSTERESIS_RATIO: 0.8,
+
+  /** Und das über so viele Updates in Folge. */
+  HYSTERESIS_UPDATES: 2,
+} as const;
+/**
+ * Meldefunktion, Spec Abschnitt 9 (Phase 8). NICHT GEBAUT.
+ *
+ * Die Zahlen beschreiben, wie eine Meldung ENTSTEHEN dürfte. Wohin sie ginge,
+ * ist offen — die App macht zur Laufzeit keine Netzwerk-Requests, und das ist
+ * das Produktversprechen und nicht eine offene Aufgabe.
+ */
 export const REPORTING = {
   MAX_PER_DAY: 20,
   /** Ungenauere Positionen werden gar nicht erst zum Melden angeboten. */
@@ -177,6 +213,7 @@ export const REPORTING = {
   /** Absenden nur im Stand. */
   MAX_SEND_SPEED_MS: 0.5,
 } as const;
+// --- Ende "noch nicht gebaut" ---------------------------------------------
 
 /** Fehlerprotokoll, Qualitätsvorgabe Abschnitt 1d. */
 export const ERROR_LOG = {

@@ -54,6 +54,20 @@ export const TOENE: Record<TonArt, TonDefinition> = {
     ],
     zweck: 'Blitzerwarnung. Weckt zusätzlich die Bluetooth-Verbindung vor der Ansage.',
   },
+  /*
+   * NOCH NICHT GEBAUT — dieser Ton hat derzeit keinen Auslöser.
+   *
+   * Er gehört zur Über-Limit-Warnung, die den Tempolimit-Datensatz aus
+   * Phase 6 voraussetzt (siehe config.ts, Abschnitt "Noch nicht gebaut").
+   * Der zugehörige Schalter ist aus den Einstellungen entfernt worden, weil
+   * er nichts tat.
+   *
+   * Der Ton bleibt stehen, weil die Gestaltung erarbeitet und in audio.test.ts
+   * gegen die anderen drei abgesichert ist — ein Ton, der sich vom Blitzerton
+   * nicht unterscheidet, wäre beim Bauen der eigentliche Fehler. Er kostet
+   * nichts, solange ihn niemand abspielt: Erzeugt werden die Samples erst
+   * beim ersten Abspielen (tonCache in player.ts).
+   */
   tempolimit: {
     art: 'tempolimit',
     // Ein einzelner, kürzerer Impuls. Bewusst unauffälliger als die

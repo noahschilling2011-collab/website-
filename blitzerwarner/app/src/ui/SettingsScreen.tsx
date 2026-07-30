@@ -26,7 +26,7 @@ export default function SettingsScreen({ mode, onZurueck }: Props) {
   const dataset = datasetOrNull();
 
   const schalter = (
-    key: keyof Pick<Settings, 'sprachansage' | 'rotlichtblitzer' | 'motorradModus' | 'haptik' | 'tempolimitWarnung'>,
+    key: keyof Pick<Settings, 'sprachansage' | 'rotlichtblitzer' | 'motorradModus' | 'haptik'>,
     text: { titel: string; hilfe?: string },
   ) => (
     <View style={[stil.zeile, { borderColor: farben.linie }]}>
@@ -96,7 +96,6 @@ export default function SettingsScreen({ mode, onZurueck }: Props) {
       </View>
 
       {schalter('rotlichtblitzer', STRINGS.einstellungen.feld.rotlichtblitzer)}
-      {schalter('tempolimitWarnung', STRINGS.einstellungen.feld.tempolimitWarnung)}
 
       {/* Ausgabe */}
       <Text style={[stil.abschnitt, { color: farben.textLeise }]}>

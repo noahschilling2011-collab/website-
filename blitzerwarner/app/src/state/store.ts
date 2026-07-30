@@ -13,24 +13,19 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { errorLog } from '../core/log';
+import { STANDARD_SETTINGS, mischeSettings } from '../core/settings';
 import { setzeSettings } from '../location/task';
 import type { Settings } from '../types';
 
+/*
+ * Weitergereicht, damit die UI weiter `from '../state/store'` importiert und
+ * nicht jeder Screen den Pfad nach core/ kennen muss. Die Werte selbst stehen
+ * dort — einmal, statt wie vorher doppelt in Store und Task.
+ */
+export { STANDARD_SETTINGS };
+
 const SETTINGS_KEY = 'blitzerwarner.einstellungen.v1';
 const ONBOARDING_KEY = 'blitzerwarner.rechtshinweis-bestaetigt.v1';
-
-export const STANDARD_SETTINGS: Settings = {
-  warnDistanceFactor: 1,
-  sprachansage: true,
-  lautstaerke: 1,
-  rotlichtblitzer: true,
-  motorradModus: false,
-  haptik: false,
-  // Standardmässig aus (Spec 8b): Wer sie will, schaltet sie ein. Sonst
-  // piept es beim ersten Überholvorgang und der Nutzer schaltet alles ab.
-  tempolimitWarnung: false,
-  tachoFaktor: 1,
-};
 
 export type AppState = {
   settings: Settings;
@@ -44,20 +39,11 @@ export type AppState = {
   bestaetigeRechtshinweis: () => Promise<void>;
 };
 
-/**
- * Einstellungen aus dem Speicher lesen und mit den Standardwerten mischen.
- *
- * Das Mischen ist wichtig: Kommt in einer späteren Version eine Einstellung
- * dazu, fehlt sie in den gespeicherten Daten. Ohne die Standardwerte wäre sie
- * dann `undefined` und würde als "aus" gelesen — auch dort, wo "ein" der
- * richtige Standard ist.
- */
 async function leseSettings(): Promise<Settings> {
   try {
     const rohtext = await AsyncStorage.getItem(SETTINGS_KEY);
     if (!rohtext) return { ...STANDARD_SETTINGS };
-    const gelesen = JSON.parse(rohtext) as Partial<Settings>;
-    return { ...STANDARD_SETTINGS, ...gelesen };
+    return mischeSettings(JSON.parse(rohtext));
   } catch (err) {
     errorLog.error('einstellungen', 'Einstellungen konnten nicht gelesen werden', err);
     return { ...STANDARD_SETTINGS };

@@ -26,7 +26,6 @@ const SETTINGS: Settings = {
   rotlichtblitzer: true,
   motorradModus: false,
   haptik: false,
-  tempolimitWarnung: false,
   tachoFaktor: 1,
 };
 

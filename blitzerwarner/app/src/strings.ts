@@ -261,13 +261,6 @@ const EINSTELLUNG_FELD: Record<keyof Settings, Feldtext> = {
     titel: 'Vibration',
     hilfe: 'Kurzes Signal zusätzlich zur Ansage.',
   },
-  tempolimitWarnung: {
-    titel: 'Bei Tempoüberschreitung warnen',
-    hilfe:
-      'Meldet sich, wenn das bekannte Limit über längere Zeit deutlich ' +
-      'überschritten wird. Das Limit stammt aus OpenStreetMap und kann veraltet ' +
-      'oder falsch sein.',
-  },
   tachoFaktor: {
     titel: 'Tacho-Kalibrierung',
     hilfe:
