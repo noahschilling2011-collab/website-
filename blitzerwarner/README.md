@@ -50,6 +50,51 @@ getestet, aber drei Dinge lassen sich nur im Auto messen — 20 Minuten
 lückenloses Tracking bei ausgeschaltetem Display, der Akkuverbrauch, und der
 Vergleich gegen den Fahrzeugtacho. Dafür gibt es jetzt eine Instrumentierung.
 
+### Die App aufs Telefon bringen
+
+**Expo Go funktioniert nicht.** Die App braucht `expo-task-manager` und
+Hintergrund-Standort; beides kann Expo Go nicht. Es muss ein eigener Build
+sein — ein Development Build oder ein Preview-Build über EAS.
+
+```bash
+cd app
+npm install
+npx eas-cli@latest login          # kostenloses Expo-Konto
+npx eas-cli@latest init           # schreibt extra.eas.projectId in app.json
+```
+
+**Android** — kostenlos, kein Android Studio nötig:
+
+```bash
+npx eas-cli@latest build --profile preview --platform android
+```
+
+Das `preview`-Profil ist in `eas.json` auf `"buildType": "apk"` gesetzt.
+Ohne das käme ein `.aab` heraus, das sich auf dem Telefon nicht antippen
+lässt. Der fertige Build wird als Link und QR-Code angeboten.
+
+**iPhone** — hier steht eine Hürde, die nicht am Projekt liegt:
+
+Ein iOS-Build, der auf einem physischen Gerät läuft, verlangt eine
+**bezahlte Apple-Developer-Mitgliedschaft (99 USD pro Mitgliedsjahr,
+developer.apple.com/support/compare-memberships)**. Das gilt für EAS-Builds
+und für TestFlight gleichermaßen.
+
+```bash
+npx eas-cli@latest device:create   # iPhone registrieren (UDID per QR)
+npx eas-cli@latest build --profile development --platform ios
+```
+
+Ohne bezahlte Mitgliedschaft bleibt nur der Weg über **Xcode auf einem Mac**
+mit einem kostenlosen Apple Account („Personal Team"). Apple erlaubt das
+ausdrücklich — „test your apps on devices" —, begrenzt es aber:
+Provisioning-Profile laufen **7 Tage nach Ausstellung** ab, danach muss die
+App neu gebaut und neu installiert werden; höchstens 3 Testgeräte und 10 App
+IDs, jeweils ebenfalls 7 Tage gültig.
+
+Praktisch heißt das: Android zum Ausprobieren, iPhone erst wenn die App
+dauerhaft laufen soll.
+
 ### Eine Testfahrt, alle drei Messwerte
 
 1. In der App: **Einstellungen → Diagnose → Fahrt aufzeichnen** einschalten.
