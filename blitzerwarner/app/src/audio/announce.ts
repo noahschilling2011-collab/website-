@@ -100,3 +100,72 @@ export function sprechrate(speedKmh: number | null): number {
 export function landwechselText(warnungAktiv: boolean): string {
   return warnungAktiv ? 'Blitzerwarnung aktiviert' : 'Blitzerwarnung deaktiviert';
 }
+
+// --- Zonenmodus (Frankreich, Spec Phase C) --------------------------------
+
+/**
+ * Wörter, die im Zonenmodus in KEINER Ansage vorkommen dürfen.
+ *
+ * Das ist die Kernauflage, nicht eine Stilfrage. Frankreich erlaubt seit dem
+ * 03.01.2012 nur den Hinweis auf einen Gefahrenbereich; die Zone darf die Art
+ * der Gefahr nicht benennen. Wer "Blitzer" sagt, benennt sie.
+ *
+ * Die Liste enthält absichtlich mehrere Sprachen: Der Ansagetext folgt der
+ * Systemsprache, und ein französischer oder englischer Katalog käme sonst
+ * ungeprüft durch. Sie ist bewusst breiter als nötig — ein zu strenger Test
+ * kostet eine Formulierung, ein zu lascher ein Bussgeld.
+ */
+export const VERBOTENE_ZONENWOERTER = [
+  // deutsch
+  'blitzer', 'radar', 'kamera', 'kontrolle', 'messstelle', 'messung',
+  'geschwindigkeitsmessung', 'überwachung', 'polizei', 'tempolimit',
+  // französisch
+  'radar', 'contrôle', 'controle', 'caméra', 'camera', 'police',
+  'vitesse', 'cinémomètre', 'cinemometre',
+  // englisch
+  'speed camera', 'speed trap', 'enforcement', 'surveillance', 'police',
+] as const;
+
+/**
+ * Ansagetexte für den Zonenmodus.
+ *
+ * Bewusst ein GETRENNTER Katalog und nicht der normale mit anderer
+ * Formulierung: Wer später einen Punkt-Ansagetext ergänzt, soll ihn nicht
+ * versehentlich in einer Zone verwenden können. Die Trennung ist die
+ * Sicherung, der Test dahinter die Kontrolle.
+ *
+ * Genannt wird ein Aufmerksamkeitshinweis auf einen Streckenabschnitt —
+ * keine Entfernung, keine Richtung, keine Art der Gefahr.
+ */
+export const ZONEN_ANSAGE = {
+  de: 'Achtungsbereich',
+  fr: 'Zone de vigilance',
+  en: 'Caution zone',
+} as const;
+
+export type ZonenSprache = keyof typeof ZONEN_ANSAGE;
+
+/**
+ * Der Ansagetext beim Eintritt in eine Zone.
+ *
+ * Genau EINE Ansage pro Zone, ohne Entfernung, ohne Countdown. Die Funktion
+ * nimmt deshalb auch keine Distanz an — was sie nicht kennt, kann sie nicht
+ * versehentlich aussprechen.
+ */
+export function zonenAnsageText(sprache: ZonenSprache = 'fr'): string {
+  return ZONEN_ANSAGE[sprache];
+}
+
+/**
+ * Prüft einen Text gegen die Verbotswortliste.
+ *
+ * Läuft nicht nur im Test, sondern auch zur Laufzeit vor der Ausgabe: Der
+ * Katalog kann sich ändern, die Auflage nicht.
+ */
+export function enthaeltVerbotenesZonenwort(text: string): string | null {
+  const klein = text.toLowerCase();
+  for (const wort of VERBOTENE_ZONENWOERTER) {
+    if (klein.includes(wort)) return wort;
+  }
+  return null;
+}
