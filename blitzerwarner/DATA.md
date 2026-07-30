@@ -293,6 +293,80 @@ Recht eine gemessene Zahl verlangt:
 Punkt 2 ist der, der den Überschlag am ehesten sprengt. Gemessen wird beim
 Build.
 
+## Offene Rechtsfragen
+
+Diese Liste ist Teil des Datenstands, nicht Beiwerk: Über das Länder-Gate
+entscheidet sich, ob die App in einem Land scharf ist. Ein Eintrag hier
+bedeutet, dass die Warnung dort abgeschaltet bleibt, bis jemand mit
+einschlägiger Qualifikation die Frage klärt.
+
+Grundlage der Tabelle in `app/src/config.ts`: ADAC, Juristische Zentrale,
+Übersicht Radarwarner und Blitzer-Apps im Ausland, Stand 5/2025, ausdrücklich
+ohne Gewähr.
+
+### 1. Österreich — POI-Warner oder Radardetektor?
+
+**Status im Gate: `strittig`, Warnung aus.**
+
+Der bisherige Eintrag im Projekt lautete `§ 98a KFG`, Warnung verboten.
+
+Die Quelle beschreibt Österreich anders: Verboten seien Radarwarngeräte, mit
+denen Verkehrsüberwachungseinrichtungen **beeinflusst oder gestört** werden
+können. GPS-Geräte mit POI-Warner als Ankündigungsfunktion seien dagegen
+erlaubt. Strafrahmen bis 10.000 Euro, Einziehung des Geräts.
+
+Das ist genau die Unterscheidung, die dem Gate bis jetzt fehlte: **aktiver
+Radardetektor** gegen **Datenbank-Warner**. Static ist Letzteres — er misst
+nichts, stört nichts, sondern vergleicht eine GPS-Position mit einer Liste.
+
+Eine der beiden Aussagen ist falsch. Das aufzulösen braucht den Gesetzestext
+des KFG in geltender Fassung und jemand, der ihn lesen kann. Bis dahin bleibt
+Österreich auf `aus` — nicht weil das die richtige Antwort wäre, sondern weil
+es die sichere ist.
+
+### 2. Kroatien, Rumänien, Ungarn — widersprüchliche Quelle
+
+**Status im Gate: `unklar`, Warnung aus.**
+
+Die Quelle nennt für diese drei Länder weder ein Mitführ- noch ein
+Benutzungsverbot, die Anmerkung nennt aber Radarwarner beziehungsweise
+Störsender als verboten. Das ist zu widersprüchlich, um als belegt zu gelten.
+Der Widerspruch steht am Eintrag und wird dort ausdrücklich **nicht**
+aufgelöst.
+
+### 3. Fünfzehn Länder ohne Aussage zur POI-Funktion
+
+**Status im Gate: `unklar`, Warnung aus.**
+
+Bulgarien, Dänemark, Griechenland, Italien, Kroatien, Lettland, Litauen,
+Norwegen, Polen, Rumänien, Schweden, Slowakei, Slowenien, Türkei, Ungarn.
+
+Die Quelle nennt jeweils ein Benutzungsverbot, sagt aber nichts dazu, ob es
+den Datenbank-Warner einschliesst. Solange das offen ist, warnt die App dort
+nicht.
+
+Der Hinweistext in der App sagt in diesen Fällen ausdrücklich, dass die
+Rechtslage **nicht belegt** ist — nicht, dass sie verboten sei. Das ist ein
+Unterschied, und die App soll nicht behaupten, was sie nicht weiss. Ein Test
+prüft das.
+
+### 4. Länder ganz ohne Eintrag
+
+Irland, Grossbritannien, Estland, Island, Malta, Zypern, Albanien, Bosnien,
+Nordmazedonien, Montenegro, Kosovo, Moldau, Ukraine, Liechtenstein, Andorra,
+Monaco, San Marino kommen in der Quelle nicht vor und haben deshalb
+absichtlich keinen Eintrag. Damit greift der Standard: keine Warnung. Ein
+fehlender Eintrag ist eine Aussage — wir wissen es nicht.
+
+### Wo punktgenau gewarnt wird
+
+Nur dort, wo die Quelle die POI-Funktion ausdrücklich erlaubt: Belgien,
+Finnland, Luxemburg, Niederlande, Portugal, Serbien, Spanien, Tschechien.
+Frankreich warnt im Zonenmodus. Alle anderen Länder warnen nicht.
+
+Ein Test hält diese Liste fest. Wächst sie, muss jemand die Quelle
+nachgelesen haben.
+
 ## Trefferquote gegen bekannte Standorte
 
 **Noch nicht gemessen.**

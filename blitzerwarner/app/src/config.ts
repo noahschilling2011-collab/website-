@@ -184,27 +184,256 @@ export const ERROR_LOG = {
 } as const;
 
 /**
+ * Wie darf in einem Land gewarnt werden?
+ *
+ * 'punkt' — Warnung an der Position der Anlage, mit Entfernungsansage.
+ * 'zone'  — nur Hinweis auf einen Gefahrenbereich, ohne Position, ohne
+ *           Entfernung, ohne Benennung der Gefahr. Frankreich verlangt das.
+ * 'aus'   — keine Warnung.
+ */
+export type Warnmodus = 'punkt' | 'zone' | 'aus';
+
+/**
+ * Wie belastbar ist der Eintrag?
+ *
+ * 'belegt'   — die Quelle sagt es ausdrücklich.
+ * 'strittig' — Quellen widersprechen sich.
+ * 'unklar'   — die Quelle nennt ein Verbot, sagt aber nichts zur
+ *              POI-Funktion, oder sie ist in sich widersprüchlich.
+ *
+ * Nur 'belegt' erlaubt einen Modus ausser 'aus'. Ein Test hält das fest.
+ */
+export type Belastbarkeit = 'belegt' | 'strittig' | 'unklar';
+
+export type Landeseintrag = {
+  readonly modus: Warnmodus;
+  readonly hinweisBanner: boolean;
+  readonly status: Belastbarkeit;
+  /** Norm oder Quelle, aus der der Eintrag stammt. Pflichtfeld. */
+  readonly grund: string;
+  /** Was in der App steht, wenn der Nutzer nachfragt. */
+  readonly hinweis: string;
+};
+
+/**
  * Länder-Gate, Spec Abschnitt 2 und 10.1.
  *
- * `warnung` = darf die Blitzerwarnung in diesem Land laufen?
- * Die Liste trägt ein Datum, weil sich Gesetze ändern.
+ * WARUM DIE STRUKTUR SO AUSSIEHT
  *
- * KEINE RECHTSBERATUNG. Vor Veröffentlichung von jemandem mit
- * einschlägiger Qualifikation prüfen lassen.
+ * Ein einfaches `warnung: boolean` reicht für Europa nicht. In fast keinem
+ * Land ist "Warnung" verboten, sondern eine bestimmte ART VON GERÄT: aktive
+ * Radardetektoren, die Messanlagen aufspüren oder stören. Ein
+ * Datenbank-Warner, der eine GPS-Position mit einer Liste vergleicht, ist
+ * etwas anderes — er misst nichts und stört nichts. Diese Unterscheidung
+ * fehlte, und sie ist der Grund, warum der Eintrag für Österreich strittig ist.
+ *
+ * Frankreich braucht eine dritte Möglichkeit: Dort ist der Hinweis auf einen
+ * Gefahrenbereich erlaubt, die Punktwarnung nicht.
+ *
+ * DIE INVARIANTE: status !== 'belegt' erzwingt modus 'aus'.
+ *
+ * Ein Land, dessen Rechtslage nicht belegt ist, warnt nicht. Der eine Fehler
+ * kostet eine Funktion, der andere ein Bussgeld — die zwei sind nicht gleich
+ * viel wert.
+ *
+ * KEINE RECHTSBERATUNG. Vor Veröffentlichung von jemandem mit einschlägiger
+ * Qualifikation prüfen lassen.
  */
 export const LAENDER_GATE = {
-  STAND: '2026-07-29',
+  QUELLE:
+    'ADAC, Juristische Zentrale, Übersicht Radarwarner und Blitzer-Apps im ' +
+    'Ausland, Stand 5/2025, ausdrücklich ohne Gewähr',
+  STAND: '2025-05',
   /** Verhalten, wenn das Land nicht sicher bestimmbar ist. */
   FALLBACK_WARNUNG_ERLAUBT: false,
+
   LAENDER: {
-    DE: { warnung: false, hinweisBanner: true, grund: '§ 23 Abs. 1c StVO' },
-    AT: { warnung: false, hinweisBanner: true, grund: '§ 98a KFG' },
-    CH: { warnung: false, hinweisBanner: true, grund: 'Art. 57b SVG' },
-    FR: { warnung: true, hinweisBanner: false, grund: 'Warnung zulässig, Anzeige exakter Standorte eingeschränkt' },
-    ES: { warnung: true, hinweisBanner: false, grund: 'Warnung zulässig' },
-    NL: { warnung: true, hinweisBanner: false, grund: 'Warnung zulässig' },
+    // --- POI-Funktion laut Quelle ausdrücklich erlaubt --------------------
+    BE: {
+      modus: 'punkt', hinweisBanner: false, status: 'belegt',
+      grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
+      hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
+    },
+    FI: {
+      modus: 'punkt', hinweisBanner: false, status: 'belegt',
+      grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
+      hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
+    },
+    LU: {
+      modus: 'punkt', hinweisBanner: false, status: 'belegt',
+      grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
+      hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
+    },
+    NL: {
+      modus: 'punkt', hinweisBanner: false, status: 'belegt',
+      grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
+      hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
+    },
+    PT: {
+      modus: 'punkt', hinweisBanner: false, status: 'belegt',
+      grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
+      hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
+    },
+    RS: {
+      modus: 'punkt', hinweisBanner: false, status: 'belegt',
+      grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
+      hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
+    },
+    ES: {
+      modus: 'punkt', hinweisBanner: false, status: 'belegt',
+      grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
+      hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
+    },
+    CZ: {
+      modus: 'punkt', hinweisBanner: false, status: 'belegt',
+      grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
+      hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
+    },
+
+    // --- Sonderfall Frankreich: Zonen statt Punkte ------------------------
+    FR: {
+      modus: 'zone', hinweisBanner: true, status: 'belegt',
+      grund:
+        'Seit 03.01.2012 ist der deutliche und unmittelbare Hinweis auf ' +
+        'Messstellen verboten; erlaubt ist der allgemeine Hinweis auf ' +
+        'Gefahrenzonen mit Mindestlänge (300 m innerorts, 2000 m Landstrasse, ' +
+        '4000 m Autobahn)',
+      hinweis:
+        'In Frankreich darf nur auf einen Gefahrenbereich hingewiesen werden, ' +
+        'nicht auf eine einzelne Messstelle. Die App nennt deshalb keine ' +
+        'Entfernung und keine Art der Gefahr.',
+    },
+
+    // --- Ausdrücklich verboten, POI eingeschlossen ------------------------
+    DE: {
+      modus: 'aus', hinweisBanner: true, status: 'belegt',
+      grund:
+        '§ 23 Abs. 1c StVO; OLG Karlsruhe, Beschl. v. 07.02.2023, ' +
+        'Az. 2 ORbs 35 Ss 9/23 (auch Bedienung durch den Beifahrer)',
+      hinweis:
+        'In Deutschland ist dem Fahrzeugführer der Betrieb und das ' +
+        'betriebsbereite Mitführen eines solchen Geräts untersagt. Die ' +
+        'Warnfunktion bleibt hier abgeschaltet.',
+    },
+    CH: {
+      modus: 'aus', hinweisBanner: true, status: 'belegt',
+      grund: 'Art. 57b SVG; die Quelle nennt die POI-Funktion ausdrücklich mit im Verbot',
+      hinweis:
+        'In der Schweiz ist das Verwenden solcher Geräte untersagt, die Quelle ' +
+        'nennt die Funktion für gespeicherte Standorte ausdrücklich mit. Die ' +
+        'Warnfunktion bleibt hier abgeschaltet.',
+    },
+
+    // --- Strittig --------------------------------------------------------
+    AT: {
+      modus: 'aus', hinweisBanner: true, status: 'strittig',
+      grund:
+        'WIDERSPRUCH, nicht aufgelöst. Bisheriger Eintrag im Projekt: § 98a KFG, ' +
+        'Warnung verboten. Die Quelle (ADAC 5/2025) beschreibt dagegen als ' +
+        'verboten nur Geräte, mit denen Überwachungseinrichtungen BEEINFLUSST ' +
+        'oder GESTÖRT werden können, und nennt GPS-Geräte mit POI-Warner als ' +
+        'Ankündigungsfunktion ausdrücklich als erlaubt. Strafrahmen bis 10.000 ' +
+        'Euro und Einziehung des Geräts. Eine der beiden Aussagen ist falsch; ' +
+        'das klärt nur der Gesetzestext in geltender Fassung. Siehe DATA.md, ' +
+        'Abschnitt Offene Rechtsfragen.',
+      hinweis:
+        'Für Österreich ist die Rechtslage in diesem Projekt nicht geklärt: Die ' +
+        'Quellen widersprechen sich, ob ein Warner ohne Messfunktion erlaubt ist. ' +
+        'Solange das offen ist, bleibt die Warnfunktion abgeschaltet.',
+    },
+
+    // --- Unklar: Verbot genannt, POI-Funktion nicht behandelt -------------
+    BG: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    DK: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    GR: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    IT: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    HR: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      grund:
+        'WIDERSPRÜCHLICH: Die Quelle nennt weder ein Mitführ- noch ein ' +
+        'Benutzungsverbot, die Anmerkung nennt aber Radarwarner als verboten. ' +
+        'Zu widersprüchlich für belegt; der Widerspruch wird hier benannt, nicht aufgelöst.',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    LV: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    LT: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    NO: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    PL: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    RO: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      grund:
+        'WIDERSPRÜCHLICH: kein Mitführ- und kein Benutzungsverbot genannt, ' +
+        'die Anmerkung nennt aber Radarwarner beziehungsweise Störsender als ' +
+        'verboten. Der Widerspruch wird hier benannt, nicht aufgelöst.',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    SE: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    SK: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    SI: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    TR: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    HU: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      grund:
+        'WIDERSPRÜCHLICH: kein Mitführ- und kein Benutzungsverbot genannt, ' +
+        'die Anmerkung nennt aber Radarwarner als verboten. Der Widerspruch ' +
+        'wird hier benannt, nicht aufgelöst.',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+
+    // Länder, die in der Quelle NICHT vorkommen, haben absichtlich keinen
+    // Eintrag — damit greift FALLBACK_WARNUNG_ERLAUBT. Betrifft unter
+    // anderem IE, GB, EE, IS, MT, CY, AL, BA, MK, ME, XK, MD, UA, LI, AD,
+    // MC, SM. Ein fehlender Eintrag ist eine Aussage: wir wissen es nicht.
   },
-} as const;
+} as const satisfies { readonly LAENDER: Readonly<Record<string, Landeseintrag>> } & Record<string, unknown>;
 
 export type LandCode = keyof typeof LAENDER_GATE.LAENDER;
 

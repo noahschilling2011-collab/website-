@@ -11,7 +11,7 @@
  * Kurz — die Boxen von DE, AT und CH überlappen sich über Hunderte von
  * Kilometern, und das Gate soll genau dort abschalten.
  */
-import { LAENDER_GATE, type LandCode } from '../config';
+import { LAENDER_GATE, type LandCode, type Warnmodus } from '../config';
 import type { Fix } from '../types';
 import { distanceToSegment } from './geo';
 import {
@@ -105,8 +105,29 @@ function gateLand(umriss: UmrissCode | null): LandCode | null {
  * Veröffentlichung geprüft.
  */
 export function warnungErlaubt(land: LandCode | null): boolean {
-  if (land === null) return LAENDER_GATE.FALLBACK_WARNUNG_ERLAUBT;
-  return LAENDER_GATE.LAENDER[land].warnung;
+  return warnmodus(land) !== 'aus';
+}
+
+/**
+ * Wie darf in diesem Land gewarnt werden?
+ *
+ * Die zweite Bedingung ist die Invariante aus config: Ein Eintrag, dessen
+ * Rechtslage nicht belegt ist, warnt nicht — egal was in `modus` steht. Sie
+ * wird hier durchgesetzt und nicht bloss in der Tabelle vorausgesetzt, damit
+ * ein neuer Eintrag mit vergessenem `modus: 'aus'` nicht durchrutscht.
+ */
+export function warnmodus(land: LandCode | null): Warnmodus {
+  if (land === null) {
+    return LAENDER_GATE.FALLBACK_WARNUNG_ERLAUBT ? 'punkt' : 'aus';
+  }
+  const eintrag = LAENDER_GATE.LAENDER[land];
+  if (eintrag.status !== 'belegt') return 'aus';
+  return eintrag.modus;
+}
+
+/** Der Hinweistext für die App. Leer, wenn kein Eintrag existiert. */
+export function landHinweis(land: LandCode | null): string | null {
+  return land === null ? null : LAENDER_GATE.LAENDER[land].hinweis;
 }
 
 // --- Erkennung ------------------------------------------------------------
