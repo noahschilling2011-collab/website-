@@ -11,7 +11,7 @@
     "test": "tsx --test tests/*.test.ts",
     "replay": "tsx src/replay/replay.ts",
     "replay:all": "tsx src/replay/replay.ts --all",
-    "sync-dataset": "cp ../assets/data/cameras.json assets/data/cameras.json"
+    "sync-dataset": "mkdir -p assets/data && cp ../assets/data/cameras.json assets/data/cameras.json && cp ../assets/data/cameras.*.zones.json assets/data/"
   },
   "dependencies": {
     "expo": "~52.0.0",

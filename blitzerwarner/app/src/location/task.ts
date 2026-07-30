@@ -13,10 +13,13 @@ import * as TaskManager from 'expo-task-manager';
 
 import { errorLog } from '../core/log';
 import { datasetOrNull } from '../core/dataset';
-import { createTripState, distanceToNearest, evaluate, type TripState } from '../core/warn';
+import { createTripState, distanceToNearest, type TripState } from '../core/warn';
+import { entscheide } from '../core/entscheidung';
+import { createZonenZustand, type ZonenZustand } from '../core/zone';
+import { brauchtZonen, zonenFehler, zonenOderNull } from '../core/zonendaten';
 import { aktualisiere, createStrategyState, vorgabeFuer, type StrategyState } from './strategy';
 import { createWatchdogState, meldeFix, starte, stoppe, type WatchdogState } from './watchdog';
-import { gebeWarnung, sageAnsage } from '../audio/player';
+import { gebeWarnung, gebeZonenhinweis, sageAnsage } from '../audio/player';
 import { landwechselText } from '../audio/announce';
 import { aktualisiereLand, createLandZustand, leseLand, warnmodus, type LandStatus, type LandZustand } from '../core/country';
 import type { Warnmodus } from '../config';
@@ -49,8 +52,21 @@ type TaskLaufzeit = {
    * Protokoll und die UI — die Entscheidung fällt `modus`, nicht dieser Wert.
    */
   warnungWarErlaubt: boolean | null;
-  /** Wurde der fehlende Zonenmodus schon ins Protokoll geschrieben? */
-  zonenModusGemeldet: boolean;
+  /**
+   * Zonenzustand der Fahrt (Frankreich). Analog zu `trip` und `strategy`:
+   * gehört zur Fahrt, nicht zur App, und wird beim Start zurückgesetzt.
+   */
+  zonen: ZonenZustand;
+  /**
+   * Für welches Land der fehlende Zonendatensatz schon protokolliert wurde.
+   *
+   * Ein Set und kein Wahrheitswert: Auf einer Fahrt von Frankreich nach
+   * Spanien wären es zwei verschiedene Ausfälle, und der zweite darf nicht
+   * verschluckt werden, nur weil der erste gemeldet war. Bei jedem Fix
+   * erneut zu protokollieren wäre die andere Untugend — das Protokoll fasst
+   * 200 Einträge und wäre in einer Minute voll.
+   */
+  zonenAusfallGemeldet: Set<string>;
 };
 
 const STANDARD_SETTINGS: Settings = {
@@ -73,7 +89,8 @@ const laufzeit: TaskLaufzeit = {
   landZustand: createLandZustand(),
   letzterModus: null,
   warnungWarErlaubt: null,
-  zonenModusGemeldet: false,
+  zonen: createZonenZustand(),
+  zonenAusfallGemeldet: new Set(),
 };
 
 /** Von der UI aufzurufen, wenn der Nutzer Einstellungen ändert. */
@@ -145,26 +162,9 @@ async function verarbeite(fix: Fix): Promise<void> {
    * Frankreich erlaubt seit 03.01.2012 nur den Hinweis auf einen
    * Gefahrenbereich; die Punktwarnung mit Entfernungsansage ist dort
    * verboten, bis 1500 Euro und Einziehung des Geräts.
-   *
-   * Solange das Zonenverhalten (Phase C) nicht gebaut ist, wird im
-   * Zonenmodus GAR NICHT gewarnt. Das ist die sichere Richtung: keine
-   * Warnung statt einer verbotenen. Ein Ja/Nein-Gate hätte hier
-   * Punktwarnungen ausgegeben, weil 'zone' ungleich 'aus' ist.
    */
   const modus = warnmodus(landStatus.land);
-  const darfPunktWarnen = modus === 'punkt';
-  const darfWarnen = darfPunktWarnen;
-
-  if (modus === 'zone' && !laufzeit.zonenModusGemeldet) {
-    laufzeit.zonenModusGemeldet = true;
-    errorLog.warn(
-      'warnung',
-      `Zonenmodus für ${landStatus.land ?? 'unbekannt'} ist im Task noch nicht ` +
-      'verdrahtet — core/zone.ts und der Replay decken ihn ab, der ' +
-      'Hintergrund-Task gibt hier aber noch keine Zonenansage aus. Es wird ' +
-      'deshalb gar nicht gewarnt; das ist die sichere Richtung.',
-    );
-  }
+  const darfWarnen = modus !== 'aus';
 
   /*
    * Der Grenzübertritt wird am MODUS erkannt, nicht an einem Ja/Nein.
@@ -206,15 +206,67 @@ async function verarbeite(fix: Fix): Promise<void> {
 
   if (!darfWarnen) return;
 
-  // 4. Warnlogik.
-  const ergebnis = evaluate(fix, grid, laufzeit.trip, laufzeit.settings);
-  if (!ergebnis.warning) return;
+  /*
+   * 4. Die Entscheidung. Bewusst als reine Funktion ausgelagert
+   *    (core/entscheidung.ts): Welche Logik bei welchem Modus greift, ist
+   *    genau die Stelle, an der Frankreich stumm blieb — beide Bausteine
+   *    waren in Ordnung, die Verdrahtung nicht. Sie steckte hier zwischen
+   *    expo-Aufrufen und war damit nicht prüfbar.
+   */
+  const zonen = brauchtZonen(landStatus.land) && landStatus.land !== null
+    ? zonenOderNull(landStatus.land)
+    : null;
 
-  await gebeWarnung(ergebnis.warning.camera, ergebnis.warning.distance, {
-    sprache: laufzeit.settings.sprachansage,
-    lautstaerke: laufzeit.settings.lautstaerke,
-    speedKmh: fix.speed != null ? fix.speed * 3.6 : null,
+  const aktion = entscheide(fix, modus, {
+    grid,
+    trip: laufzeit.trip,
+    settings: laufzeit.settings,
+    zonen,
+    zonenZustand: laufzeit.zonen,
   });
+
+  // 5. Ausführen. Ab hier nur noch Plattform, keine Entscheidung mehr.
+  switch (aktion.art) {
+    case 'punktwarnung':
+      await gebeWarnung(aktion.camera, aktion.distanzM, {
+        sprache: laufzeit.settings.sprachansage,
+        lautstaerke: laufzeit.settings.lautstaerke,
+        speedKmh: fix.speed != null ? fix.speed * 3.6 : null,
+      });
+      return;
+
+    case 'zonenhinweis':
+      // Kein speedKmh, keine Distanz — die Aktion trägt beides gar nicht.
+      await gebeZonenhinweis({
+        sprache: laufzeit.settings.sprachansage,
+        lautstaerke: laufzeit.settings.lautstaerke,
+      });
+      return;
+
+    case 'nichts':
+      /*
+       * Der einzige Grund, der kein Normalbetrieb ist.
+       *
+       * Eine App, die im Zonenmodus "Hinweise aktiviert" ansagt und danach
+       * für die ganze Fahrt schweigt, ist von aussen nicht von einer Strecke
+       * ohne Zonen zu unterscheiden. Genau dieser stille Ausfall ist im
+       * Kopfkommentar von core/dataset.ts beschrieben — deshalb hier ein
+       * ERROR und keine stille Rückkehr.
+       */
+      if (aktion.grund === 'zonendaten_fehlen' && landStatus.land !== null) {
+        if (!laufzeit.zonenAusfallGemeldet.has(landStatus.land)) {
+          laufzeit.zonenAusfallGemeldet.add(landStatus.land);
+          const fehler = zonenFehler(landStatus.land);
+          errorLog.error(
+            'daten',
+            `Zonendatensatz für ${landStatus.land} fehlt oder ist unlesbar — ` +
+            'es wird hier NICHT gewarnt',
+            fehler,
+          );
+        }
+      }
+      return;
+  }
 }
 
 TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
@@ -280,7 +332,8 @@ export async function starteTracking(settings: Settings): Promise<boolean> {
   laufzeit.landZustand = createLandZustand();
   laufzeit.letzterModus = null;
   laufzeit.warnungWarErlaubt = null;
-  laufzeit.zonenModusGemeldet = false;
+  laufzeit.zonen = createZonenZustand();
+  laufzeit.zonenAusfallGemeldet = new Set();
 
   const start = vorgabeFuer('leerlauf');
 

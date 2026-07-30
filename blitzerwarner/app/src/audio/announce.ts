@@ -6,6 +6,7 @@
  * nur am Gerät prüfen — dass der Text stimmt, hier.
  */
 import { AUDIO, type Warnmodus } from '../config';
+import { STRINGS } from '../strings';
 import type { Camera } from '../types';
 
 /**
@@ -160,19 +161,12 @@ export const VERBOTENE_ZONENWOERTER = [
 /**
  * Ansagetexte für den Zonenmodus.
  *
- * Bewusst ein GETRENNTER Katalog und nicht der normale mit anderer
- * Formulierung: Wer später einen Punkt-Ansagetext ergänzt, soll ihn nicht
- * versehentlich in einer Zone verwenden können. Die Trennung ist die
- * Sicherung, der Test dahinter die Kontrolle.
- *
- * Genannt wird ein Aufmerksamkeitshinweis auf einen Streckenabschnitt —
- * keine Entfernung, keine Richtung, keine Art der Gefahr.
+ * Der Katalog selbst steht in strings.ts, wo alle hörbaren Texte stehen und
+ * wo ihn jemand gegenlesen kann, der kein TypeScript liest. Hier wird er nur
+ * unter dem Namen weitergereicht, unter dem der Rest des Audio-Codes und die
+ * Tests ihn kennen.
  */
-export const ZONEN_ANSAGE = {
-  de: 'Achtungsbereich',
-  fr: 'Zone de vigilance',
-  en: 'Caution zone',
-} as const;
+export const ZONEN_ANSAGE = STRINGS.zone.ansage;
 
 export type ZonenSprache = keyof typeof ZONEN_ANSAGE;
 

@@ -276,6 +276,32 @@ const EINSTELLUNG_FELD: Record<keyof Settings, Feldtext> = {
   },
 };
 
+// --- Zonenmodus -----------------------------------------------------------
+
+/**
+ * Ansagetexte für den Zonenmodus (Frankreich).
+ *
+ * WARUM DIESER EINE KATALOG MEHRSPRACHIG IST, obwohl die App einsprachig
+ * deutsch ist: Die Zonenansage folgt der Systemsprache des Geräts, nicht der
+ * App-Sprache. Ein rein deutscher Katalog käme an einem französischsprachigen
+ * Gerät ungeprüft heraus — und die Auflage, die Gefahr nicht zu benennen,
+ * gilt in jeder Sprache. Deshalb stehen alle Varianten hier, wo sie
+ * gegengelesen und vom Test erfasst werden.
+ *
+ * Bewusst ein GETRENNTER Katalog neben STRINGS.ansage und nicht derselbe mit
+ * anderer Formulierung: Wer später einen Punkt-Ansagetext ergänzt, soll ihn
+ * nicht versehentlich in einer Zone verwenden können. Die Trennung ist die
+ * Sicherung, der Test in tests/zone-wortliste.test.ts die Kontrolle.
+ *
+ * Genannt wird ein Aufmerksamkeitshinweis auf einen Streckenabschnitt — keine
+ * Entfernung, keine Richtung, keine Art der Gefahr.
+ */
+const ZONE_ANSAGE = {
+  de: 'Achtungsbereich',
+  fr: 'Zone de vigilance',
+  en: 'Caution zone',
+} as const;
+
 // --- alle Texte -----------------------------------------------------------
 
 export const STRINGS = {
@@ -491,6 +517,31 @@ export const STRINGS = {
       'Das angezeigte Tempolimit stammt aus denselben Daten und ist bei ' +
       'Abschnittskontrollen und richtungsabhängigen Limits nicht immer die für ' +
       'die Messung geltende Grenze.',
+  },
+
+  /**
+   * Zonenmodus. Gilt derzeit nur für Frankreich.
+   *
+   * Kein Text in diesem Abschnitt darf ein Wort aus VERBOTENE_ZONENWOERTER
+   * enthalten — auch nicht die Bildschirmtexte. Die Regelung betrifft die
+   * Ausgabe des Geräts, nicht nur die Stimme.
+   */
+  zone: {
+    ansage: ZONE_ANSAGE,
+    /** Statuszeile, wenn der Zonenmodus läuft. */
+    aktiv: 'Hinweise für Streckenabschnitte aktiv',
+    /**
+     * Wenn die Zonendatei für ein Land im Zonenmodus fehlt. Der Nutzer
+     * erfährt, dass hier NICHT gewarnt wird — die stille Variante wäre eine
+     * App, die "aktiv" meldet und nie etwas sagt.
+     */
+    datenFehlenTitel: 'Keine Hinweisdaten für dieses Land',
+    datenFehlenText:
+      'Für dieses Land liegt der Hinweisdatensatz nicht im App-Paket. Es wird ' +
+      'hier nichts angesagt.',
+    datenFehlenHandlung:
+      'App neu installieren. Ein Update bringt den Datensatz mit. Bis dahin gilt ' +
+      'die Beschilderung.',
   },
 
   /** Kurz, weil es wenig zu sagen gibt. */
