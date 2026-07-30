@@ -343,6 +343,18 @@ export const STRINGS = {
     rechtBestaetigenAktion: 'Gelesen und verstanden',
     rechtSpaeterNachlesen: 'Dieser Hinweis steht dauerhaft in den Einstellungen.',
 
+    berechtigungTitel: 'Zugriff auf den Standort',
+    berechtigungText:
+      'Die App vergleicht die Position mit dem gespeicherten Datensatz. Damit das ' +
+      'auch bei ausgeschaltetem Display funktioniert — also in dem Zustand, für ' +
+      'den die App gebaut ist — wird der Standortzugriff im Hintergrund benötigt. ' +
+      'Die Position wird ausschliesslich auf dem Gerät verarbeitet.',
+    berechtigungAnfordern: 'Standortzugriff erlauben',
+    berechtigungErteilt: 'Standortzugriff erteilt',
+    berechtigungZweiSchritte:
+      'Android fragt in zwei Schritten: erst den Zugriff während der Nutzung, ' +
+      'danach den im Hintergrund.',
+
     ablenkungTitel: 'Bedienung während der Fahrt',
     ablenkungText:
       'Die App wird vor Fahrtantritt eingerichtet. Während der Fahrt ist nur die ' +
@@ -371,6 +383,7 @@ export const STRINGS = {
     naechsteAnlage: 'Nächste Anlage',
     keineAnlageInDerNaehe: 'Keine Anlage in Reichweite',
     warnungQuittieren: 'Warnung ausblenden',
+    fahrtStarten: 'Fahrt starten',
     fahrtBeenden: 'Fahrt beenden',
     ueberLimit: 'Über dem Limit',
   },
