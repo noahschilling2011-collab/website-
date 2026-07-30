@@ -17,6 +17,7 @@ import {
   VERBOTENE_ZONENWOERTER, ZONEN_ANSAGE, enthaeltVerbotenesZonenwort,
   zonenAnsageText, ansageText,
 } from '../src/audio/announce';
+import { TOENE } from '../src/audio/tone';
 import { STRINGS } from '../src/strings';
 import type { Camera } from '../src/types';
 
@@ -91,21 +92,21 @@ test('die Punkt-Ansagebausteine bleiben vom Zonenkatalog getrennt', () => {
   }
 });
 
-test('OFFEN: das Zonenverhalten selbst ist noch nicht gebaut', () => {
-  // Dieser Test ist eine Notiz mit Zähnen. Solange er hier steht, ist Phase C
-  // unvollständig: Es fehlen die Zonenerzeugung zur Build-Zeit
-  // (scripts/build-zones.ts), der eigene Warnton, die Anzeige ohne
-  // Entfernungsangabe und die drei Fixture-Tracks.
+test('das Zonenverhalten ist vollständig verdrahtet', () => {
+  // Hier stand bis zum Abschluss von Phase C ein Test, der festhielt, dass
+  // das Zonenverhalten FEHLT. Er ist gelöscht, weil er nicht mehr stimmt —
+  // eine Notiz, die falsch geworden ist, ist schlimmer als keine.
   //
-  // Bis dahin warnt die App in Frankreich GAR NICHT — siehe
-  // tests/gate.test.ts, "Zonenmodus erlaubt KEINE Punktwarnung". Das ist die
-  // sichere Richtung, aber kein fertiges Feature.
-  //
-  // Wer Phase C fertigstellt, löscht diesen Test.
-  const zonenLogikVorhanden = false;
-  assert.equal(
-    zonenLogikVorhanden, false,
-    'Wenn das Zonenverhalten gebaut ist: diesen Test löschen und die drei ' +
-    'Fixture-Tracks aus C.4 ergänzen.',
-  );
+  // Was jetzt geprüft wird: dass die Teile tatsächlich zusammenhängen. Ein
+  // Zonenton ohne Textkatalog oder ein Katalog ohne Ton wäre ein halber
+  // Zustand, und genau der ist bei dieser Auflage gefährlich.
+  assert.ok(Object.keys(ZONEN_ANSAGE).length >= 2, 'Textkatalog vorhanden');
+  assert.ok(VERBOTENE_ZONENWOERTER.length >= 10, 'Verbotsliste vorhanden');
+  assert.equal(typeof enthaeltVerbotenesZonenwort, 'function', 'Laufzeitprüfung vorhanden');
+  assert.ok('zone' in TOENE, 'eigener Zonenton vorhanden');
+
+  // Der Zonenton darf nicht der Blitzerton sein. Doppelt geprüft — hier und
+  // in audio.test.ts —, weil das die Stelle ist, an der ein Copy-Paste-Fehler
+  // die Auflage unbemerkt aushebeln würde.
+  assert.notDeepEqual(TOENE.zone.impulse, TOENE.blitzer.impulse);
 });
