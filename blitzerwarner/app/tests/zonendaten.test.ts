@@ -39,10 +39,14 @@ test('ohne bestimmtes Land werden keine Zonen gebraucht', () => {
 
 test('Deutschland braucht keine Zonen, obwohl eine Datei existiert', () => {
   // scripts/build-zones.ts erzeugt auch cameras.DE.zones.json — als Prüfstück
-  // für den Generator, nicht als Betriebsmittel. § 23 Abs. 1c StVO schaltet
-  // Deutschland ab, und daran ändert eine vorhandene Datei nichts.
+  // für den Generator, nicht als Betriebsmittel.
+  //
+  // Deutschland warnt inzwischen, aber im PUNKTmodus: Die Zonenpflicht ist
+  // eine französische Auflage, keine deutsche. § 23 Abs. 1c StVO verbietet dem
+  // Fahrer den Betrieb; es schreibt nicht vor, in welcher Form gewarnt wird.
+  // Eine deutsche Zonendatei bleibt deshalb ungenutzt.
   assert.equal(brauchtZonen('DE'), false);
-  assert.equal(LAENDER_GATE.LAENDER.DE.modus, 'aus');
+  assert.equal(LAENDER_GATE.LAENDER.DE.modus, 'punkt');
 });
 
 // --- Laden ----------------------------------------------------------------

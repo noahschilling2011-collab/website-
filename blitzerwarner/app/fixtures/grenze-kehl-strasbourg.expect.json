@@ -1,9 +1,10 @@
 {
-  "beschreibung": "Fahrt über die Europabrücke, Deutschland nach Frankreich. Prüft die Landeserkennung: genau ein Moduswechsel, kein Flattern, und der Wechsel liegt NACH der Grenze, nicht davor.",
+  "beschreibung": "Fahrt über die Europabrücke, Deutschland nach Frankreich. Prüft die Landeserkennung: zwei Moduswechsel (Startbestätigung in Deutschland, dann der Grenzübertritt), kein Flattern, und der Übertritt liegt NACH der Grenze, nicht davor.",
   "kameras": [],
   "erwarteteWarnungen": 0,
   "landwechsel": {
     "modi": [
+      "punkt",
       "zone"
     ],
     "maxHinterGrenzeM": 500

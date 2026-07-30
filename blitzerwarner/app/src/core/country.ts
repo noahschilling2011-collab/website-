@@ -137,18 +137,40 @@ export function warnungErlaubt(land: LandCode | null): boolean {
 /**
  * Wie darf in diesem Land gewarnt werden?
  *
- * Die zweite Bedingung ist die Invariante aus config: Ein Eintrag, dessen
- * Rechtslage nicht belegt ist, warnt nicht — egal was in `modus` steht. Sie
- * wird hier durchgesetzt und nicht bloss in der Tabelle vorausgesetzt, damit
- * ein neuer Eintrag mit vergessenem `modus: 'aus'` nicht durchrutscht.
+ * Die zweite Bedingung ist die Invariante aus config: Ein Eintrag, über dessen
+ * Rechtslage GAR NICHTS bekannt ist, warnt nicht — egal was in `modus` steht.
+ * Sie wird hier durchgesetzt und nicht bloss in der Tabelle vorausgesetzt,
+ * damit ein neuer Eintrag mit vergessenem `modus: 'aus'` nicht durchrutscht.
+ *
+ * Die Schwelle liegt bei 'unklar' und nicht mehr bei 'belegt'. Der Grund steht
+ * ausführlich im Kopf von LAENDER_GATE; kurz: 'strittig' heisst, dass wir die
+ * Norm kennen und nur ihre Reichweite umstritten ist. Darüber kann der Fahrer
+ * entscheiden, wenn man ihm den ungünstigeren Fall nennt. Bei 'unklar' wissen
+ * wir gar nichts, und dann gibt es auch nichts vorzulegen.
  */
 export function warnmodus(land: LandCode | null): Warnmodus {
   if (land === null) {
     return LAENDER_GATE.FALLBACK_WARNUNG_ERLAUBT ? 'punkt' : 'aus';
   }
   const eintrag = LAENDER_GATE.LAENDER[land];
-  if (eintrag.status !== 'belegt') return 'aus';
+  if (eintrag.status === 'unklar') return 'aus';
   return eintrag.modus;
+}
+
+/**
+ * Trifft den FAHRZEUGFÜHRER hier ein Betriebsverbot?
+ *
+ * Getrennt von warnmodus(), weil es zwei verschiedene Fragen sind: was die App
+ * tut, und was den Fahrer trifft, wenn er sie betreibt. Die erste ist eine
+ * Produktentscheidung, die zweite eine Tatsache über das Recht.
+ *
+ * Von dieser Antwort hängt der dauerhafte Banner ab — und nur davon. Ein Land
+ * ohne Fahrerverbot bekommt keinen, eines mit Fahrerverbot bekommt ihn, und er
+ * lässt sich nicht abschalten.
+ */
+export function fahrerverbot(land: LandCode | null): 'ja' | 'nein' | 'unklar' {
+  if (land === null) return 'unklar';
+  return LAENDER_GATE.LAENDER[land].fahrerverbot;
 }
 
 /** Der Hinweistext für die App. Leer, wenn kein Eintrag existiert. */

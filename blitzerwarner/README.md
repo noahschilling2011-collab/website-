@@ -22,8 +22,22 @@ Beschl. v. 07.02.2023, Az. 2 ORbs 35 Ss 9/23, liegt eine Ordnungswidrigkeit des
 Fahrers auch dann vor, wenn der **Beifahrer** die App bedient, sofern der Fahrer
 das billigt und sich die Warnung zunutze macht.
 
+**Das Verbot richtet sich an den Fahrzeugführer, nicht an die App.** Eine
+solche App zu bauen, anzubieten oder zu installieren ist nicht untersagt —
+untersagt ist dem Fahrer das Betreiben während der Fahrt. Die Warnung läuft
+deshalb auch in Deutschland, Österreich und der Schweiz; die Entscheidung
+darüber liegt beim Fahrer.
+
 Die App zeigt beim ersten Start einen bestätigungspflichtigen Rechtshinweis und
-blendet in DE/AT/CH einen dauerhaften, nicht abschaltbaren Banner ein.
+blendet in DE, AT, CH und FR einen dauerhaften, nicht abschaltbaren Banner mit
+der jeweiligen Norm und der konkreten Folge ein. Die drei Länder sind nicht
+gleich teuer: Deutschland 75 € und 1 Punkt; Österreich im ungünstigen Fall bis
+10.000 € und Geräteeinzug (Rechtslage strittig); die Schweiz untersagt schon
+das Mitführen und kann das Gerät einziehen.
+
+**Wo die Rechtslage ungeklärt ist, warnt die App nicht.** Und in Frankreich
+trifft die Auflage die App selbst, nicht nur den Fahrer — dort läuft
+ausschließlich der Zonenmodus ohne Entfernungsangabe.
 
 Das ist keine Rechtsberatung. Vor einer Store-Veröffentlichung muss das jemand
 mit einschlägiger Qualifikation prüfen.

@@ -339,6 +339,29 @@ export type Landeseintrag = {
   readonly grund: string;
   /** Was in der App steht, wenn der Nutzer nachfragt. */
   readonly hinweis: string;
+  /**
+   * Untersagt eine Norm dem FAHRZEUGFÜHRER den Betrieb?
+   *
+   * Diese Frage ist von `modus` getrennt, und die Trennung ist der Kern der
+   * Umstellung. Vorher war beides dasselbe Feld, und daraus folgte, dass die
+   * App in Deutschland schwieg.
+   *
+   * Das ist zwei verschiedene Dinge:
+   *
+   *  - `modus` sagt, WAS DIE APP TUT. Das ist eine Produktentscheidung.
+   *  - `fahrerverbot` sagt, WAS DEN FAHRER TRIFFT, wenn er sie während der
+   *    Fahrt betreibt. Das ist eine Tatsache über das Recht.
+   *
+   * § 23 Abs. 1c StVO richtet sich an den Fahrzeugführer, nicht an die App.
+   * Eine solche App zu bauen, anzubieten und zu installieren ist nicht
+   * untersagt — deshalb stehen vergleichbare Apps im deutschen App Store.
+   * Untersagt ist dem Fahrer das Betreiben. Diese Entscheidung liegt bei ihm,
+   * und die App trifft sie ihm nicht ab; sie sagt ihm, was gilt.
+   *
+   * 'unklar' heisst: Die Quellen widersprechen sich. Dann nennt der Banner
+   * den ungünstigsten Fall, nicht den bequemsten.
+   */
+  readonly fahrerverbot: 'ja' | 'nein' | 'unklar';
 };
 
 /**
@@ -356,11 +379,33 @@ export type Landeseintrag = {
  * Frankreich braucht eine dritte Möglichkeit: Dort ist der Hinweis auf einen
  * Gefahrenbereich erlaubt, die Punktwarnung nicht.
  *
- * DIE INVARIANTE: status !== 'belegt' erzwingt modus 'aus'.
+ * DIE INVARIANTE: status 'unklar' erzwingt modus 'aus'.
  *
- * Ein Land, dessen Rechtslage nicht belegt ist, warnt nicht. Der eine Fehler
- * kostet eine Funktion, der andere ein Bussgeld — die zwei sind nicht gleich
- * viel wert.
+ * Ein Land, über dessen Rechtslage wir GAR NICHTS wissen, warnt nicht. Dort
+ * lässt sich dem Fahrer auch nichts sagen, worüber er entscheiden könnte —
+ * ein Banner "wir wissen es nicht" ist keine Grundlage für eine Entscheidung.
+ *
+ * WAS SICH GEGENÜBER DER ERSTEN FASSUNG GEÄNDERT HAT, und warum
+ *
+ * Vorher lautete die Invariante `status !== 'belegt'` erzwingt `'aus'`, und
+ * DE, AT und CH standen auf 'aus'. Das war eine Produktentscheidung, keine
+ * rechtliche Notwendigkeit — und sie beruhte auf einer Verwechslung:
+ *
+ * § 23 Abs. 1c StVO, § 98a KFG und Art. 57b SVG richten sich an den
+ * FAHRZEUGFÜHRER. Sie untersagen ihm den Betrieb. Sie untersagen niemandem,
+ * eine solche App zu bauen, anzubieten oder zu installieren — deshalb stehen
+ * vergleichbare Apps im deutschen App Store, und deshalb war "die App darf
+ * hier nicht warnen" von Anfang an der falsche Satz. Richtig ist: "der Fahrer
+ * darf sie hier nicht betreiben."
+ *
+ * Diese Entscheidung gehört dem Fahrer. Die App nimmt sie ihm nicht ab; sie
+ * legt sie ihm vor — einmal beim ersten Start als bestätigungspflichtigen
+ * Rechtshinweis, danach dauerhaft als Banner (`hinweisBanner`).
+ *
+ * Was NICHT aufgeweicht wurde: Wo die Rechtslage unbekannt ist ('unklar'),
+ * bleibt es bei 'aus'. Und Frankreich bleibt im Zonenmodus — dort ist die
+ * Punktwarnung tatsächlich der App verboten, nicht bloss dem Fahrer, und ein
+ * Verstoss kostet bis 1500 Euro plus Einziehung des Geräts.
  *
  * KEINE RECHTSBERATUNG. Vor Veröffentlichung von jemandem mit einschlägiger
  * Qualifikation prüfen lassen.
@@ -376,49 +421,49 @@ export const LAENDER_GATE = {
   LAENDER: {
     // --- POI-Funktion laut Quelle ausdrücklich erlaubt --------------------
     BE: {
-      modus: 'punkt', hinweisBanner: false, status: 'belegt',
+      modus: 'punkt', hinweisBanner: false, status: 'belegt', fahrerverbot: 'nein',
       grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
       hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
     },
     FI: {
-      modus: 'punkt', hinweisBanner: false, status: 'belegt',
+      modus: 'punkt', hinweisBanner: false, status: 'belegt', fahrerverbot: 'nein',
       grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
       hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
     },
     LU: {
-      modus: 'punkt', hinweisBanner: false, status: 'belegt',
+      modus: 'punkt', hinweisBanner: false, status: 'belegt', fahrerverbot: 'nein',
       grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
       hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
     },
     NL: {
-      modus: 'punkt', hinweisBanner: false, status: 'belegt',
+      modus: 'punkt', hinweisBanner: false, status: 'belegt', fahrerverbot: 'nein',
       grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
       hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
     },
     PT: {
-      modus: 'punkt', hinweisBanner: false, status: 'belegt',
+      modus: 'punkt', hinweisBanner: false, status: 'belegt', fahrerverbot: 'nein',
       grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
       hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
     },
     RS: {
-      modus: 'punkt', hinweisBanner: false, status: 'belegt',
+      modus: 'punkt', hinweisBanner: false, status: 'belegt', fahrerverbot: 'nein',
       grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
       hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
     },
     ES: {
-      modus: 'punkt', hinweisBanner: false, status: 'belegt',
+      modus: 'punkt', hinweisBanner: false, status: 'belegt', fahrerverbot: 'nein',
       grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
       hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
     },
     CZ: {
-      modus: 'punkt', hinweisBanner: false, status: 'belegt',
+      modus: 'punkt', hinweisBanner: false, status: 'belegt', fahrerverbot: 'nein',
       grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
       hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
     },
 
     // --- Sonderfall Frankreich: Zonen statt Punkte ------------------------
     FR: {
-      modus: 'zone', hinweisBanner: true, status: 'belegt',
+      modus: 'zone', hinweisBanner: true, status: 'belegt', fahrerverbot: 'nein',
       grund:
         'Seit 03.01.2012 ist der deutliche und unmittelbare Hinweis auf ' +
         'Messstellen verboten; erlaubt ist der allgemeine Hinweis auf ' +
@@ -432,27 +477,38 @@ export const LAENDER_GATE = {
 
     // --- Ausdrücklich verboten, POI eingeschlossen ------------------------
     DE: {
-      modus: 'aus', hinweisBanner: true, status: 'belegt',
+      modus: 'punkt', hinweisBanner: true, status: 'belegt', fahrerverbot: 'ja',
       grund:
-        '§ 23 Abs. 1c StVO; OLG Karlsruhe, Beschl. v. 07.02.2023, ' +
-        'Az. 2 ORbs 35 Ss 9/23 (auch Bedienung durch den Beifahrer)',
+        '§ 23 Abs. 1c StVO richtet sich an den FAHRZEUGFÜHRER, nicht an die ' +
+        'App. Verboten ist ihm der Betrieb und das betriebsbereite Mitführen; ' +
+        'Nr. 247 BKat, 75 Euro und ein Punkt. OLG Karlsruhe, Beschl. v. ' +
+        '07.02.2023, Az. 2 ORbs 35 Ss 9/23: gilt auch, wenn der Beifahrer ' +
+        'bedient und der Fahrer sich die Warnung zunutze macht. Die App warnt ' +
+        'hier und legt die Entscheidung dem Fahrer vor.',
       hinweis:
         'In Deutschland ist dem Fahrzeugführer der Betrieb und das ' +
-        'betriebsbereite Mitführen eines solchen Geräts untersagt. Die ' +
-        'Warnfunktion bleibt hier abgeschaltet.',
+        'betriebsbereite Mitführen eines solchen Geräts untersagt — 75 Euro ' +
+        'und ein Punkt. Das Verbot trifft den Fahrer, nicht die App. Die ' +
+        'Entscheidung liegt bei dir.',
     },
     CH: {
-      modus: 'aus', hinweisBanner: true, status: 'belegt',
-      grund: 'Art. 57b SVG; die Quelle nennt die POI-Funktion ausdrücklich mit im Verbot',
+      modus: 'punkt', hinweisBanner: true, status: 'belegt', fahrerverbot: 'ja',
+      grund:
+        'Art. 57b SVG; die Quelle nennt die POI-Funktion ausdrücklich mit im ' +
+        'Verbot. DAS SCHÄRFSTE DER DREI: Untersagt ist nicht nur das ' +
+        'Verwenden, sondern schon das Mitführen, und das Gerät kann eingezogen ' +
+        'werden. Die App warnt hier und legt die Entscheidung dem Fahrer vor; ' +
+        'der Banner nennt den Geräteeinzug ausdrücklich.',
       hinweis:
-        'In der Schweiz ist das Verwenden solcher Geräte untersagt, die Quelle ' +
-        'nennt die Funktion für gespeicherte Standorte ausdrücklich mit. Die ' +
-        'Warnfunktion bleibt hier abgeschaltet.',
+        'In der Schweiz ist das Verwenden UND das Mitführen solcher Geräte ' +
+        'untersagt, die Quelle nennt die Funktion für gespeicherte Standorte ' +
+        'ausdrücklich mit. Das Gerät kann eingezogen werden. Das Verbot trifft ' +
+        'den Fahrer, nicht die App. Die Entscheidung liegt bei dir.',
     },
 
     // --- Strittig --------------------------------------------------------
     AT: {
-      modus: 'aus', hinweisBanner: true, status: 'strittig',
+      modus: 'punkt', hinweisBanner: true, status: 'strittig', fahrerverbot: 'unklar',
       grund:
         'WIDERSPRUCH, nicht aufgelöst. Bisheriger Eintrag im Projekt: § 98a KFG, ' +
         'Warnung verboten. Die Quelle (ADAC 5/2025) beschreibt dagegen als ' +
@@ -461,36 +517,42 @@ export const LAENDER_GATE = {
         'Ankündigungsfunktion ausdrücklich als erlaubt. Strafrahmen bis 10.000 ' +
         'Euro und Einziehung des Geräts. Eine der beiden Aussagen ist falsch; ' +
         'das klärt nur der Gesetzestext in geltender Fassung. Siehe DATA.md, ' +
-        'Abschnitt Offene Rechtsfragen.',
+        'Abschnitt Offene Rechtsfragen. WARUM DER WIDERSPRUCH DIE ENTSCHEIDUNG ' +
+        'NICHT MEHR TRÄGT: Beide Lesarten führen jetzt zum selben Verhalten. ' +
+        'Trifft die ADAC-Lesart zu, ist die Warnung erlaubt; trifft die andere ' +
+        'zu, ist sie dem Fahrer verboten — derselbe Fall wie DE und CH, und den ' +
+        'entscheidet er selbst. Offen bleibt allein die HÖHE des Risikos, und ' +
+        'die nennt der Banner.',
       hinweis:
-        'Für Österreich ist die Rechtslage in diesem Projekt nicht geklärt: Die ' +
-        'Quellen widersprechen sich, ob ein Warner ohne Messfunktion erlaubt ist. ' +
-        'Solange das offen ist, bleibt die Warnfunktion abgeschaltet.',
+        'Für Österreich widersprechen sich die Quellen, ob ein Warner ohne ' +
+        'Messfunktion erlaubt ist. Der Banner nennt deshalb den ungünstigeren ' +
+        'Fall: Trifft der zu, drohen bis 10.000 Euro und die Einziehung des ' +
+        'Geräts — deutlich mehr als in Deutschland. Die Entscheidung liegt bei dir.',
     },
 
     // --- Unklar: Verbot genannt, POI-Funktion nicht behandelt -------------
     BG: {
-      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
       grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
       hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
     },
     DK: {
-      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
       grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
       hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
     },
     GR: {
-      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
       grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
       hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
     },
     IT: {
-      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
       grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
       hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
     },
     HR: {
-      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
       grund:
         'WIDERSPRÜCHLICH: Die Quelle nennt weder ein Mitführ- noch ein ' +
         'Benutzungsverbot, die Anmerkung nennt aber Radarwarner als verboten. ' +
@@ -498,27 +560,27 @@ export const LAENDER_GATE = {
       hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
     },
     LV: {
-      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
       grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
       hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
     },
     LT: {
-      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
       grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
       hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
     },
     NO: {
-      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
       grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
       hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
     },
     PL: {
-      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
       grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
       hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
     },
     RO: {
-      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
       grund:
         'WIDERSPRÜCHLICH: kein Mitführ- und kein Benutzungsverbot genannt, ' +
         'die Anmerkung nennt aber Radarwarner beziehungsweise Störsender als ' +
@@ -526,27 +588,27 @@ export const LAENDER_GATE = {
       hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
     },
     SE: {
-      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
       grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
       hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
     },
     SK: {
-      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
       grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
       hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
     },
     SI: {
-      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
       grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
       hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
     },
     TR: {
-      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
       grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
       hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
     },
     HU: {
-      modus: 'aus', hinweisBanner: false, status: 'unklar',
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
       grund:
         'WIDERSPRÜCHLICH: kein Mitführ- und kein Benutzungsverbot genannt, ' +
         'die Anmerkung nennt aber Radarwarner als verboten. Der Widerspruch ' +

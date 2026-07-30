@@ -30,6 +30,7 @@ import {
   aktualisiereLand,
   createLandZustand,
   erkenneUmriss,
+  leseLand,
   warnmodus,
   type LandGrund,
 } from '../src/core/country';
@@ -115,17 +116,26 @@ test('MINDESTABSTAND_GRENZE_M ist aus der Güte der Umrisse abgeleitet', () => {
 
 // --- Der Übertritt --------------------------------------------------------
 
-test('Kehl -> Strasbourg: genau ein Moduswechsel, kein Flattern', () => {
+test('Kehl -> Strasbourg: zwei saubere Moduswechsel, kein Flattern', () => {
+  // Seit Deutschland warnt, sind es zwei: erst die Bestätigung, dass wir in
+  // Deutschland sind (aus -> punkt), dann der Grenzübertritt (punkt -> zone).
+  // Vorher war der erste unsichtbar, weil Deutschland auf 'aus' stand.
   const fixes = ladeTrack('grenze-kehl-strasbourg');
   const { wechsel } = fahre(fixes);
 
   assert.equal(
-    wechsel.length, 1,
+    wechsel.length, 2,
     `${wechsel.length} Moduswechsel: ` +
     wechsel.map((w) => `Fix ${w.index} ${w.von}->${w.nach}`).join(', '),
   );
-  assert.equal(wechsel[0]!.von, 'aus', 'in Deutschland muss der Modus aus sein');
-  assert.equal(wechsel[0]!.nach, 'zone', 'in Frankreich gilt der Zonenmodus');
+  assert.deepEqual(
+    wechsel.map((w) => `${w.von}->${w.nach}`),
+    ['aus->punkt', 'punkt->zone'],
+  );
+
+  // Der erste Wechsel ist der Start, nicht die Grenze: Er fällt weit VOR dem
+  // Rhein, weil dort Deutschland bestätigt wird.
+  assert.ok(wechsel[0]!.index < 20, `Startbestätigung erst bei Fix ${wechsel[0]!.index}`);
 });
 
 test('der Wechsel liegt 0 bis 500 m NACH der Grenze, nicht davor', () => {
@@ -133,7 +143,12 @@ test('der Wechsel liegt 0 bis 500 m NACH der Grenze, nicht davor', () => {
   const grenzIndex = datengrenze(fixes, 'DE', 'FR');
   const grenze = fixes[grenzIndex]!;
   const { wechsel } = fahre(fixes);
-  const schaltpunkt = fixes[wechsel[0]!.index]!;
+  // Der Grenzübertritt ist der Wechsel NACH 'zone'. Der erste Wechsel des
+  // Tracks ist die Startbestätigung in Deutschland und hat mit der Grenze
+  // nichts zu tun.
+  const uebertritt = wechsel.find((w) => w.nach === 'zone');
+  assert.ok(uebertritt !== undefined, 'kein Wechsel in den Zonenmodus');
+  const schaltpunkt = fixes[uebertritt.index]!;
 
   const hinterDerGrenze = haversine(
     schaltpunkt.lat, schaltpunkt.lon, grenze.lat, grenze.lon,
@@ -142,8 +157,8 @@ test('der Wechsel liegt 0 bis 500 m NACH der Grenze, nicht davor', () => {
   // DAVOR IST DER GEFÄHRLICHE FEHLER, deshalb zuerst geprüft: Ein Wechsel vor
   // der Grenze heisst, in Deutschland eine Warnfunktion einzuschalten.
   assert.ok(
-    wechsel[0]!.index > grenzIndex,
-    `Der Wechsel liegt bei Fix ${wechsel[0]!.index}, die Grenze bei ${grenzIndex} — ` +
+    uebertritt.index > grenzIndex,
+    `Der Wechsel liegt bei Fix ${uebertritt.index}, die Grenze bei ${grenzIndex} — ` +
     'die App schaltet Frankreich frei, während sie noch in Deutschland ist',
   );
 
@@ -191,9 +206,12 @@ test('der Grenzabstand ist der Grund für die Verzögerung, nicht der Zähler', 
     `Grenznähe hielt ${grenznah} Fixes, der Zähler ${wartet} — ` +
     'die Verzögerung soll aus dem Abstand kommen',
   );
+  // Der Zähler läuft genau zweimal durch: einmal für die Startbestätigung in
+  // Deutschland, einmal für Frankreich. Mehr hiesse, dass er zwischendurch
+  // neu gestartet wurde — also Flattern.
   assert.equal(
-    wartet, LAND_HYSTERESE.BESTAETIGENDE_FIXES - 1,
-    'Der Zähler soll genau einmal durchlaufen, nicht mehrfach neu starten',
+    wartet, 2 * (LAND_HYSTERESE.BESTAETIGENDE_FIXES - 1),
+    'Der Zähler startet mehr als zweimal — das wäre Flattern',
   );
 });
 
@@ -208,32 +226,64 @@ test('genau eine Ansage, und sie nennt in Frankreich die Gefahr nicht', () => {
   // Auf diesem Track beginnt der Modus in Deutschland und bleibt 'aus', der
   // einzige Wechsel ist damit auch die einzige Ansage.
   const ansagen = wechsel.map((w) => landwechselText(w.nach));
-  assert.equal(ansagen.length, 1, `${ansagen.length} Ansagen: ${ansagen.join(' | ')}`);
-  assert.equal(ansagen[0], 'Hinweise aktiviert');
+  assert.deepEqual(ansagen, ['Blitzerwarnung aktiviert', 'Hinweise aktiviert']);
+
+  // Der Punkt: Die ZWEITE Ansage fällt in Frankreich und darf die Gefahr
+  // nicht benennen. Die erste fällt in Deutschland, wo sie es darf und soll.
+  const inFrankreich = ansagen[1]!;
   assert.ok(
-    !/blitzer|radar/i.test(ansagen[0]!),
-    'Die Ansage beim Übertritt nach Frankreich benennt die Gefahr',
+    !/blitzer|radar/i.test(inFrankreich),
+    `Die Ansage beim Übertritt nach Frankreich benennt die Gefahr: "${inFrankreich}"`,
   );
+  assert.match(ansagen[0]!, /Blitzer/, 'in Deutschland darf sie es benennen');
 });
 
 // --- Die andere Richtung --------------------------------------------------
 
-test('zurück nach Deutschland schaltet sofort ab, ohne Grenzabstand', () => {
-  // Der Track wird umgedreht. Die Hysterese ist unsymmetrisch, und das muss
-  // sich hier zeigen: Der Weg nach Frankreich braucht 389 m, der Weg zurück
-  // keinen Meter. Anders herum hielte die App die Warnung in Deutschland noch
-  // Hunderte Meter lang scharf.
+test('zurück nach Deutschland wechselt in den Punktmodus, nicht in Stille', () => {
+  // Der Track wird umgedreht. Beide Seiten warnen inzwischen, nur in
+  // verschiedener Form — der Wechsel geht also von 'zone' nach 'punkt' und
+  // nimmt deshalb den langsamen Weg mit Grenzabstand. Das ist richtig: Wer
+  // nach Deutschland einfährt, soll die Punktwarnung nicht schon auf der
+  // Brücke bekommen.
   const hin = ladeTrack('grenze-kehl-strasbourg');
   const zurueck = [...hin].reverse().map((f, i) => ({ ...f, t: hin[0]!.t + i * 1000 }));
 
   const grenzIndex = datengrenze(zurueck, 'FR', 'DE');
   const { wechsel } = fahre(zurueck);
 
-  // Startet in Frankreich: erst der Wechsel auf 'zone', dann zurück auf 'aus'.
-  assert.equal(wechsel.length, 2, wechsel.map((w) => `${w.index}:${w.von}->${w.nach}`).join(', '));
-  assert.equal(wechsel[1]!.nach, 'aus');
+  assert.deepEqual(
+    wechsel.map((w) => `${w.von}->${w.nach}`),
+    ['aus->zone', 'zone->punkt'],
+    wechsel.map((w) => `${w.index}:${w.von}->${w.nach}`).join(', '),
+  );
+  assert.ok(
+    wechsel[1]!.index > grenzIndex,
+    'Der Punktmodus greift, bevor die Daten Deutschland melden',
+  );
+});
+
+test('DIE UNSYMMETRIE: ein Land ohne Aussage schaltet sofort ab', () => {
+  // Das war vorher am Grenztrack zu sehen, weil Deutschland auf 'aus' stand.
+  // Jetzt braucht es einen eigenen Fall — und der ist der wichtigere: Ein
+  // Land, über dessen Rechtslage nichts bekannt ist, muss die laufende
+  // Warnung SOFORT abschalten, ohne Zähler und ohne Grenzabstand.
+  //
+  // Italien ist so ein Land (status 'unklar') und grenzt an Frankreich.
+  const zustand = createLandZustand();
+
+  // Erst Frankreich bestätigen: tief im Land, weit von jeder Grenze.
+  const inFrankreich = { lat: 47.0, lon: 2.5, accuracy: 5 };
+  for (let i = 0; i < LAND_HYSTERESE.BESTAETIGENDE_FIXES; i++) {
+    aktualisiereLand(zustand, inFrankreich);
+  }
+  assert.equal(warnmodus(leseLand(zustand).land), 'zone', 'Frankreich wurde nicht bestätigt');
+
+  // Ein einziger Fix in Italien reicht.
+  const status = aktualisiereLand(zustand, { lat: 43.0, lon: 12.0, accuracy: 5 });
+  assert.equal(status.umriss, 'IT');
   assert.equal(
-    wechsel[1]!.index, grenzIndex,
-    'Das Abschalten muss auf demselben Fix greifen, auf dem die Daten Deutschland melden',
+    warnmodus(status.land), 'aus',
+    'Ein Land ohne belegte Rechtslage schaltet die Warnung nicht ab',
   );
 });

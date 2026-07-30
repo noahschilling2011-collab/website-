@@ -14,7 +14,7 @@
  * Handlungsanweisungen stehen im Infinitiv ("Energiesparmodus deaktivieren"),
  * damit die Datei sich nicht zwischen "du" und "Sie" entscheiden muss.
  */
-import type { LandCode } from './config';
+import { LAENDER_GATE, type LandCode } from './config';
 import type { CameraKind, Settings } from './types';
 
 // --- gemeinsame Formen ----------------------------------------------------
@@ -94,31 +94,56 @@ const ART_ANSAGE: Record<CameraKind, string> = {
  * config.LAENDER_GATE gekoppelt: Verschwindet dort ein Code, bricht hier die
  * Zuweisung — genau das soll passieren, statt dass ein Banner ins Leere zeigt.
  */
-export type BannerLand = Extract<LandCode, 'DE' | 'AT' | 'CH'>;
+export type BannerLand = Extract<LandCode, 'DE' | 'AT' | 'CH' | 'FR'>;
 
 const BANNER: Record<BannerLand, { readonly kurz: string; readonly lang: string }> = {
   DE: {
-    kurz: 'Blitzerwarnung in Deutschland abgeschaltet, § 23 Abs. 1c StVO',
+    kurz: '§ 23 Abs. 1c StVO: Betrieb durch den Fahrer untersagt — 75 Euro, 1 Punkt',
     lang:
       'In Deutschland ist es dem Fahrzeugführer nach § 23 Abs. 1c StVO untersagt, ' +
       'ein Gerät zur Anzeige von Verkehrsüberwachungsmassnahmen zu betreiben oder ' +
-      'betriebsbereit mitzuführen. Die Warnfunktion bleibt hier abgeschaltet. ' +
-      'Tacho und Tempolimit-Anzeige laufen weiter.',
+      'betriebsbereit mitzuführen. Nach Nummer 247 des Bussgeldkatalogs sind das ' +
+      '75 Euro und ein Punkt im Fahreignungsregister. Das OLG Karlsruhe hat mit ' +
+      'Beschluss vom 07.02.2023, Az. 2 ORbs 35 Ss 9/23, entschieden, dass das ' +
+      'auch gilt, wenn der Beifahrer bedient und der Fahrer sich die Warnung ' +
+      'zunutze macht.\n\n' +
+      'Das Verbot richtet sich an den Fahrzeugführer, nicht an die App. Die ' +
+      'Warnung läuft hier; ob du sie während der Fahrt betreibst, entscheidest ' +
+      'du.',
   },
   AT: {
-    kurz: 'Blitzerwarnung in Österreich abgeschaltet, § 98a KFG',
+    kurz: 'Österreich: Rechtslage strittig — im ungünstigen Fall bis 10.000 Euro',
     lang:
-      'In Österreich untersagt § 98a KFG Einrichtungen, die zur Ermittlung von ' +
-      'Geschwindigkeitsmessungen bestimmt sind. Die Warnfunktion bleibt hier ' +
-      'abgeschaltet. Tacho und Tempolimit-Anzeige laufen weiter.',
+      'Für Österreich widersprechen sich die Quellen. Die eine Lesart stützt sich ' +
+      'auf § 98a KFG und hält die Warnung für untersagt; die andere (ADAC, Stand ' +
+      '5/2025) beschreibt als verboten nur Geräte, mit denen Messeinrichtungen ' +
+      'beeinflusst oder gestört werden, und nennt Warner mit gespeicherten ' +
+      'Standorten ausdrücklich als erlaubt.\n\n' +
+      'Dieser Hinweis nennt den ungünstigeren Fall: Trifft er zu, drohen bis zu ' +
+      '10.000 Euro und die Einziehung des Geräts — deutlich mehr als in ' +
+      'Deutschland. Die Warnung läuft hier; die Entscheidung liegt bei dir.',
+  },
+  FR: {
+    kurz: 'Frankreich: nur Hinweis auf Gefahrenbereiche, keine Entfernungsangabe',
+    lang:
+      'Frankreich untersagt seit dem 03.01.2012 den deutlichen und ' +
+      'unmittelbaren Hinweis auf eine einzelne Messstelle. Zulässig ist nur der ' +
+      'allgemeine Hinweis auf einen Gefahrenbereich mit Mindestlänge — 300 m ' +
+      'innerorts, 2000 m auf Landstrassen, 4000 m auf Autobahnen.\n\n' +
+      'Anders als in Deutschland trifft diese Auflage die APP und nicht nur den ' +
+      'Fahrer. Ein Verstoss kostet bis zu 1500 Euro und die Einziehung des ' +
+      'Geräts. Die App sagt hier deshalb keine Entfernung an, nennt die Art der ' +
+      'Gefahr nicht und gibt pro Bereich genau einen Hinweis.',
   },
   CH: {
-    kurz: 'Blitzerwarnung in der Schweiz abgeschaltet, Art. 57b SVG',
+    kurz: 'Schweiz, Art. 57b SVG: schon das Mitführen untersagt, Gerät kann eingezogen werden',
     lang:
       'In der Schweiz verbietet Art. 57b SVG das Mitführen und Verwenden von ' +
-      'Geräten, die das Erkennen von Verkehrskontrollen erleichtern. Die ' +
-      'Warnfunktion bleibt hier abgeschaltet. Tacho und Tempolimit-Anzeige ' +
-      'laufen weiter.',
+      'Geräten, die das Erkennen von Verkehrskontrollen erleichtern. Die Quelle ' +
+      'nennt die Funktion für gespeicherte Standorte ausdrücklich mit.\n\n' +
+      'Das ist die schärfste der drei Regelungen: Untersagt ist nicht erst der ' +
+      'Betrieb, sondern schon das Mitführen, und das Gerät kann eingezogen ' +
+      'werden. Die Warnung läuft hier; die Entscheidung liegt bei dir.',
   },
 };
 
@@ -358,10 +383,14 @@ export const STRINGS = {
       'die Warnung zunutze macht. Die Bedienung durch eine andere Person im ' +
       'Fahrzeug ist damit kein Ausweg.',
     rechtFolge:
-      'Die Warnfunktion bleibt in Deutschland, Österreich und der Schweiz ' +
-      'abgeschaltet. Tacho und Tempolimit-Anzeige laufen dort weiter. Ausserhalb ' +
-      'dieser Länder richtet sich die Zulässigkeit nach dem jeweiligen ' +
-      'nationalen Recht; die Verantwortung dafür trägt der Fahrzeugführer.',
+      'Das Verbot richtet sich an den Fahrzeugführer, nicht an die App. Die ' +
+      'Warnung läuft deshalb auch in Deutschland, Österreich und der Schweiz — ' +
+      'ob du sie während der Fahrt betreibst, entscheidest du. In diesen drei ' +
+      'Ländern blendet die App dauerhaft einen Hinweis mit der jeweiligen Norm ' +
+      'ein; er lässt sich nicht abschalten. Ausserhalb richtet sich die ' +
+      'Zulässigkeit nach dem jeweiligen nationalen Recht; die Verantwortung ' +
+      'dafür trägt der Fahrzeugführer. Wo die Rechtslage ungeklärt ist, warnt ' +
+      'die App nicht.',
     rechtKeineBeratung:
       'Diese Zusammenfassung ist nach bestem Wissen erstellt und keine ' +
       'Rechtsberatung. Massgeblich ist allein der Gesetzestext in der jeweils ' +
@@ -650,6 +679,22 @@ export function watchdogStatuszeile(sekunden: number): string {
  * hängen.
  */
 export function bannerFuerLand(land: LandCode | null): { kurz: string; lang: string } | null {
-  if (land === 'DE' || land === 'AT' || land === 'CH') return BANNER[land];
-  return null;
+  if (land === null) return null;
+  // Aus der Gate-Tabelle abgeleitet, nicht danebengeschrieben: Wer dort
+  // hinweisBanner setzt und hier keinen Text hinterlegt, bekommt null statt
+  // eines stillschweigend fehlenden Banners — und der Test schlägt an.
+  return Object.prototype.hasOwnProperty.call(BANNER, land)
+    ? BANNER[land as BannerLand]
+    : null;
+}
+
+/**
+ * Braucht dieses Land einen dauerhaften Rechtshinweis?
+ *
+ * Einzige Quelle ist die Gate-Tabelle. Die frühere Fassung hatte die drei
+ * Codes im UI-Code stehen, und `bannerFuerLand()` war dadurch toter Code — ein
+ * neuer Eintrag mit hinweisBanner: true hätte nie einen Banner bekommen.
+ */
+export function brauchtBanner(land: LandCode | null): boolean {
+  return land !== null && LAENDER_GATE.LAENDER[land].hinweisBanner;
 }

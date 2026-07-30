@@ -18,7 +18,7 @@ import {
   AccessibilityInfo, Animated, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
 
-import { STRINGS } from '../strings';
+import { STRINGS, bannerFuerLand } from '../strings';
 import { GEWICHT, SCHRIFT, TOUCH, ZIFFERN_FEST, palette, type ThemeMode } from './theme';
 import { useApp } from '../state/store';
 import {
@@ -28,6 +28,8 @@ import { pruefe, statuszeile } from '../location/watchdog';
 import { warneSystem } from '../audio/player';
 import { datasetOrNull } from '../core/dataset';
 import { distanceToNearest } from '../core/warn';
+import { warnmodus } from '../core/country';
+import type { LandCode } from '../config';
 import { createSpeedState, readSpeed, updateSpeed } from '../core/speed';
 import { errorLog } from '../core/log';
 
@@ -58,7 +60,16 @@ export default function DriveScreen({ mode, onOeffneEinstellungen, onOeffneInfo 
   const [reduzierteBewegung, setReduzierteBewegung] = useState(false);
 
   const dataset = datasetOrNull();
-  const [land, setLand] = useState<string | null>(null);
+  /*
+   * Das Land nach der GATE-Tabelle, nicht der erkannte Umriss.
+   *
+   * Vorher stand hier landStatus().umriss — also auch Codes wie GB oder IE,
+   * für die es gar keinen Gate-Eintrag gibt. Für DE, AT und CH fällt das
+   * zusammen, überall sonst nicht: warnmodus() und bannerFuerLand() lesen die
+   * Gate-Tabelle, und ein Umriss ohne Eintrag ist dort kein gültiger
+   * Schlüssel.
+   */
+  const [land, setLand] = useState<LandCode | null>(null);
 
   // Systemeinstellung "Bewegung reduzieren" respektieren.
   useEffect(() => {
@@ -116,7 +127,7 @@ export default function DriveScreen({ mode, onOeffneEinstellungen, onOeffneInfo 
         if (dataset) setNaechsteM(distanceToNearest(fix, dataset.grid));
       }
 
-      setLand(landStatus().umriss);
+      setLand(landStatus().land);
 
       const wd = watchdogState();
       const s = statuszeile(wd, jetzt);
@@ -146,20 +157,48 @@ export default function DriveScreen({ mode, onOeffneEinstellungen, onOeffneInfo 
     }
   }, [aktiv, settings]);
 
-  const bannerLand = land === 'DE' || land === 'AT' || land === 'CH' ? land : null;
+  /*
+   * Der Rechtshinweis kommt aus strings.bannerFuerLand() und nicht aus einer
+   * Bedingung hier.
+   *
+   * Vorher stand hier `land === 'DE' || land === 'AT' || land === 'CH'`, und
+   * bannerFuerLand() war toter Code — genau das, was der Kommentar dieser
+   * Funktion verhindern sollte. Ein neuer Eintrag mit hinweisBanner: true
+   * hätte nie einen Banner bekommen, und der Banner ist eine rechtliche
+   * Anforderung, keine Verzierung.
+   */
+  const banner = bannerFuerLand(land);
+
+  /*
+   * Die Statuszeile sagt, was die Warnung TUT — nicht, ob das Tracking läuft.
+   *
+   * Vorher stand dort `STRINGS.fahrt.status.aktiv` ("Warnung aktiv"), sobald
+   * die Positionsverfolgung lief. In einem Land, in dem das Gate abschaltet,
+   * behauptete die App damit "Warnung aktiv" direkt über einem Banner, der
+   * das Gegenteil sagte. Ein Widerspruch auf demselben Bildschirm ist
+   * schlimmer als eine fehlende Zeile: Er lässt den Fahrer raten, welche der
+   * beiden Angaben stimmt.
+   */
+  const modus = warnmodus(land);
+  const statusText =
+    modus === 'aus'
+      ? STRINGS.fahrt.status.landGesperrt
+      : modus === 'zone'
+        ? STRINGS.zone.aktiv
+        : STRINGS.fahrt.status.aktiv;
 
   return (
     <View style={[stil.wurzel, { backgroundColor: farben.hintergrund }]}>
       <ScrollView contentContainerStyle={stil.inhalt}>
 
         {/* Rechtshinweis-Banner. Nicht abschaltbar (Spec 2). */}
-        {bannerLand != null && (
+        {banner != null && (
           <View
             style={[stil.banner, { borderColor: farben.warn, backgroundColor: farben.warnGedaempft }]}
             accessibilityRole="alert"
           >
             <Text style={[stil.bannerText, { color: farben.text }]}>
-              {STRINGS.banner[bannerLand].kurz}
+              {banner.kurz}
             </Text>
           </View>
         )}
@@ -226,7 +265,7 @@ export default function DriveScreen({ mode, onOeffneEinstellungen, onOeffneInfo 
           <Text style={[stil.status, { color: farben.textSekundaer }]}>
             {!aktiv
               ? STRINGS.fahrt.status.inaktiv
-              : `${STRINGS.fahrt.status.aktiv}` +
+              : `${statusText}` +
                 (status.seitMin != null ? ` · seit ${status.seitMin} min` : '') +
                 (status.fixVorSek != null ? ` · Position vor ${status.fixVorSek} s` : ` · ${STRINGS.fahrt.status.sucheGps}`)}
           </Text>

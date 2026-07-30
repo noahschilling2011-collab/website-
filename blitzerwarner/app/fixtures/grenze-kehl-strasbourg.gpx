@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Fahrt über die Europabrücke, Deutschland nach Frankreich. Prüft die Landeserkennung: genau ein Moduswechsel, kein Flattern, und der Wechsel liegt NACH der Grenze, nicht davor.
+Fahrt über die Europabrücke, Deutschland nach Frankreich. Prüft die Landeserkennung: zwei Moduswechsel (Startbestätigung in Deutschland, dann der Grenzübertritt), kein Flattern, und der Übertritt liegt NACH der Grenze, nicht davor.
 
 Synthetisch erzeugt von src/replay/make-fixtures.ts — nicht von Hand ändern,
 sondern den Generator anpassen und neu erzeugen.

@@ -279,16 +279,18 @@ const FR_LON = 7.7521;
     erwartung: {
       beschreibung:
         'Fahrt über die Europabrücke, Deutschland nach Frankreich. Prüft die ' +
-        'Landeserkennung: genau ein Moduswechsel, kein Flattern, und der ' +
-        'Wechsel liegt NACH der Grenze, nicht davor.',
+        'Landeserkennung: zwei Moduswechsel (Startbestätigung in Deutschland, ' +
+        'dann der Grenzübertritt), kein Flattern, und der Übertritt liegt NACH ' +
+        'der Grenze, nicht davor.',
       kameras: [],
       erwarteteWarnungen: 0,
       // Ohne dieses Feld schickt die CLI den Track durch die Punktlogik,
       // findet dort null Kameras und meldet "0 von 0 erwartet, OK" — ein
       // grünes Ergebnis für eine Prüfung, die nicht gelaufen ist.
       landwechsel: {
-        // Deutschland ist 'aus', Frankreich 'zone'. Genau ein Wechsel.
-        modi: ['zone'],
+        // Deutschland ist 'punkt', Frankreich 'zone'. Zwei Wechsel: erst die
+        // Startbestätigung in Deutschland, dann der Grenzübertritt.
+        modi: ['punkt', 'zone'],
         // Aus der Spec: der Wechsel liegt zwischen 0 und 500 m hinter der
         // Grenze. Gemessen werden 389 m.
         maxHinterGrenzeM: 500,

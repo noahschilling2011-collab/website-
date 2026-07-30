@@ -616,6 +616,94 @@ drei Positionen denselben Zeitstempel, obwohl zwischen ihnen 1,6 km liegen.
 Das fiel erst mit der neuen Regel auf. Eine Rundfahrt in null Sekunden gibt es
 nicht; der Test führt jetzt die Zeit mit.
 
+## Warum die App jetzt auch in Deutschland warnt
+
+Bis zu dieser Änderung schwieg die App in Deutschland, Österreich und der
+Schweiz. Das beruhte auf einem Satz, der so nicht stimmt.
+
+### Die Verwechslung
+
+§ 23 Abs. 1c StVO, § 98a KFG und Art. 57b SVG richten sich an den
+**Fahrzeugführer**. Sie untersagen *ihm* den Betrieb. Sie untersagen niemandem,
+eine solche App zu bauen, anzubieten oder zu installieren — deshalb stehen
+vergleichbare Apps im deutschen App Store.
+
+Der frühere Satz „die App darf hier nicht warnen" war also falsch. Richtig ist:
+„der Fahrer darf sie hier nicht betreiben." Das ist seine Entscheidung, nicht
+die der App.
+
+### Was sich strukturell geändert hat
+
+Die Gate-Tabelle vermischte zwei Fragen in einem Feld. Sie sind jetzt getrennt:
+
+| Feld | Frage | Art der Antwort |
+|---|---|---|
+| `modus` | Was tut die App hier? | Produktentscheidung |
+| `fahrerverbot` | Was trifft den Fahrer, wenn er sie betreibt? | Tatsache über das Recht |
+
+Die Invariante ist damit von `status !== 'belegt'` auf **`status === 'unklar'`**
+gewandert. Der Unterschied trägt: `'strittig'` heißt, dass wir die Norm kennen
+und nur ihre Reichweite umstritten ist — darüber kann der Fahrer entscheiden,
+wenn man ihm den ungünstigeren Fall nennt. Bei `'unklar'` wissen wir gar
+nichts, und dann gibt es auch nichts vorzulegen. **Dort bleibt es bei „aus".**
+
+### Der Sonderfall Österreich
+
+Österreich stand auf `status: 'strittig'`, und die Invariante hätte es damit
+gesperrt. Der Widerspruch trägt die Entscheidung aber nicht mehr:
+
+- Trifft die ADAC-Lesart zu, ist die Warnung **erlaubt**.
+- Trifft die andere zu, ist sie **dem Fahrer verboten** — derselbe Fall wie DE
+  und CH, und den entscheidet er selbst.
+
+Beide Zweige führen zum selben Verhalten. Offen bleibt allein die **Höhe** des
+Risikos, und die nennt der Banner: bis 10.000 Euro und Einziehung des Geräts,
+falls die strengere Lesart zutrifft. Das ist zwei Größenordnungen über
+Deutschlands 75 Euro, und deshalb steht es dort und nicht in einer Fußnote.
+
+### Die drei Länder sind nicht gleich teuer
+
+Ein gemeinsamer Bannertext hätte den Unterschied verwischt. Ein Test hält
+deshalb fest, dass jeder der drei seine eigene Zahl nennt:
+
+| Land | Norm | Folge für den Fahrer |
+|---|---|---|
+| DE | § 23 Abs. 1c StVO, Nr. 247 BKat | 75 Euro, 1 Punkt |
+| AT | § 98a KFG (strittig) | im ungünstigen Fall bis 10.000 Euro, Geräteeinzug |
+| CH | Art. 57b SVG | schon das **Mitführen** untersagt, Gerät kann eingezogen werden |
+
+### Frankreich bleibt, wie es war
+
+Dort ist die Punktwarnung **der App** verboten, nicht bloß dem Fahrer — bis
+1500 Euro und Einziehung des Geräts. Der Zonenmodus bleibt deshalb unverändert:
+keine Entfernung, keine Benennung der Gefahr, ein Hinweis pro Bereich.
+
+### Was dabei sonst noch aufgefallen ist
+
+**Frankreich hatte `hinweisBanner: true`, aber keinen Bannertext.** Es bekam
+also stillschweigend keinen. Aufgefallen erst durch den neuen Test, der die
+Gate-Tabelle gegen den Textkatalog prüft.
+
+**`bannerFuerLand()` war toter Code.** Die UI hatte die drei Ländercodes selbst
+hartkodiert — genau das, was der Kommentar dieser Funktion verhindern sollte.
+Ein neuer Eintrag mit `hinweisBanner: true` hätte nie einen Banner bekommen.
+
+**Die Statuszeile behauptete „Warnung aktiv"**, sobald die Positionsverfolgung
+lief — auch direkt über einem Banner, der das Gegenteil sagte. Sie liest jetzt
+den Warnmodus statt den Trackingstatus.
+
+**Der Fahrt-Screen hielt den Umriss-Code statt des Gate-Landes.** Für DE, AT
+und CH fällt das zusammen, überall sonst nicht: Codes wie GB oder IE haben
+keinen Gate-Eintrag.
+
+### Gemessen am Grenztrack
+
+Der Übertritt Kehl → Straßburg hat jetzt **zwei** Moduswechsel statt einem:
+`aus → punkt` bei Fix 4 (Startbestätigung in Deutschland, 931 m vor dem Rhein)
+und `punkt → zone` bei Fix 99. Der B.4-Messwert ist davon unberührt — der
+Grenzübertritt liegt weiterhin **389 m** hinter der Datengrenze und damit im
+geforderten Fenster von 0 bis 500 m.
+
 ## Trefferquote gegen bekannte Standorte
 
 **Noch nicht gemessen.**
