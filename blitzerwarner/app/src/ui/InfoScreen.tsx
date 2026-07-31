@@ -8,6 +8,7 @@
  * nachher.
  */
 import { Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import Constants from 'expo-constants';
 
 import { STRINGS } from '../strings';
 import { GEWICHT, SCHRIFT, TOUCH, palette, type ThemeMode } from './theme';
@@ -22,6 +23,7 @@ export default function InfoScreen({ mode, onZurueck }: Props) {
   const farben = palette(mode);
   const dataset = datasetOrNull();
   const fahrtprotokollAn = useApp((s) => s.settings.fahrtprotokoll);
+  const internetEntzogen = Constants.expoConfig?.extra?.internetEntzogen === true;
 
   /**
    * Das Fahrtprotokoll ans System übergeben.
@@ -117,6 +119,22 @@ export default function InfoScreen({ mode, onZurueck }: Props) {
         <Text style={[stil.klein, { color: farben.textLeise }]}>
           {STRINGS.datenschutz.keinNetz}
         </Text>
+        {/*
+          Nur im ausgelieferten Build. Im Entwicklungsbuild ist die
+          Berechtigung da, weil der Dev-Client sein JS über das Netz lädt —
+          dann wäre der Satz falsch, und die App behauptet nicht, was sie
+          nicht beweisen kann. Die Angabe kommt aus app.config.js.
+        */}
+        {internetEntzogen && (
+          <>
+            <Text style={[stil.klein, { color: farben.text }]}>
+              {STRINGS.datenschutz.keinNetzBewiesen}
+            </Text>
+            <Text style={[stil.klein, { color: farben.textLeise }]}>
+              {STRINGS.datenschutz.keinMikrofon}
+            </Text>
+          </>
+        )}
       </View>
 
       {/* Rechtshinweis dauerhaft nachlesbar (Spec 2). */}

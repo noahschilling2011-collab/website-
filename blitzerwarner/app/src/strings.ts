@@ -595,6 +595,19 @@ export const STRINGS = {
     keinNetz:
       'Die App stellt zur Laufzeit keine Netzwerkverbindung her. Der Datensatz ' +
       'liegt vollständig im App-Paket.',
+    /**
+     * Nur im ausgelieferten Build wahr. Im Entwicklungsbuild ist die
+     * Berechtigung vorhanden, weil der Dev-Client sein JS über das Netz lädt —
+     * der Satz wird dort deshalb nicht angezeigt. Was die App nicht beweisen
+     * kann, behauptet sie auch nicht.
+     */
+    keinNetzBewiesen:
+      'In diesem Build ist der App die Internet-Berechtigung entzogen. Sie ' +
+      'könnte also gar keine Verbindung herstellen — das lässt sich in den ' +
+      'App-Informationen des Systems nachsehen.',
+    keinMikrofon:
+      'Ebenfalls entzogen: Zugriff auf Mikrofon und Gerätespeicher. Die App ' +
+      'spielt Töne ab, sie nimmt nichts auf.',
     keinePosition:
       'Die Position verlässt das Gerät nicht. Sie wird im Arbeitsspeicher ' +
       'ausgewertet und nicht dauerhaft gespeichert.',

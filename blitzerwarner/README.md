@@ -165,6 +165,36 @@ frische Abfrage.
 - `scripts/reference-locations.json` — bekannte Standorte für die Stichprobe,
   von Hand zu füllen
 
+## Berechtigungen
+
+Im ausgelieferten Build (`preview`, `production`) hat die App **keine
+Internet-Berechtigung**. Das Versprechen „keine Netzwerk-Requests zur
+Laufzeit" ist damit nicht behauptet, sondern nachprüfbar — in den
+App-Informationen des Systems.
+
+Ebenfalls entzogen: Mikrofon (`RECORD_AUDIO`), Gerätespeicher
+(`READ_/WRITE_EXTERNAL_STORAGE`), Standortdaten aus fremden Fotos
+(`ACCESS_MEDIA_LOCATION`) und das Debug-Overlay (`SYSTEM_ALERT_WINDOW`). Alle
+fünf kamen ungefragt aus Abhängigkeiten ins Manifest — `expo-av` bringt das
+Mikrofon mit, weil dieselbe Bibliothek auch aufnehmen kann, und React Native
+setzt `INTERNET` grundsätzlich.
+
+Was bleibt, ist das Minimum:
+
+| Berechtigung | Wofür |
+|---|---|
+| `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION` | Position mit dem Datensatz vergleichen |
+| `ACCESS_BACKGROUND_LOCATION` | warnen, wenn das Display aus ist |
+| `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION` | Android beendet den Task sonst |
+| `POST_NOTIFICATIONS` | die Pflicht-Notification des Vordergrunddienstes |
+| `MODIFY_AUDIO_SETTINGS` | Musik leiser stellen statt stoppen |
+| `WAKE_LOCK`, `VIBRATE` | Ansage und Vibration |
+
+Der Entwicklungsbuild behält `INTERNET` und `SYSTEM_ALERT_WINDOW` — ohne sie
+erreicht der Dev-Client den Metro-Server nicht. Die Unterscheidung nach
+Build-Profil steht in `app/app.config.js`, geprüft von
+`app/tests/berechtigungen.test.ts`.
+
 ## Nicht-Ziele
 
 Keine Community-Meldungen, kein Melde-Button, kein Backend. Keine Navigation,
