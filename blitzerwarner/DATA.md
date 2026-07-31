@@ -704,6 +704,146 @@ und `punkt → zone` bei Fix 99. Der B.4-Messwert ist davon unberührt — der
 Grenzübertritt liegt weiterhin **389 m** hinter der Datengrenze und damit im
 geforderten Fenster von 0 bis 500 m.
 
+## Mengengerüst Europa (Phase A.1)
+
+Gemessen mit `scripts/count-europe.ts` über **124 Gebiete in 44 Ländern**.
+Abgefragt wurde nur die Anzahl (`out count;` statt `out body;`) — das ist
+billig und belastet Overpass kaum. Der Lauf brauchte trotzdem mehrere Stunden;
+die Rohdaten liegen als `assets/data/europe.count.json` im Repo, damit sie
+niemand wiederholen muss.
+
+**Ergebnis: 63364 Rohtreffer, geschätzt 29474 Anlagen nach dem Dedupe,
+rund 2 MB.**
+
+### Ein Fehler in der ersten Schätzung
+
+Der Lauf meldete zunächst 22.708 Anlagen. Das war zu wenig, und der Beweis lag
+im eigenen Datensatz: Für Deutschland schätzte er **3892**, gebaut sind aber
+**5053**.
+
+Ursache ist ein Nenner-Fehler in `DEDUPE_FAKTOR`. Er war als 5053/14102
+kalibriert — die 14102 stammen aus dem echten Build und enthalten die
+`device`-Nodes der Enforcement-Relationen. Die Zählquery liest aber nur den
+ersten `out count;`-Block und zählt damit **nur** Kamera-Nodes plus Relationen:
+für Deutschland 5181 + 5682 = 10863. Der Faktor wurde also auf eine Grundmenge
+angewandt, für die er nicht kalibriert war.
+
+Richtig ist **5053 / 10863 = 0,465** statt 0,358. Damit:
+
+| | Rohtreffer | geschätzte Anlagen | Grösse |
+|---|---|---|---|
+| falsch (0,358) | 63.364 | 22.708 | 1,6 MB |
+| **richtig (0,465)** | **63.364** | **29474** | **2,1 MB** |
+
+Die Kalibrierung an Deutschland stimmt jetzt per Konstruktion. Ob der Faktor
+für andere Länder gilt, bleibt eine Annahme: Wo weniger mit
+Enforcement-Relationen gearbeitet wird, überleben mehr Einträge das Dedupe.
+
+### Trägt die Ein-Datei-Architektur das noch?
+
+**Ja, mit deutlichem Abstand.** Gemessen an einem synthetischen Datensatz mit
+29474 Einträgen im echten Format, gegen den echten `parseDataset()`:
+
+| | Grösse | Zellen | `parseDataset()` |
+|---|---|---|---|
+| Deutschland (echt) | 0,35 MB | — | 6 ms |
+| Europa (synthetisch, 29474) | 1,92 MB | 2464 | 23 ms |
+
+Die Zeit wächst linear mit der Zahl der Einträge, nicht überproportional. Auf
+einem Telefon mit Hermes ist mit dem Drei- bis Fünffachen zu rechnen, also
+rund 100 ms — einmalig beim Start, und der Start hat ohnehin einen
+Onboarding-Screen davor.
+
+Die **Suche** ist von der Menge unabhängig: `neighbourKeys()` liest immer neun
+Zellen, egal wie viele es insgesamt gibt. Bei 2464 Zellen für Europa liegen im
+Mittel 12 Anlagen je Zelle, in Ballungsräumen mehr — das ändert an der
+Laufzeit einer Warnprüfung nichts Messbares.
+
+**Damit entfällt die in §4b vorgesehene Reduktion.** Ein länderweises
+Nachladen (`cameras.index.json` plus Einzeldateien) wäre Aufwand ohne
+Gegenwert: Es brächte 2 MB App-Grösse ein und handelte sich dafür einen
+Ladepfad ein, der fehlschlagen kann — genau die Sorte stiller Ausfall, gegen
+die `core/dataset.ts` und `core/zonendaten.ts` gebaut sind.
+
+### Warum die Zahl unter dem Erwartungswert liegt
+
+Sekundärquellen nennen 60.000 bis 100.000 Anlagen in Europa. Gemessen sind
+29474 — Faktor 2 bis 3 darunter. Das Zählskript meldet das ausdrücklich und
+verlangt eine Prüfung, bevor weitergebaut wird. Die Prüfung ergibt: **Der
+Fehler liegt nicht in der Query.**
+
+- Für Deutschland liefert dieselbe Query 10.863 Rohtreffer, aus denen der
+  echte Build 5053 Anlagen macht. Diese Zahl ist in DATA.md gegen zwei
+  unabhängige Flächenabfragen gegengeprüft.
+- Die Sekundärzahlen sind nicht vergleichbar: Sie enthalten **mobile**
+  Messstellen, die dieses Projekt ausdrücklich nicht abbildet, und stammen aus
+  kommerziellen Datenbanken mit eigener Erfassung.
+- OpenStreetMap enthält, was Freiwillige eingetragen haben. Die regionalen
+  Unterschiede sind gewaltig (siehe oben: BW 42,2 Anlagen je 1000 km², Bayern
+  1,9) und setzen sich in Europa fort.
+
+Die Lücke ist also erwartbar und kein Messfehler. Sie ist aber der Grund,
+warum die Trefferquote gegen eine unabhängige Quelle weiterhin die wichtigste
+offene Zahl dieses Projekts ist.
+
+### Pro Land
+
+Geschätzt mit dem korrigierten Faktor 0,465.
+
+| Land | Gebiete | Rohtreffer | geschätzte Anlagen | |
+|---|---|---|---|---|
+| DE | 16 | 10863 | 5053 | |
+| FR | 13 | 8472 | 3941 | |
+| IT | 20 | 7902 | 3676 | |
+| ES | 17 | 5215 | 2426 | |
+| SE | 1 | 4208 | 1957 | |
+| GB | 4 | 4086 | 1901 | |
+| HU | 1 | 2987 | 1389 | |
+| AT | 1 | 2439 | 1135 | |
+| BE | 1 | 2403 | 1118 | |
+| CZ | 1 | 2127 | 989 | |
+| PL | 16 | 1979 | 921 | |
+| NL | 1 | 1401 | 652 | |
+| FI | 1 | 1312 | 610 | |
+| CH | 1 | 1036 | 482 | |
+| TR | 1 | 760 | 354 | |
+| NO | 1 | 753 | 350 | |
+| HR | 1 | 751 | 349 | |
+| LT | 1 | 720 | 335 | |
+| UA | 1 | 704 | 327 | |
+| GR | 1 | 430 | 200 | |
+| PT | 1 | 404 | 188 | |
+| RS | 1 | 346 | 161 | |
+| RO | 1 | 343 | 160 | |
+| BA | 1 | 247 | 115 | |
+| CY | 1 | 238 | 111 | |
+| LV | 1 | 202 | 94 | |
+| SI | 1 | 193 | 90 | |
+| MK | 1 | 172 | 80 | |
+| EE | 1 | 157 | 73 | |
+| BG | 1 | 104 | 48 | |
+| LU | 1 | 95 | 44 | |
+| SK | 1 | 91 | 42 | |
+| MD | 1 | 81 | 38 | |
+| IS | 1 | 31 | 14 | |
+| IE | 1 | 28 | 13 | |
+| MT | 1 | 24 | 11 | |
+| DK | 1 | 22 | 10 | |
+| ME | 1 | 13 | 6 | |
+| AD | 1 | 13 | 6 | |
+| LI | 1 | 10 | 5 | |
+| AL | 1 | 2 | 1 | |
+| MC | 1 | 0 | 0 | **Abfrage fehlgeschlagen** |
+
+Monaco ist als einziges Gebiet fehlgeschlagen (HTTP 504 nach drei Versuchen).
+Bei einem Stadtstaat mit wenigen Strassen fällt das für das Mengengerüst nicht
+ins Gewicht; für einen echten Datensatzbau müsste es nachgezogen werden.
+
+**Russland und Belarus fehlen absichtlich** — siehe `scripts/lib/regions.ts`.
+Russland allein hat über 18.000 erfasste Anlagen, überwiegend Rotlicht, und
+würde den Datensatz für ein Gebiet verdoppeln, in das aus diesem Nutzerkreis
+niemand fährt.
+
 ## Trefferquote gegen bekannte Standorte
 
 **Noch nicht gemessen.**

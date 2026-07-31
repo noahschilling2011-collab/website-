@@ -1,8 +1,8 @@
 {
   "stand": "2026-07-30",
-  "dedupeFaktor": 0.35831796908239966,
+  "dedupeFaktor": 0.46515695480069963,
   "bytesJeEintrag": 73.37146249752622,
-  "herleitung": "Dedupe-Faktor und Bytes je Eintrag an Deutschland kalibriert: 14102 Rohtreffer -> 5053 Einträge, 370746 Bytes.",
+  "herleitung": "Dedupe-Faktor an Deutschland kalibriert, gegen dieselbe Grundmenge, die dieses Skript misst: 10863 Rohtreffer (5181 Nodes + 5682 Relationen) -> 5053 gebaute Eintraege, 370746 Bytes. KORREKTUR: Der erste Lauf rechnete mit 5053/14102 = 0,358. Die 14102 stammen aus dem echten Build und enthalten die device-Nodes der Enforcement-Relationen, die die Zaehlquery nicht mitzaehlt. Dadurch lag die Schaetzung fuer Deutschland bei 3892 statt 5053, also 23 Prozent zu niedrig, und fuer Europa entsprechend. Die Rohzahlen sind unveraendert; nur die daraus abgeleiteten Schaetzungen wurden neu gerechnet.",
   "gebiete": [
     {
       "code": "DE-BW",
@@ -11,8 +11,8 @@
       "nodes": 1544,
       "relationen": 1566,
       "roh": 3110,
-      "geschaetztNachDedupe": 1114,
-      "geschaetzteBytes": 81763,
+      "geschaetztNachDedupe": 1447,
+      "geschaetzteBytes": 106142,
       "fehler": null
     },
     {
@@ -22,8 +22,8 @@
       "nodes": 140,
       "relationen": 188,
       "roh": 328,
-      "geschaetztNachDedupe": 118,
-      "geschaetzteBytes": 8623,
+      "geschaetztNachDedupe": 153,
+      "geschaetzteBytes": 11194,
       "fehler": null
     },
     {
@@ -33,8 +33,8 @@
       "nodes": 64,
       "relationen": 76,
       "roh": 140,
-      "geschaetztNachDedupe": 50,
-      "geschaetzteBytes": 3681,
+      "geschaetztNachDedupe": 65,
+      "geschaetzteBytes": 4778,
       "fehler": null
     },
     {
@@ -44,8 +44,8 @@
       "nodes": 221,
       "relationen": 244,
       "roh": 465,
-      "geschaetztNachDedupe": 167,
-      "geschaetzteBytes": 12225,
+      "geschaetztNachDedupe": 216,
+      "geschaetzteBytes": 15870,
       "fehler": null
     },
     {
@@ -55,8 +55,8 @@
       "nodes": 55,
       "relationen": 50,
       "roh": 105,
-      "geschaetztNachDedupe": 38,
-      "geschaetzteBytes": 2760,
+      "geschaetztNachDedupe": 49,
+      "geschaetzteBytes": 3584,
       "fehler": null
     },
     {
@@ -66,8 +66,8 @@
       "nodes": 31,
       "relationen": 62,
       "roh": 93,
-      "geschaetztNachDedupe": 33,
-      "geschaetzteBytes": 2445,
+      "geschaetztNachDedupe": 43,
+      "geschaetzteBytes": 3174,
       "fehler": null
     },
     {
@@ -77,8 +77,8 @@
       "nodes": 858,
       "relationen": 865,
       "roh": 1723,
-      "geschaetztNachDedupe": 617,
-      "geschaetzteBytes": 45298,
+      "geschaetztNachDedupe": 801,
+      "geschaetzteBytes": 58805,
       "fehler": null
     },
     {
@@ -88,8 +88,8 @@
       "nodes": 97,
       "relationen": 163,
       "roh": 260,
-      "geschaetztNachDedupe": 93,
-      "geschaetzteBytes": 6835,
+      "geschaetztNachDedupe": 121,
+      "geschaetzteBytes": 8874,
       "fehler": null
     },
     {
@@ -99,8 +99,8 @@
       "nodes": 583,
       "relationen": 660,
       "roh": 1243,
-      "geschaetztNachDedupe": 445,
-      "geschaetzteBytes": 32679,
+      "geschaetztNachDedupe": 578,
+      "geschaetzteBytes": 42423,
       "fehler": null
     },
     {
@@ -110,8 +110,8 @@
       "nodes": 938,
       "relationen": 871,
       "roh": 1809,
-      "geschaetztNachDedupe": 648,
-      "geschaetzteBytes": 47559,
+      "geschaetztNachDedupe": 841,
+      "geschaetzteBytes": 61740,
       "fehler": null
     },
     {
@@ -121,8 +121,8 @@
       "nodes": 93,
       "relationen": 110,
       "roh": 203,
-      "geschaetztNachDedupe": 73,
-      "geschaetzteBytes": 5337,
+      "geschaetztNachDedupe": 94,
+      "geschaetzteBytes": 6928,
       "fehler": null
     },
     {
@@ -132,8 +132,8 @@
       "nodes": 57,
       "relationen": 66,
       "roh": 123,
-      "geschaetztNachDedupe": 44,
-      "geschaetzteBytes": 3234,
+      "geschaetztNachDedupe": 57,
+      "geschaetzteBytes": 4198,
       "fehler": null
     },
     {
@@ -143,8 +143,8 @@
       "nodes": 268,
       "relationen": 409,
       "roh": 677,
-      "geschaetztNachDedupe": 243,
-      "geschaetzteBytes": 17799,
+      "geschaetztNachDedupe": 315,
+      "geschaetzteBytes": 23105,
       "fehler": null
     },
     {
@@ -154,8 +154,8 @@
       "nodes": 64,
       "relationen": 87,
       "roh": 151,
-      "geschaetztNachDedupe": 54,
-      "geschaetzteBytes": 3970,
+      "geschaetztNachDedupe": 70,
+      "geschaetzteBytes": 5154,
       "fehler": null
     },
     {
@@ -165,8 +165,8 @@
       "nodes": 82,
       "relationen": 122,
       "roh": 204,
-      "geschaetztNachDedupe": 73,
-      "geschaetzteBytes": 5363,
+      "geschaetztNachDedupe": 95,
+      "geschaetzteBytes": 6962,
       "fehler": null
     },
     {
@@ -176,8 +176,8 @@
       "nodes": 86,
       "relationen": 143,
       "roh": 229,
-      "geschaetztNachDedupe": 82,
-      "geschaetzteBytes": 6020,
+      "geschaetztNachDedupe": 107,
+      "geschaetzteBytes": 7816,
       "fehler": null
     },
     {
@@ -187,8 +187,8 @@
       "nodes": 568,
       "relationen": 141,
       "roh": 709,
-      "geschaetztNachDedupe": 254,
-      "geschaetzteBytes": 18640,
+      "geschaetztNachDedupe": 330,
+      "geschaetzteBytes": 24198,
       "fehler": null
     },
     {
@@ -198,8 +198,8 @@
       "nodes": 25,
       "relationen": 10,
       "roh": 35,
-      "geschaetztNachDedupe": 13,
-      "geschaetzteBytes": 920,
+      "geschaetztNachDedupe": 16,
+      "geschaetzteBytes": 1195,
       "fehler": null
     },
     {
@@ -209,8 +209,8 @@
       "nodes": 887,
       "relationen": 708,
       "roh": 1595,
-      "geschaetztNachDedupe": 572,
-      "geschaetzteBytes": 41933,
+      "geschaetztNachDedupe": 742,
+      "geschaetzteBytes": 54436,
       "fehler": null
     },
     {
@@ -220,8 +220,8 @@
       "nodes": 319,
       "relationen": 162,
       "roh": 481,
-      "geschaetztNachDedupe": 172,
-      "geschaetzteBytes": 12646,
+      "geschaetztNachDedupe": 224,
+      "geschaetzteBytes": 16416,
       "fehler": null
     },
     {
@@ -231,8 +231,8 @@
       "nodes": 750,
       "relationen": 351,
       "roh": 1101,
-      "geschaetztNachDedupe": 395,
-      "geschaetzteBytes": 28946,
+      "geschaetztNachDedupe": 512,
+      "geschaetzteBytes": 37576,
       "fehler": null
     },
     {
@@ -242,8 +242,8 @@
       "nodes": 190,
       "relationen": 23,
       "roh": 213,
-      "geschaetztNachDedupe": 76,
-      "geschaetzteBytes": 5600,
+      "geschaetztNachDedupe": 99,
+      "geschaetzteBytes": 7270,
       "fehler": null
     },
     {
@@ -253,8 +253,8 @@
       "nodes": 120,
       "relationen": 23,
       "roh": 143,
-      "geschaetztNachDedupe": 51,
-      "geschaetzteBytes": 3760,
+      "geschaetztNachDedupe": 67,
+      "geschaetzteBytes": 4880,
       "fehler": null
     },
     {
@@ -264,8 +264,8 @@
       "nodes": 616,
       "relationen": 590,
       "roh": 1206,
-      "geschaetztNachDedupe": 432,
-      "geschaetzteBytes": 31706,
+      "geschaetztNachDedupe": 561,
+      "geschaetzteBytes": 41160,
       "fehler": null
     },
     {
@@ -275,8 +275,8 @@
       "nodes": 579,
       "relationen": 342,
       "roh": 921,
-      "geschaetztNachDedupe": 330,
-      "geschaetzteBytes": 24213,
+      "geschaetztNachDedupe": 428,
+      "geschaetzteBytes": 31433,
       "fehler": null
     },
     {
@@ -286,8 +286,8 @@
       "nodes": 141,
       "relationen": 67,
       "roh": 208,
-      "geschaetztNachDedupe": 75,
-      "geschaetzteBytes": 5468,
+      "geschaetztNachDedupe": 97,
+      "geschaetzteBytes": 7099,
       "fehler": null
     },
     {
@@ -297,8 +297,8 @@
       "nodes": 185,
       "relationen": 40,
       "roh": 225,
-      "geschaetztNachDedupe": 81,
-      "geschaetzteBytes": 5915,
+      "geschaetztNachDedupe": 105,
+      "geschaetzteBytes": 7679,
       "fehler": null
     },
     {
@@ -308,8 +308,8 @@
       "nodes": 237,
       "relationen": 96,
       "roh": 333,
-      "geschaetztNachDedupe": 119,
-      "geschaetzteBytes": 8755,
+      "geschaetztNachDedupe": 155,
+      "geschaetzteBytes": 11365,
       "fehler": null
     },
     {
@@ -319,8 +319,8 @@
       "nodes": 102,
       "relationen": 49,
       "roh": 151,
-      "geschaetztNachDedupe": 54,
-      "geschaetzteBytes": 3970,
+      "geschaetztNachDedupe": 70,
+      "geschaetzteBytes": 5154,
       "fehler": null
     },
     {
@@ -330,8 +330,8 @@
       "nodes": 5,
       "relationen": 5,
       "roh": 10,
-      "geschaetztNachDedupe": 4,
-      "geschaetzteBytes": 263,
+      "geschaetztNachDedupe": 5,
+      "geschaetzteBytes": 341,
       "fehler": null
     },
     {
@@ -341,8 +341,8 @@
       "nodes": 153,
       "relationen": 13,
       "roh": 166,
-      "geschaetztNachDedupe": 59,
-      "geschaetzteBytes": 4364,
+      "geschaetztNachDedupe": 77,
+      "geschaetzteBytes": 5665,
       "fehler": null
     },
     {
@@ -352,8 +352,8 @@
       "nodes": 83,
       "relationen": 71,
       "roh": 154,
-      "geschaetztNachDedupe": 55,
-      "geschaetzteBytes": 4049,
+      "geschaetztNachDedupe": 72,
+      "geschaetzteBytes": 5256,
       "fehler": null
     },
     {
@@ -363,8 +363,8 @@
       "nodes": 11,
       "relationen": 0,
       "roh": 11,
-      "geschaetztNachDedupe": 4,
-      "geschaetzteBytes": 289,
+      "geschaetztNachDedupe": 5,
+      "geschaetzteBytes": 375,
       "fehler": null
     },
     {
@@ -374,8 +374,8 @@
       "nodes": 41,
       "relationen": 8,
       "roh": 49,
-      "geschaetztNachDedupe": 18,
-      "geschaetzteBytes": 1288,
+      "geschaetztNachDedupe": 23,
+      "geschaetzteBytes": 1672,
       "fehler": null
     },
     {
@@ -385,8 +385,8 @@
       "nodes": 82,
       "relationen": 34,
       "roh": 116,
-      "geschaetztNachDedupe": 42,
-      "geschaetzteBytes": 3050,
+      "geschaetztNachDedupe": 54,
+      "geschaetzteBytes": 3959,
       "fehler": null
     },
     {
@@ -396,8 +396,8 @@
       "nodes": 18,
       "relationen": 57,
       "roh": 75,
-      "geschaetztNachDedupe": 27,
-      "geschaetzteBytes": 1972,
+      "geschaetztNachDedupe": 35,
+      "geschaetzteBytes": 2560,
       "fehler": null
     },
     {
@@ -407,8 +407,8 @@
       "nodes": 425,
       "relationen": 552,
       "roh": 977,
-      "geschaetztNachDedupe": 350,
-      "geschaetzteBytes": 25686,
+      "geschaetztNachDedupe": 454,
+      "geschaetzteBytes": 33344,
       "fehler": null
     },
     {
@@ -418,8 +418,8 @@
       "nodes": 258,
       "relationen": 296,
       "roh": 554,
-      "geschaetztNachDedupe": 199,
-      "geschaetzteBytes": 14565,
+      "geschaetztNachDedupe": 258,
+      "geschaetzteBytes": 18908,
       "fehler": null
     },
     {
@@ -429,8 +429,8 @@
       "nodes": 145,
       "relationen": 171,
       "roh": 316,
-      "geschaetztNachDedupe": 113,
-      "geschaetzteBytes": 8308,
+      "geschaetztNachDedupe": 147,
+      "geschaetzteBytes": 10785,
       "fehler": null
     },
     {
@@ -440,8 +440,8 @@
       "nodes": 235,
       "relationen": 321,
       "roh": 556,
-      "geschaetztNachDedupe": 199,
-      "geschaetzteBytes": 14617,
+      "geschaetztNachDedupe": 259,
+      "geschaetzteBytes": 18976,
       "fehler": null
     },
     {
@@ -462,8 +462,8 @@
       "nodes": 401,
       "relationen": 424,
       "roh": 825,
-      "geschaetztNachDedupe": 296,
-      "geschaetzteBytes": 21690,
+      "geschaetztNachDedupe": 384,
+      "geschaetzteBytes": 28157,
       "fehler": null
     },
     {
@@ -473,8 +473,8 @@
       "nodes": 349,
       "relationen": 536,
       "roh": 885,
-      "geschaetztNachDedupe": 317,
-      "geschaetzteBytes": 23267,
+      "geschaetztNachDedupe": 412,
+      "geschaetzteBytes": 30204,
       "fehler": null
     },
     {
@@ -484,8 +484,8 @@
       "nodes": 394,
       "relationen": 408,
       "roh": 802,
-      "geschaetztNachDedupe": 287,
-      "geschaetzteBytes": 21085,
+      "geschaetztNachDedupe": 373,
+      "geschaetzteBytes": 27372,
       "fehler": null
     },
     {
@@ -495,8 +495,8 @@
       "nodes": 182,
       "relationen": 256,
       "roh": 438,
-      "geschaetztNachDedupe": 157,
-      "geschaetzteBytes": 11515,
+      "geschaetztNachDedupe": 204,
+      "geschaetzteBytes": 14949,
       "fehler": null
     },
     {
@@ -506,8 +506,8 @@
       "nodes": 482,
       "relationen": 593,
       "roh": 1075,
-      "geschaetztNachDedupe": 385,
-      "geschaetzteBytes": 28262,
+      "geschaetztNachDedupe": 500,
+      "geschaetzteBytes": 36689,
       "fehler": null
     },
     {
@@ -517,8 +517,8 @@
       "nodes": 455,
       "relationen": 524,
       "roh": 979,
-      "geschaetztNachDedupe": 351,
-      "geschaetzteBytes": 25738,
+      "geschaetztNachDedupe": 455,
+      "geschaetzteBytes": 33413,
       "fehler": null
     },
     {
@@ -528,8 +528,8 @@
       "nodes": 181,
       "relationen": 250,
       "roh": 431,
-      "geschaetztNachDedupe": 154,
-      "geschaetzteBytes": 11331,
+      "geschaetztNachDedupe": 200,
+      "geschaetzteBytes": 14710,
       "fehler": null
     },
     {
@@ -539,8 +539,8 @@
       "nodes": 299,
       "relationen": 335,
       "roh": 634,
-      "geschaetztNachDedupe": 227,
-      "geschaetzteBytes": 16668,
+      "geschaetztNachDedupe": 295,
+      "geschaetzteBytes": 21638,
       "fehler": null
     },
     {
@@ -550,8 +550,8 @@
       "nodes": 3051,
       "relationen": 583,
       "roh": 3634,
-      "geschaetztNachDedupe": 1302,
-      "geschaetzteBytes": 95539,
+      "geschaetztNachDedupe": 1690,
+      "geschaetzteBytes": 124026,
       "fehler": null
     },
     {
@@ -561,8 +561,8 @@
       "nodes": 237,
       "relationen": 87,
       "roh": 324,
-      "geschaetztNachDedupe": 116,
-      "geschaetzteBytes": 8518,
+      "geschaetztNachDedupe": 151,
+      "geschaetzteBytes": 11058,
       "fehler": null
     },
     {
@@ -572,8 +572,8 @@
       "nodes": 111,
       "relationen": 13,
       "roh": 124,
-      "geschaetztNachDedupe": 44,
-      "geschaetzteBytes": 3260,
+      "geschaetztNachDedupe": 58,
+      "geschaetzteBytes": 4232,
       "fehler": null
     },
     {
@@ -583,8 +583,8 @@
       "nodes": 4,
       "relationen": 0,
       "roh": 4,
-      "geschaetztNachDedupe": 1,
-      "geschaetzteBytes": 105,
+      "geschaetztNachDedupe": 2,
+      "geschaetzteBytes": 137,
       "fehler": null
     },
     {
@@ -594,8 +594,8 @@
       "nodes": 340,
       "relationen": 330,
       "roh": 670,
-      "geschaetztNachDedupe": 240,
-      "geschaetzteBytes": 17615,
+      "geschaetztNachDedupe": 312,
+      "geschaetzteBytes": 22867,
       "fehler": null
     },
     {
@@ -605,8 +605,8 @@
       "nodes": 93,
       "relationen": 93,
       "roh": 186,
-      "geschaetztNachDedupe": 67,
-      "geschaetzteBytes": 4890,
+      "geschaetztNachDedupe": 87,
+      "geschaetzteBytes": 6348,
       "fehler": null
     },
     {
@@ -616,8 +616,8 @@
       "nodes": 83,
       "relationen": 91,
       "roh": 174,
-      "geschaetztNachDedupe": 62,
-      "geschaetzteBytes": 4575,
+      "geschaetztNachDedupe": 81,
+      "geschaetzteBytes": 5938,
       "fehler": null
     },
     {
@@ -627,8 +627,8 @@
       "nodes": 64,
       "relationen": 67,
       "roh": 131,
-      "geschaetztNachDedupe": 47,
-      "geschaetzteBytes": 3444,
+      "geschaetztNachDedupe": 61,
+      "geschaetzteBytes": 4471,
       "fehler": null
     },
     {
@@ -638,8 +638,8 @@
       "nodes": 22,
       "relationen": 21,
       "roh": 43,
-      "geschaetztNachDedupe": 15,
-      "geschaetzteBytes": 1130,
+      "geschaetztNachDedupe": 20,
+      "geschaetzteBytes": 1468,
       "fehler": null
     },
     {
@@ -649,8 +649,8 @@
       "nodes": 257,
       "relationen": 337,
       "roh": 594,
-      "geschaetztNachDedupe": 213,
-      "geschaetzteBytes": 15616,
+      "geschaetztNachDedupe": 276,
+      "geschaetzteBytes": 20273,
       "fehler": null
     },
     {
@@ -660,8 +660,8 @@
       "nodes": 124,
       "relationen": 112,
       "roh": 236,
-      "geschaetztNachDedupe": 85,
-      "geschaetzteBytes": 6205,
+      "geschaetztNachDedupe": 110,
+      "geschaetzteBytes": 8055,
       "fehler": null
     },
     {
@@ -671,8 +671,8 @@
       "nodes": 620,
       "relationen": 569,
       "roh": 1189,
-      "geschaetztNachDedupe": 426,
-      "geschaetzteBytes": 31259,
+      "geschaetztNachDedupe": 553,
+      "geschaetzteBytes": 40580,
       "fehler": null
     },
     {
@@ -682,8 +682,8 @@
       "nodes": 62,
       "relationen": 58,
       "roh": 120,
-      "geschaetztNachDedupe": 43,
-      "geschaetzteBytes": 3155,
+      "geschaetztNachDedupe": 56,
+      "geschaetzteBytes": 4096,
       "fehler": null
     },
     {
@@ -693,8 +693,8 @@
       "nodes": 152,
       "relationen": 154,
       "roh": 306,
-      "geschaetztNachDedupe": 110,
-      "geschaetzteBytes": 8045,
+      "geschaetztNachDedupe": 142,
+      "geschaetzteBytes": 10444,
       "fehler": null
     },
     {
@@ -704,8 +704,8 @@
       "nodes": 76,
       "relationen": 88,
       "roh": 164,
-      "geschaetztNachDedupe": 59,
-      "geschaetzteBytes": 4312,
+      "geschaetztNachDedupe": 76,
+      "geschaetzteBytes": 5597,
       "fehler": null
     },
     {
@@ -715,8 +715,8 @@
       "nodes": 31,
       "relationen": 38,
       "roh": 69,
-      "geschaetztNachDedupe": 25,
-      "geschaetzteBytes": 1814,
+      "geschaetztNachDedupe": 32,
+      "geschaetzteBytes": 2355,
       "fehler": null
     },
     {
@@ -726,8 +726,8 @@
       "nodes": 194,
       "relationen": 208,
       "roh": 402,
-      "geschaetztNachDedupe": 144,
-      "geschaetzteBytes": 10569,
+      "geschaetztNachDedupe": 187,
+      "geschaetzteBytes": 13720,
       "fehler": null
     },
     {
@@ -737,8 +737,8 @@
       "nodes": 26,
       "relationen": 24,
       "roh": 50,
-      "geschaetztNachDedupe": 18,
-      "geschaetzteBytes": 1315,
+      "geschaetztNachDedupe": 23,
+      "geschaetzteBytes": 1706,
       "fehler": null
     },
     {
@@ -748,8 +748,8 @@
       "nodes": 32,
       "relationen": 37,
       "roh": 69,
-      "geschaetztNachDedupe": 25,
-      "geschaetzteBytes": 1814,
+      "geschaetztNachDedupe": 32,
+      "geschaetzteBytes": 2355,
       "fehler": null
     },
     {
@@ -759,8 +759,8 @@
       "nodes": 187,
       "relationen": 235,
       "roh": 422,
-      "geschaetztNachDedupe": 151,
-      "geschaetzteBytes": 11095,
+      "geschaetztNachDedupe": 196,
+      "geschaetzteBytes": 14403,
       "fehler": null
     },
     {
@@ -770,8 +770,8 @@
       "nodes": 181,
       "relationen": 209,
       "roh": 390,
-      "geschaetztNachDedupe": 140,
-      "geschaetzteBytes": 10253,
+      "geschaetztNachDedupe": 181,
+      "geschaetzteBytes": 13310,
       "fehler": null
     },
     {
@@ -781,8 +781,8 @@
       "nodes": 38,
       "relationen": 113,
       "roh": 151,
-      "geschaetztNachDedupe": 54,
-      "geschaetzteBytes": 3970,
+      "geschaetztNachDedupe": 70,
+      "geschaetzteBytes": 5154,
       "fehler": null
     },
     {
@@ -792,8 +792,8 @@
       "nodes": 24,
       "relationen": 72,
       "roh": 96,
-      "geschaetztNachDedupe": 34,
-      "geschaetzteBytes": 2524,
+      "geschaetztNachDedupe": 45,
+      "geschaetzteBytes": 3276,
       "fehler": null
     },
     {
@@ -803,8 +803,8 @@
       "nodes": 35,
       "relationen": 81,
       "roh": 116,
-      "geschaetztNachDedupe": 42,
-      "geschaetzteBytes": 3050,
+      "geschaetztNachDedupe": 54,
+      "geschaetzteBytes": 3959,
       "fehler": null
     },
     {
@@ -814,8 +814,8 @@
       "nodes": 26,
       "relationen": 51,
       "roh": 77,
-      "geschaetztNachDedupe": 28,
-      "geschaetzteBytes": 2024,
+      "geschaetztNachDedupe": 36,
+      "geschaetzteBytes": 2628,
       "fehler": null
     },
     {
@@ -825,8 +825,8 @@
       "nodes": 47,
       "relationen": 134,
       "roh": 181,
-      "geschaetztNachDedupe": 65,
-      "geschaetzteBytes": 4759,
+      "geschaetztNachDedupe": 84,
+      "geschaetzteBytes": 6177,
       "fehler": null
     },
     {
@@ -836,8 +836,8 @@
       "nodes": 37,
       "relationen": 100,
       "roh": 137,
-      "geschaetztNachDedupe": 49,
-      "geschaetzteBytes": 3602,
+      "geschaetztNachDedupe": 64,
+      "geschaetzteBytes": 4676,
       "fehler": null
     },
     {
@@ -847,8 +847,8 @@
       "nodes": 118,
       "relationen": 160,
       "roh": 278,
-      "geschaetztNachDedupe": 100,
-      "geschaetzteBytes": 7309,
+      "geschaetztNachDedupe": 129,
+      "geschaetzteBytes": 9488,
       "fehler": null
     },
     {
@@ -858,8 +858,8 @@
       "nodes": 21,
       "relationen": 34,
       "roh": 55,
-      "geschaetztNachDedupe": 20,
-      "geschaetzteBytes": 1446,
+      "geschaetztNachDedupe": 26,
+      "geschaetzteBytes": 1877,
       "fehler": null
     },
     {
@@ -869,8 +869,8 @@
       "nodes": 28,
       "relationen": 76,
       "roh": 104,
-      "geschaetztNachDedupe": 37,
-      "geschaetzteBytes": 2734,
+      "geschaetztNachDedupe": 48,
+      "geschaetzteBytes": 3549,
       "fehler": null
     },
     {
@@ -880,8 +880,8 @@
       "nodes": 24,
       "relationen": 62,
       "roh": 86,
-      "geschaetztNachDedupe": 31,
-      "geschaetzteBytes": 2261,
+      "geschaetztNachDedupe": 40,
+      "geschaetzteBytes": 2935,
       "fehler": null
     },
     {
@@ -891,8 +891,8 @@
       "nodes": 49,
       "relationen": 81,
       "roh": 130,
-      "geschaetztNachDedupe": 47,
-      "geschaetzteBytes": 3418,
+      "geschaetztNachDedupe": 60,
+      "geschaetzteBytes": 4437,
       "fehler": null
     },
     {
@@ -902,8 +902,8 @@
       "nodes": 51,
       "relationen": 116,
       "roh": 167,
-      "geschaetztNachDedupe": 60,
-      "geschaetzteBytes": 4390,
+      "geschaetztNachDedupe": 78,
+      "geschaetzteBytes": 5700,
       "fehler": null
     },
     {
@@ -913,8 +913,8 @@
       "nodes": 15,
       "relationen": 36,
       "roh": 51,
-      "geschaetztNachDedupe": 18,
-      "geschaetzteBytes": 1341,
+      "geschaetztNachDedupe": 24,
+      "geschaetzteBytes": 1741,
       "fehler": null
     },
     {
@@ -924,8 +924,8 @@
       "nodes": 30,
       "relationen": 25,
       "roh": 55,
-      "geschaetztNachDedupe": 20,
-      "geschaetzteBytes": 1446,
+      "geschaetztNachDedupe": 26,
+      "geschaetzteBytes": 1877,
       "fehler": null
     },
     {
@@ -935,8 +935,8 @@
       "nodes": 62,
       "relationen": 135,
       "roh": 197,
-      "geschaetztNachDedupe": 71,
-      "geschaetzteBytes": 5179,
+      "geschaetztNachDedupe": 92,
+      "geschaetzteBytes": 6723,
       "fehler": null
     },
     {
@@ -946,8 +946,8 @@
       "nodes": 25,
       "relationen": 73,
       "roh": 98,
-      "geschaetztNachDedupe": 35,
-      "geschaetzteBytes": 2576,
+      "geschaetztNachDedupe": 46,
+      "geschaetzteBytes": 3345,
       "fehler": null
     },
     {
@@ -957,8 +957,8 @@
       "nodes": 1397,
       "relationen": 1042,
       "roh": 2439,
-      "geschaetztNachDedupe": 874,
-      "geschaetzteBytes": 64122,
+      "geschaetztNachDedupe": 1135,
+      "geschaetzteBytes": 83241,
       "fehler": null
     },
     {
@@ -968,8 +968,8 @@
       "nodes": 593,
       "relationen": 443,
       "roh": 1036,
-      "geschaetztNachDedupe": 371,
-      "geschaetzteBytes": 27237,
+      "geschaetztNachDedupe": 482,
+      "geschaetzteBytes": 35358,
       "fehler": null
     },
     {
@@ -979,8 +979,8 @@
       "nodes": 877,
       "relationen": 524,
       "roh": 1401,
-      "geschaetztNachDedupe": 502,
-      "geschaetzteBytes": 36833,
+      "geschaetztNachDedupe": 652,
+      "geschaetzteBytes": 47815,
       "fehler": null
     },
     {
@@ -990,8 +990,8 @@
       "nodes": 1545,
       "relationen": 858,
       "roh": 2403,
-      "geschaetztNachDedupe": 861,
-      "geschaetzteBytes": 63176,
+      "geschaetztNachDedupe": 1118,
+      "geschaetzteBytes": 82013,
       "fehler": null
     },
     {
@@ -1001,8 +1001,8 @@
       "nodes": 37,
       "relationen": 58,
       "roh": 95,
-      "geschaetztNachDedupe": 34,
-      "geschaetzteBytes": 2498,
+      "geschaetztNachDedupe": 44,
+      "geschaetzteBytes": 3242,
       "fehler": null
     },
     {
@@ -1012,8 +1012,8 @@
       "nodes": 22,
       "relationen": 0,
       "roh": 22,
-      "geschaetztNachDedupe": 8,
-      "geschaetzteBytes": 578,
+      "geschaetztNachDedupe": 10,
+      "geschaetzteBytes": 751,
       "fehler": null
     },
     {
@@ -1023,8 +1023,8 @@
       "nodes": 1306,
       "relationen": 821,
       "roh": 2127,
-      "geschaetztNachDedupe": 762,
-      "geschaetzteBytes": 55919,
+      "geschaetztNachDedupe": 989,
+      "geschaetzteBytes": 72593,
       "fehler": null
     },
     {
@@ -1034,8 +1034,8 @@
       "nodes": 65,
       "relationen": 26,
       "roh": 91,
-      "geschaetztNachDedupe": 33,
-      "geschaetzteBytes": 2392,
+      "geschaetztNachDedupe": 42,
+      "geschaetzteBytes": 3106,
       "fehler": null
     },
     {
@@ -1045,8 +1045,8 @@
       "nodes": 408,
       "relationen": 2579,
       "roh": 2987,
-      "geschaetztNachDedupe": 1070,
-      "geschaetzteBytes": 78529,
+      "geschaetztNachDedupe": 1389,
+      "geschaetzteBytes": 101944,
       "fehler": null
     },
     {
@@ -1056,8 +1056,8 @@
       "nodes": 185,
       "relationen": 8,
       "roh": 193,
-      "geschaetztNachDedupe": 69,
-      "geschaetzteBytes": 5074,
+      "geschaetztNachDedupe": 90,
+      "geschaetzteBytes": 6587,
       "fehler": null
     },
     {
@@ -1067,8 +1067,8 @@
       "nodes": 701,
       "relationen": 50,
       "roh": 751,
-      "geschaetztNachDedupe": 269,
-      "geschaetzteBytes": 19744,
+      "geschaetztNachDedupe": 349,
+      "geschaetzteBytes": 25631,
       "fehler": null
     },
     {
@@ -1078,8 +1078,8 @@
       "nodes": 240,
       "relationen": 7,
       "roh": 247,
-      "geschaetztNachDedupe": 89,
-      "geschaetzteBytes": 6494,
+      "geschaetztNachDedupe": 115,
+      "geschaetzteBytes": 8430,
       "fehler": null
     },
     {
@@ -1089,8 +1089,8 @@
       "nodes": 303,
       "relationen": 43,
       "roh": 346,
-      "geschaetztNachDedupe": 124,
-      "geschaetzteBytes": 9096,
+      "geschaetztNachDedupe": 161,
+      "geschaetzteBytes": 11809,
       "fehler": null
     },
     {
@@ -1100,8 +1100,8 @@
       "nodes": 13,
       "relationen": 0,
       "roh": 13,
-      "geschaetztNachDedupe": 5,
-      "geschaetzteBytes": 342,
+      "geschaetztNachDedupe": 6,
+      "geschaetzteBytes": 444,
       "fehler": null
     },
     {
@@ -1111,8 +1111,8 @@
       "nodes": 172,
       "relationen": 0,
       "roh": 172,
-      "geschaetztNachDedupe": 62,
-      "geschaetzteBytes": 4522,
+      "geschaetztNachDedupe": 80,
+      "geschaetzteBytes": 5870,
       "fehler": null
     },
     {
@@ -1123,7 +1123,7 @@
       "relationen": 0,
       "roh": 2,
       "geschaetztNachDedupe": 1,
-      "geschaetzteBytes": 53,
+      "geschaetzteBytes": 68,
       "fehler": null
     },
     {
@@ -1133,8 +1133,8 @@
       "nodes": 412,
       "relationen": 18,
       "roh": 430,
-      "geschaetztNachDedupe": 154,
-      "geschaetzteBytes": 11305,
+      "geschaetztNachDedupe": 200,
+      "geschaetzteBytes": 14676,
       "fehler": null
     },
     {
@@ -1144,8 +1144,8 @@
       "nodes": 73,
       "relationen": 31,
       "roh": 104,
-      "geschaetztNachDedupe": 37,
-      "geschaetzteBytes": 2734,
+      "geschaetztNachDedupe": 48,
+      "geschaetzteBytes": 3549,
       "fehler": null
     },
     {
@@ -1155,8 +1155,8 @@
       "nodes": 337,
       "relationen": 6,
       "roh": 343,
-      "geschaetztNachDedupe": 123,
-      "geschaetzteBytes": 9018,
+      "geschaetztNachDedupe": 160,
+      "geschaetzteBytes": 11706,
       "fehler": null
     },
     {
@@ -1166,8 +1166,8 @@
       "nodes": 292,
       "relationen": 112,
       "roh": 404,
-      "geschaetztNachDedupe": 145,
-      "geschaetzteBytes": 10621,
+      "geschaetztNachDedupe": 188,
+      "geschaetzteBytes": 13788,
       "fehler": null
     },
     {
@@ -1177,8 +1177,8 @@
       "nodes": 2466,
       "relationen": 1742,
       "roh": 4208,
-      "geschaetztNachDedupe": 1508,
-      "geschaetzteBytes": 110630,
+      "geschaetztNachDedupe": 1957,
+      "geschaetzteBytes": 143616,
       "fehler": null
     },
     {
@@ -1188,8 +1188,8 @@
       "nodes": 402,
       "relationen": 351,
       "roh": 753,
-      "geschaetztNachDedupe": 270,
-      "geschaetzteBytes": 19797,
+      "geschaetztNachDedupe": 350,
+      "geschaetzteBytes": 25699,
       "fehler": null
     },
     {
@@ -1199,8 +1199,8 @@
       "nodes": 888,
       "relationen": 424,
       "roh": 1312,
-      "geschaetztNachDedupe": 470,
-      "geschaetzteBytes": 34493,
+      "geschaetztNachDedupe": 610,
+      "geschaetzteBytes": 44778,
       "fehler": null
     },
     {
@@ -1210,8 +1210,8 @@
       "nodes": 86,
       "relationen": 71,
       "roh": 157,
-      "geschaetztNachDedupe": 56,
-      "geschaetzteBytes": 4128,
+      "geschaetztNachDedupe": 73,
+      "geschaetzteBytes": 5358,
       "fehler": null
     },
     {
@@ -1221,8 +1221,8 @@
       "nodes": 166,
       "relationen": 36,
       "roh": 202,
-      "geschaetztNachDedupe": 72,
-      "geschaetzteBytes": 5311,
+      "geschaetztNachDedupe": 94,
+      "geschaetzteBytes": 6894,
       "fehler": null
     },
     {
@@ -1232,8 +1232,8 @@
       "nodes": 362,
       "relationen": 358,
       "roh": 720,
-      "geschaetztNachDedupe": 258,
-      "geschaetzteBytes": 18929,
+      "geschaetztNachDedupe": 335,
+      "geschaetzteBytes": 24573,
       "fehler": null
     },
     {
@@ -1243,8 +1243,8 @@
       "nodes": 21,
       "relationen": 7,
       "roh": 28,
-      "geschaetztNachDedupe": 10,
-      "geschaetzteBytes": 736,
+      "geschaetztNachDedupe": 13,
+      "geschaetzteBytes": 956,
       "fehler": null
     },
     {
@@ -1254,8 +1254,8 @@
       "nodes": 18,
       "relationen": 13,
       "roh": 31,
-      "geschaetztNachDedupe": 11,
-      "geschaetzteBytes": 815,
+      "geschaetztNachDedupe": 14,
+      "geschaetzteBytes": 1058,
       "fehler": null
     },
     {
@@ -1265,8 +1265,8 @@
       "nodes": 4,
       "relationen": 6,
       "roh": 10,
-      "geschaetztNachDedupe": 4,
-      "geschaetzteBytes": 263,
+      "geschaetztNachDedupe": 5,
+      "geschaetzteBytes": 341,
       "fehler": null
     },
     {
@@ -1276,8 +1276,8 @@
       "nodes": 11,
       "relationen": 2,
       "roh": 13,
-      "geschaetztNachDedupe": 5,
-      "geschaetzteBytes": 342,
+      "geschaetztNachDedupe": 6,
+      "geschaetzteBytes": 444,
       "fehler": null
     },
     {
@@ -1309,8 +1309,8 @@
       "nodes": 21,
       "relationen": 3,
       "roh": 24,
-      "geschaetztNachDedupe": 9,
-      "geschaetzteBytes": 631,
+      "geschaetztNachDedupe": 11,
+      "geschaetzteBytes": 819,
       "fehler": null
     },
     {
@@ -1320,8 +1320,8 @@
       "nodes": 232,
       "relationen": 6,
       "roh": 238,
-      "geschaetztNachDedupe": 85,
-      "geschaetzteBytes": 6257,
+      "geschaetztNachDedupe": 111,
+      "geschaetzteBytes": 8123,
       "fehler": null
     },
     {
@@ -1331,8 +1331,8 @@
       "nodes": 81,
       "relationen": 0,
       "roh": 81,
-      "geschaetztNachDedupe": 29,
-      "geschaetzteBytes": 2130,
+      "geschaetztNachDedupe": 38,
+      "geschaetzteBytes": 2764,
       "fehler": null
     },
     {
@@ -1342,8 +1342,8 @@
       "nodes": 666,
       "relationen": 38,
       "roh": 704,
-      "geschaetztNachDedupe": 252,
-      "geschaetzteBytes": 18508,
+      "geschaetztNachDedupe": 327,
+      "geschaetzteBytes": 24027,
       "fehler": null
     },
     {
@@ -1364,261 +1364,261 @@
       "nodes": 730,
       "relationen": 30,
       "roh": 760,
-      "geschaetztNachDedupe": 272,
-      "geschaetzteBytes": 19981,
+      "geschaetztNachDedupe": 354,
+      "geschaetzteBytes": 25938,
       "fehler": null
     }
   ],
   "proLand": {
     "DE": {
       "roh": 10863,
-      "dedupe": 3892,
-      "bytes": 285591,
+      "dedupe": 5052,
+      "bytes": 370747,
       "gebiete": 16,
       "fehler": 0
     },
     "IT": {
       "roh": 7902,
-      "dedupe": 2833,
-      "bytes": 207747,
+      "dedupe": 3677,
+      "bytes": 269689,
       "gebiete": 20,
       "fehler": 0
     },
     "FR": {
       "roh": 8472,
-      "dedupe": 3035,
-      "bytes": 222732,
+      "dedupe": 3941,
+      "bytes": 289145,
       "gebiete": 13,
       "fehler": 0
     },
     "GB": {
       "roh": 4086,
-      "dedupe": 1463,
-      "bytes": 107422,
+      "dedupe": 1901,
+      "bytes": 139453,
       "gebiete": 4,
       "fehler": 0
     },
     "ES": {
       "roh": 5215,
-      "dedupe": 1870,
-      "bytes": 137106,
+      "dedupe": 2425,
+      "bytes": 177986,
       "gebiete": 17,
       "fehler": 0
     },
     "PL": {
       "roh": 1979,
-      "dedupe": 711,
-      "bytes": 52029,
+      "dedupe": 922,
+      "bytes": 67542,
       "gebiete": 16,
       "fehler": 0
     },
     "AT": {
       "roh": 2439,
-      "dedupe": 874,
-      "bytes": 64122,
+      "dedupe": 1135,
+      "bytes": 83241,
       "gebiete": 1,
       "fehler": 0
     },
     "CH": {
       "roh": 1036,
-      "dedupe": 371,
-      "bytes": 27237,
+      "dedupe": 482,
+      "bytes": 35358,
       "gebiete": 1,
       "fehler": 0
     },
     "NL": {
       "roh": 1401,
-      "dedupe": 502,
-      "bytes": 36833,
+      "dedupe": 652,
+      "bytes": 47815,
       "gebiete": 1,
       "fehler": 0
     },
     "BE": {
       "roh": 2403,
-      "dedupe": 861,
-      "bytes": 63176,
+      "dedupe": 1118,
+      "bytes": 82013,
       "gebiete": 1,
       "fehler": 0
     },
     "LU": {
       "roh": 95,
-      "dedupe": 34,
-      "bytes": 2498,
+      "dedupe": 44,
+      "bytes": 3242,
       "gebiete": 1,
       "fehler": 0
     },
     "DK": {
       "roh": 22,
-      "dedupe": 8,
-      "bytes": 578,
+      "dedupe": 10,
+      "bytes": 751,
       "gebiete": 1,
       "fehler": 0
     },
     "CZ": {
       "roh": 2127,
-      "dedupe": 762,
-      "bytes": 55919,
+      "dedupe": 989,
+      "bytes": 72593,
       "gebiete": 1,
       "fehler": 0
     },
     "SK": {
       "roh": 91,
-      "dedupe": 33,
-      "bytes": 2392,
+      "dedupe": 42,
+      "bytes": 3106,
       "gebiete": 1,
       "fehler": 0
     },
     "HU": {
       "roh": 2987,
-      "dedupe": 1070,
-      "bytes": 78529,
+      "dedupe": 1389,
+      "bytes": 101944,
       "gebiete": 1,
       "fehler": 0
     },
     "SI": {
       "roh": 193,
-      "dedupe": 69,
-      "bytes": 5074,
+      "dedupe": 90,
+      "bytes": 6587,
       "gebiete": 1,
       "fehler": 0
     },
     "HR": {
       "roh": 751,
-      "dedupe": 269,
-      "bytes": 19744,
+      "dedupe": 349,
+      "bytes": 25631,
       "gebiete": 1,
       "fehler": 0
     },
     "BA": {
       "roh": 247,
-      "dedupe": 89,
-      "bytes": 6494,
+      "dedupe": 115,
+      "bytes": 8430,
       "gebiete": 1,
       "fehler": 0
     },
     "RS": {
       "roh": 346,
-      "dedupe": 124,
-      "bytes": 9096,
+      "dedupe": 161,
+      "bytes": 11809,
       "gebiete": 1,
       "fehler": 0
     },
     "ME": {
       "roh": 13,
-      "dedupe": 5,
-      "bytes": 342,
+      "dedupe": 6,
+      "bytes": 444,
       "gebiete": 1,
       "fehler": 0
     },
     "MK": {
       "roh": 172,
-      "dedupe": 62,
-      "bytes": 4522,
+      "dedupe": 80,
+      "bytes": 5870,
       "gebiete": 1,
       "fehler": 0
     },
     "AL": {
       "roh": 2,
       "dedupe": 1,
-      "bytes": 53,
+      "bytes": 68,
       "gebiete": 1,
       "fehler": 0
     },
     "GR": {
       "roh": 430,
-      "dedupe": 154,
-      "bytes": 11305,
+      "dedupe": 200,
+      "bytes": 14676,
       "gebiete": 1,
       "fehler": 0
     },
     "BG": {
       "roh": 104,
-      "dedupe": 37,
-      "bytes": 2734,
+      "dedupe": 48,
+      "bytes": 3549,
       "gebiete": 1,
       "fehler": 0
     },
     "RO": {
       "roh": 343,
-      "dedupe": 123,
-      "bytes": 9018,
+      "dedupe": 160,
+      "bytes": 11706,
       "gebiete": 1,
       "fehler": 0
     },
     "PT": {
       "roh": 404,
-      "dedupe": 145,
-      "bytes": 10621,
+      "dedupe": 188,
+      "bytes": 13788,
       "gebiete": 1,
       "fehler": 0
     },
     "SE": {
       "roh": 4208,
-      "dedupe": 1508,
-      "bytes": 110630,
+      "dedupe": 1957,
+      "bytes": 143616,
       "gebiete": 1,
       "fehler": 0
     },
     "NO": {
       "roh": 753,
-      "dedupe": 270,
-      "bytes": 19797,
+      "dedupe": 350,
+      "bytes": 25699,
       "gebiete": 1,
       "fehler": 0
     },
     "FI": {
       "roh": 1312,
-      "dedupe": 470,
-      "bytes": 34493,
+      "dedupe": 610,
+      "bytes": 44778,
       "gebiete": 1,
       "fehler": 0
     },
     "EE": {
       "roh": 157,
-      "dedupe": 56,
-      "bytes": 4128,
+      "dedupe": 73,
+      "bytes": 5358,
       "gebiete": 1,
       "fehler": 0
     },
     "LV": {
       "roh": 202,
-      "dedupe": 72,
-      "bytes": 5311,
+      "dedupe": 94,
+      "bytes": 6894,
       "gebiete": 1,
       "fehler": 0
     },
     "LT": {
       "roh": 720,
-      "dedupe": 258,
-      "bytes": 18929,
+      "dedupe": 335,
+      "bytes": 24573,
       "gebiete": 1,
       "fehler": 0
     },
     "IE": {
       "roh": 28,
-      "dedupe": 10,
-      "bytes": 736,
+      "dedupe": 13,
+      "bytes": 956,
       "gebiete": 1,
       "fehler": 0
     },
     "IS": {
       "roh": 31,
-      "dedupe": 11,
-      "bytes": 815,
+      "dedupe": 14,
+      "bytes": 1058,
       "gebiete": 1,
       "fehler": 0
     },
     "LI": {
       "roh": 10,
-      "dedupe": 4,
-      "bytes": 263,
+      "dedupe": 5,
+      "bytes": 341,
       "gebiete": 1,
       "fehler": 0
     },
     "AD": {
       "roh": 13,
-      "dedupe": 5,
-      "bytes": 342,
+      "dedupe": 6,
+      "bytes": 444,
       "gebiete": 1,
       "fehler": 0
     },
@@ -1638,29 +1638,29 @@
     },
     "MT": {
       "roh": 24,
-      "dedupe": 9,
-      "bytes": 631,
+      "dedupe": 11,
+      "bytes": 819,
       "gebiete": 1,
       "fehler": 0
     },
     "CY": {
       "roh": 238,
-      "dedupe": 85,
-      "bytes": 6257,
+      "dedupe": 111,
+      "bytes": 8123,
       "gebiete": 1,
       "fehler": 0
     },
     "MD": {
       "roh": 81,
-      "dedupe": 29,
-      "bytes": 2130,
+      "dedupe": 38,
+      "bytes": 2764,
       "gebiete": 1,
       "fehler": 0
     },
     "UA": {
       "roh": 704,
-      "dedupe": 252,
-      "bytes": 18508,
+      "dedupe": 327,
+      "bytes": 24027,
       "gebiete": 1,
       "fehler": 0
     },
@@ -1673,8 +1673,8 @@
     },
     "TR": {
       "roh": 760,
-      "dedupe": 272,
-      "bytes": 19981,
+      "dedupe": 354,
+      "bytes": 25938,
       "gebiete": 1,
       "fehler": 0
     }

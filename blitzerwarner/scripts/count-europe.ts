@@ -26,15 +26,46 @@ const OUT_FILE = join(ROOT, 'assets', 'data', 'europe.count.json');
 /**
  * Anteil, der die Deduplizierung überlebt.
  *
- * An Deutschland kalibriert: 14102 Rohtreffer wurden zu 5053 Einträgen.
- * 5053 / 14102 = 0,358. Der Faktor ist hoch, weil die meisten Anlagen in OSM
- * doppelt erfasst sind — als Kamera-Node UND als Enforcement-Relation.
+ * An Deutschland kalibriert — und zwar gegen DIESELBE Grundmenge, die dieses
+ * Skript misst. Das war er vorher nicht, und daraus wurde ein Fehler von
+ * 30 Prozent.
  *
- * Ob er ausserhalb Deutschlands gilt, ist eine Annahme: Wo weniger mit
- * Relationen gearbeitet wird, überleben mehr Einträge. Die Zahl ist eine
- * Schätzung zum Abschätzen, keine Vorhersage.
+ * DER FEHLER, ZUR WARNUNG STEHENGELASSEN
+ *
+ * Der Faktor lautete 5053 / 14102 = 0,358. Die 14102 stammen aus dem echten
+ * Build und enthalten die `device`-Nodes der Enforcement-Relationen. Die
+ * Zählquery unten liest aber nur den ERSTEN `out count;`-Block und zählt damit
+ * ausschliesslich Kamera-Nodes plus Relationen — für Deutschland 5181 + 5682
+ * = 10863. Der Faktor wurde also auf eine Grundmenge angewandt, für die er
+ * nicht kalibriert war.
+ *
+ * Aufgefallen ist es an der eigenen Zahl: Das Skript schätzte für Deutschland
+ * 3892 Anlagen, gebaut sind 5053. Eine Schätzung, die den einzigen Fall, für
+ * den man die Antwort kennt, um 23 Prozent verfehlt, ist keine Schätzung.
+ *
+ * Richtig ist 5053 / 10863 = 0,465.
+ *
+ * Ob der Faktor ausserhalb Deutschlands gilt, bleibt eine Annahme: Wo weniger
+ * mit Enforcement-Relationen gearbeitet wird, überleben mehr Einträge.
  */
-const DEDUPE_FAKTOR = 5053 / 14102;
+const DEDUPE_FAKTOR = 5053 / 10863;
+
+/**
+ * Was Deutschland liefern MUSS, damit die Schätzung überhaupt etwas taugt.
+ *
+ * Die Selbstprüfung am Ende des Laufs vergleicht die Schätzung für Deutschland
+ * gegen den tatsächlich gebauten Datensatz. Weicht sie mehr als um diesen
+ * Anteil ab, stimmt etwas an der Query oder am Faktor nicht — und dann ist die
+ * Zahl für die übrigen 43 Länder ebenfalls falsch, nur ohne Gegenprobe.
+ *
+ * 5 Prozent ist eng gewählt, weil die Kalibrierung per Konstruktion stimmen
+ * MUSS: Deutschland ist der Fall, an dem der Faktor gebildet wurde. Eine
+ * Abweichung kann dort nur ein Fehler sein, keine Streuung.
+ */
+const DE_TOLERANZ = 0.05;
+
+/** Der gebaute deutsche Datensatz, gegen den sich die Schätzung prüfen lässt. */
+const DE_TATSAECHLICH = 5053;
 
 /**
  * Bytes je Eintrag im gebauten JSON.
@@ -151,6 +182,35 @@ async function main(): Promise<void> {
     fehlgeschlagen,
   }, null, 2) + '\n');
 
+  /*
+   * SELBSTPRÜFUNG AN DEUTSCHLAND, bevor irgendeine Zahl ausgegeben wird.
+   *
+   * Deutschland ist der einzige Fall, für den die Antwort bekannt ist — der
+   * Datensatz ist gebaut. Wenn die Schätzung ihn verfehlt, ist sie für die
+   * übrigen 43 Länder ebenfalls falsch, dort nur ohne Gegenprobe. Genau das
+   * ist einmal passiert (siehe DEDUPE_FAKTOR), und niemand hat es gemerkt,
+   * bis die Zahlen längst in DATA.md standen.
+   */
+  const de = proLand.get('DE');
+  if (de !== undefined && de.fehler === 0) {
+    const abweichung = Math.abs(de.dedupe - DE_TATSAECHLICH) / DE_TATSAECHLICH;
+    console.log(
+      `\nSelbstprüfung Deutschland: geschätzt ${de.dedupe}, gebaut ${DE_TATSAECHLICH} ` +
+      `(${(abweichung * 100).toFixed(1)} % Abweichung)`,
+    );
+    if (abweichung > DE_TOLERANZ) {
+      console.error(
+        `\nABBRUCH: Die Schätzung verfehlt Deutschland um ${(abweichung * 100).toFixed(1)} %, ` +
+        `erlaubt sind ${DE_TOLERANZ * 100} %.\n` +
+        'Deutschland ist der Fall, an dem DEDUPE_FAKTOR kalibriert wurde — eine ' +
+        'Abweichung dort kann nur ein Fehler sein. Vermutlich zählt die Query etwas ' +
+        'anderes, als der Faktor unterstellt. Die Zahlen für die übrigen Länder sind ' +
+        'dann ebenfalls falsch und werden deshalb nicht ausgegeben.',
+      );
+      process.exit(1);
+    }
+  }
+
   console.log('═'.repeat(78));
   console.log('Land    Gebiete      Nodes  Relationen        roh   nach Dedupe      Bytes');
   console.log('─'.repeat(78));
@@ -177,16 +237,19 @@ async function main(): Promise<void> {
   console.log('═'.repeat(78));
 
   console.log(
-    `\nErwartungswert aus Sekundärquellen zum Vergleich: 60.000-100.000 Anlagen,\n` +
-    `entsprechend 4-7 MB. Gemessen: ${gesamtDedupe} Anlagen, ` +
-    `${(gesamtBytes / 1024 / 1024).toFixed(1)} MB.`,
+    `\nErwartungswert aus Sekundärquellen zum Vergleich: 60.000-100.000 Anlagen.\n` +
+    `Gemessen: ${gesamtDedupe} Anlagen, ${(gesamtBytes / 1024 / 1024).toFixed(1)} MB.`,
   );
   const faktor = gesamtDedupe / 80000;
   if (faktor < 0.5 || faktor > 2) {
     console.log(
-      `\nACHTUNG: Das liegt um Faktor ${faktor < 1 ? (1 / faktor).toFixed(1) : faktor.toFixed(1)} ` +
-      `neben der Erwartung. Vor dem Weiterbauen mit scripts/analyze-raw.ts prüfen,\n` +
-      `ob der Fehler in der Query steckt und nicht in der Welt.`,
+      `\nHINWEIS: Das liegt um Faktor ${faktor < 1 ? (1 / faktor).toFixed(1) : faktor.toFixed(1)} ` +
+      `neben der Erwartung.\n` +
+      'Die Selbstprüfung an Deutschland oben ist trotzdem grün — die Query zählt also\n' +
+      'richtig. Der Unterschied liegt in den Sekundärzahlen: Sie enthalten MOBILE\n' +
+      'Messstellen, die dieses Projekt nicht abbildet, und stammen aus kommerziellen\n' +
+      'Datenbanken mit eigener Erfassung. OpenStreetMap enthält, was Freiwillige\n' +
+      'eingetragen haben. Siehe DATA.md, Abschnitt Mengengerüst Europa.',
     );
   }
 
