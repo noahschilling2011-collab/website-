@@ -8,7 +8,9 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "npm run test:logik && npm run test:render",
+    "test:logik": "tsx --test tests/*.test.ts",
+    "test:render": "node tests/hilfen/baue-rendertest.mjs && node --test --test-force-exit --test-timeout=20000 tests/hilfen/.gebaut/render.test.mjs",
     "replay": "tsx src/replay/replay.ts",
     "replay:all": "tsx src/replay/replay.ts --all",
     "sync-dataset": "mkdir -p assets/data && cp ../assets/data/cameras.json assets/data/cameras.json && cp ../assets/data/cameras.*.zones.json assets/data/"
@@ -35,9 +37,11 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@types/node": "^22.10.2",
     "@types/react": "~18.3.12",
-    "typescript": "^5.7.2",
+    "@types/react-test-renderer": "^19.1.0",
+    "react-test-renderer": "^18.3.1",
     "tsx": "^4.19.2",
-    "@types/node": "^22.10.2"
+    "typescript": "^5.7.2"
   }
 }

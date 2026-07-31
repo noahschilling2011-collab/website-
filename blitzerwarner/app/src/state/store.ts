@@ -25,7 +25,13 @@ import type { Settings } from '../types';
 export { STANDARD_SETTINGS };
 
 const SETTINGS_KEY = 'blitzerwarner.einstellungen.v1';
-const ONBOARDING_KEY = 'blitzerwarner.rechtshinweis-bestaetigt.v1';
+/**
+ * Exportiert, damit tests/render.test.tsx den bestätigten Zustand herstellen
+ * kann, ohne den Schlüssel abzuschreiben. Ein abgeschriebener Schlüssel wäre
+ * beim nächsten Umbenennen still falsch, und der Test prüfte dann dauerhaft
+ * den Onboarding-Screen statt des Fahrt-Screens.
+ */
+export const ONBOARDING_KEY = 'blitzerwarner.rechtshinweis-bestaetigt.v1';
 
 export type AppState = {
   settings: Settings;

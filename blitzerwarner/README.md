@@ -109,6 +109,34 @@ IDs, jeweils ebenfalls 7 Tage gültig.
 Praktisch heißt das: Android zum Ausprobieren, iPhone erst wenn die App
 dauerhaft laufen soll.
 
+### Was geprüft ist, bevor die App auf ein Gerät kommt
+
+| Ebene | Prüfung | Wie |
+|---|---|---|
+| Logik | 354 Tests | `npm run test:logik` |
+| Warnverhalten | 11 Fixture-Tracks | `npm run replay:all` |
+| Ende zu Ende | echte Anlage aus dem Datensatz, echte Umrisse, echtes Gate bis zum Ansagetext | `tests/kaltstart.test.ts` |
+| Oberfläche | alle vier Screens rendern, keine React-Warnung | `npm run test:render` |
+| Paket | Bundle baut (721 Module), Berechtigungen, Icons | `npx expo start`, `tests/berechtigungen.test.ts`, `tests/assets.test.ts` |
+
+Der Ende-zu-Ende-Test sucht eine real erfasste Anlage bei Stuttgart, rechnet
+eine Anfahrt darauf und lässt sie durch dieselbe Kette laufen wie der
+Hintergrund-Task — Landeserkennung, Gate, Entscheidung, Ansage. Ergebnis:
+
+```
+Datensatz: 5053 Anlagen, Stand 2026-07-29
+Anlage:    48.60411, 9.097 — Tempo 50
+Fix 0:     Land null (wartet_bestaetigung), Modus aus
+Fix 5:     Land DE (bestaetigt), Modus punkt
+Warnung:   327 m vor der Anlage
+           "Blitzer, dreihundertfünfzig Meter, Tempo fünfzig"
+```
+
+**Was das nicht abdeckt:** alles Native. Ob `expo-location` bei
+ausgeschaltetem Display Positionen liefert, ob ein Ton über Bluetooth hörbar
+wird, wie viel Akku das kostet — das zeigt nur eine Fahrt. Dafür gibt es den
+Fahrtenschreiber.
+
 ### Eine Testfahrt, alle drei Messwerte
 
 1. In der App: **Einstellungen → Diagnose → Fahrt aufzeichnen** einschalten.
