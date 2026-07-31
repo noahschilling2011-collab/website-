@@ -165,6 +165,28 @@ frische Abfrage.
 - `scripts/reference-locations.json` — bekannte Standorte für die Stichprobe,
   von Hand zu füllen
 
+## Datensatz Europa (Phase A.2) — offen, und warum
+
+Das Mengengerüst steht (siehe DATA.md): 124 Gebiete, geschätzt 29.475 Anlagen,
+rund 2 MB, und die Ein-Datei-Architektur trägt das nachweislich. Der eigentliche
+Bau ist damit nur noch ein Lauf:
+
+```bash
+npm run build-dataset -- --countries EU --out assets/data/cameras.eu.json
+```
+
+**Er ist bisher nicht durchgelaufen.** Ein Versuch brach nach fünf Anläufen für
+das erste Bundesland ab — Overpass antwortete über alle vier Spiegel abwechselnd
+mit HTTP 429, 502 und 504. Das ist kein Fehler im Skript, sondern Auslastung auf
+der Gegenseite.
+
+Der Lauf wurde deshalb abgebrochen und nicht durchgedrückt. Overpass ist
+gespendete Rechenzeit; 124 Geometrie-Abfragen gegen einen überlasteten Dienst zu
+wiederholen, bis einer davon durchkommt, ist genau das, was man dort nicht tun
+soll. Zu einem ruhigeren Zeitpunkt — nachts, europäische Zeit — ist der Lauf
+unproblematisch, und der Cache unter `.overpass-cache/` hält bereits geholte
+Gebiete fest, sodass ein Abbruch nichts kostet.
+
 ## Berechtigungen
 
 Im ausgelieferten Build (`preview`, `production`) hat die App **keine
