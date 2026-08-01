@@ -15,11 +15,11 @@ import { errorLog } from '../core/log';
 import { DATENQUALITAET } from '../core/country-data';
 import type { Settings } from '../types';
 
-type Props = { mode: ThemeMode; onZurueck: () => void };
+type Props = { mode: ThemeMode; onZurueck: () => void; onOeffneRechtliches: () => void };
 
 const FAKTOR_STUFEN = [0.75, 1, 1.25, 1.5, 2] as const;
 
-export default function SettingsScreen({ mode, onZurueck }: Props) {
+export default function SettingsScreen({ mode, onZurueck, onOeffneRechtliches }: Props) {
   const farben = palette(mode);
   const settings = useApp((s) => s.settings);
   const setze = useApp((s) => s.setzeEinstellung);
@@ -140,6 +140,26 @@ export default function SettingsScreen({ mode, onZurueck }: Props) {
           </Text>
         </View>
       )}
+
+      {/* Recht und Lizenz */}
+      <Text style={[stil.abschnitt, { color: farben.textLeise }]}>
+        {STRINGS.einstellungen.abschnittRecht}
+      </Text>
+      <Pressable
+        onPress={onOeffneRechtliches}
+        style={[stil.zeile, { borderColor: farben.linie }]}
+        accessibilityRole="button"
+        accessibilityLabel={STRINGS.rechtliches.titel}
+      >
+        <View style={stil.zeileText}>
+          <Text style={[stil.label, { color: farben.text }]}>
+            {STRINGS.rechtliches.titel}
+          </Text>
+          <Text style={[stil.hilfe, { color: farben.textLeise }]}>
+            {STRINGS.rechtliches.meineDatenHilfe}
+          </Text>
+        </View>
+      </Pressable>
 
       {/* Diagnose */}
       <Text style={[stil.abschnitt, { color: farben.textLeise }]}>

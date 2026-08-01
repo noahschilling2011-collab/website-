@@ -17,9 +17,9 @@ import { errorLog } from '../core/log';
 import { useApp } from '../state/store';
 import { fahrtprotokollAlsCsv, fahrtprotokollAnzahl } from '../location/task';
 
-type Props = { mode: ThemeMode; onZurueck: () => void };
+type Props = { mode: ThemeMode; onZurueck: () => void; onOeffneRechtliches: () => void };
 
-export default function InfoScreen({ mode, onZurueck }: Props) {
+export default function InfoScreen({ mode, onZurueck, onOeffneRechtliches }: Props) {
   const farben = palette(mode);
   const dataset = datasetOrNull();
   const fahrtprotokollAn = useApp((s) => s.settings.fahrtprotokoll);
@@ -184,6 +184,22 @@ export default function InfoScreen({ mode, onZurueck }: Props) {
           </Pressable>
         </View>
       )}
+
+      {/*
+        Der Weg zu den Rechtsdokumenten. Er steht hier und nicht versteckt in
+        den Einstellungen, weil ein Store-Prüfer, der die
+        Datenschutzerklärung sucht und nicht findet, ablehnt.
+      */}
+      <Pressable
+        onPress={onOeffneRechtliches}
+        style={[stil.link, { borderColor: farben.linie }]}
+        accessibilityRole="button"
+        accessibilityLabel={STRINGS.rechtliches.titel}
+      >
+        <Text style={[stil.linkText, { color: farben.text }]}>
+          {STRINGS.rechtliches.titel}
+        </Text>
+      </Pressable>
 
       <Pressable
         onPress={onZurueck}

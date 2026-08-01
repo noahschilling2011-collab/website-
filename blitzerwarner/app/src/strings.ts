@@ -586,6 +586,31 @@ export const STRINGS = {
       'die Beschilderung.',
   },
 
+  /**
+   * Der Rechtliches-Bereich. Die Dokumente selbst stehen in rechtstexte.ts —
+   * hier nur die Beschriftungen drumherum.
+   */
+  rechtliches: {
+    titel: 'Rechtliches',
+    stand: 'Stand',
+    oeffnen: 'Rechtliches',
+    luecke: 'unvollständig',
+    unvollstaendig:
+      'Dieses Dokument ist noch nicht vollständig. Die markierten Stellen ' +
+      'kann nur der Betreiber ausfüllen; solange sie offen sind, ist es nicht ' +
+      'veröffentlichungsreif.',
+    meineDaten: 'Meine Daten',
+    meineDatenHilfe:
+      'Es gibt kein Konto und keinen Server. Auf dem Gerät liegen nur deine ' +
+      'Einstellungen, das Fehlerprotokoll und — falls eingeschaltet — das ' +
+      'Fahrtprotokoll. Mehr hat die App nicht über dich.',
+    datenExport: 'Meine Daten ausgeben',
+    datenLoeschen: 'Alle Daten auf diesem Gerät löschen',
+    keinKonto:
+      'Ein Konto zum Löschen gibt es nicht — es wurde nie eines angelegt. ' +
+      'Mit der Deinstallation verschwindet auch der Rest.',
+  },
+
   /** Kurz, weil es wenig zu sagen gibt. */
   datenschutz: {
     titel: 'Datenschutz',

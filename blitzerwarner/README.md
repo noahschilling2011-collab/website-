@@ -215,6 +215,40 @@ soll. Zu einem ruhigeren Zeitpunkt — nachts, europäische Zeit — ist der Lau
 unproblematisch, und der Cache unter `.overpass-cache/` hält bereits geholte
 Gebiete fest, sodass ein Abbruch nichts kostet.
 
+## Rechtliches
+
+Vier Dokumente unter `rechtliches/`, erzeugt aus `app/src/rechtstexte.ts`:
+
+| Datei | Stand |
+|---|---|
+| `NUTZUNGSBEDINGUNGEN.md` | fertig |
+| `QUELLEN.md` | fertig |
+| `DATENSCHUTZ.md` | **Verantwortlicher fehlt** |
+| `IMPRESSUM.md` | **Name und Anschrift fehlen** |
+
+Sie stehen ausserdem vollständig **in** der App, unter Info → Rechtliches und
+Einstellungen → Recht und Lizenz. Nicht verlinkt, sondern eingebaut: Die App
+stellt keine Netzwerkverbindung her, ein Link auf eine Website wäre
+ausgerechnet in der Datenschutzerklärung der einzige Ort, an dem sie den
+Nutzer ins Netz schickt — und im Funkloch unlesbar.
+
+**Eine Quelle, zwei Fassungen.** Die Texte stehen in `app/src/rechtstexte.ts`;
+`npm run make-legal-docs` erzeugt daraus die Markdown-Dateien für die Adresse,
+die Apple und Google bei der Einreichung verlangen. Von Hand gepflegt liefen
+die beiden Fassungen auseinander, und von zwei Datenschutzerklärungen ist
+mindestens eine falsch. `tests/rechtstexte.test.ts` vergleicht sie bei jedem
+Testlauf.
+
+**Was noch fehlt, kann nur der Betreiber liefern:** Name und ladungsfähige
+Anschrift. Beides ist mit `[AUSZUFÜLLEN]` markiert, der Generator meldet es
+beim Lauf, ein Test hält fest, dass die Markierung nicht stillschweigend
+verschwindet, und die App zeigt die betroffenen Dokumente in der Übersicht
+als „unvollständig".
+
+**Meine Daten** (Info → Rechtliches): Ausgeben als Text — Einstellungen,
+Fehlerprotokoll und, falls eingeschaltet, das Fahrtprotokoll. Und alles
+löschen. Ein Konto zum Löschen gibt es nicht, es wurde nie eines angelegt.
+
 ## Berechtigungen
 
 Im ausgelieferten Build (`preview`, `production`) hat die App **keine

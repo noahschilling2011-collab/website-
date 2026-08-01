@@ -41,6 +41,16 @@ export type AppState = {
   geladen: boolean;
 
   ladeAlles: () => Promise<void>;
+  /**
+   * Alles löschen, was auf dem Gerät liegt: Einstellungen zurück auf die
+   * Standardwerte, Fehlerprotokoll leer.
+   *
+   * Der bestätigte Rechtshinweis bleibt stehen. Ihn zurückzusetzen wäre keine
+   * Löschung von Daten, sondern eine Belästigung — der Nutzer müsste beim
+   * nächsten Start erneut durch das Onboarding, und gelöscht wäre dadurch
+   * nichts, was ihn betrifft.
+   */
+  loescheAlleDaten: () => Promise<void>;
   setzeEinstellung: <K extends keyof Settings>(key: K, wert: Settings[K]) => Promise<void>;
   bestaetigeRechtshinweis: () => Promise<void>;
 };
@@ -86,6 +96,24 @@ export const useApp = create<AppState>((set, get) => ({
       // ist fehlgeschlagen. Das gehört ins Protokoll, aber nicht als
       // blockierender Fehler ins Gesicht des Nutzers.
       errorLog.error('einstellungen', `Einstellung ${String(key)} nicht gespeichert`, err);
+    }
+  },
+
+  async loescheAlleDaten() {
+    const settings = { ...STANDARD_SETTINGS };
+    set({ settings });
+    setzeSettings(settings);
+
+    errorLog.clear();
+    try {
+      await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      await errorLog.flush();
+    } catch (err) {
+      // Die Änderung wirkt für diese Sitzung; nur das Speichern ist
+      // fehlgeschlagen. Das gehört ins Protokoll — das damit allerdings
+      // gerade nicht leer ist. Der Widerspruch ist gewollt: Ein stiller
+      // Fehlschlag beim Löschen wäre schlimmer als ein sichtbarer Eintrag.
+      errorLog.error('einstellungen', 'Löschen konnte nicht gespeichert werden', err);
     }
   },
 

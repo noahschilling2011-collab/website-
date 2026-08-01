@@ -20,8 +20,9 @@ import DriveScreen from './src/ui/DriveScreen';
 import OnboardingScreen from './src/ui/OnboardingScreen';
 import SettingsScreen from './src/ui/SettingsScreen';
 import InfoScreen from './src/ui/InfoScreen';
+import RechtlichesScreen from './src/ui/RechtlichesScreen';
 
-type Ansicht = 'fahrt' | 'einstellungen' | 'info';
+type Ansicht = 'fahrt' | 'einstellungen' | 'info' | 'rechtliches';
 
 export default function App() {
   const geladen = useApp((s) => s.geladen);
@@ -122,10 +123,21 @@ export default function App() {
         />
       )}
       {ansicht === 'einstellungen' && (
-        <SettingsScreen mode={mode} onZurueck={() => setAnsicht('fahrt')} />
+        <SettingsScreen
+          mode={mode}
+          onZurueck={() => setAnsicht('fahrt')}
+          onOeffneRechtliches={() => setAnsicht('rechtliches')}
+        />
       )}
       {ansicht === 'info' && (
-        <InfoScreen mode={mode} onZurueck={() => setAnsicht('fahrt')} />
+        <InfoScreen
+          mode={mode}
+          onZurueck={() => setAnsicht('fahrt')}
+          onOeffneRechtliches={() => setAnsicht('rechtliches')}
+        />
+      )}
+      {ansicht === 'rechtliches' && (
+        <RechtlichesScreen mode={mode} onZurueck={() => setAnsicht('info')} />
       )}
     </>
   );

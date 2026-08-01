@@ -37,6 +37,7 @@ import App from '../App';
 import DriveScreen from '../src/ui/DriveScreen';
 import InfoScreen from '../src/ui/InfoScreen';
 import OnboardingScreen from '../src/ui/OnboardingScreen';
+import RechtlichesScreen from '../src/ui/RechtlichesScreen';
 import SettingsScreen from '../src/ui/SettingsScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -108,7 +109,7 @@ test('DriveScreen rendert', async () => {
 
 test('SettingsScreen rendert und zeigt jeden Schalter', async () => {
   const baum = await rendere(createElement(SettingsScreen, {
-    mode: 'tag' as const, onZurueck: () => {},
+    mode: 'tag' as const, onZurueck: () => {}, onOeffneRechtliches: () => {},
   }));
   const alle = texte(baum).join(' ');
 
@@ -128,12 +129,41 @@ test('SettingsScreen rendert und zeigt jeden Schalter', async () => {
 test('InfoScreen rendert und trägt die Lizenzangabe', async () => {
   // Attribution ist Lizenzpflicht aus der ODbL, kein Beiwerk.
   const baum = await rendere(createElement(InfoScreen, {
-    mode: 'tag' as const, onZurueck: () => {},
+    mode: 'tag' as const, onZurueck: () => {}, onOeffneRechtliches: () => {},
   }));
   const alle = texte(baum).join(' ');
 
   assert.match(alle, /OpenStreetMap/, 'keine Attribution');
   assert.match(alle, /Open Database License/, 'keine Lizenzangabe');
+  baum.unmount();
+});
+
+test('RechtlichesScreen rendert und listet alle vier Dokumente', async () => {
+  // Der Bereich, den ein Store-Prüfer sucht. Fehlt eines der Dokumente, wird
+  // die Einreichung abgelehnt — und zwar erst nach der Wartezeit.
+  const baum = await rendere(createElement(RechtlichesScreen, {
+    mode: 'tag' as const, onZurueck: () => {},
+  }));
+  const alle = texte(baum).join(' ');
+
+  for (const titel of ['Nutzungsbedingungen', 'Datenschutzerklärung', 'Impressum', 'Quellen']) {
+    assert.ok(alle.includes(titel), `"${titel}" fehlt im Rechtliches-Bereich`);
+  }
+  // Und die beiden Schaltflächen für die eigenen Daten.
+  assert.ok(alle.includes('Meine Daten ausgeben'));
+  assert.ok(alle.includes('löschen'));
+  baum.unmount();
+});
+
+test('unvollständige Dokumente sind in der Übersicht markiert', async () => {
+  // Impressum und Datenschutzerklärung warten auf Angaben des Betreibers.
+  // Wer die App so einreicht, soll es beim Durchsehen bemerken.
+  const baum = await rendere(createElement(RechtlichesScreen, {
+    mode: 'tag' as const, onZurueck: () => {},
+  }));
+  const alle = texte(baum);
+  const markierungen = alle.filter((t) => t === 'unvollständig').length;
+  assert.equal(markierungen, 2, `${markierungen} Markierungen, erwartet 2`);
   baum.unmount();
 });
 
@@ -204,8 +234,13 @@ test('kein Screen erzeugt React-Warnungen beim Rendern', async () => {
   try {
     for (const element of [
       createElement(OnboardingScreen, { mode: 'tag' as const }),
-      createElement(SettingsScreen, { mode: 'tag' as const, onZurueck: () => {} }),
-      createElement(InfoScreen, { mode: 'tag' as const, onZurueck: () => {} }),
+      createElement(SettingsScreen, {
+        mode: 'tag' as const, onZurueck: () => {}, onOeffneRechtliches: () => {},
+      }),
+      createElement(InfoScreen, {
+        mode: 'tag' as const, onZurueck: () => {}, onOeffneRechtliches: () => {},
+      }),
+      createElement(RechtlichesScreen, { mode: 'tag' as const, onZurueck: () => {} }),
       createElement(DriveScreen, {
         mode: 'tag' as const, onOeffneEinstellungen: () => {}, onOeffneInfo: () => {},
       }),
