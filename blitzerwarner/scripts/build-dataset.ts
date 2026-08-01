@@ -63,7 +63,57 @@ type RegionResult = {
   error?: string;
 };
 
+/**
+ * Läuft dieser Node-Prozess an einem Proxy vorbei, den die Umgebung vorgibt?
+ *
+ * WARUM DAS HIER STEHT UND NICHT IM README
+ *
+ * `fetch()` in Node beachtet HTTPS_PROXY nicht von sich aus — anders als curl,
+ * anders als praktisch jede andere HTTP-Bibliothek. In einer Umgebung mit
+ * Pflicht-Proxy geht dann jede Abfrage ins Leere, und zwar mit
+ *
+ *   HTTP 503: upstream connect error ... delayed connect error: Connection refused
+ *
+ * Das liest sich wie ein überlasteter Overpass-Server. Es ist aber der Proxy,
+ * und der Unterschied ist gross: Bei Auslastung wartet man ab, bei diesem
+ * Fehler wartet man ewig. Genau diese Fehldiagnose hat hier schon einmal einen
+ * Lauf gekostet — und beinahe eine zweite, falsche Notiz im README, Overpass
+ * sei überlastet gewesen.
+ *
+ * Deshalb bricht das Skript vorher ab, statt 124 Gebiete gegen eine Wand zu
+ * fahren. Overpass ist gespendete Rechenzeit; sinnlose Wiederholungen sind
+ * dort das Letzte, was man hinschicken sollte.
+ */
+function proxyWirdUmgangen(): string | null {
+  const proxy =
+    process.env.HTTPS_PROXY ?? process.env.https_proxy ??
+    process.env.HTTP_PROXY ?? process.env.http_proxy;
+  if (proxy === undefined || proxy === '') return null;
+
+  // Node ab v24 (und als Rückportierung in v22) beachtet die Variablen nur,
+  // wenn NODE_USE_ENV_PROXY gesetzt ist.
+  const an = process.env.NODE_USE_ENV_PROXY;
+  if (an === '1' || an === 'true') return null;
+
+  return proxy;
+}
+
 async function main() {
+  const proxy = proxyWirdUmgangen();
+  if (proxy !== null) {
+    console.error(
+      `Die Umgebung gibt einen Proxy vor (${proxy}), aber Node benutzt ihn nicht.\n` +
+      "fetch() beachtet HTTPS_PROXY nur mit NODE_USE_ENV_PROXY=1. Ohne das\n" +
+      'antwortet jede Abfrage mit HTTP 503 "upstream connect error" — das sieht\n' +
+      'aus wie ein ausgelasteter Overpass-Server, ist aber keiner.\n\n' +
+      'Nochmal so:\n\n' +
+      `  NODE_USE_ENV_PROXY=1 npm run build-dataset --${
+        process.argv.length > 2 ? ' ' + process.argv.slice(2).join(' ') : ''
+      }\n`,
+    );
+    process.exit(1);
+  }
+
   const args = parseArgs(process.argv.slice(2));
   let regions = regionsFor(args.countries);
   if (args.regions) {

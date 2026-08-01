@@ -187,6 +187,15 @@ Overpass-Antworten werden in `.overpass-cache/` zwischengespeichert. Ein
 erneuter Lauf belastet die API nicht noch einmal; `--no-cache` erzwingt eine
 frische Abfrage.
 
+**Hinter einem Proxy:** `NODE_USE_ENV_PROXY=1` davorsetzen. Node's `fetch()`
+beachtet `HTTPS_PROXY` nicht von sich aus — anders als curl und anders als
+praktisch jede andere HTTP-Bibliothek. Ohne die Variable antwortet jede
+Abfrage mit `HTTP 503: upstream connect error … Connection refused`, und das
+liest sich wie ein überlasteter Overpass-Server. Es ist keiner, und der
+Unterschied ist wichtig: Bei Auslastung wartet man ab, hier wartet man ewig.
+Das Skript prüft es beim Start und bricht mit der richtigen Zeile ab, statt
+124 Gebiete gegen eine Wand zu fahren.
+
 ### Werkzeuge
 
 - `scripts/build-dataset.ts` — Abfrage, Normalisierung, Dedupe, Gitter
