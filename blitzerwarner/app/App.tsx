@@ -9,7 +9,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { StatusBar, StyleSheet, Text, View } from 'react-native';
 
 import { STRINGS } from './src/strings';
-import { palette, type ThemeMode } from './src/ui/theme';
+import {
+  ABSTAND, GEWICHT, SCHRIFT, ZEILENHOEHE, palette, spur, type ThemeMode,
+} from './src/ui/theme';
 import { useApp } from './src/state/store';
 import { loadDataset } from './src/core/dataset';
 import { errorLog } from './src/core/log';
@@ -144,7 +146,14 @@ export default function App() {
 }
 
 const stil = StyleSheet.create({
-  mitte: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
-  titel: { fontSize: 24, fontWeight: '700', textAlign: 'center' },
-  text: { fontSize: 18, textAlign: 'center', lineHeight: 26 },
+  mitte: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: ABSTAND.M, padding: ABSTAND.XL },
+  titel: {
+    fontSize: SCHRIFT.MELDUNG, letterSpacing: spur(SCHRIFT.MELDUNG),
+    lineHeight: SCHRIFT.MELDUNG * ZEILENHOEHE.ENG, fontWeight: GEWICHT.FETT,
+    textAlign: 'center',
+  },
+  text: {
+    fontSize: SCHRIFT.TEXT, lineHeight: SCHRIFT.TEXT * ZEILENHOEHE.TEXT,
+    textAlign: 'center',
+  },
 });

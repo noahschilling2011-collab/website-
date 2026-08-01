@@ -11,7 +11,10 @@ import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-nat
 import * as Location from 'expo-location';
 
 import { STRINGS } from '../strings';
-import { GEWICHT, SCHRIFT, TOUCH, palette, type ThemeMode } from './theme';
+import {
+  ABSTAND, GEWICHT, LINIE, RADIUS, SCHRIFT, SEITE, TOUCH, ZEILENHOEHE,
+  gedrueckt, palette, spur, type ThemeMode,
+} from './theme';
 import { useApp } from '../state/store';
 import { datasetOrNull } from '../core/dataset';
 import { errorLog } from '../core/log';
@@ -137,7 +140,7 @@ export default function OnboardingScreen({ mode }: Props) {
 
         <Pressable
           onPress={frageRechte}
-          style={[stil.knopfKlein, { borderColor: farben.warn }]}
+          style={(z) => [stil.knopfKlein, { borderColor: farben.warn }, gedrueckt(z)]}
           accessibilityRole="button"
           accessibilityLabel={STRINGS.onboarding.berechtigungAnfordern}
         >
@@ -167,12 +170,13 @@ export default function OnboardingScreen({ mode }: Props) {
       <Pressable
         onPress={() => void bestaetige()}
         disabled={!kannWeiter}
-        style={[
+        style={(z) => [
           stil.knopf,
           {
             backgroundColor: kannWeiter ? farben.warn : farben.flaecheHoch,
             borderColor: kannWeiter ? farben.warn : farben.linie,
           },
+          gedrueckt(z),
         ]}
         accessibilityRole="button"
         accessibilityState={{ disabled: !kannWeiter }}
@@ -192,21 +196,21 @@ export default function OnboardingScreen({ mode }: Props) {
 }
 
 const stil = StyleSheet.create({
-  inhalt: { padding: 20, paddingTop: 56, gap: 20, paddingBottom: 40 },
-  titel: { fontSize: SCHRIFT.WARN_TITEL, fontWeight: GEWICHT.FETT },
-  karte: { borderWidth: 1, borderRadius: 12, padding: 16, gap: 12 },
+  inhalt: { padding: ABSTAND.RAND, paddingTop: SEITE.OBEN, gap: ABSTAND.RAND, paddingBottom: SEITE.UNTEN },
+  titel: { fontSize: SCHRIFT.WARN_TITEL, letterSpacing: spur(SCHRIFT.WARN_TITEL), lineHeight: SCHRIFT.WARN_TITEL * ZEILENHOEHE.ENG, fontWeight: GEWICHT.FETT },
+  karte: { borderWidth: LINIE.DUENN, borderRadius: RADIUS.M, padding: ABSTAND.L, gap: ABSTAND.M },
   kartenTitel: { fontSize: SCHRIFT.TEXT, fontWeight: GEWICHT.FETT },
-  text: { fontSize: SCHRIFT.TEXT, lineHeight: SCHRIFT.TEXT * 1.45 },
-  klein: { fontSize: SCHRIFT.KLEIN, lineHeight: SCHRIFT.KLEIN * 1.45 },
-  schalterZeile: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: TOUCH.MIN },
+  text: { fontSize: SCHRIFT.TEXT, lineHeight: SCHRIFT.TEXT * ZEILENHOEHE.TEXT },
+  klein: { fontSize: SCHRIFT.KLEIN, lineHeight: SCHRIFT.KLEIN * ZEILENHOEHE.TEXT },
+  schalterZeile: { flexDirection: 'row', alignItems: 'center', gap: ABSTAND.M, minHeight: TOUCH.MIN },
   knopf: {
-    minHeight: TOUCH.MIN, borderWidth: 2, borderRadius: 12,
+    minHeight: TOUCH.MIN, borderWidth: LINIE.DICK, borderRadius: RADIUS.M,
     alignItems: 'center', justifyContent: 'center',
   },
   knopfText: { fontSize: SCHRIFT.TEXT, fontWeight: GEWICHT.FETT },
   knopfKlein: {
-    minHeight: TOUCH.MIN, borderWidth: 1, borderRadius: 8,
-    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16,
+    minHeight: TOUCH.MIN, borderWidth: LINIE.DUENN, borderRadius: RADIUS.S,
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: ABSTAND.L,
   },
   knopfKleinText: { fontSize: SCHRIFT.TEXT, fontWeight: GEWICHT.MITTEL },
 });

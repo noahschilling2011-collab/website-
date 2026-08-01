@@ -19,7 +19,10 @@ import {
 } from 'react-native';
 
 import { STRINGS, bannerFuerLand } from '../strings';
-import { GEWICHT, SCHRIFT, TOUCH, ZIFFERN_FEST, palette, type ThemeMode } from './theme';
+import {
+  ABSTAND, DAUER, DECKKRAFT, GEWICHT, LINIE, MASS, RADIUS, SCHRIFT, SEITE, SPUR,
+  TOUCH, ZEILENHOEHE, ZIFFERN_FEST, gedrueckt, palette, spur, type ThemeMode,
+} from './theme';
 import { useApp } from '../state/store';
 import {
   laeuftTracking, landStatus, letzterFix, starteTracking, stoppeTracking, watchdogState,
@@ -88,13 +91,17 @@ export default function DriveScreen({ mode, onOeffneEinstellungen, onOeffneInfo 
   /** Der langsame Puls — das einzige bewegte Element. */
   useEffect(() => {
     if (!aktiv || reduzierteBewegung) {
-      puls.setValue(1);
+      puls.setValue(DECKKRAFT.VOLL);
       return;
     }
     const schleife = Animated.loop(
       Animated.sequence([
-        Animated.timing(puls, { toValue: 0.35, duration: 1200, useNativeDriver: true }),
-        Animated.timing(puls, { toValue: 1, duration: 1200, useNativeDriver: true }),
+        Animated.timing(puls, {
+          toValue: DECKKRAFT.PULS_TIEF, duration: DAUER.PULS, useNativeDriver: true,
+        }),
+        Animated.timing(puls, {
+          toValue: DECKKRAFT.VOLL, duration: DAUER.PULS, useNativeDriver: true,
+        }),
       ]),
     );
     schleife.start();
@@ -259,7 +266,10 @@ export default function DriveScreen({ mode, onOeffneEinstellungen, onOeffneInfo 
           <Animated.View
             style={[
               stil.punkt,
-              { backgroundColor: aktiv ? farben.warn : farben.textInaktiv, opacity: aktiv ? puls : 1 },
+              {
+                backgroundColor: aktiv ? farben.warn : farben.textInaktiv,
+                opacity: aktiv ? puls : DECKKRAFT.VOLL,
+              },
             ]}
           />
           <Text style={[stil.status, { color: farben.textSekundaer }]}>
@@ -287,13 +297,10 @@ export default function DriveScreen({ mode, onOeffneEinstellungen, onOeffneInfo 
       {/* Start/Stop — grosses Ziel, im Auto bedienbar. */}
       <Pressable
         onPress={umschalten}
-        style={({ pressed }) => [
+        style={(z) => [
           stil.knopf,
-          {
-            backgroundColor: aktiv ? farben.warnGedaempft : farben.warn,
-            borderColor: farben.warn,
-            opacity: pressed ? 0.8 : 1,
-          },
+          { backgroundColor: aktiv ? farben.warnGedaempft : farben.warn, borderColor: farben.warn },
+          gedrueckt(z),
         ]}
         accessibilityRole="button"
         accessibilityLabel={aktiv ? STRINGS.fahrt.fahrtBeenden : STRINGS.fahrt.fahrtStarten}
@@ -306,7 +313,7 @@ export default function DriveScreen({ mode, onOeffneEinstellungen, onOeffneInfo 
       <View style={stil.fussZeile}>
         <Pressable
           onPress={onOeffneEinstellungen}
-          style={stil.fussKnopf}
+          style={(z) => [stil.fussKnopf, gedrueckt(z)]}
           accessibilityRole="button"
           accessibilityLabel={STRINGS.einstellungen.titel}
         >
@@ -316,7 +323,7 @@ export default function DriveScreen({ mode, onOeffneEinstellungen, onOeffneInfo 
         </Pressable>
         <Pressable
           onPress={onOeffneInfo}
-          style={stil.fussKnopf}
+          style={(z) => [stil.fussKnopf, gedrueckt(z)]}
           accessibilityRole="button"
           accessibilityLabel={STRINGS.daten.titel}
         >
@@ -331,26 +338,32 @@ export default function DriveScreen({ mode, onOeffneEinstellungen, onOeffneInfo 
 
 const stil = StyleSheet.create({
   wurzel: { flex: 1 },
-  inhalt: { padding: 20, paddingTop: 48, gap: 28 },
-  banner: { borderWidth: 1, borderRadius: 8, padding: 14, gap: 6 },
+  inhalt: { padding: ABSTAND.RAND, paddingTop: SEITE.OBEN_FAHRT, gap: SEITE.BLOCK_FAHRT },
+  banner: { borderWidth: LINIE.DUENN, borderRadius: RADIUS.S, padding: ABSTAND.L, gap: ABSTAND.S },
   bannerTitel: { fontSize: SCHRIFT.TEXT, fontWeight: GEWICHT.FETT },
-  bannerText: { fontSize: SCHRIFT.KLEIN, lineHeight: SCHRIFT.KLEIN * 1.45 },
-  tachoBlock: { alignItems: 'center', gap: 2 },
-  tacho: { fontSize: SCHRIFT.TACHO, fontWeight: GEWICHT.FETT, lineHeight: SCHRIFT.TACHO * 1.05 },
+  bannerText: { fontSize: SCHRIFT.KLEIN, lineHeight: SCHRIFT.KLEIN * ZEILENHOEHE.TEXT },
+  tachoBlock: { alignItems: 'center', gap: ABSTAND.XS },
+  tacho: { fontSize: SCHRIFT.TACHO, letterSpacing: spur(SCHRIFT.TACHO), fontWeight: GEWICHT.FETT, lineHeight: SCHRIFT.TACHO * ZEILENHOEHE.ZAHL },
   tachoEinheit: { fontSize: SCHRIFT.TACHO_EINHEIT },
-  anlageBlock: { alignItems: 'center', gap: 4 },
-  label: { fontSize: SCHRIFT.LABEL, textTransform: 'uppercase', letterSpacing: 1 },
-  entfernung: { fontSize: SCHRIFT.WARN_ENTFERNUNG, fontWeight: GEWICHT.MITTEL },
-  statusZeile: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  punkt: { width: 10, height: 10, borderRadius: 5 },
-  status: { fontSize: SCHRIFT.STATUS },
-  leer: { borderWidth: 1, borderRadius: 8, padding: 16, gap: 8 },
-  knopf: {
-    marginHorizontal: 20, marginBottom: 12, minHeight: TOUCH.MIN,
-    borderWidth: 2, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+  anlageBlock: { alignItems: 'center', gap: ABSTAND.XS },
+  label: { fontSize: SCHRIFT.LABEL, textTransform: 'uppercase', letterSpacing: SPUR.VERSALIEN },
+  entfernung: {
+    fontSize: SCHRIFT.WARN_ENTFERNUNG, letterSpacing: spur(SCHRIFT.WARN_ENTFERNUNG),
+    lineHeight: SCHRIFT.WARN_ENTFERNUNG * ZEILENHOEHE.ZAHL, fontWeight: GEWICHT.MITTEL,
   },
-  knopfText: { fontSize: SCHRIFT.WARN_TITEL, fontWeight: GEWICHT.FETT },
-  fussZeile: { flexDirection: 'row', justifyContent: 'space-around', paddingBottom: 24 },
-  fussKnopf: { minHeight: TOUCH.MIN, minWidth: TOUCH.MIN, justifyContent: 'center', paddingHorizontal: 20 },
+  statusZeile: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: ABSTAND.S },
+  punkt: { width: MASS.PUNKT, height: MASS.PUNKT, borderRadius: RADIUS.KREIS },
+  status: { fontSize: SCHRIFT.STATUS },
+  leer: { borderWidth: LINIE.DUENN, borderRadius: RADIUS.S, padding: ABSTAND.L, gap: ABSTAND.S },
+  knopf: {
+    marginHorizontal: ABSTAND.RAND, marginBottom: ABSTAND.M, minHeight: TOUCH.MIN,
+    borderWidth: LINIE.DICK, borderRadius: RADIUS.M, alignItems: 'center', justifyContent: 'center',
+  },
+  knopfText: {
+    fontSize: SCHRIFT.WARN_TITEL, letterSpacing: spur(SCHRIFT.WARN_TITEL),
+    lineHeight: SCHRIFT.WARN_TITEL * ZEILENHOEHE.ENG, fontWeight: GEWICHT.FETT,
+  },
+  fussZeile: { flexDirection: 'row', justifyContent: 'space-around', paddingBottom: ABSTAND.XL },
+  fussKnopf: { minHeight: TOUCH.MIN, minWidth: TOUCH.MIN, justifyContent: 'center', paddingHorizontal: ABSTAND.RAND },
   fussText: { fontSize: SCHRIFT.TEXT },
 });

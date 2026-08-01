@@ -25,7 +25,10 @@ import {
   hatLuecken,
   type Dokument,
 } from '../rechtstexte';
-import { GEWICHT, SCHRIFT, TOUCH, palette, type ThemeMode } from './theme';
+import {
+  ABSTAND, GEWICHT, LINIE, RADIUS, SCHRIFT, SEITE, SPUR, TOUCH, ZEILENHOEHE,
+  gedrueckt, palette, spur, type ThemeMode,
+} from './theme';
 import { errorLog } from '../core/log';
 import { useApp } from '../state/store';
 import { fahrtprotokollAlsCsv, fahrtprotokollAnzahl } from '../location/task';
@@ -133,7 +136,7 @@ export default function RechtlichesScreen({ mode, onZurueck }: Props) {
 
         <Pressable
           onPress={() => setOffen(null)}
-          style={[stil.knopf, { borderColor: farben.linie }]}
+          style={(z) => [stil.knopf, { borderColor: farben.linie }, gedrueckt(z)]}
           accessibilityRole="button"
           accessibilityLabel={STRINGS.allgemein.zurueck}
         >
@@ -160,7 +163,7 @@ export default function RechtlichesScreen({ mode, onZurueck }: Props) {
         <Pressable
           key={dokument.titel}
           onPress={() => setOffen(dokument)}
-          style={[stil.zeile, { borderColor: farben.linie }]}
+          style={(z) => [stil.zeile, { borderColor: farben.linie }, gedrueckt(z)]}
           accessibilityRole="button"
           accessibilityLabel={dokument.titel}
         >
@@ -191,7 +194,7 @@ export default function RechtlichesScreen({ mode, onZurueck }: Props) {
 
         <Pressable
           onPress={teileDaten}
-          style={[stil.link, { borderColor: farben.linie }]}
+          style={(z) => [stil.link, { borderColor: farben.linie }, gedrueckt(z)]}
           accessibilityRole="button"
           accessibilityLabel={STRINGS.rechtliches.datenExport}
         >
@@ -202,7 +205,7 @@ export default function RechtlichesScreen({ mode, onZurueck }: Props) {
 
         <Pressable
           onPress={loescheAlles}
-          style={[stil.link, { borderColor: farben.warn }]}
+          style={(z) => [stil.link, { borderColor: farben.warn }, gedrueckt(z)]}
           accessibilityRole="button"
           accessibilityLabel={STRINGS.rechtliches.datenLoeschen}
         >
@@ -218,7 +221,7 @@ export default function RechtlichesScreen({ mode, onZurueck }: Props) {
 
       <Pressable
         onPress={onZurueck}
-        style={[stil.knopf, { borderColor: farben.linie }]}
+        style={(z) => [stil.knopf, { borderColor: farben.linie }, gedrueckt(z)]}
         accessibilityRole="button"
         accessibilityLabel={STRINGS.allgemein.zurueck}
       >
@@ -231,30 +234,30 @@ export default function RechtlichesScreen({ mode, onZurueck }: Props) {
 }
 
 const stil = StyleSheet.create({
-  inhalt: { padding: 20, paddingTop: 56, gap: 12, paddingBottom: 40 },
-  titel: { fontSize: SCHRIFT.WARN_TITEL, fontWeight: GEWICHT.FETT, marginBottom: 8 },
+  inhalt: { padding: ABSTAND.RAND, paddingTop: SEITE.OBEN, gap: ABSTAND.M, paddingBottom: SEITE.UNTEN },
+  titel: { fontSize: SCHRIFT.WARN_TITEL, letterSpacing: spur(SCHRIFT.WARN_TITEL), lineHeight: SCHRIFT.WARN_TITEL * ZEILENHOEHE.ENG, fontWeight: GEWICHT.FETT, marginBottom: ABSTAND.S },
   gruppe: {
-    fontSize: SCHRIFT.LABEL, textTransform: 'uppercase', letterSpacing: 1, marginTop: 20,
+    fontSize: SCHRIFT.LABEL, textTransform: 'uppercase', letterSpacing: SPUR.VERSALIEN, marginTop: ABSTAND.RAND,
   },
   zeile: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    minHeight: TOUCH.MIN, borderBottomWidth: 1, paddingVertical: 10,
+    flexDirection: 'row', alignItems: 'center', gap: ABSTAND.M,
+    minHeight: TOUCH.MIN, borderBottomWidth: LINIE.DUENN, paddingVertical: ABSTAND.M,
   },
-  zeileText: { flex: 1, gap: 2 },
+  zeileText: { flex: 1, gap: ABSTAND.XS },
   label: { fontSize: SCHRIFT.TEXT },
-  hilfe: { fontSize: SCHRIFT.KLEIN, lineHeight: SCHRIFT.KLEIN * 1.4 },
-  abschnitt: { gap: 8, marginTop: 16 },
+  hilfe: { fontSize: SCHRIFT.KLEIN, lineHeight: SCHRIFT.KLEIN * ZEILENHOEHE.TEXT },
+  abschnitt: { gap: ABSTAND.S, marginTop: ABSTAND.L },
   abschnittTitel: { fontSize: SCHRIFT.TEXT, fontWeight: GEWICHT.FETT },
-  text: { fontSize: SCHRIFT.TEXT, lineHeight: SCHRIFT.TEXT * 1.45 },
-  klein: { fontSize: SCHRIFT.KLEIN, lineHeight: SCHRIFT.KLEIN * 1.45 },
-  karte: { borderWidth: 1, borderRadius: 12, padding: 16, gap: 12 },
+  text: { fontSize: SCHRIFT.TEXT, lineHeight: SCHRIFT.TEXT * ZEILENHOEHE.TEXT },
+  klein: { fontSize: SCHRIFT.KLEIN, lineHeight: SCHRIFT.KLEIN * ZEILENHOEHE.TEXT },
+  karte: { borderWidth: LINIE.DUENN, borderRadius: RADIUS.M, padding: ABSTAND.L, gap: ABSTAND.M },
   link: {
-    minHeight: TOUCH.MIN, borderWidth: 1, borderRadius: 8,
-    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12,
+    minHeight: TOUCH.MIN, borderWidth: LINIE.DUENN, borderRadius: RADIUS.S,
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: ABSTAND.M,
   },
   linkText: { fontSize: SCHRIFT.TEXT },
   knopf: {
-    marginTop: 24, minHeight: TOUCH.MIN, borderWidth: 1, borderRadius: 12,
+    marginTop: ABSTAND.XL, minHeight: TOUCH.MIN, borderWidth: LINIE.DUENN, borderRadius: RADIUS.M,
     alignItems: 'center', justifyContent: 'center',
   },
   knopfText: { fontSize: SCHRIFT.TEXT, fontWeight: GEWICHT.MITTEL },

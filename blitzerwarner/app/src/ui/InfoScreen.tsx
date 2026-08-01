@@ -11,7 +11,10 @@ import { Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'r
 import Constants from 'expo-constants';
 
 import { STRINGS } from '../strings';
-import { GEWICHT, SCHRIFT, TOUCH, palette, type ThemeMode } from './theme';
+import {
+  ABSTAND, GEWICHT, LINIE, RADIUS, SCHRIFT, SEITE, TOUCH, ZEILENHOEHE,
+  gedrueckt, palette, spur, type ThemeMode,
+} from './theme';
 import { datasetOrNull } from '../core/dataset';
 import { errorLog } from '../core/log';
 import { useApp } from '../state/store';
@@ -95,7 +98,7 @@ export default function InfoScreen({ mode, onZurueck, onOeffneRechtliches }: Pro
         </Text>
         <Pressable
           onPress={oeffneLizenz}
-          style={[stil.link, { borderColor: farben.linie }]}
+          style={(z) => [stil.link, { borderColor: farben.linie }, gedrueckt(z)]}
           accessibilityRole="link"
           accessibilityLabel={STRINGS.daten.lizenzName}
         >
@@ -172,7 +175,10 @@ export default function InfoScreen({ mode, onZurueck, onOeffneRechtliches }: Pro
           <Pressable
             onPress={teileFahrtprotokoll}
             disabled={fahrtprotokollAnzahl() === 0}
-            style={[stil.link, { borderColor: farben.linie }]}
+            style={(z) => [
+              stil.link, { borderColor: farben.linie },
+              gedrueckt(z, fahrtprotokollAnzahl() === 0),
+            ]}
             accessibilityRole="button"
             accessibilityLabel={STRINGS.einstellungen.fahrtprotokollExport}
           >
@@ -192,7 +198,7 @@ export default function InfoScreen({ mode, onZurueck, onOeffneRechtliches }: Pro
       */}
       <Pressable
         onPress={onOeffneRechtliches}
-        style={[stil.link, { borderColor: farben.linie }]}
+        style={(z) => [stil.link, { borderColor: farben.linie }, gedrueckt(z)]}
         accessibilityRole="button"
         accessibilityLabel={STRINGS.rechtliches.titel}
       >
@@ -203,7 +209,7 @@ export default function InfoScreen({ mode, onZurueck, onOeffneRechtliches }: Pro
 
       <Pressable
         onPress={onZurueck}
-        style={[stil.knopf, { borderColor: farben.linie }]}
+        style={(z) => [stil.knopf, { borderColor: farben.linie }, gedrueckt(z)]}
         accessibilityRole="button"
         accessibilityLabel={STRINGS.allgemein.zurueck}
       >
@@ -216,19 +222,19 @@ export default function InfoScreen({ mode, onZurueck, onOeffneRechtliches }: Pro
 }
 
 const stil = StyleSheet.create({
-  inhalt: { padding: 20, paddingTop: 56, gap: 16, paddingBottom: 40 },
-  titel: { fontSize: SCHRIFT.WARN_TITEL, fontWeight: GEWICHT.FETT },
-  karte: { borderWidth: 1, borderRadius: 12, padding: 16, gap: 10 },
+  inhalt: { padding: ABSTAND.RAND, paddingTop: SEITE.OBEN, gap: ABSTAND.L, paddingBottom: SEITE.UNTEN },
+  titel: { fontSize: SCHRIFT.WARN_TITEL, letterSpacing: spur(SCHRIFT.WARN_TITEL), lineHeight: SCHRIFT.WARN_TITEL * ZEILENHOEHE.ENG, fontWeight: GEWICHT.FETT },
+  karte: { borderWidth: LINIE.DUENN, borderRadius: RADIUS.M, padding: ABSTAND.L, gap: ABSTAND.M },
   kartenTitel: { fontSize: SCHRIFT.TEXT, fontWeight: GEWICHT.FETT },
-  text: { fontSize: SCHRIFT.TEXT, lineHeight: SCHRIFT.TEXT * 1.45 },
-  klein: { fontSize: SCHRIFT.KLEIN, lineHeight: SCHRIFT.KLEIN * 1.45 },
+  text: { fontSize: SCHRIFT.TEXT, lineHeight: SCHRIFT.TEXT * ZEILENHOEHE.TEXT },
+  klein: { fontSize: SCHRIFT.KLEIN, lineHeight: SCHRIFT.KLEIN * ZEILENHOEHE.TEXT },
   link: {
-    minHeight: TOUCH.MIN, borderWidth: 1, borderRadius: 8,
-    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12,
+    minHeight: TOUCH.MIN, borderWidth: LINIE.DUENN, borderRadius: RADIUS.S,
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: ABSTAND.M,
   },
   linkText: { fontSize: SCHRIFT.TEXT, textDecorationLine: 'underline' },
   knopf: {
-    marginTop: 12, minHeight: TOUCH.MIN, borderWidth: 1, borderRadius: 12,
+    marginTop: ABSTAND.M, minHeight: TOUCH.MIN, borderWidth: LINIE.DUENN, borderRadius: RADIUS.M,
     alignItems: 'center', justifyContent: 'center',
   },
   knopfText: { fontSize: SCHRIFT.TEXT, fontWeight: GEWICHT.MITTEL },
