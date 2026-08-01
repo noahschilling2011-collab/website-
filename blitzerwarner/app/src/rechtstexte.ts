@@ -137,13 +137,35 @@ export const DATENSCHUTZ: Dokument = {
         'Es gibt keinen Server. Die App stellt zur Laufzeit keine ' +
         'Netzwerkverbindung her, sie hat kein Konto, keine Anmeldung, keine ' +
         'Werbung, keine Analyse-Bibliothek und keinen Absturzberichtsdienst.',
-        // Beleg: app.config.js entzieht android.permission.INTERNET in allen
-        // Profilen ausser 'development'; tests/berechtigungen.test.ts hält das
-        // durch. Nachgemessen an einem echten `expo prebuild`.
-        'Im ausgelieferten Build ist der App die Internet-Berechtigung ' +
-        'entzogen. Sie könnte also keine Verbindung herstellen, selbst wenn ' +
-        'sie es versuchte. Das lässt sich in den App-Informationen des Systems ' +
-        'nachsehen — Sie müssen uns das nicht glauben.',
+        /*
+         * Diese beiden Absätze standen vorher als einer da und galten für
+         * Android — behaupteten aber überall dasselbe.
+         *
+         * Der Satz "das lässt sich in den App-Informationen des Systems
+         * nachsehen" ist auf einem iPhone in beiden Hälften falsch: iOS kennt
+         * keine Internet-Berechtigung, jede App darf ins Netz, und es gibt
+         * dort folglich auch nichts nachzusehen. Eine Datenschutzerklärung,
+         * die zur Überprüfung an einer Stelle einlädt, an der nichts zu
+         * finden ist, beschädigt genau das Vertrauen, das sie herstellen soll.
+         *
+         * Belege: app.config.js entzieht android.permission.INTERNET in allen
+         * Profilen ausser 'development' (tests/berechtigungen.test.ts,
+         * nachgemessen an einem echten `expo prebuild`). Für iOS prüft
+         * tests/auslieferung.test.ts den Quelltext auf fetch, XMLHttpRequest,
+         * WebSocket, sendBeacon, EventSource, axios, node:http und
+         * expo-updates — und die Abhängigkeitsliste auf Analyse- und
+         * Absturzmelder-Pakete.
+         */
+        'Auf Android ist der App im ausgelieferten Build die ' +
+        'Internet-Berechtigung entzogen. Sie könnte also keine Verbindung ' +
+        'herstellen, selbst wenn sie es versuchte, und das lässt sich in den ' +
+        'App-Informationen des Systems nachsehen — Sie müssen uns das nicht ' +
+        'glauben.',
+        'Auf iOS gibt es keine Internet-Berechtigung; dort kann das System ' +
+        'diese Zusage nicht anzeigen. Nachprüfbar bleibt sie am Quelltext: ' +
+        'Die App enthält keinen Aufruf, der eine Verbindung herstellen würde, ' +
+        'und keine Bibliothek, die von sich aus sendet. Beides wird bei jedem ' +
+        'Testlauf geprüft.',
         'Ihre Position verlässt das Gerät nicht. Sie wird im Arbeitsspeicher ' +
         'mit einer mitgelieferten Liste verglichen und nicht gespeichert.',
       ],

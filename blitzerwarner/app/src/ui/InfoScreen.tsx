@@ -7,7 +7,7 @@
  * sonst zu Recht einen Ein-Stern-Review. Lieber vorher enttäuschen als
  * nachher.
  */
-import { Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { Linking, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import Constants from 'expo-constants';
 
 import { STRINGS } from '../strings';
@@ -26,7 +26,21 @@ export default function InfoScreen({ mode, onZurueck, onOeffneRechtliches }: Pro
   const farben = palette(mode);
   const dataset = datasetOrNull();
   const fahrtprotokollAn = useApp((s) => s.settings.fahrtprotokoll);
-  const internetEntzogen = Constants.expoConfig?.extra?.internetEntzogen === true;
+  /*
+   * Der Entzug der Internet-Berechtigung ist eine Android-Aussage.
+   *
+   * iOS kennt keine solche Berechtigung — jede App darf ins Netz, es gibt
+   * nichts zu entziehen und nichts, was der Nutzer in den Systemeinstellungen
+   * nachsehen könnte. Ohne die Plattformabfrage stand der Satz "In diesem
+   * Build ist der App die Internet-Berechtigung entzogen … das lässt sich in
+   * den App-Informationen des Systems nachsehen" auf jedem iPhone. Er war
+   * dort in beiden Hälften falsch.
+   *
+   * Was auf iOS wahr bleibt, steht in keinNetzOhneBeweis: die App macht keine
+   * Netzwerkaufrufe, nachprüfbar am Quelltext statt am System.
+   */
+  const internetEntzogen =
+    Platform.OS === 'android' && Constants.expoConfig?.extra?.internetEntzogen === true;
 
   /**
    * Das Fahrtprotokoll ans System übergeben.
@@ -123,12 +137,13 @@ export default function InfoScreen({ mode, onZurueck, onOeffneRechtliches }: Pro
           {STRINGS.datenschutz.keinNetz}
         </Text>
         {/*
-          Nur im ausgelieferten Build. Im Entwicklungsbuild ist die
-          Berechtigung da, weil der Dev-Client sein JS über das Netz lädt —
-          dann wäre der Satz falsch, und die App behauptet nicht, was sie
-          nicht beweisen kann. Die Angabe kommt aus app.config.js.
+          Der starke Satz nur dort, wo er stimmt: Android, ausgelieferter
+          Build. Im Entwicklungsbuild ist die Berechtigung da, weil der
+          Dev-Client sein JS über das Netz lädt; auf iOS gibt es sie
+          überhaupt nicht. In beiden Fällen steht der schwächere, aber wahre
+          Satz da. Die App behauptet nicht, was sie nicht beweisen kann.
         */}
-        {internetEntzogen && (
+        {internetEntzogen ? (
           <>
             <Text style={[stil.klein, { color: farben.text }]}>
               {STRINGS.datenschutz.keinNetzBewiesen}
@@ -137,6 +152,10 @@ export default function InfoScreen({ mode, onZurueck, onOeffneRechtliches }: Pro
               {STRINGS.datenschutz.keinMikrofon}
             </Text>
           </>
+        ) : (
+          <Text style={[stil.klein, { color: farben.textLeise }]}>
+            {STRINGS.datenschutz.keinNetzOhneBeweis}
+          </Text>
         )}
       </View>
 

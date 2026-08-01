@@ -113,11 +113,14 @@ dauerhaft laufen soll.
 
 | Ebene | Prüfung | Wie |
 |---|---|---|
-| Logik | 354 Tests | `npm run test:logik` |
+| Logik | 385 Tests | `npm run test:logik` |
 | Warnverhalten | 11 Fixture-Tracks | `npm run replay:all` |
 | Ende zu Ende | echte Anlage aus dem Datensatz, echte Umrisse, echtes Gate bis zum Ansagetext | `tests/kaltstart.test.ts` |
 | Oberfläche | alle vier Screens rendern, keine React-Warnung | `npm run test:render` |
-| Paket | Bundle baut (721 Module), Berechtigungen, Icons | `npx expo start`, `tests/berechtigungen.test.ts`, `tests/assets.test.ts` |
+| Gestaltung | Vierer-Raster, keine nackte Masszahl im Screen, jeder Token hat einen Leser, jede Fläche zeigt gedrückt und abgeschaltet | `tests/theme.test.ts` |
+| Auslieferung | kein Netzwerk-Aufruf, kein Schlüssel, keine sendende Bibliothek im Quelltext | `tests/auslieferung.test.ts` |
+| Paket | Bundle baut (721 Module in der Entwicklung, 613 ausgeliefert), Berechtigungen, Icons | `npx expo start`, `tests/berechtigungen.test.ts`, `tests/assets.test.ts` |
+| Bündel | keine Source Maps, Datensatz eingebettet, Grösse | `npm run check-bundle` (baut wirklich, ~40 s) |
 
 Der Ende-zu-Ende-Test sucht eine real erfasste Anlage bei Stuttgart, rechnet
 eine Anfahrt darauf und lässt sie durch dieselbe Kette laufen wie der
@@ -192,6 +195,12 @@ frische Abfrage.
   „warum sind das so viele/wenige?"
 - `scripts/reference-locations.json` — bekannte Standorte für die Stichprobe,
   von Hand zu füllen
+- `scripts/check-bundle.ts` — baut das ausgelieferte JS-Bündel für beide
+  Plattformen und misst nach: Source Maps, eingebetteter Datensatz, Grösse.
+  Gehört vor eine Auslieferung, nicht in `npm test` — es baut wirklich.
+  Gemessen am 2026-08-01: 4,04 MB (iOS) / 4,05 MB (Android), 613 / 612 Module,
+  keine `.map`. Gegenprobe mit `expo export --source-maps`: 6,42 MB Source Map,
+  die Prüfung greift.
 
 ## Datensatz Europa (Phase A.2) — offen, und warum
 
@@ -251,10 +260,27 @@ löschen. Ein Konto zum Löschen gibt es nicht, es wurde nie eines angelegt.
 
 ## Berechtigungen
 
-Im ausgelieferten Build (`preview`, `production`) hat die App **keine
-Internet-Berechtigung**. Das Versprechen „keine Netzwerk-Requests zur
-Laufzeit" ist damit nicht behauptet, sondern nachprüfbar — in den
+Auf **Android** hat die App im ausgelieferten Build (`preview`, `production`)
+**keine Internet-Berechtigung**. Das Versprechen „keine Netzwerk-Requests zur
+Laufzeit" ist dort nicht behauptet, sondern nachprüfbar — in den
 App-Informationen des Systems.
+
+Auf **iOS** gibt es diesen Beweis nicht: Das System kennt keine
+Internet-Berechtigung, jede App darf ins Netz, und es ist folglich auch nichts
+nachzusehen. Die Zusage ruht dort auf dem Quelltext, und der wird geprüft —
+`app/tests/auslieferung.test.ts` sucht in jeder Datei unter `app/src/` nach
+`fetch`, `XMLHttpRequest`, `WebSocket`, `sendBeacon`, `EventSource`, `axios`,
+`node:http` und `expo-updates`, und in `package.json` nach Analyse-,
+Absturzmelder- und Werbepaketen. Die einzige Stelle, die überhaupt eine
+Adresse anfasst, ist der Lizenzlink im Info-Screen: `Linking.openURL` übergibt
+sie an den Browser, die App verbindet sich nicht selbst. Auch das steht
+namentlich im Test, damit eine zweite Stelle auffällt.
+
+Diese Unterscheidung stand vorher nirgends — in der App nicht, in der
+Datenschutzerklärung nicht und hier nicht. Auf einem iPhone hätte die
+Datenschutzerklärung behauptet, die Berechtigung sei entzogen und in den
+Systemeinstellungen nachprüfbar. Beide Hälften falsch, auf genau der
+Plattform, für die zuerst gebaut wird.
 
 Ebenfalls entzogen: Mikrofon (`RECORD_AUDIO`), Gerätespeicher
 (`READ_/WRITE_EXTERNAL_STORAGE`), Standortdaten aus fremden Fotos

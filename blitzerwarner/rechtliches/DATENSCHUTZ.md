@@ -17,7 +17,9 @@ Static verarbeitet personenbezogene Daten ausschliesslich auf dem Gerät und üb
 
 Es gibt keinen Server. Die App stellt zur Laufzeit keine Netzwerkverbindung her, sie hat kein Konto, keine Anmeldung, keine Werbung, keine Analyse-Bibliothek und keinen Absturzberichtsdienst.
 
-Im ausgelieferten Build ist der App die Internet-Berechtigung entzogen. Sie könnte also keine Verbindung herstellen, selbst wenn sie es versuchte. Das lässt sich in den App-Informationen des Systems nachsehen — Sie müssen uns das nicht glauben.
+Auf Android ist der App im ausgelieferten Build die Internet-Berechtigung entzogen. Sie könnte also keine Verbindung herstellen, selbst wenn sie es versuchte, und das lässt sich in den App-Informationen des Systems nachsehen — Sie müssen uns das nicht glauben.
+
+Auf iOS gibt es keine Internet-Berechtigung; dort kann das System diese Zusage nicht anzeigen. Nachprüfbar bleibt sie am Quelltext: Die App enthält keinen Aufruf, der eine Verbindung herstellen würde, und keine Bibliothek, die von sich aus sendet. Beides wird bei jedem Testlauf geprüft.
 
 Ihre Position verlässt das Gerät nicht. Sie wird im Arbeitsspeicher mit einer mitgelieferten Liste verglichen und nicht gespeichert.
 

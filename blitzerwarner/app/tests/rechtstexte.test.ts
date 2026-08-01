@@ -172,6 +172,19 @@ test('die Datenschutzerklärung deckt sich mit dem Berechtigungs-Entzug', () => 
   const text = DATENSCHUTZ.abschnitte.flatMap((a) => a.absaetze).join(' ');
   assert.match(text, /Internet-Berechtigung\s+entzogen/);
 
+  // UND sie sagt dazu, für welches System das gilt.
+  //
+  // Vorher stand die Zusage plattformlos da, samt der Einladung, sie in den
+  // App-Informationen nachzusehen. Auf einem iPhone ist beides falsch: iOS
+  // kennt keine Internet-Berechtigung, also ist dort nichts entzogen und
+  // nichts nachzusehen. Wer eine Datenschutzerklärung zur Überprüfung an eine
+  // Stelle schickt, an der nichts zu finden ist, beschädigt genau das
+  // Vertrauen, das sie herstellen soll.
+  assert.match(text, /Auf Android/, 'die Zusage nennt das System nicht, für das sie gilt');
+  assert.match(text, /Auf iOS gibt es keine Internet-Berechtigung/,
+    'die iOS-Einschränkung fehlt — dort wäre die Aussage falsch');
+  assert.match(text, /am Quelltext/, 'für iOS fehlt der Ersatzbeleg');
+
   const vorher = process.env.EAS_BUILD_PROFILE;
   process.env.EAS_BUILD_PROFILE = 'production';
   try {

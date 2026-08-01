@@ -13,7 +13,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
-    "primaryColor": "#FF3B30",
+    "primaryColor": "#FF2D1A",
     "assetBundlePatterns": [
       "assets/**/*"
     ],
@@ -63,7 +63,7 @@
       [
         "expo-notifications",
         {
-          "color": "#FF3B30"
+          "color": "#FF2D1A"
         }
       ],
       "expo-asset",

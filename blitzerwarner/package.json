@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Offline-Warner für stationäre Blitzer. Keine Community-Daten, kein Backend, keine Werbung.",
+  "description": "Offline-Warner f\u00fcr station\u00e4re Blitzer. Keine Community-Daten, kein Backend, keine Werbung.",
   "license": "MIT",
   "scripts": {
     "build-dataset": "tsx scripts/build-dataset.ts",
@@ -13,7 +13,8 @@
     "make-icons": "tsx scripts/make-icons.ts",
     "make-legal-docs": "tsx scripts/make-legal-docs.ts",
     "test": "tsx --test scripts/lib/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check-bundle": "tsx scripts/check-bundle.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

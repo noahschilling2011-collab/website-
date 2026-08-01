@@ -104,6 +104,19 @@ module.exports = ({ config }) => {
        * Die App soll nicht behaupten, was sie nicht weiss. In einem
        * Entwicklungsbuild ist die Berechtigung da, und der Screen sagt das
        * dann auch.
+       *
+       * ACHTUNG, DAS GILT NUR FÜR ANDROID.
+       *
+       * blockedPermissions steht unter `android` und wirkt auch nur dort.
+       * iOS kennt überhaupt keine Internet-Berechtigung: Jede App darf ins
+       * Netz, es gibt nichts zu entziehen und nichts, was der Nutzer in den
+       * Systemeinstellungen nachsehen könnte.
+       *
+       * Dieses Feld war vorher plattformblind, und der Datenschutz-Screen
+       * hätte auf einem iPhone behauptet, die Berechtigung sei entzogen und
+       * in den App-Informationen nachprüfbar. Beides falsch — auf genau der
+       * Plattform, für die diese App zuerst gebaut wird. Der Screen fragt
+       * deshalb zusätzlich Platform.OS ab.
        */
       internetEntzogen: !istEntwicklung(),
     },

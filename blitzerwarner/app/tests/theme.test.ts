@@ -387,6 +387,52 @@ test('der kleinste Grad auf dem Fahrt-Screen bleibt lesbar', () => {
   assert.ok(SCHRIFT.STATUS >= 18, `SCHRIFT.STATUS = ${SCHRIFT.STATUS}`);
 });
 
+test('die Akzentfarbe ist auch ausserhalb der App dieselbe', () => {
+  // Die Palette regelt, was auf dem Bildschirm passiert. Zwei Farben liegen
+  // ausserhalb davon und wurden deshalb übersehen: primaryColor in app.json
+  // und die Akzentfarbe der Systembenachrichtigung. Beide standen auf
+  // #FF3B30 — Apples Systemrot, nicht das Warnrot dieser App (#FF2D1A).
+  //
+  // Sichtbar wird der Unterschied genau dort, wo es zählt: Die dauerhafte
+  // Benachrichtigung des Hintergrunddienstes steht im Benachrichtigungsschirm
+  // direkt neben dem App-Symbol. Zwei Rottöne nebeneinander sehen nicht nach
+  // zwei Entscheidungen aus, sondern nach keiner.
+  const expo = (
+    JSON.parse(readFileSync(join(HIER, '..', 'app.json'), 'utf8')) as {
+      expo: Record<string, unknown>;
+    }
+  ).expo;
+
+  assert.equal(
+    expo.primaryColor, PALETTEN.tag.warn,
+    'app.json primaryColor weicht von PALETTEN.tag.warn ab',
+  );
+
+  const plugins = expo.plugins as (string | [string, Record<string, unknown>])[];
+  const notif = plugins.find(
+    (p): p is [string, Record<string, unknown>] =>
+      Array.isArray(p) && p[0] === 'expo-notifications',
+  );
+  assert.ok(notif, 'expo-notifications ist nicht mehr konfiguriert');
+  assert.equal(
+    notif[1].color, PALETTEN.tag.warn,
+    'die Benachrichtigungsfarbe weicht von PALETTEN.tag.warn ab',
+  );
+
+  // Und der Hintergrund bleibt echtes Schwarz: auf OLED kostet er dann keinen
+  // Strom, und beim Start blitzt nichts Helles auf.
+  assert.equal(expo.backgroundColor, PALETTEN.tag.hintergrund);
+  assert.equal(
+    (expo.splash as Record<string, unknown>).backgroundColor,
+    PALETTEN.tag.hintergrund,
+  );
+  assert.equal(
+    ((expo.android as Record<string, unknown>).adaptiveIcon as Record<string, unknown>)
+      .backgroundColor,
+    PALETTEN.tag.hintergrund,
+  );
+});
+
 test('keine Emoji als Bedienelemente', () => {
   // Emoji sehen auf jedem System anders aus, lassen sich nicht einfärben und
   // haben keine gemeinsame Strichstärke.

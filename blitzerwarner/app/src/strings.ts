@@ -633,6 +633,19 @@ export const STRINGS = {
     keinMikrofon:
       'Ebenfalls entzogen: Zugriff auf Mikrofon und Gerätespeicher. Die App ' +
       'spielt Töne ab, sie nimmt nichts auf.',
+    /**
+     * Der Ersatz für keinNetzBewiesen auf iOS und im Entwicklungsbuild.
+     *
+     * iOS kennt keine Internet-Berechtigung: Jede App darf ins Netz, es gibt
+     * nichts zu entziehen und nichts, was der Nutzer in den
+     * Systemeinstellungen nachsehen könnte. Der Satz von Android wäre hier in
+     * beiden Hälften falsch. Was bleibt, ist die schwächere, aber wahre
+     * Aussage — und der Hinweis, woran sie überprüfbar ist.
+     */
+    keinNetzOhneBeweis:
+      'Auf diesem System lässt sich das nicht an einer Berechtigung ablesen. ' +
+      'Nachprüfbar ist es am Quelltext: Die App enthält keinen Aufruf, der ' +
+      'eine Verbindung herstellen würde.',
     keinePosition:
       'Die Position verlässt das Gerät nicht. Sie wird im Arbeitsspeicher ' +
       'ausgewertet und nicht dauerhaft gespeichert.',
