@@ -623,6 +623,33 @@ export const STRINGS = {
       n === 1 ? '1 Anlage im Umkreis' : `${n} Anlagen im Umkreis`,
     naechste: 'Nächste',
     ichHier: 'Deine Position',
+    zurueckZuMir: 'Zurück zu meiner Position',
+    bedienung: 'Ziehen verschiebt die Karte, Tippen wählt eine Anlage.',
+    bildBeschreibung:
+      'Karte der erfassten Anlagen um deine Position, Norden oben, ohne Strassen.',
+    tempolimit: 'Tempo',
+    blickrichtung: 'Blickrichtung',
+    keineRichtung:
+      'Für diese Anlage ist keine Blickrichtung erfasst. Sie kann in beide ' +
+      'Richtungen messen oder nur in eine — das steht nicht in den Daten.',
+    /** Die Anlagenart im Klartext. Schlüssel sind der CameraType aus types.ts. */
+    anlagenArt: {
+      speed: 'Geschwindigkeitsmessung',
+      red_light: 'Rotlichtüberwachung',
+      both: 'Geschwindigkeit und Rotlicht',
+    },
+    /**
+     * Warum bei kleinem Umkreis keine Grenzlinie erscheint.
+     *
+     * Die Umrisse sind auf 200 m vereinfacht. Bei 500 m Umkreis wäre das ein
+     * Fünftel des halben Bildes — eine Linie, die dort so weit danebenliegt,
+     * wäre keine Orientierung, sondern eine Falschaussage. Statt sie
+     * wegzulassen und den Nutzer rätseln zu lassen, steht der Grund da.
+     */
+    umrissZuUngenau: (abKm: number): string =>
+      `Landesgrenzen werden erst ab ${abKm} km Umkreis gezeichnet — die ` +
+      'mitgelieferten Umrisse sind zu grob vereinfacht, um näher heran ' +
+      'genau zu sein.',
   },
 
   rechtliches: {

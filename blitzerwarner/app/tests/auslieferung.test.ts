@@ -140,16 +140,86 @@ test('im Quelltext steht kein Schlüssel und kein Zugangsdatum', () => {
 
 // --- Keine Bibliothek, die von sich aus telefoniert ------------------------
 
-test('keine Abhängigkeit, die Daten nach draussen schickt', () => {
-  // Die Lücke, die der Quelltext-Scan lässt: Eine eingebundene Bibliothek
-  // kann telefonieren, ohne dass eine Zeile im eigenen Code das verrät.
-  // Analyse, Absturzmelder und Werbung tun genau das, und alle drei kommen
-  // ohne Absicht ins Projekt — als Empfehlung, als transitive Abhängigkeit,
-  // als "das hat jeder drin".
+/**
+ * Jede direkte Abhängigkeit, mit dem Grund, warum sie da ist.
+ *
+ * WARUM ERLAUBNISLISTE UND NICHT VERBOTSLISTE
+ *
+ * Zuerst stand hier eine Liste verdächtiger Namen — Sentry, Firebase,
+ * Analyse, Werbung. Die fängt genau die Pakete, an die jemand schon gedacht
+ * hat, und keines der anderen. Ein Analysedienst mit einem Namen, der nicht
+ * auf der Liste steht, wäre stillschweigend durchgegangen.
+ *
+ * Umgekehrt herum kann nichts durchrutschen: Wer eine Abhängigkeit
+ * hinzufügt, bekommt einen roten Test, bis er hier aufschreibt, wofür sie da
+ * ist. Das ist kein Misstrauen gegen Bibliotheken, sondern die Umsetzung des
+ * Produktversprechens — "keine Netzwerk-Requests zur Laufzeit" hält nur, wenn
+ * bekannt ist, was überhaupt mitläuft.
+ *
+ * Der Aufwand ist die eine Zeile, die man beim Hinzufügen schreibt.
+ */
+const ERLAUBTE_ABHAENGIGKEITEN: Record<string, string> = {
+  'expo': 'Das Gerüst: Build-Konfiguration, Prebuild, die expo-* Module darunter.',
+  'react': 'Die Komponentenbibliothek, auf der React Native aufsetzt.',
+  'react-native': 'Die Laufzeit selbst — ohne sie gibt es keine App.',
+  'expo-status-bar': 'Statusleiste einfärben.',
+  'expo-system-ui': 'Hintergrundfarbe des Systemfensters — sonst blitzt beim Start Weiss auf.',
+  'expo-asset': 'Lädt die gebündelten Dateien. Direkt eingetragen, weil der Metro-Start sie sonst nicht auflöst.',
+  'expo-font': 'Wie expo-asset: direkte Abhängigkeit, damit der Start durchläuft.',
+  'expo-file-system': 'Wie expo-asset und expo-font: direkte Abhängigkeit, damit Metro sie auflöst.',
+  'expo-dev-client': 'Nur für den Entwicklungsbuild; Expo Go kann keinen Hintergrundstandort.',
+  'expo-constants': 'Liest extra.internetEntzogen aus der Build-Konfiguration.',
+  'expo-location': 'Die Positionen. Ohne sie gibt es keine App.',
+  'expo-task-manager': 'Der Hintergrund-Task — warnen bei ausgeschaltetem Display.',
+  'expo-av': 'Die Audio-Sitzung: Musik leiser stellen statt stoppen.',
+  'expo-speech': 'Die Ansage.',
+  'expo-haptics': 'Vibration als zweiter Kanal zur Ansage.',
+  'expo-notifications': 'Die Pflicht-Benachrichtigung des Vordergrunddienstes.',
+  'expo-keep-awake': 'Display an lassen, solange die App im Vordergrund fährt.',
+  '@react-native-async-storage/async-storage': 'Einstellungen und Rechtshinweis auf dem Gerät.',
+  'zustand': 'Der Zustandsspeicher der Oberfläche.',
+  'react-native-svg':
+    'Das Kartenbild: Linienzüge der Landesumrisse, Anlagenzeichen, ' +
+    'Massstabsbalken. Rendert nativ und stellt keine Verbindung her — die ' +
+    'erste Fassung zeichnete mit Views, was für hundert Umriss-Abschnitte ' +
+    'hundert einzeln gedrehte Views bedeutet hätte.',
+};
+
+test('jede Abhängigkeit steht mit Begründung in der Erlaubnisliste', () => {
   const paket = JSON.parse(readFileSync(join(APP, 'package.json'), 'utf8')) as {
     dependencies: Record<string, string>;
   };
-  const abhaengig = Object.keys(paket.dependencies);
+
+  const unerklaert = Object.keys(paket.dependencies)
+    .filter((name) => ERLAUBTE_ABHAENGIGKEITEN[name] === undefined);
+
+  assert.deepEqual(
+    unerklaert, [],
+    `Abhängigkeiten ohne Begründung: ${unerklaert.join(', ')}\n` +
+    'Eintragen in ERLAUBTE_ABHAENGIGKEITEN mit einem Satz, wofür sie da ist. ' +
+    '"Keine Netzwerk-Requests zur Laufzeit" hält nur, wenn bekannt ist, was ' +
+    'überhaupt mitläuft.',
+  );
+
+  // Und andersherum: Was hier steht und nicht mehr installiert ist, ist eine
+  // Notiz über einen Zustand von gestern.
+  const verwaist = Object.keys(ERLAUBTE_ABHAENGIGKEITEN)
+    .filter((name) => paket.dependencies[name] === undefined);
+  assert.deepEqual(verwaist, [], `Nicht mehr installiert: ${verwaist.join(', ')}`);
+
+  for (const [name, grund] of Object.entries(ERLAUBTE_ABHAENGIGKEITEN)) {
+    assert.ok(grund.length > 10, `${name}: die Begründung ist keine`);
+  }
+});
+
+test('kein Paket, das bekanntermassen nach Hause telefoniert', () => {
+  // Zusätzlich zur Erlaubnisliste, und nicht statt ihrer: Diese Namen sollen
+  // auch dann auffallen, wenn jemand sie mit einer Begründung einträgt.
+  const paket = JSON.parse(readFileSync(join(APP, 'package.json'), 'utf8')) as {
+    dependencies: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  };
+  const alle = [...Object.keys(paket.dependencies), ...Object.keys(paket.devDependencies ?? {})];
 
   const VERDAECHTIG = [
     /^@sentry\//, /^@bugsnag\//, /^expo-updates$/, /^expo-analytics/,
@@ -157,7 +227,7 @@ test('keine Abhängigkeit, die Daten nach draussen schickt', () => {
     /^react-native-google-mobile-ads$/, /^axios$/, /^@react-native-firebase\//,
   ];
 
-  const funde = abhaengig.filter((name) => VERDAECHTIG.some((m) => m.test(name)));
+  const funde = alle.filter((name) => VERDAECHTIG.some((m) => m.test(name)));
   assert.deepEqual(
     funde, [],
     `Abhängigkeiten, die zur Laufzeit senden könnten: ${funde.join(', ')}`,

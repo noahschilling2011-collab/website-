@@ -680,6 +680,31 @@ export const KARTE = {
    * erlauben wäre geraten.
    */
   MAX_PUNKTE: 400,
+  /**
+   * Ab welchem Anteil des Bildes eine vereinfachte Linie noch ehrlich ist.
+   *
+   * Die Landesumrisse sind mit Douglas-Peucker auf TOLERANZ_GRENZE_M = 200 m
+   * vereinfacht. Bei 500 m Umkreis sind 200 m ein Fünftel des halben Bildes —
+   * eine Grenze, die dort 20 % daneben liegt, ist keine Orientierungshilfe,
+   * sondern eine Falschaussage.
+   *
+   * 5 % ist die Grenze, ab der die Abweichung im Bild nicht mehr als Lage
+   * missverstanden werden kann. Daraus folgt der kleinste Umkreis, bei dem
+   * überhaupt ein Umriss gezeichnet wird: 200 m / 0,05 = 4000 m. Die Zahl
+   * wird gerechnet und nicht hingeschrieben, damit sie mitwandert, wenn
+   * jemand die Vereinfachung ändert.
+   */
+  UMRISS_MAX_FEHLER_ANTEIL: 0.05,
+  /**
+   * Wie nah ein Fingertipp an einer Anlage liegen muss, damit sie gemeint ist.
+   *
+   * Ein Punkt ist 8 dp gross, eine Fingerkuppe rund 45. Auf den Punkt selbst
+   * zu zielen wäre aussichtslos, deshalb sucht der Tipp die nächstgelegene
+   * Anlage in diesem Umkreis. 32 dp ist die Hälfte der 64-dp-Fläche, die im
+   * Rest der App als Mindestziel gilt — genug zum Treffen, klein genug, dass
+   * bei zwei Anlagen nebeneinander die nähere gewinnt.
+   */
+  TIPP_RADIUS_DP: 32,
 } as const;
 
 export const GRID = {

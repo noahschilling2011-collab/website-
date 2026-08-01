@@ -43,7 +43,7 @@ import KarteScreen, { KartenBild } from '../src/ui/KarteScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { ONBOARDING_KEY, useApp } from '../src/state/store';
-import { baueKarte } from '../src/core/karte';
+import { baueKarte, massstabsbalken, umrissLinien } from '../src/core/karte';
 import { KARTE } from '../src/config';
 import { PALETTEN } from '../src/ui/theme';
 import type { Camera } from '../src/types';
@@ -285,45 +285,86 @@ test('KarteScreen zeigt ohne Position seinen Wartezustand, nicht ein leeres Bild
   }
 });
 
-test('das Kartenbild zeichnet je Anlage einen Punkt, plus Ringe und die eigene Position', async () => {
-  // Der gezeichnete Zustand, den der Screen im Test nie erreicht. Deshalb
-  // ist das Bild eine eigene Komponente über explizitem Zustand: hier geht
-  // eine gerechnete Karte hinein und es lässt sich nachzählen.
-  const mitte = { lat: 48.6, lon: 9.1 };
+test('das Kartenbild zeichnet Anlagen, Ringe, Umriss, Position und Massstab', async () => {
+  // Der gezeichnete Zustand, den der Screen im Test nie erreicht: letzterFix()
+  // liefert dort immer null. Deshalb ist das Bild eine eigene Komponente über
+  // explizitem Zustand — hier geht eine gerechnete Karte hinein und es lässt
+  // sich nachzählen.
+  //
+  // Basel als Mittelpunkt, weil dort wirklich Grenzlinien im Bild liegen. Ein
+  // Ort mitten im Land liesse den Umriss-Test stumm bestehen.
+  const BASEL = { lat: 47.56, lon: 7.59 };
+  const G = 350, R = 20_000;
   const cams: Camera[] = [
-    { lat: 48.605, lon: 9.1, dir: null, max: 50, type: 'speed' },
-    { lat: 48.6, lon: 9.108, dir: null, max: null, type: 'red_light' },
-    { lat: 48.596, lon: 9.095, dir: null, max: 70, type: 'both' },
+    { lat: 47.57, lon: 7.59, dir: 180, max: 50, type: 'speed' },
+    { lat: 47.55, lon: 7.60, dir: null, max: null, type: 'red_light' },
+    { lat: 47.56, lon: 7.62, dir: 90, max: 80, type: 'both' },
   ];
-  const karte = baueKarte(mitte.lat, mitte.lon, cams, 300, 2000);
+  const karte = baueKarte(BASEL.lat, BASEL.lon, cams, G, R);
+  const umrisse = umrissLinien(BASEL.lat, BASEL.lon, G, R);
   assert.equal(karte.punkte.length, 3, 'Vorbedingung: alle drei liegen im Umkreis');
+  assert.ok(umrisse.length > 0, 'Vorbedingung: bei Basel liegen Grenzlinien im Bild');
 
   const baum = await rendere(
     createElement(KartenBild, {
-      karte, ich: { x: 150, y: 150 }, farben: PALETTEN.tag,
+      karte, umrisse, ichSichtbar: true, gewaehlt: null,
+      balken: massstabsbalken(G, R), farben: PALETTEN.tag,
     }),
   );
 
-  // Gezählt wird über die Grösse: Anlagenpunkte sind 8 dp, die eigene
-  // Position 16 dp, Ringe haben eine Randstärke. Das prüft, dass wirklich
-  // gezeichnet wird — und nicht nur, dass die Komponente nicht abstürzt.
-  // Nur die Host-Elemente zählen. Die Attrappe wickelt jedes View in eine
-  // gleichnamige Funktionskomponente — ohne diese Einschränkung steht jeder
-  // Punkt zweimal im Baum, und der Test zählt doppelt.
-  const alle = baum.root.findAll((n) => n.type === 'View', { deep: true });
-  const flach = (s: unknown): Record<string, unknown> =>
-    Object.assign({}, ...(Array.isArray(s) ? s : [s]).filter(Boolean) as object[]);
+  const zaehle = (typ: string) =>
+    baum.root.findAll((n) => n.type === typ, { deep: true }).length;
 
-  let anlagen = 0, ich = 0, ringe = 0;
-  for (const n of alle) {
-    const st = flach(n.props?.style);
-    if (st.width === 8 && st.height === 8) anlagen++;
-    if (st.width === 16 && st.height === 16) ich++;
-    if (st.borderRadius === 9999 && typeof st.width === 'number' && st.width > 20) ringe++;
-  }
+  // Kreise: 3 Anlagen + 1 Zusatzring fuer type 'both' + die Entfernungsringe
+  // + die eigene Position.
+  assert.equal(zaehle('Circle'), 3 + 1 + KARTE.RINGE + 1, 'falsche Zahl Kreise');
+  // Linien: 2 Richtungsstriche — die mittlere Anlage hat dir === null und
+  // bekommt bewusst keinen — plus die 3 Striche des Massstabsbalkens.
+  assert.equal(zaehle('Line'), 2 + 3, 'Richtungsstriche oder Massstabsbalken fehlen');
+  assert.equal(zaehle('Polyline'), umrisse.length, 'die Landesumrisse fehlen');
+
+  // Ein Balken ohne Zahl sagt nichts.
+  assert.ok(
+    texte(baum).some((t) => /^\d+ (m|km)$/.test(t)),
+    'der Massstabsbalken ist nicht beschriftet',
+  );
+
   baum.unmount();
+});
 
-  assert.equal(anlagen, 3, 'nicht je Anlage ein Punkt');
-  assert.equal(ich, 1, 'die eigene Position fehlt oder ist doppelt');
-  assert.equal(ringe, KARTE.RINGE, 'die Entfernungsringe fehlen — dann hat das Bild keinen Massstab');
+test('eine verschobene Karte zeigt keinen Positionsmarker in der Mitte', async () => {
+  // Sonst behauptet die Bildmitte, dort sei der Nutzer — und das ist nach dem
+  // ersten Ziehen falsch.
+  const karte = baueKarte(47.56, 7.59, [], 350, 20_000);
+  const baum = await rendere(
+    createElement(KartenBild, {
+      karte, umrisse: [], ichSichtbar: false, gewaehlt: null,
+      balken: massstabsbalken(350, 20_000), farben: PALETTEN.tag,
+    }),
+  );
+  const kreise = baum.root.findAll((n) => n.type === 'Circle', { deep: true }).length;
+  baum.unmount();
+  assert.equal(kreise, KARTE.RINGE, 'ohne Anlagen duerfen nur die Ringe uebrig bleiben');
+});
+
+test('eine gewaehlte Anlage bekommt einen Auswahlring', async () => {
+  const karte = baueKarte(47.56, 7.59, [
+    { lat: 47.57, lon: 7.59, dir: null, max: null, type: 'speed' },
+  ], 350, 20_000);
+  const balken = massstabsbalken(350, 20_000);
+
+  const ohne = await rendere(createElement(KartenBild, {
+    karte, umrisse: [], ichSichtbar: true, gewaehlt: null, balken, farben: PALETTEN.tag,
+  }));
+  const n1 = ohne.root.findAll((n) => n.type === 'Circle', { deep: true }).length;
+  ohne.unmount();
+
+  const mit = await rendere(createElement(KartenBild, {
+    karte, umrisse: [], ichSichtbar: true, gewaehlt: karte.punkte[0]!, balken,
+    farben: PALETTEN.tag,
+  }));
+  const n2 = mit.root.findAll((n) => n.type === 'Circle', { deep: true }).length;
+  mit.unmount();
+
+  assert.equal(n2, n1 + 1, 'die Auswahl ist im Bild nicht zu sehen');
 });

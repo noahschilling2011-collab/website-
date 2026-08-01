@@ -12,7 +12,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { KARTE } from '../src/config';
-import { baueKarte, massstab, projiziere, ringe } from '../src/core/karte';
+import {
+  baueKarte, massstab, massstabsbalken, projiziere, punktBeiTipp, ringe,
+  umrissAbRadiusM, umrissLinien, verschiebe,
+} from '../src/core/karte';
+import { TOLERANZ_GRENZE_M } from '../src/core/country-data';
+import { TOUCH } from '../src/ui/theme';
 import { camerasInRadius, camerasWithinRadius } from '../src/core/dataset';
 import type { Camera } from '../src/types';
 
@@ -183,4 +188,116 @@ test('die Radien sind aufsteigend und der Startwert steht in der Liste', () => {
     r.includes(KARTE.START_RADIUS_M),
     'der Startradius ist nicht wählbar — dann steht die Karte auf einer Stufe, die es nicht gibt',
   );
+});
+
+// --- Landesumrisse --------------------------------------------------------
+
+test('die Umrissgrenze wird aus der Vereinfachung gerechnet, nicht gewählt', () => {
+  // 200 m Vereinfachungstoleranz, höchstens 5 % Fehler im Bild -> ab 4 km.
+  // Der Test hält die Rechnung, nicht die Zahl: Wer die Toleranz in der
+  // Pipeline ändert, bekommt hier keine Überraschung, sondern einen
+  // mitgewanderten Wert.
+  assert.equal(umrissAbRadiusM(), TOLERANZ_GRENZE_M / KARTE.UMRISS_MAX_FEHLER_ANTEIL);
+  assert.equal(umrissAbRadiusM(), 4000);
+});
+
+test('unter der Grenze wird kein Umriss gezeichnet', () => {
+  // Bei 500 m Umkreis wären 200 m Vereinfachung ein Fünftel des halben
+  // Bildes. Eine Grenze, die dort so weit daneben liegt, ist keine
+  // Orientierungshilfe, sondern eine Falschaussage.
+  const basel: [number, number] = [47.56, 7.59];
+  assert.deepEqual(umrissLinien(basel[0], basel[1], 350, 500), []);
+  assert.deepEqual(umrissLinien(basel[0], basel[1], 350, 2000), []);
+  assert.ok(umrissLinien(basel[0], basel[1], 350, 5000).length > 0);
+});
+
+test('am Dreiländereck und an der Küste kommen Linien, mitten im Land nicht', () => {
+  // Die Probe darauf, dass der Zuschnitt wirklich zuschneidet — und nicht
+  // etwa alles oder nichts liefert.
+  const zuege = (lat: number, lon: number) => umrissLinien(lat, lon, 350, 20_000).length;
+
+  assert.ok(zuege(47.56, 7.59) > 0, 'Basel: keine Grenze gefunden');
+  assert.ok(zuege(54.9, 8.3) > 0, 'Sylt: keine Küste gefunden');
+  assert.equal(zuege(52.52, 13.40), 0, 'Berlin: eine Grenze, die es dort nicht gibt');
+  assert.equal(zuege(48.78, 9.18), 0, 'Stuttgart: eine Grenze, die es dort nicht gibt');
+});
+
+test('der Zuschnitt zeichnet nur einen Bruchteil der 39 219 Punkte', () => {
+  // Ohne Zuschnitt wäre jede Aktualisierung eine spürbare Pause. Die
+  // Obergrenze hier ist grosszügig gesetzt; sie soll eine Grössenordnung
+  // absichern, keine Zahl festschreiben.
+  const zuege = umrissLinien(47.56, 7.59, 350, 20_000);
+  const punkte = zuege.reduce((n, z) => n + z.length, 0);
+  assert.ok(punkte > 0 && punkte < 1000, `${punkte} Punkte gezeichnet`);
+});
+
+test('ein Linienzug hat mindestens zwei Punkte — ein einzelner ist keine Linie', () => {
+  for (const zug of umrissLinien(47.56, 7.59, 350, 20_000)) {
+    assert.ok(zug.length >= 2, `Zug mit ${zug.length} Punkt(en)`);
+  }
+});
+
+// --- Massstabsbalken ------------------------------------------------------
+
+test('der Massstabsbalken ist rund und passt ins Bild', () => {
+  // Ohne Balken hat eine Karte ohne Strassen keinen Bezug: Die Ringe sagen
+  // "gleich weit", nicht "wie weit".
+  const RUND = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10_000, 20_000, 50_000, 100_000];
+  for (const radius of KARTE.RADIEN_M) {
+    const b = massstabsbalken(350, radius);
+    assert.ok(RUND.includes(b.meter), `${b.meter} m ist kein runder Wert`);
+    assert.ok(b.laengeDp <= 350 / 3 + 0.001, `Balken ${b.laengeDp} dp ist zu lang`);
+    assert.ok(b.laengeDp > 350 / 8, `Balken ${b.laengeDp} dp ist zu kurz zum Ablesen`);
+  }
+});
+
+// --- Tippen ---------------------------------------------------------------
+
+test('ein Tipp wählt die nächstgelegene Anlage, nicht irgendeine', () => {
+  const nah = anlage(MITTE_LAT + 0.001, MITTE_LON);
+  const fern = anlage(MITTE_LAT + 0.003, MITTE_LON);
+  const k = baueKarte(MITTE_LAT, MITTE_LON, [fern, nah], GROESSE, 1000);
+
+  const zielNah = k.punkte.find((p) => p.camera === nah)!;
+  const treffer = punktBeiTipp(k, zielNah.x + 3, zielNah.y + 3);
+  assert.equal(treffer?.camera, nah);
+});
+
+test('ein Tipp ins Leere hebt die Auswahl auf, statt danebenzugreifen', () => {
+  // null und nicht "die nächste, egal wie weit": Sonst wählt ein Tipp am
+  // Bildrand eine Anlage in der Mitte aus, und der Nutzer sucht danach den
+  // Zusammenhang.
+  const k = baueKarte(MITTE_LAT, MITTE_LON, [anlage(MITTE_LAT, MITTE_LON)], GROESSE, 1000);
+  assert.equal(punktBeiTipp(k, 5, 5), null);
+});
+
+test('der Tipp-Radius ist grösser als der Punkt und kleiner als das Ziel-Minimum', () => {
+  assert.ok(KARTE.TIPP_RADIUS_DP > 8, 'kleiner als der Punkt selbst — nicht treffbar');
+  assert.ok(KARTE.TIPP_RADIUS_DP <= TOUCH.MIN, 'grösser als eine Berührungsfläche');
+});
+
+// --- Verschieben ----------------------------------------------------------
+
+test('nach rechts ziehen zeigt weiter nach Westen', () => {
+  // Das Vorzeichen, das man bei einer verschiebbaren Karte falsch macht:
+  // Der Finger bewegt die KARTE, nicht den Mittelpunkt.
+  const v = verschiebe(MITTE_LAT, MITTE_LON, 50, 0, GROESSE, 2000);
+  assert.ok(v.lon < MITTE_LON, 'nach rechts ziehen bewegte den Blick nach Osten');
+
+  const w = verschiebe(MITTE_LAT, MITTE_LON, 0, 50, GROESSE, 2000);
+  assert.ok(w.lat > MITTE_LAT, 'nach unten ziehen bewegte den Blick nach Süden');
+});
+
+test('verschieben und zurückverschieben landet wieder am Anfang', () => {
+  const hin = verschiebe(MITTE_LAT, MITTE_LON, 40, -25, GROESSE, 2000);
+  const zurueck = verschiebe(hin.lat, hin.lon, -40, 25, GROESSE, 2000);
+  // Nicht exakt: cos(Breite) wird am neuen Mittelpunkt neu gerechnet. Der
+  // Rückweg muss aber weit unter einem Meter danebenliegen.
+  assert.ok(Math.abs(zurueck.lat - MITTE_LAT) * 111_320 < 0.01);
+  assert.ok(Math.abs(zurueck.lon - MITTE_LON) * 111_320 < 1);
+});
+
+test('über den Pol hinaus lässt sich nicht schieben', () => {
+  const v = verschiebe(84, 9, 0, -100_000, GROESSE, 20_000);
+  assert.ok(v.lat <= 85, `lat ${v.lat} liegt jenseits des Pols`);
 });

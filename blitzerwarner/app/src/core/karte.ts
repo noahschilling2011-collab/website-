@@ -19,6 +19,7 @@
  * Karte, die sich mit jedem GPS-Zittern dreht, ist im Stand unlesbar.
  */
 import { KARTE } from '../config';
+import { TOLERANZ_GRENZE_M, UMRISSE } from './country-data';
 import type { Camera } from '../types';
 
 /** Meter je Grad Breite. Konstant genug: Die Abweichung liegt unter 1 %. */
@@ -96,6 +97,174 @@ export function ringe(radiusM: number, anzahl = KARTE.RINGE): number[] {
   const raus: number[] = [];
   for (let i = 1; i <= anzahl; i++) raus.push((radiusM / anzahl) * i);
   return raus;
+}
+
+// --- Landesumrisse --------------------------------------------------------
+
+/**
+ * Ab welchem Umkreis ein Umriss überhaupt gezeichnet werden darf.
+ *
+ * Gerechnet, nicht gewählt: Die Linien sind auf TOLERANZ_GRENZE_M vereinfacht,
+ * und mehr als UMRISS_MAX_FEHLER_ANTEIL des halben Bildes darf die Abweichung
+ * nicht ausmachen. Ändert jemand die Vereinfachung in der Pipeline, wandert
+ * diese Grenze mit.
+ */
+export function umrissAbRadiusM(): number {
+  return TOLERANZ_GRENZE_M / KARTE.UMRISS_MAX_FEHLER_ANTEIL;
+}
+
+/** Eine gezeichnete Linie: aufeinanderfolgende Bildpunkte. */
+export type Linienzug = readonly { readonly x: number; readonly y: number }[];
+
+/**
+ * Die sichtbaren Stücke der Landesumrisse, projiziert.
+ *
+ * WARUM DAS DER EINZIGE ECHTE KARTENINHALT IST
+ *
+ * Punkte ohne Bezug sind keine Karte. Strassen kann diese App nicht zeigen —
+ * Strassengeometrie offline wären hunderte Megabyte. Die Landesumrisse liegen
+ * dagegen schon im Paket: Das Länder-Gate braucht sie ohnehin, sie sind Public
+ * Domain (Natural Earth) und kosten nichts extra. An einer Küste oder in
+ * Grenznähe machen sie aus einem Punktfeld ein Bild.
+ *
+ * ZUSCHNITT STATT ALLES ZEICHNEN
+ *
+ * 39 219 Punkte in 507 Ringen liegen im Paket. Ungefiltert zu zeichnen wäre
+ * bei jeder Aktualisierung eine spürbare Pause. Deshalb erst das Rechteck des
+ * Bildausschnitts, dann nur die Ringe, deren eigenes Rechteck sich damit
+ * überschneidet, und daraus nur die Abschnitte, die hineinragen.
+ *
+ * Ein Ring zerfällt dabei in mehrere Züge — er kann das Bild mehrfach queren.
+ */
+export function umrissLinien(
+  mitteLat: number, mitteLon: number,
+  groesseDp: number, radiusM: number,
+): Linienzug[] {
+  if (!Number.isFinite(mitteLat) || !Number.isFinite(mitteLon)) return [];
+  if (!Number.isFinite(groesseDp) || groesseDp <= 0) return [];
+  if (!Number.isFinite(radiusM) || radiusM < umrissAbRadiusM()) return [];
+
+  // Das Sichtfeld als geografisches Rechteck, mit etwas Rand: Ein Abschnitt,
+  // dessen beide Enden knapp draussen liegen, kann das Bild trotzdem queren.
+  const randM = radiusM * 0.5;
+  const spanne = radiusM + randM;
+  const cos = Math.cos((mitteLat * Math.PI) / 180);
+  const dLat = spanne / METER_JE_GRAD;
+  const dLon = cos > 0 ? spanne / (METER_JE_GRAD * cos) : 180;
+
+  const box = {
+    latMin: mitteLat - dLat, latMax: mitteLat + dLat,
+    lonMin: mitteLon - dLon, lonMax: mitteLon + dLon,
+  };
+  const drin = (lat: number, lon: number): boolean =>
+    lat >= box.latMin && lat <= box.latMax && lon >= box.lonMin && lon <= box.lonMax;
+
+  const raus: Linienzug[] = [];
+
+  for (const umriss of UMRISSE) {
+    const b = umriss.bbox;
+    // Rechtecke, die sich nicht überschneiden — das ganze Land fällt weg.
+    if (b.latMax < box.latMin || b.latMin > box.latMax) continue;
+    if (b.lonMax < box.lonMin || b.lonMin > box.lonMax) continue;
+
+    for (const ring of [...umriss.ringe, ...umriss.loecher]) {
+      let zug: { x: number; y: number }[] = [];
+      for (let i = 0; i < ring.length; i++) {
+        const [lat, lon] = ring[i]!;
+        const naechster = ring[i + 1];
+        // Ein Abschnitt zählt, wenn eines seiner Enden im Rechteck liegt.
+        const zaehlt =
+          drin(lat, lon) || (naechster !== undefined && drin(naechster[0], naechster[1]));
+
+        if (zaehlt) {
+          zug.push(projiziere(mitteLat, mitteLon, lat, lon, groesseDp, radiusM));
+        } else if (zug.length > 1) {
+          raus.push(zug);
+          zug = [];
+        } else {
+          zug = [];
+        }
+      }
+      if (zug.length > 1) raus.push(zug);
+    }
+  }
+
+  return raus;
+}
+
+// --- Massstabsbalken ------------------------------------------------------
+
+/**
+ * Ein runder Wert für den Massstabsbalken und seine Länge in Bildpunkten.
+ *
+ * Ohne Balken hat eine Karte ohne Strassen überhaupt keinen Bezug — die Ringe
+ * allein sagen nur "gleich weit", nicht "wie weit". Gewählt wird der grösste
+ * runde Wert, der höchstens ein Drittel der Bildbreite einnimmt: Länger
+ * konkurriert er mit dem Inhalt, kürzer wird er ungenau abzulesen.
+ */
+export function massstabsbalken(
+  groesseDp: number, radiusM: number,
+): { meter: number; laengeDp: number } {
+  const STUFEN = [
+    10, 20, 50, 100, 200, 500,
+    1_000, 2_000, 5_000, 10_000, 20_000, 50_000, 100_000,
+  ];
+  const maxDp = groesseDp / 3;
+  const s = massstab(groesseDp, radiusM);
+
+  let gewaehlt = STUFEN[0]!;
+  for (const stufe of STUFEN) {
+    if (stufe * s <= maxDp) gewaehlt = stufe;
+  }
+  return { meter: gewaehlt, laengeDp: gewaehlt * s };
+}
+
+// --- Auswahl per Fingertipp -----------------------------------------------
+
+/**
+ * Welcher Punkt ist gemeint?
+ *
+ * Ein Anlagenpunkt ist 8 dp gross, eine Fingerkuppe rund 45. Auf den Punkt zu
+ * zielen wäre aussichtslos; deshalb gewinnt die nächstgelegene Anlage im
+ * Umkreis von KARTE.TIPP_RADIUS_DP. null heisst: hier war nichts in der Nähe,
+ * und dann wird die Auswahl aufgehoben statt der falsche Punkt gewählt.
+ */
+export function punktBeiTipp(
+  karte: Karte, x: number, y: number,
+  radiusDp: number = KARTE.TIPP_RADIUS_DP,
+): Bildpunkt | null {
+  let bester: Bildpunkt | null = null;
+  let besteDistanz = radiusDp;
+  for (const p of karte.punkte) {
+    const d = Math.hypot(p.x - x, p.y - y);
+    if (d <= besteDistanz) { besteDistanz = d; bester = p; }
+  }
+  return bester;
+}
+
+// --- Verschieben ----------------------------------------------------------
+
+/**
+ * Den Mittelpunkt um eine Bildverschiebung versetzen.
+ *
+ * Ziehen bewegt die Karte, nicht den Mittelpunkt — deshalb kehren die
+ * Vorzeichen sich um: Wer den Finger nach rechts zieht, will weiter nach
+ * Westen sehen.
+ */
+export function verschiebe(
+  mitteLat: number, mitteLon: number,
+  dxDp: number, dyDp: number,
+  groesseDp: number, radiusM: number,
+): { lat: number; lon: number } {
+  const s = massstab(groesseDp, radiusM);
+  if (s === 0 || !Number.isFinite(s)) return { lat: mitteLat, lon: mitteLon };
+
+  const cos = Math.cos((mitteLat * Math.PI) / 180);
+  const lat = mitteLat + (dyDp / s) / METER_JE_GRAD;
+  const lon = cos > 0 ? mitteLon - (dxDp / s) / (METER_JE_GRAD * cos) : mitteLon;
+
+  // Über die Pole hinaus zu schieben ergibt keine Karte mehr.
+  return { lat: Math.max(-85, Math.min(85, lat)), lon };
 }
 
 /**

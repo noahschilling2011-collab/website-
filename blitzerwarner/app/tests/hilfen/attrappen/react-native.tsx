@@ -124,3 +124,18 @@ export const Dimensions = { get: () => ({ width: 390, height: 844, scale: 3, fon
 export function useWindowDimensions() {
   return Dimensions.get();
 }
+
+/**
+ * PanResponder — nur die Form, nicht das Verhalten.
+ *
+ * Die Attrappe gibt die Konfiguration unverändert zurück, damit ein Test die
+ * Rückrufe von Hand auslösen könnte. Was sie NICHT nachbildet: Berührungen,
+ * Reihenfolge, Abbruch durch das System. Gesten lassen sich unter Node nicht
+ * sinnvoll simulieren; ob Ziehen sich richtig anfühlt, zeigt das Gerät.
+ *
+ * Die Rechnung dahinter ist davon unberührt geprüft: verschiebe() und
+ * punktBeiTipp() sind reine Funktionen und haben eigene Tests.
+ */
+export const PanResponder = {
+  create: (config: Record<string, unknown>) => ({ panHandlers: {}, config }),
+};

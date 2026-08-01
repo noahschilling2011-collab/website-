@@ -34,6 +34,7 @@ const ALIAS = {
   'expo-speech': join(ATTRAPPEN, 'expo-speech.ts'),
   'expo-constants': join(ATTRAPPEN, 'expo-constants.ts'),
   '@react-native-async-storage/async-storage': join(ATTRAPPEN, 'async-storage.ts'),
+  'react-native-svg': join(ATTRAPPEN, 'react-native-svg.tsx'),
 };
 
 await build({

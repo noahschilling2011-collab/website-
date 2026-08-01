@@ -3,35 +3,46 @@
  *
  * WAS DIESE KARTE IST UND WAS SIE NICHT IST
  *
- * Sie zeigt die erfassten Anlagen und die eigene Position, Norden oben.
- * Sie zeigt KEINE Strassen. Das ist keine Sparmassnahme: Eine übliche Karte
- * lädt Kacheln über das Netz nach, und damit wäre das Produktversprechen
- * dahin. Strassengeometrie offline mitzuliefern wären für Deutschland allein
+ * Sie zeigt die erfassten Anlagen, die eigene Position und die Landesumrisse,
+ * Norden oben, mit Entfernungsringen und Massstabsbalken. Sie zeigt KEINE
+ * STRASSEN. Das ist keine Sparmassnahme: Eine übliche Karte lädt Kacheln über
+ * das Netz nach, und damit wäre das Produktversprechen dahin.
+ * Strassengeometrie offline mitzuliefern wären für Deutschland allein
  * hunderte Megabyte; die ganze App wiegt vier.
  *
- * Der Hinweis darauf steht ÜBER der Karte und nicht klein darunter. Wer sie
- * für eine Navigationskarte hält und dann merkt, dass sie keine ist, hält die
- * App für kaputt statt für ehrlich.
+ * Die Landesumrisse sind der einzige echte Kartenhintergrund, den es ohne Netz
+ * geben kann: Das Länder-Gate braucht sie ohnehin, sie liegen schon im Paket
+ * und sind Public Domain. An einer Küste oder in Grenznähe machen sie aus
+ * einem Punktfeld ein Bild. Mitten in Bayern bleibt es ein Punktfeld — und
+ * dann steht das auch da.
  *
  * WARUM SIE NICHT AUF DEM FAHRT-SCHIRM LIEGT
  *
  * Weil sie dort schaden würde. Der Fahrt-Screen ist für einen Blick von einer
- * halben Sekunde gebaut; eine Karte lädt zum Studieren ein. Und ohne Strassen
- * beantwortet sie unterwegs ohnehin keine Frage, die die Ansage nicht besser
- * beantwortet. Ihr Zweck ist der Stand: nachsehen, ob für die Gegend
- * überhaupt Daten da sind, bevor man losfährt.
+ * halben Sekunde gebaut; eine Karte lädt zum Studieren ein. Ihr Zweck ist der
+ * Stand: nachsehen, ob für die Gegend überhaupt Daten da sind.
  *
- * Gezeichnet wird mit gewöhnlichen Views, nicht mit einer Grafikbibliothek.
- * Punkte und Ringe sind Rechtecke mit Eckenradius — dafür lohnt keine
- * zusätzliche Abhängigkeit, und jede zusätzliche Abhängigkeit ist eine
- * weitere, die zur Laufzeit etwas tun könnte.
+ * WARUM react-native-svg UND NICHT VIEWS
+ *
+ * Die erste Fassung zeichnete mit gewöhnlichen Views. Das trug Punkte und
+ * Kreise, aber nicht Linienzüge: Ein Umriss aus hundert Abschnitten wären
+ * hundert einzeln gedrehte Views, und die Richtungskeile kämen noch dazu.
+ * react-native-svg ist dafür das vorgesehene Werkzeug, rendert nativ und
+ * stellt keine Netzwerkverbindung her — tests/auslieferung.test.ts führt es
+ * deshalb ausdrücklich als erlaubt.
  */
-import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  PanResponder, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions,
+} from 'react-native';
+import Svg, { Circle, G, Line, Polyline } from 'react-native-svg';
 
 import { KARTE } from '../config';
 import { STRINGS } from '../strings';
-import { baueKarte, projiziere, type Karte } from '../core/karte';
+import {
+  baueKarte, massstabsbalken, punktBeiTipp, umrissAbRadiusM, umrissLinien, verschiebe,
+  type Bildpunkt, type Karte, type Linienzug,
+} from '../core/karte';
 import { camerasInRadius, datasetOrNull } from '../core/dataset';
 import { letzterFix } from '../location/task';
 import { errorLog } from '../core/log';
@@ -57,6 +68,16 @@ export default function KarteScreen({ mode, onZurueck }: Props) {
   const { width } = useWindowDimensions();
   const [radiusM, setRadiusM] = useState<number>(KARTE.START_RADIUS_M);
   const [fix, setFix] = useState(() => letzterFix());
+  const [gewaehlt, setGewaehlt] = useState<Bildpunkt | null>(null);
+
+  /**
+   * Der Bildmittelpunkt, wenn er nicht die eigene Position ist.
+   *
+   * null heisst "folge mir". Sobald jemand zieht, steht hier eine feste
+   * Position und die Karte hört auf mitzuwandern — sonst würde sie unter dem
+   * Finger wegrutschen, sobald der nächste Fix eintrifft.
+   */
+  const [verschoben, setVerschoben] = useState<{ lat: number; lon: number } | null>(null);
 
   // Quadratisch, so breit wie der Inhalt. Der Rand kommt zweimal weg.
   const groesse = Math.max(0, width - ABSTAND.RAND * 2);
@@ -67,30 +88,79 @@ export default function KarteScreen({ mode, onZurueck }: Props) {
   }, []);
 
   const dataset = datasetOrNull();
+  const mitte = verschoben ?? (fix === null ? null : { lat: fix.lat, lon: fix.lon });
 
   const karte = useMemo(() => {
-    if (fix === null || dataset === null) return null;
+    if (mitte === null || dataset === null) return null;
     try {
-      const cams = camerasInRadius(dataset, fix.lat, fix.lon, radiusM);
+      const cams = camerasInRadius(dataset, mitte.lat, mitte.lon, radiusM);
       if (cams === null) return null;
-      return baueKarte(fix.lat, fix.lon, cams, groesse, radiusM);
+      return baueKarte(mitte.lat, mitte.lon, cams, groesse, radiusM);
     } catch (err) {
       errorLog.error('start', 'Karte konnte nicht berechnet werden', err);
       return null;
     }
-  }, [fix, dataset, radiusM, groesse]);
+  }, [mitte?.lat, mitte?.lon, dataset, radiusM, groesse]);
 
-  const gesamtImUmkreis =
-    karte === null ? 0 : karte.punkte.length + karte.nichtGezeichnet;
+  const umrisse = useMemo(
+    () => (mitte === null ? [] : umrissLinien(mitte.lat, mitte.lon, groesse, radiusM)),
+    [mitte?.lat, mitte?.lon, groesse, radiusM],
+  );
 
-  const ich = fix === null
-    ? { x: 0, y: 0 }
-    : projiziere(fix.lat, fix.lon, fix.lat, fix.lon, groesse, radiusM);
+  /*
+   * Ziehen.
+   *
+   * PanResponder statt einer Gestenbibliothek: Verschieben ist die einzige
+   * Geste, die diese Karte braucht — gezoomt wird über die Stufen, weil die
+   * Umkreise ohnehin fest sind und ein stufenloser Zoom nur die Frage
+   * aufwürfe, was für ein Umkreis gerade eingestellt ist.
+   *
+   * Der Anfangsmittelpunkt wird beim Griff festgehalten. Würde jede Bewegung
+   * relativ zur schon verschobenen Karte gerechnet, summierten sich die
+   * cos(Breite)-Umrechnungen und die Karte driftete unter dem Finger.
+   */
+  const griff = useRef<{ lat: number; lon: number } | null>(null);
+  const gezogen = useRef(false);
+
+  const pan = useMemo(
+    () => PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_e, g) => Math.hypot(g.dx, g.dy) > LINIE.DICK,
+      onPanResponderGrant: () => {
+        griff.current = mitte;
+        gezogen.current = false;
+      },
+      onPanResponderMove: (_e, g) => {
+        const start = griff.current;
+        if (start === null) return;
+        if (Math.hypot(g.dx, g.dy) > LINIE.DICK) gezogen.current = true;
+        setVerschoben(verschiebe(start.lat, start.lon, g.dx, g.dy, groesse, radiusM));
+      },
+      onPanResponderRelease: (e) => {
+        // Ein Tipp ist eine Berührung ohne nennenswerte Bewegung. Nur dann
+        // wird ausgewählt — sonst wählte jedes Verschieben nebenbei etwas aus.
+        if (gezogen.current || karte === null) return;
+        const { locationX, locationY } = e.nativeEvent;
+        setGewaehlt(punktBeiTipp(karte, locationX, locationY));
+      },
+    }),
+    [mitte?.lat, mitte?.lon, groesse, radiusM, karte],
+  );
+
+  const zurueckZuMir = useCallback(() => {
+    setVerschoben(null);
+    setGewaehlt(null);
+  }, []);
+
+  const gesamtImUmkreis = karte === null ? 0 : karte.punkte.length + karte.nichtGezeichnet;
+  const balken = massstabsbalken(groesse, radiusM);
 
   return (
     <ScrollView
       style={{ backgroundColor: farben.hintergrund }}
       contentContainerStyle={stil.inhalt}
+      // Sonst kämpft der Bildlauf mit dem Ziehen auf der Karte.
+      scrollEnabled={!gezogen.current}
     >
       <Text style={[stil.titel, { color: farben.text }]}>{STRINGS.karte.titel}</Text>
 
@@ -99,7 +169,6 @@ export default function KarteScreen({ mode, onZurueck }: Props) {
         {STRINGS.karte.keineStrassen}
       </Text>
 
-      {/* Umkreis wählen. */}
       <Text style={[stil.gruppe, { color: farben.textLeise }]}>{STRINGS.karte.radius}</Text>
       <View style={stil.stufen}>
         {KARTE.RADIEN_M.map((r) => {
@@ -107,7 +176,7 @@ export default function KarteScreen({ mode, onZurueck }: Props) {
           return (
             <Pressable
               key={r}
-              onPress={() => setRadiusM(r)}
+              onPress={() => { setRadiusM(r); setGewaehlt(null); }}
               style={(z) => [
                 stil.stufe,
                 {
@@ -128,7 +197,6 @@ export default function KarteScreen({ mode, onZurueck }: Props) {
         })}
       </View>
 
-      {/* Das Bild — oder der Grund, warum es keines gibt. */}
       {fix === null ? (
         <View style={[stil.leer, { borderColor: farben.linie, backgroundColor: farben.flaeche }]}>
           <Text style={[stil.leerTitel, { color: farben.text }]}>
@@ -145,11 +213,52 @@ export default function KarteScreen({ mode, onZurueck }: Props) {
           </Text>
         </View>
       ) : (
-        <KartenBild karte={karte} ich={ich} farben={farben} />
+        <View {...pan.panHandlers}>
+          <KartenBild
+            karte={karte}
+            umrisse={umrisse}
+            ichSichtbar={verschoben === null}
+            gewaehlt={gewaehlt}
+            balken={balken}
+            farben={farben}
+          />
+        </View>
       )}
 
-      {/* Was im Bild steht, noch einmal in Worten — für die Sprachausgabe
-          und für alle, die Punkte nicht zählen wollen. */}
+      {/* Verschoben? Dann muss ein Weg zurück da sein, sonst ist die Karte
+          verloren, sobald jemand einmal zu weit gezogen hat. */}
+      {verschoben !== null && (
+        <Pressable
+          onPress={zurueckZuMir}
+          style={(z) => [stil.link, { borderColor: farben.warn }, gedrueckt(z)]}
+          accessibilityRole="button"
+          accessibilityLabel={STRINGS.karte.zurueckZuMir}
+        >
+          <Text style={[stil.linkText, { color: farben.warn }]}>
+            {STRINGS.karte.zurueckZuMir}
+          </Text>
+        </Pressable>
+      )}
+
+      {/* Die angetippte Anlage. */}
+      {gewaehlt !== null && (
+        <View style={[stil.karteInfo, { borderColor: farben.warn, backgroundColor: farben.flaeche }]}>
+          <Text style={[stil.text, { color: farben.text }]}>
+            {STRINGS.karte.anlagenArt[gewaehlt.camera.type]}
+          </Text>
+          <Text style={[stil.klein, { color: farben.textSekundaer }]}>
+            {`${Math.round(gewaehlt.distanzM)} m` +
+              (gewaehlt.camera.max !== null ? ` · ${STRINGS.karte.tempolimit} ${gewaehlt.camera.max}` : '') +
+              (gewaehlt.camera.dir !== null ? ` · ${STRINGS.karte.blickrichtung} ${Math.round(gewaehlt.camera.dir)}°` : '')}
+          </Text>
+          {gewaehlt.camera.dir === null && (
+            <Text style={[stil.klein, { color: farben.textLeise }]}>
+              {STRINGS.karte.keineRichtung}
+            </Text>
+          )}
+        </View>
+      )}
+
       {karte !== null && (
         <View style={[stil.karteInfo, { borderColor: farben.linie, backgroundColor: farben.flaeche }]}>
           {gesamtImUmkreis === 0 ? (
@@ -174,13 +283,21 @@ export default function KarteScreen({ mode, onZurueck }: Props) {
             </>
           )}
 
-          {/* Nur wenn wirklich abgeschnitten wurde. Eine unvollständige
-              Karte, die vollständig aussieht, ist schlimmer als gar keine. */}
           {karte.nichtGezeichnet > 0 && (
             <Text style={[stil.klein, { color: farben.warn }]}>
               {STRINGS.karte.abgeschnitten(karte.nichtGezeichnet, gesamtImUmkreis)}
             </Text>
           )}
+
+          {/* Warum die Grenzlinie fehlt — statt dass jemand rätselt. */}
+          {radiusM < umrissAbRadiusM() && (
+            <Text style={[stil.klein, { color: farben.textLeise }]}>
+              {STRINGS.karte.umrissZuUngenau(Math.round(umrissAbRadiusM() / 1000))}
+            </Text>
+          )}
+          <Text style={[stil.klein, { color: farben.textLeise }]}>
+            {STRINGS.karte.bedienung}
+          </Text>
         </View>
       )}
 
@@ -208,79 +325,166 @@ function meter(m: number): string {
  *
  * Getrennt vom Screen und exportiert, damit der Rendertest den gezeichneten
  * Zustand überhaupt erreichen kann: Im Test liefert letzterFix() immer null,
- * der Screen zeigt dann seinen Wartezustand, und die Punkte bekäme nie
- * jemand zu sehen. Mit einer Komponente über explizitem Zustand lässt sich
- * eine Karte hineingeben und nachzählen, was herauskommt.
- *
- * Dieselbe Trennung wie in core/: rechnen und darstellen sind zwei Dinge.
+ * der Screen zeigt dann seinen Wartezustand, und die Punkte bekäme nie jemand
+ * zu sehen. Mit einer Komponente über explizitem Zustand lässt sich eine
+ * Karte hineingeben und nachzählen, was herauskommt.
  */
 export function KartenBild({
-  karte, ich, farben,
+  karte, umrisse, ichSichtbar, gewaehlt, balken, farben,
 }: {
   karte: Karte;
-  ich: { x: number; y: number };
+  umrisse: readonly Linienzug[];
+  ichSichtbar: boolean;
+  gewaehlt: Bildpunkt | null;
+  balken: { meter: number; laengeDp: number };
   farben: Palette;
 }) {
   const g = karte.groesseDp;
-  return (
-    <View
-      style={[stil.bild, { width: g, height: g, borderColor: farben.linie }]}
-      accessibilityLabel={STRINGS.karte.anlagenImUmkreis(
-        karte.punkte.length + karte.nichtGezeichnet,
-      )}
-    >
-      {/* Entfernungsringe. Ohne sie hat das Bild keinen Massstab. */}
-      {karte.ringeM.map((r) => {
-        const d = (r / karte.radiusM) * g;
-        return (
-          <View
-            key={r}
-            pointerEvents="none"
-            style={[
-              stil.ring,
-              { width: d, height: d, left: (g - d) / 2, top: (g - d) / 2, borderColor: farben.linie },
-            ]}
-          />
-        );
-      })}
+  const mitte = g / 2;
 
-      {/* Die Anlagen. */}
-      {karte.punkte.map((p, i) => (
-        <View
-          key={`${p.camera.lat},${p.camera.lon},${i}`}
-          pointerEvents="none"
-          style={[
-            stil.anlage,
-            {
-              left: p.x - MASS.KARTE_ANLAGE / 2,
-              top: p.y - MASS.KARTE_ANLAGE / 2,
-              backgroundColor: farben.warn,
-            },
-          ]}
-        />
-      ))}
+  return (
+    <View style={[stil.bild, { width: g, height: g, borderColor: farben.linie }]}>
+      <Svg width={g} height={g} accessibilityLabel={STRINGS.karte.bildBeschreibung}>
+        {/* Landesumrisse zuunterst — sie sind Hintergrund, nicht Inhalt. */}
+        <G>
+          {umrisse.map((zug, i) => (
+            <Polyline
+              key={`u${i}`}
+              points={zug.map((p) => `${p.x},${p.y}`).join(' ')}
+              fill="none"
+              stroke={farben.textLeise}
+              strokeWidth={LINIE.DUENN}
+            />
+          ))}
+        </G>
+
+        {/* Entfernungsringe. Ohne sie hat das Bild keinen Massstab. */}
+        <G>
+          {karte.ringeM.map((r) => (
+            <Circle
+              key={r}
+              cx={mitte} cy={mitte}
+              r={(r / karte.radiusM) * mitte}
+              fill="none"
+              stroke={farben.linie}
+              strokeWidth={LINIE.DUENN}
+            />
+          ))}
+        </G>
+
+        {/* Die Anlagen. Die Art wird über die Form unterschieden, nicht über
+            eine zweite Farbe — es gibt genau eine Akzentfarbe. */}
+        <G>
+          {karte.punkte.map((p, i) => (
+            <Anlagenzeichen
+              key={`a${p.camera.lat},${p.camera.lon},${i}`}
+              punkt={p}
+              gewaehlt={gewaehlt === p}
+              farben={farben}
+            />
+          ))}
+        </G>
+
+        {/* Die eigene Position, zuletzt gezeichnet und damit obenauf. Nur
+            wenn die Karte ihr auch folgt — eine verschobene Karte hätte sonst
+            einen Marker in der Mitte, der dort nichts bedeutet. */}
+        {ichSichtbar && (
+          <Circle
+            cx={mitte} cy={mitte} r={MASS.KARTE_ICH / 2}
+            fill={farben.hintergrund}
+            stroke={farben.text}
+            strokeWidth={LINIE.DICK}
+          />
+        )}
+
+        {/* Massstabsbalken unten links. */}
+        <G>
+          <Line
+            x1={ABSTAND.S} y1={g - ABSTAND.L}
+            x2={ABSTAND.S + balken.laengeDp} y2={g - ABSTAND.L}
+            stroke={farben.text} strokeWidth={LINIE.DICK}
+          />
+          <Line
+            x1={ABSTAND.S} y1={g - ABSTAND.L - ABSTAND.XS}
+            x2={ABSTAND.S} y2={g - ABSTAND.L + ABSTAND.XS}
+            stroke={farben.text} strokeWidth={LINIE.DICK}
+          />
+          <Line
+            x1={ABSTAND.S + balken.laengeDp} y1={g - ABSTAND.L - ABSTAND.XS}
+            x2={ABSTAND.S + balken.laengeDp} y2={g - ABSTAND.L + ABSTAND.XS}
+            stroke={farben.text} strokeWidth={LINIE.DICK}
+          />
+        </G>
+      </Svg>
 
       {/*
-        Die eigene Position, zuletzt gezeichnet und damit obenauf.
-
-        Sie liegt immer genau in der Mitte — die Karte ist um sie herum
-        aufgebaut. Trotzdem geht sie durch dieselbe Projektion wie alles
-        andere: Sollte die Mitte eines Tages nicht mehr die eigene Position
-        sein (verschiebbare Karte), stimmt sie dann noch.
+        Die Beschriftung des Balkens als gewöhnlicher Text und nicht als
+        SVG-Text: react-native-svg setzt Schrift auf beiden Plattformen
+        unterschiedlich, und die Schriftgrade dieser App sind gemessen.
       */}
-      <View
-        pointerEvents="none"
-        style={[
-          stil.ich,
-          {
-            left: ich.x - MASS.KARTE_ICH / 2,
-            top: ich.y - MASS.KARTE_ICH / 2,
-            borderColor: farben.text,
-            backgroundColor: farben.hintergrund,
-          },
-        ]}
-      />
+      <Text
+        style={[stil.balkenText, { color: farben.text, left: ABSTAND.S, bottom: ABSTAND.S }]}
+      >
+        {meter(balken.meter)}
+      </Text>
     </View>
+  );
+}
+
+/**
+ * Eine Anlage im Bild.
+ *
+ * Die Art wird über die Form unterschieden und nicht über eine zweite Farbe:
+ * Es gibt genau eine Akzentfarbe, und jede weitere entwertet sie (siehe
+ * theme.ts). Gefüllt = Geschwindigkeit, hohl = Rotlicht, gefüllt mit Ring =
+ * beides.
+ *
+ * Der Strich zeigt die Blickrichtung, wo sie erfasst ist — bei rund einem
+ * Drittel der Einträge. Fehlt sie, fehlt auch der Strich; eine geratene
+ * Richtung wäre schlimmer als keine.
+ */
+function Anlagenzeichen({
+  punkt, gewaehlt, farben,
+}: { punkt: Bildpunkt; gewaehlt: boolean; farben: Palette }) {
+  const r = MASS.KARTE_ANLAGE / 2;
+  const { type, dir } = punkt.camera;
+  const gefuellt = type === 'speed' || type === 'both';
+
+  // Der Richtungsstrich ist so lang wie der Punkt breit — länger würde er bei
+  // dicht stehenden Anlagen zum Liniengewirr.
+  const laenge = MASS.KARTE_ANLAGE;
+  const bogen = dir === null ? 0 : ((dir - 90) * Math.PI) / 180;
+
+  return (
+    <G>
+      {dir !== null && (
+        <Line
+          x1={punkt.x} y1={punkt.y}
+          x2={punkt.x + Math.cos(bogen) * laenge}
+          y2={punkt.y + Math.sin(bogen) * laenge}
+          stroke={farben.warn}
+          strokeWidth={LINIE.DUENN}
+        />
+      )}
+      <Circle
+        cx={punkt.x} cy={punkt.y} r={r}
+        fill={gefuellt ? farben.warn : 'none'}
+        stroke={farben.warn}
+        strokeWidth={LINIE.DUENN}
+      />
+      {type === 'both' && (
+        <Circle
+          cx={punkt.x} cy={punkt.y} r={r + LINIE.DICK}
+          fill="none" stroke={farben.warn} strokeWidth={LINIE.DUENN}
+        />
+      )}
+      {gewaehlt && (
+        <Circle
+          cx={punkt.x} cy={punkt.y} r={MASS.KARTE_ICH}
+          fill="none" stroke={farben.text} strokeWidth={LINIE.DICK}
+        />
+      )}
+    </G>
   );
 }
 
@@ -302,20 +506,17 @@ const stil = StyleSheet.create({
   },
   stufeText: { fontSize: SCHRIFT.LABEL, fontWeight: GEWICHT.MITTEL },
   bild: { borderWidth: LINIE.DUENN, borderRadius: RADIUS.M, overflow: 'hidden' },
-  ring: { position: 'absolute', borderWidth: LINIE.DUENN, borderRadius: RADIUS.KREIS },
-  anlage: {
-    position: 'absolute', width: MASS.KARTE_ANLAGE, height: MASS.KARTE_ANLAGE,
-    borderRadius: RADIUS.KREIS,
-  },
-  ich: {
-    position: 'absolute', width: MASS.KARTE_ICH, height: MASS.KARTE_ICH,
-    borderRadius: RADIUS.KREIS, borderWidth: LINIE.DICK,
-  },
+  balkenText: { position: 'absolute', fontSize: SCHRIFT.KLEIN, fontWeight: GEWICHT.MITTEL },
   karteInfo: { borderWidth: LINIE.DUENN, borderRadius: RADIUS.M, padding: ABSTAND.L, gap: ABSTAND.S },
   leer: { borderWidth: LINIE.DUENN, borderRadius: RADIUS.M, padding: ABSTAND.L, gap: ABSTAND.S },
   leerTitel: { fontSize: SCHRIFT.TEXT, fontWeight: GEWICHT.FETT },
   text: { fontSize: SCHRIFT.TEXT, lineHeight: SCHRIFT.TEXT * ZEILENHOEHE.TEXT },
   klein: { fontSize: SCHRIFT.KLEIN, lineHeight: SCHRIFT.KLEIN * ZEILENHOEHE.TEXT },
+  link: {
+    minHeight: TOUCH.MIN, borderWidth: LINIE.DUENN, borderRadius: RADIUS.S,
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: ABSTAND.M,
+  },
+  linkText: { fontSize: SCHRIFT.TEXT, fontWeight: GEWICHT.MITTEL },
   knopf: {
     marginTop: ABSTAND.XL, minHeight: TOUCH.MIN, borderWidth: LINIE.DUENN, borderRadius: RADIUS.M,
     alignItems: 'center', justifyContent: 'center',

@@ -113,13 +113,13 @@ dauerhaft laufen soll.
 
 | Ebene | Prüfung | Wie |
 |---|---|---|
-| Logik | 399 Tests | `npm run test:logik` |
+| Logik | 412 Tests | `npm run test:logik` |
 | Warnverhalten | 11 Fixture-Tracks | `npm run replay:all` |
 | Ende zu Ende | echte Anlage aus dem Datensatz, echte Umrisse, echtes Gate bis zum Ansagetext | `tests/kaltstart.test.ts` |
 | Oberfläche | alle fünf Screens rendern, Kartenbild zeichnet nach, keine React-Warnung | `npm run test:render` |
 | Gestaltung | Vierer-Raster, keine nackte Masszahl im Screen, jeder Token hat einen Leser, jede Fläche zeigt gedrückt und abgeschaltet | `tests/theme.test.ts` |
 | Auslieferung | kein Netzwerk-Aufruf, kein Schlüssel, keine sendende Bibliothek im Quelltext | `tests/auslieferung.test.ts` |
-| Paket | Bundle baut (721 Module in der Entwicklung, 613 ausgeliefert), Berechtigungen, Icons | `npx expo start`, `tests/berechtigungen.test.ts`, `tests/assets.test.ts` |
+| Paket | Bundle baut (727 Module ausgeliefert), Berechtigungen, Icons | `npx expo start`, `tests/berechtigungen.test.ts`, `tests/assets.test.ts` |
 | Bündel | keine Source Maps, Datensatz eingebettet, Grösse | `npm run check-bundle` (baut wirklich, ~40 s) |
 
 Der Ende-zu-Ende-Test sucht eine real erfasste Anlage bei Stuttgart, rechnet
@@ -207,7 +207,7 @@ Das Skript prüft es beim Start und bricht mit der richtigen Zeile ab, statt
 - `scripts/check-bundle.ts` — baut das ausgelieferte JS-Bündel für beide
   Plattformen und misst nach: Source Maps, eingebetteter Datensatz, Grösse.
   Gehört vor eine Auslieferung, nicht in `npm test` — es baut wirklich.
-  Gemessen am 2026-08-01: 4,04 MB (iOS) / 4,05 MB (Android), 613 / 612 Module,
+  Gemessen am 2026-08-01: 4,28 MB (iOS), 727 Module (vor der Karte 4,04 MB / 613),
   keine `.map`. Gegenprobe mit `expo export --source-maps`: 6,42 MB Source Map,
   die Prüfung greift.
 
@@ -321,19 +321,40 @@ keine Routenplanung. Keine mobilen Blitzer. Kein Account, kein Login, kein
 Analytics-SDK, kein Crashlytics. Kein Abo.
 
 **Keine Kartenansicht** stand hier bis Phase 4 und steht nicht mehr hier — es
-gibt jetzt eine, aber nicht die, die man erwartet. Sie zeichnet die erfassten
-Anlagen und die eigene Position aus dem gebündelten Datensatz, Norden oben,
-mit Entfernungsringen. **Keine Strassen.** Eine übliche Karte lädt Kacheln
-über das Netz nach, und damit wäre das Produktversprechen weg;
-Offline-Kacheln für Europa in brauchbarer Zoomstufe sind zweistellige
-Gigabyte, die App wiegt vier Megabyte. Strassengeometrie offline wären für
-Deutschland allein hunderte Megabyte.
+gibt jetzt eine, aber nicht die, die man erwartet.
 
-Deshalb liegt sie nicht auf dem Fahrt-Screen, sondern in der Fusszeile
+Sie zeichnet aus dem gebündelten Datensatz: die erfassten Anlagen (Form nach
+Art — gefüllt = Tempo, hohl = Rotlicht, mit Ring = beides), die
+Blickrichtung als Strich wo sie erfasst ist, die eigene Position, die
+Landesumrisse, Entfernungsringe und einen Massstabsbalken. Norden oben.
+Ziehen verschiebt, Tippen wählt eine Anlage aus und zeigt Entfernung,
+Tempolimit und Blickrichtung.
+
+**Keine Strassen.** Eine übliche Karte lädt Kacheln über das Netz nach, und
+damit wäre das Produktversprechen weg; Offline-Kacheln für Europa in
+brauchbarer Zoomstufe sind zweistellige Gigabyte, die App wiegt vier.
+Strassengeometrie offline wären für Deutschland allein hunderte Megabyte.
+
+Die Landesumrisse sind der einzige Kartenhintergrund, den es ohne Netz geben
+kann: Das Länder-Gate braucht sie ohnehin, sie liegen schon im Paket (Natural
+Earth, Public Domain) und kosten nichts extra. Gezeichnet werden sie erst ab
+4 km Umkreis — die Linien sind auf 200 m vereinfacht, und näher heran wäre
+eine Grenze, die 20 % daneben liegt, keine Orientierung, sondern eine
+Falschaussage. Die Schwelle wird aus der Vereinfachungstoleranz gerechnet,
+nicht gesetzt. Wo sie greift, steht der Grund im Bild.
+
+Deshalb liegt die Karte nicht auf dem Fahrt-Screen, sondern in der Fusszeile
 daneben: Ohne Strassen beantwortet sie unterwegs keine Frage, die die Ansage
 nicht besser beantwortet. Ihr Zweck ist der Stand — nachsehen, ob für die
 Gegend überhaupt Daten da sind. Der Hinweis darauf steht über der Karte, nicht
 klein darunter.
+
+Gezeichnet wird mit `react-native-svg`. Gemessener Preis: das ausgelieferte
+Bündel wächst von 4,04 auf 4,28 MB und von 613 auf 727 Module.
+`tests/auslieferung.test.ts` führt seit dieser Änderung eine **Erlaubnisliste**
+statt einer Verbotsliste — jede Abhängigkeit braucht einen Satz, wofür sie da
+ist, sonst ist der Test rot. Eine Verbotsliste fängt nur die Pakete, an die
+jemand schon gedacht hat.
 
 ## Lizenz und Attribution
 
