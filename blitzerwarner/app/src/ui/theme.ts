@@ -328,6 +328,22 @@ export const MASS = {
    * Augenwinkel zeigen, dass die App läuft — damit eher besser erfüllt.
    */
   PUNKT: 12,
+  /**
+   * Eine Anlage auf der Umgebungskarte.
+   *
+   * Kleiner als der Statuspunkt, weil hier bis zu 400 davon nebeneinander
+   * liegen können und sie sich sonst zu einer Fläche schliessen. 8 dp ist
+   * die Untergrenze, ab der ein Punkt auf einem Telefondisplay als Punkt und
+   * nicht als Schmutz gelesen wird.
+   */
+  KARTE_ANLAGE: 8,
+  /**
+   * Die eigene Position auf der Karte.
+   *
+   * Deutlich grösser als eine Anlage: Sie ist der Bezugspunkt, ohne den das
+   * Bild nichts bedeutet, und muss ohne Suchen gefunden werden.
+   */
+  KARTE_ICH: 16,
 } as const;
 
 /** Linienstärken. */

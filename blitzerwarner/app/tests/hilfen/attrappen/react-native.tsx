@@ -113,3 +113,14 @@ export const AccessibilityInfo = {
 export const Platform = { OS: 'ios' as const, select: (o: Record<string, unknown>) => o.ios ?? o.default };
 export const Vibration = { vibrate: () => {} };
 export const Dimensions = { get: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }) };
+
+/**
+ * Dieselben Masse als Hook.
+ *
+ * 390 x 844 ist ein iPhone 14/15 in Punkten — ein reales Gerät und nicht
+ * eine runde Zahl, damit ein Layout, das nur bei glatten Werten aufgeht,
+ * im Test auffällt und nicht erst auf dem Telefon.
+ */
+export function useWindowDimensions() {
+  return Dimensions.get();
+}

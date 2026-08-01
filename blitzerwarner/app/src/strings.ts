@@ -590,6 +590,41 @@ export const STRINGS = {
    * Der Rechtliches-Bereich. Die Dokumente selbst stehen in rechtstexte.ts —
    * hier nur die Beschriftungen drumherum.
    */
+  /**
+   * Die Umgebungskarte.
+   *
+   * Der Ton hier ist bewusst zurückhaltend. Diese Karte kann weniger, als
+   * das Wort verspricht — sie zeigt keine Strassen. Wer sie mit einer
+   * Navigationskarte verwechselt und dann feststellt, dass sie keine ist,
+   * hält die App für kaputt statt für ehrlich.
+   */
+  karte: {
+    titel: 'Umgebung',
+    oeffnen: 'Umgebung',
+    /** Steht über der Karte, nicht klein darunter. */
+    keineStrassen:
+      'Keine Strassen — die App lädt nichts nach. Gezeichnet wird nur, was im '
+      + 'Paket liegt: die erfassten Anlagen und deine Position.',
+    radius: 'Umkreis',
+    warteAufPosition: 'Warte auf die erste Position.',
+    warteAufPositionHilfe:
+      'Die Karte braucht einen GPS-Fix. Unter freiem Himmel dauert das ' +
+      'meist unter einer Minute; in Gebäuden kann es ausbleiben.',
+    keineDaten: 'Kein Datensatz geladen.',
+    keineAnlagen: 'Im gewählten Umkreis ist keine Anlage erfasst.',
+    keineAnlagenHilfe:
+      'Das heisst nicht, dass hier keine steht — nur, dass in ' +
+      'OpenStreetMap keine erfasst ist.',
+    /** Wird nur gezeigt, wenn wirklich abgeschnitten wurde. */
+    abgeschnitten: (wieviele: number, gesamt: number): string =>
+      `${gesamt} Anlagen im Umkreis, ${wieviele} davon nicht gezeichnet. ` +
+      'Kleineren Umkreis wählen.',
+    anlagenImUmkreis: (n: number): string =>
+      n === 1 ? '1 Anlage im Umkreis' : `${n} Anlagen im Umkreis`,
+    naechste: 'Nächste',
+    ichHier: 'Deine Position',
+  },
+
   rechtliches: {
     titel: 'Rechtliches',
     stand: 'Stand',

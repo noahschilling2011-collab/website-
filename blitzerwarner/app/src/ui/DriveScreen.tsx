@@ -40,11 +40,14 @@ type Props = {
   mode: ThemeMode;
   onOeffneEinstellungen: () => void;
   onOeffneInfo: () => void;
+  onOeffneKarte: () => void;
 };
 
 const AKTUALISIERUNG_MS = 1000;
 
-export default function DriveScreen({ mode, onOeffneEinstellungen, onOeffneInfo }: Props) {
+export default function DriveScreen({
+  mode, onOeffneEinstellungen, onOeffneInfo, onOeffneKarte,
+}: Props) {
   const farben = palette(mode);
   const settings = useApp((s) => s.settings);
 
@@ -329,6 +332,22 @@ export default function DriveScreen({ mode, onOeffneEinstellungen, onOeffneInfo 
         >
           <Text style={[stil.fussText, { color: farben.textSekundaer }]}>
             {STRINGS.daten.titel}
+          </Text>
+        </Pressable>
+        {/*
+          Die Umgebungskarte. Sie steht in der Fusszeile und nicht im Bild
+          darüber: Der Fahrt-Screen ist für einen Blick von einer halben
+          Sekunde gebaut, eine Karte lädt zum Studieren ein. Erreichbar muss
+          sie sein, sichtbar während der Fahrt nicht.
+        */}
+        <Pressable
+          onPress={onOeffneKarte}
+          style={(z) => [stil.fussKnopf, gedrueckt(z)]}
+          accessibilityRole="button"
+          accessibilityLabel={STRINGS.karte.oeffnen}
+        >
+          <Text style={[stil.fussText, { color: farben.textSekundaer }]}>
+            {STRINGS.karte.oeffnen}
           </Text>
         </Pressable>
       </View>

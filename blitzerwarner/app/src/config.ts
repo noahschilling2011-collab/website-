@@ -626,6 +626,62 @@ export const LAENDER_GATE = {
 export type LandCode = keyof typeof LAENDER_GATE.LAENDER;
 
 /** Räumlicher Index — muss zum Datensatz aus der Pipeline passen. */
+/**
+ * Die Umgebungskarte.
+ *
+ * WARUM ES SIE ÜBERHAUPT GIBT UND WIE SIE AUSSIEHT
+ *
+ * Eine übliche Karte lädt Kacheln nach — bei jedem Verschieben, bei jedem
+ * Zoom. Das sind Netzwerk-Requests zur Laufzeit, und damit wäre das
+ * Produktversprechen weg. Offline-Kacheln für Europa in brauchbarer
+ * Zoomstufe sind zweistellige Gigabyte; die ganze App wiegt vier Megabyte.
+ *
+ * Gezeichnet wird deshalb nur, was ohnehin im Paket liegt: die Anlagen aus
+ * dem Datensatz und die eigene Position. Keine Strassen — Strassengeometrie
+ * offline mitzuliefern wären für Deutschland allein hunderte Megabyte.
+ *
+ * Das ist die ehrliche Einschränkung: Diese Karte zeigt, WAS die App weiss
+ * und WO relativ zu dir, nicht an welcher Strasse. Für die Orientierung
+ * unterwegs taugt sie damit nicht — dafür sind die Entfernungsringe da, und
+ * deshalb liegt sie nicht auf dem Fahrt-Screen.
+ */
+export const KARTE = {
+  /**
+   * Wählbare Radien in Metern.
+   *
+   * Untergrenze 500 m: Darunter ist bei einer GPS-Streuung von 5 bis 10 m
+   * die eigene Position ein nennenswerter Anteil des Bildes, und die Karte
+   * zeigt mehr Rauschen als Lage.
+   *
+   * Obergrenze 20 km: Darüber liegen bei deutscher Anlagendichte (5053 auf
+   * 357 000 km², also rund 14 je 1000 km²) über 17 Anlagen im Bild, und die
+   * Punkte fangen an, zu einer Fläche zu verschmelzen. Der Wert ist eine
+   * Rechnung, keine Messung — wer misst, korrigiert ihn.
+   */
+  RADIEN_M: [500, 2_000, 5_000, 20_000],
+  /** Womit die Karte aufgeht. 2 km ist etwa eine Minute Fahrt bei Tempo 120. */
+  START_RADIUS_M: 2_000,
+  /**
+   * Wie viele Entfernungsringe gezeichnet werden.
+   *
+   * Drei, weil vier zu einem Muster werden und zwei keine Abstufung ergeben.
+   * Der äusserste Ring ist immer der gewählte Radius, die inneren teilen ihn.
+   */
+  RINGE: 3,
+  /**
+   * Höchstzahl gezeichneter Anlagen.
+   *
+   * Eine Obergrenze, keine Auswahl: Wird sie erreicht, sagt die Karte das
+   * hin. Stillschweigend abzuschneiden wäre die schlechteste Variante — die
+   * Karte sähe dann vollständig aus und wäre es nicht.
+   *
+   * 400 Punkte zeichnet React Native als einfache Views ohne merkliche
+   * Verzögerung; darüber wurde nicht gemessen, und ungemessen mehr zu
+   * erlauben wäre geraten.
+   */
+  MAX_PUNKTE: 400,
+} as const;
+
 export const GRID = {
   /** Kantenlänge einer Zelle in Grad. Identisch mit scripts/lib/normalize.ts. */
   CELL_SIZE: 0.05,

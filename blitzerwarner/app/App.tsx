@@ -23,8 +23,9 @@ import OnboardingScreen from './src/ui/OnboardingScreen';
 import SettingsScreen from './src/ui/SettingsScreen';
 import InfoScreen from './src/ui/InfoScreen';
 import RechtlichesScreen from './src/ui/RechtlichesScreen';
+import KarteScreen from './src/ui/KarteScreen';
 
-type Ansicht = 'fahrt' | 'einstellungen' | 'info' | 'rechtliches';
+type Ansicht = 'fahrt' | 'einstellungen' | 'info' | 'rechtliches' | 'karte';
 
 export default function App() {
   const geladen = useApp((s) => s.geladen);
@@ -122,6 +123,7 @@ export default function App() {
           mode={mode}
           onOeffneEinstellungen={() => setAnsicht('einstellungen')}
           onOeffneInfo={() => setAnsicht('info')}
+          onOeffneKarte={() => setAnsicht('karte')}
         />
       )}
       {ansicht === 'einstellungen' && (
@@ -140,6 +142,9 @@ export default function App() {
       )}
       {ansicht === 'rechtliches' && (
         <RechtlichesScreen mode={mode} onZurueck={() => setAnsicht('info')} />
+      )}
+      {ansicht === 'karte' && (
+        <KarteScreen mode={mode} onZurueck={() => setAnsicht('fahrt')} />
       )}
     </>
   );

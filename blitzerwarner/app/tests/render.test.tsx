@@ -39,9 +39,14 @@ import InfoScreen from '../src/ui/InfoScreen';
 import OnboardingScreen from '../src/ui/OnboardingScreen';
 import RechtlichesScreen from '../src/ui/RechtlichesScreen';
 import SettingsScreen from '../src/ui/SettingsScreen';
+import KarteScreen, { KartenBild } from '../src/ui/KarteScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { ONBOARDING_KEY, useApp } from '../src/state/store';
+import { baueKarte } from '../src/core/karte';
+import { KARTE } from '../src/config';
+import { PALETTEN } from '../src/ui/theme';
+import type { Camera } from '../src/types';
 import type { ThemeMode } from '../src/ui/theme';
 
 /**
@@ -241,8 +246,10 @@ test('kein Screen erzeugt React-Warnungen beim Rendern', async () => {
         mode: 'tag' as const, onZurueck: () => {}, onOeffneRechtliches: () => {},
       }),
       createElement(RechtlichesScreen, { mode: 'tag' as const, onZurueck: () => {} }),
+      createElement(KarteScreen, { mode: 'tag' as const, onZurueck: () => {} }),
       createElement(DriveScreen, {
         mode: 'tag' as const, onOeffneEinstellungen: () => {}, onOeffneInfo: () => {},
+        onOeffneKarte: () => {},
       }),
     ]) {
       const baum = await rendere(element);
@@ -254,4 +261,69 @@ test('kein Screen erzeugt React-Warnungen beim Rendern', async () => {
   }
 
   assert.deepEqual(gesammelt, [], `React meldet:\n${gesammelt.join('\n')}`);
+});
+
+// --- Die Umgebungskarte ---------------------------------------------------
+
+test('KarteScreen zeigt ohne Position seinen Wartezustand, nicht ein leeres Bild', async () => {
+  // Im Test liefert letzterFix() immer null — der Task lief nie. Das ist
+  // zugleich der echte Zustand beim ersten Start, und ein leeres Quadrat
+  // ohne Erklärung wäre dort die schlechteste Antwort.
+  const baum = await rendere(
+    createElement(KarteScreen, { mode: 'tag' as const, onZurueck: () => {} }),
+  );
+  const text = texte(baum).join(' ');
+  baum.unmount();
+
+  assert.match(text, /Warte auf die erste Position/);
+  // Und die Einschränkung steht da, bevor jemand eine Navigationskarte erwartet.
+  assert.match(text, /Keine Strassen/);
+  // Alle Umkreis-Stufen sind wählbar.
+  for (const r of KARTE.RADIEN_M) {
+    const beschriftung = r < 1000 ? `${r} m` : `${r / 1000} km`;
+    assert.ok(text.includes(beschriftung), `Stufe ${beschriftung} fehlt`);
+  }
+});
+
+test('das Kartenbild zeichnet je Anlage einen Punkt, plus Ringe und die eigene Position', async () => {
+  // Der gezeichnete Zustand, den der Screen im Test nie erreicht. Deshalb
+  // ist das Bild eine eigene Komponente über explizitem Zustand: hier geht
+  // eine gerechnete Karte hinein und es lässt sich nachzählen.
+  const mitte = { lat: 48.6, lon: 9.1 };
+  const cams: Camera[] = [
+    { lat: 48.605, lon: 9.1, dir: null, max: 50, type: 'speed' },
+    { lat: 48.6, lon: 9.108, dir: null, max: null, type: 'red_light' },
+    { lat: 48.596, lon: 9.095, dir: null, max: 70, type: 'both' },
+  ];
+  const karte = baueKarte(mitte.lat, mitte.lon, cams, 300, 2000);
+  assert.equal(karte.punkte.length, 3, 'Vorbedingung: alle drei liegen im Umkreis');
+
+  const baum = await rendere(
+    createElement(KartenBild, {
+      karte, ich: { x: 150, y: 150 }, farben: PALETTEN.tag,
+    }),
+  );
+
+  // Gezählt wird über die Grösse: Anlagenpunkte sind 8 dp, die eigene
+  // Position 16 dp, Ringe haben eine Randstärke. Das prüft, dass wirklich
+  // gezeichnet wird — und nicht nur, dass die Komponente nicht abstürzt.
+  // Nur die Host-Elemente zählen. Die Attrappe wickelt jedes View in eine
+  // gleichnamige Funktionskomponente — ohne diese Einschränkung steht jeder
+  // Punkt zweimal im Baum, und der Test zählt doppelt.
+  const alle = baum.root.findAll((n) => n.type === 'View', { deep: true });
+  const flach = (s: unknown): Record<string, unknown> =>
+    Object.assign({}, ...(Array.isArray(s) ? s : [s]).filter(Boolean) as object[]);
+
+  let anlagen = 0, ich = 0, ringe = 0;
+  for (const n of alle) {
+    const st = flach(n.props?.style);
+    if (st.width === 8 && st.height === 8) anlagen++;
+    if (st.width === 16 && st.height === 16) ich++;
+    if (st.borderRadius === 9999 && typeof st.width === 'number' && st.width > 20) ringe++;
+  }
+  baum.unmount();
+
+  assert.equal(anlagen, 3, 'nicht je Anlage ein Punkt');
+  assert.equal(ich, 1, 'die eigene Position fehlt oder ist doppelt');
+  assert.equal(ringe, KARTE.RINGE, 'die Entfernungsringe fehlen — dann hat das Bild keinen Massstab');
 });

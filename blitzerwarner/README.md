@@ -113,10 +113,10 @@ dauerhaft laufen soll.
 
 | Ebene | Prüfung | Wie |
 |---|---|---|
-| Logik | 385 Tests | `npm run test:logik` |
+| Logik | 399 Tests | `npm run test:logik` |
 | Warnverhalten | 11 Fixture-Tracks | `npm run replay:all` |
 | Ende zu Ende | echte Anlage aus dem Datensatz, echte Umrisse, echtes Gate bis zum Ansagetext | `tests/kaltstart.test.ts` |
-| Oberfläche | alle vier Screens rendern, keine React-Warnung | `npm run test:render` |
+| Oberfläche | alle fünf Screens rendern, Kartenbild zeichnet nach, keine React-Warnung | `npm run test:render` |
 | Gestaltung | Vierer-Raster, keine nackte Masszahl im Screen, jeder Token hat einen Leser, jede Fläche zeigt gedrückt und abgeschaltet | `tests/theme.test.ts` |
 | Auslieferung | kein Netzwerk-Aufruf, kein Schlüssel, keine sendende Bibliothek im Quelltext | `tests/auslieferung.test.ts` |
 | Paket | Bundle baut (721 Module in der Entwicklung, 613 ausgeliefert), Berechtigungen, Icons | `npx expo start`, `tests/berechtigungen.test.ts`, `tests/assets.test.ts` |
@@ -317,8 +317,23 @@ Build-Profil steht in `app/app.config.js`, geprüft von
 ## Nicht-Ziele
 
 Keine Community-Meldungen, kein Melde-Button, kein Backend. Keine Navigation,
-keine Routenplanung. Keine Kartenansicht in Phase 1–4. Keine mobilen Blitzer.
-Kein Account, kein Login, kein Analytics-SDK, kein Crashlytics. Kein Abo.
+keine Routenplanung. Keine mobilen Blitzer. Kein Account, kein Login, kein
+Analytics-SDK, kein Crashlytics. Kein Abo.
+
+**Keine Kartenansicht** stand hier bis Phase 4 und steht nicht mehr hier — es
+gibt jetzt eine, aber nicht die, die man erwartet. Sie zeichnet die erfassten
+Anlagen und die eigene Position aus dem gebündelten Datensatz, Norden oben,
+mit Entfernungsringen. **Keine Strassen.** Eine übliche Karte lädt Kacheln
+über das Netz nach, und damit wäre das Produktversprechen weg;
+Offline-Kacheln für Europa in brauchbarer Zoomstufe sind zweistellige
+Gigabyte, die App wiegt vier Megabyte. Strassengeometrie offline wären für
+Deutschland allein hunderte Megabyte.
+
+Deshalb liegt sie nicht auf dem Fahrt-Screen, sondern in der Fusszeile
+daneben: Ohne Strassen beantwortet sie unterwegs keine Frage, die die Ansage
+nicht besser beantwortet. Ihr Zweck ist der Stand — nachsehen, ob für die
+Gegend überhaupt Daten da sind. Der Hinweis darauf steht über der Karte, nicht
+klein darunter.
 
 ## Lizenz und Attribution
 
