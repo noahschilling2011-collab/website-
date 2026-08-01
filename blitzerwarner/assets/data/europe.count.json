@@ -1,0 +1,1685 @@
+{
+  "stand": "2026-07-30",
+  "dedupeFaktor": 0.46515695480069963,
+  "bytesJeEintrag": 73.37146249752622,
+  "herleitung": "Dedupe-Faktor an Deutschland kalibriert, gegen dieselbe Grundmenge, die dieses Skript misst: 10863 Rohtreffer (5181 Nodes + 5682 Relationen) -> 5053 gebaute Eintraege, 370746 Bytes. KORREKTUR: Der erste Lauf rechnete mit 5053/14102 = 0,358. Die 14102 stammen aus dem echten Build und enthalten die device-Nodes der Enforcement-Relationen, die die Zaehlquery nicht mitzaehlt. Dadurch lag die Schaetzung fuer Deutschland bei 3892 statt 5053, also 23 Prozent zu niedrig, und fuer Europa entsprechend. Die Rohzahlen sind unveraendert; nur die daraus abgeleiteten Schaetzungen wurden neu gerechnet.",
+  "gebiete": [
+    {
+      "code": "DE-BW",
+      "name": "Baden-Württemberg",
+      "country": "DE",
+      "nodes": 1544,
+      "relationen": 1566,
+      "roh": 3110,
+      "geschaetztNachDedupe": 1447,
+      "geschaetzteBytes": 106142,
+      "fehler": null
+    },
+    {
+      "code": "DE-BY",
+      "name": "Bayern",
+      "country": "DE",
+      "nodes": 140,
+      "relationen": 188,
+      "roh": 328,
+      "geschaetztNachDedupe": 153,
+      "geschaetzteBytes": 11194,
+      "fehler": null
+    },
+    {
+      "code": "DE-BE",
+      "name": "Berlin",
+      "country": "DE",
+      "nodes": 64,
+      "relationen": 76,
+      "roh": 140,
+      "geschaetztNachDedupe": 65,
+      "geschaetzteBytes": 4778,
+      "fehler": null
+    },
+    {
+      "code": "DE-BB",
+      "name": "Brandenburg",
+      "country": "DE",
+      "nodes": 221,
+      "relationen": 244,
+      "roh": 465,
+      "geschaetztNachDedupe": 216,
+      "geschaetzteBytes": 15870,
+      "fehler": null
+    },
+    {
+      "code": "DE-HB",
+      "name": "Bremen",
+      "country": "DE",
+      "nodes": 55,
+      "relationen": 50,
+      "roh": 105,
+      "geschaetztNachDedupe": 49,
+      "geschaetzteBytes": 3584,
+      "fehler": null
+    },
+    {
+      "code": "DE-HH",
+      "name": "Hamburg",
+      "country": "DE",
+      "nodes": 31,
+      "relationen": 62,
+      "roh": 93,
+      "geschaetztNachDedupe": 43,
+      "geschaetzteBytes": 3174,
+      "fehler": null
+    },
+    {
+      "code": "DE-HE",
+      "name": "Hessen",
+      "country": "DE",
+      "nodes": 858,
+      "relationen": 865,
+      "roh": 1723,
+      "geschaetztNachDedupe": 801,
+      "geschaetzteBytes": 58805,
+      "fehler": null
+    },
+    {
+      "code": "DE-MV",
+      "name": "Mecklenburg-Vorpommern",
+      "country": "DE",
+      "nodes": 97,
+      "relationen": 163,
+      "roh": 260,
+      "geschaetztNachDedupe": 121,
+      "geschaetzteBytes": 8874,
+      "fehler": null
+    },
+    {
+      "code": "DE-NI",
+      "name": "Niedersachsen",
+      "country": "DE",
+      "nodes": 583,
+      "relationen": 660,
+      "roh": 1243,
+      "geschaetztNachDedupe": 578,
+      "geschaetzteBytes": 42423,
+      "fehler": null
+    },
+    {
+      "code": "DE-NW",
+      "name": "Nordrhein-Westfalen",
+      "country": "DE",
+      "nodes": 938,
+      "relationen": 871,
+      "roh": 1809,
+      "geschaetztNachDedupe": 841,
+      "geschaetzteBytes": 61740,
+      "fehler": null
+    },
+    {
+      "code": "DE-RP",
+      "name": "Rheinland-Pfalz",
+      "country": "DE",
+      "nodes": 93,
+      "relationen": 110,
+      "roh": 203,
+      "geschaetztNachDedupe": 94,
+      "geschaetzteBytes": 6928,
+      "fehler": null
+    },
+    {
+      "code": "DE-SL",
+      "name": "Saarland",
+      "country": "DE",
+      "nodes": 57,
+      "relationen": 66,
+      "roh": 123,
+      "geschaetztNachDedupe": 57,
+      "geschaetzteBytes": 4198,
+      "fehler": null
+    },
+    {
+      "code": "DE-SN",
+      "name": "Sachsen",
+      "country": "DE",
+      "nodes": 268,
+      "relationen": 409,
+      "roh": 677,
+      "geschaetztNachDedupe": 315,
+      "geschaetzteBytes": 23105,
+      "fehler": null
+    },
+    {
+      "code": "DE-ST",
+      "name": "Sachsen-Anhalt",
+      "country": "DE",
+      "nodes": 64,
+      "relationen": 87,
+      "roh": 151,
+      "geschaetztNachDedupe": 70,
+      "geschaetzteBytes": 5154,
+      "fehler": null
+    },
+    {
+      "code": "DE-SH",
+      "name": "Schleswig-Holstein",
+      "country": "DE",
+      "nodes": 82,
+      "relationen": 122,
+      "roh": 204,
+      "geschaetztNachDedupe": 95,
+      "geschaetzteBytes": 6962,
+      "fehler": null
+    },
+    {
+      "code": "DE-TH",
+      "name": "Thüringen",
+      "country": "DE",
+      "nodes": 86,
+      "relationen": 143,
+      "roh": 229,
+      "geschaetztNachDedupe": 107,
+      "geschaetzteBytes": 7816,
+      "fehler": null
+    },
+    {
+      "code": "IT-21",
+      "name": "Piemont",
+      "country": "IT",
+      "nodes": 568,
+      "relationen": 141,
+      "roh": 709,
+      "geschaetztNachDedupe": 330,
+      "geschaetzteBytes": 24198,
+      "fehler": null
+    },
+    {
+      "code": "IT-23",
+      "name": "Aostatal",
+      "country": "IT",
+      "nodes": 25,
+      "relationen": 10,
+      "roh": 35,
+      "geschaetztNachDedupe": 16,
+      "geschaetzteBytes": 1195,
+      "fehler": null
+    },
+    {
+      "code": "IT-25",
+      "name": "Lombardei",
+      "country": "IT",
+      "nodes": 887,
+      "relationen": 708,
+      "roh": 1595,
+      "geschaetztNachDedupe": 742,
+      "geschaetzteBytes": 54436,
+      "fehler": null
+    },
+    {
+      "code": "IT-32",
+      "name": "Trentino-Südtirol",
+      "country": "IT",
+      "nodes": 319,
+      "relationen": 162,
+      "roh": 481,
+      "geschaetztNachDedupe": 224,
+      "geschaetzteBytes": 16416,
+      "fehler": null
+    },
+    {
+      "code": "IT-34",
+      "name": "Venetien",
+      "country": "IT",
+      "nodes": 750,
+      "relationen": 351,
+      "roh": 1101,
+      "geschaetztNachDedupe": 512,
+      "geschaetzteBytes": 37576,
+      "fehler": null
+    },
+    {
+      "code": "IT-36",
+      "name": "Friaul-Julisch Venetien",
+      "country": "IT",
+      "nodes": 190,
+      "relationen": 23,
+      "roh": 213,
+      "geschaetztNachDedupe": 99,
+      "geschaetzteBytes": 7270,
+      "fehler": null
+    },
+    {
+      "code": "IT-42",
+      "name": "Ligurien",
+      "country": "IT",
+      "nodes": 120,
+      "relationen": 23,
+      "roh": 143,
+      "geschaetztNachDedupe": 67,
+      "geschaetzteBytes": 4880,
+      "fehler": null
+    },
+    {
+      "code": "IT-45",
+      "name": "Emilia-Romagna",
+      "country": "IT",
+      "nodes": 616,
+      "relationen": 590,
+      "roh": 1206,
+      "geschaetztNachDedupe": 561,
+      "geschaetzteBytes": 41160,
+      "fehler": null
+    },
+    {
+      "code": "IT-52",
+      "name": "Toskana",
+      "country": "IT",
+      "nodes": 579,
+      "relationen": 342,
+      "roh": 921,
+      "geschaetztNachDedupe": 428,
+      "geschaetzteBytes": 31433,
+      "fehler": null
+    },
+    {
+      "code": "IT-55",
+      "name": "Umbrien",
+      "country": "IT",
+      "nodes": 141,
+      "relationen": 67,
+      "roh": 208,
+      "geschaetztNachDedupe": 97,
+      "geschaetzteBytes": 7099,
+      "fehler": null
+    },
+    {
+      "code": "IT-57",
+      "name": "Marken",
+      "country": "IT",
+      "nodes": 185,
+      "relationen": 40,
+      "roh": 225,
+      "geschaetztNachDedupe": 105,
+      "geschaetzteBytes": 7679,
+      "fehler": null
+    },
+    {
+      "code": "IT-62",
+      "name": "Latium",
+      "country": "IT",
+      "nodes": 237,
+      "relationen": 96,
+      "roh": 333,
+      "geschaetztNachDedupe": 155,
+      "geschaetzteBytes": 11365,
+      "fehler": null
+    },
+    {
+      "code": "IT-65",
+      "name": "Abruzzen",
+      "country": "IT",
+      "nodes": 102,
+      "relationen": 49,
+      "roh": 151,
+      "geschaetztNachDedupe": 70,
+      "geschaetzteBytes": 5154,
+      "fehler": null
+    },
+    {
+      "code": "IT-67",
+      "name": "Molise",
+      "country": "IT",
+      "nodes": 5,
+      "relationen": 5,
+      "roh": 10,
+      "geschaetztNachDedupe": 5,
+      "geschaetzteBytes": 341,
+      "fehler": null
+    },
+    {
+      "code": "IT-72",
+      "name": "Kampanien",
+      "country": "IT",
+      "nodes": 153,
+      "relationen": 13,
+      "roh": 166,
+      "geschaetztNachDedupe": 77,
+      "geschaetzteBytes": 5665,
+      "fehler": null
+    },
+    {
+      "code": "IT-75",
+      "name": "Apulien",
+      "country": "IT",
+      "nodes": 83,
+      "relationen": 71,
+      "roh": 154,
+      "geschaetztNachDedupe": 72,
+      "geschaetzteBytes": 5256,
+      "fehler": null
+    },
+    {
+      "code": "IT-77",
+      "name": "Basilikata",
+      "country": "IT",
+      "nodes": 11,
+      "relationen": 0,
+      "roh": 11,
+      "geschaetztNachDedupe": 5,
+      "geschaetzteBytes": 375,
+      "fehler": null
+    },
+    {
+      "code": "IT-78",
+      "name": "Kalabrien",
+      "country": "IT",
+      "nodes": 41,
+      "relationen": 8,
+      "roh": 49,
+      "geschaetztNachDedupe": 23,
+      "geschaetzteBytes": 1672,
+      "fehler": null
+    },
+    {
+      "code": "IT-82",
+      "name": "Sizilien",
+      "country": "IT",
+      "nodes": 82,
+      "relationen": 34,
+      "roh": 116,
+      "geschaetztNachDedupe": 54,
+      "geschaetzteBytes": 3959,
+      "fehler": null
+    },
+    {
+      "code": "IT-88",
+      "name": "Sardinien",
+      "country": "IT",
+      "nodes": 18,
+      "relationen": 57,
+      "roh": 75,
+      "geschaetztNachDedupe": 35,
+      "geschaetzteBytes": 2560,
+      "fehler": null
+    },
+    {
+      "code": "FR-ARA",
+      "name": "Auvergne-Rhône-Alpes",
+      "country": "FR",
+      "nodes": 425,
+      "relationen": 552,
+      "roh": 977,
+      "geschaetztNachDedupe": 454,
+      "geschaetzteBytes": 33344,
+      "fehler": null
+    },
+    {
+      "code": "FR-BFC",
+      "name": "Bourgogne-Franche-Comté",
+      "country": "FR",
+      "nodes": 258,
+      "relationen": 296,
+      "roh": 554,
+      "geschaetztNachDedupe": 258,
+      "geschaetzteBytes": 18908,
+      "fehler": null
+    },
+    {
+      "code": "FR-BRE",
+      "name": "Bretagne",
+      "country": "FR",
+      "nodes": 145,
+      "relationen": 171,
+      "roh": 316,
+      "geschaetztNachDedupe": 147,
+      "geschaetzteBytes": 10785,
+      "fehler": null
+    },
+    {
+      "code": "FR-CVL",
+      "name": "Centre-Val de Loire",
+      "country": "FR",
+      "nodes": 235,
+      "relationen": 321,
+      "roh": 556,
+      "geschaetztNachDedupe": 259,
+      "geschaetzteBytes": 18976,
+      "fehler": null
+    },
+    {
+      "code": "FR-COR",
+      "name": "Korsika",
+      "country": "FR",
+      "nodes": 0,
+      "relationen": 0,
+      "roh": 0,
+      "geschaetztNachDedupe": 0,
+      "geschaetzteBytes": 0,
+      "fehler": null
+    },
+    {
+      "code": "FR-GES",
+      "name": "Grand Est",
+      "country": "FR",
+      "nodes": 401,
+      "relationen": 424,
+      "roh": 825,
+      "geschaetztNachDedupe": 384,
+      "geschaetzteBytes": 28157,
+      "fehler": null
+    },
+    {
+      "code": "FR-HDF",
+      "name": "Hauts-de-France",
+      "country": "FR",
+      "nodes": 349,
+      "relationen": 536,
+      "roh": 885,
+      "geschaetztNachDedupe": 412,
+      "geschaetzteBytes": 30204,
+      "fehler": null
+    },
+    {
+      "code": "FR-IDF",
+      "name": "Île-de-France",
+      "country": "FR",
+      "nodes": 394,
+      "relationen": 408,
+      "roh": 802,
+      "geschaetztNachDedupe": 373,
+      "geschaetzteBytes": 27372,
+      "fehler": null
+    },
+    {
+      "code": "FR-NOR",
+      "name": "Normandie",
+      "country": "FR",
+      "nodes": 182,
+      "relationen": 256,
+      "roh": 438,
+      "geschaetztNachDedupe": 204,
+      "geschaetzteBytes": 14949,
+      "fehler": null
+    },
+    {
+      "code": "FR-NAQ",
+      "name": "Nouvelle-Aquitaine",
+      "country": "FR",
+      "nodes": 482,
+      "relationen": 593,
+      "roh": 1075,
+      "geschaetztNachDedupe": 500,
+      "geschaetzteBytes": 36689,
+      "fehler": null
+    },
+    {
+      "code": "FR-OCC",
+      "name": "Okzitanien",
+      "country": "FR",
+      "nodes": 455,
+      "relationen": 524,
+      "roh": 979,
+      "geschaetztNachDedupe": 455,
+      "geschaetzteBytes": 33413,
+      "fehler": null
+    },
+    {
+      "code": "FR-PDL",
+      "name": "Pays de la Loire",
+      "country": "FR",
+      "nodes": 181,
+      "relationen": 250,
+      "roh": 431,
+      "geschaetztNachDedupe": 200,
+      "geschaetzteBytes": 14710,
+      "fehler": null
+    },
+    {
+      "code": "FR-PAC",
+      "name": "Provence-Alpes-Côte d'Azur",
+      "country": "FR",
+      "nodes": 299,
+      "relationen": 335,
+      "roh": 634,
+      "geschaetztNachDedupe": 295,
+      "geschaetzteBytes": 21638,
+      "fehler": null
+    },
+    {
+      "code": "GB-ENG",
+      "name": "England",
+      "country": "GB",
+      "nodes": 3051,
+      "relationen": 583,
+      "roh": 3634,
+      "geschaetztNachDedupe": 1690,
+      "geschaetzteBytes": 124026,
+      "fehler": null
+    },
+    {
+      "code": "GB-SCT",
+      "name": "Schottland",
+      "country": "GB",
+      "nodes": 237,
+      "relationen": 87,
+      "roh": 324,
+      "geschaetztNachDedupe": 151,
+      "geschaetzteBytes": 11058,
+      "fehler": null
+    },
+    {
+      "code": "GB-WLS",
+      "name": "Wales",
+      "country": "GB",
+      "nodes": 111,
+      "relationen": 13,
+      "roh": 124,
+      "geschaetztNachDedupe": 58,
+      "geschaetzteBytes": 4232,
+      "fehler": null
+    },
+    {
+      "code": "GB-NIR",
+      "name": "Nordirland",
+      "country": "GB",
+      "nodes": 4,
+      "relationen": 0,
+      "roh": 4,
+      "geschaetztNachDedupe": 2,
+      "geschaetzteBytes": 137,
+      "fehler": null
+    },
+    {
+      "code": "ES-AN",
+      "name": "Andalusien",
+      "country": "ES",
+      "nodes": 340,
+      "relationen": 330,
+      "roh": 670,
+      "geschaetztNachDedupe": 312,
+      "geschaetzteBytes": 22867,
+      "fehler": null
+    },
+    {
+      "code": "ES-AR",
+      "name": "Aragonien",
+      "country": "ES",
+      "nodes": 93,
+      "relationen": 93,
+      "roh": 186,
+      "geschaetztNachDedupe": 87,
+      "geschaetzteBytes": 6348,
+      "fehler": null
+    },
+    {
+      "code": "ES-AS",
+      "name": "Asturien",
+      "country": "ES",
+      "nodes": 83,
+      "relationen": 91,
+      "roh": 174,
+      "geschaetztNachDedupe": 81,
+      "geschaetzteBytes": 5938,
+      "fehler": null
+    },
+    {
+      "code": "ES-CN",
+      "name": "Kanaren",
+      "country": "ES",
+      "nodes": 64,
+      "relationen": 67,
+      "roh": 131,
+      "geschaetztNachDedupe": 61,
+      "geschaetzteBytes": 4471,
+      "fehler": null
+    },
+    {
+      "code": "ES-CB",
+      "name": "Kantabrien",
+      "country": "ES",
+      "nodes": 22,
+      "relationen": 21,
+      "roh": 43,
+      "geschaetztNachDedupe": 20,
+      "geschaetzteBytes": 1468,
+      "fehler": null
+    },
+    {
+      "code": "ES-CL",
+      "name": "Kastilien und León",
+      "country": "ES",
+      "nodes": 257,
+      "relationen": 337,
+      "roh": 594,
+      "geschaetztNachDedupe": 276,
+      "geschaetzteBytes": 20273,
+      "fehler": null
+    },
+    {
+      "code": "ES-CM",
+      "name": "Kastilien-La Mancha",
+      "country": "ES",
+      "nodes": 124,
+      "relationen": 112,
+      "roh": 236,
+      "geschaetztNachDedupe": 110,
+      "geschaetzteBytes": 8055,
+      "fehler": null
+    },
+    {
+      "code": "ES-CT",
+      "name": "Katalonien",
+      "country": "ES",
+      "nodes": 620,
+      "relationen": 569,
+      "roh": 1189,
+      "geschaetztNachDedupe": 553,
+      "geschaetzteBytes": 40580,
+      "fehler": null
+    },
+    {
+      "code": "ES-EX",
+      "name": "Extremadura",
+      "country": "ES",
+      "nodes": 62,
+      "relationen": 58,
+      "roh": 120,
+      "geschaetztNachDedupe": 56,
+      "geschaetzteBytes": 4096,
+      "fehler": null
+    },
+    {
+      "code": "ES-GA",
+      "name": "Galicien",
+      "country": "ES",
+      "nodes": 152,
+      "relationen": 154,
+      "roh": 306,
+      "geschaetztNachDedupe": 142,
+      "geschaetzteBytes": 10444,
+      "fehler": null
+    },
+    {
+      "code": "ES-IB",
+      "name": "Balearen",
+      "country": "ES",
+      "nodes": 76,
+      "relationen": 88,
+      "roh": 164,
+      "geschaetztNachDedupe": 76,
+      "geschaetzteBytes": 5597,
+      "fehler": null
+    },
+    {
+      "code": "ES-RI",
+      "name": "La Rioja",
+      "country": "ES",
+      "nodes": 31,
+      "relationen": 38,
+      "roh": 69,
+      "geschaetztNachDedupe": 32,
+      "geschaetzteBytes": 2355,
+      "fehler": null
+    },
+    {
+      "code": "ES-MD",
+      "name": "Madrid",
+      "country": "ES",
+      "nodes": 194,
+      "relationen": 208,
+      "roh": 402,
+      "geschaetztNachDedupe": 187,
+      "geschaetzteBytes": 13720,
+      "fehler": null
+    },
+    {
+      "code": "ES-MC",
+      "name": "Murcia",
+      "country": "ES",
+      "nodes": 26,
+      "relationen": 24,
+      "roh": 50,
+      "geschaetztNachDedupe": 23,
+      "geschaetzteBytes": 1706,
+      "fehler": null
+    },
+    {
+      "code": "ES-NC",
+      "name": "Navarra",
+      "country": "ES",
+      "nodes": 32,
+      "relationen": 37,
+      "roh": 69,
+      "geschaetztNachDedupe": 32,
+      "geschaetzteBytes": 2355,
+      "fehler": null
+    },
+    {
+      "code": "ES-PV",
+      "name": "Baskenland",
+      "country": "ES",
+      "nodes": 187,
+      "relationen": 235,
+      "roh": 422,
+      "geschaetztNachDedupe": 196,
+      "geschaetzteBytes": 14403,
+      "fehler": null
+    },
+    {
+      "code": "ES-VC",
+      "name": "Valencia",
+      "country": "ES",
+      "nodes": 181,
+      "relationen": 209,
+      "roh": 390,
+      "geschaetztNachDedupe": 181,
+      "geschaetzteBytes": 13310,
+      "fehler": null
+    },
+    {
+      "code": "PL-02",
+      "name": "Niederschlesien",
+      "country": "PL",
+      "nodes": 38,
+      "relationen": 113,
+      "roh": 151,
+      "geschaetztNachDedupe": 70,
+      "geschaetzteBytes": 5154,
+      "fehler": null
+    },
+    {
+      "code": "PL-04",
+      "name": "Kujawien-Pommern",
+      "country": "PL",
+      "nodes": 24,
+      "relationen": 72,
+      "roh": 96,
+      "geschaetztNachDedupe": 45,
+      "geschaetzteBytes": 3276,
+      "fehler": null
+    },
+    {
+      "code": "PL-06",
+      "name": "Lublin",
+      "country": "PL",
+      "nodes": 35,
+      "relationen": 81,
+      "roh": 116,
+      "geschaetztNachDedupe": 54,
+      "geschaetzteBytes": 3959,
+      "fehler": null
+    },
+    {
+      "code": "PL-08",
+      "name": "Lebus",
+      "country": "PL",
+      "nodes": 26,
+      "relationen": 51,
+      "roh": 77,
+      "geschaetztNachDedupe": 36,
+      "geschaetzteBytes": 2628,
+      "fehler": null
+    },
+    {
+      "code": "PL-10",
+      "name": "Łódź",
+      "country": "PL",
+      "nodes": 47,
+      "relationen": 134,
+      "roh": 181,
+      "geschaetztNachDedupe": 84,
+      "geschaetzteBytes": 6177,
+      "fehler": null
+    },
+    {
+      "code": "PL-12",
+      "name": "Kleinpolen",
+      "country": "PL",
+      "nodes": 37,
+      "relationen": 100,
+      "roh": 137,
+      "geschaetztNachDedupe": 64,
+      "geschaetzteBytes": 4676,
+      "fehler": null
+    },
+    {
+      "code": "PL-14",
+      "name": "Masowien",
+      "country": "PL",
+      "nodes": 118,
+      "relationen": 160,
+      "roh": 278,
+      "geschaetztNachDedupe": 129,
+      "geschaetzteBytes": 9488,
+      "fehler": null
+    },
+    {
+      "code": "PL-16",
+      "name": "Oppeln",
+      "country": "PL",
+      "nodes": 21,
+      "relationen": 34,
+      "roh": 55,
+      "geschaetztNachDedupe": 26,
+      "geschaetzteBytes": 1877,
+      "fehler": null
+    },
+    {
+      "code": "PL-18",
+      "name": "Karpatenvorland",
+      "country": "PL",
+      "nodes": 28,
+      "relationen": 76,
+      "roh": 104,
+      "geschaetztNachDedupe": 48,
+      "geschaetzteBytes": 3549,
+      "fehler": null
+    },
+    {
+      "code": "PL-20",
+      "name": "Podlachien",
+      "country": "PL",
+      "nodes": 24,
+      "relationen": 62,
+      "roh": 86,
+      "geschaetztNachDedupe": 40,
+      "geschaetzteBytes": 2935,
+      "fehler": null
+    },
+    {
+      "code": "PL-22",
+      "name": "Pommern",
+      "country": "PL",
+      "nodes": 49,
+      "relationen": 81,
+      "roh": 130,
+      "geschaetztNachDedupe": 60,
+      "geschaetzteBytes": 4437,
+      "fehler": null
+    },
+    {
+      "code": "PL-24",
+      "name": "Schlesien",
+      "country": "PL",
+      "nodes": 51,
+      "relationen": 116,
+      "roh": 167,
+      "geschaetztNachDedupe": 78,
+      "geschaetzteBytes": 5700,
+      "fehler": null
+    },
+    {
+      "code": "PL-26",
+      "name": "Heiligkreuz",
+      "country": "PL",
+      "nodes": 15,
+      "relationen": 36,
+      "roh": 51,
+      "geschaetztNachDedupe": 24,
+      "geschaetzteBytes": 1741,
+      "fehler": null
+    },
+    {
+      "code": "PL-28",
+      "name": "Ermland-Masuren",
+      "country": "PL",
+      "nodes": 30,
+      "relationen": 25,
+      "roh": 55,
+      "geschaetztNachDedupe": 26,
+      "geschaetzteBytes": 1877,
+      "fehler": null
+    },
+    {
+      "code": "PL-30",
+      "name": "Grosspolen",
+      "country": "PL",
+      "nodes": 62,
+      "relationen": 135,
+      "roh": 197,
+      "geschaetztNachDedupe": 92,
+      "geschaetzteBytes": 6723,
+      "fehler": null
+    },
+    {
+      "code": "PL-32",
+      "name": "Westpommern",
+      "country": "PL",
+      "nodes": 25,
+      "relationen": 73,
+      "roh": 98,
+      "geschaetztNachDedupe": 46,
+      "geschaetzteBytes": 3345,
+      "fehler": null
+    },
+    {
+      "code": "AT",
+      "name": "Österreich",
+      "country": "AT",
+      "nodes": 1397,
+      "relationen": 1042,
+      "roh": 2439,
+      "geschaetztNachDedupe": 1135,
+      "geschaetzteBytes": 83241,
+      "fehler": null
+    },
+    {
+      "code": "CH",
+      "name": "Schweiz",
+      "country": "CH",
+      "nodes": 593,
+      "relationen": 443,
+      "roh": 1036,
+      "geschaetztNachDedupe": 482,
+      "geschaetzteBytes": 35358,
+      "fehler": null
+    },
+    {
+      "code": "NL",
+      "name": "Niederlande",
+      "country": "NL",
+      "nodes": 877,
+      "relationen": 524,
+      "roh": 1401,
+      "geschaetztNachDedupe": 652,
+      "geschaetzteBytes": 47815,
+      "fehler": null
+    },
+    {
+      "code": "BE",
+      "name": "Belgien",
+      "country": "BE",
+      "nodes": 1545,
+      "relationen": 858,
+      "roh": 2403,
+      "geschaetztNachDedupe": 1118,
+      "geschaetzteBytes": 82013,
+      "fehler": null
+    },
+    {
+      "code": "LU",
+      "name": "Luxemburg",
+      "country": "LU",
+      "nodes": 37,
+      "relationen": 58,
+      "roh": 95,
+      "geschaetztNachDedupe": 44,
+      "geschaetzteBytes": 3242,
+      "fehler": null
+    },
+    {
+      "code": "DK",
+      "name": "Dänemark",
+      "country": "DK",
+      "nodes": 22,
+      "relationen": 0,
+      "roh": 22,
+      "geschaetztNachDedupe": 10,
+      "geschaetzteBytes": 751,
+      "fehler": null
+    },
+    {
+      "code": "CZ",
+      "name": "Tschechien",
+      "country": "CZ",
+      "nodes": 1306,
+      "relationen": 821,
+      "roh": 2127,
+      "geschaetztNachDedupe": 989,
+      "geschaetzteBytes": 72593,
+      "fehler": null
+    },
+    {
+      "code": "SK",
+      "name": "Slowakei",
+      "country": "SK",
+      "nodes": 65,
+      "relationen": 26,
+      "roh": 91,
+      "geschaetztNachDedupe": 42,
+      "geschaetzteBytes": 3106,
+      "fehler": null
+    },
+    {
+      "code": "HU",
+      "name": "Ungarn",
+      "country": "HU",
+      "nodes": 408,
+      "relationen": 2579,
+      "roh": 2987,
+      "geschaetztNachDedupe": 1389,
+      "geschaetzteBytes": 101944,
+      "fehler": null
+    },
+    {
+      "code": "SI",
+      "name": "Slowenien",
+      "country": "SI",
+      "nodes": 185,
+      "relationen": 8,
+      "roh": 193,
+      "geschaetztNachDedupe": 90,
+      "geschaetzteBytes": 6587,
+      "fehler": null
+    },
+    {
+      "code": "HR",
+      "name": "Kroatien",
+      "country": "HR",
+      "nodes": 701,
+      "relationen": 50,
+      "roh": 751,
+      "geschaetztNachDedupe": 349,
+      "geschaetzteBytes": 25631,
+      "fehler": null
+    },
+    {
+      "code": "BA",
+      "name": "Bosnien und Herzegowina",
+      "country": "BA",
+      "nodes": 240,
+      "relationen": 7,
+      "roh": 247,
+      "geschaetztNachDedupe": 115,
+      "geschaetzteBytes": 8430,
+      "fehler": null
+    },
+    {
+      "code": "RS",
+      "name": "Serbien",
+      "country": "RS",
+      "nodes": 303,
+      "relationen": 43,
+      "roh": 346,
+      "geschaetztNachDedupe": 161,
+      "geschaetzteBytes": 11809,
+      "fehler": null
+    },
+    {
+      "code": "ME",
+      "name": "Montenegro",
+      "country": "ME",
+      "nodes": 13,
+      "relationen": 0,
+      "roh": 13,
+      "geschaetztNachDedupe": 6,
+      "geschaetzteBytes": 444,
+      "fehler": null
+    },
+    {
+      "code": "MK",
+      "name": "Nordmazedonien",
+      "country": "MK",
+      "nodes": 172,
+      "relationen": 0,
+      "roh": 172,
+      "geschaetztNachDedupe": 80,
+      "geschaetzteBytes": 5870,
+      "fehler": null
+    },
+    {
+      "code": "AL",
+      "name": "Albanien",
+      "country": "AL",
+      "nodes": 2,
+      "relationen": 0,
+      "roh": 2,
+      "geschaetztNachDedupe": 1,
+      "geschaetzteBytes": 68,
+      "fehler": null
+    },
+    {
+      "code": "GR",
+      "name": "Griechenland",
+      "country": "GR",
+      "nodes": 412,
+      "relationen": 18,
+      "roh": 430,
+      "geschaetztNachDedupe": 200,
+      "geschaetzteBytes": 14676,
+      "fehler": null
+    },
+    {
+      "code": "BG",
+      "name": "Bulgarien",
+      "country": "BG",
+      "nodes": 73,
+      "relationen": 31,
+      "roh": 104,
+      "geschaetztNachDedupe": 48,
+      "geschaetzteBytes": 3549,
+      "fehler": null
+    },
+    {
+      "code": "RO",
+      "name": "Rumänien",
+      "country": "RO",
+      "nodes": 337,
+      "relationen": 6,
+      "roh": 343,
+      "geschaetztNachDedupe": 160,
+      "geschaetzteBytes": 11706,
+      "fehler": null
+    },
+    {
+      "code": "PT",
+      "name": "Portugal",
+      "country": "PT",
+      "nodes": 292,
+      "relationen": 112,
+      "roh": 404,
+      "geschaetztNachDedupe": 188,
+      "geschaetzteBytes": 13788,
+      "fehler": null
+    },
+    {
+      "code": "SE",
+      "name": "Schweden",
+      "country": "SE",
+      "nodes": 2466,
+      "relationen": 1742,
+      "roh": 4208,
+      "geschaetztNachDedupe": 1957,
+      "geschaetzteBytes": 143616,
+      "fehler": null
+    },
+    {
+      "code": "NO",
+      "name": "Norwegen",
+      "country": "NO",
+      "nodes": 402,
+      "relationen": 351,
+      "roh": 753,
+      "geschaetztNachDedupe": 350,
+      "geschaetzteBytes": 25699,
+      "fehler": null
+    },
+    {
+      "code": "FI",
+      "name": "Finnland",
+      "country": "FI",
+      "nodes": 888,
+      "relationen": 424,
+      "roh": 1312,
+      "geschaetztNachDedupe": 610,
+      "geschaetzteBytes": 44778,
+      "fehler": null
+    },
+    {
+      "code": "EE",
+      "name": "Estland",
+      "country": "EE",
+      "nodes": 86,
+      "relationen": 71,
+      "roh": 157,
+      "geschaetztNachDedupe": 73,
+      "geschaetzteBytes": 5358,
+      "fehler": null
+    },
+    {
+      "code": "LV",
+      "name": "Lettland",
+      "country": "LV",
+      "nodes": 166,
+      "relationen": 36,
+      "roh": 202,
+      "geschaetztNachDedupe": 94,
+      "geschaetzteBytes": 6894,
+      "fehler": null
+    },
+    {
+      "code": "LT",
+      "name": "Litauen",
+      "country": "LT",
+      "nodes": 362,
+      "relationen": 358,
+      "roh": 720,
+      "geschaetztNachDedupe": 335,
+      "geschaetzteBytes": 24573,
+      "fehler": null
+    },
+    {
+      "code": "IE",
+      "name": "Irland",
+      "country": "IE",
+      "nodes": 21,
+      "relationen": 7,
+      "roh": 28,
+      "geschaetztNachDedupe": 13,
+      "geschaetzteBytes": 956,
+      "fehler": null
+    },
+    {
+      "code": "IS",
+      "name": "Island",
+      "country": "IS",
+      "nodes": 18,
+      "relationen": 13,
+      "roh": 31,
+      "geschaetztNachDedupe": 14,
+      "geschaetzteBytes": 1058,
+      "fehler": null
+    },
+    {
+      "code": "LI",
+      "name": "Liechtenstein",
+      "country": "LI",
+      "nodes": 4,
+      "relationen": 6,
+      "roh": 10,
+      "geschaetztNachDedupe": 5,
+      "geschaetzteBytes": 341,
+      "fehler": null
+    },
+    {
+      "code": "AD",
+      "name": "Andorra",
+      "country": "AD",
+      "nodes": 11,
+      "relationen": 2,
+      "roh": 13,
+      "geschaetztNachDedupe": 6,
+      "geschaetzteBytes": 444,
+      "fehler": null
+    },
+    {
+      "code": "MC",
+      "name": "Monaco",
+      "country": "MC",
+      "nodes": null,
+      "relationen": null,
+      "roh": null,
+      "geschaetztNachDedupe": null,
+      "geschaetzteBytes": null,
+      "fehler": "Alle Overpass-Mirrors fehlgeschlagen. Letzter Fehler: HTTP 503: upstream connect error or disconnect/reset before headers. retried and the latest reset reason: remote connection failure, transport failure reason: TLS_error:|268435581:SSL routines:OPENSSL_internal:"
+    },
+    {
+      "code": "SM",
+      "name": "San Marino",
+      "country": "SM",
+      "nodes": 0,
+      "relationen": 0,
+      "roh": 0,
+      "geschaetztNachDedupe": 0,
+      "geschaetzteBytes": 0,
+      "fehler": null
+    },
+    {
+      "code": "MT",
+      "name": "Malta",
+      "country": "MT",
+      "nodes": 21,
+      "relationen": 3,
+      "roh": 24,
+      "geschaetztNachDedupe": 11,
+      "geschaetzteBytes": 819,
+      "fehler": null
+    },
+    {
+      "code": "CY",
+      "name": "Zypern",
+      "country": "CY",
+      "nodes": 232,
+      "relationen": 6,
+      "roh": 238,
+      "geschaetztNachDedupe": 111,
+      "geschaetzteBytes": 8123,
+      "fehler": null
+    },
+    {
+      "code": "MD",
+      "name": "Moldau",
+      "country": "MD",
+      "nodes": 81,
+      "relationen": 0,
+      "roh": 81,
+      "geschaetztNachDedupe": 38,
+      "geschaetzteBytes": 2764,
+      "fehler": null
+    },
+    {
+      "code": "UA",
+      "name": "Ukraine",
+      "country": "UA",
+      "nodes": 666,
+      "relationen": 38,
+      "roh": 704,
+      "geschaetztNachDedupe": 327,
+      "geschaetzteBytes": 24027,
+      "fehler": null
+    },
+    {
+      "code": "XK",
+      "name": "Kosovo",
+      "country": "XK",
+      "nodes": 0,
+      "relationen": 0,
+      "roh": 0,
+      "geschaetztNachDedupe": 0,
+      "geschaetzteBytes": 0,
+      "fehler": null
+    },
+    {
+      "code": "TR",
+      "name": "Türkei",
+      "country": "TR",
+      "nodes": 730,
+      "relationen": 30,
+      "roh": 760,
+      "geschaetztNachDedupe": 354,
+      "geschaetzteBytes": 25938,
+      "fehler": null
+    }
+  ],
+  "proLand": {
+    "DE": {
+      "roh": 10863,
+      "dedupe": 5052,
+      "bytes": 370747,
+      "gebiete": 16,
+      "fehler": 0
+    },
+    "IT": {
+      "roh": 7902,
+      "dedupe": 3677,
+      "bytes": 269689,
+      "gebiete": 20,
+      "fehler": 0
+    },
+    "FR": {
+      "roh": 8472,
+      "dedupe": 3941,
+      "bytes": 289145,
+      "gebiete": 13,
+      "fehler": 0
+    },
+    "GB": {
+      "roh": 4086,
+      "dedupe": 1901,
+      "bytes": 139453,
+      "gebiete": 4,
+      "fehler": 0
+    },
+    "ES": {
+      "roh": 5215,
+      "dedupe": 2425,
+      "bytes": 177986,
+      "gebiete": 17,
+      "fehler": 0
+    },
+    "PL": {
+      "roh": 1979,
+      "dedupe": 922,
+      "bytes": 67542,
+      "gebiete": 16,
+      "fehler": 0
+    },
+    "AT": {
+      "roh": 2439,
+      "dedupe": 1135,
+      "bytes": 83241,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "CH": {
+      "roh": 1036,
+      "dedupe": 482,
+      "bytes": 35358,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "NL": {
+      "roh": 1401,
+      "dedupe": 652,
+      "bytes": 47815,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "BE": {
+      "roh": 2403,
+      "dedupe": 1118,
+      "bytes": 82013,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "LU": {
+      "roh": 95,
+      "dedupe": 44,
+      "bytes": 3242,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "DK": {
+      "roh": 22,
+      "dedupe": 10,
+      "bytes": 751,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "CZ": {
+      "roh": 2127,
+      "dedupe": 989,
+      "bytes": 72593,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "SK": {
+      "roh": 91,
+      "dedupe": 42,
+      "bytes": 3106,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "HU": {
+      "roh": 2987,
+      "dedupe": 1389,
+      "bytes": 101944,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "SI": {
+      "roh": 193,
+      "dedupe": 90,
+      "bytes": 6587,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "HR": {
+      "roh": 751,
+      "dedupe": 349,
+      "bytes": 25631,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "BA": {
+      "roh": 247,
+      "dedupe": 115,
+      "bytes": 8430,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "RS": {
+      "roh": 346,
+      "dedupe": 161,
+      "bytes": 11809,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "ME": {
+      "roh": 13,
+      "dedupe": 6,
+      "bytes": 444,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "MK": {
+      "roh": 172,
+      "dedupe": 80,
+      "bytes": 5870,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "AL": {
+      "roh": 2,
+      "dedupe": 1,
+      "bytes": 68,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "GR": {
+      "roh": 430,
+      "dedupe": 200,
+      "bytes": 14676,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "BG": {
+      "roh": 104,
+      "dedupe": 48,
+      "bytes": 3549,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "RO": {
+      "roh": 343,
+      "dedupe": 160,
+      "bytes": 11706,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "PT": {
+      "roh": 404,
+      "dedupe": 188,
+      "bytes": 13788,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "SE": {
+      "roh": 4208,
+      "dedupe": 1957,
+      "bytes": 143616,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "NO": {
+      "roh": 753,
+      "dedupe": 350,
+      "bytes": 25699,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "FI": {
+      "roh": 1312,
+      "dedupe": 610,
+      "bytes": 44778,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "EE": {
+      "roh": 157,
+      "dedupe": 73,
+      "bytes": 5358,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "LV": {
+      "roh": 202,
+      "dedupe": 94,
+      "bytes": 6894,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "LT": {
+      "roh": 720,
+      "dedupe": 335,
+      "bytes": 24573,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "IE": {
+      "roh": 28,
+      "dedupe": 13,
+      "bytes": 956,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "IS": {
+      "roh": 31,
+      "dedupe": 14,
+      "bytes": 1058,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "LI": {
+      "roh": 10,
+      "dedupe": 5,
+      "bytes": 341,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "AD": {
+      "roh": 13,
+      "dedupe": 6,
+      "bytes": 444,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "MC": {
+      "roh": 0,
+      "dedupe": 0,
+      "bytes": 0,
+      "gebiete": 1,
+      "fehler": 1
+    },
+    "SM": {
+      "roh": 0,
+      "dedupe": 0,
+      "bytes": 0,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "MT": {
+      "roh": 24,
+      "dedupe": 11,
+      "bytes": 819,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "CY": {
+      "roh": 238,
+      "dedupe": 111,
+      "bytes": 8123,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "MD": {
+      "roh": 81,
+      "dedupe": 38,
+      "bytes": 2764,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "UA": {
+      "roh": 704,
+      "dedupe": 327,
+      "bytes": 24027,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "XK": {
+      "roh": 0,
+      "dedupe": 0,
+      "bytes": 0,
+      "gebiete": 1,
+      "fehler": 0
+    },
+    "TR": {
+      "roh": 760,
+      "dedupe": 354,
+      "bytes": 25938,
+      "gebiete": 1,
+      "fehler": 0
+    }
+  },
+  "fehlgeschlagen": [
+    "MC"
+  ]
+}

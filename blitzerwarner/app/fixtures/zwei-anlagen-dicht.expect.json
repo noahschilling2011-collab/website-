@@ -1,0 +1,21 @@
+{
+  "beschreibung": "Zwei Anlagen 30 m hintereinander in Fahrtrichtung, 100 km/h — zu dicht — die zweite Ansage wird verschoben",
+  "kameras": [
+    {
+      "lat": 48.59999935154224,
+      "lon": 9.012239148892387,
+      "dir": null,
+      "max": 100,
+      "type": "speed"
+    },
+    {
+      "lat": 48.59999935082173,
+      "lon": 9.012647120520384,
+      "dir": null,
+      "max": 100,
+      "type": "speed"
+    }
+  ],
+  "erwarteteWarnungen": 2,
+  "minAnsageAbstandS": 4
+}

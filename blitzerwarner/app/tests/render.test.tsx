@@ -1,0 +1,370 @@
+/**
+ * Rendern die Screens überhaupt?
+ *
+ * DIE LÜCKE, DIE DIESE DATEI SCHLIESST
+ *
+ * Bis hierher prüften 347 Tests die Logik — und kein einziger hat je einen
+ * Screen gerendert. Ob die App sich öffnen lässt, war damit ungeprüft. Ein
+ * Absturz beim ersten Render ist der auffälligste denkbare Fehler und war
+ * zugleich der einzige, den keine Prüfung gefunden hätte.
+ *
+ * `react-native` ist unter Node nicht ladbar (Flow-Typen, esbuild bricht ab).
+ * tests/hilfen/ ersetzt deshalb genau die Plattformmodule durch Attrappen;
+ * alles andere — Store, Datensatz, Länder-Gate, Textkatalog — läuft echt.
+ *
+ * WAS DIESER TEST NICHT LEISTET
+ *
+ * Nichts über Aussehen, Layout, Lesbarkeit bei Sonne oder Touch-Ziele. Und
+ * nichts über die Plattform selbst: ob expo-location Positionen liefert und
+ * ob ein Ton hörbar wird, zeigt nur das Gerät.
+ *
+ * AUSFÜHRUNG: `npm run test:render`, und über `npm test` mit. Der Test wird
+ * dabei erst gebündelt (tests/hilfen/baue-rendertest.mjs), weil sich die
+ * Attrappen nur so einsetzen lassen — die Begründung steht dort.
+ *
+ * `--test-force-exit` ist nötig und kein Versäumnis: Reacts Scheduler hält
+ * unter Node über einen MessageChannel den Event-Loop offen, auch nachdem
+ * jeder Baum abgeräumt ist. Die Timer der App selbst werden sauber
+ * aufgeräumt — App.tsx und DriveScreen geben beide ein clearInterval aus
+ * ihrem Effect zurück, nachgeprüft.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createElement } from 'react';
+import { create, act, type ReactTestRenderer } from 'react-test-renderer';
+
+import App from '../App';
+import DriveScreen from '../src/ui/DriveScreen';
+import InfoScreen from '../src/ui/InfoScreen';
+import OnboardingScreen from '../src/ui/OnboardingScreen';
+import RechtlichesScreen from '../src/ui/RechtlichesScreen';
+import SettingsScreen from '../src/ui/SettingsScreen';
+import KarteScreen, { KartenBild } from '../src/ui/KarteScreen';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import { ONBOARDING_KEY, useApp } from '../src/state/store';
+import { baueKarte, massstabsbalken, umrissLinien } from '../src/core/karte';
+import { KARTE } from '../src/config';
+import { PALETTEN } from '../src/ui/theme';
+import type { Camera } from '../src/types';
+import type { ThemeMode } from '../src/ui/theme';
+
+/**
+ * Einen Baum rendern und wieder abräumen.
+ *
+ * `act()` deckt die Effekte mit ab — ohne das liefe nur der erste Durchlauf,
+ * und genau in den Effekten steckt das Laden von Datensatz, Audio und
+ * Einstellungen.
+ */
+async function rendere(element: React.ReactElement): Promise<ReactTestRenderer> {
+  let baum!: ReactTestRenderer;
+  await act(async () => { baum = create(element); });
+  return baum;
+}
+
+/** Alle Textinhalte eines Baums, für Prüfungen auf sichtbare Sätze. */
+function texte(baum: ReactTestRenderer): string[] {
+  const gefunden: string[] = [];
+  const gehe = (knoten: unknown): void => {
+    if (typeof knoten === 'string') { gefunden.push(knoten); return; }
+    if (Array.isArray(knoten)) { knoten.forEach(gehe); return; }
+    if (knoten && typeof knoten === 'object' && 'children' in knoten) {
+      gehe((knoten as { children: unknown }).children);
+    }
+  };
+  gehe(baum.toJSON());
+  return gefunden;
+}
+
+const MODI: ThemeMode[] = ['tag', 'nacht'];
+
+// --- Die einzelnen Screens ------------------------------------------------
+
+test('OnboardingScreen rendert', async () => {
+  // Der erste Bildschirm überhaupt. Stürzt er ab, sieht der Nutzer die App
+  // nie von innen.
+  for (const mode of MODI) {
+    const baum = await rendere(createElement(OnboardingScreen, { mode }));
+    assert.ok(baum.toJSON() !== null, `${mode}: leerer Baum`);
+    baum.unmount();
+  }
+});
+
+test('der Rechtshinweis steht wirklich auf dem ersten Bildschirm', async () => {
+  // Nicht nur "rendert", sondern: Der Satz, auf den es rechtlich ankommt, ist
+  // sichtbar. Ein Onboarding ohne ihn wäre gerendert und trotzdem falsch.
+  const baum = await rendere(createElement(OnboardingScreen, { mode: 'tag' as const }));
+  const alle = texte(baum).join(' ');
+
+  assert.match(alle, /23 Abs\. 1c StVO/, 'die Norm fehlt');
+  assert.match(alle, /Fahrzeugführer/, 'unklar, wen das Verbot trifft');
+  assert.match(alle, /mobilen Messstellen/, 'die Grenzen der App fehlen');
+  baum.unmount();
+});
+
+test('DriveScreen rendert', async () => {
+  for (const mode of MODI) {
+    const baum = await rendere(createElement(DriveScreen, {
+      mode, onOeffneEinstellungen: () => {}, onOeffneInfo: () => {},
+    }));
+    assert.ok(baum.toJSON() !== null, `${mode}: leerer Baum`);
+    baum.unmount();
+  }
+});
+
+test('SettingsScreen rendert und zeigt jeden Schalter', async () => {
+  const baum = await rendere(createElement(SettingsScreen, {
+    mode: 'tag' as const, onZurueck: () => {}, onOeffneRechtliches: () => {},
+  }));
+  const alle = texte(baum).join(' ');
+
+  // Die Schalter, die es geben MUSS. Verschwindet einer stillschweigend aus
+  // dem JSX, fällt es hier auf und nicht erst auf dem Gerät.
+  for (const titel of ['Sprachansage', 'Vibration', 'Fahrt aufzeichnen']) {
+    assert.ok(alle.includes(titel), `Schalter "${titel}" fehlt`);
+  }
+  // Und der, den es NICHT mehr geben darf.
+  assert.ok(
+    !alle.includes('Tempoüberschreitung'),
+    'der entfernte Schalter ist wieder da — er tut nichts',
+  );
+  baum.unmount();
+});
+
+test('InfoScreen rendert und trägt die Lizenzangabe', async () => {
+  // Attribution ist Lizenzpflicht aus der ODbL, kein Beiwerk.
+  const baum = await rendere(createElement(InfoScreen, {
+    mode: 'tag' as const, onZurueck: () => {}, onOeffneRechtliches: () => {},
+  }));
+  const alle = texte(baum).join(' ');
+
+  assert.match(alle, /OpenStreetMap/, 'keine Attribution');
+  assert.match(alle, /Open Database License/, 'keine Lizenzangabe');
+  baum.unmount();
+});
+
+test('RechtlichesScreen rendert und listet alle vier Dokumente', async () => {
+  // Der Bereich, den ein Store-Prüfer sucht. Fehlt eines der Dokumente, wird
+  // die Einreichung abgelehnt — und zwar erst nach der Wartezeit.
+  const baum = await rendere(createElement(RechtlichesScreen, {
+    mode: 'tag' as const, onZurueck: () => {},
+  }));
+  const alle = texte(baum).join(' ');
+
+  for (const titel of ['Nutzungsbedingungen', 'Datenschutzerklärung', 'Impressum', 'Quellen']) {
+    assert.ok(alle.includes(titel), `"${titel}" fehlt im Rechtliches-Bereich`);
+  }
+  // Und die beiden Schaltflächen für die eigenen Daten.
+  assert.ok(alle.includes('Meine Daten ausgeben'));
+  assert.ok(alle.includes('löschen'));
+  baum.unmount();
+});
+
+test('unvollständige Dokumente sind in der Übersicht markiert', async () => {
+  // Impressum und Datenschutzerklärung warten auf Angaben des Betreibers.
+  // Wer die App so einreicht, soll es beim Durchsehen bemerken.
+  const baum = await rendere(createElement(RechtlichesScreen, {
+    mode: 'tag' as const, onZurueck: () => {},
+  }));
+  const alle = texte(baum);
+  const markierungen = alle.filter((t) => t === 'unvollständig').length;
+  assert.equal(markierungen, 2, `${markierungen} Markierungen, erwartet 2`);
+  baum.unmount();
+});
+
+// --- Die Wurzel und der Ablauf beim Öffnen --------------------------------
+
+test('App rendert und zeigt zuerst den Rechtshinweis', async () => {
+  // Der Ablauf beim Öffnen: Der Store lädt, danach entscheidet
+  // `rechtshinweisBestaetigt`, was zu sehen ist. Unbestätigt heisst
+  // Onboarding — und daran kommt niemand vorbei.
+  await AsyncStorage.removeItem(ONBOARDING_KEY);
+  useApp.setState({ geladen: false, rechtshinweisBestaetigt: false });
+
+  const baum = await rendere(createElement(App));
+  assert.ok(baum.toJSON() !== null, 'App rendert gar nichts');
+
+  const alle = texte(baum).join(' ');
+  assert.match(alle, /23 Abs\. 1c StVO|Static/, 'weder Ladebildschirm noch Onboarding');
+  baum.unmount();
+});
+
+test('nach der Bestätigung erscheint der Fahrt-Screen', async () => {
+  /*
+   * Den Zustand über den SPEICHER herstellen, nicht über setState.
+   *
+   * Der erste Versuch setzte den Store direkt — und bekam trotzdem das
+   * Onboarding. Zu Recht: App.tsx ruft im Effect `ladeAlles()`, das liest
+   * AsyncStorage und überschreibt alles, was vorher im Store stand. Das ist
+   * genau das Verhalten, das die App braucht, und ein Test, der es umgeht,
+   * prüft einen Zustand, den es nie gibt.
+   */
+  await AsyncStorage.setItem(ONBOARDING_KEY, 'ja');
+
+  const baum = await rendere(createElement(App));
+  const alle = texte(baum).join(' ');
+
+  // Der Fahrt-Screen ist am Tacho zu erkennen — er ist das einzige Element,
+  // das dort und nirgends sonst steht.
+  assert.ok(alle.includes('km/h'), `kein Fahrt-Screen. Gesehen: ${alle.slice(0, 200)}`);
+  baum.unmount();
+});
+
+/*
+ * Hier stand ein Test, der den Banner auf dem gerenderten Fahrt-Screen prüfen
+ * sollte. Er ist entfernt, weil er nicht ging und dabei so tat, als ginge er:
+ * Der Landzustand lebt modul-global im Hintergrund-Task und lässt sich von
+ * aussen nicht setzen — nur über Positionen, die der Task selbst verarbeitet,
+ * und `verarbeite()` ist nicht exportiert.
+ *
+ * Was der Banner-Pfad braucht, ist damit an zwei anderen Stellen abgedeckt:
+ * tests/gate.test.ts prüft, dass für jedes Land mit hinweisBanner ein Text
+ * existiert, und tests/kaltstart.test.ts fährt eine echte Anlage in
+ * Deutschland an und prüft den Bannerinhalt. Was hier fehlt, ist allein die
+ * Darstellung — und die zeigt das Gerät.
+ */
+
+// --- Keine Warnungen aus React --------------------------------------------
+
+test('kein Screen erzeugt React-Warnungen beim Rendern', async () => {
+  // Fehlende keys, Zustandsänderungen ausserhalb von act(), doppelte
+  // Schlüssel: Alles davon meldet React auf der Konsole und stürzt nicht ab.
+  // Auf dem Gerät sieht es niemand, weil dort niemand die Konsole liest.
+  const gesammelt: string[] = [];
+  const echtesError = console.error;
+  const echtesWarn = console.warn;
+  console.error = (...a: unknown[]) => { gesammelt.push(a.map(String).join(' ')); };
+  console.warn = (...a: unknown[]) => { gesammelt.push(a.map(String).join(' ')); };
+
+  try {
+    for (const element of [
+      createElement(OnboardingScreen, { mode: 'tag' as const }),
+      createElement(SettingsScreen, {
+        mode: 'tag' as const, onZurueck: () => {}, onOeffneRechtliches: () => {},
+      }),
+      createElement(InfoScreen, {
+        mode: 'tag' as const, onZurueck: () => {}, onOeffneRechtliches: () => {},
+      }),
+      createElement(RechtlichesScreen, { mode: 'tag' as const, onZurueck: () => {} }),
+      createElement(KarteScreen, { mode: 'tag' as const, onZurueck: () => {} }),
+      createElement(DriveScreen, {
+        mode: 'tag' as const, onOeffneEinstellungen: () => {}, onOeffneInfo: () => {},
+        onOeffneKarte: () => {},
+      }),
+    ]) {
+      const baum = await rendere(element);
+      baum.unmount();
+    }
+  } finally {
+    console.error = echtesError;
+    console.warn = echtesWarn;
+  }
+
+  assert.deepEqual(gesammelt, [], `React meldet:\n${gesammelt.join('\n')}`);
+});
+
+// --- Die Umgebungskarte ---------------------------------------------------
+
+test('KarteScreen zeigt ohne Position seinen Wartezustand, nicht ein leeres Bild', async () => {
+  // Im Test liefert letzterFix() immer null — der Task lief nie. Das ist
+  // zugleich der echte Zustand beim ersten Start, und ein leeres Quadrat
+  // ohne Erklärung wäre dort die schlechteste Antwort.
+  const baum = await rendere(
+    createElement(KarteScreen, { mode: 'tag' as const, onZurueck: () => {} }),
+  );
+  const text = texte(baum).join(' ');
+  baum.unmount();
+
+  assert.match(text, /Warte auf die erste Position/);
+  // Und die Einschränkung steht da, bevor jemand eine Navigationskarte erwartet.
+  assert.match(text, /Keine Strassen/);
+  // Alle Umkreis-Stufen sind wählbar.
+  for (const r of KARTE.RADIEN_M) {
+    const beschriftung = r < 1000 ? `${r} m` : `${r / 1000} km`;
+    assert.ok(text.includes(beschriftung), `Stufe ${beschriftung} fehlt`);
+  }
+});
+
+test('das Kartenbild zeichnet Anlagen, Ringe, Umriss, Position und Massstab', async () => {
+  // Der gezeichnete Zustand, den der Screen im Test nie erreicht: letzterFix()
+  // liefert dort immer null. Deshalb ist das Bild eine eigene Komponente über
+  // explizitem Zustand — hier geht eine gerechnete Karte hinein und es lässt
+  // sich nachzählen.
+  //
+  // Basel als Mittelpunkt, weil dort wirklich Grenzlinien im Bild liegen. Ein
+  // Ort mitten im Land liesse den Umriss-Test stumm bestehen.
+  const BASEL = { lat: 47.56, lon: 7.59 };
+  const G = 350, R = 20_000;
+  const cams: Camera[] = [
+    { lat: 47.57, lon: 7.59, dir: 180, max: 50, type: 'speed' },
+    { lat: 47.55, lon: 7.60, dir: null, max: null, type: 'red_light' },
+    { lat: 47.56, lon: 7.62, dir: 90, max: 80, type: 'both' },
+  ];
+  const karte = baueKarte(BASEL.lat, BASEL.lon, cams, G, R);
+  const umrisse = umrissLinien(BASEL.lat, BASEL.lon, G, R);
+  assert.equal(karte.punkte.length, 3, 'Vorbedingung: alle drei liegen im Umkreis');
+  assert.ok(umrisse.length > 0, 'Vorbedingung: bei Basel liegen Grenzlinien im Bild');
+
+  const baum = await rendere(
+    createElement(KartenBild, {
+      karte, umrisse, ichSichtbar: true, gewaehlt: null,
+      balken: massstabsbalken(G, R), farben: PALETTEN.tag,
+    }),
+  );
+
+  const zaehle = (typ: string) =>
+    baum.root.findAll((n) => n.type === typ, { deep: true }).length;
+
+  // Kreise: 3 Anlagen + 1 Zusatzring fuer type 'both' + die Entfernungsringe
+  // + die eigene Position.
+  assert.equal(zaehle('Circle'), 3 + 1 + KARTE.RINGE + 1, 'falsche Zahl Kreise');
+  // Linien: 2 Richtungsstriche — die mittlere Anlage hat dir === null und
+  // bekommt bewusst keinen — plus die 3 Striche des Massstabsbalkens.
+  assert.equal(zaehle('Line'), 2 + 3, 'Richtungsstriche oder Massstabsbalken fehlen');
+  assert.equal(zaehle('Polyline'), umrisse.length, 'die Landesumrisse fehlen');
+
+  // Ein Balken ohne Zahl sagt nichts.
+  assert.ok(
+    texte(baum).some((t) => /^\d+ (m|km)$/.test(t)),
+    'der Massstabsbalken ist nicht beschriftet',
+  );
+
+  baum.unmount();
+});
+
+test('eine verschobene Karte zeigt keinen Positionsmarker in der Mitte', async () => {
+  // Sonst behauptet die Bildmitte, dort sei der Nutzer — und das ist nach dem
+  // ersten Ziehen falsch.
+  const karte = baueKarte(47.56, 7.59, [], 350, 20_000);
+  const baum = await rendere(
+    createElement(KartenBild, {
+      karte, umrisse: [], ichSichtbar: false, gewaehlt: null,
+      balken: massstabsbalken(350, 20_000), farben: PALETTEN.tag,
+    }),
+  );
+  const kreise = baum.root.findAll((n) => n.type === 'Circle', { deep: true }).length;
+  baum.unmount();
+  assert.equal(kreise, KARTE.RINGE, 'ohne Anlagen duerfen nur die Ringe uebrig bleiben');
+});
+
+test('eine gewaehlte Anlage bekommt einen Auswahlring', async () => {
+  const karte = baueKarte(47.56, 7.59, [
+    { lat: 47.57, lon: 7.59, dir: null, max: null, type: 'speed' },
+  ], 350, 20_000);
+  const balken = massstabsbalken(350, 20_000);
+
+  const ohne = await rendere(createElement(KartenBild, {
+    karte, umrisse: [], ichSichtbar: true, gewaehlt: null, balken, farben: PALETTEN.tag,
+  }));
+  const n1 = ohne.root.findAll((n) => n.type === 'Circle', { deep: true }).length;
+  ohne.unmount();
+
+  const mit = await rendere(createElement(KartenBild, {
+    karte, umrisse: [], ichSichtbar: true, gewaehlt: karte.punkte[0]!, balken,
+    farben: PALETTEN.tag,
+  }));
+  const n2 = mit.root.findAll((n) => n.type === 'Circle', { deep: true }).length;
+  mit.unmount();
+
+  assert.equal(n2, n1 + 1, 'die Auswahl ist im Bild nicht zu sehen');
+});

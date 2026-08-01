@@ -8,31 +8,41 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "npm run test:logik && npm run test:render",
+    "test:logik": "tsx --test tests/*.test.ts",
+    "test:render": "node tests/hilfen/baue-rendertest.mjs && node --test --test-force-exit --test-timeout=20000 tests/hilfen/.gebaut/render.test.mjs",
     "replay": "tsx src/replay/replay.ts",
     "replay:all": "tsx src/replay/replay.ts --all",
-    "sync-dataset": "cp ../assets/data/cameras.json assets/data/cameras.json"
+    "sync-dataset": "mkdir -p assets/data && cp ../assets/data/cameras.json assets/data/cameras.json && cp ../assets/data/cameras.*.zones.json assets/data/"
   },
   "dependencies": {
+    "@react-native-async-storage/async-storage": "1.23.1",
     "expo": "~52.0.0",
+    "expo-asset": "~11.0.5",
     "expo-av": "~15.0.0",
     "expo-constants": "~17.0.0",
+    "expo-dev-client": "~5.0.20",
+    "expo-file-system": "~18.0.12",
+    "expo-font": "~13.0.4",
     "expo-haptics": "~14.0.0",
     "expo-keep-awake": "~14.0.0",
     "expo-location": "~18.0.0",
     "expo-notifications": "~0.29.0",
     "expo-speech": "~13.0.0",
     "expo-status-bar": "~2.0.0",
+    "expo-system-ui": "~4.0.9",
     "expo-task-manager": "~12.0.0",
     "react": "18.3.1",
     "react-native": "0.76.5",
-    "@react-native-async-storage/async-storage": "1.23.1",
+    "react-native-svg": "15.8.0",
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@types/node": "^22.10.2",
     "@types/react": "~18.3.12",
-    "typescript": "^5.7.2",
+    "@types/react-test-renderer": "^19.1.0",
+    "react-test-renderer": "^18.3.1",
     "tsx": "^4.19.2",
-    "@types/node": "^22.10.2"
+    "typescript": "^5.7.2"
   }
 }

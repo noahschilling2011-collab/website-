@@ -175,6 +175,194 @@ const V = 27.8;
   });
 }
 
+// --- Zonen-Tracks (Phase C.4, Frankreich) --------------------------------
+//
+// Die Zonen werden hier so gerechnet, wie build-zones.ts sie erzeugen würde:
+// Radius = halbe Mindestlänge. Bewusst NICHT aus dem echten FR-Datensatz —
+// ein Test, dessen Erwartung von fremden Daten abhängt, ändert sein Ergebnis,
+// wenn OSM sich ändert.
+
+// Irgendwo in Frankreich, weit weg von Zellgrenzen.
+const FR_LAT = 48.5734;
+const FR_LON = 7.7521;
+
+// --- 6. Autobahnzone ------------------------------------------------------
+{
+  // 130 km/h = 36,1 m/s. Autobahn: Mindestlänge 4000 m, Radius 2000 m.
+  // Die Kamera sitzt 3000 m voraus; die Zone beginnt damit 1000 m nach dem
+  // Start und der Eintritt liegt 2000 m vor der Anlage.
+  const V_AUTOBAHN = 36.1;
+  const punkte = fahrt(FR_LAT, FR_LON, 90, V_AUTOBAHN, 110);
+  const [kLat, kLon] = ziel(FR_LAT, FR_LON, 90, 3000);
+  fixtures.push({
+    name: 'fr-zone-autobahn',
+    punkte,
+    erwartung: {
+      beschreibung:
+        'Frankreich, Autobahn: eine Zone mit 2000 m Radius um eine Anlage 3000 m ' +
+        'voraus. Erwartet genau eine Ansage, Eintritt mindestens 1800 m vor der Anlage.',
+      kameras: [],
+      zonen: [{ lat: Math.round(kLat * 1e5) / 1e5, lon: Math.round(kLon * 1e5) / 1e5, r: 2000 }],
+      erwarteteWarnungen: 1,
+    },
+  });
+}
+
+// --- 7. Innerortszone -----------------------------------------------------
+{
+  // 50 km/h = 13,9 m/s. Innerorts: Mindestlänge 300 m, Radius 150 m.
+  const V_STADT = 13.9;
+  const punkte = fahrt(FR_LAT, FR_LON, 90, V_STADT, 60);
+  const [kLat, kLon] = ziel(FR_LAT, FR_LON, 90, 500);
+  fixtures.push({
+    name: 'fr-zone-innerorts',
+    punkte,
+    erwartung: {
+      beschreibung:
+        'Frankreich, innerorts: eine Zone mit 150 m Radius um eine Anlage 500 m ' +
+        'voraus. Erwartet genau eine Ansage, Eintritt mindestens 130 m vor der Anlage.',
+      kameras: [],
+      zonen: [{ lat: Math.round(kLat * 1e5) / 1e5, lon: Math.round(kLon * 1e5) / 1e5, r: 150 }],
+      erwarteteWarnungen: 1,
+    },
+  });
+}
+
+// --- 8. Zwei Anlagen, eine Zone -------------------------------------------
+{
+  // Zwei Anlagen 600 m auseinander auf einer Landstrasse. Einzeln hätte jede
+  // 1000 m Radius; die Zonen überlappen deutlich und werden von build-zones.ts
+  // zu einer zusammengefasst. Erwartet wird EINE Ansage für beide — das ist
+  // der Fall, den die Regelung ausdrücklich zulässt.
+  const V_LAND = 25;
+  const punkte = fahrt(FR_LAT, FR_LON, 90, V_LAND, 120);
+  const [a1, o1] = ziel(FR_LAT, FR_LON, 90, 2000);
+  const [a2, o2] = ziel(FR_LAT, FR_LON, 90, 2600);
+  // Zusammengefasst: Mittelpunkt zwischen beiden, Radius deckt beide ab.
+  const [mLat, mLon] = ziel(FR_LAT, FR_LON, 90, 2300);
+  fixtures.push({
+    name: 'fr-zwei-kameras-eine-zone',
+    punkte,
+    erwartung: {
+      beschreibung:
+        'Frankreich, Landstrasse: zwei Anlagen 600 m auseinander, deren Zonen zu ' +
+        'einer zusammengefasst sind. Erwartet genau EINE Ansage für beide.',
+      kameras: [],
+      zonen: [{
+        lat: Math.round(mLat * 1e5) / 1e5,
+        lon: Math.round(mLon * 1e5) / 1e5,
+        r: 1300,
+      }],
+      erwarteteWarnungen: 1,
+    },
+  });
+  // Die beiden Einzelpositionen stehen nur im Kommentar, nicht in der
+  // Erwartungsdatei — dieselbe Regel wie bei der Zonendatei selbst.
+  void a1; void o1; void a2; void o2;
+}
+
+// --- 9. Grenzfahrt Kehl nach Strasbourg (B.4) -----------------------------
+{
+  // Über die Europabrücke, Deutschland nach Frankreich. Der Track prüft nicht
+  // die Warnlogik, sondern die LANDESERKENNUNG samt Hysterese — deshalb keine
+  // Kameras und keine Zonen in der Erwartung.
+  //
+  // Die Fahrt beginnt gut 2 km östlich des Rheins in Kehl und endet 3 km
+  // westlich in Strasbourg. 50 km/h, 1 s Abstand, also rund 14 m je Punkt —
+  // fein genug, um den Umschaltpunkt auf wenige Meter zu bestimmen.
+  const KEHL_LAT = 48.5745;
+  const KEHL_LON = 7.8150;
+  const punkte = fahrt(KEHL_LAT, KEHL_LON, 270, 13.9, 380);
+  fixtures.push({
+    name: 'grenze-kehl-strasbourg',
+    punkte,
+    erwartung: {
+      beschreibung:
+        'Fahrt über die Europabrücke, Deutschland nach Frankreich. Prüft die ' +
+        'Landeserkennung: zwei Moduswechsel (Startbestätigung in Deutschland, ' +
+        'dann der Grenzübertritt), kein Flattern, und der Übertritt liegt NACH ' +
+        'der Grenze, nicht davor.',
+      kameras: [],
+      erwarteteWarnungen: 0,
+      // Ohne dieses Feld schickt die CLI den Track durch die Punktlogik,
+      // findet dort null Kameras und meldet "0 von 0 erwartet, OK" — ein
+      // grünes Ergebnis für eine Prüfung, die nicht gelaufen ist.
+      landwechsel: {
+        // Deutschland ist 'punkt', Frankreich 'zone'. Zwei Wechsel: erst die
+        // Startbestätigung in Deutschland, dann der Grenzübertritt.
+        modi: ['punkt', 'zone'],
+        // Aus der Spec: der Wechsel liegt zwischen 0 und 500 m hinter der
+        // Grenze. Gemessen werden 389 m.
+        maxHinterGrenzeM: 500,
+      },
+    },
+  });
+}
+
+// --- 10./11. Zwei Anlagen hintereinander ----------------------------------
+{
+  /*
+   * Die Vermutung, die dahinterstand: evaluate() vermerkt nur die
+   * NÄCHSTGELEGENE Anlage als gewarnt. Liegen zwei gleichzeitig in
+   * Reichweite, bleibt die zweite unvermerkt und löst beim nächsten Fix eine
+   * eigene Warnung aus — werden daraus zwei Ansagen in kurzem Abstand?
+   *
+   * Nachgemessen bei 100 km/h. Beide Tracks fahren dieselbe Strecke, sie
+   * unterscheiden sich nur im Abstand der beiden Anlagen:
+   *
+   *   250 m Abstand -> zwei Ansagen, 9,0 s auseinander.  RICHTIG SO.
+   *    30 m Abstand -> zwei Ansagen, 0,9 s auseinander.  ZU DICHT.
+   *
+   * Die Vermutung stimmt also, aber nicht in der vermuteten Ausprägung: Bei
+   * 250 m ist das Verhalten korrekt — zwei Anlagen, zwei Warnungen, jede bei
+   * ihrer eigenen Entfernung. Erst unter rund 100 m schneidet die zweite
+   * Ansage in die erste.
+   *
+   * Beide Fälle stehen deshalb als Track hier: einer, der zwei Warnungen
+   * verlangt, und einer, der eine verlangt. Ein Track allein liesse offen,
+   * ob die Regel zu scharf oder zu lasch ist.
+   */
+  const START_LAT = 48.6;
+  const START_LON = 9.0;
+  const V = 27.8;
+  const punkte = fahrt(START_LAT, START_LON, 90, V, 60);
+  const [ersteLat, ersteLon] = ziel(START_LAT, START_LON, 90, 900);
+
+  /*
+   * BEIDE Tracks erwarten ZWEI Warnungen. Der Unterschied liegt im Abstand,
+   * und deshalb ist die Warnungszahl hier nicht der Prüfpunkt.
+   *
+   * Die zweite Anlage wird nicht verschluckt, sondern verschoben, bis
+   * WARN.MIN_ANSAGE_ABSTAND_MS eingehalten ist — sie kommt dann bei kürzerer
+   * Entfernung. Sie zu unterdrücken wäre die falsche Antwort: Bei 250 m sind
+   * zwei getrennte Warnungen richtig, und eine Regel, die das nicht
+   * unterscheidet, verschluckt eine echte Anlage.
+   */
+  for (const [name, abstandM, erwartet, was] of [
+    ['zwei-anlagen-weit', 250, 2, 'weit genug auseinander für zwei Ansagen'],
+    ['zwei-anlagen-dicht', 30, 2, 'zu dicht — die zweite Ansage wird verschoben'],
+  ] as const) {
+    const [zweiteLat, zweiteLon] = ziel(ersteLat, ersteLon, 90, abstandM);
+    fixtures.push({
+      name,
+      punkte,
+      erwartung: {
+        beschreibung:
+          `Zwei Anlagen ${abstandM} m hintereinander in Fahrtrichtung, ` +
+          `${(V * 3.6).toFixed(0)} km/h — ${was}`,
+        kameras: [
+          { lat: ersteLat, lon: ersteLon, dir: null, max: 100, type: 'speed' },
+          { lat: zweiteLat, lon: zweiteLon, dir: null, max: 100, type: 'speed' },
+        ],
+        erwarteteWarnungen: erwartet,
+        // Der eigentliche Prüfpunkt. 4 s ist WARN.MIN_ANSAGE_ABSTAND_MS;
+        // gemessen wurden vor der Regel 0,9 s beim dichten Paar.
+        minAnsageAbstandS: 4,
+      },
+    });
+  }
+}
+
 // --- schreiben ------------------------------------------------------------
 
 mkdirSync(FIXTURES, { recursive: true });

@@ -431,18 +431,40 @@ export function camerasWithinRadius(
   lon: number,
   radiusM: number,
 ): number | null {
+  const treffer = camerasInRadius(dataset, lat, lon, radiusM);
+  return treffer === null ? null : treffer.length;
+}
+
+/**
+ * Dieselbe Auswahl, aber die Anlagen selbst statt ihrer Anzahl.
+ *
+ * Für die Umgebungskarte. camerasWithinRadius() ist seit dieser Änderung nur
+ * noch die Länge davon — vorher liefen zwei fast gleiche Schleifen
+ * nebeneinander, und die zweite wäre irgendwann anders abgebogen als die
+ * erste.
+ *
+ * Die Reihenfolge ist die des Gitters, nicht nach Entfernung sortiert. Wer
+ * sortiert braucht, sortiert selbst; für das Zeichnen ist es gleichgültig,
+ * und Sortieren kostet bei jeder Aktualisierung.
+ */
+export function camerasInRadius(
+  dataset: Pick<BundledDataset, 'grid'>,
+  lat: number,
+  lon: number,
+  radiusM: number,
+): Camera[] | null {
   if (!istZahl(lat) || !istZahl(lon)) return null;
   if (!istZahl(radiusM) || radiusM <= 0) return null;
 
-  let anzahl = 0;
+  const treffer: Camera[] = [];
   for (const key of keysInRadius(lat, lon, radiusM)) {
     const zelle = dataset.grid[key];
     if (zelle === undefined) continue;
     for (const camera of zelle) {
-      if (haversine(lat, lon, camera.lat, camera.lon) <= radiusM) anzahl++;
+      if (haversine(lat, lon, camera.lat, camera.lon) <= radiusM) treffer.push(camera);
     }
   }
-  return anzahl;
+  return treffer;
 }
 
 /**

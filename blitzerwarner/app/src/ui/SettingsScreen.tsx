@@ -8,25 +8,31 @@
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { STRINGS } from '../strings';
-import { GEWICHT, SCHRIFT, TOUCH, palette, type ThemeMode } from './theme';
+import {
+  ABSTAND, GEWICHT, LINIE, RADIUS, SCHRIFT, SEITE, SPUR, TOUCH, ZEILENHOEHE,
+  gedrueckt, palette, spur, type ThemeMode,
+} from './theme';
 import { useApp } from '../state/store';
 import { datasetOrNull } from '../core/dataset';
 import { errorLog } from '../core/log';
 import { DATENQUALITAET } from '../core/country-data';
 import type { Settings } from '../types';
 
-type Props = { mode: ThemeMode; onZurueck: () => void };
+type Props = { mode: ThemeMode; onZurueck: () => void; onOeffneRechtliches: () => void };
 
 const FAKTOR_STUFEN = [0.75, 1, 1.25, 1.5, 2] as const;
 
-export default function SettingsScreen({ mode, onZurueck }: Props) {
+export default function SettingsScreen({ mode, onZurueck, onOeffneRechtliches }: Props) {
   const farben = palette(mode);
   const settings = useApp((s) => s.settings);
   const setze = useApp((s) => s.setzeEinstellung);
   const dataset = datasetOrNull();
 
   const schalter = (
-    key: keyof Pick<Settings, 'sprachansage' | 'rotlichtblitzer' | 'motorradModus' | 'haptik' | 'tempolimitWarnung'>,
+    key: keyof Pick<
+      Settings,
+      'sprachansage' | 'rotlichtblitzer' | 'motorradModus' | 'haptik' | 'fahrtprotokoll'
+    >,
     text: { titel: string; hilfe?: string },
   ) => (
     <View style={[stil.zeile, { borderColor: farben.linie }]}>
@@ -76,12 +82,13 @@ export default function SettingsScreen({ mode, onZurueck }: Props) {
             <Pressable
               key={f}
               onPress={() => void setze('warnDistanceFactor', f)}
-              style={[
+              style={(z) => [
                 stil.stufe,
                 {
                   borderColor: aktiv ? farben.warn : farben.linie,
                   backgroundColor: aktiv ? farben.warnGedaempft : 'transparent',
                 },
+                gedrueckt(z),
               ]}
               accessibilityRole="button"
               accessibilityState={{ selected: aktiv }}
@@ -96,7 +103,6 @@ export default function SettingsScreen({ mode, onZurueck }: Props) {
       </View>
 
       {schalter('rotlichtblitzer', STRINGS.einstellungen.feld.rotlichtblitzer)}
-      {schalter('tempolimitWarnung', STRINGS.einstellungen.feld.tempolimitWarnung)}
 
       {/* Ausgabe */}
       <Text style={[stil.abschnitt, { color: farben.textLeise }]}>
@@ -139,10 +145,43 @@ export default function SettingsScreen({ mode, onZurueck }: Props) {
         </View>
       )}
 
+      {/* Recht und Lizenz */}
+      <Text style={[stil.abschnitt, { color: farben.textLeise }]}>
+        {STRINGS.einstellungen.abschnittRecht}
+      </Text>
+      <Pressable
+        onPress={onOeffneRechtliches}
+        style={(z) => [stil.zeile, { borderColor: farben.linie }, gedrueckt(z)]}
+        accessibilityRole="button"
+        accessibilityLabel={STRINGS.rechtliches.titel}
+      >
+        <View style={stil.zeileText}>
+          <Text style={[stil.label, { color: farben.text }]}>
+            {STRINGS.rechtliches.titel}
+          </Text>
+          <Text style={[stil.hilfe, { color: farben.textLeise }]}>
+            {STRINGS.rechtliches.meineDatenHilfe}
+          </Text>
+        </View>
+      </Pressable>
+
       {/* Diagnose */}
       <Text style={[stil.abschnitt, { color: farben.textLeise }]}>
         {STRINGS.einstellungen.abschnittDiagnose}
       </Text>
+      {/*
+        Der Fahrtenschreiber steht in der Diagnose und nicht bei der Warnung:
+        Er ist kein Fahrkomfort, sondern ein Messwerkzeug. Standardmässig aus,
+        weil hier als einzigem Ort der App eine vollständige Bewegungsspur
+        entsteht.
+      */}
+      {schalter('fahrtprotokoll', STRINGS.einstellungen.feld.fahrtprotokoll)}
+      {settings.fahrtprotokoll && (
+        <Text style={[stil.hilfe, { color: farben.textLeise }]}>
+          {STRINGS.einstellungen.fahrtprotokollVerweis}
+        </Text>
+      )}
+
       <View style={[stil.karte, { borderColor: farben.linie, backgroundColor: farben.flaeche }]}>
         <Text style={[stil.label, { color: farben.text }]}>
           {STRINGS.einstellungen.fehlerprotokoll}
@@ -159,7 +198,7 @@ export default function SettingsScreen({ mode, onZurueck }: Props) {
 
       <Pressable
         onPress={onZurueck}
-        style={[stil.knopf, { borderColor: farben.linie }]}
+        style={(z) => [stil.knopf, { borderColor: farben.linie }, gedrueckt(z)]}
         accessibilityRole="button"
         accessibilityLabel={STRINGS.allgemein.zurueck}
       >
@@ -172,28 +211,28 @@ export default function SettingsScreen({ mode, onZurueck }: Props) {
 }
 
 const stil = StyleSheet.create({
-  inhalt: { padding: 20, paddingTop: 56, gap: 12, paddingBottom: 40 },
-  titel: { fontSize: SCHRIFT.WARN_TITEL, fontWeight: GEWICHT.FETT, marginBottom: 8 },
+  inhalt: { padding: ABSTAND.RAND, paddingTop: SEITE.OBEN, gap: ABSTAND.M, paddingBottom: SEITE.UNTEN },
+  titel: { fontSize: SCHRIFT.WARN_TITEL, letterSpacing: spur(SCHRIFT.WARN_TITEL), lineHeight: SCHRIFT.WARN_TITEL * ZEILENHOEHE.ENG, fontWeight: GEWICHT.FETT, marginBottom: ABSTAND.S },
   abschnitt: {
-    fontSize: SCHRIFT.LABEL, textTransform: 'uppercase', letterSpacing: 1, marginTop: 20,
+    fontSize: SCHRIFT.LABEL, textTransform: 'uppercase', letterSpacing: SPUR.VERSALIEN, marginTop: ABSTAND.RAND,
   },
   zeile: {
-    flexDirection: 'row', alignItems: 'center', gap: 16,
-    minHeight: TOUCH.MIN, borderBottomWidth: 1, paddingVertical: 8,
+    flexDirection: 'row', alignItems: 'center', gap: ABSTAND.L,
+    minHeight: TOUCH.MIN, borderBottomWidth: LINIE.DUENN, paddingVertical: ABSTAND.S,
   },
-  zeileText: { flex: 1, gap: 2 },
+  zeileText: { flex: 1, gap: ABSTAND.XS },
   label: { fontSize: SCHRIFT.TEXT },
-  hilfe: { fontSize: SCHRIFT.KLEIN, lineHeight: SCHRIFT.KLEIN * 1.4 },
-  stufen: { flexDirection: 'row', gap: 8 },
+  hilfe: { fontSize: SCHRIFT.KLEIN, lineHeight: SCHRIFT.KLEIN * ZEILENHOEHE.TEXT },
+  stufen: { flexDirection: 'row', gap: ABSTAND.S },
   stufe: {
-    flex: 1, minHeight: TOUCH.MIN, borderWidth: 1, borderRadius: 8,
+    flex: 1, minHeight: TOUCH.MIN, borderWidth: LINIE.DUENN, borderRadius: RADIUS.S,
     alignItems: 'center', justifyContent: 'center',
   },
   stufeText: { fontSize: SCHRIFT.TEXT, fontWeight: GEWICHT.MITTEL },
-  karte: { borderWidth: 1, borderRadius: 12, padding: 16, gap: 8 },
+  karte: { borderWidth: LINIE.DUENN, borderRadius: RADIUS.M, padding: ABSTAND.L, gap: ABSTAND.S },
   protokoll: { fontSize: SCHRIFT.KLEIN, fontFamily: 'monospace' },
   knopf: {
-    marginTop: 24, minHeight: TOUCH.MIN, borderWidth: 1, borderRadius: 12,
+    marginTop: ABSTAND.XL, minHeight: TOUCH.MIN, borderWidth: LINIE.DUENN, borderRadius: RADIUS.M,
     alignItems: 'center', justifyContent: 'center',
   },
   knopfText: { fontSize: SCHRIFT.TEXT, fontWeight: GEWICHT.MITTEL },

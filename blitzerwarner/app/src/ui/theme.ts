@@ -130,8 +130,19 @@ export const SCHRIFT = {
   TACHO_EINHEIT: 24,
   /** Entfernung zur Anlage in der Warnung. Zweitwichtigste Zahl im Bild. */
   WARN_ENTFERNUNG: 64,
-  /** Art der Anlage über der Entfernung. */
+  /**
+   * Art der Anlage über der Entfernung — und zugleich die Überschrift jedes
+   * Screens. Bewusst derselbe Grad: Es ist dieselbe Art von Aussage, und eine
+   * Grösse weniger in der Skala ist eine Entscheidung weniger, die schiefgehen
+   * kann.
+   */
   WARN_TITEL: 36,
+  /**
+   * Überschrift einer ganzseitigen Meldung (Datensatz unlesbar). Kleiner als
+   * WARN_TITEL, weil hier nichts im Vorbeischauen erfasst werden muss —
+   * dieser Bildschirm wird im Stand gelesen, und 36 dp würden schreien.
+   */
+  MELDUNG: 24,
   /** Zahl im Tempolimit-Zeichen. */
   LIMIT: 48,
   /** Die Statuszeile. Muss im Vorbeischauen lesbar sein. */
@@ -155,10 +166,24 @@ export const GEWICHT = {
 
 /**
  * Zeilenhöhen als Faktor. Grosse Zahlen brauchen weniger Luft als Fliesstext.
+ *
+ * WIDERSPRUCH, DER HIER AUFGELÖST WURDE
+ *
+ * ZAHL stand auf 1.0, im Code standen aber 1.05 (Tacho) und daneben 1.4 und
+ * 1.45 für denselben Fliesstext. Aufgelöst zugunsten des Codes, weil der
+ * gelaufen ist und der Token nicht: 1.05 bleibt, 1.4 wird zu 1.45. Damit
+ * ändert sich am Bild nichts ausser den zwei Stellen, die vorher 1.4 hatten.
  */
 export const ZEILENHOEHE = {
-  ZAHL: 1.0,
+  /**
+   * Grosse Ziffern. Nicht 1.0: Android schneidet bei lineHeight gleich
+   * fontSize die Unterlängen ab, und auch Ziffern haben welche — die 3 und
+   * die 9 in vielen Schnitten, die 4 in manchen.
+   */
+  ZAHL: 1.05,
+  /** Überschriften. Eine Zeile Text braucht weniger Luft als ein Absatz. */
   ENG: 1.2,
+  /** Fliesstext und alles, was mehrzeilig gelesen wird. */
   TEXT: 1.45,
 } as const;
 
@@ -191,6 +216,43 @@ export const ABSTAND = {
 } as const;
 
 /**
+ * Der Rahmen einer Seite.
+ *
+ * WARUM DAS NICHT IN ABSTAND STEHT
+ *
+ * ABSTAND ist eine Skala: Schritte, aus denen sich Abstände zwischen
+ * Elementen zusammensetzen. Die Werte hier sind keine Schritte, sondern Masse
+ * für genau eine Sache — den Rand des Inhalts gegen das Gerät. Getrennt,
+ * damit OBEN nicht als "der nächste Schritt nach XXL" gelesen und irgendwo
+ * mitten im Bild verwendet wird.
+ */
+export const SEITE = {
+  /**
+   * Oben. Der Inhalt beginnt unter Statusleiste und Kamerainsel; deren
+   * Unterkante liegt auf den aktuellen iPhones bei rund 54 dp.
+   */
+  OBEN: 56,
+  /**
+   * Oben auf dem Fahrt-Screen. Acht weniger, weil dort kein Titel steht,
+   * sondern sofort ein grosser Block beginnt — und ein Block setzt optisch
+   * höher an als eine Textzeile. Der Wert stand so schon im Code; er wird
+   * hier benannt, nicht neu gewählt.
+   */
+  OBEN_FAHRT: 48,
+  /**
+   * Unten am Ende einer Bildlaufliste. Ohne das klebt das letzte Element am
+   * Rand und sieht aus, als sei die Liste abgeschnitten.
+   */
+  UNTEN: 40,
+  /**
+   * Zwischen den grossen Blöcken des Fahrt-Screens (Tacho, Anlage, Status).
+   * Grösser als jeder Schritt aus ABSTAND, weil diese drei Blöcke im
+   * Vorbeischauen als getrennte Dinge erkennbar sein müssen.
+   */
+  BLOCK_FAHRT: 28,
+} as const;
+
+/**
  * Berührungsflächen in dp.
  *
  * Die Plattformvorgaben nennen 44 bis 48. Das gilt für ein ruhig gehaltenes
@@ -211,10 +273,77 @@ export const TOUCH = {
  */
 export const RADIUS = {
   KEIN: 0,
+  /** Knöpfe, Verweise, Eingaben. */
   S: 8,
-  M: 14,
-  /** Nur für das runde Tempolimit-Zeichen. */
+  /** Karten und Banner. */
+  M: 12,
+  /** Für Punkte und das runde Tempolimit-Zeichen. */
   KREIS: 9999,
+} as const;
+
+/**
+ * Buchstabenabstand, als Anteil des Schriftgrads.
+ *
+ * WARUM DAS EIN TOKEN IST UND KEINE KOSMETIK
+ *
+ * Grosse Zahlen und Überschriften kommen mit dem Standardabstand auseinander
+ * gezogen daher — bei 120 dp Tachoziffern sichtbar. Die übliche Korrektur sind
+ * −2 bis −3 Prozent des Schriftgrads; darunter beginnt es zu drängen.
+ *
+ * React Native nimmt `letterSpacing` in dp, nicht in Prozent. Deshalb ein
+ * Faktor und die Funktion darunter, statt sieben von Hand gerechneter Zahlen,
+ * die beim nächsten Ändern eines Schriftgrads still falsch werden.
+ */
+export const SPUR = {
+  /** Ab diesem Grad wird enger gesetzt. Darunter bringt es nichts. */
+  AB_GRAD: 32,
+  /** Anteil des Schriftgrads, negativ. */
+  ENG: -0.025,
+  /** Versalien in Abschnittsüberschriften brauchen umgekehrt mehr Luft. */
+  VERSALIEN: 1,
+} as const;
+
+/**
+ * Buchstabenabstand für einen Schriftgrad.
+ *
+ * Unterhalb von SPUR.AB_GRAD gibt es keinen — Fliesstext enger zu setzen
+ * macht ihn schwerer lesbar, und lesbar ist hier die einzige Anforderung.
+ */
+export function spur(fontSize: number): number {
+  return fontSize >= SPUR.AB_GRAD ? Math.round(fontSize * SPUR.ENG * 10) / 10 : 0;
+}
+
+/**
+ * Einzelmasse, die zu keiner Skala gehören.
+ *
+ * Was hier steht, ist die Grösse genau eines Dings. Deshalb kein gemeinsamer
+ * Rhythmus und keine Abstufung — nur ein Name statt einer Zahl im Screen.
+ */
+export const MASS = {
+  /**
+   * Der pulsierende Statuspunkt neben der Statuszeile.
+   *
+   * Stand vorher auf 10 und lag damit neben dem Vierer-Raster. 12, weil es
+   * das nächste Rastermass ist und der Punkt seine einzige Aufgabe — im
+   * Augenwinkel zeigen, dass die App läuft — damit eher besser erfüllt.
+   */
+  PUNKT: 12,
+  /**
+   * Eine Anlage auf der Umgebungskarte.
+   *
+   * Kleiner als der Statuspunkt, weil hier bis zu 400 davon nebeneinander
+   * liegen können und sie sich sonst zu einer Fläche schliessen. 8 dp ist
+   * die Untergrenze, ab der ein Punkt auf einem Telefondisplay als Punkt und
+   * nicht als Schmutz gelesen wird.
+   */
+  KARTE_ANLAGE: 8,
+  /**
+   * Die eigene Position auf der Karte.
+   *
+   * Deutlich grösser als eine Anlage: Sie ist der Bezugspunkt, ohne den das
+   * Bild nichts bedeutet, und muss ohne Suchen gefunden werden.
+   */
+  KARTE_ICH: 16,
 } as const;
 
 /** Linienstärken. */
@@ -250,11 +379,49 @@ export const EFFEKTE = {
 /** Deckkraft. */
 export const DECKKRAFT = {
   VOLL: 1,
+  /**
+   * Gedrückt. Ohne diese Rückmeldung weiss der Nutzer nicht, ob der Griff
+   * gesessen hat — und im Auto greift man daneben. Es gibt auf einem
+   * Berührungsbildschirm kein "darüber", also ist der gedrückte Zustand die
+   * einzige Rückmeldung, die es überhaupt geben kann.
+   *
+   * 0,72 statt 0,5: Deutlich genug, um es aus dem Augenwinkel zu bemerken,
+   * aber nicht so stark, dass die Fläche zu verschwinden scheint.
+   */
+  GEDRUECKT: 0.72,
   /** Abgeschaltetes Bedienelement. */
   INAKTIV: 0.4,
+  /**
+   * Der Tiefpunkt des Statuspulses. Unter INAKTIV, damit "läuft, gerade
+   * dunkel" nicht mit "läuft nicht" verwechselt werden kann: Ein Punkt, der
+   * schwächer wird als der abgeschaltete, ist eindeutig einer, der sich
+   * bewegt.
+   */
+  PULS_TIEF: 0.35,
   /** Fläche unter einem geöffneten Blatt. Nur ausserhalb des Fahrt-Screens. */
   ABDECKUNG: 0.75,
 } as const;
+
+/**
+ * Der Stil einer berührbaren Fläche, abhängig davon, ob sie gerade gedrückt
+ * ist.
+ *
+ * Als Funktion und nicht als Konstante, weil React Native den Zustand nur an
+ * eine Funktion übergibt. Sie an einer Stelle zu haben ist der Unterschied
+ * zwischen "jeder Knopf reagiert" und "der Knopf, an den jemand gedacht hat,
+ * reagiert" — vor dieser Änderung hatte genau EINE von siebzehn Flächen in
+ * der App eine Rückmeldung.
+ */
+export function gedrueckt(
+  zustand: { pressed: boolean },
+  abgeschaltet = false,
+): { opacity: number } {
+  // Abgeschaltet zuerst: Eine Fläche, die nicht reagiert, darf auch nicht so
+  // aussehen, als täte sie es. React Native gibt `disabled` nicht in den
+  // Zustand hinein, deshalb der zweite Parameter.
+  if (abgeschaltet) return { opacity: DECKKRAFT.INAKTIV };
+  return { opacity: zustand.pressed ? DECKKRAFT.GEDRUECKT : DECKKRAFT.VOLL };
+}
 
 /**
  * Übergänge in ms. Kurz gehalten: Eine Warnung, die sich einblendet, kommt
@@ -265,6 +432,15 @@ export const DAUER = {
   SOFORT: 0,
   KURZ: 120,
   NORMAL: 200,
+  /**
+   * Eine Halbwelle des Statuspulses — das einzige bewegte Element der App.
+   *
+   * Das ist kein Übergang, sondern ein Takt: 1200 ms hin, 1200 ms zurück
+   * ergibt 25 Schläge pro Minute. Langsam genug, dass die Bewegung im
+   * Augenwinkel nicht ablenkt, und schnell genug, dass ein Blick von einer
+   * halben Sekunde die Änderung noch trifft.
+   */
+  PULS: 1200,
 } as const;
 
 // --- Bündel ---------------------------------------------------------------
@@ -280,8 +456,10 @@ export type Theme = {
   readonly gewicht: typeof GEWICHT;
   readonly zeilenhoehe: typeof ZEILENHOEHE;
   readonly abstand: typeof ABSTAND;
+  readonly seite: typeof SEITE;
   readonly touch: typeof TOUCH;
   readonly radius: typeof RADIUS;
+  readonly mass: typeof MASS;
   readonly linie: typeof LINIE;
   readonly effekte: typeof EFFEKTE;
   readonly deckkraft: typeof DECKKRAFT;
@@ -296,8 +474,10 @@ export function theme(mode: ThemeMode): Theme {
     gewicht: GEWICHT,
     zeilenhoehe: ZEILENHOEHE,
     abstand: ABSTAND,
+    seite: SEITE,
     touch: TOUCH,
     radius: RADIUS,
+    mass: MASS,
     linie: LINIE,
     effekte: EFFEKTE,
     deckkraft: DECKKRAFT,

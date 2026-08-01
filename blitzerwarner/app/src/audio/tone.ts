@@ -11,8 +11,11 @@
  * dass ein Audiogerät im Spiel ist.
  */
 
-/** Nur drei unterscheidbare Töne in der ganzen App — mehr merkt sich niemand. */
-export type TonArt = 'blitzer' | 'tempolimit' | 'system';
+/**
+ * Die Töne der App. Die Qualitätsvorgabe nennt drei; der Zonenton ist eine
+ * begründete Ausnahme (siehe unten). Ein fünfter braucht wieder eine.
+ */
+export type TonArt = 'blitzer' | 'tempolimit' | 'system' | 'zone';
 
 export type Impuls = {
   /** Grundfrequenz in Hz. */
@@ -33,12 +36,13 @@ export type TonDefinition = {
 const SAMPLE_RATE = 44_100;
 
 /**
- * Die drei Töne.
+ * Die Töne.
  *
- * Sie müssen sich am Ohr unterscheiden, nicht auf dem Papier. Deshalb
- * unterscheiden sie sich nicht nur in der Frequenz, sondern auch im Rhythmus:
- * Die Zahl der Impulse ist auch bei schlechtem Empfang und lauter Fahrt
- * erkennbar, eine Frequenzverschiebung um ein paar hundert Hertz nicht.
+ * Sie müssen sich am Ohr unterscheiden, nicht auf dem Papier. Zwei Töne
+ * gelten als unterscheidbar, wenn sie sich in der IMPULSZAHL oder deutlich
+ * in der FREQUENZ unterscheiden — der Rhythmus ist auch bei lauter Fahrt
+ * erkennbar, eine Verschiebung um wenige hundert Hertz nicht. Ein Test prüft
+ * jedes Paar.
  */
 export const TOENE: Record<TonArt, TonDefinition> = {
   blitzer: {
@@ -50,12 +54,36 @@ export const TOENE: Record<TonArt, TonDefinition> = {
     ],
     zweck: 'Blitzerwarnung. Weckt zusätzlich die Bluetooth-Verbindung vor der Ansage.',
   },
+  /*
+   * NOCH NICHT GEBAUT — dieser Ton hat derzeit keinen Auslöser.
+   *
+   * Er gehört zur Über-Limit-Warnung, die den Tempolimit-Datensatz aus
+   * Phase 6 voraussetzt (siehe config.ts, Abschnitt "Noch nicht gebaut").
+   * Der zugehörige Schalter ist aus den Einstellungen entfernt worden, weil
+   * er nichts tat.
+   *
+   * Der Ton bleibt stehen, weil die Gestaltung erarbeitet und in audio.test.ts
+   * gegen die anderen drei abgesichert ist — ein Ton, der sich vom Blitzerton
+   * nicht unterscheidet, wäre beim Bauen der eigentliche Fehler. Er kostet
+   * nichts, solange ihn niemand abspielt: Erzeugt werden die Samples erst
+   * beim ersten Abspielen (tonCache in player.ts).
+   */
   tempolimit: {
     art: 'tempolimit',
     // Ein einzelner, kürzerer Impuls. Bewusst unauffälliger als die
     // Blitzerwarnung, damit der Nutzer nicht abstumpft.
     impulse: [{ freq: 1200, dauerMs: 120, pauseMs: 0 }],
     zweck: 'Tempolimit überschritten. Kein Sprachhinweis, sonst stumpft der Nutzer ab.',
+  },
+  zone: {
+    art: 'zone',
+    // Ein einzelner, weicher, tiefer liegender Impuls. Er muss sich HÖRBAR
+    // vom Blitzerton unterscheiden — ein Fahrer soll aus dem Klang nicht
+    // schliessen können, dass es dieselbe Sache ist. Das ist Teil der
+    // französischen Auflage, nicht Geschmack: Ein identischer Ton wäre ein
+    // unmittelbarer Hinweis auf eine Messstelle, nur ohne Worte.
+    impulse: [{ freq: 950, dauerMs: 220, pauseMs: 0 }],
+    zweck: 'Eintritt in einen Gefahrenbereich (Zonenmodus, Frankreich).',
   },
   system: {
     art: 'system',

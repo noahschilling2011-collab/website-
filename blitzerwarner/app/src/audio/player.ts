@@ -11,7 +11,13 @@ import * as Speech from 'expo-speech';
 import { AUDIO } from '../config';
 import { errorLog } from '../core/log';
 import { alsBase64, TOENE, type TonArt } from './tone';
-import { ansageText, sprechrate } from './announce';
+import {
+  ansageText,
+  enthaeltVerbotenesZonenwort,
+  sprechrate,
+  zonenAnsageText,
+  type ZonenSprache,
+} from './announce';
 import type { Camera } from '../types';
 
 /** Einmal erzeugte Tondaten, damit nicht bei jeder Warnung neu gerechnet wird. */
@@ -110,12 +116,91 @@ export async function gebeWarnung(
       language: 'de-DE',
       rate: sprechrate(opts.speedKmh),
       volume: Math.max(0, Math.min(1, opts.lautstaerke)),
-      onError: (err) => errorLog.error('audio', 'Sprachausgabe fehlgeschlagen', err),
+      // Geklammert, weil errorLog.error() einen LogEntry zurückgibt und
+      // expo-speech hier void erwartet.
+      onError: (err) => { errorLog.error('audio', 'Sprachausgabe fehlgeschlagen', err); },
     });
   } catch (err) {
     errorLog.error('audio', 'Sprachausgabe konnte nicht gestartet werden', err);
   }
 }
+
+/**
+ * Der Zonenhinweis (Frankreich).
+ *
+ * Nimmt weder Kamera noch Distanz an — was die Funktion nicht kennt, kann sie
+ * nicht aussprechen. Das ist dieselbe Sicherung wie bei `Aktion` in
+ * core/entscheidung.ts, nur eine Ebene tiefer.
+ *
+ * Die Prüfung gegen die Verbotswortliste läuft ZUR LAUFZEIT und nicht nur im
+ * Test. Der Grund steht bei enthaeltVerbotenesZonenwort(): Der Textkatalog
+ * kann sich ändern, die Auflage nicht. Findet sie ein verbotenes Wort, wird
+ * geschwiegen statt gesprochen — der Ton allein ist zulässig, denn er benennt
+ * nichts.
+ */
+export async function gebeZonenhinweis(
+  opts: { sprache: boolean; lautstaerke: number },
+): Promise<void> {
+  await spieleTon('zone', opts.lautstaerke);
+
+  if (!opts.sprache) return;
+
+  const text = zonenAnsageText(zonenSprache());
+  const verboten = enthaeltVerbotenesZonenwort(text);
+  if (verboten !== null) {
+    errorLog.error(
+      'audio',
+      `Zonenansage "${text}" enthält das unzulässige Wort "${verboten}" — nicht gesprochen`,
+    );
+    return;
+  }
+
+  await schlafe(AUDIO.WAKEUP_DELAY_MS);
+
+  try {
+    Speech.speak(text, {
+      // Die Ansage folgt der Systemsprache, nicht der App-Sprache: Sie fällt
+      // in Frankreich, und ein deutscher Satz wäre dort für Mitfahrende
+      // unverständlich. Der Katalog in strings.ts deckt deshalb mehrere
+      // Sprachen ab — und die Verbotsliste ebenfalls.
+      language: SPRACH_CODE[zonenSprache()],
+      volume: Math.max(0, Math.min(1, opts.lautstaerke)),
+      onError: (err) => { errorLog.error('audio', 'Zonenansage fehlgeschlagen', err); },
+    });
+  } catch (err) {
+    errorLog.error('audio', 'Zonenansage konnte nicht gestartet werden', err);
+  }
+}
+
+/**
+ * Welche Sprache die Zonenansage benutzt.
+ *
+ * Ohne Localization-Bibliothek: Die App hat keine, und eine neue Abhängigkeit
+ * für drei Zeichenketten wäre unverhältnismässig. Gelesen wird, was die
+ * JS-Umgebung ohnehin kennt.
+ *
+ * Fällt die Erkennung aus, gilt Französisch. Das ist die richtige Richtung:
+ * Der Zonenmodus gilt derzeit nur in Frankreich, und ein französischer Satz
+ * ist dort für jeden verständlich, der die Auflage kennt.
+ */
+function zonenSprache(): ZonenSprache {
+  try {
+    const roh = Intl.DateTimeFormat().resolvedOptions().locale ?? '';
+    const kurz = roh.slice(0, 2).toLowerCase();
+    if (kurz === 'de' || kurz === 'en' || kurz === 'fr') return kurz;
+  } catch {
+    // Kein Intl in dieser Umgebung. Kein Fall fürs Fehlerprotokoll — die
+    // Ansage kommt trotzdem, nur eben auf Französisch.
+  }
+  return 'fr';
+}
+
+/** BCP-47-Kennungen für expo-speech. Getrennt vom Katalog, weil es Technik ist. */
+const SPRACH_CODE: Record<ZonenSprache, string> = {
+  de: 'de-DE',
+  fr: 'fr-FR',
+  en: 'en-GB',
+};
 
 /** Kurzer Hinweis ohne Blitzerbezug, z. B. beim Grenzübertritt. */
 export async function sageAnsage(text: string, lautstaerke = 1): Promise<void> {

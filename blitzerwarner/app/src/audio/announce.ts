@@ -5,7 +5,8 @@
  * dass eine TTS-Stimme im Spiel ist. Was die Stimme daraus macht, lässt sich
  * nur am Gerät prüfen — dass der Text stimmt, hier.
  */
-import { AUDIO } from '../config';
+import { AUDIO, type Warnmodus } from '../config';
+import { STRINGS } from '../strings';
 import type { Camera } from '../types';
 
 /**
@@ -96,7 +97,100 @@ export function sprechrate(speedKmh: number | null): number {
   return speedKmh > AUDIO.FAST_SPEECH_ABOVE_KMH ? AUDIO.FAST_SPEECH_RATE : 1;
 }
 
-/** Ansage für den Grenzübertritt, Spec Abschnitt 10.1. */
-export function landwechselText(warnungAktiv: boolean): string {
-  return warnungAktiv ? 'Blitzerwarnung aktiviert' : 'Blitzerwarnung deaktiviert';
+/**
+ * Ansage für den Grenzübertritt, Spec Abschnitt 10.1.
+ *
+ * WARUM DIE ANSAGE DEN MODUS KENNT UND NICHT BLOSS EIN JA/NEIN
+ *
+ * Die frühere Fassung nahm ein Boolean und sagte in beiden Richtungen
+ * "Blitzerwarnung". Zwei Fehler steckten darin, und beide zeigten sich erst
+ * am Grenztrack (fixtures/grenze-kehl-strasbourg.gpx):
+ *
+ *  1. Der Aufrufer im Hintergrund-Task übergab `darfPunktWarnen`. Beim
+ *     Übertritt nach Frankreich wechselt der Modus von 'aus' auf 'zone',
+ *     `darfPunktWarnen` bleibt aber in beiden Fällen false — der Wechsel
+ *     wurde also gar nicht angesagt. Der Fahrer erfuhr nicht, dass die App
+ *     jetzt etwas tut.
+ *  2. Das Wort "Blitzerwarnung" steht auf VERBOTENE_ZONENWOERTER. Es im
+ *     Zonenmodus zu sagen, benennt die Gefahr — genau das, was Frankreich
+ *     seit 03.01.2012 untersagt.
+ *
+ * Deshalb pro Modus ein eigener Text. Der Ausschalttext ist absichtlich
+ * neutral formuliert: Er wird beim Übertritt aus Frankreich heraus gesprochen
+ * und damit unter Umständen noch auf französischem Gebiet.
+ */
+export const LANDWECHSEL_ANSAGE = {
+  punkt: 'Blitzerwarnung aktiviert',
+  /**
+   * Kein Wort aus VERBOTENE_ZONENWOERTER. Ein Test prüft das — die Liste
+   * steht weiter unten in dieser Datei und kann wachsen.
+   */
+  zone: 'Hinweise aktiviert',
+  aus: 'Warnung deaktiviert',
+} as const satisfies Record<Warnmodus, string>;
+
+export function landwechselText(modus: Warnmodus): string {
+  return LANDWECHSEL_ANSAGE[modus];
+}
+
+// --- Zonenmodus (Frankreich, Spec Phase C) --------------------------------
+
+/**
+ * Wörter, die im Zonenmodus in KEINER Ansage vorkommen dürfen.
+ *
+ * Das ist die Kernauflage, nicht eine Stilfrage. Frankreich erlaubt seit dem
+ * 03.01.2012 nur den Hinweis auf einen Gefahrenbereich; die Zone darf die Art
+ * der Gefahr nicht benennen. Wer "Blitzer" sagt, benennt sie.
+ *
+ * Die Liste enthält absichtlich mehrere Sprachen: Der Ansagetext folgt der
+ * Systemsprache, und ein französischer oder englischer Katalog käme sonst
+ * ungeprüft durch. Sie ist bewusst breiter als nötig — ein zu strenger Test
+ * kostet eine Formulierung, ein zu lascher ein Bussgeld.
+ */
+export const VERBOTENE_ZONENWOERTER = [
+  // deutsch
+  'blitzer', 'radar', 'kamera', 'kontrolle', 'messstelle', 'messung',
+  'geschwindigkeitsmessung', 'überwachung', 'polizei', 'tempolimit',
+  // französisch
+  'radar', 'contrôle', 'controle', 'caméra', 'camera', 'police',
+  'vitesse', 'cinémomètre', 'cinemometre',
+  // englisch
+  'speed camera', 'speed trap', 'enforcement', 'surveillance', 'police',
+] as const;
+
+/**
+ * Ansagetexte für den Zonenmodus.
+ *
+ * Der Katalog selbst steht in strings.ts, wo alle hörbaren Texte stehen und
+ * wo ihn jemand gegenlesen kann, der kein TypeScript liest. Hier wird er nur
+ * unter dem Namen weitergereicht, unter dem der Rest des Audio-Codes und die
+ * Tests ihn kennen.
+ */
+export const ZONEN_ANSAGE = STRINGS.zone.ansage;
+
+export type ZonenSprache = keyof typeof ZONEN_ANSAGE;
+
+/**
+ * Der Ansagetext beim Eintritt in eine Zone.
+ *
+ * Genau EINE Ansage pro Zone, ohne Entfernung, ohne Countdown. Die Funktion
+ * nimmt deshalb auch keine Distanz an — was sie nicht kennt, kann sie nicht
+ * versehentlich aussprechen.
+ */
+export function zonenAnsageText(sprache: ZonenSprache = 'fr'): string {
+  return ZONEN_ANSAGE[sprache];
+}
+
+/**
+ * Prüft einen Text gegen die Verbotswortliste.
+ *
+ * Läuft nicht nur im Test, sondern auch zur Laufzeit vor der Ausgabe: Der
+ * Katalog kann sich ändern, die Auflage nicht.
+ */
+export function enthaeltVerbotenesZonenwort(text: string): string | null {
+  const klein = text.toLowerCase();
+  for (const wort of VERBOTENE_ZONENWOERTER) {
+    if (klein.includes(wort)) return wort;
+  }
+  return null;
 }

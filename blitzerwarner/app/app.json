@@ -2,17 +2,29 @@
   "expo": {
     "name": "Static",
     "slug": "static-blitzerwarner",
+    "scheme": "static",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#000000",
-    "primaryColor": "#FF3B30",
-    "assetBundlePatterns": ["assets/**/*"],
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "primaryColor": "#FF2D1A",
+    "assetBundlePatterns": [
+      "assets/**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "de.static.blitzerwarner",
       "infoPlist": {
-        "UIBackgroundModes": ["location", "audio"],
+        "UIBackgroundModes": [
+          "location",
+          "audio"
+        ],
         "NSLocationWhenInUseUsageDescription": "Die App vergleicht deine Position mit einer offline gespeicherten Liste stationärer Blitzer, um dich rechtzeitig per Ansage zu warnen. Deine Position verlässt das Gerät nicht — es gibt keinen Server.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Die Warnung muss auch bei ausgeschaltetem Display funktionieren, weil das Gerät während der Fahrt in der Halterung liegt. Dafür wird die Position im Hintergrund benötigt. Sie wird ausschließlich auf dem Gerät verarbeitet und nicht übertragen — die App stellt zur Laufzeit keine Netzwerkverbindung her.",
         "NSLocationAlwaysUsageDescription": "Die Warnung muss auch bei ausgeschaltetem Display funktionieren. Die Position wird ausschließlich auf dem Gerät verarbeitet und nicht übertragen.",
@@ -22,6 +34,7 @@
     "android": {
       "package": "de.static.blitzerwarner",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
       "permissions": [
@@ -34,7 +47,9 @@
         "WAKE_LOCK",
         "VIBRATE"
       ],
-      "blockedPermissions": ["ACCESS_MEDIA_LOCATION"]
+      "blockedPermissions": [
+        "ACCESS_MEDIA_LOCATION"
+      ]
     },
     "plugins": [
       [
@@ -48,9 +63,11 @@
       [
         "expo-notifications",
         {
-          "color": "#FF3B30"
+          "color": "#FF2D1A"
         }
-      ]
+      ],
+      "expo-asset",
+      "expo-font"
     ],
     "extra": {
       "hinweis": "Die App macht zur Laufzeit keine Netzwerk-Requests. Das ist prüfbar und ein Alleinstellungsmerkmal."

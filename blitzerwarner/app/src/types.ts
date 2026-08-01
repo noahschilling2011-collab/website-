@@ -62,7 +62,12 @@ export type SkipReason =
   | 'nicht_voraus'
   | 'gegenrichtung'
   | 'bereits_gewarnt'
-  | 'typ_abgeschaltet';
+  | 'typ_abgeschaltet'
+  /**
+   * Die letzte Ansage liegt noch nicht lange genug zurück. Kein Verwerfen —
+   * die Warnung kommt beim nächsten Fix, der den Abstand einhält.
+   */
+  | 'ansage_zu_dicht';
 
 export type Evaluation = {
   warning: Warning | null;
@@ -79,7 +84,25 @@ export type Settings = {
   rotlichtblitzer: boolean;
   motorradModus: boolean;
   haptik: boolean;
-  tempolimitWarnung: boolean;
+  /*
+   * Hier stand `tempolimitWarnung`. Entfernt, weil der Schalter nichts tat:
+   * SPEED_LIMIT_ALERT in config.ts wurde von keinem Modul gelesen, und der
+   * Tempolimit-Datensatz aus Phase 6 existiert nicht. Ein Schalter, der
+   * nichts tut, ist schlimmer als eine fehlende Funktion — er behauptet
+   * gegenueber dem Fahrer, die App ueberwache sein Tempolimit.
+   *
+   * Kommt die Funktion, kommt das Feld zurueck. leseSettings() in
+   * state/store.ts verwirft den gespeicherten Wert, ohne zu werfen.
+   */
   /** Faktor aus der Tacho-Kalibrierung, 1.0 = nicht kalibriert. */
   tachoFaktor: number;
+  /**
+   * Fahrtenschreiber für die Testfahrt. Standardmässig AUS.
+   *
+   * Der einzige Schalter der App, der eine vollständige Bewegungsspur
+   * entstehen lässt — also genau das, was die App sonst nicht tut. Deshalb
+   * aus, deshalb ein eigener Hinweistext, und deshalb wird das Protokoll
+   * beim Ausschalten gelöscht statt nur nicht mehr fortgeschrieben.
+   */
+  fahrtprotokoll: boolean;
 };

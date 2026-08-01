@@ -50,6 +50,50 @@ export const WARN = {
    * haben. Verhindert Dauerfeuer im Stau vor der Kamera.
    */
   REARM_DISTANCE_FACTOR: 2,
+
+  /**
+   * Mindestabstand zwischen zwei gesprochenen Warnungen, in Millisekunden.
+   *
+   * DER ANLASS, GEMESSEN
+   *
+   * evaluate() vermerkt nur die NÄCHSTGELEGENE Anlage als gewarnt. Liegen
+   * zwei gleichzeitig in Reichweite, bleibt die zweite unvermerkt und löst
+   * beim nächsten Fix eine eigene Warnung aus. Gemessen bei 100 km/h und
+   * 25 m Fixtakt (Annäherungsmodus):
+   *
+   *   Abstand der Anlagen    Abstand der Ansagen
+   *          20 m                  0,9 s
+   *          50 m                  1,8 s
+   *         100 m                  3,6 s
+   *         250 m                  9,0 s
+   *
+   * Bei 250 m ist das RICHTIG — zwei Anlagen, zwei Warnungen, jede bei ihrer
+   * eigenen Entfernung. Bei 20 bis 50 m schneidet die zweite Ansage in die
+   * erste, und der Fahrer versteht keine von beiden.
+   *
+   * Im deutschen Datensatz sind das keine Einzelfälle: 107 Paare liegen unter
+   * 25 m, 344 unter 50 m, 518 unter 100 m — meist beide Fahrtrichtungen
+   * derselben Messstelle.
+   *
+   * WARUM ZEIT UND NICHT ENTFERNUNG
+   *
+   * Das Problem ist die Dauer der Ansage, und die hängt nicht vom Tempo ab.
+   * Eine Schwelle in Metern wäre auf der Autobahn zu klein und in der Stadt
+   * zu gross.
+   *
+   * WOHER DIE 4000
+   *
+   * Ton (260 ms) + AUDIO.WAKEUP_DELAY_MS (300 ms) + die gesprochene Ansage
+   * "Blitzer, dreihundertfünfzig Meter, Tempo hundert" (rund 2,5 s) ergeben
+   * gut 3 Sekunden. 4000 ms lassen Luft für längere Texte
+   * ("Blitzer und Rotlicht, ...").
+   *
+   * KEINE WARNUNG GEHT VERLOREN. Die zweite wird nicht verworfen, sondern
+   * verschoben: Sie kommt, sobald der Abstand eingehalten ist, dann eben bei
+   * kürzerer Entfernung. Bei 100 km/h sind 4 s rund 111 m — aus 330 m werden
+   * 219 m, und das ist immer noch eine brauchbare Vorwarnung.
+   */
+  MIN_ANSAGE_ABSTAND_MS: 4000,
 } as const;
 
 /** Akku-Strategie, Spec Abschnitt 6. */
@@ -107,40 +151,6 @@ export const SPEEDO_TOLERANCE = {
   GEPRUEFT_AM: null as string | null,
 } as const;
 
-/** Über-Limit-Warnung, Spec Abschnitt 8b. */
-export const SPEED_LIMIT_ALERT = {
-  /** Standardmässig aus. Wer sie will, schaltet sie ein. */
-  DEFAULT_ENABLED: false,
-
-  /** Erst ab Limit + dieser Toleranz. */
-  THRESHOLD_KMH: 5,
-
-  /** Und erst nach so langer ununterbrochener Überschreitung. */
-  SUSTAINED_MS: 5000,
-} as const;
-
-/** Map-Matching, Spec Abschnitt 8b. */
-export const MAP_MATCHING = {
-  /** Suchradius um die Position. */
-  SEARCH_RADIUS_M: 25,
-
-  /**
-   * Gewicht der Winkelabweichung im Score, in Metern pro Grad.
-   * Der Score addiert Meter und Grad, deshalb braucht der Winkelanteil
-   * eine Einheit — sonst vergleicht man Äpfel mit Birnen.
-   */
-  ANGLE_WEIGHT_M_PER_DEG: 2.0,
-
-  /** Oberhalb dieses Scores gilt kein Kandidat als brauchbar. */
-  MAX_SCORE: 120,
-
-  /** Ein anderer Kandidat muss so viel besser sein, um zu gewinnen. */
-  HYSTERESIS_RATIO: 0.8,
-
-  /** Und das über so viele Updates in Folge. */
-  HYSTERESIS_UPDATES: 2,
-} as const;
-
 /** Watchdog, Qualitätsvorgabe Abschnitt 1b. */
 export const WATCHDOG = {
   /** Wie oft der Vordergrund prüft, ob der Hintergrund-Task noch lebt. */
@@ -169,7 +179,77 @@ export const AUDIO = {
   FAST_SPEECH_RATE: 1.15,
 } as const;
 
-/** Meldefunktion, Spec Abschnitt 9. */
+// --- Noch nicht gebaut ----------------------------------------------------
+//
+// Die Zahlen unter dieser Überschrift steuern NICHTS. Sie gehören zu
+// Funktionen, die geplant, aber nicht gebaut sind — kein Modul importiert
+// sie. Sie stehen hier und nicht in einer Notiz, weil die Begründungen
+// erarbeitet sind und beim Bauen gebraucht werden.
+//
+// Der Grund für die Überschrift: Ein Konfigblock sieht aus wie ein
+// Stellparameter. Wer SPEED_LIMIT_ALERT.THRESHOLD_KMH von 5 auf 10 setzt und
+// nichts merkt, sucht den Fehler bei sich. Die Trennung sagt vorher, dass es
+// nichts zu merken gibt.
+//
+// tests/config.test.ts hält das durch: Jeder exportierte Block über dieser
+// Linie muss von mindestens einem Modul gelesen werden.
+//
+// Was noch fehlt, steht jeweils im Block. Der Schalter für die
+// Tempolimit-Warnung ist aus der UI entfernt worden — ein Schalter, der
+// nichts tut, behauptet gegenüber dem Fahrer eine Überwachung, die es nicht
+// gibt.
+
+/**
+ * Über-Limit-Warnung, Spec Abschnitt 8b. NICHT GEBAUT.
+ *
+ * Setzt den Tempolimit-Datensatz aus Phase 6 voraus, den es nicht gibt:
+ * scripts/count-speedlimits.ts hat nur das Mengengerüst gemessen. Ohne
+ * flächendeckende Limits an den Strassen — nicht nur an den Kameras — meldete
+ * sich die Warnung an zufälligen Stellen und schwiege an den übrigen.
+ */
+export const SPEED_LIMIT_ALERT = {
+  /** Standardmässig aus. Wer sie will, schaltet sie ein. */
+  DEFAULT_ENABLED: false,
+
+  /** Erst ab Limit + dieser Toleranz. */
+  THRESHOLD_KMH: 5,
+
+  /** Und erst nach so langer ununterbrochener Überschreitung. */
+  SUSTAINED_MS: 5000,
+} as const;
+/**
+ * Map-Matching, Spec Abschnitt 8b (Phase 7). NICHT GEBAUT.
+ *
+ * Braucht ein Strassennetz im App-Paket. Der Datensatz enthält heute nur
+ * Punkte, keine Wege.
+ */
+export const MAP_MATCHING = {
+  /** Suchradius um die Position. */
+  SEARCH_RADIUS_M: 25,
+
+  /**
+   * Gewicht der Winkelabweichung im Score, in Metern pro Grad.
+   * Der Score addiert Meter und Grad, deshalb braucht der Winkelanteil
+   * eine Einheit — sonst vergleicht man Äpfel mit Birnen.
+   */
+  ANGLE_WEIGHT_M_PER_DEG: 2.0,
+
+  /** Oberhalb dieses Scores gilt kein Kandidat als brauchbar. */
+  MAX_SCORE: 120,
+
+  /** Ein anderer Kandidat muss so viel besser sein, um zu gewinnen. */
+  HYSTERESIS_RATIO: 0.8,
+
+  /** Und das über so viele Updates in Folge. */
+  HYSTERESIS_UPDATES: 2,
+} as const;
+/**
+ * Meldefunktion, Spec Abschnitt 9 (Phase 8). NICHT GEBAUT.
+ *
+ * Die Zahlen beschreiben, wie eine Meldung ENTSTEHEN dürfte. Wohin sie ginge,
+ * ist offen — die App macht zur Laufzeit keine Netzwerk-Requests, und das ist
+ * das Produktversprechen und nicht eine offene Aufgabe.
+ */
 export const REPORTING = {
   MAX_PER_DAY: 20,
   /** Ungenauere Positionen werden gar nicht erst zum Melden angeboten. */
@@ -177,6 +257,7 @@ export const REPORTING = {
   /** Absenden nur im Stand. */
   MAX_SEND_SPEED_MS: 0.5,
 } as const;
+// --- Ende "noch nicht gebaut" ---------------------------------------------
 
 /** Fehlerprotokoll, Qualitätsvorgabe Abschnitt 1d. */
 export const ERROR_LOG = {
@@ -184,31 +265,448 @@ export const ERROR_LOG = {
 } as const;
 
 /**
+ * Fahrtenschreiber — die Instrumentierung für die Testfahrt (Phasen 2, 4, 5).
+ *
+ * Bewusst NICHT das Fehlerprotokoll erweitert: Das fasst 200 Einträge und ist
+ * für Fehler gedacht. Im Annäherungsmodus kommt alle 25 m eine Position; bei
+ * 100 km/h wäre es damit nach drei Minuten voll und hätte die Fehler
+ * verdrängt, wegen derer es existiert.
+ *
+ * Standardmässig AUS. Der Fahrtenschreiber schreibt eine vollständige
+ * Bewegungsspur — genau das, was die App laut README nicht tut. Er hat
+ * deshalb einen eigenen Schalter, und das Protokoll wird beim Ausschalten
+ * gelöscht.
+ */
+export const FAHRTPROTOKOLL = {
+  /**
+   * Wie viele Positionen der Ringpuffer hält.
+   *
+   * Der dichteste real vorkommende Takt ist der Annäherungsmodus:
+   * BATTERY.APPROACH_DISTANCE_INTERVAL_M = 25 m, bei 130 km/h (36 m/s) also
+   * alle 0,7 s. 10000 Einträge decken damit knapp zwei Stunden ab — und das
+   * ist der ungünstigste Fall, weil der Annäherungsmodus nur in der Nähe
+   * einer Anlage läuft. Für die geforderten 20 Minuten ist das reichlich.
+   *
+   * Nach oben begrenzt der Speicher: Ein Eintrag sind zehn Felder, im
+   * JS-Objekt grob 150 Byte. 10000 Einträge sind rund 1,5 MB im
+   * Hintergrund-Task — vertretbar, das Zehnfache nicht.
+   */
+  MAX_EINTRAEGE: 10_000,
+
+  /**
+   * Ab diesem Abstand zweier Positionen gilt die Lücke als Lücke.
+   *
+   * An WATCHDOG.STALE_AFTER_MS gekoppelt und bewusst DEUTLICH darunter: Der
+   * Watchdog schlägt nach 90 s Stille Alarm. Eine Lücke von 40 s meldet er
+   * nie — für die Frage "lückenloses Tracking über 20 Minuten" ist sie aber
+   * genau das Ereignis, das gesucht wird. Ein Drittel der Watchdog-Schwelle
+   * fängt die Beinahe-Ausfälle, von denen der Fahrer sonst nichts erfährt.
+   *
+   * Nach unten ist die Grenze der Leerlauftakt: BATTERY.IDLE_DISTANCE_INTERVAL_M
+   * = 200 m, im Stadtverkehr bei 30 km/h also alle 24 s. Eine Schwelle darunter
+   * meldete normalen Betrieb als Lücke.
+   */
+  LUECKE_AB_MS: WATCHDOG.STALE_AFTER_MS / 3,
+} as const;
+
+/**
+ * Wie darf in einem Land gewarnt werden?
+ *
+ * 'punkt' — Warnung an der Position der Anlage, mit Entfernungsansage.
+ * 'zone'  — nur Hinweis auf einen Gefahrenbereich, ohne Position, ohne
+ *           Entfernung, ohne Benennung der Gefahr. Frankreich verlangt das.
+ * 'aus'   — keine Warnung.
+ */
+export type Warnmodus = 'punkt' | 'zone' | 'aus';
+
+/**
+ * Wie belastbar ist der Eintrag?
+ *
+ * 'belegt'   — die Quelle sagt es ausdrücklich.
+ * 'strittig' — Quellen widersprechen sich.
+ * 'unklar'   — die Quelle nennt ein Verbot, sagt aber nichts zur
+ *              POI-Funktion, oder sie ist in sich widersprüchlich.
+ *
+ * Nur 'belegt' erlaubt einen Modus ausser 'aus'. Ein Test hält das fest.
+ */
+export type Belastbarkeit = 'belegt' | 'strittig' | 'unklar';
+
+export type Landeseintrag = {
+  readonly modus: Warnmodus;
+  readonly hinweisBanner: boolean;
+  readonly status: Belastbarkeit;
+  /** Norm oder Quelle, aus der der Eintrag stammt. Pflichtfeld. */
+  readonly grund: string;
+  /** Was in der App steht, wenn der Nutzer nachfragt. */
+  readonly hinweis: string;
+  /**
+   * Untersagt eine Norm dem FAHRZEUGFÜHRER den Betrieb?
+   *
+   * Diese Frage ist von `modus` getrennt, und die Trennung ist der Kern der
+   * Umstellung. Vorher war beides dasselbe Feld, und daraus folgte, dass die
+   * App in Deutschland schwieg.
+   *
+   * Das ist zwei verschiedene Dinge:
+   *
+   *  - `modus` sagt, WAS DIE APP TUT. Das ist eine Produktentscheidung.
+   *  - `fahrerverbot` sagt, WAS DEN FAHRER TRIFFT, wenn er sie während der
+   *    Fahrt betreibt. Das ist eine Tatsache über das Recht.
+   *
+   * § 23 Abs. 1c StVO richtet sich an den Fahrzeugführer, nicht an die App.
+   * Eine solche App zu bauen, anzubieten und zu installieren ist nicht
+   * untersagt — deshalb stehen vergleichbare Apps im deutschen App Store.
+   * Untersagt ist dem Fahrer das Betreiben. Diese Entscheidung liegt bei ihm,
+   * und die App trifft sie ihm nicht ab; sie sagt ihm, was gilt.
+   *
+   * 'unklar' heisst: Die Quellen widersprechen sich. Dann nennt der Banner
+   * den ungünstigsten Fall, nicht den bequemsten.
+   */
+  readonly fahrerverbot: 'ja' | 'nein' | 'unklar';
+};
+
+/**
  * Länder-Gate, Spec Abschnitt 2 und 10.1.
  *
- * `warnung` = darf die Blitzerwarnung in diesem Land laufen?
- * Die Liste trägt ein Datum, weil sich Gesetze ändern.
+ * WARUM DIE STRUKTUR SO AUSSIEHT
  *
- * KEINE RECHTSBERATUNG. Vor Veröffentlichung von jemandem mit
- * einschlägiger Qualifikation prüfen lassen.
+ * Ein einfaches `warnung: boolean` reicht für Europa nicht. In fast keinem
+ * Land ist "Warnung" verboten, sondern eine bestimmte ART VON GERÄT: aktive
+ * Radardetektoren, die Messanlagen aufspüren oder stören. Ein
+ * Datenbank-Warner, der eine GPS-Position mit einer Liste vergleicht, ist
+ * etwas anderes — er misst nichts und stört nichts. Diese Unterscheidung
+ * fehlte, und sie ist der Grund, warum der Eintrag für Österreich strittig ist.
+ *
+ * Frankreich braucht eine dritte Möglichkeit: Dort ist der Hinweis auf einen
+ * Gefahrenbereich erlaubt, die Punktwarnung nicht.
+ *
+ * DIE INVARIANTE: status 'unklar' erzwingt modus 'aus'.
+ *
+ * Ein Land, über dessen Rechtslage wir GAR NICHTS wissen, warnt nicht. Dort
+ * lässt sich dem Fahrer auch nichts sagen, worüber er entscheiden könnte —
+ * ein Banner "wir wissen es nicht" ist keine Grundlage für eine Entscheidung.
+ *
+ * WAS SICH GEGENÜBER DER ERSTEN FASSUNG GEÄNDERT HAT, und warum
+ *
+ * Vorher lautete die Invariante `status !== 'belegt'` erzwingt `'aus'`, und
+ * DE, AT und CH standen auf 'aus'. Das war eine Produktentscheidung, keine
+ * rechtliche Notwendigkeit — und sie beruhte auf einer Verwechslung:
+ *
+ * § 23 Abs. 1c StVO, § 98a KFG und Art. 57b SVG richten sich an den
+ * FAHRZEUGFÜHRER. Sie untersagen ihm den Betrieb. Sie untersagen niemandem,
+ * eine solche App zu bauen, anzubieten oder zu installieren — deshalb stehen
+ * vergleichbare Apps im deutschen App Store, und deshalb war "die App darf
+ * hier nicht warnen" von Anfang an der falsche Satz. Richtig ist: "der Fahrer
+ * darf sie hier nicht betreiben."
+ *
+ * Diese Entscheidung gehört dem Fahrer. Die App nimmt sie ihm nicht ab; sie
+ * legt sie ihm vor — einmal beim ersten Start als bestätigungspflichtigen
+ * Rechtshinweis, danach dauerhaft als Banner (`hinweisBanner`).
+ *
+ * Was NICHT aufgeweicht wurde: Wo die Rechtslage unbekannt ist ('unklar'),
+ * bleibt es bei 'aus'. Und Frankreich bleibt im Zonenmodus — dort ist die
+ * Punktwarnung tatsächlich der App verboten, nicht bloss dem Fahrer, und ein
+ * Verstoss kostet bis 1500 Euro plus Einziehung des Geräts.
+ *
+ * KEINE RECHTSBERATUNG. Vor Veröffentlichung von jemandem mit einschlägiger
+ * Qualifikation prüfen lassen.
  */
 export const LAENDER_GATE = {
-  STAND: '2026-07-29',
+  QUELLE:
+    'ADAC, Juristische Zentrale, Übersicht Radarwarner und Blitzer-Apps im ' +
+    'Ausland, Stand 5/2025, ausdrücklich ohne Gewähr',
+  STAND: '2025-05',
   /** Verhalten, wenn das Land nicht sicher bestimmbar ist. */
   FALLBACK_WARNUNG_ERLAUBT: false,
+
   LAENDER: {
-    DE: { warnung: false, hinweisBanner: true, grund: '§ 23 Abs. 1c StVO' },
-    AT: { warnung: false, hinweisBanner: true, grund: '§ 98a KFG' },
-    CH: { warnung: false, hinweisBanner: true, grund: 'Art. 57b SVG' },
-    FR: { warnung: true, hinweisBanner: false, grund: 'Warnung zulässig, Anzeige exakter Standorte eingeschränkt' },
-    ES: { warnung: true, hinweisBanner: false, grund: 'Warnung zulässig' },
-    NL: { warnung: true, hinweisBanner: false, grund: 'Warnung zulässig' },
+    // --- POI-Funktion laut Quelle ausdrücklich erlaubt --------------------
+    BE: {
+      modus: 'punkt', hinweisBanner: false, status: 'belegt', fahrerverbot: 'nein',
+      grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
+      hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
+    },
+    FI: {
+      modus: 'punkt', hinweisBanner: false, status: 'belegt', fahrerverbot: 'nein',
+      grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
+      hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
+    },
+    LU: {
+      modus: 'punkt', hinweisBanner: false, status: 'belegt', fahrerverbot: 'nein',
+      grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
+      hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
+    },
+    NL: {
+      modus: 'punkt', hinweisBanner: false, status: 'belegt', fahrerverbot: 'nein',
+      grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
+      hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
+    },
+    PT: {
+      modus: 'punkt', hinweisBanner: false, status: 'belegt', fahrerverbot: 'nein',
+      grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
+      hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
+    },
+    RS: {
+      modus: 'punkt', hinweisBanner: false, status: 'belegt', fahrerverbot: 'nein',
+      grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
+      hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
+    },
+    ES: {
+      modus: 'punkt', hinweisBanner: false, status: 'belegt', fahrerverbot: 'nein',
+      grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
+      hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
+    },
+    CZ: {
+      modus: 'punkt', hinweisBanner: false, status: 'belegt', fahrerverbot: 'nein',
+      grund: 'POI-Funktion laut Quelle ausdrücklich erlaubt',
+      hinweis: 'Der Hinweis auf gespeicherte Standorte ist hier zulässig.',
+    },
+
+    // --- Sonderfall Frankreich: Zonen statt Punkte ------------------------
+    FR: {
+      modus: 'zone', hinweisBanner: true, status: 'belegt', fahrerverbot: 'nein',
+      grund:
+        'Seit 03.01.2012 ist der deutliche und unmittelbare Hinweis auf ' +
+        'Messstellen verboten; erlaubt ist der allgemeine Hinweis auf ' +
+        'Gefahrenzonen mit Mindestlänge (300 m innerorts, 2000 m Landstrasse, ' +
+        '4000 m Autobahn)',
+      hinweis:
+        'In Frankreich darf nur auf einen Gefahrenbereich hingewiesen werden, ' +
+        'nicht auf eine einzelne Messstelle. Die App nennt deshalb keine ' +
+        'Entfernung und keine Art der Gefahr.',
+    },
+
+    // --- Ausdrücklich verboten, POI eingeschlossen ------------------------
+    DE: {
+      modus: 'punkt', hinweisBanner: true, status: 'belegt', fahrerverbot: 'ja',
+      grund:
+        '§ 23 Abs. 1c StVO richtet sich an den FAHRZEUGFÜHRER, nicht an die ' +
+        'App. Verboten ist ihm der Betrieb und das betriebsbereite Mitführen; ' +
+        'Nr. 247 BKat, 75 Euro und ein Punkt. OLG Karlsruhe, Beschl. v. ' +
+        '07.02.2023, Az. 2 ORbs 35 Ss 9/23: gilt auch, wenn der Beifahrer ' +
+        'bedient und der Fahrer sich die Warnung zunutze macht. Die App warnt ' +
+        'hier und legt die Entscheidung dem Fahrer vor.',
+      hinweis:
+        'In Deutschland ist dem Fahrzeugführer der Betrieb und das ' +
+        'betriebsbereite Mitführen eines solchen Geräts untersagt — 75 Euro ' +
+        'und ein Punkt. Das Verbot trifft den Fahrer, nicht die App. Die ' +
+        'Entscheidung liegt bei dir.',
+    },
+    CH: {
+      modus: 'punkt', hinweisBanner: true, status: 'belegt', fahrerverbot: 'ja',
+      grund:
+        'Art. 57b SVG; die Quelle nennt die POI-Funktion ausdrücklich mit im ' +
+        'Verbot. DAS SCHÄRFSTE DER DREI: Untersagt ist nicht nur das ' +
+        'Verwenden, sondern schon das Mitführen, und das Gerät kann eingezogen ' +
+        'werden. Die App warnt hier und legt die Entscheidung dem Fahrer vor; ' +
+        'der Banner nennt den Geräteeinzug ausdrücklich.',
+      hinweis:
+        'In der Schweiz ist das Verwenden UND das Mitführen solcher Geräte ' +
+        'untersagt, die Quelle nennt die Funktion für gespeicherte Standorte ' +
+        'ausdrücklich mit. Das Gerät kann eingezogen werden. Das Verbot trifft ' +
+        'den Fahrer, nicht die App. Die Entscheidung liegt bei dir.',
+    },
+
+    // --- Strittig --------------------------------------------------------
+    AT: {
+      modus: 'punkt', hinweisBanner: true, status: 'strittig', fahrerverbot: 'unklar',
+      grund:
+        'WIDERSPRUCH, nicht aufgelöst. Bisheriger Eintrag im Projekt: § 98a KFG, ' +
+        'Warnung verboten. Die Quelle (ADAC 5/2025) beschreibt dagegen als ' +
+        'verboten nur Geräte, mit denen Überwachungseinrichtungen BEEINFLUSST ' +
+        'oder GESTÖRT werden können, und nennt GPS-Geräte mit POI-Warner als ' +
+        'Ankündigungsfunktion ausdrücklich als erlaubt. Strafrahmen bis 10.000 ' +
+        'Euro und Einziehung des Geräts. Eine der beiden Aussagen ist falsch; ' +
+        'das klärt nur der Gesetzestext in geltender Fassung. Siehe DATA.md, ' +
+        'Abschnitt Offene Rechtsfragen. WARUM DER WIDERSPRUCH DIE ENTSCHEIDUNG ' +
+        'NICHT MEHR TRÄGT: Beide Lesarten führen jetzt zum selben Verhalten. ' +
+        'Trifft die ADAC-Lesart zu, ist die Warnung erlaubt; trifft die andere ' +
+        'zu, ist sie dem Fahrer verboten — derselbe Fall wie DE und CH, und den ' +
+        'entscheidet er selbst. Offen bleibt allein die HÖHE des Risikos, und ' +
+        'die nennt der Banner.',
+      hinweis:
+        'Für Österreich widersprechen sich die Quellen, ob ein Warner ohne ' +
+        'Messfunktion erlaubt ist. Der Banner nennt deshalb den ungünstigeren ' +
+        'Fall: Trifft der zu, drohen bis 10.000 Euro und die Einziehung des ' +
+        'Geräts — deutlich mehr als in Deutschland. Die Entscheidung liegt bei dir.',
+    },
+
+    // --- Unklar: Verbot genannt, POI-Funktion nicht behandelt -------------
+    BG: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    DK: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    GR: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    IT: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    HR: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
+      grund:
+        'WIDERSPRÜCHLICH: Die Quelle nennt weder ein Mitführ- noch ein ' +
+        'Benutzungsverbot, die Anmerkung nennt aber Radarwarner als verboten. ' +
+        'Zu widersprüchlich für belegt; der Widerspruch wird hier benannt, nicht aufgelöst.',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    LV: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    LT: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    NO: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    PL: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    RO: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
+      grund:
+        'WIDERSPRÜCHLICH: kein Mitführ- und kein Benutzungsverbot genannt, ' +
+        'die Anmerkung nennt aber Radarwarner beziehungsweise Störsender als ' +
+        'verboten. Der Widerspruch wird hier benannt, nicht aufgelöst.',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    SE: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    SK: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    SI: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    TR: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
+      grund: 'Quelle nennt ein Benutzungsverbot, sagt nichts zur POI-Funktion',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+    HU: {
+      modus: 'aus', hinweisBanner: false, status: 'unklar', fahrerverbot: 'unklar',
+      grund:
+        'WIDERSPRÜCHLICH: kein Mitführ- und kein Benutzungsverbot genannt, ' +
+        'die Anmerkung nennt aber Radarwarner als verboten. Der Widerspruch ' +
+        'wird hier benannt, nicht aufgelöst.',
+      hinweis: 'Für dieses Land ist die Rechtslage nicht belegt. Die Warnfunktion bleibt abgeschaltet.',
+    },
+
+    // Länder, die in der Quelle NICHT vorkommen, haben absichtlich keinen
+    // Eintrag — damit greift FALLBACK_WARNUNG_ERLAUBT. Betrifft unter
+    // anderem IE, GB, EE, IS, MT, CY, AL, BA, MK, ME, XK, MD, UA, LI, AD,
+    // MC, SM. Ein fehlender Eintrag ist eine Aussage: wir wissen es nicht.
   },
-} as const;
+} as const satisfies { readonly LAENDER: Readonly<Record<string, Landeseintrag>> } & Record<string, unknown>;
 
 export type LandCode = keyof typeof LAENDER_GATE.LAENDER;
 
 /** Räumlicher Index — muss zum Datensatz aus der Pipeline passen. */
+/**
+ * Die Umgebungskarte.
+ *
+ * WARUM ES SIE ÜBERHAUPT GIBT UND WIE SIE AUSSIEHT
+ *
+ * Eine übliche Karte lädt Kacheln nach — bei jedem Verschieben, bei jedem
+ * Zoom. Das sind Netzwerk-Requests zur Laufzeit, und damit wäre das
+ * Produktversprechen weg. Offline-Kacheln für Europa in brauchbarer
+ * Zoomstufe sind zweistellige Gigabyte; die ganze App wiegt vier Megabyte.
+ *
+ * Gezeichnet wird deshalb nur, was ohnehin im Paket liegt: die Anlagen aus
+ * dem Datensatz und die eigene Position. Keine Strassen — Strassengeometrie
+ * offline mitzuliefern wären für Deutschland allein hunderte Megabyte.
+ *
+ * Das ist die ehrliche Einschränkung: Diese Karte zeigt, WAS die App weiss
+ * und WO relativ zu dir, nicht an welcher Strasse. Für die Orientierung
+ * unterwegs taugt sie damit nicht — dafür sind die Entfernungsringe da, und
+ * deshalb liegt sie nicht auf dem Fahrt-Screen.
+ */
+export const KARTE = {
+  /**
+   * Wählbare Radien in Metern.
+   *
+   * Untergrenze 500 m: Darunter ist bei einer GPS-Streuung von 5 bis 10 m
+   * die eigene Position ein nennenswerter Anteil des Bildes, und die Karte
+   * zeigt mehr Rauschen als Lage.
+   *
+   * Obergrenze 20 km: Darüber liegen bei deutscher Anlagendichte (5053 auf
+   * 357 000 km², also rund 14 je 1000 km²) über 17 Anlagen im Bild, und die
+   * Punkte fangen an, zu einer Fläche zu verschmelzen. Der Wert ist eine
+   * Rechnung, keine Messung — wer misst, korrigiert ihn.
+   */
+  RADIEN_M: [500, 2_000, 5_000, 20_000],
+  /** Womit die Karte aufgeht. 2 km ist etwa eine Minute Fahrt bei Tempo 120. */
+  START_RADIUS_M: 2_000,
+  /**
+   * Wie viele Entfernungsringe gezeichnet werden.
+   *
+   * Drei, weil vier zu einem Muster werden und zwei keine Abstufung ergeben.
+   * Der äusserste Ring ist immer der gewählte Radius, die inneren teilen ihn.
+   */
+  RINGE: 3,
+  /**
+   * Höchstzahl gezeichneter Anlagen.
+   *
+   * Eine Obergrenze, keine Auswahl: Wird sie erreicht, sagt die Karte das
+   * hin. Stillschweigend abzuschneiden wäre die schlechteste Variante — die
+   * Karte sähe dann vollständig aus und wäre es nicht.
+   *
+   * 400 Punkte zeichnet React Native als einfache Views ohne merkliche
+   * Verzögerung; darüber wurde nicht gemessen, und ungemessen mehr zu
+   * erlauben wäre geraten.
+   */
+  MAX_PUNKTE: 400,
+  /**
+   * Ab welchem Anteil des Bildes eine vereinfachte Linie noch ehrlich ist.
+   *
+   * Die Landesumrisse sind mit Douglas-Peucker auf TOLERANZ_GRENZE_M = 200 m
+   * vereinfacht. Bei 500 m Umkreis sind 200 m ein Fünftel des halben Bildes —
+   * eine Grenze, die dort 20 % daneben liegt, ist keine Orientierungshilfe,
+   * sondern eine Falschaussage.
+   *
+   * 5 % ist die Grenze, ab der die Abweichung im Bild nicht mehr als Lage
+   * missverstanden werden kann. Daraus folgt der kleinste Umkreis, bei dem
+   * überhaupt ein Umriss gezeichnet wird: 200 m / 0,05 = 4000 m. Die Zahl
+   * wird gerechnet und nicht hingeschrieben, damit sie mitwandert, wenn
+   * jemand die Vereinfachung ändert.
+   */
+  UMRISS_MAX_FEHLER_ANTEIL: 0.05,
+  /**
+   * Wie nah ein Fingertipp an einer Anlage liegen muss, damit sie gemeint ist.
+   *
+   * Ein Punkt ist 8 dp gross, eine Fingerkuppe rund 45. Auf den Punkt selbst
+   * zu zielen wäre aussichtslos, deshalb sucht der Tipp die nächstgelegene
+   * Anlage in diesem Umkreis. 32 dp ist die Hälfte der 64-dp-Fläche, die im
+   * Rest der App als Mindestziel gilt — genug zum Treffen, klein genug, dass
+   * bei zwei Anlagen nebeneinander die nähere gewinnt.
+   */
+  TIPP_RADIUS_DP: 32,
+} as const;
+
 export const GRID = {
   /** Kantenlänge einer Zelle in Grad. Identisch mit scripts/lib/normalize.ts. */
   CELL_SIZE: 0.05,

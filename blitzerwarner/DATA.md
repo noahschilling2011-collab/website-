@@ -293,6 +293,557 @@ Recht eine gemessene Zahl verlangt:
 Punkt 2 ist der, der den Überschlag am ehesten sprengt. Gemessen wird beim
 Build.
 
+## Frankreich und der Zonenmodus (Phase C)
+
+**4012 Anlagen**, aus 11708 OSM-Rohtreffern, OSM-Stand 30.07.2026, 298 KB.
+Mit Fahrtrichtung 39,6 %, mit Tempolimit 83,9 %, Rotlicht oder kombiniert 693.
+
+In Frankreich darf die App nicht punktgenau warnen. Seit dem 03.01.2012 ist
+der deutliche und unmittelbare Hinweis auf eine Messstelle verboten; erlaubt
+ist nur der allgemeine Hinweis auf einen Gefahrenbereich mit Mindestlänge —
+300 m innerorts, 2000 m auf Land- und Nebenstrassen, 4000 m auf Autobahnen.
+Verstoss: bis 1500 Euro, Einziehung des Geräts.
+
+`scripts/build-zones.ts` erzeugt daraus `cameras.FR.zones.json`:
+
+| | |
+|---|---|
+| Anlagen | 4012 |
+| Zonen | **2579** (1433 zusammengefasst) |
+| kleinster Radius | 150 m |
+| grösster Radius | 5998 m |
+| Dateigrösse | 101 KB |
+
+Die Zonendatei enthält **ausschliesslich Mittelpunkt und Radius**. Nicht die
+Zahl der enthaltenen Anlagen, nicht ihre Koordinaten, nicht ihren Typ, nicht
+ihr Tempolimit. Aus einer Zone mit einer einzigen Anlage liesse sich sonst
+deren Position zurückrechnen, und der Radius wäre Dekoration. Ein Test
+durchsucht den Rohtext der Datei nach solchen Feldern.
+
+### Die Annahme: Strassentyp aus maxspeed
+
+Der Zonenradius hängt am Strassentyp, und den kennt der Datensatz nicht. Er
+trägt nur `maxspeed`. Abgeleitet wird:
+
+| maxspeed | angenommener Typ | Radius |
+|---|---|---:|
+| ≤ 50 | innerorts | 150 m |
+| 60–90 | Landstrasse | 1000 m |
+| ≥ 100 | Autobahn | 2000 m |
+| unbekannt | Autobahn | 2000 m |
+
+**Das ist eine Annahme, keine Messung.** Sie irrt sich bei einer innerorts
+gelegenen Schnellstrasse mit Tempo 70 und bei einer Landstrasse mit Tempo 50.
+Bei unbekanntem Tempolimit gilt bewusst die längste Zone — in Frankreich
+betrifft das 644 der 4012 Anlagen. Im Zweifel die unschärfere Zone, weil eine
+zu kurze Zone der rechtlich problematische Fall ist und eine zu lange nur der
+unpräzise.
+
+**Der saubere Weg** wäre der `highway`-Tag der zugehörigen Strasse. Der steht
+heute nicht im Datensatz, weil die Pipeline nur die Kamera-Objekte holt und
+nicht die Strassen, auf denen sie stehen. Das nachzuziehen hiesse, für jede
+Anlage die nächstgelegene Strasse zu bestimmen — machbar zur Build-Zeit, aber
+eine eigene Aufgabe. Offener Punkt.
+
+### Was beim Bauen aufgefallen ist
+
+Das Zusammenfassen überlappender Zonen kaskadierte: Werden A und B zu einer
+grösseren Zone, überlappt die anschliessend C, wird grösser, überlappt D. An
+Deutschland gemessen entstand so eine Zone mit **85 km Radius**. Die Regelung
+erlaubt das Zusammenfassen zwei dicht aufeinanderfolgender Zonen, nicht eine
+Kette durch halb Europa — und als Hinweis wäre eine 85-km-Zone wertlos.
+Obergrenze jetzt 6000 m, das Anderthalbfache der längsten Mindestlänge.
+
+## Offene Rechtsfragen
+
+Diese Liste ist Teil des Datenstands, nicht Beiwerk: Über das Länder-Gate
+entscheidet sich, ob die App in einem Land scharf ist. Ein Eintrag hier
+bedeutet, dass die Warnung dort abgeschaltet bleibt, bis jemand mit
+einschlägiger Qualifikation die Frage klärt.
+
+Grundlage der Tabelle in `app/src/config.ts`: ADAC, Juristische Zentrale,
+Übersicht Radarwarner und Blitzer-Apps im Ausland, Stand 5/2025, ausdrücklich
+ohne Gewähr.
+
+### 1. Österreich — POI-Warner oder Radardetektor?
+
+**Status im Gate: `strittig`, Warnung aus.**
+
+Der bisherige Eintrag im Projekt lautete `§ 98a KFG`, Warnung verboten.
+
+Die Quelle beschreibt Österreich anders: Verboten seien Radarwarngeräte, mit
+denen Verkehrsüberwachungseinrichtungen **beeinflusst oder gestört** werden
+können. GPS-Geräte mit POI-Warner als Ankündigungsfunktion seien dagegen
+erlaubt. Strafrahmen bis 10.000 Euro, Einziehung des Geräts.
+
+Das ist genau die Unterscheidung, die dem Gate bis jetzt fehlte: **aktiver
+Radardetektor** gegen **Datenbank-Warner**. Static ist Letzteres — er misst
+nichts, stört nichts, sondern vergleicht eine GPS-Position mit einer Liste.
+
+Eine der beiden Aussagen ist falsch. Das aufzulösen braucht den Gesetzestext
+des KFG in geltender Fassung und jemand, der ihn lesen kann. Bis dahin bleibt
+Österreich auf `aus` — nicht weil das die richtige Antwort wäre, sondern weil
+es die sichere ist.
+
+### 2. Kroatien, Rumänien, Ungarn — widersprüchliche Quelle
+
+**Status im Gate: `unklar`, Warnung aus.**
+
+Die Quelle nennt für diese drei Länder weder ein Mitführ- noch ein
+Benutzungsverbot, die Anmerkung nennt aber Radarwarner beziehungsweise
+Störsender als verboten. Das ist zu widersprüchlich, um als belegt zu gelten.
+Der Widerspruch steht am Eintrag und wird dort ausdrücklich **nicht**
+aufgelöst.
+
+### 3. Fünfzehn Länder ohne Aussage zur POI-Funktion
+
+**Status im Gate: `unklar`, Warnung aus.**
+
+Bulgarien, Dänemark, Griechenland, Italien, Kroatien, Lettland, Litauen,
+Norwegen, Polen, Rumänien, Schweden, Slowakei, Slowenien, Türkei, Ungarn.
+
+Die Quelle nennt jeweils ein Benutzungsverbot, sagt aber nichts dazu, ob es
+den Datenbank-Warner einschliesst. Solange das offen ist, warnt die App dort
+nicht.
+
+Der Hinweistext in der App sagt in diesen Fällen ausdrücklich, dass die
+Rechtslage **nicht belegt** ist — nicht, dass sie verboten sei. Das ist ein
+Unterschied, und die App soll nicht behaupten, was sie nicht weiss. Ein Test
+prüft das.
+
+### 4. Länder ganz ohne Eintrag
+
+Irland, Grossbritannien, Estland, Island, Malta, Zypern, Albanien, Bosnien,
+Nordmazedonien, Montenegro, Kosovo, Moldau, Ukraine, Liechtenstein, Andorra,
+Monaco, San Marino kommen in der Quelle nicht vor und haben deshalb
+absichtlich keinen Eintrag. Damit greift der Standard: keine Warnung. Ein
+fehlender Eintrag ist eine Aussage — wir wissen es nicht.
+
+### Wo punktgenau gewarnt wird
+
+Nur dort, wo die Quelle die POI-Funktion ausdrücklich erlaubt: Belgien,
+Finnland, Luxemburg, Niederlande, Portugal, Serbien, Spanien, Tschechien.
+Frankreich warnt im Zonenmodus. Alle anderen Länder warnen nicht.
+
+Ein Test hält diese Liste fest. Wächst sie, muss jemand die Quelle
+nachgelesen haben.
+
+## Wann die App den Grenzübertritt merkt (Phase B.4)
+
+Die Gate-Tabelle sagt, **was** in einem Land erlaubt ist. Sie sagt nicht,
+**wann** die App merkt, dass es soweit ist. Das entscheidet die Hysterese in
+`app/src/core/country.ts`, und der Wert dafür war bis B.4 ein Behelf.
+
+### Gemessen, nicht geschätzt
+
+Messtrack: `app/fixtures/grenze-kehl-strasbourg.gpx` — Europabrücke von Kehl
+nach Strasbourg, 381 Punkte, 13,9 m/s, ein Fix je etwa 14 m. Die Stelle ist
+ausgesucht, nicht bequem: Die Grenze verläuft dort im Rhein, quer zur
+Fahrtrichtung, Deutschland verbietet die Warnung, Frankreich erlaubt sie in
+Zonenform. Ein Fehler in beide Richtungen hat Folgen.
+
+Gemessen wurde, wie weit hinter der Grenze der Moduswechsel `aus -> zone`
+greift:
+
+| `MINDESTABSTAND_GRENZE_M` | Wechsel liegt hinter der Grenze |
+|---|---|
+| 3000 m (alter Wert) | 2988 m |
+| 2000 m | 1988 m |
+| 1000 m | 987 m |
+| 600 m | 598 m |
+| **400 m (neu)** | **389 m** |
+| 300 m | 292 m |
+
+Die Spec fordert 0 bis 500 m hinter der Grenze. Der alte Wert lag um Faktor
+sechs daneben — er schaltete die Zonenwarnung erst mitten in Strasbourg frei.
+Er stammte aus der Zeit der handeingetragenen Umrisse, deren Fehler unbekannt
+war.
+
+### Warum 400 m und nicht 500 m
+
+Der neue Wert ist **abgeleitet, nicht gewählt**: das Doppelte von
+`TOLERANZ_GRENZE_M` (200 m), der Vereinfachungstoleranz der generierten
+Umrisse an Landgrenzen.
+
+- **Untergrenze.** Ein Schwellwert unterhalb des Vereinfachungsfehlers prüft
+  gegen den eigenen Fehler und damit nichts. Liegt die generierte Linie um die
+  volle Toleranz nach Osten verschoben, dann liegt die tatsächliche Grenze
+  200 m westlich von ihr — ein Wechsel 200 m hinter der Linie wäre ein Wechsel
+  genau *auf* der Grenze. Erst 400 m stellen sicher, dass die Position auch im
+  schlechtesten Fall der Vereinfachung im neuen Land liegt.
+- **Obergrenze.** 500 m ist das geforderte Fenster. Ein Schwellwert genau dort
+  hätte keine Luft mehr für den Fixabstand (14 m) und die fünf bestätigenden
+  Fixes (70 m).
+
+Der Wert ist im Code an `TOLERANZ_GRENZE_M` gekoppelt. Wird die Toleranz im
+Generator geändert, wandert der Schwellwert mit, und `tests/grenze.test.ts`
+schlägt an, falls das Fenster dabei reisst.
+
+### Was die Messung nebenbei gefunden hat
+
+**Der Grenzübertritt nach Frankreich wurde nicht angesagt.** Der
+Hintergrund-Task verglich `darfPunktWarnen`, ein Ja/Nein. Beim Wechsel von
+`aus` auf `zone` bleibt dieser Wert in beiden Fällen `false` — der Wechsel
+fiel also stillschweigend aus. Gemessen: ein Moduswechsel, null Ansagen. Der
+Task vergleicht jetzt den Modus.
+
+**Die Ansage hätte in Frankreich ein verbotenes Wort enthalten.**
+`landwechselText` lautete in beiden Richtungen „Blitzerwarnung aktiviert /
+deaktiviert". „Blitzer" steht auf `VERBOTENE_ZONENWOERTER` — es beim Übertritt
+nach Frankreich zu sagen, benennt die Gefahr. Jetzt pro Modus ein eigener
+Text: „Blitzerwarnung aktiviert" nur im Punktmodus, „Hinweise aktiviert" im
+Zonenmodus, „Warnung deaktiviert" beim Abschalten. Der Ausschalttext ist
+absichtlich neutral, weil er beim Verlassen Frankreichs gesprochen wird und
+damit unter Umständen noch auf französischem Gebiet.
+
+**Der Replay meldete grün, ohne zu prüfen.** Der Grenztrack hat keine Kameras.
+`npm run replay:all` schickte ihn durch die Punktlogik, fand null Warnungen,
+erwartete null und meldete „OK" — ein grünes Ergebnis für eine Prüfung, die
+nicht stattgefunden hat. Die Fixture-Erwartung hat jetzt ein Feld
+`landwechsel`, und die CLI führt für solche Tracks die Landeslogik aus und
+nennt die gemessene Zahl:
+
+```
+grenze-kehl-strasbourg
+  Modus:             Landeserkennung (Grenzübertritt)
+  Moduswechsel:      zone  (erwartet zone)  OK
+    Fix  99: aus -> zone, 389 m hinter der Datengrenze
+  Gründe:
+    bestaetigt           353x
+    grenznah             24x
+    wartet_bestaetigung  4x
+```
+
+Die Gründe belegen, dass die richtige Bremse greift: 24 Fixes wurden wegen
+Grenznähe gehalten, nur 4 vom Fixzähler. Bremste allein der Zähler, käme der
+Wechsel schon 70 m hinter der Grenze — innerhalb des Vereinfachungsfehlers und
+damit möglicherweise davor.
+
+### Was weiter offen ist
+
+Die Umrisse sind gegen **Natural Earth** gemessen, nicht gegen die
+tatsächliche Grenze. `scripts/reference-locations.json` ist bewusst leer, und
+eine unabhängige Grenzreferenz gibt es im Projekt nicht. Der Abstand von 389 m
+ist also ein Abstand zur *Datengrenze*; wie weit die von der tatsächlichen
+Grenze abweicht, ist durch die Vereinfachungstoleranz nach oben abgeschätzt,
+aber nicht gemessen. Genau deshalb ist der Schwellwert das Doppelte der
+Toleranz und nicht das Einfache.
+
+**Der Zonenmodus ist im Hintergrund-Task noch nicht verdrahtet.** `core/zone.ts`
+und der Replay decken ihn ab, aber `location/task.ts` gibt in Frankreich noch
+keine Zonenansage aus — es wird dort also angesagt, dass Hinweise aktiv sind,
+und danach kommt keiner. Das Laden der Zonendatei hängt am
+länderweisen Datensatzformat (Phase A.4) und ist dort vermerkt. Bis dahin
+bleibt es bei „gar nicht warnen", der sicheren Richtung.
+
+## Anlagen, die dicht beieinander stehen
+
+Aus dem Lesen des Codes kam die Vermutung, `evaluate()` könne zwei Ansagen
+kurz hintereinander auslösen: Vermerkt wird nur die **nächstgelegene** Anlage
+als gewarnt, eine zweite gleichzeitig in Reichweite bleibt unvermerkt und
+löst beim nächsten Fix eine eigene Warnung aus.
+
+**Nachgemessen** bei 100 km/h und 25 m Fixtakt (Annäherungsmodus):
+
+| Abstand der Anlagen | Abstand der Ansagen | Bewertung |
+|---|---|---|
+| 20 m | 0,9 s | schneidet ineinander |
+| 50 m | 1,8 s | schneidet ineinander |
+| 100 m | 3,6 s | grenzwertig |
+| 250 m | 9,0 s | **richtig so** |
+| 600 m | 21,6 s | richtig so |
+
+Die Vermutung stimmt, aber nicht in der vermuteten Ausprägung. Bei 250 m —
+dem Fall, mit dem die Prüfung angeregt wurde — ist das Verhalten **korrekt**:
+zwei Anlagen, zwei Warnungen, jede bei ihrer eigenen Entfernung. Erst
+unterhalb von rund 100 m beginnt die zweite Ansage, bevor die erste zu Ende
+ist.
+
+### Wie oft das real vorkommt
+
+Gezählt im deutschen Datensatz (5053 Anlagen, alle Paare):
+
+| Abstand | Paare |
+|---|---|
+| unter 25 m | 107 |
+| unter 50 m | 344 |
+| unter 100 m | 518 |
+| unter 200 m | 727 |
+| unter 350 m | 935 |
+
+Der engste gemessene Abstand ist 0 m — dieselbe Position, unterschiedliche
+Blickrichtung. Das sind meist beide Fahrtrichtungen derselben Messstelle, die
+das Dedupe absichtlich getrennt hält (siehe oben, Richtungsvererbung).
+
+344 Paare unter 50 m sind kein Randfall. Die Vermutung war damit belegt und
+nicht bloss plausibel.
+
+### Was daraus folgt
+
+`WARN.MIN_ANSAGE_ABSTAND_MS = 4000`. Zwei gesprochene Warnungen halten
+mindestens vier Sekunden Abstand.
+
+**In Zeit und nicht in Metern**, weil das Problem die Dauer der Ansage ist und
+die nicht vom Tempo abhängt. Eine Schwelle in Metern wäre auf der Autobahn zu
+klein und in der Stadt zu gross.
+
+**Keine Warnung geht verloren.** Die zweite wird nicht verworfen, sondern
+verschoben: Sie kommt, sobald der Abstand eingehalten ist, dann eben bei
+kürzerer Entfernung. Am Track `zwei-anlagen-dicht` gemessen — aus 316 m
+werden 235 m. Die naheliegende Alternative, beim Warnen gleich alle Anlagen
+in der Nähe als abgehandelt zu vermerken, wäre die falsche Antwort gewesen:
+Sie hätte bei 250 m Abstand eine echte zweite Anlage verschluckt.
+
+### Wie das geprüft bleibt
+
+Zwei Fixture-Tracks, `zwei-anlagen-weit` (250 m) und `zwei-anlagen-dicht`
+(30 m). Beide erwarten **zwei** Warnungen — der Prüfpunkt ist nicht die Zahl,
+sondern der Abstand. Die Fixture-Erwartung hat dafür ein Feld
+`minAnsageAbstandS`, und `npm run replay:all` nennt den gemessenen Wert:
+
+```
+zwei-anlagen-dicht   Ansageabstand: 4.0 s  (mindestens 4 s)  OK
+zwei-anlagen-weit    Ansageabstand: 9.0 s  (mindestens 4 s)  OK
+```
+
+Ein reiner Zähltest hätte hier nichts gemerkt: Zwei Ansagen 0,9 s auseinander
+sind gezählt genauso zwei wie zwei Ansagen 9 s auseinander.
+
+### Nebenbefund
+
+Der Test „Kamera wird nach ausreichender Entfernung wieder scharf" gab allen
+drei Positionen denselben Zeitstempel, obwohl zwischen ihnen 1,6 km liegen.
+Das fiel erst mit der neuen Regel auf. Eine Rundfahrt in null Sekunden gibt es
+nicht; der Test führt jetzt die Zeit mit.
+
+## Warum die App jetzt auch in Deutschland warnt
+
+Bis zu dieser Änderung schwieg die App in Deutschland, Österreich und der
+Schweiz. Das beruhte auf einem Satz, der so nicht stimmt.
+
+### Die Verwechslung
+
+§ 23 Abs. 1c StVO, § 98a KFG und Art. 57b SVG richten sich an den
+**Fahrzeugführer**. Sie untersagen *ihm* den Betrieb. Sie untersagen niemandem,
+eine solche App zu bauen, anzubieten oder zu installieren — deshalb stehen
+vergleichbare Apps im deutschen App Store.
+
+Der frühere Satz „die App darf hier nicht warnen" war also falsch. Richtig ist:
+„der Fahrer darf sie hier nicht betreiben." Das ist seine Entscheidung, nicht
+die der App.
+
+### Was sich strukturell geändert hat
+
+Die Gate-Tabelle vermischte zwei Fragen in einem Feld. Sie sind jetzt getrennt:
+
+| Feld | Frage | Art der Antwort |
+|---|---|---|
+| `modus` | Was tut die App hier? | Produktentscheidung |
+| `fahrerverbot` | Was trifft den Fahrer, wenn er sie betreibt? | Tatsache über das Recht |
+
+Die Invariante ist damit von `status !== 'belegt'` auf **`status === 'unklar'`**
+gewandert. Der Unterschied trägt: `'strittig'` heißt, dass wir die Norm kennen
+und nur ihre Reichweite umstritten ist — darüber kann der Fahrer entscheiden,
+wenn man ihm den ungünstigeren Fall nennt. Bei `'unklar'` wissen wir gar
+nichts, und dann gibt es auch nichts vorzulegen. **Dort bleibt es bei „aus".**
+
+### Der Sonderfall Österreich
+
+Österreich stand auf `status: 'strittig'`, und die Invariante hätte es damit
+gesperrt. Der Widerspruch trägt die Entscheidung aber nicht mehr:
+
+- Trifft die ADAC-Lesart zu, ist die Warnung **erlaubt**.
+- Trifft die andere zu, ist sie **dem Fahrer verboten** — derselbe Fall wie DE
+  und CH, und den entscheidet er selbst.
+
+Beide Zweige führen zum selben Verhalten. Offen bleibt allein die **Höhe** des
+Risikos, und die nennt der Banner: bis 10.000 Euro und Einziehung des Geräts,
+falls die strengere Lesart zutrifft. Das ist zwei Größenordnungen über
+Deutschlands 75 Euro, und deshalb steht es dort und nicht in einer Fußnote.
+
+### Die drei Länder sind nicht gleich teuer
+
+Ein gemeinsamer Bannertext hätte den Unterschied verwischt. Ein Test hält
+deshalb fest, dass jeder der drei seine eigene Zahl nennt:
+
+| Land | Norm | Folge für den Fahrer |
+|---|---|---|
+| DE | § 23 Abs. 1c StVO, Nr. 247 BKat | 75 Euro, 1 Punkt |
+| AT | § 98a KFG (strittig) | im ungünstigen Fall bis 10.000 Euro, Geräteeinzug |
+| CH | Art. 57b SVG | schon das **Mitführen** untersagt, Gerät kann eingezogen werden |
+
+### Frankreich bleibt, wie es war
+
+Dort ist die Punktwarnung **der App** verboten, nicht bloß dem Fahrer — bis
+1500 Euro und Einziehung des Geräts. Der Zonenmodus bleibt deshalb unverändert:
+keine Entfernung, keine Benennung der Gefahr, ein Hinweis pro Bereich.
+
+### Was dabei sonst noch aufgefallen ist
+
+**Frankreich hatte `hinweisBanner: true`, aber keinen Bannertext.** Es bekam
+also stillschweigend keinen. Aufgefallen erst durch den neuen Test, der die
+Gate-Tabelle gegen den Textkatalog prüft.
+
+**`bannerFuerLand()` war toter Code.** Die UI hatte die drei Ländercodes selbst
+hartkodiert — genau das, was der Kommentar dieser Funktion verhindern sollte.
+Ein neuer Eintrag mit `hinweisBanner: true` hätte nie einen Banner bekommen.
+
+**Die Statuszeile behauptete „Warnung aktiv"**, sobald die Positionsverfolgung
+lief — auch direkt über einem Banner, der das Gegenteil sagte. Sie liest jetzt
+den Warnmodus statt den Trackingstatus.
+
+**Der Fahrt-Screen hielt den Umriss-Code statt des Gate-Landes.** Für DE, AT
+und CH fällt das zusammen, überall sonst nicht: Codes wie GB oder IE haben
+keinen Gate-Eintrag.
+
+### Gemessen am Grenztrack
+
+Der Übertritt Kehl → Straßburg hat jetzt **zwei** Moduswechsel statt einem:
+`aus → punkt` bei Fix 4 (Startbestätigung in Deutschland, 931 m vor dem Rhein)
+und `punkt → zone` bei Fix 99. Der B.4-Messwert ist davon unberührt — der
+Grenzübertritt liegt weiterhin **389 m** hinter der Datengrenze und damit im
+geforderten Fenster von 0 bis 500 m.
+
+## Mengengerüst Europa (Phase A.1)
+
+Gemessen mit `scripts/count-europe.ts` über **124 Gebiete in 44 Ländern**.
+Abgefragt wurde nur die Anzahl (`out count;` statt `out body;`) — das ist
+billig und belastet Overpass kaum. Der Lauf brauchte trotzdem mehrere Stunden;
+die Rohdaten liegen als `assets/data/europe.count.json` im Repo, damit sie
+niemand wiederholen muss.
+
+**Ergebnis: 63364 Rohtreffer, geschätzt 29474 Anlagen nach dem Dedupe,
+rund 2 MB.**
+
+### Ein Fehler in der ersten Schätzung
+
+Der Lauf meldete zunächst 22.708 Anlagen. Das war zu wenig, und der Beweis lag
+im eigenen Datensatz: Für Deutschland schätzte er **3892**, gebaut sind aber
+**5053**.
+
+Ursache ist ein Nenner-Fehler in `DEDUPE_FAKTOR`. Er war als 5053/14102
+kalibriert — die 14102 stammen aus dem echten Build und enthalten die
+`device`-Nodes der Enforcement-Relationen. Die Zählquery liest aber nur den
+ersten `out count;`-Block und zählt damit **nur** Kamera-Nodes plus Relationen:
+für Deutschland 5181 + 5682 = 10863. Der Faktor wurde also auf eine Grundmenge
+angewandt, für die er nicht kalibriert war.
+
+Richtig ist **5053 / 10863 = 0,465** statt 0,358. Damit:
+
+| | Rohtreffer | geschätzte Anlagen | Grösse |
+|---|---|---|---|
+| falsch (0,358) | 63.364 | 22.708 | 1,6 MB |
+| **richtig (0,465)** | **63.364** | **29474** | **2,1 MB** |
+
+Die Kalibrierung an Deutschland stimmt jetzt per Konstruktion. Ob der Faktor
+für andere Länder gilt, bleibt eine Annahme: Wo weniger mit
+Enforcement-Relationen gearbeitet wird, überleben mehr Einträge das Dedupe.
+
+### Trägt die Ein-Datei-Architektur das noch?
+
+**Ja, mit deutlichem Abstand.** Gemessen an einem synthetischen Datensatz mit
+29474 Einträgen im echten Format, gegen den echten `parseDataset()`:
+
+| | Grösse | Zellen | `parseDataset()` |
+|---|---|---|---|
+| Deutschland (echt) | 0,35 MB | — | 6 ms |
+| Europa (synthetisch, 29474) | 1,92 MB | 2464 | 23 ms |
+
+Die Zeit wächst linear mit der Zahl der Einträge, nicht überproportional. Auf
+einem Telefon mit Hermes ist mit dem Drei- bis Fünffachen zu rechnen, also
+rund 100 ms — einmalig beim Start, und der Start hat ohnehin einen
+Onboarding-Screen davor.
+
+Die **Suche** ist von der Menge unabhängig: `neighbourKeys()` liest immer neun
+Zellen, egal wie viele es insgesamt gibt. Bei 2464 Zellen für Europa liegen im
+Mittel 12 Anlagen je Zelle, in Ballungsräumen mehr — das ändert an der
+Laufzeit einer Warnprüfung nichts Messbares.
+
+**Damit entfällt die in §4b vorgesehene Reduktion.** Ein länderweises
+Nachladen (`cameras.index.json` plus Einzeldateien) wäre Aufwand ohne
+Gegenwert: Es brächte 2 MB App-Grösse ein und handelte sich dafür einen
+Ladepfad ein, der fehlschlagen kann — genau die Sorte stiller Ausfall, gegen
+die `core/dataset.ts` und `core/zonendaten.ts` gebaut sind.
+
+### Warum die Zahl unter dem Erwartungswert liegt
+
+Sekundärquellen nennen 60.000 bis 100.000 Anlagen in Europa. Gemessen sind
+29474 — Faktor 2 bis 3 darunter. Das Zählskript meldet das ausdrücklich und
+verlangt eine Prüfung, bevor weitergebaut wird. Die Prüfung ergibt: **Der
+Fehler liegt nicht in der Query.**
+
+- Für Deutschland liefert dieselbe Query 10.863 Rohtreffer, aus denen der
+  echte Build 5053 Anlagen macht. Diese Zahl ist in DATA.md gegen zwei
+  unabhängige Flächenabfragen gegengeprüft.
+- Die Sekundärzahlen sind nicht vergleichbar: Sie enthalten **mobile**
+  Messstellen, die dieses Projekt ausdrücklich nicht abbildet, und stammen aus
+  kommerziellen Datenbanken mit eigener Erfassung.
+- OpenStreetMap enthält, was Freiwillige eingetragen haben. Die regionalen
+  Unterschiede sind gewaltig (siehe oben: BW 42,2 Anlagen je 1000 km², Bayern
+  1,9) und setzen sich in Europa fort.
+
+Die Lücke ist also erwartbar und kein Messfehler. Sie ist aber der Grund,
+warum die Trefferquote gegen eine unabhängige Quelle weiterhin die wichtigste
+offene Zahl dieses Projekts ist.
+
+### Pro Land
+
+Geschätzt mit dem korrigierten Faktor 0,465.
+
+| Land | Gebiete | Rohtreffer | geschätzte Anlagen | |
+|---|---|---|---|---|
+| DE | 16 | 10863 | 5053 | |
+| FR | 13 | 8472 | 3941 | |
+| IT | 20 | 7902 | 3676 | |
+| ES | 17 | 5215 | 2426 | |
+| SE | 1 | 4208 | 1957 | |
+| GB | 4 | 4086 | 1901 | |
+| HU | 1 | 2987 | 1389 | |
+| AT | 1 | 2439 | 1135 | |
+| BE | 1 | 2403 | 1118 | |
+| CZ | 1 | 2127 | 989 | |
+| PL | 16 | 1979 | 921 | |
+| NL | 1 | 1401 | 652 | |
+| FI | 1 | 1312 | 610 | |
+| CH | 1 | 1036 | 482 | |
+| TR | 1 | 760 | 354 | |
+| NO | 1 | 753 | 350 | |
+| HR | 1 | 751 | 349 | |
+| LT | 1 | 720 | 335 | |
+| UA | 1 | 704 | 327 | |
+| GR | 1 | 430 | 200 | |
+| PT | 1 | 404 | 188 | |
+| RS | 1 | 346 | 161 | |
+| RO | 1 | 343 | 160 | |
+| BA | 1 | 247 | 115 | |
+| CY | 1 | 238 | 111 | |
+| LV | 1 | 202 | 94 | |
+| SI | 1 | 193 | 90 | |
+| MK | 1 | 172 | 80 | |
+| EE | 1 | 157 | 73 | |
+| BG | 1 | 104 | 48 | |
+| LU | 1 | 95 | 44 | |
+| SK | 1 | 91 | 42 | |
+| MD | 1 | 81 | 38 | |
+| IS | 1 | 31 | 14 | |
+| IE | 1 | 28 | 13 | |
+| MT | 1 | 24 | 11 | |
+| DK | 1 | 22 | 10 | |
+| ME | 1 | 13 | 6 | |
+| AD | 1 | 13 | 6 | |
+| LI | 1 | 10 | 5 | |
+| AL | 1 | 2 | 1 | |
+| MC | 1 | 0 | 0 | **Abfrage fehlgeschlagen** |
+
+Monaco ist als einziges Gebiet fehlgeschlagen (HTTP 504 nach drei Versuchen).
+Bei einem Stadtstaat mit wenigen Strassen fällt das für das Mengengerüst nicht
+ins Gewicht; für einen echten Datensatzbau müsste es nachgezogen werden.
+
+**Russland und Belarus fehlen absichtlich** — siehe `scripts/lib/regions.ts`.
+Russland allein hat über 18.000 erfasste Anlagen, überwiegend Rotlicht, und
+würde den Datensatz für ein Gebiet verdoppeln, in das aus diesem Nutzerkreis
+niemand fährt.
+
 ## Trefferquote gegen bekannte Standorte
 
 **Noch nicht gemessen.**

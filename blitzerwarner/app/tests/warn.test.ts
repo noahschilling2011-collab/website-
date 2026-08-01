@@ -162,11 +162,21 @@ test('Kamera wird nach ausreichender Entfernung wieder scharf', () => {
   // Weit weg fahren: über 2x Warndistanz, damit die Kamera wieder scharf wird.
   // Der Zwischenschritt ist nötig, weil die Scharfschaltung beim Auswerten
   // einer Position passiert.
-  const weit = fix({ lon: 9.2034 });
+  //
+  // Die Zeit läuft dabei mit. Sie tat es früher nicht — alle drei Positionen
+  // trugen denselben Zeitstempel, obwohl zwischen ihnen 1,6 km liegen. Das
+  // fiel erst auf, als WARN.MIN_ANSAGE_ABSTAND_MS dazukam: Eine Rundfahrt in
+  // null Sekunden gibt es nicht, und ein Test, der sie unterstellt, prüft
+  // nebenbei etwas Falsches mit.
+  const T0 = 1_000_000;
+  const weit = fix({ lon: 9.2034, t: T0 + 60_000 });
   evaluate(weit, g, state, SETTINGS);
   assert.equal(state.gewarnt.get(cameraKey(k))?.wiederScharf, true);
 
-  assert.ok(evaluate(fix(), g, state, SETTINGS).warning, 'zweite Vorbeifahrt muss warnen');
+  assert.ok(
+    evaluate(fix({ t: T0 + 120_000 }), g, state, SETTINGS).warning,
+    'zweite Vorbeifahrt muss warnen',
+  );
 });
 
 // --- Nächste Kamera für die Akku-Strategie --------------------------------

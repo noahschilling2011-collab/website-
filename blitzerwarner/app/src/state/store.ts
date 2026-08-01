@@ -13,24 +13,25 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { errorLog } from '../core/log';
+import { STANDARD_SETTINGS, mischeSettings } from '../core/settings';
 import { setzeSettings } from '../location/task';
 import type { Settings } from '../types';
 
-const SETTINGS_KEY = 'blitzerwarner.einstellungen.v1';
-const ONBOARDING_KEY = 'blitzerwarner.rechtshinweis-bestaetigt.v1';
+/*
+ * Weitergereicht, damit die UI weiter `from '../state/store'` importiert und
+ * nicht jeder Screen den Pfad nach core/ kennen muss. Die Werte selbst stehen
+ * dort — einmal, statt wie vorher doppelt in Store und Task.
+ */
+export { STANDARD_SETTINGS };
 
-export const STANDARD_SETTINGS: Settings = {
-  warnDistanceFactor: 1,
-  sprachansage: true,
-  lautstaerke: 1,
-  rotlichtblitzer: true,
-  motorradModus: false,
-  haptik: false,
-  // Standardmässig aus (Spec 8b): Wer sie will, schaltet sie ein. Sonst
-  // piept es beim ersten Überholvorgang und der Nutzer schaltet alles ab.
-  tempolimitWarnung: false,
-  tachoFaktor: 1,
-};
+const SETTINGS_KEY = 'blitzerwarner.einstellungen.v1';
+/**
+ * Exportiert, damit tests/render.test.tsx den bestätigten Zustand herstellen
+ * kann, ohne den Schlüssel abzuschreiben. Ein abgeschriebener Schlüssel wäre
+ * beim nächsten Umbenennen still falsch, und der Test prüfte dann dauerhaft
+ * den Onboarding-Screen statt des Fahrt-Screens.
+ */
+export const ONBOARDING_KEY = 'blitzerwarner.rechtshinweis-bestaetigt.v1';
 
 export type AppState = {
   settings: Settings;
@@ -40,24 +41,25 @@ export type AppState = {
   geladen: boolean;
 
   ladeAlles: () => Promise<void>;
+  /**
+   * Alles löschen, was auf dem Gerät liegt: Einstellungen zurück auf die
+   * Standardwerte, Fehlerprotokoll leer.
+   *
+   * Der bestätigte Rechtshinweis bleibt stehen. Ihn zurückzusetzen wäre keine
+   * Löschung von Daten, sondern eine Belästigung — der Nutzer müsste beim
+   * nächsten Start erneut durch das Onboarding, und gelöscht wäre dadurch
+   * nichts, was ihn betrifft.
+   */
+  loescheAlleDaten: () => Promise<void>;
   setzeEinstellung: <K extends keyof Settings>(key: K, wert: Settings[K]) => Promise<void>;
   bestaetigeRechtshinweis: () => Promise<void>;
 };
 
-/**
- * Einstellungen aus dem Speicher lesen und mit den Standardwerten mischen.
- *
- * Das Mischen ist wichtig: Kommt in einer späteren Version eine Einstellung
- * dazu, fehlt sie in den gespeicherten Daten. Ohne die Standardwerte wäre sie
- * dann `undefined` und würde als "aus" gelesen — auch dort, wo "ein" der
- * richtige Standard ist.
- */
 async function leseSettings(): Promise<Settings> {
   try {
     const rohtext = await AsyncStorage.getItem(SETTINGS_KEY);
     if (!rohtext) return { ...STANDARD_SETTINGS };
-    const gelesen = JSON.parse(rohtext) as Partial<Settings>;
-    return { ...STANDARD_SETTINGS, ...gelesen };
+    return mischeSettings(JSON.parse(rohtext));
   } catch (err) {
     errorLog.error('einstellungen', 'Einstellungen konnten nicht gelesen werden', err);
     return { ...STANDARD_SETTINGS };
@@ -94,6 +96,24 @@ export const useApp = create<AppState>((set, get) => ({
       // ist fehlgeschlagen. Das gehört ins Protokoll, aber nicht als
       // blockierender Fehler ins Gesicht des Nutzers.
       errorLog.error('einstellungen', `Einstellung ${String(key)} nicht gespeichert`, err);
+    }
+  },
+
+  async loescheAlleDaten() {
+    const settings = { ...STANDARD_SETTINGS };
+    set({ settings });
+    setzeSettings(settings);
+
+    errorLog.clear();
+    try {
+      await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      await errorLog.flush();
+    } catch (err) {
+      // Die Änderung wirkt für diese Sitzung; nur das Speichern ist
+      // fehlgeschlagen. Das gehört ins Protokoll — das damit allerdings
+      // gerade nicht leer ist. Der Widerspruch ist gewollt: Ein stiller
+      // Fehlschlag beim Löschen wäre schlimmer als ein sichtbarer Eintrag.
+      errorLog.error('einstellungen', 'Löschen konnte nicht gespeichert werden', err);
     }
   },
 

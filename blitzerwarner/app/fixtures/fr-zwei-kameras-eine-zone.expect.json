@@ -1,0 +1,12 @@
+{
+  "beschreibung": "Frankreich, Landstrasse: zwei Anlagen 600 m auseinander, deren Zonen zu einer zusammengefasst sind. Erwartet genau EINE Ansage für beide.",
+  "kameras": [],
+  "zonen": [
+    {
+      "lat": 48.5734,
+      "lon": 7.78336,
+      "r": 1300
+    }
+  ],
+  "erwarteteWarnungen": 1
+}

@@ -18,8 +18,11 @@ import {
   AccessibilityInfo, Animated, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
 
-import { STRINGS } from '../strings';
-import { GEWICHT, SCHRIFT, TOUCH, ZIFFERN_FEST, palette, type ThemeMode } from './theme';
+import { STRINGS, bannerFuerLand } from '../strings';
+import {
+  ABSTAND, DAUER, DECKKRAFT, GEWICHT, LINIE, MASS, RADIUS, SCHRIFT, SEITE, SPUR,
+  TOUCH, ZEILENHOEHE, ZIFFERN_FEST, gedrueckt, palette, spur, type ThemeMode,
+} from './theme';
 import { useApp } from '../state/store';
 import {
   laeuftTracking, landStatus, letzterFix, starteTracking, stoppeTracking, watchdogState,
@@ -28,6 +31,8 @@ import { pruefe, statuszeile } from '../location/watchdog';
 import { warneSystem } from '../audio/player';
 import { datasetOrNull } from '../core/dataset';
 import { distanceToNearest } from '../core/warn';
+import { warnmodus } from '../core/country';
+import type { LandCode } from '../config';
 import { createSpeedState, readSpeed, updateSpeed } from '../core/speed';
 import { errorLog } from '../core/log';
 
@@ -35,11 +40,14 @@ type Props = {
   mode: ThemeMode;
   onOeffneEinstellungen: () => void;
   onOeffneInfo: () => void;
+  onOeffneKarte: () => void;
 };
 
 const AKTUALISIERUNG_MS = 1000;
 
-export default function DriveScreen({ mode, onOeffneEinstellungen, onOeffneInfo }: Props) {
+export default function DriveScreen({
+  mode, onOeffneEinstellungen, onOeffneInfo, onOeffneKarte,
+}: Props) {
   const farben = palette(mode);
   const settings = useApp((s) => s.settings);
 
@@ -58,7 +66,16 @@ export default function DriveScreen({ mode, onOeffneEinstellungen, onOeffneInfo 
   const [reduzierteBewegung, setReduzierteBewegung] = useState(false);
 
   const dataset = datasetOrNull();
-  const [land, setLand] = useState<string | null>(null);
+  /*
+   * Das Land nach der GATE-Tabelle, nicht der erkannte Umriss.
+   *
+   * Vorher stand hier landStatus().umriss — also auch Codes wie GB oder IE,
+   * für die es gar keinen Gate-Eintrag gibt. Für DE, AT und CH fällt das
+   * zusammen, überall sonst nicht: warnmodus() und bannerFuerLand() lesen die
+   * Gate-Tabelle, und ein Umriss ohne Eintrag ist dort kein gültiger
+   * Schlüssel.
+   */
+  const [land, setLand] = useState<LandCode | null>(null);
 
   // Systemeinstellung "Bewegung reduzieren" respektieren.
   useEffect(() => {
@@ -77,13 +94,17 @@ export default function DriveScreen({ mode, onOeffneEinstellungen, onOeffneInfo 
   /** Der langsame Puls — das einzige bewegte Element. */
   useEffect(() => {
     if (!aktiv || reduzierteBewegung) {
-      puls.setValue(1);
+      puls.setValue(DECKKRAFT.VOLL);
       return;
     }
     const schleife = Animated.loop(
       Animated.sequence([
-        Animated.timing(puls, { toValue: 0.35, duration: 1200, useNativeDriver: true }),
-        Animated.timing(puls, { toValue: 1, duration: 1200, useNativeDriver: true }),
+        Animated.timing(puls, {
+          toValue: DECKKRAFT.PULS_TIEF, duration: DAUER.PULS, useNativeDriver: true,
+        }),
+        Animated.timing(puls, {
+          toValue: DECKKRAFT.VOLL, duration: DAUER.PULS, useNativeDriver: true,
+        }),
       ]),
     );
     schleife.start();
@@ -116,7 +137,7 @@ export default function DriveScreen({ mode, onOeffneEinstellungen, onOeffneInfo 
         if (dataset) setNaechsteM(distanceToNearest(fix, dataset.grid));
       }
 
-      setLand(landStatus().umriss);
+      setLand(landStatus().land);
 
       const wd = watchdogState();
       const s = statuszeile(wd, jetzt);
@@ -146,20 +167,48 @@ export default function DriveScreen({ mode, onOeffneEinstellungen, onOeffneInfo 
     }
   }, [aktiv, settings]);
 
-  const bannerLand = land === 'DE' || land === 'AT' || land === 'CH' ? land : null;
+  /*
+   * Der Rechtshinweis kommt aus strings.bannerFuerLand() und nicht aus einer
+   * Bedingung hier.
+   *
+   * Vorher stand hier `land === 'DE' || land === 'AT' || land === 'CH'`, und
+   * bannerFuerLand() war toter Code — genau das, was der Kommentar dieser
+   * Funktion verhindern sollte. Ein neuer Eintrag mit hinweisBanner: true
+   * hätte nie einen Banner bekommen, und der Banner ist eine rechtliche
+   * Anforderung, keine Verzierung.
+   */
+  const banner = bannerFuerLand(land);
+
+  /*
+   * Die Statuszeile sagt, was die Warnung TUT — nicht, ob das Tracking läuft.
+   *
+   * Vorher stand dort `STRINGS.fahrt.status.aktiv` ("Warnung aktiv"), sobald
+   * die Positionsverfolgung lief. In einem Land, in dem das Gate abschaltet,
+   * behauptete die App damit "Warnung aktiv" direkt über einem Banner, der
+   * das Gegenteil sagte. Ein Widerspruch auf demselben Bildschirm ist
+   * schlimmer als eine fehlende Zeile: Er lässt den Fahrer raten, welche der
+   * beiden Angaben stimmt.
+   */
+  const modus = warnmodus(land);
+  const statusText =
+    modus === 'aus'
+      ? STRINGS.fahrt.status.landGesperrt
+      : modus === 'zone'
+        ? STRINGS.zone.aktiv
+        : STRINGS.fahrt.status.aktiv;
 
   return (
     <View style={[stil.wurzel, { backgroundColor: farben.hintergrund }]}>
       <ScrollView contentContainerStyle={stil.inhalt}>
 
         {/* Rechtshinweis-Banner. Nicht abschaltbar (Spec 2). */}
-        {bannerLand != null && (
+        {banner != null && (
           <View
             style={[stil.banner, { borderColor: farben.warn, backgroundColor: farben.warnGedaempft }]}
             accessibilityRole="alert"
           >
             <Text style={[stil.bannerText, { color: farben.text }]}>
-              {STRINGS.banner[bannerLand].kurz}
+              {banner.kurz}
             </Text>
           </View>
         )}
@@ -220,13 +269,16 @@ export default function DriveScreen({ mode, onOeffneEinstellungen, onOeffneInfo 
           <Animated.View
             style={[
               stil.punkt,
-              { backgroundColor: aktiv ? farben.warn : farben.textInaktiv, opacity: aktiv ? puls : 1 },
+              {
+                backgroundColor: aktiv ? farben.warn : farben.textInaktiv,
+                opacity: aktiv ? puls : DECKKRAFT.VOLL,
+              },
             ]}
           />
           <Text style={[stil.status, { color: farben.textSekundaer }]}>
             {!aktiv
               ? STRINGS.fahrt.status.inaktiv
-              : `${STRINGS.fahrt.status.aktiv}` +
+              : `${statusText}` +
                 (status.seitMin != null ? ` · seit ${status.seitMin} min` : '') +
                 (status.fixVorSek != null ? ` · Position vor ${status.fixVorSek} s` : ` · ${STRINGS.fahrt.status.sucheGps}`)}
           </Text>
@@ -248,13 +300,10 @@ export default function DriveScreen({ mode, onOeffneEinstellungen, onOeffneInfo 
       {/* Start/Stop — grosses Ziel, im Auto bedienbar. */}
       <Pressable
         onPress={umschalten}
-        style={({ pressed }) => [
+        style={(z) => [
           stil.knopf,
-          {
-            backgroundColor: aktiv ? farben.warnGedaempft : farben.warn,
-            borderColor: farben.warn,
-            opacity: pressed ? 0.8 : 1,
-          },
+          { backgroundColor: aktiv ? farben.warnGedaempft : farben.warn, borderColor: farben.warn },
+          gedrueckt(z),
         ]}
         accessibilityRole="button"
         accessibilityLabel={aktiv ? STRINGS.fahrt.fahrtBeenden : STRINGS.fahrt.fahrtStarten}
@@ -267,7 +316,7 @@ export default function DriveScreen({ mode, onOeffneEinstellungen, onOeffneInfo 
       <View style={stil.fussZeile}>
         <Pressable
           onPress={onOeffneEinstellungen}
-          style={stil.fussKnopf}
+          style={(z) => [stil.fussKnopf, gedrueckt(z)]}
           accessibilityRole="button"
           accessibilityLabel={STRINGS.einstellungen.titel}
         >
@@ -277,12 +326,28 @@ export default function DriveScreen({ mode, onOeffneEinstellungen, onOeffneInfo 
         </Pressable>
         <Pressable
           onPress={onOeffneInfo}
-          style={stil.fussKnopf}
+          style={(z) => [stil.fussKnopf, gedrueckt(z)]}
           accessibilityRole="button"
           accessibilityLabel={STRINGS.daten.titel}
         >
           <Text style={[stil.fussText, { color: farben.textSekundaer }]}>
             {STRINGS.daten.titel}
+          </Text>
+        </Pressable>
+        {/*
+          Die Umgebungskarte. Sie steht in der Fusszeile und nicht im Bild
+          darüber: Der Fahrt-Screen ist für einen Blick von einer halben
+          Sekunde gebaut, eine Karte lädt zum Studieren ein. Erreichbar muss
+          sie sein, sichtbar während der Fahrt nicht.
+        */}
+        <Pressable
+          onPress={onOeffneKarte}
+          style={(z) => [stil.fussKnopf, gedrueckt(z)]}
+          accessibilityRole="button"
+          accessibilityLabel={STRINGS.karte.oeffnen}
+        >
+          <Text style={[stil.fussText, { color: farben.textSekundaer }]}>
+            {STRINGS.karte.oeffnen}
           </Text>
         </Pressable>
       </View>
@@ -292,26 +357,32 @@ export default function DriveScreen({ mode, onOeffneEinstellungen, onOeffneInfo 
 
 const stil = StyleSheet.create({
   wurzel: { flex: 1 },
-  inhalt: { padding: 20, paddingTop: 48, gap: 28 },
-  banner: { borderWidth: 1, borderRadius: 8, padding: 14, gap: 6 },
+  inhalt: { padding: ABSTAND.RAND, paddingTop: SEITE.OBEN_FAHRT, gap: SEITE.BLOCK_FAHRT },
+  banner: { borderWidth: LINIE.DUENN, borderRadius: RADIUS.S, padding: ABSTAND.L, gap: ABSTAND.S },
   bannerTitel: { fontSize: SCHRIFT.TEXT, fontWeight: GEWICHT.FETT },
-  bannerText: { fontSize: SCHRIFT.KLEIN, lineHeight: SCHRIFT.KLEIN * 1.45 },
-  tachoBlock: { alignItems: 'center', gap: 2 },
-  tacho: { fontSize: SCHRIFT.TACHO, fontWeight: GEWICHT.FETT, lineHeight: SCHRIFT.TACHO * 1.05 },
+  bannerText: { fontSize: SCHRIFT.KLEIN, lineHeight: SCHRIFT.KLEIN * ZEILENHOEHE.TEXT },
+  tachoBlock: { alignItems: 'center', gap: ABSTAND.XS },
+  tacho: { fontSize: SCHRIFT.TACHO, letterSpacing: spur(SCHRIFT.TACHO), fontWeight: GEWICHT.FETT, lineHeight: SCHRIFT.TACHO * ZEILENHOEHE.ZAHL },
   tachoEinheit: { fontSize: SCHRIFT.TACHO_EINHEIT },
-  anlageBlock: { alignItems: 'center', gap: 4 },
-  label: { fontSize: SCHRIFT.LABEL, textTransform: 'uppercase', letterSpacing: 1 },
-  entfernung: { fontSize: SCHRIFT.WARN_ENTFERNUNG, fontWeight: GEWICHT.MITTEL },
-  statusZeile: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  punkt: { width: 10, height: 10, borderRadius: 5 },
-  status: { fontSize: SCHRIFT.STATUS },
-  leer: { borderWidth: 1, borderRadius: 8, padding: 16, gap: 8 },
-  knopf: {
-    marginHorizontal: 20, marginBottom: 12, minHeight: TOUCH.MIN,
-    borderWidth: 2, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+  anlageBlock: { alignItems: 'center', gap: ABSTAND.XS },
+  label: { fontSize: SCHRIFT.LABEL, textTransform: 'uppercase', letterSpacing: SPUR.VERSALIEN },
+  entfernung: {
+    fontSize: SCHRIFT.WARN_ENTFERNUNG, letterSpacing: spur(SCHRIFT.WARN_ENTFERNUNG),
+    lineHeight: SCHRIFT.WARN_ENTFERNUNG * ZEILENHOEHE.ZAHL, fontWeight: GEWICHT.MITTEL,
   },
-  knopfText: { fontSize: SCHRIFT.WARN_TITEL, fontWeight: GEWICHT.FETT },
-  fussZeile: { flexDirection: 'row', justifyContent: 'space-around', paddingBottom: 24 },
-  fussKnopf: { minHeight: TOUCH.MIN, minWidth: TOUCH.MIN, justifyContent: 'center', paddingHorizontal: 20 },
+  statusZeile: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: ABSTAND.S },
+  punkt: { width: MASS.PUNKT, height: MASS.PUNKT, borderRadius: RADIUS.KREIS },
+  status: { fontSize: SCHRIFT.STATUS },
+  leer: { borderWidth: LINIE.DUENN, borderRadius: RADIUS.S, padding: ABSTAND.L, gap: ABSTAND.S },
+  knopf: {
+    marginHorizontal: ABSTAND.RAND, marginBottom: ABSTAND.M, minHeight: TOUCH.MIN,
+    borderWidth: LINIE.DICK, borderRadius: RADIUS.M, alignItems: 'center', justifyContent: 'center',
+  },
+  knopfText: {
+    fontSize: SCHRIFT.WARN_TITEL, letterSpacing: spur(SCHRIFT.WARN_TITEL),
+    lineHeight: SCHRIFT.WARN_TITEL * ZEILENHOEHE.ENG, fontWeight: GEWICHT.FETT,
+  },
+  fussZeile: { flexDirection: 'row', justifyContent: 'space-around', paddingBottom: ABSTAND.XL },
+  fussKnopf: { minHeight: TOUCH.MIN, minWidth: TOUCH.MIN, justifyContent: 'center', paddingHorizontal: ABSTAND.RAND },
   fussText: { fontSize: SCHRIFT.TEXT },
 });

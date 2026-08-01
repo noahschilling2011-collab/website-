@@ -13,12 +13,24 @@ import * as TaskManager from 'expo-task-manager';
 
 import { errorLog } from '../core/log';
 import { datasetOrNull } from '../core/dataset';
-import { createTripState, distanceToNearest, evaluate, type TripState } from '../core/warn';
-import { aktualisiere, createStrategyState, vorgabeFuer, type StrategyState } from './strategy';
+import { createTripState, distanceToNearest, type TripState } from '../core/warn';
+import { entscheide, type Aktion } from '../core/entscheidung';
+import {
+  alsCsv, createFahrtprotokoll, eintraege as protokollEintraege, leere, schreibe,
+  type Fahrtprotokoll,
+} from '../core/fahrtprotokoll';
+import { createZonenZustand, type ZonenZustand } from '../core/zone';
+import { brauchtZonen, zonenFehler, zonenOderNull } from '../core/zonendaten';
+import {
+  aktualisiere, createStrategyState, vorgabeFuer,
+  type Modus as StrategieModus, type StrategyState,
+} from './strategy';
 import { createWatchdogState, meldeFix, starte, stoppe, type WatchdogState } from './watchdog';
-import { gebeWarnung, sageAnsage } from '../audio/player';
+import { gebeWarnung, gebeZonenhinweis, sageAnsage } from '../audio/player';
 import { landwechselText } from '../audio/announce';
-import { aktualisiereLand, createLandZustand, leseLand, type LandStatus, type LandZustand } from '../core/country';
+import { aktualisiereLand, createLandZustand, leseLand, warnmodus, type LandStatus, type LandZustand } from '../core/country';
+import type { Warnmodus } from '../config';
+import { STANDARD_SETTINGS } from '../core/settings';
 import type { Fix, Settings } from '../types';
 
 export const LOCATION_TASK = 'blitzerwarner-location';
@@ -38,19 +50,37 @@ type TaskLaufzeit = {
   letzterFix: Fix | null;
   /** Landerkennung mit Hysterese gegen Flackern an der Grenze. */
   landZustand: LandZustand;
-  /** Zuletzt gemeldeter Zustand, um Wechsel zu bemerken. */
+  /**
+   * Zuletzt gemeldeter Warnmodus, um Wechsel zu bemerken. null = noch kein
+   * Fix verarbeitet; daran hängt, dass der erste Fix keine Ansage auslöst.
+   */
+  letzterModus: Warnmodus | null;
+  /**
+   * Ob beim letzten Moduswechsel Punktwarnungen erlaubt waren. Nur für das
+   * Protokoll und die UI — die Entscheidung fällt `modus`, nicht dieser Wert.
+   */
   warnungWarErlaubt: boolean | null;
-};
-
-const STANDARD_SETTINGS: Settings = {
-  warnDistanceFactor: 1,
-  sprachansage: true,
-  lautstaerke: 1,
-  rotlichtblitzer: true,
-  motorradModus: false,
-  haptik: false,
-  tempolimitWarnung: false,
-  tachoFaktor: 1,
+  /**
+   * Zonenzustand der Fahrt (Frankreich). Analog zu `trip` und `strategy`:
+   * gehört zur Fahrt, nicht zur App, und wird beim Start zurückgesetzt.
+   */
+  zonen: ZonenZustand;
+  /**
+   * Für welches Land der fehlende Zonendatensatz schon protokolliert wurde.
+   *
+   * Ein Set und kein Wahrheitswert: Auf einer Fahrt von Frankreich nach
+   * Spanien wären es zwei verschiedene Ausfälle, und der zweite darf nicht
+   * verschluckt werden, nur weil der erste gemeldet war. Bei jedem Fix
+   * erneut zu protokollieren wäre die andere Untugend — das Protokoll fasst
+   * 200 Einträge und wäre in einer Minute voll.
+   */
+  zonenAusfallGemeldet: Set<string>;
+  /**
+   * Fahrtenschreiber. Liegt hier und nicht im Store, weil der Task in einem
+   * eigenen JS-Kontext läuft — ein React-State wäre von hier nicht
+   * erreichbar, und aufgezeichnet wird genau hier.
+   */
+  fahrtprotokoll: Fahrtprotokoll;
 };
 
 const laufzeit: TaskLaufzeit = {
@@ -60,12 +90,33 @@ const laufzeit: TaskLaufzeit = {
   settings: { ...STANDARD_SETTINGS },
   letzterFix: null,
   landZustand: createLandZustand(),
+  letzterModus: null,
   warnungWarErlaubt: null,
+  zonen: createZonenZustand(),
+  zonenAusfallGemeldet: new Set(),
+  fahrtprotokoll: createFahrtprotokoll(),
 };
 
 /** Von der UI aufzurufen, wenn der Nutzer Einstellungen ändert. */
 export function setzeSettings(settings: Settings): void {
+  // Ausschalten LÖSCHT. Wer den Fahrtenschreiber abschaltet, will die Spur
+  // los sein und nicht bloss keine neue mehr — sonst läge sie bis zum
+  // nächsten App-Neustart weiter im Speicher.
+  if (laufzeit.settings.fahrtprotokoll && !settings.fahrtprotokoll) {
+    leere(laufzeit.fahrtprotokoll);
+    errorLog.info('einstellungen', 'Fahrtprotokoll abgeschaltet und gelöscht');
+  }
   laufzeit.settings = settings;
+}
+
+/** Das Fahrtprotokoll als CSV, für den Teilen-Knopf. */
+export function fahrtprotokollAlsCsv(): string {
+  return alsCsv(laufzeit.fahrtprotokoll);
+}
+
+/** Wie viele Positionen aufgezeichnet sind. Für die Beschriftung des Knopfs. */
+export function fahrtprotokollAnzahl(): number {
+  return protokollEintraege(laufzeit.fahrtprotokoll).length;
 }
 
 export function watchdogState(): WatchdogState {
@@ -102,6 +153,39 @@ function alsFix(ort: Location.LocationObject): Fix {
 }
 
 /**
+ * Eine Position im Fahrtprotokoll festhalten, falls es eingeschaltet ist.
+ *
+ * Kein stiller Fehlschlag: Wirft der Schreiber, ist das ein Fehler wie jeder
+ * andere — aber er darf die Warnung nicht mitreissen. Der Fahrtenschreiber
+ * ist Diagnose, die Warnung ist der Zweck der App.
+ */
+function zeichneAuf(
+  fix: Fix,
+  naechsteM: number | null,
+  warnmodusJetzt: Warnmodus,
+  strategie: StrategieModus,
+  aktion: Aktion,
+): void {
+  if (!laufzeit.settings.fahrtprotokoll) return;
+  try {
+    schreibe(laufzeit.fahrtprotokoll, {
+      t: fix.t,
+      lat: fix.lat,
+      lon: fix.lon,
+      speed: fix.speed,
+      accuracy: fix.accuracy,
+      course: fix.course,
+      strategie,
+      warnmodus: warnmodusJetzt,
+      naechsteM,
+      gewarnt: aktion.art !== 'nichts',
+    });
+  } catch (err) {
+    errorLog.error('hintergrund', 'Fahrtprotokoll konnte nicht geschrieben werden', err);
+  }
+}
+
+/**
  * Eine Position verarbeiten. Herausgezogen aus dem Task-Handler, damit die
  * Reihenfolge der Schritte nachvollziehbar bleibt.
  */
@@ -124,21 +208,42 @@ async function verarbeite(fix: Fix): Promise<void> {
   //    unsymmetrische Hysterese, die an Grenzfahrten das Flackern verhindert
   //    und im Zweifel abschaltet statt einzuschalten.
   const landStatus = aktualisiereLand(laufzeit.landZustand, fix);
-  const darfWarnen = landStatus.warnungErlaubt;
 
-  if (laufzeit.warnungWarErlaubt !== darfWarnen) {
+  /*
+   * Der Warnmodus, nicht bloss ein Ja/Nein.
+   *
+   * Wichtig, und zwar rechtlich: 'zone' ist NICHT dasselbe wie 'punkt'.
+   * Frankreich erlaubt seit 03.01.2012 nur den Hinweis auf einen
+   * Gefahrenbereich; die Punktwarnung mit Entfernungsansage ist dort
+   * verboten, bis 1500 Euro und Einziehung des Geräts.
+   */
+  const modus = warnmodus(landStatus.land);
+  const darfWarnen = modus !== 'aus';
+
+  /*
+   * Der Grenzübertritt wird am MODUS erkannt, nicht an einem Ja/Nein.
+   *
+   * Die frühere Fassung verglich `darfPunktWarnen`. Beim Übertritt nach
+   * Frankreich wechselt der Modus von 'aus' auf 'zone' — `darfPunktWarnen`
+   * bleibt dabei in beiden Fällen false, der Wechsel fiel also stillschweigend
+   * aus. Gemessen am Grenztrack (fixtures/grenze-kehl-strasbourg.gpx): ein
+   * Moduswechsel, null Ansagen. Der Fahrer erfuhr nicht, dass die App jetzt
+   * etwas tut.
+   */
+  if (laufzeit.letzterModus !== modus) {
     // Beim Grenzübertritt eine kurze Ansage (Spec 10.1). Beim allerersten
     // Fix wird nichts angesagt — da hat der Nutzer die App gerade gestartet
     // und braucht keine Meldung über einen Wechsel, der keiner war.
-    const erstmalig = laufzeit.warnungWarErlaubt === null;
+    const erstmalig = laufzeit.letzterModus === null;
+    laufzeit.letzterModus = modus;
     laufzeit.warnungWarErlaubt = darfWarnen;
     errorLog.info(
       'position',
       `Land ${landStatus.umriss ?? 'unbestimmt'} (${landStatus.grund}), ` +
-      `Warnung ${darfWarnen ? 'erlaubt' : 'gesperrt'}`,
+      `Warnmodus ${modus}`,
     );
     if (!erstmalig) {
-      await sageAnsage(landwechselText(darfWarnen), laufzeit.settings.lautstaerke);
+      await sageAnsage(landwechselText(modus), laufzeit.settings.lautstaerke);
     }
   }
 
@@ -153,17 +258,85 @@ async function verarbeite(fix: Fix): Promise<void> {
     await konfiguriereUpdates(vorgabe.genauigkeit, vorgabe.distanceIntervalM);
   }
 
-  if (!darfWarnen) return;
+  /*
+   * 4. Die Entscheidung.
+   *
+   * Kein `if (!darfWarnen) return;` mehr davor. Zwei Gründe:
+   *
+   *  - entscheide() beantwortet den Fall 'aus' selbst und liefert
+   *    { nichts, land_gesperrt }. Ein zweites Gate davor wäre ein zweiter
+   *    Ort, an dem "darf hier gewarnt werden" entschieden wird.
+   *  - Der Fahrtenschreiber muss auch in Deutschland aufzeichnen. Dort ist
+   *    der Modus 'aus' — und dort findet die Testfahrt statt. Mit dem
+   *    vorzeitigen return hätte er im gesamten Kerngebiet der App keine
+   *    einzige Zeile geschrieben, und die Phasen 2, 4 und 5 wären
+   *    weiterhin unmessbar geblieben.
+   *
+   * Bewusst als reine Funktion ausgelagert (core/entscheidung.ts): Welche
+   * Logik bei welchem Modus greift, ist genau die Stelle, an der Frankreich
+   * stumm blieb — beide Bausteine waren in Ordnung, die Verdrahtung nicht.
+   * Sie steckte hier zwischen expo-Aufrufen und war damit nicht prüfbar.
+   */
+  const zonen = brauchtZonen(landStatus.land) && landStatus.land !== null
+    ? zonenOderNull(landStatus.land)
+    : null;
 
-  // 4. Warnlogik.
-  const ergebnis = evaluate(fix, grid, laufzeit.trip, laufzeit.settings);
-  if (!ergebnis.warning) return;
-
-  await gebeWarnung(ergebnis.warning.camera, ergebnis.warning.distance, {
-    sprache: laufzeit.settings.sprachansage,
-    lautstaerke: laufzeit.settings.lautstaerke,
-    speedKmh: fix.speed != null ? fix.speed * 3.6 : null,
+  const aktion = entscheide(fix, modus, {
+    grid,
+    trip: laufzeit.trip,
+    settings: laufzeit.settings,
+    zonen,
+    zonenZustand: laufzeit.zonen,
   });
+
+  // 5. Aufzeichnen, BEVOR ausgeführt wird. Die Ansage dauert je nach Text
+  //    über eine Sekunde; käme der Eintrag danach, wäre der gemessene
+  //    Fixabstand um die Ansagedauer verfälscht — und genau dieser Abstand
+  //    ist der Messwert für Phase 2.
+  zeichneAuf(fix, naechste, modus, vorgabe.modus, aktion);
+
+  // 6. Ausführen. Ab hier nur noch Plattform, keine Entscheidung mehr.
+  switch (aktion.art) {
+    case 'punktwarnung':
+      await gebeWarnung(aktion.camera, aktion.distanzM, {
+        sprache: laufzeit.settings.sprachansage,
+        lautstaerke: laufzeit.settings.lautstaerke,
+        speedKmh: fix.speed != null ? fix.speed * 3.6 : null,
+      });
+      return;
+
+    case 'zonenhinweis':
+      // Kein speedKmh, keine Distanz — die Aktion trägt beides gar nicht.
+      await gebeZonenhinweis({
+        sprache: laufzeit.settings.sprachansage,
+        lautstaerke: laufzeit.settings.lautstaerke,
+      });
+      return;
+
+    case 'nichts':
+      /*
+       * Der einzige Grund, der kein Normalbetrieb ist.
+       *
+       * Eine App, die im Zonenmodus "Hinweise aktiviert" ansagt und danach
+       * für die ganze Fahrt schweigt, ist von aussen nicht von einer Strecke
+       * ohne Zonen zu unterscheiden. Genau dieser stille Ausfall ist im
+       * Kopfkommentar von core/dataset.ts beschrieben — deshalb hier ein
+       * ERROR und keine stille Rückkehr.
+       */
+      if (aktion.grund === 'zonendaten_fehlen' && landStatus.land !== null) {
+        if (!laufzeit.zonenAusfallGemeldet.has(landStatus.land)) {
+          laufzeit.zonenAusfallGemeldet.add(landStatus.land);
+          const fehler = zonenFehler(landStatus.land);
+          errorLog.error(
+            'daten',
+            `Zonendatensatz für ${landStatus.land} fehlt oder ist unlesbar — ` +
+            'es wird hier NICHT gewarnt',
+            fehler,
+          );
+        }
+      }
+      return;
+  }
 }
 
 TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
@@ -227,7 +400,14 @@ export async function starteTracking(settings: Settings): Promise<boolean> {
   laufzeit.trip = createTripState();
   laufzeit.strategy = createStrategyState();
   laufzeit.landZustand = createLandZustand();
+  laufzeit.letzterModus = null;
   laufzeit.warnungWarErlaubt = null;
+  laufzeit.zonen = createZonenZustand();
+  laufzeit.zonenAusfallGemeldet = new Set();
+  // Eine neue Fahrt, ein neues Protokoll. Zwei Fahrten in einer Datei wären
+  // für die Lückenmessung wertlos: Die Pause dazwischen sähe aus wie ein
+  // Aussetzer.
+  leere(laufzeit.fahrtprotokoll);
 
   const start = vorgabeFuer('leerlauf');
 
