@@ -4,16 +4,24 @@
  *
  *   npm run verify-dataset
  *
- * Drei Teile:
+ * Vier Teile:
  *   1. Integrität   — sitzt jede Kamera in der richtigen Gitterzelle, sind
  *                     alle Werte im plausiblen Bereich?
  *   2. Abdeckung    — Kameras pro Bundesland, absolut und pro 1000 km².
  *   3. Stichprobe   — Abgleich gegen bekannte Standorte aus einer
  *                     unabhängigen Quelle (scripts/reference-locations.json).
+ *   4. Menge        — Abgleich der Landessummen gegen amtliche Zählungen
+ *                     (scripts/reference-counts.json).
  *
- * Teil 3 läuft nur, wenn die Referenzdatei gefüllt ist. Die Trefferquote
- * daraus gehört nach DATA.md — sie ist die einzige Zahl, die etwas über die
- * tatsächliche Datenqualität aussagt.
+ * Die Teile 1 und 2 prüfen den Datensatz gegen sich selbst. Das findet
+ * Rechenfehler, aber keine Abdeckungslücke: Was in OpenStreetMap fehlt, fehlt
+ * auch in jeder Prüfung, die nur den Datensatz liest.
+ *
+ * Dafür sind 3 und 4 da, und beide brauchen eine Quelle von aussen. 3 fragt
+ * punktgenau ("steht diese bekannte Anlage drin?"), 4 fragt grob ("stimmt die
+ * Grössenordnung?"). 4 ist billiger zu füllen und deshalb der erste Schritt;
+ * 3 ist aussagekräftiger. Beide laufen nur, wenn ihre Datei gefüllt ist —
+ * ohne Quelle keine Zahl.
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -26,6 +34,7 @@ const ROOT = join(HERE, '..');
 const DATA_FILE = join(ROOT, 'assets', 'data', 'cameras.json');
 const STATS_FILE = join(ROOT, 'assets', 'data', 'cameras.stats.json');
 const REFERENCE_FILE = join(HERE, 'reference-locations.json');
+const COUNTS_FILE = join(HERE, 'reference-counts.json');
 
 /** Landesflächen in km², für die Dichteangabe. */
 const AREA_KM2: Record<string, number> = {
@@ -53,6 +62,24 @@ type ReferencePoint = {
   lat: number;
   lon: number;
   source: string;
+};
+
+/** Eine amtliche Zählung. Ohne quelle/url/zitat wird der Eintrag abgelehnt. */
+type ReferenceCount = {
+  anzahl: number;
+  was: string;
+  standDerZahl: string;
+  quelle: string;
+  url: string;
+  zitat: string;
+  /** Deckt die Zahl das ganze Land ab, oder ist sie nur eine Untergrenze? */
+  landesweit: boolean;
+  anmerkung?: string[];
+};
+
+type ReferenceCounts = {
+  laender: Record<string, ReferenceCount>;
+  ohneQuelle?: Record<string, string[]>;
 };
 
 function main() {
@@ -178,6 +205,77 @@ function main() {
     const rate = ((hits / reference.length) * 100).toFixed(0);
     console.log(`\n  Trefferquote: ${hits}/${reference.length} (${rate} %)`);
     console.log('  Diese Zahl gehört nach DATA.md.');
+  }
+
+  console.log('\n' + '═'.repeat(64));
+  console.log('4. MENGENABGLEICH GEGEN AMTLICHE ZAHLEN');
+  console.log('═'.repeat(64));
+  mengenabgleich(data);
+}
+
+/**
+ * Wie viele Anlagen kennt der Datensatz, verglichen mit einer unabhängigen
+ * Zählung?
+ *
+ * Teil 3 fragt "sind die bekannten Standorte drin?" und braucht dafür
+ * Koordinaten. Diese Prüfung fragt das Gröbere und Billigere: Stimmt die
+ * Grössenordnung überhaupt? Dafür genügt eine Zahl je Land — und die gibt es
+ * für ein paar Länder amtlich.
+ *
+ * Der Vergleich ist absichtlich nicht scharf. Die Referenzen zählen nicht
+ * dasselbe wie OpenStreetMap: mal nur staatliche Strassen, mal ohne einzelne
+ * Regionen, mal einen Stichtag vor Monaten. Deshalb wird nichts als "falsch"
+ * gemeldet, sondern nur eingeordnet — und die Einschränkung jeder Zahl steht
+ * daneben, damit niemand die Abweichung für ein Ergebnis hält.
+ */
+function mengenabgleich(data: Dataset): void {
+  if (!existsSync(COUNTS_FILE)) {
+    console.log(`Keine Referenzzahlen hinterlegt.\nDatei: ${COUNTS_FILE}`);
+    return;
+  }
+
+  const ref = JSON.parse(readFileSync(COUNTS_FILE, 'utf8')) as ReferenceCounts;
+  const laender = Object.entries(ref.laender);
+
+  if (laender.length === 0) {
+    console.log('Referenzdatei ist leer.');
+    return;
+  }
+
+  for (const [code, e] of laender) {
+    if (!e.quelle || !e.url || !e.zitat) {
+      throw new Error(`Referenzzahl für ${code} ohne Quelle, URL oder Zitat`);
+    }
+
+    const imDatensatz = data.countries[code]?.count;
+    console.log(`\n${code}  ${e.was}`);
+    console.log(`  Referenz     ${String(e.anzahl).padStart(7)}  (${e.quelle}, Stand ${e.standDerZahl})`);
+
+    if (imDatensatz === undefined) {
+      console.log('  Datensatz          —  dieses Land ist nicht gebaut');
+      continue;
+    }
+
+    const faktor = imDatensatz / e.anzahl;
+    console.log(`  Datensatz    ${String(imDatensatz).padStart(7)}  ${(faktor * 100).toFixed(0)} % der Referenz`);
+
+    // Nur dort eine Erwartung äussern, wo die Referenz das ganze Land abdeckt.
+    // Bei einer Untergrenze ist "mehr im Datensatz" kein Widerspruch.
+    if (e.landesweit) {
+      if (faktor < 0.5) console.log('  -> weniger als die Hälfte. Abdeckungslücke oder anderer Anlagenbegriff.');
+      else if (faktor > 1.5) console.log('  -> deutlich mehr als amtlich. Dubletten oder mitgezählte Fremdtypen?');
+      else console.log('  -> Grössenordnung passt.');
+    } else {
+      console.log('  -> Referenz ist eine Untergrenze, kein Landeswert. Nur nach unten aussagekräftig.');
+      if (imDatensatz < e.anzahl) console.log('     WENIGER als die Untergrenze — das ist ein Befund.');
+    }
+    for (const zeile of e.anmerkung ?? []) console.log(`     ${zeile}`);
+  }
+
+  const ohne = Object.keys(ref.ohneQuelle ?? {});
+  if (ohne.length > 0) {
+    console.log(`\nOhne belegte Referenzzahl: ${ohne.join(', ')}`);
+    console.log('Begründung je Land steht in reference-counts.json.');
   }
 }
 

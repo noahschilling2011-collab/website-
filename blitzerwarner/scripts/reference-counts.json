@@ -1,0 +1,103 @@
+{
+  "_hinweis": [
+    "Unabhängige Zählungen stationärer Geschwindigkeitsmessanlagen je Land.",
+    "",
+    "WOZU: Der gebaute Datensatz sagt, wie viele Anlagen OpenStreetMap kennt.",
+    "Er sagt nichts darüber, wie viele es gibt. Ohne eine zweite, unabhängige",
+    "Zahl ist jede Abdeckungsaussage zirkulär — der Datensatz belegt sich",
+    "sonst selbst.",
+    "",
+    "REGEL: Keine Zahl ohne Quelle. Jeder Eintrag nennt Behörde, URL, Stand",
+    "und das wörtliche Zitat, aus dem die Zahl stammt. Nichts hier stammt aus",
+    "dem Gedächtnis, aus OpenStreetMap oder aus dem gebauten Datensatz.",
+    "",
+    "WARUM SO WENIGE LÄNDER: Weil es für die meisten keine amtliche Zahl gibt.",
+    "Das steht unter 'ohneQuelle' — mit dem Grund. Eine kurze belegte Liste ist",
+    "brauchbarer als eine lange geschätzte."
+  ],
+  "stand": "2026-08-01",
+  "laender": {
+    "FR": {
+      "anzahl": 3423,
+      "was": "radars fixes — conventionnels (698), discriminants (530), tourelles (1411) und weitere",
+      "standDerZahl": "2025-01-01",
+      "quelle": "ANTAI (Agence nationale de traitement automatisé des infractions), Rapport d'activité 2024",
+      "url": "https://www.antai.gouv.fr/en/les-radars-en-france/",
+      "zitat": "In 2025, France had 4,029 traffic enforcement cameras on its roads",
+      "landesweit": true,
+      "anmerkung": [
+        "4029 ist der Gesamtbestand aller Anlagentypen. 3423 davon sind fest",
+        "installierte Geschwindigkeitsmessanlagen; nicht enthalten sind",
+        "verlegbare (396), mobile (210), Abschnittskontrollen (69),",
+        "Rotlichtanlagen (536) und Bahnübergänge (71).",
+        "Die App warnt nur vor festen Anlagen — deshalb 3423 und nicht 4029."
+      ]
+    },
+    "SE": {
+      "anzahl": 2735,
+      "was": "trafiksäkerhetskameror (ATK) an staatlichen Strassen",
+      "standDerZahl": "2025-12-31",
+      "quelle": "Trafikverket",
+      "url": "https://www.trafikverket.se/resa-och-trafik/trafiksakerhet/sakerhet-pa-vag/trafiksakerhetskameror/",
+      "zitat": "I dagsläget (årsskiftet 2025/2026) finns ungefär 2 735 trafiksäkerhetskameror längs de statliga vägarna.",
+      "landesweit": false,
+      "anmerkung": [
+        "Nur staatliche Strassen. Kommunale Strassen verwalten die Gemeinden",
+        "selbst und werden hier nicht mitgezählt — die Zahl ist also eine",
+        "Untergrenze, keine Landessumme.",
+        "Trafikverket schreibt 'ungefär'; die Zahl ist selbst gerundet."
+      ]
+    },
+    "ES": {
+      "anzahl": 706,
+      "was": "radares fijos im Netz der DGT",
+      "standDerZahl": "2025-08-22",
+      "quelle": "Infobae, gestützt auf Angaben der DGT (Dirección General de Tráfico)",
+      "url": "https://www.infobae.com/espana/2025/08/22/asi-son-los-radares-fijos-de-la-dgt-en-espana-en-2025-mas-de-700-de-este-tipo-y-el-total-supera-el-millar/",
+      "zitat": "La DGT ha desplegado una red de 706 radares fijos por toda la red viaria que está bajo su responsabilidad",
+      "landesweit": false,
+      "anmerkung": [
+        "AUSDRÜCKLICH KEINE LANDESSUMME. Katalonien und das Baskenland führen",
+        "eigene Verkehrsüberwachung und sind nicht enthalten; kommunale Anlagen",
+        "ebenfalls nicht.",
+        "Sekundärquelle, nicht die DGT selbst — deshalb mit Vorsicht. Andere",
+        "Veröffentlichungen nennen 2341 feste Anlagen für ganz Spanien; diese",
+        "Zahl liess sich nicht auf eine amtliche Stelle zurückführen und steht",
+        "deshalb nicht hier.",
+        "Als Untergrenze brauchbar: Weniger als 706 wäre im Datensatz ein",
+        "eindeutiger Befund."
+      ]
+    }
+  },
+  "ohneQuelle": {
+    "DE": [
+      "Es gibt kein zentrales Register. Verkehrsüberwachung ist Sache der",
+      "Länder und Kommunen; niemand führt eine Bundesstatistik.",
+      "Umlaufende Zahlen (rund 4500 bis 4756 stationäre Anlagen, Stand",
+      "April 2025) stammen aus Bussgeldportalen und Presseberichten, die",
+      "ihrerseits keine amtliche Quelle nennen. Sie sind nicht falsch, aber",
+      "sie sind nicht belegt — und dieser Datei fehlt dafür die Grundlage.",
+      "Zum Vergleich, ohne Beweiskraft: Der gebaute DE-Datensatz enthält",
+      "5053 Anlagen (Stand 2026-07-29)."
+    ],
+    "NL": [
+      "Die Pressemitteilung des Openbaar Ministerie vom 20.05.2026 nennt",
+      "1450 Kontrollstandorte für alle Verfahren zusammen — flexflitsers,",
+      "focusflitsers, trajectcontroles und vaste flitspalen — und schlüsselt",
+      "sie nicht auf.",
+      "Suchergebnisse nannten 650 beziehungsweise 'von 520 auf 750'. Beide",
+      "Zahlen stehen NICHT in der Pressemitteilung. Sie wurden deshalb",
+      "verworfen: Eine Zahl, die nur in der Zusammenfassung einer Suche",
+      "auftaucht, ist keine Quelle.",
+      "url: https://www.om.nl/actueel/nieuws/2026/05/20/veel-meer-flitspalen-geautomatiseerde-handhaving-verdubbelt"
+    ],
+    "AT": [
+      "Nicht recherchiert. Zuständig sind Landespolizeidirektionen und",
+      "ASFINAG getrennt; eine zusammengeführte Zahl wurde nicht gesucht."
+    ],
+    "CH": [
+      "Nicht recherchiert. Verkehrsüberwachung ist kantonal; eine",
+      "Bundesstatistik ist nicht bekannt."
+    ]
+  }
+}
