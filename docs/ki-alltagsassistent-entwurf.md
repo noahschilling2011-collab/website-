@@ -154,34 +154,63 @@ Fall ab.
 
 ### 6. Technik, Woche 1 bis 6
 
-- **Next.js 15 (App Router) auf Vercel.** Hobby-Tier untersagt kommerzielle
-  Nutzung; Pro derzeit ca. 20 $/Monat — Konditionen prüfen.
-- **Postgres bei Neon**, Drizzle ORM. Kostenloses Kontingent reicht für 100
-  Nutzer; Grenzen unsicher, prüfen.
+Die Werte unten sind gegen die Herstellerdokumentation geprüft (Stand
+2026-08-05). Was nicht belegt werden konnte, ist als solches markiert. Die
+vollständige Prüfung mit Quellenangaben steht in
+[`kalender-anbindung-entscheidung.md`](./kalender-anbindung-entscheidung.md).
+
+- **Next.js 15 (App Router) auf Vercel Pro, 20 $/Monat.** Der Hobby-Plan ist für
+  dieses Produkt ausgeschlossen: „Hobby teams are restricted to non-commercial
+  personal use only." Pro enthält 1 Seat und 20 $ Nutzungsguthaben.
+- **Postgres bei Neon**, Drizzle ORM. Free-Plan: 0,5 GB pro Projekt, 100
+  Compute-Stunden im Monat, Scale-to-Zero nach 5 Minuten (im Free-Plan nicht
+  abschaltbar). Reicht für die ersten Nutzer.
 - **Auth.js v5** mit Google als Provider.
-- **Eingehende Mail: Cloudflare Email Routing + Email Worker.** Existiert, bei
-  eigener Domain in Cloudflare kostenlos. Nachrichtengrößen- und Ratenlimits
-  **unsicher, müssen geprüft werden**. Fallback: Postmark Inbound oder Mailgun
-  Routes, beide kostenpflichtig.
-- **Ausgehende Mail: Resend oder Postmark**, mit SPF, DKIM und DMARC auf der
-  eigenen Domain. Freikontingente und Preise **unsicher, prüfen**. Wichtig: Es
-  wird **nicht** in Katrins Namen von ihrer Adresse gesendet — das ginge nur mit
-  SMTP-Zugang — sondern von der Produktdomain mit sichtbarer Signatur. Das ist
-  technisch ehrlicher und rechtlich sauberer.
-- **Google Calendar API.** Existiert, im normalen Kontingent kostenlos. Der
-  Ereignis-Scope gilt als sensibel und erfordert ein Verifizierungsverfahren;
-  nicht verifizierte Apps sind auf eine kleine Zahl von Testnutzern begrenzt —
-  die genaue Zahl und das Verfahren **unsicher, müssen geprüft werden**. Für die
-  ersten 100 Nutzer vermutlich ausreichend, und der Zeitpunkt, das zu klären, ist
-  Woche 1, nicht Woche 6.
+- **Eingehende Mail: Cloudflare Email Routing + Email Worker, Workers Paid ab
+  5 $/Monat.** Empfang selbst ist unbegrenzt und im Free-Plan enthalten, aber die
+  10 ms CPU-Zeit des Free-Plans reichen für MIME-Zerlegung und PDF-Textextraktion
+  nicht (Cloudflare dokumentiert den Fehler `EXCEEDED_CPU` für genau diesen Fall).
+  Paid hebt auf 30 Sekunden. Der Worker bekommt die vollständige Rohnachricht als
+  `ForwardableEmailMessage.raw`; Cloudflare empfiehlt `postal-mime` zum Parsen.
+  Preis der Entscheidung: Die DNS-Hoheit der Domain muss zu Cloudflare umziehen,
+  es gibt kein Postfach (bricht der Worker ab, ist die Mail weg), kein SLA, und
+  Mails, die weder SPF noch DKIM bestehen, werden abgelehnt.
+- **Ausgehende Mail: Resend Pro, 20 $/Monat.** Einziger geprüfter Dienst ohne
+  Freigabeprozess („no sandbox mode, no approval process, and no waiting period")
+  und mit dokumentiertem Threading über `In-Reply-To` und `References` — ohne das
+  eröffnet jedes Nachfassen beim Empfänger einen neuen Thread. Der Free-Plan
+  scheidet aus: 3.000 Mails im Monat, aber hartes Tageslimit von 100. Es wird
+  **nicht** in Katrins Namen von ihrer Adresse gesendet — das ginge nur mit
+  SMTP-Zugang — sondern von der Produktdomain mit sichtbarer Signatur.
+- **Kalender: Google OAuth mit `calendar.freebusy` und `calendar.events`,
+  Publishing-Status „In production", ohne Verifizierungsantrag.** Kein
+  Calendar-Scope steht auf Googles Restricted-Liste, deshalb entfällt die
+  kostenpflichtige CASA-Sicherheitsprüfung. Die harte Grenze ist eine andere:
+  unverifiziert sind „100 new users in total", der Zähler gilt „over the entire
+  lifetime of the project" und ist nicht rücksetzbar. Der Modus „Testing" ist
+  keine Alternative — dort laufen Autorisierung und Refresh-Token nach sieben
+  Tagen ab. Die konkrete Sensitivitäts-Einstufung von `calendar.events` ist nur
+  in der Cloud Console unter *Data Access* ablesbar und **muss in Woche 1 geprüft
+  werden**. Zwei OAuth-freie Alternativen für Apple- und Outlook-Nutzer stehen im
+  Anbindungsdokument; die Abstraktion dafür wird ab Tag 1 eingezogen.
 - **Anthropic API.** `claude-haiku-4-5` (1 $ / 5 $ pro Mio. Token ein/aus) für
   Extraktion und Klassifikation, `claude-sonnet-5` (3 $ / 15 $; Einführungspreis
   2 $ / 10 $ bis 31.08.2026) für Formulierung und Verhandlung. Prompt Caching für
   den System-Prompt.
 - **PDF-Text: `unpdf` oder `pdfjs-dist`.** Kein OCR — gescannte Dokumente werden
   abgelehnt statt geraten.
-- **Zeitsteuerung: GitHub Actions Schedule** (kostenlos, ausreichend granular)
-  statt Vercel Cron, dessen Limits im günstigen Tarif **unsicher** sind.
+- **Zeitsteuerung: Cloudflare Cron Triggers.** Minutengenau (`* * * * *`
+  dokumentiert), im Paid-Plan 250 Trigger — und der Worker läuft ohnehin schon
+  für den Maileingang. Vercel Cron scheidet im Hobby-Plan aus (max. einmal
+  täglich, häufigere Ausdrücke lassen das Deployment fehlschlagen); GitHub
+  Actions kommt nicht unter 5 Minuten und wird bei Repo-Inaktivität deaktiviert.
+
+**Nicht geprüft und vorrangig vor allem anderen:** Weitergeleitete Dokumente
+enthalten mit hoher Wahrscheinlichkeit Gesundheitsdaten. Alle genannten Anbieter
+sind Auftragsverarbeiter mit Zugriff auf Klartext-Mailinhalte. AVV nach Art. 28
+DSGVO, Drittlandbewertung und die Frage nach § 203 StGB sind anwaltlich zu
+klären, bevor die erste fremde Mail durch dieses System läuft. Das ist kein
+Restrisiko, das man nach hinten schiebt.
 
 Erfundene Endpunkte oder Funktionsnamen stehen hier nicht.
 
