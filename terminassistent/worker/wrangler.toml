@@ -1,0 +1,14 @@
+name = "terminassistent-mail"
+main = "email-worker.ts"
+compatibility_date = "2026-08-01"
+
+# APP_URL wird hier gesetzt, WEBHOOK_SECRET als Secret:
+#   npx wrangler secret put WEBHOOK_SECRET
+[vars]
+APP_URL = "https://assistent.example"
+
+# Danach in der Cloudflare-Oberflaeche unter Email Routing eine
+# Catch-All-Regel auf diesen Worker zeigen lassen.
+#
+# Voraussetzung: die Domain muss Cloudflare-DNS nutzen.
+# "You must be using Cloudflare DNS to use Email Service."
