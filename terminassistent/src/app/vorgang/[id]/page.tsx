@@ -12,6 +12,7 @@ import {
   automatikAusschalten,
   automatikEinschalten,
   entwurfSpeichern,
+  kompensieren,
   senden,
 } from '../../aktionen';
 
@@ -60,6 +61,14 @@ export default async function VorgangsDetail({
     .from(schema.termine)
     .where(eq(schema.termine.vorgangId, id))
     .orderBy(asc(schema.termine.von));
+
+  // Kompensieren geht nur, wenn wirklich schon etwas rausgegangen ist.
+  const [gesendet] = await d
+    .select()
+    .from(schema.ausgang)
+    .where(and(eq(schema.ausgang.vorgangId, id), eq(schema.ausgang.status, 'gesendet')))
+    .orderBy(desc(schema.ausgang.gesendetAm))
+    .limit(1);
 
   const [regel] = vorgang.gegenueberEmail
     ? await d
@@ -167,6 +176,8 @@ export default async function VorgangsDetail({
         />
       )}
 
+      {gesendet && <KorrekturKarte vorgangId={vorgang.id} an={gesendet.an} />}
+
       <div className="abschnitt">Verlauf</div>
       {verlauf.length === 0 && <p className="leise">Noch keine Nachrichten.</p>}
       {verlauf.map((nachricht) => (
@@ -181,6 +192,43 @@ export default async function VorgangsDetail({
         </div>
       ))}
     </main>
+  );
+}
+
+/**
+ * Kompensieren. Erscheint erst, wenn tatsaechlich etwas rausgegangen ist.
+ *
+ * Der Text sagt ausdruecklich, was NICHT passiert: die Mail kommt nicht
+ * zurueck. Ein Knopf, der "Rückgängig" verspricht, waere gelogen.
+ */
+function KorrekturKarte({ vorgangId, an }: { vorgangId: string; an: string }) {
+  return (
+    <details className="karte">
+      <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
+        Das hätte so nicht rausgehen dürfen
+      </summary>
+      <p className="leise" style={{ marginTop: '0.75rem' }}>
+        Die Mail an {an} ist weg und kommt nicht zurück — dafür gibt es keinen Weg. Was ich
+        tun kann: einen etwaigen Termin wieder absagen und eine Korrektur an denselben
+        Empfänger vorbereiten. Die Korrektur geht erst raus, wenn Sie sie freigeben.
+      </p>
+      <form action={kompensieren}>
+        <input type="hidden" name="vorgangId" value={vorgangId} />
+        <div className="feld">
+          <label htmlFor="grund">Was war falsch?</label>
+          <input
+            id="grund"
+            name="grund"
+            type="text"
+            required
+            placeholder="Der Termin war schon vergeben."
+          />
+        </div>
+        <button className="leise-knopf" type="submit">
+          Termin absagen und Korrektur vorbereiten
+        </button>
+      </form>
+    </details>
   );
 }
 

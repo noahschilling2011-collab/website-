@@ -37,11 +37,15 @@ const sql = dateien
   .join('\n')
   .split('--> statement-breakpoint')
   .join('\n')
-  // Wiederholbar machen: PGlite spielt das bei jedem Start ein.
+  // Wiederholbar machen: PGlite spielt das bei jedem Start komplett ein.
   .replace(/CREATE TABLE "/g, 'CREATE TABLE IF NOT EXISTS "')
   .replace(/CREATE INDEX "/g, 'CREATE INDEX IF NOT EXISTS "')
   .replace(/CREATE UNIQUE INDEX "/g, 'CREATE UNIQUE INDEX IF NOT EXISTS "')
-  // Fremdschluessel wuerden beim zweiten Lauf mit "already exists" scheitern.
+  .replace(/ADD COLUMN "/g, 'ADD COLUMN IF NOT EXISTS "')
+  // Fremdschluessel kennen kein IF NOT EXISTS und wuerden beim zweiten Lauf
+  // mit "already exists" scheitern. Fuer die eingebettete Entwicklungs-
+  // datenbank ist referenzielle Integritaet verzichtbar; gegen echtes
+  // Postgres laeuft ohnehin drizzle-kit push mit dem vollen SQL.
   .replace(/ALTER TABLE .*? ADD CONSTRAINT .*?;/gs, (treffer) =>
     treffer.replace(/^/gm, '-- '),
   );

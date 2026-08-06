@@ -3,6 +3,7 @@ import { entschluessle } from '../krypto';
 import { AttrappeSink, AttrappeSource } from './attrappe';
 import { GoogleCalendarSink, GoogleCalendarSource, type GoogleZugang } from './google';
 import { IcsFeedSource, IcsPublishSink } from './ics';
+import { ImipMailSink, type EinladungsKanal } from './imip';
 import type { CalendarSink, CalendarSource } from './types';
 
 /**
@@ -33,13 +34,29 @@ export function baueSource(verbindung: KalenderVerbindung): CalendarSource {
   }
 }
 
-export function baueSink(verbindung: KalenderVerbindung): CalendarSink {
+/**
+ * @param einladungsKanal Wird nur fuer 'imip_mail' gebraucht. Der Sink darf
+ *   nicht selbst versenden — sonst haette er die Faehigkeit, an der
+ *   60-Sekunden-Haltezeit vorbei Post an einen echten Menschen zu schicken.
+ */
+export function baueSink(
+  verbindung: KalenderVerbindung,
+  einladungsKanal?: EinladungsKanal,
+): CalendarSink {
   switch (verbindung.kind) {
     case 'google_oauth':
       return new GoogleCalendarSink(verbindung.id, googleZugang(verbindung));
 
     case 'ics_publish':
       return new IcsPublishSink(verbindung.id);
+
+    case 'imip_mail':
+      if (!einladungsKanal) {
+        throw new Error(
+          'Der iMIP-Weg braucht einen Versandkanal; ohne ihn wuerde die Einladung nirgends landen.',
+        );
+      }
+      return new ImipMailSink(verbindung.id, einladungsKanal);
 
     case 'attrappe':
       return new AttrappeSink(verbindung.id);

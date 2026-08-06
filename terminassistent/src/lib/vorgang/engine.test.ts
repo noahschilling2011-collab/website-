@@ -19,9 +19,14 @@ process.env.PGLITE_DIR = tempVerzeichnis;
 const { db, schema } = await import('../../db/index');
 const { setzeAnalysator } = await import('../llm/extraktion');
 const { AttrappeVersand, setzeMailVersand } = await import('../mail/ausgang');
-const { haltezeitAbbrechen, sendenAusloesen, takt, verarbeiteEingang } = await import(
-  './engine.js'
-);
+const {
+  haltezeitAbbrechen,
+  istStill,
+  kompensiere,
+  sendenAusloesen,
+  takt,
+  verarbeiteEingang,
+} = await import('./engine');
 const { eq } = await import('drizzle-orm');
 
 const versand = new AttrappeVersand(true);
@@ -166,7 +171,7 @@ test('Der Takt sendet erst nach Ablauf der Haltezeit', async () => {
   const vorgangId = (ergebnis as { vorgangId: string }).vorgangId;
   const vorher = versand.gesendet.length;
 
-  await sendenAusloesen(vorgangId);
+  await sendenAusloesen(vorgangId, nutzer.id);
 
   const [nachKlick] = await d
     .select()
@@ -218,8 +223,8 @@ test('Abbruch innerhalb der Haltezeit verhindert den Versand', async () => {
   const vorgangId = (ergebnis as { vorgangId: string }).vorgangId;
   const vorher = versand.gesendet.length;
 
-  await sendenAusloesen(vorgangId);
-  const abgebrochen = await haltezeitAbbrechen(vorgangId);
+  await sendenAusloesen(vorgangId, nutzer.id);
+  const abgebrochen = await haltezeitAbbrechen(vorgangId, nutzer.id);
   assert.equal(abgebrochen, true);
 
   await takt(new Date(Date.now() + 61_000));
@@ -355,7 +360,7 @@ test('Eine Zusage waehlt den Vorschlag aus und behaelt dessen UID', async () => 
     (a, b) => a.von.getTime() - b.von.getTime(),
   )[1]!;
 
-  await sendenAusloesen(vorgangId);
+  await sendenAusloesen(vorgangId, nutzer.id);
   await takt(new Date(Date.now() + 61_000));
 
   // Jetzt antwortet Frau Berger und sagt Vorschlag 2 zu.
@@ -425,7 +430,7 @@ test('Alles landet im Protokoll, im Wortlaut', async () => {
   );
   const vorgangId = (ergebnis as { vorgangId: string }).vorgangId;
 
-  await sendenAusloesen(vorgangId);
+  await sendenAusloesen(vorgangId, nutzer.id);
   await takt(new Date(Date.now() + 61_000));
 
   const eintraege = await d
@@ -445,5 +450,387 @@ test('Alles landet im Protokoll, im Wortlaut', async () => {
     gesendet!.details ?? '',
     /Assistenzsystem verfasst/,
     'der volle Wortlaut inklusive Signatur steht im Protokoll',
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Kompensieren
+// ---------------------------------------------------------------------------
+
+test('Kompensieren sagt den Termin ab und legt eine Korrektur als Entwurf bereit', async () => {
+  const nutzer = await legeNutzerAn();
+  const d = await db();
+
+  setzeAnalysator(async () => ({
+    art: 'termin',
+    titel: 'Termin mit Herrn Falsch',
+    gegenueberName: 'Herr Falsch',
+    fristDatum: null,
+    betragEuro: null,
+    istZusage: false,
+    zugesagterVorschlag: null,
+    vertrauen: 'hoch',
+    begruendung: 'Testanalyse',
+  }));
+
+  const ergebnis = await verarbeiteEingang(
+    mime({
+      von: 'falsch@example.test',
+      an: `${nutzer.handle}@assistent.test`,
+      betreff: 'Termin',
+      text: 'Wann passt es?',
+      messageId: 'k1@example.test',
+    }),
+  );
+  const vorgangId = (ergebnis as { vorgangId: string }).vorgangId;
+
+  await sendenAusloesen(vorgangId, nutzer.id);
+  await takt(new Date(Date.now() + 61_000));
+
+  // Jetzt sagt der Gegenueber zu, damit ein echter Termin existiert.
+  setzeAnalysator(async () => ({
+    art: 'termin',
+    titel: 'Termin mit Herrn Falsch',
+    gegenueberName: 'Herr Falsch',
+    fristDatum: null,
+    betragEuro: null,
+    istZusage: true,
+    zugesagterVorschlag: 1,
+    vertrauen: 'hoch',
+    begruendung: 'Zusage',
+  }));
+  await verarbeiteEingang(
+    [
+      'From: falsch@example.test',
+      `To: ${nutzer.handle}@assistent.test`,
+      'Subject: Re: Termin',
+      'Message-ID: <k2@example.test>',
+      'In-Reply-To: <k1@example.test>',
+      'References: <k1@example.test>',
+      'Content-Type: text/plain; charset=utf-8',
+      '',
+      'Der erste passt.',
+    ].join('\r\n'),
+  );
+
+  const vorherGesendet = versand.gesendet.length;
+  const ausgang = await kompensiere(vorgangId, nutzer.id, 'Der Termin war schon vergeben.');
+  assert.deepEqual(ausgang, { ok: true });
+
+  // 1. Der Termin ist abgesagt und die SEQUENCE gestiegen (RFC 5546).
+  const [termin] = await d
+    .select()
+    .from(schema.termine)
+    .where(eq(schema.termine.vorgangId, vorgangId));
+  assert.equal(termin!.platzierungsStatus, 'abgesagt');
+  assert.equal(termin!.sequence, 1);
+
+  // 2. Die Korrektur liegt als ENTWURF vor, nicht als Versand.
+  const entwuerfe = await d
+    .select()
+    .from(schema.ausgang)
+    .where(eq(schema.ausgang.vorgangId, vorgangId));
+  const korrektur = entwuerfe.find((e) => e.status === 'entwurf');
+  assert.ok(korrektur, 'es muss eine Korrektur als Entwurf geben');
+  assert.equal(
+    versand.gesendet.length,
+    vorherGesendet,
+    'auch die Korrektur geht nicht ohne Klick raus',
+  );
+
+  const [vorgang] = await d
+    .select()
+    .from(schema.vorgaenge)
+    .where(eq(schema.vorgaenge.id, vorgangId));
+  assert.equal(vorgang!.zustand, 'warte_auf_mich');
+
+  // 3. Beides steht im Protokoll.
+  const protokoll = await d
+    .select()
+    .from(schema.protokoll)
+    .where(eq(schema.protokoll.nutzerId, nutzer.id));
+  const was = protokoll.map((p) => p.was);
+  assert.ok(was.includes('Termin abgesagt'));
+  assert.ok(was.includes('Korrektur vorbereitet'));
+});
+
+test('Kompensieren ohne vorherigen Versand tut nichts', async () => {
+  const nutzer = await legeNutzerAn();
+
+  setzeAnalysator(async () => ({
+    art: 'termin',
+    titel: 'Noch nichts raus',
+    gegenueberName: null,
+    fristDatum: null,
+    betragEuro: null,
+    istZusage: false,
+    zugesagterVorschlag: null,
+    vertrauen: 'hoch',
+    begruendung: 'Testanalyse',
+  }));
+
+  const ergebnis = await verarbeiteEingang(
+    mime({
+      von: 'still@example.test',
+      an: `${nutzer.handle}@assistent.test`,
+      betreff: 'Termin',
+      text: 'Hallo',
+      messageId: 'k3@example.test',
+    }),
+  );
+  const vorgangId = (ergebnis as { vorgangId: string }).vorgangId;
+
+  const ausgang = await kompensiere(vorgangId, nutzer.id, 'egal');
+  assert.equal(ausgang.ok, false);
+  assert.match((ausgang as { grund: string }).grund, /noch nichts rausgegangen/);
+});
+
+// ---------------------------------------------------------------------------
+// Fremde Vorgaenge
+// ---------------------------------------------------------------------------
+
+test('Eine fremde Nutzerin kann weder senden noch abbrechen noch kompensieren', async () => {
+  // Die Vorgangs-ID steht in einem versteckten Formularfeld, kommt also aus
+  // dem Browser. Ohne Zugehoerigkeitspruefung koennte jede angemeldete
+  // Person fremde Post ausloesen — oder einem fremden Gegenueber einen
+  // Termin absagen.
+  const eigentuemerin = await legeNutzerAn();
+  const fremde = await legeNutzerAn();
+  const d = await db();
+
+  setzeAnalysator(async () => ({
+    art: 'termin',
+    titel: 'Nicht deine Sache',
+    gegenueberName: null,
+    fristDatum: null,
+    betragEuro: null,
+    istZusage: false,
+    zugesagterVorschlag: null,
+    vertrauen: 'hoch',
+    begruendung: 'Testanalyse',
+  }));
+
+  const ergebnis = await verarbeiteEingang(
+    mime({
+      von: 'fremd@example.test',
+      an: `${eigentuemerin.handle}@assistent.test`,
+      betreff: 'Termin',
+      text: 'Guten Tag',
+      messageId: 'f1@example.test',
+    }),
+  );
+  const vorgangId = (ergebnis as { vorgangId: string }).vorgangId;
+
+  await assert.rejects(
+    () => sendenAusloesen(vorgangId, fremde.id),
+    /nicht gefunden/,
+    'senden darf nicht durchgehen',
+  );
+
+  const [unveraendert] = await d
+    .select()
+    .from(schema.ausgang)
+    .where(eq(schema.ausgang.vorgangId, vorgangId));
+  assert.equal(unveraendert!.status, 'entwurf', 'der Entwurf blieb ein Entwurf');
+
+  // Jetzt loest die Eigentuemerin selbst aus — die Haltezeit laeuft.
+  await sendenAusloesen(vorgangId, eigentuemerin.id);
+  assert.equal(
+    await haltezeitAbbrechen(vorgangId, fremde.id),
+    false,
+    'abbrechen darf nicht durchgehen',
+  );
+
+  const [gehalten] = await d
+    .select()
+    .from(schema.ausgang)
+    .where(eq(schema.ausgang.vorgangId, vorgangId));
+  assert.equal(gehalten!.status, 'gehalten', 'der Versand laeuft weiter');
+
+  const kompensation = await kompensiere(vorgangId, fremde.id, 'war falsch');
+  assert.equal(kompensation.ok, false);
+});
+
+// ---------------------------------------------------------------------------
+// Bezahlschranke
+// ---------------------------------------------------------------------------
+
+test('Nach fuenf abgeschlossenen Vorgaengen wird nicht mehr gearbeitet', async () => {
+  const nutzer = await legeNutzerAn();
+  const d = await db();
+
+  await d
+    .update(schema.nutzer)
+    .set({ abgeschlosseneVorgaenge: 5 })
+    .where(eq(schema.nutzer.id, nutzer.id));
+
+  setzeAnalysator(async () => ({
+    art: 'termin',
+    titel: 'Sechster Vorgang',
+    gegenueberName: 'Jemand',
+    fristDatum: null,
+    betragEuro: null,
+    istZusage: false,
+    zugesagterVorschlag: null,
+    vertrauen: 'hoch',
+    begruendung: 'Testanalyse',
+  }));
+
+  const ergebnis = await verarbeiteEingang(
+    mime({
+      von: 'sechster@example.test',
+      an: `${nutzer.handle}@assistent.test`,
+      betreff: 'Termin',
+      text: 'Wann passt es?',
+      messageId: 'z1@example.test',
+    }),
+  );
+  const vorgangId = (ergebnis as { vorgangId: string }).vorgangId;
+
+  // Die Mail ist gespeichert und sichtbar — nur die Arbeit unterbleibt.
+  const nachrichten = await d
+    .select()
+    .from(schema.nachrichten)
+    .where(eq(schema.nachrichten.vorgangId, vorgangId));
+  assert.equal(nachrichten.length, 1, 'die Mail geht nicht verloren');
+
+  const termine = await d
+    .select()
+    .from(schema.termine)
+    .where(eq(schema.termine.vorgangId, vorgangId));
+  assert.equal(termine.length, 0, 'keine Vorschlaege ohne Abonnement');
+
+  const entwuerfe = await d
+    .select()
+    .from(schema.ausgang)
+    .where(eq(schema.ausgang.vorgangId, vorgangId));
+  assert.equal(entwuerfe.length, 0, 'kein Entwurf ohne Abonnement');
+});
+
+test('Wer zahlt, arbeitet weiter', async () => {
+  const nutzer = await legeNutzerAn();
+  const d = await db();
+
+  await d
+    .update(schema.nutzer)
+    .set({ abgeschlosseneVorgaenge: 42, zahlendSeit: new Date('2026-01-01') })
+    .where(eq(schema.nutzer.id, nutzer.id));
+
+  setzeAnalysator(async () => ({
+    art: 'termin',
+    titel: 'Zahlende Nutzerin',
+    gegenueberName: 'Jemand',
+    fristDatum: null,
+    betragEuro: null,
+    istZusage: false,
+    zugesagterVorschlag: null,
+    vertrauen: 'hoch',
+    begruendung: 'Testanalyse',
+  }));
+
+  const ergebnis = await verarbeiteEingang(
+    mime({
+      von: 'zahlt@example.test',
+      an: `${nutzer.handle}@assistent.test`,
+      betreff: 'Termin',
+      text: 'Wann passt es?',
+      messageId: 'z2@example.test',
+    }),
+  );
+  const vorgangId = (ergebnis as { vorgangId: string }).vorgangId;
+
+  const termine = await d
+    .select()
+    .from(schema.termine)
+    .where(eq(schema.termine.vorgangId, vorgangId));
+  assert.equal(termine.length, 3, 'Vorschlaege wie gewohnt');
+});
+
+// ---------------------------------------------------------------------------
+// Ueberwachung stiller Brueche
+// ---------------------------------------------------------------------------
+
+test('istStill erkennt gebrochene Verbindungen, aber nicht frische', () => {
+  const jetzt = new Date('2026-08-10T00:00:00Z');
+  const frisch = new Date('2026-08-09T00:00:00Z');
+  const alt = new Date('2026-08-01T00:00:00Z');
+
+  // Entzogenes Recht: sofort, ohne Karenz.
+  assert.equal(
+    istStill(
+      { kind: 'google_oauth', lastOkAt: frisch, hartGebrochen: true, erstelltAm: alt },
+      jetzt,
+    ),
+    true,
+  );
+  // Ein gewoehnlicher Fehler bei sonst frischem Abruf ist noch kein Bruch —
+  // sonst loest eine einzelne Zeitueberschreitung eine Alarmmail aus.
+  assert.equal(
+    istStill(
+      { kind: 'google_oauth', lastOkAt: frisch, hartGebrochen: false, erstelltAm: alt },
+      jetzt,
+    ),
+    false,
+  );
+  // Lange nichts gelesen: still gebrochen.
+  assert.equal(
+    istStill(
+      { kind: 'ics_secret_url', lastOkAt: alt, hartGebrochen: false, erstelltAm: alt },
+      jetzt,
+    ),
+    true,
+  );
+  // Nie gelesen, aber gerade erst angelegt: noch keine Warnung.
+  assert.equal(
+    istStill(
+      { kind: 'ics_secret_url', lastOkAt: null, hartGebrochen: false, erstelltAm: frisch },
+      jetzt,
+    ),
+    false,
+  );
+  // Reine Schreibkanaele werden nie gelesen und koennen so nicht beurteilt werden.
+  assert.equal(
+    istStill({ kind: 'ics_publish', lastOkAt: null, hartGebrochen: false, erstelltAm: alt }, jetzt),
+    false,
+  );
+  // Die Attrappe kann nicht brechen.
+  assert.equal(
+    istStill({ kind: 'attrappe', lastOkAt: null, hartGebrochen: false, erstelltAm: alt }, jetzt),
+    false,
+  );
+});
+
+test('Der Takt schreibt die Nutzerin an, wenn der Kalender still gebrochen ist', async () => {
+  const nutzer = await legeNutzerAn();
+  const d = await db();
+
+  await d
+    .insert(schema.kalenderVerbindungen)
+    .values({
+      nutzerId: nutzer.id,
+      kind: 'ics_secret_url',
+      secretRef: 'egal',
+      konfig: {},
+      lastError: 'Der Kalender-Feed ist nicht erreichbar.',
+      lastErrorAt: new Date(),
+      hartGebrochen: true,
+    });
+
+  const vorher = versand.gesendet.length;
+  const ergebnis = await takt(new Date());
+
+  assert.ok(ergebnis.verbindungsWarnungen >= 1, 'mindestens eine Warnung');
+  const warnung = versand.gesendet.slice(vorher).find((m) => m.an === nutzer.email);
+  assert.ok(warnung, 'die Nutzerin muss angeschrieben werden');
+  assert.match(warnung!.betreff, /Kalender/);
+  assert.match(warnung!.text, /nicht erreichbar/);
+
+  // Nicht jede Minute erneut anschreiben.
+  const nachErsterWarnung = versand.gesendet.length;
+  await takt(new Date());
+  assert.equal(
+    versand.gesendet.length,
+    nachErsterWarnung,
+    'kein zweites Anschreiben direkt danach',
   );
 });

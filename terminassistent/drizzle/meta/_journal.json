@@ -8,6 +8,20 @@
       "when": 1785939265463,
       "tag": "0000_breezy_ricochet",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786041076906,
+      "tag": "0001_noisy_zarda",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786042843921,
+      "tag": "0002_large_thunderbolt",
+      "breakpoints": true
     }
   ]
 }

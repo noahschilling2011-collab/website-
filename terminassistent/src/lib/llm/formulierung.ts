@@ -173,6 +173,61 @@ ${daten.bisherigerVerlauf}`,
   });
 }
 
+/**
+ * Kompensation: die Korrektur nach einer Mail, die so nicht haette
+ * rausgehen duerfen.
+ *
+ * Es gibt kein Rueckgaengig fuer eine gesendete Mail. Es gibt nur diese
+ * zweite Mail — und die muss den Fehler benennen, statt ihn zu verschleiern.
+ */
+export async function entwurfKorrektur(daten: {
+  gegenueberName: string | null;
+  betreff: string;
+  falscheNachricht: string;
+  grund: string;
+  nutzerName: string;
+}): Promise<Entwurf> {
+  if (!hatModellZugang()) {
+    return {
+      betreff: daten.betreff,
+      text: [
+        `Guten Tag${daten.gegenueberName ? ` ${daten.gegenueberName}` : ''},`,
+        '',
+        'bitte entschuldigen Sie meine vorige Nachricht — sie war nicht korrekt.',
+        '',
+        daten.grund,
+        '',
+        'Ich melde mich mit den richtigen Angaben erneut.',
+      ].join('\n'),
+    };
+  }
+
+  return strukturiert<Entwurf>({
+    modell: MODELL_FORMULIERUNG,
+    system: SYSTEM,
+    prompt: `Schreibe eine kurze Korrektur zu einer Nachricht, die soeben faelschlich verschickt wurde.
+
+Regeln fuer diesen Fall:
+- Benenne den Fehler klar, ohne ihn auszuschmuecken oder zu verharmlosen.
+- Keine ausufernde Entschuldigung, ein Satz genuegt.
+- Sag, was stattdessen gilt, oder dass eine korrigierte Nachricht folgt.
+- Keine Schuldzuweisung an Technik oder Dritte.
+
+Empfaenger: ${daten.gegenueberName ?? 'unbekannt'}
+Bisheriger Betreff: ${daten.betreff}
+Therapeutin: ${daten.nutzerName}
+
+Das ging faelschlich raus:
+${daten.falscheNachricht}
+
+Was daran falsch war:
+${daten.grund}`,
+    schema: SCHEMA,
+    maxTokens: 2000,
+    effort: 'low',
+  });
+}
+
 function ordnungszahl(n: number): string {
   return ['erste', 'zweite', 'dritte', 'vierte'][n - 1] ?? `${n}.`;
 }

@@ -42,6 +42,8 @@ export const nutzer = pgTable('nutzer', {
   /** Zaehler fuer die Gratisstufe: fuenf abgeschlossene Vorgaenge. */
   abgeschlosseneVorgaenge: integer('abgeschlossene_vorgaenge').notNull().default(0),
   zahlendSeit: timestamp('zahlend_seit', { withTimezone: true }),
+  /** Kundennummer beim Zahlungsdienstleister, sobald es eine gibt. */
+  zahlungsKundeId: text('zahlungs_kunde_id'),
   erstelltAm: timestamp('erstellt_am', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -93,6 +95,21 @@ export const kalenderVerbindungen = pgTable(
     lastOkAt: timestamp('last_ok_at', { withTimezone: true }),
     lastError: text('last_error'),
     lastErrorAt: timestamp('last_error_at', { withTimezone: true }),
+    /**
+     * Ein entzogenes Recht, keine Stoerung.
+     *
+     * Ein abgelaufenes Refresh-Token oder eine zurueckgesetzte iCal-Adresse
+     * heilt nicht von selbst; ein Netzfehler heilt beim naechsten Versuch.
+     * Ohne diese Unterscheidung wuerde eine einzelne Zeitueberschreitung
+     * die Mail "Ihr Kalender ist nicht mehr erreichbar" ausloesen — und ein
+     * Produkt, das grundlos Alarm schlaegt, wird abgeschaltet.
+     */
+    hartGebrochen: boolean('hart_gebrochen').notNull().default(false),
+    /**
+     * Wann die Nutzerin zuletzt ueber einen Bruch benachrichtigt wurde.
+     * Verhindert, dass der Takt sie jede Minute erneut anschreibt.
+     */
+    bruchGemeldetAm: timestamp('bruch_gemeldet_am', { withTimezone: true }),
 
     erstelltAm: timestamp('erstellt_am', { withTimezone: true }).notNull().defaultNow(),
     widerrufenAm: timestamp('widerrufen_am', { withTimezone: true }),

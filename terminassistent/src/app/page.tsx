@@ -2,11 +2,12 @@ import { desc, eq } from 'drizzle-orm';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { db, schema } from '../db/index';
-import type { AusgangsEintrag, Termin, Vorgang } from '../db/schema';
+import type { AusgangsEintrag, Nutzer, Termin, Vorgang } from '../db/schema';
+import { pruefeSchranke, zeigeHinweis } from '../lib/abrechnung';
 import { konfig } from '../lib/konfig';
 import { sortiere, stelleDar } from '../lib/vorgang/darstellung';
 import { aktuelleNutzerin } from '../lib/sitzung';
-import { abbrechen, demoMailEinspielen, senden } from './aktionen';
+import { abbrechen, demoMailEinspielen, senden, zahlungStarten } from './aktionen';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,10 +20,15 @@ export const dynamic = 'force-dynamic';
  * Die Zeilen, die auf die Nutzerin warten, stehen oben und tragen den
  * einen Knopf.
  */
-export default async function Startseite() {
+export default async function Startseite({
+  searchParams,
+}: {
+  searchParams: Promise<{ zahlung?: string }>;
+}) {
   const nutzer = await aktuelleNutzerin();
   if (!nutzer) redirect('/anmelden');
 
+  const { zahlung } = await searchParams;
   const d = await db();
   const vorgaenge = await d
     .select()
@@ -64,6 +70,8 @@ export default async function Startseite() {
         </Link>
       </div>
 
+      <ZahlungsRueckmeldung code={zahlung} />
+      <AbrechnungsHinweis nutzer={nutzer} />
       {konfig.demoModus && <DemoHinweis />}
 
       {zeilen.length === 0 ? (
@@ -146,6 +154,59 @@ function Zeile({
           </form>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Die Bezahlaufforderung erscheint genau in dem Moment, in dem der sechste
+ * Vorgang abgeschlossen waere — also nach nachweisbarem Nutzen, nicht davor.
+ * Davor gibt es hoechstens einen leisen Zaehler, und auch den erst ab dem
+ * drittletzten freien Vorgang.
+ */
+/**
+ * Nach der Rueckkehr aus dem Bezahlvorgang. Nur feste Codes, kein Text aus
+ * der Adresszeile — sonst koennte ein fremder Link der Nutzerin einen
+ * beliebigen Satz auf ihrer eigenen Seite unterschieben.
+ *
+ * Ohne diesen Hinweis waere eine gescheiterte Zahlung nicht von einer
+ * erfolgreichen zu unterscheiden: die Seite saehe in beiden Faellen
+ * gleich aus.
+ */
+const ZAHLUNGSTEXTE: Record<string, string> = {
+  aktiv: 'Das Abonnement ist aktiv. Alle Vorgänge werden wieder bearbeitet.',
+  nicht_bestaetigt:
+    'Die Zahlung konnte nicht bestätigt werden. Es wurde nichts freigeschaltet — falls doch abgebucht wurde, schreiben Sie mir.',
+  unvollstaendig: 'Der Bezahlvorgang wurde ohne Ergebnis beendet.',
+  fehler: 'Die Prüfung der Zahlung ist fehlgeschlagen. Einzelheiten stehen im Protokoll.',
+  nicht_eingerichtet: 'Die Bezahlung ist auf diesem Server nicht eingerichtet.',
+};
+
+function ZahlungsRueckmeldung({ code }: { code: string | undefined }) {
+  const text = code ? ZAHLUNGSTEXTE[code] : undefined;
+  if (!text) return null;
+  return <div className="hinweis">{text}</div>;
+}
+
+function AbrechnungsHinweis({ nutzer }: { nutzer: Nutzer }) {
+  const schranke = pruefeSchranke(nutzer);
+  const hinweis = zeigeHinweis(nutzer);
+  if (!hinweis) return null;
+
+  if (schranke.erlaubt) {
+    return <p className="leise">{hinweis}</p>;
+  }
+
+  return (
+    <div className="hinweis">
+      <strong>{hinweis}</strong>
+      <p style={{ marginTop: '0.35rem', marginBottom: '0.75rem' }}>
+        Neue Mails werden weiterhin gespeichert, aber nicht mehr bearbeitet. 9 € im Monat,
+        monatlich kündbar.
+      </p>
+      <form action={zahlungStarten}>
+        <button type="submit">Abonnement abschließen</button>
+      </form>
     </div>
   );
 }

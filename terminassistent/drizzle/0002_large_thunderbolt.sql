@@ -1,0 +1,1 @@
+ALTER TABLE "calendar_connections" ADD COLUMN "hart_gebrochen" boolean DEFAULT false NOT NULL;

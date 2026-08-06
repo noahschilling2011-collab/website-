@@ -6,12 +6,15 @@ import { redirect } from 'next/navigation';
 import { db, schema } from '../db/index';
 import { verschluessle, zufallsToken } from '../lib/krypto';
 import {
+  eigenerVorgang,
   haltezeitAbbrechen,
+  kompensiere,
   protokolliere,
   sendenAusloesen,
   verarbeiteEingang,
 } from '../lib/vorgang/engine';
 import { aktuelleNutzerin, beendeSitzung, sendeAnmeldeLink } from '../lib/sitzung';
+import { starteCheckout, zahlungKonfiguriert } from '../lib/zahlung';
 
 async function nutzerinOderRaus() {
   const nutzer = await aktuelleNutzerin();
@@ -33,18 +36,18 @@ export async function abmelden(): Promise<void> {
 
 /** Der eine Knopf auf dem Hauptbildschirm. Startet die Haltezeit. */
 export async function senden(formData: FormData): Promise<void> {
-  await nutzerinOderRaus();
+  const nutzer = await nutzerinOderRaus();
   const vorgangId = String(formData.get('vorgangId'));
-  await sendenAusloesen(vorgangId);
+  await sendenAusloesen(vorgangId, nutzer.id);
   revalidatePath('/');
   revalidatePath(`/vorgang/${vorgangId}`);
 }
 
 /** Innerhalb der Haltezeit. Danach hilft nur noch Kompensieren. */
 export async function abbrechen(formData: FormData): Promise<void> {
-  await nutzerinOderRaus();
+  const nutzer = await nutzerinOderRaus();
   const vorgangId = String(formData.get('vorgangId'));
-  await haltezeitAbbrechen(vorgangId);
+  await haltezeitAbbrechen(vorgangId, nutzer.id);
   revalidatePath('/');
   revalidatePath(`/vorgang/${vorgangId}`);
 }
@@ -55,6 +58,11 @@ export async function entwurfSpeichern(formData: FormData): Promise<void> {
   const vorgangId = String(formData.get('vorgangId'));
   const text = String(formData.get('text') ?? '');
   const betreff = String(formData.get('betreff') ?? '');
+
+  // Die Vorgangs-ID kommt aus einem versteckten Formularfeld. Ohne diese
+  // Pruefung koennte jede angemeldete Person den Text umschreiben, den eine
+  // fremde Nutzerin gleich abschickt.
+  if (!(await eigenerVorgang(vorgangId, nutzer.id))) return;
 
   const d = await db();
   const [entwurf] = await d
@@ -197,6 +205,52 @@ export async function verbindungWiderrufen(formData: FormData): Promise<void> {
     );
   await protokolliere(nutzer.id, null, 'Kalenderverbindung widerrufen', id);
   revalidatePath('/verbindungen');
+}
+
+// ---------------------------------------------------------------------------
+// Kompensieren
+// ---------------------------------------------------------------------------
+
+/**
+ * "Das hätte so nicht rausgehen dürfen."
+ *
+ * Es gibt kein Rueckgaengig. Diese Aktion sagt einen etwaigen Termin ab
+ * und legt einen Korrekturentwurf bereit — als Entwurf, denn auch die
+ * Korrektur ist eine Mail an einen Menschen.
+ */
+export async function kompensieren(formData: FormData): Promise<void> {
+  const nutzer = await nutzerinOderRaus();
+  const vorgangId = String(formData.get('vorgangId'));
+  const grund = String(formData.get('grund') ?? '').trim();
+  if (!grund) return;
+
+  await kompensiere(vorgangId, nutzer.id, grund);
+  revalidatePath('/');
+  revalidatePath(`/vorgang/${vorgangId}`);
+}
+
+// ---------------------------------------------------------------------------
+// Zahlung
+// ---------------------------------------------------------------------------
+
+export async function zahlungStarten(): Promise<void> {
+  const nutzer = await nutzerinOderRaus();
+  if (!zahlungKonfiguriert()) {
+    await protokolliere(
+      nutzer.id,
+      null,
+      'Zahlung nicht eingerichtet',
+      'STRIPE_SECRET_KEY und STRIPE_PREIS_ID fehlen.',
+    );
+    redirect('/?zahlung=nicht_eingerichtet');
+  }
+
+  const url = await starteCheckout({
+    nutzerId: nutzer.id,
+    email: nutzer.email,
+    kundeId: nutzer.zahlungsKundeId,
+  });
+  redirect(url);
 }
 
 // ---------------------------------------------------------------------------

@@ -1,7 +1,9 @@
 import crypto from 'node:crypto';
-import { and, asc, desc, eq, isNull, lte } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, lte, sql } from 'drizzle-orm';
 import { db, schema } from '../../db/index';
 import type { Nutzer, Vorgang, VorgangsArt } from '../../db/schema';
+import { pruefeSchranke } from '../abrechnung';
+import type { EinladungsKanal } from '../calendar/imip';
 import { baueSink, baueSource } from '../calendar/registry';
 import type { CalendarSink, CalendarSource, EventDraft } from '../calendar/types';
 import { VerbindungGebrochen } from '../calendar/types';
@@ -9,6 +11,7 @@ import { konfig } from '../konfig';
 import { analysiere, type Analyse } from '../llm/extraktion';
 import {
   entwurfBestaetigung,
+  entwurfKorrektur,
   entwurfNachfassen,
   entwurfTerminvorschlag,
   fristTitel,
@@ -89,6 +92,25 @@ async function wendeAnalyseAn(
   // Eine Zusage auf unsere Vorschlaege hat Vorrang vor der Kategorie.
   if (vorgang.zustand === 'warte_auf_andere' && analyse.istZusage) {
     await verarbeiteZusage(nutzer, vorgang, mail, analyse);
+    return;
+  }
+
+  // Die Bezahlschranke greift, bevor gearbeitet wird — nicht erst beim
+  // Versand. Die Mail bleibt trotzdem gespeichert und sichtbar; nur die
+  // Arbeit daran unterbleibt, bis bezahlt ist.
+  const schranke = pruefeSchranke(nutzer);
+  if (!schranke.erlaubt) {
+    await d
+      .update(schema.vorgaenge)
+      .set({
+        titel: analyse.titel,
+        gegenueberEmail: mail.von,
+        gegenueberName: analyse.gegenueberName ?? mail.vonName,
+        zustand: 'warte_auf_mich',
+        geaendertAm: new Date(),
+      })
+      .where(eq(schema.vorgaenge.id, vorgang.id));
+    await protokolliere(nutzer.id, vorgang.id, 'Kostenlose Vorgaenge aufgebraucht', schranke.grund);
     return;
   }
 
@@ -185,7 +207,7 @@ async function trageFristEin(
     })
     .returning();
 
-  const kanal = await kalenderKanal(nutzer.id);
+  const kanal = await kalenderKanal(nutzer.id, vorgang.id);
   if (!kanal?.sink) {
     await setzeZustand(vorgang.id, 'warte_auf_mich');
     await protokolliere(
@@ -232,7 +254,7 @@ async function erzeugeTerminEntwurf(
   vorgang: Vorgang,
   mail: EingehendeMail,
 ): Promise<void> {
-  const kanal = await kalenderKanal(nutzer.id);
+  const kanal = await kalenderKanal(nutzer.id, vorgang.id);
   if (!kanal?.source) {
     await setzeZustand(vorgang.id, 'warte_auf_mich');
     await protokolliere(
@@ -252,7 +274,7 @@ async function erzeugeTerminEntwurf(
     belegt = await kanal.source.getBusy({ from: von, to: bis });
     await merkeVerbindungOk(kanal.verbindungId);
   } catch (fehler) {
-    await merkeVerbindungFehler(kanal.verbindungId, (fehler as Error).message);
+    await merkeVerbindungFehler(kanal.verbindungId, fehler);
     await setzeZustand(vorgang.id, 'fehler');
     await protokolliere(
       nutzer.id,
@@ -339,10 +361,10 @@ async function verarbeiteZusage(
     end: gewaehlt.bis,
     zeitzone: nutzer.zeitzone,
     teilnehmer: vorgang.gegenueberEmail ?? undefined,
-    organisator: nutzer.name ? { name: nutzer.name, email: konfig.absender } : undefined,
+    organisator: organisator(nutzer),
   };
 
-  const kanal = await kalenderKanal(nutzer.id);
+  const kanal = await kalenderKanal(nutzer.id, vorgang.id);
   if (kanal?.sink) {
     const ergebnis = await kanal.sink.create(draft);
     await d
@@ -425,14 +447,16 @@ async function legeEntwurfAb(
   );
 }
 
-/** Die Nutzerin hat auf "Senden" geklickt. Jetzt laeuft die Haltezeit. */
-export async function sendenAusloesen(vorgangId: string): Promise<void> {
+/**
+ * Die Nutzerin hat auf "Senden" geklickt. Jetzt laeuft die Haltezeit.
+ *
+ * `nutzerId` ist Pflicht und nicht optional: die Vorgangs-ID kommt aus einem
+ * Formularfeld, also aus dem Browser. Ohne diese Bedingung koennte jede
+ * angemeldete Person die Post einer fremden Nutzerin ausloesen.
+ */
+export async function sendenAusloesen(vorgangId: string, nutzerId: string): Promise<void> {
   const d = await db();
-  const [vorgang] = await d
-    .select()
-    .from(schema.vorgaenge)
-    .where(eq(schema.vorgaenge.id, vorgangId))
-    .limit(1);
+  const vorgang = await eigenerVorgang(vorgangId, nutzerId);
   if (!vorgang) throw new Error('Vorgang nicht gefunden.');
 
   const uebergang = naechsterZustand(vorgang.zustand, { art: 'senden_ausgeloest' });
@@ -457,8 +481,13 @@ export async function sendenAusloesen(vorgangId: string): Promise<void> {
 }
 
 /** Abbruch innerhalb der Haltezeit. Danach hilft nur noch Kompensieren. */
-export async function haltezeitAbbrechen(vorgangId: string): Promise<boolean> {
+export async function haltezeitAbbrechen(vorgangId: string, nutzerId: string): Promise<boolean> {
   const d = await db();
+  // Erst die Zugehoerigkeit, dann die Wirkung — sonst wuerde ein fremder
+  // Abbruch den Entwurf schon veraendert haben, bevor er scheitert.
+  const vorgang = await eigenerVorgang(vorgangId, nutzerId);
+  if (!vorgang) return false;
+
   const entwurf = await neuesterEntwurf(vorgangId);
   if (!entwurf || entwurf.status !== 'gehalten') return false;
   if (entwurf.haltenBis.getTime() <= Date.now()) return false;
@@ -468,17 +497,148 @@ export async function haltezeitAbbrechen(vorgangId: string): Promise<boolean> {
     .set({ status: 'abgebrochen' })
     .where(eq(schema.ausgang.id, entwurf.id));
 
-  const [vorgang] = await d
-    .select()
-    .from(schema.vorgaenge)
-    .where(eq(schema.vorgaenge.id, vorgangId))
-    .limit(1);
-  if (!vorgang) return false;
-
   const uebergang = naechsterZustand(vorgang.zustand, { art: 'haltezeit_abgebrochen' });
   await setzeZustand(vorgangId, uebergang.zustand);
   await protokolliere(vorgang.nutzerId, vorgangId, 'Versand abgebrochen', 'Innerhalb der Haltezeit.');
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Kompensieren — der dritte Ersatz fuer ein Rueckgaengig
+// ---------------------------------------------------------------------------
+
+/**
+ * Eine Mail ist raus, die so nicht rausgehen durfte.
+ *
+ * Es gibt kein Rueckgaengig. Es gibt drei Ersatzmechanismen, und das hier
+ * ist der zweite: kompensieren. Konkret passiert dreierlei —
+ *
+ *   1. Ein Termin, der zu dieser Nachricht gehoert, wird abgesagt. Beim
+ *      OAuth-Weg wirklich geloescht, beim iMIP-Weg als METHOD:CANCEL an
+ *      den Empfaenger, beim Feed durch Entfernen aus dem Feed.
+ *   2. Ein Korrekturentwurf wird erzeugt — als Entwurf, nicht als Versand.
+ *      Auch die Korrektur einer falschen Mail ist eine Mail an einen
+ *      Menschen und braucht denselben Klick.
+ *   3. Beides steht im Protokoll, im Wortlaut.
+ */
+export async function kompensiere(
+  vorgangId: string,
+  nutzerId: string,
+  grund: string,
+): Promise<{ ok: true } | { ok: false; grund: string }> {
+  const d = await db();
+
+  // Die schaerfste Bedingung von allen: dieser Aufruf sagt einem echten
+  // Menschen einen Termin ab. Er darf nur auf einem eigenen Vorgang laufen.
+  const vorgang = await eigenerVorgang(vorgangId, nutzerId);
+  if (!vorgang) return { ok: false, grund: 'Vorgang nicht gefunden.' };
+
+  const [nutzer] = await d
+    .select()
+    .from(schema.nutzer)
+    .where(eq(schema.nutzer.id, vorgang.nutzerId))
+    .limit(1);
+  if (!nutzer) return { ok: false, grund: 'Nutzerin nicht gefunden.' };
+
+  const [gesendet] = await d
+    .select()
+    .from(schema.ausgang)
+    .where(and(eq(schema.ausgang.vorgangId, vorgangId), eq(schema.ausgang.status, 'gesendet')))
+    .orderBy(desc(schema.ausgang.gesendetAm))
+    .limit(1);
+
+  if (!gesendet) {
+    return {
+      ok: false,
+      grund: 'Zu diesem Vorgang ist noch nichts rausgegangen — es gibt nichts zu korrigieren.',
+    };
+  }
+
+  // 1. Termin absagen, falls einer daran haengt.
+  const [termin] = await d
+    .select()
+    .from(schema.termine)
+    .where(eq(schema.termine.vorgangId, vorgangId))
+    .orderBy(desc(schema.termine.erstelltAm))
+    .limit(1);
+
+  if (termin && termin.platzierungsStatus !== 'offen' && termin.platzierungsStatus !== 'abgesagt') {
+    const kanal = await kalenderKanal(nutzer.id, vorgangId);
+    if (kanal?.sink && termin.platzierungsArt && termin.platzierungsWert) {
+      // SEQUENCE muss bei einer Absage steigen (RFC 5546).
+      const naechsteSequenz = termin.sequence + 1;
+      const draft: EventDraft = {
+        uid: termin.uid,
+        sequence: naechsteSequenz,
+        titel: termin.titel,
+        start: termin.von,
+        end: termin.bis,
+        zeitzone: termin.zeitzone,
+        teilnehmer: vorgang.gegenueberEmail ?? undefined,
+        organisator: organisator(nutzer),
+      };
+      try {
+        await kanal.sink.cancel(
+          {
+            kind: termin.platzierungsArt as 'google_event_id' | 'icalendar_uid',
+            value: termin.platzierungsWert,
+          },
+          draft,
+          grund,
+        );
+        await d
+          .update(schema.termine)
+          .set({ platzierungsStatus: 'abgesagt', sequence: naechsteSequenz })
+          .where(eq(schema.termine.id, termin.id));
+        await protokolliere(
+          nutzer.id,
+          vorgangId,
+          'Termin abgesagt',
+          `${formatiereDeutsch(termin.von, nutzer.zeitzone)} Uhr · UID ${termin.uid} · SEQUENCE ${naechsteSequenz}`,
+        );
+      } catch (fehler) {
+        // Der Korrekturentwurf entsteht trotzdem. Eine gescheiterte Absage
+        // darf nicht dazu fuehren, dass der Empfaenger gar nichts hoert.
+        await protokolliere(
+          nutzer.id,
+          vorgangId,
+          'Absage des Termins fehlgeschlagen',
+          (fehler as Error).message,
+        );
+      }
+    }
+  }
+
+  // 2. Korrekturentwurf.
+  const entwurf = await entwurfKorrektur({
+    gegenueberName: vorgang.gegenueberName,
+    betreff: antwortBetreff(gesendet.betreff),
+    falscheNachricht: gesendet.text,
+    grund,
+    nutzerName: nutzer.name ?? '',
+  });
+
+  await d.insert(schema.ausgang).values({
+    vorgangId,
+    an: gesendet.an,
+    betreff: entwurf.betreff,
+    text: mitSignatur(entwurf.text, nutzer),
+    inReplyTo: gesendet.messageId,
+    referenzen: gesendet.referenzen,
+    haltenBis: NIE,
+    // Auch die Korrektur braucht den Klick.
+    status: 'entwurf',
+  });
+
+  await setzeZustand(vorgangId, 'warte_auf_mich');
+  await protokolliere(
+    nutzer.id,
+    vorgangId,
+    'Korrektur vorbereitet',
+    [`Grund: ${grund}`, '', `Betreff: ${entwurf.betreff}`, '', entwurf.text].join('\n'),
+  );
+
+  return { ok: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -489,10 +649,22 @@ export interface TaktErgebnis {
   gesendet: number;
   erinnerungen: number;
   fehler: number;
+  /** Nutzerinnen, die ueber eine still gebrochene Verbindung informiert wurden. */
+  verbindungsWarnungen: number;
 }
 
+/** Nach so vielen Tagen ohne erfolgreichen Zugriff gilt eine Verbindung als still gebrochen. */
+export const STILLE_TAGE_BIS_WARNUNG = 3;
+/** So lange wird nach einer Warnung nicht erneut gewarnt. */
+const WARNPAUSE_TAGE = 7;
+
 export async function takt(jetzt = new Date()): Promise<TaktErgebnis> {
-  const ergebnis: TaktErgebnis = { gesendet: 0, erinnerungen: 0, fehler: 0 };
+  const ergebnis: TaktErgebnis = {
+    gesendet: 0,
+    erinnerungen: 0,
+    fehler: 0,
+    verbindungsWarnungen: 0,
+  };
   const d = await db();
 
   // 1. Abgelaufene Haltezeiten senden.
@@ -581,7 +753,119 @@ export async function takt(jetzt = new Date()): Promise<TaktErgebnis> {
     }
   }
 
+  // 3. Still gebrochene Kalenderverbindungen.
+  ergebnis.verbindungsWarnungen = await warneBeiStillenVerbindungen(jetzt);
+
   return ergebnis;
+}
+
+/**
+ * Beide Kalenderwege brechen STILL.
+ *
+ * Bei OAuth laeuft das Refresh-Token nach sechs Monaten Nichtnutzung ab,
+ * bei ICS invalidiert ein Reset der geheimen Adresse die URL ohne jede
+ * Benachrichtigung. In beiden Faellen wuerde die App einfach aufhoeren zu
+ * funktionieren, ohne dass jemand es merkt — bis eine Frist verfaellt.
+ *
+ * Deshalb steht im Anbindungsdokument: "Ein Job, der last_ok_at ueberwacht
+ * und die Nutzerin anschreibt, ist Teil des Produkts, nicht des Betriebs."
+ */
+async function warneBeiStillenVerbindungen(jetzt: Date): Promise<number> {
+  const d = await db();
+  const verbindungen = await d
+    .select()
+    .from(schema.kalenderVerbindungen)
+    .where(isNull(schema.kalenderVerbindungen.widerrufenAm));
+
+  let gewarnt = 0;
+  for (const verbindung of verbindungen) {
+    if (!istStill(verbindung, jetzt)) continue;
+
+    // Nicht jede Minute erneut anschreiben.
+    if (
+      verbindung.bruchGemeldetAm &&
+      jetzt.getTime() - verbindung.bruchGemeldetAm.getTime() < WARNPAUSE_TAGE * 86_400_000
+    ) {
+      continue;
+    }
+
+    const [nutzer] = await d
+      .select()
+      .from(schema.nutzer)
+      .where(eq(schema.nutzer.id, verbindung.nutzerId))
+      .limit(1);
+    if (!nutzer) continue;
+
+    const grund =
+      verbindung.lastError ??
+      `Seit ${STILLE_TAGE_BIS_WARNUNG} Tagen konnte der Kalender nicht mehr gelesen werden.`;
+
+    try {
+      await mailVersand().sende({
+        an: nutzer.email,
+        betreff: 'Ihr Kalender ist nicht mehr erreichbar',
+        text: [
+          `Guten Tag${nutzer.name ? ` ${nutzer.name}` : ''},`,
+          '',
+          'die Verbindung zu Ihrem Kalender funktioniert nicht mehr:',
+          '',
+          grund,
+          '',
+          'Solange das so ist, kann ich keine Termine vorschlagen und keine Fristen eintragen.',
+          '',
+          `Neu verbinden: ${konfig.appUrl}/verbindungen`,
+        ].join('\n'),
+      });
+
+      await d
+        .update(schema.kalenderVerbindungen)
+        .set({ bruchGemeldetAm: jetzt })
+        .where(eq(schema.kalenderVerbindungen.id, verbindung.id));
+
+      await protokolliere(
+        nutzer.id,
+        null,
+        'Warnung wegen gebrochener Kalenderverbindung',
+        grund,
+      );
+      gewarnt++;
+    } catch {
+      // Wenn nicht einmal die Warnmail rausgeht, hilft nur das Protokoll.
+      await protokolliere(
+        nutzer.id,
+        null,
+        'Kalenderverbindung gebrochen, Warnmail fehlgeschlagen',
+        grund,
+      );
+    }
+  }
+  return gewarnt;
+}
+
+/** Rein und ohne Datenbank, damit die Grenzfaelle testbar sind. */
+export function istStill(
+  verbindung: {
+    kind: string;
+    lastOkAt: Date | null;
+    hartGebrochen: boolean;
+    erstelltAm: Date;
+  },
+  jetzt: Date,
+): boolean {
+  // Die Attrappe kann nicht brechen; eine Warnung waere nur verwirrend.
+  if (verbindung.kind === 'attrappe') return false;
+
+  // Ein entzogenes Recht heilt nicht von selbst — sofort melden. Ein
+  // gewoehnlicher Fehler kann ein Netzproblem sein und faellt unten unter
+  // dieselbe Karenz wie ein ausbleibender Abruf.
+  if (verbindung.hartGebrochen) return true;
+
+  // Reine Schreibkanaele werden nie gelesen und haben deshalb nie ein
+  // lastOkAt. Sie koennen mit diesem Kriterium nicht beurteilt werden.
+  if (verbindung.kind === 'ics_publish' || verbindung.kind === 'imip_mail') return false;
+
+  const bezug = verbindung.lastOkAt ?? verbindung.erstelltAm;
+  return jetzt.getTime() - bezug.getTime() > STILLE_TAGE_BIS_WARNUNG * 86_400_000;
 }
 
 async function erzeugeErinnerung(vorgang: Vorgang, jetzt: Date): Promise<void> {
@@ -788,6 +1072,40 @@ async function neuesterEntwurf(vorgangId: string) {
   return eintrag;
 }
 
+/**
+ * ORGANIZER einer Einladung.
+ *
+ * Die Adresse ist immer die Absenderadresse der App — sonst verwerfen
+ * Empfaenger die Einladung, weil ORGANIZER und Absenderdomain
+ * auseinanderfallen. Der Anzeigename faellt auf die Mailadresse der
+ * Nutzerin zurueck: `undefined` waere hier kein harmloser Standardwert,
+ * sondern wuerde den iMIP-Weg mit "organisator fehlt" abbrechen lassen.
+ */
+function organisator(nutzer: Nutzer): { name: string; email: string } {
+  return { name: nutzer.name ?? nutzer.email, email: konfig.absender };
+}
+
+/**
+ * Ein Vorgang, aber nur wenn er dieser Nutzerin gehoert.
+ *
+ * Jede Aktion aus der Oberflaeche bekommt ihre Vorgangs-ID aus einem
+ * versteckten Formularfeld — also aus dem Browser, also von aussen. Eine
+ * Abfrage nur ueber die ID wuerde jeder angemeldeten Person erlauben, in
+ * fremden Vorgaengen zu senden, abzubrechen oder Termine abzusagen.
+ */
+export async function eigenerVorgang(
+  vorgangId: string,
+  nutzerId: string,
+): Promise<Vorgang | null> {
+  const d = await db();
+  const [vorgang] = await d
+    .select()
+    .from(schema.vorgaenge)
+    .where(and(eq(schema.vorgaenge.id, vorgangId), eq(schema.vorgaenge.nutzerId, nutzerId)))
+    .limit(1);
+  return vorgang ?? null;
+}
+
 async function letzteNachricht(vorgangId: string) {
   const d = await db();
   const [eintrag] = await d
@@ -800,7 +1118,10 @@ async function letzteNachricht(vorgangId: string) {
 }
 
 /** Kalenderkanal einer Nutzerin: Lesen und Schreiben koennen getrennt sein. */
-async function kalenderKanal(nutzerId: string): Promise<{
+async function kalenderKanal(
+  nutzerId: string,
+  vorgangId?: string,
+): Promise<{
   source: CalendarSource | null;
   sink: CalendarSink | null;
   verbindungId: string;
@@ -819,6 +1140,28 @@ async function kalenderKanal(nutzerId: string): Promise<{
 
   if (verbindungen.length === 0) return null;
 
+  /**
+   * Der iMIP-Sink darf nicht selbst versenden. Er bekommt diesen Kanal,
+   * der die Einladung in den Ausgang legt — mit derselben Haltezeit wie
+   * jede andere Mail. Ohne vorgangId gibt es keinen Ausgang, an dem die
+   * Einladung haengen koennte; dann bleibt der Sink ungebaut.
+   */
+  const einladungsKanal: EinladungsKanal | undefined = vorgangId
+    ? async (auftrag) => {
+        const datenbank = await db();
+        await datenbank.insert(schema.ausgang).values({
+          vorgangId,
+          an: auftrag.an,
+          betreff: auftrag.betreff,
+          text: auftrag.text,
+          icalMethode: auftrag.methode,
+          icalInhalt: auftrag.ical,
+          haltenBis: haltenBis(),
+          status: 'gehalten',
+        });
+      }
+    : undefined;
+
   let source: CalendarSource | null = null;
   let sink: CalendarSink | null = null;
   for (const verbindung of verbindungen) {
@@ -831,7 +1174,7 @@ async function kalenderKanal(nutzerId: string): Promise<{
     }
     if (!sink) {
       try {
-        sink = baueSink(verbindung);
+        sink = baueSink(verbindung, einladungsKanal);
       } catch {
         /* Kanal kann nicht schreiben. */
       }
@@ -844,15 +1187,25 @@ async function merkeVerbindungOk(id: string): Promise<void> {
   const d = await db();
   await d
     .update(schema.kalenderVerbindungen)
-    .set({ lastOkAt: new Date(), lastError: null, lastErrorAt: null })
+    .set({ lastOkAt: new Date(), lastError: null, lastErrorAt: null, hartGebrochen: false })
     .where(eq(schema.kalenderVerbindungen.id, id));
 }
 
-async function merkeVerbindungFehler(id: string, grund: string): Promise<void> {
+/**
+ * `VerbindungGebrochen` bedeutet: das Recht ist weg (Token abgelaufen,
+ * geheime Adresse zurueckgesetzt). Jeder andere Fehler kann ein Netzproblem
+ * sein und heilt vielleicht beim naechsten Versuch. Nur der erste Fall
+ * loest sofort eine Mail aus.
+ */
+async function merkeVerbindungFehler(id: string, fehler: unknown): Promise<void> {
   const d = await db();
   await d
     .update(schema.kalenderVerbindungen)
-    .set({ lastError: grund, lastErrorAt: new Date() })
+    .set({
+      lastError: (fehler as Error).message,
+      lastErrorAt: new Date(),
+      hartGebrochen: fehler instanceof VerbindungGebrochen,
+    })
     .where(eq(schema.kalenderVerbindungen.id, id));
 }
 
@@ -896,17 +1249,17 @@ async function zaehleBestaetigung(
   }
 }
 
+/**
+ * In der Datenbank hochzaehlen, nicht in der Anwendung: der Takt und ein
+ * eingehender Mail-Aufruf koennen gleichzeitig laufen, und Lesen-Rechnen-
+ * Schreiben wuerde dann einen Vorgang verschlucken. Der Zaehler entscheidet
+ * ueber die Bezahlschranke — er darf nicht ungefaehr stimmen.
+ */
 async function zaehleAbgeschlossen(nutzerId: string): Promise<void> {
   const d = await db();
-  const [nutzer] = await d
-    .select()
-    .from(schema.nutzer)
-    .where(eq(schema.nutzer.id, nutzerId))
-    .limit(1);
-  if (!nutzer) return;
   await d
     .update(schema.nutzer)
-    .set({ abgeschlosseneVorgaenge: nutzer.abgeschlosseneVorgaenge + 1 })
+    .set({ abgeschlosseneVorgaenge: sql`${schema.nutzer.abgeschlosseneVorgaenge} + 1` })
     .where(eq(schema.nutzer.id, nutzerId));
 }
 
