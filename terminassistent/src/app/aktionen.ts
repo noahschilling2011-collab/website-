@@ -4,6 +4,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { db, schema } from '../db/index';
+import { loescheKonto } from '../lib/datenschutz/betroffenenrechte';
 import { verschluessle, zufallsToken } from '../lib/krypto';
 import {
   eigenerVorgang,
@@ -251,6 +252,31 @@ export async function zahlungStarten(): Promise<void> {
     kundeId: nutzer.zahlungsKundeId,
   });
   redirect(url);
+}
+
+// ---------------------------------------------------------------------------
+// Betroffenenrechte
+// ---------------------------------------------------------------------------
+
+/**
+ * Art. 17 DSGVO, mit einem Riegel davor.
+ *
+ * Die Nutzerin muss ihre eigene Mailadresse tippen. Nicht als Ritual: der
+ * Knopf steht auf derselben Seite wie der Export, und ein Fehlklick waere
+ * hier nicht rueckgaengig zu machen — es gibt keinen Papierkorb und keine
+ * Sicherung, aus der sich ein Konto zurueckholen liesse. Genau das ist ja
+ * der Sinn der Loeschung.
+ */
+export async function kontoLoeschen(formData: FormData): Promise<void> {
+  const nutzer = await nutzerinOderRaus();
+  const bestaetigung = String(formData.get('bestaetigung') ?? '').trim();
+  if (bestaetigung.toLowerCase() !== nutzer.email.toLowerCase()) {
+    redirect('/daten?fehler=bestaetigung');
+  }
+
+  await loescheKonto(nutzer.id);
+  await beendeSitzung();
+  redirect('/anmelden?geloescht=1');
 }
 
 // ---------------------------------------------------------------------------

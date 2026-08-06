@@ -108,6 +108,8 @@ export default async function Startseite({
 
       <div className="fuss">
         <Link href="/protokoll">Was ist bisher passiert</Link>
+        <Link href="/daten">Ihre Daten</Link>
+        <Link href="/datenschutz">Datenschutz</Link>
         <form action={abmeldenWrapper}>
           <button className="leise-knopf" type="submit">
             Abmelden

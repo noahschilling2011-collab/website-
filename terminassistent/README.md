@@ -32,7 +32,7 @@ Weiter ausprobieren:
 ```bash
 npm run tick              # fällige Sendungen und Erinnerungen abarbeiten
 npm run tick -- --vor 2h  # so tun, als wären zwei Stunden vergangen
-npm test                  # 85 Tests
+npm test                  # 104 Tests
 ```
 
 ## Was gebaut ist
@@ -45,6 +45,7 @@ npm test                  # 85 Tests
 | Haltezeit, Protokoll, Kompensieren | Vollständig. Alle drei Ersatzmechanismen für ein Rückgängig: verzögern (60 Sekunden Haltezeit), nachvollziehen (Protokoll im Wortlaut), kompensieren (Termin absagen mit SEQUENCE+1, Korrektur als Entwurf). |
 | Kalender verbinden | Alle drei Wege der Anbindungsentscheidung: Google-OAuth mit Zustimmungs-Flow (Weg A), geheime iCal-Adresse plus eigener Feed (Weg B), Einladung per Mail (Weg C, iMIP). |
 | Bezahlschranke | Gebaut: fünf freie abgeschlossene Vorgänge, danach wird die Mail noch gespeichert, aber nicht mehr bearbeitet. Der Stripe-Teil ist als einziges Stück im Projekt **ungetestet** — siehe „Was fehlt". |
+| Datenschutz, soweit er Code ist | Löschkonzept mit festen Fristen, automatisch im Takt. Auskunft und Datenübertragbarkeit als Download auf Klick, Kontolöschung als Selbstbedienung. Siehe [`docs/datenschutz/`](../docs/datenschutz/). |
 | Buchen (Reisen, Einkäufe) | **Nicht gebaut**, wie in Abschnitt 3 des Entwurfs begründet. |
 
 ## Die drei Regeln, an denen der Code hängt
@@ -109,6 +110,8 @@ src/
     vorgang/zustand.ts          die Zustandsmaschine, rein und testbar
     vorgang/engine.ts           Seiteneffekte
     vorgang/darstellung.ts      die Zeile, die die Nutzerin liest
+    datenschutz/aufbewahrung.ts Löschfristen, rein und testbar
+    datenschutz/betroffenenrechte.ts  Aufräumen, Export, Kontolöschung
   app/                          der eine Bildschirm plus zwei Ansichten
 worker/email-worker.ts          Cloudflare Email Worker
 ```
@@ -137,6 +140,11 @@ Vorlaufzeit, nicht nach Aufwand:
 6. **Stripe** (optional), Produkt und Preis anlegen, `STRIPE_SECRET_KEY` und
    `STRIPE_PREIS_ID` setzen. Ohne die beiden läuft alles außer der
    Freischaltung. Vorher im Testmodus durchspielen, siehe „Was fehlt".
+7. **Datenschutz**, und zwar bevor die erste fremde Mail durchläuft, nicht
+   danach: [`docs/datenschutz/`](../docs/datenschutz/) durchgehen,
+   `BETREIBER_*` setzen und erst nach anwaltlicher Prüfung
+   `DATENSCHUTZ_GEPRUEFT=ja`. Solange das fehlt, steht auf `/datenschutz`
+   sichtbar „Ungeprüfter Entwurf" — das ist Absicht.
 
 Laufende Kosten nach der geprüften Recherche: Resend Pro 20 $, Cloudflare
 Workers Paid 5 $, Vercel Pro 20 $ — zusammen 45 $ im Monat, plus Modellkosten
@@ -181,14 +189,18 @@ Ehrlich benannt, damit es niemand für fertig hält:
 - **Kein automatisches Erneuern des Google-Zugriffs bei langer Pause.** Läuft
   ein Refresh-Token nach Monaten ohne Nutzung ab, erkennt der Takt das und
   schreibt die Nutzerin an — neu verbinden muss sie selbst.
-- **Alles Rechtliche.** Kein AVV, kein Verarbeitungsverzeichnis, keine
-  Datenschutzerklärung, kein Impressum. Weitergeleitete Dokumente von
-  Therapeutinnen enthalten Gesundheitsdaten — das ist vor der ersten fremden
-  Mail anwaltlich zu klären, nicht danach.
+- **Die anwaltliche Prüfung.** Der technische Datenschutz ist gebaut (siehe unten),
+  die Vorarbeit liegt in [`docs/datenschutz/`](../docs/datenschutz/). Drei Fragen
+  entscheiden aber über das Produkt und nicht nur über seine Papiere: ob der
+  Volltext von Mails mit Gesundheitsdaten an den Modellanbieter gehen darf, wie
+  § 203 Abs. 3 StGB auf die Anbieterkette anzuwenden ist, und ob eine
+  Datenschutz-Folgenabschätzung nach Art. 35 Pflicht ist. Fällt die erste negativ
+  aus, ändert sich die Architektur — nicht der Vertragstext.
+- **Kein Impressum** nach § 5 DDG. Formal, aber abmahnfähig.
 
 ## Tests
 
-85 Tests, ohne Netz und ohne externe Konten:
+104 Tests, ohne Netz und ohne externe Konten:
 
 ```bash
 npm test
@@ -200,5 +212,8 @@ Zustandsmaschine, besonders „angeboten ist nicht eingeschaltet"),
 `engine.test.ts` (voller Durchstich von der eingehenden Mail bis zum
 Kalendereintrag, dazu Kompensieren, Bezahlschranke und der Zugriff auf fremde
 Vorgänge), `eingang.test.ts` (echte PDF-Extraktion samt Ablehnung gescannter
-Dokumente) und `google-oauth.test.ts` (manipulierter und abgelaufener `state`,
-und dass genau zwei Scopes angefragt werden — nicht mehr).
+Dokumente), `google-oauth.test.ts` (manipulierter und abgelaufener `state`,
+und dass genau zwei Scopes angefragt werden — nicht mehr) und
+`datenschutz/betroffenenrechte.test.ts` (dass beim Löschen eines Vorgangs die
+Mails mit Gesundheitsdaten wirklich mitgehen und nicht als Waisen liegen
+bleiben, und dass ein Vorgang mit einer Frist in der Zukunft trotzdem bleibt).

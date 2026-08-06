@@ -42,12 +42,27 @@ const sql = dateien
   .replace(/CREATE INDEX "/g, 'CREATE INDEX IF NOT EXISTS "')
   .replace(/CREATE UNIQUE INDEX "/g, 'CREATE UNIQUE INDEX IF NOT EXISTS "')
   .replace(/ADD COLUMN "/g, 'ADD COLUMN IF NOT EXISTS "')
-  // Fremdschluessel kennen kein IF NOT EXISTS und wuerden beim zweiten Lauf
-  // mit "already exists" scheitern. Fuer die eingebettete Entwicklungs-
-  // datenbank ist referenzielle Integritaet verzichtbar; gegen echtes
-  // Postgres laeuft ohnehin drizzle-kit push mit dem vollen SQL.
-  .replace(/ALTER TABLE .*? ADD CONSTRAINT .*?;/gs, (treffer) =>
-    treffer.replace(/^/gm, '-- '),
+  // Fremdschluessel kennen kein IF NOT EXISTS und scheitern beim zweiten
+  // Lauf mit "already exists". Frueher standen sie deshalb hier
+  // auskommentiert, mit der Begruendung, referenzielle Integritaet sei fuer
+  // die eingebettete Datenbank verzichtbar.
+  //
+  // Das war falsch, und zwar an der teuersten Stelle: ON DELETE CASCADE ist
+  // nicht Hygiene, sondern der Mechanismus, durch den beim Loeschen eines
+  // Kontos die Mails mit Gesundheitsdaten tatsaechlich verschwinden. Ohne
+  // die Constraints blieben sie als Waisen liegen — unerreichbar fuer die
+  // Anwendung, aber weiterhin in der Datenbank.
+  //
+  // Ein DO-Block mit abgefangenem duplicate_object ist wiederholbar UND
+  // behaelt die Kaskade.
+  //
+  // Ersetzung als FUNKTION, nicht als String: in einem Ersetzungsstring
+  // bedeutet `$$` ein einzelnes `$`, und aus dem Dollar-Quoting von plpgsql
+  // wuerde stillschweigend Unsinn.
+  .replace(
+    /(ALTER TABLE .*? ADD CONSTRAINT .*?;)/gs,
+    (_, anweisung: string) =>
+      `DO $$ BEGIN\n ${anweisung}\nEXCEPTION WHEN duplicate_object THEN null; END $$;`,
   );
 
 const inhalt = `// Erzeugt von scripts/schema-sql.ts — nicht von Hand aendern.

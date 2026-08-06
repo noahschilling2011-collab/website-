@@ -3,6 +3,7 @@ import { and, asc, desc, eq, isNull, lte, sql } from 'drizzle-orm';
 import { db, schema } from '../../db/index';
 import type { Nutzer, Vorgang, VorgangsArt } from '../../db/schema';
 import { pruefeSchranke } from '../abrechnung';
+import { raeumeAuf, type Geloescht } from '../datenschutz/betroffenenrechte';
 import type { EinladungsKanal } from '../calendar/imip';
 import { baueSink, baueSource } from '../calendar/registry';
 import type { CalendarSink, CalendarSource, EventDraft } from '../calendar/types';
@@ -651,6 +652,8 @@ export interface TaktErgebnis {
   fehler: number;
   /** Nutzerinnen, die ueber eine still gebrochene Verbindung informiert wurden. */
   verbindungsWarnungen: number;
+  /** Was die Speicherbegrenzung entfernt hat. */
+  geloescht: Geloescht;
 }
 
 /** Nach so vielen Tagen ohne erfolgreichen Zugriff gilt eine Verbindung als still gebrochen. */
@@ -664,6 +667,15 @@ export async function takt(jetzt = new Date()): Promise<TaktErgebnis> {
     erinnerungen: 0,
     fehler: 0,
     verbindungsWarnungen: 0,
+    geloescht: {
+      tokens: 0,
+      vorgaenge: 0,
+      protokollWortlaut: 0,
+      protokollEintraege: 0,
+      verbindungen: 0,
+      konten: 0,
+      vorwarnungen: 0,
+    },
   };
   const d = await db();
 
@@ -755,6 +767,11 @@ export async function takt(jetzt = new Date()): Promise<TaktErgebnis> {
 
   // 3. Still gebrochene Kalenderverbindungen.
   ergebnis.verbindungsWarnungen = await warneBeiStillenVerbindungen(jetzt);
+
+  // 4. Speicherbegrenzung. Laeuft im selben Takt, damit Loeschen keine
+  //    getrennte Betriebsaufgabe ist, die jemand einrichten muss oder
+  //    vergisst — sie faellt sonst als erstes hinten runter.
+  ergebnis.geloescht = await raeumeAuf(jetzt);
 
   return ergebnis;
 }
