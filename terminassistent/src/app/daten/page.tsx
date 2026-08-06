@@ -88,7 +88,7 @@ export default async function Daten() {
               <td className="leise">nach {FRISTEN.protokollTage} Tagen</td>
             </tr>
             <tr>
-              <td>Anmeldelinks</td>
+              <td>Anmeldecodes und -links</td>
               <td className="leise">nach {FRISTEN.anmeldeTokenTage} Tag</td>
             </tr>
             <tr>

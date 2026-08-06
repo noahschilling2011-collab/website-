@@ -1,4 +1,3 @@
-import { konfig } from '../../lib/konfig';
 import { anmelden } from '../aktionen';
 
 export const dynamic = 'force-dynamic';
@@ -6,9 +5,9 @@ export const dynamic = 'force-dynamic';
 export default async function Anmelden({
   searchParams,
 }: {
-  searchParams: Promise<{ gesendet?: string }>;
+  searchParams: Promise<{ fehler?: string; geloescht?: string }>;
 }) {
-  const { gesendet } = await searchParams;
+  const { fehler, geloescht } = await searchParams;
 
   return (
     <main style={{ maxWidth: '26rem', paddingTop: '5rem' }}>
@@ -17,32 +16,41 @@ export default async function Anmelden({
         Erledigt Terminabsprachen und Fristen per Mail.
       </p>
 
-      {gesendet ? (
-        <div className="karte">
-          <p style={{ marginTop: 0 }}>
-            Wenn die Adresse bei uns bekannt ist, liegt der Anmeldelink jetzt im Postfach.
-            Er gilt 30 Minuten.
-          </p>
-          {konfig.demoModus && (
-            <p className="leise" style={{ marginBottom: 0 }}>
-              Im Demo-Modus wird nichts versendet — der Link steht auf der Konsole, auf der{' '}
-              <code>npm run dev</code> läuft.
-            </p>
-          )}
+      {geloescht && (
+        <div className="hinweis">
+          Ihr Konto und alle Daten sind gelöscht. Es ist nichts übrig geblieben.
         </div>
-      ) : (
-        <form action={anmelden}>
-          <div className="feld">
-            <label htmlFor="email">Ihre E-Mail-Adresse</label>
-            <input id="email" name="email" type="email" required autoComplete="email" />
-          </div>
-          <button type="submit">Anmeldelink schicken</button>
-        </form>
+      )}
+      {fehler === 'adresse' && (
+        <div className="hinweis">Das sieht nicht nach einer E-Mail-Adresse aus.</div>
+      )}
+      {fehler === 'link' && (
+        <div className="hinweis">
+          Der Link ist abgelaufen oder wurde schon benutzt — auch dann, wenn Sie den Code aus
+          derselben Mail eingegeben haben. Fordern Sie einfach einen neuen an.
+        </div>
       )}
 
+      <form action={anmelden}>
+        <div className="feld">
+          <label htmlFor="email">Ihre E-Mail-Adresse</label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            required
+            autoComplete="email"
+            autoFocus
+            placeholder="name@praxis.de"
+          />
+        </div>
+        <button type="submit">Code schicken</button>
+      </form>
+
       <p className="leise" style={{ marginTop: '2.5rem' }}>
-        Kein Passwort, kein Google-Login. Der Zugriff auf Ihren Kalender wird erst später
-        gefragt — dann, wenn der erste Termin eingetragen werden soll.
+        Sie bekommen einen sechsstelligen Code per Mail. Kein Passwort, kein Google-Login.
+        Der Zugriff auf Ihren Kalender wird erst später gefragt — dann, wenn der erste
+        Termin eingetragen werden soll.
       </p>
     </main>
   );

@@ -122,5 +122,5 @@ for (const [index, mail] of mails.entries()) {
 console.log('');
 console.log('Fertig. Jetzt `npm run dev` starten und auf http://localhost:3000 gehen.');
 console.log(`Anmelden mit: ${EMAIL}`);
-console.log('Der Anmeldelink erscheint auf dieser Konsole, weil nichts versendet wird.');
+console.log('Der Anmeldecode erscheint auf dieser Konsole, weil nichts versendet wird.');
 process.exit(0);

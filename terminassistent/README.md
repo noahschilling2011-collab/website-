@@ -19,8 +19,9 @@ npm run seed            # Katrin aus Abschnitt 2 des Entwurfs anlegen
 npm run dev
 ```
 
-Dann auf <http://localhost:3000> mit `katrin@praxis-weber.example` anmelden. Der
-Anmeldelink wird nicht versendet, sondern auf die Konsole geschrieben, auf der
+Dann auf <http://localhost:3000> mit `katrin@praxis-weber.example` anmelden. Es
+gibt kein Passwort: Sie bekommen einen sechsstelligen Code per Mail. Im
+Demo-Modus wird nichts versendet — der Code steht auf der Konsole, auf der
 `npm run dev` läuft.
 
 Im Demo-Modus läuft die Datenbank eingebettet (PGlite in `.pglite/`), Texte
@@ -32,7 +33,7 @@ Weiter ausprobieren:
 ```bash
 npm run tick              # fällige Sendungen und Erinnerungen abarbeiten
 npm run tick -- --vor 2h  # so tun, als wären zwei Stunden vergangen
-npm test                  # 104 Tests
+npm test                  # 116 Tests
 ```
 
 ## Was gebaut ist
@@ -110,6 +111,7 @@ src/
     vorgang/zustand.ts          die Zustandsmaschine, rein und testbar
     vorgang/engine.ts           Seiteneffekte
     vorgang/darstellung.ts      die Zeile, die die Nutzerin liest
+    sitzung.ts                  Anmeldung per Code, Fehlversuchszähler, Sitzung
     datenschutz/aufbewahrung.ts Löschfristen, rein und testbar
     datenschutz/betroffenenrechte.ts  Aufräumen, Export, Kontolöschung
   app/                          der eine Bildschirm plus zwei Ansichten
@@ -154,11 +156,22 @@ von rund 1,10 $ pro aktiver Nutzerin.
 
 Drei, alle absichtlich:
 
-**Anmeldung per Magic Link statt Auth.js mit Google.** Der Entwurf nennt in
+**Anmeldung per Mailcode statt Auth.js mit Google.** Der Entwurf nennt in
 Abschnitt 6 „Auth.js v5 mit Google", fordert aber zwei Absätze vorher, dass der
 Kalender-OAuth erst nach dem ersten sichtbaren Nutzen kommt. Google-Login bei
 der Registrierung wäre genau der Dialog, den der Entwurf nach hinten schieben
-will. Ein Magic Link passt außerdem zum Produkt: es ist ein Mail-Produkt.
+will. Eine Anmeldung per Mail passt außerdem zum Produkt: es ist ein
+Mail-Produkt, das Postfach ist ohnehin offen.
+
+Der Weg hinein ist ein sechsstelliger **Code** zum Abtippen; in derselben Mail
+steht zusätzlich ein Link. Der Code ist der Weg, der immer funktioniert — ein
+Link, den das Mailprogramm in seinem eigenen eingebauten Browser öffnet, meldet
+in einer Sitzung an, die die Nutzerin anschließend nicht wiederfindet. Sechs
+Ziffern sind nur sicher, solange sie nicht beliebig oft geraten werden dürfen:
+fünf Fehlversuche verbrauchen den Code, ein neuer geht frühestens nach 60
+Sekunden und höchstens fünfmal je Stunde raus. Der Code wird mit Schlüssel
+gehasht, nicht bloß mit SHA-256 — eine Million Möglichkeiten wären sonst offline
+in Sekunden durchprobiert.
 
 **Kein Prompt Caching.** Der Entwurf schreibt „Prompt Caching für den
 System-Prompt". Das trägt hier nicht: die cachebare Mindestlänge liegt bei
@@ -200,7 +213,7 @@ Ehrlich benannt, damit es niemand für fertig hält:
 
 ## Tests
 
-104 Tests, ohne Netz und ohne externe Konten:
+116 Tests, ohne Netz und ohne externe Konten:
 
 ```bash
 npm test
@@ -214,6 +227,8 @@ Kalendereintrag, dazu Kompensieren, Bezahlschranke und der Zugriff auf fremde
 Vorgänge), `eingang.test.ts` (echte PDF-Extraktion samt Ablehnung gescannter
 Dokumente), `google-oauth.test.ts` (manipulierter und abgelaufener `state`,
 und dass genau zwei Scopes angefragt werden — nicht mehr) und
-`datenschutz/betroffenenrechte.test.ts` (dass beim Löschen eines Vorgangs die
+`sitzung.test.ts` (falscher Code, Sperre nach fünf Versuchen, fremder Code,
+Wiederverwendung, und dass Code und Link derselben Mail zusammen nur einmal
+gelten) und `datenschutz/betroffenenrechte.test.ts` (dass beim Löschen eines Vorgangs die
 Mails mit Gesundheitsdaten wirklich mitgehen und nicht als Waisen liegen
 bleiben, und dass ein Vorgang mit einer Frist in der Zukunft trotzdem bleibt).

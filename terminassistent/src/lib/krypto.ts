@@ -58,5 +58,35 @@ export function hashe(wert: string): string {
   return crypto.createHash('sha256').update(wert).digest('base64url');
 }
 
+/**
+ * Wie `hashe`, aber mit dem SECRET_KEY als Schluessel.
+ *
+ * Fuer den sechsstelligen Anmeldecode ist der Unterschied nicht kosmetisch:
+ * ein blosser SHA-256 ueber sechs Ziffern ist offline in Sekunden
+ * durchprobiert — es gibt nur eine Million Moeglichkeiten. Wer die Datenbank
+ * in die Haende bekaeme, koennte jeden offenen Code zurueckrechnen. Mit
+ * Schluessel geht das nur, wenn er auch den Schluessel hat, und dann ist der
+ * Code das kleinste Problem.
+ *
+ * Fuer den 32-Byte-Zufallstoken des Anmeldelinks waere das unnoetig; dort
+ * bleibt es bei `hashe`.
+ */
+export function hasheMitSchluessel(wert: string): string {
+  const geheim = process.env.SECRET_KEY;
+  if (!geheim) throw new Error('SECRET_KEY fehlt.');
+  return crypto.createHmac('sha256', geheim).update(wert).digest('base64url');
+}
+
+/**
+ * Ein sechsstelliger Code, gleichverteilt.
+ *
+ * `crypto.randomInt` und nicht `Math.random`: der Code ist ein Zugangsmittel.
+ * Fuehrende Nullen bleiben erhalten, sonst waeren manche Codes kuerzer und
+ * damit leichter zu raten.
+ */
+export function zufallsCode(): string {
+  return String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+}
+
 const b64 = (b: Buffer) => b.toString('base64url');
 const unb64 = (s: string) => Buffer.from(s, 'base64url');

@@ -352,7 +352,7 @@ export async function exportiereDaten(nutzerId: string): Promise<Record<string, 
       'Export nach Art. 15 und 20 DSGVO. Enthaelt alles, was zu diesem Konto gespeichert ist.',
     nichtEnthalten: [
       'Die Zugangsdaten zu Ihrem Kalender (Refresh-Token bzw. geheime iCal-Adresse). Sie liegen verschluesselt und werden hier nicht entschluesselt — eine Datei im Download-Ordner ist der falsche Ort dafuer.',
-      'Die Hashes abgelaufener Anmeldelinks.',
+      'Die Hashes abgelaufener Anmeldecodes und -links.',
     ],
     konto: {
       email: nutzer.email,

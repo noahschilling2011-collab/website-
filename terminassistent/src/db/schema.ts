@@ -47,13 +47,33 @@ export const nutzer = pgTable('nutzer', {
   erstelltAm: timestamp('erstellt_am', { withTimezone: true }).notNull().defaultNow(),
 });
 
-/** Magic-Link-Anmeldung. Siehe README zur Abweichung vom Entwurf. */
+/**
+ * Anmeldung per Mail. Siehe README zur Abweichung vom Entwurf.
+ *
+ * Ein Eintrag traegt ZWEI Zugangsmittel zur selben Anmeldung: den
+ * sechsstelligen Code zum Abtippen und den langen Zufallstoken im Link.
+ * Beide gehoeren zusammen und werden gemeinsam entwertet — wer eins
+ * benutzt, verbraucht auch das andere.
+ */
 export const anmeldeTokens = pgTable('anmelde_tokens', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: text('email').notNull(),
+  /** SHA-256 des Link-Tokens. 32 Zufallsbytes brauchen keinen Schluessel. */
   tokenHash: text('token_hash').notNull().unique(),
+  /**
+   * HMAC des sechsstelligen Codes. Mit Schluessel, weil eine Million
+   * Moeglichkeiten sonst offline durchprobierbar waeren.
+   */
+  codeHash: text('code_hash'),
+  /**
+   * Fehlversuche beim Code. Ein sechsstelliger Code ist nur sicher, solange
+   * er nicht beliebig oft geraten werden darf — das hier ist die eigentliche
+   * Schutzmassnahme, nicht die Laenge.
+   */
+  versuche: integer('versuche').notNull().default(0),
   gueltigBis: timestamp('gueltig_bis', { withTimezone: true }).notNull(),
   eingeloestAm: timestamp('eingeloest_am', { withTimezone: true }),
+  erstelltAm: timestamp('erstellt_am', { withTimezone: true }).notNull().defaultNow(),
 });
 
 // ---------------------------------------------------------------------------

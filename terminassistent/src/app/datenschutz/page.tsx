@@ -171,7 +171,7 @@ export default function Datenschutz() {
               <td className="leise">{FRISTEN.protokollTage} Tage</td>
             </tr>
             <tr>
-              <td>Anmeldelinks</td>
+              <td>Anmeldecodes und -links</td>
               <td className="leise">{FRISTEN.anmeldeTokenTage} Tag</td>
             </tr>
             <tr>

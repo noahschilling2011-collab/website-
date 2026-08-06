@@ -14,7 +14,13 @@ import {
   sendenAusloesen,
   verarbeiteEingang,
 } from '../lib/vorgang/engine';
-import { aktuelleNutzerin, beendeSitzung, sendeAnmeldeLink } from '../lib/sitzung';
+import {
+  aktuelleNutzerin,
+  beendeSitzung,
+  loeseCodeEin,
+  sendeAnmeldeCode,
+  setzeSitzung,
+} from '../lib/sitzung';
 import { starteCheckout, zahlungKonfiguriert } from '../lib/zahlung';
 
 async function nutzerinOderRaus() {
@@ -23,11 +29,54 @@ async function nutzerinOderRaus() {
   return nutzer;
 }
 
+/**
+ * Schritt 1: Adresse eingeben, Code anfordern.
+ *
+ * Die Adresse wandert in die URL des naechsten Schritts, damit die
+ * Code-Seite weiss, wem der Versuch gilt. Das ist unbedenklich — es ist die
+ * eigene Adresse, gerade selbst eingetippt — und ueberlebt ein
+ * Neuladen der Seite, was ein verstecktes Formularfeld allein nicht taete.
+ */
 export async function anmelden(formData: FormData): Promise<void> {
   const email = String(formData.get('email') ?? '').trim();
-  if (!email.includes('@')) return;
-  await sendeAnmeldeLink(email);
-  redirect('/anmelden?gesendet=1');
+  if (!email.includes('@')) redirect('/anmelden?fehler=adresse');
+
+  const ergebnis = await sendeAnmeldeCode(email);
+  const ziel = `/anmelden/code?email=${encodeURIComponent(email)}`;
+  redirect(ergebnis.ok ? ziel : `${ziel}&hinweis=zu_haeufig`);
+}
+
+/**
+ * Schritt 2: Code abtippen.
+ *
+ * Bei jedem Fehlschlag geht es zurueck auf dieselbe Seite mit einem Grund in
+ * der URL. Kein Grund verraet, ob es die Adresse ueberhaupt gibt: es gibt
+ * keine getrennte Registrierung, jede Adresse ist gueltig.
+ */
+export async function codePruefen(formData: FormData): Promise<void> {
+  const email = String(formData.get('email') ?? '').trim();
+  const code = String(formData.get('code') ?? '').trim();
+  const zurueck = `/anmelden/code?email=${encodeURIComponent(email)}`;
+
+  if (!email.includes('@')) redirect('/anmelden');
+
+  const ergebnis = await loeseCodeEin(email, code);
+  if (!ergebnis.ok) redirect(`${zurueck}&fehler=${ergebnis.grund}`);
+
+  // Das Cookie wird hier gesetzt, nicht in der Bibliothek: Next.js erlaubt
+  // es nur in Server Actions und Route Handlers.
+  await setzeSitzung(ergebnis.nutzer.id);
+  redirect('/');
+}
+
+/** Neuen Code anfordern, ohne die Adresse noch einmal einzutippen. */
+export async function codeErneutSenden(formData: FormData): Promise<void> {
+  const email = String(formData.get('email') ?? '').trim();
+  if (!email.includes('@')) redirect('/anmelden');
+
+  const ergebnis = await sendeAnmeldeCode(email);
+  const ziel = `/anmelden/code?email=${encodeURIComponent(email)}`;
+  redirect(ergebnis.ok ? `${ziel}&hinweis=erneut` : `${ziel}&hinweis=zu_haeufig`);
 }
 
 export async function abmelden(): Promise<void> {

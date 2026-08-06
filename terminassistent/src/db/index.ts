@@ -16,11 +16,32 @@ import { SCHEMA_SQL } from './schema-sql';
 
 export type Db = Awaited<ReturnType<typeof erzeugeDb>>;
 
-let cache: Promise<Db> | null = null;
+/**
+ * Der Zwischenspeicher haengt am PROZESS, nicht am Modul.
+ *
+ * Next.js buendelt Route Handler getrennt von Seiten und Server Actions.
+ * Ein modul-lokales `let cache` gibt es dann zweimal — und mit ihm zwei
+ * PGlite-Instanzen auf demselben Verzeichnis. PGlite ist eine eingebettete
+ * Einzelprozess-Datenbank; zwei Instanzen sehen die Schreibvorgaenge der
+ * jeweils anderen nicht.
+ *
+ * Der Anmeldelink ist genau daran gescheitert: die Server Action legte den
+ * Token an, der Route Handler suchte ihn in seiner eigenen Datenbank und fand
+ * nichts — nach aussen sah es aus wie ein abgelaufener Link. Betroffen waren
+ * ebenso /api/takt, /api/mail/eingang und der Kalenderfeed.
+ *
+ * Gegen echtes Postgres faellt das nicht auf, weil dort ohnehin beide
+ * Instanzen mit demselben Server reden. Das macht es zu der unangenehmen
+ * Sorte Fehler: er tritt nur im Demo-Modus auf, also genau da, wo jemand das
+ * Projekt zum ersten Mal ausprobiert.
+ */
+const SCHLUESSEL = Symbol.for('terminassistent.db');
+type Global = typeof globalThis & { [SCHLUESSEL]?: Promise<Db> };
 
 export function db(): Promise<Db> {
-  if (!cache) cache = erzeugeDb();
-  return cache;
+  const g = globalThis as Global;
+  if (!g[SCHLUESSEL]) g[SCHLUESSEL] = erzeugeDb();
+  return g[SCHLUESSEL];
 }
 
 async function erzeugeDb() {
