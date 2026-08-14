@@ -20,3 +20,9 @@ app/**/*.g.dart.bak
 .idea/
 .vscode/
 *.iml
+
+# story-render
+story-render/out/work/
+story-render/out/render.log
+__pycache__/
+*.pyc
