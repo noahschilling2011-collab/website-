@@ -104,6 +104,9 @@ local function onPlayerAdded(player: Player)
 		heat = Balance.Player.StartHeat,
 		activity = nil,
 		order = nil,
+		-- Wer waehrend der Sperrfrist am Rundenende joint, sieht nur zu.
+		spectating = false,
+		lastInterceptAt = -math.huge,
 		stats = freshStats(),
 		dirty = true,
 
@@ -205,6 +208,38 @@ function PlayerState.SetCash(player: Player, amount: number): number
 	state.cash = math.max(0, amount)
 	state.dirty = true
 	return before - state.cash
+end
+
+--[[
+	Schreibt direkt aufs Konto. Nur fuer den Aufholbonus beim Late Join --
+	verdientes Geld geht immer ueber BankAllCash.
+]]
+function PlayerState.AddBanked(player: Player, amount: number)
+	local state = states[player]
+	if not state or amount <= 0 then
+		return
+	end
+	state.banked += amount
+	state.dirty = true
+end
+
+--[[
+	Nimmt einen Anteil vom Cash und liefert den genommenen Betrag zurueck.
+	Fuer das Abfangen: der Bestohlene behaelt den Rest, seine Einzahlung laeuft
+	damit zu Ende.
+]]
+function PlayerState.TakeCashShare(player: Player, fraction: number): number
+	local state = states[player]
+	if not state then
+		return 0
+	end
+	local taken = math.floor(state.cash * fraction)
+	if taken <= 0 then
+		return 0
+	end
+	state.cash -= taken
+	state.dirty = true
+	return taken
 end
 
 --[[
@@ -384,6 +419,39 @@ end
 	Knappste Flucht der Runde: der kleinste Vorsprung, mit dem jemand den
 	Sperrkreis verlassen hat (Dokument 3.3).
 ]]
+function PlayerState.IsSpectating(player: Player): boolean
+	local state = states[player]
+	return state ~= nil and state.spectating
+end
+
+function PlayerState.SetSpectating(player: Player, value: boolean)
+	local state = states[player]
+	if state then
+		state.spectating = value
+	end
+end
+
+--[[
+	Abfang-Sperre nach 3.2: 45 s zwischen zwei Versuchen. Verbraucht die Sperre
+	nur, wenn der Versuch auch zaehlt.
+]]
+function PlayerState.CanIntercept(player: Player): boolean
+	local state = states[player]
+	if not state then
+		return false
+	end
+	return os.clock() - state.lastInterceptAt >= Balance.Intercept.CooldownSeconds
+end
+
+function PlayerState.MarkIntercept(player: Player)
+	local state = states[player]
+	if not state then
+		return
+	end
+	state.lastInterceptAt = os.clock()
+	state.stats.intercepts += 1
+end
+
 function PlayerState.RecordEscape(player: Player, marginStuds: number)
 	local state = states[player]
 	if not state then
@@ -420,6 +488,8 @@ function PlayerState.ResetForRound(player: Player)
 	state.cash = Balance.Player.StartCash
 	state.banked = Balance.Player.StartBanked
 	state.heat = Balance.Player.StartHeat
+	state.spectating = false
+	state.lastInterceptAt = -math.huge
 	state.stats = freshStats()
 	state.dirty = true
 	pushState(player, state)

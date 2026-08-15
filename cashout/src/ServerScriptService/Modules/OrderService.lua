@@ -354,11 +354,23 @@ local function runAccept(player: Player, terminal, offer)
 	)
 end
 
+--[[
+	Dokument 3.2: im Umkreis der Bank kann kein Auftrag angenommen werden,
+	damit Camper nicht nebenbei verdienen.
+]]
+local function insideBankLockout(player: Player): boolean
+	local bank = MapBuilder.GetBank()
+	if not bank then
+		return false
+	end
+	return PlayerState.IsNear(player, bank.Position, Balance.Bank.NoOrderRadius)
+end
+
 local function onTerminalTriggered(terminal, player: Player)
 	if not RoundManager.IsRunning() then
 		return
 	end
-	if not PlayerState.Get(player) then
+	if not PlayerState.Get(player) or PlayerState.IsSpectating(player) then
 		return
 	end
 	if not PlayerState.ConsumeAction(player, "OpenTerminal") then
@@ -374,6 +386,10 @@ local function onTerminalTriggered(terminal, player: Player)
 		return
 	end
 	if not PlayerState.IsNear(player, terminal.Position, Balance.Orders.InteractRadius) then
+		return
+	end
+	if insideBankLockout(player) then
+		PlayerState.Notify(player, "warn", "So nah an der Bank nimmt niemand Auftraege an.")
 		return
 	end
 
@@ -399,7 +415,7 @@ local function onChooseOrder(player: Player, terminalId: any, offerIndex: any)
 	if not RoundManager.IsRunning() then
 		return
 	end
-	if not PlayerState.Get(player) then
+	if not PlayerState.Get(player) or PlayerState.IsSpectating(player) then
 		return
 	end
 	if not PlayerState.ConsumeAction(player, "ChooseOrder") then
@@ -448,6 +464,11 @@ local function onChooseOrder(player: Player, terminalId: any, offerIndex: any)
 	end
 	if not PlayerState.IsNear(player, terminal.Position, Balance.Orders.InteractRadius) then
 		PlayerState.Notify(player, "warn", "Zu weit vom Terminal weg.")
+		Remotes.Get(Remotes.CloseTerminal):FireClient(player)
+		return
+	end
+	if insideBankLockout(player) then
+		PlayerState.Notify(player, "warn", "So nah an der Bank nimmt niemand Auftraege an.")
 		Remotes.Get(Remotes.CloseTerminal):FireClient(player)
 		return
 	end
@@ -526,6 +547,9 @@ end
 
 function onPointTriggered(prompt: ProximityPrompt, player: Player)
 	if not RoundManager.IsRunning() then
+		return
+	end
+	if PlayerState.IsSpectating(player) then
 		return
 	end
 	if pointOwner[prompt] ~= player then

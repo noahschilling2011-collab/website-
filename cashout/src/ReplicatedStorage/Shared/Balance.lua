@@ -201,11 +201,14 @@ Balance.Round = {
 	StateResyncInterval = 5,
 }
 
--- --------------------------------------------------------- Phase 3 (spaeter) --
+-- ------------------------------------------------- Late Join und Abfangen --
 
 Balance.LateJoin = {
+	-- Wer in den ersten 60 s joint, startet normal.
 	GraceSeconds = 60,
+	-- Danach: Banked = Median aller Spieler * 0,5 als Aufholbonus.
 	MedianFactor = 0.5,
+	-- In den letzten 45 s gar kein Einstieg mehr -- direkt in die Lobby.
 	LockoutSeconds = 45,
 }
 
@@ -213,6 +216,16 @@ Balance.Intercept = {
 	SplitFraction = 0.5,
 	HeatGain = 25,
 	CooldownSeconds = 45,
+
+	-- NICHT SPEZIFIZIERT: Reichweite des Abfang-Prompts und der serverseitige
+	-- Distanzcheck dazu.
+	PromptDistance = 12,
+	Radius = 16,
+
+	-- NICHT SPEZIFIZIERT: Darstellung der Markierung waehrend der Einzahlung.
+	-- Weiss ist laut 4.2 fuer genau diesen Zustand reserviert.
+	HighlightFill = 0.5,
+	MarkerHeight = 3.5,
 }
 
 -- --------------------------------------------------------------- Netzwerk --
@@ -223,6 +236,8 @@ Balance.Net = {
 
 	-- NICHT SPEZIFIZIERT.
 	StateReplicateInterval = 0.2,
+	-- Takt des Live-Leaderboards waehrend der Runde.
+	ScoreboardInterval = 1,
 	NotifyDuration = 3.5,
 	ThrottleWarnCooldown = 5,
 }

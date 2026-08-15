@@ -47,6 +47,8 @@ local activityCountdown: TextLabel
 local toastList: Frame
 local raidFrame: Frame
 local raidLabel: TextLabel
+local lobbyFrame: Frame
+local lobbyLabel: TextLabel
 
 local currentActivity: any = nil
 local currentRaid: any = nil
@@ -330,6 +332,48 @@ local function buildRaidBorder(parent: Instance)
 	}, raidFrame)
 end
 
+--[[
+	Lobby-Einblendung fuer Zuschauer (Dokument 3.1): wer in den letzten 45 s
+	joint, spielt diese Runde nicht mehr mit und wartet mit Countdown.
+]]
+local function buildLobby(parent: Instance)
+	lobbyFrame = Theme.New("Frame", {
+		Name = "Lobby",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -40),
+		Size = UDim2.fromOffset(460, 76),
+		BackgroundColor3 = Theme.Panel,
+		BackgroundTransparency = 0.05,
+		BorderSizePixel = 0,
+		Visible = false,
+		ZIndex = 12,
+	}, parent) :: Frame
+	Theme.Corner(lobbyFrame, 12)
+	Theme.Stroke(lobbyFrame, Theme.Banked, 1.5, 0.4)
+	Theme.Padding(lobbyFrame, 14)
+
+	Theme.Label({
+		Size = UDim2.new(1, 0, 0, 18),
+		Text = "LOBBY",
+		TextSize = 13,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.Banked,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		ZIndex = 12,
+	}, lobbyFrame)
+
+	lobbyLabel = Theme.Label({
+		Position = UDim2.fromOffset(0, 20),
+		Size = UDim2.new(1, 0, 0, 28),
+		Text = "",
+		TextSize = 15,
+		TextColor3 = Theme.Text,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		TextWrapped = true,
+		ZIndex = 12,
+	}, lobbyFrame)
+end
+
 -- ------------------------------------------------------------ Marker am Ziel --
 
 --[[
@@ -393,6 +437,7 @@ local function updateRound()
 		timerLabel.TextColor3 = Theme.TextDim
 		phaseLabel.Text = "warten auf Spieler"
 		rushLabel.Visible = false
+		lobbyFrame.Visible = false
 		return
 	end
 
@@ -402,8 +447,22 @@ local function updateRound()
 		timerLabel.TextColor3 = Theme.TextDim
 		phaseLabel.Text = "Pause"
 		rushLabel.Visible = false
+		lobbyFrame.Visible = false
 		return
 	end
+
+	if currentRound.spectating then
+		phaseLabel.Text = "du siehst zu"
+		lobbyLabel.Text = string.format(
+			"Diese Runde laeuft ohne dich zu Ende. Naechster Start in %s.",
+			Theme.Clock(remaining + Balance.Round.IntermissionSeconds)
+		)
+		lobbyFrame.Visible = true
+		rushLabel.Visible = false
+		timerLabel.TextColor3 = Theme.TextDim
+		return
+	end
+	lobbyFrame.Visible = false
 
 	phaseLabel.Text = "Runde laeuft"
 	local isRush = remaining <= currentRound.finalRushSeconds
@@ -467,6 +526,7 @@ function RoundHud.Start(screenGui: ScreenGui)
 	buildActivityBar(screenGui)
 	buildToasts(screenGui)
 	buildRaidBorder(screenGui)
+	buildLobby(screenGui)
 
 	RunService.Heartbeat:Connect(function()
 		updateActivity()
@@ -540,6 +600,14 @@ function RoundHud.SetActivity(activity)
 
 	activityFill.Size = UDim2.new(0, 0, 1, 0)
 	updateActivity()
+end
+
+--[[
+	Zuschauer? Nur fuer die Kamera in UIController -- die Einblendung selbst
+	haengt am Rundenzustand.
+]]
+function RoundHud.IsSpectating(): boolean
+	return currentRound ~= nil and currentRound.spectating == true
 end
 
 --[[

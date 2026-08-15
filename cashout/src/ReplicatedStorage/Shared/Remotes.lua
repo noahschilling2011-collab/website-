@@ -20,6 +20,7 @@
 	         RaidEnded(info)                   entkommen oder erwischt
 	         RoundState(state)                 Phase, Ende, Endspurt
 	         RoundEnded(result)                Endtafel
+	         Scoreboard(entries)               Live-Banked aller Spieler
 	         Notify(kind, text)                Toast im HUD
 ]]
 
@@ -42,6 +43,7 @@ Remotes.RaidStarted = "RaidStarted"
 Remotes.RaidEnded = "RaidEnded"
 Remotes.RoundState = "RoundState"
 Remotes.RoundEnded = "RoundEnded"
+Remotes.Scoreboard = "Scoreboard"
 Remotes.Notify = "Notify"
 
 local ALL = {
@@ -55,6 +57,7 @@ local ALL = {
 	Remotes.RaidEnded,
 	Remotes.RoundState,
 	Remotes.RoundEnded,
+	Remotes.Scoreboard,
 	Remotes.Notify,
 }
 

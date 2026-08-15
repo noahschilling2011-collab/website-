@@ -19,6 +19,7 @@ local HeatBar = require(UI:WaitForChild("HeatBar"))
 local OrderPanel = require(UI:WaitForChild("OrderPanel"))
 local RoundEndBoard = require(UI:WaitForChild("RoundEndBoard"))
 local RoundHud = require(UI:WaitForChild("RoundHud"))
+local Scoreboard = require(UI:WaitForChild("Scoreboard"))
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -33,6 +34,7 @@ screenGui.Parent = playerGui
 RoundHud.Start(screenGui)
 HeatBar.Start(screenGui)
 RoundEndBoard.Start(screenGui)
+Scoreboard.Start(screenGui)
 OrderPanel.Start(screenGui, function(terminalId, offerIndex)
 	Remotes.Get(Remotes.ChooseOrder):FireServer(terminalId, offerIndex)
 	-- Der Server bestaetigt per ActivityChanged bzw. CloseTerminal. Bis dahin
@@ -75,8 +77,44 @@ Remotes.Get(Remotes.RaidEnded).OnClientEvent:Connect(function(info)
 	SoundCatalog.Play(if info and info.escaped then "RaidEscaped" else "RaidCaught")
 end)
 
+Remotes.Get(Remotes.Scoreboard).OnClientEvent:Connect(function(entries)
+	Scoreboard.Update(entries)
+end)
+
+--[[
+	Zuschauer-Kamera nach 3.1: wer diese Runde nicht mitspielt, sieht von oben
+	auf die Bank statt auf den eigenen Character. Wird zurueckgestellt, sobald
+	die naechste Runde laeuft.
+]]
+local spectatorCameraActive = false
+
+local function setSpectatorCamera(active: boolean)
+	if active == spectatorCameraActive then
+		return
+	end
+	spectatorCameraActive = active
+
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return
+	end
+
+	if active then
+		camera.CameraType = Enum.CameraType.Scriptable
+		camera.CFrame = CFrame.lookAt(Vector3.new(0, 150, 220), Vector3.new(0, 20, 0))
+	else
+		camera.CameraType = Enum.CameraType.Custom
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			camera.CameraSubject = humanoid
+		end
+	end
+end
+
 Remotes.Get(Remotes.RoundState).OnClientEvent:Connect(function(state)
 	RoundHud.SetRound(state)
+	setSpectatorCamera(typeof(state) == "table" and state.spectating == true)
 	if typeof(state) == "table" and state.phase == "running" then
 		-- Neue Runde: Endtafel weg, und kein Fluchtfenster ueberlebt sie.
 		RoundEndBoard.Hide()
