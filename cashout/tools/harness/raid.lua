@@ -246,6 +246,49 @@ if gotOne then
 	print("     (Razzia lief tatsaechlich ins Rundenende hinein)")
 end
 
+-- H: Sterben im Fluchtfenster ist keine Flucht --------------------------
+print("H: Respawn im Fluchtfenster")
+a.ended = nil
+-- Cash ERST setzen, wenn die Razzia laeuft. Vorher kann ein Rundenwechsel
+-- dazwischenkommen und alles auf null zuruecksetzen -- dann prueft die
+-- Zusicherung unten 0 gegen 0 und ist wertlos.
+check(waitForRaid(a), "Razzia fuer den Respawn-Test")
+PlayerState.AddCash(a.player, 1000)
+Harness.pump(Harness.now() + 0.3)
+local cashBeforeRespawn = a.cash
+check(cashBeforeRespawn == 1000, "der Test traegt wirklich Cash: " .. cashBeforeRespawn)
+-- Sterben und weit weg wieder auftauchen -- genau das, was der Spawnpunkt tut.
+Harness.respawn(a.player, Balance.Map.SpawnPosition + Vector3.new(0, 3, 0))
+Harness.pump(Harness.now() + Balance.Heat.RaidRingSeconds + 1)
+check(
+	a.ended ~= nil and a.ended.escaped == false,
+	"Sterben im Fluchtfenster zaehlt als erwischt, nicht als Flucht"
+)
+check(
+	a.cash == math.floor(cashBeforeRespawn * Balance.Heat.RaidCashKeptFraction),
+	string.format("und kostet entsprechend Cash: %d von %d", a.cash, cashBeforeRespawn)
+)
+Harness.pump(Harness.now() + Balance.Heat.RaidStunSeconds + 0.5)
+
+-- I: Abbruch meldet sich beim Client -------------------------------------
+print("I: abgebrochene Razzia meldet sich ab")
+a.ended = nil
+check(waitForRaid(a), "Razzia fuer den Abbruch-Test")
+local errorsBeforeAbort = #Harness.errors
+-- Verlassen und wiederkommen ist der eine Abbruchweg; der andere ist das
+-- Rundenende, das Fall G schon abdeckt.
+local c = makeBot("Gamma", 3)
+Harness.pump(Harness.now() + 0.5)
+check(waitForRaid(c), "Razzia fuer Gamma")
+c.ended = nil
+-- Rundenende erzwingen, indem bis dahin gelaufen wird.
+Harness.pump(c.round.endsAt + 1)
+check(
+	c.ended ~= nil,
+	"der Client bekommt ein RaidEnded, wenn die Razzia beim Rundenende abgebrochen wird"
+)
+check(#Harness.errors == errorsBeforeAbort, "kein Fehler beim Abbruch")
+
 print("========================================")
 if #Harness.errors > 0 then
 	print("Laufzeitfehler:")

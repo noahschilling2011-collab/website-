@@ -670,6 +670,33 @@ Harness = {
 		return player
 	end,
 
+	--[[
+		Baut dem Spieler einen frischen Character, wie es Roblox beim Respawn
+		tut, und feuert CharacterAdded.
+	]]
+	respawn = function(player, position)
+		local character = makeInstance("Model", player.Name)
+		local root = makeInstance("Part", "HumanoidRootPart")
+		root.Position = position
+		root.CFrame = CFrame.new(position)
+		root.Parent = character
+		local torso = makeInstance("Part", "UpperTorso")
+		torso.Position = position
+		torso.CFrame = CFrame.new(position)
+		torso.Parent = character
+		local humanoid = makeInstance("Humanoid", "Humanoid")
+		humanoid.Parent = character
+		character.Parent = Workspace
+
+		local old = player.Character
+		player.Character = character
+		if old then
+			old:Destroy()
+		end
+		player.CharacterAdded:Fire(character)
+		return character
+	end,
+
 	removePlayer = function(player)
 		local index = table.find(playerList, player)
 		if index then
