@@ -242,6 +242,58 @@ Balance.Net = {
 	ThrottleWarnCooldown = 5,
 }
 
+-- ------------------------------------------------------------- Game Feel --
+-- Dokument 5. Was dort mit Zahl steht, steht hier mit derselben Zahl.
+
+Balance.Feel = {
+	-- Herzschlag: bei Heat 30 alle 1,2 s, bei Heat 100 alle 0,45 s, linear.
+	-- Treibt auch den Vignetten-Puls aus 4.3 -- der laeuft im selben Takt, auch
+	-- solange die Sound-Id noch 0 ist.
+	HeartbeatHeatLow = 30,
+	HeartbeatIntervalLow = 1.2,
+	HeartbeatHeatHigh = 100,
+	HeartbeatIntervalHigh = 0.45,
+
+	-- Zahlen-Popup ueber dem Kopf: 0,6 s nach oben, Transparenz auf 1.
+	PopupSeconds = 0.6,
+	PopupRise = 4,
+
+	-- Cash-Zaehler tweent statt zu springen.
+	CashTweenSeconds = 0.4,
+
+	-- Kamera-Kick bei Razzia-Start, kuerzer bei geglueckter Flucht.
+	CameraKickSeconds = 0.25,
+	CameraKickStuds = 1.2,
+	-- NICHT SPEZIFIZIERT, nur "ein zweiter, kuerzerer".
+	EscapeKickSeconds = 0.15,
+	EscapeKickStuds = 0.6,
+
+	-- Bank-Ring: bei Abbruch laeuft er zurueck statt auf null zu springen.
+	BankRingResetSeconds = 0.3,
+	BankRingRadius = 3.4,
+
+	-- Weltreaktion nach 4.3. Die Heat-Schwellen stehen in Balance.Heat.
+	SaturationAtTense = -0.1,
+	ContrastAtHigh = 0.08,
+	VignetteMaxTransparency = 0.55,
+	ShakeStudsAtCritical = 0.35,
+}
+
+--[[
+	Herzschlag-Abstand in Sekunden fuer einen Heat-Wert. Unter
+	HeartbeatHeatLow schlaegt nichts -- da reagiert die Welt laut 4.3 gar nicht.
+	Rueckgabe nil heisst "still".
+]]
+function Balance.HeartbeatInterval(heat: number): number?
+	if heat < Balance.Feel.HeartbeatHeatLow then
+		return nil
+	end
+	local span = Balance.Feel.HeartbeatHeatHigh - Balance.Feel.HeartbeatHeatLow
+	local t = math.clamp((heat - Balance.Feel.HeartbeatHeatLow) / span, 0, 1)
+	return Balance.Feel.HeartbeatIntervalLow
+		+ (Balance.Feel.HeartbeatIntervalHigh - Balance.Feel.HeartbeatIntervalLow) * t
+end
+
 -- -------------------------------------------------------------------- Map --
 -- NICHT SPEZIFIZIERT bis auf 4.4 (Bank zentral und hoch, fuenf Terminals am
 -- Rand, bessere Terminals weiter weg) und die 18 s Bank-Rundweg.
@@ -289,6 +341,22 @@ Balance.Map = {
 	-- Sichtbares Paket auf dem Ruecken, solange ein Auftrag laeuft (1.1).
 	PackageSize = Vector3.new(2.6, 2.6, 1.2),
 	PackageOffset = Vector3.new(0, 0.2, 1.1),
+
+	-- Einzahl-Beam: weisse Saeule von der Bank in den Himmel, solange jemand
+	-- einzahlt (Dokument 5). Fuer alle sichtbar.
+	BeamSize = Vector3.new(6, 400, 6),
+	BeamTransparency = 0.55,
+
+	-- NICHT SPEZIFIZIERT: Deckungen nach 4.4. "wenige Deckungen: Flucht muss
+	-- moeglich, aber nicht trivial sein" und "keine Sackgassen im
+	-- Sperrkreis-Radius". Deshalb einzeln stehende Bloecke statt Waende --
+	-- ein einzelner Block kann keine Sackgasse bilden.
+	CoverCount = 46,
+	CoverSize = Vector3.new(9, 11, 9),
+	CoverMinRadius = 60,
+	CoverMaxRadius = 400,
+	-- Mindestabstand zu Terminals, Bank und Spawn.
+	CoverClearance = 26,
 }
 
 -- ------------------------------------------------------------ Abgeleitetes --

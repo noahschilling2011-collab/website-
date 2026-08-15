@@ -262,6 +262,50 @@ check(d.round ~= nil and d.round.phase == "running", "naechste Runde laeuft")
 check(d.round.spectating == false, "Delta spielt jetzt mit")
 check(d.banked == 0 and d.cash == 0, "alles zurueckgesetzt")
 
+-- H: Phase-4-Weltseite ----------------------------------------------------
+print("H: Weltseite aus Phase 4")
+local Lighting = game:GetService("Lighting")
+check(Lighting.ClockTime == 0, "Nachtstadt: ClockTime 0")
+check(Lighting:FindFirstChild("CashoutAtmosphere") ~= nil, "Atmosphere gesetzt")
+
+local ground = map:FindFirstChild("Ground")
+check(ground ~= nil and ground.Reflectance > 0, "Boden spiegelt (nass)")
+
+local cover = map:FindFirstChild("Cover")
+check(cover ~= nil and #cover:GetChildren() > 0, "Deckungen stehen: " .. (if cover then #cover:GetChildren() else 0))
+
+-- Keine Deckung darf an einem Terminal, der Bank oder dem Spawn kleben.
+local tooClose = 0
+if cover then
+	local avoid = { Balance.Map.BankPosition, Balance.Map.SpawnPosition }
+	for _, pillar in pairs(terminals) do
+		table.insert(avoid, pillar.Position)
+	end
+	for _, block in ipairs(cover:GetChildren()) do
+		for _, other in ipairs(avoid) do
+			local flat = Vector3.new(block.Position.X - other.X, 0, block.Position.Z - other.Z)
+			if flat.Magnitude < Balance.Map.CoverClearance then
+				tooClose += 1
+			end
+		end
+	end
+end
+check(tooClose == 0, tooClose .. " Deckungen liegen zu nah an Terminal, Bank oder Spawn")
+
+local depositBeam = map:FindFirstChild("DepositBeam")
+check(depositBeam ~= nil, "Einzahl-Beam existiert")
+check(depositBeam ~= nil and depositBeam.Transparency == 1, "Beam ist aus, solange niemand einzahlt")
+
+PlayerState.AddCash(a.player, 300)
+Harness.pump(Harness.now() + 0.3)
+a.moveTo(bankCounter.Position)
+bankCounter:FindFirstChildOfClass("ProximityPrompt").Triggered:Fire(a.player)
+Harness.pump(Harness.now() + 0.6)
+check(depositBeam ~= nil and depositBeam.Transparency < 1, "Beam leuchtet waehrend der Einzahlung")
+
+Harness.pump(Harness.now() + Balance.Bank.DepositSeconds + 1)
+check(depositBeam ~= nil and depositBeam.Transparency == 1, "Beam ist danach wieder aus")
+
 print("=========================================")
 if #Harness.errors > 0 then
 	print("Laufzeitfehler:")

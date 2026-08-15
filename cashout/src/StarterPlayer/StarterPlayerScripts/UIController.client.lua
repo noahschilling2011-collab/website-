@@ -10,11 +10,14 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Balance = require(Shared:WaitForChild("Balance"))
 local Remotes = require(Shared:WaitForChild("Remotes"))
 local SoundCatalog = require(Shared:WaitForChild("SoundCatalog"))
 
 -- UI liegt neben diesem Script in StarterPlayerScripts, nicht darin.
 local UI = script.Parent:WaitForChild("UI")
+local Atmosphere = require(UI:WaitForChild("Atmosphere"))
+local Feel = require(UI:WaitForChild("Feel"))
 local HeatBar = require(UI:WaitForChild("HeatBar"))
 local OrderPanel = require(UI:WaitForChild("OrderPanel"))
 local RoundEndBoard = require(UI:WaitForChild("RoundEndBoard"))
@@ -33,6 +36,8 @@ screenGui.Parent = playerGui
 
 RoundHud.Start(screenGui)
 HeatBar.Start(screenGui)
+Atmosphere.Start(screenGui)
+Feel.Start(screenGui)
 RoundEndBoard.Start(screenGui)
 Scoreboard.Start(screenGui)
 OrderPanel.Start(screenGui, function(terminalId, offerIndex)
@@ -42,11 +47,21 @@ OrderPanel.Start(screenGui, function(terminalId, offerIndex)
 	OrderPanel.Close()
 end)
 
+local lastCash = 0
+
 Remotes.Get(Remotes.StateChanged).OnClientEvent:Connect(function(state)
-	RoundHud.SetState(state)
-	if typeof(state) == "table" then
-		HeatBar.SetHeat(state.heat)
+	if typeof(state) ~= "table" then
+		return
 	end
+
+	-- Zahlen-Popup ueber dem Kopf, bevor der Zaehler nachzieht.
+	local delta = (state.cash or 0) - lastCash
+	lastCash = state.cash or 0
+	Feel.Popup(delta)
+
+	RoundHud.SetState(state)
+	HeatBar.SetHeat(state.heat)
+	Atmosphere.SetHeat(state.heat)
 end)
 
 Remotes.Get(Remotes.ActivityChanged).OnClientEvent:Connect(function(activity)
@@ -54,10 +69,14 @@ Remotes.Get(Remotes.ActivityChanged).OnClientEvent:Connect(function(activity)
 	if activity then
 		OrderPanel.Close()
 	end
+
+	local depositing = activity ~= nil and activity.kind == "deposit"
+	Feel.SetDeposit(depositing, activity and activity.startedAt, activity and activity.duration)
 end)
 
 Remotes.Get(Remotes.OrderChanged).OnClientEvent:Connect(function(order, point)
 	RoundHud.SetOrder(order, point)
+	Feel.SetTarget(point)
 end)
 
 Remotes.Get(Remotes.OffersReady).OnClientEvent:Connect(function(terminalId, offers, terminalPosition)
@@ -70,11 +89,18 @@ end)
 
 Remotes.Get(Remotes.RaidStarted).OnClientEvent:Connect(function(info)
 	RoundHud.SetRaid(info)
+	Atmosphere.Kick(Balance.Feel.CameraKickStuds, Balance.Feel.CameraKickSeconds)
 end)
 
 Remotes.Get(Remotes.RaidEnded).OnClientEvent:Connect(function(info)
 	RoundHud.SetRaid(nil)
-	SoundCatalog.Play(if info and info.escaped then "RaidEscaped" else "RaidCaught")
+	if info and info.escaped then
+		-- Der zweite, kuerzere Kick aus Dokument 5.
+		Atmosphere.Kick(Balance.Feel.EscapeKickStuds, Balance.Feel.EscapeKickSeconds)
+		SoundCatalog.Play("RaidEscaped")
+	else
+		SoundCatalog.Play("RaidCaught")
+	end
 end)
 
 Remotes.Get(Remotes.Scoreboard).OnClientEvent:Connect(function(entries)
@@ -119,6 +145,10 @@ Remotes.Get(Remotes.RoundState).OnClientEvent:Connect(function(state)
 		-- Neue Runde: Endtafel weg, und kein Fluchtfenster ueberlebt sie.
 		RoundEndBoard.Hide()
 		RoundHud.SetRaid(nil)
+		RoundHud.SnapCounters()
+		Feel.SetDeposit(false)
+		Feel.SetTarget(nil)
+		lastCash = 0
 	end
 end)
 

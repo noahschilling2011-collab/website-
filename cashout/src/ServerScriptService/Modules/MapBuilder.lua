@@ -2,7 +2,10 @@
 	MapBuilder.lua
 
 	Baut die Map aus Parts. Keine externen Modelle, keine Asset-Ids.
-	Phase 1: grau und funktional, mehr soll es nicht sein (Dokument 8).
+	Seit Phase 4 Nachtstadt statt Baseplate (Dokument 4.1): dunkle, nasse
+	Grundflaeche, kaum Umgebungslicht, alles Wichtige leuchtet selbst. Das
+	Grundlicht wird hier gesetzt und repliziert; die Heat-Reaktion aus 4.3 ist
+	clientseitig und steht in UI/Atmosphere.lua.
 
 	Geometrie nach 4.4: Bank zentral und hoch, fuenf Terminals ringfoermig am
 	Rand, das beste am weitesten weg. Die Ringradien stehen in Balance.Map --
@@ -13,6 +16,7 @@
 	bleibt.
 ]]
 
+local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -26,6 +30,7 @@ local terminalOrder: { any } = {}
 local bank: any = nil
 local deliveryFolder: Folder? = nil
 local raidFolder: Folder? = nil
+local beam: BasePart? = nil
 local built = false
 
 local COLOR_GROUND = Color3.fromRGB(52, 56, 62)
@@ -117,6 +122,37 @@ end
 
 -- -------------------------------------------------------------------- Bauen --
 
+--[[
+	Nachtstadt nach 4.1. Wenig Umgebungslicht, damit die Farbcodes aus 4.2
+	tragen -- alles Wichtige im Spiel ist Neon und leuchtet selbst.
+]]
+local function setupLighting()
+	Lighting.ClockTime = 0
+	Lighting.Brightness = 1
+	Lighting.Ambient = Color3.fromRGB(24, 26, 34)
+	Lighting.OutdoorAmbient = Color3.fromRGB(28, 30, 40)
+	Lighting.EnvironmentDiffuseScale = 0.2
+	Lighting.EnvironmentSpecularScale = 0.4
+	Lighting.GlobalShadows = true
+	Lighting.FogEnd = 600
+	Lighting.FogStart = 120
+	Lighting.FogColor = Color3.fromRGB(14, 16, 22)
+
+	local existing = Lighting:FindFirstChild("CashoutAtmosphere")
+	if existing then
+		existing:Destroy()
+	end
+	local atmosphere = Instance.new("Atmosphere")
+	atmosphere.Name = "CashoutAtmosphere"
+	atmosphere.Density = 0.42
+	atmosphere.Offset = 0.1
+	atmosphere.Color = Color3.fromRGB(70, 78, 96)
+	atmosphere.Decay = Color3.fromRGB(30, 34, 46)
+	atmosphere.Glare = 0.2
+	atmosphere.Haze = 1.6
+	atmosphere.Parent = Lighting
+end
+
 local function buildGround(root: Instance)
 	local size = Balance.Map.GroundSize
 	local ground = newPart(
@@ -126,7 +162,68 @@ local function buildGround(root: Instance)
 		COLOR_GROUND,
 		root
 	)
-	ground.Material = Enum.Material.Concrete
+	-- Nass: der Boden spiegelt, was leuchtet. Das ist der ganze Regen-Effekt
+	-- aus 4.1 -- ohne Partikel, die auf schwacher Hardware nichts kosten sollen.
+	ground.Material = Enum.Material.Slate
+	ground.Reflectance = 0.25
+end
+
+--[[
+	Deckungen nach 4.4: einzeln stehende Bloecke auf einer Spirale, mit
+	Mindestabstand zu allem, was man ansprechen kann. Einzelne Bloecke, damit
+	im 40-Studs-Radius einer Razzia keine Sackgasse entstehen kann.
+]]
+local function buildCover(root: Instance)
+	local folder = Instance.new("Folder")
+	folder.Name = "Cover"
+	folder.Parent = root
+
+	local size = Balance.Map.CoverSize
+	local count = Balance.Map.CoverCount
+	local minRadius = Balance.Map.CoverMinRadius
+	local maxRadius = Balance.Map.CoverMaxRadius
+	local clearance = Balance.Map.CoverClearance
+	-- Goldener Winkel: verteilt gleichmaessig, ohne Muster und ohne Zufall.
+	local goldenAngle = math.pi * (3 - math.sqrt(5))
+
+	local avoid = { Balance.Map.BankPosition, Balance.Map.SpawnPosition }
+	for _, terminal in ipairs(terminalOrder) do
+		table.insert(avoid, terminal.Position)
+	end
+
+	local placed = 0
+	for index = 1, count * 3 do
+		if placed >= count then
+			break
+		end
+
+		local t = (index - 0.5) / (count * 3)
+		local radius = minRadius + (maxRadius - minRadius) * math.sqrt(t)
+		local angle = index * goldenAngle
+		local position = Vector3.new(math.cos(angle) * radius, Balance.Map.GroundY, math.sin(angle) * radius)
+
+		local tooClose = false
+		for _, other in ipairs(avoid) do
+			local flat = Vector3.new(position.X - other.X, 0, position.Z - other.Z)
+			if flat.Magnitude < clearance then
+				tooClose = true
+				break
+			end
+		end
+
+		if not tooClose then
+			local block = newPart(
+				"Cover" .. placed,
+				size,
+				position + Vector3.new(0, size.Y / 2, 0),
+				COLOR_STRUCTURE,
+				folder
+			)
+			block.Material = Enum.Material.Brick
+			table.insert(avoid, position)
+			placed += 1
+		end
+	end
 end
 
 local function buildSpawn(root: Instance)
@@ -296,10 +393,37 @@ function MapBuilder.Start()
 	raidFolder.Name = "RaidRings"
 	raidFolder.Parent = root
 
+	setupLighting()
 	buildGround(root)
 	buildSpawn(root)
 	buildBank(root)
 	buildTerminals(root)
+	buildCover(root)
+
+	-- Einzahl-Beam (Dokument 5): steht immer, ist nur meistens unsichtbar.
+	local beamSize = Balance.Map.BeamSize
+	beam = newPart(
+		"DepositBeam",
+		beamSize,
+		Balance.Map.BankPosition + Vector3.new(0, Balance.Map.GroundY + beamSize.Y / 2, 0),
+		Color3.fromRGB(255, 255, 255),
+		root
+	)
+	beam.Material = Enum.Material.Neon
+	beam.CanCollide = false
+	beam.CanQuery = false
+	beam.Transparency = 1
+end
+
+--[[
+	Weisse Saeule von der Bank in den Himmel, solange irgendjemand einzahlt.
+	Weiss ist laut 4.2 genau dafuer reserviert -- gleichzeitig Anzeige,
+	Belohnung und PvP-Einladung.
+]]
+function MapBuilder.SetDepositBeam(visible: boolean)
+	if beam then
+		beam.Transparency = if visible then Balance.Map.BeamTransparency else 1
+	end
 end
 
 -- ------------------------------------------------------- Uebergabepunkte --

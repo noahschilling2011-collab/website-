@@ -189,9 +189,19 @@ end
 
 -- -------------------------------------------------------------- Einzahlen --
 
+local function refreshBeam()
+	local any = false
+	for _, _ in pairs(deposits) do
+		any = true
+		break
+	end
+	MapBuilder.SetDepositBeam(any)
+end
+
 local function finish(player: Player)
 	unmark(player)
 	deposits[player] = nil
+	refreshBeam()
 end
 
 local function runDeposit(player: Player, bank)
@@ -203,6 +213,7 @@ local function runDeposit(player: Player, bank)
 	local deposit = { token = token, intercepted = false }
 	deposits[player] = deposit
 	mark(player, deposit)
+	refreshBeam()
 
 	local deadline = os.clock() + Balance.Bank.DepositSeconds
 	local aborted = false
@@ -270,6 +281,7 @@ end
 local function releasePlayer(player: Player)
 	unmark(player)
 	deposits[player] = nil
+	refreshBeam()
 end
 
 local function resetAll()
@@ -278,6 +290,7 @@ local function resetAll()
 	end
 	table.clear(deposits)
 	table.clear(promptOwner)
+	MapBuilder.SetDepositBeam(false)
 end
 
 function BankService.Start()

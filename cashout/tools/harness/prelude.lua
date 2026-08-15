@@ -292,6 +292,8 @@ local CLASS_PARENTS = {
 	GuiObject = "Instance",
 	Sound = "Instance",
 	Highlight = "Instance",
+	Atmosphere = "Instance",
+	ColorCorrectionEffect = "Instance",
 	ScrollingFrame = "GuiObject",
 	ModuleScript = "Instance",
 	Script = "Instance",
@@ -517,6 +519,7 @@ function TweenService:Create(instance, info, props)
 	}
 	return tween
 end
+local Lighting = makeService("Lighting")
 local Workspace = makeService("Workspace")
 services.Workspace = Workspace
 

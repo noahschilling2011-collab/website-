@@ -21,7 +21,7 @@ ausschließlich leeren Ids vollständig. Beim Serverstart kommt **eine** gesamme
 | `RoundStart` | noch nicht aufgerufen | Rundenstart-Signal. |
 | `RoundEnd` | noch nicht aufgerufen | Rundenende, unter die Endtafel. |
 
-### Phase 2 — Razzia
+### Phase 2 — Razzia (verdrahtet)
 
 | Feld | Was da hin soll |
 |---|---|
@@ -29,18 +29,18 @@ ausschließlich leeren Ids vollständig. Beim Serverstart kommt **eine** gesamme
 | `RaidEscaped` | Kurzer, heller Entlastungston beim Verlassen des Sperrkreises. |
 | `RaidCaught` | Dumpfer Aufschlag beim Erwischtwerden. |
 
-### Phase 3 — Abfangen
+### Phase 3 — Abfangen (noch nicht abgespielt)
 
 | Feld | Was da hin soll |
 |---|---|
 | `Intercept` | Moment des Abfangens, aus beiden Perspektiven brauchbar. |
 
-### Phase 4 — Feel
+### Phase 4 — Feel (verdrahtet)
 
 | Feld | Was da hin soll |
 |---|---|
-| `Heartbeat` | Einzelner Herzschlag. Wird im Takt nach Heat abgespielt (bei Heat 30 alle 1,2 s, bei Heat 100 alle 0,45 s) — muss deshalb sehr kurz und schnittfest sein. Stärkster Feel-Hebel im ganzen Dokument. |
-| `SirenLoop` | Ferne Sirene als Loop ab Heat 60. Nahtlos loopbar. |
+| `Heartbeat` | Einzelner Herzschlag. Wird im Takt nach Heat abgespielt (bei Heat 30 alle 1,2 s, bei Heat 100 alle 0,45 s) — muss deshalb sehr kurz und schnittfest sein. Stärkster Feel-Hebel im ganzen Dokument. **Der Takt läuft schon**: er treibt den Vignetten-Puls, auch solange die Id 0 ist. |
+| `SirenLoop` | Ferne Sirene als Loop ab Heat 60, lauter ab Heat 85. Nahtlos loopbar. |
 
 ## Bilder / Decals (`Assets.Images`)
 
@@ -56,3 +56,9 @@ ausschließlich leeren Ids vollständig. Beim Serverstart kommt **eine** gesamme
 - **UI.** Alle Panels sind in Code gebaut (`UI/Theme.lua` hält Farben und Instanz-Helfer).
   Keine Bild-Assets, keine Fremdschriften — nur `Enum.Font.Gotham` / `GothamBold`.
 - **Übergabepunkt.** Cyan-Pad plus Säule aus Parts, das eigene Ziel-Schild baut der Client dazu.
+- **Nachtstadt.** Licht, Nebel und `Atmosphere` sind in `MapBuilder` gesetzt, der nasse Boden ist
+  `Material.Slate` mit Reflectance — kein Regen-Partikelsystem, das auf schwacher Hardware kostet.
+- **Vignette.** Vier Rand-Frames mit Verlauf statt eines radialen Vignetten-Bildes.
+- **Bank-Ring.** 28 einzelne Segmente auf einem Kreis statt einer Ring-Textur.
+- **Pfeil zum Übergabepunkt.** Ein gedrehtes Textzeichen, kein Icon.
+- **Sperrkreis und Einzahl-Beam.** Neon-Parts.

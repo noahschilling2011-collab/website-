@@ -37,4 +37,4 @@ BankService.Start()
 RaidService.Start()
 RoundManager.Start()
 
-print("[CASHOUT] v2 Phase 2 laeuft.")
+print("[CASHOUT] v2 Phase 4 laeuft.")

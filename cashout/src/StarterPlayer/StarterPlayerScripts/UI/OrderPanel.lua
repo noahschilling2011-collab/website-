@@ -16,6 +16,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Balance = require(Shared:WaitForChild("Balance"))
@@ -163,6 +164,7 @@ local function buildCard(offer, index: number)
 	card.Activated:Connect(function()
 		local terminalId = openTerminalId
 		if terminalId and chooseCallback then
+			OrderPanel.FlyOut(card)
 			chooseCallback(terminalId, index)
 		end
 	end)
@@ -238,6 +240,32 @@ local function build(screenGui: ScreenGui)
 		TextSize = 12,
 		TextColor3 = Theme.TextDim,
 	}, panel)
+end
+
+--[[
+	Dokument 5: die angenommene Karte fliegt zum Bildschirmrand und wird dort
+	zum Marker. Verbindet Auswahl und Ziel sichtbar miteinander -- den Marker
+	selbst uebernimmt danach Feel.lua.
+]]
+function OrderPanel.FlyOut(card: TextButton)
+	local flying = card:Clone()
+	flying.Name = "FlyingCard"
+	flying.Parent = root
+	flying.ZIndex = 20
+	flying.Position = UDim2.fromOffset(card.AbsolutePosition.X, card.AbsolutePosition.Y)
+	flying.Size = UDim2.fromOffset(card.AbsoluteSize.X, card.AbsoluteSize.Y)
+	flying.AnchorPoint = Vector2.new(0, 0)
+
+	local info = TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+	TweenService:Create(flying, info, {
+		Position = UDim2.new(0, 24, 0.5, 0),
+		Size = UDim2.fromOffset(24, 30),
+		BackgroundTransparency = 1,
+	}):Play()
+
+	task.delay(0.45, function()
+		flying:Destroy()
+	end)
 end
 
 -- ------------------------------------------------------------- Distanzwache --

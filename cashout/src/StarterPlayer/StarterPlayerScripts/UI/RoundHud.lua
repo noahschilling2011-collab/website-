@@ -52,6 +52,10 @@ local lobbyLabel: TextLabel
 
 local currentActivity: any = nil
 local currentRaid: any = nil
+-- Angezeigter und tatsaechlicher Stand: der Zaehler laeuft hoch, statt zu
+-- springen (Dokument 5).
+local shownCash, targetCash = 0, 0
+local shownBanked, targetBanked = 0, 0
 local currentRound: any = nil
 local currentOrder: any = nil
 local currentPoint: BasePart? = nil
@@ -473,6 +477,29 @@ local function updateRound()
 	end
 end
 
+--[[
+	Naehert den angezeigten Wert dem echten an. Quart-artig: schnell los,
+	weich aus, ueber Balance.Feel.CashTweenSeconds.
+]]
+local function approach(shown: number, target: number, deltaTime: number): number
+	if shown == target then
+		return target
+	end
+	local rate = math.clamp(deltaTime / Balance.Feel.CashTweenSeconds * 3, 0, 1)
+	local next = shown + (target - shown) * rate
+	if math.abs(target - next) < 1 then
+		return target
+	end
+	return next
+end
+
+local function updateCounters(deltaTime: number)
+	shownCash = approach(shownCash, targetCash, deltaTime)
+	shownBanked = approach(shownBanked, targetBanked, deltaTime)
+	cashLabel.Text = string.format("%d", math.floor(shownCash + 0.5))
+	bankedLabel.Text = string.format("%d", math.floor(shownBanked + 0.5))
+end
+
 local function updateRaid()
 	if not currentRaid then
 		return
@@ -528,7 +555,8 @@ function RoundHud.Start(screenGui: ScreenGui)
 	buildRaidBorder(screenGui)
 	buildLobby(screenGui)
 
-	RunService.Heartbeat:Connect(function()
+	RunService.Heartbeat:Connect(function(deltaTime)
+		updateCounters(deltaTime)
 		updateActivity()
 		updateRound()
 		updateRaid()
@@ -540,8 +568,20 @@ function RoundHud.SetState(state)
 	if not started or typeof(state) ~= "table" then
 		return
 	end
-	cashLabel.Text = string.format("%d", state.cash or 0)
-	bankedLabel.Text = string.format("%d", state.banked or 0)
+	targetCash = state.cash or 0
+	targetBanked = state.banked or 0
+end
+
+--[[
+	Zaehler ohne Animation setzen. Fuer den Rundenwechsel, wo ein Hochzaehlen
+	von null auf null nur verwirren wuerde.
+]]
+function RoundHud.SnapCounters()
+	if not started then
+		return
+	end
+	shownCash = targetCash
+	shownBanked = targetBanked
 end
 
 function RoundHud.SetRound(state)
