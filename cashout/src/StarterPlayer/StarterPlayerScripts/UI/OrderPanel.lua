@@ -28,6 +28,7 @@ local OrderPanel = {}
 local player = Players.LocalPlayer
 
 local started = false
+local screen: ScreenGui
 local root: Frame
 local titleLabel: TextLabel
 local row: Frame
@@ -250,7 +251,9 @@ end
 function OrderPanel.FlyOut(card: TextButton)
 	local flying = card:Clone()
 	flying.Name = "FlyingCard"
-	flying.Parent = root
+	-- An die ScreenGui, nicht ans Panel: das Panel geht im selben Moment zu,
+	-- und ein Kind eines unsichtbaren Frames fliegt unsichtbar.
+	flying.Parent = screen
 	flying.ZIndex = 20
 	flying.Position = UDim2.fromOffset(card.AbsolutePosition.X, card.AbsolutePosition.Y)
 	flying.Size = UDim2.fromOffset(card.AbsoluteSize.X, card.AbsoluteSize.Y)
@@ -305,6 +308,7 @@ function OrderPanel.Start(screenGui: ScreenGui, onChoose: (string, number) -> ()
 	end
 	started = true
 	chooseCallback = onChoose
+	screen = screenGui
 
 	build(screenGui)
 	RunService.Heartbeat:Connect(watchDistance)

@@ -48,16 +48,26 @@ OrderPanel.Start(screenGui, function(terminalId, offerIndex)
 end)
 
 local lastCash = 0
+local lastBanked = 0
 
 Remotes.Get(Remotes.StateChanged).OnClientEvent:Connect(function(state)
 	if typeof(state) ~= "table" then
 		return
 	end
 
-	-- Zahlen-Popup ueber dem Kopf, bevor der Zaehler nachzieht.
-	local delta = (state.cash or 0) - lastCash
+	local cashDelta = (state.cash or 0) - lastCash
+	local bankedDelta = (state.banked or 0) - lastBanked
 	lastCash = state.cash or 0
-	Feel.Popup(delta)
+	lastBanked = state.banked or 0
+
+	-- Zahlen-Popup ueber dem Kopf, bevor der Zaehler nachzieht.
+	-- Einzahlen ist ausgenommen: dabei faellt Cash auf null, weil es aufs Konto
+	-- geht. Ein rotes Verlust-Popup im Belohnungsmoment waere genau verkehrt.
+	-- Erkennbar daran, dass Banked im selben Schritt um denselben Betrag steigt.
+	local isDeposit = cashDelta < 0 and bankedDelta >= -cashDelta
+	if not isDeposit then
+		Feel.Popup(cashDelta)
+	end
 
 	RoundHud.SetState(state)
 	HeatBar.SetHeat(state.heat)
@@ -149,6 +159,7 @@ Remotes.Get(Remotes.RoundState).OnClientEvent:Connect(function(state)
 		Feel.SetDeposit(false)
 		Feel.SetTarget(nil)
 		lastCash = 0
+		lastBanked = 0
 	end
 end)
 

@@ -23,6 +23,7 @@
 
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
+local SoundService = game:GetService("SoundService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
@@ -222,7 +223,9 @@ function Atmosphere.Start(screenGui: ScreenGui)
 		sound.SoundId = "rbxassetid://" .. tostring(SoundCatalog.Ids.SirenLoop)
 		sound.Looped = true
 		sound.Volume = 0
-		sound.Parent = script
+		-- SoundService, nicht script: ein Sound unter einem ModuleScript ist
+		-- kein zuverlaessiger 2D-Sound.
+		sound.Parent = SoundService
 		sirenSound = sound
 	end
 
