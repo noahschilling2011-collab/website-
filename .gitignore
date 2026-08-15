@@ -20,3 +20,9 @@ app/**/*.g.dart.bak
 .idea/
 .vscode/
 *.iml
+
+# Werkzeug, das Werkzeug-Läufe sich herunterladen. Gehört nie ins Repo:
+# die Luau-CLI wird zur Laufzeit besorgt (siehe .github/workflows/ci.yml),
+# nicht eingecheckt.
+*.whl
+*.tar.gz

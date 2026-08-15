@@ -1,5 +1,8 @@
 # Static — Offline-Warner für stationäre Blitzer
 
+> Dieses Repo enthält zwei unabhängige Projekte: **Static** in `blitzerwarner/`
+> (dieses README) und **CASHOUT**, ein Roblox-Spiel, in [`cashout/`](cashout/README.md).
+
 Warnt per Sprachansage und Ton vor **stationären** Blitzern. Läuft im
 Hintergrund bei ausgeschaltetem Display. Kein Backend, kein Account, keine
 Werbung, **keine Netzwerk-Requests zur Laufzeit**.

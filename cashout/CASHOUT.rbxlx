@@ -1,0 +1,6745 @@
+<?xml version='1.0' encoding='utf-8'?>
+<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">
+	<Item class="Workspace" referent="RBX0">
+		<Properties>
+			<string name="Name">Workspace</string>
+		</Properties>
+	</Item>
+	<Item class="Lighting" referent="RBX1">
+		<Properties>
+			<string name="Name">Lighting</string>
+		</Properties>
+	</Item>
+	<Item class="ReplicatedStorage" referent="RBX2">
+		<Properties>
+			<string name="Name">ReplicatedStorage</string>
+		</Properties>
+		<Item class="Folder" referent="RBX3">
+			<Properties>
+				<string name="Name">Shared</string>
+			</Properties>
+			<Item class="ModuleScript" referent="RBX4">
+				<Properties>
+					<string name="Name">Assets</string>
+					<ProtectedString name="Source">--[[
+	Assets.lua
+
+	Bild-/Decal-Ids. Alle Felder sind absichtlich leer -- hier ist keine
+	rbxassetid erfunden worden. Was an welche Stelle gehoert, steht in
+	ASSETS_TODO.md.
+
+	Sounds stehen nicht hier, sondern in SoundCatalog.lua (Dokument 5).
+
+	Der Code prueft vor jeder Verwendung auf "" und ueberspringt das Asset
+	dann. Eine Id eintragen genuegt, es ist keine Code-Aenderung noetig.
+]]
+
+local Assets = {}
+
+Assets.Images = {
+	-- Server, MapBuilder: Decal auf der Leuchtflaeche eines Terminals.
+	TerminalScreen = "",
+	-- Server, MapBuilder: Decal am Bank-Tresen.
+	BankSign = "",
+}
+
+return Assets
+</ProtectedString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBX5">
+				<Properties>
+					<string name="Name">Balance</string>
+					<ProtectedString name="Source">--[[
+	Balance.lua  (CASHOUT v2)
+
+	ALLE Zahlen des Spiels. Wenn hier eine Zahl fehlt, gehoert sie hierher --
+	nirgendwo sonst im Code darf ein Gameplay-Wert hardcodiert stehen.
+
+	Werte aus dem Dokument sind unveraendert uebernommen. Werte, die das
+	Dokument nicht nennt, die der Code aber braucht, sind mit
+	"NICHT SPEZIFIZIERT" markiert und stehen so in der Rueckmeldung.
+
+	Reines Datenmodul: kein Require-Nebeneffekt ausser den abgeleiteten
+	Nachschlagetabellen am Ende der Datei.
+]]
+
+local Balance = {}
+
+-- ---------------------------------------------------------------- Spieler --
+
+Balance.Player = {
+	StartCash = 0,
+	StartBanked = 0,
+	StartHeat = 0,
+
+	-- Wird nach einem Stun (Phase 2) wiederhergestellt. Beide Sprungwerte,
+	-- weil je nach Humanoid.UseJumpPower nur einer von beiden wirkt.
+	WalkSpeed = 16,
+	JumpPower = 50,
+	JumpHeight = 7.2,
+}
+
+-- --------------------------------------------------------------- Auftraege --
+
+Balance.Orders = {
+	-- NICHT SPEZIFIZIERT: Anzahl der Karten pro Terminal. Aus v1 uebernommen,
+	-- v2 aendert nur, was nach der Auswahl passiert.
+	OffersPerTerminal = 3,
+
+	-- Dokument 1.1: "Karte am Terminal waehlen (1 s)" / "2 s Interaktion".
+	AcceptSeconds = 1,
+	DeliverSeconds = 2,
+
+	-- NICHT SPEZIFIZIERT: Toleranz der serverseitigen Distanzchecks und
+	-- Reichweite der ProximityPrompts.
+	InteractRadius = 16,
+	PromptDistance = 12,
+
+	-- NICHT SPEZIFIZIERT: Wie oft der Server waehrend einer Interaktion
+	-- prueft, ob der Spieler noch am Platz steht. Gilt auch fuer die Bank.
+	CheckInterval = 0.25,
+
+	-- NICHT SPEZIFIZIERT: Gueltigkeit der drei Karten an einem Terminal.
+	-- Erneutes Ansprechen liefert innerhalb dieser Zeit dieselben Karten --
+	-- verhindert Reroll-Spam, ohne dass Warten bestraft wird.
+	OfferLifetimeSeconds = 30,
+
+	Tiers = {
+		{
+			Id = "Small",
+			Label = "Klein",
+			MinPayout = 60,
+			MaxPayout = 110,
+			-- Klein gibt bewusst null Heat: das Werkzeug zum Weiterverdienen
+			-- waehrend des Abkuehlens, nicht die schlechtere Version von Gross.
+			Heat = 0,
+			MinDistance = 40,
+			MaxDistance = 70,
+			MinHeatToOffer = 0,
+			-- NICHT SPEZIFIZIERT: Stufenfarbe (Paket, Karte). Bewusst ausserhalb
+			-- des gebundenen Farbcodes aus 4.2 -- kein Gruen, Gold, Rot, Weiss,
+			-- Cyan.
+			Color = Color3.fromRGB(150, 170, 190),
+		},
+		{
+			Id = "Medium",
+			Label = "Mittel",
+			MinPayout = 150,
+			MaxPayout = 250,
+			Heat = 5,
+			MinDistance = 90,
+			MaxDistance = 140,
+			MinHeatToOffer = 0,
+			Color = Color3.fromRGB(90, 140, 220),
+		},
+		{
+			Id = "Large",
+			Label = "Gross",
+			MinPayout = 320,
+			MaxPayout = 560,
+			Heat = 14,
+			MinDistance = 160,
+			MaxDistance = 230,
+			MinHeatToOffer = 0,
+			Color = Color3.fromRGB(170, 110, 230),
+		},
+		{
+			Id = "Extreme",
+			Label = "Extrem",
+			MinPayout = 800,
+			MaxPayout = 1400,
+			Heat = 26,
+			MinDistance = 260,
+			MaxDistance = 340,
+			MinHeatToOffer = 50,
+			Color = Color3.fromRGB(240, 90, 200),
+		},
+	},
+
+	--[[
+		NICHT SPEZIFIZIERT: konkrete Gewichte.
+		Dokument 4.4 sagt nur "Die Terminals mit den besseren Karten liegen
+		weiter von der Bank weg". Ein Profil pro Terminal-Rang, Rang 1 = das
+		banknaechste, Rang 5 = das entfernteste. Gewicht 0 = Stufe kommt an
+		diesem Terminal nie vor.
+	]]
+	TerminalProfiles = {
+		{ Small = 6, Medium = 3, Large = 1, Extreme = 0 },
+		{ Small = 5, Medium = 4, Large = 2, Extreme = 0 },
+		{ Small = 3, Medium = 4, Large = 3, Extreme = 1 },
+		{ Small = 2, Medium = 3, Large = 4, Extreme = 2 },
+		{ Small = 1, Medium = 2, Large = 5, Extreme = 3 },
+	},
+}
+
+-- ------------------------------------------------------------------- Heat --
+
+Balance.Heat = {
+	Min = 0,
+	Max = 100,
+
+	-- Zerfall -1 pro 5 s und NUR ausserhalb eines laufenden Auftrags.
+	-- Wer durchgehend arbeitet, kuehlt nicht ab.
+	DecayAmount = 1,
+	DecayInterval = 5,
+
+	-- Razzia (Phase 2). p = (Heat/Max)^Exponent * Scale, Check alle 10 s.
+	--   Heat 30 -&gt; 0,9 % · Heat 50 -&gt; 4,4 % · Heat 80 -&gt; 17,9 % · Heat 100 -&gt; 35 %
+	RaidCheckInterval = 10,
+	RaidChanceScale = 0.35,
+	RaidChanceExponent = 3,
+
+	-- Fluchtfenster (Phase 2).
+	RaidRingRadius = 40,
+	RaidRingSeconds = 5,
+	RaidCashKeptFraction = 0.35,
+	RaidHeatLossCaught = 40,
+	RaidHeatLossEscaped = 15,
+	RaidStunSeconds = 3,
+
+	-- Schwellen der Weltreaktion aus 4.3 (Phase 4).
+	AmbientCalmUntil = 30,
+	AmbientTenseUntil = 60,
+	AmbientHighUntil = 85,
+}
+
+--[[
+	Risikopraemie aus 1.2: payout = basePayout * (1 + Heat/100).
+	Steht als Funktion hier, damit Server und Client mit derselben Formel
+	rechnen und die 100 nicht zweimal im Code auftaucht.
+]]
+function Balance.RiskPremium(heat: number): number
+	local h = math.clamp(heat, Balance.Heat.Min, Balance.Heat.Max)
+	return 1 + h / Balance.Heat.Max
+end
+
+--[[
+	Razzia-Wahrscheinlichkeit pro Check (Phase 2). Schon hier, weil die HeatBar
+	sie in Phase 1 bereits anzeigt -- die Formel darf es nur einmal geben.
+]]
+function Balance.RaidChance(heat: number): number
+	local h = math.clamp(heat, Balance.Heat.Min, Balance.Heat.Max) / Balance.Heat.Max
+	return (h ^ Balance.Heat.RaidChanceExponent) * Balance.Heat.RaidChanceScale
+end
+
+-- ------------------------------------------------------------------- Bank --
+
+Balance.Bank = {
+	DepositSeconds = 8,
+	HeatRelief = 25,
+
+	-- NICHT SPEZIFIZIERT: Radius des Einzahlbereichs und Prompt-Reichweite.
+	Radius = 18,
+	PromptDistance = 14,
+
+	-- Phase 3: im Umkreis der Bank kann kein Auftrag angenommen werden.
+	NoOrderRadius = 25,
+}
+
+-- ------------------------------------------------------------------ Runde --
+
+Balance.Round = {
+	DurationSeconds = 300,
+	IntermissionSeconds = 15,
+	MinPlayers = 1,
+
+	-- Letzte 60 s: alle Payouts x2.
+	FinalRushSeconds = 60,
+	FinalRushMultiplier = 2,
+
+	-- NICHT SPEZIFIZIERT: Takt, in dem der Rundenzustand zum Client
+	-- nachsynchronisiert wird. Der Countdown laeuft clientseitig weiter.
+	StateResyncInterval = 5,
+}
+
+-- ------------------------------------------------- Late Join und Abfangen --
+
+Balance.LateJoin = {
+	-- Wer in den ersten 60 s joint, startet normal.
+	GraceSeconds = 60,
+	-- Danach: Banked = Median aller Spieler * 0,5 als Aufholbonus.
+	MedianFactor = 0.5,
+	-- In den letzten 45 s gar kein Einstieg mehr -- direkt in die Lobby.
+	LockoutSeconds = 45,
+}
+
+Balance.Intercept = {
+	SplitFraction = 0.5,
+	HeatGain = 25,
+	CooldownSeconds = 45,
+
+	-- NICHT SPEZIFIZIERT: Reichweite des Abfang-Prompts und der serverseitige
+	-- Distanzcheck dazu.
+	PromptDistance = 12,
+	Radius = 16,
+
+	-- NICHT SPEZIFIZIERT: Darstellung der Markierung waehrend der Einzahlung.
+	-- Weiss ist laut 4.2 fuer genau diesen Zustand reserviert.
+	HighlightFill = 0.5,
+	MarkerHeight = 3.5,
+}
+
+-- --------------------------------------------------------------- Netzwerk --
+
+Balance.Net = {
+	-- Dokument 7: "ein Aufruf pro Spieler und Aktion pro 0,3 s".
+	ActionCooldown = 0.3,
+
+	-- NICHT SPEZIFIZIERT.
+	StateReplicateInterval = 0.2,
+	-- Takt des Live-Leaderboards waehrend der Runde.
+	ScoreboardInterval = 1,
+	NotifyDuration = 3.5,
+	ThrottleWarnCooldown = 5,
+}
+
+-- ------------------------------------------------------------- Game Feel --
+-- Dokument 5. Was dort mit Zahl steht, steht hier mit derselben Zahl.
+
+Balance.Feel = {
+	-- Herzschlag: bei Heat 30 alle 1,2 s, bei Heat 100 alle 0,45 s, linear.
+	-- Treibt auch den Vignetten-Puls aus 4.3 -- der laeuft im selben Takt, auch
+	-- solange die Sound-Id noch 0 ist.
+	HeartbeatHeatLow = 30,
+	HeartbeatIntervalLow = 1.2,
+	HeartbeatHeatHigh = 100,
+	HeartbeatIntervalHigh = 0.45,
+
+	-- Zahlen-Popup ueber dem Kopf: 0,6 s nach oben, Transparenz auf 1.
+	PopupSeconds = 0.6,
+	PopupRise = 4,
+
+	-- Cash-Zaehler tweent statt zu springen.
+	CashTweenSeconds = 0.4,
+
+	-- Kamera-Kick bei Razzia-Start, kuerzer bei geglueckter Flucht.
+	CameraKickSeconds = 0.25,
+	CameraKickStuds = 1.2,
+	-- NICHT SPEZIFIZIERT, nur "ein zweiter, kuerzerer".
+	EscapeKickSeconds = 0.15,
+	EscapeKickStuds = 0.6,
+
+	-- Bank-Ring: bei Abbruch laeuft er zurueck statt auf null zu springen.
+	BankRingResetSeconds = 0.3,
+	BankRingRadius = 3.4,
+
+	-- Weltreaktion nach 4.3. Die Heat-Schwellen stehen in Balance.Heat.
+	SaturationAtTense = -0.1,
+	ContrastAtHigh = 0.08,
+	VignetteMaxTransparency = 0.55,
+	ShakeStudsAtCritical = 0.35,
+}
+
+--[[
+	Herzschlag-Abstand in Sekunden fuer einen Heat-Wert. Unter
+	HeartbeatHeatLow schlaegt nichts -- da reagiert die Welt laut 4.3 gar nicht.
+	Rueckgabe nil heisst "still".
+]]
+function Balance.HeartbeatInterval(heat: number): number?
+	if heat &lt; Balance.Feel.HeartbeatHeatLow then
+		return nil
+	end
+	local span = Balance.Feel.HeartbeatHeatHigh - Balance.Feel.HeartbeatHeatLow
+	local t = math.clamp((heat - Balance.Feel.HeartbeatHeatLow) / span, 0, 1)
+	return Balance.Feel.HeartbeatIntervalLow
+		+ (Balance.Feel.HeartbeatIntervalHigh - Balance.Feel.HeartbeatIntervalLow) * t
+end
+
+-- -------------------------------------------------------------------- Map --
+-- NICHT SPEZIFIZIERT bis auf 4.4 (Bank zentral und hoch, fuenf Terminals am
+-- Rand, bessere Terminals weiter weg) und die 18 s Bank-Rundweg.
+-- Alles Uebrige ist daraus gerechnet:
+--   18 s Rundweg bei WalkSpeed 16 -&gt; 144 Studs einfach zum besten Terminal.
+--   Bester Uebergabepunkt liegt bis zu 340 Studs vom Terminal -&gt; Boden muss
+--   mindestens 144 + 340 = 484 Studs Halbkante haben.
+
+Balance.Map = {
+	GroundSize = Vector3.new(1000, 4, 1000),
+	GroundY = 0,
+
+	-- Uebergabepunkte werden innerhalb dieser Halbkante um den Mittelpunkt
+	-- gesetzt. Kleiner als der Boden, damit niemand an der Kante steht.
+	PlayableHalfExtent = 480,
+
+	BankPosition = Vector3.new(0, 0, 0),
+	BankPlinthSize = Vector3.new(40, 2, 40),
+	BankTowerSize = Vector3.new(16, 54, 16),
+	BankCounterSize = Vector3.new(12, 4, 2),
+	BankCounterOffset = Vector3.new(0, 4, 12),
+
+	-- Ein Radius pro Terminal-Rang, Rang 1 zuerst. Rang 5 = 144 Studs = die
+	-- 18 s Rundweg aus dem Dokument.
+	TerminalRadii = { 80, 96, 112, 128, 144 },
+	TerminalStartAngleDegrees = 18,
+	TerminalSize = Vector3.new(5, 8, 5),
+
+	DeliveryPadSize = Vector3.new(14, 1, 14),
+	DeliveryPillarSize = Vector3.new(2, 16, 2),
+	-- Wie viele Richtungen der Server durchprobiert, bis ein Uebergabepunkt
+	-- innerhalb der Spielflaeche liegt.
+	DeliveryPlacementTries = 24,
+
+	SpawnPosition = Vector3.new(0, 0, 34),
+	SpawnSize = Vector3.new(16, 1, 16),
+
+	-- Sperrkreis der Razzia. Radius und Dauer stehen in Balance.Heat -- das
+	-- hier sind nur Darstellungsmasse.
+	RaidRingHeight = 1.5,
+	RaidHighlightFill = 0.55,
+	RaidZoneTransparency = 0.85,
+	RaidTimerTransparency = 0.55,
+
+	-- Sichtbares Paket auf dem Ruecken, solange ein Auftrag laeuft (1.1).
+	PackageSize = Vector3.new(2.6, 2.6, 1.2),
+	PackageOffset = Vector3.new(0, 0.2, 1.1),
+
+	-- Einzahl-Beam: weisse Saeule von der Bank in den Himmel, solange jemand
+	-- einzahlt (Dokument 5). Fuer alle sichtbar.
+	BeamSize = Vector3.new(6, 400, 6),
+	BeamTransparency = 0.55,
+
+	-- NICHT SPEZIFIZIERT: Deckungen nach 4.4. "wenige Deckungen: Flucht muss
+	-- moeglich, aber nicht trivial sein" und "keine Sackgassen im
+	-- Sperrkreis-Radius". Deshalb einzeln stehende Bloecke statt Waende --
+	-- ein einzelner Block kann keine Sackgasse bilden.
+	CoverCount = 46,
+	CoverSize = Vector3.new(9, 11, 9),
+	CoverMinRadius = 60,
+	CoverMaxRadius = 400,
+	-- Mindestabstand zu Terminals, Bank und Spawn.
+	CoverClearance = 26,
+}
+
+-- ------------------------------------------------------------ Abgeleitetes --
+
+Balance.Orders.TierById = {}
+for _, tier in ipairs(Balance.Orders.Tiers) do
+	Balance.Orders.TierById[tier.Id] = tier
+end
+
+return Balance
+</ProtectedString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBX6">
+				<Properties>
+					<string name="Name">DealCatalog</string>
+					<ProtectedString name="Source">--[[
+	DealCatalog.lua
+
+	Reine Daten. Jede Karte nennt nur ihre Stufe -- Payout, Heat und die
+	Entfernung des Uebergabepunkts stehen ausschliesslich in
+	Balance.Orders.Tiers.
+
+	Neue Karte hinzufuegen: Zeile anhaengen, Tier auf eine vorhandene Tier-Id
+	setzen. Sonst nichts.
+]]
+
+local DealCatalog = {}
+
+DealCatalog.Cards = {
+	-- Klein ------------------------------------------------------------------
+	{ Id = "courier", Tier = "Small", Name = "Kurierfahrt", Blurb = "Ein Umschlag, zwei Strassen weiter." },
+	{ Id = "resale", Tier = "Small", Name = "Ticket-Weiterverkauf", Blurb = "Ausverkauft heisst nicht ausverkauft." },
+	{ Id = "spares", Tier = "Small", Name = "Ersatzteile umleiten", Blurb = "Die Kiste stand ohnehin falsch." },
+	{ Id = "nightshift", Tier = "Small", Name = "Nachtschicht-Abrechnung", Blurb = "Niemand zaehlt um vier Uhr nach." },
+
+	-- Mittel -----------------------------------------------------------------
+	{ Id = "relabel", Tier = "Medium", Name = "Container umetikettieren", Blurb = "Neues Schild, neues Ziel." },
+	{ Id = "customs", Tier = "Medium", Name = "Zollformular korrigieren", Blurb = "Ein Feld, eine Null, ein Nachmittag." },
+	{ Id = "pallet", Tier = "Medium", Name = "Palette ohne Papiere", Blurb = "Steht seit Dienstag da. Gehoert jetzt dir." },
+	{ Id = "stock", Tier = "Medium", Name = "Lagerbestand angleichen", Blurb = "Die Inventur hatte schon immer Rundungsfehler." },
+
+	-- Gross ------------------------------------------------------------------
+	{ Id = "waybill", Tier = "Large", Name = "Frachtbrief neu ausstellen", Blurb = "Der Waggon faehrt trotzdem." },
+	{ Id = "shift", Tier = "Large", Name = "Hafenschicht kaufen", Blurb = "Acht Stunden, in denen keiner hinsieht." },
+	{ Id = "trucks", Tier = "Large", Name = "Zwei LKW ueber Nacht", Blurb = "Zurueck vor der Fruehschicht. Wahrscheinlich." },
+	{ Id = "crane", Tier = "Large", Name = "Kranfuehrer ueberzeugen", Blurb = "Er hebt, was du sagst. Einmal." },
+
+	-- Extrem (erst ab Heat &gt;= 50 im Angebot) ---------------------------------
+	{ Id = "terminalwide", Tier = "Extreme", Name = "Ganzer Hafenabschnitt", Blurb = "Kein Rueckweg ab hier." },
+	{ Id = "quarter", Tier = "Extreme", Name = "Quartalsbilanz", Blurb = "Drei Monate in einer Nacht geradeziehen." },
+	{ Id = "chain", Tier = "Extreme", Name = "Die ganze Lieferkette", Blurb = "Vom Kai bis zum Regal, alles deins." },
+	{ Id = "blackfriday", Tier = "Extreme", Name = "Schwarzer Freitag", Blurb = "Einmal im Jahr sieht niemand hin. Heute." },
+}
+
+-- Nachschlag nach Id (rein abgeleitet, keine zusaetzlichen Daten).
+DealCatalog.ById = {}
+for _, card in ipairs(DealCatalog.Cards) do
+	DealCatalog.ById[card.Id] = card
+end
+
+return DealCatalog
+</ProtectedString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBX7">
+				<Properties>
+					<string name="Name">Remotes</string>
+					<ProtectedString name="Source">--[[
+	Remotes.lua
+
+	Legt die RemoteEvents an (Server) bzw. holt sie ab (Client).
+	Kein Nebeneffekt beim Require -- die Instanzen entstehen erst beim ersten
+	Remotes.Get(). Auf dem Client blockiert Get() per WaitForChild.
+
+	C -&gt; S   ChooseOrder(terminalId: string, offerIndex: number)
+	         Der einzige Client-Request mit Nutzdaten. Terminal, Uebergabepunkt
+	         und Bank laufen ueber ProximityPrompt.Triggered, das der Server
+	         selbst empfaengt -- der Client sendet dabei gar nichts.
+
+	S -&gt; C   OffersReady(terminalId, offers, terminalPosition)
+	                                           drei Karten fuer diesen Spieler
+	         CloseTerminal()                   Panel schliessen
+	         StateChanged(state)               cash / banked / heat
+	         ActivityChanged(activity | nil)   laufende Interaktion
+	         OrderChanged(order | nil, point)  getragener Auftrag + Zielpart
+	         RaidStarted(info)                 Fluchtfenster laeuft
+	         RaidEnded(info)                   entkommen oder erwischt
+	         RoundState(state)                 Phase, Ende, Endspurt
+	         RoundEnded(result)                Endtafel
+	         Scoreboard(entries)               Live-Banked aller Spieler
+	         Notify(kind, text)                Toast im HUD
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local FOLDER_NAME = "CashoutRemotes"
+
+local Remotes = {}
+
+-- Namen als Konstanten, damit Tippfehler beim Require auffallen und nicht
+-- erst zur Laufzeit in einem WaitForChild haengen bleiben.
+Remotes.ChooseOrder = "ChooseOrder"
+Remotes.OffersReady = "OffersReady"
+Remotes.CloseTerminal = "CloseTerminal"
+Remotes.StateChanged = "StateChanged"
+Remotes.ActivityChanged = "ActivityChanged"
+Remotes.OrderChanged = "OrderChanged"
+Remotes.RaidStarted = "RaidStarted"
+Remotes.RaidEnded = "RaidEnded"
+Remotes.RoundState = "RoundState"
+Remotes.RoundEnded = "RoundEnded"
+Remotes.Scoreboard = "Scoreboard"
+Remotes.Notify = "Notify"
+
+local ALL = {
+	Remotes.ChooseOrder,
+	Remotes.OffersReady,
+	Remotes.CloseTerminal,
+	Remotes.StateChanged,
+	Remotes.ActivityChanged,
+	Remotes.OrderChanged,
+	Remotes.RaidStarted,
+	Remotes.RaidEnded,
+	Remotes.RoundState,
+	Remotes.RoundEnded,
+	Remotes.Scoreboard,
+	Remotes.Notify,
+}
+
+local cache = {}
+
+local function getFolder(): Instance
+	if RunService:IsServer() then
+		local folder = ReplicatedStorage:FindFirstChild(FOLDER_NAME)
+		if not folder then
+			folder = Instance.new("Folder")
+			folder.Name = FOLDER_NAME
+			folder.Parent = ReplicatedStorage
+		end
+		return folder
+	end
+	return ReplicatedStorage:WaitForChild(FOLDER_NAME)
+end
+
+function Remotes.Get(name: string): RemoteEvent
+	local cached = cache[name]
+	if cached then
+		return cached
+	end
+
+	local folder = getFolder()
+	local remote
+
+	if RunService:IsServer() then
+		remote = folder:FindFirstChild(name)
+		if not remote then
+			remote = Instance.new("RemoteEvent")
+			remote.Name = name
+			remote.Parent = folder
+		end
+	else
+		remote = folder:WaitForChild(name)
+	end
+
+	cache[name] = remote
+	return remote
+end
+
+-- Vom Server einmal beim Start aufgerufen, damit alle Remotes existieren,
+-- bevor der erste Client sie sucht.
+function Remotes.CreateAll()
+	assert(RunService:IsServer(), "Remotes.CreateAll nur auf dem Server aufrufen")
+	for _, name in ipairs(ALL) do
+		Remotes.Get(name)
+	end
+end
+
+return Remotes
+</ProtectedString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBX8">
+				<Properties>
+					<string name="Name">SoundCatalog</string>
+					<ProtectedString name="Source">--[[
+	SoundCatalog.lua
+
+	Alle Sound-Ids an einer Stelle. **Jede Id ist 0** -- hier ist keine
+	Roblox-Sound-Id erfunden worden. Das Spiel laeuft mit ausschliesslich
+	leeren Ids vollstaendig: SoundCatalog.Play() prueft vorher und tut dann
+	schlicht nichts.
+
+	SoundCatalog.WarnMissing() gibt beim Start EINE gesammelte Zeile mit allen
+	leeren Eintraegen aus, kein Spam pro Aufruf.
+
+	Die Effekte selbst (Herzschlag im Heat-Takt, Kamera-Kick, Einzahl-Beam)
+	sind Phase 4. Hier steht nur der Katalog und das Abspielen.
+]]
+
+local SoundService = game:GetService("SoundService")
+local RunService = game:GetService("RunService")
+
+local SoundCatalog = {}
+
+--[[
+	Id = 0 heisst "fehlt". Reihenfolge = Reihenfolge in ASSETS_TODO.md.
+]]
+SoundCatalog.Ids = {
+	-- Phase 1
+	OrderAccepted = 0,
+	OrderDelivered = 0,
+	DepositStart = 0,
+	DepositComplete = 0,
+	ActionRefused = 0,
+	RoundStart = 0,
+	RoundEnd = 0,
+
+	-- Phase 2
+	RaidAlarm = 0,
+	RaidEscaped = 0,
+	RaidCaught = 0,
+
+	-- Phase 3
+	Intercept = 0,
+
+	-- Phase 4
+	Heartbeat = 0,
+	SirenLoop = 0,
+}
+
+local warned = false
+
+--[[
+	Spielt einen Katalog-Eintrag als 2D-Sound. Ohne Id passiert nichts.
+	Nur auf dem Client sinnvoll -- serverseitig still ignoriert.
+]]
+function SoundCatalog.Play(key: string)
+	if not RunService:IsClient() then
+		return
+	end
+
+	local id = SoundCatalog.Ids[key]
+	if not id or id == 0 then
+		return
+	end
+
+	local sound = Instance.new("Sound")
+	sound.SoundId = "rbxassetid://" .. tostring(id)
+	sound.Parent = SoundService
+	sound.Ended:Connect(function()
+		sound:Destroy()
+	end)
+	sound.Destroying:Connect(function()
+		sound:Stop()
+	end)
+	sound:Play()
+end
+
+--[[
+	Einmalige Sammelmeldung ueber alle fehlenden Ids.
+]]
+function SoundCatalog.WarnMissing()
+	if warned then
+		return
+	end
+	warned = true
+
+	local missing = {}
+	for key, id in pairs(SoundCatalog.Ids) do
+		if id == 0 then
+			table.insert(missing, key)
+		end
+	end
+
+	if #missing == 0 then
+		return
+	end
+
+	table.sort(missing)
+	warn(
+		string.format(
+			"[CASHOUT] %d Sound-Ids fehlen (siehe ASSETS_TODO.md): %s",
+			#missing,
+			table.concat(missing, ", ")
+		)
+	)
+end
+
+return SoundCatalog
+</ProtectedString>
+				</Properties>
+			</Item>
+		</Item>
+	</Item>
+	<Item class="ServerScriptService" referent="RBX9">
+		<Properties>
+			<string name="Name">ServerScriptService</string>
+		</Properties>
+		<Item class="Folder" referent="RBX10">
+			<Properties>
+				<string name="Name">Dev</string>
+			</Properties>
+			<Item class="ModuleScript" referent="RBX11">
+				<Properties>
+					<string name="Name">BalanceSim</string>
+					<ProtectedString name="Source">--[[
+	BalanceSim.lua  (Dokument 6)
+
+	Rechnet Strategien gegen Balance.lua durch, ohne dass jemand mitspielen
+	muss. Laeuft auf Knopfdruck, nicht von allein:
+
+	    require(game.ServerScriptService.Dev.BalanceSim).Run()
+
+	Optional mit weniger Runden zum schnellen Ausprobieren:
+
+	    require(game.ServerScriptService.Dev.BalanceSim).Run(500)
+
+	Das Modul haelt KEINE eigenen Spielzahlen. Payouts, Heat, Entfernungen,
+	Razzia-Formel und Kartengeometrie kommen alle aus Balance.lua -- wer dort
+	tunt, sieht das Ergebnis hier sofort.
+
+	Was das Modell NICHT kann, damit niemand die Zahlen fuer mehr haelt als sie
+	sind: ein Spieler allein, keine Mitspieler, kein Abfangen, keine Wege um
+	Hindernisse, und die Fluchtquote ist eine gesetzte Konstante statt echten
+	Koennens.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Balance = require(Shared:WaitForChild("Balance"))
+local DealCatalog = require(Shared:WaitForChild("DealCatalog"))
+
+local BalanceSim = {}
+
+-- ------------------------------------------------------------- Annahmen --
+-- Alles, was das Dokument nicht festlegt und das Modell trotzdem braucht.
+-- Bewusst hier oben und nicht in Balance.lua: das sind Annahmen ueber
+-- Spielerverhalten, keine Spielregeln.
+
+-- Dokument 6: "Annahme: 50 % Fluchtquote, als Konstante oben im Skript".
+local ESCAPE_RATE = 0.5
+
+-- Zeitverlust einer Razzia zusaetzlich zum Fluchtfenster selbst. Wer entkommt,
+-- rennt in Richtung seines Ziels weiter und verliert nichts; wer erwischt wird,
+-- steht den Stun ab.
+local ESCAPED_TIME_COST = 0
+local CAUGHT_TIME_COST = Balance.Heat.RaidStunSeconds
+
+-- Bearing-Stuetzstellen fuer den Erwartungswert der Strecke Uebergabepunkt -&gt; Bank.
+local BEARING_SAMPLES = 72
+
+local DEFAULT_ROUNDS = 5000
+
+local DEPOSIT_THRESHOLDS = { 400, 800, 1500, 3000 }
+
+-- Dokument 6: "optionalem 'ab Heat 70 nur noch Klein'".
+local PANIC_HEAT = 70
+
+-- ------------------------------------------------------------- Geometrie --
+
+local TIER_INDEX = {}
+for index, tier in ipairs(Balance.Orders.Tiers) do
+	TIER_INDEX[tier.Id] = index
+end
+
+--[[
+	Terminal-Rang, an dem eine Stufe am haeufigsten im Angebot ist. Ein Spieler,
+	der immer "Gross" will, geht an das Terminal, das Gross am staerksten fuehrt.
+]]
+local function bestRankFor(tierId: string): number
+	local bestRank, bestWeight = 1, -1
+	for rank, profile in ipairs(Balance.Orders.TerminalProfiles) do
+		local weight = profile[tierId] or 0
+		if weight &gt; bestWeight then
+			bestRank, bestWeight = rank, weight
+		end
+	end
+	return bestRank
+end
+
+--[[
+	Erwartete Strecke vom Uebergabepunkt zur Bank. Der Punkt liegt D Studs vom
+	Terminal entfernt in zufaelliger Richtung, das Terminal R Studs von der
+	Bank -- gemittelt ueber den Winkel.
+]]
+local function expectedPointToBank(radius: number, distance: number): number
+	local total = 0
+	for index = 0, BEARING_SAMPLES - 1 do
+		local angle = (index / BEARING_SAMPLES) * 2 * math.pi
+		local dx = radius - distance * math.cos(angle)
+		local dz = distance * math.sin(angle)
+		total += math.sqrt(dx * dx + dz * dz)
+	end
+	return total / BEARING_SAMPLES
+end
+
+-- -------------------------------------------------------------- Angebote --
+
+--[[
+	Dieselbe gewichtete Ziehung ohne Zuruecklegen wie in OrderService: drei
+	Karten aus dem Profil des Terminals, Extrem erst ab Heat 50.
+]]
+local function drawOffers(rng, rank: number, heat: number)
+	local profile = Balance.Orders.TerminalProfiles[rank]
+	local pool = {}
+	-- Ein Eintrag pro KARTE, nicht pro Stufe -- genau wie eligibleCards im
+	-- OrderService. Der Unterschied ist nicht kosmetisch: gezogen wird ohne
+	-- Zuruecklegen. Mit einem Eintrag pro Stufe kaemen immer drei
+	-- VERSCHIEDENE Stufen heraus, waehrend der Server aus 16 Karten zieht und
+	-- dieselbe Stufe mehrfach anbieten kann -- oder die gesuchte gar nicht.
+	for _, card in ipairs(DealCatalog.Cards) do
+		local tier = Balance.Orders.TierById[card.Tier]
+		local weight = profile[card.Tier] or 0
+		if tier and weight &gt; 0 and heat &gt;= tier.MinHeatToOffer then
+			table.insert(pool, tier)
+		end
+	end
+
+	local drawn = {}
+	local remaining = table.clone(pool)
+	for _ = 1, math.min(Balance.Orders.OffersPerTerminal, #pool) do
+		local total = 0
+		for _, tier in ipairs(remaining) do
+			total += profile[tier.Id]
+		end
+		local roll = rng:NextNumber() * total
+		local pickedIndex = #remaining
+		for index, tier in ipairs(remaining) do
+			roll -= profile[tier.Id]
+			if roll &lt;= 0 then
+				pickedIndex = index
+				break
+			end
+		end
+		table.insert(drawn, remaining[pickedIndex])
+		table.remove(remaining, pickedIndex)
+	end
+	return drawn
+end
+
+--[[
+	targetIndex = nil bedeutet "die hoechste verfuegbare Stufe nehmen".
+	Sonst die angepeilte Stufe, und wenn sie nicht dabei ist, die naechst
+	niedrigere -- und wenn es die auch nicht gibt, die niedrigste im Angebot.
+]]
+local function pickOffer(offers, targetIndex: number?)
+	local best = nil
+	for _, tier in ipairs(offers) do
+		local index = TIER_INDEX[tier.Id]
+		if targetIndex == nil then
+			if not best or index &gt; TIER_INDEX[best.Id] then
+				best = tier
+			end
+		elseif index &lt;= targetIndex then
+			if not best or index &gt; TIER_INDEX[best.Id] then
+				best = tier
+			end
+		end
+	end
+	if best then
+		return best
+	end
+	-- Nichts auf oder unter dem Ziel: die niedrigste Karte nehmen.
+	local lowest = offers[1]
+	for _, tier in ipairs(offers) do
+		if TIER_INDEX[tier.Id] &lt; TIER_INDEX[lowest.Id] then
+			lowest = tier
+		end
+	end
+	return lowest
+end
+
+-- ------------------------------------------------------------- Simulation --
+
+local function newSim(rng)
+	return {
+		rng = rng,
+		t = 0,
+		cash = 0,
+		banked = 0,
+		heat = 0,
+		nextRaid = Balance.Heat.RaidCheckInterval,
+		nextDecay = Balance.Heat.DecayInterval,
+		raids = 0,
+		escapes = 0,
+		deposits = 0,
+		heatSum = 0,
+		heatSamples = 0,
+	}
+end
+
+local function payoutMultiplier(sim): number
+	local remaining = Balance.Round.DurationSeconds - sim.t
+	return if remaining &lt;= Balance.Round.FinalRushSeconds then Balance.Round.FinalRushMultiplier else 1
+end
+
+--[[
+	Laesst die Uhr um seconds weiterlaufen und arbeitet dabei Zerfallstakte und
+	Razzia-Checks ab. carrying = laeuft gerade ein Auftrag (dann kein Zerfall).
+]]
+local function advance(sim, seconds: number, carrying: boolean)
+	local remaining = seconds
+
+	while remaining &gt; 1e-9 do
+		local step = math.min(remaining, sim.nextRaid - sim.t, sim.nextDecay - sim.t)
+		if step &lt; 0 then
+			step = 0
+		end
+		sim.t += step
+		remaining -= step
+
+		if sim.t &gt;= sim.nextRaid - 1e-9 then
+			sim.nextRaid += Balance.Heat.RaidCheckInterval
+			sim.heatSum += sim.heat
+			sim.heatSamples += 1
+
+			if sim.rng:NextNumber() &lt; Balance.RaidChance(sim.heat) then
+				sim.raids += 1
+				if sim.rng:NextNumber() &lt; ESCAPE_RATE then
+					sim.escapes += 1
+					sim.heat = math.max(Balance.Heat.Min, sim.heat - Balance.Heat.RaidHeatLossEscaped)
+					remaining += ESCAPED_TIME_COST
+				else
+					sim.cash = math.floor(sim.cash * Balance.Heat.RaidCashKeptFraction)
+					sim.heat = math.max(Balance.Heat.Min, sim.heat - Balance.Heat.RaidHeatLossCaught)
+					remaining += CAUGHT_TIME_COST
+				end
+			end
+		end
+
+		if sim.t &gt;= sim.nextDecay - 1e-9 then
+			sim.nextDecay += Balance.Heat.DecayInterval
+			if not carrying and sim.heat &gt; Balance.Heat.Min then
+				sim.heat = math.max(Balance.Heat.Min, sim.heat - Balance.Heat.DecayAmount)
+			end
+		end
+
+		if sim.t &gt;= Balance.Round.DurationSeconds then
+			return
+		end
+	end
+end
+
+--[[
+	Eine Runde mit einer Strategie. Rueckgabe: banked, Ø heat, raids, escapes.
+]]
+local function simulateRound(rng, strategy)
+	local sim = newSim(rng)
+	local rank = strategy.rank
+	local radius = Balance.Map.TerminalRadii[rank]
+	local walk = Balance.Player.WalkSpeed
+
+	-- Start an der Bank (Spawn liegt dort).
+	local atBank = true
+
+	while sim.t &lt; Balance.Round.DurationSeconds do
+		local timeLeft = Balance.Round.DurationSeconds - sim.t
+
+		-- Reicht die Zeit ueberhaupt noch fuer einen Auftrag samt Einzahlung?
+		local minimalCycle = radius / walk
+			+ Balance.Orders.AcceptSeconds
+			+ Balance.Orders.Tiers[1].MinDistance / walk
+			+ Balance.Orders.DeliverSeconds
+
+		local mustBankNow = sim.cash &gt; 0
+			and timeLeft &lt;= (if atBank then 0 else radius / walk) + Balance.Bank.DepositSeconds + 1
+
+		if mustBankNow or (sim.cash &gt;= strategy.threshold and timeLeft &gt; Balance.Bank.DepositSeconds) then
+			if not atBank then
+				advance(sim, strategy.pointToBank / walk, false)
+				atBank = true
+			end
+			if sim.t &gt;= Balance.Round.DurationSeconds then
+				break
+			end
+			advance(sim, Balance.Bank.DepositSeconds, false)
+			if sim.t &lt; Balance.Round.DurationSeconds then
+				sim.banked += sim.cash
+				sim.cash = 0
+				sim.deposits += 1
+				sim.heat = math.max(Balance.Heat.Min, sim.heat - Balance.Bank.HeatRelief)
+			end
+		elseif timeLeft &lt;= minimalCycle then
+			break
+		else
+			-- Zum Terminal.
+			advance(sim, (if atBank then radius else strategy.pointToTerminal) / walk, false)
+			atBank = false
+			if sim.t &gt;= Balance.Round.DurationSeconds then
+				break
+			end
+
+			advance(sim, Balance.Orders.AcceptSeconds, false)
+			if sim.t &gt;= Balance.Round.DurationSeconds then
+				break
+			end
+
+			local targetIndex = strategy.targetIndex
+			if strategy.panic and sim.heat &gt;= PANIC_HEAT then
+				targetIndex = TIER_INDEX.Small
+			end
+
+			local offers = drawOffers(rng, rank, sim.heat)
+			if #offers == 0 then
+				break
+			end
+			local tier = pickOffer(offers, targetIndex)
+
+			local basePayout = rng:NextInteger(tier.MinPayout, tier.MaxPayout)
+			local distance = rng:NextNumber(tier.MinDistance, tier.MaxDistance)
+
+			-- Ab jetzt getragen: kein Zerfall bis zur Uebergabe.
+			advance(sim, distance / walk, true)
+			if sim.t &gt;= Balance.Round.DurationSeconds then
+				break
+			end
+			advance(sim, Balance.Orders.DeliverSeconds, true)
+			if sim.t &gt;= Balance.Round.DurationSeconds then
+				break
+			end
+
+			local payout = math.floor(basePayout * Balance.RiskPremium(sim.heat) * payoutMultiplier(sim) + 0.5)
+			sim.cash += payout
+			sim.heat = math.min(Balance.Heat.Max, sim.heat + tier.Heat)
+		end
+	end
+
+	local averageHeat = if sim.heatSamples &gt; 0 then sim.heatSum / sim.heatSamples else 0
+	return sim.banked, averageHeat, sim.raids, sim.escapes, sim.deposits
+end
+
+-- ------------------------------------------------------------ Strategien --
+
+local function buildStrategies()
+	local list = {}
+
+	local targets = {
+		{ label = "immer Klein", tierId = "Small", targetIndex = TIER_INDEX.Small },
+		{ label = "immer Mittel", tierId = "Medium", targetIndex = TIER_INDEX.Medium },
+		{ label = "immer Gross", tierId = "Large", targetIndex = TIER_INDEX.Large },
+		{ label = "hoechste verfuegbare", tierId = "Extreme", targetIndex = nil },
+	}
+
+	for _, target in ipairs(targets) do
+		local rank = bestRankFor(target.tierId)
+		local radius = Balance.Map.TerminalRadii[rank]
+		-- Mittlere Entfernung der angepeilten Stufe fuer die Rueckwege.
+		local tier = Balance.Orders.TierById[target.tierId]
+		local meanDistance = (tier.MinDistance + tier.MaxDistance) / 2
+
+		for _, threshold in ipairs(DEPOSIT_THRESHOLDS) do
+			for _, panic in ipairs({ false, true }) do
+				table.insert(list, {
+					label = string.format(
+						"%s, Bank ab %d%s",
+						target.label,
+						threshold,
+						if panic then ", ab Heat 70 Klein" else ""
+					),
+					rank = rank,
+					targetIndex = target.targetIndex,
+					threshold = threshold,
+					panic = panic,
+					pointToTerminal = meanDistance,
+					pointToBank = expectedPointToBank(radius, meanDistance),
+				})
+			end
+		end
+	end
+
+	return list
+end
+
+-- ---------------------------------------------------------------- Ausgabe --
+
+local function formatRow(result)
+	return string.format(
+		"%-46s %9.0f %7.1f %8.2f %10s %6.1f %s",
+		result.label,
+		result.banked,
+		result.heat,
+		result.raids,
+		if result.raids &gt; 0 then string.format("%.0f %%", result.escapeShare * 100) else "-",
+		result.deposits,
+		if result.sensible then "" else "  (Schwelle unerreichbar)"
+	)
+end
+
+--[[
+	Zielkorridor aus Dokument 6.
+]]
+local function checkCorridor(results)
+	local lines = {}
+	local ok = true
+
+	local best = results[1].banked
+	local third = results[math.min(3, #results)].banked
+	local spread = if best &gt; 0 then (best - third) / best else 0
+	local spreadOk = spread &lt;= 0.15
+	ok = ok and spreadOk
+	table.insert(
+		lines,
+		string.format(
+			"  [%s] die drei besten Strategien liegen innerhalb von 15 %%: %.1f %%",
+			if spreadOk then "ok " else "NEIN",
+			spread * 100
+		)
+	)
+
+	local heatSum = 0
+	local topCount = math.min(3, #results)
+	for index = 1, topCount do
+		heatSum += results[index].heat
+	end
+	local topHeat = heatSum / topCount
+	local heatOk = topHeat &gt;= 40 and topHeat &lt;= 70
+	ok = ok and heatOk
+	table.insert(
+		lines,
+		string.format(
+			"  [%s] Ø Heat der Spitzenstrategien zwischen 40 und 70: %.1f",
+			if heatOk then "ok " else "NEIN",
+			topHeat
+		)
+	)
+
+	-- Untergrenze ist die schlechteste Strategie, deren Einzahlschwelle
+	-- ueberhaupt erreichbar war.
+	local worst, worstLabel = nil, "-"
+	for _, result in ipairs(results) do
+		if result.sensible and (not worst or result.banked &lt; worst) then
+			worst, worstLabel = result.banked, result.label
+		end
+	end
+	worst = worst or results[#results].banked
+	local ratio = if worst &gt; 0 then best / worst else math.huge
+	local ratioOk = ratio &lt;= 8
+	ok = ok and ratioOk
+	table.insert(
+		lines,
+		string.format(
+			"  [%s] beste hoechstens 8x die schlechteste sinnvolle: %.2fx  (Untergrenze: %s)",
+			if ratioOk then "ok " else "NEIN",
+			ratio,
+			worstLabel
+		)
+	)
+
+	return ok, lines
+end
+
+-- ------------------------------------------------------------------- Run --
+
+--[[
+	rounds: Runden je Strategie, Vorgabe 5000.
+	seed:   fuer reproduzierbare Laeufe.
+]]
+function BalanceSim.Run(rounds: number?, seed: number?)
+	local roundCount = rounds or DEFAULT_ROUNDS
+	local rng = Random.new(seed or 20260815)
+	local strategies = buildStrategies()
+
+	print("================ CASHOUT Balance-Simulator ================")
+	print(
+		string.format(
+			"%d Strategien x %d Runden a %d s. Fluchtquote als Annahme: %d %%.",
+			#strategies,
+			roundCount,
+			Balance.Round.DurationSeconds,
+			ESCAPE_RATE * 100
+		)
+	)
+	print("")
+	print(
+		string.format(
+			"%-46s %9s %7s %8s %10s %6s",
+			"Strategie",
+			"Ø Banked",
+			"Ø Heat",
+			"Razzien",
+			"geflohen",
+			"Einz."
+		)
+	)
+
+	local results = {}
+	for _, strategy in ipairs(strategies) do
+		local bankedSum, heatSum, raidSum, escapeSum, depositSum = 0, 0, 0, 0, 0
+		for _ = 1, roundCount do
+			local banked, heat, raids, escapes, deposits = simulateRound(rng, strategy)
+			bankedSum += banked
+			heatSum += heat
+			raidSum += raids
+			escapeSum += escapes
+			depositSum += deposits
+		end
+
+		local deposits = depositSum / roundCount
+		table.insert(results, {
+			label = strategy.label,
+			banked = bankedSum / roundCount,
+			heat = heatSum / roundCount,
+			raids = raidSum / roundCount,
+			deposits = deposits,
+			escapeShare = if raidSum &gt; 0 then escapeSum / raidSum else 0,
+			-- "Sinnvoll" heisst: die Einzahlschwelle war ueberhaupt erreichbar.
+			-- Wer mit Klein-Auftraegen auf 3000 wartet, zahlt nur die eine
+			-- Pflichteinzahlung am Rundenende ein -- das ist keine Strategie,
+			-- sondern ein Konfigurationsfehler, und taugt nicht als Untergrenze
+			-- fuer den 8x-Vergleich.
+			sensible = deposits &gt;= 2,
+		})
+	end
+
+	table.sort(results, function(a, b)
+		return a.banked &gt; b.banked
+	end)
+
+	for _, result in ipairs(results) do
+		print(formatRow(result))
+	end
+
+	print("")
+	print("Zielkorridor:")
+	local ok, lines = checkCorridor(results)
+	for _, line in ipairs(lines) do
+		print(line)
+	end
+
+	print("")
+	if ok then
+		print("ERGEBNIS: im Korridor.")
+	else
+		print("ERGEBNIS: ausserhalb des Korridors. Balance.lua bleibt unveraendert --")
+		print("die Zahlen oben sind die Grundlage fuer eine Entscheidung, kein Auftrag.")
+	end
+	print("==========================================================")
+
+	return {
+		results = results,
+		inCorridor = ok,
+	}
+end
+
+return BalanceSim
+</ProtectedString>
+				</Properties>
+			</Item>
+		</Item>
+		<Item class="Script" referent="RBX12">
+			<Properties>
+				<string name="Name">Main</string>
+				<ProtectedString name="Source">--[[
+	Main.server.lua
+
+	Startet die Services. Die Reihenfolge ist nicht beliebig:
+	  - Remotes zuerst, damit kein Client auf ein fehlendes Event wartet.
+	  - MapBuilder vor Order- und BankService, die sich ihre Prompts daraus holen.
+	  - RoundManager zuletzt, weil die anderen Services sich bei ihm per
+	    OnRoundStart / OnRoundEnd anmelden, bevor die erste Runde laeuft.
+
+	Sonst passiert hier nichts.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Remotes = require(Shared:WaitForChild("Remotes"))
+local SoundCatalog = require(Shared:WaitForChild("SoundCatalog"))
+
+local Modules = ServerScriptService:WaitForChild("Modules")
+local MapBuilder = require(Modules:WaitForChild("MapBuilder"))
+local PlayerState = require(Modules:WaitForChild("PlayerState"))
+local HeatService = require(Modules:WaitForChild("HeatService"))
+local OrderService = require(Modules:WaitForChild("OrderService"))
+local BankService = require(Modules:WaitForChild("BankService"))
+local RaidService = require(Modules:WaitForChild("RaidService"))
+local RoundManager = require(Modules:WaitForChild("RoundManager"))
+
+Remotes.CreateAll()
+SoundCatalog.WarnMissing()
+
+MapBuilder.Start()
+PlayerState.Start()
+HeatService.Start()
+OrderService.Start()
+BankService.Start()
+RaidService.Start()
+RoundManager.Start()
+
+print("[CASHOUT] v2 Phase 4 laeuft.")
+</ProtectedString>
+			</Properties>
+		</Item>
+		<Item class="Folder" referent="RBX13">
+			<Properties>
+				<string name="Name">Modules</string>
+			</Properties>
+			<Item class="ModuleScript" referent="RBX14">
+				<Properties>
+					<string name="Name">BankService</string>
+					<ProtectedString name="Source">--[[
+	BankService.lua
+
+	Einzahlen und Abfangen.
+
+	Einzahlen: Balance.Bank.DepositSeconds ununterbrochen im Radius.
+	Erfolg -&gt; restlicher Cash wird Banked, Heat sinkt um Balance.Bank.HeatRelief.
+	Weglaufen oder Respawn brechen ab, ohne dass etwas passiert.
+
+	Abfangen (Dokument 3.2): waehrend der acht Sekunden ist der Einzahlende fuer
+	alle sichtbar markiert -- weiss, laut 4.2 genau fuer diesen Zustand
+	reserviert -- und traegt einen Prompt. Wer ihn ausloest, nimmt die Haelfte:
+
+	  - Der Abfaenger bekommt sie auf Cash, nicht auf Banked. Er muss sie selbst
+	    noch heimbringen.
+	  - Der Abfaenger bekommt +25 Heat. Bankcamping wird dadurch von allein
+	    teuer.
+	  - 45 s Sperre bis zum naechsten Versuch, pro Spieler.
+	  - Der Bestohlene verliert nur die Haelfte, seine Einzahlung laeuft mit dem
+	    Rest zu Ende. Kein Totalverlust -- das waere Frust statt Spannung.
+
+	Genau EIN Abfangen pro Einzahlung. "Der Bestohlene verliert nur die Haelfte"
+	waere sonst nach drei Abfaengern eine Haelfte von einer Haelfte von einer
+	Haelfte.
+
+	Einzahlen ist auch mit getragenem Auftrag erlaubt -- der Auftrag bleibt
+	dabei bestehen.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Balance = require(Shared:WaitForChild("Balance"))
+
+local Modules = script.Parent
+local MapBuilder = require(Modules:WaitForChild("MapBuilder"))
+local PlayerState = require(Modules:WaitForChild("PlayerState"))
+local RoundManager = require(Modules:WaitForChild("RoundManager"))
+
+local BankService = {}
+
+local running = false
+
+-- [Player] = { token, intercepted, marker, highlight, prompt }
+-- Eigene Buchfuehrung, damit das Aufraeumen nicht davon abhaengt, ob
+-- PlayerState den Spieler beim Verlassen schon vergessen hat.
+local deposits: { [Player]: any } = {}
+-- [ProximityPrompt] = Player -- wer zahlt an diesem Prompt gerade ein
+local promptOwner: { [ProximityPrompt]: Player } = {}
+
+local onInterceptTriggered
+
+-- ------------------------------------------------------------- Markierung --
+
+local function unmark(player: Player)
+	local deposit = deposits[player]
+	if not deposit then
+		return
+	end
+
+	if deposit.prompt then
+		promptOwner[deposit.prompt] = nil
+		deposit.prompt:Destroy()
+		deposit.prompt = nil
+	end
+	if deposit.marker then
+		deposit.marker:Destroy()
+		deposit.marker = nil
+	end
+	if deposit.highlight then
+		deposit.highlight:Destroy()
+		deposit.highlight = nil
+	end
+end
+
+--[[
+	Weisses Leuchten, Schild ueber dem Kopf und Abfang-Prompt. Fuer alle
+	sichtbar -- das ist der ganze Zweck.
+]]
+local function mark(player: Player, deposit)
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not root or not root:IsA("BasePart") then
+		return
+	end
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "CashoutDepositHighlight"
+	highlight.FillColor = Color3.fromRGB(255, 255, 255)
+	highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+	highlight.FillTransparency = Balance.Intercept.HighlightFill
+	highlight.Adornee = character
+	highlight.Parent = character
+	deposit.highlight = highlight
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "CashoutDepositMarker"
+	billboard.Size = UDim2.fromOffset(200, 44)
+	billboard.StudsOffset = Vector3.new(0, Balance.Intercept.MarkerHeight, 0)
+	billboard.AlwaysOnTop = true
+	billboard.MaxDistance = 400
+	billboard.Adornee = root
+	billboard.Parent = root
+	deposit.marker = billboard
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.GothamBold
+	label.TextScaled = true
+	label.TextColor3 = Color3.fromRGB(255, 255, 255)
+	label.TextStrokeTransparency = 0.3
+	label.Text = "ZAHLT EIN"
+	label.Parent = billboard
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "CashoutInterceptPrompt"
+	prompt.ActionText = "Abfangen"
+	prompt.ObjectText = player.DisplayName
+	prompt.KeyboardKeyCode = Enum.KeyCode.F
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = Balance.Intercept.PromptDistance
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = root
+	deposit.prompt = prompt
+
+	promptOwner[prompt] = player
+	prompt.Triggered:Connect(function(triggeringPlayer)
+		onInterceptTriggered(prompt, triggeringPlayer)
+	end)
+end
+
+-- --------------------------------------------------------------- Abfangen --
+
+function onInterceptTriggered(prompt: ProximityPrompt, thief: Player)
+	if not RoundManager.IsRunning() then
+		return
+	end
+
+	local victim = promptOwner[prompt]
+	if not victim or victim == thief then
+		return
+	end
+
+	local thiefState = PlayerState.Get(thief)
+	if not thiefState or PlayerState.IsSpectating(thief) then
+		return
+	end
+	if not PlayerState.ConsumeAction(thief, "Intercept") then
+		return
+	end
+
+	local deposit = deposits[victim]
+	if not deposit or deposit.intercepted then
+		return
+	end
+
+	if not PlayerState.CanIntercept(thief) then
+		PlayerState.Notify(thief, "warn", "Abfangen noch gesperrt.")
+		return
+	end
+
+	local victimPosition = PlayerState.GetPosition(victim)
+	if not victimPosition or not PlayerState.IsNear(thief, victimPosition, Balance.Intercept.Radius) then
+		return
+	end
+
+	local taken = PlayerState.TakeCashShare(victim, Balance.Intercept.SplitFraction)
+	if taken &lt;= 0 then
+		PlayerState.Notify(thief, "warn", "Nichts abzufangen.")
+		return
+	end
+
+	-- Genau einmal pro Einzahlung, und die Markierung verschwindet sofort.
+	deposit.intercepted = true
+	unmark(victim)
+
+	PlayerState.MarkIntercept(thief)
+	PlayerState.AddCash(thief, taken)
+	PlayerState.AddHeat(thief, Balance.Intercept.HeatGain)
+
+	PlayerState.Notify(
+		thief,
+		"good",
+		string.format("%d abgefangen. +%d Heat -- jetzt bring es heim.", taken, Balance.Intercept.HeatGain)
+	)
+	PlayerState.Notify(victim, "bad", string.format("Abgefangen. -%d. Der Rest laeuft weiter.", taken))
+end
+
+-- -------------------------------------------------------------- Einzahlen --
+
+local function refreshBeam()
+	local any = false
+	for _, _ in pairs(deposits) do
+		any = true
+		break
+	end
+	MapBuilder.SetDepositBeam(any)
+end
+
+local function finish(player: Player)
+	unmark(player)
+	deposits[player] = nil
+	refreshBeam()
+end
+
+local function runDeposit(player: Player, bank)
+	local token = PlayerState.BeginActivity(player, "deposit", "Einzahlung", Balance.Bank.DepositSeconds)
+	if not token then
+		return
+	end
+
+	local deposit = { token = token, intercepted = false }
+	deposits[player] = deposit
+	mark(player, deposit)
+	refreshBeam()
+
+	local deadline = os.clock() + Balance.Bank.DepositSeconds
+	local aborted = false
+
+	while os.clock() &lt; deadline do
+		task.wait(Balance.Orders.CheckInterval)
+
+		if not player.Parent or not PlayerState.Get(player) then
+			finish(player)
+			return
+		end
+		if PlayerState.IsActivityCancelled(player, token) then
+			aborted = true
+			break
+		end
+		if not PlayerState.IsNear(player, bank.Position, Balance.Bank.Radius) then
+			aborted = true
+			break
+		end
+	end
+
+	PlayerState.EndActivity(player, token)
+	finish(player)
+
+	if aborted or not RoundManager.IsRunning() then
+		PlayerState.Notify(player, "bad", "Einzahlung abgebrochen.")
+		return
+	end
+
+	local amount = PlayerState.BankAllCash(player)
+	PlayerState.AddHeat(player, -Balance.Bank.HeatRelief)
+	PlayerState.Notify(player, "banked", string.format("+%d eingezahlt. Sicher.", amount))
+end
+
+local function onBankTriggered(bank, player: Player)
+	if not RoundManager.IsRunning() then
+		return
+	end
+
+	local state = PlayerState.Get(player)
+	if not state or PlayerState.IsSpectating(player) then
+		return
+	end
+	if not PlayerState.ConsumeAction(player, "Deposit") then
+		return
+	end
+
+	if PlayerState.IsBusy(player) then
+		PlayerState.Notify(player, "warn", "Du bist gerade beschaeftigt.")
+		return
+	end
+	if state.cash &lt;= 0 then
+		PlayerState.Notify(player, "warn", "Nichts dabei zum Einzahlen.")
+		return
+	end
+	if not PlayerState.IsNear(player, bank.Position, Balance.Bank.Radius) then
+		return
+	end
+
+	task.spawn(runDeposit, player, bank)
+end
+
+-- ---------------------------------------------------------------- Aufraeumen --
+
+local function releasePlayer(player: Player)
+	unmark(player)
+	deposits[player] = nil
+	refreshBeam()
+end
+
+local function resetAll()
+	for player, _ in pairs(table.clone(deposits)) do
+		releasePlayer(player)
+	end
+	table.clear(deposits)
+	table.clear(promptOwner)
+	MapBuilder.SetDepositBeam(false)
+end
+
+function BankService.Start()
+	if running then
+		return
+	end
+	running = true
+
+	local bank = MapBuilder.GetBank()
+	if not bank then
+		warn("[CASHOUT] BankService: keine Bank in der Map. MapBuilder.Start() zuerst aufrufen.")
+		return
+	end
+
+	bank.Prompt.Triggered:Connect(function(player)
+		onBankTriggered(bank, player)
+	end)
+
+	game:GetService("Players").PlayerRemoving:Connect(releasePlayer)
+	RoundManager.OnRoundStart(resetAll)
+	RoundManager.OnRoundEnd(resetAll)
+end
+
+function BankService.Stop()
+	running = false
+end
+
+--[[
+	Zahlt dieser Spieler gerade ein? Fuer den Einzahl-Beam in Phase 4.
+]]
+function BankService.IsDepositing(player: Player): boolean
+	return deposits[player] ~= nil
+end
+
+return BankService
+</ProtectedString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBX15">
+				<Properties>
+					<string name="Name">HeatService</string>
+					<ProtectedString name="Source">--[[
+	HeatService.lua
+
+	Phase 1: nur der Zerfall.
+
+	-1 Heat pro Balance.Heat.DecayInterval Sekunden, und **nur ausserhalb eines
+	laufenden Auftrags** (Dokument 1.3). Wer durchgehend arbeitet, kuehlt nicht
+	ab. Wer abkuehlen will, verliert Verdienstzeit -- das ist die zweite
+	Entscheidungsachse neben dem Banken.
+
+	Der Zerfall laeuft nur waehrend einer Runde. In der Pause bleibt Heat
+	stehen; zum Rundenstart setzt PlayerState ohnehin alles zurueck.
+
+	Die Razzia (Razzia-Check, Sperrkreis, Fluchtfenster) ist Phase 2 und steht
+	bewusst noch nicht hier -- ihre Zahlen liegen aber schon in Balance.Heat.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Balance = require(Shared:WaitForChild("Balance"))
+
+local Modules = script.Parent
+local PlayerState = require(Modules:WaitForChild("PlayerState"))
+local RoundManager = require(Modules:WaitForChild("RoundManager"))
+
+local HeatService = {}
+
+local running = false
+
+function HeatService.Start()
+	if running then
+		return
+	end
+	running = true
+
+	task.spawn(function()
+		while running do
+			task.wait(Balance.Heat.DecayInterval)
+			if RoundManager.IsRunning() then
+				for player, state in pairs(PlayerState.GetAll()) do
+					-- Ein getragener Auftrag friert den Zerfall ein.
+					if state.heat &gt; Balance.Heat.Min and not state.order then
+						PlayerState.AddHeat(player, -Balance.Heat.DecayAmount)
+					end
+				end
+			end
+		end
+	end)
+end
+
+function HeatService.Stop()
+	running = false
+end
+
+return HeatService
+</ProtectedString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBX16">
+				<Properties>
+					<string name="Name">MapBuilder</string>
+					<ProtectedString name="Source">--[[
+	MapBuilder.lua
+
+	Baut die Map aus Parts. Keine externen Modelle, keine Asset-Ids.
+	Seit Phase 4 Nachtstadt statt Baseplate (Dokument 4.1): dunkle, nasse
+	Grundflaeche, kaum Umgebungslicht, alles Wichtige leuchtet selbst. Das
+	Grundlicht wird hier gesetzt und repliziert; die Heat-Reaktion aus 4.3 ist
+	clientseitig und steht in UI/Atmosphere.lua.
+
+	Geometrie nach 4.4: Bank zentral und hoch, fuenf Terminals ringfoermig am
+	Rand, das beste am weitesten weg. Die Ringradien stehen in Balance.Map --
+	Rang 5 liegt bei 144 Studs, das sind die 18 s Bank-Rundweg.
+
+	Uebergabepunkte entstehen zur Laufzeit (OrderService) und werden hier nur
+	gebaut und wieder abgeraeumt, damit alles Geometrische an einer Stelle
+	bleibt.
+]]
+
+local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Assets = require(Shared:WaitForChild("Assets"))
+local Balance = require(Shared:WaitForChild("Balance"))
+
+local MapBuilder = {}
+
+local terminals: { [string]: any } = {}
+local terminalOrder: { any } = {}
+local bank: any = nil
+local deliveryFolder: Folder? = nil
+local raidFolder: Folder? = nil
+local beam: BasePart? = nil
+local built = false
+
+local COLOR_GROUND = Color3.fromRGB(52, 56, 62)
+local COLOR_STRUCTURE = Color3.fromRGB(96, 100, 108)
+local COLOR_TERMINAL = Color3.fromRGB(120, 128, 140)
+-- Gold ist laut 4.2 fuer Banked reserviert -- die Bank traegt es zu Recht.
+local COLOR_BANK = Color3.fromRGB(255, 200, 60)
+-- Cyan ist laut 4.2 der eigene Uebergabepunkt.
+local COLOR_DELIVERY = Color3.fromRGB(80, 220, 235)
+-- Rot ist laut 4.2 ausschliesslich Gefahr. Der Sperrkreis ist der erste Ort im
+-- Spiel, an dem es ueberhaupt auftauchen darf.
+local COLOR_DANGER = Color3.fromRGB(255, 60, 60)
+
+-- ------------------------------------------------------------------ intern --
+
+local function newPart(name: string, size: Vector3, position: Vector3, color: Color3, parent: Instance): BasePart
+	local part = Instance.new("Part")
+	part.Name = name
+	part.Size = size
+	part.Position = position
+	part.Color = color
+	part.Material = Enum.Material.SmoothPlastic
+	part.Anchored = true
+	part.CanCollide = true
+	part.TopSurface = Enum.SurfaceType.Smooth
+	part.BottomSurface = Enum.SurfaceType.Smooth
+	part.Parent = parent
+	return part
+end
+
+local function addLabel(adornee: BasePart, title: string, subtitle: string, height: number, color: Color3)
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "Label"
+	billboard.Size = UDim2.fromOffset(240, 56)
+	billboard.StudsOffset = Vector3.new(0, height, 0)
+	billboard.AlwaysOnTop = true
+	billboard.MaxDistance = 400
+	billboard.Adornee = adornee
+	billboard.Parent = adornee
+
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.Name = "Title"
+	titleLabel.Size = UDim2.new(1, 0, 0.6, 0)
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.Font = Enum.Font.GothamBold
+	titleLabel.TextScaled = true
+	titleLabel.TextColor3 = color
+	titleLabel.TextStrokeTransparency = 0.4
+	titleLabel.Text = title
+	titleLabel.Parent = billboard
+
+	local subLabel = Instance.new("TextLabel")
+	subLabel.Name = "Subtitle"
+	subLabel.Position = UDim2.new(0, 0, 0.6, 0)
+	subLabel.Size = UDim2.new(1, 0, 0.4, 0)
+	subLabel.BackgroundTransparency = 1
+	subLabel.Font = Enum.Font.Gotham
+	subLabel.TextScaled = true
+	subLabel.TextColor3 = Color3.fromRGB(184, 192, 200)
+	subLabel.TextStrokeTransparency = 0.6
+	subLabel.Text = subtitle
+	subLabel.Parent = billboard
+end
+
+--[[
+	Decal nur anlegen, wenn in Assets.lua wirklich eine Id steht.
+]]
+local function addDecal(part: BasePart, assetId: string, face: Enum.NormalId)
+	if assetId == "" then
+		return
+	end
+	local decal = Instance.new("Decal")
+	decal.Texture = assetId
+	decal.Face = face
+	decal.Parent = part
+end
+
+local function addPrompt(part: BasePart, actionText: string, objectText: string, maxDistance: number): ProximityPrompt
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = actionText
+	prompt.ObjectText = objectText
+	prompt.KeyboardKeyCode = Enum.KeyCode.E
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = maxDistance
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = part
+	return prompt
+end
+
+-- -------------------------------------------------------------------- Bauen --
+
+--[[
+	Nachtstadt nach 4.1. Wenig Umgebungslicht, damit die Farbcodes aus 4.2
+	tragen -- alles Wichtige im Spiel ist Neon und leuchtet selbst.
+]]
+local function setupLighting()
+	Lighting.ClockTime = 0
+	Lighting.Brightness = 1
+	Lighting.Ambient = Color3.fromRGB(24, 26, 34)
+	Lighting.OutdoorAmbient = Color3.fromRGB(28, 30, 40)
+	Lighting.EnvironmentDiffuseScale = 0.2
+	Lighting.EnvironmentSpecularScale = 0.4
+	Lighting.GlobalShadows = true
+	Lighting.FogEnd = 600
+	Lighting.FogStart = 120
+	Lighting.FogColor = Color3.fromRGB(14, 16, 22)
+
+	local existing = Lighting:FindFirstChild("CashoutAtmosphere")
+	if existing then
+		existing:Destroy()
+	end
+	local atmosphere = Instance.new("Atmosphere")
+	atmosphere.Name = "CashoutAtmosphere"
+	atmosphere.Density = 0.42
+	atmosphere.Offset = 0.1
+	atmosphere.Color = Color3.fromRGB(70, 78, 96)
+	atmosphere.Decay = Color3.fromRGB(30, 34, 46)
+	atmosphere.Glare = 0.2
+	atmosphere.Haze = 1.6
+	atmosphere.Parent = Lighting
+end
+
+local function buildGround(root: Instance)
+	local size = Balance.Map.GroundSize
+	local ground = newPart(
+		"Ground",
+		size,
+		Vector3.new(0, Balance.Map.GroundY - size.Y / 2, 0),
+		COLOR_GROUND,
+		root
+	)
+	-- Nass: der Boden spiegelt, was leuchtet. Das ist der ganze Regen-Effekt
+	-- aus 4.1 -- ohne Partikel, die auf schwacher Hardware nichts kosten sollen.
+	ground.Material = Enum.Material.Slate
+	ground.Reflectance = 0.25
+end
+
+--[[
+	Deckungen nach 4.4: einzeln stehende Bloecke auf einer Spirale, mit
+	Mindestabstand zu allem, was man ansprechen kann. Einzelne Bloecke, damit
+	im 40-Studs-Radius einer Razzia keine Sackgasse entstehen kann.
+]]
+local function buildCover(root: Instance)
+	local folder = Instance.new("Folder")
+	folder.Name = "Cover"
+	folder.Parent = root
+
+	local size = Balance.Map.CoverSize
+	local count = Balance.Map.CoverCount
+	local minRadius = Balance.Map.CoverMinRadius
+	local maxRadius = Balance.Map.CoverMaxRadius
+	local clearance = Balance.Map.CoverClearance
+	-- Goldener Winkel: verteilt gleichmaessig, ohne Muster und ohne Zufall.
+	local goldenAngle = math.pi * (3 - math.sqrt(5))
+
+	local avoid = { Balance.Map.BankPosition, Balance.Map.SpawnPosition }
+	for _, terminal in ipairs(terminalOrder) do
+		table.insert(avoid, terminal.Position)
+	end
+
+	local placed = 0
+	for index = 1, count * 3 do
+		if placed &gt;= count then
+			break
+		end
+
+		local t = (index - 0.5) / (count * 3)
+		local radius = minRadius + (maxRadius - minRadius) * math.sqrt(t)
+		local angle = index * goldenAngle
+		local position = Vector3.new(math.cos(angle) * radius, Balance.Map.GroundY, math.sin(angle) * radius)
+
+		local tooClose = false
+		for _, other in ipairs(avoid) do
+			local flat = Vector3.new(position.X - other.X, 0, position.Z - other.Z)
+			if flat.Magnitude &lt; clearance then
+				tooClose = true
+				break
+			end
+		end
+
+		if not tooClose then
+			local block = newPart(
+				"Cover" .. placed,
+				size,
+				position + Vector3.new(0, size.Y / 2, 0),
+				COLOR_STRUCTURE,
+				folder
+			)
+			block.Material = Enum.Material.Brick
+			table.insert(avoid, position)
+			placed += 1
+		end
+	end
+end
+
+local function buildSpawn(root: Instance)
+	local spawnPoint = Instance.new("SpawnLocation")
+	spawnPoint.Name = "CashoutSpawn"
+	spawnPoint.Size = Balance.Map.SpawnSize
+	spawnPoint.Position = Balance.Map.SpawnPosition
+		+ Vector3.new(0, Balance.Map.GroundY + Balance.Map.SpawnSize.Y / 2, 0)
+	spawnPoint.Anchored = true
+	spawnPoint.CanCollide = true
+	spawnPoint.Color = COLOR_STRUCTURE
+	spawnPoint.Material = Enum.Material.Metal
+	spawnPoint.Neutral = true
+	spawnPoint.Duration = 0
+	spawnPoint.TopSurface = Enum.SurfaceType.Smooth
+	spawnPoint.Parent = root
+end
+
+local function buildBank(root: Instance)
+	local model = Instance.new("Model")
+	model.Name = "Bank"
+	model.Parent = root
+
+	local base = Balance.Map.BankPosition + Vector3.new(0, Balance.Map.GroundY, 0)
+
+	local plinthSize = Balance.Map.BankPlinthSize
+	local plinth = newPart("Plinth", plinthSize, base + Vector3.new(0, plinthSize.Y / 2, 0), COLOR_STRUCTURE, model)
+	plinth.Material = Enum.Material.Metal
+
+	local towerSize = Balance.Map.BankTowerSize
+	local tower = newPart(
+		"Tower",
+		towerSize,
+		base + Vector3.new(0, plinthSize.Y + towerSize.Y / 2, 0),
+		COLOR_BANK,
+		model
+	)
+	tower.Material = Enum.Material.Neon
+
+	local counterSize = Balance.Map.BankCounterSize
+	local counter = newPart(
+		"Counter",
+		counterSize,
+		base + Balance.Map.BankCounterOffset,
+		COLOR_BANK,
+		model
+	)
+	counter.Material = Enum.Material.Neon
+	addDecal(counter, Assets.Images.BankSign, Enum.NormalId.Front)
+
+	model.PrimaryPart = counter
+
+	addLabel(tower, "BANK", "Einzahlen: " .. Balance.Bank.DepositSeconds .. " s", towerSize.Y / 2 + 6, COLOR_BANK)
+	local prompt = addPrompt(counter, "Einzahlen", "Bank", Balance.Bank.PromptDistance)
+	prompt.Enabled = false
+
+	bank = {
+		Model = model,
+		Part = counter,
+		Position = counter.Position,
+		Prompt = prompt,
+	}
+end
+
+local function buildTerminals(root: Instance)
+	local folder = Instance.new("Folder")
+	folder.Name = "Terminals"
+	folder.Parent = root
+
+	local radii = Balance.Map.TerminalRadii
+	local count = #radii
+	local size = Balance.Map.TerminalSize
+	local startAngle = math.rad(Balance.Map.TerminalStartAngleDegrees)
+
+	for rank = 1, count do
+		local id = "T" .. rank
+		local angle = startAngle + (rank - 1) * (2 * math.pi / count)
+		local radius = radii[rank]
+		local basePosition = Balance.Map.BankPosition
+			+ Vector3.new(math.cos(angle) * radius, Balance.Map.GroundY, math.sin(angle) * radius)
+
+		local model = Instance.new("Model")
+		model.Name = "Terminal" .. rank
+		model.Parent = folder
+
+		local pillar = newPart(
+			"Pillar",
+			size,
+			basePosition + Vector3.new(0, size.Y / 2, 0),
+			COLOR_STRUCTURE,
+			model
+		)
+
+		local screen = newPart(
+			"Screen",
+			Vector3.new(size.X + 0.4, 3.2, 0.6),
+			basePosition + Vector3.new(0, size.Y - 2, size.Z / 2 + 0.3),
+			COLOR_TERMINAL,
+			model
+		)
+		screen.Material = Enum.Material.Neon
+		screen.CanCollide = false
+		addDecal(screen, Assets.Images.TerminalScreen, Enum.NormalId.Front)
+
+		model.PrimaryPart = pillar
+		model:SetAttribute("TerminalId", id)
+
+		addLabel(
+			pillar,
+			"TERMINAL " .. rank,
+			string.format("%d Studs zur Bank", math.floor(radius + 0.5)),
+			size.Y / 2 + 2,
+			Color3.fromRGB(230, 236, 242)
+		)
+		local prompt = addPrompt(pillar, "Auftraege ansehen", "Terminal " .. rank, Balance.Orders.PromptDistance)
+		prompt.Enabled = false
+
+		local terminal = {
+			Id = id,
+			Rank = rank,
+			Radius = radius,
+			Model = model,
+			Part = pillar,
+			Position = pillar.Position,
+			Prompt = prompt,
+		}
+		terminals[id] = terminal
+		table.insert(terminalOrder, terminal)
+	end
+end
+
+--[[
+	Baut die Map. Idempotent -- ein zweiter Aufruf tut nichts.
+]]
+function MapBuilder.Start()
+	if built then
+		return
+	end
+	built = true
+
+	local existing = workspace:FindFirstChild("CashoutMap")
+	if existing then
+		existing:Destroy()
+	end
+
+	-- Die Studio-Vorlage bringt Baseplate und SpawnLocation mit. Beide liegen
+	-- genau auf unserem Boden. Nur diese beiden, nichts sonst aus Workspace.
+	local baseplate = workspace:FindFirstChild("Baseplate")
+	if baseplate and baseplate:IsA("BasePart") then
+		baseplate:Destroy()
+	end
+	for _, child in ipairs(workspace:GetChildren()) do
+		if child:IsA("SpawnLocation") then
+			child:Destroy()
+		end
+	end
+
+	local root = Instance.new("Folder")
+	root.Name = "CashoutMap"
+	root.Parent = workspace
+
+	deliveryFolder = Instance.new("Folder")
+	deliveryFolder.Name = "DeliveryPoints"
+	deliveryFolder.Parent = root
+
+	raidFolder = Instance.new("Folder")
+	raidFolder.Name = "RaidRings"
+	raidFolder.Parent = root
+
+	setupLighting()
+	buildGround(root)
+	buildSpawn(root)
+	buildBank(root)
+	buildTerminals(root)
+	buildCover(root)
+
+	-- Einzahl-Beam (Dokument 5): steht immer, ist nur meistens unsichtbar.
+	local beamSize = Balance.Map.BeamSize
+	beam = newPart(
+		"DepositBeam",
+		beamSize,
+		Balance.Map.BankPosition + Vector3.new(0, Balance.Map.GroundY + beamSize.Y / 2, 0),
+		Color3.fromRGB(255, 255, 255),
+		root
+	)
+	beam.Material = Enum.Material.Neon
+	beam.CanCollide = false
+	beam.CanQuery = false
+	beam.Transparency = 1
+end
+
+--[[
+	Weisse Saeule von der Bank in den Himmel, solange irgendjemand einzahlt.
+	Weiss ist laut 4.2 genau dafuer reserviert -- gleichzeitig Anzeige,
+	Belohnung und PvP-Einladung.
+]]
+function MapBuilder.SetDepositBeam(visible: boolean)
+	if beam then
+		beam.Transparency = if visible then Balance.Map.BeamTransparency else 1
+	end
+end
+
+-- ------------------------------------------------------- Uebergabepunkte --
+
+--[[
+	Baut einen Uebergabepunkt an einer Position. Der Prompt bleibt aus, bis
+	OrderService ihn freigibt -- damit kann niemand fremde Punkte ausloesen,
+	bevor die Besitzpruefung greift.
+
+	Rueckgabe: das Model. Prompt haengt an model.PrimaryPart.
+]]
+function MapBuilder.CreateDeliveryPoint(position: Vector3, label: string, tierColor: Color3)
+	assert(deliveryFolder, "MapBuilder.Start() zuerst aufrufen")
+
+	local model = Instance.new("Model")
+	model.Name = "DeliveryPoint"
+	model.Parent = deliveryFolder
+
+	local padSize = Balance.Map.DeliveryPadSize
+	local pad = newPart(
+		"Pad",
+		padSize,
+		Vector3.new(position.X, Balance.Map.GroundY + padSize.Y / 2, position.Z),
+		COLOR_DELIVERY,
+		model
+	)
+	pad.CanCollide = false
+	pad.Transparency = 0.35
+	pad.Material = Enum.Material.Neon
+
+	local pillarSize = Balance.Map.DeliveryPillarSize
+	local pillar = newPart(
+		"Pillar",
+		pillarSize,
+		Vector3.new(position.X, Balance.Map.GroundY + pillarSize.Y / 2, position.Z),
+		tierColor,
+		model
+	)
+	pillar.CanCollide = false
+	pillar.Transparency = 0.25
+	pillar.Material = Enum.Material.Neon
+
+	model.PrimaryPart = pad
+
+	addLabel(pillar, "UEBERGABE", label, pillarSize.Y / 2 + 2, COLOR_DELIVERY)
+
+	local prompt = addPrompt(pad, "Uebergeben", "Uebergabepunkt", Balance.Orders.PromptDistance)
+	prompt.Enabled = false
+
+	return {
+		Model = model,
+		Part = pad,
+		Position = pad.Position,
+		Prompt = prompt,
+	}
+end
+
+--[[
+	Loescht alle Uebergabepunkte. Wird beim Rundenwechsel aufgerufen, damit
+	kein Punkt eine Runde ueberlebt -- auch keiner, dessen Besitzer den Server
+	verlassen hat.
+]]
+function MapBuilder.ClearDeliveryPoints()
+	if not deliveryFolder then
+		return
+	end
+	for _, child in ipairs(deliveryFolder:GetChildren()) do
+		child:Destroy()
+	end
+end
+
+-- ------------------------------------------------------------- Sperrkreis --
+
+--[[
+	Baut den Sperrkreis einer Razzia an einer Position.
+
+	Zwei flache Zylinder uebereinander:
+	  Zone  -- steht still auf Balance.Heat.RaidRingRadius und markiert die
+	           Grenze, die der Spieler ueberqueren muss.
+	  Timer -- schrumpft in Balance.Heat.RaidRingSeconds linear auf null und
+	           ist damit die ablesbare Restzeit (Dokument 5: hier darf nichts
+	           easen).
+
+	Ohne die stehende Zone waere der Kreis nicht spielbar: der schrumpfende
+	Zylinder sagt WANN, aber nicht WOHIN.
+]]
+function MapBuilder.CreateRaidRing(position: Vector3)
+	assert(raidFolder, "MapBuilder.Start() zuerst aufrufen")
+
+	local model = Instance.new("Model")
+	model.Name = "RaidRing"
+	model.Parent = raidFolder
+
+	local diameter = Balance.Heat.RaidRingRadius * 2
+	local center = Vector3.new(position.X, Balance.Map.GroundY + Balance.Map.RaidRingHeight / 2, position.Z)
+
+	-- Zylinder liegen in Roblox entlang X; Orientation kippt die Achse nach oben.
+	local zone = newPart(
+		"Zone",
+		Vector3.new(Balance.Map.RaidRingHeight, diameter, diameter),
+		center,
+		COLOR_DANGER,
+		model
+	)
+	zone.Shape = Enum.PartType.Cylinder
+	zone.Orientation = Vector3.new(0, 0, 90)
+	zone.Material = Enum.Material.Neon
+	zone.Transparency = Balance.Map.RaidZoneTransparency
+	zone.CanCollide = false
+	zone.CanQuery = false
+
+	local timer = newPart(
+		"Timer",
+		Vector3.new(Balance.Map.RaidRingHeight * 1.2, diameter, diameter),
+		center,
+		COLOR_DANGER,
+		model
+	)
+	timer.Shape = Enum.PartType.Cylinder
+	timer.Orientation = Vector3.new(0, 0, 90)
+	timer.Material = Enum.Material.Neon
+	timer.Transparency = Balance.Map.RaidTimerTransparency
+	timer.CanCollide = false
+	timer.CanQuery = false
+
+	model.PrimaryPart = zone
+
+	return {
+		Model = model,
+		Zone = zone,
+		Timer = timer,
+		Position = center,
+	}
+end
+
+function MapBuilder.ClearRaidRings()
+	if not raidFolder then
+		return
+	end
+	for _, child in ipairs(raidFolder:GetChildren()) do
+		child:Destroy()
+	end
+end
+
+function MapBuilder.GetTerminal(id: string)
+	return terminals[id]
+end
+
+function MapBuilder.GetTerminals()
+	return terminalOrder
+end
+
+function MapBuilder.GetBank()
+	return bank
+end
+
+--[[
+	Prompts an Terminals und Bank zusammen schalten. Ausserhalb der Runde ist
+	die Map still.
+]]
+function MapBuilder.SetWorldPromptsEnabled(enabled: boolean)
+	for _, terminal in ipairs(terminalOrder) do
+		terminal.Prompt.Enabled = enabled
+	end
+	if bank then
+		bank.Prompt.Enabled = enabled
+	end
+end
+
+return MapBuilder
+</ProtectedString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBX17">
+				<Properties>
+					<string name="Name">OrderService</string>
+					<ProtectedString name="Source">--[[
+	OrderService.lua
+
+	Auftraege statt Timer (Dokument 1.1).
+
+	  1. Spieler loest den ProximityPrompt am Terminal aus (Server-Event, der
+	     Client sendet dabei nichts).
+	  2. Server zieht drei Karten fuer genau diesen Spieler an genau diesem
+	     Terminal. Die Gewichte kommen aus dem Terminal-Profil -- weiter von
+	     der Bank entfernte Terminals fuehren die besseren Stufen.
+	  3. Client schickt ChooseOrder(terminalId, offerIndex). Mehr darf er
+	     nicht, insbesondere keinen Betrag.
+	  4. Annahme dauert Balance.Orders.AcceptSeconds am Terminal. Danach
+	     erscheint irgendwo im Stufenabstand ein Uebergabepunkt, der Spieler
+	     traegt ein sichtbares Paket in der Stufenfarbe.
+	  5. Am Punkt: Balance.Orders.DeliverSeconds Interaktion, dann Cash + Heat.
+
+	Ausgezahlt wird erst bei der Uebergabe, mit der Risikopraemie aus dem in
+	dem Moment aktuellen Heat und dem Endspurt-Multiplikator der Runde.
+
+	Weglaufen waehrend einer Interaktion bricht sie folgenlos ab. Ein
+	angenommener Auftrag bleibt bestehen, bis er uebergeben ist oder die Runde
+	endet -- er laeuft nicht ab.
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Balance = require(Shared:WaitForChild("Balance"))
+local DealCatalog = require(Shared:WaitForChild("DealCatalog"))
+local Remotes = require(Shared:WaitForChild("Remotes"))
+
+local Modules = script.Parent
+local MapBuilder = require(Modules:WaitForChild("MapBuilder"))
+local PlayerState = require(Modules:WaitForChild("PlayerState"))
+local RoundManager = require(Modules:WaitForChild("RoundManager"))
+
+local OrderService = {}
+
+local rng = Random.new()
+local running = false
+
+-- [Player] = { terminalId, offers, expiresAt }
+local pendingOffers: { [Player]: any } = {}
+-- [ProximityPrompt] = Player  -- wem gehoert dieser Uebergabepunkt
+local pointOwner: { [ProximityPrompt]: Player } = {}
+-- [Player] = point
+-- Eigene Buchfuehrung statt Umweg ueber PlayerState: beim Verlassen des
+-- Servers loescht PlayerState seinen Eintrag zuerst (es haengt frueher an
+-- PlayerRemoving), und der Punkt waere dann nicht mehr auffindbar.
+local activePoints: { [Player]: any } = {}
+-- [Player] = { RBXScriptConnection }
+local playerConnections: { [Player]: { RBXScriptConnection } } = {}
+
+-- Vorwaertsdeklaration: runAccept verdrahtet den Prompt eines frisch
+-- erzeugten Uebergabepunkts, die Behandlung steht weiter unten.
+local onPointTriggered
+
+-- ------------------------------------------------------- Angebote erzeugen --
+
+--[[
+	Karten, die der Spieler bei seinem aktuellen Heat an diesem Terminal sehen
+	darf. Gewicht 0 im Terminal-Profil schliesst eine Stufe hier ganz aus.
+]]
+local function eligibleCards(heat: number, profile)
+	local pool = {}
+	for _, card in ipairs(DealCatalog.Cards) do
+		local tier = Balance.Orders.TierById[card.Tier]
+		local weight = profile[card.Tier] or 0
+		if tier and weight &gt; 0 and heat &gt;= tier.MinHeatToOffer then
+			table.insert(pool, card)
+		end
+	end
+	return pool
+end
+
+--[[
+	Gewichtete Ziehung ohne Zuruecklegen.
+]]
+local function drawCards(pool, profile, count: number)
+	local remaining = table.clone(pool)
+	local drawn = {}
+
+	while #drawn &lt; count and #remaining &gt; 0 do
+		local total = 0
+		for _, card in ipairs(remaining) do
+			total += profile[card.Tier] or 0
+		end
+		if total &lt;= 0 then
+			break
+		end
+
+		local roll = rng:NextNumber() * total
+		local pickedIndex = #remaining
+		for index, card in ipairs(remaining) do
+			roll -= profile[card.Tier] or 0
+			if roll &lt;= 0 then
+				pickedIndex = index
+				break
+			end
+		end
+
+		table.insert(drawn, remaining[pickedIndex])
+		table.remove(remaining, pickedIndex)
+	end
+
+	return drawn
+end
+
+--[[
+	Karte in die Form, die der Client sieht. Der Payout ist hier noch die
+	Spanne der Stufe -- gewuerfelt wird bei der Annahme.
+]]
+local function toOffer(card)
+	local tier = Balance.Orders.TierById[card.Tier]
+	return {
+		cardId = card.Id,
+		name = card.Name,
+		blurb = card.Blurb,
+		tierId = tier.Id,
+		tierLabel = tier.Label,
+		minPayout = tier.MinPayout,
+		maxPayout = tier.MaxPayout,
+		heat = tier.Heat,
+		minDistance = tier.MinDistance,
+		maxDistance = tier.MaxDistance,
+	}
+end
+
+local function buildOffers(player: Player, terminal)
+	local state = PlayerState.Get(player)
+	if not state then
+		return nil
+	end
+
+	local profile = Balance.Orders.TerminalProfiles[terminal.Rank]
+	if not profile then
+		return nil
+	end
+
+	local cards = drawCards(eligibleCards(state.heat, profile), profile, Balance.Orders.OffersPerTerminal)
+	if #cards == 0 then
+		return nil
+	end
+
+	local offers = {}
+	for _, card in ipairs(cards) do
+		table.insert(offers, toOffer(card))
+	end
+
+	local record = {
+		terminalId = terminal.Id,
+		offers = offers,
+		expiresAt = os.clock() + Balance.Orders.OfferLifetimeSeconds,
+	}
+	pendingOffers[player] = record
+	return record
+end
+
+-- ------------------------------------------------------ Uebergabepunkt setzen --
+
+local function isInsidePlayArea(position: Vector3): boolean
+	local half = Balance.Map.PlayableHalfExtent
+	return math.abs(position.X) &lt;= half and math.abs(position.Z) &lt;= half
+end
+
+--[[
+	Sucht eine Richtung, in der der Uebergabepunkt im Stufenabstand noch auf
+	der Spielflaeche liegt und nicht im Bankgebaeude steckt. Der Abstand selbst
+	bleibt dabei unveraendert -- er ist die Waehrung der Stufe.
+
+	Findet keine Richtung, wird geklemmt. Bei der aktuellen Kartengroesse
+	(480 Studs Halbkante gegen hoechstens 340 Studs Abstand) kommt das nicht
+	vor; der Zweig ist nur da, damit ein kleinerer Boden nicht in eine
+	Endlosschleife laeuft.
+]]
+local function pickDeliveryPosition(origin: Vector3, tier): Vector3
+	local distance = rng:NextNumber(tier.MinDistance, tier.MaxDistance)
+	local tries = Balance.Map.DeliveryPlacementTries
+	local startAngle = rng:NextNumber(0, 2 * math.pi)
+	local clearance = Balance.Map.BankPlinthSize.X / 2 + Balance.Map.DeliveryPadSize.X / 2
+
+	for step = 0, tries - 1 do
+		local angle = startAngle + step * (2 * math.pi / tries)
+		local candidate = origin + Vector3.new(math.cos(angle) * distance, 0, math.sin(angle) * distance)
+		local flatToBank = Vector3.new(
+			candidate.X - Balance.Map.BankPosition.X,
+			0,
+			candidate.Z - Balance.Map.BankPosition.Z
+		)
+		if isInsidePlayArea(candidate) and flatToBank.Magnitude &gt; clearance then
+			return Vector3.new(candidate.X, Balance.Map.GroundY, candidate.Z)
+		end
+	end
+
+	local half = Balance.Map.PlayableHalfExtent
+	local fallback = origin + Vector3.new(math.cos(startAngle) * distance, 0, math.sin(startAngle) * distance)
+	return Vector3.new(
+		math.clamp(fallback.X, -half, half),
+		Balance.Map.GroundY,
+		math.clamp(fallback.Z, -half, half)
+	)
+end
+
+-- ---------------------------------------------------------------- Paket --
+
+local function findTorso(player: Player): BasePart?
+	local character = player.Character
+	if not character then
+		return nil
+	end
+	local torso = character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")
+	if torso and torso:IsA("BasePart") then
+		return torso
+	end
+	return nil
+end
+
+local function removePackage(player: Player)
+	local character = player.Character
+	if not character then
+		return
+	end
+	local existing = character:FindFirstChild("CashoutPackage")
+	if existing then
+		existing:Destroy()
+	end
+end
+
+--[[
+	Sichtbares Paket auf dem Ruecken. Farbe = Stufe, damit von weitem lesbar
+	ist, ob sich das Verfolgen lohnt.
+]]
+local function attachPackage(player: Player, tier)
+	removePackage(player)
+
+	local torso = findTorso(player)
+	if not torso then
+		return
+	end
+
+	local pack = Instance.new("Part")
+	pack.Name = "CashoutPackage"
+	pack.Size = Balance.Map.PackageSize
+	pack.Color = tier.Color
+	pack.Material = Enum.Material.Neon
+	pack.Anchored = false
+	pack.CanCollide = false
+	pack.CanQuery = false
+	pack.Massless = true
+	pack.CFrame = torso.CFrame * CFrame.new(Balance.Map.PackageOffset)
+	pack.Parent = torso.Parent
+
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = pack
+	weld.Part1 = torso
+	weld.Parent = pack
+end
+
+-- ------------------------------------------------------------ Auftrag loesen --
+
+--[[
+	Raeumt Punkt und Paket ab. Der Auftrag selbst wird im PlayerState geloescht,
+	falls es den Spieler dort noch gibt.
+]]
+local function clearOrder(player: Player)
+	local point = activePoints[player]
+	if point then
+		activePoints[player] = nil
+		pointOwner[point.Prompt] = nil
+		point.Model:Destroy()
+	end
+	removePackage(player)
+	PlayerState.ClearOrder(player)
+end
+
+-- --------------------------------------------------------------- Annahme --
+
+local function runAccept(player: Player, terminal, offer)
+	local token = PlayerState.BeginActivity(player, "accept", offer.name, Balance.Orders.AcceptSeconds)
+	if not token then
+		return
+	end
+
+	local deadline = os.clock() + Balance.Orders.AcceptSeconds
+	local aborted = false
+
+	while os.clock() &lt; deadline do
+		task.wait(Balance.Orders.CheckInterval)
+
+		if not player.Parent or not PlayerState.Get(player) then
+			return
+		end
+		if PlayerState.IsActivityCancelled(player, token) then
+			aborted = true
+			break
+		end
+		if not PlayerState.IsNear(player, terminal.Position, Balance.Orders.InteractRadius) then
+			aborted = true
+			break
+		end
+	end
+
+	PlayerState.EndActivity(player, token)
+	Remotes.Get(Remotes.CloseTerminal):FireClient(player)
+
+	if aborted or not RoundManager.IsRunning() then
+		PlayerState.Notify(player, "bad", "Annahme abgebrochen.")
+		return
+	end
+
+	-- Zwischen Auswahl und Ablauf der Sekunde kann ein anderer Auftrag
+	-- angenommen worden sein.
+	if PlayerState.HasOrder(player) then
+		PlayerState.Notify(player, "warn", "Du traegst schon einen Auftrag.")
+		return
+	end
+
+	local tier = Balance.Orders.TierById[offer.tierId]
+	local position = pickDeliveryPosition(terminal.Position, tier)
+	local basePayout = rng:NextInteger(tier.MinPayout, tier.MaxPayout)
+
+	local point = MapBuilder.CreateDeliveryPoint(
+		position,
+		string.format("%s · %s", tier.Label, offer.name),
+		tier.Color
+	)
+	pointOwner[point.Prompt] = player
+	activePoints[player] = point
+	point.Prompt.Triggered:Connect(function(triggeringPlayer)
+		onPointTriggered(point.Prompt, triggeringPlayer)
+	end)
+	point.Prompt.Enabled = true
+
+	local flat = Vector3.new(position.X - terminal.Position.X, 0, position.Z - terminal.Position.Z)
+
+	PlayerState.SetOrder(player, {
+		cardId = offer.cardId,
+		tierId = tier.Id,
+		tierLabel = tier.Label,
+		name = offer.name,
+		basePayout = basePayout,
+		heatGain = tier.Heat,
+		distance = math.floor(flat.Magnitude + 0.5),
+		point = point,
+	})
+
+	attachPackage(player, tier)
+	PlayerState.Notify(
+		player,
+		"info",
+		string.format("%s angenommen. Uebergabe in %d Studs.", offer.name, math.floor(flat.Magnitude + 0.5))
+	)
+end
+
+--[[
+	Dokument 3.2: im Umkreis der Bank kann kein Auftrag angenommen werden,
+	damit Camper nicht nebenbei verdienen.
+]]
+local function insideBankLockout(player: Player): boolean
+	local bank = MapBuilder.GetBank()
+	if not bank then
+		return false
+	end
+	return PlayerState.IsNear(player, bank.Position, Balance.Bank.NoOrderRadius)
+end
+
+local function onTerminalTriggered(terminal, player: Player)
+	if not RoundManager.IsRunning() then
+		return
+	end
+	if not PlayerState.Get(player) or PlayerState.IsSpectating(player) then
+		return
+	end
+	if not PlayerState.ConsumeAction(player, "OpenTerminal") then
+		return
+	end
+
+	if PlayerState.HasOrder(player) then
+		PlayerState.Notify(player, "warn", "Erst den laufenden Auftrag uebergeben.")
+		return
+	end
+	if PlayerState.IsBusy(player) then
+		PlayerState.Notify(player, "warn", "Du bist gerade beschaeftigt.")
+		return
+	end
+	if not PlayerState.IsNear(player, terminal.Position, Balance.Orders.InteractRadius) then
+		return
+	end
+	if insideBankLockout(player) then
+		PlayerState.Notify(player, "warn", "So nah an der Bank nimmt niemand Auftraege an.")
+		return
+	end
+
+	local record = pendingOffers[player]
+	local reuse = record ~= nil and record.terminalId == terminal.Id and os.clock() &lt; record.expiresAt
+
+	if not reuse then
+		record = buildOffers(player, terminal)
+	end
+
+	if not record then
+		PlayerState.Notify(player, "warn", "Dieses Terminal hat gerade nichts.")
+		return
+	end
+
+	-- Die Terminal-Position geht mit, damit das Panel clientseitig gegen das
+	-- Terminal messen kann und nicht gegen die Stelle, an der der Spieler beim
+	-- Oeffnen zufaellig stand.
+	Remotes.Get(Remotes.OffersReady):FireClient(player, terminal.Id, record.offers, terminal.Position)
+end
+
+local function onChooseOrder(player: Player, terminalId: any, offerIndex: any)
+	if not RoundManager.IsRunning() then
+		return
+	end
+	if not PlayerState.Get(player) or PlayerState.IsSpectating(player) then
+		return
+	end
+	if not PlayerState.ConsumeAction(player, "ChooseOrder") then
+		return
+	end
+
+	-- Alles, was vom Client kommt, ist erstmal Muell.
+	if typeof(terminalId) ~= "string" then
+		return
+	end
+	if typeof(offerIndex) ~= "number" or offerIndex ~= math.floor(offerIndex) then
+		return
+	end
+	if offerIndex &lt; 1 or offerIndex &gt; Balance.Orders.OffersPerTerminal then
+		return
+	end
+
+	local record = pendingOffers[player]
+	if not record or record.terminalId ~= terminalId then
+		return
+	end
+	if os.clock() &gt;= record.expiresAt then
+		pendingOffers[player] = nil
+		PlayerState.Notify(player, "warn", "Angebot abgelaufen.")
+		Remotes.Get(Remotes.CloseTerminal):FireClient(player)
+		return
+	end
+
+	local offer = record.offers[offerIndex]
+	if not offer then
+		return
+	end
+
+	local terminal = MapBuilder.GetTerminal(terminalId)
+	if not terminal then
+		return
+	end
+
+	if PlayerState.HasOrder(player) then
+		PlayerState.Notify(player, "warn", "Erst den laufenden Auftrag uebergeben.")
+		return
+	end
+	if PlayerState.IsBusy(player) then
+		PlayerState.Notify(player, "warn", "Du bist gerade beschaeftigt.")
+		return
+	end
+	if not PlayerState.IsNear(player, terminal.Position, Balance.Orders.InteractRadius) then
+		PlayerState.Notify(player, "warn", "Zu weit vom Terminal weg.")
+		Remotes.Get(Remotes.CloseTerminal):FireClient(player)
+		return
+	end
+	if insideBankLockout(player) then
+		PlayerState.Notify(player, "warn", "So nah an der Bank nimmt niemand Auftraege an.")
+		Remotes.Get(Remotes.CloseTerminal):FireClient(player)
+		return
+	end
+
+	-- Angebot ist verbraucht: naechster Besuch bringt neue Karten.
+	pendingOffers[player] = nil
+
+	task.spawn(runAccept, player, terminal, offer)
+end
+
+-- -------------------------------------------------------------- Uebergabe --
+
+local function runDeliver(player: Player, order)
+	local token = PlayerState.BeginActivity(player, "deliver", order.name, Balance.Orders.DeliverSeconds)
+	if not token then
+		return
+	end
+
+	local deadline = os.clock() + Balance.Orders.DeliverSeconds
+	local aborted = false
+
+	while os.clock() &lt; deadline do
+		task.wait(Balance.Orders.CheckInterval)
+
+		if not player.Parent or not PlayerState.Get(player) then
+			return
+		end
+		if PlayerState.IsActivityCancelled(player, token) then
+			aborted = true
+			break
+		end
+		-- Der Auftrag kann zwischenzeitlich weg sein (Rundenende).
+		if PlayerState.GetOrder(player) ~= order then
+			aborted = true
+			break
+		end
+		if not PlayerState.IsNear(player, order.point.Position, Balance.Orders.InteractRadius) then
+			aborted = true
+			break
+		end
+	end
+
+	PlayerState.EndActivity(player, token)
+
+	if aborted or not RoundManager.IsRunning() then
+		if PlayerState.GetOrder(player) == order then
+			PlayerState.Notify(player, "bad", "Uebergabe abgebrochen.")
+		end
+		return
+	end
+
+	local state = PlayerState.Get(player)
+	if not state then
+		return
+	end
+
+	-- Risikopraemie aus dem Heat VOR dieser Uebergabe, dann erst der Zuschlag
+	-- dieses Auftrags. Endspurt multipliziert obendrauf.
+	local premium = Balance.RiskPremium(state.heat)
+	local multiplier = RoundManager.PayoutMultiplier()
+	local payout = math.floor(order.basePayout * premium * multiplier + 0.5)
+
+	clearOrder(player)
+
+	PlayerState.AddCash(player, payout)
+	PlayerState.AddHeat(player, order.heatGain)
+	PlayerState.RecordDelivery(player, payout)
+
+	local suffix = if multiplier &gt; 1 then string.format("  (x%d Endspurt)", multiplier) else ""
+	PlayerState.Notify(
+		player,
+		"good",
+		string.format("%s: +%d Cash, +%d Heat%s", order.name, payout, order.heatGain, suffix)
+	)
+end
+
+function onPointTriggered(prompt: ProximityPrompt, player: Player)
+	if not RoundManager.IsRunning() then
+		return
+	end
+	if PlayerState.IsSpectating(player) then
+		return
+	end
+	if pointOwner[prompt] ~= player then
+		-- Fremder Uebergabepunkt. Phase 3 macht daraus vielleicht etwas,
+		-- Phase 1 ignoriert es still.
+		return
+	end
+	if not PlayerState.Get(player) then
+		return
+	end
+	if not PlayerState.ConsumeAction(player, "Deliver") then
+		return
+	end
+
+	local order = PlayerState.GetOrder(player)
+	if not order or not order.point or order.point.Prompt ~= prompt then
+		return
+	end
+	if PlayerState.IsBusy(player) then
+		PlayerState.Notify(player, "warn", "Du bist gerade beschaeftigt.")
+		return
+	end
+	if not PlayerState.IsNear(player, order.point.Position, Balance.Orders.InteractRadius) then
+		return
+	end
+
+	task.spawn(runDeliver, player, order)
+end
+
+-- ------------------------------------------------------------------ Aufraeumen --
+
+local function releasePlayer(player: Player)
+	pendingOffers[player] = nil
+	clearOrder(player)
+
+	local list = playerConnections[player]
+	if list then
+		for _, connection in ipairs(list) do
+			connection:Disconnect()
+		end
+		playerConnections[player] = nil
+	end
+end
+
+local function resetAll()
+	for player, _ in pairs(PlayerState.GetAll()) do
+		pendingOffers[player] = nil
+	end
+	for player, _ in pairs(table.clone(activePoints)) do
+		clearOrder(player)
+	end
+
+	-- Guertel und Hosentraeger: was sich trotzdem in die Welt gemogelt hat,
+	-- verschwindet beim Rundenwechsel. Kein Instance ueberlebt eine Runde.
+	MapBuilder.ClearDeliveryPoints()
+	table.clear(activePoints)
+	table.clear(pointOwner)
+end
+
+local function onPlayerAdded(player: Player)
+	playerConnections[player] = {}
+	table.insert(
+		playerConnections[player],
+		player.CharacterAdded:Connect(function()
+			-- Respawn: das Paket haengt am alten Character. Neu anhaengen,
+			-- solange der Auftrag laeuft.
+			local order = PlayerState.GetOrder(player)
+			if not order then
+				return
+			end
+			local tier = Balance.Orders.TierById[order.tierId]
+			if tier then
+				task.defer(function()
+					-- Zwischen dem Respawn und dieser Fortsetzung kann ein
+					-- Rundenwechsel den Auftrag geloescht haben. Ohne die zweite
+					-- Pruefung haengt das Paket danach am neuen Character, und
+					-- kein Aufraeumpfad fasst es je wieder an -- es ueberlebt
+					-- dann beliebig viele Runden.
+					if PlayerState.GetOrder(player) == order then
+						attachPackage(player, tier)
+					end
+				end)
+			end
+		end)
+	)
+end
+
+-- ---------------------------------------------------------------------- Start --
+
+function OrderService.Start()
+	if running then
+		return
+	end
+	running = true
+
+	for _, terminal in ipairs(MapBuilder.GetTerminals()) do
+		terminal.Prompt.Triggered:Connect(function(player)
+			onTerminalTriggered(terminal, player)
+		end)
+	end
+
+	Remotes.Get(Remotes.ChooseOrder).OnServerEvent:Connect(onChooseOrder)
+
+	Players.PlayerAdded:Connect(onPlayerAdded)
+	for _, player in ipairs(Players:GetPlayers()) do
+		onPlayerAdded(player)
+	end
+	Players.PlayerRemoving:Connect(releasePlayer)
+
+	RoundManager.OnRoundStart(resetAll)
+	RoundManager.OnRoundEnd(resetAll)
+end
+
+function OrderService.Stop()
+	running = false
+end
+
+return OrderService
+</ProtectedString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBX18">
+				<Properties>
+					<string name="Name">PlayerState</string>
+					<ProtectedString name="Source">--[[
+	PlayerState.lua
+
+	Haelt pro Spieler: cash, banked, heat, den getragenen Auftrag und die
+	gerade laufende Interaktion. Einziger Ort, an dem diese Werte geschrieben
+	werden -- alle anderen Services gehen ueber die Funktionen hier.
+
+	Repliziert geaenderte Werte gebuendelt im Takt von
+	Balance.Net.StateReplicateInterval zum Besitzer. Auftrag und Interaktion
+	gehen sofort raus, weil Marker und Fortschrittsbalken daran haengen.
+
+	Interaktionen tragen ein Token: nur wer das aktuelle Token haelt, darf sie
+	beenden. Damit kann eine abgebrochene Auftragsannahme nicht die inzwischen
+	gestartete Einzahlung wegraeumen.
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Balance = require(Shared:WaitForChild("Balance"))
+local Remotes = require(Shared:WaitForChild("Remotes"))
+
+local PlayerState = {}
+
+local states: { [Player]: any } = {}
+local connections: { [Player]: { RBXScriptConnection } } = {}
+local running = false
+local nextToken = 0
+
+-- ------------------------------------------------------------------ intern --
+
+local function track(player: Player, connection: RBXScriptConnection)
+	local list = connections[player]
+	if list then
+		table.insert(list, connection)
+	else
+		connection:Disconnect()
+	end
+end
+
+local function serialiseActivity(state): any?
+	local activity = state.activity
+	if not activity then
+		return nil
+	end
+	return {
+		kind = activity.kind,
+		label = activity.label,
+		startedAt = activity.startedAt,
+		duration = activity.duration,
+	}
+end
+
+local function pushActivity(player: Player, state)
+	Remotes.Get(Remotes.ActivityChanged):FireClient(player, serialiseActivity(state))
+end
+
+local function pushOrder(player: Player, state)
+	local order = state.order
+	if not order then
+		Remotes.Get(Remotes.OrderChanged):FireClient(player, nil, nil)
+		return
+	end
+
+	Remotes.Get(Remotes.OrderChanged):FireClient(player, {
+		cardId = order.cardId,
+		tierId = order.tierId,
+		tierLabel = order.tierLabel,
+		name = order.name,
+		basePayout = order.basePayout,
+		heatGain = order.heatGain,
+		distance = order.distance,
+	}, order.point and order.point.Part or nil)
+end
+
+local function pushState(player: Player, state)
+	state.dirty = false
+	Remotes.Get(Remotes.StateChanged):FireClient(player, {
+		cash = state.cash,
+		banked = state.banked,
+		heat = state.heat,
+	})
+end
+
+local function freshStats()
+	return {
+		bestOrder = 0,
+		ordersDelivered = 0,
+		-- Phase 2 / 3 fuellen diese beiden. In Phase 1 bleiben sie bei 0 und
+		-- die Endtafel zeigt dafuer einen Strich.
+		escapes = 0,
+		narrowestEscapeStuds = -1,
+		intercepts = 0,
+	}
+end
+
+-- -------------------------------------------------------------- Lebenszyklus --
+
+local function onPlayerAdded(player: Player)
+	states[player] = {
+		cash = Balance.Player.StartCash,
+		banked = Balance.Player.StartBanked,
+		heat = Balance.Player.StartHeat,
+		activity = nil,
+		order = nil,
+		-- Wer waehrend der Sperrfrist am Rundenende joint, sieht nur zu.
+		spectating = false,
+		lastInterceptAt = -math.huge,
+		stats = freshStats(),
+		dirty = true,
+
+		-- Ein Zeitstempel pro Aktion fuer die 0,3-s-Drossel.
+		actionAt = {},
+		lastThrottleWarn = -math.huge,
+	}
+	connections[player] = {}
+
+	track(
+		player,
+		player.CharacterAdded:Connect(function(character)
+			local humanoid = character:WaitForChild("Humanoid", 10)
+			if not humanoid or not humanoid:IsA("Humanoid") then
+				return
+			end
+			humanoid.WalkSpeed = Balance.Player.WalkSpeed
+			humanoid.JumpPower = Balance.Player.JumpPower
+			humanoid.JumpHeight = Balance.Player.JumpHeight
+
+			-- Respawn beendet jede laufende Interaktion. Der Auftrag selbst
+			-- bleibt bestehen -- das Paket wird von OrderService neu gehaengt.
+			PlayerState.CancelActivity(player)
+		end)
+	)
+end
+
+local function onPlayerRemoving(player: Player)
+	local list = connections[player]
+	if list then
+		for _, connection in ipairs(list) do
+			connection:Disconnect()
+		end
+	end
+	connections[player] = nil
+	states[player] = nil
+end
+
+--[[
+	Startet Spielerverwaltung und Replikationsschleife. Idempotent.
+]]
+function PlayerState.Start()
+	if running then
+		return
+	end
+	running = true
+
+	Players.PlayerAdded:Connect(onPlayerAdded)
+	Players.PlayerRemoving:Connect(onPlayerRemoving)
+	for _, player in ipairs(Players:GetPlayers()) do
+		onPlayerAdded(player)
+	end
+
+	task.spawn(function()
+		while running do
+			task.wait(Balance.Net.StateReplicateInterval)
+			for player, state in pairs(states) do
+				if state.dirty and player.Parent then
+					pushState(player, state)
+				end
+			end
+		end
+	end)
+end
+
+function PlayerState.Stop()
+	running = false
+end
+
+-- ------------------------------------------------------------------ Zugriff --
+
+function PlayerState.Get(player: Player)
+	return states[player]
+end
+
+function PlayerState.GetAll()
+	return states
+end
+
+function PlayerState.AddCash(player: Player, amount: number)
+	local state = states[player]
+	if not state then
+		return
+	end
+	state.cash = math.max(0, state.cash + amount)
+	state.dirty = true
+end
+
+--[[
+	Setzt Cash auf einen Betrag und liefert die Differenz zurueck.
+	Fuer Razzia (Phase 2) und Rundenreset.
+]]
+function PlayerState.SetCash(player: Player, amount: number): number
+	local state = states[player]
+	if not state then
+		return 0
+	end
+	local before = state.cash
+	state.cash = math.max(0, amount)
+	state.dirty = true
+	return before - state.cash
+end
+
+--[[
+	Schreibt direkt aufs Konto. Nur fuer den Aufholbonus beim Late Join --
+	verdientes Geld geht immer ueber BankAllCash.
+]]
+function PlayerState.AddBanked(player: Player, amount: number)
+	local state = states[player]
+	if not state or amount &lt;= 0 then
+		return
+	end
+	state.banked += amount
+	state.dirty = true
+end
+
+--[[
+	Nimmt einen Anteil vom Cash und liefert den genommenen Betrag zurueck.
+	Fuer das Abfangen: der Bestohlene behaelt den Rest, seine Einzahlung laeuft
+	damit zu Ende.
+]]
+function PlayerState.TakeCashShare(player: Player, fraction: number): number
+	local state = states[player]
+	if not state then
+		return 0
+	end
+	local taken = math.floor(state.cash * fraction)
+	if taken &lt;= 0 then
+		return 0
+	end
+	state.cash -= taken
+	state.dirty = true
+	return taken
+end
+
+--[[
+	Zahlt den gesamten Cash aufs Konto ein und liefert den Betrag zurueck.
+]]
+function PlayerState.BankAllCash(player: Player): number
+	local state = states[player]
+	if not state then
+		return 0
+	end
+	local amount = state.cash
+	state.cash = 0
+	state.banked += amount
+	state.dirty = true
+	return amount
+end
+
+function PlayerState.AddHeat(player: Player, delta: number)
+	local state = states[player]
+	if not state then
+		return
+	end
+	local before = state.heat
+	state.heat = math.clamp(state.heat + delta, Balance.Heat.Min, Balance.Heat.Max)
+	if state.heat ~= before then
+		state.dirty = true
+	end
+end
+
+function PlayerState.Notify(player: Player, kind: string, text: string)
+	Remotes.Get(Remotes.Notify):FireClient(player, kind, text)
+end
+
+--[[
+	Zwingt eine sofortige Replikation. Nur fuer Momente, in denen der Client
+	die Zahl auf den Frame genau braucht (Rundenstart, Rundenende).
+]]
+function PlayerState.FlushState(player: Player)
+	local state = states[player]
+	if state and player.Parent then
+		pushState(player, state)
+	end
+end
+
+-- ---------------------------------------------------------------- Drosselung --
+
+--[[
+	Dokument 7: ein Aufruf pro Spieler und Aktion pro 0,3 s.
+	false = Anfrage ignorieren.
+]]
+function PlayerState.ConsumeAction(player: Player, action: string): boolean
+	local state = states[player]
+	if not state then
+		return false
+	end
+
+	local now = os.clock()
+	local last = state.actionAt[action]
+	if last and now - last &lt; Balance.Net.ActionCooldown then
+		if now - state.lastThrottleWarn &gt;= Balance.Net.ThrottleWarnCooldown then
+			state.lastThrottleWarn = now
+			PlayerState.Notify(player, "warn", "Zu schnell. Kurz durchatmen.")
+		end
+		return false
+	end
+
+	state.actionAt[action] = now
+	return true
+end
+
+-- ------------------------------------------------------------- Interaktionen --
+
+function PlayerState.IsBusy(player: Player): boolean
+	local state = states[player]
+	return state ~= nil and state.activity ~= nil
+end
+
+--[[
+	Startet eine Interaktion und liefert deren Token.
+	nil, wenn der Spieler schon beschaeftigt ist.
+]]
+function PlayerState.BeginActivity(player: Player, kind: string, label: string, duration: number): number?
+	local state = states[player]
+	if not state or state.activity then
+		return nil
+	end
+
+	nextToken += 1
+	state.activity = {
+		kind = kind,
+		label = label,
+		duration = duration,
+		startedAt = workspace:GetServerTimeNow(),
+		cancelled = false,
+		token = nextToken,
+	}
+	pushActivity(player, state)
+	return nextToken
+end
+
+function PlayerState.EndActivity(player: Player, token: number)
+	local state = states[player]
+	if not state or not state.activity or state.activity.token ~= token then
+		return
+	end
+	state.activity = nil
+	pushActivity(player, state)
+end
+
+--[[
+	Markiert die laufende Interaktion als abgebrochen. Die zustaendige Schleife
+	sieht das beim naechsten Tick und raeumt selbst auf.
+]]
+function PlayerState.CancelActivity(player: Player)
+	local state = states[player]
+	if state and state.activity then
+		state.activity.cancelled = true
+	end
+end
+
+--[[
+	Bricht sofort ab und gibt den Slot frei, damit direkt etwas anderes starten
+	kann. Die alte Schleife merkt am naechsten Tick, dass ihr Token nicht mehr
+	gilt, und beendet sich selbst.
+]]
+function PlayerState.ForceEndActivity(player: Player)
+	local state = states[player]
+	if not state or not state.activity then
+		return
+	end
+	state.activity.cancelled = true
+	state.activity = nil
+	pushActivity(player, state)
+end
+
+function PlayerState.IsActivityCancelled(player: Player, token: number): boolean
+	local state = states[player]
+	if not state or not state.activity or state.activity.token ~= token then
+		return true
+	end
+	return state.activity.cancelled
+end
+
+-- ---------------------------------------------------------------- Auftraege --
+
+function PlayerState.HasOrder(player: Player): boolean
+	local state = states[player]
+	return state ~= nil and state.order ~= nil
+end
+
+function PlayerState.GetOrder(player: Player)
+	local state = states[player]
+	return state and state.order or nil
+end
+
+function PlayerState.SetOrder(player: Player, order)
+	local state = states[player]
+	if not state then
+		return
+	end
+	state.order = order
+	pushOrder(player, state)
+end
+
+function PlayerState.ClearOrder(player: Player)
+	local state = states[player]
+	if not state then
+		return
+	end
+	state.order = nil
+	pushOrder(player, state)
+end
+
+-- ------------------------------------------------------------------ Statistik --
+
+--[[
+	Knappste Flucht der Runde: der kleinste Vorsprung, mit dem jemand den
+	Sperrkreis verlassen hat (Dokument 3.3).
+]]
+function PlayerState.IsSpectating(player: Player): boolean
+	local state = states[player]
+	return state ~= nil and state.spectating
+end
+
+function PlayerState.SetSpectating(player: Player, value: boolean)
+	local state = states[player]
+	if state then
+		state.spectating = value
+	end
+end
+
+--[[
+	Abfang-Sperre nach 3.2: 45 s zwischen zwei Versuchen. Verbraucht die Sperre
+	nur, wenn der Versuch auch zaehlt.
+]]
+function PlayerState.CanIntercept(player: Player): boolean
+	local state = states[player]
+	if not state then
+		return false
+	end
+	return os.clock() - state.lastInterceptAt &gt;= Balance.Intercept.CooldownSeconds
+end
+
+function PlayerState.MarkIntercept(player: Player)
+	local state = states[player]
+	if not state then
+		return
+	end
+	state.lastInterceptAt = os.clock()
+	state.stats.intercepts += 1
+end
+
+function PlayerState.RecordEscape(player: Player, marginStuds: number)
+	local state = states[player]
+	if not state then
+		return
+	end
+	state.stats.escapes += 1
+	if state.stats.narrowestEscapeStuds &lt; 0 or marginStuds &lt; state.stats.narrowestEscapeStuds then
+		state.stats.narrowestEscapeStuds = marginStuds
+	end
+end
+
+function PlayerState.RecordDelivery(player: Player, payout: number)
+	local state = states[player]
+	if not state then
+		return
+	end
+	state.stats.ordersDelivered += 1
+	if payout &gt; state.stats.bestOrder then
+		state.stats.bestOrder = payout
+	end
+end
+
+-- --------------------------------------------------------------- Rundenreset --
+
+--[[
+	Setzt einen Spieler auf den Rundenstart zurueck. Auftrag und Interaktion
+	raeumt der Aufrufer ab (OrderService kennt Paket und Punkt).
+]]
+function PlayerState.ResetForRound(player: Player)
+	local state = states[player]
+	if not state then
+		return
+	end
+	state.cash = Balance.Player.StartCash
+	state.banked = Balance.Player.StartBanked
+	state.heat = Balance.Player.StartHeat
+	state.spectating = false
+	state.lastInterceptAt = -math.huge
+	state.stats = freshStats()
+	state.dirty = true
+	pushState(player, state)
+end
+
+-- ------------------------------------------------------------------ Position --
+
+--[[
+	Position des Spielers oder nil, wenn er gerade keinen Character hat.
+	Bewusst nicht player:DistanceFromCharacter -- das liefert 0 ohne Character
+	und wuerde jeden Distanzcheck bestehen lassen.
+]]
+function PlayerState.GetPosition(player: Player): Vector3?
+	local character = player.Character
+	if not character then
+		return nil
+	end
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if not root or not root:IsA("BasePart") then
+		return nil
+	end
+	return root.Position
+end
+
+function PlayerState.IsNear(player: Player, position: Vector3, radius: number): boolean
+	local here = PlayerState.GetPosition(player)
+	if not here then
+		return false
+	end
+	return (here - position).Magnitude &lt;= radius
+end
+
+return PlayerState
+</ProtectedString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBX19">
+				<Properties>
+					<string name="Name">RaidService</string>
+					<ProtectedString name="Source">--[[
+	RaidService.lua
+
+	Die Razzia als Fluchtfenster (Dokument 1.4).
+
+	Alle Balance.Heat.RaidCheckInterval Sekunden ein Wurf pro Spieler gegen
+	p = (Heat/100)^3 * 0.35. Trifft er:
+
+	  1. Der Getroffene leuchtet fuer alle im Server sichtbar auf (Highlight),
+	     bei ihm selbst kommen Sirene und roter Rand dazu.
+	  2. Um seine Position legt sich ein Sperrkreis mit
+	     Balance.Heat.RaidRingRadius, der in Balance.Heat.RaidRingSeconds
+	     linear auf null schrumpft.
+	  3. Beim Schliessen draussen: behaelt alles, Heat -15.
+	  4. Drinnen: Cash * 0.35 bleibt uebrig, Heat -40, 3 s Stun.
+
+	Kein NPC, kein Pathfinding -- ein schrumpfender Zylinder und ein
+	Abstandsvergleich beim Schliessen.
+
+	AUSLEGUNG, die das Dokument offen laesst: verglichen wird beim Schliessen
+	gegen den ANFANGSRADIUS (40 Studs), nicht gegen den dann schon auf null
+	geschrumpften Timer -- sonst waere jeder ausserhalb und die Razzia
+	folgenlos. Der schrumpfende Zylinder ist die ablesbare Restzeit, der
+	stehende Aussenring die Grenze. Bei WalkSpeed 16 sind 40 Studs in 2,5 s
+	zu schaffen: das Fenster ist zu gewinnen, aber nur wenn man sofort losrennt
+	und nicht ins Leere laeuft.
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Balance = require(Shared:WaitForChild("Balance"))
+local Remotes = require(Shared:WaitForChild("Remotes"))
+
+local Modules = script.Parent
+local MapBuilder = require(Modules:WaitForChild("MapBuilder"))
+local PlayerState = require(Modules:WaitForChild("PlayerState"))
+local RoundManager = require(Modules:WaitForChild("RoundManager"))
+
+local RaidService = {}
+
+local rng = Random.new()
+local running = false
+
+-- [Player] = { origin, ring, highlight, token }
+-- Eigene Buchfuehrung, damit das Aufraeumen nicht davon abhaengt, ob
+-- PlayerState den Spieler beim Verlassen schon vergessen hat.
+local active: { [Player]: any } = {}
+local nextToken = 0
+
+-- ------------------------------------------------------------------ intern --
+
+local function flatDistance(a: Vector3, b: Vector3): number
+	return (Vector3.new(a.X - b.X, 0, a.Z - b.Z)).Magnitude
+end
+
+local function highlightPlayer(player: Player)
+	local character = player.Character
+	if not character then
+		return nil
+	end
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "CashoutRaidHighlight"
+	highlight.FillColor = Color3.fromRGB(255, 60, 60)
+	highlight.OutlineColor = Color3.fromRGB(255, 60, 60)
+	highlight.FillTransparency = Balance.Map.RaidHighlightFill
+	highlight.OutlineTransparency = 0
+	highlight.Adornee = character
+	highlight.Parent = character
+	return highlight
+end
+
+--[[
+	Raeumt Ring und Highlight ab. Vertraegt einen zweiten Aufruf.
+]]
+local function teardown(raid)
+	if raid.ring then
+		raid.ring.Model:Destroy()
+		raid.ring = nil
+	end
+	if raid.highlight then
+		raid.highlight:Destroy()
+		raid.highlight = nil
+	end
+end
+
+local function stun(player: Player)
+	PlayerState.ForceEndActivity(player)
+
+	local token = PlayerState.BeginActivity(player, "stun", "Festgesetzt", Balance.Heat.RaidStunSeconds)
+	if not token then
+		return
+	end
+
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.WalkSpeed = 0
+		-- Beide, weil je nach Humanoid.UseJumpPower nur einer der Werte wirkt.
+		humanoid.JumpPower = 0
+		humanoid.JumpHeight = 0
+	end
+
+	task.delay(Balance.Heat.RaidStunSeconds, function()
+		PlayerState.EndActivity(player, token)
+
+		-- Nur zuruecksetzen, wenn es noch derselbe Humanoid ist. Nach einem
+		-- Respawn haengt der alte im Nirgendwo und wird ignoriert.
+		if humanoid and humanoid.Parent and player.Character == humanoid.Parent then
+			humanoid.WalkSpeed = Balance.Player.WalkSpeed
+			humanoid.JumpPower = Balance.Player.JumpPower
+			humanoid.JumpHeight = Balance.Player.JumpHeight
+		end
+	end)
+end
+
+-- ---------------------------------------------------------------- Schliessen --
+
+local function close(player: Player, token: number)
+	local raid = active[player]
+	if not raid or raid.token ~= token then
+		return
+	end
+	active[player] = nil
+	teardown(raid)
+
+	if not player.Parent then
+		return
+	end
+
+	local state = PlayerState.Get(player)
+	if not state then
+		return
+	end
+
+	local position = PlayerState.GetPosition(player)
+	-- Ohne Character oder mit einem anderen als beim Start gilt man als drinnen:
+	-- sonst waere Sterben die beste Fluchtmoeglichkeit.
+	local sameCharacter = player.Character ~= nil and player.Character == raid.character
+	local distance = if position and sameCharacter then flatDistance(position, raid.origin) else 0
+	local margin = distance - Balance.Heat.RaidRingRadius
+	local escaped = margin &gt; 0
+
+	if escaped then
+		PlayerState.AddHeat(player, -Balance.Heat.RaidHeatLossEscaped)
+		PlayerState.RecordEscape(player, margin)
+		PlayerState.Notify(player, "good", string.format("Entkommen. %.0f Studs Vorsprung.", margin))
+	else
+		local kept = math.floor(state.cash * Balance.Heat.RaidCashKeptFraction)
+		local lost = PlayerState.SetCash(player, kept)
+		PlayerState.AddHeat(player, -Balance.Heat.RaidHeatLossCaught)
+		stun(player)
+		if lost &gt; 0 then
+			PlayerState.Notify(player, "bad", string.format("Erwischt. -%d Cash.", lost))
+		else
+			PlayerState.Notify(player, "bad", "Erwischt. Nichts zu holen.")
+		end
+	end
+
+	Remotes.Get(Remotes.RaidEnded):FireClient(player, {
+		escaped = escaped,
+		marginStuds = margin,
+	})
+end
+
+-- -------------------------------------------------------------------- Start --
+
+local function begin(player: Player)
+	local origin = PlayerState.GetPosition(player)
+	if not origin then
+		return
+	end
+
+	nextToken += 1
+	local token = nextToken
+
+	local ring = MapBuilder.CreateRaidRing(origin)
+	local raid = {
+		origin = origin,
+		-- Merken, WELCHER Character das war. Wer im Fluchtfenster stirbt, wird am
+		-- Spawn wiedergeboren -- weit weg vom Kreis. Ohne diesen Vergleich waere
+		-- Sterben die zuverlaessigste Fluchtmoeglichkeit im Spiel.
+		character = player.Character,
+		ring = ring,
+		highlight = highlightPlayer(player),
+		token = token,
+	}
+	active[player] = raid
+
+	-- Linear, damit die Restzeit am Radius ablesbar bleibt (Dokument 5).
+	local shrink = TweenService:Create(
+		ring.Timer,
+		TweenInfo.new(Balance.Heat.RaidRingSeconds, Enum.EasingStyle.Linear),
+		{ Size = Vector3.new(ring.Timer.Size.X, 0.05, 0.05) }
+	)
+	shrink:Play()
+
+	Remotes.Get(Remotes.RaidStarted):FireClient(player, {
+		startedAt = workspace:GetServerTimeNow(),
+		duration = Balance.Heat.RaidRingSeconds,
+		radius = Balance.Heat.RaidRingRadius,
+		-- Ohne den Mittelpunkt kann der Client nicht sagen, wie weit noch
+		-- fehlt. Er haette dann nur den schrumpfenden Zylinder -- und der zeigt
+		-- die RESTZEIT, nicht die Grenze. Wer ihn fuer die Grenze haelt, hoert
+		-- bei rund 27 Studs auf zu rennen und wird erwischt.
+		origin = origin,
+	})
+	PlayerState.Notify(player, "bad", "RAZZIA. Raus aus dem Kreis.")
+
+	task.delay(Balance.Heat.RaidRingSeconds, close, player, token)
+end
+
+-- ---------------------------------------------------------------- Aufraeumen --
+
+--[[
+	Bricht eine laufende Razzia folgenlos ab. Fuer Rundenwechsel und fuer
+	Spieler, die den Server verlassen -- niemand soll fuer eine Razzia bezahlen,
+	die es nicht mehr gibt.
+]]
+local function abort(player: Player)
+	local raid = active[player]
+	if not raid then
+		return
+	end
+	active[player] = nil
+	teardown(raid)
+
+	-- Der Client haelt seinen roten Rand, bis RaidEnded kommt. Ohne diese
+	-- Meldung stuende die Gefahrenanzeige die ganze Pause ueber im Bild --
+	-- fuer eine Razzia, die es nicht mehr gibt.
+	if player.Parent then
+		Remotes.Get(Remotes.RaidEnded):FireClient(player, {
+			escaped = true,
+			aborted = true,
+			marginStuds = 0,
+		})
+	end
+end
+
+local function abortAll()
+	for player, _ in pairs(table.clone(active)) do
+		abort(player)
+	end
+	-- Guertel und Hosentraeger, falls ein Ring seinen Eintrag ueberlebt hat.
+	MapBuilder.ClearRaidRings()
+	table.clear(active)
+end
+
+-- -------------------------------------------------------------------- Public --
+
+function RaidService.Start()
+	if running then
+		return
+	end
+	running = true
+
+	Players.PlayerRemoving:Connect(abort)
+	RoundManager.OnRoundStart(abortAll)
+	RoundManager.OnRoundEnd(abortAll)
+
+	task.spawn(function()
+		while running do
+			task.wait(Balance.Heat.RaidCheckInterval)
+			if RoundManager.IsRunning() then
+				for player, state in pairs(PlayerState.GetAll()) do
+					if
+						player.Parent
+						and not active[player]
+						and rng:NextNumber() &lt; Balance.RaidChance(state.heat)
+					then
+						begin(player)
+					end
+				end
+			end
+		end
+	end)
+end
+
+function RaidService.Stop()
+	running = false
+end
+
+function RaidService.IsRaided(player: Player): boolean
+	return active[player] ~= nil
+end
+
+return RaidService
+</ProtectedString>
+				</Properties>
+			</Item>
+			<Item class="ModuleScript" referent="RBX20">
+				<Properties>
+					<string name="Name">RoundManager</string>
+					<ProtectedString name="Source">--[[
+	RoundManager.lua
+
+	Rundenzustand, Timer, Rundenende. Einzige Autoritaet darueber, ob gerade
+	gespielt wird.
+
+	Ablauf: Wartephase (zu wenige Spieler) -&gt; Pause -&gt; Runde -&gt; Endtafel,
+	danach wieder Pause. Die Endtafel steht waehrend der gesamten Pause.
+
+	Andere Services haengen sich per OnRoundStart / OnRoundEnd ein, statt dass
+	RoundManager sie kennt -- das haelt die Requires zyklenfrei. Deshalb wird
+	RoundManager.Start() in Main zuletzt aufgerufen.
+
+	Der Countdown laeuft clientseitig. Der Server schickt nur bei
+	Phasenwechseln und alle Balance.Round.StateResyncInterval Sekunden einen
+	Zeitstempel -- das haelt die Uhr synchron, ohne jede Sekunde zu senden.
+
+	Seit Phase 3 dazu die Late-Join-Regel aus 3.1 und das Live-Leaderboard.
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Balance = require(Shared:WaitForChild("Balance"))
+local Remotes = require(Shared:WaitForChild("Remotes"))
+
+local Modules = script.Parent
+local MapBuilder = require(Modules:WaitForChild("MapBuilder"))
+local PlayerState = require(Modules:WaitForChild("PlayerState"))
+
+local RoundManager = {}
+
+local running = false
+local startListeners: { () -&gt; () } = {}
+local endListeners: { () -&gt; () } = {}
+
+local phase = "waiting"
+local roundId = 0
+local phaseEndsAt = 0
+local roundEndsAt = 0
+local lastResult: any = nil
+
+-- ------------------------------------------------------------------ intern --
+
+local function roundState(player: Player?)
+	return {
+		phase = phase,
+		-- Zaehlt pro Runde hoch. Ohne das kann der Client einen Resync nicht von
+		-- einem Rundenstart unterscheiden -- und der Resync kommt alle 5 s.
+		roundId = roundId,
+		endsAt = phaseEndsAt,
+		finalRushSeconds = Balance.Round.FinalRushSeconds,
+		finalRushMultiplier = Balance.Round.FinalRushMultiplier,
+		spectating = player ~= nil and PlayerState.IsSpectating(player) or false,
+	}
+end
+
+local function broadcastState(player: Player?)
+	local remote = Remotes.Get(Remotes.RoundState)
+	if player then
+		remote:FireClient(player, roundState(player))
+		return
+	end
+	for target, _ in pairs(PlayerState.GetAll()) do
+		if target.Parent then
+			remote:FireClient(target, roundState(target))
+		end
+	end
+end
+
+--[[
+	Live-Leaderboard (Phase 3): das Banked aller Mitspieler, immer sichtbar.
+	Zuschauer stehen mit drin, aber ohne Wertung -- sie haben nichts eingezahlt.
+]]
+local function broadcastScoreboard()
+	local entries = {}
+	for player, state in pairs(PlayerState.GetAll()) do
+		table.insert(entries, {
+			userId = player.UserId,
+			name = player.DisplayName,
+			banked = state.banked,
+			spectating = state.spectating,
+		})
+	end
+
+	table.sort(entries, function(a, b)
+		if a.banked == b.banked then
+			return a.name &lt; b.name
+		end
+		return a.banked &gt; b.banked
+	end)
+
+	Remotes.Get(Remotes.Scoreboard):FireAllClients(entries)
+end
+
+local function fire(listeners: { () -&gt; () }, label: string)
+	for _, listener in ipairs(listeners) do
+		local ok, err = pcall(listener)
+		if not ok then
+			warn(string.format("[CASHOUT] %s-Listener fehlgeschlagen: %s", label, tostring(err)))
+		end
+	end
+end
+
+--[[
+	Wartet bis zum Zeitpunkt, bricht bei Stop ab und synchronisiert
+	zwischendurch. Kein while true ohne Abbruchbedingung.
+]]
+local function waitUntil(deadline: number)
+	local nextResync = os.clock() + Balance.Round.StateResyncInterval
+	while running and os.clock() &lt; deadline do
+		task.wait(0.1)
+		if os.clock() &gt;= nextResync then
+			nextResync = os.clock() + Balance.Round.StateResyncInterval
+			broadcastState()
+		end
+	end
+end
+
+local function enoughPlayers(): boolean
+	return #Players:GetPlayers() &gt;= Balance.Round.MinPlayers
+end
+
+local function setPhase(newPhase: string, duration: number)
+	phase = newPhase
+	phaseEndsAt = workspace:GetServerTimeNow() + duration
+	broadcastState()
+end
+
+-- ------------------------------------------------------------- Rundenschluss --
+
+local function buildResult()
+	local standings = {}
+	local bestOrder = { value = 0, who = nil }
+	local mostIntercepts = { value = 0, who = nil }
+	local narrowestEscape = { value = -1, who = nil }
+
+	for player, state in pairs(PlayerState.GetAll()) do
+		table.insert(standings, {
+			userId = player.UserId,
+			name = player.DisplayName,
+			banked = state.banked,
+		})
+
+		local stats = state.stats
+		if stats.bestOrder &gt; bestOrder.value then
+			bestOrder = { value = stats.bestOrder, who = player.DisplayName }
+		end
+		if stats.intercepts &gt; mostIntercepts.value then
+			mostIntercepts = { value = stats.intercepts, who = player.DisplayName }
+		end
+		if stats.narrowestEscapeStuds &gt;= 0 then
+			if narrowestEscape.value &lt; 0 or stats.narrowestEscapeStuds &lt; narrowestEscape.value then
+				narrowestEscape = { value = stats.narrowestEscapeStuds, who = player.DisplayName }
+			end
+		end
+	end
+
+	table.sort(standings, function(a, b)
+		if a.banked == b.banked then
+			return a.name &lt; b.name
+		end
+		return a.banked &gt; b.banked
+	end)
+
+	return {
+		standings = standings,
+		highlights = {
+			-- Phase 1 fuellt nur bestOrder. Die anderen beiden Zeilen stehen
+			-- mit who = nil in der Tafel und zeigen dort einen Strich, bis
+			-- Phase 2 und 3 sie fuellen.
+			bestOrder = bestOrder,
+			mostIntercepts = mostIntercepts,
+			narrowestEscape = narrowestEscape,
+		},
+	}
+end
+
+local function endRound()
+	MapBuilder.SetWorldPromptsEnabled(false)
+
+	-- Nicht eingezahlter Cash zaehlt nicht -- das wird hier sichtbar gemacht,
+	-- statt es nur bei der Wertung zu ignorieren.
+	for player, _ in pairs(PlayerState.GetAll()) do
+		PlayerState.ForceEndActivity(player)
+		PlayerState.SetCash(player, 0)
+		PlayerState.FlushState(player)
+	end
+
+	fire(endListeners, "RoundEnd")
+
+	broadcastScoreboard()
+	lastResult = buildResult()
+	Remotes.Get(Remotes.RoundEnded):FireAllClients(lastResult)
+end
+
+--[[
+	Late Join nach 3.1. Rueckgabe: true, wenn der Spieler mitspielen darf.
+
+	  - erste 60 s: normaler Start
+	  - danach: Banked = Median aller Mitspieler * 0,5 als Aufholbonus.
+	    Bewusst nicht der volle Median, sonst lohnt sich spaetes Joinen.
+	  - letzte 45 s: gar kein Einstieg mehr, direkt in die Lobby
+]]
+local function applyLateJoin(player: Player)
+	if phase ~= "running" then
+		PlayerState.SetSpectating(player, false)
+		return
+	end
+
+	local remaining = roundEndsAt - workspace:GetServerTimeNow()
+	local elapsed = Balance.Round.DurationSeconds - remaining
+
+	if remaining &lt;= Balance.LateJoin.LockoutSeconds then
+		PlayerState.SetSpectating(player, true)
+		PlayerState.Notify(player, "info", "Runde laeuft aus. Du bist in der naechsten dabei.")
+		return
+	end
+
+	PlayerState.SetSpectating(player, false)
+
+	if elapsed &lt;= Balance.LateJoin.GraceSeconds then
+		return
+	end
+
+	local values = {}
+	for other, state in pairs(PlayerState.GetAll()) do
+		if other ~= player and not state.spectating then
+			table.insert(values, state.banked)
+		end
+	end
+	if #values == 0 then
+		return
+	end
+
+	table.sort(values)
+	local middle = #values // 2
+	local median = if #values % 2 == 1 then values[middle + 1] else (values[middle] + values[middle + 1]) / 2
+
+	local bonus = math.floor(median * Balance.LateJoin.MedianFactor)
+	if bonus &lt;= 0 then
+		return
+	end
+
+	PlayerState.AddBanked(player, bonus)
+	PlayerState.Notify(player, "banked", string.format("Aufholbonus: %d Banked.", bonus))
+end
+
+local function startRound()
+	roundId += 1
+
+	for player, _ in pairs(PlayerState.GetAll()) do
+		PlayerState.ResetForRound(player)
+	end
+
+	fire(startListeners, "RoundStart")
+
+	lastResult = nil
+	MapBuilder.SetWorldPromptsEnabled(true)
+
+	setPhase("running", Balance.Round.DurationSeconds)
+	roundEndsAt = phaseEndsAt
+	broadcastState()
+	broadcastScoreboard()
+end
+
+-- ------------------------------------------------------------------ Schleife --
+
+local function loop()
+	while running do
+		if not enoughPlayers() then
+			setPhase("waiting", 0)
+			while running and not enoughPlayers() do
+				task.wait(1)
+			end
+			if not running then
+				return
+			end
+		end
+
+		setPhase("intermission", Balance.Round.IntermissionSeconds)
+		waitUntil(os.clock() + Balance.Round.IntermissionSeconds)
+		if not running then
+			return
+		end
+
+		if not enoughPlayers() then
+			-- Waehrend der Pause sind alle gegangen: zurueck in die Warteschleife.
+			continue
+		end
+
+		startRound()
+		waitUntil(os.clock() + Balance.Round.DurationSeconds)
+		if not running then
+			return
+		end
+
+		endRound()
+	end
+end
+
+-- -------------------------------------------------------------------- Public --
+
+--[[
+	Wird VOR Start() von den Services aufgerufen.
+]]
+function RoundManager.OnRoundStart(listener: () -&gt; ())
+	table.insert(startListeners, listener)
+end
+
+function RoundManager.OnRoundEnd(listener: () -&gt; ())
+	table.insert(endListeners, listener)
+end
+
+function RoundManager.IsRunning(): boolean
+	return phase == "running"
+end
+
+--[[
+	Endspurt: die letzten Balance.Round.FinalRushSeconds einer Runde.
+]]
+function RoundManager.IsFinalRush(): boolean
+	if phase ~= "running" then
+		return false
+	end
+	return roundEndsAt - workspace:GetServerTimeNow() &lt;= Balance.Round.FinalRushSeconds
+end
+
+--[[
+	Payout-Multiplikator aus dem Rundenzustand. Ausserhalb des Endspurts 1.
+]]
+function RoundManager.PayoutMultiplier(): number
+	return if RoundManager.IsFinalRush() then Balance.Round.FinalRushMultiplier else 1
+end
+
+function RoundManager.Start()
+	if running then
+		return
+	end
+	running = true
+
+	Players.PlayerAdded:Connect(function(player)
+		-- Frisch verbundene Clients brauchen den aktuellen Stand, sonst steht
+		-- ihr Timer bis zum naechsten Resync auf null. task.defer, damit
+		-- PlayerState den Spieler zuerst angelegt hat.
+		task.defer(function()
+			if not player.Parent then
+				return
+			end
+			applyLateJoin(player)
+			broadcastState(player)
+			broadcastScoreboard()
+			if lastResult then
+				Remotes.Get(Remotes.RoundEnded):FireClient(player, lastResult)
+			end
+		end)
+	end)
+
+	task.spawn(function()
+		while running do
+			task.wait(Balance.Net.ScoreboardInterval)
+			if phase == "running" then
+				broadcastScoreboard()
+			end
+		end
+	end)
+
+	task.spawn(loop)
+end
+
+function RoundManager.Stop()
+	running = false
+end
+
+return RoundManager
+</ProtectedString>
+				</Properties>
+			</Item>
+		</Item>
+	</Item>
+	<Item class="StarterPlayer" referent="RBX21">
+		<Properties>
+			<string name="Name">StarterPlayer</string>
+		</Properties>
+		<Item class="StarterPlayerScripts" referent="RBX22">
+			<Properties>
+				<string name="Name">StarterPlayerScripts</string>
+			</Properties>
+			<Item class="Folder" referent="RBX23">
+				<Properties>
+					<string name="Name">UI</string>
+				</Properties>
+				<Item class="ModuleScript" referent="RBX24">
+					<Properties>
+						<string name="Name">Atmosphere</string>
+						<ProtectedString name="Source">--[[
+	Atmosphere.lua
+
+	Die Welt reagiert auf Heat (Dokument 4.3). Alles clientseitig, alles ueber
+	Lighting-Effekte und ein Rand-Frame -- kein Postprocessing-Zoo.
+
+	    0-30    nichts
+	   30-60    leichte Vignette, Saettigung -10 %
+	   60-85    Vignette pulsiert im Takt des Herzschlags, ferne Sirene im Loop,
+	            leiser Kontrast-Anstieg
+	   85-100   roter Randpuls, Bild minimal wackelig, Sirene deutlich naeher
+
+	Der Herzschlag-Takt kommt aus Balance.HeartbeatInterval: bei Heat 30 alle
+	1,2 s, bei Heat 100 alle 0,45 s. Er treibt den Puls auch dann, wenn die
+	Sound-Id noch 0 ist -- die Vignette schlaegt also von Anfang an richtig.
+
+	Hier haengt auch der Kamera-Kick, weil er dieselbe Stellschraube benutzt
+	(Humanoid.CameraOffset) wie das Wackeln.
+
+	Die Vignette ist aus vier Rand-Frames mit Verlauf gebaut. Ein echtes
+	radiales Vignetten-Bild waere eine Asset-Id, und die gibt es hier nicht.
+]]
+
+local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
+local SoundService = game:GetService("SoundService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Balance = require(Shared:WaitForChild("Balance"))
+local SoundCatalog = require(Shared:WaitForChild("SoundCatalog"))
+
+local Theme = require(script.Parent:WaitForChild("Theme"))
+
+local Atmosphere = {}
+
+local player = Players.LocalPlayer
+
+local started = false
+local heat = 0
+local pulse = 0
+local nextBeat = 0
+
+local colorCorrection: ColorCorrectionEffect
+local edges: { Frame } = {}
+
+local kickStuds = 0
+local kickUntil = 0
+local kickSeconds = 0
+
+local sirenSound: Sound? = nil
+
+-- ------------------------------------------------------------------ Aufbau --
+
+--[[
+	Vier Randstreifen mit Verlauf von aussen (deckend) nach innen (klar).
+	Zusammen ergibt das eine rechteckige Vignette ohne jedes Bild-Asset.
+]]
+local function buildVignette(screenGui: ScreenGui)
+	local root = Theme.New("Frame", {
+		Name = "Vignette",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		ZIndex = 2,
+	}, screenGui)
+
+	local thickness = 0.22
+	local edgeSpecs = {
+		{ UDim2.fromScale(0, 0), UDim2.new(1, 0, thickness, 0), 90 },
+		{ UDim2.new(0, 0, 1 - thickness, 0), UDim2.new(1, 0, thickness, 0), 270 },
+		{ UDim2.fromScale(0, 0), UDim2.new(thickness, 0, 1, 0), 0 },
+		{ UDim2.new(1 - thickness, 0, 0, 0), UDim2.new(thickness, 0, 1, 0), 180 },
+	}
+
+	for index, spec in ipairs(edgeSpecs) do
+		local edge = Theme.New("Frame", {
+			Name = "Edge" .. index,
+			Position = spec[1],
+			Size = spec[2],
+			BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			ZIndex = 2,
+		}, root) :: Frame
+
+		Theme.New("UIGradient", {
+			Rotation = spec[3],
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0),
+				NumberSequenceKeypoint.new(1, 1),
+			}),
+		}, edge)
+
+		table.insert(edges, edge)
+	end
+end
+
+local function setEdges(transparency: number, color: Color3)
+	for _, edge in ipairs(edges) do
+		edge.BackgroundTransparency = transparency
+		edge.BackgroundColor3 = color
+	end
+end
+
+-- ------------------------------------------------------------- Pro Frame --
+
+local function humanoid(): Humanoid?
+	local character = player.Character
+	local found = character and character:FindFirstChildOfClass("Humanoid")
+	return found
+end
+
+local function step(deltaTime: number)
+	local now = os.clock()
+
+	-- Herzschlag-Takt.
+	local interval = Balance.HeartbeatInterval(heat)
+	if interval then
+		if now &gt;= nextBeat then
+			nextBeat = now + interval
+			pulse = 1
+			if heat &gt;= Balance.Heat.AmbientTenseUntil then
+				SoundCatalog.Play("Heartbeat")
+			end
+		end
+		-- Abklingen bis zum naechsten Schlag.
+		pulse = math.max(0, pulse - deltaTime / math.max(interval * 0.6, 0.05))
+	else
+		nextBeat = now
+		pulse = 0
+	end
+
+	-- Vignette.
+	if heat &lt; Balance.Heat.AmbientCalmUntil then
+		setEdges(1, Color3.fromRGB(0, 0, 0))
+	else
+		local critical = heat &gt;= Balance.Heat.AmbientHighUntil
+		local tense = heat &gt;= Balance.Heat.AmbientTenseUntil
+
+		-- 0 bei Ruhe, 1 bei Maximum.
+		local ramp = math.clamp(
+			(heat - Balance.Heat.AmbientCalmUntil) / (Balance.Heat.Max - Balance.Heat.AmbientCalmUntil),
+			0,
+			1
+		)
+		local base = 1 - ramp * Balance.Feel.VignetteMaxTransparency
+		-- Erst ab "angespannt" pulsiert die Vignette mit.
+		local beat = if tense then pulse * 0.18 else 0
+		setEdges(
+			math.clamp(base - beat, 0, 1),
+			if critical then Theme.Danger else Color3.fromRGB(0, 0, 0)
+		)
+	end
+
+	-- Farbe: Saettigung runter, ab "hoch" etwas Kontrast dazu.
+	if heat &lt; Balance.Heat.AmbientCalmUntil then
+		colorCorrection.Saturation = 0
+		colorCorrection.Contrast = 0
+	else
+		local ramp = math.clamp(
+			(heat - Balance.Heat.AmbientCalmUntil) / (Balance.Heat.AmbientTenseUntil - Balance.Heat.AmbientCalmUntil),
+			0,
+			1
+		)
+		colorCorrection.Saturation = Balance.Feel.SaturationAtTense * ramp
+		colorCorrection.Contrast = if heat &gt;= Balance.Heat.AmbientTenseUntil then Balance.Feel.ContrastAtHigh else 0
+	end
+
+	-- Sirene ab "angespannt", naeher ab "kritisch".
+	if sirenSound then
+		if heat &gt;= Balance.Heat.AmbientTenseUntil then
+			sirenSound.Volume = if heat &gt;= Balance.Heat.AmbientHighUntil then 0.6 else 0.25
+			if not sirenSound.IsPlaying then
+				sirenSound:Play()
+			end
+		elseif sirenSound.IsPlaying then
+			sirenSound:Stop()
+		end
+	end
+
+	-- Wackeln und Kamera-Kick teilen sich denselben Offset.
+	local target = humanoid()
+	if target then
+		local offset = Vector3.zero
+
+		if heat &gt;= Balance.Heat.AmbientHighUntil then
+			local amount = Balance.Feel.ShakeStudsAtCritical
+			offset += Vector3.new(
+				math.sin(now * 37) * amount,
+				math.sin(now * 43) * amount,
+				0
+			)
+		end
+
+		if now &lt; kickUntil then
+			local left = (kickUntil - now) / math.max(kickSeconds, 0.001)
+			offset += Vector3.new(0, -kickStuds * left, 0)
+		end
+
+		target.CameraOffset = offset
+	end
+end
+
+-- ------------------------------------------------------------------- Public --
+
+function Atmosphere.Start(screenGui: ScreenGui)
+	if started then
+		return
+	end
+	started = true
+
+	colorCorrection = Instance.new("ColorCorrectionEffect")
+	colorCorrection.Name = "CashoutHeatColor"
+	colorCorrection.Saturation = 0
+	colorCorrection.Contrast = 0
+	colorCorrection.Parent = Lighting
+
+	-- Sirene nur anlegen, wenn es sie gibt. Bis dahin bleibt es still.
+	if SoundCatalog.Ids.SirenLoop ~= 0 then
+		local sound = Instance.new("Sound")
+		sound.Name = "CashoutSiren"
+		sound.SoundId = "rbxassetid://" .. tostring(SoundCatalog.Ids.SirenLoop)
+		sound.Looped = true
+		sound.Volume = 0
+		-- SoundService, nicht script: ein Sound unter einem ModuleScript ist
+		-- kein zuverlaessiger 2D-Sound.
+		sound.Parent = SoundService
+		sirenSound = sound
+	end
+
+	buildVignette(screenGui)
+	RunService.RenderStepped:Connect(step)
+end
+
+function Atmosphere.SetHeat(value: number)
+	if not started then
+		return
+	end
+	heat = math.clamp(value or 0, Balance.Heat.Min, Balance.Heat.Max)
+end
+
+--[[
+	Kurzer Kamera-Kick. Dokument 5: 0,25 s bei Razzia-Start, ein zweiter,
+	kuerzerer bei geglueckter Flucht.
+]]
+function Atmosphere.Kick(studs: number, seconds: number)
+	if not started then
+		return
+	end
+	kickStuds = studs
+	kickSeconds = seconds
+	kickUntil = os.clock() + seconds
+end
+
+return Atmosphere
+</ProtectedString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX25">
+					<Properties>
+						<string name="Name">Feel</string>
+						<ProtectedString name="Source">--[[
+	Feel.lua
+
+	Die kleinen Sachen aus Dokument 5, die den Unterschied zwischen
+	"funktioniert" und "macht Spass" ausmachen:
+
+	  - Zahlen-Popup ueber dem Kopf: gruen nach oben bei Gewinn, rot nach unten
+	    bei Verlust, 0,6 s, Transparenz auf 1.
+	  - Bank-Ring: der 8-Sekunden-Fortschritt als Ring um den Spieler, der sich
+	    schliesst. Bei Abbruch springt er nicht auf null, sondern laeuft in
+	    0,3 s zurueck.
+	  - Pfeil am Bildschirmrand zum eigenen Uebergabepunkt (4.2, Cyan), solange
+	    der nicht im Bild ist.
+
+	Alles ohne Bild-Assets: der Ring ist aus einzelnen Segmenten gebaut, der
+	Pfeil ist ein gedrehtes Zeichen.
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Balance = require(Shared:WaitForChild("Balance"))
+
+local Theme = require(script.Parent:WaitForChild("Theme"))
+
+local Feel = {}
+
+local player = Players.LocalPlayer
+
+local started = false
+local screen: ScreenGui
+local arrow: TextLabel
+
+local RING_SEGMENTS = 28
+
+local ringBillboard: BillboardGui? = nil
+local ringSegments: { Frame } = {}
+local ringProgress = 0
+local ringTarget = 0
+local ringActive = false
+local ringStartedAt = 0
+local ringDuration = 1
+
+local targetPart: BasePart? = nil
+
+-- ------------------------------------------------------------------ Popup --
+
+--[[
+	Zahl ueber dem Kopf. Gewinn steigt gruen, Verlust faellt rot -- Rot ist
+	laut 4.2 der Gefahr vorbehalten, und Geld zu verlieren ist genau das.
+]]
+function Feel.Popup(amount: number)
+	if not started or amount == 0 then
+		return
+	end
+
+	local character = player.Character
+	local head = character and (character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart"))
+	if not head or not head:IsA("BasePart") then
+		return
+	end
+
+	local gain = amount &gt; 0
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "CashoutPopup"
+	billboard.Size = UDim2.fromOffset(160, 40)
+	billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Adornee = head
+	billboard.Parent = head
+
+	local label = Theme.Label({
+		Size = UDim2.fromScale(1, 1),
+		Text = if gain then string.format("+%d", amount) else string.format("%d", amount),
+		TextSize = 26,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = if gain then Theme.Cash else Theme.Danger,
+		TextStrokeTransparency = 0.4,
+		TextXAlignment = Enum.TextXAlignment.Center,
+	}, billboard)
+
+	local rise = if gain then Balance.Feel.PopupRise else -Balance.Feel.PopupRise
+	local info = TweenInfo.new(Balance.Feel.PopupSeconds, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	TweenService:Create(billboard, info, { StudsOffset = Vector3.new(0, 2.5 + rise, 0) }):Play()
+	TweenService:Create(label, info, { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+
+	task.delay(Balance.Feel.PopupSeconds + 0.1, function()
+		billboard:Destroy()
+	end)
+end
+
+-- ------------------------------------------------------------------- Ring --
+
+local function buildRing()
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not root or not root:IsA("BasePart") then
+		return
+	end
+
+	if ringBillboard then
+		ringBillboard:Destroy()
+	end
+	table.clear(ringSegments)
+
+	local size = 120
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "CashoutBankRing"
+	billboard.Size = UDim2.fromOffset(size, size)
+	billboard.StudsOffset = Vector3.new(0, 0.2, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Adornee = root
+	billboard.Parent = root
+	ringBillboard = billboard
+
+	for index = 1, RING_SEGMENTS do
+		local angle = (index - 1) / RING_SEGMENTS * 2 * math.pi
+		local radius = size * 0.42
+		local segment = Theme.New("Frame", {
+			Name = "Segment" .. index,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(0.5, math.cos(angle) * radius, 0.5, math.sin(angle) * radius),
+			Size = UDim2.fromOffset(6, 12),
+			Rotation = math.deg(angle) + 90,
+			BackgroundColor3 = Theme.Banked,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+		}, billboard) :: Frame
+		Theme.Corner(segment, 2)
+		table.insert(ringSegments, segment)
+	end
+end
+
+local function updateRing(deltaTime: number)
+	if #ringSegments == 0 then
+		return
+	end
+
+	if ringActive then
+		local elapsed = workspace:GetServerTimeNow() - ringStartedAt
+		ringTarget = math.clamp(elapsed / math.max(ringDuration, 0.001), 0, 1)
+		ringProgress = ringTarget
+	elseif ringProgress &gt; 0 then
+		-- Zuruecklaufen statt springen.
+		ringProgress = math.max(0, ringProgress - deltaTime / Balance.Feel.BankRingResetSeconds)
+	end
+
+	local lit = ringProgress * RING_SEGMENTS
+	for index, segment in ipairs(ringSegments) do
+		segment.BackgroundTransparency = if index &lt;= lit then 0 else 0.85
+	end
+
+	if ringBillboard then
+		ringBillboard.Enabled = ringProgress &gt; 0
+	end
+end
+
+--[[
+	active = laeuft gerade eine Einzahlung. startedAt/duration kommen aus der
+	Aktivitaet, damit der Ring dieselbe Uhr benutzt wie der Server.
+]]
+function Feel.SetDeposit(active: boolean, startedAt: number?, duration: number?)
+	if not started then
+		return
+	end
+
+	if active then
+		if #ringSegments == 0 or (ringBillboard and not ringBillboard.Parent) then
+			buildRing()
+		end
+		ringActive = true
+		ringStartedAt = startedAt or workspace:GetServerTimeNow()
+		ringDuration = duration or Balance.Bank.DepositSeconds
+	else
+		ringActive = false
+	end
+end
+
+-- ------------------------------------------------------------------ Pfeil --
+
+function Feel.SetTarget(part: BasePart?)
+	if not started then
+		return
+	end
+	targetPart = part
+	if not part then
+		arrow.Visible = false
+	end
+end
+
+local function updateArrow()
+	if not targetPart or not targetPart.Parent then
+		arrow.Visible = false
+		return
+	end
+
+	local camera = workspace.CurrentCamera
+	if not camera then
+		arrow.Visible = false
+		return
+	end
+
+	local point, onScreen = camera:WorldToViewportPoint(targetPart.Position)
+	if onScreen and point.Z &gt; 0 then
+		-- Ziel ist im Bild: der Marker am Punkt selbst reicht.
+		arrow.Visible = false
+		return
+	end
+
+	local viewport = camera.ViewportSize
+	local center = Vector2.new(viewport.X / 2, viewport.Y / 2)
+	local direction = Vector2.new(point.X - center.X, point.Y - center.Y)
+	if point.Z &lt; 0 then
+		direction = -direction
+	end
+	if direction.Magnitude &lt; 1 then
+		direction = Vector2.new(0, -1)
+	end
+	direction = direction.Unit
+
+	-- Strahl-Rechteck-Schnitt statt getrenntem Klemmen pro Achse. Klemmen
+	-- saettigt bei schraegen Richtungen beide Achsen gleichzeitig und drueckt
+	-- den Pfeil in eine Ecke -- und eine Ecke zeigt in vier Richtungen auf
+	-- einmal. Hier ist der Rand die naechste getroffene Kante.
+	local margin = 60
+	local halfX = viewport.X / 2 - margin
+	local halfY = viewport.Y / 2 - margin
+	local scale = math.huge
+	if math.abs(direction.X) &gt; 1e-4 then
+		scale = math.min(scale, halfX / math.abs(direction.X))
+	end
+	if math.abs(direction.Y) &gt; 1e-4 then
+		scale = math.min(scale, halfY / math.abs(direction.Y))
+	end
+	if scale == math.huge then
+		scale = halfY
+	end
+
+	local edge = Vector2.new(center.X + direction.X * scale, center.Y + direction.Y * scale)
+
+	arrow.Visible = true
+	arrow.Position = UDim2.fromOffset(edge.X, edge.Y)
+	-- Das Zeichen zeigt nach oben; 0 Grad ist damit "nach oben".
+	arrow.Rotation = math.deg(math.atan2(direction.Y, direction.X)) + 90
+end
+
+-- ------------------------------------------------------------------- Public --
+
+function Feel.Start(screenGui: ScreenGui)
+	if started then
+		return
+	end
+	started = true
+	screen = screenGui
+
+	arrow = Theme.Label({
+		Name = "TargetArrow",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Size = UDim2.fromOffset(48, 48),
+		Text = "▲",
+		TextSize = 40,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.Delivery,
+		TextStrokeTransparency = 0.5,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		Visible = false,
+		ZIndex = 4,
+	}, screenGui)
+
+	player.CharacterAdded:Connect(function()
+		-- Neuer Character, neuer Ring.
+		table.clear(ringSegments)
+		ringBillboard = nil
+		ringProgress = 0
+		ringActive = false
+	end)
+
+	RunService.RenderStepped:Connect(function(deltaTime)
+		updateRing(deltaTime)
+		updateArrow()
+	end)
+end
+
+return Feel
+</ProtectedString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX26">
+					<Properties>
+						<string name="Name">HeatBar</string>
+						<ProtectedString name="Source">--[[
+	HeatBar.lua
+
+	Heat als Leiste (Orange -&gt; Rot nach 4.2) und die Risikopraemie aus 1.2 --
+	also womit jeder Auftrag gerade multipliziert wird. Die Formel kommt aus
+	Balance, der Client rechnet mit exakt derselben wie der Server.
+
+Dazu die Razzia-Wahrscheinlichkeit pro
+	Check. In Phase 1 stand die Zeile bewusst nicht hier, weil es die Razzia
+	noch nicht gab; seit Phase 2 beschreibt sie ein Ereignis, das wirklich
+	eintritt.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Balance = require(Shared:WaitForChild("Balance"))
+
+local Theme = require(script.Parent:WaitForChild("Theme"))
+
+local HeatBar = {}
+
+local started = false
+local heat = 0
+
+local fill: Frame
+local valueLabel: TextLabel
+local premiumLabel: TextLabel
+local riskLabel: TextLabel
+
+function HeatBar.Start(screenGui: ScreenGui)
+	if started then
+		return
+	end
+	started = true
+
+	local panel = Theme.New("Frame", {
+		Name = "Heat",
+		Position = UDim2.fromOffset(16, 124),
+		Size = UDim2.fromOffset(260, 78),
+		BackgroundColor3 = Theme.Panel,
+		BackgroundTransparency = 0.1,
+		BorderSizePixel = 0,
+	}, screenGui) :: Frame
+	Theme.Corner(panel, 10)
+	Theme.Stroke(panel, Theme.Line, 1, 0.3)
+	Theme.Padding(panel, 12)
+
+	Theme.Label({
+		Size = UDim2.new(1, -70, 0, 14),
+		Text = "HEAT",
+		TextSize = 11,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.TextDim,
+	}, panel)
+
+	valueLabel = Theme.Label({
+		Name = "Value",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, 0, 0, 0),
+		Size = UDim2.fromOffset(70, 14),
+		Text = "0 / 100",
+		TextSize = 12,
+		Font = Enum.Font.GothamBold,
+		TextXAlignment = Enum.TextXAlignment.Right,
+	}, panel)
+
+	local track = Theme.New("Frame", {
+		Name = "Track",
+		Position = UDim2.fromOffset(0, 20),
+		Size = UDim2.new(1, 0, 0, 12),
+		BackgroundColor3 = Theme.Background,
+		BorderSizePixel = 0,
+	}, panel)
+	Theme.Corner(track, 6)
+
+	fill = Theme.New("Frame", {
+		Name = "Fill",
+		Size = UDim2.new(0, 0, 1, 0),
+		BackgroundColor3 = Theme.HeatLow,
+		BorderSizePixel = 0,
+	}, track) :: Frame
+	Theme.Corner(fill, 6)
+
+	premiumLabel = Theme.Label({
+		Name = "Premium",
+		Position = UDim2.fromOffset(0, 36),
+		Size = UDim2.new(1, 0, 0, 15),
+		Text = "",
+		TextSize = 13,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.Cash,
+	}, panel)
+
+	riskLabel = Theme.Label({
+		Name = "Risk",
+		Position = UDim2.fromOffset(0, 51),
+		Size = UDim2.new(1, 0, 0, 14),
+		Text = "",
+		TextSize = 12,
+		TextColor3 = Theme.TextDim,
+	}, panel)
+
+	HeatBar.SetHeat(0)
+end
+
+function HeatBar.SetHeat(value: number)
+	if not started then
+		return
+	end
+
+	heat = math.clamp(value or 0, Balance.Heat.Min, Balance.Heat.Max)
+
+	local t = heat / Balance.Heat.Max
+	fill.Size = UDim2.new(t, 0, 1, 0)
+	fill.BackgroundColor3 = Theme.HeatColor(t)
+
+	valueLabel.Text = string.format("%d / %d", math.floor(heat + 0.5), Balance.Heat.Max)
+	valueLabel.TextColor3 = Theme.HeatColor(t)
+
+	premiumLabel.Text = string.format("Auftraege zahlen x%.2f", Balance.RiskPremium(heat))
+
+	local chance = Balance.RaidChance(heat) * 100
+	riskLabel.Text = string.format("Razzia-Risiko %.1f %% pro Check", chance)
+	riskLabel.TextColor3 = if heat &gt;= Balance.Heat.AmbientTenseUntil then Theme.HeatColor(t) else Theme.TextDim
+end
+
+return HeatBar
+</ProtectedString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX27">
+					<Properties>
+						<string name="Name">OrderPanel</string>
+						<ProtectedString name="Source">--[[
+	OrderPanel.lua
+
+	Die drei Auftragskarten eines Terminals. Alles, was hier steht, kommt vom
+	Server -- der Client rechnet keine Betraege aus und schickt beim Klick nur
+	die Terminal-Id und den Index 1..3.
+
+	Auf der Karte steht die Entfernung des Uebergabepunkts, nicht mehr eine
+	Wartezeit. Das ist der Preis der Stufe.
+
+	Das Panel schliesst sich selbst, wenn der Spieler sich vom Terminal
+	entfernt. Der Server prueft die Distanz sowieso noch einmal; das hier ist
+	nur, damit kein totes Fenster offen steht.
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Balance = require(Shared:WaitForChild("Balance"))
+
+local Theme = require(script.Parent:WaitForChild("Theme"))
+
+local OrderPanel = {}
+
+local player = Players.LocalPlayer
+
+local started = false
+local screen: ScreenGui
+local root: Frame
+local titleLabel: TextLabel
+local row: Frame
+
+local openTerminalId: string? = nil
+local terminalPosition: Vector3? = nil
+local chooseCallback: ((string, number) -&gt; ())? = nil
+
+-- ------------------------------------------------------------------- Karten --
+
+local function clearCards()
+	for _, child in ipairs(row:GetChildren()) do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+end
+
+local function buildCard(offer, index: number)
+	local tierColor = Theme.TierColor(offer.tierId)
+
+	local card = Theme.New("TextButton", {
+		Name = "Card" .. index,
+		LayoutOrder = index,
+		Size = UDim2.fromOffset(200, 244),
+		BackgroundColor3 = Theme.PanelRaised,
+		BorderSizePixel = 0,
+		AutoButtonColor = false,
+		Text = "",
+	}, row) :: TextButton
+	Theme.Corner(card, 10)
+	Theme.Stroke(card, tierColor, 1.5, 0.45)
+
+	local chip = Theme.New("Frame", {
+		Position = UDim2.fromOffset(12, 12),
+		Size = UDim2.fromOffset(74, 20),
+		BackgroundColor3 = tierColor,
+		BackgroundTransparency = 0.78,
+		BorderSizePixel = 0,
+	}, card)
+	Theme.Corner(chip, 6)
+
+	Theme.Label({
+		Size = UDim2.fromScale(1, 1),
+		Text = string.upper(offer.tierLabel),
+		TextSize = 11,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = tierColor,
+		TextXAlignment = Enum.TextXAlignment.Center,
+	}, chip)
+
+	Theme.Label({
+		Position = UDim2.fromOffset(12, 40),
+		Size = UDim2.new(1, -24, 0, 38),
+		Text = offer.name,
+		TextSize = 16,
+		Font = Enum.Font.GothamBold,
+		TextWrapped = true,
+		TextYAlignment = Enum.TextYAlignment.Top,
+	}, card)
+
+	Theme.Label({
+		Position = UDim2.fromOffset(12, 78),
+		Size = UDim2.new(1, -24, 0, 34),
+		Text = offer.blurb,
+		TextSize = 12,
+		TextColor3 = Theme.TextDim,
+		TextWrapped = true,
+		TextYAlignment = Enum.TextYAlignment.Top,
+	}, card)
+
+	Theme.New("Frame", {
+		Position = UDim2.fromOffset(12, 118),
+		Size = UDim2.new(1, -24, 0, 1),
+		BackgroundColor3 = Theme.Line,
+		BorderSizePixel = 0,
+	}, card)
+
+	local rows = {
+		{ "Basis", string.format("%d – %d", offer.minPayout, offer.maxPayout), Theme.Cash },
+		{ "Heat", if offer.heat &gt; 0 then string.format("+%d", offer.heat) else "keine", Theme.HeatLow },
+		{ "Weg", string.format("%d – %d", offer.minDistance, offer.maxDistance), Theme.Delivery },
+	}
+
+	for rowIndex, entry in ipairs(rows) do
+		local y = 130 + (rowIndex - 1) * 22
+
+		Theme.Label({
+			Position = UDim2.fromOffset(12, y),
+			Size = UDim2.new(0.5, -12, 0, 18),
+			Text = entry[1],
+			TextSize = 12,
+			TextColor3 = Theme.TextDim,
+		}, card)
+
+		Theme.Label({
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, -12, 0, y),
+			Size = UDim2.new(0.5, -12, 0, 18),
+			Text = entry[2],
+			TextSize = 13,
+			Font = Enum.Font.GothamBold,
+			TextColor3 = entry[3],
+			TextXAlignment = Enum.TextXAlignment.Right,
+		}, card)
+	end
+
+	local take = Theme.New("Frame", {
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -12),
+		Size = UDim2.new(1, -24, 0, 32),
+		BackgroundColor3 = tierColor,
+		BackgroundTransparency = 0.82,
+		BorderSizePixel = 0,
+	}, card)
+	Theme.Corner(take, 8)
+
+	Theme.Label({
+		Size = UDim2.fromScale(1, 1),
+		Text = "ANNEHMEN",
+		TextSize = 13,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = tierColor,
+		TextXAlignment = Enum.TextXAlignment.Center,
+	}, take)
+
+	card.MouseEnter:Connect(function()
+		take.BackgroundTransparency = 0.6
+	end)
+	card.MouseLeave:Connect(function()
+		take.BackgroundTransparency = 0.82
+	end)
+
+	card.Activated:Connect(function()
+		local terminalId = openTerminalId
+		if terminalId and chooseCallback then
+			OrderPanel.FlyOut(card)
+			chooseCallback(terminalId, index)
+		end
+	end)
+end
+
+-- ------------------------------------------------------------------ Aufbau --
+
+local function build(screenGui: ScreenGui)
+	root = Theme.New("Frame", {
+		Name = "OrderPanel",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = Theme.Background,
+		BackgroundTransparency = 0.45,
+		BorderSizePixel = 0,
+		Visible = false,
+		ZIndex = 5,
+	}, screenGui) :: Frame
+
+	local panel = Theme.New("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(684, 352),
+		BackgroundColor3 = Theme.Panel,
+		BorderSizePixel = 0,
+		ZIndex = 6,
+	}, root)
+	Theme.Corner(panel, 14)
+	Theme.Stroke(panel, Theme.Line, 1, 0.2)
+	Theme.Padding(panel, 16)
+
+	titleLabel = Theme.Label({
+		Size = UDim2.new(1, -40, 0, 22),
+		Text = "TERMINAL",
+		TextSize = 16,
+		Font = Enum.Font.GothamBold,
+	}, panel)
+
+	local close = Theme.New("TextButton", {
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, 0, 0, 0),
+		Size = UDim2.fromOffset(28, 24),
+		BackgroundTransparency = 1,
+		Text = "×",
+		TextSize = 24,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.TextDim,
+	}, panel) :: TextButton
+	close.Activated:Connect(function()
+		OrderPanel.Close()
+	end)
+
+	row = Theme.New("Frame", {
+		Position = UDim2.fromOffset(0, 34),
+		Size = UDim2.new(1, 0, 0, 244),
+		BackgroundTransparency = 1,
+	}, panel) :: Frame
+
+	Theme.New("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		VerticalAlignment = Enum.VerticalAlignment.Top,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 12),
+	}, row)
+
+	Theme.Label({
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 0, 1, 0),
+		Size = UDim2.new(1, 0, 0, 18),
+		Text = "Annahme dauert "
+			.. Balance.Orders.AcceptSeconds
+			.. " s am Terminal. Danach zum Uebergabepunkt laufen — Heat kuehlt unterwegs nicht ab.",
+		TextSize = 12,
+		TextColor3 = Theme.TextDim,
+	}, panel)
+end
+
+--[[
+	Dokument 5: die angenommene Karte fliegt zum Bildschirmrand und wird dort
+	zum Marker. Verbindet Auswahl und Ziel sichtbar miteinander -- den Marker
+	selbst uebernimmt danach Feel.lua.
+]]
+function OrderPanel.FlyOut(card: TextButton)
+	local flying = card:Clone()
+	flying.Name = "FlyingCard"
+	-- An die ScreenGui, nicht ans Panel: das Panel geht im selben Moment zu,
+	-- und ein Kind eines unsichtbaren Frames fliegt unsichtbar.
+	flying.Parent = screen
+	flying.ZIndex = 20
+	flying.Position = UDim2.fromOffset(card.AbsolutePosition.X, card.AbsolutePosition.Y)
+	flying.Size = UDim2.fromOffset(card.AbsoluteSize.X, card.AbsoluteSize.Y)
+	flying.AnchorPoint = Vector2.new(0, 0)
+
+	local info = TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+	TweenService:Create(flying, info, {
+		Position = UDim2.new(0, 24, 0.5, 0),
+		Size = UDim2.fromOffset(24, 30),
+		BackgroundTransparency = 1,
+	}):Play()
+
+	task.delay(0.45, function()
+		flying:Destroy()
+	end)
+end
+
+-- ------------------------------------------------------------- Distanzwache --
+
+local function watchDistance()
+	if not openTerminalId then
+		return
+	end
+
+	-- Ohne Terminal-Position laesst sich nichts pruefen: dann zumachen, statt
+	-- ein Panel offen stehen zu lassen, das nie wieder von allein schliesst.
+	if not terminalPosition then
+		OrderPanel.Close()
+		return
+	end
+
+	local character = player.Character
+	local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+	if not rootPart or not rootPart:IsA("BasePart") then
+		OrderPanel.Close()
+		return
+	end
+
+	-- Gegen das Terminal messen, nicht gegen die Stelle, an der der Spieler
+	-- beim Oeffnen stand. Sonst schliesst sich das Panel beim Umrunden des
+	-- Terminals, obwohl der Server die Annahme noch erlauben wuerde.
+	if (rootPart.Position - terminalPosition).Magnitude &gt; Balance.Orders.InteractRadius then
+		OrderPanel.Close()
+	end
+end
+
+-- ------------------------------------------------------------------- Public --
+
+function OrderPanel.Start(screenGui: ScreenGui, onChoose: (string, number) -&gt; ())
+	if started then
+		return
+	end
+	started = true
+	chooseCallback = onChoose
+	screen = screenGui
+
+	build(screenGui)
+	RunService.Heartbeat:Connect(watchDistance)
+end
+
+function OrderPanel.Open(terminalId: string, offers, position: Vector3?)
+	if not started or typeof(offers) ~= "table" then
+		return
+	end
+
+	openTerminalId = terminalId
+	terminalPosition = if typeof(position) == "Vector3" then position else nil
+
+	-- Klammern, damit nur der String und nicht der Ersetzungszaehler ankommt.
+	local shortId = (string.gsub(terminalId, "^T", ""))
+	titleLabel.Text = string.format("TERMINAL %s  ·  drei Auftraege", shortId)
+
+	clearCards()
+	for index, offer in ipairs(offers) do
+		buildCard(offer, index)
+	end
+
+	root.Visible = true
+end
+
+function OrderPanel.Close()
+	if not started then
+		return
+	end
+	openTerminalId = nil
+	terminalPosition = nil
+	root.Visible = false
+	clearCards()
+end
+
+function OrderPanel.IsOpen(): boolean
+	return started and root.Visible
+end
+
+return OrderPanel
+</ProtectedString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX28">
+					<Properties>
+						<string name="Name">RoundEndBoard</string>
+						<ProtectedString name="Source">--[[
+	RoundEndBoard.lua
+
+	Endstand-Tafel nach 3.3: Banked aller Spieler, darunter die drei Zeilen
+	hoechster Einzelauftrag / meiste Abfaenge / knappste Flucht.
+
+	Phase 1 kann nur die erste der drei Zeilen fuellen -- Abfaenge kommen mit
+	Phase 3, die Flucht mit Phase 2. Die beiden anderen Zeilen stehen deshalb
+	mit einem Strich da statt zu fehlen: die Tafel behaelt ihre Form, und man
+	sieht, was noch aussteht.
+
+	Die 5 s Zeitlupe auf den Sieger sind Phase 4.
+]]
+
+local Players = game:GetService("Players")
+
+local Theme = require(script.Parent:WaitForChild("Theme"))
+
+local RoundEndBoard = {}
+
+local player = Players.LocalPlayer
+
+local started = false
+local root: Frame
+local list: ScrollingFrame
+local highlightList: Frame
+
+local ROW_HEIGHT = 30
+
+-- ------------------------------------------------------------------ Aufbau --
+
+local function build(screenGui: ScreenGui)
+	root = Theme.New("Frame", {
+		Name = "RoundEndBoard",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = Theme.Background,
+		BackgroundTransparency = 0.35,
+		BorderSizePixel = 0,
+		Visible = false,
+		ZIndex = 8,
+	}, screenGui) :: Frame
+
+	local panel = Theme.New("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(460, 480),
+		BackgroundColor3 = Theme.Panel,
+		BorderSizePixel = 0,
+		ZIndex = 9,
+	}, root)
+	Theme.Corner(panel, 14)
+	Theme.Stroke(panel, Theme.Banked, 1.5, 0.4)
+	Theme.Padding(panel, 18)
+
+	Theme.Label({
+		Size = UDim2.new(1, 0, 0, 24),
+		Text = "ENDSTAND",
+		TextSize = 18,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.Banked,
+	}, panel)
+
+	Theme.Label({
+		Position = UDim2.fromOffset(0, 26),
+		Size = UDim2.new(1, 0, 0, 16),
+		Text = "Nur eingezahltes Geld zaehlt.",
+		TextSize = 12,
+		TextColor3 = Theme.TextDim,
+	}, panel)
+
+	-- ScrollingFrame, weil bis zu zwoelf Spieler in den Server passen und die
+	-- Tafel laut 3.3 das Banked ALLER Spieler zeigt. Ein fester Rahmen haette
+	-- ab Rang neun still abgeschnitten.
+	list = Theme.New("ScrollingFrame", {
+		Name = "Standings",
+		Position = UDim2.fromOffset(0, 50),
+		Size = UDim2.new(1, 0, 0, 280),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		CanvasSize = UDim2.new(),
+		ScrollBarThickness = 4,
+		ScrollBarImageColor3 = Theme.Line,
+		ZIndex = 9,
+	}, panel) :: ScrollingFrame
+
+	Theme.New("UIListLayout", {
+		FillDirection = Enum.FillDirection.Vertical,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 4),
+	}, list)
+
+	Theme.New("Frame", {
+		Position = UDim2.fromOffset(0, 340),
+		Size = UDim2.new(1, 0, 0, 1),
+		BackgroundColor3 = Theme.Line,
+		BorderSizePixel = 0,
+		ZIndex = 9,
+	}, panel)
+
+	highlightList = Theme.New("Frame", {
+		Name = "Highlights",
+		Position = UDim2.fromOffset(0, 352),
+		Size = UDim2.new(1, 0, 0, 90),
+		BackgroundTransparency = 1,
+		ZIndex = 9,
+	}, panel) :: Frame
+
+	Theme.New("UIListLayout", {
+		FillDirection = Enum.FillDirection.Vertical,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 4),
+	}, highlightList)
+end
+
+local function clear(container: GuiObject)
+	for _, child in ipairs(container:GetChildren()) do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+end
+
+local function addStandingRow(index: number, entry)
+	local isSelf = entry.userId == player.UserId
+	local isWinner = index == 1
+
+	local rowFrame = Theme.New("Frame", {
+		Name = "Row" .. index,
+		LayoutOrder = index,
+		Size = UDim2.new(1, 0, 0, ROW_HEIGHT),
+		BackgroundColor3 = if isSelf then Theme.PanelRaised else Theme.Panel,
+		BackgroundTransparency = if isSelf then 0 else 1,
+		BorderSizePixel = 0,
+		ZIndex = 10,
+	}, list) :: Frame
+	Theme.Corner(rowFrame, 6)
+
+	local nameColor = if isWinner then Theme.Banked else Theme.Text
+
+	Theme.Label({
+		Position = UDim2.fromOffset(8, 0),
+		Size = UDim2.fromOffset(28, ROW_HEIGHT),
+		Text = tostring(index),
+		TextSize = 13,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.TextDim,
+		ZIndex = 10,
+	}, rowFrame)
+
+	Theme.Label({
+		Position = UDim2.fromOffset(36, 0),
+		Size = UDim2.new(1, -150, 0, ROW_HEIGHT),
+		Text = entry.name,
+		TextSize = 14,
+		Font = if isWinner then Enum.Font.GothamBold else Enum.Font.Gotham,
+		TextColor3 = nameColor,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		ZIndex = 10,
+	}, rowFrame)
+
+	Theme.Label({
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -8, 0, 0),
+		Size = UDim2.fromOffset(110, ROW_HEIGHT),
+		Text = string.format("%d", entry.banked),
+		TextSize = 15,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.Banked,
+		TextXAlignment = Enum.TextXAlignment.Right,
+		ZIndex = 10,
+	}, rowFrame)
+end
+
+--[[
+	who = nil bedeutet: diese Auswertung gibt es in dieser Phase noch nicht.
+	Dann steht ein Strich da, keine erfundene Null.
+]]
+local function addHighlightRow(order: number, caption: string, entry, format: (number) -&gt; string)
+	local rowFrame = Theme.New("Frame", {
+		LayoutOrder = order,
+		Size = UDim2.new(1, 0, 0, 26),
+		BackgroundTransparency = 1,
+		ZIndex = 10,
+	}, highlightList) :: Frame
+
+	Theme.Label({
+		Size = UDim2.new(0.55, 0, 1, 0),
+		Text = caption,
+		TextSize = 12,
+		TextColor3 = Theme.TextDim,
+		ZIndex = 10,
+	}, rowFrame)
+
+	local hasValue = entry ~= nil and entry.who ~= nil
+	Theme.Label({
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, 0, 0, 0),
+		Size = UDim2.new(0.45, 0, 1, 0),
+		Text = if hasValue then string.format("%s · %s", entry.who, format(entry.value)) else "—",
+		TextSize = 13,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = if hasValue then Theme.Text else Theme.TextDim,
+		TextXAlignment = Enum.TextXAlignment.Right,
+		ZIndex = 10,
+	}, rowFrame)
+end
+
+-- ------------------------------------------------------------------- Public --
+
+function RoundEndBoard.Start(screenGui: ScreenGui)
+	if started then
+		return
+	end
+	started = true
+	build(screenGui)
+end
+
+function RoundEndBoard.Show(result)
+	if not started or typeof(result) ~= "table" then
+		return
+	end
+
+	clear(list)
+	clear(highlightList)
+
+	local standings = result.standings or {}
+	for index, entry in ipairs(standings) do
+		addStandingRow(index, entry)
+	end
+
+	-- Hoehe direkt aus der Zeilenzahl rechnen statt auf AbsoluteContentSize zu
+	-- warten -- das steht erst einen Frame spaeter richtig.
+	list.CanvasSize = UDim2.fromOffset(0, #standings * (ROW_HEIGHT + 4))
+	list.CanvasPosition = Vector2.new(0, 0)
+
+	local highlights = result.highlights or {}
+	addHighlightRow(1, "Hoechster Einzelauftrag", highlights.bestOrder, function(value)
+		return string.format("%d", value)
+	end)
+	addHighlightRow(2, "Meiste Abfaenge", highlights.mostIntercepts, function(value)
+		return string.format("%d", value)
+	end)
+	addHighlightRow(3, "Knappste Flucht", highlights.narrowestEscape, function(value)
+		return string.format("%d Studs", value)
+	end)
+
+	root.Visible = true
+end
+
+function RoundEndBoard.Hide()
+	if not started then
+		return
+	end
+	root.Visible = false
+end
+
+return RoundEndBoard
+</ProtectedString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX29">
+					<Properties>
+						<string name="Name">RoundHud</string>
+						<ProtectedString name="Source">--[[
+	RoundHud.lua
+
+	Rundentimer, die beiden Zahlen (Cash und Banked), der getragene Auftrag mit
+	Restentfernung, der Fortschrittsbalken der laufenden Interaktion und kurze
+	Meldungen.
+
+	Der Countdown laeuft hier lokal weiter -- der Server schickt nur bei
+	Phasenwechseln und alle paar Sekunden einen Zeitstempel.
+
+	Seit Phase 2 dazu der rote Rand des Fluchtfensters mit ablesbarer Restzeit
+	(Dokument 1.4). Rot taucht nur hier auf -- 4.2 reserviert es ausschliesslich
+	fuer Gefahr.
+
+	Kamera-Kick, Herzschlag, Vignette und Einzahl-Beam sind Phase 4 und stehen
+	bewusst noch nicht hier.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Balance = require(Shared:WaitForChild("Balance"))
+local SoundCatalog = require(Shared:WaitForChild("SoundCatalog"))
+
+local Theme = require(script.Parent:WaitForChild("Theme"))
+
+local RoundHud = {}
+
+local player = Players.LocalPlayer
+
+local started = false
+local cashLabel: TextLabel
+local bankedLabel: TextLabel
+local timerLabel: TextLabel
+local phaseLabel: TextLabel
+local rushLabel: TextLabel
+local orderFrame: Frame
+local orderTitle: TextLabel
+local orderDetail: TextLabel
+local activityFrame: Frame
+local activityLabel: TextLabel
+local activityFill: Frame
+local activityCountdown: TextLabel
+local toastList: Frame
+local raidFrame: Frame
+local raidLabel: TextLabel
+local lobbyFrame: Frame
+local lobbyLabel: TextLabel
+
+local currentActivity: any = nil
+local currentRaid: any = nil
+-- Angezeigter und tatsaechlicher Stand: der Zaehler laeuft hoch, statt zu
+-- springen (Dokument 5).
+local shownCash, targetCash = 0, 0
+local shownBanked, targetBanked = 0, 0
+local currentRound: any = nil
+local currentOrder: any = nil
+local currentPoint: BasePart? = nil
+local pointMarker: BillboardGui? = nil
+
+local KIND_COLOR = {
+	good = Theme.Cash,
+	banked = Theme.Banked,
+	info = Theme.Delivery,
+	-- Kein Rot: Rot ist laut 4.2 ausschliesslich Gefahr.
+	warn = Theme.Muted,
+	bad = Theme.Muted,
+}
+
+local KIND_SOUND = {
+	good = "OrderDelivered",
+	banked = "DepositComplete",
+	info = "OrderAccepted",
+	warn = "ActionRefused",
+	bad = "ActionRefused",
+}
+
+-- ------------------------------------------------------------------ Aufbau --
+
+local function buildTopBar(parent: Instance)
+	local panel = Theme.New("Frame", {
+		Name = "Round",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 12),
+		Size = UDim2.fromOffset(220, 68),
+		BackgroundColor3 = Theme.Panel,
+		BackgroundTransparency = 0.1,
+		BorderSizePixel = 0,
+	}, parent)
+	Theme.Corner(panel, 10)
+	Theme.Stroke(panel, Theme.Line, 1, 0.3)
+
+	timerLabel = Theme.Label({
+		Name = "Timer",
+		Position = UDim2.fromOffset(0, 6),
+		Size = UDim2.new(1, 0, 0, 34),
+		Text = "--:--",
+		TextSize = 30,
+		Font = Enum.Font.GothamBold,
+		TextXAlignment = Enum.TextXAlignment.Center,
+	}, panel)
+
+	phaseLabel = Theme.Label({
+		Name = "Phase",
+		Position = UDim2.fromOffset(0, 40),
+		Size = UDim2.new(1, 0, 0, 14),
+		Text = "warten",
+		TextSize = 11,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.TextDim,
+		TextXAlignment = Enum.TextXAlignment.Center,
+	}, panel)
+
+	rushLabel = Theme.Label({
+		Name = "Rush",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 74),
+		Size = UDim2.fromOffset(220, 20),
+		Text = "",
+		TextSize = 14,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.Banked,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		Visible = false,
+	}, parent)
+end
+
+local function buildMoneyPanel(parent: Instance)
+	local panel = Theme.New("Frame", {
+		Name = "Money",
+		Position = UDim2.fromOffset(16, 16),
+		Size = UDim2.fromOffset(260, 96),
+		BackgroundColor3 = Theme.Panel,
+		BackgroundTransparency = 0.1,
+		BorderSizePixel = 0,
+	}, parent)
+	Theme.Corner(panel, 10)
+	Theme.Stroke(panel, Theme.Line, 1, 0.3)
+	Theme.Padding(panel, 12)
+
+	Theme.Label({
+		Position = UDim2.fromOffset(0, 0),
+		Size = UDim2.new(1, 0, 0, 14),
+		Text = "CASH  (angreifbar)",
+		TextSize = 11,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.TextDim,
+	}, panel)
+
+	cashLabel = Theme.Label({
+		Name = "Cash",
+		Position = UDim2.fromOffset(0, 14),
+		Size = UDim2.new(1, 0, 0, 26),
+		Text = "0",
+		TextSize = 24,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.Cash,
+	}, panel)
+
+	Theme.Label({
+		Position = UDim2.fromOffset(0, 42),
+		Size = UDim2.new(1, 0, 0, 14),
+		Text = "BANKED  (zaehlt)",
+		TextSize = 11,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.TextDim,
+	}, panel)
+
+	bankedLabel = Theme.Label({
+		Name = "Banked",
+		Position = UDim2.fromOffset(0, 56),
+		Size = UDim2.new(1, 0, 0, 26),
+		Text = "0",
+		TextSize = 24,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.Banked,
+	}, panel)
+end
+
+local function buildOrderPanel(parent: Instance)
+	orderFrame = Theme.New("Frame", {
+		Name = "Order",
+		Position = UDim2.fromOffset(16, 214),
+		Size = UDim2.fromOffset(260, 66),
+		BackgroundColor3 = Theme.Panel,
+		BackgroundTransparency = 0.1,
+		BorderSizePixel = 0,
+		Visible = false,
+	}, parent) :: Frame
+	Theme.Corner(orderFrame, 10)
+	Theme.Stroke(orderFrame, Theme.Delivery, 1.5, 0.4)
+	Theme.Padding(orderFrame, 12)
+
+	Theme.Label({
+		Size = UDim2.new(1, 0, 0, 14),
+		Text = "AUFTRAG UNTERWEGS",
+		TextSize = 11,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.Delivery,
+	}, orderFrame)
+
+	orderTitle = Theme.Label({
+		Position = UDim2.fromOffset(0, 16),
+		Size = UDim2.new(1, 0, 0, 18),
+		Text = "",
+		TextSize = 15,
+		Font = Enum.Font.GothamBold,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+	}, orderFrame)
+
+	orderDetail = Theme.Label({
+		Position = UDim2.fromOffset(0, 34),
+		Size = UDim2.new(1, 0, 0, 16),
+		Text = "",
+		TextSize = 12,
+		TextColor3 = Theme.TextDim,
+	}, orderFrame)
+end
+
+local function buildActivityBar(parent: Instance)
+	activityFrame = Theme.New("Frame", {
+		Name = "Activity",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -110),
+		Size = UDim2.fromOffset(420, 58),
+		BackgroundColor3 = Theme.Panel,
+		BackgroundTransparency = 0.1,
+		BorderSizePixel = 0,
+		Visible = false,
+	}, parent) :: Frame
+	Theme.Corner(activityFrame, 10)
+	Theme.Stroke(activityFrame, Theme.Line, 1, 0.3)
+	Theme.Padding(activityFrame, 12)
+
+	activityLabel = Theme.Label({
+		Size = UDim2.new(1, -70, 0, 16),
+		Text = "",
+		TextSize = 14,
+		Font = Enum.Font.GothamBold,
+	}, activityFrame)
+
+	activityCountdown = Theme.Label({
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, 0, 0, 0),
+		Size = UDim2.fromOffset(70, 16),
+		Text = "",
+		TextSize = 14,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.TextDim,
+		TextXAlignment = Enum.TextXAlignment.Right,
+	}, activityFrame)
+
+	local track = Theme.New("Frame", {
+		Name = "Track",
+		Position = UDim2.fromOffset(0, 24),
+		Size = UDim2.new(1, 0, 0, 10),
+		BackgroundColor3 = Theme.Background,
+		BorderSizePixel = 0,
+	}, activityFrame)
+	Theme.Corner(track, 5)
+
+	activityFill = Theme.New("Frame", {
+		Name = "Fill",
+		Size = UDim2.new(0, 0, 1, 0),
+		BackgroundColor3 = Theme.Delivery,
+		BorderSizePixel = 0,
+	}, track) :: Frame
+	Theme.Corner(activityFill, 5)
+end
+
+local function buildToasts(parent: Instance)
+	toastList = Theme.New("Frame", {
+		Name = "Toasts",
+		AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.new(1, -16, 1, -16),
+		Size = UDim2.fromOffset(320, 240),
+		BackgroundTransparency = 1,
+	}, parent) :: Frame
+
+	Theme.New("UIListLayout", {
+		FillDirection = Enum.FillDirection.Vertical,
+		VerticalAlignment = Enum.VerticalAlignment.Bottom,
+		HorizontalAlignment = Enum.HorizontalAlignment.Right,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 6),
+	}, toastList)
+end
+
+--[[
+	Roter Rand waehrend des Fluchtfensters. Vier Balken statt eines gefuellten
+	Frames, damit die Mitte des Bildschirms frei bleibt -- man muss beim Rennen
+	sehen, wohin.
+]]
+local function buildRaidBorder(parent: Instance)
+	raidFrame = Theme.New("Frame", {
+		Name = "RaidBorder",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Visible = false,
+		ZIndex = 15,
+	}, parent) :: Frame
+
+	local thickness = 14
+	local edges = {
+		{ UDim2.fromScale(0, 0), UDim2.new(1, 0, 0, thickness) },
+		{ UDim2.new(0, 0, 1, -thickness), UDim2.new(1, 0, 0, thickness) },
+		{ UDim2.fromScale(0, 0), UDim2.new(0, thickness, 1, 0) },
+		{ UDim2.new(1, -thickness, 0, 0), UDim2.new(0, thickness, 1, 0) },
+	}
+	for index, edge in ipairs(edges) do
+		Theme.New("Frame", {
+			Name = "Edge" .. index,
+			Position = edge[1],
+			Size = edge[2],
+			BackgroundColor3 = Theme.Danger,
+			BorderSizePixel = 0,
+			ZIndex = 15,
+		}, raidFrame)
+	end
+
+	raidLabel = Theme.Label({
+		Name = "Countdown",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 110),
+		Size = UDim2.fromOffset(420, 30),
+		Text = "",
+		TextSize = 22,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.Danger,
+		TextStrokeTransparency = 0.5,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		ZIndex = 16,
+	}, raidFrame)
+end
+
+--[[
+	Lobby-Einblendung fuer Zuschauer (Dokument 3.1): wer in den letzten 45 s
+	joint, spielt diese Runde nicht mehr mit und wartet mit Countdown.
+]]
+local function buildLobby(parent: Instance)
+	lobbyFrame = Theme.New("Frame", {
+		Name = "Lobby",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -40),
+		Size = UDim2.fromOffset(460, 76),
+		BackgroundColor3 = Theme.Panel,
+		BackgroundTransparency = 0.05,
+		BorderSizePixel = 0,
+		Visible = false,
+		ZIndex = 12,
+	}, parent) :: Frame
+	Theme.Corner(lobbyFrame, 12)
+	Theme.Stroke(lobbyFrame, Theme.Banked, 1.5, 0.4)
+	Theme.Padding(lobbyFrame, 14)
+
+	Theme.Label({
+		Size = UDim2.new(1, 0, 0, 18),
+		Text = "LOBBY",
+		TextSize = 13,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.Banked,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		ZIndex = 12,
+	}, lobbyFrame)
+
+	lobbyLabel = Theme.Label({
+		Position = UDim2.fromOffset(0, 20),
+		Size = UDim2.new(1, 0, 0, 28),
+		Text = "",
+		TextSize = 15,
+		TextColor3 = Theme.Text,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		TextWrapped = true,
+		ZIndex = 12,
+	}, lobbyFrame)
+end
+
+-- ------------------------------------------------------------ Marker am Ziel --
+
+--[[
+	Cyan-Schild am eigenen Uebergabepunkt. Bewusst clientseitig: der Punkt-Part
+	steht fuer alle in der Welt, das Cyan-Schild sieht nur der Besitzer.
+	Der Pfeil am Bildschirmrand ist Phase 4.
+]]
+local function setPointMarker(point: BasePart?)
+	if pointMarker then
+		pointMarker:Destroy()
+		pointMarker = nil
+	end
+	currentPoint = point
+	if not point then
+		return
+	end
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "CashoutOwnDelivery"
+	billboard.Size = UDim2.fromOffset(180, 40)
+	billboard.StudsOffset = Vector3.new(0, 20, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Adornee = point
+	billboard.Parent = point
+
+	Theme.Label({
+		Size = UDim2.fromScale(1, 1),
+		Text = "DEIN ZIEL",
+		TextSize = 20,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.Delivery,
+		TextStrokeTransparency = 0.4,
+		TextXAlignment = Enum.TextXAlignment.Center,
+	}, billboard)
+
+	pointMarker = billboard
+end
+
+-- --------------------------------------------------------------- Pro Frame --
+
+local function updateActivity()
+	if not currentActivity then
+		return
+	end
+
+	local elapsed = workspace:GetServerTimeNow() - currentActivity.startedAt
+	local duration = math.max(currentActivity.duration, 0.001)
+	activityFill.Size = UDim2.new(math.clamp(elapsed / duration, 0, 1), 0, 1, 0)
+	activityCountdown.Text = string.format("%.1f s", math.max(duration - elapsed, 0))
+end
+
+local function updateRound()
+	if not currentRound then
+		return
+	end
+
+	local remaining = currentRound.endsAt - workspace:GetServerTimeNow()
+
+	if currentRound.phase == "waiting" then
+		timerLabel.Text = "--:--"
+		timerLabel.TextColor3 = Theme.TextDim
+		phaseLabel.Text = "warten auf Spieler"
+		rushLabel.Visible = false
+		lobbyFrame.Visible = false
+		return
+	end
+
+	timerLabel.Text = Theme.Clock(remaining)
+
+	if currentRound.phase == "intermission" then
+		timerLabel.TextColor3 = Theme.TextDim
+		phaseLabel.Text = "Pause"
+		rushLabel.Visible = false
+		lobbyFrame.Visible = false
+		return
+	end
+
+	if currentRound.spectating then
+		phaseLabel.Text = "du siehst zu"
+		lobbyLabel.Text = string.format(
+			"Diese Runde laeuft ohne dich zu Ende. Naechster Start in %s.",
+			Theme.Clock(remaining + Balance.Round.IntermissionSeconds)
+		)
+		lobbyFrame.Visible = true
+		rushLabel.Visible = false
+		timerLabel.TextColor3 = Theme.TextDim
+		return
+	end
+	lobbyFrame.Visible = false
+
+	phaseLabel.Text = "Runde laeuft"
+	local isRush = remaining &lt;= currentRound.finalRushSeconds
+	timerLabel.TextColor3 = if isRush then Theme.Banked else Theme.Text
+	rushLabel.Visible = isRush
+	if isRush then
+		rushLabel.Text = string.format("ENDSPURT  ·  alle Payouts x%d", currentRound.finalRushMultiplier)
+	end
+end
+
+--[[
+	Naehert den angezeigten Wert dem echten an. Quart-artig: schnell los,
+	weich aus, ueber Balance.Feel.CashTweenSeconds.
+]]
+local function approach(shown: number, target: number, deltaTime: number): number
+	if shown == target then
+		return target
+	end
+	local rate = math.clamp(deltaTime / Balance.Feel.CashTweenSeconds * 3, 0, 1)
+	local next = shown + (target - shown) * rate
+	if math.abs(target - next) &lt; 1 then
+		return target
+	end
+	return next
+end
+
+local function updateCounters(deltaTime: number)
+	shownCash = approach(shownCash, targetCash, deltaTime)
+	shownBanked = approach(shownBanked, targetBanked, deltaTime)
+	cashLabel.Text = string.format("%d", math.floor(shownCash + 0.5))
+	bankedLabel.Text = string.format("%d", math.floor(shownBanked + 0.5))
+end
+
+local function updateRaid()
+	if not currentRaid then
+		return
+	end
+
+	local remaining = currentRaid.startedAt + currentRaid.duration - workspace:GetServerTimeNow()
+	if remaining &lt;= 0 then
+		raidLabel.Text = "RAZZIA"
+		return
+	end
+
+	-- Die echte Restdistanz, nicht der Anfangsradius. Der schrumpfende Zylinder
+	-- im Boden zeigt die RESTZEIT; wer ihn fuer die Grenze haelt, hoert bei rund
+	-- 27 Studs auf zu rennen und wird erwischt. Diese Zahl ist die Grenze.
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if currentRaid.origin and root and root:IsA("BasePart") then
+		local flat = Vector3.new(
+			root.Position.X - currentRaid.origin.X,
+			0,
+			root.Position.Z - currentRaid.origin.Z
+		)
+		local missing = currentRaid.radius - flat.Magnitude
+		if missing &gt; 0 then
+			raidLabel.Text = string.format("RAZZIA — %.1f s — noch %d Studs", remaining, math.ceil(missing))
+			raidLabel.TextColor3 = Theme.Danger
+		else
+			raidLabel.Text = string.format("RAZZIA — %.1f s — DRAUSSEN", remaining)
+			raidLabel.TextColor3 = Theme.Cash
+		end
+		return
+	end
+
+	raidLabel.Text = string.format("RAZZIA — %.1f s — %d Studs raus", remaining, currentRaid.radius)
+	raidLabel.TextColor3 = Theme.Danger
+end
+
+local function updateOrderDistance()
+	if not currentOrder or not orderFrame.Visible then
+		return
+	end
+
+	local base = string.format(
+		"%s · Basis %d · +%d Heat",
+		currentOrder.tierLabel,
+		currentOrder.basePayout,
+		currentOrder.heatGain
+	)
+
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if currentPoint and currentPoint.Parent and root and root:IsA("BasePart") then
+		local flat = Vector3.new(
+			currentPoint.Position.X - root.Position.X,
+			0,
+			currentPoint.Position.Z - root.Position.Z
+		)
+		orderDetail.Text = string.format("%s · noch %d Studs", base, math.floor(flat.Magnitude + 0.5))
+	else
+		orderDetail.Text = base
+	end
+end
+
+-- ------------------------------------------------------------------- Public --
+
+function RoundHud.Start(screenGui: ScreenGui)
+	if started then
+		return
+	end
+	started = true
+
+	buildTopBar(screenGui)
+	buildMoneyPanel(screenGui)
+	buildOrderPanel(screenGui)
+	buildActivityBar(screenGui)
+	buildToasts(screenGui)
+	buildRaidBorder(screenGui)
+	buildLobby(screenGui)
+
+	RunService.Heartbeat:Connect(function(deltaTime)
+		updateCounters(deltaTime)
+		updateActivity()
+		updateRound()
+		updateRaid()
+		updateOrderDistance()
+	end)
+end
+
+function RoundHud.SetState(state)
+	if not started or typeof(state) ~= "table" then
+		return
+	end
+	targetCash = state.cash or 0
+	targetBanked = state.banked or 0
+end
+
+--[[
+	Zaehler ohne Animation setzen. Fuer den Rundenwechsel, wo ein Hochzaehlen
+	von null auf null nur verwirren wuerde.
+]]
+function RoundHud.SnapCounters()
+	if not started then
+		return
+	end
+	shownCash = targetCash
+	shownBanked = targetBanked
+end
+
+function RoundHud.SetRound(state)
+	if not started or typeof(state) ~= "table" then
+		return
+	end
+	currentRound = state
+	updateRound()
+end
+
+function RoundHud.SetOrder(order, point: BasePart?)
+	if not started then
+		return
+	end
+
+	currentOrder = order
+	setPointMarker(point)
+
+	if not order then
+		orderFrame.Visible = false
+		return
+	end
+
+	orderFrame.Visible = true
+	orderTitle.Text = order.name
+	local stroke = orderFrame:FindFirstChildOfClass("UIStroke")
+	if stroke then
+		stroke.Color = Theme.TierColor(order.tierId)
+	end
+	updateOrderDistance()
+end
+
+function RoundHud.SetActivity(activity)
+	if not started then
+		return
+	end
+
+	currentActivity = activity
+	if not activity then
+		activityFrame.Visible = false
+		return
+	end
+
+	activityFrame.Visible = true
+	activityFill.BackgroundColor3 = if activity.kind == "deposit"
+		then Theme.Banked
+		elseif activity.kind == "deliver" then Theme.Delivery
+		else Theme.Muted
+
+	local prefix = if activity.kind == "deposit"
+		then "EINZAHLUNG"
+		elseif activity.kind == "deliver" then "UEBERGABE"
+		elseif activity.kind == "accept" then "ANNAHME"
+		else string.upper(tostring(activity.kind))
+	activityLabel.Text = prefix .. "  ·  " .. tostring(activity.label)
+
+	activityFill.Size = UDim2.new(0, 0, 1, 0)
+	updateActivity()
+end
+
+--[[
+	Zuschauer? Nur fuer die Kamera in UIController -- die Einblendung selbst
+	haengt am Rundenzustand.
+]]
+function RoundHud.IsSpectating(): boolean
+	return currentRound ~= nil and currentRound.spectating == true
+end
+
+--[[
+	Fluchtfenster an oder aus. info = nil beendet es.
+]]
+function RoundHud.SetRaid(info)
+	if not started then
+		return
+	end
+	currentRaid = info
+	raidFrame.Visible = info ~= nil
+	if info then
+		SoundCatalog.Play("RaidAlarm")
+		updateRaid()
+	end
+end
+
+function RoundHud.Notify(kind: string, text: string)
+	if not started then
+		return
+	end
+
+	local color = KIND_COLOR[kind] or Theme.Muted
+	if KIND_SOUND[kind] then
+		SoundCatalog.Play(KIND_SOUND[kind])
+	end
+
+	local toast = Theme.New("Frame", {
+		Name = "Toast",
+		Size = UDim2.new(1, 0, 0, 34),
+		BackgroundColor3 = Theme.Panel,
+		BackgroundTransparency = 0.05,
+		BorderSizePixel = 0,
+	}, toastList) :: Frame
+	Theme.Corner(toast, 8)
+
+	Theme.New("Frame", {
+		Size = UDim2.fromOffset(4, 34),
+		BackgroundColor3 = color,
+		BorderSizePixel = 0,
+	}, toast)
+
+	local label = Theme.Label({
+		Position = UDim2.fromOffset(14, 0),
+		Size = UDim2.new(1, -22, 1, 0),
+		Text = text,
+		TextSize = 14,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = color,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+	}, toast)
+
+	task.delay(Balance.Net.NotifyDuration, function()
+		if not toast.Parent then
+			return
+		end
+		local info = TweenInfo.new(0.35)
+		TweenService:Create(toast, info, { BackgroundTransparency = 1 }):Play()
+		TweenService:Create(label, info, { TextTransparency = 1 }):Play()
+		task.delay(0.4, function()
+			toast:Destroy()
+		end)
+	end)
+end
+
+return RoundHud
+</ProtectedString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX30">
+					<Properties>
+						<string name="Name">Scoreboard</string>
+						<ProtectedString name="Source">--[[
+	Scoreboard.lua
+
+	Live-Banked aller Spieler im Server, immer sichtbar (Dokument 2:
+	"Sichtbarer Wettbewerb ... immer sichtbar").
+
+	Zeigt nur Banked -- Cash gehoert niemandem, solange es nicht eingezahlt ist,
+	und wer wie viel dabei hat, ist genau die Information, die das Spiel
+	verschweigt.
+
+	Zuschauer (Late-Join-Sperre aus 3.1) stehen mit drin, aber ausgegraut und
+	ohne Zahl: sie spielen diese Runde nicht mit.
+]]
+
+local Players = game:GetService("Players")
+
+local Theme = require(script.Parent:WaitForChild("Theme"))
+
+local Scoreboard = {}
+
+local player = Players.LocalPlayer
+
+local started = false
+local list: Frame
+local emptyLabel: TextLabel
+
+local ROW_HEIGHT = 22
+local MAX_ROWS = 12
+
+function Scoreboard.Start(screenGui: ScreenGui)
+	if started then
+		return
+	end
+	started = true
+
+	local panel = Theme.New("Frame", {
+		Name = "Scoreboard",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -16, 0, 16),
+		Size = UDim2.fromOffset(240, 40 + ROW_HEIGHT * MAX_ROWS),
+		BackgroundColor3 = Theme.Panel,
+		BackgroundTransparency = 0.15,
+		BorderSizePixel = 0,
+		AutomaticSize = Enum.AutomaticSize.Y,
+	}, screenGui) :: Frame
+	Theme.Corner(panel, 10)
+	Theme.Stroke(panel, Theme.Line, 1, 0.35)
+	Theme.Padding(panel, 10)
+
+	Theme.Label({
+		Size = UDim2.new(1, 0, 0, 14),
+		Text = "BANKED IM SERVER",
+		TextSize = 11,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.TextDim,
+	}, panel)
+
+	list = Theme.New("Frame", {
+		Name = "Rows",
+		Position = UDim2.fromOffset(0, 20),
+		Size = UDim2.new(1, 0, 0, ROW_HEIGHT * MAX_ROWS),
+		BackgroundTransparency = 1,
+		AutomaticSize = Enum.AutomaticSize.Y,
+	}, panel) :: Frame
+
+	Theme.New("UIListLayout", {
+		FillDirection = Enum.FillDirection.Vertical,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 2),
+	}, list)
+
+	emptyLabel = Theme.Label({
+		Name = "Empty",
+		Position = UDim2.fromOffset(0, 20),
+		Size = UDim2.new(1, 0, 0, ROW_HEIGHT),
+		Text = "niemand da",
+		TextSize = 12,
+		TextColor3 = Theme.TextDim,
+	}, panel)
+end
+
+local function clear()
+	for _, child in ipairs(list:GetChildren()) do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+end
+
+function Scoreboard.Update(entries)
+	if not started or typeof(entries) ~= "table" then
+		return
+	end
+
+	clear()
+	emptyLabel.Visible = #entries == 0
+
+	for index, entry in ipairs(entries) do
+		if index &gt; MAX_ROWS then
+			break
+		end
+
+		local isSelf = entry.userId == player.UserId
+		local row = Theme.New("Frame", {
+			Name = "Row" .. index,
+			LayoutOrder = index,
+			Size = UDim2.new(1, 0, 0, ROW_HEIGHT),
+			BackgroundColor3 = Theme.PanelRaised,
+			BackgroundTransparency = if isSelf then 0.2 else 1,
+			BorderSizePixel = 0,
+		}, list) :: Frame
+		Theme.Corner(row, 4)
+
+		Theme.Label({
+			Position = UDim2.fromOffset(6, 0),
+			Size = UDim2.new(1, -80, 1, 0),
+			Text = entry.name,
+			TextSize = 12,
+			Font = if isSelf then Enum.Font.GothamBold else Enum.Font.Gotham,
+			TextColor3 = if entry.spectating then Theme.TextDim else Theme.Text,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+		}, row)
+
+		Theme.Label({
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, -6, 0, 0),
+			Size = UDim2.fromOffset(72, ROW_HEIGHT),
+			Text = if entry.spectating then "sieht zu" else string.format("%d", entry.banked),
+			TextSize = 12,
+			Font = Enum.Font.GothamBold,
+			TextColor3 = if entry.spectating then Theme.TextDim else Theme.Banked,
+			TextXAlignment = Enum.TextXAlignment.Right,
+		}, row)
+	end
+end
+
+return Scoreboard
+</ProtectedString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX31">
+					<Properties>
+						<string name="Name">Theme</string>
+						<ProtectedString name="Source">--[[
+	Theme.lua
+
+	Farben und ein paar Instanz-Helfer, damit OrderPanel, HeatBar, RoundHud und
+	RoundEndBoard nicht viermal dasselbe Instance.new-Geruest enthalten.
+
+	Der Farbcode aus Dokument 4.2 ist bindend, nicht dekorativ:
+
+	  Gruen  (60,220,120)  Cash, unsicher       -- nirgends sonst
+	  Gold   (255,200,60)  Banked, sicher       -- Bank, Sieger
+	  Orange -&gt; Rot        Heat, Verlaufskurve
+	  Rot    (255,60,60)   AUSSCHLIESSLICH Gefahr
+	  Weiss                fremder Spieler zahlt gerade ein
+	  Cyan                 dein aktiver Uebergabepunkt
+
+	Deshalb ist Danger hier zwar definiert, wird in Phase 1 aber nirgends
+	benutzt -- es gibt noch keine Gefahr. Negative Meldungen laufen ueber
+	Theme.Muted, nicht ueber Rot.
+
+	Stufenfarben kommen aus Balance.Orders.Tiers, damit Server (Paket) und
+	Client (Karte) dieselbe Farbe benutzen.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Balance = require(Shared:WaitForChild("Balance"))
+
+local Theme = {}
+
+-- Untergrund
+Theme.Background = Color3.fromRGB(14, 16, 20)
+Theme.Panel = Color3.fromRGB(24, 27, 33)
+Theme.PanelRaised = Color3.fromRGB(34, 38, 46)
+Theme.Line = Color3.fromRGB(56, 62, 72)
+
+Theme.Text = Color3.fromRGB(238, 242, 246)
+Theme.TextDim = Color3.fromRGB(146, 154, 166)
+
+-- Gebundener Farbcode
+Theme.Cash = Color3.fromRGB(60, 220, 120)
+Theme.Banked = Color3.fromRGB(255, 200, 60)
+Theme.Danger = Color3.fromRGB(255, 60, 60)
+Theme.Depositing = Color3.fromRGB(255, 255, 255)
+Theme.Delivery = Color3.fromRGB(80, 220, 235)
+
+-- Heat-Verlauf: Orange -&gt; Rot
+Theme.HeatLow = Color3.fromRGB(255, 150, 50)
+Theme.HeatHigh = Theme.Danger
+
+-- Neutral fuer Hinweise und Abbrueche. Bewusst kein Rot.
+Theme.Muted = Color3.fromRGB(176, 184, 196)
+
+function Theme.TierColor(tierId: string): Color3
+	local tier = Balance.Orders.TierById[tierId]
+	return tier and tier.Color or Theme.Muted
+end
+
+--[[
+	Instanz mit Eigenschaften anlegen. Parent kommt zuletzt, damit nichts
+	unfertig im Baum haengt.
+]]
+function Theme.New(className: string, props: { [string]: any }, parent: Instance?): Instance
+	local instance = Instance.new(className)
+	for key, value in pairs(props) do
+		instance[key] = value
+	end
+	if parent then
+		instance.Parent = parent
+	end
+	return instance
+end
+
+function Theme.Corner(parent: Instance, radius: number)
+	Theme.New("UICorner", { CornerRadius = UDim.new(0, radius) }, parent)
+end
+
+function Theme.Stroke(parent: Instance, color: Color3, thickness: number, transparency: number?)
+	Theme.New("UIStroke", {
+		Color = color,
+		Thickness = thickness,
+		Transparency = transparency or 0,
+	}, parent)
+end
+
+function Theme.Padding(parent: Instance, px: number)
+	Theme.New("UIPadding", {
+		PaddingTop = UDim.new(0, px),
+		PaddingBottom = UDim.new(0, px),
+		PaddingLeft = UDim.new(0, px),
+		PaddingRight = UDim.new(0, px),
+	}, parent)
+end
+
+function Theme.Label(props: { [string]: any }, parent: Instance): TextLabel
+	local defaults = {
+		BackgroundTransparency = 1,
+		Font = Enum.Font.Gotham,
+		TextColor3 = Theme.Text,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Center,
+		Text = "",
+	}
+	for key, value in pairs(props) do
+		defaults[key] = value
+	end
+	return Theme.New("TextLabel", defaults, parent) :: TextLabel
+end
+
+--[[
+	Heat-Farbe fuer t in [0, 1]: Orange -&gt; Rot.
+]]
+function Theme.HeatColor(t: number): Color3
+	return Theme.HeatLow:Lerp(Theme.HeatHigh, math.clamp(t, 0, 1))
+end
+
+--[[
+	mm:ss, nie negativ.
+]]
+function Theme.Clock(seconds: number): string
+	local whole = math.max(math.floor(seconds), 0)
+	return string.format("%d:%02d", whole // 60, whole % 60)
+end
+
+return Theme
+</ProtectedString>
+					</Properties>
+				</Item>
+			</Item>
+			<Item class="LocalScript" referent="RBX32">
+				<Properties>
+					<string name="Name">UIController</string>
+					<ProtectedString name="Source">--[[
+	UIController.client.lua
+
+	Einstiegspunkt auf dem Client: legt die ScreenGui an, startet die UI-Module
+	und verdrahtet sie mit den Remotes. Keine Spiellogik -- der Client zeigt an
+	und meldet Klicks, sonst nichts.
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Balance = require(Shared:WaitForChild("Balance"))
+local Remotes = require(Shared:WaitForChild("Remotes"))
+local SoundCatalog = require(Shared:WaitForChild("SoundCatalog"))
+
+-- UI liegt neben diesem Script in StarterPlayerScripts, nicht darin.
+local UI = script.Parent:WaitForChild("UI")
+local Atmosphere = require(UI:WaitForChild("Atmosphere"))
+local Feel = require(UI:WaitForChild("Feel"))
+local HeatBar = require(UI:WaitForChild("HeatBar"))
+local OrderPanel = require(UI:WaitForChild("OrderPanel"))
+local RoundEndBoard = require(UI:WaitForChild("RoundEndBoard"))
+local RoundHud = require(UI:WaitForChild("RoundHud"))
+local Scoreboard = require(UI:WaitForChild("Scoreboard"))
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CashoutHud"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = playerGui
+
+RoundHud.Start(screenGui)
+HeatBar.Start(screenGui)
+Atmosphere.Start(screenGui)
+Feel.Start(screenGui)
+RoundEndBoard.Start(screenGui)
+Scoreboard.Start(screenGui)
+OrderPanel.Start(screenGui, function(terminalId, offerIndex)
+	Remotes.Get(Remotes.ChooseOrder):FireServer(terminalId, offerIndex)
+	-- Der Server bestaetigt per ActivityChanged bzw. CloseTerminal. Bis dahin
+	-- ist das Panel zu, damit niemand zweimal klickt.
+	OrderPanel.Close()
+end)
+
+local lastCash = 0
+local lastBanked = 0
+
+Remotes.Get(Remotes.StateChanged).OnClientEvent:Connect(function(state)
+	if typeof(state) ~= "table" then
+		return
+	end
+
+	local cashDelta = (state.cash or 0) - lastCash
+	local bankedDelta = (state.banked or 0) - lastBanked
+	lastCash = state.cash or 0
+	lastBanked = state.banked or 0
+
+	-- Zahlen-Popup ueber dem Kopf, bevor der Zaehler nachzieht.
+	-- Einzahlen ist ausgenommen: dabei faellt Cash auf null, weil es aufs Konto
+	-- geht. Ein rotes Verlust-Popup im Belohnungsmoment waere genau verkehrt.
+	-- Erkennbar daran, dass Banked im selben Schritt um denselben Betrag steigt.
+	local isDeposit = cashDelta &lt; 0 and bankedDelta &gt;= -cashDelta
+	if not isDeposit then
+		Feel.Popup(cashDelta)
+	end
+
+	RoundHud.SetState(state)
+	HeatBar.SetHeat(state.heat)
+	Atmosphere.SetHeat(state.heat)
+end)
+
+Remotes.Get(Remotes.ActivityChanged).OnClientEvent:Connect(function(activity)
+	RoundHud.SetActivity(activity)
+	if activity then
+		OrderPanel.Close()
+	end
+
+	local depositing = activity ~= nil and activity.kind == "deposit"
+	Feel.SetDeposit(depositing, activity and activity.startedAt, activity and activity.duration)
+end)
+
+Remotes.Get(Remotes.OrderChanged).OnClientEvent:Connect(function(order, point)
+	RoundHud.SetOrder(order, point)
+	Feel.SetTarget(point)
+end)
+
+Remotes.Get(Remotes.OffersReady).OnClientEvent:Connect(function(terminalId, offers, terminalPosition)
+	OrderPanel.Open(terminalId, offers, terminalPosition)
+end)
+
+Remotes.Get(Remotes.CloseTerminal).OnClientEvent:Connect(function()
+	OrderPanel.Close()
+end)
+
+Remotes.Get(Remotes.RaidStarted).OnClientEvent:Connect(function(info)
+	RoundHud.SetRaid(info)
+	Atmosphere.Kick(Balance.Feel.CameraKickStuds, Balance.Feel.CameraKickSeconds)
+end)
+
+Remotes.Get(Remotes.RaidEnded).OnClientEvent:Connect(function(info)
+	RoundHud.SetRaid(nil)
+	if info and info.escaped then
+		-- Der zweite, kuerzere Kick aus Dokument 5.
+		Atmosphere.Kick(Balance.Feel.EscapeKickStuds, Balance.Feel.EscapeKickSeconds)
+		SoundCatalog.Play("RaidEscaped")
+	else
+		SoundCatalog.Play("RaidCaught")
+	end
+end)
+
+Remotes.Get(Remotes.Scoreboard).OnClientEvent:Connect(function(entries)
+	Scoreboard.Update(entries)
+end)
+
+--[[
+	Zuschauer-Kamera nach 3.1: wer diese Runde nicht mitspielt, sieht von oben
+	auf die Bank statt auf den eigenen Character. Wird zurueckgestellt, sobald
+	die naechste Runde laeuft.
+]]
+local spectatorWanted = false
+
+--[[
+	Setzt die Kamera auf den Soll-Zustand. Bewusst kein Merker, der nach dem
+	ersten Aufruf dichtmacht: Roblox stellt CameraType bei jedem Character-Spawn
+	auf Custom zurueck, und der erste Rundenzustand kann eintreffen, bevor es
+	ueberhaupt eine CurrentCamera gibt. Beides wuerde einen Merker fuer immer
+	falsch stehen lassen -- der Zuschauer haette dann die normale Kamera bei
+	laufender Lobby-Einblendung.
+]]
+local function applySpectatorCamera()
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return
+	end
+
+	if spectatorWanted then
+		if camera.CameraType ~= Enum.CameraType.Scriptable then
+			camera.CameraType = Enum.CameraType.Scriptable
+		end
+		camera.CFrame = CFrame.lookAt(Vector3.new(0, 150, 220), Vector3.new(0, 20, 0))
+	elseif camera.CameraType ~= Enum.CameraType.Custom then
+		camera.CameraType = Enum.CameraType.Custom
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			camera.CameraSubject = humanoid
+		end
+	end
+end
+
+local function setSpectatorCamera(active: boolean)
+	spectatorWanted = active
+	applySpectatorCamera()
+end
+
+-- Beide Wege, auf denen die Kamera unter uns weggezogen wird.
+player.CharacterAdded:Connect(function()
+	task.defer(applySpectatorCamera)
+end)
+workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(applySpectatorCamera)
+
+-- Welche Runde der Client zuletzt gesehen hat. Der Server schickt den
+-- Rundenzustand alle 5 s zur Uhrensynchronisation nach; ohne diesen Vergleich
+-- liefe der Rundenstart-Block rund 60 Mal pro Runde und wuerde dabei jedes Mal
+-- Pfeil, Razzia-Anzeige und Bank-Ring mitten im Betrieb zuruecksetzen.
+local seenRoundId = -1
+
+Remotes.Get(Remotes.RoundState).OnClientEvent:Connect(function(state)
+	RoundHud.SetRound(state)
+	setSpectatorCamera(typeof(state) == "table" and state.spectating == true)
+	if typeof(state) == "table" and state.phase == "running" and state.roundId ~= seenRoundId then
+		seenRoundId = state.roundId
+		-- Neue Runde: Endtafel weg, und kein Fluchtfenster ueberlebt sie.
+		RoundEndBoard.Hide()
+		RoundHud.SetRaid(nil)
+		RoundHud.SnapCounters()
+		Feel.SetDeposit(false)
+		Feel.SetTarget(nil)
+		lastCash = 0
+		lastBanked = 0
+	end
+end)
+
+Remotes.Get(Remotes.RoundEnded).OnClientEvent:Connect(function(result)
+	OrderPanel.Close()
+	RoundEndBoard.Show(result)
+end)
+
+Remotes.Get(Remotes.Notify).OnClientEvent:Connect(function(kind, text)
+	RoundHud.Notify(kind, text)
+end)
+</ProtectedString>
+				</Properties>
+			</Item>
+		</Item>
+	</Item>
+</roblox>

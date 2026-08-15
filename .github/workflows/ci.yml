@@ -71,3 +71,48 @@ jobs:
         run: |
           npx tsx src/replay/make-fixtures.ts
           git diff --exit-code -- fixtures/
+
+  cashout:
+    name: CASHOUT (Luau)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Luau-CLI holen
+        # Roblox-Code lässt sich hier nicht ausführen, aber er lässt sich
+        # übersetzen. Das fängt genau die Klasse Fehler ab, die sonst erst als
+        # roter Text in der Studio-Konsole auftaucht.
+        run: |
+          curl -sSL -o luau.zip https://github.com/luau-lang/luau/releases/latest/download/luau-ubuntu.zip
+          unzip -q luau.zip
+          chmod +x luau luau-compile
+
+      - name: Alle Module übersetzen
+        run: |
+          fail=0
+          for f in $(find cashout/src -name '*.lua' | sort); do
+            if ./luau-compile --binary "$f" > /dev/null; then
+              echo "ok   $f"
+            else
+              echo "FAIL $f"
+              fail=1
+            fi
+          done
+          exit $fail
+
+      - name: Place-Datei ist reproduzierbar
+        # CASHOUT.rbxlx wird aus src/ erzeugt. Wer src/ ändert und das Bauen
+        # vergisst, liefert eine Place-Datei aus, die nicht mehr dem Code
+        # entspricht -- und merkt es erst in Studio. Also hier nachbauen und
+        # vergleichen, genau wie bei den Replay-Fixtures.
+        run: |
+          python3 cashout/tools/build_place.py
+          git diff --exit-code -- cashout/CASHOUT.rbxlx
+
+      - name: Kopflauf (Runde + Grenzfälle)
+        # Die Servermodule laufen hier wirklich, gegen gestubbte Roblox-APIs
+        # und eine virtuelle Uhr: eine volle 300-s-Runde plus die Grenzfälle
+        # (Müllargumente, Drossel, fremder Übergabepunkt, Verlassen mit
+        # offenem Auftrag, Rundenende mitten in einer Interaktion).
+        # Bricht ab, sobald eine Zusage aus Phase 1 nicht mehr hält.
+        run: cashout/tools/harness/run.sh "$PWD/luau"
