@@ -202,6 +202,11 @@ local function begin(player: Player)
 		startedAt = workspace:GetServerTimeNow(),
 		duration = Balance.Heat.RaidRingSeconds,
 		radius = Balance.Heat.RaidRingRadius,
+		-- Ohne den Mittelpunkt kann der Client nicht sagen, wie weit noch
+		-- fehlt. Er haette dann nur den schrumpfenden Zylinder -- und der zeigt
+		-- die RESTZEIT, nicht die Grenze. Wer ihn fuer die Grenze haelt, hoert
+		-- bei rund 27 Studs auf zu rennen und wird erwischt.
+		origin = origin,
 	})
 	PlayerState.Notify(player, "bad", "RAZZIA. Raus aus dem Kreis.")
 

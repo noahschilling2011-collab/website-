@@ -11,6 +11,9 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Shared = Harness.makeFolder("Shared", ReplicatedStorage)
 Harness.makeModule("Balance", Shared, "Shared/Balance")
+-- Der Simulator zieht seine Angebote seit dem Karten-Pool-Fix aus demselben
+-- Katalog wie der Server.
+Harness.makeModule("DealCatalog", Shared, "Shared/DealCatalog")
 
 local Dev = Harness.makeFolder("Dev", ServerScriptService)
 local BalanceSim = require(Harness.makeModule("BalanceSim", Dev, "Dev/BalanceSim"))

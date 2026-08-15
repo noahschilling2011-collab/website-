@@ -510,7 +510,31 @@ local function updateRaid()
 		raidLabel.Text = "RAZZIA"
 		return
 	end
+
+	-- Die echte Restdistanz, nicht der Anfangsradius. Der schrumpfende Zylinder
+	-- im Boden zeigt die RESTZEIT; wer ihn fuer die Grenze haelt, hoert bei rund
+	-- 27 Studs auf zu rennen und wird erwischt. Diese Zahl ist die Grenze.
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if currentRaid.origin and root and root:IsA("BasePart") then
+		local flat = Vector3.new(
+			root.Position.X - currentRaid.origin.X,
+			0,
+			root.Position.Z - currentRaid.origin.Z
+		)
+		local missing = currentRaid.radius - flat.Magnitude
+		if missing > 0 then
+			raidLabel.Text = string.format("RAZZIA — %.1f s — noch %d Studs", remaining, math.ceil(missing))
+			raidLabel.TextColor3 = Theme.Danger
+		else
+			raidLabel.Text = string.format("RAZZIA — %.1f s — DRAUSSEN", remaining)
+			raidLabel.TextColor3 = Theme.Cash
+		end
+		return
+	end
+
 	raidLabel.Text = string.format("RAZZIA — %.1f s — %d Studs raus", remaining, currentRaid.radius)
+	raidLabel.TextColor3 = Theme.Danger
 end
 
 local function updateOrderDistance()

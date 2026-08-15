@@ -622,7 +622,16 @@ local function onPlayerAdded(player: Player)
 			end
 			local tier = Balance.Orders.TierById[order.tierId]
 			if tier then
-				task.defer(attachPackage, player, tier)
+				task.defer(function()
+					-- Zwischen dem Respawn und dieser Fortsetzung kann ein
+					-- Rundenwechsel den Auftrag geloescht haben. Ohne die zweite
+					-- Pruefung haengt das Paket danach am neuen Character, und
+					-- kein Aufraeumpfad fasst es je wieder an -- es ueberlebt
+					-- dann beliebig viele Runden.
+					if PlayerState.GetOrder(player) == order then
+						attachPackage(player, tier)
+					end
+				end)
 			end
 		end)
 	)

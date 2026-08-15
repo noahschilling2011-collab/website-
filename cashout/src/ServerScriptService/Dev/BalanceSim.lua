@@ -24,6 +24,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Balance = require(Shared:WaitForChild("Balance"))
+local DealCatalog = require(Shared:WaitForChild("DealCatalog"))
 
 local BalanceSim = {}
 
@@ -98,11 +99,15 @@ end
 local function drawOffers(rng, rank: number, heat: number)
 	local profile = Balance.Orders.TerminalProfiles[rank]
 	local pool = {}
-	for _, tier in ipairs(Balance.Orders.Tiers) do
-		local weight = profile[tier.Id] or 0
-		if weight > 0 and heat >= tier.MinHeatToOffer then
-			-- Ein Eintrag pro Stufe reicht: der Katalog hat pro Stufe gleich
-			-- viele Karten, die Auswahl haengt nur an der Stufe.
+	-- Ein Eintrag pro KARTE, nicht pro Stufe -- genau wie eligibleCards im
+	-- OrderService. Der Unterschied ist nicht kosmetisch: gezogen wird ohne
+	-- Zuruecklegen. Mit einem Eintrag pro Stufe kaemen immer drei
+	-- VERSCHIEDENE Stufen heraus, waehrend der Server aus 16 Karten zieht und
+	-- dieselbe Stufe mehrfach anbieten kann -- oder die gesuchte gar nicht.
+	for _, card in ipairs(DealCatalog.Cards) do
+		local tier = Balance.Orders.TierById[card.Tier]
+		local weight = profile[card.Tier] or 0
+		if tier and weight > 0 and heat >= tier.MinHeatToOffer then
 			table.insert(pool, tier)
 		end
 	end
