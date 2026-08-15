@@ -36,6 +36,7 @@ local startListeners: { () -> () } = {}
 local endListeners: { () -> () } = {}
 
 local phase = "waiting"
+local roundId = 0
 local phaseEndsAt = 0
 local roundEndsAt = 0
 local lastResult: any = nil
@@ -45,6 +46,9 @@ local lastResult: any = nil
 local function roundState(player: Player?)
 	return {
 		phase = phase,
+		-- Zaehlt pro Runde hoch. Ohne das kann der Client einen Resync nicht von
+		-- einem Rundenstart unterscheiden -- und der Resync kommt alle 5 s.
+		roundId = roundId,
 		endsAt = phaseEndsAt,
 		finalRushSeconds = Balance.Round.FinalRushSeconds,
 		finalRushMultiplier = Balance.Round.FinalRushMultiplier,
@@ -244,6 +248,8 @@ local function applyLateJoin(player: Player)
 end
 
 local function startRound()
+	roundId += 1
+
 	for player, _ in pairs(PlayerState.GetAll()) do
 		PlayerState.ResetForRound(player)
 	end

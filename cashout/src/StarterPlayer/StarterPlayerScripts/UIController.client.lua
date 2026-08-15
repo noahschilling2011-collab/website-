@@ -122,23 +122,28 @@ end)
 	auf die Bank statt auf den eigenen Character. Wird zurueckgestellt, sobald
 	die naechste Runde laeuft.
 ]]
-local spectatorCameraActive = false
+local spectatorWanted = false
 
-local function setSpectatorCamera(active: boolean)
-	if active == spectatorCameraActive then
-		return
-	end
-	spectatorCameraActive = active
-
+--[[
+	Setzt die Kamera auf den Soll-Zustand. Bewusst kein Merker, der nach dem
+	ersten Aufruf dichtmacht: Roblox stellt CameraType bei jedem Character-Spawn
+	auf Custom zurueck, und der erste Rundenzustand kann eintreffen, bevor es
+	ueberhaupt eine CurrentCamera gibt. Beides wuerde einen Merker fuer immer
+	falsch stehen lassen -- der Zuschauer haette dann die normale Kamera bei
+	laufender Lobby-Einblendung.
+]]
+local function applySpectatorCamera()
 	local camera = workspace.CurrentCamera
 	if not camera then
 		return
 	end
 
-	if active then
-		camera.CameraType = Enum.CameraType.Scriptable
+	if spectatorWanted then
+		if camera.CameraType ~= Enum.CameraType.Scriptable then
+			camera.CameraType = Enum.CameraType.Scriptable
+		end
 		camera.CFrame = CFrame.lookAt(Vector3.new(0, 150, 220), Vector3.new(0, 20, 0))
-	else
+	elseif camera.CameraType ~= Enum.CameraType.Custom then
 		camera.CameraType = Enum.CameraType.Custom
 		local character = player.Character
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -148,10 +153,28 @@ local function setSpectatorCamera(active: boolean)
 	end
 end
 
+local function setSpectatorCamera(active: boolean)
+	spectatorWanted = active
+	applySpectatorCamera()
+end
+
+-- Beide Wege, auf denen die Kamera unter uns weggezogen wird.
+player.CharacterAdded:Connect(function()
+	task.defer(applySpectatorCamera)
+end)
+workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(applySpectatorCamera)
+
+-- Welche Runde der Client zuletzt gesehen hat. Der Server schickt den
+-- Rundenzustand alle 5 s zur Uhrensynchronisation nach; ohne diesen Vergleich
+-- liefe der Rundenstart-Block rund 60 Mal pro Runde und wuerde dabei jedes Mal
+-- Pfeil, Razzia-Anzeige und Bank-Ring mitten im Betrieb zuruecksetzen.
+local seenRoundId = -1
+
 Remotes.Get(Remotes.RoundState).OnClientEvent:Connect(function(state)
 	RoundHud.SetRound(state)
 	setSpectatorCamera(typeof(state) == "table" and state.spectating == true)
-	if typeof(state) == "table" and state.phase == "running" then
+	if typeof(state) == "table" and state.phase == "running" and state.roundId ~= seenRoundId then
+		seenRoundId = state.roundId
 		-- Neue Runde: Endtafel weg, und kein Fluchtfenster ueberlebt sie.
 		RoundEndBoard.Hide()
 		RoundHud.SetRaid(nil)

@@ -221,11 +221,25 @@ local function updateArrow()
 	end
 	direction = direction.Unit
 
+	-- Strahl-Rechteck-Schnitt statt getrenntem Klemmen pro Achse. Klemmen
+	-- saettigt bei schraegen Richtungen beide Achsen gleichzeitig und drueckt
+	-- den Pfeil in eine Ecke -- und eine Ecke zeigt in vier Richtungen auf
+	-- einmal. Hier ist der Rand die naechste getroffene Kante.
 	local margin = 60
-	local edge = Vector2.new(
-		math.clamp(center.X + direction.X * viewport.X, margin, viewport.X - margin),
-		math.clamp(center.Y + direction.Y * viewport.Y, margin, viewport.Y - margin)
-	)
+	local halfX = viewport.X / 2 - margin
+	local halfY = viewport.Y / 2 - margin
+	local scale = math.huge
+	if math.abs(direction.X) > 1e-4 then
+		scale = math.min(scale, halfX / math.abs(direction.X))
+	end
+	if math.abs(direction.Y) > 1e-4 then
+		scale = math.min(scale, halfY / math.abs(direction.Y))
+	end
+	if scale == math.huge then
+		scale = halfY
+	end
+
+	local edge = Vector2.new(center.X + direction.X * scale, center.Y + direction.Y * scale)
 
 	arrow.Visible = true
 	arrow.Position = UDim2.fromOffset(edge.X, edge.Y)

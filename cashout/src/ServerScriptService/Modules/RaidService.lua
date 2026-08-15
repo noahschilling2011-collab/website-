@@ -137,9 +137,10 @@ local function close(player: Player, token: number)
 	end
 
 	local position = PlayerState.GetPosition(player)
-	-- Ohne Character (Respawn im Fenster) gilt man als drinnen: sonst waere
-	-- Sterben die beste Fluchtmoeglichkeit.
-	local distance = if position then flatDistance(position, raid.origin) else 0
+	-- Ohne Character oder mit einem anderen als beim Start gilt man als drinnen:
+	-- sonst waere Sterben die beste Fluchtmoeglichkeit.
+	local sameCharacter = player.Character ~= nil and player.Character == raid.character
+	local distance = if position and sameCharacter then flatDistance(position, raid.origin) else 0
 	local margin = distance - Balance.Heat.RaidRingRadius
 	local escaped = margin > 0
 
@@ -179,6 +180,10 @@ local function begin(player: Player)
 	local ring = MapBuilder.CreateRaidRing(origin)
 	local raid = {
 		origin = origin,
+		-- Merken, WELCHER Character das war. Wer im Fluchtfenster stirbt, wird am
+		-- Spawn wiedergeboren -- weit weg vom Kreis. Ohne diesen Vergleich waere
+		-- Sterben die zuverlaessigste Fluchtmoeglichkeit im Spiel.
+		character = player.Character,
 		ring = ring,
 		highlight = highlightPlayer(player),
 		token = token,
@@ -217,6 +222,17 @@ local function abort(player: Player)
 	end
 	active[player] = nil
 	teardown(raid)
+
+	-- Der Client haelt seinen roten Rand, bis RaidEnded kommt. Ohne diese
+	-- Meldung stuende die Gefahrenanzeige die ganze Pause ueber im Bild --
+	-- fuer eine Razzia, die es nicht mehr gibt.
+	if player.Parent then
+		Remotes.Get(Remotes.RaidEnded):FireClient(player, {
+			escaped = true,
+			aborted = true,
+			marginStuds = 0,
+		})
+	end
 end
 
 local function abortAll()

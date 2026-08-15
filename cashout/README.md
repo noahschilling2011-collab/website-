@@ -5,12 +5,22 @@ Rundenbasiertes Entscheidungsspiel für Roblox. Cash kann dir genommen werden, B
 
 ## In Studio starten
 
-1. `rojo serve` im Ordner `cashout/` starten, in Studio mit dem Rojo-Plugin verbinden, synchronisieren.
-2. Ohne Rojo: Ordner 1:1 nachbauen — `src/ReplicatedStorage/Shared` → ReplicatedStorage.Shared,
-   `src/ServerScriptService` → ServerScriptService, `src/StarterPlayer/StarterPlayerScripts` → StarterPlayerScripts.
-   `*.server.lua` = Script, `*.client.lua` = LocalScript, alles andere = ModuleScript (ohne Endung im Namen).
-3. Keine Map bauen — `MapBuilder` erzeugt Boden, Bank, fünf Terminals, Deckungen und das Nachtlicht selbst.
-4. Play drücken. In der Konsole steht `[CASHOUT] v2 Phase 4 laeuft.` plus eine Sammelzeile der fehlenden Sound-Ids.
+**Der kurze Weg:** [`CASHOUT.rbxlx`](CASHOUT.rbxlx) in Studio über *Datei > Öffnen* laden, Play drücken.
+Fertig — kein Rojo, kein Plugin, keine Map bauen. `MapBuilder` erzeugt Boden, Bank, fünf Terminals,
+Deckungen und das Nachtlicht beim Serverstart selbst. In der Konsole steht dann
+`[CASHOUT] v2 Phase 4 laeuft.` plus eine Sammelzeile der fehlenden Sound-Ids.
+
+Die Place-Datei wird aus `src/` erzeugt und ist deshalb immer nur so aktuell wie ihr letzter Bau:
+
+    python3 tools/build_place.py
+
+**Zum Weiterentwickeln** ist Rojo der bessere Weg, weil Änderungen live synchronisieren:
+`rojo serve` im Ordner `cashout/`, in Studio mit dem Rojo-Plugin verbinden.
+
+Von Hand geht es auch: `src/ReplicatedStorage/Shared` → ReplicatedStorage.Shared,
+`src/ServerScriptService` → ServerScriptService, `src/StarterPlayer/StarterPlayerScripts` →
+StarterPlayerScripts. `*.server.lua` = Script, `*.client.lua` = LocalScript, alles andere =
+ModuleScript (ohne Endung im Namen).
 
 ## Spielen
 
