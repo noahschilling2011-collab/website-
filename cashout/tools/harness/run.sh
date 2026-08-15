@@ -18,5 +18,8 @@ python3 "$HERE/build.py" raid.lua harness_raid.lua
 python3 "$HERE/build.py" pvp.lua harness_pvp.lua
 "$LUAU" "$HERE/harness_pvp.lua"
 
+python3 "$HERE/build.py" multiplayer.lua harness_multiplayer.lua
+"$LUAU" "$HERE/harness_multiplayer.lua"
+
 python3 "$HERE/build.py" sim.lua harness_sim.lua
 "$LUAU" "$HERE/harness_sim.lua"
