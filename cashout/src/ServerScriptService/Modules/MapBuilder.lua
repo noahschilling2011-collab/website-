@@ -25,6 +25,7 @@ local terminals: { [string]: any } = {}
 local terminalOrder: { any } = {}
 local bank: any = nil
 local deliveryFolder: Folder? = nil
+local raidFolder: Folder? = nil
 local built = false
 
 local COLOR_GROUND = Color3.fromRGB(52, 56, 62)
@@ -34,6 +35,9 @@ local COLOR_TERMINAL = Color3.fromRGB(120, 128, 140)
 local COLOR_BANK = Color3.fromRGB(255, 200, 60)
 -- Cyan ist laut 4.2 der eigene Uebergabepunkt.
 local COLOR_DELIVERY = Color3.fromRGB(80, 220, 235)
+-- Rot ist laut 4.2 ausschliesslich Gefahr. Der Sperrkreis ist der erste Ort im
+-- Spiel, an dem es ueberhaupt auftauchen darf.
+local COLOR_DANGER = Color3.fromRGB(255, 60, 60)
 
 -- ------------------------------------------------------------------ intern --
 
@@ -288,6 +292,10 @@ function MapBuilder.Start()
 	deliveryFolder.Name = "DeliveryPoints"
 	deliveryFolder.Parent = root
 
+	raidFolder = Instance.new("Folder")
+	raidFolder.Name = "RaidRings"
+	raidFolder.Parent = root
+
 	buildGround(root)
 	buildSpawn(root)
 	buildBank(root)
@@ -359,6 +367,79 @@ function MapBuilder.ClearDeliveryPoints()
 		return
 	end
 	for _, child in ipairs(deliveryFolder:GetChildren()) do
+		child:Destroy()
+	end
+end
+
+-- ------------------------------------------------------------- Sperrkreis --
+
+--[[
+	Baut den Sperrkreis einer Razzia an einer Position.
+
+	Zwei flache Zylinder uebereinander:
+	  Zone  -- steht still auf Balance.Heat.RaidRingRadius und markiert die
+	           Grenze, die der Spieler ueberqueren muss.
+	  Timer -- schrumpft in Balance.Heat.RaidRingSeconds linear auf null und
+	           ist damit die ablesbare Restzeit (Dokument 5: hier darf nichts
+	           easen).
+
+	Ohne die stehende Zone waere der Kreis nicht spielbar: der schrumpfende
+	Zylinder sagt WANN, aber nicht WOHIN.
+]]
+function MapBuilder.CreateRaidRing(position: Vector3)
+	assert(raidFolder, "MapBuilder.Start() zuerst aufrufen")
+
+	local model = Instance.new("Model")
+	model.Name = "RaidRing"
+	model.Parent = raidFolder
+
+	local diameter = Balance.Heat.RaidRingRadius * 2
+	local center = Vector3.new(position.X, Balance.Map.GroundY + Balance.Map.RaidRingHeight / 2, position.Z)
+
+	-- Zylinder liegen in Roblox entlang X; Orientation kippt die Achse nach oben.
+	local zone = newPart(
+		"Zone",
+		Vector3.new(Balance.Map.RaidRingHeight, diameter, diameter),
+		center,
+		COLOR_DANGER,
+		model
+	)
+	zone.Shape = Enum.PartType.Cylinder
+	zone.Orientation = Vector3.new(0, 0, 90)
+	zone.Material = Enum.Material.Neon
+	zone.Transparency = Balance.Map.RaidZoneTransparency
+	zone.CanCollide = false
+	zone.CanQuery = false
+
+	local timer = newPart(
+		"Timer",
+		Vector3.new(Balance.Map.RaidRingHeight * 1.2, diameter, diameter),
+		center,
+		COLOR_DANGER,
+		model
+	)
+	timer.Shape = Enum.PartType.Cylinder
+	timer.Orientation = Vector3.new(0, 0, 90)
+	timer.Material = Enum.Material.Neon
+	timer.Transparency = Balance.Map.RaidTimerTransparency
+	timer.CanCollide = false
+	timer.CanQuery = false
+
+	model.PrimaryPart = zone
+
+	return {
+		Model = model,
+		Zone = zone,
+		Timer = timer,
+		Position = center,
+	}
+end
+
+function MapBuilder.ClearRaidRings()
+	if not raidFolder then
+		return
+	end
+	for _, child in ipairs(raidFolder:GetChildren()) do
 		child:Destroy()
 	end
 end

@@ -5,11 +5,10 @@
 	also womit jeder Auftrag gerade multipliziert wird. Die Formel kommt aus
 	Balance, der Client rechnet mit exakt derselben wie der Server.
 
-	Die Razzia-Wahrscheinlichkeit steht hier bewusst NICHT. In Phase 1 gibt es
-	keine Razzia, und eine laufende Prozentzahl fuer ein Ereignis, das nicht
-	eintreten kann, ist eine Luege an den Spieler. Balance.RaidChance existiert
-	schon; die Zeile kommt mit Phase 2 dazu, so wie die Endtafel ihre beiden
-	offenen Zeilen bis dahin als Strich zeigt.
+Dazu die Razzia-Wahrscheinlichkeit pro
+	Check. In Phase 1 stand die Zeile bewusst nicht hier, weil es die Razzia
+	noch nicht gab; seit Phase 2 beschreibt sie ein Ereignis, das wirklich
+	eintritt.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -27,6 +26,7 @@ local heat = 0
 local fill: Frame
 local valueLabel: TextLabel
 local premiumLabel: TextLabel
+local riskLabel: TextLabel
 
 function HeatBar.Start(screenGui: ScreenGui)
 	if started then
@@ -37,7 +37,7 @@ function HeatBar.Start(screenGui: ScreenGui)
 	local panel = Theme.New("Frame", {
 		Name = "Heat",
 		Position = UDim2.fromOffset(16, 124),
-		Size = UDim2.fromOffset(260, 62),
+		Size = UDim2.fromOffset(260, 78),
 		BackgroundColor3 = Theme.Panel,
 		BackgroundTransparency = 0.1,
 		BorderSizePixel = 0,
@@ -92,6 +92,15 @@ function HeatBar.Start(screenGui: ScreenGui)
 		TextColor3 = Theme.Cash,
 	}, panel)
 
+	riskLabel = Theme.Label({
+		Name = "Risk",
+		Position = UDim2.fromOffset(0, 51),
+		Size = UDim2.new(1, 0, 0, 14),
+		Text = "",
+		TextSize = 12,
+		TextColor3 = Theme.TextDim,
+	}, panel)
+
 	HeatBar.SetHeat(0)
 end
 
@@ -110,6 +119,10 @@ function HeatBar.SetHeat(value: number)
 	valueLabel.TextColor3 = Theme.HeatColor(t)
 
 	premiumLabel.Text = string.format("Auftraege zahlen x%.2f", Balance.RiskPremium(heat))
+
+	local chance = Balance.RaidChance(heat) * 100
+	riskLabel.Text = string.format("Razzia-Risiko %.1f %% pro Check", chance)
+	riskLabel.TextColor3 = if heat >= Balance.Heat.AmbientTenseUntil then Theme.HeatColor(t) else Theme.TextDim
 end
 
 return HeatBar

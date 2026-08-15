@@ -1,3 +1,5 @@
 harness_round.lua
 harness_edgecases.lua
+harness_raid.lua
+harness_sim.lua
 harness.lua

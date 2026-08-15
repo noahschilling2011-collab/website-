@@ -20,6 +20,7 @@ Harness.makeModule("RoundManager", Modules, "Modules/RoundManager")
 Harness.makeModule("OrderService", Modules, "Modules/OrderService")
 Harness.makeModule("HeatService", Modules, "Modules/HeatService")
 Harness.makeModule("BankService", Modules, "Modules/BankService")
+Harness.makeModule("RaidService", Modules, "Modules/RaidService")
 
 local Balance = require(Shared:FindFirstChild("Balance"))
 

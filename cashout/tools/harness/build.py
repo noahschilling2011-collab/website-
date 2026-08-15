@@ -24,7 +24,9 @@ FILES = {
     "Modules/OrderService": "ServerScriptService/Modules/OrderService.lua",
     "Modules/HeatService": "ServerScriptService/Modules/HeatService.lua",
     "Modules/BankService": "ServerScriptService/Modules/BankService.lua",
+    "Modules/RaidService": "ServerScriptService/Modules/RaidService.lua",
     "Main.server": "ServerScriptService/Main.server.lua",
+    "Dev/BalanceSim": "ServerScriptService/Dev/BalanceSim.lua",
 }
 
 

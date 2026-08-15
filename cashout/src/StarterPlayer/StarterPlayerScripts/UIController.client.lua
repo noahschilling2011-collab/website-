@@ -11,6 +11,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared:WaitForChild("Remotes"))
+local SoundCatalog = require(Shared:WaitForChild("SoundCatalog"))
 
 -- UI liegt neben diesem Script in StarterPlayerScripts, nicht darin.
 local UI = script.Parent:WaitForChild("UI")
@@ -65,11 +66,21 @@ Remotes.Get(Remotes.CloseTerminal).OnClientEvent:Connect(function()
 	OrderPanel.Close()
 end)
 
+Remotes.Get(Remotes.RaidStarted).OnClientEvent:Connect(function(info)
+	RoundHud.SetRaid(info)
+end)
+
+Remotes.Get(Remotes.RaidEnded).OnClientEvent:Connect(function(info)
+	RoundHud.SetRaid(nil)
+	SoundCatalog.Play(if info and info.escaped then "RaidEscaped" else "RaidCaught")
+end)
+
 Remotes.Get(Remotes.RoundState).OnClientEvent:Connect(function(state)
 	RoundHud.SetRound(state)
 	if typeof(state) == "table" and state.phase == "running" then
-		-- Neue Runde: Endtafel weg.
+		-- Neue Runde: Endtafel weg, und kein Fluchtfenster ueberlebt sie.
 		RoundEndBoard.Hide()
+		RoundHud.SetRaid(nil)
 	end
 end)
 

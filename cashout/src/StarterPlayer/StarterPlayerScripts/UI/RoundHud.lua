@@ -8,6 +8,10 @@
 	Der Countdown laeuft hier lokal weiter -- der Server schickt nur bei
 	Phasenwechseln und alle paar Sekunden einen Zeitstempel.
 
+	Seit Phase 2 dazu der rote Rand des Fluchtfensters mit ablesbarer Restzeit
+	(Dokument 1.4). Rot taucht nur hier auf -- 4.2 reserviert es ausschliesslich
+	fuer Gefahr.
+
 	Kamera-Kick, Herzschlag, Vignette und Einzahl-Beam sind Phase 4 und stehen
 	bewusst noch nicht hier.
 ]]
@@ -41,8 +45,11 @@ local activityLabel: TextLabel
 local activityFill: Frame
 local activityCountdown: TextLabel
 local toastList: Frame
+local raidFrame: Frame
+local raidLabel: TextLabel
 
 local currentActivity: any = nil
+local currentRaid: any = nil
 local currentRound: any = nil
 local currentOrder: any = nil
 local currentPoint: BasePart? = nil
@@ -276,6 +283,53 @@ local function buildToasts(parent: Instance)
 	}, toastList)
 end
 
+--[[
+	Roter Rand waehrend des Fluchtfensters. Vier Balken statt eines gefuellten
+	Frames, damit die Mitte des Bildschirms frei bleibt -- man muss beim Rennen
+	sehen, wohin.
+]]
+local function buildRaidBorder(parent: Instance)
+	raidFrame = Theme.New("Frame", {
+		Name = "RaidBorder",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Visible = false,
+		ZIndex = 15,
+	}, parent) :: Frame
+
+	local thickness = 14
+	local edges = {
+		{ UDim2.fromScale(0, 0), UDim2.new(1, 0, 0, thickness) },
+		{ UDim2.new(0, 0, 1, -thickness), UDim2.new(1, 0, 0, thickness) },
+		{ UDim2.fromScale(0, 0), UDim2.new(0, thickness, 1, 0) },
+		{ UDim2.new(1, -thickness, 0, 0), UDim2.new(0, thickness, 1, 0) },
+	}
+	for index, edge in ipairs(edges) do
+		Theme.New("Frame", {
+			Name = "Edge" .. index,
+			Position = edge[1],
+			Size = edge[2],
+			BackgroundColor3 = Theme.Danger,
+			BorderSizePixel = 0,
+			ZIndex = 15,
+		}, raidFrame)
+	end
+
+	raidLabel = Theme.Label({
+		Name = "Countdown",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 110),
+		Size = UDim2.fromOffset(420, 30),
+		Text = "",
+		TextSize = 22,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.Danger,
+		TextStrokeTransparency = 0.5,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		ZIndex = 16,
+	}, raidFrame)
+end
+
 -- ------------------------------------------------------------ Marker am Ziel --
 
 --[[
@@ -360,6 +414,19 @@ local function updateRound()
 	end
 end
 
+local function updateRaid()
+	if not currentRaid then
+		return
+	end
+
+	local remaining = currentRaid.startedAt + currentRaid.duration - workspace:GetServerTimeNow()
+	if remaining <= 0 then
+		raidLabel.Text = "RAZZIA"
+		return
+	end
+	raidLabel.Text = string.format("RAZZIA — %.1f s — %d Studs raus", remaining, currentRaid.radius)
+end
+
 local function updateOrderDistance()
 	if not currentOrder or not orderFrame.Visible then
 		return
@@ -399,10 +466,12 @@ function RoundHud.Start(screenGui: ScreenGui)
 	buildOrderPanel(screenGui)
 	buildActivityBar(screenGui)
 	buildToasts(screenGui)
+	buildRaidBorder(screenGui)
 
 	RunService.Heartbeat:Connect(function()
 		updateActivity()
 		updateRound()
+		updateRaid()
 		updateOrderDistance()
 	end)
 end
@@ -471,6 +540,21 @@ function RoundHud.SetActivity(activity)
 
 	activityFill.Size = UDim2.new(0, 0, 1, 0)
 	updateActivity()
+end
+
+--[[
+	Fluchtfenster an oder aus. info = nil beendet es.
+]]
+function RoundHud.SetRaid(info)
+	if not started then
+		return
+	end
+	currentRaid = info
+	raidFrame.Visible = info ~= nil
+	if info then
+		SoundCatalog.Play("RaidAlarm")
+		updateRaid()
+	end
 end
 
 function RoundHud.Notify(kind: string, text: string)

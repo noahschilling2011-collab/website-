@@ -380,6 +380,21 @@ end
 
 -- ------------------------------------------------------------------ Statistik --
 
+--[[
+	Knappste Flucht der Runde: der kleinste Vorsprung, mit dem jemand den
+	Sperrkreis verlassen hat (Dokument 3.3).
+]]
+function PlayerState.RecordEscape(player: Player, marginStuds: number)
+	local state = states[player]
+	if not state then
+		return
+	end
+	state.stats.escapes += 1
+	if state.stats.narrowestEscapeStuds < 0 or marginStuds < state.stats.narrowestEscapeStuds then
+		state.stats.narrowestEscapeStuds = marginStuds
+	end
+end
+
 function PlayerState.RecordDelivery(player: Player, payout: number)
 	local state = states[player]
 	if not state then

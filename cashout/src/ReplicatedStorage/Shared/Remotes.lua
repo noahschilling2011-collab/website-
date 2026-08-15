@@ -16,6 +16,8 @@
 	         StateChanged(state)               cash / banked / heat
 	         ActivityChanged(activity | nil)   laufende Interaktion
 	         OrderChanged(order | nil, point)  getragener Auftrag + Zielpart
+	         RaidStarted(info)                 Fluchtfenster laeuft
+	         RaidEnded(info)                   entkommen oder erwischt
 	         RoundState(state)                 Phase, Ende, Endspurt
 	         RoundEnded(result)                Endtafel
 	         Notify(kind, text)                Toast im HUD
@@ -36,6 +38,8 @@ Remotes.CloseTerminal = "CloseTerminal"
 Remotes.StateChanged = "StateChanged"
 Remotes.ActivityChanged = "ActivityChanged"
 Remotes.OrderChanged = "OrderChanged"
+Remotes.RaidStarted = "RaidStarted"
+Remotes.RaidEnded = "RaidEnded"
 Remotes.RoundState = "RoundState"
 Remotes.RoundEnded = "RoundEnded"
 Remotes.Notify = "Notify"
@@ -47,6 +51,8 @@ local ALL = {
 	Remotes.StateChanged,
 	Remotes.ActivityChanged,
 	Remotes.OrderChanged,
+	Remotes.RaidStarted,
+	Remotes.RaidEnded,
 	Remotes.RoundState,
 	Remotes.RoundEnded,
 	Remotes.Notify,

@@ -11,3 +11,9 @@ python3 "$HERE/build.py" round.lua harness_round.lua
 
 python3 "$HERE/build.py" edgecases.lua harness_edgecases.lua
 "$LUAU" "$HERE/harness_edgecases.lua"
+
+python3 "$HERE/build.py" raid.lua harness_raid.lua
+"$LUAU" "$HERE/harness_raid.lua"
+
+python3 "$HERE/build.py" sim.lua harness_sim.lua
+"$LUAU" "$HERE/harness_sim.lua"

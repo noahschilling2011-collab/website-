@@ -291,6 +291,8 @@ local CLASS_PARENTS = {
 	TextButton = "GuiObject",
 	GuiObject = "Instance",
 	Sound = "Instance",
+	Highlight = "Instance",
+	ScrollingFrame = "GuiObject",
 	ModuleScript = "Instance",
 	Script = "Instance",
 }
@@ -490,6 +492,31 @@ local Players = makeService("Players")
 local SoundService = makeService("SoundService")
 local RunService = makeService("RunService")
 local TweenService = makeService("TweenService")
+
+--[[
+	Tween-Stub: setzt die Zieleigenschaften nach Ablauf der Dauer. Fuer den
+	Kopflauf reicht das -- keine Servellogik haengt an Zwischenwerten.
+]]
+function TweenService:Create(instance, info, props)
+	local duration = if type(info) == "table" and type(info[1]) == "number" then info[1] else 0
+	local tween
+	tween = {
+		Completed = Signal.new(),
+		Play = function()
+			task.delay(duration, function()
+				if rawget(instance, "_destroyed") then
+					return
+				end
+				for key, value in pairs(props) do
+					instance[key] = value
+				end
+				tween.Completed:Fire()
+			end)
+		end,
+		Cancel = function() end,
+	}
+	return tween
+end
 local Workspace = makeService("Workspace")
 services.Workspace = Workspace
 

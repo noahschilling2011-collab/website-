@@ -264,6 +264,13 @@ Balance.Map = {
 	SpawnPosition = Vector3.new(0, 0, 34),
 	SpawnSize = Vector3.new(16, 1, 16),
 
+	-- Sperrkreis der Razzia. Radius und Dauer stehen in Balance.Heat -- das
+	-- hier sind nur Darstellungsmasse.
+	RaidRingHeight = 1.5,
+	RaidHighlightFill = 0.55,
+	RaidZoneTransparency = 0.85,
+	RaidTimerTransparency = 0.55,
+
 	-- Sichtbares Paket auf dem Ruecken, solange ein Auftrag laeuft (1.1).
 	PackageSize = Vector3.new(2.6, 2.6, 1.2),
 	PackageOffset = Vector3.new(0, 0.2, 1.1),
