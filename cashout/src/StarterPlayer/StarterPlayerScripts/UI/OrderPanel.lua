@@ -1,9 +1,12 @@
 --[[
-	DealPanel.lua
+	OrderPanel.lua
 
-	Die drei Karten eines Terminals. Alles, was hier steht, kommt vom Server --
-	der Client rechnet keine Betraege aus und schickt beim Klick nur die
-	Terminal-Id und den Index 1..3.
+	Die drei Auftragskarten eines Terminals. Alles, was hier steht, kommt vom
+	Server -- der Client rechnet keine Betraege aus und schickt beim Klick nur
+	die Terminal-Id und den Index 1..3.
+
+	Auf der Karte steht die Entfernung des Uebergabepunkts, nicht mehr eine
+	Wartezeit. Das ist der Preis der Stufe.
 
 	Das Panel schliesst sich selbst, wenn der Spieler sich vom Terminal
 	entfernt. Der Server prueft die Distanz sowieso noch einmal; das hier ist
@@ -19,7 +22,7 @@ local Balance = require(Shared:WaitForChild("Balance"))
 
 local Theme = require(script.Parent:WaitForChild("Theme"))
 
-local DealPanel = {}
+local OrderPanel = {}
 
 local player = Players.LocalPlayer
 
@@ -43,7 +46,7 @@ local function clearCards()
 end
 
 local function buildCard(offer, index: number)
-	local tierColor = Theme.TierColor[offer.tierId] or Theme.Cool
+	local tierColor = Theme.TierColor(offer.tierId)
 
 	local card = Theme.New("TextButton", {
 		Name = "Card" .. index,
@@ -58,7 +61,6 @@ local function buildCard(offer, index: number)
 	Theme.Stroke(card, tierColor, 1.5, 0.45)
 
 	local chip = Theme.New("Frame", {
-		Name = "Chip",
 		Position = UDim2.fromOffset(12, 12),
 		Size = UDim2.fromOffset(74, 20),
 		BackgroundColor3 = tierColor,
@@ -77,7 +79,6 @@ local function buildCard(offer, index: number)
 	}, chip)
 
 	Theme.Label({
-		Name = "Name",
 		Position = UDim2.fromOffset(12, 40),
 		Size = UDim2.new(1, -24, 0, 38),
 		Text = offer.name,
@@ -88,7 +89,6 @@ local function buildCard(offer, index: number)
 	}, card)
 
 	Theme.Label({
-		Name = "Blurb",
 		Position = UDim2.fromOffset(12, 78),
 		Size = UDim2.new(1, -24, 0, 34),
 		Text = offer.blurb,
@@ -99,7 +99,6 @@ local function buildCard(offer, index: number)
 	}, card)
 
 	Theme.New("Frame", {
-		Name = "Divider",
 		Position = UDim2.fromOffset(12, 118),
 		Size = UDim2.new(1, -24, 0, 1),
 		BackgroundColor3 = Theme.Line,
@@ -107,9 +106,9 @@ local function buildCard(offer, index: number)
 	}, card)
 
 	local rows = {
-		{ "Payout", string.format("%d – %d", offer.minPayout, offer.maxPayout), Theme.Cash },
-		{ "Heat", string.format("+%d", offer.heat), Theme.HeatHigh },
-		{ "Dauer", string.format("%d s", offer.duration), Theme.Text },
+		{ "Basis", string.format("%d – %d", offer.minPayout, offer.maxPayout), Theme.Cash },
+		{ "Heat", if offer.heat > 0 then string.format("+%d", offer.heat) else "keine", Theme.HeatLow },
+		{ "Weg", string.format("%d – %d", offer.minDistance, offer.maxDistance), Theme.Delivery },
 	}
 
 	for rowIndex, entry in ipairs(rows) do
@@ -136,7 +135,6 @@ local function buildCard(offer, index: number)
 	end
 
 	local take = Theme.New("Frame", {
-		Name = "Take",
 		AnchorPoint = Vector2.new(0.5, 1),
 		Position = UDim2.new(0.5, 0, 1, -12),
 		Size = UDim2.new(1, -24, 0, 32),
@@ -148,7 +146,7 @@ local function buildCard(offer, index: number)
 
 	Theme.Label({
 		Size = UDim2.fromScale(1, 1),
-		Text = "NEHMEN",
+		Text = "ANNEHMEN",
 		TextSize = 13,
 		Font = Enum.Font.GothamBold,
 		TextColor3 = tierColor,
@@ -174,7 +172,7 @@ end
 
 local function build(screenGui: ScreenGui)
 	root = Theme.New("Frame", {
-		Name = "DealPanel",
+		Name = "OrderPanel",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundColor3 = Theme.Background,
 		BackgroundTransparency = 0.45,
@@ -184,7 +182,6 @@ local function build(screenGui: ScreenGui)
 	}, screenGui) :: Frame
 
 	local panel = Theme.New("Frame", {
-		Name = "Panel",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Size = UDim2.fromOffset(684, 352),
@@ -197,7 +194,6 @@ local function build(screenGui: ScreenGui)
 	Theme.Padding(panel, 16)
 
 	titleLabel = Theme.Label({
-		Name = "Title",
 		Size = UDim2.new(1, -40, 0, 22),
 		Text = "TERMINAL",
 		TextSize = 16,
@@ -205,7 +201,6 @@ local function build(screenGui: ScreenGui)
 	}, panel)
 
 	local close = Theme.New("TextButton", {
-		Name = "Close",
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.new(1, 0, 0, 0),
 		Size = UDim2.fromOffset(28, 24),
@@ -216,11 +211,10 @@ local function build(screenGui: ScreenGui)
 		TextColor3 = Theme.TextDim,
 	}, panel) :: TextButton
 	close.Activated:Connect(function()
-		DealPanel.Close()
+		OrderPanel.Close()
 	end)
 
 	row = Theme.New("Frame", {
-		Name = "Row",
 		Position = UDim2.fromOffset(0, 34),
 		Size = UDim2.new(1, 0, 0, 244),
 		BackgroundTransparency = 1,
@@ -235,11 +229,12 @@ local function build(screenGui: ScreenGui)
 	}, row)
 
 	Theme.Label({
-		Name = "Hint",
 		AnchorPoint = Vector2.new(0, 1),
 		Position = UDim2.new(0, 0, 1, 0),
 		Size = UDim2.new(1, 0, 0, 18),
-		Text = "Am Terminal bleiben, bis der Deal durch ist. Weglaufen bricht ab — kein Geld, kein Heat.",
+		Text = "Annahme dauert "
+			.. Balance.Orders.AcceptSeconds
+			.. " s am Terminal. Danach zum Uebergabepunkt laufen — Heat kuehlt unterwegs nicht ab.",
 		TextSize = 12,
 		TextColor3 = Theme.TextDim,
 	}, panel)
@@ -255,18 +250,18 @@ local function watchDistance()
 	local character = player.Character
 	local rootPart = character and character:FindFirstChild("HumanoidRootPart")
 	if not rootPart or not rootPart:IsA("BasePart") then
-		DealPanel.Close()
+		OrderPanel.Close()
 		return
 	end
 
-	if (rootPart.Position - openedAt).Magnitude > Balance.Map.TerminalRadius then
-		DealPanel.Close()
+	if (rootPart.Position - openedAt).Magnitude > Balance.Orders.InteractRadius then
+		OrderPanel.Close()
 	end
 end
 
 -- ------------------------------------------------------------------- Public --
 
-function DealPanel.Start(screenGui: ScreenGui, onChoose: (string, number) -> ())
+function OrderPanel.Start(screenGui: ScreenGui, onChoose: (string, number) -> ())
 	if started then
 		return
 	end
@@ -277,7 +272,7 @@ function DealPanel.Start(screenGui: ScreenGui, onChoose: (string, number) -> ())
 	RunService.Heartbeat:Connect(watchDistance)
 end
 
-function DealPanel.Open(terminalId: string, offers)
+function OrderPanel.Open(terminalId: string, offers)
 	if not started or typeof(offers) ~= "table" then
 		return
 	end
@@ -290,7 +285,7 @@ function DealPanel.Open(terminalId: string, offers)
 
 	-- Klammern, damit nur der String und nicht der Ersetzungszaehler ankommt.
 	local shortId = (string.gsub(terminalId, "^T", ""))
-	titleLabel.Text = string.format("TERMINAL %s  ·  drei Angebote", shortId)
+	titleLabel.Text = string.format("TERMINAL %s  ·  drei Auftraege", shortId)
 
 	clearCards()
 	for index, offer in ipairs(offers) do
@@ -300,7 +295,7 @@ function DealPanel.Open(terminalId: string, offers)
 	root.Visible = true
 end
 
-function DealPanel.Close()
+function OrderPanel.Close()
 	if not started then
 		return
 	end
@@ -310,8 +305,8 @@ function DealPanel.Close()
 	clearCards()
 end
 
-function DealPanel.IsOpen(): boolean
+function OrderPanel.IsOpen(): boolean
 	return started and root.Visible
 end
 
-return DealPanel
+return OrderPanel

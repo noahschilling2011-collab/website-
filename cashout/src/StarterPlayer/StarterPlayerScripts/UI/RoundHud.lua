@@ -1,80 +1,123 @@
 --[[
 	RoundHud.lua
 
-	Die beiden Zahlen, um die es geht (Cash und Banked), der Fortschritts-
-	balken der laufenden Taetigkeit, kurze Meldungen und der Razzia-Blitz.
+	Rundentimer, die beiden Zahlen (Cash und Banked), der getragene Auftrag mit
+	Restentfernung, der Fortschrittsbalken der laufenden Interaktion und kurze
+	Meldungen.
 
-	SetRoundTime() ist bereits fertig, wird in Phase 1 nur von niemandem
-	aufgerufen -- der Timer bleibt bis dahin ausgeblendet.
+	Der Countdown laeuft hier lokal weiter -- der Server schickt nur bei
+	Phasenwechseln und alle paar Sekunden einen Zeitstempel.
+
+	Kamera-Kick, Herzschlag, Vignette und Einzahl-Beam sind Phase 4 und stehen
+	bewusst noch nicht hier.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Assets = require(Shared:WaitForChild("Assets"))
 local Balance = require(Shared:WaitForChild("Balance"))
+local SoundCatalog = require(Shared:WaitForChild("SoundCatalog"))
 
 local Theme = require(script.Parent:WaitForChild("Theme"))
 
 local RoundHud = {}
 
+local player = Players.LocalPlayer
+
 local started = false
 local cashLabel: TextLabel
 local bankedLabel: TextLabel
 local timerLabel: TextLabel
+local phaseLabel: TextLabel
+local rushLabel: TextLabel
+local orderFrame: Frame
+local orderTitle: TextLabel
+local orderDetail: TextLabel
 local activityFrame: Frame
 local activityLabel: TextLabel
 local activityFill: Frame
 local activityCountdown: TextLabel
 local toastList: Frame
-local flash: Frame
 
 local currentActivity: any = nil
+local currentRound: any = nil
+local currentOrder: any = nil
+local currentPoint: BasePart? = nil
+local pointMarker: BillboardGui? = nil
 
 local KIND_COLOR = {
-	good = Theme.Banked,
+	good = Theme.Cash,
 	banked = Theme.Banked,
-	bad = Theme.Bad,
-	warn = Theme.Warn,
-	info = Theme.Cool,
+	info = Theme.Delivery,
+	-- Kein Rot: Rot ist laut 4.2 ausschliesslich Gefahr.
+	warn = Theme.Muted,
+	bad = Theme.Muted,
 }
 
 local KIND_SOUND = {
-	good = "DealComplete",
+	good = "OrderDelivered",
 	banked = "DepositComplete",
-	-- "bad" bekommt bewusst nicht die Sirene: die spielt FlashRaid, sonst
-	-- kaeme sie bei einer Razzia doppelt.
-	bad = "Warning",
-	warn = "Warning",
+	info = "OrderAccepted",
+	warn = "ActionRefused",
+	bad = "ActionRefused",
 }
 
---[[
-	Spielt ein Asset nur, wenn in Assets.lua eine Id hinterlegt ist.
-	Solange dort "" steht, passiert hier nichts -- kein Fehler, kein Rauschen.
-]]
-local function playSound(key: string)
-	local assetId = Assets.Sounds[key]
-	if not assetId or assetId == "" then
-		return
-	end
-	local sound = Instance.new("Sound")
-	sound.SoundId = assetId
-	sound.Parent = SoundService
-	sound.Ended:Connect(function()
-		sound:Destroy()
-	end)
-	sound:Play()
-end
-
 -- ------------------------------------------------------------------ Aufbau --
+
+local function buildTopBar(parent: Instance)
+	local panel = Theme.New("Frame", {
+		Name = "Round",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 12),
+		Size = UDim2.fromOffset(220, 68),
+		BackgroundColor3 = Theme.Panel,
+		BackgroundTransparency = 0.1,
+		BorderSizePixel = 0,
+	}, parent)
+	Theme.Corner(panel, 10)
+	Theme.Stroke(panel, Theme.Line, 1, 0.3)
+
+	timerLabel = Theme.Label({
+		Name = "Timer",
+		Position = UDim2.fromOffset(0, 6),
+		Size = UDim2.new(1, 0, 0, 34),
+		Text = "--:--",
+		TextSize = 30,
+		Font = Enum.Font.GothamBold,
+		TextXAlignment = Enum.TextXAlignment.Center,
+	}, panel)
+
+	phaseLabel = Theme.Label({
+		Name = "Phase",
+		Position = UDim2.fromOffset(0, 40),
+		Size = UDim2.new(1, 0, 0, 14),
+		Text = "warten",
+		TextSize = 11,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.TextDim,
+		TextXAlignment = Enum.TextXAlignment.Center,
+	}, panel)
+
+	rushLabel = Theme.Label({
+		Name = "Rush",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 74),
+		Size = UDim2.fromOffset(220, 20),
+		Text = "",
+		TextSize = 14,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.Banked,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		Visible = false,
+	}, parent)
+end
 
 local function buildMoneyPanel(parent: Instance)
 	local panel = Theme.New("Frame", {
 		Name = "Money",
-		AnchorPoint = Vector2.new(0, 0),
 		Position = UDim2.fromOffset(16, 16),
 		Size = UDim2.fromOffset(260, 96),
 		BackgroundColor3 = Theme.Panel,
@@ -86,7 +129,6 @@ local function buildMoneyPanel(parent: Instance)
 	Theme.Padding(panel, 12)
 
 	Theme.Label({
-		Name = "CashCaption",
 		Position = UDim2.fromOffset(0, 0),
 		Size = UDim2.new(1, 0, 0, 14),
 		Text = "CASH  (angreifbar)",
@@ -106,7 +148,6 @@ local function buildMoneyPanel(parent: Instance)
 	}, panel)
 
 	Theme.Label({
-		Name = "BankedCaption",
 		Position = UDim2.fromOffset(0, 42),
 		Size = UDim2.new(1, 0, 0, 14),
 		Text = "BANKED  (zaehlt)",
@@ -126,18 +167,44 @@ local function buildMoneyPanel(parent: Instance)
 	}, panel)
 end
 
-local function buildTimer(parent: Instance)
-	timerLabel = Theme.Label({
-		Name = "Timer",
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 16),
-		Size = UDim2.fromOffset(160, 34),
-		Text = "--:--",
-		TextSize = 28,
-		Font = Enum.Font.GothamBold,
-		TextXAlignment = Enum.TextXAlignment.Center,
+local function buildOrderPanel(parent: Instance)
+	orderFrame = Theme.New("Frame", {
+		Name = "Order",
+		Position = UDim2.fromOffset(16, 214),
+		Size = UDim2.fromOffset(260, 66),
+		BackgroundColor3 = Theme.Panel,
+		BackgroundTransparency = 0.1,
+		BorderSizePixel = 0,
 		Visible = false,
-	}, parent)
+	}, parent) :: Frame
+	Theme.Corner(orderFrame, 10)
+	Theme.Stroke(orderFrame, Theme.Delivery, 1.5, 0.4)
+	Theme.Padding(orderFrame, 12)
+
+	Theme.Label({
+		Size = UDim2.new(1, 0, 0, 14),
+		Text = "AUFTRAG UNTERWEGS",
+		TextSize = 11,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.Delivery,
+	}, orderFrame)
+
+	orderTitle = Theme.Label({
+		Position = UDim2.fromOffset(0, 16),
+		Size = UDim2.new(1, 0, 0, 18),
+		Text = "",
+		TextSize = 15,
+		Font = Enum.Font.GothamBold,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+	}, orderFrame)
+
+	orderDetail = Theme.Label({
+		Position = UDim2.fromOffset(0, 34),
+		Size = UDim2.new(1, 0, 0, 16),
+		Text = "",
+		TextSize = 12,
+		TextColor3 = Theme.TextDim,
+	}, orderFrame)
 end
 
 local function buildActivityBar(parent: Instance)
@@ -156,7 +223,6 @@ local function buildActivityBar(parent: Instance)
 	Theme.Padding(activityFrame, 12)
 
 	activityLabel = Theme.Label({
-		Name = "Label",
 		Size = UDim2.new(1, -70, 0, 16),
 		Text = "",
 		TextSize = 14,
@@ -164,7 +230,6 @@ local function buildActivityBar(parent: Instance)
 	}, activityFrame)
 
 	activityCountdown = Theme.Label({
-		Name = "Countdown",
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.new(1, 0, 0, 0),
 		Size = UDim2.fromOffset(70, 16),
@@ -187,7 +252,7 @@ local function buildActivityBar(parent: Instance)
 	activityFill = Theme.New("Frame", {
 		Name = "Fill",
 		Size = UDim2.new(0, 0, 1, 0),
-		BackgroundColor3 = Theme.Cool,
+		BackgroundColor3 = Theme.Delivery,
 		BorderSizePixel = 0,
 	}, track) :: Frame
 	Theme.Corner(activityFill, 5)
@@ -211,19 +276,45 @@ local function buildToasts(parent: Instance)
 	}, toastList)
 end
 
-local function buildFlash(parent: Instance)
-	flash = Theme.New("Frame", {
-		Name = "RaidFlash",
+-- ------------------------------------------------------------ Marker am Ziel --
+
+--[[
+	Cyan-Schild am eigenen Uebergabepunkt. Bewusst clientseitig: der Punkt-Part
+	steht fuer alle in der Welt, das Cyan-Schild sieht nur der Besitzer.
+	Der Pfeil am Bildschirmrand ist Phase 4.
+]]
+local function setPointMarker(point: BasePart?)
+	if pointMarker then
+		pointMarker:Destroy()
+		pointMarker = nil
+	end
+	currentPoint = point
+	if not point then
+		return
+	end
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "CashoutOwnDelivery"
+	billboard.Size = UDim2.fromOffset(180, 40)
+	billboard.StudsOffset = Vector3.new(0, 20, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Adornee = point
+	billboard.Parent = point
+
+	Theme.Label({
 		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = Theme.Bad,
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
-		ZIndex = 20,
-		Visible = false,
-	}, parent) :: Frame
+		Text = "DEIN ZIEL",
+		TextSize = 20,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.Delivery,
+		TextStrokeTransparency = 0.4,
+		TextXAlignment = Enum.TextXAlignment.Center,
+	}, billboard)
+
+	pointMarker = billboard
 end
 
--- --------------------------------------------------------------- Fortschritt --
+-- --------------------------------------------------------------- Pro Frame --
 
 local function updateActivity()
 	if not currentActivity then
@@ -232,10 +323,67 @@ local function updateActivity()
 
 	local elapsed = workspace:GetServerTimeNow() - currentActivity.startedAt
 	local duration = math.max(currentActivity.duration, 0.001)
-	local progress = math.clamp(elapsed / duration, 0, 1)
-
-	activityFill.Size = UDim2.new(progress, 0, 1, 0)
+	activityFill.Size = UDim2.new(math.clamp(elapsed / duration, 0, 1), 0, 1, 0)
 	activityCountdown.Text = string.format("%.1f s", math.max(duration - elapsed, 0))
+end
+
+local function updateRound()
+	if not currentRound then
+		return
+	end
+
+	local remaining = currentRound.endsAt - workspace:GetServerTimeNow()
+
+	if currentRound.phase == "waiting" then
+		timerLabel.Text = "--:--"
+		timerLabel.TextColor3 = Theme.TextDim
+		phaseLabel.Text = "warten auf Spieler"
+		rushLabel.Visible = false
+		return
+	end
+
+	timerLabel.Text = Theme.Clock(remaining)
+
+	if currentRound.phase == "intermission" then
+		timerLabel.TextColor3 = Theme.TextDim
+		phaseLabel.Text = "Pause"
+		rushLabel.Visible = false
+		return
+	end
+
+	phaseLabel.Text = "Runde laeuft"
+	local isRush = remaining <= currentRound.finalRushSeconds
+	timerLabel.TextColor3 = if isRush then Theme.Banked else Theme.Text
+	rushLabel.Visible = isRush
+	if isRush then
+		rushLabel.Text = string.format("ENDSPURT  ·  alle Payouts x%d", currentRound.finalRushMultiplier)
+	end
+end
+
+local function updateOrderDistance()
+	if not currentOrder or not orderFrame.Visible then
+		return
+	end
+
+	local base = string.format(
+		"%s · Basis %d · +%d Heat",
+		currentOrder.tierLabel,
+		currentOrder.basePayout,
+		currentOrder.heatGain
+	)
+
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if currentPoint and currentPoint.Parent and root and root:IsA("BasePart") then
+		local flat = Vector3.new(
+			currentPoint.Position.X - root.Position.X,
+			0,
+			currentPoint.Position.Z - root.Position.Z
+		)
+		orderDetail.Text = string.format("%s · noch %d Studs", base, math.floor(flat.Magnitude + 0.5))
+	else
+		orderDetail.Text = base
+	end
 end
 
 -- ------------------------------------------------------------------- Public --
@@ -246,13 +394,17 @@ function RoundHud.Start(screenGui: ScreenGui)
 	end
 	started = true
 
+	buildTopBar(screenGui)
 	buildMoneyPanel(screenGui)
-	buildTimer(screenGui)
+	buildOrderPanel(screenGui)
 	buildActivityBar(screenGui)
 	buildToasts(screenGui)
-	buildFlash(screenGui)
 
-	RunService.Heartbeat:Connect(updateActivity)
+	RunService.Heartbeat:Connect(function()
+		updateActivity()
+		updateRound()
+		updateOrderDistance()
+	end)
 end
 
 function RoundHud.SetState(state)
@@ -261,6 +413,36 @@ function RoundHud.SetState(state)
 	end
 	cashLabel.Text = string.format("%d", state.cash or 0)
 	bankedLabel.Text = string.format("%d", state.banked or 0)
+end
+
+function RoundHud.SetRound(state)
+	if not started or typeof(state) ~= "table" then
+		return
+	end
+	currentRound = state
+	updateRound()
+end
+
+function RoundHud.SetOrder(order, point: BasePart?)
+	if not started then
+		return
+	end
+
+	currentOrder = order
+	setPointMarker(point)
+
+	if not order then
+		orderFrame.Visible = false
+		return
+	end
+
+	orderFrame.Visible = true
+	orderTitle.Text = order.name
+	local stroke = orderFrame:FindFirstChildOfClass("UIStroke")
+	if stroke then
+		stroke.Color = Theme.TierColor(order.tierId)
+	end
+	updateOrderDistance()
 end
 
 function RoundHud.SetActivity(activity)
@@ -275,15 +457,16 @@ function RoundHud.SetActivity(activity)
 	end
 
 	activityFrame.Visible = true
-	activityFill.BackgroundColor3 = if activity.kind == "stun"
-		then Theme.Bad
-		elseif activity.kind == "deposit" then Theme.Banked
-		else Theme.Cool
+	activityFill.BackgroundColor3 = if activity.kind == "deposit"
+		then Theme.Banked
+		elseif activity.kind == "deliver" then Theme.Delivery
+		else Theme.Muted
 
 	local prefix = if activity.kind == "deposit"
 		then "EINZAHLUNG"
-		elseif activity.kind == "stun" then "FESTGESETZT"
-		else "DEAL"
+		elseif activity.kind == "deliver" then "UEBERGABE"
+		elseif activity.kind == "accept" then "ANNAHME"
+		else string.upper(tostring(activity.kind))
 	activityLabel.Text = prefix .. "  ·  " .. tostring(activity.label)
 
 	activityFill.Size = UDim2.new(0, 0, 1, 0)
@@ -295,9 +478,9 @@ function RoundHud.Notify(kind: string, text: string)
 		return
 	end
 
-	local color = KIND_COLOR[kind] or Theme.Cool
+	local color = KIND_COLOR[kind] or Theme.Muted
 	if KIND_SOUND[kind] then
-		playSound(KIND_SOUND[kind])
+		SoundCatalog.Play(KIND_SOUND[kind])
 	end
 
 	local toast = Theme.New("Frame", {
@@ -310,7 +493,6 @@ function RoundHud.Notify(kind: string, text: string)
 	Theme.Corner(toast, 8)
 
 	Theme.New("Frame", {
-		Name = "Accent",
 		Size = UDim2.fromOffset(4, 34),
 		BackgroundColor3 = color,
 		BorderSizePixel = 0,
@@ -337,33 +519,6 @@ function RoundHud.Notify(kind: string, text: string)
 			toast:Destroy()
 		end)
 	end)
-end
-
-function RoundHud.FlashRaid()
-	if not started then
-		return
-	end
-	playSound("RaidSiren")
-	flash.Visible = true
-	flash.BackgroundTransparency = 0.45
-	local tween = TweenService:Create(flash, TweenInfo.new(0.7), { BackgroundTransparency = 1 })
-	tween.Completed:Connect(function()
-		flash.Visible = false
-	end)
-	tween:Play()
-end
-
---[[
-	Phase 2: Rundenrestzeit in Sekunden. Blendet den Timer beim ersten Aufruf ein.
-]]
-function RoundHud.SetRoundTime(seconds: number)
-	if not started then
-		return
-	end
-	local clamped = math.max(math.floor(seconds), 0)
-	timerLabel.Visible = true
-	timerLabel.Text = string.format("%d:%02d", clamped // 60, clamped % 60)
-	timerLabel.TextColor3 = if clamped <= 30 then Theme.Bad else Theme.Text
 end
 
 return RoundHud

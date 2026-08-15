@@ -1,16 +1,19 @@
 --[[
 	HeatBar.lua
 
-	Heat als Leiste, dazu die tatsaechliche Razzia-Wahrscheinlichkeit pro
-	Check. Die Zahl kommt aus Balance.RaidChance -- der Client rechnet mit
-	genau derselben Formel wie der Server, nur zur Anzeige.
+	Heat als Leiste (Orange -> Rot nach 4.2), dazu die beiden Zahlen, die die
+	Entscheidung tragen:
 
-	Ab Balance.Heat.DangerAt pulst der Rahmen. Ab Balance.Heat.WarnAt wechselt
-	der Hinweistext.
+	  - die Risikopraemie aus 1.2, also womit jeder Auftrag gerade multipliziert
+	    wird,
+	  - die Razzia-Wahrscheinlichkeit pro Check.
+
+	Beide kommen aus Balance -- der Client rechnet mit exakt derselben Formel
+	wie der Server, nur zur Anzeige. Die Razzia selbst ist Phase 2; die Zahl
+	steht trotzdem schon da, weil die Entscheidung sonst blind waere.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Balance = require(Shared:WaitForChild("Balance"))
@@ -24,17 +27,8 @@ local heat = 0
 
 local fill: Frame
 local valueLabel: TextLabel
+local premiumLabel: TextLabel
 local riskLabel: TextLabel
-local stroke: UIStroke
-
-local function updatePulse()
-	if heat < Balance.Heat.DangerAt then
-		stroke.Transparency = 0.3
-		return
-	end
-	-- 0 .. 0.55 im Sekundentakt: sichtbar, aber nicht zappelig.
-	stroke.Transparency = 0.275 + math.sin(os.clock() * 6) * 0.275
-end
 
 function HeatBar.Start(screenGui: ScreenGui)
 	if started then
@@ -51,17 +45,11 @@ function HeatBar.Start(screenGui: ScreenGui)
 		BorderSizePixel = 0,
 	}, screenGui) :: Frame
 	Theme.Corner(panel, 10)
+	Theme.Stroke(panel, Theme.Line, 1, 0.3)
 	Theme.Padding(panel, 12)
 
-	stroke = Theme.New("UIStroke", {
-		Color = Theme.HeatHigh,
-		Thickness = 1.5,
-		Transparency = 0.3,
-	}, panel) :: UIStroke
-
 	Theme.Label({
-		Name = "Caption",
-		Size = UDim2.new(1, -60, 0, 14),
+		Size = UDim2.new(1, -70, 0, 14),
 		Text = "HEAT",
 		TextSize = 11,
 		Font = Enum.Font.GothamBold,
@@ -72,8 +60,8 @@ function HeatBar.Start(screenGui: ScreenGui)
 		Name = "Value",
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.new(1, 0, 0, 0),
-		Size = UDim2.fromOffset(60, 14),
-		Text = "0",
+		Size = UDim2.fromOffset(70, 14),
+		Text = "0 / 100",
 		TextSize = 12,
 		Font = Enum.Font.GothamBold,
 		TextXAlignment = Enum.TextXAlignment.Right,
@@ -81,7 +69,7 @@ function HeatBar.Start(screenGui: ScreenGui)
 
 	local track = Theme.New("Frame", {
 		Name = "Track",
-		Position = UDim2.fromOffset(0, 22),
+		Position = UDim2.fromOffset(0, 20),
 		Size = UDim2.new(1, 0, 0, 12),
 		BackgroundColor3 = Theme.Background,
 		BorderSizePixel = 0,
@@ -96,9 +84,19 @@ function HeatBar.Start(screenGui: ScreenGui)
 	}, track) :: Frame
 	Theme.Corner(fill, 6)
 
+	premiumLabel = Theme.Label({
+		Name = "Premium",
+		Position = UDim2.fromOffset(0, 36),
+		Size = UDim2.new(1, 0, 0, 15),
+		Text = "",
+		TextSize = 13,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.Cash,
+	}, panel)
+
 	riskLabel = Theme.Label({
 		Name = "Risk",
-		Position = UDim2.fromOffset(0, 40),
+		Position = UDim2.fromOffset(0, 51),
 		Size = UDim2.new(1, 0, 0, 14),
 		Text = "",
 		TextSize = 12,
@@ -106,7 +104,6 @@ function HeatBar.Start(screenGui: ScreenGui)
 	}, panel)
 
 	HeatBar.SetHeat(0)
-	RunService.Heartbeat:Connect(updatePulse)
 end
 
 function HeatBar.SetHeat(value: number)
@@ -123,14 +120,8 @@ function HeatBar.SetHeat(value: number)
 	valueLabel.Text = string.format("%d / %d", math.floor(heat + 0.5), Balance.Heat.Max)
 	valueLabel.TextColor3 = Theme.HeatColor(t)
 
-	local chance = Balance.RaidChance(heat) * 100
-	local suffix = if heat >= Balance.Heat.DangerAt
-		then "  ·  Zeit einzuzahlen"
-		elseif heat >= Balance.Heat.WarnAt then "  ·  wird eng"
-		else ""
-
-	riskLabel.Text = string.format("Razzia-Risiko %.1f %% pro Check%s", chance, suffix)
-	riskLabel.TextColor3 = if heat >= Balance.Heat.WarnAt then Theme.HeatColor(t) else Theme.TextDim
+	premiumLabel.Text = string.format("Auftraege zahlen x%.2f", Balance.RiskPremium(heat))
+	riskLabel.Text = string.format("Razzia-Risiko %.1f %% pro Check", Balance.RaidChance(heat) * 100)
 end
 
 return HeatBar

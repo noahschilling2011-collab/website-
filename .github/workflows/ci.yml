@@ -100,8 +100,10 @@ jobs:
           done
           exit $fail
 
-      - name: Balancing-Simulation läuft
-        # Kein Schwellwert, nur ein Rauchtest: Balance.lua muss ladbar bleiben
-        # und die Simulation durchlaufen. Die Bewertung der Zahlen steht in
-        # cashout/BALANCE.md und ist eine Design-Entscheidung, kein Build-Gate.
-        run: cashout/tools/balance_sim.sh "$PWD/luau"
+      - name: Kopflauf (Runde + Grenzfälle)
+        # Die Servermodule laufen hier wirklich, gegen gestubbte Roblox-APIs
+        # und eine virtuelle Uhr: eine volle 300-s-Runde plus die Grenzfälle
+        # (Müllargumente, Drossel, fremder Übergabepunkt, Verlassen mit
+        # offenem Auftrag, Rundenende mitten in einer Interaktion).
+        # Bricht ab, sobald eine Zusage aus Phase 1 nicht mehr hält.
+        run: cashout/tools/harness/run.sh "$PWD/luau"

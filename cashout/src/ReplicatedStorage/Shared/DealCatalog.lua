@@ -1,8 +1,9 @@
 --[[
 	DealCatalog.lua
 
-	Reine Daten. Jede Karte nennt nur ihre Stufe -- Payout, Heat und Dauer
-	stehen ausschliesslich in Balance.Deals.Tiers.
+	Reine Daten. Jede Karte nennt nur ihre Stufe -- Payout, Heat und die
+	Entfernung des Uebergabepunkts stehen ausschliesslich in
+	Balance.Orders.Tiers.
 
 	Neue Karte hinzufuegen: Zeile anhaengen, Tier auf eine vorhandene Tier-Id
 	setzen. Sonst nichts.

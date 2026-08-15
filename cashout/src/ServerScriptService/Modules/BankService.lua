@@ -1,9 +1,13 @@
 --[[
 	BankService.lua
 
-	Einzahlen: Balance.Bank.DepositSeconds ununterbrochen im Radius stehen.
+	Einzahlen: Balance.Bank.DepositSeconds ununterbrochen im Radius.
 	Erfolg -> gesamter Cash wird Banked, Heat sinkt um Balance.Bank.HeatRelief.
-	Weglaufen, Respawn oder Razzia brechen ab, ohne dass etwas passiert.
+	Weglaufen oder Respawn brechen ab, ohne dass etwas passiert.
+
+	Einzahlen ist auch mit getragenem Auftrag erlaubt -- der Auftrag bleibt
+	dabei bestehen. Wer mit vollem Cash unterwegs ist, darf zwischendurch
+	sichern, verliert aber die Zeit.
 
 	Phase 3 (Abfangen) haengt spaeter hier dran: der markierte Zustand waehrend
 	der acht Sekunden ist genau dieses Zeitfenster.
@@ -17,6 +21,7 @@ local Balance = require(Shared:WaitForChild("Balance"))
 local Modules = script.Parent
 local MapBuilder = require(Modules:WaitForChild("MapBuilder"))
 local PlayerState = require(Modules:WaitForChild("PlayerState"))
+local RoundManager = require(Modules:WaitForChild("RoundManager"))
 
 local BankService = {}
 
@@ -32,7 +37,7 @@ local function runDeposit(player: Player, bank)
 	local aborted = false
 
 	while os.clock() < deadline do
-		task.wait(Balance.Activity.CheckInterval)
+		task.wait(Balance.Orders.CheckInterval)
 
 		if not player.Parent or not PlayerState.Get(player) then
 			return
@@ -49,7 +54,7 @@ local function runDeposit(player: Player, bank)
 
 	PlayerState.EndActivity(player, token)
 
-	if aborted then
+	if aborted or not RoundManager.IsRunning() then
 		PlayerState.Notify(player, "bad", "Einzahlung abgebrochen.")
 		return
 	end
@@ -60,11 +65,15 @@ local function runDeposit(player: Player, bank)
 end
 
 local function onBankTriggered(bank, player: Player)
+	if not RoundManager.IsRunning() then
+		return
+	end
+
 	local state = PlayerState.Get(player)
 	if not state then
 		return
 	end
-	if not PlayerState.ConsumeRequest(player) then
+	if not PlayerState.ConsumeAction(player, "Deposit") then
 		return
 	end
 

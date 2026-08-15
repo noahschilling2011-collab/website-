@@ -5,18 +5,19 @@
 	Kein Nebeneffekt beim Require -- die Instanzen entstehen erst beim ersten
 	Remotes.Get(). Auf dem Client blockiert Get() per WaitForChild.
 
-	Richtung:
-	  C -> S   ChooseDeal(terminalId: string, offerIndex: number)
-	           Das ist der einzige Client-Request mit Nutzdaten. Terminal- und
-	           Bank-Interaktion laufen ueber ProximityPrompt.Triggered, das der
-	           Server selbst empfaengt -- der Client sendet dabei gar nichts.
+	C -> S   ChooseOrder(terminalId: string, offerIndex: number)
+	         Der einzige Client-Request mit Nutzdaten. Terminal, Uebergabepunkt
+	         und Bank laufen ueber ProximityPrompt.Triggered, das der Server
+	         selbst empfaengt -- der Client sendet dabei gar nichts.
 
-	  S -> C   OffersReady(terminalId, offers)      drei Karten fuer diesen Spieler
-	           StateChanged(state)                  cash / banked / heat
-	           ActivityChanged(activity | nil)      laufender Deal / Einzahlung / Stun
-	           Notify(kind, text)                   Toast im HUD
-	           RaidAlert(info)                      Razzia-Treffer (Screen-Flash)
-	           CloseTerminal()                      Panel schliessen (Deal gestartet o. abgebrochen)
+	S -> C   OffersReady(terminalId, offers)   drei Karten fuer diesen Spieler
+	         CloseTerminal()                   Panel schliessen
+	         StateChanged(state)               cash / banked / heat
+	         ActivityChanged(activity | nil)   laufende Interaktion
+	         OrderChanged(order | nil, point)  getragener Auftrag + Zielpart
+	         RoundState(state)                 Phase, Ende, Endspurt
+	         RoundEnded(result)                Endtafel
+	         Notify(kind, text)                Toast im HUD
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -28,22 +29,26 @@ local Remotes = {}
 
 -- Namen als Konstanten, damit Tippfehler beim Require auffallen und nicht
 -- erst zur Laufzeit in einem WaitForChild haengen bleiben.
-Remotes.ChooseDeal = "ChooseDeal"
+Remotes.ChooseOrder = "ChooseOrder"
 Remotes.OffersReady = "OffersReady"
+Remotes.CloseTerminal = "CloseTerminal"
 Remotes.StateChanged = "StateChanged"
 Remotes.ActivityChanged = "ActivityChanged"
+Remotes.OrderChanged = "OrderChanged"
+Remotes.RoundState = "RoundState"
+Remotes.RoundEnded = "RoundEnded"
 Remotes.Notify = "Notify"
-Remotes.RaidAlert = "RaidAlert"
-Remotes.CloseTerminal = "CloseTerminal"
 
 local ALL = {
-	Remotes.ChooseDeal,
+	Remotes.ChooseOrder,
 	Remotes.OffersReady,
+	Remotes.CloseTerminal,
 	Remotes.StateChanged,
 	Remotes.ActivityChanged,
+	Remotes.OrderChanged,
+	Remotes.RoundState,
+	Remotes.RoundEnded,
 	Remotes.Notify,
-	Remotes.RaidAlert,
-	Remotes.CloseTerminal,
 }
 
 local cache = {}

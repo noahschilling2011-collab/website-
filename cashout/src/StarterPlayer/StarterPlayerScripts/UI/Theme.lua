@@ -1,37 +1,60 @@
 --[[
 	Theme.lua
 
-	Farben und ein paar Instanz-Helfer, damit DealPanel, HeatBar und RoundHud
-	nicht dreimal dasselbe Instance.new-Geruest enthalten.
-	Nur Darstellung -- hier steht keine Spielregel und keine Balance-Zahl.
+	Farben und ein paar Instanz-Helfer, damit OrderPanel, HeatBar, RoundHud und
+	RoundEndBoard nicht viermal dasselbe Instance.new-Geruest enthalten.
+
+	Der Farbcode aus Dokument 4.2 ist bindend, nicht dekorativ:
+
+	  Gruen  (60,220,120)  Cash, unsicher       -- nirgends sonst
+	  Gold   (255,200,60)  Banked, sicher       -- Bank, Sieger
+	  Orange -> Rot        Heat, Verlaufskurve
+	  Rot    (255,60,60)   AUSSCHLIESSLICH Gefahr
+	  Weiss                fremder Spieler zahlt gerade ein
+	  Cyan                 dein aktiver Uebergabepunkt
+
+	Deshalb ist Danger hier zwar definiert, wird in Phase 1 aber nirgends
+	benutzt -- es gibt noch keine Gefahr. Negative Meldungen laufen ueber
+	Theme.Muted, nicht ueber Rot.
+
+	Stufenfarben kommen aus Balance.Orders.Tiers, damit Server (Paket) und
+	Client (Karte) dieselbe Farbe benutzen.
 ]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Balance = require(Shared:WaitForChild("Balance"))
 
 local Theme = {}
 
-Theme.Background = Color3.fromRGB(18, 20, 24)
-Theme.Panel = Color3.fromRGB(28, 31, 37)
-Theme.PanelRaised = Color3.fromRGB(38, 42, 50)
-Theme.Line = Color3.fromRGB(58, 63, 72)
+-- Untergrund
+Theme.Background = Color3.fromRGB(14, 16, 20)
+Theme.Panel = Color3.fromRGB(24, 27, 33)
+Theme.PanelRaised = Color3.fromRGB(34, 38, 46)
+Theme.Line = Color3.fromRGB(56, 62, 72)
 
 Theme.Text = Color3.fromRGB(238, 242, 246)
-Theme.TextDim = Color3.fromRGB(150, 158, 168)
+Theme.TextDim = Color3.fromRGB(146, 154, 166)
 
-Theme.Cash = Color3.fromRGB(240, 202, 92)
-Theme.Banked = Color3.fromRGB(92, 200, 136)
-Theme.Bad = Color3.fromRGB(226, 86, 86)
-Theme.Warn = Color3.fromRGB(232, 168, 72)
-Theme.Cool = Color3.fromRGB(92, 174, 214)
+-- Gebundener Farbcode
+Theme.Cash = Color3.fromRGB(60, 220, 120)
+Theme.Banked = Color3.fromRGB(255, 200, 60)
+Theme.Danger = Color3.fromRGB(255, 60, 60)
+Theme.Depositing = Color3.fromRGB(255, 255, 255)
+Theme.Delivery = Color3.fromRGB(80, 220, 235)
 
-Theme.HeatLow = Color3.fromRGB(92, 200, 136)
-Theme.HeatMid = Color3.fromRGB(232, 190, 72)
-Theme.HeatHigh = Color3.fromRGB(226, 76, 76)
+-- Heat-Verlauf: Orange -> Rot
+Theme.HeatLow = Color3.fromRGB(255, 150, 50)
+Theme.HeatHigh = Theme.Danger
 
-Theme.TierColor = {
-	Small = Color3.fromRGB(120, 176, 208),
-	Medium = Color3.fromRGB(128, 196, 140),
-	Large = Color3.fromRGB(232, 180, 84),
-	Extreme = Color3.fromRGB(228, 96, 96),
-}
+-- Neutral fuer Hinweise und Abbrueche. Bewusst kein Rot.
+Theme.Muted = Color3.fromRGB(176, 184, 196)
+
+function Theme.TierColor(tierId: string): Color3
+	local tier = Balance.Orders.TierById[tierId]
+	return tier and tier.Color or Theme.Muted
+end
 
 --[[
 	Instanz mit Eigenschaften anlegen. Parent kommt zuletzt, damit nichts
@@ -85,14 +108,18 @@ function Theme.Label(props: { [string]: any }, parent: Instance): TextLabel
 end
 
 --[[
-	Farbverlauf gruen -> gelb -> rot ueber t in [0, 1]. Fuer die Heat-Leiste.
+	Heat-Farbe fuer t in [0, 1]: Orange -> Rot.
 ]]
 function Theme.HeatColor(t: number): Color3
-	t = math.clamp(t, 0, 1)
-	if t < 0.5 then
-		return Theme.HeatLow:Lerp(Theme.HeatMid, t / 0.5)
-	end
-	return Theme.HeatMid:Lerp(Theme.HeatHigh, (t - 0.5) / 0.5)
+	return Theme.HeatLow:Lerp(Theme.HeatHigh, math.clamp(t, 0, 1))
+end
+
+--[[
+	mm:ss, nie negativ.
+]]
+function Theme.Clock(seconds: number): string
+	local whole = math.max(math.floor(seconds), 0)
+	return string.format("%d:%02d", whole // 60, whole % 60)
 end
 
 return Theme

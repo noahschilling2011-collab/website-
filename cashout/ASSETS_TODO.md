@@ -1,33 +1,58 @@
-# Fehlende Assets
+# Was ich besorgen muss
 
-Alle Felder stehen gesammelt in `src/ReplicatedStorage/Shared/Assets.lua` und sind
-auf `""` gesetzt. **Hier ist keine einzige Asset-Id erfunden worden.**
+**Hier ist keine einzige Roblox-Id erfunden worden.** Sound-Ids stehen in
+`src/ReplicatedStorage/Shared/SoundCatalog.lua` und sind alle `0`, Bild-Ids in
+`src/ReplicatedStorage/Shared/Assets.lua` und alle `""`.
 
-Der Code prüft vor jeder Verwendung auf `""` und überspringt das Asset dann. Eine Id
-eintragen genügt — es ist keine Code-Änderung nötig.
+Der Code prüft vor jeder Verwendung und überspringt dann — das Spiel läuft mit
+ausschließlich leeren Ids vollständig. Beim Serverstart kommt **eine** gesammelte
+`warn()`-Zeile mit allen fehlenden Sounds, kein Spam pro Aufruf.
 
-## Sounds
+## Sounds (`SoundCatalog.Ids`)
 
-| Feld | Wo es abgespielt wird | Was da hin soll |
+### Phase 1 — jetzt schon verdrahtet
+
+| Feld | Wo | Was da hin soll |
 |---|---|---|
-| `Sounds.DealComplete` | `UI/RoundHud.lua` → `Notify("good", …)` | Kurzer, trockener Bestätigungston, wenn ein Deal auszahlt. Max. 0,4 s, darf sich bei 10 Deals/Minute nicht abnutzen. |
-| `Sounds.DepositComplete` | `UI/RoundHud.lua` → `Notify("banked", …)` | Der Belohnungsmoment des Spiels. Voller, satter Ton, deutlich hörbarer als DealComplete — hier wird Geld unantastbar. ~0,8 s. |
-| `Sounds.RaidSiren` | `UI/RoundHud.lua` → `FlashRaid()` | Kurze, harte Sirene/Alarm zum roten Bildschirmblitz. ~1 s, muss den Spieler erschrecken, ohne zu nerven. |
-| `Sounds.Warning` | `UI/RoundHud.lua` → `Notify("warn"/"bad", …)` | Leiser, neutraler Fehlerton für „zu weit weg", „beschäftigt", „Deal abgebrochen". Bewusst unauffällig. |
+| `OrderAccepted` | `RoundHud.Notify("info", …)` | Kurzes Quittieren beim Annehmen eines Auftrags. Max. 0,3 s, trocken. |
+| `OrderDelivered` | `RoundHud.Notify("good", …)` | Übergabe geschafft, Cash steigt. ~0,5 s, muss sich bei 10 Übergaben pro Runde nicht abnutzen. |
+| `DepositComplete` | `RoundHud.Notify("banked", …)` | Der Belohnungsmoment: hier wird Geld unantastbar. Voller und deutlich hörbarer als `OrderDelivered`, ~0,8 s. |
+| `ActionRefused` | `RoundHud.Notify("warn"/"bad", …)` | Leiser, neutraler Ton für „zu weit weg", „beschäftigt", „abgebrochen". Bewusst unauffällig. |
+| `RoundStart` | noch nicht aufgerufen | Rundenstart-Signal. |
+| `RoundEnd` | noch nicht aufgerufen | Rundenende, unter die Endtafel. |
 
-## Bilder / Decals
+### Phase 2 — Razzia
 
-| Feld | Wo es gesetzt wird | Was da hin soll |
+| Feld | Was da hin soll |
+|---|---|
+| `RaidAlarm` | Sirene zum Start des Fluchtfensters. Muss erschrecken, ~1 s. |
+| `RaidEscaped` | Kurzer, heller Entlastungston beim Verlassen des Sperrkreises. |
+| `RaidCaught` | Dumpfer Aufschlag beim Erwischtwerden. |
+
+### Phase 3 — Abfangen
+
+| Feld | Was da hin soll |
+|---|---|
+| `Intercept` | Moment des Abfangens, aus beiden Perspektiven brauchbar. |
+
+### Phase 4 — Feel
+
+| Feld | Was da hin soll |
+|---|---|
+| `Heartbeat` | Einzelner Herzschlag. Wird im Takt nach Heat abgespielt (bei Heat 30 alle 1,2 s, bei Heat 100 alle 0,45 s) — muss deshalb sehr kurz und schnittfest sein. Stärkster Feel-Hebel im ganzen Dokument. |
+| `SirenLoop` | Ferne Sirene als Loop ab Heat 60. Nahtlos loopbar. |
+
+## Bilder / Decals (`Assets.Images`)
+
+| Feld | Wo | Was da hin soll |
 |---|---|---|
-| `Images.TerminalScreen` | `Modules/MapBuilder.lua` → `addDecal(screen, …)` | Decal für die Leuchtfläche des Terminals (`NormalId.Right`). Terminal-Optik, dunkel mit hellem Raster — muss neben der Neon-Fläche noch lesbar sein. |
-| `Images.BankSign` | `Modules/MapBuilder.lua` → `addDecal(counter, …)` | Decal für den Bank-Tresen (`NormalId.Left`). Muss aus 150 Studs Entfernung als „das ist die Bank" erkennbar sein — das ist der Orientierungspunkt quer über die Map. |
+| `TerminalScreen` | `MapBuilder`, Leuchtfläche des Terminals | Terminal-Optik, dunkel mit hellem Raster. Muss neben der Neon-Fläche lesbar bleiben. |
+| `BankSign` | `MapBuilder`, Bank-Tresen | Muss quer über die Map als „das ist die Bank" erkennbar sein. |
 
 ## Bewusst ohne Asset gebaut
 
-- **Map.** Boden, Terminals und Bank entstehen in `MapBuilder.lua` aus Parts. Kein
-  externes Modell wird referenziert. Grau und beschriftet, aber vollständig spielbar.
-- **UI.** Alle Panels, Leisten und Karten sind in Code gebaut (`UI/Theme.lua` hält
-  Farben und Instanz-Helfer). Keine Bild-Assets, keine Fremdschriften — nur
-  `Enum.Font.Gotham` / `GothamBold`.
-- **Razzia-Effekt.** Der rote Vollbild-Blitz ist ein getweentes `Frame`, kein
-  ParticleEmitter und kein PostEffect.
+- **Map.** Boden, Bank und Terminals entstehen in `MapBuilder.lua` aus Parts, kein externes Modell.
+- **Paket auf dem Rücken.** Ein eingefärbter Part, geschweißt an den Torso. Farbe = Auftragsstufe.
+- **UI.** Alle Panels sind in Code gebaut (`UI/Theme.lua` hält Farben und Instanz-Helfer).
+  Keine Bild-Assets, keine Fremdschriften — nur `Enum.Font.Gotham` / `GothamBold`.
+- **Übergabepunkt.** Cyan-Pad plus Säule aus Parts, das eigene Ziel-Schild baut der Client dazu.

@@ -1,16 +1,16 @@
 --[[
 	PlayerState.lua
 
-	Haelt pro Spieler: cash, banked, heat und die gerade laufende Taetigkeit
-	(Deal / Einzahlung / Stun). Einziger Ort, an dem diese Werte geschrieben
+	Haelt pro Spieler: cash, banked, heat, den getragenen Auftrag und die
+	gerade laufende Interaktion. Einziger Ort, an dem diese Werte geschrieben
 	werden -- alle anderen Services gehen ueber die Funktionen hier.
 
 	Repliziert geaenderte Werte gebuendelt im Takt von
-	Balance.Net.StateReplicateInterval zum Besitzer. Aktivitaeten werden sofort
-	gesendet, weil daran die Fortschrittsanzeige haengt.
+	Balance.Net.StateReplicateInterval zum Besitzer. Auftrag und Interaktion
+	gehen sofort raus, weil Marker und Fortschrittsbalken daran haengen.
 
-	Aktivitaeten tragen ein Token: nur wer das aktuelle Token haelt, darf sie
-	beenden. Damit kann eine abgebrochene Deal-Schleife nicht die inzwischen
+	Interaktionen tragen ein Token: nur wer das aktuelle Token haelt, darf sie
+	beenden. Damit kann eine abgebrochene Auftragsannahme nicht die inzwischen
 	gestartete Einzahlung wegraeumen.
 ]]
 
@@ -56,6 +56,24 @@ local function pushActivity(player: Player, state)
 	Remotes.Get(Remotes.ActivityChanged):FireClient(player, serialiseActivity(state))
 end
 
+local function pushOrder(player: Player, state)
+	local order = state.order
+	if not order then
+		Remotes.Get(Remotes.OrderChanged):FireClient(player, nil, nil)
+		return
+	end
+
+	Remotes.Get(Remotes.OrderChanged):FireClient(player, {
+		cardId = order.cardId,
+		tierId = order.tierId,
+		tierLabel = order.tierLabel,
+		name = order.name,
+		basePayout = order.basePayout,
+		heatGain = order.heatGain,
+		distance = order.distance,
+	}, order.point and order.point.Part or nil)
+end
+
 local function pushState(player: Player, state)
 	state.dirty = false
 	Remotes.Get(Remotes.StateChanged):FireClient(player, {
@@ -63,6 +81,18 @@ local function pushState(player: Player, state)
 		banked = state.banked,
 		heat = state.heat,
 	})
+end
+
+local function freshStats()
+	return {
+		bestOrder = 0,
+		ordersDelivered = 0,
+		-- Phase 2 / 3 fuellen diese beiden. In Phase 1 bleiben sie bei 0 und
+		-- die Endtafel zeigt dafuer einen Strich.
+		escapes = 0,
+		narrowestEscapeStuds = -1,
+		intercepts = 0,
+	}
 end
 
 -- -------------------------------------------------------------- Lebenszyklus --
@@ -73,12 +103,13 @@ local function onPlayerAdded(player: Player)
 		banked = Balance.Player.StartBanked,
 		heat = Balance.Player.StartHeat,
 		activity = nil,
+		order = nil,
+		stats = freshStats(),
 		dirty = true,
 
-		-- Token-Bucket fuers Rate-Limit.
-		tokens = Balance.Net.MaxRequestsPerSecond,
-		lastRefill = os.clock(),
-		lastRateWarn = -math.huge,
+		-- Ein Zeitstempel pro Aktion fuer die 0,3-s-Drossel.
+		actionAt = {},
+		lastThrottleWarn = -math.huge,
 	}
 	connections[player] = {}
 
@@ -93,7 +124,8 @@ local function onPlayerAdded(player: Player)
 			humanoid.JumpPower = Balance.Player.JumpPower
 			humanoid.JumpHeight = Balance.Player.JumpHeight
 
-			-- Respawn beendet jede laufende Taetigkeit.
+			-- Respawn beendet jede laufende Interaktion. Der Auftrag selbst
+			-- bleibt bestehen -- das Paket wird von OrderService neu gehaengt.
 			PlayerState.CancelActivity(player)
 		end)
 	)
@@ -162,7 +194,7 @@ end
 
 --[[
 	Setzt Cash auf einen Betrag und liefert die Differenz zurueck.
-	Nur fuer die Razzia gedacht, die einen Anteil einbehaelt.
+	Fuer Razzia (Phase 2) und Rundenreset.
 ]]
 function PlayerState.SetCash(player: Player, amount: number): number
 	local state = states[player]
@@ -206,36 +238,44 @@ function PlayerState.Notify(player: Player, kind: string, text: string)
 	Remotes.Get(Remotes.Notify):FireClient(player, kind, text)
 end
 
--- ---------------------------------------------------------------- Rate-Limit --
+--[[
+	Zwingt eine sofortige Replikation. Nur fuer Momente, in denen der Client
+	die Zahl auf den Frame genau braucht (Rundenstart, Rundenende).
+]]
+function PlayerState.FlushState(player: Player)
+	local state = states[player]
+	if state and player.Parent then
+		pushState(player, state)
+	end
+end
+
+-- ---------------------------------------------------------------- Drosselung --
 
 --[[
-	Verbraucht ein Request-Token. false = Anfrage ignorieren.
-	Warnt hoechstens einmal pro Balance.Net.RateWarnCooldown Sekunden.
+	Dokument 7: ein Aufruf pro Spieler und Aktion pro 0,3 s.
+	false = Anfrage ignorieren.
 ]]
-function PlayerState.ConsumeRequest(player: Player): boolean
+function PlayerState.ConsumeAction(player: Player, action: string): boolean
 	local state = states[player]
 	if not state then
 		return false
 	end
 
 	local now = os.clock()
-	local cap = Balance.Net.MaxRequestsPerSecond
-	state.tokens = math.min(cap, state.tokens + (now - state.lastRefill) * cap)
-	state.lastRefill = now
-
-	if state.tokens < 1 then
-		if now - state.lastRateWarn >= Balance.Net.RateWarnCooldown then
-			state.lastRateWarn = now
-			PlayerState.Notify(player, "warn", "Zu viele Anfragen. Langsamer.")
+	local last = state.actionAt[action]
+	if last and now - last < Balance.Net.ActionCooldown then
+		if now - state.lastThrottleWarn >= Balance.Net.ThrottleWarnCooldown then
+			state.lastThrottleWarn = now
+			PlayerState.Notify(player, "warn", "Zu schnell. Kurz durchatmen.")
 		end
 		return false
 	end
 
-	state.tokens -= 1
+	state.actionAt[action] = now
 	return true
 end
 
--- -------------------------------------------------------------- Taetigkeiten --
+-- ------------------------------------------------------------- Interaktionen --
 
 function PlayerState.IsBusy(player: Player): boolean
 	local state = states[player]
@@ -243,7 +283,7 @@ function PlayerState.IsBusy(player: Player): boolean
 end
 
 --[[
-	Startet eine Taetigkeit und liefert deren Token.
+	Startet eine Interaktion und liefert deren Token.
 	nil, wenn der Spieler schon beschaeftigt ist.
 ]]
 function PlayerState.BeginActivity(player: Player, kind: string, label: string, duration: number): number?
@@ -265,9 +305,6 @@ function PlayerState.BeginActivity(player: Player, kind: string, label: string, 
 	return nextToken
 end
 
---[[
-	Beendet die Taetigkeit, falls sie noch die mit diesem Token ist.
-]]
 function PlayerState.EndActivity(player: Player, token: number)
 	local state = states[player]
 	if not state or not state.activity or state.activity.token ~= token then
@@ -278,7 +315,7 @@ function PlayerState.EndActivity(player: Player, token: number)
 end
 
 --[[
-	Markiert die laufende Taetigkeit als abgebrochen. Die zustaendige Schleife
+	Markiert die laufende Interaktion als abgebrochen. Die zustaendige Schleife
 	sieht das beim naechsten Tick und raeumt selbst auf.
 ]]
 function PlayerState.CancelActivity(player: Player)
@@ -289,9 +326,9 @@ function PlayerState.CancelActivity(player: Player)
 end
 
 --[[
-	Bricht sofort ab und gibt den Slot frei, damit direkt eine andere
-	Taetigkeit starten kann (Razzia-Stun). Die alte Schleife merkt am naechsten
-	Tick, dass ihr Token nicht mehr gilt, und beendet sich selbst.
+	Bricht sofort ab und gibt den Slot frei, damit direkt etwas anderes starten
+	kann. Die alte Schleife merkt am naechsten Tick, dass ihr Token nicht mehr
+	gilt, und beendet sich selbst.
 ]]
 function PlayerState.ForceEndActivity(player: Player)
 	local state = states[player]
@@ -309,6 +346,68 @@ function PlayerState.IsActivityCancelled(player: Player, token: number): boolean
 		return true
 	end
 	return state.activity.cancelled
+end
+
+-- ---------------------------------------------------------------- Auftraege --
+
+function PlayerState.HasOrder(player: Player): boolean
+	local state = states[player]
+	return state ~= nil and state.order ~= nil
+end
+
+function PlayerState.GetOrder(player: Player)
+	local state = states[player]
+	return state and state.order or nil
+end
+
+function PlayerState.SetOrder(player: Player, order)
+	local state = states[player]
+	if not state then
+		return
+	end
+	state.order = order
+	pushOrder(player, state)
+end
+
+function PlayerState.ClearOrder(player: Player)
+	local state = states[player]
+	if not state then
+		return
+	end
+	state.order = nil
+	pushOrder(player, state)
+end
+
+-- ------------------------------------------------------------------ Statistik --
+
+function PlayerState.RecordDelivery(player: Player, payout: number)
+	local state = states[player]
+	if not state then
+		return
+	end
+	state.stats.ordersDelivered += 1
+	if payout > state.stats.bestOrder then
+		state.stats.bestOrder = payout
+	end
+end
+
+-- --------------------------------------------------------------- Rundenreset --
+
+--[[
+	Setzt einen Spieler auf den Rundenstart zurueck. Auftrag und Interaktion
+	raeumt der Aufrufer ab (OrderService kennt Paket und Punkt).
+]]
+function PlayerState.ResetForRound(player: Player)
+	local state = states[player]
+	if not state then
+		return
+	end
+	state.cash = Balance.Player.StartCash
+	state.banked = Balance.Player.StartBanked
+	state.heat = Balance.Player.StartHeat
+	state.stats = freshStats()
+	state.dirty = true
+	pushState(player, state)
 end
 
 -- ------------------------------------------------------------------ Position --

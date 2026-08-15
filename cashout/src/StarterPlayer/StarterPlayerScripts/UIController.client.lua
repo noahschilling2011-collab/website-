@@ -1,9 +1,9 @@
 --[[
 	UIController.client.lua
 
-	Einstiegspunkt auf dem Client: legt die ScreenGui an, startet die drei
-	UI-Module und verdrahtet sie mit den Remotes. Keine Spiellogik --
-	der Client zeigt an und meldet Klicks, sonst nichts.
+	Einstiegspunkt auf dem Client: legt die ScreenGui an, startet die UI-Module
+	und verdrahtet sie mit den Remotes. Keine Spiellogik -- der Client zeigt an
+	und meldet Klicks, sonst nichts.
 ]]
 
 local Players = game:GetService("Players")
@@ -14,8 +14,9 @@ local Remotes = require(Shared:WaitForChild("Remotes"))
 
 -- UI liegt neben diesem Script in StarterPlayerScripts, nicht darin.
 local UI = script.Parent:WaitForChild("UI")
-local DealPanel = require(UI:WaitForChild("DealPanel"))
 local HeatBar = require(UI:WaitForChild("HeatBar"))
+local OrderPanel = require(UI:WaitForChild("OrderPanel"))
+local RoundEndBoard = require(UI:WaitForChild("RoundEndBoard"))
 local RoundHud = require(UI:WaitForChild("RoundHud"))
 
 local player = Players.LocalPlayer
@@ -30,11 +31,12 @@ screenGui.Parent = playerGui
 
 RoundHud.Start(screenGui)
 HeatBar.Start(screenGui)
-DealPanel.Start(screenGui, function(terminalId, offerIndex)
-	Remotes.Get(Remotes.ChooseDeal):FireServer(terminalId, offerIndex)
+RoundEndBoard.Start(screenGui)
+OrderPanel.Start(screenGui, function(terminalId, offerIndex)
+	Remotes.Get(Remotes.ChooseOrder):FireServer(terminalId, offerIndex)
 	-- Der Server bestaetigt per ActivityChanged bzw. CloseTerminal. Bis dahin
 	-- ist das Panel zu, damit niemand zweimal klickt.
-	DealPanel.Close()
+	OrderPanel.Close()
 end)
 
 Remotes.Get(Remotes.StateChanged).OnClientEvent:Connect(function(state)
@@ -47,22 +49,35 @@ end)
 Remotes.Get(Remotes.ActivityChanged).OnClientEvent:Connect(function(activity)
 	RoundHud.SetActivity(activity)
 	if activity then
-		DealPanel.Close()
+		OrderPanel.Close()
 	end
 end)
 
+Remotes.Get(Remotes.OrderChanged).OnClientEvent:Connect(function(order, point)
+	RoundHud.SetOrder(order, point)
+end)
+
 Remotes.Get(Remotes.OffersReady).OnClientEvent:Connect(function(terminalId, offers)
-	DealPanel.Open(terminalId, offers)
+	OrderPanel.Open(terminalId, offers)
 end)
 
 Remotes.Get(Remotes.CloseTerminal).OnClientEvent:Connect(function()
-	DealPanel.Close()
+	OrderPanel.Close()
+end)
+
+Remotes.Get(Remotes.RoundState).OnClientEvent:Connect(function(state)
+	RoundHud.SetRound(state)
+	if typeof(state) == "table" and state.phase == "running" then
+		-- Neue Runde: Endtafel weg.
+		RoundEndBoard.Hide()
+	end
+end)
+
+Remotes.Get(Remotes.RoundEnded).OnClientEvent:Connect(function(result)
+	OrderPanel.Close()
+	RoundEndBoard.Show(result)
 end)
 
 Remotes.Get(Remotes.Notify).OnClientEvent:Connect(function(kind, text)
 	RoundHud.Notify(kind, text)
-end)
-
-Remotes.Get(Remotes.RaidAlert).OnClientEvent:Connect(function()
-	RoundHud.FlashRaid()
 end)
