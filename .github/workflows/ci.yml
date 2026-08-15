@@ -100,6 +100,15 @@ jobs:
           done
           exit $fail
 
+      - name: Place-Datei ist reproduzierbar
+        # CASHOUT.rbxlx wird aus src/ erzeugt. Wer src/ ändert und das Bauen
+        # vergisst, liefert eine Place-Datei aus, die nicht mehr dem Code
+        # entspricht -- und merkt es erst in Studio. Also hier nachbauen und
+        # vergleichen, genau wie bei den Replay-Fixtures.
+        run: |
+          python3 cashout/tools/build_place.py
+          git diff --exit-code -- cashout/CASHOUT.rbxlx
+
       - name: Kopflauf (Runde + Grenzfälle)
         # Die Servermodule laufen hier wirklich, gegen gestubbte Roblox-APIs
         # und eine virtuelle Uhr: eine volle 300-s-Runde plus die Grenzfälle
