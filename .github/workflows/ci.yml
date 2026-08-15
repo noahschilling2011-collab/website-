@@ -71,3 +71,37 @@ jobs:
         run: |
           npx tsx src/replay/make-fixtures.ts
           git diff --exit-code -- fixtures/
+
+  cashout:
+    name: CASHOUT (Luau)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Luau-CLI holen
+        # Roblox-Code lässt sich hier nicht ausführen, aber er lässt sich
+        # übersetzen. Das fängt genau die Klasse Fehler ab, die sonst erst als
+        # roter Text in der Studio-Konsole auftaucht.
+        run: |
+          curl -sSL -o luau.zip https://github.com/luau-lang/luau/releases/latest/download/luau-ubuntu.zip
+          unzip -q luau.zip
+          chmod +x luau luau-compile
+
+      - name: Alle Module übersetzen
+        run: |
+          fail=0
+          for f in $(find cashout/src -name '*.lua' | sort); do
+            if ./luau-compile --binary "$f" > /dev/null; then
+              echo "ok   $f"
+            else
+              echo "FAIL $f"
+              fail=1
+            fi
+          done
+          exit $fail
+
+      - name: Balancing-Simulation läuft
+        # Kein Schwellwert, nur ein Rauchtest: Balance.lua muss ladbar bleiben
+        # und die Simulation durchlaufen. Die Bewertung der Zahlen steht in
+        # cashout/BALANCE.md und ist eine Design-Entscheidung, kein Build-Gate.
+        run: cashout/tools/balance_sim.sh "$PWD/luau"
