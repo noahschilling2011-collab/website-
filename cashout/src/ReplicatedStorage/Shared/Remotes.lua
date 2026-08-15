@@ -10,7 +10,8 @@
 	         und Bank laufen ueber ProximityPrompt.Triggered, das der Server
 	         selbst empfaengt -- der Client sendet dabei gar nichts.
 
-	S -> C   OffersReady(terminalId, offers)   drei Karten fuer diesen Spieler
+	S -> C   OffersReady(terminalId, offers, terminalPosition)
+	                                           drei Karten fuer diesen Spieler
 	         CloseTerminal()                   Panel schliessen
 	         StateChanged(state)               cash / banked / heat
 	         ActivityChanged(activity | nil)   laufende Interaktion

@@ -57,8 +57,8 @@ Remotes.Get(Remotes.OrderChanged).OnClientEvent:Connect(function(order, point)
 	RoundHud.SetOrder(order, point)
 end)
 
-Remotes.Get(Remotes.OffersReady).OnClientEvent:Connect(function(terminalId, offers)
-	OrderPanel.Open(terminalId, offers)
+Remotes.Get(Remotes.OffersReady).OnClientEvent:Connect(function(terminalId, offers, terminalPosition)
+	OrderPanel.Open(terminalId, offers, terminalPosition)
 end)
 
 Remotes.Get(Remotes.CloseTerminal).OnClientEvent:Connect(function()

@@ -389,7 +389,10 @@ local function onTerminalTriggered(terminal, player: Player)
 		return
 	end
 
-	Remotes.Get(Remotes.OffersReady):FireClient(player, terminal.Id, record.offers)
+	-- Die Terminal-Position geht mit, damit das Panel clientseitig gegen das
+	-- Terminal messen kann und nicht gegen die Stelle, an der der Spieler beim
+	-- Oeffnen zufaellig stand.
+	Remotes.Get(Remotes.OffersReady):FireClient(player, terminal.Id, record.offers, terminal.Position)
 end
 
 local function onChooseOrder(player: Player, terminalId: any, offerIndex: any)

@@ -22,7 +22,7 @@ local player = Players.LocalPlayer
 
 local started = false
 local root: Frame
-local list: Frame
+local list: ScrollingFrame
 local highlightList: Frame
 
 local ROW_HEIGHT = 30
@@ -68,13 +68,20 @@ local function build(screenGui: ScreenGui)
 		TextColor3 = Theme.TextDim,
 	}, panel)
 
-	list = Theme.New("Frame", {
+	-- ScrollingFrame, weil bis zu zwoelf Spieler in den Server passen und die
+	-- Tafel laut 3.3 das Banked ALLER Spieler zeigt. Ein fester Rahmen haette
+	-- ab Rang neun still abgeschnitten.
+	list = Theme.New("ScrollingFrame", {
 		Name = "Standings",
 		Position = UDim2.fromOffset(0, 50),
 		Size = UDim2.new(1, 0, 0, 280),
 		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		CanvasSize = UDim2.new(),
+		ScrollBarThickness = 4,
+		ScrollBarImageColor3 = Theme.Line,
 		ZIndex = 9,
-	}, panel) :: Frame
+	}, panel) :: ScrollingFrame
 
 	Theme.New("UIListLayout", {
 		FillDirection = Enum.FillDirection.Vertical,
@@ -105,7 +112,7 @@ local function build(screenGui: ScreenGui)
 	}, highlightList)
 end
 
-local function clear(container: Frame)
+local function clear(container: GuiObject)
 	for _, child in ipairs(container:GetChildren()) do
 		if child:IsA("GuiObject") then
 			child:Destroy()
@@ -217,14 +224,14 @@ function RoundEndBoard.Show(result)
 	clear(highlightList)
 
 	local standings = result.standings or {}
-	local maxRows = math.floor(list.AbsoluteSize.Y / (ROW_HEIGHT + 4))
 	for index, entry in ipairs(standings) do
-		-- AbsoluteSize ist beim ersten Frame noch 0; dann lieber alles zeigen
-		-- als nichts.
-		if maxRows <= 0 or index <= maxRows then
-			addStandingRow(index, entry)
-		end
+		addStandingRow(index, entry)
 	end
+
+	-- Hoehe direkt aus der Zeilenzahl rechnen statt auf AbsoluteContentSize zu
+	-- warten -- das steht erst einen Frame spaeter richtig.
+	list.CanvasSize = UDim2.fromOffset(0, #standings * (ROW_HEIGHT + 4))
+	list.CanvasPosition = Vector2.new(0, 0)
 
 	local highlights = result.highlights or {}
 	addHighlightRow(1, "Hoechster Einzelauftrag", highlights.bestOrder, function(value)

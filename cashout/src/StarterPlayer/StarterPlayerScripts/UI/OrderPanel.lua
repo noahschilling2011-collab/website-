@@ -32,7 +32,7 @@ local titleLabel: TextLabel
 local row: Frame
 
 local openTerminalId: string? = nil
-local openedAt: Vector3? = nil
+local terminalPosition: Vector3? = nil
 local chooseCallback: ((string, number) -> ())? = nil
 
 -- ------------------------------------------------------------------- Karten --
@@ -243,7 +243,14 @@ end
 -- ------------------------------------------------------------- Distanzwache --
 
 local function watchDistance()
-	if not openTerminalId or not openedAt then
+	if not openTerminalId then
+		return
+	end
+
+	-- Ohne Terminal-Position laesst sich nichts pruefen: dann zumachen, statt
+	-- ein Panel offen stehen zu lassen, das nie wieder von allein schliesst.
+	if not terminalPosition then
+		OrderPanel.Close()
 		return
 	end
 
@@ -254,7 +261,10 @@ local function watchDistance()
 		return
 	end
 
-	if (rootPart.Position - openedAt).Magnitude > Balance.Orders.InteractRadius then
+	-- Gegen das Terminal messen, nicht gegen die Stelle, an der der Spieler
+	-- beim Oeffnen stand. Sonst schliesst sich das Panel beim Umrunden des
+	-- Terminals, obwohl der Server die Annahme noch erlauben wuerde.
+	if (rootPart.Position - terminalPosition).Magnitude > Balance.Orders.InteractRadius then
 		OrderPanel.Close()
 	end
 end
@@ -272,16 +282,13 @@ function OrderPanel.Start(screenGui: ScreenGui, onChoose: (string, number) -> ()
 	RunService.Heartbeat:Connect(watchDistance)
 end
 
-function OrderPanel.Open(terminalId: string, offers)
+function OrderPanel.Open(terminalId: string, offers, position: Vector3?)
 	if not started or typeof(offers) ~= "table" then
 		return
 	end
 
 	openTerminalId = terminalId
-
-	local character = player.Character
-	local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-	openedAt = if rootPart and rootPart:IsA("BasePart") then rootPart.Position else nil
+	terminalPosition = if typeof(position) == "Vector3" then position else nil
 
 	-- Klammern, damit nur der String und nicht der Ersetzungszaehler ankommt.
 	local shortId = (string.gsub(terminalId, "^T", ""))
@@ -300,7 +307,7 @@ function OrderPanel.Close()
 		return
 	end
 	openTerminalId = nil
-	openedAt = nil
+	terminalPosition = nil
 	root.Visible = false
 	clearCards()
 end
