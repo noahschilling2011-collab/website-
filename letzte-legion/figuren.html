@@ -2,34 +2,239 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LETZTE LEGION — Figuren</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#08080b">
+<title>LETZTE LEGION — Character Database</title>
 <style>
-  :root { --ink:#e8e8ec; --dim:#8a8a94; }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  html,body { height:100%; background:#0d0d11; overflow:hidden;
-    font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
-  #scene { display:block; width:100%; height:100svh; }
-  .hud { position:fixed; top:16px; left:18px; color:var(--ink);
-    pointer-events:none; z-index:5; }
-  .hud h1 { font-size:13px; letter-spacing:.22em; font-weight:700; }
-  .hud p { font-size:11px; color:var(--dim); margin-top:4px; letter-spacing:.06em; }
-  .lbl { position:fixed; top:0; left:0; transform:translate(-50%,0); color:var(--ink);
-    font-size:11px; font-weight:700; letter-spacing:.18em; pointer-events:none;
-    text-shadow:0 1px 6px rgba(0,0,0,.9); z-index:4; white-space:nowrap;
-    will-change:transform; }
-  .lbl small { display:block; text-align:center; color:var(--dim);
-    font-weight:400; letter-spacing:.08em; margin-top:2px; }
-  .fallback { color:var(--ink); padding:40px; font-size:14px; }
+  :root{
+    --ink:#eef0f4; --dim:#9296a6; --faint:#7e8194;
+    --bg0:#07070a; --bg1:#0d0e13; --bg2:#14161d; --bg3:#1c1f28;
+    --line:rgba(255,255,255,.09);
+    --accent:#6f9fdf; --accent-dim:rgba(111,159,223,.16);
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --pad:clamp(14px,2.4vw,28px);
+    --ease:cubic-bezier(.2,.8,.2,1);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--ink);
+    font-family:var(--sans);overscroll-behavior:none}
+  body{position:fixed;inset:0}
+
+  #scene{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+  #scene.dragging{cursor:grabbing}
+
+  /* Vignette + Scanline-Hauch: liegt ueber dem Canvas, nie ueber der UI */
+  #vignette{position:fixed;inset:0;pointer-events:none;z-index:1;
+    background:
+      radial-gradient(120% 85% at 50% 42%,transparent 42%,rgba(0,0,0,.55) 100%),
+      linear-gradient(rgba(255,255,255,.014) 50%,transparent 50%);
+    background-size:100% 100%,100% 3px;mix-blend-mode:normal}
+
+  #scrim{position:fixed;inset:0;z-index:1;pointer-events:none;
+    background:linear-gradient(90deg,rgba(4,4,7,.88) 0%,rgba(4,4,7,.62) 20%,
+      rgba(4,4,7,.22) 34%,transparent 46%);opacity:1;transition:opacity .45s var(--ease)}
+  #scrim.idle{opacity:0}
+  @media (max-width:680px){
+    #scrim{background:linear-gradient(0deg,rgba(4,4,7,.9) 0%,rgba(4,4,7,.66) 26%,
+      rgba(4,4,7,.2) 42%,transparent 56%)}
+  }
+  #ui{position:fixed;inset:0;z-index:2;pointer-events:none;
+    display:grid;grid-template-rows:auto 1fr auto;
+    padding:calc(var(--pad) + env(safe-area-inset-top)) calc(var(--pad) + env(safe-area-inset-right))
+            calc(var(--pad) + env(safe-area-inset-bottom)) calc(var(--pad) + env(safe-area-inset-left))}
+
+  /* ---------- Kopf ---------- */
+  #brand{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+  .brand-mark{font-size:clamp(15px,1.5vw,19px);font-weight:800;letter-spacing:.34em;
+    line-height:1;text-shadow:0 2px 20px rgba(0,0,0,.8)}
+  .brand-sub{margin-top:7px;font-family:var(--mono);font-size:10px;letter-spacing:.3em;
+    color:var(--faint)}
+  .brand-sub b{color:var(--accent);font-weight:600;transition:color .5s var(--ease)}
+  #sysline{font-family:var(--mono);font-size:9.5px;letter-spacing:.22em;color:var(--faint);
+    text-align:right;line-height:1.9;white-space:nowrap}
+  #sysline i{font-style:normal;color:var(--dim)}
+
+  /* ---------- Dossier ---------- */
+  #stage{position:relative;min-height:0}
+  #dossier.idle{opacity:0!important;pointer-events:none}
+  #dossier{position:absolute;left:0;top:50%;transform:translateY(-50%);
+    transition:opacity .45s var(--ease);
+    width:min(310px,30vw);pointer-events:auto;
+    opacity:0;animation:fadeIn .7s var(--ease) .25s forwards}
+  @keyframes fadeIn{to{opacity:1}}
+  .dsr-head{display:flex;align-items:baseline;gap:10px}
+  .dsr-idx{font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:var(--accent);
+    transition:color .5s var(--ease)}
+  .dsr-rule{flex:1;height:1px;background:linear-gradient(90deg,var(--accent),transparent);
+    opacity:.5;transition:background .5s var(--ease)}
+  #dsrName{font-size:clamp(26px,3.4vw,40px);font-weight:800;letter-spacing:-.015em;
+    line-height:1.02;margin-top:8px;text-shadow:0 4px 26px rgba(0,0,0,.75)}
+  #dsrRole{font-family:var(--mono);font-size:10.5px;letter-spacing:.26em;color:var(--dim);
+    margin-top:7px}
+  #dsrText{margin-top:14px;font-size:12.5px;line-height:1.62;color:var(--dim);
+    max-width:34ch;border-left:1px solid var(--line);padding-left:12px}
+
+  #dsrStats{margin-top:18px;display:flex;flex-direction:column;gap:9px}
+  .stat{display:grid;grid-template-columns:1fr auto;gap:3px 8px;align-items:center}
+  .stat-k{font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;color:var(--faint)}
+  .stat-v{font-family:var(--mono);font-size:10.5px;color:var(--ink);justify-self:end;
+    font-variant-numeric:tabular-nums}
+  .stat-bar{grid-column:1/-1;height:3px;background:rgba(255,255,255,.07);
+    border-radius:2px;overflow:hidden}
+  .stat-bar i{display:block;height:100%;width:0;border-radius:2px;
+    background:linear-gradient(90deg,var(--accent),color-mix(in srgb,var(--accent) 45%,#fff));
+    transition:width .82s var(--ease),background .5s var(--ease)}
+  .stat.text .stat-v{color:var(--accent);transition:color .5s var(--ease)}
+
+  /* ---------- Auswahl-Leiste ---------- */
+  #railwrap{pointer-events:auto}
+  #rail{display:flex;gap:8px;justify-content:center;overflow-x:auto;overflow-y:hidden;
+    padding:2px 2px 6px;scrollbar-width:none;scroll-snap-type:x proximity}
+  #rail::-webkit-scrollbar{display:none}
+  .card{position:relative;flex:0 0 auto;width:clamp(96px,11vw,132px);
+    padding:11px 12px 12px;border:1px solid var(--line);border-radius:10px;
+    background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.012));
+    backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);
+    cursor:pointer;scroll-snap-align:center;text-align:left;
+    transition:transform .3s var(--ease),border-color .3s var(--ease),background .3s var(--ease);
+    color:inherit;font:inherit}
+  @supports not (backdrop-filter:blur(1px)){.card{background:rgba(20,22,29,.92)}}
+  .card:hover{transform:translateY(-3px);border-color:rgba(255,255,255,.2)}
+  .card:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  .card-n{font-family:var(--mono);font-size:9px;letter-spacing:.16em;color:var(--faint)}
+  .card-name{margin-top:5px;font-size:12px;font-weight:700;letter-spacing:.07em;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card-type{margin-top:3px;font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;
+    color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card-bar{margin-top:9px;height:2px;background:rgba(255,255,255,.08);border-radius:2px;
+    overflow:hidden}
+  .card-bar i{display:block;height:100%;width:0;background:var(--c);
+    transition:width .5s var(--ease)}
+  .card[aria-selected="true"]{border-color:var(--c);
+    background:linear-gradient(180deg,color-mix(in srgb,var(--c) 20%,transparent),rgba(255,255,255,.02))}
+  .card[aria-selected="true"] .card-n,.card[aria-selected="true"] .card-type{color:var(--c)}
+  .card[aria-selected="true"] .card-bar i{width:100%}
+
+  #foot{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:10px;
+    font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:var(--faint)}
+  #foot kbd{font:inherit;border:1px solid var(--line);border-radius:4px;padding:2px 5px;
+    color:var(--dim)}
+  #foot span{white-space:nowrap}
+
+  /* ---------- Ladezustand / Fallback ---------- */
+  #boot{position:fixed;inset:0;z-index:5;display:grid;place-content:center;gap:12px;
+    background:var(--bg0);text-align:center;transition:opacity .6s var(--ease)}
+  #boot.gone{opacity:0;pointer-events:none}
+  #boot .b1{font-size:13px;font-weight:800;letter-spacing:.34em}
+  #boot .b2{font-family:var(--mono);font-size:10px;letter-spacing:.24em;color:var(--faint)}
+  #boot .b3{width:180px;height:2px;background:rgba(255,255,255,.1);margin:4px auto 0;
+    border-radius:2px;overflow:hidden}
+  #boot .b3 i{display:block;height:100%;width:35%;background:var(--accent);
+    animation:sweep 1.15s var(--ease) infinite}
+  @keyframes sweep{0%{transform:translateX(-120%)}100%{transform:translateX(400%)}}
+  .fallback{position:fixed;inset:0;z-index:9;display:grid;place-content:center;
+    padding:32px;background:var(--bg0);color:var(--ink);font-size:14px;line-height:1.7;
+    text-align:center}
+  .fallback code{font-family:var(--mono);color:var(--accent);font-size:13px}
+
+  /* ---------- Tablet ---------- */
+  @media (max-width:900px){
+    #dossier{width:min(268px,42vw)}
+    #dsrText{display:none}
+  }
+  /* ---------- Phone: Dossier wandert nach unten ueber die Leiste ---------- */
+  @media (max-width:680px){
+    #ui{grid-template-rows:auto 1fr auto}
+    #dossier{position:static;transform:none;width:auto;align-self:end;
+      margin-bottom:10px;display:grid;grid-template-columns:1fr auto;
+      gap:0 14px;align-items:end}
+    .dsr-head{grid-column:1/-1}
+    #dsrName{font-size:clamp(22px,7vw,30px)}
+    #dsrStats{margin-top:12px;grid-column:1/-1;
+      display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 14px}
+    #dsrText{display:none}
+    #stage{display:flex;align-items:flex-end}
+    #rail{justify-content:flex-start;padding-bottom:4px}
+    .card{width:104px;padding:9px 10px 10px}
+    #foot{gap:12px;font-size:8.5px;flex-wrap:nowrap}
+    #foot span:nth-child(3),#foot span:nth-child(4){display:none}
+    #sysline{display:none}
+  }
+  @media (max-width:380px){ .card{width:92px} }
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;
+      transition-duration:.01ms!important}
+    #dossier{opacity:1}
+  }
 </style>
 </head>
 <body>
 <canvas id="scene"></canvas>
-<div class="hud">
-  <h1>LETZTE LEGION — FIGUREN</h1>
-  <p>1–6 fokussieren · 0 Übersicht · Ziehen dreht die Figur</p>
+<div id="vignette"></div>
+<div id="scrim"></div>
+
+<div id="ui">
+  <header id="brand">
+    <div>
+      <div class="brand-mark">LETZTE LEGION</div>
+      <div class="brand-sub">CHARACTER DATABASE — <b id="brandIdx">01 / 06</b></div>
+    </div>
+    <div id="sysline">
+      <i id="sysMode">FOCUS</i> · RENDER LOW-POLY PBR<br>
+      <i id="sysFps">— FPS</i> · <i id="sysQual">HIGH</i>
+    </div>
+  </header>
+
+  <div id="stage">
+    <section id="dossier" aria-live="polite">
+      <div class="dsr-head">
+        <span class="dsr-idx" id="dsrIdx">01</span>
+        <span class="dsr-rule"></span>
+      </div>
+      <h1 id="dsrName">LEGIONÄR</h1>
+      <div id="dsrRole">PLAYER UNIT</div>
+      <div id="dsrStats"></div>
+      <p id="dsrText"></p>
+    </section>
+  </div>
+
+  <div id="railwrap">
+    <nav id="rail" role="tablist" aria-label="Figurenauswahl"></nav>
+    <div id="foot">
+      <span><kbd>1</kbd>–<kbd>6</kbd> FOKUS</span>
+      <span><kbd>0</kbd> ÜBERSICHT</span>
+      <span>ZIEHEN DREHT</span>
+      <span>SCROLL ZOOMT</span>
+    </div>
+  </div>
 </div>
+
+<div id="boot">
+  <div class="b1">LETZTE LEGION</div>
+  <div class="b2">INITIALISIERE CHARACTER DATABASE</div>
+  <div class="b3"><i></i></div>
+</div>
+
 <noscript><div class="fallback">Für diese Ansicht wird JavaScript benötigt.</div></noscript>
+
+<script>
+// Klassisches Script: meldet sich, wenn das Modul nicht startet (CORS bei file://, CDN weg).
+window.addEventListener('error', function (e) {
+  if (e && e.target && e.target.tagName === 'SCRIPT') window.__llFailed = true;
+}, true);
+setTimeout(function () {
+  if (window.__LLFIG) return;
+  var d = document.createElement('div');
+  d.className = 'fallback';
+  d.innerHTML = 'Die 3D-Engine konnte nicht geladen werden.<br><br>' +
+    'Modul-Scripts sind über <code>file://</code> vom Browser gesperrt — starte lokal mit<br>' +
+    '<code>python3 -m http.server 8000</code><br>und öffne <code>http://localhost:8000/figuren.html</code>.' +
+    '<br><br>Andernfalls: Netzwerk bzw. CDN prüfen.';
+  document.body.appendChild(d);
+}, 9000);
+</script>
 
 <script type="importmap">
 { "imports": {
@@ -41,398 +246,1515 @@
 <script type="module">
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-/* ============================================================
-   LETZTE LEGION — Figuren-Baukasten
-   Jede Figur = eine gemergte BufferGeometry mit Vertex-Colors
-   (Körper, MeshLambert) + optional eine Glow-Geometry (Augen,
-   MeshBasic). Genau diese zwei Geometrien pro Typ wandern im
-   Spiel in je eine InstancedMesh. Kein Skinning, keine Texturen.
-   ============================================================ */
-
-const DEG = Math.PI / 180;
+/* =====================================================================
+   LETZTE LEGION — CHARACTER DATABASE
+   Sechs Figuren, aus Primitiven gebaut, pro Materialklasse zu einer
+   Geometry verschmolzen. Animierte Teile (Kopf, Arme, Schild, Speer,
+   Wanst) liegen als eigene Sektions-Gruppen vor und werden ueber ihren
+   Ursprung bewegt — kein Skinning, keine Texturen, keine Assets.
+   ===================================================================== */
+const DEG = Math.PI / 180, TAU = Math.PI * 2;
 const params = new URLSearchParams(location.search);
-const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const mqReduce = matchMedia('(prefers-reduced-motion: reduce)');
+let REDUCED = mqReduce.matches;
+const IS_TOUCH = matchMedia('(hover: none)').matches || navigator.maxTouchPoints > 1;
+const IS_SMALL = matchMedia('(max-width: 680px)').matches;
 
-/* ---------- Part-Helper ---------- */
-const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(),
-      _e = new THREE.Euler(), _v = new THREE.Vector3(), _s = new THREE.Vector3();
-function P(geo, hex, p = [0,0,0], r = [0,0,0], s = [1,1,1]) {
-  const g = geo.index ? geo.toNonIndexed() : geo;
-  _e.set(r[0]*DEG, r[1]*DEG, r[2]*DEG);
-  _m4.compose(_v.set(...p), _q.setFromEuler(_e), _s.set(...s));
-  g.applyMatrix4(_m4);
+const CFG = {
+  dprMax: IS_TOUCH ? 1.75 : 2,
+  bloom: { strength: 0.72, radius: 0.7, threshold: 1.62 },
+  shadowSize: IS_TOUCH ? 1024 : 2048,
+  particles: IS_TOUCH ? 140 : 260,
+  fog: { near: 9, far: 34 },
+  cam: {
+    fov: 42, near: 0.05, far: 120,
+    overviewDist: 13.6, overviewPitch: 0.165, overviewY: 0.92,
+    focusDistMul: 2.15, focusDistAdd: 0.46, focusPitch: 0.085,
+    minPitch: -0.16, maxPitch: 0.62,
+    damp: 3.6, spinDamp: 5.2, spinFriction: 3.4,
+    zoomMin: 0.55, zoomMax: 2.2
+  },
+  autoSpin: 0.22,
+  dim: { on: 0.085, off: 1.0 },
+  backZ: -3.4          // Helligkeit nicht fokussierter Figuren
+};
+
+/* ---------- Materialklassen: Metall, Ruestung, Haut, Stoff, Holz, Knochen, Organik ---------- */
+const MATS = {
+  METAL:   { metalness: 0.95, roughness: 0.42, env: 1.05 },
+  ARMOR:   { metalness: 0.62, roughness: 0.48, env: 0.85 },
+  SKIN:    { metalness: 0.0,  roughness: 0.82, env: 0.30 },
+  CLOTH:   { metalness: 0.0,  roughness: 0.96, env: 0.18 },
+  WOOD:    { metalness: 0.0,  roughness: 0.78, env: 0.22 },
+  BONE:    { metalness: 0.0,  roughness: 0.52, env: 0.40 },
+  ORGANIC: { metalness: 0.06, roughness: 0.58, env: 0.55 }
+};
+const M = { METAL: 'METAL', ARMOR: 'ARMOR', SKIN: 'SKIN', CLOTH: 'CLOTH',
+            WOOD: 'WOOD', BONE: 'BONE', ORGANIC: 'ORGANIC', GLOW: 'GLOW' };
+
+/* ---------- Stammdaten der sechs Figuren ---------- */
+const ROSTER = [
+  { key: 'legion', name: 'LEGIONÄR', role: 'PLAYER UNIT', type: 'SPIELER-EINHEIT',
+    accent: '#6f9fdf', glow: null,
+    text: 'Rückgrat der Formation. Feuert automatisch, frisst Verluste zuerst. Breit aufgestellt volle Feuerkraft, eng gezogen nur vierzig Prozent.',
+    stats: [
+      { k: 'HP',      v: 30,  d: '1 / EINHEIT' },
+      { k: 'DAMAGE',  v: 46,  d: '3 / SCHUSS' },
+      { k: 'SPEED',   v: 62,  d: '430 PX/S' },
+      { k: 'ARMOR',   v: 54,  d: 'LORICA' },
+      { k: 'CLASS',   v: -1,  d: 'INFANTERIE' }
+    ] },
+  { key: 'walker', name: 'WALKER', role: 'STANDARD-ZOMBIE', type: 'RUDEL · TRAUBE',
+    accent: '#9ac46a', glow: '#c8ff6a',
+    text: 'Kommt in Trauben aus dem Nebel. Einzeln harmlos, in der Masse frisst er die Formation von vorn auf.',
+    stats: [
+      { k: 'TYPE',    v: -1,  d: 'STANDARD' },
+      { k: 'HP',      v: 24,  d: '6' },
+      { k: 'DAMAGE',  v: 32,  d: 'FRISST 2' },
+      { k: 'SPEED',   v: 22,  d: '+25 PX/S' },
+      { k: 'THREAT',  v: -1,  d: 'NIEDRIG' }
+    ] },
+  { key: 'runner', name: 'RUNNER', role: 'RUDEL · SCHNELL', type: 'FLANKE · SCHNELL',
+    accent: '#b6d96a', glow: '#d8ff7a',
+    text: 'Bricht schräg von der Seite ins Feld. Zwei Trefferpunkte, aber fünfmal so schnell wie ein Walker.',
+    stats: [
+      { k: 'TYPE',    v: -1,  d: 'RUDEL 5–8' },
+      { k: 'HP',      v: 9,   d: '2' },
+      { k: 'DAMAGE',  v: 18,  d: 'FRISST 1' },
+      { k: 'SPEED',   v: 92,  d: '+120 PX/S' },
+      { k: 'THREAT',  v: -1,  d: 'MITTEL' }
+    ] },
+  { key: 'brute', name: 'BRUTE', role: 'TANK', type: 'EINZELGÄNGER',
+    accent: '#8fa87a', glow: '#c8ff6a',
+    text: 'Ab dreihundert Metern. Läuft langsam, hält viel aus und reißt beim Durchbruch sechs Einheiten mit.',
+    stats: [
+      { k: 'TYPE',    v: -1,  d: 'TANK' },
+      { k: 'HP',      v: 74,  d: '60' },
+      { k: 'DAMAGE',  v: 70,  d: 'FRISST 6' },
+      { k: 'SPEED',   v: 15,  d: '+15 PX/S' },
+      { k: 'THREAT',  v: -1,  d: 'HOCH' }
+    ] },
+  { key: 'speier', name: 'SPEIER', role: 'BOSS B', type: 'WERFER-BOSS',
+    accent: '#e0a24a', glow: '#ff7a3c',
+    text: 'Springt zwischen drei Positionen. Speit drei Bögen zu je fünf Kugeln — abschießbar, aber jede Kugel kostet drei Einheiten.',
+    stats: [
+      { k: 'TYPE',    v: -1,  d: 'BOSS · FERN' },
+      { k: 'HP',      v: 92,  d: '900+' },
+      { k: 'DAMAGE',  v: 78,  d: '20 % ARMEE' },
+      { k: 'SPEED',   v: 46,  d: 'SPRUNG' },
+      { k: 'THREAT',  v: -1,  d: 'EXTREM' }
+    ] },
+  { key: 'fleisch', name: 'FLEISCHBERG', role: 'BOSS A', type: 'WALZEN-BOSS',
+    accent: '#d97a5e', glow: '#ff5a3c',
+    text: 'Walzt über die volle Lane. Bodenschlag alle vier Sekunden, dazu zehn Walker auf Ruf. Der größte Brocken im Feld.',
+    stats: [
+      { k: 'TYPE',    v: -1,  d: 'BOSS · NAH' },
+      { k: 'HP',      v: 100, d: '900+' },
+      { k: 'DAMAGE',  v: 90,  d: '20 % ARMEE' },
+      { k: 'SPEED',   v: 26,  d: '42 PX/S' },
+      { k: 'THREAT',  v: -1,  d: 'EXTREM' }
+    ] }
+];
+
+/* =====================================================================
+   Geometrie-Werkzeug
+   ===================================================================== */
+const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(),
+      _v = new THREE.Vector3(), _s = new THREE.Vector3(),
+      _a = new THREE.Vector3(), _b = new THREE.Vector3(),
+      _mid = new THREE.Vector3(), _dir = new THREE.Vector3(),
+      _up = new THREE.Vector3(0, 1, 0);
+
+function paint(g, hex) {
   const c = new THREE.Color(hex);
   const n = g.attributes.position.count;
   const col = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) { col[i*3] = c.r; col[i*3+1] = c.g; col[i*3+2] = c.b; }
+  for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   return g;
+}
+/* Primitive platzieren: Position, Rotation (Grad), Skalierung */
+function P(geo, hex, p, r, s) {
+  const g = geo.index ? geo.toNonIndexed() : geo;
+  p = p || [0, 0, 0]; r = r || [0, 0, 0]; s = s || [1, 1, 1];
+  _e.set(r[0] * DEG, r[1] * DEG, r[2] * DEG);
+  _m4.compose(_v.set(p[0], p[1], p[2]), _q.setFromEuler(_e), _s.set(s[0], s[1], s[2]));
+  g.applyMatrix4(_m4);
+  return paint(g, hex);
 }
 /* Kapsel exakt zwischen zwei Punkten — macht schwebende Gliedmassen unmoeglich */
-const _a = new THREE.Vector3(), _b = new THREE.Vector3(),
-      _mid = new THREE.Vector3(), _dir = new THREE.Vector3(), _up = new THREE.Vector3(0,1,0);
-function limb(r, from, to, hex, rs = 7) {
-  _a.set(...from); _b.set(...to);
-  _mid.addVectors(_a, _b).multiplyScalar(.5);
+function limb(r, from, to, hex, rs) {
+  _a.fromArray(from); _b.fromArray(to);
+  _mid.addVectors(_a, _b).multiplyScalar(0.5);
   _dir.subVectors(_b, _a);
-  const len = Math.max(.001, _dir.length() - r * 1.2);
-  const g = new THREE.CapsuleGeometry(r, len, 3, rs).toNonIndexed();
+  const len = Math.max(0.001, _dir.length() - r * 1.15);
+  const g = new THREE.CapsuleGeometry(r, len, 2, rs || 7).toNonIndexed();
   _q.setFromUnitVectors(_up, _dir.normalize());
-  _m4.compose(_mid, _q, _s.set(1,1,1));
+  _m4.compose(_mid, _q, _s.set(1, 1, 1));
   g.applyMatrix4(_m4);
-  const c = new THREE.Color(hex);
-  const n = g.attributes.position.count;
-  const col = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) { col[i*3] = c.r; col[i*3+1] = c.g; col[i*3+2] = c.b; }
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  return g;
+  return paint(g, hex);
 }
-function fuse(parts) {
-  const g = mergeGeometries(parts, false);
-  parts.forEach(p => p.dispose());
-  g.computeVertexNormals();
-  return g;
+/* Konischer Abschnitt zwischen zwei Punkten — fuer echte Verjuengung an Armen/Beinen */
+function tube(rFrom, rTo, from, to, hex, rs) {
+  _a.fromArray(from); _b.fromArray(to);
+  _mid.addVectors(_a, _b).multiplyScalar(0.5);
+  _dir.subVectors(_b, _a);
+  const len = Math.max(0.001, _dir.length());
+  const g = new THREE.CylinderGeometry(rTo, rFrom, len, rs || 8, 1, false).toNonIndexed();
+  _q.setFromUnitVectors(_up, _dir.normalize());
+  _m4.compose(_mid, _q, _s.set(1, 1, 1));
+  g.applyMatrix4(_m4);
+  return paint(g, hex);
 }
-const cap  = (r,l,cs=3,rs=7) => new THREE.CapsuleGeometry(r,l,cs,rs);
-const sph  = (r,w=7,h=5)     => new THREE.SphereGeometry(r,w,h);
-const cyl  = (rt,rb,h,rs=7)  => new THREE.CylinderGeometry(rt,rb,h,rs);
-const box  = (x,y,z)         => new THREE.BoxGeometry(x,y,z);
-const cone = (r,h,rs=6)      => new THREE.ConeGeometry(r,h,rs);
-const ico  = (r,d=1)         => new THREE.IcosahedronGeometry(r,d);
-const tor  = (r,t,rs=6,ts=8) => new THREE.TorusGeometry(r,t,rs,ts);
-/* Halbzylinder-Scheibe: Helmkamm */
-const halfDisc = (r,h,rs=8)  => new THREE.CylinderGeometry(r,r,h,rs,1,false,0,Math.PI);
+/* Gekruemmte Schale: Ruestungsplatte, Schild, Umhang */
+function shell(r, h, thetaStart, thetaLen, hex, p, rot, s, seg) {
+  return P(new THREE.CylinderGeometry(r, r, h, seg || 14, 1, true, thetaStart, thetaLen),
+    hex, p, rot, s);
+}
+const sph  = (r, w, h) => new THREE.SphereGeometry(r, w || 10, h || 7);
+const boxg = (x, y, z) => new THREE.BoxGeometry(x, y, z);
+const cyl  = (rt, rb, h, rs) => new THREE.CylinderGeometry(rt, rb, h, rs || 8);
+const cone = (r, h, rs) => new THREE.ConeGeometry(r, h, rs || 7);
+const ico  = (r, d) => new THREE.IcosahedronGeometry(r, d === undefined ? 1 : d);
+const tor  = (r, t, rs, ts) => new THREE.TorusGeometry(r, t, rs || 6, ts || 12);
+const halfDisc = (r, h, rs) =>
+  new THREE.CylinderGeometry(r, r, h, rs || 10, 1, false, 0, Math.PI);
 
-/* ============================ FIGUREN ============================ */
+/* ---------- Sektions-Builder ----------
+   Alle Koordinaten werden im Figurenraum geschrieben; beim Bauen wird die
+   Sektion um ihren Ursprung zentriert, damit sie sich sauber drehen laesst. */
+function figure() { return { sections: [], meta: {} }; }
+function sect(fig, name, origin) {
+  const s = { name, origin: origin || [0, 0, 0], parts: {} };
+  fig.sections.push(s);
+  return s;
+}
+function put(s, cls, geo) {
+  if (!s.parts[cls]) s.parts[cls] = [];
+  s.parts[cls].push(geo);
+  return s;
+}
+/* Bequem: mehrere Teile derselben Klasse auf einmal */
+function putAll(s, cls, arr) { for (let i = 0; i < arr.length; i++) put(s, cls, arr[i]); return s; }
+const torArc = (r, t, arc, rs, ts) =>
+  new THREE.TorusGeometry(r, t, rs || 5, ts || 12, arc);
 
-function buildLegionnaire() {
-  const STEEL='#5b8fd4', SHIELD='#3d6299', BRONZE='#a8823f',
-        CREST='#c99a4a', SKIN='#d4b58c', DARK='#3a5a8c', WOOD='#6b5a42';
-  const body = fuse([
-    P(cyl(.036,.042,.13),  DARK,  [-.055,.065,0]),
-    P(cyl(.036,.042,.13),  DARK,  [ .055,.065,0]),
-    P(cap(.115,.17),       STEEL, [0,.3,0]),
-    P(cyl(.122,.122,.03),  BRONZE,[0,.25,0]),
-    /* Schulterplatten */
-    P(sph(.05,6,4),        DARK,  [-.115,.4,0]),
-    P(sph(.05,6,4),        DARK,  [ .115,.4,0]),
-    /* Kopf frei unterm Helm */
-    P(sph(.08),            SKIN,  [0,.525,.03]),
-    P(sph(.09,8,5),        BRONZE,[0,.572,0],[0,0,0],[1,.75,1]),
-    P(cyl(.093,.096,.026,8),BRONZE,[0,.542,0]),
-    /* Kamm: Halbscheibe laengs, sitzt auf der Kalotte */
-    P(halfDisc(.085,.02),  CREST, [0,.602,-.005],[90,0,90]),
-    /* Schild seitlich angewinkelt, gibt die Silhouette frei */
-    P(box(.17,.24,.03),    SHIELD,[-.155,.3,.1],[-4,-24,0]),
-    P(sph(.03),            BRONZE,[-.168,.3,.117]),
-    /* Speer als limb — Spitze exakt am Endpunkt */
-    limb(.011, [.16,.06,-.04], [.21,.6,-.02], WOOD),
-    P(cone(.02,.07),       '#d8dce4',[.213,.632,-.018],[5,0,-5])
-  ]);
-  return { body, glow:null, h:.62, r:.16, bob:{a:.015,f:1.6} };
+/* =====================================================================
+   FIGUR 01 — LEGIONÄR
+   Lorica segmentata, Scutum mit Umbo, Pilum, Helm mit Querkamm.
+   Sektionen: body · head · shield · spear
+   ===================================================================== */
+function buildLegion() {
+  const STEEL = '#7ba3dd', STEEL_D = '#40639b', IRON = '#9fb0c6', IRON_D = '#4d5769',
+        BRONZE = '#c08a3e', GOLD = '#e8c766', SKIN = '#b8926a', SKIN_D = '#96774f',
+        TUNIC = '#2e4677', LEATHER = '#6d5233', WOOD = '#7a6242', CAPE = '#24406f',
+        CAPE_D = '#1b3159';
+  const f = figure();
+  const b = sect(f, 'body');
+
+  for (let i = 0; i < 2; i++) {
+    const sgn = i ? 1 : -1;
+    const hip = [sgn * 0.058, 0.335, 0], knee = [sgn * 0.062, 0.195, 0.012],
+          ankle = [sgn * 0.06, 0.062, 0.008];
+    put(b, M.SKIN, tube(0.05, 0.04, hip, knee, SKIN));
+    put(b, M.SKIN, tube(0.04, 0.03, knee, ankle, SKIN_D));
+    put(b, M.SKIN, P(sph(0.041, 8, 6), SKIN, knee));
+    /* Beinschiene: gekruemmte Platte auf dem Schienbein */
+    put(b, M.METAL, shell(0.047, 0.125, -1.15, 2.3, IRON, [sgn * 0.061, 0.132, 0.012], 0, 0, 12));
+    put(b, M.METAL, P(tor(0.046, 0.007, 5, 10), IRON_D, [sgn * 0.061, 0.183, 0.012], [90, 0, 0]));
+    /* Caliga */
+    put(b, M.CLOTH, P(boxg(0.072, 0.048, 0.125), LEATHER, [sgn * 0.06, 0.03, 0.03]));
+    put(b, M.CLOTH, P(boxg(0.078, 0.022, 0.14), '#4d3a24', [sgn * 0.06, 0.011, 0.036]));
+  }
+  put(b, M.CLOTH, P(sph(0.088, 10, 7), TUNIC, [0, 0.372, 0], 0, [1.0, 0.72, 0.86]));
+  put(b, M.CLOTH, P(tor(0.084, 0.014, 6, 14), LEATHER, [0, 0.408, 0], [90, 0, 0], [1, 1, 0.9]));
+  put(b, M.METAL, P(boxg(0.036, 0.028, 0.016), GOLD, [0, 0.408, 0.079]));
+  /* Pteruges — Lederstreifen als Schurz */
+  for (let i = 0; i < 7; i++) {
+    const a = (-72 + i * 24) * DEG;
+    put(b, M.CLOTH, P(boxg(0.026, 0.088, 0.015), i % 2 ? LEATHER : '#5d4529',
+      [Math.sin(a) * 0.079, 0.343, Math.cos(a) * 0.079], [7, a / DEG, 0]));
+  }
+  /* Rumpf + Lorica-Baender */
+  put(b, M.ARMOR, tube(0.085, 0.101, [0, 0.398, 0], [0, 0.547, 0.004], STEEL_D, 12));
+  for (let i = 0; i < 3; i++)
+    put(b, M.METAL, P(tor(0.092, 0.0135, 6, 16), i === 1 ? STEEL : IRON,
+      [0, 0.435 + i * 0.037, 0.002], [90, 0, 0], [1.02, 1, 0.88]));
+  put(b, M.ARMOR, P(boxg(0.126, 0.072, 0.028), STEEL, [0, 0.516, 0.084], [-7, 0, 0]));
+  put(b, M.METAL, P(cyl(0.027, 0.027, 0.012, 10), GOLD, [0, 0.516, 0.101], [90, 0, 0]));
+  put(b, M.METAL, P(boxg(0.012, 0.03, 0.008), BRONZE, [0, 0.516, 0.107], [0, 0, 22]));
+  /* Schultern + Pauldrons */
+  for (let i = 0; i < 2; i++) {
+    const sgn = i ? 1 : -1;
+    put(b, M.ARMOR, P(sph(0.048, 8, 6), STEEL_D, [sgn * 0.106, 0.541, 0.002]));
+    put(b, M.METAL, P(sph(0.066, 10, 7), IRON, [sgn * 0.114, 0.546, 0.002], [0, 0, sgn * -13], [1, 0.6, 1.02]));
+    put(b, M.METAL, P(sph(0.058, 9, 6), IRON_D, [sgn * 0.126, 0.514, 0.002], [0, 0, sgn * -16], [1, 0.5, 1.0]));
+  }
+  put(b, M.SKIN, P(cyl(0.031, 0.035, 0.04, 8), SKIN, [0, 0.572, 0.004]));
+  /* Arme: Schulter -> Ellbogen -> Handgelenk, luekenlos verbunden */
+  const armPts = [
+    { s: [-0.106, 0.541, 0.002], e: [-0.138, 0.443, 0.028], w: [-0.128, 0.372, 0.078] },
+    { s: [0.106, 0.541, 0.002],  e: [0.142, 0.448, 0.012],  w: [0.132, 0.372, 0.055] }
+  ];
+  for (const a of armPts) {
+    put(b, M.SKIN, tube(0.036, 0.03, a.s, a.e, SKIN));
+    put(b, M.SKIN, P(sph(0.031, 8, 6), SKIN, a.e));
+    put(b, M.SKIN, tube(0.03, 0.024, a.e, a.w, SKIN_D));
+    put(b, M.METAL, tube(0.033, 0.028,
+      [(a.e[0] * 0.72 + a.w[0] * 0.28), (a.e[1] * 0.72 + a.w[1] * 0.28), (a.e[2] * 0.72 + a.w[2] * 0.28)],
+      [(a.e[0] * 0.18 + a.w[0] * 0.82), (a.e[1] * 0.18 + a.w[1] * 0.82), (a.e[2] * 0.18 + a.w[2] * 0.82)],
+      IRON, 8));
+    put(b, M.SKIN, P(sph(0.027, 8, 6), SKIN, a.w));
+  }
+  /* Umhang: zwei gekruemmte Schalen, unten schmaler */
+  put(b, M.CLOTH, shell(0.126, 0.30, Math.PI - 1.15, 2.3, CAPE, [0, 0.40, -0.014], 0, [1, 1, 0.86], 16));
+  put(b, M.CLOTH, shell(0.112, 0.16, Math.PI - 0.92, 1.84, CAPE_D, [0, 0.20, -0.012], 0, [1, 1, 0.86], 14));
+  put(b, M.METAL, P(sph(0.017, 7, 5), GOLD, [-0.104, 0.556, -0.026]));
+  put(b, M.METAL, P(sph(0.017, 7, 5), GOLD, [0.104, 0.556, -0.026]));
+
+  /* ---- Kopf ---- */
+  const h = sect(f, 'head', [0, 0.575, 0.004]);
+  put(h, M.SKIN, P(sph(0.047, 10, 8), SKIN, [0, 0.617, 0.008]));
+  put(h, M.SKIN, P(boxg(0.05, 0.03, 0.05), SKIN_D, [0, 0.598, 0.03], [6, 0, 0]));
+  put(h, M.METAL, P(sph(0.055, 12, 8), IRON, [0, 0.633, 0.002], 0, [1, 0.94, 1.03]));
+  put(h, M.METAL, P(tor(0.0545, 0.008, 6, 16), BRONZE, [0, 0.607, 0.002], [90, 0, 0]));
+  put(h, M.METAL, P(boxg(0.079, 0.013, 0.022), BRONZE, [0, 0.613, 0.042], [-15, 0, 0]));
+  put(h, M.METAL, P(boxg(0.013, 0.046, 0.014), IRON, [0, 0.596, 0.05], [7, 0, 0]));
+  for (let i = 0; i < 2; i++) {
+    const sgn = i ? 1 : -1;
+    put(h, M.METAL, P(boxg(0.013, 0.05, 0.04), IRON, [sgn * 0.046, 0.594, 0.014], [0, sgn * -9, sgn * 5]));
+  }
+  put(h, M.METAL, P(boxg(0.082, 0.014, 0.038), IRON, [0, 0.594, -0.05], [-34, 0, 0]));
+  put(h, M.METAL, P(boxg(0.016, 0.015, 0.092), BRONZE, [0, 0.667, -0.004]));
+  put(h, M.METAL, P(halfDisc(0.053, 0.017, 12), '#d4a24f', [0, 0.671, -0.004], [90, 0, 90], [1, 1, 1.12]));
+  put(h, M.METAL, P(halfDisc(0.03, 0.014, 10), '#b8863a', [0, 0.66, -0.072], [90, 0, 90], [1, 1, 1.1]));
+
+  /* ---- Scutum ---- */
+  const sh = sect(f, 'shield', [-0.128, 0.372, 0.078]);
+  const SX = -0.162, SZ = -0.026, SR = 0.132;
+  put(sh, M.ARMOR, shell(SR, 0.30, -0.62, 1.24, '#31538c', [SX, 0.40, SZ], 0, 0, 16));
+  put(sh, M.ARMOR, shell(SR - 0.014, 0.296, -0.62, 1.24, '#223a63', [SX, 0.40, SZ], 0, 0, 16));
+  put(sh, M.METAL, shell(SR - 0.007, 0.018, -0.63, 1.26, GOLD, [SX, 0.549, SZ], 0, 0, 16));
+  put(sh, M.METAL, shell(SR - 0.007, 0.018, -0.63, 1.26, GOLD, [SX, 0.251, SZ], 0, 0, 16));
+  for (let i = 0; i < 2; i++) {
+    const t = i ? 0.62 : -0.62;
+    put(sh, M.METAL, P(boxg(0.014, 0.302, 0.022), GOLD,
+      [SX + Math.sin(t) * (SR - 0.006), 0.40, SZ + Math.cos(t) * (SR - 0.006)], [0, t / DEG, 0]));
+  }
+  put(sh, M.METAL, P(sph(0.034, 10, 7), IRON, [SX, 0.40, SZ + SR - 0.012], 0, [1, 1, 0.7]));
+  put(sh, M.METAL, P(cone(0.023, 0.034, 8), IRON, [SX, 0.40, SZ + SR + 0.012], [90, 0, 0]));
+  for (let i = 0; i < 2; i++) {
+    const sgn = i ? 1 : -1;
+    put(sh, M.METAL, P(boxg(0.072, 0.016, 0.008), GOLD, [SX, 0.40 + sgn * 0.072, SZ + SR - 0.004], [0, 0, sgn * 14]));
+    put(sh, M.METAL, P(boxg(0.042, 0.014, 0.008), GOLD, [SX, 0.40 + sgn * 0.104, SZ + SR - 0.012], [0, 0, sgn * -12]));
+  }
+  put(sh, M.WOOD, P(boxg(0.022, 0.024, 0.062), WOOD, [-0.142, 0.386, 0.03], [0, 0, 8]));
+
+  /* ---- Pilum ---- */
+  const sp = sect(f, 'spear', [0.132, 0.372, 0.055]);
+  const sTop = [0.163, 0.735, -0.022], sBot = [0.145, 0.055, 0.012];
+  put(sp, M.WOOD, tube(0.0095, 0.008, sBot, sTop, WOOD, 7));
+  put(sp, M.CLOTH, P(tor(0.013, 0.005, 5, 9), '#4d3a24', [0.15, 0.34, 0.005], [90, 3, 0]));
+  put(sp, M.CLOTH, P(tor(0.013, 0.005, 5, 9), '#4d3a24', [0.152, 0.395, 0.002], [90, 3, 0]));
+  put(sp, M.METAL, P(cyl(0.013, 0.0115, 0.052, 8), IRON_D, [0.161, 0.688, -0.02], [2, 0, -1.6]));
+  put(sp, M.METAL, P(cone(0.019, 0.086, 6), IRON, [0.164, 0.757, -0.023], [2, 0, -1.6]));
+  put(sp, M.METAL, P(boxg(0.036, 0.03, 0.005), IRON, [0.163, 0.722, -0.022], [2, 0, -1.6]));
+  put(sp, M.METAL, P(cone(0.0125, 0.036, 6), IRON_D, [0.1445, 0.038, 0.013], [178, 0, 1.6]));
+
+  f.meta = { h: 0.755, r: 0.20, base: 0 };
+  return f;
 }
 
+/* =====================================================================
+   FIGUR 02 — WALKER
+   Gebeugt, Rippen frei, Kiefer haengt, Arme baumeln nach vorn.
+   Sektionen: body · head · armL · armR
+   ===================================================================== */
 function buildWalker() {
-  const SKIN='#8a9c78', SKIN2='#78896a', RAG='#5a6851', LEG='#4e5a46';
-  const body = fuse([
-    P(cyl(.03,.036,.11),  LEG,  [-.05,.055,0]),
-    P(cyl(.03,.036,.11),  LEG,  [ .05,.05,-.025]),
-    P(cyl(.098,.108,.1),  RAG,  [0,.15,0]),
-    P(cap(.105,.14),      SKIN, [0,.29,.015],[14,0,0]),
-    /* Kopf haengt klar VOR dem Koerper */
-    P(sph(.075),          SKIN2,[0,.44,.105],[0,0,7]),
-    /* Arme baumeln vor der Silhouette — limb von Schulter zu Handhoehe */
-    limb(.026, [-.115,.36,.05], [-.15,.13,.14],  SKIN),
-    limb(.026, [ .115,.35,.06], [ .125,.1,.185], SKIN),
-    P(sph(.032,6,4),      SKIN2,[-.15,.115,.145]),
-    P(sph(.032,6,4),      SKIN2,[ .125,.085,.19])
-  ]);
-  const glow = fuse([
-    P(sph(.013,6,4), '#c8ff6a', [-.021,.447,.163]),
-    P(sph(.013,6,4), '#c8ff6a', [ .029,.442,.162])
-  ]);
-  return { body, glow, h:.52, r:.15, bob:{a:.03,f:2.2} };
+  const FLESH = '#8a9c78', FLESH_D = '#6d7f5e', ROT = '#5c6b4e',
+        RAG = '#4e5a46', RAG2 = '#3a4434', BONE = '#cfd3bd', GORE = '#4a2f2b';
+  const f = figure();
+  const b = sect(f, 'body');
+
+  const legs = [
+    { hip: [-0.052, 0.275, -0.005], knee: [-0.058, 0.16, 0.014], ankle: [-0.05, 0.045, 0.024] },
+    { hip: [0.052, 0.272, -0.012], knee: [0.056, 0.155, -0.004], ankle: [0.048, 0.045, 0.014] }
+  ];
+  for (const l of legs) {
+    put(b, M.SKIN, tube(0.036, 0.026, l.hip, l.knee, FLESH));
+    put(b, M.SKIN, P(sph(0.026, 6, 5), FLESH_D, l.knee));
+    put(b, M.SKIN, tube(0.026, 0.019, l.knee, l.ankle, FLESH_D));
+    put(b, M.CLOTH, P(boxg(0.046, 0.03, 0.088), RAG2, [l.ankle[0], 0.024, l.ankle[2] + 0.024]));
+    put(b, M.CLOTH, P(boxg(0.042, 0.046, 0.042), RAG, [l.knee[0], l.knee[1] - 0.028, l.knee[2]], [0, 0, 6]));
+  }
+  put(b, M.CLOTH, P(sph(0.056, 8, 6), RAG, [0, 0.288, -0.004], 0, [1.05, 0.7, 0.9]));
+  /* Ausgezehrter Rumpf, stark nach vorn geneigt */
+  put(b, M.SKIN, tube(0.05, 0.064, [0, 0.30, -0.014], [0, 0.44, 0.062], FLESH, 9));
+  /* Freiliegende Rippen */
+  for (let i = 0; i < 4; i++)
+    put(b, M.BONE, P(torArc(0.057 - i * 0.003, 0.006, 2.4, 5, 12), BONE,
+      [0, 0.336 + i * 0.028, 0.022 + i * 0.014], [70, 0, 0], [1, 1, 0.78]));
+  /* Wirbelfortsaetze */
+  for (let i = 0; i < 5; i++)
+    put(b, M.BONE, P(cone(0.011, 0.026, 5), BONE,
+      [0, 0.33 + i * 0.028, -0.052 - i * 0.006], [-96, 0, 0]));
+  /* Bauchwunde */
+  put(b, M.ORGANIC, P(sph(0.042, 9, 6), GORE, [0, 0.338, 0.066], 0, [1.1, 0.9, 0.6]));
+  put(b, M.ORGANIC, P(sph(0.018, 6, 5), '#6b3d36', [-0.016, 0.322, 0.082]));
+  put(b, M.ORGANIC, P(sph(0.014, 6, 5), '#6b3d36', [0.019, 0.33, 0.082]));
+  /* Schultern + Lumpen */
+  put(b, M.SKIN, P(sph(0.038, 7, 5), FLESH, [-0.084, 0.432, 0.036]));
+  put(b, M.SKIN, P(sph(0.038, 7, 5), FLESH, [0.084, 0.429, 0.032]));
+  put(b, M.BONE, P(boxg(0.13, 0.016, 0.03), BONE, [0, 0.443, 0.03], [8, 0, 0]));
+  put(b, M.CLOTH, shell(0.072, 0.12, -1.5, 3.0, RAG, [0, 0.392, 0.018], [12, 0, 0], [1, 1, 0.88], 11));
+  put(b, M.CLOTH, P(boxg(0.05, 0.09, 0.014), RAG2, [-0.06, 0.26, 0.052], [4, 0, 9]));
+  put(b, M.CLOTH, P(boxg(0.04, 0.07, 0.013), RAG, [0.062, 0.272, 0.044], [2, 0, -7]));
+  put(b, M.CLOTH, P(boxg(0.045, 0.06, 0.013), RAG2, [0.01, 0.25, -0.05], [-6, 0, 3]));
+  put(b, M.SKIN, tube(0.02, 0.018, [0, 0.434, 0.058], [0, 0.472, 0.082], FLESH_D, 6));
+
+  /* ---- Kopf ---- */
+  const h = sect(f, 'head', [0, 0.452, 0.062]);
+  put(h, M.SKIN, P(sph(0.042, 8, 6), FLESH_D, [0, 0.486, 0.094], [0, 0, 6], [0.9, 1.02, 1.14]));
+  put(h, M.BONE, P(boxg(0.058, 0.014, 0.03), BONE, [0, 0.497, 0.116], [-12, 0, 0]));
+  put(h, M.BONE, P(boxg(0.044, 0.022, 0.05), BONE, [0, 0.452, 0.112], [14, 0, 0]));
+  for (let i = 0; i < 4; i++)
+    put(h, M.BONE, P(cone(0.005, 0.014, 4), '#e6e8d6',
+      [-0.016 + i * 0.011, 0.466, 0.116 + (i % 2) * 0.004], [172, 0, 0]));
+  for (let i = 0; i < 2; i++) {
+    const sgn = i ? 1 : -1;
+    put(h, M.ORGANIC, P(sph(0.015, 7, 5), '#20241c', [sgn * 0.019, 0.486, 0.118]));
+    put(h, M.GLOW, P(sph(0.0085, 6, 5), '#c8ff6a', [sgn * 0.019, 0.4865, 0.126]));
+  }
+  put(h, M.SKIN, P(boxg(0.03, 0.02, 0.02), ROT, [-0.03, 0.505, 0.058], [0, 0, 22]));
+
+  /* ---- Arme ---- */
+  const arms = [
+    { n: 'armL', s: [-0.084, 0.432, 0.036], e: [-0.13, 0.312, 0.116], w: [-0.124, 0.196, 0.196], bone: false },
+    { n: 'armR', s: [0.084, 0.429, 0.032], e: [0.134, 0.3, 0.104], w: [0.132, 0.184, 0.178], bone: true }
+  ];
+  for (const a of arms) {
+    const s = sect(f, a.n, a.s);
+    put(s, M.SKIN, tube(0.023, 0.018, a.s, a.e, FLESH));
+    put(s, M.SKIN, P(sph(0.019, 6, 5), FLESH_D, a.e));
+    if (a.bone) {
+      put(s, M.SKIN, tube(0.018, 0.015, a.e,
+        [a.e[0] * 0.55 + a.w[0] * 0.45, a.e[1] * 0.55 + a.w[1] * 0.45, a.e[2] * 0.55 + a.w[2] * 0.45], ROT));
+      put(s, M.BONE, tube(0.009, 0.007,
+        [a.e[0] * 0.6 + a.w[0] * 0.4, a.e[1] * 0.6 + a.w[1] * 0.4, a.e[2] * 0.6 + a.w[2] * 0.4], a.w, BONE, 6));
+    } else {
+      put(s, M.SKIN, tube(0.018, 0.014, a.e, a.w, FLESH_D));
+    }
+    put(s, M.SKIN, P(sph(0.019, 6, 5), FLESH_D, a.w));
+    for (let i = 0; i < 3; i++) {
+      const sgn = a.s[0] < 0 ? -1 : 1;
+      put(s, M.BONE, P(cone(0.006, 0.026, 4), '#ded9c2',
+        [a.w[0] + sgn * (0.004 + i * 0.008), a.w[1] - 0.018, a.w[2] + 0.016 - i * 0.006], [150, 0, sgn * 12]));
+    }
+  }
+  f.meta = { h: 0.60, r: 0.17, base: 0 };
+  return f;
 }
 
+/* =====================================================================
+   FIGUR 03 — RUNNER
+   Sprintpose: hinteres Bein gestreckt, Arme zurueck, Kopf voraus.
+   Sektionen: body · head
+   ===================================================================== */
 function buildRunner() {
-  const SKIN='#93a878', SKIN2='#7d9165', LEG='#5f7050';
-  const body = fuse([
-    limb(.026, [-.045,.02,.1],  [-.05,.17,-.01], LEG),
-    limb(.026, [ .045,.02,-.12],[ .05,.17,.01],  LEG),
-    P(cap(.078,.14),      SKIN, [0,.25,.02],[26,0,0]),
-    P(sph(.064),          SKIN2,[0,.375,.15]),
-    limb(.02, [-.09,.3,.0],  [-.13,.38,-.15], SKIN2),
-    limb(.02, [ .09,.3,.0],  [ .13,.38,-.15], SKIN2)
-  ]);
-  const glow = fuse([
-    P(sph(.012,6,4), '#c8ff6a', [-.021,.383,.196]),
-    P(sph(.012,6,4), '#c8ff6a', [ .021,.383,.196])
-  ]);
-  return { body, glow, h:.46, r:.13, bob:{a:.032,f:3.4} };
+  const FLESH = '#a3bb7d', FLESH_D = '#88a066', SIN = '#6f8452',
+        RAG = '#46543a', BONE = '#d8dec4';
+  const f = figure();
+  const b = sect(f, 'body');
+
+  /* Standbein hinten — Fuss auf dem Boden */
+  const bHip = [0.05, 0.252, -0.012], bKnee = [0.082, 0.15, -0.1], bAnk = [0.09, 0.05, -0.182];
+  put(b, M.SKIN, tube(0.042, 0.032, bHip, bKnee, FLESH));
+  put(b, M.SKIN, P(sph(0.03, 7, 5), FLESH_D, bKnee));
+  put(b, M.SKIN, tube(0.031, 0.022, bKnee, bAnk, FLESH_D));
+  put(b, M.CLOTH, P(boxg(0.05, 0.03, 0.098), RAG, [0.09, 0.017, -0.216], [-8, 0, 0]));
+  /* Schwungbein vorn */
+  const fHip = [-0.05, 0.256, 0.004], fKnee = [-0.07, 0.196, 0.1], fAnk = [-0.06, 0.116, 0.166];
+  put(b, M.SKIN, tube(0.042, 0.032, fHip, fKnee, FLESH));
+  put(b, M.SKIN, P(sph(0.03, 7, 5), FLESH_D, fKnee));
+  put(b, M.SKIN, tube(0.031, 0.022, fKnee, fAnk, FLESH_D));
+  put(b, M.CLOTH, P(boxg(0.048, 0.028, 0.092), RAG, [-0.058, 0.098, 0.202], [24, 0, 0]));
+  put(b, M.CLOTH, P(sph(0.058, 8, 6), RAG, [0, 0.266, -0.004], 0, [1.06, 0.74, 0.94]));
+  /* Rumpf stark nach vorn */
+  put(b, M.SKIN, tube(0.056, 0.068, [0, 0.262, -0.022], [0, 0.378, 0.102], FLESH, 10));
+  for (let i = 0; i < 3; i++)
+    put(b, M.BONE, P(torArc(0.058 - i * 0.003, 0.0058, 2.1, 5, 11), BONE,
+      [0, 0.30 + i * 0.028, 0.028 + i * 0.026], [58, 0, 0], [1, 1, 0.84]));
+  /* Rueckenkamm entlang der Wirbelsaeule */
+  const crestBase = [[0, 0.288, -0.046], [0, 0.312, -0.03], [0, 0.336, -0.012], [0, 0.358, 0.008], [0, 0.374, 0.03]];
+  for (let i = 0; i < crestBase.length; i++)
+    put(b, M.BONE, P(cone(0.013 - i * 0.0014, 0.036 - i * 0.004, 5), BONE, crestBase[i], [-118, 0, 0]));
+
+  put(b, M.SKIN, P(sph(0.043, 8, 6), FLESH, [-0.082, 0.368, 0.084]));
+  put(b, M.SKIN, P(sph(0.043, 8, 6), FLESH, [0.082, 0.366, 0.08]));
+  /* Arme nach hinten gerissen */
+  for (let i = 0; i < 2; i++) {
+    const sgn = i ? 1 : -1;
+    const s = [sgn * 0.082, 0.367, 0.082], e = [sgn * 0.116, 0.32, -0.018], w = [sgn * 0.108, 0.29, -0.126];
+    put(b, M.SKIN, tube(0.026, 0.021, s, e, FLESH));
+    put(b, M.SKIN, P(sph(0.022, 7, 5), FLESH_D, e));
+    put(b, M.SKIN, tube(0.021, 0.016, e, w, SIN));
+    put(b, M.SKIN, P(sph(0.019, 7, 5), FLESH_D, w));
+    for (let k = 0; k < 3; k++)
+      put(b, M.BONE, P(cone(0.005, 0.022, 4), BONE,
+        [w[0] + sgn * (0.002 + k * 0.007), w[1] - 0.006, w[2] - 0.014 - k * 0.004], [64, 0, sgn * 10]));
+  }
+  put(b, M.CLOTH, P(boxg(0.04, 0.06, 0.012), RAG, [-0.052, 0.244, 0.03], [10, 0, 8]));
+  put(b, M.CLOTH, P(boxg(0.034, 0.05, 0.012), RAG, [0.056, 0.25, 0.012], [8, 0, -6]));
+  put(b, M.SKIN, tube(0.026, 0.023, [0, 0.372, 0.09], [0, 0.394, 0.128], FLESH_D, 7));
+
+  /* ---- Kopf ---- */
+  const h = sect(f, 'head', [0, 0.386, 0.116]);
+  put(h, M.SKIN, P(sph(0.041, 10, 8), FLESH_D, [0, 0.402, 0.156], [10, 0, 0], [0.9, 0.92, 1.32]));
+  put(h, M.BONE, P(boxg(0.046, 0.012, 0.026), BONE, [0, 0.416, 0.19], [-14, 0, 0]));
+  put(h, M.BONE, P(boxg(0.036, 0.02, 0.056), BONE, [0, 0.374, 0.186], [20, 0, 0]));
+  for (let i = 0; i < 5; i++)
+    put(h, M.BONE, P(cone(0.0045, 0.016, 4), '#eef0e2',
+      [-0.016 + i * 0.008, 0.39, 0.196 + (i % 2) * 0.004], [166, 0, 0]));
+  for (let i = 0; i < 2; i++) {
+    const sgn = i ? 1 : -1;
+    put(h, M.ORGANIC, P(sph(0.013, 7, 5), '#1d2119', [sgn * 0.017, 0.408, 0.184]));
+    put(h, M.GLOW, P(sph(0.008, 6, 5), '#d8ff7a', [sgn * 0.0175, 0.4085, 0.192]));
+  }
+  f.meta = { h: 0.56, r: 0.20, base: 0 };
+  return f;
 }
 
+/* =====================================================================
+   FIGUR 04 — BRUTE
+   Schulterberg mit Knochenplatten, Kopf tief dazwischen, Arme bis zum Boden.
+   Sektionen: body · head · armL · armR
+   ===================================================================== */
 function buildBrute() {
-  const HIDE='#79866c', ARMOR='#4c5544', FLESH='#67755b', DK='#3f4838';
-  const body = fuse([
-    P(cyl(.088,.1,.22),  DK,   [-.18,.11,.01]),
-    P(cyl(.088,.1,.22),  DK,   [ .18,.11,.01]),
-    P(cap(.23,.26),      HIDE, [0,.56,0]),
-    P(sph(.17,7,5),      FLESH,[0,.38,.1],[0,0,0],[1.1,.72,1]),   // Wanst
-    /* flacher Schulterpanzer HINTER dem Kopf */
-    P(box(.56,.15,.26),  ARMOR,[0,.83,-.08],[6,0,0]),
-    P(sph(.115,7,5),     ARMOR,[-.285,.82,-.04]),                 // Deltoids
-    P(sph(.115,7,5),     ARMOR,[ .285,.82,-.04]),
-    /* Kopf klar vorgestreckt, Stirnwulst drueber */
-    P(sph(.115),         FLESH,[0,.82,.2]),
-    P(box(.19,.06,.1),   ARMOR,[0,.88,.24],[-12,0,0]),            // Stirnwulst
-    P(box(.16,.06,.11),  DK,   [0,.75,.25],[8,0,0]),              // Kiefer
-    /* Arme: Schulter -> Boden-Faust, verbunden per limb */
-    limb(.082, [-.32,.8,-.02], [-.42,.2,.1],  FLESH),
-    limb(.082, [ .32,.8,-.02], [ .42,.2,.1],  FLESH),
-    P(sph(.115,7,5),     DK,   [-.43,.13,.12]),
-    P(sph(.115,7,5),     DK,   [ .43,.13,.12])
-  ]);
-  const glow = fuse([
-    P(sph(.016,6,4), '#c8ff6a', [-.042,.835,.31]),
-    P(sph(.016,6,4), '#c8ff6a', [ .042,.835,.31])
-  ]);
-  return { body, glow, h:1.0, r:.34, bob:{a:.05,f:1.2} };
+  const HIDE = '#7e8c6e', HIDE_D = '#5e6c50', FLESH = '#6b7a5c', GUT = '#8a9873',
+        PLATE = '#454e3c', BONE = '#d2d6bd', IRON = '#474d55', SCAR = '#4a2f2b';
+  const f = figure();
+  const b = sect(f, 'body');
+
+  for (let i = 0; i < 2; i++) {
+    const sgn = i ? 1 : -1;
+    const hip = [sgn * 0.135, 0.42, 0], knee = [sgn * 0.152, 0.245, 0.022], ankle = [sgn * 0.145, 0.085, 0.015];
+    put(b, M.SKIN, tube(0.105, 0.088, hip, knee, HIDE));
+    put(b, M.SKIN, P(sph(0.086, 8, 6), HIDE_D, knee));
+    put(b, M.SKIN, tube(0.088, 0.072, knee, ankle, HIDE_D));
+    put(b, M.SKIN, P(boxg(0.145, 0.078, 0.215), HIDE_D, [sgn * 0.145, 0.042, 0.05]));
+    for (let k = 0; k < 3; k++)
+      put(b, M.BONE, P(cone(0.019, 0.05, 5), BONE,
+        [sgn * 0.145 + (k - 1) * 0.045, 0.03, 0.152], [96, 0, 0]));
+  }
+  put(b, M.SKIN, P(sph(0.165, 10, 7), HIDE_D, [0, 0.445, 0], 0, [1.2, 0.82, 1]));
+  put(b, M.SKIN, tube(0.185, 0.25, [0, 0.46, 0], [0, 0.79, -0.012], HIDE, 12));
+  put(b, M.SKIN, P(sph(0.205, 11, 8), GUT, [0, 0.535, 0.088], 0, [1.14, 0.86, 1]));
+  put(b, M.SKIN, P(sph(0.205, 11, 8), HIDE, [0, 0.725, 0.056], 0, [1.22, 0.82, 0.92]));
+  for (let i = 0; i < 3; i++)
+    put(b, M.BONE, P(torArc(0.185 - i * 0.012, 0.016, 2.2, 5, 13), BONE,
+      [0, 0.63 + i * 0.062, 0.088 - i * 0.012], [76, 0, 0], [1, 1, 0.8]));
+  put(b, M.ORGANIC, P(sph(0.055, 8, 6), SCAR, [-0.1, 0.6, 0.175], 0, [1.3, 0.8, 0.5]));
+  /* Schulterberg */
+  for (let i = 0; i < 2; i++) {
+    const sgn = i ? 1 : -1;
+    put(b, M.SKIN, P(sph(0.158, 10, 8), HIDE, [sgn * 0.275, 0.815, -0.005]));
+    put(b, M.BONE, P(cone(0.048, 0.125, 6), BONE, [sgn * 0.268, 0.935, -0.012], [0, 0, sgn * -22]));
+    put(b, M.BONE, P(cone(0.036, 0.09, 6), BONE, [sgn * 0.345, 0.885, -0.03], [0, 0, sgn * -46]));
+    put(b, M.BONE, P(cone(0.03, 0.072, 5), BONE, [sgn * 0.2, 0.925, -0.085], [-24, 0, sgn * -14]));
+  }
+  /* Rueckenstacheln */
+  for (let i = 0; i < 4; i++)
+    put(b, M.BONE, P(cone(0.04 - i * 0.006, 0.12 - i * 0.018, 6), BONE,
+      [0, 0.855 - i * 0.09, -0.13 - i * 0.028], [-38 - i * 8, 0, 0]));
+  /* Eisenketten */
+  put(b, M.METAL, P(tor(0.13, 0.016, 6, 16), IRON, [0, 0.845, 0.045], [72, 0, 0], [1.15, 1, 1]));
+  put(b, M.METAL, P(tor(0.115, 0.013, 6, 14), IRON, [0, 0.79, 0.09], [64, 0, 6], [1.1, 1, 1]));
+  put(b, M.SKIN, P(cyl(0.088, 0.1, 0.07, 9), FLESH, [0, 0.845, 0.105], [16, 0, 0]));
+
+  /* ---- Kopf ---- */
+  const h = sect(f, 'head', [0, 0.85, 0.11]);
+  put(h, M.SKIN, P(sph(0.098, 11, 8), FLESH, [0, 0.875, 0.182], 0, [1, 0.96, 1.1]));
+  put(h, M.BONE, P(boxg(0.175, 0.05, 0.078), PLATE, [0, 0.914, 0.212], [-15, 0, 0]));
+  put(h, M.BONE, P(boxg(0.142, 0.052, 0.088), BONE, [0, 0.834, 0.222], [11, 0, 0]));
+  for (let i = 0; i < 5; i++)
+    put(h, M.BONE, P(cone(0.011, 0.03, 4), '#e8ead6',
+      [-0.05 + i * 0.025, 0.856, 0.234 + (i % 2) * 0.006], [170, 0, 0]));
+  for (let i = 0; i < 2; i++) {
+    const sgn = i ? 1 : -1;
+    put(h, M.BONE, P(cone(0.024, 0.078, 6), BONE, [sgn * 0.056, 0.862, 0.252], [16, 0, sgn * -14]));
+    put(h, M.BONE, P(cone(0.018, 0.052, 5), BONE, [sgn * 0.082, 0.918, 0.16], [-32, 0, sgn * -30]));
+    put(h, M.ORGANIC, P(sph(0.021, 7, 5), '#1c1f18', [sgn * 0.037, 0.888, 0.238]));
+    put(h, M.GLOW, P(sph(0.012, 6, 5), '#c8ff6a', [sgn * 0.037, 0.8885, 0.25]));
+  }
+
+  /* ---- Arme ---- */
+  for (let i = 0; i < 2; i++) {
+    const sgn = i ? 1 : -1;
+    const s = [sgn * 0.30, 0.80, 0.005], e = [sgn * 0.40, 0.50, 0.072], w = [sgn * 0.425, 0.245, 0.115];
+    const sec2 = sect(f, i ? 'armR' : 'armL', s);
+    put(sec2, M.SKIN, tube(0.098, 0.082, s, e, HIDE));
+    put(sec2, M.SKIN, P(sph(0.082, 8, 6), HIDE_D, e));
+    put(sec2, M.SKIN, tube(0.082, 0.07, e, w, FLESH));
+    put(sec2, M.BONE, P(cone(0.026, 0.062, 5), BONE, [sgn * 0.365, 0.63, 0.045], [0, 0, sgn * -68]));
+    put(sec2, M.BONE, P(cone(0.022, 0.05, 5), BONE, [sgn * 0.415, 0.375, 0.09], [0, 0, sgn * -74]));
+    put(sec2, M.SKIN, P(sph(0.105, 10, 8), HIDE_D, [sgn * 0.435, 0.175, 0.135]));
+    for (let k = 0; k < 3; k++)
+      put(sec2, M.BONE, P(cone(0.022, 0.052, 5), BONE,
+        [sgn * 0.435 + (k - 1) * 0.05, 0.185, 0.222], [86, 0, 0]));
+  }
+  f.meta = { h: 1.16, r: 0.44, base: 0 };
+  return f;
 }
 
+/* =====================================================================
+   FIGUR 05 — SPEIER
+   Aufgeblaehter Werfer-Boss: Kehlsack, Warzen, Schlund mit Zahnkranz.
+   Sektionen: body · belly · head
+   ===================================================================== */
 function buildSpeier() {
-  const BODY='#8f8a5e', THROAT='#b5ae7d', WART='#6d683f',
-        LIMBS='#7c7850', BELLY='#7d7849', MAW='#241a1a';
-  const body = fuse([
-    /* Beine gespreizt + Fuesse direkt drunter */
-    limb(.07, [-.3,.06,.05], [-.24,.5,0], LIMBS),
-    limb(.07, [ .3,.06,.05], [ .24,.5,0], LIMBS),
-    P(box(.2,.07,.26),  WART, [-.31,.035,.1]),
-    P(box(.2,.07,.26),  WART, [ .31,.035,.1]),
-    /* Bauch, unten dunkler Ballast */
-    P(sph(.7,9,7),      BODY, [0,.96,0],[0,0,0],[1.16,.96,1.06]),
-    P(sph(.62,9,7),     BELLY,[0,.78,.06],[0,0,0],[1.14,.7,1.04]),
-    /* Warzen groesser, asymmetrisch */
-    P(ico(.21,0),       WART, [-.5,.9,.42],[15,20,0]),
-    P(ico(.16,0),       WART, [ .56,1.2,.3],[0,40,15]),
-    P(ico(.18,0),       WART, [ .2,.62,.58],[30,10,0]),
-    P(ico(.13,0),       WART, [-.3,1.35,.35],[10,0,30]),
-    /* heller Kehlsack — Kroete */
-    P(sph(.42,8,6),     THROAT,[0,1.42,.3],[0,0,0],[1,.9,1]),
-    P(sph(.28,8,6),     BODY, [0,1.78,.3]),
-    /* Schlund mit Maulwulst + haengender Unterkiefer */
-    P(cyl(.12,.15,.16,8),MAW, [0,1.63,.53],[108,0,0]),
-    P(tor(.145,.04,5,9),BODY, [0,1.64,.58],[108,0,0]),
-    P(box(.26,.07,.22), LIMBS,[0,1.46,.62],[-32,0,0]),
-    /* Aermchen baumeln VOR dem Bauch */
-    limb(.042, [-.58,1.32,.4], [-.56,.84,.7], LIMBS),
-    limb(.042, [ .58,1.32,.4], [ .56,.84,.7], LIMBS),
-    P(sph(.055,6,4),    WART, [-.56,.8,.72]),
-    P(sph(.055,6,4),    WART, [ .56,.8,.72])
-  ]);
-  const glow = fuse([
-    P(sph(.03,6,4), '#ff5a3c', [-.105,1.88,.52]),
-    P(sph(.03,6,4), '#ff5a3c', [ .105,1.88,.52])
-  ]);
-  return { body, glow, h:1.95, r:.7, bob:{a:.035,f:1.0} };
+  const BODY = '#9a9463', THROAT = '#c2ba86', WART = '#6f6a41', LIMB = '#847f55',
+        BELLY = '#8a8452', MAW = '#2a1d1d', BONE = '#ddd9b4', PUS = '#b8a94e';
+  const f = figure();
+  const b = sect(f, 'body');
+
+  for (let i = 0; i < 2; i++) {
+    const sgn = i ? 1 : -1;
+    const hip = [sgn * 0.30, 0.60, 0.02], knee = [sgn * 0.365, 0.32, 0.105], ankle = [sgn * 0.32, 0.115, 0.108];
+    put(b, M.SKIN, tube(0.155, 0.125, hip, knee, LIMB));
+    put(b, M.SKIN, P(sph(0.12, 8, 6), LIMB, knee));
+    put(b, M.SKIN, tube(0.125, 0.1, knee, ankle, LIMB));
+    put(b, M.SKIN, P(boxg(0.235, 0.09, 0.30), LIMB, [sgn * 0.32, 0.055, 0.165]));
+    for (let k = 0; k < 3; k++)
+      put(b, M.BONE, P(cone(0.026, 0.07, 5), BONE,
+        [sgn * 0.32 + (k - 1) * 0.075, 0.042, 0.315], [92, 0, 0]));
+    put(b, M.SKIN, P(sph(0.245, 10, 8), LIMB, [sgn * 0.345, 0.63, -0.01], 0, [1, 0.92, 1]));
+  }
+  /* Rueckenhoecker + Kamm */
+  put(b, M.ORGANIC, P(ico(0.27, 1), WART, [0, 1.34, -0.44], [12, 20, 0]));
+  put(b, M.ORGANIC, P(ico(0.2, 1), WART, [-0.3, 1.1, -0.46], [0, 32, 14]));
+  put(b, M.ORGANIC, P(ico(0.16, 1), WART, [0.32, 1.06, -0.44], [8, -20, 10]));
+  for (let i = 0; i < 4; i++)
+    put(b, M.BONE, P(cone(0.075 - i * 0.012, 0.22 - i * 0.03, 6), BONE,
+      [0, 1.62 - i * 0.2, -0.34 - i * 0.11], [-42 - i * 10, 0, 0]));
+  /* Aermchen */
+  for (let i = 0; i < 2; i++) {
+    const sgn = i ? 1 : -1;
+    const s = [sgn * 0.60, 1.32, 0.16], e = [sgn * 0.71, 1.06, 0.35], w = [sgn * 0.62, 0.86, 0.53];
+    put(b, M.SKIN, tube(0.078, 0.062, s, e, LIMB));
+    put(b, M.SKIN, P(sph(0.06, 7, 5), LIMB, e));
+    put(b, M.SKIN, tube(0.062, 0.048, e, w, LIMB));
+    put(b, M.SKIN, P(sph(0.055, 7, 5), WART, w));
+    for (let k = 0; k < 3; k++)
+      put(b, M.BONE, P(cone(0.014, 0.05, 4), BONE,
+        [w[0] + sgn * 0.01, w[1] - 0.03, w[2] + 0.03 + k * 0.018], [128, 0, sgn * 16]));
+  }
+
+  /* ---- Wanst (pulsiert) ---- */
+  const bl = sect(f, 'belly', [0, 0.95, 0.04]);
+  /* Facettierte, asymmetrische Masse statt glatter Kugel */
+  put(bl, M.ORGANIC, P(ico(0.72, 1), BODY, [0, 0.99, 0.0], [12, 24, 6], [1.16, 0.98, 1.04]));
+  put(bl, M.ORGANIC, P(ico(0.6, 1), BELLY, [0.02, 0.76, 0.12], [4, -18, 0], [1.1, 0.68, 1.0]));
+  put(bl, M.ORGANIC, P(ico(0.34, 1), BODY, [-0.42, 1.24, 0.2], [22, 10, 14]));
+  put(bl, M.ORGANIC, P(ico(0.3, 1), BODY, [0.48, 1.02, -0.16], [0, 30, 8]));
+  const warts = [[-0.56, 0.92, 0.4, 0.22], [0.6, 1.22, 0.26, 0.18], [0.24, 0.6, 0.6, 0.19],
+                 [-0.34, 1.36, 0.34, 0.15], [-0.66, 1.12, -0.08, 0.17], [0.54, 0.74, 0.34, 0.14],
+                 [0.1, 1.38, 0.5, 0.13], [-0.2, 0.6, 0.56, 0.12], [0.66, 1.34, -0.02, 0.11]];
+  for (const w of warts)
+    put(bl, M.ORGANIC, P(ico(w[3], 0), WART, [w[0], w[1], w[2]], [w[0] * 40, w[1] * 30, 0]));
+  put(bl, M.ORGANIC, P(sph(0.09, 8, 6), PUS, [0.12, 1.12, 0.66], 0, [1, 1, 0.6]));
+  put(bl, M.ORGANIC, P(sph(0.07, 8, 6), PUS, [-0.18, 0.86, 0.62], 0, [1, 1, 0.6]));
+  put(bl, M.GLOW, P(sph(0.032, 6, 5), '#ff9a4a', [0.12, 1.12, 0.71]));
+  put(bl, M.GLOW, P(sph(0.026, 6, 5), '#ff9a4a', [-0.18, 0.86, 0.665]));
+
+  /* ---- Kopf mit Schlund ---- */
+  const h = sect(f, 'head', [0, 1.58, 0.12]);
+  put(h, M.ORGANIC, P(ico(0.42, 1), THROAT, [0, 1.44, 0.32], [8, 0, 0], [1.02, 0.86, 1.0]));
+  put(h, M.ORGANIC, P(ico(0.3, 1), BODY, [0, 1.77, 0.26], [0, 22, 0]));
+  put(h, M.ORGANIC, P(boxg(0.44, 0.1, 0.22), WART, [0, 1.88, 0.42], [-17, 0, 0]));
+  put(h, M.ORGANIC, P(ico(0.13, 0), WART, [-0.26, 1.72, 0.34], [12, 0, 20]));
+  put(h, M.ORGANIC, P(ico(0.11, 0), WART, [0.28, 1.68, 0.3], [0, 24, -14]));
+  put(h, M.ORGANIC, P(tor(0.3, 0.06, 5, 12), WART, [0, 1.3, 0.36], [96, 0, 0], [1, 1, 0.7]));
+  put(h, M.ORGANIC, P(cyl(0.15, 0.19, 0.2, 11), MAW, [0, 1.62, 0.52], [104, 0, 0]));
+  put(h, M.ORGANIC, P(tor(0.185, 0.05, 6, 16), BODY, [0, 1.63, 0.55], [104, 0, 0]));
+  for (let i = 0; i < 9; i++) {
+    const a = i / 9 * TAU;
+    put(h, M.BONE, P(cone(0.026, 0.07, 5), BONE,
+      [Math.sin(a) * 0.17, 1.63 + Math.cos(a) * 0.165, 0.585], [104 + Math.cos(a) * 22, 0, -Math.sin(a) * 26]));
+  }
+  put(h, M.SKIN, P(boxg(0.3, 0.09, 0.24), LIMB, [0, 1.45, 0.57], [-30, 0, 0]));
+  for (let i = 0; i < 2; i++) {
+    const sgn = i ? 1 : -1;
+    put(h, M.BONE, P(cone(0.06, 0.2, 6), BONE, [sgn * 0.2, 1.93, 0.19], [-22, 0, sgn * -20]));
+    put(h, M.ORGANIC, P(sph(0.062, 8, 6), '#241d10', [sgn * 0.115, 1.86, 0.47]));
+    put(h, M.GLOW, P(sph(0.036, 7, 5), '#ff7a3c', [sgn * 0.115, 1.862, 0.508]));
+  }
+  f.meta = { h: 2.02, r: 0.80, base: 0 };
+  return f;
 }
 
-function buildFleischberg() {
-  const A='#9c7a72', B='#8a6a64', C='#a8857c', D='#7a5c58', E='#5f4543',
-        TUSK='#d8c9b4';
-  const body = fuse([
-    /* Rumpf: hohe Schulterlinie hinten, faellt nach vorn — Gorilla */
-    P(ico(1.0),   A, [0,1.3,-.25],[-14,8,0],[1.2,1.0,1.05]),
-    P(ico(.74),   C, [0,.88,.4],[6,0,0],[1.05,.85,.95]),           // Brust integriert
-    P(ico(.72),   B, [0,.62,-.5],[0,-14,0],[1.15,.75,1.0]),        // Hinterpartie
-    P(ico(.5),    B, [0,.5,.15],[0,0,0],[1.2,.6,1.0]),             // Bauchsack unten
-    /* Schultern HALB in der Masse versenkt */
-    P(ico(.44,0), D, [-.62,1.62,-.05],[0,25,10]),
-    P(ico(.44,0), D, [ .62,1.6,-.1],[0,-15,-8]),
-    /* Rueckenkegel — deutlich aus der Silhouette */
-    P(cone(.26,.55,5), E, [0,2.35,-.3],[-18,0,0]),
-    P(cone(.22,.46,5), E, [-.15,2.15,-.85],[-38,0,-10]),
-    P(cone(.18,.38,5), E, [ .15,1.8,-1.18],[-55,0,12]),
-    P(cone(.14,.3,5),  E, [-.05,1.4,-1.35],[-70,0,0]),
-    /* Kopf TIEF und VOR der Brust, unter der Schulterlinie */
-    P(sph(.27,8,6), B, [0,1.58,.86]),
-    P(box(.4,.11,.2),  D, [0,1.72,.88],[-14,0,0]),                 // Stirnwulst
-    P(box(.34,.12,.22),D, [0,1.43,.92],[10,0,0]),                  // Kiefer
-    P(cone(.04,.13,5), TUSK,[-.13,1.5,1.06],[16,0,-8]),            // Hauer
-    P(cone(.04,.13,5), TUSK,[ .13,1.5,1.06],[16,0,8]),
-    /* Arme: Schulter -> Boden, per limb verbunden */
-    limb(.21, [-.74,1.5,.08], [-1.14,.3,.66], B),
-    limb(.21, [ .74,1.48,.1], [ 1.16,.3,.7], B),
-    P(sph(.26,8,6), D, [-1.17,.24,.72]),
-    P(sph(.26,8,6), D, [ 1.19,.24,.76]),
-    /* Hinterbein-Hoecker */
-    P(sph(.3,7,5),  D, [-.55,.3,-.6],[0,0,0],[1,.85,1]),
-    P(sph(.3,7,5),  D, [ .55,.3,-.62],[0,0,0],[1,.85,1])
-  ]);
-  const glow = fuse([
-    P(sph(.032,6,4), '#ff5a3c', [-.1,1.61,1.07]),
-    P(sph(.032,6,4), '#ff5a3c', [ .1,1.61,1.07])
-  ]);
-  return { body, glow, h:2.35, r:.95, bob:{a:.02,f:.5} };
+/* =====================================================================
+   FIGUR 06 — FLEISCHBERG
+   Groesster Gegner: Fleischmasse, Rueckenkegel, Arme bis zum Boden.
+   Sektionen: body · head · armL · armR
+   ===================================================================== */
+function buildFleisch() {
+  const A = '#8b6a63', B = '#755652', C = '#9a7871', D = '#5f4744', E = '#42302f',
+        BONE = '#cfc2ab', TUSK = '#e2d6bd', GORE = '#4a2724';
+  const f = figure();
+  const b = sect(f, 'body');
+
+  /* Hinterlaeufe */
+  for (let i = 0; i < 2; i++) {
+    const sgn = i ? 1 : -1;
+    const hau = [sgn * 0.55, 0.85, -0.55], knee = [sgn * 0.63, 0.5, -0.28], ankle = [sgn * 0.6, 0.22, -0.04];
+    put(b, M.SKIN, P(sph(0.34, 10, 8), D, [sgn * 0.56, 0.8, -0.52], 0, [1, 0.92, 1]));
+    put(b, M.SKIN, tube(0.24, 0.19, hau, knee, B));
+    put(b, M.SKIN, P(sph(0.185, 8, 6), D, knee));
+    put(b, M.SKIN, tube(0.19, 0.155, knee, ankle, B));
+    put(b, M.SKIN, P(boxg(0.34, 0.15, 0.44), D, [sgn * 0.6, 0.095, 0.075]));
+    for (let k = 0; k < 3; k++)
+      put(b, M.BONE, P(cone(0.042, 0.11, 5), BONE,
+        [sgn * 0.6 + (k - 1) * 0.105, 0.075, 0.29], [94, 0, 0]));
+  }
+  /* Fleischmasse */
+  put(b, M.SKIN, P(ico(0.98, 1), A, [0, 1.34, -0.22], [-14, 8, 0], [1.22, 1.0, 1.04]));
+  put(b, M.SKIN, P(ico(0.74, 1), C, [0, 0.92, 0.38], [6, 18, 0], [1.06, 0.86, 0.94]));
+  put(b, M.SKIN, P(ico(0.72, 1), B, [0, 0.66, -0.5], [0, -14, 0], [1.15, 0.78, 1.0]));
+  put(b, M.SKIN, P(ico(0.52, 1), B, [0, 0.52, 0.14], [0, 26, 0], [1.2, 0.62, 1.0]));
+  /* Asymmetrische Wucherungen brechen die runde Silhouette */
+  put(b, M.SKIN, P(ico(0.36, 1), D, [-0.72, 1.06, 0.12], [18, 0, 24]));
+  put(b, M.SKIN, P(ico(0.3, 1), D, [0.78, 0.86, -0.06], [0, 30, -16]));
+  put(b, M.SKIN, P(ico(0.26, 0), E, [0.3, 1.9, -0.62], [22, 14, 0]));
+  put(b, M.SKIN, P(ico(0.22, 0), E, [-0.36, 1.82, -0.7], [10, -20, 12]));
+  /* Freiliegender Brustkorb */
+  for (let i = 0; i < 4; i++)
+    put(b, M.BONE, P(torArc(0.44 - i * 0.03, 0.036, 1.5, 5, 12), BONE,
+      [0, 0.84 + i * 0.15, 0.36 - i * 0.03], [76, 0, 0], [1, 1, 0.6]));
+  put(b, M.ORGANIC, P(sph(0.17, 9, 7), GORE, [-0.34, 1.02, 0.6], 0, [1.2, 0.9, 0.5]));
+  /* Schultermassen + Platten */
+  for (let i = 0; i < 2; i++) {
+    const sgn = i ? 1 : -1;
+    put(b, M.SKIN, P(ico(0.45, 1), D, [sgn * 0.64, 1.62, -0.04], [0, sgn * 25, sgn * 10]));
+    put(b, M.BONE, P(cone(0.1, 0.28, 6), BONE, [sgn * 0.66, 1.86, -0.1], [-14, 0, sgn * -26]));
+    put(b, M.BONE, P(cone(0.075, 0.2, 6), BONE, [sgn * 0.86, 1.66, -0.18], [-10, 0, sgn * -58]));
+  }
+  /* Rueckenkegel */
+  const spines = [[0, 2.42, -0.24, 0.24, 0.58, -18], [-0.34, 2.2, -0.5, 0.2, 0.46, -26],
+                  [0.34, 2.16, -0.54, 0.2, 0.46, -26], [-0.18, 2.14, -0.86, 0.2, 0.46, -42],
+                  [0.2, 1.82, -1.16, 0.17, 0.4, -58], [-0.08, 1.46, -1.36, 0.14, 0.32, -72],
+                  [0.06, 1.12, -1.5, 0.11, 0.24, -84], [-0.5, 1.86, -0.86, 0.15, 0.34, -46],
+                  [0.52, 1.8, -0.9, 0.15, 0.34, -46]];
+  for (const s of spines)
+    put(b, M.BONE, P(cone(s[3], s[4], 6), BONE, [s[0], s[1], s[2]], [s[5], 0, s[0] * 30]));
+  put(b, M.SKIN, tube(0.34, 0.3, [0, 1.62, 0.28], [0, 1.5, 0.62], B, 10));
+
+  /* ---- Kopf ---- */
+  const h = sect(f, 'head', [0, 1.55, 0.55]);
+  put(h, M.SKIN, P(sph(0.34, 11, 8), B, [0, 1.56, 0.9]));
+  put(h, M.SKIN, P(boxg(0.5, 0.15, 0.26), D, [0, 1.74, 0.94], [-15, 0, 0]));
+  put(h, M.SKIN, P(boxg(0.42, 0.16, 0.28), D, [0, 1.37, 0.98], [11, 0, 0]));
+  for (let i = 0; i < 5; i++)
+    put(h, M.BONE, P(cone(0.028, 0.08, 4), TUSK,
+      [-0.115 + i * 0.058, 1.45, 0.99 + (i % 2) * 0.012], [168, 0, 0]));
+  for (let i = 0; i < 2; i++) {
+    const sgn = i ? 1 : -1;
+    put(h, M.BONE, P(cone(0.052, 0.19, 6), TUSK, [sgn * 0.145, 1.5, 1.05], [17, 0, sgn * -11]));
+    put(h, M.BONE, P(cone(0.036, 0.12, 5), TUSK, [sgn * 0.185, 1.62, 0.96], [150, 0, sgn * 14]));
+    put(h, M.BONE, P(cone(0.062, 0.17, 6), BONE, [sgn * 0.225, 1.71, 0.7], [-32, 0, sgn * -28]));
+    put(h, M.ORGANIC, P(sph(0.072, 8, 6), '#1d1416', [sgn * 0.125, 1.62, 1.08]));
+    put(h, M.GLOW, P(sph(0.044, 7, 5), '#ff5a3c', [sgn * 0.125, 1.622, 1.125]));
+  }
+
+  /* ---- Arme ---- */
+  for (let i = 0; i < 2; i++) {
+    const sgn = i ? 1 : -1;
+    const s = [sgn * 0.76, 1.5, 0.06], e = [sgn * 1.02, 0.94, 0.36], w = [sgn * 1.14, 0.44, 0.6];
+    const sec2 = sect(f, i ? 'armR' : 'armL', s);
+    put(sec2, M.SKIN, tube(0.235, 0.2, s, e, B));
+    put(sec2, M.SKIN, P(sph(0.2, 9, 7), D, e));
+    put(sec2, M.SKIN, tube(0.2, 0.17, e, w, B));
+    put(sec2, M.BONE, P(cone(0.058, 0.16, 5), BONE, [sgn * 0.96, 1.14, 0.28], [0, 0, sgn * -62]));
+    put(sec2, M.BONE, P(cone(0.048, 0.13, 5), BONE, [sgn * 1.11, 0.66, 0.5], [0, 0, sgn * -72]));
+    put(sec2, M.SKIN, P(sph(0.27, 10, 8), D, [sgn * 1.18, 0.26, 0.68]));
+    for (let k = 0; k < 3; k++)
+      put(sec2, M.BONE, P(cone(0.05, 0.115, 5), BONE,
+        [sgn * 1.18 + (k - 1) * 0.115, 0.28, 0.9], [88, 0, 0]));
+  }
+  f.meta = { h: 2.5, r: 1.08, base: 0 };
+  return f;
 }
 
-/* ============================ BÜHNE ============================ */
+const BUILDERS = { legion: buildLegion, walker: buildWalker, runner: buildRunner,
+                   brute: buildBrute, speier: buildSpeier, fleisch: buildFleisch };
 
+/* =====================================================================
+   Renderer, Buehne, Licht
+   ===================================================================== */
 const canvas = document.getElementById('scene');
 let renderer;
 try {
-  renderer = new THREE.WebGLRenderer({ canvas, antialias:true,
-    powerPreference:'high-performance' });
-} catch (e) {
-  canvas.replaceWith(Object.assign(document.createElement('div'),
-    { className:'fallback', textContent:'WebGL ist hier nicht verfügbar.' }));
-  throw e;
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: !IS_TOUCH, powerPreference: 'high-performance' });
+} catch (err) {
+  const d = document.createElement('div');
+  d.className = 'fallback';
+  d.textContent = 'WebGL ist auf diesem Gerät nicht verfügbar — die Figurenansicht braucht eine GPU.';
+  document.body.appendChild(d);
+  document.getElementById('boot').classList.add('gone');
+  throw err;
 }
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, CFG.dprMax));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.98;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color('#0d0d11');
-scene.fog = new THREE.Fog('#0d0d11', 10, 26);
+scene.background = new THREE.Color('#07070a');
+scene.fog = new THREE.Fog('#07070a', CFG.fog.near, CFG.fog.far);
 
-scene.add(new THREE.HemisphereLight(0x8899bb, 0x22201c, .7));
-const key = new THREE.DirectionalLight(0xfff0dd, 2.5);
-key.position.set(3, 8, 4);
-scene.add(key);
-const rim = new THREE.DirectionalLight(0x6a80c0, .9);   // kühles Gegenlicht
-rim.position.set(-4, 3, -5);
-scene.add(rim);
+/* Registry: alles, was disposed werden muss */
+const TRASH = { geo: [], mat: [], tex: [] };
+const keepG = g => (TRASH.geo.push(g), g);
+const keepM = m => (TRASH.mat.push(m), m);
+const keepT = t => (TRASH.tex.push(t), t);
 
-/* Boden + Blob-Schatten */
-const ground = new THREE.Mesh(new THREE.BoxGeometry(30, .1, 18),
-  new THREE.MeshLambertMaterial({ color:'#17171c' }));
-ground.position.y = -.05;
-scene.add(ground);
+/* ---------- Environment: winzige Studio-Box per PMREM, kein externes HDRI ---------- */
+function buildEnvironment() {
+  const envScene = new THREE.Scene();
+  const room = new THREE.Mesh(
+    new THREE.BoxGeometry(12, 8, 12),
+    new THREE.MeshBasicMaterial({ color: '#12141b', side: THREE.BackSide }));
+  envScene.add(room);
+  const panel = (col, int, pos, rot, sz) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(sz[0], sz[1]),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(int) }));
+    m.position.fromArray(pos); m.rotation.fromArray(rot.map(v => v * DEG));
+    envScene.add(m); return m;
+  };
+  panel('#fff1de', 3.1, [0, 3.9, 0], [90, 0, 0], [6, 6]);        // Deckenlicht
+  panel('#4f7ad0', 1.5, [-5.9, 1.4, 0], [0, 90, 0], [7, 5]);     // kaltes Seitenlicht
+  panel('#c2601f', 0.9, [5.9, 1.2, -1], [0, -90, 0], [6, 4]);    // warmer Kontrapunkt
+  panel('#0a0b10', 1.0, [0, -3.9, 0], [-90, 0, 0], [12, 12]);    // dunkler Boden
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  pmrem.compileEquirectangularShader();
+  const rt = pmrem.fromScene(envScene, 0.035);
+  envScene.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+  pmrem.dispose();
+  return rt.texture;
+}
+scene.environment = keepT(buildEnvironment());
 
-const bodyMat = new THREE.MeshLambertMaterial({ vertexColors:true });
-const glowMat = new THREE.MeshBasicMaterial({ vertexColors:true });
-const blobGeo = new THREE.CircleGeometry(1, 20);
-const blobMat = new THREE.MeshBasicMaterial({ color:'#000000',
-  transparent:true, opacity:.35 });
+/* ---------- Licht: Key, Rim, Fill, zwei farbige Akzente ---------- */
+const keyLight = new THREE.DirectionalLight(0xffe9cf, 3.1);
+keyLight.position.set(3.4, 6.2, 4.2);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(CFG.shadowSize, CFG.shadowSize);
+keyLight.shadow.camera.near = 1;
+keyLight.shadow.camera.far = 28;
+keyLight.shadow.camera.left = -11; keyLight.shadow.camera.right = 11;
+keyLight.shadow.camera.top = 7; keyLight.shadow.camera.bottom = -3.5;
+keyLight.shadow.bias = -0.0006;
+keyLight.shadow.normalBias = 0.022;
+keyLight.shadow.radius = 2.4;
+scene.add(keyLight);
+scene.add(keyLight.target);
 
-const DEFS = [
-  { name:'LEGIONÄR',    sub:'Spieler-Einheit', build:buildLegionnaire },
-  { name:'WALKER',      sub:'Standard-Zombie', build:buildWalker },
-  { name:'RUNNER',      sub:'Rudel · schnell', build:buildRunner },
-  { name:'BRUTE',       sub:'Tank',            build:buildBrute },
-  { name:'SPEIER',      sub:'Boss B',          build:buildSpeier },
-  { name:'FLEISCHBERG', sub:'Boss A',          build:buildFleischberg },
-];
-const X = [-4.2, -3.15, -2.15, -1.0, 1.0, 3.4];
+const rimLight = new THREE.DirectionalLight(0x7ea6ff, 2.6);
+rimLight.position.set(-4.6, 3.0, -5.4);
+scene.add(rimLight);
 
-const figures = DEFS.map((d, i) => {
-  const built = d.build();
-  const grp = new THREE.Group();
-  grp.position.x = X[i];
-  grp.rotation.y = -22 * DEG;
-  grp.add(new THREE.Mesh(built.body, bodyMat));
-  if (built.glow) grp.add(new THREE.Mesh(built.glow, glowMat));
-  const blob = new THREE.Mesh(blobGeo, blobMat);
-  blob.rotation.x = -90 * DEG;
-  blob.position.y = .012;
-  blob.scale.setScalar(built.r * 1.1);
-  blob.position.x = X[i];              // Schatten bobbt nicht mit
-  scene.add(blob);
-  scene.add(grp);
-  const lbl = document.createElement('div');
-  lbl.className = 'lbl';
-  lbl.innerHTML = `${d.name}<small>${d.sub}</small>`;
-  document.body.appendChild(lbl);
-  return { grp, lbl, ...built, x:X[i], phase: i * 1.7 };
+const fillLight = new THREE.HemisphereLight(0x5a6a8c, 0x0a0a0e, 0.55);
+scene.add(fillLight);
+
+const accentA = new THREE.PointLight(0x6f9fdf, 1.8, 4.6, 2.0);
+const accentB = new THREE.PointLight(0xff6a3c, 0.9, 4.2, 2.0);
+scene.add(accentA); scene.add(accentB);
+
+/* ---------- Hintergrund: sehr subtiler vertikaler Verlauf ---------- */
+function gradientTexture(stops, w, h) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d');
+  const grd = g.createLinearGradient(0, 0, 0, h);
+  for (const s of stops) grd.addColorStop(s[0], s[1]);
+  g.fillStyle = grd; g.fillRect(0, 0, w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const skyTex = keepT(gradientTexture(
+  [[0, '#141726'], [0.42, '#0c0d14'], [0.72, '#07070a'], [1, '#040406']], 4, 256));
+const sky = new THREE.Mesh(
+  keepG(new THREE.SphereGeometry(46, 24, 16)),
+  keepM(new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false, depthWrite: false })));
+scene.add(sky);
+
+/* ---------- Boden: Plattform mit weichem Abfall zum Nichts ---------- */
+function radialTexture(inner, outer, stopIn) {
+  const s = 256, c = document.createElement('canvas');
+  c.width = c.height = s;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  grd.addColorStop(0, inner);
+  grd.addColorStop(stopIn, inner);
+  grd.addColorStop(1, outer);
+  g.fillStyle = grd; g.fillRect(0, 0, s, s);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const floorTex = keepT(radialTexture('#1a1d26', '#050508', 0.3));
+const floor = new THREE.Mesh(
+  keepG(new THREE.CircleGeometry(17, 64)),
+  keepM(new THREE.MeshStandardMaterial({
+    map: floorTex, color: '#ffffff', roughness: 0.52, metalness: 0.35,
+    envMapIntensity: 0.5
+  })));
+floor.rotation.x = -90 * DEG;
+floor.receiveShadow = true;
+scene.add(floor);
+
+/* Konzentrische Technik-Ringe */
+const deckParts = [];
+for (let i = 0; i < 5; i++) {
+  const rr = 3.2 + i * 2.6;
+  deckParts.push(P(new THREE.RingGeometry(rr, rr + 0.014, 96), '#39435c', [0, 0.002, 0], [-90, 0, 0]));
+}
+for (let i = 0; i < 12; i++) {
+  const a = i / 12 * TAU;
+  deckParts.push(P(new THREE.PlaneGeometry(0.014, 5.6), '#2c3448',
+    [Math.sin(a) * 9.4, 0.002, Math.cos(a) * 9.4], [-90, 0, -a / DEG]));
+}
+const deck = new THREE.Mesh(
+  keepG(mergeGeometries(deckParts, false)),
+  keepM(new THREE.MeshBasicMaterial({
+    vertexColors: true, transparent: true, opacity: 0.32,
+    side: THREE.DoubleSide, depthWrite: false })));
+for (const g of deckParts) g.dispose();
+scene.add(deck);
+
+/* ---------- Schwebende Partikel ---------- */
+const dustGeo = keepG(new THREE.BufferGeometry());
+const dustN = CFG.particles;
+const dustPos = new Float32Array(dustN * 3);
+const dustVel = new Float32Array(dustN);
+for (let i = 0; i < dustN; i++) {
+  const a = Math.random() * TAU, rr = 1.5 + Math.random() * 11;
+  dustPos[i * 3] = Math.sin(a) * rr;
+  dustPos[i * 3 + 1] = Math.random() * 5.2;
+  dustPos[i * 3 + 2] = Math.cos(a) * rr;
+  dustVel[i] = 0.045 + Math.random() * 0.11;
+}
+dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+const dustMat = keepM(new THREE.PointsMaterial({
+  color: '#9fb4d8', size: 0.028, sizeAttenuation: true,
+  transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending }));
+const dust = new THREE.Points(dustGeo, dustMat);
+dust.frustumCulled = false;
+scene.add(dust);
+
+/* =====================================================================
+   Figuren instanziieren
+   ===================================================================== */
+const BASE_MATS = {};
+for (const k in MATS) {
+  BASE_MATS[k] = new THREE.MeshStandardMaterial({
+    vertexColors: true, flatShading: true, side: THREE.DoubleSide,
+    metalness: MATS[k].metalness, roughness: MATS[k].roughness, envMapIntensity: MATS[k].env
+  });
+}
+BASE_MATS.GLOW = new THREE.MeshBasicMaterial({
+  vertexColors: true, toneMapped: false, side: THREE.DoubleSide });
+
+const LINEUP_X = [-6.5, -5.05, -3.75, -2.1, 0.5, 4.25];
+const figures = [];
+
+for (let i = 0; i < ROSTER.length; i++) {
+  const def = ROSTER[i];
+  const built = BUILDERS[def.key]();
+  const root = new THREE.Group();
+  root.position.x = LINEUP_X[i];
+  const turn = new THREE.Group();          // Drehteller: Drag + Auto-Spin
+  root.add(turn);
+
+  const mats = {};
+  for (const k in BASE_MATS) {
+    const m = BASE_MATS[k].clone();
+    if (k === 'GLOW') m.color.setScalar(2.7);
+    mats[k] = keepM(m);
+  }
+
+  const nodes = {};
+  for (const s of built.sections) {
+    const grp = new THREE.Group();
+    grp.position.fromArray(s.origin);
+    for (const cls in s.parts) {
+      const parts = s.parts[cls];
+      const geo = keepG(mergeGeometries(parts, false));
+      for (const p of parts) p.dispose();
+      geo.translate(-s.origin[0], -s.origin[1], -s.origin[2]);
+      geo.computeVertexNormals();
+      const mesh = new THREE.Mesh(geo, mats[cls]);
+      mesh.castShadow = cls !== 'GLOW';
+      mesh.receiveShadow = cls !== 'GLOW';
+      grp.add(mesh);
+    }
+    grp.userData.rest = { px: grp.position.x, py: grp.position.y, pz: grp.position.z };
+    nodes[s.name] = grp;
+    turn.add(grp);
+  }
+  scene.add(root);
+
+  /* Kontaktring + Bodenschein unter der Figur */
+  const glowTex = keepT(radialTexture('#ffffff', 'rgba(0,0,0,1)', 0.02));
+  const halo = new THREE.Mesh(
+    keepG(new THREE.CircleGeometry(built.meta.r * 2.6, 40)),
+    keepM(new THREE.MeshBasicMaterial({
+      map: glowTex, color: def.accent, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false })));
+  halo.rotation.x = -90 * DEG;
+  halo.position.set(LINEUP_X[i], 0.004, 0);
+  scene.add(halo);
+
+  const ring = new THREE.Mesh(
+    keepG(new THREE.RingGeometry(built.meta.r * 1.28, built.meta.r * 1.34, 56)),
+    keepM(new THREE.MeshBasicMaterial({
+      color: def.accent, transparent: true, opacity: 0.22,
+      side: THREE.DoubleSide, depthWrite: false })));
+  ring.rotation.x = -90 * DEG;
+  ring.position.set(LINEUP_X[i], 0.006, 0);
+  scene.add(ring);
+
+  figures.push({
+    def, root, turn, nodes, mats, halo, ring,
+    x: LINEUP_X[i], h: built.meta.h, r: built.meta.r,
+    spin: 0, spinVel: 0, phase: i * 1.7,
+    dimCur: 1, dimTarget: 1
+  });
+}
+
+/* =====================================================================
+   UI — Karten, Dossier, Kopfzeile
+   ===================================================================== */
+const el = {
+  rail: document.getElementById('rail'),
+  idx: document.getElementById('dsrIdx'),
+  name: document.getElementById('dsrName'),
+  role: document.getElementById('dsrRole'),
+  stats: document.getElementById('dsrStats'),
+  text: document.getElementById('dsrText'),
+  brandIdx: document.getElementById('brandIdx'),
+  sysMode: document.getElementById('sysMode'),
+  sysFps: document.getElementById('sysFps'),
+  sysQual: document.getElementById('sysQual'),
+  boot: document.getElementById('boot')
+};
+const pad2 = n => (n < 10 ? '0' : '') + n;
+
+/* Karten einmal bauen */
+const cards = ROSTER.map((d, i) => {
+  const c = document.createElement('button');
+  c.className = 'card';
+  c.type = 'button';
+  c.setAttribute('role', 'tab');
+  c.setAttribute('aria-selected', 'false');
+  c.style.setProperty('--c', d.accent);
+  c.innerHTML =
+    '<div class="card-n">' + pad2(i + 1) + ' / 06</div>' +
+    '<div class="card-name"></div>' +
+    '<div class="card-type"></div>' +
+    '<div class="card-bar"><i></i></div>';
+  c.querySelector('.card-name').textContent = d.name;
+  c.querySelector('.card-type').textContent = d.type;
+  c.addEventListener('click', () => select(i, true));
+  el.rail.appendChild(c);
+  return c;
 });
 
-/* ============================ KAMERA ============================ */
-const camera = new THREE.PerspectiveCamera(45, 1, .1, 100);
-let focusIdx = params.has('focus') ? (+params.get('focus') - 1) : -1;
-const camPos = new THREE.Vector3(), camAim = new THREE.Vector3();
+/* Fünf Statzeilen einmal bauen, danach nur Werte aktualisieren */
+const statRows = [];
+for (let i = 0; i < 5; i++) {
+  const row = document.createElement('div');
+  row.className = 'stat';
+  row.innerHTML = '<span class="stat-k"></span><span class="stat-v"></span>' +
+                  '<span class="stat-bar"><i></i></span>';
+  el.stats.appendChild(row);
+  statRows.push({ row, k: row.querySelector('.stat-k'), v: row.querySelector('.stat-v'),
+                  bar: row.querySelector('.stat-bar'), fill: row.querySelector('.stat-bar i') });
+}
 
-function setView() {
-  if (focusIdx >= 0 && focusIdx < figures.length) {
-    const f = figures[focusIdx];
-    const dist = Math.max(1.5, f.h * 1.55);
-    camPos.set(f.x + dist * .28, f.h * .72 + .25, dist);
-    camAim.set(f.x, f.h * .48, 0);
+let selected = 0, mode = 'focus';
+function applyDossier(i) {
+  const d = ROSTER[i];
+  document.documentElement.style.setProperty('--accent', d.accent);
+  el.idx.textContent = pad2(i + 1);
+  el.name.textContent = d.name;
+  el.role.textContent = d.role;
+  el.text.textContent = d.text;
+  el.brandIdx.textContent = pad2(i + 1) + ' / 06';
+  for (let s = 0; s < statRows.length; s++) {
+    const st = d.stats[s], r = statRows[s];
+    r.k.textContent = st.k;
+    r.v.textContent = st.d;
+    if (st.v < 0) {
+      r.row.classList.add('text');
+      r.bar.style.display = 'none';
+      r.fill.style.width = '0%';
+    } else {
+      r.row.classList.remove('text');
+      r.bar.style.display = '';
+      /* Von 0 aufziehen, damit der Balken sichtbar laeuft */
+      r.fill.style.width = '0%';
+      const w = st.v;
+      requestAnimationFrame(() => { r.fill.style.width = w + '%'; });
+    }
+  }
+  for (let c = 0; c < cards.length; c++)
+    cards[c].setAttribute('aria-selected', c === i ? 'true' : 'false');
+  if (IS_SMALL && cards[i].scrollIntoView)
+    cards[i].scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'nearest', inline: 'center' });
+}
+
+/* =====================================================================
+   Kamera
+   ===================================================================== */
+const camera = new THREE.PerspectiveCamera(CFG.cam.fov, 1, CFG.cam.near, CFG.cam.far);
+const camTarget = new THREE.Vector3(-1.1, CFG.cam.overviewY, 0);
+const camWant = new THREE.Vector3(-1.1, CFG.cam.overviewY, 0);
+let dist = CFG.cam.overviewDist, distWant = CFG.cam.overviewDist;
+let pitch = CFG.cam.overviewPitch, pitchWant = CFG.cam.overviewPitch;
+let yaw = 0.14, yawWant = 0.14, zoom = 1;
+const OVERVIEW = { x: -0.85, y: CFG.cam.overviewY };
+
+function frameSelection(instant) {
+  if (mode === 'overview') {
+    camWant.set(OVERVIEW.x, OVERVIEW.y, 0);
+    distWant = CFG.cam.overviewDist;
+    pitchWant = CFG.cam.overviewPitch;
+    yawWant = 0.045;
+    el.sysMode.textContent = 'OVERVIEW';
   } else {
-    camPos.set(0, 3.4, 8.8);
-    camAim.set(-.15, .95, 0);
+    const f = figures[selected];
+    /* Auf breiten Schirmen die Figur nach rechts schieben, damit das
+       Dossier links frei steht und nie ueber der Figur klebt. */
+    const wide = (canvas.clientWidth || 1) / (canvas.clientHeight || 1) > 1.05;
+    const shift = wide ? (f.h * CFG.cam.focusDistMul + CFG.cam.focusDistAdd) * 0.11 : 0;
+    camWant.set(f.x - shift, f.h * (wide ? 0.46 : 0.52), 0);
+    distWant = f.h * CFG.cam.focusDistMul + CFG.cam.focusDistAdd;
+    pitchWant = CFG.cam.focusPitch;
+    yawWant = 0.13;
+    el.sysMode.textContent = 'FOCUS ' + pad2(selected + 1);
+  }
+  zoom = 1;
+  if (instant) {
+    camTarget.copy(camWant);
+    dist = distWant; pitch = pitchWant; yaw = yawWant;
   }
 }
-setView();
-camera.position.copy(camPos);
+function select(i, userAction) {
+  selected = ((i % ROSTER.length) + ROSTER.length) % ROSTER.length;
+  mode = 'focus';
+  document.getElementById('dossier').classList.remove('idle');
+  document.getElementById('scrim').classList.remove('idle');
+  applyDossier(selected);
+  frameSelection(false);
+  if (userAction) figures[selected].spinVel += 0.9;
+}
+function overview() {
+  mode = 'overview';
+  document.getElementById('dossier').classList.add('idle');
+  document.getElementById('scrim').classList.add('idle');
+  frameSelection(false);
+  el.sysMode.textContent = 'OVERVIEW';
+  for (const c of cards) c.setAttribute('aria-selected', 'false');
+}
+
+/* =====================================================================
+   Eingaben — Maus, Touch, Tastatur
+   ===================================================================== */
+const pointers = new Map();
+let dragging = false, lastX = 0, lastY = 0, pinchDist = 0, moved = 0, downTime = 0;
+
+function pointerDown(e) {
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size === 1) {
+    dragging = true; moved = 0; downTime = performance.now();
+    lastX = e.clientX; lastY = e.clientY;
+    canvas.classList.add('dragging');
+  } else if (pointers.size === 2) {
+    const p = [...pointers.values()];
+    pinchDist = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+  }
+  if (canvas.setPointerCapture) { try { canvas.setPointerCapture(e.pointerId); } catch (_) {} }
+}
+function pointerMove(e) {
+  if (!pointers.has(e.pointerId)) return;
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size === 2) {
+    const p = [...pointers.values()];
+    const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+    if (pinchDist > 0) applyZoom(Math.pow(pinchDist / d, 0.9));
+    pinchDist = d;
+    return;
+  }
+  if (!dragging) return;
+  const dx = e.clientX - lastX, dy = e.clientY - lastY;
+  lastX = e.clientX; lastY = e.clientY;
+  moved += Math.abs(dx) + Math.abs(dy);
+  const targets = mode === 'focus' ? [figures[selected]] : figures;
+  for (const f of targets) f.spinVel += dx * 0.014;
+  pitchWant = clamp(pitchWant + dy * 0.0022, CFG.cam.minPitch, CFG.cam.maxPitch);
+}
+function pointerUp(e) {
+  pointers.delete(e.pointerId);
+  if (pointers.size < 2) pinchDist = 0;
+  if (pointers.size === 0) {
+    canvas.classList.remove('dragging');
+    if (dragging && moved < 9 && performance.now() - downTime < 420) pickAt(e.clientX, e.clientY);
+    dragging = false;
+  }
+}
+canvas.addEventListener('pointerdown', pointerDown);
+canvas.addEventListener('pointermove', pointerMove);
+canvas.addEventListener('pointerup', pointerUp);
+canvas.addEventListener('pointercancel', pointerUp);
+canvas.addEventListener('lostpointercapture', pointerUp);
+
+function applyZoom(mul) {
+  zoom = clamp(zoom * mul, CFG.cam.zoomMin, CFG.cam.zoomMax);
+}
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  applyZoom(Math.exp(e.deltaY * 0.0011));
+}, { passive: false });
+
+/* Klick/Tap auf eine Figur waehlt sie aus */
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+const pickRoots = figures.map(f => f.root);
+function pickAt(cx, cy) {
+  const rect = canvas.getBoundingClientRect();
+  ndc.set(((cx - rect.left) / rect.width) * 2 - 1, -((cy - rect.top) / rect.height) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  const hits = raycaster.intersectObjects(pickRoots, true);
+  if (!hits.length) return;
+  let o = hits[0].object;
+  while (o && pickRoots.indexOf(o) === -1) o = o.parent;
+  const i = pickRoots.indexOf(o);
+  if (i >= 0 && (mode === 'overview' || i !== selected)) select(i, true);
+}
 
 addEventListener('keydown', e => {
-  if (e.key === '0') focusIdx = -1;
-  else if (e.key >= '1' && e.key <= '6') focusIdx = +e.key - 1;
-  else return;
-  setView();
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key;
+  if (k === '0') { overview(); e.preventDefault(); }
+  else if (k >= '1' && k <= '6') { select(+k - 1, true); e.preventDefault(); }
+  else if (k === 'ArrowRight') { select(selected + 1, true); e.preventDefault(); }
+  else if (k === 'ArrowLeft') { select(selected - 1, true); e.preventDefault(); }
+  else if (k === '+' || k === '=') { applyZoom(0.88); e.preventDefault(); }
+  else if (k === '-') { applyZoom(1.14); e.preventDefault(); }
 });
 
-/* Ziehen dreht alle Figuren */
-let dragging = false, lastX = 0, spinVel = 0;
-addEventListener('pointerdown', e => { dragging = true; lastX = e.clientX; });
-addEventListener('pointerup',   () => dragging = false);
-addEventListener('pointermove', e => {
-  if (!dragging) return;
-  spinVel = (e.clientX - lastX) * .006;
-  lastX = e.clientX;
-  figures.forEach(f => f.grp.rotation.y += spinVel);
-});
+/* =====================================================================
+   Animation je Figur
+   ===================================================================== */
+const clampAmp = () => (REDUCED ? 0.25 : 1);
+function animateFigure(f, t, focused) {
+  const A = clampAmp(), n = f.nodes, ph = f.phase;
+  const set = (node, dx, dy, dz, rx, ry, rz) => {
+    if (!node) return;
+    const r = node.userData.rest;
+    node.position.set(r.px + dx, r.py + dy, r.pz + dz);
+    node.rotation.set(rx, ry, rz);
+  };
+  switch (f.def.key) {
+    case 'legion': {
+      const b = Math.sin(t * 1.5 + ph) * 0.006 * A;
+      f.turn.position.y = b;
+      f.turn.rotation.z = Math.sin(t * 0.7 + ph) * 0.006 * A;
+      set(n.head, 0, 0, 0, Math.sin(t * 0.9 + ph) * 0.03 * A, Math.sin(t * 0.55 + ph) * 0.09 * A, 0);
+      set(n.shield, 0, Math.sin(t * 1.1 + ph) * 0.004 * A, 0,
+        Math.sin(t * 0.8 + ph) * 0.035 * A, 0, Math.sin(t * 0.6 + ph) * 0.03 * A);
+      set(n.spear, 0, 0, 0, Math.sin(t * 0.85 + ph + 1) * 0.028 * A, 0,
+        Math.sin(t * 0.65 + ph) * 0.035 * A);
+      break;
+    }
+    case 'walker': {
+      f.turn.position.y = Math.abs(Math.sin(t * 1.1 + ph)) * 0.014 * A;
+      f.turn.rotation.z = Math.sin(t * 0.62 + ph) * 0.055 * A;
+      f.turn.rotation.x = Math.sin(t * 0.44 + ph) * 0.022 * A;
+      set(n.head, 0, 0, 0, Math.sin(t * 0.7 + ph) * 0.11 * A + 0.04,
+        Math.sin(t * 0.41 + ph) * 0.19 * A, Math.sin(t * 0.53) * 0.06 * A);
+      set(n.armL, 0, 0, 0, Math.sin(t * 0.9 + ph) * 0.1 * A, 0, Math.sin(t * 0.7) * 0.05 * A);
+      set(n.armR, 0, 0, 0, Math.sin(t * 0.9 + ph + 2) * 0.1 * A, 0, Math.sin(t * 0.72 + 1) * 0.05 * A);
+      break;
+    }
+    case 'runner': {
+      const j = Math.sin(t * 3.4 + ph);
+      f.turn.position.y = Math.abs(j) * 0.02 * A;
+      f.turn.rotation.z = Math.sin(t * 2.6 + ph) * 0.045 * A;
+      set(n.head, 0, 0, 0, j * 0.08 * A, Math.sin(t * 4.3 + ph) * 0.14 * A, 0);
+      break;
+    }
+    case 'brute': {
+      const br = Math.sin(t * 0.72 + ph);
+      f.turn.position.y = br * 0.016 * A;
+      f.turn.rotation.z = Math.sin(t * 0.4 + ph) * 0.018 * A;
+      const s = 1 + br * 0.018 * A;
+      if (n.body) n.body.scale.set(s, 1 + br * 0.01 * A, s);
+      set(n.head, 0, br * 0.008 * A, 0, br * 0.05 * A + 0.03, Math.sin(t * 0.33 + ph) * 0.1 * A, 0);
+      set(n.armL, 0, 0, 0, Math.sin(t * 0.6 + ph) * 0.05 * A, 0, Math.sin(t * 0.5) * 0.04 * A);
+      set(n.armR, 0, 0, 0, Math.sin(t * 0.6 + ph + 2.4) * 0.05 * A, 0, Math.sin(t * 0.52 + 1) * 0.04 * A);
+      break;
+    }
+    case 'speier': {
+      const p = Math.sin(t * 0.55 + ph);
+      f.turn.position.y = p * 0.02 * A;
+      const s = 1 + p * 0.045 * A;
+      if (n.belly) n.belly.scale.set(s, 1 + p * 0.03 * A, s);
+      set(n.head, 0, p * 0.03 * A, 0, p * 0.05 * A, Math.sin(t * 0.31 + ph) * 0.12 * A, 0);
+      break;
+    }
+    case 'fleisch': {
+      const p = Math.sin(t * 0.34 + ph), q = Math.sin(t * 0.21 + ph * 0.5);
+      f.turn.position.y = p * 0.024 * A;
+      f.turn.rotation.z = q * 0.014 * A;
+      const s = 1 + p * 0.022 * A;
+      if (n.body) n.body.scale.set(s, 1 + p * 0.014 * A, s);
+      set(n.head, 0, p * 0.02 * A, 0, p * 0.045 * A + 0.02, q * 0.11 * A, 0);
+      set(n.armL, 0, 0, 0, Math.sin(t * 0.29 + ph) * 0.04 * A, 0, q * 0.03 * A);
+      set(n.armR, 0, 0, 0, Math.sin(t * 0.29 + ph + 2.1) * 0.04 * A, 0, -q * 0.03 * A);
+      break;
+    }
+  }
+  /* Kontaktring + Bodenschein reagieren auf Auswahl */
+  const on = focused ? 1 : 0;
+  f.ring.material.opacity += ((focused ? 0.62 : 0.16) - f.ring.material.opacity) * 0.08;
+  f.halo.material.opacity += ((focused ? 0.34 : 0.0) - f.halo.material.opacity) * 0.06;
+  f.ring.scale.setScalar(1 + (focused ? Math.sin(t * 1.6) * 0.012 : 0));
+  return on;
+}
+function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
 
-const spin = params.get('spin') !== '0';
-const startAngle = params.has('angle') ? +params.get('angle') : null;
-if (startAngle !== null) figures.forEach(f => f.grp.rotation.y = startAngle * DEG);
+/* =====================================================================
+   Postprocessing — dezentes Bloom nur fuer die leuchtenden Augen
+   ===================================================================== */
+const composer = new EffectComposer(renderer);
+composer.setPixelRatio(renderer.getPixelRatio());
+const renderPass = new RenderPass(scene, camera);
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1),
+  CFG.bloom.strength, CFG.bloom.radius, CFG.bloom.threshold);
+const outputPass = new OutputPass();
+composer.addPass(renderPass);
+composer.addPass(bloomPass);
+composer.addPass(outputPass);
 
-/* ============================ LOOP ============================ */
+let quality = 0;                                  // 0 HIGH · 1 MEDIUM · 2 LOW
+let shadowBox = 11;
+function setQuality(q) {
+  if (q === quality) return;
+  quality = q;
+  bloomPass.enabled = q < 1;
+  renderer.shadowMap.enabled = q < 2;
+  scene.traverse(o => { if (o.isMesh && o.material) o.material.needsUpdate = true; });
+  const dpr = Math.min(window.devicePixelRatio || 1, q < 2 ? CFG.dprMax : 1);
+  renderer.setPixelRatio(dpr);
+  composer.setPixelRatio(dpr);
+  resize();
+  el.sysQual.textContent = ['HIGH', 'MEDIUM', 'LOW'][q];
+}
+
 function resize() {
-  const w = canvas.clientWidth, h = canvas.clientHeight;
+  const w = canvas.clientWidth || window.innerWidth;
+  const h = canvas.clientHeight || window.innerHeight;
   if (!w || !h) return;
   renderer.setSize(w, h, false);
+  composer.setSize(w, h);
   camera.aspect = w / h;
+  /* Auf schmalen Hochkant-Displays etwas mehr Blickfeld, sonst schneidet die Figur an */
+  camera.fov = camera.aspect < 0.8 ? CFG.cam.fov + 14 : CFG.cam.fov;
   camera.updateProjectionMatrix();
 }
-new ResizeObserver(resize).observe(canvas);
+if (window.ResizeObserver) new ResizeObserver(resize).observe(canvas);
+addEventListener('resize', resize);
+addEventListener('orientationchange', () => setTimeout(resize, 220));
 resize();
 
-let visible = true;
-document.addEventListener('visibilitychange', () => visible = !document.hidden);
+/* =====================================================================
+   Loop
+   ===================================================================== */
+let running = true;
+document.addEventListener('visibilitychange', () => {
+  running = !document.hidden;
+  if (running) last = performance.now() / 1000;
+});
+if (mqReduce.addEventListener)
+  mqReduce.addEventListener('change', e => { REDUCED = e.matches; });
+
+const spinParam = params.get('spin') !== '0';
+const angleParam = params.has('angle') ? +params.get('angle') * DEG : null;
+if (angleParam !== null) for (const f of figures) f.spin = angleParam;
 
 let last = performance.now() / 1000, elapsed = 0;
-const _proj = new THREE.Vector3();
+let fpsAcc = 0, fpsFrames = 0, fpsTimer = 0, slowFor = 0;
+const _lookAt = new THREE.Vector3();
 
-renderer.setAnimationLoop(() => {
-  if (!visible) return;
+function tick() {
   const now = performance.now() / 1000;
-  const dt = Math.min(now - last, .1);
-  last = now; elapsed += dt;
+  let dt = now - last;
+  last = now;
+  if (!running) return;
+  if (dt > 0.1) dt = 0.1;
+  elapsed += dt;
   const t = elapsed;
 
-  figures.forEach(f => {
-    if (spin && !reduced && !dragging && startAngle === null)
-      f.grp.rotation.y += dt * .45;
-    f.grp.position.y = reduced ? 0
-      : Math.sin(t * f.bob.f * Math.PI * 2 + f.phase) * f.bob.a + f.bob.a;
-    /* Label projizieren */
-    _proj.set(f.x, -.14, .9).project(camera);
-    const sx = (_proj.x * .5 + .5) * innerWidth;
-    const sy = (-_proj.y * .5 + .5) * innerHeight;
-    const vis = _proj.z < 1 && (focusIdx === -1 || figures[focusIdx] === f);
-    f.lbl.style.display = vis ? 'block' : 'none';
-    f.lbl.style.transform = `translate(${sx - 0}px,${sy}px) translateX(-50%)`;
-  });
+  /* --- Figuren --- */
+  for (let i = 0; i < figures.length; i++) {
+    const f = figures[i];
+    const focused = mode === 'focus' && i === selected;
+    /* Drehteller: Drag-Impuls mit Reibung + sanfter Auto-Spin */
+    f.spin += f.spinVel * dt;
+    f.spinVel -= f.spinVel * Math.min(1, CFG.cam.spinFriction * dt);
+    if (spinParam && !REDUCED && angleParam === null && !dragging)
+      f.spin += (focused || mode === 'overview' ? CFG.autoSpin : CFG.autoSpin * 0.35) * dt;
+    f.turn.rotation.y = f.spin;
+    animateFigure(f, t, focused);
+    /* Nicht gewaehlte Figuren abdunkeln */
+    const front = (mode === 'overview' || focused);
+    f.dimTarget = front ? CFG.dim.off : CFG.dim.on;
+    const zWant = front ? 0 : CFG.backZ;
+    f.root.position.z += (zWant - f.root.position.z) * Math.min(1, dt * 3.0);
+    f.halo.position.z = f.root.position.z;
+    f.ring.position.z = f.root.position.z;
+    if (Math.abs(f.dimCur - f.dimTarget) > 0.002) {
+      f.dimCur += (f.dimTarget - f.dimCur) * Math.min(1, dt * 4.2);
+      for (const k in f.mats) {
+        const m = f.mats[k];
+        if (k === 'GLOW') m.color.setScalar(0.55 + 2.15 * f.dimCur);
+        else m.color.setScalar(f.dimCur);
+      }
+    }
+  }
 
-  camera.position.lerp(camPos, 1 - Math.pow(.002, dt));
-  camera.lookAt(camAim);
-  camera.updateMatrixWorld();
-  renderer.render(scene, camera);
+  /* --- Kamera: gedaempft auf Ziel --- */
+  const k = 1 - Math.exp(-CFG.cam.damp * dt);
+  camTarget.lerp(camWant, k);
+  dist += (distWant * zoom - dist) * k;
+  pitch += (pitchWant - pitch) * k;
+  yaw += (yawWant - yaw) * k;
+  const cp = Math.cos(pitch), sp = Math.sin(pitch);
+  camera.position.set(
+    camTarget.x + dist * cp * Math.sin(yaw),
+    Math.max(0.12, camTarget.y + dist * sp),
+    camTarget.z + dist * cp * Math.cos(yaw));
+  _lookAt.copy(camTarget);
+  camera.lookAt(_lookAt);
+
+  /* --- Licht folgt der Auswahl --- */
+  const fsel = figures[selected];
+  const lx = mode === 'focus' ? fsel.x : OVERVIEW.x;
+  /* Schattenkamera nur bei Moduswechsel neu spannen: eng im Fokus, weit in der Uebersicht */
+  const wantBox = mode === 'focus' ? Math.max(2.2, fsel.r * 3.2 + fsel.h) : 11;
+  if (Math.abs(shadowBox - wantBox) > 0.01) {
+    shadowBox = wantBox;
+    const sc = keyLight.shadow.camera;
+    sc.left = -shadowBox; sc.right = shadowBox;
+    sc.top = shadowBox * 0.7 + 1.2; sc.bottom = -shadowBox * 0.35;
+    sc.updateProjectionMatrix();
+  }
+  keyLight.position.set(lx + 3.2, 6.2, 4.2);
+  keyLight.target.position.set(lx, mode === 'focus' ? fsel.h * 0.4 : 0.7, 0);
+  keyLight.target.updateMatrixWorld();
+  rimLight.position.set(lx - 4.4, 3.0, -5.4);
+  const acc = new THREE.Color(fsel.def.accent);
+  accentA.color.lerp(acc, Math.min(1, dt * 2.4));
+  const reach = Math.max(1.1, fsel.r * 2.0);
+  accentA.position.set(lx - reach, fsel.h * 1.05 + 0.35, reach * 0.8);
+  accentA.distance = 2.0 + fsel.h * 1.5;
+  accentA.intensity = 1.5 + fsel.h * 0.5;
+  accentB.position.set(lx + reach, fsel.h * 0.95, -reach * 0.9);
+  accentB.distance = 1.9 + fsel.h * 1.3;
+  accentB.intensity = 0.75 + Math.sin(t * 0.6) * 0.12 + fsel.h * 0.2;
+
+  /* --- Staub --- */
+  if (!REDUCED) {
+    const p = dustGeo.attributes.position.array;
+    for (let i = 0; i < dustN; i++) {
+      p[i * 3 + 1] += dustVel[i] * dt;
+      if (p[i * 3 + 1] > 5.4) p[i * 3 + 1] = -0.2;
+    }
+    dustGeo.attributes.position.needsUpdate = true;
+  }
+  sky.position.copy(camera.position);
+
+  /* --- Rendern --- */
+  if (bloomPass.enabled) composer.render();
+  else renderer.render(scene, camera);
+
+  /* --- Qualitaet nachregeln, ohne DOM-Sturm --- */
+  fpsAcc += dt; fpsFrames++; fpsTimer += dt;
+  if (fpsTimer >= 0.5) {
+    const fps = fpsFrames / fpsAcc;
+    el.sysFps.textContent = Math.round(fps) + ' FPS';
+    if (fps < 42) { slowFor += fpsTimer; if (slowFor > 2.0 && quality < 2) setQuality(quality + 1), slowFor = 0; }
+    else slowFor = Math.max(0, slowFor - fpsTimer);
+    fpsAcc = 0; fpsFrames = 0; fpsTimer = 0;
+  }
   window.READY = true;
-});
+}
+renderer.setAnimationLoop(tick);
+
+/* =====================================================================
+   Start
+   ===================================================================== */
+const focusParam = params.has('focus') ? +params.get('focus') - 1 : 0;
+if (focusParam >= 0 && focusParam < ROSTER.length) { selected = focusParam; mode = 'focus'; }
+else { mode = 'overview'; }
+applyDossier(selected);
+frameSelection(true);
+if (mode === 'overview') overview();
+tick();
 renderer.render(scene, camera);
+window.__LLFIG = { scene, renderer, camera, figures, select, overview,
+  /* Direktrender ohne Bloom-Passes: zeigt die echten Szenen-Draw-Calls */
+  measure: () => {
+    renderer.info.reset();
+    renderer.render(scene, camera);
+    return { calls: renderer.info.render.calls, tris: renderer.info.render.triangles,
+             geos: renderer.info.memory.geometries, texs: renderer.info.memory.textures };
+  } };
+requestAnimationFrame(() => el.boot.classList.add('gone'));
+setTimeout(() => { if (el.boot.parentNode) el.boot.parentNode.removeChild(el.boot); }, 900);
+
+/* =====================================================================
+   Aufraeumen
+   ===================================================================== */
+function destroy() {
+  renderer.setAnimationLoop(null);
+  for (const g of TRASH.geo) g.dispose();
+  for (const m of TRASH.mat) m.dispose();
+  for (const t of TRASH.tex) t.dispose();
+  for (const k in BASE_MATS) BASE_MATS[k].dispose();
+  scene.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) {
+      const arr = Array.isArray(o.material) ? o.material : [o.material];
+      for (const m of arr) {
+        for (const key in m) { const v = m[key]; if (v && v.isTexture) v.dispose(); }
+        m.dispose();
+      }
+    }
+  });
+  composer.dispose();
+  renderer.dispose();
+}
+addEventListener('pagehide', destroy, { once: true });
 </script>
 </body>
 </html>
