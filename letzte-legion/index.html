@@ -1,0 +1,1408 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LETZTE LEGION</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#0a0a0c;overflow:hidden}
+  canvas{display:block;position:fixed;inset:0;cursor:crosshair}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<script>
+"use strict";
+/* =====================================================================
+   LETZTE LEGION — vertikaler Lane-Horde-Runner, eine Datei, Canvas 2D.
+   Alle Tuning-Werte leben in CFG. Keine Magic Numbers im Code verstreut.
+   ===================================================================== */
+var CFG = {
+  // Spielfeld
+  W: 540, H: 960, laneW: 460, dprMax: 2,
+
+  // Scroll & Armee
+  scrollSpeed: 130,        // px/s, Welt bewegt sich runter
+  pxPerMeter: 10,          // 130 px/s = 13 m/s
+  startArmy: 10,
+  maxVisible: 48,          // mehr Einheiten: Zahl skaliert, Schaden linear weiter
+  unitFireInterval: 0.5,   // s pro Einheit (Stufe 1), phasenversetzt
+  bulletSpeed: 700,
+  bulletDamage: 3,
+  formationLerp: 0.12,     // s Glättung der X-Bewegung
+  formationY: 780,         // Frontlinie
+  squeezeTime: 0.25,       // s Übergang breit<->eng
+  squeezeFirePct: 0.40,    // Feuerkraft im Eng-Modus
+  wideCols: 8,  wideWidth: 250,
+  tightCols: 3, tightWidth: 80,
+  rowGapWide: 15, rowGapTight: 11,
+
+  // Waffenstufen (Stufe fällt nie; auf Stufe 4 werden Pickups zu +15-Gates)
+  weapons: [
+    { name: "BOGEN",    interval: 0.50, shots: 1, pierce: 1 },
+    { name: "ARMBRUST", interval: 0.38, shots: 1, pierce: 1 },
+    { name: "REPETIER", interval: 0.38, shots: 2, pierce: 1 },
+    { name: "BALLISTA", interval: 0.38, shots: 2, pierce: 2 }
+  ],
+  weaponGateBonus: 15,
+
+  // Zombies              hp  speed(rel. Welt) eat  radius
+  zWalker: { hp: 6,  speed: 25,  eat: 2, r: 11 },
+  zRunner: { hp: 2,  speed: 120, eat: 1, r: 8  },
+  zBrute:  { hp: 60, speed: 15,  eat: 6, r: 20 },
+  bruteFromM: 300,
+  runnerFromM: 60,
+  spawnBase: 2.8,          // Zombies/s am Start
+  spawnGrowPer100m: 0.15,  // +15 % pro 100 m
+  zombieCap: 300,          // harte Obergrenze, Spawner pausiert darüber
+  firstSpawnDelay: 3,      // s — erster Kontakt damit fruehestens ~8 s
+  walkerClusterMin: 4, walkerClusterMax: 8,
+  walkerClusterSpread: 34, // enge Traube trifft gleichzeitig ein — Durchbruchsgefahr
+  runnerPackMin: 5, runnerPackMax: 8,
+  runnerChance: 0.22, bruteChance: 0.12,
+
+  // Gates
+  gateInterval: 7, gateFirstAt: 4,
+  gateAddBase: 8, gateAddPerM: 1 / 40,
+  gateAddMax: 19,          // Deckel, damit x1.5 ab Armee 40 immer schlaegt
+  gateGuardChance: 0.40,   // besseres Gate hinter Zombie-Traube
+  gateH: 46,
+  gateDeadZone: 3,         // exakt mittig beruehrt keines der beiden Gates
+
+  // Zombies laufen auf die Formation zu (px/s horizontal)
+  homWalker: 16, homRunner: 34, homBrute: 8,
+
+  // Bosse
+  bossEveryM: 450,
+  bossHpBase: 900, bossHpGrow: 0.6,
+  bossArmyLossPct: 0.20, bossArmyLossMin: 4,
+  bossKillArmyPct: 0.25,
+  bossSpawnFactor: 0.25,   // Zombie-Spawn waehrend Boss
+  bossY: 205, bossEnterTime: 1.5,
+  // Boss A — FLEISCHBERG
+  slamInterval: 4, slamTelegraph: 0.7, slamHalfW: 115, // halbe Lane-Breite
+  callInterval: 9, bossAddCount: 10, bossAddSpeed: 60,
+  bossAWalkSpeed: 42,
+  // Boss B — SPEIER
+  spitInterval: 3.5, spitTelegraph: 0.5, spitSpeed: 140,
+  spitArcs: 3, spitPerArc: 5, spitArcGap: 0.22, spitFanDeg: 56,
+  spitEat: 3, spitR: 7,
+  jumpInterval: 8, jumpTelegraph: 0.8, jumpAir: 0.35,
+  bossBSpots: [135, 270, 405], bossBHopEvery: 2.6,
+
+  // Pools & Grid
+  poolBullets: 600, poolZombies: 350, poolParticles: 400,
+  poolDmgNums: 16, poolSpits: 64,
+  gridCell: 64, gridCellCap: 64,
+
+  // Feel
+  dmgAggregate: 0.25, dmgMaxShown: 12,
+  hitFlash: 0.05, hitFlashGap: 0.08,   // Blinken statt Dauerweiss bei Dauerfeuer
+  hitstop: 0.15, bossSlowmo: 0.4, bossSlowmoScale: 0.3,
+  deathSlowmo: 0.6, deathSlowmoScale: 0.25,
+  shakeMax: 5,
+  armyPopTime: 0.22, armyTickPerSec: 40,
+  introHintTime: 3,
+  blipMaxPerSec: 12,
+
+  // Farben — exklusiv
+  colUnit:   "#7fb4ff",  // Legionaere + eigene Projektile
+  colZombie: "#9db38a",  // Zombies
+  colWarn:   "#ffd84d",  // Telegraphs / Warnzonen — sonst nichts
+  colBad:    "#ff5a3c",  // Negativ-Gates, Boss-Projektile
+  colGold:   "#e8c766",  // Positiv-Gates, Pickups, Boss-Loot
+  colHud:    "#e8e8ec",
+  colGround: "#141418", colEdge: "#0d0d11", colMark: "#1d1d23"
+};
+var STEP = 1 / 60, MAX_STEPS = 5;
+
+/* ================= Utils ================= */
+function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function rnd(a, b) { return a + Math.random() * (b - a); }
+function rndi(a, b) { return (a + Math.random() * (b - a + 1)) | 0; }
+var LANE_L = (CFG.W - CFG.laneW) / 2, LANE_R = LANE_L + CFG.laneW, LANE_MID = CFG.W / 2;
+var REDUCED = false;
+try {
+  var mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+  REDUCED = mq.matches;
+  if (mq.addEventListener) mq.addEventListener("change", function (e) { REDUCED = e.matches; });
+} catch (e) {}
+
+/* ================= Canvas & Letterbox ================= */
+var cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+var view = { scale: 1, ox: 0, oy: 0, dpr: 1 };
+function resize() {
+  view.dpr = Math.min(window.devicePixelRatio || 1, CFG.dprMax);
+  var w = window.innerWidth, h = window.innerHeight;
+  cv.width = Math.round(w * view.dpr); cv.height = Math.round(h * view.dpr);
+  cv.style.width = w + "px"; cv.style.height = h + "px";
+  view.scale = Math.min(w / CFG.W, h / CFG.H);
+  view.ox = (w - CFG.W * view.scale) / 2;
+  view.oy = (h - CFG.H * view.scale) / 2;
+}
+window.addEventListener("resize", resize);
+resize();
+
+/* ================= Input ================= */
+var input = { targetX: CFG.W / 2, squeeze: false, keyA: false, keyD: false, mouseSq: false, keySq: false };
+function clientToGameX(cx) { return (cx - view.ox) / view.scale; }
+window.addEventListener("mousemove", function (e) {
+  input.targetX = clamp(clientToGameX(e.clientX), LANE_L, LANE_R);
+});
+window.addEventListener("mousedown", function (e) {
+  if (e.button === 2) { input.mouseSq = true; }
+  audioBoot();
+});
+window.addEventListener("mouseup", function (e) {
+  if (e.button === 2) input.mouseSq = false;
+});
+window.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+window.addEventListener("keydown", function (e) {
+  audioBoot();
+  var k = e.key;
+  if (k === " " || k === "Spacebar") { input.keySq = true; e.preventDefault(); }
+  else if (k === "a" || k === "A") input.keyA = true;
+  else if (k === "d" || k === "D") input.keyD = true;
+  else if (k === "r" || k === "R") resetGame();
+  else if (k === "m" || k === "M") toggleMute();
+  else if (k === "Escape") togglePause();
+});
+window.addEventListener("keyup", function (e) {
+  var k = e.key;
+  if (k === " " || k === "Spacebar") input.keySq = false;
+  else if (k === "a" || k === "A") input.keyA = false;
+  else if (k === "d" || k === "D") input.keyD = false;
+});
+window.addEventListener("blur", function () { autoPause(); });
+document.addEventListener("visibilitychange", function () { if (document.hidden) autoPause(); });
+
+/* ================= Vorgerenderte Sprites =================
+   Jede Silhouette einmal auf Offscreen-Canvas (2x), im Loop nur drawImage. */
+var SPR_SCALE = 2;
+function makeSprite(w, h, draw) {
+  var c = document.createElement("canvas");
+  c.width = w * SPR_SCALE; c.height = h * SPR_SCALE;
+  var g = c.getContext("2d");
+  g.scale(SPR_SCALE, SPR_SCALE);
+  draw(g, w, h);
+  c.gw = w; c.gh = h;
+  return c;
+}
+function whiteVariant(spr) {
+  var c = document.createElement("canvas");
+  c.width = spr.width; c.height = spr.height;
+  var g = c.getContext("2d");
+  g.drawImage(spr, 0, 0);
+  g.globalCompositeOperation = "source-in";
+  g.fillStyle = "#ffffff";
+  g.fillRect(0, 0, c.width, c.height);
+  c.gw = spr.gw; c.gh = spr.gh;
+  return c;
+}
+function tintVariant(spr, color, alpha) {
+  var c = document.createElement("canvas");
+  c.width = spr.width; c.height = spr.height;
+  var g = c.getContext("2d");
+  g.drawImage(spr, 0, 0);
+  g.globalCompositeOperation = "source-atop";
+  g.globalAlpha = alpha;
+  g.fillStyle = color;
+  g.fillRect(0, 0, c.width, c.height);
+  c.gw = spr.gw; c.gh = spr.gh;
+  return c;
+}
+var SPR = {};
+function buildSprites() {
+  // Legionaer — Stahlblau, Helm + Schild
+  SPR.unit = makeSprite(16, 22, function (g, w, h) {
+    g.fillStyle = "#3d5f8f"; g.fillRect(4, 8, 8, 12);            // Koerper dunkel
+    g.fillStyle = CFG.colUnit; g.fillRect(5, 9, 6, 10);          // Brust
+    g.beginPath(); g.arc(8, 6, 4.4, 0, 7); g.fill();             // Helm
+    g.fillStyle = "#dceaff"; g.fillRect(7.2, 1, 1.6, 4);         // Helmkamm
+    g.fillStyle = "#5c86c4"; g.fillRect(3, 10, 2.4, 9);          // Schildkante
+    g.fillStyle = "#26374f"; g.fillRect(5, 19, 2, 3); g.fillRect(9, 19, 2, 3); // Beine
+  });
+  // Walker — fahles Gruen, gebeugt, Arme hoch
+  SPR.walker = makeSprite(24, 27, function (g) {
+    g.fillStyle = "#5c6b52";
+    g.fillRect(6, 9, 12, 13);                                    // Rumpf-Schatten
+    g.fillStyle = CFG.colZombie;
+    g.fillRect(7, 10, 10, 11);                                   // Rumpf
+    g.beginPath(); g.arc(12, 7, 4.6, 0, 7); g.fill();            // Kopf
+    g.fillRect(3, 11, 4, 3); g.fillRect(17, 12, 4, 3);           // Arme vorgestreckt
+    g.fillStyle = "#3c4636";
+    g.fillRect(8, 21, 3, 5); g.fillRect(13, 21, 3, 5);           // Beine
+    g.fillStyle = "#2c3328";
+    g.fillRect(10, 6, 1.6, 1.6); g.fillRect(13, 6, 1.6, 1.6);    // Augenhoehlen
+  });
+  // Runner — kleiner, nach vorn geworfen
+  SPR.runner = makeSprite(18, 21, function (g) {
+    g.fillStyle = "#68785c";
+    g.fillRect(5, 8, 9, 9);
+    g.fillStyle = CFG.colZombie;
+    g.fillRect(6, 9, 7, 7);
+    g.beginPath(); g.arc(9, 5.5, 3.6, 0, 7); g.fill();
+    g.fillRect(2, 9, 4, 2.4); g.fillRect(13, 10, 4, 2.4);
+    g.fillStyle = "#3c4636";
+    g.fillRect(5, 16, 2.6, 5); g.fillRect(11, 15, 2.6, 5);
+  });
+  // Brute — massig, dunkle Kontur
+  SPR.brute = makeSprite(46, 50, function (g) {
+    g.fillStyle = "#39422f";
+    g.beginPath(); g.arc(23, 26, 21, 0, 7); g.fill();            // Kontur
+    g.fillStyle = "#55644a";
+    g.beginPath(); g.arc(23, 26, 19, 0, 7); g.fill();
+    g.fillStyle = CFG.colZombie;
+    g.beginPath(); g.arc(23, 24, 15, 0, 7); g.fill();            // Masse
+    g.beginPath(); g.arc(23, 11, 7, 0, 7); g.fill();             // Kopf
+    g.fillRect(2, 20, 8, 10); g.fillRect(36, 20, 8, 10);         // Pranken
+    g.fillStyle = "#2c3328";
+    g.fillRect(20, 9, 2.2, 2.2); g.fillRect(25, 9, 2.2, 2.2);
+    g.fillRect(16, 24, 14, 3);                                   // Maul
+  });
+  // Eigenes Projektil — Tracer
+  SPR.bullet = makeSprite(6, 15, function (g) {
+    g.fillStyle = "#4a6ea3"; g.fillRect(2, 2, 2, 13);
+    g.fillStyle = CFG.colUnit; g.fillRect(1.6, 0, 2.8, 10);
+    g.fillStyle = "#dceaff"; g.fillRect(2.3, 0, 1.4, 5);
+  });
+  // Boss-Projektil — Rot mit 1 px dunkler Kontur
+  SPR.spit = makeSprite(18, 18, function (g) {
+    g.fillStyle = "#38100a";
+    g.beginPath(); g.arc(9, 9, 8, 0, 7); g.fill();
+    g.fillStyle = CFG.colBad;
+    g.beginPath(); g.arc(9, 9, 7, 0, 7); g.fill();
+    g.fillStyle = "#ffb09e";
+    g.beginPath(); g.arc(6.6, 6.6, 2.4, 0, 7); g.fill();
+  });
+  // Boss A — FLEISCHBERG
+  SPR.bossA = makeSprite(124, 108, function (g) {
+    g.fillStyle = "#39422f";
+    g.beginPath(); g.ellipse(62, 58, 58, 46, 0, 0, 7); g.fill();
+    g.fillStyle = "#55644a";
+    g.beginPath(); g.ellipse(62, 56, 54, 42, 0, 0, 7); g.fill();
+    g.fillStyle = CFG.colZombie;
+    g.beginPath(); g.ellipse(62, 50, 44, 34, 0, 0, 7); g.fill();
+    g.beginPath(); g.arc(62, 22, 16, 0, 7); g.fill();            // Schaedel
+    g.fillStyle = "#3c4636";
+    g.beginPath(); g.ellipse(10, 62, 12, 18, 0, 0, 7); g.fill(); // Pranken
+    g.beginPath(); g.ellipse(114, 62, 12, 18, 0, 0, 7); g.fill();
+    g.fillStyle = "#2c3328";
+    g.fillRect(54, 18, 4.4, 4.4); g.fillRect(66, 18, 4.4, 4.4);
+    g.fillRect(42, 52, 40, 8);                                   // Maul
+    g.fillStyle = "#55644a";
+    g.fillRect(46, 52, 4, 5); g.fillRect(56, 55, 4, 5); g.fillRect(68, 52, 4, 5); // Zaehne
+  });
+  // Boss B — SPEIER
+  SPR.bossB = makeSprite(108, 100, function (g) {
+    g.fillStyle = "#39422f";
+    g.beginPath(); g.ellipse(54, 56, 50, 42, 0, 0, 7); g.fill();
+    g.fillStyle = "#55644a";
+    g.beginPath(); g.ellipse(54, 54, 46, 38, 0, 0, 7); g.fill();
+    g.fillStyle = CFG.colZombie;
+    g.beginPath(); g.ellipse(54, 58, 38, 32, 0, 0, 7); g.fill(); // Wanst
+    g.beginPath(); g.arc(54, 20, 14, 0, 7); g.fill();
+    g.fillStyle = "#2c3328";
+    g.fillRect(47, 15, 4, 4); g.fillRect(61, 15, 4, 4);
+    g.beginPath(); g.ellipse(54, 34, 12, 8, 0, 0, 7); g.fill();  // Maul/Muendung
+    g.fillStyle = "#3c4636";
+    g.beginPath(); g.ellipse(16, 68, 10, 14, 0, 0, 7); g.fill();
+    g.beginPath(); g.ellipse(92, 68, 10, 14, 0, 0, 7); g.fill();
+  });
+  SPR.walkerF = whiteVariant(SPR.walker);
+  SPR.runnerF = whiteVariant(SPR.runner);
+  SPR.bruteF  = whiteVariant(SPR.brute);
+  SPR.bossAF  = whiteVariant(SPR.bossA);
+  SPR.bossBF  = whiteVariant(SPR.bossB);
+  SPR.spitF   = whiteVariant(SPR.spit);
+}
+buildSprites();
+
+/* ================= Audio — reine WebAudio-Synthese ================= */
+var AU = { ctx: null, master: null, muted: false, blipBudget: 0, noise: null };
+function audioBoot() {
+  if (AU.ctx) { if (AU.ctx.state === "suspended") AU.ctx.resume(); return; }
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  try {
+    AU.ctx = new AC();
+    AU.master = AU.ctx.createGain();
+    AU.master.gain.value = AU.muted ? 0 : 0.5;
+    AU.master.connect(AU.ctx.destination);
+    var len = (AU.ctx.sampleRate * 0.2) | 0;
+    AU.noise = AU.ctx.createBuffer(1, len, AU.ctx.sampleRate);
+    var d = AU.noise.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  } catch (e) { AU.ctx = null; }
+}
+function toggleMute() {
+  AU.muted = !AU.muted;
+  if (AU.master) AU.master.gain.value = AU.muted ? 0 : 0.5;
+}
+function tone(freq, dur, type, vol, slide) {
+  if (!AU.ctx || AU.muted) return;
+  var t = AU.ctx.currentTime;
+  var o = AU.ctx.createOscillator(), g = AU.ctx.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq * slide), t + dur);
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(AU.master);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function noiseHit(dur, vol, freq) {
+  if (!AU.ctx || AU.muted || !AU.noise) return;
+  var t = AU.ctx.currentTime;
+  var s = AU.ctx.createBufferSource(), g = AU.ctx.createGain(), f = AU.ctx.createBiquadFilter();
+  s.buffer = AU.noise; f.type = "bandpass"; f.frequency.value = freq; f.Q.value = 0.9;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f); f.connect(g); g.connect(AU.master);
+  s.start(t); s.stop(t + dur + 0.02);
+}
+// Schuss-Blips: auf blipMaxPerSec gedeckelt, Rest wird weggedrosselt
+function sfxShot() {
+  if (AU.blipBudget < 1) return;
+  AU.blipBudget -= 1;
+  tone(rnd(640, 780), 0.045, "triangle", 0.05, 0.7);
+}
+function sfxZombieDie() { noiseHit(0.05, 0.09, rnd(1500, 2400)); }
+function sfxGateGood()  { tone(520, 0.1, "square", 0.1, 1.4); tone(780, 0.16, "square", 0.08, 1.2); }
+function sfxGateBad()   { tone(160, 0.25, "sawtooth", 0.12, 0.6); }
+function sfxEat()       { noiseHit(0.12, 0.12, 500); }
+function sfxThud()      { tone(64, 0.34, "sine", 0.4, 0.5); noiseHit(0.2, 0.2, 220); }
+function sfxTelegraph() { tone(980, 0.12, "square", 0.05, 1.05); }
+function sfxBossHurt()  { noiseHit(0.06, 0.06, 900); }
+function sfxBossDie()   {
+  tone(90, 0.5, "sine", 0.4, 0.4); noiseHit(0.4, 0.25, 300);
+  tone(523, 0.14, "square", 0.1, 1); tone(659, 0.2, "square", 0.1, 1);
+  tone(784, 0.3, "square", 0.1, 1);
+}
+function sfxDeath()     { tone(220, 0.7, "sawtooth", 0.2, 0.25); }
+function sfxSpit()      { noiseHit(0.1, 0.1, 700); }
+
+/* ================= Pools — kein new im Game-Loop ================= */
+function makePool(n, fields) {
+  var arr = new Array(n);
+  for (var i = 0; i < n; i++) {
+    var o = { active: false };
+    for (var k in fields) o[k] = fields[k];
+    arr[i] = o;
+  }
+  arr.count = 0;
+  return arr;
+}
+var bullets   = makePool(CFG.poolBullets,  { x: 0, y: 0, px: 0, py: 0, dmg: 0, pierce: 1, hitId: -1 });
+var zombies   = makePool(CFG.poolZombies,  { x: 0, y: 0, px: 0, py: 0, type: 0, hp: 0, maxHp: 0,
+                                             speed: 0, ownSpeed: 0, eat: 0, r: 0, vx: 0, wob: 0,
+                                             flash: 0, dmgAcc: 0, dmgT: 0, id: 0, kind: 0 });
+var particles = makePool(CFG.poolParticles,{ x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, t: 0, life: 1,
+                                             col: "#fff", size: 2, grav: 0 });
+var dmgNums   = makePool(CFG.poolDmgNums,  { x: 0, y: 0, val: 0, t: 0, boss: false });
+var spits     = makePool(CFG.poolSpits,    { x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0,
+                                             flash: 0, dmgAcc: 0, dmgT: 0, kind: 1 });
+// Aktive liegen in [0, count). Deaktivieren = Swap-and-Pop.
+function poolSpawn(pool) {
+  if (pool.count >= pool.length) return null;
+  var o = pool[pool.count]; pool.count++;
+  o.active = true;
+  return o;
+}
+function poolKill(pool, i) {
+  var last = pool.count - 1;
+  var o = pool[i];
+  o.active = false;
+  pool[i] = pool[last]; pool[last] = o;
+  pool.count = last;
+}
+
+/* ================= Uniform Grid (64 px) fuer Projektil<->Ziel =================
+   Zellen halten Referenzen auf Zombies UND Boss-Projektile (kind 0/1). */
+var GW = Math.ceil(CFG.W / CFG.gridCell), GH = Math.ceil(CFG.H / CFG.gridCell);
+var gridCells = new Array(GW * GH), gridCount = new Int16Array(GW * GH);
+for (var gi = 0; gi < GW * GH; gi++) gridCells[gi] = new Array(CFG.gridCellCap);
+function gridReset() { for (var i = 0; i < gridCount.length; i++) gridCount[i] = 0; }
+function gridInsert(o) {
+  var cx = clamp((o.x / CFG.gridCell) | 0, 0, GW - 1);
+  var cy = clamp((o.y / CFG.gridCell) | 0, 0, GH - 1);
+  var idx = cy * GW + cx;
+  if (gridCount[idx] < CFG.gridCellCap) {
+    gridCells[idx][gridCount[idx]] = o;
+    gridCount[idx]++;
+  }
+}
+
+/* ================= Spielzustand ================= */
+var state = {};
+var zombieIdSeq = 1;
+function resetGame() {
+  state.time = 0; state.dist = 0; state.scrollY = 0; state.pScrollY = 0;
+  state.army = CFG.startArmy; state.maxArmy = CFG.startArmy; state.kills = 0; state.shots = 0;
+  state.armyShown = CFG.startArmy; state.armyPop = 0; state.armyFlash = 0;
+  state.weapon = 0;
+  state.formX = CFG.W / 2; state.pFormX = CFG.W / 2;
+  input.targetX = CFG.W / 2;
+  state.squeeze = 0;
+  state.spawnAcc = 0; state.spawnStartT = CFG.firstSpawnDelay;
+  state.gateT = CFG.gateFirstAt;
+  state.bossIndex = 0; state.nextBossM = CFG.bossEveryM;
+  state.boss = { active: false };
+  state.slams = [];             // beim Reset neu — nicht im Loop
+  for (var si = 0; si < 4; si++) state.slams.push({ active: false, x: 0, t: 0 });
+  state.over = false; state.dying = false; state.deathT = 0;
+  state.paused = false; state.pauseAuto = false;
+  state.hitstop = 0; state.slowmo = 0; state.slowmoScale = 1;
+  state.shakeT = 0; state.shakeAmp = 0;
+  bullets.count = 0; particles.count = 0; dmgNums.count = 0; spits.count = 0; zombies.count = 0;
+  for (var i = 0; i < bullets.length; i++) bullets[i].active = false;
+  for (i = 0; i < zombies.length; i++) zombies[i].active = false;
+  for (i = 0; i < particles.length; i++) particles[i].active = false;
+  for (i = 0; i < dmgNums.length; i++) dmgNums[i].active = false;
+  for (i = 0; i < spits.length; i++) spits[i].active = false;
+  state.gates = [null, null, null, null];   // max 4 Paare gleichzeitig
+  for (i = 0; i < 4; i++) state.gates[i] = { active: false, y: 0, py: 0, left: gateSlot(), right: gateSlot() };
+  state.fireT = new Float32Array(CFG.maxVisible);
+  state.unitJit = new Float32Array(CFG.maxVisible * 2);
+  for (i = 0; i < CFG.maxVisible; i++) {
+    state.fireT[i] = Math.random() * CFG.unitFireInterval;  // phasenversetzt, kein Salventakt
+    state.unitJit[i * 2] = rnd(-2.5, 2.5);
+    state.unitJit[i * 2 + 1] = rnd(-2, 2);
+  }
+}
+function gateSlot() { return { kind: 0, val: 0, label: "" }; }
+
+/* ================= Armee-Aenderungen ================= */
+function armyGain(n) {
+  if (n <= 0) return;
+  state.army += n;
+  if (state.army > state.maxArmy) state.maxArmy = state.army;
+  state.armyPop = CFG.armyPopTime;
+}
+function armyLose(n) {
+  if (n <= 0 || state.dying || state.over) return;
+  state.army -= n;
+  state.armyFlash = 0.3;
+  if (state.army <= 0) { state.army = 0; startDeath(); }
+}
+function startDeath() {
+  state.dying = true;
+  state.deathT = REDUCED ? 0 : CFG.deathSlowmo;
+  sfxDeath();
+  if (state.deathT <= 0) state.over = true;
+}
+
+/* ================= Formation ================= */
+function formHalfW() { return lerp(CFG.wideWidth, CFG.tightWidth, state.squeeze) / 2; }
+function formCols()  { return Math.round(lerp(CFG.wideCols, CFG.tightCols, state.squeeze)); }
+function visibleUnits() { return Math.min(state.army, CFG.maxVisible); }
+// Position von Einheit i (Frontreihe zuerst, Reihen nach hinten/unten)
+function unitPos(i, out) {
+  var cols = formCols(), w = formHalfW() * 2;
+  var row = (i / cols) | 0, col = i % cols;
+  var gap = lerp(CFG.rowGapWide, CFG.rowGapTight, state.squeeze);
+  out.x = state.formX - w / 2 + (col + 0.5) * (w / cols) + state.unitJit[i * 2];
+  out.y = CFG.formationY + row * gap + state.unitJit[i * 2 + 1];
+}
+var _upos = { x: 0, y: 0 };
+
+/* ================= Zombies ================= */
+function spawnZombie(type, x, y, opts) {
+  if (zombies.count >= CFG.zombieCap) return null;   // harte Obergrenze
+  var z = poolSpawn(zombies);
+  if (!z) return null;
+  var def = type === 1 ? CFG.zRunner : type === 2 ? CFG.zBrute : CFG.zWalker;
+  z.type = type; z.kind = 0;
+  z.x = z.px = clamp(x, LANE_L + def.r, LANE_R - def.r);
+  z.y = z.py = y;
+  z.hp = z.maxHp = def.hp;
+  z.ownSpeed = (opts && opts.speed !== undefined) ? opts.speed : def.speed;
+  z.eat = def.eat; z.r = def.r;
+  z.vx = (opts && opts.vx) || 0;
+  z.wob = Math.random() * 6.28;
+  z.flash = -1; z.dmgAcc = 0; z.dmgT = 0;
+  z.id = zombieIdSeq++;
+  return z;
+}
+function spawnWalkerCluster(cx, cy, n) {
+  var s = CFG.walkerClusterSpread;
+  for (var i = 0; i < n; i++)
+    spawnZombie(0, cx + rnd(-s, s), cy + rnd(-s, s), null);
+}
+function spawnRunnerPack() {
+  var left = Math.random() < 0.5;
+  var n = rndi(CFG.runnerPackMin, CFG.runnerPackMax);
+  var x0 = left ? LANE_L + 20 : LANE_R - 20;
+  var vx = (left ? 1 : -1) * rnd(26, 44);            // schraeg in die Lane
+  for (var i = 0; i < n; i++)
+    spawnZombie(1, x0 + rnd(-14, 14), -30 - i * 26, { vx: vx });
+}
+// Spawnrate: 2/s, +15 % pro 100 m; waehrend Boss auf 25 %
+function currentSpawnRate() {
+  var r = CFG.spawnBase * Math.pow(1 + CFG.spawnGrowPer100m, state.dist / 100);
+  if (state.boss.active) r *= CFG.bossSpawnFactor;
+  return r;
+}
+function updateSpawner(dt) {
+  if (state.time < state.spawnStartT) return;
+  state.spawnAcc += currentSpawnRate() * dt;
+  var guard = 0;
+  while (state.spawnAcc >= 1 && zombies.count < CFG.zombieCap && guard < 8) {
+    guard++;
+    var roll = Math.random();
+    if (state.dist >= CFG.bruteFromM && roll < CFG.bruteChance) {
+      spawnZombie(2, rnd(LANE_L + 40, LANE_R - 40), -50, null);
+      state.spawnAcc -= 3;                            // Brute wiegt schwerer
+    } else if (state.dist >= CFG.runnerFromM && roll < CFG.bruteChance + CFG.runnerChance) {
+      var pack = rndi(CFG.runnerPackMin, CFG.runnerPackMax);
+      if (state.spawnAcc >= pack * 0.6) { spawnRunnerPack(); state.spawnAcc -= pack * 0.6; }
+      else break;
+    } else {
+      var n = rndi(CFG.walkerClusterMin, CFG.walkerClusterMax);
+      if (state.spawnAcc >= n * 0.8) {
+        spawnWalkerCluster(rnd(LANE_L + 60, LANE_R - 60), rnd(-90, -40), n);
+        state.spawnAcc -= n * 0.8;
+      } else break;
+    }
+  }
+  if (state.spawnAcc > 12) state.spawnAcc = 12;
+}
+
+/* ================= Gates ================= */
+// kind: 0 add, 1 mul, 2 waffe, 3 minus
+function rollGate(slot, allowNeg) {
+  var addN = Math.min(CFG.gateAddMax, Math.round(CFG.gateAddBase + state.dist * CFG.gateAddPerM));
+  var r = Math.random();
+  if (r < 0.30)      { slot.kind = 0; slot.val = addN;  slot.label = "+" + addN; }
+  else if (r < 0.50) { slot.kind = 1; slot.val = 1.3;   slot.label = "×1.3"; }
+  else if (r < 0.65) { slot.kind = 1; slot.val = 1.5;   slot.label = "×1.5"; }
+  else if (r < 0.71) { slot.kind = 1; slot.val = 2;     slot.label = "×2"; }
+  else if (r < 0.85) {
+    if (state.weapon >= CFG.weapons.length - 1) {      // Stufe 4: Pickup wird +15
+      slot.kind = 0; slot.val = CFG.weaponGateBonus; slot.label = "+" + CFG.weaponGateBonus;
+    } else { slot.kind = 2; slot.val = 0; slot.label = "WAFFE"; }
+  }
+  else if (allowNeg) { slot.kind = 3; slot.val = addN;  slot.label = "−" + addN; }
+  else               { slot.kind = 0; slot.val = addN;  slot.label = "+" + addN; }
+}
+function gateValue(slot) {                             // erwarteter Nutzen fuers Ranking
+  if (slot.kind === 0) return slot.val;
+  if (slot.kind === 1) return (slot.val - 1) * state.army;
+  if (slot.kind === 2) return 900;                     // Waffe schlaegt fast alles
+  return -slot.val;
+}
+function spawnGatePair() {
+  var g = null;
+  for (var i = 0; i < 4; i++) if (!state.gates[i].active) { g = state.gates[i]; break; }
+  if (!g) return;
+  g.active = true;
+  g.y = g.py = -CFG.gateH - 10;
+  rollGate(g.left, true);
+  rollGate(g.right, g.left.kind !== 3);               // nie zwei Negative als Paar
+  if (g.left.kind === 3 && g.right.kind === 3) rollGate(g.right, false);
+  if (g.left.label === g.right.label) rollGate(g.right, g.left.kind !== 3); // leere Wahl vermeiden
+  // Belohnung hinter Risiko: das bessere Gate in ~40 % der Faelle bewacht
+  if (Math.random() < CFG.gateGuardChance && state.time > state.spawnStartT) {
+    var betterLeft = gateValue(g.left) >= gateValue(g.right);
+    var gx = betterLeft ? LANE_L + CFG.laneW * 0.25 : LANE_L + CFG.laneW * 0.75;
+    spawnWalkerCluster(gx, g.y - 120, rndi(CFG.walkerClusterMin, CFG.walkerClusterMax));
+  }
+}
+function applyGate(slot) {
+  if (slot.kind === 0) { armyGain(slot.val); sfxGateGood(); }
+  else if (slot.kind === 1) {
+    armyGain(Math.round(state.army * slot.val) - state.army);
+    sfxGateGood();
+  }
+  else if (slot.kind === 2) {
+    state.weapon = Math.min(CFG.weapons.length - 1, state.weapon + 1);
+    sfxGateGood();
+  }
+  else { armyLose(slot.val); sfxGateBad(); }
+  burstParticles(state.formX, CFG.formationY - 14, slot.kind === 3 ? CFG.colBad : CFG.colGold, 10, 130);
+}
+function updateGates(dt, scrollActive) {
+  if (!state.boss.active) {                            // Gates pausieren im Bosskampf
+    state.gateT -= dt;
+    if (state.gateT <= 0) { spawnGatePair(); state.gateT = CFG.gateInterval; }
+  }
+  for (var i = 0; i < 4; i++) {
+    var g = state.gates[i];
+    if (!g.active) continue;
+    g.py = g.y;
+    if (scrollActive) g.y += CFG.scrollSpeed * dt;     // Gates fahren mit der Welt
+    if (g.y > CFG.H + 30) { g.active = false; continue; }
+    // Beruehrung: Gate-Unterkante erreicht die Frontlinie
+    if (g.y + CFG.gateH >= CFG.formationY && g.y < CFG.formationY + 30) {
+      var half = formHalfW();
+      var off = state.formX - LANE_MID;
+      var takenLeft  = off < -CFG.gateDeadZone;
+      var takenRight = off > CFG.gateDeadZone;
+      if (takenLeft || takenRight) {
+        applyGate(takenLeft ? g.left : g.right);       // wirkt sofort, das andere verschwindet
+        g.active = false;
+      }
+    }
+  }
+}
+
+/* ================= Feuern ================= */
+function fireBullet(x, y, dmg, pierce) {
+  var b = poolSpawn(bullets);
+  if (!b) return;
+  b.x = b.px = x; b.y = b.py = y;
+  b.dmg = dmg; b.pierce = pierce; b.hitId = -1;
+  state.shots++;
+  sfxShot();
+}
+function updateFiring(dt) {
+  var w = CFG.weapons[state.weapon];
+  var vis = visibleUnits();
+  if (vis <= 0) return;
+  // Eng-Modus: hintere Reihen halten den Schuss zurueck -> Feuerrate auf 40 %
+  var firePct = lerp(1, CFG.squeezeFirePct, state.squeeze);
+  var effInterval = w.interval / firePct;
+  // Schaden skaliert linear ueber maxVisible hinaus
+  var dmg = CFG.bulletDamage * (state.army / vis);
+  for (var i = 0; i < vis; i++) {
+    state.fireT[i] -= dt;
+    if (state.fireT[i] <= 0) {
+      state.fireT[i] += effInterval;
+      unitPos(i, _upos);
+      for (var s = 0; s < w.shots; s++) {
+        var off = w.shots > 1 ? (s === 0 ? -4 : 4) : 0;
+        fireBullet(_upos.x + off, _upos.y - 9, dmg, w.pierce);
+      }
+    }
+  }
+}
+
+/* ================= Partikel & Schadenszahlen ================= */
+function burstParticles(x, y, col, n, spd) {
+  for (var i = 0; i < n; i++) {
+    var p = poolSpawn(particles);
+    if (!p) return;
+    var a = Math.random() * 6.28, v = rnd(spd * 0.4, spd);
+    p.x = p.px = x; p.y = p.py = y;
+    p.vx = Math.cos(a) * v; p.vy = Math.sin(a) * v;
+    p.t = 0; p.life = rnd(0.25, 0.5); p.col = col; p.size = rnd(1.5, 3.5); p.grav = 0;
+  }
+}
+function goldFountain(x, y) {                          // Boss-Loot Richtung Formation
+  for (var i = 0; i < 26; i++) {
+    var p = poolSpawn(particles);
+    if (!p) return;
+    p.x = p.px = x + rnd(-30, 30); p.y = p.py = y;
+    p.vx = rnd(-60, 60); p.vy = rnd(180, 420);
+    p.t = 0; p.life = rnd(0.6, 1.1); p.col = CFG.colGold; p.size = rnd(2, 4); p.grav = 60;
+  }
+}
+function updateParticles(dt) {
+  for (var i = particles.count - 1; i >= 0; i--) {
+    var p = particles[i];
+    p.px = p.x; p.py = p.y;
+    p.t += dt;
+    if (p.t >= p.life) { poolKill(particles, i); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+}
+// Aggregation: pro Ziel alle 0.25 s EINE Summenzahl, hartes Limit 12
+function pushDmgNum(x, y, val, boss) {
+  if (dmgNums.count >= CFG.dmgMaxShown) return;        // hartes Limit 12
+
+  var d = poolSpawn(dmgNums);
+  if (!d) return;
+  d.x = x + rnd(-6, 6); d.y = y; d.val = Math.round(val); d.t = 0; d.boss = !!boss;
+}
+function flushDmg(o, boss) {
+  if (o.dmgAcc > 0) { pushDmgNum(o.x, o.y - (o.r || 40), o.dmgAcc, boss); o.dmgAcc = 0; }
+  o.dmgT = 0;
+}
+function tickDmg(o, dt, boss) {
+  if (o.dmgT > 0) {
+    o.dmgT -= dt;
+    if (o.dmgT <= 0) flushDmg(o, boss);
+  }
+}
+function updateDmgNums(dt) {
+  for (var i = dmgNums.count - 1; i >= 0; i--) {
+    var d = dmgNums[i];
+    d.t += dt;
+    if (d.t > 0.7) poolKill(dmgNums, i);
+  }
+}
+function damageTarget(o, dmg, boss) {                  // Zombie / Spit / Boss
+  o.hp -= dmg;
+  if (o.flash <= -CFG.hitFlashGap) o.flash = CFG.hitFlash;
+  o.dmgAcc += dmg;
+  if (o.dmgT <= 0) o.dmgT = CFG.dmgAggregate;
+}
+
+/* ================= Kollisionen: Grid-Pass ================= */
+function collideBullets() {
+  gridReset();
+  var i, z;
+  for (i = 0; i < zombies.count; i++) gridInsert(zombies[i]);
+  for (i = 0; i < spits.count; i++) gridInsert(spits[i]);
+  var boss = state.boss;
+  for (i = bullets.count - 1; i >= 0; i--) {
+    var b = bullets[i];
+    if (b.y < -20) { poolKill(bullets, i); continue; }
+    // Boss zuerst — grosser Kreis, direkter Test
+    if (boss.active && boss.phase === 1) {
+      var bdx = b.x - boss.x, bdy = b.y - boss.y;
+      if (bdx * bdx + bdy * bdy < boss.r * boss.r) {
+        damageTarget(boss, b.dmg, true);
+        sfxBossHurt();
+        poolKill(bullets, i);
+        continue;
+      }
+    }
+    var cx = clamp((b.x / CFG.gridCell) | 0, 0, GW - 1);
+    var cy = clamp((b.y / CFG.gridCell) | 0, 0, GH - 1);
+    var dead = false;
+    for (var oy = -1; oy <= 1 && !dead; oy++) {
+      var yy = cy + oy;
+      if (yy < 0 || yy >= GH) continue;
+      for (var ox = -1; ox <= 1 && !dead; ox++) {
+        var xx = cx + ox;
+        if (xx < 0 || xx >= GW) continue;
+        var cell = gridCells[yy * GW + xx], cn = gridCount[yy * GW + xx];
+        for (var k = 0; k < cn; k++) {
+          var o = cell[k];
+          if (!o.active || o.hp <= 0) continue;
+          if (o.kind === 1) {                          // Boss-Projektil, 1 HP, abschiessbar
+            var dx1 = b.x - o.x, dy1 = b.y - o.y;
+            var rr1 = CFG.spitR + 4;
+            if (dx1 * dx1 + dy1 * dy1 < rr1 * rr1) {
+              killSpit(o);
+              b.pierce--;
+              if (b.pierce <= 0) { poolKill(bullets, i); dead = true; break; }
+            }
+          } else {
+            if (o.id === b.hitId) continue;
+            var dx = b.x - o.x, dy = b.y - o.y, rr = o.r + 4;
+            if (dx * dx + dy * dy < rr * rr) {         // Kreis gegen Kreis, quadriert
+              damageTarget(o, b.dmg, false);
+              b.hitId = o.id;
+              if (o.hp <= 0) killZombieAt(o);
+              b.pierce--;
+              if (b.pierce <= 0) { poolKill(bullets, i); dead = true; break; }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+function killZombieAt(z) {                             // markiert; Aufraeumen im Zombie-Pass
+  z.hp = 0;
+}
+function killSpit(s) { s.hp = 0; }
+
+/* ================= Zombie-Update & Frontlinien-Check ================= */
+function updateZombies(dt, scrollActive) {
+  var world = scrollActive ? CFG.scrollSpeed : 0;
+  var half = formHalfW();
+  for (var i = zombies.count - 1; i >= 0; i--) {
+    var z = zombies[i];
+    z.px = z.x; z.py = z.y;
+    if (z.flash > -1) z.flash -= dt;
+    tickDmg(z, dt, false);
+    if (z.hp <= 0) {                                   // von Kugeln getoetet
+      flushDmg(z, false);
+      state.kills++;
+      burstParticles(z.x, z.y, CFG.colZombie, 3, 90);  // 3 Partikel + Sofort-Despawn
+      sfxZombieDie();
+      poolKill(zombies, i);
+      continue;
+    }
+    z.wob += dt * 5;
+    z.y += (world + z.ownSpeed) * dt;
+    // Die Flut konvergiert auf die Formation
+    var hom = z.type === 1 ? CFG.homRunner : z.type === 2 ? CFG.homBrute : CFG.homWalker;
+    var toForm = state.formX - z.x;
+    z.x += (toForm > 4 ? hom : toForm < -4 ? -hom : 0) * dt;
+    z.x += z.vx * dt + Math.sin(z.wob) * 6 * dt;
+    if (z.x < LANE_L + z.r) { z.x = LANE_L + z.r; z.vx = Math.abs(z.vx); }
+    if (z.x > LANE_R - z.r) { z.x = LANE_R - z.r; z.vx = -Math.abs(z.vx); }
+    // Frontlinien-Check: kein Einheiten-Einzelcheck
+    if (z.y + z.r >= CFG.formationY - 2) {
+      var dx = z.x - state.formX;
+      if (dx > -(half + z.r) && dx < half + z.r) {
+        flushDmg(z, false);
+        armyLose(z.eat);                               // stirbt UND frisst
+        sfxEat();
+        burstParticles(z.x, CFG.formationY, CFG.colZombie, 4, 110);
+        poolKill(zombies, i);
+        continue;
+      }
+    }
+    if (z.y > CFG.H + 50) poolKill(zombies, i);        // vorbeigelaufen
+  }
+}
+
+/* ================= Boss-Projektile ================= */
+function spawnSpit(x, y, angle) {
+  var s = poolSpawn(spits);
+  if (!s) return;
+  s.x = s.px = x; s.y = s.py = y;
+  s.vx = Math.cos(angle) * CFG.spitSpeed;
+  s.vy = Math.sin(angle) * CFG.spitSpeed;
+  s.hp = 1; s.flash = 0; s.dmgAcc = 0; s.dmgT = 0; s.kind = 1;
+}
+function updateSpits(dt) {
+  var half = formHalfW();
+  for (var i = spits.count - 1; i >= 0; i--) {
+    var s = spits[i];
+    s.px = s.x; s.py = s.y;
+    if (s.hp <= 0) {                                   // abgeschossen
+      burstParticles(s.x, s.y, CFG.colBad, 3, 80);
+      poolKill(spits, i);
+      continue;
+    }
+    s.x += s.vx * dt; s.y += s.vy * dt;
+    if (s.y > CFG.H + 20 || s.x < -20 || s.x > CFG.W + 20) { poolKill(spits, i); continue; }
+    if (s.y + CFG.spitR >= CFG.formationY - 2) {
+      var dx = s.x - state.formX;
+      if (dx > -(half + CFG.spitR) && dx < half + CFG.spitR) {
+        armyLose(CFG.spitEat);                         // je 3 Einheiten
+        sfxEat();
+        burstParticles(s.x, CFG.formationY, CFG.colBad, 5, 120);
+        poolKill(spits, i);
+      }
+    }
+  }
+}
+
+/* ================= Bodenschlag-Zonen (beide Bosse) ================= */
+function addSlam(x) {
+  for (var i = 0; i < state.slams.length; i++) {
+    if (!state.slams[i].active) {
+      var s = state.slams[i];
+      s.active = true; s.x = clamp(x, LANE_L + CFG.slamHalfW, LANE_R - CFG.slamHalfW);
+      s.t = CFG.slamTelegraph;
+      sfxTelegraph();
+      return;
+    }
+  }
+}
+function updateSlams(dt) {
+  for (var i = 0; i < state.slams.length; i++) {
+    var s = state.slams[i];
+    if (!s.active) continue;
+    s.t -= dt;
+    if (s.t <= 0) {
+      s.active = false;
+      slamImpact(s.x);
+    }
+  }
+}
+function slamImpact(x) {
+  sfxThud();
+  shake(CFG.shakeMax);
+  burstParticles(x, CFG.formationY - 6, CFG.colWarn, 14, 220);
+  var half = formHalfW();
+  // Ueberlappt die Formation die Zone? -> 20 % der Armee, mindestens 4
+  if (state.formX + half > x - CFG.slamHalfW && state.formX - half < x + CFG.slamHalfW) {
+    armyLose(Math.max(CFG.bossArmyLossMin, Math.round(state.army * CFG.bossArmyLossPct)));
+  }
+}
+function shake(amp) {
+  if (REDUCED) return;
+  state.shakeT = 0.3;
+  state.shakeAmp = Math.min(CFG.shakeMax, amp);       // 5 px gedeckelt
+}
+
+/* ================= Bosse ================= */
+function startBoss() {
+  var idx = state.bossIndex;
+  var b = state.boss;
+  b.active = true;
+  b.type = idx % 2;                                    // A, B, A, B ... recycelt
+  b.phase = 0;                                         // 0 enter, 1 fight, 2 dying
+  b.hp = b.maxHp = Math.round(CFG.bossHpBase * (1 + idx * CFG.bossHpGrow));
+  b.x = b.px = LANE_MID; b.y = b.py = -140;
+  b.r = b.type === 0 ? 56 : 50;
+  b.dir = 1; b.flash = -1; b.dmgAcc = 0; b.dmgT = 0;
+  b.atkT = b.type === 0 ? CFG.slamInterval : CFG.spitInterval;
+  b.callT = CFG.callInterval;
+  b.jumpT = CFG.jumpInterval;
+  b.hopT = CFG.bossBHopEvery; b.spot = 1;
+  b.spitTele = 0; b.spitQueue = 0; b.spitQT = 0; b.spitAimX = 0;
+  b.jumpTele = 0; b.jumpX = 0; b.air = 0;
+  b.dieT = 0;
+  // Farb-Shift ab Boss 3 (Recycling)
+  var cycle = (idx / 2) | 0;
+  var base = b.type === 0 ? SPR.bossA : SPR.bossB;
+  b.spr = cycle === 0 ? base : tintVariant(base, cycle % 2 === 1 ? "#8a5a3c" : "#6a4a7a", Math.min(0.45, 0.25 + cycle * 0.1));
+  b.sprF = b.type === 0 ? SPR.bossAF : SPR.bossBF;
+}
+function bossKill() {
+  var b = state.boss;
+  b.phase = 2; b.dieT = 0.9;
+  flushDmg(b, true);
+  sfxBossDie();
+  if (!REDUCED) { state.hitstop = CFG.hitstop; state.slowmo = CFG.bossSlowmo; state.slowmoScale = CFG.bossSlowmoScale; }
+  burstParticles(b.x, b.y, CFG.colZombie, 24, 320);    // Truemmer
+  goldFountain(b.x, b.y + 30);
+  // Belohnung: Waffenstufe +1 (auf Max: +15 Armee), +25 % Armee
+  if (state.weapon < CFG.weapons.length - 1) state.weapon++;
+  else armyGain(CFG.weaponGateBonus);
+  armyGain(Math.max(1, Math.round(state.army * CFG.bossKillArmyPct)));
+  for (var i = 0; i < spits.count; i++) spits[i].hp = 0;
+  for (i = 0; i < state.slams.length; i++) state.slams[i].active = false;
+  state.bossIndex++;
+  state.nextBossM = (state.bossIndex + 1) * CFG.bossEveryM;
+}
+function updateBoss(dt) {
+  var b = state.boss;
+  if (!b.active) {
+    if (state.dist >= state.nextBossM - 0.001) startBoss();
+    return;
+  }
+  b.px = b.x; b.py = b.y;
+  if (b.flash > -1) b.flash -= dt;
+  tickDmg(b, dt, true);
+  if (b.phase === 0) {                                 // reinschieben
+    b.y += (CFG.bossY - (-140)) / CFG.bossEnterTime * dt;
+    if (b.y >= CFG.bossY) { b.y = CFG.bossY; b.phase = 1; }
+    return;
+  }
+  if (b.phase === 2) {                                 // sterben, dann Scroll weiter
+    b.dieT -= dt;
+    b.y += 40 * dt;
+    if (b.dieT <= 0) b.active = false;
+    return;
+  }
+  if (b.hp <= 0) { bossKill(); return; }
+  if (b.type === 0) updateBossA(b, dt);
+  else updateBossB(b, dt);
+}
+function updateBossA(b, dt) {                          // FLEISCHBERG
+  b.x += b.dir * CFG.bossAWalkSpeed * dt;              // walzt hin und her
+  if (b.x > LANE_R - 70) { b.x = LANE_R - 70; b.dir = -1; }
+  if (b.x < LANE_L + 70) { b.x = LANE_L + 70; b.dir = 1; }
+  b.atkT -= dt;
+  if (b.atkT <= 0) { b.atkT = CFG.slamInterval; addSlam(state.formX); }  // Bodenschlag auf Spieler-X
+  b.callT -= dt;
+  if (b.callT <= 0) {                                  // Ruf: 10 Walker direkt vor ihm
+    b.callT = CFG.callInterval;
+    for (var i = 0; i < CFG.bossAddCount; i++)
+      spawnZombie(0, b.x + rnd(-80, 80), b.y + b.r + rnd(10, 70), { speed: CFG.bossAddSpeed });
+  }
+}
+function updateBossB(b, dt) {                          // SPEIER
+  var spots = CFG.bossBSpots;
+  b.hopT -= dt;
+  if (b.hopT <= 0 && b.spitTele <= 0 && b.air <= 0) {  // huepft zwischen drei X-Positionen
+    b.hopT = CFG.bossBHopEvery;
+    b.spot = (b.spot + rndi(1, 2)) % 3;
+  }
+  if (b.air <= 0) b.x += (spots[b.spot] - b.x) * Math.min(1, dt * 6);
+  // Speiattacke: Telegraph an der Muendung, dann 3 Boegen a 5 Kugeln
+  b.atkT -= dt;
+  if (b.atkT <= 0 && b.spitTele <= 0 && b.air <= 0) {
+    b.atkT = CFG.spitInterval;
+    b.spitTele = CFG.spitTelegraph;
+    b.spitAimX = state.formX;
+    sfxTelegraph();
+  }
+  if (b.spitTele > 0) {
+    b.spitTele -= dt;
+    if (b.spitTele <= 0) { b.spitQueue = CFG.spitArcs; b.spitQT = 0; }
+  }
+  if (b.spitQueue > 0) {
+    b.spitQT -= dt;
+    if (b.spitQT <= 0) {
+      b.spitQT = CFG.spitArcGap;
+      b.spitQueue--;
+      sfxSpit();
+      var mx = b.x, my = b.y + 26;
+      var base = Math.atan2(CFG.formationY - my, b.spitAimX - mx);
+      var fan = CFG.spitFanDeg * Math.PI / 180;
+      for (var i = 0; i < CFG.spitPerArc; i++) {
+        var a = base + (i / (CFG.spitPerArc - 1) - 0.5) * fan;
+        spawnSpit(mx, my, a);
+      }
+    }
+  }
+  // Sprung auf Spieler-X: Schatten-Telegraph, Aufprall = Bodenschlag-Zone
+  b.jumpT -= dt;
+  if (b.jumpT <= 0 && b.spitTele <= 0 && b.spitQueue <= 0 && b.air <= 0) {
+    b.jumpT = CFG.jumpInterval;
+    b.jumpTele = CFG.jumpTelegraph;
+    b.jumpX = clamp(state.formX, LANE_L + CFG.slamHalfW, LANE_R - CFG.slamHalfW);
+    sfxTelegraph();
+  }
+  if (b.jumpTele > 0) {
+    b.jumpTele -= dt;
+    if (b.jumpTele <= 0) { b.air = CFG.jumpAir; }
+  }
+  if (b.air > 0) {
+    b.air -= dt;
+    b.x += (b.jumpX - b.x) * Math.min(1, dt * 10);
+    if (b.air <= 0) {
+      slamImpact(b.jumpX);
+      var spots2 = CFG.bossBSpots, best = 0, bd = 1e9;
+      for (var s2 = 0; s2 < 3; s2++) {
+        var d2 = Math.abs(spots2[s2] - b.x);
+        if (d2 < bd) { bd = d2; best = s2; }
+      }
+      b.spot = best;
+    }
+  }
+}
+
+/* ================= Haupt-Update ================= */
+function updateBullets(dt) {
+  for (var i = 0; i < bullets.count; i++) {
+    var b = bullets[i];
+    b.px = b.x; b.py = b.y;
+    b.y -= CFG.bulletSpeed * dt;
+  }
+}
+function stepGame(dt, realDt) {
+  // Echtzeit-Timer (laufen auch in Zeitlupe normal weiter)
+  if (state.slowmo > 0) state.slowmo -= realDt;
+  if (state.shakeT > 0) state.shakeT -= realDt;
+  if (state.armyPop > 0) state.armyPop -= realDt;
+  if (state.armyFlash > 0) state.armyFlash -= realDt;
+  if (state.dying) {
+    state.deathT -= realDt;
+    if (state.deathT <= 0) { state.over = true; return; }
+  }
+  state.time += dt;
+  // Eingabe -> Formation
+  input.squeeze = input.keySq || input.mouseSq;
+  var sqTarget = input.squeeze ? 1 : 0;
+  var sqStep = dt / CFG.squeezeTime;
+  state.squeeze = state.squeeze < sqTarget ? Math.min(1, state.squeeze + sqStep)
+                                           : Math.max(0, state.squeeze - sqStep);
+  if (input.keyA) input.targetX -= 430 * dt;
+  if (input.keyD) input.targetX += 430 * dt;
+  input.targetX = clamp(input.targetX, LANE_L, LANE_R);
+  state.pFormX = state.formX;
+  state.formX += (input.targetX - state.formX) * (1 - Math.exp(-dt / CFG.formationLerp));
+  var half = formHalfW();
+  state.formX = clamp(state.formX, LANE_L + half * 0.4, LANE_R - half * 0.4);
+  // Scroll: stoppt solange der Boss lebt
+  var scrollActive = !(state.boss.active && state.boss.phase < 2);
+  state.pScrollY = state.scrollY;
+  if (scrollActive) {
+    state.scrollY += CFG.scrollSpeed * dt;
+    state.dist += CFG.scrollSpeed * dt / CFG.pxPerMeter;
+  }
+  updateSpawner(dt);
+  updateGates(dt, scrollActive);
+  updateFiring(dt);
+  updateBullets(dt);
+  collideBullets();
+  updateZombies(dt, scrollActive);
+  updateSpits(dt);
+  updateSlams(dt);
+  updateBoss(dt);
+  updateParticles(dt);
+  updateDmgNums(dt);
+  // Armeezahl: Wachstum poppt, Verlust tickt sichtbar runter
+  if (state.armyShown < state.army) state.armyShown = state.army;
+  else if (state.armyShown > state.army) {
+    var fall = Math.max(CFG.armyTickPerSec, (state.armyShown - state.army) * 5) * dt;
+    state.armyShown = Math.max(state.army, state.armyShown - fall);
+  }
+}
+
+/* ================= Pause ================= */
+function togglePause() {
+  if (state.over) return;
+  state.paused = !state.paused;
+  state.pauseAuto = false;
+}
+function autoPause() {
+  if (!state.over && !state.paused) { state.paused = true; state.pauseAuto = true; }
+}
+window.addEventListener("focus", function () {
+  if (state.paused && state.pauseAuto) { state.paused = false; state.pauseAuto = false; }
+  accum = 0; lastT = performance.now();               // Accumulator leeren: kein Zeitsprung
+});
+
+/* ================= Loop: Fixed Timestep + Interpolation ================= */
+var lastT = performance.now(), accum = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  var ft = Math.min(0.25, (now - lastT) / 1000);
+  lastT = now;
+  AU.blipBudget = Math.min(CFG.blipMaxPerSec, AU.blipBudget + CFG.blipMaxPerSec * ft);
+  if (state.paused || state.over) { render(1); return; }
+  if (state.hitstop > 0) { state.hitstop -= ft; render(1); return; }
+  accum += ft;
+  var steps = 0;
+  while (accum >= STEP && steps < MAX_STEPS) {
+    var ts = 1;
+    if (state.slowmo > 0 && !REDUCED) ts = state.slowmoScale;
+    if (state.dying && !REDUCED) ts = CFG.deathSlowmoScale;
+    stepGame(STEP * ts, STEP);
+    accum -= STEP;
+    steps++;
+  }
+  if (steps >= MAX_STEPS) accum = 0;                  // Nachhol-Limit: Rest verwerfen
+  render(accum / STEP);
+}
+
+/* ================= Render ================= */
+function drawSpr(spr, x, y, scale) {
+  var w = spr.gw * (scale || 1), h = spr.gh * (scale || 1);
+  ctx.drawImage(spr, x - w / 2, y - h / 2, w, h);
+}
+function render(alpha) {
+  var s = view.scale * view.dpr;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = "#0a0a0c";
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  var shx = 0, shy = 0;
+  if (state.shakeT > 0 && !REDUCED) {
+    shx = rnd(-state.shakeAmp, state.shakeAmp);
+    shy = rnd(-state.shakeAmp, state.shakeAmp);
+  }
+  ctx.setTransform(s, 0, 0, s, view.ox * view.dpr + shx * s, view.oy * view.dpr + shy * s);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, 0, CFG.W, CFG.H); ctx.clip();
+  // Boden: Nachtstrasse, Randstreifen, mitscrollende Markierung
+  ctx.fillStyle = CFG.colEdge; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  ctx.fillStyle = CFG.colGround; ctx.fillRect(LANE_L, 0, CFG.laneW, CFG.H);
+  var sy = lerp(state.pScrollY, state.scrollY, alpha) % 80;
+  ctx.fillStyle = CFG.colMark;
+  for (var my = -80 + sy; my < CFG.H; my += 80) {
+    ctx.fillRect(LANE_L + CFG.laneW / 3 - 2, my, 4, 38);
+    ctx.fillRect(LANE_L + CFG.laneW * 2 / 3 - 2, my, 4, 38);
+  }
+  ctx.fillRect(LANE_L - 3, 0, 3, CFG.H);
+  ctx.fillRect(LANE_R, 0, 3, CFG.H);
+  // Steuerhinweise auf dem Asphalt (erste Sekunden)
+  if (state.time < CFG.introHintTime + 1.5 && !state.boss.active) {
+    var ha = clamp(CFG.introHintTime + 1.5 - state.time, 0, 1) * 0.55;
+    ctx.globalAlpha = ha;
+    ctx.fillStyle = "#5a5a64";
+    ctx.textAlign = "center";
+    ctx.font = "bold 26px system-ui, sans-serif";
+    ctx.fillText("MAUS / A–D — LEER = ENG", LANE_MID, 520);
+    ctx.font = "bold 17px system-ui, sans-serif";
+    ctx.fillText("R = NEUSTART · M = TON", LANE_MID, 552);
+    ctx.globalAlpha = 1;
+  }
+  renderGates(alpha);
+  renderTelegraphs(alpha);
+  renderZombies(alpha);
+  renderBoss(alpha);
+  renderSpits(alpha);
+  renderBullets(alpha);
+  renderFormation(alpha);
+  renderParticles(alpha);
+  renderDmgNums();
+  renderHud();
+  ctx.restore();
+}
+function renderGates(alpha) {
+  for (var i = 0; i < 4; i++) {
+    var g = state.gates[i];
+    if (!g.active) continue;
+    var y = lerp(g.py, g.y, alpha);
+    drawGateHalf(g.left, LANE_L + 4, y, LANE_MID - LANE_L - 10);
+    drawGateHalf(g.right, LANE_MID + 6, y, LANE_R - LANE_MID - 10);
+  }
+}
+function drawGateHalf(slot, x, y, w) {
+  var neg = slot.kind === 3;
+  var col = neg ? CFG.colBad : CFG.colGold;
+  ctx.globalAlpha = 0.16;
+  ctx.fillStyle = col;
+  ctx.fillRect(x, y, w, CFG.gateH);
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = col; ctx.lineWidth = 2;
+  ctx.strokeRect(x + 1, y + 1, w - 2, CFG.gateH - 2);
+  ctx.fillStyle = col;
+  ctx.textAlign = "center";
+  ctx.font = "bold 27px system-ui, sans-serif";
+  ctx.fillText(slot.label, x + w / 2, y + CFG.gateH / 2 + 9);
+}
+function renderTelegraphs(alpha) {
+  var i;
+  // Bodenschlag-Zonen: Gelb leuchtet auf, sonst nichts in dieser Farbe
+  for (i = 0; i < state.slams.length; i++) {
+    var sl = state.slams[i];
+    if (!sl.active) continue;
+    var p = 1 - sl.t / CFG.slamTelegraph;
+    ctx.globalAlpha = 0.14 + 0.22 * p + 0.08 * Math.sin(state.time * 24);
+    ctx.fillStyle = CFG.colWarn;
+    ctx.fillRect(sl.x - CFG.slamHalfW, CFG.formationY - 150, CFG.slamHalfW * 2, 210);
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = CFG.colWarn; ctx.lineWidth = 2;
+    ctx.strokeRect(sl.x - CFG.slamHalfW, CFG.formationY - 150, CFG.slamHalfW * 2, 210);
+    ctx.globalAlpha = 1;
+  }
+  var b = state.boss;
+  if (b.active && b.phase === 1) {
+    if (b.type === 1 && b.spitTele > 0) {              // Muendungs-Telegraph
+      var t = 1 - b.spitTele / CFG.spitTelegraph;
+      ctx.globalAlpha = 0.35 + 0.45 * t;
+      ctx.fillStyle = CFG.colWarn;
+      ctx.beginPath(); ctx.arc(b.x, b.y + 26, 10 + 8 * t, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    if (b.type === 1 && b.jumpTele > 0) {              // Schatten-Telegraph
+      var jt = 1 - b.jumpTele / CFG.jumpTelegraph;
+      ctx.globalAlpha = 0.2 + 0.3 * jt;
+      ctx.fillStyle = CFG.colWarn;
+      ctx.beginPath();
+      ctx.ellipse(b.jumpX, CFG.formationY - 40, 40 + 60 * jt, 14 + 20 * jt, 0, 0, 7);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+}
+function renderZombies(alpha) {
+  for (var i = 0; i < zombies.count; i++) {
+    var z = zombies[i];
+    var x = lerp(z.px, z.x, alpha), y = lerp(z.py, z.y, alpha);
+    var spr = z.type === 1 ? SPR.runner : z.type === 2 ? SPR.brute : SPR.walker;
+    if (z.flash > 0) spr = z.type === 1 ? SPR.runnerF : z.type === 2 ? SPR.bruteF : SPR.walkerF;
+    drawSpr(spr, x, y, 1);
+  }
+}
+function renderBoss(alpha) {
+  var b = state.boss;
+  if (!b.active) return;
+  var x = lerp(b.px, b.x, alpha), y = lerp(b.py, b.y, alpha);
+  if (b.phase === 2) ctx.globalAlpha = Math.max(0, b.dieT / 0.9);
+  var wob = 1 + Math.sin(state.time * 3) * 0.02;
+  drawSpr(b.flash > 0 ? b.sprF : b.spr, x, y, b.air > 0 ? 1.25 : wob);
+  ctx.globalAlpha = 1;
+  if (b.phase === 1) {                                 // HP-Balken oben
+    var bw = 300, bx = LANE_MID - bw / 2, by = 74;
+    ctx.fillStyle = "#26262e"; ctx.fillRect(bx, by, bw, 12);
+    ctx.fillStyle = CFG.colZombie;
+    ctx.fillRect(bx + 1, by + 1, (bw - 2) * clamp(b.hp / b.maxHp, 0, 1), 10);
+    ctx.strokeStyle = CFG.colHud; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, 11);
+    ctx.fillStyle = CFG.colHud;
+    ctx.textAlign = "center";
+    ctx.font = "bold 15px system-ui, sans-serif";
+    ctx.fillText(b.type === 0 ? "FLEISCHBERG" : "SPEIER", LANE_MID, by - 6);
+  }
+}
+function renderSpits(alpha) {
+  for (var i = 0; i < spits.count; i++) {
+    var sp = spits[i];
+    drawSpr(SPR.spit, lerp(sp.px, sp.x, alpha), lerp(sp.py, sp.y, alpha), 1);
+  }
+}
+function renderBullets(alpha) {
+  for (var i = 0; i < bullets.count; i++) {
+    var b = bullets[i];
+    drawSpr(SPR.bullet, lerp(b.px, b.x, alpha), lerp(b.py, b.y, alpha), 1);
+  }
+}
+function renderFormation(alpha) {
+  var fx = lerp(state.pFormX, state.formX, alpha);
+  var vis = visibleUnits();
+  var cols = formCols(), w = formHalfW() * 2;
+  var gap = lerp(CFG.rowGapWide, CFG.rowGapTight, state.squeeze);
+  for (var i = vis - 1; i >= 0; i--) {
+    var row = (i / cols) | 0, col = i % cols;
+    var ux = fx - w / 2 + (col + 0.5) * (w / cols) + state.unitJit[i * 2];
+    var uy = CFG.formationY + row * gap + state.unitJit[i * 2 + 1];
+    drawSpr(SPR.unit, ux, uy + Math.sin(state.time * 6 + i) * 1.2, 1);
+  }
+  // Armeezahl gross ueber der Formation; Pop bei Wachstum, roter Blitz bei Verlust
+  var pop = state.armyPop > 0 ? 1 + 0.35 * (state.armyPop / CFG.armyPopTime) : 1;
+  var num = Math.round(state.armyShown);
+  ctx.textAlign = "center";
+  ctx.font = "bold " + Math.round(34 * pop) + "px system-ui, sans-serif";
+  ctx.fillStyle = state.armyFlash > 0 ? CFG.colBad : CFG.colHud;
+  ctx.fillText(String(num), fx, CFG.formationY - 26);
+}
+function renderParticles(alpha) {
+  for (var i = 0; i < particles.count; i++) {
+    var p = particles[i];
+    ctx.globalAlpha = clamp(1 - p.t / p.life, 0, 1);
+    ctx.fillStyle = p.col;
+    var x = lerp(p.px, p.x, alpha), y = lerp(p.py, p.y, alpha);
+    ctx.fillRect(x - p.size / 2, y - p.size / 2, p.size, p.size);
+  }
+  ctx.globalAlpha = 1;
+}
+function renderDmgNums() {
+  ctx.textAlign = "center";
+  for (var i = 0; i < dmgNums.count; i++) {
+    var d = dmgNums[i];
+    var a = clamp(1 - d.t / 0.7, 0, 1);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = d.boss ? CFG.colGold : CFG.colHud;
+    ctx.font = "bold " + (d.boss ? 26 : 16) + "px system-ui, sans-serif";
+    ctx.fillText(String(d.val), d.x, d.y - d.t * 46);
+  }
+  ctx.globalAlpha = 1;
+}
+function renderHud() {
+  ctx.fillStyle = CFG.colHud;
+  ctx.textAlign = "center";
+  ctx.font = "bold 38px system-ui, sans-serif";
+  ctx.fillText(Math.floor(state.dist) + " m", LANE_MID, 48);
+  ctx.textAlign = "left";
+  ctx.font = "bold 15px system-ui, sans-serif";
+  ctx.fillStyle = "#8b8b95";
+  ctx.fillText(romanWeapon(), LANE_L + 8, CFG.H - 14);
+  ctx.textAlign = "right";
+  ctx.fillText(AU.muted ? "STUMM" : "", LANE_R - 8, CFG.H - 14);
+  if (state.paused) overlay("PAUSE", state.pauseAuto ? "Fenster fokussieren" : "ESC — WEITER", "");
+  if (state.over)
+    overlay("DIE LEGION IST GEFALLEN",
+      "DISTANZ " + Math.floor(state.dist) + " M — KILLS " + state.kills +
+      " — GRÖSSTE ARMEE " + state.maxArmy,
+      "R — NEUSTART");
+}
+function romanWeapon() {
+  var r = ["I", "II", "III", "IV"];
+  return CFG.weapons[state.weapon].name + " " + r[state.weapon];
+}
+function overlay(title, line, hint) {
+  ctx.fillStyle = "rgba(10,10,12,0.78)";
+  ctx.fillRect(0, 0, CFG.W, CFG.H);
+  ctx.fillStyle = CFG.colHud;
+  ctx.textAlign = "center";
+  ctx.font = "bold 40px system-ui, sans-serif";
+  ctx.fillText(title, LANE_MID, 420);
+  ctx.font = "bold 19px system-ui, sans-serif";
+  ctx.fillStyle = "#a8a8b2";
+  ctx.fillText(line, LANE_MID, 470);
+  if (hint) {
+    ctx.fillStyle = CFG.colGold;
+    ctx.font = "bold 24px system-ui, sans-serif";
+    ctx.fillText(hint, LANE_MID, 530);
+  }
+}
+
+/* ================= Start + Test-Haken ================= */
+resetGame();
+requestAnimationFrame(frame);
+// Minimaler Haken fuer automatisierte Abnahmetests — greift nicht ins Spiel ein.
+window.__LL = {
+  CFG: CFG, state: state, input: input,
+  pools: { bullets: bullets, zombies: zombies, particles: particles, dmgNums: dmgNums, spits: spits },
+  reset: resetGame,
+  sim: function (seconds) {
+    var n = Math.round(seconds / STEP);
+    for (var i = 0; i < n && !state.over; i++) stepGame(STEP, STEP);
+    return { dist: state.dist, army: state.army, over: state.over, time: state.time };
+  },
+  stress: function (nz, nb) {
+    for (var i = 0; i < nz; i++) spawnZombie(i % 7 === 0 ? 2 : i % 3 === 0 ? 1 : 0,
+      rnd(LANE_L + 30, LANE_R - 30), rnd(-40, 600), null);
+    for (i = 0; i < nb; i++) fireBullet(rnd(LANE_L, LANE_R), rnd(100, 900), 3, 1);
+  },
+  stepOnce: function () { stepGame(STEP, STEP); },
+  renderOnce: function () { render(1); }
+};
+</script>
+</body>
+</html>
