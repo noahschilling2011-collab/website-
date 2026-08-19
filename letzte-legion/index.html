@@ -1,0 +1,2049 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LETZTE LEGION</title>
+<style>
+  :root { --ink:#e8e8ec; --dim:#8a8a94; --gold:#e8c766; --bad:#ff5a3c; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { height:100%; background:#0d0d11; overflow:hidden;
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
+  #scene { display:block; width:100%; height:100svh; cursor:crosshair; }
+  .fallback { color:var(--ink); padding:40px; font-size:14px; line-height:1.6; }
+  .fallback code { color:var(--dim); }
+  #hud { position:fixed; inset:0; pointer-events:none; z-index:5; color:var(--ink); }
+  #hudDist { position:absolute; top:14px; left:50%; transform:translateX(-50%);
+    font-size:34px; font-weight:800; letter-spacing:.04em;
+    text-shadow:0 2px 8px rgba(0,0,0,.8); }
+  #bossWrap { position:absolute; top:60px; left:50%; transform:translateX(-50%);
+    width:min(46vw,320px); text-align:center; display:none; }
+  #bossName { font-size:13px; font-weight:700; letter-spacing:.22em; }
+  #bossHp { margin-top:4px; height:10px; background:#26262e;
+    border:1px solid var(--ink); }
+  #bossHp i { display:block; height:100%; background:#7d8f70; width:100%; }
+  #armyLbl { position:absolute; top:0; left:0; font-size:30px; font-weight:800;
+    transform:translate(-50%,-100%); text-shadow:0 2px 8px rgba(0,0,0,.9);
+    will-change:transform; transition:color .12s; }
+  #armyLbl.loss { color:var(--bad); }
+  #hudWeapon { position:absolute; left:16px; bottom:12px; font-size:14px;
+    font-weight:700; color:var(--dim); letter-spacing:.08em; }
+  #hudMute { position:absolute; right:16px; bottom:12px; font-size:14px;
+    font-weight:700; color:var(--dim); letter-spacing:.08em; }
+  #hintBox { position:absolute; left:50%; top:63%; transform:translate(-50%,0);
+    text-align:center; font-size:20px; font-weight:700; letter-spacing:.12em;
+    color:#9a9aa4; text-shadow:0 2px 8px rgba(0,0,0,.8);
+    transition:opacity .6s; }
+  #hintBox small { display:block; font-size:13px; font-weight:400;
+    color:var(--dim); margin-top:6px; letter-spacing:.08em; }
+  #overlay { position:absolute; inset:0; display:none; align-items:center;
+    justify-content:center; flex-direction:column; text-align:center;
+    background:rgba(10,10,14,.78); }
+  #ovTitle { font-size:34px; font-weight:800; letter-spacing:.06em; }
+  #ovLine { margin-top:14px; font-size:16px; color:#a8a8b2; }
+  #ovHint { margin-top:22px; font-size:20px; font-weight:800; color:var(--gold); }
+  .dmg { position:absolute; top:0; left:0; font-size:15px; font-weight:800;
+    transform:translate(-50%,-50%); text-shadow:0 1px 5px rgba(0,0,0,.9);
+    will-change:transform,opacity; display:none; }
+  .dmg.boss { font-size:24px; color:var(--gold); }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div id="hud">
+  <div id="hudDist">0 m</div>
+  <div id="bossWrap"><span id="bossName"></span><div id="bossHp"><i></i></div></div>
+  <div id="armyLbl">10</div>
+  <div id="hudWeapon">BOGEN I</div>
+  <div id="hudMute"></div>
+  <div id="hintBox">MAUS / A–D — LEER = ENG<small>R = NEUSTART · M = TON</small></div>
+  <div id="overlay"><div id="ovTitle"></div><div id="ovLine"></div><div id="ovHint"></div></div>
+</div>
+<noscript><div class="fallback">Für dieses Spiel wird JavaScript benötigt.</div></noscript>
+<script>
+// Klassisches Script: faengt CDN-/Modul-Ausfall ab (Modul-Script bleibt dann stumm).
+setTimeout(function () {
+  if (window.__LL) return;
+  var c = document.getElementById('scene');
+  var d = document.createElement('div');
+  d.className = 'fallback';
+  d.innerHTML = 'Die 3D-Engine konnte nicht geladen werden.<br>' +
+    'Per Doppelklick (<code>file://</code>) blockiert der Browser Modul-Scripts — ' +
+    'lokal starten mit <code>python3 -m http.server 8000</code> und ' +
+    '<code>http://localhost:8000/</code> öffnen. Sonst: Netzwerk/CDN prüfen.';
+  if (c) c.replaceWith(d);
+}, 4000);
+</script>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.185.1/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.185.1/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+/* =====================================================================
+   LETZTE LEGION v2 — Logik 2D (unveraendert aus v1), Bild 3D (Three.js).
+   Logik-Koordinaten in px: x quer zur Lane (40..500), y Richtung Kamera,
+   Formation bei y=780. Mapping: 1 Welt-Unit = 100 px, Formation bei z=0.
+   Alle Tuning-Werte in CFG.
+   ===================================================================== */
+var CFG = {
+  // Logik-Raum (px) — identisch zu v1
+  W: 540, H: 960, laneW: 460,
+
+  // Scroll & Armee
+  scrollSpeed: 130,        // px/s
+  pxPerMeter: 10,
+  startArmy: 10,
+  maxVisible: 48,
+  unitFireInterval: 0.5,
+  bulletSpeed: 700,
+  bulletDamage: 3,
+  formationLerp: 0.12,
+  formationY: 780,
+  adSpeed: 430,            // px/s bei A/D
+  squeezeTime: 0.25,
+  squeezeFirePct: 0.40,
+  wideCols: 8,  wideWidth: 250,
+  tightCols: 3, tightWidth: 80,
+  rowGapWide: 15, rowGapTight: 11,
+
+  // Waffenstufen
+  weapons: [
+    { name: "BOGEN",    interval: 0.50, shots: 1, pierce: 1 },
+    { name: "ARMBRUST", interval: 0.38, shots: 1, pierce: 1 },
+    { name: "REPETIER", interval: 0.38, shots: 2, pierce: 1 },
+    { name: "BALLISTA", interval: 0.38, shots: 2, pierce: 2 }
+  ],
+  weaponGateBonus: 15,
+
+  // Zombies
+  zWalker: { hp: 6,  speed: 25,  eat: 2, r: 11 },
+  zRunner: { hp: 2,  speed: 120, eat: 1, r: 8  },
+  zBrute:  { hp: 60, speed: 15,  eat: 6, r: 20 },
+  bruteFromM: 300,
+  runnerFromM: 60,
+  spawnBase: 2.8,
+  spawnGrowPer100m: 0.15,
+  zombieCap: 300,
+  firstSpawnDelay: 3,
+  walkerClusterMin: 4, walkerClusterMax: 8,
+  walkerClusterSpread: 34,
+  runnerPackMin: 5, runnerPackMax: 8,
+  runnerChance: 0.22, bruteChance: 0.12,
+  runnerVxMin: 26, runnerVxMax: 44,   // Schraegfahrt der Rudel
+  homWalker: 16, homRunner: 34, homBrute: 8,
+  homFromY: 0,             // Konvergenz erst auf den letzten ~780 px (wie v1)
+  spawnDistPx: 2400,       // Spawnlinie: z = -24, tief im Nebel
+  growTime: 0.25,          // Einwachsen frisch gespawnter Figuren (Boss-Ruf)
+
+  // Prefill beim Start: die Flut ist schon unterwegs, naechste Traube >= 8 s
+  prefillClusters: 4, prefillNearestS: 8.4, prefillStepS: 2.6,
+  gatePrefill1S: 10.4, gatePrefill2S: 17.4, gatePrefillNextT: 6,
+
+  // Gates
+  gateInterval: 7,
+  gateAddBase: 8, gateAddPerM: 1 / 40,
+  gateAddMax: 19,
+  gateGuardChance: 0.40,
+  gateH: 46,
+  gateDeadZone: 3,
+
+  // Waffenschrein: goldene Statue am Fahrbahnrand, Countdown = HP.
+  // Rechtzeitig freigeschossen -> Waffenstufe +1 (auf Max: +15 Armee).
+  // Zieht Flanken-Feuerkraft von der Horde ab — das ist der Trade-off.
+  shrineFirstAtM: 130, shrineEveryM: 260,
+  shrineHpBase: 90, shrineHpPerM: 0.55, shrineHpPerWeapon: 0.3,
+  shrineXInset: 34, shrineR: 26, shrineDeadTime: 0.5,
+
+  // Bosse
+  bossEveryM: 450,
+  bossHpBase: 900, bossHpGrow: 0.6,
+  bossArmyLossPct: 0.20, bossArmyLossMin: 4,
+  bossKillArmyPct: 0.25,
+  bossSpawnFactor: 0.25,
+  bossY: 205, bossEnterTime: 1.5, bossEnterFromY: -140,
+  slamInterval: 4, slamTelegraph: 0.7, slamHalfW: 115,
+  callInterval: 9, bossAddCount: 10, bossAddSpeed: 60,
+  bossAWalkSpeed: 42,
+  spitInterval: 3.5, spitTelegraph: 0.5, spitSpeed: 140,
+  spitArcs: 3, spitPerArc: 5, spitArcGap: 0.22, spitFanDeg: 56,
+  spitEat: 3, spitR: 7,
+  jumpInterval: 8, jumpTelegraph: 0.8, jumpAir: 0.35,
+  bossBSpots: [135, 270, 405], bossBHopEvery: 2.6,
+
+  // Pools & Grid
+  poolBullets: 600, poolZombies: 350, poolParticles: 400,
+  poolDmgNums: 16, poolSpits: 64, poolDying: 24,
+  gridCell: 64, gridCellCap: 64,
+
+  // Feel
+  dmgAggregate: 0.25, dmgMaxShown: 12,
+  hitFlash: 0.05, hitFlashGap: 0.08,
+  hitstop: 0.15, bossSlowmo: 0.4, bossSlowmoScale: 0.3,
+  deathSlowmo: 0.6, deathSlowmoScale: 0.25,
+  shakeMax: 5,             // Logik-Wert; im Bild max ~0.05 Units Kamera-Jitter
+  armyPopTime: 0.22, armyTickPerSec: 40,
+  introHintTime: 3,
+  blipMaxPerSec: 12,
+
+  // 3D-Buehne
+  world: {
+    pxPerUnit: 100,
+    bg: "#0d0d11", ground: "#17171c", wall: "#101014", mark: "#2c2c34",
+    fogNear: 14, fogFar: 26,
+    camPos: [0, 5.6, 5.8], camAim: [0, 0.1, -5.6], camFollow: 0.35, camFollowMax: 0.5,
+    laneLen: 36, wallH: 0.3,
+    marks: 16, markGap: 4,
+    blobOpacity: 0.35,
+    dyingTime: 0.09        // Todes-Schrumpfen: ~3 Frames
+  },
+
+  // Farben (HUD/Gates/Telegraphs — Figurfarben stecken in den Modellen)
+  colWarn: "#ffd84d", colBad: "#ff5a3c", colGold: "#e8c766", colHud: "#e8e8ec"
+};
+var STEP = 1 / 60, MAX_STEPS = 5;
+var SPAWN_Y = CFG.formationY - CFG.spawnDistPx;   // -1620 px -> z = -24
+
+/* ================= Utils ================= */
+function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function rnd(a, b) { return a + Math.random() * (b - a); }
+function rndi(a, b) { return (a + Math.random() * (b - a + 1)) | 0; }
+var LANE_L = (CFG.W - CFG.laneW) / 2, LANE_R = LANE_L + CFG.laneW, LANE_MID = CFG.W / 2;
+var PXU = CFG.world.pxPerUnit;
+function wx(x) { return (x - LANE_MID) / PXU; }
+function wz(y) { return -(CFG.formationY - y) / PXU; }
+var REDUCED = false;
+try {
+  var mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+  REDUCED = mq.matches;
+  if (mq.addEventListener) mq.addEventListener("change", function (e) { REDUCED = e.matches; });
+} catch (e) {}
+
+/* ================= Pools — kein new im Game-Loop ================= */
+function makePool(n, fields) {
+  var arr = new Array(n);
+  for (var i = 0; i < n; i++) {
+    var o = { active: false };
+    for (var k in fields) o[k] = fields[k];
+    arr[i] = o;
+  }
+  arr.count = 0;
+  return arr;
+}
+var bullets   = makePool(CFG.poolBullets,  { x: 0, y: 0, px: 0, py: 0, dmg: 0, pierce: 1, hitId: -1 });
+var zombies   = makePool(CFG.poolZombies,  { x: 0, y: 0, px: 0, py: 0, type: 0, hp: 0, maxHp: 0,
+                                             speed: 0, ownSpeed: 0, eat: 0, r: 0, vx: 0, wob: 0,
+                                             age: 0, flash: 0, dmgAcc: 0, dmgT: 0, id: 0, kind: 0 });
+var particles = makePool(CFG.poolParticles,{ x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, t: 0, life: 1,
+                                             col: "#fff", size: 2, grav: 0 });
+var dmgNums   = makePool(CFG.poolDmgNums,  { x: 0, y: 0, val: 0, t: 0, boss: false });
+var spits     = makePool(CFG.poolSpits,    { x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, hp: 1,
+                                             flash: 0, dmgAcc: 0, dmgT: 0, kind: 1 });
+var dying     = makePool(CFG.poolDying,    { x: 0, y: 0, type: 0, t: 0 });
+function poolSpawn(pool) {
+  if (pool.count >= pool.length) return null;
+  var o = pool[pool.count]; pool.count++;
+  o.active = true;
+  return o;
+}
+function poolKill(pool, i) {
+  var last = pool.count - 1;
+  var o = pool[i];
+  o.active = false;
+  pool[i] = pool[last]; pool[last] = o;
+  pool.count = last;
+}
+
+/* ================= Uniform Grid (64 px) fuer Projektil<->Ziel ================= */
+var GW = Math.ceil(CFG.W / CFG.gridCell), GH = Math.ceil(CFG.H / CFG.gridCell);
+var gridCells = new Array(GW * GH), gridCount = new Int16Array(GW * GH);
+for (var gi = 0; gi < GW * GH; gi++) gridCells[gi] = new Array(CFG.gridCellCap);
+function gridReset() { for (var i = 0; i < gridCount.length; i++) gridCount[i] = 0; }
+function gridInsert(o) {
+  var cx = clamp((o.x / CFG.gridCell) | 0, 0, GW - 1);
+  var cy = clamp((o.y / CFG.gridCell) | 0, 0, GH - 1);
+  var idx = cy * GW + cx;
+  if (gridCount[idx] < CFG.gridCellCap) {
+    gridCells[idx][gridCount[idx]] = o;
+    gridCount[idx]++;
+  }
+}
+
+/* ================= Spielzustand ================= */
+var state = {};
+var zombieIdSeq = 1;
+function resetGame() {
+  state.time = 0; state.dist = 0; state.scrollY = 0; state.pScrollY = 0;
+  state.army = CFG.startArmy; state.maxArmy = CFG.startArmy; state.kills = 0; state.shots = 0;
+  state.armyShown = CFG.startArmy; state.armyPop = 0; state.armyFlash = 0;
+  state.weapon = 0;
+  state.formX = CFG.W / 2; state.pFormX = CFG.W / 2;
+  input.targetX = CFG.W / 2;
+  state.squeeze = 0;
+  state.spawnAcc = 0; state.spawnStartT = CFG.firstSpawnDelay;
+  state.bossIndex = 0; state.nextBossM = CFG.bossEveryM;
+  state.shrine = { active: false, x: 0, y: 0, py: 0, hp: 0, maxHp: 1, r: CFG.shrineR,
+                   flash: -1, dead: false, deadT: 0, id: 0, kind: 2, side: 1 };
+  state.nextShrineM = CFG.shrineFirstAtM;
+  state.boss = { active: false, phase: -1, flash: -1, hp: 0, maxHp: 1, x: 0, y: 0, px: 0, py: 0, r: 0 };
+  state.slams = [];
+  for (var si = 0; si < 4; si++) state.slams.push({ active: false, x: 0, t: 0 });
+  state.over = false; state.dying = false; state.deathT = 0;
+  state.paused = false; state.pauseAuto = false;
+  state.hitstop = 0; state.slowmo = 0; state.slowmoScale = 1;
+  state.shakeT = 0; state.shakeAmp = 0;
+  bullets.count = 0; particles.count = 0; dmgNums.count = 0; spits.count = 0;
+  zombies.count = 0; dying.count = 0;
+  for (var i = 0; i < bullets.length; i++) bullets[i].active = false;
+  for (i = 0; i < zombies.length; i++) zombies[i].active = false;
+  for (i = 0; i < particles.length; i++) particles[i].active = false;
+  for (i = 0; i < dmgNums.length; i++) dmgNums[i].active = false;
+  for (i = 0; i < spits.length; i++) spits[i].active = false;
+  for (i = 0; i < dying.length; i++) dying[i].active = false;
+  state.gates = [null, null, null, null];
+  for (i = 0; i < 4; i++) state.gates[i] = { active: false, y: 0, py: 0, left: gateSlot(), right: gateSlot() };
+  state.fireT = new Float32Array(CFG.maxVisible);
+  state.unitJit = new Float32Array(CFG.maxVisible * 2);
+  for (i = 0; i < CFG.maxVisible; i++) {
+    state.fireT[i] = Math.random() * CFG.unitFireInterval;
+    state.unitJit[i * 2] = rnd(-2.5, 2.5);
+    state.unitJit[i * 2 + 1] = rnd(-2, 2);
+  }
+  prefillWorld();
+  hudReset();
+}
+function gateSlot() { return { kind: 0, val: 0, label: "" }; }
+// Beim Start ist die Flut schon unterwegs: Trauben und Gates in der Pipeline,
+// die naechste Traube >= 8 s entfernt — die ersten Sekunden bleiben ruhig.
+function prefillWorld() {
+  var wSpd = CFG.scrollSpeed + CFG.zWalker.speed;
+  for (var k = 0; k < CFG.prefillClusters; k++) {
+    var t = CFG.prefillNearestS + k * CFG.prefillStepS;
+    spawnWalkerCluster(rnd(LANE_L + 60, LANE_R - 60), CFG.formationY - t * wSpd,
+      rndi(CFG.walkerClusterMin, CFG.walkerClusterMax));
+  }
+  spawnGatePair(CFG.formationY - CFG.gatePrefill1S * CFG.scrollSpeed);
+  spawnGatePair(CFG.formationY - CFG.gatePrefill2S * CFG.scrollSpeed);
+  state.gateT = CFG.gatePrefillNextT;
+}
+
+/* ================= Armee-Aenderungen ================= */
+function armyGain(n) {
+  if (n <= 0) return;
+  state.army += n;
+  if (state.army > state.maxArmy) state.maxArmy = state.army;
+  state.armyPop = CFG.armyPopTime;
+}
+function armyLose(n) {
+  if (n <= 0 || state.dying || state.over) return;
+  state.army -= n;
+  state.armyFlash = 0.3;
+  if (state.army <= 0) { state.army = 0; startDeath(); }
+}
+function startDeath() {
+  state.dying = true;
+  state.deathT = REDUCED ? 0 : CFG.deathSlowmo;
+  sfxDeath();
+  if (state.deathT <= 0) state.over = true;
+}
+
+/* ================= Formation ================= */
+function formHalfW() { return lerp(CFG.wideWidth, CFG.tightWidth, state.squeeze) / 2; }
+function formCols()  { return Math.round(lerp(CFG.wideCols, CFG.tightCols, state.squeeze)); }
+function visibleUnits() { return Math.min(state.army, CFG.maxVisible); }
+function unitPos(i, out) {
+  var cols = formCols(), w = formHalfW() * 2;
+  var row = (i / cols) | 0, col = i % cols;
+  var gap = lerp(CFG.rowGapWide, CFG.rowGapTight, state.squeeze);
+  out.x = state.formX - w / 2 + (col + 0.5) * (w / cols) + state.unitJit[i * 2];
+  out.y = CFG.formationY + row * gap + state.unitJit[i * 2 + 1];
+}
+var _upos = { x: 0, y: 0 };
+
+/* ================= Zombies ================= */
+function spawnZombie(type, x, y, opts) {
+  if (zombies.count >= CFG.zombieCap) return null;
+  var z = poolSpawn(zombies);
+  if (!z) return null;
+  var def = type === 1 ? CFG.zRunner : type === 2 ? CFG.zBrute : CFG.zWalker;
+  z.type = type; z.kind = 0;
+  z.x = z.px = clamp(x, LANE_L + def.r, LANE_R - def.r);
+  z.y = z.py = y;
+  z.hp = z.maxHp = def.hp;
+  z.ownSpeed = (opts && opts.speed !== undefined) ? opts.speed : def.speed;
+  z.eat = def.eat; z.r = def.r;
+  z.vx = (opts && opts.vx) || 0;
+  z.wob = Math.random() * 6.28;
+  z.age = 0;
+  z.flash = -1; z.dmgAcc = 0; z.dmgT = 0;
+  z.id = zombieIdSeq++;
+  return z;
+}
+function spawnWalkerCluster(cx, cy, n) {
+  var s = CFG.walkerClusterSpread;
+  for (var i = 0; i < n; i++)
+    spawnZombie(0, cx + rnd(-s, s), cy + rnd(-s, s), null);
+}
+function spawnRunnerPack() {
+  var left = Math.random() < 0.5;
+  var n = rndi(CFG.runnerPackMin, CFG.runnerPackMax);
+  var x0 = left ? LANE_L + 20 : LANE_R - 20;
+  var vx = (left ? 1 : -1) * rnd(CFG.runnerVxMin, CFG.runnerVxMax);
+  for (var i = 0; i < n; i++)
+    spawnZombie(1, x0 + rnd(-14, 14), SPAWN_Y - i * 26, { vx: vx });
+}
+function currentSpawnRate() {
+  var r = CFG.spawnBase * Math.pow(1 + CFG.spawnGrowPer100m, state.dist / 100);
+  if (state.boss.active) r *= CFG.bossSpawnFactor;
+  return r;
+}
+function updateSpawner(dt) {
+  if (state.time < state.spawnStartT) return;
+  state.spawnAcc += currentSpawnRate() * dt;
+  var guard = 0;
+  while (state.spawnAcc >= 1 && zombies.count < CFG.zombieCap && guard < 8) {
+    guard++;
+    var roll = Math.random();
+    if (state.dist >= CFG.bruteFromM && roll < CFG.bruteChance) {
+      spawnZombie(2, rnd(LANE_L + 40, LANE_R - 40), SPAWN_Y, null);
+      state.spawnAcc -= 3;
+    } else if (state.dist >= CFG.runnerFromM && roll < CFG.bruteChance + CFG.runnerChance) {
+      var pack = rndi(CFG.runnerPackMin, CFG.runnerPackMax);
+      if (state.spawnAcc >= pack * 0.6) { spawnRunnerPack(); state.spawnAcc -= pack * 0.6; }
+      else break;
+    } else {
+      var n = rndi(CFG.walkerClusterMin, CFG.walkerClusterMax);
+      if (state.spawnAcc >= n * 0.8) {
+        spawnWalkerCluster(rnd(LANE_L + 60, LANE_R - 60), SPAWN_Y + rnd(-50, 0), n);
+        state.spawnAcc -= n * 0.8;
+      } else break;
+    }
+  }
+  if (state.spawnAcc > 12) state.spawnAcc = 12;
+}
+
+/* ================= Gates ================= */
+// kind: 0 add, 1 mul, 2 waffe, 3 minus
+function rollGate(slot, allowNeg) {
+  var addN = Math.min(CFG.gateAddMax, Math.round(CFG.gateAddBase + state.dist * CFG.gateAddPerM));
+  var r = Math.random();
+  if (r < 0.30)      { slot.kind = 0; slot.val = addN;  slot.label = "+" + addN; }
+  else if (r < 0.50) { slot.kind = 1; slot.val = 1.3;   slot.label = "×1.3"; }
+  else if (r < 0.65) { slot.kind = 1; slot.val = 1.5;   slot.label = "×1.5"; }
+  else if (r < 0.71) { slot.kind = 1; slot.val = 2;     slot.label = "×2"; }
+  else if (r < 0.85) {
+    if (state.weapon >= CFG.weapons.length - 1) {
+      slot.kind = 0; slot.val = CFG.weaponGateBonus; slot.label = "+" + CFG.weaponGateBonus;
+    } else { slot.kind = 2; slot.val = 0; slot.label = "WAFFE"; }
+  }
+  else if (allowNeg) { slot.kind = 3; slot.val = addN;  slot.label = "−" + addN; }
+  else               { slot.kind = 0; slot.val = addN;  slot.label = "+" + addN; }
+}
+function gateValue(slot) {
+  if (slot.kind === 0) return slot.val;
+  if (slot.kind === 1) return (slot.val - 1) * state.army;
+  if (slot.kind === 2) return 900;
+  return -slot.val;
+}
+function spawnGatePair(yStart) {
+  var g = null;
+  for (var i = 0; i < 4; i++) if (!state.gates[i].active) { g = state.gates[i]; break; }
+  if (!g) return;
+  g.active = true;
+  g.y = g.py = (yStart === undefined ? SPAWN_Y : yStart);
+  rollGate(g.left, true);
+  rollGate(g.right, g.left.kind !== 3);
+  if (g.left.kind === 3 && g.right.kind === 3) rollGate(g.right, false);
+  if (g.left.label === g.right.label) rollGate(g.right, g.left.kind !== 3);
+  if (Math.random() < CFG.gateGuardChance && state.time > state.spawnStartT) {
+    var betterLeft = gateValue(g.left) >= gateValue(g.right);
+    var gx = betterLeft ? LANE_L + CFG.laneW * 0.25 : LANE_L + CFG.laneW * 0.75;
+    spawnWalkerCluster(gx, g.y - 120, rndi(CFG.walkerClusterMin, CFG.walkerClusterMax));
+  }
+}
+function applyGate(slot) {
+  if (slot.kind === 0) { armyGain(slot.val); sfxGateGood(); }
+  else if (slot.kind === 1) {
+    armyGain(Math.round(state.army * slot.val) - state.army);
+    sfxGateGood();
+  }
+  else if (slot.kind === 2) {
+    state.weapon = Math.min(CFG.weapons.length - 1, state.weapon + 1);
+    sfxGateGood();
+  }
+  else { armyLose(slot.val); sfxGateBad(); }
+  burstParticles(state.formX, CFG.formationY - 14, slot.kind === 3 ? CFG.colBad : CFG.colGold, 10, 130);
+}
+function updateGates(dt, scrollActive) {
+  if (!state.boss.active) {
+    state.gateT -= dt;
+    if (state.gateT <= 0) { spawnGatePair(); state.gateT = CFG.gateInterval; }
+  }
+  for (var i = 0; i < 4; i++) {
+    var g = state.gates[i];
+    if (!g.active) continue;
+    g.py = g.y;
+    if (scrollActive) g.y += CFG.scrollSpeed * dt;
+    if (g.y > CFG.H + 30) { g.active = false; continue; }
+    if (g.y + CFG.gateH >= CFG.formationY && g.y < CFG.formationY + 30) {
+      var off = state.formX - LANE_MID;
+      var takenLeft  = off < -CFG.gateDeadZone;
+      var takenRight = off > CFG.gateDeadZone;
+      if (takenLeft || takenRight) {
+        applyGate(takenLeft ? g.left : g.right);
+        g.active = false;
+      }
+    }
+  }
+}
+
+/* ================= Waffenschrein ================= */
+function spawnShrine() {
+  var s = state.shrine;
+  s.active = true; s.dead = false; s.deadT = 0;
+  s.side = -s.side;
+  s.x = s.side < 0 ? LANE_L + CFG.shrineXInset : LANE_R - CFG.shrineXInset;
+  s.y = s.py = SPAWN_Y;
+  s.maxHp = Math.round((CFG.shrineHpBase + state.dist * CFG.shrineHpPerM) *
+                       (1 + state.weapon * CFG.shrineHpPerWeapon));
+  s.hp = s.maxHp;
+  s.flash = -1;
+  s.id = zombieIdSeq++;
+}
+function shrineDestroyed() {
+  var s = state.shrine;
+  s.dead = true; s.deadT = CFG.shrineDeadTime;
+  if (state.weapon < CFG.weapons.length - 1) state.weapon++;
+  else armyGain(CFG.weaponGateBonus);
+  goldFountain(s.x, s.y);
+  burstParticles(s.x, s.y, CFG.colGold, 12, 200);
+  sfxShrine();
+}
+function updateShrine(dt, scrollActive) {
+  var s = state.shrine;
+  if (!s.active && !state.boss.active && state.dist >= state.nextShrineM) {
+    spawnShrine();
+    state.nextShrineM += CFG.shrineEveryM;
+  }
+  if (!s.active) return;
+  if (s.flash > -1) s.flash -= dt;
+  if (s.dead) {
+    s.deadT -= dt;
+    if (s.deadT <= 0) s.active = false;
+    return;
+  }
+  s.py = s.y;
+  if (scrollActive) s.y += CFG.scrollSpeed * dt;
+  if (s.y - s.r > CFG.formationY) s.active = false;    // verpasst — keine Belohnung
+}
+function sfxShrine() {
+  tone(523, 0.12, "square", 0.12, 1);
+  tone(659, 0.16, "square", 0.11, 1);
+  tone(784, 0.22, "square", 0.11, 1);
+  tone(1047, 0.3, "square", 0.1, 1);
+}
+
+/* ================= Feuern ================= */
+function fireBullet(x, y, dmg, pierce) {
+  var b = poolSpawn(bullets);
+  if (!b) return;
+  b.x = b.px = x; b.y = b.py = y;
+  b.dmg = dmg; b.pierce = pierce; b.hitId = -1;
+  state.shots++;
+  sfxShot();
+}
+function updateFiring(dt) {
+  var w = CFG.weapons[state.weapon];
+  var vis = visibleUnits();
+  if (vis <= 0) return;
+  var firePct = lerp(1, CFG.squeezeFirePct, state.squeeze);
+  var effInterval = w.interval / firePct;
+  var dmg = CFG.bulletDamage * (state.army / vis);
+  for (var i = 0; i < vis; i++) {
+    state.fireT[i] -= dt;
+    if (state.fireT[i] <= 0) {
+      state.fireT[i] += effInterval;
+      unitPos(i, _upos);
+      for (var s = 0; s < w.shots; s++) {
+        var off = w.shots > 1 ? (s === 0 ? -4 : 4) : 0;
+        fireBullet(_upos.x + off, _upos.y - 9, dmg, w.pierce);
+      }
+    }
+  }
+}
+function updateBullets(dt) {
+  for (var i = 0; i < bullets.count; i++) {
+    var b = bullets[i];
+    b.px = b.x; b.py = b.y;
+    b.y -= CFG.bulletSpeed * dt;
+  }
+}
+
+/* ================= Partikel & Schadenszahlen ================= */
+function burstParticles(x, y, col, n, spd) {
+  for (var i = 0; i < n; i++) {
+    var p = poolSpawn(particles);
+    if (!p) return;
+    var a = Math.random() * 6.28, v = rnd(spd * 0.4, spd);
+    p.x = p.px = x; p.y = p.py = y;
+    p.vx = Math.cos(a) * v; p.vy = Math.sin(a) * v;
+    p.t = 0; p.life = rnd(0.25, 0.5); p.col = col; p.size = rnd(1.5, 3.5); p.grav = 0;
+  }
+}
+function goldFountain(x, y) {
+  for (var i = 0; i < 26; i++) {
+    var p = poolSpawn(particles);
+    if (!p) return;
+    p.x = p.px = x + rnd(-30, 30); p.y = p.py = y;
+    p.vx = rnd(-60, 60); p.vy = rnd(180, 420);
+    p.t = 0; p.life = rnd(0.6, 1.1); p.col = CFG.colGold; p.size = rnd(2, 4); p.grav = 60;
+  }
+}
+function updateParticles(dt) {
+  for (var i = particles.count - 1; i >= 0; i--) {
+    var p = particles[i];
+    p.px = p.x; p.py = p.y;
+    p.t += dt;
+    if (p.t >= p.life) { poolKill(particles, i); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+}
+function pushDmgNum(x, y, val, boss) {
+  if (dmgNums.count >= CFG.dmgMaxShown) return;        // hartes Limit 12
+  var d = poolSpawn(dmgNums);
+  if (!d) return;
+  d.x = x + rnd(-6, 6); d.y = y; d.val = Math.round(val); d.t = 0; d.boss = !!boss;
+}
+function flushDmg(o, boss) {
+  if (o.dmgAcc > 0) { pushDmgNum(o.x, o.y - (o.r || 40), o.dmgAcc, boss); o.dmgAcc = 0; }
+  o.dmgT = 0;
+}
+function tickDmg(o, dt, boss) {
+  if (o.dmgT > 0) {
+    o.dmgT -= dt;
+    if (o.dmgT <= 0) flushDmg(o, boss);
+  }
+}
+function updateDmgNums(dt) {
+  for (var i = dmgNums.count - 1; i >= 0; i--) {
+    var d = dmgNums[i];
+    d.t += dt;
+    if (d.t > 0.7) poolKill(dmgNums, i);
+  }
+}
+function damageTarget(o, dmg) {
+  o.hp -= dmg;
+  if (o.flash <= -CFG.hitFlashGap) o.flash = CFG.hitFlash;
+  o.dmgAcc += dmg;
+  if (o.dmgT <= 0) o.dmgT = CFG.dmgAggregate;
+}
+
+/* ================= Kollisionen: Grid-Pass ================= */
+function collideBullets() {
+  gridReset();
+  var i;
+  // Nur Ziele im Schussfeld einsortieren — die ferne Flut ist unerreichbar
+  for (i = 0; i < zombies.count; i++)
+    if (zombies[i].y > -CFG.gridCell) gridInsert(zombies[i]);
+  for (i = 0; i < spits.count; i++) gridInsert(spits[i]);
+  var shr = state.shrine;
+  if (shr.active && !shr.dead && shr.y > -CFG.gridCell) gridInsert(shr);
+  var boss = state.boss;
+  for (i = bullets.count - 1; i >= 0; i--) {
+    var b = bullets[i];
+    if (b.y < -20) { poolKill(bullets, i); continue; }
+    if (boss.active && boss.phase === 1) {
+      var bdx = b.x - boss.x, bdy = b.y - boss.y;
+      if (bdx * bdx + bdy * bdy < boss.r * boss.r) {
+        damageTarget(boss, b.dmg);
+        sfxBossHurt();
+        poolKill(bullets, i);
+        continue;
+      }
+    }
+    var cx = clamp((b.x / CFG.gridCell) | 0, 0, GW - 1);
+    var cy = clamp((b.y / CFG.gridCell) | 0, 0, GH - 1);
+    var dead = false;
+    for (var oy = -1; oy <= 1 && !dead; oy++) {
+      var yy = cy + oy;
+      if (yy < 0 || yy >= GH) continue;
+      for (var ox = -1; ox <= 1 && !dead; ox++) {
+        var xx = cx + ox;
+        if (xx < 0 || xx >= GW) continue;
+        var cell = gridCells[yy * GW + xx], cn = gridCount[yy * GW + xx];
+        for (var k = 0; k < cn; k++) {
+          var o = cell[k];
+          if (!o.active || o.hp <= 0) continue;
+          if (o.kind === 1) {
+            var dx1 = b.x - o.x, dy1 = b.y - o.y;
+            var rr1 = CFG.spitR + 4;
+            if (dx1 * dx1 + dy1 * dy1 < rr1 * rr1) {
+              o.hp = 0;
+              b.pierce--;
+              if (b.pierce <= 0) { poolKill(bullets, i); dead = true; break; }
+            }
+          } else if (o.kind === 2) {                   // Waffenschrein
+            if (o.id === b.hitId) continue;
+            var dx2 = b.x - o.x, dy2 = b.y - o.y, rr2 = o.r + 4;
+            if (dx2 * dx2 + dy2 * dy2 < rr2 * rr2) {
+              o.hp -= b.dmg;
+              if (o.flash <= -CFG.hitFlashGap) o.flash = CFG.hitFlash;
+              b.hitId = o.id;
+              if (o.hp <= 0) shrineDestroyed();
+              b.pierce--;
+              if (b.pierce <= 0) { poolKill(bullets, i); dead = true; break; }
+            }
+          } else {
+            if (o.id === b.hitId) continue;
+            var dx = b.x - o.x, dy = b.y - o.y, rr = o.r + 4;
+            if (dx * dx + dy * dy < rr * rr) {
+              damageTarget(o, b.dmg);
+              b.hitId = o.id;
+              b.pierce--;
+              if (b.pierce <= 0) { poolKill(bullets, i); dead = true; break; }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+/* ================= Zombie-Update & Frontlinien-Check ================= */
+function pushDying(x, y, type) {
+  var d = poolSpawn(dying);
+  if (!d) return;
+  d.x = x; d.y = y; d.type = type; d.t = CFG.world.dyingTime;
+}
+function updateZombies(dt, scrollActive) {
+  var world = scrollActive ? CFG.scrollSpeed : 0;
+  var half = formHalfW();
+  for (var i = zombies.count - 1; i >= 0; i--) {
+    var z = zombies[i];
+    z.px = z.x; z.py = z.y;
+    z.age += dt;
+    if (z.flash > -1) z.flash -= dt;
+    tickDmg(z, dt, false);
+    if (z.hp <= 0) {
+      flushDmg(z, false);
+      state.kills++;
+      burstParticles(z.x, z.y, "#7d8f70", 3, 90);      // 3 Partikel + Schrumpfen
+      pushDying(z.x, z.y, z.type);
+      sfxZombieDie();
+      poolKill(zombies, i);
+      continue;
+    }
+    z.wob += dt * 5;
+    z.y += (world + z.ownSpeed) * dt;
+    if (z.y > CFG.homFromY) {                          // Konvergenz nur nahe der Front
+      var hom = z.type === 1 ? CFG.homRunner : z.type === 2 ? CFG.homBrute : CFG.homWalker;
+      var toForm = state.formX - z.x;
+      z.x += (toForm > 4 ? hom : toForm < -4 ? -hom : 0) * dt;
+    }
+    z.x += z.vx * dt + Math.sin(z.wob) * 6 * dt;
+    if (z.x < LANE_L + z.r) { z.x = LANE_L + z.r; z.vx = Math.abs(z.vx); }
+    if (z.x > LANE_R - z.r) { z.x = LANE_R - z.r; z.vx = -Math.abs(z.vx); }
+    if (z.y + z.r >= CFG.formationY - 2) {
+      var dx = z.x - state.formX;
+      if (dx > -(half + z.r) && dx < half + z.r) {
+        flushDmg(z, false);
+        armyLose(z.eat);
+        sfxEat();
+        burstParticles(z.x, CFG.formationY, "#7d8f70", 4, 110);
+        pushDying(z.x, z.y, z.type);
+        poolKill(zombies, i);
+        continue;
+      }
+    }
+    if (z.y > CFG.H + 50) poolKill(zombies, i);
+  }
+}
+function updateDying(dt) {
+  for (var i = dying.count - 1; i >= 0; i--) {
+    dying[i].t -= dt;
+    if (dying[i].t <= 0) poolKill(dying, i);
+  }
+}
+
+/* ================= Boss-Projektile ================= */
+function spawnSpit(x, y, angle) {
+  var s = poolSpawn(spits);
+  if (!s) return;
+  s.x = s.px = x; s.y = s.py = y;
+  s.vx = Math.cos(angle) * CFG.spitSpeed;
+  s.vy = Math.sin(angle) * CFG.spitSpeed;
+  s.hp = 1; s.flash = 0; s.dmgAcc = 0; s.dmgT = 0; s.kind = 1;
+}
+function updateSpits(dt) {
+  var half = formHalfW();
+  for (var i = spits.count - 1; i >= 0; i--) {
+    var s = spits[i];
+    s.px = s.x; s.py = s.y;
+    if (s.hp <= 0) {
+      burstParticles(s.x, s.y, CFG.colBad, 3, 80);
+      poolKill(spits, i);
+      continue;
+    }
+    s.x += s.vx * dt; s.y += s.vy * dt;
+    if (s.y > CFG.H + 20 || s.x < -20 || s.x > CFG.W + 20) { poolKill(spits, i); continue; }
+    if (s.y + CFG.spitR >= CFG.formationY - 2) {
+      var dx = s.x - state.formX;
+      if (dx > -(half + CFG.spitR) && dx < half + CFG.spitR) {
+        armyLose(CFG.spitEat);
+        sfxEat();
+        burstParticles(s.x, CFG.formationY, CFG.colBad, 5, 120);
+        poolKill(spits, i);
+      }
+    }
+  }
+}
+
+/* ================= Bodenschlag-Zonen ================= */
+function addSlam(x) {
+  for (var i = 0; i < state.slams.length; i++) {
+    if (!state.slams[i].active) {
+      var s = state.slams[i];
+      s.active = true; s.x = clamp(x, LANE_L + CFG.slamHalfW, LANE_R - CFG.slamHalfW);
+      s.t = CFG.slamTelegraph;
+      sfxTelegraph();
+      return;
+    }
+  }
+}
+function updateSlams(dt) {
+  for (var i = 0; i < state.slams.length; i++) {
+    var s = state.slams[i];
+    if (!s.active) continue;
+    s.t -= dt;
+    if (s.t <= 0) {
+      s.active = false;
+      slamImpact(s.x);
+    }
+  }
+}
+function slamImpact(x) {
+  sfxThud();
+  shake(CFG.shakeMax);
+  burstParticles(x, CFG.formationY - 6, CFG.colWarn, 14, 220);
+  var half = formHalfW();
+  if (state.formX + half > x - CFG.slamHalfW && state.formX - half < x + CFG.slamHalfW) {
+    armyLose(Math.max(CFG.bossArmyLossMin, Math.round(state.army * CFG.bossArmyLossPct)));
+  }
+}
+function shake(amp) {
+  if (REDUCED) return;
+  state.shakeT = 0.3;
+  state.shakeAmp = Math.min(CFG.shakeMax, amp);
+}
+
+/* ================= Bosse ================= */
+function startBoss() {
+  var idx = state.bossIndex;
+  var b = state.boss;
+  b.active = true;
+  b.type = idx % 2;
+  b.phase = 0;
+  b.hp = b.maxHp = Math.round(CFG.bossHpBase * (1 + idx * CFG.bossHpGrow));
+  b.x = b.px = LANE_MID; b.y = b.py = CFG.bossEnterFromY;
+  b.r = b.type === 0 ? 56 : 50;
+  b.dir = 1; b.flash = -1; b.dmgAcc = 0; b.dmgT = 0;
+  b.atkT = b.type === 0 ? CFG.slamInterval : CFG.spitInterval;
+  b.callT = CFG.callInterval;
+  b.jumpT = CFG.jumpInterval;
+  b.hopT = CFG.bossBHopEvery; b.spot = 1;
+  b.spitTele = 0; b.spitQueue = 0; b.spitQT = 0; b.spitAimX = 0;
+  b.jumpTele = 0; b.jumpX = 0; b.air = 0;
+  b.dieT = 0;
+  b.cycle = (idx / 2) | 0;                             // Farb-Shift ab Boss 3
+  bossMeshSpawn(b);
+}
+function bossKill() {
+  var b = state.boss;
+  b.phase = 2; b.dieT = 0.9;
+  flushDmg(b, true);
+  sfxBossDie();
+  if (!REDUCED) { state.hitstop = CFG.hitstop; state.slowmo = CFG.bossSlowmo; state.slowmoScale = CFG.bossSlowmoScale; }
+  burstParticles(b.x, b.y, "#7d8f70", 24, 320);
+  goldFountain(b.x, b.y + 30);
+  if (state.weapon < CFG.weapons.length - 1) state.weapon++;
+  else armyGain(CFG.weaponGateBonus);
+  armyGain(Math.max(1, Math.round(state.army * CFG.bossKillArmyPct)));
+  for (var i = 0; i < spits.count; i++) spits[i].hp = 0;
+  for (i = 0; i < state.slams.length; i++) state.slams[i].active = false;
+  state.bossIndex++;
+  state.nextBossM = (state.bossIndex + 1) * CFG.bossEveryM;
+}
+function updateBoss(dt) {
+  var b = state.boss;
+  if (!b.active) {
+    if (state.dist >= state.nextBossM - 0.001) startBoss();
+    return;
+  }
+  b.px = b.x; b.py = b.y;
+  if (b.flash > -1) b.flash -= dt;
+  tickDmg(b, dt, true);
+  if (b.phase === 0) {
+    b.y += (CFG.bossY - CFG.bossEnterFromY) / CFG.bossEnterTime * dt;
+    if (b.y >= CFG.bossY) { b.y = CFG.bossY; b.phase = 1; }
+    return;
+  }
+  if (b.phase === 2) {
+    b.dieT -= dt;
+    b.y += 40 * dt;
+    if (b.dieT <= 0) b.active = false;
+    return;
+  }
+  if (b.hp <= 0) { bossKill(); return; }
+  if (b.type === 0) updateBossA(b, dt);
+  else updateBossB(b, dt);
+}
+function updateBossA(b, dt) {                          // FLEISCHBERG
+  b.x += b.dir * CFG.bossAWalkSpeed * dt;
+  if (b.x > LANE_R - 70) { b.x = LANE_R - 70; b.dir = -1; }
+  if (b.x < LANE_L + 70) { b.x = LANE_L + 70; b.dir = 1; }
+  b.atkT -= dt;
+  if (b.atkT <= 0) { b.atkT = CFG.slamInterval; addSlam(state.formX); }
+  b.callT -= dt;
+  if (b.callT <= 0) {
+    b.callT = CFG.callInterval;
+    for (var i = 0; i < CFG.bossAddCount; i++)
+      spawnZombie(0, b.x + rnd(-80, 80), b.y + b.r + rnd(10, 70), { speed: CFG.bossAddSpeed });
+  }
+}
+function updateBossB(b, dt) {                          // SPEIER
+  var spots = CFG.bossBSpots;
+  b.hopT -= dt;
+  if (b.hopT <= 0 && b.spitTele <= 0 && b.air <= 0) {
+    b.hopT = CFG.bossBHopEvery;
+    b.spot = (b.spot + rndi(1, 2)) % 3;
+  }
+  if (b.air <= 0) b.x += (spots[b.spot] - b.x) * Math.min(1, dt * 6);
+  b.atkT -= dt;
+  if (b.atkT <= 0 && b.spitTele <= 0 && b.air <= 0) {
+    b.atkT = CFG.spitInterval;
+    b.spitTele = CFG.spitTelegraph;
+    b.spitAimX = state.formX;
+    sfxTelegraph();
+  }
+  if (b.spitTele > 0) {
+    b.spitTele -= dt;
+    if (b.spitTele <= 0) { b.spitQueue = CFG.spitArcs; b.spitQT = 0; }
+  }
+  if (b.spitQueue > 0) {
+    b.spitQT -= dt;
+    if (b.spitQT <= 0) {
+      b.spitQT = CFG.spitArcGap;
+      b.spitQueue--;
+      sfxSpit();
+      var mx = b.x, my = b.y + 26;
+      var base = Math.atan2(CFG.formationY - my, b.spitAimX - mx);
+      var fan = CFG.spitFanDeg * Math.PI / 180;
+      for (var i = 0; i < CFG.spitPerArc; i++) {
+        var a = base + (i / (CFG.spitPerArc - 1) - 0.5) * fan;
+        spawnSpit(mx, my, a);
+      }
+    }
+  }
+  b.jumpT -= dt;
+  if (b.jumpT <= 0 && b.spitTele <= 0 && b.spitQueue <= 0 && b.air <= 0) {
+    b.jumpT = CFG.jumpInterval;
+    b.jumpTele = CFG.jumpTelegraph;
+    b.jumpX = clamp(state.formX, LANE_L + CFG.slamHalfW, LANE_R - CFG.slamHalfW);
+    sfxTelegraph();
+  }
+  if (b.jumpTele > 0) {
+    b.jumpTele -= dt;
+    if (b.jumpTele <= 0) { b.air = CFG.jumpAir; }
+  }
+  if (b.air > 0) {
+    b.air -= dt;
+    b.x += (b.jumpX - b.x) * Math.min(1, dt * 10);
+    if (b.air <= 0) {
+      slamImpact(b.jumpX);
+      var best = 0, bd = 1e9;
+      for (var s2 = 0; s2 < 3; s2++) {
+        var d2 = Math.abs(spots[s2] - b.x);
+        if (d2 < bd) { bd = d2; best = s2; }
+      }
+      b.spot = best;
+    }
+  }
+}
+
+/* ================= Haupt-Update ================= */
+function stepGame(dt, realDt) {
+  if (state.slowmo > 0) state.slowmo -= realDt;
+  if (state.shakeT > 0) state.shakeT -= realDt;
+  if (state.armyPop > 0) state.armyPop -= realDt;
+  if (state.armyFlash > 0) state.armyFlash -= realDt;
+  if (state.dying) {
+    state.deathT -= realDt;
+    if (state.deathT <= 0) { state.over = true; return; }
+  }
+  state.time += dt;
+  input.squeeze = input.keySq || input.mouseSq;
+  var sqTarget = input.squeeze ? 1 : 0;
+  var sqStep = dt / CFG.squeezeTime;
+  state.squeeze = state.squeeze < sqTarget ? Math.min(1, state.squeeze + sqStep)
+                                           : Math.max(0, state.squeeze - sqStep);
+  if (input.mouseSeen) { input.targetX = laneXFromClient(input.mx, input.my); input.mouseSeen = false; }
+  if (input.keyA) input.targetX -= CFG.adSpeed * dt;
+  if (input.keyD) input.targetX += CFG.adSpeed * dt;
+  input.targetX = clamp(input.targetX, LANE_L, LANE_R);
+  state.pFormX = state.formX;
+  state.formX += (input.targetX - state.formX) * (1 - Math.exp(-dt / CFG.formationLerp));
+  var half = formHalfW();
+  state.formX = clamp(state.formX, LANE_L + half * 0.4, LANE_R - half * 0.4);
+  var scrollActive = !(state.boss.active && state.boss.phase < 2);
+  state.pScrollY = state.scrollY;
+  if (scrollActive) {
+    state.scrollY += CFG.scrollSpeed * dt;
+    state.dist += CFG.scrollSpeed * dt / CFG.pxPerMeter;
+  }
+  updateSpawner(dt);
+  updateGates(dt, scrollActive);
+  updateShrine(dt, scrollActive);
+  updateFiring(dt);
+  updateBullets(dt);
+  collideBullets();
+  updateZombies(dt, scrollActive);
+  updateDying(dt);
+  updateSpits(dt);
+  updateSlams(dt);
+  updateBoss(dt);
+  updateParticles(dt);
+  updateDmgNums(dt);
+  if (state.armyShown < state.army) state.armyShown = state.army;
+  else if (state.armyShown > state.army) {
+    var fall = Math.max(CFG.armyTickPerSec, (state.armyShown - state.army) * 5) * dt;
+    state.armyShown = Math.max(state.army, state.armyShown - fall);
+  }
+}
+
+/* ================= Pause & Eingabe ================= */
+function togglePause() {
+  if (state.over) return;
+  state.paused = !state.paused;
+  state.pauseAuto = false;
+}
+function autoPause() {
+  if (!state.over && !state.paused) { state.paused = true; state.pauseAuto = true; }
+  // Gehaltene Eingaben loesen — sonst klemmen sie nach Fokusverlust
+  input.keyA = input.keyD = input.keySq = input.mouseSq = false;
+}
+var input = { targetX: CFG.W / 2, squeeze: false, keyA: false, keyD: false,
+              mouseSq: false, keySq: false, mx: 0, my: 0, mouseSeen: false };
+window.addEventListener("mousemove", function (e) {
+  input.mx = e.clientX; input.my = e.clientY; input.mouseSeen = true;
+});
+window.addEventListener("mousedown", function (e) {
+  if (e.button === 2) input.mouseSq = true;
+  audioBoot();
+});
+window.addEventListener("mouseup", function (e) {
+  if (e.button === 2) input.mouseSq = false;
+});
+window.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+window.addEventListener("keydown", function (e) {
+  audioBoot();
+  var k = e.key;
+  if (k === " " || k === "Spacebar") { input.keySq = true; e.preventDefault(); }
+  else if (k === "a" || k === "A") input.keyA = true;
+  else if (k === "d" || k === "D") input.keyD = true;
+  else if (k === "r" || k === "R") resetGame();
+  else if (k === "m" || k === "M") toggleMute();
+  else if (k === "Escape") togglePause();
+});
+window.addEventListener("keyup", function (e) {
+  var k = e.key;
+  if (k === " " || k === "Spacebar") input.keySq = false;
+  else if (k === "a" || k === "A") input.keyA = false;
+  else if (k === "d" || k === "D") input.keyD = false;
+});
+window.addEventListener("blur", autoPause);
+document.addEventListener("visibilitychange", function () { if (document.hidden) autoPause(); });
+window.addEventListener("focus", function () {
+  if (state.paused && state.pauseAuto) { state.paused = false; state.pauseAuto = false; }
+  accum = 0; lastT = performance.now();
+});
+
+/* ================= Audio — reine WebAudio-Synthese ================= */
+var AU = { ctx: null, master: null, muted: false, blipBudget: 0, tickBudget: 0, noise: null };
+function audioBoot() {
+  if (AU.ctx) { if (AU.ctx.state === "suspended") AU.ctx.resume(); return; }
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  try {
+    AU.ctx = new AC();
+    AU.master = AU.ctx.createGain();
+    AU.master.gain.value = AU.muted ? 0 : 0.5;
+    AU.master.connect(AU.ctx.destination);
+    var len = (AU.ctx.sampleRate * 0.2) | 0;
+    AU.noise = AU.ctx.createBuffer(1, len, AU.ctx.sampleRate);
+    var d = AU.noise.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  } catch (e) { AU.ctx = null; }
+}
+function toggleMute() {
+  AU.muted = !AU.muted;
+  if (AU.master) AU.master.gain.value = AU.muted ? 0 : 0.5;
+  hudMuteEl.textContent = AU.muted ? "STUMM" : "";
+}
+function tone(freq, dur, type, vol, slide) {
+  if (!AU.ctx || AU.muted) return;
+  var t = AU.ctx.currentTime;
+  var o = AU.ctx.createOscillator(), g = AU.ctx.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq * slide), t + dur);
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(AU.master);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function noiseHit(dur, vol, freq) {
+  if (!AU.ctx || AU.muted || !AU.noise) return;
+  var t = AU.ctx.currentTime;
+  var s = AU.ctx.createBufferSource(), g = AU.ctx.createGain(), f = AU.ctx.createBiquadFilter();
+  s.buffer = AU.noise; f.type = "bandpass"; f.frequency.value = freq; f.Q.value = 0.9;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f); f.connect(g); g.connect(AU.master);
+  s.start(t); s.stop(t + dur + 0.02);
+}
+// Blips UND Massen-Ticks sind gedeckelt — 300 Kills/s duerfen keinen Node-Sturm ausloesen
+function sfxShot() {
+  if (AU.blipBudget < 1) return;
+  AU.blipBudget -= 1;
+  tone(rnd(640, 780), 0.045, "triangle", 0.05, 0.7);
+}
+function sfxZombieDie() {
+  if (AU.tickBudget < 1) return;
+  AU.tickBudget -= 1;
+  noiseHit(0.05, 0.09, rnd(1500, 2400));
+}
+function sfxEat() {
+  if (AU.tickBudget < 1) return;
+  AU.tickBudget -= 1;
+  noiseHit(0.12, 0.12, 500);
+}
+function sfxGateGood()  { tone(520, 0.1, "square", 0.1, 1.4); tone(780, 0.16, "square", 0.08, 1.2); }
+function sfxGateBad()   { tone(160, 0.25, "sawtooth", 0.12, 0.6); }
+function sfxThud()      { tone(64, 0.34, "sine", 0.4, 0.5); noiseHit(0.2, 0.2, 220); }
+function sfxTelegraph() { tone(980, 0.12, "square", 0.05, 1.05); }
+function sfxBossHurt()  { if (AU.tickBudget >= 1) { AU.tickBudget -= 1; noiseHit(0.06, 0.06, 900); } }
+function sfxBossDie()   {
+  tone(90, 0.5, "sine", 0.4, 0.4); noiseHit(0.4, 0.25, 300);
+  tone(523, 0.14, "square", 0.1, 1); tone(659, 0.2, "square", 0.1, 1);
+  tone(784, 0.3, "square", 0.1, 1);
+}
+function sfxDeath()     { tone(220, 0.7, "sawtooth", 0.2, 0.25); }
+function sfxSpit()      { noiseHit(0.1, 0.1, 700); }
+
+/* =====================================================================
+   3D-Schicht. Figuren aus dem Baukasten (figuren.html): eine gemergte
+   BufferGeometry mit Vertex-Colors pro Typ + optionale Glow-Geometry.
+   Horde-Typen (Walker/Runner/Brute) mit reduzierten Segmentzahlen —
+   300 Figuren muessen unter das 120k-Dreiecksbudget passen; die
+   Silhouetten bleiben identisch, Flat Shading verzeiht die Reduktion.
+   ===================================================================== */
+var DEG = Math.PI / 180;
+var _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(),
+    _e = new THREE.Euler(), _v = new THREE.Vector3(), _s = new THREE.Vector3();
+function vcolor(g, hex) {
+  var c = new THREE.Color(hex);
+  var n = g.attributes.position.count;
+  var col = new Float32Array(n * 3);
+  for (var i = 0; i < n; i++) { col[i*3] = c.r; col[i*3+1] = c.g; col[i*3+2] = c.b; }
+  g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  return g;
+}
+function P(geo, hex, p, r, s) {
+  var g = geo.index ? geo.toNonIndexed() : geo;
+  p = p || [0,0,0]; r = r || [0,0,0]; s = s || [1,1,1];
+  _e.set(r[0]*DEG, r[1]*DEG, r[2]*DEG);
+  _m4.compose(_v.set(p[0],p[1],p[2]), _q.setFromEuler(_e), _s.set(s[0],s[1],s[2]));
+  g.applyMatrix4(_m4);
+  return vcolor(g, hex);
+}
+var _pa = new THREE.Vector3(), _pb = new THREE.Vector3(),
+    _mid = new THREE.Vector3(), _dir = new THREE.Vector3(), _up = new THREE.Vector3(0,1,0);
+function limb(r, from, to, hex, rs) {
+  rs = rs || 7;
+  _pa.set(from[0],from[1],from[2]); _pb.set(to[0],to[1],to[2]);
+  _mid.addVectors(_pa, _pb).multiplyScalar(0.5);
+  _dir.subVectors(_pb, _pa);
+  var len = Math.max(0.001, _dir.length() - r * 1.2);
+  var g = new THREE.CapsuleGeometry(r, len, 2, rs).toNonIndexed();
+  _q.setFromUnitVectors(_up, _dir.normalize());
+  _m4.compose(_mid, _q, _s.set(1,1,1));
+  g.applyMatrix4(_m4);
+  return vcolor(g, hex);
+}
+function fuse(parts) {
+  var g = mergeGeometries(parts, false);
+  for (var i = 0; i < parts.length; i++) parts[i].dispose();
+  g.computeVertexNormals();
+  return g;
+}
+var cap  = function (r,l,cs,rs) { return new THREE.CapsuleGeometry(r,l,cs===undefined?3:cs,rs===undefined?7:rs); };
+var sph  = function (r,w,h)     { return new THREE.SphereGeometry(r,w===undefined?7:w,h===undefined?5:h); };
+var cyl  = function (rt,rb,h,rs){ return new THREE.CylinderGeometry(rt,rb,h,rs===undefined?7:rs); };
+var box  = function (x,y,z)     { return new THREE.BoxGeometry(x,y,z); };
+var cone = function (r,h,rs)    { return new THREE.ConeGeometry(r,h,rs===undefined?6:rs); };
+var ico  = function (r,d)       { return new THREE.IcosahedronGeometry(r,d===undefined?1:d); };
+var tor  = function (r,t,rs,ts) { return new THREE.TorusGeometry(r,t,rs===undefined?6:rs,ts===undefined?8:ts); };
+var halfDisc = function (r,h,rs){ return new THREE.CylinderGeometry(r,r,h,rs===undefined?8:rs,1,false,0,Math.PI); };
+
+function buildLegionnaire() {
+  var STEEL="#5b8fd4", SHIELD="#3d6299", BRONZE="#a8823f",
+      CREST="#c99a4a", SKIN="#d4b58c", DARK="#3a5a8c", WOOD="#6b5a42";
+  var body = fuse([
+    P(cyl(.036,.042,.13,5),  DARK,  [-.055,.065,0]),
+    P(cyl(.036,.042,.13,5),  DARK,  [ .055,.065,0]),
+    P(cap(.115,.17,2,6),     STEEL, [0,.3,0]),
+    P(cyl(.122,.122,.03,6),  BRONZE,[0,.25,0]),
+    P(sph(.05,5,3),          DARK,  [-.115,.4,0]),
+    P(sph(.05,5,3),          DARK,  [ .115,.4,0]),
+    P(sph(.08,6,4),          SKIN,  [0,.525,.03]),
+    P(sph(.09,7,4),          BRONZE,[0,.572,0],[0,0,0],[1,.75,1]),
+    P(cyl(.093,.096,.026,7), BRONZE,[0,.542,0]),
+    P(halfDisc(.085,.02,6),  CREST, [0,.602,-.005],[90,0,90]),
+    P(box(.17,.24,.03),      SHIELD,[-.155,.3,.1],[-4,-24,0]),
+    P(sph(.03,5,3),          BRONZE,[-.168,.3,.117]),
+    limb(.011, [.16,.06,-.04], [.21,.6,-.02], WOOD, 4),
+    P(cone(.02,.07,5),       "#d8dce4",[.213,.632,-.018],[5,0,-5])
+  ]);
+  return { body: body, glow: null, h:.62, r:.16, bob:{a:.015,f:1.6} };
+}
+function buildWalker() {
+  var SKIN="#8a9c78", SKIN2="#78896a", RAG="#5a6851", LEG="#4e5a46";
+  var body = fuse([
+    P(cyl(.03,.036,.11,4),  LEG,  [-.05,.055,0]),
+    P(cyl(.03,.036,.11,4),  LEG,  [ .05,.05,-.025]),
+    P(cyl(.098,.108,.1,5),  RAG,  [0,.15,0]),
+    P(cap(.105,.14,2,5),    SKIN, [0,.29,.015],[14,0,0]),
+    P(sph(.075,5,4),        SKIN2,[0,.44,.105],[0,0,7]),
+    limb(.026, [-.115,.36,.05], [-.15,.13,.14],  SKIN, 4),
+    limb(.026, [ .115,.35,.06], [ .125,.1,.185], SKIN, 4),
+    P(sph(.032,4,3),        SKIN2,[-.15,.115,.145]),
+    P(sph(.032,4,3),        SKIN2,[ .125,.085,.19])
+  ]);
+  var glow = fuse([
+    P(ico(.013,0), "#c8ff6a", [-.021,.447,.163]),
+    P(ico(.013,0), "#c8ff6a", [ .029,.442,.162])
+  ]);
+  return { body: body, glow: glow, h:.52, r:.15, bob:{a:.03,f:2.2} };
+}
+function buildRunner() {
+  var SKIN="#93a878", SKIN2="#7d9165", LEG="#5f7050";
+  var body = fuse([
+    limb(.026, [-.045,.02,.1],  [-.05,.17,-.01], LEG, 4),
+    limb(.026, [ .045,.02,-.12],[ .05,.17,.01],  LEG, 4),
+    P(cap(.078,.14,2,5),    SKIN, [0,.25,.02],[26,0,0]),
+    P(sph(.064,5,4),        SKIN2,[0,.375,.15]),
+    limb(.02, [-.09,.3,0],  [-.13,.38,-.15], SKIN2, 4),
+    limb(.02, [ .09,.3,0],  [ .13,.38,-.15], SKIN2, 4)
+  ]);
+  var glow = fuse([
+    P(ico(.012,0), "#c8ff6a", [-.021,.383,.196]),
+    P(ico(.012,0), "#c8ff6a", [ .021,.383,.196])
+  ]);
+  return { body: body, glow: glow, h:.46, r:.13, bob:{a:.032,f:3.4} };
+}
+function buildBrute() {
+  var HIDE="#79866c", ARMOR="#4c5544", FLESH="#67755b", DK="#3f4838";
+  var body = fuse([
+    P(cyl(.088,.1,.22,5),  DK,   [-.18,.11,.01]),
+    P(cyl(.088,.1,.22,5),  DK,   [ .18,.11,.01]),
+    P(cap(.23,.26,2,6),    HIDE, [0,.56,0]),
+    P(sph(.17,6,4),        FLESH,[0,.38,.1],[0,0,0],[1.1,.72,1]),
+    P(box(.56,.15,.26),    ARMOR,[0,.83,-.08],[6,0,0]),
+    P(sph(.115,5,4),       ARMOR,[-.285,.82,-.04]),
+    P(sph(.115,5,4),       ARMOR,[ .285,.82,-.04]),
+    P(sph(.115,6,4),       FLESH,[0,.82,.2]),
+    P(box(.19,.06,.1),     ARMOR,[0,.88,.24],[-12,0,0]),
+    P(box(.16,.06,.11),    DK,   [0,.75,.25],[8,0,0]),
+    limb(.082, [-.32,.8,-.02], [-.42,.2,.1],  FLESH, 5),
+    limb(.082, [ .32,.8,-.02], [ .42,.2,.1],  FLESH, 5),
+    P(sph(.115,5,4),       DK,   [-.43,.13,.12]),
+    P(sph(.115,5,4),       DK,   [ .43,.13,.12])
+  ]);
+  var glow = fuse([
+    P(ico(.016,0), "#c8ff6a", [-.042,.835,.31]),
+    P(ico(.016,0), "#c8ff6a", [ .042,.835,.31])
+  ]);
+  return { body: body, glow: glow, h:1.0, r:.34, bob:{a:.05,f:1.2} };
+}
+function buildSpeier() {
+  var BODY="#8f8a5e", THROAT="#b5ae7d", WART="#6d683f",
+      LIMBS="#7c7850", BELLY="#7d7849", MAW="#241a1a";
+  var body = fuse([
+    limb(.07, [-.3,.06,.05], [-.24,.5,0], LIMBS),
+    limb(.07, [ .3,.06,.05], [ .24,.5,0], LIMBS),
+    P(box(.2,.07,.26),  WART, [-.31,.035,.1]),
+    P(box(.2,.07,.26),  WART, [ .31,.035,.1]),
+    P(sph(.7,9,7),      BODY, [0,.96,0],[0,0,0],[1.16,.96,1.06]),
+    P(sph(.62,9,7),     BELLY,[0,.78,.06],[0,0,0],[1.14,.7,1.04]),
+    P(ico(.21,0),       WART, [-.5,.9,.42],[15,20,0]),
+    P(ico(.16,0),       WART, [ .56,1.2,.3],[0,40,15]),
+    P(ico(.18,0),       WART, [ .2,.62,.58],[30,10,0]),
+    P(ico(.13,0),       WART, [-.3,1.35,.35],[10,0,30]),
+    P(sph(.42,8,6),     THROAT,[0,1.42,.3],[0,0,0],[1,.9,1]),
+    P(sph(.28,8,6),     BODY, [0,1.78,.3]),
+    P(cyl(.12,.15,.16,8),MAW, [0,1.63,.53],[108,0,0]),
+    P(tor(.145,.04,5,9),BODY, [0,1.64,.58],[108,0,0]),
+    P(box(.26,.07,.22), LIMBS,[0,1.46,.62],[-32,0,0]),
+    limb(.042, [-.58,1.32,.4], [-.56,.84,.7], LIMBS),
+    limb(.042, [ .58,1.32,.4], [ .56,.84,.7], LIMBS),
+    P(sph(.055,6,4),    WART, [-.56,.8,.72]),
+    P(sph(.055,6,4),    WART, [ .56,.8,.72])
+  ]);
+  var glow = fuse([
+    P(sph(.03,6,4), "#ff5a3c", [-.105,1.88,.52]),
+    P(sph(.03,6,4), "#ff5a3c", [ .105,1.88,.52])
+  ]);
+  return { body: body, glow: glow, h:1.95, r:.7, bob:{a:.035,f:1.0} };
+}
+function buildFleischberg() {
+  var A="#9c7a72", B="#8a6a64", C="#a8857c", D="#7a5c58", E="#5f4543",
+      TUSK="#d8c9b4";
+  var body = fuse([
+    P(ico(1.0),   A, [0,1.3,-.25],[-14,8,0],[1.2,1.0,1.05]),
+    P(ico(.74),   C, [0,.88,.4],[6,0,0],[1.05,.85,.95]),
+    P(ico(.72),   B, [0,.62,-.5],[0,-14,0],[1.15,.75,1.0]),
+    P(ico(.5),    B, [0,.5,.15],[0,0,0],[1.2,.6,1.0]),
+    P(ico(.44,0), D, [-.62,1.62,-.05],[0,25,10]),
+    P(ico(.44,0), D, [ .62,1.6,-.1],[0,-15,-8]),
+    P(cone(.26,.55,5), E, [0,2.35,-.3],[-18,0,0]),
+    P(cone(.22,.46,5), E, [-.15,2.15,-.85],[-38,0,-10]),
+    P(cone(.18,.38,5), E, [ .15,1.8,-1.18],[-55,0,12]),
+    P(cone(.14,.3,5),  E, [-.05,1.4,-1.35],[-70,0,0]),
+    P(sph(.27,8,6), B, [0,1.58,.86]),
+    P(box(.4,.11,.2),  D, [0,1.72,.88],[-14,0,0]),
+    P(box(.34,.12,.22),D, [0,1.43,.92],[10,0,0]),
+    P(cone(.04,.13,5), TUSK,[-.13,1.5,1.06],[16,0,-8]),
+    P(cone(.04,.13,5), TUSK,[ .13,1.5,1.06],[16,0,8]),
+    limb(.21, [-.74,1.5,.08], [-1.14,.3,.66], B),
+    limb(.21, [ .74,1.48,.1], [ 1.16,.3,.7], B),
+    P(sph(.26,8,6), D, [-1.17,.24,.72]),
+    P(sph(.26,8,6), D, [ 1.19,.24,.76]),
+    P(sph(.3,7,5),  D, [-.55,.3,-.6],[0,0,0],[1,.85,1]),
+    P(sph(.3,7,5),  D, [ .55,.3,-.62],[0,0,0],[1,.85,1])
+  ]);
+  var glow = fuse([
+    P(sph(.032,6,4), "#ff5a3c", [-.1,1.61,1.07]),
+    P(sph(.032,6,4), "#ff5a3c", [ .1,1.61,1.07])
+  ]);
+  return { body: body, glow: glow, h:2.35, r:.95, bob:{a:.02,f:.5} };
+}
+
+/* ================= Renderer & Buehne ================= */
+var canvas = document.getElementById("scene");
+var renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true,
+    powerPreference: "high-performance" });
+} catch (e) {
+  var fb = document.createElement("div");
+  fb.className = "fallback";
+  fb.textContent = "WebGL ist hier nicht verfügbar — das Spiel braucht eine GPU-fähige Umgebung.";
+  canvas.replaceWith(fb);
+  throw e;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+
+var scene = new THREE.Scene();
+scene.background = new THREE.Color(CFG.world.bg);
+scene.fog = new THREE.Fog(CFG.world.bg, CFG.world.fogNear, CFG.world.fogFar);
+
+scene.add(new THREE.HemisphereLight(0x8899bb, 0x22201c, 0.7));
+var keyLight = new THREE.DirectionalLight(0xfff0dd, 2.5);
+keyLight.position.set(3, 8, 4);
+scene.add(keyLight);
+var rimLight = new THREE.DirectionalLight(0x6a80c0, 0.9);
+rimLight.position.set(-4, 3, -5);
+scene.add(rimLight);
+
+var LANE_UNITS = CFG.laneW / PXU;                      // 4.6
+var laneLen = CFG.world.laneLen;
+var ground = new THREE.Mesh(new THREE.BoxGeometry(LANE_UNITS, 0.1, laneLen),
+  new THREE.MeshLambertMaterial({ color: CFG.world.ground }));
+ground.position.set(0, -0.05, -laneLen / 2 + 8);
+scene.add(ground);
+var wallGeo = new THREE.BoxGeometry(0.24, CFG.world.wallH, laneLen);
+var wallMat = new THREE.MeshLambertMaterial({ color: CFG.world.wall });
+var wallL = new THREE.Mesh(wallGeo, wallMat);
+wallL.position.set(-LANE_UNITS / 2 - 0.12, CFG.world.wallH / 2 - 0.05, -laneLen / 2 + 8);
+scene.add(wallL);
+var wallR = new THREE.Mesh(wallGeo, wallMat);
+wallR.position.set(LANE_UNITS / 2 + 0.12, CFG.world.wallH / 2 - 0.05, -laneLen / 2 + 8);
+scene.add(wallR);
+// Fahrbahnmarkierung: eine InstancedMesh, wandert mit dem Scroll
+var markMesh = new THREE.InstancedMesh(
+  new THREE.BoxGeometry(0.06, 0.02, 0.9),
+  new THREE.MeshLambertMaterial({ color: CFG.world.mark }), CFG.world.marks);
+markMesh.frustumCulled = false;
+scene.add(markMesh);
+
+/* ================= Instancing-Pipeline =================
+   Eine InstancedMesh pro Figurtyp (+ eine fuer die Glow-Augen).
+   Matrix-Updates ueber EIN wiederverwendetes Dummy-Object3D. */
+var dummy = new THREE.Object3D();
+var COL_WHITE = new THREE.Color(1, 1, 1);
+var COL_FLASH = new THREE.Color(2.6, 2.6, 2.6);
+var lambertVC = { vertexColors: true };
+function makeInstanced(geo, count, basic) {
+  var mat = basic ? new THREE.MeshBasicMaterial(lambertVC)
+                  : new THREE.MeshLambertMaterial(lambertVC);
+  var m = new THREE.InstancedMesh(geo, mat, count);
+  m.frustumCulled = false;
+  m.count = 0;
+  m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  for (var i = 0; i < count; i++) m.setColorAt(i, COL_WHITE);
+  if (m.instanceColor) m.instanceColor.setUsage(THREE.DynamicDrawUsage);
+  scene.add(m);
+  return m;
+}
+var FIG = {
+  legion: buildLegionnaire(),
+  walker: buildWalker(),
+  runner: buildRunner(),
+  brute:  buildBrute()
+};
+var IM = {
+  legion:  makeInstanced(FIG.legion.body, CFG.maxVisible, false),
+  walker:  makeInstanced(FIG.walker.body, CFG.poolZombies, false),
+  walkerG: makeInstanced(FIG.walker.glow, CFG.poolZombies, true),
+  runner:  makeInstanced(FIG.runner.body, CFG.poolZombies, false),
+  runnerG: makeInstanced(FIG.runner.glow, CFG.poolZombies, true),
+  brute:   makeInstanced(FIG.brute.body, CFG.poolZombies, false),
+  bruteG:  makeInstanced(FIG.brute.glow, CFG.poolZombies, true)
+};
+// Projektil: gestreckte Box, hell, braucht kein Licht
+var bulletGeo = vcolor(new THREE.BoxGeometry(0.05, 0.05, 0.28).toNonIndexed(), "#a8d4ff");
+var bulletMesh = makeInstanced(bulletGeo, CFG.poolBullets, true);
+// Boss-Projektil: rote Kugel mit dunklem Kern
+var spitGeo = fuse([
+  P(sph(0.1, 7, 5), "#ff5a3c", [0, 0, 0]),
+  P(sph(0.055, 5, 4), "#38100a", [0, 0, 0.055])
+]);
+var spitMesh = makeInstanced(spitGeo, CFG.poolSpits, true);
+// Blob-Schatten: flache Kreise, eine InstancedMesh fuer alle Figuren
+var blobGeo = new THREE.CircleGeometry(1, 10);
+blobGeo.rotateX(-90 * DEG);
+var blobMesh = new THREE.InstancedMesh(blobGeo,
+  new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true,
+    opacity: CFG.world.blobOpacity }), CFG.poolZombies + CFG.maxVisible + 8);
+blobMesh.frustumCulled = false;
+blobMesh.count = 0;
+blobMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+scene.add(blobMesh);
+// Partikel: kleine Boxen, Farbe pro Instanz
+var partMesh = makeInstanced(vcolor(new THREE.BoxGeometry(0.05, 0.05, 0.05).toNonIndexed(), "#ffffff"),
+  CFG.poolParticles, true);
+var partColors = {};
+function partColor(hex) {
+  var c = partColors[hex];
+  if (!c) { c = new THREE.Color(hex); partColors[hex] = c; }
+  return c;
+}
+
+/* ================= Boss-Meshes ================= */
+function makeBossRig(built) {
+  var grp = new THREE.Group();
+  var mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  var bodyMesh = new THREE.Mesh(built.body, mat);
+  grp.add(bodyMesh);
+  if (built.glow) grp.add(new THREE.Mesh(built.glow, new THREE.MeshBasicMaterial({ vertexColors: true })));
+  grp.visible = false;
+  scene.add(grp);
+  return { grp: grp, mat: mat, built: built };
+}
+var bossRigA = makeBossRig(buildFleischberg());
+var bossRigB = makeBossRig(buildSpeier());
+// Speier: Maul skaliert beim Spei-Telegraph auf (separates Teil, Merge kann nicht skalieren)
+var mawMesh = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.12, 0.15, 0.16, 8),
+  new THREE.MeshBasicMaterial({ color: "#241a1a" }));
+mawMesh.position.set(0, 1.63, 0.54);
+mawMesh.rotation.x = 108 * DEG;
+bossRigB.grp.add(mawMesh);
+var bossTints = ["#ffffff", "#c9a184", "#b394c9", "#c9c084"];  // Farb-Shift pro Zyklus
+var activeRig = null;
+function bossMeshSpawn(b) {
+  if (activeRig) activeRig.grp.visible = false;
+  activeRig = b.type === 0 ? bossRigA : bossRigB;
+  activeRig.grp.visible = true;
+  activeRig.mat.color.set(bossTints[Math.min(b.cycle, bossTints.length - 1)]);
+  activeRig.mat.emissive.set(0x000000);
+  activeRig.grp.scale.setScalar(1);
+}
+
+/* ================= Telegraphs ================= */
+// Bodenschlag-Zone: flache gelbe Flaeche, Opacity pulsiert — Gelb nur hier
+var slamMeshes = [];
+for (var smi = 0; smi < 4; smi++) {
+  var sm = new THREE.Mesh(new THREE.PlaneGeometry(CFG.slamHalfW * 2 / PXU, 2.2),
+    new THREE.MeshBasicMaterial({ color: CFG.colWarn, transparent: true, opacity: 0.3,
+      side: THREE.DoubleSide, depthWrite: false }));
+  sm.rotation.x = -90 * DEG;
+  sm.position.y = 0.02;
+  sm.visible = false;
+  scene.add(sm);
+  slamMeshes.push(sm);
+}
+// Sprung: wachsender dunkler Kreis am Zielpunkt
+var jumpShadow = new THREE.Mesh(new THREE.CircleGeometry(1, 20),
+  new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5,
+    depthWrite: false }));
+jumpShadow.rotation.x = -90 * DEG;
+jumpShadow.position.y = 0.025;
+jumpShadow.visible = false;
+scene.add(jumpShadow);
+// Speier-Telegraph: aufleuchtende gelbe Kugel am Maul
+var muzzleGlow = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6),
+  new THREE.MeshBasicMaterial({ color: CFG.colWarn, transparent: true, opacity: 0.9 }));
+muzzleGlow.visible = false;
+scene.add(muzzleGlow);
+
+/* ================= Gates ================= */
+// Panel (Box auf zwei Pfosten), Rahmen als Basic-Mesh gold/rot, Wert als
+// Laufzeit-CanvasTexture. Waffen-Pickup: rotierendes Oktaeder ueber Sockel.
+var gatePanelGeo = fuse([
+  P(cyl(0.03, 0.03, 0.9, 5), "#2a2a30", [-0.6, 0.45, 0]),
+  P(cyl(0.03, 0.03, 0.9, 5), "#2a2a30", [ 0.6, 0.45, 0]),
+  P(box(1.4, 0.7, 0.08), "#1c1c22", [0, 1.0, 0])
+]);
+function gateFrameGeo() {
+  var w = 1.4, h = 0.7, t = 0.05, y = 1.0;
+  return fuse([
+    P(box(w + t, t, 0.1), "#ffffff", [0, y + h / 2, 0]),
+    P(box(w + t, t, 0.1), "#ffffff", [0, y - h / 2, 0]),
+    P(box(t, h, 0.1), "#ffffff", [-w / 2, y, 0]),
+    P(box(t, h, 0.1), "#ffffff", [ w / 2, y, 0])
+  ]);
+}
+var frameGeoShared = gateFrameGeo();
+var octaGeo = fuse([
+  P(new THREE.OctahedronGeometry(0.25), "#e8c766", [0, 1.05, 0]),
+  P(cyl(0.16, 0.2, 0.12, 6), "#6b5a42", [0, 0.06, 0])
+]);
+var labelGeo = new THREE.PlaneGeometry(1.24, 0.56);
+var gateVis = [];
+for (var gvi = 0; gvi < 8; gvi++) {
+  var cvs = document.createElement("canvas");
+  cvs.width = 256; cvs.height = 128;
+  var tex = new THREE.CanvasTexture(cvs);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  var grp = new THREE.Group();
+  var panel = new THREE.Mesh(gatePanelGeo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+  var frame = new THREE.Mesh(frameGeoShared, new THREE.MeshBasicMaterial({ vertexColors: true }));
+  var label = new THREE.Mesh(labelGeo, new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+  label.position.set(0, 1.0, 0.06);
+  var octa = new THREE.Mesh(octaGeo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+  grp.add(panel); grp.add(frame); grp.add(label); grp.add(octa);
+  grp.visible = false;
+  scene.add(grp);
+  gateVis.push({ grp: grp, panel: panel, frame: frame, frameMat: frame.material,
+    label: label, octa: octa, cvs: cvs, ctx: cvs.getContext("2d"), tex: tex, lastLabel: "" });
+}
+function drawGateLabel(gv, text, neg) {
+  gv.ctx.clearRect(0, 0, 256, 128);
+  gv.ctx.font = "800 86px system-ui, sans-serif";
+  gv.ctx.textAlign = "center";
+  gv.ctx.textBaseline = "middle";
+  gv.ctx.fillStyle = "#ffffff";
+  gv.ctx.fillText(text, 128, 70);
+  gv.tex.needsUpdate = true;
+  gv.frameMat.color.set(neg ? CFG.colBad : CFG.colGold);
+  gv.lastLabel = text;
+}
+
+/* ================= Waffenschrein (Bild) =================
+   Goldene Legionaers-Statue auf Steinsockel, grosse Countdown-Zahl davor. */
+function buildGoldLegionnaire() {
+  var G1 = "#e8c766", G2 = "#c9a24a", G3 = "#a8823f", G4 = "#8a6a30";
+  return fuse([
+    P(cyl(.036,.042,.13,5),  G4, [-.055,.065,0]),
+    P(cyl(.036,.042,.13,5),  G4, [ .055,.065,0]),
+    P(cap(.115,.17,2,6),     G2, [0,.3,0]),
+    P(cyl(.122,.122,.03,6),  G3, [0,.25,0]),
+    P(sph(.05,5,3),          G3, [-.115,.4,0]),
+    P(sph(.05,5,3),          G3, [ .115,.4,0]),
+    P(sph(.08,6,4),          G2, [0,.525,.03]),
+    P(sph(.09,7,4),          G1, [0,.572,0],[0,0,0],[1,.75,1]),
+    P(cyl(.093,.096,.026,7), G1, [0,.542,0]),
+    P(halfDisc(.085,.02,6),  G1, [0,.602,-.005],[90,0,90]),
+    P(box(.17,.24,.03),      G3, [-.155,.3,.1],[-4,-24,0]),
+    P(sph(.03,5,3),          G1, [-.168,.3,.117]),
+    limb(.011, [.16,.06,-.04], [.21,.6,-.02], G4, 4),
+    P(cone(.02,.07,5),       G1, [.213,.632,-.018],[5,0,-5])
+  ]);
+}
+var shrineGrp = new THREE.Group();
+var shrineStatueMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+var shrineStatue = new THREE.Mesh(buildGoldLegionnaire(), shrineStatueMat);
+shrineStatue.scale.setScalar(3.2);
+shrineStatue.position.y = 0.5;
+shrineGrp.add(shrineStatue);
+var shrinePedestal = new THREE.Mesh(fuse([
+  P(box(0.95, 0.42, 0.95), "#26262c", [0, 0.21, 0]),
+  P(box(1.05, 0.08, 1.05), "#3a3a42", [0, 0.04, 0]),
+  P(box(0.99, 0.05, 0.99), "#c9a24a", [0, 0.45, 0])
+]), new THREE.MeshLambertMaterial({ vertexColors: true }));
+shrineGrp.add(shrinePedestal);
+var shrineCvs = document.createElement("canvas");
+shrineCvs.width = 256; shrineCvs.height = 128;
+var shrineCtx = shrineCvs.getContext("2d");
+var shrineTex = new THREE.CanvasTexture(shrineCvs);
+shrineTex.colorSpace = THREE.SRGBColorSpace;
+var shrineNum = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.64),
+  new THREE.MeshBasicMaterial({ map: shrineTex, transparent: true }));
+shrineNum.position.set(0, 1.62, 1.0);                   // ueber Gate-Panel-Hoehe, frei vor der Statue
+shrineGrp.add(shrineNum);
+shrineGrp.visible = false;
+scene.add(shrineGrp);
+var shrineLastHp = -1;
+function drawShrineNum(v) {
+  shrineCtx.clearRect(0, 0, 256, 128);
+  shrineCtx.font = "800 96px system-ui, sans-serif";
+  shrineCtx.textAlign = "center";
+  shrineCtx.textBaseline = "middle";
+  shrineCtx.fillStyle = "#e8c766";
+  shrineCtx.fillText(String(v), 128, 68);
+  shrineTex.needsUpdate = true;
+}
+function renderShrine3d(alpha) {
+  var s = state.shrine;
+  if (!s.active) { shrineGrp.visible = false; return; }
+  shrineGrp.visible = true;
+  var sx = wx(s.x), sz = wz(lerp(s.py, s.y, alpha));
+  shrineGrp.position.set(sx, 0, sz);
+  shrineGrp.rotation.y = s.side < 0 ? 0.35 : -0.35;   // leicht zur Lane gedreht
+  var sc = s.dead ? Math.max(0.001, s.deadT / CFG.shrineDeadTime) : 1;
+  shrineGrp.scale.setScalar(sc);
+  shrineStatueMat.emissive.setScalar(s.flash > 0 ? 0.45 : 0);
+  var hpShow = Math.max(0, Math.ceil(s.hp));
+  if (hpShow !== shrineLastHp) { drawShrineNum(hpShow); shrineLastHp = hpShow; }
+  if (!s.dead) pushBlob(sx, sz, 0.6);
+}
+
+/* ================= HUD (HTML-Overlay) ================= */
+var hudEl = document.getElementById("hud");
+var hudDistEl = document.getElementById("hudDist");
+var bossWrapEl = document.getElementById("bossWrap");
+var bossNameEl = document.getElementById("bossName");
+var bossHpFill = document.querySelector("#bossHp i");
+var armyLblEl = document.getElementById("armyLbl");
+var hudWeaponEl = document.getElementById("hudWeapon");
+var hudMuteEl = document.getElementById("hudMute");
+var hintBoxEl = document.getElementById("hintBox");
+var overlayEl = document.getElementById("overlay");
+var ovTitleEl = document.getElementById("ovTitle");
+var ovLineEl = document.getElementById("ovLine");
+var ovHintEl = document.getElementById("ovHint");
+var dmgEls = [];
+for (var dei = 0; dei < CFG.poolDmgNums; dei++) {
+  var de = document.createElement("div");
+  de.className = "dmg";
+  hudEl.appendChild(de);
+  dmgEls.push(de);
+}
+var hudCache = { dist: -1, weapon: -1, army: -1, overlay: "" };
+function hudReset() {
+  hudCache.dist = -1; hudCache.weapon = -1; hudCache.army = -1; hudCache.overlay = "";
+  overlayEl.style.display = "none";
+  bossWrapEl.style.display = "none";
+}
+function setOverlay(mode) {
+  if (hudCache.overlay === mode) return;
+  hudCache.overlay = mode;
+  if (!mode) { overlayEl.style.display = "none"; return; }
+  overlayEl.style.display = "flex";
+  if (mode === "pause") {
+    ovTitleEl.textContent = "PAUSE";
+    ovLineEl.textContent = state.pauseAuto ? "Fenster fokussieren" : "ESC — WEITER";
+    ovHintEl.textContent = "";
+  } else {
+    ovTitleEl.textContent = "DIE LEGION IST GEFALLEN";
+    ovLineEl.textContent = "DISTANZ " + Math.floor(state.dist) + " M — KILLS " + state.kills +
+      " — GRÖSSTE ARMEE " + state.maxArmy;
+    ovHintEl.textContent = "R — NEUSTART";
+  }
+}
+
+/* ================= Kamera & Projektion ================= */
+var camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+var CP = CFG.world.camPos, CA = CFG.world.camAim;
+camera.position.set(CP[0], CP[1], CP[2]);
+camera.lookAt(CA[0], CA[1], CA[2]);
+var camX = 0;
+function resize() {
+  var w = canvas.clientWidth, h = canvas.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+if (window.ResizeObserver) new ResizeObserver(resize).observe(canvas);
+window.addEventListener("resize", resize);
+resize();
+var _ray = new THREE.Vector3(), _proj = new THREE.Vector3();
+function laneXFromClient(cx, cy) {
+  var w = canvas.clientWidth || 1, h = canvas.clientHeight || 1;
+  _ray.set((cx / w) * 2 - 1, -(cy / h) * 2 + 1, 0.5).unproject(camera);
+  _ray.sub(camera.position);
+  if (Math.abs(_ray.z) < 1e-6) return input.targetX;
+  var t = (0 - camera.position.z) / _ray.z;
+  if (t < 0) return input.targetX;
+  return clamp(LANE_MID + (camera.position.x + _ray.x * t) * PXU, LANE_L, LANE_R);
+}
+// Weltpunkt -> CSS-Position eines HUD-Elements; false = hinter der Kamera
+function projectToHud(el, x, y, z, extraY) {
+  _proj.set(x, y, z).project(camera);
+  if (_proj.z > 1) { el.style.display = "none"; return false; }
+  var sx = (_proj.x * 0.5 + 0.5) * canvas.clientWidth;
+  var sy = (-_proj.y * 0.5 + 0.5) * canvas.clientHeight + (extraY || 0);
+  el.style.left = sx + "px";
+  el.style.top = sy + "px";
+  return true;
+}
+
+/* ================= Renderpass: Logik -> Instanz-Matrizen ================= */
+var TWO_PI = Math.PI * 2;
+function fillFigure(mesh, glowMesh, idx, x3, y3, z3, rotY, rotZ, scale, flashOn) {
+  dummy.position.set(x3, y3, z3);
+  dummy.rotation.set(0, rotY, rotZ);
+  dummy.scale.setScalar(scale);
+  dummy.updateMatrix();
+  mesh.setMatrixAt(idx, dummy.matrix);
+  mesh.setColorAt(idx, flashOn ? COL_FLASH : COL_WHITE);
+  if (glowMesh) glowMesh.setMatrixAt(idx, dummy.matrix);
+}
+var blobCount = 0;
+function pushBlob(x3, z3, r) {
+  if (blobCount >= blobMesh.instanceMatrix.count) return;
+  dummy.position.set(x3, 0.012, z3);
+  dummy.rotation.set(0, 0, 0);
+  dummy.scale.set(r, 1, r);
+  dummy.updateMatrix();
+  blobMesh.setMatrixAt(blobCount, dummy.matrix);
+  blobCount++;
+}
+function finishInstanced(mesh, glowMesh, n) {
+  mesh.count = n;
+  mesh.instanceMatrix.needsUpdate = true;
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  if (glowMesh) {
+    glowMesh.count = n;
+    glowMesh.instanceMatrix.needsUpdate = true;
+  }
+}
+function render3d(alpha) {
+  var t = state.time + alpha * STEP;
+  var bobScale = REDUCED ? 1 / 3 : 1;
+  blobCount = 0;
+  // --- Formation ---
+  var fx = lerp(state.pFormX, state.formX, alpha);
+  var vis = visibleUnits();
+  var cols = formCols(), w2 = formHalfW() * 2;
+  var gap = lerp(CFG.rowGapWide, CFG.rowGapTight, state.squeeze);
+  var legFreq = FIG.legion.bob.f * (1 + 0.5 * state.squeeze);   // Eng-Modus: Anspannung
+  for (var i = 0; i < vis; i++) {
+    var row = (i / cols) | 0, col = i % cols;
+    var ux = fx - w2 / 2 + (col + 0.5) * (w2 / cols) + state.unitJit[i * 2];
+    var uy = CFG.formationY + row * gap + state.unitJit[i * 2 + 1];
+    var ph = i * 1.7;
+    var bobY = Math.abs(Math.sin(t * legFreq * TWO_PI + ph)) * FIG.legion.bob.a * bobScale;
+    var x3 = wx(ux), z3 = wz(uy);
+    fillFigure(IM.legion, null, i, x3, bobY, z3, Math.PI, 0, 1, false);
+    pushBlob(x3, z3, FIG.legion.r);
+  }
+  finishInstanced(IM.legion, null, vis);
+  // --- Zombies (eine InstancedMesh pro Typ) + Sterbende ---
+  var cw = 0, cr = 0, cb = 0;
+  for (i = 0; i < zombies.count; i++) {
+    var z = zombies[i];
+    var zx = wx(lerp(z.px, z.x, alpha)), zz = wz(lerp(z.py, z.y, alpha));
+    var fig = z.type === 1 ? FIG.runner : z.type === 2 ? FIG.brute : FIG.walker;
+    var ph2 = z.id * 1.7;
+    var bob = Math.abs(Math.sin(t * fig.bob.f * TWO_PI + ph2)) * fig.bob.a * bobScale;
+    var roll = Math.sin(t * fig.bob.f * TWO_PI + ph2) * 4 * DEG * bobScale;
+    var grow = z.age < CFG.growTime ? z.age / CFG.growTime : 1;
+    var yaw = z.type === 1 ? -z.vx * 0.004 : 0;
+    var flashOn = z.flash > 0;
+    if (z.type === 1) { fillFigure(IM.runner, IM.runnerG, cr, zx, bob, zz, yaw, roll, grow, flashOn); cr++; }
+    else if (z.type === 2) { fillFigure(IM.brute, IM.bruteG, cb, zx, bob, zz, 0, roll, grow, flashOn); cb++; }
+    else { fillFigure(IM.walker, IM.walkerG, cw, zx, bob, zz, 0, roll, grow, flashOn); cw++; }
+    pushBlob(zx, zz, fig.r * grow);
+  }
+  for (i = 0; i < dying.count; i++) {
+    var dz = dying[i];
+    var ds = Math.max(0.001, dz.t / CFG.world.dyingTime);
+    var dx3 = wx(dz.x), dz3 = wz(dz.y);
+    if (dz.type === 1) { fillFigure(IM.runner, IM.runnerG, cr, dx3, 0, dz3, 0, 0, ds, false); cr++; }
+    else if (dz.type === 2) { fillFigure(IM.brute, IM.bruteG, cb, dx3, 0, dz3, 0, 0, ds, false); cb++; }
+    else { fillFigure(IM.walker, IM.walkerG, cw, dx3, 0, dz3, 0, 0, ds, false); cw++; }
+  }
+  finishInstanced(IM.walker, IM.walkerG, cw);
+  finishInstanced(IM.runner, IM.runnerG, cr);
+  finishInstanced(IM.brute, IM.bruteG, cb);
+  // --- Projektile ---
+  for (i = 0; i < bullets.count; i++) {
+    var bu = bullets[i];
+    dummy.position.set(wx(lerp(bu.px, bu.x, alpha)), 0.42, wz(lerp(bu.py, bu.y, alpha)));
+    dummy.rotation.set(0, 0, 0);
+    dummy.scale.setScalar(1);
+    dummy.updateMatrix();
+    bulletMesh.setMatrixAt(i, dummy.matrix);
+  }
+  bulletMesh.count = bullets.count;
+  bulletMesh.instanceMatrix.needsUpdate = true;
+  // --- Boss-Projektile: Flughoehe rampt vom Maul (1.55) zur Formation (0.45) ---
+  for (i = 0; i < spits.count; i++) {
+    var sp = spits[i];
+    var spz = wz(lerp(sp.py, sp.y, alpha));
+    var spy = 0.45 + clamp((-spz - 0.2) / 5.3, 0, 1) * 1.1;
+    dummy.position.set(wx(lerp(sp.px, sp.x, alpha)), spy, spz);
+    dummy.rotation.set(0, 0, t * 4 + i);
+    dummy.scale.setScalar(1);
+    dummy.updateMatrix();
+    spitMesh.setMatrixAt(i, dummy.matrix);
+  }
+  spitMesh.count = spits.count;
+  spitMesh.instanceMatrix.needsUpdate = true;
+  // --- Partikel ---
+  for (i = 0; i < particles.count; i++) {
+    var p = particles[i];
+    var pl = clamp(1 - p.t / p.life, 0, 1);
+    dummy.position.set(wx(lerp(p.px, p.x, alpha)),
+      0.15 + Math.sin(Math.min(1, p.t / p.life) * Math.PI) * 0.35,
+      wz(lerp(p.py, p.y, alpha)));
+    dummy.rotation.set(p.t * 5, p.t * 7, 0);
+    dummy.scale.setScalar(Math.max(0.001, pl) * p.size * 0.55);
+    dummy.updateMatrix();
+    partMesh.setMatrixAt(i, dummy.matrix);
+    partMesh.setColorAt(i, partColor(p.col));
+  }
+  partMesh.count = particles.count;
+  partMesh.instanceMatrix.needsUpdate = true;
+  if (partMesh.instanceColor) partMesh.instanceColor.needsUpdate = true;
+  // --- Fahrbahnmarkierung ---
+  var sy = lerp(state.pScrollY, state.scrollY, alpha) / PXU;
+  var perCol = CFG.world.marks / 2;
+  var span = perCol * CFG.world.markGap;               // Wrap-Strecke
+  for (i = 0; i < CFG.world.marks; i++) {
+    var colSide = i < perCol ? -1 : 1;
+    var k = i % perCol;
+    var zPos = -span + 6 + ((k * CFG.world.markGap + sy) % span + span) % span;
+    dummy.position.set(colSide * LANE_UNITS / 6, 0.005, zPos);
+    dummy.rotation.set(0, 0, 0);
+    dummy.scale.setScalar(1);
+    dummy.updateMatrix();
+    markMesh.setMatrixAt(i, dummy.matrix);
+  }
+  markMesh.instanceMatrix.needsUpdate = true;
+  // --- Gates ---
+  for (i = 0; i < 4; i++) {
+    var g = state.gates[i];
+    var gvL = gateVis[i * 2], gvR = gateVis[i * 2 + 1];
+    if (!g.active) { gvL.grp.visible = false; gvR.grp.visible = false; continue; }
+    var gz = wz(lerp(g.py, g.y, alpha) + CFG.gateH);
+    updateGateVis(gvL, g.left, -LANE_UNITS / 4, gz, t);
+    updateGateVis(gvR, g.right, LANE_UNITS / 4, gz, t);
+  }
+  // --- Bodenschlag-Telegraphs ---
+  for (i = 0; i < 4; i++) {
+    var sl = state.slams[i], sm2 = slamMeshes[i];
+    if (!sl.active) { sm2.visible = false; continue; }
+    sm2.visible = true;
+    sm2.position.x = wx(sl.x);
+    sm2.position.z = -0.5;
+    var pp = 1 - sl.t / CFG.slamTelegraph;
+    sm2.material.opacity = 0.25 + 0.25 * pp + 0.06 * Math.sin(t * 24);
+  }
+  renderBoss3d(alpha, t);
+  renderShrine3d(alpha);
+  blobMesh.count = blobCount;
+  blobMesh.instanceMatrix.needsUpdate = true;
+  renderHud3d(alpha, fx);
+  // --- Kamera: Nachfuehren (gedaempft) + kleiner Boss-Einschlag-Jitter ---
+  var wantX = REDUCED ? 0 : clamp(wx(fx) * CFG.world.camFollow, -CFG.world.camFollowMax, CFG.world.camFollowMax);
+  camX += (wantX - camX) * 0.08;
+  var jx = 0, jy = 0;
+  if (state.shakeT > 0 && !REDUCED) {
+    jx = rnd(-1, 1) * 0.01 * state.shakeAmp;
+    jy = rnd(-1, 1) * 0.01 * state.shakeAmp;
+  }
+  camera.position.set(CP[0] + camX + jx, CP[1] + jy, CP[2]);
+  camera.lookAt(CA[0] + camX * 0.7, CA[1], CA[2]);
+  renderer.render(scene, camera);
+}
+function updateGateVis(gv, slot, x3, z3, t) {
+  gv.grp.visible = true;
+  gv.grp.position.set(x3, 0, z3);
+  var isWeapon = slot.kind === 2;
+  gv.panel.visible = !isWeapon;
+  gv.frame.visible = !isWeapon;
+  gv.label.visible = !isWeapon;
+  gv.octa.visible = isWeapon;
+  if (isWeapon) gv.octa.rotation.y = t * 1.6;
+  else if (gv.lastLabel !== slot.label) drawGateLabel(gv, slot.label, slot.kind === 3);
+}
+function renderBoss3d(alpha, t) {
+  var b = state.boss;
+  muzzleGlow.visible = false;
+  jumpShadow.visible = false;
+  if (!b.active || !activeRig) {
+    if (activeRig) activeRig.grp.visible = false;
+    bossWrapEl.style.display = "none";
+    return;
+  }
+  var rig = activeRig;
+  rig.grp.visible = true;
+  var bx = wx(lerp(b.px, b.x, alpha)), bz = wz(lerp(b.py, b.y, alpha));
+  var yPos = 0, s = 1;
+  if (b.type === 0) s = 1 + Math.sin(t * 0.4 * TWO_PI) * 0.03;          // Atmen
+  if (b.type === 1 && b.air > 0) {                                       // Sprung
+    var prog = 1 - b.air / CFG.jumpAir;
+    yPos = Math.sin(prog * Math.PI) * 1.4;
+    s = 1.15;
+  }
+  if (b.phase === 2) {                                                   // Sterben
+    var dp = Math.max(0, b.dieT / 0.9);
+    s = dp;
+    yPos = -(1 - dp) * 0.6;
+  }
+  rig.grp.position.set(bx, yPos, bz);
+  rig.grp.scale.setScalar(s);
+  rig.mat.emissive.setScalar(b.flash > 0 ? 0.9 : 0);                     // Treffer-Blink
+  if (b.phase < 2) pushBlob(bx, bz, rig.built.r * 1.15);
+  if (b.type === 1) {
+    var mawS = b.spitTele > 0 ? 1 + 0.6 * (1 - b.spitTele / CFG.spitTelegraph) : 1;
+    mawMesh.scale.setScalar(mawS);
+    if (b.spitTele > 0) {
+      muzzleGlow.visible = true;
+      var mt = 1 - b.spitTele / CFG.spitTelegraph;
+      muzzleGlow.position.set(bx, 1.63 + yPos, bz + 0.62);
+      muzzleGlow.scale.setScalar(0.7 + mt * 0.9);
+      muzzleGlow.material.opacity = 0.5 + 0.5 * mt;
+    }
+    if (b.jumpTele > 0) {
+      jumpShadow.visible = true;
+      var jt = 1 - b.jumpTele / CFG.jumpTelegraph;
+      jumpShadow.position.x = wx(b.jumpX);
+      jumpShadow.position.z = -0.4;
+      jumpShadow.scale.setScalar(0.4 + jt * 0.8);
+      jumpShadow.material.opacity = 0.25 + 0.35 * jt;
+    }
+  }
+  if (b.phase === 1) {
+    bossWrapEl.style.display = "block";
+    bossNameEl.textContent = b.type === 0 ? "FLEISCHBERG" : "SPEIER";
+    bossHpFill.style.width = (clamp(b.hp / b.maxHp, 0, 1) * 100) + "%";
+  } else {
+    bossWrapEl.style.display = "none";
+  }
+}
+function renderHud3d(alpha, fx) {
+  var d = Math.floor(state.dist);
+  if (d !== hudCache.dist) { hudCache.dist = d; hudDistEl.textContent = d + " m"; }
+  if (state.weapon !== hudCache.weapon) {
+    hudCache.weapon = state.weapon;
+    hudWeaponEl.textContent = CFG.weapons[state.weapon].name + " " + ["I","II","III","IV"][state.weapon];
+  }
+  // Armeezahl schwebt ueber der Formation
+  var shown = Math.round(state.armyShown);
+  if (shown !== hudCache.army) { hudCache.army = shown; armyLblEl.textContent = String(shown); }
+  if (projectToHud(armyLblEl, wx(fx), 1.0, 0.4, 0)) {
+    var pop = state.armyPop > 0 ? 1 + 0.35 * (state.armyPop / CFG.armyPopTime) : 1;
+    armyLblEl.style.display = "block";
+    armyLblEl.style.transform = "translate(-50%,-100%) scale(" + pop.toFixed(3) + ")";
+    armyLblEl.className = state.armyFlash > 0 ? "loss" : "";
+    armyLblEl.id = "armyLbl";
+  }
+  // Schadenszahlen: Pool aus 16 divs, projiziert
+  for (var i = 0; i < CFG.poolDmgNums; i++) {
+    var el = dmgEls[i];
+    if (i >= dmgNums.count) { el.style.display = "none"; continue; }
+    var dn = dmgNums[i];
+    if (projectToHud(el, wx(dn.x), 0.55 + dn.t * 0.6, wz(dn.y), 0)) {
+      el.style.display = "block";
+      el.textContent = String(dn.val);
+      el.style.opacity = clamp(1 - dn.t / 0.7, 0, 1).toFixed(2);
+      el.className = dn.boss ? "dmg boss" : "dmg";
+    }
+  }
+  // Steuerhinweise am Anfang
+  hintBoxEl.style.opacity = state.time < CFG.introHintTime + 1.5 && !state.boss.active ? "1" : "0";
+  if (state.over) setOverlay("over");
+  else if (state.paused) setOverlay("pause");
+  else setOverlay("");
+}
+
+/* ================= Loop: Fixed Timestep + Interpolation ================= */
+var lastT = performance.now(), accum = 0;
+renderer.setAnimationLoop(function () {
+  var now = performance.now();
+  var ft = Math.min(0.1, (now - lastT) / 1000);        // dt-Deckel
+  lastT = now;
+  AU.blipBudget = Math.min(CFG.blipMaxPerSec, AU.blipBudget + CFG.blipMaxPerSec * ft);
+  AU.tickBudget = Math.min(CFG.blipMaxPerSec, AU.tickBudget + CFG.blipMaxPerSec * ft);
+  if (!state.paused && !state.over) {
+    if (state.hitstop > 0) {
+      state.hitstop -= ft;
+    } else {
+      accum += ft;
+      var steps = 0;
+      while (accum >= STEP && steps < MAX_STEPS) {
+        var ts = 1;
+        if (state.slowmo > 0 && !REDUCED) ts = state.slowmoScale;
+        if (state.dying && !REDUCED) ts = CFG.deathSlowmoScale;
+        stepGame(STEP * ts, STEP);
+        accum -= STEP;
+        steps++;
+      }
+      if (steps >= MAX_STEPS) accum = 0;               // Nachhol-Limit
+    }
+  }
+  render3d(clamp(accum / STEP, 0, 1));
+});
+
+/* ================= Start + Test-Haken ================= */
+resetGame();
+render3d(1);
+// Minimaler Haken fuer automatisierte Abnahmetests — greift nicht ins Spiel ein.
+window.__LL = {
+  CFG: CFG, state: state, input: input,
+  pools: { bullets: bullets, zombies: zombies, particles: particles, dmgNums: dmgNums,
+           spits: spits, dying: dying },
+  reset: resetGame,
+  sim: function (seconds) {
+    var n = Math.round(seconds / STEP);
+    for (var i = 0; i < n && !state.over; i++) stepGame(STEP, STEP);
+    return { dist: state.dist, army: state.army, over: state.over, time: state.time };
+  },
+  stress: function (nz, nb) {
+    for (var i = 0; i < nz; i++) spawnZombie(i % 7 === 0 ? 2 : i % 3 === 0 ? 1 : 0,
+      rnd(LANE_L + 30, LANE_R - 30), rnd(-40, 600), null);
+    for (i = 0; i < nb; i++) fireBullet(rnd(LANE_L, LANE_R), rnd(100, 900), 3, 1);
+  },
+  stepOnce: function () { stepGame(STEP, STEP); },
+  renderOnce: function () { render3d(1); },
+  renderInfo: function () {
+    return { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles };
+  }
+};
+</script>
+</body>
+</html>
