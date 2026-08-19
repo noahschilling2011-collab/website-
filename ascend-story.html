@@ -647,6 +647,27 @@ button svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;
   background:#2b1613;border:1px solid rgba(179,38,30,.55);color:#ff8a7a;
   font-size:9px;font-weight:800;letter-spacing:.5px;vertical-align:1px}
 
+/* ---- Ton-Schalter ---- */
+.mutebtn{position:fixed;left:14px;bottom:calc(16px + env(safe-area-inset-bottom));
+  z-index:20;width:44px;min-height:44px;border-radius:22px;padding:0;
+  display:grid;place-items:center;
+  background:#22242e linear-gradient(180deg,rgba(255,255,255,.08),rgba(0,0,0,.2));
+  border:1px solid rgba(255,255,255,.12)}
+.mutebtn svg{width:19px;height:19px}
+.mutebtn .slash{display:none}
+.mutebtn.off .wav{display:none}
+.mutebtn.off .slash{display:block}
+.mutebtn.off{color:#8b8b95}
+.mutebtn.up{bottom:calc(74px + env(safe-area-inset-bottom))}
+
+/* Unter 440px teilen sich drei Knoepfe die untere Reihe. Kabinen-Knopf links
+   neben den Ton-Schalter statt mittig, Beschriftungen schmaler — sonst schiebt
+   sich die Akte ueber "Ans Tableau" (auch schon vor dem Ton-Schalter so). */
+@media (max-width:439px){
+  .viewbtn{left:64px;transform:none;padding:0 13px;font-size:12px;gap:7px}
+  .bookbtn{padding:0 12px;font-size:11px;gap:6px}
+}
+
 /* ---- Erzählband ---- */
 .sband{position:fixed;left:50%;bottom:calc(134px + env(safe-area-inset-bottom));
   transform:translateX(-50%) translateY(10px);z-index:34;
@@ -759,6 +780,14 @@ button svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <div class="sband" id="sband" role="status"></div>
+
+<button class="mutebtn" id="mutebtn" aria-pressed="false" aria-label="Ton ausschalten">
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M4 9v6h4l5 4V5L8 9z"/>
+    <path class="wav" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>
+    <path class="slash" d="M17 9.5l5 5M22 9.5l-5 5"/>
+  </svg>
+</button>
 
 <!-- Sheet -->
 <div class="ov" id="ov" aria-hidden="true">
@@ -975,6 +1004,7 @@ button svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;
       </div>
       <div class="rc-list" id="acList" style="margin-top:16px"></div>
       <div class="clue epi" id="acEpi" style="display:none;margin-top:12px"></div>
+      <div class="note" id="acCareer"></div>
       <button class="big" id="acAgain" style="margin-top:6px">Neuer Fall</button>
       <div class="note">SIMULATION · es wurde kein Geld abgebucht</div>
     </div>
@@ -1077,7 +1107,27 @@ var CASETYPES=[
   winTx:"Bruder {N} hat das Kraut benannt, noch ehe man ihn fragte. Die drei Kranken werden es überstehen.",
   loseTx:"Bruder {A} hat den Wein nicht angerührt. Es war <b>Bruder {N}</b> ({X}).",
   epiWin:"Der Wein wird fortan vorgekostet, das Amt ist unbeliebt. Bruder {N} bekommt bis auf Weiteres nur Wasser.",
-  epiLose:"Der Abendwein wird wieder ausgeschenkt. Es trinkt ihn nur niemand mehr zuerst."}
+  epiLose:"Der Abendwein wird wieder ausgeschenkt. Es trinkt ihn nur niemand mehr zuerst."},
+ {id:"faelschung",chip:"Fälschung",file:"Akte 447-B · Fälschung",
+  victimLine:"Objekt: das Zinsbuch",
+  brSub:"Im Zinsbuch stimmen die Summen nicht mehr mit den Belegen überein. Die Abtei bittet um Aufklärung.",
+  task:"Finden Sie heraus, wer das Zinsbuch frisiert hat, und erheben Sie im {G} Anklage.",
+  foundLbl:"Aus dem Zinsbuch geschlossen",
+  perp:"Wer das Zinsbuch frisierte",comma:true,
+  winTx:"Bruder {N} hat die Zahlen vorgerechnet, diesmal die echten. Es fehlt mehr, als das Buch je zugegeben hat.",
+  loseTx:"Bruder {A} hat keine Zeile geändert. Es war <b>Bruder {N}</b> ({X}).",
+  epiWin:"Das Zinsbuch wird neu angelegt, mit Vorsatzblatt und Gegenzeichnung. Die fehlende Summe steht jetzt ordentlich drin — als fehlend.",
+  epiLose:"Die Summen werden per Beschluss für richtig erklärt. Nachgerechnet wird hier nicht mehr."},
+ {id:"entweihung",chip:"Entweihung",file:"Akte 447-B · Entweihung",
+  victimLine:"Objekt: die Krypta",
+  brSub:"In der Krypta hat nachts jemand die Grabplatte des Gründers verschoben. Die Abtei bittet um Aufklärung.",
+  task:"Finden Sie heraus, wer nachts in der Krypta war, und erheben Sie im {G} Anklage.",
+  foundLbl:"In der Krypta festgestellt",
+  perp:"Wer nachts in der Krypta war",comma:true,
+  winTx:"Bruder {N} hat es zugegeben. Er habe nur nachsehen wollen, ob der Gründer noch da ist.",
+  loseTx:"Bruder {A} war nicht in der Krypta. Es war <b>Bruder {N}</b> ({X}).",
+  epiWin:"Die Grabplatte liegt wieder, wie sie lag. Was Bruder {N} darunter gesucht hat, sagt er nicht.",
+  epiLose:"Die Krypta wird nachts abgeschlossen. Der Schlüssel hängt dort, wo ihn jeder kennt."}
 ];
 
 /* ---- Modifikatoren: einer pro Runde oder keiner ---- */
@@ -1094,13 +1144,22 @@ var MODS=[
 
 /* ---- Erzähltexte ---- */
 var STORY_PLACE={
-  kueche:"In der Küche ist der Herd noch warm. Jemand hat das Abendessen nicht zu Ende gekocht.",
-  biblio:"In der Bibliothek riecht es nach kaltem Wachs. Eines der Pulte ist zu ordentlich.",
-  wasch:"Im Waschhaus hängt noch nasse Leinwand. Es riecht nach Asche, obwohl hier nichts brennt.",
-  kapitel:"Im Kapitelsaal stehen die Bänke, als wäre die Sitzung nur unterbrochen worden. Niemand hat sie zu Ende gebracht.",
-  garten:"Im Garten steht der Himmel offen über den Beeten. Die Erde an der Mauer ist frisch umgegraben.",
-  zellen:"Vor den Zellen ist der Gang gefegt. Hinter einer der Türen hört jemand auf zu atmen, bis Sie vorbei sind.",
-  keller:"Im Vorratskeller zählt niemand die Fässer. Es fällt erst auf, wenn eines fehlt."
+  kueche:["In der Küche ist der Herd noch warm. Jemand hat das Abendessen nicht zu Ende gekocht.",
+    "In der Küche steht ein siebter Teller bereit. Gedeckt wird hier für sechs.",
+    "Die Küche riecht nach verbranntem Brot. Verbrannt wird hier sonst nichts."],
+  biblio:["In der Bibliothek riecht es nach kaltem Wachs. Eines der Pulte ist zu ordentlich.",
+    "In der Bibliothek fehlt ein Band aus der Reihe. Der Staub daneben ist frisch verwischt.",
+    "In der Bibliothek liegt ein Lesezeichen auf dem Boden. Niemand hebt es auf."],
+  wasch:["Im Waschhaus hängt noch nasse Leinwand. Es riecht nach Asche, obwohl hier nichts brennt.",
+    "Im Waschhaus tropft es im Takt. Jemand hat heute mehr gewaschen, als anfiel."],
+  kapitel:["Im Kapitelsaal stehen die Bänke, als wäre die Sitzung nur unterbrochen worden. Niemand hat sie zu Ende gebracht.",
+    "Im Kapitelsaal liegt die Sitzordnung aus. Ein Name ist durchgestrichen und wieder hingeschrieben."],
+  garten:["Im Garten steht der Himmel offen über den Beeten. Die Erde an der Mauer ist frisch umgegraben.",
+    "Im Garten fehlt der Spaten von seinem Haken. Die Beete sind unberührt."],
+  zellen:["Vor den Zellen ist der Gang gefegt. Hinter einer der Türen hört jemand auf zu atmen, bis Sie vorbei sind.",
+    "Vor den Zellen brennt nur ein Licht. Es brennt vor der falschen Tür."],
+  keller:["Im Vorratskeller zählt niemand die Fässer. Es fällt erst auf, wenn eines fehlt.",
+    "Im Vorratskeller steht ein Fass quer zur Spur im Staub. Gerollt hat es niemand, sagt jeder."]
 };
 var STORY_TWO="Zwei bleiben. Einer von beiden hat heute Abend gelogen, ohne ein Wort zu sagen.";
 
@@ -1306,6 +1365,15 @@ function stillSolvable(sil){
 
 /* ---------- Preise (unverändert) ---------- */
 var P_FLOOR=50, P_CLOSE=200, P_RESUME=750, P_OPEN=1200, P_IDLE=25, P_ALARM=2500, P_SUB=49;
+/* Pruefvermerk-Schwellen: Ausgaben im Verhaeltnis zu den kalkulierten Fallkosten */
+var V_OK=1.0, V_RAHMEN=1.25, V_ANMERK=1.6;
+function vermerkTx(){
+  var q=spent/kase.cost;
+  return q<=V_OK ? "ohne Beanstandung"
+       : q<=V_RAHMEN ? "im Rahmen"
+       : q<=V_ANMERK ? "mit Anmerkung"
+       : "wird geprüft";
+}
 var IDLE_AFTER=20;
 /* billigste denkbare Fahrt: eine Etage (nach den Preisen deklariert,
    damit der Wert nicht NaN ist) */
@@ -1451,12 +1519,30 @@ var HELD={
  Krug:'<path d="M-3 -16h5v3h-1.4c2.8 1.2 4.6 3.8 4.6 7c0 4.4-3.2 7.6-7 7.6c-3.8 0-7-3.2-7-7.6c0-3.2 1.8-5.8 4.6-7h-1.8z"/>'
 };
 var figCache={};
+/* Sechs feste Staturen, ueber Groesse, Schulter, Kapuze und Neigung gespreizt.
+   Feste Stufen statt Streuwert: bei nur sechs Namen kollidiert ein Hash sonst
+   und zwei Brueder stehen praktisch deckungsgleich nebeneinander.
+   Benachbarte Groessen unterscheiden sich zusaetzlich immer in der Kapuze. */
+var FIGSLOT=[
+  {ht:1.024,sh:1.12,hood:0,lean:-0.6},
+  {ht:0.880,sh:0.86,hood:0,lean: 1.4},
+  {ht:1.120,sh:0.98,hood:2,lean:-2.2},
+  {ht:0.928,sh:1.06,hood:1,lean: 2.2},
+  {ht:1.072,sh:0.90,hood:1,lean: 0.6},
+  {ht:0.976,sh:1.14,hood:2,lean:-1.4}
+];
 function figParams(nm){
   if(figCache[nm]) return figCache[nm];
-  var h=2166136261;
-  for(var i=0;i<nm.length;i++){ h^=nm.charCodeAt(i); h=Math.imul(h,16777619)>>>0; }
-  function r(){ h=(Math.imul(h,1103515245)+12345)>>>0; return h/4294967296; }
-  var p={ht:.88+.24*r(), sh:.85+.3*r(), hood:Math.floor(r()*3), lean:(r()*5-2.5)};
+  var i=NAMES.indexOf(nm), p;
+  if(i>=0){
+    p=FIGSLOT[i];
+  }else{
+    /* Namen ausserhalb der sechs: aus dem Namen abgeleitet, damit er stabil bleibt */
+    var h=2166136261;
+    for(var k=0;k<nm.length;k++){ h^=nm.charCodeAt(k); h=Math.imul(h,16777619)>>>0; }
+    function r(){ h=(Math.imul(h,1103515245)+12345)>>>0; return h/4294967296; }
+    p={ht:.88+.24*r(), sh:.85+.3*r(), hood:Math.floor(r()*3), lean:(r()*5-2.5)};
+  }
   figCache[nm]=p;
   return p;
 }
@@ -1666,6 +1752,7 @@ $("confirm").onclick=function(){
   var t1=reduce?200:650, t2=reduce?200:430;
   setTimeout(function(){
     showStage($("stDone"));
+    sfx("pay");
     book(label,price);
     var fn=pendingFn; pendingFn=null;
     setTimeout(function(){ closeSheet(); if(fn) fn(); },t2);
@@ -1687,13 +1774,14 @@ function askClose(){
   charge("Türschließung",P_CLOSE,function(){
     if(inHall) leaveHall();
     mode="SCHLIESSEN"; doorsOpen=false; render();
-    if(inHall) leaveHall();
-  if(panelView) setView(false);
+    sfx("thud");
+    if(panelView) setView(false);
     setTimeout(startRide,reduce?100:950);
   });
 }
 function startRide(){
   mode="FAHRT"; stopUsed=false;
+  rideLoopStart();
   var span=goalFloor-curFloor;
   var s=Math.round(curFloor+0.6*span);
   stopAt=(Math.abs(span)>=3 && s!==curFloor && s!==goalFloor)?s:null;
@@ -1706,6 +1794,7 @@ function runRide(){
   clearInterval(rideTimer);
   rideTimer=setInterval(function(){
     curFloor+=(goalFloor>curFloor?1:-1);
+    sfx("tick");
     render();
     if(curFloor===goalFloor){ arrive(); return; }
     if(stopAt!==null && curFloor===stopAt && !stopUsed){ pauseRide(); }
@@ -1713,6 +1802,7 @@ function runRide(){
 }
 function pauseRide(){
   clearInterval(rideTimer);
+  rideLoopStop();
   mode="ANGEHALTEN"; render();
   pulse(elStage,"flickerbox",1900);
   askResume();
@@ -1720,13 +1810,16 @@ function pauseRide(){
 function askResume(){
   charge("Weiterfahrt-Freigabe",P_RESUME,function(){
     stopUsed=true; mode="FAHRT"; render();
+    rideLoopStart();
     pulse(elWorld,"jolt",250);
     runRide();
   });
 }
 function arrive(){
   clearInterval(rideTimer);
+  rideLoopStop();
   mode="ANGEKOMMEN"; render();
+  sfx("gong");
   pulse(elWorld,"joltRev",250);
   pulse(elBar,"flash",520);
   setTimeout(askOpen,reduce?60:420);
@@ -1765,6 +1858,7 @@ $("btnClose").onclick=function(e){
 $("btnAlarm").onclick=function(e){
   e.stopPropagation(); touch();
   charge("Notruf",P_ALARM,function(){
+    sfx("notruf");
     toast("Ihr Notruf wurde <b>entgegengenommen</b>");
   });
 };
@@ -1865,7 +1959,7 @@ function announceOut(before){
   before.forEach(function(x){
     if(now.indexOf(x)<0){
       var r=outReason(x);
-      toast("<b>"+x.name+"</b> scheidet aus"+(r?" — "+r:""));
+      toast("<b>Bruder "+x.name+"</b> scheidet aus"+(r?" — "+r:""));
     }
   });
   updateCounter();
@@ -1989,7 +2083,7 @@ $("tuNext").onclick=function(){
 /* ---------- Auftrag ---------- */
 function showBriefing(){
   var ct=kase.ctype, goalTxt=niceName(kase.goal);
-  $("brTitle").textContent="Vorfall 447-B · "+ct.chip;
+  $("brTitle").textContent="Vorfall 447-B · "+ct.chip+" · Ihr "+(career.faelle+1)+". Fall";
   $("brSub").textContent=ct.brSub;
   $("brTask").textContent=fillT(ct.task);
   $("brGoal").textContent=goalTxt;
@@ -2119,6 +2213,8 @@ $("acGo").onclick=function(){
   this.dataset.sure="";
   caseClosed=true;
   var win=(accusePick===kase.culprit);
+  sfx(win?"win":"lose");
+  careerCaseDone(win,win?vermerkTx():null);
   $("acPick").hidden=true; $("acEnd").hidden=false;
   $("acMark").className="vmark "+(win?"win":"lose");
   $("acMark").textContent=win?"✓":"✗";
@@ -2132,7 +2228,10 @@ $("acGo").onclick=function(){
   row("Fahrten",String(rides));
   row("Erfragt",asked+" Fragen");
   row("Ausgegeben",money(spent));
+  row("Kalkulierte Fallkosten",money(kase.cost));
+  if(win) row("Prüfvermerk der Zentrale",vermerkTx());
   if(lootN) row("Mitgenommen",lootN+" Stück · "+de0(lootSum));
+  if(lootSum>0) row("davon gedeckt aus Mitgenommenem",de0(lootSum));
   var t=document.createElement("div"); t.className="rc-sum";
   t.innerHTML="<span>Restbudget</span><span>"+money(Math.max(0,budget))+"</span>";
   L.appendChild(t);
@@ -2153,6 +2252,8 @@ $("acGo").onclick=function(){
   $("acEpi").style.display="";
   $("acEpi").innerHTML='<div class="clue-tx" style="font-style:italic;color:#e6e4da">'+
     epi+" "+lootLine+"</div>";
+  $("acCareer").textContent="Dienstakte: "+career.siege+" von "+career.faelle+
+    " Fällen geschlossen.";
 };
 $("acAgain").onclick=function(){ restart(); };
 
@@ -2161,6 +2262,8 @@ function endGame(label,price){
   if(over) return;
   over=true;
   clearInterval(rideTimer);
+  rideLoopStop();
+  if(!caseClosed) careerCaseDone(false,null);
   closeSheet();
   $("goWhy").textContent = label
     ? ("Der Posten „"+label+"“ über "+money(price)+" konnte nicht gedeckt werden.")
@@ -2174,7 +2277,9 @@ function endGame(label,price){
   row("Zieletage",niceName(kase.goal));
   row("Fahrten",String(rides));
   row("Erfragt",asked+" Fragen");
+  row("Kalkulierte Fallkosten",money(kase.cost));
   if(lootN) row("Mitgenommen",lootN+" Stück · "+de0(lootSum));
+  if(lootSum>0) row("davon gedeckt aus Mitgenommenem",de0(lootSum));
   var t=document.createElement("div"); t.className="rc-sum";
   t.innerHTML="<span>Ausgegeben</span><span>"+money(spent)+"</span>";
   L.appendChild(t);
@@ -2430,11 +2535,12 @@ function enterHall(){
   $("hhud").style.display="block";
   $("enterbtn").style.display="none";
   $("viewbtn").style.display="none";
+  $("mutebtn").classList.add("up");
   $("navR").focus();
   if(!storyFloorSeen[curFloor]){
     storyFloorSeen[curFloor]=true;
     var p=placeOf(curFloor);
-    if(p&&STORY_PLACE[p.id]) story(STORY_PLACE[p.id]);
+    if(p&&STORY_PLACE[p.id]) story(pickOf(STORY_PLACE[p.id]));
   }
 }
 function leaveHall(){
@@ -2444,6 +2550,7 @@ function leaveHall(){
   elStage.classList.remove("off");
   $("hhud").style.display="none";
   $("viewbtn").style.display="";
+  $("mutebtn").classList.remove("up");
   render();
 }
 $("enterbtn").onclick=enterHall;
@@ -2506,7 +2613,12 @@ function ask(o){
   var k=known[talkWho.name], free=false, txt="";
   if(o.id==="seen"){
     var mine=kase.alibis.filter(function(a){ return a.witness===talkWho; });
-    if(!mine.length){ txt="Dazu kann ich nichts sagen."; free=true; }
+    if(!mine.length){
+      txt=pickOf(["Dazu kann ich nichts sagen.",
+        "Ich habe auf meine Hände gesehen, nicht auf die Türen.",
+        "Wenn ich jemanden gesehen hätte, wüsste ich es noch. Ich weiß nichts."]);
+      free=true;
+    }
     else{
       txt=mine.map(function(a){
         if(alibisKnown.indexOf(a)<0) alibisKnown.push(a);
@@ -2518,7 +2630,9 @@ function ask(o){
     txt=pickOf([
       "Ich hatte "+art(talkWho.item)+" dabei, wie fast jeden Abend.",
       art(talkWho.item).replace(/^ein/,"Ein")+", nichts weiter. Den trage ich immer bei mir.",
-      "Nur "+art(talkWho.item)+". Fragen Sie die anderen, die sehen das auch so."
+      "Nur "+art(talkWho.item)+". Fragen Sie die anderen, die sehen das auch so.",
+      "Sie sehen doch, was ich trage: "+art(talkWho.item)+". Wie jeden Abend.",
+      art(talkWho.item).replace(/^e/,"E")+". Schreiben Sie es ruhig auf, es ändert sich nicht."
     ]);
     if(talkWho.item==="Kerze") txt=txt.replace("Den trage","Die trage");
   }else if(o.id==="high"){
@@ -2526,24 +2640,33 @@ function ask(o){
     txt=talkWho.high
       ? pickOf(["Ich war oben im Haus"+(pl2?", in der "+pl2.name:"")+", den ganzen Abend.",
                 "Oben. Ich bin die ganze Zeit nicht heruntergekommen.",
-                "In den oberen Stockwerken. Da ist es ruhiger."])
+                "In den oberen Stockwerken. Da ist es ruhiger.",
+                "Oben. Von dort hört man das Haus besser, als dem Haus lieb ist.",
+                "Über der zweiten Treppe, den ganzen Abend. Da oben ist man vor dem Aufzug sicher."])
       : pickOf(["Ich war unten im Haus"+(pl2?", in der "+pl2.name:"")+", den ganzen Abend.",
                 "Unten. Ich hatte oben nichts zu suchen.",
-                "In den unteren Stockwerken, wie immer um die Zeit."]);
+                "In den unteren Stockwerken, wie immer um die Zeit.",
+                "Unten, wo die Arbeit ist. Oben ist nur die Aussicht.",
+                "Ich kam den ganzen Abend nicht über die erste Treppe hinaus. Fragen Sie die Stufen."]);
   }else{
     txt=talkWho.lift
       ? pickOf(["Ja, einmal. Es war spät, ich wollte nicht die Treppe nehmen.",
                 "Ja. Ich weiß, was das kostet. Ich bin trotzdem gefahren.",
-                "Einmal, ja. Die Abrechnung kam am nächsten Morgen."])
+                "Einmal, ja. Die Abrechnung kam am nächsten Morgen.",
+                "Gefahren, ja. Die Quittung war schneller unten als ich.",
+                "Ja. Beten ist umsonst, fahren nicht. An dem Abend fehlte mir die Zeit zum Beten."])
       : pickOf(["Nein. Ich zahle nicht für Fahrstühle.",
                 "Nein, ich nehme die Treppe. Immer.",
-                "Keinen Schritt hinein. Das ist mir zu teuer."]);
+                "Keinen Schritt hinein. Das ist mir zu teuer.",
+                "Nein. Ich habe gesehen, was aus Brüdern wird, die dem Ding ihre Kasse anvertrauen.",
+                "Nein. Die Treppe verlangt nur Atem, und den habe ich noch."]);
   }
   var before=possible();
   var already=!!k[o.id];
   k[o.id]=true;
   if(!already && !free){ asked++; book("Aufenthaltsgebühr Flur",P_ASK); }
   $("tkAnswer").innerHTML='<div class="answer'+(free?" none":"")+'">'+txt+'</div>';
+  sfx("blip");
   updateBadge(); renderQs(); announceOut(before);
   storyCheck(); refreshFigures();
 }
@@ -2679,6 +2802,7 @@ $("thGo").onclick=function(){
   touch();
   if(!theftPend||theftPend.block){ closeTheft(); return; }
   var seen=doSteal(theftPend);
+  sfx("theft");
   closeTheft();
   if(theftEl){ theftEl.classList.add("gone"); theftEl=null; }
   var p=theftPend.p;
@@ -2764,6 +2888,7 @@ document.addEventListener("keydown",function(e){
 /* ---------- Standgebühr ---------- */
 function touch(){ idleSec=0; }
 setInterval(function(){
+  if(anySheetOpen()) return;   /* offene Sheets halten die Uhr an, nicht nur die Buchung */
   idleSec++;
   if(idleSec>=idleLimit()){
     idleSec=0;
@@ -2771,6 +2896,138 @@ setInterval(function(){
     toast("Standgebühr <b>−"+money(P_IDLE)+"</b>");
   }
 },1000);
+
+/* ---------- Klang: synthetisch, ein Context, ein Master ---------- */
+var AC=null, sndMaster=null, noiseBuf=null, muted=false, rideNodes=null;
+try{ muted=localStorage.getItem("ascend.mute")==="1"; }catch(e){}
+function ensureAudio(){
+  if(AC){ if(AC.state==="suspended") AC.resume(); return; }
+  var Ctx=window.AudioContext||window.webkitAudioContext;
+  if(!Ctx) return;
+  try{
+    AC=new Ctx();
+    sndMaster=AC.createGain(); sndMaster.gain.value=0.15;
+    sndMaster.connect(AC.destination);
+    var len=Math.floor(AC.sampleRate*0.25), buf=AC.createBuffer(1,len,AC.sampleRate);
+    var d=buf.getChannelData(0);
+    for(var i=0;i<len;i++) d[i]=Math.random()*2-1;
+    noiseBuf=buf;
+    if(mode==="FAHRT") rideLoopStart();
+  }catch(e){ AC=null; }
+}
+function sndOk(){ return !!AC&&!muted&&!document.hidden; }
+function tone(f0,f1,t0,dur,type,vol){
+  if(!sndOk()) return;
+  var t=AC.currentTime+(t0||0);
+  var o=AC.createOscillator(), g=AC.createGain();
+  o.type=type||"sine";
+  o.frequency.setValueAtTime(f0,t);
+  if(f1) o.frequency.exponentialRampToValueAtTime(f1,t+dur);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(vol||0.5,t+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g); g.connect(sndMaster);
+  o.start(t); o.stop(t+dur+0.05);
+}
+function noiseHit(t0,dur,freq,vol){
+  if(!sndOk()||!noiseBuf) return;
+  var t=AC.currentTime+(t0||0);
+  var src=AC.createBufferSource(); src.buffer=noiseBuf;
+  var f=AC.createBiquadFilter(); f.type="bandpass";
+  f.frequency.value=freq; f.Q.value=1.2;
+  var g=AC.createGain();
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(vol||0.4,t+0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  src.connect(f); f.connect(g); g.connect(sndMaster);
+  src.start(t); src.stop(t+dur+0.05);
+}
+function sfx(nm){
+  if(!sndOk()) return;
+  if(nm==="thud"){ tone(110,55,0,0.16,"triangle",0.9); noiseHit(0,0.09,220,0.35); }
+  else if(nm==="tick"){ tone(660,null,0,0.045,"sine",0.22); }
+  else if(nm==="gong"){ tone(523,null,0,0.5,"sine",0.5); tone(392,null,0.16,0.7,"sine",0.5); }
+  else if(nm==="pay"){ tone(1180,880,0,0.05,"square",0.16); tone(880,620,0.09,0.06,"square",0.16); }
+  else if(nm==="theft"){ noiseHit(0,0.16,1800,0.4); }
+  else if(nm==="blip"){ tone(520,660,0,0.09,"sine",0.32); }
+  else if(nm==="win"){ tone(392,null,0,0.14,"triangle",0.5);
+    tone(494,null,0.12,0.14,"triangle",0.5); tone(587,null,0.24,0.3,"triangle",0.5); }
+  else if(nm==="lose"){ tone(440,null,0,0.2,"triangle",0.5); tone(349,null,0.2,0.42,"triangle",0.5); }
+  else if(nm==="notruf"){ tone(440,null,0,0.12,"sine",0.42); tone(440,null,0.2,0.12,"sine",0.42); }
+}
+function rideLoopStart(){
+  if(!AC||muted||document.hidden||rideNodes) return;
+  var o1=AC.createOscillator(), o2=AC.createOscillator(),
+      g=AC.createGain(), f=AC.createBiquadFilter();
+  o1.type="sawtooth"; o1.frequency.value=52;
+  o2.type="sawtooth"; o2.frequency.value=54.5;
+  f.type="lowpass"; f.frequency.value=190;
+  g.gain.setValueAtTime(0.0001,AC.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.06,AC.currentTime+0.4);
+  o1.connect(f); o2.connect(f); f.connect(g); g.connect(sndMaster);
+  o1.start(); o2.start();
+  rideNodes={o1:o1,o2:o2,g:g};
+}
+function rideLoopStop(){
+  if(!rideNodes) return;
+  var n=rideNodes; rideNodes=null;
+  if(AC){
+    n.g.gain.setTargetAtTime(0.0001,AC.currentTime,0.08);
+    setTimeout(function(){ try{ n.o1.stop(); n.o2.stop(); }catch(e){} },400);
+  }
+}
+function applyMute(){
+  var b=$("mutebtn");
+  b.setAttribute("aria-pressed",muted?"true":"false");
+  b.setAttribute("aria-label",muted?"Ton einschalten":"Ton ausschalten");
+  b.classList.toggle("off",muted);
+  if(muted) rideLoopStop();
+  else if(mode==="FAHRT") rideLoopStart();
+}
+$("mutebtn").onclick=function(e){
+  e.stopPropagation(); touch();
+  muted=!muted;
+  try{ localStorage.setItem("ascend.mute",muted?"1":"0"); }catch(e2){}
+  applyMute();
+};
+document.addEventListener("pointerdown",ensureAudio,true);
+document.addEventListener("keydown",ensureAudio,true);
+document.addEventListener("visibilitychange",function(){
+  if(document.hidden) rideLoopStop();
+  else if(mode==="FAHRT") rideLoopStart();
+});
+
+/* ---------- Dienstakte: haelt ueber Faelle hinweg ---------- */
+var CAREER_KEY="ascend.career.v1";
+var career={faelle:0,siege:0,ausgaben:0,lootSumme:0,lootStueck:0,besterVermerk:null};
+var VERMERK_RANG=["ohne Beanstandung","im Rahmen","mit Anmerkung","wird geprüft"];
+function loadCareer(){
+  try{
+    var s=localStorage.getItem(CAREER_KEY);
+    if(!s) return;
+    var o=JSON.parse(s);
+    ["faelle","siege","ausgaben","lootSumme","lootStueck"].forEach(function(k){
+      if(typeof o[k]==="number"&&isFinite(o[k])) career[k]=o[k];
+    });
+    if(typeof o.besterVermerk==="string") career.besterVermerk=o.besterVermerk;
+  }catch(e){}
+}
+function saveCareer(){
+  try{ localStorage.setItem(CAREER_KEY,JSON.stringify(career)); }catch(e){}
+}
+function careerCaseDone(win,vermerk){
+  career.faelle++;
+  if(win) career.siege++;
+  career.ausgaben+=spent;
+  career.lootSumme+=lootSum;
+  career.lootStueck+=lootN;
+  if(win&&vermerk){
+    var a=VERMERK_RANG.indexOf(vermerk), b=VERMERK_RANG.indexOf(career.besterVermerk);
+    if(b<0||a<b) career.besterVermerk=vermerk;
+  }
+  saveCareer();
+}
+loadCareer();
 
 /* ---------- Tastatur ---------- */
 document.addEventListener("keydown",function(e){
@@ -2784,6 +3041,7 @@ document.addEventListener("keydown",function(e){
 $("sealFig").innerHTML='<path class="robe" d="'+MONK_PATH+'"/>';
 $("nbSeal").innerHTML='<path class="robe" d="'+MONK_PATH+'"/>';
 applyCam();
+applyMute();
 kase=newCase();
 budget=kase?kase.roundBudget:START_BUDGET;
 updateBadge();
@@ -2794,6 +3052,26 @@ renderBand();
 updateCounter();
 showTut();
 setTimeout(function(){ elHint.classList.add("gone"); },6000);
+
+/* ---------- Konsolen-Harness ---------- */
+window.__tests=function(){
+  var fails=[];
+  MODS.forEach(function(m){
+    for(var i=0;i<100;i++){
+      var c=newCase(m?m.id:null);
+      if(!c){ fails.push("Generator liefert null · Mod "+(m?m.id:"ohne")); break; }
+      if(c.cost>c.roundBudget*COST_CAP) fails.push("Kostendeckel verletzt · Mod "+(m?m.id:"ohne"));
+    }
+  });
+  for(var j=0;j<50;j++){
+    kase=newCase(); silenced={}; stolenFloors={};
+    known={}; alibisKnown=[];            /* sonst faerbt Vorwissen die Pruefung */
+    var r=simTheftSweep();
+    if(!r.ok) fails.push("Diebstahl-Sweep macht Fall unlösbar");
+  }
+  restart();                             /* Harness verstellt globalen Zustand */
+  return fails.length?fails:"OK";
+};
 </script>
 </body>
 </html>
