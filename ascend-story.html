@@ -647,6 +647,105 @@ button svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;
   background:#2b1613;border:1px solid rgba(179,38,30,.55);color:#ff8a7a;
   font-size:9px;font-weight:800;letter-spacing:.5px;vertical-align:1px}
 
+/* ---- Gelerntes am Porträt (P7) ---- */
+.figure .tags{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);
+  display:flex;flex-direction:column;gap:3px;align-items:center;pointer-events:none}
+.figure .tg{padding:2px 7px;border-radius:5px;background:#151920;
+  border:1px solid rgba(255,255,255,.16);color:#c3c4cc;
+  font-size:9px;font-weight:700;white-space:nowrap;line-height:1.4}
+.figure .tg.fit{border-color:rgba(61,208,232,.5);color:#a9dfe9}
+.figure .tg.out{border-color:rgba(255,107,107,.5);color:#ff9d92}
+
+/* ---- Flurtiefe: zwei zusätzliche Ebenen (P7) ---- */
+.hmid,.hnear{position:absolute;left:50%;top:50%;width:1620px;height:520px;
+  margin:-260px 0 0 -810px;pointer-events:none}
+.hmid{transform:translateZ(-210px)}
+.hnear{transform:translateZ(-60px)}
+.hpiece{position:absolute;bottom:0;border-radius:2px}
+
+/* ---- Anklage-Moment ---- */
+.acfocus{position:fixed;inset:0;z-index:45;display:grid;place-items:center;
+  background:rgba(4,5,8,.86);opacity:0;pointer-events:none;
+  transition:opacity .2s ease}
+.acfocus.show{opacity:1;pointer-events:auto}
+.focusfig{width:170px;text-align:center;transform:scale(.86);
+  transition:transform .5s cubic-bezier(.2,.8,.2,1)}
+.acfocus.show .focusfig{transform:scale(1)}
+.focusfig svg{width:100%;height:250px;display:block;overflow:visible}
+.focusfig .robe{fill:#0a0b10;stroke:rgba(255,120,100,.75);stroke-width:2.4}
+.focusfig .face{fill:rgba(255,180,150,.16)}
+.focusfig .held{fill:#dfc98f}
+.focusfig .nm{margin-top:8px;padding:5px 13px;border-radius:7px;background:#2a1512;
+  border:1px solid rgba(224,82,61,.65);color:#ff8a7a;font-size:13px;font-weight:800;
+  display:inline-block}
+
+/* ---- Beweisführung (P1) ---- */
+.ev{display:flex;align-items:flex-start;gap:11px;padding:11px 13px;border-radius:11px;
+  background:#212129;border:1px solid rgba(255,255,255,.07);margin-bottom:7px;
+  cursor:pointer;width:100%;text-align:left;min-height:0;box-shadow:none;
+  transition:border-color .16s ease,background .16s ease}
+.ev:hover{background:#26262f}
+.ev.on{border-color:var(--acc);background:#152a30}
+.ev .box{width:19px;height:19px;flex:0 0 auto;margin-top:1px;border-radius:5px;
+  border:1.5px solid rgba(255,255,255,.28);display:grid;place-items:center}
+.ev.on .box{border-color:var(--acc);background:var(--acc)}
+.ev .box svg{width:12px;height:12px;stroke:#00232b;stroke-width:3;fill:none;
+  stroke-linecap:round;stroke-linejoin:round;display:none}
+.ev.on .box svg{display:block}
+.ev>span:last-child{display:block;min-width:0}
+.ev .evl{display:block;color:var(--head);font-size:12px;font-weight:700;line-height:1.35}
+.ev .evs{display:block;color:var(--muted);font-size:11px;margin-top:3px;line-height:1.45}
+.ev .evx{display:block;color:var(--acc);font-size:10px;font-weight:700;margin-top:5px;
+  line-height:1.4}
+.evcov{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px}
+.cov{padding:5px 10px;border-radius:14px;background:#20232d;
+  border:1px solid rgba(255,255,255,.13);color:var(--text);
+  font-size:11px;font-weight:700;position:relative}
+.cov.done{color:#6f7078;border-color:rgba(255,255,255,.06)}
+.cov.done::after{content:"";position:absolute;left:7px;right:7px;top:50%;height:1.5px;
+  background:#ff6b6b;border-radius:2px}
+.cov.acc{background:#2a1512;border-color:rgba(224,82,61,.65);color:#ff8a7a}
+.cov.acc::after{display:none}
+.evnote{font-size:11px;line-height:1.5;padding:9px 12px;border-radius:10px;
+  background:#20222b;border:1px solid rgba(255,255,255,.08);color:var(--muted);
+  margin-bottom:12px}
+.evnote.good{background:#14261c;border-color:rgba(52,199,89,.4);color:#9fe0b0}
+.evnote b{color:var(--head)}
+.evnote.good b{color:#c6f0d3}
+.empty-ev{color:var(--dim);font-size:12px;padding:12px;text-align:center;
+  border:1px dashed rgba(255,255,255,.12);border-radius:11px;margin-bottom:8px}
+
+/* ---- Aussagen-Status (P2) ---- */
+.stat{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;
+  padding:2px 8px;border-radius:9px;margin-left:6px;vertical-align:1px}
+.stat i{width:6px;height:6px;border-radius:50%;background:currentColor;display:block}
+.stat.roh{background:#26262e;border:1px solid rgba(255,255,255,.12);color:#8b8b95}
+.stat.ok{background:#14261c;border:1px solid rgba(52,199,89,.4);color:#7fd69a}
+.clue.roh{opacity:.62}
+.clue.roh .clue-tx{color:var(--muted)}
+.why-roh{margin-top:5px;font-size:10px;color:#8b8b95}
+
+/* ---- Rang / Note ---- */
+.rankchip{padding:5px 11px;border-radius:14px;background:#1d2430;
+  border:1px solid rgba(61,208,232,.35);color:#a9dfe9;
+  font-size:11px;font-weight:700;white-space:nowrap}
+.note-badge{width:64px;height:64px;margin:2px auto 10px;border-radius:16px;
+  display:grid;place-items:center;font-size:30px;font-weight:900;
+  font-family:ui-serif,Georgia,serif;letter-spacing:-1px}
+.note-S{background:#f0b429 linear-gradient(135deg,#ffd97a,var(--gold));color:#2a1e03}
+.note-A{background:#2f6b46;color:#d6f5e2}
+.note-B{background:#2b3a4a;color:#cfe2f0}
+.note-C{background:#3a2b2b;color:#e8c9c4}
+.note-why{color:var(--muted);font-size:11px;text-align:center;line-height:1.6;
+  margin:-4px 0 12px}
+
+/* ---- Twist-Aktionen ---- */
+.act .glow{background:radial-gradient(circle,rgba(120,200,255,.34),transparent 68%)}
+.act .lbl{background:#16222b;border-color:rgba(120,200,255,.42);color:#9fd8f2}
+.pickgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.pickgrid button{min-height:44px;font-size:13px}
+.pickgrid button:disabled{opacity:.4}
+
 /* ---- Ton-Schalter ---- */
 .mutebtn{position:fixed;left:14px;bottom:calc(16px + env(safe-area-inset-bottom));
   z-index:20;width:44px;min-height:44px;border-radius:22px;padding:0;
@@ -755,6 +854,7 @@ button svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;
   </div>
   <div class="hud-status">
     <span class="dot"></span><span class="st-val" id="status">Bereit</span>
+    <div class="cntbox rankchip" id="rankchip">—</div>
     <div class="cntbox modc" id="modchip" style="display:none">—</div>
     <div class="cntbox lootc" id="lootchip" title="Mitgenommen (Simulation)">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8c-4 0-6.5 3.2-6.5 7.2 0 2.8 2.2 4.8 6.5 4.8s6.5-2 6.5-4.8C18.5 11.2 16 8 12 8z"/><path d="M9.4 8 8 4.5h8L14.6 8"/></svg>
@@ -858,6 +958,8 @@ button svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;
   <div class="hworld" id="hworld">
     <div class="hf hceil" id="hceil"></div>
     <div class="hf hfloor" id="hfloor"></div>
+    <div class="hf hmid" id="hmid"></div>
+    <div class="hf hnear" id="hnear"></div>
     <div class="hf hback" id="hback">
       <div id="hprops"></div>
       <div class="hlift" id="hlift">
@@ -913,6 +1015,38 @@ button svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;
   </div>
 </div>
 
+<!-- Handschriftvergleich -->
+<div class="ov" id="hsOv" aria-hidden="true">
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Handschriftvergleich">
+    <div class="grip"></div>
+    <div class="shead">
+      <div class="shic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16"/><path d="M14.5 4.5l5 5L9 20H4v-5z"/></svg></div>
+      <div><div class="sht">Handschriftvergleich</div><div class="shs" id="hsS">—</div></div>
+    </div>
+    <div id="hsBody"></div>
+    <div class="pickgrid" id="hsGrid"></div>
+    <div class="note" id="hsNote">—</div>
+    <button id="hsClose" class="ghost">Schließen</button>
+  </div>
+</div>
+
+<div class="acfocus" id="acFocus" aria-hidden="true"></div>
+
+<!-- Fortsetzen -->
+<div class="ov" id="rsOv" aria-hidden="true">
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Fall fortsetzen">
+    <div class="grip"></div>
+    <div class="shead">
+      <div class="shseal" aria-hidden="true"><svg id="rsSeal" viewBox="0 0 60 96"></svg></div>
+      <div><div class="sht">Fall 447-B fortsetzen?</div><div class="shs" id="rsS">—</div></div>
+    </div>
+    <div class="note" style="text-align:left;line-height:1.6">Die Akte lag noch auf dem Tisch.
+      ASCEND+ hat die bisherigen Posten bereits verbucht.</div>
+    <button class="big" id="rsGo" style="margin-top:12px">Fortsetzen</button>
+    <button id="rsNew" class="ghost">Neuer Fall</button>
+  </div>
+</div>
+
 <!-- Fundstück -->
 <div class="ov" id="fdOv" aria-hidden="true">
   <div class="sheet" role="dialog" aria-modal="true" aria-label="Fundstück">
@@ -944,6 +1078,7 @@ button svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;
     <div class="grip"></div>
     <div class="wal">ASCEND+ <span class="pill">AUFTRAG</span></div>
     <div class="rc-title" style="margin-top:10px" id="brTitle">Vorfall 447-B</div>
+    <div class="rc-sub" id="brRank" style="margin-bottom:2px;color:#a9dfe9;font-weight:700">—</div>
     <div class="rc-sub" id="brSub">—</div>
     <div class="case-head">
       <div class="case-k">Auftrag</div>
@@ -992,7 +1127,13 @@ button svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;
         <div class="shic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v17M6 21h12M12 6H5M12 6h7"/><path d="M5 6 3 12h4zM3 12a2 2 0 0 0 4 0M19 6l-2 6h4zM17 12a2 2 0 0 0 4 0"/></svg></div>
         <div><div class="sht">Anklage</div><div class="shs">Ein Versuch. Danach ist der Fall geschlossen.</div></div>
       </div>
+      <div class="case-k" style="margin-bottom:7px">Angeklagter</div>
       <div class="acc-grid" id="acGrid"></div>
+      <div class="case-k" style="margin-bottom:7px">Beweisführung · Belege wählen</div>
+      <div id="acEv"></div>
+      <div class="case-k" style="margin:12px 0 0">Damit ausgeschlossen</div>
+      <div class="evcov" id="acCov"></div>
+      <div class="evnote" id="acHint">—</div>
       <button class="big grey" id="acGo" disabled>Wählen Sie einen Bruder</button>
       <button id="acLater" class="ghost">Noch nicht</button>
     </div>
@@ -1002,6 +1143,9 @@ button svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;
         <h2 id="acTitle">—</h2>
         <div class="sub" id="acText">—</div>
       </div>
+      <div class="note-badge" id="acNote" style="display:none">—</div>
+      <div class="note-why" id="acNoteWhy" style="display:none">—</div>
+      <div class="evnote" id="acChain" style="display:none">—</div>
       <div class="rc-list" id="acList" style="margin-top:16px"></div>
       <div class="clue epi" id="acEpi" style="display:none;margin-top:12px"></div>
       <div class="note" id="acCareer"></div>
@@ -1036,6 +1180,24 @@ var START_BUDGET=20000;
 var COST_CAP=0.55;               /* Route darf hoechstens so viel des Budgets kosten */
 var NAMES=["Anselm","Cassian","Dorotheus","Eligius","Fulko","Gereon"];
 var ITEMS=["Kerze","Korb","Krug"];
+/* Merkmale. "zeit" kommt erst ab Praefekt dazu; erzeugt wird es immer, damit
+   kein Codepfad auf undefined laeuft. */
+var ATTRS=["item","high","lift","zeit"];
+/* Raenge: aus der Dienstakte abgeleitet, nicht separat gespeichert. */
+var RANKS=[
+ {id:"novize",   name:"Novize",    ab:0, faktor:1.60, wahrheit:false, attrs:["item","high","lift"]},
+ {id:"inspektor",name:"Inspektor", ab:3, faktor:1.35, wahrheit:true,  attrs:["item","high","lift"]},
+ {id:"praefekt", name:"Präfekt",   ab:8, faktor:1.20, wahrheit:true,  attrs:["item","high","lift","zeit"]}
+];
+var MIN_FAKTOR=1.15;   /* Abnahme 1 verlangt Optimalkosten <= Budget/1,15 */
+function rankOf(siege){
+  var r=RANKS[0];
+  RANKS.forEach(function(q){ if(siege>=q.ab) r=q; });
+  return r;
+}
+function curRank(){ return kase&&kase.rank ? kase.rank : rankOf(career.siege); }
+function activeAttrs(){ return curRank().attrs; }
+function truthRule(){ return curRank().wahrheit; }
 var PLACES=[
   {id:"kueche", name:"Küche",         item:"Korb",  tint:"rgba(255,196,120,.30)",
    ceil:"balken",  boden:"#161009", loot:"Zinnkrug",       lart:"den Zinnkrug",       lval:600},
@@ -1055,6 +1217,16 @@ var PLACES=[
 var MTOKN={kueche:"Anschreibtafel",biblio:"Ausleihbuch",wasch:"Waschliste",
   kapitel:"Sitzungsbuch",garten:"Gerätebuch",zellen:"Rundenliste",keller:"Bestandsbuch"};
 var P_ASK=150;
+var P_ESK=75;     /* jede weitere Frage im selben Flur-Aufenthalt kostet so viel mehr */
+/* Kosten eines Aufenthalts mit q kostenpflichtigen Fragen: 150 + 225 + 300 + ... */
+function askBlock(q){ return q*P_ASK + P_ESK*q*(q-1)/2; }
+/* nQ Fragen moeglichst gleichmaessig auf nf Aufenthalte verteilt */
+function questionCost(nQ,nf){
+  if(nf<1) nf=1;
+  var base=Math.floor(nQ/nf), rest=nQ%nf, c=0;
+  for(var i=0;i<nf;i++) c+=askBlock(base+(i<rest?1:0));
+  return c;
+}
 
 /* ---- Anlässe: gleicher Motor, anderer Rahmen ---- */
 var CASETYPES=[
@@ -1133,11 +1305,11 @@ var CASETYPES=[
 /* ---- Modifikatoren: einer pro Runde oder keiner ---- */
 var MODS=[
  null,
- {id:"knapp",chip:"Knappe Kasse",budget:14000,floors:2,idle:20,
-  brief:"Nur 14.000 € Budget — dafür stehen die Brüder auf zwei Etagen."},
- {id:"eile",chip:"Eile",budget:25000,floors:3,idle:10,
-  brief:"Die Standgebühr fällt alle 10 Sekunden an — dafür 25.000 € Budget."},
- {id:"geluebde",chip:"Schweigegelübde",budget:20000,floors:3,idle:20,silent:true,
+ {id:"knapp",chip:"Knappe Kasse",dfaktor:-0.15,floors:2,idle:20,
+  brief:"Die Zentrale hat den Ansatz gekürzt — dafür stehen die Brüder auf zwei Etagen."},
+ {id:"eile",chip:"Eile",dfaktor:0.10,floors:3,idle:10,
+  brief:"Die Standgebühr fällt alle 10 Sekunden an — der Ansatz ist entsprechend höher."},
+ {id:"geluebde",chip:"Schweigegelübde",dfaktor:0,floors:3,idle:20,silent:true,
   brief:"Die Brüder beantworten keine Merkmalsfragen, nur Zeugenfragen. "+
         "Alle Merkmale liegen in Fundstücken — an jedem Ort eines."}
 ];
@@ -1194,12 +1366,20 @@ function bestRoute(start,stops,goal){
   return best;
 }
 
-var KEYTX={item:"Gegenstand",high:"Aufenthalt",lift:"Aufzug"};
+var KEYTX={item:"Gegenstand",high:"Aufenthalt",lift:"Aufzug",zeit:"Stunde"};
 function art(i){ return (i==="Kerze"?"eine ":"einen ")+i; }
 function valTx(k,v){
   if(k==="item") return "trug "+art(v);
   if(k==="high") return v?"war oben im Haus":"war unten im Haus";
+  if(k==="zeit") return v?"war nach der Vesper unterwegs":"war vor der Vesper unterwegs";
   return v?"ist Aufzug gefahren":"ist nicht Aufzug gefahren";
+}
+/* Kurzform fuer Karten und Etiketten */
+function shortVal(k,x){
+  if(k==="item") return x.item;
+  if(k==="high") return x.high?"oben":"unten";
+  if(k==="zeit") return x.zeit?"nach Vesper":"vor Vesper";
+  return x.lift?"gefahren":"nicht gefahren";
 }
 /* Tatbefund-Satz im Vokabular des Anlasses */
 function perpTx(k,v){
@@ -1213,19 +1393,21 @@ function fillT(s){
           .replace(/\{G\}/g,niceName(kase.goal));
 }
 
-function makeCase(mod){
+function makeCase(mod,rank,ctype){
+  rank=rank||rankOf(career.siege);
+  var attrs=rank.attrs;
   var nf=(mod&&mod.floors)||3;
-  var roundBudget=(mod&&mod.budget)||START_BUDGET;
   var combos=[];
-  for(var i=0;i<3;i++) for(var h=0;h<2;h++) for(var l=0;l<2;l++)
-    combos.push({item:ITEMS[i],high:!!h,lift:!!l});
+  for(var i=0;i<3;i++) for(var h=0;h<2;h++) for(var l=0;l<2;l++) for(var z=0;z<2;z++)
+    combos.push({item:ITEMS[i],high:!!h,lift:!!l,zeit:!!z});
   combos=shuf(combos).slice(0,6);
   var sus=NAMES.map(function(n,i){
-    return {name:n,item:combos[i].item,high:combos[i].high,lift:combos[i].lift};
+    return {name:n,item:combos[i].item,high:combos[i].high,
+            lift:combos[i].lift,zeit:combos[i].zeit};
   });
   var culprit=sus[ri(6)];
 
-  var keys=shuf(["item","high","lift"]).slice(0, 2+ri(2));
+  var keys=shuf(attrs).slice(0, 2+ri(attrs.length-1));
   var findings=keys.map(function(k){
     return {key:k,val:culprit[k],
       excl:sus.filter(function(x){ return x[k]!==culprit[k]; })};
@@ -1234,12 +1416,17 @@ function makeCase(mod){
     return findings.every(function(f){ return f.excl.indexOf(x)<0; });
   });
 
+  /* Alibis mit garantierter Bestaetigungsreihenfolge (P2): ein Zeuge ist nur
+     zulaessig, wenn er selbst schon entlastet ist — per Merkmal oder durch ein
+     frueher bestaetigtes Alibi. Damit existiert die Kette per Konstruktion. */
+  var cleared=sus.filter(function(x){ return alive.indexOf(x)<0; });
   var alibis=[];
   shuf(alive).forEach(function(x){
     if(x===culprit || alive.length<=1) return;
-    var w=sus.filter(function(y){ return y!==x && y!==culprit; })[0];
-    if(!w) return;
-    alibis.push({who:x,witness:w});
+    var cand=cleared.filter(function(y){ return y!==x && y!==culprit; });
+    if(!cand.length) return;
+    alibis.push({who:x,witness:pickOf(cand)});
+    cleared.push(x);
     alive=alive.filter(function(y){ return y!==x; });
   });
   if(alive.length!==1 || alive[0]!==culprit) return null;
@@ -1249,15 +1436,75 @@ function makeCase(mod){
   var susFloors=fl.slice(0,nf);
   shuf(sus).forEach(function(x,i){ x.floor=susFloors[i%nf]; });
 
-  var pl=shuf(PLACES), floorPlace={}, alibiFloors=[];
+  var pl=shuf(PLACES), floorPlace={}, alibiFloors=[], used=nf;
+  if(pl.length<nf+alibis.length+2) return null;
   susFloors.forEach(function(f,i){ floorPlace[f]=pl[i]; });
-  alibis.forEach(function(a,i){
+  alibis.forEach(function(a){
     var extra=fl.filter(function(f){
       return susFloors.indexOf(f)<0 && alibiFloors.indexOf(f)<0; })[0];
     alibiFloors.push(extra);
-    floorPlace[extra]=pl[nf+i];
+    floorPlace[extra]=pl[used++];
     a.place=floorPlace[extra]; a.floor=extra;
   });
+
+  var goal=fl.filter(function(f){
+    return susFloors.indexOf(f)<0 && alibiFloors.indexOf(f)<0; })[0];
+  if(!floorPlace[goal]) floorPlace[goal]=pl[used++];
+
+  /* ---- Fall-Twists (P5): nutzen vorhandene Orte und Aktionen ---- */
+  var twist=null, twistStops=[], twistFee=0;
+  var needPlace=(ctype&&ctype.id==="gift") ? "keller"
+              : (ctype&&ctype.id==="verrat") ? "biblio" : null;
+  if(needPlace){
+    /* Ort auf eine eigene Etage legen — die Aktion soll eine Fahrt kosten. */
+    var already=null;
+    Object.keys(floorPlace).forEach(function(f){
+      if(floorPlace[f].id===needPlace) already=Number(f);
+    });
+    var tf;
+    if(already!==null && susFloors.indexOf(already)<0){
+      tf=already;
+    }else{
+      tf=fl.filter(function(f){
+        return susFloors.indexOf(f)<0 && alibiFloors.indexOf(f)<0 && f!==goal; })[0];
+      if(tf===undefined) return null;
+      var pp=PLACES.filter(function(q){ return q.id===needPlace; })[0];
+      /* denselben Ort nicht zweimal im Haus */
+      var dup=null;
+      Object.keys(floorPlace).forEach(function(f){
+        if(floorPlace[f].id===needPlace) dup=f;
+      });
+      if(dup!==null){
+        var frei=pl.filter(function(q){
+          return !Object.keys(floorPlace).some(function(f){ return floorPlace[f]===q; });
+        })[0];
+        if(!frei) return null;
+        floorPlace[dup]=frei;
+      }
+      floorPlace[tf]=pp;
+    }
+    if(ctype.id==="gift"){
+      /* Ein Tatbefund gilt als ungeprueft; die Fassprobe bestaetigt oder korrigiert ihn.
+         Der angezeigte Wert kann falsch sein — solange er ungeprueft ist, schliesst
+         er niemanden aus, also wird niemand in die Irre gefuehrt. */
+      var fi=ri(findings.length), fd=findings[fi];
+      var flip=(fd.key==="item")
+        ? (Math.random()<0.5 ? pickOf(ITEMS.filter(function(t){ return t!==fd.val; })) : fd.val)
+        : (Math.random()<0.5 ? !fd.val : fd.val);
+      twist={id:"probe",floor:tf,place:floorPlace[tf],findIdx:fi,
+             shown:flip,truth:fd.val,done:false,fee:300};
+      fd.unsure=true; fd.shown=flip;
+      twistStops.push(tf); twistFee=300;
+    }else{
+      twist={id:"schrift",floor:tf,place:floorPlace[tf],used:0,max:2,fee:300,results:[]};
+      /* freiwillig — weder Fahrt noch Gebuehr flieszen in die Optimalkosten ein */
+    }
+  }else if(ctype&&ctype.id==="brand"){
+    /* Russpur: ein Merkmal eines Anwesenden liegt beim Betreten offen */
+    var rf=pickOf(susFloors);
+    var rw=pickOf(sus.filter(function(x){ return x.floor===rf; }));
+    twist={id:"russ",floor:rf,who:rw.name,key:pickOf(findings).key,done:false};
+  }
 
   var tokens=[];
   Object.keys(floorPlace).forEach(function(f){
@@ -1266,14 +1513,18 @@ function makeCase(mod){
     if(who.length) tokens.push({floor:Number(f),place:p,item:p.item,who:who});
   });
 
-  var goal=fl.filter(function(f){
-    return susFloors.indexOf(f)<0 && alibiFloors.indexOf(f)<0; })[0];
-  if(!floorPlace[goal]) floorPlace[goal]=pl[6];
-
-  var stops=(mod&&mod.silent)?susFloors.concat(alibiFloors):susFloors;
+  var silent=!!(mod&&mod.silent);
+  var stops=(silent?susFloors.concat(alibiFloors):susFloors).concat(twistStops);
+  stops=stops.filter(function(f,i){ return stops.indexOf(f)===i; });
   var route=bestRoute(0,stops,goal);
-  var cost=route+((mod&&mod.silent)?alibis.length*P_ASK:9*P_ASK);
-  if(cost>roundBudget*COST_CAP) return null;
+  var nQ=silent?alibis.length:3*attrs.length;
+  var cost=route+questionCost(nQ,stops.length||1)+twistFee;
+  if(cost>START_BUDGET*COST_CAP) return null;
+
+  /* Budget aus den Optimalkosten, nicht fest (P3) */
+  var faktor=Math.max(MIN_FAKTOR, rank.faktor+((mod&&mod.dfaktor)||0));
+  /* aufrunden, sonst kann die 500er-Stufe den Faktor wieder unter MIN_FAKTOR druecken */
+  var roundBudget=Math.ceil(cost*faktor/500)*500;
 
   var left=sus.slice();
   findings.forEach(function(fd){ left=left.filter(function(x){ return fd.excl.indexOf(x)<0; }); });
@@ -1296,23 +1547,27 @@ function makeCase(mod){
 
   return {sus:sus,culprit:culprit,findings:findings,alibis:alibis,
           susFloors:susFloors,floorPlace:floorPlace,tokens:tokens,
-          goal:goal,route:route,cost:cost,mtokens:mtokens,roundBudget:roundBudget};
+          goal:goal,route:route,cost:cost,mtokens:mtokens,roundBudget:roundBudget,
+          twist:twist,rank:rank,attrs:attrs,nQ:nQ};
 }
-function newCase(modWant,typeWant){
+function newCase(modWant,typeWant,rankWant){
   var ct=typeWant?CASETYPES.filter(function(c){ return c.id===typeWant; })[0]:pickOf(CASETYPES);
   var mod;
   if(modWant===undefined) mod=pickOf(MODS);
   else if(modWant===null) mod=null;
   else mod=MODS.filter(function(m){ return m&&m.id===modWant; })[0]||null;
-  for(var t=0;t<200;t++){
-    var c=makeCase(mod);
+  var rank=rankWant
+    ? (RANKS.filter(function(r){ return r.id===rankWant; })[0]||RANKS[0])
+    : rankOf(career.siege);
+  for(var t=0;t<300;t++){
+    var c=makeCase(mod,rank,ct);
     if(c){ c.ctype=ct; c.mod=mod; return c; }
   }
   return null;
 }
 
 function attrLine(x){
-  return x.item+" · "+(x.high?"oben":"unten")+" · Aufzug "+(x.lift?"ja":"nein");
+  return activeAttrs().map(function(k){ return shortVal(k,x); }).join(" · ");
 }
 function knownOf(x){
   var k=known[x.name]||{}, out=[];
@@ -1340,17 +1595,18 @@ function lootOn(f){
   return (p&&p.loot&&!stolenFloors[f])?p:null;
 }
 
-/* ---- Lösbarkeitsprüfung: bleibt der Fall mit dieser Schweige-Menge lösbar? ---- */
+/* ---- Lösbarkeitsprüfung: bleibt der Fall mit dieser Schweige-Menge lösbar? ----
+   Prueft optimistisch: alles, was noch erfragbar oder auffindbar ist, gilt als
+   erreichbar. Seit P2 wird die Bestaetigungskette der Aussagen mitgeprueft —
+   eine Aussage traegt erst, wenn ihr Urheber selbst entlastet ist. */
 function stillSolvable(sil){
-  return kase.sus.every(function(x){
-    if(x===kase.culprit) return true;
-    var byAlibi=kase.alibis.some(function(a){
-      return a.who===x && (alibisKnown.indexOf(a)>=0 || !sil[a.witness.name]);
-    });
-    if(byAlibi) return true;
-    return kase.findings.some(function(fd){
+  /* 1. Wer laesst sich ueber Merkmale ausschliessen? */
+  var cl={};
+  kase.sus.forEach(function(x){
+    var ok=kase.findings.some(function(fd){
       if(x[fd.key]===fd.val) return false;
       if((known[x.name]||{})[fd.key]) return true;
+      /* ein ungepruefter Befund gilt hier als erreichbar — die Fassprobe existiert */
       if(kase.mod&&kase.mod.silent){
         return kase.mtokens.some(function(t){
           return t.reveals.some(function(r){ return r.name===x.name&&r.key===fd.key; });
@@ -1360,7 +1616,24 @@ function stillSolvable(sil){
       if(fd.key==="item") return kase.tokens.some(function(t){ return t.who.indexOf(x)>=0; });
       return false;
     });
+    if(ok) cl[x.name]=true;
   });
+  /* Handschriftvergleich: ein "Nein" entlastet unabhaengig von Merkmalen */
+  if(kase.twist&&kase.twist.id==="schrift"){
+    kase.twist.results.forEach(function(r){ if(!r.ja) cl[r.name]=true; });
+  }
+  /* 2. Aussagen ketten: erst der entlastete Zeuge macht seine Aussage gueltig */
+  var chg=true;
+  while(chg){
+    chg=false;
+    kase.alibis.forEach(function(a){
+      if(cl[a.who.name]) return;
+      var erreichbar=(alibisKnown.indexOf(a)>=0)||!sil[a.witness.name];
+      if(!erreichbar) return;
+      if(!truthRule()||cl[a.witness.name]){ cl[a.who.name]=true; chg=true; }
+    });
+  }
+  return kase.sus.every(function(x){ return x===kase.culprit||cl[x.name]; });
 }
 
 /* ---------- Preise (unverändert) ---------- */
@@ -1609,9 +1882,9 @@ function spawnMonks(){
   }
 }
 function knownCount(){
-  var n=0;
+  var n=0, aa=activeAttrs();
   Object.keys(known).forEach(function(k){
-    var o=known[k]; if(o.item)n++; if(o.high)n++; if(o.lift)n++;
+    var o=known[k]; aa.forEach(function(a){ if(o[a]) n++; });
   });
   return n+alibisKnown.length;
 }
@@ -1683,13 +1956,16 @@ function render(){
     elLockText.textContent="Fahrt unterbrochen";
     elLockBtn.textContent=money(P_RESUME);
     elLock.classList.add("show");
-  }else if(mode==="ANGEKOMMEN"){
-    elLockText.textContent="Türen verriegelt";
-    elLockBtn.textContent=money(P_OPEN);
-    elLock.classList.add("show");
   }else{
     elLock.classList.remove("show");
   }
+}
+/* Waehrend der Fahrt laeuft nur die Anzeige — kein voller render(), damit der
+   Tick kein Layout anfasst. Bewegung liegt ohnehin in transform/opacity. */
+function renderFloorOnly(){
+  drawSeg(shortName(curFloor));
+  elFloorSr.textContent=niceName(curFloor);
+  elSign.textContent=longName(curFloor);
 }
 function pulse(el,cls,ms){
   if(reduce) return;
@@ -1699,6 +1975,7 @@ function pulse(el,cls,ms){
 
 /* ---------- HUD-Chips: Modifikator + Diebstahl ---------- */
 function updateChips(){
+  $("rankchip").textContent=curRank().name;
   var mc=$("modchip");
   if(kase&&kase.mod){ mc.style.display=""; mc.textContent=kase.mod.chip; }
   else mc.style.display="none";
@@ -1716,17 +1993,30 @@ function toast(html){
   },2600);
 }
 
-function book(label,price){
+function book(label,price,parts){
   budget-=price; spent+=price;
-  items.push({label:label,price:price});
+  if(parts&&parts.length) parts.forEach(function(p){ items.push(p); });
+  else items.push({label:label,price:price});
   render();
   if(budget<=0 && !over && !caseClosed) endGame();
 }
 
-/* ---------- Bezahlschranke ---------- */
-function charge(label,price,fn){
+/* ---------- Bezahlschranke ----------
+   Ab 500 € das volle Modal (P4). Kleinbeträge buchen sofort — die Quittung
+   listet sie trotzdem, die Satire verlagert sich vom Unterbrechen aufs Summieren. */
+var MODAL_AB=500;
+function charge(label,price,fn,parts){
   if(price>budget){ pendingFn=null; endGame(label,price); return; }
+  if(price<MODAL_AB){
+    sfx("pay");
+    book(label,price,parts);
+    toast(label+" <b>−"+money(price)+"</b>");
+    pulse($("total"),"bump",520);
+    if(fn) fn();
+    return;
+  }
   pendingFn=fn;
+  $("confirm").dataset.parts=parts?JSON.stringify(parts):"";
   $("item").textContent=label;
   $("amount").textContent=money(price);
   $("confirm").dataset.label=label;
@@ -1748,36 +2038,39 @@ ov.addEventListener("click",function(e){ if(e.target===ov){ touch(); cancelSheet
 $("confirm").onclick=function(){
   touch();
   var label=this.dataset.label, price=Number(this.dataset.price);
+  var parts=this.dataset.parts?JSON.parse(this.dataset.parts):null;
   showStage($("stScan"));
-  var t1=reduce?200:650, t2=reduce?200:430;
+  var t1=reduce?180:560, t2=reduce?180:360;
   setTimeout(function(){
     showStage($("stDone"));
     sfx("pay");
-    book(label,price);
+    book(label,price,parts);
     var fn=pendingFn; pendingFn=null;
     setTimeout(function(){ closeSheet(); if(fn) fn(); },t2);
   },t1);
 };
 
 /* ---------- Ablauf (Logik unverändert) ---------- */
+/* Eine Fahrt, ein Posten: Etagenwahl + Türschließung + Türöffnung in einem
+   Zug. Nur die Zielwahl ist eine Entscheidung — Türen sind keine. */
 function pickFloor(f){
   if(mode!=="BEREIT"){ toast("Aufzug ist beschäftigt"); return; }
   if(f===curFloor){ toast("Sie befinden sich bereits hier"); return; }
-  var price=P_FLOOR*Math.abs(f-curFloor);
-  charge("Etagenwahl · "+ordName(f),price,function(){
+  var d=P_FLOOR*Math.abs(f-curFloor), total=d+P_CLOSE+P_OPEN;
+  charge("Fahrt · "+ordName(f),total,function(){
     goalFloor=f; render();
-    setTimeout(askClose,reduce?150:700);
-  });
+    setTimeout(askClose,reduce?60:260);
+  },[{label:"Etagenwahl · "+ordName(f),price:d},
+     {label:"Türschließung",price:P_CLOSE},
+     {label:"Türöffnung",price:P_OPEN}]);
 }
 function askClose(){
   if(goalFloor===null) return;
-  charge("Türschließung",P_CLOSE,function(){
-    if(inHall) leaveHall();
-    mode="SCHLIESSEN"; doorsOpen=false; render();
-    sfx("thud");
-    if(panelView) setView(false);
-    setTimeout(startRide,reduce?100:950);
-  });
+  if(inHall) leaveHall();
+  mode="SCHLIESSEN"; doorsOpen=false; render();
+  sfx("thud");
+  if(panelView) setView(false);
+  setTimeout(startRide,reduce?80:620);
 }
 function startRide(){
   mode="FAHRT"; stopUsed=false;
@@ -1795,10 +2088,10 @@ function runRide(){
   rideTimer=setInterval(function(){
     curFloor+=(goalFloor>curFloor?1:-1);
     sfx("tick");
-    render();
+    renderFloorOnly();
     if(curFloor===goalFloor){ arrive(); return; }
     if(stopAt!==null && curFloor===stopAt && !stopUsed){ pauseRide(); }
-  },reduce?90:430);
+  },reduce?80:330);
 }
 function pauseRide(){
   clearInterval(rideTimer);
@@ -1822,37 +2115,32 @@ function arrive(){
   sfx("gong");
   pulse(elWorld,"joltRev",250);
   pulse(elBar,"flash",520);
-  setTimeout(askOpen,reduce?60:420);
+  setTimeout(askOpen,reduce?50:300);
 }
+/* Türöffnung ist bezahlt (im Fahrtpaket) — hier faellt keine Entscheidung mehr. */
 function askOpen(){
-  charge("Türöffnung",P_OPEN,function(){
-    doorsOpen=true; mode="BEREIT"; rides++; seenFloors[curFloor]=1;
-    goalFloor=null; render();
-    var sum=0; items.forEach(function(it){ sum+=it.price; }); items=[];
-    toast("Fahrt abgerechnet <b>−"+money(sum)+"</b>");
-    if(curFloor===kase.goal && !caseClosed){
-      setTimeout(openAccuse,reduce?150:1100);
-    }else if(budget<MIN_RIDE && !caseClosed && !over){
-      setTimeout(function(){ endGame(); },reduce?100:900);
-    }
+  sfx("servo");
+  doorsOpen=true; mode="BEREIT"; rides++; seenFloors[curFloor]=1;
+  goalFloor=null; hallAsks=0; render();
+  runTwistArrival(); saveRun();
+  showReceipt(curFloor,function(){
+    if(curFloor===kase.goal && !caseClosed){ openAccuse(); }
+    else if(budget<MIN_RIDE && !caseClosed && !over){ endGame(); }
   });
 }
 
 elLockBtn.onclick=function(e){
   e.stopPropagation(); touch();
   if(mode==="ANGEHALTEN") askResume();
-  else if(mode==="ANGEKOMMEN") askOpen();
 };
 $("btnOpen").onclick=function(e){
   e.stopPropagation(); touch();
-  if(mode==="ANGEKOMMEN"){ askOpen(); return; }
   if(mode==="BEREIT"){ toast("Türen sind bereits offen"); return; }
   toast("Nicht möglich während der Fahrt");
 };
 $("btnClose").onclick=function(e){
   e.stopPropagation(); touch();
-  if(mode==="BEREIT" && goalFloor!==null){ askClose(); return; }
-  if(mode==="BEREIT"){ toast("Kein Fahrtziel gewählt"); return; }
+  if(mode==="BEREIT"){ toast("Wählen Sie ein Fahrtziel — die Türen folgen"); return; }
   toast("Nicht möglich");
 };
 $("btnAlarm").onclick=function(e){
@@ -1864,7 +2152,10 @@ $("btnAlarm").onclick=function(e){
 };
 
 /* ---------- Quittung ---------- */
-function showReceipt(toFloor){
+var rcThen=null;
+function showReceipt(toFloor,then){
+  rcThen=then||null;
+  if(!items.length){ var f=rcThen; rcThen=null; if(f) f(); return; }
   var list=$("rcList"); list.innerHTML="";
   var sum=0;
   items.forEach(function(it){
@@ -1885,7 +2176,11 @@ function showReceipt(toFloor){
   rcOv.setAttribute("aria-hidden","false");
   $("rcClose").focus();
 }
-function closeReceipt(){ rcOv.classList.remove("show"); rcOv.setAttribute("aria-hidden","true"); }
+function closeReceipt(){
+  rcOv.classList.remove("show"); rcOv.setAttribute("aria-hidden","true");
+  var f=rcThen; rcThen=null;
+  if(f) setTimeout(f,reduce?40:230);
+}
 $("rcClose").onclick=function(){ touch(); closeReceipt(); };
 rcOv.addEventListener("click",function(e){ if(e.target===rcOv){ touch(); closeReceipt(); } });
 $("rcUp").onclick=function(){
@@ -1901,32 +2196,117 @@ $("rcUp").onclick=function(){
 /* Ein Verdaechtiger faellt raus, sobald ein BEKANNTES Merkmal einem Tatbefund
    widerspricht, oder sobald eine Zeugenaussage ihn entlastet. Unbekannte
    Merkmale schliessen nie aus. */
+function findingOf(key){
+  var f=null;
+  if(kase) kase.findings.forEach(function(o){ if(o.key===key) f=o; });
+  return f;
+}
+/* Ungeprueft = zaehlt nicht: weder als Ausschluss noch als Beleg. */
+function findActive(f){ return f && !(f.unsure && !f.checked); }
 function statusOf(x,key){
   if(!kase) return "plain";
-  var f=null;
-  kase.findings.forEach(function(o){ if(o.key===key) f=o; });
+  var f=findingOf(key);
   if(!(known[x.name]||{})[key]) return "unknown";
-  if(!f) return "plain";
+  if(!findActive(f)) return "plain";
   return x[key]===f.val ? "fit" : "out";
 }
-function isOut(x){
-  if(alibisKnown.some(function(a){ return a.who===x; })) return true;
-  return ["item","high","lift"].some(function(k){ return statusOf(x,k)==="out"; });
+/* Ueber bekannte Merkmale ausgeschlossen? */
+function attrOut(x){
+  return activeAttrs().some(function(k){ return statusOf(x,k)==="out"; });
 }
+/* Fixpunkt: wer gilt als entlastet? Aussagen tragen ab Rang Inspektor erst,
+   wenn ihr Urheber selbst entlastet ist. */
+function clearedSet(){
+  var cl={};
+  if(!kase) return cl;
+  kase.sus.forEach(function(x){ if(attrOut(x)) cl[x.name]=true; });
+  if(kase.twist&&kase.twist.id==="schrift"){
+    kase.twist.results.forEach(function(r){ if(!r.ja) cl[r.name]=true; });
+  }
+  var chg=true;
+  while(chg){
+    chg=false;
+    alibisKnown.forEach(function(a){
+      if(cl[a.who.name]) return;
+      if(!truthRule()||cl[a.witness.name]){ cl[a.who.name]=true; chg=true; }
+    });
+  }
+  return cl;
+}
+function alibiConfirmed(a){
+  if(!truthRule()) return true;
+  return !!clearedSet()[a.witness.name];
+}
+function isOut(x){ return !!clearedSet()[x.name]; }
 function possible(){
-  return kase ? kase.sus.filter(function(x){ return !isOut(x); }) : [];
+  var cl=clearedSet();
+  return kase ? kase.sus.filter(function(x){ return !cl[x.name]; }) : [];
 }
 function outReason(x){
   var r=null;
-  if(alibisKnown.some(function(a){ return a.who===x; })) return "hat ein Alibi";
-  ["item","high","lift"].forEach(function(k){
+  if(kase&&kase.twist&&kase.twist.id==="schrift"&&
+     kase.twist.results.some(function(q){ return q.name===x.name&&!q.ja; }))
+    return "Handschrift stimmt nicht";
+  activeAttrs().forEach(function(k){
     if(r||statusOf(x,k)!=="out") return;
-    if(k==="item") r="trug "+art(x.item);
-    else if(k==="high") r=x.high?"war oben":"war unten";
-    else r=x.lift?"ist gefahren":"ist nicht gefahren";
+    r=(k==="item") ? ("trug "+art(x.item)) : valTx(k,x[k]).replace(/^ist /,"ist ");
   });
+  if(r) return r;
+  if(alibisKnown.some(function(a){ return a.who===x&&alibiConfirmed(a); })) return "hat ein Alibi";
+  return null;
+}
+/* ---------- Belege (P1) ----------
+   Ein Beleg ist alles, womit sich andere ausschliessen lassen: ein Tatbefund
+   (Ausschlussmenge = die Brueder, deren Merkmal ihm bekanntermassen widerspricht),
+   eine bestaetigte Zeugenaussage (genau eine Person) oder ein Twist-Ergebnis. */
+function byName(n){
+  var r=null;
+  if(kase) kase.sus.forEach(function(x){ if(x.name===n) r=x; });
   return r;
 }
+function evidenceList(){
+  var ev=[];
+  if(!kase) return ev;
+  kase.findings.forEach(function(f,i){
+    if(!findActive(f)) return;
+    var excl=kase.sus.filter(function(x){
+      return (known[x.name]||{})[f.key] && x[f.key]!==f.val;
+    });
+    if(!excl.length) return;
+    ev.push({id:"f"+i,kind:"finding",label:"Tatbefund "+KEYTX[f.key],
+             sub:kase.ctype.perp+(kase.ctype.comma?", ":" ")+valTx(f.key,f.val),
+             excl:excl});
+  });
+  alibisKnown.forEach(function(a,i){
+    if(!alibiConfirmed(a)) return;
+    ev.push({id:"a"+i,kind:"alibi",label:"Aussage Bruder "+a.witness.name,
+             sub:a.who.name+" war den ganzen Abend in der "+a.place.name,
+             excl:[a.who]});
+  });
+  if(kase.twist&&kase.twist.id==="schrift"){
+    kase.twist.results.forEach(function(r,i){
+      if(r.ja) return;
+      var x=byName(r.name);
+      if(x) ev.push({id:"s"+i,kind:"twist",label:"Handschriftvergleich",
+                     sub:r.name+" — keine Übereinstimmung",excl:[x]});
+    });
+  }
+  return ev;
+}
+function evCovers(sel,acc){
+  var cov={};
+  sel.forEach(function(e){
+    e.excl.forEach(function(x){ if(x!==acc) cov[x.name]=true; });
+  });
+  return cov;
+}
+/* Gueltig, wenn die gewaehlten Belege alle fuenf anderen abdecken. */
+function evValid(sel,acc){
+  if(!acc||!sel.length) return false;
+  var cov=evCovers(sel,acc);
+  return kase.sus.every(function(x){ return x===acc||cov[x.name]; });
+}
+
 var lastPossible=6;
 function updateCounter(){
   if(!kase) return;
@@ -1938,7 +2318,7 @@ function updateCounter(){
   }else{
     /* Sackgasse: alle Merkmale der Uebrigen bekannt, trotzdem mehrdeutig.
        Dann hilft nur noch eine Zeugenaussage — das muss dastehen. */
-    var fk=kase.findings.map(function(f){ return f.key; });
+    var fk=kase.findings.filter(findActive).map(function(f){ return f.key; });
     var stuck=p.every(function(x){
       var k=known[x.name]||{};
       return fk.every(function(key){ return !!k[key]; });
@@ -1975,12 +2355,16 @@ function renderBand(){
   b.innerHTML='<span class="lb">Gesucht</span>';
   kase.findings.forEach(function(f){
     var t=document.createElement("button");
+    var roh=(f.unsure&&!f.checked);
     t.className="chipf";
-    var txt = f.key==="item" ? (ICN.item+" "+f.val)
-            : f.key==="high" ? ((f.val?"↑ oben":"↓ unten"))
-            : (f.val?"⇅ Aufzug":"⊘ kein Aufzug");
-    t.textContent=txt;
-    t.title="Tatbefund · "+KEYTX[f.key];
+    if(roh){ t.style.opacity=".55"; t.style.borderStyle="dashed"; }
+    var v=roh?f.shown:f.val;
+    var txt = f.key==="item" ? (ICN.item+" "+v)
+            : f.key==="high" ? ((v?"↑ oben":"↓ unten"))
+            : f.key==="zeit" ? ((v?"◐ nach Vesper":"◑ vor Vesper"))
+            : (v?"⇅ Aufzug":"⊘ kein Aufzug");
+    t.textContent=txt+(roh?" ?":"");
+    t.title=(roh?"Ungeprüfter Befund · ":"Tatbefund · ")+KEYTX[f.key];
     t.onclick=function(){ touch(); openBook(); };
     b.appendChild(t);
   });
@@ -2083,7 +2467,8 @@ $("tuNext").onclick=function(){
 /* ---------- Auftrag ---------- */
 function showBriefing(){
   var ct=kase.ctype, goalTxt=niceName(kase.goal);
-  $("brTitle").textContent="Vorfall 447-B · "+ct.chip+" · Ihr "+(career.faelle+1)+". Fall";
+  $("brTitle").textContent="Vorfall 447-B · "+ct.chip;
+  $("brRank").textContent="Ihr "+(career.faelle+1)+". Fall · Rang: "+kase.rank.name;
   $("brSub").textContent=ct.brSub;
   $("brTask").textContent=fillT(ct.task);
   $("brGoal").textContent=goalTxt;
@@ -2098,8 +2483,17 @@ function showBriefing(){
     " Etagen auf. Betreten Sie eine Etage und befragen Sie sie. Alle Antworten sind wahr. "+
     (vow
       ? "Merkmalsfragen beantwortet hier niemand — was zählt, liegt in den Fundstücken. "+
-        "Nur Zeugenfragen werden beantwortet; jede beantwortete kostet "+money(P_ASK)+" Aufenthaltsgebühr."
-      : "Jede beantwortete Frage kostet "+money(P_ASK)+" Aufenthaltsgebühr; weiß jemand nichts, ist sie frei.")+
+        "Nur Zeugenfragen werden beantwortet."
+      : "Weiß jemand nichts, ist die Frage frei.")+
+    " Die erste beantwortete Frage je Flur-Aufenthalt kostet "+money(P_ASK)+
+    ", jede weitere im selben Aufenthalt "+money(P_ESK)+" mehr. Wegfahren setzt zurück."+
+    (kase.rank.wahrheit
+      ? "<br><br><b>Dienstanweisung ab Rang "+RANKS[1].name+":</b> Eine Aussage zählt erst, "+
+        "wenn der Aussagende selbst entlastet ist. Vorher steht sie unbestätigt in der Akte."
+      : "")+
+    "<br><br><b>Anklage:</b> Ein Name genügt nicht. Sie benennen den Bruder und die Belege, "+
+    "die alle anderen ausschließen. Reicht es nicht, wird die Anklage abgewiesen — "+
+    "einmal, gegen "+money(P_GERICHT)+" Gerichtskosten."+
     "<br><br>Ermittlungsfahrten werden zum regulären Tarif berechnet — ASCEND+ berechnet auch "+
     ct.chip+"-Ermittlungen zum Normaltarif.";
   $("brOv").classList.add("show"); $("brOv").setAttribute("aria-hidden","false");
@@ -2117,9 +2511,13 @@ function openBook(){
   $("nbSub").textContent=kase.ctype.victimLine;
   var fb=$("nbFind"); fb.innerHTML="";
   kase.findings.forEach(function(f){
-    var d=document.createElement("div"); d.className="clue";
-    d.innerHTML='<div class="clue-src">Tatbefund · '+KEYTX[f.key]+'</div>'+
-      '<div class="clue-tx">'+perpTx(f.key,f.val)+'</div>';
+    var roh=(f.unsure&&!f.checked);
+    var d=document.createElement("div"); d.className="clue"+(roh?" roh":"");
+    d.innerHTML='<div class="clue-src">'+(roh?"Ungeprüfter Befund":"Tatbefund")+' · '+KEYTX[f.key]+
+      (roh?'<span class="stat roh"><i></i>ungeprüft</span>':'')+'</div>'+
+      '<div class="clue-tx">'+perpTx(f.key,roh?f.shown:f.val)+'</div>'+
+      (roh?'<div class="why-roh">Schließt niemanden aus und zählt nicht als Beleg, '+
+           'solange er nicht geprüft ist.</div>':'');
     fb.appendChild(d);
   });
   $("nbGoal").textContent=niceName(kase.goal);
@@ -2129,14 +2527,11 @@ function openBook(){
     var c=document.createElement("div");
     c.tabIndex=0;
     var rows="";
-    [["item","Gegenstand"],["high","Aufenthalt"],["lift","Aufzug"]].forEach(function(pr){
-      var st=statusOf(x,pr[0]);
-      var v = st==="unknown" ? "?"
-            : pr[0]==="item" ? x.item
-            : pr[0]==="high" ? (x.high?"oben":"unten")
-            : (x.lift?"gefahren":"nicht gefahren");
+    activeAttrs().forEach(function(a){
+      var st=statusOf(x,a);
+      var v = st==="unknown" ? "?" : shortVal(a,x);
       var mark = st==="fit" ? " ✓" : (st==="out" ? " ✗" : "");
-      rows+='<div class="attr"><span class="k">'+pr[1]+'</span>'+
+      rows+='<div class="attr"><span class="k">'+KEYTX[a]+'</span>'+
             '<span class="v '+st+'">'+v+mark+'</span></div>';
     });
     var gone=isOut(x), why=gone?outReason(x):null;
@@ -2155,13 +2550,18 @@ function openBook(){
     cl.innerHTML='<div class="empty">Noch keine Zeugenaussage.</div>';
   }else{
     alibisKnown.forEach(function(a){
+      var ok=alibiConfirmed(a);
       var d=document.createElement("div");
-      d.className="clue";
+      d.className="clue"+(ok?"":" roh");
       d.innerHTML='<div class="clue-src">Bruder '+a.witness.name+
-        (silenced[a.witness.name]?' <span class="mute">schweigt inzwischen</span>':'')+'</div>'+
+        (silenced[a.witness.name]?' <span class="mute">schweigt inzwischen</span>':'')+
+        '<span class="stat '+(ok?"ok":"roh")+'"><i></i>'+
+        (ok?"bestätigt":"unbestätigt")+'</span></div>'+
         '<div class="clue-tx">'+a.who.name+' war den ganzen Abend '+
         (a.place?("in der "+a.place.name+" ("+niceName(a.floor)+")"):"anderswo")+
-        '. Ich war dabei.</div>';
+        '. Ich war dabei.</div>'+
+        (ok?"":'<div class="why-roh">Bruder '+a.witness.name+
+           ' ist selbst noch verdächtig. Erst wenn er entlastet ist, zählt seine Aussage.</div>');
       cl.appendChild(d);
     });
   }
@@ -2176,9 +2576,14 @@ $("goalchip").onclick=function(){
 $("nbClose").onclick=function(){ touch(); closeBook(); };
 $("nbOv").addEventListener("click",function(e){ if(e.target===$("nbOv")){ touch(); closeBook(); } });
 
-/* ---------- Anklage ---------- */
+/* ---------- Anklage: Beweisführung statt Namensraten (P1) ---------- */
+var P_GERICHT=2500;
+var acSel={}, acTries=0;
+function acSelected(){
+  return evidenceList().filter(function(e){ return acSel[e.id]; });
+}
 function openAccuse(){
-  accusePick=null;
+  accusePick=null; acSel={};
   $("acPick").hidden=false; $("acEnd").hidden=true;
   var g=$("acGrid"); g.innerHTML="";
   kase.sus.forEach(function(x){
@@ -2188,38 +2593,148 @@ function openAccuse(){
       touch(); accusePick=x;
       Array.prototype.forEach.call(g.children,function(o){ o.classList.remove("on"); });
       b.classList.add("on");
-      var go=$("acGo"); go.disabled=false; go.classList.remove("grey");
-      go.dataset.sure="";
-      go.textContent="Bruder "+x.name+" anklagen";
+      paintAccuse();
     };
     g.appendChild(b);
   });
-  var go=$("acGo"); go.disabled=true; go.classList.add("grey");
-  go.textContent="Wählen Sie einen Bruder";
+  paintAccuse();
   $("acOv").classList.add("show"); $("acOv").setAttribute("aria-hidden","false");
+  $("acGrid").firstChild.focus();
+}
+function paintAccuse(){
+  var all=evidenceList(), sel=acSelected(), box=$("acEv");
+  box.innerHTML="";
+  if(!all.length){
+    box.innerHTML='<div class="empty-ev">Noch kein Beleg in der Akte. '+
+      'Ohne Belege wird keine Anklage angenommen.</div>';
+  }
+  all.forEach(function(e){
+    var b=document.createElement("button");
+    b.className="ev"+(acSel[e.id]?" on":"");
+    b.setAttribute("aria-pressed",acSel[e.id]?"true":"false");
+    b.innerHTML='<span class="box"><svg viewBox="0 0 24 24" aria-hidden="true">'+
+      '<path d="M20 6 9 17l-5-5"/></svg></span><span>'+
+      '<span class="evl">'+e.label+'</span>'+
+      '<span class="evs">'+e.sub+'</span>'+
+      '<span class="evx">schließt aus: '+e.excl.map(function(x){ return x.name; }).join(", ")+
+      '</span></span>';
+    b.onclick=function(){ touch(); acSel[e.id]=!acSel[e.id]; paintAccuse(); };
+    box.appendChild(b);
+  });
+
+  var cov=evCovers(sel,accusePick), C=$("acCov");
+  C.innerHTML="";
+  kase.sus.forEach(function(x){
+    var d=document.createElement("span");
+    var isAcc=(x===accusePick);
+    d.className="cov"+(isAcc?" acc":(cov[x.name]?" done":""));
+    d.textContent=x.name;
+    C.appendChild(d);
+  });
+
+  var offen=kase.sus.filter(function(x){ return x!==accusePick && !cov[x.name]; });
+  var valid=evValid(sel,accusePick);
+  var H=$("acHint");
+  H.className="evnote"+(valid?" good":"");
+  if(!accusePick){
+    H.innerHTML="Wählen Sie einen Bruder — und die Belege, die alle anderen ausschließen.";
+  }else if(valid){
+    H.innerHTML="Die Belege schließen alle anderen aus. <b>Die Anklage trägt.</b>";
+  }else if(!sel.length){
+    H.innerHTML="Kein Beleg gewählt. Eine Anklage ohne Beleg wird abgewiesen.";
+  }else{
+    H.innerHTML="Noch offen: <b>"+offen.map(function(x){ return x.name; }).join(", ")+
+      "</b>. Solange jemand offen bleibt, ist die Beweisführung unvollständig.";
+  }
+  var go=$("acGo");
+  go.disabled=!accusePick;
+  go.classList.toggle("grey",!accusePick||!valid);
+  go.textContent=!accusePick ? "Wählen Sie einen Bruder"
+    : ("Bruder "+accusePick.name+" anklagen"+(valid?"":" — ohne vollen Beleg"));
 }
 $("acLater").onclick=function(){
   touch();
   $("acOv").classList.remove("show"); $("acOv").setAttribute("aria-hidden","true");
 };
+
+/* Note aus drei Groessen: erster Versuch, Restbudget, Fragen-Effizienz */
+function noteOf(){
+  var erst=(acTries===0);
+  var rest=kase.roundBudget?Math.max(0,budget)/kase.roundBudget:0;
+  var eff=askedPaid?(askedUseful/askedPaid):1;
+  var pts=(erst?1:0)+(rest>=0.35?1:0)+(eff>=0.70?1:0);
+  return {g:["C","B","A","S"][pts],erst:erst,rest:rest,eff:eff};
+}
+var NOTEN=["C","B","A","S"];
+function careerNote(ctId,g){
+  career.noten=career.noten||{};
+  var alt=career.noten[ctId];
+  if(!alt||NOTEN.indexOf(g)>NOTEN.indexOf(alt)) career.noten[ctId]=g;
+}
+
+/* Kurzer Fokus auf den Gewaehlten, dann Urteil (P7) */
+function accuseStrike(fn){
+  if(reduce){ fn(); return; }
+  var ov2=$("acFocus");
+  ov2.innerHTML='<div class="focusfig">'+figSVG(accusePick)+
+    '<div class="nm">Bruder '+accusePick.name+'</div></div>';
+  ov2.classList.add("show");
+  sfx("strike");
+  setTimeout(function(){ ov2.classList.remove("show"); fn(); },1100);
+}
+
 $("acGo").onclick=function(){
   if(!accusePick) return;
   touch();
-  if(!this.dataset.sure){
-    this.dataset.sure="1";
-    this.textContent="Wirklich? Ein Versuch — falsch schließt den Fall";
+  var sel=acSelected(), valid=evValid(sel,accusePick);
+  /* Richtiger Name, aber lueckenhafte Belege: einmal Abweisung gegen Gerichtskosten. */
+  if(!valid && accusePick===kase.culprit && acTries===0){
+    acTries=1;
+    $("acOv").classList.remove("show"); $("acOv").setAttribute("aria-hidden","true");
+    charge("Gerichtskosten · abgewiesene Anklage",P_GERICHT,function(){
+      toast("Anklage abgewiesen — <b>Beweisführung unzureichend</b>");
+      story("Der Richter legt die Akte zur Seite. Ein Name ist keine Beweisführung, sagt er, "+
+            "und stellt die Kosten in Rechnung.");
+      if(!over) openAccuse();
+    });
     return;
   }
-  this.dataset.sure="";
+  accuseStrike(function(){ finishCase(valid&&accusePick===kase.culprit,valid,sel); });
+};
+
+function finishCase(win,valid,sel){
   caseClosed=true;
-  var win=(accusePick===kase.culprit);
   sfx(win?"win":"lose");
+  var nt=win?noteOf():null;
   careerCaseDone(win,win?vermerkTx():null);
+  if(win){ careerNote(kase.ctype.id,nt.g); saveCareer(); }
   $("acPick").hidden=true; $("acEnd").hidden=false;
+  $("acOv").classList.add("show"); $("acOv").setAttribute("aria-hidden","false");
   $("acMark").className="vmark "+(win?"win":"lose");
   $("acMark").textContent=win?"✓":"✗";
-  $("acTitle").textContent=win?"Fall geschlossen":"Fehlurteil";
-  $("acText").innerHTML=fillT(win?kase.ctype.winTx:kase.ctype.loseTx);
+  $("acTitle").textContent=win?"Fall geschlossen":(valid?"Fehlurteil":"Anklage abgewiesen");
+  $("acText").innerHTML= win ? fillT(kase.ctype.winTx)
+    : (accusePick===kase.culprit
+        ? "Die Beweisführung blieb lückenhaft. Der Name war richtig, die Akte nicht. "+
+          "<b>Bruder "+kase.culprit.name+"</b> geht ohne Auflagen."
+        : fillT(kase.ctype.loseTx));
+
+  var NB=$("acNote"), NW=$("acNoteWhy");
+  if(win){
+    NB.style.display=""; NW.style.display="";
+    NB.className="note-badge note-"+nt.g;
+    NB.textContent=nt.g;
+    NW.innerHTML="Erster Anklageversuch: "+(nt.erst?"ja":"nein")+
+      " · Restbudget "+Math.round(nt.rest*100)+" %"+
+      " · Fragen mit Ertrag "+Math.round(nt.eff*100)+" %";
+  }else{ NB.style.display="none"; NW.style.display="none"; }
+
+  var CH=$("acChain");
+  if(win&&sel&&sel.length){
+    CH.style.display="";
+    CH.innerHTML="Überführt durch: <b>"+sel.map(function(e){ return e.label; }).join(" · ")+"</b>";
+  }else CH.style.display="none";
+
   var L=$("acList"); L.innerHTML="";
   function row(a,b){
     var d=document.createElement("div"); d.className="rc-row";
@@ -2243,7 +2758,6 @@ $("acGo").onclick=function(){
       L.appendChild(d);
     });
   }
-  /* Epilog: drei Sätze, je nach Ausgang — und was mitgegangen ist */
   var epi=fillT(win?kase.ctype.epiWin:kase.ctype.epiLose);
   var lootLine=thefts.length
     ? "In Ihrem Mantel: "+thefts.map(function(t2){ return t2.n; }).join(", ")+
@@ -2253,8 +2767,9 @@ $("acGo").onclick=function(){
   $("acEpi").innerHTML='<div class="clue-tx" style="font-style:italic;color:#e6e4da">'+
     epi+" "+lootLine+"</div>";
   $("acCareer").textContent="Dienstakte: "+career.siege+" von "+career.faelle+
-    " Fällen geschlossen.";
-};
+    " Fällen geschlossen · Rang "+rankOf(career.siege).name+".";
+  clearSave();
+}
 $("acAgain").onclick=function(){ restart(); };
 
 /* ---------- Budget aufgebraucht ---------- */
@@ -2288,23 +2803,33 @@ function endGame(label,price){
 }
 $("goAgain").onclick=function(){ restart(); };
 
-function restart(){
-  ["acOv","goOv","nbOv","rcOv","ov","thOv","fdOv","tkOv"].forEach(function(id){
+function closeAllSheets(){
+  ["acOv","goOv","nbOv","rcOv","ov","thOv","fdOv","tkOv","hsOv","rsOv","brOv","tuOv"]
+  .forEach(function(id){
     $(id).classList.remove("show"); $(id).setAttribute("aria-hidden","true");
   });
-  kase=newCase();
-  budget=kase?kase.roundBudget:START_BUDGET; spent=0; rides=0;
-  known={}; alibisKnown=[]; crossed={}; over=false; caseClosed=false; accusePick=null; asked=0;
-  silenced={}; stolenFloors={}; thefts=[]; lootN=0; lootSum=0;
-  storyFloorSeen={}; storyTwoDone=false; storyTheftDone=false; storyQ=[];
-  items=[]; mode="BEREIT"; curFloor=0; goalFloor=null; doorsOpen=true;
-  stopAt=null; stopUsed=false; pendingFn=null; idleSec=0;
+}
+function refreshAll(){
   if(inHall) leaveHall();
   if(panelView) setView(false);
   updateBadge();
   prevDoors=null; spawnMonks(); prevDoors=true;
-  seenFloors={}; lastPossible=6;
+  lastPossible=6;
   render(); renderBand(); updateCounter();
+}
+function restart(){
+  closeAllSheets();
+  clearSave();
+  kase=newCase();
+  budget=kase?kase.roundBudget:START_BUDGET; spent=0; rides=0;
+  known={}; alibisKnown=[]; crossed={}; over=false; caseClosed=false; accusePick=null; asked=0;
+  silenced={}; stolenFloors={}; thefts=[]; lootN=0; lootSum=0;
+  acSel={}; acTries=0; hallAsks=0; askedPaid=0; askedUseful=0; rcThen=null;
+  storyFloorSeen={}; storyTwoDone=false; storyTheftDone=false; storyQ=[];
+  items=[]; mode="BEREIT"; curFloor=0; goalFloor=null; doorsOpen=true;
+  stopAt=null; stopUsed=false; pendingFn=null; idleSec=0;
+  seenFloors={};
+  refreshAll(); saveRun();
   showBriefing();
 }
 
@@ -2323,6 +2848,36 @@ var DECOR={
   zellen:[[-66,40,74,230,"#15151a"],[26,40,74,230,"#15151a"],[112,40,74,230,"#15151a"]],
   keller:[[-56,110,110,160,"#18181e"],[70,140,96,130,"#141419"],[16,86,66,66,"#20202a"]]
 };
+
+/* Zwei Parallax-Ebenen aus den vorhandenen Ortsdaten: die mittlere traegt
+   ortstypische Silhouetten, die vordere nur dunkle Pfeiler als Rahmen. */
+var PARA={
+  kueche: [[-560,120,240,"#141017"],[180,150,300,"#120f14"],[620,110,200,"#151119"]],
+  biblio: [[-620,260,150,"#12121a"],[-330,300,150,"#101017"],[240,280,150,"#131320"],[600,320,150,"#0f0f16"]],
+  wasch:  [[-500,170,340,"#101620"],[300,140,260,"#0e131c"]],
+  kapitel:[[-580,230,190,"#14141d"],[-160,250,190,"#111119"],[320,230,190,"#14141d"]],
+  garten: [[-620,300,120,"#0d1512"],[-200,340,110,"#0b120f"],[280,290,130,"#0e1613"],[640,330,110,"#0b120f"]],
+  zellen: [[-600,280,160,"#101016"],[-180,280,160,"#0e0e13"],[260,280,160,"#101016"],[660,280,160,"#0e0e13"]],
+  keller: [[-540,200,220,"#131017"],[120,230,240,"#100d13"],[600,190,200,"#131017"]]
+};
+function paintParallax(pl){
+  var mid=$("hmid"), near=$("hnear");
+  mid.innerHTML=""; near.innerHTML="";
+  var pool=PARA[pl?pl.id:"kapitel"]||[];
+  pool.forEach(function(g){
+    var e=document.createElement("div"); e.className="hpiece";
+    e.style.left=(810+g[0])+"px"; e.style.height=g[1]+"px";
+    e.style.width=g[2]+"px"; e.style.background=g[3];
+    e.style.boxShadow="0 -2px 18px rgba(0,0,0,.6)";
+    mid.appendChild(e);
+  });
+  [-900,-300,300,900].forEach(function(x){
+    var e=document.createElement("div"); e.className="hpiece";
+    e.style.left=(810+x)+"px"; e.style.height="520px"; e.style.width="46px";
+    e.style.background="#07080c"; e.style.bottom="-40px";
+    near.appendChild(e);
+  });
+}
 
 /* Decke und Boden je Ort: Gewölbe, Balken, offener Himmel — und ein eigener Bodenton */
 function paintRoom(pl){
@@ -2354,15 +2909,40 @@ function paintRoom(pl){
     "repeating-linear-gradient(90deg, transparent 0 118px, rgba(255,255,255,.035) 118px 120px)";
 }
 
+/* ---------- Fall-Twists (P5) ---------- */
+/* Brandstiftung: beim Betreten liegt ein Merkmal offen — Hinfahren statt Fragen. */
+function runTwistArrival(){
+  var t=kase&&kase.twist;
+  if(!t||t.id!=="russ"||t.done||curFloor!==t.floor) return;
+  t.done=true;
+  var x=byName(t.who);
+  if(!x) return;
+  var before=possible();
+  known[x.name]=known[x.name]||{};
+  known[x.name][t.key]=true;
+  updateBadge(); announceOut(before); storyCheck();
+  story("An Bruder "+x.name+"' Ärmel: Ruß. "+
+        valTx(t.key,x[t.key]).replace(/^./,function(c){ return c.toUpperCase(); })+".");
+}
+function twistActionOn(f){
+  var t=kase&&kase.twist;
+  if(!t||t.floor!==f) return null;
+  if(t.id==="probe"&&!t.done) return t;
+  if(t.id==="schrift"&&t.used<t.max) return t;
+  return null;
+}
+
 /* Stationsplan getrennt vom Rendern — auch fuer Pruefungen nutzbar */
 function hallPlan(f){
   var here=susOn(f);
   var tok=(kase.mod&&kase.mod.silent)?null:tokenOn(f);
   var mtok=mtokenOn(f);
+  var act=twistActionOn(f);
   var sts=[];
   if(here.length) sts.push({type:"people",people:here});
   if(tok) sts.push({type:"find",tok:tok});
   if(mtok) sts.push({type:"find",mtok:mtok});
+  if(act) sts.push({type:"act",act:act});
   sts.push({type:"lift"});
   sts.push({type:"deco"});
   sts=shuf(sts);
@@ -2379,7 +2959,7 @@ function buildHall(f){
   var pl=placeOf(f);
   var tint=pl?pl.tint:"rgba(255,244,214,.24)";
   elProps.innerHTML="";
-  paintRoom(pl);
+  paintRoom(pl); paintParallax(pl);
 
   curPlan=hallPlan(f);
   stations=curPlan.sts;
@@ -2427,7 +3007,7 @@ function buildHall(f){
         g.style.left=(50+(k-(st.people.length-1)/2)*(many?36:44))+"%";
         g.tabIndex=0; g.setAttribute("role","button");
         g.setAttribute("aria-label","Bruder "+pp.name+" befragen");
-        g.innerHTML=figSVG(pp)+'<div class="nm">'+pp.name+'</div>';
+        g.innerHTML=figSVG(pp)+'<div class="tags"></div><div class="nm">'+pp.name+'</div>';
         (function(el,who){
           function go(e){ if(e) e.stopPropagation(); touch(); openTalk(who); }
           el.onclick=go;
@@ -2466,6 +3046,22 @@ function buildHall(f){
       }
     }
 
+    if(st.type==="act"){
+      var an=(st.act.id==="probe")?"Weinfass prüfen":"Handschrift vergleichen";
+      var a=document.createElement("div");
+      a.className="find act";
+      a.tabIndex=0; a.setAttribute("role","button");
+      a.setAttribute("aria-label",an+" für "+money(st.act.fee));
+      a.innerHTML='<div class="glow"></div><div class="lbl">'+an+' · '+money(st.act.fee)+'</div>';
+      (function(el,tw){
+        function fg(e){ if(e) e.stopPropagation(); touch();
+          if(tw.id==="probe") doProbe(el); else openSchrift(); }
+        el.onclick=fg;
+        el.onkeydown=function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); fg(); } };
+      })(a,st.act);
+      d.appendChild(a);
+    }
+
     /* Verwertbares an dieser Station? */
     if(i===curPlan.lootIdx && curPlan.lootP){
       var lp2=curPlan.lootP;
@@ -2489,7 +3085,19 @@ function buildHall(f){
 
   var pi=stations.findIndex(function(x){ return x.type==="people"; });
   stIdx=pi>=0?pi:0;
+  refreshFigures();
   applyHall();
+}
+/* Bekanntes Wissen als Etikett am Portraet — was man weiss, sieht man (P7). */
+function tagsFor(x){
+  var out="";
+  activeAttrs().forEach(function(a){
+    var st=statusOf(x,a);
+    if(st==="unknown") return;
+    out+='<span class="tg '+(st==="fit"?"fit":(st==="out"?"out":""))+'">'+
+         shortVal(a,x)+'</span>';
+  });
+  return out;
 }
 function refreshFigures(){
   stations.forEach(function(st){
@@ -2500,6 +3108,8 @@ function refreshFigures(){
       el.classList.toggle("away",!!silenced[x.name]);
       el.classList.toggle("done",allAsked(x));
       el.querySelector(".nm").textContent=silenced[x.name]?(x.name+" · schweigt"):x.name;
+      var tg=el.querySelector(".tags");
+      if(tg) tg.innerHTML=tagsFor(x);
     });
   });
 }
@@ -2529,6 +3139,7 @@ $("navR").onclick=function(){ step(1); };
 function enterHall(){
   if(!doorsOpen || mode!=="BEREIT" || inHall) return;
   touch(); inHall=true;
+  hallAsks=0;
   buildHall(curFloor);
   elHall.classList.add("on");
   elStage.classList.add("off");
@@ -2537,10 +3148,11 @@ function enterHall(){
   $("viewbtn").style.display="none";
   $("mutebtn").classList.add("up");
   $("navR").focus();
+  var pl0=placeOf(curFloor);
+  if(pl0) ambience(pl0.id);
   if(!storyFloorSeen[curFloor]){
     storyFloorSeen[curFloor]=true;
-    var p=placeOf(curFloor);
-    if(p&&STORY_PLACE[p.id]) story(pickOf(STORY_PLACE[p.id]));
+    if(pl0&&STORY_PLACE[pl0.id]) story(pickOf(STORY_PLACE[pl0.id]));
   }
 }
 function leaveHall(){
@@ -2557,17 +3169,20 @@ $("enterbtn").onclick=enterHall;
 $("hlift").onclick=leaveHall;
 
 /* ---------- Befragung ---------- */
-var QS=[
-  {id:"high", q:"Wo waren Sie an dem Abend?"},
-  {id:"item", q:"Was hatten Sie bei sich?"},
-  {id:"lift", q:"Sind Sie Aufzug gefahren?"},
-  {id:"seen", q:"Haben Sie jemanden gesehen?"}
-];
+var QTX={high:"Wo waren Sie an dem Abend?",item:"Was hatten Sie bei sich?",
+  lift:"Sind Sie Aufzug gefahren?",zeit:"Waren Sie vor oder nach der Vesper unterwegs?",
+  seen:"Haben Sie jemanden gesehen?"};
+function questionList(){
+  return activeAttrs().concat(["seen"]).map(function(k){ return {id:k,q:QTX[k]}; });
+}
 var talkWho=null;
+/* Fragen-Eskalation: erste bezahlte Frage je Flur-Aufenthalt 150 €, dann +75 € */
+var hallAsks=0, askedPaid=0, askedUseful=0;
+function askPrice(){ return P_ASK+P_ESK*hallAsks; }
 function allAsked(x){
   var k=known[x.name]||{};
   if(kase&&kase.mod&&kase.mod.silent) return !!k.seen;
-  return k.item&&k.high&&k.lift&&k.seen;
+  return activeAttrs().every(function(a){ return !!k[a]; })&&!!k.seen;
 }
 function openTalk(x){
   talkWho=x;
@@ -2591,16 +3206,20 @@ function renderQs(){
   var k=known[talkWho.name];
   var sil=!!silenced[talkWho.name];
   var vow=!!(kase.mod&&kase.mod.silent);
-  QS.forEach(function(o){
+  questionList().forEach(function(o){
     var b=document.createElement("button");
     var gag=sil||(vow&&o.id!=="seen");
     b.className="q"+((k[o.id]||gag)?" used":"");
     b.innerHTML="<span>"+o.q+"</span><span class='price'>"+
-      (sil?"schweigt":(vow&&o.id!=="seen")?"Gelübde":(k[o.id]?"beantwortet":money(P_ASK)))+"</span>";
+      (sil?"schweigt":(vow&&o.id!=="seen")?"Gelübde"
+        :(k[o.id]?"beantwortet":money(askPrice())))+"</span>";
     if(sil) b.disabled=true;
     else b.onclick=function(){ ask(o); };
     box.appendChild(b);
   });
+  $("tkNote").textContent="Die erste Frage in diesem Flur kostet "+money(P_ASK)+
+    ", jede weitere "+money(P_ESK)+" mehr. Wegfahren setzt zurück — kostet aber eine Fahrt. "+
+    "SIMULATION · keine echte Zahlung";
 }
 function ask(o){
   touch();
@@ -2635,6 +3254,14 @@ function ask(o){
       art(talkWho.item).replace(/^e/,"E")+". Schreiben Sie es ruhig auf, es ändert sich nicht."
     ]);
     if(talkWho.item==="Kerze") txt=txt.replace("Den trage","Die trage");
+  }else if(o.id==="zeit"){
+    txt=talkWho.zeit
+      ? pickOf(["Nach der Vesper. Vorher war ich im Chor, da sieht man mich.",
+                "Erst nach der Vesper. Davor hatte ich nichts zu tun, was sich lohnt zu erzählen.",
+                "Nach der Vesper, ja. Um die Zeit ist das Haus ehrlicher."])
+      : pickOf(["Vor der Vesper. Danach lag ich, wo ich hingehöre.",
+                "Vor der Vesper. Nach der Vesper bin ich zu nichts mehr zu gebrauchen.",
+                "Davor. Die Vesper habe ich gehört, nicht gesehen."]);
   }else if(o.id==="high"){
     var pl2=placeOf(talkWho.floor);
     txt=talkWho.high
@@ -2661,14 +3288,22 @@ function ask(o){
                 "Nein. Ich habe gesehen, was aus Brüdern wird, die dem Ding ihre Kasse anvertrauen.",
                 "Nein. Die Treppe verlangt nur Atem, und den habe ich noch."]);
   }
-  var before=possible();
+  var before=possible(), beforeAli=alibisKnown.length;
   var already=!!k[o.id];
   k[o.id]=true;
-  if(!already && !free){ asked++; book("Aufenthaltsgebühr Flur",P_ASK); }
+  if(!already && !free){
+    asked++; askedPaid++;
+    var pr=askPrice(); hallAsks++;
+    /* Ertrag: liefert die Antwort etwas zu einem Tatbefund oder eine neue Aussage? */
+    if(o.id==="seen" ? (alibisKnown.length>beforeAli)
+                     : findActive(findingOf(o.id))) askedUseful++;
+    book("Aufenthaltsgebühr Flur",pr);
+    toast("Aufenthaltsgebühr <b>−"+money(pr)+"</b>");
+  }
   $("tkAnswer").innerHTML='<div class="answer'+(free?" none":"")+'">'+txt+'</div>';
   sfx("blip");
   updateBadge(); renderQs(); announceOut(before);
-  storyCheck(); refreshFigures();
+  storyCheck(); refreshFigures(); saveRun();
 }
 function closeTalk(){ $("tkOv").classList.remove("show"); $("tkOv").setAttribute("aria-hidden","true"); }
 $("tkClose").onclick=function(){ touch(); closeTalk(); };
@@ -2684,7 +3319,7 @@ function takeToken(tok,el){
   el.classList.add("done");
   updateBadge();
   announceOut(before0);
-  storyCheck(); refreshFigures();
+  storyCheck(); refreshFigures(); saveRun();
   toast(neu.length
     ? (tok.place.name+": <b>"+art(tok.item)+"</b> — gehört "+neu.join(" und "))
     : ("Nichts Neues beim "+tok.item));
@@ -2702,7 +3337,7 @@ function takeMTok(t,el){
   el.classList.add("done");
   updateBadge();
   announceOut(before);
-  storyCheck(); refreshFigures();
+  storyCheck(); refreshFigures(); saveRun();
   $("fdT").textContent=MTOKN[t.place.id]||"Verzeichnis";
   $("fdS").textContent=t.place.name+" · "+niceName(t.floor);
   var L=$("fdList"); L.innerHTML="";
@@ -2717,6 +3352,80 @@ function takeMTok(t,el){
 function closeFd(){ $("fdOv").classList.remove("show"); $("fdOv").setAttribute("aria-hidden","true"); }
 $("fdClose").onclick=function(){ touch(); closeFd(); };
 $("fdOv").addEventListener("click",function(e){ if(e.target===$("fdOv")){ touch(); closeFd(); } });
+
+/* ---------- Fassprobe: bestaetigt oder korrigiert einen Tatbefund ---------- */
+function doProbe(el){
+  var t=kase.twist;
+  if(!t||t.id!=="probe"||t.done) return;
+  charge("Fassprobe",t.fee,function(){
+    var before=possible();
+    t.done=true;
+    var fd=kase.findings[t.findIdx];
+    fd.checked=true;
+    var korr=(t.shown!==t.truth);
+    if(el) el.classList.add("done");
+    renderBand(); announceOut(before); storyCheck();
+    $("fdT").textContent=korr?"Befund korrigiert":"Befund bestätigt";
+    $("fdS").textContent=t.place.name+" · "+niceName(t.floor);
+    var L=$("fdList"); L.innerHTML="";
+    function ln(tx){ var d=document.createElement("div"); d.className="clue";
+      d.innerHTML='<div class="clue-tx">'+tx+'</div>'; L.appendChild(d); }
+    ln(korr
+      ? ("Im Fass steht etwas anderes, als im Bericht stand. Nicht „"+valTx(fd.key,t.shown)+
+         "“, sondern <b>"+valTx(fd.key,fd.val)+"</b>. Der erste Befund war eine Vermutung.")
+      : ("Der Bericht stimmt. <b>"+perpTx(fd.key,fd.val)+"</b>. Nun ist es geprüft."));
+    $("fdOv").classList.add("show"); $("fdOv").setAttribute("aria-hidden","false");
+    $("fdClose").focus();
+    if(inHall) buildHall(curFloor);
+    saveRun();
+  });
+}
+
+/* ---------- Handschriftvergleich: hartes Ja/Nein fuer einen Bruder ---------- */
+function openSchrift(){
+  var t=kase.twist;
+  if(!t||t.id!=="schrift") return;
+  $("hsS").textContent=t.place.name+" · "+niceName(t.floor);
+  var B=$("hsBody"); B.innerHTML="";
+  t.results.forEach(function(r){
+    var d=document.createElement("div"); d.className="clue";
+    d.innerHTML='<div class="clue-src">Bruder '+r.name+'</div><div class="clue-tx">'+
+      (r.ja?"Die Züge stimmen überein.":"Keine Übereinstimmung.")+'</div>';
+    B.appendChild(d);
+  });
+  var G=$("hsGrid"); G.innerHTML="";
+  kase.sus.forEach(function(x){
+    var b=document.createElement("button");
+    var done=t.results.some(function(r){ return r.name===x.name; });
+    b.textContent=x.name;
+    b.disabled=done||t.used>=t.max;
+    if(!b.disabled) b.onclick=function(){ touch(); doSchrift(x); };
+    G.appendChild(b);
+  });
+  $("hsNote").textContent="Noch "+(t.max-t.used)+" von "+t.max+" Vergleichen · je "+
+    money(t.fee)+". Ein „Nein“ schließt aus. Ein „Ja“ allein überführt nicht. "+
+    "SIMULATION · keine echte Zahlung";
+  $("hsOv").classList.add("show"); $("hsOv").setAttribute("aria-hidden","false");
+  $("hsClose").focus();
+}
+function doSchrift(x){
+  var t=kase.twist;
+  if(!t||t.used>=t.max) return;
+  closeHs();
+  charge("Handschriftvergleich · Bruder "+x.name,t.fee,function(){
+    var before=possible();
+    t.used++;
+    t.results.push({name:x.name,ja:(x===kase.culprit)});
+    announceOut(before); storyCheck(); updateBadge();
+    toast("Handschrift Bruder "+x.name+": <b>"+(x===kase.culprit?"stimmt überein":"stimmt nicht")+"</b>");
+    if(inHall) buildHall(curFloor);
+    saveRun();
+    openSchrift();
+  });
+}
+function closeHs(){ $("hsOv").classList.remove("show"); $("hsOv").setAttribute("aria-hidden","true"); }
+$("hsClose").onclick=function(){ touch(); closeHs(); };
+$("hsOv").addEventListener("click",function(e){ if(e.target===$("hsOv")){ touch(); closeHs(); } });
 
 /* ---------- Diebstahl ---------- */
 function theftEval(){
@@ -2818,7 +3527,7 @@ $("thGo").onclick=function(){
   }
   theftPend=null;
   refreshFigures();
-  render();
+  render(); saveRun();
 };
 /* Ausfuehrung getrennt von der Oberflaeche — auch fuer Pruefungen nutzbar.
    forceSeen: true = jeder Riskierte sieht es, false = keiner, sonst 50 %. */
@@ -2874,6 +3583,10 @@ document.addEventListener("keydown",function(e){
   }
   if($("fdOv").classList.contains("show")){
     if(e.key==="Escape"){ touch(); closeFd(); }
+    return;
+  }
+  if($("hsOv").classList.contains("show")){
+    if(e.key==="Escape"){ touch(); closeHs(); }
     return;
   }
   if(inHall){
@@ -2954,6 +3667,22 @@ function sfx(nm){
     tone(494,null,0.12,0.14,"triangle",0.5); tone(587,null,0.24,0.3,"triangle",0.5); }
   else if(nm==="lose"){ tone(440,null,0,0.2,"triangle",0.5); tone(349,null,0.2,0.42,"triangle",0.5); }
   else if(nm==="notruf"){ tone(440,null,0,0.12,"sine",0.42); tone(440,null,0.2,0.12,"sine",0.42); }
+  else if(nm==="strike"){ tone(150,70,0,0.28,"triangle",0.85); noiseHit(0,0.14,320,0.4); }
+  else if(nm==="servo"){ tone(300,180,0,0.22,"sawtooth",0.10); }
+}
+/* Dezente Ortsatmosphaere beim Betreten — kurz, leise, synthetisch. */
+function ambience(id){
+  if(!sndOk()) return;
+  if(id==="kueche"){ for(var i=0;i<7;i++) noiseHit(i*0.11+Math.random()*0.05,0.05,900+Math.random()*900,0.10); }
+  else if(id==="garten"){
+    noiseHit(0,1.1,520,0.06);
+    tone(1900,2300,0.35,0.09,"sine",0.10); tone(2200,1800,0.52,0.08,"sine",0.09);
+  }
+  else if(id==="kapitel"){ tone(196,null,0,1.5,"sine",0.10); tone(294,null,0.05,1.3,"sine",0.07); }
+  else if(id==="biblio"){ noiseHit(0,0.5,300,0.05); }
+  else if(id==="wasch"){ for(var j=0;j<4;j++) tone(1400,900,j*0.31,0.05,"sine",0.09); }
+  else if(id==="keller"){ tone(80,null,0,1.4,"sine",0.12); }
+  else if(id==="zellen"){ noiseHit(0,0.8,200,0.05); }
 }
 function rideLoopStart(){
   if(!AC||muted||document.hidden||rideNodes) return;
@@ -2997,9 +3726,118 @@ document.addEventListener("visibilitychange",function(){
   else if(mode==="FAHRT") rideLoopStart();
 });
 
+/* ---------- Laufender Fall: ueberlebt einen Reload (P8) ----------
+   Karriere bleibt in localStorage, der Fall liegt in sessionStorage. Serialisiert
+   wird ueber Namen und Orts-Ids, weil kase Objektreferenzen haelt. */
+var RUN_KEY="ascend.run.v1";
+var runMem=null;
+function placeById(id){
+  var p=null; PLACES.forEach(function(q){ if(q.id===id) p=q; });
+  return p;
+}
+function serializeRun(){
+  if(!kase||caseClosed||over) return null;
+  var fp={};
+  Object.keys(kase.floorPlace).forEach(function(f){ fp[f]=kase.floorPlace[f].id; });
+  var tw=null;
+  if(kase.twist){
+    tw={}; Object.keys(kase.twist).forEach(function(k){ tw[k]=kase.twist[k]; });
+    if(tw.place) tw.place=tw.place.id;
+  }
+  return {v:1,
+    ct:kase.ctype.id, mod:kase.mod?kase.mod.id:null, rank:kase.rank.id,
+    sus:kase.sus.map(function(x){ return {name:x.name,item:x.item,high:x.high,
+      lift:x.lift,zeit:x.zeit,floor:x.floor}; }),
+    culprit:kase.culprit.name,
+    findings:kase.findings.map(function(f){ return {key:f.key,val:f.val,
+      unsure:!!f.unsure,checked:!!f.checked,shown:f.shown}; }),
+    alibis:kase.alibis.map(function(a){ return {who:a.who.name,witness:a.witness.name,
+      place:a.place?a.place.id:null,floor:a.floor}; }),
+    mtokens:kase.mtokens?kase.mtokens.map(function(t){ return {floor:t.floor,
+      place:t.place.id,reveals:t.reveals}; }):null,
+    susFloors:kase.susFloors, floorPlace:fp, goal:kase.goal,
+    cost:kase.cost, roundBudget:kase.roundBudget, nQ:kase.nQ, twist:tw,
+    known:known, aliK:alibisKnown.map(function(a){ return kase.alibis.indexOf(a); }),
+    budget:budget, spent:spent, rides:rides, asked:asked,
+    askedPaid:askedPaid, askedUseful:askedUseful, hallAsks:hallAsks,
+    curFloor:curFloor, silenced:silenced, stolenFloors:stolenFloors,
+    thefts:thefts, lootN:lootN, lootSum:lootSum, acTries:acTries,
+    crossed:crossed, seenFloors:seenFloors, storyFloorSeen:storyFloorSeen,
+    storyTwoDone:storyTwoDone, storyTheftDone:storyTheftDone};
+}
+function saveRun(){
+  var o=serializeRun();
+  runMem=o;
+  try{
+    if(o) sessionStorage.setItem(RUN_KEY,JSON.stringify(o));
+    else sessionStorage.removeItem(RUN_KEY);
+  }catch(e){}
+}
+function clearSave(){
+  runMem=null;
+  try{ sessionStorage.removeItem(RUN_KEY); }catch(e){}
+}
+function readRun(){
+  try{
+    var t=sessionStorage.getItem(RUN_KEY);
+    if(t) return JSON.parse(t);
+  }catch(e){}
+  return runMem;
+}
+function hydrate(o){
+  if(!o||o.v!==1) return false;
+  var ct=CASETYPES.filter(function(c){ return c.id===o.ct; })[0];
+  var mod=o.mod?MODS.filter(function(m){ return m&&m.id===o.mod; })[0]:null;
+  var rank=RANKS.filter(function(r){ return r.id===o.rank; })[0];
+  if(!ct||!rank) return false;
+  var sus=o.sus.map(function(x){ return {name:x.name,item:x.item,high:x.high,
+    lift:x.lift,zeit:x.zeit,floor:x.floor}; });
+  function nm(n){ var r=null; sus.forEach(function(x){ if(x.name===n) r=x; }); return r; }
+  var findings=o.findings.map(function(f){
+    return {key:f.key,val:f.val,unsure:f.unsure,checked:f.checked,shown:f.shown,
+      excl:sus.filter(function(x){ return x[f.key]!==f.val; })};
+  });
+  var alibis=o.alibis.map(function(a){
+    return {who:nm(a.who),witness:nm(a.witness),place:placeById(a.place),floor:a.floor};
+  });
+  if(alibis.some(function(a){ return !a.who||!a.witness; })) return false;
+  var floorPlace={};
+  Object.keys(o.floorPlace).forEach(function(f){ floorPlace[f]=placeById(o.floorPlace[f]); });
+  var tokens=[];
+  Object.keys(floorPlace).forEach(function(f){
+    var p=floorPlace[f]; if(!p||!p.item) return;
+    var who=sus.filter(function(x){ return x.item===p.item; });
+    if(who.length) tokens.push({floor:Number(f),place:p,item:p.item,who:who});
+  });
+  var mtokens=o.mtokens?o.mtokens.map(function(t){
+    return {floor:t.floor,place:placeById(t.place),reveals:t.reveals}; }):null;
+  var tw=null;
+  if(o.twist){
+    tw={}; Object.keys(o.twist).forEach(function(k){ tw[k]=o.twist[k]; });
+    if(tw.place) tw.place=placeById(tw.place);
+  }
+  kase={sus:sus,culprit:nm(o.culprit),findings:findings,alibis:alibis,
+    susFloors:o.susFloors,floorPlace:floorPlace,tokens:tokens,mtokens:mtokens,
+    goal:o.goal,route:0,cost:o.cost,roundBudget:o.roundBudget,nQ:o.nQ,
+    twist:tw,rank:rank,attrs:rank.attrs,ctype:ct,mod:mod};
+  if(!kase.culprit) return false;
+  known=o.known||{};
+  alibisKnown=(o.aliK||[]).map(function(i){ return alibis[i]; }).filter(Boolean);
+  budget=o.budget; spent=o.spent; rides=o.rides; asked=o.asked;
+  askedPaid=o.askedPaid||0; askedUseful=o.askedUseful||0; hallAsks=o.hallAsks||0;
+  curFloor=o.curFloor; silenced=o.silenced||{}; stolenFloors=o.stolenFloors||{};
+  thefts=o.thefts||[]; lootN=o.lootN||0; lootSum=o.lootSum||0; acTries=o.acTries||0;
+  crossed=o.crossed||{}; seenFloors=o.seenFloors||{};
+  storyFloorSeen=o.storyFloorSeen||{}; storyTwoDone=!!o.storyTwoDone;
+  storyTheftDone=!!o.storyTheftDone;
+  items=[]; mode="BEREIT"; goalFloor=null; doorsOpen=true;
+  stopAt=null; stopUsed=false; pendingFn=null; over=false; caseClosed=false;
+  return true;
+}
+
 /* ---------- Dienstakte: haelt ueber Faelle hinweg ---------- */
 var CAREER_KEY="ascend.career.v1";
-var career={faelle:0,siege:0,ausgaben:0,lootSumme:0,lootStueck:0,besterVermerk:null};
+var career={faelle:0,siege:0,ausgaben:0,lootSumme:0,lootStueck:0,besterVermerk:null,noten:{}};
 var VERMERK_RANG=["ohne Beanstandung","im Rahmen","mit Anmerkung","wird geprüft"];
 function loadCareer(){
   try{
@@ -3010,6 +3848,8 @@ function loadCareer(){
       if(typeof o[k]==="number"&&isFinite(o[k])) career[k]=o[k];
     });
     if(typeof o.besterVermerk==="string") career.besterVermerk=o.besterVermerk;
+    /* neu ab diesem Stand — aeltere Akten haben das Feld nicht, das ist in Ordnung */
+    if(o.noten&&typeof o.noten==="object") career.noten=o.noten;
   }catch(e){}
 }
 function saveCareer(){
@@ -3040,18 +3880,87 @@ document.addEventListener("keydown",function(e){
 
 $("sealFig").innerHTML='<path class="robe" d="'+MONK_PATH+'"/>';
 $("nbSeal").innerHTML='<path class="robe" d="'+MONK_PATH+'"/>';
+$("rsSeal").innerHTML='<path class="robe" d="'+MONK_PATH+'"/>';
 applyCam();
 applyMute();
+
+/* Erst einen frischen Fall aufbauen, damit die Kabine steht — dann fragen,
+   ob der abgebrochene Fall fortgesetzt werden soll. */
+var pendingRun=readRun();
 kase=newCase();
 budget=kase?kase.roundBudget:START_BUDGET;
-updateBadge();
-spawnMonks();
-prevDoors=true;
-render();
-renderBand();
-updateCounter();
-showTut();
+refreshAll();
+if(pendingRun){
+  var pct=CASETYPES.filter(function(c){ return c.id===pendingRun.ct; })[0];
+  $("rsS").textContent=(pct?pct.chip:"Fall")+" · "+niceName(pendingRun.curFloor)+
+    " · Restbudget "+money(Math.max(0,pendingRun.budget));
+  $("rsOv").classList.add("show"); $("rsOv").setAttribute("aria-hidden","false");
+  $("rsGo").focus();
+}else{
+  showTut();
+}
+$("rsGo").onclick=function(){
+  touch();
+  closeAllSheets();
+  if(hydrate(pendingRun)){ refreshAll(); toast("Fall <b>fortgesetzt</b>"); }
+  else{ clearSave(); showTut(); }
+  pendingRun=null;
+};
+$("rsNew").onclick=function(){
+  touch(); closeAllSheets(); clearSave(); pendingRun=null; showTut();
+};
 setTimeout(function(){ elHint.classList.add("gone"); },6000);
+
+/* ---------- selfTest: bleibt im Code, per ?test=1 oder Konsole ---------- */
+/* Setzt alles Erfragbare auf bekannt — der Zustand nach perfekter Ermittlung. */
+function revealAll(){
+  known={}; alibisKnown=[];
+  kase.sus.forEach(function(x){
+    known[x.name]={};
+    activeAttrs().forEach(function(a){ known[x.name][a]=true; });
+    known[x.name].seen=true;
+  });
+  kase.findings.forEach(function(f){ if(f.unsure) f.checked=true; });
+  kase.alibis.forEach(function(a){ alibisKnown.push(a); });
+}
+function selfTest(n){
+  n=n||20;
+  var keep={kase:kase,known:known,ali:alibisKnown,sil:silenced,st:stolenFloors,
+    bud:budget,cf:curFloor,cc:caseClosed,ov:over};
+  var rows=[], alles=true;
+  RANKS.forEach(function(rk){
+    var r={Rang:rk.name,Fälle:0,eindeutig:0,Kette:0,"Budget≥1,15×":0,"Beleg möglich":0,
+           "leer verliert":0,Twists:0};
+    for(var i=0;i<n;i++){
+      var m=MODS[i%MODS.length];
+      var c=newCase(m?m.id:null,undefined,rk.id);
+      if(!c) continue;
+      kase=c; silenced={}; stolenFloors={}; caseClosed=false; over=false;
+      r["Fälle"]++;
+      if(c.twist) r.Twists++;
+      revealAll();
+      var p=possible();
+      if(p.length===1&&p[0]===c.culprit) r.eindeutig++;
+      if(!rk.wahrheit||c.alibis.every(alibiConfirmed)) r.Kette++;
+      if(c.cost<=c.roundBudget/1.15) r["Budget≥1,15×"]++;
+      if(evValid(evidenceList(),c.culprit)) r["Beleg möglich"]++;
+      if(!evValid([],c.culprit)) r["leer verliert"]++;
+    }
+    ["eindeutig","Kette","Budget≥1,15×","Beleg möglich","leer verliert"].forEach(function(k){
+      if(r[k]!==r["Fälle"]) alles=false;
+    });
+    rows.push(r);
+  });
+  kase=keep.kase; known=keep.known; alibisKnown=keep.ali; silenced=keep.sil;
+  stolenFloors=keep.st; budget=keep.bud; curFloor=keep.cf;
+  caseClosed=keep.cc; over=keep.ov;
+  if(console.table) console.table(rows);
+  else rows.forEach(function(r){ console.log(JSON.stringify(r)); });
+  console.log(alles?"selfTest: alles bestanden":"selfTest: ABWEICHUNG — siehe Tabelle");
+  return {rows:rows,ok:alles};
+}
+window.selfTest=selfTest;
+if(location.search.indexOf("test=1")>=0) setTimeout(function(){ selfTest(); },300);
 
 /* ---------- Konsolen-Harness ---------- */
 window.__tests=function(){
@@ -3060,7 +3969,7 @@ window.__tests=function(){
     for(var i=0;i<100;i++){
       var c=newCase(m?m.id:null);
       if(!c){ fails.push("Generator liefert null · Mod "+(m?m.id:"ohne")); break; }
-      if(c.cost>c.roundBudget*COST_CAP) fails.push("Kostendeckel verletzt · Mod "+(m?m.id:"ohne"));
+      if(c.cost>c.roundBudget/1.15) fails.push("Budgetdeckel verletzt · Mod "+(m?m.id:"ohne"));
     }
   });
   for(var j=0;j<50;j++){
@@ -3069,9 +3978,28 @@ window.__tests=function(){
     var r=simTheftSweep();
     if(!r.ok) fails.push("Diebstahl-Sweep macht Fall unlösbar");
   }
+  if(!selfTest(12).ok) fails.push("selfTest meldet Abweichung");
   restart();                             /* Harness verstellt globalen Zustand */
   return fails.length?fails:"OK";
 };
 </script>
+
+<!-- ÄNDERUNGSJOURNAL
+P1 Anklage: Name + Belege. Gültig, wenn die Vereinigung der Ausschlussmengen alle fünf
+   anderen deckt (mathematisch: der Täter steht in keiner Ausschlussmenge, Deckung ⇒ Sieg).
+   Richtiger Name ohne volle Belege = Abweisung, 2.500 €, genau eine Wiederholung.
+P2 Aussagen tragen ab Rang Inspektor erst, wenn ihr Urheber entlastet ist; Zeugenwahl im
+   Generator garantiert die Bestätigungskette, stillSolvable prüft sie mit.
+P3 Budget = Optimalkosten × Rangfaktor (1,60/1,35/1,20; Mods ±, Untergrenze 1,15), auf 500 €
+   aufgerundet. Fragen im selben Flur-Aufenthalt: 150/225/300 €. Feste Mod-Budgets entfallen.
+P4 Fahrt = ein Posten (Wahl+Türen), Modal erst ab 500 €, Kleinbeträge buchen sofort.
+   Quittung war toter Code — reaktiviert, listet auch alle Sofort-Buchungen.
+P5/P6/P7/P8 Twists (Rußspur/Fassprobe/Handschrift), Ränge + Merkmal "zeit" + Note S–C,
+   Etiketten/Parallax/Ambience, laufender Fall in sessionStorage.
+BEWUSST NICHT: Preise, Satirekern und CSS-3D unverändert. "Novize 1+" als Mindestauswahl
+   gelesen, nicht als Rabatt auf die Deckungsregel — sonst bliebe das Raten im Einstieg.
+   Vorbestehender Nebenbefund unberührt gelassen: Kamera landet im Flur zufällig auch auf
+   der dunklen Aufzugstation. Datei 173 KB (Auftrag nennt keine Grenze).
+-->
 </body>
 </html>
