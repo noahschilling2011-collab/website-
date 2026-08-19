@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LETZTE LEGION — Figuren</title>
+<style>
+  :root { --ink:#e8e8ec; --dim:#8a8a94; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { height:100%; background:#0d0d11; overflow:hidden;
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
+  #scene { display:block; width:100%; height:100svh; }
+  .hud { position:fixed; top:16px; left:18px; color:var(--ink);
+    pointer-events:none; z-index:5; }
+  .hud h1 { font-size:13px; letter-spacing:.22em; font-weight:700; }
+  .hud p { font-size:11px; color:var(--dim); margin-top:4px; letter-spacing:.06em; }
+  .lbl { position:fixed; top:0; left:0; transform:translate(-50%,0); color:var(--ink);
+    font-size:11px; font-weight:700; letter-spacing:.18em; pointer-events:none;
+    text-shadow:0 1px 6px rgba(0,0,0,.9); z-index:4; white-space:nowrap;
+    will-change:transform; }
+  .lbl small { display:block; text-align:center; color:var(--dim);
+    font-weight:400; letter-spacing:.08em; margin-top:2px; }
+  .fallback { color:var(--ink); padding:40px; font-size:14px; }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div class="hud">
+  <h1>LETZTE LEGION — FIGUREN</h1>
+  <p>1–6 fokussieren · 0 Übersicht · Ziehen dreht die Figur</p>
+</div>
+<noscript><div class="fallback">Für diese Ansicht wird JavaScript benötigt.</div></noscript>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.185.1/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.185.1/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+/* ============================================================
+   LETZTE LEGION — Figuren-Baukasten
+   Jede Figur = eine gemergte BufferGeometry mit Vertex-Colors
+   (Körper, MeshLambert) + optional eine Glow-Geometry (Augen,
+   MeshBasic). Genau diese zwei Geometrien pro Typ wandern im
+   Spiel in je eine InstancedMesh. Kein Skinning, keine Texturen.
+   ============================================================ */
+
+const DEG = Math.PI / 180;
+const params = new URLSearchParams(location.search);
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- Part-Helper ---------- */
+const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(),
+      _e = new THREE.Euler(), _v = new THREE.Vector3(), _s = new THREE.Vector3();
+function P(geo, hex, p = [0,0,0], r = [0,0,0], s = [1,1,1]) {
+  const g = geo.index ? geo.toNonIndexed() : geo;
+  _e.set(r[0]*DEG, r[1]*DEG, r[2]*DEG);
+  _m4.compose(_v.set(...p), _q.setFromEuler(_e), _s.set(...s));
+  g.applyMatrix4(_m4);
+  const c = new THREE.Color(hex);
+  const n = g.attributes.position.count;
+  const col = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { col[i*3] = c.r; col[i*3+1] = c.g; col[i*3+2] = c.b; }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return g;
+}
+/* Kapsel exakt zwischen zwei Punkten — macht schwebende Gliedmassen unmoeglich */
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(),
+      _mid = new THREE.Vector3(), _dir = new THREE.Vector3(), _up = new THREE.Vector3(0,1,0);
+function limb(r, from, to, hex, rs = 7) {
+  _a.set(...from); _b.set(...to);
+  _mid.addVectors(_a, _b).multiplyScalar(.5);
+  _dir.subVectors(_b, _a);
+  const len = Math.max(.001, _dir.length() - r * 1.2);
+  const g = new THREE.CapsuleGeometry(r, len, 3, rs).toNonIndexed();
+  _q.setFromUnitVectors(_up, _dir.normalize());
+  _m4.compose(_mid, _q, _s.set(1,1,1));
+  g.applyMatrix4(_m4);
+  const c = new THREE.Color(hex);
+  const n = g.attributes.position.count;
+  const col = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { col[i*3] = c.r; col[i*3+1] = c.g; col[i*3+2] = c.b; }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return g;
+}
+function fuse(parts) {
+  const g = mergeGeometries(parts, false);
+  parts.forEach(p => p.dispose());
+  g.computeVertexNormals();
+  return g;
+}
+const cap  = (r,l,cs=3,rs=7) => new THREE.CapsuleGeometry(r,l,cs,rs);
+const sph  = (r,w=7,h=5)     => new THREE.SphereGeometry(r,w,h);
+const cyl  = (rt,rb,h,rs=7)  => new THREE.CylinderGeometry(rt,rb,h,rs);
+const box  = (x,y,z)         => new THREE.BoxGeometry(x,y,z);
+const cone = (r,h,rs=6)      => new THREE.ConeGeometry(r,h,rs);
+const ico  = (r,d=1)         => new THREE.IcosahedronGeometry(r,d);
+const tor  = (r,t,rs=6,ts=8) => new THREE.TorusGeometry(r,t,rs,ts);
+/* Halbzylinder-Scheibe: Helmkamm */
+const halfDisc = (r,h,rs=8)  => new THREE.CylinderGeometry(r,r,h,rs,1,false,0,Math.PI);
+
+/* ============================ FIGUREN ============================ */
+
+function buildLegionnaire() {
+  const STEEL='#5b8fd4', SHIELD='#3d6299', BRONZE='#a8823f',
+        CREST='#c99a4a', SKIN='#d4b58c', DARK='#3a5a8c', WOOD='#6b5a42';
+  const body = fuse([
+    P(cyl(.036,.042,.13),  DARK,  [-.055,.065,0]),
+    P(cyl(.036,.042,.13),  DARK,  [ .055,.065,0]),
+    P(cap(.115,.17),       STEEL, [0,.3,0]),
+    P(cyl(.122,.122,.03),  BRONZE,[0,.25,0]),
+    /* Schulterplatten */
+    P(sph(.05,6,4),        DARK,  [-.115,.4,0]),
+    P(sph(.05,6,4),        DARK,  [ .115,.4,0]),
+    /* Kopf frei unterm Helm */
+    P(sph(.08),            SKIN,  [0,.525,.03]),
+    P(sph(.09,8,5),        BRONZE,[0,.572,0],[0,0,0],[1,.75,1]),
+    P(cyl(.093,.096,.026,8),BRONZE,[0,.542,0]),
+    /* Kamm: Halbscheibe laengs, sitzt auf der Kalotte */
+    P(halfDisc(.085,.02),  CREST, [0,.602,-.005],[90,0,90]),
+    /* Schild seitlich angewinkelt, gibt die Silhouette frei */
+    P(box(.17,.24,.03),    SHIELD,[-.155,.3,.1],[-4,-24,0]),
+    P(sph(.03),            BRONZE,[-.168,.3,.117]),
+    /* Speer als limb — Spitze exakt am Endpunkt */
+    limb(.011, [.16,.06,-.04], [.21,.6,-.02], WOOD),
+    P(cone(.02,.07),       '#d8dce4',[.213,.632,-.018],[5,0,-5])
+  ]);
+  return { body, glow:null, h:.62, r:.16, bob:{a:.015,f:1.6} };
+}
+
+function buildWalker() {
+  const SKIN='#8a9c78', SKIN2='#78896a', RAG='#5a6851', LEG='#4e5a46';
+  const body = fuse([
+    P(cyl(.03,.036,.11),  LEG,  [-.05,.055,0]),
+    P(cyl(.03,.036,.11),  LEG,  [ .05,.05,-.025]),
+    P(cyl(.098,.108,.1),  RAG,  [0,.15,0]),
+    P(cap(.105,.14),      SKIN, [0,.29,.015],[14,0,0]),
+    /* Kopf haengt klar VOR dem Koerper */
+    P(sph(.075),          SKIN2,[0,.44,.105],[0,0,7]),
+    /* Arme baumeln vor der Silhouette — limb von Schulter zu Handhoehe */
+    limb(.026, [-.115,.36,.05], [-.15,.13,.14],  SKIN),
+    limb(.026, [ .115,.35,.06], [ .125,.1,.185], SKIN),
+    P(sph(.032,6,4),      SKIN2,[-.15,.115,.145]),
+    P(sph(.032,6,4),      SKIN2,[ .125,.085,.19])
+  ]);
+  const glow = fuse([
+    P(sph(.013,6,4), '#c8ff6a', [-.021,.447,.163]),
+    P(sph(.013,6,4), '#c8ff6a', [ .029,.442,.162])
+  ]);
+  return { body, glow, h:.52, r:.15, bob:{a:.03,f:2.2} };
+}
+
+function buildRunner() {
+  const SKIN='#93a878', SKIN2='#7d9165', LEG='#5f7050';
+  const body = fuse([
+    limb(.026, [-.045,.02,.1],  [-.05,.17,-.01], LEG),
+    limb(.026, [ .045,.02,-.12],[ .05,.17,.01],  LEG),
+    P(cap(.078,.14),      SKIN, [0,.25,.02],[26,0,0]),
+    P(sph(.064),          SKIN2,[0,.375,.15]),
+    limb(.02, [-.09,.3,.0],  [-.13,.38,-.15], SKIN2),
+    limb(.02, [ .09,.3,.0],  [ .13,.38,-.15], SKIN2)
+  ]);
+  const glow = fuse([
+    P(sph(.012,6,4), '#c8ff6a', [-.021,.383,.196]),
+    P(sph(.012,6,4), '#c8ff6a', [ .021,.383,.196])
+  ]);
+  return { body, glow, h:.46, r:.13, bob:{a:.032,f:3.4} };
+}
+
+function buildBrute() {
+  const HIDE='#79866c', ARMOR='#4c5544', FLESH='#67755b', DK='#3f4838';
+  const body = fuse([
+    P(cyl(.088,.1,.22),  DK,   [-.18,.11,.01]),
+    P(cyl(.088,.1,.22),  DK,   [ .18,.11,.01]),
+    P(cap(.23,.26),      HIDE, [0,.56,0]),
+    P(sph(.17,7,5),      FLESH,[0,.38,.1],[0,0,0],[1.1,.72,1]),   // Wanst
+    /* flacher Schulterpanzer HINTER dem Kopf */
+    P(box(.56,.15,.26),  ARMOR,[0,.83,-.08],[6,0,0]),
+    P(sph(.115,7,5),     ARMOR,[-.285,.82,-.04]),                 // Deltoids
+    P(sph(.115,7,5),     ARMOR,[ .285,.82,-.04]),
+    /* Kopf klar vorgestreckt, Stirnwulst drueber */
+    P(sph(.115),         FLESH,[0,.82,.2]),
+    P(box(.19,.06,.1),   ARMOR,[0,.88,.24],[-12,0,0]),            // Stirnwulst
+    P(box(.16,.06,.11),  DK,   [0,.75,.25],[8,0,0]),              // Kiefer
+    /* Arme: Schulter -> Boden-Faust, verbunden per limb */
+    limb(.082, [-.32,.8,-.02], [-.42,.2,.1],  FLESH),
+    limb(.082, [ .32,.8,-.02], [ .42,.2,.1],  FLESH),
+    P(sph(.115,7,5),     DK,   [-.43,.13,.12]),
+    P(sph(.115,7,5),     DK,   [ .43,.13,.12])
+  ]);
+  const glow = fuse([
+    P(sph(.016,6,4), '#c8ff6a', [-.042,.835,.31]),
+    P(sph(.016,6,4), '#c8ff6a', [ .042,.835,.31])
+  ]);
+  return { body, glow, h:1.0, r:.34, bob:{a:.05,f:1.2} };
+}
+
+function buildSpeier() {
+  const BODY='#8f8a5e', THROAT='#b5ae7d', WART='#6d683f',
+        LIMBS='#7c7850', BELLY='#7d7849', MAW='#241a1a';
+  const body = fuse([
+    /* Beine gespreizt + Fuesse direkt drunter */
+    limb(.07, [-.3,.06,.05], [-.24,.5,0], LIMBS),
+    limb(.07, [ .3,.06,.05], [ .24,.5,0], LIMBS),
+    P(box(.2,.07,.26),  WART, [-.31,.035,.1]),
+    P(box(.2,.07,.26),  WART, [ .31,.035,.1]),
+    /* Bauch, unten dunkler Ballast */
+    P(sph(.7,9,7),      BODY, [0,.96,0],[0,0,0],[1.16,.96,1.06]),
+    P(sph(.62,9,7),     BELLY,[0,.78,.06],[0,0,0],[1.14,.7,1.04]),
+    /* Warzen groesser, asymmetrisch */
+    P(ico(.21,0),       WART, [-.5,.9,.42],[15,20,0]),
+    P(ico(.16,0),       WART, [ .56,1.2,.3],[0,40,15]),
+    P(ico(.18,0),       WART, [ .2,.62,.58],[30,10,0]),
+    P(ico(.13,0),       WART, [-.3,1.35,.35],[10,0,30]),
+    /* heller Kehlsack — Kroete */
+    P(sph(.42,8,6),     THROAT,[0,1.42,.3],[0,0,0],[1,.9,1]),
+    P(sph(.28,8,6),     BODY, [0,1.78,.3]),
+    /* Schlund mit Maulwulst + haengender Unterkiefer */
+    P(cyl(.12,.15,.16,8),MAW, [0,1.63,.53],[108,0,0]),
+    P(tor(.145,.04,5,9),BODY, [0,1.64,.58],[108,0,0]),
+    P(box(.26,.07,.22), LIMBS,[0,1.46,.62],[-32,0,0]),
+    /* Aermchen baumeln VOR dem Bauch */
+    limb(.042, [-.58,1.32,.4], [-.56,.84,.7], LIMBS),
+    limb(.042, [ .58,1.32,.4], [ .56,.84,.7], LIMBS),
+    P(sph(.055,6,4),    WART, [-.56,.8,.72]),
+    P(sph(.055,6,4),    WART, [ .56,.8,.72])
+  ]);
+  const glow = fuse([
+    P(sph(.03,6,4), '#ff5a3c', [-.105,1.88,.52]),
+    P(sph(.03,6,4), '#ff5a3c', [ .105,1.88,.52])
+  ]);
+  return { body, glow, h:1.95, r:.7, bob:{a:.035,f:1.0} };
+}
+
+function buildFleischberg() {
+  const A='#9c7a72', B='#8a6a64', C='#a8857c', D='#7a5c58', E='#5f4543',
+        TUSK='#d8c9b4';
+  const body = fuse([
+    /* Rumpf: hohe Schulterlinie hinten, faellt nach vorn — Gorilla */
+    P(ico(1.0),   A, [0,1.3,-.25],[-14,8,0],[1.2,1.0,1.05]),
+    P(ico(.74),   C, [0,.88,.4],[6,0,0],[1.05,.85,.95]),           // Brust integriert
+    P(ico(.72),   B, [0,.62,-.5],[0,-14,0],[1.15,.75,1.0]),        // Hinterpartie
+    P(ico(.5),    B, [0,.5,.15],[0,0,0],[1.2,.6,1.0]),             // Bauchsack unten
+    /* Schultern HALB in der Masse versenkt */
+    P(ico(.44,0), D, [-.62,1.62,-.05],[0,25,10]),
+    P(ico(.44,0), D, [ .62,1.6,-.1],[0,-15,-8]),
+    /* Rueckenkegel — deutlich aus der Silhouette */
+    P(cone(.26,.55,5), E, [0,2.35,-.3],[-18,0,0]),
+    P(cone(.22,.46,5), E, [-.15,2.15,-.85],[-38,0,-10]),
+    P(cone(.18,.38,5), E, [ .15,1.8,-1.18],[-55,0,12]),
+    P(cone(.14,.3,5),  E, [-.05,1.4,-1.35],[-70,0,0]),
+    /* Kopf TIEF und VOR der Brust, unter der Schulterlinie */
+    P(sph(.27,8,6), B, [0,1.58,.86]),
+    P(box(.4,.11,.2),  D, [0,1.72,.88],[-14,0,0]),                 // Stirnwulst
+    P(box(.34,.12,.22),D, [0,1.43,.92],[10,0,0]),                  // Kiefer
+    P(cone(.04,.13,5), TUSK,[-.13,1.5,1.06],[16,0,-8]),            // Hauer
+    P(cone(.04,.13,5), TUSK,[ .13,1.5,1.06],[16,0,8]),
+    /* Arme: Schulter -> Boden, per limb verbunden */
+    limb(.21, [-.74,1.5,.08], [-1.14,.3,.66], B),
+    limb(.21, [ .74,1.48,.1], [ 1.16,.3,.7], B),
+    P(sph(.26,8,6), D, [-1.17,.24,.72]),
+    P(sph(.26,8,6), D, [ 1.19,.24,.76]),
+    /* Hinterbein-Hoecker */
+    P(sph(.3,7,5),  D, [-.55,.3,-.6],[0,0,0],[1,.85,1]),
+    P(sph(.3,7,5),  D, [ .55,.3,-.62],[0,0,0],[1,.85,1])
+  ]);
+  const glow = fuse([
+    P(sph(.032,6,4), '#ff5a3c', [-.1,1.61,1.07]),
+    P(sph(.032,6,4), '#ff5a3c', [ .1,1.61,1.07])
+  ]);
+  return { body, glow, h:2.35, r:.95, bob:{a:.02,f:.5} };
+}
+
+/* ============================ BÜHNE ============================ */
+
+const canvas = document.getElementById('scene');
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias:true,
+    powerPreference:'high-performance' });
+} catch (e) {
+  canvas.replaceWith(Object.assign(document.createElement('div'),
+    { className:'fallback', textContent:'WebGL ist hier nicht verfügbar.' }));
+  throw e;
+}
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#0d0d11');
+scene.fog = new THREE.Fog('#0d0d11', 10, 26);
+
+scene.add(new THREE.HemisphereLight(0x8899bb, 0x22201c, .7));
+const key = new THREE.DirectionalLight(0xfff0dd, 2.5);
+key.position.set(3, 8, 4);
+scene.add(key);
+const rim = new THREE.DirectionalLight(0x6a80c0, .9);   // kühles Gegenlicht
+rim.position.set(-4, 3, -5);
+scene.add(rim);
+
+/* Boden + Blob-Schatten */
+const ground = new THREE.Mesh(new THREE.BoxGeometry(30, .1, 18),
+  new THREE.MeshLambertMaterial({ color:'#17171c' }));
+ground.position.y = -.05;
+scene.add(ground);
+
+const bodyMat = new THREE.MeshLambertMaterial({ vertexColors:true });
+const glowMat = new THREE.MeshBasicMaterial({ vertexColors:true });
+const blobGeo = new THREE.CircleGeometry(1, 20);
+const blobMat = new THREE.MeshBasicMaterial({ color:'#000000',
+  transparent:true, opacity:.35 });
+
+const DEFS = [
+  { name:'LEGIONÄR',    sub:'Spieler-Einheit', build:buildLegionnaire },
+  { name:'WALKER',      sub:'Standard-Zombie', build:buildWalker },
+  { name:'RUNNER',      sub:'Rudel · schnell', build:buildRunner },
+  { name:'BRUTE',       sub:'Tank',            build:buildBrute },
+  { name:'SPEIER',      sub:'Boss B',          build:buildSpeier },
+  { name:'FLEISCHBERG', sub:'Boss A',          build:buildFleischberg },
+];
+const X = [-4.2, -3.15, -2.15, -1.0, 1.0, 3.4];
+
+const figures = DEFS.map((d, i) => {
+  const built = d.build();
+  const grp = new THREE.Group();
+  grp.position.x = X[i];
+  grp.rotation.y = -22 * DEG;
+  grp.add(new THREE.Mesh(built.body, bodyMat));
+  if (built.glow) grp.add(new THREE.Mesh(built.glow, glowMat));
+  const blob = new THREE.Mesh(blobGeo, blobMat);
+  blob.rotation.x = -90 * DEG;
+  blob.position.y = .012;
+  blob.scale.setScalar(built.r * 1.1);
+  blob.position.x = X[i];              // Schatten bobbt nicht mit
+  scene.add(blob);
+  scene.add(grp);
+  const lbl = document.createElement('div');
+  lbl.className = 'lbl';
+  lbl.innerHTML = `${d.name}<small>${d.sub}</small>`;
+  document.body.appendChild(lbl);
+  return { grp, lbl, ...built, x:X[i], phase: i * 1.7 };
+});
+
+/* ============================ KAMERA ============================ */
+const camera = new THREE.PerspectiveCamera(45, 1, .1, 100);
+let focusIdx = params.has('focus') ? (+params.get('focus') - 1) : -1;
+const camPos = new THREE.Vector3(), camAim = new THREE.Vector3();
+
+function setView() {
+  if (focusIdx >= 0 && focusIdx < figures.length) {
+    const f = figures[focusIdx];
+    const dist = Math.max(1.5, f.h * 1.55);
+    camPos.set(f.x + dist * .28, f.h * .72 + .25, dist);
+    camAim.set(f.x, f.h * .48, 0);
+  } else {
+    camPos.set(0, 3.4, 8.8);
+    camAim.set(-.15, .95, 0);
+  }
+}
+setView();
+camera.position.copy(camPos);
+
+addEventListener('keydown', e => {
+  if (e.key === '0') focusIdx = -1;
+  else if (e.key >= '1' && e.key <= '6') focusIdx = +e.key - 1;
+  else return;
+  setView();
+});
+
+/* Ziehen dreht alle Figuren */
+let dragging = false, lastX = 0, spinVel = 0;
+addEventListener('pointerdown', e => { dragging = true; lastX = e.clientX; });
+addEventListener('pointerup',   () => dragging = false);
+addEventListener('pointermove', e => {
+  if (!dragging) return;
+  spinVel = (e.clientX - lastX) * .006;
+  lastX = e.clientX;
+  figures.forEach(f => f.grp.rotation.y += spinVel);
+});
+
+const spin = params.get('spin') !== '0';
+const startAngle = params.has('angle') ? +params.get('angle') : null;
+if (startAngle !== null) figures.forEach(f => f.grp.rotation.y = startAngle * DEG);
+
+/* ============================ LOOP ============================ */
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(canvas);
+resize();
+
+let visible = true;
+document.addEventListener('visibilitychange', () => visible = !document.hidden);
+
+let last = performance.now() / 1000, elapsed = 0;
+const _proj = new THREE.Vector3();
+
+renderer.setAnimationLoop(() => {
+  if (!visible) return;
+  const now = performance.now() / 1000;
+  const dt = Math.min(now - last, .1);
+  last = now; elapsed += dt;
+  const t = elapsed;
+
+  figures.forEach(f => {
+    if (spin && !reduced && !dragging && startAngle === null)
+      f.grp.rotation.y += dt * .45;
+    f.grp.position.y = reduced ? 0
+      : Math.sin(t * f.bob.f * Math.PI * 2 + f.phase) * f.bob.a + f.bob.a;
+    /* Label projizieren */
+    _proj.set(f.x, -.14, .9).project(camera);
+    const sx = (_proj.x * .5 + .5) * innerWidth;
+    const sy = (-_proj.y * .5 + .5) * innerHeight;
+    const vis = _proj.z < 1 && (focusIdx === -1 || figures[focusIdx] === f);
+    f.lbl.style.display = vis ? 'block' : 'none';
+    f.lbl.style.transform = `translate(${sx - 0}px,${sy}px) translateX(-50%)`;
+  });
+
+  camera.position.lerp(camPos, 1 - Math.pow(.002, dt));
+  camera.lookAt(camAim);
+  camera.updateMatrixWorld();
+  renderer.render(scene, camera);
+  window.READY = true;
+});
+renderer.render(scene, camera);
+</script>
+</body>
+</html>
