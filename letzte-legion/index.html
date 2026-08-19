@@ -154,6 +154,13 @@ var CFG = {
   gateH: 46,
   gateDeadZone: 3,
 
+  // Waffenschrein: goldene Statue am Fahrbahnrand, Countdown = HP.
+  // Rechtzeitig freigeschossen -> Waffenstufe +1 (auf Max: +15 Armee).
+  // Zieht Flanken-Feuerkraft von der Horde ab — das ist der Trade-off.
+  shrineFirstAtM: 130, shrineEveryM: 260,
+  shrineHpBase: 90, shrineHpPerM: 0.55, shrineHpPerWeapon: 0.3,
+  shrineXInset: 34, shrineR: 26, shrineDeadTime: 0.5,
+
   // Bosse
   bossEveryM: 450,
   bossHpBase: 900, bossHpGrow: 0.6,
@@ -282,6 +289,9 @@ function resetGame() {
   state.squeeze = 0;
   state.spawnAcc = 0; state.spawnStartT = CFG.firstSpawnDelay;
   state.bossIndex = 0; state.nextBossM = CFG.bossEveryM;
+  state.shrine = { active: false, x: 0, y: 0, py: 0, hp: 0, maxHp: 1, r: CFG.shrineR,
+                   flash: -1, dead: false, deadT: 0, id: 0, kind: 2, side: 1 };
+  state.nextShrineM = CFG.shrineFirstAtM;
   state.boss = { active: false, phase: -1, flash: -1, hp: 0, maxHp: 1, x: 0, y: 0, px: 0, py: 0, r: 0 };
   state.slams = [];
   for (var si = 0; si < 4; si++) state.slams.push({ active: false, x: 0, t: 0 });
@@ -494,6 +504,52 @@ function updateGates(dt, scrollActive) {
   }
 }
 
+/* ================= Waffenschrein ================= */
+function spawnShrine() {
+  var s = state.shrine;
+  s.active = true; s.dead = false; s.deadT = 0;
+  s.side = -s.side;
+  s.x = s.side < 0 ? LANE_L + CFG.shrineXInset : LANE_R - CFG.shrineXInset;
+  s.y = s.py = SPAWN_Y;
+  s.maxHp = Math.round((CFG.shrineHpBase + state.dist * CFG.shrineHpPerM) *
+                       (1 + state.weapon * CFG.shrineHpPerWeapon));
+  s.hp = s.maxHp;
+  s.flash = -1;
+  s.id = zombieIdSeq++;
+}
+function shrineDestroyed() {
+  var s = state.shrine;
+  s.dead = true; s.deadT = CFG.shrineDeadTime;
+  if (state.weapon < CFG.weapons.length - 1) state.weapon++;
+  else armyGain(CFG.weaponGateBonus);
+  goldFountain(s.x, s.y);
+  burstParticles(s.x, s.y, CFG.colGold, 12, 200);
+  sfxShrine();
+}
+function updateShrine(dt, scrollActive) {
+  var s = state.shrine;
+  if (!s.active && !state.boss.active && state.dist >= state.nextShrineM) {
+    spawnShrine();
+    state.nextShrineM += CFG.shrineEveryM;
+  }
+  if (!s.active) return;
+  if (s.flash > -1) s.flash -= dt;
+  if (s.dead) {
+    s.deadT -= dt;
+    if (s.deadT <= 0) s.active = false;
+    return;
+  }
+  s.py = s.y;
+  if (scrollActive) s.y += CFG.scrollSpeed * dt;
+  if (s.y - s.r > CFG.formationY) s.active = false;    // verpasst — keine Belohnung
+}
+function sfxShrine() {
+  tone(523, 0.12, "square", 0.12, 1);
+  tone(659, 0.16, "square", 0.11, 1);
+  tone(784, 0.22, "square", 0.11, 1);
+  tone(1047, 0.3, "square", 0.1, 1);
+}
+
 /* ================= Feuern ================= */
 function fireBullet(x, y, dmg, pierce) {
   var b = poolSpawn(bullets);
@@ -598,6 +654,8 @@ function collideBullets() {
   for (i = 0; i < zombies.count; i++)
     if (zombies[i].y > -CFG.gridCell) gridInsert(zombies[i]);
   for (i = 0; i < spits.count; i++) gridInsert(spits[i]);
+  var shr = state.shrine;
+  if (shr.active && !shr.dead && shr.y > -CFG.gridCell) gridInsert(shr);
   var boss = state.boss;
   for (i = bullets.count - 1; i >= 0; i--) {
     var b = bullets[i];
@@ -629,6 +687,17 @@ function collideBullets() {
             var rr1 = CFG.spitR + 4;
             if (dx1 * dx1 + dy1 * dy1 < rr1 * rr1) {
               o.hp = 0;
+              b.pierce--;
+              if (b.pierce <= 0) { poolKill(bullets, i); dead = true; break; }
+            }
+          } else if (o.kind === 2) {                   // Waffenschrein
+            if (o.id === b.hitId) continue;
+            var dx2 = b.x - o.x, dy2 = b.y - o.y, rr2 = o.r + 4;
+            if (dx2 * dx2 + dy2 * dy2 < rr2 * rr2) {
+              o.hp -= b.dmg;
+              if (o.flash <= -CFG.hitFlashGap) o.flash = CFG.hitFlash;
+              b.hitId = o.id;
+              if (o.hp <= 0) shrineDestroyed();
               b.pierce--;
               if (b.pierce <= 0) { poolKill(bullets, i); dead = true; break; }
             }
@@ -941,6 +1010,7 @@ function stepGame(dt, realDt) {
   }
   updateSpawner(dt);
   updateGates(dt, scrollActive);
+  updateShrine(dt, scrollActive);
   updateFiring(dt);
   updateBullets(dt);
   collideBullets();
@@ -1499,6 +1569,75 @@ function drawGateLabel(gv, text, neg) {
   gv.lastLabel = text;
 }
 
+/* ================= Waffenschrein (Bild) =================
+   Goldene Legionaers-Statue auf Steinsockel, grosse Countdown-Zahl davor. */
+function buildGoldLegionnaire() {
+  var G1 = "#e8c766", G2 = "#c9a24a", G3 = "#a8823f", G4 = "#8a6a30";
+  return fuse([
+    P(cyl(.036,.042,.13,5),  G4, [-.055,.065,0]),
+    P(cyl(.036,.042,.13,5),  G4, [ .055,.065,0]),
+    P(cap(.115,.17,2,6),     G2, [0,.3,0]),
+    P(cyl(.122,.122,.03,6),  G3, [0,.25,0]),
+    P(sph(.05,5,3),          G3, [-.115,.4,0]),
+    P(sph(.05,5,3),          G3, [ .115,.4,0]),
+    P(sph(.08,6,4),          G2, [0,.525,.03]),
+    P(sph(.09,7,4),          G1, [0,.572,0],[0,0,0],[1,.75,1]),
+    P(cyl(.093,.096,.026,7), G1, [0,.542,0]),
+    P(halfDisc(.085,.02,6),  G1, [0,.602,-.005],[90,0,90]),
+    P(box(.17,.24,.03),      G3, [-.155,.3,.1],[-4,-24,0]),
+    P(sph(.03,5,3),          G1, [-.168,.3,.117]),
+    limb(.011, [.16,.06,-.04], [.21,.6,-.02], G4, 4),
+    P(cone(.02,.07,5),       G1, [.213,.632,-.018],[5,0,-5])
+  ]);
+}
+var shrineGrp = new THREE.Group();
+var shrineStatueMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+var shrineStatue = new THREE.Mesh(buildGoldLegionnaire(), shrineStatueMat);
+shrineStatue.scale.setScalar(3.2);
+shrineStatue.position.y = 0.5;
+shrineGrp.add(shrineStatue);
+var shrinePedestal = new THREE.Mesh(fuse([
+  P(box(0.95, 0.42, 0.95), "#26262c", [0, 0.21, 0]),
+  P(box(1.05, 0.08, 1.05), "#3a3a42", [0, 0.04, 0]),
+  P(box(0.99, 0.05, 0.99), "#c9a24a", [0, 0.45, 0])
+]), new THREE.MeshLambertMaterial({ vertexColors: true }));
+shrineGrp.add(shrinePedestal);
+var shrineCvs = document.createElement("canvas");
+shrineCvs.width = 256; shrineCvs.height = 128;
+var shrineCtx = shrineCvs.getContext("2d");
+var shrineTex = new THREE.CanvasTexture(shrineCvs);
+shrineTex.colorSpace = THREE.SRGBColorSpace;
+var shrineNum = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.64),
+  new THREE.MeshBasicMaterial({ map: shrineTex, transparent: true }));
+shrineNum.position.set(0, 1.62, 1.0);                   // ueber Gate-Panel-Hoehe, frei vor der Statue
+shrineGrp.add(shrineNum);
+shrineGrp.visible = false;
+scene.add(shrineGrp);
+var shrineLastHp = -1;
+function drawShrineNum(v) {
+  shrineCtx.clearRect(0, 0, 256, 128);
+  shrineCtx.font = "800 96px system-ui, sans-serif";
+  shrineCtx.textAlign = "center";
+  shrineCtx.textBaseline = "middle";
+  shrineCtx.fillStyle = "#e8c766";
+  shrineCtx.fillText(String(v), 128, 68);
+  shrineTex.needsUpdate = true;
+}
+function renderShrine3d(alpha) {
+  var s = state.shrine;
+  if (!s.active) { shrineGrp.visible = false; return; }
+  shrineGrp.visible = true;
+  var sx = wx(s.x), sz = wz(lerp(s.py, s.y, alpha));
+  shrineGrp.position.set(sx, 0, sz);
+  shrineGrp.rotation.y = s.side < 0 ? 0.35 : -0.35;   // leicht zur Lane gedreht
+  var sc = s.dead ? Math.max(0.001, s.deadT / CFG.shrineDeadTime) : 1;
+  shrineGrp.scale.setScalar(sc);
+  shrineStatueMat.emissive.setScalar(s.flash > 0 ? 0.45 : 0);
+  var hpShow = Math.max(0, Math.ceil(s.hp));
+  if (hpShow !== shrineLastHp) { drawShrineNum(hpShow); shrineLastHp = hpShow; }
+  if (!s.dead) pushBlob(sx, sz, 0.6);
+}
+
 /* ================= HUD (HTML-Overlay) ================= */
 var hudEl = document.getElementById("hud");
 var hudDistEl = document.getElementById("hudDist");
@@ -1734,6 +1873,9 @@ function render3d(alpha) {
     sm2.material.opacity = 0.25 + 0.25 * pp + 0.06 * Math.sin(t * 24);
   }
   renderBoss3d(alpha, t);
+  renderShrine3d(alpha);
+  blobMesh.count = blobCount;
+  blobMesh.instanceMatrix.needsUpdate = true;
   renderHud3d(alpha, fx);
   // --- Kamera: Nachfuehren (gedaempft) + kleiner Boss-Einschlag-Jitter ---
   var wantX = REDUCED ? 0 : clamp(wx(fx) * CFG.world.camFollow, -CFG.world.camFollowMax, CFG.world.camFollowMax);
@@ -1785,6 +1927,7 @@ function renderBoss3d(alpha, t) {
   rig.grp.position.set(bx, yPos, bz);
   rig.grp.scale.setScalar(s);
   rig.mat.emissive.setScalar(b.flash > 0 ? 0.9 : 0);                     // Treffer-Blink
+  if (b.phase < 2) pushBlob(bx, bz, rig.built.r * 1.15);
   if (b.type === 1) {
     var mawS = b.spitTele > 0 ? 1 + 0.6 * (1 - b.spitTele / CFG.spitTelegraph) : 1;
     mawMesh.scale.setScalar(mawS);
