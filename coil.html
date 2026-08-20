@@ -1,0 +1,1573 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="color-scheme" content="dark">
+<title>COIL</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230e0f16'/%3E%3Crect x='7' y='16' width='6' height='6' rx='1.5' fill='%2315505e'/%3E%3Crect x='13' y='16' width='6' height='6' rx='1.5' fill='%233dd0e8'/%3E%3Crect x='19' y='10' width='6' height='6' rx='1.5' fill='%237ef3ff'/%3E%3C/svg%3E">
+<!--
+  COIL — Snake in 3D.
+
+  WICHTIG: Diese Datei braucht einen Server, kein Doppelklick.
+  <script type="module"> unterliegt CORS, und file:// hat keinen gueltigen Origin.
+
+      python3 -m http.server 8000
+      → http://localhost:8000/coil.html
+
+  Parameter:  ?seed=12345   feste Runde
+              ?test=1       Selbsttests laufen und sichtbar anzeigen
+              ?debug=1      Overlay mit FPS, Frame-Zeit, Draw Calls, Dreiecken
+-->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.185.1/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.185.1/examples/jsm/"
+  }
+}
+</script>
+<style>
+:root{
+  --bg:#07080c;
+  --acc:#3dd0e8;
+  --acc-hot:#7ef3ff;
+  --warm:#f0b429;
+  --core:#ff5c8a;
+  --tx:#e8e8ec;
+  --tx2:#8b8b95;
+  --glass:rgba(18,20,28,.62);
+  --line:rgba(255,255,255,.09);
+  --s1:clamp(.72rem,.68rem+.2vw,.82rem);
+  --s2:clamp(.86rem,.8rem+.3vw,1rem);
+  --s3:clamp(1.5rem,1.1rem+2vw,2.2rem);
+  --s4:clamp(2.6rem,1.6rem+5vw,4.4rem);
+  font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,
+    "Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overscroll-behavior:none;background:var(--bg);color:var(--tx)}
+body{overflow:hidden;user-select:none;-webkit-user-select:none;
+  font-variant-numeric:tabular-nums}
+#scene{display:block;width:100%;height:100svh;touch-action:none;outline:none}
+.wrap{position:fixed;inset:0}
+
+/* ---------- HUD ---------- */
+.hud{position:fixed;left:0;right:0;top:0;z-index:5;pointer-events:none;
+  padding:calc(10px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right))
+          0 calc(12px + env(safe-area-inset-left));
+  display:grid;grid-template-columns:1fr auto 1fr;align-items:start;gap:10px}
+.hud.off{display:none}
+.hud-l,.hud-r{display:flex;flex-direction:column;gap:2px;font-size:var(--s1);
+  color:var(--tx2);line-height:1.35}
+.hud-r{align-items:flex-end;text-align:right}
+.hud-l b,.hud-r b{color:var(--tx);font-weight:650}
+.score{font-size:var(--s4);font-weight:800;line-height:.95;letter-spacing:-.02em;
+  text-align:center;text-shadow:0 2px 18px rgba(61,208,232,.28)}
+.mid{display:flex;flex-direction:column;align-items:center;gap:4px}
+.mwrap{position:relative;width:46px;height:46px;display:grid;place-items:center}
+.mwrap svg{position:absolute;inset:0;transform:rotate(-90deg)}
+.mwrap circle{fill:none;stroke-width:3;stroke-linecap:round}
+.mtrack{stroke:rgba(255,255,255,.10)}
+.mring{stroke:var(--acc);transition:stroke .2s}
+.mval{font-size:var(--s2);font-weight:800;color:var(--acc)}
+.mwrap.hi .mring{stroke:var(--warm)}
+.mwrap.hi .mval{color:var(--warm)}
+.mwrap.one{opacity:.42}
+
+/* ---------- Bildschirme ---------- */
+.screen{position:fixed;inset:0;z-index:10;display:none;place-items:center;
+  padding:calc(18px + env(safe-area-inset-top)) 18px calc(18px + env(safe-area-inset-bottom));
+  background:rgba(7,8,12,.55)}
+.screen.on{display:grid}
+.panel{width:min(380px,100%);max-height:100%;overflow-y:auto;
+  padding:26px 22px;border-radius:20px;text-align:center;
+  background:var(--glass);border:1px solid var(--line);
+  backdrop-filter:blur(20px) saturate(150%);-webkit-backdrop-filter:blur(20px) saturate(150%);
+  box-shadow:0 24px 70px rgba(0,0,0,.6)}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .panel{background:#12141c}
+}
+.title{font-size:var(--s4);font-weight:800;letter-spacing:.22em;margin:0 0 2px;
+  color:var(--acc-hot);text-shadow:0 0 26px rgba(61,208,232,.45)}
+.sub{color:var(--tx2);font-size:var(--s2);margin:0 0 20px;line-height:1.55}
+.big{width:100%;min-height:52px;border:0;border-radius:14px;cursor:pointer;
+  font-family:inherit;font-size:var(--s2);font-weight:800;letter-spacing:.04em;
+  color:#04222a;background-color:var(--acc);
+  background-image:linear-gradient(135deg,var(--acc-hot),var(--acc));
+  box-shadow:0 8px 26px rgba(61,208,232,.24)}
+.ghost{width:100%;min-height:46px;margin-top:8px;border:1px solid var(--line);
+  border-radius:12px;cursor:pointer;font-family:inherit;font-size:var(--s2);
+  font-weight:650;color:var(--tx);background:rgba(255,255,255,.04)}
+.ghost:hover,.big:hover{filter:brightness(1.08)}
+button:focus-visible,#scene:focus-visible{outline:2px solid var(--acc);outline-offset:3px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:0 0 18px}
+.stat{padding:11px 12px;border-radius:12px;background:rgba(255,255,255,.035);
+  border:1px solid rgba(255,255,255,.055);text-align:left}
+.stat i{display:block;font-style:normal;font-size:var(--s1);color:var(--tx2);
+  letter-spacing:.04em}
+.stat b{display:block;font-size:var(--s3);font-weight:800;line-height:1.15;margin-top:2px}
+.cause{display:inline-block;padding:5px 13px;border-radius:20px;margin-bottom:14px;
+  background:rgba(255,92,138,.13);border:1px solid rgba(255,92,138,.34);
+  color:#ff8fae;font-size:var(--s1);font-weight:700;letter-spacing:.05em}
+.rec{color:var(--warm);font-size:var(--s1);font-weight:800;letter-spacing:.08em;
+  margin-bottom:10px}
+.seedline{color:var(--tx2);font-size:var(--s1);margin-top:14px;opacity:.75}
+.row{display:flex;gap:8px;margin-top:8px}
+.row .ghost{margin-top:0}
+.hint{color:var(--tx2);font-size:var(--s1);margin-top:16px;line-height:1.6}
+kbd{display:inline-block;padding:1px 6px;border-radius:5px;font:inherit;font-size:.92em;
+  background:rgba(255,255,255,.07);border:1px solid var(--line)}
+
+/* ---------- Debug / Fallback / Testbericht ---------- */
+.dbg{position:fixed;left:calc(8px + env(safe-area-inset-left));
+  bottom:calc(8px + env(safe-area-inset-bottom));z-index:8;display:none;
+  padding:7px 10px;border-radius:9px;background:rgba(7,8,12,.8);
+  border:1px solid var(--line);color:var(--tx2);font-size:11px;line-height:1.55;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre;pointer-events:none}
+.dbg.on{display:block}
+.fallback{position:fixed;inset:0;z-index:30;display:none;place-items:center;padding:24px;
+  background:var(--bg)}
+.fallback.on{display:grid}
+.fallback .panel{background:#12141c;backdrop-filter:none;-webkit-backdrop-filter:none}
+.testout{position:fixed;inset:auto 0 0 0;z-index:40;max-height:56svh;overflow:auto;
+  display:none;padding:14px 16px calc(14px + env(safe-area-inset-bottom));
+  background:rgba(7,8,12,.96);border-top:1px solid var(--line);
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.7}
+.testout.on{display:block}
+.testout .ok{color:#5fe08a}
+.testout .no{color:#ff6b8a}
+.testout h2{margin:0 0 8px;font-size:13px;letter-spacing:.1em;color:var(--tx)}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+<div class="wrap"><canvas id="scene" tabindex="0" aria-label="COIL Spielfeld"></canvas></div>
+
+<div class="hud off" id="hud">
+  <div class="hud-l"><span>Länge <b id="hLen">4</b></span><span>Tempo <b id="hSpd">1</b></span></div>
+  <div class="mid">
+    <div class="score" id="hScore">0</div>
+    <div class="mwrap one" id="hMwrap">
+      <svg viewBox="0 0 46 46" aria-hidden="true">
+        <circle class="mtrack" cx="23" cy="23" r="20"></circle>
+        <circle class="mring" cx="23" cy="23" r="20" id="hRing"
+          stroke-dasharray="125.7" stroke-dashoffset="0"></circle>
+      </svg>
+      <span class="mval" id="hMult">×1</span>
+    </div>
+  </div>
+  <div class="hud-r"><span>Best <b id="hBest">0</b></span><span id="hMuteTx">Ton an</span></div>
+</div>
+
+<div class="screen on" id="scStart">
+  <div class="panel">
+    <h1 class="title">COIL</h1>
+    <p class="sub" id="startHint">Pfeiltasten oder WASD</p>
+    <div class="stats" style="grid-template-columns:1fr">
+      <div class="stat"><i>Bestscore</i><b id="startBest">0</b></div>
+    </div>
+    <button class="big" id="btnStart">Starten</button>
+    <button class="ghost" id="btnMute0">Ton an</button>
+    <p class="hint" id="startKeys"><kbd>Space</kbd> Start / Pause · <kbd>M</kbd> Ton ·
+      <kbd>R</kbd> Neustart</p>
+  </div>
+</div>
+
+<div class="screen" id="scPause">
+  <div class="panel">
+    <h2 class="title" style="font-size:var(--s3)">Pause</h2>
+    <p class="sub">Das Spiel wartet auf Sie.</p>
+    <button class="big" id="btnResume">Fortsetzen</button>
+    <div class="row">
+      <button class="ghost" id="btnRestart">Neustart</button>
+      <button class="ghost" id="btnMute">Ton an</button>
+    </div>
+    <button class="ghost" id="btnQual">Qualität: Hoch</button>
+  </div>
+</div>
+
+<div class="screen" id="scOver">
+  <div class="panel">
+    <div class="rec" id="ovRec" style="display:none">NEUER BESTSCORE</div>
+    <div class="cause" id="ovCause">Wand</div>
+    <div class="score" id="ovScore" style="margin-bottom:16px">0</div>
+    <div class="stats">
+      <div class="stat"><i>Bestscore</i><b id="ovBest">0</b></div>
+      <div class="stat"><i>Länge</i><b id="ovLen">4</b></div>
+      <div class="stat"><i>Höchste Kombo</i><b id="ovMult">×1</b></div>
+      <div class="stat"><i>Dauer</i><b id="ovTime">0:00</b></div>
+    </div>
+    <button class="big" id="btnAgain">Nochmal</button>
+    <div class="seedline" id="ovSeed">Seed —</div>
+  </div>
+</div>
+
+<div class="fallback" id="scFail">
+  <div class="panel">
+    <h2 class="title" style="font-size:var(--s3)">COIL lässt sich nicht starten</h2>
+    <p class="sub" id="failWhy">—</p>
+    <p class="hint">Diese Seite braucht WebGL und lädt Three.js von unpkg.com.
+      Über <code>file://</code> geöffnet scheitert sie an CORS — starten Sie sie mit
+      <kbd>python3 -m http.server 8000</kbd> und rufen Sie
+      <code>http://localhost:8000/coil.html</code> auf.</p>
+  </div>
+</div>
+
+<div class="dbg" id="dbg"></div>
+<div class="testout" id="testout"></div>
+
+<!-- Wachhund: ein fehlgeschlagener Modul-Import loest kein window.error aus.
+     Meldet sich das Modul nicht, zeigt die Seite Klartext statt Schwarz. -->
+<script>
+window.__coilReady = false;
+setTimeout(function () {
+  if (window.__coilReady) return;
+  var w = document.getElementById('failWhy');
+  w.textContent = navigator.onLine === false
+    ? 'Keine Netzverbindung — Three.js konnte nicht geladen werden.'
+    : 'Three.js konnte nicht von unpkg.com geladen werden, oder das Modul-Script wurde blockiert.';
+  document.getElementById('scFail').classList.add('on');
+  ['scStart','scPause','scOver'].forEach(function (i) {
+    document.getElementById(i).classList.remove('on');
+  });
+  document.getElementById('hud').classList.add('off');
+}, 6000);
+</script>
+<noscript><div class="fallback on"><div class="panel">
+  <h2 class="title" style="font-size:var(--s3)">JavaScript nötig</h2>
+  <p class="sub">COIL läuft im Browser und braucht aktiviertes JavaScript.</p>
+</div></div></noscript>
+
+<!-- ===================================================================
+     SIMULATION — kennt kein DOM, kein Three.js, kein Math.random().
+     Bewusst ein klassisches Script: laeuft auch dann, wenn der
+     Three.js-Import scheitert, und ist ohne Browser testbar.
+     =================================================================== -->
+<script>
+/*==SIM_START==*/
+"use strict";
+var COIL = (function () {
+
+  /* ---- Tuning. Alle Stellschrauben an einem Ort. ---- */
+  var GRID              = 21;     /* ungerade, damit der Start exakt mittig liegt */
+  var CAP               = GRID * GRID;
+  var TICK_START_MS     = 170;
+  var TICK_DEC_MS       = 7;      /* pro Stufe kuerzer */
+  var TICK_MIN_MS       = 85;
+  var APPLES_PER_STEP   = 5;      /* Aepfel je Geschwindigkeitsstufe */
+  var START_LEN         = 4;
+  var COMBO_TICKS       = 40;
+  var COMBO_MAX         = 8;
+  var APPLE_POINTS      = 10;
+  var CORE_POINTS       = 120;
+  var CORE_MIN_MULT     = 3;
+  var CORE_LIFE_TICKS   = 60;
+  var CORE_PULSE_TICKS  = 15;     /* letzte Ticks: schnelleres Pulsieren */
+  var OBST_AT           = [300, 700, 1200, 1800];
+  var OBST_MIN_HEAD_D   = 5;      /* Mindestabstand zum Kopf */
+  var OBST_AHEAD_CLEAR  = 6;      /* Zellen in Fahrtrichtung, die frei bleiben */
+  var OBST_TRIES        = 50;
+  var QUEUE_MAX         = 2;
+  var COYOTE_MS         = 60;
+
+  var FREE = 0, BODY = 1, OBST = 2;
+
+  /* ---- Seedbarer Zufall (mulberry32). Zustand liegt IM State. ---- */
+  function rnd(s) {
+    s.rs = (s.rs + 0x6D2B79F5) >>> 0;
+    var t = s.rs;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  function rndInt(s, n) { return (rnd(s) * n) | 0; }
+
+  function ix(x, y) { return y * GRID + x; }
+  function cx(i) { return i % GRID; }
+  function cy(i) { return (i / GRID) | 0; }
+
+  /* Scratch-Puffer: feste Groesse, waechst nie. Nur innerhalb eines
+     Aufrufs benutzt, deshalb unkritisch fuer die Reinheit von step(). */
+  var _free = new Int16Array(CAP);
+  var _q = new Int16Array(CAP);
+  var _seen = new Uint8Array(CAP);
+
+  /* ---- Zustand ---- */
+  function create(seed) {
+    var s = {
+      rs: (seed >>> 0) || 1,
+      cells: new Int16Array(CAP),   /* Ringpuffer, cells[head] ist der Kopf */
+      occ: new Uint8Array(CAP),     /* 0 frei, 1 Koerper, 2 Hindernis */
+      head: 0, len: START_LEN,
+      dx: 0, dy: -1,                /* zuletzt AUSGEFUEHRTE Richtung */
+      qx: new Int8Array(QUEUE_MAX), qy: new Int8Array(QUEUE_MAX), qn: 0,
+      apple: -1, core: -1, coreLife: 0, coreBorn: 0,
+      obst: [],
+      score: 0, mult: 1, maxMult: 1, comboLeft: 0,
+      tick: 0, apples: 0, alive: true, cause: null, moved: false,
+      nextObst: 0,
+      /* Ereignisse des letzten Schritts — nur fuer Ton und Optik */
+      evApple: false, evCore: false, evComboLost: false, evObst: -1, evCoreGone: false
+    };
+    var mid = (GRID - 1) >> 1;
+    for (var i = 0; i < START_LEN; i++) {
+      var c = ix(mid, mid + (START_LEN - 1 - i));
+      s.cells[i] = c; s.occ[c] = BODY;
+    }
+    s.head = START_LEN - 1;
+    s.apple = pickApple(s);
+    return s;
+  }
+
+  function clone(s) {
+    return {
+      rs: s.rs, cells: s.cells.slice(), occ: s.occ.slice(),
+      head: s.head, len: s.len, dx: s.dx, dy: s.dy,
+      qx: s.qx.slice(), qy: s.qy.slice(), qn: s.qn,
+      apple: s.apple, core: s.core, coreLife: s.coreLife, coreBorn: s.coreBorn,
+      obst: s.obst.slice(),
+      score: s.score, mult: s.mult, maxMult: s.maxMult, comboLeft: s.comboLeft,
+      tick: s.tick, apples: s.apples, alive: s.alive, cause: s.cause, moved: s.moved,
+      nextObst: s.nextObst,
+      evApple: false, evCore: false, evComboLost: false, evObst: -1, evCoreGone: false
+    };
+  }
+
+  /* i-tes Segment vom Kopf aus (0 = Kopf) */
+  function seg(s, i) { return s.cells[(s.head - i + CAP + CAP) % CAP]; }
+  function tailCell(s) { return seg(s, s.len - 1); }
+
+  /* ---- Eingabe ----
+     Geprueft wird gegen die Richtung, die vor dieser Eingabe tatsaechlich
+     gefahren wird: das Ende der Queue, sonst die zuletzt ausgefuehrte
+     Richtung. Nur so kann Nord → Ost → West nicht zur Kehrtwende werden. */
+  function prevDir(s) {
+    if (s.qn > 0) return { x: s.qx[s.qn - 1], y: s.qy[s.qn - 1] };
+    return { x: s.dx, y: s.dy };
+  }
+  function enqueue(s, dx, dy) {
+    if (!s.alive) return false;
+    if (s.qn >= QUEUE_MAX) return false;
+    var p = prevDir(s);
+    if (dx === p.x && dy === p.y) return false;          /* nichts Neues */
+    if (dx === -p.x && dy === -p.y) return false;         /* 180°, still verworfen */
+    s.qx[s.qn] = dx; s.qy[s.qn] = dy; s.qn++;
+    return true;
+  }
+  function shift(s) {
+    for (var i = 1; i < s.qn; i++) { s.qx[i - 1] = s.qx[i]; s.qy[i - 1] = s.qy[i]; }
+    s.qn--;
+  }
+
+  /* ---- Spawns ---- */
+  function collectFree(s, skipA, skipB, skipC) {
+    var n = 0;
+    for (var i = 0; i < CAP; i++) {
+      if (s.occ[i] !== FREE) continue;
+      if (i === skipA || i === skipB || i === skipC) continue;
+      _free[n++] = i;
+    }
+    return n;
+  }
+  function aheadCell(s) {
+    var hx = cx(seg(s, 0)) + s.dx, hy = cy(seg(s, 0)) + s.dy;
+    if (hx < 0 || hy < 0 || hx >= GRID || hy >= GRID) return -1;
+    return ix(hx, hy);
+  }
+  function pickApple(s) {
+    /* Kein Notnagel: lieber kein Apfel als einer vor dem Kopf. */
+    var n = collectFree(s, s.core, aheadCell(s), -1);
+    if (n === 0) return -1;
+    return _free[rndInt(s, n)];
+  }
+  /* Der Kern liegt bewusst so weit weg wie moeglich — ein Angebot, kein Geschenk. */
+  function pickCore(s) {
+    var h = seg(s, 0), hx = cx(h), hy = cy(h), best = -1, bd = -1;
+    for (var i = 0; i < CAP; i++) {
+      if (s.occ[i] !== FREE || i === s.apple) continue;
+      var d = Math.abs(cx(i) - hx) + Math.abs(cy(i) - hy);
+      if (d > bd) { bd = d; best = i; }
+    }
+    return best;
+  }
+
+  /* ---- Erreichbarkeit: zerschneidet die Hindernis-Menge das Feld? ----
+     Geprueft wird ueber die statische Geometrie (alles, was kein Hindernis
+     ist). Der Koerper zaehlt hier nicht als Wand, weil er sich bewegt —
+     sonst waeren spaete Hindernisse fast nie platzierbar. */
+  function connected(occ, extra) {
+    var total = 0, start = -1, i;
+    for (i = 0; i < CAP; i++) {
+      _seen[i] = 0;
+      if (occ[i] === OBST || i === extra) continue;
+      total++; if (start < 0) start = i;
+    }
+    if (total === 0) return true;
+    var qh = 0, qt = 0;
+    _q[qt++] = start; _seen[start] = 1;
+    var reached = 0;
+    while (qh < qt) {
+      var c = _q[qh++]; reached++;
+      var x = cx(c), y = cy(c);
+      if (x > 0)        nb(c - 1);
+      if (x < GRID - 1) nb(c + 1);
+      if (y > 0)        nb(c - GRID);
+      if (y < GRID - 1) nb(c + GRID);
+    }
+    function nb(k) {
+      if (_seen[k] || occ[k] === OBST || k === extra) return;
+      _seen[k] = 1; _q[qt++] = k;
+    }
+    return reached === total;
+  }
+
+  /* Alle vier Bedingungen aus 2.5, einzeln pruefbar. */
+  function obstacleOk(s, i) {
+    if (s.occ[i] !== FREE) return false;                 /* 1: frei */
+    if (i === s.apple || i === s.core) return false;     /* 1: kein Pickup */
+    var x = cx(i), y = cy(i);
+    if (x === 0 || y === 0 || x === GRID - 1 || y === GRID - 1) return false;  /* 3: nicht am Rand */
+    var h = seg(s, 0), hx = cx(h), hy = cy(h);
+    if (Math.abs(x - hx) + Math.abs(y - hy) < OBST_MIN_HEAD_D) return false;   /* 2: Abstand */
+    for (var k = 1; k <= OBST_AHEAD_CLEAR; k++) {        /* 2: nicht im Weg */
+      if (x === hx + s.dx * k && y === hy + s.dy * k) return false;
+    }
+    return connected(s.occ, i);                          /* 4: nichts wird abgeschnitten */
+  }
+  function placeObstacle(s) {
+    for (var t = 0; t < OBST_TRIES; t++) {
+      var i = rndInt(s, CAP);
+      if (obstacleOk(s, i)) {
+        s.occ[i] = OBST; s.obst.push(i); return i;
+      }
+    }
+    return -1;   /* in dieser Runde faellt der Block aus */
+  }
+
+  function tickMs(s) {
+    var lvl = (s.apples / APPLES_PER_STEP) | 0;
+    return Math.max(TICK_MIN_MS, TICK_START_MS - TICK_DEC_MS * lvl);
+  }
+  function speedLevel(s) { return 1 + (((s.apples / APPLES_PER_STEP) | 0)); }
+
+  /* ---- Ein Schritt. Reine Funktion: neuer Zustand, alter bleibt. ---- */
+  function step(prev, input) {
+    var s = clone(prev);
+    if (!s.alive) return s;
+    if (input) enqueue(s, input.x, input.y);
+
+    /* Richtung ziehen — ungueltige Eintraege still verwerfen */
+    while (s.qn > 0) {
+      var nx = s.qx[0], ny = s.qy[0];
+      shift(s);
+      if (nx === -s.dx && ny === -s.dy) continue;
+      if (nx === s.dx && ny === s.dy) continue;
+      s.dx = nx; s.dy = ny; break;
+    }
+
+    var h = seg(s, 0), hx = cx(h) + s.dx, hy = cy(h) + s.dy;
+    s.tick++; s.moved = true;
+
+    if (hx < 0 || hy < 0 || hx >= GRID || hy >= GRID) {
+      s.alive = false; s.cause = "Wand"; return s;
+    }
+    var nh = ix(hx, hy);
+    var grow = (nh === s.apple);
+    var tail = tailCell(s);
+
+    if (s.occ[nh] === OBST) { s.alive = false; s.cause = "Hindernis"; return s; }
+    /* Schwanz-Sonderfall: das Feld wird in genau diesem Tick frei. */
+    if (s.occ[nh] === BODY && !(nh === tail && !grow)) {
+      s.alive = false; s.cause = "Eigener Körper"; return s;
+    }
+
+    s.head = (s.head + 1) % CAP;
+    s.cells[s.head] = nh;
+    if (grow) { s.len++; }
+    else { s.occ[tail] = FREE; }
+    s.occ[nh] = BODY;
+
+    /* Kern altert, bevor er eingesammelt werden kann */
+    if (s.core >= 0) {
+      s.coreLife--;
+      if (nh === s.core) {
+        s.score += CORE_POINTS * s.mult;
+        s.core = -1; s.coreLife = 0; s.evCore = true;
+      } else if (s.coreLife <= 0) {
+        s.core = -1; s.evCoreGone = true;
+      }
+    }
+
+    if (grow) {
+      s.mult = s.comboLeft > 0 ? Math.min(s.mult + 1, COMBO_MAX) : 1;
+      if (s.mult > s.maxMult) s.maxMult = s.mult;
+      s.score += APPLE_POINTS * s.mult;
+      s.comboLeft = COMBO_TICKS;
+      s.apples++;
+      s.evApple = true;
+      s.apple = pickApple(s);
+      if (s.core < 0 && s.mult >= CORE_MIN_MULT) {
+        var c = pickCore(s);
+        if (c >= 0) { s.core = c; s.coreLife = CORE_LIFE_TICKS; s.coreBorn = s.tick; }
+      }
+    } else if (s.comboLeft > 0) {
+      s.comboLeft--;
+      if (s.comboLeft === 0 && s.mult > 1) { s.mult = 1; s.evComboLost = true; }
+    }
+
+    while (s.nextObst < OBST_AT.length && s.score >= OBST_AT[s.nextObst]) {
+      var oi = placeObstacle(s);
+      s.nextObst++;
+      if (oi >= 0) { s.evObst = oi; break; }   /* hoechstens einer je Tick */
+    }
+    return s;
+  }
+
+  return {
+    GRID: GRID, CAP: CAP, FREE: FREE, BODY: BODY, OBST: OBST,
+    TICK_START_MS: TICK_START_MS, TICK_MIN_MS: TICK_MIN_MS, TICK_DEC_MS: TICK_DEC_MS,
+    COMBO_TICKS: COMBO_TICKS, COMBO_MAX: COMBO_MAX, CORE_LIFE_TICKS: CORE_LIFE_TICKS,
+    CORE_PULSE_TICKS: CORE_PULSE_TICKS, CORE_MIN_MULT: CORE_MIN_MULT,
+    QUEUE_MAX: QUEUE_MAX, COYOTE_MS: COYOTE_MS, OBST_AT: OBST_AT,
+    OBST_MIN_HEAD_D: OBST_MIN_HEAD_D, OBST_AHEAD_CLEAR: OBST_AHEAD_CLEAR,
+    APPLE_POINTS: APPLE_POINTS, CORE_POINTS: CORE_POINTS, START_LEN: START_LEN,
+    create: create, clone: clone, step: step, enqueue: enqueue,
+    seg: seg, tailCell: tailCell, ix: ix, cx: cx, cy: cy,
+    tickMs: tickMs, speedLevel: speedLevel, aheadCell: aheadCell,
+    connected: connected, obstacleOk: obstacleOk, placeObstacle: placeObstacle,
+    pickApple: pickApple, pickCore: pickCore, rnd: rnd, rndInt: rndInt
+  };
+})();
+if (typeof module !== "undefined" && module.exports) module.exports = COIL;
+/*==SIM_END==*/
+</script>
+
+<!-- ===================================================================
+     SELBSTTESTS — laufen ohne Rendering. Wenn das nicht ginge, waere die
+     Trennung aus Regel 1 nicht sauber.
+     =================================================================== -->
+<script>
+/*==TEST_START==*/
+"use strict";
+(function () {
+  var C = COIL, G = C.GRID;
+
+  /* Zustand aus einer expliziten Segmentliste bauen (Kopf zuerst). */
+  function build(segs, dir, seed) {
+    var s = C.create(seed || 7);
+    s.occ.fill(0); s.obst.length = 0; s.apple = -1; s.core = -1;
+    for (var i = 0; i < segs.length; i++) {
+      var c = C.ix(segs[segs.length - 1 - i][0], segs[segs.length - 1 - i][1]);
+      s.cells[i] = c; s.occ[c] = C.BODY;
+    }
+    s.head = segs.length - 1; s.len = segs.length;
+    s.dx = dir[0]; s.dy = dir[1]; s.qn = 0;
+    return s;
+  }
+  /* Ein Rechteck abfahren, ohne zu fressen und ohne zu sterben. */
+  function loopTicks(s, n) {
+    var plan = [[1, 0, 15], [0, 1, 15], [-1, 0, 15], [0, -1, 15]], p = 0, left = plan[0][2];
+    for (var t = 0; t < n; t++) {
+      if (left === 0) { p = (p + 1) % 4; left = plan[p][2]; s = C.step(s, { x: plan[p][0], y: plan[p][1] }); }
+      else s = C.step(s, null);
+      left--;
+      if (!s.alive) return s;
+    }
+    return s;
+  }
+  function opposite(a, b) { return a.x === -b.x && a.y === -b.y; }
+
+  var T = {};
+
+  /* 1 — Determinismus */
+  T.determinismus = function () {
+    var dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
+    function run() {
+      var s = C.create(4242), r = { rs: 999 };
+      for (var i = 0; i < 200; i++) {
+        var inp = C.rnd(r) < 0.35 ? dirs[C.rndInt(r, 4)] : null;
+        s = C.step(s, inp);
+        if (!s.alive) s = C.create(4242);
+      }
+      return s;
+    }
+    var a = run(), b = run();
+    if (a.score !== b.score) return "Score " + a.score + " ≠ " + b.score;
+    if (a.len !== b.len) return "Länge " + a.len + " ≠ " + b.len;
+    if (C.seg(a, 0) !== C.seg(b, 0)) return "Kopfposition weicht ab";
+    if (a.tick !== b.tick) return "Tickzahl weicht ab";
+    return null;
+  };
+
+  /* 2 — 180°-Schutz: nie eine Kehrtwende, nie Tod am eigenen Hals */
+  T.kehrtwende = function () {
+    var dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
+    var r = { rs: 20250820 };
+    for (var run = 0; run < 5000; run++) {
+      var s = C.create(1 + C.rndInt(r, 1e6));
+      for (var t = 0; t < 12 && s.alive; t++) {
+        var before = { x: s.dx, y: s.dy }, neck = s.len > 1 ? C.seg(s, 1) : -1;
+        s = C.step(s, dirs[C.rndInt(r, 4)]);
+        if (opposite(before, { x: s.dx, y: s.dy }))
+          return "Kehrtwende in Lauf " + run;
+        if (!s.alive && s.cause === "Eigener Körper" && C.seg(s, 0) === neck)
+          return "Sofort-Selbstkollision in Lauf " + run;
+      }
+    }
+    return null;
+  };
+
+  /* 3 — Apfel-Spawn */
+  T.apfelSpawn = function () {
+    var dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
+    var r = { rs: 777 }, s = C.create(31337), n = 0;
+    while (n < 10000) {
+      var a = C.pickApple(s);
+      if (a >= 0) {
+        if (s.occ[a] !== C.FREE) return "Apfel auf belegter Zelle";
+        if (a === C.aheadCell(s)) return "Apfel direkt vor dem Kopf";
+        if (a === s.core) return "Apfel auf dem Kern";
+        n++;
+      }
+      s = C.step(s, C.rnd(r) < 0.3 ? dirs[C.rndInt(r, 4)] : null);
+      if (!s.alive) s = C.create(1 + C.rndInt(r, 1e6));
+      if (s.tick % 37 === 0 && s.obst.length < 4) C.placeObstacle(s);
+    }
+    return null;
+  };
+
+  /* 4 — Hindernis-Invariante, unabhaengig nachgeprueft */
+  T.hindernis = function () {
+    var dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
+    var r = { rs: 99 }, s = C.create(555), n = 0, guard = 0;
+    while (n < 1000 && guard++ < 400000) {
+      s = C.step(s, C.rnd(r) < 0.3 ? dirs[C.rndInt(r, 4)] : null);
+      if (!s.alive) { s = C.create(1 + C.rndInt(r, 1e6)); continue; }
+      if (s.obst.length >= 4) { s = C.create(1 + C.rndInt(r, 1e6)); continue; }
+      var h = C.seg(s, 0), hx = C.cx(h), hy = C.cy(h);
+      var i = C.placeObstacle(s);
+      if (i < 0) continue;
+      n++;
+      var x = C.cx(i), y = C.cy(i);
+      if (s.occ[i] !== C.OBST) return "Bedingung 1: Zelle war belegt";
+      if (i === s.apple || i === s.core) return "Bedingung 1: auf einem Pickup";
+      if (x === 0 || y === 0 || x === G - 1 || y === G - 1) return "Bedingung 3: am Rand";
+      if (Math.abs(x - hx) + Math.abs(y - hy) < C.OBST_MIN_HEAD_D) return "Bedingung 2: zu nah am Kopf";
+      for (var k = 1; k <= C.OBST_AHEAD_CLEAR; k++)
+        if (x === hx + s.dx * k && y === hy + s.dy * k) return "Bedingung 2: im Fahrweg";
+      if (!C.connected(s.occ, -1)) return "Bedingung 4: Feld zerschnitten";
+    }
+    if (n < 1000) return "nur " + n + " Platzierungen erreicht";
+    return null;
+  };
+
+  /* 5 — Schwanz-Sonderfall */
+  T.schwanz = function () {
+    var s = build([[5, 5], [6, 5], [6, 6], [5, 6]], [-1, 0]);
+    s.apple = C.ix(1, 1);
+    var tail = C.tailCell(s);
+    if (tail !== C.ix(5, 6)) return "Testaufbau falsch";
+    var n = C.step(s, { x: 0, y: 1 });
+    if (!n.alive) return "Tod auf dem freiwerdenden Schwanzfeld (" + n.cause + ")";
+    if (C.seg(n, 0) !== C.ix(5, 6)) return "Kopf steht nicht auf dem Schwanzfeld";
+    /* Gegenprobe: mit Wachstum bleibt der Schwanz liegen und es IST ein Tod */
+    var g = build([[5, 5], [6, 5], [6, 6], [5, 6]], [-1, 0]);
+    g.apple = C.ix(5, 6);
+    var m = C.step(g, { x: 0, y: 1 });
+    if (m.alive) return "Gegenprobe: Wachstum auf den Schwanz müsste tödlich sein";
+    return null;
+  };
+
+  /* 6 — Kombo-Fenster: 39 haelt, 41 setzt zurueck */
+  T.kombo = function () {
+    function lauf(warte) {
+      var s = build([[2, 2], [1, 2], [0, 2], [0, 3]], [1, 0], 11);
+      s.apple = C.ix(3, 2);                       /* direkt vor dem Kopf */
+      s = C.step(s, null);                        /* erster Apfel: ×1 */
+      if (!s.evApple) return { err: "erster Apfel nicht gefressen" };
+      s.apple = C.ix(10, 10);                     /* aus dem Weg */
+      s = loopTicks(s, warte);
+      if (!s.alive) return { err: "Testschlange gestorben nach " + warte + " Ticks" };
+      var h = C.seg(s, 0);
+      s.apple = C.ix(C.cx(h) + s.dx, C.cy(h) + s.dy);
+      s = C.step(s, null);
+      if (!s.evApple) return { err: "zweiter Apfel nicht gefressen" };
+      return { mult: s.mult };
+    }
+    var a = lauf(39); if (a.err) return a.err;
+    if (a.mult !== 2) return "nach 39 Ticks sollte ×2 stehen, steht ×" + a.mult;
+    var b = lauf(41); if (b.err) return b.err;
+    if (b.mult !== 1) return "nach 41 Ticks sollte ×1 stehen, steht ×" + b.mult;
+    return null;
+  };
+
+  /* 7 — nichts waechst unbemerkt mit */
+  T.keinWachstum = function () {
+    var dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
+    var r = { rs: 2024 }, s = C.create(8080);
+    var c0 = s.cells.length, o0 = s.occ.length, q0 = s.qx.length;
+    for (var i = 0; i < 5000; i++) {
+      s = C.step(s, C.rnd(r) < 0.3 ? dirs[C.rndInt(r, 4)] : null);
+      if (!s.alive) s = C.create(1 + C.rndInt(r, 1e6));
+      if (s.cells.length !== c0) return "cells gewachsen";
+      if (s.occ.length !== o0) return "occ gewachsen";
+      if (s.qx.length !== q0 || s.qn > C.QUEUE_MAX) return "Eingabepuffer gewachsen";
+      if (s.obst.length > C.OBST_AT.length) return "Hindernisliste gewachsen";
+      if (s.len > C.CAP) return "Länge über Kapazität";
+    }
+    var P = (typeof window !== "undefined") && window.__coilPools;
+    if (P) {
+      if (P.particleCount() !== P.particleCap) return "Partikelpool gewachsen";
+      if (P.bodyCapacity() !== C.CAP) return "Instanzkapazität gewachsen";
+    }
+    return null;
+  };
+
+  /* 8 — Simulationstempo */
+  T.tempo = function () {
+    var s = C.create(1234), t0 = (typeof performance !== "undefined" ? performance : Date).now();
+    for (var i = 0; i < 5000; i++) {
+      s = C.step(s, null);
+      if (!s.alive) s = C.create(1234 + i);
+    }
+    var ms = (typeof performance !== "undefined" ? performance : Date).now() - t0;
+    T.tempo.ms = ms;
+    if (ms >= 50) return "5.000 Schritte in " + ms.toFixed(1) + " ms (Grenze 50)";
+    return null;
+  };
+
+  var ORDER = [
+    ["1 Determinismus", "determinismus"],
+    ["2 180°-Schutz", "kehrtwende"],
+    ["3 Apfel-Spawn", "apfelSpawn"],
+    ["4 Hindernis-Invariante", "hindernis"],
+    ["5 Schwanz-Sonderfall", "schwanz"],
+    ["6 Kombo-Fenster", "kombo"],
+    ["7 Kein Wachstum", "keinWachstum"],
+    ["8 Simulationstempo", "tempo"]
+  ];
+
+  function run() {
+    var fails = [], rows = [];
+    for (var i = 0; i < ORDER.length; i++) {
+      var name = ORDER[i][0], fn = T[ORDER[i][1]], err = null, t0, ms;
+      t0 = (typeof performance !== "undefined" ? performance : Date).now();
+      try { err = fn(); } catch (e) { err = "Ausnahme: " + (e && e.message ? e.message : e); }
+      ms = (typeof performance !== "undefined" ? performance : Date).now() - t0;
+      rows.push({ name: name, err: err, ms: ms });
+      if (err) fails.push(name + ": " + err);
+    }
+    run.rows = rows;
+    return fails.length ? fails : "OK";
+  }
+  run.rows = [];
+  if (typeof window !== "undefined") window.__tests = run;
+  if (typeof module !== "undefined" && module.exports) module.exports = run;
+})();
+/*==TEST_END==*/
+</script>
+
+<!-- ===================================================================
+     DARSTELLUNG — interpoliert nur zwischen zwei Simulationszustaenden.
+     =================================================================== -->
+<script type="module">
+import * as THREE from 'three';
+
+const $ = id => document.getElementById(id);
+const C = window.COIL;
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const params = new URLSearchParams(location.search);
+const DEBUG = params.has('debug');
+
+/* ---------- Blickwinkel: eine Konstante, hier und nirgends sonst ----------
+   Steil genug, dass die hinterste Zellreihe ihre Hoehe behaelt. Flacher
+   heiszt: der Spieler verschaetzt sich um genau die Zelle, an der er stirbt. */
+const CAM_ELEV_DEG = 70;
+const CAM_FOV      = 34;
+const CAM_MARGIN   = 1.04;
+const CAM_FOLLOW   = 1.5;      /* wie weit die Kamera dem Kopf folgt */
+
+const H_BODY = 0.55, H_HEAD = 0.62, H_OBST = 1.40;
+const COL = {
+  bg:0x07080c, plate:0x0e0f16, grid:0x1c1f2b, rim:0x3dd0e8,
+  head:0x7ef3ff, bodyA:0x3dd0e8, bodyB:0x15505e,
+  apple:0xf0b429, core:0xff5c8a, obst:0x2a2d3a, obstTop:0x4a4f63
+};
+
+/* ---------- Speicher, der auch dann nicht stirbt, wenn er wirft ---------- */
+const mem = {};
+const store = {
+  get(k, d){ try{ const v=localStorage.getItem('coil.'+k); return v===null?d:v; }
+             catch(e){ return k in mem ? mem[k] : d; } },
+  set(k, v){ mem[k]=String(v); try{ localStorage.setItem('coil.'+k, v); }catch(e){} }
+};
+
+/* ---------- Ersatzbildschirm statt schwarzer Flaeche ---------- */
+let started = false;
+let failed = false;
+function fail(why){
+  failed = true;
+  $('failWhy').textContent = why;
+  $('scFail').classList.add('on');
+  ['scStart','scPause','scOver'].forEach(i=>$(i).classList.remove('on'));
+  $('hud').classList.add('off');
+}
+window.addEventListener('error', () => {
+  /* Nur einspringen, wenn nicht schon ein genauerer Grund steht — sonst
+     ueberschreibt die Rohmeldung den verstaendlichen Text. */
+  if(!started && !failed)
+    fail('Ein Teil des Spiels konnte nicht geladen werden. Bitte die Seite neu laden.');
+}, { once:true });
+
+/* ---------- Renderer ---------- */
+const canvas = $('scene');
+let renderer;
+try{
+  renderer = new THREE.WebGLRenderer({ canvas, antialias:true,
+    powerPreference:'high-performance' });
+}catch(e){
+  fail('Dieses Gerät stellt kein WebGL bereit. COIL braucht 3D-Darstellung im Browser.');
+  throw e;
+}
+let saver = store.get('saver','0') === '1';
+function applyPixelRatio(){
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, saver ? 1.25 : 2));
+}
+applyPixelRatio();
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(COL.bg);
+const camera = new THREE.PerspectiveCamera(CAM_FOV, 1, 1, 400);
+
+/* ---------- Abgerundete Kanten nur, wenn der Pfad wirklich existiert ---------- */
+let RoundedBox = null;
+try{
+  ({ RoundedBoxGeometry: RoundedBox } =
+    await import('three/addons/geometries/RoundedBoxGeometry.js'));
+}catch(e){ RoundedBox = null; }
+const boxGeo = (w,h,d) => RoundedBox
+  ? new RoundedBox(w,h,d,1,Math.min(w,h,d)*0.16)
+  : new THREE.BoxGeometry(w,h,d);
+
+/* ---------- Arena ---------- */
+const G = C.GRID, HALF = (G-1)/2;
+const wx = i => C.cx(i) - HALF, wz = i => C.cy(i) - HALF;
+
+const plate = new THREE.Mesh(
+  new THREE.BoxGeometry(G+0.9, 0.5, G+0.9),
+  new THREE.MeshStandardMaterial({ color:COL.plate, roughness:0.95, metalness:0.0 })
+);
+plate.position.y = -0.25 - H_BODY/2;
+scene.add(plate);
+
+/* Gitter: eine einzige LineSegments-Geometrie, keine 441 Meshes. */
+{
+  const pts = [], e = G/2, y = -H_BODY/2 + 0.002;
+  for(let i=0;i<=G;i++){
+    const p = -e + i;
+    pts.push(p, y, -e, p, y, e, -e, y, p, e, y, p);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  scene.add(new THREE.LineSegments(g,
+    new THREE.LineBasicMaterial({ color:COL.grid, transparent:true, opacity:0.9 })));
+}
+
+/* Rand: vier Balken in EINEM InstancedMesh. */
+{
+  const rimGeo = new THREE.BoxGeometry(1,1,1);
+  const rimMat = new THREE.MeshStandardMaterial({
+    color:0x0b1418, emissive:COL.rim, emissiveIntensity:2.4, roughness:0.5 });
+  const rim = new THREE.InstancedMesh(rimGeo, rimMat, 4);
+  const e = G/2 + 0.22, t = 0.22, h = 0.20, y = -H_BODY/2 + 0.10;
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(),
+        p = new THREE.Vector3(), s = new THREE.Vector3();
+  const cfg = [[0,-e,G+0.9,t],[0,e,G+0.9,t],[-e,0,t,G+0.9],[e,0,t,G+0.9]];
+  cfg.forEach((c,i)=>{
+    p.set(c[0], y, c[1]); s.set(c[2], h, c[3]);
+    rim.setMatrixAt(i, m.compose(p,q,s));
+  });
+  rim.instanceMatrix.needsUpdate = true;
+  scene.add(rim);
+}
+
+/* ---------- Koerper: ein InstancedMesh, Kapazitaet fest auf 441 ---------- */
+const bodyGeo = boxGeo(0.86, H_BODY, 0.86);
+const bodyMat = new THREE.MeshStandardMaterial({ roughness:0.42, metalness:0.15,
+  emissive:0x0a2c34, emissiveIntensity:0.55 });
+const body = new THREE.InstancedMesh(bodyGeo, bodyMat, C.CAP);
+body.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+body.count = 0;
+body.frustumCulled = false;
+scene.add(body);
+{ /* Instanzfarben einmal anlegen */
+  const c = new THREE.Color();
+  for(let i=0;i<C.CAP;i++) body.setColorAt(i, c.setHex(COL.bodyA));
+  body.instanceColor.needsUpdate = true;
+}
+
+/* ---------- Kopf mit Augen ---------- */
+const head = new THREE.Mesh(boxGeo(0.90, H_HEAD, 0.90),
+  new THREE.MeshStandardMaterial({ color:COL.head, emissive:COL.head,
+    emissiveIntensity:0.85, roughness:0.3, metalness:0.1 }));
+scene.add(head);
+const eyes = new THREE.InstancedMesh(new THREE.BoxGeometry(0.20,0.06,0.15),
+  new THREE.MeshBasicMaterial({ color:0x04222a }), 2);
+eyes.frustumCulled = false;
+head.add(eyes);
+
+/* ---------- Hindernisse ---------- */
+const obst = new THREE.InstancedMesh(boxGeo(0.92, H_OBST, 0.92),
+  new THREE.MeshStandardMaterial({ color:COL.obst, roughness:0.85,
+    emissive:COL.obstTop, emissiveIntensity:0.10 }), C.OBST_AT.length);
+obst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+obst.count = 0; obst.frustumCulled = false;
+scene.add(obst);
+
+/* ---------- Pickups ---------- */
+const apple = new THREE.Mesh(new THREE.OctahedronGeometry(0.34, 0),
+  new THREE.MeshStandardMaterial({ color:COL.apple, emissive:COL.apple,
+    emissiveIntensity:1.5, roughness:0.25, flatShading:true }));
+apple.visible = false; scene.add(apple);
+const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.30, 0),
+  new THREE.MeshStandardMaterial({ color:COL.core, emissive:COL.core,
+    emissiveIntensity:1.9, roughness:0.25, flatShading:true }));
+core.visible = false; scene.add(core);
+
+/* Radiale Textur aus einem Canvas — kein externes Asset. */
+function radialTex(inner, outer){
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+  const g = cv.getContext('2d').createRadialGradient(32,32,0,32,32,32);
+  g.addColorStop(0, inner); g.addColorStop(1, outer);
+  const ctx = cv.getContext('2d'); ctx.fillStyle = g; ctx.fillRect(0,0,64,64);
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const glowTex = radialTex('rgba(255,255,255,1)','rgba(255,255,255,0)');
+const glow = new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1),
+  new THREE.MeshBasicMaterial({ map:glowTex, transparent:true, depthWrite:false,
+    blending:THREE.AdditiveBlending }), 2);
+glow.frustumCulled = false; glow.count = 0; scene.add(glow);
+const shadow = new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1),
+  new THREE.MeshBasicMaterial({ map:radialTex('rgba(0,0,0,.65)','rgba(0,0,0,0)'),
+    transparent:true, depthWrite:false }), 3);
+shadow.frustumCulled = false; shadow.count = 0; scene.add(shadow);
+
+/* ---------- Partikel: fester Ringpuffer, nie neu erzeugt ---------- */
+const P_CAP = 200;
+const pPos = new Float32Array(P_CAP*3), pVel = new Float32Array(P_CAP*3),
+      pLife = new Float32Array(P_CAP);
+let pNext = 0;
+const pGeo = new THREE.BufferGeometry();
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+const particles = new THREE.Points(pGeo, new THREE.PointsMaterial({
+  color:COL.apple, size:0.22, transparent:true, opacity:0.9, depthWrite:false,
+  blending:THREE.AdditiveBlending, sizeAttenuation:true }));
+particles.frustumCulled = false;
+scene.add(particles);
+for(let i=0;i<P_CAP;i++) pPos[i*3+1] = -999;
+
+/* Vorberechnete Zufallstabelle — im Loop wird nichts erzeugt. */
+const RTAB = new Float32Array(1024);
+{ let r = 987654321>>>0;
+  for(let i=0;i<RTAB.length;i++){
+    r = (r + 0x6D2B79F5)>>>0; let t=r;
+    t = Math.imul(t ^ (t>>>15), t|1); t ^= t + Math.imul(t ^ (t>>>7), t|61);
+    RTAB[i] = ((t ^ (t>>>14))>>>0)/4294967296;
+  }
+}
+let rTabI = 0;
+const rt = () => RTAB[(rTabI++) & 1023];
+
+function burst(x, z, hex, n){
+  const cnt = saver ? Math.max(4, n>>1) : n;
+  particles.material.color.setHex(hex);
+  for(let i=0;i<cnt;i++){
+    const k = pNext; pNext = (pNext+1) % P_CAP;
+    pPos[k*3] = x; pPos[k*3+1] = 0.2; pPos[k*3+2] = z;
+    if(reduced){ pVel[k*3]=pVel[k*3+1]=pVel[k*3+2]=0; pLife[k]=0.22; }
+    else{
+      const a = rt()*Math.PI*2, sp = 1.4 + rt()*2.6;
+      pVel[k*3] = Math.cos(a)*sp; pVel[k*3+1] = 1.6 + rt()*2.4; pVel[k*3+2] = Math.sin(a)*sp;
+      pLife[k] = 0.45 + rt()*0.3;
+    }
+  }
+}
+
+/* ---------- Licht ---------- */
+scene.add(new THREE.HemisphereLight(0x8fd8ea, 0x05070b, 0.55));
+{ const d = new THREE.DirectionalLight(0xdff4ff, 1.5); d.position.set(6, 14, 9); scene.add(d); }
+
+/* ---------- Kamera: fest ausgerichtet, kein Mitdrehen ---------- */
+const camBase = new THREE.Vector3(), camLook = new THREE.Vector3();
+const _v = new THREE.Vector3(), _m = new THREE.Matrix4(),
+      _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _c = new THREE.Color();
+let camDist = 50;
+function fitCamera(){
+  const w = canvas.clientWidth || 1, h = canvas.clientHeight || 1;
+  const el = CAM_ELEV_DEG * Math.PI/180;
+  const halfFov = CAM_FOV * Math.PI/360;
+  const extentZ = (G+1.4) * Math.sin(el);     /* Tiefe erscheint verkuerzt */
+  const extentX = (G+1.4);
+  const dV = (extentZ/2) / Math.tan(halfFov);
+  const dH = (extentX/2) / Math.tan(halfFov) / (w/h);
+  camDist = Math.max(dV, dH) * CAM_MARGIN;
+  camBase.set(0, Math.sin(el)*camDist, Math.cos(el)*camDist);
+}
+function resize(){
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if(!w || !h) return;
+  renderer.setSize(w, h, false);
+  camera.aspect = w/h;
+  fitCamera();
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(canvas);
+resize();
+
+/* Wie stark schrumpft eine hintere Zelle gegenueber einer vorderen?
+   Nur zur Kontrolle im Debug-Overlay — Regel 2 in Zahlen. */
+function cellRatio(){
+  const near = new THREE.Vector3(0,0,HALF), far = new THREE.Vector3(0,0,-HALF);
+  const a = near.clone(), b = near.clone().setZ(HALF-1);
+  const c = far.clone(), d = far.clone().setZ(-HALF+1);
+  [a,b,c,d].forEach(v=>v.project(camera));
+  const nearH = Math.abs(a.y-b.y), farH = Math.abs(c.y-d.y);
+  return nearH>0 ? farH/nearH : 0;
+}
+
+/* ---------- Ton: synthetisch, Context erst bei der ersten Eingabe ---------- */
+let AC=null, master=null;
+let muted = store.get('mute','0') === '1';
+function audioOn(){
+  if(AC){ if(AC.state==='suspended') AC.resume(); return; }
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if(!Ctx) return;
+  try{
+    AC = new Ctx();
+    master = AC.createGain(); master.gain.value = 0.25; master.connect(AC.destination);
+  }catch(e){ AC=null; }
+}
+function tone(f0,f1,at,dur,type,vol){
+  if(!AC||muted||document.hidden) return;
+  const t = AC.currentTime + at, o = AC.createOscillator(), g = AC.createGain();
+  o.type = type||'sine';
+  o.frequency.setValueAtTime(f0,t);
+  if(f1) o.frequency.exponentialRampToValueAtTime(f1, t+dur);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(vol||0.5, t+0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t+dur+0.03);
+}
+let noiseBuf=null;
+function noise(dur,f0,f1,vol){
+  if(!AC||muted||document.hidden) return;
+  if(!noiseBuf){
+    const n = Math.floor(AC.sampleRate*0.6);
+    noiseBuf = AC.createBuffer(1,n,AC.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for(let i=0;i<n;i++) d[i] = RTAB[i & 1023]*2-1;
+  }
+  const t=AC.currentTime, s=AC.createBufferSource(), f=AC.createBiquadFilter(), g=AC.createGain();
+  s.buffer=noiseBuf; f.type='lowpass';
+  f.frequency.setValueAtTime(f0,t); f.frequency.exponentialRampToValueAtTime(f1,t+dur);
+  g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t+dur+0.05);
+}
+const sfx = {
+  apple: m => tone(440*Math.pow(2,(m-1)/12), null, 0, 0.06, 'sine', 0.55),
+  core:  () => { tone(1180,null,0,0.05,'triangle',0.4); tone(1560,null,0.06,0.07,'triangle',0.4); },
+  combo: () => { tone(300,180,0,0.16,'sine',0.22); },
+  obst:  () => { tone(90,60,0,0.22,'triangle',0.5); },
+  dead:  () => noise(0.5, 1800, 90, 0.5),
+  step:  () => tone(1400,null,0,0.012,'square',0.05)
+};
+
+/* ---------- Spielzustand ---------- */
+const seedParam = parseInt(params.get('seed')||'', 10);
+let seed = Number.isFinite(seedParam) ? (seedParam>>>0) : ((Date.now()^0x9e3779b9)>>>0);
+let sim = C.create(seed), prevSim = C.clone(sim);
+let tickMs = C.tickMs(sim), lastTick = performance.now();
+let state = 'start';                 /* start | run | pause | over */
+let deadAt = 0, startedAt = 0, obstT = [], lastColorLen = -1, lastSpeedLvl = 1;
+/* Die Schlange steht, bis die erste Richtung kommt — Zeit, sich zu orientieren. */
+let armed = false;
+/* Zaehlt jede Runde mit: ein Neustart waehrend der Zerfallsanimation darf nicht
+   vom Game-Over-Timeout der alten Runde ueberdeckt werden. */
+let runId = 0;
+let best = parseInt(store.get('best','0'),10) || 0;
+
+function newRun(newSeed){
+  seed = (newSeed!==undefined) ? newSeed : ((Date.now()^(Math.random()*0xffffffff))>>>0);
+  sim = C.create(seed); prevSim = C.clone(sim);
+  tickMs = C.tickMs(sim); lastTick = performance.now();
+  obstT = []; lastColorLen = -1; lastSpeedLvl = 1;
+  obst.count = 0; body.count = 0;
+  for(let i=0;i<P_CAP;i++){ pLife[i]=0; pPos[i*3+1]=-999; }
+  shake = 0; deathT = 0; armed = false; runId++;
+  head.quaternion.identity(); headAngle = dirAngle(sim.dx, sim.dy); head.rotation.y = headAngle;
+}
+
+/* ---------- Bildschirme ---------- */
+function show(id){
+  ['scStart','scPause','scOver'].forEach(i => $(i).classList.toggle('on', i===id));
+  $('hud').classList.toggle('off', id==='scStart' || state==='over');
+}
+function setState(s){
+  state = s;
+  if(s==='run'){ show(null); $('hud').classList.remove('off'); lastTick = performance.now(); }
+  else if(s==='pause'){ show('scPause'); $('btnResume').focus(); }
+  else if(s==='over'){ show('scOver'); $('btnAgain').focus(); }
+  else show('scStart');
+}
+function startGame(){
+  audioOn();
+  if(state==='over' || state==='start') newRun(Number.isFinite(seedParam)?seedParam:undefined);
+  startedAt = performance.now();
+  setState('run');
+}
+function togglePause(){
+  if(state==='run') setState('pause');
+  else if(state==='pause') setState('run');
+}
+function gameOver(){
+  deadAt = performance.now(); deathT = 0;
+  shake = reduced ? 0 : 0.15;
+  sfx.dead();
+  if(sim.score > best){ best = sim.score; store.set('best', best); $('ovRec').style.display=''; }
+  else $('ovRec').style.display='none';
+  $('ovCause').textContent = sim.cause || '—';
+  $('ovScore').textContent = sim.score;
+  $('ovBest').textContent = best;
+  $('ovLen').textContent = sim.len;
+  $('ovMult').textContent = '×'+sim.maxMult;
+  const sec = Math.max(0, Math.round((deadAt-startedAt)/1000));
+  $('ovTime').textContent = Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0');
+  $('ovSeed').textContent = 'Seed '+seed;
+  /* Der Bildschirm kommt erst nach der Zerfallsanimation — aber nur, wenn
+     inzwischen keine neue Runde gestartet wurde. */
+  const myRun = runId;
+  setTimeout(()=>{ if(state==='run' && runId===myRun) setState('over'); }, reduced?260:950);
+}
+
+/* ---------- Eingabe ---------- */
+function input(dx,dy){
+  if(state==='start'){ startGame(); }
+  if(state!=='run' || !sim.alive) return;
+  audioOn();
+  C.enqueue(sim, dx, dy);
+  const now = performance.now();
+  if(!armed){
+    /* Die erste Richtung setzt die Schlange in Gang; der Tick beginnt jetzt. */
+    armed = true; lastTick = now; return;
+  }
+  /* Coyote: kurz vor dem naechsten Tick sofort ticken, statt eine Runde zu warten */
+  if(now - lastTick >= tickMs - C.COYOTE_MS) lastTick = now - tickMs;
+}
+const KEYS = {
+  ArrowUp:[0,-1], ArrowDown:[0,1], ArrowLeft:[-1,0], ArrowRight:[1,0],
+  w:[0,-1], s:[0,1], a:[-1,0], d:[1,0]
+};
+window.addEventListener('keydown', e => {
+  if(e.repeat) return;
+  const k = e.key.length===1 ? e.key.toLowerCase() : e.key;
+  if(KEYS[k]){ e.preventDefault(); input(KEYS[k][0], KEYS[k][1]); return; }
+  if(k===' '){ e.preventDefault(); audioOn();
+    if(state==='start'||state==='over') startGame(); else togglePause(); return; }
+  if(k==='Escape'){ if(state==='run') setState('pause'); return; }
+  if(k==='r'){ audioOn(); if(state!=='start'){ newRun(); startedAt=performance.now(); setState('run'); } return; }
+  if(k==='m'){ toggleMute(); }
+});
+
+let tx=0, ty=0, tUsed=false, tMoved=false;
+canvas.addEventListener('pointerdown', e => {
+  tx=e.clientX; ty=e.clientY; tUsed=false; tMoved=false; audioOn();
+  canvas.focus({preventScroll:true});
+});
+canvas.addEventListener('pointermove', e => {
+  if(tUsed) return;
+  const dx=e.clientX-tx, dy=e.clientY-ty;
+  if(dx*dx+dy*dy < 24*24) return;
+  tUsed = true; tMoved = true;                    /* ein Wisch je Fingerkontakt */
+  if(Math.abs(dx) > Math.abs(dy)) input(dx>0?1:-1, 0); else input(0, dy>0?1:-1);
+});
+canvas.addEventListener('pointerup', () => {
+  if(!tMoved && state==='start') startGame();     /* Tippen startet, pausiert nie */
+});
+canvas.addEventListener('pointercancel', () => { tUsed = true; });
+$('scStart').addEventListener('click', () => { if(state==='start') startGame(); });
+$('scOver').addEventListener('click', e => { if(state==='over' && e.target===e.currentTarget) startGame(); });
+
+/* ---------- Menue-Knoepfe ---------- */
+function paintMute(){
+  const t = muted ? 'Ton aus' : 'Ton an';
+  $('btnMute').textContent = t; $('btnMute0').textContent = t; $('hMuteTx').textContent = t;
+}
+function toggleMute(){
+  muted = !muted; store.set('mute', muted?1:0);
+  paintMute();
+  /* audioOn() nur hier: ein Klick ist eine Geste, der Seitenaufbau ist keine. */
+  if(!muted) audioOn();
+}
+function toggleQual(){
+  saver = !saver; store.set('saver', saver?1:0);
+  applyPixelRatio(); resize(); paintQual();
+}
+function paintQual(){ $('btnQual').textContent = 'Qualität: ' + (saver?'Sparsam':'Hoch'); }
+$('btnStart').onclick = e => { e.stopPropagation(); startGame(); };
+$('btnResume').onclick = () => setState('run');
+$('btnRestart').onclick = () => { newRun(); startedAt=performance.now(); setState('run'); };
+$('btnAgain').onclick = e => { e.stopPropagation(); startGame(); };
+$('btnMute').onclick = toggleMute;
+$('btnMute0').onclick = e => { e.stopPropagation(); toggleMute(); };
+$('btnQual').onclick = toggleQual;
+paintMute();                  /* Beschriftungen setzen, ohne Ton anzufassen */
+paintQual();
+$('hBest').textContent = best; $('startBest').textContent = best;
+{
+  const touch = matchMedia('(hover:none)').matches || 'ontouchstart' in window;
+  $('startHint').textContent = touch ? 'Wischen zum Lenken' : 'Pfeiltasten oder WASD';
+  if(touch) $('startKeys').style.display = 'none';
+}
+
+/* ---------- Automatische Pause, nie automatischer Start ---------- */
+let visible = true;
+function autoPause(){ if(state==='run') setState('pause'); }
+document.addEventListener('visibilitychange', () => {
+  visible = !document.hidden; if(document.hidden) autoPause();
+});
+new IntersectionObserver(([e]) => {
+  visible = e.isIntersecting; if(!e.isIntersecting) autoPause();
+}, { threshold:0.15 }).observe(canvas);
+
+/* ---------- Bildschleife ---------- */
+const _c2 = new THREE.Color(), _e = new THREE.Euler();
+const dirAngle = (dx,dy) => Math.atan2(-dx, -dy);
+let headAngle = dirAngle(sim.dx, sim.dy);
+head.rotation.y = headAngle;
+let shake = 0, deathT = 0, lastFrame = performance.now();
+let frames = 0, ftSum = 0, qualDecided = saver;
+let fpsN = 0, fpsT = performance.now(), fps = 0, dbgT = 0;
+
+/* Augen einmal setzen — sie sitzen im Kopf-Koordinatensystem. */
+{
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(),
+        p = new THREE.Vector3(), s = new THREE.Vector3(1,1,1);
+  /* Oben aufgesetzt und nach vorn gerueckt: aus der Aufsicht immer lesbar. */
+  eyes.setMatrixAt(0, m.compose(p.set(-0.19, H_HEAD/2, -0.20), q, s));
+  eyes.setMatrixAt(1, m.compose(p.set( 0.19, H_HEAD/2, -0.20), q, s));
+  eyes.instanceMatrix.needsUpdate = true;
+}
+
+function onTick(){
+  if(sim.evApple){
+    sfx.apple(sim.mult);
+    burst(wx(C.seg(sim,0)), wz(C.seg(sim,0)), COL.apple, 14);
+  }
+  if(sim.evCore){ sfx.core(); burst(wx(C.seg(sim,0)), wz(C.seg(sim,0)), COL.core, 20); }
+  if(sim.evComboLost) sfx.combo();
+  if(sim.evObst >= 0){ sfx.obst(); obstT.push(performance.now()); }
+  const lvl = C.speedLevel(sim);
+  if(lvl >= 4) sfx.step();
+  lastSpeedLvl = lvl;
+  paintHud();
+}
+function paintHud(){
+  $('hScore').textContent = sim.score;
+  $('hLen').textContent = sim.len;
+  $('hSpd').textContent = C.speedLevel(sim);
+  $('hMult').textContent = '×'+sim.mult;
+  const w = $('hMwrap');
+  w.classList.toggle('one', sim.mult<=1);
+  w.classList.toggle('hi', sim.mult>=C.CORE_MIN_MULT);
+  $('hRing').setAttribute('stroke-dashoffset',
+    (125.7*(1 - sim.comboLeft/C.COMBO_TICKS)).toFixed(1));
+}
+
+function place(mesh, x, y, z, sc, rotY){
+  mesh.position.set(x,y,z);
+  if(sc!==undefined) mesh.scale.setScalar(sc);
+  if(rotY!==undefined) mesh.rotation.y = rotY;
+}
+
+function draw(now, dt){
+  const running = (state==='run' && sim.alive);
+  const t = running ? Math.min(1, Math.max(0,(now-lastTick)/tickMs)) : 1;
+  const fall = (!sim.alive && deadAt) ? Math.min(1,(now-deadAt)/(reduced?1:700)) : 0;
+
+  /* --- Koerper --- */
+  const n = Math.max(0, sim.len-1);
+  if(sim.len !== lastColorLen || fall>0){
+    lastColorLen = sim.len;
+    for(let i=0;i<n;i++){
+      _c.setHex(COL.bodyA).lerp(_c2.setHex(COL.bodyB), n>1 ? i/(n-1) : 0);
+      if(fall>0) _c.lerp(_c2.setHex(0x3a3f4a), fall*0.85);
+      body.setColorAt(i, _c);
+    }
+    if(body.instanceColor) body.instanceColor.needsUpdate = true;
+  }
+  body.count = n;
+  for(let i=1;i<=n;i++){
+    const cur = C.seg(sim,i);
+    const pv  = i < prevSim.len ? C.seg(prevSim,i) : C.seg(prevSim, prevSim.len-1);
+    const x = wx(pv) + (wx(cur)-wx(pv))*t, z = wz(pv) + (wz(cur)-wz(pv))*t;
+    let y = 0, rx = 0, rz = 0;
+    if(fall>0){
+      const r1 = RTAB[(i*7)&1023], r2 = RTAB[(i*13+5)&1023], r3 = RTAB[(i*29+11)&1023];
+      y = -fall*fall*(1.2+r1*2.2);
+      rx = (r2-0.5)*fall*3.2; rz = (r3-0.5)*fall*3.2;
+    }
+    _q.setFromEuler(_e.set(rx,0,rz));
+    body.setMatrixAt(i-1, _m.compose(_v.set(x,y,z), _q, _s.set(1,1,1)));
+  }
+  body.instanceMatrix.needsUpdate = true;
+
+  /* --- Kopf --- */
+  {
+    const cur = C.seg(sim,0), pv = C.seg(prevSim,0);
+    const e = 1-(1-t)*(1-t);                       /* leichtes Ease-Out */
+    const x = wx(pv) + (wx(cur)-wx(pv))*e, z = wz(pv) + (wz(cur)-wz(pv))*e;
+    const target = dirAngle(sim.dx, sim.dy);
+    let d = target - headAngle;
+    while(d >  Math.PI) d -= Math.PI*2;
+    while(d < -Math.PI) d += Math.PI*2;
+    headAngle += d * Math.min(1, dt/0.09);         /* 90 ms bis zur neuen Richtung */
+    place(head, x, fall>0 ? -fall*fall*2.4 : 0, z, 1, headAngle);
+    head.rotation.x = fall*1.6;
+    shadow.count = 0; glow.count = 0;
+    addShadow(x, z, 1.5, 1);
+    if(fall===0) headLight(x, z);
+  }
+
+  /* --- Hindernisse: wachsen sichtbar aus der Platte --- */
+  obst.count = sim.obst.length;
+  for(let i=0;i<sim.obst.length;i++){
+    const born = obstT[i] || 0;
+    const g = born ? Math.min(1,(now-born)/(reduced?1:400)) : 1;
+    const h = Math.max(0.02, g);
+    _q.identity();
+    obst.setMatrixAt(i, _m.compose(
+      _v.set(wx(sim.obst[i]), (H_OBST*h - H_BODY)/2 - (1-h)*0.1, wz(sim.obst[i])),
+      _q, _s.set(1,h,1)));
+  }
+  obst.instanceMatrix.needsUpdate = true;
+
+  /* --- Apfel und Kern --- */
+  const bob = reduced ? 0 : Math.sin(now/430)*0.08;
+  apple.visible = sim.apple>=0 && fall===0;
+  if(apple.visible){
+    const x = wx(sim.apple), z = wz(sim.apple);
+    place(apple, x, 0.14+bob, z);
+    if(!reduced) apple.rotation.y += dt*1.1;
+    addGlow(x, z, 2.6, COL.apple, 0.5);
+    addShadow(x, z, 1.2, 0.7);
+  }
+  core.visible = sim.core>=0 && fall===0;
+  if(core.visible){
+    const x = wx(sim.core), z = wz(sim.core);
+    const late = sim.coreLife <= C.CORE_PULSE_TICKS;
+    const puls = reduced ? 1 : 1 + Math.sin(now/(late?90:260))*(late?0.22:0.10);
+    place(core, x, 0.16+bob, z, puls);
+    if(!reduced) core.rotation.y -= dt*1.6;
+    addGlow(x, z, 2.4*puls, COL.core, 0.55);
+    addShadow(x, z, 1.1, 0.7);
+  }
+  glow.instanceMatrix.needsUpdate = true;
+  if(glow.instanceColor) glow.instanceColor.needsUpdate = true;
+  shadow.instanceMatrix.needsUpdate = true;
+
+  /* --- Partikel --- */
+  let alive = 0;
+  for(let i=0;i<P_CAP;i++){
+    if(pLife[i] <= 0) continue;
+    pLife[i] -= dt; alive++;
+    if(pLife[i] <= 0){ pPos[i*3+1] = -999; continue; }
+    if(!reduced){
+      pVel[i*3+1] -= dt*7.5;
+      pPos[i*3]   += pVel[i*3]*dt;
+      pPos[i*3+1] += pVel[i*3+1]*dt;
+      pPos[i*3+2] += pVel[i*3+2]*dt;
+    }
+  }
+  pGeo.attributes.position.needsUpdate = true;
+  particles.visible = alive > 0;
+
+  /* --- Kamera: nur verschieben, nie drehen --- */
+  const hx = head.position.x, hz = head.position.z;
+  _v.set(Math.max(-CAM_FOLLOW,Math.min(CAM_FOLLOW,hx*0.35)), 0,
+         Math.max(-CAM_FOLLOW,Math.min(CAM_FOLLOW,hz*0.35)));
+  camLook.lerp(_v, 1-Math.pow(0.0015, dt));
+  let bx = camBase.x, by = camBase.y, bz = camBase.z;
+  if(state==='start' && !reduced){                /* nur im Menue kreist sie */
+    const a = now/9000, r = Math.hypot(camBase.x, camBase.z);
+    bx = Math.sin(a)*r*0.28; bz = Math.cos(a*0.7)*r;
+  }
+  if(!sim.alive && deadAt){                        /* 250 ms leicht heranziehen */
+    const k = Math.min(1,(now-deadAt)/250) * (reduced?0:0.12);
+    bx += (hx-bx)*k; by += (0-by)*k; bz += (hz-bz)*k;
+  }
+  if(shake > 0){
+    shake = Math.max(0, shake - dt*1.25);
+    bx += (RTAB[(fpsN*3)&1023]-0.5)*shake; bz += (RTAB[(fpsN*5+7)&1023]-0.5)*shake;
+  }
+  camera.position.set(bx+camLook.x, by, bz+camLook.z);
+  camera.lookAt(camLook.x, 0, camLook.z);
+}
+function addGlow(x,z,size,hex,op){
+  const i = glow.count++;
+  _q.setFromAxisAngle(_v.set(1,0,0), -Math.PI/2);
+  glow.setMatrixAt(i, _m.compose(_v.set(x,-H_BODY/2+0.012,z), _q, _s.set(size,size,1)));
+  glow.setColorAt(i, _c.setHex(hex).multiplyScalar(op));
+}
+function addShadow(x,z,size,op){
+  const i = shadow.count++;
+  _q.setFromAxisAngle(_v.set(1,0,0), -Math.PI/2);
+  shadow.setMatrixAt(i, _m.compose(_v.set(x,-H_BODY/2+0.006,z), _q, _s.set(size,size,1)));
+}
+function headLight(x,z){ addGlow(x, z, 2.0, COL.head, 0.22); }
+
+renderer.setAnimationLoop(() => {
+  const now = performance.now();
+  const dt = Math.min((now-lastFrame)/1000, 0.1);
+  lastFrame = now;
+  if(!visible) return;
+
+  if(state==='run' && sim.alive && armed){
+    let guard = 0;
+    while(now - lastTick >= tickMs && guard++ < 8){
+      prevSim = sim;
+      sim = C.step(sim, null);
+      lastTick += tickMs;
+      onTick();
+      if(!sim.alive){ gameOver(); break; }
+      tickMs = C.tickMs(sim);
+    }
+  }
+  draw(now, dt);
+  renderer.render(scene, camera);
+
+  /* Adaptive Qualitaet: die ersten 90 Bilder messen, dann entscheiden. */
+  if(!qualDecided){
+    frames++; ftSum += dt*1000;
+    if(frames >= 90){
+      qualDecided = true;
+      if(ftSum/frames > 13){ saver = true; store.set('saver',1); applyPixelRatio(); resize(); paintQual(); }
+    }
+  }
+  fpsN++;
+  if(DEBUG && now-dbgT > 250){
+    if(now-fpsT >= 500){ fps = fpsN*1000/(now-fpsT); fpsN = 0; fpsT = now; }
+    dbgT = now;
+    const r = renderer.info.render;
+    $('dbg').textContent =
+      'fps '+fps.toFixed(0)+'   frame '+(dt*1000).toFixed(1)+' ms\n'+
+      'calls '+r.calls+'   tris '+r.triangles+'\n'+
+      'tick '+tickMs+' ms   len '+sim.len+'\n'+
+      'Zellhöhe hinten/vorn '+(cellRatio()*100).toFixed(0)+' %\n'+
+      'Qualität '+(saver?'sparsam':'hoch')+'   Seed '+seed;
+  }
+});
+if(DEBUG){
+  $('dbg').classList.add('on');
+  /* Nur bei ?debug=1: Zugriff auf die Szene, um Zahlen statt Vermutungen zu haben. */
+  window.__coilDbg = { scene, camera, renderer, head, body, obst, apple, core,
+    info:()=>renderer.info.render, sim:()=>sim, camLook, camBase };
+}
+paintHud();
+started = true;
+window.__coilReady = true;
+
+/* Kapazitaeten fuer Test 7 sichtbar machen. */
+window.__coilPools = {
+  particleCap: P_CAP,
+  particleCount: () => pPos.length/3,
+  bodyCapacity: () => body.instanceMatrix.count
+};
+
+/* ---------- Selbsttests sichtbar machen ---------- */
+if(params.has('test')){
+  const res = window.__tests();
+  const el = $('testout');
+  el.classList.add('on');
+  let html = '<h2>COIL — SELBSTTESTS</h2>';
+  window.__tests.rows.forEach(r => {
+    html += '<div class="'+(r.err?'no':'ok')+'">'+(r.err?'FEHL':'ok  ')+' &nbsp;'+
+      r.name+' &nbsp;<span style="opacity:.55">'+r.ms.toFixed(1)+' ms</span>'+
+      (r.err?' &nbsp;→ '+r.err:'')+'</div>';
+  });
+  html += '<div style="margin-top:8px" class="'+(res==='OK'?'ok':'no')+'"><b>'+
+    (res==='OK'?'OK — alle acht Prüfungen bestanden':'FEHLGESCHLAGEN: '+res.join(' | '))+
+    '</b></div>';
+  el.innerHTML = html;
+  console.log('__tests() →', res);
+}
+
+/* ---------- Aufraeumen ---------- */
+addEventListener('pagehide', () => {
+  renderer.setAnimationLoop(null);
+  scene.traverse(o => {
+    if(o.geometry) o.geometry.dispose();
+    if(o.material){
+      const ms = Array.isArray(o.material) ? o.material : [o.material];
+      ms.forEach(m => { Object.values(m).forEach(v => v && v.isTexture && v.dispose()); m.dispose(); });
+    }
+  });
+  renderer.dispose();
+  if(AC) AC.close().catch(()=>{});
+});
+</script>
+
+<!--
+ÄNDERUNGSJOURNAL
+1  P0 zuerst: step() als reine Funktion, Ringpuffer, Belegungsgitter, mulberry32 im Zustand.
+2  Alle acht Selbsttests liefen in node durch, bevor die erste Zeile Three.js entstand.
+3  Kamerawinkel gemessen, nicht geraten: 62 Grad ergaben 59 % Zellhoehe hinten, 70 Grad ergeben 71-86 %.
+4  Darum 70 Grad Neigung, 34 Grad FOV, Rand 1.04 — ueber sechs Viewports nachgemessen.
+5  Augen auf der Kopfoberseite: bei 70 Grad Aufsicht waere die Vorderflaeche fast auf Kante.
+6  Geraten und im Spiel nachgezogen: Kombofenster 40 Ticks, Kern 120 Punkte bei 60 Ticks Leben.
+7  Ebenfalls geraten: Hindernisse ab 300/700/1200/1800, Kopfdrehung 90 ms, Shake 0.15 bei 1.25/s.
+8  Flood-Fill nur ueber Nicht-Hindernis-Felder; der Koerper zaehlt bewusst nicht als Wand.
+9  pickApple hat keinen Notnagel: lieber kein Apfel als einer direkt vor dem Kopf.
+10 Schlange steht nach dem Start bis zur ersten Richtung — sonst stirbt sie ohne Zutun an der Wand.
+11 Neustart im Zerfall zaehlt eine runId hoch, sonst deckte der alte Game-Over-Schirm die neue Runde.
+12 Dritte Ursache "Hindernis" ergaenzt; die Vorgabe nennt nur Wand und Eigener Koerper.
+13 Weggelassen: Bloom. Hohe Emissive-Werte und additive Sprites tragen den Look guenstiger.
+14 RoundedBoxGeometry nur optional per await import(), stiller Rueckfall auf BoxGeometry.
+15 Draw Calls, Dreiecke, DOM aus renderer.info; Framezeit hier nicht messbar (SwiftShader, Software).
+-->
+
+<!--
+IDEEN — aufgeschrieben, nicht gebaut
+
+Spiel
+- Enger-Raum-Bonus: Punkte dafuer, dicht am eigenen Koerper entlangzufahren, ohne ihn zu beruehren.
+- Kern erscheint mit einer kurzen Leitlinie vom Kopf, damit der Umweg planbar wird statt geraten.
+- Hindernisse koennten nach 200 Ticks wieder versinken — Druck, der auch wieder nachlaesst.
+- Ein zweiter Apfel bei Multiplikator 6+, der den Kombodruck in eine Wegwahl uebersetzt.
+- Schwanz-Streifzug: die letzten drei Segmente kurz durchlaessig, als bewusst gesetzte Rettung.
+
+Darstellung
+- Bodenraster koennte im Umkreis des Kopfes leicht aufleuchten statt gleichmaessig dunkel zu bleiben.
+- Kombostufe als Farbtemperatur des Koerpers statt nur als Zahl im HUD.
+- Hindernisse mit einer Sekunde Vorwarnung als flacher Umriss, bevor sie herauswachsen.
+- Beim Tod die letzten zehn Ticks als kurzer Ruecklauf, damit der Fehler sichtbar wird.
+
+Ton
+- Basspuls im Takt der Ticks, der mit der Tempostufe lauter wird, statt des Klick-Ticks.
+- Kern-Ton als Akkord aus der aktuellen Kombostufe, damit Kombo und Kern zusammenklingen.
+
+Umfang
+- Tagesseed aus dem Datum, damit alle dieselbe Runde spielen — ohne Server, ohne Rangliste.
+- Wiederholung der letzten Runde aus Seed plus Eingabefolge; die Simulation ist dafuer bereits
+  deterministisch genug, es fehlt nur das Aufzeichnen der Eingaben.
+-->
+</body>
+</html>
+
