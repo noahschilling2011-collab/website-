@@ -7,7 +7,9 @@
 <meta name="description" content="Meridian Atelier gestaltet digitale Ansichten für Residences, Marina und Timepieces. Eine durchgehende Scroll-Reise von über der Wolkendecke bis in die Nahaufnahme.">
 <meta name="color-scheme" content="dark">
 
-<link rel="preload" as="image" href="https://images.unsplash.com/photo-1560773526-435221de2527?auto=format&amp;fit=crop&amp;w=2400&amp;q=75" fetchpriority="high">
+<link rel="preload" as="image" href="https://images.unsplash.com/photo-1560773526-435221de2527?auto=format&amp;fit=crop&amp;w=2400&amp;q=75"
+      imagesrcset="https://images.unsplash.com/photo-1560773526-435221de2527?auto=format&amp;fit=crop&amp;w=1200&amp;q=75 1200w, https://images.unsplash.com/photo-1560773526-435221de2527?auto=format&amp;fit=crop&amp;w=1800&amp;q=75 1800w, https://images.unsplash.com/photo-1560773526-435221de2527?auto=format&amp;fit=crop&amp;w=2400&amp;q=75 2400w"
+      imagesizes="100vw" fetchpriority="high">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=Inter:wght@300;400;500&display=swap">
 
 <script type="importmap">
@@ -126,8 +128,8 @@ h2{font-size:var(--step-3);line-height:1.08}
 
 .glass{
   background:rgba(255,255,255,0.04);
-  backdrop-filter:blur(20px) saturate(150%);
-  -webkit-backdrop-filter:blur(20px) saturate(150%);
+  backdrop-filter:blur(14px) saturate(150%);
+  -webkit-backdrop-filter:blur(14px) saturate(150%);
   border:1px solid rgba(255,255,255,0.08);
   border-radius:3px;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
@@ -188,8 +190,11 @@ h2{font-size:var(--step-3);line-height:1.08}
   overflow:hidden;
   background-color:var(--fb,#0d1016);
   pointer-events:none;
-  will-change:opacity,transform;
 }
+/* will-change setzt das Script nur an den Platten, die gerade laufen.
+   Dauerhaft gesetzt hielte es sieben bildschirmgrosse Ebenen im
+   Speicher, von denen höchstens zwei gleichzeitig zu sehen sind. */
+.js-ready .plate.is-live{will-change:opacity,transform}
 .js-ready .plate img{
   width:100%;height:100%;
   object-fit:cover;object-position:var(--pos,50% 50%);
@@ -393,8 +398,10 @@ h2{font-size:var(--step-3);line-height:1.08}
   <section class="station" style="--h:120svh" data-station="above">
     <figure class="plate" data-plate="hero-sky" style="--fb:#241a16">
       <img src="https://images.unsplash.com/photo-1560773526-435221de2527?auto=format&amp;fit=crop&amp;w=2400&amp;q=75"
+           srcset="https://images.unsplash.com/photo-1560773526-435221de2527?auto=format&amp;fit=crop&amp;w=1200&amp;q=75 1200w, https://images.unsplash.com/photo-1560773526-435221de2527?auto=format&amp;fit=crop&amp;w=1800&amp;q=75 1800w, https://images.unsplash.com/photo-1560773526-435221de2527?auto=format&amp;fit=crop&amp;w=2400&amp;q=75 2400w"
+           sizes="100vw"
            alt="Sonnenaufgang über einer geschlossenen Wolkendecke, orange Lichtband am Horizont"
-           fetchpriority="high" decoding="async" width="2400" height="1600">
+           fetchpriority="high" decoding="async" width="2400" height="1799">
     </figure>
     <div class="copy copy--wide">
       <p class="eyebrow">Studio für digitale Objekte</p>
@@ -409,8 +416,10 @@ h2{font-size:var(--step-3);line-height:1.08}
   <section class="station" style="--h:100svh" data-station="descent">
     <figure class="plate" data-plate="fog-tower" style="--fb:#1a1f26;--pos:50% 42%">
       <img src="https://images.unsplash.com/photo-1776794314398-3b6def1dbf14?auto=format&amp;fit=crop&amp;w=2400&amp;q=75"
+           srcset="https://images.unsplash.com/photo-1776794314398-3b6def1dbf14?auto=format&amp;fit=crop&amp;w=1200&amp;q=75 1200w, https://images.unsplash.com/photo-1776794314398-3b6def1dbf14?auto=format&amp;fit=crop&amp;w=1800&amp;q=75 1800w, https://images.unsplash.com/photo-1776794314398-3b6def1dbf14?auto=format&amp;fit=crop&amp;w=2400&amp;q=75 2400w"
+           sizes="100vw"
            alt="Wolkenkratzer, dessen obere Etagen im Morgennebel verschwinden"
-           loading="lazy" decoding="async" width="2400" height="1600">
+           loading="lazy" decoding="async" width="2400" height="1800">
     </figure>
     <div class="copy">
       <p class="eyebrow"><span class="num">01</span>Annäherung</p>
@@ -423,13 +432,17 @@ h2{font-size:var(--step-3);line-height:1.08}
   <section class="station" style="--h:130svh" data-station="skyline">
     <figure class="plate" data-plate="skyline" style="--fb:#161b21">
       <img src="https://images.unsplash.com/photo-1507670092296-5c5c6a2b5cc3?auto=format&amp;fit=crop&amp;w=2400&amp;q=75"
+           srcset="https://images.unsplash.com/photo-1507670092296-5c5c6a2b5cc3?auto=format&amp;fit=crop&amp;w=1200&amp;q=75 1200w, https://images.unsplash.com/photo-1507670092296-5c5c6a2b5cc3?auto=format&amp;fit=crop&amp;w=1800&amp;q=75 1800w, https://images.unsplash.com/photo-1507670092296-5c5c6a2b5cc3?auto=format&amp;fit=crop&amp;w=2400&amp;q=75 2400w"
+           sizes="100vw"
            alt="Luftaufnahme mehrerer Hochhäuser, deren Spitzen aus einer Wolkenschicht ragen"
-           loading="lazy" decoding="async" width="2400" height="1600">
+           loading="lazy" decoding="async" width="2400" height="1599">
     </figure>
     <figure class="plate" data-plate="tower" style="--fb:#2a1d19;--pos:50% 45%">
       <img src="https://images.unsplash.com/photo-1766548729715-9471973631f1?auto=format&amp;fit=crop&amp;w=2400&amp;q=75"
+           srcset="https://images.unsplash.com/photo-1766548729715-9471973631f1?auto=format&amp;fit=crop&amp;w=1200&amp;q=75 1200w, https://images.unsplash.com/photo-1766548729715-9471973631f1?auto=format&amp;fit=crop&amp;w=1800&amp;q=75 1800w, https://images.unsplash.com/photo-1766548729715-9471973631f1?auto=format&amp;fit=crop&amp;w=2400&amp;q=75 2400w"
+           sizes="100vw"
            alt="Einzelner Turm, der bei Sonnenuntergang aus einer Wolkendecke ragt"
-           loading="lazy" decoding="async" width="2400" height="1600">
+           loading="lazy" decoding="async" width="2400" height="1800">
     </figure>
     <div class="copy">
       <p class="eyebrow"><span class="num">02</span>Maßstab</p>
@@ -447,13 +460,17 @@ h2{font-size:var(--step-3);line-height:1.08}
   <section class="station" style="--h:130svh" data-station="residences">
     <figure class="plate" data-plate="interior" style="--fb:#15161a">
       <img src="https://images.unsplash.com/photo-1568115286680-d203e08a8be6?auto=format&amp;fit=crop&amp;w=2400&amp;q=75"
+           srcset="https://images.unsplash.com/photo-1568115286680-d203e08a8be6?auto=format&amp;fit=crop&amp;w=1200&amp;q=75 1200w, https://images.unsplash.com/photo-1568115286680-d203e08a8be6?auto=format&amp;fit=crop&amp;w=1800&amp;q=75 1800w, https://images.unsplash.com/photo-1568115286680-d203e08a8be6?auto=format&amp;fit=crop&amp;w=2400&amp;q=75 2400w"
+           sizes="100vw"
            alt="Leerer Wohnraum mit raumhoher Glasfront und Blick nach draußen"
-           loading="lazy" decoding="async" width="2400" height="1600">
+           loading="lazy" decoding="async" width="2400" height="1601">
     </figure>
     <figure class="plate plate--inset" data-plate="interior-sea" data-depth="front" style="--fb:#1b1e22">
       <img src="https://images.unsplash.com/photo-1707484687082-9493754d389f?auto=format&amp;fit=crop&amp;w=2400&amp;q=75"
+           srcset="https://images.unsplash.com/photo-1707484687082-9493754d389f?auto=format&amp;fit=crop&amp;w=1200&amp;q=75 1200w, https://images.unsplash.com/photo-1707484687082-9493754d389f?auto=format&amp;fit=crop&amp;w=1800&amp;q=75 1800w, https://images.unsplash.com/photo-1707484687082-9493754d389f?auto=format&amp;fit=crop&amp;w=2400&amp;q=75 2400w"
+           sizes="(max-width: 720px) 56vw, (max-height: 520px) 1px, min(34vw, 400px)"
            alt="Unmöblierter Raum mit großem Fenster und Blick auf das Meer"
-           loading="lazy" decoding="async" width="2400" height="1600">
+           loading="lazy" decoding="async" width="2400" height="1601">
     </figure>
     <div class="copy">
       <p class="eyebrow"><span class="num">03</span>Residences</p>
@@ -466,8 +483,10 @@ h2{font-size:var(--step-3);line-height:1.08}
   <section class="station" style="--h:120svh" data-station="marina">
     <figure class="plate" data-plate="marina" style="--fb:#241a1c;--pos:50% 80%">
       <img src="https://images.unsplash.com/photo-1768463852017-921060ff24fe?auto=format&amp;fit=crop&amp;w=2400&amp;q=75"
+           srcset="https://images.unsplash.com/photo-1768463852017-921060ff24fe?auto=format&amp;fit=crop&amp;w=1200&amp;q=75 1200w, https://images.unsplash.com/photo-1768463852017-921060ff24fe?auto=format&amp;fit=crop&amp;w=1800&amp;q=75 1800w, https://images.unsplash.com/photo-1768463852017-921060ff24fe?auto=format&amp;fit=crop&amp;w=2400&amp;q=75 2400w"
+           sizes="100vw"
            alt="Yacht auf ruhigem Wasser vor der Skyline der Dubai Marina bei Sonnenuntergang"
-           loading="lazy" decoding="async" width="2400" height="1600">
+           loading="lazy" decoding="async" width="2400" height="3600">
     </figure>
     <div class="copy">
       <p class="eyebrow"><span class="num">04</span>Marina</p>
@@ -615,10 +634,19 @@ h2{font-size:var(--step-3);line-height:1.08}
                (1 - smoothstep(s.fadeOut[0], s.fadeOut[1], p));
 
       if (op <= 0.002) {
-        if (pl.shown) { pl.el.style.opacity = '0'; pl.el.style.visibility = 'hidden'; pl.shown = false; }
+        if (pl.shown) {
+          pl.el.style.opacity = '0';
+          pl.el.style.visibility = 'hidden';
+          pl.el.classList.remove('is-live');
+          pl.shown = false;
+        }
         continue;
       }
-      if (!pl.shown) { pl.el.style.visibility = 'visible'; pl.shown = true; }
+      if (!pl.shown) {
+        pl.el.style.visibility = 'visible';
+        pl.el.classList.add('is-live');
+        pl.shown = true;
+      }
 
       if (s.ken && !reduced) pl.ken = Math.min(1, pl.ken + dt * 0.028);
       var k = clamp01((p - s.move[0]) / (s.move[1] - s.move[0]));
@@ -703,14 +731,20 @@ const root = document.documentElement;
 let renderer;
 try {
   renderer = new THREE.WebGLRenderer({
-    canvas, antialias: true, alpha: true, powerPreference: 'high-performance'
+    canvas,
+    // Auf dichten Displays löst der Pixelratio die Kanten schon auf;
+    // MSAA kostet dort Bandbreite ohne sichtbaren Gewinn.
+    antialias: window.devicePixelRatio < 1.6,
+    alpha: true,
+    powerPreference: 'high-performance'
   });
 } catch (err) {
   root.classList.add('no-webgl');
   throw err;
 }
 
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+const MAX_PR = Math.min(window.devicePixelRatio, 2);
+renderer.setPixelRatio(MAX_PR);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
@@ -759,7 +793,8 @@ const FIELD_VERT = `
   uniform float uDrift;
   uniform vec2  uFadeNear;
   uniform vec2  uFadeFar;
-  attribute vec3 aRand;
+  uniform float uCull;
+  attribute vec4 aRand;
   varying vec2 vUv;
   varying float vA;
   varying float vMix;
@@ -779,6 +814,13 @@ const FIELD_VERT = `
     vA = aRand.y
        * smoothstep(uFadeNear.x, uFadeNear.y, d)
        * (1.0 - smoothstep(uFadeFar.x, uFadeFar.y, d));
+
+    // Beitragslose Instanzen gar nicht erst rastern. Ein Quad, das nur
+    // im Fragment-Shader verworfen wird, kostet trotzdem jeden Pixel.
+    if (vA < 0.004 || aRand.w > uCull) {
+      gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+      return;
+    }
     gl_Position = projectionMatrix * mv;
   }
 `;
@@ -802,7 +844,7 @@ const FIELD_FRAG = `
 function makeField(o) {
   const geo = new THREE.PlaneGeometry(1, 1);
   const rnd = mulberry32(o.seed);
-  const rand = new Float32Array(o.count * 3);
+  const rand = new Float32Array(o.count * 4);
   const mesh = new THREE.InstancedMesh(
     geo,
     new THREE.ShaderMaterial({
@@ -817,7 +859,8 @@ function makeField(o) {
         uOpacity: { value: 0 },
         uSoft: { value: o.soft },
         uFadeNear: { value: new THREE.Vector2(o.near[0], o.near[1]) },
-        uFadeFar: { value: new THREE.Vector2(o.far[0], o.far[1]) }
+        uFadeFar: { value: new THREE.Vector2(o.far[0], o.far[1]) },
+        uCull: { value: 1 }
       },
       transparent: true,
       depthWrite: false,
@@ -827,6 +870,12 @@ function makeField(o) {
   );
 
   const dummy = new THREE.Object3D();
+  const order = [];
+  for (let i = 0; i < o.count; i++) order.push(i);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    const t = order[i]; order[i] = order[j]; order[j] = t;
+  }
   for (let i = 0; i < o.count; i++) {
     const s = o.size[0] + Math.pow(rnd(), 1.7) * (o.size[1] - o.size[0]);
     dummy.position.set(
@@ -837,11 +886,14 @@ function makeField(o) {
     dummy.scale.set(s, s * (0.55 + rnd() * 0.5), 1);
     dummy.updateMatrix();
     mesh.setMatrixAt(i, dummy.matrix);
-    rand[i * 3] = 0.35 + rnd() * 1.3;
-    rand[i * 3 + 1] = o.alpha[0] + rnd() * (o.alpha[1] - o.alpha[0]);
-    rand[i * 3 + 2] = rnd() * Math.PI * 2;
+    rand[i * 4] = 0.35 + rnd() * 1.3;
+    rand[i * 4 + 1] = o.alpha[0] + rnd() * (o.alpha[1] - o.alpha[0]);
+    rand[i * 4 + 2] = rnd() * Math.PI * 2;
+    // Rang in zufälliger Reihenfolge: beim Kürzen fällt ein gleichmässig
+    // verteilter Teil weg, nicht ein zusammenhängender Bereich.
+    rand[i * 4 + 3] = order[i] / o.count;
   }
-  geo.setAttribute('aRand', new THREE.InstancedBufferAttribute(rand, 3));
+  geo.setAttribute('aRand', new THREE.InstancedBufferAttribute(rand, 4));
   mesh.instanceMatrix.needsUpdate = true;
   mesh.frustumCulled = false;
   mesh.renderOrder = o.order;
@@ -849,20 +901,20 @@ function makeField(o) {
 }
 
 const clouds = makeField({
-  seed: 90210, count: 440, span: 620,
+  seed: 90210, count: 300, span: 620,
   box: { x: [-310, 310], y: [44, 110], z: [-152, 76] },
-  size: [14, 58], alpha: [0.34, 0.88], soft: 2.6,
+  size: [14, 46], alpha: [0.38, 0.92], soft: 2.6,
   color: 0xfff2e2, colorB: 0x6c798c, drift: 1.9, order: 1,
-  near: [2, 19], far: [220, 370]
+  near: [9, 32], far: [150, 265]
 });
 scene.add(clouds);
 
 const spray = makeField({
-  seed: 5150, count: 260, span: 76,
+  seed: 5150, count: 200, span: 76,
   box: { x: [-34, 34], y: [5, 33], z: [-264, -150] },
-  size: [0.10, 0.62], alpha: [0.22, 0.78], soft: 1.5,
+  size: [0.10, 0.62], alpha: [0.26, 0.85], soft: 1.5,
   color: 0xdfe9f2, colorB: 0xfbe6cf, drift: 0.9, order: 3, additive: true,
-  near: [0.6, 5], far: [90, 165]
+  near: [0.6, 5], far: [70, 130]
 });
 scene.add(spray);
 
@@ -1259,6 +1311,25 @@ const FOG_A = new THREE.Color(0x24303d);
 const FOG_B = new THREE.Color(0x07080b);
 
 /* ---------------------------------------------------------------
+   Qualitätsstufen. Welche Hardware die Seite öffnet, ist nicht
+   vorhersagbar — also wird die Framezeit gemessen und die Auflösung
+   plus die Partikelzahl nachgeführt, statt auf ein Budget zu hoffen.
+   --------------------------------------------------------------- */
+const TIERS = [
+  { pr: 1.00, cull: 1.00 },
+  { pr: 0.78, cull: 0.62 },
+  { pr: 0.58, cull: 0.36 }
+];
+let tier = 0;
+
+function applyTier() {
+  const t = TIERS[tier];
+  renderer.setPixelRatio(MAX_PR * t.pr);
+  clouds.material.uniforms.uCull.value = t.cull;
+  spray.material.uniforms.uCull.value = t.cull;
+}
+
+/* ---------------------------------------------------------------
    Grösse
    --------------------------------------------------------------- */
 function resize() {
@@ -1289,6 +1360,40 @@ new ResizeObserver(resize).observe(canvas);
 resize();
 
 /* ---------------------------------------------------------------
+   Shader vorab übersetzen. Sonst übersetzt der Treiber die fünf
+   PBR-Materialien der Uhr genau in dem Frame, in dem sie zum ersten
+   Mal auftaucht — und das ist ein sichtbarer Ruckler an der Stelle,
+   an der die Seite am wenigsten einen gebrauchen kann. Beide
+   Varianten der Uhrmaterialien werden gewärmt, damit auch der
+   spätere Wechsel auf undurchsichtig nichts kostet.
+   --------------------------------------------------------------- */
+function setWatchOpaque(on) {
+  for (let i = 0; i < watchMats.length; i++) {
+    const m = watchMats[i];
+    if (m.transparent === !on) continue;
+    m.transparent = !on;
+    if (on) m.opacity = 1;
+    m.needsUpdate = true;
+  }
+}
+let watchOpaque = false;
+
+(function prewarm() {
+  const state = [clouds.visible, city.visible, spray.visible, watchRoot.visible];
+  clouds.visible = city.visible = spray.visible = watchRoot.visible = true;
+  try {
+    setWatchOpaque(true);
+    renderer.compile(scene, camera);
+    setWatchOpaque(false);
+    renderer.compile(scene, camera);
+  } catch (e) {
+    // Vorwärmen ist Kür. Schlägt es fehl, übersetzt der Treiber eben später.
+  }
+  clouds.visible = state[0]; city.visible = state[1];
+  spray.visible = state[2]; watchRoot.visible = state[3];
+})();
+
+/* ---------------------------------------------------------------
    Loop
    --------------------------------------------------------------- */
 const reduced = M.reduced;
@@ -1296,6 +1401,13 @@ const FIXED_TIME = 10 * 3600 + 9 * 60 + 36;
 let elapsed = 0;
 let logged = false;
 let peakCalls = 0, peakTris = 0;
+let acc = 0, samples = 0, hold = 0;
+// Eigene Zeitnahme: das dt des Scroll-Motors ist bei 0.1s gedeckelt und
+// taugt deshalb nicht zum Messen — gerade die langsamen Frames, um die es
+// hier geht, sähen alle gleich aus.
+let lastFrame = 0;
+const START = performance.now();
+let painted = false;
 
 M.onFrame(function (p, dt) {
   if (!reduced) elapsed += dt;
@@ -1347,7 +1459,17 @@ M.onFrame(function (p, dt) {
     rimLight.intensity = RIM_MAX * wk;
     ambient.intensity = AMB_MAX * wk;
     glareMat.uniforms.uK.value = wk;
-    for (let i = 0; i < watchMats.length; i++) watchMats[i].opacity = wk;
+    // Während der Einblendung braucht es Transparenz, danach nicht mehr —
+    // undurchsichtig verwirft die Tiefenprüfung die verdeckten Flächen
+    // des Gehäuses, statt sie erst zu schattieren und zu überschreiben.
+    const wantOpaque = wk > 0.995;
+    if (wantOpaque !== watchOpaque) {
+      watchOpaque = wantOpaque;
+      setWatchOpaque(wantOpaque);
+    }
+    if (!watchOpaque) {
+      for (let i = 0; i < watchMats.length; i++) watchMats[i].opacity = wk;
+    }
 
     const secs = reduced ? FIXED_TIME : (Date.now() % 86400000) / 1000;
     const s = Math.floor(secs % 60);
@@ -1358,7 +1480,39 @@ M.onFrame(function (p, dt) {
     hourHand.rotation.y = -(hr / 12) * Math.PI * 2;
   }
 
-  renderer.render(scene, camera);
+  // Ist gerade nichts von der 3D-Ebene sichtbar, muss auch nichts
+  // gezeichnet werden — das Bild darunter bleibt einfach stehen.
+  const showing = clouds.visible || city.visible || spray.visible || watchRoot.visible;
+  if (showing) {
+    renderer.render(scene, camera);
+    painted = true;
+  } else if (painted) {
+    renderer.clear();
+    painted = false;
+  }
+
+  // Framezeit über etwa eine Sekunde mitteln, Ausreisser nach einem
+  // Tabwechsel ignorieren. Hysterese und Sperrzeit verhindern Pendeln.
+  const now = performance.now();
+  const frame = (now - lastFrame) / 1000;
+  lastFrame = now;
+  // Erste Sekunde auslassen: da laufen noch Dekodierung und Uploads.
+  // Pausen über eine Sekunde sind Tabwechsel, keine Framezeiten.
+  if (now - START > 700 && frame > 0.002 && frame < 1) { acc += frame; samples++; }
+  // Fenster über die Zeit, nicht über die Framezahl: auf langsamer
+  // Hardware greift die erste Anpassung sonst erst nach vielen Sekunden,
+  // also genau dort, wo sie am dringendsten wäre.
+  if (acc >= 0.8 && samples >= 4) {
+    const avg = acc / samples;
+    acc = 0; samples = 0;
+    if (hold > 0) {
+      hold--;
+    } else if (avg > 0.026 && tier < TIERS.length - 1) {
+      tier++; applyTier(); hold = 2;
+    } else if (avg < 0.0135 && tier > 0) {
+      tier--; applyTier(); hold = 8;
+    }
+  }
 
   const info = renderer.info.render;
   if (info.calls > peakCalls) peakCalls = info.calls;
@@ -1372,7 +1526,11 @@ M.onFrame(function (p, dt) {
 });
 
 M.stats = function () {
-  return { calls: peakCalls, triangles: peakTris, programs: renderer.info.programs.length };
+  return {
+    calls: peakCalls, triangles: peakTris,
+    programs: renderer.info.programs.length,
+    tier: tier, pixelRatio: +renderer.getPixelRatio().toFixed(2)
+  };
 };
 
 window.addEventListener('pagehide', function () {
