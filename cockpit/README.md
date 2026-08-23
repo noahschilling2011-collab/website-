@@ -41,10 +41,13 @@ projekte:    [{ name:"…", notiz:"…", status:"aktiv|liegt|fertig", datum:"202
 ziele:       [{ titel:"…", angelegt:"2026-06-01", faellig:"2027-03-01" }]
 ```
 
-Stand jetzt gefüllt: `name` und `projekte`. Die Projektliste stammt aus den
+Gefüllt sind `name`, `projekte` und ein `ziel`. Die Projektliste stammt aus den
 Branches und Pull Requests dieses Repos (Name, letzter Commit je Branch, Stand
-2026-08-23) — nicht geraten, aber prüf sie trotzdem.
-`stundenplan`, `termine` und `ziele` sind **leer**, weil ich sie nicht kenne.
+2026-08-23) — nicht geraten, aber prüf sie trotzdem. Beim Ziel steht „März 2027"
+als `2027-03-01`, die übliche BewO-Frist; ein anderer Tag ist eine Zahl.
+
+`stundenplan` und `termine` sind **leer** — die Schulzeiten trägst du selbst
+nach. Solange sie fehlen, sagt der Tagesplan das offen, statt etwas zu erfinden.
 
 ## Persistenz
 
