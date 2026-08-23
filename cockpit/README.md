@@ -62,12 +62,36 @@ JS-Variablen. Stattdessen:
 
 ## Geprüft
 
-`cockpit/index.html` wurde headless in Chromium gerendert und getestet:
-44 Verhaltensprüfungen (Aufgaben, Chat-Request und -Fehlerpfad, Import-Validierung,
-Export-Rundlauf, Zeitleisten-Zustände, 30-Tage-Regel, Zielbalken, 360px, Fokus,
-`prefers-reduced-motion`, Lauf mit vergiftetem Storage) plus ein Kontrast- und
-Overflow-Sweep in drei Breiten: 0 Fehler, 0 Warnungen.
+Die Harnische liegen dabei und laufen gegen die echte Datei:
 
-Nicht geprüft: eine echte Antwort der Anthropic-API — im Test war der Endpunkt
-abgefangen. Request-Form, Prompt-Inhalt und Rendering der Antwort sind geprüft,
-der Netzweg selbst nicht.
+```bash
+pip install playwright && playwright install chromium
+python3 cockpit/tests/verhalten.py      # 60 Prüfungen
+python3 cockpit/tests/mitternacht.py    # 3 Fälle gegen gefälschte Uhr
+```
+
+Abgedeckt: Aufgaben anlegen, abhaken und löschen samt Fokusverbleib; Chat-Request
+und -Fehlerpfad; dass eine Rückfrage den bisherigen Verlauf mitträgt;
+Import-Validierung Feld für Feld; Export → Import → Export byte-identisch;
+Zeitleisten-Zustände inklusive Blöcken über Mitternacht; die 30-Tage-Regel; der
+Zielbalken; 360px ohne horizontales Scrollen; Fokusringe; Tastatur-Scrollen der
+Spalten ab 901px; `prefers-reduced-motion`; und ein Lauf mit absichtlich
+werfendem `localStorage`/`sessionStorage`.
+
+Dazu ein Kontrast- und Overflow-Sweep in drei Breiten: 0 Fehler, 0 Warnungen.
+
+**Nicht geprüft:** eine echte Antwort der Anthropic-API. Im Test war der Endpunkt
+abgefangen — Request-Form, Prompt-Inhalt und Rendering der Antwort sind belegt,
+der Netzweg selbst nicht. Die Tests laufen auch nicht in CI: der Workflow dieses
+Repos hat keinen Browser-Schritt, und einen dafür einzuziehen wäre eine eigene
+Entscheidung.
+
+## Bewusste Grenzen
+
+- Blöcke hängen am Wochentag. Um 03:00 am Dienstag zeigt ein Dienstag-Block
+  22:00–02:00 „kommt heute Abend", nicht den Ausläufer von Montagnacht.
+- Ein Block mit `von`, aber ohne `bis` bleibt ab seinem Beginn „laufend" — ohne
+  Ende gibt es keine Restzeit, und es wird auch keine erfunden.
+- In den Prompt geht der Stundenplan **von heute**, nicht die ganze Woche. So
+  steht es in der Vorgabe. „Was habe ich morgen?" beantwortet der Planer deshalb
+  mit „steht nicht in den Daten" — eine Zeile in `snapshot()` ändert das.

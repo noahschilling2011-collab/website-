@@ -89,6 +89,9 @@ input,textarea{font:inherit; color:inherit}
   animation:pop .3s var(--in) both;
 }
 @keyframes pop{from{opacity:0; transform:translateY(-6px) scale(.985)} to{opacity:1; transform:none}}
+/* Rausgehen schneller als Reingehen: 220ms statt 300ms, beschleunigende Kurve. */
+.pop.zu{animation:pop-zu .22s var(--out) both; pointer-events:none}
+@keyframes pop-zu{from{opacity:1; transform:none} to{opacity:0; transform:translateY(-4px) scale(.99)}}
 .pop[hidden]{display:none}
 .pop h3{font-size:var(--step--1); margin-bottom:var(--s2)}
 .pop p.hint{font-size:var(--step--2); color:var(--muted); margin-bottom:var(--s3)}
@@ -226,7 +229,7 @@ input,textarea{font:inherit; color:inherit}
   opacity:0; transition:opacity .14s ease-out, color .14s ease-out;
 }
 .task-x svg{width:14px; height:14px}
-.task:hover .task-x,.task-x:focus-visible{opacity:1}
+.task:hover .task-x,.task-x:focus,.task-x:focus-visible{opacity:1}
 .task-x:hover{color:var(--head)}
 
 /* ── Chat: die einzige Glasflaeche im Layout ───────────────────── */
@@ -342,7 +345,7 @@ input,textarea{font:inherit; color:inherit}
     <!-- ── Links: Projekte ─────────────────────────────────────── -->
     <section class="col" aria-labelledby="h-proj">
       <h2 class="col-h" id="h-proj">Projekte</h2>
-      <div class="col-scroll">
+      <div class="col-scroll" id="pane-proj">
         <ul id="projects" class="stagger"></ul>
       </div>
       <p class="col-foot" id="proj-count"></p>
@@ -389,7 +392,7 @@ input,textarea{font:inherit; color:inherit}
     <!-- ── Rechts: Ziele ───────────────────────────────────────── -->
     <section class="col" aria-labelledby="h-goals">
       <h2 class="col-h" id="h-goals">Ziele</h2>
-      <div class="col-scroll">
+      <div class="col-scroll" id="pane-goals">
         <ul id="goals" class="stagger"></ul>
       </div>
     </section>
@@ -735,9 +738,12 @@ function renderAufgaben() {
     cb.type = "checkbox";
     cb.checked = !!t.erledigt;
     cb.id = "task-" + t.id;
+    /* NICHT neu rendern: das Element, auf dem der Nutzer gerade steht, waere
+       im selben Tick weg und der Fokus fiele auf <body> zurueck. Am Zustand
+       haengt nur die Klasse. */
     cb.addEventListener("change", function () {
       t.erledigt = cb.checked;
-      renderAufgaben();
+      li.classList.toggle("is-done", cb.checked);
     });
 
     var lab = document.createElement("label");
@@ -749,8 +755,13 @@ function renderAufgaben() {
     x.setAttribute("aria-label", "Aufgabe löschen: " + t.text);
     x.appendChild(icon(X_PATH));
     x.addEventListener("click", function () {
+      /* Position merken, damit der Fokus danach auf der Zeile landet, die
+         nachrueckt — sonst steht man nach dem Loeschen wieder ganz oben. */
+      var pos = state.aufgaben.indexOf(t);
       state.aufgaben = state.aufgaben.filter(function (a) { return a.id !== t.id; });
       renderAufgaben();
+      var rest = box.querySelectorAll(".task-x");
+      (rest.length ? rest[Math.min(pos, rest.length - 1)] : $("task-input")).focus();
     });
 
     li.appendChild(cb);
@@ -832,6 +843,7 @@ function snapshot(jetzt) {
   var nowMin = jetzt.getHours() * 60 + jetzt.getMinutes();
 
   return {
+    name: state.name,
     jetzt: {
       wochentag: DAYLBL[key],
       datum: jetzt.getFullYear() + "-" + pad(jetzt.getMonth() + 1) + "-" + pad(jetzt.getDate()),
@@ -855,6 +867,12 @@ function snapshot(jetzt) {
       var f = parseDate(z.faellig);
       return { titel: z.titel, faellig: z.faellig || null,
                verbleibende_tage: f ? dayDiff(heute, f) : null };
+    }),
+    /* Der Verlauf steht sichtbar im Panel — ohne ihn im Prompt waere jede
+       Rueckfrage ("und dann?") ins Leere gestellt. Die Request-Form bleibt
+       wie vorgegeben eine einzige user-Message. */
+    bisheriger_verlauf: state.verlauf.map(function (v) {
+      return { frage: v.frage, antwort: v.antwort };
     })
   };
 }
@@ -1108,12 +1126,32 @@ function zeigeMeldung(text, schlecht) {
   m.className = "msg" + (schlecht ? " bad" : "");
 }
 
-function popOffen() { return !$("pop-import").hidden; }
+var popTimer = null;
+
+/* Waehrend der Schliessanimation gilt das Popover als zu — sonst wuerde ein
+   Klick auf "Import" in diesem Fenster ein zweites Schliessen ausloesen. */
+function popOffen() {
+  var pop = $("pop-import");
+  return !pop.hidden && !pop.classList.contains("zu");
+}
 
 function oeffnePop(auf) {
-  $("pop-import").hidden = !auf;
+  var pop = $("pop-import");
+  if (popTimer) { clearTimeout(popTimer); popTimer = null; }
+
+  if (auf) {
+    pop.classList.remove("zu");
+    pop.hidden = false;
+    $("import-text").focus();
+  } else if (!pop.hidden) {
+    pop.classList.add("zu");
+    popTimer = setTimeout(function () {
+      pop.hidden = true;
+      pop.classList.remove("zu");
+      popTimer = null;
+    }, 220);
+  }
   $("btn-import").setAttribute("aria-expanded", auf ? "true" : "false");
-  if (auf) { $("import-text").focus(); }
 }
 
 function render() {
@@ -1198,6 +1236,29 @@ function start() {
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && popOffen()) { oeffnePop(false); $("btn-import").focus(); }
   });
+
+  /* Ab 901px scrollt die Seite nicht mehr, jede Spalte scrollt fuer sich.
+     Projekte und Ziele enthalten aber nichts Fokussierbares — ohne tabindex
+     kaeme man per Tastatur nie an die unteren Karten. Unterhalb der Grenze
+     scrollt die Seite normal, dann ist der Tabstop nur im Weg. */
+  var breit = window.matchMedia("(min-width:901px)");
+  function scrollPanes() {
+    ["pane-proj", "pane-goals"].forEach(function (id, i) {
+      var n = $(id);
+      if (breit.matches) {
+        n.setAttribute("tabindex", "0");
+        n.setAttribute("role", "group");
+        n.setAttribute("aria-labelledby", i === 0 ? "h-proj" : "h-goals");
+      } else {
+        n.removeAttribute("tabindex");
+        n.removeAttribute("role");
+        n.removeAttribute("aria-labelledby");
+      }
+    });
+  }
+  scrollPanes();
+  if (breit.addEventListener) breit.addEventListener("change", scrollPanes);
+  else if (breit.addListener) breit.addListener(scrollPanes);
 
   document.addEventListener("pointerdown", function (e) {
     if (!popOffen()) return;
