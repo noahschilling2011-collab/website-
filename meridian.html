@@ -1,0 +1,1391 @@
+<!doctype html>
+<html lang="de" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Meridian Atelier — Residences, Marina, Timepieces</title>
+<meta name="description" content="Meridian Atelier gestaltet digitale Ansichten für Residences, Marina und Timepieces. Eine durchgehende Scroll-Reise von über der Wolkendecke bis in die Nahaufnahme.">
+<meta name="color-scheme" content="dark">
+
+<link rel="preload" as="image" href="https://images.unsplash.com/photo-1560773526-435221de2527?auto=format&amp;fit=crop&amp;w=2400&amp;q=75" fetchpriority="high">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=Inter:wght@300;400;500&display=swap">
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.185.1/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.185.1/examples/jsm/"
+  }
+}
+</script>
+
+<style>
+:root{
+  --bg:#08080a;
+  --ink:#ecebe7;
+  --ink-2:#a9a49c;
+  --ink-3:#8a867e;
+  --gold:#c9a568;
+  --cold:#7f97ab;
+  --line:rgba(255,255,255,0.09);
+  --s-1:8px; --s-2:12px; --s-3:16px; --s-4:24px; --s-5:32px; --s-6:48px; --s-7:64px; --s-8:96px;
+  --serif:"Cormorant Garamond",ui-serif,Georgia,"Times New Roman",serif;
+  --sans:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --ease:cubic-bezier(0.16,1,0.3,1);
+  --step--2:clamp(0.68rem,0.66rem + 0.10vw,0.74rem);
+  --step--1:clamp(0.81rem,0.78rem + 0.15vw,0.92rem);
+  --step-0:clamp(1.00rem,0.96rem + 0.22vw,1.12rem);
+  --step-1:clamp(1.18rem,1.09rem + 0.44vw,1.46rem);
+  --step-3:clamp(1.95rem,1.55rem + 1.95vw,3.30rem);
+  --step-4:clamp(2.55rem,1.75rem + 3.90vw,5.40rem);
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+html{background:var(--bg);-webkit-text-size-adjust:100%}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:var(--step-0);
+  font-weight:300;
+  line-height:1.6;
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+img{max-width:100%;height:auto;display:block}
+::selection{background:rgba(201,165,104,.28);color:#fff}
+:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+
+.skip{
+  position:fixed;top:var(--s-2);left:var(--s-2);z-index:99;
+  transform:translateY(-160%);
+  background:#101014;color:var(--ink);
+  padding:10px 16px;border:1px solid var(--line);border-radius:2px;
+  font-size:var(--step--1);letter-spacing:.08em;text-transform:uppercase;text-decoration:none;
+  transition:transform 200ms var(--ease);
+}
+.skip:focus-visible{transform:translateY(0)}
+
+/* ---------------------------------------------------------------
+   Grundzustand = Seite ohne JS: ein normales, scrollbares Foto-Essay.
+   Alles Kinematische hängt an .js-ready.
+   --------------------------------------------------------------- */
+
+#scene{display:none}
+
+.station{
+  position:relative;
+  padding:var(--s-7) var(--s-4);
+  max-width:1180px;
+  margin:0 auto;
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+.plate{margin:0 0 var(--s-5)}
+.plate img{width:100%;border-radius:2px}
+.plate--inset{max-width:520px}
+
+.eyebrow{
+  font-size:var(--step--2);
+  letter-spacing:.34em;
+  text-transform:uppercase;
+  color:var(--gold);
+  margin:0 0 var(--s-3);
+  font-weight:400;
+}
+.eyebrow .num{color:var(--ink-3);margin-right:.9em;letter-spacing:.24em}
+h1,h2{
+  font-family:var(--serif);
+  font-weight:300;
+  color:#f4f2ee;
+  margin:0 0 var(--s-4);
+  letter-spacing:-0.015em;
+}
+h1{font-size:var(--step-4);line-height:1.02}
+h2{font-size:var(--step-3);line-height:1.08}
+.lede{max-width:44ch;color:var(--ink-2);margin:0 0 var(--s-4);font-size:var(--step-1);line-height:1.5}
+.body{max-width:52ch;color:var(--ink-2);margin:0 0 var(--s-4)}
+.body strong{color:var(--ink);font-weight:400}
+
+.meta{
+  display:flex;flex-wrap:wrap;gap:var(--s-2) var(--s-5);
+  list-style:none;margin:var(--s-5) 0 0;padding:0;
+  font-size:var(--step--2);letter-spacing:.2em;text-transform:uppercase;color:var(--ink-3);
+}
+.meta b{display:block;font-family:var(--serif);font-size:var(--step-1);letter-spacing:0;
+  text-transform:none;color:var(--ink);font-weight:400;margin-bottom:2px}
+
+.hint{
+  display:inline-flex;align-items:center;gap:var(--s-2);
+  font-size:var(--step--2);letter-spacing:.3em;text-transform:uppercase;color:var(--ink-3);
+  margin-top:var(--s-6);
+}
+.hint span::after{
+  content:"";display:block;width:1px;height:34px;margin:10px auto 0;
+  background:linear-gradient(to bottom,var(--gold),transparent);
+}
+
+.glass{
+  background:rgba(255,255,255,0.04);
+  backdrop-filter:blur(20px) saturate(150%);
+  -webkit-backdrop-filter:blur(20px) saturate(150%);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:3px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+  padding:var(--s-4) var(--s-5);
+}
+@supports not (backdrop-filter:blur(1px)){
+  .glass{background:rgba(18,18,22,.92)}
+}
+
+#topbar{
+  display:flex;justify-content:space-between;align-items:baseline;gap:var(--s-4);
+  max-width:1180px;margin:0 auto;padding:var(--s-4);
+  font-size:var(--step--2);letter-spacing:.28em;text-transform:uppercase;color:#a4a099;
+}
+#topbar .bar{flex:1}
+#topbar .mark{color:var(--ink);letter-spacing:.36em}
+
+#progress{display:none}
+
+#colophon{
+  max-width:1180px;margin:0 auto;padding:var(--s-6) var(--s-4) var(--s-7);
+  color:var(--ink-3);font-size:var(--step--2);letter-spacing:.06em;line-height:1.8;
+}
+#colophon .sign{
+  font-family:var(--serif);font-size:var(--step-1);letter-spacing:.02em;
+  color:var(--ink-2);text-transform:none;margin-bottom:var(--s-3);
+}
+#credits{margin-top:var(--s-3);max-width:70ch}
+#credits .sep{opacity:.45;padding:0 .35em}
+
+.nofx{
+  max-width:1180px;margin:0 auto;padding:0 var(--s-4) var(--s-6);
+  color:var(--ink-3);font-size:var(--step--1);
+}
+
+/* ---------------------------------------------------------------
+   Kinematischer Modus
+   --------------------------------------------------------------- */
+.js-ready body{overflow-x:hidden}
+
+.js-ready #scene{
+  display:block;
+  position:fixed;inset:0;width:100%;height:100svh;
+  z-index:2;pointer-events:none;
+}
+.js-ready.no-webgl #scene{display:none}
+
+.js-ready .station{
+  max-width:none;margin:0;padding:0;border:0;
+  height:var(--h,110svh);
+}
+
+.js-ready .plate{
+  position:fixed;inset:0;
+  margin:0;
+  z-index:1;
+  opacity:0;
+  overflow:hidden;
+  background-color:var(--fb,#0d1016);
+  pointer-events:none;
+  will-change:opacity,transform;
+}
+.js-ready .plate img{
+  width:100%;height:100%;
+  object-fit:cover;object-position:var(--pos,50% 50%);
+  border-radius:0;
+}
+.js-ready .plate.is-broken img{opacity:0}
+.js-ready .plate--inset img{filter:brightness(.74) contrast(1.06) saturate(.9)}
+
+.js-ready .plate--inset{
+  inset:auto clamp(64px,7vw,112px) 13svh auto;
+  width:min(34vw,400px);height:min(44svh,400px);
+  max-width:none;
+  z-index:3;
+  border:1px solid rgba(255,255,255,.10);
+  box-shadow:0 30px 90px rgba(0,0,0,.55);
+}
+@media (max-width:720px){
+  .js-ready .plate--inset{
+    inset:auto var(--s-3) 10svh auto;
+    width:56vw;height:34svh;
+  }
+}
+
+#grade{
+  display:none;position:fixed;inset:0;z-index:4;pointer-events:none;
+}
+.js-ready #grade{
+  display:block;
+  background:
+    linear-gradient(to right,rgba(4,4,6,.52) 0%,rgba(4,4,6,.20) 32%,transparent 56%),
+    radial-gradient(120% 90% at 50% 40%,transparent 38%,rgba(4,4,6,.58) 100%),
+    linear-gradient(to top,rgba(4,4,6,.74) 0%,transparent 34%),
+    linear-gradient(to bottom,rgba(4,4,6,.58) 0%,transparent 26%);
+}
+
+.js-ready .copy{
+  position:fixed;
+  left:max(var(--s-4),calc(50vw - 560px));
+  top:50svh;transform:translateY(calc(-50% + 34px));
+  width:min(92vw,540px);
+  z-index:5;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity 560ms var(--ease),transform 620ms var(--ease);
+}
+.js-ready .copy.is-on{
+  opacity:1;
+  transform:translateY(-50%);
+  pointer-events:auto;
+}
+.js-ready .copy::before{
+  content:"";position:absolute;inset:-20svh -42vw -20svh -48vw;
+  z-index:-1;pointer-events:none;
+  background:radial-gradient(56% 52% at 32% 50%,
+    rgba(3,3,5,.90) 0%,rgba(3,3,5,.70) 44%,rgba(3,3,5,.26) 70%,transparent 88%);
+}
+.js-ready .copy .eyebrow,
+.js-ready .copy h1,.js-ready .copy h2,
+.js-ready .copy .lede,.js-ready .copy .body,
+.js-ready .copy .meta,.js-ready .copy .hint{
+  text-shadow:0 1px 2px rgba(0,0,0,.55),0 10px 44px rgba(0,0,0,.45);
+}
+.js-ready .copy--wide{width:min(92vw,620px)}
+/* Timepiece: im Querformat steht die Uhr rechts und der Text links wie sonst.
+   Im Hochformat sitzt die Uhr oben und der Text darunter. */
+@media (max-aspect-ratio:21/20){
+  .js-ready .copy--end{
+    left:50%;top:auto;bottom:15svh;
+    width:min(92vw,520px);
+    text-align:center;
+    transform:translate(-50%,34px);
+  }
+  .js-ready .copy--end.is-on{transform:translate(-50%,0)}
+  .js-ready .copy--end::before{
+    inset:-10svh -24vw -16svh -24vw;
+    background:linear-gradient(to top,rgba(3,3,5,.94) 26%,rgba(3,3,5,.62) 68%,transparent 100%);
+  }
+  .js-ready .copy--end .lede,.js-ready .copy--end .body{margin-left:auto;margin-right:auto}
+}
+
+/* Gestaffelte Einblendung der Zeilen */
+.js-ready .copy > *{
+  opacity:0;transform:translateY(22px);
+  transition:opacity 480ms var(--ease),transform 620ms var(--ease);
+}
+.js-ready .copy.is-on > *{opacity:1;transform:translateY(0)}
+.js-ready .copy.is-on > *:nth-child(1){transition-delay:40ms}
+.js-ready .copy.is-on > *:nth-child(2){transition-delay:110ms}
+.js-ready .copy.is-on > *:nth-child(3){transition-delay:180ms}
+.js-ready .copy.is-on > *:nth-child(4){transition-delay:250ms}
+.js-ready .copy.is-on > *:nth-child(5){transition-delay:320ms}
+
+.js-ready #topbar{
+  position:fixed;top:0;left:0;right:0;z-index:6;
+  max-width:none;margin:0;
+  padding:var(--s-3) clamp(var(--s-4),4vw,var(--s-6));
+  mix-blend-mode:normal;
+}
+.js-ready #topbar .bar{
+  display:flex;justify-content:space-between;align-items:center;gap:var(--s-4);
+  width:100%;max-width:1240px;margin:0 auto;
+  padding:10px var(--s-4);
+  background:rgba(8,8,11,.44);
+}
+
+/* Fortschritt rechts */
+.js-ready #progress{
+  display:block;position:fixed;z-index:6;
+  right:clamp(14px,2.4vw,30px);top:50svh;transform:translateY(-50%);
+  width:34px;height:min(46svh,380px);
+  pointer-events:none;
+}
+#progress .track{
+  position:absolute;right:11px;top:0;bottom:0;width:1px;
+  background:rgba(255,255,255,.14);
+}
+#progress .fill{
+  position:absolute;right:11px;top:0;width:1px;height:0;
+  background:linear-gradient(to bottom,rgba(201,165,104,.35),var(--gold));
+  transform-origin:top;
+}
+#progress .tick{
+  position:absolute;right:8px;width:7px;height:1px;
+  background:rgba(255,255,255,.22);
+  transition:background 300ms var(--ease),width 300ms var(--ease);
+}
+#progress .tick.is-on{background:var(--gold);width:13px;right:5px}
+#progress .lab{
+  position:absolute;right:26px;top:50%;
+  transform:translateY(-50%) rotate(180deg);
+  writing-mode:vertical-rl;
+  font-size:var(--step--2);letter-spacing:.34em;text-transform:uppercase;
+  color:var(--ink-3);white-space:nowrap;
+}
+#progress .lab b{color:var(--ink-2);font-weight:400}
+@media (max-width:640px){
+  .js-ready #progress .lab{display:none}
+  .js-ready #progress{width:20px}
+}
+
+.js-ready #colophon{
+  position:fixed;left:0;right:0;bottom:0;z-index:6;
+  max-width:none;margin:0;
+  padding:0 clamp(var(--s-4),4vw,var(--s-6)) clamp(var(--s-3),2.4vw,var(--s-4));
+  opacity:0;transition:opacity 700ms var(--ease);
+  pointer-events:none;
+}
+.js-ready #colophon.is-on{opacity:1;pointer-events:auto}
+.js-ready #colophon .inner{max-width:1240px;margin:0 auto}
+.js-ready #colophon .sign{display:none}
+.js-ready #credits{
+  max-width:none;font-size:var(--step--2);color:var(--ink-3);
+  line-height:1.7;letter-spacing:.05em;
+}
+.js-ready .nofx{display:none}
+
+@media (max-width:720px){
+  .js-ready .copy{left:var(--s-4);width:calc(100vw - 2*var(--s-4))}
+  .js-ready .copy:not(.copy--end)::before{
+    inset:-22svh -14vw;
+    background:linear-gradient(to bottom,
+      rgba(3,3,5,.22) 0%,rgba(3,3,5,.86) 24%,rgba(3,3,5,.86) 76%,rgba(3,3,5,.22) 100%);
+  }
+  .js-ready .copy--end{left:50%;width:calc(100vw - 2*var(--s-4))}
+  .js-ready #topbar .bar{padding:9px var(--s-3);gap:var(--s-2)}
+}
+@media (max-height:520px){
+  .js-ready .plate--inset{display:none}
+}
+@media (max-width:460px){
+  .js-ready #topbar .bar > span + span{display:none}
+  .js-ready #topbar .bar{justify-content:center}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms !important;
+    animation-iteration-count:1 !important;
+    scroll-behavior:auto !important;
+  }
+  .js-ready .copy,.js-ready .copy > *{transition-duration:.01ms !important}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#story">Direkt zum Inhalt</a>
+
+<canvas id="scene" aria-hidden="true"></canvas>
+<div id="grade" aria-hidden="true"></div>
+
+<header id="topbar">
+  <div class="bar glass">
+    <span class="mark">Meridian&nbsp;Atelier</span>
+    <span>Zürich · Est. 2011</span>
+  </div>
+</header>
+
+<main id="story">
+
+  <!-- 0.00 ABOVE -->
+  <section class="station" style="--h:120svh" data-station="above">
+    <figure class="plate" data-plate="hero-sky" style="--fb:#241a16">
+      <img src="https://images.unsplash.com/photo-1560773526-435221de2527?auto=format&amp;fit=crop&amp;w=2400&amp;q=75"
+           alt="Sonnenaufgang über einer geschlossenen Wolkendecke, orange Lichtband am Horizont"
+           fetchpriority="high" decoding="async" width="2400" height="1600">
+    </figure>
+    <div class="copy copy--wide">
+      <p class="eyebrow">Studio für digitale Objekte</p>
+      <h1>Meridian<br>Atelier</h1>
+      <p class="lede">Wir bauen die Ansicht, an der die Entscheidung fällt — für Residences, für Marina, für Timepieces.</p>
+      <p class="body">Seit vierzehn Jahren arbeiten wir an genau einer Stelle des Verkaufs: dem Moment, in dem jemand ein Objekt zum ersten Mal sieht, das es so noch nicht gibt. Diese Seite ist kein Video. Sie wird berechnet, während Sie scrollen.</p>
+      <p class="hint"><span>Scrollen</span></p>
+    </div>
+  </section>
+
+  <!-- 0.20 DESCENT -->
+  <section class="station" style="--h:100svh" data-station="descent">
+    <figure class="plate" data-plate="fog-tower" style="--fb:#1a1f26;--pos:50% 42%">
+      <img src="https://images.unsplash.com/photo-1776794314398-3b6def1dbf14?auto=format&amp;fit=crop&amp;w=2400&amp;q=75"
+           alt="Wolkenkratzer, dessen obere Etagen im Morgennebel verschwinden"
+           loading="lazy" decoding="async" width="2400" height="1600">
+    </figure>
+    <div class="copy">
+      <p class="eyebrow"><span class="num">01</span>Annäherung</p>
+      <h2>Vom Überblick zur Kante</h2>
+      <p class="body">Jedes Projekt beginnt weit oben: Lage, Nachbarschaft, Anspruch, Preisband. Erst wenn diese Ebene steht, gehen wir tiefer. Der Weg nach unten ist kein Abstieg, sondern eine Verengung — bis am Ende ein einzelnes Detail übrig bleibt, das die ganze Arbeit tragen muss.</p>
+    </div>
+  </section>
+
+  <!-- 0.35 SKYLINE -->
+  <section class="station" style="--h:130svh" data-station="skyline">
+    <figure class="plate" data-plate="skyline" style="--fb:#161b21">
+      <img src="https://images.unsplash.com/photo-1507670092296-5c5c6a2b5cc3?auto=format&amp;fit=crop&amp;w=2400&amp;q=75"
+           alt="Luftaufnahme mehrerer Hochhäuser, deren Spitzen aus einer Wolkenschicht ragen"
+           loading="lazy" decoding="async" width="2400" height="1600">
+    </figure>
+    <figure class="plate" data-plate="tower" style="--fb:#2a1d19;--pos:50% 45%">
+      <img src="https://images.unsplash.com/photo-1766548729715-9471973631f1?auto=format&amp;fit=crop&amp;w=2400&amp;q=75"
+           alt="Einzelner Turm, der bei Sonnenuntergang aus einer Wolkendecke ragt"
+           loading="lazy" decoding="async" width="2400" height="1600">
+    </figure>
+    <div class="copy">
+      <p class="eyebrow"><span class="num">02</span>Maßstab</p>
+      <h2>Wir zeigen, was noch nicht steht</h2>
+      <p class="body">Für Entwickler und Eigentümer entsteht bei uns eine Umgebung statt eines Renderings-Ordners: eine Stadt, durch die man sich bewegt, mit dem geplanten Haus an seiner tatsächlichen Stelle. Was hier vor dem Foto steht, ist echte Geometrie — Höhen, Fensterraster und Fluchten sind aus dem Bebauungsplan abgeleitet, nicht gemalt.</p>
+      <ul class="meta">
+        <li><b>445</b>Baukörper</li>
+        <li><b>1</b>Zeichenaufruf</li>
+        <li><b>60 fps</b>Ziel</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 0.55 RESIDENCES -->
+  <section class="station" style="--h:130svh" data-station="residences">
+    <figure class="plate" data-plate="interior" style="--fb:#15161a">
+      <img src="https://images.unsplash.com/photo-1568115286680-d203e08a8be6?auto=format&amp;fit=crop&amp;w=2400&amp;q=75"
+           alt="Leerer Wohnraum mit raumhoher Glasfront und Blick nach draußen"
+           loading="lazy" decoding="async" width="2400" height="1600">
+    </figure>
+    <figure class="plate plate--inset" data-plate="interior-sea" data-depth="front" style="--fb:#1b1e22">
+      <img src="https://images.unsplash.com/photo-1707484687082-9493754d389f?auto=format&amp;fit=crop&amp;w=2400&amp;q=75"
+           alt="Unmöblierter Raum mit großem Fenster und Blick auf das Meer"
+           loading="lazy" decoding="async" width="2400" height="1600">
+    </figure>
+    <div class="copy">
+      <p class="eyebrow"><span class="num">03</span>Residences</p>
+      <h2>Der Blick ist das Produkt</h2>
+      <p class="body">Eine Wohnung in dieser Preisklasse wird nicht über Grundrisse verkauft, sondern über das, was hinter dem Glas liegt. Wir zeigen es zur richtigen Tageszeit, aus der richtigen Höhe und ohne Möbelkatalog. Der Interessent stellt die Uhrzeit selbst — und sieht, was das Licht mit dem Raum macht, den er kaufen soll.</p>
+    </div>
+  </section>
+
+  <!-- 0.75 MARINA -->
+  <section class="station" style="--h:120svh" data-station="marina">
+    <figure class="plate" data-plate="marina" style="--fb:#241a1c;--pos:50% 80%">
+      <img src="https://images.unsplash.com/photo-1768463852017-921060ff24fe?auto=format&amp;fit=crop&amp;w=2400&amp;q=75"
+           alt="Yacht auf ruhigem Wasser vor der Skyline der Dubai Marina bei Sonnenuntergang"
+           loading="lazy" decoding="async" width="2400" height="1600">
+    </figure>
+    <div class="copy">
+      <p class="eyebrow"><span class="num">04</span>Marina</p>
+      <h2>Wasserlinie, kurz vor sechs</h2>
+      <p class="body">Für Werften und Marina-Betreiber konfigurieren wir Schiffe im Browser: Rumpffarbe, Decklayout, Hölzer, Beschläge. Kein Formular mit Vorschaubild, sondern das Boot vor der Skyline, in der es später liegen wird. Die Werft bekommt am Ende eine Stückliste, der Kunde ein Bild, das er behalten will.</p>
+    </div>
+  </section>
+
+  <!-- 1.00 TIMEPIECE -->
+  <section class="station" style="--h:100svh" data-station="timepiece">
+    <div class="copy copy--end">
+      <p class="eyebrow"><span class="num">05</span>Timepieces</p>
+      <h2>Nichts hiervon ist ein Foto</h2>
+      <p class="body">Gehäuse, Lünette, Krone, Zeiger: berechnet, während Sie lesen. Der Sekundenzeiger geht nach Ihrer Systemzeit. Was für eine Uhr funktioniert, funktioniert für jedes Objekt, das man drehen können muss, bevor man es kauft.</p>
+      <p class="body"><strong>Meridian Atelier</strong> — Ansichten für Objekte, die es noch nicht gibt.</p>
+    </div>
+  </section>
+
+</main>
+
+<aside id="progress" aria-hidden="true">
+  <span class="track"></span>
+  <span class="fill"></span>
+  <span class="lab"><b data-role="label">Above</b></span>
+</aside>
+
+<footer id="colophon">
+  <div class="inner">
+    <p class="sign">Meridian Atelier — Zürich</p>
+    <p id="credits">
+      Fotografien: Jerry Zhang<span class="sep">·</span>Venti Views<span class="sep">·</span>Rohan Makhecha<span class="sep">·</span>Andrew Spencer<span class="sep">·</span>Moritz Bruder<span class="sep">·</span>Vangel Dimo<span class="sep">·</span>Dawid Tkocz<span class="sep">·</span>Photos via Unsplash. Uhr, Stadt und Wolken in Echtzeit gerendert.
+    </p>
+  </div>
+</footer>
+
+<p class="nofx"><noscript>Diese Seite läuft ohne JavaScript als Bildstrecke. Die scrollgesteuerte Kamerafahrt und die in Echtzeit gerechnete Uhr brauchen JavaScript und WebGL.</noscript></p>
+
+<script>
+/* Scroll-Motor, Foto-Ebene, Text-Stationen.
+   Bewusst klassisches Script: läuft auch dann, wenn die Import-Map
+   oder das CDN für Three.js ausfällt. */
+(function () {
+  'use strict';
+
+  var doc = document.documentElement;
+  doc.classList.remove('no-js');
+  doc.classList.add('js-ready');
+
+  var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
+  function smoothstep(a, b, x) {
+    if (a === b) return x >= b ? 1 : 0;
+    var t = clamp01((x - a) / (b - a));
+    return t * t * (3 - 2 * t);
+  }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+
+  /* --- Fotoplatten -------------------------------------------------- */
+  var SPEC = {
+    'hero-sky':     { fadeIn: [-0.20, 0.00], fadeOut: [0.10, 0.20], move: [0.00, 0.22], scale: [1.12, 1.00], y: [0, -3] },
+    'fog-tower':    { fadeIn: [0.11, 0.19],  fadeOut: [0.28, 0.35], move: [0.10, 0.36], scale: [1.15, 1.02], y: [7, -8] },
+    'skyline':      { fadeIn: [0.28, 0.35],  fadeOut: [0.40, 0.46], move: [0.26, 0.48], scale: [1.10, 1.00], y: [4, -4] },
+    'tower':        { fadeIn: [0.40, 0.46],  fadeOut: [0.48, 0.55], move: [0.38, 0.56], scale: [1.12, 1.00], y: [6, -6] },
+    'interior':     { fadeIn: [0.48, 0.55],  fadeOut: [0.68, 0.75], move: [0.46, 0.77], scale: [1.08, 1.00], y: [3, -5] },
+    'interior-sea': { fadeIn: [0.54, 0.60],  fadeOut: [0.66, 0.72], move: [0.52, 0.74], scale: [1.02, 1.02], y: [16, -18] },
+    'marina':       { fadeIn: [0.68, 0.75],  fadeOut: [0.88, 0.96], move: [0.66, 1.00], scale: [1.06, 1.13], y: [3, -3], ken: true }
+  };
+
+  var plates = [];
+  Array.prototype.forEach.call(document.querySelectorAll('.plate'), function (el) {
+    var spec = SPEC[el.getAttribute('data-plate')];
+    if (!spec) return;
+    var img = el.querySelector('img');
+    if (img) {
+      img.addEventListener('error', function () { el.classList.add('is-broken'); });
+      if (img.complete && img.naturalWidth === 0) el.classList.add('is-broken');
+    }
+    plates.push({
+      el: el, s: spec, ken: 0, shown: false,
+      lastOp: -1, lastT: ''
+    });
+  });
+
+  /* --- Text-Stationen ------------------------------------------------ */
+  var STATIONS = [
+    { key: 'above',      at: 0.00, on: [-1.00, 0.14], label: 'Above' },
+    { key: 'descent',    at: 0.20, on: [0.16, 0.30],  label: 'Annäherung' },
+    { key: 'skyline',    at: 0.35, on: [0.32, 0.51],  label: 'Maßstab' },
+    { key: 'residences', at: 0.55, on: [0.545, 0.695], label: 'Residences' },
+    { key: 'marina',     at: 0.75, on: [0.715, 0.885], label: 'Marina' },
+    { key: 'timepiece',  at: 1.00, on: [0.905, 1.01], label: 'Timepieces' }
+  ];
+  STATIONS.forEach(function (st) {
+    st.copy = document.querySelector('[data-station="' + st.key + '"] .copy');
+    st.state = false;
+  });
+
+  /* --- Fortschrittsanzeige ------------------------------------------- */
+  var progress = document.getElementById('progress');
+  var fillEl = progress.querySelector('.fill');
+  var labelEl = progress.querySelector('[data-role="label"]');
+  STATIONS.forEach(function (st) {
+    var tick = document.createElement('span');
+    tick.className = 'tick';
+    tick.style.top = (st.at * 100) + '%';
+    progress.appendChild(tick);
+    st.tick = tick;
+  });
+
+  var colophon = document.getElementById('colophon');
+  var colophonOn = false;
+
+  /* --- Scrollwert ----------------------------------------------------- */
+  var maxScroll = 1;
+  function measure() {
+    maxScroll = Math.max(1, doc.scrollHeight - window.innerHeight);
+  }
+  measure();
+  window.addEventListener('resize', measure, { passive: true });
+  window.addEventListener('orientationchange', measure, { passive: true });
+  window.addEventListener('load', measure);
+
+  var target = clamp01(window.scrollY / maxScroll);
+  var current = target;
+  var frameCbs = [];
+  var active = true;
+  var lastTime = 0;
+
+  var canvas = document.getElementById('scene');
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(function (entries) {
+      active = entries[0].isIntersecting && !document.hidden;
+    }, { threshold: 0 }).observe(canvas);
+  }
+  document.addEventListener('visibilitychange', function () {
+    active = !document.hidden;
+    lastTime = 0;
+  });
+
+  function applyPlates(p, dt) {
+    for (var i = 0; i < plates.length; i++) {
+      var pl = plates[i], s = pl.s;
+      var op = smoothstep(s.fadeIn[0], s.fadeIn[1], p) *
+               (1 - smoothstep(s.fadeOut[0], s.fadeOut[1], p));
+
+      if (op <= 0.002) {
+        if (pl.shown) { pl.el.style.opacity = '0'; pl.el.style.visibility = 'hidden'; pl.shown = false; }
+        continue;
+      }
+      if (!pl.shown) { pl.el.style.visibility = 'visible'; pl.shown = true; }
+
+      if (s.ken && !reduced) pl.ken = Math.min(1, pl.ken + dt * 0.028);
+      var k = clamp01((p - s.move[0]) / (s.move[1] - s.move[0]));
+      var sc = lerp(s.scale[0], s.scale[1], k) + pl.ken * 0.085;
+      var y = lerp(s.y[0], s.y[1], k);
+
+      var t = 'translate3d(0,' + y.toFixed(2) + '%,0) scale(' + sc.toFixed(4) + ')';
+      if (t !== pl.lastT) { pl.el.style.transform = t; pl.lastT = t; }
+      var o = op.toFixed(3);
+      if (o !== pl.lastOp) { pl.el.style.opacity = o; pl.lastOp = o; }
+    }
+  }
+
+  function applyStations(p) {
+    var activeIdx = 0;
+    for (var i = 0; i < STATIONS.length; i++) {
+      var st = STATIONS[i];
+      var on = p >= st.on[0] && p < st.on[1];
+      if (on) activeIdx = i;
+      if (on !== st.state) {
+        st.state = on;
+        if (st.copy) st.copy.classList.toggle('is-on', on);
+        st.tick.classList.toggle('is-on', on);
+      }
+    }
+    labelEl.textContent = STATIONS[activeIdx].label;
+
+    var wantColophon = p > 0.93;
+    if (wantColophon !== colophonOn) {
+      colophonOn = wantColophon;
+      colophon.classList.toggle('is-on', wantColophon);
+    }
+  }
+
+  function frame(now) {
+    requestAnimationFrame(frame);
+    if (!lastTime) lastTime = now;
+    var dt = Math.min((now - lastTime) / 1000, 0.1);
+    lastTime = now;
+    if (!active) return;
+
+    target = clamp01(window.scrollY / maxScroll);
+    current += (target - current) * (reduced ? 0.34 : 0.06);
+    if (Math.abs(target - current) < 0.00008) current = target;
+
+    var p = current;
+    API.p = p;
+    API.raw = target;
+
+    applyPlates(p, dt);
+    applyStations(p);
+    fillEl.style.height = (p * 100).toFixed(2) + '%';
+
+    for (var i = 0; i < frameCbs.length; i++) frameCbs[i](p, dt);
+  }
+
+  var API = {
+    p: current,
+    raw: target,
+    reduced: reduced,
+    smoothstep: smoothstep,
+    clamp01: clamp01,
+    lerp: lerp,
+    isActive: function () { return active; },
+    onFrame: function (fn) { frameCbs.push(fn); }
+  };
+  window.MERIDIAN = API;
+
+  applyPlates(current, 0);
+  applyStations(current);
+  requestAnimationFrame(frame);
+})();
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+const M = window.MERIDIAN;
+const canvas = document.getElementById('scene');
+const root = document.documentElement;
+
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({
+    canvas, antialias: true, alpha: true, powerPreference: 'high-performance'
+  });
+} catch (err) {
+  root.classList.add('no-webgl');
+  throw err;
+}
+
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.setClearAlpha(0);
+
+const scene = new THREE.Scene();
+const BASE_FOV = 42;
+const camera = new THREE.PerspectiveCamera(BASE_FOV, 1, 0.4, 900);
+
+/* ---------------------------------------------------------------
+   Hilfen
+   --------------------------------------------------------------- */
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function ramp(x, stops) {
+  if (x <= stops[0][0]) return stops[0][1];
+  const last = stops[stops.length - 1];
+  if (x >= last[0]) return last[1];
+  for (let i = 1; i < stops.length; i++) {
+    const a = stops[i - 1], b = stops[i];
+    if (x <= b[0]) {
+      const t = (x - a[0]) / (b[0] - a[0]);
+      return a[1] + (b[1] - a[1]) * t * t * (3 - 2 * t);
+    }
+  }
+  return last[1];
+}
+
+const TONE = `
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+`;
+
+/* ---------------------------------------------------------------
+   Partikelfeld — Wolken und Gischt teilen sich denselben Shader
+   --------------------------------------------------------------- */
+const FIELD_VERT = `
+  uniform float uTime;
+  uniform float uSpan;
+  uniform float uDrift;
+  uniform vec2  uFadeNear;
+  uniform vec2  uFadeFar;
+  attribute vec3 aRand;
+  varying vec2 vUv;
+  varying float vA;
+  varying float vMix;
+  void main() {
+    vUv = uv;
+    vMix = fract(aRand.x * 3.7);
+    vec3 ip = vec3(instanceMatrix[3]);
+    float sx = length(vec3(instanceMatrix[0]));
+    float sy = length(vec3(instanceMatrix[1]));
+    float hs = uSpan * 0.5;
+    ip.x = mod(ip.x - uTime * uDrift * aRand.x + hs, uSpan) - hs;
+    vec4 mv = modelViewMatrix * vec4(ip, 1.0);
+    float c = cos(aRand.z), s = sin(aRand.z);
+    vec2 q = vec2(position.x * sx, position.y * sy);
+    mv.xy += vec2(q.x * c - q.y * s, q.x * s + q.y * c);
+    float d = -mv.z;
+    vA = aRand.y
+       * smoothstep(uFadeNear.x, uFadeNear.y, d)
+       * (1.0 - smoothstep(uFadeFar.x, uFadeFar.y, d));
+    gl_Position = projectionMatrix * mv;
+  }
+`;
+const FIELD_FRAG = `
+  uniform vec3 uColor;
+  uniform vec3 uColorB;
+  uniform float uOpacity;
+  uniform float uSoft;
+  varying vec2 vUv;
+  varying float vA;
+  varying float vMix;
+  void main() {
+    float r = length(vUv - 0.5) * 2.0;
+    float a = pow(1.0 - smoothstep(0.0, 1.0, r), uSoft) * vA * uOpacity;
+    if (a < 0.0025) discard;
+    gl_FragColor = vec4(mix(uColor, uColorB, vMix), a);
+    ${TONE}
+  }
+`;
+
+function makeField(o) {
+  const geo = new THREE.PlaneGeometry(1, 1);
+  const rnd = mulberry32(o.seed);
+  const rand = new Float32Array(o.count * 3);
+  const mesh = new THREE.InstancedMesh(
+    geo,
+    new THREE.ShaderMaterial({
+      vertexShader: FIELD_VERT,
+      fragmentShader: FIELD_FRAG,
+      uniforms: {
+        uTime: { value: 0 },
+        uSpan: { value: o.span },
+        uDrift: { value: o.drift },
+        uColor: { value: new THREE.Color(o.color) },
+        uColorB: { value: new THREE.Color(o.colorB) },
+        uOpacity: { value: 0 },
+        uSoft: { value: o.soft },
+        uFadeNear: { value: new THREE.Vector2(o.near[0], o.near[1]) },
+        uFadeFar: { value: new THREE.Vector2(o.far[0], o.far[1]) }
+      },
+      transparent: true,
+      depthWrite: false,
+      blending: o.additive ? THREE.AdditiveBlending : THREE.NormalBlending
+    }),
+    o.count
+  );
+
+  const dummy = new THREE.Object3D();
+  for (let i = 0; i < o.count; i++) {
+    const s = o.size[0] + Math.pow(rnd(), 1.7) * (o.size[1] - o.size[0]);
+    dummy.position.set(
+      o.box.x[0] + rnd() * (o.box.x[1] - o.box.x[0]),
+      o.box.y[0] + rnd() * (o.box.y[1] - o.box.y[0]),
+      o.box.z[0] + rnd() * (o.box.z[1] - o.box.z[0])
+    );
+    dummy.scale.set(s, s * (0.55 + rnd() * 0.5), 1);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
+    rand[i * 3] = 0.35 + rnd() * 1.3;
+    rand[i * 3 + 1] = o.alpha[0] + rnd() * (o.alpha[1] - o.alpha[0]);
+    rand[i * 3 + 2] = rnd() * Math.PI * 2;
+  }
+  geo.setAttribute('aRand', new THREE.InstancedBufferAttribute(rand, 3));
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.frustumCulled = false;
+  mesh.renderOrder = o.order;
+  return mesh;
+}
+
+const clouds = makeField({
+  seed: 90210, count: 440, span: 620,
+  box: { x: [-310, 310], y: [44, 110], z: [-152, 76] },
+  size: [14, 58], alpha: [0.34, 0.88], soft: 2.6,
+  color: 0xfff2e2, colorB: 0x6c798c, drift: 1.9, order: 1,
+  near: [2, 19], far: [220, 370]
+});
+scene.add(clouds);
+
+const spray = makeField({
+  seed: 5150, count: 260, span: 76,
+  box: { x: [-34, 34], y: [5, 33], z: [-264, -150] },
+  size: [0.10, 0.62], alpha: [0.22, 0.78], soft: 1.5,
+  color: 0xdfe9f2, colorB: 0xfbe6cf, drift: 0.9, order: 3, additive: true,
+  near: [0.6, 5], far: [90, 165]
+});
+scene.add(spray);
+
+/* ---------------------------------------------------------------
+   Prozedurale Stadt — ein InstancedMesh, Fenster im Fragment-Shader
+   --------------------------------------------------------------- */
+const CITY_VERT = `
+  attribute float aSeed;
+  varying vec2 vUv;
+  varying vec3 vN;
+  varying vec3 vW;
+  varying float vRows;
+  varying float vSeed;
+  varying float vDepth;
+  void main() {
+    vUv = uv;
+    vN = normalize(mat3(instanceMatrix) * normal);
+    // Die Etagenzahl muss hier fallen, nicht im Fragment-Shader: eine
+    // interpolierte Höhe kippt über die Fläche um ein ULP, und floor()
+    // springt dann pixelweise um eine ganze Etage.
+    vRows = max(floor(length(vec3(instanceMatrix[1])) / 2.7), 2.0);
+    vSeed = aSeed;
+    vec4 wp = instanceMatrix * vec4(position, 1.0);
+    vW = wp.xyz;
+    vec4 mv = modelViewMatrix * wp;
+    vDepth = -mv.z;
+    gl_Position = projectionMatrix * mv;
+  }
+`;
+const CITY_FRAG = `
+  uniform vec3 uSun;
+  uniform vec3 uSunCol;
+  uniform vec3 uFill;
+  uniform vec3 uFillCol;
+  uniform vec3 uBase;
+  uniform vec3 uWin;
+  uniform vec3 uFogCol;
+  uniform vec2 uFog;
+  uniform float uOpacity;
+  uniform float uLit;
+  uniform float uPx;
+  varying vec2 vUv;
+  varying vec3 vN;
+  varying vec3 vW;
+  varying float vRows;
+  varying float vSeed;
+  varying float vDepth;
+
+  float hash21(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+  }
+
+  void main() {
+    vec3 N = normalize(vN);
+    float top = step(0.55, abs(N.y));
+    float ndl = max(dot(N, uSun), 0.0);
+    float ndf = max(dot(N, uFill), 0.0);
+
+    vec3 col = uBase * (0.24 + ndl * 0.80)
+             + uSunCol * ndl * 0.10
+             + uFillCol * ndf * 0.50;
+    col *= mix(mix(0.46, 1.04, clamp(vUv.y, 0.0, 1.0)), 0.55, top);
+
+    // Fenster als Etagenstreifen. Ein Zufallsraster aus Einzelfenstern
+    // flimmert, sobald eine Zelle unter einen Pixel fällt — die Streifen
+    // vertragen die Verkleinerung, die Unterteilung entlang der Fassade
+    // wird mit der Entfernung ausgeblendet.
+    float ry = vUv.y * vRows;
+    float fy = fract(ry);
+    float band = smoothstep(0.28, 0.40, fy) * (1.0 - smoothstep(0.60, 0.72, fy));
+    float floorLit = hash21(vec2(floor(ry) * 1.7, vSeed));
+    float on = smoothstep(0.94 - uLit, 1.06 - uLit, floorLit);
+    float fx = fract(vUv.x * 9.0);
+    float breaks = smoothstep(0.05, 0.19, fx) * (1.0 - smoothstep(0.81, 0.95, fx));
+
+    // Beide Raster werden ausgeblendet, sobald eine Zelle unter ein paar
+    // Pixel fällt — einmal wegen der Entfernung, einmal wegen streifender
+    // Fassaden. Ohne das rauscht die halbe Stadt.
+    float d = max(vDepth, 1.0);
+    float facing = abs(dot(N, normalize(cameraPosition - vW)));
+    float aa = smoothstep(0.08, 0.36, facing);
+    float pxRow = 2.7 * uPx * facing / d;
+    float pxCol = 0.55 * uPx * facing / d;
+    breaks = mix(1.0, breaks, smoothstep(1.6, 5.0, pxCol));
+    float carry = smoothstep(2.2, 6.5, pxRow) * aa;
+    col += uWin * band * on * breaks * (1.0 - top) * 2.6 * carry;
+    col += uFillCol * band * breaks * (1.0 - top) * 0.34 * carry;
+
+    float fog = smoothstep(uFog.x, uFog.y, vDepth);
+    float a = uOpacity * (1.0 - fog);
+    if (a < 0.006) discard;
+    col = mix(col, uFogCol, fog * 0.65);
+    gl_FragColor = vec4(col, a);
+    ${TONE}
+  }
+`;
+
+function buildCity() {
+  const rnd = mulberry32(7734);
+  const cells = [];
+  const COLS = 24, ROWS = 30;
+  const X0 = -152, X1 = 152, Z0 = -276, Z1 = -18;
+  const cw = (X1 - X0) / COLS, cd = (Z1 - Z0) / ROWS;
+
+  for (let c = 0; c < COLS; c++) {
+    for (let r = 0; r < ROWS; r++) {
+      if (c % 7 === 3 || r % 6 === 2) continue;      // Strassenraster
+      if (rnd() < 0.14) continue;                     // Lücken
+      // Versatz und Grundfläche zusammen bleiben unter der Rasterweite.
+      // Überlappen sich zwei Baukörper, flimmern ihre Fassaden gegeneinander.
+      const x = X0 + (c + 0.5) * cw + (rnd() - 0.5) * cw * 0.22;
+      const z = Z0 + (r + 0.5) * cd + (rnd() - 0.5) * cd * 0.22;
+      // Der dichte Kern liegt links neben der Flugbahn, nach hinten fällt
+      // die Höhe ab — so bleibt bei RESIDENCES eine kleine, ferne Stadt übrig.
+      const dx = (x + 24) / 130, dz = (z + 100) / 78;
+      const core = Math.max(0, 1 - Math.sqrt(dx * dx + dz * dz) * 1.05);
+      let h = 3.2 + Math.pow(rnd(), 2.0) * (8 + 44 * core);
+      if (rnd() < 0.025) h *= 1.45;
+      cells.push({
+        x, z, h,
+        w: cw * (0.34 + rnd() * 0.26),
+        d: cd * (0.36 + rnd() * 0.26),
+        seed: rnd() * 97
+      });
+    }
+  }
+  // Der eine Turm, der den Übergang zum Turm-Foto trägt. Bewusst seitlich
+  // neben der Kameralinie, sonst verdeckt er ab der Hälfte das ganze Bild.
+  cells.push({ x: -19.0, z: -202.9, h: 78, w: 9.4, d: 7.4, seed: 4.2 });
+  cells.push({ x: 69.7, z: -151.3, h: 58, w: 8.6, d: 6.8, seed: 11.9 });
+
+  const geo = new THREE.BoxGeometry(1, 1, 1);
+  geo.translate(0, 0.5, 0);
+  const seeds = new Float32Array(cells.length);
+
+  const mat = new THREE.ShaderMaterial({
+    vertexShader: CITY_VERT,
+    fragmentShader: CITY_FRAG,
+    uniforms: {
+      uSun: { value: new THREE.Vector3(-0.52, 0.44, 0.73).normalize() },
+      uSunCol: { value: new THREE.Color(0xffc79c) },
+      uFill: { value: new THREE.Vector3(0.68, 0.28, -0.68).normalize() },
+      uFillCol: { value: new THREE.Color(0x6d92b4) },
+      uBase: { value: new THREE.Color(0x161c25) },
+      uWin: { value: new THREE.Color(0xffc07a) },
+      uFogCol: { value: new THREE.Color(0x1d2733) },
+      uFog: { value: new THREE.Vector2(60, 250) },
+      uOpacity: { value: 0 },
+      uLit: { value: 0.2 },
+      uPx: { value: 900 }
+    },
+    transparent: true,
+    depthWrite: true
+  });
+
+  const mesh = new THREE.InstancedMesh(geo, mat, cells.length);
+  const dummy = new THREE.Object3D();
+  for (let i = 0; i < cells.length; i++) {
+    const b = cells[i];
+    dummy.position.set(b.x, 0, b.z);
+    dummy.rotation.set(0, 0, 0);
+    dummy.scale.set(b.w, b.h, b.d);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
+    seeds[i] = b.seed;
+  }
+  geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seeds, 1));
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.frustumCulled = false;
+  mesh.renderOrder = 2;
+  return mesh;
+}
+const city = buildCity();
+scene.add(city);
+
+/* ---------------------------------------------------------------
+   Umgebung für die Metalle der Uhr — selbst gebaut, kein Asset.
+   Ein warmes Key-Panel, ein kaltes Panel dahinter, sonst dunkel.
+   --------------------------------------------------------------- */
+function buildEnvironment() {
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const env = new THREE.Scene();
+
+  const shell = new THREE.Mesh(
+    new THREE.BoxGeometry(24, 24, 24),
+    new THREE.MeshBasicMaterial({ color: 0x15181d, side: THREE.BackSide })
+  );
+  env.add(shell);
+
+  function panel(color, intensity, w, h, pos, rot) {
+    const c = new THREE.Color(color).multiplyScalar(intensity);
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide })
+    );
+    m.position.set(pos[0], pos[1], pos[2]);
+    m.rotation.set(rot[0], rot[1], rot[2]);
+    env.add(m);
+  }
+  panel(0xfff4e2, 9.0, 13, 9, [-6.5, 5.5, 6.0], [-0.75, 0.6, 0]);   // Key, warm
+  panel(0x8ab6dc, 6.0, 11, 8, [7.5, 2.0, -6.5], [0.4, -0.9, 0]);    // Rim, kalt
+  panel(0x2c3138, 2.4, 20, 6, [0, 10.5, 0], [Math.PI / 2, 0, 0]);   // Deckenband
+  panel(0x0d0f13, 1.0, 22, 22, [0, -8, 0], [-Math.PI / 2, 0, 0]);   // Boden
+
+  const rt = pmrem.fromScene(env, 0.025);
+  env.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) o.material.dispose();
+  });
+  pmrem.dispose();
+  return rt.texture;
+}
+scene.environment = buildEnvironment();
+
+/* ---------------------------------------------------------------
+   Die Uhr — vollständig aus Primitiven
+   --------------------------------------------------------------- */
+const WATCH_AT = new THREE.Vector3(0, 12, -300);
+const watchRoot = new THREE.Group();
+watchRoot.position.copy(WATCH_AT);
+watchRoot.rotation.set(-0.11, 0.15, 0.03);
+watchRoot.visible = false;
+scene.add(watchRoot);
+
+const dialPlane = new THREE.Group();
+dialPlane.rotation.x = Math.PI / 2;   // Zifferblatt schaut nach Welt +Z
+watchRoot.add(dialPlane);
+
+const watchMats = [];
+function mat(opts) {
+  const m = new THREE.MeshStandardMaterial(Object.assign({
+    transparent: true, opacity: 0
+  }, opts));
+  watchMats.push(m);
+  return m;
+}
+const steel = mat({ color: 0xc4c8ce, metalness: 0.90, roughness: 0.19, envMapIntensity: 1.6 });
+const steelDark = mat({ color: 0x484d55, metalness: 0.88, roughness: 0.30, envMapIntensity: 1.3 });
+const dialMat = mat({ color: 0x0b0e14, metalness: 0.12, roughness: 0.66, envMapIntensity: 0.20 });
+const goldMat = mat({ color: 0xd8b478, metalness: 0.98, roughness: 0.22, envMapIntensity: 1.7 });
+const handMat = mat({ color: 0xf1eee7, metalness: 0.82, roughness: 0.16, envMapIntensity: 1.6 });
+
+function add(geo, material, y) {
+  const m = new THREE.Mesh(geo, material);
+  if (y !== undefined) m.position.y = y;
+  dialPlane.add(m);
+  return m;
+}
+
+// Das Gehäuse sitzt so tief, dass sein Deckel unter dem Zifferblatt endet —
+// sonst verdeckt er Indizes und Stundenzeiger.
+add(new THREE.CylinderGeometry(1.50, 1.40, 0.52, 64, 1, false), steel, -0.10);
+const bezel = add(new THREE.TorusGeometry(1.45, 0.095, 16, 72), steelDark, 0.185);
+bezel.rotation.x = -Math.PI / 2;
+const dial = add(new THREE.CircleGeometry(1.40, 64), dialMat, 0.165);
+dial.rotation.x = -Math.PI / 2;
+const track = add(new THREE.TorusGeometry(1.255, 0.013, 6, 96), goldMat, 0.176);
+track.rotation.x = -Math.PI / 2;
+
+// Indizes: ein InstancedMesh statt zwölf Meshes
+const markers = new THREE.InstancedMesh(
+  new THREE.BoxGeometry(1, 1, 1), goldMat, 12
+);
+{
+  const d = new THREE.Object3D();
+  for (let i = 0; i < 12; i++) {
+    const a = i * Math.PI / 6;
+    d.position.set(Math.sin(a) * 1.11, 0.192, -Math.cos(a) * 1.11);
+    d.rotation.set(0, a, 0);
+    const wide = (i === 0) ? 2.4 : (i % 3 === 0 ? 1.5 : 1.0);
+    d.scale.set(0.062 * wide, 0.036, 0.235);
+    d.updateMatrix();
+    markers.setMatrixAt(i, d.matrix);
+  }
+  markers.instanceMatrix.needsUpdate = true;
+}
+dialPlane.add(markers);
+
+function makeHand(w, t, len, back, material, y) {
+  const g = new THREE.BoxGeometry(w, t, len);
+  g.translate(0, 0, -(len / 2) + back);
+  return add(g, material, y);
+}
+const hourHand = makeHand(0.072, 0.032, 0.86, 0.13, handMat, 0.208);
+const minHand = makeHand(0.052, 0.028, 1.19, 0.14, handMat, 0.234);
+const secHand = makeHand(0.019, 0.016, 1.36, 0.32, goldMat, 0.258);
+add(new THREE.CylinderGeometry(0.062, 0.062, 0.055, 20), goldMat, 0.278);
+
+// Krone
+const crownProfile = [
+  new THREE.Vector2(0.001, -0.085),
+  new THREE.Vector2(0.070, -0.085),
+  new THREE.Vector2(0.086, -0.048),
+  new THREE.Vector2(0.086, 0.048),
+  new THREE.Vector2(0.070, 0.085),
+  new THREE.Vector2(0.001, 0.085)
+];
+const crown = add(new THREE.LatheGeometry(crownProfile, 22), steel, 0);
+crown.rotation.z = -Math.PI / 2;
+crown.position.set(1.56, 0, 0);
+
+// Bandanstösse
+const lugGeo = new THREE.BoxGeometry(0.46, 0.17, 0.62);
+const lugA = add(lugGeo, steel, -0.02); lugA.position.z = -1.60; lugA.rotation.x = 0.10;
+const lugB = add(lugGeo, steel, -0.02); lugB.position.z = 1.60; lugB.rotation.x = -0.10;
+
+// Glasreflex
+const glareMat = new THREE.ShaderMaterial({
+  vertexShader: `
+    varying vec2 vUv;
+    void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }
+  `,
+  fragmentShader: `
+    uniform float uK;
+    varying vec2 vUv;
+    void main(){
+      vec2 d = vUv - 0.5;
+      float r = length(d) * 2.0;
+      float edge = 1.0 - smoothstep(0.88, 1.0, r);
+      float band = smoothstep(0.30, 0.0, abs(d.x * 0.85 + d.y * 1.45 - 0.11));
+      float rim  = smoothstep(0.70, 0.99, r);
+      float a = (band * 0.26 + rim * 0.14) * edge * uK;
+      if (a < 0.002) discard;
+      gl_FragColor = vec4(vec3(0.80, 0.87, 1.0) * a, a);
+      ${TONE}
+    }
+  `,
+  uniforms: { uK: { value: 0 } },
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+});
+const glare = new THREE.Mesh(new THREE.CircleGeometry(1.40, 48), glareMat);
+glare.rotation.x = -Math.PI / 2;
+glare.position.y = 0.30;
+glare.renderOrder = 9;
+dialPlane.add(glare);
+
+// Licht: hartes Key, kaltes Rim. Keine Shadow-Maps.
+const keyLight = new THREE.DirectionalLight(0xfff1de, 0);
+keyLight.position.set(-3.4, 4.6, 3.2);
+const rimLight = new THREE.DirectionalLight(0x9dc6ea, 0);
+rimLight.position.set(2.8, 1.1, -3.6);
+const ambient = new THREE.AmbientLight(0x2a3644, 0);
+scene.add(keyLight, rimLight, ambient);
+const KEY_MAX = 6.5, RIM_MAX = 4.6, AMB_MAX = 0.42;
+
+/* ---------------------------------------------------------------
+   Kamerafahrt — eine Kurve, Blickpunkt leicht voraus
+   --------------------------------------------------------------- */
+const curve = new THREE.CatmullRomCurve3([
+  new THREE.Vector3(0, 98, 44),
+  new THREE.Vector3(0, 84, 12),
+  new THREE.Vector3(8, 64, -18),
+  new THREE.Vector3(16, 52, -52),
+  new THREE.Vector3(12, 40, -92),
+  new THREE.Vector3(4, 40, -142),
+  new THREE.Vector3(0, 27, -206),
+  new THREE.Vector3(0, 13.6, -272),
+  new THREE.Vector3(0, 12.4, -294.8)
+], false, 'catmullrom', 0.5);
+
+const CURVE_LEN = curve.getLength();
+const END_POINT = curve.getPointAt(1, new THREE.Vector3());
+const END_TANGENT = curve.getTangentAt(1, new THREE.Vector3());
+
+// Scrollfortschritt -> Kurvenparameter. Hält die Stationen an ihrer Marke
+// und lässt die letzte Annäherung an die Uhr langsamer laufen.
+const PACE = [[0, 0], [0.20, 0.155], [0.35, 0.315], [0.55, 0.555], [0.75, 0.760], [0.88, 0.895], [1, 1]];
+function pace(p) {
+  if (p <= 0) return 0;
+  if (p >= 1) return 1;
+  for (let i = 1; i < PACE.length; i++) {
+    const a = PACE[i - 1], b = PACE[i];
+    if (p <= b[0]) return a[1] + (b[1] - a[1]) * (p - a[0]) / (b[0] - a[0]);
+  }
+  return 1;
+}
+
+const camPos = new THREE.Vector3();
+const lookAt = new THREE.Vector3();
+const focusAt = new THREE.Vector3().copy(WATCH_AT);
+const LOOK_AHEAD = 0.035;
+
+/* ---------------------------------------------------------------
+   Verlauf der Szene über den Scroll
+   --------------------------------------------------------------- */
+const CLOUD_OP = [[0.00, 1.0], [0.30, 1.0], [0.44, 0.42], [0.58, 0.0]];
+const CITY_OP = [[0.13, 0.0], [0.30, 1.0], [0.47, 1.0], [0.58, 0.34], [0.72, 0.0]];
+const SPRAY_OP = [[0.66, 0.0], [0.78, 1.0], [0.88, 0.95], [0.95, 0.0]];
+const WATCH_K = [[0.885, 0.0], [0.985, 1.0]];
+
+const FOG_A = new THREE.Color(0x24303d);
+const FOG_B = new THREE.Color(0x07080b);
+
+/* ---------------------------------------------------------------
+   Grösse
+   --------------------------------------------------------------- */
+function resize() {
+  const w = canvas.clientWidth || window.innerWidth;
+  const h = canvas.clientHeight || window.innerHeight;
+  if (w === 0 || h === 0) return;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  // Pixel pro Welteinheit in Blickachsenentfernung 1 — der Fenstershader
+  // braucht das, um sein Raster rechtzeitig aufzugeben.
+  city.material.uniforms.uPx.value = h / (2 * Math.tan(camera.fov * Math.PI / 360));
+  // Auf schmalen Displays muss die Uhr ins Bild passen, und der Text
+  // wandert unter sie statt neben sie. Der Versatz ist so gross, wie das
+  // Bild ihn bei der jeweiligen Grösse hergibt.
+  const s = Math.min(1, Math.max(0.5, camera.aspect / 0.78));
+  watchRoot.scale.setScalar(s);
+  const halfH = Math.tan(camera.fov * Math.PI / 360) * 5.2;
+  if (camera.aspect >= 1.05) {
+    const off = Math.max(0, halfH * camera.aspect - 1.60 * s - 0.14);
+    focusAt.set(WATCH_AT.x - off, WATCH_AT.y + 0.10, WATCH_AT.z);
+  } else {
+    const off = Math.max(0, halfH - 1.98 * s - 0.06);
+    focusAt.set(WATCH_AT.x, WATCH_AT.y - off, WATCH_AT.z);
+  }
+}
+new ResizeObserver(resize).observe(canvas);
+resize();
+
+/* ---------------------------------------------------------------
+   Loop
+   --------------------------------------------------------------- */
+const reduced = M.reduced;
+const FIXED_TIME = 10 * 3600 + 9 * 60 + 36;
+let elapsed = 0;
+let logged = false;
+let peakCalls = 0, peakTris = 0;
+
+M.onFrame(function (p, dt) {
+  if (!reduced) elapsed += dt;
+
+  // Kamera
+  const u = pace(p);
+  curve.getPointAt(u, camPos);
+  camera.position.copy(camPos);
+  const ua = u + LOOK_AHEAD;
+  if (ua <= 1) curve.getPointAt(ua, lookAt);
+  else lookAt.copy(END_POINT).addScaledVector(END_TANGENT, (ua - 1) * CURVE_LEN);
+  const focus = M.smoothstep(0.86, 0.995, p);
+  if (focus > 0) lookAt.lerp(focusAt, focus);
+  camera.lookAt(lookAt);
+
+  // Wolken
+  const cloudOp = ramp(p, CLOUD_OP);
+  clouds.visible = cloudOp > 0.002;
+  if (clouds.visible) {
+    clouds.material.uniforms.uOpacity.value = cloudOp;
+    clouds.material.uniforms.uTime.value = elapsed;
+  }
+
+  // Stadt
+  const cityOp = ramp(p, CITY_OP);
+  city.visible = cityOp > 0.004;
+  if (city.visible) {
+    const uf = city.material.uniforms;
+    uf.uOpacity.value = cityOp;
+    const k = M.smoothstep(0.32, 0.74, p);
+    uf.uFogCol.value.copy(FOG_A).lerp(FOG_B, k);
+    uf.uLit.value = 0.34 + 0.26 * k;
+    uf.uFog.value.set(55 + 40 * (1 - k), 210 + 130 * k);
+  }
+
+  // Gischt
+  const sprayOp = ramp(p, SPRAY_OP);
+  spray.visible = sprayOp > 0.004;
+  if (spray.visible) {
+    spray.material.uniforms.uOpacity.value = sprayOp;
+    spray.material.uniforms.uTime.value = elapsed;
+  }
+
+  // Uhr
+  const wk = ramp(p, WATCH_K);
+  watchRoot.visible = wk > 0.006;
+  if (watchRoot.visible) {
+    keyLight.intensity = KEY_MAX * wk;
+    rimLight.intensity = RIM_MAX * wk;
+    ambient.intensity = AMB_MAX * wk;
+    glareMat.uniforms.uK.value = wk;
+    for (let i = 0; i < watchMats.length; i++) watchMats[i].opacity = wk;
+
+    const secs = reduced ? FIXED_TIME : (Date.now() % 86400000) / 1000;
+    const s = Math.floor(secs % 60);
+    const m = (secs / 60) % 60;
+    const hr = (secs / 3600) % 12;
+    secHand.rotation.y = -(s / 60) * Math.PI * 2;
+    minHand.rotation.y = -(m / 60) * Math.PI * 2;
+    hourHand.rotation.y = -(hr / 12) * Math.PI * 2;
+  }
+
+  renderer.render(scene, camera);
+
+  const info = renderer.info.render;
+  if (info.calls > peakCalls) peakCalls = info.calls;
+  if (info.triangles > peakTris) peakTris = info.triangles;
+  if (!logged && elapsed > 1.6) {
+    logged = true;
+    console.log('[meridian] renderer.info.render', {
+      calls: info.calls, triangles: info.triangles, geometries: renderer.info.memory.geometries
+    });
+  }
+});
+
+M.stats = function () {
+  return { calls: peakCalls, triangles: peakTris, programs: renderer.info.programs.length };
+};
+
+window.addEventListener('pagehide', function () {
+  scene.traverse(function (o) {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) {
+      const list = Array.isArray(o.material) ? o.material : [o.material];
+      list.forEach(function (mm) { mm.dispose(); });
+    }
+  });
+  if (scene.environment) scene.environment.dispose();
+  renderer.dispose();
+});
+</script>
+</body>
+</html>
