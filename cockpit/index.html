@@ -540,11 +540,14 @@ function dayDiff(from, to) {
   return Math.round((midnight(to) - midnight(from)) / 86400000);
 }
 
-/* "HH:MM" -> Minuten seit Mitternacht, sonst null. */
+/* "HH:MM" -> Minuten seit Mitternacht, sonst null.
+   Einstellige Stunde ("7:45") wird akzeptiert, sonst wuerde ein Tippfehler im
+   DATA-Block den Block stillschweigend als "ohne Uhrzeit" einsortieren. */
 function toMin(s) {
   if (typeof s !== "string") return null;
-  var m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(s);
-  return m ? (+m[1]) * 60 + (+m[2]) : null;
+  var m = /^(\d{1,2}):([0-5]\d)$/.exec(s);
+  if (!m || +m[1] > 23) return null;
+  return (+m[1]) * 60 + (+m[2]);
 }
 
 /* "vor 3 Tagen", "seit 3 Tagen" — Dativ. */
@@ -590,6 +593,17 @@ function tagesBloecke(key) {
 function blockStatus(b, nowMin) {
   var von = toMin(b.von), bis = toMin(b.bis);
   if (von === null) return "offen";                    /* ohne Uhrzeit */
+
+  /* Block ueber Mitternacht: "bis" liegt vor "von". Ohne diesen Zweig gilt er
+     ab Beginn als vergangen, weil nowMin dann groesser als bis ist.
+
+     Bewusste Grenze: Bloecke haengen am Wochentag. Um 03:00 am Dienstag zeigt
+     ein Dienstag-Block 22:00-02:00 "kommt heute Abend", nicht den Ausläufer
+     von Montagnacht — der Vortag wird nicht mit hereingezogen. */
+  if (bis !== null && bis <= von) {
+    return (nowMin >= von || nowMin < bis) ? "now" : "future";
+  }
+
   if (bis !== null && nowMin >= bis) return "past";
   if (nowMin >= von && (bis === null || nowMin < bis)) return "now";
   return "future";
@@ -699,7 +713,11 @@ function renderZeitleiste(jetzt) {
     var body = el("div", "tl-body");
     body.appendChild(el("p", "tl-what", b.was || "(ohne Bezeichnung)"));
     if (b.notiz) body.appendChild(el("p", "tl-note", b.notiz));
-    if (st === "now" && bis !== null) body.appendChild(el("p", "tl-left", restText(bis - nowMin)));
+    if (st === "now" && bis !== null) {
+      var offen = bis - nowMin;
+      if (offen <= 0) offen += 1440;                   /* laeuft ueber Mitternacht */
+      body.appendChild(el("p", "tl-left", restText(offen)));
+    }
     li.appendChild(body);
 
     box.appendChild(li);
