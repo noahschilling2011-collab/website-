@@ -1,0 +1,1197 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cockpit</title>
+<style>
+:root{
+  /* Flaechen: Tiefe ueber Helligkeit, nicht ueber Schatten. */
+  --bg:#0a0a0c; --surface:#121216; --pop:#1a1a20; --hover:#22222a;
+  --sunk:#0e0e11;                       /* Ebene fuer liegengebliebene Projekte */
+  --text:#e8e8ec; --head:#f4f4f7; --muted:#8b8b95; --dim:#a0a0aa;
+  --faint:#7e7e87;                      /* 4.9:1 auf --bg, die dunkelste noch lesbare Stufe */
+  --accent:#e0a458;                     /* ein Akzent, warm, entsaettigt */
+  --line:rgba(255,255,255,.07);
+  --line-strong:rgba(255,255,255,.12);
+
+  /* 4px-Skala */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s6:24px; --s8:32px; --s12:48px; --s16:64px;
+
+  --r:12px; --r-sm:8px;
+
+  --step--2:clamp(.69rem,.67rem + .10vw,.75rem);
+  --step--1:clamp(.81rem,.79rem + .13vw,.88rem);
+  --step-0: clamp(.94rem,.92rem + .18vw,1.02rem);
+  --step-1: clamp(1.06rem,1.01rem + .28vw,1.22rem);
+  --step-3: clamp(2.1rem,1.65rem + 1.9vw,3.1rem);
+
+  --in:cubic-bezier(.2,.8,.2,1);
+  --out:cubic-bezier(.4,0,1,1);
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  font-size:var(--step-0); line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  overflow-wrap:anywhere;
+}
+h1,h2,h3{margin:0; font-weight:500; color:var(--head); line-height:1.25}
+p,ul,ol{margin:0}
+ul,ol{list-style:none; padding:0}
+button{font:inherit; color:inherit; background:none; border:0; cursor:pointer}
+input,textarea{font:inherit; color:inherit}
+
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:2px}
+
+/* Zwei sehr dunkle Radial-Gradients — ohne Struktur dahinter verwischt der
+   Blur des Chat-Panels nichts und das Glas waere nur ein grauer Kasten. */
+.bgfx{
+  position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:
+    radial-gradient(58vw 46vh at 60% 92%, rgba(224,164,88,.075), transparent 68%),
+    radial-gradient(66vw 56vh at 14% 6%,  rgba(110,140,200,.055), transparent 70%);
+}
+
+.shell{position:relative; z-index:1}
+
+/* ── Kopfzeile ─────────────────────────────────────────────────── */
+.top{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:var(--s4); padding:var(--s4) var(--s6) var(--s3);
+  border-bottom:1px solid var(--line);
+}
+.greet{font-size:var(--step--1); color:var(--muted); font-weight:400}
+.greet b{font-weight:500; color:var(--head)}
+.tools{display:flex; align-items:center; gap:var(--s2); position:relative}
+
+.btn{
+  display:inline-flex; align-items:center; gap:var(--s2);
+  padding:var(--s2) var(--s3); border-radius:var(--r-sm);
+  font-size:var(--step--1); color:var(--muted); white-space:nowrap;
+  border:1px solid transparent;
+  transition:color .14s ease-out, background-color .14s ease-out, border-color .14s ease-out;
+}
+.btn:hover{color:var(--head); background:var(--hover); border-color:var(--line)}
+.btn[aria-expanded="true"]{color:var(--head); background:var(--hover); border-color:var(--line)}
+.btn svg{width:15px; height:15px; flex:none}
+
+/* Popover — Ebene 2, solide. Das einzige Glas im Layout ist der Chat. */
+.pop{
+  position:absolute; top:calc(100% + var(--s2)); right:0; z-index:20;
+  width:min(30rem,calc(100vw - var(--s8)));
+  background:var(--pop); border:1px solid var(--line-strong);
+  border-radius:var(--r); padding:var(--s4);
+  box-shadow:0 12px 32px rgba(0,0,0,.5);
+  animation:pop .3s var(--in) both;
+}
+@keyframes pop{from{opacity:0; transform:translateY(-6px) scale(.985)} to{opacity:1; transform:none}}
+.pop[hidden]{display:none}
+.pop h3{font-size:var(--step--1); margin-bottom:var(--s2)}
+.pop p.hint{font-size:var(--step--2); color:var(--muted); margin-bottom:var(--s3)}
+.pop textarea{
+  display:block; width:100%; min-height:9rem; resize:vertical;
+  background:var(--bg); border:1px solid var(--line-strong); border-radius:var(--r-sm);
+  padding:var(--s3); font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:var(--step--2); line-height:1.5;
+}
+.pop-row{display:flex; align-items:center; gap:var(--s3); margin-top:var(--s3); flex-wrap:wrap}
+.btn-solid{
+  padding:var(--s2) var(--s4); border-radius:var(--r-sm);
+  background:var(--hover); border:1px solid var(--line-strong); color:var(--head);
+  font-size:var(--step--1);
+  transition:background-color .14s ease-out;
+}
+.btn-solid:hover{background:#2a2a34}
+.msg{font-size:var(--step--2); color:var(--muted)}
+.msg.bad{color:var(--head)}
+.msg.bad::before{content:"– "; color:var(--muted)}
+
+/* ── Spalten ───────────────────────────────────────────────────── */
+.app{display:grid; grid-template-columns:1fr}
+.col{display:flex; flex-direction:column; min-width:0}
+.col-h{
+  font-size:var(--step--2); letter-spacing:.09em; text-transform:uppercase;
+  color:var(--muted); font-weight:500;
+  padding:var(--s6) var(--s6) var(--s3);
+}
+.col-scroll{padding:0 var(--s6) var(--s6); min-height:0}
+.col-foot{
+  background:var(--bg);
+  padding:var(--s3) var(--s6) var(--s6);
+  font-size:var(--step--2); color:var(--muted);
+  border-top:1px solid var(--line);
+}
+
+@media (min-width:901px){
+  html,body{height:100%; overflow:hidden}
+  .shell{height:100dvh; display:grid; grid-template-rows:auto minmax(0,1fr)}
+  .app{grid-template-columns:minmax(250px,1fr) minmax(340px,1.45fr) minmax(230px,.95fr); min-height:0}
+  .col{border-left:1px solid var(--line); min-height:0}
+  .col:first-child{border-left:0}
+  .col-scroll{overflow-y:auto; flex:1 1 auto}
+}
+
+/* ── Links: Projekte ───────────────────────────────────────────── */
+.proj{
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--r);
+  padding:var(--s3) var(--s4); margin-bottom:var(--s2);
+  transition:background-color .16s ease-out, transform .16s ease-out;
+}
+.proj:hover{background:var(--hover); transform:translateY(-1px)}
+.proj-top{display:flex; align-items:baseline; gap:var(--s2)}
+.dot{
+  width:6px; height:6px; border-radius:50%; flex:none;
+  background:var(--accent); align-self:center;
+}
+.proj-name{font-size:var(--step-0); color:var(--head); font-weight:500}
+.proj-note{font-size:var(--step--1); color:var(--muted); margin-top:2px}
+.proj-age{font-size:var(--step--2); color:var(--muted); margin-top:var(--s2); font-variant-numeric:tabular-nums}
+
+/* Laenger als 30 Tage nicht angefasst: andere Behandlung, aber kein Alarm.
+   Gedimmt ueber Farbe, nicht ueber opacity — opacity wuerde den Kontrast
+   unter die lesbare Grenze druecken. */
+.proj.rest{background:var(--sunk); border-color:rgba(255,255,255,.045)}
+.proj.rest:hover{background:#141418}
+.proj.rest .proj-name{color:var(--dim); font-weight:400}
+.proj.rest .dot{background:none; box-shadow:inset 0 0 0 1px var(--muted)}
+.proj.rest .proj-note{color:#85858e}
+.proj-rest-label{
+  display:inline-block; margin-top:var(--s2);
+  font-size:var(--step--2); color:var(--muted);
+  border-top:1px solid var(--line); padding-top:var(--s2); width:100%;
+  font-variant-numeric:tabular-nums;
+}
+.done .dot{background:none; box-shadow:inset 0 0 0 1px var(--accent)}
+
+/* ── Mitte: Heute ──────────────────────────────────────────────── */
+.col-mid .col-scroll{padding-bottom:var(--s4)}
+.now{margin-bottom:var(--s8)}
+.now-time{
+  font-size:var(--step-3); line-height:1.02; letter-spacing:-.025em;
+  color:var(--head); font-weight:400; font-variant-numeric:tabular-nums;
+}
+.now-date{font-size:var(--step--1); color:var(--muted); margin-top:var(--s1)}
+
+.sec-h{
+  font-size:var(--step--2); letter-spacing:.09em; text-transform:uppercase;
+  color:var(--muted); font-weight:500; margin-bottom:var(--s3);
+}
+.sec{margin-bottom:var(--s8)}
+
+.tl-row{display:grid; grid-template-columns:auto 1fr; gap:var(--s3); padding:var(--s2) 0}
+.tl-time{
+  font-size:var(--step--1); color:var(--muted);
+  font-variant-numeric:tabular-nums; white-space:nowrap;
+}
+.tl-body{border-left:2px solid var(--line); padding-left:var(--s3); min-width:0}
+.tl-what{font-size:var(--step-0)}
+.tl-note{font-size:var(--step--2); color:var(--muted)}
+.tl-row.past .tl-time,.tl-row.past .tl-what{color:var(--faint)}
+.tl-row.now .tl-body{border-left-color:var(--accent)}
+.tl-row.now .tl-what{color:var(--head)}
+.tl-row.now .tl-time{color:var(--accent)}
+.tl-left{font-size:var(--step--2); color:var(--accent); font-variant-numeric:tabular-nums}
+
+.task-add{
+  display:block; width:100%; background:none; border:0;
+  border-bottom:1px solid var(--line); padding:var(--s2) 0; margin-bottom:var(--s2);
+  font-size:var(--step-0);
+  transition:border-color .14s ease-out;
+}
+.task-add::placeholder{color:var(--faint)}
+.task-add:focus{border-bottom-color:var(--accent)}
+
+.task{display:flex; align-items:flex-start; gap:var(--s3); padding:var(--s2) 0}
+.task input[type=checkbox]{
+  appearance:none; -webkit-appearance:none; flex:none;
+  width:16px; height:16px; margin:3px 0 0; border-radius:4px;
+  border:1px solid var(--line-strong); background:var(--surface);
+  cursor:pointer; position:relative;
+  transition:background-color .14s ease-out, border-color .14s ease-out;
+}
+.task input[type=checkbox]:hover{border-color:var(--muted)}
+.task input[type=checkbox]:checked{background:var(--accent); border-color:var(--accent)}
+.task input[type=checkbox]:checked::after{
+  content:""; position:absolute; left:5px; top:1px; width:4px; height:9px;
+  border:solid #16110a; border-width:0 2px 2px 0; transform:rotate(42deg);
+}
+.task label{flex:1 1 auto; min-width:0; cursor:pointer}
+.task.is-done label{color:var(--faint); text-decoration:line-through}
+.task-x{
+  flex:none; padding:2px; border-radius:4px; color:var(--faint); line-height:0;
+  opacity:0; transition:opacity .14s ease-out, color .14s ease-out;
+}
+.task-x svg{width:14px; height:14px}
+.task:hover .task-x,.task-x:focus-visible{opacity:1}
+.task-x:hover{color:var(--head)}
+
+/* ── Chat: die einzige Glasflaeche im Layout ───────────────────── */
+.chat{
+  margin:0 var(--s6) var(--s6); border-radius:var(--r);
+  background:rgba(255,255,255,.04);
+  backdrop-filter:blur(20px) saturate(150%);
+  -webkit-backdrop-filter:blur(20px) saturate(150%);
+  border:1px solid rgba(255,255,255,.09);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07);
+  display:flex; flex-direction:column; min-height:0;
+}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .chat{background:rgba(22,22,28,.92)}
+}
+.chat-log{
+  overflow-y:auto; max-height:min(38vh,22rem);
+  padding:var(--s4) var(--s4) 0; display:flex; flex-direction:column; gap:var(--s4);
+}
+.chat-log:empty{display:none}
+.qa-q{font-size:var(--step--1); color:var(--muted)}
+.qa-q::before{content:"– "}
+.qa-a{margin-top:var(--s2)}
+.qa-a p{margin-top:var(--s2)}
+.qa-a p:first-child{margin-top:0}
+.chat-state{padding:var(--s3) var(--s4) 0; font-size:var(--step--1); color:var(--muted)}
+.chat-state.bad{color:var(--text)}
+.thinking{color:var(--text); animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.72} 50%{opacity:1}}
+.chat-form{display:flex; align-items:flex-end; gap:var(--s2); padding:var(--s3) var(--s4)}
+.chat-in{
+  flex:1 1 auto; min-width:0; resize:none; background:none; border:0; padding:var(--s2) 0;
+  max-height:7.5rem; line-height:1.5;
+}
+.chat-in::placeholder{color:var(--faint)}
+.chat-send{
+  flex:none; padding:var(--s2); border-radius:var(--r-sm); color:var(--muted); line-height:0;
+  transition:color .14s ease-out, background-color .14s ease-out;
+}
+.chat-send svg{width:17px; height:17px}
+.chat-send:hover:not(:disabled){color:var(--head); background:rgba(255,255,255,.06)}
+.chat-send:disabled{opacity:.4; cursor:default}
+
+/* ── Rechts: Ziele ─────────────────────────────────────────────── */
+.goal{padding:var(--s3) 0; border-top:1px solid var(--line)}
+.goal:first-child{border-top:0; padding-top:0}
+.goal-title{font-size:var(--step-0); color:var(--head)}
+.goal-meta{
+  display:flex; justify-content:space-between; gap:var(--s3);
+  font-size:var(--step--2); color:var(--muted); margin-top:var(--s1);
+  font-variant-numeric:tabular-nums;
+}
+.rail{height:2px; background:var(--line); border-radius:1px; margin-top:var(--s3); overflow:hidden}
+.rail span{display:block; height:100%; background:var(--accent); transform-origin:left center}
+.goal-src{font-size:var(--step--2); color:var(--faint); margin-top:var(--s2)}
+
+/* ── Leerzustaende: ehrlich, statt erfundener Fuellung ─────────── */
+.empty{font-size:var(--step--1); color:var(--muted); padding:var(--s2) 0}
+.empty code{
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:.9em; color:var(--dim);
+}
+
+/* ── Bewegung ──────────────────────────────────────────────────── */
+.stagger>*{animation:rise .42s var(--in) both; animation-delay:calc(var(--i,0) * 50ms)}
+@keyframes rise{from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none}}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms !important;
+    animation-delay:0ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;
+    scroll-behavior:auto !important;
+  }
+  .thinking{animation:none !important; opacity:1}
+}
+</style>
+</head>
+<body>
+<div class="bgfx" aria-hidden="true"></div>
+
+<div class="shell">
+
+  <header class="top">
+    <h1 class="greet"><span id="greet-word">Hallo</span><b id="greet-name"></b></h1>
+
+    <div class="tools">
+      <button type="button" class="btn" id="btn-export">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        <span id="export-label">Export</span>
+      </button>
+
+      <button type="button" class="btn" id="btn-import" aria-expanded="false" aria-controls="pop-import">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+        <span>Import</span>
+      </button>
+
+      <div class="pop" id="pop-import" hidden>
+        <h3 id="pop-title">State importieren</h3>
+        <p class="hint" id="pop-hint">Exportiertes JSON hier einsetzen. Es ersetzt den kompletten Zustand.</p>
+        <textarea id="import-text" aria-labelledby="pop-title" aria-describedby="pop-hint" spellcheck="false"></textarea>
+        <div class="pop-row">
+          <button type="button" class="btn-solid" id="btn-load">Laden</button>
+          <p class="msg" id="import-msg" role="status"></p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="app">
+
+    <!-- ── Links: Projekte ─────────────────────────────────────── -->
+    <section class="col" aria-labelledby="h-proj">
+      <h2 class="col-h" id="h-proj">Projekte</h2>
+      <div class="col-scroll">
+        <ul id="projects" class="stagger"></ul>
+      </div>
+      <p class="col-foot" id="proj-count"></p>
+    </section>
+
+    <!-- ── Mitte: Heute ────────────────────────────────────────── -->
+    <section class="col col-mid" aria-labelledby="h-today">
+      <h2 class="col-h" id="h-today">Heute</h2>
+
+      <div class="col-scroll">
+        <div class="now">
+          <p class="now-time" id="clock">--:--:--</p>
+          <p class="now-date" id="datum"></p>
+        </div>
+
+        <section class="sec" aria-labelledby="h-plan">
+          <h3 class="sec-h" id="h-plan">Tagesplan</h3>
+          <ol id="timeline"></ol>
+        </section>
+
+        <section class="sec" aria-labelledby="h-tasks">
+          <h3 class="sec-h" id="h-tasks">Aufgaben</h3>
+          <form id="task-form" autocomplete="off">
+            <input class="task-add" id="task-input" type="text"
+                   placeholder="Aufgabe eintippen, Enter" aria-label="Neue Aufgabe für heute">
+          </form>
+          <ul id="tasks"></ul>
+        </section>
+      </div>
+
+      <div class="chat">
+        <div class="chat-log" id="chat-log" aria-live="polite"></div>
+        <p class="chat-state" id="chat-state" hidden></p>
+        <form class="chat-form" id="chat-form" autocomplete="off">
+          <textarea class="chat-in" id="chat-input" rows="1"
+                    placeholder="Frag nach deinem Tag …" aria-label="Frage an den Tagesplaner"></textarea>
+          <button type="submit" class="chat-send" id="chat-send" aria-label="Frage abschicken">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13"/><path d="M12 5l7 7-7 7"/></svg>
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- ── Rechts: Ziele ───────────────────────────────────────── -->
+    <section class="col" aria-labelledby="h-goals">
+      <h2 class="col-h" id="h-goals">Ziele</h2>
+      <div class="col-scroll">
+        <ul id="goals" class="stagger"></ul>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+(function () {
+"use strict";
+
+/* ════════════════════════════════════════════════════════════════════════
+   DATA — die Wahrheit. Hier editieren, sonst nirgends.
+
+   Nichts in dieser Datei erfindet Zahlen. Was hier nicht drinsteht,
+   zeigt das Cockpit als "nicht eingetragen" an. Das ist Absicht.
+
+   Datumsformat durchgehend YYYY-MM-DD, Uhrzeiten HH:MM.
+   ════════════════════════════════════════════════════════════════════════ */
+
+var DATA = {
+
+  name: "Noah",
+
+  /* ── Stundenplan ──────────────────────────────────────────────────────
+     LEER — deine Schulzeiten kenne ich nicht, und ich rate sie nicht.
+     Pro Tag eine Liste von Bloecken:
+         mo: [{ von:"07:45", bis:"13:00", was:"Schule" }]
+     Mehrere Bloecke pro Tag sind erlaubt (z.B. Mittagspause dazwischen). */
+  stundenplan: {
+    mo: [], di: [], mi: [], do: [], fr: [], sa: [], so: []
+  },
+
+  /* ── Feste, wiederkehrende Termine ────────────────────────────────────
+     LEER — dito.  tag: "mo".."so".  Ohne von/bis = Termin ohne feste Uhrzeit.
+         { tag:"di", von:"18:00", bis:"20:00", was:"Flag-Football-Training" }
+         { tag:"sa", was:"Bikepark", notiz:"nach Wetter" }                    */
+  termine: [],
+
+  /* ── Projekte ─────────────────────────────────────────────────────────
+     Diese Liste ist NICHT geraten: Namen, Stand und Datum stammen aus den
+     Branches und Pull Requests dieses Repos (letzter Commit je Branch,
+     Stand 2026-08-23). Was nicht stimmt, hier korrigieren oder rauswerfen.
+     status: "aktiv" | "liegt" | "fertig"  — abgeleitet aus offenem PR plus
+     letztem Commit. Die 30-Tage-Regel unten dimmt zusaetzlich, unabhaengig
+     vom Status. */
+  projekte: [
+    { name:"ASCEND+",            notiz:"Aufzug-Detective-Game — Beweisführung, Ökonomie, Scam-Layer; zuletzt COIL: Snake in 3D.", status:"aktiv", datum:"2026-08-20" },
+    { name:"LETZTE LEGION",      notiz:"Horde-Runner, auf Three.js umgebaut; zuletzt die Figurenansicht.",                        status:"aktiv", datum:"2026-08-19" },
+    { name:"CASHOUT",            notiz:"Roblox-Spiel, v2 mit allen vier Phasen.",                                                 status:"aktiv", datum:"2026-08-15" },
+    { name:"Insta-Story v2",     notiz:"2.5D-Parallax statt flachem Ken-Burns.",                                                  status:"aktiv", datum:"2026-08-14" },
+    { name:"KI-Alltagsassistent",notiz:"Produktentwurf plus lauffähige Umsetzung, Login per Code aus der Mail.",                  status:"aktiv", datum:"2026-08-06" },
+    { name:"Static",             notiz:"Offline-Warner für stationäre Blitzer — Pipeline, App und Replay-Suite.",                 status:"aktiv", datum:"2026-08-01" },
+    { name:"Garage Heist",       notiz:"Roblox-Tycoon mit Klau-Fenster; Strecke zuletzt dreidimensional.",                        status:"aktiv", datum:"2026-07-26" },
+    { name:"iOS 27 Liquid Glass",notiz:"Oberflächen-Nachbau mit Snap, Clips, Nachrichten und Store-Apps.",                        status:"liegt", datum:"2026-07-20" },
+    { name:"MiniCity",           notiz:"Roblox-Place v0.2, gebaute Datei liegt im Repo.",                                         status:"liegt", datum:"2026-07-20" },
+    { name:"SnapClone",          notiz:"Snapchat-Klon in HTML mit 1:1-Chat und Spotlight-Feed.",                                  status:"liegt", datum:"2026-07-20" },
+    { name:"HALT",               notiz:"Betrugs-Strategie als installierbare PWA.",                                               status:"liegt", datum:"2026-07-18" },
+    { name:"Klassenraum",        notiz:"Schul-Plattform, Phase 0: Auth, Rollen, RLS.",                                            status:"liegt", datum:"2026-07-14" },
+    { name:"FDP-Präsentation",   notiz:"Gliederung, als PDF gerendert.",                                                          status:"liegt", datum:"2026-07-14" },
+    { name:"AI Maps",            notiz:"Navigations-System; Karte fällt automatisch auf OSM-Raster zurück.",                      status:"liegt", datum:"2026-07-13" },
+    { name:"Mach Nummer 3",      notiz:"Simulator mit mehreren CORS-Proxys als Fallback.",                                        status:"liegt", datum:"2026-07-13" }
+  ],
+
+  /* ── Ziele ────────────────────────────────────────────────────────────
+     LEER — deine Ziele und Zieldaten kenne ich nicht.
+     Der Balken zeigt ausschliesslich verstrichene Zeit zwischen "angelegt"
+     und "faellig". Keine geschaetzte Fertigstellung, die gibt es hier nicht.
+         { titel:"…", angelegt:"2026-08-23", faellig:"2027-03-01" }           */
+  ziele: []
+};
+
+/* Modell fuer den Chat. Frei tauschbar. */
+var MODEL = "claude-sonnet-4-6";
+
+/* ════════════════════════════════════════════════════════════════════════
+   Zustand — reine JS-Variablen. Kein localStorage, kein sessionStorage.
+   ════════════════════════════════════════════════════════════════════════ */
+
+var state = {
+  version: 1,
+  name: DATA.name,
+  stundenplan: DATA.stundenplan,
+  termine: DATA.termine,
+  projekte: DATA.projekte,
+  ziele: DATA.ziele,
+  aufgaben: [],          /* { id, text, erledigt } */
+  verlauf: []            /* { frage, antwort } — die letzten 5 */
+};
+
+var chatStatus = { kind: "idle", text: "" };
+var nextTaskId = 1;
+
+/* ════════════════════════════════════════════════════════════════════════
+   Kleinkram
+   ════════════════════════════════════════════════════════════════════════ */
+
+var DAYS   = ["so","mo","di","mi","do","fr","sa"];
+var DAYLBL = { mo:"Montag", di:"Dienstag", mi:"Mittwoch", do:"Donnerstag",
+               fr:"Freitag", sa:"Samstag", so:"Sonntag" };
+var MONTHS = ["Januar","Februar","März","April","Mai","Juni",
+              "Juli","August","September","Oktober","November","Dezember"];
+
+function $(id) { return document.getElementById(id); }
+
+function el(tag, cls, txt) {
+  var n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (txt !== undefined && txt !== null) n.textContent = txt;
+  return n;
+}
+
+/* SVG nur aus festen Konstanten in dieser Datei — nie aus Eingaben. */
+function icon(path) {
+  var s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  s.setAttribute("viewBox", "0 0 24 24");
+  s.setAttribute("fill", "none");
+  s.setAttribute("stroke", "currentColor");
+  s.setAttribute("stroke-width", "1.8");
+  s.setAttribute("stroke-linecap", "round");
+  s.setAttribute("aria-hidden", "true");
+  var p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  p.setAttribute("d", path);
+  s.appendChild(p);
+  return s;
+}
+var X_PATH = "M6 6l12 12M18 6L6 18";
+
+function pad(n) { return n < 10 ? "0" + n : "" + n; }
+
+/* "YYYY-MM-DD" als LOKALES Datum lesen. new Date(str) waere UTC und
+   verschoebe die Tagesdifferenz je nach Zeitzone um einen Tag. */
+function parseDate(s) {
+  if (typeof s !== "string") return null;
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return null;
+  var d = new Date(+m[1], +m[2] - 1, +m[3]);
+  if (d.getFullYear() !== +m[1] || d.getMonth() !== +m[2] - 1 || d.getDate() !== +m[3]) return null;
+  return d;
+}
+
+function midnight(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+
+function dayDiff(from, to) {
+  return Math.round((midnight(to) - midnight(from)) / 86400000);
+}
+
+/* "HH:MM" -> Minuten seit Mitternacht, sonst null. */
+function toMin(s) {
+  if (typeof s !== "string") return null;
+  var m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(s);
+  return m ? (+m[1]) * 60 + (+m[2]) : null;
+}
+
+/* "vor 3 Tagen", "seit 3 Tagen" — Dativ. */
+function tage(n) { return n === 1 ? "1 Tag" : n + " Tagen"; }
+/* "noch 3 Tage" — Nominativ. */
+function tageNom(n) { return n === 1 ? "1 Tag" : n + " Tage"; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   Ableitungen — jede Zahl im UI kommt aus einer dieser Funktionen.
+   ════════════════════════════════════════════════════════════════════════ */
+
+var STILL_LIEGT_AB = 30;   /* Tage ohne Anfassen, ab denen ein Projekt liegt */
+
+function projektAlter(p, heute) {
+  var d = parseDate(p.datum);
+  return d ? dayDiff(d, heute) : null;
+}
+
+/* Bloecke des heutigen Tages: Stundenplan + wiederkehrende Termine. */
+function tagesBloecke(key) {
+  var out = [];
+  var plan = state.stundenplan[key] || [];
+  var i;
+  for (i = 0; i < plan.length; i++) {
+    out.push({ von: plan[i].von, bis: plan[i].bis, was: plan[i].was, notiz: plan[i].notiz });
+  }
+  for (i = 0; i < state.termine.length; i++) {
+    if (state.termine[i].tag === key) {
+      out.push({ von: state.termine[i].von, bis: state.termine[i].bis,
+                 was: state.termine[i].was, notiz: state.termine[i].notiz });
+    }
+  }
+  out.sort(function (a, b) {
+    var x = toMin(a.von), y = toMin(b.von);
+    if (x === null && y === null) return 0;
+    if (x === null) return 1;          /* ohne Uhrzeit ans Ende */
+    if (y === null) return -1;
+    return x - y;
+  });
+  return out;
+}
+
+function blockStatus(b, nowMin) {
+  var von = toMin(b.von), bis = toMin(b.bis);
+  if (von === null) return "offen";                    /* ohne Uhrzeit */
+  if (bis !== null && nowMin >= bis) return "past";
+  if (nowMin >= von && (bis === null || nowMin < bis)) return "now";
+  return "future";
+}
+
+function restText(min) {
+  if (min < 60) return "noch " + min + " min";
+  var h = Math.floor(min / 60), m = min % 60;
+  return m === 0 ? "noch " + h + " h" : "noch " + h + " h " + m + " min";
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Rendern
+   ════════════════════════════════════════════════════════════════════════ */
+
+function leer(txt, code) {
+  var p = el("p", "empty", txt);
+  if (code) { p.appendChild(document.createTextNode(" ")); p.appendChild(el("code", null, code)); }
+  return p;
+}
+
+function renderProjekte(heute) {
+  var box = $("projects");
+  box.textContent = "";
+
+  if (!state.projekte.length) {
+    box.appendChild(leer("Keine Projekte eingetragen. Trag sie im DATA-Block ein:", "projekte"));
+    $("proj-count").textContent = "";
+    return;
+  }
+
+  var liste = state.projekte.slice().sort(function (a, b) {
+    var x = parseDate(a.datum), y = parseDate(b.datum);
+    if (!x && !y) return 0;
+    if (!x) return 1;
+    if (!y) return -1;
+    return y - x;
+  });
+
+  var aktiv = 0, liegen = 0, fertig = 0;
+
+  liste.forEach(function (p, idx) {
+    var alter = projektAlter(p, heute);
+    var ruht  = alter !== null && alter > STILL_LIEGT_AB;
+
+    if (p.status === "fertig") fertig++;
+    else if (ruht || p.status === "liegt") liegen++;
+    else aktiv++;
+
+    var li = el("li", "proj" + (ruht ? " rest" : "") + (p.status === "fertig" ? " done" : ""));
+    li.style.setProperty("--i", Math.min(idx, 7));
+
+    var top = el("div", "proj-top");
+    top.appendChild(el("span", "dot"));
+    top.appendChild(el("h3", "proj-name", p.name));
+    li.appendChild(top);
+
+    if (p.notiz) li.appendChild(el("p", "proj-note", p.notiz));
+
+    if (alter === null) {
+      li.appendChild(el("p", "proj-age", "kein Datum hinterlegt"));
+    } else if (ruht) {
+      li.appendChild(el("p", "proj-rest-label", "liegt seit " + tage(alter)));
+    } else if (alter === 0) {
+      li.appendChild(el("p", "proj-age", "heute angefasst"));
+    } else {
+      li.appendChild(el("p", "proj-age", "zuletzt angefasst vor " + tage(alter)));
+    }
+
+    box.appendChild(li);
+  });
+
+  var foot = aktiv + " aktiv · " + liegen + " liegen";
+  if (fertig) foot += " · " + fertig + " fertig";
+  $("proj-count").textContent = foot;
+}
+
+function renderUhr(jetzt) {
+  $("clock").textContent = pad(jetzt.getHours()) + ":" + pad(jetzt.getMinutes()) + ":" + pad(jetzt.getSeconds());
+  $("datum").textContent = DAYLBL[DAYS[jetzt.getDay()]] + ", " +
+    jetzt.getDate() + ". " + MONTHS[jetzt.getMonth()] + " " + jetzt.getFullYear();
+}
+
+function renderZeitleiste(jetzt) {
+  var box = $("timeline");
+  box.textContent = "";
+
+  var key = DAYS[jetzt.getDay()];
+  var bloecke = tagesBloecke(key);
+
+  if (!bloecke.length) {
+    box.appendChild(leer("Für " + DAYLBL[key] + " ist nichts eingetragen — weder Schulzeit noch fester Termin. Beides steht im DATA-Block unter",
+                         "stundenplan / termine"));
+    return;
+  }
+
+  var nowMin = jetzt.getHours() * 60 + jetzt.getMinutes();
+
+  bloecke.forEach(function (b) {
+    var st = blockStatus(b, nowMin);
+    var li = el("li", "tl-row" + (st === "past" ? " past" : st === "now" ? " now" : ""));
+
+    var von = toMin(b.von), bis = toMin(b.bis);
+    var zeit = von === null ? "—" : (b.von + (bis !== null ? "–" + b.bis : ""));
+    li.appendChild(el("p", "tl-time", zeit));
+
+    var body = el("div", "tl-body");
+    body.appendChild(el("p", "tl-what", b.was || "(ohne Bezeichnung)"));
+    if (b.notiz) body.appendChild(el("p", "tl-note", b.notiz));
+    if (st === "now" && bis !== null) body.appendChild(el("p", "tl-left", restText(bis - nowMin)));
+    li.appendChild(body);
+
+    box.appendChild(li);
+  });
+}
+
+function renderAufgaben() {
+  var box = $("tasks");
+  box.textContent = "";
+
+  state.aufgaben.forEach(function (t) {
+    var li = el("li", "task" + (t.erledigt ? " is-done" : ""));
+
+    var cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = !!t.erledigt;
+    cb.id = "task-" + t.id;
+    cb.addEventListener("change", function () {
+      t.erledigt = cb.checked;
+      renderAufgaben();
+    });
+
+    var lab = document.createElement("label");
+    lab.setAttribute("for", cb.id);
+    lab.textContent = t.text;
+
+    var x = el("button", "task-x");
+    x.type = "button";
+    x.setAttribute("aria-label", "Aufgabe löschen: " + t.text);
+    x.appendChild(icon(X_PATH));
+    x.addEventListener("click", function () {
+      state.aufgaben = state.aufgaben.filter(function (a) { return a.id !== t.id; });
+      renderAufgaben();
+    });
+
+    li.appendChild(cb);
+    li.appendChild(lab);
+    li.appendChild(x);
+    box.appendChild(li);
+  });
+}
+
+function renderZiele(heute) {
+  var box = $("goals");
+  box.textContent = "";
+
+  if (!state.ziele.length) {
+    box.appendChild(leer("Keine Ziele eingetragen. Trag sie im DATA-Block ein:", "ziele"));
+    return;
+  }
+
+  state.ziele.forEach(function (z, idx) {
+    var faellig  = parseDate(z.faellig);
+    var angelegt = parseDate(z.angelegt);
+
+    var li = el("li", "goal");
+    li.style.setProperty("--i", Math.min(idx, 7));
+    li.appendChild(el("h3", "goal-title", z.titel));
+
+    var meta = el("div", "goal-meta");
+
+    if (faellig) {
+      meta.appendChild(el("span", null, pad(faellig.getDate()) + "." + pad(faellig.getMonth() + 1) + "." + faellig.getFullYear()));
+      var rest = dayDiff(heute, faellig);
+      meta.appendChild(el("span", null,
+        rest > 0 ? "noch " + tageNom(rest) :
+        rest === 0 ? "heute" :
+        "seit " + tage(-rest) + " überfällig"));
+    } else {
+      meta.appendChild(el("span", null, "kein Zieldatum"));
+    }
+    li.appendChild(meta);
+
+    /* Der Balken misst NUR verstrichene Zeit zwischen Anlage und Zieldatum.
+       Keine geschaetzte Fertigstellung — die waere erfunden. */
+    if (faellig && angelegt && faellig > angelegt) {
+      var anteil = Math.max(0, Math.min(1, (midnight(heute) - angelegt) / (faellig - angelegt)));
+      var rail = el("div", "rail");
+      rail.setAttribute("role", "img");
+      rail.setAttribute("aria-label", Math.round(anteil * 100) + " % der Zeit seit Anlage verstrichen");
+      var fill = el("span");
+      fill.style.width = (anteil * 100).toFixed(1) + "%";
+      rail.appendChild(fill);
+      li.appendChild(rail);
+      li.appendChild(el("p", "goal-src", "verstrichene Zeit seit " + pad(angelegt.getDate()) + "." + pad(angelegt.getMonth() + 1) + "."));
+    }
+
+    box.appendChild(li);
+  });
+}
+
+function renderGruss(jetzt) {
+  var h = jetzt.getHours();
+  $("greet-word").textContent =
+    h < 5 ? "Noch wach, " : h < 11 ? "Guten Morgen, " : h < 18 ? "Guten Tag, " : "Guten Abend, ";
+  $("greet-name").textContent = state.name ? state.name : "—";
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Chat — der einzige Teil, der wirklich KI ist.
+   ════════════════════════════════════════════════════════════════════════ */
+
+var ANWEISUNG =
+  "Du bist mein Tagesplaner. Antworte auf Deutsch, du-Form, maximal 6 Sätze. " +
+  "Beziehe dich nur auf die Daten unten. Erfinde keine Termine, keine Projekte, " +
+  "keine Zahlen. Wenn etwas in den Daten fehlt, sag das. Wenn ein Projekt lange " +
+  "liegt, sprich es an, statt ein neues vorzuschlagen.";
+
+function snapshot(jetzt) {
+  var heute  = midnight(jetzt);
+  var key    = DAYS[jetzt.getDay()];
+  var nowMin = jetzt.getHours() * 60 + jetzt.getMinutes();
+
+  return {
+    jetzt: {
+      wochentag: DAYLBL[key],
+      datum: jetzt.getFullYear() + "-" + pad(jetzt.getMonth() + 1) + "-" + pad(jetzt.getDate()),
+      uhrzeit: pad(jetzt.getHours()) + ":" + pad(jetzt.getMinutes())
+    },
+    tagesplan_heute: tagesBloecke(key).map(function (b) {
+      return { von: b.von || null, bis: b.bis || null, was: b.was,
+               notiz: b.notiz || null, lage: blockStatus(b, nowMin) };
+    }),
+    aufgaben_offen: state.aufgaben.filter(function (t) { return !t.erledigt; })
+                                  .map(function (t) { return t.text; }),
+    aufgaben_erledigt: state.aufgaben.filter(function (t) { return t.erledigt; })
+                                     .map(function (t) { return t.text; }),
+    projekte: state.projekte.map(function (p) {
+      var alter = projektAlter(p, heute);
+      return { name: p.name, beschreibung: p.notiz || null, status: p.status || null,
+               letztes_update: p.datum || null, tage_seit_letztem_update: alter,
+               liegt_laenger_als_30_tage: alter !== null && alter > STILL_LIEGT_AB };
+    }),
+    ziele: state.ziele.map(function (z) {
+      var f = parseDate(z.faellig);
+      return { titel: z.titel, faellig: z.faellig || null,
+               verbleibende_tage: f ? dayDiff(heute, f) : null };
+    })
+  };
+}
+
+function baueFrage(frage, jetzt) {
+  return ANWEISUNG + "\n\nDATEN (JSON):\n" +
+         JSON.stringify(snapshot(jetzt), null, 2) +
+         "\n\nFRAGE:\n" + frage;
+}
+
+function lesbarerFehler(err) {
+  var m = err && err.message ? err.message : String(err);
+  if (/Failed to fetch|NetworkError|Load failed/i.test(m)) {
+    return "Der Request ist nicht rausgegangen — kein Netz, oder die Seite läuft " +
+           "ausserhalb der Umgebung, die den API-Key setzt. Nachricht: " + m;
+  }
+  return m;
+}
+
+function setChat(kind, text) {
+  chatStatus = { kind: kind, text: text || "" };
+  renderChat();
+}
+
+function renderChat() {
+  var log = $("chat-log");
+  log.textContent = "";
+
+  state.verlauf.forEach(function (paar) {
+    var block = el("div", "qa");
+    block.appendChild(el("p", "qa-q", paar.frage));
+    var a = el("div", "qa-a");
+    paar.antwort.split(/\n{2,}|\n/).forEach(function (zeile) {
+      if (zeile.trim()) a.appendChild(el("p", null, zeile.trim()));
+    });
+    block.appendChild(a);
+    log.appendChild(block);
+  });
+  log.scrollTop = log.scrollHeight;
+
+  var s = $("chat-state");
+  if (chatStatus.kind === "loading") {
+    s.hidden = false;
+    s.className = "chat-state thinking";
+    s.textContent = "denkt nach …";
+  } else if (chatStatus.kind === "error") {
+    s.hidden = false;
+    s.className = "chat-state bad";
+    s.textContent = chatStatus.text;
+  } else {
+    s.hidden = true;
+    s.textContent = "";
+  }
+
+  $("chat-send").disabled = (chatStatus.kind === "loading");
+}
+
+function frag(frage) {
+  var jetzt = new Date();
+  setChat("loading");
+
+  fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 1000,
+      messages: [{ role: "user", content: baueFrage(frage, jetzt) }]
+    })
+  })
+  .then(function (res) {
+    if (!res.ok) {
+      return res.text().then(function (t) {
+        throw new Error("Die API hat mit HTTP " + res.status + " geantwortet." + (t ? " " + t.slice(0, 300) : ""));
+      });
+    }
+    return res.json();
+  })
+  .then(function (data) {
+    var bloecke = Array.isArray(data.content) ? data.content : [];
+    var text = bloecke.filter(function (b) { return b.type === "text"; })
+                      .map(function (b) { return b.text; })
+                      .join("\n").trim();
+    if (!text) throw new Error("Die Antwort kam an, enthielt aber keinen Text.");
+
+    state.verlauf.push({ frage: frage, antwort: text });
+    while (state.verlauf.length > 5) state.verlauf.shift();
+    setChat("idle");
+  })
+  .catch(function (err) {
+    setChat("error", lesbarerFehler(err));
+  });
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Export / Import — die Persistenz. Kein Storage-API im Spiel.
+   ════════════════════════════════════════════════════════════════════════ */
+
+function exportText() { return JSON.stringify(state, null, 2); }
+
+var exportTimer = null;
+function exportHinweis(txt) {
+  var lab = $("export-label");
+  lab.textContent = txt;
+  if (exportTimer) clearTimeout(exportTimer);
+  exportTimer = setTimeout(function () { lab.textContent = "Export"; }, 2200);
+}
+
+function altKopieren(text) {
+  var ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  var ok = false;
+  try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+  document.body.removeChild(ta);
+  return ok;
+}
+
+function exportieren() {
+  var text = exportText();
+  var fertig = function (ok) {
+    if (ok) { exportHinweis("Kopiert"); return; }
+    /* Zwischenablage verweigert — dann wenigstens sichtbar zum Selbstkopieren. */
+    oeffnePop(true);
+    $("import-text").value = text;
+    $("import-text").select();
+    zeigeMeldung("Die Zwischenablage war nicht erreichbar. Das JSON steht im Feld — von Hand kopieren.", true);
+    exportHinweis("Export");
+  };
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () { fertig(true); },
+                                            function () { fertig(altKopieren(text)); });
+  } else {
+    fertig(altKopieren(text));
+  }
+}
+
+/* Vollstaendige Pruefung. Fehler landen im UI, nicht in der Konsole. */
+function pruefe(o) {
+  var i, k, b;
+  if (o === null || typeof o !== "object" || Array.isArray(o)) return "Das JSON muss ein Objekt sein.";
+  if (typeof o.name !== "string") return 'Feld "name" fehlt oder ist kein Text.';
+
+  if (!o.stundenplan || typeof o.stundenplan !== "object" || Array.isArray(o.stundenplan))
+    return 'Feld "stundenplan" fehlt oder ist kein Objekt.';
+  for (i = 0; i < DAYS.length; i++) {
+    k = DAYS[i];
+    if (!Array.isArray(o.stundenplan[k])) return 'stundenplan.' + k + ' muss eine Liste sein.';
+    for (b = 0; b < o.stundenplan[k].length; b++) {
+      var blk = o.stundenplan[k][b];
+      if (!blk || typeof blk !== "object") return 'stundenplan.' + k + '[' + b + '] ist kein Objekt.';
+      if (typeof blk.was !== "string" || !blk.was) return 'stundenplan.' + k + '[' + b + '] braucht ein "was".';
+      if (toMin(blk.von) === null) return 'stundenplan.' + k + '[' + b + '].von ist keine Uhrzeit im Format HH:MM.';
+      if (blk.bis !== undefined && blk.bis !== null && toMin(blk.bis) === null)
+        return 'stundenplan.' + k + '[' + b + '].bis ist keine Uhrzeit im Format HH:MM.';
+    }
+  }
+
+  if (!Array.isArray(o.termine)) return 'Feld "termine" muss eine Liste sein.';
+  for (i = 0; i < o.termine.length; i++) {
+    var t = o.termine[i];
+    if (!t || typeof t !== "object") return 'termine[' + i + '] ist kein Objekt.';
+    if (DAYS.indexOf(t.tag) === -1) return 'termine[' + i + '].tag muss mo, di, mi, do, fr, sa oder so sein.';
+    if (typeof t.was !== "string" || !t.was) return 'termine[' + i + '] braucht ein "was".';
+    if (t.von !== undefined && t.von !== null && toMin(t.von) === null)
+      return 'termine[' + i + '].von ist keine Uhrzeit im Format HH:MM.';
+  }
+
+  if (!Array.isArray(o.projekte)) return 'Feld "projekte" muss eine Liste sein.';
+  for (i = 0; i < o.projekte.length; i++) {
+    var p = o.projekte[i];
+    if (!p || typeof p !== "object") return 'projekte[' + i + '] ist kein Objekt.';
+    if (typeof p.name !== "string" || !p.name) return 'projekte[' + i + '] braucht einen "name".';
+    if (p.datum !== undefined && p.datum !== null && !parseDate(p.datum))
+      return 'projekte[' + i + '].datum ist kein Datum im Format JJJJ-MM-TT.';
+    if (p.status !== undefined && p.status !== null && ["aktiv","liegt","fertig"].indexOf(p.status) === -1)
+      return 'projekte[' + i + '].status muss aktiv, liegt oder fertig sein.';
+  }
+
+  if (!Array.isArray(o.ziele)) return 'Feld "ziele" muss eine Liste sein.';
+  for (i = 0; i < o.ziele.length; i++) {
+    var z = o.ziele[i];
+    if (!z || typeof z !== "object") return 'ziele[' + i + '] ist kein Objekt.';
+    if (typeof z.titel !== "string" || !z.titel) return 'ziele[' + i + '] braucht einen "titel".';
+    if (z.faellig !== undefined && z.faellig !== null && !parseDate(z.faellig))
+      return 'ziele[' + i + '].faellig ist kein Datum im Format JJJJ-MM-TT.';
+    if (z.angelegt !== undefined && z.angelegt !== null && !parseDate(z.angelegt))
+      return 'ziele[' + i + '].angelegt ist kein Datum im Format JJJJ-MM-TT.';
+  }
+
+  if (!Array.isArray(o.aufgaben)) return 'Feld "aufgaben" muss eine Liste sein.';
+  for (i = 0; i < o.aufgaben.length; i++) {
+    var a = o.aufgaben[i];
+    if (!a || typeof a !== "object") return 'aufgaben[' + i + '] ist kein Objekt.';
+    if (typeof a.text !== "string") return 'aufgaben[' + i + '].text fehlt.';
+  }
+
+  if (!Array.isArray(o.verlauf)) return 'Feld "verlauf" muss eine Liste sein.';
+  for (i = 0; i < o.verlauf.length; i++) {
+    var v = o.verlauf[i];
+    if (!v || typeof v !== "object" || typeof v.frage !== "string" || typeof v.antwort !== "string")
+      return 'verlauf[' + i + '] braucht "frage" und "antwort" als Text.';
+  }
+
+  return null;
+}
+
+function importieren(roh) {
+  var o;
+  if (!roh.trim()) { zeigeMeldung("Das Feld ist leer.", true); return; }
+  try { o = JSON.parse(roh); }
+  catch (e) { zeigeMeldung("Kein gültiges JSON: " + e.message, true); return; }
+
+  var fehler = pruefe(o);
+  if (fehler) { zeigeMeldung(fehler, true); return; }
+
+  state = {
+    version: 1,
+    name: o.name,
+    stundenplan: o.stundenplan,
+    termine: o.termine,
+    projekte: o.projekte,
+    ziele: o.ziele,
+    aufgaben: o.aufgaben.map(function (a) {
+      /* IDs uebernehmen, wenn vorhanden — sonst waere Export -> Import ->
+         Export nicht mehr Zeichen fuer Zeichen derselbe State. */
+      var id = (typeof a.id === "number" && isFinite(a.id)) ? a.id : nextTaskId++;
+      if (id >= nextTaskId) nextTaskId = id + 1;
+      return { id: id, text: a.text, erledigt: !!a.erledigt };
+    }),
+    verlauf: o.verlauf.slice(-5)
+  };
+
+  zeigeMeldung("Geladen: " + state.projekte.length + " Projekte, " + state.ziele.length +
+               " Ziele, " + state.aufgaben.length + " Aufgaben.", false);
+  render();
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Verdrahtung
+   ════════════════════════════════════════════════════════════════════════ */
+
+function zeigeMeldung(text, schlecht) {
+  var m = $("import-msg");
+  m.textContent = text;
+  m.className = "msg" + (schlecht ? " bad" : "");
+}
+
+function popOffen() { return !$("pop-import").hidden; }
+
+function oeffnePop(auf) {
+  $("pop-import").hidden = !auf;
+  $("btn-import").setAttribute("aria-expanded", auf ? "true" : "false");
+  if (auf) { $("import-text").focus(); }
+}
+
+function render() {
+  var jetzt = new Date();
+  renderGruss(jetzt);
+  renderUhr(jetzt);
+  renderZeitleiste(jetzt);
+  renderProjekte(midnight(jetzt));
+  renderAufgaben();
+  renderZiele(midnight(jetzt));
+  renderChat();
+}
+
+function start() {
+  render();
+
+  /* Live-Uhr im Sekundentakt. Teurere Teile nur, wenn sich Minute oder Tag
+     wirklich geaendert haben — sonst rendert die Seite 60x pro Minute umsonst. */
+  var letzteMinute = -1, letzterTag = -1;
+
+  setInterval(function () {
+    var jetzt = new Date();
+    renderUhr(jetzt);
+
+    if (jetzt.getDate() !== letzterTag) {
+      if (letzterTag !== -1) render();          /* Tageswechsel: alles neu */
+      letzterTag = jetzt.getDate();
+      letzteMinute = jetzt.getMinutes();
+      renderZeitleiste(jetzt);
+      renderGruss(jetzt);
+    } else if (jetzt.getMinutes() !== letzteMinute) {
+      letzteMinute = jetzt.getMinutes();
+      renderZeitleiste(jetzt);
+      renderGruss(jetzt);
+    }
+  }, 1000);
+
+  /* ── Aufgaben ────────────────────────────────────────────────────── */
+  $("task-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var feld = $("task-input");
+    var text = feld.value.trim();
+    if (!text) return;
+    state.aufgaben.push({ id: nextTaskId++, text: text, erledigt: false });
+    feld.value = "";
+    renderAufgaben();
+  });
+
+  /* ── Chat ────────────────────────────────────────────────────────── */
+  var eingabe = $("chat-input");
+
+  function absenden() {
+    var frage = eingabe.value.trim();
+    if (!frage || chatStatus.kind === "loading") return;
+    eingabe.value = "";
+    eingabe.style.height = "auto";
+    frag(frage);
+  }
+
+  $("chat-form").addEventListener("submit", function (e) { e.preventDefault(); absenden(); });
+
+  eingabe.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); absenden(); }
+  });
+
+  eingabe.addEventListener("input", function () {
+    eingabe.style.height = "auto";
+    eingabe.style.height = Math.min(eingabe.scrollHeight, 120) + "px";
+  });
+
+  /* ── Export / Import ─────────────────────────────────────────────── */
+  $("btn-export").addEventListener("click", exportieren);
+
+  $("btn-import").addEventListener("click", function () {
+    var auf = !popOffen();
+    oeffnePop(auf);
+    if (auf) zeigeMeldung("", false);
+  });
+
+  $("btn-load").addEventListener("click", function () { importieren($("import-text").value); });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && popOffen()) { oeffnePop(false); $("btn-import").focus(); }
+  });
+
+  document.addEventListener("pointerdown", function (e) {
+    if (!popOffen()) return;
+    if ($("pop-import").contains(e.target) || $("btn-import").contains(e.target)) return;
+    oeffnePop(false);
+  });
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", start);
+} else {
+  start();
+}
+
+})();
+</script>
+</body>
+</html>
