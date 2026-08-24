@@ -449,7 +449,7 @@ h2{font-size:var(--step-3);line-height:1.08}
       <h2>Wir zeigen, was noch nicht steht</h2>
       <p class="body">Für Entwickler und Eigentümer entsteht bei uns eine Umgebung statt eines Renderings-Ordners: eine Stadt, durch die man sich bewegt, mit dem geplanten Haus an seiner tatsächlichen Stelle. Was hier vor dem Foto steht, ist echte Geometrie — Höhen, Fensterraster und Fluchten sind aus dem Bebauungsplan abgeleitet, nicht gemalt.</p>
       <ul class="meta">
-        <li><b>445</b>Baukörper</li>
+        <li><b>453</b>Baukörper</li>
         <li><b>1</b>Zeichenaufruf</li>
         <li><b>60 fps</b>Ziel</li>
       </ul>
@@ -978,7 +978,8 @@ const CITY_FRAG = `
     vec3 col = uBase * (0.24 + ndl * 0.80)
              + uSunCol * ndl * 0.10
              + uFillCol * ndf * 0.50;
-    col *= mix(mix(0.46, 1.04, clamp(vUv.y, 0.0, 1.0)), 0.55, top);
+    float roof = 0.62 + 0.30 * hash21(vec2(vSeed * 5.3, 7.1));
+    col *= mix(mix(0.46, 1.04, clamp(vUv.y, 0.0, 1.0)), roof, top);
 
     // Fenster als Etagenstreifen. Ein Zufallsraster aus Einzelfenstern
     // flimmert, sobald eine Zelle unter einen Pixel fällt — die Streifen
@@ -1002,8 +1003,10 @@ const CITY_FRAG = `
     float pxCol = 0.55 * uPx * facing / d;
     breaks = mix(1.0, breaks, smoothstep(1.6, 5.0, pxCol));
     float carry = smoothstep(2.2, 6.5, pxRow) * aa;
-    col += uWin * band * on * breaks * (1.0 - top) * 2.6 * carry;
-    col += uFillCol * band * breaks * (1.0 - top) * 0.34 * carry;
+    // Seed ab 100 markiert Dachaufbauten — die haben keine Etagen.
+    float glazed = 1.0 - step(100.0, vSeed);
+    col += uWin * band * on * breaks * (1.0 - top) * 2.6 * carry * glazed;
+    col += uFillCol * band * breaks * (1.0 - top) * 0.34 * carry * glazed;
 
     float fog = smoothstep(uFog.x, uFog.y, vDepth);
     float a = uOpacity * (1.0 - fog);
@@ -1036,7 +1039,7 @@ function buildCity() {
       let h = 3.2 + Math.pow(rnd(), 2.0) * (8 + 44 * core);
       if (rnd() < 0.025) h *= 1.45;
       cells.push({
-        x, z, h,
+        x, z, h, y: 0,
         w: cw * (0.34 + rnd() * 0.26),
         d: cd * (0.36 + rnd() * 0.26),
         seed: rnd() * 97
@@ -1045,8 +1048,49 @@ function buildCity() {
   }
   // Der eine Turm, der den Übergang zum Turm-Foto trägt. Bewusst seitlich
   // neben der Kameralinie, sonst verdeckt er ab der Hälfte das ganze Bild.
-  cells.push({ x: -19.0, z: -202.9, h: 78, w: 9.4, d: 7.4, seed: 4.2 });
-  cells.push({ x: 69.7, z: -151.3, h: 58, w: 8.6, d: 6.8, seed: 11.9 });
+  cells.push({ x: -19.0, z: -202.9, h: 78, y: 0, w: 9.4, d: 7.4, seed: 4.2 });
+  cells.push({ x: 69.7, z: -151.3, h: 58, y: 0, w: 8.6, d: 6.8, seed: 11.9 });
+
+  // Aufbauten: Rücksprünge, Masten, Technikkästen. Sie sind wieder nur
+  // Quader und laufen deshalb im selben InstancedMesh mit — die Silhouette
+  // ist der Unterschied zwischen einer Stadt und einer Reihe Kartons.
+  // Ein Seed ab 100 heisst: keine Fenster, das ist Dachaufbau.
+  const CROWN = [];
+  function crown(o) { o.y -= 0.05; CROWN.push(o); }   // leicht versenkt, sonst
+                                                      // liegen zwei Flächen
+                                                      // exakt aufeinander
+  const base = cells.length;
+  for (let i = 0; i < base; i++) {
+    const b = cells[i];
+    let top = b.h, w = b.w, d = b.d;
+    let stepped = false;
+
+    if (b.h > 14 && rnd() < 0.74) {
+      const ch = b.h * (0.10 + rnd() * 0.13);
+      w *= 0.55 + rnd() * 0.20; d *= 0.55 + rnd() * 0.20;
+      crown({ x: b.x, z: b.z, y: top, h: ch, w, d, seed: rnd() * 97 });
+      top += ch; stepped = true;
+
+      if (b.h > 34 && rnd() < 0.45) {
+        const c2 = b.h * (0.06 + rnd() * 0.08);
+        w *= 0.60 + rnd() * 0.18; d *= 0.60 + rnd() * 0.18;
+        crown({ x: b.x, z: b.z, y: top, h: c2, w, d, seed: rnd() * 97 });
+        top += c2;
+      }
+    }
+
+    if (b.h > 40 && rnd() < 0.42) {
+      const mast = Math.min(b.w, b.d) * 0.09;
+      crown({ x: b.x, z: b.z, y: top, h: b.h * (0.14 + rnd() * 0.16),
+              w: mast, d: mast, seed: 100 + rnd() });
+    } else if (!stepped && b.h > 4.5 && rnd() < 0.46) {
+      crown({ x: b.x + (rnd() - 0.5) * b.w * 0.3, z: b.z + (rnd() - 0.5) * b.d * 0.3,
+              y: top, h: 1.1 + rnd() * 1.6,
+              w: b.w * (0.22 + rnd() * 0.16), d: b.d * (0.22 + rnd() * 0.16),
+              seed: 100 + rnd() });
+    }
+  }
+  for (let i = 0; i < CROWN.length; i++) cells.push(CROWN[i]);
 
   const geo = new THREE.BoxGeometry(1, 1, 1);
   geo.translate(0, 0.5, 0);
@@ -1076,7 +1120,7 @@ function buildCity() {
   const dummy = new THREE.Object3D();
   for (let i = 0; i < cells.length; i++) {
     const b = cells[i];
-    dummy.position.set(b.x, 0, b.z);
+    dummy.position.set(b.x, b.y, b.z);
     dummy.rotation.set(0, 0, 0);
     dummy.scale.set(b.w, b.h, b.d);
     dummy.updateMatrix();
