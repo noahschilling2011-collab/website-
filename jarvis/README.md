@@ -146,3 +146,20 @@ Datenmenge deutlich wächst.
 [CLAUDE.md](CLAUDE.md) enthält die Regeln, [STATUS.md](STATUS.md) den Stand,
 [docs/phases/](docs/phases/) die Aufträge. Bearbeitet wird immer nur die als
 `AKTUELL` markierte Phase.
+
+---
+
+## Endpunkte ohne Oberfläche — „nur API, kein UI"
+
+Diese Endpunkte sind absichtlich nur über die API erreichbar. Die Oberfläche
+ruft sie nicht auf. Das ist kein toter Code, das ist Absicht — ein Audit, das
+„wird nirgends aufgerufen" meldet, hat hier recht und trotzdem unrecht.
+
+| Endpunkt | wofür | Beispiel |
+|---|---|---|
+| `GET /api/audit` | jede bestätigte, abgelehnte oder abgelaufene Aktion ab EXTERNAL, unveränderlich | `curl -H "X-Jarvis-Token: $JARVIS_TOKEN" 127.0.0.1:8000/api/audit` |
+| `GET /api/task-log` | eine Zeile je Auftrag: Ziel, Ausgang, Zusammenfassung | `curl -H "X-Jarvis-Token: $JARVIS_TOKEN" 127.0.0.1:8000/api/task-log` |
+
+`tests/test_routen_haben_einen_nutzer.py` hält diese Liste aktuell: ein neuer
+Endpunkt muss entweder in `index.html` vorkommen oder dort ausdrücklich als
+„nur API" eingetragen sein.

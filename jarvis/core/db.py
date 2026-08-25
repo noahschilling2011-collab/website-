@@ -143,11 +143,6 @@ def count_messages(db_path: Path | str) -> int:
         return conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
 
 
-def clear_messages(db_path: Path | str) -> int:
-    with session(db_path) as conn:
-        return conn.execute("DELETE FROM messages").rowcount
-
-
 # --- Modellaufrufe --------------------------------------------------------
 
 
@@ -293,15 +288,6 @@ def attach_tool_calls(db_path: Path | str, ids: list[int], message_id: int) -> N
             "UPDATE tool_calls SET message_id = ? WHERE id = ?",
             [(message_id, i) for i in ids],
         )
-
-
-def list_tool_calls(db_path: Path | str, message_id: int) -> list[ToolCallRow]:
-    with session(db_path) as conn:
-        rows = conn.execute(
-            "SELECT * FROM tool_calls WHERE message_id = ? ORDER BY id ASC",
-            (message_id,),
-        ).fetchall()
-        return [ToolCallRow.from_row(r) for r in rows]
 
 
 def tool_calls_by_message(db_path: Path | str) -> dict[int, list[ToolCallRow]]:

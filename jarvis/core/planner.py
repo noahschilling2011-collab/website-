@@ -162,15 +162,3 @@ async def erstelle_plan(
     )
 
 
-def plan_als_text(schritte: list[Step]) -> str:
-    return "\n".join(
-        f"{i}. {s.description}" + (f" [{s.agent}]" if s.agent else "")
-        for i, s in enumerate(schritte, 1)
-    )
-
-
-def als_json(schritte: list[Step]) -> str:
-    return json.dumps(
-        [{"description": s.description, "agent": s.agent} for s in schritte],
-        ensure_ascii=False,
-    )

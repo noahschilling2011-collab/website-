@@ -78,10 +78,6 @@ REGELN:
 4. Knapp. Keine Einleitung, kein "Gerne!"."""
 
 
-class TaskAbgebrochen(RuntimeError):
-    pass
-
-
 @dataclass
 class Laufzeit:
     """Was der Runner nach aussen meldet, waehrend er laeuft."""

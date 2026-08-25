@@ -253,3 +253,72 @@ prüfen.** Dafür braucht es einen echten Provider mit Key — `LLM_API_KEY`,
 durch Planner, Schritt und Zusammenfassung: drei bis vier Modellaufrufe,
 die Geld kosten. Ich umgehe das nicht mit einem schlaueren Fake — ein Fake,
 der Werkzeuge auswählt, prüft nur sich selbst.
+
+---
+
+# BEFUND SCHRITT 7 — `/api/chat` ist kein Rest aus Phase 1
+
+**Angehalten, wie Regel 5 es verlangt.** Die fünf toten Definitionen sind gelöscht.
+Die Löschung von `/api/chat` habe ich gebaut, geprüft und **wieder zurückgenommen**,
+weil die Prämisse des Auftrags nicht stimmt.
+
+## Was beim Löschen herauskam
+
+Der Auftrag sagt: *„Dass alles über `/api/tasks` läuft, ist laut Spec richtig … Der
+Endpunkt ist ein Rest aus Phase 1."* Beim Löschen brachen 12 Tests. Zehn davon
+liessen sich sinnerhaltend umschreiben. Zwei nicht — und die beiden sind der Grund
+für diesen Befund:
+
+```
+$ # zweiter Auftrag, nachdem der erste "Mein Name ist Noah" hiess
+Modellaufrufe im zweiten Zug: 3
+  Aufruf 0: kennt 'Noah'?  False
+  Aufruf 1: kennt 'Noah'?  False
+  Aufruf 2: kennt 'Noah'?  False
+
+system_prompt aus Settings taucht auf in: 0 von 6 Aufrufen
+Verlauf in der DB: 4 Nachrichten
+```
+
+**1. Der Gesprächsverlauf erreicht das Modell auf dem Auftragspfad überhaupt nicht.**
+Vier Nachrichten stehen in der Datenbank, und keiner der drei Modellaufrufe des
+zweiten Zuges kennt die erste. `/api/chat` war der einzige Pfad, der
+`db.list_messages(..., history_limit)` an das Modell weitergibt. Die Oberfläche hat
+`/api/chat` nie benutzt — JARVIS hat im Browser also **noch nie** gewusst, was man
+ihm einen Zug vorher gesagt hat. Was über Züge hinweg trägt, ist allein das
+Gedächtnis aus Phase 3 (`recall`), und das greift nur, wenn das Modell das Werkzeug
+von sich aus ruft.
+
+**2. `settings.system_prompt` erreicht keinen einzigen Modellaufruf.** Die Agenten
+tragen ihre eigenen Prompts (`STANDARD_PROMPT` und Geschwister über `mit_stil`). Der
+konfigurierbare Systemprompt aus den Settings ist auf dem Auftragspfad wirkungslos —
+`/api/chat` war sein einziger Leser.
+
+## Warum ich nicht weitergemacht habe
+
+`/api/chat` zu löschen heisst damit **nicht**, einen doppelten Weg aufzuräumen,
+sondern die letzte Stelle zu entfernen, die Verlauf und Systemprompt überhaupt
+benutzt. Das Ergebnis wäre ein System, in dem beides gebaut, gespeichert und tot ist.
+
+Den Verlauf in den Auftragspfad einzubauen wäre ein neues Feature — Regel 2 verbietet
+das, Regel 5 verlangt melden statt nebenbei reparieren.
+
+## Was zu entscheiden ist
+
+| Weg | Folge |
+|---|---|
+| **A** — erst Verlauf und Systemprompt in den Auftragspfad, dann `/api/chat` löschen | JARVIS bekommt Gesprächsgedächtnis. Neues Verhalten, gehört in einen eigenen Auftrag. |
+| **B** — `/api/chat` behalten, in `NUR_API` eingetragen lassen | Nichts geht verloren, die Doppelung bleibt sichtbar dokumentiert. |
+| **C** — `/api/chat` trotzdem löschen | Verlauf und `settings.system_prompt` sind danach unbenutzt. Ehrlich, aber ärmer. |
+
+Bis zur Entscheidung steht `/api/chat` in `NUR_API` in
+`tests/test_routen_haben_einen_nutzer.py`, mit genau dieser Begründung.
+
+## Was in Schritt 7 erledigt ist
+
+- Die fünf toten Definitionen sind **gelöscht**, nicht auskommentiert:
+  `TaskAbgebrochen`, `plan_als_text`, `als_json`, `clear_messages`, `list_tool_calls`.
+  30 Zeilen, `git diff --stat` bestätigt: nur diese.
+- `/api/audit` und `/api/task-log` stehen in der README unter „nur API, kein UI".
+- Nebenbefund, **nicht angefasst**: `core/runner.py` importiert `ToolResult` und
+  `field`, beide schon vor dieser Session ungenutzt. Nicht Teil der genannten fünf.
