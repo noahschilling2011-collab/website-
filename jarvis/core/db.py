@@ -72,6 +72,14 @@ class LLMCall:
 
 
 def connect(db_path: Path | str) -> sqlite3.Connection:
+    # sqlite3.connect("") wirft nicht, sondern legt eine private Wegwerf-
+    # Datenbank an, die beim Schliessen verschwindet. Schreibvorgaenge melden
+    # dann Erfolg und sind trotzdem weg. Deshalb hier abfangen, nicht dort.
+    if not str(db_path).strip():
+        raise ValueError(
+            "Leerer Datenbankpfad. sqlite3 wuerde daraus eine anonyme "
+            "Wegwerf-Datenbank machen und jeden Schreibvorgang still verlieren."
+        )
     if str(db_path) != ":memory:":
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path, timeout=10.0)

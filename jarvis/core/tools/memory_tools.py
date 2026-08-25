@@ -20,9 +20,25 @@ class _MitDatenbank(Tool):
     """Der Pfad wird beim Start gesetzt, nicht importiert.
 
     So bleibt das Werkzeug ohne Umgebung baubar und in Tests umlenkbar.
+
+    Der Vorgabewert bleibt leer, weil die Registry die Werkzeuge ohne
+    Argumente baut. Er ist aber keine benutzbare Voreinstellung: wer das
+    Werkzeug laufen laesst, ohne den Pfad zu setzen, bekommt einen Fehler
+    und keine stille Wegwerf-Datenbank.
     """
 
     db_path: Path | str = ""
+
+    def pfad(self) -> Path | str:
+        """Der Datenbankpfad - oder ein Fehler, nie ein stiller Ersatz."""
+        if not str(self.db_path).strip():
+            raise ValueError(
+                f"{self.name}: db_path ist leer. Das Werkzeug wurde nie mit der "
+                f"Datenbank verdrahtet (das passiert beim App-Start in "
+                f"api/app.py). Ohne diesen Fehler wuerde sqlite3 eine anonyme "
+                f"Wegwerf-Datenbank anlegen und jeden gemerkten Satz verlieren."
+            )
+        return self.db_path
 
 
 @register
@@ -62,7 +78,7 @@ class Remember(_MitDatenbank):
         begonnen = time.monotonic()
         try:
             neu, konflikt = memory.add_fact(
-                self.db_path, text, category=category.strip() or "allgemein"
+                self.pfad(), text, category=category.strip() or "allgemein"
             )
         except ValueError as exc:
             return ToolResult(ok=False, error=str(exc), display=str(exc))
@@ -116,7 +132,7 @@ class Recall(_MitDatenbank):
         self, query: str, include_messages: bool = False
     ) -> ToolResult:
         begonnen = time.monotonic()
-        fakten = memory.search_facts(self.db_path, query)
+        fakten = memory.search_facts(self.pfad(), query)
         zeilen = [
             f"Fakt #{f.id} ({f.category})"
             + (f" [Widerspruch zu #{f.conflicts_with}]" if f.conflicts_with else "")
@@ -125,7 +141,7 @@ class Recall(_MitDatenbank):
         ]
 
         if include_messages:
-            for mid, rolle, inhalt, wann in memory.search_messages(self.db_path, query):
+            for mid, rolle, inhalt, wann in memory.search_messages(self.pfad(), query):
                 gekuerzt = inhalt if len(inhalt) <= 200 else inhalt[:199] + "…"
                 zeilen.append(f"Nachricht #{mid} ({rolle}, {wann}): {gekuerzt}")
 
