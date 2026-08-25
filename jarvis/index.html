@@ -390,6 +390,43 @@ button, input, textarea { font: inherit; color: inherit; }
   50%      { box-shadow: 0 0 0 5px rgba(242, 181, 68, 0); }
 }
 
+/* --- Sprache (Phase 9) ---------------------------------------------------- */
+
+.btn-mic {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px; height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: color 200ms var(--ease), border-color 200ms var(--ease),
+              background 200ms var(--ease), transform 200ms var(--ease);
+}
+.btn-mic:hover { color: var(--text-loud); border-color: var(--accent-line); }
+.btn-mic.is-hoert {
+  color: var(--on-accent);
+  background: var(--danger);
+  border-color: var(--danger);
+  animation: puls 1.2s ease-in-out infinite;
+}
+.btn-mic[disabled] { opacity: 0.35; cursor: not-allowed; }
+.btn-mic.is-spricht { color: var(--accent); border-color: var(--accent-line); }
+
+.sprache {
+  flex: none;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 11px;
+  cursor: pointer;
+}
+.sprache:hover { color: var(--text-loud); border-color: var(--accent-line); }
+
 /* --- Ansichten (Phase 7) -------------------------------------------------- */
 
 .tabs { display: flex; gap: 2px; }
@@ -779,6 +816,17 @@ button, input, textarea { font: inherit; color: inherit; }
   <div class="composer-wrap">
     <form class="composer glass" id="composer">
       <textarea id="input" rows="1" placeholder="Schreib etwas…" aria-label="Nachricht"></textarea>
+      <button class="sprache" id="btn-sprache" type="button"
+              title="Sprache für Erkennung und Ausgabe">DE</button>
+      <button class="btn-mic" id="btn-mic" type="button"
+              aria-label="Zum Sprechen gedrückt halten"
+              title="Gedrückt halten und sprechen">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="9" y="3" width="6" height="11" rx="3"></rect>
+          <path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path>
+        </svg>
+      </button>
       <button class="btn-send" id="btn-send" type="submit" aria-label="Senden">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -827,6 +875,8 @@ button, input, textarea { font: inherit; color: inherit; }
     hint:      document.getElementById('hint'),
     chip:      document.getElementById('model-chip'),
     phase:     document.getElementById('brand-phase'),
+    mic:       document.getElementById('btn-mic'),
+    sprache:   document.getElementById('btn-sprache'),
     healthDot: document.getElementById('health-dot'),
     healthTxt: document.getElementById('health-text'),
     memBtn:    document.getElementById('btn-memory'),
@@ -1239,7 +1289,10 @@ button, input, textarea { font: inherit; color: inherit; }
     var started = Date.now();
     var planBox = null;
 
-    api('/api/tasks', { method: 'POST', body: { goal: text } })
+    var warSprache = sprachModus;
+    sprachModus = false;
+
+    api('/api/tasks', { method: 'POST', body: { goal: text, voice: warSprache } })
       .then(function (start) {
         return neuerPlan(start.task_id, wartend, started);
       })
@@ -1281,6 +1334,8 @@ button, input, textarea { font: inherit; color: inherit; }
 
           el.hint.textContent = 'Fertig in ' + ((Date.now() - begonnen) / 1000).toFixed(1)
             + ' s · Vorgang ' + taskId + ' · ' + daten.status;
+          // Nur vorlesen, was gesprochen gefragt wurde.
+          if (warSprache && daten.result) lieseVor(daten.result);
           if (el.memPanel.classList.contains('is-open')) ladeGedaechtnis();
           setBusy(false);
           el.input.focus();
@@ -1456,6 +1511,142 @@ button, input, textarea { font: inherit; color: inherit; }
       })
       .catch(function (err) { meldung(err.message); });
   });
+
+  // --- Sprache (Phase 9) --------------------------------------------------
+  //
+  // VoiceProvider ist eine Abstraktion mit genau einer Implementierung: der
+  // Web Speech API des Browsers. Sie kostet nichts, braucht keinen Key und
+  // läuft in Chrome. Ein besserer Anbieter kommt später dahinter — dann
+  // ändert sich diese Datei und nichts sonst.
+  //
+  // Push-to-Talk, kein Wake Word. Dauerhorchen ist ein eigenes, deutlich
+  // größeres Problem (Falschauslösungen, Mikrofonrechte, Energieverbrauch)
+  // und in dieser Phase ausdrücklich verboten.
+
+  function BrowserVoice() {
+    var Erkennung = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var synth = window.speechSynthesis || null;
+    var laeuft = null;
+
+    return {
+      sttVerfuegbar: !!Erkennung,
+      ttsVerfuegbar: !!synth,
+
+      hoere: function (sprache, beiErgebnis, beiFehler) {
+        if (!Erkennung) { beiFehler('Dieser Browser kann keine Spracherkennung.'); return null; }
+        var r = new Erkennung();
+        r.lang = sprache;
+        // Kein Streaming-STT in dieser Phase: ein Ergebnis, wenn losgelassen wird.
+        r.interimResults = false;
+        r.continuous = false;
+        r.maxAlternatives = 1;
+        r.onresult = function (e) {
+          var text = '';
+          for (var i = 0; i < e.results.length; i++) text += e.results[i][0].transcript;
+          beiErgebnis(text.trim());
+        };
+        r.onerror = function (e) {
+          beiFehler(e.error === 'not-allowed'
+            ? 'Kein Zugriff aufs Mikrofon — im Browser erlauben.'
+            : 'Spracherkennung fehlgeschlagen: ' + e.error);
+        };
+        try { r.start(); } catch (err) { beiFehler(String(err)); return null; }
+        return r;
+      },
+
+      sprich: function (text, sprache, beiEnde) {
+        if (!synth) { if (beiEnde) beiEnde(); return; }
+        this.stopp();
+        var u = new SpeechSynthesisUtterance(text);
+        u.lang = sprache;
+        u.onend = function () { laeuft = null; if (beiEnde) beiEnde(); };
+        u.onerror = function () { laeuft = null; if (beiEnde) beiEnde(); };
+        laeuft = u;
+        synth.speak(u);
+      },
+
+      stopp: function () {
+        if (synth && (synth.speaking || synth.pending)) synth.cancel();
+        laeuft = null;
+      },
+
+      sprichtGerade: function () { return !!(synth && synth.speaking); }
+    };
+  }
+
+  var voice = BrowserVoice();
+  var SPRACHEN = { DE: 'de-DE', EN: 'en-US' };
+  var sprachModus = false;     // war die letzte Eingabe gesprochen?
+  var sprache = 'DE';
+  var erkennung = null;
+
+  function sprachcodeAktiv() { return SPRACHEN[sprache]; }
+
+  el.sprache.addEventListener('click', function () {
+    sprache = sprache === 'DE' ? 'EN' : 'DE';
+    el.sprache.textContent = sprache;
+    el.sprache.title = 'Erkennung und Ausgabe: ' + sprachcodeAktiv();
+  });
+
+  function hoerenStarten() {
+    if (busy || erkennung) return;
+    // Unterbrechbarkeit: läuft gerade eine Ausgabe, stoppt sie hier.
+    voice.stopp();
+    el.mic.classList.remove('is-spricht');
+
+    if (!voice.sttVerfuegbar) {
+      meldung('Dieser Browser kann keine Spracherkennung. Chrome kann es.');
+      return;
+    }
+    el.mic.classList.add('is-hoert');
+    meldung('Ich höre… loslassen zum Senden.');
+    erkennung = voice.hoere(sprachcodeAktiv(), function (text) {
+      hoerenBeenden();
+      if (!text) { meldung('Nichts verstanden.'); return; }
+      sprachModus = true;
+      el.input.value = '';
+      send(text);
+    }, function (fehler) {
+      hoerenBeenden();
+      meldung(fehler);
+    });
+  }
+
+  function hoerenBeenden() {
+    el.mic.classList.remove('is-hoert');
+    if (erkennung) { try { erkennung.stop(); } catch (e) { /* schon aus */ } }
+    erkennung = null;
+  }
+
+  el.mic.addEventListener('mousedown', hoerenStarten);
+  el.mic.addEventListener('touchstart', function (e) { e.preventDefault(); hoerenStarten(); });
+  ['mouseup', 'mouseleave', 'touchend'].forEach(function (ereignis) {
+    el.mic.addEventListener(ereignis, function () {
+      if (erkennung) hoerenBeenden();
+    });
+  });
+  // Tastatur: Leertaste oder Enter auf dem Knopf hält ebenfalls.
+  el.mic.addEventListener('keydown', function (e) {
+    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); hoerenStarten(); }
+  });
+  el.mic.addEventListener('keyup', function (e) {
+    if (e.key === ' ' || e.key === 'Enter') hoerenBeenden();
+  });
+
+  function lieseVor(text) {
+    if (!voice.ttsVerfuegbar || !text) return;
+    el.mic.classList.add('is-spricht');
+    el.mic.setAttribute('aria-label', 'Vorlesen abbrechen');
+    voice.sprich(text, sprachcodeAktiv(), function () {
+      el.mic.classList.remove('is-spricht');
+      el.mic.setAttribute('aria-label', 'Zum Sprechen gedrückt halten');
+    });
+  }
+
+  if (!voice.sttVerfuegbar) {
+    el.mic.disabled = true;
+    el.mic.title = 'Dieser Browser kann keine Spracherkennung (Chrome kann es).';
+  }
 
   // --- Ansichten (Phase 7) ------------------------------------------------
 

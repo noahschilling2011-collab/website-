@@ -118,6 +118,7 @@ async def fuehre_task_aus(
     agenten: dict[str, ToolAgent] | None = None,
     task: Task | None = None,
     laufzeit: Laufzeit | None = None,
+    antwortstil: str = "",
 ) -> Task:
     laufzeit = laufzeit or Laufzeit()
     task = task or Task(goal=ziel, budget=budget)
@@ -141,7 +142,7 @@ async def fuehre_task_aus(
             await laufzeit.on_call(aufruf)
 
     verfuegbar = agenten or baue_agenten(
-        provider, max_permission=max_permission,
+        provider, max_permission=max_permission, antwortstil=antwortstil,
         on_reply=buche, on_call=buche_werkzeug,
         bestaetigung=laufzeit.bestaetigung, audit=laufzeit.audit,
     )
@@ -156,7 +157,8 @@ async def fuehre_task_aus(
 
     try:
         return await _lauf(
-            provider, task, budget, kosten, verfuegbar, laufzeit, buche, ctx
+            provider, task, budget, kosten, verfuegbar, laufzeit, buche, ctx,
+            antwortstil,
         )
     finally:
         delegationskontext.reset(marke)
@@ -171,6 +173,7 @@ async def _lauf(
     laufzeit: Laufzeit,
     buche: Callable[[LLMReply], Awaitable[None]],
     ctx: DelegationsKontext,
+    antwortstil: str = "",
 ) -> Task:
     ziel = task.goal
     await laufzeit.task(task)
@@ -269,7 +272,7 @@ async def _lauf(
         return task
 
     task.result = await _fasse_zusammen(
-        provider, task, erledigt, gescheitert, buche
+        provider, task, erledigt, gescheitert, buche, antwortstil
     )
     if task.status == "running":
         task.status = "done" if not gescheitert else "failed"
@@ -283,6 +286,7 @@ async def _fasse_zusammen(
     erledigt: list[Step],
     gescheitert: list[Step],
     buche: Callable[[LLMReply], Awaitable[None]],
+    antwortstil: str = "",
 ) -> str:
     teile = [f"Ziel: {task.goal}", "", "Ergebnisse der Schritte:"]
     quellen: list[str] = []
@@ -298,7 +302,8 @@ async def _fasse_zusammen(
 
     try:
         reply = await provider.complete(
-            [LLMMessage("user", "\n".join(teile))], system=ABSCHLUSS_PROMPT
+            [LLMMessage("user", "\n".join(teile))],
+            system=ABSCHLUSS_PROMPT + antwortstil,
         )
         await buche(reply)
         text = reply.text.strip()
@@ -314,7 +319,7 @@ async def _fasse_zusammen(
     # Das Abrufdatum ist der heutige Tag: die Seiten wurden in diesem Lauf
     # geholt. Es steht dran, weil ein Preis ohne Datum in drei Wochen falsch
     # ist, ohne dass man es merkt.
-    if quellen:
+    if quellen and not antwortstil:
         heute = time.strftime("%Y-%m-%d", time.gmtime())
         text += "\n\nQuellen:\n" + "\n".join(
             f"- {u} (abgerufen am {heute})" for u in quellen

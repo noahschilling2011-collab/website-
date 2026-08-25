@@ -22,6 +22,7 @@ from api.security import require_token
 from core import db, memory
 from core.contracts import Permission, Step, StepStatus, Task, TaskBudget, Tool
 from core.llm import LLMReply
+from core.agents import SPRACHSTIL
 from core.runner import Laufzeit, fuehre_task_aus
 from core.tools.dispatch import ToolCall
 
@@ -32,6 +33,9 @@ tasks_router = APIRouter(prefix="/api/tasks", dependencies=[Depends(require_toke
 
 class TaskCreate(BaseModel):
     goal: str = Field(min_length=1, max_length=10_000)
+    # Phase 9: im Sprachmodus muss die Antwort kuerzer sein - ein vorgelesener
+    # Absatz mit 500 Woertern ist unbrauchbar.
+    voice: bool = False
 
 
 class Bestaetigen(BaseModel):
@@ -215,7 +219,7 @@ def baue_laufzeit(request: Request, eintrag: "LaufenderTask") -> Laufzeit:
                     audit=audit, abbruch=abbruch)
 
 
-async def starte_task(request: Request, ziel: str) -> Task:
+async def starte_task(request: Request, ziel: str, *, voice: bool = False) -> Task:
     """Legt einen Task an und startet ihn im Hintergrund."""
     settings = request.app.state.settings
     registry: TaskRegistry = request.app.state.tasks
@@ -239,6 +243,7 @@ async def starte_task(request: Request, ziel: str) -> Task:
                 max_permission=Permission(settings.max_permission),
                 task=task,
                 laufzeit=baue_laufzeit(request, eintrag),
+                antwortstil=SPRACHSTIL if voice else "",
             )
         except asyncio.CancelledError:
             task.status = "cancelled"
@@ -322,7 +327,7 @@ async def post_task(request: Request, body: TaskCreate) -> dict[str, str]:
     ziel = body.goal.strip()
     if not ziel:
         raise HTTPException(status_code=422, detail="Das Ziel ist leer.")
-    task = await starte_task(request, ziel)
+    task = await starte_task(request, ziel, voice=body.voice)
     return {"task_id": task.id, "status": task.status}
 
 

@@ -17,6 +17,17 @@ from core.llm import LLMMessage, LLMProvider, LLMReply
 from core.tools.dispatch import Audit, Bestaetigung, ToolCall
 from core.tools.loop import run_tool_loop
 
+SPRACHSTIL = """
+
+SPRACHMODUS: Deine Antwort wird VORGELESEN, nicht gelesen.
+
+- Hoechstens drei Saetze. Wer zuhoert, kann nicht ueberfliegen.
+- Keine Aufzaehlungen, keine Ueberschriften, keine URLs im Fliesstext - das
+  klingt vorgelesen wie Kauderwelsch.
+- Zahlen ausschreiben, wo es die Verstaendlichkeit erhoeht.
+- Wenn die vollstaendige Antwort laenger waere: gib die Kernaussage und sag,
+  dass die Einzelheiten im Text stehen."""
+
 RECHERCHE_PROMPT = """Du bist der Research Agent von JARVIS.
 
 Du beantwortest genau den Arbeitsschritt, den du bekommst - nicht mehr.
@@ -203,6 +214,7 @@ def baue_agenten(
     provider: LLMProvider,
     *,
     max_permission: Permission,
+    antwortstil: str = "",
     on_reply: Callable[[LLMReply], Awaitable[None]] | None = None,
     on_call: Callable[[ToolCall], Awaitable[None]] | None = None,
     bestaetigung: Bestaetigung | None = None,
@@ -215,6 +227,10 @@ def baue_agenten(
     ein maechtigeres Werkzeug in die Liste schreibt, laesst der Dispatcher es
     nicht durch.
     """
+    def mit_stil(prompt: str) -> str:
+        """Haengt den Antwortstil an - im Sprachmodus die Kuerzungsregeln."""
+        return prompt + antwortstil
+
     hermes = ToolAgent(
         provider,
         name="hermes",
@@ -222,7 +238,7 @@ def baue_agenten(
             "Zerlegt einen groesseren Auftrag, gibt Teilauftraege an andere "
             "Agenten und fuehrt deren Ergebnisse zusammen."
         ),
-        system_prompt=HERMES_PROMPT,
+        system_prompt=mit_stil(HERMES_PROMPT),
         tools=["ask_agent", "calculator", "clock"],
         max_permission=Permission.LOCAL,
         can_call_agents=["research", "satellite"],
@@ -242,7 +258,7 @@ def baue_agenten(
                 "Ueberschwemmungen, Baustellen, Brandflaechen. Kennt seine "
                 "Aufloesungsgrenze und behauptet nichts darunter."
             ),
-            system_prompt=SATELLIT_PROMPT,
+            system_prompt=mit_stil(SATELLIT_PROMPT),
             tools=["satellite_search", "satellite_compare", "calculator", "clock"],
             max_permission=Permission.READ,
             vorpruefung=pruefe_anfrage,
@@ -256,7 +272,7 @@ def baue_agenten(
             description=(
                 "Recherchiert im Web und belegt jede Behauptung mit einer Quelle."
             ),
-            system_prompt=RECHERCHE_PROMPT,
+            system_prompt=mit_stil(RECHERCHE_PROMPT),
             tools=["web_search", "fetch_url"],
             max_permission=Permission.READ,
             on_reply=on_reply,
@@ -267,7 +283,7 @@ def baue_agenten(
             provider,
             name="jarvis",
             description="Erledigt einen Schritt mit den eigenen Werkzeugen.",
-            system_prompt=STANDARD_PROMPT,
+            system_prompt=mit_stil(STANDARD_PROMPT),
             tools=["clock", "calculator", "recall", "remember", "send_email"],
             max_permission=max_permission,
             on_reply=on_reply,

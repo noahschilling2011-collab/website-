@@ -3,7 +3,7 @@
 > Einzige Wahrheit über den Projektstand. Claude Code liest diese Datei zuerst
 > und aktualisiert sie am Ende jeder Phase. Von Hand korrigieren ist erlaubt.
 
-AKTUELL: Phase 8 — Satellite Agent
+AKTUELL: Phase 9 — Voice
 LETZTE ÄNDERUNG: 2026-08-25
 
 > **Abweichung von der Arbeitsweise, auf Ansage:** es werden alle Phasen
@@ -24,7 +24,7 @@ LETZTE ÄNDERUNG: 2026-08-25
 | 6 | Hermes                    | IN ARBEIT| –              |
 | 7 | Observability-Dashboard   | IN ARBEIT| –              |
 | 8 | Satellite Agent           | IN ARBEIT| –              |
-| 9 | Voice                     | GESPERRT | –              |
+| 9 | Voice                     | IN ARBEIT| –              |
 |10 | Härten & Verpacken        | GESPERRT | –              |
 
 Status-Werte: GESPERRT / OFFEN / IN ARBEIT / FERTIG
@@ -225,6 +225,31 @@ ist vor dem ersten echten Aufruf zu bestätigen.
 
 **Gefiltert wird serverseitig** — erst 200 Szenen holen und lokal filtern wäre
 bei Kontingenten die falsche Reihenfolge.
+
+## Phase 9 — Voice
+
+| # | Kriterium | Stand |
+|---|---|---|
+| 1 | Taste halten, sprechen, loslassen → Transkript im Chat, Task startet | ✗ **nicht ausgeführt** — Headless-Chromium hat kein Mikrofon |
+| 2 | Antwort wird vorgelesen und lässt sich abbrechen | ✗ **nicht ausgeführt** — keine Sprachsynthese im Testbrowser |
+| 3 | Antwort im Sprachmodus kürzer als im Textmodus, vom Systemprompt erzwungen | ✓ backendseitig geprüft |
+| 4 | Deutsch und Englisch funktionieren beide | ◐ Umschaltung gebaut und im Quelltext geprüft, nicht gesprochen getestet |
+
+Gebaut: `SPRACHSTIL` (höchstens drei Sätze, keine Aufzählungen, keine URLs im
+Fließtext), `voice`-Flag an `POST /api/tasks`, `VoiceProvider`-Abstraktion im
+UI über die Web Speech API, Push-to-Talk-Knopf, Sprachumschaltung DE/EN.
+
+**Im Sprachmodus hängt keine Quellenliste unter der Antwort** — vorgelesene
+URLs sind unbrauchbar. Im Textmodus bleibt sie.
+
+**Kein Wake Word, kein Streaming-STT** — beides ist in dieser Phase
+ausdrücklich verboten. `continuous = false` und `interimResults = false` sind
+die zwei Zeilen, die das sicherstellen; ein Test prüft sie.
+
+**Was ich nicht testen konnte:** Spracherkennung und Sprachausgabe laufen im
+Browser. Headless-Chromium hat weder Mikrofon noch Sprachsynthese. DoD 1, 2
+und 4 brauchen einen echten Browser mit Mikrofon — das musst du selbst
+ausprobieren.
 
 ## Offene Blocker
 
