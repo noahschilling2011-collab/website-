@@ -3,7 +3,7 @@
 > Einzige Wahrheit über den Projektstand. Claude Code liest diese Datei zuerst
 > und aktualisiert sie am Ende jeder Phase. Von Hand korrigieren ist erlaubt.
 
-AKTUELL: Phase 2 — Tool-System
+AKTUELL: Phase 3 — Memory
 LETZTE ÄNDERUNG: 2026-08-25
 
 > **Abweichung von der Arbeitsweise, auf Ansage:** es werden alle Phasen
@@ -18,7 +18,7 @@ LETZTE ÄNDERUNG: 2026-08-25
 |---|---------------------------|----------|----------------|
 | 1 | Walking Skeleton          | IN ARBEIT| –              |
 | 2 | Tool-System               | IN ARBEIT| –              |
-| 3 | Memory                    | GESPERRT | –              |
+| 3 | Memory                    | IN ARBEIT| –              |
 | 4 | Planner + Research Agent  | GESPERRT | –              |
 | 5 | Permissions & Bestätigung | GESPERRT | –              |
 | 6 | Hermes                    | GESPERRT | –              |
@@ -66,6 +66,31 @@ unbekannte Namen und `9**9**9` — je ein Test.
 (`X-Subscription-Token`) und Antwortpfade
 (`web.results[].{title,url,description}`) stammen aus der offiziellen Doku.
 
+## Phase 3 — Memory
+
+| # | Kriterium | Stand |
+|---|---|---|
+| 1 | Merk-dir-Satz erzeugt einen `facts`-Eintrag | ✓ über den echten Endpunkt, Modellzug geskriptet |
+| 2 | Nach Neustart korrekte Antwort, Memory-Lookup im Log sichtbar | ◐ der Fakt landet nach dem Neustart nachweislich im Systemprompt; die Antwort selbst gibt das Modell |
+| 3 | Nach dem Löschen halluziniert das Modell die Antwort nicht | ✓ nach dem Löschen steht nichts mehr im Kontext — geprüft |
+| 4 | `task_log` hat nach drei Tasks drei Zeilen | ✓ |
+| 5 | Widersprechender Fakt wird als Konflikt angezeigt, nicht stumm überschrieben | ✓ beide Stände bleiben, Verweis + Anzeige im UI |
+
+Gebaut: `core/memory.py`, Tabellen `facts` und `task_log`, FTS5-Indizes über
+`facts` und `messages` (per Trigger aktuell gehalten), Werkzeuge `remember`
+(LOCAL) und `recall` (READ), Endpunkte `GET/POST/PATCH/DELETE /api/memory` und
+`GET /api/tasks`, Gedächtnis-Ansicht im UI mit Bearbeiten, Löschen und
+Konfliktauflösung.
+
+**Grenze der Konflikterkennung, ehrlich benannt:** eine Stichwortsuche kann
+keinen inhaltlichen Widerspruch erkennen. `finde_konflikt` meldet
+*Verdachtsfälle* — gleiche Kategorie, mindestens ein gemeinsames Inhaltswort —
+und überschreibt nie selbst. Aufgelöst wird von Hand. Lieber einmal zu viel
+gefragt als still das Falsche behalten.
+
+**Keine Embeddings.** FTS5 mit `unicode61 remove_diacritics 2`. Ein Vektorindex
+kommt, wenn eine Messung zeigt, dass das nicht reicht — nicht auf Verdacht.
+
 ## Offene Blocker
 
 - [ ] LLM-API-Key besorgen, als `LLM_API_KEY` in `.env` eintragen
@@ -89,6 +114,8 @@ unbekannte Namen und `9**9**9` — je ein Test.
 | `docs/contracts.md` aus dem Master-Prompt wiederhergestellt | Die Datei im Setup-Zip war nach 67 Bytes abgeschnitten. |
 | `prompt_hash` in `llm_calls`, obwohl PHASE-01 die Spalten abschließend nennt | 0.6 verlangt ihn. Auf Rückfrage bestätigt. |
 | `ChatResponse` trägt zusätzlich `tool_calls` | Phase 2 DoD 6 verlangt die Anzeige je Antwort; ohne das Feld müsste die Oberfläche nach jedem Zug den ganzen Verlauf neu holen. |
+| `facts` hat eine Spalte `conflicts_with`, die im Auftrag nicht steht | Ohne sie wäre der Konflikt aus DoD 5 nach dem Neuladen verschwunden. |
+| Chat-Agent auf `max_permission = LOCAL` angehoben (war READ) | `remember` schreibt lokal. EXTERNAL und SENSITIVE bleiben zu. |
 
 ## Entscheidungslog
 

@@ -79,6 +79,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         suche = registry.get("web_search")
         if suche is not None:
             suche.api_key = settings.search_api_key
+        for name in ("remember", "recall"):
+            werkzeug = registry.get(name)
+            if werkzeug is not None:
+                werkzeug.db_path = settings.db_path
         if not settings.search_api_key:
             log.info("SEARCH_API_KEY fehlt - web_search meldet das beim Aufruf.")
 

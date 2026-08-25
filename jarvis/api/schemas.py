@@ -5,6 +5,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from core.db import Message, ToolCallRow
+from core.memory import Fact, TaskLogRow
 
 
 class ChatRequest(BaseModel):
@@ -81,3 +82,55 @@ class HealthOut(BaseModel):
     database: str
     messages: int
     spend: SpendOut
+
+
+class FactOut(BaseModel):
+    id: int
+    text: str
+    category: str
+    source_message_id: int | None = None
+    created_at: str
+    confirmed: bool = False
+    conflicts_with: int | None = None
+
+    @classmethod
+    def of(cls, fact: Fact) -> "FactOut":
+        return cls(
+            id=fact.id, text=fact.text, category=fact.category,
+            source_message_id=fact.source_message_id,
+            created_at=fact.created_at, confirmed=fact.confirmed,
+            conflicts_with=fact.conflicts_with,
+        )
+
+
+class FactCreate(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+    category: str = Field(default="allgemein", max_length=64)
+
+
+class FactUpdate(BaseModel):
+    text: str | None = Field(default=None, min_length=1, max_length=2000)
+    category: str | None = Field(default=None, max_length=64)
+    confirmed: bool | None = None
+    # true loest den Widerspruch auf: der Verweis wird geloescht.
+    resolve_conflict: bool = False
+
+
+class FactCreated(BaseModel):
+    fact: FactOut
+    conflict: FactOut | None = None
+
+
+class TaskLogOut(BaseModel):
+    task_id: str
+    goal: str
+    outcome: str
+    summary: str = ""
+    created_at: str
+
+    @classmethod
+    def of(cls, row: TaskLogRow) -> "TaskLogOut":
+        return cls(
+            task_id=row.task_id, goal=row.goal, outcome=row.outcome,
+            summary=row.summary, created_at=row.created_at,
+        )

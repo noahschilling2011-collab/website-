@@ -4,7 +4,7 @@
 Timeout), `loop` dreht die Runde Modell → Tool → Modell.
 """
 
-from core.tools import builtin, search  # noqa: F401  - Registrierung per Import
+from core.tools import builtin, memory_tools, search  # noqa: F401  - Registrierung per Import
 from core.tools.dispatch import ToolCall, run_tool
 from core.tools.loop import run_tool_loop
 from core.tools.registry import all_tools, get, register, schemas_for

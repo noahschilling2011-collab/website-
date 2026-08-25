@@ -49,10 +49,10 @@ class Settings(BaseSettings):
 
     # --- Ab Phase 2 ---
     search_api_key: str = ""
-    # Obergrenze fuer den Chat-Agenten. 1 = READ: er darf lesen und rechnen,
-    # aber nichts schreiben und nichts nach aussen schicken. Hoeher zu gehen
-    # ist eine bewusste Entscheidung, keine Voreinstellung.
-    max_permission: int = 1
+    # Obergrenze fuer den Chat-Agenten. 2 = LOCAL: lesen, rechnen und lokal
+    # ins Gedaechtnis schreiben - aber nichts nach aussen schicken. EXTERNAL
+    # und SENSITIVE bleiben zu; das waere eine bewusste Entscheidung.
+    max_permission: int = 2
 
     # --- Budgets (0.5) ---
     budget_max_steps: int = 12

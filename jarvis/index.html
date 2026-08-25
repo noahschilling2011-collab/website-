@@ -182,6 +182,131 @@ button, input, textarea { font: inherit; color: inherit; }
 .msg-assistant .bubble { border-bottom-left-radius: 5px; }
 .msg-error .bubble { border-color: rgba(242, 114, 107, 0.45); color: #ffd9d6; }
 
+/* --- Gedächtnis-Ansicht (Phase 3) ---------------------------------------- */
+
+.kopf-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 200ms var(--ease), border-color 200ms var(--ease),
+              background 200ms var(--ease);
+}
+.kopf-btn:hover { color: var(--text-loud); border-color: var(--accent-line); }
+.kopf-btn[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.panel {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: 30;
+  width: min(460px, 92vw);
+  display: flex;
+  flex-direction: column;
+  border-width: 0 0 0 1px;
+  border-radius: 0;
+  transform: translateX(102%);
+  transition: transform 300ms var(--ease);
+}
+.panel.is-open { transform: none; }
+.panel-kopf {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--line);
+}
+.panel-kopf h2 {
+  margin: 0;
+  font-size: var(--step-0);
+  font-weight: 500;
+  color: var(--text-loud);
+}
+.panel-zu {
+  margin-left: auto;
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  border: 0; border-radius: 8px;
+  background: none; color: var(--text-dim); cursor: pointer;
+}
+.panel-zu:hover { background: var(--bg-2); color: var(--text); }
+.panel-koerper { flex: 1; min-height: 0; overflow-y: auto; padding: var(--s-4) var(--s-5); }
+.panel-fuss {
+  padding: var(--s-3) var(--s-5) max(var(--s-4), env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: var(--s-2);
+}
+.panel-fuss input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-0);
+}
+.panel-fuss button {
+  flex: none;
+  padding: 8px var(--s-3);
+  border: 0; border-radius: 10px;
+  background: var(--accent); color: var(--on-accent);
+  cursor: pointer;
+}
+
+.fakt {
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--line);
+  animation: rise 300ms var(--ease) both;
+}
+.fakt-text { overflow-wrap: anywhere; }
+.fakt-text[contenteditable="true"] {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+.fakt-zeile {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.fakt-kat {
+  padding: 1px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+.fakt-konflikt {
+  margin-top: 6px;
+  padding: 6px var(--s-3);
+  border-radius: 8px;
+  border: 1px solid rgba(242, 114, 107, 0.45);
+  background: rgba(242, 114, 107, 0.08);
+  color: #ffd9d6;
+  font-size: 11px;
+}
+.fakt-aktion {
+  border: 0; background: none; padding: 2px 6px;
+  color: var(--text-dim); cursor: pointer; font-size: 11px;
+  border-radius: 6px;
+}
+.fakt-aktion:hover { background: var(--bg-2); color: var(--text); }
+.fakt-aktion.is-loeschen:hover { color: var(--danger); }
+.panel-leer { color: var(--text-dim); text-align: center; padding: var(--s-6) 0; }
+
 /* --- Werkzeugaufrufe, aufklappbar (Phase 2, DoD 6) ------------------------ */
 
 .tools {
@@ -371,6 +496,13 @@ button, input, textarea { font: inherit; color: inherit; }
     </span>
     <h1 class="brand-name">JARVIS</h1>
     <span class="brand-phase" id="brand-phase"></span>
+    <button class="kopf-btn" id="btn-memory" type="button" aria-pressed="false">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <path d="M12 3a4 4 0 0 0-4 4v10a4 4 0 0 0 8 0V7a4 4 0 0 0-4-4zM8 9h8M8 15h8"></path>
+      </svg>
+      Gedächtnis
+    </button>
     <span class="status">
       <span class="dot" id="health-dot"></span>
       <span class="status-text" id="health-text">verbinde…</span>
@@ -392,6 +524,23 @@ button, input, textarea { font: inherit; color: inherit; }
     </form>
     <p class="hint" id="hint"></p>
   </div>
+
+  <aside class="panel glass" id="memory-panel" aria-label="Gedächtnis" aria-hidden="true">
+    <div class="panel-kopf">
+      <h2>Was JARVIS über dich weiß</h2>
+      <button class="panel-zu" id="memory-zu" type="button" aria-label="Schließen">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <path d="M6 6l12 12M18 6L6 18"></path>
+        </svg>
+      </button>
+    </div>
+    <div class="panel-koerper" id="memory-liste"></div>
+    <form class="panel-fuss" id="memory-form">
+      <input id="memory-neu" placeholder="Fakt hinzufügen…" aria-label="Neuer Fakt">
+      <button type="submit">Merken</button>
+    </form>
+  </aside>
 </div>
 
 <script>
@@ -415,7 +564,13 @@ button, input, textarea { font: inherit; color: inherit; }
     chip:      document.getElementById('model-chip'),
     phase:     document.getElementById('brand-phase'),
     healthDot: document.getElementById('health-dot'),
-    healthTxt: document.getElementById('health-text')
+    healthTxt: document.getElementById('health-text'),
+    memBtn:    document.getElementById('btn-memory'),
+    memPanel:  document.getElementById('memory-panel'),
+    memZu:     document.getElementById('memory-zu'),
+    memListe:  document.getElementById('memory-liste'),
+    memForm:   document.getElementById('memory-form'),
+    memNeu:    document.getElementById('memory-neu')
   };
 
   function api(path, options) {
@@ -632,6 +787,8 @@ button, input, textarea { font: inherit; color: inherit; }
         scrollDown();
         el.hint.textContent = 'Antwort in ' + ((Date.now() - started) / 1000).toFixed(1)
           + ' s · Vorgang ' + data.task_id;
+        // remember() kann gerade etwas eingetragen haben.
+        if (el.memPanel.classList.contains('is-open')) ladeGedaechtnis();
         return loadHealth();
       })
       .catch(function (err) {
@@ -666,6 +823,150 @@ button, input, textarea { font: inherit; color: inherit; }
     el.input.style.height = Math.min(el.input.scrollHeight, 200) + 'px';
   }
   el.input.addEventListener('input', autogrow);
+
+  // --- Gedächtnis (Phase 3) ---------------------------------------------
+
+  var fakten = [];
+
+  function faktNode(fakt) {
+    var box = document.createElement('div');
+    box.className = 'fakt';
+
+    var text = document.createElement('div');
+    text.className = 'fakt-text';
+    text.textContent = fakt.text;
+    box.appendChild(text);
+
+    if (fakt.conflicts_with) {
+      var partner = fakten.filter(function (f) { return f.id === fakt.conflicts_with; })[0];
+      var warnung = document.createElement('div');
+      warnung.className = 'fakt-konflikt';
+      warnung.textContent = 'Widerspricht möglicherweise #' + fakt.conflicts_with
+        + (partner ? ': ' + partner.text : '')
+        + ' — beide stehen noch da. Was gilt, entscheidest du.';
+      box.appendChild(warnung);
+    }
+
+    var zeile = document.createElement('div');
+    zeile.className = 'fakt-zeile';
+
+    var kat = document.createElement('span');
+    kat.className = 'fakt-kat';
+    kat.textContent = fakt.category;
+    zeile.appendChild(kat);
+
+    var wann = document.createElement('span');
+    wann.textContent = fakt.created_at.slice(0, 10);
+    zeile.appendChild(wann);
+
+    var luecke = document.createElement('span');
+    luecke.style.marginLeft = 'auto';
+    zeile.appendChild(luecke);
+
+    var bearbeiten = document.createElement('button');
+    bearbeiten.type = 'button';
+    bearbeiten.className = 'fakt-aktion';
+    bearbeiten.textContent = 'bearbeiten';
+    bearbeiten.addEventListener('click', function () {
+      if (text.isContentEditable) { text.blur(); return; }
+      text.contentEditable = 'true';
+      text.focus();
+      bearbeiten.textContent = 'speichern';
+    });
+    text.addEventListener('blur', function () {
+      if (!text.isContentEditable) return;
+      text.contentEditable = 'false';
+      bearbeiten.textContent = 'bearbeiten';
+      var neu = text.textContent.trim();
+      if (!neu || neu === fakt.text) { text.textContent = fakt.text; return; }
+      api('/api/memory/' + fakt.id, { method: 'PATCH', body: { text: neu } })
+        .then(ladeGedaechtnis)
+        .catch(function (err) { text.textContent = fakt.text; meldung(err.message); });
+    });
+    text.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); text.blur(); }
+      if (e.key === 'Escape') { text.textContent = fakt.text; text.blur(); }
+    });
+    zeile.appendChild(bearbeiten);
+
+    if (fakt.conflicts_with) {
+      var loesen = document.createElement('button');
+      loesen.type = 'button';
+      loesen.className = 'fakt-aktion';
+      loesen.textContent = 'Widerspruch erledigt';
+      loesen.addEventListener('click', function () {
+        api('/api/memory/' + fakt.id, { method: 'PATCH', body: { resolve_conflict: true } })
+          .then(ladeGedaechtnis).catch(function (err) { meldung(err.message); });
+      });
+      zeile.appendChild(loesen);
+    }
+
+    var loeschen = document.createElement('button');
+    loeschen.type = 'button';
+    loeschen.className = 'fakt-aktion is-loeschen';
+    loeschen.textContent = 'löschen';
+    loeschen.addEventListener('click', function () {
+      if (!window.confirm('Diesen Eintrag löschen?\n\n' + fakt.text)) return;
+      api('/api/memory/' + fakt.id, { method: 'DELETE' })
+        .then(ladeGedaechtnis).catch(function (err) { meldung(err.message); });
+    });
+    zeile.appendChild(loeschen);
+
+    box.appendChild(zeile);
+    return box;
+  }
+
+  function meldung(text) { el.hint.textContent = text; }
+
+  function ladeGedaechtnis() {
+    return api('/api/memory').then(function (liste) {
+      fakten = liste || [];
+      el.memListe.textContent = '';
+      if (!fakten.length) {
+        var leer = document.createElement('p');
+        leer.className = 'panel-leer';
+        leer.textContent = 'Noch nichts gemerkt. JARVIS merkt sich nur, worum du '
+          + 'ihn bittest — nicht den ganzen Chat.';
+        el.memListe.appendChild(leer);
+        return;
+      }
+      fakten.forEach(function (f, i) {
+        var node = faktNode(f);
+        node.style.animationDelay = Math.min(i, 8) * 40 + 'ms';
+        el.memListe.appendChild(node);
+      });
+    }).catch(function (err) { meldung('Gedächtnis: ' + err.message); });
+  }
+
+  function memoryOffen(offen) {
+    el.memPanel.classList.toggle('is-open', offen);
+    el.memPanel.setAttribute('aria-hidden', offen ? 'false' : 'true');
+    el.memBtn.setAttribute('aria-pressed', offen ? 'true' : 'false');
+    if (offen) ladeGedaechtnis();
+  }
+
+  el.memBtn.addEventListener('click', function () {
+    memoryOffen(!el.memPanel.classList.contains('is-open'));
+  });
+  el.memZu.addEventListener('click', function () { memoryOffen(false); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') memoryOffen(false);
+  });
+
+  el.memForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var text = el.memNeu.value.trim();
+    if (!text) return;
+    el.memNeu.value = '';
+    api('/api/memory', { method: 'POST', body: { text: text } })
+      .then(function (d) {
+        if (d && d.conflict) {
+          meldung('Achtung: widerspricht möglicherweise "' + d.conflict.text + '"');
+        }
+        return ladeGedaechtnis();
+      })
+      .catch(function (err) { meldung(err.message); });
+  });
 
   el.hint.textContent = 'Enter senden · Umschalt+Enter neue Zeile';
   showEmpty();

@@ -20,8 +20,9 @@ def test_schema_hat_die_erwarteten_tabellen(path):
                 "AND name NOT LIKE 'sqlite_%'"
             )
         }
-    # messages + llm_calls aus Phase 1, tool_calls kam mit Phase 2 dazu.
-    assert tabellen == {"messages", "llm_calls", "tool_calls"}
+    # Phase 1: messages, llm_calls · Phase 2: tool_calls
+    # Phase 3: facts, task_log (plus die FTS5-Schattentabellen).
+    assert {"messages", "llm_calls", "tool_calls", "facts", "task_log"} <= tabellen
 
 
 def test_llm_calls_hat_die_spalten_aus_phase_1_plus_prompt_hash(path):
