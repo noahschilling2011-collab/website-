@@ -82,6 +82,9 @@ class Settings(BaseSettings):
     llm_max_retries: int = 2
     llm_max_tokens: int = 4096
     history_limit: int = 40
+    # Phase 7: wie oft der Ereignisstrom ein Lebenszeichen schickt. In Tests
+    # klein, damit ein weggegangener Client sofort auffaellt.
+    sse_heartbeat_seconds: float = 20.0
     # Alias, damit JARVIS_DB_PATH das tut, was der Name verspricht. Ohne ihn
     # hiesse die Variable DB_PATH und ein JARVIS_DB_PATH waere still wirkungslos.
     db_path: Path = Field(

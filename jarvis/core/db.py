@@ -345,14 +345,16 @@ def save_step(db_path: Path | str, task_id: str, index: int, step) -> None:
     with session(db_path) as conn:
         now = utcnow()
         conn.execute(
-            "INSERT INTO steps (id, task_id, idx, description, agent, status, "
-            "result, note, attempts, max_attempts, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "INSERT INTO steps (id, task_id, idx, description, prompt, agent, "
+            "status, result, note, attempts, max_attempts, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(id) DO UPDATE SET status = excluded.status, "
+            "prompt = excluded.prompt, "
             "result = excluded.result, note = excluded.note, "
             "attempts = excluded.attempts, updated_at = excluded.updated_at",
             (
-                step.id, task_id, index, step.description, step.agent,
+                step.id, task_id, index, step.description,
+                getattr(step, "prompt", ""), step.agent,
                 step.status.value if hasattr(step.status, "value") else step.status,
                 json.dumps(step.result.to_dict(), ensure_ascii=False, default=str)
                 if step.result else None,

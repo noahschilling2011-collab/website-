@@ -3,7 +3,7 @@
 > Einzige Wahrheit über den Projektstand. Claude Code liest diese Datei zuerst
 > und aktualisiert sie am Ende jeder Phase. Von Hand korrigieren ist erlaubt.
 
-AKTUELL: Phase 6 — Hermes
+AKTUELL: Phase 7 — Observability-Dashboard
 LETZTE ÄNDERUNG: 2026-08-25
 
 > **Abweichung von der Arbeitsweise, auf Ansage:** es werden alle Phasen
@@ -22,7 +22,7 @@ LETZTE ÄNDERUNG: 2026-08-25
 | 4 | Planner + Research Agent  | IN ARBEIT| –              |
 | 5 | Permissions & Bestätigung | IN ARBEIT| –              |
 | 6 | Hermes                    | IN ARBEIT| –              |
-| 7 | Observability-Dashboard   | GESPERRT | –              |
+| 7 | Observability-Dashboard   | IN ARBEIT| –              |
 | 8 | Satellite Agent           | GESPERRT | –              |
 | 9 | Voice                     | GESPERRT | –              |
 |10 | Härten & Verpacken        | GESPERRT | –              |
@@ -161,6 +161,35 @@ sonst wäre `max_cost_eur` eine Zahl ohne Bedeutung.
 
 **Der Delegationskontext hängt an einem `ContextVar`**, nicht an einem
 Modulglobal: mehrere Tasks können gleichzeitig laufen.
+
+## Phase 7 — Observability-Dashboard
+
+| # | Kriterium | Stand |
+|---|---|---|
+| 1 | Live sehen, was läuft — SSE, kein Polling im Sekundentakt | ✓ `GET /api/events`, gegen einen echten uvicorn geprüft |
+| 2 | Alten Task öffnen, jeden Schritt inkl. Prompt und Antwort nachlesen | ✓ |
+| 3 | Kostenanzeige stimmt mit der Summe aus `llm_calls` überein | ✓ nachgerechnet, nicht geschätzt |
+| 4 | Laufender Task per Knopf abbrechen, stoppt tatsächlich | ✓ endet in `cancelled` mit übersprungenen Schritten |
+
+Gebaut: `api/events.py` (Ereignisbus + SSE), `GET /api/stats`,
+`GET /api/tool-calls`, `Step.prompt`, vier Ansichten im UI (Chat, Aufträge,
+Werkzeuge, Kosten) — weiterhin ohne Build-Step.
+
+**Ein Fund, der über den Test hinausgeht:** seit Phase 4 schrieb der Task-Pfad
+nichts mehr in `llm_calls`. Nur der alte Chat-Pfad tat das. Jede Kostenanzeige
+wäre zu niedrig gewesen — und DoD 5 aus Phase 1 war für Aufträge still
+zurückgefallen. Jetzt wird jeder Modellzug protokolliert, auch der des
+Planners.
+
+**Zweiter Fund:** die Rückfrage aus Phase 5 wurde sichtbar, bevor der Schritt
+in der Datenbank auf `needs_confirmation` stand. Ein Client sah kurz eine
+offene Frage zu einem Schritt, der laut Datenbank noch lief. Der Test war
+deshalb sporadisch rot — etwa jeder zwölfte Lauf.
+
+**SSE braucht einen echten Server.** Starlettes TestClient puffert den Strom
+und blockiert beim Verlassen des Kontexts. Die Stromtests starten deshalb
+einen uvicorn im Thread; die Netzsperre der Testsitzung lässt dafür genau
+`127.0.0.1` durch und sonst nichts.
 
 ## Offene Blocker
 

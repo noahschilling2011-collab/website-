@@ -43,6 +43,28 @@ log = logging.getLogger("jarvis")
 # Teilergebnis.
 PLAN_MAX_STEPS = 12
 
+
+class gebucht:
+    """Huellt einen Provider so ein, dass jeder Zug gebucht wird.
+
+    Der Planner ruft `complete` direkt, nicht ueber den Tool-Loop - ohne
+    diese Huelle waere sein Verbrauch unsichtbar.
+    """
+
+    def __init__(self, provider: LLMProvider, buche) -> None:  # noqa: ANN001
+        self._provider = provider
+        self._buche = buche
+        self.name = getattr(provider, "name", "?")
+        self.model = getattr(provider, "model", "")
+
+    async def complete(self, messages, *, system, tools=None):  # noqa: ANN001, ANN201
+        reply = await self._provider.complete(messages, system=system, tools=tools)
+        await self._buche(reply)
+        return reply
+
+    async def aclose(self) -> None:
+        return None
+
 ABSCHLUSS_PROMPT = """Du bist JARVIS und fasst die Ergebnisse eines Auftrags
 fuer den Nutzer zusammen.
 
@@ -68,6 +90,8 @@ class Laufzeit:
     on_step: Callable[[Task, int, Step], Awaitable[None]] | None = None
     on_call: Callable[[ToolCall], Awaitable[None]] | None = None
     on_subtask: Callable[[Task, str | None], Awaitable[None]] | None = None
+    # Jeder Modellzug - fuer das Kostenprotokoll in llm_calls.
+    on_reply: Callable[[LLMReply], Awaitable[None]] | None = None
     bestaetigung: Bestaetigung | None = None
     audit: Audit | None = None
     abbruch: asyncio.Event | None = None
@@ -105,6 +129,11 @@ async def fuehre_task_aus(
         """Jeder Modellzug zaehlt aufs Budget - auch der des Planners."""
         task.spent_tokens += reply.usage.in_tokens + reply.usage.out_tokens
         task.spent_cost_eur += kosten(reply.usage.in_tokens, reply.usage.out_tokens)
+        # ...und landet im Kostenprotokoll. Ohne das waere llm_calls seit
+        # Phase 4 unvollstaendig gewesen: der Task-Pfad haette nichts
+        # geschrieben, und jede Kostenanzeige waere zu niedrig.
+        if laufzeit.on_reply is not None:
+            await laufzeit.on_reply(reply)
 
     async def buche_werkzeug(aufruf: ToolCall) -> None:
         task.spent_tool_calls += 1
@@ -149,7 +178,7 @@ async def _lauf(
     # --- Plan --------------------------------------------------------------
     try:
         task.steps = await erstelle_plan(
-            provider,
+            gebucht(provider, buche),
             ziel,
             agenten={n: a.description for n, a in verfuegbar.items()
                      if n != "jarvis"},

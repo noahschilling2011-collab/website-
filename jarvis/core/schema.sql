@@ -169,6 +169,7 @@ CREATE TABLE IF NOT EXISTS steps (
     task_id       TEXT    NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
     idx           INTEGER NOT NULL,
     description   TEXT    NOT NULL,
+    prompt        TEXT    NOT NULL DEFAULT '',
     agent         TEXT,
     status        TEXT    NOT NULL,
     result        TEXT,                                -- JSON eines ToolResult

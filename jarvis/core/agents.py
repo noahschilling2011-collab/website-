@@ -100,6 +100,10 @@ class ToolAgent(Agent):
         if vorher:
             auftrag += "\n\nWas frühere Schritte ergeben haben:\n" + "\n".join(vorher)
 
+        # Genau das, was an das Modell geht - damit Phase 7 den Schritt
+        # nachlesen kann, ohne dass man es rekonstruieren muss.
+        step.prompt = f"[system]\n{self.system_prompt}\n\n[auftrag]\n{auftrag}"
+
         try:
             text, aufrufe, _ = await run_tool_loop(
                 self.provider,

@@ -32,16 +32,39 @@ class NetzwerkImTestVerboten(RuntimeError):
     pass
 
 
+# Die eigene Maschine ist erlaubt: der SSE-Test braucht einen echten uvicorn,
+# und der laeuft auf 127.0.0.1. Alles andere - insbesondere jeder
+# Modellanbieter - bleibt gesperrt.
+ERLAUBTE_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+
 @pytest.fixture(autouse=True)
 def kein_echtes_netz(monkeypatch: pytest.MonkeyPatch) -> None:
+    echt_sync = httpx.HTTPTransport.handle_request
+    echt_async = httpx.AsyncHTTPTransport.handle_async_request
+
+    def erlaubt(request) -> bool:  # noqa: ANN001
+        return (request.url.host or "") in ERLAUBTE_HOSTS
+
     def blocked(self, request, *args, **kwargs):  # noqa: ANN001
+        if erlaubt(request):
+            return echt_sync(self, request, *args, **kwargs)
+        raise NetzwerkImTestVerboten(
+            f"Test wollte wirklich ins Netz: {request.method} {request.url}. "
+            "Tests laufen gegen FakeLLMProvider oder httpx.MockTransport."
+        )
+
+    async def blocked_async(self, request, *args, **kwargs):  # noqa: ANN001
+        if erlaubt(request):
+            return await echt_async(self, request, *args, **kwargs)
         raise NetzwerkImTestVerboten(
             f"Test wollte wirklich ins Netz: {request.method} {request.url}. "
             "Tests laufen gegen FakeLLMProvider oder httpx.MockTransport."
         )
 
     monkeypatch.setattr(httpx.HTTPTransport, "handle_request", blocked)
-    monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", blocked)
+    monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request",
+                        blocked_async)
 
 
 @pytest.fixture(autouse=True)
@@ -55,6 +78,32 @@ def saubere_umgebung(monkeypatch: pytest.MonkeyPatch):
     get_settings.cache_clear()
 
 
+@pytest.fixture(autouse=True)
+def werkzeuge_zuruecksetzen():
+    """Werkzeug-Konfiguration je Test isolieren.
+
+    Die Registry haelt Werkzeug-*Instanzen*, und `create_app` schreibt ihnen
+    beim Start Pfade und Keys hinein. Laufen in einem Prozess zwei Apps -
+    etwa der Live-Server fuer die SSE-Tests neben einem TestClient -, dann
+    ueberschreibt der spaetere Start die Konfiguration des frueheren.
+
+    Das ist im Betrieb kein Problem (dort laeuft eine App), aber es macht
+    Tests voneinander abhaengig. Hier wird deshalb vor und nach jedem Test
+    aufgeraeumt.
+    """
+    from core.tools import registry
+
+    felder = ("api_key", "transport", "db_path", "outbox")
+    vorher = {
+        tool.name: {f: getattr(tool, f) for f in felder if hasattr(tool, f)}
+        for tool in registry.all_tools()
+    }
+    yield
+    for tool in registry.all_tools():
+        for feld, wert in vorher.get(tool.name, {}).items():
+            setattr(tool, feld, wert)
+
+
 @pytest.fixture
 def db_path(tmp_path: Path) -> Path:
     return tmp_path / "test.db"
@@ -63,4 +112,57 @@ def db_path(tmp_path: Path) -> Path:
 @pytest.fixture
 def settings(db_path: Path) -> Settings:
     # _env_file=None: die echte .env des Entwicklers bleibt aussen vor.
-    return Settings(_env_file=None, db_path=db_path, jarvis_token="test-token-123")
+    return Settings(
+        _env_file=None,
+        db_path=db_path,
+        jarvis_token="test-token-123",
+        # Kurz, damit ein Test nicht 20 s auf ein Lebenszeichen wartet.
+        sse_heartbeat_seconds=0.15,
+    )
+
+
+@pytest.fixture
+def live_server(settings):
+    """Ein echter uvicorn in einem Thread.
+
+    Fuer Server-Sent Events gibt es keinen Ersatz: Starlettes TestClient
+    puffert den Strom und blockiert beim Verlassen des Kontexts. Ein echter
+    Server ist hier nicht Luxus, sondern der einzige Weg, das Verhalten zu
+    pruefen, das der Nutzer bekommt.
+    """
+    import socket
+    import threading
+    import time
+
+    import uvicorn
+
+    from api.app import create_app
+
+    with socket.socket() as s_:
+        s_.bind(("127.0.0.1", 0))
+        port = s_.getsockname()[1]
+
+    app = create_app(settings)
+    config = uvicorn.Config(
+        app, host="127.0.0.1", port=port, log_level="warning",
+    )
+    server = uvicorn.Server(config)
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+
+    ende = time.monotonic() + 15
+    while not server.started and time.monotonic() < ende:
+        time.sleep(0.02)
+    if not server.started:
+        raise RuntimeError("uvicorn ist nicht hochgekommen")
+
+    try:
+        class LiveServer(str):
+            """Die URL - mit der App daran, damit Tests den Anbieter tauschen."""
+
+        server_url = LiveServer(f"http://127.0.0.1:{port}")
+        server_url.app = app
+        yield server_url
+    finally:
+        server.should_exit = True
+        thread.join(timeout=10)

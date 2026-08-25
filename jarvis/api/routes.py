@@ -15,7 +15,7 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 
 from api.schemas import (
     ChatRequest,
@@ -30,6 +30,7 @@ from api.schemas import (
     TaskLogOut,
     ToolCallOut,
 )
+from api.events import strom
 from api.security import require_token
 from core import db, memory
 from core.contracts import Permission
@@ -307,6 +308,113 @@ async def get_audit(request: Request) -> list[dict]:
         }
         for r in rows
     ]
+
+
+@api.get("/events")
+async def get_events(request: Request) -> StreamingResponse:
+    """Live-Strom der Task-Ereignisse (Phase 7, DoD 1).
+
+    Kein Polling im Sekundentakt. Der Browser liest das mit fetch und einem
+    Reader statt mit EventSource - so bleibt der Token im Header und landet
+    nicht in der URL und damit im Log.
+    """
+    return StreamingResponse(
+        strom(
+            request.app.state.events,
+            herzschlag=_settings(request).sse_heartbeat_seconds,
+            getrennt=request.is_disconnected,
+        ),
+        media_type="text/event-stream",
+        headers={
+            "cache-control": "no-cache",
+            # Falls je ein Reverse-Proxy davorkommt: nicht puffern.
+            "x-accel-buffering": "no",
+        },
+    )
+
+
+@api.get("/tool-calls")
+async def get_tool_calls(request: Request, limit: int = 100) -> list[dict]:
+    """Das Werkzeug-Log ueber alle Antworten hinweg."""
+    pfad = _settings(request).db_path
+
+    def lesen() -> list[dict]:
+        with db.session(pfad) as conn:
+            rows = conn.execute(
+                "SELECT * FROM tool_calls ORDER BY id DESC LIMIT ?",
+                (max(1, min(limit, 1000)),),
+            ).fetchall()
+        return [db.ToolCallRow.from_row(r).__dict__ for r in rows]
+
+    return await asyncio.to_thread(lesen)
+
+
+@api.get("/stats")
+async def get_stats(request: Request) -> dict:
+    """Kosten je Tag, Fehlerrate, Modellverbrauch (Phase 7).
+
+    Alles direkt aus `llm_calls` gerechnet - nicht geschaetzt und nicht
+    nebenher mitgezaehlt. Wenn die Zahl hier von der Summe abweicht, ist die
+    Zahl falsch, nicht die Tabelle.
+    """
+    pfad = _settings(request).db_path
+
+    def rechnen() -> dict:
+        with db.session(pfad) as conn:
+            pro_tag = [
+                dict(r) for r in conn.execute(
+                    "SELECT substr(created_at, 1, 10) AS tag, COUNT(*) AS calls, "
+                    "SUM(in_tokens) AS in_tokens, SUM(out_tokens) AS out_tokens, "
+                    "ROUND(SUM(cost_eur), 6) AS cost_eur, "
+                    "SUM(CASE WHEN ok = 0 THEN 1 ELSE 0 END) AS fehler "
+                    "FROM llm_calls GROUP BY tag ORDER BY tag DESC LIMIT 30"
+                )
+            ]
+            pro_modell = [
+                dict(r) for r in conn.execute(
+                    "SELECT model, COUNT(*) AS calls, SUM(in_tokens) AS in_tokens, "
+                    "SUM(out_tokens) AS out_tokens, ROUND(SUM(cost_eur), 6) AS cost_eur "
+                    "FROM llm_calls GROUP BY model ORDER BY calls DESC"
+                )
+            ]
+            gesamt = dict(conn.execute(
+                "SELECT COUNT(*) AS calls, "
+                "COALESCE(SUM(in_tokens), 0) AS in_tokens, "
+                "COALESCE(SUM(out_tokens), 0) AS out_tokens, "
+                "ROUND(COALESCE(SUM(cost_eur), 0), 6) AS cost_eur, "
+                "SUM(CASE WHEN ok = 0 THEN 1 ELSE 0 END) AS fehler "
+                "FROM llm_calls"
+            ).fetchone())
+            werkzeuge = [
+                dict(r) for r in conn.execute(
+                    "SELECT name, COUNT(*) AS calls, "
+                    "SUM(CASE WHEN ok = 0 THEN 1 ELSE 0 END) AS fehler, "
+                    "ROUND(AVG(duration_ms)) AS ms "
+                    "FROM tool_calls GROUP BY name ORDER BY calls DESC"
+                )
+            ]
+            tasks = dict(conn.execute(
+                "SELECT COUNT(*) AS gesamt, "
+                "SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) AS done, "
+                "SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed, "
+                "SUM(CASE WHEN status = 'aborted_budget' THEN 1 ELSE 0 END) "
+                "AS aborted_budget, "
+                "SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled "
+                "FROM tasks"
+            ).fetchone())
+
+        calls = gesamt["calls"] or 0
+        fehler = gesamt["fehler"] or 0
+        return {
+            "total": {**gesamt, "fehler": fehler,
+                      "fehlerrate": round(fehler / calls, 4) if calls else 0.0},
+            "per_day": pro_tag,
+            "per_model": pro_modell,
+            "per_tool": werkzeuge,
+            "tasks": tasks,
+        }
+
+    return await asyncio.to_thread(rechnen)
 
 
 @router.get("/", include_in_schema=False)

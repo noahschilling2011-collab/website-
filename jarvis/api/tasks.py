@@ -81,7 +81,9 @@ class TaskRegistry:
 
 def baue_laufzeit(request: Request, eintrag: "LaufenderTask") -> Laufzeit:
     """Verdrahtet die Fortschrittsmeldungen des Runners mit der Datenbank."""
-    pfad = request.app.state.settings.db_path
+    settings = request.app.state.settings
+    pfad = settings.db_path
+    bus = request.app.state.events
     task, abbruch = eintrag.task, eintrag.abbruch
 
     ENDZUSTAENDE = ("done", "failed", "aborted_budget", "cancelled")
@@ -94,9 +96,17 @@ def baue_laufzeit(request: Request, eintrag: "LaufenderTask") -> Laufzeit:
         if t.status in ENDZUSTAENDE:
             return
         await asyncio.to_thread(db.save_task, pfad, t)
+        bus.publish("task", {"id": t.id, "goal": t.goal, "status": t.status,
+                             "depth": t.depth, "spent_tokens": t.spent_tokens,
+                             "spent_cost_eur": round(t.spent_cost_eur, 6),
+                             "spent_tool_calls": t.spent_tool_calls})
 
     async def on_step(t: Task, i: int, s: Step) -> None:
         await asyncio.to_thread(db.save_step, pfad, t.id, i, s)
+        bus.publish("step", {"task_id": t.id, "index": i, "id": s.id,
+                             "description": s.description.split("\n")[0],
+                             "agent": s.agent, "status": s.status.value,
+                             "attempts": s.attempts, "note": s.note})
 
     async def on_call(aufruf: ToolCall) -> None:
         ergebnis = aufruf.result
@@ -110,6 +120,21 @@ def baue_laufzeit(request: Request, eintrag: "LaufenderTask") -> Laufzeit:
             duration_ms=(ergebnis.duration_ms if ergebnis else 0),
         )
         eintrag.aufruf_ids.append(zeile.id)
+        bus.publish("tool", {"task_id": task.id, "name": aufruf.name,
+                             "arguments": aufruf.arguments,
+                             "ok": bool(ergebnis and ergebnis.ok),
+                             "duration_ms": ergebnis.duration_ms if ergebnis else 0})
+
+    async def on_reply(reply: LLMReply) -> None:
+        """Jeder Modellzug in llm_calls - die Kostentabelle ist die Wahrheit."""
+        await asyncio.to_thread(
+            db.log_llm_call, pfad,
+            model=reply.model, prompt_hash=reply.prompt_hash,
+            in_tokens=reply.usage.in_tokens, out_tokens=reply.usage.out_tokens,
+            cost_eur=settings.cost_eur(reply.usage.in_tokens,
+                                       reply.usage.out_tokens),
+            duration_ms=reply.duration_ms, ok=True,
+        )
 
     async def on_subtask(unterauftrag: Task, parent_id: str | None) -> None:
         """Jeder Unterauftrag wird eigenstaendig persistiert.
@@ -140,8 +165,7 @@ def baue_laufzeit(request: Request, eintrag: "LaufenderTask") -> Laufzeit:
             (s for s in task.steps if s.status is StepStatus.RUNNING), None
         )
         zukunft: asyncio.Future = asyncio.get_running_loop().create_future()
-        eintrag.antwort = zukunft
-        eintrag.offene_frage = {
+        frage = {
             "tool": tool.name,
             "permission": tool.permission.name,
             "arguments": argumente,
@@ -150,11 +174,19 @@ def baue_laufzeit(request: Request, eintrag: "LaufenderTask") -> Laufzeit:
             "timeout_s": BESTAETIGUNG_TIMEOUT_S,
         }
 
+        # Erst den Schritt festschreiben, dann die Frage sichtbar machen.
+        # Andersherum sieht ein Client kurz eine offene Rueckfrage zu einem
+        # Schritt, der laut Datenbank noch laeuft - ein Zustand, den es nicht
+        # gibt.
         if schritt is not None:
             schritt.status = StepStatus.NEEDS_CONFIRMATION
             schritt.note = vorschau
             await on_step(task, task.steps.index(schritt), schritt)
         await on_task(task)
+
+        eintrag.antwort = zukunft
+        eintrag.offene_frage = frage
+        bus.publish("confirmation", {"task_id": task.id, **frage})
 
         try:
             entschieden = await asyncio.wait_for(
@@ -178,7 +210,8 @@ def baue_laufzeit(request: Request, eintrag: "LaufenderTask") -> Laufzeit:
         return bool(entschieden)
 
     return Laufzeit(on_task=on_task, on_step=on_step, on_call=on_call,
-                    on_subtask=on_subtask, bestaetigung=bestaetigung,
+                    on_subtask=on_subtask, on_reply=on_reply,
+                    bestaetigung=bestaetigung,
                     audit=audit, abbruch=abbruch)
 
 
@@ -234,6 +267,14 @@ async def starte_task(request: Request, ziel: str) -> Task:
             )
             # Jetzt erst: der Task ist fertig UND alles ist geschrieben.
             await asyncio.to_thread(db.save_task, settings.db_path, task)
+            request.app.state.events.publish("task", {
+                "id": task.id, "goal": task.goal, "status": task.status,
+                "depth": task.depth, "spent_tokens": task.spent_tokens,
+                "spent_cost_eur": round(task.spent_cost_eur, 6),
+                "spent_tool_calls": task.spent_tool_calls,
+                "result": task.result, "abort_reason": task.abort_reason,
+                "final": True,
+            })
             registry.remove(task.id)
 
     eintrag.future = asyncio.create_task(lauf())
@@ -263,6 +304,7 @@ def task_als_dict(row: dict[str, Any]) -> dict[str, Any]:
                 "id": s["id"],
                 "index": s["idx"],
                 "description": s["description"],
+                "prompt": s["prompt"],
                 "agent": s["agent"],
                 "status": s["status"],
                 "note": s["note"],

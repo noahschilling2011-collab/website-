@@ -13,6 +13,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from api.events import EventBus
 from api.routes import api, router
 from api.tasks import TaskRegistry, tasks_router
 from api.security import ensure_token
@@ -119,6 +120,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.index_path = INDEX_PATH
     app.state.tasks = TaskRegistry()
+    app.state.events = EventBus()
     app.state.token, app.state.token_generated = ensure_token(settings.jarvis_token)
 
     @app.exception_handler(LLMError)

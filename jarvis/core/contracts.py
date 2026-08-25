@@ -80,6 +80,11 @@ class Step:
     result: ToolResult | None = None
     attempts: int = 0
     max_attempts: int = 2
+    # ERGAENZT gegenueber docs/contracts.md: was der Agent tatsaechlich
+    # bekommen hat. Phase 7 DoD 2 verlangt, jeden Schritt "inkl. Prompt und
+    # Antwort" nachlesen zu koennen. Der Hash in llm_calls (0.6) bleibt, wo er
+    # ist - er dient der Kostenrechnung, nicht der Nachschau.
+    prompt: str = ""
     # ERGAENZT gegenueber docs/contracts.md: die Begruendung der Verifikation.
     # Ohne sie steht im UI zwar FAILED, aber nicht warum - und der naechste
     # Versuch bekommt nicht gesagt, was gefehlt hat. Rein additiv, mit

@@ -154,9 +154,11 @@ button, input, textarea { font: inherit; color: inherit; }
 }
 
 .thread {
+  /* display kommt aus .thread.is-active - sonst bleibt der Chat sichtbar,
+     wenn eine andere Ansicht aktiv ist. */
+  display: none;
   overflow-y: auto;
   padding: var(--s-5) var(--s-5) var(--s-6);
-  display: flex;
   flex-direction: column;
   gap: var(--s-4);
   scroll-behavior: smooth;
@@ -388,6 +390,85 @@ button, input, textarea { font: inherit; color: inherit; }
   50%      { box-shadow: 0 0 0 5px rgba(242, 181, 68, 0); }
 }
 
+/* --- Ansichten (Phase 7) -------------------------------------------------- */
+
+.tabs { display: flex; gap: 2px; }
+.tab {
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 200ms var(--ease), background 200ms var(--ease);
+}
+.tab:hover { color: var(--text-loud); }
+.tab[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); }
+
+.view { display: none; overflow-y: auto; padding: var(--s-5); }
+.view.is-active { display: block; }
+.thread.is-active { display: flex; }
+
+.karte {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-1);
+  padding: var(--s-4);
+  margin-bottom: var(--s-3);
+  animation: rise 300ms var(--ease) both;
+}
+.karte h3 {
+  margin: 0 0 var(--s-2);
+  font-size: var(--step-0);
+  font-weight: 500;
+  color: var(--text-loud);
+}
+.karte-zeile {
+  display: flex;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.zustand {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+}
+.zustand.is-done { color: var(--ok); border-color: rgba(95,207,142,0.4); }
+.zustand.is-failed, .zustand.is-aborted_budget { color: var(--danger); border-color: rgba(242,114,107,0.4); }
+.zustand.is-running, .zustand.is-pending { color: var(--accent); border-color: var(--accent-line); }
+
+.tabelle { width: 100%; border-collapse: collapse; font-size: var(--step--1); }
+.tabelle th, .tabelle td {
+  text-align: left;
+  padding: 6px var(--s-2);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.tabelle th { color: var(--text-dim); font-weight: 500; font-size: 11px; }
+.tabelle td.zahl, .tabelle th.zahl { text-align: right; font-variant-numeric: tabular-nums; }
+.tabelle-wrap { overflow-x: auto; }
+
+.kpi { display: flex; flex-wrap: wrap; gap: var(--s-3); margin-bottom: var(--s-4); }
+.kpi > div {
+  flex: 1 1 140px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: var(--s-3) var(--s-4);
+  background: var(--bg-1);
+}
+.kpi dt { font-size: 11px; color: var(--text-dim); margin: 0; }
+.kpi dd {
+  margin: 4px 0 0;
+  font-size: var(--step-1);
+  color: var(--text-loud);
+  font-variant-numeric: tabular-nums;
+}
+
+.balken { height: 4px; border-radius: 2px; background: var(--accent); margin-top: 4px; }
+
 /* --- Unteraufträge (Phase 6) --------------------------------------------- */
 
 .unter {
@@ -576,6 +657,7 @@ button, input, textarea { font: inherit; color: inherit; }
 .composer-wrap {
   padding: 0 var(--s-5) max(var(--s-5), env(safe-area-inset-bottom, 0px));
 }
+.composer-wrap[hidden] { display: none; }
 
 .composer {
   display: flex;
@@ -669,6 +751,12 @@ button, input, textarea { font: inherit; color: inherit; }
     </span>
     <h1 class="brand-name">JARVIS</h1>
     <span class="brand-phase" id="brand-phase"></span>
+    <nav class="tabs" role="tablist">
+      <button class="tab" id="tab-chat" role="tab" aria-selected="true">Chat</button>
+      <button class="tab" id="tab-tasks" role="tab" aria-selected="false">Aufträge</button>
+      <button class="tab" id="tab-tools" role="tab" aria-selected="false">Werkzeuge</button>
+      <button class="tab" id="tab-kosten" role="tab" aria-selected="false">Kosten</button>
+    </nav>
     <button class="kopf-btn" id="btn-memory" type="button" aria-pressed="false">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
            stroke-width="2" stroke-linecap="round" aria-hidden="true">
@@ -683,7 +771,10 @@ button, input, textarea { font: inherit; color: inherit; }
     </span>
   </header>
 
-  <div class="thread" id="thread" aria-live="polite" aria-busy="false"></div>
+  <div class="thread is-active" id="thread" aria-live="polite" aria-busy="false"></div>
+  <section class="view" id="view-tasks" aria-label="Aufträge"></section>
+  <section class="view" id="view-tools" aria-label="Werkzeuge"></section>
+  <section class="view" id="view-kosten" aria-label="Kosten"></section>
 
   <div class="composer-wrap">
     <form class="composer glass" id="composer">
@@ -1365,6 +1456,259 @@ button, input, textarea { font: inherit; color: inherit; }
       })
       .catch(function (err) { meldung(err.message); });
   });
+
+  // --- Ansichten (Phase 7) ------------------------------------------------
+
+  var ANSICHTEN = {
+    chat:   { tab: 'tab-chat',   el: 'thread',      laden: null },
+    tasks:  { tab: 'tab-tasks',  el: 'view-tasks',  laden: ladeTasks },
+    tools:  { tab: 'tab-tools',  el: 'view-tools',  laden: ladeWerkzeuge },
+    kosten: { tab: 'tab-kosten', el: 'view-kosten', laden: ladeKosten }
+  };
+  var aktiveAnsicht = 'chat';
+
+  function zeigeAnsicht(name) {
+    aktiveAnsicht = name;
+    Object.keys(ANSICHTEN).forEach(function (k) {
+      var a = ANSICHTEN[k];
+      document.getElementById(a.tab).setAttribute('aria-selected', k === name ? 'true' : 'false');
+      document.getElementById(a.el).classList.toggle('is-active', k === name);
+    });
+    // Die Eingabe gehört zum Chat, nicht zum Dashboard.
+    document.querySelector('.composer-wrap').hidden = name !== 'chat';
+    if (ANSICHTEN[name].laden) ANSICHTEN[name].laden();
+  }
+
+  Object.keys(ANSICHTEN).forEach(function (k) {
+    document.getElementById(ANSICHTEN[k].tab)
+      .addEventListener('click', function () { zeigeAnsicht(k); });
+  });
+
+  function karte(titel) {
+    var box = document.createElement('div');
+    box.className = 'karte';
+    if (titel) {
+      var h = document.createElement('h3');
+      h.textContent = titel;
+      box.appendChild(h);
+    }
+    return box;
+  }
+
+  function zustandNode(status) {
+    var s = document.createElement('span');
+    s.className = 'zustand is-' + status;
+    s.textContent = status;
+    return s;
+  }
+
+  function tabelle(spalten, zeilen) {
+    var wrap = document.createElement('div');
+    wrap.className = 'tabelle-wrap';
+    var t = document.createElement('table');
+    t.className = 'tabelle';
+    var kopf = document.createElement('tr');
+    spalten.forEach(function (sp) {
+      var th = document.createElement('th');
+      if (sp.zahl) th.className = 'zahl';
+      th.textContent = sp.titel;
+      kopf.appendChild(th);
+    });
+    t.appendChild(kopf);
+    zeilen.forEach(function (zeile) {
+      var tr = document.createElement('tr');
+      spalten.forEach(function (sp) {
+        var td = document.createElement('td');
+        if (sp.zahl) td.className = 'zahl';
+        td.textContent = sp.wert(zeile);
+        tr.appendChild(td);
+      });
+      t.appendChild(tr);
+    });
+    wrap.appendChild(t);
+    return wrap;
+  }
+
+  function leer(text) {
+    var p = document.createElement('p');
+    p.className = 'panel-leer';
+    p.textContent = text;
+    return p;
+  }
+
+  // --- Aufträge ---
+
+  function ladeTasks() {
+    var ziel = document.getElementById('view-tasks');
+    return api('/api/tasks').then(function (liste) {
+      ziel.textContent = '';
+      var oberste = (liste || []).filter(function (t) { return !t.parent_task_id; });
+      if (!oberste.length) { ziel.appendChild(leer('Noch kein Auftrag gelaufen.')); return; }
+      oberste.forEach(function (t) { ziel.appendChild(taskKarte(t)); });
+    }).catch(function (err) { ziel.textContent = ''; ziel.appendChild(leer(err.message)); });
+  }
+
+  function taskKarte(t) {
+    var box = karte(t.goal);
+
+    var zeile = document.createElement('div');
+    zeile.className = 'karte-zeile';
+    zeile.appendChild(zustandNode(t.status));
+    [t.created_at.replace('T', ' ').replace('Z', ''),
+     t.spent_tokens + ' Token',
+     t.spent_tool_calls + ' Werkzeuge',
+     (t.spent_cost_eur || 0).toFixed(4) + ' €'].forEach(function (text) {
+      var s = document.createElement('span');
+      s.textContent = text;
+      zeile.appendChild(s);
+    });
+    box.appendChild(zeile);
+
+    var details = document.createElement('details');
+    details.className = 'unter';
+    var summary = document.createElement('summary');
+    summary.textContent = 'Schritte, Prompt und Antwort';
+    details.appendChild(summary);
+
+    var geladen = false;
+    details.addEventListener('toggle', function () {
+      if (!details.open || geladen) return;
+      geladen = true;
+      api('/api/tasks/' + t.id).then(function (voll) {
+        details.appendChild(planNode(voll, null));
+        voll.steps.forEach(function (schritt) {
+          var d = document.createElement('details');
+          d.className = 'tools';
+          var sm = document.createElement('summary');
+          sm.textContent = 'Schritt ' + (schritt.index + 1) + ': '
+            + schritt.description.split('\n')[0];
+          d.appendChild(sm);
+
+          ['Prompt', 'Antwort'].forEach(function (was) {
+            var abschnitt = document.createElement('div');
+            abschnitt.className = 'tool';
+            var kopf = document.createElement('div');
+            kopf.className = 'tool-kopf';
+            var name = document.createElement('span');
+            name.className = 'tool-name';
+            name.textContent = was;
+            kopf.appendChild(name);
+            abschnitt.appendChild(kopf);
+            var pre = document.createElement('pre');
+            pre.textContent = was === 'Prompt'
+              ? (schritt.prompt || '(nicht aufgezeichnet)')
+              : ((schritt.result && schritt.result.display) || '(kein Ergebnis)');
+            abschnitt.appendChild(pre);
+            d.appendChild(abschnitt);
+          });
+
+          var aufrufe = (schritt.result && schritt.result.data
+                         && schritt.result.data.tool_calls) || [];
+          aufrufe.forEach(function (a) {
+            d.appendChild(toolNode({
+              name: a.name, arguments: a.arguments,
+              ok: a.result ? a.result.ok : false,
+              display: a.result ? a.result.display : '',
+              error: a.result ? a.result.error : null,
+              sources: a.result ? a.result.sources : [],
+              duration_ms: a.result ? a.result.duration_ms : 0
+            }));
+          });
+          details.appendChild(d);
+        });
+      }).catch(function (err) { details.appendChild(leer(err.message)); });
+    });
+    box.appendChild(details);
+    return box;
+  }
+
+  // --- Werkzeuge ---
+
+  function ladeWerkzeuge() {
+    var ziel = document.getElementById('view-tools');
+    return api('/api/tool-calls?limit=200').then(function (liste) {
+      ziel.textContent = '';
+      if (!liste || !liste.length) { ziel.appendChild(leer('Noch kein Werkzeug gelaufen.')); return; }
+      ziel.appendChild(tabelle([
+        { titel: 'Zeit', wert: function (r) { return r.created_at.slice(11, 19); } },
+        { titel: 'Werkzeug', wert: function (r) { return r.name; } },
+        { titel: 'Argumente', wert: function (r) { return argumentText(r.arguments).slice(0, 70); } },
+        { titel: 'ok', wert: function (r) { return r.ok ? '✓' : '✕'; } },
+        { titel: 'ms', zahl: true, wert: function (r) { return r.duration_ms; } }
+      ], liste));
+    }).catch(function (err) { ziel.textContent = ''; ziel.appendChild(leer(err.message)); });
+  }
+
+  // --- Kosten ---
+
+  function ladeKosten() {
+    var ziel = document.getElementById('view-kosten');
+    return api('/api/stats').then(function (st) {
+      ziel.textContent = '';
+
+      var kpi = document.createElement('dl');
+      kpi.className = 'kpi';
+      [['Modellaufrufe', st.total.calls],
+       ['Token gesamt', (st.total.in_tokens || 0) + (st.total.out_tokens || 0)],
+       ['Kosten gesamt', (st.total.cost_eur || 0).toFixed(4) + ' €'],
+       ['Fehlerrate', (st.total.fehlerrate * 100).toFixed(1) + ' %']
+      ].forEach(function (paar) {
+        var d = document.createElement('div');
+        var dt = document.createElement('dt'); dt.textContent = paar[0];
+        var dd = document.createElement('dd'); dd.textContent = paar[1];
+        d.appendChild(dt); d.appendChild(dd); kpi.appendChild(d);
+      });
+      ziel.appendChild(kpi);
+
+      var proTag = karte('Kosten pro Tag');
+      if (st.per_day.length) {
+        var max = Math.max.apply(null, st.per_day.map(function (r) { return r.cost_eur || 0; })) || 1;
+        proTag.appendChild(tabelle([
+          { titel: 'Tag', wert: function (r) { return r.tag; } },
+          { titel: 'Aufrufe', zahl: true, wert: function (r) { return r.calls; } },
+          { titel: 'Token', zahl: true, wert: function (r) { return (r.in_tokens || 0) + (r.out_tokens || 0); } },
+          { titel: 'Fehler', zahl: true, wert: function (r) { return r.fehler || 0; } },
+          { titel: '€', zahl: true, wert: function (r) { return (r.cost_eur || 0).toFixed(4); } }
+        ], st.per_day));
+        st.per_day.slice(0, 1).forEach(function (r) {
+          var b = document.createElement('div');
+          b.className = 'balken';
+          b.style.width = Math.round(((r.cost_eur || 0) / max) * 100) + '%';
+          proTag.appendChild(b);
+        });
+      } else { proTag.appendChild(leer('Noch keine Modellaufrufe.')); }
+      ziel.appendChild(proTag);
+
+      var proModell = karte('Verbrauch pro Modell');
+      proModell.appendChild(tabelle([
+        { titel: 'Modell', wert: function (r) { return r.model; } },
+        { titel: 'Aufrufe', zahl: true, wert: function (r) { return r.calls; } },
+        { titel: 'rein', zahl: true, wert: function (r) { return r.in_tokens; } },
+        { titel: 'raus', zahl: true, wert: function (r) { return r.out_tokens; } },
+        { titel: '€', zahl: true, wert: function (r) { return (r.cost_eur || 0).toFixed(4); } }
+      ], st.per_model));
+      ziel.appendChild(proModell);
+
+      var proWerkzeug = karte('Werkzeuge');
+      proWerkzeug.appendChild(tabelle([
+        { titel: 'Werkzeug', wert: function (r) { return r.name; } },
+        { titel: 'Aufrufe', zahl: true, wert: function (r) { return r.calls; } },
+        { titel: 'Fehler', zahl: true, wert: function (r) { return r.fehler || 0; } },
+        { titel: 'Ø ms', zahl: true, wert: function (r) { return r.ms || 0; } }
+      ], st.per_tool));
+      ziel.appendChild(proWerkzeug);
+
+      var aufträge = karte('Aufträge');
+      aufträge.appendChild(tabelle([
+        { titel: 'gesamt', zahl: true, wert: function (r) { return r.gesamt || 0; } },
+        { titel: 'done', zahl: true, wert: function (r) { return r.done || 0; } },
+        { titel: 'failed', zahl: true, wert: function (r) { return r.failed || 0; } },
+        { titel: 'Budget', zahl: true, wert: function (r) { return r.aborted_budget || 0; } },
+        { titel: 'abgebrochen', zahl: true, wert: function (r) { return r.cancelled || 0; } }
+      ], [st.tasks]));
+      ziel.appendChild(aufträge);
+    }).catch(function (err) { ziel.textContent = ''; ziel.appendChild(leer(err.message)); });
+  }
 
   el.hint.textContent = 'Enter senden · Umschalt+Enter neue Zeile';
   showEmpty();
