@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import Awaitable, Callable
 
 from core.agents import ToolAgent, baue_agenten
+from core.delegation import DelegationsKontext, kontext as delegationskontext
 from core.contracts import (
     Permission,
     Step,
@@ -66,6 +67,7 @@ class Laufzeit:
     on_task: Callable[[Task], Awaitable[None]] | None = None
     on_step: Callable[[Task, int, Step], Awaitable[None]] | None = None
     on_call: Callable[[ToolCall], Awaitable[None]] | None = None
+    on_subtask: Callable[[Task, str | None], Awaitable[None]] | None = None
     bestaetigung: Bestaetigung | None = None
     audit: Audit | None = None
     abbruch: asyncio.Event | None = None
@@ -115,6 +117,33 @@ async def fuehre_task_aus(
         bestaetigung=laufzeit.bestaetigung, audit=laufzeit.audit,
     )
 
+    # Der Delegationskontext gilt fuer den ganzen Lauf: er sagt ask_agent,
+    # in welchem Task es sich befindet und wie tief es noch gehen darf.
+    ctx = DelegationsKontext(
+        task=task, agenten=verfuegbar, max_depth=budget.max_depth,
+        on_subtask=laufzeit.on_subtask,
+    )
+    marke = delegationskontext.set(ctx)
+
+    try:
+        return await _lauf(
+            provider, task, budget, kosten, verfuegbar, laufzeit, buche, ctx
+        )
+    finally:
+        delegationskontext.reset(marke)
+
+
+async def _lauf(
+    provider: LLMProvider,
+    task: Task,
+    budget: TaskBudget,
+    kosten: Callable[[int, int], float],
+    verfuegbar: dict[str, ToolAgent],
+    laufzeit: Laufzeit,
+    buche: Callable[[LLMReply], Awaitable[None]],
+    ctx: DelegationsKontext,
+) -> Task:
+    ziel = task.goal
     await laufzeit.task(task)
 
     # --- Plan --------------------------------------------------------------
@@ -252,6 +281,13 @@ async def _fasse_zusammen(
 
     # Die Quellen haengen wir selbst an. Ob das Modell sie im Text zitiert, ist
     # eine Bitte; dass sie unter der Antwort stehen, ist eine Tatsache.
+    #
+    # Das Abrufdatum ist der heutige Tag: die Seiten wurden in diesem Lauf
+    # geholt. Es steht dran, weil ein Preis ohne Datum in drei Wochen falsch
+    # ist, ohne dass man es merkt.
     if quellen:
-        text += "\n\nQuellen:\n" + "\n".join(f"- {u}" for u in quellen)
+        heute = time.strftime("%Y-%m-%d", time.gmtime())
+        text += "\n\nQuellen:\n" + "\n".join(
+            f"- {u} (abgerufen am {heute})" for u in quellen
+        )
     return text

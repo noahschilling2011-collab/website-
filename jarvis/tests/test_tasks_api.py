@@ -17,9 +17,12 @@ TOKEN = {"X-Jarvis-Token": "test-token-123"}
 
 
 @pytest.fixture
-def suche_ohne_netz():
+def suche_ohne_netz(settings):
     suche = registry.get("web_search")
     alt = (suche.api_key, suche.transport)
+    # Der App-Start setzt den Key aus den Settings - sonst ueberschreibt er
+    # den hier gesetzten wieder mit dem leeren Wert.
+    settings.search_api_key = "test-key"
     suche.api_key = "test-key"
     suche.transport = httpx.MockTransport(lambda r: httpx.Response(200, json={
         "web": {"results": [{"title": "Quelle", "url": "https://example.org/q",

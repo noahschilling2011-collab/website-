@@ -111,6 +111,17 @@ def baue_laufzeit(request: Request, eintrag: "LaufenderTask") -> Laufzeit:
         )
         eintrag.aufruf_ids.append(zeile.id)
 
+    async def on_subtask(unterauftrag: Task, parent_id: str | None) -> None:
+        """Jeder Unterauftrag wird eigenstaendig persistiert.
+
+        Daraus entsteht der Baum aus DoD 3: Hermes -> research -> Werkzeuge.
+        """
+        await asyncio.to_thread(
+            db.save_task, pfad, unterauftrag, parent_task_id=parent_id
+        )
+        for i, schritt in enumerate(unterauftrag.steps):
+            await asyncio.to_thread(db.save_step, pfad, unterauftrag.id, i, schritt)
+
     async def audit(**felder: Any) -> None:
         await asyncio.to_thread(
             db.log_audit, pfad, task_id=task.id, **felder
@@ -167,7 +178,8 @@ def baue_laufzeit(request: Request, eintrag: "LaufenderTask") -> Laufzeit:
         return bool(entschieden)
 
     return Laufzeit(on_task=on_task, on_step=on_step, on_call=on_call,
-                    bestaetigung=bestaetigung, audit=audit, abbruch=abbruch)
+                    on_subtask=on_subtask, bestaetigung=bestaetigung,
+                    audit=audit, abbruch=abbruch)
 
 
 async def starte_task(request: Request, ziel: str) -> Task:

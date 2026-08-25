@@ -3,7 +3,7 @@
 > Einzige Wahrheit über den Projektstand. Claude Code liest diese Datei zuerst
 > und aktualisiert sie am Ende jeder Phase. Von Hand korrigieren ist erlaubt.
 
-AKTUELL: Phase 5 — Permissions & Bestätigung
+AKTUELL: Phase 6 — Hermes
 LETZTE ÄNDERUNG: 2026-08-25
 
 > **Abweichung von der Arbeitsweise, auf Ansage:** es werden alle Phasen
@@ -21,7 +21,7 @@ LETZTE ÄNDERUNG: 2026-08-25
 | 3 | Memory                    | IN ARBEIT| –              |
 | 4 | Planner + Research Agent  | IN ARBEIT| –              |
 | 5 | Permissions & Bestätigung | IN ARBEIT| –              |
-| 6 | Hermes                    | GESPERRT | –              |
+| 6 | Hermes                    | IN ARBEIT| –              |
 | 7 | Observability-Dashboard   | GESPERRT | –              |
 | 8 | Satellite Agent           | GESPERRT | –              |
 | 9 | Voice                     | GESPERRT | –              |
@@ -141,6 +141,26 @@ SENSITIVE bleibt zu.
 
 **Timeout:** eine unbeantwortete Rückfrage läuft nach 10 Minuten ab. Danach
 gilt der Task als `cancelled` — nicht als bestätigt.
+
+## Phase 6 — Hermes
+
+| # | Kriterium | Stand |
+|---|---|---|
+| 1 | Referenz-Task läuft durch und liefert eine Empfehlung mit Begründung | ◐ läuft mit geskripteten Modellzügen durch; die Empfehlung selbst formuliert das Modell |
+| 2 | Jeder Preis hat eine Quelle mit Abrufdatum; Preis ohne Quelle → Schritt fehlgeschlagen | ✓ als Regel in `core/verify.py`, Abrufdatum unter der Antwort |
+| 3 | Task-Baum im UI sichtbar (Hermes → Research → Tool-Calls) | ✓ Unteraufträge persistiert, im UI aufklappbar, rekursiv |
+| 4 | Gesamtkosten und Gesamttokens am Ende | ✓ inklusive dem, was Unteraufträge verbraucht haben |
+| 5 | Aus Tiefe 2 wird kein weiterer Agent gerufen — abgelehnt und geloggt | ✓ |
+| 6 | Der Task bleibt unter dem Default-Budget | ◐ mit Fake-Zügen ja; mit echten Modellaufrufen ungeprüft |
+
+Gebaut: `core/delegation.py` mit dem Werkzeug `ask_agent`, Agent `hermes`,
+Persistenz der Unteraufträge über `parent_task_id`, Baumansicht im UI.
+
+**Ein Unterauftrag bekommt kein eigenes Budget.** Er zählt aufs selbe —
+sonst wäre `max_cost_eur` eine Zahl ohne Bedeutung.
+
+**Der Delegationskontext hängt an einem `ContextVar`**, nicht an einem
+Modulglobal: mehrere Tasks können gleichzeitig laufen.
 
 ## Offene Blocker
 

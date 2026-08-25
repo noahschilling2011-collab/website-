@@ -21,6 +21,14 @@ from core.contracts import Step, ToolResult
 # Formulierungen, mit denen ein Modell sein Nichtwissen einraeumt. Ein Schritt,
 # der damit endet, hat sein Ziel nicht erreicht - auch wenn technisch alles
 # geklappt hat.
+# Phase 6, DoD 2: "Jeder Preis hat eine Quelle mit Abrufdatum. Preise ohne
+# Quelle -> Schritt gilt als fehlgeschlagen." Eine Zahl mit Waehrung ist genau
+# die Sorte Behauptung, die man nicht ungeprueft weiterreicht.
+PREIS = re.compile(
+    r"(?:€|EUR\b|\bEuro\b)\s*\d|\d[\d.,]*\s*(?:€|EUR\b|\bEuro\b)",
+    re.IGNORECASE,
+)
+
 AUFGEGEBEN = re.compile(
     r"\b(konnte nichts|nichts gefunden|keine (?:quelle|informationen|angaben|daten)"
     r"|nicht heraus(?:finden|gefunden)|kann ich nicht beantworten"
@@ -54,6 +62,13 @@ def verifiziere(step: Step, ergebnis: ToolResult | None) -> tuple[bool, str]:
             "Rechercheschritt ohne Quelle. Jede Tatsachenbehauptung braucht "
             "eine URL - such und lies die Seite, statt aus dem Gedaechtnis zu "
             "antworten."
+        )
+
+    if PREIS.search(text) and not ergebnis.sources:
+        return False, (
+            "Im Ergebnis stehen Preise, aber keine Quelle. Ein Preis ohne "
+            "Beleg ist wertlos - such die Seite, aus der die Zahl stammt, und "
+            "nenn sie."
         )
 
     if AUFGEGEBEN.search(text):

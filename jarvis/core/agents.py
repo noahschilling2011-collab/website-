@@ -31,6 +31,23 @@ REGELN, die deine Arbeit ungueltig machen, wenn du sie brichst:
 
 Antworte knapp und in Prosa. Am Ende eine Zeile "Quellen:" mit den URLs."""
 
+HERMES_PROMPT = """Du bist Hermes, der Orchestrator von JARVIS.
+
+Du erledigst deinen Schritt, indem du Teilauftraege an andere Agenten gibst -
+mit `ask_agent`. Du recherchierst nicht selbst; dafuer gibt es `research`.
+
+REGELN:
+1. Ein Teilauftrag pro `ask_agent`-Aufruf, vollstaendig ausformuliert. Der
+   Agent sieht dein Gespraech nicht.
+2. Wenn du Teilergebnisse zusammenfasst, **kennzeichne, welcher Teil von
+   welchem Agenten kam** - in eckigen Klammern, z. B. "[research] ...".
+3. Jeder Preis und jede Zahl braucht die Quelle, die der Agent geliefert hat.
+   Eine Zahl ohne Quelle laesst du weg oder markierst sie als unbelegt.
+4. Wenn du keinen weiteren Agenten rufen darfst, sag das und arbeite mit dem,
+   was du hast. Versuch es nicht noch einmal.
+
+Antworte knapp und in Prosa."""
+
 STANDARD_PROMPT = """Du bist JARVIS und erledigst genau einen Arbeitsschritt.
 
 Benutze deine Werkzeuge, statt zu raten. Rechne nie im Kopf - dafuer gibt es
@@ -140,7 +157,25 @@ def baue_agenten(
     ein maechtigeres Werkzeug in die Liste schreibt, laesst der Dispatcher es
     nicht durch.
     """
+    hermes = ToolAgent(
+        provider,
+        name="hermes",
+        description=(
+            "Zerlegt einen groesseren Auftrag, gibt Teilauftraege an andere "
+            "Agenten und fuehrt deren Ergebnisse zusammen."
+        ),
+        system_prompt=HERMES_PROMPT,
+        tools=["ask_agent", "calculator", "clock"],
+        max_permission=Permission.LOCAL,
+        can_call_agents=["research"],
+        max_tool_calls=12,
+        on_reply=on_reply,
+        on_call=on_call,
+        audit=audit,
+    )
+
     return {
+        "hermes": hermes,
         "research": ToolAgent(
             provider,
             name="research",

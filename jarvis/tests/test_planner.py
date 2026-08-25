@@ -20,10 +20,13 @@ OHNE_KOSTEN = lambda a, b: 0.0  # noqa: E731
 
 
 @pytest.fixture
-def suche_ohne_netz():
+def suche_ohne_netz(settings):
     """web_search und fetch_url gegen MockTransport statt gegen das Internet."""
     suche, holen = registry.get("web_search"), registry.get("fetch_url")
     alt = (suche.api_key, suche.transport, holen.transport)
+    # Der App-Start setzt den Key aus den Settings - sonst ueberschreibt er
+    # den hier gesetzten wieder mit dem leeren Wert.
+    settings.search_api_key = "test-key"
     suche.api_key = "test-key"
     suche.transport = httpx.MockTransport(lambda r: httpx.Response(200, json={
         "web": {"results": [{"title": "Quelle", "url": "https://example.org/q",
