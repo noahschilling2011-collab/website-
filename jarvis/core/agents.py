@@ -327,6 +327,27 @@ def baue_agenten(
             on_call=on_call,
             audit=audit,
         ),
+        # FIX-02 Schritt 2: die Weltlage ist ein AGENT, kein eigener Datenweg.
+        # Vorher rief api/weltlage.py den Provider direkt - vorbei an Budget,
+        # Audit und llm_calls. Als Agent gilt fuer sie, was fuer jeden anderen
+        # Schritt gilt.
+        "weltlage": ToolAgent(
+            provider,
+            name="weltlage",
+            description=(
+                "Liefert belegte Meldungen zu einem Land oder zur Weltlage. "
+                "Jede Meldung braucht Medium, Datum und Quell-URL; ohne die "
+                "wird sie verworfen. Antwortet als JSON."
+            ),
+            system_prompt=WELTLAGE_PROMPT,      # bewusst OHNE Sprachstil:
+                                                # die Antwort ist JSON, kein Fliesstext
+            tools=["wiki_lokal", "wiki_live", "wikidata", "web_search", "fetch_url"],
+            max_permission=Permission.READ,
+            max_tool_calls=12,
+            on_reply=on_reply,
+            on_call=on_call,
+            audit=audit,
+        ),
         "research": ToolAgent(
             provider,
             name="research",

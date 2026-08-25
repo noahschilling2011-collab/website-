@@ -132,7 +132,26 @@ def eintrag_fuer(client, **kw):
 
 
 def setze_antwort(client, roh_json):
-    client.app.state.provider = FakeLLMProvider(replies=[roh_json])
+    """Drei Zuege, weil die Weltlage seit FIX-02 Schritt 2 ein echter Auftrag ist.
+
+    Planner -> Schritt (der Agent 'weltlage' liefert das JSON) -> Zusammenfassung.
+    Vorher war es ein einziger Direktaufruf am Runner vorbei - genau das ist
+    weggefallen.
+    """
+    plan = json.dumps({"steps": [{"description": "Weltlage sammeln",
+                                  "agent": "weltlage"}]}, ensure_ascii=False)
+    client.app.state.provider = FakeLLMProvider(
+        replies=[plan, roh_json, "Zusammengefasst."])
+
+
+PLAN = json.dumps({"steps": [{"description": "Weltlage sammeln",
+                              "agent": "weltlage"}]}, ensure_ascii=False)
+
+
+def setze_roh(client, text):
+    """Wie setze_antwort, aber der Schritt liefert absichtlich Unbrauchbares."""
+    client.app.state.provider = FakeLLMProvider(
+        replies=[PLAN, text, "Zusammengefasst."])
 
 
 # --- Datenvertrag (Abschnitt 7) ---------------------------------------------
@@ -323,21 +342,21 @@ def test_unbrauchbares_modell_json_ist_ein_fehler(client):
     "heute ist nichts passiert" und ist damit eine Behauptung, die niemand
     geprueft hat.
     """
-    client.app.state.provider = FakeLLMProvider(replies=["Das ist kein JSON."])
+    setze_roh(client, "Das ist kein JSON.")
     antwort = client.post("/api/weltlage/DEU", headers=TOKEN)
     assert antwort.status_code == 502, antwort.text
     assert "kein verwertbares JSON" in antwort.json()["detail"]
 
 
 def test_modell_json_das_kein_objekt_ist_gibt_502_statt_500(client):
-    client.app.state.provider = FakeLLMProvider(replies=['["a", "b"]'])
+    setze_roh(client, '["a", "b"]')
     antwort = client.post("/api/weltlage/DEU", headers=TOKEN)
     assert antwort.status_code == 502, antwort.text
     assert "statt eines Objekts" in antwort.json()["detail"]
 
 
 def test_meldungen_die_keine_liste_sind_geben_502(client):
-    client.app.state.provider = FakeLLMProvider(replies=['{"meldungen": "keine Liste"}'])
+    setze_roh(client, '{"meldungen": "keine Liste"}')
     antwort = client.post("/api/weltlage/DEU", headers=TOKEN)
     assert antwort.status_code == 502
     assert "erwartet wird eine Liste" in antwort.json()["detail"]
@@ -391,8 +410,8 @@ def test_dod_8_zaehler_liest_die_kosten_aus_llm_calls(client, db):
 
 def test_dod_12_kein_modellaufruf_traegt_eine_externe_bild_url(client, verlag):
     """Kein Vision-Modell auf fremde Nachrichtenfotos."""
-    fake = FakeLLMProvider(replies=[_meldungen_json([
-        _eintrag(verlag_url=f"{verlag}/mit-bild", medium="Verlag")])])
+    fake = FakeLLMProvider(replies=[PLAN, _meldungen_json([
+        _eintrag(verlag_url=f"{verlag}/mit-bild", medium="Verlag")]), "Zusammengefasst."])
     client.app.state.provider = fake
     daten = client.post("/api/weltlage/DEU", headers=TOKEN).json()
     assert daten["meldungen"][0]["bild_url"], "das Bild sollte geholt worden sein"

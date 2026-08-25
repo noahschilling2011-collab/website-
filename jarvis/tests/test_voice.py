@@ -60,11 +60,40 @@ def test_ohne_sprachmodus_steht_der_stil_nicht_im_prompt():
         assert "VORGELESEN" not in agent.system_prompt
 
 
+# Agenten, deren Antwort ein MASCHINENVERTRAG ist und kein Fliesstext. Der
+# Sprachstil ("hoechstens drei Saetze, keine Aufzaehlungen, keine URLs im
+# Fliesstext") wuerde ihr JSON zerstoeren - und ein Agent, der JSON liefert,
+# wird ohnehin nie vorgelesen. Die Ausnahme steht hier ausdruecklich, damit
+# sie eine Entscheidung bleibt und kein Versehen wird.
+OHNE_SPRACHSTIL = {"weltlage"}
+
+
 def test_mit_sprachmodus_steht_er_in_jedem_agentenprompt():
     agenten = baue_agenten(FakeLLMProvider(), max_permission=Permission.LOCAL,
                            antwortstil=SPRACHSTIL)
+    geprueft = 0
     for name, agent in agenten.items():
+        if name in OHNE_SPRACHSTIL:
+            continue
         assert "VORGELESEN" in agent.system_prompt, name
+        geprueft += 1
+    assert geprueft >= 3, "die Ausnahmeliste hat den Test ausgehoehlt"
+
+
+def test_die_ausnahmeliste_nennt_nur_agenten_die_es_gibt():
+    """Sonst waechst sie still mit und deckt irgendwann alles ab."""
+    agenten = baue_agenten(FakeLLMProvider(), max_permission=Permission.LOCAL)
+    verwaist = OHNE_SPRACHSTIL - set(agenten)
+    assert not verwaist, f"nennt Agenten, die es nicht gibt: {verwaist}"
+
+
+def test_der_weltlage_agent_liefert_absichtlich_kein_fliesstext():
+    """Die Begruendung der Ausnahme, als Test."""
+    agenten = baue_agenten(FakeLLMProvider(), max_permission=Permission.LOCAL,
+                           antwortstil=SPRACHSTIL)
+    prompt = agenten["weltlage"].system_prompt
+    assert "AUSSCHLIESSLICH mit JSON" in prompt
+    assert "VORGELESEN" not in prompt
 
 
 def test_die_zusammenfassung_bekommt_den_sprachstil():

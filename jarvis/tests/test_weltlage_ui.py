@@ -115,8 +115,11 @@ def server(tmp_path, verlag):
 
 
 def setze(app, eintraege, gesagt=""):
-    app.state.provider = FakeLLMProvider(
-        replies=[json.dumps({"meldungen": eintraege, "gesagt": gesagt}, ensure_ascii=False)])
+    """Planner -> Schritt -> Zusammenfassung (FIX-02 Schritt 2)."""
+    plan = json.dumps({"steps": [{"description": "Weltlage sammeln",
+                                  "agent": "weltlage"}]}, ensure_ascii=False)
+    inhalt = json.dumps({"meldungen": eintraege, "gesagt": gesagt}, ensure_ascii=False)
+    app.state.provider = FakeLLMProvider(replies=[plan, inhalt, "Zusammengefasst."])
 
 
 def browser(pw, breite=1280, hoehe=720, reduziert=False):

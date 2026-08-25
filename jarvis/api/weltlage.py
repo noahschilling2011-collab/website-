@@ -20,6 +20,8 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from api.security import require_token
+from api.tasks import LaufenderTask, baue_laufzeit
+from core import db
 from core.db import session
 from core.weltlage import (
     CACHE_TTL_MINUTEN,
@@ -222,19 +224,57 @@ async def post_weltlage(request: Request, land_iso: str) -> dict:
     if gecached is not None:
         return gecached
 
-    from core.agents import WELTLAGE_PROMPT
-    from core.llm import LLMMessage
+    from core.contracts import Permission, Task, TaskBudget
+    from core.runner import fuehre_task_aus
 
-    # Abschnitt 3: beim Start sechs Ereignisse weltweit, nicht 195 Laender.
-    ziel = ("Sechs belegte Ereignisse weltweit, je zwei Saetze."
+    # FIX-02 Schritt 2: KEIN eigener Datenweg neben JARVIS.
+    #
+    # Vorher rief diese Route provider.complete() direkt auf. Das ging am
+    # Runner vorbei - und damit an Budget, Audit UND an db.log_llm_call. Genau
+    # daher kam die Kachel "heute 0,0000 EUR": die Aufrufe fanden statt, nur
+    # protokolliert hat sie niemand.
+    #
+    # Jetzt laeuft die Weltlage als ganz normaler Auftrag durch denselben
+    # Runner. Alles, was fuer /api/tasks gilt, gilt hier automatisch mit.
+    ziel = ("Weltlage: sechs belegte Ereignisse weltweit, je zwei Saetze."
             if land_iso == WELTWEIT
-            else f"Was ist in {land_iso} passiert? Hoechstens fuenf belegte Meldungen.")
-    provider = request.app.state.provider
+            else f"Weltlage {land_iso}: was ist dort passiert? "
+                 f"Hoechstens fuenf belegte Meldungen.")
+
+    task = Task(goal=ziel, budget=TaskBudget.from_settings(settings))
+    eintrag = LaufenderTask(task=task)
+    request.app.state.tasks.add(eintrag)
     try:
-        antwort = await provider.complete([LLMMessage("user", ziel)],
-                                          system=WELTLAGE_PROMPT)
+        await fuehre_task_aus(
+            request.app.state.provider,
+            ziel,
+            budget=task.budget,
+            kosten=settings.cost_eur,
+            max_permission=Permission(settings.max_permission),
+            task=task,
+            laufzeit=baue_laufzeit(request, eintrag),
+        )
     except Exception as exc:                      # noqa: BLE001
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise HTTPException(status_code=502, detail=f"{type(exc).__name__}: {exc}") from exc
+    finally:
+        await asyncio.to_thread(db.save_task, settings.db_path, task)
+        request.app.state.tasks.remove(task.id)
+
+    if task.status != "done":
+        raise HTTPException(
+            status_code=502,
+            detail=f"Der Auftrag endete auf {task.status}: "
+                   f"{task.result or task.abort_reason or 'ohne Begruendung'}",
+        )
+
+    # Das JSON steht im SCHRITT, nicht in der Zusammenfassung: der Runner
+    # formuliert am Ende Prosa, und Prosa ist kein Vertrag.
+    roh_text = ""
+    for schritt in reversed(task.steps):
+        if schritt.result is not None and schritt.result.display:
+            roh_text = schritt.result.display
+            break
+    roh_text = roh_text or (task.result or "")
 
     # FIX-02 Schritt 1: kein except, der eine Ausnahme in Inhalt verwandelt.
     # Unbrauchbares Modell-JSON ist ein Fehler und wird als Fehler gemeldet -
@@ -242,7 +282,7 @@ async def post_weltlage(request: Request, land_iso: str) -> dict:
     # sieht aus wie "heute ist nichts passiert"; das ist eine Behauptung, die
     # niemand geprueft hat.
     try:
-        daten = json.loads(_json_aus(antwort.text))
+        daten = json.loads(_json_aus(roh_text))
     except (ValueError, TypeError) as exc:
         raise HTTPException(
             status_code=502,
