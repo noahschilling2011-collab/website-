@@ -116,3 +116,85 @@ in der README unter „nur API, kein UI".
 
 Ein Test, der jede registrierte Route entweder in `index.html` findet oder in einer
 ausdrücklichen Liste `NUR_API = {...}`.
+
+---
+
+# BEFUND SCHRITT 2 — der Pfad, einzeln geprüft
+
+Alles gegen einen laufenden `uvicorn` auf `127.0.0.1:8012`, Anbieter `fake`,
+plus einen echten Chromium über Playwright.
+
+## 2a Schrittliste — ✓
+
+```
+status   : done
+schritte : 1
+   - done | Was ist 2+2 | agent= None
+```
+
+Im Browser:
+
+```
+Plan-Text    : Plan · done · 1/1 | ✓ | Was ist 2+2 | 392 Token
+Schritt-Knoten im Plan: 1
+JS-Fehler    : keine
+```
+
+## 2b `/api/events` — ✓
+
+```
+task-Ereignisse: 3
+step-Ereignisse: 3
+      1 event: hello
+      3 event: step
+      3 event: task
+```
+
+## 2c Werkzeug-Ansicht — funktionsfähig, im Auslieferungszustand dauerhaft leer
+
+Nach zwei Aufträgen: `/api/tool-calls` → `[]`, `tool_calls` in der DB → `0`.
+Der Fake schlägt nie einen Werkzeugaufruf vor, also läuft keiner.
+
+Die Ansicht selbst ist nicht kaputt. Mit einem geskripteten Fake, der einen
+Werkzeugaufruf vorschlägt:
+
+```
+status          : done
+spent_tool_calls: 1
+tool_calls DB   : 1  -> ('calculator', 1, 0)
+/api/tool-calls : [{"name": "calculator", "ok": true, "display": "2+2 = 4", ...}]
+```
+
+Im Browser zeigt die Ansicht ohne Daten korrekt „Noch kein Werkzeug gelaufen."
+
+## 2d Abbrechen — ✓ am Endpunkt, im Auslieferungszustand nicht erreichbar
+
+Mit einem künstlich verlangsamten Fake:
+
+```
+vor dem Abbruch : running
+cancel HTTP     : 200 {"status":"cancelling"}
+Endzustand      : cancelled
+abort_reason    : Vom Nutzer abgebrochen.
+```
+
+Mit dem normalen Fake dauert ein Auftrag `Fertig in 0.7 s` — kein Mensch
+trifft den Knopf. Der Knopf ist da und funktioniert; prüfbar ist er nur mit
+einem Anbieter, der lange genug braucht.
+
+## Zusätzlich aufgefallen — nicht repariert
+
+1. Das Ergebnis zitiert den Planner-Umschlag mit: `Zuletzt sagtest du: "Ziel: Was ist 2+2`.
+   Der Fake echot, was er bekommt, und bekommt `Ziel: `-präfixierten Text.
+   Kosmetisch, nur im Fake-Betrieb sichtbar.
+2. Der Bestätigungsdialog ist mit dem Fake gar nicht erreichbar: er hängt an
+   einem Werkzeug ab `EXTERNAL`, und der Fake ruft kein Werkzeug auf.
+
+## BLOCKER
+
+**Werkzeuge und Bestätigungsdialog lassen sich mit dem Fake nicht sinnvoll
+prüfen.** Dafür braucht es einen echten Provider mit Key — `LLM_API_KEY`,
+`LLM_MODEL`, und für die Websuche `SEARCH_API_KEY`. Jeder Auftrag geht dann
+durch Planner, Schritt und Zusammenfassung: drei bis vier Modellaufrufe,
+die Geld kosten. Ich umgehe das nicht mit einem schlaueren Fake — ein Fake,
+der Werkzeuge auswählt, prüft nur sich selbst.
