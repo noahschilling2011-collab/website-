@@ -25,21 +25,55 @@ Zusätzlich: in `scripts/smoke.py` einen Schritt ergänzen, der **einen echten A
 
 ---
 
-## SCHRITT 1 — FakeLLMProvider
+## SCHRITT 1 — Echter Provider statt schlauerem Fake
 
-Ursache: der Provider echot die letzte Nachricht, der Planner will JSON, nach 3 Versuchen `failed`.
+> **Überarbeitet am 25.08.2026.** Ursprünglich stand hier: den `FakeLLMProvider` so
+> umbauen, dass er Plan-JSON liefert. Das ist überholt. Mit einem Max-Abo gibt es einen
+> echten Provider ohne Zusatzkosten — und ein Fake, der ein echtes Modell nachahmt,
+> verdeckt auf Dauer Fehler, statt sie zu zeigen.
 
-**Bau ihn absichtlich dumm.** Kein Musterabgleich auf Zielinhalte, keine Werkzeugauswahl.
+Ursache: der voreingestellte Provider echot die letzte Nachricht, der Planner will JSON,
+nach 3 Versuchen `failed`.
 
-- Fragt der Planner nach einem Plan → **ein** Schritt, Beschreibung = das Ziel, kein Werkzeug.
-- Alles andere → Echo wie bisher.
-- Der Antwortpfad muss gültiges JSON gegen das Pydantic-Schema liefern, nicht gegen ein Beispiel.
+**Fix:** `ClaudeCodeProvider` aus `docs/provider-claude-code.md` einbauen und als
+Voreinstellung setzen. Nutzt die angemeldete Claude Code CLI, kein API-Schlüssel,
+keine Zusatzkosten.
 
-README ehrlich korrigieren:
+Entscheidend ist `--json-schema`: das Plan-JSON wird von der CLI erzwungen, nicht vom
+Prompt erhofft. Damit ist die Ursache weg statt umschifft.
 
-> Ohne API-Key läuft die Oberfläche und Aufträge laufen durch, aber **es wird kein Werkzeug ausgeführt** — dafür braucht es einen echten Provider.
+Die drei geprüften Fallen aus dem Provider-Dokument sind Pflicht, nicht optional:
+`cwd` auf ein leeres Scratch-Verzeichnis (sonst liest Claude Code JARVIS' eigene
+CLAUDE.md), `is_error` prüfen statt Exit-Code, `stdin=DEVNULL` gegen drei Sekunden
+Wartezeit pro Aufruf.
 
-**Abnahme:** Schritt-0-Test grün. `pytest -q` weiterhin 364+ grün, kein einziger vorher grüner Test jetzt rot. `scripts/smoke.py` grün und legt nachweislich einen Auftrag an.
+**Der `FakeLLMProvider` bleibt — aber nur für Tests.** Er darf weiter dumm sein und soll
+es auch. Kein Test verbraucht Kontingent.
+
+**README korrigieren:**
+
+> Voraussetzung ist eine installierte und **angemeldete** Claude Code CLI
+> (`claude` im Pfad, `claude -p "test" < /dev/null` liefert eine Antwort).
+> Ohne Anmeldung startet JARVIS, aber kein Auftrag läuft durch.
+
+**Abnahme:** Schritt-0-Test grün, **ohne** untergeschobenen Provider.
+`pytest -q` weiterhin 364+ grün und weiterhin **null** CLI-Aufrufe in der Testsuite,
+im Log nachgewiesen. `scripts/smoke.py` grün und legt nachweislich einen Auftrag an.
+Zusätzlich: zehn Planner-Läufe liefern zehnmal gültiges JSON. Wenn nicht, melden —
+nicht die Retry-Grenze hochsetzen.
+
+> **BLOCKIERT am 25.08.2026.** `docs/provider-claude-code.md` existiert im Repo nicht
+> und wurde nicht mitgeliefert. Ohne dieses Dokument sind CLI-Flags, Ausgabeform und
+> Fehlerbehandlung geraten — genau die erfundene API, die CLAUDE.md Regel 1 verbietet.
+> Zweitens hebt dieser Schritt `CLAUDE.md:49` auf („Du selbst (Claude Code) bist
+> **nicht** JARVIS' Modell-Backend … Bau keine Brücke von JARVIS zurück zu deiner
+> eigenen Session"). Beides muss der Nutzer entscheiden, bevor gebaut wird.
+>
+> Als Zwischenstand liegt die alte Fassung von Schritt 1 im Baum: der
+> `FakeLLMProvider` beantwortet die Planungsanfrage mit einem Ein-Schritt-Plan
+> (Commit `2234a22`). Damit läuft ein Auftrag durch, ohne dass ein Werkzeug läuft.
+> Wird der `ClaudeCodeProvider` gebaut, ersetzt er diesen Zweig als Voreinstellung;
+> der Fake bleibt für Tests.
 
 ---
 
@@ -112,10 +146,31 @@ in der README unter „nur API, kein UI".
 
 ---
 
-## SCHRITT 8 — Rückfallschutz
+## SCHRITT 8 — Budget von Euro auf Aufrufe umstellen
+
+`BUDGET_MAX_COST_EUR` ist mit diesem Provider bedeutungslos. Ersetzen durch:
+
+```
+BUDGET_MAX_CLI_AUFRUFE_PRO_TASK=12
+BUDGET_MAX_CLI_AUFRUFE_PRO_TAG=150
+```
+
+Den Tageswert aus der in Schritt 2 gemessenen Zahl ableiten, nicht raten. Zähler
+sichtbar im Dashboard. Beim Anschlagen: klare Meldung, dass das Kontingent begrenzt ist
+und mit der Claude-App geteilt wird — nicht stillschweigend weiterlaufen.
+
+Der Kill-Switch bleibt wichtiger als vorher, nicht unwichtiger: eine durchgedrehte
+Retry-Schleife über Nacht kostet jetzt kein Geld, sondern deinen Wochenzugang.
+
+> **Hängt an Schritt 1.** Ohne `ClaudeCodeProvider` gibt es keine CLI-Aufrufe zu zählen.
+
+---
+
+## SCHRITT 9 — Rückfallschutz (optional, aber billig)
 
 Ein Test, der jede registrierte Route entweder in `index.html` findet oder in einer
-ausdrücklichen Liste `NUR_API = {...}`.
+ausdrücklichen Liste `NUR_API = {...}`. Neue Endpunkte, die niemand ruft, fallen dann
+sofort auf statt erst beim nächsten Audit.
 
 ---
 
