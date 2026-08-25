@@ -71,3 +71,25 @@ jobs:
         run: |
           npx tsx src/replay/make-fixtures.ts
           git diff --exit-code -- fixtures/
+
+  jarvis:
+    name: JARVIS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Tests
+        # Die Suite sperrt echte Netzwerkverbindungen. Sie braucht also weder
+        # einen API-Key noch Netz - und kann in CI nichts kosten.
+        run: pytest -q
+
+      - name: Rauchtest
+        # Faehrt die App gegen eine temporaere Datenbank hoch und geht den
+        # ganzen Weg einmal durch. Fake-Anbieter, kein echter Modellaufruf.
+        run: python -m scripts.smoke

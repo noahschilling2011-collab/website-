@@ -1,103 +1,113 @@
-# Static — Offline-Warner für stationäre Blitzer
+# website-
 
-Warnt per Sprachansage und Ton vor **stationären** Blitzern. Läuft im
-Hintergrund bei ausgeschaltetem Display. Kein Backend, kein Account, keine
-Werbung, **keine Netzwerk-Requests zur Laufzeit**.
+Dieses Repository ist eine Werkstatt: pro Branch ein Projekt. Auf **diesem**
+Branch entsteht JARVIS. Das ältere Blitzerwarner-Projekt liegt unangetastet in
+[`blitzerwarner/`](blitzerwarner/README.md) daneben.
 
-**Diese App warnt nicht vor mobilen Messstellen.** Das ist eine
-Produktentscheidung, keine Lücke: Mobile Blitzer brauchen eine
-Crowd-Datenbank, und die lässt sich ohne Nutzerbasis nicht aufbauen.
+---
 
-Gewonnen wird auf vier Achsen: Akku, Datenschutz, Offline-Fähigkeit,
-Einfachheit. Auf Datenqualität verliert das Projekt gegen kommerzielle
-Anbieter — was drin ist und was fehlt, steht offen in
-[blitzerwarner/DATA.md](blitzerwarner/DATA.md).
+# JARVIS
 
-## Rechtlicher Hinweis
+Persönliches AI-Operating-System. Läuft lokal, spricht Deutsch, gehört dir.
+Wird in zehn Phasen gebaut — **Phase 1 ist fertig**, der genaue Stand steht in
+[STATUS.md](STATUS.md).
 
-§ 23 Abs. 1c StVO verbietet dem Fahrzeugführer Betrieb und betriebsbereites
-Mitführen von Geräten, die Verkehrsüberwachungsmaßnahmen anzeigen. Verstoß:
-75 € und 1 Punkt (BKat Nr. 247). Nach OLG Karlsruhe, Beschl. v. 07.02.2023,
-Az. 2 ORbs 35 Ss 9/23, liegt eine Ordnungswidrigkeit des Fahrers auch dann
-vor, wenn der **Beifahrer** die App bedient und der Fahrer sich die Warnung
-zunutze macht.
+Kein Account, kein Deployment, keine Nutzerverwaltung. JARVIS läuft auf
+`127.0.0.1` und redet mit genau einem Menschen.
 
-Die App schaltet die Warnfunktion in Deutschland, Österreich und der Schweiz
-daher automatisch ab und zeigt dort einen nicht abschaltbaren Hinweis. Tacho
-und Tempolimit-Anzeige laufen weiter.
+## Was Phase 1 kann
 
-Das ist keine Rechtsberatung. Vor einer Store-Veröffentlichung muss das jemand
-mit einschlägiger Qualifikation prüfen.
-
-## Aufbau
-
-```
-blitzerwarner/
-├── scripts/            Datenpipeline (Node, läuft VOR dem App-Build)
-│   ├── build-dataset.ts        OSM abfragen, normalisieren, deduplizieren, kacheln
-│   ├── verify-dataset.ts       Integrität, Abdeckung, Stichprobe
-│   ├── count-speedlimits.ts    Mengengerüst für den Tempolimit-Datensatz
-│   ├── explore-tagging.ts      welche OSM-Taggings es überhaupt gibt
-│   ├── assess-candidates.ts    bringt eine Tagging-Variante echte Blitzer?
-│   └── crosscheck-region.ts    auffällige Gebietszahl gegenprüfen
-├── assets/data/        der gebaute Datensatz (cameras.json)
-├── app/                Expo-App (React Native, TypeScript)
-│   ├── src/config.ts           JEDE Zahl der App, jede mit Begründung
-│   ├── src/core/               Geometrie, Warnlogik, Tacho, Länder-Gate, Daten
-│   ├── src/audio/              Warnton, Ansagetexte, Wiedergabe, Audio-Routen
-│   ├── src/location/           Background-Task, Akku-Strategie, Watchdog
-│   ├── src/replay/             Replay-Harness — GPX rein, Warnungen raus
-│   ├── src/ui/                 vier Screens
-│   ├── fixtures/               Referenz-Tracks mit Erwartungen
-│   └── tests/                  165 Tests, kein Netz, kein Gerät nötig
-├── DATA.md             Datenlage, ehrlich
-└── CARPLAY.md          warum es keine CarPlay-Oberfläche gibt
-```
+Eine Nachricht geht vom Browser ans eigene Backend, von dort an ein Modell und
+zurück — und ist nach dem Neuladen noch da. Mehrere Konversationen, Verlauf,
+Umbenennen, Löschen. Mehr nicht, und das mit Absicht: Streaming, Werkzeuge,
+Aufgaben und Agenten haben ihre eigenen Phasen.
 
 ## Loslegen
 
 ```bash
-# Datenpipeline
-cd blitzerwarner
-npm install
-npm run build-dataset                        # alle 16 Bundesländer
-npm run verify-dataset                       # prüfen
-npm test                                     # Unit-Tests
-
-# App
-cd app
-npm install
-npm test                                     # 165 Tests
-npm run replay:all                           # Replay-Suite (Phase-3-DoD)
-npx expo run:android                         # braucht Development Build
+pip install -r requirements.txt
+uvicorn main:app --reload
 ```
 
-Hintergrund-Location läuft **nicht** in Expo Go. Es braucht einen Development
-Build (`eas build --profile development`).
+Dann [http://127.0.0.1:8000](http://127.0.0.1:8000) öffnen. Ohne weitere
+Einrichtung läuft der **Fake-Anbieter**: deterministische Antworten, kein Netz,
+keine Kosten. Gut genug, um alles außer der Modellqualität zu prüfen.
 
-## Stand
+### Echtes Modell anschließen
 
-| Phase | Inhalt | Status |
+```bash
+cp .env.example .env
+```
+
+In der `.env`:
+
+```
+JARVIS_PROVIDER=anthropic
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+**Ab hier kostet jeder Aufruf Geld.** Preise je eine Million Token:
+
+| Modell | Eingabe | Ausgabe |
 |---|---|---|
-| 1 | Datenpipeline | 5053 Anlagen, Trefferquote offen (braucht Referenzdaten) |
-| 2 | Background-Tracking | Code steht, Gerätetest offen |
-| 3 | Warnlogik + Replay-Test | **fertig**, 5 Tracks grün |
-| 4 | UI + Ansage | Code steht, Gerätetest offen |
-| 5 | Tacho | Code steht, Vergleichsprotokoll offen |
-| 6 | Tempolimit-Datensatz | Mengengerüst gemessen, Build offen |
-| 7 | Map-Matching | offen |
-| 8 | Meldefunktion (OSM-Notes) | offen |
-| 9 | Store-Vorbereitung | offen |
+| `claude-opus-5` (Voreinstellung) | 5 $ | 25 $ |
+| `claude-sonnet-5` | 2 $ | 10 $ |
+| `claude-haiku-4-5` | 1 $ | 5 $ |
 
-Was ohne echtes Gerät nicht abschließbar ist: 20 Minuten lückenloses Tracking
-bei ausgeschaltetem Display, Akkumessung gegen das Ziel von unter 3 %/h, und
-das Vergleichsprotokoll gegen den Auto-Tacho.
+Der Key liegt ausschließlich im Backend. Der Browser sieht ihn nie und ruft
+auch kein Modell direkt auf.
 
-## Lizenz und Attribution
+## Prüfen
 
-Blitzerdaten aus **OpenStreetMap**, © OpenStreetMap-Mitwirkende, lizenziert
-unter der **Open Database License (ODbL) 1.0**. Der erzeugte Datensatz ist eine
-abgeleitete Datenbank; Share-Alike ist vor einer Veröffentlichung im Detail zu
-prüfen. Die Attribution ist in der App sichtbar.
+```bash
+pytest -q                       # 72 Tests, kein Netz, kostenlos
+python -m scripts.smoke         # End-zu-End gegen den Fake-Anbieter
+python -m scripts.smoke --real  # dasselbe mit echtem Modell — kostet Geld
+```
 
-Code: MIT.
+`pytest` kann keinen echten Modellaufruf machen: `tests/conftest.py` sperrt die
+httpx-Transportschicht für die ganze Testsitzung, und `tests/test_no_network.py`
+prüft nach, dass die Sperre hält.
+
+## Aufbau
+
+```
+main.py              uvicorn-Einstiegspunkt
+core/
+  config.py          Konfiguration aus Umgebung und .env
+  db.py              SQLite, kein ORM
+  schema.sql         conversations, messages
+  llm.py             LLMProvider · FakeLLMProvider · AnthropicProvider
+api/
+  app.py             Anwendungsfabrik, Fehlerübersetzung
+  routes.py          Endpunkte
+  schemas.py         was über HTTP geht
+web/index.html       die gesamte Oberfläche, ohne Build-Step
+scripts/smoke.py     Rauchtest der aktuellen Phase
+docs/
+  contracts.md       Tool · ToolResult · Permission · Task · Step · Agent
+  phases/            ein Auftrag je Phase
+```
+
+## Entscheidungen, die erklärungsbedürftig sind
+
+**Kein `anthropic`-SDK.** Der Stack in `CLAUDE.md` legt `httpx` fest. Der
+Provider spricht deshalb die dokumentierte Messages-API direkt. Das SDK wäre
+sonst die naheliegendere Wahl — ein Wechsel ist eine Stack-Änderung und wird
+vorher besprochen, nicht nebenbei gemacht.
+
+**SQLite statt Postgres.** Für einen Nutzer reicht es, und es hat keinen
+Betriebsaufwand. Ein Wechsel ist Phase 10 — und nur, wenn eine Messung zeigt,
+dass es nötig ist.
+
+**Eine `index.html` ohne Build-Step.** Bis Phase 7. Solange die Oberfläche in
+eine Datei passt, ist das die Variante mit den wenigsten beweglichen Teilen.
+
+**`temperature` wird nicht gesendet.** Auf den aktuellen Opus-Modellen ist der
+Parameter entfernt und ergibt einen 400. Dasselbe gilt für
+`thinking.budget_tokens`. Ein Test hält das fest.
+
+## Mitarbeiten
+
+`CLAUDE.md` enthält die Regeln, `STATUS.md` den Stand, `docs/phases/` die
+Aufträge. Es wird immer nur die als `AKTUELL` markierte Phase bearbeitet.
