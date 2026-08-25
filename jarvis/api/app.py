@@ -88,6 +88,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         post = registry.get("send_email")
         if post is not None:
             post.outbox = settings.outbox_path
+        satellit = registry.get("satellite_search")
+        if satellit is not None:
+            from core.satellite.cdse import CDSEProvider
+
+            satellit.provider = CDSEProvider(
+                settings.cdse_client_id, settings.cdse_client_secret
+            )
         if not settings.search_api_key:
             log.info("SEARCH_API_KEY fehlt - web_search meldet das beim Aufruf.")
 

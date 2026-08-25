@@ -3,7 +3,7 @@
 > Einzige Wahrheit über den Projektstand. Claude Code liest diese Datei zuerst
 > und aktualisiert sie am Ende jeder Phase. Von Hand korrigieren ist erlaubt.
 
-AKTUELL: Phase 7 — Observability-Dashboard
+AKTUELL: Phase 8 — Satellite Agent
 LETZTE ÄNDERUNG: 2026-08-25
 
 > **Abweichung von der Arbeitsweise, auf Ansage:** es werden alle Phasen
@@ -23,7 +23,7 @@ LETZTE ÄNDERUNG: 2026-08-25
 | 5 | Permissions & Bestätigung | IN ARBEIT| –              |
 | 6 | Hermes                    | IN ARBEIT| –              |
 | 7 | Observability-Dashboard   | IN ARBEIT| –              |
-| 8 | Satellite Agent           | GESPERRT | –              |
+| 8 | Satellite Agent           | IN ARBEIT| –              |
 | 9 | Voice                     | GESPERRT | –              |
 |10 | Härten & Verpacken        | GESPERRT | –              |
 
@@ -191,6 +191,41 @@ und blockiert beim Verlassen des Kontexts. Die Stromtests starten deshalb
 einen uvicorn im Thread; die Netzsperre der Testsitzung lässt dafür genau
 `127.0.0.1` durch und sonst nichts.
 
+## Phase 8 — Satellite Agent
+
+| # | Kriterium | Stand |
+|---|---|---|
+| 1 | Bild mit Aufnahmedatum, Sensor, m/px und Wolkenanteil | ✗ **kein `CDSE_CLIENT_ID`/`CDSE_CLIENT_SECRET`**. Katalogsuche und Steckbrief sind gegen `httpx.MockTransport` geprüft; ein echtes Bild wurde nie geholt. Ein **Geocoder ist nicht gebaut** — die Werkzeuge nehmen eine Bounding Box, keinen Ortsnamen |
+| 2 | Kein Bild unter dem Schwellwert → JARVIS sagt das, statt ein wolkiges zu liefern | ✓ |
+| 3 | Vergleich zweier Zeitpunkte mit Differenzdarstellung | ◐ die **numerische** Differenz (NDVI, Fläche in Hektar) ist gebaut und getestet; die Bilder nebeneinander brauchen die Rendering-Schnittstelle und damit Zugangsdaten |
+
+Gebaut: `core/satellite/{contracts,analysis,policy,cdse}.py`, Werkzeuge
+`satellite_search` und `satellite_compare`, Agent `satellite` (READ).
+
+**Die Auflösungsgrenze ist Code, keine Bitte.** `beurteilbar()` lehnt Aussagen
+über Objekte unter dem Dreifachen der Bodenauflösung ab; `grenzsatz()` erzeugt
+die Pflichtzeile `GRENZE`. Bei 10 m/px sind das 30 m — ein Einfamilienhaus ist
+damit ein Pixel und nicht beurteilbar.
+
+**Vergleichbarkeit vor Rechnung.** Liegen zwei Aufnahmen mehr als zwei Monate
+im Jahreslauf auseinander, wird der Vergleich abgelehnt: was man dann sieht,
+ist die Jahreszeit. Der Jahreswechsel wird korrekt gerechnet (Dezember und
+Januar sind einen Monat auseinander, nicht elf).
+
+**Beobachtungsanfragen werden abgelehnt, bevor ein Modell läuft.** Eine
+Ablehnung, die von der Tagesform eines Modells abhängt, ist keine Regel. Die
+Stichwortprüfung ist die erste Verteidigungslinie und ausdrücklich nicht
+perfekt — die zweite ist der Systemprompt, die dritte die Auflösung selbst.
+
+**CDSE-Endpunkte** stammen aus der offiziellen Doku (Token-Endpunkt,
+OData-Katalog, Attribut `cloudCover`, Raum- und Zeitfilter). **UNSICHER:** die
+Token-Doku zeigt `grant_type=password`; die `.env.example` sieht einen
+Service-Account vor. Beide Wege sind implementiert, der Service-Account-Weg
+ist vor dem ersten echten Aufruf zu bestätigen.
+
+**Gefiltert wird serverseitig** — erst 200 Szenen holen und lokal filtern wäre
+bei Kontingenten die falsche Reihenfolge.
+
 ## Offene Blocker
 
 - [ ] LLM-API-Key besorgen, als `LLM_API_KEY` in `.env` eintragen
@@ -198,6 +233,7 @@ einen uvicorn im Thread; die Netzsperre der Testsitzung lässt dafür genau
 - [ ] `LLM_PRICE_IN_PER_MTOK` / `LLM_PRICE_OUT_PER_MTOK` in EUR
 - [ ] `JARVIS_TOKEN` würfeln und eintragen
 - [ ] `SEARCH_API_KEY` von api-dashboard.search.brave.com (für Phase 2 DoD 3)
+- [ ] `CDSE_CLIENT_ID` / `CDSE_CLIENT_SECRET` von dataspace.copernicus.eu (Phase 8)
 - [ ] Danach `/dod` je Phase laufen lassen
 
 ## Bekannte Abweichungen vom Plan

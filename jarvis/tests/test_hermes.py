@@ -57,7 +57,7 @@ def test_hermes_ruft_agenten_und_recherchiert_nicht_selbst():
     hermes = baue_agenten(FakeLLMProvider(), max_permission=Permission.EXTERNAL)["hermes"]
     assert "ask_agent" in hermes.tools
     assert "web_search" not in hermes.tools
-    assert hermes.can_call_agents == ["research"]
+    assert hermes.can_call_agents == ["research", "satellite"]
 
 
 def test_hermes_prompt_verlangt_die_kennzeichnung_der_herkunft():

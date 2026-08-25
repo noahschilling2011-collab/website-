@@ -68,6 +68,11 @@ class Settings(BaseSettings):
     # waere eine eigene Entscheidung, keine Voreinstellung.
     max_permission: int = 3
 
+    # --- Ab Phase 8 (Satellit) ---
+    cdse_client_id: str = ""
+    cdse_client_secret: str = ""
+    firms_map_key: str = ""
+
     # --- Budgets (0.5) ---
     budget_max_steps: int = 12
     budget_max_depth: int = 2

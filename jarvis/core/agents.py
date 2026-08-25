@@ -12,6 +12,7 @@ import time
 from typing import Awaitable, Callable, Iterable
 
 from core.contracts import Agent, Permission, Step, Task, ToolResult
+from core.satellite.policy import pruefe_anfrage
 from core.llm import LLMMessage, LLMProvider, LLMReply
 from core.tools.dispatch import Audit, Bestaetigung, ToolCall
 from core.tools.loop import run_tool_loop
@@ -30,6 +31,43 @@ REGELN, die deine Arbeit ungueltig machen, wenn du sie brichst:
    Preise und Steuersaetze ohne Datum sind wertlos.
 
 Antworte knapp und in Prosa. Am Ende eine Zeile "Quellen:" mit den URLs."""
+
+SATELLIT_PROMPT = """Du bist der Satellite Agent von JARVIS.
+
+Du arbeitest mit frei verfuegbaren Erdbeobachtungsdaten. Deine wichtigste
+Eigenschaft ist, dass du weisst, was du NICHT sehen kannst.
+
+HARTE REGELN:
+1. **Fuehr die Bodenaufloesung bei jeder Aussage mit.** Sentinel-2 hat 10 m je
+   Pixel. Ein Einfamilienhaus ist damit EIN Pixel. Benenne kein Objekt, das
+   kleiner als etwa 30 m ist - weder Gebaeude noch Fahrzeuge noch Personen.
+   Wer bei 10 m/px "neues Gebaeude" sagt, halluziniert.
+2. **Es gibt keine Live-Bilder.** "Aktuell" heisst: das juengste Bild unter
+   dem Wolken-Schwellwert im Suchfenster. Sentinel-2 ueberfliegt einen Ort
+   alle 3 bis 5 Tage, und viele Aufnahmen sind bewoelkt. Sag das so.
+3. **Findest du kein Bild unter dem Schwellwert, sag das.** Liefere nie
+   ersatzweise ein bewoelktes Bild ohne Hinweis.
+4. **Rechne, bevor du interpretierst.** Erst NDVI/NDWI-Zahlen aus
+   satellite_compare, dann eine Deutung - nie umgekehrt.
+5. **Nenn Aufnahmedatum, Sensor, m/px und Wolkenanteil** zu jedem Bild, und
+   die Attribution der Datenquelle.
+
+Realistisch beurteilbar sind: Abholzung, Ueberschwemmungen, grosse Baustellen
+und Erdbewegungen, Tagebau, Solarparks, landwirtschaftliche Veraenderungen,
+Brandflaechen, Schneebedeckung, Gewaesserstaende, neue Strassentrassen.
+
+AUSGABEFORMAT bei jeder Veraenderungsanalyse - die letzte Zeile ist Pflicht:
+
+BEOBACHTET
+  <was die Zahlen sagen>
+INTERPRETATION
+  <was das heissen koennte, mit den Alternativen>
+KONFIDENZ  niedrig | mittel | hoch
+GRUNDLAGE  <Sensor, m/px, beide Aufnahmedaten mit Wolkenanteil>
+GRENZE     <was bei dieser Aufloesung nicht beurteilbar ist>
+
+Du beobachtest keine Grundstuecke und keine Personen. Wenn danach gefragt
+wird, lehnst du ab und erklaerst kurz warum."""
 
 HERMES_PROMPT = """Du bist Hermes, der Orchestrator von JARVIS.
 
@@ -74,6 +112,7 @@ class ToolAgent(Agent):
         on_call: Callable[[ToolCall], Awaitable[None]] | None = None,
         bestaetigung: Bestaetigung | None = None,
         audit: Audit | None = None,
+        vorpruefung: Callable[[str], None] | None = None,
     ) -> None:
         self.provider = provider
         self.name = name
@@ -87,9 +126,24 @@ class ToolAgent(Agent):
         self._on_call = on_call
         self._bestaetigung = bestaetigung
         self._audit = audit
+        # Laeuft vor dem ersten Modellaufruf. Wirft, wenn der Auftrag gar nicht
+        # erst bearbeitet werden soll - eine Ablehnung, die vom Tagesform eines
+        # Modells abhaengt, ist keine Regel.
+        self._vorpruefung = vorpruefung
 
     async def run(self, task: Task, step: Step) -> ToolResult:
         begonnen = time.monotonic()
+
+        if self._vorpruefung is not None:
+            try:
+                self._vorpruefung(f"{task.goal}\n{step.description}")
+            except Exception as exc:  # noqa: BLE001 - die Begruendung ist die Antwort
+                return ToolResult(
+                    ok=False,
+                    error=type(exc).__name__,
+                    display=str(exc),
+                    duration_ms=int((time.monotonic() - begonnen) * 1000),
+                )
 
         vorher = [
             f"- {s.description}: {(s.result.display or '')[:400]}"
@@ -171,7 +225,7 @@ def baue_agenten(
         system_prompt=HERMES_PROMPT,
         tools=["ask_agent", "calculator", "clock"],
         max_permission=Permission.LOCAL,
-        can_call_agents=["research"],
+        can_call_agents=["research", "satellite"],
         max_tool_calls=12,
         on_reply=on_reply,
         on_call=on_call,
@@ -180,6 +234,22 @@ def baue_agenten(
 
     return {
         "hermes": hermes,
+        "satellite": ToolAgent(
+            provider,
+            name="satellite",
+            description=(
+                "Beantwortet Fragen zu Erdbeobachtungsdaten - Abholzung, "
+                "Ueberschwemmungen, Baustellen, Brandflaechen. Kennt seine "
+                "Aufloesungsgrenze und behauptet nichts darunter."
+            ),
+            system_prompt=SATELLIT_PROMPT,
+            tools=["satellite_search", "satellite_compare", "calculator", "clock"],
+            max_permission=Permission.READ,
+            vorpruefung=pruefe_anfrage,
+            on_reply=on_reply,
+            on_call=on_call,
+            audit=audit,
+        ),
         "research": ToolAgent(
             provider,
             name="research",
