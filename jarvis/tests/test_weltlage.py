@@ -316,10 +316,41 @@ def test_dod_13_schweigetest_kein_fuellsatz(client):
     assert daten["gesagt"] == "Zu Namibia finde ich heute nichts."
 
 
-def test_unbrauchbares_modell_json_erfindet_nichts(client):
+def test_unbrauchbares_modell_json_ist_ein_fehler(client):
+    """FIX-02 Schritt 1: ein Fehler bleibt ein Fehler.
+
+    Vorher wurde daraus eine leere, erfolgreiche Antwort - die sieht aus wie
+    "heute ist nichts passiert" und ist damit eine Behauptung, die niemand
+    geprueft hat.
+    """
     client.app.state.provider = FakeLLMProvider(replies=["Das ist kein JSON."])
-    daten = client.post("/api/weltlage/DEU", headers=TOKEN).json()
-    assert daten["meldungen"] == []
+    antwort = client.post("/api/weltlage/DEU", headers=TOKEN)
+    assert antwort.status_code == 502, antwort.text
+    assert "kein verwertbares JSON" in antwort.json()["detail"]
+
+
+def test_modell_json_das_kein_objekt_ist_gibt_502_statt_500(client):
+    client.app.state.provider = FakeLLMProvider(replies=['["a", "b"]'])
+    antwort = client.post("/api/weltlage/DEU", headers=TOKEN)
+    assert antwort.status_code == 502, antwort.text
+    assert "statt eines Objekts" in antwort.json()["detail"]
+
+
+def test_meldungen_die_keine_liste_sind_geben_502(client):
+    client.app.state.provider = FakeLLMProvider(replies=['{"meldungen": "keine Liste"}'])
+    antwort = client.post("/api/weltlage/DEU", headers=TOKEN)
+    assert antwort.status_code == 502
+    assert "erwartet wird eine Liste" in antwort.json()["detail"]
+
+
+def test_ein_lauf_ohne_meldung_wird_nicht_gecacht(client, db):
+    """Sonst wird eine gescheiterte Recherche 60 Minuten lang als Ergebnis ausgeliefert."""
+    setze_antwort(client, _meldungen_json([], gesagt="Dazu finde ich nichts."))
+    client.post("/api/weltlage/NAM", headers=TOKEN)
+    with session(db) as conn:
+        zeilen = conn.execute(
+            "SELECT count(*) FROM weltlage_cache WHERE land_iso = 'NAM'").fetchone()[0]
+    assert zeilen == 0, "ein leeres Ergebnis darf nicht als Ergebnis gelten"
 
 
 # --- DoD 14: Kontextluecke --------------------------------------------------

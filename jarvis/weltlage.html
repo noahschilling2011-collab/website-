@@ -313,7 +313,13 @@ function ladeLand(iso, name){
       ? api('/api/weltlage/' + encodeURIComponent(iso), {method:'POST'})
       : d)
     .then(d => { zeichneKarten(d); zeigeStatus(d); return ladeZaehler(); })
-    .catch(err => { el('gesagt').textContent = err.message; })
+    .catch(err => {
+      // Scheitert die Recherche, ist der richtige Zustand leer plus Begruendung.
+      // Kein Platzhalter, keine Karte - und die Begruendung ist die echte.
+      zeichneKarten({ meldungen: [] });
+      el('gesagt').textContent = err.message;
+      return ladeZaehler();
+    })
     .finally(() => { laeuft = false; });
 }
 

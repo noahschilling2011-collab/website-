@@ -236,18 +236,40 @@ async def post_weltlage(request: Request, land_iso: str) -> dict:
     except Exception as exc:                      # noqa: BLE001
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
+    # FIX-02 Schritt 1: kein except, der eine Ausnahme in Inhalt verwandelt.
+    # Unbrauchbares Modell-JSON ist ein Fehler und wird als Fehler gemeldet -
+    # nicht als leere, erfolgreiche Antwort. Eine leere Antwort mit HTTP 200
+    # sieht aus wie "heute ist nichts passiert"; das ist eine Behauptung, die
+    # niemand geprueft hat.
     try:
         daten = json.loads(_json_aus(antwort.text))
-    except (ValueError, TypeError):
-        daten = {"meldungen": [], "gesagt": "Das Modell hat kein verwertbares JSON geliefert."}
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Das Modell hat kein verwertbares JSON geliefert ({exc}).",
+        ) from exc
+    if not isinstance(daten, dict):
+        raise HTTPException(
+            status_code=502,
+            detail=f"Das Modell hat {type(daten).__name__} statt eines Objekts geliefert.",
+        )
+    roh = daten.get("meldungen")
+    if roh is not None and not isinstance(roh, list):
+        raise HTTPException(
+            status_code=502,
+            detail=f"'meldungen' ist {type(roh).__name__}, erwartet wird eine Liste.",
+        )
 
-    nutzlast = await baue_nutzlast(request, land_iso,
-                                   daten.get("meldungen") or [],
+    nutzlast = await baue_nutzlast(request, land_iso, roh or [],
                                    str(daten.get("gesagt") or ""))
 
     def schreiben() -> None:
         with session(pfad) as conn:
-            cache_schreiben(conn, land_iso, nutzlast)
+            # Nur ein Ergebnis wird gecacht. Ein Lauf ohne Meldung koennte ein
+            # echtes "heute nichts" sein oder eine gescheiterte Recherche - das
+            # eine Stunde lang als Ergebnis auszuliefern waere geraten.
+            if nutzlast["meldungen"]:
+                cache_schreiben(conn, land_iso, nutzlast)
             _zaehle(conn, abfragen=1, verworfen=nutzlast["verworfen"])
 
     await asyncio.to_thread(schreiben)
