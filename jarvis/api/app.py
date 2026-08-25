@@ -21,11 +21,14 @@ from api.security import ensure_token
 from core.config import PROJECT_ROOT, Settings, get_settings
 from core.db import connect, init_db
 from core.llm import LLMError, LLMProvider, build_provider
+from api.weltlage import weltlage_router
 from core.tools import registry
 
 log = logging.getLogger("jarvis")
 
 INDEX_PATH = PROJECT_ROOT / "index.html"
+WELTLAGE_PATH = PROJECT_ROOT / "weltlage.html"
+STATIC_PATH = PROJECT_ROOT / "static"
 
 # Ein Einrichtungsfehler ist kein Fehler des Anbieters. Er bekommt einen
 # eigenen Status, damit die Oberflaeche "richte das ein" sagen kann statt
@@ -167,6 +170,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
     app.state.index_path = INDEX_PATH
+    app.state.weltlage_path = WELTLAGE_PATH
     app.state.tasks = TaskRegistry()
     app.state.events = EventBus()
     app.state.token, app.state.token_generated = ensure_token(settings.jarvis_token)
@@ -180,6 +184,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             content={"detail": str(exc), "kind": exc.kind, "retryable": exc.retryable},
         )
 
+    if STATIC_PATH.exists():
+        from fastapi.staticfiles import StaticFiles
+
+        app.mount("/static", StaticFiles(directory=STATIC_PATH), name="static")
+    app.include_router(weltlage_router)
     app.include_router(api)
     app.include_router(tasks_router)
     app.include_router(router)

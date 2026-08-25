@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>JARVIS · Weltlage</title>
+
+<!-- Import-Map mit fester Version. Lokal statt CDN: die Seite soll ohne Netz
+     laufen, und ohne Netz ist ein CDN eine leere Flaeche. -->
+<script type="importmap">
+{ "imports": { "three": "/static/vendor/three.module.js" } }
+</script>
+
+<style>
+:root{
+  --grund:#08090b; --flaeche:#111318; --land:#232830; --kante:rgba(255,255,255,.10);
+  --schrift:#e8eaef; --leise:#9aa2b1; --akzent:#4da3ff;
+  --glas:rgba(17,19,24,.82);
+  --kurve:cubic-bezier(.4,0,.2,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--grund); color:var(--schrift);
+  font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  /* Abschnitt 5: kein Scrollbalken, nirgends. */
+  overflow:hidden;
+}
+#globus{position:fixed;inset:0;display:block;width:100%;height:100svh}
+.ersatz{position:fixed;inset:0;display:grid;place-items:center;padding:2rem;text-align:center;color:var(--leise)}
+
+/* --- Kopf --- */
+.kopf{
+  position:fixed;top:0;left:0;right:0;z-index:3;
+  display:flex;align-items:center;gap:.75rem;
+  padding:.7rem 1rem;
+  background:linear-gradient(180deg,rgba(8,9,11,.9),rgba(8,9,11,0));
+}
+.marke{font-weight:600;letter-spacing:.02em}
+.marke span{color:var(--akzent)}
+.land{color:var(--leise);font-variant-numeric:tabular-nums}
+.kopf .luecke{flex:1}
+.knopf{
+  appearance:none;border:1px solid var(--kante);border-radius:.55rem;
+  background:var(--glas);color:var(--schrift);
+  padding:.42rem .7rem;font:inherit;font-size:.86rem;cursor:pointer;
+  transition:border-color .2s var(--kurve),background .2s var(--kurve);
+}
+.knopf:hover{border-color:var(--akzent)}
+.knopf:focus-visible{outline:2px solid var(--akzent);outline-offset:2px}
+.knopf[aria-pressed="true"]{border-color:var(--akzent);color:var(--akzent)}
+
+/* --- Karten --- */
+.karten{
+  position:fixed;z-index:2;right:1rem;top:3.6rem;bottom:3.2rem;width:min(38ch,42vw);
+  display:flex;flex-direction:column;gap:.6rem;
+  /* Karten sind so hoch wie ihr Inhalt und wachsen nicht ins Leere. Bei
+     fuenf Karten schrumpfen sie, bis alle passen. Was dann immer noch nicht
+     passt, wird nicht angezeigt - statt zu scrollen. */
+  justify-content:flex-start;
+  overflow:hidden;
+}
+.karte{flex:0 1 auto}
+.karte{
+  border:1px solid var(--kante);border-radius:.8rem;overflow:hidden;
+  background:var(--glas);
+  -webkit-backdrop-filter:blur(18px) saturate(140%);
+  backdrop-filter:blur(18px) saturate(140%);
+  display:flex;flex-direction:column;min-height:0;
+  animation:auf .28s var(--kurve) both;
+}
+@keyframes auf{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+.bild{position:relative;flex:0 0 auto;height:4.4rem;background:#0d0f13}
+.bild img{width:100%;height:100%;object-fit:cover;display:block}
+/* Ueber dem Bild derselbe Herkunftsstempel - damit es nie ohne Zuordnung
+   im Raum steht, auch nicht auf einem Screenshot. */
+.bild .stempel{
+  position:absolute;left:0;right:0;bottom:0;
+  padding:1.4rem .55rem .35rem;
+  background:linear-gradient(180deg,transparent,rgba(8,9,11,.92));
+  font-size:.7rem;color:#cfd5e0;letter-spacing:.02em;
+}
+/* Kein og:image -> Kartenkachel, sichtbar ANDERS als ein Foto. */
+.kachel{
+  height:4.4rem;display:grid;place-items:center;gap:.2rem;
+  background:repeating-linear-gradient(45deg,#12151b 0 8px,#161a21 8px 16px);
+  color:var(--leise);font-size:.72rem;text-align:center;
+}
+.kachel b{font-size:.78rem;color:#c3cad6;font-weight:600}
+
+.block{padding:.5rem .7rem;min-height:0;overflow:hidden}
+.meldung .schlag{font-weight:600;font-size:.95rem;margin-bottom:.15rem}
+.meldung .kurz{color:#c8cede;font-size:.86rem;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.quelle{margin-top:.35rem;font-size:.7rem;color:var(--leise);letter-spacing:.03em;text-transform:uppercase}
+
+/* Abschnitt 4b: andere Flaeche, andere Kante. Man muss sehen, wo die Belege
+   aufhoeren und die Erklaerung anfaengt. */
+.einordnung{
+  border-top:1px dashed rgba(255,255,255,.16);
+  background:rgba(77,163,255,.055);
+}
+.einordnung .marke2{
+  font-size:.66rem;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--akzent);margin-bottom:.2rem;
+}
+.einordnung p{font-size:.84rem;color:#bcc4d3;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.einordnung .hinweis{margin-top:.25rem;font-size:.68rem;color:var(--leise);font-style:italic}
+
+/* --- Statusleiste --- */
+.status{
+  position:fixed;left:0;right:0;bottom:0;z-index:3;
+  display:flex;align-items:center;gap:1rem;flex-wrap:wrap;
+  padding:.5rem 1rem;font-size:.76rem;color:var(--leise);
+  background:linear-gradient(0deg,rgba(8,9,11,.92),rgba(8,9,11,0));
+}
+.status b{color:var(--schrift);font-weight:600;font-variant-numeric:tabular-nums}
+.gesagt{color:#c8cede}
+
+.leer{
+  place-self:start;padding:.7rem .8rem;border:1px dashed var(--kante);
+  border-radius:.7rem;color:var(--leise);font-size:.85rem;background:var(--glas);
+}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.001ms !important;transition-duration:.001ms !important}
+}
+@media (min-width:1500px){
+  .karten{width:min(64ch,50vw);display:grid;grid-template-columns:1fr 1fr;
+          grid-auto-rows:min-content;align-content:start}
+}
+@media (max-width:720px){
+  .karten{left:1rem;width:auto}
+}
+</style>
+</head>
+<body>
+
+<canvas id="globus" aria-label="Globus. Länder sind anwählbar."></canvas>
+<noscript><div class="ersatz">Für den Globus wird JavaScript gebraucht.</div></noscript>
+
+<header class="kopf">
+  <div class="marke">JARVIS <span>· Weltlage</span></div>
+  <div class="land" id="land">weltweit</div>
+  <div class="luecke"></div>
+  <button class="knopf" id="btn-welt" type="button">Weltweit</button>
+  <button class="knopf" id="btn-mic" type="button" aria-pressed="false"
+          title="Leertaste halten und sprechen">🎤 Halten</button>
+</header>
+
+<main class="karten" id="karten" aria-live="polite"></main>
+
+<footer class="status">
+  <span class="gesagt" id="gesagt">Bereit.</span>
+  <span>Abfragen <b id="z-abfragen">0</b></span>
+  <span>aus dem Cache <b id="z-treffer">0</b></span>
+  <span>Cache-Quote <b id="z-quote">0 %</b></span>
+  <span>verworfen <b id="z-verworfen">0</b></span>
+  <span>heute <b id="z-kosten">0,0000 €</b></span>
+</footer>
+
+<script type="module">
+import * as THREE from 'three';
+
+const TOKEN = '__JARVIS_TOKEN__';
+const el = id => document.getElementById(id);
+const reduziert = matchMedia('(prefers-reduced-motion: reduce)').matches;
+document.body.dataset.reduziert = String(reduziert);
+const MAX_KARTEN = 5;
+
+function api(pfad, opt){
+  const o = opt || {};
+  o.headers = {'X-Jarvis-Token': TOKEN};
+  return fetch(pfad, o).then(r => r.text().then(roh => {
+    let d = null; try { d = roh ? JSON.parse(roh) : null; } catch(e){}
+    if (!r.ok) throw new Error((d && d.detail) || roh || ('HTTP ' + r.status));
+    return d;
+  }));
+}
+
+/* ---------------------------------------------------------------- Karten */
+
+function textKnoten(tag, klasse, text){
+  const n = document.createElement(tag);
+  if (klasse) n.className = klasse;
+  if (text != null) n.textContent = text;      // nie innerHTML: fremder Text
+  return n;
+}
+
+function stempelText(m){
+  const d = new Date(m.veroeffentlicht);
+  const datum = isNaN(d) ? '' : d.toLocaleDateString('de-DE');
+  const zeit  = isNaN(d) ? '' : d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  return [m.medium, datum, zeit].filter(Boolean).join(' · ');
+}
+
+function bildBereich(m){
+  if (m.bild_url){
+    const box = textKnoten('div','bild');
+    const img = document.createElement('img');
+    img.src = m.bild_url;
+    // Die Bildbeschreibung kommt AUS DER QUELLE. Gibt es keine, bleibt alt
+    // leer - JARVIS erfindet keine.
+    img.alt = m.bild_beschreibung || '';
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    // referrerpolicy NICHT abschalten: manche Verlage unterbinden sonst.
+    img.addEventListener('error', () => box.replaceWith(kachel(m)));
+    box.appendChild(img);
+    box.appendChild(textKnoten('div','stempel', stempelText(m)));
+    return box;
+  }
+  return kachel(m);
+}
+
+function kachel(m){
+  // Kein Quellbild. Sieht bewusst anders aus als ein Foto - der Nutzer muss
+  // auf einen Blick sehen, ob er ein Foto oder einen Ersatz vor sich hat.
+  const k = textKnoten('div','kachel');
+  k.appendChild(textKnoten('b', null, m.land_iso || '—'));
+  k.appendChild(textKnoten('span', null, 'keine Quellgrafik'));
+  return k;
+}
+
+function karteNode(m){
+  const k = textKnoten('article','karte');
+  k.appendChild(bildBereich(m));
+
+  const meldung = textKnoten('div','block meldung');
+  meldung.appendChild(textKnoten('div','schlag', m.schlagzeile));
+  meldung.appendChild(textKnoten('div','kurz', m.kurz));
+  meldung.appendChild(textKnoten('div','quelle', stempelText(m)));
+  k.appendChild(meldung);
+
+  // Zweiter, optisch getrennter Block. Und er sagt selbst, dass er nicht aus
+  // der Quelle stammt.
+  const ein = textKnoten('div','block einordnung');
+  ein.appendChild(textKnoten('div','marke2','Einordnung'));
+  if (m.einordnung){
+    ein.appendChild(textKnoten('p', null, m.einordnung));
+    ein.appendChild(textKnoten('div','hinweis',
+      'Von JARVIS, nicht aus der Quelle. Kein Beleg.'));
+  } else {
+    ein.appendChild(textKnoten('p', null,
+      m.einordnung_fehlt || 'Dazu habe ich keinen Kontext.'));
+    ein.appendChild(textKnoten('div','hinweis','Leer gelassen statt gefüllt.'));
+  }
+  k.appendChild(ein);
+  return k;
+}
+
+function zeichneKarten(daten){
+  const ziel = el('karten');
+  ziel.textContent = '';
+  const liste = (daten.meldungen || []).slice(0, MAX_KARTEN);
+  if (!liste.length){
+    ziel.appendChild(textKnoten('div','leer','0 belegte Meldungen.'));
+    zustand.ausgeblendet = 0;
+    return;
+  }
+  liste.forEach(m => ziel.appendChild(karteNode(m)));
+
+  // "Was nicht reinpasst, wird nicht angezeigt" heisst: ganze Karten
+  // weglassen. Eine Karte, die mitten im Satz abgeschnitten ist, ist
+  // schlechter als eine Karte weniger.
+  requestAnimationFrame(() => {
+    const platz = ziel.getBoundingClientRect();
+    let weg = 0;
+    while (ziel.children.length > 1){
+      const letzte = ziel.lastElementChild.getBoundingClientRect();
+      if (letzte.bottom <= platz.bottom + 1 && letzte.right <= platz.right + 1) break;
+      ziel.lastElementChild.remove();
+      weg++;
+    }
+    zustand.ausgeblendet = weg;
+    if (weg) el('gesagt').textContent +=
+      ` ${weg} weitere ${weg === 1 ? 'Meldung passt' : 'Meldungen passen'} nicht ins Bild.`;
+    document.body.dataset.karten = String(ziel.querySelectorAll('.karte').length);
+  });
+}
+
+function zeigeStatus(daten){
+  el('gesagt').textContent = daten.gesagt
+    || (daten.cache ? `Aus dem Cache, ${daten.alter_minuten} Minuten alt.` : 'Bereit.');
+}
+
+function ladeZaehler(){
+  return api('/api/weltlage/zaehler').then(z => {
+    el('z-abfragen').textContent  = z.abfragen;
+    el('z-treffer').textContent   = z.treffer;
+    el('z-quote').textContent     = Math.round(z.quote * 100) + ' %';
+    el('z-verworfen').textContent = z.verworfen;
+    el('z-kosten').textContent    = (z.kosten_eur || 0).toFixed(4).replace('.', ',') + ' €';
+  }).catch(() => {});
+}
+
+/* ------------------------------------------------------------ Laden */
+
+let laeuft = false;
+
+function ladeLand(iso, name){
+  if (laeuft) return Promise.resolve();
+  laeuft = true;
+  el('land').textContent = name || iso;
+  // Abschnitt 4c: EIN Satz beim Start, dann Ruhe bis die Karten da sind.
+  el('gesagt').textContent = 'Ich schaue nach ' + (name || iso) + '.';
+  el('karten').textContent = '';
+
+  return api('/api/weltlage/' + encodeURIComponent(iso))
+    .then(d => d.auftrag_noetig
+      ? api('/api/weltlage/' + encodeURIComponent(iso), {method:'POST'})
+      : d)
+    .then(d => { zeichneKarten(d); zeigeStatus(d); return ladeZaehler(); })
+    .catch(err => { el('gesagt').textContent = err.message; })
+    .finally(() => { laeuft = false; });
+}
+
+/* ------------------------------------------------------------ Globus */
+
+const canvas = el('globus');
+let renderer = null;
+
+function ersatzAnzeigen(text){
+  const d = textKnoten('div','ersatz', text);
+  canvas.replaceWith(d);
+}
+
+try {
+  renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true,
+                                      powerPreference:'high-performance'});
+} catch (e) {
+  ersatzAnzeigen('Ohne WebGL kein Globus. Die Länderliste geht trotzdem: /api/weltlage/DEU');
+}
+
+const zustand = {laender: [], aktiv: null};
+
+if (renderer){
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+  const szene = new THREE.Scene();
+  const kamera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+  kamera.position.set(0, 0, 3.1);
+
+  const welt = new THREE.Group();
+  szene.add(welt);
+
+  // Die Kugel selbst - dunkel, damit die Grenzen darauf lesbar sind.
+  welt.add(new THREE.Mesh(
+    new THREE.SphereGeometry(1, 64, 48),
+    new THREE.MeshBasicMaterial({color:0x141922})
+  ));
+
+  const AKZENT = new THREE.Color(0x4da3ff);
+  const RUHE   = new THREE.Color(0x9aa2b1);   // Graustufe, wie im Auftrag
+
+  function aufKugel(lon, lat, r){
+    const phi = (90 - lat) * Math.PI / 180;
+    const theta = (lon + 180) * Math.PI / 180;
+    return new THREE.Vector3(
+      -r * Math.sin(phi) * Math.cos(theta),
+       r * Math.cos(phi),
+       r * Math.sin(phi) * Math.sin(theta)
+    );
+  }
+
+  /* Minimaler TopoJSON-Decoder: nur was fuer Grenzlinien noetig ist.
+     Kein topojson-client als zweite Abhaengigkeit fuer 40 Zeilen. */
+  function bogen(topo, i){
+    const umgedreht = i < 0;
+    const roh = topo.arcs[umgedreht ? ~i : i];
+    const [sx, sy] = topo.transform ? topo.transform.scale : [1, 1];
+    const [tx, ty] = topo.transform ? topo.transform.translate : [0, 0];
+    let x = 0, y = 0;
+    const punkte = roh.map(([dx, dy]) => {
+      x += dx; y += dy;
+      return topo.transform ? [x * sx + tx, y * sy + ty] : [dx, dy];
+    });
+    return umgedreht ? punkte.reverse() : punkte;
+  }
+  function ringe(topo, geo){
+    const teile = geo.type === 'Polygon' ? [geo.arcs] : geo.arcs;
+    return teile.flatMap(poly => poly.map(ring =>
+      ring.flatMap((i, n) => {
+        const p = bogen(topo, i);
+        return n ? p.slice(1) : p;
+      })));
+  }
+  function mittelpunkt(rr){
+    let x = 0, y = 0, n = 0;
+    rr.forEach(r => r.forEach(([lon, lat]) => { x += lon; y += lat; n++; }));
+    return n ? [x / n, y / n] : [0, 0];
+  }
+
+  Promise.all([
+    fetch('/static/vendor/countries-110m.json').then(r => r.json()),
+    fetch('/static/vendor/iso3166.json').then(r => r.json()),
+  ]).then(([topo, iso]) => {
+    const geos = topo.objects.countries.geometries;
+    // Alle Grenzlinien in EINE Geometrie: 177 Line-Meshes waeren 177 Draw
+    // Calls fuer denselben Anblick.
+    const punkte = [];
+    geos.forEach(g => {
+      const rr = ringe(topo, g);
+      const code = g.id != null ? String(g.id).padStart(3, '0') : null;
+      const eintrag = code && iso[code] ? iso[code] : null;
+      const [lon, lat] = mittelpunkt(rr);
+      zustand.laender.push({
+        iso: eintrag ? eintrag.a3 : (g.properties.name || '').toUpperCase().slice(0, 8),
+        name: (eintrag && eintrag.name) || g.properties.name || '?',
+        lon, lat, ohne_iso: !eintrag,
+      });
+      rr.forEach(ring => {
+        for (let i = 0; i < ring.length - 1; i++){
+          punkte.push(aufKugel(ring[i][0], ring[i][1], 1.002));
+          punkte.push(aufKugel(ring[i+1][0], ring[i+1][1], 1.002));
+        }
+      });
+    });
+    const geo = new THREE.BufferGeometry().setFromPoints(punkte);
+    // Kontrast gemessen, nicht geschaetzt: bei multiplyScalar(2.4) waren die
+    // Grenzen im Screenshot kaum vom Kugelgrund zu unterscheiden.
+    welt.add(new THREE.LineSegments(geo,
+      new THREE.LineBasicMaterial({color:0x7d8798})));
+
+    // Ein Punkt je Land: das ist die anwählbare Fläche.
+    const kugel = new THREE.SphereGeometry(0.016, 8, 6);
+    const marken = new THREE.InstancedMesh(
+      kugel, new THREE.MeshBasicMaterial({color:0xffffff}),
+      zustand.laender.length);
+    const hilfe = new THREE.Object3D();
+    zustand.laender.forEach((l, i) => {
+      hilfe.position.copy(aufKugel(l.lon, l.lat, 1.01));
+      hilfe.updateMatrix();
+      marken.setMatrixAt(i, hilfe.matrix);
+      marken.setColorAt(i, RUHE);
+    });
+    marken.instanceMatrix.needsUpdate = true;
+    welt.add(marken);
+    zustand.marken = marken;
+    document.body.dataset.laender = String(zustand.laender.length);
+  }).catch(err => {
+    el('gesagt').textContent = 'Ländergrenzen nicht geladen: ' + err.message;
+  });
+
+  /* Auswahl per Klick */
+  const zeiger = new THREE.Raycaster();
+  const maus = new THREE.Vector2();
+
+  function waehle(index){
+    const land = zustand.laender[index];
+    if (!land) return;
+    if (zustand.marken){
+      zustand.laender.forEach((_, i) =>
+        zustand.marken.setColorAt(i, i === index ? AKZENT : RUHE));
+      zustand.marken.instanceColor.needsUpdate = true;
+    }
+    zustand.aktiv = land;
+    dreheZu(land.lon, land.lat);
+    ladeLand(land.iso, land.name);
+  }
+
+  canvas.addEventListener('click', ev => {
+    if (!zustand.marken) return;
+    const r = canvas.getBoundingClientRect();
+    maus.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
+    maus.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
+    zeiger.setFromCamera(maus, kamera);
+    const treffer = zeiger.intersectObject(zustand.marken);
+    if (treffer.length) waehle(treffer[0].instanceId);
+  });
+
+  /* Die Drehung IST die Ladeanzeige. Hoechstens 1,8 s. */
+  let ziel = null, start = null, t0 = 0;
+  const DAUER_MS = 1800;
+
+  zustand.dreheZu = dreheZu;
+
+  function dreheZu(lon, lat){
+    const zielY = -(lon + 180) * Math.PI / 180 - Math.PI / 2;
+    const zielX = lat * Math.PI / 180;
+    if (reduziert){
+      welt.rotation.set(zielX, zielY, 0);      // springt direkt
+      document.body.dataset.drehung = 'sprung';
+      return;
+    }
+    document.body.dataset.drehung = 'animiert';
+    start = {x: welt.rotation.x, y: welt.rotation.y};
+    ziel = {x: zielX, y: zielY};
+    t0 = performance.now();
+  }
+
+  function resize(){
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (!w || !h) return;
+    renderer.setSize(w, h, false);
+    kamera.aspect = w / h;
+    kamera.updateProjectionMatrix();
+  }
+  new ResizeObserver(resize).observe(canvas);
+  resize();
+
+  let sichtbar = true;
+  document.addEventListener('visibilitychange', () => { sichtbar = !document.hidden; });
+  new IntersectionObserver(([e]) => { sichtbar = e.isIntersecting; }).observe(canvas);
+
+  const glatt = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+
+  renderer.setAnimationLoop(() => {
+    if (!sichtbar) return;
+    if (ziel){
+      const t = Math.min((performance.now() - t0) / DAUER_MS, 1);
+      const e = glatt(t);
+      welt.rotation.x = start.x + (ziel.x - start.x) * e;
+      welt.rotation.y = start.y + (ziel.y - start.y) * e;
+      if (t >= 1) ziel = null;
+    }
+    renderer.render(szene, kamera);
+  });
+  renderer.render(szene, kamera);
+  window.addEventListener('pagehide', () => renderer.setAnimationLoop(null));
+}
+
+/* ------------------------------------------------------- Bedienung */
+
+el('btn-welt').addEventListener('click', () => {
+  // Zurueck auf die Uebersicht: die Drehung ist auch hier die Ladeanzeige.
+  if (zustand.dreheZu) zustand.dreheZu(0, 15);
+  ladeLand('WELT', 'weltweit');
+});
+
+/* Push-to-Talk. Sprache ist eine Abkuerzung, keine Pflicht: alles hier ist
+   auch mit Maus und Tastatur erreichbar. */
+const Erkennung = window.SpeechRecognition || window.webkitSpeechRecognition;
+let hoerer = null;
+
+function suchLand(gesagt){
+  const wort = (gesagt || '').trim().toLowerCase();
+  if (!wort) return null;
+  if (/^(weltweit|welt|global)$/.test(wort)) return {iso:'WELT', name:'weltweit'};
+  return zustand.laender.find(l => l.name.toLowerCase() === wort)
+      || zustand.laender.find(l => l.name.toLowerCase().startsWith(wort))
+      || null;
+}
+
+function starteHoeren(){
+  if (!Erkennung || hoerer) return;
+  hoerer = new Erkennung();
+  hoerer.lang = 'de-DE';
+  hoerer.continuous = false;       // kein Streaming-STT
+  hoerer.interimResults = false;
+  hoerer.onresult = ev => {
+    const gesagt = ev.results[0][0].transcript;
+    const land = suchLand(gesagt);
+    if (land) ladeLand(land.iso, land.name);
+    else el('gesagt').textContent = `"${gesagt}" kenne ich nicht als Land.`;
+  };
+  hoerer.onend = () => { hoerer = null; el('btn-mic').setAttribute('aria-pressed','false'); };
+  hoerer.onerror = () => { hoerer = null; el('btn-mic').setAttribute('aria-pressed','false'); };
+  el('btn-mic').setAttribute('aria-pressed','true');
+  hoerer.start();
+}
+function stoppeHoeren(){ if (hoerer) hoerer.stop(); }
+
+if (!Erkennung){
+  el('btn-mic').disabled = true;
+  el('btn-mic').title = 'Dieser Browser kann keine Spracherkennung.';
+}
+el('btn-mic').addEventListener('mousedown', starteHoeren);
+el('btn-mic').addEventListener('mouseup', stoppeHoeren);
+addEventListener('keydown', ev => {
+  if (ev.code === 'Space' && !ev.repeat && ev.target === document.body){
+    ev.preventDefault(); starteHoeren();
+  }
+});
+addEventListener('keyup', ev => {
+  if (ev.code === 'Space'){ ev.preventDefault(); stoppeHoeren(); }
+});
+
+ladeZaehler();
+</script>
+</body>
+</html>

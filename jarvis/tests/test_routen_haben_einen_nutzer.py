@@ -56,8 +56,14 @@ def routen() -> list[str]:
     return sorted(pfade)
 
 
+# Alle ausgelieferten Seiten, nicht nur die erste. Als Phase 11 dazukam,
+# schlug dieser Test an - zu Recht: er kannte weltlage.html noch nicht.
+SEITEN = ("index.html", "weltlage.html")
+
+
 def seite() -> str:
-    return (WURZEL / "index.html").read_text(encoding="utf-8")
+    return "\n".join((WURZEL / name).read_text(encoding="utf-8")
+                     for name in SEITEN if (WURZEL / name).exists())
 
 
 def wird_gerufen(pfad: str, html: str) -> bool:
@@ -94,6 +100,12 @@ def test_nur_api_enthaelt_keine_leichen():
 def test_die_regel_greift_ueberhaupt():
     """Gegenprobe: eine erfundene Route wuerde auffallen."""
     assert not wird_gerufen("/api/gibtesnicht", seite())
+
+
+def test_alle_ausgelieferten_seiten_existieren():
+    """Sonst waere der Test oben gruen, weil er nichts zu lesen fand."""
+    for name in SEITEN:
+        assert (WURZEL / name).exists(), f"{name} fehlt - der Routentest liefe ins Leere"
 
 
 def test_readme_nennt_die_eigenen_api_routen():

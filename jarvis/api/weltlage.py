@@ -1,0 +1,265 @@
+"""Weltlage-Endpunkte (docs/phases/PHASE-11.md).
+
+Drei Grundsaetze, die hier als Code stehen und nicht als Bitte:
+
+* **Ein Klick = ein Auftrag.** Geladen wird nur das angewaehlte Land. Wer 195
+  Laender gleichzeitig live haelt, hat kein Dashboard gebaut, sondern ein Abo.
+* **Cache je Land, TTL 60 Minuten.** Der zweite Klick innerhalb der Stunde
+  kostet null neue Auftraege - im Zaehler nachpruefbar.
+* **Ohne Medium und Datum wird die Meldung verworfen**, und die Zahl der
+  verworfenen steht sichtbar in der Statusleiste.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+
+from api.security import require_token
+from core.db import session
+from core.weltlage import (
+    CACHE_TTL_MINUTEN,
+    Meldung,
+    cache_lesen,
+    cache_schreiben,
+    hole_quellbild,
+    siebe,
+)
+
+log = logging.getLogger("jarvis")
+
+weltlage_router = APIRouter(prefix="/api/weltlage", dependencies=[Depends(require_token)])
+
+MAX_KARTEN = 5          # Abschnitt 5: hoechstens 5 Karten gleichzeitig
+WELTWEIT = "WELT"       # Abschnitt 3: beim Start 6 Ereignisse, nicht 195
+
+
+def _settings(request: Request):
+    return request.app.state.settings
+
+
+def _heute() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+def _zaehle(conn, *, treffer: int = 0, abfragen: int = 0, verworfen: int = 0) -> None:
+    conn.execute(
+        "INSERT INTO weltlage_zaehler (tag, treffer, abfragen, verworfen) "
+        "VALUES (?, ?, ?, ?) ON CONFLICT(tag) DO UPDATE SET "
+        "treffer = treffer + excluded.treffer, "
+        "abfragen = abfragen + excluded.abfragen, "
+        "verworfen = verworfen + excluded.verworfen",
+        (_heute(), treffer, abfragen, verworfen),
+    )
+
+
+def _meldung_aus_modell(roh: dict, land_iso: str) -> Meldung | None:
+    """Baut eine Meldung aus dem, was das Modell geliefert hat.
+
+    Was sich nicht in den Vertrag fuegt, wird hier zu None und spaeter
+    gezaehlt - nicht zurechtgebogen.
+    """
+    wann = str(roh.get("veroeffentlicht") or "").strip()
+    zeitpunkt = None
+    for form in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M",
+                 "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            zeitpunkt = datetime.strptime(wann, form)
+            break
+        except ValueError:
+            continue
+    if zeitpunkt is None:
+        return None
+    if zeitpunkt.tzinfo is None:
+        zeitpunkt = zeitpunkt.replace(tzinfo=timezone.utc)
+
+    return Meldung(
+        schlagzeile=str(roh.get("schlagzeile") or "").strip(),
+        kurz=str(roh.get("kurz") or "").strip(),
+        medium=str(roh.get("medium") or "").strip(),
+        veroeffentlicht=zeitpunkt,
+        quell_url=str(roh.get("quell_url") or "").strip(),
+        land_iso=str(roh.get("land_iso") or land_iso).strip().upper(),
+        einordnung=str(roh.get("einordnung") or "").strip(),
+        einordnung_fehlt=str(roh.get("einordnung_fehlt") or "").strip(),
+    )
+
+
+async def baue_nutzlast(
+    request: Request, land_iso: str, roh_meldungen: list[dict], gesagt: str
+) -> dict:
+    """Vom Modellergebnis zur Anzeige - mit Sieb und Bildregel."""
+    kandidaten: list[Meldung] = []
+    unlesbar = 0
+    for eintrag in roh_meldungen:
+        m = _meldung_aus_modell(eintrag, land_iso)
+        if m is None:
+            unlesbar += 1
+        else:
+            kandidaten.append(m)
+
+    gut, gruende = siebe(kandidaten)
+    verworfen = len(gruende) + unlesbar
+    gut = gut[:MAX_KARTEN]
+
+    # Das Bild wird serverseitig geholt, weil der Browser an CORS scheitert.
+    # Kein og:image heisst: kein Bild. Nie ein Ersatz.
+    async def schmuecke(m: Meldung) -> None:
+        # Ein Verlag kann alles zurueckgeben. Was hier schiefgeht, kostet
+        # dieses eine Bild - nicht die ganze Antwort.
+        try:
+            bild = await hole_quellbild(m.quell_url, medium=m.medium)
+        except Exception as exc:                      # noqa: BLE001
+            log.warning("Quellbild von %s nicht geholt: %s", m.quell_url, exc)
+            return
+        if bild is not None:
+            m.bild_url = bild.url
+            m.bild_herkunft = bild.herkunft
+            m.bild_beschreibung = bild.beschreibung
+
+    if gut:
+        await asyncio.gather(*(schmuecke(m) for m in gut))
+
+    # Zweiter Durchgang: ein Bild ohne Herkunft faellt raus (Abschnitt 7).
+    gut, nochmal = siebe(gut)
+    verworfen += len(nochmal)
+
+    if not gut:
+        gesagt = gesagt or f"Zu {land_iso} finde ich heute nichts."
+
+    return {
+        "land_iso": land_iso,
+        "meldungen": [m.als_dict() for m in gut],
+        "verworfen": verworfen,
+        "gesagt": gesagt,
+        "cache": False,
+    }
+
+
+@weltlage_router.get("/zaehler")
+async def get_zaehler(request: Request) -> dict:
+    """Cache-Treffer gegen echte Abfragen, plus die Kosten des Tages.
+
+    Die Kosten kommen aus `llm_calls`, nicht aus einer eigenen Zaehlung -
+    sonst haette man zwei Wahrheiten.
+    """
+    pfad = _settings(request).db_path
+
+    def lesen() -> dict:
+        with session(pfad) as conn:
+            zeile = conn.execute(
+                "SELECT treffer, abfragen, verworfen FROM weltlage_zaehler WHERE tag = ?",
+                (_heute(),),
+            ).fetchone()
+            treffer, abfragen, verworfen = (zeile if zeile else (0, 0, 0))
+            kosten = conn.execute(
+                "SELECT COALESCE(SUM(cost_eur), 0), COUNT(*) FROM llm_calls "
+                "WHERE substr(created_at, 1, 10) = ?",
+                (_heute(),),
+            ).fetchone()
+            laender = conn.execute("SELECT COUNT(*) FROM weltlage_cache").fetchone()[0]
+        gesamt = treffer + abfragen
+        return {
+            "treffer": treffer,
+            "abfragen": abfragen,
+            "quote": round(treffer / gesamt, 3) if gesamt else 0.0,
+            "verworfen": verworfen,
+            "kosten_eur": round(kosten[0], 6),
+            "modellaufrufe": kosten[1],
+            "laender_im_cache": laender,
+            "ttl_minuten": CACHE_TTL_MINUTEN,
+        }
+
+    return await asyncio.to_thread(lesen)
+
+
+@weltlage_router.get("/{land_iso}")
+async def get_weltlage(request: Request, land_iso: str) -> dict:
+    """Cache-Treffer oder Auftrag. Nie beides, nie stillschweigend beides."""
+    land_iso = land_iso.strip().upper()[:8]
+    if not land_iso.isalnum():
+        raise HTTPException(status_code=422, detail="Ungueltiger Laendercode.")
+    pfad = _settings(request).db_path
+
+    def aus_cache() -> dict | None:
+        with session(pfad) as conn:
+            treffer = cache_lesen(conn, land_iso)
+            if treffer is not None:
+                _zaehle(conn, treffer=1)
+            return treffer
+
+    gecached = await asyncio.to_thread(aus_cache)
+    if gecached is not None:
+        return gecached
+
+    return {"land_iso": land_iso, "cache": False, "auftrag_noetig": True,
+            "meldungen": [], "verworfen": 0,
+            "gesagt": f"Ich schaue nach {land_iso}."}
+
+
+@weltlage_router.post("/{land_iso}")
+async def post_weltlage(request: Request, land_iso: str) -> dict:
+    """Legt genau EINEN Auftrag an und schreibt das Ergebnis in den Cache."""
+    land_iso = land_iso.strip().upper()[:8]
+    if not land_iso.isalnum():
+        raise HTTPException(status_code=422, detail="Ungueltiger Laendercode.")
+
+    settings = _settings(request)
+    pfad = settings.db_path
+
+    def cache_pruefen() -> dict | None:
+        with session(pfad) as conn:
+            treffer = cache_lesen(conn, land_iso)
+            if treffer is not None:
+                _zaehle(conn, treffer=1)
+            return treffer
+
+    gecached = await asyncio.to_thread(cache_pruefen)
+    if gecached is not None:
+        return gecached
+
+    from core.agents import WELTLAGE_PROMPT
+    from core.llm import LLMMessage
+
+    # Abschnitt 3: beim Start sechs Ereignisse weltweit, nicht 195 Laender.
+    ziel = ("Sechs belegte Ereignisse weltweit, je zwei Saetze."
+            if land_iso == WELTWEIT
+            else f"Was ist in {land_iso} passiert? Hoechstens fuenf belegte Meldungen.")
+    provider = request.app.state.provider
+    try:
+        antwort = await provider.complete([LLMMessage("user", ziel)],
+                                          system=WELTLAGE_PROMPT)
+    except Exception as exc:                      # noqa: BLE001
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    try:
+        daten = json.loads(_json_aus(antwort.text))
+    except (ValueError, TypeError):
+        daten = {"meldungen": [], "gesagt": "Das Modell hat kein verwertbares JSON geliefert."}
+
+    nutzlast = await baue_nutzlast(request, land_iso,
+                                   daten.get("meldungen") or [],
+                                   str(daten.get("gesagt") or ""))
+
+    def schreiben() -> None:
+        with session(pfad) as conn:
+            cache_schreiben(conn, land_iso, nutzlast)
+            _zaehle(conn, abfragen=1, verworfen=nutzlast["verworfen"])
+
+    await asyncio.to_thread(schreiben)
+    return nutzlast
+
+
+def _json_aus(text: str) -> str:
+    import re
+
+    text = (text or "").strip()
+    block = re.search(r"```(?:json)?\s*(.+?)```", text, re.DOTALL)
+    if block:
+        return block.group(1).strip()
+    start, ende = text.find("{"), text.rfind("}")
+    return text[start:ende + 1] if start != -1 and ende > start else text

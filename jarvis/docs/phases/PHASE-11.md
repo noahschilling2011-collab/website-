@@ -256,3 +256,84 @@ steht sichtbar in der Statusleiste.
 - Keine Kennzahl im HUD, die nicht aus echten Daten kommt. Kein „Threat Level",
   kein „Uplink", keine Zähler, die nur hübsch aussehen.
 - Kein zweiter Modellaufruf, um eine Meldung „spannender zu formulieren".
+
+---
+
+# ERGEBNIS — gebaut am 25.08.2026
+
+> **Die Sperre oben wurde auf Ansage übergangen.** Phase 2, 4 und 9 stehen auf
+> `OFFEN`, nicht auf `FERTIG`. Alles unten ist deshalb mit einem geskripteten
+> `FakeLLMProvider` geprüft, nicht mit einem echten Modell. Was ein echtes Modell
+> braucht, ist unten als solches markiert.
+
+## Was existiert
+
+| Datei | wofür |
+|---|---|
+| `core/weltlage.py` | `Meldung`-Vertrag, `pruefe()`/`siebe()`, `hole_quellbild()`, Cache |
+| `api/weltlage.py` | `GET/POST /api/weltlage/{land}`, `GET /api/weltlage/zaehler` |
+| `weltlage.html` | Vollbild-Globus, Karten, Statusleiste — kein Build-Step |
+| `static/vendor/` | `three.module.js` + `three.core.js` (0.185.1), `countries-110m.json`, `iso3166.json` |
+| `core/agents.py` | `WELTLAGE_PROMPT` mit den Regeln aus 4, 4b und 4c |
+| Tabellen `weltlage_cache`, `weltlage_zaehler` | Cache je Land, Zählung je Tag |
+| `tests/test_weltlage.py` · `tests/test_weltlage_ui.py` | 35 + 14 Tests |
+
+**Eigene Seite statt fünfter Tab.** Der Auftrag verlangt Vollbild ohne Scrollbalken;
+der Globus hält sich nicht an das Raster der Chat-Oberfläche. `index.html` bleibt
+unberührt.
+
+**Three.js lokal statt vom CDN.** Der Auftrag sagt „Import-Map mit fester Version" —
+eine lokale Datei ist fester als ein CDN, läuft ohne Netz und ist headless prüfbar.
+`three@0.185.1` ist ein geteilter Build: `three.module.js` allein reicht nicht,
+`three.core.js` gehört dazu. Das fiel erst im Browser auf, nicht beim Lesen.
+
+## Definition of Done
+
+| # | Kriterium | Stand | BELEG |
+|---|---|---|---|
+| 1 | Globus zeigt alle Länder, ein Klick = **ein** Auftrag | ◐ | `test_der_globus_zeigt_alle_laender_des_atlas` → 177. `test_dod_1_ein_klick_ist_genau_ein_auftrag` prüft den Zähler: `(treffer, abfragen) == (0, 1)`. **Nicht 195:** der 110m-Atlas kennt 177 Flächen, davon 174 mit ISO-Code — N. Zypern, Somaliland und Kosovo haben keinen |
+| 2 | Zweiter Klick in 60 min kostet **null** neue Aufträge | ✓ | `test_dod_2_…` zweimal: der zweite Klick läuft gegen einen Provider, der bei jedem Aufruf wirft. Gegenprobe: Cache abgeschaltet → beide Tests rot |
+| 3 | Jede Karte trägt Medium und Datum; Testmeldung ohne Medium wird verworfen und gezählt | ✓ | `test_dod_3_…` → `verworfen == 1` im Zähler. Gegenprobe: Prüfung ausgehebelt → rot |
+| 4 | **Bildtest**, beide Fälle automatisiert | ✓ | Fixture-Verlag: mit `og:image` → genau dieses Bild plus Herkunftsstempel; ohne → `.kachel` mit „keine Quellgrafik", `img`-Zähler **0**. Gegenprobe: Stockfoto als Fallback eingebaut → rot |
+| 5 | Negativtest: „0 belegte Meldungen", keine Karte | ✓ | `test_dod_5_null_meldungen_zeigt_keine_karte` im Browser |
+| 6 | Kein Scrollbalken bei 1280×720 **und** 1920×1080 | ✓ | `test_dod_6_kein_scrollbalken`, beide Breiten headless |
+| 7 | Push-to-Talk gesprochen → Globus dreht → Meldungen | ✗ | **NICHT AUSGEFÜHRT** — Headless-Chromium hat kein Mikrofon. Der Tastaturweg (Leertaste, Knopf, `#btn-welt`) ist geprüft; die Spracherkennung selbst musst du ausprobieren |
+| 8 | Tageskosten und Cache-Quote sichtbar, stimmen mit `llm_calls` | ✓ | `test_dod_8_zaehler_liest_die_kosten_aus_llm_calls` rechnet gegen eine unabhängige SQL-Summe; `test_dod_8_zaehler_stehen_sichtbar_in_der_statusleiste` liest die Statusleiste |
+| 9 | `prefers-reduced-motion`: keine Drehung, kein Übergang | ✓ | `test_dod_9_…` → `dataset.drehung == "sprung"`, Transition < 0,01 s. Mit Gegenprobe ohne reduced motion |
+| 10 | **Trennungstest**, Screenshot-geprüft | ✓ | `test_dod_10_…` vergleicht die berechneten Stile: andere Fläche (`backgroundColor` verschieden), andere Kante (`dashed`), plus der Hinweis „Von JARVIS, nicht aus der Quelle. Kein Beleg." Gegenprobe: beide Blöcke gleich ausgezeichnet → rot |
+| 11 | **Captiontest**: mit `og:image:alt` → Caption; ohne → kein Wort | ✓ | `test_dod_11_…` beide Fälle. Gegenprobe: erfundene Beschreibung eingesetzt → rot. Zusätzlich zählt `<figcaption>` als Quelle |
+| 12 | **Null Vision-Aufruf** mit externer Bild-URL | ✓ | `test_dod_12_…` durchsucht alles, was je an das Modell ging, nach `.jpg`. Plus `ZU BILDERN SAGST DU NICHTS` im Prompt |
+| 13 | Schweigetest: kein Füllsatz | ✓ | `test_dod_13_schweigetest_kein_fuellsatz` |
+| 14 | Kontextlücke: leere Einordnung mit Hinweis | ✓ | `test_dod_14_…` im Browser: „Dazu habe ich keinen Kontext." + „Leer gelassen statt gefüllt." |
+
+## Was beim Bauen herauskam
+
+**Fünf Karten passen bei 1280×720 nicht.** Der erste Entwurf presste sie hinein und
+schnitt den Text mitten im Satz ab. Das ist schlechter als eine Karte weniger, also:
+ganze Karten werden weggelassen, und die Statusleiste sagt
+„3 weitere Meldungen passen nicht ins Bild." Ab 1500 px gibt es zwei Spalten, dort
+passen alle fünf vollständig — beides im Screenshot geprüft.
+
+**Der Rückfallschutz aus FIX-01 Schritt 9 hat angeschlagen.** Die neuen Routen kamen
+in `index.html` nicht vor. Er kannte `weltlage.html` noch nicht; jetzt liest er alle
+ausgelieferten Seiten. Genau dafür war er gebaut.
+
+**Ein kaputtes Bild darf nicht fünf Karten mitreißen.** Ein Verlag kann alles
+zurückgeben; die Bildbeschaffung fängt deshalb jede Ausnahme je Meldung ab.
+
+## Nicht gebaut — wie im Auftrag verlangt
+
+Kein Vorabladen aller Länder, keine Hintergrund-Aktualisierung, keine Kennzahl im HUD
+ohne echte Daten, kein zweiter Modellaufruf zum Ausschmücken.
+
+## BLOCKER
+
+1. **Ohne echtes Modell ist keine dieser Zeilen abgenommen.** Die Regeln aus
+   Abschnitt 4 stehen im Prompt und sind als Text geprüft — ob ein Modell sie
+   befolgt, zeigt erst ein Lauf mit `LLM_API_KEY`.
+2. **`SEARCH_API_KEY` fehlt.** Der Weltlage-Agent kann ohne Websuche keine echten
+   Meldungen finden; alles oben lief gegen geskriptete Antworten.
+3. **DoD 7 braucht ein Mikrofon.**
+4. **Kosten:** ein Weltdurchlauf über 195 Länder liegt bei jedem realistischen
+   Anbieterpreis weit über `BUDGET_MAX_COST_EUR=0.50`. Deshalb lädt nur das
+   angewählte Land, mit 60-Minuten-Cache.

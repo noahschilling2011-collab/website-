@@ -292,3 +292,26 @@ CREATE TABLE IF NOT EXISTS lookups (
 
 CREATE UNIQUE INDEX IF NOT EXISTS lookups_begriff_quelle
     ON lookups(begriff, quelle);
+
+
+-- ---------------------------------------------------------------------------
+-- Weltlage (docs/phases/PHASE-11.md)
+--
+-- Cache je Land, TTL 60 Minuten. Ohne den kostet ein zweiter Klick auf
+-- Deutschland einen zweiten Auftrag - und 195 Laender live zu halten waere
+-- kein Dashboard, sondern ein Abo.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS weltlage_cache (
+    land_iso   TEXT PRIMARY KEY,
+    nutzlast   TEXT NOT NULL,          -- JSON: Meldungen + Zaehler
+    geholt_am  TEXT NOT NULL
+);
+
+-- Getrennt vom Cache, weil der geleert werden darf und die Zaehlung nicht.
+CREATE TABLE IF NOT EXISTS weltlage_zaehler (
+    tag        TEXT PRIMARY KEY,       -- YYYY-MM-DD
+    treffer    INTEGER NOT NULL DEFAULT 0,   -- aus dem Cache bedient
+    abfragen   INTEGER NOT NULL DEFAULT 0,   -- echte Auftraege
+    verworfen  INTEGER NOT NULL DEFAULT 0
+);

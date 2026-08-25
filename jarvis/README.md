@@ -149,6 +149,19 @@ Datenmenge deutlich wächst.
 
 ---
 
+## Weltlage — der Globus
+
+`http://127.0.0.1:8000/weltlage` — eigene Vollbildseite, kein Build-Step.
+Three.js und die Ländergrenzen liegen unter `static/vendor/` mit fester Version,
+nicht am CDN: die Seite läuft damit auch ohne Netz.
+
+Ein Klick auf ein Land lädt **einen** Auftrag. Der zweite Klick innerhalb von
+60 Minuten kostet nichts — die Statusleiste zeigt Abfragen, Cache-Treffer,
+Cache-Quote, verworfene Meldungen und die Tageskosten aus `llm_calls`.
+
+**Ohne `SEARCH_API_KEY` findet der Weltlage-Agent keine echten Meldungen.**
+Der Globus, der Cache und die Zähler laufen trotzdem.
+
 ## Endpunkte ohne Oberfläche — „nur API, kein UI"
 
 Diese Endpunkte sind absichtlich nur über die API erreichbar. Die Oberfläche

@@ -45,8 +45,14 @@ LETZTE ÄNDERUNG: 2026-08-25 (STATUS.md entwertet, Schritt 3 aus FIX-01)
 | 8 | Satellite Agent           | OFFEN  | 0 von 6 |
 | 9 | Voice                     | OFFEN  | 0 von 4 |
 | 10 | Härten & Verpacken        | OFFEN  | 2 von 4 |
+| 11 | Weltlage (Globus)         | OFFEN  | 11 von 14 |
 
 Status-Werte: GESPERRT / OFFEN / IN ARBEIT / FERTIG
+
+> **Phase 11 wurde auf Ansage gebaut, obwohl ihr eigener Auftrag sie sperrt**
+> (er verlangt Phase 2, 4 und 9 auf `FERTIG`). Die 11 belegten Kriterien sind
+> gegen einen geskripteten Fake geprüft, nicht gegen ein echtes Modell. Die
+> Belege stehen in `docs/phases/PHASE-11.md` unter „ERGEBNIS".
 Legende der DoD-Tabellen:
 **✓ BELEGT** — der Befehl zeigt genau das, was das Kriterium verlangt.
 **◐ TEILWEISE** — die Mechanik ist geprüft, die im Kriterium verlangte Endstufe nicht

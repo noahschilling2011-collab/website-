@@ -428,3 +428,21 @@ async def index(request: Request) -> HTMLResponse:
     """
     html = request.app.state.index_path.read_text(encoding="utf-8")
     return HTMLResponse(html.replace("__JARVIS_TOKEN__", request.app.state.token))
+
+
+@router.get("/weltlage", include_in_schema=False)
+async def weltlage_seite(request: Request) -> HTMLResponse:
+    """Die Globus-Ansicht (Phase 11).
+
+    Eigene Seite statt fuenfter Tab in `index.html`: der Phasenauftrag
+    verlangt Vollbild ohne Scrollbalken, und der Globus haelt sich nicht an
+    das Raster der Chat-Oberflaeche. Kein Build-Step, wie ueberall sonst.
+
+    Der Token wird wie bei `/` beim Ausliefern eingesetzt, der LLM-Key
+    niemals (0.4.1).
+    """
+    seite = request.app.state.weltlage_path
+    if not seite.exists():
+        raise HTTPException(status_code=404, detail="weltlage.html fehlt.")
+    html = seite.read_text(encoding="utf-8")
+    return HTMLResponse(html.replace("__JARVIS_TOKEN__", request.app.state.token))
