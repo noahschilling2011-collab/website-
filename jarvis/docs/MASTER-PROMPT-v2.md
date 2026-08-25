@@ -79,7 +79,17 @@ Wenn du glaubst, eine dieser Grenzen sei falsch: sag es in einem Satz und halte 
 3. Die API bindet standardmäßig an `127.0.0.1`, nicht `0.0.0.0`.
 4. Jeder API-Request braucht einen Header `X-Jarvis-Token`, verglichen mit einem Wert aus `.env`. Auch lokal. Kostet fünf Zeilen und verhindert, dass ein beliebiges Skript im Browser deinen Assistenten fernsteuert.
 5. Kein `eval`, kein `exec`, kein `shell=True` mit Nutzereingaben — nirgends, in keiner Phase.
-6. Ein Tool, das schreibt, löscht, sendet oder Geld ausgibt, ist `requires_confirmation = True`. Ohne Ausnahme.
+6. Bestätigung ist Pflicht ab `EXTERNAL` (3) aufwärts, plus bei jeder **löschenden oder
+   überschreibenden** lokalen Operation. Rein anhängende lokale Schreibvorgänge
+   (`remember`) brauchen keine.
+
+   > **Geändert am 25.08.2026.** Vorher stand hier: *Ein Tool, das schreibt, löscht,
+   > sendet oder Geld ausgibt, ist `requires_confirmation = True`. Ohne Ausnahme.*
+   > Das widersprach der Definition von `Permission.LOCAL` weiter unten, die
+   > ausdrücklich *lokal schreiben: Notiz, Memory-Eintrag* nennt — also ein Schreiben
+   > ohne Rückfrage. Nach der alten Regel hätte jedes `remember` eine Rückfrage
+   > ausgelöst, was das Gedächtnis unbenutzbar macht. Die Spec war falsch, nicht der
+   > Code: `remember` bleibt `LOCAL` mit `requires_confirmation = False`.
 
 ## 0.5 Budget & Kill-Switch — die Sektion, die in v1 komplett fehlte
 
