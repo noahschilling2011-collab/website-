@@ -33,7 +33,8 @@ Auftrag: `docs/phases/PHASE-01.md`
 |---|---|
 | `pytest -q` | 72 passed |
 | `python -m scripts.smoke` | bestanden, Exitcode 0 |
-| `uvicorn main:app` + echtes HTTP | Health, Chat und `GET /` geliefert |
+| `uvicorn main:app --reload` + echtes HTTP | Health, Chat und `GET /` geliefert |
+| echter Browser gegen den laufenden Server | getippt, gesendet, neu geladen — Konversation stand noch da, keine JS-Fehler, keine 404 |
 | Oberfläche headless in 360/768/1440 px | keine JS-Fehler, kein seitliches Scrollen |
 | Kontrast an echten Pixeln gemessen | schlechtester Wert 4.70:1 (AA verlangt 4.5:1) |
 
