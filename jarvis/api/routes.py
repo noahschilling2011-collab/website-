@@ -280,9 +280,12 @@ async def delete_memory(request: Request, fact_id: int) -> None:
         raise HTTPException(status_code=404, detail="Fakt nicht gefunden.")
 
 
-@api.get("/tasks", response_model=list[TaskLogOut])
+@api.get("/task-log", response_model=list[TaskLogOut])
 async def get_task_log(request: Request) -> list[TaskLogOut]:
-    """Das episodische Gedaechtnis: was wurde wann beauftragt, wie ging es aus."""
+    """Das episodische Gedaechtnis: was wurde wann beauftragt, wie ging es aus.
+
+    Nicht zu verwechseln mit `GET /api/tasks` aus Phase 4 - das ist die
+    Struktur laufender Auftraege, das hier die kurze Chronik."""
     rows = await asyncio.to_thread(memory.list_task_log, _settings(request).db_path)
     return [TaskLogOut.of(r) for r in rows]
 

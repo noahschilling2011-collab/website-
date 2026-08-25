@@ -80,6 +80,11 @@ class Step:
     result: ToolResult | None = None
     attempts: int = 0
     max_attempts: int = 2
+    # ERGAENZT gegenueber docs/contracts.md: die Begruendung der Verifikation.
+    # Ohne sie steht im UI zwar FAILED, aber nicht warum - und der naechste
+    # Versuch bekommt nicht gesagt, was gefehlt hat. Rein additiv, mit
+    # Default; nichts wurde umbenannt. In STATUS.md unter "Abweichungen".
+    note: str = ""
 
 
 @dataclass
@@ -117,6 +122,14 @@ class Task:
     spent_cost_eur: float = 0.0
     created_at: float = field(default_factory=time.time)
     depth: int = 0
+    # ERGAENZT gegenueber docs/contracts.md, beides rein additiv mit Default:
+    #   result       - das Endergebnis. Ohne das Feld muesste der Runner es
+    #                  neben dem Task herreichen.
+    #   abort_reason - welche Grenze gerissen hat. 0.5 verlangt, dass die
+    #                  Ueberschreitung benannt wird; ein Task, der nur
+    #                  "aborted_budget" sagt, sagt zu wenig.
+    result: str | None = None
+    abort_reason: str | None = None
 
     # --- Budget ---------------------------------------------------------
     # 0.5: "Jede Grenze wird VOR jedem Schritt geprüft, nicht danach."
@@ -133,8 +146,12 @@ class Task:
         Eine Grenze, die man nicht benennen kann, ist keine Grenze.
         """
         b = self.budget
-        if len(self.steps) >= b.max_steps:
-            return f"max_steps erreicht ({len(self.steps)}/{b.max_steps})"
+        # Gezaehlt wird, was wirklich gelaufen ist - nicht, was geplant wurde.
+        # Sonst reisst die Grenze, bevor ein einziger Schritt lief, und es
+        # gaebe nie ein Teilergebnis.
+        gestartet = sum(1 for s in self.steps if s.attempts > 0)
+        if gestartet >= b.max_steps:
+            return f"max_steps erreicht ({gestartet}/{b.max_steps})"
         if self.depth > b.max_depth:
             return f"max_depth überschritten ({self.depth}/{b.max_depth})"
         if self.spent_tool_calls >= b.max_tool_calls:

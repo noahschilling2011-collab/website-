@@ -134,3 +134,49 @@ CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE ON messages BEGIN
         VALUES('delete', old.id, old.content);
     INSERT INTO messages_fts(rowid, content_text) VALUES (new.id, new.content);
 END;
+
+
+-- ---------------------------------------------------------------------------
+-- Phase 4: Tasks und Schritte.
+--
+-- `task_log` aus Phase 3 bleibt, was es ist: die kurze Chronik. Hier steht
+-- die Struktur eines laufenden Auftrags, Schritt fuer Schritt. Ein Schritt
+-- wird persistiert, BEVOR er laeuft - sonst ist nach einem Absturz nicht
+-- nachvollziehbar, was gerade passierte.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS tasks (
+    id                TEXT    PRIMARY KEY,
+    goal              TEXT    NOT NULL,
+    status            TEXT    NOT NULL,
+    depth             INTEGER NOT NULL DEFAULT 0,
+    parent_task_id    TEXT    REFERENCES tasks(id) ON DELETE CASCADE,
+    budget            TEXT    NOT NULL DEFAULT '{}',   -- JSON
+    spent_tokens      INTEGER NOT NULL DEFAULT 0,
+    spent_cost_eur    REAL    NOT NULL DEFAULT 0.0,
+    spent_tool_calls  INTEGER NOT NULL DEFAULT 0,
+    result            TEXT,
+    abort_reason      TEXT,
+    created_at        TEXT    NOT NULL,
+    finished_at       TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_tasks_created ON tasks(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tasks_parent  ON tasks(parent_task_id);
+
+CREATE TABLE IF NOT EXISTS steps (
+    id            TEXT    PRIMARY KEY,
+    task_id       TEXT    NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    idx           INTEGER NOT NULL,
+    description   TEXT    NOT NULL,
+    agent         TEXT,
+    status        TEXT    NOT NULL,
+    result        TEXT,                                -- JSON eines ToolResult
+    note          TEXT,                                -- Begruendung der Pruefung
+    attempts      INTEGER NOT NULL DEFAULT 0,
+    max_attempts  INTEGER NOT NULL DEFAULT 2,
+    created_at    TEXT    NOT NULL,
+    updated_at    TEXT    NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_steps_task ON steps(task_id, idx);

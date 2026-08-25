@@ -1,0 +1,254 @@
+"""Task-Runner (Phase 4).
+
+Die Reihenfolge ist Absicht und steht so im Auftrag:
+
+* Jede Budgetgrenze wird **vor** jedem Schritt geprueft, nicht danach (0.5).
+* Ein Schritt wird persistiert, **bevor** er laeuft - sonst ist nach einem
+  Absturz nicht nachvollziehbar, was gerade passierte.
+* Verifikation ist ein eigener, billiger Schritt aus `core/verify.py` -
+  Code, kein Modell, das sich selbst benotet.
+* Bei Ueberschreitung: `aborted_budget`, Teilergebnis zurueck, Begruendung
+  benennen. **Nicht** stillschweigend weiterlaufen und nicht selbst erhoehen.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import time
+from dataclasses import dataclass, field
+from typing import Awaitable, Callable
+
+from core.agents import ToolAgent, baue_agenten
+from core.contracts import (
+    Permission,
+    Step,
+    StepStatus,
+    Task,
+    TaskBudget,
+    ToolResult,
+)
+from core.llm import LLMMessage, LLMProvider, LLMReply
+from core.planner import PlanungFehlgeschlagen, erstelle_plan
+from core.tools.dispatch import ToolCall
+from core.verify import verifiziere
+
+log = logging.getLogger("jarvis")
+
+# Strukturelle Obergrenze fuer den Plan - bewusst NICHT das Budget. Wuerde der
+# Plan aufs Budget gekuerzt, koennte max_steps nie greifen, und der Nutzer
+# saehe nie, dass sein Ziel groesser war als das Budget. Der Plan darf also
+# zu gross sein; das Budget stoppt ihn dann waehrend der Ausfuehrung, mit
+# Teilergebnis.
+PLAN_MAX_STEPS = 12
+
+ABSCHLUSS_PROMPT = """Du bist JARVIS und fasst die Ergebnisse eines Auftrags
+fuer den Nutzer zusammen.
+
+REGELN:
+1. Antworte nur mit dem, was in den Schritt-Ergebnissen steht. Ergaenze nichts
+   aus dem Gedaechtnis.
+2. Jede Zahl und jede Tatsachenbehauptung bekommt die Quelle in Klammern
+   dahinter, als vollstaendige URL.
+3. Wenn ein Schritt fehlgeschlagen ist, sag welcher und was dadurch offen
+   bleibt. Tu nicht so, als waere alles beantwortet.
+4. Knapp. Keine Einleitung, kein "Gerne!"."""
+
+
+class TaskAbgebrochen(RuntimeError):
+    pass
+
+
+@dataclass
+class Laufzeit:
+    """Was der Runner nach aussen meldet, waehrend er laeuft."""
+
+    on_task: Callable[[Task], Awaitable[None]] | None = None
+    on_step: Callable[[Task, int, Step], Awaitable[None]] | None = None
+    on_call: Callable[[ToolCall], Awaitable[None]] | None = None
+    abbruch: asyncio.Event | None = None
+
+    async def task(self, t: Task) -> None:
+        if self.on_task:
+            await self.on_task(t)
+
+    async def step(self, t: Task, i: int, s: Step) -> None:
+        if self.on_step:
+            await self.on_step(t, i, s)
+
+    def abgebrochen(self) -> bool:
+        return self.abbruch is not None and self.abbruch.is_set()
+
+
+async def fuehre_task_aus(
+    provider: LLMProvider,
+    ziel: str,
+    *,
+    budget: TaskBudget,
+    kosten: Callable[[int, int], float],
+    max_permission: Permission = Permission.LOCAL,
+    agenten: dict[str, ToolAgent] | None = None,
+    task: Task | None = None,
+    laufzeit: Laufzeit | None = None,
+) -> Task:
+    laufzeit = laufzeit or Laufzeit()
+    task = task or Task(goal=ziel, budget=budget)
+    task.goal = ziel
+    task.budget = budget
+    task.status = "running"
+
+    async def buche(reply: LLMReply) -> None:
+        """Jeder Modellzug zaehlt aufs Budget - auch der des Planners."""
+        task.spent_tokens += reply.usage.in_tokens + reply.usage.out_tokens
+        task.spent_cost_eur += kosten(reply.usage.in_tokens, reply.usage.out_tokens)
+
+    async def buche_werkzeug(aufruf: ToolCall) -> None:
+        task.spent_tool_calls += 1
+        if laufzeit.on_call:
+            await laufzeit.on_call(aufruf)
+
+    verfuegbar = agenten or baue_agenten(
+        provider, max_permission=max_permission,
+        on_reply=buche, on_call=buche_werkzeug,
+    )
+
+    await laufzeit.task(task)
+
+    # --- Plan --------------------------------------------------------------
+    try:
+        task.steps = await erstelle_plan(
+            provider,
+            ziel,
+            agenten={n: a.description for n, a in verfuegbar.items()
+                     if n != "jarvis"},
+            max_steps=PLAN_MAX_STEPS,
+        )
+    except PlanungFehlgeschlagen as exc:
+        task.status = "failed"
+        task.result = str(exc)
+        await laufzeit.task(task)
+        return task
+
+    for i, schritt in enumerate(task.steps):
+        await laufzeit.step(task, i, schritt)
+    await laufzeit.task(task)
+
+    # --- Schritte ----------------------------------------------------------
+    for i, schritt in enumerate(task.steps):
+        if laufzeit.abgebrochen():
+            task.status = "cancelled"
+            task.abort_reason = "Vom Nutzer abgebrochen."
+            for rest in task.steps[i:]:
+                if rest.status is StepStatus.PENDING:
+                    rest.status = StepStatus.SKIPPED
+                    await laufzeit.step(task, task.steps.index(rest), rest)
+            await laufzeit.task(task)
+            return task
+
+        # 0.5: VOR dem Schritt, nicht danach.
+        verletzung = task.budget_verletzung()
+        if verletzung:
+            task.status = "aborted_budget"
+            task.abort_reason = verletzung
+            log.warning("task %s: Budget - %s", task.id, verletzung)
+            for rest in task.steps[i:]:
+                if rest.status is StepStatus.PENDING:
+                    rest.status = StepStatus.SKIPPED
+                    await laufzeit.step(task, task.steps.index(rest), rest)
+            break
+
+        agent = verfuegbar.get(schritt.agent or "jarvis") or verfuegbar["jarvis"]
+
+        while True:
+            schritt.attempts += 1
+            schritt.status = StepStatus.RUNNING
+            await laufzeit.step(task, i, schritt)
+
+            ergebnis = await agent.run(task, schritt)
+            bestanden, begruendung = verifiziere(schritt, ergebnis)
+            schritt.result = ergebnis
+            schritt.note = begruendung
+
+            if bestanden:
+                schritt.status = StepStatus.DONE
+                await laufzeit.step(task, i, schritt)
+                break
+
+            log.info(
+                "task %s Schritt %d: Versuch %d/%d nicht bestanden - %s",
+                task.id, i + 1, schritt.attempts, schritt.max_attempts, begruendung,
+            )
+
+            if schritt.attempts >= schritt.max_attempts:
+                schritt.status = StepStatus.FAILED
+                await laufzeit.step(task, i, schritt)
+                break
+
+            # Der naechste Versuch bekommt gesagt, was gefehlt hat - sonst
+            # macht er denselben Fehler nochmal.
+            schritt.description = (
+                f"{schritt.description}\n\n[Vorheriger Versuch nicht bestanden: "
+                f"{begruendung}]"
+            )
+            schritt.status = StepStatus.PENDING
+            await laufzeit.step(task, i, schritt)
+
+    # --- Abschluss ---------------------------------------------------------
+    erledigt = [s for s in task.steps if s.status is StepStatus.DONE]
+    gescheitert = [s for s in task.steps if s.status is StepStatus.FAILED]
+
+    if not erledigt:
+        task.status = task.status if task.status == "aborted_budget" else "failed"
+        task.result = (
+            "Kein Schritt ist durchgelaufen. "
+            + (task.abort_reason or "")
+            + (f" Zuletzt: {gescheitert[-1].note}" if gescheitert else "")
+        ).strip()
+        await laufzeit.task(task)
+        return task
+
+    task.result = await _fasse_zusammen(
+        provider, task, erledigt, gescheitert, buche
+    )
+    if task.status == "running":
+        task.status = "done" if not gescheitert else "failed"
+    await laufzeit.task(task)
+    return task
+
+
+async def _fasse_zusammen(
+    provider: LLMProvider,
+    task: Task,
+    erledigt: list[Step],
+    gescheitert: list[Step],
+    buche: Callable[[LLMReply], Awaitable[None]],
+) -> str:
+    teile = [f"Ziel: {task.goal}", "", "Ergebnisse der Schritte:"]
+    quellen: list[str] = []
+    for s in erledigt:
+        teile.append(f"\n### {s.description}\n{(s.result.display if s.result else '')}")
+        for url in (s.result.sources if s.result else []):
+            if url not in quellen:
+                quellen.append(url)
+    for s in gescheitert:
+        teile.append(f"\n### FEHLGESCHLAGEN: {s.description}\nGrund: {s.note}")
+    if task.abort_reason:
+        teile.append(f"\nHINWEIS: Der Auftrag wurde abgebrochen - {task.abort_reason}")
+
+    try:
+        reply = await provider.complete(
+            [LLMMessage("user", "\n".join(teile))], system=ABSCHLUSS_PROMPT
+        )
+        await buche(reply)
+        text = reply.text.strip()
+    except Exception as exc:  # noqa: BLE001 - lieber roh als gar nichts
+        log.warning("task %s: Zusammenfassung fehlgeschlagen - %s", task.id, exc)
+        text = "\n\n".join(
+            (s.result.display if s.result else "") for s in erledigt
+        ).strip()
+
+    # Die Quellen haengen wir selbst an. Ob das Modell sie im Text zitiert, ist
+    # eine Bitte; dass sie unter der Antwort stehen, ist eine Tatsache.
+    if quellen:
+        text += "\n\nQuellen:\n" + "\n".join(f"- {u}" for u in quellen)
+    return text

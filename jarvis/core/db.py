@@ -305,3 +305,91 @@ def tool_calls_by_message(db_path: Path | str) -> dict[int, list[ToolCallRow]]:
     for row in rows:
         gruppen.setdefault(row["message_id"], []).append(ToolCallRow.from_row(row))
     return gruppen
+
+
+# --- Tasks und Schritte (Phase 4) -----------------------------------------
+
+
+def save_task(db_path: Path | str, task, *, parent_task_id: str | None = None) -> None:
+    """Schreibt den Task-Kopf. Wird bei jeder Zustandsaenderung aufgerufen."""
+    import dataclasses
+
+    with session(db_path) as conn:
+        now = utcnow()
+        conn.execute(
+            "INSERT INTO tasks (id, goal, status, depth, parent_task_id, budget, "
+            "spent_tokens, spent_cost_eur, spent_tool_calls, result, abort_reason, "
+            "created_at, finished_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(id) DO UPDATE SET status = excluded.status, "
+            "spent_tokens = excluded.spent_tokens, "
+            "spent_cost_eur = excluded.spent_cost_eur, "
+            "spent_tool_calls = excluded.spent_tool_calls, "
+            "result = excluded.result, abort_reason = excluded.abort_reason, "
+            "finished_at = excluded.finished_at",
+            (
+                task.id, task.goal, task.status, task.depth, parent_task_id,
+                json.dumps(dataclasses.asdict(task.budget)),
+                task.spent_tokens, task.spent_cost_eur,
+                getattr(task, "spent_tool_calls", 0),
+                getattr(task, "result", None),
+                getattr(task, "abort_reason", None),
+                now,
+                now if task.status in ("done", "failed", "aborted_budget",
+                                       "cancelled") else None,
+            ),
+        )
+
+
+def save_step(db_path: Path | str, task_id: str, index: int, step) -> None:
+    with session(db_path) as conn:
+        now = utcnow()
+        conn.execute(
+            "INSERT INTO steps (id, task_id, idx, description, agent, status, "
+            "result, note, attempts, max_attempts, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(id) DO UPDATE SET status = excluded.status, "
+            "result = excluded.result, note = excluded.note, "
+            "attempts = excluded.attempts, updated_at = excluded.updated_at",
+            (
+                step.id, task_id, index, step.description, step.agent,
+                step.status.value if hasattr(step.status, "value") else step.status,
+                json.dumps(step.result.to_dict(), ensure_ascii=False, default=str)
+                if step.result else None,
+                getattr(step, "note", None),
+                step.attempts, step.max_attempts, now, now,
+            ),
+        )
+
+
+def get_task_row(db_path: Path | str, task_id: str) -> dict | None:
+    with session(db_path) as conn:
+        row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        if row is None:
+            return None
+        task = dict(row)
+        task["budget"] = json.loads(task["budget"] or "{}")
+        task["steps"] = [
+            {**dict(s), "result": json.loads(s["result"]) if s["result"] else None}
+            for s in conn.execute(
+                "SELECT * FROM steps WHERE task_id = ? ORDER BY idx ASC", (task_id,)
+            )
+        ]
+        task["children"] = [
+            r["id"] for r in conn.execute(
+                "SELECT id FROM tasks WHERE parent_task_id = ? ORDER BY created_at",
+                (task_id,),
+            )
+        ]
+        return task
+
+
+def list_task_rows(db_path: Path | str, limit: int = 50) -> list[dict]:
+    with session(db_path) as conn:
+        rows = conn.execute(
+            "SELECT id, goal, status, depth, parent_task_id, spent_tokens, "
+            "spent_cost_eur, spent_tool_calls, created_at, finished_at "
+            "FROM tasks ORDER BY created_at DESC, rowid DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [dict(r) for r in rows]

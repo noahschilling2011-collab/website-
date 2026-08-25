@@ -13,6 +13,7 @@ tun als haette es gesucht.
 
 from __future__ import annotations
 
+import re
 import time
 from typing import Any
 
@@ -149,5 +150,137 @@ class WebSearch(Tool):
             display="\n".join(zeilen),
             # Pflicht bei allem, was aus dem Netz kommt.
             sources=[t["url"] for t in treffer],
+            duration_ms=dauer(),
+        )
+
+
+# --- Seiten holen ---------------------------------------------------------
+
+# Bewusst klein gehalten: das ist kein HTML-Parser, sondern eine Notloesung,
+# um aus einer Seite lesbaren Text zu machen. Ein echter Parser waere eine
+# neue Abhaengigkeit, und der Stack ist festgelegt.
+_SKRIPT_STIL = re.compile(
+    r"<(script|style|noscript|svg|head)\b[^>]*>.*?</\1>",
+    re.IGNORECASE | re.DOTALL,
+)
+_TAG = re.compile(r"<[^>]+>")
+_LEERRAUM = re.compile(r"[ \t\r\f\v]+")
+_ZEILEN = re.compile(r"\n{3,}")
+
+ENTITAETEN = {
+    "&nbsp;": " ", "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"',
+    "&#39;": "'", "&apos;": "'", "&euro;": "€", "&mdash;": "—", "&ndash;": "–",
+}
+
+
+def html_zu_text(html: str) -> str:
+    text = _SKRIPT_STIL.sub(" ", html)
+    text = re.sub(r"<br\s*/?>|</p>|</div>|</li>|</tr>", "\n", text, flags=re.IGNORECASE)
+    text = _TAG.sub(" ", text)
+    for zeichen, ersatz in ENTITAETEN.items():
+        text = text.replace(zeichen, ersatz)
+    text = _LEERRAUM.sub(" ", text)
+    text = "\n".join(zeile.strip() for zeile in text.split("\n"))
+    return _ZEILEN.sub("\n\n", text).strip()
+
+
+@register
+class FetchUrl(Tool):
+    name = "fetch_url"
+    description = (
+        "Holt eine Webseite und gibt ihren Text zurueck. Benutze das, um einen "
+        "Suchtreffer wirklich zu lesen, statt dich auf den Auszug zu verlassen. "
+        "Die URL muss aus einem Suchergebnis oder vom Nutzer stammen - rate "
+        "keine URLs."
+    )
+    parameters = {
+        "type": "object",
+        "properties": {
+            "url": {"type": "string", "description": "Vollstaendige http(s)-URL."},
+            "max_chars": {
+                "type": "integer",
+                "description": "Wie viel Text hoechstens, 500 bis 20000.",
+                "minimum": 500,
+                "maximum": 20000,
+            },
+        },
+        "required": ["url"],
+        "additionalProperties": False,
+    }
+    permission = Permission.READ
+    timeout_s = 20
+
+    # Mehr als das laedt niemand, um einen Text zu lesen - und es verhindert,
+    # dass ein 200-MB-Download den Task auffrisst.
+    MAX_BYTES = 2_000_000
+
+    transport: httpx.AsyncBaseTransport | None = None
+
+    async def execute(self, url: str, max_chars: int = 6000) -> ToolResult:
+        begonnen = time.monotonic()
+
+        def dauer() -> int:
+            return int((time.monotonic() - begonnen) * 1000)
+
+        if not url.lower().startswith(("http://", "https://")):
+            return ToolResult(
+                ok=False,
+                error=f"Nur http(s)-URLs, bekam {url!r}.",
+                display=f"{url!r} ist keine abrufbare Adresse.",
+                duration_ms=dauer(),
+            )
+
+        try:
+            async with httpx.AsyncClient(
+                timeout=float(self.timeout_s),
+                follow_redirects=True,
+                max_redirects=5,
+                transport=self.transport,
+                headers={"user-agent": "JARVIS/0.1 (persoenlicher Assistent)"},
+            ) as client:
+                antwort = await client.get(url)
+        except httpx.HTTPError as exc:
+            return ToolResult(
+                ok=False,
+                error=f"Abruf fehlgeschlagen: {exc}",
+                display=f"{url} war nicht erreichbar.",
+                duration_ms=dauer(),
+            )
+
+        if antwort.status_code >= 400:
+            return ToolResult(
+                ok=False,
+                error=f"HTTP {antwort.status_code} von {url}.",
+                display=f"{url} antwortete mit HTTP {antwort.status_code}.",
+                duration_ms=dauer(),
+            )
+
+        roh = antwort.content[: self.MAX_BYTES]
+        typ = antwort.headers.get("content-type", "")
+        try:
+            inhalt = roh.decode(antwort.encoding or "utf-8", errors="replace")
+        except (LookupError, UnicodeDecodeError):
+            inhalt = roh.decode("utf-8", errors="replace")
+
+        text = html_zu_text(inhalt) if "html" in typ.lower() else inhalt.strip()
+        gekuerzt = len(text) > max_chars
+        if gekuerzt:
+            text = text[:max_chars] + "\n\n[…gekuerzt]"
+
+        if not text:
+            return ToolResult(
+                ok=False,
+                error="Die Seite enthielt keinen lesbaren Text.",
+                display=f"{url} lieferte keinen Text (Content-Type: {typ or 'unbekannt'}).",
+                sources=[str(antwort.url)],
+                duration_ms=dauer(),
+            )
+
+        return ToolResult(
+            ok=True,
+            data={"url": str(antwort.url), "content_type": typ,
+                  "chars": len(text), "truncated": gekuerzt},
+            display=text,
+            sources=[str(antwort.url)],
             duration_ms=dauer(),
         )

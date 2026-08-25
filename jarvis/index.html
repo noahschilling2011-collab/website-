@@ -307,6 +307,87 @@ button, input, textarea { font: inherit; color: inherit; }
 .fakt-aktion.is-loeschen:hover { color: var(--danger); }
 .panel-leer { color: var(--text-dim); text-align: center; padding: var(--s-6) 0; }
 
+/* --- Plan eines Auftrags (Phase 4) --------------------------------------- */
+
+.plan {
+  margin-top: var(--s-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+.plan-kopf {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 8px var(--s-3);
+  font-size: 11px;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--line);
+}
+.plan-abbrechen {
+  margin-left: auto;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 2px 10px;
+  cursor: pointer;
+}
+.plan-abbrechen:hover { color: var(--danger); border-color: rgba(242,114,107,0.5); }
+
+.schritt {
+  display: flex;
+  gap: var(--s-3);
+  padding: 8px var(--s-3);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: var(--step--1);
+}
+.schritt:first-of-type { border-top: 0; }
+.schritt-marke {
+  flex: none;
+  width: 16px; height: 16px;
+  margin-top: 3px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-dim);
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  color: var(--bg-0);
+}
+.schritt.is-running .schritt-marke {
+  border-color: var(--accent);
+  animation: puls 1.4s ease-in-out infinite;
+}
+.schritt.is-done .schritt-marke { background: var(--ok); border-color: var(--ok); }
+.schritt.is-failed .schritt-marke { background: var(--danger); border-color: var(--danger); }
+.schritt.is-skipped { opacity: 0.5; }
+.schritt-koerper { min-width: 0; flex: 1; }
+.schritt-agent {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 7px;
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  font-size: 10px;
+  color: var(--accent);
+}
+.schritt-note { margin-top: 3px; font-size: 11px; color: var(--text-dim); }
+.schritt.is-failed .schritt-note { color: #ffb9b4; }
+.plan-fuss {
+  padding: 6px var(--s-3);
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.plan-fuss.is-abbruch { color: #ffb9b4; }
+
+@keyframes puls {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(242, 181, 68, 0.4); }
+  50%      { box-shadow: 0 0 0 5px rgba(242, 181, 68, 0); }
+}
+
 /* --- Werkzeugaufrufe, aufklappbar (Phase 2, DoD 6) ------------------------ */
 
 .tools {
@@ -767,6 +848,90 @@ button, input, textarea { font: inherit; color: inherit; }
       : s + ' · Preise nicht in .env eingetragen';
   }
 
+  // --- Plan eines Auftrags (Phase 4) --------------------------------------
+
+  var MARKE = { done: '✓', failed: '✕', skipped: '–', running: '', pending: '' };
+
+  function schrittNode(schritt) {
+    var box = document.createElement('div');
+    box.className = 'schritt is-' + schritt.status;
+
+    var marke = document.createElement('span');
+    marke.className = 'schritt-marke';
+    marke.textContent = MARKE[schritt.status] || '';
+    box.appendChild(marke);
+
+    var koerper = document.createElement('div');
+    koerper.className = 'schritt-koerper';
+
+    var titel = document.createElement('div');
+    // Der Runner haengt bei einem Retry den Grund an die Beschreibung — für
+    // die Liste reicht die erste Zeile.
+    titel.textContent = schritt.description.split('\n')[0];
+    if (schritt.agent) {
+      var agent = document.createElement('span');
+      agent.className = 'schritt-agent';
+      agent.textContent = schritt.agent;
+      titel.appendChild(agent);
+    }
+    koerper.appendChild(titel);
+
+    var hinweise = [];
+    if (schritt.attempts > 1) hinweise.push(schritt.attempts + ' Versuche');
+    if (schritt.status === 'failed' && schritt.note) hinweise.push(schritt.note);
+    if (hinweise.length) {
+      var note = document.createElement('div');
+      note.className = 'schritt-note';
+      note.textContent = hinweise.join(' · ');
+      koerper.appendChild(note);
+    }
+
+    box.appendChild(koerper);
+    return box;
+  }
+
+  function planNode(daten, onAbbruch) {
+    var box = document.createElement('div');
+    box.className = 'plan';
+
+    var kopf = document.createElement('div');
+    kopf.className = 'plan-kopf';
+    var laeuft = daten.status === 'running' || daten.status === 'pending';
+    var fertig = daten.steps.filter(function (s) { return s.status === 'done'; }).length;
+    kopf.textContent = laeuft
+      ? 'Plan läuft — ' + fertig + '/' + daten.steps.length + ' Schritten'
+      : 'Plan · ' + daten.status + ' · ' + fertig + '/' + daten.steps.length;
+
+    if (laeuft && onAbbruch) {
+      var stop = document.createElement('button');
+      stop.type = 'button';
+      stop.className = 'plan-abbrechen';
+      stop.textContent = 'abbrechen';
+      stop.addEventListener('click', onAbbruch);
+      kopf.appendChild(stop);
+    }
+    box.appendChild(kopf);
+
+    daten.steps.forEach(function (schritt) { box.appendChild(schrittNode(schritt)); });
+
+    var fuss = document.createElement('div');
+    fuss.className = 'plan-fuss';
+    var teile = [];
+    if (daten.spent_tokens) teile.push(daten.spent_tokens + ' Token');
+    if (daten.spent_tool_calls) teile.push(daten.spent_tool_calls + ' Werkzeugaufrufe');
+    if (daten.spent_cost_eur) teile.push(daten.spent_cost_eur.toFixed(4) + ' €');
+    if (daten.abort_reason) {
+      fuss.className += ' is-abbruch';
+      teile.unshift('Abgebrochen: ' + daten.abort_reason);
+    }
+    fuss.textContent = teile.join(' · ');
+    if (teile.length) box.appendChild(fuss);
+
+    return box;
+  }
+
+  var ENDZUSTAENDE = ['done', 'failed', 'aborted_budget', 'cancelled'];
+
   function send(text) {
     setBusy(true);
     el.hint.textContent = '';
@@ -774,32 +939,62 @@ button, input, textarea { font: inherit; color: inherit; }
     if (el.thread.querySelector('.empty')) el.thread.textContent = '';
     el.thread.appendChild(messageNode('user', text));
 
-    var pending = thinkingNode();
-    el.thread.appendChild(pending);
+    var wartend = thinkingNode();
+    el.thread.appendChild(wartend);
     scrollDown();
 
     var started = Date.now();
+    var planBox = null;
 
-    api('/api/chat', { method: 'POST', body: { message: text } })
-      .then(function (data) {
-        pending.remove();
-        el.thread.appendChild(messageNode('assistant', data.reply, data.tool_calls));
-        scrollDown();
-        el.hint.textContent = 'Antwort in ' + ((Date.now() - started) / 1000).toFixed(1)
-          + ' s · Vorgang ' + data.task_id;
-        // remember() kann gerade etwas eingetragen haben.
-        if (el.memPanel.classList.contains('is-open')) ladeGedaechtnis();
-        return loadHealth();
+    api('/api/tasks', { method: 'POST', body: { goal: text } })
+      .then(function (start) {
+        return neuerPlan(start.task_id, wartend, started);
       })
       .catch(function (err) {
-        pending.remove();
+        wartend.remove();
         appendError(err.message);
-        el.hint.textContent = '';
-      })
-      .then(function () {
         setBusy(false);
         el.input.focus();
       });
+
+    function neuerPlan(taskId, platzhalter, begonnen) {
+      // Phase 7 ersetzt dieses Polling durch einen Ereignisstrom. Bis dahin
+      // ist ein Intervall von 700 ms der Kompromiss zwischen "man sieht was"
+      // und "der Server wird nicht mit Anfragen zugeschüttet".
+      var abgebrochen = false;
+
+      function abbrechen() {
+        abgebrochen = true;
+        api('/api/tasks/' + taskId + '/cancel', { method: 'POST' })
+          .catch(function (err) { meldung(err.message); });
+      }
+
+      function tick() {
+        return api('/api/tasks/' + taskId).then(function (daten) {
+          var neuerKasten = planNode(daten, abgebrochen ? null : abbrechen);
+          if (planBox) { planBox.replaceWith(neuerKasten); }
+          else { platzhalter.before(neuerKasten); }
+          planBox = neuerKasten;
+
+          if (ENDZUSTAENDE.indexOf(daten.status) === -1) {
+            return new Promise(function (weiter) { setTimeout(weiter, 700); }).then(tick);
+          }
+
+          platzhalter.remove();
+          var antwort = messageNode('assistant', daten.result || 'Kein Ergebnis.');
+          planBox.after(antwort);
+          scrollDown();
+
+          el.hint.textContent = 'Fertig in ' + ((Date.now() - begonnen) / 1000).toFixed(1)
+            + ' s · Vorgang ' + taskId + ' · ' + daten.status;
+          if (el.memPanel.classList.contains('is-open')) ladeGedaechtnis();
+          setBusy(false);
+          el.input.focus();
+          return loadHealth();
+        });
+      }
+      return tick();
+    }
   }
 
   el.form.addEventListener('submit', function (e) {

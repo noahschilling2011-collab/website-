@@ -264,7 +264,7 @@ def test_dod_3_nach_dem_loeschen_steht_nichts_mehr_im_kontext(client, settings):
 def test_dod_4_drei_chats_ergeben_drei_zeilen_im_task_log(client):
     for i in range(3):
         client.post("/api/chat", json={"message": f"Frage {i}"}, headers=TOKEN)
-    log = client.get("/api/tasks", headers=TOKEN).json()
+    log = client.get("/api/task-log", headers=TOKEN).json()
     assert len(log) == 3
     assert {e["outcome"] for e in log} == {"done"}
 
@@ -283,7 +283,7 @@ def test_gescheiterter_task_wird_als_failed_protokolliert(client):
 
     client.app.state.provider = Kaputt()
     client.post("/api/chat", json={"message": "Frage"}, headers=TOKEN)
-    log = client.get("/api/tasks", headers=TOKEN).json()
+    log = client.get("/api/task-log", headers=TOKEN).json()
     assert len(log) == 1 and log[0]["outcome"] == "failed"
 
 

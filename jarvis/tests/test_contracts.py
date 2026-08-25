@@ -101,10 +101,18 @@ def test_jede_grenze_wird_benannt(feld: str, wert, erwartet: str):
     assert verletzung is not None and erwartet in verletzung
 
 
-def test_max_steps_greift():
+def test_max_steps_zaehlt_gelaufene_schritte_nicht_geplante():
+    """Sonst reisst die Grenze, bevor ein Schritt lief - und es gaebe nie
+    ein Teilergebnis, das DoD 5 aus Phase 4 verlangt."""
     t = Task(budget=TaskBudget(max_steps=2))
-    t.steps = [Step(id="a", description="x"), Step(id="b", description="y")]
-    assert "max_steps" in (t.budget_verletzung() or "")
+    t.steps = [Step(id=str(i), description="x") for i in range(4)]
+    assert t.budget_verletzung() is None, "nur geplant, noch nichts gelaufen"
+
+    t.steps[0].attempts = 1
+    assert t.budget_verletzung() is None
+
+    t.steps[1].attempts = 1
+    assert "max_steps erreicht (2/2)" in (t.budget_verletzung() or "")
 
 
 def test_max_seconds_greift():

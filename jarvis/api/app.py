@@ -14,6 +14,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from api.routes import api, router
+from api.tasks import TaskRegistry, tasks_router
 from api.security import ensure_token
 from core.config import PROJECT_ROOT, Settings, get_settings
 from core.db import connect, init_db
@@ -101,6 +102,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             yield
         finally:
+            # Laufende Tasks beenden, bevor der Prozess geht - sonst haengen
+            # Modellaufrufe in der Luft, die schon Geld gekostet haben.
+            await app.state.tasks.stop_alle()
             await app.state.provider.aclose()
 
     app = FastAPI(
@@ -111,6 +115,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
     app.state.index_path = INDEX_PATH
+    app.state.tasks = TaskRegistry()
     app.state.token, app.state.token_generated = ensure_token(settings.jarvis_token)
 
     @app.exception_handler(LLMError)
@@ -123,5 +128,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     app.include_router(api)
+    app.include_router(tasks_router)
     app.include_router(router)
     return app

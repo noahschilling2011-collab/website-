@@ -3,7 +3,7 @@
 > Einzige Wahrheit über den Projektstand. Claude Code liest diese Datei zuerst
 > und aktualisiert sie am Ende jeder Phase. Von Hand korrigieren ist erlaubt.
 
-AKTUELL: Phase 3 — Memory
+AKTUELL: Phase 4 — Planner + Research Agent
 LETZTE ÄNDERUNG: 2026-08-25
 
 > **Abweichung von der Arbeitsweise, auf Ansage:** es werden alle Phasen
@@ -19,7 +19,7 @@ LETZTE ÄNDERUNG: 2026-08-25
 | 1 | Walking Skeleton          | IN ARBEIT| –              |
 | 2 | Tool-System               | IN ARBEIT| –              |
 | 3 | Memory                    | IN ARBEIT| –              |
-| 4 | Planner + Research Agent  | GESPERRT | –              |
+| 4 | Planner + Research Agent  | IN ARBEIT| –              |
 | 5 | Permissions & Bestätigung | GESPERRT | –              |
 | 6 | Hermes                    | GESPERRT | –              |
 | 7 | Observability-Dashboard   | GESPERRT | –              |
@@ -91,6 +91,30 @@ gefragt als still das Falsche behalten.
 **Keine Embeddings.** FTS5 mit `unicode61 remove_diacritics 2`. Ein Vektorindex
 kommt, wenn eine Messung zeigt, dass das nicht reicht — nicht auf Verdacht.
 
+## Phase 4 — Planner + Research Agent
+
+| # | Kriterium | Stand |
+|---|---|---|
+| 1 | Grundsteuer-Frage erzeugt einen Plan, Schritt für Schritt sichtbar | ✓ Plan über `GET /api/tasks/{id}`, im UI mit Live-Status; echte Modellzüge geskriptet |
+| 2 | Jede Faktenbehauptung hat eine anklickbare Quelle | ◐ Quellen werden gesammelt und unter die Antwort gehängt; dass das Modell sie *im Text* zitiert, ist eine Bitte im Prompt |
+| 3 | Falsche URL → Retry sichtbar, dann sauberes Scheitern, kein Endlos-Loop | ✓ genau `max_attempts` Versuche, dann `FAILED` mit Begründung |
+| 4 | „Wie spät ist es?" ergibt einen Plan mit **einem** Schritt | ✓ |
+| 5 | `max_steps=2` → `aborted_budget` mit Teilergebnis | ✓ |
+
+Gebaut: `core/planner.py`, `core/agents.py`, `core/verify.py`, `core/runner.py`,
+Tabellen `tasks` und `steps`, Werkzeug `fetch_url`, Endpunkte
+`POST /api/tasks`, `GET /api/tasks`, `GET /api/tasks/{id}`,
+`POST /api/tasks/{id}/cancel`.
+
+**Verifikation ist Code, kein Modellaufruf.** Ein Test liest den Quelltext von
+`core/verify.py` und schlägt an, wenn dort je ein Provider auftaucht — sonst
+wäre es wieder dasselbe Modell, das sich selbst benotet.
+
+**Kostenfolge, die man kennen muss:** ein Chat-Zug geht jetzt durch Planner,
+Schritt und Zusammenfassung — drei bis vier Modellaufrufe statt einem. Bei
+`claude-opus-5` ist das echtes Geld. Der Planner ist darauf getrimmt, einfache
+Ziele in genau einem Schritt zu erledigen, aber die zwei Zusatzaufrufe bleiben.
+
 ## Offene Blocker
 
 - [ ] LLM-API-Key besorgen, als `LLM_API_KEY` in `.env` eintragen
@@ -116,6 +140,10 @@ kommt, wenn eine Messung zeigt, dass das nicht reicht — nicht auf Verdacht.
 | `ChatResponse` trägt zusätzlich `tool_calls` | Phase 2 DoD 6 verlangt die Anzeige je Antwort; ohne das Feld müsste die Oberfläche nach jedem Zug den ganzen Verlauf neu holen. |
 | `facts` hat eine Spalte `conflicts_with`, die im Auftrag nicht steht | Ohne sie wäre der Konflikt aus DoD 5 nach dem Neuladen verschwunden. |
 | Chat-Agent auf `max_permission = LOCAL` angehoben (war READ) | `remember` schreibt lokal. EXTERNAL und SENSITIVE bleiben zu. |
+| `Step.note`, `Task.result`, `Task.abort_reason` ergänzt | Rein additiv, mit Default, nichts umbenannt. Ohne `note` steht im UI `FAILED` ohne Grund; ohne `abort_reason` sagt ein Task nur „aborted_budget" und nicht, welche Grenze riss (0.5 verlangt die Benennung). Gemeldet statt danebengebaut. |
+| Der Plan wird **nicht** auf `budget.max_steps` gekürzt | Sonst könnte `max_steps` nie greifen und der Nutzer sähe nie, dass sein Ziel größer war als das Budget. Der Plan darf zu groß sein; das Budget stoppt ihn während der Ausführung, mit Teilergebnis. |
+| `max_steps` zählt gelaufene, nicht geplante Schritte | Sonst reißt die Grenze, bevor ein Schritt lief — und es gäbe nie ein Teilergebnis. |
+| `GET /api/tasks` aus Phase 3 heißt jetzt `GET /api/task-log` | Phase 4 belegt `/api/tasks` mit der Task-Struktur. Der episodische Log ist etwas anderes. |
 
 ## Entscheidungslog
 
