@@ -3,7 +3,7 @@
 > Einzige Wahrheit über den Projektstand. Claude Code liest diese Datei zuerst
 > und aktualisiert sie am Ende jeder Phase. Von Hand korrigieren ist erlaubt.
 
-AKTUELL: Phase 9 — Voice
+AKTUELL: Phase 10 — Härten & Verpacken
 LETZTE ÄNDERUNG: 2026-08-25
 
 > **Abweichung von der Arbeitsweise, auf Ansage:** es werden alle Phasen
@@ -25,7 +25,7 @@ LETZTE ÄNDERUNG: 2026-08-25
 | 7 | Observability-Dashboard   | IN ARBEIT| –              |
 | 8 | Satellite Agent           | IN ARBEIT| –              |
 | 9 | Voice                     | IN ARBEIT| –              |
-|10 | Härten & Verpacken        | GESPERRT | –              |
+|10 | Härten & Verpacken        | IN ARBEIT| –              |
 
 Status-Werte: GESPERRT / OFFEN / IN ARBEIT / FERTIG
 Legende der DoD-Tabellen: ✓ erfüllt und ausgeführt · ◐ Mechanik steht und ist
@@ -250,6 +250,47 @@ die zwei Zeilen, die das sicherstellen; ein Test prüft sie.
 Browser. Headless-Chromium hat weder Mikrofon noch Sprachsynthese. DoD 1, 2
 und 4 brauchen einen echten Browser mit Mikrofon — das musst du selbst
 ausprobieren.
+
+## Phase 10 — Härten & Verpacken
+
+| # | Kriterium | Stand |
+|---|---|---|
+| 1 | `docker compose up` startet alles auf einem frischen Rechner | ✗ **nicht ausgeführt** — in dieser Umgebung war kein Docker-Daemon erreichbar. Dockerfile und Compose sind geschrieben, der Build ist ungeprüft |
+| 2 | Ein neuer Nutzer kommt nur mit der README zum laufenden System | ◐ README vollständig; ohne fremden Rechner nicht nachweisbar |
+| 3 | Alle Tests laufen in CI grün | ◐ 364 Tests lokal grün, alle CI-Schritte lokal nachgespielt; der CI-Lauf selbst steht aus |
+| 4 | Ein Backup lässt sich einspielen, der Verlauf ist danach vollständig | ✓ inklusive dessen, was noch im WAL steht |
+
+Gebaut: `Dockerfile`, `docker-compose.yml`, `.dockerignore`,
+`scripts/backup.py`, `scripts/migrate.py`, `scripts/measure.py`,
+`scripts/healthcheck.py`, vollständige README, CI um Migration und
+Backup/Restore erweitert.
+
+**Gesichert wird über SQLites Backup-API, nicht mit `cp`.** Bei
+eingeschaltetem WAL liegen die letzten Schreibvorgänge in `-wal`; eine
+kopierte `.db` allein ist unvollständig. Ein Test hält eine Verbindung offen,
+schreibt und prüft, dass die Zeile trotzdem im Backup landet.
+
+**Ein Restore legt die bisherige Datenbank beiseite**, statt sie zu
+überschreiben. Ein Restore, der das Vorherige unwiederbringlich löscht, ist
+eine Falle.
+
+**Der Compose-Port wird nur an `127.0.0.1` veröffentlicht** (§0.4.3). Ohne das
+Präfix hinge JARVIS am ganzen Netz.
+
+### Postgres: nicht nötig — gemessen, nicht angenommen
+
+`python -m scripts.measure` mit 20.000 Nachrichten und 5.000 Fakten
+(feste Zufallssaat, wiederholbar):
+
+| Abfrage | Median | p95 | max |
+|---|---|---|---|
+| FTS5 über `facts` | 4,14 ms | 4,81 ms | 5,44 ms |
+| FTS5 über `messages` | 19,96 ms | 21,44 ms | 21,62 ms |
+| Kontextblock (Suche + Format) | 4,04 ms | 4,41 ms | 4,88 ms |
+
+Datei: 5,5 MB. Ein Modellaufruf dauert das Tausendfache. **Postgres und
+pgvector bleiben gestrichen.** Die Messung gehört wiederholt, wenn die
+Datenmenge deutlich wächst.
 
 ## Offene Blocker
 
