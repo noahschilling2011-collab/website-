@@ -1,0 +1,13 @@
+# JARVIS. Der Stack steht in CLAUDE.md und wird nicht verhandelt.
+#
+# Kein anthropic-SDK: httpx ist als HTTP-Client festgelegt, und der Provider
+# spricht die dokumentierte Messages-API direkt. Wenn das SDK doch rein soll,
+# ist das eine Stack-Aenderung und gehoert vorher besprochen.
+fastapi>=0.115
+uvicorn[standard]>=0.30
+httpx>=0.27
+pydantic-settings>=2.4
+
+# Zum Testen. Kein pytest-asyncio noetig - tests/conftest.py hat ein
+# run()-Helferlein.
+pytest>=8.0

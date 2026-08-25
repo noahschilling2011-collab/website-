@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>JARVIS</title>
+<!-- Als data-URL eingebettet: sonst fragt der Browser /favicon.ico an und
+     bekommt einen 404 in die Konsole. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20rx%3D%226%22%20fill%3D%22%230a0a0c%22/%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23f2b544%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223.2%22/%3E%3Cpath%20d%3D%22M12%202.6v3.2M12%2018.2v3.2M2.6%2012h3.2M18.2%2012h3.2%22/%3E%3C/g%3E%3C/svg%3E">
+<style>
+/* ---------------------------------------------------------------------------
+   JARVIS — Phase 1, Walking Skeleton.
+
+   Ein linearer Verlauf, kein Konversations-Browser: das Schema aus
+   docs/phases/PHASE-01.md kennt genau eine Tabelle `messages`.
+
+   Akzent ist ein warmes Bernstein — bewusst nicht das übliche Indigo. Genau
+   eine Akzentfarbe, sonst Graustufen (0.3).
+--------------------------------------------------------------------------- */
+
+:root {
+  --bg-0: #0a0a0c;
+  --bg-1: #121216;
+  --bg-2: #1a1a20;
+  --bg-3: #22222a;
+
+  --text:      #e8e8ec;
+  --text-loud: #f4f4f7;
+  --text-dim:  #9a9aa4;   /* 5.0:1 auch auf der akzentgetönten Fläche */
+
+  --accent:      #f2b544;
+  --accent-soft: rgba(242, 181, 68, 0.14);
+  --accent-line: rgba(242, 181, 68, 0.35);
+  --on-accent:   #17140c;
+
+  --danger: #f2726b;
+  --ok:     #5fcf8e;
+
+  --line: rgba(255, 255, 255, 0.09);
+
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 24px; --s-6: 32px;
+
+  --step--1: clamp(0.83rem, 0.80rem + 0.15vw, 0.90rem);
+  --step-0:  clamp(0.94rem, 0.91rem + 0.20vw, 1.02rem);
+  --step-1:  clamp(1.13rem, 1.06rem + 0.35vw, 1.32rem);
+
+  /* 0.3: ruhige Animationen, 200–400 ms, cubic-bezier(0.4, 0, 0.2, 1) */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif;
+  font-size: var(--step-0);
+  line-height: 1.55;
+  color: var(--text);
+  background-color: var(--bg-0);
+  /* Struktur hinter dem Glas. Ohne das ist backdrop-filter sinnlos. */
+  background-image:
+    radial-gradient(900px 620px at 12% -8%,  rgba(242, 181, 68, 0.10), transparent 62%),
+    radial-gradient(760px 560px at 92% 108%, rgba(86, 132, 214, 0.10), transparent 60%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, textarea { font: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid var(--line);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .glass { background: rgba(22, 22, 28, 0.94); }
+}
+
+/* --- Gerüst --------------------------------------------------------------- */
+
+.app {
+  display: grid;
+  /* Die Spalte muss ausdrücklich begrenzt werden: eine implizite Grid-Spalte
+     ist auto = max-content und wächst mit dem breitesten Kind. */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100dvh;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.brand-mark {
+  width: 30px; height: 30px;
+  flex: none;
+  display: grid; place-items: center;
+  border-radius: 9px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+}
+.brand-name {
+  margin: 0;
+  font-size: var(--step-0);
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  color: var(--text-loud);
+}
+.brand-phase { font-size: 11px; letter-spacing: 0.06em; color: var(--text-dim); }
+
+.status {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); flex: none; }
+.dot.is-ok  { background: var(--ok); }
+.dot.is-bad { background: var(--danger); }
+.status-text {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.model-chip {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.thread {
+  overflow-y: auto;
+  padding: var(--s-5) var(--s-5) var(--s-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  scroll-behavior: smooth;
+}
+
+.msg { max-width: min(70ch, 88%); animation: rise 320ms var(--ease) both; }
+.msg-user { align-self: flex-end; }
+.msg-assistant, .msg-error { align-self: flex-start; }
+
+.bubble {
+  padding: var(--s-3) var(--s-4);
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--bg-1);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.msg-user .bubble {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  border-bottom-right-radius: 5px;
+}
+.msg-assistant .bubble { border-bottom-left-radius: 5px; }
+.msg-error .bubble { border-color: rgba(242, 114, 107, 0.45); color: #ffd9d6; }
+
+.empty {
+  margin: auto;
+  max-width: 46ch;
+  text-align: center;
+  color: var(--text-dim);
+  animation: rise 380ms var(--ease) both;
+}
+.empty h2 {
+  margin: 0 0 var(--s-2);
+  font-size: var(--step-1);
+  font-weight: 500;
+  color: var(--text-loud);
+  letter-spacing: -0.01em;
+}
+.empty p { margin: 0; }
+
+.typing { display: inline-flex; gap: 5px; align-items: center; height: 1.55em; }
+.typing i {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  animation: pulse 1.25s ease-in-out infinite;
+}
+.typing i:nth-child(2) { animation-delay: 0.16s; }
+.typing i:nth-child(3) { animation-delay: 0.32s; }
+
+/* --- Eingabe -------------------------------------------------------------- */
+
+.composer-wrap {
+  padding: 0 var(--s-5) max(var(--s-5), env(safe-area-inset-bottom, 0px));
+}
+
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-2) var(--s-2) var(--s-4);
+  border-radius: 16px;
+  transition: border-color 200ms var(--ease);
+}
+.composer:focus-within { border-color: var(--accent-line); }
+
+.composer textarea {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: transparent;
+  padding: 10px 0;
+  min-height: 1.5em;
+  max-height: 200px;
+  line-height: 1.5;
+}
+.composer textarea::placeholder { color: var(--text-dim); }
+/* Das outline:none oben schlägt die globale :focus-visible-Regel (höhere
+   Spezifität). Ohne diesen Ersatz wäre das Feld per Tastatur unsichtbar. */
+.composer textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+.btn-send {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px; height: 38px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--accent);
+  color: var(--on-accent);
+  cursor: pointer;
+  transition: transform 200ms var(--ease), opacity 200ms var(--ease);
+}
+.btn-send:hover:not(:disabled) { transform: translateY(-1px); }
+.btn-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.hint {
+  margin: var(--s-2) var(--s-1) 0;
+  font-size: 11px;
+  color: var(--text-dim);
+  min-height: 1.4em;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.25; transform: translateY(0); }
+  50%      { opacity: 1;    transform: translateY(-3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .thread, .composer-wrap { padding-left: var(--s-4); padding-right: var(--s-4); }
+  .topbar { padding-left: var(--s-4); padding-right: var(--s-4); }
+  .msg { max-width: 94%; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="topbar glass">
+    <span class="brand-mark" aria-hidden="true">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3.2"></circle>
+        <path d="M12 2.6v3.2M12 18.2v3.2M2.6 12h3.2M18.2 12h3.2"></path>
+        <path d="M5.4 5.4l2.3 2.3M16.3 16.3l2.3 2.3M18.6 5.4l-2.3 2.3M7.7 16.3l-2.3 2.3"></path>
+      </svg>
+    </span>
+    <h1 class="brand-name">JARVIS</h1>
+    <span class="brand-phase">Phase 1</span>
+    <span class="status">
+      <span class="dot" id="health-dot"></span>
+      <span class="status-text" id="health-text">verbinde…</span>
+      <span class="model-chip" id="model-chip">—</span>
+    </span>
+  </header>
+
+  <div class="thread" id="thread" aria-live="polite" aria-busy="false"></div>
+
+  <div class="composer-wrap">
+    <form class="composer glass" id="composer">
+      <textarea id="input" rows="1" placeholder="Schreib etwas…" aria-label="Nachricht"></textarea>
+      <button class="btn-send" id="btn-send" type="submit" aria-label="Senden">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4.5 12h13M12 5.5l6 6.5-6 6.5"></path>
+        </svg>
+      </button>
+    </form>
+    <p class="hint" id="hint"></p>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // Wird beim Ausliefern vom Backend eingesetzt. Das ist der JARVIS-Token,
+  // nicht der Modell-Key — der verlässt das Backend nie (0.4.1).
+  var TOKEN = '__JARVIS_TOKEN__';
+
+  // Zustand lebt in Variablen, nicht in localStorage: in manchen Umgebungen
+  // ist die API nicht verfügbar und die Seite stürbe an der ersten Zeile.
+  var busy = false;
+
+  var el = {
+    thread:    document.getElementById('thread'),
+    form:      document.getElementById('composer'),
+    input:     document.getElementById('input'),
+    send:      document.getElementById('btn-send'),
+    hint:      document.getElementById('hint'),
+    chip:      document.getElementById('model-chip'),
+    healthDot: document.getElementById('health-dot'),
+    healthTxt: document.getElementById('health-text')
+  };
+
+  function api(path, options) {
+    var opts = options || {};
+    opts.headers = { 'X-Jarvis-Token': TOKEN };
+    if (opts.body !== undefined) {
+      opts.headers['content-type'] = 'application/json';
+      opts.body = JSON.stringify(opts.body);
+    }
+    return fetch(path, opts).then(function (res) {
+      return res.text().then(function (raw) {
+        var data = null;
+        try { data = raw ? JSON.parse(raw) : null; } catch (e) { data = null; }
+        if (!res.ok) {
+          var detail = (data && data.detail) || raw || ('HTTP ' + res.status);
+          if (typeof detail !== 'string') detail = JSON.stringify(detail);
+          var err = new Error(detail);
+          err.status = res.status;
+          throw err;
+        }
+        return data;
+      });
+    });
+  }
+
+  function messageNode(role, content) {
+    var wrap = document.createElement('div');
+    wrap.className = 'msg msg-' + role;
+    var bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    // textContent, niemals innerHTML: der Inhalt kommt aus einem Modell.
+    bubble.textContent = content;
+    wrap.appendChild(bubble);
+    return wrap;
+  }
+
+  function showEmpty() {
+    el.thread.textContent = '';
+    var box = document.createElement('div');
+    box.className = 'empty';
+    var h = document.createElement('h2');
+    h.textContent = 'Womit fangen wir an?';
+    var p = document.createElement('p');
+    p.textContent = 'Der Verlauf liegt lokal in SQLite und ist nach einem Neustart noch da.';
+    box.appendChild(h); box.appendChild(p);
+    el.thread.appendChild(box);
+  }
+
+  function scrollDown() {
+    requestAnimationFrame(function () { el.thread.scrollTop = el.thread.scrollHeight; });
+  }
+
+  function appendError(text) {
+    var wrap = document.createElement('div');
+    wrap.className = 'msg msg-error';
+    var bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = text;
+    wrap.appendChild(bubble);
+    el.thread.appendChild(wrap);
+    scrollDown();
+  }
+
+  function thinkingNode() {
+    var wrap = document.createElement('div');
+    wrap.className = 'msg msg-assistant';
+    var bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    var dots = document.createElement('span');
+    dots.className = 'typing';
+    dots.setAttribute('aria-label', 'JARVIS denkt nach');
+    for (var i = 0; i < 3; i++) dots.appendChild(document.createElement('i'));
+    bubble.appendChild(dots);
+    wrap.appendChild(bubble);
+    return wrap;
+  }
+
+  function setBusy(value) {
+    busy = value;
+    el.send.disabled = value;
+    el.input.disabled = value;
+    el.thread.setAttribute('aria-busy', value ? 'true' : 'false');
+  }
+
+  function loadHistory() {
+    return api('/api/messages').then(function (messages) {
+      if (!messages || !messages.length) { showEmpty(); return; }
+      el.thread.textContent = '';
+      messages.forEach(function (m) {
+        el.thread.appendChild(messageNode(m.role, m.content));
+      });
+      scrollDown();
+    });
+  }
+
+  function loadHealth() {
+    return api('/api/health').then(function (h) {
+      el.chip.textContent = h.model;
+      el.healthDot.className = 'dot ' + (h.status === 'ok' ? 'is-ok' : 'is-bad');
+      if (h.provider_error) {
+        el.healthTxt.textContent = h.provider_error;
+      } else if (h.provider === 'fake') {
+        el.healthTxt.textContent = 'Fake-Anbieter — kein echtes Modell, keine Kosten';
+      } else {
+        el.healthTxt.textContent = spendText(h.spend);
+      }
+    }).catch(function (err) {
+      el.healthDot.className = 'dot is-bad';
+      el.healthTxt.textContent = err.status === 401
+        ? 'Token abgelehnt — Seite neu laden'
+        : 'Backend nicht erreichbar';
+    });
+  }
+
+  function spendText(spend) {
+    if (!spend || !spend.calls) return 'noch kein Modellaufruf';
+    var s = spend.calls + ' Aufrufe · ' + (spend.in_tokens + spend.out_tokens) + ' Token';
+    return spend.prices_configured
+      ? s + ' · ' + spend.cost_eur.toFixed(4) + ' €'
+      : s + ' · Preise nicht in .env eingetragen';
+  }
+
+  function send(text) {
+    setBusy(true);
+    el.hint.textContent = '';
+
+    if (el.thread.querySelector('.empty')) el.thread.textContent = '';
+    el.thread.appendChild(messageNode('user', text));
+
+    var pending = thinkingNode();
+    el.thread.appendChild(pending);
+    scrollDown();
+
+    var started = Date.now();
+
+    api('/api/chat', { method: 'POST', body: { message: text } })
+      .then(function (data) {
+        pending.remove();
+        el.thread.appendChild(messageNode('assistant', data.reply));
+        scrollDown();
+        el.hint.textContent = 'Antwort in ' + ((Date.now() - started) / 1000).toFixed(1)
+          + ' s · Vorgang ' + data.task_id;
+        return loadHealth();
+      })
+      .catch(function (err) {
+        pending.remove();
+        appendError(err.message);
+        el.hint.textContent = '';
+      })
+      .then(function () {
+        setBusy(false);
+        el.input.focus();
+      });
+  }
+
+  el.form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var text = el.input.value.trim();
+    if (!text || busy) return;
+    el.input.value = '';
+    autogrow();
+    send(text);
+  });
+
+  el.input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      el.form.requestSubmit();
+    }
+  });
+
+  function autogrow() {
+    el.input.style.height = 'auto';
+    el.input.style.height = Math.min(el.input.scrollHeight, 200) + 'px';
+  }
+  el.input.addEventListener('input', autogrow);
+
+  el.hint.textContent = 'Enter senden · Umschalt+Enter neue Zeile';
+  showEmpty();
+  loadHealth();
+  loadHistory().catch(function (err) { appendError(err.message); });
+})();
+</script>
+</body>
+</html>
