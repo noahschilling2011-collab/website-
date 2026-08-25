@@ -910,6 +910,62 @@ button, input, textarea { font: inherit; color: inherit; }
     });
   }
 
+  // --- Ereignisstrom (Phase 7, DoD 1) ---------------------------------------
+  //
+  // Kein EventSource: das kann keine Header setzen, der JARVIS-Token muesste
+  // dann in die URL - und landet damit in jedem Zugriffslog. Der Server
+  // liefert an /api/events einen text/event-stream; hier wird der mit fetch
+  // und einem Reader gelesen, der Token bleibt im Header.
+  //
+  // Der Strom ersetzt das Polling: es gibt keinen Timer mehr, der nachfragt.
+  function ereignisStrom(beiEreignis, beiAbbruch) {
+    var steuerung = new AbortController();
+    var offen = true;
+
+    fetch('/api/events', {
+      headers: { 'X-Jarvis-Token': TOKEN },
+      signal: steuerung.signal
+    }).then(function (res) {
+      if (!res.ok || !res.body) throw new Error('Ereignisstrom nicht verfuegbar (HTTP ' + res.status + ')');
+      var leser = res.body.getReader();
+      var dekoder = new TextDecoder();
+      var puffer = '';
+
+      function weiter() {
+        return leser.read().then(function (stueck) {
+          if (stueck.done) { offen = false; if (beiAbbruch) beiAbbruch(null); return; }
+          puffer += dekoder.decode(stueck.value, { stream: true });
+
+          // Ein Ereignis endet bei der Leerzeile. Alles davor gehoert zusammen.
+          var grenze;
+          while ((grenze = puffer.indexOf('\n\n')) !== -1) {
+            var roh = puffer.slice(0, grenze);
+            puffer = puffer.slice(grenze + 2);
+            var typ = null, daten = null;
+            roh.split('\n').forEach(function (zeile) {
+              if (zeile.indexOf('event: ') === 0) typ = zeile.slice(7).trim();
+              else if (zeile.indexOf('data: ') === 0) {
+                try { daten = JSON.parse(zeile.slice(6)); } catch (e) { daten = null; }
+              }
+              // ": herzschlag" faellt hier durch - genau richtig.
+            });
+            if (typ && daten) beiEreignis(typ, daten);
+          }
+          return weiter();
+        });
+      }
+      return weiter();
+    }).catch(function (err) {
+      offen = false;
+      if (err && err.name === 'AbortError') return;
+      if (beiAbbruch) beiAbbruch(err);
+    });
+
+    return {
+      schliessen: function () { if (offen) { offen = false; steuerung.abort(); } }
+    };
+  }
+
   function toolNode(call) {
     var box = document.createElement('div');
     box.className = 'tool';
@@ -1304,10 +1360,13 @@ button, input, textarea { font: inherit; color: inherit; }
       });
 
     function neuerPlan(taskId, platzhalter, begonnen) {
-      // Phase 7 ersetzt dieses Polling durch einen Ereignisstrom. Bis dahin
-      // ist ein Intervall von 700 ms der Kompromiss zwischen "man sieht was"
-      // und "der Server wird nicht mit Anfragen zugeschüttet".
+      // Kein Timer. Der Server schiebt; geholt wird nur, wenn ein Ereignis
+      // sagt, dass es etwas zu holen gibt.
       var abgebrochen = false;
+      var fertig = false;
+      var laeuft = false;      // eine Abfrage gleichzeitig, sonst ueberholen sie sich
+      var nachholen = false;
+      var strom = null;
 
       function abbrechen() {
         abgebrochen = true;
@@ -1315,34 +1374,68 @@ button, input, textarea { font: inherit; color: inherit; }
           .catch(function (err) { meldung(err.message); });
       }
 
-      function tick() {
+      function zeichne() {
+        if (fertig) return Promise.resolve();
+        if (laeuft) { nachholen = true; return Promise.resolve(); }
+        laeuft = true;
         return api('/api/tasks/' + taskId).then(function (daten) {
+          laeuft = false;
           var neuerKasten = planNode(daten, abgebrochen ? null : abbrechen);
           if (planBox) { planBox.replaceWith(neuerKasten); }
           else { platzhalter.before(neuerKasten); }
           planBox = neuerKasten;
 
-          if (ENDZUSTAENDE.indexOf(daten.status) === -1) {
-            var pause = daten.confirmation ? 300 : 700;
-            return new Promise(function (weiter) { setTimeout(weiter, pause); }).then(tick);
-          }
-
-          platzhalter.remove();
-          var antwort = messageNode('assistant', daten.result || 'Kein Ergebnis.');
-          planBox.after(antwort);
-          scrollDown();
-
-          el.hint.textContent = 'Fertig in ' + ((Date.now() - begonnen) / 1000).toFixed(1)
-            + ' s · Vorgang ' + taskId + ' · ' + daten.status;
-          // Nur vorlesen, was gesprochen gefragt wurde.
-          if (warSprache && daten.result) lieseVor(daten.result);
-          if (el.memPanel.classList.contains('is-open')) ladeGedaechtnis();
-          setBusy(false);
-          el.input.focus();
-          return loadHealth();
+          if (ENDZUSTAENDE.indexOf(daten.status) !== -1) return abschluss(daten);
+          if (nachholen) { nachholen = false; return zeichne(); }
+        }).catch(function (err) {
+          laeuft = false;
+          appendError(err.message);
+          beenden();
         });
       }
-      return tick();
+
+      function abschluss(daten) {
+        if (fertig) return;
+        beenden();
+        platzhalter.remove();
+        var antwort = messageNode('assistant', daten.result || 'Kein Ergebnis.');
+        if (planBox) planBox.after(antwort); else el.thread.appendChild(antwort);
+        scrollDown();
+
+        el.hint.textContent = 'Fertig in ' + ((Date.now() - begonnen) / 1000).toFixed(1)
+          + ' s · Vorgang ' + taskId + ' · ' + daten.status;
+        // Nur vorlesen, was gesprochen gefragt wurde.
+        if (warSprache && daten.result) lieseVor(daten.result);
+        if (el.memPanel.classList.contains('is-open')) ladeGedaechtnis();
+        setBusy(false);
+        el.input.focus();
+        return loadHealth();
+      }
+
+      function beenden() {
+        fertig = true;
+        if (strom) { strom.schliessen(); strom = null; }
+      }
+
+      strom = ereignisStrom(function (typ, daten) {
+        if (fertig) return;
+        var gehoertUns = (typ === 'task' && daten.id === taskId)
+          || (typ === 'step' && daten.task_id === taskId);
+        if (!gehoertUns) return;
+        zeichne();
+      }, function (err) {
+        // Der Strom ist weg. Lieber einmal ehrlich melden als still
+        // wieder anfangen zu pollen.
+        if (fertig) return;
+        beenden();
+        appendError(err ? ('Ereignisstrom abgerissen: ' + err.message)
+                        : 'Ereignisstrom abgerissen.');
+        setBusy(false);
+      });
+
+      // Einmal sofort zeichnen: der Auftrag kann schon laufen, bevor der
+      // Strom steht. Das ist kein Polling, das passiert genau einmal.
+      return zeichne();
     }
   }
 

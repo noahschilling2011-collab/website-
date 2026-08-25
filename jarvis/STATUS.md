@@ -41,7 +41,7 @@ LETZTE ÄNDERUNG: 2026-08-25 (STATUS.md entwertet, Schritt 3 aus FIX-01)
 | 4 | Planner + Research Agent  | OFFEN  | 0 von 5 |
 | 5 | Permissions & Bestätigung | OFFEN  | 5 von 7 |
 | 6 | Hermes                    | OFFEN  | 1 von 6 |
-| 7 | Observability-Dashboard   | OFFEN  | 3 von 4 |
+| 7 | Observability-Dashboard   | OFFEN  | 4 von 4 (aber Phase 1 sperrt) |
 | 8 | Satellite Agent           | OFFEN  | 0 von 6 |
 | 9 | Voice                     | OFFEN  | 0 von 4 |
 | 10 | Härten & Verpacken        | OFFEN  | 2 von 4 |
@@ -211,7 +211,7 @@ Modulglobal: mehrere Tasks können gleichzeitig laufen.
 
 | # | Kriterium | Stand | BELEG — ausgeführter Befehl | Was der Beleg nicht zeigt |
 |---|---|---|---|---|
-| 1 | Live sehen was laeuft - SSE/WebSocket, kein Polling im Sekundentakt | ◐ TEILWEISE | `cd /home/user/website-/jarvis; grep -c EventSource index.html; grep -c '/api/events' index.html; sed -n 1326p index.html   # dazu: PYTHONPATH=/home…` | Belegt ist der SERVER-Strom, nicht die Ansicht. Die Oberflaeche oeffnet /api/events nie - kein EventSource, kein WebSocket - sondern pollt /api/tasks/<id> alle 700 ms, also genau das, was das Kriterium ausschliesst. Der Kommentar in inde… |
+| 1 | Live sehen was laeuft - SSE/WebSocket, kein Polling im Sekundentakt | ✓ BELEGT | `python3 scratchpad/ui5.py` (Playwright gegen einen uvicorn mit dreistufigem, kuenstlich verlangsamtem Anbieter; zaehlt Netzanfragen der Seite) — dazu `grep -c 'setTimeout(weiter, pause)' index.html` → 0 | Gegenprobe ueber die Laufzeit: bei 6,2 s Laufzeit 9 Abfragen, bei 13,3 s Laufzeit 10 — die Zahl haengt an den Ereignissen, nicht an der Uhr (ein 700-ms-Poller waere von 8 auf 18 gegangen). **Kein `EventSource`:** das kann keine Header setzen, der Token muesste in die URL und damit ins Zugriffslog. Gelesen wird mit `fetch` + Reader. Die woertliche Abnahme aus FIX-01 (`grep -c EventSource index.html` > 0) ist damit **nicht** erfuellt — der eine Treffer ist ein Kommentar, der erklaert, warum nicht. |
 | 2 | Alten Task oeffnen, jeden Schritt inkl. Prompt und Antwort nachlesen | ✓ BELEGT | `PYTHONPATH=/home/user/website-/jarvis PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers python3 /tmp/claude-0/-home-user-website-/9814d470-2beb-57e6-b33a-9…` | Der Server wurde neu gestartet, der Auftrag also wirklich aus der Datenbank gelesen. Was als 'Antwort' dasteht, ist aber der Text eines geskripteten FakeLLMProvider, keine Modellantwort. In diesem Lauf lief kein Werkzeug (der Fake waehlt… |
 | 3 | Kostenanzeige stimmt mit der Summe aus llm_calls ueberein - nachgerechnet | ✓ BELEGT | `curl -s -H 'X-Jarvis-Token: pruef-123' http://127.0.0.1:8137/api/stats \| python3 -m json.tool   # dagegen: python3 -c "import sqlite3;c=sqlite3.co…` | Die Gleichheit Anzeige==llm_calls ist echt nachgerechnet (unabhaengige SQL-Summe plus Preisformel je Aufruf). Die Token selbst stammen aber vom FakeLLMProvider, der Woerter zaehlt statt zu tokenisieren - die Zahlen sind konsistent, nicht… |
 | 4 | Laufender Task per Knopf abbrechen, stoppt tatsaechlich | ✓ BELEGT | `PYTHONPATH=/home/user/website-/jarvis PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers python3 /tmp/claude-0/-home-user-website-/9814d470-2beb-57e6-b33a-9…` | Der Abbruch greift ZWISCHEN den Schritten: der gerade laufende Schritt B lief nach dem Klick noch zu Ende (running -> done), erst C wurde uebersprungen. Bei einem echten, langsamen Modellaufruf heisst 'stoppt' also: kein weiterer Schritt… |
