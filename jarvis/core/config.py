@@ -49,10 +49,24 @@ class Settings(BaseSettings):
 
     # --- Ab Phase 2 ---
     search_api_key: str = ""
-    # Obergrenze fuer den Chat-Agenten. 2 = LOCAL: lesen, rechnen und lokal
-    # ins Gedaechtnis schreiben - aber nichts nach aussen schicken. EXTERNAL
-    # und SENSITIVE bleiben zu; das waere eine bewusste Entscheidung.
-    max_permission: int = 2
+
+    # Phase 5: send_email schreibt hierhin statt zu senden. Ein echter Versand
+    # waere ein eigenes Werkzeug mit eigenem Anbieter und eigenem Key.
+    outbox_path: Path = Field(
+        default=PROJECT_ROOT / "data" / "outbox.jsonl",
+        validation_alias=AliasChoices("JARVIS_OUTBOX_PATH", "OUTBOX_PATH"),
+    )
+    # Obergrenze fuer den Chat-Agenten. 3 = EXTERNAL.
+    #
+    # Bis Phase 4 stand hier LOCAL, weil es keinen Schutz gab: ein Werkzeug mit
+    # Aussenwirkung waere einfach gelaufen. Seit Phase 5 ist jedes Werkzeug ab
+    # EXTERNAL bestaetigungspflichtig - die Registry laesst gar nichts anderes
+    # zu -, und der Mensch sieht vor der Ausfuehrung genau, was passieren
+    # wuerde. Damit ist die Bestaetigung der Schutz, nicht die Decke.
+    #
+    # SENSITIVE (loeschen, bezahlen, Konto aendern) bleibt zu. Das aufzumachen
+    # waere eine eigene Entscheidung, keine Voreinstellung.
+    max_permission: int = 3
 
     # --- Budgets (0.5) ---
     budget_max_steps: int = 12
@@ -81,7 +95,7 @@ class Settings(BaseSettings):
     def _leerer_preis_ist_unbekannt(cls, value: object) -> object:
         return None if isinstance(value, str) and not value.strip() else value
 
-    @field_validator("db_path")
+    @field_validator("db_path", "outbox_path")
     @classmethod
     def _absoluter_pfad(cls, value: Path) -> Path:
         return value if value.is_absolute() else PROJECT_ROOT / value

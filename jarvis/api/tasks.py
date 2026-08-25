@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 
 from api.security import require_token
 from core import db, memory
-from core.contracts import Permission, Step, StepStatus, Task, TaskBudget
+from core.contracts import Permission, Step, StepStatus, Task, TaskBudget, Tool
 from core.llm import LLMReply
 from core.runner import Laufzeit, fuehre_task_aus
 from core.tools.dispatch import ToolCall
@@ -34,6 +34,15 @@ class TaskCreate(BaseModel):
     goal: str = Field(min_length=1, max_length=10_000)
 
 
+class Bestaetigen(BaseModel):
+    approve: bool
+
+
+# 0.5 / Phase 5: unbeantwortete Rueckfragen laufen nach zehn Minuten ab.
+# Danach gilt der Task als abgebrochen - nicht als bestaetigt.
+BESTAETIGUNG_TIMEOUT_S = 600
+
+
 @dataclass
 class LaufenderTask:
     task: Task
@@ -42,6 +51,9 @@ class LaufenderTask:
     # Werkzeugaufrufe entstehen, bevor die Antwort existiert. Sie werden
     # sofort geschrieben und am Ende an die Antwort gehaengt.
     aufruf_ids: list[int] = field(default_factory=list)
+    # Die offene Rueckfrage, falls gerade eine ansteht (Phase 5).
+    offene_frage: dict[str, Any] | None = None
+    antwort: asyncio.Future | None = None
 
 
 class TaskRegistry:
@@ -72,7 +84,15 @@ def baue_laufzeit(request: Request, eintrag: "LaufenderTask") -> Laufzeit:
     pfad = request.app.state.settings.db_path
     task, abbruch = eintrag.task, eintrag.abbruch
 
+    ENDZUSTAENDE = ("done", "failed", "aborted_budget", "cancelled")
+
     async def on_task(t: Task) -> None:
+        # Der Endzustand wird hier bewusst NICHT geschrieben. Sonst meldet
+        # GET /api/tasks/{id} "done", bevor die Antwort im Verlauf steht - und
+        # ein Client, der daraufhin sofort /api/messages holt, sieht sie nicht.
+        # Geschrieben wird er ganz am Ende, wenn alles andere steht.
+        if t.status in ENDZUSTAENDE:
+            return
         await asyncio.to_thread(db.save_task, pfad, t)
 
     async def on_step(t: Task, i: int, s: Step) -> None:
@@ -91,8 +111,63 @@ def baue_laufzeit(request: Request, eintrag: "LaufenderTask") -> Laufzeit:
         )
         eintrag.aufruf_ids.append(zeile.id)
 
+    async def audit(**felder: Any) -> None:
+        await asyncio.to_thread(
+            db.log_audit, pfad, task_id=task.id, **felder
+        )
+
+    async def bestaetigung(
+        tool: Tool, argumente: dict[str, Any], vorschau: str
+    ) -> bool:
+        """Haelt den Task an und wartet auf den Menschen.
+
+        Der Schritt geht auf NEEDS_CONFIRMATION, die Vorschau steht in `note`
+        und ist damit ueber `GET /api/tasks/{id}` sichtbar - das UI zeigt
+        exakt, was passieren wuerde.
+        """
+        schritt = next(
+            (s for s in task.steps if s.status is StepStatus.RUNNING), None
+        )
+        zukunft: asyncio.Future = asyncio.get_running_loop().create_future()
+        eintrag.antwort = zukunft
+        eintrag.offene_frage = {
+            "tool": tool.name,
+            "permission": tool.permission.name,
+            "arguments": argumente,
+            "preview": vorschau,
+            "step_id": schritt.id if schritt else None,
+            "timeout_s": BESTAETIGUNG_TIMEOUT_S,
+        }
+
+        if schritt is not None:
+            schritt.status = StepStatus.NEEDS_CONFIRMATION
+            schritt.note = vorschau
+            await on_step(task, task.steps.index(schritt), schritt)
+        await on_task(task)
+
+        try:
+            entschieden = await asyncio.wait_for(
+                zukunft, timeout=BESTAETIGUNG_TIMEOUT_S
+            )
+        except asyncio.TimeoutError:
+            log.warning("task %s: Rueckfrage zu %s lief ab", task.id, tool.name)
+            await audit(tool=tool.name, arguments=argumente,
+                        permission=tool.permission.name, decision="timeout",
+                        executed=False, detail=vorschau)
+            # Der Auftrag ist eindeutig: danach cancelled, nicht bestaetigt.
+            abbruch.set()
+            entschieden = False
+        finally:
+            eintrag.offene_frage = None
+            eintrag.antwort = None
+            if schritt is not None and schritt.status is StepStatus.NEEDS_CONFIRMATION:
+                schritt.status = StepStatus.RUNNING
+                await on_step(task, task.steps.index(schritt), schritt)
+
+        return bool(entschieden)
+
     return Laufzeit(on_task=on_task, on_step=on_step, on_call=on_call,
-                    abbruch=abbruch)
+                    bestaetigung=bestaetigung, audit=audit, abbruch=abbruch)
 
 
 async def starte_task(request: Request, ziel: str) -> Task:
@@ -145,6 +220,8 @@ async def starte_task(request: Request, ziel: str) -> Task:
                 outcome=task.status,
                 summary=(task.result or task.abort_reason or "")[:500],
             )
+            # Jetzt erst: der Task ist fertig UND alles ist geschrieben.
+            await asyncio.to_thread(db.save_task, settings.db_path, task)
             registry.remove(task.id)
 
     eintrag.future = asyncio.create_task(lauf())
@@ -167,6 +244,8 @@ def task_als_dict(row: dict[str, Any]) -> dict[str, Any]:
         "created_at": row["created_at"],
         "finished_at": row["finished_at"],
         "children": row.get("children", []),
+        # Wird vom Endpunkt gesetzt, wenn gerade eine Rueckfrage offensteht.
+        "confirmation": None,
         "steps": [
             {
                 "id": s["id"],
@@ -205,7 +284,28 @@ async def get_task(request: Request, task_id: str) -> dict[str, Any]:
     row = await asyncio.to_thread(db.get_task_row, pfad, task_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Task nicht gefunden.")
-    return task_als_dict(row)
+    daten = task_als_dict(row)
+    eintrag = request.app.state.tasks.get(task_id)
+    if eintrag is not None and eintrag.offene_frage is not None:
+        daten["confirmation"] = eintrag.offene_frage
+    return daten
+
+
+@tasks_router.post("/{task_id}/confirm")
+async def confirm_task(
+    request: Request, task_id: str, body: Bestaetigen
+) -> dict[str, Any]:
+    """Beantwortet die offene Rueckfrage eines Tasks (Phase 5)."""
+    registry: TaskRegistry = request.app.state.tasks
+    eintrag = registry.get(task_id)
+    if eintrag is None:
+        raise HTTPException(status_code=404, detail="Task laeuft nicht.")
+    if eintrag.antwort is None or eintrag.antwort.done():
+        raise HTTPException(
+            status_code=409, detail="Zu diesem Task steht keine Frage offen."
+        )
+    eintrag.antwort.set_result(body.approve)
+    return {"task_id": task_id, "approved": body.approve}
 
 
 @tasks_router.post("/{task_id}/cancel")

@@ -290,6 +290,25 @@ async def get_task_log(request: Request) -> list[TaskLogOut]:
     return [TaskLogOut.of(r) for r in rows]
 
 
+@api.get("/audit")
+async def get_audit(request: Request) -> list[dict]:
+    """Das Audit-Log: jede Aktion ab EXTERNAL, unveraenderlich (Phase 5).
+
+    Die Tabelle laesst UPDATE und DELETE nicht zu - das ist ein Trigger in
+    `core/schema.sql`, keine Absprache.
+    """
+    rows = await asyncio.to_thread(db.list_audit, _settings(request).db_path)
+    return [
+        {
+            "id": r.id, "task_id": r.task_id, "step_id": r.step_id,
+            "tool": r.tool, "arguments": r.arguments, "permission": r.permission,
+            "decision": r.decision, "executed": r.executed, "ok": r.ok,
+            "detail": r.detail, "created_at": r.created_at,
+        }
+        for r in rows
+    ]
+
+
 @router.get("/", include_in_schema=False)
 async def index(request: Request) -> HTMLResponse:
     """Liefert die Oberflaeche.

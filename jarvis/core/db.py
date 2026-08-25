@@ -393,3 +393,72 @@ def list_task_rows(db_path: Path | str, limit: int = 50) -> list[dict]:
             (limit,),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+# --- Audit-Log (Phase 5) --------------------------------------------------
+
+
+@dataclass(frozen=True)
+class AuditRow:
+    id: int
+    task_id: str | None
+    step_id: str | None
+    tool: str
+    arguments: dict
+    permission: str
+    decision: str
+    executed: bool
+    ok: bool | None
+    detail: str | None
+    created_at: str
+
+    @classmethod
+    def from_row(cls, row: sqlite3.Row) -> "AuditRow":
+        return cls(
+            id=row["id"], task_id=row["task_id"], step_id=row["step_id"],
+            tool=row["tool"], arguments=json.loads(row["arguments"] or "{}"),
+            permission=row["permission"], decision=row["decision"],
+            executed=bool(row["executed"]),
+            ok=None if row["ok"] is None else bool(row["ok"]),
+            detail=row["detail"], created_at=row["created_at"],
+        )
+
+
+def log_audit(
+    db_path: Path | str,
+    *,
+    tool: str,
+    arguments: dict,
+    permission: str,
+    decision: str,
+    task_id: str | None = None,
+    step_id: str | None = None,
+    executed: bool = False,
+    ok: bool | None = None,
+    detail: str | None = None,
+) -> AuditRow:
+    with session(db_path) as conn:
+        now = utcnow()
+        cur = conn.execute(
+            "INSERT INTO audit_log (task_id, step_id, tool, arguments, permission, "
+            "decision, executed, ok, detail, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (task_id, step_id, tool,
+             json.dumps(arguments, ensure_ascii=False, default=str),
+             permission, decision, int(executed),
+             None if ok is None else int(ok), detail, now),
+        )
+        assert cur.lastrowid is not None
+        return AuditRow(
+            id=cur.lastrowid, task_id=task_id, step_id=step_id, tool=tool,
+            arguments=arguments, permission=permission, decision=decision,
+            executed=executed, ok=ok, detail=detail, created_at=now,
+        )
+
+
+def list_audit(db_path: Path | str, limit: int = 200) -> list[AuditRow]:
+    with session(db_path) as conn:
+        rows = conn.execute(
+            "SELECT * FROM audit_log ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+    return [AuditRow.from_row(r) for r in rows]

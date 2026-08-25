@@ -180,3 +180,40 @@ CREATE TABLE IF NOT EXISTS steps (
 );
 
 CREATE INDEX IF NOT EXISTS idx_steps_task ON steps(task_id, idx);
+
+
+-- ---------------------------------------------------------------------------
+-- Phase 5: Audit-Log.
+--
+-- "Jede Aktion ab EXTERNAL wird unveraenderlich protokolliert."
+--
+-- Unveraenderlich heisst hier nicht "wir aendern es halt nicht", sondern:
+-- die Datenbank laesst UPDATE und DELETE auf dieser Tabelle nicht zu. Wer
+-- eine Zeile loswerden will, muss die Datei anfassen - und das sieht man.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS audit_log (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id      TEXT,
+    step_id      TEXT,
+    tool         TEXT    NOT NULL,
+    arguments    TEXT    NOT NULL DEFAULT '{}',   -- JSON
+    permission   TEXT    NOT NULL,
+    decision     TEXT    NOT NULL,                -- approved | denied | timeout | auto
+    executed     INTEGER NOT NULL DEFAULT 0,
+    ok           INTEGER,
+    detail       TEXT,
+    created_at   TEXT    NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at DESC);
+
+CREATE TRIGGER IF NOT EXISTS audit_log_kein_update
+BEFORE UPDATE ON audit_log BEGIN
+    SELECT RAISE(ABORT, 'audit_log ist unveraenderlich');
+END;
+
+CREATE TRIGGER IF NOT EXISTS audit_log_kein_delete
+BEFORE DELETE ON audit_log BEGIN
+    SELECT RAISE(ABORT, 'audit_log ist unveraenderlich');
+END;

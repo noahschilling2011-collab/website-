@@ -3,7 +3,7 @@
 > Einzige Wahrheit über den Projektstand. Claude Code liest diese Datei zuerst
 > und aktualisiert sie am Ende jeder Phase. Von Hand korrigieren ist erlaubt.
 
-AKTUELL: Phase 4 — Planner + Research Agent
+AKTUELL: Phase 5 — Permissions & Bestätigung
 LETZTE ÄNDERUNG: 2026-08-25
 
 > **Abweichung von der Arbeitsweise, auf Ansage:** es werden alle Phasen
@@ -20,7 +20,7 @@ LETZTE ÄNDERUNG: 2026-08-25
 | 2 | Tool-System               | IN ARBEIT| –              |
 | 3 | Memory                    | IN ARBEIT| –              |
 | 4 | Planner + Research Agent  | IN ARBEIT| –              |
-| 5 | Permissions & Bestätigung | GESPERRT | –              |
+| 5 | Permissions & Bestätigung | IN ARBEIT| –              |
 | 6 | Hermes                    | GESPERRT | –              |
 | 7 | Observability-Dashboard   | GESPERRT | –              |
 | 8 | Satellite Agent           | GESPERRT | –              |
@@ -115,6 +115,33 @@ Schritt und Zusammenfassung — drei bis vier Modellaufrufe statt einem. Bei
 `claude-opus-5` ist das echtes Geld. Der Planner ist darauf getrimmt, einfache
 Ziele in genau einem Schritt zu erledigen, aber die zwei Zusatzaufrufe bleiben.
 
+## Phase 5 — Permissions & Bestätigung
+
+| # | Kriterium | Stand |
+|---|---|---|
+| 1 | Test-Tool `send_email` (EXTERNAL, schreibt nur in eine Datei) löst eine Rückfrage aus | ✓ über den echten Endpunkt |
+| 2 | Die Rückfrage zeigt Empfänger, Betreff und Text vor dem Senden | ✓ |
+| 3 | Ohne Bestätigung passiert nichts — die Datei ist leer | ✓ die Datei entsteht gar nicht erst |
+| 4 | Ein Agent mit `max_permission = READ` kann `send_email` nicht aufrufen | ✓ auch mit dem Tool in seiner Liste |
+| 5 | Audit-Log enthält jede bestätigte Aktion mit Zeitstempel | ✓ inklusive Ablehnungen und Timeouts |
+
+Gebaut: Bestätigungs-Haken im Dispatcher, `vorschau()` je Werkzeug,
+`POST /api/tasks/{id}/confirm`, `GET /api/audit`, Tabelle `audit_log`,
+Werkzeug `send_email`, Rückfrage-Dialog im UI.
+
+**Unveränderlich heißt hier wirklich unveränderlich:** zwei SQLite-Trigger
+lehnen `UPDATE` und `DELETE` auf `audit_log` ab. Ein Test versucht beides und
+erwartet den Fehler.
+
+**`max_permission` steht jetzt auf EXTERNAL** (vorher LOCAL). Bis Phase 4 gab
+es keinen Schutz — ein Werkzeug mit Außenwirkung wäre einfach gelaufen. Seit
+Phase 5 ist alles ab EXTERNAL bestätigungspflichtig (die Registry lässt gar
+nichts anderes zu), und der Mensch sieht vorher genau, was passieren würde.
+SENSITIVE bleibt zu.
+
+**Timeout:** eine unbeantwortete Rückfrage läuft nach 10 Minuten ab. Danach
+gilt der Task als `cancelled` — nicht als bestätigt.
+
 ## Offene Blocker
 
 - [ ] LLM-API-Key besorgen, als `LLM_API_KEY` in `.env` eintragen
@@ -144,6 +171,8 @@ Ziele in genau einem Schritt zu erledigen, aber die zwei Zusatzaufrufe bleiben.
 | Der Plan wird **nicht** auf `budget.max_steps` gekürzt | Sonst könnte `max_steps` nie greifen und der Nutzer sähe nie, dass sein Ziel größer war als das Budget. Der Plan darf zu groß sein; das Budget stoppt ihn während der Ausführung, mit Teilergebnis. |
 | `max_steps` zählt gelaufene, nicht geplante Schritte | Sonst reißt die Grenze, bevor ein Schritt lief — und es gäbe nie ein Teilergebnis. |
 | `GET /api/tasks` aus Phase 3 heißt jetzt `GET /api/task-log` | Phase 4 belegt `/api/tasks` mit der Task-Struktur. Der episodische Log ist etwas anderes. |
+| Der Endzustand eines Tasks wird zuletzt geschrieben, nicht vom Runner | Sonst meldet `GET /api/tasks/{id}` `done`, bevor die Antwort im Verlauf steht — ein Client, der sofort nachlädt, sieht sie nicht. Preis: stirbt der Prozess genau dazwischen, steht der Task dauerhaft auf `running`. Das ist ehrlicher als ein `done` ohne Ergebnis. |
+| `max_permission` von LOCAL auf EXTERNAL angehoben | Erst mit dem Bestätigungs-Flow aus Phase 5 gibt es einen Schutz, der das trägt. SENSITIVE bleibt zu. |
 
 ## Entscheidungslog
 

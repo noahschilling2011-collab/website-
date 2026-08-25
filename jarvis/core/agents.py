@@ -13,7 +13,7 @@ from typing import Awaitable, Callable, Iterable
 
 from core.contracts import Agent, Permission, Step, Task, ToolResult
 from core.llm import LLMMessage, LLMProvider, LLMReply
-from core.tools.dispatch import ToolCall
+from core.tools.dispatch import Audit, Bestaetigung, ToolCall
 from core.tools.loop import run_tool_loop
 
 RECHERCHE_PROMPT = """Du bist der Research Agent von JARVIS.
@@ -55,6 +55,8 @@ class ToolAgent(Agent):
         max_tool_calls: int = 8,
         on_reply: Callable[[LLMReply], Awaitable[None]] | None = None,
         on_call: Callable[[ToolCall], Awaitable[None]] | None = None,
+        bestaetigung: Bestaetigung | None = None,
+        audit: Audit | None = None,
     ) -> None:
         self.provider = provider
         self.name = name
@@ -66,6 +68,8 @@ class ToolAgent(Agent):
         self.max_tool_calls = max_tool_calls
         self._on_reply = on_reply
         self._on_call = on_call
+        self._bestaetigung = bestaetigung
+        self._audit = audit
 
     async def run(self, task: Task, step: Step) -> ToolResult:
         begonnen = time.monotonic()
@@ -89,6 +93,8 @@ class ToolAgent(Agent):
                 max_tool_calls=self.max_tool_calls,
                 on_call=self._on_call,
                 on_reply=self._on_reply,
+                bestaetigung=self._bestaetigung,
+                audit=self._audit,
             )
         except Exception as exc:  # noqa: BLE001 - ein Schritt reisst nie den Task um
             return ToolResult(
@@ -124,6 +130,8 @@ def baue_agenten(
     max_permission: Permission,
     on_reply: Callable[[LLMReply], Awaitable[None]] | None = None,
     on_call: Callable[[ToolCall], Awaitable[None]] | None = None,
+    bestaetigung: Bestaetigung | None = None,
+    audit: Audit | None = None,
 ) -> dict[str, ToolAgent]:
     """Die Agenten, die es in dieser Phase gibt.
 
@@ -144,15 +152,18 @@ def baue_agenten(
             max_permission=Permission.READ,
             on_reply=on_reply,
             on_call=on_call,
+            audit=audit,
         ),
         "jarvis": ToolAgent(
             provider,
             name="jarvis",
             description="Erledigt einen Schritt mit den eigenen Werkzeugen.",
             system_prompt=STANDARD_PROMPT,
-            tools=["clock", "calculator", "recall", "remember"],
+            tools=["clock", "calculator", "recall", "remember", "send_email"],
             max_permission=max_permission,
             on_reply=on_reply,
             on_call=on_call,
+            bestaetigung=bestaetigung,
+            audit=audit,
         ),
     }

@@ -13,7 +13,7 @@ from typing import Any, Awaitable, Callable, Iterable
 from core.contracts import Permission
 from core.llm import LLMMessage, LLMProvider, LLMReply
 from core.tools import registry
-from core.tools.dispatch import ToolCall, run_tool
+from core.tools.dispatch import Audit, Bestaetigung, ToolCall, run_tool
 
 log = logging.getLogger("jarvis")
 
@@ -34,6 +34,8 @@ async def run_tool_loop(
     max_tool_calls: int = 20,
     on_call: Callable[[ToolCall], Awaitable[None]] | None = None,
     on_reply: Callable[[LLMReply], Awaitable[None]] | None = None,
+    bestaetigung: Bestaetigung | None = None,
+    audit: Audit | None = None,
 ) -> tuple[str, list[ToolCall], list[LLMReply]]:
     """Gibt (Antworttext, ausgefuehrte Aufrufe, alle Modellantworten) zurueck."""
     schemas = registry.schemas_for(erlaubt, max_permission)
@@ -82,6 +84,8 @@ async def run_tool_loop(
                 tool_use.input,
                 max_permission=max_permission,
                 erlaubt=erlaubt,
+                bestaetigung=bestaetigung,
+                audit=audit,
             )
             aufruf = ToolCall(
                 name=tool_use.name, arguments=tool_use.input, result=ergebnis

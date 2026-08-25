@@ -388,6 +388,63 @@ button, input, textarea { font: inherit; color: inherit; }
   50%      { box-shadow: 0 0 0 5px rgba(242, 181, 68, 0); }
 }
 
+/* --- Rückfrage vor einer Aktion mit Außenwirkung (Phase 5) ---------------- */
+
+.frage {
+  margin: var(--s-2) var(--s-3) var(--s-3);
+  border: 1px solid var(--accent-line);
+  border-radius: 12px;
+  background: var(--accent-soft);
+  overflow: hidden;
+}
+.frage-kopf {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 8px var(--s-3);
+  font-size: 11px;
+  color: var(--accent);
+  border-bottom: 1px solid var(--accent-line);
+}
+.frage-stufe {
+  margin-left: auto;
+  padding: 1px 8px;
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  font-size: 10px;
+}
+.frage pre {
+  margin: 0;
+  padding: var(--s-3);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--step--1);
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.frage-knoepfe {
+  display: flex;
+  gap: var(--s-2);
+  padding: 0 var(--s-3) var(--s-3);
+}
+.frage-knoepfe button {
+  padding: 7px var(--s-4);
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 500;
+}
+.frage-ja { background: var(--accent); color: var(--on-accent); }
+.frage-nein {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--line) !important;
+}
+.frage-nein:hover { color: var(--danger); border-color: rgba(242,114,107,0.5) !important; }
+.frage-hinweis { padding: 0 var(--s-3) var(--s-3); font-size: 11px; color: var(--text-dim); }
+
 /* --- Werkzeugaufrufe, aufklappbar (Phase 2, DoD 6) ------------------------ */
 
 .tools {
@@ -890,6 +947,65 @@ button, input, textarea { font: inherit; color: inherit; }
     return box;
   }
 
+  function frageNode(daten) {
+    var frage = daten.confirmation;
+    var box = document.createElement('div');
+    box.className = 'frage';
+
+    var kopf = document.createElement('div');
+    kopf.className = 'frage-kopf';
+    kopf.textContent = 'JARVIS möchte ' + frage.tool + ' ausführen';
+    var stufe = document.createElement('span');
+    stufe.className = 'frage-stufe';
+    stufe.textContent = frage.permission;
+    kopf.appendChild(stufe);
+    box.appendChild(kopf);
+
+    // Exakt das, was passieren würde — textContent, der Inhalt kommt aus
+    // einem Modell.
+    var pre = document.createElement('pre');
+    pre.textContent = frage.preview;
+    box.appendChild(pre);
+
+    var knoepfe = document.createElement('div');
+    knoepfe.className = 'frage-knoepfe';
+
+    function antworte(erlauben) {
+      knoepfe.textContent = '';
+      var warte = document.createElement('span');
+      warte.className = 'frage-hinweis';
+      warte.textContent = erlauben ? 'wird ausgeführt…' : 'abgelehnt';
+      knoepfe.appendChild(warte);
+      api('/api/tasks/' + daten.id + '/confirm', {
+        method: 'POST', body: { approve: erlauben }
+      }).catch(function (err) { meldung(err.message); });
+    }
+
+    var ja = document.createElement('button');
+    ja.type = 'button';
+    ja.className = 'frage-ja';
+    ja.textContent = 'Ausführen';
+    ja.addEventListener('click', function () { antworte(true); });
+
+    var nein = document.createElement('button');
+    nein.type = 'button';
+    nein.className = 'frage-nein';
+    nein.textContent = 'Nicht ausführen';
+    nein.addEventListener('click', function () { antworte(false); });
+
+    knoepfe.appendChild(ja);
+    knoepfe.appendChild(nein);
+    box.appendChild(knoepfe);
+
+    var hinweis = document.createElement('p');
+    hinweis.className = 'frage-hinweis';
+    hinweis.textContent = 'Ohne Antwort passiert nichts. Nach '
+      + Math.round((frage.timeout_s || 600) / 60) + ' Minuten wird der Auftrag abgebrochen.';
+    box.appendChild(hinweis);
+
+    return box;
+  }
+
   function planNode(daten, onAbbruch) {
     var box = document.createElement('div');
     box.className = 'plan';
@@ -913,6 +1029,8 @@ button, input, textarea { font: inherit; color: inherit; }
     box.appendChild(kopf);
 
     daten.steps.forEach(function (schritt) { box.appendChild(schrittNode(schritt)); });
+
+    if (daten.confirmation) box.appendChild(frageNode(daten));
 
     var fuss = document.createElement('div');
     fuss.className = 'plan-fuss';
@@ -977,7 +1095,8 @@ button, input, textarea { font: inherit; color: inherit; }
           planBox = neuerKasten;
 
           if (ENDZUSTAENDE.indexOf(daten.status) === -1) {
-            return new Promise(function (weiter) { setTimeout(weiter, 700); }).then(tick);
+            var pause = daten.confirmation ? 300 : 700;
+            return new Promise(function (weiter) { setTimeout(weiter, pause); }).then(tick);
           }
 
           platzhalter.remove();

@@ -15,11 +15,35 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass, field
-from typing import Any, Iterable
+from typing import Any, Awaitable, Callable, Iterable
 
-from core.contracts import Permission, ToolResult
+from core.contracts import Permission, Tool, ToolResult
 from core.tools import registry
 from core.tools.validate import pruefe
+
+# Eine Bestaetigung beantwortet genau eine Frage: darf dieser Aufruf mit diesen
+# Argumenten laufen? Sie bekommt das Tool und die Argumente, damit der
+# Aufrufer dem Nutzer zeigen kann, was passieren wuerde.
+Bestaetigung = Callable[[Tool, dict[str, Any], str], Awaitable[bool]]
+Audit = Callable[..., Awaitable[None]]
+
+
+def beschreibe_aufruf(tool: Tool, argumente: dict[str, Any]) -> str:
+    """Was wuerde passieren - im Klartext, fuer die Rueckfrage.
+
+    Ein Tool darf `vorschau()` anbieten und dann selbst erklaeren, was es tut.
+    Ohne das bleibt es bei Name und Argumenten; das ist wenig, aber ehrlich.
+    """
+    vorschau = getattr(tool, "vorschau", None)
+    if callable(vorschau):
+        try:
+            text = vorschau(**argumente)
+            if text:
+                return str(text)
+        except Exception:  # noqa: BLE001 - eine kaputte Vorschau blockiert nichts
+            pass
+    argtext = ", ".join(f"{k}={v!r}" for k, v in argumente.items())
+    return f"{tool.name}({argtext})"
 
 
 @dataclass
@@ -44,6 +68,8 @@ async def run_tool(
     *,
     max_permission: Permission = Permission.SENSITIVE,
     erlaubt: Iterable[str] | None = None,
+    bestaetigung: Bestaetigung | None = None,
+    audit: Audit | None = None,
 ) -> ToolResult:
     begonnen = time.monotonic()
 
@@ -93,6 +119,40 @@ async def run_tool(
             duration_ms=dauer(),
         )
 
+    # --- Bestaetigung (0.4.6, Phase 5) ---------------------------------
+    # Alles ab EXTERNAL wird protokolliert, egal wie es ausgeht.
+    protokollieren = tool.permission >= Permission.EXTERNAL
+    vorschau = beschreibe_aufruf(tool, argumente)
+
+    if tool.requires_confirmation:
+        if bestaetigung is None:
+            if protokollieren and audit is not None:
+                await audit(tool=tool.name, arguments=argumente,
+                            permission=tool.permission.name, decision="denied",
+                            executed=False, detail="Niemand konnte bestaetigen.")
+            return ToolResult(
+                ok=False,
+                error=(
+                    f"{name} braucht eine Bestaetigung, aber in diesem Zusammenhang "
+                    "kann niemand bestaetigen."
+                ),
+                display=vorschau,
+                duration_ms=dauer(),
+            )
+
+        erlaubt_vom_nutzer = await bestaetigung(tool, argumente, vorschau)
+        if not erlaubt_vom_nutzer:
+            if protokollieren and audit is not None:
+                await audit(tool=tool.name, arguments=argumente,
+                            permission=tool.permission.name, decision="denied",
+                            executed=False, detail=vorschau)
+            return ToolResult(
+                ok=False,
+                error="Nicht bestaetigt.",
+                display=f"Nicht ausgefuehrt: {vorschau}",
+                duration_ms=dauer(),
+            )
+
     try:
         ergebnis = await asyncio.wait_for(
             tool.execute(**argumente), timeout=tool.timeout_s
@@ -131,4 +191,12 @@ async def run_tool(
 
     if not ergebnis.duration_ms:
         ergebnis.duration_ms = dauer()
+
+    if protokollieren and audit is not None:
+        await audit(
+            tool=tool.name, arguments=argumente,
+            permission=tool.permission.name,
+            decision="approved" if tool.requires_confirmation else "auto",
+            executed=True, ok=ergebnis.ok, detail=vorschau,
+        )
     return ergebnis

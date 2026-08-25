@@ -84,6 +84,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             werkzeug = registry.get(name)
             if werkzeug is not None:
                 werkzeug.db_path = settings.db_path
+        post = registry.get("send_email")
+        if post is not None:
+            post.outbox = settings.outbox_path
         if not settings.search_api_key:
             log.info("SEARCH_API_KEY fehlt - web_search meldet das beim Aufruf.")
 

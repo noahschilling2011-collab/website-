@@ -30,7 +30,7 @@ from core.contracts import (
 )
 from core.llm import LLMMessage, LLMProvider, LLMReply
 from core.planner import PlanungFehlgeschlagen, erstelle_plan
-from core.tools.dispatch import ToolCall
+from core.tools.dispatch import Audit, Bestaetigung, ToolCall
 from core.verify import verifiziere
 
 log = logging.getLogger("jarvis")
@@ -66,6 +66,8 @@ class Laufzeit:
     on_task: Callable[[Task], Awaitable[None]] | None = None
     on_step: Callable[[Task, int, Step], Awaitable[None]] | None = None
     on_call: Callable[[ToolCall], Awaitable[None]] | None = None
+    bestaetigung: Bestaetigung | None = None
+    audit: Audit | None = None
     abbruch: asyncio.Event | None = None
 
     async def task(self, t: Task) -> None:
@@ -110,6 +112,7 @@ async def fuehre_task_aus(
     verfuegbar = agenten or baue_agenten(
         provider, max_permission=max_permission,
         on_reply=buche, on_call=buche_werkzeug,
+        bestaetigung=laufzeit.bestaetigung, audit=laufzeit.audit,
     )
 
     await laufzeit.task(task)
