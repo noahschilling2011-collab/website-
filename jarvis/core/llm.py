@@ -145,6 +145,49 @@ class FakeTurn:
         return "tool_use" if self.tool_uses else "end_turn"
 
 
+def _ist_planungsanfrage(system: str) -> bool:
+    """Erkennt am Rollen-Marker, dass ein Plan verlangt wird.
+
+    Bewusst kein Blick auf den Inhalt des Ziels: der Fake soll dumm bleiben.
+    Er weiss, WER fragt, nicht WAS gefragt wird.
+    """
+    from core.planner import PLANNER_MARKER   # spaet: planner importiert llm
+
+    return PLANNER_MARKER in system
+
+
+def _fake_plan(history: list[LLMMessage]) -> str:
+    """Ein Plan mit genau einem Schritt: dem Ziel selbst, ohne Agenten.
+
+    Das JSON entsteht aus dem Pydantic-Modell des Planners, nicht aus einer
+    abgetippten Beispielzeile. Aendert sich das Schema, aendert sich diese
+    Antwort mit - oder der Import bricht, was ebenfalls auffaellt.
+    """
+    from core.planner import ZIEL_PRAEFIX, Plan, PlanStep
+
+    erste_frage = next(
+        (m.content for m in history
+         if m.role == "user" and isinstance(m.content, str)),
+        "",
+    )
+    ziel = erste_frage
+    if ziel.startswith(ZIEL_PRAEFIX):
+        ziel = ziel[len(ZIEL_PRAEFIX):]
+    ziel = ziel.strip()
+
+    feld = PlanStep.model_fields["description"]
+    grenzen = {art.__class__.__name__: art for art in feld.metadata}
+    hoechstens = getattr(grenzen.get("MaxLen"), "max_length", 500)
+    if len(ziel) > hoechstens:
+        ziel = ziel[:hoechstens]
+    if not ziel:
+        # min_length=1: ein leeres Ziel wuerde das Schema verletzen. Dann
+        # lieber ehrlich benennen, dass nichts ankam.
+        ziel = "(kein Ziel uebermittelt)"
+
+    return Plan(steps=[PlanStep(description=ziel, agent=None)]).model_dump_json()
+
+
 class FakeLLMProvider(LLMProvider):
     """Deterministischer Anbieter ohne Netz.
 
@@ -184,6 +227,8 @@ class FakeLLMProvider(LLMProvider):
                 text, tool_uses = zug.text, zug.tool_uses
             else:
                 text = zug
+        elif _ist_planungsanfrage(system):
+            text = _fake_plan(history)
         else:
             last_user = next(
                 (m.content for m in reversed(history)

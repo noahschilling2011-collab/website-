@@ -33,7 +33,16 @@ log = logging.getLogger("jarvis")
 
 MAX_REPARATUREN = 2
 
-SYSTEM = """Du bist der Planner von JARVIS. Du zerlegst ein Ziel in Schritte.
+# Woran ein Anbieter erkennt, dass gerade ein Plan verlangt wird - ohne den
+# Prompt zu zerlegen. Der FakeLLMProvider haengt daran; deshalb steht der
+# Marker hier und wird nicht dort noch einmal getippt.
+PLANNER_MARKER = "Du bist der Planner von JARVIS."
+
+# Der Umschlag, in dem das Ziel zum Modell geht. Auch das teilen sich
+# Planner und Fake, statt es zweimal zu kennen.
+ZIEL_PRAEFIX = "Ziel: "
+
+SYSTEM = PLANNER_MARKER + """ Du zerlegst ein Ziel in Schritte.
 
 DIE WICHTIGSTE REGEL: Wenn das Ziel mit einem einzigen Schritt zu erledigen
 ist, gibst du GENAU EINEN Schritt zurueck. Die meisten Ziele sind das.
@@ -104,7 +113,7 @@ async def erstelle_plan(
     system = SYSTEM.replace("<<AGENTEN>>", beschreibung).replace(
         "<<MAX_STEPS>>", str(max_steps)
     )
-    verlauf: list[LLMMessage] = [LLMMessage("user", f"Ziel: {ziel}")]
+    verlauf: list[LLMMessage] = [LLMMessage("user", ZIEL_PRAEFIX + ziel)]
 
     letzter_fehler = ""
     for versuch in range(MAX_REPARATUREN + 1):

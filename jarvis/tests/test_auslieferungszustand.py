@@ -50,7 +50,8 @@ def test_ausgelieferter_zustand_kann_einen_auftrag(client: TestClient):
     antwort = client.post(
         "/api/tasks", json={"goal": "Was ist 2+2"}, headers=TOKEN
     )
-    assert antwort.status_code == 200, antwort.text
+    # 202 Accepted: der Auftrag laeuft im Hintergrund weiter.
+    assert antwort.status_code == 202, antwort.text
     task = warte_auf_ende(client, antwort.json()["task_id"])
 
     assert task["status"] == "done", task["result"]

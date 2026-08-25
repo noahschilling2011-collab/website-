@@ -21,8 +21,13 @@ python -m uvicorn main:app --reload
 Dann <http://127.0.0.1:8000> öffnen.
 
 Ohne weitere Einrichtung läuft der **FakeLLMProvider**: deterministische
-Antworten, kein Netz, keine Kosten. Die ganze Oberfläche lässt sich damit
-ausprobieren.
+Antworten, kein Netz, keine Kosten.
+
+Die Oberfläche läuft damit, und Aufträge laufen durch — der Fake liefert dem
+Planner einen Plan mit genau **einem** Schritt, dessen Beschreibung das Ziel
+ist. Aber **es wird kein Werkzeug ausgeführt**: der Fake schlägt nie einen
+Werkzeugaufruf vor. Rechner, Websuche, Gedächtnis und Bestätigungsdialog
+brauchen einen echten Provider mit Key — und der kostet Geld.
 
 ---
 
