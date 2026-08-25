@@ -50,6 +50,14 @@ class Settings(BaseSettings):
     # --- Ab Phase 2 ---
     search_api_key: str = ""
 
+    # --- Vault (docs/MIGRATION-VAULT.md) ---
+    # Leer = kein Vault. Dann bleibt JARVIS bei der Datenbank, und nichts an
+    # diesem Pfad wird angelegt. AliasChoices, weil der Feldname sonst still
+    # VAULT_PATH lesen wuerde - derselbe Fehler wie frueher bei db_path.
+    vault_pfad: str = Field(
+        default="", validation_alias=AliasChoices("VAULT_PFAD", "VAULT_PATH")
+    )
+
     # Phase 5: send_email schreibt hierhin statt zu senden. Ein echter Versand
     # waere ein eigenes Werkzeug mit eigenem Anbieter und eigenem Key.
     outbox_path: Path = Field(

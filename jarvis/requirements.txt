@@ -11,3 +11,8 @@ pydantic-settings>=2.4
 # Zum Testen. Kein pytest-asyncio noetig - tests/conftest.py hat ein
 # run()-Helferlein.
 pytest>=8.0
+
+# Vault-Index (docs/MIGRATION-VAULT.md Schritt 3): beobachtet den
+# Obsidian-Ordner. Version festgenagelt, damit ein Update nicht still das
+# Ereignisverhalten aendert.
+watchdog==6.0.0

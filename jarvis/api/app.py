@@ -6,6 +6,7 @@ koennen dadurch eine eigene `Settings` uebergeben, ohne das Modul neu zu laden.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -85,6 +86,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             werkzeug = registry.get(name)
             if werkzeug is not None:
                 werkzeug.db_path = settings.db_path
+                werkzeug.vault_pfad = settings.vault_pfad
         post = registry.get("send_email")
         if post is not None:
             post.outbox = settings.outbox_path
@@ -95,6 +97,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             satellit.provider = CDSEProvider(
                 settings.cdse_client_id, settings.cdse_client_secret
             )
+        # --- Vault (docs/MIGRATION-VAULT.md) ---
+        # Der Index ist abgeleitet: beim Start einmal neu bauen kostet nichts
+        # und macht ihn verlaesslich, egal was zwischendurch in Obsidian
+        # passiert ist.
+        app.state.vault = None
+        if settings.vault_pfad:
+            from core.vault_index import Beobachter, reindex
+
+            anzahl = await asyncio.to_thread(
+                reindex, settings.db_path, settings.vault_pfad
+            )
+            log.info("Vault %s - %d Notizen indexiert.", settings.vault_pfad, anzahl)
+            try:
+                app.state.vault = Beobachter(settings.db_path, settings.vault_pfad).start()
+            except Exception as exc:      # noqa: BLE001 - ohne Beobachter laeuft alles weiter
+                log.warning("Vault-Beobachter nicht gestartet: %s. "
+                            "Der Index bleibt auf dem Stand des Starts.", exc)
+
         if not settings.search_api_key:
             log.info("SEARCH_API_KEY fehlt - web_search meldet das beim Aufruf.")
 
@@ -117,6 +137,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             # Modellaufrufe in der Luft, die schon Geld gekostet haben.
             await app.state.tasks.stop_alle()
             await app.state.provider.aclose()
+            if getattr(app.state, "vault", None) is not None:
+                app.state.vault.stop()
 
     app = FastAPI(
         title="JARVIS",

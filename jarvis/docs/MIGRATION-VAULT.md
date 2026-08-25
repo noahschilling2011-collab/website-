@@ -169,3 +169,78 @@ dann ist das Prinzip gebrochen.
 - Ein Obsidian-Plugin. Obsidian muss von JARVIS nichts wissen.
 - Vektor-Einbettungen. Erst FTS5 messen. Embeddings kommen, wenn FTS5 nachweislich zu
   schlecht ist — das ist eine Messung, keine Annahme.
+
+---
+
+# ERGEBNIS — gebaut am 25.08.2026
+
+## Was existiert
+
+| Datei | wofür |
+|---|---|
+| `core/vault.py` | Notiz, Frontmatter hin und zurück, atomares Schreiben, Konflikterkennung |
+| `core/vault_index.py` | abgeleiteter Index, FTS5, Beobachter mit 800-ms-Entprellung |
+| `scripts/reindex.py` | `python -m scripts.reindex` — baut den Index von null neu |
+| `scripts/migrate_vault.py` | Schritt 4, bricht ab statt zu löschen |
+| `tests/test_vault.py` | 24 Tests |
+| Tabellen `vault_notizen` + `vault_fts` | in `core/schema.sql`, ausdrücklich **ohne** Indexier-Zeitstempel |
+
+`VAULT_PFAD` leer heißt: nichts ändert sich, nichts wird angelegt, JARVIS bleibt
+bei der Datenbank. Nachgewiesen mit `test_ohne_vault_bleibt_alles_beim_alten`.
+
+## Schritt 0 — Bestand
+
+```
+$ python3 -c "... select count(*) from facts"
+facts: 0
+```
+
+**Die Messlatte ist 0.** Die produktive Datenbank enthält keine Fakten, die Migration
+kann dort also nichts beweisen. Deshalb ist sie zusätzlich gegen eine geseedete
+Datenbank gelaufen — dieselbe Datei, dieselben Schritte:
+
+```
+[0] Bestand: 3 Zeilen in facts
+[1] schreiben
+       1 -> Noah-fahrt-Downhill-f_1.md
+       2 -> Der-Kaffee-wird-schwarz-getrunken-f_2.md
+       3 -> Wohnort-ist-Schwabisch-Gmund-f_3.md
+[2] neu indexieren        3 Notizen im Index
+[3] zaehlen und vergleichen   ✓ 3 == 3
+[4] Stichprobe, Zeichen fuer Zeichen
+    ✓ f_1: 'Noah fährt Downhill. Sein Rad ist ein Santa Cruz V10.'
+    ✓ f_2: 'Der Kaffee wird schwarz getrunken.'
+    ✓ f_3: 'Wohnort ist Schwäbisch Gmünd.'
+[5] facts -> facts_alt    ✓ umbenannt. NICHT geloescht.
+```
+
+## Definition of Done
+
+| # | Kriterium | Stand | BELEG |
+|---|---|---|---|
+| 1 | Anzahl Fakten im Vault == Anzahl aus Schritt 0 | ✓ | `pytest -q tests/test_vault.py::test_dod_1_jeder_fakt_wird_eine_notiz` — ruft `scripts/migrate_vault.py` als echten Unterprozess auf |
+| 2 | Neue Notiz in Obsidian → in unter 3 s gefunden, mit Zeitstempeln | ✓ | `pytest -s -k dod_2_beobachter` → `geschrieben -> im Index: 0.31 s` |
+| 3 | Geänderte Notiz → neuer Inhalt | ✓ | `test_dod_3_geaenderte_notiz_liefert_den_neuen_inhalt` |
+| 4 | **Umbenennen → der Fakt überlebt** | ✓ | `test_dod_4_umbenennen_ueberlebt_der_fakt`. Gegenprobe: Schlüssel auf den Dateinamen umgestellt → Test rot |
+| 5 | Löschen → Fakt weg, keine Halluzination | ✓ | `test_dod_5_geloeschte_notiz_ist_weg` + `test_beobachter_bemerkt_auch_das_loeschen` |
+| 6 | Index wegwerfen, `reindex`, identischer Zustand — zweimal | ✓ | `test_dod_6_zweimal_neu_indexieren_gibt_dasselbe`. Gegenprobe: Uhr statt `mtime` in den Index → *„im Index steckt Zustand, der nicht im Vault steht"* |
+| 7 | Datei öffnet in Obsidian sauber, Frontmatter als Eigenschaften, Wikilinks klickbar | **NICHT AUSGEFÜHRT** | Obsidian ist hier nicht installiert. Das Format entspricht dem, was `docs/MIGRATION-VAULT.md` Schritt 1 vorgibt, und geht in `test_frontmatter_geht_hin_und_zurueck` verlustfrei hin und zurück — **den Screenshot musst du selbst machen** |
+| 8 | Konfliktfall → keine stille Überschreibung, `-konflikt`-Datei | ◐ | `test_dod_8_fremde_aenderung_wird_nicht_still_ueberschrieben` prüft Datei und Ausnahme. Die **Meldung im UI** fehlt: der Konflikt kommt als `ToolResult(ok=False)` zurück und erscheint in der Werkzeug-Ansicht, es gibt aber keinen eigenen Dialog |
+| 9 | Kein Eintrag aus `.obsidian/` oder `.git/` | ✓ | `test_dod_9_obsidian_und_git_bleiben_draussen` — prüft zusätzlich mit einer SQL-Abfrage auf `pfad LIKE '.obsidian%'` |
+| 10 | `pytest` grün, Tests für Umbenennen, Löschen, Verschieben, Idempotenz | ✓ | `443 passed`; alle vier Fälle einzeln als Test |
+
+## Was nicht gebaut wurde — und warum
+
+- **Keine Zwei-Wege-Synchronisation, kein Merge.** Der Index ist abgeleitet; damit
+  entfällt der Konfliktfall zwischen zwei Wahrheiten. Es gab keine Stelle, an der ein
+  Merge nötig gewesen wäre.
+- **Kein MCP-Server, kein Obsidian-Plugin.** Nur Dateien.
+- **Keine Embeddings.** FTS5 ist ungemessen, aber es gibt noch nichts zu messen.
+
+## Offen
+
+- DoD 7 braucht dich mit einem echten Obsidian.
+- DoD 8 braucht eine sichtbare Konfliktmeldung im UI, wenn das mehr sein soll als eine
+  Zeile im Werkzeug-Log.
+- Die Migration auf der produktiven Datenbank ist mit 0 Fakten trivial. Sobald echte
+  Fakten da sind, gehört sie wiederholt — `--abschluss` nicht vergessen.

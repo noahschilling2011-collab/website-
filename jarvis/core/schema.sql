@@ -218,3 +218,51 @@ CREATE TRIGGER IF NOT EXISTS audit_log_kein_delete
 BEFORE DELETE ON audit_log BEGIN
     SELECT RAISE(ABORT, 'audit_log ist unveraenderlich');
 END;
+
+
+-- ---------------------------------------------------------------------------
+-- Vault-Index (docs/MIGRATION-VAULT.md)
+--
+-- ABGELEITET, NIE AUTORITATIV. Diese Tabellen duerfen jederzeit geleert und
+-- aus den Markdown-Dateien neu gebaut werden. Deshalb steht hier ausdruecklich
+-- KEIN Indexier-Zeitstempel: zweimal neu indexieren muss byte-gleiche Zeilen
+-- liefern, sonst steckt Zustand im Index, der nicht im Vault steht - und genau
+-- das waere der gebrochene Vertrag.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS vault_notizen (
+    id        TEXT PRIMARY KEY,          -- aus dem Frontmatter, nicht der Dateiname
+    pfad      TEXT NOT NULL,             -- relativ zur Vault-Wurzel
+    typ       TEXT NOT NULL DEFAULT 'fakt',
+    quelle    TEXT NOT NULL DEFAULT 'gespraech',
+    erfasst   TEXT NOT NULL DEFAULT '',
+    snapshot  TEXT,
+    tags      TEXT NOT NULL DEFAULT '',  -- kommasepariert, fuer die Anzeige
+    text      TEXT NOT NULL,
+    mtime     REAL NOT NULL              -- aus der Datei, nicht aus der Uhr
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS vault_notizen_pfad ON vault_notizen(pfad);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS vault_fts USING fts5(
+    text,
+    tags,
+    content='vault_notizen',
+    content_rowid='rowid',
+    tokenize='unicode61 remove_diacritics 2'
+);
+
+CREATE TRIGGER IF NOT EXISTS vault_fts_ai AFTER INSERT ON vault_notizen BEGIN
+    INSERT INTO vault_fts(rowid, text, tags) VALUES (new.rowid, new.text, new.tags);
+END;
+
+CREATE TRIGGER IF NOT EXISTS vault_fts_ad AFTER DELETE ON vault_notizen BEGIN
+    INSERT INTO vault_fts(vault_fts, rowid, text, tags)
+    VALUES ('delete', old.rowid, old.text, old.tags);
+END;
+
+CREATE TRIGGER IF NOT EXISTS vault_fts_au AFTER UPDATE ON vault_notizen BEGIN
+    INSERT INTO vault_fts(vault_fts, rowid, text, tags)
+    VALUES ('delete', old.rowid, old.text, old.tags);
+    INSERT INTO vault_fts(rowid, text, tags) VALUES (new.rowid, new.text, new.tags);
+END;
