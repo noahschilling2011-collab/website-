@@ -160,6 +160,30 @@ def main() -> int:
                 print(f"    {GRAU}Hinweis: LLM_PRICE_*_PER_MTOK sind leer - "
                       f"deshalb 0 EUR statt einer geschaetzten Zahl.{AUS}")
 
+            schritt(10, "Auftrag - der Weg, den die Oberflaeche wirklich geht")
+            import time as _zeit
+
+            angelegt = zweiter_start.post(
+                "/api/tasks", json={"goal": "Was ist 2+2"}, headers=kopf
+            )
+            angelegt.raise_for_status()
+            tid = angelegt.json()["task_id"]
+            frist = _zeit.monotonic() + 20.0
+            auftrag = {}
+            while _zeit.monotonic() < frist:
+                auftrag = zweiter_start.get(f"/api/tasks/{tid}", headers=kopf).json()
+                if auftrag["status"] in ("done", "failed", "aborted_budget", "cancelled"):
+                    break
+                _zeit.sleep(0.05)
+            print(f"    {GRAU}status:{AUS}  {auftrag.get('status')}")
+            print(f"    {GRAU}schritte:{AUS} {len(auftrag.get('steps') or [])}")
+            print(f"    {GRAU}ergebnis:{AUS} {str(auftrag.get('result'))[:200]}")
+            assert auftrag.get("status") == "done", (
+                f"Auftrag endete auf {auftrag.get('status')}: {auftrag.get('result')}"
+            )
+            assert auftrag.get("steps"), "Plan ohne Schritte"
+            ok(f"Auftrag {tid} durchgelaufen, {len(auftrag['steps'])} Schritt(e)")
+
         print(f"\n{GRUEN}Rauchtest bestanden.{AUS}")
         return 0
 
