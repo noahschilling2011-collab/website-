@@ -89,8 +89,48 @@ Vertrag (BUGS-01, Fund 12).
 
 | Schritt | Stand |
 |---|---|
-| 0 | ✓ ausgeführt — Befund widerlegt |
-| 1 | **entfällt** — es gibt nichts zu löschen |
-| 2 | **blockiert** — dieselbe Sperre wie FIX-01: ohne `LLM_API_KEY` liefert der Fake kein Plan-JSON, und ohne `SEARCH_API_KEY` findet der Research Agent nichts. Die Weltlage geht heute **nicht** über `/api/tasks`, sondern ruft den Provider direkt — das ist der berechtigte Kern der Kritik und gehört repariert, aber erst nach FIX-01 Schritt 1 |
-| 3 | **gültig und offen** — Duplikat-, Länder- und Inhaltsprüfung fehlen wirklich |
-| 4 | **hängt an FIX-01 Schritt 8** — ohne `ClaudeCodeProvider` gibt es keine CLI-Aufrufe zu zählen. Der Wechsel von `€` auf Aufrufe ist trotzdem richtig, sobald der Provider steht |
+| 0 | ✓ ausgeführt — Befund widerlegt, kein Demo-Pfad |
+| 1 | ✓ **erledigt** — zwei verschluckende `except` sind raus |
+| 2 | ✓ **erledigt** — die Weltlage ist jetzt ein Agent, kein eigener Datenweg |
+| 3 | ✓ **erledigt** — Inhalts-, Alters-, Duplikat- und Länderprüfung |
+| 4 | ✓ **erledigt** — Euro-Kachel raus, `Modellaufrufe heute` rein |
+
+## Definition of Done
+
+| # | Kriterium | Stand | BELEG |
+|---|---|---|---|
+| 1 | `grep -rn "Dritter Vorfall" .` findet nichts außerhalb `docs/` | ✓ | Die Fixtures heißen jetzt `TESTMELDUNG Alpha`. Ein Testtext, der wie eine echte Meldung aussieht, hat genau diese Verwechslung ausgelöst |
+| 2 | „Weltweit" liefert mindestens drei `land_iso`, sonst Ablehnung | ✓ | `test_fix02_dod_2_weltweit_aus_einem_land_wird_abgelehnt` → `verworfen_gruende: {"nur ein Land im Weltweit-Modus": 3}`. Gegenprobe: Prüfung aus → rot |
+| 3 | Keine zwei Karten mit identischer Schlagzeile | ✓ | `test_fix02_dod_3_…` speist fünf identische ein → 1 Karte, 4× „doppelte Schlagzeile". Auch gleiche `quell_url` zählt. Gegenprobe → rot |
+| 4 | Medium und Datum aus der echten Quelle, drei Stichproben | ✗ | **NICHT AUSGEFÜHRT** — ohne `SEARCH_API_KEY` gibt es keine echten Quellen zu öffnen |
+| 5 | Negativtest: `0 belegte Meldungen` plus Fehlermeldung, keine Karte | ✓ | Im Browser: `Karten sichtbar: 0`, `Leer-Kasten: 0 belegte Meldungen.`, Statusleiste mit dem echten Grund |
+| 6 | Zählertest: eine Meldung ohne `medium` → `verworfen 1` | ✓ | Im Browser: 2 Karten (`Gilt`, `Gilt auch`), `verworfen 1`, Statusleiste „Verworfen: 1× kein Medium." |
+| 7 | Aufrufe in der Statusleiste passen zu `llm_calls` | ✓ | `test_fix02_dod_7_…` rechnet gegen eine unabhängige SQL-Summe. Live über drei Länder: `llm_calls 9`, Seitenzähler `9`, `/api/stats 9` |
+| 8 | Kein `except`, der eine Ausnahme in Inhalt verwandelt | ✓ | Die zwei sind raus. Übrig bleiben: Datumsformate durchprobieren, Bildholen (→ kein Bild, wie spezifiziert), Provider-Fehler → 502 |
+
+## Was dabei zusätzlich herauskam
+
+**Der Kern des Befunds ist repariert, nur an anderer Stelle als vermutet.** `heute
+0,0000 €` kam nicht von einem Demo-Pfad, sondern davon, dass `post_weltlage` den
+Provider direkt rief — vorbei am Runner und damit an `db.log_llm_call`, am Budget und
+am Audit. Schritt 2 hat das an der Wurzel behoben: die Weltlage ist jetzt ein Agent
+`weltlage` in `core/agents.py` und läuft durch `fuehre_task_aus` wie jeder andere
+Auftrag.
+
+**Ein Konflikt musste entschieden werden.** Phase 9 verlangt den Sprachstil in *jedem*
+Agentenprompt; beim Weltlage-Agenten würde er das JSON zerstören. Die Ausnahme steht
+als benannte Liste `OHNE_SPRACHSTIL` im Test, mit zwei Wächtern gegen stilles Wachsen.
+
+**Kartenzahl:** gekappt wird jetzt *nach* dem Bildholen, nicht davor — sonst rücken
+gültige Kandidaten nicht nach, wenn eine der ersten fünf am Bild scheitert
+(BUGS-01 Fund 13, miterledigt).
+
+## BLOCKER
+
+- **`SEARCH_API_KEY` fehlt** — gemeldet, nicht ersetzt. Ohne ihn findet der
+  Weltlage-Agent nichts Echtes; DoD 4 bleibt unausgeführt.
+- **`LLM_API_KEY` fehlt** — mit dem Fake liefert der Weltlage-Agent kein gültiges JSON,
+  die Ansicht zeigt dann korrekt `0 belegte Meldungen` plus Fehlermeldung.
+- **Schritt 4 auf CLI-Aufrufe** braucht den `ClaudeCodeProvider` aus FIX-01 Schritt 1.
+  Bis dahin zählt die Kachel `Modellaufrufe heute` aus `llm_calls` — dieselbe Wirkung:
+  0 Aufrufe bei sichtbaren Karten wäre ein sichtbarer Widerspruch.

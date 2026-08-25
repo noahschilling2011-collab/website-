@@ -72,13 +72,13 @@ def verlag():
 
 def _eintrag(quell_url, **kw):
     basis = {
-        "schlagzeile": "Dritter Vorfall in neun Tagen",
-        "kurz": "Reuters meldet einen dritten Zwischenfall.",
+        "schlagzeile": "TESTMELDUNG Alpha",
+        "kurz": "TESTTEXT, erste Haelfte. TESTTEXT, zweite Haelfte.",
         "medium": "Reuters",
         "veroeffentlicht": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "quell_url": quell_url,
         "land_iso": "DEU",
-        "einordnung": "Der dritte Vorfall seit Mai.",
+        "einordnung": "TESTEINORDNUNG.",
         "einordnung_fehlt": "",
     }
     basis.update(kw)
@@ -253,7 +253,7 @@ def test_dod_4_ohne_og_image_kommt_die_kachel_kein_ersatzfoto(server, verlag):
 def test_dod_10_meldung_und_einordnung_sind_zwei_getrennte_flaechen(server, verlag):
     basis, app = server
     setze(app, [_eintrag(f"{verlag}/ohne-bild", medium="Reuters",
-                         einordnung="Der dritte Vorfall seit Mai.")])
+                         einordnung="TESTEINORDNUNG.")])
     with playwright.sync_playwright() as pw:
         br, seite = browser(pw)
         try:
@@ -349,7 +349,12 @@ def test_hoechstens_fuenf_karten_und_keine_angeschnittene(server, verlag):
     eine Karte weniger. Der Rest wird gezaehlt und gesagt, nicht verschwiegen.
     """
     basis, app = server
-    setze(app, [_eintrag(f"{verlag}/ohne-bild", medium="Reuters") for _ in range(9)])
+    # Neun UNTERSCHIEDLICHE aus verschiedenen Laendern - seit FIX-02 fallen
+    # Duplikate weg, und "weltweit" mit nur einem Land wird ganz abgelehnt.
+    LAENDER = ("DEU", "FRA", "ITA", "ESP", "POL", "NLD", "BEL", "AUT", "CHE")
+    setze(app, [_eintrag(f"{verlag}/ohne-bild?i={i}", medium="Reuters",
+                         schlagzeile=f"Meldung {i}", land_iso=LAENDER[i])
+                for i in range(9)])
     with playwright.sync_playwright() as pw:
         br, seite = browser(pw)
         try:
@@ -379,7 +384,10 @@ def test_hoechstens_fuenf_karten_und_keine_angeschnittene(server, verlag):
 def test_bei_1920_passen_fuenf_ganze_karten(server, verlag):
     """Gegenprobe zum Test oben: auf einem grossen Schirm ist Platz fuer alle."""
     basis, app = server
-    setze(app, [_eintrag(f"{verlag}/ohne-bild", medium="Reuters") for _ in range(5)])
+    LAENDER = ("DEU", "FRA", "ITA", "ESP", "POL")
+    setze(app, [_eintrag(f"{verlag}/ohne-bild?i={i}", medium="Reuters",
+                         schlagzeile=f"Meldung {i}", land_iso=LAENDER[i])
+                for i in range(5)])
     with playwright.sync_playwright() as pw:
         br, seite = browser(pw, 1920, 1080)
         try:

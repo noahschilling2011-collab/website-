@@ -157,8 +157,8 @@ body{
   <span>Abfragen <b id="z-abfragen">0</b></span>
   <span>aus dem Cache <b id="z-treffer">0</b></span>
   <span>Cache-Quote <b id="z-quote">0 %</b></span>
-  <span>verworfen <b id="z-verworfen">0</b></span>
-  <span>heute <b id="z-kosten">0,0000 €</b></span>
+  <span id="z-verworfen-box">verworfen <b id="z-verworfen">0</b></span>
+  <span>Modellaufrufe heute <b id="z-aufrufe">0</b></span>
 </footer>
 
 <script type="module">
@@ -282,8 +282,23 @@ function zeichneKarten(daten){
 }
 
 function zeigeStatus(daten){
-  el('gesagt').textContent = daten.gesagt
+  var text = daten.gesagt
     || (daten.cache ? `Aus dem Cache, ${daten.alter_minuten} Minuten alt.` : 'Bereit.');
+
+  // "verworfen 3" sagt nichts. Welche drei Gruende es waren, sagt alles.
+  var gruende = daten.verworfen_gruende || {};
+  var namen = Object.keys(gruende);
+  if (namen.length){
+    text += ' Verworfen: ' + namen.map(function (g){
+      return gruende[g] + '× ' + g;
+    }).join(', ') + '.';
+  }
+  el('gesagt').textContent = text;
+
+  var box = el('z-verworfen-box');
+  if (box) box.title = namen.length
+    ? namen.map(function (g){ return gruende[g] + '× ' + g; }).join('\n')
+    : 'nichts verworfen';
 }
 
 function ladeZaehler(){
@@ -292,7 +307,10 @@ function ladeZaehler(){
     el('z-treffer').textContent   = z.treffer;
     el('z-quote').textContent     = Math.round(z.quote * 100) + ' %';
     el('z-verworfen').textContent = z.verworfen;
-    el('z-kosten').textContent    = (z.kosten_eur || 0).toFixed(4).replace('.', ',') + ' €';
+    // Schritt 4: keine Euro-Kachel mehr. Stehen hier 0 Aufrufe, waehrend
+    // Karten zu sehen sind, ist das ein sichtbarer Widerspruch - und genau
+    // das soll es sein.
+    el('z-aufrufe').textContent   = z.modellaufrufe;
   }).catch(() => {});
 }
 

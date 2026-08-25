@@ -102,10 +102,15 @@ def _meldungen_json(eintraege, gesagt=""):
     return json.dumps({"meldungen": eintraege, "gesagt": gesagt}, ensure_ascii=False)
 
 
+# Die Fixtures heissen absichtlich "TESTMELDUNG" und nicht wie das Beispiel
+# aus PHASE-11 Abschnitt 4. Am 25.08.2026 wurde ein Screenshot aus genau
+# diesen Fixtures fuer einen hartkodierten Demo-Datensatz in der Anwendung
+# gehalten - siehe docs/FIX-02.md. Ein Testtext, der wie eine echte Meldung
+# aussieht, laedt zu dieser Verwechslung ein.
 def _eintrag(verlag_url="http://127.0.0.1:0/ohne-bild", **kw):
     basis = {
-        "schlagzeile": "Dritter Vorfall in neun Tagen",
-        "kurz": "Reuters meldet einen dritten Zwischenfall. Die Behoerde bestaetigt zwei davon.",
+        "schlagzeile": "TESTMELDUNG Alpha",
+        "kurz": "TESTTEXT, erste Haelfte. TESTTEXT, zweite Haelfte.",
         "medium": "Reuters",
         "veroeffentlicht": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "quell_url": verlag_url,
@@ -128,7 +133,8 @@ def client(db, settings, verlag):
 
 
 def eintrag_fuer(client, **kw):
-    return _eintrag(verlag_url=f"{client.verlag}/ohne-bild", **kw)
+    url = kw.pop("quell_url", f"{client.verlag}/ohne-bild")
+    return _eintrag(verlag_url=url, **kw)
 
 
 def setze_antwort(client, roh_json):
@@ -385,7 +391,7 @@ def test_dod_14_leere_einordnung_traegt_einen_hinweis(client):
 
 def test_einordnung_bleibt_getrennt_von_der_meldung(client):
     setze_antwort(client, _meldungen_json([
-        eintrag_fuer(client, einordnung="Der Vorfall ist der dritte seit Mai.")]))
+        eintrag_fuer(client, einordnung="TESTEINORDNUNG, zweite Fassung.")]))
     m = client.post("/api/weltlage/DEU", headers=TOKEN).json()["meldungen"][0]
     assert m["einordnung"] not in m["kurz"], "Einordnung darf nicht in die Meldung sickern"
 
@@ -447,11 +453,130 @@ def test_die_regeln_stehen_im_prompt(regel):
 
 
 def test_hoechstens_fuenf_karten(client):
-    setze_antwort(client, _meldungen_json([eintrag_fuer(client) for _ in range(9)]))
+    """Neun UNTERSCHIEDLICHE Meldungen - sonst greift seit FIX-02 die Duplikatpruefung."""
+    neun = [eintrag_fuer(client, schlagzeile=f"Meldung {i}",
+                         quell_url=f"{client.verlag}/ohne-bild?i={i}")
+            for i in range(9)]
+    setze_antwort(client, _meldungen_json(neun))
     daten = client.post("/api/weltlage/DEU", headers=TOKEN).json()
     assert len(daten["meldungen"]) == 5, "Abschnitt 5: hoechstens 5 Karten"
+    assert daten["verworfen"] == 0, "Kappen ist kein Verwerfen"
 
 
 def test_der_zaehler_braucht_einen_token(client):
     assert client.get("/api/weltlage/zaehler").status_code == 401
     assert client.post("/api/weltlage/DEU").status_code == 401
+
+
+# --- FIX-02 Schritt 3: die Pruefungen, die den Rueckfall verhindern ---------
+
+
+def test_fix02_dod_3_keine_zwei_karten_mit_gleicher_schlagzeile(client):
+    """Die Antwort enthaelt absichtlich fuenfmal dieselbe Meldung."""
+    doppelt = [eintrag_fuer(client, quell_url=f"{client.verlag}/ohne-bild?i={i}")
+               for i in range(5)]
+    setze_antwort(client, _meldungen_json(doppelt))
+    daten = client.post("/api/weltlage/DEU", headers=TOKEN).json()
+
+    titel = [m["schlagzeile"] for m in daten["meldungen"]]
+    assert len(titel) == len(set(titel)), titel
+    assert len(titel) == 1, "vier Duplikate haetten wegfallen muessen"
+    assert daten["verworfen_gruende"].get("doppelte Schlagzeile") == 4
+
+
+def test_fix02_gleiche_quell_url_zaehlt_auch_als_duplikat(client):
+    zwei = [eintrag_fuer(client, schlagzeile="A"), eintrag_fuer(client, schlagzeile="B")]
+    setze_antwort(client, _meldungen_json(zwei))
+    daten = client.post("/api/weltlage/DEU", headers=TOKEN).json()
+    assert len(daten["meldungen"]) == 1
+    assert daten["verworfen_gruende"].get("doppelte Quell-URL") == 1
+
+
+def test_fix02_dod_2_weltweit_aus_einem_land_wird_abgelehnt(client):
+    """Fuenf Karten aus einem Land sind keine Weltlage, sondern ein Fehler."""
+    eins = [eintrag_fuer(client, schlagzeile=f"M{i}", land_iso="DEU",
+                         quell_url=f"{client.verlag}/ohne-bild?i={i}") for i in range(3)]
+    setze_antwort(client, _meldungen_json(eins))
+    daten = client.post("/api/weltlage/WELT", headers=TOKEN).json()
+    assert daten["meldungen"] == []
+    assert daten["verworfen_gruende"].get("nur ein Land im Weltweit-Modus") == 3
+
+
+def test_fix02_dod_2_weltweit_mit_drei_laendern_geht_durch(client):
+    drei = [eintrag_fuer(client, schlagzeile=f"M{i}", land_iso=land,
+                         quell_url=f"{client.verlag}/ohne-bild?i={i}")
+            for i, land in enumerate(("DEU", "FRA", "ITA"))]
+    setze_antwort(client, _meldungen_json(drei))
+    daten = client.post("/api/weltlage/WELT", headers=TOKEN).json()
+    assert {m["land_iso"] for m in daten["meldungen"]} == {"DEU", "FRA", "ITA"}
+
+
+def test_fix02_ein_land_alleine_ist_im_laendermodus_in_ordnung(client):
+    """Die Laenderpruefung gilt nur weltweit - sonst waere sie Unsinn."""
+    setze_antwort(client, _meldungen_json([eintrag_fuer(client)]))
+    daten = client.post("/api/weltlage/DEU", headers=TOKEN).json()
+    assert len(daten["meldungen"]) == 1
+
+
+def test_fix02_zu_alte_meldungen_fallen_raus(client):
+    from datetime import datetime, timedelta, timezone
+
+    alt = (datetime.now(timezone.utc) - timedelta(days=9)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    setze_antwort(client, _meldungen_json([eintrag_fuer(client, veroeffentlicht=alt)]))
+    daten = client.post("/api/weltlage/DEU", headers=TOKEN).json()
+    assert daten["meldungen"] == []
+    assert "aelter als 3 Tage" in daten["verworfen_gruende"]
+
+
+def test_fix02_leere_meldung_besteht_den_vertrag_nicht_mehr(client):
+    setze_antwort(client, _meldungen_json([
+        eintrag_fuer(client, schlagzeile="", kurz="")]))
+    daten = client.post("/api/weltlage/DEU", headers=TOKEN).json()
+    assert daten["meldungen"] == []
+    assert "keine Schlagzeile" in daten["verworfen_gruende"]
+
+
+def test_fix02_dod_6_zaehlertest_meldung_ohne_medium(client):
+    setze_antwort(client, _meldungen_json([
+        eintrag_fuer(client, schlagzeile="Gilt", quell_url=f"{client.verlag}/ohne-bild?a=1"),
+        eintrag_fuer(client, schlagzeile="Faellt raus", medium="",
+                     quell_url=f"{client.verlag}/ohne-bild?a=2")]))
+    daten = client.post("/api/weltlage/DEU", headers=TOKEN).json()
+    assert [m["schlagzeile"] for m in daten["meldungen"]] == ["Gilt"]
+    assert daten["verworfen"] == 1
+    assert daten["verworfen_gruende"] == {"kein Medium": 1}
+
+    zaehler = client.get("/api/weltlage/zaehler", headers=TOKEN).json()
+    assert zaehler["verworfen"] == 1
+
+
+def test_fix02_verworfen_null_bei_karten_aus_einer_quelle_ist_unmoeglich(client):
+    """Der Kern des Befunds: fuenf gleiche Karten bei verworfen 0."""
+    fuenf = [eintrag_fuer(client, quell_url=f"{client.verlag}/ohne-bild?i={i}")
+             for i in range(5)]
+    setze_antwort(client, _meldungen_json(fuenf))
+    daten = client.post("/api/weltlage/DEU", headers=TOKEN).json()
+    assert not (len(daten["meldungen"]) > 1 and daten["verworfen"] == 0)
+
+
+# --- FIX-02 Schritt 4: die Anzeige ------------------------------------------
+
+
+def test_fix02_dod_7_modellaufrufe_stimmen_mit_llm_calls(client, db):
+    setze_antwort(client, _meldungen_json([eintrag_fuer(client)]))
+    client.post("/api/weltlage/DEU", headers=TOKEN)
+
+    zaehler = client.get("/api/weltlage/zaehler", headers=TOKEN).json()
+    with session(db) as conn:
+        echt = conn.execute("SELECT count(*) FROM llm_calls").fetchone()[0]
+    assert zaehler["modellaufrufe"] == echt
+    assert echt > 0, "die Weltlage muss ihre Aufrufe protokollieren"
+
+
+def test_fix02_die_euro_kachel_ist_weg():
+    from pathlib import Path
+
+    html = (Path(__file__).resolve().parent.parent / "weltlage.html").read_text(encoding="utf-8")
+    assert 'id="z-kosten"' not in html
+    assert 'id="z-aufrufe"' in html
+    assert "Modellaufrufe heute" in html

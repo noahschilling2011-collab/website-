@@ -82,12 +82,20 @@ class Meldung:
         }
 
 
-def pruefe(meldung: Meldung) -> str | None:
+# FIX-02 Schritt 3: eine Meldung, die aelter ist als das, wird verworfen.
+# "Weltlage" heisst Lage, nicht Archiv.
+MAX_ALTER_TAGE = 3
+
+
+def pruefe(meldung: Meldung, *, jetzt: datetime | None = None) -> str | None:
     """Gibt den Verwerfungsgrund zurueck, oder None wenn die Meldung gilt.
 
-    Vier Gruende, alle aus Abschnitt 7. Keiner davon ist verhandelbar, und
-    keiner haengt an einem Modell.
+    Keiner dieser Gruende ist verhandelbar, und keiner haengt an einem Modell.
     """
+    if not (meldung.schlagzeile or "").strip():
+        return "keine Schlagzeile"
+    if not (meldung.kurz or "").strip():
+        return "kein Text"
     if not (meldung.medium or "").strip():
         return "kein Medium"
     if meldung.veroeffentlicht is None:
@@ -96,6 +104,10 @@ def pruefe(meldung: Meldung) -> str | None:
         return "Quell-URL ungueltig"
     if meldung.bild_url and not (meldung.bild_herkunft or "").strip():
         return "Bild ohne Herkunft"
+
+    bezug = jetzt or _jetzt()
+    if abs((bezug - meldung.veroeffentlicht).days) > MAX_ALTER_TAGE:
+        return f"aelter als {MAX_ALTER_TAGE} Tage"
     return None
 
 
@@ -107,20 +119,54 @@ def _url_gueltig(url: str) -> bool:
     return teile.scheme in ("http", "https") and bool(teile.netloc)
 
 
-def siebe(meldungen: list[Meldung]) -> tuple[list[Meldung], list[str]]:
+def siebe(
+    meldungen: list[Meldung],
+    *,
+    weltweit: bool = False,
+    jetzt: datetime | None = None,
+) -> tuple[list[Meldung], list[str]]:
     """Trennt gueltige von verworfenen Meldungen.
 
     Die Anzahl der verworfenen steht sichtbar in der Statusleiste - deshalb
     kommen die Gruende hier mit heraus statt im Log zu verschwinden.
+
+    Drei Siebe, in dieser Reihenfolge:
+    1. der Vertrag je Meldung (`pruefe`),
+    2. Duplikate - gleiche Schlagzeile ODER gleiche Quell-URL,
+    3. im Weltweit-Modus: alles aus demselben Land ist keine Weltlage.
     """
     gut: list[Meldung] = []
     verworfen: list[str] = []
+    gesehen_titel: set[str] = set()
+    gesehen_url: set[str] = set()
+
     for m in meldungen:
-        grund = pruefe(m)
-        if grund is None:
-            gut.append(m)
-        else:
+        grund = pruefe(m, jetzt=jetzt)
+        if grund is not None:
             verworfen.append(grund)
+            continue
+
+        titel = " ".join((m.schlagzeile or "").lower().split())
+        url = (m.quell_url or "").strip().rstrip("/")
+        if titel in gesehen_titel:
+            verworfen.append("doppelte Schlagzeile")
+            continue
+        if url in gesehen_url:
+            verworfen.append("doppelte Quell-URL")
+            continue
+
+        gesehen_titel.add(titel)
+        gesehen_url.add(url)
+        gut.append(m)
+
+    # Fuenf Karten aus einem Land, waehrend "weltweit" aktiv ist, ist keine
+    # Weltlage, sondern ein Fehler. Lieber nichts zeigen als das Falsche.
+    if weltweit and len(gut) > 1:
+        laender = {(m.land_iso or "").strip().upper() for m in gut}
+        if len(laender) < 2:
+            verworfen.extend(["nur ein Land im Weltweit-Modus"] * len(gut))
+            return [], verworfen
+
     return gut, verworfen
 
 

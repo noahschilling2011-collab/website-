@@ -104,9 +104,10 @@ async def baue_nutzlast(
         else:
             kandidaten.append(m)
 
-    gut, gruende = siebe(kandidaten)
-    verworfen = len(gruende) + unlesbar
-    gut = gut[:MAX_KARTEN]
+    weltweit = land_iso == WELTWEIT
+    gut, gruende = siebe(kandidaten, weltweit=weltweit)
+    if unlesbar:
+        gruende.extend(["unlesbares Datum"] * unlesbar)
 
     # Das Bild wird serverseitig geholt, weil der Browser an CORS scheitert.
     # Kein og:image heisst: kein Bild. Nie ein Ersatz.
@@ -124,19 +125,30 @@ async def baue_nutzlast(
             m.bild_beschreibung = bild.beschreibung
 
     if gut:
-        await asyncio.gather(*(schmuecke(m) for m in gut))
+        await asyncio.gather(*(schmuecke(m) for m in gut[:MAX_KARTEN * 2]))
 
     # Zweiter Durchgang: ein Bild ohne Herkunft faellt raus (Abschnitt 7).
-    gut, nochmal = siebe(gut)
-    verworfen += len(nochmal)
+    # Erst JETZT wird gekappt - sonst ruecken gueltige Kandidaten nicht nach,
+    # wenn eine der ersten fuenf am Bild scheitert (BUGS-01 Fund 13).
+    gut, nochmal = siebe(gut, weltweit=weltweit)
+    gruende.extend(nochmal)
+    gut = gut[:MAX_KARTEN]
 
     if not gut:
         gesagt = gesagt or f"Zu {land_iso} finde ich heute nichts."
 
+    # Die Gruende stehen namentlich in der Antwort, nicht nur als Zahl.
+    # "verworfen 3" sagt nichts; "2x doppelte Schlagzeile, 1x kein Medium"
+    # sagt, was schiefgelaufen ist.
+    haeufigkeit: dict[str, int] = {}
+    for grund in gruende:
+        haeufigkeit[grund] = haeufigkeit.get(grund, 0) + 1
+
     return {
         "land_iso": land_iso,
         "meldungen": [m.als_dict() for m in gut],
-        "verworfen": verworfen,
+        "verworfen": len(gruende),
+        "verworfen_gruende": haeufigkeit,
         "gesagt": gesagt,
         "cache": False,
     }
