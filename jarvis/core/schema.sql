@@ -266,3 +266,29 @@ CREATE TRIGGER IF NOT EXISTS vault_fts_au AFTER UPDATE ON vault_notizen BEGIN
     VALUES ('delete', old.rowid, old.text, old.tags);
     INSERT INTO vault_fts(rowid, text, tags) VALUES (new.rowid, new.text, new.tags);
 END;
+
+
+-- ---------------------------------------------------------------------------
+-- Nachschlage-Cache (docs/wissensquellen.md Abschnitt 4)
+--
+-- Dieselbe Frage zweimal kostet einmal. Nebeneffekt, der wichtiger ist als die
+-- Ersparnis: Antworten werden konsistent, weil sie aus derselben gespeicherten
+-- Quelle kommen.
+--
+-- `snapshot` ist Pflichtfeld der Quelle, nicht des Caches: es sagt, wie alt das
+-- Wissen ist. `geholt_am` sagt, wann WIR es geholt haben. Zwei verschiedene
+-- Dinge, die man nicht verwechseln darf.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS lookups (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    begriff    TEXT NOT NULL,
+    quelle     TEXT NOT NULL,          -- wiki_lokal | wiki_live | wikidata
+    text       TEXT NOT NULL,
+    titel      TEXT NOT NULL DEFAULT '',
+    snapshot   TEXT,                   -- Stand des Wissens, NULL bei Live-Quellen
+    geholt_am  TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS lookups_begriff_quelle
+    ON lookups(begriff, quelle);

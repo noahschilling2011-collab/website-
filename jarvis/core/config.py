@@ -50,6 +50,19 @@ class Settings(BaseSettings):
     # --- Ab Phase 2 ---
     search_api_key: str = ""
 
+    # --- Wissensquellen (docs/wissensquellen.md) ---
+    # kiwix-serve laeuft lokal; WIKI_ZIM ist der Slug der ZIM-Datei.
+    # Leer = wiki_lokal meldet das beim Aufruf, statt still nichts zu finden.
+    wiki_kiwix_basis: str = Field(
+        default="http://127.0.0.1:8080",
+        validation_alias=AliasChoices("WIKI_KIWIX_BASIS", "KIWIX_URL"),
+    )
+    wiki_zim: str = Field(default="", validation_alias=AliasChoices("WIKI_ZIM"))
+    # Pflicht laut Wikimedia-User-Agent-Richtlinie: eine Kontaktangabe.
+    wiki_kontakt: str = Field(default="", validation_alias=AliasChoices("WIKI_KONTAKT"))
+    # Optional. Hebt 500 Anfragen/Stunde auf 5.000/Stunde.
+    wiki_token: str = Field(default="", validation_alias=AliasChoices("WIKI_API_TOKEN"))
+
     # --- Vault (docs/MIGRATION-VAULT.md) ---
     # Leer = kein Vault. Dann bleibt JARVIS bei der Datenbank, und nichts an
     # diesem Pfad wird angelegt. AliasChoices, weil der Feldname sonst still

@@ -32,10 +32,20 @@ RECHERCHE_PROMPT = """Du bist der Research Agent von JARVIS.
 
 Du beantwortest genau den Arbeitsschritt, den du bekommst - nicht mehr.
 
+REIHENFOLGE DER QUELLEN - von billig nach teuer, nie umgekehrt:
+1. wiki_lokal zuerst. Kostet nichts, braucht kein Netz, kein Ratenlimit.
+   Treffer -> fertig. Nenn den Artikeltitel UND das Snapshot-Datum, und sag
+   dem Nutzer, aus welchem Stand du antwortest.
+2. wiki_live nur, wenn wiki_lokal nichts hat ODER die Frage etwas betrifft,
+   das nach dem Snapshot-Datum passiert ist.
+3. wikidata, wenn du eine ZAHL oder ein Datum brauchst statt eines Absatzes.
+4. web_search erst danach.
+
 REGELN, die deine Arbeit ungueltig machen, wenn du sie brichst:
 1. Jede Tatsachenbehauptung braucht eine Quelle. Such erst, lies die Seite mit
    fetch_url, und nenn die URL. Eine Behauptung ohne Quelle ist ein
-   fehlgeschlagener Schritt.
+   fehlgeschlagener Schritt. Auch bei lokaler Quelle: Artikeltitel und
+   Snapshot-Datum sind die Quelle.
 2. Erfinde keine Zahlen, keine Daten, keine URLs. Wenn du etwas nicht findest,
    schreib das hin.
 3. Nenn zu jeder Zahl, wann sie erhoben wurde, wenn die Quelle das hergibt.
@@ -273,7 +283,7 @@ def baue_agenten(
                 "Recherchiert im Web und belegt jede Behauptung mit einer Quelle."
             ),
             system_prompt=mit_stil(RECHERCHE_PROMPT),
-            tools=["web_search", "fetch_url"],
+            tools=["wiki_lokal", "wiki_live", "wikidata", "web_search", "fetch_url"],
             max_permission=Permission.READ,
             on_reply=on_reply,
             on_call=on_call,

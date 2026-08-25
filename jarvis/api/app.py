@@ -87,6 +87,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if werkzeug is not None:
                 werkzeug.db_path = settings.db_path
                 werkzeug.vault_pfad = settings.vault_pfad
+        lokal = registry.get("wiki_lokal")
+        if lokal is not None:
+            lokal.basis = settings.wiki_kiwix_basis
+            lokal.zim = settings.wiki_zim
+            lokal.db_path = settings.db_path
+        for name in ("wiki_live", "wikidata"):
+            werkzeug = registry.get(name)
+            if werkzeug is not None:
+                werkzeug.kontakt = settings.wiki_kontakt
+                werkzeug.db_path = settings.db_path
+        live = registry.get("wiki_live")
+        if live is not None:
+            live.token = settings.wiki_token
+        if not settings.wiki_zim:
+            log.info("WIKI_ZIM fehlt - wiki_lokal meldet das beim Aufruf.")
+        if not settings.wiki_kontakt:
+            log.info("WIKI_KONTAKT fehlt - wiki_live und wikidata melden das "
+                     "beim Aufruf (User-Agent-Richtlinie).")
+
         post = registry.get("send_email")
         if post is not None:
             post.outbox = settings.outbox_path

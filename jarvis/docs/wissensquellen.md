@@ -167,3 +167,73 @@ klingt, ist entweder Memory unter anderem Namen oder Marketing.
 6. Zweite identische Anfrage trifft den Cache, null neue Netzabfragen.
 7. Ohne Netz beantwortet JARVIS Stammwissensfragen weiterhin — Test mit gekappter
    Verbindung.
+
+---
+
+# ERGEBNIS — gebaut am 25.08.2026
+
+## Endpunkte, nachgeschlagen statt geraten
+
+Abschnitt 2 verlangt: *„Bevor eine dieser Quellen in ein Tool wandert, öffnet der
+Coding Agent die offizielle Doku und schreibt in die Datei, welchen Endpunkt er dort
+gesehen hat."* Hier stehen sie.
+
+| Quelle | Endpunkt | gesehen bei |
+|---|---|---|
+| `wiki_lokal` | `GET /search?pattern=…&books.name=…&format=xml&pageLength=…` | kiwix-tools.readthedocs.io/en/latest/kiwix-serve.html |
+| `wiki_lokal` | `GET /content/ZIMNAME/PATH/IN/ZIMFILE` | ebenda |
+| `wiki_live` | `GET https://{sprache}.wikipedia.org/w/rest.php/v1/search/page?q=…&limit=…` | mediawiki.org/wiki/API:REST_API/Reference |
+| `wikidata` | `POST https://query.wikidata.org/sparql`, `Accept: application/sparql-results+json` | mediawiki.org/wiki/Wikidata_Query_Service/User_Manual |
+
+Drei Dinge, die aus der Doku kamen und das Design geändert haben:
+
+1. **`format` kennt nur `html` und `xml`, kein JSON.** Also wird XML geparst, statt
+   auf ein JSON zu hoffen, das es nicht gibt.
+2. **Nicht auf `api.wikimedia.org/core/…` gebaut.** Die Abkündigungsseite nennt
+   `{wiki_domain}/w/rest.php/v1/search/page` selbst als Entsprechung — genau dieser
+   Weg ist implementiert. Gegenprobe: auf die Core API umgebogen → Test rot.
+3. **Das Snapshot-Datum steht im ZIM-Namen** als `_YYYY-MM`; dieses Format nennt die
+   kiwix-Doku bei `--nodatealiases`. Es wird gelesen, nicht geraten.
+
+## Was existiert
+
+| Datei | wofür |
+|---|---|
+| `core/wissen.py` | `Wissen`-Vertrag mit Pflichtfeldern `titel` und `snapshot`, Cache |
+| `core/tools/wissen_tools.py` | `wiki_lokal`, `wiki_live`, `wikidata` — alle `READ`, alle ohne Bestätigung |
+| Tabelle `lookups` | `(begriff, quelle)` eindeutig, mit `snapshot` **und** `geholt_am` |
+| `tests/test_wissen.py` | 23 Tests, davon ein echter kiwix-Attrappenserver |
+
+`core/agents.py` trägt die Reihenfolge jetzt im Prompt: `wiki_lokal` → `wiki_live` →
+`wikidata` → `web_search`. Ein Test prüft, dass sie im Prompt **in dieser Reihenfolge**
+steht und dass `wiki_lokal` in der Werkzeugliste vor `web_search` kommt.
+
+## Definition of Done
+
+| # | Kriterium | Stand | BELEG |
+|---|---|---|---|
+| 1 | `kiwix-serve` läuft lokal, `curl` liefert einen Artikel | ◐ | `test_dod_1_kiwix_antwortet` gegen einen echten HTTP-Server, der das dokumentierte Format spricht. **Ein echtes kiwix-serve mit ZIM lief nicht** — die ZIM ist mehrere GB und muss von dir geholt werden |
+| 2 | Frage wird über `wiki_lokal` beantwortet, **kein** `web_search` | ✓ | `test_dod_2_und_3_…` + `test_dod_2_der_research_agent_kennt_die_reihenfolge` + `test_dod_2_wiki_lokal_liegt_dem_agenten_vor_web_search` |
+| 3 | Antwort nennt Artikeltitel und Snapshot-Datum | ✓ | `test_dod_2_und_3_…`. Gegenprobe: Snapshot weggelassen → *„Snapshot-Datum ist Pflicht"* |
+| 4 | Frage nach dem Snapshot-Datum geht auf `wiki_live` über | ◐ | Die Regel steht im Prompt und die Werkzeuge sind da; **ob das Modell sie befolgt, ist ohne echtes Modell nicht prüfbar** |
+| 5 | `wiki_live` sendet konformen User-Agent mit Kontakt | ✓ | `test_dod_5_…` liest den tatsächlich gesendeten Header. Ohne `WIKI_KONTAKT` fragt das Werkzeug gar nicht erst |
+| 6 | Zweite identische Anfrage trifft den Cache, null neue Netzabfragen | ✓ | `test_dod_6_zweite_anfrage_trifft_den_cache_ohne_netz` — würgt den Server danach ab. Gegenprobe: Cache aus → rot |
+| 7 | Ohne Netz beantwortet JARVIS Stammwissensfragen weiter | ◐ | `test_dod_7_…` zeigt es für den Cache-Fall. Der volle Beweis braucht eine echte ZIM |
+
+## BLOCKER
+
+- **Die ZIM-Datei musst du holen.** `download.kiwix.org/zim/` → deutsche Wikipedia,
+  Variante `mini`. Die genaue Größe steht im Katalog — **nachsehen, nicht raten**;
+  zum Vergleich lag die englische `all_mini` bei 11,7 GB. Danach `kiwix-serve`
+  starten und `WIKI_ZIM` auf den Slug setzen.
+- **`WIKI_KONTAKT` ist Pflicht** für `wiki_live` und `wikidata` — eine Mailadresse
+  oder Projekt-URL. Ohne die fragt JARVIS absichtlich gar nicht erst an.
+- `WIKI_API_TOKEN` ist optional und hebt 500 auf 5.000 Anfragen pro Stunde.
+
+## Nicht gebaut
+
+- Die neun Quellen aus Abschnitt 2 (OpenAlex, Crossref, arXiv, …). Sie sind dort
+  ausdrücklich als **ungeprüft** markiert; ohne nachgeschlagene Endpunkte wandert
+  keine davon in ein Werkzeug.
+- Die Häufigkeitsauswertung aus Abschnitt 4.3 („Du hast dreimal nach X gefragt —
+  soll ich das merken?"). Der Cache zählt noch nicht mit, wie oft gefragt wurde.
