@@ -10,6 +10,7 @@ die Event-Loop.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -47,6 +48,7 @@ class Message:
 class LLMCall:
     id: int
     model: str
+    prompt_hash: str
     in_tokens: int
     out_tokens: int
     cost_eur: float
@@ -59,6 +61,7 @@ class LLMCall:
         return cls(
             id=row["id"],
             model=row["model"],
+            prompt_hash=row["prompt_hash"],
             in_tokens=row["in_tokens"],
             out_tokens=row["out_tokens"],
             cost_eur=row["cost_eur"],
@@ -144,6 +147,7 @@ def log_llm_call(
     db_path: Path | str,
     *,
     model: str,
+    prompt_hash: str = "",
     in_tokens: int,
     out_tokens: int,
     cost_eur: float,
@@ -153,15 +157,17 @@ def log_llm_call(
     with session(db_path) as conn:
         now = utcnow()
         cur = conn.execute(
-            "INSERT INTO llm_calls "
-            "(model, in_tokens, out_tokens, cost_eur, duration_ms, ok, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (model, in_tokens, out_tokens, cost_eur, duration_ms, int(ok), now),
+            "INSERT INTO llm_calls (model, prompt_hash, in_tokens, out_tokens, "
+            "cost_eur, duration_ms, ok, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (model, prompt_hash, in_tokens, out_tokens, cost_eur,
+             duration_ms, int(ok), now),
         )
         assert cur.lastrowid is not None
         return LLMCall(
             id=cur.lastrowid,
             model=model,
+            prompt_hash=prompt_hash,
             in_tokens=in_tokens,
             out_tokens=out_tokens,
             cost_eur=cost_eur,
@@ -194,3 +200,108 @@ def llm_call_totals(db_path: Path | str) -> dict[str, float]:
             "out_tokens": row["out_tokens"],
             "cost_eur": round(row["cost_eur"], 6),
         }
+
+
+# --- Werkzeugaufrufe (Phase 2) --------------------------------------------
+
+
+@dataclass(frozen=True)
+class ToolCallRow:
+    id: int
+    message_id: int | None
+    name: str
+    arguments: dict
+    ok: bool
+    display: str
+    error: str | None
+    sources: list[str]
+    duration_ms: int
+    created_at: str
+
+    @classmethod
+    def from_row(cls, row: sqlite3.Row) -> "ToolCallRow":
+        return cls(
+            id=row["id"],
+            message_id=row["message_id"],
+            name=row["name"],
+            arguments=json.loads(row["arguments"] or "{}"),
+            ok=bool(row["ok"]),
+            display=row["display"],
+            error=row["error"],
+            sources=json.loads(row["sources"] or "[]"),
+            duration_ms=row["duration_ms"],
+            created_at=row["created_at"],
+        )
+
+
+def add_tool_call(
+    db_path: Path | str,
+    *,
+    message_id: int | None,
+    name: str,
+    arguments: dict,
+    ok: bool,
+    display: str = "",
+    error: str | None = None,
+    sources: list[str] | None = None,
+    duration_ms: int = 0,
+) -> ToolCallRow:
+    with session(db_path) as conn:
+        now = utcnow()
+        cur = conn.execute(
+            "INSERT INTO tool_calls (message_id, name, arguments, ok, display, "
+            "error, sources, duration_ms, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                message_id,
+                name,
+                json.dumps(arguments, ensure_ascii=False, default=str),
+                int(ok),
+                display,
+                error,
+                json.dumps(sources or [], ensure_ascii=False),
+                duration_ms,
+                now,
+            ),
+        )
+        assert cur.lastrowid is not None
+        return ToolCallRow(
+            id=cur.lastrowid, message_id=message_id, name=name,
+            arguments=arguments, ok=ok, display=display, error=error,
+            sources=sources or [], duration_ms=duration_ms, created_at=now,
+        )
+
+
+def attach_tool_calls(db_path: Path | str, ids: list[int], message_id: int) -> None:
+    """Haengt vorher geschriebene Aufrufe an die fertige Antwort.
+
+    Die Aufrufe entstehen, bevor die Antwort existiert - deshalb zwei Schritte
+    statt einer Zeile mit unbekannter message_id.
+    """
+    if not ids:
+        return
+    with session(db_path) as conn:
+        conn.executemany(
+            "UPDATE tool_calls SET message_id = ? WHERE id = ?",
+            [(message_id, i) for i in ids],
+        )
+
+
+def list_tool_calls(db_path: Path | str, message_id: int) -> list[ToolCallRow]:
+    with session(db_path) as conn:
+        rows = conn.execute(
+            "SELECT * FROM tool_calls WHERE message_id = ? ORDER BY id ASC",
+            (message_id,),
+        ).fetchall()
+        return [ToolCallRow.from_row(r) for r in rows]
+
+
+def tool_calls_by_message(db_path: Path | str) -> dict[int, list[ToolCallRow]]:
+    with session(db_path) as conn:
+        rows = conn.execute(
+            "SELECT * FROM tool_calls WHERE message_id IS NOT NULL ORDER BY id ASC"
+        ).fetchall()
+    gruppen: dict[int, list[ToolCallRow]] = {}
+    for row in rows:
+        gruppen.setdefault(row["message_id"], []).append(ToolCallRow.from_row(row))
+    return gruppen

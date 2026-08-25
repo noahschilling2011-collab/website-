@@ -23,10 +23,15 @@ from api.schemas import (
     HealthOut,
     MessageOut,
     SpendOut,
+    ToolCallOut,
 )
 from api.security import require_token
 from core import db
-from core.llm import LLMError, LLMMessage
+from core.contracts import Permission
+from core.llm import LLMError, LLMMessage, LLMReply
+from core.tools import registry
+from core.tools.dispatch import ToolCall
+from core.tools.loop import run_tool_loop
 
 log = logging.getLogger("jarvis")
 
@@ -53,7 +58,7 @@ async def health(request: Request) -> HealthOut:
     provider_error = getattr(provider, "reason", None)
     return HealthOut(
         status="ok" if database == "ok" and provider_error is None else "degraded",
-        phase=1,
+        phase=2,
         provider=provider.name,
         model=provider.model,
         api_key_configured=bool(settings.llm_api_key),
@@ -75,7 +80,8 @@ async def health(request: Request) -> HealthOut:
 async def get_messages(request: Request) -> list[MessageOut]:
     settings = _settings(request)
     messages = await asyncio.to_thread(db.list_messages, settings.db_path)
-    return [MessageOut.of(m) for m in messages]
+    gruppen = await asyncio.to_thread(db.tool_calls_by_message, settings.db_path)
+    return [MessageOut.of(m, gruppen.get(m.id, [])) for m in messages]
 
 
 @api.post("/chat", response_model=ChatResponse)
@@ -95,17 +101,66 @@ async def post_chat(request: Request, body: ChatRequest) -> ChatResponse:
         db.list_messages, settings.db_path, settings.history_limit
     )
 
-    # 2. Modell fragen. Keine Transaktion offen.
+    # Werkzeugaufrufe werden geschrieben, sobald sie passieren - noch ohne
+    # message_id, die Antwort gibt es ja noch nicht. Sonst waere nach einem
+    # Absturz mitten in der Schleife nicht nachvollziehbar, was schon lief.
+    aufruf_ids: list[int] = []
+    aufrufe: list[ToolCall] = []
+
+    async def merke_aufruf(aufruf: ToolCall) -> None:
+        aufrufe.append(aufruf)
+        ergebnis = aufruf.result
+        zeile = await asyncio.to_thread(
+            db.add_tool_call,
+            settings.db_path,
+            message_id=None,
+            name=aufruf.name,
+            arguments=aufruf.arguments,
+            ok=bool(ergebnis and ergebnis.ok),
+            display=(ergebnis.display if ergebnis else ""),
+            error=(ergebnis.error if ergebnis else None),
+            sources=(list(ergebnis.sources) if ergebnis else []),
+            duration_ms=(ergebnis.duration_ms if ergebnis else 0),
+        )
+        aufruf_ids.append(zeile.id)
+        log.info(
+            "task %s: Werkzeug %s(%s) -> ok=%s in %d ms",
+            task_id, aufruf.name, aufruf.arguments,
+            bool(ergebnis and ergebnis.ok),
+            ergebnis.duration_ms if ergebnis else 0,
+        )
+
+    async def protokolliere_modellaufruf(reply: LLMReply) -> None:
+        kosten = settings.cost_eur(reply.usage.in_tokens, reply.usage.out_tokens)
+        await asyncio.to_thread(
+            db.log_llm_call,
+            settings.db_path,
+            model=reply.model,
+            prompt_hash=reply.prompt_hash,
+            in_tokens=reply.usage.in_tokens,
+            out_tokens=reply.usage.out_tokens,
+            cost_eur=kosten,
+            duration_ms=reply.duration_ms,
+            ok=True,
+        )
+
+    # 2. Modell fragen, Werkzeuge laufen lassen. Keine Transaktion offen.
     try:
-        reply = await provider.complete(
+        antwort, _, _ = await run_tool_loop(
+            provider,
             [LLMMessage(role=m.role, content=m.content) for m in history],
             system=settings.system_prompt,
+            max_permission=Permission(settings.max_permission),
+            max_tool_calls=settings.budget_max_tool_calls,
+            on_call=merke_aufruf,
+            on_reply=protokolliere_modellaufruf,
         )
     except LLMError as exc:
         await asyncio.to_thread(
             db.log_llm_call,
             settings.db_path,
             model=provider.model or "unbekannt",
+            prompt_hash=exc.prompt_hash,
             in_tokens=0,
             out_tokens=0,
             cost_eur=0.0,
@@ -115,30 +170,30 @@ async def post_chat(request: Request, body: ChatRequest) -> ChatResponse:
         log.warning("task %s: Modellaufruf fehlgeschlagen - %s", task_id, exc)
         raise
 
-    # 3. Antwort und Aufruf protokollieren.
-    kosten = settings.cost_eur(reply.usage.in_tokens, reply.usage.out_tokens)
-    await asyncio.to_thread(db.add_message, settings.db_path, "assistant", reply.text)
-    await asyncio.to_thread(
-        db.log_llm_call,
-        settings.db_path,
-        model=reply.model,
-        in_tokens=reply.usage.in_tokens,
-        out_tokens=reply.usage.out_tokens,
-        cost_eur=kosten,
-        duration_ms=reply.duration_ms,
-        ok=True,
+    # 3. Antwort festschreiben und die Aufrufe daranhaengen.
+    nachricht = await asyncio.to_thread(
+        db.add_message, settings.db_path, "assistant", antwort
     )
-    log.info(
-        "task %s: %s, %d/%d Token, %d ms, %.6f EUR",
-        task_id,
-        reply.model,
-        reply.usage.in_tokens,
-        reply.usage.out_tokens,
-        reply.duration_ms,
-        kosten,
+    await asyncio.to_thread(
+        db.attach_tool_calls, settings.db_path, aufruf_ids, nachricht.id
     )
 
-    return ChatResponse(reply=reply.text, task_id=task_id)
+    return ChatResponse(
+        reply=antwort,
+        task_id=task_id,
+        tool_calls=[
+            ToolCallOut(
+                name=a.name,
+                arguments=a.arguments,
+                ok=bool(a.result and a.result.ok),
+                display=(a.result.display if a.result else ""),
+                error=(a.result.error if a.result else None),
+                sources=(list(a.result.sources) if a.result else []),
+                duration_ms=(a.result.duration_ms if a.result else 0),
+            )
+            for a in aufrufe
+        ],
+    )
 
 
 @router.get("/", include_in_schema=False)

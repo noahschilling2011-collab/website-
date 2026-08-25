@@ -12,7 +12,7 @@ def path(db_path):
     return db_path
 
 
-def test_schema_hat_genau_die_tabellen_aus_phase_1(path):
+def test_schema_hat_die_erwarteten_tabellen(path):
     with db.session(path) as conn:
         tabellen = {
             r[0] for r in conn.execute(
@@ -20,14 +20,17 @@ def test_schema_hat_genau_die_tabellen_aus_phase_1(path):
                 "AND name NOT LIKE 'sqlite_%'"
             )
         }
-    assert tabellen == {"messages", "llm_calls"}
+    # messages + llm_calls aus Phase 1, tool_calls kam mit Phase 2 dazu.
+    assert tabellen == {"messages", "llm_calls", "tool_calls"}
 
 
-def test_llm_calls_hat_genau_die_spalten_aus_phase_1(path):
+def test_llm_calls_hat_die_spalten_aus_phase_1_plus_prompt_hash(path):
+    """PHASE-01 nannte die Spalten ohne prompt_hash; 0.6 verlangt ihn.
+    Auf Nachfrage aufgenommen - deshalb steht er hier ausdruecklich drin."""
     with db.session(path) as conn:
         spalten = [r[1] for r in conn.execute("PRAGMA table_info(llm_calls)")]
     assert spalten == [
-        "id", "model", "in_tokens", "out_tokens",
+        "id", "model", "prompt_hash", "in_tokens", "out_tokens",
         "cost_eur", "duration_ms", "ok", "created_at",
     ]
 
@@ -105,3 +108,15 @@ def test_session_macht_rollback_bei_fehler(path):
             )
             raise RuntimeError("Abbruch")
     assert db.list_messages(path) == []
+
+
+def test_llm_calls_hat_den_prompt_hash_aus_abschnitt_0_6(path):
+    with db.session(path) as conn:
+        spalten = [r[1] for r in conn.execute("PRAGMA table_info(llm_calls)")]
+    assert "prompt_hash" in spalten
+    call = db.log_llm_call(
+        path, model="m", prompt_hash="abc123", in_tokens=1, out_tokens=1,
+        cost_eur=0.0, duration_ms=1, ok=True,
+    )
+    assert call.prompt_hash == "abc123"
+    assert db.list_llm_calls(path)[0].prompt_hash == "abc123"

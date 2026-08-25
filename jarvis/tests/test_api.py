@@ -103,7 +103,7 @@ def test_seite_setzt_niemals_innerhtml(client):
 
 def test_chat_antwortet_mit_reply_und_task_id(client):
     body = client.post("/api/chat", json={"message": "Hallo"}, headers=TOKEN).json()
-    assert set(body) == {"reply", "task_id"}
+    assert set(body) == {"reply", "task_id", "tool_calls"}
     assert body["reply"]
     assert len(body["task_id"]) == 12
 
@@ -184,7 +184,7 @@ def test_verlauf_ueberlebt_einen_neustart(settings):
 def test_health_meldet_anbieter_und_summen(client):
     body = client.get("/api/health", headers=TOKEN).json()
     assert body["status"] == "ok"
-    assert body["phase"] == 1
+    assert body["phase"] == 2
     assert body["provider"] == "fake"
     assert body["database"] == "ok"
     assert body["spend"]["calls"] == 0
@@ -212,7 +212,7 @@ class KaputterProvider:
     def __init__(self, error: LLMError) -> None:
         self.error = error
 
-    async def complete(self, messages, *, system):
+    async def complete(self, messages, *, system, tools=None):
         raise self.error
 
     async def aclose(self) -> None:
@@ -269,3 +269,9 @@ def test_chat_ohne_key_gibt_503_statt_absturz(client_ohne_key):
     antwort = client_ohne_key.post("/api/chat", json={"message": "x"}, headers=TOKEN)
     assert antwort.status_code == 503
     assert antwort.json()["kind"] == "missing_api_key"
+
+
+def test_chat_protokolliert_den_prompt_hash(client, settings):
+    client.post("/api/chat", json={"message": "Hallo"}, headers=TOKEN)
+    call = db.list_llm_calls(settings.db_path)[0]
+    assert len(call.prompt_hash) == 16

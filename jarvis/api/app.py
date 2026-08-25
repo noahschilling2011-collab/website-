@@ -18,6 +18,7 @@ from api.security import ensure_token
 from core.config import PROJECT_ROOT, Settings, get_settings
 from core.db import connect, init_db
 from core.llm import LLMError, LLMProvider, build_provider
+from core.tools import registry
 
 log = logging.getLogger("jarvis")
 
@@ -50,7 +51,7 @@ class UnavailableProvider(LLMProvider):
     def reason(self) -> str:
         return str(self.error)
 
-    async def complete(self, messages, *, system):  # noqa: ANN001, ANN201
+    async def complete(self, messages, *, system, tools=None):  # noqa: ANN001, ANN201
         raise self.error
 
 
@@ -73,6 +74,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 exc, name=settings.llm_provider, model=settings.llm_model
             )
 
+        # Der Such-Key wird hier gesetzt und nicht im Tool importiert -
+        # so bleibt das Tool ohne Umgebung baubar und testbar.
+        suche = registry.get("web_search")
+        if suche is not None:
+            suche.api_key = settings.search_api_key
+        if not settings.search_api_key:
+            log.info("SEARCH_API_KEY fehlt - web_search meldet das beim Aufruf.")
+
         log.info(
             "JARVIS bereit - Anbieter %s, Modell %s, Datenbank %s",
             app.state.provider.name,
@@ -92,7 +101,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(
         title="JARVIS",
-        description="Persoenliches AI-Operating-System. Phase 1: Walking Skeleton.",
+        description="Persoenliches AI-Operating-System.",
         version="0.1.0",
         lifespan=lifespan,
     )

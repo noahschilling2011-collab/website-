@@ -308,3 +308,43 @@ def test_api_key_taucht_in_keiner_fehlermeldung_auf():
     with pytest.raises(LLMError) as exc:
         run(provider.complete([LLMMessage("user", "x")], system="S"))
     assert "sk-ant-streng-geheim-9876" not in str(exc.value)
+
+
+# --- Prompt-Hash (0.6) -----------------------------------------------------
+
+
+def test_gleicher_prompt_gleicher_hash():
+    from core.llm import prompt_hash
+    a = prompt_hash("S", [LLMMessage("user", "x")])
+    b = prompt_hash("S", [LLMMessage("user", "x")])
+    assert a == b and len(a) == 16
+
+
+def test_anderer_prompt_anderer_hash():
+    from core.llm import prompt_hash
+    assert prompt_hash("S", [LLMMessage("user", "x")]) != prompt_hash(
+        "S", [LLMMessage("user", "y")]
+    )
+    assert prompt_hash("S", [LLMMessage("user", "x")]) != prompt_hash(
+        "T", [LLMMessage("user", "x")]
+    )
+
+
+def test_der_prompt_selbst_steckt_nicht_im_hash():
+    """Der Hash darf nichts vom Inhalt preisgeben - er landet in der Datenbank."""
+    from core.llm import prompt_hash
+    h = prompt_hash("System", [LLMMessage("user", "mein Passwort ist Hunter2")])
+    assert "Hunter2" not in h and "Passwort" not in h
+
+
+def test_fake_liefert_einen_hash():
+    reply = run(FakeLLMProvider().complete([LLMMessage("user", "x")], system="S"))
+    assert len(reply.prompt_hash) == 16
+
+
+def test_anthropic_liefert_den_hash_mit():
+    def handler(request):
+        return httpx.Response(200, json=_antwort())
+
+    reply = run(_provider(handler).complete([LLMMessage("user", "x")], system="S"))
+    assert len(reply.prompt_hash) == 16

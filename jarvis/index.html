@@ -182,6 +182,71 @@ button, input, textarea { font: inherit; color: inherit; }
 .msg-assistant .bubble { border-bottom-left-radius: 5px; }
 .msg-error .bubble { border-color: rgba(242, 114, 107, 0.45); color: #ffd9d6; }
 
+/* --- Werkzeugaufrufe, aufklappbar (Phase 2, DoD 6) ------------------------ */
+
+.tools {
+  margin-top: var(--s-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+.tools > summary {
+  padding: 6px var(--s-3);
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition: color 200ms var(--ease), background 200ms var(--ease);
+}
+.tools > summary::-webkit-details-marker { display: none; }
+.tools > summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform 200ms var(--ease);
+}
+.tools[open] > summary::before { transform: rotate(90deg); }
+.tools > summary:hover { color: var(--text); background: var(--bg-2); }
+
+.tool {
+  padding: var(--s-3);
+  border-top: 1px solid var(--line);
+  font-size: var(--step--1);
+}
+.tool-kopf {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+.tool-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--accent);
+}
+.tool-name.is-bad { color: var(--danger); }
+.tool-dauer { font-size: 11px; color: var(--text-dim); margin-left: auto; }
+.tool pre {
+  margin: var(--s-2) 0 0;
+  padding: var(--s-2) var(--s-3);
+  border-radius: 8px;
+  background: var(--bg-0);
+  color: var(--text-dim);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.tool-quellen {
+  margin: var(--s-2) 0 0;
+  padding-left: 1.1em;
+  font-size: 11px;
+}
+.tool-quellen a { color: var(--accent); overflow-wrap: anywhere; }
+
 .empty {
   margin: auto;
   max-width: 46ch;
@@ -305,7 +370,7 @@ button, input, textarea { font: inherit; color: inherit; }
       </svg>
     </span>
     <h1 class="brand-name">JARVIS</h1>
-    <span class="brand-phase">Phase 1</span>
+    <span class="brand-phase" id="brand-phase"></span>
     <span class="status">
       <span class="dot" id="health-dot"></span>
       <span class="status-text" id="health-text">verbinde…</span>
@@ -348,6 +413,7 @@ button, input, textarea { font: inherit; color: inherit; }
     send:      document.getElementById('btn-send'),
     hint:      document.getElementById('hint'),
     chip:      document.getElementById('model-chip'),
+    phase:     document.getElementById('brand-phase'),
     healthDot: document.getElementById('health-dot'),
     healthTxt: document.getElementById('health-text')
   };
@@ -375,7 +441,79 @@ button, input, textarea { font: inherit; color: inherit; }
     });
   }
 
-  function messageNode(role, content) {
+  function toolNode(call) {
+    var box = document.createElement('div');
+    box.className = 'tool';
+
+    var kopf = document.createElement('div');
+    kopf.className = 'tool-kopf';
+
+    var name = document.createElement('span');
+    name.className = 'tool-name' + (call.ok ? '' : ' is-bad');
+    name.textContent = call.name + '(' + argumentText(call.arguments) + ')';
+
+    var dauer = document.createElement('span');
+    dauer.className = 'tool-dauer';
+    dauer.textContent = (call.ok ? '' : 'fehlgeschlagen · ') + (call.duration_ms || 0) + ' ms';
+
+    kopf.appendChild(name);
+    kopf.appendChild(dauer);
+    box.appendChild(kopf);
+
+    var ausgabe = call.display || call.error || '';
+    if (ausgabe) {
+      var pre = document.createElement('pre');
+      pre.textContent = ausgabe;
+      box.appendChild(pre);
+    }
+
+    if (call.sources && call.sources.length) {
+      var liste = document.createElement('ul');
+      liste.className = 'tool-quellen';
+      call.sources.forEach(function (url) {
+        var li = document.createElement('li');
+        // Nur http(s) wird verlinkt — eine URL aus dem Netz ist nichts,
+        // dem man ein href blind anvertraut.
+        if (/^https?:\/\//i.test(url)) {
+          var a = document.createElement('a');
+          a.href = url;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          a.textContent = url;
+          li.appendChild(a);
+        } else {
+          li.textContent = url;
+        }
+        liste.appendChild(li);
+      });
+      box.appendChild(liste);
+    }
+    return box;
+  }
+
+  function argumentText(args) {
+    if (!args) return '';
+    try {
+      return Object.keys(args).map(function (k) {
+        return k + '=' + JSON.stringify(args[k]);
+      }).join(', ');
+    } catch (e) { return ''; }
+  }
+
+  function toolsNode(calls) {
+    var details = document.createElement('details');
+    details.className = 'tools';
+    var summary = document.createElement('summary');
+    var fehler = calls.filter(function (c) { return !c.ok; }).length;
+    summary.textContent = calls.length + (calls.length === 1 ? ' Werkzeug' : ' Werkzeuge')
+      + ': ' + calls.map(function (c) { return c.name; }).join(', ')
+      + (fehler ? ' · ' + fehler + ' fehlgeschlagen' : '');
+    details.appendChild(summary);
+    calls.forEach(function (c) { details.appendChild(toolNode(c)); });
+    return details;
+  }
+
+  function messageNode(role, content, toolCalls) {
     var wrap = document.createElement('div');
     wrap.className = 'msg msg-' + role;
     var bubble = document.createElement('div');
@@ -383,6 +521,7 @@ button, input, textarea { font: inherit; color: inherit; }
     // textContent, niemals innerHTML: der Inhalt kommt aus einem Modell.
     bubble.textContent = content;
     wrap.appendChild(bubble);
+    if (toolCalls && toolCalls.length) wrap.appendChild(toolsNode(toolCalls));
     return wrap;
   }
 
@@ -439,7 +578,7 @@ button, input, textarea { font: inherit; color: inherit; }
       if (!messages || !messages.length) { showEmpty(); return; }
       el.thread.textContent = '';
       messages.forEach(function (m) {
-        el.thread.appendChild(messageNode(m.role, m.content));
+        el.thread.appendChild(messageNode(m.role, m.content, m.tool_calls));
       });
       scrollDown();
     });
@@ -448,6 +587,7 @@ button, input, textarea { font: inherit; color: inherit; }
   function loadHealth() {
     return api('/api/health').then(function (h) {
       el.chip.textContent = h.model;
+      el.phase.textContent = 'Phase ' + h.phase;
       el.healthDot.className = 'dot ' + (h.status === 'ok' ? 'is-ok' : 'is-bad');
       if (h.provider_error) {
         el.healthTxt.textContent = h.provider_error;
@@ -488,7 +628,7 @@ button, input, textarea { font: inherit; color: inherit; }
     api('/api/chat', { method: 'POST', body: { message: text } })
       .then(function (data) {
         pending.remove();
-        el.thread.appendChild(messageNode('assistant', data.reply));
+        el.thread.appendChild(messageNode('assistant', data.reply, data.tool_calls));
         scrollDown();
         el.hint.textContent = 'Antwort in ' + ((Date.now() - started) / 1000).toFixed(1)
           + ' s · Vorgang ' + data.task_id;

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from core.db import Message
+from core.db import Message, ToolCallRow
 
 
 class ChatRequest(BaseModel):
@@ -12,10 +12,34 @@ class ChatRequest(BaseModel):
 
 
 class ChatResponse(BaseModel):
-    """Genau die Form aus PHASE-01: `{reply, task_id}`. Nicht mehr."""
+    """Die Form aus PHASE-01 (`{reply, task_id}`), plus die Werkzeugaufrufe.
+
+    Phase 2 verlangt, dass im UI je Antwort sichtbar ist, welche Werkzeuge mit
+    welchen Argumenten liefen. Ohne dieses Feld muesste die Oberflaeche direkt
+    nach dem Senden noch einmal den ganzen Verlauf holen.
+    """
 
     reply: str
     task_id: str
+    tool_calls: list[ToolCallOut] = []
+
+
+class ToolCallOut(BaseModel):
+    name: str
+    arguments: dict = {}
+    ok: bool = True
+    display: str = ""
+    error: str | None = None
+    sources: list[str] = []
+    duration_ms: int = 0
+
+    @classmethod
+    def of(cls, row: ToolCallRow) -> "ToolCallOut":
+        return cls(
+            name=row.name, arguments=row.arguments, ok=row.ok,
+            display=row.display, error=row.error, sources=row.sources,
+            duration_ms=row.duration_ms,
+        )
 
 
 class MessageOut(BaseModel):
@@ -23,14 +47,18 @@ class MessageOut(BaseModel):
     role: str
     content: str
     created_at: str
+    tool_calls: list[ToolCallOut] = []
 
     @classmethod
-    def of(cls, message: Message) -> "MessageOut":
+    def of(
+        cls, message: Message, tool_calls: list[ToolCallRow] | None = None
+    ) -> "MessageOut":
         return cls(
             id=message.id,
             role=message.role,
             content=message.content,
             created_at=message.created_at,
+            tool_calls=[ToolCallOut.of(t) for t in (tool_calls or [])],
         )
 
 

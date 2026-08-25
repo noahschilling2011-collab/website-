@@ -16,6 +16,8 @@ Gedaechtnis.
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -31,9 +33,21 @@ RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 529})
 
 
 @dataclass(frozen=True)
+class ToolUse:
+    """Ein Werkzeugaufruf, den das Modell vorschlaegt."""
+
+    id: str
+    name: str
+    input: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class LLMMessage:
     role: str
-    content: str
+    # Entweder Text oder rohe Inhaltsbloecke. Bloecke braucht der Tool-Loop:
+    # die Assistenten-Antwort mit tool_use und die Nutzerzeile mit tool_result
+    # muessen unveraendert zurueckgeschickt werden.
+    content: str | list[dict[str, Any]]
 
 
 @dataclass(frozen=True)
@@ -49,6 +63,27 @@ class LLMReply:
     usage: LLMUsage = field(default_factory=LLMUsage)
     duration_ms: int = 0
     stop_reason: str | None = None
+    prompt_hash: str = ""
+    tool_uses: tuple[ToolUse, ...] = ()
+    # Die Bloecke der Assistenten-Antwort, wortwoertlich. Gehen im naechsten
+    # Zug unveraendert zurueck - sonst verliert das Modell den Faden.
+    content_blocks: tuple[dict[str, Any], ...] = ()
+
+
+def prompt_hash(system: str, messages: Iterable[LLMMessage]) -> str:
+    """Kurzer Fingerabdruck des Prompts fuer das Aufruf-Log (0.6).
+
+    Der Prompt selbst wird **nicht** gespeichert - er kann Privates enthalten
+    und hat im Kostenprotokoll nichts verloren. Der Hash reicht, um zwei
+    Aufrufe als denselben Prompt zu erkennen.
+    """
+    payload = json.dumps(
+        {"system": system, "messages": [[m.role, m.content] for m in messages]},
+        ensure_ascii=False,
+        sort_keys=True,
+        default=str,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
 class LLMError(RuntimeError):
@@ -69,6 +104,7 @@ class LLMError(RuntimeError):
         self.kind = kind
         self.retryable = retryable
         self.duration_ms = duration_ms
+        self.prompt_hash = ""
 
 
 class LLMProvider(ABC):
@@ -79,7 +115,11 @@ class LLMProvider(ABC):
 
     @abstractmethod
     async def complete(
-        self, messages: Iterable[LLMMessage], *, system: str
+        self,
+        messages: Iterable[LLMMessage],
+        *,
+        system: str,
+        tools: list[dict[str, Any]] | None = None,
     ) -> LLMReply: ...
 
     async def aclose(self) -> None:
@@ -87,6 +127,22 @@ class LLMProvider(ABC):
 
 
 # --- Fake -----------------------------------------------------------------
+
+
+@dataclass
+class FakeTurn:
+    """Ein geskripteter Zug des Fake-Anbieters.
+
+    Damit lassen sich Tool-Schleifen testen, ohne einen echten Aufruf zu
+    bezahlen: erst ein Zug mit `tool_uses`, dann einer mit Text.
+    """
+
+    text: str = ""
+    tool_uses: tuple[ToolUse, ...] = ()
+
+    @property
+    def stop_reason(self) -> str:
+        return "tool_use" if self.tool_uses else "end_turn"
 
 
 class FakeLLMProvider(LLMProvider):
@@ -103,23 +159,36 @@ class FakeLLMProvider(LLMProvider):
     name = "fake"
 
     def __init__(
-        self, replies: Iterable[str] | None = None, model: str = "fake-echo-1"
+        self,
+        replies: Iterable[str | FakeTurn] | None = None,
+        model: str = "fake-echo-1",
     ) -> None:
-        self._replies: list[str] = list(replies) if replies is not None else []
+        self._replies: list[str | FakeTurn] = list(replies) if replies is not None else []
         self.model = model
         self.calls: list[dict[str, Any]] = []
 
     async def complete(
-        self, messages: Iterable[LLMMessage], *, system: str
+        self,
+        messages: Iterable[LLMMessage],
+        *,
+        system: str,
+        tools: list[dict[str, Any]] | None = None,
     ) -> LLMReply:
         history = list(messages)
-        self.calls.append({"system": system, "messages": history})
+        self.calls.append({"system": system, "messages": history, "tools": tools})
 
+        tool_uses: tuple[ToolUse, ...] = ()
         if self._replies:
-            text = self._replies.pop(0) if len(self._replies) > 1 else self._replies[0]
+            zug = self._replies.pop(0) if len(self._replies) > 1 else self._replies[0]
+            if isinstance(zug, FakeTurn):
+                text, tool_uses = zug.text, zug.tool_uses
+            else:
+                text = zug
         else:
             last_user = next(
-                (m.content for m in reversed(history) if m.role == "user"), ""
+                (m.content for m in reversed(history)
+                 if m.role == "user" and isinstance(m.content, str)),
+                "",
             )
             text = (
                 f"[fake] Ich habe {len(history)} Nachricht(en) im Kontext. "
@@ -128,16 +197,30 @@ class FakeLLMProvider(LLMProvider):
 
         # Kein echtes Tokenizing - das waere geraten. Woerter sind als Zahl
         # ehrlicher, weil offensichtlich ist, dass sie nicht stimmen.
+        bloecke: list[dict[str, Any]] = []
+        if text:
+            bloecke.append({"type": "text", "text": text})
+        bloecke.extend(
+            {"type": "tool_use", "id": t.id, "name": t.name, "input": t.input}
+            for t in tool_uses
+        )
+
         return LLMReply(
             text=text,
             model=self.model,
             usage=LLMUsage(
-                in_tokens=sum(len(m.content.split()) for m in history)
+                in_tokens=sum(
+                    len(m.content.split()) if isinstance(m.content, str) else 8
+                    for m in history
+                )
                 + len(system.split()),
-                out_tokens=len(text.split()),
+                out_tokens=len(text.split()) + 8 * len(tool_uses),
             ),
             duration_ms=0,
-            stop_reason="end_turn",
+            stop_reason="tool_use" if tool_uses else "end_turn",
+            prompt_hash=prompt_hash(system, history),
+            tool_uses=tool_uses,
+            content_blocks=tuple(bloecke),
         )
 
 
@@ -192,16 +275,28 @@ class AnthropicProvider(LLMProvider):
             },
         )
 
-    def _body(self, messages: list[LLMMessage], system: str) -> dict[str, Any]:
-        return {
+    def _body(
+        self,
+        messages: list[LLMMessage],
+        system: str,
+        tools: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {
             "model": self.model,
             "max_tokens": self.max_tokens,
             "system": system,
             "messages": [{"role": m.role, "content": m.content} for m in messages],
         }
+        if tools:
+            body["tools"] = tools
+        return body
 
     async def complete(
-        self, messages: Iterable[LLMMessage], *, system: str
+        self,
+        messages: Iterable[LLMMessage],
+        *,
+        system: str,
+        tools: list[dict[str, Any]] | None = None,
     ) -> LLMReply:
         history = list(messages)
         if not history:
@@ -211,15 +306,19 @@ class AnthropicProvider(LLMProvider):
                 "Die erste Nachricht muss von 'user' sein.", kind="invalid_request"
             )
 
+        fingerabdruck = prompt_hash(system, history)
         begonnen = time.monotonic()
         try:
             response = await self._post_with_retries(
-                "/v1/messages", self._body(history, system)
+                "/v1/messages", self._body(history, system, tools)
             )
         except LLMError as exc:
             exc.duration_ms = int((time.monotonic() - begonnen) * 1000)
+            exc.prompt_hash = fingerabdruck
             raise
-        return self._parse(response, int((time.monotonic() - begonnen) * 1000))
+        return self._parse(
+            response, int((time.monotonic() - begonnen) * 1000), fingerabdruck
+        )
 
     async def _post_with_retries(
         self, url: str, body: dict[str, Any]
@@ -297,7 +396,9 @@ class AnthropicProvider(LLMProvider):
             retryable=status in RETRYABLE_STATUS,
         )
 
-    def _parse(self, response: httpx.Response, duration_ms: int) -> LLMReply:
+    def _parse(
+        self, response: httpx.Response, duration_ms: int, fingerabdruck: str
+    ) -> LLMReply:
         try:
             payload = response.json()
         except ValueError as exc:
@@ -318,16 +419,26 @@ class AnthropicProvider(LLMProvider):
                 duration_ms=duration_ms,
             )
 
-        blocks = payload.get("content") or []
-        # Nur Textbloecke. Denk-Bloecke kommen mit leerem Text und haben in der
-        # Konversation nichts verloren.
+        blocks = [b for b in (payload.get("content") or []) if isinstance(b, dict)]
+        # Nur Textbloecke in den Text. Denk-Bloecke kommen mit leerem Text und
+        # haben in der Konversation nichts verloren.
         text = "".join(
-            block.get("text", "")
-            for block in blocks
-            if isinstance(block, dict) and block.get("type") == "text"
+            block.get("text", "") for block in blocks if block.get("type") == "text"
         ).strip()
 
-        if not text:
+        tool_uses = tuple(
+            ToolUse(
+                id=str(block.get("id", "")),
+                name=str(block.get("name", "")),
+                input=block.get("input") or {},
+            )
+            for block in blocks
+            if block.get("type") == "tool_use"
+        )
+
+        # Bei stop_reason "tool_use" ist ein leerer Text normal - das Modell
+        # ruft erst ein Werkzeug und redet danach.
+        if not text and not tool_uses:
             raise LLMError(
                 f"Die Antwort enthielt keinen Text (stop_reason={stop_reason!r}).",
                 kind="empty_response",
@@ -344,6 +455,9 @@ class AnthropicProvider(LLMProvider):
             ),
             duration_ms=duration_ms,
             stop_reason=stop_reason,
+            prompt_hash=fingerabdruck,
+            tool_uses=tool_uses,
+            content_blocks=tuple(blocks),
         )
 
     async def aclose(self) -> None:

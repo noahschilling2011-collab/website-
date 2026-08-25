@@ -25,6 +25,13 @@ from core.config import Settings, get_settings
 GRUEN, ROT, GRAU, AUS = "\033[32m", "\033[31m", "\033[90m", "\033[0m"
 
 
+def await_sync(coro):
+    """Eine Coroutine im Rauchtest ausfuehren - der laeuft synchron."""
+    import asyncio
+
+    return asyncio.run(coro)
+
+
 def schritt(nummer: int, was: str) -> None:
     print(f"\n{GRAU}[{nummer}]{AUS} {was}")
 
@@ -38,7 +45,7 @@ def fehler(text: str) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Rauchtest von JARVIS, Phase 1.")
+    parser = argparse.ArgumentParser(description="Rauchtest von JARVIS.")
     parser.add_argument(
         "--real", action="store_true",
         help="echten Anbieter benutzen. Kostet Geld. Braucht LLM_API_KEY.",
@@ -90,10 +97,10 @@ def main() -> int:
             )
             chat.raise_for_status()
             antwort = chat.json()
-            assert set(antwort) == {"reply", "task_id"}, antwort
+            assert {"reply", "task_id"} <= set(antwort), antwort
             print(f"    {GRAU}reply:{AUS}   {antwort['reply'][:200]}")
             print(f"    {GRAU}task_id:{AUS} {antwort['task_id']}")
-            ok("Antwort im Format {reply, task_id}")
+            ok("Antwort im Format {reply, task_id, tool_calls}")
 
             schritt(5, "Zweite Nachricht (derselbe Verlauf)")
             zweite = client.post(
@@ -104,7 +111,28 @@ def main() -> int:
             print(f"    {GRAU}reply:{AUS}   {zweite.json()['reply'][:200]}")
             ok("Antwort erhalten")
 
-            schritt(6, "llm_calls")
+            schritt(6, "Werkzeuge (Phase 2)")
+            from core.contracts import Permission
+            from core.tools import registry
+            from core.tools.dispatch import run_tool
+
+            print(f"    {GRAU}registriert:{AUS} {', '.join(registry.names())}")
+            rechnung = await_sync(run_tool("calculator", {"expression": "4380 * 0.17"}))
+            print(f"    {GRAU}calculator:{AUS}  {rechnung.display}")
+            assert rechnung.ok and rechnung.data["result"] == 744.6, rechnung
+
+            uhr = await_sync(run_tool("clock"))
+            print(f"    {GRAU}clock:{AUS}       {uhr.display}")
+            assert uhr.ok, uhr
+
+            verweigert = await_sync(
+                run_tool("web_search", {"query": "x"}, max_permission=Permission.INFO)
+            )
+            print(f"    {GRAU}verweigert:{AUS}  {verweigert.error}")
+            assert verweigert.ok is False, "web_search haette abgelehnt werden muessen"
+            ok("Rechner, Uhr und Permission-Sperre arbeiten")
+
+            schritt(7, "llm_calls")
             calls = db.list_llm_calls(settings.db_path)
             for c in reversed(calls):
                 print(f"    {GRAU}{c.created_at}{AUS} {c.model} "
@@ -113,14 +141,14 @@ def main() -> int:
             assert len(calls) == 2, f"erwartet 2 Aufrufe, sind {len(calls)}"
             ok("jeder Modellaufruf ist protokolliert")
 
-            schritt(7, "Verlauf")
+            schritt(8, "Verlauf")
             messages = client.get("/api/messages", headers=kopf).json()
             for m in messages:
                 print(f"    {GRAU}{m['role']:<9}{AUS} {m['content'][:80]}")
             assert len(messages) == 4, f"erwartet 4 Nachrichten, sind {len(messages)}"
             ok("vier Nachrichten in der richtigen Reihenfolge")
 
-            schritt(8, "Neustart - liegt es wirklich auf der Platte?")
+            schritt(9, "Neustart - liegt es wirklich auf der Platte?")
 
         with TestClient(create_app(settings)) as zweiter_start:
             messages = zweiter_start.get("/api/messages", headers=kopf).json()

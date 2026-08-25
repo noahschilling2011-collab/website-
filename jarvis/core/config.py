@@ -47,7 +47,14 @@ class Settings(BaseSettings):
     llm_price_in_per_mtok: float | None = None
     llm_price_out_per_mtok: float | None = None
 
-    # --- Budgets (0.5). In Phase 1 nur eingelesen, noch nicht durchgesetzt. ---
+    # --- Ab Phase 2 ---
+    search_api_key: str = ""
+    # Obergrenze fuer den Chat-Agenten. 1 = READ: er darf lesen und rechnen,
+    # aber nichts schreiben und nichts nach aussen schicken. Hoeher zu gehen
+    # ist eine bewusste Entscheidung, keine Voreinstellung.
+    max_permission: int = 1
+
+    # --- Budgets (0.5) ---
     budget_max_steps: int = 12
     budget_max_depth: int = 2
     budget_max_tool_calls: int = 20
