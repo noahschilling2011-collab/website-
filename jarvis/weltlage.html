@@ -26,7 +26,11 @@ body{
   /* Abschnitt 5: kein Scrollbalken, nirgends. */
   overflow:hidden;
 }
-#globus{position:fixed;inset:0;display:block;width:100%;height:100svh}
+#globus{position:fixed;inset:0;display:block;width:100%;height:100svh;
+        /* Ohne das scrollt Android die Seite, statt zu drehen. */
+        touch-action:none;cursor:grab}
+#globus:active{cursor:grabbing}
+#globus:focus-visible{outline:2px solid var(--akzent,#4da3ff);outline-offset:-2px}
 .ersatz{position:fixed;inset:0;display:grid;place-items:center;padding:2rem;text-align:center;color:var(--leise)}
 
 /* --- Kopf --- */
@@ -163,7 +167,8 @@ body{
 </head>
 <body>
 
-<canvas id="globus" aria-label="Globus. Länder sind anwählbar."></canvas>
+<canvas id="globus" tabindex="0"
+        aria-label="Globus. Ziehen dreht, Pfeiltasten drehen, Plus und Minus zoomen. Länder sind anwählbar."></canvas>
 <noscript><div class="ersatz">Für den Globus wird JavaScript gebraucht.</div></noscript>
 
 <header class="kopf">
@@ -405,6 +410,12 @@ try {
 }
 
 const zustand = {laender: [], aktiv: null};
+/* Nach aussen sichtbar, weil die Abnahme A6 sonst nichts messen kann: die
+   Weltdrehung und der Kamerastand stecken in der Three.js-Szene und sind
+   von aussen unsichtbar. Was unten drankommt (`drehung`, `naehe`,
+   `mitteLonLat`) liest nur; `waehle` macht nichts, was ein Klick nicht
+   auch macht. Kein Token, kein Datenweg. */
+window.zustand = zustand;
 
 if (renderer){
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -418,13 +429,30 @@ if (renderer){
   szene.add(welt);
 
   // Die Kugel selbst - dunkel, damit die Grenzen darauf lesbar sind.
-  welt.add(new THREE.Mesh(
+  // FIX-05 A1: getroffen wird ab jetzt SIE, nicht mehr die Landesmarken.
+  // Vorher lief der Strahl bei einem Fehlschuss zwischen den Marken weiter
+  // und traf ein Land auf der RUECKSEITE (Klick auf den Nordatlantik
+  // waehlte Indonesien). Eine Kugel stoppt ihn.
+  // Gerechnet wird der Schnitt gegen `kugel` weiter unten - dieses Mesh
+  // zeichnet nur. Warum nicht gegen seine Dreiecke, steht dort.
+  const erde = new THREE.Mesh(
     new THREE.SphereGeometry(1, 64, 48),
     new THREE.MeshBasicMaterial({color:0x141922})
-  ));
+  );
+  welt.add(erde);
 
   const AKZENT = new THREE.Color(0x4da3ff);
   const RUHE   = new THREE.Color(0x9aa2b1);   // Graustufe, wie im Auftrag
+
+  /* FIX-05 A4. Vorher lief `renderer.render()` in JEDEM Frame, auch wenn
+     sich nichts bewegte - 60 Bilder je Sekunde fuer ein Standbild. Im
+     eigenen Tab ist das Verschwendung, als eingebetteter Tab ist es genau
+     das Lag, das man im Chat merkt.
+     Gesetzt wird das Flag von: Zeigerdrehung, laufendem Flug, Auswahl,
+     Resize, dem ersten Laden der Geometrie. */
+  let dreckig = true;
+  // Nur zum Nachmessen von aussen (Abnahme A6 Kriterium 5).
+  window.__globusBilder = 0;
 
   function aufKugel(lon, lat, r){
     const phi = (90 - lat) * Math.PI / 180;
@@ -434,6 +462,24 @@ if (renderer){
        r * Math.cos(phi),
        r * Math.sin(phi) * Math.sin(theta)
     );
+  }
+
+  /* Die Umkehrung von aufKugel. Genau diese Formel rueckwaerts, keine
+     zweite erfunden:
+       x = -r sin(phi) cos(theta)      phi   = (90 - lat) * PI/180
+       y =  r cos(phi)                 theta = (lon + 180) * PI/180
+       z =  r sin(phi) sin(theta)
+     Also phi = acos(y/r) und theta = atan2(z, -x). */
+  function vonKugel(v){
+    const r = v.length() || 1;
+    const phi = Math.acos(Math.max(-1, Math.min(1, v.y / r)));
+    const theta = Math.atan2(v.z, -v.x);
+    const lat = 90 - phi * 180 / Math.PI;
+    let lon = theta * 180 / Math.PI - 180;
+    // atan2 liefert -180..180, minus 180 ergibt -360..0. Zurueckfalten.
+    while (lon < -180) lon += 360;
+    while (lon >  180) lon -= 360;
+    return [lon, lat];
   }
 
   /* Minimaler TopoJSON-Decoder: nur was fuer Grenzlinien noetig ist.
@@ -458,10 +504,48 @@ if (renderer){
         return n ? p.slice(1) : p;
       })));
   }
+  /* Flaeche eines Rings, Shoelace. Vorzeichen egal, nur die Groesse
+     zaehlt - es geht darum, das Festland vom Ueberseegebiet zu trennen. */
+  function flaeche(ring){
+    let s = 0;
+    for (let i = 0, n = ring.length; i < n; i++){
+      const [x1, y1] = ring[i];
+      const [x2, y2] = ring[(i + 1) % n];
+      s += x1 * y2 - x2 * y1;
+    }
+    return Math.abs(s) / 2;
+  }
+
+  /* FIX-05 A2. Hier stand eine arithmetische Mittelung ALLER Punkte ALLER
+     Ringe in lon/lat. Zwei Fehler auf einmal, beide gemessen:
+
+       FRA  lon= -10,71  lat= 35,40  -> Atlantik vor Portugal
+       FJI  lon=  88,88  lat=-17,01  -> Indischer Ozean
+       USA  lon=-121,39  lat= 45,02  -> Pazifik vor Oregon
+       NOR  lon=  18,60  lat= 71,74  -> Barentssee
+
+     Ueberseegebiete zaehlten gleich stark wie das Festland (FRA, USA, NOR),
+     und ueber der Datumsgrenze mitteln sich +178 und -178 zu 0 (FJI).
+
+     Zwei Aenderungen: nur der FLAECHENGROESSTE Ring, und gemittelt wird
+     ueber 3D-Vektoren auf der Einheitskugel - dort gibt es keine
+     Datumsgrenze. */
   function mittelpunkt(rr){
-    let x = 0, y = 0, n = 0;
-    rr.forEach(r => r.forEach(([lon, lat]) => { x += lon; y += lat; n++; }));
-    return n ? [x / n, y / n] : [0, 0];
+    if (!rr.length) return [0, 0];
+    let groesster = rr[0], best = -1;
+    rr.forEach(r => { const a = flaeche(r); if (a > best){ best = a; groesster = r; } });
+
+    const summe = new THREE.Vector3();
+    const hilfsvektor = new THREE.Vector3();
+    groesster.forEach(([lon, lat]) => {
+      hilfsvektor.copy(aufKugel(lon, lat, 1));
+      summe.add(hilfsvektor);
+    });
+    // Ein Ring, dessen Punkte sich zu null aufheben (ein exakter Grosskreis),
+    // hat keinen sinnvollen Mittelpunkt. Kommt hier nicht vor, waere aber
+    // eine stille Division durch fast null.
+    if (summe.lengthSq() < 1e-9) return groesster[0];
+    return vonKugel(summe.normalize());
   }
 
   Promise.all([
@@ -478,9 +562,16 @@ if (renderer){
       const eintrag = code && iso[code] ? iso[code] : null;
       const [lon, lat] = mittelpunkt(rr);
       zustand.laender.push({
-        iso: eintrag ? eintrag.a3 : (g.properties.name || '').toUpperCase().slice(0, 8),
+        iso: eintrag ? eintrag.a3 : null,
         name: (eintrag && eintrag.name) || g.properties.name || '?',
         lon, lat, ohne_iso: !eintrag,
+        // FIX-05 A1: die Ringe bleiben liegen. Sie sind ab jetzt die
+        // Trefferflaeche - vorher war es ein Punkt je Land, und der lag
+        // bei vier Laendern im Meer.
+        ringe: rr,
+        // Vorfilter. Ohne ihn prueft jeder Klick alle 177 Laender
+        // Punkt-fuer-Punkt; mit ihm bleiben eine Handvoll uebrig.
+        box: kasten(rr),
       });
       rr.forEach(ring => {
         for (let i = 0; i < ring.length - 1; i++){
@@ -510,10 +601,65 @@ if (renderer){
     marken.instanceMatrix.needsUpdate = true;
     welt.add(marken);
     zustand.marken = marken;
+    dreckig = true;
     document.body.dataset.laender = String(zustand.laender.length);
   }).catch(err => {
     el('gesagt').textContent = 'Ländergrenzen nicht geladen: ' + err.message;
   });
+
+  /* Umschliessendes Rechteck in lon/lat. `ueber_datumsgrenze` merkt sich,
+     ob das Land die 180 Grad kreuzt - dann taugt der einfache Vergleich
+     nicht, und es wird ohne Vorfilter geprueft. Betrifft Russland, Fidschi
+     und Neuseeland. */
+  function kasten(rr){
+    let lo = 180, la = 90, LO = -180, LA = -90, weit = false;
+    rr.forEach(r => r.forEach(([lon, lat]) => {
+      if (lon < lo) lo = lon;
+      if (lon > LO) LO = lon;
+      if (lat < la) la = lat;
+      if (lat > LA) LA = lat;
+    }));
+    weit = (LO - lo) > 180;
+    return {lo, la, LO, LA, weit};
+  }
+
+  /* Punkt-in-Polygon, Ray-Casting nach Westen. Fuenfzehn Zeilen statt einer
+     Abhaengigkeit - CLAUDE.md legt den Stack fest, und turf.js waere ein
+     halbes Megabyte fuer das hier. */
+  function imRing(lon, lat, ring){
+    let drin = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++){
+      const [xi, yi] = ring[i];
+      const [xj, yj] = ring[j];
+      if ((yi > lat) !== (yj > lat) &&
+          lon < (xj - xi) * (lat - yi) / (yj - yi) + xi){
+        drin = !drin;
+      }
+    }
+    return drin;
+  }
+
+  /* Welches Land liegt unter lon/lat? Index oder -1.
+
+     Ein Land ist getroffen, wenn eine UNGERADE Zahl seiner Ringe den Punkt
+     enthaelt. Das behandelt Loecher richtig: Suedafrika enthaelt Lesotho
+     als inneren Ring, und wer nach Maseru klickt, meint nicht Suedafrika. */
+  function landAn(lon, lat){
+    const kandidaten = [];
+    for (let i = 0; i < zustand.laender.length; i++){
+      const b = zustand.laender[i].box;
+      if (!b) continue;
+      if (lat < b.la || lat > b.LA) continue;
+      if (!b.weit && (lon < b.lo || lon > b.LO)) continue;
+      kandidaten.push(i);
+    }
+    for (const i of kandidaten){
+      let treffer = 0;
+      for (const ring of zustand.laender[i].ringe) if (imRing(lon, lat, ring)) treffer++;
+      if (treffer % 2 === 1) return i;
+    }
+    return -1;
+  }
 
   /* Auswahl per Klick */
   const zeiger = new THREE.Raycaster();
@@ -522,24 +668,143 @@ if (renderer){
   function waehle(index){
     const land = zustand.laender[index];
     if (!land) return;
+    // FIX-05 A5: drei der 177 Geometrien haben keinen ISO-Code (N. Cyprus,
+    // Somaliland, Kosovo). Frueher wurde daraus eine Pseudo-Kennung
+    // gebastelt, die /api/weltlage/<iso> nie kennt - der Klick lief ins
+    // Leere. Lieber gar nicht anwaehlbar und den echten Grund sagen.
+    if (land.ohne_iso){
+      el('gesagt').textContent = 'Für ' + land.name + ' habe ich keinen Ländercode.';
+      return;
+    }
     if (zustand.marken){
       zustand.laender.forEach((_, i) =>
         zustand.marken.setColorAt(i, i === index ? AKZENT : RUHE));
       zustand.marken.instanceColor.needsUpdate = true;
+      dreckig = true;
     }
     zustand.aktiv = land;
     dreheZu(land.lon, land.lat);
     ladeLand(land.iso, land.name);
   }
 
-  canvas.addEventListener('click', ev => {
-    if (!zustand.marken) return;
-    const r = canvas.getBoundingClientRect();
-    maus.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
-    maus.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
+  /* Die Trefferkugel. Sie liegt im Weltkoordinatensystem auf dem Ursprung
+     mit Radius 1 - genau dort, wo `erde` steht, denn `welt` wird nur
+     gedreht, nie verschoben oder skaliert. */
+  const kugel = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 1);
+  const treffpunkt = new THREE.Vector3();
+
+  /* Ein Punkt im Bildfeld (-1 .. 1 in beiden Achsen, 0/0 ist die Mitte)
+     -> lon/lat. Gibt null zurueck, wenn dort keine Kugel ist.
+
+     Geschnitten wird gegen die RECHNERISCHE Kugel, nicht gegen die 6144
+     Dreiecke des Meshes. Gemessen am 26.08.2026: bei welt.rotation.y =
+     -3*PI/2 laeuft der Strahl durch die Bildmitte genau eine Kante der
+     SphereGeometry entlang, und `intersectObject` liefert dort 0 Treffer -
+     ein Zehntausendstel NDC daneben 1. Ein Klick auf einer Dreieckskante
+     faellt also durch. `Ray.intersectSphere(sphere, target)` (Signatur aus
+     static/vendor/three.core.js) hat diese Kanten nicht, ist billiger, und
+     sie gibt den VORDEREN Schnittpunkt zurueck - der Strahl stoppt weiter
+     an der Kugel und trifft nichts auf der Rueckseite. Das war der Kern
+     von A1. */
+  function punktAufErde(nx, ny){
+    maus.set(nx, ny);
     zeiger.setFromCamera(maus, kamera);
-    const treffer = zeiger.intersectObject(zustand.marken);
-    if (treffer.length) waehle(treffer[0].instanceId);
+    if (!zeiger.ray.intersectSphere(kugel, treffpunkt)) return null;
+    // Der Treffer steckt im Weltkoordinatensystem, die Ringe liegen in
+    // Kugelkoordinaten der ungedrehten Kugel. worldToLocal( vector ) rechnet
+    // um - Signatur gegen static/vendor/three.core.js geprueft, nicht
+    // geraten. updateMatrixWorld davor, sonst rechnet es mit der Drehung
+    // des VORIGEN Frames.
+    welt.updateMatrixWorld();
+    const lokal = welt.worldToLocal(treffpunkt.clone());
+    return vonKugel(lokal);
+  }
+
+  /* Zeigerposition -> Punkt auf der Erde -> lon/lat.
+     Gibt null zurueck, wenn daneben geklickt wurde (leerer Raum). */
+  function zeigerAufErde(ev){
+    const r = canvas.getBoundingClientRect();
+    return punktAufErde(((ev.clientX - r.left) / r.width) * 2 - 1,
+                        -((ev.clientY - r.top) / r.height) * 2 + 1);
+  }
+
+  /* --- Drehen, Zoomen, Auswaehlen ------------------------------------
+     EIN Satz Zeiger-Ereignisse fuer Maus und Finger. Kein zweiter Pfad
+     fuer Touch, kein OrbitControls - das waeren 600 KB fuer 30 Zeilen. */
+
+  const ZIEH_SCHWELLE = 5;          // Pixel. Darunter ist es ein Klick.
+  const KIPP_GRENZE = 85 * Math.PI / 180;
+  let zieht = false, zeigerId = null;
+  let startX = 0, startY = 0, letztX = 0, letztY = 0, bewegt = 0;
+
+  canvas.addEventListener('pointerdown', ev => {
+    zieht = true;
+    zeigerId = ev.pointerId;
+    startX = letztX = ev.clientX;
+    startY = letztY = ev.clientY;
+    bewegt = 0;
+    // Wer selbst dreht, will nicht weggezogen werden.
+    ziel = null;
+    // Damit ein Zug ausserhalb des Canvas nicht abreisst.
+    try { canvas.setPointerCapture(ev.pointerId); } catch (e) { /* egal */ }
+  });
+
+  canvas.addEventListener('pointermove', ev => {
+    if (!zieht || ev.pointerId !== zeigerId) return;
+    const dx = ev.clientX - letztX, dy = ev.clientY - letztY;
+    letztX = ev.clientX; letztY = ev.clientY;
+    bewegt = Math.max(bewegt, Math.hypot(ev.clientX - startX, ev.clientY - startY));
+    // 0.005 rad je Pixel: eine Bildschirmbreite ist etwa eine halbe Drehung.
+    welt.rotation.y += dx * 0.005;
+    welt.rotation.x += dy * 0.005;
+    // Ohne Klemmung kippt die Kugel ueber den Pol und steht auf dem Kopf.
+    welt.rotation.x = Math.max(-KIPP_GRENZE, Math.min(KIPP_GRENZE, welt.rotation.x));
+    dreckig = true;
+  });
+
+  function zeigerFertig(ev){
+    if (!zieht || ev.pointerId !== zeigerId) return;
+    zieht = false;
+    zeigerId = null;
+    try { canvas.releasePointerCapture(ev.pointerId); } catch (e) { /* egal */ }
+    // Ziehen ist KEINE Auswahl. Sonst startet jede Drehung eine Recherche.
+    if (bewegt > ZIEH_SCHWELLE) return;
+    const punkt = zeigerAufErde(ev);
+    if (!punkt) return;                       // neben die Kugel geklickt
+    const index = landAn(punkt[0], punkt[1]);
+    if (index >= 0) waehle(index);            // Ozean: gar nichts
+  }
+  canvas.addEventListener('pointerup', zeigerFertig);
+  canvas.addEventListener('pointercancel', ev => { zieht = false; zeigerId = null; });
+
+  canvas.addEventListener('wheel', ev => {
+    ev.preventDefault();
+    // NAH und WEIT sind die vorhandenen Grenzen, keine neuen Zahlen.
+    const z = kamera.position.z + Math.sign(ev.deltaY) * 0.15;
+    kamera.position.z = Math.max(NAH, Math.min(WEIT, z));
+    dreckig = true;
+  }, {passive: false});
+
+  /* Tastatur. Ohne sie waere die Ansicht nur mit Maus bedienbar. */
+  canvas.addEventListener('keydown', ev => {
+    const schritt = 0.12;
+    let getan = true;
+    switch (ev.key){
+      case 'ArrowLeft':  welt.rotation.y -= schritt; break;
+      case 'ArrowRight': welt.rotation.y += schritt; break;
+      case 'ArrowUp':    welt.rotation.x -= schritt; break;
+      case 'ArrowDown':  welt.rotation.x += schritt; break;
+      case '+': case '=':
+        kamera.position.z = Math.max(NAH, kamera.position.z - 0.2); break;
+      case '-': case '_':
+        kamera.position.z = Math.min(WEIT, kamera.position.z + 0.2); break;
+      default: getan = false;
+    }
+    if (!getan) return;
+    ev.preventDefault();
+    ziel = null;
+    welt.rotation.x = Math.max(-KIPP_GRENZE, Math.min(KIPP_GRENZE, welt.rotation.x));
+    dreckig = true;
   });
 
   /* Die Drehung IST die Ladeanzeige. Hoechstens 1,8 s. */
@@ -553,11 +818,32 @@ if (renderer){
 
   zustand.dreheZu = dreheZu;
   zustand.fliegeZu = fliegeZu;
+  // Lesend, nur fuer die Abnahme A6 (Kriterien 2, 3, 6, 7).
+  zustand.drehung = () => ({x: welt.rotation.x, y: welt.rotation.y});
+  zustand.naehe = () => kamera.position.z;
+  zustand.mitteLonLat = () => punktAufErde(0, 0);
+  zustand.waehle = waehle;
 
   function dreheZu(lon, lat){ fliegeZu(lon, lat, WEIT); }
 
+  /* FIX-05 A3. Hier stand eine dritte Formel neben `aufKugel` und
+     `vonKugel` - und sie war um genau 180 Grad verdreht. Gemessen:
+     `dreheZu(3.3, 47)` stellte lon=-176,7 in die Mitte, `dreheZu(-150, 30)`
+     stellte Aegypten hin. Solange niemand gegen die Kugel raycastete, fiel
+     das nicht auf; jetzt entscheidet die Bildmitte, was getroffen wird.
+
+     Nicht geraten, sondern hergeleitet. `welt.rotation` ist ein Euler in
+     der Reihenfolge XYZ; mit z = 0 ist die Weltmatrix M = Rx(x)·Ry(y)
+     (nachgesehen in static/vendor/three.core.js, makeRotationFromEuler).
+     Gesucht ist M · aufKugel(lon, lat) = (0, 0, 1), also der Punkt vorn
+     zur Kamera. Mit
+         aufKugel = (-cos(lat)·cos(th), sin(lat), cos(lat)·sin(th)),
+         th = (lon + 180)·PI/180
+     gibt Ry(y) die x-Komponente -cos(lat)·cos(th + y). Die wird null fuer
+     th + y = PI/2, also y = PI/2 - th. Danach steht (0, sin(lat),
+     cos(lat)) da, und Rx(x) dreht das genau fuer x = lat auf (0, 0, 1). */
   function fliegeZu(lon, lat, naehe){
-    const zielY = -(lon + 180) * Math.PI / 180 - Math.PI / 2;
+    const zielY = Math.PI / 2 - (lon + 180) * Math.PI / 180;
     const zielX = lat * Math.PI / 180;
     const zielZ = Math.max(NAH, Math.min(WEIT, naehe == null ? WEIT : naehe));
     if (reduziert){
@@ -565,12 +851,14 @@ if (renderer){
       kamera.position.z = zielZ;
       document.body.dataset.drehung = 'sprung';
       document.body.dataset.naehe = zielZ.toFixed(2);
+      dreckig = true;
       return;
     }
     document.body.dataset.drehung = 'animiert';
     // Von aussen pruefbar machen, wohin geflogen wird. Die Kameraposition
     // selbst steckt in der Three.js-Szene und ist es nicht.
     document.body.dataset.naehe = zielZ.toFixed(2);
+    dreckig = true;
     start = {x: welt.rotation.x, y: welt.rotation.y, z: kamera.position.z};
     ziel = {x: zielX, y: zielY, z: zielZ};
     t0 = performance.now();
@@ -582,6 +870,7 @@ if (renderer){
     renderer.setSize(w, h, false);
     kamera.aspect = w / h;
     kamera.updateProjectionMatrix();
+    dreckig = true;
   }
   new ResizeObserver(resize).observe(canvas);
   resize();
@@ -592,7 +881,7 @@ if (renderer){
 
   const glatt = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
 
-  renderer.setAnimationLoop(() => {
+  function schleife(){
     if (!sichtbar) return;
     if (ziel){
       const t = Math.min((performance.now() - t0) / DAUER_MS, 1);
@@ -601,10 +890,17 @@ if (renderer){
       welt.rotation.y = start.y + (ziel.y - start.y) * e;
       kamera.position.z = start.z + (ziel.z - start.z) * e;
       if (t >= 1) ziel = null;
+      dreckig = true;
     }
+    // Der Kern von A4: im Ruhezustand faellt die Zeichenlast auf null.
+    if (!dreckig) return;
     renderer.render(szene, kamera);
-  });
+    window.__globusBilder++;
+    dreckig = false;
+  }
+  renderer.setAnimationLoop(schleife);
   renderer.render(szene, kamera);
+  window.__globusBilder++;
   window.addEventListener('pagehide', () => renderer.setAnimationLoop(null));
 }
 
@@ -725,8 +1021,16 @@ function starteHoeren(){
   hoerer.onresult = ev => {
     const gesagt = ev.results[0][0].transcript;
     const land = suchLand(gesagt);
-    if (land) ladeLand(land.iso, land.name);
-    else el('gesagt').textContent = `"${gesagt}" kenne ich nicht als Land.`;
+    // Dieselbe Regel wie beim Klick (A5): ohne ISO keine Anfrage. Seit
+    // `iso` fuer diese drei Laender null ist, waere sonst /api/weltlage/null
+    // rausgegangen.
+    if (land && land.ohne_iso){
+      el('gesagt').textContent = 'Für ' + land.name + ' habe ich keinen Ländercode.';
+    } else if (land){
+      ladeLand(land.iso, land.name);
+    } else {
+      el('gesagt').textContent = `"${gesagt}" kenne ich nicht als Land.`;
+    }
   };
   hoerer.onend = () => { hoerer = null; el('btn-mic').setAttribute('aria-pressed','false'); };
   hoerer.onerror = () => { hoerer = null; el('btn-mic').setAttribute('aria-pressed','false'); };

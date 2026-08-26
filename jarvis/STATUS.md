@@ -3,8 +3,8 @@
 > Einzige Wahrheit über den Projektstand. Claude Code liest diese Datei zuerst
 > und aktualisiert sie am Ende jeder Phase. Von Hand korrigieren ist erlaubt.
 
-AKTUELL: FIX-01 — Reparaturauftrag, siehe `docs/FIX-01.md`
-LETZTE ÄNDERUNG: 2026-08-25 (STATUS.md entwertet, Schritt 3 aus FIX-01)
+AKTUELL: FIX-05 — Globus reparieren und einbauen, siehe `docs/FIX-05.md`
+LETZTE ÄNDERUNG: 2026-08-26 (FIX-05 Schritt A abgenommen — Globus dreh-, zoom- und anklickbar; Schritt B steht aus)
 
 > **Abweichung von der Arbeitsweise, auf Ansage:** es wurden alle Phasen
 > gebaut, nicht eine nach der anderen. Das widerspricht CLAUDE.md
@@ -564,6 +564,45 @@ Präfix hinge JARVIS am ganzen Netz.
 Datei: 5,5 MB. Ein Modellaufruf dauert das Tausendfache. **Postgres und
 pgvector bleiben gestrichen.** Die Messung gehört wiederholt, wenn die
 Datenmenge deutlich wächst.
+
+## FIX-05 Schritt A — Globus in `weltlage.html`
+
+Auftrag und Befunde: `docs/FIX-05.md`. Abnahme A6, sieben Kriterien, geprüft
+mit `pytest tests/test_globus.py -v` (echtes Chromium über Playwright, echter
+uvicorn, SwiftShader-WebGL) — **14 passed in 39.77s**.
+
+| # | Kriterium | Beleg | Status |
+|---|-----------|-------|--------|
+| 1 | Frankreich ist anklickbar | `test_a6_1_frankreich_ist_anklickbar` — Klick in die Bildmitte, Kopfzeile „France", `/api/weltlage/FRA` gerufen | ✓ |
+| 2 | Ziehen dreht, wählt nichts | `test_a6_2_ziehen_dreht_und_waehlt_nichts` — Δrotation.y > 0,5 rad, null Anfragen | ✓ |
+| 3 | Rückseite erreichbar | `test_a6_3_die_rueckseite_ist_erreichbar` — nach einem Zug steht ein Punkt >90° entfernt in der Mitte | ✓ |
+| 4 | Ozeanklick wählt nichts | `test_a6_4_klick_auf_ozean_waehlt_nichts` — Nordpazifik, null Anfragen, Kopfzeile unverändert | ✓ |
+| 5 | Stillstand = keine `render`-Aufrufe | `test_a6_5_im_stillstand_wird_nicht_gezeichnet` — `window.__globusBilder` über 3 s unverändert; Gegenprobe `test_nach_einer_drehung_wird_wieder_gezeichnet` | ✓ |
+| 6 | Touch dreht | `test_a6_6_touch_dreht` — `PointerEvent` mit `pointerType: 'touch'`, ein Handler-Satz für Maus und Finger | ✓ |
+| 7 | Tastatur dreht | `test_a6_7_tastatur_dreht` + `test_die_tastatur_zoomt_auch` + `test_der_zoom_haelt_die_vorhandenen_grenzen` (1,45 / 3,1) | ✓ |
+
+**Zwei Fehler, die erst beim Messen auffielen** — beide standen nicht im
+Auftrag, beide waren echt:
+
+1. **`fliegeZu` war um genau 180° verdreht.** Gemessen: `dreheZu(3.3, 47)`
+   stellte lon = −176,7 in die Mitte, `dreheZu(-150, 30)` stellte Ägypten
+   hin. Solange niemand gegen die Kugel raycastete, fiel das nicht auf.
+   Auch die Ortssuche flog damit an den Gegenpunkt. Jetzt aus `aufKugel`
+   hergeleitet statt geraten (Rechnung steht im Code); nachgemessen für
+   acht Orte, Abweichung ≤ 1e−13 Grad.
+2. **Der Strahl fiel auf Dreieckskanten durch.** Bei
+   `welt.rotation.y = −3π/2` lief er durch die Bildmitte genau eine Kante
+   der `SphereGeometry` entlang: `intersectObject` → 0 Treffer, ein
+   Zehntausendstel NDC daneben → 1. Geschnitten wird jetzt gegen die
+   rechnerische Kugel (`Ray.intersectSphere`), die keine Kanten hat.
+
+**Nicht abgenommen, weil nicht Teil von A:** der Einbau in `index.html`
+(Schritt B), die Sprach-Abnahmeanleitung (C) und der Vault (D).
+
+**Was diese Tests nicht zeigen:** sie laufen unter
+`prefers-reduced-motion: reduce`, `fliegeZu` springt dort sofort statt 1,8 s
+zu animieren. Der animierte Flug ist damit **nicht** geprüft. Und WebGL
+läuft unter SwiftShader, nicht auf einer GPU.
 
 ## Offene Blocker
 
