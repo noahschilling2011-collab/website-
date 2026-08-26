@@ -224,6 +224,27 @@ Modulglobal: mehrere Tasks können gleichzeitig laufen.
 
 > **Nur Erstprüfung.** Die Gegenprobe für diese Phase ist nicht gelaufen (Sitzungslimit). Die Verdikte sind nicht von einem zweiten Prüfer widerlegt worden.
 
+> **26.08.2026 — Aufräumen (Inbetriebnahme-Befund, Schritt 5d).** Kein
+> Kriterium bewegt sich dadurch; nur Karteileichen sind weg.
+>
+> - `FIRMS_MAP_KEY` **entfernt** aus `core/config.py` und `.env.example`.
+>   Kein Code hat es je gelesen — es stand nur in der Vorlage und forderte
+>   einen NASA-Zugang, der nichts bewirkt hätte. Belegt durch den neuen
+>   `tests/test_config.py::test_jedes_settings_feld_wird_irgendwo_gelesen`:
+>   er prüft alle 32 Settings-Felder statisch und wurde rot genau bei diesem
+>   einen. Gegenprobe: Feld wieder eingefügt → wieder rot. Der Plan für
+>   aktive Brände bleibt in `docs/satellite.md:46` stehen.
+> - Drei unbenutzte Importnamen aus `core/tools/satellite_tools.py` raus:
+>   `GRENZE_FAKTOR`, `UeberwachungAbgelehnt`, `pruefe_anfrage`.
+>
+> **Korrektur an einem Befund von außen:** `pruefe_anfrage` ist *kein* toter
+> Code. In `core/tools/satellite_tools.py` war der Import unbenutzt, die
+> Überwachungssperre selbst hängt aber an `core/agents.py:362`
+> (`vorpruefung=pruefe_anfrage`) und wird in `core/agents.py:238-247`
+> abgefangen und als `ToolResult(ok=False)` mit Begründung zurückgegeben.
+> Wer die drei Namen als „tote Imports" pauschal löscht, ohne das zu prüfen,
+> löscht beim nächsten Mal die Sperre mit.
+
 Gebaut: `api/events.py` (Ereignisbus + SSE), `GET /api/stats`,
 `GET /api/tool-calls`, `Step.prompt`, vier Ansichten im UI (Chat, Aufträge,
 Werkzeuge, Kosten) — weiterhin ohne Build-Step.
@@ -256,6 +277,27 @@ einen uvicorn im Thread; die Netzsperre der Testsitzung lässt dafür genau
 | 6 | Attribution der Datenquelle steht sichtbar am Bild | ✗ OFFEN | `cd /home/user/website-/jarvis && JARVIS_TOKEN=pruef8 python3 -m uvicorn main:app --host 127.0.0.1 --port 8137 &  (dann) python3 scratchpad/ui.py  #…` | Browserbeleg im echten Chromium: die geladene Oberflaeche hat null Bildelemente und null Canvas, also gibt es kein "Bild", an dem eine Attribution stehen koennte. Gebaut ist nur die Datenseite: Scene.attribution ist Pflichtfeld (eine Sze… |
 
 > **Nur Erstprüfung.** Die Gegenprobe für diese Phase ist nicht gelaufen (Sitzungslimit). Die Verdikte sind nicht von einem zweiten Prüfer widerlegt worden.
+
+> **26.08.2026 — Aufräumen (Inbetriebnahme-Befund, Schritt 5d).** Kein
+> Kriterium bewegt sich dadurch; nur Karteileichen sind weg.
+>
+> - `FIRMS_MAP_KEY` **entfernt** aus `core/config.py` und `.env.example`.
+>   Kein Code hat es je gelesen — es stand nur in der Vorlage und forderte
+>   einen NASA-Zugang, der nichts bewirkt hätte. Belegt durch den neuen
+>   `tests/test_config.py::test_jedes_settings_feld_wird_irgendwo_gelesen`:
+>   er prüft alle 32 Settings-Felder statisch und wurde rot genau bei diesem
+>   einen. Gegenprobe: Feld wieder eingefügt → wieder rot. Der Plan für
+>   aktive Brände bleibt in `docs/satellite.md:46` stehen.
+> - Drei unbenutzte Importnamen aus `core/tools/satellite_tools.py` raus:
+>   `GRENZE_FAKTOR`, `UeberwachungAbgelehnt`, `pruefe_anfrage`.
+>
+> **Korrektur an einem Befund von außen:** `pruefe_anfrage` ist *kein* toter
+> Code. In `core/tools/satellite_tools.py` war der Import unbenutzt, die
+> Überwachungssperre selbst hängt aber an `core/agents.py:362`
+> (`vorpruefung=pruefe_anfrage`) und wird in `core/agents.py:238-247`
+> abgefangen und als `ToolResult(ok=False)` mit Begründung zurückgegeben.
+> Wer die drei Namen als „tote Imports" pauschal löscht, ohne das zu prüfen,
+> löscht beim nächsten Mal die Sperre mit.
 
 Gebaut: `core/satellite/{contracts,analysis,policy,cdse}.py`, Werkzeuge
 `satellite_search` und `satellite_compare`, Agent `satellite` (READ).
@@ -295,6 +337,27 @@ bei Kontingenten die falsche Reihenfolge.
 
 > **Nur Erstprüfung.** Die Gegenprobe für diese Phase ist nicht gelaufen (Sitzungslimit). Die Verdikte sind nicht von einem zweiten Prüfer widerlegt worden.
 
+> **26.08.2026 — Aufräumen (Inbetriebnahme-Befund, Schritt 5d).** Kein
+> Kriterium bewegt sich dadurch; nur Karteileichen sind weg.
+>
+> - `FIRMS_MAP_KEY` **entfernt** aus `core/config.py` und `.env.example`.
+>   Kein Code hat es je gelesen — es stand nur in der Vorlage und forderte
+>   einen NASA-Zugang, der nichts bewirkt hätte. Belegt durch den neuen
+>   `tests/test_config.py::test_jedes_settings_feld_wird_irgendwo_gelesen`:
+>   er prüft alle 32 Settings-Felder statisch und wurde rot genau bei diesem
+>   einen. Gegenprobe: Feld wieder eingefügt → wieder rot. Der Plan für
+>   aktive Brände bleibt in `docs/satellite.md:46` stehen.
+> - Drei unbenutzte Importnamen aus `core/tools/satellite_tools.py` raus:
+>   `GRENZE_FAKTOR`, `UeberwachungAbgelehnt`, `pruefe_anfrage`.
+>
+> **Korrektur an einem Befund von außen:** `pruefe_anfrage` ist *kein* toter
+> Code. In `core/tools/satellite_tools.py` war der Import unbenutzt, die
+> Überwachungssperre selbst hängt aber an `core/agents.py:362`
+> (`vorpruefung=pruefe_anfrage`) und wird in `core/agents.py:238-247`
+> abgefangen und als `ToolResult(ok=False)` mit Begründung zurückgegeben.
+> Wer die drei Namen als „tote Imports" pauschal löscht, ohne das zu prüfen,
+> löscht beim nächsten Mal die Sperre mit.
+
 Gebaut: `SPRACHSTIL` (höchstens drei Sätze, keine Aufzählungen, keine URLs im
 Fließtext), `voice`-Flag an `POST /api/tasks`, `VoiceProvider`-Abstraktion im
 UI über die Web Speech API, Push-to-Talk-Knopf, Sprachumschaltung DE/EN.
@@ -321,6 +384,27 @@ ausprobieren.
 | 4 | Backup lässt sich einspielen, Verlauf danach vollständig | ✓ BELEGT | `JARVIS_DB_PATH=/tmp/fresh/data/jarvis.db python -m scripts.backup sichern /tmp/dod4-backup.db; rm -f /tmp/fresh/data/jarvis.db*; ... backup pruefen…` | Der WAL-Anspruch separat geprüft: bei offen gehaltener Verbindung (WAL 16512 Bytes) ist die `cp`-Kopie unbrauchbar ("no such table: messages"), das über scripts.backup erzeugte Backup enthält beide Zeilen ['alte Zeile','nur im WAL'] — de… |
 
 > **Nur Erstprüfung.** Die Gegenprobe für diese Phase ist nicht gelaufen (Sitzungslimit). Die Verdikte sind nicht von einem zweiten Prüfer widerlegt worden.
+
+> **26.08.2026 — Aufräumen (Inbetriebnahme-Befund, Schritt 5d).** Kein
+> Kriterium bewegt sich dadurch; nur Karteileichen sind weg.
+>
+> - `FIRMS_MAP_KEY` **entfernt** aus `core/config.py` und `.env.example`.
+>   Kein Code hat es je gelesen — es stand nur in der Vorlage und forderte
+>   einen NASA-Zugang, der nichts bewirkt hätte. Belegt durch den neuen
+>   `tests/test_config.py::test_jedes_settings_feld_wird_irgendwo_gelesen`:
+>   er prüft alle 32 Settings-Felder statisch und wurde rot genau bei diesem
+>   einen. Gegenprobe: Feld wieder eingefügt → wieder rot. Der Plan für
+>   aktive Brände bleibt in `docs/satellite.md:46` stehen.
+> - Drei unbenutzte Importnamen aus `core/tools/satellite_tools.py` raus:
+>   `GRENZE_FAKTOR`, `UeberwachungAbgelehnt`, `pruefe_anfrage`.
+>
+> **Korrektur an einem Befund von außen:** `pruefe_anfrage` ist *kein* toter
+> Code. In `core/tools/satellite_tools.py` war der Import unbenutzt, die
+> Überwachungssperre selbst hängt aber an `core/agents.py:362`
+> (`vorpruefung=pruefe_anfrage`) und wird in `core/agents.py:238-247`
+> abgefangen und als `ToolResult(ok=False)` mit Begründung zurückgegeben.
+> Wer die drei Namen als „tote Imports" pauschal löscht, ohne das zu prüfen,
+> löscht beim nächsten Mal die Sperre mit.
 
 Gebaut: `Dockerfile`, `docker-compose.yml`, `.dockerignore`,
 `scripts/backup.py`, `scripts/migrate.py`, `scripts/measure.py`,

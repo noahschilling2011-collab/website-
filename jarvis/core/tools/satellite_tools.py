@@ -15,14 +15,8 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from core.contracts import Permission, Tool, ToolResult
-from core.satellite.analysis import (
-    GRENZE_FAKTOR,
-    grenzsatz,
-    vergleichbar,
-    vergleiche_raster,
-)
+from core.satellite.analysis import grenzsatz, vergleichbar, vergleiche_raster
 from core.satellite.cdse import CDSEFehler, CDSEProvider
-from core.satellite.policy import UeberwachungAbgelehnt, pruefe_anfrage
 from core.tools.registry import register
 
 BBOX_SCHEMA = {

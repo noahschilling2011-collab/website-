@@ -1,3 +1,6 @@
+import re
+from pathlib import Path
+
 import pytest
 
 from core.config import Settings, get_settings
@@ -76,3 +79,72 @@ def test_jarvis_db_path_wirkt_wirklich(monkeypatch: pytest.MonkeyPatch, tmp_path
     ziel = tmp_path / "woanders.db"
     monkeypatch.setenv("JARVIS_DB_PATH", str(ziel))
     assert Settings(_env_file=None).db_path == ziel
+
+
+# --- Kein Feld, das niemand liest ------------------------------------------
+#
+# Inbetriebnahme-Befund, Schritt 5d: FIRMS_MAP_KEY stand in `.env.example`
+# und in `Settings` - und wurde nirgends gelesen. Das ist schlimmer als ein
+# fehlendes Feld: es steht in der Vorlage und fordert den Nutzer auf, sich
+# einen Zugang zu besorgen, der nichts bewirkt.
+#
+# Der Test ist statisch, nicht dynamisch: er sucht `.<feldname>` im Quelltext
+# ausserhalb von `core/config.py` und - fuer Felder, die nur die Konfiguration
+# selbst auswertet (die Preise) - `self.<feldname>` innerhalb, aber ohne die
+# Zeilen der Felddeklaration. Ein Feld, das nur sich selbst kennt, faellt
+# durch.
+
+
+def test_jedes_settings_feld_wird_irgendwo_gelesen():
+    wurzel = Path(__file__).resolve().parent.parent
+    konfig = wurzel / "core" / "config.py"
+
+    quellen = [
+        p for p in wurzel.rglob("*.py")
+        if "__pycache__" not in p.parts
+        and "tests" not in p.relative_to(wurzel).parts
+        and p != konfig
+    ]
+    fremder_text = "\n".join(p.read_text(encoding="utf-8") for p in quellen)
+
+    # config.py ohne die Deklarationszeilen: sonst belegt jedes Feld sich selbst.
+    eigener_text = "\n".join(
+        zeile for zeile in konfig.read_text(encoding="utf-8").splitlines()
+        if not re.match(r"\s{4}[a-z_]+\s*:\s", zeile)
+    )
+
+    ungelesen = [
+        name for name in Settings.model_fields
+        if not re.search(rf"\.{name}\b", fremder_text)
+        and not re.search(rf"\bself\.{name}\b", eigener_text)
+    ]
+    assert ungelesen == [], (
+        f"Diese Felder liest niemand: {ungelesen}. Entweder benutzen oder "
+        f"aus Settings und .env.example entfernen - ein Feld, das nur in der "
+        f"Vorlage steht, verspricht eine Wirkung, die es nicht hat."
+    )
+
+
+def test_env_example_nennt_keine_unbekannte_variable():
+    """Was in der Vorlage steht, muss auch ein Feld sein.
+
+    Sonst traegt der Nutzer etwas ein, das `extra=ignore` still verschluckt.
+    """
+    wurzel = Path(__file__).resolve().parent.parent
+    vorlage = (wurzel / ".env.example").read_text(encoding="utf-8")
+    genannt = {
+        zeile.split("=", 1)[0].strip().lower()
+        for zeile in vorlage.splitlines()
+        if "=" in zeile and not zeile.lstrip().startswith("#")
+    }
+    felder = set(Settings.model_fields)
+    # Alias-Namen zaehlen mit: VAULT_PFAD, WIKI_API_TOKEN, JARVIS_DB_PATH ...
+    for feld in Settings.model_fields.values():
+        quelle = getattr(feld, "validation_alias", None)
+        for kandidat in getattr(quelle, "choices", []) or []:
+            felder.add(str(kandidat).lower())
+
+    unbekannt = sorted(genannt - felder)
+    assert unbekannt == [], (
+        f".env.example nennt Variablen, die Settings nicht kennt: {unbekannt}"
+    )

@@ -90,9 +90,13 @@ class Settings(BaseSettings):
     max_permission: int = 3
 
     # --- Ab Phase 8 (Satellit) ---
+    # Hier stand FIRMS_MAP_KEY. Kein Code hat es je gelesen - es stand nur in
+    # der Vorlage und forderte den Nutzer auf, sich bei NASA einen Zugang zu
+    # besorgen, der nichts bewirkt. Der Plan dafuer bleibt in
+    # docs/satellite.md (aktive Braende ueber NASA FIRMS); wenn das gebaut
+    # wird, kommt das Feld mit dem Code zurueck, der es liest.
     cdse_client_id: str = ""
     cdse_client_secret: str = ""
-    firms_map_key: str = ""
 
     # --- Budgets (0.5) ---
     budget_max_steps: int = 12
