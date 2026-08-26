@@ -23,7 +23,7 @@ vom 25.08., kein Aufgabenzettel, den man umschreibt):
 | 13 · Kartenzahl sinkt ohne Nachrücken | behoben | `5a21934` (FIX-02) |
 | 9 · Konflikterkennung mit Vault verschwunden | behoben | FIX-04 Schritt 4, `core/gedaechtnis.py` |
 | 8 · Panel und Modell sehen verschiedene Daten | behoben | FIX-04 Schritt 2+3, `core/gedaechtnis.py` |
-| 20 · ein OS-Thread je geänderter Datei | behoben | `core/vault_index.py` (ein Arbeiter statt tausend Timer) |
+| 20 · ein OS-Thread je geänderter Datei | behoben in `229ecfc`, seit FIX-04 **gegenstandslos** — der Beobachter ist ersatzlos entfallen | `core/vault_index.py` |
 | 18 · `facts` ohne FTS-Trigger nach der Vault-Migration | behoben | `scripts/migrate_vault.py` |
 | 17 · Volltextindex nach der Migration leer | behoben | `scripts/migrate.py` |
 | 21 · eine nicht-UTF-8-Datei legt `remember` lahm | behoben | `core/vault.py` |
