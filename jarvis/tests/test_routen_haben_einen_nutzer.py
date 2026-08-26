@@ -58,7 +58,14 @@ def routen() -> list[str]:
 
 # Alle ausgelieferten Seiten, nicht nur die erste. Als Phase 11 dazukam,
 # schlug dieser Test an - zu Recht: er kannte weltlage.html noch nicht.
-SEITEN = ("index.html", "weltlage.html")
+#
+# FIX-05 Schritt B hat dasselbe noch einmal ausgeloest: der Globus-Code
+# steht jetzt in `static/globus.js` (eine Datei fuer beide Seiten statt
+# zwei Kopien), und mit ihm die Aufrufe von `/api/weltlage/<iso>`,
+# `/api/weltlage/zaehler` und `/api/ort`. Die Frage dieses Tests ist "ruft
+# die ausgelieferte Oberflaeche diese Route auf?" - und diese Datei ist
+# Teil der Oberflaeche. Sie wird per `import` aus beiden Seiten geladen.
+SEITEN = ("index.html", "weltlage.html", "static/globus.js")
 
 
 def seite() -> str:

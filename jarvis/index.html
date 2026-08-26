@@ -4,6 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>JARVIS</title>
+
+<!-- Nur die Zuordnung, KEIN Import. Three.js sind 2,0 MB
+     (three.module.js 635 KB + three.core.js 1410 KB); statisch geladen
+     waeren sie in jedem Seitenaufruf drin, auch wenn niemand die
+     Weltansicht oeffnet. Geladen wird erst beim ersten Klick auf "Welt",
+     per dynamischem import() - siehe ladeGlobus(). -->
+<script type="importmap">
+{ "imports": { "three": "/static/vendor/three.module.js" } }
+</script>
+
 <!-- Als data-URL eingebettet: sonst fragt der Browser /favicon.ico an und
      bekommt einen 404 in die Konsole. -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20rx%3D%226%22%20fill%3D%22%230a0a0c%22/%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23f2b544%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223.2%22/%3E%3Cpath%20d%3D%22M12%202.6v3.2M12%2018.2v3.2M2.6%2012h3.2M18.2%2012h3.2%22/%3E%3C/g%3E%3C/svg%3E">
@@ -445,6 +455,19 @@ button, input, textarea { font: inherit; color: inherit; }
 
 .view { display: none; overflow-y: auto; padding: var(--s-5); }
 .view.is-active { display: block; }
+
+/* FIX-05 B-5: der Globus fuellt seinen BEHAELTER, nicht das Fenster. Kein
+   Innenabstand, kein Scrollbalken - er zeichnet bis an die Kante, und
+   `position:relative` macht ihn zum Bezugssystem fuer alles, was
+   static/globus.js absolut darin platziert. */
+#view-welt { padding: 0; overflow: hidden; position: relative; }
+/* 2,0 MB brauchen sichtbar Zeit. Bis dahin steht hier, was los ist. */
+.globus-laedt {
+  position: absolute; inset: 0; z-index: 9;
+  display: grid; place-items: center;
+  padding: var(--s-5); text-align: center;
+  color: var(--text-dim); font-size: var(--step--1);
+}
 .thread.is-active { display: flex; }
 
 .karte {
@@ -814,6 +837,7 @@ button, input, textarea { font: inherit; color: inherit; }
       <button class="tab" id="tab-tasks" role="tab" aria-selected="false">Aufträge</button>
       <button class="tab" id="tab-tools" role="tab" aria-selected="false">Werkzeuge</button>
       <button class="tab" id="tab-kosten" role="tab" aria-selected="false">Kosten</button>
+      <button class="tab" id="tab-welt" role="tab" aria-selected="false">Welt</button>
     </nav>
     <button class="kopf-btn" id="btn-memory" type="button" aria-pressed="false">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -833,6 +857,7 @@ button, input, textarea { font: inherit; color: inherit; }
   <section class="view" id="view-tasks" aria-label="Aufträge"></section>
   <section class="view" id="view-tools" aria-label="Werkzeuge"></section>
   <section class="view" id="view-kosten" aria-label="Kosten"></section>
+  <section class="view" id="view-welt" aria-label="Welt"></section>
 
   <div class="composer-wrap">
     <form class="composer glass" id="composer">
@@ -1819,17 +1844,56 @@ button, input, textarea { font: inherit; color: inherit; }
     el.mic.title = 'Dieser Browser kann keine Spracherkennung (Chrome kann es).';
   }
 
+  // --- Weltansicht (FIX-05 Schritt B) --------------------------------------
+
+  /* Der Globus wohnt in `static/globus.js` - derselben Datei, die auch
+     `/weltlage` benutzt. Zwei Kopien waeren zwei Orte fuer jeden Fehler.
+
+     Der ganze Anti-Lag-Trick steckt in zwei Zeilen: der Import passiert
+     ERST beim ersten Klick auf "Welt", und beim Verlassen der Ansicht
+     wird die Zeichenschleife abgeschaltet (siehe zeigeAnsicht). Wer den
+     Tab nie oeffnet, laedt nie 2,0 MB. */
+  var globusModul = null;
+  var globusLaedt = false;
+
+  function ladeGlobus() {
+    if (globusModul) { globusModul.weiter(); return; }
+    if (globusLaedt) return;                 // zweimal klicken laedt nicht zweimal
+    globusLaedt = true;
+
+    var ziel = document.getElementById('view-welt');
+    var hinweis = document.createElement('div');
+    hinweis.className = 'globus-laedt';
+    hinweis.textContent = 'Globus wird geladen — 2 MB Three.js, das dauert einen Moment.';
+    ziel.appendChild(hinweis);
+
+    // Dynamischer Import aus einem klassischen <script>: erlaubt, und die
+    // Import-Map im <head> gilt auch dafuer ('three' loest auf).
+    import('/static/globus.js').then(function (modul) {
+      return modul.starte(ziel, TOKEN).then(function () {
+        globusModul = modul;
+        hinweis.remove();
+      });
+    }).catch(function (err) {
+      hinweis.textContent = 'Globus nicht geladen: ' + err.message;
+    }).then(function () {
+      globusLaedt = false;
+    });
+  }
+
   // --- Ansichten (Phase 7) ------------------------------------------------
 
   var ANSICHTEN = {
     chat:   { tab: 'tab-chat',   el: 'thread',      laden: null },
     tasks:  { tab: 'tab-tasks',  el: 'view-tasks',  laden: ladeTasks },
     tools:  { tab: 'tab-tools',  el: 'view-tools',  laden: ladeWerkzeuge },
-    kosten: { tab: 'tab-kosten', el: 'view-kosten', laden: ladeKosten }
+    kosten: { tab: 'tab-kosten', el: 'view-kosten', laden: ladeKosten },
+    welt:   { tab: 'tab-welt',   el: 'view-welt',   laden: ladeGlobus }
   };
   var aktiveAnsicht = 'chat';
 
   function zeigeAnsicht(name) {
+    var vorher = aktiveAnsicht;
     aktiveAnsicht = name;
     Object.keys(ANSICHTEN).forEach(function (k) {
       var a = ANSICHTEN[k];
@@ -1838,6 +1902,10 @@ button, input, textarea { font: inherit; color: inherit; }
     });
     // Die Eingabe gehört zum Chat, nicht zum Dashboard.
     document.querySelector('.composer-wrap').hidden = name !== 'chat';
+    // FIX-05 B-4: Klassen umschalten haelt keinen Renderloop an. Ohne die
+    // naechste Zeile zeichnet der Globus weiter, waehrend du chattest -
+    // und genau das ist das Ruckeln, um das es geht.
+    if (vorher === 'welt' && name !== 'welt' && globusModul) globusModul.pausiere();
     if (ANSICHTEN[name].laden) ANSICHTEN[name].laden();
   }
 

@@ -583,7 +583,14 @@ def test_fix02_dod_7_modellaufrufe_stimmen_mit_llm_calls(client, db):
 def test_fix02_die_euro_kachel_ist_weg():
     from pathlib import Path
 
-    html = (Path(__file__).resolve().parent.parent / "weltlage.html").read_text(encoding="utf-8")
+    # Seit FIX-05 Schritt B liegt das Markup der Statusleiste in
+    # `static/globus.js`, weil `index.html` denselben Globus als Tab laedt
+    # und zwei Kopien zwei Orte fuer jeden Fehler waeren. Geprueft wird
+    # weiter die ausgelieferte Oberflaeche - nur besteht die jetzt aus
+    # zwei Dateien.
+    wurzel = Path(__file__).resolve().parent.parent
+    html = "\n".join((wurzel / name).read_text(encoding="utf-8")
+                     for name in ("weltlage.html", "static/globus.js"))
     assert 'id="z-kosten"' not in html
     assert 'id="z-aufrufe"' in html
     assert "Modellaufrufe heute" in html

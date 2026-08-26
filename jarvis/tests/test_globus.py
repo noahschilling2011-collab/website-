@@ -93,16 +93,17 @@ def _mitte(seite):
 
 
 def _sammle_fehler(seite, fehler):
-    """Alles ausser dem Favicon.
+    """Jeder Seiten- und Konsolenfehler, ohne Ausnahme.
 
-    Chromium holt `/favicon.ico` von sich aus, ohne dass die Seite das
-    verlangt; JARVIS hat keins und antwortet mit 404. Das ist kein
-    Seitenfehler, und ein Favicon nur fuer diesen Test dazuzulegen waere
-    eine stille Aenderung ausserhalb des Auftrags.
+    Hier stand einmal ein Filter fuer `/favicon.ico`: Chromium holt das von
+    sich aus, und weltlage.html hatte keins. Seit die Seite dasselbe
+    eingebettete Favicon fuehrt wie index.html, gibt es den 404 nicht mehr -
+    und ein Filter, der einen echten Fehler verstecken koennte, ist
+    schlechter als kein Filter.
     """
     seite.on("pageerror", lambda e: fehler.append(str(e)))
     seite.on("console", lambda m: fehler.append(m.text)
-             if m.type == "error" and "favicon" not in m.location["url"] else None)
+             if m.type == "error" else None)
 
 
 def test_die_seite_laedt_ohne_javascript_fehler(server):

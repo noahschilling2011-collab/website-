@@ -4,7 +4,7 @@
 > und aktualisiert sie am Ende jeder Phase. Von Hand korrigieren ist erlaubt.
 
 AKTUELL: FIX-05 — Globus reparieren und einbauen, siehe `docs/FIX-05.md`
-LETZTE ÄNDERUNG: 2026-08-26 (FIX-05 Schritt A abgenommen — Globus dreh-, zoom- und anklickbar; Schritt B steht aus)
+LETZTE ÄNDERUNG: 2026-08-26 (FIX-05 A und B abgenommen — Globus repariert und als fünfter Tab eingebaut; C liegt bei Noah, D braucht den Vault-Pfad)
 
 > **Abweichung von der Arbeitsweise, auf Ansage:** es wurden alle Phasen
 > gebaut, nicht eine nach der anderen. Das widerspricht CLAUDE.md
@@ -603,6 +603,73 @@ Auftrag, beide waren echt:
 `prefers-reduced-motion: reduce`, `fliegeZu` springt dort sofort statt 1,8 s
 zu animieren. Der animierte Flug ist damit **nicht** geprüft. Und WebGL
 läuft unter SwiftShader, nicht auf einer GPU.
+
+## FIX-05 Schritt B — Globus als fünfter Tab in `index.html`
+
+Abnahme B6, fünf Kriterien, geprüft mit `pytest tests/test_globus_tab.py -v`
+(echtes Chromium, echter uvicorn) — **20 passed**. Dazu `web-selfcheck` gegen
+den laufenden Server.
+
+| # | Kriterium | Beleg | Status |
+|---|-----------|-------|--------|
+| 1 | Ohne Weltansicht keine 2 MB | `test_b6_1_ohne_weltansicht_kommt_three_nicht` — Netzmitschnitt über alle vier alten Tabs: kein `three.core.js`, kein `three.module.js`, kein `globus.js`, kein `countries-110m.json` | ✓ |
+| 2 | Beim Öffnen genau einmal | `test_b6_2_beim_oeffnen_kommt_es_genau_einmal` — ein Abruf; nach Chat und zurück immer noch einer | ✓ |
+| 3 | Chat bleibt flüssig | `test_b6_3_...` — nach dem Zurückschalten 3 s lang **keine** gezeichneten Bilder **und** kein Schleifendurchlauf (`window.__globusSchleife`) | ✓ |
+| 4 | Layout hält | `test_b6_4_kein_seitliches_scrollen_in_beiden_tabs[360/768/1440]` + `web-selfcheck` gegen `/` (Chat und Welt-Tab) und `/weltlage`: **kein** horizontales Scrollen, Canvas deckungsgleich mit `#view-welt` | ✓ |
+| 5 | Alle sieben A-Kriterien gelten im Tab | `test_b6_5_a1` … `test_b6_5_a7` — Frankreich anklickbar, Ziehen wählt nichts, Rückseite erreichbar, Ozean wählt nichts, Ruhelast null, Touch dreht, Tastatur dreht und zoomt | ✓ |
+
+**Was gebaut wurde.** `static/globus.js` (1183 Zeilen) — der Globus-Code
+liegt jetzt einmal da und wird von beiden Seiten benutzt. Drei Ausfuhren:
+`starte(behaelter, token)`, `pausiere()`, `weiter()`. `weltlage.html` ist von
+1060 auf 54 Zeilen geschrumpft und nur noch die Hülle. `index.html` bekam die
+Import-Map (ohne statischen Import), den Tab „Welt", die Ansicht
+`#view-welt`, `ladeGlobus()` mit dynamischem Import und die eine Zeile in
+`zeigeAnsicht()`, die beim Verlassen abschaltet.
+
+**Der Token ist ein Parameter, kein Platzhalter.** `/static` geht durch einen
+`StaticFiles`-Mount (`api/app.py:205`); den Platzhalter `__JARVIS_TOKEN__`
+ersetzt nur die HTML-Route (`api/routes.py:515`, `:533`). Stünde er in
+`static/globus.js`, ginge jeder API-Aufruf mit dem Platzhalter raus und
+bekäme 401. Die Seite reicht ihn herein.
+
+**Drei Tests mussten mitgeändert werden** — nicht stillschweigend:
+`test_routen_haben_einen_nutzer` und `test_fix02_die_euro_kachel_ist_weg`
+lasen die ausgelieferte Oberfläche als Text aus `index.html` und
+`weltlage.html`. Die besteht jetzt aus drei Dateien; `static/globus.js`
+steht in beiden Listen. Der dritte ist die Favicon-Ausnahme in
+`tests/test_globus.py`, die mit dem Favicon selbst wegfiel.
+
+**Zwei Kollisionen und eine Falle**, alle gemessen, alle in `docs/FIX-05.md`
+mit Zahlen: die id `btn-mic` gibt es im Chat schon (heißt im Globus jetzt
+`btn-globus-mic`), die Klassen `karte` und `status` ebenfalls (Globus-Stil
+liegt komplett unter `.globus-wurzel`), und die Leertaste des Globus hätte
+im Chatfeld die Ländersuche gestartet (zwei Schranken: nur bei aktiver
+Ansicht, nie aus einem Eingabefeld).
+
+**Mutationen: 3 von 6 getötet, 3 überleben doppelt abgesichert.** Nimmt man
+bei diesen dreien jeweils **beide** Sicherungen weg, fallen die Tests sofort
+(M2b, M3b, M6b). Die Tabelle und die drei Befunde dazu stehen in
+`docs/FIX-05.md` — darunter der wichtigste: der `IntersectionObserver`
+reagiert in diesem Chromium sehr wohl auf `display:none`, weshalb der Zähler
+der gezeichneten Bilder allein B-4 nicht prüft.
+
+**Was diese Abnahme nicht zeigt.** `web-selfcheck` misst nur den
+Startzustand — kein Hover, kein geöffnetes Ortspanel. WebGL läuft unter
+SwiftShader. Und die drei Kontrastfehler, die der Lauf gegen `/` meldet,
+sind **einer**: der aktive Tab, Akzent auf `--accent-soft`. Er ist nicht neu
+(derselbe Lauf gegen die Fassung vor FIX-05 meldet ihn wortgleich) und
+wurde nicht angefasst.
+
+## FIX-05 Schritt C — Sprach-Abnahme
+
+`docs/FIX-05-sprachtest.md` liegt bereit: vier Schritte, je ein sichtbares
+Ergebnis, passend zu den vier DoD-Kriterien aus `docs/phases/PHASE-09.md`.
+Am Sprachpfad wurde **nichts** geändert.
+
+**Status: ◐ — wartet auf Noah.** Headless-Chromium hat kein Mikrofon und
+keine Sprachsynthese; alle vier Kriterien brauchen beides. Kommt seine
+Antwort, wird sie hier mit dem Vermerk eingetragen, dass der Beleg vom
+Nutzer stammt und nicht aus einem ausgeführten Befehl.
 
 ## Offene Blocker
 
