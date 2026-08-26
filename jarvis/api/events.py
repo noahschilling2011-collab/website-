@@ -47,14 +47,48 @@ class EventBus:
             try:
                 queue.put_nowait(ereignis)
             except asyncio.QueueFull:
-                # Aeltestes wegwerfen, damit der Strom weiterlaeuft. Der
-                # Zuhoerer erfaehrt davon - stiller Verlust waere schlimmer.
-                try:
-                    queue.get_nowait()
-                    queue.put_nowait({"type": "dropped", "data": {}})
-                    queue.put_nowait(ereignis)
-                except (asyncio.QueueEmpty, asyncio.QueueFull):
-                    pass
+                self._verdraengen(queue, ereignis)
+
+    @staticmethod
+    def _verdraengen(queue: asyncio.Queue, ereignis: dict[str, Any]) -> None:
+        """Aeltestes weg, damit das NEUE hineinpasst - und ein Hinweis dazu.
+
+        BUGS-01 Fund 19. Vorher machte diese Stelle EINEN Platz frei, stellte
+        den Hinweis hinein - und fuer das eigentliche Ereignis war wieder
+        keiner da. Der zweite `put_nowait` warf `QueueFull`, das `except`
+        verschluckte es, und weg war es. Gemessen:
+
+            Puffer voll: 256/256
+            nach dem final-Ereignis: 256
+            'final' ueberhaupt enthalten: False
+            letztes Ereignis im Puffer: dropped
+
+        Ausgerechnet `final` faellt so am haeufigsten heraus, weil es zuletzt
+        kommt - und die Oberflaeche bleibt auf "Plan laeuft" stehen, weil sie
+        seit Phase 7 bewusst nicht mehr pollt.
+
+        Jetzt werden ZWEI Plaetze frei gemacht, einer fuer den Hinweis und
+        einer fuer das Ereignis. Bleibt trotzdem keiner (zweiter Zuhoerer,
+        Nebenlaeufigkeit), hat das Ereignis Vorrang vor dem Hinweis: der
+        Hinweis ist Beiwerk, das Ereignis ist die Nachricht.
+        """
+        # Zwei Plaetze, weil zwei Dinge hineinsollen: der Hinweis und das
+        # Ereignis. Genau das war der Fehler - es wurde nur einer frei.
+        for _ in range(2):
+            try:
+                queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+
+        # Danach ist Platz. Dazwischen kann nichts passieren: `publish` ist
+        # synchron und `await`-frei, es gibt also keinen Punkt, an dem ein
+        # anderer Zuhoerer dazwischenkaeme.
+        for stueck in ({"type": "dropped", "data": {}}, ereignis):
+            try:
+                queue.put_nowait(stueck)
+            except asyncio.QueueFull:      # nur bei QUEUE_GROESSE < 2 moeglich
+                log.warning("Ereignis %r ging verloren - Puffer zu klein.",
+                            stueck["type"])
 
 
 def sse(ereignis: dict[str, Any]) -> str:

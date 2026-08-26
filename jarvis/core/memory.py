@@ -39,7 +39,25 @@ STOPWOERTER = {
     "the", "and", "for", "with", "that", "this",
 }
 
-WORT = re.compile(r"[0-9A-Za-zÄÖÜäöüß]+")
+# BUGS-01 Fund 22: das Muster hiess frueher r"[0-9A-Za-zAEOEUEaeoeuess]+" - also
+# ASCII plus deutsche Umlaute. Alles andere fiel heraus, und zwar auf zwei
+# verschiedene Weisen. Gemessen:
+#
+#     'Je parle français à Genève'  ->  ['ais', 'fran', 'gen', 'parle']
+#     'Wrocław Kraków'              ->  ['krak', 'wroc']
+#     'Мой велосипед'               ->  []
+#
+# Kyrillisch und Griechisch fielen ganz weg - `recall` fand dort nichts. Woerter
+# mit lateinischen Akzenten wurden STILL ZERSCHNITTEN, und danach suchte `recall`
+# nach Bruchstuecken, die niemand geschrieben hat. Der zweite Fall ist der
+# schlimmere: kein Treffer ist ehrlich, ein falscher nicht.
+#
+# `\w` mit `re.UNICODE` (in Python 3 der Standard) nimmt Buchstaben und Ziffern
+# jeder Schrift - und den Unterstrich, den wir nicht wollen. Deshalb explizit:
+# alles, was `str.isalnum()` als Buchstabe oder Ziffer gilt. Satzzeichen und
+# FTS5-Syntax (", *, -, NEAR, ^, Klammern) bleiben draussen; genau dagegen ist
+# `fts_query` gebaut.
+WORT = re.compile(r"[^\W_]+", re.UNICODE)
 
 
 def inhaltswoerter(text: str) -> set[str]:
