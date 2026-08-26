@@ -17,7 +17,6 @@ die Datei, laesst SQLite den Integritaetscheck laufen und zaehlt die Zeilen.
 from __future__ import annotations
 
 import argparse
-import shutil
 import sqlite3
 import sys
 from datetime import datetime, timezone
@@ -85,16 +84,19 @@ def einspielen(quelle: Path, ziel: Path, *, force: bool = False) -> Path:
     if ziel.exists() and not force:
         # Vor dem Ueberschreiben die alte Datei beiseitelegen. Ein Restore,
         # der das Vorherige unwiederbringlich loescht, ist eine Falle.
+        #
+        # BUGS-01 Fund 2: das lief frueher ueber `shutil.copy2` - also nur
+        # die `.db`. Bei eingeschaltetem WAL steht der letzte Stand aber in
+        # der `-wal`-Datei, und die wurde unmittelbar danach geloescht. Der
+        # Restore zerstoerte damit sein eigenes Sicherheitsnetz und meldete
+        # Erfolg. Ueber die Backup-API kommt der WAL-Inhalt mit - genau
+        # dafuer benutzt `sichern` sie.
         stempel = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         beiseite = ziel.with_suffix(f".vor-restore-{stempel}.db")
-        shutil.copy2(ziel, beiseite)
+        sichern(ziel, beiseite)
         print(f"Bisherige Datenbank gesichert nach {beiseite}")
 
     ziel.parent.mkdir(parents=True, exist_ok=True)
-    for anhang in ("-wal", "-shm"):
-        rest = Path(str(ziel) + anhang)
-        if rest.exists():
-            rest.unlink()
 
     src = sqlite3.connect(quelle)
     dst = sqlite3.connect(ziel)

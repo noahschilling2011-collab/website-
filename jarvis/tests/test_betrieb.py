@@ -226,3 +226,91 @@ def test_healthcheck_uebersetzt_die_bindadresse(monkeypatch):
     monkeypatch.setenv("JARVIS_HOST", "0.0.0.0")
     monkeypatch.setenv("JARVIS_PORT", "9")
     assert healthcheck.main() == 1   # kein Absturz beim Aufloesen
+
+
+def test_fund2_die_sicherheitskopie_enthaelt_auch_den_wal_inhalt(
+    gefuellt: Path, tmp_path: Path
+):
+    """BUGS-01 Fund 2 - der Restore machte sich selbst rueckgaengig.
+
+    Der reale Fall: JARVIS laeuft, seine Verbindung ist offen, die letzten
+    Nachrichten stehen noch im `-wal`. Wer jetzt ein aelteres Backup
+    einspielt, bekommt eine Sicherheitskopie per `shutil.copy2` - also nur
+    die `.db` ohne den WAL - und direkt danach wird das `-wal` geloescht.
+    Was seit dem letzten Checkpoint geschrieben wurde, ist damit weg, und
+    `einspielen` meldet trotzdem Erfolg.
+    """
+    sicherung = tmp_path / "sicherung.db"
+    sichern(gefuellt, sicherung)                    # Stand: 2 Nachrichten
+
+    # JARVIS laeuft weiter und schreibt. Die Verbindung bleibt offen, also
+    # bleibt der Schreibvorgang im WAL.
+    offen = db.connect(gefuellt)
+    offen.execute(
+        "INSERT INTO messages (role, content, created_at) "
+        "VALUES ('user', 'nur im wal', '2026-08-26T12:00:00Z')"
+    )
+    offen.commit()
+    assert Path(str(gefuellt) + "-wal").exists(), (
+        "Ohne WAL-Datei prueft der Test nichts - dann ist die Voraussetzung falsch."
+    )
+
+    try:
+        einspielen(sicherung, gefuellt)
+    finally:
+        offen.close()
+
+    beiseite = list(gefuellt.parent.glob("*.vor-restore-*.db"))
+    assert len(beiseite) == 1, beiseite
+    with sqlite3.connect(beiseite[0]) as conn:
+        texte = [r[0] for r in conn.execute("SELECT content FROM messages")]
+    assert "nur im wal" in texte, (
+        f"Die Sicherheitskopie hat den WAL-Inhalt verloren: {texte}"
+    )
+
+
+def test_fund2_auch_nach_einem_absturz_geht_nichts_verloren(
+    gefuellt: Path, tmp_path: Path
+):
+    """Der stille Fall - und deshalb der schlimmere.
+
+    Wenn JARVIS abgestuerzt ist, liegt das `-wal` unbeachtet auf der Platte.
+    Frueher lief `einspielen` in diesem Fall ohne Fehler durch, gab 0 zurueck
+    und hatte den letzten Stand trotzdem geloescht. Wichtig: die Zieldatei
+    zwischendurch NICHT oeffnen - jedes Oeffnen checkpointet den WAL in die
+    `.db` und heilt die Voraussetzung des Tests weg.
+    """
+    import shutil
+
+    sicherung = tmp_path / "sicherung.db"
+    sichern(gefuellt, sicherung)
+
+    offen = db.connect(gefuellt)
+    offen.execute(
+        "INSERT INTO messages (role, content, created_at) "
+        "VALUES ('user', 'nur im wal', '2026-08-26T12:00:00Z')"
+    )
+    offen.commit()
+
+    # Der Zustand auf der Platte nach einem Kill: .db, -wal und -shm, ohne
+    # sauberes Schliessen.
+    nach_absturz = tmp_path / "nach-absturz"
+    nach_absturz.mkdir()
+    for anhang in ("", "-wal", "-shm"):
+        quelle = Path(str(gefuellt) + anhang)
+        if quelle.exists():
+            shutil.copy2(quelle, nach_absturz / quelle.name)
+    offen.close()
+
+    ziel = nach_absturz / gefuellt.name
+    assert Path(str(ziel) + "-wal").exists(), "Ohne WAL prueft der Test nichts."
+
+    einspielen(sicherung, ziel)
+
+    beiseite = list(nach_absturz.glob("*.vor-restore-*.db"))
+    assert len(beiseite) == 1, beiseite
+    with sqlite3.connect(beiseite[0]) as conn:
+        texte = [r[0] for r in conn.execute("SELECT content FROM messages")]
+    assert "nur im wal" in texte, (
+        f"Stillschweigend verloren, Rueckgabe war trotzdem ok: {texte}"
+    )
