@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import math
 import operator
 import time
 from datetime import datetime
@@ -88,9 +89,42 @@ KONSTANTEN = {"pi": 3.141592653589793, "e": 2.718281828459045}
 MAX_EXPONENT = 1000
 MAX_BASIS = 10**15
 
+# BUGS-01 Fund 14. Die beiden Grenzen oben decken nur `**` ab. Eine Kette aus
+# Multiplikationen kam an ihnen vorbei, und `rechne()` laeuft synchron im
+# Event-Loop - der ganze Server steht solange still. Gemessen:
+#
+#     " * ".join(["(10**15)**1000"] * 400)   ->  6797 Zeichen  ->  34,6 s
+#
+# Deshalb eine Grenze fuer JEDES Zwischenergebnis, nicht nur fuer Potenzen.
+# Sie liegt da, wo Python selbst aufhoert: ab 4300 Stellen weigert es sich,
+# aus einer Zahl einen String zu machen. Ein Ergebnis, das man nicht
+# hinschreiben kann, ist fuer einen Rechner ohnehin keins - genau daran ist
+# `(10**15)**1000` mit einem ValueError aus `execute` herausgeflogen.
+MAX_STELLEN = 4300
+MAX_BITS = int(MAX_STELLEN * math.log2(10))
+
 
 class UnsichererAusdruck(ValueError):
     pass
+
+
+def _im_rahmen(wert):
+    """Weist ein Zwischenergebnis ab, das zu gross zum Hinschreiben ist.
+
+    Steht nur an `BinOp`. Vorzeichen machen eine Zahl nicht groesser, und von
+    den erlaubten Funktionen kann keine eine Zahl wachsen lassen - `int` und
+    `float` sind durch den Wertebereich von float gedeckelt, `sum` braucht
+    eine Liste und die ist ohnehin verboten. Ein Deckel an einer Stelle, die
+    nie ausloest, laesst sich nicht pruefen; deshalb steht er nicht dort.
+    `test_die_erlaubten_funktionen_koennen_keine_zahl_wachsen_lassen` haelt
+    das fest, falls jemand die Liste erweitert.
+    """
+    if isinstance(wert, int) and not isinstance(wert, bool):
+        if wert.bit_length() > MAX_BITS:
+            raise UnsichererAusdruck(
+                f"Zwischenergebnis zu gross - mehr als {MAX_STELLEN} Stellen."
+            )
+    return wert
 
 
 def rechne(ausdruck: str) -> float | int:
@@ -129,7 +163,7 @@ def rechne(ausdruck: str) -> float | int:
                     raise UnsichererAusdruck("Potenz zu gross.")
             if isinstance(knoten.op, (ast.Div, ast.FloorDiv, ast.Mod)) and rechts == 0:
                 raise UnsichererAusdruck("Division durch null.")
-            return funktion(links, rechts)
+            return _im_rahmen(funktion(links, rechts))
         if isinstance(knoten, ast.UnaryOp):
             funktion = OPERATOREN.get(type(knoten.op))
             if funktion is None:

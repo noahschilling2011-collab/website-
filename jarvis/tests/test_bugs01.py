@@ -628,3 +628,94 @@ def test_fund4_mehrere_werkzeuge_in_einem_zug_laufen_nicht_alle_durch():
         f"{t.spent_tool_calls} Werkzeuge gelaufen, erlaubt war 1"
     )
     assert t.status == "aborted_budget", t.status
+
+
+# --- Fund 14: Rechner-Bombe ----------------------------------------------
+
+
+def test_fund14_eine_multiplikationskette_blockiert_den_server_nicht():
+    """BUGS-01 Fund 14, mit korrigiertem Mechanismus.
+
+    Der Bericht nennt `(10**15)**1000` und eine nicht greifende
+    30-Sekunden-Schranke. Nachgemessen rechnet dieser Ausdruck in 0,2 ms -
+    einfrieren tut da nichts. Was WIRKLICH einfriert, ist eine Kette von
+    Multiplikationen: die Potenzgrenze deckelt nur `**`, nicht `*`.
+
+        n= 50  Ausdruck   847 Zeichen   0.540 s
+        n=100  Ausdruck  1697 Zeichen   2.163 s
+        n=200  Ausdruck  3397 Zeichen   8.514 s
+        n=400  Ausdruck  6797 Zeichen  34.555 s
+
+    6797 Zeichen kann jedes Modell schreiben, und `rechne()` laeuft synchron
+    im Event-Loop: 34 s lang antwortet der ganze Server nicht mehr.
+    """
+    import time as _t
+
+    from core.tools.builtin import UnsichererAusdruck, rechne
+
+    ausdruck = " * ".join(["(10**15)**1000"] * 400)
+    begonnen = _t.monotonic()
+    with pytest.raises(UnsichererAusdruck):
+        rechne(ausdruck)
+    gedauert = _t.monotonic() - begonnen
+    assert gedauert < 1.0, f"{gedauert:.1f} s - der Server haengt so lange"
+
+
+def test_fund14_ein_unausdruckbares_ergebnis_ist_ein_sauberer_fehler():
+    """`(10**15)**1000` hat 15001 Stellen.
+
+    Python weigert sich ab 4300 Stellen, daraus einen String zu machen. Der
+    ValueError flog aus `execute` heraus - er entsteht erst beim Formatieren
+    der Antwort, also NACH dem try-Block. Was ankam, war der Python-Interna-
+    Text ueber `sys.set_int_max_str_digits`.
+    """
+    from core.tools.dispatch import run_tool as _run_tool
+
+    ergebnis = run(_run_tool("calculator", {"expression": "(10**15)**1000"}))
+    assert ergebnis.ok is False
+    assert "set_int_max_str_digits" not in (ergebnis.error or ""), ergebnis.error
+    assert "gross" in (ergebnis.error or "").lower(), ergebnis.error
+
+
+def test_fund14_normales_rechnen_bleibt_normales_rechnen():
+    """Eine Grenze, die richtige Rechnungen abweist, ist keine Grenze."""
+    from core.tools.builtin import rechne
+
+    assert rechne("4380 * 0.17") == pytest.approx(744.6)
+    assert rechne("2**64") == 2**64
+    assert rechne("10**100") == 10**100
+    assert rechne("round(3.14159, 2)") == 3.14
+
+
+def test_fund14_die_bitgrenze_passt_genau_auf_die_stellengrenze():
+    """Geprueft wird die Bitlaenge, gemeint sind Stellen - das muss stimmen.
+
+    Eine Grenze, die man nur ungefaehr ausrechnet, ist entweder zu streng
+    (richtige Rechnungen fliegen raus) oder zu lasch (der Fehler von vorhin
+    kommt zurueck).
+    """
+    from core.tools.builtin import MAX_BITS, MAX_STELLEN
+
+    groesste = 2**MAX_BITS - 1
+    assert len(str(groesste)) == MAX_STELLEN, (
+        "die groesste erlaubte Zahl muss sich noch hinschreiben lassen"
+    )
+    with pytest.raises(ValueError, match="4300 digits"):
+        str(2 ** (MAX_BITS + 1))
+
+
+def test_die_erlaubten_funktionen_koennen_keine_zahl_wachsen_lassen():
+    """Waechter zu Fund 14.
+
+    Der Groessendeckel steht nur an `BinOp`, weil das die einzige Stelle ist,
+    an der eine Zahl waechst. Wer `FUNKTIONEN` erweitert, muss diesen Test
+    ansehen: `factorial` oder `pow` wuerden die Annahme kippen und den
+    Deckel unterlaufen.
+    """
+    from core.tools.builtin import FUNKTIONEN
+
+    assert set(FUNKTIONEN) == {"abs", "round", "min", "max", "sum",
+                               "int", "float"}, (
+        "Neue Funktion in FUNKTIONEN - kann sie eine Zahl groesser machen? "
+        "Dann gehoert _im_rahmen auch an den Call-Zweig."
+    )

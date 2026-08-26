@@ -21,6 +21,8 @@ vom 25.08., kein Aufgabenzettel, den man umschreibt):
 | 7 · Keine SSRF-Sperre | behoben | `f1d5e22` |
 | 12 · `pruefe()` ohne Inhaltsprüfung | behoben | `5a21934` (FIX-02) |
 | 13 · Kartenzahl sinkt ohne Nachrücken | behoben | `5a21934` (FIX-02) |
+| 14 · Rechner-Bombe | behoben, **Mechanismus im Bericht falsch** — siehe unten | `core/tools/builtin.py` (Deckel für jedes Zwischenergebnis) |
+| 5 · Weltlage nicht in `llm_calls` | war mit FIX-02 Schritt 2 schon weg, jetzt durch einen Test festgehalten | `tests/test_weltlage.py` |
 | 4 · Budget nur zwischen Schritten | behoben | `core/tools/loop.py`, `core/agents.py`, `core/runner.py`, `core/contracts.py` |
 | 2 · Restore macht sich selbst rückgängig | behoben | `scripts/backup.py` (Sicherheitskopie über die Backup-API) |
 | 1 · Abbrechen-Knopf | behoben | `api/tasks.py` (Wecker für die Rückfrage) + `core/runner.py` (Prüfung *nach* jedem Schritt) |
@@ -214,6 +216,33 @@ Gekappt wird **vor** dem Bildholen, gesiebt **danach**.
 `(10**15)**1000` liegt exakt auf der Grenze (`1000` ist nicht `> 1000`), wird zugelassen,
 und `rechne()` läuft synchron im asyncio-Loop. Die 30-Sekunden-Werkzeugschranke greift
 nicht, weil `asyncio.wait_for` eine synchrone Funktion nicht unterbrechen kann.
+
+> **Korrektur beim Reparieren, 26.08.** Der genannte Ausdruck friert nichts ein — er
+> rechnet in 0,2 ms. Zwei getrennte Defekte stecken dahinter, beide nachgemessen:
+>
+> 1. `(10**15)**1000` ergibt 15001 Stellen. Python weigert sich ab 4300 Stellen,
+>    daraus einen String zu machen. Der `ValueError` entsteht erst beim Formatieren
+>    der Antwort — **nach** dem `try`-Block in `execute` — und flog unbehandelt heraus.
+>    Beim Nutzer kam der Python-Interna-Text über `sys.set_int_max_str_digits` an.
+> 2. Das Einfrieren ist echt, kommt aber von einer **Multiplikationskette**: die
+>    Potenzgrenze deckelt nur `**`, nicht `*`.
+>
+>    ```
+>    n= 50  Ausdruck   847 Zeichen   0.540 s
+>    n=100  Ausdruck  1697 Zeichen   2.163 s
+>    n=200  Ausdruck  3397 Zeichen   8.514 s
+>    n=400  Ausdruck  6797 Zeichen  34.555 s
+>    ```
+>
+>    Der Satz über `asyncio.wait_for` stimmt dabei: `rechne()` läuft synchron im
+>    Event-Loop, 34 s lang antwortet der ganze Server nicht.
+>
+> Behoben mit einem Deckel für **jedes** Zwischenergebnis, nicht nur für Potenzen.
+> Er liegt da, wo Python selbst aufhört. Danach: 3,2 ms statt 34,6 s.
+>
+> Offen und **nicht** repariert: ein sehr langer Ausdruck (ab ~2000 Faktoren) läuft
+> beim Parsen in einen `RecursionError`. Der wird vom Dispatcher aufgefangen, dauert
+> 23 ms und reisst nichts um — aber die Meldung an den Nutzer ist nichtssagend.
 
 ### 15. `can_call_agents` wird nirgends geprüft
 

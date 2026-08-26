@@ -587,3 +587,34 @@ def test_fix02_die_euro_kachel_ist_weg():
     assert 'id="z-kosten"' not in html
     assert 'id="z-aufrufe"' in html
     assert "Modellaufrufe heute" in html
+
+
+# --- BUGS-01 Fund 5: die Aufrufe muessen im Kostenprotokoll stehen ---------
+
+
+def test_fund5_weltlage_aufrufe_stehen_in_llm_calls(client, db):
+    """`heute 0,0000 EUR` kam nicht von einem Demo-Pfad, sondern von hier.
+
+    `post_weltlage` rief `provider.complete()` direkt auf und schrieb nie
+    `db.log_llm_call`. Die Aufrufe fanden statt - protokolliert hat sie
+    niemand. Seit FIX-02 Schritt 2 laeuft die Weltlage als normaler Auftrag;
+    dieser Test haelt fest, dass das auch wirklich im Protokoll ankommt und
+    nicht beim naechsten Umbau still wieder verschwindet.
+    """
+    from core.db import llm_call_totals
+
+    vorher = llm_call_totals(db)
+    assert vorher["calls"] == 0
+
+    setze_antwort(client, _meldungen_json([eintrag_fuer(client)]))
+    assert client.post("/api/weltlage/DEU", headers=TOKEN).status_code == 200
+
+    nachher = llm_call_totals(db)
+    assert nachher["calls"] > 0, (
+        "Die Weltlage hat Modellaufrufe gemacht, aber llm_calls ist leer."
+    )
+    assert nachher["in_tokens"] > 0 and nachher["out_tokens"] > 0
+
+    # Und was die Oberflaeche anzeigt, kommt aus derselben Tabelle.
+    stats = client.get("/api/stats", headers=TOKEN).json()
+    assert stats["total"]["calls"] == nachher["calls"], stats
