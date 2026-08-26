@@ -21,6 +21,8 @@ vom 25.08., kein Aufgabenzettel, den man umschreibt):
 | 7 · Keine SSRF-Sperre | behoben | `f1d5e22` |
 | 12 · `pruefe()` ohne Inhaltsprüfung | behoben | `5a21934` (FIX-02) |
 | 13 · Kartenzahl sinkt ohne Nachrücken | behoben | `5a21934` (FIX-02) |
+| 9 · Konflikterkennung mit Vault verschwunden | behoben | FIX-04 Schritt 4, `core/gedaechtnis.py` |
+| 8 · Panel und Modell sehen verschiedene Daten | behoben | FIX-04 Schritt 2+3, `core/gedaechtnis.py` |
 | 20 · ein OS-Thread je geänderter Datei | behoben | `core/vault_index.py` (ein Arbeiter statt tausend Timer) |
 | 18 · `facts` ohne FTS-Trigger nach der Vault-Migration | behoben | `scripts/migrate_vault.py` |
 | 17 · Volltextindex nach der Migration leer | behoben | `scripts/migrate.py` |
@@ -37,7 +39,7 @@ vom 25.08., kein Aufgabenzettel, den man umschreibt):
 | 4 · Budget nur zwischen Schritten | behoben | `core/tools/loop.py`, `core/agents.py`, `core/runner.py`, `core/contracts.py` |
 | 2 · Restore macht sich selbst rückgängig | behoben | `scripts/backup.py` (Sicherheitskopie über die Backup-API) |
 | 1 · Abbrechen-Knopf | behoben | `api/tasks.py` (Wecker für die Rückfrage) + `core/runner.py` (Prüfung *nach* jedem Schritt) |
-| alle übrigen | offen | — |
+| **alle 23** | **behoben** | — |
 
 ---
 
