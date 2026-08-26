@@ -333,6 +333,20 @@ class ToolAgent(Agent):
         )
 
 
+def heute_zeile() -> str:
+    """Der eine Satz, den jeder Agent vorneweg bekommt."""
+    # Nur ISO, bewusst. Eine zweite Darstellung ("Wednesday, 26. August")
+    # waere in einem deutschen Prompt halb englisch - %A und %B haengen an
+    # der Locale des Servers - und ein zweiter Ausdruck desselben Datums ist
+    # eine zweite Stelle, die falsch sein kann.
+    return (
+        f"Heute ist der {time.strftime('%Y-%m-%d', time.gmtime())} (UTC). "
+        f"Rechne nicht mit einem anderen Jahr, auch wenn dein Training "
+        f"aelter ist. Brauchst du die Uhrzeit genauer, nimm das Werkzeug "
+        f"clock, falls du es hast."
+    )
+
+
 def baue_agenten(
     provider: LLMProvider,
     *,
@@ -352,8 +366,23 @@ def baue_agenten(
     nicht durch.
     """
     def mit_stil(prompt: str) -> str:
-        """Haengt den Antwortstil an - im Sprachmodus die Kuerzungsregeln."""
-        return prompt + antwortstil
+        """Setzt das heutige Datum davor und haengt den Antwortstil an.
+
+        Das Datum ist kein Schmuck. Gemessen am 26.08.2026, erster Lauf mit
+        einem echten Modell: der Agent suchte nach "Deutschland aktuelle
+        Meldungen 26. August 2024" - zwei Jahre daneben. Er hatte keine
+        Moeglichkeit, es besser zu wissen. `research` und `weltlage` haben
+        kein `clock` (`tools=[...]` weiter unten), und nirgends stand ein
+        Datum in einem Prompt. Ein Modell, das nach "aktuell" gefragt wird,
+        raet dann aus seinem Training - und trifft das Jahr seines
+        Trainingsstands.
+
+        Als Satz im Prompt statt als Werkzeug, weil ein Werkzeug gerufen
+        werden MUSS und ein Satz einfach dasteht. Dieselbe Ueberlegung wie
+        in `core/satellite/policy.py`: eine Regel, die vom Tagesform eines
+        Modells abhaengt, ist keine Regel.
+        """
+        return f"{heute_zeile()}\n\n{prompt}{antwortstil}"
 
     hermes = ToolAgent(
         provider,
@@ -402,7 +431,9 @@ def baue_agenten(
                 "Jede Meldung braucht Medium, Datum und Quell-URL; ohne die "
                 "wird sie verworfen. Antwortet als JSON."
             ),
-            system_prompt=WELTLAGE_PROMPT,      # bewusst OHNE Sprachstil:
+            # Ohne Sprachstil (die Antwort ist JSON), aber MIT Datum -
+            # eine Nachrichtenlage ohne heutiges Datum ist wertlos.
+            system_prompt=f"{heute_zeile()}\n\n{WELTLAGE_PROMPT}",  # ohne Sprachstil:
                                                 # die Antwort ist JSON, kein Fliesstext
             tools=["wiki_lokal", "wiki_live", "wikidata", "web_search", "fetch_url"],
             max_permission=Permission.READ,
