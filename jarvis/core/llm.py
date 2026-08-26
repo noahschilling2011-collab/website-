@@ -26,6 +26,9 @@ from typing import Any, Awaitable, Callable, Iterable
 import httpx
 
 ANTHROPIC_VERSION = "2023-06-01"
+# Groq spricht das OpenAI-Format unter einem eigenen Praefix.
+# console.groq.com/docs/api-reference: POST /openai/v1/chat/completions
+GROQ_BASIS = "https://api.groq.com"
 
 # Wiederholbar laut Fehlertabelle des Anbieters. Alles andere ist ein Fehler
 # in der Anfrage und wird durch Wiederholen nicht besser.
@@ -296,27 +299,42 @@ class FakeLLMProvider(LLMProvider):
 # --- Anthropic ------------------------------------------------------------
 
 
-class AnthropicProvider(LLMProvider):
-    """Spricht mit der Messages-API.
+class _HTTPAnbieter(LLMProvider):
+    """Was jeder Anbieter ueber HTTP gleich macht.
+
+    Wiederholung, Retry-After, Fehlertexte und das Schliessen des Klienten
+    haengen nicht am Format der Anfrage, sondern am Protokoll. Sie stehen
+    deshalb hier und nicht zweimal darunter.
 
     `transport` existiert fuer Tests: ein `httpx.MockTransport` laesst die
     Anfrage vollstaendig pruefen, ohne dass ein Byte das Geraet verlaesst.
     """
 
-    name = "anthropic"
-
     def __init__(
         self,
-        api_key: str,
         *,
         model: str,
-        max_tokens: int = 4096,
-        base_url: str = "https://api.anthropic.com",
-        timeout: float = 60.0,
-        max_retries: int = 2,
+        max_tokens: int,
+        base_url: str,
+        timeout: float,
+        max_retries: int,
+        headers: dict[str, str],
         transport: httpx.AsyncBaseTransport | None = None,
         sleep: Callable[[float], Awaitable[None]] | None = None,
     ) -> None:
+        self.model = model
+        self.max_tokens = max_tokens
+        self.max_retries = max_retries
+        self._sleep = sleep or asyncio.sleep
+        self._client = httpx.AsyncClient(
+            base_url=base_url,
+            timeout=timeout,
+            transport=transport,
+            headers=headers,
+        )
+
+    @staticmethod
+    def _pflichtfelder(api_key: str, model: str) -> None:
         if not api_key:
             raise LLMError(
                 "Kein LLM_API_KEY gesetzt. Trag ihn in die .env ein - "
@@ -329,65 +347,6 @@ class AnthropicProvider(LLMProvider):
                 "wird aus der Doku des Anbieters uebernommen, nicht geraten.",
                 kind="missing_model",
             )
-        self.model = model
-        self.max_tokens = max_tokens
-        self.max_retries = max_retries
-        self._sleep = sleep or asyncio.sleep
-        self._client = httpx.AsyncClient(
-            base_url=base_url,
-            timeout=timeout,
-            transport=transport,
-            headers={
-                "content-type": "application/json",
-                "x-api-key": api_key,
-                "anthropic-version": ANTHROPIC_VERSION,
-            },
-        )
-
-    def _body(
-        self,
-        messages: list[LLMMessage],
-        system: str,
-        tools: list[dict[str, Any]] | None = None,
-    ) -> dict[str, Any]:
-        body: dict[str, Any] = {
-            "model": self.model,
-            "max_tokens": self.max_tokens,
-            "system": system,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
-        }
-        if tools:
-            body["tools"] = tools
-        return body
-
-    async def complete(
-        self,
-        messages: Iterable[LLMMessage],
-        *,
-        system: str,
-        tools: list[dict[str, Any]] | None = None,
-    ) -> LLMReply:
-        history = list(messages)
-        if not history:
-            raise LLMError("Leere Nachrichtenliste.", kind="invalid_request")
-        if history[0].role != "user":
-            raise LLMError(
-                "Die erste Nachricht muss von 'user' sein.", kind="invalid_request"
-            )
-
-        fingerabdruck = prompt_hash(system, history)
-        begonnen = time.monotonic()
-        try:
-            response = await self._post_with_retries(
-                "/v1/messages", self._body(history, system, tools)
-            )
-        except LLMError as exc:
-            exc.duration_ms = int((time.monotonic() - begonnen) * 1000)
-            exc.prompt_hash = fingerabdruck
-            raise
-        return self._parse(
-            response, int((time.monotonic() - begonnen) * 1000), fingerabdruck
-        )
 
     async def _post_with_retries(
         self, url: str, body: dict[str, Any]
@@ -465,6 +424,88 @@ class AnthropicProvider(LLMProvider):
             retryable=status in RETRYABLE_STATUS,
         )
 
+    async def aclose(self) -> None:
+        await self._client.aclose()
+
+
+class AnthropicProvider(_HTTPAnbieter):
+    """Spricht mit der Messages-API."""
+
+    name = "anthropic"
+
+    def __init__(
+        self,
+        api_key: str,
+        *,
+        model: str,
+        max_tokens: int = 4096,
+        base_url: str = "https://api.anthropic.com",
+        timeout: float = 60.0,
+        max_retries: int = 2,
+        transport: httpx.AsyncBaseTransport | None = None,
+        sleep: Callable[[float], Awaitable[None]] | None = None,
+    ) -> None:
+        self._pflichtfelder(api_key, model)
+        super().__init__(
+            model=model,
+            max_tokens=max_tokens,
+            base_url=base_url,
+            timeout=timeout,
+            max_retries=max_retries,
+            transport=transport,
+            sleep=sleep,
+            headers={
+                "content-type": "application/json",
+                "x-api-key": api_key,
+                "anthropic-version": ANTHROPIC_VERSION,
+            },
+        )
+
+    def _body(
+        self,
+        messages: list[LLMMessage],
+        system: str,
+        tools: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {
+            "model": self.model,
+            "max_tokens": self.max_tokens,
+            "system": system,
+            "messages": [{"role": m.role, "content": m.content} for m in messages],
+        }
+        if tools:
+            body["tools"] = tools
+        return body
+
+    async def complete(
+        self,
+        messages: Iterable[LLMMessage],
+        *,
+        system: str,
+        tools: list[dict[str, Any]] | None = None,
+    ) -> LLMReply:
+        history = list(messages)
+        if not history:
+            raise LLMError("Leere Nachrichtenliste.", kind="invalid_request")
+        if history[0].role != "user":
+            raise LLMError(
+                "Die erste Nachricht muss von 'user' sein.", kind="invalid_request"
+            )
+
+        fingerabdruck = prompt_hash(system, history)
+        begonnen = time.monotonic()
+        try:
+            response = await self._post_with_retries(
+                "/v1/messages", self._body(history, system, tools)
+            )
+        except LLMError as exc:
+            exc.duration_ms = int((time.monotonic() - begonnen) * 1000)
+            exc.prompt_hash = fingerabdruck
+            raise
+        return self._parse(
+            response, int((time.monotonic() - begonnen) * 1000), fingerabdruck
+        )
+
     def _parse(
         self, response: httpx.Response, duration_ms: int, fingerabdruck: str
     ) -> LLMReply:
@@ -529,13 +570,294 @@ class AnthropicProvider(LLMProvider):
             content_blocks=tuple(blocks),
         )
 
-    async def aclose(self) -> None:
-        await self._client.aclose()
+
+class GroqProvider(_HTTPAnbieter):
+    """Spricht das OpenAI-Format, das Groq unter /openai/v1 anbietet.
+
+    Warum es diesen Anbieter gibt: Groq hat eine kostenlose Stufe, trainiert
+    laut Services Agreement 4.2 nicht auf Eingaben und Ausgaben und hat eine
+    eigene Vertragspartei fuer den EWR. Damit kann JARVIS mit echten
+    Werkzeugaufrufen laufen, ohne dass Geld fliesst.
+
+    **Nach innen spricht auch dieser Anbieter Anthropic.** `content_blocks`
+    kommen als `text`- und `tool_use`-Bloecke zurueck, und `tool_result`
+    versteht er in derselben Form, in der `core/tools/loop.py` sie baut.
+    Uebersetzt wird ausschliesslich an der Leitung. So merken `loop.py`,
+    `agents.py` und `runner.py` von einem zweiten Anbieter nichts - genau
+    das ist der Punkt, an dem ein zweiter Anbieter sonst durchs ganze
+    Programm sickert.
+
+    Die Form stammt aus console.groq.com/docs/api-reference und /docs/tool-use,
+    nicht aus dem Gedaechtnis. Drei Unterschiede zu Anthropic, die man beim
+    Abschreiben aus dem Kopf falsch macht:
+
+      * `Authorization: Bearer <key>`, nicht `x-api-key`
+      * `max_completion_tokens`, nicht `max_tokens`
+      * `arguments` ist ein **JSON-String**, kein Objekt
+    """
+
+    name = "groq"
+    PFAD = "/openai/v1/chat/completions"
+
+    def __init__(
+        self,
+        api_key: str,
+        *,
+        model: str,
+        max_tokens: int = 4096,
+        base_url: str = GROQ_BASIS,
+        timeout: float = 60.0,
+        max_retries: int = 2,
+        transport: httpx.AsyncBaseTransport | None = None,
+        sleep: Callable[[float], Awaitable[None]] | None = None,
+    ) -> None:
+        self._pflichtfelder(api_key, model)
+        super().__init__(
+            model=model,
+            max_tokens=max_tokens,
+            base_url=base_url,
+            timeout=timeout,
+            max_retries=max_retries,
+            transport=transport,
+            sleep=sleep,
+            headers={
+                "content-type": "application/json",
+                "authorization": f"Bearer {api_key}",
+            },
+        )
+
+    # --- hin: Anthropic-Form -> OpenAI-Form -------------------------------
+
+    @staticmethod
+    def _werkzeuge(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": werkzeug["name"],
+                    "description": werkzeug.get("description", ""),
+                    "parameters": werkzeug.get("input_schema") or {},
+                },
+            }
+            for werkzeug in tools
+        ]
+
+    @staticmethod
+    def _als_text(inhalt: Any) -> str:
+        return inhalt if isinstance(inhalt, str) else json.dumps(
+            inhalt, ensure_ascii=False
+        )
+
+    def _nachrichten(
+        self, verlauf: list[LLMMessage], system: str
+    ) -> list[dict[str, Any]]:
+        raus: list[dict[str, Any]] = []
+        if system:
+            raus.append({"role": "system", "content": system})
+
+        # tool_result kennt nur die id. Den Namen kennt nur der tool_use-Block
+        # davor - deshalb im Vorbeigehen mitschreiben.
+        namen: dict[str, str] = {}
+
+        for nachricht in verlauf:
+            if isinstance(nachricht.content, str):
+                raus.append({"role": nachricht.role, "content": nachricht.content})
+                continue
+
+            bloecke = [b for b in nachricht.content if isinstance(b, dict)]
+            text = "".join(
+                b.get("text", "") for b in bloecke if b.get("type") == "text"
+            )
+
+            if nachricht.role == "assistant":
+                aufrufe = []
+                for block in bloecke:
+                    if block.get("type") != "tool_use":
+                        continue
+                    kennung = str(block.get("id", ""))
+                    name = str(block.get("name", ""))
+                    namen[kennung] = name
+                    aufrufe.append({
+                        "id": kennung,
+                        "type": "function",
+                        "function": {
+                            "name": name,
+                            # JSON-String, kein Objekt. Wer hier das dict
+                            # durchreicht, bekommt einen 400.
+                            "arguments": json.dumps(
+                                block.get("input") or {}, ensure_ascii=False
+                            ),
+                        },
+                    })
+                assistent: dict[str, Any] = {"role": "assistant", "content": text}
+                if aufrufe:
+                    assistent["tool_calls"] = aufrufe
+                raus.append(assistent)
+                continue
+
+            # Nutzerzeile: die Werkzeugergebnisse werden zu eigenen
+            # Nachrichten, ein uebriger Text bleibt eine Nutzernachricht.
+            for block in bloecke:
+                if block.get("type") != "tool_result":
+                    continue
+                inhalt = self._als_text(block.get("content", ""))
+                if block.get("is_error"):
+                    # OpenAI-Form kennt kein is_error. Ohne diesen Zusatz
+                    # haelt das Modell einen Fehlschlag fuer ein Ergebnis.
+                    inhalt = f"FEHLER: {inhalt}"
+                werkzeug: dict[str, Any] = {
+                    "role": "tool",
+                    "tool_call_id": str(block.get("tool_use_id", "")),
+                    "content": inhalt,
+                }
+                name = namen.get(str(block.get("tool_use_id", "")))
+                if name:
+                    werkzeug["name"] = name
+                raus.append(werkzeug)
+            if text:
+                raus.append({"role": "user", "content": text})
+
+        return raus
+
+    def _body(
+        self,
+        verlauf: list[LLMMessage],
+        system: str,
+        tools: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {
+            "model": self.model,
+            "messages": self._nachrichten(verlauf, system),
+            "max_completion_tokens": self.max_tokens,
+        }
+        # Ein leeres tools: [] ist bei manchen Anbietern ein 400. Weglassen.
+        if tools:
+            body["tools"] = self._werkzeuge(tools)
+        return body
+
+    async def complete(
+        self,
+        messages: Iterable[LLMMessage],
+        *,
+        system: str,
+        tools: list[dict[str, Any]] | None = None,
+    ) -> LLMReply:
+        history = list(messages)
+        if not history:
+            raise LLMError("Leere Nachrichtenliste.", kind="invalid_request")
+        # Das OpenAI-Format erlaubt hier mehr als Anthropic. Die Pruefung
+        # bleibt trotzdem: BUGS-01 Fund 23 wird oben in
+        # `ab_erster_nutzernachricht` geschnitten, und eine Assistentenantwort
+        # ohne die Frage davor ist auch hier Kontext ohne Anker.
+        if history[0].role != "user":
+            raise LLMError(
+                "Die erste Nachricht muss von 'user' sein.", kind="invalid_request"
+            )
+
+        fingerabdruck = prompt_hash(system, history)
+        begonnen = time.monotonic()
+        try:
+            response = await self._post_with_retries(
+                self.PFAD, self._body(history, system, tools)
+            )
+        except LLMError as exc:
+            exc.duration_ms = int((time.monotonic() - begonnen) * 1000)
+            exc.prompt_hash = fingerabdruck
+            raise
+        return self._parse(
+            response, int((time.monotonic() - begonnen) * 1000), fingerabdruck
+        )
+
+    # --- zurueck: OpenAI-Form -> Anthropic-Form ---------------------------
+
+    def _parse(
+        self, response: httpx.Response, duration_ms: int, fingerabdruck: str
+    ) -> LLMReply:
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise LLMError(
+                f"Antwort des Anbieters war kein JSON: {exc}",
+                kind="bad_response",
+                duration_ms=duration_ms,
+            ) from exc
+
+        auswahl = payload.get("choices") or []
+        if not auswahl or not isinstance(auswahl[0], dict):
+            raise LLMError(
+                "Die Antwort enthielt kein 'choices'.",
+                kind="bad_response",
+                duration_ms=duration_ms,
+            )
+        nachricht = auswahl[0].get("message") or {}
+        stop_reason = auswahl[0].get("finish_reason")
+
+        text = (nachricht.get("content") or "").strip()
+        bloecke: list[dict[str, Any]] = []
+        if text:
+            bloecke.append({"type": "text", "text": text})
+
+        tool_uses: list[ToolUse] = []
+        for aufruf in nachricht.get("tool_calls") or []:
+            funktion = aufruf.get("function") or {}
+            name = str(funktion.get("name", ""))
+            roh = funktion.get("arguments")
+            if isinstance(roh, str):
+                try:
+                    eingabe = json.loads(roh or "{}")
+                except ValueError as exc:
+                    raise LLMError(
+                        f"Das Modell hat fuer {name!r} Argumente geschickt, die "
+                        f"kein JSON sind: {exc}",
+                        kind="bad_response",
+                        duration_ms=duration_ms,
+                    ) from exc
+            else:
+                eingabe = roh
+            if not isinstance(eingabe, dict):
+                raise LLMError(
+                    f"Die Argumente fuer {name!r} sind kein Objekt, sondern "
+                    f"{type(eingabe).__name__}.",
+                    kind="bad_response",
+                    duration_ms=duration_ms,
+                )
+            kennung = str(aufruf.get("id", ""))
+            tool_uses.append(ToolUse(id=kennung, name=name, input=eingabe))
+            bloecke.append({
+                "type": "tool_use", "id": kennung, "name": name, "input": eingabe,
+            })
+
+        if not text and not tool_uses:
+            raise LLMError(
+                f"Die Antwort enthielt keinen Text (finish_reason={stop_reason!r}).",
+                kind="empty_response",
+                duration_ms=duration_ms,
+            )
+
+        usage = payload.get("usage") or {}
+        return LLMReply(
+            text=text,
+            model=payload.get("model", self.model),
+            usage=LLMUsage(
+                # OpenAI-Namen, nicht input_tokens/output_tokens.
+                in_tokens=int(usage.get("prompt_tokens", 0)),
+                out_tokens=int(usage.get("completion_tokens", 0)),
+            ),
+            duration_ms=duration_ms,
+            stop_reason=stop_reason,
+            prompt_hash=fingerabdruck,
+            tool_uses=tuple(tool_uses),
+            content_blocks=tuple(bloecke),
+        )
 
 
-# Genau ein echter Anbieter in Phase 1. Ein weiterer kommt hier dazu, wenn er
-# gebraucht wird - nicht auf Verdacht.
-PROVIDERS: dict[str, type[LLMProvider]] = {"anthropic": AnthropicProvider}
+# Zwei echte Anbieter. `groq` kam dazu, weil er eine kostenlose Stufe hat und
+# laut Services Agreement 4.2 nicht auf Eingaben trainiert - damit laeuft
+# JARVIS mit echten Werkzeugaufrufen, ohne dass Geld fliesst.
+PROVIDERS: dict[str, type[LLMProvider]] = {
+    "anthropic": AnthropicProvider,
+    "groq": GroqProvider,
+}
 
 
 def build_provider(settings: Any) -> LLMProvider:
@@ -543,6 +865,12 @@ def build_provider(settings: Any) -> LLMProvider:
 
     Ohne `LLM_PROVIDER` laeuft der Fake - so startet JARVIS auch ohne Konto,
     und man sieht die Oberflaeche, bevor man Geld ausgibt.
+
+    Hier stand bis zum zweiten Anbieter `return AnthropicProvider(...)` fest
+    verdrahtet - der Blick in PROVIDERS war Zierde. Solange es genau einen
+    Eintrag gab, fiel das nicht auf; der zweite waere still als Anthropic
+    gelaufen und haette mit einem gsk-Key ein 401 von api.anthropic.com
+    bekommen. `test_build_provider_baut_wirklich_groq` haelt das fest.
     """
     key = (settings.llm_provider or "").strip().lower()
     if key in ("", "fake"):
@@ -553,7 +881,7 @@ def build_provider(settings: Any) -> LLMProvider:
             f"Bekannt sind: {', '.join(sorted([*PROVIDERS, 'fake']))}.",
             kind="unknown_provider",
         )
-    return AnthropicProvider(
+    return PROVIDERS[key](
         settings.llm_api_key,
         model=settings.llm_model,
         max_tokens=settings.llm_max_tokens,

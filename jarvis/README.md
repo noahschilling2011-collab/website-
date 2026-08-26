@@ -40,7 +40,7 @@ cp .env.example .env
 | Variable | Woher |
 |---|---|
 | `JARVIS_TOKEN` | `python -c "import secrets;print(secrets.token_urlsafe(32))"` |
-| `LLM_PROVIDER` | `anthropic` |
+| `LLM_PROVIDER` | `groq` (kostenlos) oder `anthropic` (kostet Geld). Siehe `.env.example` für den Unterschied |
 | `LLM_API_KEY` | Konto beim Anbieter, Key aus der Console |
 | `LLM_MODEL` | Modell-ID **aus der Doku des Anbieters**, nicht raten |
 | `LLM_PRICE_IN_PER_MTOK`, `LLM_PRICE_OUT_PER_MTOK` | Preisseite des Anbieters, je 1 Mio. Token. **Die Felder heißen EUR, Anthropic rechnet in USD** — entweder umrechnen oder jedes „EUR“ in JARVIS als USD lesen. Ein Wechselkurs wird nirgends geholt. |
