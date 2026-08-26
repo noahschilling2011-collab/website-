@@ -380,3 +380,101 @@ stehen aber nicht in `WIKI_HOSTS` und werden jetzt abgelehnt. Der Test wurde nic
 entschärft, sondern erweitert: er hält beide Seiten fest — den Normalfall **und**
 dass die beiden anderen bewusst draußen sind. Wer sie braucht, trägt sie ein; eine
 Zeile, sichtbar im Produktivcode.
+
+---
+
+## ERGEBNIS SCHRITT 2 — ausgeführt am 26.08.2026
+
+### Was offen war
+
+`f1d5e22` prüfte Schema und aufgelöste Adresse — aber **nur auf der ersten Station**,
+und `core/tools/search.py:307` stand auf `follow_redirects=True`. Nachgestellt mit zwei
+echten Servern (Station 1 freigegeben, Station 2 nicht):
+
+```
+AssertionError: GEHEIMES INTERNES DASHBOARD hunter2
+assert True is False
+  where True = ToolResult(ok=True,
+        data={'url': 'http://127.0.0.1:39025/admin', 'content_type': 'text/html', …},
+        display='GEHEIMES INTERNES DASHBOARD hunter2', …).ok
+```
+
+Ein Server, der auf einen internen Host weiterleitet, bekam den Inhalt geliefert.
+
+Dazu: `antwort.content` lud die **ganze** Datei und schnitt sie erst danach ab.
+Gemessen gegen einen Server, der 12,8 MB schickt:
+
+```
+AssertionError: 12800000 Bytes gingen ueber die Leitung, Deckel ist 2000000
+```
+
+### Was jetzt da ist
+
+`hole_gepruefte_kette()` in `core/tools/search.py`: folgt Weiterleitungen **von Hand**
+und prüft jede Station einzeln — Schema, Namensauflösung, jede zurückgegebene Adresse.
+Höchstens fünf Stationen. Der Rumpf wird **gestromt** und beim Deckel abgebrochen.
+
+`fetch_url` und `hole_quellbild` benutzen beide diese Kette und den Klienten
+`nach_draussen()` aus Schritt 1b.
+
+> **Zweite Fundstelle, nicht im Auftrag genannt:** `core/weltlage.py:284` hatte
+> denselben Fehler — Adressprüfung am Eingang, danach `follow_redirects=True`. Die
+> URL kommt dort ebenfalls aus dem Modell. Derselbe Fehler an einer zweiten Stelle mit
+> demselben Helfer geschlossen; ein eigener Test hält es fest.
+
+### Korrektur an der Vorlage: `is_global` allein macht die Sperre **schwächer**
+
+FIX-03 Schritt 2 Punkt 3 sagt, `is_global` decke „Loopback, private Bereiche,
+Link-Local …, reservierte und Multicast-Bereiche" in einer Prüfung ab. Nachgemessen mit
+Pythons `ipaddress` stimmt das nicht:
+
+```
+Adresse                 not is_global   is_private
+169.254.169.254                  True         True    <- beide fangen sie
+100.64.0.1                       True        False    <- nur is_global
+224.0.0.1                       False        False    <- KEINE von beiden
+ff02::1                         False        False    <- KEINE von beiden
+```
+
+Zwei Punkte des Auftrags sind damit falsch, beide gemessen:
+
+1. „`is_private` allein benutzen und Link-Local vergessen" — in Python **gehört**
+   Link-Local zu den privaten Bereichen. `169.254.169.254` wird von `is_private`
+   gefangen. Der Hinweis trifft andere Sprachen, nicht diese.
+2. `is_global` **allein lässt Multicast durch**. Wer nur umstellt, macht die Sperre
+   schwächer als vorher.
+
+Deshalb **beides**: `is_global` bringt CGNAT (`100.64.0.0/10`) dazu, die
+Einzelprüfungen behalten Multicast. Ein Test über 19 Adressen nagelt jede einzeln fest.
+
+### Bekannte Grenze, dokumentiert statt stillschweigend gelöst
+
+`oeffentliches_ziel()` trägt den Vermerk: zwischen Auflösen und Verbinden kann derselbe
+Name auf eine andere Adresse zeigen (DNS rebinding, TOCTOU). Vollständig schließen ließe
+sich das nur, indem direkt auf die geprüfte Adresse verbunden wird. Steht offen, ist kein
+Versehen — ein Test prüft, dass der Vermerk im Code steht.
+
+### DoD 4
+
+Elf Adressen und Schemata, jede einzeln abgewiesen: `127.0.0.1:8080/admin`,
+`169.254.169.254`, `[::1]`, `[fe80::1]`, `10.0.0.1`, `192.168.1.1`, `172.16.0.1`,
+`file:///etc/passwd`, `gopher://`, `ftp://`, `data:`. Dazu `[::ffff:127.0.0.1]:8080`.
+
+### DoD 5
+
+```
+Station 2 (http://127.0.0.1:39025/admin): 127.0.0.1 zeigt auf 127.0.0.1 -
+das ist das eigene Netz. JARVIS holt nur oeffentliche Adressen.
+```
+
+Die zweite Station hat **null** Anfragen gesehen. Gegenprobe: eine Weiterleitung auf
+einen erlaubten Host wird weiterhin verfolgt und liefert den Inhalt. Dritte Probe: eine
+Kette, die auf sich selbst zeigt, endet nach fünf Stationen.
+
+### Gegenproben
+
+Acht Mutationen einzeln gefahren, jede fällt: `follow_redirects=True` zurück; Prüfung nur
+auf Station 1; nur `is_private`; nur `is_global`; kein Bytedeckel; kein Stationsdeckel;
+Quellbild folgt wieder selbst; Quellbild ohne Kettenprüfung.
+
+Volle Suite: **652 passed.** Rauchtest bestanden.

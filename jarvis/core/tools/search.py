@@ -23,6 +23,7 @@ from typing import Any
 import httpx
 
 from core.contracts import Permission, Tool, ToolResult
+from core.netz import nach_draussen
 from core.tools.registry import register
 
 BRAVE_URL = "https://api.search.brave.com/res/v1/web/search"
@@ -201,8 +202,42 @@ ERLAUBTE_SCHEMATA = ("http", "https")
 
 
 def _ist_intern(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """Alles, was nicht oeffentlich routbar ist.
+
+    FIX-03 Schritt 2 Punkt 3 verlangt `is_global`, mit der Begruendung, das
+    decke Loopback, privat, Link-Local, reserviert UND Multicast in einer
+    Pruefung ab. Nachgemessen mit Pythons `ipaddress` stimmt das so nicht:
+
+        Adresse                 not is_global   is_private
+        169.254.169.254                  True         True   <- beide fangen sie
+        100.64.0.1                       True        False   <- nur is_global
+        224.0.0.1                       False        False   <- KEINE von beiden
+        ff02::1                         False        False   <- KEINE von beiden
+
+    Zwei Korrekturen an der Vorlage, beide gemessen:
+
+    * `is_private` allein vergisst die Metadaten-Adresse NICHT - in Python
+      gehoert Link-Local zu den privaten Bereichen. Der Warnhinweis aus FIX-03
+      trifft andere Sprachen, nicht diese.
+    * `is_global` allein laesst dafuer MULTICAST durch. Wer hier nur auf
+      `is_global` umstellt, macht die Sperre schwaecher als vorher.
+
+    Deshalb beides: `is_global` bringt die CGNAT-Bereiche dazu, die
+    Einzelpruefungen behalten Multicast. Eine Sperre, die man vereinfacht,
+    ohne sie zu messen, wird leiser - nicht besser.
+
+    IPv4-in-IPv6 (`::ffff:127.0.0.1`) braucht hier KEIN eigenes Auspacken.
+    Nachgemessen auf Python 3.11.15 beantworten alle benutzten Praedikate die
+    verpackte Adresse genauso wie die blanke - `::ffff:224.0.0.1` meldet sogar
+    `is_multicast=True`. Ein Zweig, der nie ausloest, laesst sich nicht
+    pruefen; deshalb steht er nicht hier, sondern als Annahme in
+    `test_schritt2_verpackte_und_blanke_adressen_werden_gleich_beurteilt`.
+    Faellt der Test auf einer neuen Python-Version, gehoert das Auspacken
+    zurueck.
+    """
     return bool(
-        ip.is_private or ip.is_loopback or ip.is_link_local
+        not ip.is_global
+        or ip.is_private or ip.is_loopback or ip.is_link_local
         or ip.is_multicast or ip.is_reserved or ip.is_unspecified
     )
 
@@ -215,7 +250,16 @@ ERLAUBT_INTERN: set[str] = set()
 
 
 def oeffentliches_ziel(url: str) -> str | None:
-    """Gibt den Ablehnungsgrund zurueck, oder None wenn die URL nach draussen zeigt."""
+    """Gibt den Ablehnungsgrund zurueck, oder None wenn die URL nach draussen zeigt.
+
+    BEKANNTE GRENZE, die hier NICHT geschlossen wird (FIX-03 Schritt 2):
+    zwischen dem Aufloesen des Namens hier und dem Verbinden gleich danach
+    kann derselbe Name auf eine andere Adresse zeigen - DNS rebinding, in der
+    Literatur TOCTOU. Vollstaendig schliessen liesse sich das nur, indem man
+    direkt auf die gepruefte Adresse verbindet und den Namen nur noch im
+    Host-Header fuehrt. Das steht hier bewusst offen und ist kein Versehen:
+    wer es schliessen will, faengt an dieser Stelle an.
+    """
     try:
         teile = urllib.parse.urlparse(url)
     except ValueError as exc:
@@ -244,6 +288,67 @@ def oeffentliches_ziel(url: str) -> str | None:
             return (f"{name} zeigt auf {ip} - das ist das eigene Netz. "
                     f"JARVIS holt nur oeffentliche Adressen.")
     return None
+
+
+# FIX-03 Schritt 2 Punkt 4. Eine Weiterleitung auf 127.0.0.1 ist der
+# Standardweg um eine Eingangspruefung herum: geprueft wird die URL, die das
+# Modell nennt - geholt wird, worauf der fremde Server zeigt. Deshalb folgt
+# hier niemand automatisch. Jede Station wird einzeln geprueft.
+WEITERLEITUNGEN = frozenset({301, 302, 303, 307, 308})
+MAX_STATIONEN = 5
+
+# Eine Verlagsseite, aus der nur das og:image gelesen wird, braucht keine
+# zwei Megabyte. Der Kopfbereich reicht.
+MAX_BILD_BYTES = 500_000
+
+
+class ZielVerboten(Exception):
+    """Eine Station der Kette zeigt nicht nach draussen."""
+
+
+async def hole_gepruefte_kette(
+    client: httpx.AsyncClient,
+    url: str,
+    *,
+    max_bytes: int,
+) -> tuple[httpx.Response, bytes, list[str]]:
+    """Holt `url` und folgt Weiterleitungen VON HAND, mit Pruefung je Station.
+
+    Gibt (letzte Antwort, Rumpf bis `max_bytes`, alle Stationen) zurueck.
+    Wirft `ZielVerboten`, sobald eine Station nicht nach draussen zeigt oder
+    die Kette zu lang wird.
+
+    Der Rumpf wird gestroemt und beim Deckel abgebrochen - `antwort.content`
+    haette die ganze Datei erst geladen und danach abgeschnitten.
+    """
+    stationen: list[str] = []
+    ziel = url
+    for nummer in range(1, MAX_STATIONEN + 2):
+        grund = oeffentliches_ziel(ziel)
+        if grund is not None:
+            raise ZielVerboten(f"Station {nummer} ({ziel}): {grund}")
+        if nummer > MAX_STATIONEN:
+            raise ZielVerboten(
+                f"Mehr als {MAX_STATIONEN} Weiterleitungen ab {url} - "
+                f"Station {nummer} waere {ziel}."
+            )
+        stationen.append(ziel)
+
+        async with client.stream("GET", ziel) as antwort:
+            ort = antwort.headers.get("location")
+            if antwort.status_code in WEITERLEITUNGEN and ort:
+                # Der Rumpf einer Weiterleitung interessiert niemanden und
+                # wird bewusst nicht gelesen.
+                ziel = str(antwort.url.join(ort))
+                continue
+            roh = bytearray()
+            async for stueck in antwort.aiter_bytes():
+                roh += stueck
+                if len(roh) >= max_bytes:
+                    break
+            return antwort, bytes(roh[:max_bytes]), stationen
+
+    raise ZielVerboten(f"Weiterleitungskette ab {url} endet nicht.")
 
 
 @register
@@ -302,14 +407,24 @@ class FetchUrl(Tool):
             )
 
         try:
-            async with httpx.AsyncClient(
+            # nach_draussen: dieser Klient darf grundsaetzlich keine
+            # Anmeldedaten tragen (FIX-03 Schritt 1b) und folgt keiner
+            # Weiterleitung von selbst (Schritt 2 Punkt 4).
+            async with nach_draussen(
                 timeout=float(self.timeout_s),
-                follow_redirects=True,
-                max_redirects=5,
                 transport=self.transport,
                 headers={"user-agent": "JARVIS/0.1 (persoenlicher Assistent)"},
             ) as client:
-                antwort = await client.get(url)
+                antwort, roh, stationen = await hole_gepruefte_kette(
+                    client, url, max_bytes=self.MAX_BYTES
+                )
+        except ZielVerboten as exc:
+            return ToolResult(
+                ok=False,
+                error=str(exc),
+                display=f"{url} wurde nicht geholt: {exc}",
+                duration_ms=dauer(),
+            )
         except httpx.HTTPError as exc:
             return ToolResult(
                 ok=False,
@@ -326,7 +441,6 @@ class FetchUrl(Tool):
                 duration_ms=dauer(),
             )
 
-        roh = antwort.content[: self.MAX_BYTES]
         typ = antwort.headers.get("content-type", "")
         try:
             inhalt = roh.decode(antwort.encoding or "utf-8", errors="replace")

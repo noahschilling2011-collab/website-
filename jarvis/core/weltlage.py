@@ -27,6 +27,8 @@ import logging
 
 import httpx
 
+from core.netz import nach_draussen
+
 # Ehrlicher User-Agent mit Zweck. Verlage duerfen wissen, wer da liest.
 log = logging.getLogger("jarvis")
 
@@ -280,18 +282,30 @@ async def hole_quellbild(
         log.warning("Quellbild abgelehnt: %s", grund)
         return None
     kopf = {"user-agent": USER_AGENT, "accept": "text/html"}
+    # FIX-03 Schritt 2 Punkt 4: hier stand `follow_redirects=True`. Die
+    # Adresspruefung oben lief damit nur auf der ERSTEN Station - ein Verlag,
+    # der auf 127.0.0.1 weiterleitet, kam daran vorbei. Es ist derselbe Fehler
+    # wie in fetch_url, an einer zweiten Stelle; deshalb dieselbe Kette.
+    from core.tools.search import MAX_BILD_BYTES, ZielVerboten, hole_gepruefte_kette
+
     try:
-        async with httpx.AsyncClient(timeout=BILD_TIMEOUT_S, transport=transport,
-                                     follow_redirects=True, headers=kopf) as client:
+        async with nach_draussen(timeout=BILD_TIMEOUT_S, transport=transport,
+                                 headers=kopf) as client:
             if not await darf_ich(url, client):
                 return None
-            antwort = await client.get(url)
+            antwort, roh, _ = await hole_gepruefte_kette(
+                client, url, max_bytes=MAX_BILD_BYTES
+            )
             if antwort.status_code >= 400:
                 return None
             typ = antwort.headers.get("content-type", "")
             if "html" not in typ.lower():
                 return None
-            return bild_aus_seite(antwort.text, url, medium)
+            seite = roh.decode(antwort.encoding or "utf-8", errors="replace")
+            return bild_aus_seite(seite, url, medium)
+    except ZielVerboten as exc:
+        log.warning("Quellbild abgelehnt: %s", exc)
+        return None
     except httpx.HTTPError:
         return None
 

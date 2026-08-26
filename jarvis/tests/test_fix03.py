@@ -351,3 +351,354 @@ def test_schritt1a_der_healthcheck_fragt_den_eigenen_server_weiterhin(monkeypatc
 
     assert healthcheck.main() == 0
     assert gesehen == ["http://127.0.0.1:8000/api/health"], gesehen
+
+
+# --- SCHRITT 2: fetch_url ------------------------------------------------
+
+
+def _fetch(url: str, **felder):
+    from core.tools.dispatch import run_tool
+
+    return run(run_tool("fetch_url", {"url": url, **felder}))
+
+
+@pytest.mark.parametrize("url", [
+    "http://127.0.0.1:8080/admin",
+    "http://169.254.169.254/",              # Metadaten der Cloud-Anbieter
+    "http://[::1]/",
+    "http://[fe80::1]/",                    # Link-Local, IPv6
+    "http://10.0.0.1/",
+    "http://192.168.1.1/",
+    "http://172.16.0.1/",
+    "file:///etc/passwd",
+    "gopher://127.0.0.1:70/",
+    "ftp://127.0.0.1/",
+    "data:text/plain;base64,aGFsbG8=",
+])
+def test_dod4_interne_adressen_und_fremde_schemata_werden_abgewiesen(url):
+    ergebnis = _fetch(url)
+    assert ergebnis.ok is False, f"{url} wurde geholt: {(ergebnis.display or '')[:120]}"
+
+
+def test_dod4_die_ablehnung_nennt_den_grund_und_nicht_den_inhalt():
+    """Ein Fehler, den niemand lesen kann, ist keiner."""
+    ergebnis = _fetch("http://169.254.169.254/latest/meta-data/")
+    assert "169.254.169.254" in (ergebnis.error or "")
+    assert ergebnis.data.get("text") is None if ergebnis.data else True
+
+
+# --- DoD 5: die Weiterleitung ist der Standardweg um die Pruefung herum ---
+
+
+class _Server:
+    """Ein echter HTTP-Server auf 127.0.0.1.
+
+    `/um` leitet auf `ziel` weiter, alles andere liefert den Geheimtext. So
+    laesst sich eine Kette aus zwei Stationen bauen, ohne irgendetwas zu
+    erfinden - beide Stationen sind echte Server, die wirklich antworten.
+    """
+
+    def __init__(self) -> None:
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+
+        self.gesehen: list[str] = []
+        self.ziel = ""
+        eigen = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):                  # noqa: N802
+                eigen.gesehen.append(self.path)
+                if self.path.startswith("/um"):
+                    self.send_response(302)
+                    self.send_header("location", eigen.ziel)
+                    self.end_headers()
+                    return
+                koerper = b"GEHEIMES INTERNES DASHBOARD hunter2"
+                self.send_response(200)
+                self.send_header("content-type", "text/html")
+                self.send_header("content-length", str(len(koerper)))
+                self.end_headers()
+                self.wfile.write(koerper)
+
+            def log_message(self, *_):         # noqa: A003
+                pass
+
+        self._server = HTTPServer(("127.0.0.1", 0), Handler)
+        self.port = self._server.server_port
+        self.basis = f"http://127.0.0.1:{self.port}"
+        self.marke = f"127.0.0.1:{self.port}"
+        threading.Thread(target=self._server.serve_forever, daemon=True).start()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self._server.shutdown()
+
+
+def test_dod5_eine_weiterleitung_auf_einen_internen_host_wird_gestoppt():
+    """Der Standardweg um eine Eingangspruefung herum.
+
+    Station 1 ist freigegeben, Station 2 nicht. Beide sind echte Server, die
+    wirklich antworten - waere Station 2 tot, wuerde der Test aus dem falschen
+    Grund gruen.
+    """
+    from core.tools.search import ERLAUBT_INTERN
+
+    with _Server() as erlaubt, _Server() as verboten:
+        erlaubt.ziel = f"{verboten.basis}/admin"
+        ERLAUBT_INTERN.add(erlaubt.marke)
+        try:
+            ergebnis = _fetch(f"{erlaubt.basis}/um")
+        finally:
+            ERLAUBT_INTERN.discard(erlaubt.marke)
+
+        gesehen_verboten = list(verboten.gesehen)
+        gesehen_erlaubt = list(erlaubt.gesehen)
+
+    assert ergebnis.ok is False, (ergebnis.display or "")[:200]
+    assert "GEHEIM" not in (ergebnis.display or "")
+    assert "GEHEIM" not in str(ergebnis.data or {})
+    fehler = ergebnis.error or ""
+    assert "Station" in fehler, f"die Station fehlt in der Meldung: {fehler}"
+    assert str(verboten.port) in fehler, fehler
+    assert gesehen_erlaubt == ["/um"], gesehen_erlaubt
+    assert gesehen_verboten == [], (
+        f"die zweite Station wurde trotzdem geholt: {gesehen_verboten}"
+    )
+
+
+def test_dod5_eine_weiterleitung_auf_einen_erlaubten_host_wird_verfolgt():
+    """Gegenprobe: die Sperre darf nicht jede Weiterleitung abwuergen."""
+    from core.tools.search import ERLAUBT_INTERN
+
+    with _Server() as server:
+        server.ziel = f"{server.basis}/seite"
+        ERLAUBT_INTERN.add(server.marke)
+        try:
+            ergebnis = _fetch(f"{server.basis}/um")
+        finally:
+            ERLAUBT_INTERN.discard(server.marke)
+        gesehen = list(server.gesehen)
+
+    assert ergebnis.ok is True, ergebnis.error
+    assert "GEHEIMES INTERNES DASHBOARD" in (ergebnis.display or "")
+    assert gesehen == ["/um", "/seite"], gesehen
+
+
+def test_dod5_eine_endlose_weiterleitungskette_endet():
+    """Ohne Deckel dreht sich die Handkette ewig."""
+    from core.tools.search import ERLAUBT_INTERN
+
+    with _Server() as server:
+        server.ziel = f"{server.basis}/um"     # auf sich selbst
+        ERLAUBT_INTERN.add(server.marke)
+        try:
+            ergebnis = _fetch(f"{server.basis}/um")
+        finally:
+            ERLAUBT_INTERN.discard(server.marke)
+        gesehen = list(server.gesehen)
+
+    assert ergebnis.ok is False
+    assert "eiterleitung" in (ergebnis.error or ""), ergebnis.error
+    assert len(gesehen) <= 7, f"{len(gesehen)} Stationen - der Deckel greift nicht"
+
+
+# --- Schritt 2 Punkt 5: die Antwortgroesse ist begrenzt -------------------
+
+
+def test_schritt2_eine_riesige_antwort_wird_nicht_ganz_geladen():
+    """Sonst flutet eine grosse Datei den Modellkontext - und den Speicher.
+
+    Der Server schickt absichtlich mehr, als der Deckel erlaubt, und zaehlt
+    mit, wie viel er wirklich losgeworden ist.
+    """
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    from core.tools.search import ERLAUBT_INTERN, FetchUrl
+
+    gesendet = {"bytes": 0}
+    block = b"A" * 64_000
+
+    class Riese(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def do_GET(self):                      # noqa: N802
+            self.send_response(200)
+            self.send_header("content-type", "text/plain")
+            self.send_header("transfer-encoding", "chunked")
+            self.end_headers()
+            try:
+                for _ in range(200):           # 12,8 MB, wenn niemand abbricht
+                    self.wfile.write(b"%x\r\n" % len(block) + block + b"\r\n")
+                    self.wfile.flush()
+                    gesendet["bytes"] += len(block)
+                self.wfile.write(b"0\r\n\r\n")
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
+        def log_message(self, *_):             # noqa: A003
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Riese)
+    marke = f"127.0.0.1:{server.server_port}"
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    ERLAUBT_INTERN.add(marke)
+    try:
+        ergebnis = _fetch(f"http://127.0.0.1:{server.server_port}/gross")
+    finally:
+        ERLAUBT_INTERN.discard(marke)
+        server.shutdown()
+
+    # Der Sender hat, als abgebrochen wurde, schon in die Socket-Puffer
+    # geschrieben - das laesst sich nicht verhindern und ist auch nicht der
+    # Punkt. Der Punkt ist, dass die Uebertragung frueh endet statt bis zum
+    # letzten Byte zu laufen.
+    voll = 200 * len(block)
+    assert gesendet["bytes"] < voll // 2, (
+        f"{gesendet['bytes']} von {voll} Bytes gingen raus - "
+        "die Uebertragung wurde nicht abgebrochen"
+    )
+    assert ergebnis.ok is True, ergebnis.error
+    assert (ergebnis.data or {}).get("truncated") is True, ergebnis.data
+
+
+def test_schritt2_die_gepruefte_kette_haelt_den_bytedeckel_genau_ein():
+    """Praezise gemessen, wo es zaehlt: was der Klient wirklich behaelt."""
+    import httpx as _httpx
+
+    from core.netz import nach_draussen
+    from core.tools.search import hole_gepruefte_kette
+
+    riesig = b"B" * 5_000_000
+
+    def geben(request: _httpx.Request) -> _httpx.Response:
+        return _httpx.Response(200, content=riesig,
+                               headers={"content-type": "text/plain"})
+
+    from core.tools.search import ERLAUBT_INTERN
+
+    # Der Transport antwortet, aber die Adresspruefung loest den Namen
+    # wirklich auf - deshalb eine Adresse, die es gibt, plus Freigabe.
+    ziel = "http://127.0.0.1:1/x"
+
+    async def holen(deckel: int):
+        async with nach_draussen(timeout=5,
+                                 transport=_httpx.MockTransport(geben)) as client:
+            return await hole_gepruefte_kette(client, ziel, max_bytes=deckel)
+
+    ERLAUBT_INTERN.add("127.0.0.1:1")
+    try:
+        for deckel in (1_000, 100_000, 2_000_000):
+            _, roh, stationen = run(holen(deckel))
+            assert len(roh) == deckel, (deckel, len(roh))
+            assert stationen == [ziel]
+    finally:
+        ERLAUBT_INTERN.discard("127.0.0.1:1")
+
+
+def test_schritt2_der_bekannte_restfehler_steht_im_code():
+    """TOCTOU zwischen Aufloesen und Verbinden.
+
+    FIX-03 verlangt ausdruecklich, dass diese Luecke als Kommentar im Code
+    steht und nicht stillschweigend als geloest behandelt wird.
+    """
+    quelle = (WURZEL / "core" / "tools" / "search.py").read_text(encoding="utf-8")
+    assert "TOCTOU" in quelle or "zwischen Aufloesen und Verbinden" in quelle, (
+        "der bekannte Restfehler ist nirgends vermerkt"
+    )
+
+
+# --- Schritt 2 Punkt 3: welche Adressen gelten als intern ----------------
+
+
+@pytest.mark.parametrize("adresse,intern", [
+    ("127.0.0.1", True),
+    ("10.0.0.1", True),
+    ("192.168.1.1", True),
+    ("172.16.0.1", True),
+    ("169.254.169.254", True),       # Metadaten der Cloud-Anbieter
+    ("100.64.0.1", True),            # CGNAT - nur is_global faengt die
+    ("224.0.0.1", True),             # Multicast - is_global faengt die NICHT
+    ("240.0.0.1", True),             # reserviert
+    ("0.0.0.0", True),
+    ("::1", True),
+    ("fe80::1", True),
+    ("fc00::1", True),
+    ("ff02::1", True),               # Multicast, IPv6
+    ("::ffff:127.0.0.1", True),      # IPv4 in IPv6 verpackt
+    ("::ffff:10.0.0.1", True),
+    ("8.8.8.8", False),
+    ("1.1.1.1", False),
+    ("2606:4700::1111", False),
+    ("::ffff:8.8.8.8", False),
+])
+def test_schritt2_intern_und_oeffentlich_sind_gemessen_nicht_geraten(adresse, intern):
+    """Waechter gegen eine Vereinfachung, die die Sperre schwaecher macht.
+
+    Gemessen mit Pythons `ipaddress`: `is_global` allein laesst Multicast
+    durch, `is_private` allein laesst CGNAT durch. Wer hier auf eine der
+    beiden Pruefungen zusammenstreicht, faengt sich diesen Test ein.
+    """
+    import ipaddress
+
+    from core.tools.search import _ist_intern
+
+    assert _ist_intern(ipaddress.ip_address(adresse)) is intern, adresse
+
+
+def test_schritt2_eine_ipv4_in_ipv6_adresse_kommt_nicht_durch():
+    """`::ffff:127.0.0.1` ist dieselbe Maschine, nur anders geschrieben."""
+    ergebnis = _fetch("http://[::ffff:127.0.0.1]:8080/admin")
+    assert ergebnis.ok is False, (ergebnis.display or "")[:120]
+
+
+def test_schritt2_verpackte_und_blanke_adressen_werden_gleich_beurteilt():
+    """Die Annahme hinter dem fehlenden Auspacken in `_ist_intern`.
+
+    Auf Python 3.11 beantwortet `ipaddress` `::ffff:10.0.0.1` genauso wie
+    `10.0.0.1`. Sollte das auf einer neueren Version nicht mehr gelten, faellt
+    dieser Test - und dann gehoert das Auspacken zurueck in den Code.
+    """
+    import ipaddress
+
+    from core.tools.search import _ist_intern
+
+    for blank in ("127.0.0.1", "10.0.0.1", "169.254.169.254", "100.64.0.1",
+                  "224.0.0.1", "240.0.0.1", "8.8.8.8", "1.1.1.1"):
+        verpackt = f"::ffff:{blank}"
+        assert _ist_intern(ipaddress.ip_address(blank)) == \
+            _ist_intern(ipaddress.ip_address(verpackt)), (
+            f"{blank} und {verpackt} werden verschieden beurteilt - "
+            "das Auspacken von ipv4_mapped gehoert zurueck in _ist_intern"
+        )
+
+
+# --- Schritt 2 Punkt 4 gilt auch fuer das Quellbild ----------------------
+
+
+def test_schritt2_das_quellbild_folgt_keiner_weiterleitung_ins_eigene_netz():
+    """Derselbe Fehler an einer zweiten Stelle.
+
+    `hole_quellbild` holt eine Verlagsseite, deren URL aus dem Modell kommt.
+    Die Adresspruefung lief dort auf der ersten Station - und danach stand
+    `follow_redirects=True`.
+    """
+    from core.tools.search import ERLAUBT_INTERN
+    from core.weltlage import hole_quellbild
+
+    with _Server() as erlaubt, _Server() as verboten:
+        erlaubt.ziel = f"{verboten.basis}/seite"
+        ERLAUBT_INTERN.add(erlaubt.marke)
+        try:
+            bild = run(hole_quellbild(f"{erlaubt.basis}/um", medium="Test"))
+        finally:
+            ERLAUBT_INTERN.discard(erlaubt.marke)
+        gesehen_verboten = list(verboten.gesehen)
+
+    assert bild is None
+    assert gesehen_verboten == [], (
+        f"die zweite Station wurde geholt: {gesehen_verboten}"
+    )
