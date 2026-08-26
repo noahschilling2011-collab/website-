@@ -506,6 +506,82 @@ def test_die_leertaste_im_chat_startet_nicht_den_globus(server):
             br.close()
 
 
+def test_wer_waehrend_des_ladens_wegklickt_laesst_nichts_laufen(server):
+    """Der Fehler, den erst eine gedrosselte Leitung sichtbar macht.
+
+    `globusModul` wurde frueher erst gesetzt, wenn `starte()` durch war -
+    also nach den 2,0 MB Three.js UND den beiden Geometrie-Abrufen. Die
+    Pause-Zeile in `zeigeAnsicht()` prueft aber genau darauf. Wer waehrend
+    des Ladens zurueck auf "Chat" ging, hatte den Renderloop danach
+    dauerhaft im Chat laufen, und die Leertaste blieb beim Globus haengen.
+
+    Gemessen bei 250 kB/s vor dem Fix: 114 Schleifendurchlaeufe in zwei
+    Sekunden bei sichtbarem Chat, `defaultPrevented` auf der Leertaste true.
+    Ohne Drosselung ist das Fenster zu schmal - der Test braucht sie.
+    """
+    with playwright.sync_playwright() as pw:
+        br, seite = _browser(pw)
+        try:
+            cdp = seite.context.new_cdp_session(seite)
+            cdp.send("Network.enable")
+            cdp.send("Network.emulateNetworkConditions", {
+                "offline": False, "latency": 60,
+                "downloadThroughput": 250 * 1024, "uploadThroughput": 250 * 1024})
+
+            _lade_chat(seite, server)
+            seite.click("#tab-welt")
+            seite.wait_for_timeout(2500)          # mitten in den 2 MB
+            seite.click("#tab-chat")
+            seite.wait_for_timeout(8000)          # dem Globus Zeit zum Fertigwerden
+
+            vorher = seite.evaluate("() => window.__globusSchleife || 0")
+            seite.wait_for_timeout(2000)
+            nachher = seite.evaluate("() => window.__globusSchleife || 0")
+            assert nachher == vorher, \
+                f"{nachher - vorher} Schleifendurchlaeufe im Chat"
+
+            geschluckt = seite.evaluate("""() => {
+              if (document.activeElement) document.activeElement.blur();
+              const ev = new KeyboardEvent('keydown', {
+                key: ' ', code: 'Space', bubbles: true, cancelable: true});
+              document.body.dispatchEvent(ev);
+              return ev.defaultPrevented;
+            }""")
+            assert geschluckt is False, "die Leertaste blieb beim Globus"
+        finally:
+            br.close()
+
+
+def test_und_danach_geht_der_globus_trotzdem_noch(server):
+    """Die Gegenprobe: ein Globus, der nach dem Rennen tot bleibt, waere
+    auch 'null Schleifendurchlaeufe'."""
+    with playwright.sync_playwright() as pw:
+        br, seite = _browser(pw)
+        try:
+            cdp = seite.context.new_cdp_session(seite)
+            cdp.send("Network.enable")
+            cdp.send("Network.emulateNetworkConditions", {
+                "offline": False, "latency": 60,
+                "downloadThroughput": 250 * 1024, "uploadThroughput": 250 * 1024})
+
+            _lade_chat(seite, server)
+            seite.click("#tab-welt")
+            seite.wait_for_timeout(2500)
+            seite.click("#tab-chat")
+            seite.wait_for_timeout(8000)
+
+            seite.click("#tab-welt")
+            seite.wait_for_function("() => document.body.dataset.laender", timeout=40000)
+            seite.wait_for_timeout(300)
+            vorher = seite.evaluate("() => window.__globusSchleife")
+            _dreh_zu(seite, 20, 10)
+            seite.wait_for_timeout(400)
+            assert seite.evaluate("() => window.__globusSchleife") > vorher
+            assert seite.evaluate("() => window.__globusBilder") > 0
+        finally:
+            br.close()
+
+
 def test_keine_doppelten_ids_auf_der_seite(server):
     """`btn-mic` gibt es im Chat schon. Zwei gleiche ids in einem Dokument
     sind ungueltig, und `getElementById` trifft dann die falsche."""

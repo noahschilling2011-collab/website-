@@ -1855,8 +1855,22 @@ button, input, textarea { font: inherit; color: inherit; }
      Tab nie oeffnet, laedt nie 2,0 MB. */
   var globusModul = null;
   var globusLaedt = false;
+  /* Ist die Weltansicht GERADE die aktive? Nicht dasselbe wie "der Globus
+     ist fertig geladen" - und genau daran hing ein Fehler:
+
+     Wer auf "Welt" klickt und noch waehrend der 2,0 MB zurueck auf "Chat"
+     geht, hatte den Renderloop danach dauerhaft im Chat laufen. Die
+     Pause-Zeile in zeigeAnsicht() prueft `globusModul`, und das wurde
+     frueher erst gesetzt, wenn `starte()` durch war - also nach dem Import
+     UND den beiden Geometrie-Abrufen. Bis dahin lief die Schleife schon.
+     Gemessen bei 250 kB/s: 114 Schleifendurchlaeufe in 2 Sekunden, waehrend
+     der Chat zu sehen war, und die Leertaste blieb beim Globus haengen.
+     Deshalb jetzt: `globusModul` sofort nach dem Import, und dieses Flag
+     als Wahrheit darueber, was der Nutzer sehen will. */
+  var globusGewollt = false;
 
   function ladeGlobus() {
+    globusGewollt = true;
     if (globusModul) { globusModul.weiter(); return; }
     if (globusLaedt) return;                 // zweimal klicken laedt nicht zweimal
     globusLaedt = true;
@@ -1870,10 +1884,16 @@ button, input, textarea { font: inherit; color: inherit; }
     // Dynamischer Import aus einem klassischen <script>: erlaubt, und die
     // Import-Map im <head> gilt auch dafuer ('three' loest auf).
     import('/static/globus.js').then(function (modul) {
-      return modul.starte(ziel, TOKEN).then(function () {
-        globusModul = modul;
-        hinweis.remove();
-      });
+      globusModul = modul;                   // ab hier ist pausiere() erreichbar
+      var fertig = modul.starte(ziel, TOKEN);
+      // `starte()` hat die Schleife im selben Zug schon angeworfen; erst
+      // danach laedt es die Grenzen. Wer inzwischen weggeklickt hat, soll
+      // sie nicht laufen sehen - und zwar sofort, nicht in zehn Sekunden.
+      if (!globusGewollt) modul.pausiere();
+      return fertig;
+    }).then(function () {
+      hinweis.remove();
+      if (globusGewollt) globusModul.weiter(); else globusModul.pausiere();
     }).catch(function (err) {
       hinweis.textContent = 'Globus nicht geladen: ' + err.message;
     }).then(function () {
@@ -1903,9 +1923,14 @@ button, input, textarea { font: inherit; color: inherit; }
     // Die Eingabe gehört zum Chat, nicht zum Dashboard.
     document.querySelector('.composer-wrap').hidden = name !== 'chat';
     // FIX-05 B-4: Klassen umschalten haelt keinen Renderloop an. Ohne die
-    // naechste Zeile zeichnet der Globus weiter, waehrend du chattest -
+    // naechsten Zeilen zeichnet der Globus weiter, waehrend du chattest -
     // und genau das ist das Ruckeln, um das es geht.
-    if (vorher === 'welt' && name !== 'welt' && globusModul) globusModul.pausiere();
+    // Das Flag wird IMMER gesetzt, auch wenn das Modul noch laedt: sonst
+    // faengt der Globus nach dem Laden im Chat an zu zeichnen.
+    if (vorher === 'welt' && name !== 'welt') {
+      globusGewollt = false;
+      if (globusModul) globusModul.pausiere();
+    }
     if (ANSICHTEN[name].laden) ANSICHTEN[name].laden();
   }
 

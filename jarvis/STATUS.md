@@ -501,6 +501,13 @@ Browser. Headless-Chromium hat weder Mikrofon noch Sprachsynthese. DoD 1, 2
 und 4 brauchen einen echten Browser mit Mikrofon — das musst du selbst
 ausprobieren.
 
+> **26.08.2026 — FIX-05 Schritt C.** Dafür gibt es jetzt eine Anleitung:
+> **`docs/FIX-05-sprachtest.md`** — vier Schritte, je ein sichtbares
+> Ergebnis, eins je DoD-Kriterium, in fünf Minuten in Chrome abzuarbeiten.
+> Am Sprachpfad wurde **nichts** geändert. Kommt Noahs Antwort, wandern die
+> vier Zeilen hier oben von `◐` auf `✓` — mit dem Vermerk, dass der Beleg
+> vom Nutzer stammt und nicht aus einem ausgeführten Befehl.
+
 ## Phase 10 — Härten & Verpacken
 
 | # | Kriterium | Stand | BELEG — ausgeführter Befehl | Was der Beleg nicht zeigt |
@@ -659,6 +666,30 @@ SwiftShader. Und die drei Kontrastfehler, die der Lauf gegen `/` meldet,
 sind **einer**: der aktive Tab, Akzent auf `--accent-soft`. Er ist nicht neu
 (derselbe Lauf gegen die Fassung vor FIX-05 meldet ihn wortgleich) und
 wurde nicht angefasst.
+
+> **Nachtrag 26.08.2026 — was die Gegenprüfung fand.** Nach B6 lief ein
+> zweiter Durchgang über den Diff: vier unabhängige Blickwinkel, danach
+> jeder Befund von Skeptikern zu widerlegen versucht. **Zwei Fehler haben
+> das überlebt, beide echt, beide behoben** (Einzelheiten mit Messwerten in
+> `docs/FIX-05.md`):
+>
+> 1. **Das Rennen beim Laden.** Wer auf „Welt" klickt und noch während der
+>    2,0 MB zurück auf „Chat" geht, hatte den Renderloop danach dauerhaft im
+>    Chat laufen — und die Leertaste blieb beim Globus hängen. Ohne
+>    gedrosselte Leitung ist das Fenster zu schmal, um es zu treffen;
+>    deshalb war es der Abnahme entgangen. Gemessen bei 250 kB/s: **114
+>    Schleifendurchläufe in zwei Sekunden**, nach dem Fix null.
+>    Regressionstest:
+>    `test_wer_waehrend_des_ladens_wegklickt_laesst_nichts_laufen`.
+> 2. **Karten, die im Hintergrund ankommen**, wurden nie zugeschnitten — in
+>    einer Ansicht mit `display:none` misst `getBoundingClientRect()`
+>    nichts. Gemessen: 5 gequetschte Karten statt 1 ganzer plus dem
+>    ehrlichen Hinweis „4 weitere Meldungen passen nicht ins Bild".
+>    Regressionstest:
+>    `test_karten_die_im_hintergrund_ankommen_werden_nachtraeglich_zugeschnitten`.
+>
+> Beide Regressionstests wurden gegen den alten Zustand geprüft (M7, M8) und
+> fallen dort. Suite danach: **957 Tests, alle grün.**
 
 ## FIX-05 Schritt C — Sprach-Abnahme
 

@@ -151,9 +151,23 @@ Datenmenge deutlich wächst.
 
 ## Weltlage — der Globus
 
-`http://127.0.0.1:8000/weltlage` — eigene Vollbildseite, kein Build-Step.
-Three.js und die Ländergrenzen liegen unter `static/vendor/` mit fester Version,
-nicht am CDN: die Seite läuft damit auch ohne Netz.
+Zwei Wege zum selben Globus:
+
+* `http://127.0.0.1:8000/` → Tab **„Welt"** — im Chat, neben Aufträgen,
+  Werkzeugen und Kosten.
+* `http://127.0.0.1:8000/weltlage` — eigene Vollbildseite.
+
+Beide laden dieselbe Datei, `static/globus.js`. Zwei Kopien wären zwei Orte
+für jeden Fehler. Kein Build-Step; Three.js und die Ländergrenzen liegen unter
+`static/vendor/` mit fester Version, nicht am CDN: das läuft damit auch ohne
+Netz.
+
+**Der Tab kostet nichts, solange du ihn nicht öffnest.** Three.js sind 2,0 MB;
+geladen wird erst beim ersten Klick auf „Welt", und beim Verlassen der Ansicht
+hält die Zeichenschleife an. Nachgemessen in `tests/test_globus_tab.py`.
+
+Ziehen dreht, Mausrad und `+`/`−` zoomen, Pfeiltasten drehen, ein Klick auf ein
+Land wählt es aus. Auf dem Handy dasselbe mit dem Finger.
 
 Ein Klick auf ein Land lädt **einen** Auftrag. Der zweite Klick innerhalb von
 60 Minuten kostet nichts — die Statusleiste zeigt Abfragen, Cache-Treffer,

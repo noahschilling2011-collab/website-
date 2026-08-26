@@ -261,6 +261,7 @@ let resizeFn = null;
 let sichtbarSetzen = null;
 let neuZeichnen = null;
 let hoerenAbstellen = null;
+let kartenNachholen = null;
 let geometrieFertig = Promise.resolve();
 let gestartet = false;
 let aktiv = false;
@@ -380,32 +381,48 @@ export async function starte(behaelter, token){
   function zeichneKarten(daten){
     const ziel = el('karten');
     ziel.textContent = '';
+    zustand.ausgeblendet = 0;
     const liste = (daten.meldungen || []).slice(0, MAX_KARTEN);
     if (!liste.length){
       ziel.appendChild(textKnoten('div','leer','0 belegte Meldungen.'));
       zustand.ausgeblendet = 0;
+      document.body.dataset.karten = '0';
       return;
     }
     liste.forEach(m => ziel.appendChild(karteNode(m)));
 
-    // "Was nicht reinpasst, wird nicht angezeigt" heisst: ganze Karten
-    // weglassen. Eine Karte, die mitten im Satz abgeschnitten ist, ist
-    // schlechter als eine Karte weniger.
-    requestAnimationFrame(() => {
-      const platz = ziel.getBoundingClientRect();
-      let weg = 0;
-      while (ziel.children.length > 1){
-        const letzte = ziel.lastElementChild.getBoundingClientRect();
-        if (letzte.bottom <= platz.bottom + 1 && letzte.right <= platz.right + 1) break;
-        ziel.lastElementChild.remove();
-        weg++;
-      }
-      zustand.ausgeblendet = weg;
-      if (weg) el('gesagt').textContent +=
-        ` ${weg} weitere ${weg === 1 ? 'Meldung passt' : 'Meldungen passen'} nicht ins Bild.`;
-      document.body.dataset.karten = String(ziel.querySelectorAll('.karte').length);
-    });
+    requestAnimationFrame(schneideKarten);
   }
+
+  /* "Was nicht reinpasst, wird nicht angezeigt" heisst: ganze Karten
+     weglassen. Eine Karte, die mitten im Satz abgeschnitten ist, ist
+     schlechter als eine Karte weniger.
+
+     Eigene Funktion, weil `weiter()` sie nachholen muss. Als eingebauter
+     Tab steht `#view-welt` auf `display:none`, sobald der Nutzer woanders
+     ist - dann liefert `getBoundingClientRect()` lauter Nullen, die
+     Abbruchbedingung ist sofort wahr und es wird nichts weggenommen.
+     Kommt die Antwort im Hintergrund an, staenden beim Zurueckkommen fuenf
+     Karten uebereinander statt zwei. Gemessen, nicht vermutet. */
+  function schneideKarten(){
+    const ziel = el('karten');
+    if (!ziel || !ziel.children.length) return;
+    const platz = ziel.getBoundingClientRect();
+    // Versteckte Ansicht: nichts messbar, also nichts entscheiden.
+    if (!platz.width || !platz.height) return;
+    let weg = 0;
+    while (ziel.children.length > 1){
+      const letzte = ziel.lastElementChild.getBoundingClientRect();
+      if (letzte.bottom <= platz.bottom + 1 && letzte.right <= platz.right + 1) break;
+      ziel.lastElementChild.remove();
+      weg++;
+    }
+    zustand.ausgeblendet = (zustand.ausgeblendet || 0) + weg;
+    if (weg) el('gesagt').textContent +=
+      ` ${weg} weitere ${weg === 1 ? 'Meldung passt' : 'Meldungen passen'} nicht ins Bild.`;
+    document.body.dataset.karten = String(ziel.querySelectorAll('.karte').length);
+  }
+  kartenNachholen = schneideKarten;
 
   function zeigeStatus(daten){
     var text = daten.gesagt
@@ -1175,6 +1192,7 @@ export function pausiere(){
 export function weiter(){
   if (!gestartet) return;
   aktiv = true;
+  if (kartenNachholen) requestAnimationFrame(kartenNachholen);
   if (!renderer) return;
   if (sichtbarSetzen) sichtbarSetzen(true);
   // B-5: in einer Ansicht mit `display:none` sind clientWidth und

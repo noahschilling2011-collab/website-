@@ -550,3 +550,64 @@ def test_weltweit_schliesst_das_panel_und_zoomt_zurueck(server, monkeypatch):
             assert weit > nah, f"nicht zurueckgezoomt: {nah} -> {weit}"
         finally:
             br.close()
+
+
+# --- FIX-05 B: Karten, die im Hintergrund ankommen -------------------------
+
+
+def test_karten_die_im_hintergrund_ankommen_werden_nachtraeglich_zugeschnitten(
+        server, verlag):
+    """Als eingebauter Tab misst nichts, solange `#view-welt` versteckt ist.
+
+    `zeichneKarten()` schneidet mit `getBoundingClientRect()` zu. In einer
+    Ansicht mit `display:none` sind alle Masse null, die Abbruchbedingung ist
+    sofort wahr, und es wird nichts weggenommen. Wer ein Land anklickt, in
+    den Chat wechselt und zurueckkommt, saehe sonst fuenf Karten
+    uebereinander statt zwei - abgeschnittener Text statt einer Karte
+    weniger. `weiter()` holt das Zuschneiden deshalb nach.
+    """
+    basis, app = server
+    LAENDER = ("DEU", "FRA", "ITA", "ESP", "POL", "NLD", "BEL", "AUT", "CHE")
+    setze(app, [_eintrag(f"{verlag}/ohne-bild?i={i}", medium="Reuters",
+                         schlagzeile=f"Meldung {i}", land_iso=LAENDER[i])
+                for i in range(9)])
+    with playwright.sync_playwright() as pw:
+        br, seite = browser(pw, 1280, 620)
+        try:
+            seite.goto(f"{basis}/", wait_until="networkidle")
+            seite.wait_for_selector("#tab-welt")
+            seite.click("#tab-welt")
+            seite.wait_for_function("() => document.body.dataset.laender",
+                                    timeout=40000)
+
+            # Die Antwort absichtlich verzoegern, damit sie im Hintergrund
+            # ankommt. Ohne die Verzoegerung ist der Fake-Anbieter schneller
+            # als der Tabwechsel und der Test misst nichts.
+            def langsam(route):
+                time.sleep(2.5)
+                route.continue_()
+            seite.route("**/api/weltlage/WELT", langsam)
+
+            seite.click("#btn-welt")
+            seite.wait_for_timeout(150)
+            seite.click("#tab-chat")          # weg, bevor die Karten kommen
+            seite.wait_for_timeout(4000)      # Antwort trifft im Verborgenen ein
+
+            seite.click("#tab-welt")
+            seite.wait_for_timeout(700)
+
+            # Nicht auf "ragt ueber den Rand" pruefen: die Spalte ist eine
+            # Flexbox mit `overflow:hidden`, sie QUETSCHT die Karten, statt
+            # sie hinauszuschieben. Ohne das Nachholen stehen deshalb fuenf
+            # zusammengedrueckte Karten mit abgeschnittenem Text da - und
+            # ueberstehen tut nichts. Gemessen bei 1280x620:
+            #   ohne Nachholen: 5 Karten, kein Hinweis
+            #   mit  Nachholen: 1 Karte,  "4 weitere Meldungen passen nicht"
+            anzahl = seite.locator("#view-welt .karte").count()
+            gesagt = seite.locator("#gesagt").inner_text()
+            assert anzahl >= 1, "ohne Karten misst der Test nichts"
+            assert anzahl < 5, \
+                f"{anzahl} Karten - es wurde nichts zugeschnitten"
+            assert "passen nicht ins Bild" in gesagt, gesagt
+        finally:
+            br.close()

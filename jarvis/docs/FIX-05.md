@@ -203,3 +203,69 @@ Der 404 auf `/favicon.ico` in `weltlage.html` **wurde** angefasst — eine
 Zeile, dasselbe eingebettete Favicon wie in `index.html`, mit demselben
 Kommentar. Er war der einzige Fehler in der A6-Prüfung, und damit fiel auch
 die Favicon-Ausnahme im Test wieder weg.
+
+---
+
+## Schritt B — zwei Fehler, die eine Gegenprüfung fand
+
+Nach der Abnahme B6 lief ein zweiter Durchgang über den Diff: vier
+unabhängige Blickwinkel (Korrektheit, Sicherheit, Lag, Tests), danach jeder
+Befund von Skeptikern zu widerlegen versucht. Zwei Befunde haben das
+überlebt, beide echt, beide reproduziert und behoben.
+
+### 1. Das Rennen beim Laden — **hoch**
+
+Wer auf „Welt" klickt und **noch während der 2,0 MB** zurück auf „Chat"
+geht, hatte den Renderloop danach dauerhaft im Chat laufen.
+
+Ursache: `globusModul` wurde erst gesetzt, wenn `starte()` aufgelöst hatte —
+also nach dem Import **und** den beiden Geometrie-Abrufen. Die Pause-Zeile in
+`zeigeAnsicht()` prüfte aber genau darauf (`&& globusModul`). Die
+Zeichenschleife und das `aktiv`-Flag laufen dagegen schon im synchronen Teil
+von `starte()` an.
+
+Ohne Drosselung ist das Fenster zu schmal, um es zu treffen — deshalb war es
+in der Abnahme nicht aufgefallen. Bei 250 kB/s, Rückklick nach 2,5 s:
+
+```
+NORMAL gedrosselt: Schleife +0   in 2 s, Leertaste geschluckt=False
+RENNEN gedrosselt: Schleife +114 in 2 s, Leertaste geschluckt=True
+```
+
+Zwei Folgen: genau der Zähler, den Mutation M1 tötet, lief weiter — und der
+Leertasten-Handler blieb scharf, also hätte die Leertaste im Chatfeld das
+Mikrofon des Globus geöffnet. Das ist die Falle aus dem Abschnitt oben, nur
+über einen Weg, den die `aktiv`-Schranke nicht abdeckte.
+
+Behoben: `globusModul` wird **sofort nach dem Import** gesetzt, ein eigenes
+Flag `globusGewollt` sagt, was der Nutzer sehen will, und es wird auch dann
+gesetzt, wenn das Modul noch lädt. Nach dem Fix beide Fälle `+0` und
+`geschluckt=False`.
+
+### 2. Karten, die im Hintergrund ankommen — **mittel**
+
+`zeichneKarten()` schneidet mit `getBoundingClientRect()` zu. In einer
+Ansicht mit `display:none` sind alle Maße null, die Abbruchbedingung ist
+sofort wahr, es wird nichts weggenommen. Wer ein Land anklickt, in den Chat
+wechselt und zurückkommt, sah gequetschte Karten mit abgeschnittenem Text
+statt einer Karte weniger. Gemessen bei 1280×620:
+
+```
+ohne Nachholen: 5 Karten, kein Hinweis
+mit  Nachholen: 1 Karte,  "4 weitere Meldungen passen nicht ins Bild."
+```
+
+Beachte: **nichts ragt über den Rand.** Die Spalte ist eine Flexbox mit
+`overflow:hidden` — sie quetscht, statt hinauszuschieben. Ein Test, der auf
+Überstand prüft, sieht den Fehler nicht; erst Anzahl und Hinweis zeigen ihn.
+
+Behoben: das Zuschneiden ist eine eigene Funktion `schneideKarten()`, die
+`weiter()` nachholt. Sie steigt bei einer Fläche von 0×0 ausdrücklich aus,
+statt eine Entscheidung auf unmessbaren Werten zu treffen.
+
+### Zwei weitere Mutationen
+
+| # | Mutation | Ergebnis |
+|---|----------|----------|
+| M7 | den Zustand vor dem Fix wiederherstellen | **getötet** — „120 Schleifendurchlaeufe im Chat" |
+| M8 | `kartenNachholen` aus `weiter()` entfernen | **getötet** — „5 Karten - es wurde nichts zugeschnitten" |
