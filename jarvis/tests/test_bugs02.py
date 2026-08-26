@@ -439,3 +439,222 @@ def test_fund21_eine_heile_notiz_wird_weiterhin_gelesen(vault_mit_muell):
     notiz = vault.lies(pfad)
     assert notiz.id == "abc123"
     assert "Santa Cruz" in notiz.text
+
+
+# --- Fund 17 und 18: Migration und Volltextindex ------------------------
+
+
+def _alte_datenbank(pfad: Path) -> None:
+    """Eine Datenbank, wie sie in Phase 1 entstanden ist: kein FTS, keine Trigger."""
+    import sqlite3
+
+    con = sqlite3.connect(pfad)
+    con.executescript("""
+        CREATE TABLE messages (id INTEGER PRIMARY KEY AUTOINCREMENT,
+            role TEXT NOT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL);
+        CREATE TABLE facts (id INTEGER PRIMARY KEY AUTOINCREMENT,
+            text TEXT NOT NULL, category TEXT NOT NULL DEFAULT 'allgemein',
+            source_message_id INTEGER, created_at TEXT NOT NULL,
+            confirmed INTEGER NOT NULL DEFAULT 0);
+    """)
+    con.execute("INSERT INTO messages (role, content, created_at) VALUES "
+                "('user','Mein Rad ist ein Santa Cruz V10','2026-01-01T00:00:00Z')")
+    con.execute("INSERT INTO messages (role, content, created_at) VALUES "
+                "('assistant','Gemerkt.','2026-01-01T00:00:01Z')")
+    con.execute("INSERT INTO facts (text, category, created_at) VALUES "
+                "('Ich fahre Downhill in Innsbruck','hobby','2026-01-01T00:00:00Z')")
+    con.commit()
+    con.close()
+
+
+def test_fund17_die_alte_historie_ist_nach_der_migration_auffindbar(tmp_path: Path):
+    """BUGS-01 Fund 17.
+
+    `init_db` legt die FTS-Tabellen an, aber der Index ueber die BESTEHENDEN
+    Zeilen bleibt leer. Gemessen vor der Reparatur:
+
+        Zeilen in messages    : 3
+        Eintraege im FTS-Index: 0
+        Volltextsuche nach 'santa': []
+
+    Neue Nachrichten nach der Migration landen im Index - die Trigger tun
+    ihre Arbeit. Nur die alte Historie ist unsichtbar, und genau die will man
+    nach einer Migration wiederfinden.
+    """
+    import sqlite3
+
+    from core import memory
+    from scripts.migrate import migriere
+
+    pfad = tmp_path / "alt.db"
+    _alte_datenbank(pfad)
+    migriere(pfad)
+
+    con = sqlite3.connect(pfad)
+    try:
+        treffer = con.execute(
+            "SELECT content FROM messages WHERE id IN "
+            "(SELECT rowid FROM messages_fts WHERE messages_fts MATCH ?)",
+            ('"santa"',),
+        ).fetchall()
+    finally:
+        con.close()
+    assert treffer, "die alte Nachricht ist im Volltextindex nicht auffindbar"
+
+    assert [f.text for f in memory.search_facts(pfad, "downhill")], (
+        "der alte Fakt ist ueber recall nicht auffindbar"
+    )
+
+
+def test_fund17_die_migration_bleibt_idempotent(tmp_path: Path):
+    """Zweimal laufen lassen schadet nicht - das verspricht das Modul."""
+    import sqlite3
+
+    from scripts.migrate import migriere
+
+    pfad = tmp_path / "alt.db"
+    _alte_datenbank(pfad)
+    migriere(pfad)
+
+    con = sqlite3.connect(pfad)
+    vorher = con.execute("SELECT count(*) FROM messages_fts_docsize").fetchone()[0]
+    con.close()
+
+    migriere(pfad)
+
+    con = sqlite3.connect(pfad)
+    try:
+        nachher = con.execute("SELECT count(*) FROM messages_fts_docsize").fetchone()[0]
+        treffer = con.execute(
+            "SELECT count(*) FROM messages_fts WHERE messages_fts MATCH ?",
+            ('"santa"',),
+        ).fetchone()[0]
+    finally:
+        con.close()
+    assert nachher == vorher == 2, (vorher, nachher)
+    assert treffer == 1, f"{treffer} Treffer - der Index hat Doppelte"
+
+
+def test_fund17_eine_neue_datenbank_wird_nicht_angefasst(tmp_path: Path):
+    """Gegenprobe: nichts nachzuziehen heisst nichts tun."""
+    import sqlite3
+
+    from core import db
+    from scripts.migrate import fts_nachziehen
+
+    pfad = tmp_path / "neu.db"
+    with db.session(pfad) as conn:
+        db.init_db(conn)
+    db.add_message(pfad, "user", "Santa Cruz")
+
+    con = sqlite3.connect(pfad)
+    try:
+        assert fts_nachziehen(con) == []
+    finally:
+        con.close()
+
+
+def test_fund17_der_rebuild_befehl_von_fts5_geht_bei_messages_fts_nicht(tmp_path: Path):
+    """Warum von Hand befuellt wird und nicht mit dem eingebauten Befehl.
+
+    `messages_fts` heisst seine Spalte `content_text`, die Quelltabelle
+    `messages` heisst sie `content`. FTS5 verlangt fuer eine
+    `content=`-Tabelle gleiche Namen; deshalb scheitert `'rebuild'` dort -
+    und genau das meinte der Bericht mit "der Reparaturbefehl ist selbst
+    kaputt". Bei `facts_fts` und `vault_fts` stimmen die Namen und `rebuild`
+    laeuft.
+
+    Dieser Test haelt die Annahme fest. Faellt er, weil die Spalten
+    angeglichen wurden, kann `fts_nachziehen` auf `rebuild` umstellen.
+    """
+    import sqlite3
+
+    from core import db
+
+    pfad = tmp_path / "neu.db"
+    with db.session(pfad) as conn:
+        db.init_db(conn)
+
+    con = sqlite3.connect(pfad)
+    try:
+        with pytest.raises(sqlite3.OperationalError, match="content_text"):
+            con.execute("INSERT INTO messages_fts(messages_fts) VALUES('rebuild')")
+        con.execute("INSERT INTO facts_fts(facts_fts) VALUES('rebuild')")
+        con.execute("INSERT INTO vault_fts(vault_fts) VALUES('rebuild')")
+    finally:
+        con.close()
+
+
+def test_fund18_nach_der_vault_migration_hat_facts_wieder_seine_trigger(tmp_path: Path):
+    """BUGS-01 Fund 18, mit praeziserem Mechanismus.
+
+    Der Bericht sagt, das RENAME "nimmt die Trigger mit". Genauer: SQLite
+    SCHREIBT sie um - nach `ALTER TABLE facts RENAME TO facts_alt` steht dort
+
+        CREATE TRIGGER facts_ai AFTER INSERT ON "facts_alt" ...
+
+    Der Trigger existiert also weiter, nur an der falschen Tabelle. Und weil
+    er existiert, tut `CREATE TRIGGER IF NOT EXISTS` beim naechsten Start
+    nichts. Die neue `facts`-Tabelle bleibt ohne Trigger, und ein neuer Fakt
+    landet nie im Volltextindex - gemessen: `recall` fand ihn nicht.
+    """
+    import sqlite3
+
+    from core import db, memory
+    from scripts.migrate_vault import benenne_facts_um
+
+    pfad = tmp_path / "j.db"
+    with db.session(pfad) as conn:
+        db.init_db(conn)
+    memory.add_fact(pfad, "Mein Rad ist ein Santa Cruz", category="hobby")
+
+    with db.session(pfad) as conn:
+        benenne_facts_um(conn)
+
+    con = sqlite3.connect(pfad)
+    try:
+        ziele = {
+            name: sql for name, sql in con.execute(
+                "SELECT name, sql FROM sqlite_master WHERE type='trigger' "
+                "AND name IN ('facts_ai','facts_ad','facts_au')"
+            )
+        }
+    finally:
+        con.close()
+    assert set(ziele) == {"facts_ai", "facts_ad", "facts_au"}, sorted(ziele)
+    for name, sql in ziele.items():
+        assert "facts_alt" not in sql, f"{name} zeigt noch auf facts_alt: {sql}"
+
+    memory.add_fact(pfad, "Ich fahre Downhill in Innsbruck", category="hobby")
+    assert [f.text for f in memory.search_facts(pfad, "downhill")], (
+        "ein neuer Fakt landet nicht im Volltextindex"
+    )
+
+
+def test_fund18_die_alten_zeilen_bleiben_in_facts_alt(tmp_path: Path):
+    """Gegenprobe: umbenannt heisst nicht geloescht.
+
+    Das Migrationsskript sagt ausdruecklich "NICHT geloescht - loeschen
+    fruehestens in zwei Wochen".
+    """
+    import sqlite3
+
+    from core import db, memory
+    from scripts.migrate_vault import benenne_facts_um
+
+    pfad = tmp_path / "j.db"
+    with db.session(pfad) as conn:
+        db.init_db(conn)
+    memory.add_fact(pfad, "Mein Rad ist ein Santa Cruz", category="hobby")
+
+    with db.session(pfad) as conn:
+        benenne_facts_um(conn)
+
+    con = sqlite3.connect(pfad)
+    try:
+        alt = con.execute("SELECT text FROM facts_alt").fetchall()
+        neu = con.execute("SELECT count(*) FROM facts").fetchone()[0]
+    finally:
+        con.close()
+    assert alt == [("Mein Rad ist ein Santa Cruz",)]
+    assert neu == 0, "die neue Tabelle startet leer"

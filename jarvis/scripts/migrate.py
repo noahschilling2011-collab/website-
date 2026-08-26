@@ -32,6 +32,72 @@ SPALTEN = [
 ]
 
 
+# (FTS-Tabelle, Quelltabelle, rowid-Spalte, [(FTS-Spalte, Quellspalte), ...])
+#
+# BUGS-01 Fund 17: `init_db` legt die FTS-Tabellen an, aber der Index ueber die
+# BESTEHENDEN Zeilen bleibt leer. Neue Zeilen holen die Trigger ab; die alte
+# Historie war danach fuer `recall` unsichtbar - gemessen:
+#
+#     Zeilen in messages    : 3
+#     Eintraege im FTS-Index: 0
+#     Volltextsuche nach 'santa': []
+#
+# Befuellt wird von Hand statt mit dem eingebauten `'rebuild'`. Der geht bei
+# `messages_fts` naemlich nicht: die FTS-Spalte heisst `content_text`, die
+# Quellspalte `content`, und FTS5 verlangt fuer eine `content=`-Tabelle gleiche
+# Namen. Ausgefuehrt:
+#
+#     rebuild messages_fts   -> OperationalError: no such column: T.content_text
+#     rebuild facts_fts      -> ok
+#     rebuild vault_fts      -> ok
+#
+# Das ist der "Reparaturbefehl, der selbst kaputt ist" aus dem Bericht. Die
+# Spalten anzugleichen hiesse, den Index in jeder bestehenden Datenbank neu
+# aufzubauen - dafuer ist der Gewinn zu klein. Ein Test haelt die Annahme fest.
+FTS_INDIZES = [
+    ("messages_fts", "messages", "id", [("content_text", "content")]),
+    ("facts_fts", "facts", "id", [("text", "text")]),
+    ("vault_fts", "vault_notizen", "rowid", [("text", "text"), ("tags", "tags")]),
+]
+
+
+def _tabellen(conn: sqlite3.Connection) -> set[str]:
+    return {r[0] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'")}
+
+
+def fts_nachziehen(conn: sqlite3.Connection) -> list[str]:
+    """Fuellt leere Volltextindizes aus ihren Quelltabellen.
+
+    Nur wenn der Index wirklich leer ist und die Quelle Zeilen hat. Sonst
+    entstuenden beim zweiten Lauf Doppelte - und das Modul verspricht
+    ausdruecklich, dass zweimal Laufen nicht schadet.
+
+    Die Leerpruefung geht ueber die Schattentabelle `<fts>_docsize`. `SELECT
+    count(*) FROM <fts>` waere der naheliegende Weg, liest aber die
+    Quelltabelle - und scheitert bei `messages_fts` an derselben
+    Namensabweichung wie `'rebuild'`.
+    """
+    getan: list[str] = []
+    vorhanden = _tabellen(conn)
+    for fts, quelle, rowid, spalten in FTS_INDIZES:
+        if fts not in vorhanden or quelle not in vorhanden:
+            continue
+        if f"{fts}_docsize" not in vorhanden:
+            continue
+        im_index = conn.execute(f"SELECT count(*) FROM {fts}_docsize").fetchone()[0]
+        in_quelle = conn.execute(f"SELECT count(*) FROM {quelle}").fetchone()[0]
+        if im_index or not in_quelle:
+            continue
+        ziel = ", ".join(z for z, _ in spalten)
+        her = ", ".join(q for _, q in spalten)
+        befehl = (f"INSERT INTO {fts}(rowid, {ziel}) "
+                  f"SELECT {rowid}, {her} FROM {quelle}")
+        conn.execute(befehl)
+        getan.append(f"{befehl}   -- {in_quelle} Zeile(n)")
+    return getan
+
+
 def fehlende_spalten(conn: sqlite3.Connection) -> list[tuple[str, str, str]]:
     fehlt = []
     tabellen = {
@@ -59,6 +125,11 @@ def migriere(db_pfad: Path, *, dry_run: bool = False) -> list[str]:
             getan.append(befehl)
             if not dry_run:
                 conn.execute(befehl)
+
+        # BUGS-01 Fund 17: die Tabellen sind jetzt da, der Index ueber die
+        # alten Zeilen noch nicht.
+        if not dry_run:
+            getan.extend(fts_nachziehen(conn))
     return getan
 
 

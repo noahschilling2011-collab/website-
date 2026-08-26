@@ -16,7 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.config import get_settings                      # noqa: E402
-from core.db import session                               # noqa: E402
+from core.db import init_db, session                      # noqa: E402
 from core.vault import Notiz, schreibe, sicherstellen     # noqa: E402
 from core.vault_index import alle, reindex                # noqa: E402
 
@@ -41,6 +41,33 @@ def als_notiz(zeile: dict) -> Notiz:
         erfasst=(zeile["created_at"] or "")[:10],
         tags=[t for t in [zeile["category"]] if t and t != "allgemein"],
     )
+
+
+# Die Trigger, die an `facts` haengen. Stehen hier, damit die Liste an EINER
+# Stelle steht und nicht in einer Schleife ueber sqlite_master erraten wird.
+FACTS_TRIGGER = ("facts_ai", "facts_ad", "facts_au")
+
+
+def benenne_facts_um(conn) -> None:
+    """`facts` -> `facts_alt`, und die Trigger zeigen danach wieder richtig.
+
+    BUGS-01 Fund 18. Der Bericht sagt, das RENAME "nimmt die Trigger mit".
+    Genauer: SQLite SCHREIBT sie um. Nach dem Umbenennen steht dort
+
+        CREATE TRIGGER facts_ai AFTER INSERT ON "facts_alt" ...
+
+    Der Trigger existiert also weiter, nur an der falschen Tabelle. Und weil
+    er existiert, tut `CREATE TRIGGER IF NOT EXISTS` beim naechsten Start
+    nichts: die neue `facts`-Tabelle bleibt ohne Trigger, ein neuer Fakt
+    landet nie im Volltextindex, und `recall` findet ihn nicht.
+
+    Deshalb: umbenennen, die umgeschriebenen Trigger wegwerfen, Schema neu
+    anwenden. `init_db` legt `facts` und die drei Trigger dann sauber an.
+    """
+    conn.execute("ALTER TABLE facts RENAME TO facts_alt")
+    for name in FACTS_TRIGGER:
+        conn.execute(f"DROP TRIGGER IF EXISTS {name}")
+    init_db(conn)
 
 
 def main() -> int:
@@ -97,9 +124,9 @@ def main() -> int:
             if da:
                 print(f"    {GRAU}facts_alt existiert schon - nichts getan{AUS}")
             else:
-                conn.execute("ALTER TABLE facts RENAME TO facts_alt")
-                print(f"    {GRUEN}✓{AUS} umbenannt. NICHT geloescht - "
-                      f"loeschen fruehestens in zwei Wochen.")
+                benenne_facts_um(conn)
+                print(f"    {GRUEN}✓{AUS} umbenannt, Trigger neu gesetzt. "
+                      f"NICHT geloescht - loeschen fruehestens in zwei Wochen.")
     else:
         print(f"[5] {GRAU}uebersprungen (--abschluss setzen){AUS}")
 
