@@ -658,3 +658,207 @@ def test_fund18_die_alten_zeilen_bleiben_in_facts_alt(tmp_path: Path):
         con.close()
     assert alt == [("Mein Rad ist ein Santa Cruz",)]
     assert neu == 0, "die neue Tabelle startet leer"
+
+
+# --- Fund 20: ein OS-Thread je geaenderter Datei -------------------------
+
+
+def test_fund20_ein_grosser_schwung_startet_keine_tausend_threads(tmp_path: Path):
+    """BUGS-01 Fund 20.
+
+    `_spaeter` legte fuer JEDEN Dateipfad einen eigenen `threading.Timer` an -
+    also einen echten OS-Thread pro geaenderter Datei. Bei einem
+    git-Checkout oder einem Obsidian-Sync mit ein paar tausend Notizen
+    laufen die alle gleichzeitig und schreiben gleichzeitig in dieselbe
+    SQLite-Datei. Gemessen:
+
+        N=  200  indexiert=  200  FEHLEND=   0   Threads +200
+        N= 1000  indexiert= 1000  FEHLEND=   0   Threads +1000
+        N= 3000  indexiert= 2667  FEHLEND= 333   Threads +2848
+           Ausnahme x333: OperationalError: database is locked
+
+    Der Verlust ist still: die Ausnahme stirbt im Timer-Thread, es gibt
+    keinen Retry und keinen Logeintrag.
+    """
+    import threading
+    import time as _t
+
+    from core import db
+    from core.vault_index import Beobachter
+
+    pfad = tmp_path / "j.db"
+    with db.session(pfad) as conn:
+        db.init_db(conn)
+    wurzel = tmp_path / "Vault"
+    wurzel.mkdir()
+
+    beobachter = Beobachter(pfad, wurzel, entprellung=0.3)
+    vorher = threading.active_count()
+    getan: list[int] = []
+    for i in range(300):
+        beobachter._spaeter(f"datei-{i}.md", lambda i=i: getan.append(i))
+    spitze = threading.active_count()
+
+    frist = _t.monotonic() + 10
+    while len(getan) < 300 and _t.monotonic() < frist:
+        _t.sleep(0.05)
+    beobachter.stop()
+
+    assert len(getan) == 300, f"{len(getan)} von 300 Arbeiten gelaufen"
+    assert spitze - vorher <= 4, (
+        f"{spitze - vorher} zusaetzliche Threads fuer 300 Dateien"
+    )
+
+
+def test_fund20_die_faelligkeitstabelle_waechst_nicht_unbegrenzt(tmp_path: Path):
+    """`self._timer` wurde nur beim Neu-Planen aufgeraeumt, nie beim Feuern.
+
+        len(_timer) direkt nach dem Planen : 50
+        gefeuert                            : 50
+        len(_timer) NACH dem Feuern         : 50
+    """
+    import time as _t
+
+    from core import db
+    from core.vault_index import Beobachter
+
+    pfad = tmp_path / "j.db"
+    with db.session(pfad) as conn:
+        db.init_db(conn)
+    wurzel = tmp_path / "Vault"
+    wurzel.mkdir()
+
+    beobachter = Beobachter(pfad, wurzel, entprellung=0.2)
+    getan: list[int] = []
+    for i in range(50):
+        beobachter._spaeter(f"datei-{i}.md", lambda i=i: getan.append(i))
+
+    frist = _t.monotonic() + 10
+    while len(getan) < 50 and _t.monotonic() < frist:
+        _t.sleep(0.05)
+    _t.sleep(0.3)
+    offen = beobachter.offene_arbeiten()
+    beobachter.stop()
+
+    assert len(getan) == 50
+    assert offen == 0, f"{offen} Eintraege blieben nach dem Feuern stehen"
+
+
+def test_fund20_dreitausend_dateien_verlieren_keinen_eintrag(tmp_path: Path):
+    """Der Fall aus dem Bericht, nur kleiner - und ohne stillen Verlust.
+
+    Gemessen wurde der Verlust ab etwa 1500 Dateien. Hier laufen 600, damit
+    der Test in Sekunden durchlaeuft; der Unterschied ist nicht die Zahl,
+    sondern dass jetzt EIN Schreiber arbeitet statt hunderter.
+    """
+    import time as _t
+
+    from core import db
+    from core.vault import Notiz, schreibe
+    from core.vault_index import Beobachter, alle
+
+    pfad = tmp_path / "j.db"
+    with db.session(pfad) as conn:
+        db.init_db(conn)
+    wurzel = tmp_path / "Vault"
+    wurzel.mkdir()
+
+    dateien = []
+    for i in range(600):
+        dateien.append(schreibe(wurzel, Notiz(
+            id=f"f_{i:05d}", typ="fakt", text=f"Notiz Nummer {i}", quelle="test")))
+
+    beobachter = Beobachter(pfad, wurzel, entprellung=0.2)
+    from core.vault_index import aktualisiere
+
+    for d in dateien:
+        beobachter._spaeter(str(d), lambda p=d: aktualisiere(pfad, wurzel, p))
+
+    frist = _t.monotonic() + 40
+    while _t.monotonic() < frist:
+        if beobachter.offene_arbeiten() == 0 and len(alle(pfad)) >= len(dateien):
+            break
+        _t.sleep(0.1)
+    beobachter.stop()
+
+    fehlend = len(dateien) - len(alle(pfad))
+    assert fehlend == 0, f"{fehlend} von {len(dateien)} Notizen fehlen im Index"
+
+
+def test_fund20_ein_fehler_verpufft_nicht_still(tmp_path: Path, caplog):
+    """Vorher starb die Ausnahme im Timer-Thread - kein Retry, kein Log."""
+    import logging
+    import time as _t
+
+    from core import db
+    from core.vault_index import Beobachter
+
+    pfad = tmp_path / "j.db"
+    with db.session(pfad) as conn:
+        db.init_db(conn)
+    wurzel = tmp_path / "Vault"
+    wurzel.mkdir()
+
+    beobachter = Beobachter(pfad, wurzel, entprellung=0.1)
+    gelaufen: list[str] = []
+
+    def kaputt():
+        gelaufen.append("kaputt")
+        raise RuntimeError("absichtlich kaputt")
+
+    with caplog.at_level(logging.WARNING, logger="jarvis"):
+        beobachter._spaeter("kaputt.md", kaputt)
+        beobachter._spaeter("heil.md", lambda: gelaufen.append("heil"))
+        frist = _t.monotonic() + 5
+        while len(gelaufen) < 2 and _t.monotonic() < frist:
+            _t.sleep(0.05)
+        beobachter.stop()
+
+    assert set(gelaufen) == {"kaputt", "heil"}, (
+        f"{gelaufen} - ein Fehler darf die anderen Arbeiten nicht mitnehmen"
+    )
+    assert any("absichtlich kaputt" in e.getMessage() for e in caplog.records), (
+        [e.getMessage() for e in caplog.records]
+    )
+
+
+def test_fund20_die_entprellung_setzt_die_frist_wirklich_zurueck(tmp_path: Path):
+    """Wer weiter schreibt, wird nicht zwischendurch indexiert.
+
+    Das ist der Unterschied zwischen "Frist zuruecksetzen" und "erste Frist
+    gewinnt". Obsidian schreibt beim Tippen dauernd; ohne Zuruecksetzen
+    liefe die Indexierung waehrenddessen alle paar Zehntel erneut.
+    """
+    import time as _t
+
+    from core import db
+    from core.vault_index import Beobachter
+
+    pfad = tmp_path / "j.db"
+    with db.session(pfad) as conn:
+        db.init_db(conn)
+    wurzel = tmp_path / "Vault"
+    wurzel.mkdir()
+
+    beobachter = Beobachter(pfad, wurzel, entprellung=0.4)
+    laeufe: list[float] = []
+
+    # 1,2 s lang alle 0,1 s dasselbe neu einplanen - drei Entprellungsfristen
+    # lang. Mit Zuruecksetzen darf in der Zeit NICHTS laufen.
+    ende = _t.monotonic() + 1.2
+    while _t.monotonic() < ende:
+        beobachter._spaeter("dieselbe.md", lambda: laeufe.append(_t.monotonic()))
+        _t.sleep(0.1)
+    waehrenddessen = len(laeufe)
+
+    frist = _t.monotonic() + 5
+    while not laeufe and _t.monotonic() < frist:
+        _t.sleep(0.05)
+    _t.sleep(0.3)
+    beobachter.stop()
+
+    assert waehrenddessen == 0, (
+        f"{waehrenddessen} Laeufe waehrend des Schreibens - die Frist wurde "
+        "nicht zurueckgesetzt"
+    )
+    assert len(laeufe) == 1, f"{len(laeufe)} Laeufe, erwartet genau einer"

@@ -21,6 +21,7 @@ vom 25.08., kein Aufgabenzettel, den man umschreibt):
 | 7 · Keine SSRF-Sperre | behoben | `f1d5e22` |
 | 12 · `pruefe()` ohne Inhaltsprüfung | behoben | `5a21934` (FIX-02) |
 | 13 · Kartenzahl sinkt ohne Nachrücken | behoben | `5a21934` (FIX-02) |
+| 20 · ein OS-Thread je geänderter Datei | behoben | `core/vault_index.py` (ein Arbeiter statt tausend Timer) |
 | 18 · `facts` ohne FTS-Trigger nach der Vault-Migration | behoben | `scripts/migrate_vault.py` |
 | 17 · Volltextindex nach der Migration leer | behoben | `scripts/migrate.py` |
 | 21 · eine nicht-UTF-8-Datei legt `remember` lahm | behoben | `core/vault.py` |

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -179,18 +180,84 @@ class Beobachter:
         self.wurzel = Path(wurzel).expanduser()
         self.entprellung = entprellung
         self._observer = None
-        self._timer: dict[str, threading.Timer] = {}
-        self._sperre = threading.Lock()
+        # BUGS-01 Fund 20: hier stand `dict[str, threading.Timer]` - EIN
+        # OS-Thread je geaenderter Datei. Bei einem git-Checkout oder einem
+        # Obsidian-Sync mit ein paar tausend Notizen liefen die alle
+        # gleichzeitig und schrieben gleichzeitig in dieselbe SQLite-Datei.
+        # Gemessen:
+        #
+        #     N=  200  indexiert=  200  FEHLEND=   0   Threads +200
+        #     N= 1000  indexiert= 1000  FEHLEND=   0   Threads +1000
+        #     N= 3000  indexiert= 2667  FEHLEND= 333   Threads +2848
+        #        Ausnahme x333: OperationalError: database is locked
+        #
+        # Der Verlust war still: die Ausnahme starb im Timer-Thread, ohne
+        # Retry und ohne Logeintrag. Und die Tabelle wurde nur beim
+        # Neu-Planen aufgeraeumt, nie beim Feuern - 3000 Dateien liessen
+        # 3000 Eintraege zurueck.
+        #
+        # Jetzt: eine Faelligkeitstabelle und EIN langlebiger Arbeiter. Damit
+        # gibt es genau einen Schreiber, das Locking-Problem verschwindet
+        # ohne hoeheren Busy-Timeout - und der Speicher waechst nicht mehr.
+        self._faellig: dict[str, tuple[float, object]] = {}
+        self._sperre = threading.Condition()
+        self._laeuft = False
+        self._arbeiter: threading.Thread | None = None
+
+    def offene_arbeiten(self) -> int:
+        """Wieviel noch aussteht. Fuer Tests und fuer die Fehlersuche."""
+        with self._sperre:
+            return len(self._faellig)
 
     def _spaeter(self, schluessel: str, arbeit) -> None:
+        """Plant `arbeit` ein - und setzt die Frist zurueck, wenn sie schon steht.
+
+        Das Zuruecksetzen ist die Entprellung: ein Editor schreibt mehrfach
+        hintereinander, und gewinnen soll die letzte Fassung.
+        """
         with self._sperre:
-            laufend = self._timer.pop(schluessel, None)
-            if laufend is not None:
-                laufend.cancel()
-            t = threading.Timer(self.entprellung, arbeit)
-            t.daemon = True
-            self._timer[schluessel] = t
-            t.start()
+            self._faellig[schluessel] = (time.monotonic() + self.entprellung, arbeit)
+            self._arbeiter_sicherstellen()
+            self._sperre.notify_all()
+
+    def _arbeiter_sicherstellen(self) -> None:
+        """Der Arbeiter startet beim ersten Ereignis, nicht schon beim Bauen.
+
+        Aufrufer haelt `self._sperre`.
+        """
+        if self._arbeiter is not None and self._arbeiter.is_alive():
+            return
+        self._laeuft = True
+        self._arbeiter = threading.Thread(
+            target=self._arbeiten, name="jarvis-vault-index", daemon=True
+        )
+        self._arbeiter.start()
+
+    def _arbeiten(self) -> None:
+        """Schlaeft bis zur fruehesten Faelligkeit und arbeitet dann seriell ab."""
+        while True:
+            with self._sperre:
+                if not self._laeuft:
+                    return
+                if not self._faellig:
+                    self._sperre.wait(timeout=1.0)
+                    continue
+                jetzt = time.monotonic()
+                dran = [s for s, (wann, _) in self._faellig.items() if wann <= jetzt]
+                if not dran:
+                    naechste = min(wann for wann, _ in self._faellig.values())
+                    self._sperre.wait(timeout=max(0.01, naechste - jetzt))
+                    continue
+                # pop, damit die Tabelle schrumpft - genau das fehlte vorher.
+                arbeiten = [self._faellig.pop(s)[1] for s in dran]
+
+            for arbeit in arbeiten:
+                try:
+                    arbeit()
+                except Exception as exc:      # noqa: BLE001
+                    # Ein Fehler an einer Datei darf die anderen nicht
+                    # mitnehmen - und er darf nicht still verpuffen.
+                    log.warning("Vault-Beobachter: Arbeit fehlgeschlagen - %s", exc)
 
     def start(self) -> "Beobachter":
         from watchdog.events import FileSystemEventHandler
@@ -230,9 +297,12 @@ class Beobachter:
 
     def stop(self) -> None:
         with self._sperre:
-            for t in self._timer.values():
-                t.cancel()
-            self._timer.clear()
+            self._laeuft = False
+            self._faellig.clear()
+            self._sperre.notify_all()
+        arbeiter, self._arbeiter = self._arbeiter, None
+        if arbeiter is not None:
+            arbeiter.join(timeout=5)
         if self._observer is not None:
             self._observer.stop()
             self._observer.join(timeout=5)
