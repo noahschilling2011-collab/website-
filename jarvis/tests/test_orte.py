@@ -12,6 +12,7 @@ die Tests ohne Netz laufen.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import httpx
 import pytest
@@ -172,8 +173,10 @@ def test_ohne_kontakt_wird_gar_nicht_erst_gefragt():
     def handler(_: httpx.Request) -> httpx.Response:  # pragma: no cover
         raise AssertionError("Es haette gar nicht gefragt werden duerfen")
 
+    # NICHT "Berlin": das steht seit der eingebauten Tabelle drin und
+    # wuerde gar nicht mehr live gefragt. Ein Berg tut es.
     with pytest.raises(OrtFehler) as fehler:
-        run(finde_ort("Berlin", **_client(handler, kontakt="  ")))
+        run(finde_ort("Kilimandscharo", **_client(handler, kontakt="  ")))
     assert "WIKI_KONTAKT" in str(fehler.value)
 
 
@@ -196,7 +199,7 @@ def test_ein_serverfehler_wird_gemeldet():
         return httpx.Response(503, text="wartung")
 
     with pytest.raises(OrtFehler) as fehler:
-        run(finde_ort("Berlin", **_client(handler)))
+        run(finde_ort("Kilimandscharo", **_client(handler)))
     assert "503" in str(fehler.value)
 
 
@@ -205,7 +208,7 @@ def test_kein_json_ist_ein_fehler():
         return httpx.Response(200, text="<html>wartung</html>")
 
     with pytest.raises(OrtFehler):
-        run(finde_ort("Berlin", **_client(handler)))
+        run(finde_ort("Kilimandscharo", **_client(handler)))
 
 
 # --- Der Ausschnitt --------------------------------------------------------
@@ -243,3 +246,186 @@ def test_eine_bbox_verlaesst_die_erde_nicht():
 def test_eine_kantenlaenge_von_null_wird_abgewiesen():
     with pytest.raises(OrtFehler):
         bbox_um(48.8, 9.8, kante_km=0)
+
+
+# --- Die eingebaute Tabelle: jedes Land, jede Hauptstadt ------------------
+
+
+def test_die_tabelle_kennt_die_ganze_welt():
+    """Erzeugt von scripts/orte_tabelle.py aus Wikidata. Wenn hier etwas
+    fehlt, ist die Datei kaputt - nicht der Test."""
+    from core.orte import tabelle
+
+    roh = json.loads(
+        (Path(__file__).resolve().parent.parent / "core" / "daten" / "orte.json")
+        .read_text(encoding="utf-8")
+    )
+    assert roh["laender"] >= 190, f"nur {roh['laender']} Laender"
+    assert roh["hauptstaedte"] >= 190, f"nur {roh['hauptstaedte']} Hauptstaedte"
+    assert len(tabelle()) > 500, "zu wenig Namen im Index"
+
+
+@pytest.mark.parametrize("eingabe,erwartet_iso", [
+    ("Deutschland", "DEU"), ("Germany", "DEU"), ("Berlin", "DEU"),
+    ("Japan", "JPN"), ("Tokyo", "JPN"), ("Tokio", "JPN"),
+    ("Vereinigte Staaten", "USA"), ("United States", "USA"),
+    ("Washington, D.C.", "USA"),
+    ("Schweiz", "CHE"), ("Bern", "CHE"),
+    ("Brasilien", "BRA"), ("Brasília", "BRA"),
+    ("Kigali", "RWA"), ("Suva", "FJI"), ("Palikir", "FSM"),
+    ("Nuku'alofa", "TON"),
+])
+def test_laender_und_hauptstaedte_weltweit(eingabe, erwartet_iso):
+    from core.orte import aus_tabelle
+
+    ort = aus_tabelle(eingabe)
+    assert ort is not None, f"{eingabe!r} nicht gefunden"
+    assert ort.iso3 == erwartet_iso
+
+
+@pytest.mark.parametrize("kuerzel,iso3", [
+    ("DE", "DEU"), ("DEU", "DEU"), ("de", "DEU"),
+    ("US", "USA"), ("USA", "USA"),
+    ("JP", "JPN"), ("CH", "CHE"), ("GB", "GBR"),
+])
+def test_auch_die_kuerzel_treffen(kuerzel, iso3):
+    from core.orte import aus_tabelle
+
+    assert aus_tabelle(kuerzel).iso3 == iso3
+
+
+def test_ein_kuerzel_trifft_nur_exakt_und_nie_ueber_eine_faltung():
+    """Der Falschtreffer, der beim Bauen auffiel: mit ISO-Codes im selben
+    Index wie die Namen fand "Poel" (eine Insel in der Ostsee) das Land
+    POLEN - "poel" wird durch die oe-Ersatzschreibung zu "pol", und das ist
+    Polens ISO-Code. Kuerzel stehen deshalb in einem eigenen Index."""
+    from core.orte import aus_tabelle
+
+    assert aus_tabelle("Poel") is None, "Poel ist nicht Polen"
+    assert aus_tabelle("Polen").iso3 == "POL"
+    assert aus_tabelle("POL").iso3 == "POL"
+
+
+@pytest.mark.parametrize("ohne_umlaut,mit_umlaut", [
+    ("Aegypten", "Ägypten"), ("Tuerkei", "Türkei"),
+    ("Vereinigtes Koenigreich", "Vereinigtes Königreich"),
+])
+def test_wer_keine_umlaute_tippt_findet_trotzdem(ohne_umlaut, mit_umlaut):
+    from core.orte import aus_tabelle
+
+    a, b = aus_tabelle(ohne_umlaut), aus_tabelle(mit_umlaut)
+    assert a is not None and b is not None
+    assert a.qid == b.qid
+
+
+def test_gross_und_kleinschreibung_ist_egal():
+    from core.orte import aus_tabelle
+
+    assert aus_tabelle("SCHWEIZ").iso3 == aus_tabelle("schweiz").iso3 == "CHE"
+
+
+def test_ein_land_gewinnt_gegen_die_gleichnamige_hauptstadt():
+    """Luxemburg, Singapur, Monaco, Dschibuti, Guatemala: wer den Namen
+    sagt, meint fast immer den Staat."""
+    from core.orte import aus_tabelle
+
+    for name in ("Monaco", "Luxemburg", "Singapur"):
+        ort = aus_tabelle(name)
+        assert ort is not None, name
+        assert ort.art == "land", f"{name} sollte das Land sein"
+
+
+def test_die_tabelle_kommt_ohne_netz_und_ohne_kontakt_aus():
+    """Der Punkt der ganzen Datei. `finde_ort` wuerde ohne WIKI_KONTAKT
+    werfen - fuer Laender und Hauptstaedte darf es das nicht."""
+    from core.orte import finde_ort
+
+    ort = run(finde_ort("Deutschland", kontakt=""))
+    assert ort is not None
+    assert ort.iso3 == "DEU"
+    assert ort.als_dict()["quelle"] == "Tabelle"
+
+
+def test_was_nicht_in_der_tabelle_steht_geht_live():
+    """Berge, Kleinstaedte, Stadtteile - dafuer ist die Live-Abfrage da."""
+    gefragt = {"ja": False}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        gefragt["ja"] = True
+        return httpx.Response(200, json=_antwort(
+            _zeile("Q7420", "Kilimandscharo", 37.3268, -3.3376)))
+
+    ort = run(finde_ort("Kilimandscharo", kontakt="k@example.org",
+                        transport=httpx.MockTransport(handler)))
+    assert gefragt["ja"], "haette live fragen muessen"
+    assert ort.name == "Kilimandscharo"
+    assert ort.als_dict()["quelle"] == "Wikidata"
+
+
+def test_ein_land_fragt_gar_nicht_erst_live():
+    def handler(request: httpx.Request) -> httpx.Response:  # pragma: no cover
+        raise AssertionError("Fuer ein Land darf nicht gefragt werden")
+
+    ort = run(finde_ort("Frankreich", kontakt="k@example.org",
+                        transport=httpx.MockTransport(handler)))
+    assert ort.iso3 == "FRA"
+
+
+# --- Das Werkzeug: was der normale Chat benutzt ---------------------------
+
+
+def _werkzeug(kontakt=""):
+    from core.tools import registry
+    import core.tools.satellite_tools  # noqa: F401
+
+    w = registry.get("find_place")
+    w.kontakt = kontakt
+    return w
+
+
+def test_das_werkzeug_findet_ein_land_ohne_netz_und_ohne_kontakt():
+    """Der Fall, der Noah betrifft: kein WIKI_KONTAKT in der .env. Laender
+    und Hauptstaedte muessen trotzdem gehen."""
+    ergebnis = run(_werkzeug(kontakt="").execute(name="Japan"))
+    assert ergebnis.ok is True
+    assert ergebnis.data["ort"]["iso3"] == "JPN"
+    assert ergebnis.data["ort"]["quelle"] == "Tabelle"
+    assert len(ergebnis.data["bbox"]) == 4
+
+
+def test_das_werkzeug_liefert_eine_fertige_bbox():
+    """Der ganze Zweck: das Modell soll keine Koordinaten raten. In Noahs
+    erstem echten Lauf schickte es bbox=[5.9,47.3,15,55.1] - fuer
+    Deutschland zufaellig richtig, fuer eine Stadt waere es Unsinn."""
+    ergebnis = run(_werkzeug().execute(name="Tokyo"))
+    min_lon, min_lat, max_lon, max_lat = ergebnis.data["bbox"]
+    ort = ergebnis.data["ort"]
+    assert min_lat < ort["lat"] < max_lat
+    assert min_lon < ort["lon"] < max_lon
+
+
+def test_das_werkzeug_sagt_gleich_wie_scharf_das_bild_waere():
+    klein = run(_werkzeug().execute(name="Bern", kante_km=12))
+    gross = run(_werkzeug().execute(name="Bern", kante_km=400))
+    assert klein.data["bild_aufloesung_m"] < 30
+    assert gross.data["bild_aufloesung_m"] > 500
+    assert "m je Bildpixel" in klein.display
+
+
+def test_ein_unbekannter_ort_ist_ein_sauberer_fehler():
+    ergebnis = run(_werkzeug(kontakt="").execute(name="Gibtesnichtstadt123"))
+    assert ergebnis.ok is False
+    assert "Hauptstadt" in ergebnis.display
+
+
+def test_der_satelliten_agent_hat_das_werkzeug_und_die_regel():
+    from core.agents import baue_agenten
+    from core.contracts import Permission
+    from core.llm import FakeLLMProvider
+
+    a = baue_agenten(FakeLLMProvider(), max_permission=Permission.READ)["satellite"]
+    assert "find_place" in a.tools
+    assert "Rate NIE Koordinaten" in a.system_prompt
+    # Und die Aufloesungsregel nennt nicht mehr die 10 m des Sensors als
+    # das, was man sieht.
+    assert "bild_aufloesung_m" in a.system_prompt

@@ -20,6 +20,7 @@ from pathlib import Path
 
 from core.contracts import Permission, Tool, ToolResult
 from core.satellite.analysis import grenzsatz, vergleichbar, vergleiche_raster
+from core.orte import OrtFehler, aus_tabelle, bbox_um, finde_ort
 from core.satellite.bilder import BildFehler
 from core.satellite.bilder import speichere as speichere_bild
 from core.satellite.ueberflug import (
@@ -449,5 +450,100 @@ class SatellitePasses(Tool):
                 "Boden dunkel ist."
             ),
             sources=["https://celestrak.org/NORAD/elements/gp.php"],
+            duration_ms=dauer(),
+        )
+
+
+@register
+class OrtFinden(Tool):
+    name = "find_place"
+    description = (
+        "Macht aus einem ORTSNAMEN Koordinaten und einen fertigen Ausschnitt "
+        "(bbox) fuer satellite_search. **Benutze das immer, bevor du "
+        "satellite_search rufst** - rate keine Koordinaten. Kennt jedes Land "
+        "und jede Hauptstadt der Welt ohne Netz (auch als Kuerzel: DE, DEU, "
+        "USA), alles andere ueber Wikidata. Weltweit, nicht nur Deutschland."
+    )
+    parameters = {
+        "type": "object",
+        "properties": {
+            "name": {
+                "type": "string",
+                "description": "Der Ortsname, z. B. 'Schwaebisch Gmuend', "
+                               "'Tokyo', 'Kilimandscharo', 'DE'.",
+            },
+            "kante_km": {
+                "type": "number",
+                "description": (
+                    "Kantenlaenge des Ausschnitts in km. 12 ist die Vorgabe "
+                    "und ergibt rund 23 m je Bildpixel - das Schaerfste, was "
+                    "Sentinel-2 hergibt. Fuer ein ganzes Land eher 400, dann "
+                    "sind es aber schon rund 800 m je Pixel."
+                ),
+                "minimum": 0.5,
+                "maximum": 2000,
+            },
+        },
+        "required": ["name"],
+        "additionalProperties": False,
+    }
+    permission = Permission.READ
+    timeout_s = 30
+
+    kontakt: str = ""      # WIKI_KONTAKT, beim Start gesetzt
+
+    async def execute(self, name: str, kante_km: float = 12.0) -> ToolResult:
+        begonnen = time.monotonic()
+
+        def dauer() -> int:
+            return int((time.monotonic() - begonnen) * 1000)
+
+        try:
+            ort = await finde_ort(name, kontakt=self.kontakt)
+        except OrtFehler as exc:
+            # Ohne WIKI_KONTAKT geht nur die Tabelle. Das ist kein Grund,
+            # gar nichts zu liefern - Laender und Hauptstaedte stehen drin.
+            ort = aus_tabelle(name)
+            if ort is None:
+                # BEIDE Gruende nennen. "WIKI_KONTAKT fehlt" allein ist
+                # irrefuehrend: der Ort steht ausserdem nicht in der
+                # eingebauten Tabelle, und das waere auch mit Kontakt so.
+                grund = (
+                    f"{name!r} steht nicht in der eingebauten Tabelle "
+                    f"(jedes Land, jede Hauptstadt), und live nachschlagen "
+                    f"geht auch nicht: {exc}"
+                )
+                return ToolResult(ok=False, error=str(exc), display=grund,
+                                  duration_ms=dauer())
+
+        if ort is None:
+            return ToolResult(
+                ok=False,
+                error="Ort nicht gefunden.",
+                display=(
+                    f"Kein Ort namens {name!r} gefunden. Jedes Land und jede "
+                    f"Hauptstadt ist eingebaut; alles andere kommt von "
+                    f"Wikidata - vielleicht anders geschrieben?"
+                ),
+                duration_ms=dauer(),
+            )
+
+        box = bbox_um(ort.lat, ort.lon, kante_km=float(kante_km))
+        aufloesung = effektive_aufloesung_m(box, BILD_KANTE, BILD_KANTE)
+        return ToolResult(
+            ok=True,
+            data={"ort": ort.als_dict(), "bbox": list(box),
+                  "bild_aufloesung_m": round(aufloesung, 1)},
+            display=(
+                f"{ort.name}: {ort.lat:.4f}, {ort.lon:.4f}"
+                + (f" ({ort.art}, {ort.iso3})" if ort.art else "")
+                + (f", {ort.einwohner} Einwohner" if ort.einwohner else "")
+                + f"\nAusschnitt {kante_km:.0f} km: bbox="
+                + "[" + ", ".join(f"{x:.4f}" for x in box) + "]"
+                + f"\nDaraus wuerden {aufloesung:.0f} m je Bildpixel - "
+                + ("gut genug fuer Siedlungsgrenzen und Felder."
+                   if aufloesung < 60 else
+                   "nur fuer sehr grosse Strukturen.")
+            ),
             duration_ms=dauer(),
         )

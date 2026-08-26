@@ -123,6 +123,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             # Wohin das gerenderte Bild geschrieben wird - neben die
             # Datenbank, nicht hinein.
             satellit.db_path = settings.db_path
+        ortsuche = registry.get("find_place")
+        if ortsuche is not None:
+            # Fuer die Live-Abfrage. Ohne Kontakt geht immer noch die
+            # eingebaute Tabelle: jedes Land, jede Hauptstadt.
+            ortsuche.kontakt = settings.wiki_kontakt
         ueberflug = registry.get("satellite_passes")
         if ueberflug is not None:
             # Braucht keinen Key - CelesTrak ist offen. Nur den Pfad

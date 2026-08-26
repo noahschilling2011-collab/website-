@@ -37,7 +37,7 @@ from api.security import require_token
 from api.tasks import LaufenderTask, baue_laufzeit
 from core import db
 from core.contracts import Permission, Task, TaskBudget
-from core.orte import Ort, OrtFehler, bbox_um, finde_ort
+from core.orte import Ort, OrtFehler, aus_tabelle, bbox_um, finde_ort
 from core.tools.dispatch import run_tool
 
 log = logging.getLogger("jarvis")
@@ -93,7 +93,12 @@ async def post_ort(request: Request, anfrage: OrtAnfrage) -> dict:
     try:
         ort: Ort | None = await finde_ort(anfrage.name, kontakt=settings.wiki_kontakt)
     except OrtFehler as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        # Ohne WIKI_KONTAKT wirft die Live-Abfrage. Die eingebaute Tabelle
+        # (jedes Land, jede Hauptstadt) geht trotzdem - erst wenn auch die
+        # nichts hat, ist es ein Fehler.
+        ort = aus_tabelle(anfrage.name)
+        if ort is None:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
     if ort is None:
         raise HTTPException(
             status_code=404,

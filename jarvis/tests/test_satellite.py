@@ -397,11 +397,26 @@ def test_der_satellite_agent_ist_auf_read_gedeckelt():
 
 
 def test_der_prompt_verbietet_aussagen_unter_der_aufloesung():
+    """Die Regel selbst, nicht ihr Wortlaut.
+
+    Hier stand `assert "EIN Pixel" in prompt` - ein Satz aus der alten
+    Fassung ("Ein Einfamilienhaus ist damit EIN Pixel"). Der ist am
+    26.08.2026 weggefallen, weil er eine falsche Zahl festschrieb: er
+    rechnete mit den 10 m des SENSORS, waehrend das gelieferte Bild bei
+    einem Stadtausschnitt 23 m und bei einem ganzen Land ueber 1000 m je
+    Pixel hat. Der Test prueft jetzt, was die Regel leisten soll, statt wie
+    sie formuliert ist - und ist damit strenger als vorher: er verlangt,
+    dass der Prompt auf die BILDaufloesung verweist.
+    """
     from core.agents import baue_agenten
 
     prompt = baue_agenten(FakeLLMProvider(),
                           max_permission=Permission.READ)["satellite"].system_prompt
-    assert "EIN Pixel" in prompt
+    # Auf die wahre Zahl verweisen, nicht auf die des Sensors.
+    assert "bild_aufloesung_m" in prompt
+    # Und sagen, was daraus folgt.
+    assert "halluziniert" in prompt
+    assert "Benenne kein Objekt" in prompt
     assert "keine Live-Bilder" in prompt.replace("Es gibt keine Live-Bilder", "keine Live-Bilder")
     assert "GRENZE" in prompt
 

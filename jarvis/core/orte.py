@@ -31,10 +31,13 @@ unmaskiert in etwas Ausführbares wandert.
 
 from __future__ import annotations
 
+import json
 import logging
 import math
 import re
 from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
 
 import httpx
 
@@ -64,6 +67,13 @@ class Ort:
     lon: float
     einwohner: int | None = None
     weitere_treffer: int = 0
+    # Nur aus der eingebauten Tabelle gefuellt: "land" oder "hauptstadt".
+    art: str = ""
+    iso3: str = ""
+
+    @property
+    def aus_der_tabelle(self) -> bool:
+        return bool(self.art)
 
     def als_dict(self) -> dict:
         return {
@@ -73,6 +83,9 @@ class Ort:
             "lon": self.lon,
             "einwohner": self.einwohner,
             "weitere_treffer": self.weitere_treffer,
+            "art": self.art,
+            "iso3": self.iso3,
+            "quelle": "Tabelle" if self.aus_der_tabelle else "Wikidata",
         }
 
 
@@ -152,14 +165,145 @@ def _auswerten(payload: dict) -> Ort | None:
     )
 
 
+# --- Die eingebaute Tabelle -----------------------------------------------
+#
+# Jedes Land und jede Hauptstadt der Welt, erzeugt von
+# `scripts/orte_tabelle.py`. Drei Gruende, warum das eine Datei ist und
+# keine Abfrage:
+#
+# 1. Es sind rund 400 Eintraege, die sich im Jahr vielleicht einmal aendern.
+# 2. Sie muessen auch ohne Netz gehen - und ohne WIKI_KONTAKT.
+# 3. Wikidata hat beim Bau dieser Datei auf httpx durchgehend mit 403
+#    geantwortet und auf curl mit 200 (siehe scripts/orte_tabelle.py). Ob
+#    das an der Umgebung lag, war von dort nicht zu entscheiden - aber ein
+#    Land soll nicht davon abhaengen.
+#
+# Alles andere (Berge, Kleinstaedte, Stadtteile) geht weiter live.
+
+TABELLE_PFAD = Path(__file__).resolve().parent / "daten" / "orte.json"
+
+# Fuer den Vergleich: Kleinschreibung, Umlaute aufgeloest, Bindestriche und
+# Mehrfach-Leerzeichen weg. Damit findet "schwabisch gmund" auch
+# "Schwäbisch Gmünd" - und "SAO PAULO" das São Paulo.
+_FALTUNG = str.maketrans({
+    "ä": "a", "ö": "o", "ü": "u", "ß": "ss",
+    "á": "a", "à": "a", "â": "a", "ã": "a", "å": "a",
+    "é": "e", "è": "e", "ê": "e", "ë": "e",
+    "í": "i", "ì": "i", "î": "i", "ï": "i",
+    "ó": "o", "ò": "o", "ô": "o", "õ": "o", "ø": "o",
+    "ú": "u", "ù": "u", "û": "u",
+    "ç": "c", "ñ": "n", "ý": "y",
+    # Apostrophe in allen Varianten, die in Ortsnamen vorkommen. Wikidata
+    # schreibt Nukuʻalofa mit dem ʻOkina (U+02BB) - wer das nicht kennt,
+    # findet Tongas Hauptstadt nie.
+    "-": " ", "'": "", "’": "", "ʻ": "", "ʼ": "", "`": "", "´": "",
+    ".": "",
+})
+
+
+def falte(name: str) -> str:
+    return " ".join((name or "").strip().lower().translate(_FALTUNG).split())
+
+
+# Ein ISO-Code ist ein exaktes Kuerzel, kein unscharfer Name. Er steht
+# deshalb in einem EIGENEN Index.
+#
+# Der Grund ist gemessen: mit beidem im selben Index fand "Poel" (eine
+# Insel in der Ostsee) das Land POLEN - "poel" wird durch die
+# oe-Ersatzschreibung zu "pol", und das ist Polens ISO-Code. Ein Kuerzel
+# darf nur exakt treffen, nie ueber eine Faltung.
+ISO_FORM = re.compile(r"^[A-Za-z]{2,3}$")
+
+
+@lru_cache(maxsize=1)
+def _geladen() -> tuple[dict[str, Ort], dict[str, Ort]]:
+    """(Namen, ISO-Codes). Einmal gelesen, dann im Speicher."""
+    try:
+        roh = json.loads(TABELLE_PFAD.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        log.warning("Ortstabelle nicht lesbar (%s) - es geht nur noch live.", exc)
+        return {}, {}
+    aus: dict[str, Ort] = {}
+    codes: dict[str, Ort] = {}
+    for eintrag in roh.get("orte", []):
+        ort = Ort(
+            qid=eintrag["qid"],
+            # Der Anzeigename, nicht der erste Suchname: sonst heisst
+            # Deutschland "DE", weil die ISO-Codes alphabetisch vorn
+            # stehen. Aeltere Dateien ohne "name" fallen zurueck.
+            name=eintrag.get("name") or eintrag["namen"][0],
+            lat=float(eintrag["lat"]),
+            lon=float(eintrag["lon"]),
+            art=eintrag.get("art", ""),
+            iso3=eintrag.get("iso3", ""),
+        )
+        for name in eintrag["namen"]:
+            if ISO_FORM.match(name):
+                codes.setdefault(name.upper(), ort)
+                continue
+            schluessel = falte(name)
+            # Ein Land gewinnt gegen eine Hauptstadt gleichen Namens
+            # (Luxemburg, Singapur, Dschibuti, Guatemala ...): wer "Monaco"
+            # sagt, meint fast immer den Staat.
+            if schluessel in aus and aus[schluessel].art == "land":
+                continue
+            aus[schluessel] = ort
+    return aus, codes
+
+
+def tabelle() -> dict[str, Ort]:
+    return _geladen()[0]
+
+
+def iso_codes() -> dict[str, Ort]:
+    return _geladen()[1]
+
+
+# Wer keine Umlaute tippt, schreibt "oe" statt "ö". Die Faltung oben macht
+# aus "ö" ein "o" - "Koenigreich" und "Königreich" landen also auf
+# verschiedenen Schluesseln. Ein zweiter Versuch fängt das, statt die
+# Ersetzung in den Hauptindex zu ziehen: dort wuerde sie Falschtreffer
+# erzeugen (aus "Poel" wuerde "Pol").
+_UMSCHRIFT = (("oe", "o"), ("ae", "a"), ("ue", "u"), ("ss", "s"))
+
+
+def aus_tabelle(name: str) -> Ort | None:
+    roh = (name or "").strip()
+    # 1. Ein Kuerzel trifft nur exakt: "DE", "DEU", "US".
+    if ISO_FORM.match(roh):
+        treffer = iso_codes().get(roh.upper())
+        if treffer is not None:
+            return treffer
+    # 2. Der Name, gefaltet.
+    schluessel = falte(roh)
+    treffer = tabelle().get(schluessel)
+    if treffer is not None:
+        return treffer
+    # 3. Zweiter Versuch fuer wer keine Umlaute tippt.
+    zweiter = schluessel
+    for lang, kurz in _UMSCHRIFT:
+        zweiter = zweiter.replace(lang, kurz)
+    return tabelle().get(zweiter) if zweiter != schluessel else None
+
+
 async def finde_ort(
     name: str,
     *,
     kontakt: str,
     transport: httpx.AsyncBaseTransport | None = None,
     timeout: float = 20.0,
+    nur_tabelle: bool = False,
 ) -> Ort | None:
-    """Der beste Treffer, oder None. Wirft nur bei kaputter Eingabe/Antwort."""
+    """Der beste Treffer, oder None. Wirft nur bei kaputter Eingabe/Antwort.
+
+    Erst die eingebaute Tabelle (jedes Land, jede Hauptstadt - ohne Netz,
+    ohne Key), dann Wikidata live fuer alles andere.
+    """
+    aus_der_tabelle = aus_tabelle(name)
+    if aus_der_tabelle is not None:
+        return aus_der_tabelle
+    if nur_tabelle:
+        return None
     if not kontakt.strip():
         raise OrtFehler(
             "WIKI_KONTAKT fehlt in der .env. Wikimedia verlangt einen "
