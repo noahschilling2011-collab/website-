@@ -418,3 +418,135 @@ def test_der_globus_zeigt_alle_laender_des_atlas(server):
             assert anzahl == 177, anzahl
         finally:
             br.close()
+
+
+# --- Ortssuche: schreib einen Ort, flieg hin (26.08.2026) ------------------
+
+
+def _ort_stub(monkeypatch, gefunden=True):
+    """Wikidata antwortet - der Geocoder hat eigene Tests in test_orte.py."""
+    from core.orte import Ort
+
+    async def stub(name, **_):
+        if not gefunden:
+            return None
+        return Ort(qid="Q4037", name="Schwäbisch Gmünd", lat=48.8, lon=9.8,
+                   einwohner=62726)
+
+    import api.ort
+    monkeypatch.setattr(api.ort, "finde_ort", stub)
+
+
+def test_ein_ort_wird_gesucht_und_angeflogen(server, monkeypatch):
+    """Was Noah wollte: "ich schreib ja ich will dort, dann zoomt es dorthin".
+
+    Bis hierher konnte der Globus nur Laender, und nur die, deren
+    Mittelpunkt als Marke auf der Kugel sitzt. Und die Kamera stand fest -
+    `dreheZu` drehte nur.
+    """
+    basis, app = server
+    _ort_stub(monkeypatch)
+    app.state.provider = FakeLLMProvider(replies=[
+        json.dumps({"steps": [{"description": "Ort einordnen", "agent": None}]}),
+        "Schwaebisch Gmuend liegt in Baden-Wuerttemberg.",
+        "Schwaebisch Gmuend liegt in Baden-Wuerttemberg.",
+    ])
+
+    with playwright.sync_playwright() as pw:
+        br, seite = browser(pw)
+        try:
+            seite.goto(f"{basis}/weltlage", wait_until="networkidle")
+            seite.wait_for_timeout(1200)
+            vorher = seite.evaluate("() => document.body.dataset.naehe || '3.10'")
+
+            seite.fill("#ort-eingabe", "Schwäbisch Gmünd")
+            seite.click("#btn-ort")
+            seite.wait_for_selector("#ortpanel:not([hidden])", timeout=25000)
+
+            assert "Gmünd" in seite.text_content("#ort-name")
+            assert "48.8000, 9.8000" in seite.text_content("#ort-koord")
+            assert "62.726" in seite.text_content("#ort-koord")
+
+            # Und es ist wirklich herangeflogen, nicht nur gedreht.
+            nachher = seite.evaluate("() => document.body.dataset.naehe")
+            assert float(nachher) < float(vorher), \
+                f"Kamera nicht herangefahren: {vorher} -> {nachher}"
+            assert float(nachher) <= 1.5
+        finally:
+            br.close()
+
+
+def test_ein_unbekannter_ort_sagt_das_und_zoomt_nicht(server, monkeypatch):
+    basis, app = server
+    _ort_stub(monkeypatch, gefunden=False)
+
+    with playwright.sync_playwright() as pw:
+        br, seite = browser(pw)
+        try:
+            seite.goto(f"{basis}/weltlage", wait_until="networkidle")
+            seite.wait_for_timeout(1200)
+            seite.fill("#ort-eingabe", "Gibtesnichtstadt123")
+            seite.click("#btn-ort")
+            seite.wait_for_function(
+                "() => document.getElementById('gesagt')"
+                ".textContent.includes('nicht gefunden')", timeout=25000)
+            assert seite.is_hidden("#ortpanel")
+        finally:
+            br.close()
+
+
+def test_ohne_cdse_kommt_kein_bild_aber_der_ort_bleibt(server, monkeypatch):
+    """Noahs heutiger Zustand: keine Copernicus-Zugangsdaten. Der Ort und
+    der Text muessen trotzdem da sein, und der Grund fuer das fehlende Bild
+    sichtbar - nicht ein leeres Panel."""
+    basis, app = server
+    _ort_stub(monkeypatch)
+    app.state.provider = FakeLLMProvider(replies=[
+        json.dumps({"steps": [{"description": "x", "agent": None}]}),
+        "Ein Text.", "Ein Text.",
+    ])
+
+    with playwright.sync_playwright() as pw:
+        br, seite = browser(pw)
+        try:
+            seite.goto(f"{basis}/weltlage", wait_until="networkidle")
+            seite.wait_for_timeout(1200)
+            seite.fill("#ort-eingabe", "Schwäbisch Gmünd")
+            seite.click("#btn-ort")
+            seite.wait_for_selector("#ortpanel:not([hidden])", timeout=25000)
+
+            assert seite.is_hidden("#ort-bild-box"), "ohne CDSE kein Bildrahmen"
+            assert "CDSE_CLIENT_ID" in seite.text_content("#ort-hinweis")
+            assert seite.text_content("#ort-name").strip()
+        finally:
+            br.close()
+
+
+def test_weltweit_schliesst_das_panel_und_zoomt_zurueck(server, monkeypatch):
+    basis, app = server
+    _ort_stub(monkeypatch)
+    app.state.provider = FakeLLMProvider(replies=[
+        json.dumps({"steps": [{"description": "x", "agent": None}]}),
+        "Ein Text.", "Ein Text.",
+    ])
+
+    with playwright.sync_playwright() as pw:
+        br, seite = browser(pw)
+        try:
+            seite.goto(f"{basis}/weltlage", wait_until="networkidle")
+            seite.wait_for_timeout(1200)
+            seite.fill("#ort-eingabe", "Schwäbisch Gmünd")
+            seite.click("#btn-ort")
+            seite.wait_for_selector("#ortpanel:not([hidden])", timeout=25000)
+            nah = float(seite.evaluate("() => document.body.dataset.naehe"))
+
+            seite.click("#btn-welt")
+            # state="hidden": die Vorgabe ist "visible", und ein
+            # verstecktes Element wird das nie. Erster Anlauf lief
+            # in den Timeout, obwohl das Panel korrekt zu war.
+            seite.wait_for_selector("#ortpanel", state="hidden",
+                                    timeout=10000)
+            weit = float(seite.evaluate("() => document.body.dataset.naehe"))
+            assert weit > nah, f"nicht zurueckgezoomt: {nah} -> {weit}"
+        finally:
+            br.close()

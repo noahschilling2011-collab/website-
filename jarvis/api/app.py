@@ -21,6 +21,7 @@ from api.security import ensure_token
 from core.config import PROJECT_ROOT, Settings, get_settings
 from core.db import connect, init_db
 from core.llm import LLMError, LLMProvider, build_provider
+from api.ort import ort_router
 from api.weltlage import weltlage_router
 from core.tools import registry
 
@@ -197,6 +198,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         from fastapi.staticfiles import StaticFiles
 
         app.mount("/static", StaticFiles(directory=STATIC_PATH), name="static")
+    app.include_router(ort_router)
     app.include_router(weltlage_router)
     app.include_router(api)
     app.include_router(tasks_router)

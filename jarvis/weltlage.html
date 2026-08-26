@@ -127,6 +127,31 @@ body{
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:.001ms !important;transition-duration:.001ms !important}
 }
+.ortsuche{display:flex;gap:.4rem;align-items:center}
+.ortsuche input{
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);
+  color:#e8ecf3;border-radius:8px;padding:.38rem .6rem;font:inherit;
+  font-size:.86rem;width:min(30ch,34vw);outline:none;
+}
+.ortsuche input:focus{border-color:#4da3ff}
+.ortpanel{
+  position:fixed;left:1.4rem;bottom:3.2rem;width:min(42ch,42vw);z-index:5;
+  background:rgba(14,18,26,.82);backdrop-filter:blur(14px);
+  border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:1rem 1.1rem;
+}
+.ortpanel h2{margin:0 0 .1rem;font-size:1.05rem;font-weight:600}
+.ortkoord{margin:0 0 .7rem;font-size:.78rem;color:#8d96a6}
+.ortbild{margin:0 0 .7rem;border-radius:10px;overflow:hidden;
+         border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.3)}
+.ortbild img{display:block;width:100%;height:auto}
+.ortbild figcaption{padding:.35rem .6rem;font-size:.72rem;color:#8d96a6}
+.orttext{margin:0;font-size:.88rem;line-height:1.5;color:#d5dbe6}
+.orthinweis{margin:.6rem 0 0;font-size:.78rem;color:#c9a227}
+.orthinweis:empty{display:none}
+.ortzu{position:absolute;top:.5rem;right:.6rem;background:none;border:0;
+       color:#8d96a6;font-size:1.2rem;line-height:1;cursor:pointer}
+.ortzu:hover{color:#e8ecf3}
+@media (max-width:720px){ .ortpanel{left:1rem;width:auto;right:1rem} }
 @media (min-width:1500px){
   .karten{width:min(64ch,50vw);display:grid;grid-template-columns:1fr 1fr;
           grid-auto-rows:min-content;align-content:start}
@@ -145,10 +170,28 @@ body{
   <div class="marke">JARVIS <span>· Weltlage</span></div>
   <div class="land" id="land">weltweit</div>
   <div class="luecke"></div>
+  <form class="ortsuche" id="ortsuche">
+    <input id="ort-eingabe" type="search" autocomplete="off"
+           placeholder="Ort eingeben, z. B. Schwäbisch Gmünd"
+           aria-label="Ort suchen">
+    <button class="knopf" type="submit" id="btn-ort">Hinfliegen</button>
+  </form>
   <button class="knopf" id="btn-welt" type="button">Weltweit</button>
   <button class="knopf" id="btn-mic" type="button" aria-pressed="false"
           title="Leertaste halten und sprechen">🎤 Halten</button>
 </header>
+
+<section class="ortpanel" id="ortpanel" hidden aria-live="polite">
+  <button class="ortzu" id="ort-zu" type="button" aria-label="Schließen">×</button>
+  <h2 id="ort-name">—</h2>
+  <p class="ortkoord" id="ort-koord"></p>
+  <figure class="ortbild" id="ort-bild-box" hidden>
+    <img id="ort-bild" alt="Satellitenaufnahme des gesuchten Ortes">
+    <figcaption id="ort-bildunterschrift"></figcaption>
+  </figure>
+  <p class="orttext" id="ort-text"></p>
+  <p class="orthinweis" id="ort-hinweis"></p>
+</section>
 
 <main class="karten" id="karten" aria-live="polite"></main>
 
@@ -172,7 +215,10 @@ const MAX_KARTEN = 5;
 
 function api(pfad, opt){
   const o = opt || {};
-  o.headers = {'X-Jarvis-Token': TOKEN};
+  // Mischen, nicht ersetzen: ein POST braucht zusaetzlich content-type.
+  // Vorher stand hier eine Zuweisung - damit ging jeder mitgegebene Header
+  // still verloren.
+  o.headers = Object.assign({}, o.headers || {}, {'X-Jarvis-Token': TOKEN});
   return fetch(pfad, o).then(r => r.text().then(roh => {
     let d = null; try { d = roh ? JSON.parse(roh) : null; } catch(e){}
     if (!r.ok) throw new Error((d && d.detail) || roh || ('HTTP ' + r.status));
@@ -500,19 +546,33 @@ if (renderer){
   let ziel = null, start = null, t0 = 0;
   const DAUER_MS = 1800;
 
-  zustand.dreheZu = dreheZu;
+  // Kamerastand. 3.1 ist der Ueberblick, 1.45 ist so nah, wie es geht,
+  // ohne in die Kugel zu fahren - der Radius ist 1, die Grenzlinien
+  // liegen bei 1.002 und die Landesmarken bei 1.01.
+  const WEIT = 3.1, NAH = 1.45;
 
-  function dreheZu(lon, lat){
+  zustand.dreheZu = dreheZu;
+  zustand.fliegeZu = fliegeZu;
+
+  function dreheZu(lon, lat){ fliegeZu(lon, lat, WEIT); }
+
+  function fliegeZu(lon, lat, naehe){
     const zielY = -(lon + 180) * Math.PI / 180 - Math.PI / 2;
     const zielX = lat * Math.PI / 180;
+    const zielZ = Math.max(NAH, Math.min(WEIT, naehe == null ? WEIT : naehe));
     if (reduziert){
       welt.rotation.set(zielX, zielY, 0);      // springt direkt
+      kamera.position.z = zielZ;
       document.body.dataset.drehung = 'sprung';
+      document.body.dataset.naehe = zielZ.toFixed(2);
       return;
     }
     document.body.dataset.drehung = 'animiert';
-    start = {x: welt.rotation.x, y: welt.rotation.y};
-    ziel = {x: zielX, y: zielY};
+    // Von aussen pruefbar machen, wohin geflogen wird. Die Kameraposition
+    // selbst steckt in der Three.js-Szene und ist es nicht.
+    document.body.dataset.naehe = zielZ.toFixed(2);
+    start = {x: welt.rotation.x, y: welt.rotation.y, z: kamera.position.z};
+    ziel = {x: zielX, y: zielY, z: zielZ};
     t0 = performance.now();
   }
 
@@ -539,6 +599,7 @@ if (renderer){
       const e = glatt(t);
       welt.rotation.x = start.x + (ziel.x - start.x) * e;
       welt.rotation.y = start.y + (ziel.y - start.y) * e;
+      kamera.position.z = start.z + (ziel.z - start.z) * e;
       if (t >= 1) ziel = null;
     }
     renderer.render(szene, kamera);
@@ -549,8 +610,94 @@ if (renderer){
 
 /* ------------------------------------------------------- Bedienung */
 
+/* --------------------------------------------------------- Ortssuche */
+
+/* Schreib einen Ort, flieg hin, sieh nach.
+   Der Globus konnte bisher nur Laender, und nur die, deren Mittelpunkt als
+   Marke auf der Kugel sitzt. */
+
+function zeigeOrtBild(pfad, unterschrift){
+  const box = el('ort-bild-box');
+  const bild = el('ort-bild');
+  if (!pfad){ box.hidden = true; bild.removeAttribute('src'); return; }
+
+  // Die ID herausziehen, gegen die Form pruefen, die Adresse selbst bauen -
+  // `pfad` kommt aus einer Antwort, die mittelbar aus einem Modell stammt.
+  const id = String(pfad).split('/').pop();
+  if (!/^[0-9a-f]{32}$/.test(id)){ box.hidden = true; return; }
+
+  // Ein <img src> schickt keinen X-Jarvis-Token. Also holen wir die Bytes
+  // selbst und machen eine Blob-URL daraus - der Token bleibt im Header
+  // und landet nicht in Adresszeile, Verlauf und Log.
+  fetch('/api/bild/' + id, { headers: {'X-Jarvis-Token': TOKEN} })
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+    .then(blob => {
+      const url = URL.createObjectURL(blob);
+      bild.onload = () => URL.revokeObjectURL(url);
+      bild.src = url;
+      el('ort-bildunterschrift').textContent = unterschrift || '';
+      box.hidden = false;
+    })
+    .catch(fehler => {
+      box.hidden = true;
+      el('ort-hinweis').textContent = 'Bild nicht geladen: ' + fehler.message;
+    });
+}
+
+function ortAnzeigen(d){
+  const panel = el('ortpanel');
+  panel.hidden = false;
+  el('ort-name').textContent = d.ort.name;
+  const ew = d.ort.einwohner
+    ? ' · ' + d.ort.einwohner.toLocaleString('de-DE') + ' Einwohner' : '';
+  const mehr = d.ort.weitere_treffer
+    ? ' · ' + d.ort.weitere_treffer + ' weitere(r) Treffer gleichen Namens' : '';
+  el('ort-koord').textContent =
+    d.ort.lat.toFixed(4) + ', ' + d.ort.lon.toFixed(4) + ew + mehr;
+  el('ort-text').textContent = d.text || '';
+  el('ort-hinweis').textContent = d.hinweis || '';
+
+  const unterschrift = d.bild
+    ? [d.bild.attribution,
+       d.bild.aufloesung_m ? d.bild.aufloesung_m + ' m je Pixel' : '',
+       d.szene && d.szene.aufgenommen ? 'Aufnahme ' + d.szene.aufgenommen : '',
+       d.szene && d.szene.wolken_pct != null ? d.szene.wolken_pct + ' % Wolken' : '']
+      .filter(Boolean).join(' · ')
+    : '';
+  zeigeOrtBild(d.bild && d.bild.url, unterschrift);
+}
+
+el('ort-zu').addEventListener('click', () => {
+  el('ortpanel').hidden = true;
+  if (zustand.dreheZu) zustand.dreheZu(0, 15);
+});
+
+el('ortsuche').addEventListener('submit', ev => {
+  ev.preventDefault();
+  const name = el('ort-eingabe').value.trim();
+  if (!name) return;
+  const knopf = el('btn-ort');
+  knopf.disabled = true;
+  el('gesagt').textContent = 'Suche ' + name + ' …';
+  api('/api/ort', {
+    method: 'POST',
+    headers: {'content-type': 'application/json'},
+    body: JSON.stringify({name}),
+  }).then(d => {
+    // Erst hinfliegen, dann anzeigen: die Drehung ist auch hier die
+    // Ladeanzeige, und sie dauert 1,8 s.
+    if (zustand.fliegeZu) zustand.fliegeZu(d.ort.lon, d.ort.lat, 1.45);
+    ortAnzeigen(d);
+    el('gesagt').textContent = d.ort.name;
+  }).catch(fehler => {
+    el('ortpanel').hidden = true;
+    el('gesagt').textContent = 'Ort nicht gefunden: ' + fehler.message;
+  }).finally(() => { knopf.disabled = false; });
+});
+
 el('btn-welt').addEventListener('click', () => {
   // Zurueck auf die Uebersicht: die Drehung ist auch hier die Ladeanzeige.
+  el('ortpanel').hidden = true;
   if (zustand.dreheZu) zustand.dreheZu(0, 15);
   ladeLand('WELT', 'weltweit');
 });
