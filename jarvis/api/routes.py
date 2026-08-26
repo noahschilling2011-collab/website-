@@ -15,7 +15,7 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
 
 from api.schemas import (
     ChatRequest,
@@ -33,6 +33,7 @@ from api.schemas import (
 from api.events import strom
 from api.security import require_token
 from core import db, gedaechtnis, memory
+from core.satellite import bilder
 from core.abbruch import LaufBeendet, baue_pruefpunkt
 from core.contracts import Permission, Task, TaskBudget
 from core.llm import (
@@ -406,6 +407,31 @@ async def get_tool_calls(request: Request, limit: int = 100) -> list[dict]:
         return [db.ToolCallRow.from_row(r).__dict__ for r in rows]
 
     return await asyncio.to_thread(lesen)
+
+
+@api.get("/bild/{kennung}")
+async def get_bild(request: Request, kennung: str) -> Response:
+    """Ein Satellitenbild als PNG.
+
+    Liegt bewusst hinter demselben `X-Jarvis-Token` wie alles unter `/api/`.
+    Ein `<img src>` kann diesen Header nicht schicken - deshalb holt das
+    Frontend die Bytes per fetch() und macht daraus eine Blob-URL. Der
+    Umweg ist der Punkt: die Alternative waere der Token in der Adresszeile,
+    im Verlauf, im Referrer und in jedem Log.
+    """
+    pfad = _settings(request).db_path
+    try:
+        daten = await asyncio.to_thread(bilder.lade, kennung, db_path=pfad)
+    except bilder.BildFehler as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if daten is None:
+        raise HTTPException(status_code=404, detail="Bild nicht gefunden.")
+    return Response(
+        content=daten,
+        media_type="image/png",
+        # Inhaltsadressiert: dieselbe ID sind immer dieselben Bytes.
+        headers={"Cache-Control": "private, max-age=86400, immutable"},
+    )
 
 
 @api.get("/stats")

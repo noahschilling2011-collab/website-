@@ -22,6 +22,7 @@ zu filtern ist bei Kontingenten die falsche Reihenfolge.
 from __future__ import annotations
 
 import logging
+import math
 from datetime import datetime, timezone
 from typing import Any
 
@@ -37,6 +38,37 @@ TOKEN_URL = (
 )
 KATALOG_URL = "https://catalogue.dataspace.copernicus.eu/odata/v1/Products"
 
+# Sentinel Hub Process API - der Dienst, der ein anzeigbares Bild liefert.
+# Der Katalog oben liefert nur Metadaten; das war der Grund, warum
+# `preview_url` bis hierher immer None war.
+#
+# Gemessen am 26.08.2026, nicht aus der Erinnerung. Beide Pfade sind
+# geroutet, ein erfundener nicht:
+#
+#     POST /api/v1/process        -> 401   (existiert, Token fehlt)
+#     POST /process/v1            -> 401   (existiert auch)
+#     POST /gibtesnicht/quatsch   -> 503   (existiert nicht)
+#
+# Die 503 auf dem erfundenen Pfad ist der Beleg, dass die 401 etwas heisst.
+PROCESS_URL = "https://sh.dataspace.copernicus.eu/api/v1/process"
+
+# Echtfarbe aus den sichtbaren Baendern. Der Faktor 2.5 steht so im
+# Beispiel der CDSE-Doku - Sentinel-2-Reflektanzen sind sonst sehr dunkel.
+EVALSCRIPT_ECHTFARBE = (
+    "//VERSION=3\n"
+    "function setup() {\n"
+    '  return { input: ["B02", "B03", "B04"], '
+    'output: { bands: 3, sampleType: "AUTO" } }\n'
+    "}\n"
+    "function evaluatePixel(s) {\n"
+    "  return [2.5 * s.B04, 2.5 * s.B03, 2.5 * s.B02]\n"
+    "}"
+)
+
+# Sentinel Hub rechnet nach Flaeche ab (Processing Units). Ein 8000er-Bild
+# waere ein Kontingent-Loch, das niemand bemerkt, bis der Monat leer ist.
+MAX_KANTE_PX = 2500
+
 # Aus den Copernicus-Nutzungsbedingungen. Steht unter jedem Bild.
 ATTRIBUTION = "Enthaelt modifizierte Copernicus-Sentinel-Daten"
 LIZENZ = "Copernicus Sentinel Data Terms and Conditions"
@@ -45,9 +77,44 @@ LIZENZ = "Copernicus Sentinel Data Terms and Conditions"
 # Die Zahl ist kein Detail, sie entscheidet, was ueberhaupt aussagbar ist.
 SENTINEL2_AUFLOESUNG_M = 10.0
 
+# Ein Grad Breite in Metern. Fuer die Laenge kommt der Kosinus der
+# Breite dazu - siehe effektive_aufloesung_m.
+GRAD_M = 111_320.0
+
 
 class CDSEFehler(RuntimeError):
     pass
+
+
+def effektive_aufloesung_m(
+    bbox: tuple[float, float, float, float], breite: int, hoehe: int
+) -> float:
+    """Meter je Bildpixel - und zwar die WAHRE Zahl, nicht die des Sensors.
+
+    Der Unterschied ist der ganze Punkt. Sentinel-2 liefert 10 m/px. Ein
+    512-Pixel-Bild von ganz Deutschland hat rund 1,3 KILOMETER je Pixel -
+    zwei Groessenordnungen daneben. Bis hierher stand ueberall die
+    Konstante 10.0, unabhaengig vom Ausschnitt. Ein Agent, dem man das
+    sagt, haelt sich fuer scharfsichtig und benennt Dinge, die auf dem
+    Bild ein Zehntel Pixel gross sind - genau das, was `SATELLIT_PROMPT`
+    als Halluzination verbietet.
+
+    Die Breitengradstauchung geht mit ein: ein Grad Laenge ist bei 60 Grad
+    Nord halb so lang wie am Aequator. Ohne den Kosinus liegt man in
+    Nordeuropa um ein Drittel daneben.
+
+    Nach unten gedeckelt auf die Sensoraufloesung: mehr Pixel erfinden
+    keine Schaerfe.
+    """
+    min_lon, min_lat, max_lon, max_lat = bbox
+    mitte = math.radians((min_lat + max_lat) / 2.0)
+    breite_m = abs(max_lon - min_lon) * GRAD_M * math.cos(mitte)
+    hoehe_m = abs(max_lat - min_lat) * GRAD_M
+    je_pixel = max(
+        breite_m / max(1, breite),
+        hoehe_m / max(1, hoehe),
+    )
+    return max(SENTINEL2_AUFLOESUNG_M, je_pixel)
 
 
 def bbox_als_polygon(bbox: tuple[float, float, float, float]) -> str:
@@ -191,6 +258,81 @@ class CDSEProvider:
         if not self._token:
             raise CDSEFehler("CDSE lieferte kein access_token.")
         return self._token
+
+    async def render(
+        self,
+        bbox: tuple[float, float, float, float],
+        von: str,
+        bis: str,
+        *,
+        breite: int = 512,
+        hoehe: int = 512,
+    ) -> bytes:
+        """Ein anzeigbares PNG aus der Sentinel Hub Process API.
+
+        `von` und `bis` sind ISO-Zeitpunkte in UTC. Eng gewaehlt - am besten
+        der Aufnahmetag der Szene, die `search` gefunden hat: dann zeigt das
+        Bild genau diese Szene und nicht irgendeine aus dem Zeitraum.
+
+        Bewusst KEIN `maxCloudCoverage` im dataFilter: gefiltert wird schon
+        serverseitig im Katalog. Ein Feld, das ich nicht in einem
+        ausgefuehrten Beispiel gesehen habe, kommt hier nicht rein.
+        """
+        zugang = await self.token()
+        kante_b = max(1, min(breite, MAX_KANTE_PX))
+        kante_h = max(1, min(hoehe, MAX_KANTE_PX))
+        koerper = {
+            "input": {
+                "bounds": {
+                    "properties": {
+                        "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+                    },
+                    "bbox": list(bbox),
+                },
+                "data": [{
+                    "type": "sentinel-2-l2a",
+                    "dataFilter": {"timeRange": {"from": von, "to": bis}},
+                }],
+            },
+            "output": {
+                "width": kante_b,
+                "height": kante_h,
+                "responses": [
+                    {"identifier": "default", "format": {"type": "image/png"}}
+                ],
+            },
+            "evalscript": EVALSCRIPT_ECHTFARBE,
+        }
+        async with httpx.AsyncClient(timeout=self.timeout,
+                                     transport=self.transport) as client:
+            antwort = await client.post(
+                PROCESS_URL, json=koerper,
+                headers={"Authorization": f"Bearer {zugang}"},
+            )
+        if antwort.status_code >= 400:
+            # Bewusst ohne den Antworttext: er kann die Anfrage spiegeln,
+            # und in der steht nichts Geheimes - aber das Secret steckt im
+            # Klienten, und eine Fehlermeldung ist der falsche Ort, um sich
+            # darauf zu verlassen.
+            raise CDSEFehler(
+                f"Das Bild konnte nicht erzeugt werden "
+                f"(HTTP {antwort.status_code}). Bei 403 ist meist das "
+                f"Kontingent erschoepft (10.000 Processing Units je Monat)."
+            )
+
+        typ = antwort.headers.get("content-type", "")
+        if not typ.startswith("image/"):
+            # Sentinel Hub antwortet bei manchen Fehlern mit 200 und JSON.
+            # Wer das als Bild ablegt, speichert eine kaputte Datei und
+            # zeigt sie an.
+            raise CDSEFehler(
+                f"Die Antwort war kein Bild, sondern {typ!r}. "
+                "Wahrscheinlich gibt es fuer diesen Ausschnitt und Zeitraum "
+                "keine Aufnahme."
+            )
+        if not antwort.content:
+            raise CDSEFehler("Die Antwort war ein leeres Bild.")
+        return antwort.content
 
     async def search(
         self,

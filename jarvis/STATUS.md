@@ -306,6 +306,50 @@ einen uvicorn im Thread; die Netzsperre der Testsitzung lässt dafür genau
 
 ## Phase 8 — Satellite Agent
 
+> **26.08.2026 — der Bildpfad ist gebaut.** Damit sind DoD 1, 3 und 6 nicht
+> mehr *strukturell* unerfüllbar; sie bleiben trotzdem `✗`/`◐`, weil hier
+> keine CDSE-Zugangsdaten liegen und ich sie nicht gegen den echten Dienst
+> ausgeführt habe. **NICHT AUSGEFÜHRT: ein Aufruf gegen das echte
+> `sh.dataspace.copernicus.eu`.** Belegt ist die Anfrageform gegen die
+> Dokumentation und gegen zwei Messungen, nicht gegen den laufenden Dienst.
+>
+> Gemessen statt erinnert — die Endpunkt-Frage war nicht aus der Doku zu
+> klären, also gemessen:
+>
+> ```
+> POST /api/v1/process        -> 401   (existiert, Token fehlt)
+> POST /process/v1            -> 401   (existiert auch)
+> POST /gibtesnicht/quatsch   -> 503   (existiert nicht)
+> ```
+>
+> Die 503 auf dem erfundenen Pfad ist der Beleg, dass die 401 etwas heißt.
+> Kontingent laut `documentation.dataspace.copernicus.eu/Quotas.html`:
+> 10.000 Processing Units und 50.000 Anfragen im Monat — der Bildpfad ist
+> **kostenlos** benutzbar.
+>
+> **Gebaut:** `CDSEProvider.render()` gegen die Sentinel Hub Process API,
+> `core/satellite/bilder.py` (inhaltsadressierte Ablage unter `data/bilder/`),
+> `GET /api/bild/{kennung}` hinter demselben Token wie alles andere, und die
+> Bildanzeige in `index.html` — die Datei hatte vorher **null** `<img>`.
+>
+> **Der Auflösungsfehler ist behoben.** Bis hierher stand überall die
+> Konstante 10.0 m/px, unabhängig vom Ausschnitt. Gemessen:
+>
+> ```
+> ganz Deutschland, 512 px  ->  1696 m je Bildpixel
+> Schwäbisch Gmünd, 512 px  ->    21,7 m je Bildpixel
+> ```
+>
+> Der Grenzsatz („Objekte unter X m sind nicht beurteilbar") stützt sich
+> jetzt auf **diese** Zahl. Wer dort die 10 stehen lässt, sagt dem Modell,
+> es könne Dinge sehen, die auf dem Bild ein Zehntel Pixel groß sind — genau
+> die Halluzination, die `SATELLIT_PROMPT` verbietet.
+>
+> **Weiterhin offen:** DoD 5 (Überflüge aus TLE-Daten). `skyfield` ist nicht
+> im Stack und wäre laut `CLAUDE.md` eine Stack-Änderung — die entscheidet
+> Noah, nicht ich.
+
+
 | # | Kriterium | Stand | BELEG — ausgeführter Befehl | Was der Beleg nicht zeigt |
 |---|---|---|---|---|
 | 1 | "Aktuellstes wolkenfreies Sentinel-2-Bild von Schwaebisch Gmuend" liefert ein BILD mit Aufnahmedatum, Sensor, m/px und Wolkenanteil | ✗ BLOCKIERT | `cd /home/user/website-/jarvis && python3 -m pytest -q "tests/test_satellite.py::test_die_suche_liefert_datum_sensor_aufloesung_und_wolken" ; python…` | Dreifach nicht erfuellt. (a) Kein echter Key: keine CDSE-Variablen in der Umgebung, .env.example Zeile 29/30 leer; die Antwort kam aus httpx.MockTransport, es wurde nie ein echter Katalog befragt. (b) Kein Bild: CDSEProvider hat weder re… |

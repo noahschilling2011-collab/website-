@@ -656,6 +656,27 @@ button, input, textarea { font: inherit; color: inherit; }
   max-height: 260px;
   overflow-y: auto;
 }
+.tool-bild {
+  margin: 10px 0 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(0,0,0,.25);
+}
+.tool-bild img {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* Ein Satellitenbild ist Bildinformation, keine Illustration - nichts
+     zuschneiden, nichts weichzeichnen. */
+  image-rendering: auto;
+}
+.tool-bild figcaption {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--dim, #9aa);
+}
+.tool-bild-fehler { padding: 10px; font-size: 13px; color: var(--dim, #9aa); }
 .tool-quellen {
   margin: var(--s-2) 0 0;
   padding-left: 1.1em;
@@ -973,6 +994,45 @@ button, input, textarea { font: inherit; color: inherit; }
     var kopf = document.createElement('div');
     kopf.className = 'tool-kopf';
 
+  function zeigeBild(box, pfad, attribution) {
+    var figur = document.createElement('figure');
+    figur.className = 'tool-bild';
+
+    var bild = document.createElement('img');
+    bild.alt = 'Satellitenaufnahme';
+    bild.loading = 'lazy';
+    figur.appendChild(bild);
+
+    // Attribution ist Pflicht, nicht Deko: Copernicus-Daten duerfen ohne
+    // sie nicht angezeigt werden (core/satellite/contracts.py).
+    if (attribution) {
+      var bildunterschrift = document.createElement('figcaption');
+      bildunterschrift.textContent = attribution;
+      figur.appendChild(bildunterschrift);
+    }
+    box.appendChild(figur);
+
+    fetch(pfad, { headers: { 'X-Jarvis-Token': TOKEN } })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.blob();
+      })
+      .then(function (blob) {
+        var url = URL.createObjectURL(blob);
+        bild.src = url;
+        // Aufraeumen, sobald das Bild steht - eine Blob-URL haelt sonst
+        // die Bytes bis zum Neuladen der Seite im Speicher.
+        bild.onload = function () { URL.revokeObjectURL(url); };
+      })
+      .catch(function (fehler) {
+        figur.removeChild(bild);
+        var hinweis = document.createElement('p');
+        hinweis.className = 'tool-bild-fehler';
+        hinweis.textContent = 'Bild konnte nicht geladen werden: ' + fehler.message;
+        figur.insertBefore(hinweis, figur.firstChild);
+      });
+  }
+
     var name = document.createElement('span');
     name.className = 'tool-name' + (call.ok ? '' : ' is-bad');
     name.textContent = call.name + '(' + argumentText(call.arguments) + ')';
@@ -990,6 +1050,24 @@ button, input, textarea { font: inherit; color: inherit; }
       var pre = document.createElement('pre');
       pre.textContent = ausgabe;
       box.appendChild(pre);
+    }
+
+    // Satellitenbild (Phase 8). Bis hierher hatte diese Datei null <img>.
+    //
+    // Geholt wird per fetch() mit dem Token-Header, nicht ueber ein nacktes
+    // <img src>: ein img-Tag schickt keine eigenen Header, der Token muesste
+    // sonst in die Adresse — und stuende damit im Verlauf, im Referrer und
+    // in jedem Log. Aus den Bytes wird eine Blob-URL.
+    var vorschau = call.data && call.data.preview_url;
+    if (vorschau) {
+      // Nicht den Pfad aus dem Ergebnis fetchen, sondern die ID daraus
+      // ziehen, gegen die Form pruefen und die Adresse selbst bauen. Der
+      // Unterschied ist klein und wichtig: `preview_url` kommt aus einem
+      // Werkzeugergebnis, also mittelbar aus einem Modell.
+      var id = String(vorschau).split('/').pop();
+      if (/^[0-9a-f]{32}$/.test(id)) {
+        zeigeBild(box, '/api/bild/' + id, call.data.attribution || '');
+      }
     }
 
     if (call.sources && call.sources.length) {

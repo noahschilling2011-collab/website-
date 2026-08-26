@@ -119,6 +119,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             satellit.provider = CDSEProvider(
                 settings.cdse_client_id, settings.cdse_client_secret
             )
+            # Wohin das gerenderte Bild geschrieben wird - neben die
+            # Datenbank, nicht hinein.
+            satellit.db_path = settings.db_path
+        if not settings.cdse_client_id:
+            log.info("CDSE_CLIENT_ID fehlt - satellite_search meldet das beim "
+                     "Aufruf. Ein Konto gibt es kostenlos auf "
+                     "dataspace.copernicus.eu.")
         # --- Vault (docs/MIGRATION-VAULT.md) ---
         # Der Index ist abgeleitet: beim Start einmal neu bauen kostet nichts
         # und macht ihn verlaesslich, egal was zwischendurch in Obsidian
