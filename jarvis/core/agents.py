@@ -8,15 +8,20 @@ sie im Dispatcher - nicht hier (0.7).
 
 from __future__ import annotations
 
+import logging
+
 import time
 from typing import Awaitable, Callable, Iterable
 
 from core.abbruch import LaufBeendet
 from core.contracts import Agent, Permission, Step, Task, ToolResult
+from core.belege import belegte_urls, ohne_unbelegte_links
 from core.satellite.policy import pruefe_anfrage
 from core.llm import LLMMessage, LLMProvider, LLMReply
 from core.tools.dispatch import Audit, Bestaetigung, ToolCall
 from core.tools.loop import run_tool_loop
+
+log = logging.getLogger("jarvis")
 
 SPRACHSTIL = """
 
@@ -186,6 +191,7 @@ class ToolAgent(Agent):
         bestaetigung: Bestaetigung | None = None,
         audit: Audit | None = None,
         vorpruefung: Callable[[str], None] | None = None,
+        links_pruefen: bool = True,
         budget_pruefung: Callable[[], None] | None = None,
     ) -> None:
         self.provider = provider
@@ -204,6 +210,7 @@ class ToolAgent(Agent):
         # erst bearbeitet werden soll - eine Ablehnung, die vom Tagesform eines
         # Modells abhaengt, ist keine Regel.
         self._vorpruefung = vorpruefung
+        self._links_pruefen = links_pruefen
         # BUGS-01 Fund 4 und FIX-03 Schritt 3a: der Pruefpunkt des Auftrags.
         # Er steht vor jedem bezahlten Zug und vor jedem Werkzeug und wirft
         # `LaufBeendet`. Ohne ihn gaelte weder Abbruch noch Budget innerhalb
@@ -297,6 +304,25 @@ class ToolAgent(Agent):
                 if url not in quellen:
                     quellen.append(url)
 
+        # Erfundene Links raus. Der Agent hier hat oft gar kein Werkzeug mit
+        # Netzzugang - was er dann an Adressen anhaengt, kommt aus dem
+        # Gedaechtnis des Modells, nicht von einer Seite.
+        #
+        # `links_pruefen=False` gibt es fuer genau einen Fall: einen Agenten,
+        # dessen Ausgabe kein Mensch liest, sondern ein Parser. Siehe die
+        # Begruendung bei `weltlage` in `baue_agenten`.
+        if self._links_pruefen:
+            belegt = belegte_urls(
+                quellen,
+                [(a.result.display or "") for a in aufrufe if a.result],
+            )
+            text, erfunden = ohne_unbelegte_links(text, belegt)
+            if erfunden:
+                log.warning(
+                    "Agent %s: %d Link(e) entfernt - kein Werkzeug hat sie "
+                    "geliefert.", self.name, erfunden,
+                )
+
         return ToolResult(
             ok=bool(text.strip()),
             data={"tool_calls": [a.to_dict() for a in aufrufe]},
@@ -381,6 +407,20 @@ def baue_agenten(
             tools=["wiki_lokal", "wiki_live", "wikidata", "web_search", "fetch_url"],
             max_permission=Permission.READ,
             max_tool_calls=12,
+            # Der einzige Agent ohne Link-Filter, und zwar aus zwei Gruenden:
+            #
+            # 1. Seine Ausgabe ist JSON fuer einen Parser, kein Fliesstext fuer
+            #    einen Menschen. Eine URL da rauszuschneiden zerstoert den
+            #    Datensatz, statt eine Behauptung zu entschaerfen - gemessen:
+            #    der Filter liess 21 Weltlage-Tests fallen, weil jede Meldung
+            #    ohne quell_url verworfen wird.
+            # 2. Er hat eine eigene, schaerfere Pruefung. `core/weltlage.py`
+            #    verwirft jede Meldung ohne gueltige quell_url (`_url_gueltig`),
+            #    dedupliziert darueber, und `api/weltlage.py` HOLT die
+            #    Quellseite anschliessend wirklich. Eine erfundene URL faellt
+            #    dort durch - nicht weil jemand sie fuer echt haelt, sondern
+            #    weil sie nicht antwortet.
+            links_pruefen=False,
             on_reply=on_reply,
             on_call=on_call,
             audit=audit,

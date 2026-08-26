@@ -22,6 +22,7 @@ from typing import Awaitable, Callable
 from core.agents import ToolAgent, baue_agenten
 from core.delegation import DelegationsKontext, kontext as delegationskontext
 from core.abbruch import LaufBeendet, baue_pruefpunkt
+from core.belege import belegte_urls, ohne_unbelegte_links
 from core.contracts import (
     Permission,
     Step,
@@ -445,6 +446,22 @@ async def _fasse_zusammen(
         text = "\n\n".join(
             (s.result.display if s.result else "") for s in erledigt
         ).strip()
+
+    # Erst die erfundenen Links raus, DANN die echten anhaengen - sonst
+    # wuerde der Filter gleich wieder wegnehmen, was JARVIS selbst belegt.
+    #
+    # Was ein Werkzeug geholt hat, gilt: `sources`, und ausserdem jede
+    # Adresse, die im Ergebnistext eines Werkzeugs steht - nicht jedes
+    # Werkzeug fuellt `sources`.
+    belegt = belegte_urls(
+        quellen, [(s.result.display or "") for s in erledigt if s.result]
+    )
+    text, erfunden = ohne_unbelegte_links(text, belegt)
+    if erfunden:
+        log.warning(
+            "task %s: %d Link(e) aus der Antwort entfernt - kein Werkzeug hat "
+            "sie geliefert.", task.id, erfunden,
+        )
 
     # Die Quellen haengen wir selbst an. Ob das Modell sie im Text zitiert, ist
     # eine Bitte; dass sie unter der Antwort stehen, ist eine Tatsache.
