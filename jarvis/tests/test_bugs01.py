@@ -439,3 +439,192 @@ def test_fund1a_der_abbruch_weckt_die_rueckfrage_sofort(settings, tmp_path):
 
     assert daten["status"] == "cancelled", daten
     assert gedauert < 15.0, f"Der Abbruch brauchte {gedauert:.1f} s"
+
+
+# --- Fund 4: Das Budget wird nur zwischen Schritten geprueft -------------
+
+
+def _plan_mit_werkzeugrunden(runden: int):
+    """Ein Ein-Schritt-Plan, dessen Schritt `runden` Mal ein Werkzeug ruft.
+
+    Bewusst nicht als feste `replies`-Liste: wie viele Zuege wirklich
+    verbraucht werden, haengt genau an dem Verhalten, das hier geprueft wird.
+    Eine feste Liste waere danach verschoben, und die Zusammenfassung bekaeme
+    einen Werkzeugzug statt eines Textes. Unterschieden wird an den echten
+    Markern aus dem Produktivcode, nicht an geratenen Zeichenketten.
+    """
+    from core.llm import FakeLLMProvider, FakeTurn, ToolUse
+    from core.planner import PLANNER_MARKER
+    from core.runner import ABSCHLUSS_PROMPT
+
+    class Werkzeugschleife(FakeLLMProvider):
+        def __init__(self) -> None:
+            super().__init__()
+            self.werkzeugzuege = 0
+
+        async def complete(self, messages, *, system, tools=None):
+            if system.startswith(PLANNER_MARKER):
+                self._replies = ['{"steps":[{"description":"A"}]}']
+            elif system.startswith(ABSCHLUSS_PROMPT):
+                self._replies = ["Zusammengefasst."]
+            elif self.werkzeugzuege < runden:
+                self.werkzeugzuege += 1
+                self._replies = [FakeTurn(tool_uses=(
+                    ToolUse(f"t{self.werkzeugzuege}", "clock", {}),
+                ))]
+            else:
+                self._replies = ["Fertig."]
+            return await super().complete(messages, system=system, tools=tools)
+
+    return Werkzeugschleife()
+
+
+def test_fund4_max_tool_calls_gilt_auch_innerhalb_eines_schritts():
+    """BUGS-01 Fund 4 - ein Ein-Schritt-Plan hatte praktisch kein Budget.
+
+    `budget_verletzung()` lief nur in der Schleife ueber `task.steps`.
+    Innerhalb eines Schritts konnte der Werkzeug-Loop beliebig viele
+    Werkzeuge rufen; der Task endete danach auf "done".
+    """
+    from core.contracts import TaskBudget
+    from core.runner import fuehre_task_aus
+
+    p = _plan_mit_werkzeugrunden(6)
+    t = run(fuehre_task_aus(p, "Ein Schritt, viele Werkzeuge",
+                            budget=TaskBudget(max_tool_calls=2),
+                            kosten=lambda a, b: 0.0))
+
+    assert t.spent_tool_calls <= 2, (
+        f"{t.spent_tool_calls} Werkzeugaufrufe bei max_tool_calls=2"
+    )
+    assert t.status == "aborted_budget", t.status
+    assert "max_tool_calls" in (t.abort_reason or "")
+
+
+def test_fund4_max_tokens_gilt_auch_innerhalb_eines_schritts():
+    from core.contracts import TaskBudget
+    from core.runner import fuehre_task_aus
+
+    # Erst messen, wieviel ein Zug wirklich kostet - eine geratene Zahl waere
+    # entweder wirkungslos oder wuerde schon den Planner erschlagen.
+    mess = _plan_mit_werkzeugrunden(6)
+    gemessen = run(fuehre_task_aus(mess, "Messlauf", budget=TaskBudget(),
+                                   kosten=lambda a, b: 0.0))
+    assert gemessen.status == "done", gemessen.status
+    grenze = gemessen.spent_tokens // 2
+
+    p = _plan_mit_werkzeugrunden(6)
+    t = run(fuehre_task_aus(p, "Ein Schritt, viele Werkzeuge",
+                            budget=TaskBudget(max_tokens=grenze),
+                            kosten=lambda a, b: 0.0))
+
+    assert t.status == "aborted_budget", t.status
+    assert "max_tokens" in (t.abort_reason or "")
+    assert t.spent_tokens < gemessen.spent_tokens, (
+        f"{t.spent_tokens} statt hoechstens {gemessen.spent_tokens} - "
+        "der Task ist trotz Grenze voll durchgelaufen"
+    )
+
+
+def test_fund4_nach_der_grenze_laeuft_nur_noch_der_abschluss():
+    """Genau ein Zug darf noch - der, den 0.5 verlangt.
+
+    Der Werkzeugzug, der die Grenze reisst, laeuft zu Ende. Danach kommt
+    kein weiterer Werkzeugzug mehr, sondern nur noch die Zusammenfassung:
+    0.5 verlangt ausdruecklich ein Teilergebnis. Ohne den Fix liefen alle
+    sechs Werkzeugrunden durch.
+    """
+    from core.contracts import TaskBudget
+    from core.runner import fuehre_task_aus
+
+    p = _plan_mit_werkzeugrunden(6)
+    t = run(fuehre_task_aus(p, "Ein Schritt, viele Werkzeuge",
+                            budget=TaskBudget(max_tool_calls=2),
+                            kosten=lambda a, b: 0.0))
+
+    assert t.status == "aborted_budget"
+    # Plan + zwei Werkzeugrunden + Zusammenfassung. Mehr nicht.
+    assert len(p.calls) == 4, f"{len(p.calls)} Modellaufrufe: {t.abort_reason}"
+    assert p.werkzeugzuege == 2, f"{p.werkzeugzuege} Werkzeugzuege statt 2"
+    assert t.result, "Ohne Teilergebnis waere 0.5 verletzt."
+
+
+def test_fund4_der_wiederholversuch_prueft_das_budget_ebenfalls():
+    """Ein nicht bestandener Schritt wird wiederholt - auch ueber die Grenze.
+
+    Die Grenze wird nicht geraten, sondern gemessen: sie liegt exakt auf dem
+    Stand nach Plan plus erstem Versuch. Eine geratene Zahl wuerde entweder
+    schon den Planner erschlagen oder gar nichts pruefen.
+    """
+    from core.contracts import TaskBudget
+    from core.llm import FakeLLMProvider
+    from core.runner import Laufzeit, fuehre_task_aus
+
+    def anbieter():
+        # Ein research-Schritt ohne Quelle besteht die Verifikation nie.
+        return FakeLLMProvider(replies=[
+            '{"steps":[{"description":"Etwas belegen","agent":"research"}]}',
+            "Die Zahl ist 400 %.",
+        ])
+
+    zuege: list[int] = []
+
+    async def mitzaehlen(reply):
+        zuege.append(reply.usage.in_tokens + reply.usage.out_tokens)
+
+    gemessen = run(fuehre_task_aus(anbieter(), "Beleg", budget=TaskBudget(),
+                                   kosten=lambda a, b: 0.0,
+                                   laufzeit=Laufzeit(on_reply=mitzaehlen)))
+    assert gemessen.steps[0].attempts == 2, (
+        f"Der Messlauf soll zweimal versuchen, versuchte {gemessen.steps[0].attempts}"
+    )
+    grenze = sum(zuege[:2])          # Plan + erster Versuch
+
+    t = run(fuehre_task_aus(anbieter(), "Beleg",
+                            budget=TaskBudget(max_tokens=grenze),
+                            kosten=lambda a, b: 0.0))
+
+    assert t.status == "aborted_budget", t.status
+    assert t.steps[0].attempts == 1, (
+        f"{t.steps[0].attempts} Versuche, obwohl das Budget nach dem ersten weg war"
+    )
+
+
+def test_fund4_mehrere_werkzeuge_in_einem_zug_laufen_nicht_alle_durch():
+    """Ein Modell darf mehrere Werkzeuge auf einmal anfordern.
+
+    Die Pruefung am Rundenanfang reicht dafuer nicht: die Grenze faellt
+    mitten im Zug. Was danach kommt, darf nicht mehr laufen.
+    """
+    from core.contracts import TaskBudget
+    from core.llm import FakeLLMProvider, FakeTurn, ToolUse
+    from core.planner import PLANNER_MARKER
+    from core.runner import ABSCHLUSS_PROMPT, fuehre_task_aus
+
+    class DreiAufEinmal(FakeLLMProvider):
+        async def complete(self, messages, *, system, tools=None):
+            if system.startswith(PLANNER_MARKER):
+                self._replies = ['{"steps":[{"description":"A"}]}']
+            elif system.startswith(ABSCHLUSS_PROMPT):
+                self._replies = ["Zusammengefasst."]
+            elif not self.calls or all(
+                c["system"].startswith(PLANNER_MARKER) for c in self.calls
+            ):
+                self._replies = [FakeTurn(tool_uses=(
+                    ToolUse("a", "clock", {}),
+                    ToolUse("b", "clock", {}),
+                    ToolUse("c", "clock", {}),
+                ))]
+            else:
+                self._replies = ["Fertig."]
+            return await super().complete(messages, system=system, tools=tools)
+
+    p = DreiAufEinmal()
+    t = run(fuehre_task_aus(p, "Drei auf einmal",
+                            budget=TaskBudget(max_tool_calls=1),
+                            kosten=lambda a, b: 0.0))
+
+    assert t.spent_tool_calls == 1, (
+        f"{t.spent_tool_calls} Werkzeuge gelaufen, erlaubt war 1"
+    )
+    assert t.status == "aborted_budget", t.status

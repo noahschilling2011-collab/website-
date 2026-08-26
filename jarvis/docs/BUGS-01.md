@@ -21,6 +21,7 @@ vom 25.08., kein Aufgabenzettel, den man umschreibt):
 | 7 · Keine SSRF-Sperre | behoben | `f1d5e22` |
 | 12 · `pruefe()` ohne Inhaltsprüfung | behoben | `5a21934` (FIX-02) |
 | 13 · Kartenzahl sinkt ohne Nachrücken | behoben | `5a21934` (FIX-02) |
+| 4 · Budget nur zwischen Schritten | behoben | `core/tools/loop.py`, `core/agents.py`, `core/runner.py`, `core/contracts.py` |
 | 2 · Restore macht sich selbst rückgängig | behoben | `scripts/backup.py` (Sicherheitskopie über die Backup-API) |
 | 1 · Abbrechen-Knopf | behoben | `api/tasks.py` (Wecker für die Rückfrage) + `core/runner.py` (Prüfung *nach* jedem Schritt) |
 | alle übrigen | offen | — |

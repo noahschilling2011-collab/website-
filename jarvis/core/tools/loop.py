@@ -24,6 +24,12 @@ BUDGET_HINWEIS = (
 )
 
 
+def _mit_budgetnotiz(text: str, grund: str) -> str:
+    """Haengt an, warum hier Schluss ist - statt stumm abzubrechen (0.5)."""
+    notiz = f"[Budget des Auftrags aufgebraucht: {grund}]"
+    return f"{text.strip()}\n\n{notiz}" if text.strip() else notiz
+
+
 async def run_tool_loop(
     provider: LLMProvider,
     verlauf: list[LLMMessage],
@@ -36,8 +42,20 @@ async def run_tool_loop(
     on_reply: Callable[[LLMReply], Awaitable[None]] | None = None,
     bestaetigung: Bestaetigung | None = None,
     audit: Audit | None = None,
+    budget: Callable[[], str | None] | None = None,
 ) -> tuple[str, list[ToolCall], list[LLMReply]]:
-    """Gibt (Antworttext, ausgefuehrte Aufrufe, alle Modellantworten) zurueck."""
+    """Gibt (Antworttext, ausgefuehrte Aufrufe, alle Modellantworten) zurueck.
+
+    `budget` ist die Budgetpruefung des Auftrags. Sie gibt die Begruendung
+    zurueck, wenn eine Grenze gerissen ist, sonst None.
+
+    BUGS-01 Fund 4: `max_tool_calls` hier ist die Grenze des *Agenten*, nicht
+    die des Auftrags. Die des Auftrags wurde frueher nur zwischen den
+    Schritten geprueft - innerhalb eines Schritts waren `max_tokens`,
+    `max_cost_eur`, `max_tool_calls` und `max_seconds` beliebig
+    ueberschreitbar. Bei einem Ein-Schritt-Plan hatte der Auftrag damit
+    praktisch kein Budget.
+    """
     schemas = registry.schemas_for(erlaubt, max_permission)
     nachrichten = list(verlauf)
     aufrufe: list[ToolCall] = []
@@ -45,6 +63,14 @@ async def run_tool_loop(
     budget_gemeldet = False
 
     while True:
+        # Vor jedem bezahlten Zug. Der Zug, der die Grenze reisst, laeuft zu
+        # Ende - danach wird hier nichts mehr ausgegeben.
+        grund = budget() if budget is not None else None
+        if grund is not None:
+            log.warning("Auftragsbudget erreicht (%s) - Werkzeugrunde endet", grund)
+            letzter = antworten[-1].text if antworten else ""
+            return _mit_budgetnotiz(letzter, grund), aufrufe, antworten
+
         reply = await provider.complete(
             nachrichten,
             system=system,
@@ -64,7 +90,17 @@ async def run_tool_loop(
         )
 
         ergebnisbloecke: list[dict[str, Any]] = []
+        gerissen: str | None = None
         for tool_use in reply.tool_uses:
+            # Auch zwischen zwei Werkzeugen desselben Zuges. Ein Modell darf
+            # mehrere auf einmal anfordern; die duerfen nicht alle noch
+            # durchlaufen, nachdem die Grenze weg ist.
+            gerissen = budget() if budget is not None else None
+            if gerissen is not None:
+                log.warning("Auftragsbudget erreicht (%s) - %s laeuft nicht mehr",
+                            gerissen, tool_use.name)
+                break
+
             if len(aufrufe) >= max_tool_calls:
                 ergebnisbloecke.append({
                     "type": "tool_result",
@@ -106,5 +142,8 @@ async def run_tool_loop(
                 "content": inhalt,
                 **({"is_error": True} if not ergebnis.ok else {}),
             })
+
+        if gerissen is not None:
+            return _mit_budgetnotiz(reply.text, gerissen), aufrufe, antworten
 
         nachrichten.append(LLMMessage(role="user", content=ergebnisbloecke))

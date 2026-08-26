@@ -137,10 +137,20 @@ async def fuehre_task_aus(
         if laufzeit.on_call:
             await laufzeit.on_call(aufruf)
 
+    def verbrauchsgrenze() -> str | None:
+        """Waehrend eines Schritts zaehlt nur der Verbrauch (BUGS-01 Fund 4).
+
+        `max_steps` und `max_depth` zaehlen den laufenden Schritt schon mit -
+        die wuerden hier immer reissen und ihn toeten, bevor er etwas tut.
+        """
+        return task.budget_verletzung(nur_verbrauch=True)
+
     verfuegbar = agenten or baue_agenten(
         provider, max_permission=max_permission, antwortstil=antwortstil,
         on_reply=buche, on_call=buche_werkzeug,
         bestaetigung=laufzeit.bestaetigung, audit=laufzeit.audit,
+        # BUGS-01 Fund 4: damit das Budget auch INNERHALB eines Schritts gilt.
+        budget_pruefung=verbrauchsgrenze,
     )
 
     # Der Delegationskontext gilt fuer den ganzen Lauf: er sagt ask_agent,
@@ -193,6 +203,24 @@ async def _lauf(
         await laufzeit.step(task, i, schritt)
     await laufzeit.task(task)
 
+    async def budget_reissleine(ab: int, *, nur_verbrauch: bool = False) -> str | None:
+        """0.5: Grenze gerissen -> Task beenden, Rest ueberspringen.
+
+        Gibt die Begruendung zurueck, oder None, wenn noch Luft ist.
+        `nur_verbrauch` siehe `Task.budget_verletzung`.
+        """
+        verletzung = task.budget_verletzung(nur_verbrauch=nur_verbrauch)
+        if not verletzung:
+            return None
+        task.status = "aborted_budget"
+        task.abort_reason = verletzung
+        log.warning("task %s: Budget - %s", task.id, verletzung)
+        for rest in task.steps[ab:]:
+            if rest.status is StepStatus.PENDING:
+                rest.status = StepStatus.SKIPPED
+                await laufzeit.step(task, task.steps.index(rest), rest)
+        return verletzung
+
     # --- Schritte ----------------------------------------------------------
     for i, schritt in enumerate(task.steps):
         if laufzeit.abgebrochen():
@@ -206,20 +234,21 @@ async def _lauf(
             return task
 
         # 0.5: VOR dem Schritt, nicht danach.
-        verletzung = task.budget_verletzung()
-        if verletzung:
-            task.status = "aborted_budget"
-            task.abort_reason = verletzung
-            log.warning("task %s: Budget - %s", task.id, verletzung)
-            for rest in task.steps[i:]:
-                if rest.status is StepStatus.PENDING:
-                    rest.status = StepStatus.SKIPPED
-                    await laufzeit.step(task, task.steps.index(rest), rest)
+        if await budget_reissleine(i):
             break
 
         agent = verfuegbar.get(schritt.agent or "jarvis") or verfuegbar["jarvis"]
 
+        gerissen = False
         while True:
+            # BUGS-01 Fund 4: auch vor jedem WIEDERHOLVERSUCH. Ein Schritt, der
+            # die Verifikation nicht besteht, wurde sonst noch einmal gestartet,
+            # obwohl das Budget beim ersten Versuch schon weg war. Ein zweiter
+            # Versuch ist kein zweiter Schritt - deshalb nur der Verbrauch.
+            if await budget_reissleine(i, nur_verbrauch=True):
+                gerissen = True
+                break
+
             schritt.attempts += 1
             schritt.status = StepStatus.RUNNING
             await laufzeit.step(task, i, schritt)
@@ -252,6 +281,15 @@ async def _lauf(
             )
             schritt.status = StepStatus.PENDING
             await laufzeit.step(task, i, schritt)
+
+        if gerissen:
+            break
+
+        # BUGS-01 Fund 4: NACH dem Schritt, nicht erst vor dem naechsten.
+        # Sonst endet ein Ein-Schritt-Plan auf "done", obwohl er das Budget
+        # ueberzogen hat.
+        if await budget_reissleine(i + 1):
+            break
 
         # BUGS-01 Fund 1b: NACH dem Schritt noch einmal pruefen. Vorher lag
         # die Pruefung nur VOR dem naechsten - bei einem Ein-Schritt-Plan

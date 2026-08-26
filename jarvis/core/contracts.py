@@ -144,20 +144,29 @@ class Task:
     def elapsed_seconds(self, jetzt: float | None = None) -> float:
         return (jetzt if jetzt is not None else time.time()) - self.created_at
 
-    def budget_verletzung(self, jetzt: float | None = None) -> str | None:
+    def budget_verletzung(
+        self, jetzt: float | None = None, *, nur_verbrauch: bool = False
+    ) -> str | None:
         """Benennt die *erste* verletzte Grenze, oder None.
 
         Der Rückgabewert ist die Begründung, die der Nutzer zu sehen bekommt.
         Eine Grenze, die man nicht benennen kann, ist keine Grenze.
+
+        `nur_verbrauch=True` lässt `max_steps` und `max_depth` aus. Die beiden
+        sind Struktur, kein Verbrauch: sie zählen den Schritt, der gerade
+        läuft, bereits mit. *Während* eines Schritts würden sie deshalb immer
+        reißen, sobald der letzte erlaubte Schritt begonnen hat — und genau
+        der soll ja noch zu Ende laufen. Zwischen den Schritten prüft der
+        Runner weiterhin alles, so wie 0.5 es verlangt.
         """
         b = self.budget
         # Gezaehlt wird, was wirklich gelaufen ist - nicht, was geplant wurde.
         # Sonst reisst die Grenze, bevor ein einziger Schritt lief, und es
         # gaebe nie ein Teilergebnis.
         gestartet = sum(1 for s in self.steps if s.attempts > 0)
-        if gestartet >= b.max_steps:
+        if not nur_verbrauch and gestartet >= b.max_steps:
             return f"max_steps erreicht ({gestartet}/{b.max_steps})"
-        if self.depth > b.max_depth:
+        if not nur_verbrauch and self.depth > b.max_depth:
             return f"max_depth überschritten ({self.depth}/{b.max_depth})"
         if self.spent_tool_calls >= b.max_tool_calls:
             return (

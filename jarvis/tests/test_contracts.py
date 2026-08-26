@@ -115,6 +115,45 @@ def test_max_steps_zaehlt_gelaufene_schritte_nicht_geplante():
     assert "max_steps erreicht (2/2)" in (t.budget_verletzung() or "")
 
 
+def test_nur_verbrauch_laesst_struktur_aus_aber_nichts_anderes():
+    """BUGS-01 Fund 4 - der Unterschied zwischen Struktur und Verbrauch.
+
+    `max_steps` und `max_depth` zaehlen den laufenden Schritt schon mit. Waehrend
+    eines Schritts geprueft wuerden sie ihn toeten, bevor er etwas tut. Alle
+    anderen Grenzen gelten dort sehr wohl - sonst haette ein Ein-Schritt-Plan
+    wieder kein Budget.
+    """
+    t = Task(budget=TaskBudget(max_steps=1))
+    t.steps = [Step(id="1", description="x")]
+    t.steps[0].attempts = 1
+    assert "max_steps" in (t.budget_verletzung() or "")
+    assert t.budget_verletzung(nur_verbrauch=True) is None
+
+    tief = Task(budget=TaskBudget())
+    tief.depth = 3
+    assert "max_depth" in (tief.budget_verletzung() or "")
+    assert tief.budget_verletzung(nur_verbrauch=True) is None, (
+        "max_depth ist ebenfalls Struktur"
+    )
+
+    for feld, wert, erwartet in [
+        ("spent_tokens", 60_000, "max_tokens"),
+        ("spent_tool_calls", 20, "max_tool_calls"),
+        ("spent_cost_eur", 0.50, "max_cost_eur"),
+    ]:
+        frisch = Task(budget=TaskBudget())
+        setattr(frisch, feld, wert)
+        verletzung = frisch.budget_verletzung(nur_verbrauch=True)
+        assert verletzung is not None and erwartet in verletzung, (
+            f"{feld} ist Verbrauch und muss auch waehrend eines Schritts reissen"
+        )
+
+    spaet = Task(budget=TaskBudget(max_seconds=180))
+    assert "max_seconds" in (
+        spaet.budget_verletzung(jetzt=spaet.created_at + 181, nur_verbrauch=True) or ""
+    )
+
+
 def test_max_seconds_greift():
     t = Task(budget=TaskBudget(max_seconds=180))
     assert "max_seconds" in (t.budget_verletzung(jetzt=t.created_at + 181) or "")

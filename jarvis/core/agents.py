@@ -185,6 +185,7 @@ class ToolAgent(Agent):
         bestaetigung: Bestaetigung | None = None,
         audit: Audit | None = None,
         vorpruefung: Callable[[str], None] | None = None,
+        budget_pruefung: Callable[[], str | None] | None = None,
     ) -> None:
         self.provider = provider
         self.name = name
@@ -202,6 +203,10 @@ class ToolAgent(Agent):
         # erst bearbeitet werden soll - eine Ablehnung, die vom Tagesform eines
         # Modells abhaengt, ist keine Regel.
         self._vorpruefung = vorpruefung
+        # BUGS-01 Fund 4: die Budgetpruefung des Auftrags. Ohne sie gilt das
+        # Budget nur zwischen den Schritten, und ein Ein-Schritt-Plan haette
+        # praktisch keins.
+        self.budget_pruefung = budget_pruefung
 
     async def run(self, task: Task, step: Step) -> ToolResult:
         begonnen = time.monotonic()
@@ -242,6 +247,7 @@ class ToolAgent(Agent):
                 on_reply=self._on_reply,
                 bestaetigung=self._bestaetigung,
                 audit=self._audit,
+                budget=self.budget_pruefung,
             )
         except Exception as exc:  # noqa: BLE001 - ein Schritt reisst nie den Task um
             return ToolResult(
@@ -280,6 +286,7 @@ def baue_agenten(
     on_call: Callable[[ToolCall], Awaitable[None]] | None = None,
     bestaetigung: Bestaetigung | None = None,
     audit: Audit | None = None,
+    budget_pruefung: Callable[[], str | None] | None = None,
 ) -> dict[str, ToolAgent]:
     """Die Agenten, die es in dieser Phase gibt.
 
@@ -309,7 +316,7 @@ def baue_agenten(
         audit=audit,
     )
 
-    return {
+    alle = {
         "hermes": hermes,
         "satellite": ToolAgent(
             provider,
@@ -374,3 +381,10 @@ def baue_agenten(
             audit=audit,
         ),
     }
+
+    # BUGS-01 Fund 4: an EINER Stelle gesetzt, nicht fuenfmal einzeln - sonst
+    # bekommt der naechste Agent die Budgetpruefung nicht und faellt still aus
+    # dem Budget heraus.
+    for agent in alle.values():
+        agent.budget_pruefung = budget_pruefung
+    return alle
