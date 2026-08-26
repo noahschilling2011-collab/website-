@@ -85,21 +85,34 @@ class HealthOut(BaseModel):
 
 
 class FactOut(BaseModel):
-    id: int
+    """Ein Fakt, wie ihn das Panel sieht.
+
+    FIX-04: `id` ist `int | str`. Ohne Vault ist es die Zeilennummer, mit
+    Vault die `id` aus dem Frontmatter (`f_395043`). Eine Vault-Notiz in eine
+    Zahl zu pressen hiesse, ihren Schluessel wegzuwerfen - und der Schluessel
+    ist genau das, was ein Umbenennen in Obsidian ueberlebt.
+
+    `pfad` ist die Datei im Vault, damit im Panel sichtbar ist, WO die
+    Wahrheit liegt. Ohne Vault bleibt er leer.
+    """
+
+    id: int | str
     text: str
     category: str
     source_message_id: int | None = None
     created_at: str
     confirmed: bool = False
-    conflicts_with: int | None = None
+    conflicts_with: int | str | None = None
+    pfad: str = ""
 
     @classmethod
-    def of(cls, fact: Fact) -> "FactOut":
+    def of(cls, eintrag) -> "FactOut":
         return cls(
-            id=fact.id, text=fact.text, category=fact.category,
-            source_message_id=fact.source_message_id,
-            created_at=fact.created_at, confirmed=fact.confirmed,
-            conflicts_with=fact.conflicts_with,
+            id=eintrag.id, text=eintrag.text, category=eintrag.category,
+            source_message_id=getattr(eintrag, "source_message_id", None),
+            created_at=eintrag.created_at, confirmed=eintrag.confirmed,
+            conflicts_with=eintrag.conflicts_with,
+            pfad=getattr(eintrag, "pfad", ""),
         )
 
 

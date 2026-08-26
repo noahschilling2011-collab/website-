@@ -86,73 +86,63 @@ class Remember(_MitDatenbank):
     }
     permission = Permission.LOCAL
 
-    def _in_den_vault(self, text: str, category: str, begonnen: float) -> ToolResult:
-        """Der Vault ist die Wahrheit - geschrieben wird die Datei, nicht die Zeile.
+    def _merken(self, text: str, category: str, begonnen: float) -> ToolResult:
+        """FIX-04 Schritt 2: EIN Schreibweg, fuer alle Aufrufer derselbe.
 
-        Der Index wird gleich mitgezogen, damit `recall` den Satz sofort
-        findet, ohne auf den Beobachter zu warten.
+        Vorher stand hier ein zweiter, eigener Weg in den Vault - und die
+        API-Endpunkte hatten einen dritten in die Tabelle `facts`. Jetzt geht
+        alles durch `core.gedaechtnis`: mit Vault zuerst die Datei, dann der
+        Index; ohne Vault wie bisher.
         """
-        from core.vault import Notiz, VaultKonflikt, neue_id, schreibe
-        from core.vault_index import aktualisiere
+        from core import gedaechtnis
+        from core.vault import VaultKonflikt
 
-        notiz = Notiz(
-            id=neue_id(),
-            text=text.strip(),
-            typ="fakt",
-            quelle="gespraech",
-            tags=[c for c in [category.strip()] if c and c != "allgemein"],
-        )
+        def dauer() -> int:
+            return int((time.monotonic() - begonnen) * 1000)
+
         try:
-            ziel = schreibe(Path(self.vault_pfad), notiz)
+            neu, widerspruch = gedaechtnis.anlegen(
+                self.pfad(), self.vault_pfad, text, category=category
+            )
+        except ValueError as exc:
+            return ToolResult(ok=False, error=str(exc), display=str(exc),
+                              duration_ms=dauer())
         except VaultKonflikt as exc:
             return ToolResult(ok=False, error=str(exc), display=str(exc),
-                              duration_ms=int((time.monotonic() - begonnen) * 1000))
+                              duration_ms=dauer())
         except OSError as exc:
             return ToolResult(ok=False, error=str(exc),
                               display=f"Vault nicht beschreibbar: {exc}",
-                              duration_ms=int((time.monotonic() - begonnen) * 1000))
+                              duration_ms=dauer())
 
-        aktualisiere(self.pfad(), Path(self.vault_pfad), ziel)
-        relativ = ziel.relative_to(Path(self.vault_pfad).expanduser())
+        # Ohne Vault bleibt die Anzeige wortgleich zu vorher: "#7" ist eine
+        # Zeilennummer, "f_395043" ist ein Dateischluessel. Beides als "#7"
+        # zu schreiben waere gelogen.
+        def zeige(kennung) -> str:
+            return f"#{kennung}" if isinstance(kennung, int) else str(kennung)
+
+        wo = f" in {neu.pfad}" if neu.pfad else ""
+        zeilen = [f"Gemerkt ({zeige(neu.id)}, {neu.category}){wo}: {neu.text}"]
+        if widerspruch is not None:
+            zeilen.append(
+                f"ACHTUNG: das widerspricht moeglicherweise "
+                f"{zeige(widerspruch.id)}: {widerspruch.text}"
+            )
+            zeilen.append(
+                "Beide Staende bleiben stehen. Sag dem Nutzer, dass es einen "
+                "Widerspruch gibt, und frag welcher gilt."
+            )
         return ToolResult(
             ok=True,
-            data={"id": notiz.id, "datei": str(relativ)},
-            display=f"Gemerkt in {relativ}: {notiz.text}",
-            sources=[str(relativ)],
-            duration_ms=int((time.monotonic() - begonnen) * 1000),
+            data={"id": neu.id, "conflicts_with": widerspruch.id if widerspruch else None,
+                  "datei": neu.pfad},
+            display="\n".join(zeilen),
+            sources=[neu.pfad] if neu.pfad else [],
+            duration_ms=dauer(),
         )
 
     async def execute(self, text: str, category: str = "allgemein") -> ToolResult:
-        begonnen = time.monotonic()
-        if self.vault_an():
-            return self._in_den_vault(text, category, begonnen)
-        try:
-            neu, konflikt = memory.add_fact(
-                self.pfad(), text, category=category.strip() or "allgemein"
-            )
-        except ValueError as exc:
-            return ToolResult(ok=False, error=str(exc), display=str(exc))
-
-        dauer = int((time.monotonic() - begonnen) * 1000)
-        if konflikt:
-            return ToolResult(
-                ok=True,
-                data={"id": neu.id, "conflicts_with": konflikt.id},
-                display=(
-                    f"Gemerkt (#{neu.id}): {neu.text}\n"
-                    f"ACHTUNG: das widerspricht moeglicherweise #{konflikt.id}: "
-                    f"{konflikt.text}\n"
-                    "Beide Staende bleiben stehen. Sag dem Nutzer, dass es "
-                    "einen Widerspruch gibt, und frag welcher gilt."
-                ),
-                duration_ms=dauer,
-            )
-        return ToolResult(
-            ok=True,
-            data={"id": neu.id},
-            display=f"Gemerkt (#{neu.id}, {neu.category}): {neu.text}",
-            duration_ms=dauer,
-        )
+        return self._merken(text, category.strip() or "allgemein", time.monotonic())
 
 
 @register
@@ -184,8 +174,13 @@ class Recall(_MitDatenbank):
         Jede Zeile nennt die Quelldatei. Auch bei lokaler Quelle - eine
         Antwort ohne Herkunft ist eine Behauptung.
         """
+        from core.gedaechtnis import frisch_halten
         from core.vault_index import suche
 
+        # FIX-04 Schritt 3: derselbe Leseweg wie das Panel - erst die
+        # Zeitstempel gegen den Index, dann suchen. Ohne das faende `recall`
+        # nicht, was zwischendurch in Obsidian getippt wurde.
+        frisch_halten(self.pfad(), self.vault_pfad)
         treffer = suche(self.pfad(), query, limit=self.MAX_NOTIZEN)
 
         zeilen: list[str] = []

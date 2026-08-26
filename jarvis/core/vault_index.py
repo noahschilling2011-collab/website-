@@ -38,6 +38,8 @@ class Treffer:
     erfasst: str
     snapshot: str | None
     tags: list[str]
+    widerspruch: str | None = None
+    bestaetigt: bool = False
 
     @property
     def herkunft(self) -> str:
@@ -70,13 +72,16 @@ def _eintrag(conn, wurzel: Path, pfad: Path) -> str | None:
         log.warning("Vault: %s uebersprungen - %s", pfad.name, exc)
         return None
     conn.execute(
-        "INSERT INTO vault_notizen (id, pfad, typ, quelle, erfasst, snapshot, tags, text, mtime) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        "INSERT INTO vault_notizen (id, pfad, typ, quelle, erfasst, snapshot, tags, "
+        "text, mtime, widerspruch, bestaetigt) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT(id) DO UPDATE SET pfad=excluded.pfad, typ=excluded.typ, "
         "quelle=excluded.quelle, erfasst=excluded.erfasst, snapshot=excluded.snapshot, "
-        "tags=excluded.tags, text=excluded.text, mtime=excluded.mtime",
+        "tags=excluded.tags, text=excluded.text, mtime=excluded.mtime, "
+        "widerspruch=excluded.widerspruch, bestaetigt=excluded.bestaetigt",
         (notiz.id, _relativ(wurzel, pfad), notiz.typ, notiz.quelle, notiz.erfasst,
-         notiz.snapshot, ",".join(notiz.tags), notiz.text, pfad.stat().st_mtime),
+         notiz.snapshot, ",".join(notiz.tags), notiz.text, pfad.stat().st_mtime,
+         notiz.widerspruch, int(notiz.bestaetigt)),
     )
     return notiz.id
 
@@ -134,7 +139,7 @@ def suche(db_path, frage: str, limit: int = 5) -> list[Treffer]:
     with session(db_path) as conn:
         try:
             zeilen = conn.execute(
-                "SELECT n.id, n.text, n.pfad, n.typ, n.quelle, n.erfasst, n.snapshot, n.tags "
+                "SELECT n.id, n.text, n.pfad, n.typ, n.quelle, n.erfasst, n.snapshot, n.tags, n.widerspruch, n.bestaetigt "
                 "FROM vault_fts f JOIN vault_notizen n ON n.rowid = f.rowid "
                 "WHERE vault_fts MATCH ? ORDER BY rank LIMIT ?",
                 (ausdruck, limit),
@@ -144,7 +149,8 @@ def suche(db_path, frage: str, limit: int = 5) -> list[Treffer]:
             return []
     return [
         Treffer(id=z[0], text=z[1], pfad=z[2], typ=z[3], quelle=z[4], erfasst=z[5],
-                snapshot=z[6], tags=[t for t in (z[7] or "").split(",") if t])
+                snapshot=z[6], tags=[t for t in (z[7] or "").split(",") if t],
+                widerspruch=z[8], bestaetigt=bool(z[9]))
         for z in zeilen
     ]
 
@@ -152,12 +158,13 @@ def suche(db_path, frage: str, limit: int = 5) -> list[Treffer]:
 def alle(db_path) -> list[Treffer]:
     with session(db_path) as conn:
         zeilen = conn.execute(
-            "SELECT id, text, pfad, typ, quelle, erfasst, snapshot, tags "
-            "FROM vault_notizen ORDER BY pfad"
+            "SELECT id, text, pfad, typ, quelle, erfasst, snapshot, tags, "
+            "widerspruch, bestaetigt FROM vault_notizen ORDER BY pfad"
         ).fetchall()
     return [
         Treffer(id=z[0], text=z[1], pfad=z[2], typ=z[3], quelle=z[4], erfasst=z[5],
-                snapshot=z[6], tags=[t for t in (z[7] or "").split(",") if t])
+                snapshot=z[6], tags=[t for t in (z[7] or "").split(",") if t],
+                widerspruch=z[8], bestaetigt=bool(z[9]))
         for z in zeilen
     ]
 

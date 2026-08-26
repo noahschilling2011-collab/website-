@@ -32,7 +32,7 @@ from api.schemas import (
 )
 from api.events import strom
 from api.security import require_token
-from core import db, memory
+from core import db, gedaechtnis, memory
 from core.abbruch import LaufBeendet, baue_pruefpunkt
 from core.contracts import Permission, Task, TaskBudget
 from core.llm import (
@@ -174,17 +174,20 @@ async def post_chat(request: Request, body: ChatRequest) -> ChatResponse:
 
     # Passende Fakten in den Systemprompt heben. Jede Zeile traegt ihre
     # Fakt-ID, damit die Herkunft sichtbar bleibt (Phase 3).
-    gedaechtnis = await asyncio.to_thread(
-        memory.kontextblock, settings.db_path, text
+    # FIX-04: derselbe Leseweg wie das Panel und wie `recall`. Vorher las
+    # diese Zeile nur `facts` - mit gesetztem VAULT_PFAD kam hier IMMER ein
+    # leerer Block heraus, und Phase-3-DoD 2 war still kaputt.
+    gedaechtnis_block = await asyncio.to_thread(
+        gedaechtnis.kontextblock, settings.db_path, settings.vault_pfad, text
     )
     systemprompt = (
-        f"{settings.system_prompt}\n\n{gedaechtnis}"
-        if gedaechtnis
+        f"{settings.system_prompt}\n\n{gedaechtnis_block}"
+        if gedaechtnis_block
         else settings.system_prompt
     )
-    if gedaechtnis:
+    if gedaechtnis_block:
         log.info("task %s: %d Fakten in den Kontext gehoben",
-                 task_id, gedaechtnis.count("\n- "))
+                 task_id, gedaechtnis_block.count("\n- ") + 1)
 
     # 2. Modell fragen, Werkzeuge laufen lassen. Keine Transaktion offen.
     try:
@@ -258,23 +261,41 @@ async def post_chat(request: Request, body: ChatRequest) -> ChatResponse:
 
 @api.get("/memory", response_model=list[FactOut])
 async def get_memory(request: Request, q: str = "") -> list[FactOut]:
-    """Alles, was JARVIS ueber dich weiss. Mit `q` gefiltert."""
-    pfad = _settings(request).db_path
-    fakten = await asyncio.to_thread(
-        memory.search_facts, pfad, q, 200
-    ) if q.strip() else await asyncio.to_thread(memory.list_facts, pfad)
-    return [FactOut.of(f) for f in fakten]
+    """Alles, was JARVIS ueber dich weiss. Mit `q` gefiltert.
+
+    FIX-04: liest ueber `core.gedaechtnis` - denselben Weg wie `recall`.
+    """
+    settings = _settings(request)
+    eintraege = await asyncio.to_thread(
+        gedaechtnis.liste, settings.db_path, settings.vault_pfad, q
+    )
+    if not eintraege and not q.strip():
+        # Eine leere Liste sieht aus wie "noch nichts gemerkt". Wenn der Vault
+        # aber voll ist, ist sie ein Fehler und muss als Fehler dastehen.
+        schaden = await asyncio.to_thread(
+            gedaechtnis.fehlbestand, settings.db_path, settings.vault_pfad
+        )
+        if schaden:
+            log.error("Gedaechtnis: %s", schaden)
+            raise HTTPException(status_code=500, detail=schaden)
+    return [FactOut.of(e) for e in eintraege]
 
 
 @api.post("/memory", response_model=FactCreated, status_code=201)
 async def post_memory(request: Request, body: FactCreate) -> FactCreated:
-    pfad = _settings(request).db_path
+    """FIX-04 Schritt 2: mit Vault entsteht zuerst die DATEI, dann der Index."""
+    settings = _settings(request)
     try:
         neu, konflikt = await asyncio.to_thread(
-            memory.add_fact, pfad, body.text, category=body.category
+            gedaechtnis.anlegen, settings.db_path, settings.vault_pfad,
+            body.text, category=body.category, quelle="mensch",
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(
+            status_code=507, detail=f"Vault nicht beschreibbar: {exc}"
+        ) from exc
     return FactCreated(
         fact=FactOut.of(neu),
         conflict=FactOut.of(konflikt) if konflikt else None,
@@ -283,18 +304,20 @@ async def post_memory(request: Request, body: FactCreate) -> FactCreated:
 
 @api.patch("/memory/{fact_id}", response_model=FactOut)
 async def patch_memory(
-    request: Request, fact_id: int, body: FactUpdate
+    request: Request, fact_id: str, body: FactUpdate
 ) -> FactOut:
-    pfad = _settings(request).db_path
+    """`fact_id` ist ein String: mit Vault heisst er `f_395043`, ohne Vault `7`."""
+    settings = _settings(request)
     try:
         geaendert = await asyncio.to_thread(
-            memory.update_fact,
-            pfad,
+            gedaechtnis.aendern,
+            settings.db_path,
+            settings.vault_pfad,
             fact_id,
             text=body.text,
             category=body.category,
             confirmed=body.confirmed,
-            conflicts_with=None if body.resolve_conflict else -1,
+            widerspruch_aufloesen=body.resolve_conflict,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -304,9 +327,12 @@ async def patch_memory(
 
 
 @api.delete("/memory/{fact_id}", status_code=204)
-async def delete_memory(request: Request, fact_id: int) -> None:
-    pfad = _settings(request).db_path
-    if not await asyncio.to_thread(memory.delete_fact, pfad, fact_id):
+async def delete_memory(request: Request, fact_id: str) -> None:
+    """Mit Vault verschwindet die DATEI, danach der Indexeintrag."""
+    settings = _settings(request)
+    if not await asyncio.to_thread(
+        gedaechtnis.loeschen, settings.db_path, settings.vault_pfad, fact_id
+    ):
         raise HTTPException(status_code=404, detail="Fakt nicht gefunden.")
 
 

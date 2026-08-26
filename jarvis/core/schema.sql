@@ -239,7 +239,12 @@ CREATE TABLE IF NOT EXISTS vault_notizen (
     snapshot  TEXT,
     tags      TEXT NOT NULL DEFAULT '',  -- kommasepariert, fuer die Anzeige
     text      TEXT NOT NULL,
-    mtime     REAL NOT NULL              -- aus der Datei, nicht aus der Uhr
+    mtime     REAL NOT NULL,             -- aus der Datei, nicht aus der Uhr
+    -- FIX-04 Schritt 4: beide stehen im Frontmatter der Notiz und damit in der
+    -- WAHRHEIT. Hier sind sie nur abgeleitet - `rm data/jarvis.db` und ein
+    -- reindex holen sie vollstaendig zurueck.
+    widerspruch TEXT,                    -- id der aelteren, widersprechenden Notiz
+    bestaetigt  INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS vault_notizen_pfad ON vault_notizen(pfad);

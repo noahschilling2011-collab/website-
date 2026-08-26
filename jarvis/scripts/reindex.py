@@ -1,36 +1,66 @@
-"""Baut den Vault-Index von null neu.
+"""Den Index aus dem Vault neu aufbauen (FIX-04 Schritt 3).
 
-    python -m scripts.reindex
+    python -m scripts.reindex [--db PFAD] [--vault PFAD]
 
-Der Index ist abgeleitet: ihn wegzuwerfen kostet nichts. Wenn dieser Befehl
-zweimal hintereinander unterschiedliche Ergebnisse liefert, steckt Zustand im
-Index, der nicht im Vault steht - und dann ist das Prinzip gebrochen.
+Der Vault ist die Wahrheit, die Datenbank nur ein Index. Dieser Befehl ist der
+Beweis dafuer: er leert die Tabelle und baut sie vollstaendig aus `vault/*.md`
+neu auf. Schluessel ist die `id` aus dem Frontmatter, nicht der Dateiname -
+deshalb ueberlebt ein Fakt das Umbenennen in Obsidian.
+
+Wer nach `rm data/jarvis.db` diesen Befehl laufen laesst, muss dieselbe Anzahl
+und dieselben `id`s zurueckbekommen. Das ist der Pruefstein aus dem Auftrag.
 """
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from core.config import get_settings          # noqa: E402
-from core.vault_index import alle, reindex    # noqa: E402
+from core.config import get_settings
+from core.db import connect, init_db
+from core.vault_index import reindex
 
 
 def main() -> int:
-    settings = get_settings()
-    wurzel = settings.vault_pfad
-    if not wurzel:
-        print("VAULT_PFAD ist leer - kein Vault eingerichtet. Nichts zu tun.")
-        return 0
+    parser = argparse.ArgumentParser(description="Baut den Vault-Index neu auf.")
+    parser.add_argument("--db", default=None, help="abweichender Datenbankpfad")
+    parser.add_argument("--vault", default=None, help="abweichender Vault-Pfad")
+    args = parser.parse_args()
 
-    anzahl = reindex(settings.db_path, wurzel)
-    print(f"{anzahl} Notizen aus {wurzel} indexiert.")
-    for t in alle(settings.db_path)[:5]:
-        print(f"  {t.id}  {t.pfad}")
-    if anzahl > 5:
-        print(f"  ... und {anzahl - 5} weitere")
+    settings = get_settings()
+    db_pfad = Path(args.db) if args.db else Path(settings.db_path)
+    vault = args.vault if args.vault is not None else settings.vault_pfad
+
+    if not str(vault).strip():
+        print("VAULT_PFAD ist nicht gesetzt - ohne Vault gibt es nichts zu "
+              "indexieren. Die Tabelle `facts` IST dann der Speicher.",
+              file=sys.stderr)
+        return 1
+
+    wurzel = Path(str(vault)).expanduser()
+    if not wurzel.exists():
+        print(f"Der Vault {wurzel} existiert nicht.", file=sys.stderr)
+        return 1
+
+    # Die Datenbank darf fehlen - genau das ist der Sinn der Uebung.
+    db_pfad.parent.mkdir(parents=True, exist_ok=True)
+    conn = connect(db_pfad)
+    try:
+        init_db(conn)
+    finally:
+        conn.close()
+
+    dateien = len(list(wurzel.rglob("*.md")))
+    anzahl = reindex(db_pfad, wurzel)
+    print(f"Vault:      {wurzel}")
+    print(f"Datenbank:  {db_pfad}")
+    print(f".md-Dateien:      {dateien}")
+    print(f"indexierte Notizen: {anzahl}")
+    if anzahl < dateien:
+        print(f"\n{dateien - anzahl} Datei(en) wurden uebersprungen - sie haben "
+              f"kein 'id' im Frontmatter oder sind nicht lesbar. Das Log oben "
+              f"nennt jede einzeln.")
     return 0
 
 

@@ -67,6 +67,13 @@ class Notiz:
     snapshot: str | None = None
     tags: list[str] = field(default_factory=list)
     links: list[str] = field(default_factory=list)
+    # FIX-04 Schritt 4: der Widerspruch gehoert in die WAHRHEIT, nicht in den
+    # Index. Sonst waere er nach `rm data/jarvis.db` weg - und der Pruefstein
+    # aus dem Auftrag verlangt, dass nach einem Neuaufbau kein einziger Fakt
+    # fehlt. Dasselbe gilt fuer `bestaetigt`: was ein Mensch entschieden hat,
+    # ist keine abgeleitete Information.
+    widerspruch: str | None = None
+    bestaetigt: bool = False
     # Rein informativ, wird nicht geschrieben:
     pfad: Path | None = None
     weitere: dict[str, Any] = field(default_factory=dict)
@@ -116,7 +123,8 @@ def lies(pfad: Path) -> Notiz:
     if "id" not in kopf:
         raise ValueError(f"{pfad}: kein 'id' im Frontmatter - keine JARVIS-Notiz.")
 
-    bekannt = {"id", "typ", "quelle", "erfasst", "snapshot", "tags"}
+    bekannt = {"id", "typ", "quelle", "erfasst", "snapshot", "tags",
+               "widerspruch", "bestaetigt"}
     tags = kopf.get("tags") or []
     if isinstance(tags, str):
         tags = [tags]
@@ -129,6 +137,10 @@ def lies(pfad: Path) -> Notiz:
         snapshot=kopf.get("snapshot"),
         tags=list(tags),
         links=wikilinks(koerper),
+        widerspruch=(str(kopf["widerspruch"])
+                     if kopf.get("widerspruch") not in (None, "", False) else None),
+        bestaetigt=str(kopf.get("bestaetigt") or "").strip().lower() in
+                   ("true", "ja", "yes", "1"),
         pfad=pfad,
         weitere={k: v for k, v in kopf.items() if k not in bekannt},
     )
@@ -164,6 +176,8 @@ def serialisiere(notiz: Notiz) -> str:
         ("erfasst", notiz.erfasst),
         ("snapshot", notiz.snapshot),
         ("tags", notiz.tags),
+        ("widerspruch", notiz.widerspruch),
+        ("bestaetigt", notiz.bestaetigt),
     ]
     felder += sorted(notiz.weitere.items())
     kopf = "\n".join(f"{k}: {_als_yaml(v)}" for k, v in felder)

@@ -283,3 +283,98 @@ Ich baue keine neue und ich lasse den neuen Entwurf **nicht** von ihr abhängen:
 Befehl und Zeitstempel-Prüfung tragen den Alltag allein — genau wie der Auftrag es verlangt.
 Die bestehende bleibt vorerst stehen; sie zu entfernen wäre eine Verhaltensänderung, die
 dieser Auftrag nicht verlangt. **Sag Bescheid, wenn sie rausfliegen soll.**
+
+---
+
+## ERGEBNIS SCHRITTE 2 BIS 4 — ausgeführt am 26.08.2026
+
+### Schritt 2 — Ein Schreibweg
+
+Neu: `core/gedaechtnis.py`. Alle Schreibwege gehen jetzt durch `anlegen()`,
+`aendern()`, `loeschen()`. Mit Vault entsteht **zuerst die Datei**, danach wird der Index
+nachgezogen — in dieser Reihenfolge, in einer Funktion.
+
+Belegt: mit gesetztem `VAULT_PFAD` und je einem Schreibvorgang über das Panel **und** über
+das Werkzeug bleibt `facts` leer.
+
+```
+in facts: 0 Zeilen   |   in vault_notizen: 2
+```
+
+Der zweite Schreibweg in `memory_tools.py` (`_in_den_vault`) ist ersatzlos weg; `remember`
+ruft dieselbe Funktion wie das Panel.
+
+### Schritt 3 — Ein Leseweg, und der Index ist wegwerfbar
+
+- `GET /api/memory` und `recall` lesen **beide** aus dem Index, über `gedaechtnis.liste`
+  bzw. `vault_index.suche`.
+- `memory.kontextblock` → `gedaechtnis.kontextblock`. **Das war der stillste Teil:** vorher
+  kam mit Vault immer `''` heraus.
+- Neu: `python -m scripts.reindex`. Leert die Tabelle und baut sie vollständig aus
+  `vault/*.md` neu auf, Schlüssel ist `id` aus dem Frontmatter.
+- `reindex` beim Start lief schon (`api/app.py:130`).
+- Zeitstempel-Prüfung beim Lesen: `gedaechtnis.frisch_halten` vergleicht `mtime` gegen den
+  Index und liest nur die abweichenden Dateien neu.
+
+**Keine Dateiüberwachung gebaut, keine Polling-Schleife, kein Hintergrund-Dienst.**
+
+### Schritt 4 — Konflikterkennung zurück
+
+Wann sie verschwand: mit `docs/MIGRATION-VAULT.md` Schritt 5. Der stellte den Schreibweg des
+**Werkzeugs** auf den Vault um — und `memory.finde_konflikt` blieb auf der SQLite-Seite
+zurück. Kein Aufrufer auf dem Vault-Pfad hat sie je gerufen.
+
+`gedaechtnis._finde_widerspruch` wendet **dieselbe Regel** wieder an: gleiche Kategorie,
+überlappende Inhaltswörter, wortgleich zählt nicht.
+
+Der Widerspruch steht im **Frontmatter der Notiz**, nicht in der Datenbank:
+
+```yaml
+widerspruch: f_e3f321
+bestaetigt: False
+```
+
+Das ist keine Kosmetik — sonst wäre er nach `rm data/jarvis.db` weg, und DoD 5 wäre nicht
+haltbar.
+
+### Definition of Done — alle acht, ausgeführt
+
+| # | Ergebnis |
+|---|---|
+| 1 | `Gemerkt (f_fb512b, ausruestung) in fakten/…-f_fb512b.md` → `.md=1  Index=1`, Panel zeigt sie mit Pfad |
+| 2 | `kontextblock -> 'Was du ueber den Nutzer weisst:\n- (f_fb512b, ausruestung) Ich fahre Downhill und mein Rad ist ein Santa Cruz V10'` |
+| 3 | Hand-`.md` → `recall: [fakten/von-hand.md] Noah spricht Schwaebisch`, **und** im Panel |
+| 4 | `DELETE /api/memory/f_handarbeit -> 204`, `Datei noch da: False`, `recall: Nichts zu 'Schwaebisch'` |
+| 5 | **Prüfstein:** `GLEICHE ANZAHL: True   GLEICHE IDS: True` — inklusive der Widersprüche |
+| 6 | umbenannt → `GLEICHE IDS: True   KEIN DUPLIKAT: True` |
+| 7 | `f_a29601  widerspricht=f_fb512b`, `f_fb512b  widerspricht=None` — der alte bleibt unberührt |
+| 8 | `git status`: nur die vollständige neue Datei, keine `.tmp`-Reste |
+
+### Gegenproben
+
+Sieben Mutationen einzeln gefahren, jede fällt: `GET` liest wieder `facts`; `POST` schreibt
+wieder in `facts`; kein Widerspruch im Frontmatter; kein `frisch_halten` beim Lesen;
+`kontextblock` wieder nur `facts`; Löschen lässt die Datei liegen; `fehlbestand` meldet nie
+etwas.
+
+**19 Tests** in `tests/test_fix04.py`. Volle Suite: **707 passed.** Rauchtest bestanden.
+
+### Was das Frontend angeht: nichts
+
+`index.html:1519/1535/1547` reicht `fakt.id` unverändert in die URL, und `:1478` vergleicht
+mit `===` gegen `conflicts_with` aus derselben Antwort. Beides funktioniert mit Strings
+genauso wie mit Zahlen. Geprüft, nicht angenommen.
+
+### Eine leere Liste ist jetzt nie mehr stumm
+
+`gedaechtnis.fehlbestand()` zählt die `.md`-Dateien mit `id:` gegen den Index. Sind es mehr
+als im Index, gibt `GET /api/memory` **HTTP 500** mit dem Schaden im Klartext statt einer
+leeren Liste. Eine fremde Datei ohne `id` zählt nicht mit — das ist jemandes Einkaufszettel
+im selben Ordner, kein fehlender Fakt.
+
+### Offen, gemeldet, nicht heimlich gemacht
+
+Die Dateiüberwachung (`core/vault_index.py`, `Beobachter`, gestartet in `api/app.py:135`)
+steht weiterhin. Der neue Entwurf hängt **nicht** an ihr — Start, Befehl und
+Zeitstempel-Prüfung tragen den Alltag allein, und genau das ist oben belegt. Sie zu
+entfernen wäre eine Verhaltensänderung, die dieser Auftrag nicht verlangt. Sag Bescheid.

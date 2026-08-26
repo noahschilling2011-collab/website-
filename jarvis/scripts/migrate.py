@@ -29,6 +29,9 @@ SPALTEN = [
     ("llm_calls", "prompt_hash", "TEXT NOT NULL DEFAULT ''"),
     ("facts", "conflicts_with", "INTEGER"),
     ("steps", "prompt", "TEXT NOT NULL DEFAULT ''"),
+    # FIX-04 Schritt 4
+    ("vault_notizen", "widerspruch", "TEXT"),
+    ("vault_notizen", "bestaetigt", "INTEGER NOT NULL DEFAULT 0"),
 ]
 
 
