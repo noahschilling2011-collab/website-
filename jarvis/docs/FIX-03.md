@@ -281,3 +281,102 @@ gehört er neu ausgestellt, bevor hier weitergearbeitet wird.
 
 Die Reparatur aus `f1d5e22` prüft den Sprachcode mit einem regulären Ausdruck, setzt
 den Host aber weiterhin zusammen. Das ist **nicht**, was Schritt 1a verlangt.
+
+---
+
+## ERGEBNIS SCHRITT 1 — ausgeführt am 26.08.2026
+
+### 1a — Der Host kommt aus einer Konstante
+
+`core/tools/wissen_tools.py`: `WIKI_HOSTS` ersetzt den regulären Ausdruck aus
+`f1d5e22`. Der war zu schwach — `"xx"` besteht jeden BCP-47-Test und ergibt trotzdem
+einen Host, den niemand geprüft hat. Ein Code, der nicht in der Zuordnung steht, wird
+abgelehnt und **nicht** auf `de` zurückgefallen.
+
+Auch `scripts/healthcheck.py` baut den Host nicht mehr aus `JARVIS_HOST` zusammen,
+sondern prüft ihn erst. Der Wert kommt dort nicht aus einem Modell — aber „nirgends"
+heißt nirgends, und eine Regel mit einer Ausnahme ist eine Regel, der niemand traut.
+
+### 1b — Zwei Klienten
+
+Neu: `core/netz.py`.
+
+* `nach_draussen()` — verweigert **jede** Anfrage, die `authorization`,
+  `proxy-authorization`, `cookie`, `x-api-key` oder `x-jarvis-token` trägt.
+* `fuer_dienst(hosts)` — verweigert **jede** Anfrage an einen Host außerhalb von
+  `hosts`. Darf dorthin Anmeldedaten tragen.
+
+Beide prüfen als `event_hook` und damit **vor** dem Transport. Ausgeführt:
+
+```
+2) nach_draussen MIT Authorization
+   abgewiesen: Anfrage an beispiel.test traegt authorization…
+   beim Transport angekommen: 0
+5) fuer_dienst an einen FREMDEN Host
+   abgewiesen: Anfrage an 'evil.com', erlaubt sind nur de.wikipedia.org…
+   beim Transport angekommen: 0
+```
+
+Verdrahtet: `wiki_live` → `fuer_dienst(WIKI_DIENST_HOSTS)`, `wikidata` →
+`fuer_dienst({"query.wikidata.org"})`, `wiki_lokal` → `nach_draussen()`.
+
+### DoD 1 — böser Sprachcode, kein ausgehender Aufruf
+
+```
+--- mit WIKI_KONTAKT, mit Token, boeser Sprachcode ---
+  ok=False  error='evil.com/' ist keine eingerichtete Wikipedia. Verfuegbar: de, en, es, fr, it, ja, nl, pl,…
+  ausgehende Anfragen: 0
+```
+
+Zum Vergleich derselbe Aufruf gegen den Stand `cb0a52a` — die Kopie liegt im
+Prüfverzeichnis, das Repository wurde dafür nicht angefasst:
+
+```
+--- ALT: mit WIKI_KONTAKT, mit Token, boeser Sprachcode ---
+  ok=True    ausgehende Anfragen: 1
+    -> HOST: evil.com
+       URL:  https://evil.com/.wikipedia.org/w/rest.php/v1/search/page?q=Bergisel&limit=3
+       Authorization: Bearer GEHEIM-123
+```
+
+### DoD 2 — kein Parameter im Host-Teil
+
+```
+$ grep -rn 'https://{' --include="*.py" .
+$
+```
+
+Kein Treffer, repository-weit. `tests/test_fix03.py` hält das mit einem eigenen
+Scanner fest, der auch `.format` und `http://` erfasst — plus einer Gegenprobe, dass
+der Scanner so eine Stelle überhaupt findet.
+
+### DoD 3 — ein fremder Server sieht nie einen Authorization-Header
+
+Ein echter `HTTPServer` auf `127.0.0.1`, der jede Kopfzeile mitschreibt. `wiki_live`
+wird über den einzigen Hebel, den ein Modell hat, darauf zu lenken versucht:
+`sprache` = `127.0.0.1:PORT`, `127.0.0.1`, `localhost`, `evil.com:PORT/`, `xx`.
+
+Aufzeichnung: **leer.** Der Server hat keine einzige Anfrage gesehen.
+
+### Gegenproben
+
+Sechs Mutationen einzeln gefahren, jede fällt:
+
+| Mutation | Ergebnis |
+|---|---|
+| unbekannter Code fällt auf `de` zurück | 9 Tests rot |
+| wieder ein blanker `AsyncClient` in `wiki_live` | 1 Test rot |
+| Anmeldedaten-Hook lässt durch | 1 Test rot |
+| Dienst-Hook prüft nichts | 2 Tests rot |
+| `healthcheck` ohne Hostprüfung | 1 Test rot |
+
+Volle Suite: **612 passed.** Rauchtest bestanden.
+
+### Bewusst verengt, nicht versehentlich
+
+`tests/test_bugs01.py::test_fund6_ein_normaler_sprachcode_geht_weiterhin` prüfte
+vorher `de`, `en`, `als`, `zh-yue`. `als` und `zh-yue` gibt es bei Wikipedia, sie
+stehen aber nicht in `WIKI_HOSTS` und werden jetzt abgelehnt. Der Test wurde nicht
+entschärft, sondern erweitert: er hält beide Seiten fest — den Normalfall **und**
+dass die beiden anderen bewusst draußen sind. Wer sie braucht, trägt sie ein; eine
+Zeile, sichtbar im Produktivcode.

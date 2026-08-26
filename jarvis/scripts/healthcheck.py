@@ -10,9 +10,18 @@ den Token nicht unbedingt. Ungesund ist nur, wenn gar nichts kommt.
 from __future__ import annotations
 
 import os
+import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
+
+# FIX-03 Schritt 1a verlangt, dass nirgends ein Parameter in den Host-Teil
+# einer URL geraet. Hier kommt der Wert nicht aus einem Modell, sondern aus
+# der Umgebung dessen, der den Container startet - trotzdem wird er geprueft
+# statt geglaubt. Erlaubt ist ein blanker Hostname oder eine IP: keine
+# Schraegstriche, kein Schema, kein "@", kein Leerzeichen.
+NUR_HOST = re.compile(r"^[A-Za-z0-9._:\[\]-]+$")
 
 
 def main() -> int:
@@ -20,7 +29,12 @@ def main() -> int:
     # 0.0.0.0 ist eine Bind-Adresse, keine Zieladresse.
     ziel = "127.0.0.1" if host in ("0.0.0.0", "::") else host
     port = os.environ.get("JARVIS_PORT", "8000")
-    url = f"http://{ziel}:{port}/api/health"
+    if not NUR_HOST.match(ziel) or not port.isdigit():
+        print(f"JARVIS_HOST/JARVIS_PORT unbrauchbar: {ziel!r}:{port!r}",
+              file=sys.stderr)
+        return 1
+
+    url = urllib.parse.urlunsplit(("http", f"{ziel}:{port}", "/api/health", "", ""))
 
     try:
         urllib.request.urlopen(url, timeout=3)

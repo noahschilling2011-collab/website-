@@ -151,7 +151,21 @@ def test_fund6_der_token_geht_nie_an_einen_fremden_host(db, monkeypatch, sprache
 
 
 def test_fund6_ein_normaler_sprachcode_geht_weiterhin(db, monkeypatch):
-    """Gegenprobe: die Sperre darf den Normalfall nicht mitnehmen."""
+    """Gegenprobe: die Sperre darf den Normalfall nicht mitnehmen.
+
+    Der Vertrag hat sich mit FIX-03 Schritt 1a bewusst verengt. Vorher liess
+    ein regulaerer Ausdruck jeden BCP-47-foermigen Code durch und baute daraus
+    einen Host. Jetzt entscheidet die Zuordnung `WIKI_HOSTS`: was dort steht,
+    geht durch; was nicht, wird abgelehnt statt geraten.
+
+    Deshalb steht hier beides - der Normalfall UND die Codes, die es bei
+    Wikipedia zwar gibt ('als', 'zh-yue'), die aber nicht eingerichtet sind.
+    Das ist kein Fehler, sondern die Entscheidung aus FIX-03: lieber ein
+    fehlgeschlagener Schritt als ein ungeprueftes Ziel. Wer sie braucht,
+    traegt sie in WIKI_HOSTS ein - eine Zeile, sichtbar im Produktivcode.
+    """
+    from core.tools.wissen_tools import WIKI_HOSTS
+
     gesehen = {}
 
     def spion(anfrage: httpx.Request) -> httpx.Response:
@@ -163,11 +177,21 @@ def test_fund6_ein_normaler_sprachcode_geht_weiterhin(db, monkeypatch):
     monkeypatch.setattr(w, "kontakt", "noah@example.org", raising=False)
     monkeypatch.setattr(w, "db_path", db, raising=False)
     monkeypatch.setattr(w, "transport", httpx.MockTransport(spion), raising=False)
-    for sprache in ("de", "en", "als", "zh-yue"):
+
+    for sprache in ("de", "en"):
         gesehen.clear()
         ergebnis = run(run_tool("wiki_live", {"begriff": f"x{sprache}", "sprache": sprache}))
         assert ergebnis.ok, (sprache, ergebnis.error)
-        assert gesehen["host"] == f"{sprache}.wikipedia.org"
+        assert gesehen["host"] == WIKI_HOSTS[sprache].removeprefix("https://")
+
+    for sprache in ("als", "zh-yue"):
+        assert sprache not in WIKI_HOSTS, (
+            f"{sprache!r} ist jetzt eingerichtet - dann gehoert er nach oben"
+        )
+        gesehen.clear()
+        ergebnis = run(run_tool("wiki_live", {"begriff": f"x{sprache}", "sprache": sprache}))
+        assert ergebnis.ok is False, sprache
+        assert gesehen == {}, f"es ging etwas an {gesehen.get('host')!r}"
 
 
 # --- Fund 7: fetch_url ohne SSRF-Sperre ---------------------------------

@@ -20,6 +20,7 @@ from pathlib import Path
 import httpx
 
 from core.contracts import Permission, Tool, ToolResult
+from core.netz import fuer_dienst, nach_draussen
 from core.tools.registry import register
 from core.wissen import Wissen, aus_cache, in_cache, snapshot_aus_zimname
 
@@ -30,12 +31,40 @@ USER_AGENT_VORLAGE = "JARVIS/0.1 (persoenlicher Assistent; {kontakt})"
 
 MAX_ZEICHEN = 1500      # Ein Artikel-Volltext frisst das Tokenbudget.
 
-# BUGS-01 Fund 6: `sprache` kommt aus dem MODELL. Wird sie ungeprueft in den
-# Hostnamen gesetzt, genuegt "evil.com/" - dann geht die Anfrage samt
-# Authorization-Header an einen fremden Server. Ein Sprachcode nach BCP 47 ist
-# hoechstens acht Zeichen aus Buchstaben, Ziffern und Bindestrich; alles andere
-# ist keine Sprache, sondern ein Angriff.
-SPRACHCODE = re.compile(r"^[a-z0-9]{2,8}(-[a-z0-9]{2,8}){0,2}$")
+# FIX-03 Schritt 1a. `sprache` kommt aus dem MODELL. Frueher wurde sie in den
+# Hostnamen interpoliert - "evil.com/" genuegte, und die Anfrage ging samt
+# Authorization-Header an einen fremden Server.
+#
+# Die erste Reparatur (BUGS-01 Fund 6) pruefte den Code mit einem regulaeren
+# Ausdruck. Das war zu schwach: "xx" besteht jeden BCP-47-Test und ergibt
+# trotzdem einen Host, den niemand geprueft hat. Deshalb wird der Host jetzt
+# gar nicht mehr zusammengesetzt, sondern nachgeschlagen. Steht der Code hier
+# nicht, ist der Aufruf abgelehnt - nicht auf "de" zurueckgefallen. Ein
+# unbekannter Sprachcode ist ein fehlgeschlagener Schritt, kein Anlass zum
+# Raten.
+#
+# Die Liste ist absichtlich kurz und wird von Hand erweitert. Jeder Eintrag
+# ist eine Wikipedia-Ausgabe, die es wirklich gibt; geraten wird hier nichts.
+WIKI_HOSTS = {
+    "de": "https://de.wikipedia.org",
+    "en": "https://en.wikipedia.org",
+    "fr": "https://fr.wikipedia.org",
+    "es": "https://es.wikipedia.org",
+    "it": "https://it.wikipedia.org",
+    "nl": "https://nl.wikipedia.org",
+    "pl": "https://pl.wikipedia.org",
+    "pt": "https://pt.wikipedia.org",
+    "ru": "https://ru.wikipedia.org",
+    "sv": "https://sv.wikipedia.org",
+    "ja": "https://ja.wikipedia.org",
+    "zh": "https://zh.wikipedia.org",
+}
+
+# Genau die Hosts aus der Zuordnung - mehr darf der Klient von wiki_live nicht
+# ansprechen, auch wenn sich jemand spaeter eine URL zusammenbaut.
+WIKI_DIENST_HOSTS = frozenset(
+    basis.removeprefix("https://") for basis in WIKI_HOSTS.values()
+)
 
 
 class _MitCache(Tool):
@@ -128,8 +157,10 @@ class WikiLokal(_MitCache):
 
         snapshot = snapshot_aus_zimname(self.zim)
         try:
-            async with httpx.AsyncClient(timeout=self.timeout_s,
-                                         transport=self.transport) as client:
+            # kiwix-serve laeuft lokal und will keine Anmeldedaten. Der
+            # Klient nach draussen stellt sicher, dass auch keine mitgehen.
+            async with nach_draussen(timeout=self.timeout_s,
+                                     transport=self.transport) as client:
                 suche = await client.get(
                     f"{self.basis}/search",
                     params={"pattern": begriff, "books.name": self.zim,
@@ -197,14 +228,17 @@ class WikiLive(_MitCache):
     Endpunkt aus der MediaWiki-Doku
     (https://www.mediawiki.org/wiki/API:REST_API/Reference):
 
-        GET https://{sprache}.wikipedia.org/w/rest.php/v1/search/page?q=…&limit=…
+        GET <wiki-basis>/w/rest.php/v1/search/page?q=…&limit=…
+
+    `<wiki-basis>` ist ein Wert aus `WIKI_HOSTS`, nie ein zusammengesetzter
+    String - siehe den Kommentar dort.
         -> {"pages": [{"id", "key", "title", "excerpt", "description", …}]}
 
     **Nicht** auf `api.wikimedia.org/core/...` gebaut: das ist laut
     https://wikitech.wikimedia.org/wiki/API_Portal/Deprecation ab Juli 2026 in
     der Abkuendigung, und die Ersatzrouten sollen erst in der zweiten
     Jahreshaelfte 2026 angekuendigt werden. Die Abkuendigungstabelle nennt
-    `{wiki_domain}/w/rest.php/v1/search/page` selbst als Entsprechung - also
+    den Weg `<wiki-domain>/w/rest.php/v1/search/page` selbst als Entsprechung -
     genau diesen Weg.
 
     Ratenlimits laut https://www.mediawiki.org/wiki/Wikimedia_APIs/Rate_limits:
@@ -247,10 +281,10 @@ class WikiLive(_MitCache):
             return ToolResult(ok=False, error=hinweis, display=hinweis)
 
         sprache = (sprache or "de").strip().lower()
-        if not SPRACHCODE.match(sprache):
-            hinweis = (f"{sprache!r} ist kein Sprachcode. Erlaubt sind zwei bis "
-                       f"acht Buchstaben oder Ziffern, optional mit Bindestrich "
-                       f"getrennt - zum Beispiel 'de', 'en' oder 'zh-yue'.")
+        basis = WIKI_HOSTS.get(sprache)
+        if basis is None:
+            hinweis = (f"{sprache!r} ist keine eingerichtete Wikipedia. "
+                       f"Verfuegbar: {', '.join(sorted(WIKI_HOSTS))}.")
             return ToolResult(ok=False, error=hinweis, display=hinweis,
                               duration_ms=int((time.monotonic() - begonnen) * 1000))
         schluessel = f"{sprache}:{begriff}"
@@ -264,10 +298,14 @@ class WikiLive(_MitCache):
             kopf["authorization"] = f"Bearer {self.token}"
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout_s,
-                                         transport=self.transport) as client:
+            # FIX-03 Schritt 1b: ein Dienst-Klient. Er traegt die Anmeldedaten -
+            # und weist jeden Host ab, der nicht zu WIKI_HOSTS gehoert. Selbst
+            # wenn hier jemand spaeter wieder eine URL zusammenbaut, geht der
+            # Token nicht mit.
+            async with fuer_dienst(WIKI_DIENST_HOSTS, timeout=self.timeout_s,
+                                   transport=self.transport) as client:
                 antwort = await client.get(
-                    f"https://{sprache}.wikipedia.org/w/rest.php/v1/search/page",
+                    f"{basis}/w/rest.php/v1/search/page",
                     params={"q": begriff, "limit": 3}, headers=kopf,
                 )
                 if antwort.status_code == 429:
@@ -297,7 +335,7 @@ class WikiLive(_MitCache):
         rumpf = str(erste.get("description") or "")
         auszug = re.sub(r"<[^>]+>", "", str(erste.get("excerpt") or ""))
         text = " — ".join(t for t in (rumpf, auszug) if t) or titel
-        url = f"https://{sprache}.wikipedia.org/wiki/{urllib.parse.quote(str(erste.get('key') or titel))}"
+        url = f"{basis}/wiki/{urllib.parse.quote(str(erste.get('key') or titel))}"
 
         treffer = Wissen(begriff=schluessel, titel=titel, text=text,
                          quelle="wiki_live", snapshot=None, url=url)
@@ -351,8 +389,8 @@ class WikidataFrage(_MitCache):
             return ToolResult(ok=False, error=hinweis, display=hinweis)
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout_s,
-                                         transport=self.transport) as client:
+            async with fuer_dienst({"query.wikidata.org"}, timeout=self.timeout_s,
+                                   transport=self.transport) as client:
                 antwort = await client.post(
                     "https://query.wikidata.org/sparql",
                     data={"query": sparql},
