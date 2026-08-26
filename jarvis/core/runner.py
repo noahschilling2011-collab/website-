@@ -21,6 +21,7 @@ from typing import Awaitable, Callable
 
 from core.agents import ToolAgent, baue_agenten
 from core.delegation import DelegationsKontext, kontext as delegationskontext
+from core.abbruch import LaufBeendet, baue_pruefpunkt
 from core.contracts import (
     Permission,
     Step,
@@ -137,20 +138,17 @@ async def fuehre_task_aus(
         if laufzeit.on_call:
             await laufzeit.on_call(aufruf)
 
-    def verbrauchsgrenze() -> str | None:
-        """Waehrend eines Schritts zaehlt nur der Verbrauch (BUGS-01 Fund 4).
-
-        `max_steps` und `max_depth` zaehlen den laufenden Schritt schon mit -
-        die wuerden hier immer reissen und ihn toeten, bevor er etwas tut.
-        """
-        return task.budget_verletzung(nur_verbrauch=True)
+    # FIX-03 Schritt 3a: EIN Pruefpunkt vor jedem teuren Aufruf - Abbruch UND
+    # Verbrauchsgrenzen, und er wirft, statt etwas zurueckzugeben.
+    pruefpunkt = baue_pruefpunkt(task, abgebrochen=laufzeit.abgebrochen)
 
     verfuegbar = agenten or baue_agenten(
         provider, max_permission=max_permission, antwortstil=antwortstil,
         on_reply=buche, on_call=buche_werkzeug,
         bestaetigung=laufzeit.bestaetigung, audit=laufzeit.audit,
-        # BUGS-01 Fund 4: damit das Budget auch INNERHALB eines Schritts gilt.
-        budget_pruefung=verbrauchsgrenze,
+        # BUGS-01 Fund 4 und FIX-03 Schritt 3a: damit Abbruch und Budget auch
+        # INNERHALB eines Schritts gelten.
+        budget_pruefung=pruefpunkt,
     )
 
     # Der Delegationskontext gilt fuer den ganzen Lauf: er sagt ask_agent,
@@ -164,7 +162,7 @@ async def fuehre_task_aus(
     try:
         return await _lauf(
             provider, task, budget, kosten, verfuegbar, laufzeit, buche, ctx,
-            antwortstil,
+            antwortstil, pruefpunkt,
         )
     finally:
         delegationskontext.reset(marke)
@@ -180,11 +178,33 @@ async def _lauf(
     buche: Callable[[LLMReply], Awaitable[None]],
     ctx: DelegationsKontext,
     antwortstil: str = "",
+    pruefpunkt: Callable[[], None] = lambda: None,
 ) -> Task:
     ziel = task.goal
     await laufzeit.task(task)
 
+    async def lauf_beenden(ende: LaufBeendet, ab: int) -> None:
+        """Ein geworfener Pruefpunkt endet hier - an EINER Stelle."""
+        task.status = ende.status
+        task.abort_reason = ende.grund
+        log.warning("task %s: %s - %s", task.id, ende.status, ende.grund)
+        for rest in task.steps[ab:]:
+            if rest.status is StepStatus.PENDING:
+                rest.status = StepStatus.SKIPPED
+                await laufzeit.step(task, task.steps.index(rest), rest)
+        await laufzeit.task(task)
+
     # --- Plan --------------------------------------------------------------
+    # FIX-03 Schritt 3a: auch der Planungszug ist ein bezahlter Aufruf. Wer
+    # sofort nach dem Absenden abbricht, soll ihn nicht mehr bezahlen.
+    try:
+        pruefpunkt()
+    except LaufBeendet as ende:
+        await lauf_beenden(ende, 0)
+        task.result = "Abgebrochen, bevor der Plan stand."
+        await laufzeit.task(task)
+        return task
+
     try:
         task.steps = await erstelle_plan(
             gebucht(provider, buche),
@@ -253,7 +273,19 @@ async def _lauf(
             schritt.status = StepStatus.RUNNING
             await laufzeit.step(task, i, schritt)
 
-            ergebnis = await agent.run(task, schritt)
+            try:
+                ergebnis = await agent.run(task, schritt)
+            except LaufBeendet as ende:
+                # FIX-03 Schritt 3a: der Pruefpunkt hat mitten im Schritt
+                # geworfen. Was bis dahin da war, bleibt als Teilergebnis.
+                if ende.teiltext:
+                    schritt.result = ToolResult(ok=True, display=ende.teiltext)
+                    schritt.status = StepStatus.DONE
+                    await laufzeit.step(task, i, schritt)
+                await lauf_beenden(ende, i + 1)
+                gerissen = True
+                break
+
             bestanden, begruendung = verifiziere(schritt, ergebnis)
             schritt.result = ergebnis
             schritt.note = begruendung
@@ -314,12 +346,7 @@ async def _lauf(
     # ein weiterer bezahlter Modellaufruf nach dem Abbruch. Was fertig wurde,
     # steht als Teilergebnis da; das verlangt 0.5 ausdruecklich.
     if task.status == "cancelled":
-        teile = [f"### {s.description}\n{(s.result.display if s.result else '')}"
-                 for s in erledigt]
-        task.result = (
-            ("Abgebrochen. Was bis dahin fertig wurde:\n\n" + "\n\n".join(teile))
-            if teile else "Abgebrochen, bevor ein Schritt fertig war."
-        )
+        task.result = _teilergebnis(task, erledigt, task.abort_reason or "")
         await laufzeit.task(task)
         return task
 
@@ -333,13 +360,52 @@ async def _lauf(
         await laufzeit.task(task)
         return task
 
-    task.result = await _fasse_zusammen(
-        provider, task, erledigt, gescheitert, buche, antwortstil
-    )
+    # FIX-03 Schritt 3a und 3d: die Zusammenfassung ist selbst ein bezahlter
+    # Modellaufruf. Vorher stand hier gar kein Pruefpunkt - wer waehrend des
+    # Abschlusszuges abbrach, bezahlte ihn zu Ende und bekam danach "done".
+    try:
+        # Der Pruefpunkt steht IN _fasse_zusammen, unmittelbar vor dem
+        # Modellaufruf - das ist die Stelle, die 3a meint. Hier draussen waere
+        # er nur eine zweite Kopie derselben Pruefung.
+        task.result = await _fasse_zusammen(
+            provider, task, erledigt, gescheitert, buche, antwortstil,
+            pruefpunkt=pruefpunkt,
+        )
+    except LaufBeendet as ende:
+        await lauf_beenden(ende, len(task.steps))
+        task.result = _teilergebnis(task, erledigt, ende.grund)
+        await laufzeit.task(task)
+        return task
+
+    # 3d: der Abbruch kann waehrend der Zusammenfassung gekommen sein. Wer
+    # hier ungeprueft "done" setzt, meldet einen abgebrochenen Auftrag als
+    # erledigt - genau das war der Fall.
+    try:
+        pruefpunkt()
+    except LaufBeendet as ende:
+        await lauf_beenden(ende, len(task.steps))
+        await laufzeit.task(task)
+        return task
+
     if task.status == "running":
         task.status = "done" if not gescheitert else "failed"
     await laufzeit.task(task)
     return task
+
+
+def _teilergebnis(task: Task, erledigt: list[Step], grund: str) -> str:
+    """Was fertig wurde, ohne einen weiteren bezahlten Zug.
+
+    Ein abgebrochener oder ausgebudgeteter Auftrag bekommt KEINE
+    Zusammenfassung vom Modell - die waere ein Aufruf nach dem Ende. Ein
+    Teilergebnis verlangt 0.5 trotzdem, also wird es hier zusammengesetzt.
+    """
+    teile = [f"### {s.description}\n{(s.result.display if s.result else '')}"
+             for s in erledigt]
+    kopf = f"Abgebrochen - {grund}" if grund else "Abgebrochen"
+    if not teile:
+        return f"{kopf}. Kein Schritt wurde fertig."
+    return f"{kopf}. Was bis dahin fertig wurde:\n\n" + "\n\n".join(teile)
 
 
 async def _fasse_zusammen(
@@ -349,6 +415,8 @@ async def _fasse_zusammen(
     gescheitert: list[Step],
     buche: Callable[[LLMReply], Awaitable[None]],
     antwortstil: str = "",
+    *,
+    pruefpunkt: Callable[[], None] = lambda: None,
 ) -> str:
     teile = [f"Ziel: {task.goal}", "", "Ergebnisse der Schritte:"]
     quellen: list[str] = []
@@ -363,12 +431,15 @@ async def _fasse_zusammen(
         teile.append(f"\nHINWEIS: Der Auftrag wurde abgebrochen - {task.abort_reason}")
 
     try:
+        pruefpunkt()
         reply = await provider.complete(
             [LLMMessage("user", "\n".join(teile))],
             system=ABSCHLUSS_PROMPT + antwortstil,
         )
         await buche(reply)
         text = reply.text.strip()
+    except LaufBeendet:
+        raise
     except Exception as exc:  # noqa: BLE001 - lieber roh als gar nichts
         log.warning("task %s: Zusammenfassung fehlgeschlagen - %s", task.id, exc)
         text = "\n\n".join(

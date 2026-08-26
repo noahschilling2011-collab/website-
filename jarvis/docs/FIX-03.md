@@ -478,3 +478,114 @@ auf Station 1; nur `is_private`; nur `is_global`; kein Bytedeckel; kein Stations
 Quellbild folgt wieder selbst; Quellbild ohne Kettenprüfung.
 
 Volle Suite: **652 passed.** Rauchtest bestanden.
+
+---
+
+## ERGEBNIS SCHRITT 3 — ausgeführt am 26.08.2026
+
+### Was offen war
+
+Zwei Halblösungen, die zusammen zwei Lücken offen ließen:
+
+* Innerhalb eines Schritts wurde der **Abbruch-Wunsch überhaupt nicht gesehen**. Ein
+  Schritt mit vielen Werkzeugrunden lief nach `cancel` munter weiter — jede Runde ein
+  bezahlter Modellaufruf. Der Test dazu lief 25 s in die Frist und meldete
+  `zuletzt running`.
+* Die Budgetprüfung gab einen **Rückgabewert** zurück, und genau der wurde an zwei
+  Stellen nie ausgewertet: vor dem Planungszug und vor der Zusammenfassung. Wer während
+  des Abschlusszuges abbrach, bezahlte ihn zu Ende und bekam danach `done`:
+
+```
+AssertionError: {'id': '4ec9d962b85f', 'status': 'done', …}
+assert 'done' == 'cancelled'
+```
+
+Und im `task_log` stand derselbe Auftrag als `['done']` — DoD 8 war damit nicht haltbar.
+
+### 3a — Ein Prüfpunkt, der wirft
+
+Neu: `core/abbruch.py`.
+
+```python
+def pruefpunkt() -> None:
+    if abgebrochen():
+        raise LaufBeendet("Vom Nutzer abgebrochen.", status="cancelled")
+    verletzung = task.budget_verletzung(nur_verbrauch=True)
+    if verletzung:
+        raise LaufBeendet(verletzung, status="aborted_budget")
+```
+
+Eine Funktion, beide Fragen, und sie **wirft**. Einen Rückgabewert kann jemand vergessen
+auszuwerten — eine Ausnahme nicht. `LaufBeendet` trägt den Endzustand (`cancelled` oder
+`aborted_budget`) und den Teiltext mit, damit ein Teilergebnis möglich bleibt.
+
+Der Prüfpunkt steht vor **jedem** teuren Aufruf:
+
+| Stelle | vorher |
+|---|---|
+| vor dem Planungszug | keine Prüfung |
+| vor jedem Modellzug im Werkzeug-Loop | nur Budget, kein Abbruch |
+| vor jedem Werkzeug, auch innerhalb eines Zuges | nur Budget, kein Abbruch |
+| vor jedem Wiederholversuch | nur Budget |
+| vor der Zusammenfassung | keine Prüfung |
+| vor der Zeile, die `done` setzt | keine Prüfung |
+
+`ToolAgent.run` fängt `LaufBeendet` **nicht** in ein `ToolResult` ab — das würde aus dem
+Abbruch einen misslungenen Schritt machen, und der Task liefe weiter.
+
+Zwischen den Schritten prüft der Runner weiterhin **alles**, `max_steps` und `max_depth`
+eingeschlossen — so wie 0.5 es verlangt. Der Prüfpunkt selbst nimmt die beiden aus: sie
+zählen den laufenden Schritt bereits mit und würden ihn töten, bevor er etwas tut.
+
+### 3b, 3c — schon da, jetzt belegt
+
+Der Wecker für die offene Rückfrage und die Ablehnung durch den Endpunkt stammen aus
+`2c75886`. DoD 7 prüft sie jetzt mit Prüfsumme.
+
+### 3d — `cancelled` heißt `cancelled`
+
+Ein abgebrochener Auftrag bekommt seine Zusammenfassung nicht mehr vom Modell, sondern
+setzt sie in `_teilergebnis()` lokal aus den fertigen Schritten zusammen.
+
+### DoD 6
+
+Ein-Schritt-Plan, `max_cost_eur=0.0001`, Preise so gesetzt, dass der erste Zug sie reißt:
+
+```
+status: aborted_budget, abort_reason enthält "max_cost_eur"
+llm_calls: 1 Zeile   (gezählt, nicht geschätzt)
+```
+
+Nach dem Planungszug ist Schluss — der zweite Modellaufruf startet nicht.
+
+### DoD 7
+
+Abbruch bei offener Bestätigung → `cancelled` in **unter 2 Sekunden**. Danach
+`POST /confirm` → HTTP ≥ 400. SHA-256 der Postausgangsdatei vorher und nachher
+identisch.
+
+### DoD 8
+
+Nach einem Abbruch während der Zusammenfassung steht im `task_log` kein Eintrag auf
+`done`.
+
+### Gegenproben
+
+Sieben Mutationen einzeln gefahren, jede fällt: Prüfpunkt sieht den Abbruch nicht
+(5 Tests rot); Prüfpunkt gibt zurück statt zu werfen (7 rot); kein Prüfpunkt vor dem
+Plan; kein Prüfpunkt in `_fasse_zusammen`; kein Prüfpunkt vor `done`; `ToolAgent`
+verschluckt `LaufBeendet`.
+
+Volle Suite: **659 passed.** Rauchtest bestanden.
+
+### Zwei bestehende Tests bewusst geändert
+
+* `test_fund4_nach_der_grenze_laeuft_nur_noch_der_abschluss` hieß so, weil vorher noch
+  ein vierter bezahlter Zug lief. Der fällt jetzt weg — die Erwartung ist von vier auf
+  **drei** Modellaufrufe gesunken, also strenger geworden. Das Teilergebnis prüft der
+  Test weiterhin, es wird nur nicht mehr gekauft.
+* `test_dod_4_abbruch_stoppt_den_task_wirklich` brach sofort ab und erwartete
+  übersprungene Schritte. Der Abbruch greift jetzt schon **vor** dem Plan, und ohne Plan
+  gibt es nichts zu überspringen. Der Test wartet daher, bis der Plan steht — und der
+  frühere Fall hat einen **eigenen, neuen** Test bekommen, der nachweist, dass der
+  Planungszug gar nicht mehr bezahlt wird (`len(anbieter.calls) == 0`).

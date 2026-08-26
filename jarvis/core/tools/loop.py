@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Awaitable, Callable, Iterable
 
+from core.abbruch import LaufBeendet
 from core.contracts import Permission
 from core.llm import LLMMessage, LLMProvider, LLMReply
 from core.tools import registry
@@ -42,12 +43,14 @@ async def run_tool_loop(
     on_reply: Callable[[LLMReply], Awaitable[None]] | None = None,
     bestaetigung: Bestaetigung | None = None,
     audit: Audit | None = None,
-    budget: Callable[[], str | None] | None = None,
+    pruefpunkt: Callable[[], None] | None = None,
 ) -> tuple[str, list[ToolCall], list[LLMReply]]:
     """Gibt (Antworttext, ausgefuehrte Aufrufe, alle Modellantworten) zurueck.
 
-    `budget` ist die Budgetpruefung des Auftrags. Sie gibt die Begruendung
-    zurueck, wenn eine Grenze gerissen ist, sonst None.
+    `pruefpunkt` ist die Pruefung aus `core.abbruch`. Sie steht vor jedem
+    bezahlten Zug und vor jedem Werkzeug und WIRFT `LaufBeendet`, wenn der
+    Auftrag abgebrochen wurde oder eine Verbrauchsgrenze gerissen ist. Was bis
+    dahin an Text zusammengekommen ist, haengt an der Ausnahme.
 
     BUGS-01 Fund 4: `max_tool_calls` hier ist die Grenze des *Agenten*, nicht
     die des Auftrags. Die des Auftrags wurde frueher nur zwischen den
@@ -62,14 +65,19 @@ async def run_tool_loop(
     antworten: list[LLMReply] = []
     budget_gemeldet = False
 
+    def _bisher() -> str:
+        return antworten[-1].text if antworten else ""
+
     while True:
         # Vor jedem bezahlten Zug. Der Zug, der die Grenze reisst, laeuft zu
         # Ende - danach wird hier nichts mehr ausgegeben.
-        grund = budget() if budget is not None else None
-        if grund is not None:
-            log.warning("Auftragsbudget erreicht (%s) - Werkzeugrunde endet", grund)
-            letzter = antworten[-1].text if antworten else ""
-            return _mit_budgetnotiz(letzter, grund), aufrufe, antworten
+        if pruefpunkt is not None:
+            try:
+                pruefpunkt()
+            except LaufBeendet as ende:
+                log.warning("Lauf endet in der Werkzeugrunde - %s", ende.grund)
+                ende.teiltext = _mit_budgetnotiz(_bisher(), ende.grund)
+                raise
 
         reply = await provider.complete(
             nachrichten,
@@ -90,16 +98,17 @@ async def run_tool_loop(
         )
 
         ergebnisbloecke: list[dict[str, Any]] = []
-        gerissen: str | None = None
         for tool_use in reply.tool_uses:
             # Auch zwischen zwei Werkzeugen desselben Zuges. Ein Modell darf
             # mehrere auf einmal anfordern; die duerfen nicht alle noch
             # durchlaufen, nachdem die Grenze weg ist.
-            gerissen = budget() if budget is not None else None
-            if gerissen is not None:
-                log.warning("Auftragsbudget erreicht (%s) - %s laeuft nicht mehr",
-                            gerissen, tool_use.name)
-                break
+            if pruefpunkt is not None:
+                try:
+                    pruefpunkt()
+                except LaufBeendet as ende:
+                    log.warning("Lauf endet vor %s - %s", tool_use.name, ende.grund)
+                    ende.teiltext = _mit_budgetnotiz(reply.text, ende.grund)
+                    raise
 
             if len(aufrufe) >= max_tool_calls:
                 ergebnisbloecke.append({
@@ -142,8 +151,5 @@ async def run_tool_loop(
                 "content": inhalt,
                 **({"is_error": True} if not ergebnis.ok else {}),
             })
-
-        if gerissen is not None:
-            return _mit_budgetnotiz(reply.text, gerissen), aufrufe, antworten
 
         nachrichten.append(LLMMessage(role="user", content=ergebnisbloecke))

@@ -33,6 +33,7 @@ from api.schemas import (
 from api.events import strom
 from api.security import require_token
 from core import db, memory
+from core.abbruch import LaufBeendet, baue_pruefpunkt
 from core.contracts import Permission, Task, TaskBudget
 from core.llm import LLMError, LLMMessage, LLMReply
 from core.tools import registry
@@ -119,10 +120,10 @@ async def post_chat(request: Request, body: ChatRequest) -> ChatResponse:
     # ein hartes Budget vorschreibt. Der Zug bekommt hier dieselbe Buchhaltung
     # wie ein Task, mit denselben Werten aus der .env.
     zug = Task(goal=text, budget=TaskBudget.from_settings(settings))
-
-    def verbrauchsgrenze() -> str | None:
-        # nur_verbrauch: ein Chat-Zug hat keine Schritte und keine Tiefe.
-        return zug.budget_verletzung(nur_verbrauch=True)
+    # FIX-03 Schritt 3a: derselbe Pruefpunkt wie im Runner. Einen Abbruch gibt
+    # es im Chat nicht - ein Zug ist kurz und hat keine Auftrags-ID, die man
+    # abbrechen koennte -, die Verbrauchsgrenzen gelten aber genauso.
+    pruefpunkt = baue_pruefpunkt(zug, abgebrochen=lambda: False)
 
     async def merke_aufruf(aufruf: ToolCall) -> None:
         zug.spent_tool_calls += 1
@@ -188,8 +189,14 @@ async def post_chat(request: Request, body: ChatRequest) -> ChatResponse:
             max_tool_calls=settings.budget_max_tool_calls,
             on_call=merke_aufruf,
             on_reply=protokolliere_modellaufruf,
-            budget=verbrauchsgrenze,
+            pruefpunkt=pruefpunkt,
         )
+    except LaufBeendet as ende:
+        # Das Budget ist aufgebraucht. Der Nutzer bekommt trotzdem, was bis
+        # dahin da war - stillschweigend abbrechen waere schlimmer als eine
+        # kurze Antwort mit Hinweis.
+        log.warning("chat %s: %s", task_id, ende.grund)
+        antwort = ende.teiltext or f"[Budget aufgebraucht: {ende.grund}]"
     except LLMError as exc:
         await asyncio.to_thread(
             db.log_llm_call,

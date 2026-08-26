@@ -550,13 +550,17 @@ def test_fund4_max_tokens_gilt_auch_innerhalb_eines_schritts():
     )
 
 
-def test_fund4_nach_der_grenze_laeuft_nur_noch_der_abschluss():
-    """Genau ein Zug darf noch - der, den 0.5 verlangt.
+def test_fund4_nach_der_grenze_kommt_kein_bezahlter_zug_mehr():
+    """Nach der Grenze wird nichts mehr bezahlt - auch keine Zusammenfassung.
 
-    Der Werkzeugzug, der die Grenze reisst, laeuft zu Ende. Danach kommt
-    kein weiterer Werkzeugzug mehr, sondern nur noch die Zusammenfassung:
-    0.5 verlangt ausdruecklich ein Teilergebnis. Ohne den Fix liefen alle
-    sechs Werkzeugrunden durch.
+    Der Werkzeugzug, der die Grenze reisst, laeuft zu Ende. Danach ist Schluss.
+    Ohne den Fix aus Fund 4 liefen alle sechs Werkzeugrunden durch.
+
+    Diese Zahl ist mit FIX-03 Schritt 3a von vier auf drei gesunken, und zwar
+    absichtlich: vorher stand vor der Zusammenfassung kein Pruefpunkt, also
+    lief sie noch als vierter bezahlter Aufruf. Das Teilergebnis, das 0.5
+    verlangt, gibt es weiterhin - es wird jetzt aus den fertigen Schritten
+    zusammengesetzt statt vom Modell gekauft.
     """
     from core.contracts import TaskBudget
     from core.runner import fuehre_task_aus
@@ -567,10 +571,11 @@ def test_fund4_nach_der_grenze_laeuft_nur_noch_der_abschluss():
                             kosten=lambda a, b: 0.0))
 
     assert t.status == "aborted_budget"
-    # Plan + zwei Werkzeugrunden + Zusammenfassung. Mehr nicht.
-    assert len(p.calls) == 4, f"{len(p.calls)} Modellaufrufe: {t.abort_reason}"
+    # Plan + zwei Werkzeugrunden. Mehr nicht - die Zusammenfassung faellt weg.
+    assert len(p.calls) == 3, f"{len(p.calls)} Modellaufrufe: {t.abort_reason}"
     assert p.werkzeugzuege == 2, f"{p.werkzeugzuege} Werkzeugzuege statt 2"
     assert t.result, "Ohne Teilergebnis waere 0.5 verletzt."
+    assert "Abgebrochen" in t.result, t.result
 
 
 def test_fund4_der_wiederholversuch_prueft_das_budget_ebenfalls():

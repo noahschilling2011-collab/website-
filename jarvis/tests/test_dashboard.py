@@ -291,7 +291,14 @@ def test_werkzeug_log_und_statistik_brauchen_den_token(client):
 
 def test_dod_4_abbruch_stoppt_den_task_wirklich(client):
     """Der Task muss danach im Endzustand cancelled stehen, nicht nur
-    'wurde gebeten'."""
+    'wurde gebeten'.
+
+    Abgebrochen wird hier, NACHDEM der Plan steht - sonst gibt es keine
+    Schritte, die man ueberspringen koennte. Der Fall davor hat seit FIX-03
+    Schritt 3a einen eigenen Test.
+    """
+    import time as _t
+
     langsam = FakeLLMProvider(replies=[
         '{"steps":[{"description":"A"},{"description":"B"},{"description":"C"}]}',
         "A erledigt.", "B erledigt.", "C erledigt.", "Fertig.",
@@ -300,9 +307,48 @@ def test_dod_4_abbruch_stoppt_den_task_wirklich(client):
     tid = client.post("/api/tasks", json={"goal": "Langes Ziel"},
                       headers=TOKEN).json()["task_id"]
 
-    # Sofort abbrechen - der Runner prueft vor jedem Schritt.
+    frist = _t.monotonic() + 10
+    while _t.monotonic() < frist:
+        d = client.get(f"/api/tasks/{tid}", headers=TOKEN).json()
+        if d["steps"]:
+            break
+        _t.sleep(0.01)
+    else:
+        raise AssertionError("der Plan stand nie")
+
     client.post(f"/api/tasks/{tid}/cancel", headers=TOKEN)
     fertig = warte_auf_ende(client, tid)
     assert fertig["status"] == "cancelled"
     assert fertig["abort_reason"]
     assert any(s["status"] == "skipped" for s in fertig["steps"])
+
+
+def test_ein_abbruch_vor_dem_plan_bezahlt_den_planungszug_nicht(client):
+    """FIX-03 Schritt 3a: auch der Planungszug ist ein bezahlter Aufruf.
+
+    Wer sofort nach dem Absenden abbricht, soll ihn nicht mehr bezahlen.
+    Vorher lief er durch, weil die erste Abbruchpruefung erst vor dem ersten
+    SCHRITT stand - und Schritte gibt es ohne Plan nicht.
+    """
+    import asyncio as _asyncio
+
+    class LangsamerPlaner(FakeLLMProvider):
+        async def complete(self, messages, *, system, tools=None):
+            await _asyncio.sleep(0.8)
+            return await super().complete(messages, system=system, tools=tools)
+
+    anbieter = LangsamerPlaner(replies=[
+        '{"steps":[{"description":"A"}]}', "A erledigt.", "Fertig.",
+    ])
+    client.app.state.provider = anbieter
+    tid = client.post("/api/tasks", json={"goal": "Langes Ziel"},
+                      headers=TOKEN).json()["task_id"]
+    client.post(f"/api/tasks/{tid}/cancel", headers=TOKEN)
+
+    fertig = warte_auf_ende(client, tid)
+    assert fertig["status"] == "cancelled", fertig
+    assert fertig["steps"] == [], fertig["steps"]
+    assert len(anbieter.calls) == 0, (
+        f"{len(anbieter.calls)} Modellaufruf(e) nach dem Abbruch"
+    )
+    assert fertig["result"], "auch hier gehoert eine Antwort hin"

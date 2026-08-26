@@ -19,7 +19,10 @@ from pathlib import Path
 
 import httpx
 import pytest
+from fastapi.testclient import TestClient
 
+import api.app  # noqa: F401  - registriert die Werkzeuge
+from api.app import create_app
 from tests.conftest import run
 
 WURZEL = Path(__file__).resolve().parent.parent
@@ -702,3 +705,284 @@ def test_schritt2_das_quellbild_folgt_keiner_weiterleitung_ins_eigene_netz():
     assert gesehen_verboten == [], (
         f"die zweite Station wurde geholt: {gesehen_verboten}"
     )
+
+
+# --- SCHRITT 3: Abbruch und Budget innerhalb des Schritts ----------------
+
+
+TOKEN = {"X-Jarvis-Token": "test-token-123"}
+
+
+def _warte_auf_ende(client, tid, sekunden=25.0):
+    import time as _t
+
+    frist = _t.monotonic() + sekunden
+    while _t.monotonic() < frist:
+        d = client.get(f"/api/tasks/{tid}", headers=TOKEN).json()
+        if d["status"] in ("done", "failed", "aborted_budget", "cancelled"):
+            return d
+        _t.sleep(0.05)
+    raise AssertionError(f"Task {tid} wurde nicht fertig, zuletzt {d['status']}")
+
+
+def test_schritt3a_der_pruefpunkt_bricht_ab_statt_etwas_zurueckzugeben():
+    """Der Formunterschied, den FIX-03 ausdruecklich verlangt.
+
+    Ein Rueckgabewert kann jemand vergessen auszuwerten. Eine Ausnahme nicht.
+    """
+    from core.abbruch import LaufBeendet, baue_pruefpunkt
+    from core.contracts import Task, TaskBudget
+
+    task = Task(goal="x", budget=TaskBudget(max_tokens=10))
+
+    # Noch Luft: der Pruefpunkt tut nichts und gibt auch nichts zurueck.
+    pruefpunkt = baue_pruefpunkt(task, abgebrochen=lambda: False)
+    assert pruefpunkt() is None
+
+    task.spent_tokens = 10
+    with pytest.raises(LaufBeendet) as gerissen:
+        pruefpunkt()
+    assert gerissen.value.status == "aborted_budget"
+    assert "max_tokens" in gerissen.value.grund
+
+    # Der Abbruch-Wunsch zaehlt genauso - und geht vor.
+    frisch = Task(goal="x", budget=TaskBudget())
+    pruefpunkt = baue_pruefpunkt(frisch, abgebrochen=lambda: True)
+    with pytest.raises(LaufBeendet) as gerissen:
+        pruefpunkt()
+    assert gerissen.value.status == "cancelled"
+
+
+def test_schritt3a_der_abbruch_wirkt_mitten_im_werkzeug_loop(settings):
+    """Vorher lag die Abbruchpruefung nur an der Schrittgrenze.
+
+    Ein Schritt mit vielen Werkzeugrunden lief nach dem Abbruch munter
+    weiter - jede Runde ein bezahlter Modellaufruf.
+    """
+    import asyncio as _asyncio
+    import json as _json
+    import time as _t
+
+    from core.llm import FakeLLMProvider, FakeTurn, ToolUse
+    from core.planner import PLANNER_MARKER
+    from core.runner import ABSCHLUSS_PROMPT
+
+    class VieleRunden(FakeLLMProvider):
+        def __init__(self) -> None:
+            super().__init__()
+            self.werkzeugzuege = 0
+
+        async def complete(self, messages, *, system, tools=None):
+            if system.startswith(PLANNER_MARKER):
+                self._replies = [_json.dumps({"steps": [
+                    {"description": "Lange rechnen", "agent": None}]})]
+            elif system.startswith(ABSCHLUSS_PROMPT):
+                self._replies = ["Zusammengefasst."]
+            else:
+                await _asyncio.sleep(0.4)
+                self.werkzeugzuege += 1
+                self._replies = [FakeTurn(tool_uses=(
+                    ToolUse(f"c{self.werkzeugzuege}", "clock", {}),
+                ))]
+            return await super().complete(messages, system=system, tools=tools)
+
+    app = create_app(settings)
+    with TestClient(app) as c:
+        anbieter = VieleRunden()
+        app.state.provider = anbieter
+        tid = c.post("/api/tasks", json={"goal": "Lange"},
+                     headers=TOKEN).json()["task_id"]
+        _t.sleep(1.2)                       # mitten im Schritt
+        vorher = anbieter.werkzeugzuege
+        c.post(f"/api/tasks/{tid}/cancel", headers=TOKEN)
+        daten = _warte_auf_ende(c, tid)
+        nachher = anbieter.werkzeugzuege
+
+    assert daten["status"] == "cancelled", daten
+    assert nachher - vorher <= 1, (
+        f"{nachher - vorher} Werkzeugrunden nach dem Abbruch"
+    )
+
+
+def test_schritt3d_ein_abbruch_waehrend_der_zusammenfassung_endet_nicht_auf_done(settings):
+    """Das Fenster zwischen letzter Pruefung und Statuszuweisung.
+
+    Zwischen der Abbruchpruefung nach dem letzten Schritt und der Zeile, die
+    'done' setzt, lag ein voller bezahlter Modellaufruf. Wer in diesem Fenster
+    abbricht, bekam trotzdem 'done'.
+    """
+    import asyncio as _asyncio
+    import json as _json
+    import time as _t
+
+    from core.llm import FakeLLMProvider
+    from core.planner import PLANNER_MARKER
+    from core.runner import ABSCHLUSS_PROMPT
+
+    im_abschluss = {"jetzt": False}
+
+    class LangsamerAbschluss(FakeLLMProvider):
+        async def complete(self, messages, *, system, tools=None):
+            if system.startswith(PLANNER_MARKER):
+                self._replies = [_json.dumps({"steps": [
+                    {"description": "A", "agent": None}]})]
+            elif system.startswith(ABSCHLUSS_PROMPT):
+                im_abschluss["jetzt"] = True
+                await _asyncio.sleep(1.5)
+                self._replies = ["Zusammengefasst."]
+            else:
+                self._replies = ["A erledigt."]
+            return await super().complete(messages, system=system, tools=tools)
+
+    app = create_app(settings)
+    with TestClient(app) as c:
+        app.state.provider = LangsamerAbschluss()
+        tid = c.post("/api/tasks", json={"goal": "Ein Schritt"},
+                     headers=TOKEN).json()["task_id"]
+
+        frist = _t.monotonic() + 10
+        while not im_abschluss["jetzt"] and _t.monotonic() < frist:
+            _t.sleep(0.02)
+        assert im_abschluss["jetzt"], "die Zusammenfassung lief nie"
+        _t.sleep(0.2)
+        c.post(f"/api/tasks/{tid}/cancel", headers=TOKEN)
+        daten = _warte_auf_ende(c, tid)
+
+    assert daten["status"] == "cancelled", daten
+    assert daten["result"], "auch ein Abbruch liefert das Teilergebnis"
+
+
+def test_dod6_ein_schritt_plan_mit_winzigem_kostenbudget(settings):
+    """DoD 6, mit gezaehlten Zeilen in llm_calls statt geschaetzt."""
+    import json as _json
+
+    from core.db import llm_call_totals
+    from core.llm import FakeLLMProvider
+    from core.planner import PLANNER_MARKER
+    from core.runner import ABSCHLUSS_PROMPT
+
+    settings.budget_max_cost_eur = 0.0001
+    settings.llm_price_in_per_mtok = 1_000_000.0
+    settings.llm_price_out_per_mtok = 1_000_000.0
+
+    class Einfach(FakeLLMProvider):
+        async def complete(self, messages, *, system, tools=None):
+            if system.startswith(PLANNER_MARKER):
+                self._replies = [_json.dumps({"steps": [
+                    {"description": "A", "agent": None}]})]
+            elif system.startswith(ABSCHLUSS_PROMPT):
+                self._replies = ["Zusammengefasst."]
+            else:
+                self._replies = ["A erledigt."]
+            return await super().complete(messages, system=system, tools=tools)
+
+    app = create_app(settings)
+    with TestClient(app) as c:
+        app.state.provider = Einfach()
+        tid = c.post("/api/tasks", json={"goal": "Ein Schritt"},
+                     headers=TOKEN).json()["task_id"]
+        daten = _warte_auf_ende(c, tid)
+
+    assert daten["status"] == "aborted_budget", daten
+    assert "max_cost_eur" in (daten["abort_reason"] or "")
+    gezaehlt = llm_call_totals(settings.db_path)
+    assert gezaehlt["calls"] == 1, (
+        f"{gezaehlt['calls']} Zeilen in llm_calls - nach dem Planungszug "
+        "haette Schluss sein muessen"
+    )
+
+
+def test_dod7_abbruch_bei_offener_bestaetigung(settings, tmp_path):
+    """DoD 7 mit Pruefsumme der Zieldatei vorher und nachher."""
+    import hashlib
+    import time as _t
+
+    from core.llm import FakeLLMProvider, FakeTurn, ToolUse
+    from core.tools import registry
+
+    postausgang = tmp_path / "outbox.jsonl"
+    postausgang.write_text('{"vorher": true}\n', encoding="utf-8")
+    settings.outbox_path = postausgang
+    registry.get("send_email").outbox = postausgang
+
+    def pruefsumme() -> str:
+        return hashlib.sha256(postausgang.read_bytes()).hexdigest()
+
+    vorher = pruefsumme()
+
+    app = create_app(settings)
+    with TestClient(app) as c:
+        app.state.provider = FakeLLMProvider(replies=[
+            '{"steps":[{"description":"Krankmeldung schicken"}]}',
+            FakeTurn(tool_uses=(ToolUse("t1", "send_email", {
+                "to": "chef@firma.de", "subject": "Krankmeldung",
+                "body": "Ich bin heute nicht da."}),)),
+            "Erledigt.", "Erledigt.",
+        ])
+        tid = c.post("/api/tasks", json={"goal": "Melde mich krank"},
+                     headers=TOKEN).json()["task_id"]
+
+        frist = _t.monotonic() + 10
+        while _t.monotonic() < frist:
+            if c.get(f"/api/tasks/{tid}", headers=TOKEN).json().get("confirmation"):
+                break
+            _t.sleep(0.02)
+        else:
+            raise AssertionError("keine Rueckfrage")
+
+        begonnen = _t.monotonic()
+        c.post(f"/api/tasks/{tid}/cancel", headers=TOKEN)
+        daten = _warte_auf_ende(c, tid, sekunden=10)
+        gedauert = _t.monotonic() - begonnen
+
+        spaet = c.post(f"/api/tasks/{tid}/confirm", json={"approve": True},
+                       headers=TOKEN)
+
+    assert daten["status"] == "cancelled", daten
+    assert gedauert < 2.0, f"der Abbruch brauchte {gedauert:.2f} s"
+    assert spaet.status_code >= 400, spaet.text
+    assert pruefsumme() == vorher, "die Zieldatei wurde angefasst"
+
+
+def test_dod8_nach_einem_abbruch_steht_im_task_log_nie_done(settings):
+    """DoD 8, ueber den Pfad, der vorher 'done' geschrieben hat."""
+    import asyncio as _asyncio
+    import json as _json
+    import time as _t
+
+    from core import memory
+    from core.llm import FakeLLMProvider
+    from core.planner import PLANNER_MARKER
+    from core.runner import ABSCHLUSS_PROMPT
+
+    im_abschluss = {"jetzt": False}
+
+    class LangsamerAbschluss(FakeLLMProvider):
+        async def complete(self, messages, *, system, tools=None):
+            if system.startswith(PLANNER_MARKER):
+                self._replies = [_json.dumps({"steps": [
+                    {"description": "A", "agent": None}]})]
+            elif system.startswith(ABSCHLUSS_PROMPT):
+                im_abschluss["jetzt"] = True
+                await _asyncio.sleep(1.5)
+                self._replies = ["Zusammengefasst."]
+            else:
+                self._replies = ["A erledigt."]
+            return await super().complete(messages, system=system, tools=tools)
+
+    app = create_app(settings)
+    with TestClient(app) as c:
+        app.state.provider = LangsamerAbschluss()
+        tid = c.post("/api/tasks", json={"goal": "Ein Schritt"},
+                     headers=TOKEN).json()["task_id"]
+        frist = _t.monotonic() + 10
+        while not im_abschluss["jetzt"] and _t.monotonic() < frist:
+            _t.sleep(0.02)
+        _t.sleep(0.2)
+        c.post(f"/api/tasks/{tid}/cancel", headers=TOKEN)
+        _warte_auf_ende(c, tid)
+
+    eintraege = [e for e in memory.list_task_log(settings.db_path)
+                 if e.task_id == tid]
+    assert eintraege, "der Abbruch wurde gar nicht protokolliert"
+    assert all(e.outcome != "done" for e in eintraege), [e.outcome for e in eintraege]

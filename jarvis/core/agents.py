@@ -11,6 +11,7 @@ from __future__ import annotations
 import time
 from typing import Awaitable, Callable, Iterable
 
+from core.abbruch import LaufBeendet
 from core.contracts import Agent, Permission, Step, Task, ToolResult
 from core.satellite.policy import pruefe_anfrage
 from core.llm import LLMMessage, LLMProvider, LLMReply
@@ -185,7 +186,7 @@ class ToolAgent(Agent):
         bestaetigung: Bestaetigung | None = None,
         audit: Audit | None = None,
         vorpruefung: Callable[[str], None] | None = None,
-        budget_pruefung: Callable[[], str | None] | None = None,
+        budget_pruefung: Callable[[], None] | None = None,
     ) -> None:
         self.provider = provider
         self.name = name
@@ -203,9 +204,11 @@ class ToolAgent(Agent):
         # erst bearbeitet werden soll - eine Ablehnung, die vom Tagesform eines
         # Modells abhaengt, ist keine Regel.
         self._vorpruefung = vorpruefung
-        # BUGS-01 Fund 4: die Budgetpruefung des Auftrags. Ohne sie gilt das
-        # Budget nur zwischen den Schritten, und ein Ein-Schritt-Plan haette
-        # praktisch keins.
+        # BUGS-01 Fund 4 und FIX-03 Schritt 3a: der Pruefpunkt des Auftrags.
+        # Er steht vor jedem bezahlten Zug und vor jedem Werkzeug und wirft
+        # `LaufBeendet`. Ohne ihn gaelte weder Abbruch noch Budget innerhalb
+        # eines Schritts, und ein Ein-Schritt-Plan haette praktisch beides
+        # nicht.
         self.budget_pruefung = budget_pruefung
 
     async def run(self, task: Task, step: Step) -> ToolResult:
@@ -268,8 +271,14 @@ class ToolAgent(Agent):
                 on_reply=self._on_reply,
                 bestaetigung=self._bestaetigung,
                 audit=self._audit,
-                budget=self.budget_pruefung,
+                pruefpunkt=self.budget_pruefung,
             )
+        except LaufBeendet:
+            # FIX-03 Schritt 3a: das ist kein Schrittfehler, sondern das Ende
+            # des Laufs. Wer das hier in ein ToolResult verwandelt, macht aus
+            # dem Abbruch einen misslungenen Schritt - und der Task laeuft
+            # weiter.
+            raise
         except Exception as exc:  # noqa: BLE001 - ein Schritt reisst nie den Task um
             return ToolResult(
                 ok=False,
@@ -307,7 +316,7 @@ def baue_agenten(
     on_call: Callable[[ToolCall], Awaitable[None]] | None = None,
     bestaetigung: Bestaetigung | None = None,
     audit: Audit | None = None,
-    budget_pruefung: Callable[[], str | None] | None = None,
+    budget_pruefung: Callable[[], None] | None = None,
 ) -> dict[str, ToolAgent]:
     """Die Agenten, die es in dieser Phase gibt.
 
