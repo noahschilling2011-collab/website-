@@ -21,6 +21,7 @@ vom 25.08., kein Aufgabenzettel, den man umschreibt):
 | 7 · Keine SSRF-Sperre | behoben | `f1d5e22` |
 | 12 · `pruefe()` ohne Inhaltsprüfung | behoben | `5a21934` (FIX-02) |
 | 13 · Kartenzahl sinkt ohne Nachrücken | behoben | `5a21934` (FIX-02) |
+| 15 · `can_call_agents` ungeprüft | behoben | `core/delegation.py` (Rufer im Kontext) + `core/agents.py` |
 | 14 · Rechner-Bombe | behoben, **Mechanismus im Bericht falsch** — siehe unten | `core/tools/builtin.py` (Deckel für jedes Zwischenergebnis) |
 | 5 · Weltlage nicht in `llm_calls` | war mit FIX-02 Schritt 2 schon weg, jetzt durch einen Test festgehalten | `tests/test_weltlage.py` |
 | 4 · Budget nur zwischen Schritten | behoben | `core/tools/loop.py`, `core/agents.py`, `core/runner.py`, `core/contracts.py` |

@@ -34,6 +34,11 @@ class DelegationsKontext:
     # Wird fuer jeden Unterauftrag aufgerufen: der Baum in DoD 3 entsteht daraus.
     on_subtask: Callable[[Task, str | None], Awaitable[None]] | None = None
     abgelehnt: list[dict[str, Any]] = field(default_factory=list)
+    # BUGS-01 Fund 15: WER ruft. Ohne diese Angabe laesst sich
+    # `can_call_agents` nicht durchsetzen - und die Liste war genau deshalb
+    # bis hierher reine Deko. `ToolAgent.run` setzt sie fuer die Dauer seines
+    # Laufs; None heisst "kein Agent ruft" (Direktaufruf im Test).
+    rufer: str | None = None
 
 
 kontext: ContextVar[DelegationsKontext | None] = ContextVar(
@@ -98,6 +103,23 @@ class AskAgent(Tool):
             return ToolResult(ok=False, error=grund, display=grund,
                               duration_ms=dauer())
 
+        # BUGS-01 Fund 15: die Liste des Rufers ist eine Grenze, keine Deko.
+        # hermes (LOCAL, ['research','satellite']) erreichte darueber auch
+        # jarvis - und jarvis hat send_email in den Werkzeugen.
+        rufender = ctx.agenten.get(ctx.rufer) if ctx.rufer else None
+        if rufender is not None and agent not in rufender.can_call_agents:
+            erlaubt = ", ".join(rufender.can_call_agents) or "keinen"
+            grund = (
+                f"{rufender.name} darf {agent!r} nicht rufen. "
+                f"Erlaubt sind: {erlaubt}."
+            )
+            ctx.abgelehnt.append({"agent": agent, "task": task,
+                                  "depth": ctx.task.depth, "reason": grund})
+            log.warning("task %s: %s darf %s nicht rufen (erlaubt: %s)",
+                        ctx.task.id, rufender.name, agent, erlaubt)
+            return ToolResult(ok=False, error=grund, display=grund,
+                              duration_ms=dauer())
+
         ziel_agent = ctx.agenten.get(agent)
         if ziel_agent is None:
             bekannt = ", ".join(sorted(n for n in ctx.agenten if n != "hermes"))
@@ -123,6 +145,8 @@ class AskAgent(Tool):
         eigener = kontext.set(DelegationsKontext(
             task=unterauftrag, agenten=ctx.agenten, max_depth=ctx.max_depth,
             on_subtask=ctx.on_subtask, abgelehnt=ctx.abgelehnt,
+            # Der gerufene Agent setzt sich in `run` selbst als Rufer ein.
+            rufer=None,
         ))
         try:
             ergebnis = await ziel_agent.run(unterauftrag, schritt)

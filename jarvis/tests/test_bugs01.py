@@ -719,3 +719,87 @@ def test_die_erlaubten_funktionen_koennen_keine_zahl_wachsen_lassen():
         "Neue Funktion in FUNKTIONEN - kann sie eine Zahl groesser machen? "
         "Dann gehoert _im_rahmen auch an den Call-Zweig."
     )
+
+
+# --- Fund 15: can_call_agents wird nirgends geprueft ---------------------
+
+
+def test_fund15_hermes_erreicht_ueber_ask_agent_nur_seine_eigene_liste():
+    """BUGS-01 Fund 15 - die Liste war Deko.
+
+    `hermes` traegt `can_call_agents = ['research', 'satellite']`. Geprueft
+    hat das niemand: ueber `ask_agent` erreichte er auch `jarvis` (der
+    `send_email` in den Werkzeugen hat) und sich selbst. Der Weg laeuft
+    hier ueber den echten Runner, nicht ueber einen von Hand gesetzten
+    Kontext - sonst prueft der Test seine eigene Verdrahtung.
+    """
+    import json as _json
+
+    from core.contracts import Permission, TaskBudget
+    from core.llm import FakeLLMProvider, FakeTurn, ToolUse
+    from core.planner import PLANNER_MARKER
+    from core.runner import ABSCHLUSS_PROMPT, fuehre_task_aus
+
+    aufrufe: list = []
+
+    class HermesRuftJarvis(FakeLLMProvider):
+        """Hermes versucht genau einmal, jarvis zu rufen."""
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.delegiert = False
+
+        async def complete(self, messages, *, system, tools=None):
+            if system.startswith(PLANNER_MARKER):
+                self._replies = [_json.dumps({"steps": [
+                    {"description": "Delegieren", "agent": "hermes"}]})]
+            elif system.startswith(ABSCHLUSS_PROMPT):
+                self._replies = ["Zusammengefasst."]
+            elif not self.delegiert:
+                self.delegiert = True
+                self._replies = [FakeTurn(tool_uses=(ToolUse(
+                    "d1", "ask_agent",
+                    {"agent": "jarvis", "task": "Schick eine Mail"}),))]
+            else:
+                self._replies = ["Fertig."]
+            return await super().complete(messages, system=system, tools=tools)
+
+    from core.runner import Laufzeit
+
+    async def mitschreiben(aufruf):
+        aufrufe.append(aufruf)
+
+    run(fuehre_task_aus(HermesRuftJarvis(), "Delegiere an jarvis",
+                        budget=TaskBudget(), kosten=lambda a, b: 0.0,
+                        max_permission=Permission.LOCAL,
+                        laufzeit=Laufzeit(on_call=mitschreiben)))
+
+    delegationen = [a for a in aufrufe if a.name == "ask_agent"]
+    assert len(delegationen) == 1, [a.name for a in aufrufe]
+    ergebnis = delegationen[0].result
+    assert ergebnis is not None and ergebnis.ok is False, (
+        "hermes hat jarvis erreicht, obwohl der nicht in can_call_agents steht"
+    )
+    assert "jarvis" in (ergebnis.error or "")
+
+
+def test_fund15_die_erlaubten_agenten_gehen_weiterhin_durch(suche_ohne_netz=None):
+    """Eine Grenze, die auch das Erlaubte abweist, ist keine Grenze."""
+    from core.contracts import Permission, Task, TaskBudget
+    from core.delegation import DelegationsKontext, kontext
+    from core.agents import baue_agenten
+    from core.llm import FakeLLMProvider
+    from core.tools.dispatch import run_tool as _run_tool
+
+    agenten = baue_agenten(FakeLLMProvider(), max_permission=Permission.LOCAL)
+    assert agenten["hermes"].can_call_agents == ["research", "satellite"]
+
+    haupt = Task(goal="x", budget=TaskBudget(max_depth=2), depth=0)
+    marke = kontext.set(DelegationsKontext(
+        task=haupt, agenten=agenten, max_depth=2, rufer="hermes"))
+    try:
+        ergebnis = run(_run_tool("ask_agent",
+                                 {"agent": "research", "task": "Helme"}))
+    finally:
+        kontext.reset(marke)
+    assert ergebnis.ok is True, ergebnis.error

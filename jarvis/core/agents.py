@@ -211,6 +211,27 @@ class ToolAgent(Agent):
     async def run(self, task: Task, step: Step) -> ToolResult:
         begonnen = time.monotonic()
 
+        # BUGS-01 Fund 15: ab hier ist bekannt, WER ruft - sonst laesst sich
+        # `can_call_agents` in ask_agent nicht durchsetzen. Der Kontext wird
+        # kopiert statt veraendert: `abgelehnt` und `task` bleiben dieselben
+        # Objekte, aber zwei Agenten treten sich nicht gegenseitig auf den
+        # Rufer-Eintrag.
+        from dataclasses import replace
+
+        from core.delegation import kontext as _kontext
+
+        _ctx = _kontext.get()
+        _marke = None
+        if _ctx is not None and _ctx.rufer != self.name:
+            _marke = _kontext.set(replace(_ctx, rufer=self.name))
+        try:
+            return await self._run(task, step, begonnen)
+        finally:
+            if _marke is not None:
+                _kontext.reset(_marke)
+
+    async def _run(self, task: Task, step: Step, begonnen: float) -> ToolResult:
+
         if self._vorpruefung is not None:
             try:
                 self._vorpruefung(f"{task.goal}\n{step.description}")
