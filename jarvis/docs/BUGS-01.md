@@ -21,6 +21,7 @@ vom 25.08., kein Aufgabenzettel, den man umschreibt):
 | 7 · Keine SSRF-Sperre | behoben | `f1d5e22` |
 | 12 · `pruefe()` ohne Inhaltsprüfung | behoben | `5a21934` (FIX-02) |
 | 13 · Kartenzahl sinkt ohne Nachrücken | behoben | `5a21934` (FIX-02) |
+| 23 · jede Chat-Nachricht ab der 21. scheitert | behoben | `core/llm.py`, `api/routes.py` |
 | 22 · `fts_query` wirft nicht-deutsche Wörter weg | behoben | `core/memory.py` |
 | 19 · `EventBus` wirft das neue Ereignis weg | behoben | `api/events.py` |
 | 16 · `/api/chat` ohne Budget | behoben | `api/routes.py` |

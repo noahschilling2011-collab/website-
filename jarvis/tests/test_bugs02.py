@@ -223,3 +223,133 @@ def test_fund22_recall_findet_einen_kyrillischen_fakt(db_path: Path):
 
     assert [f.text for f in memory.search_facts(db_path, "велосипед")]
     assert [f.text for f in memory.search_facts(db_path, "français")]
+
+
+# --- Fund 23: das Verlaufsfenster beginnt mit "assistant" ----------------
+
+
+def test_fund23_das_verlaufsfenster_beginnt_immer_mit_user(db_path: Path):
+    """BUGS-01 Fund 23, und es ist schlimmer als gemeldet.
+
+    Der Bericht sagt "jede 21. Nachricht". Gemessen ist es JEDE ab der 21.:
+
+        Nutzerzuege  Zeilen   erste Rolle im Fenster  Anthropic ok?
+                 20      39                     user  ja
+                 21      40                assistant  NEIN
+                 22      40                assistant  NEIN
+        fehlerhafte Nutzerzuege: [21, 22, 23, 24, 25, ...]  20 von 40
+
+    Der Verlauf ist u,a,u,a,... Sobald mehr Zeilen da sind als
+    `history_limit`, schneidet `list_messages(limit)` ein Fenster gerader
+    Laenge aus einer ungeraden Folge - und das beginnt dann mit `assistant`.
+    Die Messages-API verlangt `user` als erste Nachricht.
+    """
+    from core import db
+    from core.config import Settings
+    from core.llm import ab_erster_nutzernachricht
+
+    grenze = Settings(_env_file=None).history_limit
+    with db.session(db_path) as conn:
+        db.init_db(conn)
+
+    ungeschnitten, geschnitten = [], []
+    for zug in range(1, grenze + 5):
+        db.add_message(db_path, "user", f"Frage {zug}")
+        roh = db.list_messages(db_path, grenze)
+        if roh and roh[0].role != "user":
+            ungeschnitten.append(zug)
+        fenster = ab_erster_nutzernachricht(roh)
+        if fenster and fenster[0].role != "user":
+            geschnitten.append(zug)
+        db.add_message(db_path, "assistant", f"Antwort {zug}")
+
+    assert ungeschnitten, (
+        "ohne Schnitt muesste das Fenster ab Zug 21 mit 'assistant' beginnen - "
+        "wenn nicht, prueft dieser Test nichts mehr"
+    )
+    assert geschnitten == [], (
+        f"{len(geschnitten)} Zuege mit 'assistant' an erster Stelle: {geschnitten[:8]}"
+    )
+
+
+def test_fund23_der_schnitt_nimmt_nur_weg_was_noetig_ist():
+    """Eine Kuerzung, die mehr wegnimmt als noetig, verliert Kontext."""
+    from core.llm import LLMMessage, ab_erster_nutzernachricht
+
+    a, u = LLMMessage("assistant", "A"), LLMMessage("user", "U")
+
+    assert ab_erster_nutzernachricht([u, a, u]) == [u, a, u]
+    assert ab_erster_nutzernachricht([a, u, a, u]) == [u, a, u]
+    assert ab_erster_nutzernachricht([a, a, a, u]) == [u]
+    assert ab_erster_nutzernachricht([]) == []
+    assert ab_erster_nutzernachricht([a, a]) == [], (
+        "ohne eine einzige Nutzernachricht bleibt nichts uebrig"
+    )
+
+
+def test_fund23_der_chat_ueberlebt_den_einundzwanzigsten_zug(settings, tmp_path):
+    """Ende zu Ende gegen den ECHTEN Anbieter, nur ohne Netz.
+
+    `FakeLLMProvider` prueft die Regel nicht - genau deshalb ist der Fund nie
+    aufgefallen. Hier laeuft `AnthropicProvider` mit einem `MockTransport`:
+    dieselbe Pruefung, dieselbe Fehlermeldung, kein Byte nach draussen.
+    """
+    import httpx
+    from fastapi.testclient import TestClient
+
+    import api.app  # noqa: F401
+    from api.app import create_app
+    from core.llm import AnthropicProvider
+
+    TOKEN = {"X-Jarvis-Token": "test-token-123"}
+    gesehen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        import json as _json
+
+        koerper = _json.loads(request.content)
+        gesehen.append(koerper["messages"][0]["role"])
+        return httpx.Response(200, json={
+            "id": "msg_01", "type": "message", "role": "assistant",
+            "model": "claude-opus-5",
+            "content": [{"type": "text", "text": "Antwort"}],
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 11, "output_tokens": 7},
+        })
+
+    app = create_app(settings)
+    with TestClient(app) as c:
+        app.state.provider = AnthropicProvider(
+            "sk-ant-test-key", model="claude-opus-5",
+            transport=httpx.MockTransport(handler),
+        )
+        for zug in range(1, settings.history_limit // 2 + 6):
+            antwort = c.post("/api/chat", json={"message": f"Frage {zug}"},
+                             headers=TOKEN)
+            assert antwort.status_code == 200, (
+                f"Zug {zug}: HTTP {antwort.status_code} - {antwort.text[:160]}"
+            )
+
+    assert gesehen, "es ging keine einzige Anfrage an den Anbieter"
+    assert set(gesehen) == {"user"}, (
+        f"erste Rolle im Anfragekoerper: {sorted(set(gesehen))}"
+    )
+
+
+def test_fund23_der_anbieter_besteht_weiterhin_auf_user_als_erster_rolle():
+    """Die Pruefung im Anbieter bleibt - sie ist der Grund, warum es auffiel.
+
+    Sie wegzunehmen waere die falsche Reparatur: dann ginge die kaputte
+    Anfrage still an die echte API und kaeme als 400 zurueck.
+    """
+    import httpx
+
+    from core.llm import AnthropicProvider, LLMError, LLMMessage
+
+    provider = AnthropicProvider(
+        "sk-ant-test-key", model="claude-opus-5",
+        transport=httpx.MockTransport(
+            lambda r: httpx.Response(200, json={})),
+    )
+    with pytest.raises(LLMError, match="erste Nachricht"):
+        run(provider.complete([LLMMessage("assistant", "Hallo")], system="s"))

@@ -155,10 +155,32 @@ def test_systemprompt_wird_mitgeschickt(client, fake, settings):
 
 
 def test_verlaufsfenster_wird_eingehalten(client, fake, settings):
+    """`history_limit` ist eine Obergrenze, keine feste Groesse.
+
+    Seit BUGS-01 Fund 23 wird vorne abgeschnitten, bis die erste Nachricht
+    von `user` ist - die Messages-API verlangt das. Ein Fenster gerader Laenge
+    aus einer ungeraden Folge beginnt sonst mit `assistant`, und der Anbieter
+    lehnt die ganze Anfrage ab. Kosten: hoechstens eine Nachricht.
+    """
     settings.history_limit = 4
     for i in range(5):
         client.post("/api/chat", json={"message": f"m{i}"}, headers=TOKEN)
-    assert len(fake.calls[-1]["messages"]) == 4
+
+    fenster = fake.calls[-1]["messages"]
+    assert 3 <= len(fenster) <= 4, len(fenster)
+    assert fenster[0].role == "user", [m.role for m in fenster]
+    assert fenster[-1].content == "m4", "die neueste Nachricht muss drin sein"
+
+
+def test_das_verlaufsfenster_wird_nicht_unnoetig_gekuerzt(client, fake, settings):
+    """Gegenprobe: beginnt das Fenster ohnehin mit `user`, bleibt es ganz."""
+    settings.history_limit = 5
+    for i in range(5):
+        client.post("/api/chat", json={"message": f"m{i}"}, headers=TOKEN)
+
+    fenster = fake.calls[-1]["messages"]
+    assert len(fenster) == 5
+    assert fenster[0].role == "user"
 
 
 @pytest.mark.parametrize("nachricht", ["", "   ", "\n\t "])

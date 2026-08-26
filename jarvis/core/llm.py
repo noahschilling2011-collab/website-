@@ -41,6 +41,30 @@ class ToolUse:
     input: dict[str, Any]
 
 
+def ab_erster_nutzernachricht(verlauf: list):
+    """Schneidet vorne weg, bis die erste Nachricht von `user` ist.
+
+    BUGS-01 Fund 23. Die Messages-API verlangt `user` als erste Rolle. Der
+    Verlauf ist u,a,u,a,... - sobald mehr Zeilen da sind als `history_limit`,
+    schneidet ein Fenster gerader Laenge aus einer ungeraden Folge, und das
+    beginnt mit `assistant`. Gemessen war ab dem 21. Zug JEDE Anfrage
+    betroffen, nicht nur jede 21.:
+
+        Zug 21: HTTP 502 - "Die erste Nachricht muss von 'user' sein."
+
+    Der Anbieter faengt es ab und meldet es sauber - deshalb wird hier
+    geschnitten und nicht dort die Pruefung entfernt. Eine Antwort des
+    Assistenten ohne die Frage davor ist ohnehin Kontext ohne Anker.
+
+    Arbeitet auf allem, was `.role` hat: `LLMMessage` genauso wie die
+    `Message`-Zeilen aus der Datenbank.
+    """
+    for i, nachricht in enumerate(verlauf):
+        if getattr(nachricht, "role", None) == "user":
+            return verlauf[i:]
+    return []
+
+
 @dataclass(frozen=True)
 class LLMMessage:
     role: str

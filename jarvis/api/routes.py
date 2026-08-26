@@ -35,7 +35,12 @@ from api.security import require_token
 from core import db, memory
 from core.abbruch import LaufBeendet, baue_pruefpunkt
 from core.contracts import Permission, Task, TaskBudget
-from core.llm import LLMError, LLMMessage, LLMReply
+from core.llm import (
+    LLMError,
+    LLMMessage,
+    LLMReply,
+    ab_erster_nutzernachricht,
+)
 from core.tools import registry
 from core.tools.dispatch import ToolCall
 from core.tools.loop import run_tool_loop
@@ -107,6 +112,8 @@ async def post_chat(request: Request, body: ChatRequest) -> ChatResponse:
     history = await asyncio.to_thread(
         db.list_messages, settings.db_path, settings.history_limit
     )
+    # BUGS-01 Fund 23: das Fenster darf nicht mit `assistant` beginnen.
+    history = ab_erster_nutzernachricht(history)
 
     # Werkzeugaufrufe werden geschrieben, sobald sie passieren - noch ohne
     # message_id, die Antwort gibt es ja noch nicht. Sonst waere nach einem
