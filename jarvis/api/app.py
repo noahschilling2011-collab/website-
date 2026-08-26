@@ -123,19 +123,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # Der Index ist abgeleitet: beim Start einmal neu bauen kostet nichts
         # und macht ihn verlaesslich, egal was zwischendurch in Obsidian
         # passiert ist.
-        app.state.vault = None
+        # FIX-04 Schritt 3: reindex beim Start, und sonst nichts. Keine
+        # Dateiueberwachung, kein Hintergrund-Dienst, keine Polling-Schleife.
+        # Was zwischendurch in Obsidian passiert, holt
+        # `core.gedaechtnis.frisch_halten` beim naechsten Lesen nach - es
+        # prueft die Zeitstempel und wirft geloeschte Dateien aus dem Index.
         if settings.vault_pfad:
-            from core.vault_index import Beobachter, reindex
+            from core.vault_index import reindex
 
             anzahl = await asyncio.to_thread(
                 reindex, settings.db_path, settings.vault_pfad
             )
             log.info("Vault %s - %d Notizen indexiert.", settings.vault_pfad, anzahl)
-            try:
-                app.state.vault = Beobachter(settings.db_path, settings.vault_pfad).start()
-            except Exception as exc:      # noqa: BLE001 - ohne Beobachter laeuft alles weiter
-                log.warning("Vault-Beobachter nicht gestartet: %s. "
-                            "Der Index bleibt auf dem Stand des Starts.", exc)
 
         if not settings.search_api_key:
             log.info("SEARCH_API_KEY fehlt - web_search meldet das beim Aufruf.")
@@ -159,8 +158,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             # Modellaufrufe in der Luft, die schon Geld gekostet haben.
             await app.state.tasks.stop_alle()
             await app.state.provider.aclose()
-            if getattr(app.state, "vault", None) is not None:
-                app.state.vault.stop()
 
     app = FastAPI(
         title="JARVIS",

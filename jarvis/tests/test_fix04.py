@@ -569,3 +569,59 @@ def test_das_log_zaehlt_die_fakten_richtig(welt, caplog):
               if "Fakten in den Kontext" in e.getMessage()]
     assert zeilen, [e.getMessage() for e in caplog.records]
     assert "1 Fakten" in zeilen[-1], zeilen[-1]
+
+
+def test_eine_ausserhalb_geloeschte_notiz_verschwindet_auch_aus_dem_index(welt):
+    """Der Index darf nichts behaupten, wofuer es keine Wahrheit mehr gibt.
+
+    `frisch_halten` zog zuerst nur Neues und Geaendertes nach. Wer eine Notiz
+    in Obsidian loeschte, sah sie im Panel weiter:
+
+        Dateien im Vault: ['Notiz-b-f_b.md', 'Notiz-c-f_c.md']
+        Panel:            ['f_a', 'f_b', 'f_c']
+
+    Das ist "den Index als Wahrheit behandeln" - genau was FIX-04 verbietet.
+    """
+    from core import gedaechtnis
+    from core.vault import Notiz, schreibe
+
+    einstellungen, vault = welt
+    for kennung in ("a", "b", "c"):
+        schreibe(vault, Notiz(id=f"f_{kennung}", text=f"Notiz {kennung}",
+                              tags=["test"]))
+
+    with _klient(einstellungen) as c:
+        assert len(c.get("/api/memory", headers=TOKEN).json()) == 3
+
+        sorted(vault.rglob("*.md"))[0].unlink()
+
+        panel = c.get("/api/memory", headers=TOKEN).json()
+        assert [p["id"] for p in panel] == ["f_b", "f_c"], panel
+        for eintrag in panel:
+            assert (vault / eintrag["pfad"]).exists(), eintrag
+
+        ergebnis = run(_werkzeug("recall").execute(query="Notiz"))
+    assert "f_a" not in str(ergebnis.data), ergebnis.data
+
+
+def test_ein_unveraenderter_vault_wird_beim_lesen_nicht_neu_indexiert(welt):
+    """Gegenprobe: `frisch_halten` darf nicht jedes Mal alles neu schreiben.
+
+    Sonst waere es die Polling-Schleife, die FIX-04 ausdruecklich nicht will -
+    nur mit anderem Namen.
+    """
+    from core import gedaechtnis
+    from core.vault import Notiz, schreibe
+
+    einstellungen, vault = welt
+    for kennung in ("a", "b", "c"):
+        schreibe(vault, Notiz(id=f"f_{kennung}", text=f"Notiz {kennung}",
+                              tags=["test"]))
+
+    erst = gedaechtnis.frisch_halten(einstellungen.db_path, einstellungen.vault_pfad)
+    assert erst == 3, "beim ersten Mal ist alles neu"
+    for _ in range(3):
+        assert gedaechtnis.frisch_halten(
+            einstellungen.db_path, einstellungen.vault_pfad) == 0, (
+            "ohne Aenderung darf nichts angefasst werden"
+        )

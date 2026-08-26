@@ -346,61 +346,61 @@ def test_dateien_uebersieht_versteckte(vault):
     assert all(not p.name.startswith(".") for p in dateien(vault))
 
 
-# --- DoD 2, mit dem laufenden Beobachter ------------------------------------
+# --- DoD 2, ohne Ueberwachung -----------------------------------------------
+#
+# Diese drei Tests liefen frueher gegen die Klasse `Beobachter`. Die ist mit
+# FIX-04 Schritt 3 entfallen ("Ausdruecklich nicht bauen: Dateiueberwachung,
+# Hintergrund-Dienst, Polling-Schleife"). Was sie geprueft haben, gilt
+# weiterhin - nur ist der Ausloeser jetzt das Lesen und nicht ein Thread.
 
 
-def test_dod_2_beobachter_findet_eine_neue_notiz_in_unter_3_sekunden(db, vault):
-    """Mit Zeitstempeln, wie die DoD es verlangt."""
-    from core.vault_index import Beobachter
+def test_dod_2_eine_neue_notiz_ist_beim_naechsten_lesen_da(db, vault):
+    """Mit Zeitstempeln, wie die DoD es verlangt - nur ohne Beobachter.
 
-    with Beobachter(db, vault, entprellung=0.3):
-        time.sleep(0.4)                       # Beobachter hochfahren lassen
-        geschrieben = time.monotonic()
-        schreibe(vault, notiz("Ein Fakt ueber Zugvoegel."))
+    `docs/MIGRATION-VAULT.md` DoD 2 verlangte "in unter 3 Sekunden gefunden".
+    Ohne Ueberwachung ist die Frage anders gestellt: nicht "wie lange dauert
+    es, bis jemand es merkt", sondern "ist es da, wenn jemand nachsieht".
+    """
+    from core.gedaechtnis import liste
 
-        gefunden = None
-        while time.monotonic() - geschrieben < 3.0:
-            if suche(db, "Zugvoegel"):
-                gefunden = time.monotonic()
-                break
-            time.sleep(0.05)
+    geschrieben = time.monotonic()
+    schreibe(vault, notiz("Ein Fakt ueber Zugvoegel."))
 
-    assert gefunden is not None, "nach 3 s nicht im Index"
-    dauer = gefunden - geschrieben
+    treffer = [e for e in liste(db, str(vault)) if "Zugvoegel" in e.text]
+    dauer = time.monotonic() - geschrieben
+
+    assert treffer, "beim ersten Lesen nicht da"
     assert dauer < 3.0
-    print(f"\n    geschrieben -> im Index: {dauer:.2f} s")
+    print(f"\n    geschrieben -> im Index: {dauer:.3f} s")
 
 
-def test_beobachter_bemerkt_auch_das_loeschen(db, vault):
-    from core.vault_index import Beobachter
+def test_das_loeschen_wird_beim_naechsten_lesen_bemerkt(db, vault):
+    from core.gedaechtnis import liste
 
     pfad = schreibe(vault, notiz("Verschwindet gleich."))
     reindex(db, vault)
     assert suche(db, "Verschwindet")
 
-    with Beobachter(db, vault, entprellung=0.3):
-        time.sleep(0.4)
-        pfad.unlink()
-        frist = time.monotonic() + 3.0
-        while time.monotonic() < frist and suche(db, "Verschwindet"):
-            time.sleep(0.05)
+    pfad.unlink()
 
+    assert [e for e in liste(db, str(vault)) if "Verschwindet" in e.text] == []
     assert suche(db, "Verschwindet") == []
 
 
-def test_entprellung_indexiert_nicht_fuenfmal(db, vault):
-    """Editoren schreiben mehrfach hintereinander. Einmal reicht."""
-    from core.vault_index import Beobachter
+def test_mehrfaches_speichern_gibt_einen_eintrag_mit_dem_letzten_stand(db, vault):
+    """Editoren schreiben mehrfach hintereinander. Einmal reicht.
+
+    Frueher machte das die Entprellung des Beobachters. Jetzt macht es der
+    Schluessel: eine Datei, eine `id`, ein Eintrag - egal wie oft geschrieben
+    wurde. Gelesen wird die Datei, wie sie zuletzt auf der Platte liegt.
+    """
+    from core.gedaechtnis import liste
 
     n = notiz("Mehrfach gespeichert.")
-    with Beobachter(db, vault, entprellung=0.4):
-        time.sleep(0.4)
-        for i in range(5):
-            n.text = f"Mehrfach gespeichert, Fassung {i}."
-            schreibe(vault, n)
-            time.sleep(0.05)
-        time.sleep(1.2)
+    for i in range(5):
+        n.text = f"Mehrfach gespeichert, Fassung {i}."
+        schreibe(vault, n)
 
-    treffer = suche(db, "Mehrfach")
+    treffer = [e for e in liste(db, str(vault)) if "Mehrfach" in e.text]
     assert len(treffer) == 1, "eine Datei, ein Eintrag"
     assert "Fassung 4" in treffer[0].text, "der letzte Stand muss gewinnen"

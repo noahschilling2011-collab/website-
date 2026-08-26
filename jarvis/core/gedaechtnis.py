@@ -113,20 +113,39 @@ def frisch_halten(db_path, vault_pfad) -> int:
                 "SELECT pfad, mtime FROM vault_notizen")
         }
         gezogen = 0
+        auf_der_platte: set[str] = set()
         for pfad in dateien(wurzel):
             try:
                 mtime = pfad.stat().st_mtime
             except OSError:
                 continue
             relativ = _relativ(wurzel, pfad)
+            auf_der_platte.add(relativ)
             gesehen = bekannt.get(relativ)
             if gesehen is not None and abs(gesehen - mtime) < 1e-6:
                 continue
             if _eintrag(conn, wurzel, pfad) is not None:
                 gezogen += 1
-    if gezogen:
-        log.info("Vault: %d Datei(en) beim Lesen nachgezogen.", gezogen)
-    return gezogen
+
+        # Und was es nicht mehr gibt, kennt der Index auch nicht mehr.
+        #
+        # Das fehlte zuerst: `frisch_halten` zog nur Neues und Geaendertes
+        # nach. Wer eine Notiz in Obsidian loeschte, sah sie im Panel weiter -
+        # der Index behauptete etwas, wofuer es keine Wahrheit mehr gab:
+        #
+        #     Dateien im Vault: ['Notiz-b-f_b.md', 'Notiz-c-f_c.md']
+        #     Panel:            ['f_a', 'f_b', 'f_c']
+        #
+        # Genau das ist "den Index als Wahrheit behandeln", und genau das
+        # verbietet FIX-04.
+        verwaist = sorted(set(bekannt) - auf_der_platte)
+        for relativ in verwaist:
+            conn.execute("DELETE FROM vault_notizen WHERE pfad = ?", (relativ,))
+
+    if gezogen or verwaist:
+        log.info("Vault: %d Datei(en) nachgezogen, %d verwaiste Eintraege "
+                 "entfernt.", gezogen, len(verwaist))
+    return gezogen + len(verwaist)
 
 
 def liste(db_path, vault_pfad, q: str = "", limit: int = 200) -> list[Eintrag]:

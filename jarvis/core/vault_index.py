@@ -5,16 +5,20 @@ aus den Markdown-Dateien neu bauen - das ist der Vertrag aus
 `docs/MIGRATION-VAULT.md`, und `test_vault.py` prueft ihn: zweimal neu
 indexieren muss byte-gleiche Zeilen liefern.
 
-Der Beobachter haengt an `watchdog`. Vier Ereignisse zaehlen: angelegt,
-geaendert, geloescht, **verschoben**. Verschieben ist der Fall, den man
-vergisst - und in Obsidian passiert er staendig.
+Aktuell gehalten wird er an zwei Stellen und sonst nirgends (FIX-04 Schritt 3):
+beim Start durch `reindex()`, und bei jedem Lesen durch
+`core.gedaechtnis.frisch_halten`, das die Zeitstempel vergleicht. Ueberwacht
+wird nichts - eine Dateiueberwachung stand hier frueher und ist entfallen,
+siehe den Kommentar weiter unten.
+
+Der Schluessel ist `id` aus dem Frontmatter, nie der Dateiname. Deshalb
+ueberlebt ein Fakt das Umbenennen und das Verschieben in Obsidian - der Fall,
+den man vergisst, und der dort staendig passiert.
 """
 
 from __future__ import annotations
 
 import logging
-import threading
-import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -176,147 +180,22 @@ def mtime_von(db_path, notiz_id: str) -> float | None:
     return zeile[0] if zeile else None
 
 
-# --- Beobachter -------------------------------------------------------------
-
-
-class Beobachter:
-    """Haelt den Index aktuell, waehrend jemand in Obsidian arbeitet."""
-
-    def __init__(self, db_path, wurzel: Path, entprellung: float = ENTPRELLUNG_S) -> None:
-        self.db_path = db_path
-        self.wurzel = Path(wurzel).expanduser()
-        self.entprellung = entprellung
-        self._observer = None
-        # BUGS-01 Fund 20: hier stand `dict[str, threading.Timer]` - EIN
-        # OS-Thread je geaenderter Datei. Bei einem git-Checkout oder einem
-        # Obsidian-Sync mit ein paar tausend Notizen liefen die alle
-        # gleichzeitig und schrieben gleichzeitig in dieselbe SQLite-Datei.
-        # Gemessen:
-        #
-        #     N=  200  indexiert=  200  FEHLEND=   0   Threads +200
-        #     N= 1000  indexiert= 1000  FEHLEND=   0   Threads +1000
-        #     N= 3000  indexiert= 2667  FEHLEND= 333   Threads +2848
-        #        Ausnahme x333: OperationalError: database is locked
-        #
-        # Der Verlust war still: die Ausnahme starb im Timer-Thread, ohne
-        # Retry und ohne Logeintrag. Und die Tabelle wurde nur beim
-        # Neu-Planen aufgeraeumt, nie beim Feuern - 3000 Dateien liessen
-        # 3000 Eintraege zurueck.
-        #
-        # Jetzt: eine Faelligkeitstabelle und EIN langlebiger Arbeiter. Damit
-        # gibt es genau einen Schreiber, das Locking-Problem verschwindet
-        # ohne hoeheren Busy-Timeout - und der Speicher waechst nicht mehr.
-        self._faellig: dict[str, tuple[float, object]] = {}
-        self._sperre = threading.Condition()
-        self._laeuft = False
-        self._arbeiter: threading.Thread | None = None
-
-    def offene_arbeiten(self) -> int:
-        """Wieviel noch aussteht. Fuer Tests und fuer die Fehlersuche."""
-        with self._sperre:
-            return len(self._faellig)
-
-    def _spaeter(self, schluessel: str, arbeit) -> None:
-        """Plant `arbeit` ein - und setzt die Frist zurueck, wenn sie schon steht.
-
-        Das Zuruecksetzen ist die Entprellung: ein Editor schreibt mehrfach
-        hintereinander, und gewinnen soll die letzte Fassung.
-        """
-        with self._sperre:
-            self._faellig[schluessel] = (time.monotonic() + self.entprellung, arbeit)
-            self._arbeiter_sicherstellen()
-            self._sperre.notify_all()
-
-    def _arbeiter_sicherstellen(self) -> None:
-        """Der Arbeiter startet beim ersten Ereignis, nicht schon beim Bauen.
-
-        Aufrufer haelt `self._sperre`.
-        """
-        if self._arbeiter is not None and self._arbeiter.is_alive():
-            return
-        self._laeuft = True
-        self._arbeiter = threading.Thread(
-            target=self._arbeiten, name="jarvis-vault-index", daemon=True
-        )
-        self._arbeiter.start()
-
-    def _arbeiten(self) -> None:
-        """Schlaeft bis zur fruehesten Faelligkeit und arbeitet dann seriell ab."""
-        while True:
-            with self._sperre:
-                if not self._laeuft:
-                    return
-                if not self._faellig:
-                    self._sperre.wait(timeout=1.0)
-                    continue
-                jetzt = time.monotonic()
-                dran = [s for s, (wann, _) in self._faellig.items() if wann <= jetzt]
-                if not dran:
-                    naechste = min(wann for wann, _ in self._faellig.values())
-                    self._sperre.wait(timeout=max(0.01, naechste - jetzt))
-                    continue
-                # pop, damit die Tabelle schrumpft - genau das fehlte vorher.
-                arbeiten = [self._faellig.pop(s)[1] for s in dran]
-
-            for arbeit in arbeiten:
-                try:
-                    arbeit()
-                except Exception as exc:      # noqa: BLE001
-                    # Ein Fehler an einer Datei darf die anderen nicht
-                    # mitnehmen - und er darf nicht still verpuffen.
-                    log.warning("Vault-Beobachter: Arbeit fehlgeschlagen - %s", exc)
-
-    def start(self) -> "Beobachter":
-        from watchdog.events import FileSystemEventHandler
-        from watchdog.observers import Observer
-
-        beobachter = self
-
-        class Handler(FileSystemEventHandler):
-            def on_created(self, ereignis):
-                if not ereignis.is_directory:
-                    beobachter._spaeter(str(ereignis.src_path),
-                                        lambda p=ereignis.src_path: aktualisiere(
-                                            beobachter.db_path, beobachter.wurzel, Path(p)))
-
-            def on_modified(self, ereignis):
-                self.on_created(ereignis)
-
-            def on_deleted(self, ereignis):
-                if not ereignis.is_directory:
-                    beobachter._spaeter(str(ereignis.src_path),
-                                        lambda p=ereignis.src_path: entferne(
-                                            beobachter.db_path, beobachter.wurzel, Path(p)))
-
-            def on_moved(self, ereignis):
-                # Der vergessene Fall. In Obsidian passiert er staendig.
-                if ereignis.is_directory:
-                    return
-                alt, neu = ereignis.src_path, ereignis.dest_path
-                beobachter._spaeter(str(neu), lambda: verschiebe(
-                    beobachter.db_path, beobachter.wurzel, Path(alt), Path(neu)))
-
-        self.wurzel.mkdir(parents=True, exist_ok=True)
-        self._observer = Observer()
-        self._observer.schedule(Handler(), str(self.wurzel), recursive=True)
-        self._observer.start()
-        return self
-
-    def stop(self) -> None:
-        with self._sperre:
-            self._laeuft = False
-            self._faellig.clear()
-            self._sperre.notify_all()
-        arbeiter, self._arbeiter = self._arbeiter, None
-        if arbeiter is not None:
-            arbeiter.join(timeout=5)
-        if self._observer is not None:
-            self._observer.stop()
-            self._observer.join(timeout=5)
-            self._observer = None
-
-    def __enter__(self) -> "Beobachter":
-        return self.start()
-
-    def __exit__(self, *_) -> None:
-        self.stop()
+# --- Frischhalten ohne Ueberwachung -----------------------------------------
+#
+# Hier stand die Klasse `Beobachter`: ein watchdog-Observer, der den Vault im
+# Hintergrund beobachtete. Sie ist mit FIX-04 entfallen.
+#
+# Der Grund ist nicht Geschmack, sondern dass sie nichts mehr tut, was jemand
+# merkt. FIX-04 Schritt 3 verlangt "Start plus Befehl plus Zeitstempel-Pruefung"
+# und verbietet ausdruecklich Dateiueberwachung, Hintergrund-Dienst und
+# Polling-Schleife. Seit `core.gedaechtnis.frisch_halten` bei JEDEM Lesen die
+# Zeitstempel prueft - und seit es auch geloeschte Dateien aus dem Index wirft -
+# ist jede Beobachtung, die vor einem Lesen passiert, unsichtbar: wer nicht
+# liest, merkt den Unterschied nicht, und wer liest, bekommt den frischen Stand.
+#
+# Was sie dafuer kostete: eine Abhaengigkeit ausserhalb des festgelegten Stacks
+# (`watchdog`, CLAUDE.md:31 nennt sie nicht), einen Thread ueber die ganze
+# Laufzeit, 141 Zeilen - und BUGS-01 Fund 20, wo sie bei 3000 Dateien 2848
+# Threads startete und 333 Notizen still aus dem Index verlor.
+#
+# `reindex()` oben ist der Befehl, `frisch_halten` die Zeitstempel-Pruefung.

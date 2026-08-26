@@ -489,3 +489,73 @@ Frontmatter als Eigenschaften, Wikilinks klickbar") — das ist eine Sichtprüfu
 Bildschirm und steht dort seit der Migration als **NICHT AUSGEFÜHRT**. Was sich ohne
 Bildschirm prüfen lässt, ist jetzt geprüft: das Frontmatter ist gültiges YAML für einen
 fremden Parser (siehe Punkt 2). Den Screenshot musst du selbst machen.
+
+---
+
+## NACHTRAG 2 — die beiden offenen Fragen, entschieden
+
+Du hast mich um das Urteil gebeten. Hier ist es, mit den Zahlen dahinter.
+
+### Die Dateiüberwachung: **raus.** Sie zahlt sich nicht mehr.
+
+Vorher habe ich das Einzige gemessen, an dem die Antwort hing — und dabei **ein Loch in
+meiner eigenen Reparatur gefunden**:
+
+```
+Panel vorher:            ['f_a', 'f_b', 'f_c']
+Dateien im Vault jetzt:  ['Notiz-b-f_b.md', 'Notiz-c-f_c.md']
+Panel nachher:           ['f_a', 'f_b', 'f_c']
+
+Einträge im Index OHNE Datei: ['f_a']
+```
+
+`frisch_halten` zog nur Neues und Geändertes nach. Wer eine Notiz in Obsidian löschte, sah
+sie im Panel weiter — der Index behauptete etwas, wofür es keine Wahrheit mehr gab. Genau
+das, was dieser Auftrag verbietet. **Der Beobachter hat das verdeckt**, weil er das Löschen
+mitbekam.
+
+Erst gestopft, dann geurteilt. Jetzt:
+
+```
+Panel nachher:                ['f_b', 'f_c']
+Einträge im Index OHNE Datei: []
+```
+
+Damit ist die Rechnung eindeutig:
+
+| | |
+|---|---|
+| **Kostet** | 141 Zeilen · ein Thread über die ganze Laufzeit · `watchdog==6.0.0`, eine Abhängigkeit **außerhalb** des festgelegten Stacks (`CLAUDE.md:31` nennt sie nicht) · BUGS-01 Fund 20, wo sie bei 3000 Dateien 2848 Threads startete und 333 Notizen **still** aus dem Index verlor |
+| **Bringt** | Frische *vor* einem Lesen — und jede Beobachtung ist ein Lesen. Wer nicht liest, merkt den Unterschied nicht; wer liest, bekommt seit `frisch_halten` ohnehin den frischen Stand |
+
+Eine Komponente, die nichts liefert, was jemand merkt, aber schon einmal Daten verloren hat,
+ist kein Gewinn. **Entfernt** — Klasse, Verdrahtung in `api/app.py`, Abhängigkeit.
+
+Was das kostet und wo es steht: `MIGRATION-VAULT.md` DoD 2 ist jetzt **anders erfüllt** statt
+gleich erfüllt, und das steht dort so — mit dem alten Messwert daneben. Ein Häkchen, das
+etwas anderes beschreibt als das, was läuft, wäre schlimmer als ein fehlendes.
+
+### Committen im Vault: **nein.** Und zwar deutlich.
+
+Dagegen spricht mehr als dafür:
+
+- Der Vault ist **dein** Repository mit deinem Rhythmus. Ein Commit pro `remember` macht aus
+  einer Historie eine Logdatei.
+- Ein fehlschlagender Commit — Konflikt, Hook, detached HEAD — würde den **Schreibweg**
+  reißen. Für einen kosmetischen Gewinn ein echtes Risiko.
+- Kein DoD verlangt es. Punkt 8 lässt „sauber **oder** bewusst committet" ausdrücklich offen.
+
+Wenn du Versionierung willst, ist sie einen Einzeiler entfernt und bleibt in deiner Hand:
+
+```bash
+git -C "$VAULT_PFAD" add -A && git -C "$VAULT_PFAD" commit -qm "jarvis $(date -I)"
+```
+
+Als `cron`, als Alias, als Feierabend-Gewohnheit — aber nicht mitten im Schreibweg.
+
+### Danach
+
+Volle Suite: **708 passed** (vorher 711 — die fünf Fund-20-Tests sind mit dem Code
+entfallen, drei neue für `frisch_halten` sind dazugekommen). Rauchtest bestanden. Der
+komplette DoD-Durchlauf noch einmal gegen den Endstand: alle acht Punkte unverändert grün,
+einschließlich des Prüfsteins.
