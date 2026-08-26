@@ -243,3 +243,199 @@ def test_fund7_die_ausnahmeliste_ist_im_auslieferungszustand_leer():
     from core.tools.search import ERLAUBT_INTERN
 
     assert ERLAUBT_INTERN == set(), ERLAUBT_INTERN
+
+
+# --- Fund 1: der Abbrechen-Knopf ----------------------------------------
+
+
+def _langsam(replies):
+    """Ein Anbieter, der lange genug braucht, dass man abbrechen kann."""
+    from core.llm import FakeLLMProvider
+
+    class Langsam(FakeLLMProvider):
+        async def complete(self, messages, *, system, tools=None):
+            await asyncio.sleep(1.2)
+            return await super().complete(messages, system=system, tools=tools)
+
+    return Langsam(replies=replies)
+
+
+def _warte(client, tid, sekunden=25.0):
+    import time as _t
+
+    frist = _t.monotonic() + sekunden
+    while _t.monotonic() < frist:
+        d = client.get(f"/api/tasks/{tid}",
+                       headers={"X-Jarvis-Token": "test-token-123"}).json()
+        if d["status"] in ("done", "failed", "aborted_budget", "cancelled"):
+            return d
+        _t.sleep(0.05)
+    raise AssertionError(f"Task {tid} wurde nicht fertig")
+
+
+def test_fund1b_abbruch_beim_einzigen_schritt_wirkt(settings):
+    """Ein Ein-Schritt-Plan ist der Normalfall - dort war der Knopf wirkungslos."""
+    import json as _json
+    import time as _t
+
+    TOKEN = {"X-Jarvis-Token": "test-token-123"}
+    app = create_app(settings)
+    with TestClient(app) as c:
+        app.state.provider = _langsam([
+            _json.dumps({"steps": [{"description": "A", "agent": None}]}),
+            "A erledigt.", "Zusammengefasst.",
+        ])
+        tid = c.post("/api/tasks", json={"goal": "Ein Schritt"},
+                     headers=TOKEN).json()["task_id"]
+        _t.sleep(1.6)                       # der Schritt laeuft
+        c.post(f"/api/tasks/{tid}/cancel", headers=TOKEN)
+        daten = _warte(c, tid)
+
+    assert daten["status"] == "cancelled", daten
+    assert daten["abort_reason"] == "Vom Nutzer abgebrochen."
+
+
+def test_fund1b_nach_dem_abbruch_kommt_kein_weiterer_modellaufruf(settings):
+    """Vorher liefen noch zwei bezahlte Zuege nach dem Abbruch."""
+    import json as _json
+    import time as _t
+
+    TOKEN = {"X-Jarvis-Token": "test-token-123"}
+    app = create_app(settings)
+    with TestClient(app) as c:
+        provider = _langsam([
+            _json.dumps({"steps": [{"description": "A", "agent": None}]}),
+            "A erledigt.", "Zusammengefasst.",
+        ])
+        app.state.provider = provider
+        tid = c.post("/api/tasks", json={"goal": "Ein Schritt"},
+                     headers=TOKEN).json()["task_id"]
+        _t.sleep(1.6)
+        c.post(f"/api/tasks/{tid}/cancel", headers=TOKEN)
+        vorher = len(provider.calls)
+        daten = _warte(c, tid)
+        nachher = len(provider.calls)
+
+    assert daten["status"] == "cancelled"
+    assert nachher - vorher <= 1, f"{nachher - vorher} Aufrufe nach dem Abbruch"
+
+
+def test_fund1b_das_teilergebnis_bleibt_erhalten(settings):
+    """0.5 verlangt ein Teilergebnis - nur eben ohne neuen Modellaufruf."""
+    import json as _json
+    import time as _t
+
+    TOKEN = {"X-Jarvis-Token": "test-token-123"}
+    app = create_app(settings)
+    with TestClient(app) as c:
+        app.state.provider = _langsam([
+            _json.dumps({"steps": [{"description": "A", "agent": None},
+                                   {"description": "B", "agent": None}]}),
+            "A ist fertig.", "B ist fertig.", "Zusammengefasst.",
+        ])
+        tid = c.post("/api/tasks", json={"goal": "Zwei Schritte"},
+                     headers=TOKEN).json()["task_id"]
+        _t.sleep(2.8)                       # Schritt A ist durch
+        c.post(f"/api/tasks/{tid}/cancel", headers=TOKEN)
+        daten = _warte(c, tid)
+
+    assert daten["status"] == "cancelled"
+    assert "Abgebrochen" in (daten["result"] or "")
+
+
+def test_fund1a_abbruch_bei_offener_rueckfrage_sendet_die_mail_nicht(settings, tmp_path):
+    """Der schwerste Teil von Fund 1.
+
+    Vorher: `/cancel` setzte nur das Abbruch-Flag. Der Task hing weiter in
+    `wait_for` auf die Rueckfrage, die Oberflaeche zeigte sie weiter an - und
+    ein Klick auf "Ausfuehren" liess das EXTERNAL-Werkzeug trotz Abbruch
+    laufen. Die Mail ging raus, nachdem der Nutzer abgebrochen hatte.
+    """
+    import time as _t
+
+    from core.llm import FakeLLMProvider, FakeTurn, ToolUse
+
+    TOKEN = {"X-Jarvis-Token": "test-token-123"}
+    postausgang = tmp_path / "outbox.jsonl"
+    settings.outbox_path = postausgang
+    registry.get("send_email").outbox = postausgang
+
+    app = create_app(settings)
+    with TestClient(app) as c:
+        app.state.provider = FakeLLMProvider(replies=[
+            '{"steps":[{"description":"Krankmeldung schicken"}]}',
+            FakeTurn(tool_uses=(ToolUse("t1", "send_email", {
+                "to": "chef@firma.de", "subject": "Krankmeldung",
+                "body": "Ich bin heute nicht da.",
+            }),)),
+            "Erledigt.", "Erledigt.",
+        ])
+        tid = c.post("/api/tasks", json={"goal": "Melde mich krank"},
+                     headers=TOKEN).json()["task_id"]
+
+        frist = _t.monotonic() + 10.0
+        while _t.monotonic() < frist:
+            daten = c.get(f"/api/tasks/{tid}", headers=TOKEN).json()
+            if daten.get("confirmation"):
+                break
+            _t.sleep(0.02)
+        else:
+            raise AssertionError(f"keine Rueckfrage, zuletzt: {daten}")
+
+        assert not postausgang.exists()          # noch nichts passiert
+
+        c.post(f"/api/tasks/{tid}/cancel", headers=TOKEN)
+
+        # Der Nutzer drueckt danach trotzdem "Ausfuehren" - der Knopf steht
+        # in einer schon gerenderten Seite noch da.
+        spaet = c.post(f"/api/tasks/{tid}/confirm", json={"approve": True},
+                       headers=TOKEN)
+        daten = _warte(c, tid)
+
+    assert spaet.status_code == 409, spaet.text
+    assert daten["status"] == "cancelled", daten
+    assert not postausgang.exists(), postausgang.read_text(encoding="utf-8")
+
+
+def test_fund1a_der_abbruch_weckt_die_rueckfrage_sofort(settings, tmp_path):
+    """Ohne Wecker haengt der Task bis zum Bestaetigungs-Timeout (600 s)."""
+    import time as _t
+
+    from api.tasks import BESTAETIGUNG_TIMEOUT_S
+    from core.llm import FakeLLMProvider, FakeTurn, ToolUse
+
+    assert BESTAETIGUNG_TIMEOUT_S >= 60, (
+        "Der Test lebt davon, dass der Timeout laenger ist als seine Frist - "
+        "sonst beweist er nichts."
+    )
+
+    TOKEN = {"X-Jarvis-Token": "test-token-123"}
+    settings.outbox_path = tmp_path / "outbox.jsonl"
+    registry.get("send_email").outbox = settings.outbox_path
+
+    app = create_app(settings)
+    with TestClient(app) as c:
+        app.state.provider = FakeLLMProvider(replies=[
+            '{"steps":[{"description":"Mail schicken"}]}',
+            FakeTurn(tool_uses=(ToolUse("t1", "send_email", {
+                "to": "a@b.de", "subject": "s", "body": "b"}),)),
+            "Erledigt.", "Erledigt.",
+        ])
+        tid = c.post("/api/tasks", json={"goal": "Mail"},
+                     headers=TOKEN).json()["task_id"]
+
+        frist = _t.monotonic() + 10.0
+        while _t.monotonic() < frist:
+            if c.get(f"/api/tasks/{tid}", headers=TOKEN).json().get("confirmation"):
+                break
+            _t.sleep(0.02)
+        else:
+            raise AssertionError("keine Rueckfrage")
+
+        begonnen = _t.monotonic()
+        c.post(f"/api/tasks/{tid}/cancel", headers=TOKEN)
+        daten = _warte(c, tid, sekunden=20.0)
+        gedauert = _t.monotonic() - begonnen
+
+    assert daten["status"] == "cancelled", daten
+    assert gedauert < 15.0, f"Der Abbruch brauchte {gedauert:.1f} s"

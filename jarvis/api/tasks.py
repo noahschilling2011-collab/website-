@@ -192,6 +192,17 @@ def baue_laufzeit(request: Request, eintrag: "LaufenderTask") -> Laufzeit:
         eintrag.offene_frage = frage
         bus.publish("confirmation", {"task_id": task.id, **frage})
 
+        # BUGS-01 Fund 1a: der Abbruch muss die Rueckfrage WECKEN. Vorher
+        # setzte /cancel nur `eintrag.abbruch` - hier hing der Task
+        # unbeeindruckt in wait_for, die Rueckfrage blieb anklickbar, und wer
+        # danach "Ausfuehren" drueckte, loeste das EXTERNAL-Werkzeug trotz
+        # Abbruch aus.
+        async def auf_abbruch_hoeren() -> None:
+            await abbruch.wait()
+            if not zukunft.done():
+                zukunft.set_result(False)
+
+        waechter = asyncio.create_task(auf_abbruch_hoeren())
         try:
             entschieden = await asyncio.wait_for(
                 zukunft, timeout=BESTAETIGUNG_TIMEOUT_S
@@ -205,11 +216,17 @@ def baue_laufzeit(request: Request, eintrag: "LaufenderTask") -> Laufzeit:
             abbruch.set()
             entschieden = False
         finally:
+            waechter.cancel()
             eintrag.offene_frage = None
             eintrag.antwort = None
             if schritt is not None and schritt.status is StepStatus.NEEDS_CONFIRMATION:
                 schritt.status = StepStatus.RUNNING
                 await on_step(task, task.steps.index(schritt), schritt)
+
+        # Abgebrochen heisst abgebrochen - auch wenn gleichzeitig jemand
+        # "Ausfuehren" gedrueckt hat.
+        if abbruch.is_set():
+            return False
 
         return bool(entschieden)
 
@@ -357,6 +374,15 @@ async def confirm_task(
     """Beantwortet die offene Rueckfrage eines Tasks (Phase 5)."""
     registry: TaskRegistry = request.app.state.tasks
     eintrag = registry.get(task_id)
+    # BUGS-01 Fund 1a: nach einem Abbruch darf die Rueckfrage nicht mehr
+    # beantwortbar sein. Sonst kann der Nutzer sie bestaetigen, nachdem er
+    # sie abgebrochen hat - und das Werkzeug laeuft.
+    if eintrag is not None and eintrag.abbruch.is_set():
+        raise HTTPException(
+            status_code=409,
+            detail="Der Auftrag wurde abgebrochen. Die Rueckfrage gilt nicht mehr.",
+        )
+
     if eintrag is None:
         raise HTTPException(status_code=404, detail="Task laeuft nicht.")
     if eintrag.antwort is None or eintrag.antwort.done():

@@ -11,7 +11,18 @@ konnte, dessen Fund ist rausgeflogen.
 Zwei Prüfer sind am Sitzungslimit gescheitert (Brillen `vertraege` und `frontend`) —
 deren Funde stehen unten **nicht** drin, weil sie nicht gegengeprüft sind.
 
-**Nichts hiervon ist repariert.** Erst der Befund, dann entscheidest du.
+**Stand der Reparatur** (der Befund selbst bleibt unverändert stehen — er ist das Protokoll
+vom 25.08., kein Aufgabenzettel, den man umschreibt):
+
+| Fund | Stand | Commit |
+|---|---|---|
+| 3 · Nicht-ASCII-Token → 500 | behoben | `f1d5e22` |
+| 6 · Hostname aus Modellparameter | behoben | `f1d5e22` |
+| 7 · Keine SSRF-Sperre | behoben | `f1d5e22` |
+| 12 · `pruefe()` ohne Inhaltsprüfung | behoben | `5a21934` (FIX-02) |
+| 13 · Kartenzahl sinkt ohne Nachrücken | behoben | `5a21934` (FIX-02) |
+| 1 · Abbrechen-Knopf | behoben | `api/tasks.py` (Wecker für die Rückfrage) + `core/runner.py` (Prüfung *nach* jedem Schritt) |
+| alle übrigen | offen | — |
 
 ---
 

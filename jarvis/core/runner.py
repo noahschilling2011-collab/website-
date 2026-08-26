@@ -253,9 +253,37 @@ async def _lauf(
             schritt.status = StepStatus.PENDING
             await laufzeit.step(task, i, schritt)
 
+        # BUGS-01 Fund 1b: NACH dem Schritt noch einmal pruefen. Vorher lag
+        # die Pruefung nur VOR dem naechsten - bei einem Ein-Schritt-Plan
+        # (und darauf ist der Planner getrimmt) war der Abbrechen-Knopf damit
+        # wirkungslos: der Auftrag lief zu Ende, verbrauchte noch zwei
+        # Modellaufrufe und meldete sich als "done".
+        if laufzeit.abgebrochen():
+            task.status = "cancelled"
+            task.abort_reason = "Vom Nutzer abgebrochen."
+            for rest in task.steps[i + 1:]:
+                if rest.status is StepStatus.PENDING:
+                    rest.status = StepStatus.SKIPPED
+                    await laufzeit.step(task, task.steps.index(rest), rest)
+            await laufzeit.task(task)
+            break
+
     # --- Abschluss ---------------------------------------------------------
     erledigt = [s for s in task.steps if s.status is StepStatus.DONE]
     gescheitert = [s for s in task.steps if s.status is StepStatus.FAILED]
+
+    # Ein abgebrochener Auftrag bekommt KEINE Zusammenfassung mehr - die waere
+    # ein weiterer bezahlter Modellaufruf nach dem Abbruch. Was fertig wurde,
+    # steht als Teilergebnis da; das verlangt 0.5 ausdruecklich.
+    if task.status == "cancelled":
+        teile = [f"### {s.description}\n{(s.result.display if s.result else '')}"
+                 for s in erledigt]
+        task.result = (
+            ("Abgebrochen. Was bis dahin fertig wurde:\n\n" + "\n\n".join(teile))
+            if teile else "Abgebrochen, bevor ein Schritt fertig war."
+        )
+        await laufzeit.task(task)
+        return task
 
     if not erledigt:
         task.status = task.status if task.status == "aborted_budget" else "failed"
