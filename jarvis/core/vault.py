@@ -17,6 +17,7 @@ darueber hinausgeht, wird als Text durchgereicht statt geraten.
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import unicodedata
@@ -25,6 +26,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 from typing import Any, Iterable
+
+log = logging.getLogger("jarvis")
 
 TRENNER = "---"
 
@@ -250,11 +253,28 @@ def schreibe(
 
 
 def finde(wurzel: Path, notiz_id: str) -> Path | None:
-    """Sucht eine Notiz an ihrer `id`, nicht am Dateinamen."""
+    """Sucht eine Notiz an ihrer `id`, nicht am Dateinamen.
+
+    BUGS-01 Fund 21: hier stand nur `except OSError`. Ein
+    `UnicodeDecodeError` ist ein `ValueError` und flog durch - eine einzige
+    fremde Datei im Vault machte damit den ganzen Vault unbrauchbar:
+
+        finde('abc123')      -> UnicodeDecodeError: 'utf-8' codec can't
+                                decode byte 0xff in position 3
+
+    Die gesuchte Notiz lag heil daneben; erreicht wurde sie nicht, weil die
+    Muelldatei alphabetisch davor kam. Und weil `schreibe` und `loesche` ueber
+    `finde` gehen, schrieb `remember` danach gar nichts mehr.
+
+    Ein Vault ist ein Ordner, in den auch andere Programme schreiben. Was
+    JARVIS nicht lesen kann, ueberspringt es - sichtbar im Log, nicht still.
+    `core/vault_index.py` macht das schon so; hier fehlte es.
+    """
     for pfad in dateien(wurzel):
         try:
             kopf, _ = trenne(pfad.read_text(encoding="utf-8"))
-        except OSError:
+        except (ValueError, OSError) as exc:
+            log.warning("Vault: %s nicht lesbar, uebersprungen - %s", pfad.name, exc)
             continue
         if str(kopf.get("id") or "") == notiz_id:
             return pfad

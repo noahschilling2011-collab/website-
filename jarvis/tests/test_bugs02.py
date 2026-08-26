@@ -353,3 +353,89 @@ def test_fund23_der_anbieter_besteht_weiterhin_auf_user_als_erster_rolle():
     )
     with pytest.raises(LLMError, match="erste Nachricht"):
         run(provider.complete([LLMMessage("assistant", "Hallo")], system="s"))
+
+
+# --- Fund 21: eine nicht-UTF-8-Datei im Vault ---------------------------
+
+
+@pytest.fixture
+def vault_mit_muell(tmp_path: Path) -> Path:
+    """Ein Vault mit einer guten Notiz und zwei unlesbaren Dateien.
+
+    Der Name der Muelldatei beginnt mit 'a', damit sie in der sortierten
+    Reihenfolge VOR der guten Notiz kommt - sonst faellt der Fund nicht auf.
+    """
+    wurzel = tmp_path / "vault"
+    wurzel.mkdir()
+    (wurzel / "gut.md").write_text(
+        "---\nid: abc123\ntyp: fakt\n---\n\nMein Rad ist ein Santa Cruz\n",
+        encoding="utf-8",
+    )
+    (wurzel / "a-binaer.md").write_bytes(b"\x00\x01\x02\xff\xfe kein Text")
+    (wurzel / "b-latin1.md").write_bytes(
+        "---\nid: xyz\n---\n\nCaf\xe9 Ma\xdfstab\n".encode("latin-1")
+    )
+    return wurzel
+
+
+def test_fund21_eine_unlesbare_datei_macht_den_vault_nicht_unbrauchbar(vault_mit_muell):
+    """BUGS-01 Fund 21, und es ist schlimmer als gemeldet.
+
+    `finde()` faengt nur `OSError`. Ein `UnicodeDecodeError` ist ein
+    `ValueError` und flog durch. Gemessen:
+
+        finde('abc123')      -> UnicodeDecodeError: 'utf-8' codec can't decode
+                                byte 0xff in position 3
+        finde('gibtsnicht')  -> UnicodeDecodeError: ...
+
+    Die gesuchte Notiz ist heil und liegt daneben - erreicht wird sie
+    trotzdem nicht, weil die Muelldatei alphabetisch davor kommt. Eine
+    einzige fremde Datei macht damit den ganzen Vault unbrauchbar, und
+    `remember` schreibt nicht mehr, weil es ueber `finde` geht.
+    """
+    from core import vault
+
+    assert vault.finde(vault_mit_muell, "abc123") is not None
+    assert vault.finde(vault_mit_muell, "gibtsnicht") is None
+
+
+def test_fund21_remember_schreibt_weiter(vault_mit_muell):
+    """Der Weg, den der Fund im Titel nennt."""
+    from core import vault
+
+    notiz = vault.Notiz(id="neu001", typ="fakt", text="Ich fahre Downhill",
+                        quelle="test", tags=["hobby"])
+    ziel = vault.schreibe(vault_mit_muell, notiz)
+    assert ziel.exists()
+    assert vault.finde(vault_mit_muell, "neu001") == ziel
+
+
+def test_fund21_loeschen_geht_auch_noch(vault_mit_muell):
+    from core import vault
+
+    assert vault.loesche(vault_mit_muell, "abc123") is True
+    assert vault.finde(vault_mit_muell, "abc123") is None
+
+
+def test_fund21_der_index_ueberspringt_die_muelldatei_und_nimmt_den_rest(
+    vault_mit_muell, db_path: Path
+):
+    """Gegenprobe: der Index konnte das schon - hier bleibt es so."""
+    from core import db
+    from core.vault_index import reindex
+
+    with db.session(db_path) as conn:
+        db.init_db(conn)
+
+    anzahl = reindex(db_path, vault_mit_muell)
+    assert anzahl == 1, f"{anzahl} Notizen indexiert, erwartet 1"
+
+
+def test_fund21_eine_heile_notiz_wird_weiterhin_gelesen(vault_mit_muell):
+    """Eine Nachsicht, die auch Heiles verschluckt, waere keine."""
+    from core import vault
+
+    pfad = vault.finde(vault_mit_muell, "abc123")
+    notiz = vault.lies(pfad)
+    assert notiz.id == "abc123"
+    assert "Santa Cruz" in notiz.text
