@@ -412,7 +412,8 @@ def baue_agenten(
                 "Aufloesungsgrenze und behauptet nichts darunter."
             ),
             system_prompt=mit_stil(SATELLIT_PROMPT),
-            tools=["satellite_search", "satellite_compare", "calculator", "clock"],
+            tools=["satellite_search", "satellite_compare",
+                   "satellite_passes", "calculator", "clock"],
             max_permission=Permission.READ,
             vorpruefung=pruefe_anfrage,
             on_reply=on_reply,

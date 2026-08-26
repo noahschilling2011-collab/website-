@@ -11,6 +11,7 @@ erfinden waere genau der Fehler, den Regel 1 verbietet.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from datetime import datetime, timedelta, timezone
@@ -21,6 +22,14 @@ from core.contracts import Permission, Tool, ToolResult
 from core.satellite.analysis import grenzsatz, vergleichbar, vergleiche_raster
 from core.satellite.bilder import BildFehler
 from core.satellite.bilder import speichere as speichere_bild
+from core.satellite.ueberflug import (
+    MINDESTHOEHE_GRAD,
+    STANDARDGRUPPE,
+    UeberflugFehler,
+    hole_tle,
+    parse_tle,
+    ueberfluege,
+)
 from core.satellite.cdse import (
     CDSEFehler,
     CDSEProvider,
@@ -298,5 +307,147 @@ class SatelliteCompare(Tool):
                 f"groesste Zunahme {ergebnis.groesste_zunahme:+.3f}.\n"
                 f"{grenzsatz(resolution_m)}"
             ),
+            duration_ms=dauer(),
+        )
+
+
+@register
+class SatellitePasses(Tool):
+    name = "satellite_passes"
+    description = (
+        "Sagt, welche Satelliten in den naechsten Stunden ueber einen Ort "
+        "hinwegfliegen - fuer JEDEN Punkt der Erde, nicht nur Deutschland. "
+        "Gerechnet aus echten Bahndaten (TLE von CelesTrak) mit skyfield, "
+        "nicht geschaetzt. Liefert Aufgang, hoechsten Stand, Untergang, "
+        "Himmelsrichtungen und Entfernung. Sagt NICHT, ob der Ueberflug mit "
+        "blossem Auge sichtbar ist - dafuer muesste zusaetzlich Sonnenstand "
+        "und Erdschatten gerechnet werden."
+    )
+    parameters = {
+        "type": "object",
+        "properties": {
+            "lat": {
+                "type": "number",
+                "description": "Breite in Grad, -90 bis 90. Norden positiv.",
+                "minimum": -90,
+                "maximum": 90,
+            },
+            "lon": {
+                "type": "number",
+                "description": "Laenge in Grad, -180 bis 180. Osten positiv.",
+                "minimum": -180,
+                "maximum": 180,
+            },
+            "hours": {
+                "type": "integer",
+                "description": "Wie weit nach vorn geschaut wird, 1 bis 72.",
+                "minimum": 1,
+                "maximum": 72,
+            },
+            "min_elevation_deg": {
+                "type": "number",
+                "description": (
+                    "Ab welcher Hoehe ueber dem Horizont ein Ueberflug zaehlt. "
+                    "10 Grad ist ueblich - darunter stehen Haeuser und Baeume "
+                    "im Weg."
+                ),
+                "minimum": 0,
+                "maximum": 89,
+            },
+            "group": {
+                "type": "string",
+                "description": (
+                    "visual = die mit blossem Auge sichtbaren (rund 157), "
+                    "stations = Raumstationen (rund 21)."
+                ),
+                "enum": ["visual", "stations"],
+            },
+        },
+        "required": ["lat", "lon"],
+        "additionalProperties": False,
+    }
+    permission = Permission.READ
+    timeout_s = 60
+
+    db_path: Path = PROJECT_ROOT / "data" / "jarvis.db"
+
+    async def execute(
+        self,
+        lat: float,
+        lon: float,
+        hours: int = 24,
+        min_elevation_deg: float = MINDESTHOEHE_GRAD,
+        group: str = STANDARDGRUPPE,
+    ) -> ToolResult:
+        begonnen = time.monotonic()
+
+        def dauer() -> int:
+            return int((time.monotonic() - begonnen) * 1000)
+
+        stunden = max(1, min(int(hours), 72))
+        try:
+            text, frisch = await hole_tle(group, db_path=self.db_path)
+            satelliten = parse_tle(text)
+        except UeberflugFehler as exc:
+            return ToolResult(ok=False, error=str(exc), display=str(exc),
+                              duration_ms=dauer())
+
+        von = datetime.now(timezone.utc)
+        bis = von + timedelta(hours=stunden)
+        try:
+            # skyfield rechnet in numpy; das gehoert nicht in die
+            # Ereignisschleife des Servers.
+            gefunden = await asyncio.to_thread(
+                ueberfluege,
+                satelliten,
+                lat=float(lat),
+                lon=float(lon),
+                von=von,
+                bis=bis,
+                mindesthoehe_grad=float(min_elevation_deg),
+            )
+        except UeberflugFehler as exc:
+            return ToolResult(ok=False, error=str(exc), display=str(exc),
+                              duration_ms=dauer())
+
+        kopf = (
+            f"Ort {lat:.4f}, {lon:.4f} - naechste {stunden} h, "
+            f"ab {min_elevation_deg:.0f} Grad ueber dem Horizont. "
+            f"{len(satelliten)} Satelliten der Gruppe {group!r} geprueft "
+            f"({'frisch geholt' if frisch else 'aus dem Zwischenspeicher'})."
+        )
+        if not gefunden:
+            # Kein Fehler. Ueber einem Pol kommt bei der ISS null heraus,
+            # weil ihre Bahnneigung 51,6 Grad ist - das ist die Wahrheit.
+            return ToolResult(
+                ok=True,
+                data={"passes": [], "geprueft": len(satelliten),
+                      "gruppe": group, "stunden": stunden},
+                display=(
+                    f"{kopf}\n\nKein Ueberflug in diesem Zeitfenster.\n\n"
+                    "Das ist kein Fehler: nicht jede Bahn kommt ueber jeden "
+                    "Ort. Ueber den Polen zum Beispiel erscheint die ISS nie "
+                    "- ihre Bahnneigung ist 51,6 Grad."
+                ),
+                duration_ms=dauer(),
+            )
+
+        return ToolResult(
+            ok=True,
+            data={
+                "passes": [u.als_dict() for u in gefunden],
+                "geprueft": len(satelliten),
+                "gruppe": group,
+                "stunden": stunden,
+            },
+            display=(
+                f"{kopf}\n\n{len(gefunden)} Ueberflug(e), Zeiten in UTC:\n\n"
+                + "\n\n".join(u.steckbrief() for u in gefunden)
+                + "\n\nOb ein Ueberflug mit blossem Auge zu sehen ist, steht "
+                "hier NICHT: dafuer muesste zusaetzlich gerechnet werden, ob "
+                "der Satellit von der Sonne beschienen wird und ob es am "
+                "Boden dunkel ist."
+            ),
+            sources=["https://celestrak.org/NORAD/elements/gp.php"],
             duration_ms=dauer(),
         )

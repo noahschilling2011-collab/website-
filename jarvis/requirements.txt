@@ -16,3 +16,22 @@ pytest>=8.0
 # solange der Ordner im Hintergrund beobachtet wurde. Seit FIX-04 Schritt 3
 # zieht core.gedaechtnis.frisch_halten beim Lesen nach - mit pathlib und
 # stdlib-sqlite3, ohne Thread und ohne Paket ausserhalb von CLAUDE.md:31.
+
+# ---- Stack-Aenderung, ausdruecklich freigegeben --------------------------
+#
+# CLAUDE.md legt den Stack fest und `skyfield` stand nicht darin. Noah hat
+# es am 26.08.2026 zugesagt, fuer PHASE-08 DoD 5: Satellitenueberfluege aus
+# echten TLE-Bahndaten, mit skyfield gerechnet statt geschaetzt.
+#
+# Der Preis, damit er nicht spaeter ueberrascht: skyfield zieht numpy
+# (~17 MB), sgp4 und jplephem mit. Das ist die groesste Abhaengigkeit im
+# Projekt - und die einzige, die nicht reines Python ist.
+#
+# Nicht dabei ist eine Ephemeriden-Datei (de421.bsp, ~16 MB Download).
+# Deshalb wird die Geometrie der Ueberfluege gerechnet, aber NICHT, ob man
+# sie mit blossem Auge sieht - dafuer braeuchte es Sonnenstand und
+# Erdschatten. Was nicht gerechnet wird, wird auch nicht behauptet.
+#
+# Version festgenagelt: eine neue Minor-Version koennte still das
+# Ereignisverhalten von find_events aendern.
+skyfield==1.55

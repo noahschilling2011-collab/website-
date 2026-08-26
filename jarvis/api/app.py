@@ -122,6 +122,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             # Wohin das gerenderte Bild geschrieben wird - neben die
             # Datenbank, nicht hinein.
             satellit.db_path = settings.db_path
+        ueberflug = registry.get("satellite_passes")
+        if ueberflug is not None:
+            # Braucht keinen Key - CelesTrak ist offen. Nur den Pfad
+            # fuer den TLE-Zwischenspeicher.
+            ueberflug.db_path = settings.db_path
         if not settings.cdse_client_id:
             log.info("CDSE_CLIENT_ID fehlt - satellite_search meldet das beim "
                      "Aufruf. Ein Konto gibt es kostenlos auf "

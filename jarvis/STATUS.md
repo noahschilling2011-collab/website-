@@ -306,6 +306,50 @@ einen uvicorn im Thread; die Netzsperre der Testsitzung lässt dafür genau
 
 ## Phase 8 — Satellite Agent
 
+> **26.08.2026 — DoD 5 gebaut: Überflüge aus echten Bahndaten.**
+> Steht auf `◐`, nicht `✓`: gerechnet und getestet ist es, **ausgeführt gegen
+> den echten CelesTrak-Dienst im Betrieb ist es nicht** — der Test rechnet
+> gegen fest eingetragene TLE-Sätze, damit er ohne Netz auskommt. Den
+> laufenden Abruf muss Noah zeigen.
+>
+> **Stack-Änderung, von Noah freigegeben** (`docs/decisions.md`): `skyfield`
+> kam dazu und zieht `numpy`, `sgp4` und `jplephem` mit. Dreimal als Blocker
+> gemeldet, beim vierten Mal zugesagt — nicht stillschweigend hinzugefügt.
+>
+> Gemessen, nicht angenommen:
+>
+> ```
+> GROUP=visual    -> 157 Satelliten     (die mit bloßem Auge sichtbaren)
+> GROUP=stations  ->  21 Satelliten
+> GROUP=gibtesnicht -> HTTP 200 + "Invalid query: ..."
+> ```
+>
+> Die letzte Zeile ist die wichtige: eine **ungültige** Gruppe kommt mit
+> Status 200 zurück. Wer nur den Status prüft, legt diesen Satz als
+> Bahndaten ab und rechnet damit.
+>
+> **Weltweit, nicht nur Deutschland.** Gerechnet und geprüft für Schwäbisch
+> Gmünd, Sydney und den Nordpol. Am Nordpol kommt **null** heraus — das ist
+> keine Panne, sondern Physik: die ISS-Bahnneigung ist 51,6 Grad, sie
+> erreicht 89,9 Grad Nord nie. Ein Code, der dort etwas erfände, wäre kaputt.
+>
+> **Was ausdrücklich NICHT behauptet wird:** ob ein Überflug mit bloßem Auge
+> sichtbar ist. Dafür bräuchte es Sonnenstand und Erdschatten und damit eine
+> Ephemeriden-Datei (`de421.bsp`, ~16 MB). Die Geometrie ist exakt, die
+> Sichtbarkeit wird weggelassen statt geschätzt — und das steht im Ergebnis.
+>
+> **CelesTraks Regeln sind eingebaut, nicht nur gelesen:** der
+> Zwischenspeicher hält mindestens zwei Stunden, weil CelesTrak selbst nur
+> alle zwei Stunden auf neue Daten prüft und häufiger fragende IPs sperrt.
+> Die Gruppe `active` (~10.000 Objekte) ist bewusst nicht wählbar.
+>
+> **Eine Mutation überlebt, und das ist der Befund, nicht ein Testloch:**
+> `except Exception` um die Satellitenrechnung. Gemessen wirft weder
+> `EarthSatellite` noch `find_events` bei kaputten TLE-Daten — es kommt
+> still ein Satellit mit `satnum 640000` und null Ereignissen heraus. Der
+> Zweig bleibt trotzdem, damit ein kaputter Satz von 157 nicht die ganze
+> Antwort kippt.
+
 > **26.08.2026 — der Bildpfad ist gebaut.** Damit sind DoD 1, 3 und 6 nicht
 > mehr *strukturell* unerfüllbar; sie bleiben trotzdem `✗`/`◐`, weil hier
 > keine CDSE-Zugangsdaten liegen und ich sie nicht gegen den echten Dienst
@@ -356,7 +400,7 @@ einen uvicorn im Thread; die Netzsperre der Testsitzung lässt dafür genau
 | 2 | Kein Bild unter dem Wolken-Schwellwert -> JARVIS sagt das, statt ersatzweise ein wolkiges zu liefern | ◐ TEILWEISE | `cd /home/user/website-/jarvis && python3 -m pytest -q "tests/test_satellite.py::test_dod_2_kein_bild_unter_dem_schwellwert_wird_gesagt" -v` | Belegt ist das WERKZEUG, nicht "JARVIS". Der leere Katalog kommt aus einem geskripteten httpx.MockTransport, nicht vom echten CDSE. Die Endstufe - der Satz erscheint so in der Antwort an den Nutzer - laeuft ueber den Agenten und damit ue… |
 | 3 | Vergleich zweier Zeitpunkte zeigt beide Bilder nebeneinander plus eine Differenzdarstellung | ◐ TEILWEISE | `cd /home/user/website-/jarvis && python3 -m pytest -q "tests/test_satellite.py::test_der_vergleich_rechnet_und_nennt_die_grenze" "tests/test_satell…` | Belegt ist ausschliesslich die NUMERISCHE Differenz (A.5 Schritt 3). Das Kriterium verlangt "beide Bilder nebeneinander plus eine Differenzdarstellung" - dafuer gibt es keinen Code: index.html enthaelt null "img"-Vorkommen, der Browserte… |
 | 4 | Jede Bildaussage folgt BEOBACHTET / INTERPRETATION / KONFIDENZ und nennt die Bodenaufloesung | ◐ TEILWEISE | `cd /home/user/website-/jarvis && python3 -m pytest -q "tests/test_satellite.py::test_der_bericht_hat_die_pflichtzeile_grenze" "tests/test_satellite…` | Die Funktion erzeugt das Schema korrekt und weist erfundene Konfidenzstufen ab - aber sie wird im Produktivpfad NIE aufgerufen: der grep ueber alle .py ausserhalb von tests/ findet nur die Definition selbst. Die Displays von satellite_se… |
-| 5 | "Welche Satelliten ueberfliegen heute meine Position?" - Zeiten aus echten TLE-Daten, mit skyfield gerechnet | ✗ OFFEN | `cd /home/user/website-/jarvis && grep -rniE "skyfield\|celestrak\|sgp4" --include=*.py --include=*.txt . ; echo "grep-Exitcode: $?" ; python3 -c "i…` | Nicht gebaut, nicht angefangen. skyfield steht nicht in requirements.txt und ist nicht installiert; die Woerter skyfield, celestrak und sgp4 kommen in keiner .py- oder .txt-Datei des Projekts vor; in der Werkzeugliste gibt es kein Ueberf… |
+| 5 | "Welche Satelliten ueberfliegen heute meine Position?" - Zeiten aus echten TLE-Daten, mit skyfield gerechnet | ◐ TEILWEISE | `cd /home/user/website-/jarvis && grep -rniE "skyfield\|celestrak\|sgp4" --include=*.py --include=*.txt . ; echo "grep-Exitcode: $?" ; python3 -c "i…` | Nicht gebaut, nicht angefangen. skyfield steht nicht in requirements.txt und ist nicht installiert; die Woerter skyfield, celestrak und sgp4 kommen in keiner .py- oder .txt-Datei des Projekts vor; in der Werkzeugliste gibt es kein Ueberf… |
 | 6 | Attribution der Datenquelle steht sichtbar am Bild | ✗ OFFEN | `cd /home/user/website-/jarvis && JARVIS_TOKEN=pruef8 python3 -m uvicorn main:app --host 127.0.0.1 --port 8137 &  (dann) python3 scratchpad/ui.py  #…` | Browserbeleg im echten Chromium: die geladene Oberflaeche hat null Bildelemente und null Canvas, also gibt es kein "Bild", an dem eine Attribution stehen koennte. Gebaut ist nur die Datenseite: Scene.attribution ist Pflichtfeld (eine Sze… |
 
 > **Nur Erstprüfung.** Die Gegenprobe für diese Phase ist nicht gelaufen (Sitzungslimit). Die Verdikte sind nicht von einem zweiten Prüfer widerlegt worden.

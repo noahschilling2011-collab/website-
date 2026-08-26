@@ -57,3 +57,41 @@ Summe: grob 20–30 Abende, verteilt über Monate — bei laufendem Weiterarbeit
 **Laufende Kosten:** jeder Hermes-Task mit Recherche kostet echtes Geld. Trag die Preise deines Anbieters in `.env` ein und setz `max_cost_eur` bewusst. Ein Bug in einer Retry-Schleife kann über Nacht mehr verbrauchen, als du erwartest — deshalb steht der Kill-Switch in §0.5 und nicht in Phase 10.
 
 **Der ehrlichste Rat in diesem Dokument:** Wenn nach Phase 3 die Luft raus ist, hast du trotzdem etwas Fertiges — einen Chat-Assistenten mit Tools und Gedächtnis, den du täglich benutzen kannst. Das ist mehr wert als ein zu 60 % gebautes Hermes-System. Phase 1–3 sind so geschnitten, dass sie allein einen Sinn ergeben.
+
+
+---
+
+## Stack-Änderung: `skyfield` (26.08.2026)
+
+**Entschieden von Noah, auf Nachfrage.** `CLAUDE.md` erklärt den Stack für
+nicht verhandelbar, und `skyfield` stand nicht darin. Es wurde dreimal als
+Blocker gemeldet und beim vierten Mal freigegeben — nicht stillschweigend
+hinzugefügt.
+
+**Wofür:** `docs/phases/PHASE-08.md` DoD 5 verlangt Satellitenüberflüge aus
+echten TLE-Daten, *mit skyfield gerechnet*. Die Alternative wäre gewesen,
+SGP4 selbst zu implementieren — das ist Bahnmechanik mit
+Störungsrechnung, keine Fingerübung, und ein Fehler darin fällt nicht auf,
+er verschiebt nur Zeiten um Minuten.
+
+**Was es kostet:** `numpy` (~17 MB), `sgp4`, `jplephem`. Damit ist es die
+größte Abhängigkeit im Projekt und die einzige, die nicht reines Python
+ist. Import passiert deshalb **spät**, erst wenn jemand wirklich nach
+Überflügen fragt — wer nie fragt, zahlt die Sekunde Ladezeit nicht.
+
+**Was bewusst NICHT dazukam:** die Ephemeriden-Datei `de421.bsp` (~16 MB
+Download). Ohne sie lässt sich nicht rechnen, ob ein Überflug mit bloßem
+Auge sichtbar ist — dafür braucht es Sonnenstand und Erdschatten. Die
+Geometrie ist exakt, die Sichtbarkeit wird weggelassen statt geschätzt,
+und das steht so im Ergebnis.
+
+**Datenquelle:** CelesTrak, `gp.php?GROUP=...&FORMAT=tle`. Deren Regeln
+sind eingebaut, nicht nur gelesen: der Zwischenspeicher hält mindestens
+zwei Stunden, weil CelesTrak selbst nur alle zwei Stunden auf neue Daten
+prüft und IPs sperrt, die häufiger fragen. Die Gruppe `active` (~10.000
+Objekte) ist bewusst nicht wählbar — dafür bitten sie um „one download per
+update".
+
+**Gemessen, nicht angenommen:** eine erfundene Gruppe antwortet mit
+**HTTP 200** und dem Text `Invalid query: ...`. Wer nur den Status prüft,
+legt diesen Satz als Bahndaten ab.
