@@ -85,9 +85,16 @@ def verlag():
     Verlag.robots = ROBOTS_ERLAUBT
     server = HTTPServer(("127.0.0.1", 0), Verlag)
     threading.Thread(target=server.serve_forever, daemon=True).start()
+    # Die SSRF-Sperre (BUGS-01 Fund 7) laesst 127.0.0.1 sonst nicht durch -
+    # zu Recht. Der Test-Verlag traegt sich ausdruecklich ein und wieder aus.
+    from core.tools.search import ERLAUBT_INTERN
+
+    marke = f"127.0.0.1:{server.server_port}"
+    ERLAUBT_INTERN.add(marke)
     try:
         yield f"http://127.0.0.1:{server.server_port}"
     finally:
+        ERLAUBT_INTERN.discard(marke)
         server.shutdown(); server.server_close()
 
 

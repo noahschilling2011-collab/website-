@@ -30,6 +30,13 @@ USER_AGENT_VORLAGE = "JARVIS/0.1 (persoenlicher Assistent; {kontakt})"
 
 MAX_ZEICHEN = 1500      # Ein Artikel-Volltext frisst das Tokenbudget.
 
+# BUGS-01 Fund 6: `sprache` kommt aus dem MODELL. Wird sie ungeprueft in den
+# Hostnamen gesetzt, genuegt "evil.com/" - dann geht die Anfrage samt
+# Authorization-Header an einen fremden Server. Ein Sprachcode nach BCP 47 ist
+# hoechstens acht Zeichen aus Buchstaben, Ziffern und Bindestrich; alles andere
+# ist keine Sprache, sondern ein Angriff.
+SPRACHCODE = re.compile(r"^[a-z0-9]{2,8}(-[a-z0-9]{2,8}){0,2}$")
+
 
 class _MitCache(Tool):
     db_path: Path | str = ""
@@ -239,7 +246,13 @@ class WikiLive(_MitCache):
                        "anfragen.")
             return ToolResult(ok=False, error=hinweis, display=hinweis)
 
-        sprache = (sprache or "de").strip().lower()[:12]
+        sprache = (sprache or "de").strip().lower()
+        if not SPRACHCODE.match(sprache):
+            hinweis = (f"{sprache!r} ist kein Sprachcode. Erlaubt sind zwei bis "
+                       f"acht Buchstaben oder Ziffern, optional mit Bindestrich "
+                       f"getrennt - zum Beispiel 'de', 'en' oder 'zh-yue'.")
+            return ToolResult(ok=False, error=hinweis, display=hinweis,
+                              duration_ms=int((time.monotonic() - begonnen) * 1000))
         schluessel = f"{sprache}:{begriff}"
         gecached = self._gecached(schluessel, "wiki_live")
         if gecached is not None:

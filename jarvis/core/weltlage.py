@@ -23,9 +23,13 @@ import urllib.robotparser
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
+import logging
+
 import httpx
 
 # Ehrlicher User-Agent mit Zweck. Verlage duerfen wissen, wer da liest.
+log = logging.getLogger("jarvis")
+
 USER_AGENT = "JARVIS-Weltlage/0.1 (persoenlicher Assistent; kein Crawler)"
 
 BILD_TIMEOUT_S = 5.0
@@ -265,6 +269,15 @@ async def hole_quellbild(
     Gibt die `og:image`-URL zurueck oder None. **Niemals einen Ersatz.**
     """
     if not _url_gueltig(url):
+        return None
+    # BUGS-01 Fund 7: die quell_url kommt aus dem Modell. Dieselbe Sperre wie
+    # bei fetch_url - sonst waere die Bildbeschaffung der zweite Weg ins
+    # eigene Netz.
+    from core.tools.search import oeffentliches_ziel
+
+    grund = oeffentliches_ziel(url)
+    if grund is not None:
+        log.warning("Quellbild abgelehnt: %s", grund)
         return None
     kopf = {"user-agent": USER_AGENT, "accept": "text/html"}
     try:

@@ -13,8 +13,11 @@ tun als haette es gesucht.
 
 from __future__ import annotations
 
+import ipaddress
 import re
+import socket
 import time
+import urllib.parse
 from typing import Any
 
 import httpx
@@ -184,6 +187,65 @@ def html_zu_text(html: str) -> str:
     return _ZEILEN.sub("\n\n", text).strip()
 
 
+# --- SSRF-Sperre (BUGS-01 Fund 7) -----------------------------------------
+#
+# Die URL kommt aus dem MODELL. Ohne Sperre liest fetch_url alles, was der
+# Server erreicht - localhost, das Heimnetz, die Metadaten-Adresse der Cloud -
+# und der Inhalt landet anschliessend im Prompt. Das ist die Netzwerk-Variante
+# von "kein eval mit Modelleingaben".
+#
+# Geprueft wird die aufgeloeste IP, nicht der Name: "meine-domain.de" kann auf
+# 127.0.0.1 zeigen.
+
+ERLAUBTE_SCHEMATA = ("http", "https")
+
+
+def _ist_intern(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    return bool(
+        ip.is_private or ip.is_loopback or ip.is_link_local
+        or ip.is_multicast or ip.is_reserved or ip.is_unspecified
+    )
+
+
+# Ausdrueckliche Ausnahme fuer Tests, die einen eigenen Verlag auf 127.0.0.1
+# hochfahren. Im Auslieferungszustand ist sie LEER - ein Test nagelt das fest.
+# Sie steht hier und nicht in der Testdatei, damit sie im Produktivcode
+# sichtbar bleibt: eine Sperre mit unsichtbarer Hintertuer ist keine Sperre.
+ERLAUBT_INTERN: set[str] = set()
+
+
+def oeffentliches_ziel(url: str) -> str | None:
+    """Gibt den Ablehnungsgrund zurueck, oder None wenn die URL nach draussen zeigt."""
+    try:
+        teile = urllib.parse.urlparse(url)
+    except ValueError as exc:
+        return f"URL nicht lesbar ({exc})."
+    if teile.scheme not in ERLAUBTE_SCHEMATA:
+        return f"Nur http(s), bekam {teile.scheme or 'nichts'!r}."
+    if not teile.hostname:
+        return "Kein Hostname in der URL."
+
+    name = teile.hostname
+    if f"{name}:{teile.port}" in ERLAUBT_INTERN or name in ERLAUBT_INTERN:
+        return None
+    try:
+        infos = socket.getaddrinfo(name, teile.port or (443 if teile.scheme == "https" else 80),
+                                   proto=socket.IPPROTO_TCP)
+    except socket.gaierror as exc:
+        return f"Name nicht aufloesbar ({exc})."
+
+    for eintrag in infos:
+        roh = eintrag[4][0]
+        try:
+            ip = ipaddress.ip_address(roh)
+        except ValueError:
+            return f"Adresse nicht lesbar: {roh!r}."
+        if _ist_intern(ip):
+            return (f"{name} zeigt auf {ip} - das ist das eigene Netz. "
+                    f"JARVIS holt nur oeffentliche Adressen.")
+    return None
+
+
 @register
 class FetchUrl(Tool):
     name = "fetch_url"
@@ -221,6 +283,15 @@ class FetchUrl(Tool):
 
         def dauer() -> int:
             return int((time.monotonic() - begonnen) * 1000)
+
+        grund = oeffentliches_ziel(url)
+        if grund is not None:
+            return ToolResult(
+                ok=False,
+                error=grund,
+                display=grund,
+                duration_ms=dauer(),
+            )
 
         if not url.lower().startswith(("http://", "https://")):
             return ToolResult(
