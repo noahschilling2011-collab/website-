@@ -20,7 +20,7 @@ def gefuellt(db_path: Path) -> Path:
     db.add_message(db_path, "assistant", "Gemerkt.")
     db.log_llm_call(db_path, model="m", prompt_hash="abc", in_tokens=10,
                     out_tokens=4, cost_eur=0.001, duration_ms=12, ok=True)
-    memory.add_fact(db_path, "Ich fahre Downhill", category="hobby")
+    memory._add_fact(db_path, "Ich fahre Downhill", category="hobby")
     memory.log_task(db_path, "t1", goal="Ziel", outcome="done")
     db.log_audit(db_path, tool="send_email", arguments={"to": "a@b.de"},
                  permission="EXTERNAL", decision="approved", executed=True)

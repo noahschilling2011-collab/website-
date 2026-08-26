@@ -150,7 +150,7 @@ def finde_konflikt(
     return None
 
 
-def add_fact(
+def _add_fact(
     db_path: Path | str,
     text: str,
     *,
@@ -163,6 +163,14 @@ def add_fact(
 
     Der alte Fakt wird **nicht** angefasst. Beide bleiben stehen, der neue
     zeigt auf den alten. Was gilt, entscheidet der Mensch.
+
+    PRIVAT (FIX-04 Schritt 2). Diese Funktion schreibt direkt in `facts` und
+    ist damit der EINE Weg, an dem der Vault vorbeigeht. Sie gehoert
+    ausschliesslich `core.gedaechtnis` - und der ruft sie nur, wenn gar kein
+    Vault eingerichtet ist; dann *ist* `facts` die Wahrheit.
+
+    Wer sie von aussen ruft, bekommt einen AttributeError statt eines zweiten
+    Gedaechtnisses. Genau das ist der Sinn des Unterstrichs.
     """
     text = text.strip()
     if not text:
@@ -201,7 +209,7 @@ def list_facts(db_path: Path | str, limit: int = 500) -> list[Fact]:
     return [Fact.from_row(r) for r in rows]
 
 
-def update_fact(
+def _update_fact(
     db_path: Path | str,
     fact_id: int,
     *,
@@ -239,7 +247,7 @@ def update_fact(
     return get_fact(db_path, fact_id)
 
 
-def delete_fact(db_path: Path | str, fact_id: int) -> bool:
+def _delete_fact(db_path: Path | str, fact_id: int) -> bool:
     with session(db_path) as conn:
         # Wer auf den geloeschten Fakt zeigte, zeigt danach auf nichts - der
         # Konflikt ist mit dem Loeschen erledigt.

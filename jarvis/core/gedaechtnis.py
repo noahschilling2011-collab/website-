@@ -253,7 +253,7 @@ def anlegen(
         raise ValueError("Ein Fakt ohne Text ist kein Fakt.")
 
     if not vault_an(vault_pfad):
-        neu, konflikt = memory.add_fact(
+        neu, konflikt = memory._add_fact(
             db_path, text, category=category, pruefe_konflikt=pruefe_konflikt
         )
         return Eintrag.aus_fakt(neu), (Eintrag.aus_fakt(konflikt) if konflikt else None)
@@ -297,7 +297,7 @@ def aendern(
 ) -> Eintrag | None:
     """Aendert einen Fakt. Mit Vault: die DATEI wird geaendert, dann der Index."""
     if not vault_an(vault_pfad):
-        geaendert = memory.update_fact(
+        geaendert = memory._update_fact(
             db_path, int(eintrag_id), text=text, category=category,
             confirmed=confirmed,
             conflicts_with=None if widerspruch_aufloesen else -1,
@@ -336,7 +336,7 @@ def aendern(
 def loeschen(db_path, vault_pfad, eintrag_id) -> bool:
     """Loescht einen Fakt. Mit Vault: die DATEI verschwindet, dann der Index."""
     if not vault_an(vault_pfad):
-        return memory.delete_fact(db_path, int(eintrag_id))
+        return memory._delete_fact(db_path, int(eintrag_id))
 
     from core.db import session
     from core.vault import finde, loesche

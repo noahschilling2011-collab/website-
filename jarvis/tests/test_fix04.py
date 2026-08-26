@@ -448,3 +448,124 @@ def test_ohne_vault_bleibt_alles_beim_alten(settings, db_path: Path):
     assert [e.id for e in gedaechtnis.liste(db_path, "")] == [zweit.id, neu.id]
     assert gedaechtnis.loeschen(db_path, "", neu.id) is True
     assert [e.id for e in gedaechtnis.liste(db_path, "")] == [zweit.id]
+
+
+# --- Schritt 2: der direkte Schreibweg ist privat ------------------------
+
+
+def test_schritt2_memory_hat_keine_oeffentlichen_schreibfunktionen_mehr():
+    """FIX-04 Schritt 2: *die Funktion, die direkt in die Datenbank schreibt,
+    wird privat und nur vom Indexer aufgerufen.*
+
+    Wer `memory.add_fact` ruft, umgeht den Vault. Nach dem Umbenennen bekommt
+    er einen AttributeError statt eines zweiten Gedaechtnisses - scheitern
+    statt stillschweigend funktionieren.
+    """
+    from core import memory
+
+    for name in ("add_fact", "update_fact", "delete_fact"):
+        assert not hasattr(memory, name), (
+            f"core.memory.{name} ist wieder oeffentlich - damit gibt es einen "
+            f"zweiten Schreibweg an core.gedaechtnis vorbei"
+        )
+        assert hasattr(memory, f"_{name}"), f"_{name} fehlt"
+
+
+def test_schritt2_nur_gedaechtnis_ruft_die_privaten_schreibfunktionen():
+    """Ein Waechter ueber den Produktivcode, nicht ueber die Tests."""
+    treffer: list[str] = []
+    for datei in WURZEL.rglob("*.py"):
+        if "tests" in datei.parts or "__pycache__" in datei.parts:
+            continue
+        if datei.name in ("memory.py", "gedaechtnis.py"):
+            continue
+        text = datei.read_text(encoding="utf-8")
+        for name in ("_add_fact", "_update_fact", "_delete_fact"):
+            if name in text:
+                treffer.append(f"{datei.relative_to(WURZEL)}: {name}")
+    assert treffer == [], "am Vordereingang vorbei:\n" + "\n".join(treffer)
+
+
+# --- Das Frontmatter bleibt fuer fremde Leser lesbar ---------------------
+
+
+def test_das_frontmatter_ist_gueltiges_yaml_fuer_einen_fremden_parser(welt):
+    """Der Vault ist die WAHRHEIT - sie darf nicht davon abhaengen, wer liest.
+
+    Geprueft mit PyYAML, also einem Parser, der nichts von JARVIS weiss.
+    Booleans stehen klein: YAML 1.1 liest `True` und `true` beide als
+    Boolean, YAML 1.2 kennt nur die Kleinschreibung - dort waere `True` die
+    Zeichenkette "True". Die Kleinschreibung ist unter beiden richtig.
+    """
+    yaml = pytest.importorskip("yaml")
+
+    from core.vault import lies
+
+    einstellungen, vault = welt
+    with _klient(einstellungen) as c:
+        erst = run(_werkzeug("remember").execute(
+            text="Mein Rad ist ein Santa Cruz V10", category="ausruestung"))
+        run(_werkzeug("remember").execute(text="Mein Rad ist ein Propain Rage",
+                                          category="ausruestung"))
+        # Eine Notiz auf `true`, eine auf `false` - sonst prueft der Test nur
+        # die Haelfte der Schreibweisen.
+        c.patch(f"/api/memory/{erst.data['id']}", json={"confirmed": True},
+                headers=TOKEN)
+
+    gesehen = {True: 0, False: 0}
+    geprueft = 0
+    for datei in sorted(vault.rglob("*.md")):
+        roh = datei.read_text(encoding="utf-8")
+        kopf_text = roh.split("---")[1]
+        kopf = yaml.safe_load(kopf_text)
+        notiz = lies(datei)
+
+        assert isinstance(kopf["bestaetigt"], bool), (
+            f"{datei.name}: bestaetigt ist {kopf['bestaetigt']!r}, kein Boolean"
+        )
+        assert kopf["bestaetigt"] == notiz.bestaetigt
+        assert (kopf["widerspruch"] or None) == notiz.widerspruch
+        assert kopf["id"] == notiz.id
+        assert f"bestaetigt: {str(notiz.bestaetigt).lower()}" in roh, (
+            f"{datei.name}: Boolean nicht klein geschrieben - "
+            f"{[z for z in roh.splitlines() if 'bestaetigt' in z]}"
+        )
+        for gross in ("bestaetigt: True", "bestaetigt: False"):
+            assert gross not in roh, f"{datei.name}: {gross}"
+        gesehen[notiz.bestaetigt] += 1
+        geprueft += 1
+
+    assert geprueft == 2, geprueft
+    assert gesehen[True] == 1 and gesehen[False] == 1, (
+        f"beide Schreibweisen muessen vorkommen, gesehen: {gesehen}"
+    )
+
+
+def test_das_log_zaehlt_die_fakten_richtig(welt, caplog):
+    """Ein Log, das falsch zaehlt, ist schlimmer als keins.
+
+    Die erste Zeile des Kontextblocks ist die Ueberschrift, kein Fakt.
+    """
+    import logging
+
+    from core.llm import FakeLLMProvider
+
+    einstellungen, vault = welt
+    with _klient(einstellungen):
+        run(_werkzeug("remember").execute(text="Mein Rad ist ein Santa Cruz V10",
+                                          category="ausruestung"))
+
+    with _klient(einstellungen) as c:
+        c.app.state.provider = FakeLLMProvider()
+        with caplog.at_level(logging.INFO, logger="jarvis"):
+            antwort = c.post("/api/chat",
+                             json={"message": "Was fuer ein Rad fahre ich?"},
+                             headers=TOKEN)
+        assert antwort.status_code == 200, antwort.text
+        prompt = c.app.state.provider.calls[-1]["system"]
+
+    assert "Santa Cruz V10" in prompt, "der Fakt muss im Systemprompt stehen"
+    zeilen = [e.getMessage() for e in caplog.records
+              if "Fakten in den Kontext" in e.getMessage()]
+    assert zeilen, [e.getMessage() for e in caplog.records]
+    assert "1 Fakten" in zeilen[-1], zeilen[-1]

@@ -187,7 +187,7 @@ def test_fund22_die_erweiterung_laesst_keine_fts5_syntax_durch(db_path: Path):
 
     with db.session(db_path) as conn:
         db.init_db(conn)
-    memory.add_fact(db_path, "Ein harmloser Fakt", category="test")
+    memory._add_fact(db_path, "Ein harmloser Fakt", category="test")
 
     boese = [
         'a "b" NEAR(c) -d *e',
@@ -218,8 +218,8 @@ def test_fund22_recall_findet_einen_kyrillischen_fakt(db_path: Path):
 
     with db.session(db_path) as conn:
         db.init_db(conn)
-    memory.add_fact(db_path, "Мой велосипед ist ein Santa Cruz", category="hobby")
-    memory.add_fact(db_path, "Je parle français", category="sprache")
+    memory._add_fact(db_path, "Мой велосипед ist ein Santa Cruz", category="hobby")
+    memory._add_fact(db_path, "Je parle français", category="sprache")
 
     assert [f.text for f in memory.search_facts(db_path, "велосипед")]
     assert [f.text for f in memory.search_facts(db_path, "français")]
@@ -606,7 +606,7 @@ def test_fund18_nach_der_vault_migration_hat_facts_wieder_seine_trigger(tmp_path
     pfad = tmp_path / "j.db"
     with db.session(pfad) as conn:
         db.init_db(conn)
-    memory.add_fact(pfad, "Mein Rad ist ein Santa Cruz", category="hobby")
+    memory._add_fact(pfad, "Mein Rad ist ein Santa Cruz", category="hobby")
 
     with db.session(pfad) as conn:
         benenne_facts_um(conn)
@@ -625,7 +625,7 @@ def test_fund18_nach_der_vault_migration_hat_facts_wieder_seine_trigger(tmp_path
     for name, sql in ziele.items():
         assert "facts_alt" not in sql, f"{name} zeigt noch auf facts_alt: {sql}"
 
-    memory.add_fact(pfad, "Ich fahre Downhill in Innsbruck", category="hobby")
+    memory._add_fact(pfad, "Ich fahre Downhill in Innsbruck", category="hobby")
     assert [f.text for f in memory.search_facts(pfad, "downhill")], (
         "ein neuer Fakt landet nicht im Volltextindex"
     )
@@ -645,7 +645,7 @@ def test_fund18_die_alten_zeilen_bleiben_in_facts_alt(tmp_path: Path):
     pfad = tmp_path / "j.db"
     with db.session(pfad) as conn:
         db.init_db(conn)
-    memory.add_fact(pfad, "Mein Rad ist ein Santa Cruz", category="hobby")
+    memory._add_fact(pfad, "Mein Rad ist ein Santa Cruz", category="hobby")
 
     with db.session(pfad) as conn:
         benenne_facts_um(conn)

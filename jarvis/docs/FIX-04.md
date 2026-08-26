@@ -378,3 +378,114 @@ Die Dateiüberwachung (`core/vault_index.py`, `Beobachter`, gestartet in `api/ap
 steht weiterhin. Der neue Entwurf hängt **nicht** an ihr — Start, Befehl und
 Zeitstempel-Prüfung tragen den Alltag allein, und genau das ist oben belegt. Sie zu
 entfernen wäre eine Verhaltensänderung, die dieser Auftrag nicht verlangt. Sag Bescheid.
+
+---
+
+## NACHTRAG — der zweite Durchgang, 26.08.2026
+
+Beim erneuten Durchgehen des Auftrags sind drei Dinge aufgefallen, die beim ersten Mal
+nicht sauber waren. Alle drei sind repariert.
+
+### 1. Schritt 2 war nur zur Hälfte erfüllt
+
+Der Auftrag sagt: *„die Funktion, die direkt in die Datenbank schreibt, wird **privat** und
+nur vom Indexer aufgerufen"* und *„Wenn ein Aufrufer das versucht, soll es **scheitern**,
+nicht stillschweigend funktionieren."*
+
+Die Endpunkte gingen zwar über die Fassade — aber `memory.add_fact`, `update_fact` und
+`delete_fact` blieben öffentlich. Jeder neue Codepfad hätte weiter direkt in `facts`
+schreiben können, ohne dass etwas gemeckert hätte. Jetzt heißen sie `_add_fact`,
+`_update_fact`, `_delete_fact`; wer den alten Namen benutzt, bekommt einen `AttributeError`
+statt eines zweiten Gedächtnisses.
+
+Zwei Wächter halten das fest: einer prüft, dass die öffentlichen Namen weg sind, der andere
+scannt den **gesamten Produktivcode** darauf, dass außer `core/gedaechtnis.py` niemand die
+privaten Namen anfasst.
+
+### 2. Das Frontmatter war für fremde Leser nicht eindeutig
+
+Der Vault ist die Wahrheit — *„menschenlesbar, in Obsidian editierbar"*. Geschrieben wurde
+aber Pythons `True` mit großem T:
+
+```yaml
+bestaetigt: True
+```
+
+YAML 1.1 (PyYAML) liest das als Boolean, YAML 1.2 kennt als Boolean nur die Kleinschreibung
+— dort wäre `True` die **Zeichenkette** `"True"`. Welche Fassung ein fremder Editor benutzt,
+weiß ich nicht, und ich rate es nicht. Die Kleinschreibung ist unter beiden richtig und
+kostet nichts:
+
+```
+geschrieben: ['widerspruch: f_alt', 'bestaetigt: true']
+  PyYAML liest : bestaetigt=True (bool)  widerspruch='f_alt'
+  JARVIS liest : bestaetigt=True         widerspruch='f_alt'
+  gleich       : True
+```
+
+Gegengeprüft mit PyYAML, also einem Parser, der nichts von JARVIS weiß.
+
+### 3. Das Log zählte einen Fakt zu viel
+
+`2 Fakten in den Kontext gehoben` bei genau einem Fakt — die Überschrift des Kontextblocks
+wurde mitgezählt. Ein Log, das falsch zählt, ist schlimmer als keins.
+
+### DoD 2, 4 und 8 — jetzt vollständig belegt
+
+**DoD 2** verlangt „Memory-Lookup **im Log** sichtbar". Beim ersten Mal hatte ich nur den
+Kontextblock gezeigt:
+
+```
+POST /api/chat -> 200
+Systemprompt enthaelt den Fakt: True
+  ...Was du ueber den Nutzer weisst:
+     - (f_95e1b0, ausruestung) Mein Rad ist ein Santa Cruz V10...
+LOG: task d35e324d3e87: 1 Fakten in den Kontext gehoben
+```
+
+**DoD 4** verlangt „das Modell sagt, dass es das nicht weiß. **Es halluziniert die Antwort
+nicht.**" Das lässt sich mit einem Fake-Modell nicht an der Antwort zeigen — wohl aber
+daran, dass das Modell den Fakt gar nicht erst bekommt:
+
+```
+DELETE /api/memory/f_95e1b0 -> 204
+Systemprompt enthaelt 'Santa Cruz': False
+Systemprompt enthaelt 'Was du ueber den Nutzer weisst': False
+recall: Nichts zu 'Rad' im Vault.
+```
+
+Es steht nichts im Prompt, was nachgeplappert werden könnte.
+
+**DoD 8** — hier bin ich beim ersten Mal zu großzügig gewesen. Wortwörtlich:
+
+```
+vor dem Schreiben:  ''  (sauber: True)
+nach dem Schreiben:
+  ?? fakten/
+neue Dateien: 1   geaenderte/halbe: 0   Nicht-.md-Reste: []
+```
+
+`git status` ist danach **nicht** leer: eine neue, untracked Datei steht drin. Der Auftrag
+lässt beides zu („sauber … **oder** die Änderungen sind bewusst committet"), und der Kern —
+*„Kein halbes Schreiben"* — ist erfüllt: keine geänderten Dateien, keine `.tmp`-Reste, die
+neue Datei ist vollständig. **JARVIS committet nicht von selbst.** Ob es das soll, steht in
+keinem Auftrag; sag Bescheid.
+
+### Zahlen
+
+**23 Tests** in `tests/test_fix04.py`. Zehn Mutationen einzeln gefahren, jede fällt — drei
+davon überlebten den ersten Anlauf und haben je einen Test bekommen, der sie tötet.
+
+Volle Suite: **711 passed.** Rauchtest bestanden.
+
+### Zu Obsidian, ein letztes Mal
+
+Nicht installiert, wird nicht gebraucht, wird nicht installiert. Der Auftrag sagt: *„Nimm es
+einmal auf … und lass es aus jeder weiteren Überlegung raus."* Aufgenommen in Schritt 0:
+`~/JARVIS-Vault/.obsidian` existiert nicht.
+
+Offen bleibt allein `docs/MIGRATION-VAULT.md` DoD 7 („Datei öffnet in Obsidian sauber,
+Frontmatter als Eigenschaften, Wikilinks klickbar") — das ist eine Sichtprüfung mit
+Bildschirm und steht dort seit der Migration als **NICHT AUSGEFÜHRT**. Was sich ohne
+Bildschirm prüfen lässt, ist jetzt geprüft: das Frontmatter ist gültiges YAML für einen
+fremden Parser (siehe Punkt 2). Den Screenshot musst du selbst machen.

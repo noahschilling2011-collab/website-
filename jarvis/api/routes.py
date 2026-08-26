@@ -186,8 +186,12 @@ async def post_chat(request: Request, body: ChatRequest) -> ChatResponse:
         else settings.system_prompt
     )
     if gedaechtnis_block:
-        log.info("task %s: %d Fakten in den Kontext gehoben",
-                 task_id, gedaechtnis_block.count("\n- ") + 1)
+        # Gezaehlt werden die Zeilen, die wirklich ein Fakt sind - die erste
+        # Zeile ist die Ueberschrift. Ein "+1" auf die Trennzeichen zaehlt sie
+        # mit und meldet dann einen Fakt zuviel.
+        anzahl = sum(1 for z in gedaechtnis_block.splitlines()
+                     if z.startswith("- "))
+        log.info("task %s: %d Fakten in den Kontext gehoben", task_id, anzahl)
 
     # 2. Modell fragen, Werkzeuge laufen lassen. Keine Transaktion offen.
     try:

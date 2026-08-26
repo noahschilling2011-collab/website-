@@ -105,6 +105,14 @@ def _skalar(wert: str) -> Any:
 
 
 def _als_yaml(wert: Any) -> str:
+    # Booleans klein. YAML 1.1 (PyYAML) liest `True` und `true` beide als
+    # Boolean, YAML 1.2 kennt als Boolean nur die Kleinschreibung - `True`
+    # waere dort die Zeichenkette "True". Welche Fassung ein fremder Editor
+    # benutzt, weiss ich nicht und rate es nicht: die Kleinschreibung ist
+    # unter beiden richtig und kostet nichts. Der Vault ist die Wahrheit,
+    # und die soll nicht davon abhaengen, wer sie liest.
+    if isinstance(wert, bool):
+        return "true" if wert else "false"
     if wert is None:
         return "null"
     if isinstance(wert, (list, tuple)):

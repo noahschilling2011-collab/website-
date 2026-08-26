@@ -51,33 +51,33 @@ def test_fts_query_baut_aus_freiem_text_eine_sichere_anfrage():
 
 
 def test_sonderzeichen_in_der_suche_werfen_nicht(pfad):
-    memory.add_fact(pfad, "Mein Rad ist ein Santa Cruz V10")
+    memory._add_fact(pfad, "Mein Rad ist ein Santa Cruz V10")
     for boese in ['"', "*", "NEAR(a b)", "a AND OR b", "-x", "^", "()"]:
         assert memory.search_facts(pfad, boese) == [] or True  # kein Absturz
 
 
 def test_suche_findet_nach_stichwort(pfad):
-    memory.add_fact(pfad, "Mein Rad ist ein Santa Cruz V10", category="ausruestung")
-    memory.add_fact(pfad, "Ich trinke keinen Kaffee", category="vorlieben")
+    memory._add_fact(pfad, "Mein Rad ist ein Santa Cruz V10", category="ausruestung")
+    memory._add_fact(pfad, "Ich trinke keinen Kaffee", category="vorlieben")
     treffer = memory.search_facts(pfad, "Was für ein Rad fahre ich?")
     assert [f.text for f in treffer] == ["Mein Rad ist ein Santa Cruz V10"]
 
 
 def test_suche_findet_ohne_umlaut_unterschied(pfad):
-    memory.add_fact(pfad, "Ich mag Grünkohl")
+    memory._add_fact(pfad, "Ich mag Grünkohl")
     assert memory.search_facts(pfad, "gruenkohl") or memory.search_facts(pfad, "grünkohl")
 
 
 def test_geloeschter_fakt_verschwindet_aus_dem_index(pfad):
-    fakt, _ = memory.add_fact(pfad, "Mein Rad ist ein Santa Cruz V10")
+    fakt, _ = memory._add_fact(pfad, "Mein Rad ist ein Santa Cruz V10")
     assert memory.search_facts(pfad, "Rad")
-    memory.delete_fact(pfad, fakt.id)
+    memory._delete_fact(pfad, fakt.id)
     assert memory.search_facts(pfad, "Rad") == []
 
 
 def test_geaenderter_fakt_wird_neu_indiziert(pfad):
-    fakt, _ = memory.add_fact(pfad, "Mein Rad ist ein Santa Cruz V10")
-    memory.update_fact(pfad, fakt.id, text="Mein Auto ist ein Golf")
+    fakt, _ = memory._add_fact(pfad, "Mein Rad ist ein Santa Cruz V10")
+    memory._update_fact(pfad, fakt.id, text="Mein Auto ist ein Golf")
     assert memory.search_facts(pfad, "Rad") == []
     assert memory.search_facts(pfad, "Auto")
 
@@ -92,10 +92,10 @@ def test_nachrichten_sind_auch_durchsuchbar(pfad):
 
 
 def test_dod_5_widerspruch_wird_angezeigt_nicht_ueberschrieben(pfad):
-    alt, _ = memory.add_fact(
+    alt, _ = memory._add_fact(
         pfad, "Mein Rad ist ein Santa Cruz V10", category="ausruestung"
     )
-    neu, konflikt = memory.add_fact(
+    neu, konflikt = memory._add_fact(
         pfad, "Mein Rad ist ein Propain Rage", category="ausruestung"
     )
     assert konflikt is not None and konflikt.id == alt.id
@@ -106,21 +106,21 @@ def test_dod_5_widerspruch_wird_angezeigt_nicht_ueberschrieben(pfad):
 
 
 def test_gleicher_fakt_zweimal_ist_kein_widerspruch(pfad):
-    memory.add_fact(pfad, "Ich fahre Downhill", category="hobby")
-    _, konflikt = memory.add_fact(pfad, "Ich fahre Downhill", category="hobby")
+    memory._add_fact(pfad, "Ich fahre Downhill", category="hobby")
+    _, konflikt = memory._add_fact(pfad, "Ich fahre Downhill", category="hobby")
     assert konflikt is None
 
 
 def test_andere_kategorie_ist_kein_widerspruch(pfad):
-    memory.add_fact(pfad, "Mein Rad ist ein Santa Cruz V10", category="ausruestung")
-    _, konflikt = memory.add_fact(pfad, "Ich fahre Rad zur Arbeit", category="hobby")
+    memory._add_fact(pfad, "Mein Rad ist ein Santa Cruz V10", category="ausruestung")
+    _, konflikt = memory._add_fact(pfad, "Ich fahre Rad zur Arbeit", category="hobby")
     assert konflikt is None
 
 
 def test_widerspruch_laesst_sich_aufloesen(pfad):
-    alt, _ = memory.add_fact(pfad, "Mein Rad ist ein Santa Cruz V10", category="a")
-    neu, _ = memory.add_fact(pfad, "Mein Rad ist ein Propain Rage", category="a")
-    memory.delete_fact(pfad, alt.id)
+    alt, _ = memory._add_fact(pfad, "Mein Rad ist ein Santa Cruz V10", category="a")
+    neu, _ = memory._add_fact(pfad, "Mein Rad ist ein Propain Rage", category="a")
+    memory._delete_fact(pfad, alt.id)
     assert memory.get_fact(pfad, neu.id).conflicts_with is None
 
 
@@ -128,19 +128,19 @@ def test_widerspruch_laesst_sich_aufloesen(pfad):
 
 
 def test_kontextblock_traegt_die_fakt_id_als_herkunft(pfad):
-    fakt, _ = memory.add_fact(pfad, "Mein Rad ist ein Santa Cruz V10")
+    fakt, _ = memory._add_fact(pfad, "Mein Rad ist ein Santa Cruz V10")
     block = memory.kontextblock(pfad, "Welches Rad?")
     assert f"#{fakt.id}" in block and "Santa Cruz V10" in block
 
 
 def test_kontextblock_ist_leer_wenn_nichts_passt(pfad):
-    memory.add_fact(pfad, "Ich trinke keinen Kaffee")
+    memory._add_fact(pfad, "Ich trinke keinen Kaffee")
     assert memory.kontextblock(pfad, "Wie ist das Wetter in Oslo?") == ""
 
 
 def test_kontextblock_markiert_offene_widersprueche(pfad):
-    memory.add_fact(pfad, "Mein Rad ist ein Santa Cruz V10", category="a")
-    memory.add_fact(pfad, "Mein Rad ist ein Propain Rage", category="a")
+    memory._add_fact(pfad, "Mein Rad ist ein Santa Cruz V10", category="a")
+    memory._add_fact(pfad, "Mein Rad ist ein Propain Rage", category="a")
     assert "WIDERSPRUCH" in memory.kontextblock(pfad, "Welches Rad?")
 
 
@@ -190,7 +190,7 @@ def test_recall_findet_nichts_und_sagt_das(pfad):
 
 
 def test_recall_findet_den_fakt(pfad):
-    memory.add_fact(pfad, "Mein Rad ist ein Santa Cruz V10")
+    memory._add_fact(pfad, "Mein Rad ist ein Santa Cruz V10")
     ergebnis = run(get_tool("recall").execute(query="Rad"))
     assert "Santa Cruz V10" in ergebnis.display
 
