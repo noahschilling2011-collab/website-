@@ -671,6 +671,69 @@ keine Sprachsynthese; alle vier Kriterien brauchen beides. Kommt seine
 Antwort, wird sie hier mit dem Vermerk eingetragen, dass der Beleg vom
 Nutzer stammt und nicht aus einem ausgeführten Befehl.
 
+## FIX-05 Schritt D — Obsidian einschalten
+
+**Status: ✗ BLOCKIERT.** Es fehlt genau eine Zeile, und die kann nur Noah
+schreiben: **der Pfad zu seinem Vault.** Raten ist hier keine Option — der
+falsche Pfad legt einen zweiten, leeren Vault an, und ab da stehen die
+Fakten an zwei Orten.
+
+So findest du ihn: Obsidian öffnen, unten links auf den Vault-Namen, dann
+**„Vault-Ordner öffnen"** (bzw. rechte Maustaste auf den Vault in der
+Vault-Auswahl → *Reveal in system explorer*). Der Pfad in der Adresszeile
+ist es. Auf Windows sieht er ungefähr so aus wie
+`C:\Users\Noah\Documents\Mein Vault`.
+
+Dann in `jarvis/.env` die vorhandene, leere Zeile füllen:
+
+```
+VAULT_PFAD=C:\Users\Noah\Documents\Mein Vault
+```
+
+und danach:
+
+```bash
+python -m scripts.migrate_vault      # schreibt facts -> Vault, zählt gegen
+python -m scripts.reindex            # FTS-Index über die Notizen
+```
+
+**Was schon läuft — mit echter Ausgabe, nur gegen einen Probe-Vault**, weil
+der echte Pfad fehlt. Drei erfundene Fakten in eine Wegwerf-Datenbank, dann:
+
+```
+$ JARVIS_DB_PATH=…/probe.db VAULT_PFAD=…/vault python -m scripts.migrate_vault
+[0] Bestand: 3 Zeilen in facts
+[1] schreiben
+       1 -> Noah-baut-JARVIS-auf-einem-Windows-Rechner-mit-Python-3147-f_1.md
+       2 -> Der-Vault-Pfad-kommt-von-Noah-und-wird-nicht-geraten-f_2.md
+       3 -> Die-Weltlage-laeuft-seit-FIX-02-als-normaler-Auftrag-f_3.md
+[2] neu indexieren
+    3 Notizen im Index
+[3] zählen und vergleichen
+    ✓ 3 == 3
+[4] Stichprobe, Zeichen für Zeichen
+    ✓ f_1 … ✓ f_2 … ✓ f_3
+[5] übersprungen (--abschluss setzen)
+
+Migration durchgelaufen.
+
+$ … python -m scripts.reindex
+.md-Dateien:      3
+indexierte Notizen: 3
+
+$ rm probe.db && … python -m scripts.reindex     # der Prüfstein
+.md-Dateien:      3
+indexierte Notizen: 3
+```
+
+Der letzte Lauf ist der eigentliche Punkt: **Datenbank gelöscht, Vault
+bleibt, Index kommt vollständig zurück.** Die Markdown-Dateien sind die
+Wahrheit, SQLite ist nur ein Index.
+
+**`--abschluss` wurde bewusst nicht gesetzt** — auch im Probelauf nicht. Das
+schiebt `facts` nach `facts_alt`, und ab da wird der Rückweg teuer. Es
+gehört an den echten Vault, nach einer Zählung, die stimmt.
+
 ## Offene Blocker
 
 - [ ] LLM-API-Key besorgen, als `LLM_API_KEY` in `.env` eintragen
@@ -679,6 +742,8 @@ Nutzer stammt und nicht aus einem ausgeführten Befehl.
 - [ ] `JARVIS_TOKEN` würfeln und eintragen
 - [ ] `SEARCH_API_KEY` von api-dashboard.search.brave.com (für Phase 2 DoD 3)
 - [ ] `CDSE_CLIENT_ID` / `CDSE_CLIENT_SECRET` von dataspace.copernicus.eu (Phase 8)
+- [ ] **`VAULT_PFAD` in `.env`** — der Pfad zu Noahs Obsidian-Vault (FIX-05 Schritt D). Ohne ihn bleibt JARVIS bei der Datenbank.
+- [ ] **Sprach-Abnahme** — `docs/FIX-05-sprachtest.md`, vier Schritte, fünf Minuten in Chrome (FIX-05 Schritt C)
 - [ ] Danach `/dod` je Phase laufen lassen
 
 ## Bekannte Abweichungen vom Plan
