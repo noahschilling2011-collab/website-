@@ -43,7 +43,7 @@ cp .env.example .env
 | `LLM_PROVIDER` | `anthropic` |
 | `LLM_API_KEY` | Konto beim Anbieter, Key aus der Console |
 | `LLM_MODEL` | Modell-ID **aus der Doku des Anbieters**, nicht raten |
-| `LLM_PRICE_IN_PER_MTOK`, `LLM_PRICE_OUT_PER_MTOK` | Preisseite des Anbieters, EUR je 1 Mio. Token |
+| `LLM_PRICE_IN_PER_MTOK`, `LLM_PRICE_OUT_PER_MTOK` | Preisseite des Anbieters, je 1 Mio. Token. **Die Felder heißen EUR, Anthropic rechnet in USD** — entweder umrechnen oder jedes „EUR“ in JARVIS als USD lesen. Ein Wechselkurs wird nirgends geholt. |
 | `SEARCH_API_KEY` | <https://api-dashboard.search.brave.com> — für die Websuche |
 | `CDSE_CLIENT_ID`, `CDSE_CLIENT_SECRET` | <https://dataspace.copernicus.eu> — für Satellitendaten |
 
