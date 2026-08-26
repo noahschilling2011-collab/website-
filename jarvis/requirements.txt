@@ -12,6 +12,7 @@ pydantic-settings>=2.4
 # run()-Helferlein.
 pytest>=8.0
 
-# Vault-Index (docs/MIGRATION-VAULT.md Schritt 3): beobachtet den
-# Obsidian-Ordner. Version festgenagelt, damit ein Update nicht still das
-# Ereignisverhalten aendert.
+# Der Vault-Index braucht keine eigene Abhaengigkeit. Hier stand watchdog,
+# solange der Ordner im Hintergrund beobachtet wurde. Seit FIX-04 Schritt 3
+# zieht core.gedaechtnis.frisch_halten beim Lesen nach - mit pathlib und
+# stdlib-sqlite3, ohne Thread und ohne Paket ausserhalb von CLAUDE.md:31.
