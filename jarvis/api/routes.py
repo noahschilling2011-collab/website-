@@ -33,7 +33,7 @@ from api.schemas import (
 from api.events import strom
 from api.security import require_token
 from core import db, memory
-from core.contracts import Permission
+from core.contracts import Permission, Task, TaskBudget
 from core.llm import LLMError, LLMMessage, LLMReply
 from core.tools import registry
 from core.tools.dispatch import ToolCall
@@ -113,7 +113,19 @@ async def post_chat(request: Request, body: ChatRequest) -> ChatResponse:
     aufruf_ids: list[int] = []
     aufrufe: list[ToolCall] = []
 
+    # BUGS-01 Fund 16: der Chat hatte kein Budget. Begrenzt war nur die Zahl
+    # der Werkzeugrunden - keine Token-, Kosten- oder Zeitschranke. Ein
+    # Chat-Zug konnte damit mehr kosten als ein ganzer Auftrag, fuer den 0.5
+    # ein hartes Budget vorschreibt. Der Zug bekommt hier dieselbe Buchhaltung
+    # wie ein Task, mit denselben Werten aus der .env.
+    zug = Task(goal=text, budget=TaskBudget.from_settings(settings))
+
+    def verbrauchsgrenze() -> str | None:
+        # nur_verbrauch: ein Chat-Zug hat keine Schritte und keine Tiefe.
+        return zug.budget_verletzung(nur_verbrauch=True)
+
     async def merke_aufruf(aufruf: ToolCall) -> None:
+        zug.spent_tool_calls += 1
         aufrufe.append(aufruf)
         ergebnis = aufruf.result
         zeile = await asyncio.to_thread(
@@ -138,6 +150,8 @@ async def post_chat(request: Request, body: ChatRequest) -> ChatResponse:
 
     async def protokolliere_modellaufruf(reply: LLMReply) -> None:
         kosten = settings.cost_eur(reply.usage.in_tokens, reply.usage.out_tokens)
+        zug.spent_tokens += reply.usage.in_tokens + reply.usage.out_tokens
+        zug.spent_cost_eur += kosten
         await asyncio.to_thread(
             db.log_llm_call,
             settings.db_path,
@@ -174,6 +188,7 @@ async def post_chat(request: Request, body: ChatRequest) -> ChatResponse:
             max_tool_calls=settings.budget_max_tool_calls,
             on_call=merke_aufruf,
             on_reply=protokolliere_modellaufruf,
+            budget=verbrauchsgrenze,
         )
     except LLMError as exc:
         await asyncio.to_thread(

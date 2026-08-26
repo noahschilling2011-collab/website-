@@ -21,6 +21,9 @@ vom 25.08., kein Aufgabenzettel, den man umschreibt):
 | 7 · Keine SSRF-Sperre | behoben | `f1d5e22` |
 | 12 · `pruefe()` ohne Inhaltsprüfung | behoben | `5a21934` (FIX-02) |
 | 13 · Kartenzahl sinkt ohne Nachrücken | behoben | `5a21934` (FIX-02) |
+| 16 · `/api/chat` ohne Budget | behoben | `api/routes.py` |
+| 11 · 500 bei Nicht-Objekt-JSON | war mit FIX-02 Schritt 1 schon weg, Tests vorhanden | `tests/test_weltlage.py` |
+| 10 · misslungener Lauf 60 min im Cache | war mit FIX-02 Schritt 1 schon weg, Test vorhanden | `tests/test_weltlage.py` |
 | 15 · `can_call_agents` ungeprüft | behoben | `core/delegation.py` (Rufer im Kontext) + `core/agents.py` |
 | 14 · Rechner-Bombe | behoben, **Mechanismus im Bericht falsch** — siehe unten | `core/tools/builtin.py` (Deckel für jedes Zwischenergebnis) |
 | 5 · Weltlage nicht in `llm_calls` | war mit FIX-02 Schritt 2 schon weg, jetzt durch einen Test festgehalten | `tests/test_weltlage.py` |

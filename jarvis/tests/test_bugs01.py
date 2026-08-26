@@ -803,3 +803,85 @@ def test_fund15_die_erlaubten_agenten_gehen_weiterhin_durch(suche_ohne_netz=None
     finally:
         kontext.reset(marke)
     assert ergebnis.ok is True, ergebnis.error
+
+
+# --- Fund 16: /api/chat hat kein Budget ----------------------------------
+
+
+def _chat_mit_werkzeugrunden(runden: int):
+    """Ein Anbieter, der im Chat `runden` Mal ein Werkzeug ruft."""
+    from core.llm import FakeLLMProvider, FakeTurn, ToolUse
+
+    class Schleife(FakeLLMProvider):
+        def __init__(self) -> None:
+            super().__init__()
+            self.werkzeugzuege = 0
+
+        async def complete(self, messages, *, system, tools=None):
+            if self.werkzeugzuege < runden:
+                self.werkzeugzuege += 1
+                self._replies = [FakeTurn(tool_uses=(
+                    ToolUse(f"c{self.werkzeugzuege}", "clock", {}),
+                ))]
+            else:
+                self._replies = ["Fertig."]
+            return await super().complete(messages, system=system, tools=tools)
+
+    return Schleife()
+
+
+def test_fund16_chat_haelt_das_kostenbudget_ein(settings):
+    """BUGS-01 Fund 16 - im Chat war nur die Rundenzahl begrenzt.
+
+    Keine Token-, Kosten- oder Zeitschranke. Ein Chat-Zug konnte damit mehr
+    kosten als ein ganzer Auftrag, fuer den 0.5 ein hartes Budget vorschreibt.
+    Der Preis wird hier auf 1 EUR je Aufruf gesetzt, damit die Grenze nach dem
+    ersten Zug faellt - geraten wird nichts.
+    """
+    TOKEN = {"X-Jarvis-Token": "test-token-123"}
+    settings.budget_max_cost_eur = 1.5
+    settings.llm_price_in_per_mtok = 1_000_000.0
+    settings.llm_price_out_per_mtok = 1_000_000.0
+
+    app = create_app(settings)
+    with TestClient(app) as c:
+        anbieter = _chat_mit_werkzeugrunden(6)
+        app.state.provider = anbieter
+        antwort = c.post("/api/chat", json={"message": "Wie spaet?"}, headers=TOKEN)
+
+    assert antwort.status_code == 200, antwort.text
+    assert anbieter.werkzeugzuege < 6, (
+        f"{anbieter.werkzeugzuege} Runden trotz max_cost_eur=1.5"
+    )
+
+
+def test_fund16_chat_haelt_das_tokenbudget_ein(settings):
+    """Die Grenze, die im Chat bisher gar nicht existierte."""
+    TOKEN = {"X-Jarvis-Token": "test-token-123"}
+
+    # Erst messen, was ein Lauf ohne Grenze verbraucht.
+    from core.db import llm_call_totals
+
+    settings.budget_max_tool_calls = 20
+    app = create_app(settings)
+    with TestClient(app) as c:
+        app.state.provider = _chat_mit_werkzeugrunden(6)
+        assert c.post("/api/chat", json={"message": "Wie spaet?"},
+                      headers=TOKEN).status_code == 200
+    ohne_grenze = llm_call_totals(settings.db_path)
+    assert ohne_grenze["calls"] == 7, ohne_grenze
+
+    verbraucht = ohne_grenze["in_tokens"] + ohne_grenze["out_tokens"]
+    settings.budget_max_tokens = verbraucht // 3
+
+    app = create_app(settings)
+    with TestClient(app) as c:
+        p = _chat_mit_werkzeugrunden(6)
+        app.state.provider = p
+        antwort = c.post("/api/chat", json={"message": "Wie spaet?"}, headers=TOKEN)
+
+    assert antwort.status_code == 200, antwort.text
+    assert p.werkzeugzuege < 6, (
+        f"{p.werkzeugzuege} Runden trotz Tokengrenze {settings.budget_max_tokens}"
+    )
+    assert antwort.json()["reply"], "auch ein gedeckelter Zug antwortet"
