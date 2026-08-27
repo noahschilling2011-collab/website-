@@ -67,8 +67,15 @@ def _browser(pw, breite=1440):
 def _lade_chat(seite, basis, gerufen=None):
     if gerufen is not None:
         seite.on("request", lambda r: gerufen.append(r.url))
-    seite.goto(basis + "/", wait_until="networkidle")
+    # KEIN `networkidle`: seit FIX-06 Abschnitt 6 ist das COMMAND CENTER die
+    # Startansicht, und die haelt eine SSE-Verbindung offen. "Netzwerk still"
+    # tritt damit nie ein - der Aufruf lief in den Timeout.
+    seite.goto(basis + "/", wait_until="domcontentloaded")
     seite.wait_for_selector("#tab-welt")
+    seite.wait_for_selector("#view-cc .cc")
+    # Der Name des Helfers ist Programm: dieser Test misst den Chat.
+    seite.click("#tab-chat")
+    seite.wait_for_timeout(200)
     return seite
 
 

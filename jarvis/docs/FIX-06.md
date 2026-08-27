@@ -190,3 +190,112 @@ fertig. Passiert bei FIX-05 einmal und hier noch einmal.
 | — | die alten englischen Namen bleiben als **Zeiger** | rund 400 Regeln in `index.html`; Aliase halten sie gültig, ohne die Werte zu verdoppeln |
 | — | `.glas` **und** `.glass` in einer Regel | `.glass` steht dreimal im Markup von `index.html` |
 | — | `--ease` zeigt jetzt auf `--kurve-rein` | 5.6 legt die Kurven fest; die alte war `cubic-bezier(.4,0,.2,1)`, sichtbar in allen Hover-Übergängen |
+
+
+---
+
+# Abschnitt 6 — COMMAND CENTER
+
+## Die Inventur, bevor gebaut wurde
+
+Der Auftrag nennt in 6.1 für jede Zone eine Quelle. Jede einzeln nachgesehen:
+
+| Zone | Quelle laut Auftrag | Nachgeprüft |
+|---|---|---|
+| 1 | `GET /api/health` | existiert, `api/routes.py:60` |
+| 2 | dieselbe Szene wie 7 | `static/globus.js`, ein Renderer, ein Canvas |
+| 3 | `GET /api/tasks` + SSE | existiert — **liefert aber keine Schritte** (in Abschnitt 5 gemessen und dort vermerkt) |
+| 4 | SSE aus `api/events.py` | existiert; Ereignistypen `task`, `step`, `tool`, `confirmation`, `hello` |
+| 5 | `GET /api/stats` | existiert, `api/routes.py:438` |
+| 6 | `GET /api/tool-calls` | existiert, `api/routes.py:397` |
+| 7 | `GET /api/stats/verlauf` | **gab es nicht** — gebaut, siehe unten |
+| 8 | `GET /api/weltlage/WELT` | existiert; liefert ohne Zwischenspeicher `auftrag_noetig: true` |
+
+Alle acht Zonen haben damit eine echte Quelle. Der Auftrag sagt: *„Gibt es
+keine, wird sie nicht gebaut."* — es musste keine wegfallen.
+
+## `GET /api/stats/verlauf` — der eine neue Endpunkt
+
+Aggregation über `llm_calls`, gruppiert nach `substr(created_at, 1, 13)`
+(`YYYY-MM-DDTHH`). `created_at` ist UTC mit `Z` (`core/db.utcnow`), damit ist
+die Gruppe eindeutig und braucht keine Zeitzonenrechnung in SQL. Fenster
+1 bis 168 Stunden, Vorgabe 24. Dieselbe Token-Prüfung wie überall
+(`dependencies=[Depends(require_token)]` am Router), acht Tests dagegen.
+
+**Zwei Entscheidungen, die man sehen muss:**
+
+**Lücken werden mit Nullen gefüllt, nicht ausgelassen.** Eine Stunde ohne
+Aufruf ist eine Stunde mit null Token — das ist eine Messung. Ließe man sie
+weg, rücken die Punkte zusammen und das Flächendiagramm behauptet eine
+Dichte, die es nicht gab.
+
+**`cost_eur` kommt roh aus der Tabelle.** Stehen keine Preise in der `.env`,
+schreibt `core/llm.py` dort `0.0`, und dann steht hier `0.0`. Nicht
+geschätzt — das steht seit dem 25.08. so im Entscheidungslog.
+
+## Zone 2 — ein Canvas, zwei Orte
+
+Der Auftrag verbietet einen zweiten WebGL-Kontext, und zwar mit Grund:
+Browser begrenzen die Zahl gleichzeitiger Kontexte und verwerfen den älteren
+ohne Vorwarnung.
+
+Gelöst durch **Umhängen statt Kopieren**: `globus.js` bekam `miniAn(behaelter)`
+und `miniAus()`. Beide verschieben dasselbe `<canvas>` im Dokument —
+`miniAus()` setzt es mit `insertBefore` an genau die Stelle zurück, an der es
+stand. Beide Ansichten sind Tabs und nie gleichzeitig sichtbar, also reicht
+ein Canvas. Gemessen im Browser:
+
+```
+Canvas liegt in: cc-globus-platz
+WebGL-Kontexte (canvas-Elemente gesamt): 1
+nach Tabwechsel liegt Canvas in: view globus-wurzel is-active
+```
+
+**Three.js wird trotzdem nicht beim Start geladen.** Das COMMAND CENTER ist
+die Startansicht — würde Zone 2 den Globus holen, hingen die 2,0 MB aus
+FIX-05 B-2 wieder an jedem Seitenaufruf. Stattdessen steht dort ein Satz mit
+der Zahl und ein Knopf. `test_die_startansicht_laedt_three_js_nicht` hält das
+fest.
+
+## Zwei Funde beim Bauen
+
+**1. Ein `<canvas>` lässt sich nicht mit `inset` aufspannen.** Es ist ein
+ersetztes Element: steht `width: auto`, nimmt CSS die intrinsische Größe
+(300×150) und ignoriert eine der beiden Kanten. Gemessen: `canvasW` blieb
+`300px`, obwohl `left` **und** `right` gesetzt waren. Behoben mit
+ausdrücklicher `width: calc(100% - 20px)`.
+
+**2. Der sechste Tab hat die Kopfzeile bei 360 px aufgerissen.** Gemessen:
+`scrollWidth` 404 bei `innerWidth` 360, Täter `#tab-welt`. Mit fünf Tabs
+passte die Reihe gerade noch — mit dem sechsten nicht mehr. `.tabs` bekommt
+`flex-wrap: wrap`; danach `scrollWidth` 360.
+
+**3. Spezifität:** `.cc > .zone` sind zwei Klassen und schlagen `.cc-kopf`.
+Die Kopfzeile stand als Spalte statt als Zeile, bis der Selektor
+`.cc > .zone.cc-kopf` hieß.
+
+## Eine Folge, die man kennen muss: die Seite wird nie „network idle"
+
+Das COMMAND CENTER ist die Startansicht und hängt an SSE. Damit hält
+`index.html` ab dem ersten Bild eine offene HTTP-Verbindung — und
+`wait_until="networkidle"` tritt dort nie ein. Drei bestehende Browsertests
+liefen deshalb in den Timeout und warten jetzt auf `domcontentloaded` plus
+einen Selektor. Das ist keine Bequemlichkeit, sondern die richtige Bedingung:
+„Netzwerk still" ist bei einer Ansicht mit Live-Strom kein erreichbarer
+Zustand.
+
+## Abweichungen vom Auftragstext
+
+| Abweichung | Begründung |
+|---|---|
+| `.app` wird für diese Ansicht auf 1500 px verbreitert (`is-weit`) | Zwölf Spalten in einer 900-px-Spalte sind kein Dashboard, sondern eine Liste. Nur diese Ansicht; Chat und die anderen Tabs bleiben bei 900 px. |
+| Die Uhr steht auf `--step-1`, nicht auf `--kenngroesse` | `--kenngroesse` ist die Größe für **eine** Heldenzahl. Als Uhr war sie 64 px hoch und hat die Kopfzeile erschlagen. |
+| Die vier Kennzahlen stehen eine Stufe unter `--kenngroesse` | Vier davon nebeneinander fraßen ein Drittel der Höhe — und DoD 1 verlangt, dass alles in 900 px passt. |
+| Zone 8 löst **keinen** POST aus | `GET /api/weltlage/WELT` liefert ohne Zwischenspeicher `auftrag_noetig`. Ein automatischer POST wäre ein Modellaufruf und Geld, ausgelöst vom bloßen Öffnen der Startansicht. |
+| Bei frischer Datenbank steht in den Kennzahlen `—`, nicht `0` | 6.3 verbietet Nullen, die wie Daten aussehen. Ausnahme sind die Kosten: DoD 5 verlangt dort ausdrücklich `0,0000 €` mit dem Hinweis. |
+
+## Was nicht gebaut wurde — wie beauftragt
+
+Die Euro-Beträge aus dem Video (Herkunft unbekannt), der Arc-Reactor-Ring
+(zeigt nichts), der Countdown auf ein unbekanntes Ereignis. Alle drei stehen
+in 6.2 unter „wird ausdrücklich nicht gebaut".

@@ -278,6 +278,14 @@ let kartenNachholen = null;
 let geometrieFertig = Promise.resolve();
 let gestartet = false;
 let aktiv = false;
+/* FIX-06 Zone 2: dasselbe Canvas, an einer anderen Stelle im Dokument.
+   Ein zweiter Renderer waere ein zweiter WebGL-Kontext, und Browser
+   verwerfen den aelteren ohne Vorwarnung, sobald die Zahl reisst. Beide
+   Ansichten sind Tabs - sie sind nie gleichzeitig sichtbar, also reicht
+   ein Canvas fuer beide. */
+let leinwand = null;
+let leinwandHeimat = null;
+let leinwandAnker = null;
 
 function stilEinsetzen(){
   // Ein Stilblock je Dokument, auch wenn zwei Behaelter starten wuerden.
@@ -522,6 +530,11 @@ export async function starte(behaelter, token){
   const canvas = el('globus');
   // `renderer` ist modulweit deklariert - `pausiere()` und `weiter()`
   // muessen drankommen, und die stehen ausserhalb von `starte()`.
+  // Dasselbe gilt fuer das Canvas: `miniAn()` haengt es um, `miniAus()`
+  // haengt es genau dorthin zurueck, wo es stand.
+  leinwand = canvas;
+  leinwandHeimat = canvas.parentNode;
+  leinwandAnker = canvas.nextSibling;
 
   function ersatzAnzeigen(text){
     const d = textKnoten('div','ersatz', text);
@@ -1239,3 +1252,37 @@ export function weiter(){
 
 /** Nur fuer die Abnahme: laeuft die Ansicht gerade? */
 export function laeuftGerade(){ return aktiv; }
+
+/** Das Canvas nach `behaelter` umhaengen und weiterzeichnen (FIX-06 Zone 2).
+ *
+ *  Gibt `false` zurueck, wenn es noch kein Canvas gibt - dann ist Three.js
+ *  schlicht noch nicht geladen, und der Aufrufer zeigt seinen eigenen
+ *  Hinweis. Kein zweiter Renderer, kein zweiter Kontext: es ist dasselbe
+ *  Canvas, das die Weltansicht benutzt.
+ */
+export function miniAn(behaelter){
+  if (!leinwand || !behaelter) return false;
+  if (leinwand.parentNode !== behaelter) behaelter.appendChild(leinwand);
+  // `resize()` haengt an einem ResizeObserver auf dem Canvas selbst - der
+  // feuert nach dem Umhaengen von allein. `weiter()` misst zusaetzlich
+  // sofort nach, damit nicht ein Bild lang die alte Groesse steht.
+  weiter();
+  return true;
+}
+
+/** Das Canvas zurueck in die Weltansicht, an dieselbe Stelle. */
+export function miniAus(){
+  if (!leinwand || !leinwandHeimat) return false;
+  if (leinwandAnker && leinwandAnker.parentNode === leinwandHeimat){
+    leinwandHeimat.insertBefore(leinwand, leinwandAnker);
+  } else {
+    leinwandHeimat.appendChild(leinwand);
+  }
+  pausiere();
+  return true;
+}
+
+/** Nur fuer die Abnahme: in welchem Behaelter liegt das Canvas gerade? */
+export function wohinGehaengt(){
+  return leinwand && leinwand.parentNode ? leinwand.parentNode.className : null;
+}

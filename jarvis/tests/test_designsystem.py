@@ -162,8 +162,10 @@ def test_dod_3_jedes_bedienbare_element_zeigt_einen_ring_im_akzent(server, route
     with playwright.sync_playwright() as pw:
         br, seite = _browser(pw)
         try:
-            seite.goto(server + route, wait_until="networkidle")
-            seite.wait_for_timeout(800)
+            # `/` haelt seit FIX-06 Abschnitt 6 eine SSE-Verbindung offen -
+            # "Netzwerk still" tritt dort nie ein.
+            seite.goto(server + route, wait_until="domcontentloaded")
+            seite.wait_for_timeout(1200)
             ringe = []
             for _ in range(20):
                 seite.keyboard.press("Tab")
@@ -202,7 +204,10 @@ def test_dod_4_bei_reduzierter_bewegung_laeuft_nichts(server):
     with playwright.sync_playwright() as pw:
         br, seite = _browser(pw, reduced_motion="reduce")
         try:
-            seite.goto(server + "/", wait_until="networkidle")
+            seite.goto(server + "/", wait_until="domcontentloaded")
+            # Kein `networkidle`: die Startansicht haelt seit
+            # FIX-06 Abschnitt 6 eine SSE-Verbindung offen.
+            seite.wait_for_selector("#view-cc .cc")
             seite.wait_for_timeout(1200)
             laeuft = seite.evaluate("""() => {
               const out = [];

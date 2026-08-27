@@ -574,7 +574,9 @@ def test_karten_die_im_hintergrund_ankommen_werden_nachtraeglich_zugeschnitten(
     with playwright.sync_playwright() as pw:
         br, seite = browser(pw, 1280, 620)
         try:
-            seite.goto(f"{basis}/", wait_until="networkidle")
+            # Kein `networkidle`: die Startansicht haelt seit FIX-06
+            # Abschnitt 6 eine SSE-Verbindung offen.
+            seite.goto(f"{basis}/", wait_until="domcontentloaded")
             seite.wait_for_selector("#tab-welt")
             seite.click("#tab-welt")
             seite.wait_for_function("() => document.body.dataset.laender",

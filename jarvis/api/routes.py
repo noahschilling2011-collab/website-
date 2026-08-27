@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
@@ -497,6 +498,89 @@ async def get_stats(request: Request) -> dict:
             "per_model": pro_modell,
             "per_tool": werkzeuge,
             "tasks": tasks,
+        }
+
+    return await asyncio.to_thread(rechnen)
+
+
+@api.get("/stats/verlauf")
+async def get_stats_verlauf(request: Request, stunden: int = 24) -> dict:
+    """Token, Kosten und Aufrufe je Stunde - fuer Zone 7 des COMMAND CENTER.
+
+    Zwei Entscheidungen, die man sehen muss:
+
+    **Luecken werden mit Nullen gefuellt, nicht ausgelassen.** Eine Stunde
+    ohne Aufruf ist eine Stunde mit null Token - das ist eine Messung, keine
+    Erfindung. Liesse man sie weg, ruecken die Punkte zusammen und das
+    Flaechendiagramm behauptet eine Dichte, die es nicht gab.
+
+    **`cost_eur` kommt roh aus der Tabelle.** Stehen keine Preise in der
+    `.env`, schreibt `core/llm.py` dort `0.0`, und dann steht hier `0.0`.
+    Nicht geschaetzt - eine geschaetzte Kostenzahl waere schlimmer als gar
+    keine (`STATUS.md`, Entscheidungslog 25.08.).
+
+    Gruppiert wird ueber `substr(created_at, 1, 13)`, also `YYYY-MM-DDTHH`.
+    `created_at` ist UTC mit `Z` (`core/db.utcnow`), damit ist die Gruppe
+    eindeutig und braucht keine Zeitzonenrechnung in SQL.
+    """
+    pfad = _settings(request).db_path
+    fenster = max(1, min(int(stunden), 168))          # 1 Stunde bis 7 Tage
+
+    jetzt = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+    erste = jetzt - timedelta(hours=fenster - 1)
+    schluessel = [
+        (erste + timedelta(hours=i)).strftime("%Y-%m-%dT%H")
+        for i in range(fenster)
+    ]
+    ab = erste.isoformat(timespec="seconds").replace("+00:00", "Z")
+
+    def rechnen() -> dict:
+        with db.session(pfad) as conn:
+            rohe = {
+                r["stunde"]: dict(r) for r in conn.execute(
+                    "SELECT substr(created_at, 1, 13) AS stunde, "
+                    "COUNT(*) AS calls, "
+                    "COALESCE(SUM(in_tokens), 0) AS in_tokens, "
+                    "COALESCE(SUM(out_tokens), 0) AS out_tokens, "
+                    "COALESCE(SUM(cost_eur), 0.0) AS cost_eur, "
+                    "SUM(CASE WHEN ok = 0 THEN 1 ELSE 0 END) AS fehler "
+                    "FROM llm_calls WHERE created_at >= ? "
+                    "GROUP BY stunde",
+                    (ab,),
+                )
+            }
+
+        punkte = []
+        for s in schluessel:
+            r = rohe.get(s)
+            ein = int(r["in_tokens"]) if r else 0
+            aus = int(r["out_tokens"]) if r else 0
+            punkte.append({
+                "stunde": s,
+                "calls": int(r["calls"]) if r else 0,
+                "in_tokens": ein,
+                "out_tokens": aus,
+                "tokens": ein + aus,
+                "cost_eur": round(float(r["cost_eur"]), 6) if r else 0.0,
+                "fehler": int(r["fehler"] or 0) if r else 0,
+            })
+
+        return {
+            "fenster_h": fenster,
+            "von": schluessel[0],
+            "bis": schluessel[-1],
+            "stunden": punkte,
+            "summe": {
+                "calls": sum(p["calls"] for p in punkte),
+                "tokens": sum(p["tokens"] for p in punkte),
+                "in_tokens": sum(p["in_tokens"] for p in punkte),
+                "out_tokens": sum(p["out_tokens"] for p in punkte),
+                "cost_eur": round(sum(p["cost_eur"] for p in punkte), 6),
+                "fehler": sum(p["fehler"] for p in punkte),
+            },
+            # Damit die Oberflaeche nicht selbst maximieren muss und der
+            # Massstab in jeder Zeichnung derselbe ist.
+            "hoechstwert": max((p["tokens"] for p in punkte), default=0),
         }
 
     return await asyncio.to_thread(rechnen)

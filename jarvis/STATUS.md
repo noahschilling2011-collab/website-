@@ -912,6 +912,98 @@ zählt: **`GET /api/tasks` liefert keine Schritte.**
 
 **Suite nach dem Umbau:** `pytest -q` → **968 Tests, alle grün.**
 
+## FIX-06 Abschnitt 6 — COMMAND CENTER
+
+Auftrag, Inventur und alle Messungen: `docs/FIX-06.md`. Abnahme mit
+`pytest tests/test_command_center.py -q` → **12 passed**, dazu
+`pytest tests/test_stats_verlauf.py -q` → **8 passed** für den neuen
+Endpunkt, und `web-selfcheck` gegen den laufenden Server. Volle Suite danach:
+`python3 -m pytest` → **1033 passed, 1 warning in 314.69s**.
+
+| # | Kriterium | BELEG — ausgeführter Befehl | Status |
+|---|-----------|------|--------|
+| 1 | Kein Scrollen bei 1440×900 | `test_dod_1_kein_scrollen_bei_1440x900` misst `document.body.scrollHeight <= innerHeight` **und** die Breite **und** ob die Ansicht in sich scrollt. Live nachgemessen mit gefüllter Datenbank: `scrollHeight 900, innerHeight 900` | ✓ |
+| 2 | Jede Zone hat eine echte Quelle | `test_dod_2_jede_zone_hat_eine_echte_quelle` schneidet den Netzverkehr mit und verlangt alle sieben Endpunkte (`health`, `tasks`, `stats`, `stats/verlauf`, `tool-calls`, `events`, `weltlage/WELT`); dazu die Gegenprobe, dass es genau **8** Zonen sind. `test_der_endpunkt_fuer_zone_7_antwortet_wirklich` prüft den Status, nicht nur den Aufruf | ✓ |
+| 3 | Leerer Zustand ist sauber | `test_dod_3_leerer_zustand_ist_sauber` bei frischer Datenbank: mindestens vier Zonen mit Strich **und** Satz, **0** Animationen mit unendlicher Wiederholung, alle Überschriften stehen, und in den Kennzahlen steht `—` statt `0` | ✓ |
+| 4 | Live ohne Polling | zwei Tests, beide Hälften. `test_dod_4_kein_polling_im_leerlauf`: nach dem Aufbau 5 s Leerlauf → **0** weitere `/api/`-Anfragen, die Uhr läuft trotzdem weiter. `test_dod_4_ein_ereignis_bewegt_zone_3_und_4`: Auftrag über die API angestoßen → Zone 4 bekommt Zeilen | ✓ |
+| 5 | Kosten sagen die Wahrheit | `test_dod_5_kosten_sagen_die_wahrheit` — genau **eine** Kachel mit `€`, darin `0,0000 €` **und** „Preise nicht in .env eingetragen" | ✓ |
+| 6 | Mobil brauchbar | `test_dod_6_mobil_stapeln_sich_die_zonen` bei 360 px: kein seitliches Scrollen, alle acht Zonen exakt gleich breit. Dazu `web-selfcheck` gegen den laufenden Server: **0 Fehler, 0 Warnungen** bei 360, 768 und 1440 px | ✓ |
+
+**Was gebaut wurde.** Neuer Tab `tab-cc` / `view-cc` über dieselbe
+`ANSICHTEN`-Registry, die FIX-05 für die Weltansicht benutzt — kein zweiter
+Mechanismus. Acht Zonen im Zwölfspaltenraster aus Abschnitt 5.4
+(`.zonen`/`.zone`, `gap: 1px` auf einer Kantenfarbe). Die Ansicht ist die
+Startansicht; der Chat bleibt ein eigener Tab.
+
+**Der eine neue Endpunkt: `GET /api/stats/verlauf`.** Aggregation über
+`llm_calls` nach Stunde, Fenster 1–168 h, Vorgabe 24. Lücken werden mit
+Nullen gefüllt statt ausgelassen — sonst rücken die Punkte zusammen und das
+Flächendiagramm behauptet eine Dichte, die es nicht gab. `cost_eur` kommt
+roh aus der Tabelle, nichts wird geschätzt.
+
+**Zone 2 — ein Canvas, zwei Orte.** Der Auftrag verbietet einen zweiten
+WebGL-Kontext. Gelöst durch Umhängen statt Kopieren: `globus.js` bekam
+`miniAn(behaelter)` und `miniAus()`, beide verschieben dasselbe `<canvas>`
+im Dokument. Im Browser gemessen:
+
+```
+Canvas liegt in: cc-globus-platz
+WebGL-Kontexte (canvas-Elemente gesamt): 1
+nach Tabwechsel liegt Canvas in: view globus-wurzel is-active
+```
+
+**Und trotzdem lädt der Start kein Three.js.** Wäre Zone 2 gierig, hingen
+die 2,0 MB aus FIX-05 B-2 wieder an jedem Seitenaufruf — bei einer
+Startansicht wäre das der schlimmste denkbare Ort. Stattdessen ein Satz mit
+der Zahl und ein Knopf; `test_die_startansicht_laedt_three_js_nicht` hält
+es fest.
+
+### Vier Funde beim Bauen, alle behoben
+
+1. **Ein `<canvas>` lässt sich nicht mit `inset` aufspannen.** Es ist ein
+   ersetztes Element: bei `width: auto` nimmt CSS die intrinsische Größe
+   (300×150) und ignoriert eine der Kanten. Gemessen: `canvasW` blieb
+   `300px`, obwohl `left` **und** `right` gesetzt waren.
+2. **Der sechste Tab hat die Kopfzeile bei 360 px aufgerissen.** Gemessen:
+   `scrollWidth 404` bei `innerWidth 360`, Täter `#tab-welt`. Mit fünf Tabs
+   passte die Reihe gerade noch. `.tabs` bekommt `flex-wrap: wrap`, danach
+   `scrollWidth 360`. **Das war eine Regression durch diesen Abschnitt**,
+   keine Altlast.
+3. **Spezifität:** `.cc > .zone` sind zwei Klassen und schlagen `.cc-kopf`.
+   Die Kopfzeile stand als Spalte statt als Zeile.
+4. **Ein `innerHTML` von mir hat der eigene Test gefangen.**
+   `test_seite_setzt_niemals_innerhtml` fiel über
+   `marke.innerHTML = 'JARVIS <b>//</b> COMMAND CENTER'`. Der Text war eine
+   Konstante und damit harmlos — aber eine Ausnahme „nur diesmal" ist genau
+   die, die später jemand kopiert und mit einer Modellantwort füllt. Als
+   Knoten gebaut.
+
+### Eine Folge, die man kennen muss
+
+**`index.html` erreicht nie mehr „network idle".** Die Startansicht hängt am
+SSE-Strom und hält damit ab dem ersten Bild eine offene HTTP-Verbindung.
+Drei bestehende Browsertests warteten auf `networkidle` und liefen in den
+Timeout; sie warten jetzt auf `domcontentloaded` plus einen Selektor. Das
+ist die richtige Bedingung, nicht die bequeme: „Netzwerk still" ist bei
+einer Ansicht mit Live-Strom kein erreichbarer Zustand.
+
+### Abweichungen vom Auftragstext
+
+| Abweichung | Begründung |
+|---|---|
+| `.app` wird nur für diese Ansicht auf 1500 px verbreitert | Zwölf Spalten in einer 900-px-Spalte sind kein Dashboard, sondern eine Liste. Chat und die anderen Tabs bleiben bei 900 px. |
+| Uhr auf `--step-1` statt `--kenngroesse`, Kennzahlen eine Stufe darunter | `--kenngroesse` ist die Größe für **eine** Heldenzahl. Als Uhr war sie 64 px hoch; vier Kennzahlen in dieser Größe fraßen ein Drittel der Höhe — und DoD 1 verlangt, dass alles in 900 px passt. |
+| Zone 8 löst **keinen** POST aus | `GET /api/weltlage/WELT` liefert ohne Zwischenspeicher `auftrag_noetig`. Ein automatischer POST wäre ein Modellaufruf und Geld, ausgelöst vom bloßen Öffnen der Startansicht. |
+| Bei frischer Datenbank steht in den Kennzahlen `—`, nicht `0` | 6.3 verbietet Nullen, die wie Daten aussehen. Ausnahme sind die Kosten — DoD 5 verlangt dort ausdrücklich `0,0000 €` mit dem Hinweis. |
+
+### Was diese Abnahme nicht zeigt
+
+Zone 3 ist nur mit dem Fake-Anbieter gelaufen — dass ein echtes Modell einen
+mehrstufigen Plan baut und der Balken sich mehrfach bewegt, ist ungeprüft.
+Zone 8 hat nie echte Meldungen angezeigt, weil dafür ein Modellaufruf nötig
+ist; geprüft ist nur der leere Zustand. Und der Mini-Globus lief unter
+SwiftShader, nicht auf einer GPU.
+
 ## FIX-07 — Lokaler Zugriff: Dateien und Kalender
 
 Auftrag, RFC-Belege und alle Messungen: `docs/FIX-07.md`. Phase 1 des

@@ -406,7 +406,10 @@ button, input, textarea { font: inherit; color: inherit; }
 
 /* --- Ansichten (Phase 7) -------------------------------------------------- */
 
-.tabs { display: flex; gap: 2px; }
+/* `wrap` seit FIX-06 Abschnitt 6: mit dem sechsten Tab passte die Reihe
+   bei 360 px nicht mehr in die Zeile und schob die Seite um 44 px zur
+   Seite. Gemessen: scrollWidth 404 bei innerWidth 360, Taeter #tab-welt. */
+.tabs { display: flex; gap: 2px; flex-wrap: wrap; min-width: 0; }
 .tab {
   padding: 4px 12px;
   border: 0;
@@ -429,6 +432,159 @@ button, input, textarea { font: inherit; color: inherit; }
 
 .view { display: none; overflow-y: auto; padding: var(--s-5); }
 .view.is-active { display: block; }
+
+/* --- COMMAND CENTER (FIX-06 Abschnitt 6) --------------------------------- */
+
+/* Zwoelf Spalten brauchen Platz. Der Rest der App bleibt bei 900 px - ein
+   Dashboard in einer 900-px-Spalte ist kein Dashboard, sondern eine Liste.
+   Die Klasse haengt an `.app` und wird in `zeigeAnsicht()` gesetzt. */
+.app.is-weit { max-width: 1500px; }
+
+/* DoD 1: kein Scrollen bei 1440x900. Deshalb `overflow: hidden` statt
+   `auto` - was nicht passt, faellt auf, statt sich wegzuscrollen. */
+#view-cc { padding: var(--s-4); overflow: hidden; }
+
+.cc { border: 1px solid var(--kante); border-radius: 12px; overflow: hidden;
+      grid-auto-rows: min-content; }
+.cc > .zone { padding: 9px 13px; min-width: 0; display: flex;
+              flex-direction: column; gap: 5px; }
+
+.z3  { grid-column: span 3; }
+.z4  { grid-column: span 4; }
+.z5  { grid-column: span 5; }
+.z6  { grid-column: span 6; }
+.z12 { grid-column: span 12; }
+
+.zone-kopf {
+  display: flex; align-items: baseline; gap: var(--s-3);
+  font-size: var(--etikett); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-leise);
+}
+.zone-kopf .zahl-rechts { margin-left: auto; font-variant-numeric: tabular-nums; }
+.zone-leer { margin: 0; color: var(--text-leise); font-size: var(--step--1); }
+/* Der Strich aus 6.3: die Zone bleibt stehen, der Inhalt ist ehrlich leer. */
+.zone-leer::before { content: "—"; display: block; color: var(--kante);
+                     font-size: 20px; line-height: 1.1; }
+
+/* Zone 1 --------------------------------------------------------------- */
+/* `.cc > .zone` sind zwei Klassen und schlagen eine einzelne - ohne den
+   zusammengesetzten Selektor bleibt die Kopfzeile eine Spalte. Gemessen:
+   Marke und Anbieter standen untereinander statt nebeneinander. */
+.cc > .zone.cc-kopf { flex-direction: row; align-items: center; gap: var(--s-4); }
+.cc-marke { font-size: var(--step-0); letter-spacing: .14em; color: var(--text-laut);
+            font-weight: 500; }
+.cc-marke b { color: var(--akzent); font-weight: 500; }
+/* Nicht `--kenngroesse`: das ist die Groesse fuer EINE Heldenzahl. Als Uhr
+   in der Kopfzeile war sie 64 px hoch und hat die ganze Zeile erschlagen. */
+.cc-uhr { margin-left: auto; font-family: var(--mono);
+          font-variant-numeric: tabular-nums; font-size: var(--step-1);
+          line-height: 1; color: var(--text-laut); letter-spacing: .04em; }
+.cc-uhr small { font-size: var(--etikett); color: var(--text-leise);
+                margin-left: 8px; letter-spacing: .06em; }
+.cc-anbieter { font-size: var(--etikett); color: var(--text-leise);
+               letter-spacing: .06em; }
+
+/* Zone 2 --------------------------------------------------------------- */
+.cc-globus { position: relative; min-height: 215px; padding: 0; }
+.cc-globus .zone-kopf { position: absolute; inset: 9px 13px auto; z-index: 2;
+                        pointer-events: none; }
+.cc-globus-platz { flex: 1; min-height: 0; position: relative; }
+/* Das Canvas kommt aus der Weltansicht herueber. Dort galt
+   `.globus-wurzel #globus{position:absolute;inset:0}` - hier greift die
+   Regel nicht mehr, also braucht es eine eigene. */
+/* `inset` reicht hier NICHT. Ein <canvas> ist ein ersetztes Element: steht
+   `width: auto`, nimmt CSS die intrinsische Groesse (300x150) und ignoriert
+   eine der beiden Kanten - gemessen, canvasW war 300px trotz left und
+   right. Deshalb Breite und Hoehe ausdruecklich. */
+.cc-globus-platz canvas { position: absolute; top: 22px; left: 10px;
+                          width: calc(100% - 20px); height: calc(100% - 30px);
+                          display: block; cursor: grab; }
+.cc-globus-hinweis { position: absolute; inset: 22px 13px 9px; margin: 0;
+                     display: flex; flex-direction: column; align-items: center;
+                     justify-content: center; text-align: center;
+                     font-size: var(--step--1); color: var(--text-leise); }
+.cc-globus-hinweis button {
+  display: block; margin: 8px auto 0; padding: 5px 12px; border-radius: 8px;
+  border: 1px solid var(--akzent-linie); background: var(--akzent-glut-fest);
+  color: var(--akzent); cursor: pointer; font-size: var(--step--1);
+}
+
+/* Zone 3 --------------------------------------------------------------- */
+.cc-auftrag { display: flex; flex-direction: column; gap: 3px; }
+.cc-auftrag + .cc-auftrag { margin-top: 7px; }
+.cc-auftrag-ziel { font-size: var(--step--1); color: var(--text-laut);
+                   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cc-auftrag-zeile { display: flex; gap: var(--s-2); font-size: var(--etikett);
+                    color: var(--text-leise); font-variant-numeric: tabular-nums; }
+.cc-balken { height: 3px; background: var(--kante); border-radius: 2px; overflow: hidden; }
+.cc-balken i { display: block; height: 100%; background: var(--akzent);
+               transition: width var(--dauer-normal) var(--kurve-raus); }
+
+/* Zone 4 --------------------------------------------------------------- */
+.cc-strom { flex: 1; min-height: 0; overflow-y: auto; font-family: var(--mono);
+            font-size: 11px; line-height: 1.6; display: flex;
+            flex-direction: column; justify-content: flex-end; }
+.cc-strom div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                color: var(--text); }
+.cc-strom .t  { color: var(--text-leise); }
+.cc-strom .n  { color: var(--akzent); }
+
+/* Zone 5 --------------------------------------------------------------- */
+.cc-kennzahlen { display: grid; grid-template-columns: repeat(4, 1fr);
+                 gap: 1px; background: var(--kante); }
+.cc-kennzahl { background: var(--ebene-1); padding: 7px 13px 9px; min-width: 0; }
+/* Vier Kennzahlen nebeneinander, nicht eine grosse: eine Stufe unter
+   `--kenngroesse`, sonst frisst Zone 5 ein Drittel der Hoehe. */
+.cc-kennzahl .wert { font-size: clamp(1.5rem, 1.1rem + 1.2vw, 2.1rem);
+                     line-height: 1.15;
+                     font-variant-numeric: tabular-nums; color: var(--text-laut);
+                     display: block; }
+.cc-kennzahl .name { font-size: var(--etikett); letter-spacing: .08em;
+                     text-transform: uppercase; color: var(--text-leise); }
+.cc-kennzahl .fussnote { font-size: var(--etikett); color: var(--text-leise);
+                         display: block; margin-top: 1px; }
+.z-kennzahlen { padding: 0; gap: 0; }
+
+/* Zone 6 --------------------------------------------------------------- */
+.cc-tabelle { width: 100%; border-collapse: collapse; font-size: var(--step--1); }
+.cc-tabelle td { padding: 2px 0; border-bottom: 1px solid var(--kante);
+                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cc-tabelle tr:last-child td { border-bottom: 0; }
+.cc-tabelle .t { color: var(--text-leise); font-family: var(--mono); width: 1%; }
+.cc-tabelle .ms { text-align: right; font-variant-numeric: tabular-nums;
+                  color: var(--text-leise); width: 1%; }
+.cc-tabelle .ok  { color: var(--akzent); width: 1%; text-align: center; }
+.cc-tabelle .weg { color: var(--ab); width: 1%; text-align: center; }
+
+/* Zone 7 --------------------------------------------------------------- */
+.cc-diagramm { flex: 1; min-height: 64px; }
+.cc-diagramm svg { width: 100%; height: 100%; display: block; }
+
+/* Zone 8 --------------------------------------------------------------- */
+.cc-meldungen { display: grid; grid-template-columns: repeat(3, 1fr);
+                gap: var(--s-3); }
+.cc-meldung { display: flex; gap: var(--s-3); min-width: 0; }
+.cc-meldung img { width: 62px; height: 46px; object-fit: cover; border-radius: 6px;
+                  flex: none; background: var(--ebene-2); }
+.cc-meldung-text { min-width: 0; }
+.cc-meldung h4 { margin: 0; font-size: var(--step--1); font-weight: 500;
+                 color: var(--text-laut); display: -webkit-box;
+                 -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+                 overflow: hidden; }
+.cc-meldung p { margin: 2px 0 0; font-size: var(--etikett); color: var(--text-leise); }
+
+/* DoD 6: bei 360 px stapeln sich die Zonen, nichts scrollt seitlich. */
+@media (max-width: 900px) {
+  #view-cc { overflow-y: auto; }
+  /* Bei 360 px quetschte die Kopfzeile die Marke auf drei Zeilen und den
+     Anbieter auf vier. Gestapelt liest sich das. */
+  .cc > .zone.cc-kopf { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .cc-uhr { margin-left: 0; }
+  .cc > .zone { grid-column: span 12 !important; }
+  .cc-kennzahlen { grid-template-columns: repeat(2, 1fr); }
+  .cc-meldungen { grid-template-columns: 1fr; }
+  .cc-globus { min-height: 220px; }
+}
 
 /* FIX-05 B-5: der Globus fuellt seinen BEHAELTER, nicht das Fenster. Kein
    Innenabstand, kein Scrollbalken - er zeichnet bis an die Kante, und
@@ -802,7 +958,8 @@ button, input, textarea { font: inherit; color: inherit; }
     <h1 class="brand-name">JARVIS</h1>
     <span class="brand-phase" id="brand-phase"></span>
     <nav class="tabs" role="tablist">
-      <button class="tab" id="tab-chat" role="tab" aria-selected="true">Chat</button>
+      <button class="tab" id="tab-cc" role="tab" aria-selected="true">Center</button>
+      <button class="tab" id="tab-chat" role="tab" aria-selected="false">Chat</button>
       <button class="tab" id="tab-tasks" role="tab" aria-selected="false">Aufträge</button>
       <button class="tab" id="tab-tools" role="tab" aria-selected="false">Werkzeuge</button>
       <button class="tab" id="tab-kosten" role="tab" aria-selected="false">Kosten</button>
@@ -822,7 +979,8 @@ button, input, textarea { font: inherit; color: inherit; }
     </span>
   </header>
 
-  <div class="thread is-active" id="thread" aria-live="polite" aria-busy="false"></div>
+  <section class="view is-active" id="view-cc" aria-label="Command Center"></section>
+  <div class="thread" id="thread" aria-live="polite" aria-busy="false"></div>
   <section class="view" id="view-tasks" aria-label="Aufträge"></section>
   <section class="view" id="view-tools" aria-label="Werkzeuge"></section>
   <section class="view" id="view-kosten" aria-label="Kosten"></section>
@@ -1838,10 +1996,12 @@ button, input, textarea { font: inherit; color: inherit; }
      als Wahrheit darueber, was der Nutzer sehen will. */
   var globusGewollt = false;
 
+  // Gibt ein Promise zurueck: das COMMAND CENTER wartet darauf, bevor es
+  // das Canvas in Zone 2 haengt.
   function ladeGlobus() {
     globusGewollt = true;
-    if (globusModul) { globusModul.weiter(); return; }
-    if (globusLaedt) return;                 // zweimal klicken laedt nicht zweimal
+    if (globusModul) { globusModul.weiter(); return Promise.resolve(); }
+    if (globusLaedt) return Promise.resolve(); // zweimal klicken laedt nicht zweimal
     globusLaedt = true;
 
     var ziel = document.getElementById('view-welt');
@@ -1852,7 +2012,7 @@ button, input, textarea { font: inherit; color: inherit; }
 
     // Dynamischer Import aus einem klassischen <script>: erlaubt, und die
     // Import-Map im <head> gilt auch dafuer ('three' loest auf).
-    import('/static/globus.js').then(function (modul) {
+    return import('/static/globus.js').then(function (modul) {
       globusModul = modul;                   // ab hier ist pausiere() erreichbar
       var fertig = modul.starte(ziel, TOKEN);
       // `starte()` hat die Schleife im selben Zug schon angeworfen; erst
@@ -1873,13 +2033,18 @@ button, input, textarea { font: inherit; color: inherit; }
   // --- Ansichten (Phase 7) ------------------------------------------------
 
   var ANSICHTEN = {
+    cc:     { tab: 'tab-cc',     el: 'view-cc',     laden: ladeCommandCenter },
     chat:   { tab: 'tab-chat',   el: 'thread',      laden: null },
     tasks:  { tab: 'tab-tasks',  el: 'view-tasks',  laden: ladeTasks },
     tools:  { tab: 'tab-tools',  el: 'view-tools',  laden: ladeWerkzeuge },
     kosten: { tab: 'tab-kosten', el: 'view-kosten', laden: ladeKosten },
     welt:   { tab: 'tab-welt',   el: 'view-welt',   laden: ladeGlobus }
   };
-  var aktiveAnsicht = 'chat';
+  // FIX-06 Abschnitt 6: das COMMAND CENTER ist die Startansicht. Der Chat
+  // bleibt ein eigener Tab.
+  var aktiveAnsicht = 'cc';
+  // Die Ansicht braucht Platz. Nur sie - der Chat bleibt bei 900 px.
+  var WEITE_ANSICHTEN = { cc: true };
 
   function zeigeAnsicht(name) {
     var vorher = aktiveAnsicht;
@@ -1891,6 +2056,11 @@ button, input, textarea { font: inherit; color: inherit; }
     });
     // Die Eingabe gehört zum Chat, nicht zum Dashboard.
     document.querySelector('.composer-wrap').hidden = name !== 'chat';
+    document.querySelector('.app').classList.toggle('is-weit', !!WEITE_ANSICHTEN[name]);
+    // Uhr, SSE-Verbindung und das umgehaengte Canvas gehoeren zur Ansicht.
+    // Bleiben sie stehen, laeuft ein Timer im Chat weiter und der Globus
+    // zeichnet in einen unsichtbaren Behaelter.
+    if (vorher === 'cc' && name !== 'cc') ccVerlassen();
     // FIX-05 B-4: Klassen umschalten haelt keinen Renderloop an. Ohne die
     // naechsten Zeilen zeichnet der Globus weiter, waehrend du chattest -
     // und genau das ist das Ruckeln, um das es geht.
@@ -2046,6 +2216,493 @@ button, input, textarea { font: inherit; color: inherit; }
     return box;
   }
 
+  // --- COMMAND CENTER (FIX-06 Abschnitt 6) --------------------------------
+  //
+  // Acht Zonen, jede mit einer echten Quelle. Zone 7 haengt an einem
+  // Endpunkt, den es vorher nicht gab (`GET /api/stats/verlauf`).
+  //
+  // Aktualisiert wird ueber den SSE-Strom, der seit Phase 7 da ist - kein
+  // `setInterval` auf einen Endpunkt. Die einzige Ausnahme ist die Uhr in
+  // Zone 1: einmal pro Sekunde, lokal, ohne Netz.
+
+  var ccStrom = null;       // die SSE-Verbindung, solange die Ansicht offen ist
+  var ccUhr = null;         // der eine erlaubte Timer
+  var ccGebaut = false;
+  var ccEl = {};            // Griffe auf die Zonen, damit nur Inhalte tauschen
+  var ccGlobusDrin = false; // liegt das Canvas gerade in Zone 2?
+  var ccHolt = false;       // eine Sammelabfrage gleichzeitig
+
+  function ccZone(klassen, titel, rechts) {
+    var z = document.createElement('section');
+    z.className = 'zone ' + klassen;
+    if (titel !== null) {
+      var k = document.createElement('div');
+      k.className = 'zone-kopf';
+      var t = document.createElement('span');
+      t.textContent = titel;
+      k.appendChild(t);
+      if (rechts !== undefined) {
+        var r = document.createElement('span');
+        r.className = 'zahl-rechts';
+        r.textContent = rechts;
+        k.appendChild(r);
+        z.rechts = r;
+      }
+      z.appendChild(k);
+    }
+    var koerper = document.createElement('div');
+    koerper.className = 'zone-koerper';
+    koerper.style.minHeight = '0';
+    koerper.style.flex = '1';
+    z.appendChild(koerper);
+    z.koerper = koerper;
+    return z;
+  }
+
+  // 6.3: der leere Zustand ist der Normalfall, nicht der Fehlerfall. Strich
+  // plus ein Satz, der sagt, was passieren muss. Keine Nullen als Daten.
+  function ccLeer(satz) {
+    var p = document.createElement('p');
+    p.className = 'zone-leer';
+    p.textContent = satz;
+    return p;
+  }
+
+  function ccSetze(zone, knoten) {
+    zone.koerper.textContent = '';
+    zone.koerper.appendChild(knoten);
+  }
+
+  function ccZahl(n) {
+    return (n || 0).toLocaleString('de-DE');
+  }
+
+  function baueCommandCenter() {
+    var ziel = document.getElementById('view-cc');
+    ziel.textContent = '';
+    var raster = document.createElement('div');
+    raster.className = 'zonen cc';
+
+    // Zone 1 - Kopf, Uhr, Anbieter/Modell. Quelle: GET /api/health + lokale Uhr
+    var z1 = document.createElement('section');
+    z1.className = 'zone z12 cc-kopf zone-rein';
+    var marke = document.createElement('span');
+    marke.className = 'cc-marke';
+    // Kein innerHTML - auch nicht fuer zwei Schraegstriche. Die Regel gilt
+    // ohne Ausnahme (tests/test_api.py::test_seite_setzt_niemals_innerhtml),
+    // und eine Ausnahme "nur diesmal" ist genau die, die spaeter jemand
+    // kopiert und mit einer Modellantwort fuellt.
+    marke.appendChild(document.createTextNode('JARVIS '));
+    var strich = document.createElement('b');
+    strich.textContent = '//';
+    marke.appendChild(strich);
+    marke.appendChild(document.createTextNode(' COMMAND CENTER'));
+    var anbieter = document.createElement('span');
+    anbieter.className = 'cc-anbieter';
+    anbieter.textContent = 'verbinde…';
+    var uhr = document.createElement('span');
+    uhr.className = 'cc-uhr';
+    z1.appendChild(marke);
+    z1.appendChild(anbieter);
+    z1.appendChild(uhr);
+    ccEl.anbieter = anbieter;
+    ccEl.uhr = uhr;
+    raster.appendChild(z1);
+
+    // Zone 2 - Mini-Globus. Dieselbe Szene wie die Weltansicht, dasselbe
+    // Canvas: es wird umgehaengt, nicht kopiert. Ein zweiter WebGL-Kontext
+    // ist im Auftrag ausdruecklich verboten, und Browser verwerfen den
+    // aelteren ohne Vorwarnung.
+    var z2 = ccZone('z3 cc-globus zone-rein', 'GLOBUS');
+    z2.koerper.className = 'cc-globus-platz';
+    ccEl.globus = z2;
+    raster.appendChild(z2);
+
+    // Zone 3 - laufende Auftraege. Quelle: GET /api/tasks (+ Detail je Auftrag)
+    ccEl.auftraege = ccZone('z4 zone-rein', 'AUFTRÄGE', '');
+    raster.appendChild(ccEl.auftraege);
+
+    // Zone 4 - Ereignisstrom. Quelle: SSE aus api/events.py
+    ccEl.strom = ccZone('z5 zone-rein', 'EREIGNISSE');
+    ccEl.strom.koerper.className = 'cc-strom';
+    ccSetze(ccEl.strom, ccLeer('Der Strom ist offen. Hier steht, was passiert, sobald etwas passiert.'));
+    raster.appendChild(ccEl.strom);
+
+    // Zone 5 - vier Kennzahlen. Quelle: GET /api/stats
+    var z5 = document.createElement('section');
+    z5.className = 'zone z12 z-kennzahlen zone-rein';
+    var kz = document.createElement('div');
+    kz.className = 'cc-kennzahlen';
+    ccEl.kennzahl = {};
+    [['calls', 'Modellaufrufe'], ['tokens', 'Token'], ['kosten', 'Kosten'],
+     ['tools', 'Werkzeuge']].forEach(function (paar) {
+      var k = document.createElement('div');
+      k.className = 'cc-kennzahl';
+      var w = document.createElement('span');
+      w.className = 'wert';
+      w.textContent = '—';
+      var n = document.createElement('span');
+      n.className = 'name';
+      n.textContent = paar[1];
+      var f = document.createElement('span');
+      f.className = 'fussnote';
+      k.appendChild(w); k.appendChild(n); k.appendChild(f);
+      kz.appendChild(k);
+      ccEl.kennzahl[paar[0]] = { wert: w, fussnote: f };
+    });
+    z5.appendChild(kz);
+    raster.appendChild(z5);
+
+    // Zone 6 - Werkzeuge zuletzt. Quelle: GET /api/tool-calls
+    ccEl.werkzeuge = ccZone('z6 zone-rein', 'WERKZEUGE ZULETZT');
+    raster.appendChild(ccEl.werkzeuge);
+
+    // Zone 7 - Token-Verlauf. Quelle: GET /api/stats/verlauf
+    ccEl.verlauf = ccZone('z6 zone-rein', 'TOKEN JE STUNDE', '');
+    ccEl.verlauf.koerper.className = 'cc-diagramm';
+    raster.appendChild(ccEl.verlauf);
+
+    // Zone 8 - Meldungen weltweit. Quelle: GET /api/weltlage/WELT
+    ccEl.meldungen = ccZone('z12 zone-rein', 'MELDUNGEN WELTWEIT');
+    raster.appendChild(ccEl.meldungen);
+
+    ziel.appendChild(raster);
+    ccGebaut = true;
+  }
+
+  // --- Zone 1: die Uhr. Der einzige Timer in dieser Ansicht. ---------------
+
+  function ccUhrTick() {
+    if (!ccEl.uhr) return;
+    var d = new Date();
+    function zwei(n) { return n < 10 ? '0' + n : String(n); }
+    ccEl.uhr.textContent = zwei(d.getHours()) + ':' + zwei(d.getMinutes())
+      + ':' + zwei(d.getSeconds());
+    var s = document.createElement('small');
+    s.textContent = d.toLocaleDateString('de-DE',
+      { weekday: 'short', day: '2-digit', month: '2-digit' });
+    ccEl.uhr.appendChild(s);
+  }
+
+  // --- Zone 3 ---------------------------------------------------------------
+
+  function ccZeichneAuftraege(liste) {
+    var laufend = (liste || []).filter(function (t) {
+      return !t.parent_task_id && (t.status === 'running' || t.status === 'pending');
+    });
+    ccEl.auftraege.rechts.textContent = laufend.length
+      ? laufend.length + ' laufend' : '';
+    if (!laufend.length) {
+      ccSetze(ccEl.auftraege, ccLeer('Kein Auftrag läuft. Stell im Chat eine Frage.'));
+      return;
+    }
+    ccEl.auftraege.koerper.textContent = '';
+    laufend.slice(0, 4).forEach(function (t) {
+      var box = document.createElement('div');
+      box.className = 'cc-auftrag';
+      var ziel = document.createElement('div');
+      ziel.className = 'cc-auftrag-ziel';
+      ziel.textContent = t.goal;
+      var zeile = document.createElement('div');
+      zeile.className = 'cc-auftrag-zeile';
+      var schritte = document.createElement('span');
+      schritte.textContent = '…';
+      var kosten = document.createElement('span');
+      kosten.textContent = ccZahl(t.spent_tokens) + ' Token';
+      zeile.appendChild(schritte);
+      zeile.appendChild(kosten);
+      var balken = document.createElement('div');
+      balken.className = 'cc-balken';
+      var fuell = document.createElement('i');
+      fuell.style.width = '0%';
+      balken.appendChild(fuell);
+      box.appendChild(ziel); box.appendChild(zeile); box.appendChild(balken);
+      ccEl.auftraege.koerper.appendChild(box);
+
+      // `GET /api/tasks` liefert keine Schritte (in FIX-06 Abschnitt 5
+      // nachgemessen und dort vermerkt). Fuer n/m muss das Detail her -
+      // aber nur fuer die wenigen laufenden, und nur auf ein Ereignis hin.
+      api('/api/tasks/' + t.id).then(function (d) {
+        var alle = d.steps || [];
+        var fertig = alle.filter(function (x) { return x.status === 'done'; }).length;
+        if (!alle.length) { schritte.textContent = 'Plan wird gebaut'; return; }
+        schritte.textContent = 'Schritt ' + Math.min(fertig + 1, alle.length)
+          + '/' + alle.length;
+        fuell.style.width = Math.round(fertig / alle.length * 100) + '%';
+      }).catch(function () { schritte.textContent = ''; });
+    });
+  }
+
+  // --- Zone 4 ---------------------------------------------------------------
+
+  var CC_STROM_MAX = 40;
+
+  function ccStromZeile(typ, daten) {
+    if (!ccEl.strom) return;
+    if (ccEl.strom.koerper.querySelector('.zone-leer')) {
+      ccEl.strom.koerper.textContent = '';
+    }
+    var d = new Date();
+    function zwei(n) { return n < 10 ? '0' + n : String(n); }
+    var zeile = document.createElement('div');
+    var t = document.createElement('span');
+    t.className = 't';
+    t.textContent = zwei(d.getHours()) + ':' + zwei(d.getMinutes())
+      + ':' + zwei(d.getSeconds()) + ' ';
+    var n = document.createElement('span');
+    n.className = 'n';
+    n.textContent = typ + ' ';
+    zeile.appendChild(t);
+    zeile.appendChild(n);
+    // textContent, nie innerHTML: `goal` und `name` kommen mittelbar aus
+    // einem Modell.
+    zeile.appendChild(document.createTextNode(ccStromText(typ, daten)));
+    ccEl.strom.koerper.appendChild(zeile);
+    while (ccEl.strom.koerper.children.length > CC_STROM_MAX) {
+      ccEl.strom.koerper.removeChild(ccEl.strom.koerper.firstChild);
+    }
+    ccEl.strom.koerper.scrollTop = ccEl.strom.koerper.scrollHeight;
+  }
+
+  function ccStromText(typ, d) {
+    if (typ === 'task') return (d.status || '') + ' · ' + (d.goal || d.id || '');
+    if (typ === 'step') return '#' + (d.index + 1) + ' ' + (d.status || '')
+      + ' · ' + (d.description || '');
+    if (typ === 'tool') return (d.name || '') + ' · ' + (d.ok ? 'ok' : 'fehlgeschlagen')
+      + ' · ' + (d.duration_ms || 0) + ' ms';
+    if (typ === 'confirmation') return 'Rückfrage: ' + (d.tool || '');
+    if (typ === 'hello') return (d.listeners || 1) + ' Zuhörer';
+    return '';
+  }
+
+  // --- Zone 5 ---------------------------------------------------------------
+
+  function ccZeichneKennzahlen(st) {
+    var g = st.total || {};
+    var token = (g.in_tokens || 0) + (g.out_tokens || 0);
+    var werkzeuge = (st.per_tool || []).reduce(function (a, r) { return a + (r.calls || 0); }, 0);
+
+    // 6.3: bei einer frischen Datenbank steht hier ein Strich, keine Null.
+    // Eine Null sieht aus wie eine Messung; sie ist hier aber nur die
+    // Abwesenheit einer. Sobald ein Aufruf gelaufen ist, stehen die echten
+    // Zahlen da - auch wenn eine davon dann wirklich 0 ist.
+    var gabEs = (g.calls || 0) > 0;
+    ccEl.kennzahl.calls.wert.textContent = gabEs ? ccZahl(g.calls) : '—';
+    ccEl.kennzahl.calls.fussnote.textContent = !gabEs
+      ? 'Noch kein Modellaufruf gelaufen.'
+      : ((g.fehler || 0) ? (g.fehler + ' fehlgeschlagen') : '');
+    ccEl.kennzahl.tokens.wert.textContent = gabEs ? ccZahl(token) : '—';
+    ccEl.kennzahl.tokens.fussnote.textContent = gabEs
+      ? (ccZahl(g.in_tokens) + ' rein · ' + ccZahl(g.out_tokens) + ' raus')
+      : 'Zählt mit, sobald ein Modell antwortet.';
+    ccEl.kennzahl.tools.wert.textContent = werkzeuge ? ccZahl(werkzeuge) : '—';
+    ccEl.kennzahl.tools.fussnote.textContent = werkzeuge
+      ? (st.per_tool.length + ' verschiedene') : 'Noch kein Werkzeug gelaufen.';
+
+    // 6.2: die einzige echte Geldzahl im System. Steht sie auf 0, dann steht
+    // sie auf 0 - mit dem Satz daneben, warum. Nichts wird geschaetzt.
+    var eur = g.cost_eur || 0;
+    ccEl.kennzahl.kosten.wert.textContent =
+      eur.toFixed(4).replace('.', ',') + ' €';
+    ccEl.kennzahl.kosten.fussnote.textContent = eur === 0
+      ? 'Preise nicht in .env eingetragen' : 'aus llm_calls, nicht geschätzt';
+  }
+
+  // --- Zone 6 ---------------------------------------------------------------
+
+  function ccZeichneWerkzeuge(liste) {
+    if (!liste || !liste.length) {
+      ccSetze(ccEl.werkzeuge, ccLeer('Noch kein Werkzeug gelaufen.'));
+      return;
+    }
+    var t = document.createElement('table');
+    t.className = 'cc-tabelle';
+    liste.slice(0, 6).forEach(function (r) {
+      var tr = document.createElement('tr');
+      [['t', r.created_at.slice(11, 19)],
+       ['', r.name],
+       [r.ok ? 'ok' : 'weg', r.ok ? '✓' : '✕'],
+       ['ms', (r.duration_ms || 0) + ' ms']].forEach(function (paar) {
+        var td = document.createElement('td');
+        if (paar[0]) td.className = paar[0];
+        td.textContent = paar[1];
+        tr.appendChild(td);
+      });
+      t.appendChild(tr);
+    });
+    ccSetze(ccEl.werkzeuge, t);
+  }
+
+  // --- Zone 7: Flaechendiagramm, von Hand als SVG ---------------------------
+
+  function ccZeichneVerlauf(d) {
+    var punkte = d.stunden || [];
+    ccEl.verlauf.rechts.textContent = d.fenster_h ? (d.fenster_h + ' h') : '';
+
+    // Eine Flaeche auf der Nulllinie sieht aus wie eine Messung, ist aber
+    // keine Aussage. 6.3 verbietet Nullen, die wie Daten aussehen.
+    if (!d.summe || !d.summe.tokens) {
+      ccSetze(ccEl.verlauf, ccLeer('In den letzten ' + (d.fenster_h || 24)
+        + ' Stunden lief kein Modellaufruf.'));
+      return;
+    }
+
+    var B = 100, H = 30, hoch = d.hoechstwert || 1;
+    var schritt = punkte.length > 1 ? B / (punkte.length - 1) : B;
+    var weg = [];
+    punkte.forEach(function (p, i) {
+      var x = (i * schritt).toFixed(2);
+      var y = (H - (p.tokens / hoch) * (H - 1)).toFixed(2);
+      weg.push((i ? 'L' : 'M') + x + ' ' + y);
+    });
+
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + B + ' ' + H);
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', 'Token je Stunde, Höchstwert '
+      + d.hoechstwert + ' in ' + d.fenster_h + ' Stunden');
+
+    var flaeche = document.createElementNS(svg.namespaceURI, 'path');
+    flaeche.setAttribute('d', weg.join(' ') + ' L' + B + ' ' + H + ' L0 ' + H + ' Z');
+    flaeche.setAttribute('fill', 'var(--akzent-glut)');
+    var linie = document.createElementNS(svg.namespaceURI, 'path');
+    linie.setAttribute('d', weg.join(' '));
+    linie.setAttribute('fill', 'none');
+    linie.setAttribute('stroke', 'var(--akzent)');
+    linie.setAttribute('stroke-width', '0.7');
+    linie.setAttribute('vector-effect', 'non-scaling-stroke');
+    svg.appendChild(flaeche);
+    svg.appendChild(linie);
+    ccSetze(ccEl.verlauf, svg);
+  }
+
+  // --- Zone 8 ---------------------------------------------------------------
+
+  function ccZeichneMeldungen(d) {
+    var m = (d && d.meldungen) || [];
+    if (!m.length) {
+      // Kein stiller POST: der kostet einen Modellaufruf und Geld.
+      ccSetze(ccEl.meldungen, ccLeer(
+        'Keine Weltmeldungen im Zwischenspeicher. Sie entstehen, wenn du in '
+        + 'der Weltansicht ein Land auswählst — das kostet einen Modellaufruf.'));
+      return;
+    }
+    var gitter = document.createElement('div');
+    gitter.className = 'cc-meldungen';
+    m.slice(0, 3).forEach(function (x) {
+      var karte = document.createElement('article');
+      karte.className = 'cc-meldung';
+      if (x.bild_url) {
+        var bild = document.createElement('img');
+        bild.src = x.bild_url;
+        bild.loading = 'lazy';
+        bild.alt = x.bild_beschreibung || '';
+        karte.appendChild(bild);
+      }
+      var text = document.createElement('div');
+      text.className = 'cc-meldung-text';
+      var h = document.createElement('h4');
+      h.textContent = x.schlagzeile;
+      var p = document.createElement('p');
+      // Herkunft ist Pflicht, nicht Deko.
+      p.textContent = x.medium + (x.bild_herkunft ? ' · Bild: ' + x.bild_herkunft : '');
+      text.appendChild(h); text.appendChild(p);
+      karte.appendChild(text);
+      gitter.appendChild(karte);
+    });
+    ccSetze(ccEl.meldungen, gitter);
+  }
+
+  // --- Zone 2: das Canvas umhaengen, nicht ein zweites bauen ---------------
+
+  function ccGlobusAnbieten() {
+    var platz = ccEl.globus.koerper;
+    platz.textContent = '';
+    if (globusModul && globusModul.miniAn && globusModul.miniAn(platz)) {
+      ccGlobusDrin = true;
+      return;
+    }
+    // Three.js sind 2,0 MB. Die Startansicht laedt die nicht ungefragt -
+    // das war der ganze Punkt von FIX-05 B-2.
+    var hinweis = document.createElement('p');
+    hinweis.className = 'cc-globus-hinweis';
+    hinweis.textContent = 'Der Globus wird erst geladen, wenn du ihn brauchst — 2,0 MB.';
+    var knopf = document.createElement('button');
+    knopf.type = 'button';
+    knopf.textContent = 'Globus laden';
+    knopf.addEventListener('click', function () {
+      hinweis.textContent = 'lädt…';
+      knopf.remove();
+      ladeGlobus().then(function () {
+        if (aktiveAnsicht === 'cc') ccGlobusAnbieten();
+      });
+    });
+    hinweis.appendChild(knopf);
+    platz.appendChild(hinweis);
+  }
+
+  function ccGlobusZurueck() {
+    if (!ccGlobusDrin) return;
+    ccGlobusDrin = false;
+    if (globusModul && globusModul.miniAus) globusModul.miniAus();
+  }
+
+  // --- Sammelabruf. Ausgeloest beim Oeffnen und von Ereignissen. -----------
+
+  function ccHole() {
+    if (ccHolt) return Promise.resolve();
+    ccHolt = true;
+    return Promise.all([
+      api('/api/tasks').then(ccZeichneAuftraege).catch(function (e) {
+        ccSetze(ccEl.auftraege, ccLeer(e.message)); }),
+      api('/api/stats').then(ccZeichneKennzahlen).catch(function () {}),
+      api('/api/tool-calls?limit=20').then(ccZeichneWerkzeuge).catch(function (e) {
+        ccSetze(ccEl.werkzeuge, ccLeer(e.message)); }),
+      api('/api/stats/verlauf?stunden=24').then(ccZeichneVerlauf).catch(function (e) {
+        ccSetze(ccEl.verlauf, ccLeer(e.message)); }),
+      api('/api/health').then(function (h) {
+        ccEl.anbieter.textContent = (h.provider || '?') + ' · ' + (h.model || '?')
+          + (h.api_key_configured ? '' : ' · kein Schlüssel');
+      }).catch(function () { ccEl.anbieter.textContent = 'Anbieter unbekannt'; })
+    ]).then(function () { ccHolt = false; })
+      .catch(function () { ccHolt = false; });
+  }
+
+  function ladeCommandCenter() {
+    if (!ccGebaut) baueCommandCenter();
+
+    ccUhrTick();
+    if (!ccUhr) ccUhr = setInterval(ccUhrTick, 1000);
+
+    ccGlobusAnbieten();
+
+    // Zone 8 einmal beim Oeffnen - Weltmeldungen aendern sich nicht im
+    // Sekundentakt und haengen an keinem Ereignis.
+    api('/api/weltlage/WELT').then(ccZeichneMeldungen).catch(function (e) {
+      ccSetze(ccEl.meldungen, ccLeer(e.message));
+    });
+
+    // 6.4: kein Polling. Der Strom sagt, wann es etwas zu holen gibt.
+    if (!ccStrom) {
+      ccStrom = ereignisStrom(function (typ, daten) {
+        ccStromZeile(typ, daten);
+        if (typ === 'hello') return;
+        ccHole();
+      }, function (err) {
+        if (err) ccStromZeile('strom', { status: 'abgerissen: ' + err.message });
+        ccStrom = null;
+      });
+    }
+    return ccHole();
+  }
+
+  function ccVerlassen() {
+    if (ccUhr) { clearInterval(ccUhr); ccUhr = null; }
+    if (ccStrom) { ccStrom.schliessen(); ccStrom = null; }
+    ccGlobusZurueck();
+  }
+
   // --- Werkzeuge ---
 
   function ladeWerkzeuge() {
@@ -2136,6 +2793,7 @@ button, input, textarea { font: inherit; color: inherit; }
 
   el.hint.textContent = 'Enter senden · Umschalt+Enter neue Zeile';
   showEmpty();
+  zeigeAnsicht('cc');
   loadHealth();
   loadHistory().catch(function (err) { appendError(err.message); });
 })();
