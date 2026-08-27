@@ -2,7 +2,7 @@
 
 > FIX-05 Schritt C. **Hier wird nichts gebaut, nur abgenommen.**
 >
-> Der Sprachpfad steht seit Phase 9: `index.html:1697-1820` — `BrowserVoice()`
+> Der Sprachpfad steht seit Phase 9: `index.html:1680-1814` — `BrowserVoice()`
 > mit `SpeechRecognition` (Zuhören) und `speechSynthesis` (Vorlesen),
 > Push-to-Talk auf `#btn-mic`, DE/EN-Umschalter auf `#btn-sprache`, das
 > `voice`-Flag an `POST /api/tasks` (`index.html:1429`) und `SPRACHSTIL` im

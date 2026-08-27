@@ -3,8 +3,8 @@
 > Einzige Wahrheit über den Projektstand. Claude Code liest diese Datei zuerst
 > und aktualisiert sie am Ende jeder Phase. Von Hand korrigieren ist erlaubt.
 
-AKTUELL: FIX-05 — Globus reparieren und einbauen, siehe `docs/FIX-05.md`
-LETZTE ÄNDERUNG: 2026-08-27 (FIX-05 A, B und D durch — Globus repariert und eingebaut, Vault läuft auf Noahs Rechner; C liegt noch bei Noah)
+AKTUELL: FIX-06 — COMMAND CENTER, siehe `docs/FIX-06.md`. Abschnitt 5 (Design-System) abgenommen, 6 bis 8 stehen aus.
+LETZTE ÄNDERUNG: 2026-08-27 (FIX-06 Abschnitt 5 abgenommen — eine Palette für beide Seiten und den Globus, kein Blau mehr)
 
 > **Abweichung von der Arbeitsweise, auf Ansage:** es wurden alle Phasen
 > gebaut, nicht eine nach der anderen. Das widerspricht CLAUDE.md
@@ -843,6 +843,74 @@ Wahrheit, SQLite ist nur ein Index.
 **`--abschluss` wurde bewusst nicht gesetzt** — auch im Probelauf nicht. Das
 schiebt `facts` nach `facts_alt`, und ab da wird der Rückweg teuer. Es
 gehört an den echten Vault, nach einer Zählung, die stimmt.
+
+## FIX-06 Abschnitt 5 — Design-System
+
+Auftrag und alle Messungen: `docs/FIX-06.md`. Abnahme mit
+`pytest tests/test_designsystem.py -q` → **9 passed**, dazu `web-selfcheck`
+gegen den laufenden Server in drei Ansichten.
+
+| # | Kriterium | Beleg | Status |
+|---|-----------|-------|--------|
+| 1 | Kein Blau mehr im Projekt | `grep -rniE "4da3ff" index.html weltlage.html static/` (ohne `vendor/`) → **0 Treffer**; als Test festgehalten in `test_dod_1_kein_blau_mehr_im_projekt` | ✓ |
+| 2 | Kontraste halten | `web-selfcheck` gegen `/weltlage`, `/` (Chat) und `/` (Welt-Tab): **0 Kontrastbefunde** bei 360, 768 und 1440 px. Vorher: 3× derselbe Fehler | ✓ |
+| 3 | Fokus bleibt sichtbar | `test_dod_3_...` tabbt beide Seiten durch und misst die **Umrandung selbst** — Stil, Breite, Farbe. 13 bzw. 5 Elemente, alle mit `2px solid rgb(240,180,92)` | ✓ |
+| 4 | Reduced Motion steht still | `test_dod_4_...` rendert mit gesetzter Einstellung: **keine** Animation mit unendlicher Wiederholung; `web-selfcheck` bestätigt es unabhängig | ✓ |
+
+**Was gebaut wurde.** `static/system.css` (210 Zeilen) — die Palette steht
+**einmal**. Farben mit gerechneten Kontrasten, drei Typo-Stufen, das
+Zonenraster aus 5.4 (`gap: 1px` auf einer Kantenfarbe), `.glas` mit
+`@supports`-Fallback, die Bewegungsdauern und -kurven aus 5.6, der globale
+Reduced-Motion-Block und der Fokusring. `index.html` und `weltlage.html`
+binden sie ein; `static/globus.js` erbt sie über `:root`.
+
+**Die Falle, an der es fast gescheitert wäre.** Ein `<link>` allein hätte am
+Globus nichts geändert: `globus.js` deklarierte alle neun Variablen — samt
+einem zweiten, blauen `--akzent` — noch einmal auf `.globus-wurzel` selbst,
+und eine Deklaration **auf** einem Element verdrängt den geerbten Wert ohne
+Spezifitätsstreit. Die App wäre bernsteinfarben geworden, der Globus blau
+geblieben. Der Block ist weg, ein Test hält es fest.
+
+**Three.js liest kein CSS** — die vier Szenenfarben werden jetzt zur
+Laufzeit aus den Custom Properties gelesen (`THREE.Color` nimmt eine
+CSS-Zeichenkette; `setStyle` in `static/vendor/three.core.js:14165`,
+Hex-Zweig `:14253`, nachgesehen). `test_die_akzentfarbe_erreicht_wirklich_die_dreidimensionale_szene`
+misst die Instanzfarbe der ausgewählten Landesmarke: warm heißt rot > grün >
+blau, das alte Blau war genau andersherum.
+
+**Zwei echte Funde nebenbei**, beide behoben, beide in `docs/FIX-06.md` mit
+Zahlen:
+
+1. **Das Ortssuchfeld im Globus hatte gar keinen Fokusring** — `outline:none`
+   plus eine gefärbte Rahmenlinie. `web-selfcheck` hat es durchgewunken, weil
+   sein `FOCUS_JS` **jeden** Rahmen als Ring zählt, auch einen aus dem
+   Ruhezustand. Gefunden hat es erst ein Test, der die Umrandung misst.
+2. **Der Kontrastfehler auf `index.html` war ein Messfehler.** `over()` im
+   Prüfskript setzt das Alpha der unteren Schicht auf 1 — die Suche nach dem
+   Untergrund bricht beim Glas der Kopfleiste ab und rechnet gegen **Weiß**.
+   Gemeldet 1,69:1, tatsächlich gemalt 7,68:1. Behoben, ohne das Skript
+   anzufassen: der aktive Tab ist jetzt deckend (`--akzent-glut-fest`,
+   dieselbe Farbe vorkomponiert). Optisch identisch, messbar ehrlich.
+
+**Vier Abweichungen vom Auftragstext**, alle bewusst und in `docs/FIX-06.md`
+begründet: `--schriftfamilie` statt `--schrift` (dort war es eine Farbe —
+stiller Typkonflikt), ein paar zusätzliche Namen für Werte, die der Auftrag
+nennt aber nicht benennt, die alten englischen Namen bleiben als **Zeiger**
+(rund 400 Regeln in `index.html`), und `.glas`/`.glass` teilen eine Regel.
+
+**Was diese Abnahme nicht zeigt.** `web-selfcheck` misst nur den
+Startzustand — kein Hover, kein geöffnetes Ortspanel, keine `transition`.
+Sein Bewegungstest sieht `requestAnimationFrame` nicht, also auch die
+Globus-Schleife nicht (die hält FIX-05 A6/5 in Schach). Und WebGL läuft
+unter SwiftShader, nicht auf einer GPU.
+
+**Zwei Zeilen der Auftragsinventur stimmen nicht** — Einzelheiten in
+`docs/FIX-06.md`: die Zeilenangabe für den Sprachpfad, und „Euro-Beträge
+existieren nicht" (es gibt sie an zehn Stellen; gemeint sind offenbar die
+aus dem Video). Dazu zwei Präzisierungen, von denen eine für Abschnitt 6
+zählt: **`GET /api/tasks` liefert keine Schritte.**
+
+**Suite nach dem Umbau:** `pytest -q` → **968 Tests, alle grün.**
 
 ## Offene Blocker
 

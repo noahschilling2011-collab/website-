@@ -1,0 +1,213 @@
+/* JARVIS — Design-System (FIX-06 Abschnitt 5).
+ *
+ * EINE Palette fuer beide Seiten. `index.html` und `weltlage.html` binden
+ * diese Datei ein; `static/globus.js` erbt sie ueber `:root`, seit sein
+ * eigener Variablenblock weg ist.
+ *
+ * **Warum eine Datei und nicht zwei Bloecke.** Zwei Kopien einer Palette
+ * driften auseinander, und man merkt es erst auf dem Screenshot. Genau das
+ * war hier schon passiert: `index.html` fuhr einen warmen Bernstein,
+ * `static/globus.js` ein kaltes Blau - dieselbe App, zwei Akzentfarben.
+ * (Den alten Blauwert schreibe ich hier bewusst nicht hin: die Abnahme
+ * greppt nach ihm, und ein Kommentar, der den Test rot macht, ist kein
+ * Kommentar, sondern eine Falle.)
+ *
+ * **Die Kontraste sind gerechnet, nicht geschaetzt.** WCAG-2-Formel,
+ * sRGB-Linearisierung, `(L1+0.05)/(L2+0.05)`. Die Zahlen stehen bei den
+ * Farben; nachgerechnet am 27.08.2026 mit einem eigenen Skript, alle
+ * sieben Werte auf zwei Nachkommastellen bestaetigt.
+ */
+
+:root {
+  /* --- Flaechen. Tiefe ueber Helligkeit, nicht ueber Schatten. ---------- */
+  --grund:     #0a0a0c;   /* Seite */
+  --ebene-1:   #131316;   /* Karte, Zone */
+  --ebene-2:   #1b1b21;   /* Popover, aktive Karte */
+  --ebene-3:   #24242c;   /* Hover auf Ebene 2 */
+
+  /* --- Ein Akzent. Warm, entsaettigt - auf Dunkel gilt heller und blasser.
+     Kontrast: 10,73 auf --grund, 10,06 auf --ebene-1, 9,29 auf --ebene-2,
+     8,35 auf --ebene-3. Taugt ueberall, auch fuer Fliesstext. */
+  --akzent:       #f0b45c;
+  --akzent-satt:  #e09a3e;   /* 8,35 / 7,83 - nur fuer Flaechen */
+  --akzent-linie: rgba(240,180,92,.22);
+  --akzent-glut:  rgba(240,180,92,.08);
+  /* Dieselbe Glut, aber deckend: vorkomponiert ueber --ebene-1 unter Glas.
+     Gerechnet, nicht gegriffen - und noetig, weil eine halbtransparente
+     Flaeche ueber halbtransparentem Glas von keinem Pruefwerkzeug (und von
+     keinem Menschen) mehr zuverlaessig gemessen werden kann. */
+  --akzent-glut-fest: #26211b;
+  --auf-akzent:   #17140c;   /* Text AUF einer Akzentflaeche */
+
+  /* --- Vorzeichen. Ausschliesslich fuer Richtung, nie als Dekoration. --- */
+  --auf:  #6ee7a8;   /* 12,87 / 12,06 */
+  --ab:   #f6836f;   /*  7,91 /  7,41 */
+
+  /* --- Text ------------------------------------------------------------- */
+  --text-laut:   #f4f4f7;   /* 18,02 / 16,89 */
+  --text:        #e8e8ec;   /* 16,19 / 15,18 */
+  /* 5,86 / 5,50 / 5,08 / 4,56. GEH NICHT DUNKLER: #7a7a84 faellt auf
+     --ebene-1 auf 4,37 und reisst die 4,5-Grenze. Nachgerechnet.
+     Auf --ebene-3 bleiben nur 0,06 Reserve - wer die Flaeche je aufhellt,
+     muss diese Farbe mit aufhellen. */
+  --text-leise:  #8b8b95;
+
+  --kante: rgba(255,255,255,.09);
+
+  /* --- Bewegung --------------------------------------------------------- */
+  --kurve-rein: cubic-bezier(.2,.8,.2,1);
+  --kurve-raus: cubic-bezier(.4,0,1,1);
+  --dauer-tupf: 140ms;   /* Hover, Fokus, Farbe */
+  --dauer-rein: 380ms;   /* Zone erscheint */
+  --dauer-raus: 220ms;   /* Zone verschwindet */
+  --dauer-zahl: 600ms;   /* Zahl zaehlt hoch */
+
+  /* --- Schrift. Systemstack, kein Webfont: die Seite soll ohne Netz
+     laufen, und ein nachgeladener Font ist genau das, was dann fehlt. --- */
+  --schriftfamilie: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+
+  /* Drei Stufen im harten Kontrast - daher kommt der Charakter, nicht von
+     einer Schrift. */
+  --kenngroesse: clamp(2.2rem, 1.6rem + 2.6vw, 4rem);
+  --normal:      clamp(.94rem, .9rem + .2vw, 1.02rem);
+  --etikett:     .68rem;
+
+  /* --- Abstaende, 4er-Schritte ------------------------------------------ */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 24px; --s-6: 32px; --s-7: 48px;
+
+  /* --- Altnamen aus index.html ------------------------------------------
+     Zeiger auf dieselben Werte, keine zweiten Werte. So bleibt jede der
+     rund 400 bestehenden Regeln in index.html gueltig, ohne dass die
+     Palette an zwei Orten steht. Neuer Code nimmt die deutschen Namen. */
+  --bg-0: var(--grund);
+  --bg-1: var(--ebene-1);
+  --bg-2: var(--ebene-2);
+  --bg-3: var(--ebene-3);
+  --text-loud: var(--text-laut);
+  --text-dim:  var(--text-leise);
+  --accent:      var(--akzent);
+  --accent-soft: var(--akzent-glut);
+  --accent-line: var(--akzent-linie);
+  --on-accent:   var(--auf-akzent);
+  --ok:     var(--auf);
+  --danger: var(--ab);
+  --line: var(--kante);
+  --ease: var(--kurve-rein);
+  /* Fuer den Globus-Stil, der frueher eigene Namen fuehrte. */
+  --glas-flaeche: rgba(255,255,255,.04);
+
+  --step--1: clamp(0.83rem, 0.80rem + 0.15vw, 0.90rem);
+  --step-0:  var(--normal);
+  --step-1:  clamp(1.13rem, 1.06rem + 0.35vw, 1.32rem);
+}
+
+/* --- Typografie: die drei Rollen als Klassen -------------------------- */
+
+/* Die eine grosse Zahl, der Laendername. */
+.kenngroesse {
+  font-size: var(--kenngroesse);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.02;
+  color: var(--text-laut);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Zonentitel, Achsen, Einheiten. Diese Stufe traegt den Look. Jede Zone
+   bekommt GENAU EINE - zwei Etiketten uebereinander sind eins zu viel. */
+.etikett {
+  font-size: var(--etikett);
+  font-weight: 600;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: var(--text-leise);
+}
+
+/* Kopfzeilenmuster BEREICH // UNTERTITEL. */
+.marke-kopf {
+  display: flex;
+  align-items: baseline;
+  gap: .5ch;
+  text-transform: uppercase;
+  letter-spacing: .14em;
+  font-weight: 600;
+}
+.marke-kopf b      { color: var(--text-laut); font-weight: 600; }
+.marke-kopf i      { color: var(--akzent); font-style: normal; }
+.marke-kopf span   { color: var(--text-leise); font-weight: 500; }
+
+/* Jede Zahl, die sich aendert. Ohne das springt jeder Zaehler bei jedem
+   Tick, weil die Ziffern verschieden breit sind. */
+.zahl, .kenngroesse, [data-zahl] { font-variant-numeric: tabular-nums; }
+
+/* --- Raster: dicht, mit sichtbaren Zonengrenzen ------------------------ */
+
+/* Die LINIE ist der Abstand. `gap: 1px` auf einer Kantenfarbe erzeugt
+   Trennlinien ohne einen einzigen `border` - und ohne die doppelten
+   Linien, die entstehen, wenn Nachbarn beide einen Rahmen tragen. */
+.zonen {
+  display: grid;
+  gap: 1px;
+  background: var(--kante);
+  grid-template-columns: repeat(12, 1fr);
+  grid-auto-rows: minmax(0, auto);
+}
+/* `min-height: 0` ist Pflicht: sonst wachsen Grid-Kinder ueber ihren
+   Container hinaus und das Scrollen ist zurueck, das weg sollte. */
+.zone { background: var(--ebene-1); padding: 14px 16px; min-height: 0; }
+
+/* --- Glas, sparsam ----------------------------------------------------- */
+
+/* Lohnt nur, wo etwas mit Struktur dahinterliegt. Hoechstens zwei Flaechen
+   gleichzeitig sichtbar - darueber bricht das Scrollen auf mittlerer
+   Hardware ein, und ueber dem Globus laeuft ohnehin schon WebGL.
+   `.glass` ist der Altname aus index.html, dieselbe Regel. */
+.glas, .glass {
+  background: var(--glas-flaeche);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid var(--kante);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07);
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .glas, .glass { background: rgba(19,19,22,.92); }
+}
+
+/* --- Bewegung ---------------------------------------------------------- */
+
+@keyframes zone-rein {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.zone-rein { animation: zone-rein var(--dauer-rein) var(--kurve-rein) both; }
+
+/* Hoechstens acht gestaffelt, danach als Gruppe. */
+.zone-rein:nth-child(1) { animation-delay:   0ms; }
+.zone-rein:nth-child(2) { animation-delay:  45ms; }
+.zone-rein:nth-child(3) { animation-delay:  90ms; }
+.zone-rein:nth-child(4) { animation-delay: 135ms; }
+.zone-rein:nth-child(5) { animation-delay: 180ms; }
+.zone-rein:nth-child(6) { animation-delay: 225ms; }
+.zone-rein:nth-child(7) { animation-delay: 270ms; }
+.zone-rein:nth-child(n+8) { animation-delay: 315ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --- Fokus ------------------------------------------------------------- */
+/* Ein Ring in der Akzentfarbe, ueberall gleich. Nicht wegoptimieren:
+   ohne ihn ist die Seite mit der Tastatur unbedienbar. */
+:focus-visible {
+  outline: 2px solid var(--akzent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}

@@ -45,16 +45,20 @@ const STIL = `
       Behaelter bekommt 'position:relative'. */
 
 .globus-wurzel{
-  --grund:#08090b; --flaeche:#111318; --land:#232830; --kante:rgba(255,255,255,.10);
-  --schrift:#e8eaef; --leise:#9aa2b1; --akzent:#4da3ff;
-  --glas:rgba(17,19,24,.82);
-  --kurve:cubic-bezier(.4,0,.2,1);
+  /* Hier standen bis FIX-06 neun eigene Variablen - darunter ein zweites,
+     blaues --akzent. Sie sind weg, und das ist der ganze Punkt: eine
+     Deklaration AUF diesem Element haette den von :root geerbten Wert aus
+     static/system.css verdraengt, ganz ohne Spezifitaetsstreit. Die App
+     waere bernsteinfarben geworden und der Globus blau geblieben.
+
+     --flaeche und --land waren ausserdem schon vorher tot: null Nutzungen
+     im ganzen Block. */
 
   /* Der Behaelter ist das Bezugssystem fuer alles darin. */
   position:relative;
   overflow:hidden;
-  background:var(--grund); color:var(--schrift);
-  font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  background:var(--grund); color:var(--text);
+  font:15px/1.55 var(--schriftfamilie);
 }
 /* Der Stern war frueher global. Hier gilt er nur im Behaelter - sonst
    raeumt der Globus die Abstaende der ganzen App ab. */
@@ -64,25 +68,25 @@ const STIL = `
         /* Ohne das scrollt Android die Seite, statt zu drehen. */
         touch-action:none;cursor:grab}
 .globus-wurzel #globus:active{cursor:grabbing}
-.globus-wurzel #globus:focus-visible{outline:2px solid var(--akzent,#4da3ff);outline-offset:-2px}
-.globus-wurzel .ersatz{position:absolute;inset:0;display:grid;place-items:center;padding:2rem;text-align:center;color:var(--leise)}
+.globus-wurzel #globus:focus-visible{outline:2px solid var(--akzent);outline-offset:-2px}
+.globus-wurzel .ersatz{position:absolute;inset:0;display:grid;place-items:center;padding:2rem;text-align:center;color:var(--text-leise)}
 
 /* --- Kopf --- */
 .globus-wurzel .kopf{
   position:absolute;top:0;left:0;right:0;z-index:3;
   display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;
   padding:.7rem 1rem;
-  background:linear-gradient(180deg,rgba(8,9,11,.9),rgba(8,9,11,0));
+  background:linear-gradient(180deg,rgba(10,10,12,.9),rgba(10,10,12,0));
 }
 .globus-wurzel .marke{font-weight:600;letter-spacing:.02em}
 .globus-wurzel .marke span{color:var(--akzent)}
-.globus-wurzel .land{color:var(--leise);font-variant-numeric:tabular-nums}
+.globus-wurzel .land{color:var(--text-leise);font-variant-numeric:tabular-nums}
 .globus-wurzel .kopf .luecke{flex:1}
 .globus-wurzel .knopf{
   appearance:none;border:1px solid var(--kante);border-radius:.55rem;
-  background:var(--glas);color:var(--schrift);
+  background:var(--ebene-1);color:var(--text);
   padding:.42rem .7rem;font:inherit;font-size:.86rem;cursor:pointer;
-  transition:border-color .2s var(--kurve),background .2s var(--kurve);
+  transition:border-color .2s var(--kurve-rein),background .2s var(--kurve-rein);
 }
 .globus-wurzel .knopf:hover{border-color:var(--akzent)}
 .globus-wurzel .knopf:focus-visible{outline:2px solid var(--akzent);outline-offset:2px}
@@ -101,11 +105,11 @@ const STIL = `
 .globus-wurzel .karte{flex:0 1 auto}
 .globus-wurzel .karte{
   border:1px solid var(--kante);border-radius:.8rem;overflow:hidden;
-  background:var(--glas);
+  background:var(--ebene-1);
   -webkit-backdrop-filter:blur(18px) saturate(140%);
   backdrop-filter:blur(18px) saturate(140%);
   display:flex;flex-direction:column;min-height:0;
-  animation:globus-auf .28s var(--kurve) both;
+  animation:globus-auf .28s var(--kurve-rein) both;
   /* Gegen index.html:454-455. Dort hat '.karte' Innen- und Aussenabstand;
      hier machen das '.block' und der 'gap' der Spalte. Ohne diese zwei
      Zeilen sitzt im eingebauten Tab ploetzlich Luft um jede Karte. */
@@ -113,60 +117,61 @@ const STIL = `
 }
 @keyframes globus-auf{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
-.globus-wurzel .bild{position:relative;flex:0 0 auto;height:4.4rem;background:#0d0f13}
+.globus-wurzel .bild{position:relative;flex:0 0 auto;height:4.4rem;background:var(--grund)}
 .globus-wurzel .bild img{width:100%;height:100%;object-fit:cover;display:block}
 /* Ueber dem Bild derselbe Herkunftsstempel - damit es nie ohne Zuordnung
    im Raum steht, auch nicht auf einem Screenshot. */
 .globus-wurzel .bild .stempel{
   position:absolute;left:0;right:0;bottom:0;
   padding:1.4rem .55rem .35rem;
-  background:linear-gradient(180deg,transparent,rgba(8,9,11,.92));
-  font-size:.7rem;color:#cfd5e0;letter-spacing:.02em;
+  background:linear-gradient(180deg,transparent,rgba(10,10,12,.92));
+  font-size:.7rem;color:var(--text);letter-spacing:.02em;
 }
 /* Kein og:image -> Kartenkachel, sichtbar ANDERS als ein Foto. */
 .globus-wurzel .kachel{
   height:4.4rem;display:grid;place-items:center;gap:.2rem;
-  background:repeating-linear-gradient(45deg,#12151b 0 8px,#161a21 8px 16px);
-  color:var(--leise);font-size:.72rem;text-align:center;
+  background:repeating-linear-gradient(45deg,var(--ebene-1) 0 8px,var(--ebene-2) 8px 16px);
+  color:var(--text-leise);font-size:.72rem;text-align:center;
 }
-.globus-wurzel .kachel b{font-size:.78rem;color:#c3cad6;font-weight:600}
+.globus-wurzel .kachel b{font-size:.78rem;color:var(--text);font-weight:600}
 
 .globus-wurzel .block{padding:.5rem .7rem;min-height:0;overflow:hidden}
 .globus-wurzel .meldung .schlag{font-weight:600;font-size:.95rem;margin-bottom:.15rem}
-.globus-wurzel .meldung .kurz{color:#c8cede;font-size:.86rem;
+.globus-wurzel .meldung .kurz{color:var(--text);font-size:.86rem;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.globus-wurzel .quelle{margin-top:.35rem;font-size:.7rem;color:var(--leise);letter-spacing:.03em;text-transform:uppercase}
+.globus-wurzel .quelle{margin-top:.35rem;font-size:.7rem;color:var(--text-leise);letter-spacing:.03em;text-transform:uppercase}
 
 /* Abschnitt 4b: andere Flaeche, andere Kante. Man muss sehen, wo die Belege
    aufhoeren und die Erklaerung anfaengt. */
 .globus-wurzel .einordnung{
   border-top:1px dashed rgba(255,255,255,.16);
-  background:rgba(77,163,255,.055);
+  /* War rgba(77,163,255,.055) - das blaue Pendant zur Akzentglut. */
+  background:var(--akzent-glut);
 }
 .globus-wurzel .einordnung .marke2{
   font-size:.66rem;letter-spacing:.09em;text-transform:uppercase;
   color:var(--akzent);margin-bottom:.2rem;
 }
-.globus-wurzel .einordnung p{font-size:.84rem;color:#bcc4d3;
+.globus-wurzel .einordnung p{font-size:.84rem;color:var(--text);
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.globus-wurzel .einordnung .hinweis{margin-top:.25rem;font-size:.68rem;color:var(--leise);font-style:italic}
+.globus-wurzel .einordnung .hinweis{margin-top:.25rem;font-size:.68rem;color:var(--text-leise);font-style:italic}
 
 /* --- Statusleiste --- */
 .globus-wurzel .status{
   position:absolute;left:0;right:0;bottom:0;z-index:3;
   display:flex;align-items:center;gap:1rem;flex-wrap:wrap;
-  padding:.5rem 1rem;font-size:.76rem;color:var(--leise);
-  background:linear-gradient(0deg,rgba(8,9,11,.92),rgba(8,9,11,0));
+  padding:.5rem 1rem;font-size:.76rem;color:var(--text-leise);
+  background:linear-gradient(0deg,rgba(10,10,12,.92),rgba(10,10,12,0));
   /* Gegen index.html:130. Dort schiebt '.status' sich mit margin-left:auto
      in der Kopfleiste nach rechts; hier ist es eine volle Leiste. */
   margin-left:0;
 }
-.globus-wurzel .status b{color:var(--schrift);font-weight:600;font-variant-numeric:tabular-nums}
-.globus-wurzel .gesagt{color:#c8cede}
+.globus-wurzel .status b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
+.globus-wurzel .gesagt{color:var(--text)}
 
 .globus-wurzel .leer{
   place-self:start;padding:.7rem .8rem;border:1px dashed var(--kante);
-  border-radius:.7rem;color:var(--leise);font-size:.85rem;background:var(--glas);
+  border-radius:.7rem;color:var(--text-leise);font-size:.85rem;background:var(--ebene-1);
 }
 
 @media (prefers-reduced-motion: reduce){
@@ -176,30 +181,38 @@ const STIL = `
 .globus-wurzel .ortsuche{display:flex;gap:.4rem;align-items:center;min-width:0}
 .globus-wurzel .ortsuche input{
   background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);
-  color:#e8ecf3;border-radius:8px;padding:.38rem .6rem;font:inherit;
+  color:var(--text-laut);border-radius:8px;padding:.38rem .6rem;font:inherit;
   /* Frueher 'width:min(30ch,34vw)'. vw misst das FENSTER, nicht den
      Behaelter - im eingebauten Tab lief die Kopfzeile damit ueber den Rand
      hinaus. Jetzt schrumpft das Feld mit dem Platz, den es wirklich hat. */
-  flex:1 1 14ch;min-width:8ch;max-width:30ch;outline:none;
+  flex:1 1 14ch;min-width:8ch;max-width:30ch;
 }
-.globus-wurzel .ortsuche input:focus{border-color:#4da3ff}
+.globus-wurzel .ortsuche input:focus{border-color:var(--akzent)}
+/* Hier stand 'outline:none'. Eine gefaerbte Rahmenlinie ist KEIN Fokusring -
+   sie ist ein Pixel breit, sitzt am selben Platz wie der Ruherahmen und
+   verschwindet auf einem hellen Bild dahinter. 'web-selfcheck' hat das
+   durchgewunken, weil es jeden Rahmen als Ring zaehlt; gefunden hat es erst
+   ein Test, der die Umrandung selbst misst. Die Regel aus system.css kaeme
+   gegen die Basisregel nicht an - deshalb hier ausdruecklich. */
+.globus-wurzel .ortsuche input:focus-visible{
+  outline:2px solid var(--akzent);outline-offset:2px}
 .globus-wurzel .ortpanel{
   position:absolute;left:1.4rem;bottom:3.2rem;width:min(42ch,42%);z-index:5;
   background:rgba(14,18,26,.82);backdrop-filter:blur(14px);
   border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:1rem 1.1rem;
 }
 .globus-wurzel .ortpanel h2{margin:0 0 .1rem;font-size:1.05rem;font-weight:600}
-.globus-wurzel .ortkoord{margin:0 0 .7rem;font-size:.78rem;color:#8d96a6}
+.globus-wurzel .ortkoord{margin:0 0 .7rem;font-size:.78rem;color:var(--text-leise)}
 .globus-wurzel .ortbild{margin:0 0 .7rem;border-radius:10px;overflow:hidden;
          border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.3)}
 .globus-wurzel .ortbild img{display:block;width:100%;height:auto}
-.globus-wurzel .ortbild figcaption{padding:.35rem .6rem;font-size:.72rem;color:#8d96a6}
-.globus-wurzel .orttext{margin:0;font-size:.88rem;line-height:1.5;color:#d5dbe6}
-.globus-wurzel .orthinweis{margin:.6rem 0 0;font-size:.78rem;color:#c9a227}
+.globus-wurzel .ortbild figcaption{padding:.35rem .6rem;font-size:.72rem;color:var(--text-leise)}
+.globus-wurzel .orttext{margin:0;font-size:.88rem;line-height:1.5;color:var(--text)}
+.globus-wurzel .orthinweis{margin:.6rem 0 0;font-size:.78rem;color:var(--akzent-satt)}
 .globus-wurzel .orthinweis:empty{display:none}
 .globus-wurzel .ortzu{position:absolute;top:.5rem;right:.6rem;background:none;border:0;
-       color:#8d96a6;font-size:1.2rem;line-height:1;cursor:pointer}
-.globus-wurzel .ortzu:hover{color:#e8ecf3}
+       color:var(--text-leise);font-size:1.2rem;line-height:1;cursor:pointer}
+.globus-wurzel .ortzu:hover{color:var(--text-laut)}
 @media (max-width:720px){ .globus-wurzel .ortpanel{left:1rem;width:auto;right:1rem} }
 @media (min-width:1500px){
   .globus-wurzel .karten{width:min(64ch,50%);display:grid;grid-template-columns:1fr 1fr;
@@ -285,6 +298,26 @@ export async function starte(behaelter, token){
   behaelter.insertAdjacentHTML('beforeend', MARKUP);
 
   const TOKEN = token;
+
+  /* Three.js liest kein CSS. Damit die Palette trotzdem an EINER Stelle
+     steht, werden die Farben der Szene hier aus den Custom Properties
+     gelesen statt als 0x-Zahl danebengeschrieben - genau so ist frueher
+     ein zweiter, blauer Akzent entstanden und jahrelang stehengeblieben.
+
+     `THREE.Color` nimmt eine CSS-Zeichenkette an: `set()` verzweigt bei
+     `typeof value === 'string'` auf `setStyle()`, und `setStyle()` hat
+     einen Zweig fuer sechsstellige Hex-Werte. Nachgesehen in
+     static/vendor/three.core.js, Zeile 14044 und 14253 - nicht erinnert. */
+  const gelesen = getComputedStyle(behaelter);
+  function farbe(name){
+    const wert = gelesen.getPropertyValue(name).trim();
+    if (!wert){
+      // Ohne static/system.css gibt es die Palette nicht. Dann lieber laut
+      // in der Konsole als still in einer falschen Farbe.
+      console.error('globus.js: ' + name + ' ist leer - fehlt static/system.css?');
+    }
+    return new THREE.Color(wert || '#888888');
+  }
 
   // Nur im eigenen Behaelter suchen. In index.html gibt es `btn-mic`
   // schon (die Sprachtaste des Chats); document.getElementById wuerde
@@ -530,12 +563,12 @@ export async function starte(behaelter, token){
     // zeichnet nur. Warum nicht gegen seine Dreiecke, steht dort.
     const erde = new THREE.Mesh(
       new THREE.SphereGeometry(1, 64, 48),
-      new THREE.MeshBasicMaterial({color:0x141922})
+      new THREE.MeshBasicMaterial({color: farbe('--ebene-1')})
     );
     welt.add(erde);
 
-    const AKZENT = new THREE.Color(0x4da3ff);
-    const RUHE   = new THREE.Color(0x9aa2b1);   // Graustufe, wie im Auftrag
+    const AKZENT = farbe('--akzent');
+    const RUHE   = farbe('--text-leise');   // Graustufe, wie im Auftrag
 
     /* FIX-05 A4. Vorher lief `renderer.render()` in JEDEM Frame, auch wenn
        sich nichts bewegte - 60 Bilder je Sekunde fuer ein Standbild. Im
@@ -683,7 +716,7 @@ export async function starte(behaelter, token){
       // Kontrast gemessen, nicht geschaetzt: bei multiplyScalar(2.4) waren die
       // Grenzen im Screenshot kaum vom Kugelgrund zu unterscheiden.
       welt.add(new THREE.LineSegments(geo,
-        new THREE.LineBasicMaterial({color:0x7d8798})));
+        new THREE.LineBasicMaterial({color: farbe('--text-leise')})));
 
       // Ein Punkt je Land: das ist die anwählbare Fläche.
       const kugel = new THREE.SphereGeometry(0.016, 8, 6);
