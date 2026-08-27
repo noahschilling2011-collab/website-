@@ -4,7 +4,7 @@
 > und aktualisiert sie am Ende jeder Phase. Von Hand korrigieren ist erlaubt.
 
 AKTUELL: FIX-05 — Globus reparieren und einbauen, siehe `docs/FIX-05.md`
-LETZTE ÄNDERUNG: 2026-08-26 (FIX-05 A und B abgenommen — Globus repariert und als fünfter Tab eingebaut; C liegt bei Noah, D braucht den Vault-Pfad)
+LETZTE ÄNDERUNG: 2026-08-27 (FIX-05 A, B und D durch — Globus repariert und eingebaut, Vault läuft auf Noahs Rechner; C liegt noch bei Noah)
 
 > **Abweichung von der Arbeitsweise, auf Ansage:** es wurden alle Phasen
 > gebaut, nicht eine nach der anderen. Das widerspricht CLAUDE.md
@@ -711,10 +711,82 @@ Nutzer stammt und nicht aus einem ausgeführten Befehl.
 
 ## FIX-05 Schritt D — Obsidian einschalten
 
-**Status: ✗ BLOCKIERT.** Es fehlt genau eine Zeile, und die kann nur Noah
-schreiben: **der Pfad zu seinem Vault.** Raten ist hier keine Option — der
-falsche Pfad legt einen zweiten, leeren Vault an, und ab da stehen die
-Fakten an zwei Orten.
+**Status: ✓ BELEGT — 27.08.2026, auf Noahs Rechner.**
+
+> **Der Beleg stammt vom Nutzer, nicht aus einem Befehl, den ich ausgeführt
+> habe** — so wie der Groq-Eintrag vom 26.08. Ich habe keinen Zugriff auf
+> seinen Windows-Rechner; er hat die Befehle ausgeführt und die Ausgabe
+> zurückgeschickt.
+
+Eingetragen ist `VAULT_PFAD=C:\Users\Noah\JARVIS-Vault`. Belegt wurde der
+**ganze Schreibweg**, am Browser und am Modell vorbei:
+
+```
+> python -c "... print('VAULT:', repr(s.vault_pfad)); print(gedaechtnis.anlegen(...)[0])"
+VAULT: 'C:\Users\Noah\JARVIS-Vault'
+DB: C:\Users\Noah\JARVIS\data\jarvis.db
+Eintrag(id='f_0c5b7e', text='Ich heisse Noah', category='person',
+        created_at='2026-08-27', pfad='fakten\Ich-heisse-Noah-f_0c5b7e.md')
+
+> Get-ChildItem C:\Users\Noah\JARVIS-Vault -Recurse -Filter *.md
+C:\Users\Noah\JARVIS-Vault\fakten\Ich-heisse-Noah-f_0c5b7e.md
+```
+
+Damit ist dreierlei belegt: die `.env`-Zeile wird von den Einstellungen
+gelesen, `gedaechtnis.anlegen` schreibt zuerst die **Datei**, und die Datei
+liegt wirklich im richtigen Vault.
+
+Weiter belegt aus seinem Startlog:
+
+```
+INFO: Vault C:\Users\Noah\JARVIS-Vault - 0 Notizen indexiert.
+```
+
+Der Start indexiert den Vault (`api/app.py:149`). Die `0` ist richtig: seine
+`facts`-Tabelle war leer, also gab es bei der Migration nichts zu
+übertragen.
+
+**Was damit NICHT belegt ist — ehrlich getrennt:**
+
+- **Die Migration echter Daten.** `migrate_vault` lief gegen **0 Zeilen**.
+  Der Zähl- und Vergleichsteil ([3] und [4]) hat also nichts zu tun gehabt.
+  Geprüft wurde er hier gegen einen Probe-Vault mit drei erfundenen Fakten,
+  nicht gegen Noahs Bestand.
+- **Der laufende Server.** Der Fakt wurde von einem **eigenen**
+  Python-Prozess geschrieben, nicht vom Server. Dass die laufende Instanz
+  ihn beim nächsten Lesen sieht (`gedaechtnis.frisch_halten`,
+  Zeitstempelvergleich), steht im Code und ist getestet — auf seinem
+  Rechner aber noch nicht nachgesehen.
+- **Ob das Modell `remember` von sich aus aufruft.** Anbieter ist
+  `groq` / `openai/gpt-oss-120b`. Das Werkzeug ist korrekt verdrahtet
+  (`api/app.py:89-93` setzt ihm `db_path` und `vault_pfad`, es braucht keine
+  Bestätigung, der Chat-Agent hat es in `core/agents.py:486`) — ob das
+  Modell es benutzt, ist eine andere Frage und offen.
+- **`--abschluss` wurde nicht gesetzt.** `facts` steht unverändert da.
+
+**Nebenbefund aus seinem Log, nicht Teil dieses Auftrags:** seine `.env` hat
+keinen `JARVIS_TOKEN`, der wird bei jedem Start neu gewürfelt
+(`WARNING: JARVIS_TOKEN war leer.`). Aufgeschrieben, nicht angefasst.
+
+### Der Weg dorthin — was tatsächlich im Weg stand
+
+Nicht der Code. Vier Stolperstellen, alle in der Bedienung:
+
+1. Die `.env`-Zeile wurde in **PowerShell** eingegeben statt in die Datei.
+2. Der JARVIS-Ordner lag nicht dort, wo ich ihn vermutet hatte — er liegt
+   unter `C:\Users\Noah\JARVIS`, nicht unter `website-\jarvis`. Gefunden
+   über eine Suche nach `STATUS.md`, statt weiter zu raten.
+3. **Platzhalter in Codeblöcken wurden wörtlich eingetippt** (`<der Pfad von
+   oben>`, `N Notizen indexiert`). Lehre: erwartete Ausgabe nie wie einen
+   Befehl formatieren.
+4. Port 8000 war doppelt belegt; der Neustart starb still an
+   `WinError 10048`, während die alte Instanz ohne Vault weiterlief.
+
+Der ursprüngliche Blocker lautete: *es fehlt genau eine Zeile, und die kann
+nur Noah schreiben.* Das stimmte — der falsche Pfad hätte einen zweiten,
+leeren Vault angelegt, weil `migrate_vault` fehlende Ordner erzeugt.
+
+### Die Anleitung, mit der es dann lief
 
 So findest du ihn: Obsidian öffnen, unten links auf den Vault-Namen, dann
 **„Vault-Ordner öffnen"** (bzw. rechte Maustaste auf den Vault in der
@@ -780,7 +852,8 @@ gehört an den echten Vault, nach einer Zählung, die stimmt.
 - [ ] `JARVIS_TOKEN` würfeln und eintragen
 - [ ] `SEARCH_API_KEY` von api-dashboard.search.brave.com (für Phase 2 DoD 3)
 - [ ] `CDSE_CLIENT_ID` / `CDSE_CLIENT_SECRET` von dataspace.copernicus.eu (Phase 8)
-- [ ] **`VAULT_PFAD` in `.env`** — der Pfad zu Noahs Obsidian-Vault (FIX-05 Schritt D). Ohne ihn bleibt JARVIS bei der Datenbank.
+- [x] ~~**`VAULT_PFAD` in `.env`**~~ — erledigt am 27.08.2026, `C:\Users\Noah\JARVIS-Vault`, belegt oben.
+- [ ] **`JARVIS_TOKEN` in `.env`** — fehlt bei Noah, wird bei jedem Start neu gewürfelt (Nebenbefund aus seinem Startlog, 27.08.2026)
 - [ ] **Sprach-Abnahme** — `docs/FIX-05-sprachtest.md`, vier Schritte, fünf Minuten in Chrome (FIX-05 Schritt C)
 - [ ] Danach `/dod` je Phase laufen lassen
 
