@@ -86,7 +86,7 @@ const STIL = `
   appearance:none;border:1px solid var(--kante);border-radius:.55rem;
   background:var(--ebene-1);color:var(--text);
   padding:.42rem .7rem;font:inherit;font-size:.86rem;cursor:pointer;
-  transition:border-color .2s var(--kurve-rein),background .2s var(--kurve-rein);
+  transition:border-color var(--dauer-tupf) var(--kurve-rein),background var(--dauer-tupf) var(--kurve-rein);
 }
 .globus-wurzel .knopf:hover{border-color:var(--akzent)}
 .globus-wurzel .knopf:focus-visible{outline:2px solid var(--akzent);outline-offset:2px}
@@ -107,12 +107,13 @@ const STIL = `
 .globus-wurzel .landtafel-buehne{position:relative;overflow:hidden}
 .globus-wurzel .landtafel-satz{
   transform:translateY(0);opacity:1;
-  transition:transform var(--dauer-rein,380ms) var(--kurve-rein),
-             opacity var(--dauer-rein,380ms) var(--kurve-rein);
+  transition:transform var(--dauer-rein) var(--kurve-rein),
+             opacity var(--dauer-rein) var(--kurve-rein);
 }
 .globus-wurzel .landtafel-satz.geht{
-  transform:translateY(-8px);opacity:0;
-  transition-duration:220ms;
+  transform:translateY(-6px);opacity:0;
+  transition-duration:var(--dauer-raus);
+  transition-timing-function:var(--kurve-raus);
 }
 .globus-wurzel .landtafel-satz.kommt{transform:translateY(8px);opacity:0}
 .globus-wurzel .landtafel-name{
@@ -122,7 +123,7 @@ const STIL = `
   overflow-wrap:anywhere;
 }
 .globus-wurzel .landtafel-wo{
-  margin-top:.25rem;font-size:var(--etikett);letter-spacing:.06em;
+  margin-top:.25rem;font-size:var(--etikett);
   color:var(--text-leise);font-variant-numeric:tabular-nums;
 }
 .globus-wurzel .landtafel-tut{
@@ -154,13 +155,13 @@ const STIL = `
   -webkit-backdrop-filter:blur(18px) saturate(140%);
   backdrop-filter:blur(18px) saturate(140%);
   display:flex;flex-direction:column;min-height:0;
-  animation:globus-auf .28s var(--kurve-rein) both;
+  animation:globus-auf var(--dauer-rein) var(--kurve-rein) both;
   /* Gegen index.html:454-455. Dort hat '.karte' Innen- und Aussenabstand;
      hier machen das '.block' und der 'gap' der Spalte. Ohne diese zwei
      Zeilen sitzt im eingebauten Tab ploetzlich Luft um jede Karte. */
   padding:0;margin-bottom:0;
 }
-@keyframes globus-auf{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes globus-auf{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
 .globus-wurzel .bild{position:relative;flex:0 0 auto;height:4.4rem;background:var(--grund)}
 .globus-wurzel .bild img{width:100%;height:100%;object-fit:cover;display:block}
@@ -194,7 +195,7 @@ const STIL = `
   background:var(--akzent-glut);
 }
 .globus-wurzel .einordnung .marke2{
-  font-size:.66rem;letter-spacing:.09em;text-transform:uppercase;
+  font-size:.66rem;letter-spacing:.11em;text-transform:uppercase;
   color:var(--akzent);margin-bottom:.2rem;
 }
 .globus-wurzel .einordnung p{font-size:.84rem;color:var(--text);

@@ -109,6 +109,102 @@ def test_nur_die_eine_akzentfarbe_und_die_zwei_signalfarben():
     assert treffer == [], "Fremdfarbe gefunden:\n" + "\n".join(treffer)
 
 
+def test_nur_die_vier_dauern_aus_dem_design_system():
+    """Vier Zeiten, nicht neun.
+
+    `static/system.css` legt sie fest: 140 ms Hover/Fokus/Farbe, 380 ms
+    erscheinen, 220 ms verschwinden, 600 ms Zahl zaehlt hoch. Daneben standen
+    im Projekt neun handgeschriebene `200ms`, ein `300ms` und fuenf
+    verschiedene Erscheinungsdauern (320/300/300/380/280 ms) - gefunden beim
+    Abgleich mit Noahs Bewegtbild-Vorlage.
+
+    Der Test verbietet nicht jede Zahl: Endlospulse haben bewusst eigene
+    Perioden (2,4 s / 1,1 s), und die sind hier ausgenommen. Verboten sind
+    Zeiten in `transition` und in einmaligen `animation`-Deklarationen -
+    genau dort, wo ein Token stehen muesste.
+    """
+    # NUR die Kurzformen `transition:` und `animation:`. Nicht
+    # `animation-delay` - die 45-ms-Staffelung in system.css IST die Regel,
+    # kein Verstoss gegen sie. Und nicht `!important`, das sind die
+    # Barrierefreiheits- und Druck-Ueberschreibungen.
+    # Auch die Langformen `transition-duration` und `animation-duration`.
+    # Ohne sie rutschte `#view-cc.is-active { animation-duration: 1000ms }`
+    # durch - eine fuenfte Dauer, die der Test uebersehen hat. NICHT
+    # `-delay`: die 45-ms-Staffelung IST die Regel.
+    verdaechtig = re.compile(
+        r"(?:transition|animation)(?:-duration)?\s*:[^;{}]*?(\d+(?:\.\d+)?m?s)\b",
+        re.IGNORECASE)
+    erlaubt_endlos = re.compile(r"infinite|!important")
+    treffer = []
+    for pfad in (WURZEL / "index.html", WURZEL / "weltlage.html",
+                 *sorted((WURZEL / "static").glob("*.css")),
+                 *sorted((WURZEL / "static").glob("*.js"))):
+        text = pfad.read_text(encoding="utf-8")
+        ohne = re.sub(r"/\*.*?\*/", lambda m: re.sub(r"[^\n]", " ", m.group(0)),
+                      text, flags=re.DOTALL)
+        for nr, zeile in enumerate(ohne.splitlines(), 1):
+            if erlaubt_endlos.search(zeile):
+                continue
+            for wert in verdaechtig.findall(zeile):
+                treffer.append(f"{pfad.name}:{nr}: {wert} statt eines Tokens"
+                               f" -> {zeile.strip()[:64]}")
+    assert treffer == [], ("harte Zeit statt --dauer-*:\n" + "\n".join(treffer))
+
+
+def test_die_dauer_token_haben_auch_benutzer():
+    """Ein Token ohne Nutzer ist kein Design-System, sondern eine Absichts-
+    erklaerung. Vor dem Abgleich hatten `--dauer-tupf`, `--dauer-raus` und
+    `--dauer-zahl` null Treffer im ganzen Projekt."""
+    text = "".join(
+        pfad.read_text(encoding="utf-8")
+        for pfad in (WURZEL / "index.html", WURZEL / "weltlage.html",
+                     *sorted((WURZEL / "static").glob("*.css")),
+                     *sorted((WURZEL / "static").glob("*.js")))
+    )
+    ohne_leer = []
+    for token in ("--dauer-tupf", "--dauer-rein", "--dauer-raus", "--dauer-zahl"):
+        if text.count(f"var({token})") == 0:
+            ohne_leer.append(token)
+    assert ohne_leer == [], f"definiert, aber nirgends benutzt: {ohne_leer}"
+
+
+def test_hover_bewegt_nichts():
+    """Die Vorlage sagt woertlich: nur Flaeche und Textfarbe, kein Versatz,
+    kein Skalieren. `.btn-send:hover` war der einzige Verstoss."""
+    treffer = []
+    for pfad in (WURZEL / "index.html", WURZEL / "static" / "globus.js"):
+        text = pfad.read_text(encoding="utf-8")
+        ohne = re.sub(r"/\*.*?\*/", lambda m: re.sub(r"[^\n]", " ", m.group(0)),
+                      text, flags=re.DOTALL)
+        for nr, zeile in enumerate(ohne.splitlines(), 1):
+            if ":hover" in zeile and re.search(r"transform\s*:", zeile):
+                treffer.append(f"{pfad.name}:{nr}: {zeile.strip()[:70]}")
+    assert treffer == [], "Hover verschiebt etwas:\n" + "\n".join(treffer)
+
+
+def test_endlosanimationen_malen_nicht_neu():
+    """Eine Endlosanimation auf `box-shadow` malt in jedem Bild neu.
+    `transform` und `opacity` laufen auf dem Compositor. Bei etwas, das
+    dauerhaft laeuft, ist das der ganze Unterschied."""
+    treffer = []
+    for pfad in (WURZEL / "index.html", WURZEL / "static" / "globus.js",
+                 WURZEL / "static" / "system.css"):
+        text = pfad.read_text(encoding="utf-8")
+        ohne = re.sub(r"/\*.*?\*/", lambda m: re.sub(r"[^\n]", " ", m.group(0)),
+                      text, flags=re.DOTALL)
+        # Welche Keyframes laufen endlos?
+        endlos = set(re.findall(r"animation:\s*([\w-]+)[^;]*infinite", ohne))
+        for name in endlos:
+            block = re.search(r"@keyframes\s+" + re.escape(name) + r"\s*\{(.*?)\n\}",
+                              ohne, re.DOTALL)
+            if not block:
+                continue
+            for teuer in ("box-shadow", "width", "height", "top", "left", "filter"):
+                if teuer + ":" in block.group(1).replace(" ", ""):
+                    treffer.append(f"{pfad.name}: @keyframes {name} aendert {teuer}")
+    assert treffer == [], "teure Endlosanimation:\n" + "\n".join(treffer)
+
+
 def test_beide_seiten_binden_dieselbe_palette_ein():
     for name in ("index.html", "weltlage.html"):
         text = (WURZEL / name).read_text(encoding="utf-8")

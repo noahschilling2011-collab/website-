@@ -47,12 +47,12 @@ def server(tmp_path):
         faden.join(timeout=10)
 
 
-def _browser(pw, breite=1440, hoehe=900):
+def _browser(pw, breite=1440, hoehe=900, bewegung="reduce"):
     br = pw.chromium.launch(
         executable_path=CHROMIUM,
         args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
     seite = br.new_page(viewport={"width": breite, "height": hoehe},
-                        reduced_motion="reduce")
+                        reduced_motion=bewegung)
     return br, seite
 
 
@@ -338,5 +338,105 @@ def test_ohne_js_fehler(server):
                 seite.click(tab)
                 seite.wait_for_timeout(300)
             assert fehler == [], fehler
+        finally:
+            br.close()
+
+
+# --- Der Reaktor: acht Zustaende, eine Rangfolge --------------------------
+
+
+def test_der_reaktor_ist_adressierbar(server):
+    """Acht einzelne Strahlen statt zweier Sammelpfade, plus Kern und Ring.
+
+    In einem Sammelpfad ist kein einzelner Strahl ansprechbar - ohne die
+    Aufteilung waeren die Zustaende nicht baubar.
+    """
+    with playwright.sync_playwright() as pw:
+        br, seite = _browser(pw)
+        try:
+            _oeffne(seite, server)
+            assert seite.eval_on_selector_all(".brand-mark .strahl", "l => l.length") == 8
+            assert seite.eval_on_selector_all(".brand-mark .kern", "l => l.length") == 1
+            assert seite.eval_on_selector_all(".brand-mark .reaktor-ring", "l => l.length") == 1
+            # Ohne Auftrag ist Ruhe.
+            assert seite.get_attribute(".brand-mark", "data-zustand") == "ruhe"
+            # Und er sagt vorlesbar, was er zeigt.
+            assert seite.get_attribute(".brand-mark", "role") == "img"
+            assert seite.get_attribute(".brand-mark", "aria-label")
+        finally:
+            br.close()
+
+
+def test_der_reaktor_zeigt_den_lauf_und_danach_das_ergebnis(server):
+    """Vom Ruhezustand ueber "denkt" zum Ergebnis - am echten Auftrag
+    gemessen, nicht am gesetzten Attribut."""
+    with playwright.sync_playwright() as pw:
+        br, seite = _browser(pw)
+        try:
+            _oeffne(seite, server)
+            seite.click("#tab-chat")
+            seite.wait_for_timeout(200)
+            assert seite.get_attribute(".brand-mark", "data-zustand") == "ruhe"
+
+            seite.fill("#input", "Wie spaet ist es?")
+            seite.press("#input", "Enter")
+            # Waehrend der Auftrag laeuft, ist es nicht mehr Ruhe.
+            seite.wait_for_function(
+                "() => document.querySelector('.brand-mark').dataset.zustand !== 'ruhe'",
+                timeout=20000)
+            unterwegs = seite.get_attribute(".brand-mark", "data-zustand")
+            assert unterwegs in ("denkt", "werkzeug"), unterwegs
+
+            # Und am Ende steht ein Ergebnis, kein Dauerlauf.
+            seite.wait_for_function(
+                "() => ['fertig','fehl','ruhe'].indexOf("
+                "document.querySelector('.brand-mark').dataset.zustand) !== -1",
+                timeout=40000)
+        finally:
+            br.close()
+
+
+def test_der_reaktor_zeigt_immer_nur_eines(server):
+    """Vorher konnten der laufende Schritt und das Mikrofon gleichzeitig
+    pulsieren, mit zwei verschiedenen Perioden nebeneinander. Ein Symbol,
+    das zwei Sachen gleichzeitig sagt, sagt keine."""
+    with playwright.sync_playwright() as pw:
+        br, seite = _browser(pw, bewegung="no-preference")
+        try:
+            _oeffne(seite, server)
+            for zustand in ("ruhe", "wartet", "denkt", "werkzeug",
+                            "hoert", "spricht", "fehl", "fertig"):
+                seite.evaluate(
+                    "(z) => document.querySelector('.brand-mark').dataset.zustand = z",
+                    zustand)
+                seite.wait_for_timeout(80)
+                laufend = seite.evaluate("""() => {
+                  var n = 0;
+                  document.querySelectorAll('.brand-mark svg *').forEach(function (e) {
+                    if (getComputedStyle(e).animationName !== 'none') n++;
+                  });
+                  return n;
+                }""")
+                # Hoechstens EIN Element bewegt sich - ausser bei "fehl",
+                # wo Kern und Strahlen denselben einmaligen Blitz zeigen.
+                grenze = 9 if zustand == "fehl" else 1
+                assert laufend <= grenze, (zustand, laufend)
+        finally:
+            br.close()
+
+
+def test_bei_reduzierter_bewegung_steht_der_reaktor_still(server):
+    with playwright.sync_playwright() as pw:
+        br, seite = _browser(pw, bewegung="reduce")
+        try:
+            _oeffne(seite, server)
+            seite.evaluate(
+                "() => document.querySelector('.brand-mark').dataset.zustand = 'denkt'")
+            seite.wait_for_timeout(200)
+            dauern = seite.eval_on_selector_all(
+                ".brand-mark svg *",
+                "l => l.map(e => getComputedStyle(e).animationDuration)")
+            for d in dauern:
+                assert float(d.replace("s", "")) < 0.01, dauern
         finally:
             br.close()

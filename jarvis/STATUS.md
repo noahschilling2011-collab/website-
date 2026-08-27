@@ -1004,6 +1004,92 @@ Zone 8 hat nie echte Meldungen angezeigt, weil dafür ein Modellaufruf nötig
 ist; geprüft ist nur der leere Zustand. Und der Mini-Globus lief unter
 SwiftShader, nicht auf einer GPU.
 
+## Bewegtbild-Vorlage eingebaut — 16 von 25 Schritten
+
+Noahs Design-Canvas („JARVIS Bewegtbild") wurde gegen den echten Code
+gehalten: 205 Funde, daraus 25 Bauschritte. Der React-Code selbst kann nicht
+übernommen werden (`CLAUDE.md` verbietet Framework und Build-Step bis Phase
+7) — seine **Entscheidungen** schon.
+
+**Der Kern in einem Satz:** die Vorlage erfindet keine einzige neue Zahl.
+Alle vier Zeiten (140/380/220/600 ms), der 45-ms-Versatz und die Palette
+standen bereits in `static/system.css`. Was fehlte, waren **Benutzer**.
+
+### Was jetzt anders ist
+
+| Vorher | Jetzt |
+|---|---|
+| neun handgeschriebene `200ms`, ein `300ms` | alles auf `--dauer-tupf` (140 ms) |
+| fünf Erscheinungsdauern (320/300/300/380/280 ms) | eine: `--dauer-rein` |
+| `--dauer-tupf`, `--dauer-raus`, `--dauer-zahl` mit **null** Nutzern | 10 / 3 / 2 Nutzer |
+| Panel fuhr in beide Richtungen gleich | rein 380 ms, raus 220 ms — mit den jeweiligen Kurven |
+| `.btn-send:hover` verschob den Knopf | nur die Fläche wechselt |
+| Puls über `box-shadow` (malt jedes Bild neu) | `transform` + `opacity` (Compositor) |
+| Kennzahlen links, Etikett darunter | Etikett oben, Zahl **rechtsbündig**, 44 px |
+| Kennzahlen sprangen auf ihren Wert | zählen einmal hoch, 600 ms, easeOutQuart |
+| leerer Zustand: kleiner grauer Strich | Strich in Wertgröße — „hier wäre eine Zahl" |
+| Ereignisstrom als Fließtext | drei Spalten, Zeitstempel fluchten, letzte Zeile hell |
+| `20:13:27web_search` klebte zusammen | Spalten mit Abstand, Haken in `--auf`, Einheit kleiner |
+| Verlauf als Volltonfläche, 0,7er Linie | echter Gradient, 1,6er Linie, deckt sich einmal auf |
+| Ansichtswechsel schaltete hart um | blendet ein |
+| kein Ausdruck möglich (alle Zonen unsichtbar) | `@media print` friert auf den Endzustand |
+
+### Der Reaktor
+
+Das Markensymbol war ein Kästchen mit Rahmen und zwei Sammelpfaden. Jetzt
+acht **einzeln adressierbare** Strahlen, ein Kern und ein Ring — und **acht
+Zustände mit einer Rangfolge**: `wartet` → `fehl` → `hoert` → `spricht` →
+`werkzeug` → `denkt` → `fertig` → `ruhe`.
+
+Die Rangfolge steht in `reaktorZustand()`, nicht im CSS — CSS kennt keine
+Rangfolge, nur Spezifität, und die wäre die falsche Sprache dafür. Was den
+**Nutzer braucht**, schlägt jeden Betriebszustand.
+
+**Der Grund, warum es das braucht:** vorher konnten der laufende Schritt und
+das Mikrofon *gleichzeitig* pulsieren, mit zwei verschiedenen Perioden
+nebeneinander. Ein Symbol, das zwei Sachen gleichzeitig sagt, sagt keine.
+`test_der_reaktor_zeigt_immer_nur_eines` geht alle acht Zustände durch und
+zählt die laufenden Animationen.
+
+Kein Drehen: das Symbol ist 16 px groß, da wird Rotation zu Flimmern — das
+schreibt die Vorlage selbst vor. Und `aria-label` wechselt mit dem Zustand,
+damit auch ein Screenreader erfährt, was JARVIS gerade tut.
+
+### Vier Abweichungen von der Vorlage, alle begründet
+
+| Vorlage | Hier | Warum |
+|---|---|---|
+| Aufdeckung des Verlaufs 2000 ms | `--dauer-zahl` (600 ms) | wäre eine fünfte Dauer. Ein Video darf sich Zeit lassen, ein Dashboard nicht — und so decken sich Diagramm und Kennzahlen in **derselben** Bewegung auf |
+| Fehl-Blitz 180 ms, Abkühlen 400 ms | `--dauer-tupf` / `--dauer-rein` | fünfte und sechste Dauer; 140 und 380 liegen so nah, dass man den Unterschied nicht sieht — den Bruch im System schon |
+| eigene Dauer für die CC-Ansicht (1000 ms) | keine | eine längere Einblende der Ansicht überdeckt die Staffelung der acht Zonen, die sie zeigen soll |
+| großer Strich über dem Satz | in Zone 8 **neben** dem Satz | übereinander wurde der Satz unten abgeschnitten, und `#view-cc` scrollt laut DoD 1 nicht — es klippt |
+
+### Fünf neue Wächter, drei davon haben sofort etwas gefunden
+
+- `test_kein_undefiniertes_custom_property` — jedes `var(--x)` gegen alle
+  Definitionen. Fand `--dauer-normal`.
+- `test_nur_die_vier_dauern_aus_dem_design_system` — fand meine eigene
+  2000-ms-Aufdeckung, und nach dem Nachschärfen auch die 1000-ms-Langform,
+  die die erste Fassung durchgelassen hatte.
+- `test_die_dauer_token_haben_auch_benutzer` — ein Token ohne Nutzer ist
+  kein Design-System, sondern eine Absichtserklärung.
+- `test_hover_bewegt_nichts`, `test_endlosanimationen_malen_nicht_neu`.
+
+**Zwei Regressionen habe ich mir dabei selbst gebaut** und im Screenshot
+gesehen, nicht im Test: der Ereignisstrom brach um (drei Kinder, zwei
+Rasterspalten) und Zone 8 wurde unten abgeschnitten. Beide behoben — und
+sie sind der Grund, warum bei jedem Schritt ein Bild gemacht wurde.
+
+**Suite:** `python3 -m pytest` → **1098 passed**.
+
+### Was von den 25 Schritten offen ist
+
+Neun, alle in `static/globus.js` (Weltansicht): Karten 45 ms gestaffelt,
+Einordnung 420 ms später, Namen schrumpfen statt umbrechen, Striche statt
+Nullen, Saum auf den Vorlagenwert, Einordnungsrand gestrichelt. Dazu acht
+Punkte, die **Noah entscheiden muss** — darunter die Geometrie des
+Glaspanels, `MAX_KARTEN` von 5 auf 4, und ein Saum-Regler mit drei Stufen.
+
 ## Zwei Funde aus dem Abgleich mit Noahs Bewegtbild-Vorlage
 
 Noah hat am 27.08.2026 eine Design-Canvas geliefert („JARVIS Bewegtbild",

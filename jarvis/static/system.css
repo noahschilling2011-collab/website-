@@ -156,7 +156,7 @@
 }
 /* `min-height: 0` ist Pflicht: sonst wachsen Grid-Kinder ueber ihren
    Container hinaus und das Scrollen ist zurueck, das weg sollte. */
-.zone { background: var(--ebene-1); padding: 14px 16px; min-height: 0; }
+.zone { background: var(--ebene-1); padding: var(--s-4); min-height: 0; }
 
 /* --- Glas, sparsam ----------------------------------------------------- */
 
@@ -177,8 +177,11 @@
 
 /* --- Bewegung ---------------------------------------------------------- */
 
+/* Wie weit eine Zone einlaeuft, entscheidet der Ort: ganze Zonen 12 px,
+   einzelne Elemente 8. Ueber eine Custom Property, damit hier EINE Regel
+   steht statt zweier fast gleicher. */
 @keyframes zone-rein {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(var(--zone-weg, 8px)); }
   to   { opacity: 1; transform: none; }
 }
 .zone-rein { animation: zone-rein var(--dauer-rein) var(--kurve-rein) both; }
@@ -200,6 +203,23 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* --- Druck --------------------------------------------------------------
+   Ohne diese Regel fehlt auf dem Ausdruck alles, was mit `opacity: 0`
+   anfaengt und erst durch eine Animation sichtbar wird - beim COMMAND
+   CENTER waeren das alle acht Zonen. `animation-delay: -99s` spult jede
+   Animation ans Ende, statt sie abzuschalten: der Endzustand ist der
+   sichtbare. */
+@media print {
+  *, *::before, *::after {
+    animation-delay: -99s !important;
+    animation-duration: .001s !important;
+    transition-duration: 0s !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    print-color-adjust: exact;
   }
 }
 
