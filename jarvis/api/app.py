@@ -62,6 +62,40 @@ class UnavailableProvider(LLMProvider):
         raise self.error
 
 
+def diagnose(settings: Settings) -> list[str]:
+    """Was von der LLM-Konfiguration wirklich angekommen ist - Zeile fuer Zeile.
+
+    Drei Regeln:
+
+    1. **Der Key steht nie drin.** Logs landen in Terminals, in Dateien und in
+       Screenshots. Gemeldet wird nur, wie lang er ist - das reicht, um einen
+       halb eingefuegten Key zu erkennen, und verraet nichts.
+    2. **Die Datei wird benannt, mit vollem Pfad.** "Trag es in die .env ein"
+       hilft nicht, wenn zwei `.env` existieren oder der Server in einem
+       anderen Verzeichnis gestartet wurde.
+    3. **Auch was da IST, wird gemeldet.** Der Nutzer sieht sonst nur, was
+       fehlt, und weiss nicht, ob die Datei ueberhaupt gelesen wurde.
+    """
+    datei = Path(str(settings.model_config.get("env_file") or ".env")).resolve()
+    zeilen = [
+        # Nicht "gelesen aus": die Werte koennen auch aus Umgebungsvariablen
+        # kommen, und dann waere das gelogen. Gemeldet wird, welche Datei
+        # gemeint ist und ob es sie gibt - beides stimmt immer.
+        f"Konfigurationsdatei: {datei}"
+        + ("" if datei.is_file() else "  -- DIESE DATEI GIBT ES NICHT"),
+        f"LLM_PROVIDER={settings.llm_provider}" if settings.llm_provider
+        else "LLM_PROVIDER ist leer",
+        f"LLM_MODEL={settings.llm_model}" if settings.llm_model
+        else "LLM_MODEL ist leer",
+    ]
+    key = settings.llm_api_key
+    zeilen.append(
+        f"LLM_API_KEY ist gesetzt ({len(key)} Zeichen)" if key
+        else "LLM_API_KEY ist leer  <-- das fehlt"
+    )
+    return zeilen
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
 
@@ -77,6 +111,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app.state.provider = build_provider(settings)
         except LLMError as exc:
             log.error("Anbieter nicht verfuegbar - %s", exc)
+            # Und jetzt die Zeile, die das Raten erspart.
+            #
+            # Anlass, 27.08.2026: der Server meldete "Kein LLM_API_KEY
+            # gesetzt" und zwei Zeilen weiter "Anbieter groq, Modell
+            # openai/gpt-oss-120b". Beides stand in derselben `.env`. Wer das
+            # liest, weiss nicht, ob die Datei ueberhaupt gefunden wurde, ob
+            # es die richtige war, oder ob nur eine Zeile leer blieb - und
+            # faengt an zu raten. Eine Fehlermeldung, die zum Raten zwingt,
+            # ist eine halbe Fehlermeldung.
+            for zeile in diagnose(settings):
+                log.error("  %s", zeile)
             app.state.provider = UnavailableProvider(
                 exc, name=settings.llm_provider, model=settings.llm_model
             )
