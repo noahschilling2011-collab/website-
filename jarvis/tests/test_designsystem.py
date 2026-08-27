@@ -46,6 +46,69 @@ def test_dod_1_kein_blau_mehr_im_projekt():
     assert treffer == [], "altes Blau gefunden:\n" + "\n".join(treffer)
 
 
+def test_kein_undefiniertes_custom_property():
+    """Ein `var(--gibt-es-nicht)` faellt still auf den Anfangswert zurueck.
+
+    Gefunden in FIX-06 Abschnitt 7 beim Gegenlesen: `--dauer-normal` stand in
+    `index.html:521` am Fortschrittsbalken des COMMAND CENTER und ist NIRGENDS
+    definiert. Die ganze `transition` war damit ungueltig, und der Balken
+    sprang hart - ausgerechnet in der Zone, die Fortschritt zeigen soll.
+
+    Kein Fehler im Browser, keine Warnung, kein roter Test. Genau deshalb
+    dieser hier.
+    """
+    quellen = [WURZEL / "index.html", WURZEL / "weltlage.html",
+               *sorted((WURZEL / "static").glob("*.css")),
+               *sorted((WURZEL / "static").glob("*.js"))]
+    # `vendor/` bleibt draussen: fremder Code, nicht unsere Palette.
+    definiert: set[str] = set()
+    benutzt: dict[str, str] = {}
+    for pfad in quellen:
+        text = pfad.read_text(encoding="utf-8")
+        definiert |= set(re.findall(r"(--[a-z0-9-]+)\s*:", text))
+        # Blockkommentare raus, aber ZEILENWEISE ersetzt statt geloescht,
+        # damit die Zeilennummern stimmen. Ohne das schlaegt der Test bei
+        # `index.html:830` an - dort steht in einem Kommentar, dass es
+        # `--dim` NICHT gibt. Ein Test, der ueber die Erklaerung stolpert,
+        # warum etwas fehlt, ist eine Falle.
+        ohne = re.sub(r"/\*.*?\*/", lambda m: re.sub(r"[^\n]", " ", m.group(0)),
+                      text, flags=re.DOTALL)
+        for nr, zeile in enumerate(ohne.splitlines(), 1):
+            for name in re.findall(r"var\(\s*(--[a-z0-9-]+)", zeile):
+                benutzt.setdefault(name, f"{pfad.name}:{nr}")
+
+    fehlt = sorted(n for n in benutzt if n not in definiert)
+    assert fehlt == [], "benutzt, aber nirgends definiert:\n" + "\n".join(
+        f"  {n}  ({benutzt[n]})" for n in fehlt)
+
+
+def test_nur_die_eine_akzentfarbe_und_die_zwei_signalfarben():
+    """Drei Fremdfarben, die keiner Palette angehoeren - gefunden beim
+    Abgleich mit Noahs Bewegtbild-Vorlage.
+
+    `rgb(242,181,68)` liegt um 2/1/24 neben `--akzent #f0b45c` und ist
+    nirgends definiert: ein vierter Bernstein, den niemand gewaehlt hat.
+    `rgb(86,132,214)` ist genau das zweite Blau, das der Kopfkommentar von
+    `static/system.css` fuer abgeschafft erklaert - der Waechter suchte
+    bisher nur nach `4da3ff` und hat es durchgelassen.
+    `#ffb9b4` ist ein zweites Rot neben `--ab #f6836f`.
+    """
+    verboten = {
+        r"242,\s*181,\s*68": "vierter Bernstein statt --akzent",
+        r"86,\s*132,\s*214": "zweites Blau - system.css erklaert es fuer abgeschafft",
+        r"ffb9b4": "zweites Rot statt --ab",
+    }
+    treffer = []
+    for pfad in (WURZEL / "index.html", WURZEL / "weltlage.html",
+                 *sorted((WURZEL / "static").glob("*.css")),
+                 *sorted((WURZEL / "static").glob("*.js"))):
+        for nr, zeile in enumerate(pfad.read_text(encoding="utf-8").splitlines(), 1):
+            for muster, grund in verboten.items():
+                if re.search(muster, zeile, re.I):
+                    treffer.append(f"{pfad.name}:{nr}: {grund} -> {zeile.strip()[:70]}")
+    assert treffer == [], "Fremdfarbe gefunden:\n" + "\n".join(treffer)
+
+
 def test_beide_seiten_binden_dieselbe_palette_ein():
     for name in ("index.html", "weltlage.html"):
         text = (WURZEL / name).read_text(encoding="utf-8")

@@ -53,8 +53,16 @@ body {
   background-color: var(--bg-0);
   /* Struktur hinter dem Glas. Ohne das ist backdrop-filter sinnlos. */
   background-image:
-    radial-gradient(900px 620px at 12% -8%,  rgba(242, 181, 68, 0.10), transparent 62%),
-    radial-gradient(760px 560px at 92% 108%, rgba(86, 132, 214, 0.10), transparent 60%);
+    /* Hier standen zwei Farben, die keiner Palette angehoerten: ein
+       vierter Bernstein dicht neben --akzent, und der zweite Akzent, den
+       der Kopf von static/system.css fuer abgeschafft erklaert. Jetzt
+       zweimal derselbe Akzent, unten schwaecher.
+       Die alten Werte stehen ABSICHTLICH nicht hier: der Waechter
+       durchsucht auch Kommentare, und ein Kommentar, der ihn rot macht,
+       ist genau die Falle, die er verhindern soll. Sie stehen in
+       test_nur_die_eine_akzentfarbe_und_die_zwei_signalfarben. */
+    radial-gradient(900px 620px at 12% -8%,  rgba(240, 180, 92, 0.10), transparent 62%),
+    radial-gradient(760px 560px at 92% 108%, rgba(240, 180, 92, 0.06), transparent 60%);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
 }
@@ -353,18 +361,18 @@ button, input, textarea { font: inherit; color: inherit; }
   color: var(--accent);
 }
 .schritt-note { margin-top: 3px; font-size: 11px; color: var(--text-dim); }
-.schritt.is-failed .schritt-note { color: #ffb9b4; }
+.schritt.is-failed .schritt-note { color: var(--ab); }
 .plan-fuss {
   padding: 6px var(--s-3);
   border-top: 1px solid var(--line);
   font-size: 11px;
   color: var(--text-dim);
 }
-.plan-fuss.is-abbruch { color: #ffb9b4; }
+.plan-fuss.is-abbruch { color: var(--ab); }
 
 @keyframes puls {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(242, 181, 68, 0.4); }
-  50%      { box-shadow: 0 0 0 5px rgba(242, 181, 68, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(240, 180, 92, 0.4); }
+  50%      { box-shadow: 0 0 0 5px rgba(240, 180, 92, 0); }
 }
 
 /* --- Sprache (Phase 9) ---------------------------------------------------- */
@@ -516,9 +524,19 @@ button, input, textarea { font: inherit; color: inherit; }
                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cc-auftrag-zeile { display: flex; gap: var(--s-2); font-size: var(--etikett);
                     color: var(--text-leise); font-variant-numeric: tabular-nums; }
-.cc-balken { height: 3px; background: var(--kante); border-radius: 2px; overflow: hidden; }
-.cc-balken i { display: block; height: 100%; background: var(--akzent);
-               transition: width var(--dauer-normal) var(--kurve-raus); }
+.cc-balken { height: 3px; background: var(--kante); overflow: hidden; }
+/* `scaleX` statt `width`: `width` loest ein Layout aus, `transform` nicht -
+   und diese Ansicht darf laut DoD 1 nicht scrollen, da will man kein
+   Nachrechnen der Nachbarzonen bei jedem Fortschritt.
+   Hier stand `var(--dauer-normal)`, und das Token gibt es in keiner Datei.
+   Damit war die ganze Deklaration ungueltig und der Balken sprang hart -
+   ausgerechnet an der Stelle, die Fortschritt zeigen soll. Gefunden beim
+   Abgleich mit Noahs Bewegtbild-Vorlage, festgehalten in
+   `test_kein_undefiniertes_custom_property`. */
+.cc-balken i { display: block; height: 100%; width: 100%;
+               background: var(--akzent);
+               transform-origin: left center; transform: scaleX(0);
+               transition: transform var(--dauer-zahl) var(--kurve-rein); }
 
 /* Zone 4 --------------------------------------------------------------- */
 .cc-strom { flex: 1; min-height: 0; overflow-y: auto; font-family: var(--mono);
@@ -2414,7 +2432,7 @@ button, input, textarea { font: inherit; color: inherit; }
       var balken = document.createElement('div');
       balken.className = 'cc-balken';
       var fuell = document.createElement('i');
-      fuell.style.width = '0%';
+      fuell.style.transform = 'scaleX(0)';
       balken.appendChild(fuell);
       box.appendChild(ziel); box.appendChild(zeile); box.appendChild(balken);
       ccEl.auftraege.koerper.appendChild(box);
@@ -2428,7 +2446,7 @@ button, input, textarea { font: inherit; color: inherit; }
         if (!alle.length) { schritte.textContent = 'Plan wird gebaut'; return; }
         schritte.textContent = 'Schritt ' + Math.min(fertig + 1, alle.length)
           + '/' + alle.length;
-        fuell.style.width = Math.round(fertig / alle.length * 100) + '%';
+        fuell.style.transform = 'scaleX(' + (fertig / alle.length).toFixed(4) + ')';
       }).catch(function () { schritte.textContent = ''; });
     });
   }

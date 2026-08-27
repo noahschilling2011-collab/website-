@@ -1004,6 +1004,64 @@ Zone 8 hat nie echte Meldungen angezeigt, weil dafür ein Modellaufruf nötig
 ist; geprüft ist nur der leere Zustand. Und der Mini-Globus lief unter
 SwiftShader, nicht auf einer GPU.
 
+## Zwei Funde aus dem Abgleich mit Noahs Bewegtbild-Vorlage
+
+Noah hat am 27.08.2026 eine Design-Canvas geliefert („JARVIS Bewegtbild",
+zehn Szenen, 42 Screenshots, React-Quellcode). Der React-Code kann nicht
+übernommen werden — `CLAUDE.md` verbietet Framework und Build-Step bis
+Phase 7 —, seine **Entscheidungen** schon. Beim Abgleich mit dem echten Code
+fielen zwei Fehler auf, die beide **kein Werkzeug gemeldet hatte**:
+
+### 1. Der Fortschrittsbalken im COMMAND CENTER war tot
+
+`index.html:521` stand auf `transition: width var(--dauer-normal) …`, und
+`--dauer-normal` ist in **keiner** Datei definiert. Damit war die gesamte
+Deklaration ungültig, und der Balken sprang hart — ausgerechnet in der Zone,
+die Fortschritt sichtbar machen soll. Eingebaut in FIX-06 Abschnitt 6, von
+mir, und von keinem der zwölf Tests dieser Ansicht bemerkt: ein
+`var(--gibt-es-nicht)` erzeugt im Browser keine Warnung und keinen Fehler.
+
+Behoben mit `transform: scaleX()` und `--dauer-zahl` (600 ms). `transform`
+statt `width` ist kein Schönheitsgriff: `width` löst ein Layout aus, und
+DoD 1 dieser Ansicht verlangt, dass bei 1440×900 nichts scrollt.
+
+**Neuer Wächter:** `test_kein_undefiniertes_custom_property` sammelt jedes
+`var(--x)` aus `index.html`, `weltlage.html` und `static/*` und hält es gegen
+alle Definitionen. Er hatte prompt einen Fehlalarm auf `index.html:830` —
+dort steht in einem **Kommentar**, dass es `--dim` nicht gibt. Der Test
+ignoriert jetzt Blockkommentare, ersetzt sie aber zeichenweise durch
+Leerzeichen, damit die Zeilennummern stimmen.
+
+### 2. Drei Farben ohne Palette — darunter das Blau, das als abgeschafft galt
+
+| Fundort | Was es war |
+|---|---|
+| `index.html:56` | ein vierter Bernstein, 2/1/24 neben `--akzent`, nirgends definiert |
+| `index.html:57` | **genau die zweite Akzentfarbe**, die der Kopf von `static/system.css` für abgeschafft erklärt |
+| `index.html:356`, `:363` | ein zweites Rot neben `--ab` |
+| `index.html:366-367` | derselbe vierte Bernstein im Mikrofon-Puls |
+
+Der Wächter aus FIX-06 Abschnitt 5 suchte nur nach `4da3ff` und hat den Rest
+durchgelassen. `test_nur_die_eine_akzentfarbe_und_die_zwei_signalfarben`
+schließt die Lücke.
+
+**Und eine Lehre über den Wächter selbst:** mein erster Erklärkommentar
+nannte die alten Werte im Klartext — und machte den Test damit rot. Genau die
+Falle, vor der der Blau-Test im eigenen Docstring warnt („ein Kommentar, der
+den Wächter rot macht, ist eine Falle"). Umformuliert statt den Test
+aufgeweicht; die Werte stehen jetzt im Test, wo sie hingehören.
+
+**Suite danach:** `python3 -m pytest` → **1090 passed**.
+
+**Was noch aussteht:** der vollständige Bauplan aus 205 Funden — vier Leser
+über `animations-v3.jsx`, `jarvis-scene.jsx`, die Szenenbeschreibungen und
+die Screenshots, danach jeder Fund gegen den Code gehalten. Kern: die Vorlage
+erfindet **keine einzige neue Zahl**. Alle vier Zeiten (140/380/220/600 ms),
+der 45-ms-Versatz und die Palette stehen bereits in `static/system.css` — es
+fehlen die Benutzer. `--dauer-tupf`, `--dauer-raus` und `--dauer-zahl` hatten
+null Treffer im ganzen Projekt, daneben stehen neun handgeschriebene `200ms`
+und fünf verschiedene Erscheinungsdauern.
+
 ## FIX-10 Schritt A — Messstrecke für die Werkzeugwahl
 
 Auftrag, Inventur und alle Messungen: `docs/FIX-10.md`. **Nur Schritt A** —
