@@ -251,6 +251,12 @@ def test_nach_einer_groessenaenderung_im_hintergrund_stimmt_das_canvas(server):
     und `resize()` steigt frueh aus. Wer das Fenster zieht, waehrend der
     Chat offen ist, bekommt beim Zurueckschalten ein Canvas in der alten
     Groesse - verzerrt oder mit Rand. `weiter()` misst deshalb neu.
+
+    Ehrlich dazu: gemessen ist das ERGEBNIS, nicht der Weg. Nimmt man nur
+    das `resizeFn()` aus `weiter()` heraus, bleibt der Test gruen - der
+    `ResizeObserver` faengt es dann ab (Mutation M3). Erst ohne beide faellt
+    er (M3b). Der Auftrag will sich auf den Observer ausdruecklich nicht
+    verlassen; deshalb steht die Zeile trotzdem da.
     """
     with playwright.sync_playwright() as pw:
         br, seite = _browser(pw, 1440)
@@ -312,12 +318,24 @@ def test_die_ansicht_ueberdeckt_den_kopf_nicht(server):
 
 
 def test_b6_5_a1_frankreich_ist_auch_im_tab_anklickbar(server):
+    """Und dabei gleich der Token.
+
+    `#land` zeigt "France" schon, BEVOR die Antwort da ist - `ladeLand()`
+    schreibt den Namen sofort hin. Diese Zusage allein belegt also nichts
+    ueber den Aufruf. Der Token wandert im Tab einen anderen Weg als auf der
+    eigenen Seite: `starte(ziel, TOKEN)` reicht ihn aus `index.html` herein,
+    statt dass er wie frueher im Modul selbst stuende. Waere dabei etwas
+    schiefgegangen, kaeme 401 zurueck - deshalb wird hier die ANTWORT
+    geprueft, nicht nur die Anfrage.
+    """
     with playwright.sync_playwright() as pw:
         br, seite = _browser(pw)
-        gerufen = []
+        gerufen, antworten = [], []
         try:
             _lade_chat(seite, server)
             seite.on("request", lambda r: gerufen.append(r.url)
+                     if "/api/weltlage/" in r.url else None)
+            seite.on("response", lambda r: antworten.append((r.url, r.status))
                      if "/api/weltlage/" in r.url else None)
             _oeffne_welt(seite)
             _dreh_zu(seite, *FRANKREICH)
@@ -327,6 +345,9 @@ def test_b6_5_a1_frankreich_ist_auch_im_tab_anklickbar(server):
 
             assert "France" in seite.text_content("#land")
             assert any("/api/weltlage/FRA" in u for u in gerufen), gerufen
+            abgelehnt = [(u, c) for u, c in antworten if c in (401, 403)]
+            assert abgelehnt == [], f"Token kam nicht an: {abgelehnt}"
+            assert any(c == 200 for _, c in antworten), antworten
         finally:
             br.close()
 
@@ -582,6 +603,68 @@ def test_und_danach_geht_der_globus_trotzdem_noch(server):
             br.close()
 
 
+def test_in_der_weltansicht_gehoert_die_leertaste_dem_globus(server):
+    """Die Gegenprobe zum Test darueber.
+
+    Ohne sie waere "die Leertaste startet den Globus nicht" auch dann gruen,
+    wenn man den Leertasten-Handler ersatzlos loescht - das Feature waere weg
+    und der Test zufrieden. Hier muss sie greifen: in der Weltansicht, ohne
+    Fokus in einem Eingabefeld, nimmt der Globus die Taste an.
+    """
+    with playwright.sync_playwright() as pw:
+        br, seite = _browser(pw)
+        try:
+            _lade_chat(seite, server)
+            _oeffne_welt(seite)
+            geschluckt = seite.evaluate("""() => {
+              if (document.activeElement) document.activeElement.blur();
+              const ev = new KeyboardEvent('keydown', {
+                key: ' ', code: 'Space', bubbles: true, cancelable: true});
+              document.body.dispatchEvent(ev);
+              return ev.defaultPrevented;
+            }""")
+            assert geschluckt is True, \
+                "der Globus nimmt die Leertaste nicht mehr an"
+
+            # Aus einem Eingabefeld heraus aber nie - dort ist sie ein
+            # Leerzeichen. (Der Globus hat selbst eins: die Ortssuche.)
+            im_feld = seite.evaluate("""() => {
+              const feld = document.getElementById('ort-eingabe');
+              feld.focus();
+              const ev = new KeyboardEvent('keydown', {
+                key: ' ', code: 'Space', bubbles: true, cancelable: true});
+              feld.dispatchEvent(ev);
+              return ev.defaultPrevented;
+            }""")
+            assert im_feld is False, "die Ortssuche kann kein Leerzeichen mehr"
+        finally:
+            br.close()
+
+
+def test_der_tab_laedt_ohne_javascript_fehler(server):
+    """`tests/test_globus.py` prueft das fuer die eigene Seite. Im Tab ist
+    es eine andere Umgebung: fremdes CSS, fremde ids, ein dynamischer
+    Import. Also hier noch einmal, ueber beide Ansichten."""
+    with playwright.sync_playwright() as pw:
+        br, seite = _browser(pw)
+        fehler = []
+        try:
+            seite.on("pageerror", lambda e: fehler.append("pageerror: " + str(e)))
+            seite.on("console", lambda m: fehler.append("konsole: " + m.text)
+                     if m.type == "error" else None)
+            _lade_chat(seite, server)
+            _oeffne_welt(seite)
+            _dreh_zu(seite, *FRANKREICH)
+            seite.wait_for_timeout(500)
+            seite.click("#tab-chat")
+            seite.wait_for_timeout(500)
+            seite.click("#tab-welt")
+            seite.wait_for_timeout(800)
+            assert fehler == [], fehler
+        finally:
+            br.close()
+
+
 def test_keine_doppelten_ids_auf_der_seite(server):
     """`btn-mic` gibt es im Chat schon. Zwei gleiche ids in einem Dokument
     sind ungueltig, und `getElementById` trifft dann die falsche."""
@@ -641,8 +724,16 @@ def test_die_karten_des_chats_bleiben_wie_sie_waren(server):
 
 def test_und_umgekehrt_bekommt_die_globus_karte_keinen_chat_abstand(server):
     """Die Gegenrichtung: `index.html:454` setzt `padding` auf `.karte`.
-    Ohne die zwei Gegenzeilen im Globus-Stil sitzt im Tab ploetzlich Luft
-    um jede Meldungskarte."""
+    Ohne die zwei Gegenzeilen im Globus-Stil saesse im Tab Luft um jede
+    Meldungskarte.
+
+    Ehrlich dazu: nimmt man nur die zwei Zeilen weg, bleibt der Test gruen -
+    dann greift der Stern-Reset `.globus-wurzel *{...padding:0}`, der
+    dieselbe Spezifitaet hat und spaeter im Dokument steht (Mutation M6).
+    Erst ohne beide faellt er (M6b). Die zwei Zeilen sind die
+    reihenfolgeunabhaengige Ansage; der Test misst, dass am Ende null
+    herauskommt.
+    """
     with playwright.sync_playwright() as pw:
         br, seite = _browser(pw)
         try:

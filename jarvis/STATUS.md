@@ -689,7 +689,14 @@ wurde nicht angefasst.
 >    `test_karten_die_im_hintergrund_ankommen_werden_nachtraeglich_zugeschnitten`.
 >
 > Beide Regressionstests wurden gegen den alten Zustand geprüft (M7, M8) und
-> fallen dort. Suite danach: **957 Tests, alle grün.**
+> fallen dort.
+>
+> Derselbe Durchgang fand **drei Lücken in den Tests** — der Leertasten-Test
+> war einseitig (grün auch ohne das Feature), die Token-Übergabe im Tab war
+> unabgedeckt (`#land` zeigt „France" schon vor der Antwort), und
+> `test_globus_tab.py` sammelte keine JS-Fehler. Alle drei geschlossen, die
+> neuen Tests gegen M9 und M10 geprüft. Suite danach: **959 Tests, alle
+> grün.**
 
 ## FIX-05 Schritt C — Sprach-Abnahme
 

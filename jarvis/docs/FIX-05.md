@@ -269,3 +269,34 @@ statt eine Entscheidung auf unmessbaren Werten zu treffen.
 |---|----------|----------|
 | M7 | den Zustand vor dem Fix wiederherstellen | **getötet** — „120 Schleifendurchlaeufe im Chat" |
 | M8 | `kartenNachholen` aus `weiter()` entfernen | **getötet** — „5 Karten - es wurde nichts zugeschnitten" |
+
+### Drei Lücken in den Tests, die derselbe Durchgang fand
+
+Der vierte Blickwinkel war „taugen die Tests?" — und fand drei Stellen, an
+denen die Abnahme weniger belegte, als sie behauptete:
+
+1. **Der Leertasten-Test war einseitig.** `test_die_leertaste_im_chat_...`
+   prüft eine *Abwesenheit* — er wäre auch grün, wenn man den Handler
+   ersatzlos löschte. Dazu gibt es jetzt die Gegenprobe
+   `test_in_der_weltansicht_gehoert_die_leertaste_dem_globus`: in der
+   Weltansicht **muss** sie greifen, im Eingabefeld der Ortssuche **nicht**.
+2. **Der Token war im Tab unabgedeckt.** `#land` zeigt „France" schon,
+   bevor die Antwort da ist — `ladeLand()` schreibt den Namen sofort hin.
+   Der Test prüfte also nur, dass die Anfrage rausgeht, nicht dass sie
+   ankommt. Im Tab wandert der Token einen anderen Weg als auf der eigenen
+   Seite (`starte(ziel, TOKEN)` statt Platzhalter im Modul); ein Fehler
+   dabei ergäbe 401. Jetzt wird die **Antwort** geprüft.
+3. **Keine JS-Fehler-Sammlung im Tab.** `tests/test_globus.py` sammelt
+   `pageerror` und Konsolenfehler, `test_globus_tab.py` tat es nicht — dabei
+   ist der Tab eine andere Umgebung: fremdes CSS, fremde ids, ein
+   dynamischer Import. Ergänzt als `test_der_tab_laedt_ohne_javascript_fehler`,
+   über beide Ansichten und einen Hin- und Rückwechsel.
+
+| # | Mutation | Ergebnis |
+|---|----------|----------|
+| M9 | Leertasten-Handler ersatzlos weg | **getötet** — „der Globus nimmt die Leertaste nicht mehr an" |
+| M10 | falscher Token an `starte()` | **getötet** — „Token kam nicht an: … 401" |
+
+Zwei weitere Hinweise waren berechtigt und betrafen nur die Docstrings: der
+B-5-Test und der `.karte`-Test versprachen mehr, als sie messen (M3 und M6
+überleben einzeln). Beide Docstrings sagen das jetzt selbst.
