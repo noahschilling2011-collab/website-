@@ -312,7 +312,11 @@ def test_dod_5_null_meldungen_zeigt_keine_karte(server):
         try:
             klicke_weltweit(seite, basis)
             assert seite.locator(".karte").count() == 0
-            assert "0 belegte Meldungen" in seite.locator(".leer").inner_text()
+            # Der Wortlaut kam mit der Bewegtbild-Vorlage: "0 belegte
+            # Meldungen" liest sich wie ein Fehler, ist aber keiner.
+            leer = seite.locator(".leer").inner_text()
+            assert "Keine Quelle gefunden" in leer, leer
+            assert "kein Fehler" in leer, leer
             assert "Dazu finde ich heute nichts." in seite.locator("#gesagt").inner_text()
         finally:
             br.close()

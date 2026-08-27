@@ -49,6 +49,18 @@ Temperaturparameter, und `core/llm.py` sagt im Modulkopf ausdruecklich, dass
 `temperature`, `top_p`, `top_k` bewusst nicht gesendet werden - auf den
 aktuellen Opus-Modellen ist jedes davon ein 400.
 
+NICHT MIT TASKBENCH VERGLEICHBAR
+--------------------------------
+Die Zahlen hier sind ein **Makro-Mittel je Fall** (jeder der 30 Faelle zaehlt
+gleich viel). TaskBench rechnet ein Mikro-Mittel ueber alle Werkzeugvorkommen
+(`taskbench/evaluate.py`). Beides ist richtig, beides heisst F1 - aber ein
+node-F1 von hier gehoert nicht neben eines aus dem TaskBench-Leaderboard.
+
+Und noch eine Grenze, die dort genauso gilt: kommt ein Werkzeug zweimal im
+Plan vor, kollabieren seine Kanten zur selben Menge. Ein Plan, der
+`satellite_search` zweimal braucht, ist von einem mit einem Aufruf nicht zu
+unterscheiden.
+
 Die Reproduzierbarkeit wird deshalb **gemessen statt erzwungen**: `--laeufe 3`
 faehrt den Satz dreimal und meldet die Spanne je Zahl. Bleibt sie unter 0,05,
 ist die Messstrecke brauchbar. Bleibt sie es nicht, ist das der Befund - und
@@ -125,16 +137,45 @@ danach, ohne Markdown-Codeblock:
 {"werkzeuge": ["name"], "kanten": [["name_a", "name_b"]]}"""
 
 
-def werkzeugtext() -> tuple[str, dict]:
+# Zwei archivierte Textsaetze, damit sich Schritt B BEWEISEN laesst statt
+# behaupten. Ohne sie waere der Vergleich vorher/nachher verloren, sobald
+# die Beschreibungen im Code einmal ersetzt sind.
+TEXTE = {
+    "alt":     WURZEL / "tests" / "plandaten" / "werkzeugtexte-vorher.json",
+    "nachher": WURZEL / "tests" / "plandaten" / "werkzeugtexte-nachher.json",
+}
+
+
+def werkzeugtext(satz: str = "code") -> tuple[str, dict]:
     """Die Werkzeugtexte, wie sie das echte System sendet.
 
-    Aus der Registry, nicht aus einer Kopie: nur so misst Schritt B wirklich
-    die umgeschriebenen Beschreibungen.
+    `satz="code"` nimmt sie aus der Registry - das ist der Normalfall und
+    misst genau das, was JARVIS wirklich sendet.
+
+    `satz="alt"` bzw. `"nachher"` nimmt einen archivierten Stand. Damit
+    laeuft der Vorher/Nachher-Vergleich aus FIX-10 Schritt B in EINER
+    Sitzung, mit demselben Modell am selben Tag - statt zweier Laeufe im
+    Abstand von Stunden, deren Unterschied ebensogut das Modell sein
+    koennte.
     """
     alle = sorted(registry.all_tools(), key=lambda t: t.name)
+    if satz != "code":
+        import json as _json
+        ersatz = _json.loads(TEXTE[satz].read_text(encoding="utf-8"))
+        fehlt = {t.name for t in alle} - set(ersatz)
+        if fehlt:
+            raise SystemExit(f"{TEXTE[satz].name} kennt {sorted(fehlt)} nicht.")
+        zeilen = [f"- {t.name}: {ersatz[t.name]}" for t in alle]
+        laengen = [len(ersatz[t.name]) for t in alle]
+        return "\n".join(zeilen), {
+            "satz": satz, "anzahl": len(alle), "zeichen": sum(laengen),
+            "token_geschaetzt": round(sum(laengen) / 4),
+            "kuerzeste": min(laengen), "laengste": max(laengen),
+        }
     zeilen = [f"- {t.name}: {t.description}" for t in alle]
     text = "\n".join(zeilen)
     kennzahl = {
+        "satz": "code",
         "anzahl": len(alle),
         "zeichen": sum(len(t.description) for t in alle),
         "token_geschaetzt": round(sum(len(t.description) for t in alle) / 4),
@@ -204,10 +245,25 @@ class Deckel:
 async def ein_lauf(provider, faelle: list[dict], system: str, deckel: Deckel) -> dict:
     knoten: list[float] = []
     kanten: list[float] = []
+    # Getrennt: nur die Faelle, die ueberhaupt etwas erwarten.
+    #
+    # Der Sonderfall "beide leer = 1.0" ist richtig - aber er verschenkt zwei
+    # Drittel der Aussage. 19 der 30 Faelle haben keine Kanten, 6 kein
+    # Werkzeug. Ein Modell, das ausnahmslos {"werkzeuge": [], "kanten": []}
+    # antwortet, bekommt damit edge-F1 0,63 und sieht halbwegs brauchbar aus.
+    # Der FakeLLMProvider tut genau das, und die Zahl beweist es.
+    knoten_mit: list[float] = []
+    kanten_mit: list[float] = []
     leer_richtig = 0
     leer_gesamt = 0
     einzeln: list[dict] = []
     modell = ""
+    # Je Werkzeug: Treffer, Fehltreffer (vorhergesagt, nicht erwartet),
+    # Auslassung (erwartet, nicht vorhergesagt). Ohne das weiss man beim
+    # Umschreiben der Beschreibungen nicht, WELCHE der 18 schuld ist.
+    treffer: dict[str, int] = {}
+    fehltreffer: dict[str, int] = {}
+    auslassung: dict[str, int] = {}
 
     for fall in faelle:
         erwartet_w = set(fall["werkzeuge"])
@@ -237,6 +293,17 @@ async def ein_lauf(provider, faelle: list[dict], system: str, deckel: Deckel) ->
         e = f1(erwartet_k, bekommen_k)
         knoten.append(n)
         kanten.append(e)
+        if erwartet_w:
+            knoten_mit.append(n)
+        if erwartet_k:
+            kanten_mit.append(e)
+
+        for w in erwartet_w & bekommen_w:
+            treffer[w] = treffer.get(w, 0) + 1
+        for w in bekommen_w - erwartet_w:
+            fehltreffer[w] = fehltreffer.get(w, 0) + 1
+        for w in erwartet_w - bekommen_w:
+            auslassung[w] = auslassung.get(w, 0) + 1
 
         if not erwartet_w:
             leer_gesamt += 1
@@ -245,6 +312,8 @@ async def ein_lauf(provider, faelle: list[dict], system: str, deckel: Deckel) ->
 
         einzeln.append({
             "id": fall["id"],
+            "kategorie": fall.get("kategorie", "?"),
+            "n_werkzeuge": len(erwartet_w),
             "node_f1": round(n, 3),
             "edge_f1": round(e, 3),
             "erwartet": sorted(erwartet_w),
@@ -252,10 +321,34 @@ async def ein_lauf(provider, faelle: list[dict], system: str, deckel: Deckel) ->
             "lesbar": lesbar,
         })
 
+    namen = sorted(set(treffer) | set(fehltreffer) | set(auslassung))
+    je_werkzeug = []
+    for name in namen:
+        t = treffer.get(name, 0)
+        f = fehltreffer.get(name, 0)
+        a = auslassung.get(name, 0)
+        pz = t / (t + f) if (t + f) else 0.0
+        tq = t / (t + a) if (t + a) else 0.0
+        je_werkzeug.append({
+            "name": name,
+            "praezision": round(pz, 3),
+            "trefferquote": round(tq, 3),
+            "f1": round(2 * pz * tq / (pz + tq), 3) if (pz + tq) else 0.0,
+            # Ohne die Stuetzzahl liest man aus einem einzigen Fall eine
+            # Aussage heraus. Bei 30 Faellen und 18 Werkzeugen liegt sie oft
+            # bei 1 bis 3.
+            "stuetze": t + a,
+        })
+
     return {
         "modell": modell,
         "node_f1": round(mittel(knoten), 4),
         "edge_f1": round(mittel(kanten), 4),
+        "node_f1_mit_werkzeug": round(mittel(knoten_mit), 4),
+        "edge_f1_mit_kanten": round(mittel(kanten_mit), 4),
+        "n_mit_werkzeug": len(knoten_mit),
+        "n_mit_kanten": len(kanten_mit),
+        "je_werkzeug": je_werkzeug,
         "leer_genauigkeit": round(leer_richtig / leer_gesamt, 4) if leer_gesamt else 0.0,
         "leer_richtig": leer_richtig,
         "leer_gesamt": leer_gesamt,
@@ -278,6 +371,38 @@ def zeige(lauf: dict, nummer: int) -> None:
               f"   bekommen {','.join(x['bekommen']) or '(keins)'}")
     print(f"   node-F1 {lauf['node_f1']:.4f}   edge-F1 {lauf['edge_f1']:.4f}   "
           f"Leer {lauf['leer_genauigkeit']:.4f} ({lauf['leer_richtig']}/{lauf['leer_gesamt']})")
+    # Die ehrlichere Haelfte: nur die Faelle, die ueberhaupt etwas erwarten.
+    print(f"   nur mit Werkzeug: node-F1 {lauf['node_f1_mit_werkzeug']:.4f} "
+          f"({lauf['n_mit_werkzeug']} Faelle)   "
+          f"nur mit Kanten: edge-F1 {lauf['edge_f1_mit_kanten']:.4f} "
+          f"({lauf['n_mit_kanten']} Faelle)")
+
+    # Nach Kategorie und nach Werkzeuganzahl. Ein einziger Gesamtwert
+    # vermischt "einfacher Fall verpatzt" mit "Kette verpatzt".
+    for schluessel, titel in (("kategorie", "Kategorie"), ("n_werkzeuge", "Werkzeuge")):
+        gruppen: dict = {}
+        for x in lauf["einzeln"]:
+            gruppen.setdefault(x[schluessel], []).append(x)
+        print(f"{GRAU}   -- nach {titel} --{AUS}")
+        for wert in sorted(gruppen, key=str):
+            g = gruppen[wert]
+            print(f"      {str(wert):10} n={len(g):2}   "
+                  f"node {mittel([x['node_f1'] for x in g]):.3f}   "
+                  f"edge {mittel([x['edge_f1'] for x in g]):.3f}")
+        # Gegenprobe: die gewichteten Gruppenmittel muessen den Gesamtwert
+        # ergeben. Tun sie es nicht, ist die Gruppierung kaputt und die
+        # Aufschluesselung waere Zierrat.
+        gewichtet = sum(mittel([x["node_f1"] for x in g]) * len(g)
+                        for g in gruppen.values()) / len(lauf["einzeln"])
+        assert abs(gewichtet - lauf["node_f1"]) < 0.001, (gewichtet, lauf["node_f1"])
+
+    if lauf["je_werkzeug"]:
+        print(f"{GRAU}   -- je Werkzeug (Stuetze = wie oft es erwartet war) --{AUS}")
+        for w in sorted(lauf["je_werkzeug"], key=lambda x: (-x["stuetze"], x["name"])):
+            farbe = GRUEN if w["f1"] == 1.0 else (GELB if w["f1"] > 0 else ROT)
+            print(f"{farbe}      {w['name']:20} F1 {w['f1']:.2f}   "
+                  f"Praez {w['praezision']:.2f}   Treffer {w['trefferquote']:.2f}   "
+                  f"Stuetze {w['stuetze']}{AUS}")
     if lauf["unlesbar"]:
         print(f"{ROT}   {lauf['unlesbar']} Antworten waren kein lesbares JSON "
               f"und zaehlen als Fehlschlag.{AUS}")
@@ -298,6 +423,10 @@ def main() -> int:
                    help="Harte Obergrenze fuer Token ueber alle Laeufe. Abbruch.")
     p.add_argument("--deckel-eur", type=float, default=1.0,
                    help="Zusaetzlich, greift nur mit Preisen in der .env.")
+    p.add_argument("--texte", choices=("code", "alt", "nachher"), default="code",
+                   help="Welcher Satz Werkzeugbeschreibungen gemessen wird. "
+                        "'code' ist der echte Stand; 'alt' und 'nachher' sind "
+                        "die archivierten Staende fuer den Vorher/Nachher-Vergleich.")
     p.add_argument("--faelle", type=Path, default=FAELLE,
                    help="Andere Falldatei. Fuer Probelaeufe, nicht fuer die Abnahme.")
     p.add_argument("--kein-verlauf", action="store_true",
@@ -309,7 +438,7 @@ def main() -> int:
         return 2
     faelle = json.loads(args.faelle.read_text(encoding="utf-8"))
 
-    text, kennzahl = werkzeugtext()
+    text, kennzahl = werkzeugtext(args.texte)
     system = SYSTEM.replace("<<WERKZEUGE>>", text)
     einstellungen = get_settings()
 
@@ -331,7 +460,8 @@ def main() -> int:
             return 2
         provider = build_provider(einstellungen)
 
-    print(f"{GRAU}{len(faelle)} Faelle · {kennzahl['anzahl']} Werkzeuge · "
+    print(f"{GRAU}{len(faelle)} Faelle · Textsatz '{kennzahl['satz']}' · "
+          f"{kennzahl['anzahl']} Werkzeuge · "
           f"{kennzahl['zeichen']} Zeichen Beschreibungstext "
           f"(rund {kennzahl['token_geschaetzt']} Token je Aufruf){AUS}")
 
@@ -352,7 +482,8 @@ def main() -> int:
 
     if len(laeufe) > 1:
         print(f"\n{GRAU}--- Streuung ueber {len(laeufe)} Laeufe ---{AUS}")
-        for name in ("node_f1", "edge_f1", "leer_genauigkeit"):
+        for name in ("node_f1", "edge_f1", "node_f1_mit_werkzeug",
+                     "edge_f1_mit_kanten", "leer_genauigkeit"):
             werte = [x[name] for x in laeufe]
             s = spanne(werte)
             farbe = GRUEN if s <= 0.05 else ROT
@@ -374,7 +505,10 @@ def main() -> int:
                     "faelle": len(faelle),
                     "node_f1": lauf["node_f1"],
                     "edge_f1": lauf["edge_f1"],
+                    "node_f1_mit_werkzeug": lauf["node_f1_mit_werkzeug"],
+                    "edge_f1_mit_kanten": lauf["edge_f1_mit_kanten"],
                     "leer_genauigkeit": lauf["leer_genauigkeit"],
+                    "je_werkzeug": lauf["je_werkzeug"],
                     "unlesbar": lauf["unlesbar"],
                     "werkzeuge": kennzahl,
                 }, ensure_ascii=False) + "\n")

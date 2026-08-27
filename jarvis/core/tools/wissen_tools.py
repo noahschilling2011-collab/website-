@@ -120,10 +120,10 @@ class WikiLokal(_MitCache):
 
     name = "wiki_lokal"
     description = (
-        "Schlaegt einen Begriff in der lokalen Wikipedia-Kopie nach. Zuerst "
-        "hier suchen, bevor eine Netzquelle bemueht wird - das kostet nichts "
-        "und braucht kein Netz. Die Antwort hat ein Snapshot-Datum: sag dem "
-        "Nutzer, aus welchem Stand du antwortest."
+        "Schlaegt einen Begriff in der lokalen Wikipedia-Kopie nach - kein Netz, keine Kosten, kein Ratenlimit.\n"
+        "Nimm es fuer: Stammwissen zu Begriffen, Personen, Orten; immer als ERSTEN Versuch, und nenne das Snapshot-Datum aus dem Ergebnis.\n"
+        "Nimm es NICHT fuer: Ereignisse nach dem Snapshot oder wenn hier nichts steht (dann wiki_live), nicht fuer eine blosse Zahl (das ist wikidata), nicht fuer Tagesaktuelles (das ist web_search).\n"
+        "Beispiel: wiki_lokal(begriff=\"Sentinel-2\")"
     )
     parameters = {
         "type": "object",
@@ -248,9 +248,10 @@ class WikiLive(_MitCache):
 
     name = "wiki_live"
     description = (
-        "Schlaegt einen Begriff in der Online-Wikipedia nach. Benutze das NUR, "
-        "wenn wiki_lokal nichts hat oder die Frage etwas betrifft, das nach dem "
-        "Snapshot-Datum passiert ist. Das kostet ein Ratenlimit."
+        "Schlaegt einen Begriff in der Online-Wikipedia nach: kurzer Anriss samt Artikel-URL.\n"
+        "Nimm es fuer: was wiki_lokal nicht hatte oder was nach dessen Snapshot-Datum liegt; kostet ein Ratenlimit. Dabei faellt die Artikel-URL an - fuer mehr als den Anriss gib sie an fetch_url.\n"
+        "Nimm es NICHT fuer: den ersten Versuch (der geht an wiki_lokal), nicht fuer Nachrichten oder Preise von heute (das ist web_search), nicht fuer einen Zahlenwert (das ist wikidata).\n"
+        "Beispiel: wiki_live(begriff=\"Wikidata Query Service\", sprache=\"en\")"
     )
     parameters = {
         "type": "object",
@@ -360,9 +361,10 @@ class WikidataFrage(_MitCache):
 
     name = "wikidata"
     description = (
-        "Stellt eine SPARQL-Abfrage an Wikidata. Nimm das, wenn du eine ZAHL "
-        "oder ein Datum brauchst - Einwohnerzahl, Gruendungsjahr, Koordinaten - "
-        "und keinen Fliesstext."
+        "Stellt eine SPARQL-Abfrage an Wikidata und gibt Ergebniszeilen zurueck, keinen Fliesstext.\n"
+        "Nimm es fuer: einen harten Einzelwert - Einwohnerzahl, Gruendungsjahr, Hoehe, Datum; ist die Q-Nummer unbekannt, im SPARQL ueber rdfs:label filtern. Dabei faellt die blanke Zahl an; weitergerechnet wird damit in calculator, nie im Kopf.\n"
+        "Nimm es NICHT fuer: Erklaerungen in Saetzen (das ist wiki_lokal), nicht fuer Koordinaten zu einem Satellitenbild (das macht find_place samt fertiger bbox).\n"
+        "Beispiel: wikidata(sparql=\"SELECT ?e WHERE { wd:Q1055 wdt:P1082 ?e }\")"
     )
     parameters = {
         "type": "object",

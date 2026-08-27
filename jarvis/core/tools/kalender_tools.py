@@ -37,9 +37,10 @@ def _datum(wert: str | None, ersatz: date) -> date:
 class Kalender(Tool):
     name = "kalender"
     description = (
-        "Termine in einem Zeitfenster, aus Noahs Kalender. Ohne Angabe: "
-        "von heute bis in sieben Tagen. Wiederkehrende Termine werden "
-        "gezaehlt, aber nicht aufgeloest - das sagt das Ergebnis dazu."
+        "Liest Termine aus Noahs Kalender in einem Zeitfenster; ohne Angabe von heute bis in sieben Tagen.\n"
+        "Nimm es fuer: \"was habe ich morgen vor?\", \"wann ist der Zahnarzt?\" - alles, wo ein Eintrag im Kalender die Antwort ist. Das heutige Datum fuer von/bis liefert dir clock; wiederkehrende Termine werden gezaehlt, nicht aufgeloest.\n"
+        "Nimm es NICHT fuer: Uhrzeit, heutiges Datum oder Wochentag - das gibt clock.\n"
+        "Beispiel: kalender(von=\"2026-08-28\", bis=\"2026-08-30\")"
     )
     parameters = {
         "type": "object",

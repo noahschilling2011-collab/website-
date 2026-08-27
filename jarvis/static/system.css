@@ -30,6 +30,11 @@
      8,35 auf --ebene-3. Taugt ueberall, auch fuer Fliesstext. */
   --akzent:       #f0b45c;
   --akzent-satt:  #e09a3e;   /* 8,35 / 7,83 - nur fuer Flaechen */
+  /* Fuer die Einordnung: eine Flaeche, die kaum da ist, und ein Strich,
+     der sie vom Beleg trennt. Beide aus dem Akzent, damit kein vierter Ton
+     entsteht. */
+  --akzent-fuellung: rgba(240,180,92,.055);
+  --akzent-strich:   rgba(240,180,92,.32);
   --akzent-linie: rgba(240,180,92,.22);
   --akzent-glut:  rgba(240,180,92,.08);
   /* Dieselbe Glut, aber deckend: vorkomponiert ueber --ebene-1 unter Glas.

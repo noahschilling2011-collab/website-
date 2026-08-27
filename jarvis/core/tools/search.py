@@ -70,10 +70,10 @@ async def brave_suche(
 class WebSearch(Tool):
     name = "web_search"
     description = (
-        "Sucht im Web und liefert Titel, URL und einen Auszug je Treffer. "
-        "Benutze das fuer alles, was aktuell ist oder was du nicht sicher "
-        "weisst. Jede Behauptung, die du daraus uebernimmst, belegst du mit "
-        "der URL."
+        "Sucht im Web und liefert je Treffer Titel, URL und Auszug.\n"
+        "Nimm es fuer: Aktuelles - Nachrichten, Preise, Termine, Versionen - und alles, was in keiner Wikipedia steht. Dabei fallen die URLs an, die fetch_url danach braucht; jede uebernommene Behauptung belegst du mit der URL.\n"
+        "Nimm es NICHT fuer: Stammwissen, das wiki_lokal umsonst hat, nicht fuer einen Enzyklopaedie-Artikel nach dem Snapshot-Datum (den holt wiki_live), nicht fuer etwas, das der Nutzer dir frueher gesagt hat (das findet recall).\n"
+        "Beispiel: web_search(query=\"Sentinel-2 Ausfall Maerz 2026\", count=5)"
     )
     parameters = {
         "type": "object",
@@ -355,10 +355,10 @@ async def hole_gepruefte_kette(
 class FetchUrl(Tool):
     name = "fetch_url"
     description = (
-        "Holt eine Webseite und gibt ihren Text zurueck. Benutze das, um einen "
-        "Suchtreffer wirklich zu lesen, statt dich auf den Auszug zu verlassen. "
-        "Die URL muss aus einem Suchergebnis oder vom Nutzer stammen - rate "
-        "keine URLs."
+        "Holt eine Webseite und gibt ihren Text zurueck.\n"
+        "Nimm es fuer: einen Treffer wirklich lesen statt nur den Auszug. Du brauchst dafuer eine volle URL - die liefert dir web_search oder wiki_live, oder der Nutzer nennt sie; rate nie eine URL.\n"
+        "Nimm es NICHT fuer: eine Frage, zu der du noch keine URL hast (erst web_search), nicht zum Nachschlagen eines Begriffs (das ist wiki_lokal).\n"
+        "Beispiel: fetch_url(url=\"https://www.esa.int/Applications/Observing_the_Earth\", max_chars=6000)"
     )
     parameters = {
         "type": "object",

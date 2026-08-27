@@ -157,3 +157,93 @@ def test_der_pruefsatz_ist_in_sich_stimmig():
             leer += 1
 
     assert leer == 6, f"{leer} Faelle ohne Werkzeug, erwartet 6"
+
+
+# --- Die ehrlicheren Teilzahlen (aus der Microsoft-Ernte) -----------------
+
+
+@pytest.mark.skipif(not FAELLE.is_file(), reason="Pruefsatz noch nicht geschrieben")
+def test_die_verteilung_stimmt_mit_dem_bericht_ueberein():
+    """Die Zahlen, auf die sich `plantest.py` in seinen Kommentaren beruft,
+    werden hier nachgezaehlt statt geglaubt."""
+    faelle = json.loads(FAELLE.read_text(encoding="utf-8"))
+    mit_werkzeug = [f for f in faelle if f["werkzeuge"]]
+    mit_kanten = [f for f in faelle if f["kanten"]]
+    assert len(mit_werkzeug) == 24, len(mit_werkzeug)
+    assert len(mit_kanten) == 11, len(mit_kanten)
+    # Die Stuetzsumme des Werkzeugberichts: jedes erwartete Vorkommen einmal.
+    stuetze = sum(len(f["werkzeuge"]) for f in faelle)
+    assert stuetze == 44, stuetze
+
+
+def test_ein_immer_leeres_modell_faellt_bei_den_ehrlichen_zahlen_durch():
+    """Der eigentliche Grund fuer die Teilzahlen.
+
+    Ein Modell, das ausnahmslos `{"werkzeuge": [], "kanten": []}` antwortet,
+    bekommt bei den Gesamtzahlen 0,20 und 0,63 - das sieht nach halber Arbeit
+    aus. Ueber die Faelle, die wirklich etwas erwarten, sind es 0,00 und 0,00.
+
+    Ohne diese Trennung wuerde eine Verbesserung an den Beschreibungen im
+    Rauschen der 6 leeren Faelle untergehen.
+    """
+    import subprocess
+    import sys
+
+    lauf = subprocess.run(
+        [sys.executable, "-m", "scripts.plantest", "--trocken", "--kein-verlauf"],
+        cwd=str(Path(__file__).resolve().parent.parent),
+        capture_output=True, text=True, timeout=180,
+    )
+    assert lauf.returncode == 0, lauf.stderr[-800:]
+    text = lauf.stdout
+    assert "node-F1 0.2000" in text, text[-600:]
+    assert "nur mit Werkzeug: node-F1 0.0000 (24 Faelle)" in text, text[-600:]
+    assert "nur mit Kanten: edge-F1 0.0000 (11 Faelle)" in text, text[-600:]
+
+
+def test_der_werkzeugbericht_zaehlt_alle_vorkommen():
+    """Die Stuetzsummen des Berichts muessen die Annotation exakt abdecken -
+    sonst zaehlt er etwas anderes, als er behauptet."""
+    import asyncio
+
+    from core.llm import FakeLLMProvider
+    from scripts.plantest import Deckel, ein_lauf
+
+    class OhneKosten:
+        def cost_eur(self, a, b): return 0.0
+        prices_configured = False
+
+    faelle = json.loads(FAELLE.read_text(encoding="utf-8"))
+    lauf = asyncio.run(ein_lauf(
+        FakeLLMProvider(replies=['{"werkzeuge": [], "kanten": []}']),
+        faelle, "egal", Deckel(10_000_000, 99.0, OhneKosten())))
+
+    summe = sum(w["stuetze"] for w in lauf["je_werkzeug"])
+    assert summe == sum(len(f["werkzeuge"]) for f in faelle) == 44, summe
+    # Kein Werkzeug wurde vorhergesagt, also ist jede Trefferquote 0.
+    assert all(w["trefferquote"] == 0.0 for w in lauf["je_werkzeug"])
+
+
+def test_erfundene_werkzeuge_werden_bestraft():
+    """Halluziniert das Modell einen Namen, muss er als Fehltreffer mit
+    Stuetze 0 auftauchen - sonst bliebe die Erfindung folgenlos."""
+    import asyncio
+
+    from core.llm import FakeLLMProvider
+    from scripts.plantest import Deckel, ein_lauf
+
+    class OhneKosten:
+        def cost_eur(self, a, b): return 0.0
+        prices_configured = False
+
+    faelle = [{"id": "x", "auftrag": "egal", "werkzeuge": ["clock"],
+               "kanten": [], "begruendung": "", "kategorie": "einzel"}]
+    lauf = asyncio.run(ein_lauf(
+        FakeLLMProvider(replies=['{"werkzeuge": ["gibt_es_nicht"], "kanten": []}']),
+        faelle, "egal", Deckel(10_000_000, 99.0, OhneKosten())))
+
+    nach_name = {w["name"]: w for w in lauf["je_werkzeug"]}
+    assert nach_name["gibt_es_nicht"]["stuetze"] == 0
+    assert nach_name["gibt_es_nicht"]["praezision"] == 0.0
+    assert nach_name["clock"]["stuetze"] == 1
+    assert lauf["node_f1"] == 0.0

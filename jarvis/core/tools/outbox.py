@@ -22,8 +22,10 @@ from core.tools.registry import register
 class SendEmail(Tool):
     name = "send_email"
     description = (
-        "Verschickt eine E-Mail. Der Nutzer muss jeden Versand einzeln "
-        "bestaetigen und sieht vorher Empfaenger, Betreff und Text."
+        "Verschickt eine E-Mail; der Nutzer bestaetigt jeden Versand einzeln und sieht vorher Empfaenger, Betreff und Text.\n"
+        "Nimm es fuer: eine Nachricht an einen Menschen, die der Nutzer wirklich abschicken will.\n"
+        "Nimm es NICHT fuer: einen Auftrag an eine andere Instanz des Systems - dafuer ask_agent.\n"
+        "Beispiel: send_email(to=\"noah@example.de\", subject=\"Termine diese Woche\", body=\"Hallo Noah, ...\")"
     )
     parameters = {
         "type": "object",

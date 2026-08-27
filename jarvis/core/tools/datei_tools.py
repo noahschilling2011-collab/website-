@@ -86,10 +86,10 @@ class _MitWurzeln(Tool):
 class DateiSuchen(_MitWurzeln):
     name = "datei_suchen"
     description = (
-        "Sucht Dateien in den freigegebenen Ordnern - nach Dateiname oder, "
-        "mit inhalt=true, nach einem Wort im Text. Gibt Pfade und "
-        "Metadaten zurueck, NICHT den Inhalt. Fuer den Inhalt danach "
-        "datei_lesen aufrufen."
+        "Findet Dateien in den freigegebenen Ordnern - nach Dateiname oder, mit inhalt=true, nach einem Wort im Text - und gibt Pfade und Metadaten zurueck, NICHT den Inhalt.\n"
+        "Nimm es fuer: \"wo liegt meine Mathe-Zusammenfassung?\" - immer wenn du den Pfad noch nicht kennst. Dabei fallen die Pfade an, die datei_lesen danach braucht.\n"
+        "Nimm es NICHT fuer: den Text einer Datei - den holt datei_lesen.\n"
+        "Beispiel: datei_suchen(muster=\"mathe\", inhalt=false, hoechstens=20)"
     )
     parameters = {
         "type": "object",
@@ -163,9 +163,10 @@ class DateiSuchen(_MitWurzeln):
 class DateiLesen(_MitWurzeln):
     name = "datei_lesen"
     description = (
-        "Liest einen Ausschnitt aus einer Datei in einem freigegebenen "
-        "Ordner. Nie die ganze Datei auf einmal; das Ergebnis sagt, ob "
-        "etwas abgeschnitten wurde."
+        "Liest einen Ausschnitt aus einer Datei in einem freigegebenen Ordner - nie die ganze Datei auf einmal; das Ergebnis sagt, ob etwas abgeschnitten wurde.\n"
+        "Nimm es fuer: den Inhalt einer Datei, deren Pfad du schon hast. Du brauchst dafuer den Pfad, den dir datei_suchen liefert.\n"
+        "Nimm es NICHT fuer: eine Datei erst finden oder viele Dateien nach einem Wort durchsuchen - das macht datei_suchen.\n"
+        "Beispiel: datei_lesen(pfad=\"Schule/mathe.md\", ab_zeile=0, zeilen=300)"
     )
     parameters = {
         "type": "object",

@@ -1004,6 +1004,105 @@ Zone 8 hat nie echte Meldungen angezeigt, weil dafür ein Modellaufruf nötig
 ist; geprüft ist nur der leere Zustand. Und der Mini-Globus lief unter
 SwiftShader, nicht auf einer GPU.
 
+## Microsofts JARVIS geerntet + Design fertig
+
+Noah wollte ausdrücklich, dass aus `microsoft/JARVIS` übernommen wird, was
+taugt. Drei Teile durchgesehen: **19 Punkte brauchbar, 17 nicht** — 6 wegen
+Abhängigkeiten (torch + transformers rund 1,5 GB), 11 wegen inhaltlicher
+Mängel, darunter **vier echte Bugs im Microsoft-Code**, die man beim
+Abschreiben mitnehmen würde.
+
+### Zwei Befunde, die den Auftragstext korrigieren
+
+**1. Die Messstrecke ist an drei Stellen strenger als TaskBench.**
+Halluzinierte Werkzeugnamen werden bestraft, unlesbares JSON zählt als
+Fehlschlag, die Streuung wird gemessen. Davon wurde nichts ersetzt.
+
+**2. EasyTools Beispielfeld wirkt auf die ARGUMENTE, nicht auf die
+Werkzeugwahl.** Der Auftragstext nimmt das anders an. Mit den heutigen
+Kennzahlen wäre sein Effekt gar nicht messbar.
+
+### Die Messstrecke rechnet jetzt ehrlich
+
+Der Sonderfall „beide leer = 1.0" ist richtig — aber **19 der 30 Fälle haben
+keine Kanten, 6 kein Werkzeug**. Ein Modell, das ausnahmslos `[]` antwortet,
+bekam damit `node-F1 0,20` und `edge-F1 0,63` und sah nach halber Arbeit aus.
+Gemessen, mit dem `FakeLLMProvider`:
+
+```
+node-F1 0.2000   edge-F1 0.6333   Leer 1.0000 (6/6)
+nur mit Werkzeug: node-F1 0.0000 (24 Fälle)   nur mit Kanten: edge-F1 0.0000 (11 Fälle)
+```
+
+Dazu ein **Bericht je Werkzeug** (Präzision, Trefferquote, F1, Stützzahl) —
+ohne den weiß man beim Umschreiben der Beschreibungen nicht, welche der 18
+schuld ist — und eine Aufschlüsselung nach Kategorie und Werkzeuganzahl. Die
+gewichteten Gruppenmittel werden gegen den Gesamtwert geprüft; stimmen sie
+nicht, bricht das Skript ab.
+
+Und ein Satz im Kopfkommentar, der vorher fehlte: **diese Zahlen gehören
+nicht neben eines aus dem TaskBench-Leaderboard.** Hier steht ein Makro-Mittel
+je Fall, dort ein Mikro-Mittel über Werkzeugvorkommen.
+
+### Die 18 Werkzeugbeschreibungen nach EasyTool
+
+Alle 18 im selben Format: *was es tut* → *Nimm es für* → *Nimm es NICHT für* →
+*Beispiel*. Vorher nannten **drei von 18** ein anderes Werkzeug beim Namen;
+RestBench tut es bei 28 von 54.
+
+**Alle acht Verwechslungspaare zeigen jetzt beidseitig aufeinander**, und
+zwar in der NICHT-für-Zeile, nicht irgendwo im Text — `wiki_lokal`↔`wiki_live`,
+`recall`↔`web_search`, `satellite_search`↔`satellite_passes`,
+`datei_suchen`↔`datei_lesen`, `kalender`↔`clock`, `wikidata`↔`wiki_lokal`.
+Dazu fünf Datenkanten in beide Richtungen: das konsumierende Werkzeug nennt
+den Vorgänger, das produzierende sagt, was bei ihm anfällt.
+
+**Der Preis steht fest und wird nicht schöngeredet: 4.601 → 9.512 Zeichen**,
+also rund 1.150 → 2.378 Token bei **jedem** Aufruf. Ob das gerechtfertigt
+ist, entscheidet die Messung — nicht ich.
+
+**Damit das überhaupt entscheidbar bleibt**, sind beide Stände archiviert
+(`tests/plandaten/werkzeugtexte-vorher.json` und `-nachher.json`) und
+`scripts/plantest.py` hat ein `--texte alt|nachher|code`. Der
+Vorher/Nachher-Vergleich läuft damit in **einer** Sitzung mit demselben
+Modell — statt in zwei Läufen im Abstand von Stunden, deren Unterschied
+ebensogut das Modell sein könnte.
+
+16 Tests halten die Form fest, darunter: jedes Beispiel benutzt nur
+Parameter, die es wirklich gibt.
+
+### Design: die restlichen neun Schritte
+
+Weltansicht fertig — Karten mit 45 ms Versatz, Einordnung 420 ms später und
+4 px weit, gestrichelter Rand in Akzent, Namen schrumpfen statt umzubrechen,
+Ausgang läuft vor dem Eingang, Saum auf den Vorlagenwert, Flugkurve auf
+easeOutQuart, Küstenlinien zurückgenommen. Und **Striche statt Nullen** in
+der Fußleiste plus ehrliche Sätze: „Keine Quelle gefunden … das ist kein
+Fehler" statt „0 belegte Meldungen".
+
+### Vier selbstgebaute Fehler, alle im Browser gefunden
+
+1. **Der Backtick — zum dritten Mal in diesem Projekt.** Mein eigener
+   Kommentar in `STIL` enthielt `` `anywhere` `` und beendete das
+   Template-Literal. `node --check` besteht das, die Seite lädt nicht mehr.
+   Der Wächter dafür existiert seit FIX-05 und hätte es gefangen — ich hatte
+   ihn nach der Änderung nur nicht laufen lassen, weil der Suitelauf vorher
+   ins Timeout lief. **Zweimal passiert**, beim zweiten Mal in demselben
+   Kommentar, den ich zur Warnung geschrieben hatte.
+2. **Der 45-ms-Versatz hat alle Karten gelöscht.** `schneideKarten` misst mit
+   `getBoundingClientRect`, und das rechnet `transform` mit: während eine
+   Karte einläuft, steht sie bei `translateY(8px)` und gilt als „passt
+   nicht". Gemessen 0 statt 5 Karten. Jetzt wird erst still angehängt, dann
+   zugeschnitten, **dann** gestaffelt.
+3. **Die Wartemeldung sah aus wie der Leerzustand.** Sie benutzte dieselbe
+   Klasse `.leer` — „ich arbeite noch" war damit von „nichts gefunden" nicht
+   zu unterscheiden, für den Test wie für den Menschen. Eigene Klasse.
+4. Ein `offsetTop`-Ansatz, der bei einer Flexbox mit fester Höhe nichts misst,
+   weil die quetscht statt überzulaufen — verworfen, nachdem die Messung im
+   Browser es zeigte.
+
+**Suite: 1118 Tests, alle grün.**
+
 ## Bewegtbild-Vorlage eingebaut — 16 von 25 Schritten
 
 Noahs Design-Canvas („JARVIS Bewegtbild") wurde gegen den echten Code

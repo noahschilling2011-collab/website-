@@ -57,11 +57,10 @@ class _MitDatenbank(Tool):
 class Remember(_MitDatenbank):
     name = "remember"
     description = (
-        "Merkt sich eine dauerhafte Tatsache ueber den Nutzer - Vorlieben, "
-        "Ausruestung, Namen, Gewohnheiten. Benutze das NUR, wenn der Nutzer "
-        "etwas sagt, das auch in einem Monat noch gilt, oder wenn er dich "
-        "ausdruecklich bittet, es dir zu merken. Merk dir nichts, was nur fuer "
-        "dieses Gespraech gilt, und nichts, was du selbst geschlossen hast."
+        "Legt eine dauerhafte Tatsache ueber den Nutzer im Langzeitgedaechtnis ab.\n"
+        "Nimm es fuer: was auch in einem Monat noch gilt - Vorlieben, Ausruestung, Namen, Gewohnheiten - oder wenn der Nutzer ausdruecklich darum bittet. Dabei entsteht der Eintrag, den recall spaeter wiederfindet.\n"
+        "Nimm es NICHT fuer: Nachsehen, was schon gespeichert ist - das macht recall; auch nicht fuer Dinge, die nur fuer dieses Gespraech gelten, oder die du selbst geschlossen hast.\n"
+        "Beispiel: remember(text=\"Mein Rad ist ein Santa Cruz V10\", category=\"ausruestung\")"
     )
     parameters = {
         "type": "object",
@@ -149,10 +148,10 @@ class Remember(_MitDatenbank):
 class Recall(_MitDatenbank):
     name = "recall"
     description = (
-        "Durchsucht das Langzeitgedaechtnis und den bisherigen Verlauf nach "
-        "Stichworten. Benutze das, wenn der Nutzer nach etwas fragt, das er "
-        "dir frueher gesagt haben koennte. Wenn nichts gefunden wird, sag das "
-        "- rate nicht."
+        "Durchsucht Noahs Langzeitgedaechtnis und den bisherigen Gespraechsverlauf nach Stichworten.\n"
+        "Nimm es fuer: alles, was der Nutzer dir frueher selbst gesagt haben koennte - Vorlieben, Ausruestung, Namen, Gewohnheiten; hier findest du wieder, was remember abgelegt hat. Findest du nichts, sag das - rate nicht.\n"
+        "Nimm es NICHT fuer: Wissen ueber die Welt oder Aktuelles - das steht nicht im Gedaechtnis, dafuer web_search; und nicht, um etwas Neues abzulegen - das macht remember.\n"
+        "Beispiel: recall(query=\"Fahrrad\", include_messages=true)"
     )
     parameters = {
         "type": "object",

@@ -50,10 +50,10 @@ kontext: ContextVar[DelegationsKontext | None] = ContextVar(
 class AskAgent(Tool):
     name = "ask_agent"
     description = (
-        "Gibt einen Teilauftrag an einen anderen Agenten. Benutze das, wenn "
-        "ein Schritt Faehigkeiten braucht, die du nicht hast - zum Beispiel "
-        "Recherche im Web. Formuliere den Teilauftrag so, dass er allein "
-        "verstaendlich ist; der Agent sieht dein Gespraech nicht."
+        "Gibt einen Teilauftrag an einen anderen Agenten - research (Web, Wikipedia, Wikidata) oder satellite (Erdbeobachtung).\n"
+        "Nimm es fuer: einen Schritt, der Faehigkeiten braucht, die du nicht hast; formuliere ihn allein verstaendlich, der Agent sieht dein Gespraech nicht. Andere Agentennamen als research und satellite werden abgelehnt.\n"
+        "Nimm es NICHT fuer: eine Zeit- oder Rechenfrage, die du selbst mit clock oder calculator erledigst.\n"
+        "Beispiel: ask_agent(agent=\"research\", task=\"Was kostet ein Santa Cruz V10 aktuell neu? Nenne Haendler und Quelle.\")"
     )
     parameters = {
         "type": "object",

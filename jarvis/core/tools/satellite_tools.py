@@ -72,16 +72,10 @@ def _bbox(werte) -> tuple[float, float, float, float]:
 class SatelliteSearch(Tool):
     name = "satellite_search"
     description = (
-        "Sucht das juengste wolkenarme Sentinel-2-Bild fuer eine Bounding Box. "
-        "WICHTIG: 'aktuell' heisst das juengste Bild unter dem Wolken-"
-        "Schwellwert im Suchfenster - es gibt keine Live-Bilder. Sentinel-2 "
-        "ueberfliegt einen Ort etwa alle 3 bis 5 Tage, und ein Teil der "
-        "Aufnahmen ist bewoelkt. Liefert ein anzeigbares Bild der juengsten "
-        "Szene. ACHTUNG Aufloesung: der Sensor hat 10 m je Pixel, das "
-        "gelieferte Bild hat 512 Pixel Kantenlaenge - bei einem grossen "
-        "Ausschnitt sind das schnell mehr als 1000 m je Bildpixel. Die "
-        "wahre Zahl steht im Ergebnis unter bild_aufloesung_m; benutze "
-        "DIESE, nicht die 10."
+        "Sucht die juengste wolkenarme Sentinel-2-Szene zu einer bbox und liefert ein anzeigbares Bild.\n"
+        "Nimm es fuer: wie ein Ort von oben aussieht; \"aktuell\" heisst juengste Szene unter dem Wolken-Schwellwert, Live-Bilder gibt es nicht. Du brauchst dafuer eine bbox, die liefert dir find_place. Dabei fallen je Szene acquired_at, cloud_cover_pct und resolution_m an - genau diese drei nimmt satellite_compare; NDVI-Werte fallen hier NICHT an.\n"
+        "Nimm es NICHT fuer: wann ein Satellit ueber den Ort hinwegfliegt, das macht satellite_passes. Als Bildaufloesung nennst du bild_aufloesung_m aus dem Ergebnis - bei grossem Ausschnitt ueber 1000 m je Pixel -, nie die 10 m des Sensors und nie als resolution_m fuer satellite_compare.\n"
+        "Beispiel: satellite_search(bbox=[9.74, 48.75, 9.90, 48.86], days_back=30, max_cloud_pct=20)"
     )
     parameters = {
         "type": "object",
@@ -234,11 +228,10 @@ class SatelliteSearch(Tool):
 class SatelliteCompare(Tool):
     name = "satellite_compare"
     description = (
-        "Vergleicht zwei Vegetationsraster (NDVI) desselben Ausschnitts "
-        "numerisch und meldet, auf wie vielen Hektar sich etwas geaendert hat. "
-        "Rechnet erst und interpretiert danach - nie umgekehrt. Lehnt den "
-        "Vergleich ab, wenn die Aufnahmen zu weit im Jahreslauf "
-        "auseinanderliegen: was man dann sieht, ist die Jahreszeit."
+        "Vergleicht zwei NDVI-Raster desselben Ausschnitts und meldet die veraenderte Flaeche in Hektar.\n"
+        "Nimm es fuer: wie viel Gruen zwischen zwei Aufnahmen verschwunden ist - erst rechnen, dann deuten. before und after sind die NDVI-Werte selbst und muessen aus einer echten Rasterquelle stammen - satellite_search liefert sie NICHT, erfinde sie nie. Von dort kommen before_date/after_date (acquired_at), before_cloud_pct/after_cloud_pct (cloud_cover_pct) und resolution_m der Szene.\n"
+        "Nimm es NICHT fuer: das Bild eines einzelnen Zeitpunkts, das macht satellite_search. Setze als resolution_m nie bild_aufloesung_m des Vorschaubilds ein - sonst stimmen die Hektar um Groessenordnungen nicht. Zu weit im Jahreslauf auseinander, und es lehnt ab - man saehe die Jahreszeit.\n"
+        "Beispiel: satellite_compare(before=[0.72, 0.68], after=[0.31, 0.29], before_date=\"2020-07-14\", after_date=\"2024-07-09\", resolution_m=10)"
     )
     parameters = {
         "type": "object",
@@ -316,13 +309,10 @@ class SatelliteCompare(Tool):
 class SatellitePasses(Tool):
     name = "satellite_passes"
     description = (
-        "Sagt, welche Satelliten in den naechsten Stunden ueber einen Ort "
-        "hinwegfliegen - fuer JEDEN Punkt der Erde, nicht nur Deutschland. "
-        "Gerechnet aus echten Bahndaten (TLE von CelesTrak) mit skyfield, "
-        "nicht geschaetzt. Liefert Aufgang, hoechsten Stand, Untergang, "
-        "Himmelsrichtungen und Entfernung. Sagt NICHT, ob der Ueberflug mit "
-        "blossem Auge sichtbar ist - dafuer muesste zusaetzlich Sonnenstand "
-        "und Erdschatten gerechnet werden."
+        "Rechnet aus echten Bahndaten (TLE), welche Satelliten in den naechsten Stunden ueber einen Punkt hinwegfliegen - weltweit.\n"
+        "Nimm es fuer: wann die ISS drueber ist - Aufgang, hoechster Stand, Untergang, Richtung, Entfernung. Du brauchst dafuer lat und lon, die liefert dir find_place.\n"
+        "Nimm es NICHT fuer: ein Bild des Ortes von oben, das macht satellite_search. Sagt auch NICHT, ob der Ueberflug mit blossem Auge sichtbar ist.\n"
+        "Beispiel: satellite_passes(lat=48.8000, lon=9.7986, hours=24, group=\"stations\")"
     )
     parameters = {
         "type": "object",
@@ -458,11 +448,10 @@ class SatellitePasses(Tool):
 class OrtFinden(Tool):
     name = "find_place"
     description = (
-        "Macht aus einem ORTSNAMEN Koordinaten und einen fertigen Ausschnitt "
-        "(bbox) fuer satellite_search. **Benutze das immer, bevor du "
-        "satellite_search rufst** - rate keine Koordinaten. Kennt jedes Land "
-        "und jede Hauptstadt der Welt ohne Netz (auch als Kuerzel: DE, DEU, "
-        "USA), alles andere ueber Wikidata. Weltweit, nicht nur Deutschland."
+        "Macht aus einem ORTSNAMEN Koordinaten und einen fertigen Ausschnitt (bbox), weltweit.\n"
+        "Nimm es fuer: jeden Ortsnamen, bevor ein Satelliten-Werkzeug drankommt - rate nie Koordinaten. Dabei fallen bbox an (fuer satellite_search) und lat/lon (fuer satellite_passes).\n"
+        "Nimm es NICHT fuer: Zahlen zum Ort wie Hoehe oder Gruendungsjahr, das macht wikidata; die Einwohnerzahl steht, wenn bekannt, schon hier im Ergebnis.\n"
+        "Beispiel: find_place(name=\"Schwaebisch Gmuend\", kante_km=12)"
     )
     parameters = {
         "type": "object",

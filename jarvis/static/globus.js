@@ -120,8 +120,13 @@ const STIL = `
   font-size:var(--kenngroesse);line-height:1.02;
   text-transform:uppercase;letter-spacing:.02em;
   color:var(--text-laut);font-weight:500;
-  overflow-wrap:anywhere;
+  /* NICHT overflow-wrap anywhere: "VEREINIGTE ARABISCHE EMIRATE" wurde
+     damit mitten im Wort getrennt. Lange Namen schrumpfen stattdessen.
+     (Kein Backtick in diesem Kommentar - er steht in einem Template-Literal
+     und wuerde es beenden. node --check merkt das nicht.) */
+  overflow-wrap:normal;
 }
+.globus-wurzel .landtafel-name.lang{font-size:clamp(1.6rem,1.2rem + 1.6vw,2.5rem)}
 .globus-wurzel .landtafel-wo{
   margin-top:.25rem;font-size:var(--etikett);
   color:var(--text-leise);font-variant-numeric:tabular-nums;
@@ -162,6 +167,12 @@ const STIL = `
   padding:0;margin-bottom:0;
 }
 @keyframes globus-auf{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+/* Solange gemessen wird, steht die Karte still - sonst verschiebt ihr
+   transform das Ergebnis von getBoundingClientRect. KEIN Backtick in
+   diesem Kommentar: er steht in einem Template-Literal. */
+.globus-wurzel .karte.ungestaffelt{animation:none;opacity:0}
+/* Einzelne Elemente laufen 4 px weit ein, ganze Zonen 12, Karten 8. */
+@keyframes einordnung-rein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 
 .globus-wurzel .bild{position:relative;flex:0 0 auto;height:4.4rem;background:var(--grund)}
 .globus-wurzel .bild img{width:100%;height:100%;object-fit:cover;display:block}
@@ -190,17 +201,25 @@ const STIL = `
 /* Abschnitt 4b: andere Flaeche, andere Kante. Man muss sehen, wo die Belege
    aufhoeren und die Erklaerung anfaengt. */
 .globus-wurzel .einordnung{
-  border-top:1px dashed rgba(255,255,255,.16);
-  /* War rgba(77,163,255,.055) - das blaue Pendant zur Akzentglut. */
-  background:var(--akzent-glut);
+  border-top:1px dashed var(--akzent-strich);
+  background:var(--akzent-fuellung);
+  /* Klebt am Kachelfuss: die Einordnung gehoert unter den Beleg, egal wie
+     lang der ist. Sonst haengt sie bei kurzen Meldungen in der Luft. */
+  margin-top:auto;
+  animation:einordnung-rein var(--dauer-rein) var(--kurve-rein) both;
+  /* Erst der Beleg, dann die Deutung. 420 ms spaeter ist lange genug, um
+     die Reihenfolge zu lesen, und kurz genug, um nicht zu warten. */
+  animation-delay:420ms;
 }
 .globus-wurzel .einordnung .marke2{
   font-size:.66rem;letter-spacing:.11em;text-transform:uppercase;
-  color:var(--akzent);margin-bottom:.2rem;
+  color:var(--akzent);margin-bottom:5px;
 }
-.globus-wurzel .einordnung p{font-size:.84rem;color:var(--text);
+.globus-wurzel .einordnung p{font-size:12.5px;line-height:1.4;color:var(--text);
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .globus-wurzel .einordnung .hinweis{margin-top:.25rem;font-size:.68rem;color:var(--text-leise);font-style:italic}
+
+.globus-wurzel .laedt{color:var(--text-leise);font-size:.9rem;line-height:1.5}
 
 /* --- Statusleiste --- */
 .globus-wurzel .status{
@@ -311,15 +330,17 @@ const MARKUP = `
   <p class="orthinweis" id="ort-hinweis"></p>
 </section>
 
-<main class="karten" id="karten" aria-live="polite"></main>
+<main class="karten" id="karten" aria-live="polite">
+  <div class="leer">Wähl ein Land, dann sucht JARVIS Quellen dafür und ordnet sie ein.</div>
+</main>
 
 <footer class="status">
   <span class="gesagt" id="gesagt">Bereit.</span>
-  <span>Abfragen <b id="z-abfragen">0</b></span>
-  <span>aus dem Cache <b id="z-treffer">0</b></span>
-  <span>Cache-Quote <b id="z-quote">0 %</b></span>
-  <span id="z-verworfen-box">verworfen <b id="z-verworfen">0</b></span>
-  <span>Modellaufrufe heute <b id="z-aufrufe">0</b></span>
+  <span>Abfragen <b id="z-abfragen">—</b></span>
+  <span>aus dem Cache <b id="z-treffer">—</b></span>
+  <span>Cache-Quote <b id="z-quote">—</b></span>
+  <span id="z-verworfen-box">verworfen <b id="z-verworfen">—</b></span>
+  <span>Modellaufrufe heute <b id="z-aufrufe">—</b></span>
 </footer>
 `;
 
@@ -482,14 +503,36 @@ export async function starte(behaelter, token){
     zustand.ausgeblendet = 0;
     const liste = (daten.meldungen || []).slice(0, MAX_KARTEN);
     if (!liste.length){
-      ziel.appendChild(textKnoten('div','leer','0 belegte Meldungen.'));
+      // "0 belegte Meldungen" liest sich wie ein Fehler. Es ist keiner:
+      // fuer manche Laender liegt an manchen Tagen nichts vor.
+      ziel.appendChild(textKnoten('div', 'leer',
+        'Keine Quelle gefunden, die in den letzten Stunden aktualisiert '
+        + 'wurde. Für dieses Land liegt nichts vor — das ist kein Fehler.'));
       zustand.ausgeblendet = 0;
       document.body.dataset.karten = '0';
       return;
     }
-    liste.forEach(m => ziel.appendChild(karteNode(m)));
+    // Erst still anhaengen, dann zuschneiden, DANN staffeln.
+    //
+    // Andersherum ging es schief: `schneideKarten` misst mit
+    // getBoundingClientRect, und das rechnet `transform` mit. Waehrend eine
+    // Karte einlaeuft, steht sie bei translateY(8px) - sie galt damit als
+    // "passt nicht" und flog raus, eine nach der anderen, bis keine mehr da
+    // war. Gemessen: 0 statt 5 Karten.
+    liste.forEach(m => {
+      const k = karteNode(m);
+      k.classList.add('ungestaffelt');
+      ziel.appendChild(k);
+    });
 
-    requestAnimationFrame(schneideKarten);
+    requestAnimationFrame(() => {
+      schneideKarten();
+      // 45 ms Versatz, derselbe Takt wie die Zonen im COMMAND CENTER.
+      Array.prototype.forEach.call(ziel.children, (k, i) => {
+        k.style.animationDelay = (i * 45) + 'ms';
+        k.classList.remove('ungestaffelt');
+      });
+    });
   }
 
   /* "Was nicht reinpasst, wird nicht angezeigt" heisst: ganze Karten
@@ -554,6 +597,9 @@ export async function starte(behaelter, token){
     n.className = 'landtafel-name';
     n.id = 'landtafel-name';
     n.textContent = name;
+    // Ab hier passt der Name nicht mehr in eine Zeile der Kenngroessenstufe.
+    // Gemessen am laengsten Landesnamen im Datensatz.
+    if (name.length > 20) n.classList.add('lang');
     const w = document.createElement('div');
     w.className = 'landtafel-wo';
     w.id = 'landtafel-wo';
@@ -569,12 +615,13 @@ export async function starte(behaelter, token){
     jetzt.classList.add('geht');
     buehne.appendChild(neu);
 
-    // Ein Frame warten, sonst gilt `kommt` als Anfangszustand UND Endzustand
-    // und es wird gar nicht animiert.
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      neu.classList.remove('kommt');
-    }));
-    setTimeout(() => { if (jetzt.parentNode) jetzt.remove(); }, 450);
+    // Erst raus, dann rein - nicht gleichzeitig. Der alte Satz braucht
+    // 220 ms (`--dauer-raus`); genau so lange wartet der neue, sonst
+    // ueberlagern sich zwei Namen und man liest keinen von beiden.
+    // Das ersetzt das Warten auf einen Frame: 220 ms sind laenger als ein
+    // Frame, also gilt `kommt` sicher als Anfangszustand.
+    setTimeout(() => neu.classList.remove('kommt'), 220);
+    setTimeout(() => { if (jetzt.parentNode) jetzt.remove(); }, 240);
   }
 
   function zeigeStatus(daten){
@@ -627,7 +674,15 @@ export async function starte(behaelter, token){
           : String(iso)));
     // Abschnitt 4c: EIN Satz beim Start, dann Ruhe bis die Karten da sind.
     sageStatus('Ich schaue nach ' + (name || iso) + '.');
+    // Nicht leeren, sondern sagen, was gerade passiert. Eine leere Flaeche
+    // sieht aus wie ein Fehler; die Drehung allein erklaert sie nicht.
     el('karten').textContent = '';
+    // Eigene Klasse, NICHT `leer`: "ich arbeite noch" ist etwas anderes als
+    // "nichts gefunden". Mit derselben Klasse sah der Wartezustand fuer
+    // jeden Beobachter - Test wie Mensch - schon nach dem Endergebnis aus.
+    el('karten').appendChild(textKnoten('div', 'laedt',
+      'JARVIS liest Quellen für das gewählte Land. Der Globus dreht, '
+      + 'solange gesucht wird.'));
 
     return api('/api/weltlage/' + encodeURIComponent(iso))
       .then(d => d.auftrag_noetig
@@ -739,7 +794,7 @@ export async function starte(behaelter, token){
           'uniform vec3 farbe; varying vec3 vN; varying vec3 vP;',
           'void main(){',
           '  float f = pow(1.0 - abs(dot(normalize(vN), normalize(-vP))), 4.2);',
-          '  gl_FragColor = vec4(farbe, f * 0.55);',
+          '  gl_FragColor = vec4(farbe, f * 0.336);',
           '}'
         ].join('\n')
       })
@@ -915,11 +970,11 @@ export async function starte(behaelter, token){
       });
       welt.add(new THREE.LineSegments(
         new THREE.BufferGeometry().setFromPoints(kueste),
-        new THREE.LineBasicMaterial({color: farbe('--text')})));
+        new THREE.LineBasicMaterial({color: farbe('--text-leise')})));
       welt.add(new THREE.LineSegments(
         new THREE.BufferGeometry().setFromPoints(binnen),
         new THREE.LineBasicMaterial({color: farbe('--text-leise'),
-                                     transparent: true, opacity: 0.45})));
+                                     transparent: true, opacity: 0.25})));
       document.body.dataset.linien = kueste.length + ':' + binnen.length;
 
       geos.forEach(g => {
@@ -1326,7 +1381,10 @@ export async function starte(behaelter, token){
     document.addEventListener('visibilitychange', () => { sichtbar = !document.hidden; });
     new IntersectionObserver(([e]) => { sichtbar = e.isIntersecting; }).observe(canvas);
 
-    const glatt = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+    /* easeOutQuart statt easeInOutCubic: der Flug soll sofort losgehen und
+       weich ankommen, nicht erst anfahren. Ein Flug, der langsam anfaengt,
+       fuehlt sich an, als haette der Klick nicht gewirkt. */
+    const glatt = t => 1 - Math.pow(1 - t, 4);
 
     function schleife(){
       window.__globusSchleife++;

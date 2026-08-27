@@ -17,9 +17,10 @@ from core.tools.registry import register
 class Clock(Tool):
     name = "clock"
     description = (
-        "Gibt das aktuelle Datum und die aktuelle Uhrzeit zurueck. "
-        "Benutze das immer, wenn nach der Zeit, dem Datum oder dem Wochentag "
-        "gefragt wird - rate die Zeit nie."
+        "Gibt das aktuelle Datum, die Uhrzeit und den Wochentag zurueck, wahlweise in einer IANA-Zeitzone.\n"
+        "Nimm es fuer: \"wie spaet ist es?\", \"welcher Tag ist heute?\" - und immer, bevor du mit einem Datum rechnest; rate die Zeit nie. Dabei faellt das heutige Datum an, das kalender fuer von/bis braucht.\n"
+        "Nimm es NICHT fuer: was an einem Tag ansteht - Termine stehen im kalender.\n"
+        "Beispiel: clock(timezone=\"Europe/Berlin\")"
     )
     parameters = {
         "type": "object",
@@ -186,11 +187,10 @@ def rechne(ausdruck: str) -> float | int:
 class Calculator(Tool):
     name = "calculator"
     description = (
-        "Rechnet einen arithmetischen Ausdruck aus. Benutze das fuer JEDE "
-        "Rechnung - auch fuer einfache. Rechne nie im Kopf. "
-        "Erlaubt sind + - * / // % **, Klammern, pi, e und die Funktionen "
-        "abs, round, min, max, sum, int, float. "
-        "Prozent schreibst du als Multiplikation: 17 % von 4380 ist '4380 * 0.17'."
+        "Rechnet einen arithmetischen Ausdruck aus und gibt das Ergebnis zurueck.\n"
+        "Nimm es fuer: JEDE Rechnung, auch die einfachste - rechne nie im Kopf; erlaubt sind + - * / // % **, Klammern, pi, e und abs, round, min, max, sum, int, float. Prozent als Multiplikation: 17 % von 4380 ist \"4380 * 0.17\".\n"
+        "Nimm es NICHT fuer: Zahlen beschaffen - Einwohnerzahl oder Gruendungsjahr holt wikidata, gerechnet wird danach hier.\n"
+        "Beispiel: calculator(expression=\"4380 * 0.17\")"
     )
     parameters = {
         "type": "object",
