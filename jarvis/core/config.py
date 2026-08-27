@@ -71,6 +71,28 @@ class Settings(BaseSettings):
         default="", validation_alias=AliasChoices("VAULT_PFAD", "VAULT_PATH")
     )
 
+    # --- Lokaler Zugriff (docs/FIX-07.md) ---
+    # Leer = kein Dateizugriff. JARVIS sieht dann NICHTS vom Dateisystem.
+    # Getrennt durch os.pathsep (":" unter Linux/macOS, ";" unter Windows).
+    #
+    # NICHT das Benutzerverzeichnis als Ganzes eintragen. Dort liegen .ssh,
+    # Browserprofile, Passwortspeicher und die .env-Dateien anderer
+    # Projekte. Wer die Wurzel zu weit setzt, hat die Allowlist umsonst.
+    datei_wurzeln: str = Field(
+        default="", validation_alias=AliasChoices("DATEI_WURZELN", "FILE_ROOTS")
+    )
+    # Obergrenze je Datei. Groesseres wird nicht gelesen, mit Nennung der
+    # Grenze - eine 400-MB-Logdatei gehoert nicht in einen Prompt.
+    datei_max_kb: int = Field(
+        default=512, validation_alias=AliasChoices("DATEI_MAX_KB")
+    )
+    # Leer = kein Kalender. Dateipfad ODER https-Adresse eines ICS-Abos.
+    # Die Abo-Adresse ist ein Geheimnis wie ein Passwort: wer sie hat, liest
+    # den ganzen Kalender mit.
+    kalender_quelle: str = Field(
+        default="", validation_alias=AliasChoices("KALENDER_QUELLE", "CALENDAR_SOURCE")
+    )
+
     # Phase 5: send_email schreibt hierhin statt zu senden. Ein echter Versand
     # waere ein eigenes Werkzeug mit eigenem Anbieter und eigenem Key.
     outbox_path: Path = Field(

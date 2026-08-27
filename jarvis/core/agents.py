@@ -483,7 +483,11 @@ def baue_agenten(
             name="jarvis",
             description="Erledigt einen Schritt mit den eigenen Werkzeugen.",
             system_prompt=mit_stil(STANDARD_PROMPT),
-            tools=["clock", "calculator", "recall", "remember", "send_email"],
+            # FIX-07: datei_suchen, datei_lesen und kalender kommen dazu.
+            # `max_permission` bleibt unveraendert - die drei sind READ, und
+            # SENSITIVE bleibt zu.
+            tools=["clock", "calculator", "recall", "remember", "send_email",
+                   "datei_suchen", "datei_lesen", "kalender"],
             max_permission=max_permission,
             on_reply=on_reply,
             on_call=on_call,

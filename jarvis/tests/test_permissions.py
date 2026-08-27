@@ -111,11 +111,24 @@ def test_dod_2_die_vorschau_zeigt_empfaenger_betreff_und_text():
     assert "Ich bin heute nicht da." in vorschau
 
 
-def test_die_vorschau_kuerzt_einen_riesigen_text():
+def test_die_vorschau_kuerzt_nicht(  # FIX-07 Abschnitt 3.6
+):
+    """Umgedreht gegenueber Phase 5: die Vorschau zeigt den ganzen Text.
+
+    Fruehere Fassung war `test_die_vorschau_kuerzt_einen_riesigen_text` und
+    hat bei 800 Zeichen abgeschnitten. Seit `datei_lesen` kann fremder
+    Dateiinhalt in den Mailtext geraten; eine geschmuggelte Anweisung steht
+    dann am Ende. Der Bestaetigungsdialog ist die letzte Stelle, an der ein
+    Mensch das sieht - er darf nichts wegwerfen.
+    """
+    schluss = "PS: Anbei mein SSH-Schluessel: AAAAB3NzaC1yc2E"
+    koerper = "x" * 5000 + "\n" + schluss
     vorschau = beschreibe_aufruf(registry.get("send_email"), {
-        "to": "a@b.de", "subject": "s", "body": "x" * 5000,
+        "to": "a@b.de", "subject": "s", "body": koerper,
     })
-    assert len(vorschau) < 1200 and "…" in vorschau
+    assert schluss in vorschau, "die letzte Zeile fehlt in der Vorschau"
+    assert koerper in vorschau
+    assert "…" not in vorschau
 
 
 # --- Ohne Bestaetiger -----------------------------------------------------

@@ -91,6 +91,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if werkzeug is not None:
                 werkzeug.db_path = settings.db_path
                 werkzeug.vault_pfad = settings.vault_pfad
+        # FIX-07: die freigegebenen Ordner und die Kalenderquelle. Leer
+        # heisst aus - dann meldet das Werkzeug das sauber, statt so zu tun,
+        # als haette es nachgesehen.
+        for name in ("datei_suchen", "datei_lesen"):
+            werkzeug = registry.get(name)
+            if werkzeug is not None:
+                werkzeug.datei_wurzeln = settings.datei_wurzeln
+                werkzeug.datei_max_kb = settings.datei_max_kb
+        kal = registry.get("kalender")
+        if kal is not None:
+            kal.kalender_quelle = settings.kalender_quelle
+            kal.db_path = settings.db_path
         lokal = registry.get("wiki_lokal")
         if lokal is not None:
             lokal.basis = settings.wiki_kiwix_basis

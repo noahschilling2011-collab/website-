@@ -42,14 +42,27 @@ class SendEmail(Tool):
     outbox: Path | str = ""
 
     def vorschau(self, to: str, subject: str, body: str) -> str:
-        """Genau das, was der Nutzer vor dem Senden zu sehen bekommt (DoD 2)."""
-        gekuerzt = body if len(body) <= 800 else body[:799] + "…"
+        """Genau das, was der Nutzer vor dem Senden zu sehen bekommt (DoD 2).
+
+        **Vollstaendig, nie gekuerzt.** Bis FIX-07 stand hier eine Grenze von
+        800 Zeichen. Das war ein Fehler, und zwar ein sicherheitsrelevanter:
+        seit `datei_lesen` existiert, kann fremder Dateiinhalt in den Text
+        geraten - und wer eine Anweisung in eine Datei schmuggelt, setzt sie
+        ans Ende, nicht an den Anfang. Gemessen an einem Text von 1163
+        Zeichen fehlte genau die letzte Zeile in der Vorschau. Dieser Dialog
+        ist die einzige Stelle, an der ein Mensch das noch sieht; er darf
+        nichts verschweigen.
+
+        Lang wird der Text dadurch schon - aber `.frage pre` in `index.html`
+        ist ein Scrollbereich (`max-height: 320px; overflow-y: auto`). Der
+        Text ist also vollstaendig da und trotzdem nicht im Weg.
+        """
         return (
             "E-Mail senden\n"
             f"An:      {to}\n"
             f"Betreff: {subject}\n"
             "\n"
-            f"{gekuerzt}"
+            f"{body}"
         )
 
     async def execute(self, to: str, subject: str, body: str) -> ToolResult:

@@ -7,6 +7,8 @@ Timeout), `loop` dreht die Runde Modell → Tool → Modell.
 from core import delegation  # noqa: F401  - registriert ask_agent
 from core.tools import (  # noqa: F401  - Registrierung per Import
     builtin,
+    datei_tools,
+    kalender_tools,
     memory_tools,
     outbox,
     satellite_tools,
