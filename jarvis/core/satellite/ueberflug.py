@@ -309,6 +309,122 @@ def ueberfluege(
     return gefunden[:hoechstens]
 
 
+@dataclass(frozen=True)
+class Bodenspur:
+    """Wo ein Satellit **steht** - nicht, ob man ihn sieht.
+
+    `Ueberflug` beantwortet die andere Frage ("wann geht er hier auf"), und
+    die braucht einen Beobachtungsort. Fuer eine Bahn auf dem Globus ist der
+    Ort die ganze Erde: fuer jeden Zeitschritt der Punkt senkrecht unter dem
+    Satelliten.
+
+    **Die Grenze, die dazugehoert:** eine Bodenspur sagt nichts ueber
+    Sichtbarkeit. Dafuer braeuchte es den Sonnenstand, also `de421.bsp` und
+    rund 16 MB - das steht schon im Modulkopf. Der Satz gehoert in die
+    Oberflaeche, nicht nur hierher (FIX-06 Abschnitt 7.3).
+    """
+
+    name: str
+    norad: int
+    hoehe_km: float                  # Mittel ueber das Fenster
+    punkte: list[tuple[float, float]]   # (lat, lon) in Grad
+    tle_alter_tage: float
+    tle_zu_alt: bool
+
+    def als_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "norad": self.norad,
+            "hoehe_km": round(self.hoehe_km, 1),
+            "punkte": [[round(a, 3), round(b, 3)] for a, b in self.punkte],
+            "tle_alter_tage": round(self.tle_alter_tage, 2),
+            "tle_zu_alt": self.tle_zu_alt,
+        }
+
+
+# Ein Deckel gegen Unfug: 157 Satelliten mal zu viele Punkte sind schnell
+# ein paar Megabyte JSON und eine Sekunde Rechenzeit.
+SPUR_MAX_PUNKTE = 400
+
+
+def bodenspuren(
+    satelliten: list[tuple[str, str, str]],
+    *,
+    von: datetime,
+    minuten: int = 90,
+    schritt_s: int = 30,
+) -> list[Bodenspur]:
+    """Fuer jeden Satelliten die Punktfolge lat/lon unter ihm.
+
+    Die skyfield-Aufrufe sind **nachgeschlagen**, nicht erinnert:
+    `wgs84.latlon_of(position)` gibt Breite und Laenge des Punktes
+    senkrecht unter einer geozentrischen Position, `wgs84.height_of(position)`
+    die Hoehe ueber dem Ellipsoid. Beide sind in
+    `documentation/earth-satellites.rst` dokumentiert und gegen die
+    installierte Fassung 1.55 geprueft. Beide verlangen `position.center == 399`
+    - das ist bei `EarthSatellite.at()` gegeben.
+
+    Gerechnet wird **vektorisiert** ueber `ts.linspace`: ein `at()` je
+    Satellit statt eines je Zeitpunkt. Bei 157 Satelliten und 181 Punkten
+    ist das der Unterschied zwischen einer Sekunde und einer halben Minute.
+    """
+    if minuten <= 0:
+        raise UeberflugFehler("Das Zeitfenster muss groesser als null sein.")
+    if schritt_s <= 0:
+        raise UeberflugFehler("Der Zeitschritt muss groesser als null sein.")
+
+    anzahl = int(minuten * 60 / schritt_s) + 1
+    if anzahl > SPUR_MAX_PUNKTE:
+        raise UeberflugFehler(
+            f"{anzahl} Punkte je Satellit sind zu viele; hoechstens "
+            f"{SPUR_MAX_PUNKTE}. Nimm ein kuerzeres Fenster oder groessere "
+            f"Schritte."
+        )
+
+    # Spaet importiert, wie in `ueberfluege()`: skyfield zieht numpy mit.
+    from skyfield.api import EarthSatellite, load, wgs84
+
+    ts = load.timescale()
+    t0 = ts.from_datetime(von)
+    t1 = ts.from_datetime(von + timedelta(minutes=minuten))
+    zeiten = ts.linspace(t0, t1, anzahl)
+
+    ergebnis: list[Bodenspur] = []
+    for name, l1, l2 in satelliten:
+        try:
+            sat = EarthSatellite(l1, l2, name, ts)
+            stand = sat.at(zeiten)
+            breite, laenge = wgs84.latlon_of(stand)
+            hoehe = wgs84.height_of(stand)
+            grad_b = [float(x) for x in breite.degrees]
+            grad_l = [float(x) for x in laenge.degrees]
+            km = [float(x) for x in hoehe.km]
+        except Exception as exc:  # noqa: BLE001
+            # Wie in `ueberfluege()`: ein kaputter Satz von 157 darf nicht
+            # die ganze Antwort kippen.
+            log.warning("Bodenspur von %r nicht berechenbar: %s", name, exc)
+            continue
+
+        # Ein TLE mit unbrauchbaren Zahlen liefert NaN statt zu werfen -
+        # gemessen an einem Satz aus zwei Muellzeilen. NaN im JSON waere
+        # ungueltig und im Globus eine Linie ins Nichts.
+        if any(b != b or l != l for b, l in zip(grad_b, grad_l)):
+            log.warning("Bodenspur von %r enthaelt NaN - verworfen.", name)
+            continue
+
+        alter = abs((von - sat.epoch.utc_datetime()).total_seconds()) / 86400.0
+        ergebnis.append(Bodenspur(
+            name=name,
+            norad=int(sat.model.satnum),
+            hoehe_km=sum(km) / len(km),
+            punkte=list(zip(grad_b, grad_l)),
+            tle_alter_tage=alter,
+            tle_zu_alt=alter > TLE_WARNT_AB_TAGEN,
+        ))
+
+    return ergebnis
+
+
 def jetzt_utc() -> datetime:
     return datetime.now(timezone.utc)
 

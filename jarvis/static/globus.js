@@ -92,6 +92,51 @@ const STIL = `
 .globus-wurzel .knopf:focus-visible{outline:2px solid var(--akzent);outline-offset:2px}
 .globus-wurzel .knopf[aria-pressed="true"]{border-color:var(--akzent);color:var(--akzent)}
 
+/* --- Landtafel (FIX-06 Abschnitt 7.2) ---
+   Links ueber dem Canvas. Das ist die eine Stelle, an der Glas etwas zu tun
+   hat: dahinter liegt der Globus und damit echte Struktur.
+   Beim Wechsel geht die alte Zeile in 220 ms raus, die neue in 380 ms rein,
+   mit 8 px Versatz von unten. Nur transform und opacity - alles andere
+   loest ein Layout aus und ruckelt neben einer WebGL-Schleife. */
+.globus-wurzel .landtafel{
+  position:absolute;left:1rem;top:4.2rem;z-index:3;
+  max-width:min(24rem,42vw);
+  padding:.85rem 1.1rem;border-radius:.9rem;
+  pointer-events:none;
+}
+.globus-wurzel .landtafel-buehne{position:relative;overflow:hidden}
+.globus-wurzel .landtafel-satz{
+  transform:translateY(0);opacity:1;
+  transition:transform var(--dauer-rein,380ms) var(--kurve-rein),
+             opacity var(--dauer-rein,380ms) var(--kurve-rein);
+}
+.globus-wurzel .landtafel-satz.geht{
+  transform:translateY(-8px);opacity:0;
+  transition-duration:220ms;
+}
+.globus-wurzel .landtafel-satz.kommt{transform:translateY(8px);opacity:0}
+.globus-wurzel .landtafel-name{
+  font-size:var(--kenngroesse);line-height:1.02;
+  text-transform:uppercase;letter-spacing:.02em;
+  color:var(--text-laut);font-weight:500;
+  overflow-wrap:anywhere;
+}
+.globus-wurzel .landtafel-wo{
+  margin-top:.25rem;font-size:var(--etikett);letter-spacing:.06em;
+  color:var(--text-leise);font-variant-numeric:tabular-nums;
+}
+.globus-wurzel .landtafel-tut{
+  margin-top:.5rem;font-size:.86rem;color:var(--akzent);
+}
+/* DoD 5: die Grenze steht in der ANSICHT, nicht nur im Code. */
+.globus-wurzel .landtafel-sat{
+  margin-top:.45rem;padding-top:.45rem;border-top:1px solid var(--kante);
+  font-size:.78rem;line-height:1.45;color:var(--text-leise);
+}
+@media (max-width:640px){
+  .globus-wurzel .landtafel{left:.6rem;right:.6rem;max-width:none;top:6.5rem}
+}
+
 /* --- Karten --- */
 .globus-wurzel .karten{
   position:absolute;z-index:2;right:1rem;top:3.6rem;bottom:3.2rem;width:min(38ch,42%);
@@ -241,6 +286,17 @@ const MARKUP = `
   <button class="knopf" id="btn-globus-mic" type="button" aria-pressed="false"
           title="Leertaste halten und sprechen">🎤 Halten</button>
 </header>
+
+<section class="landtafel glas" id="landtafel" aria-live="polite">
+  <div class="landtafel-buehne" id="landtafel-buehne">
+    <div class="landtafel-satz" id="landtafel-satz">
+      <div class="landtafel-name" id="landtafel-name">Weltweit</div>
+      <div class="landtafel-wo" id="landtafel-wo">alle Länder</div>
+    </div>
+  </div>
+  <div class="landtafel-tut" id="landtafel-tut">Bereit.</div>
+  <div class="landtafel-sat" id="sat-hinweis">Satellitenbahnen werden geladen …</div>
+</section>
 
 <section class="ortpanel" id="ortpanel" hidden aria-live="polite">
   <button class="ortzu" id="ort-zu" type="button" aria-label="Schließen">×</button>
@@ -459,11 +515,66 @@ export async function starte(behaelter, token){
       weg++;
     }
     zustand.ausgeblendet = (zustand.ausgeblendet || 0) + weg;
-    if (weg) el('gesagt').textContent +=
-      ` ${weg} weitere ${weg === 1 ? 'Meldung passt' : 'Meldungen passen'} nicht ins Bild.`;
+    if (weg) sageStatus(el('gesagt').textContent
+      + ` ${weg} weitere ${weg === 1 ? 'Meldung passt' : 'Meldungen passen'} nicht ins Bild.`);
     document.body.dataset.karten = String(ziel.querySelectorAll('.karte').length);
   }
   kartenNachholen = schneideKarten;
+
+  /* FIX-06 Abschnitt 7.2 - die Landtafel.
+
+     Der Statustext steht ab jetzt an zwei Stellen: klein in der Fusszeile,
+     wo er seit Phase 11 steht, und gross auf der Tafel. Ein Setter, damit
+     die beiden nicht auseinanderlaufen. */
+  function sageStatus(text){
+    el('gesagt').textContent = text;
+    const tut = el('landtafel-tut');
+    if (tut) tut.textContent = text;
+  }
+
+  /* Namenswechsel. Alte Zeile raus in 220 ms, neue rein in 380 ms mit 8 px
+     Versatz von unten - nur `transform` und `opacity`, wie im Auftrag
+     verlangt. Alles andere loest ein Layout aus, und ein Layout neben einer
+     WebGL-Schleife ist genau das Ruckeln, das FIX-05 A4 abgestellt hat. */
+  function setzeLandtafel(name, wo){
+    const buehne = el('landtafel-buehne');
+    const jetzt = el('landtafel-satz');
+    if (!buehne || !jetzt) return;
+    const alterName = jetzt.querySelector('.landtafel-name').textContent;
+    if (alterName === name){
+      jetzt.querySelector('.landtafel-wo').textContent = wo || '';
+      return;
+    }
+
+    const neu = document.createElement('div');
+    neu.className = 'landtafel-satz kommt';
+    neu.id = 'landtafel-satz';
+    const n = document.createElement('div');
+    n.className = 'landtafel-name';
+    n.id = 'landtafel-name';
+    n.textContent = name;
+    const w = document.createElement('div');
+    w.className = 'landtafel-wo';
+    w.id = 'landtafel-wo';
+    w.textContent = wo || '';
+    neu.appendChild(n);
+    neu.appendChild(w);
+
+    // Waehrend des Wechsels liegen beide uebereinander. Ohne das springt
+    // die Tafel in der Hoehe, und "ohne Sprung" ist Kriterium 4.
+    jetzt.style.position = 'absolute';
+    jetzt.style.inset = '0';
+    jetzt.removeAttribute('id');
+    jetzt.classList.add('geht');
+    buehne.appendChild(neu);
+
+    // Ein Frame warten, sonst gilt `kommt` als Anfangszustand UND Endzustand
+    // und es wird gar nicht animiert.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      neu.classList.remove('kommt');
+    }));
+    setTimeout(() => { if (jetzt.parentNode) jetzt.remove(); }, 450);
+  }
 
   function zeigeStatus(daten){
     var text = daten.gesagt
@@ -477,7 +588,7 @@ export async function starte(behaelter, token){
         return gruende[g] + '× ' + g;
       }).join(', ') + '.';
     }
-    el('gesagt').textContent = text;
+    sageStatus(text);
 
     var box = el('z-verworfen-box');
     if (box) box.title = namen.length
@@ -506,8 +617,15 @@ export async function starte(behaelter, token){
     if (laeuft) return Promise.resolve();
     laeuft = true;
     el('land').textContent = name || iso;
+    // FIX-06 7.2: derselbe Name gross auf der Tafel, mit ISO und Koordinaten.
+    const eintrag = (zustand.laender || []).find(l => l.iso === iso);
+    setzeLandtafel(name || iso, iso === 'WELT'
+      ? 'alle Länder'
+      : (eintrag
+          ? `${iso} · ${eintrag.lat.toFixed(1)}°, ${eintrag.lon.toFixed(1)}°`
+          : String(iso)));
     // Abschnitt 4c: EIN Satz beim Start, dann Ruhe bis die Karten da sind.
-    el('gesagt').textContent = 'Ich schaue nach ' + (name || iso) + '.';
+    sageStatus('Ich schaue nach ' + (name || iso) + '.');
     el('karten').textContent = '';
 
     return api('/api/weltlage/' + encodeURIComponent(iso))
@@ -519,7 +637,7 @@ export async function starte(behaelter, token){
         // Scheitert die Recherche, ist der richtige Zustand leer plus Begruendung.
         // Kein Platzhalter, keine Karte - und die Begruendung ist die echte.
         zeichneKarten({ meldungen: [] });
-        el('gesagt').textContent = err.message;
+        sageStatus(err.message);
         return ladeZaehler();
       })
       .finally(() => { laeuft = false; });
@@ -582,6 +700,54 @@ export async function starte(behaelter, token){
 
     const AKZENT = farbe('--akzent');
     const RUHE   = farbe('--text-leise');   // Graustufe, wie im Auftrag
+
+    /* FIX-06 Abschnitt 7.1 - der Atmosphaerensaum.
+       Ein zweites Kugel-Mesh, knapp groesser, von INNEN gerendert: dann
+       wird sein Rand zum Saum. Radien im Ueberblick, damit der Saum
+       ausserhalb von allem liegt: Erde 1.0, Grenzlinien 1.002, Landesmarken
+       1.01, Saum 1.032.
+
+       Alle vier Namen darin sind in static/vendor/three.core.js
+       nachgeschlagen, nicht erinnert: ShaderMaterial, BackSide,
+       AdditiveBlending und `normalMatrix` (die Uniform, die Three.js jedem
+       Shader mitgibt).
+
+       `depthWrite: false` ist Pflicht - sonst verdeckt der Saum die
+       Satellitenbahnen, die weiter aussen liegen.
+
+       Der Saum haengt an `welt`, nicht an `szene`: sonst dreht er nicht mit,
+       und beim Drehen sieht man, dass er nicht rund ist. */
+    const luft = new THREE.Mesh(
+      new THREE.SphereGeometry(1.032, 64, 48),
+      new THREE.ShaderMaterial({
+        transparent: true,
+        side: THREE.BackSide,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        uniforms: {farbe: {value: AKZENT.clone()}},
+        vertexShader: [
+          'varying vec3 vN; varying vec3 vP;',
+          'void main(){',
+          '  vN = normalize(normalMatrix * normal);',
+          '  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
+          '  vP = mv.xyz;',
+          '  gl_Position = projectionMatrix * mv;',
+          '}'
+        ].join('\n'),
+        fragmentShader: [
+          'uniform vec3 farbe; varying vec3 vN; varying vec3 vP;',
+          'void main(){',
+          '  float f = pow(1.0 - abs(dot(normalize(vN), normalize(-vP))), 4.2);',
+          '  gl_FragColor = vec4(farbe, f * 0.55);',
+          '}'
+        ].join('\n')
+      })
+    );
+    welt.add(luft);
+    // Von aussen pruefbar (DoD 1): sonst laesst sich nicht messen, ob der
+    // Saum ueberhaupt da ist und ob er mitdreht. `zustand` haengt schon am
+    // window, aus demselben Grund wie `drehung` und `naehe`.
+    zustand.saum = luft;
 
     /* FIX-05 A4. Vorher lief `renderer.render()` in JEDEM Frame, auch wenn
        sich nichts bewegte - 60 Bilder je Sekunde fuer ein Standbild. Im
@@ -698,9 +864,63 @@ export async function starte(behaelter, token){
       fetch('/static/vendor/iso3166.json').then(r => r.json()),
     ]).then(([topo, iso]) => {
       const geos = topo.objects.countries.geometries;
-      // Alle Grenzlinien in EINE Geometrie: 177 Line-Meshes waeren 177 Draw
-      // Calls fuer denselben Anblick.
-      const punkte = [];
+
+      /* FIX-06 Abschnitt 7.3: Grenzlinien in ZWEI Staerken statt einer
+         Erdtextur. Der Auftrag nennt das die dritte Moeglichkeit und sagt
+         "probier das zuerst" - sie gibt Flaechenwirkung ohne eine einzige
+         zusaetzliche Flaeche und ohne eine Binaerdatei im Repo.
+
+         Woher die Unterscheidung kommt: TopoJSON teilt sich Boegen zwischen
+         Nachbarn. Ein Bogen, der in genau EINEM Land vorkommt, ist eine
+         Aussenkante - Kueste. Kommt er in zweien vor, ist es eine
+         Binnengrenze. Negative Indizes sind derselbe Bogen rueckwaerts
+         (`~i`), also wird kanonisiert.
+
+         Das ist keine Heuristik, sondern die Struktur des Formats. */
+      const bogenZaehler = new Map();
+      function bogenIndizes(g){
+        const teile = g.type === 'Polygon' ? [g.arcs] : g.arcs;
+        return teile.flatMap(poly => poly.flatMap(ring =>
+          ring.map(i => (i < 0 ? ~i : i))));
+      }
+      geos.forEach(g => {
+        bogenIndizes(g).forEach(i => {
+          bogenZaehler.set(i, (bogenZaehler.get(i) || 0) + 1);
+        });
+      });
+
+      // Zwei Geometrien, nicht 177: derselbe Grund wie vorher, nur eben
+      // zweimal. Zwei Draw Calls statt einem sind der Preis fuer die
+      // Tiefenwirkung.
+      const kueste = [];
+      const binnen = [];
+      // JEDER Bogen genau einmal. Der alte Code lief ueber die Ringe und hat
+      // damit jede Binnengrenze doppelt gezeichnet - einmal aus jedem der
+      // beiden Nachbarlaender. Zweimal dieselbe Linie ist unsichtbar, aber
+      // sie kostet.
+      const gesehen = new Set();
+      geos.forEach(g => {
+        bogenIndizes(g).forEach(kanon => {
+          if (gesehen.has(kanon)) return;
+          gesehen.add(kanon);
+          // Vorwaertsrichtung reicht: eine Strecke hat keine Richtung.
+          const linie = bogen(topo, kanon);
+          const ziel = (bogenZaehler.get(kanon) || 1) > 1 ? binnen : kueste;
+          for (let n = 0; n < linie.length - 1; n++){
+            ziel.push(aufKugel(linie[n][0], linie[n][1], 1.002));
+            ziel.push(aufKugel(linie[n+1][0], linie[n+1][1], 1.002));
+          }
+        });
+      });
+      welt.add(new THREE.LineSegments(
+        new THREE.BufferGeometry().setFromPoints(kueste),
+        new THREE.LineBasicMaterial({color: farbe('--text')})));
+      welt.add(new THREE.LineSegments(
+        new THREE.BufferGeometry().setFromPoints(binnen),
+        new THREE.LineBasicMaterial({color: farbe('--text-leise'),
+                                     transparent: true, opacity: 0.45})));
+      document.body.dataset.linien = kueste.length + ':' + binnen.length;
+
       geos.forEach(g => {
         const rr = ringe(topo, g);
         const code = g.id != null ? String(g.id).padStart(3, '0') : null;
@@ -718,18 +938,7 @@ export async function starte(behaelter, token){
           // Punkt-fuer-Punkt; mit ihm bleiben eine Handvoll uebrig.
           box: kasten(rr),
         });
-        rr.forEach(ring => {
-          for (let i = 0; i < ring.length - 1; i++){
-            punkte.push(aufKugel(ring[i][0], ring[i][1], 1.002));
-            punkte.push(aufKugel(ring[i+1][0], ring[i+1][1], 1.002));
-          }
-        });
       });
-      const geo = new THREE.BufferGeometry().setFromPoints(punkte);
-      // Kontrast gemessen, nicht geschaetzt: bei multiplyScalar(2.4) waren die
-      // Grenzen im Screenshot kaum vom Kugelgrund zu unterscheiden.
-      welt.add(new THREE.LineSegments(geo,
-        new THREE.LineBasicMaterial({color: farbe('--text-leise')})));
 
       // Ein Punkt je Land: das ist die anwählbare Fläche.
       const kugel = new THREE.SphereGeometry(0.016, 8, 6);
@@ -748,8 +957,11 @@ export async function starte(behaelter, token){
       zustand.marken = marken;
       dreckig = true;
       document.body.dataset.laender = String(zustand.laender.length);
+      // Erst wenn die Erde steht, kommen die Bahnen dazu. Scheitern sie,
+      // bleibt der Globus trotzdem benutzbar.
+      ladeBahnen();
     }).catch(err => {
-      el('gesagt').textContent = 'Ländergrenzen nicht geladen: ' + err.message;
+      sageStatus('Ländergrenzen nicht geladen: ' + err.message);
     });
 
     /* Umschliessendes Rechteck in lon/lat. `ueber_datumsgrenze` merkt sich,
@@ -818,7 +1030,7 @@ export async function starte(behaelter, token){
       // gebastelt, die /api/weltlage/<iso> nie kennt - der Klick lief ins
       // Leere. Lieber gar nicht anwaehlbar und den echten Grund sagen.
       if (land.ohne_iso){
-        el('gesagt').textContent = 'Für ' + land.name + ' habe ich keinen Ländercode.';
+        sageStatus('Für ' + land.name + ' habe ich keinen Ländercode.');
         return;
       }
       if (zustand.marken){
@@ -830,6 +1042,91 @@ export async function starte(behaelter, token){
       zustand.aktiv = land;
       dreheZu(land.lon, land.lat);
       ladeLand(land.iso, land.name);
+    }
+
+    /* ---------------------------------------------- Satellitenbahnen
+       FIX-06 Abschnitt 7.3. Was hier gezeichnet wird, ist die BODENSPUR:
+       der Punkt senkrecht unter dem Satelliten, ueber die Zeit. Sie sagt,
+       wo er steht - nicht, ob er von hier zu sehen ist. Dafuer braeuchte
+       es den Sonnenstand und damit `de421.bsp`, rund 16 MB. Der Satz steht
+       deshalb auch in der Oberflaeche und nicht nur hier (DoD 5).
+
+       Gerechnet wird auf dem Server (`GET /api/satelliten/spur`) aus den
+       zwischengespeicherten TLE-Saetzen - kein zweiter Abrufpfad zu
+       CelesTrak. */
+    let bahnenGeladen = false;
+
+    function bahnRadius(hoehe_km){
+      // Erdradius 6371 km. Bei der ISS sind das rund 1.065 - deutlich
+      // ausserhalb des Atmosphaerensaums (1.032), und genau deshalb liegt
+      // der Saum dort und nicht weiter draussen.
+      return 1.0 + hoehe_km / 6371;
+    }
+
+    function ladeBahnen(){
+      if (bahnenGeladen) return Promise.resolve();
+      bahnenGeladen = true;
+      return api('/api/satelliten/spur?gruppe=visual&minuten=90')
+        .then(d => {
+          const spuren = d.spuren || [];
+          if (!spuren.length) return;
+
+          // ALLE Bahnen in EINE Geometrie - derselbe Grund wie bei den
+          // Grenzlinien: 157 Meshes waeren 157 Draw Calls.
+          const strecken = [];
+          const koepfe = [];
+          spuren.forEach(sp => {
+            const r = bahnRadius(sp.hoehe_km);
+            const punkte = sp.punkte;
+            for (let i = 0; i < punkte.length - 1; i++){
+              const a = punkte[i], b = punkte[i+1];
+              // Der Sprung ueber die Datumsgrenze ist keine Strecke. Ohne
+              // diese Zeile zieht sich eine Linie quer durch die Kugel.
+              if (Math.abs(b[1] - a[1]) > 180) continue;
+              strecken.push(aufKugel(a[1], a[0], r));
+              strecken.push(aufKugel(b[1], b[0], r));
+            }
+            koepfe.push({p: aufKugel(punkte[0][1], punkte[0][0], r), name: sp.name});
+          });
+
+          if (strecken.length){
+            const bahnen = new THREE.LineSegments(
+              new THREE.BufferGeometry().setFromPoints(strecken),
+              new THREE.LineBasicMaterial({color: AKZENT, transparent: true,
+                                           opacity: 0.5}));
+            welt.add(bahnen);
+            zustand.bahnen = bahnen;
+          }
+
+          // Ein kleines helles Mesh am aktuellen Ende jeder Bahn.
+          if (koepfe.length){
+            const punkt = new THREE.SphereGeometry(0.008, 6, 4);
+            const jetzt = new THREE.InstancedMesh(
+              punkt, new THREE.MeshBasicMaterial({color: AKZENT}), koepfe.length);
+            const hilfe2 = new THREE.Object3D();
+            koepfe.forEach((k, i) => {
+              hilfe2.position.copy(k.p);
+              hilfe2.updateMatrix();
+              jetzt.setMatrixAt(i, hilfe2.matrix);
+            });
+            jetzt.instanceMatrix.needsUpdate = true;
+            welt.add(jetzt);
+            zustand.satelliten = jetzt;
+          }
+
+          document.body.dataset.bahnen = String(spuren.length);
+          const alt = spuren.filter(x => x.tle_zu_alt).length;
+          el('sat-hinweis').textContent = spuren.length + ' Satelliten · '
+            + d.grenze + (alt ? ' ' + alt + ' Bahndatensätze sind älter als sieben Tage.' : '');
+          // FIX-05 A4: nur zeichnen, wenn sich etwas geaendert hat. Hier hat
+          // sich etwas geaendert.
+          dreckig = true;
+        })
+        .catch(err => {
+          // Kein leeres Ergebnis, das wie "keine Satelliten" aussieht.
+          el('sat-hinweis').textContent = 'Satellitenbahnen nicht geladen: '
+            + err.message;
+        });
     }
 
     /* Die Trefferkugel. Sie liegt im Weltkoordinatensystem auf dem Ursprung
@@ -1126,7 +1423,7 @@ export async function starte(behaelter, token){
     if (!name) return;
     const knopf = el('btn-ort');
     knopf.disabled = true;
-    el('gesagt').textContent = 'Suche ' + name + ' …';
+    sageStatus('Suche ' + name + ' …');
     api('/api/ort', {
       method: 'POST',
       headers: {'content-type': 'application/json'},
@@ -1136,10 +1433,10 @@ export async function starte(behaelter, token){
       // Ladeanzeige, und sie dauert 1,8 s.
       if (zustand.fliegeZu) zustand.fliegeZu(d.ort.lon, d.ort.lat, 1.45);
       ortAnzeigen(d);
-      el('gesagt').textContent = d.ort.name;
+      sageStatus(d.ort.name);
     }).catch(fehler => {
       el('ortpanel').hidden = true;
-      el('gesagt').textContent = 'Ort nicht gefunden: ' + fehler.message;
+      sageStatus('Ort nicht gefunden: ' + fehler.message);
     }).finally(() => { knopf.disabled = false; });
   });
 
@@ -1177,11 +1474,11 @@ export async function starte(behaelter, token){
       // `iso` fuer diese drei Laender null ist, waere sonst /api/weltlage/null
       // rausgegangen.
       if (land && land.ohne_iso){
-        el('gesagt').textContent = 'Für ' + land.name + ' habe ich keinen Ländercode.';
+        sageStatus('Für ' + land.name + ' habe ich keinen Ländercode.');
       } else if (land){
         ladeLand(land.iso, land.name);
       } else {
-        el('gesagt').textContent = `"${gesagt}" kenne ich nicht als Land.`;
+        sageStatus(`"${gesagt}" kenne ich nicht als Land.`);
       }
     };
     hoerer.onend = () => { hoerer = null; el('btn-globus-mic').setAttribute('aria-pressed','false'); };

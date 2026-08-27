@@ -1004,6 +1004,73 @@ Zone 8 hat nie echte Meldungen angezeigt, weil dafür ein Modellaufruf nötig
 ist; geprüft ist nur der leere Zustand. Und der Mini-Globus lief unter
 SwiftShader, nicht auf einer GPU.
 
+## FIX-06 Abschnitt 7 — WELT-NETZ
+
+Auftrag, nachgeschlagene API-Namen und alle Messungen: `docs/FIX-06.md`.
+Abnahme mit `pytest tests/test_weltnetz.py -q` → **11 passed**, dazu
+`tests/test_bodenspur.py` → **10 passed** und `tests/test_satelliten_spur.py`
+→ **8 passed**. Volle Suite danach:
+`python3 -m pytest` → **1063 passed, 1 warning in 414.05s**.
+
+| # | Kriterium | BELEG — ausgeführter Befehl | Status |
+|---|-----------|------|--------|
+| 1 | Atmosphärensaum sichtbar, dreht mit | zwei Tests. `test_dod_1_der_saum_ist_da_und_haengt_an_der_welt` prüft Radius (1.032, außerhalb von Erde/Grenzen/Marken), `side === 1` (`BackSide`), `depthWrite === false`. `test_dod_1_der_saum_dreht_mit` misst am **Screenshot** vier Punkte auf dem Rand, vor und nach 90° Drehung — rundum warm, `r − b > 15` an allen acht Messpunkten | ✓ |
+| 2 | Satellitenbahnen aus echten TLE-Daten | `test_dod_2_die_bahnen_kommen_aus_echten_tle_daten`: Cachedatei unter `data/tle/visual.tle` existiert, enthält **kein** „Invalid query", `dataset.bahnen` steht auf der Zahl der Spuren, und die Linien liegen bei Radius 1.03–1.12 — außerhalb des Saums, nicht im Nirgendwo. `test_es_gibt_keinen_zweiten_abrufpfad`: **null** Anfragen an celestrak im Netzmitschnitt | ✓ |
+| 3 | Bahnen kosten keine Bildrate | `test_dod_3_bei_stillstand_wird_nicht_gezeichnet` — 2,5 s Stillstand, `__globusBilder` unverändert, `__globusSchleife` läuft weiter. Das Kriterium aus FIX-05 A6/5 gilt damit unverändert | ✓ |
+| 4 | Ländername wechselt animiert | `test_dod_4_der_name_wechselt_ohne_sprung`: mitten im Wechsel **zwei** Sätze im DOM, der alte mit `.geht`, und die Tafelhöhe ändert sich um höchstens 6 px — „ohne Sprung" ist gemessen, nicht behauptet. `test_nur_transform_und_opacity_werden_animiert` liest die `transition-property` und lässt nichts anderes durch | ✓ |
+| 5 | Sichtbarkeitsgrenze steht in der Ansicht | `test_dod_5_die_grenze_steht_im_ui` — der Satz steht in `#sat-hinweis`, ist sichtbar (Höhe > 8 px), und er kommt vom Endpunkt, damit die Oberfläche ihn nicht selbst erfindet | ✓ |
+| 6 | Alle sieben FIX-05-Kriterien gelten weiter | `test_dod_6_der_saum_verschluckt_den_klick_nicht` (Klick in die Mitte trifft `DEU` — der Saum liegt weiter außen als alles andere und wäre der naheliegendste Weg, A1 zu zerstören), `test_dod_6_drehen_und_zoomen_gehen_weiter`, plus die vollständigen FIX-05-Suiten: `tests/test_globus.py` und `tests/test_globus_tab.py` grün | ✓ |
+
+**Was gebaut wurde.** Der Atmosphärensaum (7.1), die Landtafel mit
+animiertem Namenswechsel (7.2), `core/satellite/ueberflug.bodenspuren()`
+plus `GET /api/satelliten/spur` und die Bahnen auf dem Globus (7.3), und
+Grenzlinien in zwei Stärken statt einer Erdtextur (7.4).
+
+**Nachgeschlagen, nicht erinnert.** Der Auftrag liefert den Shader mit dem
+Hinweis „Ich habe diesen Shader **nicht ausgeführt**" — alle Namen gegen
+`static/vendor/three.core.js` geprüft. Und für skyfield warnt er
+ausdrücklich vor `subpoint`-artigen Namen; nachgelesen in
+`documentation/earth-satellites.rst` und danach gegen die installierte
+Fassung geprüft:
+
+```
+$ python3 -c "from skyfield.api import wgs84; import inspect; print(inspect.signature(wgs84.latlon_of))"
+(position)
+```
+
+**Die Startwerte des Auftrags waren zu kräftig.** `1.055` / Exponent `2.6` /
+Alpha `0.85` ergaben am Bildschirm einen fast deckenden Ring statt eines
+Saums. Der Auftrag sagt selbst, das seien Werte, „die am Bildschirm
+nachjustiert gehören": jetzt `1.032` / `4.2` / `0.55`.
+
+**7.4 über die Struktur des Formats, nicht über eine Heuristik.** TopoJSON
+teilt sich Bögen zwischen Nachbarn: ein Bogen in genau einem Land ist eine
+Küste, einer in zweien eine Binnengrenze. Gemessen **10.004 Küsten- gegen
+5.298 Binnen-Vertices**. Nebenbefund: der alte Code lief über die Ringe und
+zeichnete damit jede Binnengrenze doppelt — jetzt jeder Bogen genau einmal.
+
+### Zwei Funde, die ohne DoD 6 durchgegangen wären
+
+1. **Zwei FIX-05-Tests wurden rot.** Der Globus fragt beim Start
+   `/api/satelliten/spur`; ohne TLE-Cache und ohne Netz antwortet der
+   Endpunkt mit 503, und der Browser schreibt das als Konsolenfehler mit.
+   **Nicht gefiltert** — ein Filter, der einen echten Fehler verstecken
+   kann, ist schlimmer als der Fehler (dieselbe Entscheidung wie beim
+   Favicon in FIX-05 A6). Stattdessen bekommen beide Fixtures den
+   TLE-Cache, den sie im Betrieb auch hätten.
+2. **`gl.readPixels` misst nichts.** Der Kontext läuft ohne
+   `preserveDrawingBuffer`; nach dem Compositing kamen lauter Nullen
+   zurück. Gemessen wird deshalb am Screenshot — und dort der **wärmste**
+   Punkt auf dem Strahl, nicht der hellste: der hellste war zweimal eine
+   weiße Küstenlinie (232,232,236 statt 101,55,18).
+
+### Was diese Abnahme nicht zeigt
+
+Die Bahnen sind mit **zwei** TLE-Sätzen gelaufen, nicht mit den 157 der
+Gruppe `visual` — dafür wäre ein echter CelesTrak-Abruf nötig, und den
+macht `pytest` nicht. Die Rechenzeit für 157 Satelliten ist damit ungemessen.
+Alles lief unter SwiftShader, nicht auf einer GPU.
+
 ## FIX-07 — Lokaler Zugriff: Dateien und Kalender
 
 Auftrag, RFC-Belege und alle Messungen: `docs/FIX-07.md`. Phase 1 des

@@ -26,6 +26,34 @@ OZEAN = (-150.0, 30.0)
 BREITEN = (360, 768, 1440)
 
 
+def _tle_cache_fuellen(db_path):
+    """Zwei echte Bahnsaetze in den TLE-Cache, auf heute datiert.
+
+    Seit FIX-06 Abschnitt 7.3 holt der Globus beim Start
+    `GET /api/satelliten/spur`. Ohne Cache und ohne Netz - und
+    `tests/conftest.py` sperrt das Netz - antwortet der Endpunkt mit 503,
+    und der Browser schreibt das als Konsolenfehler mit. Das ist keine
+    Fehlfunktion, sondern die ehrliche Meldung "CelesTrak nicht erreichbar".
+
+    Gefiltert wird sie trotzdem nicht: ein Filter, der einen echten Fehler
+    verstecken kann, ist schlimmer als der Fehler. Stattdessen bekommt der
+    Test die Daten, die er im Betrieb auch haette - dieselbe Entscheidung
+    wie beim Favicon in FIX-05 A6.
+    """
+    from datetime import datetime, timezone
+
+    from core.satellite.ueberflug import cache_datei
+
+    heute = datetime.now(timezone.utc)
+    tag = heute.timetuple().tm_yday + heute.hour / 24
+    datei = cache_datei("visual", db_path=db_path)
+    datei.parent.mkdir(parents=True, exist_ok=True)
+    datei.write_text(
+        "ISS (ZARYA)\r\n"
+        f"1 25544U 98067A   26{tag:012.8f}  .00005000  00000-0  10000-3 0  9993\r\n"
+        "2 25544  51.6400 208.9163 0001000  86.9990 273.1360 15.50377580440135\r\n",
+        encoding="utf-8")
+
 @pytest.fixture
 def server(tmp_path):
     import uvicorn
@@ -39,6 +67,7 @@ def server(tmp_path):
 
     st = Settings(_env_file=None, db_path=tmp_path / "tab.db",
                   jarvis_token="tab-token")
+    _tle_cache_fuellen(st.db_path)
     cfg = uvicorn.Config(create_app(st), host="127.0.0.1", port=port,
                          log_level="warning")
     srv = uvicorn.Server(cfg)

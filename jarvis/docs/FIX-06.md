@@ -299,3 +299,137 @@ Zustand.
 Die Euro-Beträge aus dem Video (Herkunft unbekannt), der Arc-Reactor-Ring
 (zeigt nichts), der Countdown auf ein unbekanntes Ereignis. Alle drei stehen
 in 6.2 unter „wird ausdrücklich nicht gebaut".
+
+
+---
+
+# Abschnitt 7 — WELT-NETZ
+
+## Was nachgeschlagen wurde, statt es zu erinnern
+
+**Three.js.** Der Auftrag liefert den Atmosphären-Shader mit dem Hinweis
+*„Ich habe diesen Shader nicht ausgeführt"* und der Auflage, jeden Namen
+gegen die eingebaute Fassung zu prüfen. Getan: `ShaderMaterial`,
+`BackSide`, `AdditiveBlending`, `SphereGeometry`, `LineSegments` und die
+Uniform `normalMatrix` stehen alle in `static/vendor/three.core.js`.
+
+**skyfield.** Die Bodenspur braucht andere Aufrufe als der Überflug, und der
+Auftrag warnt ausdrücklich: *„bei einer Bibliothek mit `subpoint`-artigen
+Namen ist die Verwechslungsgefahr real."* Nachgeschlagen in
+`documentation/earth-satellites.rst` und danach gegen die **installierte
+Fassung 1.55** geprüft:
+
+```
+$ python3 -c "from skyfield.api import wgs84; import inspect; \
+              print(inspect.signature(wgs84.latlon_of))"
+(position)
+```
+
+`wgs84.latlon_of(position)` gibt Breite und Länge des Punktes senkrecht
+unter einer geozentrischen Position, `wgs84.height_of(position)` die Höhe
+über dem Ellipsoid. Beide verlangen `position.center == 399` — bei
+`EarthSatellite.at()` gegeben. Gerechnet wird **vektorisiert** über
+`ts.linspace`: ein `at()` je Satellit statt eines je Zeitpunkt.
+
+Gegenprobe mit einem echten ISS-Satz, ohne Netz:
+
+```
+   0.019    53.193    416.3 km
+  47.591   108.107    420.1 km
+  30.525  -163.621    416.8 km
+```
+
+## 7.1 Der Saum
+
+Radien im Überblick, damit er außerhalb von allem liegt: Erde 1.0,
+Grenzlinien 1.002, Landesmarken 1.01, **Saum 1.032**. `depthWrite: false`
+ist Pflicht, sonst verdeckt er die Satellitenbahnen, die weiter außen
+liegen. Er hängt an `welt`, nicht an `szene` — sonst dreht er nicht mit.
+
+**Die Startwerte des Auftrags waren zu kräftig.** `1.055` / Exponent `2.6` /
+Alpha `0.85` ergaben am Bildschirm einen fetten, fast deckenden Ring statt
+eines Saums; der Auftrag sagt selbst, das seien Werte, „die am Bildschirm
+nachjustiert gehören". Jetzt `1.032` / `4.2` / `0.55`.
+
+## 7.2 Der Ländername
+
+Ein `.glas`-Panel links über dem Canvas — die eine Stelle, an der Glas
+etwas zu tun hat, weil dahinter echte Struktur liegt. Name in der
+Kenngrößen-Stufe, darunter ISO und Koordinaten, darunter der Satz, was
+JARVIS gerade tut, darunter der Satellitenhinweis.
+
+Beim Wechsel liegt die alte Zeile **absolut** und die neue trägt die Höhe —
+sonst klappt die Tafel während des Übergangs auf, und „ohne Sprung" ist
+Kriterium 4. Animiert werden ausschließlich `transform` und `opacity`; ein
+Test misst die `transition-property` und lässt nichts anderes durch.
+
+Der Statustext steht ab jetzt an zwei Stellen (klein in der Fußzeile, groß
+auf der Tafel). Ein Setter `sageStatus()` hält sie zusammen.
+
+## 7.3 Satellitenbahnen
+
+`GET /api/satelliten/spur?gruppe=visual&minuten=90`. **Kein zweiter
+Abrufpfad:** derselbe `hole_tle`, derselbe Zwei-Stunden-Cache, dieselbe
+`Invalid query`-Prüfung, dieselbe Gruppenliste. Ein Test prüft, dass der
+Browser CelesTrak nie direkt anspricht.
+
+Auf dem Globus: alle Bahnen in **eine** Geometrie (177 Meshes wären 177
+Draw Calls — dieselbe Begründung wie bei den Grenzlinien), Radius
+`1.0 + höhe_km/6371`, dazu ein kleines helles Mesh am Ende jeder Bahn.
+
+**Der Sprung über die Datumsgrenze ist keine Strecke.** Ohne die Prüfung
+`Math.abs(b[1] - a[1]) > 180` zieht sich bei jeder Umrundung eine Linie
+quer durch die Kugel.
+
+**Die Grenze steht in der Ansicht,** nicht nur im Code: *„Die Bahn zeigt, wo
+der Satellit steht — nicht, ob er von hier aus sichtbar ist. Dafür bräuchte
+es den Sonnenstand."* Der Satz kommt vom Endpunkt, damit die Oberfläche ihn
+nicht selbst erfinden muss.
+
+## 7.4 Landflächen — der dritte Weg, wie empfohlen
+
+Der Auftrag nennt drei Wege und sagt zum dritten: *„Probier das zuerst."*
+Getan — und er reicht.
+
+**Grenzlinien in zwei Stärken.** Woher die Unterscheidung kommt: TopoJSON
+teilt sich Bögen zwischen Nachbarn. Ein Bogen, der in genau **einem** Land
+vorkommt, ist eine Außenkante — Küste. Kommt er in zweien vor, ist es eine
+Binnengrenze. Negative Indizes sind derselbe Bogen rückwärts (`~i`), also
+wird kanonisiert. Das ist keine Heuristik, sondern die Struktur des Formats.
+
+Gemessen: **10.004 Küsten-Vertices, 5.298 Binnen-Vertices.** Küste in
+`--text`, Binnengrenzen in `--text-leise` bei 45 % Deckung.
+
+Nebenbefund: der alte Code lief über die Ringe und hat damit **jede
+Binnengrenze doppelt gezeichnet**, einmal aus jedem Nachbarland. Zweimal
+dieselbe Linie ist unsichtbar, aber sie kostet. Jetzt jeder Bogen genau
+einmal.
+
+Keine Erdtextur (wäre eine Binärdatei im Repo — Noahs Entscheidung), keine
+triangulierten Polygone (150 Zeilen statt 20, und große Länder brauchen
+Unterteilung, sonst schneiden die Sehnen in die Kugel).
+
+## Ein Fund, der ohne DoD 6 durchgegangen wäre
+
+Die FIX-05-Tests `test_die_seite_laedt_ohne_javascript_fehler` und
+`test_der_tab_laedt_ohne_javascript_fehler` sind **rot geworden**: der
+Globus fragt jetzt beim Start `/api/satelliten/spur`, und ohne TLE-Cache
+und ohne Netz antwortet der Endpunkt mit 503 — der Browser schreibt das als
+Konsolenfehler mit.
+
+Nicht gefiltert. Ein Filter, der einen echten Fehler verstecken kann, ist
+schlimmer als der Fehler — dieselbe Entscheidung wie beim Favicon in
+FIX-05 A6. Stattdessen bekommen beide Fixtures den TLE-Cache, den sie im
+Betrieb auch hätten.
+
+## Wie der Saum gemessen wird
+
+`gl.readPixels` geht **nicht**: der Kontext läuft ohne
+`preserveDrawingBuffer`, und nach dem Compositing ist der Puffer leer —
+gemessen, es kamen lauter Nullen zurück. Gemessen wird deshalb am
+Screenshot.
+
+Und gesucht wird auf einem Strahl von der Mitte nach außen nicht der
+**hellste**, sondern der **wärmste** Punkt (größtes Rot minus Blau). Der
+hellste war zweimal eine weiße Küstenlinie (232,232,236 statt 101,55,18),
+und eine weiße Linie sagt über den Saum nichts aus.

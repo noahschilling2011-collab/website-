@@ -35,6 +35,13 @@ from api.events import strom
 from api.security import require_token
 from core import db, gedaechtnis, memory
 from core.satellite import bilder
+from core.satellite.ueberflug import (
+    UeberflugFehler,
+    bodenspuren,
+    hole_tle,
+    jetzt_utc,
+    parse_tle,
+)
 from core.abbruch import LaufBeendet, baue_pruefpunkt
 from core.contracts import Permission, Task, TaskBudget
 from core.llm import (
@@ -584,6 +591,63 @@ async def get_stats_verlauf(request: Request, stunden: int = 24) -> dict:
         }
 
     return await asyncio.to_thread(rechnen)
+
+
+@api.get("/satelliten/spur")
+async def get_satelliten_spur(
+    request: Request, gruppe: str = "visual", minuten: int = 90
+) -> dict:
+    """Bodenspuren fuer den Globus (FIX-06 Abschnitt 7.3).
+
+    **Kein zweiter Abrufpfad.** Es laeuft dieselbe `hole_tle` wie im
+    Werkzeug: derselbe Zwei-Stunden-Cache, dieselbe `Invalid query`-Pruefung,
+    dieselbe Gruppenliste. CelesTrak sperrt IPs, die dauernd anfragen - und
+    ein Dashboard, das bei jedem Oeffnen holt, ist genau so ein Fall.
+
+    Was hier NICHT beantwortet wird: ob man den Satelliten sieht. Dafuer
+    braeuchte es den Sonnenstand, also `de421.bsp` und rund 16 MB. Der Satz
+    dazu geht als `grenze` mit raus, damit die Oberflaeche ihn nicht selbst
+    erfinden muss.
+    """
+    einstellungen = _settings(request)
+    try:
+        text, frisch = await hole_tle(gruppe, db_path=einstellungen.db_path)
+    except UeberflugFehler as exc:
+        # Unbekannte Gruppe ist ein Eingabefehler, alles andere heisst:
+        # keine Daten da und wir holen sie jetzt nicht heimlich.
+        if "Unbekannte Gruppe" in str(exc):
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=503,
+            detail=f"Bahndaten nicht verfuegbar: {exc}",
+        ) from exc
+
+    satelliten = parse_tle(text)
+
+    def rechnen() -> list[dict]:
+        return [s.als_dict() for s in bodenspuren(
+            satelliten, von=jetzt_utc(), minuten=minuten, schritt_s=30)]
+
+    try:
+        spuren = await asyncio.to_thread(rechnen)
+    except UeberflugFehler as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    return {
+        "gruppe": gruppe,
+        "minuten": minuten,
+        "schritt_s": 30,
+        "aus_cache": not frisch,
+        "anzahl": len(spuren),
+        "spuren": spuren,
+        # Dieser Satz steht so in der Oberflaeche (DoD 5), also mit Umlauten.
+        "grenze": (
+            "Die Bahn zeigt, wo der Satellit steht — nicht, ob er von hier "
+            "aus sichtbar ist. Dafür bräuchte es den Sonnenstand."
+        ),
+    }
 
 
 @router.get("/", include_in_schema=False)
