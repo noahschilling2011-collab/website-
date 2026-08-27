@@ -1004,6 +1004,95 @@ Zone 8 hat nie echte Meldungen angezeigt, weil dafür ein Modellaufruf nötig
 ist; geprüft ist nur der leere Zustand. Und der Mini-Globus lief unter
 SwiftShader, nicht auf einer GPU.
 
+## FIX-10 Schritt A — Messstrecke für die Werkzeugwahl
+
+Auftrag, Inventur und alle Messungen: `docs/FIX-10.md`. **Nur Schritt A** —
+der Auftrag sagt ausdrücklich „Halt nach A an".
+
+**BLOCKER: die drei Zahlen fehlen noch.** Die Messstrecke ruft echte Modelle;
+hier gibt es keinen Key, und `CLAUDE.md` verbietet mir, JARVIS' Modell-Backend
+zu sein. Bewiesen ist die Mechanik gegen den `FakeLLMProvider`. Die echten
+Zahlen erzeugt Noah mit `python -m scripts.plantest --laeufe 3`, sobald sein
+Groq-Key läuft.
+
+| # | Kriterium | BELEG — ausgeführter Befehl | Status |
+|---|-----------|------|--------|
+| 1 | 30 Fälle mit der Mischung aus A1 | `python3 -c "import json;print(len(json.load(open('tests/plandaten/faelle.json'))))"` → **30**. Verteilung: einzel 8, kette 10, parallel 6, leer 4, unmöglich 2 | ✓ |
+| 2 | 6 Fälle erwarten kein Werkzeug | in `test_der_pruefsatz_ist_in_sich_stimmig` gezählt und zugesichert → **6** | ✓ |
+| 3 | Der Lauf läuft durch | `python3 -m scripts.plantest --trocken` über alle 30: `node-F1 0.2000  edge-F1 0.6333  Leer 1.0000 (6/6)`. Genau das muss ein Anbieter erreichen, der immer `[]` antwortet — 6 von 30 richtig. Die Mechanik stimmt, die Planungsgüte sagt der Trockenlauf **nicht** | ◐ |
+| 4 | Reproduzierbar, Schwankung unter 0,05 | `--laeufe 3` liefert die Spanne je Zahl und färbt sie rot ab 0,05. Im Trockenlauf: `Spanne 0.0000` dreimal. **Am echten Modell ungeprüft** | ◐ |
+| 5 | Modell und Datum im Ergebnis | eine Zeile in `tests/plandaten/verlauf.jsonl`, mit `zeit`, `modell`, `anbieter`, `node_f1`, `edge_f1`, `leer_genauigkeit`, `unlesbar` und den Werkzeug-Kennzahlen. Sie ist als `"anbieter": "fake"` gekennzeichnet | ✓ |
+| 6 | Deckel greift | `--deckel-token 500` → `Tokendeckel gerissen: 872 von hoechstens 500 nach 1 Aufrufen. Abbruch.`, Rückgabewert **3**, kein Weiterlaufen | ✓ |
+| 7 | `pytest` unberührt | Kein echter Modellaufruf, nichts kaputt: `python3 -m pytest` → **1088 passed**. **Die Anzahl hat sich geändert**, um genau die 18 Tests in `tests/test_plantest_metrik.py` — Begründung unten | ◐ |
+
+**◐ statt ✓ bei 3, 4 und 7** — bei 3 und 4, weil der Beleg vom Fake stammt und
+nicht vom echten Modell; bei 7, weil die Testanzahl gestiegen ist. Alles
+andere wäre ein `✓` ohne Deckung.
+
+### Der Fund, der die Messung umbaut
+
+Der Auftrag nimmt an, der Planer wähle die Werkzeuge, und warnt im selben
+Absatz: *„Finde zuerst heraus, wo die Planung im Code tatsächlich passiert.
+Rate es nicht."* Nachgesehen — **er wählt keine.**
+
+`core/planner.erstelle_plan` liefert `Step`s mit `description` und optionalem
+`agent`; sein Systemprompt (`core/planner.py:45`) redet über Schritte und
+Agenten, Werkzeuge kommen darin nicht vor. Welche Werkzeuge laufen,
+entscheidet erst das Modell in `core/tools/loop.run_tool_loop`, Zug für Zug.
+
+Gemessen wird deshalb wie in TaskBench: der **vorhergesagte** Aufrufgraph, ein
+Aufruf je Fall, ohne Ausführung. Die Alternative — den echten Schleifenpfad
+fahren — führt Werkzeuge aus (Geld, Netz, `send_email`) oder schiebt erfundene
+Zwischenergebnisse unter, und dann misst man die Erfindung mit.
+
+**Was die Zahlen damit nicht sagen:** sie messen den ausgesprochenen Plan,
+nicht das Laufzeitverhalten.
+
+### Drei weitere Abweichungen, alle gemeldet statt stillschweigend
+
+1. **Temperatur 0 geht nicht.** `LLMProvider.complete` hat keinen solchen
+   Parameter, und `core/llm.py` sagt im Modulkopf, dass `temperature`,
+   `top_p` und `top_k` bewusst nicht gesendet werden. Nachrüsten hieße, den
+   Anbietervertrag zu ändern, den `runner`, `agents` und `loop` alle
+   benutzen. Stattdessen wird die Reproduzierbarkeit **gemessen statt
+   erzwungen** — genau das verlangt Kriterium 4 ohnehin.
+2. **Der Deckel läuft auf Token, nicht auf Euro.** `Settings.cost_eur` gibt
+   `0.0` zurück, solange keine Preise in der `.env` stehen — und bei einem
+   kostenlosen Anbieter stehen dort keine. Ein Eurodeckel wäre eine Attrappe,
+   die nie greift. Der Eurodeckel bleibt zusätzlich und greift mit Preisen.
+3. **Ein Test in `pytest`.** Die Metrik ruft nichts; sie ist eine reine
+   Funktion über zwei Mengen und entscheidet über jede Zahl, die hier je
+   herauskommt. Fiele der Sonderfall „beide leer = 1.0" falsch aus, wären 6
+   der 30 Fälle systematisch falsch bewertet — und niemand sähe es.
+
+### Die Inventur des Auftrags stimmt nicht mehr
+
+| Behauptung | Gemessen |
+|---|---|
+| „367 grüne Tests" | **1088** |
+| „14 Werkzeugbeschreibungen" | **18** — FIX-07 brachte drei, `ask_agent` fehlte schon vorher |
+| „3.808 Zeichen · rund 950 Token" | **4.601 Zeichen · rund 1.150 Token** |
+| „Faktor 5 zwischen kürzester und längster" | **stimmt** — `send_email` 120, `satellite_search` 596 |
+| `Plan` in `core/contracts.py:65-90` | steht in `core/planner.py:75` |
+
+Der Kernbefund des Auftrags hält also, und der Kontextpreis ist sogar höher
+als angenommen: **1.150 Token bei jedem Aufruf, der Werkzeuge anbietet.**
+
+### Eine Ermessensfrage im Prüfsatz, offengelegt
+
+`einzel-02` („23 Prozent von 6340") und `kette-06` („wie viele Tage bis
+Heiligabend") annotieren beide `calculator`, weil die Werkzeugbeschreibung
+wörtlich sagt *„Benutze das für JEDE Rechnung — auch für einfache."* Rechnet
+das Modell im Kopf, zählt das hier als Fehler. Man kann anderer Meinung sein.
+**Der Fall wird trotzdem nicht angepasst, wenn die Zahl schlecht ausfällt** —
+wer die Prüfung an die Antwort anpasst, misst nichts mehr.
+
+### Was diese Abnahme nicht zeigt
+
+Ob JARVIS gut plant. Dafür braucht es einen echten Modellaufruf, und den kann
+nur Noah auslösen. Alles hier belegt ausschließlich, dass die Messstrecke
+funktioniert, abbricht wenn sie soll, und ihre Zahlen protokolliert.
+
 ## FIX-06 Abschnitt 7 — WELT-NETZ
 
 Auftrag, nachgeschlagene API-Namen und alle Messungen: `docs/FIX-06.md`.
