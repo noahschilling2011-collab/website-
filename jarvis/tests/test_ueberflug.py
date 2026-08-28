@@ -302,9 +302,19 @@ def test_das_werkzeug_liefert_ueberfluege(tmp_path):
     ergebnis = run(w.execute(lat=GMUEND[0], lon=GMUEND[1], hours=24))
     assert ergebnis.ok is True
     assert ergebnis.data["passes"], "ueber Mitteleuropa fliegt die ISS taeglich"
-    erster = ergebnis.data["passes"][0]
-    assert erster["norad"] == 25544
-    assert erster["von"] in HIMMELSRICHTUNGEN_ERWARTET
+
+    # NICHT passes[0]: welcher Satellit ZUERST kommt, haengt an der Uhrzeit
+    # des Testlaufs. Der Satz im TLE-Fixture enthaelt mehrere; ein Pruefer
+    # bekam hier 48274 statt 25544, weil er zu einer anderen Stunde lief.
+    # Ein Test, der je nach Tageszeit anders ausgeht, misst nichts - er
+    # erzeugt nur Misstrauen gegen die ganze Suite.
+    #
+    # Die Aussage, um die es geht, ist "die ISS fliegt taeglich ueber
+    # Mitteleuropa" - also: sie ist DABEI, nicht: sie ist die erste.
+    norads = {p["norad"] for p in ergebnis.data["passes"]}
+    assert 25544 in norads, sorted(norads)
+    for p in ergebnis.data["passes"]:
+        assert p["von"] in HIMMELSRICHTUNGEN_ERWARTET, p
     assert "UTC" in ergebnis.display
 
 

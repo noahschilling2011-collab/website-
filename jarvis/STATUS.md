@@ -1101,7 +1101,14 @@ Fehler" statt „0 belegte Meldungen".
    weil die quetscht statt überzulaufen — verworfen, nachdem die Messung im
    Browser es zeigte.
 
-**Suite: 1118 Tests, alle grün.**
+**Suite: 1118 Tests, alle grün** — aber nur bei mir, und das war der Fehler
+in dem Satz. `test_das_werkzeug_liefert_ueberfluege` hing an der Uhrzeit: es
+prüfte den *ersten* Überflug in der Liste, und welcher Satellit das ist,
+hängt davon ab, wann man den Test startet. Bei mir war es die ISS
+(NORAD 25544), bei der Gegenprüfung NORAD 48274 — derselbe Code, dieselben
+Bahndaten, andere Minute. Der Test prüft jetzt, dass die ISS **unter** den
+Überflügen ist, und dass jede Himmelsrichtung eine der acht erwarteten ist.
+Ein zeitabhängiger Test, der bei mir grün ist, ist kein grüner Test.
 
 ## Bewegtbild-Vorlage eingebaut — 16 von 25 Schritten
 
@@ -1185,9 +1192,78 @@ sie sind der Grund, warum bei jedem Schritt ein Bild gemacht wurde.
 
 Neun, alle in `static/globus.js` (Weltansicht): Karten 45 ms gestaffelt,
 Einordnung 420 ms später, Namen schrumpfen statt umbrechen, Striche statt
-Nullen, Saum auf den Vorlagenwert, Einordnungsrand gestrichelt. Dazu acht
-Punkte, die **Noah entscheiden muss** — darunter die Geometrie des
-Glaspanels, `MAX_KARTEN` von 5 auf 4, und ein Saum-Regler mit drei Stufen.
+Nullen, Saum auf den Vorlagenwert, Einordnungsrand gestrichelt. **Alle neun
+sind gebaut.** Dazu acht Punkte, die eine Entscheidung brauchten — die
+stehen jetzt einzeln im Abschnitt darunter, drei davon inzwischen erledigt.
+
+## Die letzten Design-Punkte — ausgeschrieben, drei davon erledigt
+
+Bisher stand hier nur eine Zahl („acht Punkte, die Noah entscheiden muss").
+Eine Zahl kann man nicht beantworten. Hier stehen sie einzeln, mit **beiden**
+Werten gemessen: was `jarvis-scene.jsx` macht, und was `static/globus.js`
+heute macht.
+
+Beim Ausschreiben sind drei der acht weggefallen — **zwei, weil sie längst
+gebaut waren oder gar keine Entscheidung brauchten, und eine, weil ich sie
+jetzt gebaut habe.** Übrig bleiben fünf, und bei allen fünf ist mein
+Vorschlag: so lassen.
+
+### Erledigt
+
+| # | Punkt | Ergebnis |
+|---|---|---|
+| 1 | **Glaspanel hinter der Landtafel** | **War schon da.** Ich hatte nur die Regel `.landtafel` gelesen (`globus.js:101`) und übersehen, dass das Element im Markup `class="landtafel glas"` trägt (`globus.js:328`). `.glas` in `static/system.css:167-173` ist Wert für Wert die Vorlage: `rgba(255,255,255,.04)`, `blur(20px) saturate(150%)`, `1px solid rgba(255,255,255,.09)`, `inset 0 1px 0 rgba(255,255,255,.07)`. Keine Entscheidung, sondern mein Lesefehler. |
+| 6 | **Ring um die gewählte Landesmarke** | **Gebaut.** Ein `RingGeometry`-Mesh auf Radius 1.014 — zwischen den Marken (1.01) und dem Saum (1.032). Es geht in 380 ms auf und blendet weg; bei `prefers-reduced-motion` steht es still und bleibt stehen, weil ein wegblendender Ring für genau die Menschen nie sichtbar wäre, für die die Einstellung da ist. Drei Tests, beide Mutationen rot. |
+| 8 | **Glasrezept der Karten** | **Repariert, ohne Entscheidung.** Es ging nicht darum, ob JARVIS der Vorlage folgt — JARVIS hatte **drei** Glasrezepte: `.glas` mit 20px/150 %, `.karte` mit 18px/140 % und `.ortpanel` mit `blur(14px)` ganz ohne `saturate` und einer Fläche `rgba(14,18,26,.82)`, die **nicht aus der Palette** kam (ein Blaustich neben `--grund` #0a0a0c). Die Vorlage sagt dasselbe wie das eigene Design-System: 20/150. Also beide auf `.glas` gezogen, das Ortpanel über die **Klasse** im Markup, damit auch der `@supports`-Ersatz greift. |
+
+**Und im selben Zug denselben Fehler noch einmal gemacht.** Ein Absatz weiter
+oben steht, warum ein zeitabhängiger Test kein grüner Test ist — und der
+erste Ringtest, den ich dazu geschrieben habe, prüfte `groesse < 0.6`
+unmittelbar nach dem Klick. Einzeln lief er fünfmal grün; im vollen Suitelauf
+war er rot, mit 0,667: zwischen dem `waehle()` und der nächsten Runde durch
+den Playwright-Kanal waren unter Last ein paar Bilder mehr vergangen. Nicht
+die Schranke gelockert, sondern die Zeitabhängigkeit entfernt — der
+Anfangswert wird jetzt im **selben** `evaluate` gelesen, in dem `waehle()`
+läuft, und der Verlauf wird über `requestAnimationFrame` mitgeschrieben und
+auf Monotonie geprüft. Danach fünf Läufe hintereinander grün.
+
+Der Unterschied 18/140 → 20/150 ist gemessen, nicht geschätzt: **96 von 14.884
+Pixeln** einer 122×122-Karte, alle am Rand und in den Ecken, wo der
+Hintergrund durch die 1-px-Kante scheint. Klein — aber ohne Grund, und ein
+viertes Rezept ist keins.
+
+**Neuer Wächter:** `test_es_gibt_genau_ein_glasrezept` sammelt jedes
+`backdrop-filter` aus `index.html`, `weltlage.html` und `static/*` und
+verlangt, dass genau ein Wert übrig bleibt. `backdrop-filter: none` ist
+ausgenommen — das *schaltet* Glas ab und ist genau das, was die
+Barrierefreiheits- und Druckregeln tun. `@supports`-Zeilen auch: die fragen
+nach der Fähigkeit, sie erklären kein Glas.
+
+### Offen — fünf, und bei allen fünf: so lassen
+
+| # | Frage | Vorlage | Code heute | Mein Vorschlag |
+|---|---|---|---|---|
+| 2 | **`MAX_KARTEN` 5 → 4?** | genau 4 (`jarvis-scene.jsx:881`, `for (let i = 0; i < 4; i++)`) | `MAX_KARTEN = 5` an **zwei** Stellen: `api/weltlage.py:39` („Abschnitt 5: hoechstens 5 Karten gleichzeitig") und `globus.js:432`, das sie nur spiegelt | **Nur du.** Die 5 ist eine Zusage aus FIX-02 Abschnitt 5, keine Geschmacksfrage — sie steht im Backend, das bis `MAX_KARTEN * 2` Kandidaten prüft und erst danach kappt (`api/weltlage.py:128-135`). Vorn auf 4 zu gehen hieße, eine bereits geholte und geprüfte Meldung wegzuwerfen. Wenn 4, dann an beiden Stellen und mit geänderter Zusage. |
+| 3 | **Saum-Stärke: eine oder drei Stufen?** | drei, als Regler: `dezent .13`, normal `.21`, `kräftig .34` (`jarvis-scene.jsx:840`) | ein fester Wert im Shader: `f * 0.336` (`globus.js:828`) | **Eine Stufe lassen.** Die drei Werte der Vorlage skalieren einen CSS-Verlauf, der Shader-Wert eine Fresnel-Kante — sie sind **nicht** dasselbe und nicht ineinander umzurechnen. Ein Regler wäre ein neues Bedienelement für einen Effekt, den man einmal einstellt. |
+| 4 | **Polster 12 / 16 / 20 px?** | Regler `polster` (`jarvis-scene.jsx:841`), Panel-Polster `18px 24px 20px` | `.landtafel` `padding:.85rem 1.1rem` = 13,6 / 17,6 px | **Lassen.** In `rem` skaliert es mit der Schriftgröße, in `px` nicht. Das Design-System rechnet in `rem`. |
+| 5 | **Tafelbreite fest oder mitwachsend?** | `width: 420` fest, auf einer 1600×900-Bühne | `max-width:min(24rem,42vw)` = 384 px, ab 914 px Breite mitwachsend | **Lassen.** 420 px fest reißen bei 640 px Fensterbreite über den halben Schirm; die Vorlage hat kein Handy. |
+| 7 | **Tag/Nacht-Kante auf der Kugel?** | `linear-gradient(102deg, transparent 38%, rgba(0,0,0,.45) 84%)` (`jarvis-scene.jsx:194`) | gibt es nicht — die Kugel ist gleichmäßig beleuchtet | **Nur mit echter Sonnenposition.** Eine hübsche schräge Kante bei 102° ist eine erfundene Uhrzeit. Und die Vorlage sagt an dieser Stelle selbst, dass ihr Globus ein Platzhalter ist („Das echte 3D kommt aus Three.js", `jarvis-scene.jsx:167`). Entweder richtig gerechnet oder gar nicht. |
+
+Der Kartenradius bleibt, wie er ist: `.8rem` = 12,8 px im Globus, 12 px im
+Chat, 8 px in der Vorlage. Innerhalb von JARVIS ist er konsistent; die
+Vorlage ist hier der Ausreißer.
+
+**Suite nach diesem Durchgang:** `python3 -m pytest -q` → **1122 passed**,
+0 Fehler (1118 vorher, plus drei Ringtests und der Glas-Wächter). Der volle
+Lauf ist zweimal komplett durchgelaufen: einmal rot wegen meines eigenen
+zeitabhängigen Tests, danach grün.
+
+> **Woher die Liste kommt:** heute neu aus `jarvis-scene.jsx` abgeleitet und
+> Zeile für Zeile gegen `static/globus.js` gehalten. Die frühere Notiz nannte
+> nur die Zahl acht und drei Beispiele; die vollständige Liste war nie
+> aufgeschrieben. Beim Ausschreiben ist einer der drei Beispielpunkte als
+> mein eigener Lesefehler aufgeflogen — das ist der Grund, warum eine Liste
+> mehr wert ist als eine Zahl.
 
 ## Zwei Funde aus dem Abgleich mit Noahs Bewegtbild-Vorlage
 
@@ -1246,6 +1322,56 @@ der 45-ms-Versatz und die Palette stehen bereits in `static/system.css` — es
 fehlen die Benutzer. `--dauer-tupf`, `--dauer-raus` und `--dauer-zahl` hatten
 null Treffer im ganzen Projekt, daneben stehen neun handgeschriebene `200ms`
 und fünf verschiedene Erscheinungsdauern.
+
+## Gegenprüfung des eigenen Codes — 15 Funde, 15 behoben
+
+Nach dem Design- und dem Microsoft-Durchgang habe ich den eigenen Diff
+gegenprüfen lassen. **Fünfzehn Funde, keiner davon von einem Test bemerkt.**
+Zwei fallen aus der Reihe, weil sie zeigen, wie ein Wächter danebenzielen
+kann:
+
+**Fund 3 — der Werkzeugtext, der genau das vorführte, was er verbot.** Die
+Beschreibung von `satellite_compare` sagt in Zeile 3: „KEIN Werkzeug liefert
+dir heute NDVI-Werte — hast du keine aus einer echten Quelle, rufst du dieses
+Werkzeug GAR NICHT auf." Und zwei Zeilen darunter stand ein `Beispiel:` mit
+ausgedachten NDVI-Zahlen. Sechzehn Tests prüfen die *Form* dieser Texte —
+vier Zeilen, jedes Verwechslungspaar beidseitig, jedes Beispiel nur mit
+echten Parametern. Keiner prüft, ob ein Beispiel dem eigenen Verbot
+widerspricht. Jetzt stehen im Beispiel Platzhalter statt Zahlen.
+
+> Beim Reparieren habe ich mir prompt den nächsten Fehler gebaut: die
+> Einschränkung landete zuerst *in* der `Beispiel:`-Zeile („Beispiel (die
+> Zahlen stehen für echte Messwerte…)"), und damit brach das Format, auf das
+> `test_alle_achtzehn_haben_das_gleiche_format` besteht. Der Satz gehört in
+> die `Nimm es NICHT für:`-Zeile, nicht in die Beispielzeile.
+
+**Fund 5 — ein `assert` im Bericht, der einen bezahlten Lauf wegwarf.** Die
+Aufschlüsselung nach Kategorie prüft sich selbst gegen: die gewichteten
+Gruppenmittel müssen den Gesamtwert ergeben. Das war ein `assert` — und
+`zeige()` lief **vor** `laeufe.append(lauf)`. Wäre die Gegenprobe je
+angeschlagen, hätte die Messstrecke einen Lauf verworfen, der schon Geld
+gekostet hat, wegen eines Fehlers in der *Darstellung*. Jetzt wird erst
+gesichert, dann gedruckt, und die Gegenprobe druckt eine rote Zeile statt
+abzubrechen. Dasselbe gilt für einen gerissenen Deckel: die bereits
+gefahrenen Läufe landen im Verlauf, statt mit dem Abbruch zu verschwinden.
+
+Die übrigen dreizehn, knapp:
+
+| # | Fund | Behoben mit |
+|---|---|---|
+| 1 | Namen schrumpften erst ab 20 Zeichen — `LIECHTENSTEIN` (13) hat kein Leerzeichen zum Umbrechen und wurde mittendrin abgeschnitten | zwei Stufen, ab 10 und ab 18 Zeichen |
+| 2 | die Wartemeldung benutzte die Klasse `.leer` — „ich arbeite noch" war von „nichts gefunden" nicht zu unterscheiden, auch für die Tests nicht | eigene Klasse `.laedt` |
+| 4 | der 45-ms-Versatz lief über `ziel.children` — also über Karten, die währenddessen dazukommen konnten | über den erfassten Stapel, mit `parentNode`-Prüfung |
+| 6 | `praezision 0.0` hieß zweierlei: „nie vorhergesagt" und „immer daneben" | `None`, im Bericht als `--` |
+| 7 | geklonte Knoten brachten ihre `id` mit — zwei Elemente mit derselben `id` im Dokument | `querySelectorAll('[id]')` und weg damit |
+| 8 | `--akzent-fuellung` und `--akzent-strich` gab es nicht | die Token, die es gibt: `--akzent-glut`, `--akzent-linie` |
+| 9 | Pixel statt `rem` in einer Ansicht, die sonst in `rem` rechnet | `rem` |
+| 10 | ein `margin-top:auto`, das in einem Grid nichts tut | gelöscht |
+| 11 | `import json as _json` mitten in einer Funktion, neben dem `json` von ganz oben | das vorhandene `json` |
+| 12 | dieselbe Kennzahl-Konstruktion zweimal, in beiden Zweigen | ein Zweig, der nur die Textquelle wählt |
+| 13 | drei Zähl-Dicts von Hand | `collections.Counter` |
+| 14 | `je_werkzeug` machte **84 % jeder Verlaufszeile** aus (1.463 von 1.743 Zeichen, gemessen) | nur noch Name → F1, und nur für Werkzeuge mit Stütze; die volle Tabelle steht im Bericht |
+| 15 | der lokale `prefers-reduced-motion`-Block schaltete nur `animation` und `transition` ab, nicht `animation-delay`, `animation-iteration-count` und `transition-delay` | alle fünf |
 
 ## FIX-10 Schritt A — Messstrecke für die Werkzeugwahl
 
@@ -1520,6 +1646,7 @@ eine Stack-Änderung** (`python-dateutil`) und braucht seine Zusage.
 - [ ] **Sprach-Abnahme** — `docs/FIX-05-sprachtest.md`, vier Schritte, fünf Minuten in Chrome (FIX-05 Schritt C)
 - [ ] **`DATEI_WURZELN` in `.env`** — die Ordner, die JARVIS lesen darf. Ohne die Zeile sagen `datei_suchen` und `datei_lesen` „nicht eingerichtet" und tun nichts (FIX-07, Vorlage in `.env.example`)
 - [ ] **`KALENDER_QUELLE` in `.env`** — Pfad zu einer `.ics` oder die Abo-Adresse aus Google/Apple/Outlook. Diese Adresse **ist** das Geheimnis, sie gehört nur in die `.env`. Ohne sie sagt `kalender` „nicht eingerichtet" — und liefert bewusst keine leere Terminliste (FIX-07)
+- [ ] **Entscheidung: `satellite_compare` — Sackgasse auflösen oder Werkzeug zurückziehen?** Es verlangt NDVI-Werte, und **kein registriertes Werkzeug liefert welche.** `ndvi()` existiert (`core/satellite/analysis.py:70`), ist aber nicht als Werkzeug registriert — die 18 in der Registry sind `ask_agent, calculator, clock, datei_lesen, datei_suchen, fetch_url, find_place, kalender, recall, remember, satellite_compare, satellite_passes, satellite_search, send_email, web_search, wiki_live, wiki_lokal, wikidata`. Heute kann JARVIS es also nur aufrufen, wenn du die Zahlen selbst mitbringst — und genau das steht seit dem Textdurchgang auch in seiner Beschreibung. Zwei Wege: `ndvi` als Werkzeug registrieren (dann braucht es eine Rasterquelle, also CDSE), oder `satellite_compare` abmelden, bis es eine gibt. Beides ist deine Entscheidung, weil beides den Werkzeugsatz ändert
 - [ ] **Entscheidung: wiederkehrende Termine auflösen?** Wenn ja, ist `python-dateutil` eine Stack-Änderung und braucht Noahs Zusage. Heute werden sie gezählt und benannt, nicht erfunden (FIX-07)
 - [ ] Danach `/dod` je Phase laufen lassen
 

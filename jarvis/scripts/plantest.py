@@ -74,6 +74,7 @@ import asyncio
 import json
 import re
 import sys
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -159,30 +160,25 @@ def werkzeugtext(satz: str = "code") -> tuple[str, dict]:
     koennte.
     """
     alle = sorted(registry.all_tools(), key=lambda t: t.name)
-    if satz != "code":
-        import json as _json
-        ersatz = _json.loads(TEXTE[satz].read_text(encoding="utf-8"))
-        fehlt = {t.name for t in alle} - set(ersatz)
+    if satz == "code":
+        beschreibung = {t.name: t.description for t in alle}
+    else:
+        beschreibung = json.loads(TEXTE[satz].read_text(encoding="utf-8"))
+        fehlt = {t.name for t in alle} - set(beschreibung)
         if fehlt:
             raise SystemExit(f"{TEXTE[satz].name} kennt {sorted(fehlt)} nicht.")
-        zeilen = [f"- {t.name}: {ersatz[t.name]}" for t in alle]
-        laengen = [len(ersatz[t.name]) for t in alle]
-        return "\n".join(zeilen), {
-            "satz": satz, "anzahl": len(alle), "zeichen": sum(laengen),
-            "token_geschaetzt": round(sum(laengen) / 4),
-            "kuerzeste": min(laengen), "laengste": max(laengen),
-        }
-    zeilen = [f"- {t.name}: {t.description}" for t in alle]
-    text = "\n".join(zeilen)
+
+    zeilen = [f"- {t.name}: {beschreibung[t.name]}" for t in alle]
+    laengen = [len(beschreibung[t.name]) for t in alle]
     kennzahl = {
-        "satz": "code",
+        "satz": satz,
         "anzahl": len(alle),
-        "zeichen": sum(len(t.description) for t in alle),
-        "token_geschaetzt": round(sum(len(t.description) for t in alle) / 4),
-        "kuerzeste": min(len(t.description) for t in alle),
-        "laengste": max(len(t.description) for t in alle),
+        "zeichen": sum(laengen),
+        "token_geschaetzt": round(sum(laengen) / 4),
+        "kuerzeste": min(laengen),
+        "laengste": max(laengen),
     }
-    return text, kennzahl
+    return "\n".join(zeilen), kennzahl
 
 
 def json_aus_text(text: str) -> str:
@@ -261,9 +257,9 @@ async def ein_lauf(provider, faelle: list[dict], system: str, deckel: Deckel) ->
     # Je Werkzeug: Treffer, Fehltreffer (vorhergesagt, nicht erwartet),
     # Auslassung (erwartet, nicht vorhergesagt). Ohne das weiss man beim
     # Umschreiben der Beschreibungen nicht, WELCHE der 18 schuld ist.
-    treffer: dict[str, int] = {}
-    fehltreffer: dict[str, int] = {}
-    auslassung: dict[str, int] = {}
+    treffer: Counter[str] = Counter()
+    fehltreffer: Counter[str] = Counter()
+    auslassung: Counter[str] = Counter()
 
     for fall in faelle:
         erwartet_w = set(fall["werkzeuge"])
@@ -298,12 +294,9 @@ async def ein_lauf(provider, faelle: list[dict], system: str, deckel: Deckel) ->
         if erwartet_k:
             kanten_mit.append(e)
 
-        for w in erwartet_w & bekommen_w:
-            treffer[w] = treffer.get(w, 0) + 1
-        for w in bekommen_w - erwartet_w:
-            fehltreffer[w] = fehltreffer.get(w, 0) + 1
-        for w in erwartet_w - bekommen_w:
-            auslassung[w] = auslassung.get(w, 0) + 1
+        treffer.update(erwartet_w & bekommen_w)
+        fehltreffer.update(bekommen_w - erwartet_w)
+        auslassung.update(erwartet_w - bekommen_w)
 
         if not erwartet_w:
             leer_gesamt += 1
@@ -327,13 +320,18 @@ async def ein_lauf(provider, faelle: list[dict], system: str, deckel: Deckel) ->
         t = treffer.get(name, 0)
         f = fehltreffer.get(name, 0)
         a = auslassung.get(name, 0)
-        pz = t / (t + f) if (t + f) else 0.0
-        tq = t / (t + a) if (t + a) else 0.0
+        # None heisst "kein Nenner", nicht "null Prozent". Ein Werkzeug, das
+        # nie vorhergesagt wurde, hat keine Praezision - es als 0.00 zu
+        # drucken laese es wie ein staendig danebengreifendes aussehen.
+        pz = t / (t + f) if (t + f) else None
+        tq = t / (t + a) if (t + a) else None
+        f1_w = (2 * pz * tq / (pz + tq)
+                if pz is not None and tq is not None and (pz + tq) else 0.0)
         je_werkzeug.append({
             "name": name,
-            "praezision": round(pz, 3),
-            "trefferquote": round(tq, 3),
-            "f1": round(2 * pz * tq / (pz + tq), 3) if (pz + tq) else 0.0,
+            "praezision": None if pz is None else round(pz, 3),
+            "trefferquote": None if tq is None else round(tq, 3),
+            "f1": round(f1_w, 3),
             # Ohne die Stuetzzahl liest man aus einem einzigen Fall eine
             # Aussage heraus. Bei 30 Faellen und 18 Werkzeugen liegt sie oft
             # bei 1 bis 3.
@@ -392,16 +390,25 @@ def zeige(lauf: dict, nummer: int) -> None:
         # Gegenprobe: die gewichteten Gruppenmittel muessen den Gesamtwert
         # ergeben. Tun sie es nicht, ist die Gruppierung kaputt und die
         # Aufschluesselung waere Zierrat.
-        gewichtet = sum(mittel([x["node_f1"] for x in g]) * len(g)
-                        for g in gruppen.values()) / len(lauf["einzeln"])
-        assert abs(gewichtet - lauf["node_f1"]) < 0.001, (gewichtet, lauf["node_f1"])
+        gewichtet = (sum(mittel([x["node_f1"] for x in g]) * len(g)
+                         for g in gruppen.values()) / len(lauf["einzeln"])
+                     if lauf["einzeln"] else 0.0)
+        if abs(gewichtet - lauf["node_f1"]) >= 0.001:
+            # Kein `assert`: der Lauf ist bereits bezahlt. Ein Abbruch hier
+            # wuerfe die Messung weg, statt nur die Aufschluesselung zu
+            # verwerfen. Der Befund wird laut gedruckt und der Lauf bleibt.
+            print(f"{ROT}   Aufschluesselung kaputt: gewichtetes Mittel "
+                  f"{gewichtet:.4f} != Gesamtwert {lauf['node_f1']:.4f}. "
+                  f"Die Gruppenzahlen oben sind nicht zu gebrauchen.{AUS}")
 
     if lauf["je_werkzeug"]:
         print(f"{GRAU}   -- je Werkzeug (Stuetze = wie oft es erwartet war) --{AUS}")
         for w in sorted(lauf["je_werkzeug"], key=lambda x: (-x["stuetze"], x["name"])):
             farbe = GRUEN if w["f1"] == 1.0 else (GELB if w["f1"] > 0 else ROT)
+            def q(v):
+                return "  -- " if v is None else f"{v:.2f}"
             print(f"{farbe}      {w['name']:20} F1 {w['f1']:.2f}   "
-                  f"Praez {w['praezision']:.2f}   Treffer {w['trefferquote']:.2f}   "
+                  f"Praez {q(w['praezision'])}   Treffer {q(w['trefferquote'])}   "
                   f"Stuetze {w['stuetze']}{AUS}")
     if lauf["unlesbar"]:
         print(f"{ROT}   {lauf['unlesbar']} Antworten waren kein lesbares JSON "
@@ -467,14 +474,21 @@ def main() -> int:
 
     deckel = Deckel(args.deckel_token, args.deckel_eur, einstellungen)
     laeufe: list[dict] = []
+    gerissen = None
     try:
         for i in range(1, args.laeufe + 1):
             lauf = asyncio.run(ein_lauf(provider, faelle, system, deckel))
-            zeige(lauf, i)
+            # Erst sichern, dann drucken. Der Lauf ist bezahlt; der Bericht
+            # ist nur Darstellung und darf ihn nicht mitnehmen, wenn er
+            # stolpert.
             laeufe.append(lauf)
+            zeige(lauf, i)
     except DeckelGerissen as ende:
+        # Auch hier: die bereits gefahrenen Laeufe werden unten noch
+        # ausgewertet und in den Verlauf geschrieben, statt sie samt Kosten
+        # wegzuwerfen.
+        gerissen = ende
         print(f"\n{ROT}{ende}{AUS}")
-        return 3
 
     print(f"\n{GRAU}Verbrauch: {deckel.aufrufe} Aufrufe, {deckel.token} Token"
           + (f", {deckel.eur:.4f} EUR" if einstellungen.prices_configured
@@ -493,7 +507,7 @@ def main() -> int:
                 print(f"{ROT}   Ueber 0,05: die Messung selbst ist unzuverlaessig "
                       f"und muss zuerst repariert werden.{AUS}")
 
-    if not args.kein_verlauf:
+    if laeufe and not args.kein_verlauf:
         VERLAUF.parent.mkdir(parents=True, exist_ok=True)
         with VERLAUF.open("a", encoding="utf-8") as f:
             for i, lauf in enumerate(laeufe, 1):
@@ -508,13 +522,24 @@ def main() -> int:
                     "node_f1_mit_werkzeug": lauf["node_f1_mit_werkzeug"],
                     "edge_f1_mit_kanten": lauf["edge_f1_mit_kanten"],
                     "leer_genauigkeit": lauf["leer_genauigkeit"],
-                    "je_werkzeug": lauf["je_werkzeug"],
+                    # Nur Name -> F1, und nur fuer Werkzeuge, die im Fallsatz
+                    # ueberhaupt erwartet waren. Die volle Tabelle mit
+                    # Praezision, Trefferquote und Stuetze steht im Bericht;
+                    # hier machte sie 84 % der Zeile aus (1463 von 1743
+                    # Zeichen, gemessen am Trockenlauf) und die Datei damit
+                    # unlesbar. Fuer den Zweck des Verlaufs - welches
+                    # Werkzeug wurde zwischen zwei Laeufen schlechter -
+                    # reicht der F1; die Stuetze haengt am Fallsatz und
+                    # wiederholt sich Zeile fuer Zeile unveraendert.
+                    "je_werkzeug_f1": {w["name"]: w["f1"]
+                                       for w in lauf["je_werkzeug"]
+                                       if w["stuetze"]},
                     "unlesbar": lauf["unlesbar"],
                     "werkzeuge": kennzahl,
                 }, ensure_ascii=False) + "\n")
         print(f"{GRAU}Angehaengt an {VERLAUF}{AUS}")
 
-    return 0
+    return 3 if gerissen else 0
 
 
 if __name__ == "__main__":

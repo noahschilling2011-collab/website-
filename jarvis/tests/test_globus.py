@@ -469,3 +469,127 @@ def test_a5_ein_land_ohne_iso_wird_nicht_angefragt(server):
             assert "Ländercode" in seite.text_content("#gesagt")
         finally:
             br.close()
+
+
+# --- Entscheidung 6 aus Noahs Bewegtbild-Vorlage: der Ring ------------------
+
+_RING_LESEN = """() => {
+  const r = window.zustand && window.zustand.ring;
+  if (!r) return null;
+  // Die Normale des Rings ist sein lokales +Z, gedreht mit seinem Quaternion.
+  const n = new (r.position.constructor)(0, 0, 1).applyQuaternion(r.quaternion);
+  const aussen = r.position.clone().normalize();
+  return {
+    sichtbar: r.visible,
+    deckung: r.material.opacity,
+    groesse: r.scale.x,
+    radius: r.position.length(),
+    // 1 = die Ringflaeche liegt flach auf der Kugel, 0 = sie steht senkrecht
+    // darauf und waere von vorn nur ein Strich.
+    flach: n.dot(aussen),
+  };
+}"""
+
+
+def test_der_ring_liegt_flach_auf_der_kugel_beim_gewaehlten_land(server):
+    """Die Vorlage (jarvis-scene.jsx:205-215) legt um die Marke einen Ring.
+
+    Auf einer Kugel ist "flach" die eigentliche Arbeit: ein Ring, dessen
+    Normale nicht nach aussen zeigt, ist von vorn ein Strich. Geprueft wird
+    deshalb nicht, DASS es ein Mesh gibt, sondern wo es liegt und wie es
+    liegt - dot(Normale, Ortsvektor) muss 1 sein.
+    """
+    basis, _ = server
+    with playwright.sync_playwright() as pw:
+        br, seite = _browser(pw)
+        try:
+            _lade(seite, basis)
+            vorher = seite.evaluate(_RING_LESEN)
+            assert vorher is not None, "zustand.ring fehlt"
+            assert vorher["sichtbar"] is False, "der Ring steht vor der Wahl im Bild"
+
+            seite.evaluate("""() => {
+              const i = window.zustand.laender.findIndex(l => !l.ohne_iso);
+              window.zustand.waehle(i);
+            }""")
+            r = seite.evaluate(_RING_LESEN)
+            assert r["sichtbar"] is True, r
+            # Marken liegen auf 1.01, der Saum auf 1.032. Dazwischen.
+            assert 1.010 < r["radius"] < 1.032, r["radius"]
+            assert r["flach"] > 0.999, f"der Ring steht schraeg: {r['flach']}"
+        finally:
+            br.close()
+
+
+def test_der_ring_blendet_weg_und_laesst_nichts_stehen(server):
+    """Ohne reduzierte Bewegung geht der Ring auf und verschwindet.
+
+    Der zweite Teil ist der wichtige: ein Mesh, das auf `opacity` 0 steht,
+    aber `visible` bleibt, kostet in JEDEM Bild eine Zeichenanweisung - und
+    genau davon lebt der Ruhezustand aus FIX-05 A4.
+    """
+    basis, _ = server
+    with playwright.sync_playwright() as pw:
+        br, seite = _browser(pw, reduziert=False)
+        try:
+            _lade(seite, basis)
+            # Der Anfangswert wird im SELBEN evaluate gelesen, in dem
+            # `waehle` laeuft. Sonst haengt er daran, wie viele Bilder
+            # zwischen dem Aufruf und der naechsten Runde durch den
+            # Playwright-Kanal vergehen - und genau so ist dieser Test beim
+            # ersten Suitelauf rot geworden (0,667 statt der erwarteten
+            # 0,45). Ein Test, dessen Ergebnis von der Maschinenlast
+            # abhaengt, misst die Maschine, nicht den Code.
+            seite.evaluate("""() => {
+              const i = window.zustand.laender.findIndex(l => !l.ohne_iso);
+              window.__ringSpur = [];
+              window.zustand.waehle(i);
+              window.__ringSpur.push(window.zustand.ring.scale.x);
+              const nimm = () => {
+                window.__ringSpur.push(window.zustand.ring.scale.x);
+                if (window.zustand.ring.visible) requestAnimationFrame(nimm);
+              };
+              requestAnimationFrame(nimm);
+            }""")
+            assert seite.evaluate("() => window.__ringSpur[0]") == 0.45
+
+            # --dauer-rein ist 380 ms. Nach 900 ms ist er sicher durch.
+            seite.wait_for_timeout(900)
+            danach = seite.evaluate(_RING_LESEN)
+            assert danach["sichtbar"] is False, danach
+            assert danach["groesse"] > 0.99, f"nicht ausgewachsen: {danach}"
+
+            spur = seite.evaluate("() => window.__ringSpur")
+            # Waechst nur, nie zurueck.
+            assert spur == sorted(spur), spur
+            # Und er waechst wirklich, statt zu springen: mindestens zwei
+            # verschiedene Groessen. Der erste Wert steht garantiert fest
+            # (synchron gesetzt), der letzte auch (1.0) - also hat dieser
+            # Test keine Zeitabhaengigkeit mehr.
+            assert len(set(spur)) >= 2, spur
+            assert spur[-1] > 0.99, spur[-1]
+        finally:
+            br.close()
+
+
+def test_bei_reduzierter_bewegung_steht_der_ring_still_und_bleibt(server):
+    """"prefers-reduced-motion: alles sofort, alles sichtbar" - so steht es
+    in der Vorlage selbst (jarvis-scene.jsx:678-680). Ein Ring, der
+    wegblendet, waere fuer genau die Menschen nie zu sehen, fuer die die
+    Einstellung gedacht ist."""
+    basis, _ = server
+    with playwright.sync_playwright() as pw:
+        br, seite = _browser(pw)          # reduziert=True ist der Standard
+        try:
+            _lade(seite, basis)
+            seite.evaluate("""() => {
+              const i = window.zustand.laender.findIndex(l => !l.ohne_iso);
+              window.zustand.waehle(i);
+            }""")
+            seite.wait_for_timeout(900)
+            r = seite.evaluate(_RING_LESEN)
+            assert r["sichtbar"] is True, r
+            assert r["deckung"] > 0.4, r["deckung"]
+            assert r["groesse"] > 0.99, r["groesse"]
+        finally:
+            br.close()

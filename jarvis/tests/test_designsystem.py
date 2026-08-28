@@ -151,6 +151,47 @@ def test_nur_die_vier_dauern_aus_dem_design_system():
     assert treffer == [], ("harte Zeit statt --dauer-*:\n" + "\n".join(treffer))
 
 
+def test_es_gibt_genau_ein_glasrezept():
+    """Ein `backdrop-filter` ausserhalb von `.glas` ist ein zweites Glas.
+
+    Gefunden beim Abgleich mit Noahs Bewegtbild-Vorlage: `static/globus.js`
+    hatte zwei eigene Rezepte neben dem der `.glas`-Klasse -
+    `blur(18px) saturate(140%)` fuer die Karten und `blur(14px)` ganz ohne
+    `saturate` fuer das Ortpanel, dessen Flaeche mit `rgba(14,18,26,.82)`
+    nicht einmal aus der Palette kam. Die Vorlage sagt dasselbe wie
+    `static/system.css`: 20px und 150%.
+
+    Der Test verbietet `backdrop-filter` nicht - er verlangt, dass es nur an
+    einer Stelle im Projekt steht. Wer ein zweites Glas braucht, gibt ihm
+    einen Namen in `static/system.css`, statt es irgendwo hinzuschreiben.
+
+    Ausgenommen ist `backdrop-filter: none` - das SCHALTET Glas ab und ist
+    genau das, was die Barrierefreiheits- und Druckregeln tun muessen.
+    """
+    muster = re.compile(r"(?:-webkit-)?backdrop-filter\s*:\s*([^;{}]+)")
+    treffer = []
+    for pfad in (WURZEL / "index.html", WURZEL / "weltlage.html",
+                 *sorted((WURZEL / "static").glob("*.css")),
+                 *sorted((WURZEL / "static").glob("*.js"))):
+        text = pfad.read_text(encoding="utf-8")
+        ohne = re.sub(r"/\*.*?\*/", lambda m: re.sub(r"[^\n]", " ", m.group(0)),
+                      text, flags=re.DOTALL)
+        for nr, zeile in enumerate(ohne.splitlines(), 1):
+            # `@supports not (backdrop-filter: blur(1px))` fragt nach der
+            # Faehigkeit, es erklaert kein Glas.
+            if "@supports" in zeile:
+                continue
+            for wert in muster.findall(zeile):
+                w = wert.strip().rstrip("!important").strip()
+                if w == "none":
+                    continue
+                treffer.append((pfad.name, nr, w))
+    rezepte = sorted({w for _, _, w in treffer})
+    assert rezepte == ["blur(20px) saturate(150%)"], (
+        "mehr als ein Glasrezept:\n"
+        + "\n".join(f"{d}:{n}: {w}" for d, n, w in treffer))
+
+
 def test_die_dauer_token_haben_auch_benutzer():
     """Ein Token ohne Nutzer ist kein Design-System, sondern eine Absichts-
     erklaerung. Vor dem Abgleich hatten `--dauer-tupf`, `--dauer-raus` und

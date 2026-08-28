@@ -126,7 +126,16 @@ const STIL = `
      und wuerde es beenden. node --check merkt das nicht.) */
   overflow-wrap:normal;
 }
-.globus-wurzel .landtafel-name.lang{font-size:clamp(1.6rem,1.2rem + 1.6vw,2.5rem)}
+/* Zwei Stufen, nicht eine.
+   Die erste Fassung schrumpfte erst ab 20 Zeichen - und liess damit genau
+   die Faelle abgeschnitten, die kein Leerzeichen zum Umbrechen haben:
+   LIECHTENSTEIN (13), PHILIPPINEN (11), AEQUATORIALGUINEA (16). Bei
+   1280 px sind 349 px Inhaltsbreite da; LIECHTENSTEIN braucht in der
+   Kenngroessenstufe rund 490 px. Die Tafel schneidet (overflow:hidden),
+   also war der Name mittendrin weg.
+   Ab 10 Zeichen wird deshalb eine Stufe kleiner, ab 18 zwei. */
+.globus-wurzel .landtafel-name.lang{font-size:clamp(1.5rem,1.0rem + 1.6vw,2.3rem)}
+.globus-wurzel .landtafel-name.sehr-lang{font-size:clamp(1.15rem,.85rem + 1.1vw,1.7rem)}
 .globus-wurzel .landtafel-wo{
   margin-top:.25rem;font-size:var(--etikett);
   color:var(--text-leise);font-variant-numeric:tabular-nums;
@@ -157,8 +166,14 @@ const STIL = `
 .globus-wurzel .karte{
   border:1px solid var(--kante);border-radius:.8rem;overflow:hidden;
   background:var(--ebene-1);
-  -webkit-backdrop-filter:blur(18px) saturate(140%);
-  backdrop-filter:blur(18px) saturate(140%);
+  /* Dieselben Werte wie '.glas' in static/system.css (20px/150%). Hier
+     standen 18px und 140% - ein drittes Glasrezept neben dem der Vorlage
+     und dem des eigenen Design-Systems, die beide 20/150 sagen. Sichtbar
+     ist der Unterschied nur am Rand und in den Ecken, wo der Hintergrund
+     durch die 1px-Kante scheint: gemessen 96 von 14884 Pixeln einer
+     122x122-Karte. Klein, aber ohne Grund. */
+  -webkit-backdrop-filter:blur(20px) saturate(150%);
+  backdrop-filter:blur(20px) saturate(150%);
   display:flex;flex-direction:column;min-height:0;
   animation:globus-auf var(--dauer-rein) var(--kurve-rein) both;
   /* Gegen index.html:454-455. Dort hat '.karte' Innen- und Aussenabstand;
@@ -201,11 +216,8 @@ const STIL = `
 /* Abschnitt 4b: andere Flaeche, andere Kante. Man muss sehen, wo die Belege
    aufhoeren und die Erklaerung anfaengt. */
 .globus-wurzel .einordnung{
-  border-top:1px dashed var(--akzent-strich);
-  background:var(--akzent-fuellung);
-  /* Klebt am Kachelfuss: die Einordnung gehoert unter den Beleg, egal wie
-     lang der ist. Sonst haengt sie bei kurzen Meldungen in der Luft. */
-  margin-top:auto;
+  border-top:1px dashed var(--akzent-linie);
+  background:var(--akzent-glut);
   animation:einordnung-rein var(--dauer-rein) var(--kurve-rein) both;
   /* Erst der Beleg, dann die Deutung. 420 ms spaeter ist lange genug, um
      die Reihenfolge zu lesen, und kurz genug, um nicht zu warten. */
@@ -213,9 +225,9 @@ const STIL = `
 }
 .globus-wurzel .einordnung .marke2{
   font-size:.66rem;letter-spacing:.11em;text-transform:uppercase;
-  color:var(--akzent);margin-bottom:5px;
+  color:var(--akzent);margin-bottom:.3rem;
 }
-.globus-wurzel .einordnung p{font-size:12.5px;line-height:1.4;color:var(--text);
+.globus-wurzel .einordnung p{font-size:.78rem;line-height:1.4;color:var(--text);
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .globus-wurzel .einordnung .hinweis{margin-top:.25rem;font-size:.68rem;color:var(--text-leise);font-style:italic}
 
@@ -241,7 +253,19 @@ const STIL = `
 
 @media (prefers-reduced-motion: reduce){
   .globus-wurzel,.globus-wurzel *,.globus-wurzel *::before,.globus-wurzel *::after{
-    animation-duration:.001ms !important;transition-duration:.001ms !important}
+    animation-duration:.001ms !important;
+    /* Die VERZOEGERUNGEN muessen mit weg, nicht nur die Dauern. Sonst
+       bleibt der 420-ms-Verzug der Einordnung und die 45-ms-Staffelung der
+       Karten stehen - und mit animation-fill-mode both heisst das: bis zu
+       600 ms unsichtbarer Inhalt fuer genau die Leute, die weniger
+       Bewegung wollen.
+       Der globale Block in static/system.css deckt das heute mit ab. Diese
+       Kopie darf trotzdem nicht weniger koennen als er: wer sie liest,
+       haelt sie sonst fuer vollstaendig. */
+    animation-delay:0ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.001ms !important;
+    transition-delay:0ms !important}
 }
 .globus-wurzel .ortsuche{display:flex;gap:.4rem;align-items:center;min-width:0}
 .globus-wurzel .ortsuche input{
@@ -263,8 +287,16 @@ const STIL = `
   outline:2px solid var(--akzent);outline-offset:2px}
 .globus-wurzel .ortpanel{
   position:absolute;left:1.4rem;bottom:3.2rem;width:min(42ch,42%);z-index:5;
-  background:rgba(14,18,26,.82);backdrop-filter:blur(14px);
-  border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:1rem 1.1rem;
+  /* Vorher: rgba(14,18,26,.82), blur(14px), Kante rgba(255,255,255,.1) -
+     ein VIERTES Glasrezept, und die Flaechenfarbe war nicht einmal aus der
+     Palette (ein Blaustich gegenueber --grund #0a0a0c und --ebene-1
+     #131316). Der Waechter aus FIX-06 Abschnitt 5 prueft nur Akzentfarben
+     und hat sie durchgelassen. Jetzt '.glas' aus static/system.css, wie
+     die Landtafel daneben - und zwar ueber die KLASSE im Markup, nicht als
+     Kopie der Werte: nur so gilt auch der Ersatz aus
+     '@supports not (backdrop-filter)', ohne den das Panel auf Browsern
+     ohne Glas bei 4 % Deckung unlesbar waere. */
+  border-radius:14px;padding:1rem 1.1rem;
 }
 .globus-wurzel .ortpanel h2{margin:0 0 .1rem;font-size:1.05rem;font-weight:600}
 .globus-wurzel .ortkoord{margin:0 0 .7rem;font-size:.78rem;color:var(--text-leise)}
@@ -318,7 +350,7 @@ const MARKUP = `
   <div class="landtafel-sat" id="sat-hinweis">Satellitenbahnen werden geladen …</div>
 </section>
 
-<section class="ortpanel" id="ortpanel" hidden aria-live="polite">
+<section class="ortpanel glas" id="ortpanel" hidden aria-live="polite">
   <button class="ortzu" id="ort-zu" type="button" aria-label="Schließen">×</button>
   <h2 id="ort-name">—</h2>
   <p class="ortkoord" id="ort-koord"></p>
@@ -331,7 +363,7 @@ const MARKUP = `
 </section>
 
 <main class="karten" id="karten" aria-live="polite">
-  <div class="leer">Wähl ein Land, dann sucht JARVIS Quellen dafür und ordnet sie ein.</div>
+  <div class="laedt">Wähl ein Land, dann sucht JARVIS Quellen dafür und ordnet sie ein.</div>
 </main>
 
 <footer class="status">
@@ -519,16 +551,23 @@ export async function starte(behaelter, token){
     // Karte einlaeuft, steht sie bei translateY(8px) - sie galt damit als
     // "passt nicht" und flog raus, eine nach der anderen, bis keine mehr da
     // war. Gemessen: 0 statt 5 Karten.
-    liste.forEach(m => {
+    const angehaengt = liste.map(m => {
       const k = karteNode(m);
       k.classList.add('ungestaffelt');
       ziel.appendChild(k);
+      return k;
     });
 
     requestAnimationFrame(() => {
       schneideKarten();
-      // 45 ms Versatz, derselbe Takt wie die Zonen im COMMAND CENTER.
-      Array.prototype.forEach.call(ziel.children, (k, i) => {
+      // NUR die Karten dieses Durchgangs, und nur die, die noch im
+      // Dokument stehen. `ziel.children` waere die LEBENDE Liste: laeuft
+      // zeichneKarten zweimal in einem Bild - der catch-Zweig unten tut
+      // genau das -, wuerde dieser Rueckruf den Karten des NAECHSTEN
+      // Durchgangs die Sperre abnehmen, bevor sie gemessen wurden. Dann
+      // waere der Fehler von oben zurueck: alle geloescht.
+      angehaengt.forEach((k, i) => {
+        if (k.parentNode !== ziel) return;
         k.style.animationDelay = (i * 45) + 'ms';
         k.classList.remove('ungestaffelt');
       });
@@ -597,9 +636,11 @@ export async function starte(behaelter, token){
     n.className = 'landtafel-name';
     n.id = 'landtafel-name';
     n.textContent = name;
-    // Ab hier passt der Name nicht mehr in eine Zeile der Kenngroessenstufe.
-    // Gemessen am laengsten Landesnamen im Datensatz.
-    if (name.length > 20) n.classList.add('lang');
+    // Ab hier passt der Name nicht mehr in eine Zeile der jeweiligen Stufe.
+    // Die Schwelle liegt bei 10, nicht bei 20: ein Name ohne Leerzeichen
+    // hat keine Umbruchstelle, und die Tafel schneidet ab.
+    if (name.length > 18) n.classList.add('sehr-lang');
+    else if (name.length > 10) n.classList.add('lang');
     const w = document.createElement('div');
     w.className = 'landtafel-wo';
     w.id = 'landtafel-wo';
@@ -611,7 +652,11 @@ export async function starte(behaelter, token){
     // die Tafel in der Hoehe, und "ohne Sprung" ist Kriterium 4.
     jetzt.style.position = 'absolute';
     jetzt.style.inset = '0';
+    // Auch den KINDERN die id nehmen, nicht nur der Huelle: sonst gibt es
+    // 240 ms lang zwei Elemente mit id="landtafel-name", und
+    // getElementById liefert in diesem Fenster den ALTEN Laendernamen.
     jetzt.removeAttribute('id');
+    jetzt.querySelectorAll('[id]').forEach(k => k.removeAttribute('id'));
     jetzt.classList.add('geht');
     buehne.appendChild(neu);
 
@@ -755,6 +800,15 @@ export async function starte(behaelter, token){
     welt.add(erde);
 
     const AKZENT = farbe('--akzent');
+    /* Die Ringdauer kommt aus derselben Quelle wie jede andere Dauer im
+       Projekt. Sie hier als 380 hinzuschreiben waere eine fuenfte Zahl
+       neben vier, die es schon gibt. */
+    const RING_MS = (() => {
+      const wert = gelesen.getPropertyValue('--dauer-rein').trim();
+      const zahl = parseFloat(wert);
+      if (!wert || !isFinite(zahl)) return 380;
+      return wert.endsWith('ms') ? zahl : zahl * 1000;
+    })();
     const RUHE   = farbe('--text-leise');   // Graustufe, wie im Auftrag
 
     /* FIX-06 Abschnitt 7.1 - der Atmosphaerensaum.
@@ -812,6 +866,8 @@ export async function starte(behaelter, token){
        Gesetzt wird das Flag von: Zeigerdrehung, laufendem Flug, Auswahl,
        Resize, dem ersten Laden der Geometrie. */
     let dreckig = true;
+    // Startzeit der Ring-Animation (Entscheidung 6). 0 heisst: laeuft nicht.
+    let ringT0 = 0;
     // Nur zum Nachmessen von aussen (Abnahme A6 Kriterium 5 und B6
     // Kriterium 3). Zwei Zaehler, weil sie zwei verschiedene Dinge
     // messen: `__globusBilder` sind die wirklich gezeichneten Bilder,
@@ -1011,6 +1067,31 @@ export async function starte(behaelter, token){
       marken.instanceMatrix.needsUpdate = true;
       welt.add(marken);
       zustand.marken = marken;
+
+      /* Design-Entscheidung 6 aus Noahs Bewegtbild-Vorlage: der Ring um die
+         gewaehlte Marke. Die Vorlage (jarvis-scene.jsx:205-215) zeigt einen
+         Punkt und darum einen duennen Ring, der aufgeht und dabei
+         ausblendet. Der Farbwechsel allein sagt nur "das da"; der Ring sagt
+         "hierhin".
+
+         EIN Mesh, nicht eins je Land - es ist immer nur ein Land gewaehlt.
+         Es wird versteckt geboren und in `waehle` umgesetzt.
+
+         RingGeometry und DoubleSide sind in static/vendor/three.core.js
+         nachgeschlagen (class RingGeometry extends BufferGeometry,
+         const DoubleSide = 2), nicht erinnert.
+
+         Radius 1.014 - knapp ueber den Marken (1.01), damit der Ring nicht
+         in der Kugel des Landes steckt, und weit unter dem Saum (1.032). */
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.030, 0.034, 48),
+        new THREE.MeshBasicMaterial({
+          color: AKZENT, transparent: true, opacity: 0,
+          side: THREE.DoubleSide, depthWrite: false,
+        }));
+      ring.visible = false;
+      welt.add(ring);
+      zustand.ring = ring;
       dreckig = true;
       document.body.dataset.laender = String(zustand.laender.length);
       // Erst wenn die Erde steht, kommen die Bahnen dazu. Scheitern sie,
@@ -1094,6 +1175,34 @@ export async function starte(behaelter, token){
           zustand.marken.setColorAt(i, i === index ? AKZENT : RUHE));
         zustand.marken.instanceColor.needsUpdate = true;
         dreckig = true;
+      }
+      if (zustand.ring){
+        /* Der Ring liegt flach auf der Kugel: seine Normale (+Z) zeigt vom
+           Mittelpunkt weg. `setFromUnitVectors` rechnet dabei im lokalen
+           Raum von `welt` - anders als `lookAt`, das ueber den Weltraum
+           geht und sich an der Drehung des Globus verschluckt. Beide
+           Vektoren sind normalisiert, so verlangt es die Signatur
+           (nachgesehen in three.core.js). */
+        const p = aufKugel(land.lon, land.lat, 1.014);
+        zustand.ring.position.copy(p);
+        zustand.ring.quaternion.setFromUnitVectors(
+          new THREE.Vector3(0, 0, 1), p.clone().normalize());
+        zustand.ring.visible = true;
+        if (reduziert){
+          // Die Vorlage sagt es selbst: "alles sofort, alles sichtbar".
+          // Ein Ring, der wegblendet, waere hier nie zu sehen - also
+          // steht er still und bleibt stehen, bis das naechste Land dran ist.
+          zustand.ring.scale.setScalar(1);
+          zustand.ring.material.opacity = 0.55;
+          ringT0 = 0;
+        } else {
+          // Anfangswerte hier setzen, nicht erst im ersten Bild der
+          // Schleife: sonst steht der Ring bis zu einem Frame lang auf
+          // opacity 0 und der erste Eindruck ist ein Aufblitzen.
+          zustand.ring.scale.setScalar(0.45);
+          zustand.ring.material.opacity = 0.85;
+          ringT0 = performance.now();
+        }
       }
       zustand.aktiv = land;
       dreheZu(land.lon, land.lat);
@@ -1396,6 +1505,19 @@ export async function starte(behaelter, token){
         welt.rotation.y = start.y + (ziel.y - start.y) * e;
         kamera.position.z = start.z + (ziel.z - start.z) * e;
         if (t >= 1) ziel = null;
+        dreckig = true;
+      }
+      if (ringT0 && zustand.ring){
+        const t = Math.min((performance.now() - ringT0) / RING_MS, 1);
+        const e = glatt(t);
+        zustand.ring.scale.setScalar(0.45 + e * 0.55);
+        zustand.ring.material.opacity = 0.85 * (1 - e);
+        if (t >= 1){
+          ringT0 = 0;
+          // Ausgeblendet heisst weg: ein unsichtbares Mesh kostet sonst in
+          // jedem Bild eine Zeichenanweisung.
+          zustand.ring.visible = false;
+        }
         dreckig = true;
       }
       // Der Kern von A4: im Ruhezustand faellt die Zeichenlast auf null.

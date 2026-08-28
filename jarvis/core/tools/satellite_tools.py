@@ -229,9 +229,9 @@ class SatelliteCompare(Tool):
     name = "satellite_compare"
     description = (
         "Vergleicht zwei NDVI-Raster desselben Ausschnitts und meldet die veraenderte Flaeche in Hektar.\n"
-        "Nimm es fuer: wie viel Gruen zwischen zwei Aufnahmen verschwunden ist - erst rechnen, dann deuten. before und after sind die NDVI-Werte selbst und muessen aus einer echten Rasterquelle stammen - satellite_search liefert sie NICHT, erfinde sie nie. Von dort kommen before_date/after_date (acquired_at), before_cloud_pct/after_cloud_pct (cloud_cover_pct) und resolution_m der Szene.\n"
-        "Nimm es NICHT fuer: das Bild eines einzelnen Zeitpunkts, das macht satellite_search. Setze als resolution_m nie bild_aufloesung_m des Vorschaubilds ein - sonst stimmen die Hektar um Groessenordnungen nicht. Zu weit im Jahreslauf auseinander, und es lehnt ab - man saehe die Jahreszeit.\n"
-        "Beispiel: satellite_compare(before=[0.72, 0.68], after=[0.31, 0.29], before_date=\"2020-07-14\", after_date=\"2024-07-09\", resolution_m=10)"
+        "Nimm es fuer: wie viel Gruen zwischen zwei Aufnahmen verschwunden ist - erst rechnen, dann deuten. before und after sind die NDVI-Werte selbst und muessen aus einer echten Rasterquelle stammen. Von satellite_search kommen before_date/after_date (acquired_at), before_cloud_pct/after_cloud_pct (cloud_cover_pct) und resolution_m der Szene.\n"
+        "Nimm es NICHT fuer: das Bild eines einzelnen Zeitpunkts, das macht satellite_search. KEIN Werkzeug liefert dir heute NDVI-Werte - hast du keine aus einer echten Quelle, rufst du dieses Werkzeug GAR NICHT auf, sondern sagst, dass die Rasterdaten fehlen; die Platzhalter im Beispiel denkst du dir NIE als Zahlen aus. Setze als resolution_m nie bild_aufloesung_m des Vorschaubilds ein - sonst stimmen die Hektar um Groessenordnungen nicht. Zu weit im Jahreslauf auseinander, und es lehnt ab - man saehe die Jahreszeit.\n"
+        "Beispiel: satellite_compare(before=<NDVI-Werte der aelteren Aufnahme>, after=<NDVI-Werte der juengeren>, before_date=\"2020-07-14\", after_date=\"2024-07-09\", resolution_m=10)"
     )
     parameters = {
         "type": "object",
