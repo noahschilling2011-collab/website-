@@ -12,6 +12,20 @@ pydantic-settings>=2.4
 # run()-Helferlein.
 pytest>=8.0
 
+# Die drei standen hier NICHT, obwohl die Suite sie braucht - gefunden bei
+# der Verknuepfungspruefung am 29.08.2026. Sie fehlten unbemerkt, weil die
+# Tests sie ueber `pytest.importorskip` holen: ohne sie werden die
+# betroffenen Tests still UEBERSPRUNGEN statt rot. Ein "alles gruen" auf
+# einer frischen Installation haette dann sechs Testdateien gar nicht
+# ausgefuehrt.
+#
+# playwright braucht ausserdem einen Browser. In dieser Umgebung liegt er
+# unter /opt/pw-browsers; auf einer neuen Maschine holt ihn
+# `playwright install chromium`.
+playwright>=1.40      # 6 Testdateien: der Globus und beide Oberflaechen
+Pillow>=10.0          # tests/test_satellitenbild.py: prueft echte PNG-Bytes
+PyYAML>=6.0           # liest das Frontmatter der Skills in .claude/skills/
+
 # Der Vault-Index braucht keine eigene Abhaengigkeit. Hier stand watchdog,
 # solange der Ordner im Hintergrund beobachtet wurde. Seit FIX-04 Schritt 3
 # zieht core.gedaechtnis.frisch_halten beim Lesen nach - mit pathlib und

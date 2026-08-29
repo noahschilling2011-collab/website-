@@ -3,8 +3,8 @@
 > Einzige Wahrheit über den Projektstand. Claude Code liest diese Datei zuerst
 > und aktualisiert sie am Ende jeder Phase. Von Hand korrigieren ist erlaubt.
 
-AKTUELL: FIX-06 — COMMAND CENTER, siehe `docs/FIX-06.md`. Abschnitt 5 (Design-System) abgenommen, 6 bis 8 stehen aus.
-LETZTE ÄNDERUNG: 2026-08-27 (FIX-06 Abschnitt 5 abgenommen — eine Palette für beide Seiten und den Globus, kein Blau mehr)
+AKTUELL: FIX-06 — COMMAND CENTER, siehe `docs/FIX-06.md`. Abschnitte 5 (Design-System), 6 (COMMAND CENTER) und 7 (WELT-NETZ) sind gebaut; **8 (MÄRKTE) steht aus und ist blockiert** — der Auftragstext dafür liegt nicht im Repo, nur der Name in der Kopfzeile von `docs/FIX-06.md`.
+LETZTE ÄNDERUNG: 2026-08-29 (CDSE-Zugang: die Anleitung war falsch, der Code auch — zwei Dashboards, ein Token ohne Ablauf, ein Kontingent um Faktor 5 daneben)
 
 > **Abweichung von der Arbeitsweise, auf Ansage:** es wurden alle Phasen
 > gebaut, nicht eine nach der anderen. Das widerspricht CLAUDE.md
@@ -270,7 +270,7 @@ Modulglobal: mehrere Tasks können gleichzeitig laufen.
 >   Kein Code hat es je gelesen — es stand nur in der Vorlage und forderte
 >   einen NASA-Zugang, der nichts bewirkt hätte. Belegt durch den neuen
 >   `tests/test_config.py::test_jedes_settings_feld_wird_irgendwo_gelesen`:
->   er prüft alle 32 Settings-Felder statisch und wurde rot genau bei diesem
+>   er prüft alle 34 Settings-Felder statisch und wurde rot genau bei diesem
 >   einen. Gegenprobe: Feld wieder eingefügt → wieder rot. Der Plan für
 >   aktive Brände bleibt in `docs/satellite.md:46` stehen.
 > - Drei unbenutzte Importnamen aus `core/tools/satellite_tools.py` raus:
@@ -412,7 +412,7 @@ einen uvicorn im Thread; die Netzsperre der Testsitzung lässt dafür genau
 >   Kein Code hat es je gelesen — es stand nur in der Vorlage und forderte
 >   einen NASA-Zugang, der nichts bewirkt hätte. Belegt durch den neuen
 >   `tests/test_config.py::test_jedes_settings_feld_wird_irgendwo_gelesen`:
->   er prüft alle 32 Settings-Felder statisch und wurde rot genau bei diesem
+>   er prüft alle 34 Settings-Felder statisch und wurde rot genau bei diesem
 >   einen. Gegenprobe: Feld wieder eingefügt → wieder rot. Der Plan für
 >   aktive Brände bleibt in `docs/satellite.md:46` stehen.
 > - Drei unbenutzte Importnamen aus `core/tools/satellite_tools.py` raus:
@@ -471,7 +471,7 @@ bei Kontingenten die falsche Reihenfolge.
 >   Kein Code hat es je gelesen — es stand nur in der Vorlage und forderte
 >   einen NASA-Zugang, der nichts bewirkt hätte. Belegt durch den neuen
 >   `tests/test_config.py::test_jedes_settings_feld_wird_irgendwo_gelesen`:
->   er prüft alle 32 Settings-Felder statisch und wurde rot genau bei diesem
+>   er prüft alle 34 Settings-Felder statisch und wurde rot genau bei diesem
 >   einen. Gegenprobe: Feld wieder eingefügt → wieder rot. Der Plan für
 >   aktive Brände bleibt in `docs/satellite.md:46` stehen.
 > - Drei unbenutzte Importnamen aus `core/tools/satellite_tools.py` raus:
@@ -526,7 +526,7 @@ ausprobieren.
 >   Kein Code hat es je gelesen — es stand nur in der Vorlage und forderte
 >   einen NASA-Zugang, der nichts bewirkt hätte. Belegt durch den neuen
 >   `tests/test_config.py::test_jedes_settings_feld_wird_irgendwo_gelesen`:
->   er prüft alle 32 Settings-Felder statisch und wurde rot genau bei diesem
+>   er prüft alle 34 Settings-Felder statisch und wurde rot genau bei diesem
 >   einen. Gegenprobe: Feld wieder eingefügt → wieder rot. Der Plan für
 >   aktive Brände bleibt in `docs/satellite.md:46` stehen.
 > - Drei unbenutzte Importnamen aus `core/tools/satellite_tools.py` raus:
@@ -1052,13 +1052,20 @@ RestBench tut es bei 28 von 54.
 
 **Alle acht Verwechslungspaare zeigen jetzt beidseitig aufeinander**, und
 zwar in der NICHT-für-Zeile, nicht irgendwo im Text — `wiki_lokal`↔`wiki_live`,
-`recall`↔`web_search`, `satellite_search`↔`satellite_passes`,
-`datei_suchen`↔`datei_lesen`, `kalender`↔`clock`, `wikidata`↔`wiki_lokal`.
+`wiki_lokal`↔`web_search`, `wiki_live`↔`web_search`, `recall`↔`web_search`,
+`satellite_search`↔`satellite_passes`, `datei_suchen`↔`datei_lesen`,
+`kalender`↔`clock`, `wikidata`↔`wiki_lokal`. (Hier standen sechs unter der
+Überschrift „alle acht" — die zwei fehlenden waren die beiden mit
+`web_search`.)
 Dazu fünf Datenkanten in beide Richtungen: das konsumierende Werkzeug nennt
 den Vorgänger, das produzierende sagt, was bei ihm anfällt.
 
-**Der Preis steht fest und wird nicht schöngeredet: 4.601 → 9.512 Zeichen**,
-also rund 1.150 → 2.378 Token bei **jedem** Aufruf. Ob das gerechtfertigt
+**Der Preis steht fest und wird nicht schöngeredet: 4.601 → 9.736 Zeichen**,
+also rund 1.150 → 2.434 Token bei **jedem** Aufruf. (Hier stand 9.512 — der
+Stand vor dem Umbau der `satellite_compare`-Beschreibung, der beim
+Ausschreiben der Design-Punkte auffiel. Die Zahl wird aus der Registry
+gelesen, nicht abgeschrieben: `sum(len(t.description) for t in
+registry.all_tools())`.) Ob das gerechtfertigt
 ist, entscheidet die Messung — nicht ich.
 
 **Damit das überhaupt entscheidbar bleibt**, sind beide Stände archiviert
@@ -1275,7 +1282,7 @@ fielen zwei Fehler auf, die beide **kein Werkzeug gemeldet hatte**:
 
 ### 1. Der Fortschrittsbalken im COMMAND CENTER war tot
 
-`index.html:521` stand auf `transition: width var(--dauer-normal) …`, und
+`.cc-balken i` stand auf `transition: width var(--dauer-normal) …`, und
 `--dauer-normal` ist in **keiner** Datei definiert. Damit war die gesamte
 Deklaration ungültig, und der Balken sprang hart — ausgerechnet in der Zone,
 die Fortschritt sichtbar machen soll. Eingebaut in FIX-06 Abschnitt 6, von
@@ -1288,7 +1295,7 @@ DoD 1 dieser Ansicht verlangt, dass bei 1440×900 nichts scrollt.
 
 **Neuer Wächter:** `test_kein_undefiniertes_custom_property` sammelt jedes
 `var(--x)` aus `index.html`, `weltlage.html` und `static/*` und hält es gegen
-alle Definitionen. Er hatte prompt einen Fehlalarm auf `index.html:830` —
+alle Definitionen. Er hatte prompt einen Fehlalarm im `--dim`-Kommentar —
 dort steht in einem **Kommentar**, dass es `--dim` nicht gibt. Der Test
 ignoriert jetzt Blockkommentare, ersetzt sie aber zeichenweise durch
 Leerzeichen, damit die Zeilennummern stimmen.
@@ -1297,10 +1304,10 @@ Leerzeichen, damit die Zeilennummern stimmen.
 
 | Fundort | Was es war |
 |---|---|
-| `index.html:56` | ein vierter Bernstein, 2/1/24 neben `--akzent`, nirgends definiert |
-| `index.html:57` | **genau die zweite Akzentfarbe**, die der Kopf von `static/system.css` für abgeschafft erklärt |
-| `index.html:356`, `:363` | ein zweites Rot neben `--ab` |
-| `index.html:366-367` | derselbe vierte Bernstein im Mikrofon-Puls |
+| `index.html`, Kopf des Stilblocks | ein vierter Bernstein, 2/1/24 neben `--akzent`, nirgends definiert |
+| `index.html`, dieselbe Stelle | **genau die zweite Akzentfarbe**, die der Kopf von `static/system.css` für abgeschafft erklärt |
+| `index.html`, Plan-Abschnitt | ein zweites Rot neben `--ab` |
+| `index.html`, Mikrofon-Puls | derselbe vierte Bernstein im Mikrofon-Puls |
 
 Der Wächter aus FIX-06 Abschnitt 5 suchte nur nach `4da3ff` und hat den Rest
 durchgelassen. `test_nur_die_eine_akzentfarbe_und_die_zwei_signalfarben`
@@ -1322,6 +1329,83 @@ der 45-ms-Versatz und die Palette stehen bereits in `static/system.css` — es
 fehlen die Benutzer. `--dauer-tupf`, `--dauer-raus` und `--dauer-zahl` hatten
 null Treffer im ganzen Projekt, daneben stehen neun handgeschriebene `200ms`
 und fünf verschiedene Erscheinungsdauern.
+
+## Verknüpfungsprüfung — acht Achsen, 36 Funde, davon sechs sofort belegt
+
+Noah hat gefragt, ob „jetzt alles fertig und verknüpft" sei. Statt ja zu
+sagen, habe ich acht Prüfer angesetzt — Werkzeuge, Routen gegen Frontend,
+DOM-Verdrahtung, tote Module, Konfiguration, Skripte, Datenbankschema und
+Doku gegen Wirklichkeit — mit je drei Skeptikern zur Gegenprüfung.
+
+**Die Antwort ist nein.** 36 Funde. Sechs davon habe ich selbst in je einem
+Befehl entschieden und sofort behoben, der Rest wartet auf die
+Gegenprüfung.
+
+### Was diese Datei selbst über sich behauptet hat
+
+`CLAUDE.md` nennt `STATUS.md` „die einzige Wahrheit über den Projektstand".
+Umso peinlicher:
+
+| Behauptung | Wirklichkeit |
+|---|---|
+| Kopf: „Abschnitt 5 abgenommen, 6 bis 8 stehen aus" | 6 und 7 sind seit fünf Commits gebaut. Der Kopf war **einen Tag und fünf Commits alt** |
+| „4.601 → 9.512 Zeichen" als „nicht schöngeredet" | 9.736 — der Stand vor meinem eigenen `satellite_compare`-Umbau |
+| „alle 32 Settings-Felder", viermal | 34 (`len(Settings.model_fields)`) |
+| „Alle acht Verwechslungspaare", dann sechs aufgezählt | acht im Test, die zwei mit `web_search` fehlten in der Liste |
+
+Die Zahlen stehen jetzt so da, wie ein Befehl sie liefert, mit dem Befehl
+daneben.
+
+### Zeilennummern, die auf eine Fassung zeigen, die es nicht mehr gibt
+
+Ein Prüfer meldete „zwölf von zwölf Zeilenangaben falsch". **Das ist
+überzogen** — nachgemessen treffen `api/weltlage.py:39`, `core/planner.py:45`
+und `core/satellite/analysis.py:70` genau. Aber drei `index.html`-Angaben
+waren gewandert, und zwar aus einem Grund, den Umnummerieren nicht behebt:
+sie beschreiben den Zustand **vor** der Reparatur (`index.html:521` stand
+auf dem kaputten `transition: width var(--dauer-normal)`). Heute steht dort
+der Fix. Eine Zeilennummer auf eine gelöschte Fassung ist unrettbar — also
+stehen dort jetzt **stabile Anker** (`.cc-balken i`, „der `--dim`-Kommentar")
+statt Zahlen.
+
+### Der Fund, der die Suite selbst betraf
+
+`playwright`, `Pillow` und `PyYAML` standen **nicht in `requirements.txt`**,
+obwohl **103 von 1125 Tests** sie brauchen — 9 % der Suite.
+
+Das ist schlimmer als ein normaler fehlender Import: die Tests holen diese
+Pakete über `pytest.importorskip`. Ohne sie werden sie **still
+übersprungen**, nicht rot. Nach `pip install -r requirements.txt` auf einer
+frischen Maschine hätte die Suite „alles grün" gemeldet und dabei sechs
+Testdateien nicht ausgeführt — den ganzen Globus, das Design-System, das
+COMMAND CENTER und beide Oberflächen.
+
+**Neuer Wächter:** `tests/test_abhaengigkeiten.py` sammelt jedes
+`importorskip` aus `tests/` und `scripts/` und verlangt einen Eintrag in
+`requirements.txt`. Mutation geprüft: `playwright` wieder entfernt → rot,
+mit Nennung aller sechs betroffenen Dateien.
+
+> Und er hat sich beim ersten Lauf an sich selbst verschluckt: sein eigener
+> Docstring nennt `importorskip("x")` als Beispiel. Er überspringt jetzt die
+> Datei, in der er steht — dieselbe Falle wie beim Blau-Wächter und beim
+> `--dim`-Kommentar, zum dritten Mal in diesem Projekt.
+
+**Suite:** `python3 -m pytest -q` → **1127 passed**, 0 Fehler, **0
+übersprungen**. Die letzte Zahl ist ab jetzt die interessante: solange sie
+0 ist, läuft wirklich alles, was es gibt.
+
+### Was noch offen ist
+
+Die restlichen 30 Funde stehen unter Gegenprüfung. Die schwersten, noch
+unbestätigt:
+
+* Der Chat-Pfad (`api/routes.py:207`) bietet dem Modell **alle 18 Werkzeuge**
+  an, darunter `ask_agent` und `send_email` — beide können dort nicht laufen
+  (kein Delegationskontext, keine Bestätigungsfunktion).
+* `/weltlage` wird ausgeliefert, aber **kein Knopf führt hin**.
+* `docker compose up` baut ein Image **ohne `static/`** — der Globus fehlt.
+* Der Wächter für tote Routen prüft **Teilstrings statt Aufrufen** und sieht
+  zwei ausgelieferte Routen gar nicht.
 
 ## Der CDSE-Zugang — drei Fehler, gefunden bevor Noah sie treffen konnte
 
