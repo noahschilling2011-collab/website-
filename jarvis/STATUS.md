@@ -1330,6 +1330,86 @@ fehlen die Benutzer. `--dauer-tupf`, `--dauer-raus` und `--dauer-zahl` hatten
 null Treffer im ganzen Projekt, daneben stehen neun handgeschriebene `200ms`
 und fünf verschiedene Erscheinungsdauern.
 
+## Die Beschaffungsliste — `docs/BESCHAFFUNG.md`
+
+Noah wollte wissen, was er besorgen muss („sag mir genau, ich besorg es dir
+gerne"). Sechs Rechercheure gegen die echten Doku-Seiten, jede Antwort von
+zwei Skeptikern belegt oder widerlegt. Ergebnis in `docs/BESCHAFFUNG.md`.
+
+**Die Kurzfassung: ein Konto, 0 €, keine Kreditkarte, keine Wartezeit.**
+
+Und ein Befund, der die Frage halbiert: von den drei Satelliten-Werkzeugen
+war **nur eines wirklich blockiert**. `satellite_passes` braucht nichts
+(CelesTrak ist offen), und die Szenensuche braucht seit heute auch nichts
+mehr — sie schickte einen Token an einen Katalog, der offen ist und ihn
+ablehnt. Der Schlüssel wird nur noch fürs gerenderte Bild gebraucht.
+
+### `satellite_compare` ist keine Sackgasse mehr
+
+Bisher stand hier: „braucht NDVI-Werte, und kein Werkzeug liefert welche."
+Die Recherche hat es aufgelöst — **NDVI geht mit demselben CDSE-Zugang**,
+über die Process API mit einem Evalscript auf B04/B08, `sampleType:
+FLOAT32` und `format.type = "image/tiff"`. Kein zweites Konto, kein zweiter
+Schlüssel, keine Zusatzfreischaltung.
+
+Die Auswertehälfte steht schon: `core/satellite/analysis.py` rechnet aus
+`veraendert_pixel × aufloesung_m²` bereits Hektar. Es fehlt nur der
+Beschaffungsteil — Raster holen, GeoTIFF nach `list[float]`. Die einzige
+Entscheidung, die Noah bleibt, ist der **TIFF-Leser**: `rasterio`/GDAL wären
+eine Stack-Änderung, `Pillow` steht seit heute ohnehin in
+`requirements.txt` und liest 32-Bit-Float-TIFF im Modus `F`.
+
+Nicht gangbar ist die Statistical API (`/statistics/v1`): sie liefert
+min/max/mean/Histogramm über das ganze Gebiet — aus einem Mittelwert folgt
+nicht, *welche* Fläche sich verändert hat.
+
+### Ein vierter Fehler im CDSE-Code
+
+`PROCESS_URL` stand auf `…/api/v1/process`. CDSE hat am **09.03.2026**
+angekündigt (Rollout ab 17.03.2026): aus `/api/<version>/<service>` wird
+`/<service>/<version>`. Die Altform antwortet noch, ist aber für die
+Abkündigung vorgemerkt — genau die Art Zeitbombe, die in einem Projekt, das
+nur gelegentlich läuft, erst dann auffällt, wenn niemand mehr weiß warum.
+
+Selbst nachgemessen, statt der Ankündigung zu glauben:
+
+```
+POST /process/v1      -> 401   (geroutet, Token fehlt)
+POST /api/v1/process  -> 401   (Altform, noch geroutet)
+POST /statistics/v1   -> 401   (geroutet)
+POST /gibtesnicht/v9  -> 503   (nicht geroutet)
+```
+
+Die 503 auf dem erfundenen Pfad ist der Beleg, dass die 401 etwas heißt —
+ohne sie könnte sie auch von einem Torwächter vor dem Nichts kommen.
+Umgestellt, Wächter dazu (`test_die_endpunkte_haben_die_neue_pfadform`),
+Mutation rot.
+
+### Märkte: die Landschaft, nicht die Auswahl
+
+**Abschnitt 8 bleibt blockiert**, und zwar nicht am Geld: **der
+Auftragstext liegt nicht im Repo.** Nur der Name steht in der Kopfzeile von
+`docs/FIX-06.md`. Welche Daten die Ansicht zeigen soll, ist unbekannt — und
+wird nicht geraten.
+
+Was recherchiert ist: EZB direkt für Währungen (kein Konto, amtlich),
+Deutsche Börse Delayed Data für deutsche Aktien (der einzige Weg, der
+kostenlos *und* lizenzrechtlich ausdrücklich abgedeckt ist), Finnhub für
+US-Titel. **Ausdrücklich nicht** Twelve Data auf der Gratisstufe — dort ist
+genau unser Fall ausgeschlossen („The data cannot be displayed to users"),
+Anzeigen kostet 79 USD/Monat. Und nicht Yahoo/yfinance, dessen AGB die
+Nutzung dem Wortlaut nach auch privat nicht deckt.
+
+Dazu ein Punkt, der in keiner Anbieterdoku steht: § 87b Abs. 1 Satz 2 UrhG
+stellt die „wiederholte und systematische Vervielfältigung … unwesentlicher
+Teile" der Nutzung eines wesentlichen Teils gleich, und § 87c Abs. 1 Nr. 1
+nimmt elektronisch zugängliche Datenbanken von der Privatkopie aus. „Ist ja
+nur privat" ist im Datenbankrecht kein Freibrief. *(Reiner Gesetzestext,
+keine Rechtsprechung geprüft, kein Rechtsrat.)*
+
+**Suite:** `python3 -m pytest -q` → **1128 passed**, 0 Fehler, 0
+übersprungen.
+
 ## Verknüpfungsprüfung — acht Achsen, 36 Funde, davon sechs sofort belegt
 
 Noah hat gefragt, ob „jetzt alles fertig und verknüpft" sei. Statt ja zu
@@ -1811,13 +1891,14 @@ eine Stack-Änderung** (`python-dateutil`) und braucht seine Zusage.
 - [ ] `LLM_PRICE_IN_PER_MTOK` / `LLM_PRICE_OUT_PER_MTOK` in EUR
 - [ ] `JARVIS_TOKEN` würfeln und eintragen
 - [ ] `SEARCH_API_KEY` von api-dashboard.search.brave.com (für Phase 2 DoD 3)
-- [ ] `CDSE_CLIENT_ID` / `CDSE_CLIENT_SECRET` von dataspace.copernicus.eu (Phase 8)
+- [ ] `CDSE_CLIENT_ID` / `CDSE_CLIENT_SECRET` — **Anleitung Schritt für Schritt in `docs/BESCHAFFUNG.md`.** Kostenlos, keine Kreditkarte. Die Falle: „OAuth clients" steckt im *Sentinel Hub* Dashboard (`shapps.dataspace.copernicus.eu`), nicht im Copernicus Browser — und der Footer-Link „Dashboard" führt auf eine Infoseite
 - [x] ~~**`VAULT_PFAD` in `.env`**~~ — erledigt am 27.08.2026, `C:\Users\Noah\JARVIS-Vault`, belegt oben.
 - [ ] **`JARVIS_TOKEN` in `.env`** — fehlt bei Noah, wird bei jedem Start neu gewürfelt (Nebenbefund aus seinem Startlog, 27.08.2026)
 - [ ] **Sprach-Abnahme** — `docs/FIX-05-sprachtest.md`, vier Schritte, fünf Minuten in Chrome (FIX-05 Schritt C)
 - [ ] **`DATEI_WURZELN` in `.env`** — die Ordner, die JARVIS lesen darf. Ohne die Zeile sagen `datei_suchen` und `datei_lesen` „nicht eingerichtet" und tun nichts (FIX-07, Vorlage in `.env.example`)
 - [ ] **`KALENDER_QUELLE` in `.env`** — Pfad zu einer `.ics` oder die Abo-Adresse aus Google/Apple/Outlook. Diese Adresse **ist** das Geheimnis, sie gehört nur in die `.env`. Ohne sie sagt `kalender` „nicht eingerichtet" — und liefert bewusst keine leere Terminliste (FIX-07)
-- [ ] **Entscheidung: `satellite_compare` — Sackgasse auflösen oder Werkzeug zurückziehen?** Es verlangt NDVI-Werte, und **kein registriertes Werkzeug liefert welche.** `ndvi()` existiert (`core/satellite/analysis.py:70`), ist aber nicht als Werkzeug registriert — die 18 in der Registry sind `ask_agent, calculator, clock, datei_lesen, datei_suchen, fetch_url, find_place, kalender, recall, remember, satellite_compare, satellite_passes, satellite_search, send_email, web_search, wiki_live, wiki_lokal, wikidata`. Heute kann JARVIS es also nur aufrufen, wenn du die Zahlen selbst mitbringst — und genau das steht seit dem Textdurchgang auch in seiner Beschreibung. Zwei Wege: `ndvi` als Werkzeug registrieren (dann braucht es eine Rasterquelle, also CDSE), oder `satellite_compare` abmelden, bis es eine gibt. Beides ist deine Entscheidung, weil beides den Werkzeugsatz ändert
+- [ ] **Entscheidung: `satellite_compare` — die Sackgasse ist auflösbar.** Die Recherche hat es geklärt: NDVI geht mit **demselben** CDSE-Zugang, über die Process API mit `sampleType: FLOAT32` und `format.type = "image/tiff"` — kein zweites Konto, kein zweiter Schlüssel. Es fehlt nur der Beschaffungsteil (Raster holen, GeoTIFF → `list[float]`); die Auswertehälfte in `core/satellite/analysis.py` rechnet schon Hektar. **Deine Entscheidung ist nur noch der TIFF-Leser**: `rasterio`/GDAL wären eine Stack-Änderung, `Pillow` steht seit heute ohnehin in `requirements.txt` und liest 32-Bit-Float-TIFF im Modus `F`. Details in `docs/BESCHAFFUNG.md` §3
+- [ ] **Alt, überholt: `satellite_compare` zurückziehen?** Es verlangt NDVI-Werte, und **kein registriertes Werkzeug liefert welche.** `ndvi()` existiert (`core/satellite/analysis.py:70`), ist aber nicht als Werkzeug registriert — die 18 in der Registry sind `ask_agent, calculator, clock, datei_lesen, datei_suchen, fetch_url, find_place, kalender, recall, remember, satellite_compare, satellite_passes, satellite_search, send_email, web_search, wiki_live, wiki_lokal, wikidata`. Heute kann JARVIS es also nur aufrufen, wenn du die Zahlen selbst mitbringst — und genau das steht seit dem Textdurchgang auch in seiner Beschreibung. Zwei Wege: `ndvi` als Werkzeug registrieren (dann braucht es eine Rasterquelle, also CDSE), oder `satellite_compare` abmelden, bis es eine gibt. Beides ist deine Entscheidung, weil beides den Werkzeugsatz ändert
 - [ ] **Entscheidung: wiederkehrende Termine auflösen?** Wenn ja, ist `python-dateutil` eine Stack-Änderung und braucht Noahs Zusage. Heute werden sie gezählt und benannt, nicht erfunden (FIX-07)
 - [ ] Danach `/dod` je Phase laufen lassen
 

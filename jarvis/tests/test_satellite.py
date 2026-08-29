@@ -295,6 +295,29 @@ def test_die_suche_sortiert_das_juengste_bild_nach_vorn():
     assert [s.scene_id for s in szenen] == ["neu", "alt"]
 
 
+def test_die_endpunkte_haben_die_neue_pfadform():
+    """CDSE hat am 09.03.2026 angekuendigt: aus /api/<version>/<service>
+    wird /<service>/<version>. Die Altform antwortet noch, ist aber fuer
+    die Abkuendigung vorgemerkt.
+
+    Der Test prueft die FORM, nicht die Erreichbarkeit - das Netz ist in
+    tests/conftest.py gesperrt, und das ist richtig so. Nachgemessen wurde
+    ausserhalb der Suite, am 29.08.2026:
+
+        POST /process/v1     -> 401   (geroutet)
+        POST /statistics/v1  -> 401   (geroutet)
+        POST /gibtesnicht/v9 -> 503   (nicht geroutet)
+    """
+    from core.satellite.cdse import PROCESS_URL, STATISTICS_URL
+
+    for url in (PROCESS_URL, STATISTICS_URL):
+        pfad = url.split("copernicus.eu", 1)[1]
+        assert not pfad.startswith("/api/"), (
+            f"{url} benutzt die abgekuendigte Altform /api/<version>/<service>")
+        teile = [t for t in pfad.split("/") if t]
+        assert len(teile) == 2 and teile[1].startswith("v"), pfad
+
+
 def test_der_katalog_bekommt_keinen_token():
     """Der OData-Katalog ist offen - und lehnt einen Token ab, den er nicht
     kennt. Gemessen am 29.08.2026 gegen den echten Endpunkt:

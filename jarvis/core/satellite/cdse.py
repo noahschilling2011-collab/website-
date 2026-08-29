@@ -52,15 +52,30 @@ KATALOG_URL = "https://catalogue.dataspace.copernicus.eu/odata/v1/Products"
 # Der Katalog oben liefert nur Metadaten; das war der Grund, warum
 # `preview_url` bis hierher immer None war.
 #
-# Gemessen am 26.08.2026, nicht aus der Erinnerung. Beide Pfade sind
-# geroutet, ein erfundener nicht:
+# Am 29.08.2026 auf die dokumentierte NEUE Pfadform umgestellt. CDSE hat am
+# 09.03.2026 angekuendigt (Rollout ab 17.03.2026): aus
+# /api/<version>/<service> wird /<service>/<version>. Die Altform antwortet
+# heute noch, ist aber fuer die Abkuendigung vorgemerkt - und ein Endpunkt,
+# der irgendwann still verschwindet, ist genau die Art Zeitbombe, die man
+# nicht in einem Projekt haben will, das nur gelegentlich laeuft.
 #
-#     POST /api/v1/process        -> 401   (existiert, Token fehlt)
-#     POST /process/v1            -> 401   (existiert auch)
-#     POST /gibtesnicht/quatsch   -> 503   (existiert nicht)
+# Selbst nachgemessen, nicht aus der Ankuendigung geschlossen:
 #
-# Die 503 auf dem erfundenen Pfad ist der Beleg, dass die 401 etwas heisst.
-PROCESS_URL = "https://sh.dataspace.copernicus.eu/api/v1/process"
+#     POST /process/v1            -> 401   (geroutet, Token fehlt)
+#     POST /api/v1/process        -> 401   (Altform, noch geroutet)
+#     POST /statistics/v1         -> 401   (geroutet - die Statistical API)
+#     POST /gibtesnicht/v9        -> 503   (nicht geroutet)
+#
+# Die 503 auf dem erfundenen Pfad ist der Beleg, dass die 401 etwas heisst:
+# ohne sie koennte die 401 auch von einem Torwaechter vor dem Nichts kommen.
+PROCESS_URL = "https://sh.dataspace.copernicus.eu/process/v1"
+
+# Noch nicht benutzt, aber geroutet und im selben Kontingent: liefert
+# Kennzahlen (min/max/mean/stDev/Histogramm) statt eines Rasters. Fuer
+# `satellite_compare` reicht das NICHT - aus einem Mittelwert folgt nicht,
+# WELCHE Flaeche sich veraendert hat. Steht hier, damit der Pfad beim
+# naechsten Mal nicht wieder gesucht werden muss.
+STATISTICS_URL = "https://sh.dataspace.copernicus.eu/statistics/v1"
 
 # Echtfarbe aus den sichtbaren Baendern. Der Faktor 2.5 steht so im
 # Beispiel der CDSE-Doku - Sentinel-2-Reflektanzen sind sonst sehr dunkel.
