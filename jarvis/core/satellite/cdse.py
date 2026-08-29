@@ -8,12 +8,21 @@ Endpunkte aus der offiziellen Dokumentation, nicht aus dem Gedaechtnis:
 * Raum:    ``OData.CSC.Intersects(area=geography'SRID=4326;POLYGON(...)')``
 * Zeit:    ``ContentDate/Start``
 
-**UNSICHER:** Die Doku-Seite zum Token zeigt den Ablauf ``grant_type=password``
-mit ``client_id=cdse-public``. Die `.env.example` dieses Projekts sieht
-``CDSE_CLIENT_ID`` und ``CDSE_CLIENT_SECRET`` vor, also einen Service-Account
-mit ``grant_type=client_credentials`` gegen denselben Keycloak-Realm. Beide
-Wege sind implementiert; welcher fuer den konkreten Zugang gilt, ist vor dem
-ersten echten Aufruf in der Doku zum Service-Account zu bestaetigen.
+**Geklaert am 29.08.2026** (vorher stand hier UNSICHER): Es sind ZWEI
+verschiedene Wege, nicht zwei Varianten desselben.
+
+* ``grant_type=client_credentials`` mit einem im Sentinel-Hub-Dashboard
+  angelegten OAuth-Client - das ist der Weg fuer die Process-API. Gemessen
+  gegen den echten Endpunkt: mit erfundenen Zugangsdaten antwortet er
+  ``invalid_client`` (HTTP 401), mit einem erfundenen grant_type dagegen
+  ``unsupported_grant_type`` (HTTP 400). Der Unterschied ist der Beleg,
+  dass client_credentials unterstuetzt wird.
+* ``grant_type=password`` mit dem festen oeffentlichen Client
+  ``cdse-public`` - das ist der Weg zum Herunterladen von Produkten aus
+  dem OData-Katalog, mit Kontoname und Kontopasswort.
+
+Sie sind nicht austauschbar: das client_secret funktioniert nicht mit
+password, das Kontopasswort nicht mit client_credentials.
 
 Gefiltert wird **serverseitig** (A.4): erst 200 Szenen holen und dann lokal
 zu filtern ist bei Kontingenten die falsche Reihenfolge.
@@ -23,6 +32,7 @@ from __future__ import annotations
 
 import logging
 import math
+import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -216,6 +226,9 @@ class CDSEProvider:
         self.timeout = timeout
         self.transport = transport
         self._token: str | None = None
+        # Wann der zwischengespeicherte Token ungueltig wird (monotone Uhr).
+        # 0.0 heisst: keiner da.
+        self._token_bis: float = 0.0
 
     @property
     def eingerichtet(self) -> bool:
@@ -238,7 +251,17 @@ class CDSEProvider:
         }
 
     async def token(self) -> str:
-        if self._token:
+        # Frueher stand hier `if self._token: return self._token` - ohne
+        # jedes Ablaufdatum. Ein Keycloak-Token lebt nicht ewig: das
+        # Beispiel-Token im CDSE-Beginners-Guide hat exp - iat = 600
+        # Sekunden. Ein Server, der laenger laeuft als das, haette ab dann
+        # bei JEDEM Bild eine 401 bekommen - und die Fehlermeldung unten
+        # haette faelschlich nach falschen Zugangsdaten geklungen.
+        #
+        # Die Lebensdauer kommt aus `expires_in` der Antwort, nicht aus
+        # einer geratenen Zahl. 60 Sekunden Sicherheitsabstand, damit ein
+        # Token nicht mitten im Aufruf abläuft.
+        if self._token and time.monotonic() < self._token_bis:
             return self._token
         if not self.eingerichtet:
             raise CDSEFehler(
@@ -254,9 +277,26 @@ class CDSEProvider:
                 f"CDSE hat den Zugang abgelehnt (HTTP {antwort.status_code}). "
                 "Stimmen CDSE_CLIENT_ID und CDSE_CLIENT_SECRET?"
             )
-        self._token = str(antwort.json().get("access_token") or "")
+        nutzlast = antwort.json()
+        self._token = str(nutzlast.get("access_token") or "")
         if not self._token:
             raise CDSEFehler("CDSE lieferte kein access_token.")
+        try:
+            lebt_s = float(nutzlast.get("expires_in") or 0)
+        except (TypeError, ValueError):
+            lebt_s = 0.0
+        if lebt_s <= 0:
+            # Fehlt `expires_in`, wird nicht gerechnet, sondern kurz
+            # behalten. Ein Aufruf zu viel ist billiger als eine Stunde 401.
+            self._token_bis = time.monotonic() + 30.0
+        else:
+            # 60 s Sicherheitsabstand, damit ein Token nicht mitten im
+            # Aufruf abläuft - aber nie mehr als die Haelfte der Laufzeit.
+            # Ohne diese zweite Haelfte waere ein kurzlebiger Token (60 s
+            # oder weniger) sofort abgelaufen und wuerde bei JEDEM Aufruf
+            # neu geholt. Genau das ist meine erste Fassung geworden, und
+            # der Test hat es gefunden.
+            self._token_bis = time.monotonic() + max(lebt_s - 60.0, lebt_s / 2)
         return self._token
 
     async def render(
@@ -342,7 +382,19 @@ class CDSEProvider:
         max_cloud_pct: float = 20.0,
         limit: int = 10,
     ) -> list[Scene]:
-        zugang = await self.token()
+        # KEIN Token an den Katalog. Gemessen am 29.08.2026 gegen den echten
+        # Endpunkt, nicht aus der Doku geschlossen:
+        #
+        #   GET .../odata/v1/Products?$top=1  ohne Header        -> HTTP 200
+        #   dieselbe URL mit "Authorization: Bearer nicht-echt"  -> HTTP 403
+        #
+        # Der Katalog ist offen. Ein Header, den er nicht akzeptiert, macht
+        # aus einer funktionierenden Suche eine 403 - und die liest sich wie
+        # "Kontingent erschoepft", ist aber ein selbstgemachter Fehler.
+        # Der Token gehoert nur an die Process-API (sh.dataspace...), die
+        # ihn wirklich verlangt. Ausserdem spart das den Token-Aufruf bei
+        # jeder Suche: `satellite_search` laeuft damit auch dann, wenn gar
+        # keine Zugangsdaten eingetragen sind.
         params = {
             "$filter": baue_filter(bbox, start, end, max_cloud_pct),
             "$orderby": "ContentDate/Start desc",
@@ -351,10 +403,7 @@ class CDSEProvider:
         }
         async with httpx.AsyncClient(timeout=self.timeout,
                                      transport=self.transport) as client:
-            antwort = await client.get(
-                KATALOG_URL, params=params,
-                headers={"Authorization": f"Bearer {zugang}"},
-            )
+            antwort = await client.get(KATALOG_URL, params=params)
         if antwort.status_code >= 400:
             raise CDSEFehler(
                 f"Katalogsuche fehlgeschlagen (HTTP {antwort.status_code})."

@@ -10,7 +10,10 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+import time
+
 import httpx
+
 import pytest
 
 from core.contracts import Permission
@@ -290,6 +293,83 @@ def test_die_suche_sortiert_das_juengste_bild_nach_vorn():
     provider = CDSEProvider("id", "secret", transport=httpx.MockTransport(handler))
     szenen = run(provider.search(BBOX, JETZT - timedelta(days=30), JETZT))
     assert [s.scene_id for s in szenen] == ["neu", "alt"]
+
+
+def test_der_katalog_bekommt_keinen_token():
+    """Der OData-Katalog ist offen - und lehnt einen Token ab, den er nicht
+    kennt. Gemessen am 29.08.2026 gegen den echten Endpunkt:
+
+        GET .../odata/v1/Products?$top=1  ohne Header       -> HTTP 200
+        dieselbe URL mit einem falschen Bearer              -> HTTP 403
+
+    Ein Authorization-Header macht aus einer funktionierenden Suche also
+    eine 403 - die sich wie "Kontingent erschoepft" liest, aber
+    selbstgemacht ist. Nebenwirkung, die hier mitgeprueft wird: die Suche
+    braucht dann ueberhaupt keine Zugangsdaten mehr.
+    """
+    gesehen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "token" in str(request.url):
+            raise AssertionError("die Suche hat einen Token geholt")
+        gesehen["auth"] = request.headers.get("Authorization")
+        return httpx.Response(200, json={"value": []})
+
+    # Bewusst OHNE client_id/secret: die Suche muss trotzdem laufen.
+    provider = CDSEProvider(transport=httpx.MockTransport(handler))
+    run(provider.search(BBOX, JETZT - timedelta(days=30), JETZT))
+    assert gesehen["auth"] is None, gesehen["auth"]
+
+
+def test_der_token_wird_nicht_ewig_behalten():
+    """Frueher stand im Code `if self._token: return self._token`. Ein
+    Keycloak-Token lebt nicht ewig - das Beispiel-Token im
+    CDSE-Beginners-Guide hat exp minus iat = 600 Sekunden. Ein Server, der
+    laenger laeuft, haette ab dann bei jedem Bild eine 401 bekommen.
+
+    Geprueft wird die Ablaufrechnung selbst, ohne echte Uhrzeit: bei
+    expires_in=600 muss die Frist 540 Sekunden in der Zukunft liegen (600
+    minus 60 Sekunden Sicherheitsabstand).
+    """
+    rufe = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        rufe.append(str(request.url))
+        return httpx.Response(200, json={"access_token": "t", "expires_in": 600})
+
+    provider = CDSEProvider("id", "secret", transport=httpx.MockTransport(handler))
+    run(provider.token())
+    assert len(rufe) == 1
+
+    # Noch gueltig -> kein zweiter Aufruf.
+    run(provider.token())
+    assert len(rufe) == 1, "der Token wurde unnoetig neu geholt"
+
+    # Die Frist liegt 600 - 60 = 540 s in der Zukunft.
+    rest = provider._token_bis - time.monotonic()
+    assert 530 < rest <= 540, rest
+
+    # Abgelaufen -> neu holen.
+    provider._token_bis = time.monotonic() - 1
+    run(provider.token())
+    assert len(rufe) == 2, "der abgelaufene Token wurde weiterbenutzt"
+
+
+def test_ohne_expires_in_wird_der_token_nur_kurz_behalten():
+    """Fehlt das Feld, wird nicht geraten, sondern kurz gecacht: lieber ein
+    Aufruf zu viel als eine Stunde 401.
+
+    Dieser Test hat in seinem ersten Lauf einen echten Fehler gefunden: der
+    Ersatzwert war 60 Sekunden, davon 60 Sekunden Sicherheitsabstand
+    abgezogen - macht 0. Der Token waere bei JEDEM Aufruf neu geholt
+    worden."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"access_token": "t"})
+
+    provider = CDSEProvider("id", "secret", transport=httpx.MockTransport(handler))
+    run(provider.token())
+    rest = provider._token_bis - time.monotonic()
+    assert 25 < rest <= 30, rest
 
 
 def test_abgelehnte_zugangsdaten_werden_gemeldet():

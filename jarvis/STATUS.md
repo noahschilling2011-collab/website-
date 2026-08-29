@@ -1323,6 +1323,93 @@ fehlen die Benutzer. `--dauer-tupf`, `--dauer-raus` und `--dauer-zahl` hatten
 null Treffer im ganzen Projekt, daneben stehen neun handgeschriebene `200ms`
 und fünf verschiedene Erscheinungsdauern.
 
+## Der CDSE-Zugang — drei Fehler, gefunden bevor Noah sie treffen konnte
+
+Noah wollte den Satelliten-Schlüssel besorgen und **fand die Stelle nicht**.
+Das lag an unserer eigenen `.env.example`: „im Dashboard unter *User
+Settings* → *OAuth clients*" — ohne zu sagen, in **welchem** Dashboard.
+
+**Es gibt zwei.** „OAuth clients" existiert nur im *Sentinel Hub Dashboard*
+(`shapps.dataspace.copernicus.eu/dashboard`), nicht im Copernicus Browser.
+Und der Link „Dashboard" in der Fußzeile von `dataspace.copernicus.eu` führt
+**nicht** dorthin — nachgemessen, indem die Seite geholt und die `href`
+ausgelesen wurden:
+
+| Link im Footer | Tatsächliches Ziel |
+|---|---|
+| „Dashboard" (Support & More) | `/copernicus-data-space-ecosystem-dashboard` — eine Infoseite |
+| „Sentinel Hub" (Analysis) | `/analyse/apis/sentinel-hub` — die Produktseite |
+
+Das echte Ziel `https://shapps.dataspace.copernicus.eu/dashboard/#/` steht
+nur in der **oberen** Navigation. Die Produktseite verlinkt es immerhin
+weiter (auch nachgemessen). Die `.env.example` hat jetzt den Direktlink,
+den Klickweg über das Profilsymbol und die Warnung vor dem Footer-Link.
+
+### Beim Nachschlagen fielen drei Fehler im Code auf
+
+**1. Der Katalog hätte jede Suche abgelehnt.** `search()` schickte den
+Bearer-Token an den OData-Katalog. Selbst gemessen gegen den echten
+Endpunkt:
+
+```
+GET .../odata/v1/Products?$top=1  ohne Header               -> HTTP 200
+dieselbe URL mit "Authorization: Bearer nicht-echt"         -> HTTP 403
+```
+
+Der Katalog ist **offen**. Ein Header, den er nicht akzeptiert, macht aus
+einer funktionierenden Suche eine 403 — die sich wie „Kontingent
+erschöpft" liest und in Wahrheit selbstgemacht ist. Header raus.
+**Nebeneffekt, der Noah Arbeit spart:** die Szenensuche läuft jetzt ganz
+ohne Zugangsdaten; der Schlüssel wird nur noch fürs gerenderte Bild
+gebraucht.
+
+**2. Der Token lief nie ab.** Im Code stand `if self._token: return
+self._token` — ohne jedes Ablaufdatum. Ein Keycloak-Token lebt nicht ewig
+(das Beispiel-Token im CDSE-Beginners-Guide hat `exp - iat` = 600
+Sekunden). Nach zehn Minuten Serverlaufzeit hätte die Process-API bei jedem
+Bild 401 geliefert — und unsere Fehlermeldung hätte fälschlich nach
+falschen Zugangsdaten geklungen. Läuft jetzt über `expires_in`.
+
+> **Und meine erste Reparatur war selbst kaputt.** Fehlt `expires_in`,
+> setzte ich 60 Sekunden an und zog 60 Sekunden Sicherheitsabstand ab —
+> macht 0, der Token wäre bei *jedem* Aufruf neu geholt worden. Der Test
+> hat es im ersten Lauf gefunden. Die Frist ist jetzt
+> `max(lebt - 60, lebt / 2)`, damit auch ein kurzlebiger Token noch
+> zwischengespeichert wird.
+
+**3. Das Kontingent war um Faktor 5 falsch.** In der `.env.example` standen
+50.000 Anfragen im Monat. Richtig sind laut `Quotas.html`, Zeile
+„Copernicus General Users", Spalte „Sentinel Hub APIs": **10.000 Anfragen
+und 10.000 Processing Units je Monat**, je 300 je Minute. Die 50.000 stehen
+in der Nachbarspalte „Direct HTTP access to COGs" — ein Zugriffsweg, den
+JARVIS nicht benutzt.
+
+### Und ein `UNSICHER`, das aufgelöst ist
+
+Im Kopf von `core/satellite/cdse.py` stand seit dem Bau, es sei ungeklärt,
+ob `grant_type=client_credentials` oder `grant_type=password` gilt. Es sind
+**zwei verschiedene Wege**, keine zwei Varianten: `client_credentials` mit
+dem Dashboard-Client für die Process-API, `password` mit dem festen
+öffentlichen Client `cdse-public` fürs Herunterladen aus dem Katalog. Sie
+sind nicht austauschbar. Der Beleg ist eine Differenzmessung am echten
+Endpunkt:
+
+```
+grant_type=client_credentials, erfundene Daten -> invalid_client        (401)
+grant_type=quatsch_grant                       -> unsupported_grant_type (400)
+```
+
+Die 401 statt einer 400 zeigt, dass der Ablauf unterstützt wird und nur die
+Zugangsdaten fehlen.
+
+**Drei neue Wächter**, beide Mutationen rot: Token wieder an den Katalog →
+rot; Token wieder ewig → rot.
+
+**Was weiterhin ungeprüft ist:** der erste echte `client_credentials`-Aufruf.
+Dafür braucht es Noahs Zugangsdaten, und die gehören nicht hierher.
+
+**Suite:** `python3 -m pytest -q` → **1125 passed**, 0 Fehler.
+
 ## Gegenprüfung des eigenen Codes — 15 Funde, 15 behoben
 
 Nach dem Design- und dem Microsoft-Durchgang habe ich den eigenen Diff
