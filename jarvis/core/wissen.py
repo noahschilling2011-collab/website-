@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from core.db import session
@@ -55,13 +55,35 @@ def _jetzt() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def aus_cache(db_path: Path | str, begriff: str, quelle: str) -> Wissen | None:
+def aus_cache(db_path: Path | str, begriff: str, quelle: str,
+              max_alter_stunden: float | None = None) -> Wissen | None:
+    """Ein Treffer aus dem Cache - oder None, wenn er zu alt ist.
+
+    `max_alter_stunden=None` heisst "kein Verfall". Genau das war bis zum
+    30.08.2026 das EINZIGE Verhalten: `geholt_am` wurde geschrieben und nie
+    gelesen. Gefunden bei der Verknuepfungspruefung, von drei Skeptikern
+    bestaetigt.
+
+    Der Fehler war nicht kosmetisch. `docs/wissensquellen.md` DoD 4 sagt:
+    "Eine Frage zu einem Ereignis nach dem Snapshot-Datum geht nachweislich
+    auf `wiki_live` ueber, statt aus dem veralteten Stand zu antworten."
+    Wenn `wiki_live` seinerseits aus einem Cache antwortet, der nie
+    abläuft, ist der Uebergang wertlos: nach dem ersten Nachschlagen eines
+    Begriffs bekommt man denselben Text bis in alle Ewigkeit.
+
+    Verglichen werden Zeichenketten, nicht Zeitobjekte. `_jetzt()` schreibt
+    `%Y-%m-%dT%H:%M:%SZ` - dieses Format ist lexikografisch sortierbar, und
+    ein Vergleich ohne Parsen kann nicht an einer Zeitzone scheitern.
+    """
+    frage = ("SELECT begriff, titel, text, quelle, snapshot FROM lookups "
+             "WHERE begriff = ? AND quelle = ?")
+    werte: list = [begriff.strip().lower(), quelle]
+    if max_alter_stunden is not None:
+        grenze = datetime.now(timezone.utc) - timedelta(hours=max_alter_stunden)
+        frage += " AND geholt_am >= ?"
+        werte.append(grenze.strftime("%Y-%m-%dT%H:%M:%SZ"))
     with session(db_path) as conn:
-        zeile = conn.execute(
-            "SELECT begriff, titel, text, quelle, snapshot FROM lookups "
-            "WHERE begriff = ? AND quelle = ?",
-            (begriff.strip().lower(), quelle),
-        ).fetchone()
+        zeile = conn.execute(frage, tuple(werte)).fetchone()
     if zeile is None:
         return None
     return Wissen(begriff=zeile[0], titel=zeile[1], text=zeile[2],

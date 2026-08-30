@@ -429,10 +429,24 @@ einen uvicorn im Thread; die Netzsperre der Testsitzung lässt dafür genau
 Gebaut: `core/satellite/{contracts,analysis,policy,cdse}.py`, Werkzeuge
 `satellite_search` und `satellite_compare`, Agent `satellite` (READ).
 
-**Die Auflösungsgrenze ist Code, keine Bitte.** `beurteilbar()` lehnt Aussagen
-über Objekte unter dem Dreifachen der Bodenauflösung ab; `grenzsatz()` erzeugt
-die Pflichtzeile `GRENZE`. Bei 10 m/px sind das 30 m — ein Einfamilienhaus ist
-damit ein Pixel und nicht beurteilbar.
+**Die Auflösungsgrenze ist Code, keine Bitte** — *seit dem 30.08.2026, und
+vorher war dieser Satz falsch.* `grenzsatz()` erzeugte schon immer die
+Pflichtzeile `GRENZE` (belegt: `core/tools/satellite_tools.py:219` und
+`:302`), aber **`beurteilbar()` rief niemand im Betrieb auf** — nur Tests.
+Die Grenze war Prosa im Systemprompt; ignorierte das Modell sie, hinderte es
+niemand. Gefunden bei der Verknüpfungsprüfung, von drei Skeptikern
+bestätigt.
+
+Im Werkzeug selbst *kann* sie nicht greifen: dort kommt nie eine Objektgröße
+an, die kennt nur das Modell. In `Vergleich` schon — die veränderte Fläche
+hat eine Kantenlänge. Liegt die unter dem Dreifachen der Bodenauflösung, ist
+der Befund kleiner als das, was der Sensor auflöst. Bei 10 m/px sind das
+30 m Kantenlänge, also 900 m² oder 9 Pixel.
+
+Die Zahl wird dabei **nicht** verworfen — ein Abbruch würde eine korrekte
+Messung wegwerfen. Sie bekommt einen Satz daneben: *„Die veränderte Fläche
+ist zu klein, um sie zu deuten: 0,04 ha entsprechen rund 20 m Kantenlänge,
+die Grenze liegt bei 30 m. Die Zahl stimmt, sie trägt nur keine Aussage."*
 
 **Vergleichbarkeit vor Rechnung.** Liegen zwei Aufnahmen mehr als zwei Monate
 im Jahreslauf auseinander, wird der Vergleich abgelehnt: was man dann sieht,
@@ -1329,6 +1343,75 @@ der 45-ms-Versatz und die Palette stehen bereits in `static/system.css` — es
 fehlen die Benutzer. `--dauer-tupf`, `--dauer-raus` und `--dauer-zahl` hatten
 null Treffer im ganzen Projekt, daneben stehen neun handgeschriebene `200ms`
 und fünf verschiedene Erscheinungsdauern.
+
+## Die Gegenprüfung ist durch — 8 von 36 halten stand
+
+36 Funde, jeder von drei Skeptikern angegriffen, die ihn **widerlegen**
+sollten. **28 sind gefallen**, 8 haben es überstanden. Dass zwei Drittel
+durchfallen, ist kein Fehler der Prüfer — es ist der Grund, warum die
+Gegenprüfung existiert. Ein Beispiel für einen widerlegten Fund: „`/api/chat`
+bietet `ask_agent` an" stimmt technisch, ist aber folgenlos, weil die
+Oberfläche `/api/chat` gar nicht ruft (sie postet auf `/api/tasks`).
+
+*(Zwölf Prüfagenten sind ins Sitzungslimit gelaufen — betroffen sind
+`doku-4` bis `doku-7` und der Lückenkritiker. Deren Funde stehen damit
+weiterhin ungeprüft; sie sind unten nicht mitgezählt.)*
+
+### Vier behoben, alle mit Mutationstest
+
+**1. `docker compose up` baute ein kaputtes JARVIS.** Der `Dockerfile`
+kopierte `static/` **nicht** — und `weltlage.html` auch nicht. Beide Seiten
+laden `/static/system.css`, der Tab „Welt" importiert
+`/static/globus.js`. Wer der README folgte, bekam eine Seite ohne
+Stylesheet und einen Globus im 404. Kein Test sah das, weil die Suite gegen
+den Quellbaum läuft, nicht gegen das Image. 3 von 3 Skeptikern bestätigt.
+
+**2. Der Nachschlage-Cache verfiel nie.** `lookups.geholt_am` wurde
+geschrieben und **nie gelesen**. Das bricht DoD 4 aus
+`docs/wissensquellen.md`: *„Eine Frage zu einem Ereignis nach dem
+Snapshot-Datum geht nachweislich auf `wiki_live` über, statt aus dem
+veralteten Stand zu antworten."* Wenn `wiki_live` seinerseits aus einem
+ewigen Cache antwortet, ist der Übergang wertlos — nach dem ersten
+Nachschlagen eines Begriffs bekam man denselben Text für immer.
+
+Jetzt mit Verfallszeit, `WISSEN_CACHE_STUNDEN`, Voreinstellung **24 h**.
+Die Zahl ist keine Messung, sondern eine Abwägung zwischen zwei Zusagen
+derselben Datei: DoD 6 verlangt, dass eine zweite identische Anfrage den
+Cache trifft (hält bei jeder Dauer über ein paar Sekunden), DoD 4, dass
+`wiki_live` bei veralteten Ständen greift (hält bei **keiner** unendlichen
+Dauer). Wer es anders will, stellt es — still erhöht wird es nicht.
+
+**3. Eine Regel, die diese Datei als durchgesetzt beschrieb, war Prosa.**
+Siehe die Korrektur bei Phase 8: `beurteilbar()` rief niemand auf. Jetzt
+rechnet es in `Vergleich` — und der Satz kommt beim Nutzer an, nicht nur im
+Objekt. Beide Hälften einzeln mutationsgeprüft: „beurteilbar immer True" →
+rot, „Hinweis nicht ausgeben" → rot.
+
+**4. Der Chat-Pfad bot Sackgassen an.** `post_chat` übergab kein
+`erlaubt=` — also **alle 18 Werkzeuge**, mehr als jeder Agent hat. Zwei
+können dort nie laufen: `send_email` braucht eine Bestätigung, die dieser
+Pfad nicht stellt, `ask_agent` den Delegationskontext aus `core/runner.py`.
+Unsicher war nichts, der Dispatcher fällt zu. Aber ein Modell, dem man eine
+Sackgasse anbietet, verbrennt Züge daran und erklärt dem Nutzer hinterher
+einen Fehler, den er nicht verursacht hat.
+
+Die Liste wird **gerechnet, nicht abgeschrieben**: alles ohne
+`requires_confirmation`, minus `ask_agent`. Ein neues
+bestätigungspflichtiges Werkzeug fällt damit automatisch heraus, statt hier
+vergessen zu werden — und genau das prüft ein zweiter Test.
+
+### Vier bestätigte, aber kosmetische — bewusst offen
+
+Drei Typografie-Rollenklassen in `system.css`, die kein Element setzt; zwei
+ids in `index.html`, die niemand anfasst; `mtime_von()` in
+`core/vault_index.py`, das nur ein Test ruft; die Ausnahme `Verworfen` in
+`core/weltlage.py`, die nirgends geworfen wird. Alle vier sind Reste, keine
+Fehler — sie kosten ein paar Zeilen und niemand merkt etwas. Sie stehen
+hier, damit sie beim nächsten Aufräumen nicht wieder verteidigt werden
+müssen.
+
+**Suite:** `python3 -m pytest -q` → **1135 passed**, 0 Fehler, 0
+übersprungen.
 
 ## Die Beschaffungsliste — `docs/BESCHAFFUNG.md`
 

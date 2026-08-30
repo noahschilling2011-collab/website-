@@ -126,10 +126,27 @@ class Vergleich:
     groesste_abnahme: float
     groesste_zunahme: float
     hektar: float = field(init=False)
+    beurteilbar: bool = field(init=False)
 
     def __post_init__(self) -> None:
         flaeche_m2 = self.veraendert_pixel * self.aufloesung_m**2
         self.hektar = flaeche_m2 / 10_000
+        # Hier wird `beurteilbar()` endlich BENUTZT. Bis zum 30.08.2026 rief
+        # die Funktion niemand im Betrieb auf - STATUS.md beschrieb sie
+        # trotzdem als "Code, keine Bitte". Gefunden bei der
+        # Verknuepfungspruefung, von drei Skeptikern bestaetigt.
+        #
+        # Im Werkzeug selbst kann sie nicht greifen: dort kommt nie eine
+        # Objektgroesse an, die kennt nur das Modell. Hier schon. Die
+        # veraenderte FLAECHE hat eine Kantenlaenge, und wenn die unter dem
+        # Dreifachen der Bodenaufloesung liegt, ist der Befund kleiner als
+        # das, was der Sensor aufloesen kann - also Rauschen, nicht Fund.
+        #
+        # Beispiel bei 10 m/px: die Grenze liegt bei 30 m Kantenlaenge, also
+        # 900 m2 oder 9 Pixel. Wer daraus "ein Gebaeude ist verschwunden"
+        # macht, liest Zufall.
+        kante_m = flaeche_m2 ** 0.5
+        self.beurteilbar = beurteilbar(kante_m, self.aufloesung_m)
 
     def als_dict(self) -> dict:
         return {
@@ -140,7 +157,26 @@ class Vergleich:
             "mean_delta": round(self.mittlere_aenderung, 4),
             "max_decrease": round(self.groesste_abnahme, 4),
             "max_increase": round(self.groesste_zunahme, 4),
+            "beurteilbar": self.beurteilbar,
         }
+
+    def grenzhinweis(self) -> str:
+        """Der Satz, der neben der Zahl stehen muss, wenn sie zu klein ist.
+
+        Kein Werfen: die Zahl bleibt richtig, sie traegt nur nichts. Ein
+        Abbruch wuerde eine korrekte Messung wegwerfen.
+        """
+        if self.beurteilbar:
+            return ""
+        grenze_m = GRENZE_FAKTOR * self.aufloesung_m
+        return (
+            f"Die veraenderte Flaeche ist zu klein, um sie zu deuten: "
+            f"{self.hektar:.2f} ha entsprechen rund "
+            f"{(self.hektar * 10_000) ** 0.5:.0f} m Kantenlaenge, die Grenze "
+            f"liegt bei {grenze_m:.0f} m ({GRENZE_FAKTOR}x "
+            f"{self.aufloesung_m:g} m/px). Die Zahl stimmt, sie traegt nur "
+            f"keine Aussage."
+        )
 
 
 def vergleiche_raster(

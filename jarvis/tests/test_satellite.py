@@ -549,3 +549,61 @@ def test_der_agent_arbeitet_legitime_auftraege_normal_ab():
     task = Task(goal="Zeig mir Abholzung im Amazonasbecken", budget=TaskBudget())
     ergebnis = run(agent.run(task, Step(id="s1", description="Szenen suchen")))
     assert ergebnis.ok is True and len(provider.calls) == 1
+
+
+# --- beurteilbar() tut endlich Arbeit (Verknuepfungspruefung, 30.08.2026) ---
+
+
+def test_die_aufloesungsgrenze_wirkt_wirklich_und_nicht_nur_im_prompt():
+    """STATUS.md sagte: "Die Aufloesungsgrenze ist Code, keine Bitte."
+
+    Sie war eine Bitte. `beurteilbar()` wurde von NICHTS im Betrieb
+    aufgerufen - nur von Tests. Die Grenze stand als Prosa im Systemprompt
+    und als Hinweissatz unter dem Ergebnis; wenn das Modell sie ignorierte,
+    hinderte es niemand.
+
+    Im Werkzeug selbst kann sie nicht greifen: dort kommt nie eine
+    Objektgroesse an. In `Vergleich` schon - die veraenderte Flaeche HAT
+    eine Kantenlaenge.
+    """
+    from core.satellite.analysis import vergleiche_raster
+
+    # 4 von 100 Pixeln bei 10 m/px = 400 m2 = 20 m Kante. Grenze: 30 m.
+    klein = vergleiche_raster([0.8] * 100, [0.8] * 96 + [0.1] * 4,
+                              aufloesung_m=10.0)
+    assert klein.beurteilbar is False, klein.als_dict()
+    assert "zu klein" in klein.grenzhinweis()
+    assert "20 m" in klein.grenzhinweis() and "30 m" in klein.grenzhinweis()
+
+    # 100 von 100 Pixeln = 10.000 m2 = 100 m Kante. Weit ueber der Grenze.
+    gross = vergleiche_raster([0.8] * 100, [0.1] * 100, aufloesung_m=10.0)
+    assert gross.beurteilbar is True, gross.als_dict()
+    assert gross.grenzhinweis() == ""
+
+    # Und die Zahl bleibt in BEIDEN Faellen erhalten. Ein Abbruch wuerde
+    # eine korrekte Messung wegwerfen.
+    assert klein.hektar == pytest.approx(0.04)
+    assert gross.hektar == pytest.approx(1.0)
+
+
+def test_der_grenzhinweis_steht_im_werkzeugergebnis():
+    """Ein Befund im Objekt, den niemand ausgibt, ist derselbe Fehler noch
+    einmal - nur eine Ebene hoeher."""
+    tool = registry.get("satellite_compare")
+
+    def lauf(after):
+        return run(tool.execute(before=[0.8] * 100, after=after,
+                                before_date="2024-07-01",
+                                after_date="2024-07-20", resolution_m=10.0))
+
+    klein = lauf([0.8] * 96 + [0.1] * 4)
+    assert klein.ok is True
+    assert klein.data["beurteilbar"] is False
+    assert "zu klein" in klein.display, klein.display
+
+    gross = lauf([0.1] * 100)
+    assert gross.data["beurteilbar"] is True
+    assert "zu klein" not in gross.display, gross.display
+    # Der allgemeine Grenzsatz bleibt in beiden Faellen stehen.
+    for r in (klein, gross):
+        assert "nicht beurteilbar" in r.display

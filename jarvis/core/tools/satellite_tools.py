@@ -299,7 +299,12 @@ class SatelliteCompare(Tool):
                 f"Mittlere Aenderung {ergebnis.mittlere_aenderung:+.3f}, "
                 f"groesste Abnahme {ergebnis.groesste_abnahme:+.3f}, "
                 f"groesste Zunahme {ergebnis.groesste_zunahme:+.3f}.\n"
-                f"{grenzsatz(resolution_m)}"
+                # Der Grenzhinweis steht VOR dem allgemeinen Grenzsatz und
+                # nur dann, wenn er zutrifft. Ohne ihn liest ein Modell eine
+                # Hektarzahl von 0,04 wie einen Fund - dabei ist sie kleiner
+                # als das, was der Sensor aufloesen kann.
+                + (f"{ergebnis.grenzhinweis()}\n" if not ergebnis.beurteilbar else "")
+                + f"{grenzsatz(resolution_m)}"
             ),
             duration_ms=dauer(),
         )

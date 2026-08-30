@@ -351,3 +351,62 @@ def test_alle_drei_sind_read_und_brauchen_keine_bestaetigung():
         werkzeug = registry.get(name)
         assert werkzeug.permission is Permission.READ
         assert werkzeug.requires_confirmation is False
+
+
+# --- Der Cache verfaellt (Verknuepfungspruefung, 30.08.2026) ---------------
+
+
+def test_ein_zu_alter_treffer_kommt_nicht_aus_dem_cache(db):
+    """`geholt_am` wurde geschrieben und NIE gelesen - der Cache hatte damit
+    keine Verfallszeit.
+
+    Das bricht DoD 4 aus docs/wissensquellen.md: "Eine Frage zu einem
+    Ereignis nach dem Snapshot-Datum geht nachweislich auf wiki_live ueber,
+    statt aus dem veralteten Stand zu antworten." Wenn wiki_live selbst aus
+    einem Cache antwortet, der nie ablaeuft, ist der Uebergang wertlos.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    from core.db import session
+    from core.wissen import Wissen, aus_cache, in_cache
+
+    in_cache(db, Wissen(begriff="Bonn", titel="Bonn", text="Stadt am Rhein",
+                        quelle="wiki_live", snapshot=None))
+
+    # Frisch: kommt zurueck, egal welche Grenze.
+    assert aus_cache(db, "Bonn", "wiki_live", max_alter_stunden=1) is not None
+    assert aus_cache(db, "Bonn", "wiki_live") is not None
+
+    # Den Eintrag kuenstlich altern lassen - ueber die Spalte, die frueher
+    # nur beschrieben wurde.
+    alt = (datetime.now(timezone.utc) - timedelta(hours=30)).strftime(
+        "%Y-%m-%dT%H:%M:%SZ")
+    with session(db) as conn:
+        conn.execute("UPDATE lookups SET geholt_am = ? WHERE begriff = ?",
+                     (alt, "bonn"))
+
+    assert aus_cache(db, "Bonn", "wiki_live", max_alter_stunden=24) is None
+    # Ohne Grenze weiterhin da - das alte Verhalten bleibt erreichbar.
+    assert aus_cache(db, "Bonn", "wiki_live") is not None
+    # Und mit einer grosszuegigen Grenze auch.
+    assert aus_cache(db, "Bonn", "wiki_live", max_alter_stunden=48) is not None
+
+
+def test_die_zweite_identische_anfrage_trifft_den_cache_trotzdem(db):
+    """Gegenprobe: die Verfallszeit darf DoD 6 nicht kaputtmachen ("Zweite
+    identische Anfrage trifft den Cache, null neue Netzabfragen")."""
+    from core.wissen import Wissen, aus_cache, in_cache
+
+    in_cache(db, Wissen(begriff="Bonn", titel="Bonn", text="x",
+                        quelle="wiki_live", snapshot=None))
+    assert aus_cache(db, "Bonn", "wiki_live", max_alter_stunden=24) is not None
+
+
+def test_die_voreinstellung_ist_endlich():
+    """Eine Voreinstellung von 0 (nie verfallen) waere genau der Fehler, der
+    hier behoben wurde - dann haette das Feld keinen Nutzen."""
+    from core.config import Settings
+
+    st = Settings(_env_file=None)
+    assert st.wissen_cache_stunden > 0, "der Cache verfiele wieder nie"
+    assert st.wissen_cache_stunden <= 24 * 7, st.wissen_cache_stunden

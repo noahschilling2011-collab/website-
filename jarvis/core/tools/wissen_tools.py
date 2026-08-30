@@ -70,6 +70,8 @@ WIKI_DIENST_HOSTS = frozenset(
 class _MitCache(Tool):
     db_path: Path | str = ""
     cache_an: bool = True
+    # Stunden. 0 heisst "nie verfallen" - siehe core/config.py.
+    cache_stunden: float = 24.0
 
     def _cache_pfad(self) -> Path | str | None:
         return self.db_path if str(self.db_path).strip() else None
@@ -78,7 +80,8 @@ class _MitCache(Tool):
         pfad = self._cache_pfad()
         if not (self.cache_an and pfad):
             return None
-        return aus_cache(pfad, begriff, quelle)
+        grenze = self.cache_stunden if self.cache_stunden > 0 else None
+        return aus_cache(pfad, begriff, quelle, max_alter_stunden=grenze)
 
     def _merken(self, treffer: Wissen) -> None:
         pfad = self._cache_pfad()

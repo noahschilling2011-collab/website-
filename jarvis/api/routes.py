@@ -105,6 +105,41 @@ async def get_messages(request: Request) -> list[MessageOut]:
     return [MessageOut.of(m, gruppen.get(m.id, [])) for m in messages]
 
 
+def chat_werkzeuge() -> list[str]:
+    """Was auf dem Chat-Pfad WIRKLICH laufen kann.
+
+    Bis zum 30.08.2026 uebergab `post_chat` gar kein `erlaubt=`. Damit bot
+    `registry.schemas_for(None, EXTERNAL)` alle 18 Werkzeuge an - mehr, als
+    jeder Agent hat. Zwei davon koennen hier grundsaetzlich nicht laufen,
+    und der Dispatcher lehnt sie ab, NACHDEM das Modell sie vorgeschlagen
+    hat:
+
+    * `send_email` ist EXTERNAL und damit zwingend bestaetigungspflichtig
+      (`core/tools/registry.py` erzwingt das). `post_chat` uebergibt kein
+      `bestaetigung=` - es gibt auf diesem Pfad niemanden, der eine
+      Rueckfrage beantworten koennte. Ergebnis war immer:
+      "braucht eine Bestaetigung, aber in diesem Zusammenhang kann niemand
+      bestaetigen."
+    * `ask_agent` braucht den Delegationskontext, den `core/runner.py` setzt.
+      Der Chat-Pfad setzt ihn nicht, also steigt `AskAgent.execute` sofort
+      mit ok=False aus.
+
+    Der Dispatcher faellt in beiden Faellen zu - unsicher war nichts. Aber
+    ein Modell, dem man ein Werkzeug anbietet, das nie funktioniert,
+    verbrennt Zuege und Token an einer Sackgasse und erklaert dem Nutzer
+    hinterher einen Fehler, den er nicht verursacht hat.
+
+    Gefunden bei der Verknuepfungspruefung, von zwei von drei Skeptikern
+    bestaetigt. Die Liste wird BERECHNET, nicht abgeschrieben: ein neues
+    bestaetigungspflichtiges Werkzeug faellt damit automatisch heraus,
+    statt hier vergessen zu werden.
+    """
+    return [
+        t.name for t in registry.all_tools()
+        if not t.requires_confirmation and t.name != "ask_agent"
+    ]
+
+
 @api.post("/chat", response_model=ChatResponse)
 async def post_chat(request: Request, body: ChatRequest) -> ChatResponse:
     settings = _settings(request)
@@ -208,6 +243,7 @@ async def post_chat(request: Request, body: ChatRequest) -> ChatResponse:
             provider,
             [LLMMessage(role=m.role, content=m.content) for m in history],
             system=systemprompt,
+            erlaubt=chat_werkzeuge(),
             max_permission=Permission(settings.max_permission),
             max_tool_calls=settings.budget_max_tool_calls,
             on_call=merke_aufruf,

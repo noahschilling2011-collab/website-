@@ -21,7 +21,20 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY --chown=jarvis:jarvis core ./core
 COPY --chown=jarvis:jarvis api ./api
 COPY --chown=jarvis:jarvis scripts ./scripts
-COPY --chown=jarvis:jarvis main.py index.html ./
+COPY --chown=jarvis:jarvis main.py index.html weltlage.html ./
+
+# static/ hat hier GEFEHLT - gefunden bei der Verknuepfungspruefung am
+# 29.08.2026, von drei Skeptikern bestaetigt. Ohne den Ordner startet der
+# Container zwar, liefert aber eine Seite ohne Stylesheet: index.html und
+# weltlage.html laden beide /static/system.css, und der Tab "Welt" laeuft
+# beim import('/static/globus.js') in einen 404. Wer der README folgt und
+# `docker compose up` startet, bekam also ein kaputtes JARVIS - und der
+# Grund war in keinem Test sichtbar, weil die Suite gegen den Quellbaum
+# laeuft, nicht gegen das Image.
+#
+# 2,3 MB, davon der groesste Teil das gevendorte Three.js und die
+# Laendergeometrie. Beides muss mit: sie kommen bewusst NICHT aus einem CDN.
+COPY --chown=jarvis:jarvis static ./static
 
 # Die Datenbank gehoert nicht ins Image, sondern in ein Volume.
 RUN mkdir -p /app/data && chown jarvis:jarvis /app/data

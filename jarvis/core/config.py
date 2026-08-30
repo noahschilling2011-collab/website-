@@ -63,6 +63,19 @@ class Settings(BaseSettings):
     # Optional. Hebt 500 Anfragen/Stunde auf 5.000/Stunde.
     wiki_token: str = Field(default="", validation_alias=AliasChoices("WIKI_API_TOKEN"))
 
+    # Wie lange ein Nachschlage-Treffer im Cache gilt, in Stunden.
+    # 0 = nie verfallen (das war bis zum 30.08.2026 das einzige
+    # Verhalten - `geholt_am` wurde geschrieben und nie gelesen).
+    #
+    # 24 Stunden ist die Voreinstellung und keine gemessene Zahl,
+    # sondern eine Abwaegung zwischen zwei Zusagen aus
+    # docs/wissensquellen.md: DoD 6 verlangt, dass eine zweite
+    # identische Anfrage den Cache trifft (haelt bei jeder Dauer ueber
+    # ein paar Sekunden), DoD 4, dass wiki_live bei veralteten Staenden
+    # wirklich greift (haelt bei keiner unendlichen Dauer). Wer es
+    # anders will, stellt es hier - still erhoeht wird es nicht.
+    wissen_cache_stunden: float = 24.0
+
     # --- Vault (docs/MIGRATION-VAULT.md) ---
     # Leer = kein Vault. Dann bleibt JARVIS bei der Datenbank, und nichts an
     # diesem Pfad wird angelegt. AliasChoices, weil der Feldname sonst still

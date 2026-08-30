@@ -121,3 +121,45 @@ def test_readme_nennt_die_eigenen_api_routen():
     assert "nur API, kein UI" in readme
     for pfad in ("/api/audit", "/api/task-log"):
         assert pfad in readme, f"{pfad} fehlt in der README-Tabelle"
+
+
+# --- Der Chat-Pfad bietet nur an, was dort laufen kann -----------------------
+
+
+def test_der_chatpfad_bietet_keine_werkzeuge_an_die_dort_nie_laufen():
+    """Gefunden bei der Verknuepfungspruefung am 30.08.2026.
+
+    `post_chat` uebergab kein `erlaubt=`. Damit bot es alle 18 Werkzeuge an -
+    mehr, als jeder Agent hat. Zwei koennen dort grundsaetzlich nicht laufen:
+    `send_email` braucht eine Bestaetigung, die dieser Pfad nicht stellt, und
+    `ask_agent` den Delegationskontext, den nur `core/runner.py` setzt.
+
+    Der Dispatcher faellt zu - unsicher war nichts. Aber ein Modell, dem man
+    eine Sackgasse anbietet, verbrennt Zuege daran und erklaert dem Nutzer
+    hinterher einen Fehler, den er nicht verursacht hat.
+    """
+    from api.routes import chat_werkzeuge
+    from core.tools import registry
+
+    angeboten = set(chat_werkzeuge())
+    alle = {t.name for t in registry.all_tools()}
+
+    assert "send_email" not in angeboten
+    assert "ask_agent" not in angeboten
+    # Und der Rest ist noch da - der Chat soll nicht nebenbei entkernt werden.
+    assert angeboten == alle - {"send_email", "ask_agent"}, sorted(alle - angeboten)
+    assert len(angeboten) >= 15, sorted(angeboten)
+
+
+def test_die_liste_wird_gerechnet_und_nicht_abgeschrieben():
+    """Ein neues bestaetigungspflichtiges Werkzeug muss automatisch
+    herausfallen. Steht die Liste als Namen im Code, vergisst man genau
+    das - und der naechste EXTERNAL-Aufruf laeuft wieder ins Leere."""
+    from api.routes import chat_werkzeuge
+    from core.tools import registry
+
+    angeboten = set(chat_werkzeuge())
+    bestaetigungspflichtig = {t.name for t in registry.all_tools()
+                              if t.requires_confirmation}
+    assert bestaetigungspflichtig, "kein einziges Werkzeug ist bestaetigungspflichtig?"
+    assert not (angeboten & bestaetigungspflichtig), sorted(angeboten & bestaetigungspflichtig)
