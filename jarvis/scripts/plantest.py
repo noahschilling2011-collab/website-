@@ -489,6 +489,28 @@ def main() -> int:
         # wegzuwerfen.
         gerissen = ende
         print(f"\n{ROT}{ende}{AUS}")
+    except Exception as ende:                      # noqa: BLE001
+        # Der haeufigste Fall ist ein Ratenlimit (HTTP 429), das die zwei
+        # Wiederholungen des Providers ueberdauert. Auf einer Gratis-Stufe
+        # ist das kein Ausnahmefall, sondern der Normalzustand: bei
+        # 8.000 Token/Minute und rund 2.800 Token je Aufruf sind knapp drei
+        # Aufrufe pro Minute drin.
+        #
+        # Frueher flog der Fehler bis nach draussen. Damit war JEDER bereits
+        # bezahlte Lauf weg - bei Lauf 3 von 3 also zwei vollstaendige
+        # Durchgaenge, fuer die das Tageskontingent schon verbraucht war.
+        # Das ist genau der Fehler, den `zeige()` vorher hatte, nur eine
+        # Ebene hoeher.
+        gerissen = ende
+        print(f"\n{ROT}Abgebrochen: {type(ende).__name__}: {ende}{AUS}")
+        if laeufe:
+            print(f"{GELB}{len(laeufe)} bereits gefahrene(r) Lauf/Laeufe bleiben "
+                  f"erhalten und werden unten ausgewertet.{AUS}")
+        else:
+            print(f"{GRAU}Kein Lauf ist vollstaendig geworden. Bei einem "
+                  f"Ratenlimit hilft --laeufe 1 und ein zweiter Anlauf "
+                  f"spaeter; der Verlauf haengt an, statt zu ueberschreiben."
+                  f"{AUS}")
 
     print(f"\n{GRAU}Verbrauch: {deckel.aufrufe} Aufrufe, {deckel.token} Token"
           + (f", {deckel.eur:.4f} EUR" if einstellungen.prices_configured

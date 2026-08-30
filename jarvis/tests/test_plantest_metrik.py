@@ -17,6 +17,7 @@ die Testanzahl steigt um diese Datei, und um nichts sonst.
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -247,3 +248,73 @@ def test_erfundene_werkzeuge_werden_bestraft():
     assert nach_name["gibt_es_nicht"]["praezision"] == 0.0
     assert nach_name["clock"]["stuetze"] == 1
     assert lauf["node_f1"] == 0.0
+
+
+# --- Ein Ratenlimit darf keinen bezahlten Lauf wegwerfen -------------------
+
+
+def test_ein_fehler_im_zweiten_lauf_rettet_den_ersten(tmp_path, capsys, monkeypatch):
+    """Auf einer Gratis-Stufe ist HTTP 429 der Normalzustand, nicht die
+    Ausnahme: bei 8.000 Token/Minute und rund 2.800 Token je Aufruf sind
+    knapp drei Aufrufe pro Minute drin.
+
+    Frueher fing `main()` nur `DeckelGerissen`. Ein Ratenlimit, das die zwei
+    Wiederholungen des Providers ueberdauert, flog bis nach draussen - und
+    damit war JEDER bereits bezahlte Lauf weg. Bei Lauf 3 von 3 also zwei
+    vollstaendige Durchgaenge, fuer die das Tageskontingent schon verbraucht
+    war.
+    """
+    import core.llm
+    from core.llm import FakeLLMProvider, LLMError
+    from scripts import plantest
+
+    class Stirbt(FakeLLMProvider):
+        n = 0
+
+        async def complete(self, *a, **k):
+            Stirbt.n += 1
+            if Stirbt.n > 30:          # genau nach dem ersten vollen Lauf
+                raise LLMError("Ratenlimit erreicht (429).")
+            return await super().complete(*a, **k)
+
+    # `main()` importiert erst BEIM AUFRUF aus core.llm - also dort
+    # ersetzen, nicht auf scripts.plantest. Ein Attribut auf dem Modul
+    # wuerde der lokale Import einfach ueberschreiben.
+    monkeypatch.setattr(core.llm, "FakeLLMProvider", Stirbt)
+    verlauf = tmp_path / "verlauf.jsonl"
+    monkeypatch.setattr(plantest, "VERLAUF", verlauf)
+    monkeypatch.setattr(sys, "argv", ["plantest", "--trocken", "--laeufe", "3"])
+
+    code = plantest.main()
+    ausgabe = capsys.readouterr().out
+
+    assert code == 3, "ein Abbruch muss sich im Exitcode zeigen"
+    assert "Abgebrochen" in ausgabe
+    assert "bleiben erhalten" in ausgabe
+    # Der Kern: Lauf 1 ist gefahren UND im Verlauf gelandet.
+    assert "Lauf 1" in ausgabe
+    assert verlauf.is_file(), "der bezahlte Lauf wurde nicht gesichert"
+    zeilen = [json.loads(z) for z in verlauf.read_text(encoding="utf-8").splitlines()]
+    assert len(zeilen) == 1, zeilen
+    assert zeilen[0]["lauf"] == 1
+
+
+def test_ohne_einen_einzigen_ganzen_lauf_wird_geraten_wie_es_weitergeht(
+        tmp_path, capsys, monkeypatch):
+    """Stirbt schon der erste Lauf, gibt es nichts zu sichern - dann soll
+    wenigstens dastehen, was man stattdessen tun kann."""
+    import core.llm
+    from core.llm import FakeLLMProvider, LLMError
+    from scripts import plantest
+
+    class StirbtSofort(FakeLLMProvider):
+        async def complete(self, *a, **k):
+            raise LLMError("Ratenlimit erreicht (429).")
+
+    monkeypatch.setattr(core.llm, "FakeLLMProvider", StirbtSofort)
+    monkeypatch.setattr(plantest, "VERLAUF", tmp_path / "v.jsonl")
+    monkeypatch.setattr(sys, "argv", ["plantest", "--trocken", "--laeufe", "3"])
+
+    assert plantest.main() == 3
+    ausgabe = capsys.readouterr().out
+    assert "--laeufe 1" in ausgabe, ausgabe[-400:]
