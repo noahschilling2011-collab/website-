@@ -103,40 +103,24 @@
   --step-1:  clamp(1.13rem, 1.06rem + 0.35vw, 1.32rem);
 }
 
-/* --- Typografie: die drei Rollen als Klassen -------------------------- */
+/* --- Typografie: die drei Rollen ------------------------------------- */
 
-/* Die eine grosse Zahl, der Laendername. */
-.kenngroesse {
-  font-size: var(--kenngroesse);
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  line-height: 1.02;
-  color: var(--text-laut);
-  font-variant-numeric: tabular-nums;
-}
+/* Hier standen `.kenngroesse`, `.etikett` und `.marke-kopf` als KLASSEN.
+   Am 30.08.2026 entfernt: 36 Zeilen, die kein einziges Element benutzte -
+   gemessen, null Treffer als `class="..."` oder `classList` in
+   index.html, weltlage.html und static/globus.js.
 
-/* Zonentitel, Achsen, Einheiten. Diese Stufe traegt den Look. Jede Zone
-   bekommt GENAU EINE - zwei Etiketten uebereinander sind eins zu viel. */
-.etikett {
-  font-size: var(--etikett);
-  font-weight: 600;
-  letter-spacing: .11em;
-  text-transform: uppercase;
-  color: var(--text-leise);
-}
+   Das war nicht nur toter Ballast, sondern eine Doppeldeutigkeit: das
+   Design-System sagte, die Rollen SEIEN Klassen, waehrend die Oberflaeche
+   sie an ueber einem Dutzend Stellen aus `var(--etikett)` und
+   `var(--kenngroesse)` neu zusammensetzte. Zwei Quellen fuer dieselbe
+   Regel, und nur eine davon in Betrieb.
 
-/* Kopfzeilenmuster BEREICH // UNTERTITEL. */
-.marke-kopf {
-  display: flex;
-  align-items: baseline;
-  gap: .5ch;
-  text-transform: uppercase;
-  letter-spacing: .14em;
-  font-weight: 600;
-}
-.marke-kopf b      { color: var(--text-laut); font-weight: 600; }
-.marke-kopf i      { color: var(--akzent); font-style: normal; }
-.marke-kopf span   { color: var(--text-leise); font-weight: 500; }
+   Die Groessen-Token oben BLEIBEN - sie sind der echte Vertrag und werden
+   ueberall benutzt. Wer die Rollen wieder als Klassen will, baut sie neu
+   UND setzt sie; eine Klasse ohne Benutzer ist eine Absichtserklaerung,
+   kein Design-System. (Gefunden bei der Verknuepfungspruefung, von drei
+   Skeptikern bestaetigt.) */
 
 /* Jede Zahl, die sich aendert. Ohne das springt jeder Zaehler bei jedem
    Tick, weil die Ziffern verschieden breit sind. */

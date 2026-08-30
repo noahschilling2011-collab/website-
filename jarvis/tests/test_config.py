@@ -148,3 +148,39 @@ def test_env_example_nennt_keine_unbekannte_variable():
     assert unbekannt == [], (
         f".env.example nennt Variablen, die Settings nicht kennt: {unbekannt}"
     )
+
+
+def test_status_md_schreibt_keine_feldzahl_von_hand():
+    """Eine Zahl, die man in Prosa pflegt, verrottet.
+
+    Gefunden am 30.08.2026 und im selben Lauf zweimal bestaetigt: STATUS.md
+    behauptete viermal woertlich "alle 32 Settings-Felder". Es waren 34. Die
+    Korrektur auf 34 war wenige Stunden spaeter wieder falsch, weil
+    `wissen_cache_stunden` dazukam - also 35.
+
+    Der Test verbietet die Zahl nicht, er verlangt nur, dass sie stimmt.
+    Wer sie hinschreibt, muss sie pflegen; wer "jedes Feld" schreibt, nicht.
+
+    Und er zaehlt Prosa mit, auch ein Zitat des alten Fehlers - genau das
+    ist beim ersten Lauf passiert. Das ist Absicht, nicht Nachlaessigkeit:
+    ein Waechter mit einer Ausnahme fuer "aber das ist ja nur zitiert"
+    laesst sich mit derselben Ausrede immer umgehen. Wer den Fehler
+    beschreiben will, nennt die Zahl nicht woertlich neben dem Wort
+    "Settings-Felder".
+    """
+    import re
+
+    from core.config import Settings
+
+    wurzel = Path(__file__).resolve().parent.parent
+    echt = len(Settings.model_fields)
+    schlecht = []
+    for datei in sorted(wurzel.glob("*.md")) + sorted((wurzel / "docs").glob("*.md")):
+        for nr, zeile in enumerate(datei.read_text(encoding="utf-8").splitlines(), 1):
+            for zahl in re.findall(r"(\d+)\s+Settings-Felder", zeile):
+                if int(zahl) != echt:
+                    schlecht.append(
+                        f"{datei.name}:{nr}: behauptet {zahl} Settings-Felder, "
+                        f"es sind {echt} -> {zeile.strip()[:70]}")
+    assert schlecht == [], (
+        "handgeschriebene Feldzahl stimmt nicht mehr:\n  " + "\n  ".join(schlecht))

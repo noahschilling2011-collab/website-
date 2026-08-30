@@ -174,6 +174,20 @@ def alle(db_path) -> list[Treffer]:
 
 
 def mtime_von(db_path, notiz_id: str) -> float | None:
+    """NUR fuer Tests. Im Betrieb ruft das niemand - und das ist richtig so.
+
+    `frisch_halten()` vergleicht die Zeitstempel im selben Durchgang, in dem
+    es ohnehin ueber alle Notizen laeuft; ein zweiter Einzelabruf je Notiz
+    waere dort eine Abfrage pro Datei statt einer fuer alle.
+
+    Sie steht hier trotzdem, statt als rohes SQL im Test: so haengt
+    tests/test_vault.py am Modul und nicht am Tabellenschema. Wer die Spalte
+    umbenennt, aendert eine Stelle.
+
+    Bei der Verknuepfungspruefung am 30.08.2026 wurde sie als "toter Code"
+    gemeldet. Das stimmt nicht - sie hat einen Benutzer. Irrefuehrend war
+    nur, dass man ihr das nicht ansah.
+    """
     with session(db_path) as conn:
         zeile = conn.execute("SELECT mtime FROM vault_notizen WHERE id = ?",
                              (notiz_id,)).fetchone()

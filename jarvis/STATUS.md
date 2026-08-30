@@ -270,7 +270,7 @@ Modulglobal: mehrere Tasks können gleichzeitig laufen.
 >   Kein Code hat es je gelesen — es stand nur in der Vorlage und forderte
 >   einen NASA-Zugang, der nichts bewirkt hätte. Belegt durch den neuen
 >   `tests/test_config.py::test_jedes_settings_feld_wird_irgendwo_gelesen`:
->   er prüft alle 34 Settings-Felder statisch und wurde rot genau bei diesem
+>   er prüft **jedes** Settings-Feld statisch und wurde rot genau bei diesem
 >   einen. Gegenprobe: Feld wieder eingefügt → wieder rot. Der Plan für
 >   aktive Brände bleibt in `docs/satellite.md:46` stehen.
 > - Drei unbenutzte Importnamen aus `core/tools/satellite_tools.py` raus:
@@ -405,26 +405,9 @@ einen uvicorn im Thread; die Netzsperre der Testsitzung lässt dafür genau
 
 > **Nur Erstprüfung.** Die Gegenprobe für diese Phase ist nicht gelaufen (Sitzungslimit). Die Verdikte sind nicht von einem zweiten Prüfer widerlegt worden.
 
-> **26.08.2026 — Aufräumen (Inbetriebnahme-Befund, Schritt 5d).** Kein
-> Kriterium bewegt sich dadurch; nur Karteileichen sind weg.
->
-> - `FIRMS_MAP_KEY` **entfernt** aus `core/config.py` und `.env.example`.
->   Kein Code hat es je gelesen — es stand nur in der Vorlage und forderte
->   einen NASA-Zugang, der nichts bewirkt hätte. Belegt durch den neuen
->   `tests/test_config.py::test_jedes_settings_feld_wird_irgendwo_gelesen`:
->   er prüft alle 34 Settings-Felder statisch und wurde rot genau bei diesem
->   einen. Gegenprobe: Feld wieder eingefügt → wieder rot. Der Plan für
->   aktive Brände bleibt in `docs/satellite.md:46` stehen.
-> - Drei unbenutzte Importnamen aus `core/tools/satellite_tools.py` raus:
->   `GRENZE_FAKTOR`, `UeberwachungAbgelehnt`, `pruefe_anfrage`.
->
-> **Korrektur an einem Befund von außen:** `pruefe_anfrage` ist *kein* toter
-> Code. In `core/tools/satellite_tools.py` war der Import unbenutzt, die
-> Überwachungssperre selbst hängt aber an `core/agents.py:362`
-> (`vorpruefung=pruefe_anfrage`) und wird in `core/agents.py:238-247`
-> abgefangen und als `ToolResult(ok=False)` mit Begründung zurückgegeben.
-> Wer die drei Namen als „tote Imports" pauschal löscht, ohne das zu prüfen,
-> löscht beim nächsten Mal die Sperre mit.
+> **26.08.2026 — Aufräumen (Inbetriebnahme-Befund, Schritt 5d).** Der Befund
+> gilt projektweit und steht einmal, bei Phase 4. Er hat hier dreimal
+> wörtlich gestanden — und trug seine veraltete Zahl damit viermal.
 
 Gebaut: `core/satellite/{contracts,analysis,policy,cdse}.py`, Werkzeuge
 `satellite_search` und `satellite_compare`, Agent `satellite` (READ).
@@ -478,26 +461,9 @@ bei Kontingenten die falsche Reihenfolge.
 
 > **Nur Erstprüfung.** Die Gegenprobe für diese Phase ist nicht gelaufen (Sitzungslimit). Die Verdikte sind nicht von einem zweiten Prüfer widerlegt worden.
 
-> **26.08.2026 — Aufräumen (Inbetriebnahme-Befund, Schritt 5d).** Kein
-> Kriterium bewegt sich dadurch; nur Karteileichen sind weg.
->
-> - `FIRMS_MAP_KEY` **entfernt** aus `core/config.py` und `.env.example`.
->   Kein Code hat es je gelesen — es stand nur in der Vorlage und forderte
->   einen NASA-Zugang, der nichts bewirkt hätte. Belegt durch den neuen
->   `tests/test_config.py::test_jedes_settings_feld_wird_irgendwo_gelesen`:
->   er prüft alle 34 Settings-Felder statisch und wurde rot genau bei diesem
->   einen. Gegenprobe: Feld wieder eingefügt → wieder rot. Der Plan für
->   aktive Brände bleibt in `docs/satellite.md:46` stehen.
-> - Drei unbenutzte Importnamen aus `core/tools/satellite_tools.py` raus:
->   `GRENZE_FAKTOR`, `UeberwachungAbgelehnt`, `pruefe_anfrage`.
->
-> **Korrektur an einem Befund von außen:** `pruefe_anfrage` ist *kein* toter
-> Code. In `core/tools/satellite_tools.py` war der Import unbenutzt, die
-> Überwachungssperre selbst hängt aber an `core/agents.py:362`
-> (`vorpruefung=pruefe_anfrage`) und wird in `core/agents.py:238-247`
-> abgefangen und als `ToolResult(ok=False)` mit Begründung zurückgegeben.
-> Wer die drei Namen als „tote Imports" pauschal löscht, ohne das zu prüfen,
-> löscht beim nächsten Mal die Sperre mit.
+> **26.08.2026 — Aufräumen (Inbetriebnahme-Befund, Schritt 5d).** Der Befund
+> gilt projektweit und steht einmal, bei Phase 4. Er hat hier dreimal
+> wörtlich gestanden — und trug seine veraltete Zahl damit viermal.
 
 Gebaut: `SPRACHSTIL` (höchstens drei Sätze, keine Aufzählungen, keine URLs im
 Fließtext), `voice`-Flag an `POST /api/tasks`, `VoiceProvider`-Abstraktion im
@@ -533,26 +499,9 @@ ausprobieren.
 
 > **Nur Erstprüfung.** Die Gegenprobe für diese Phase ist nicht gelaufen (Sitzungslimit). Die Verdikte sind nicht von einem zweiten Prüfer widerlegt worden.
 
-> **26.08.2026 — Aufräumen (Inbetriebnahme-Befund, Schritt 5d).** Kein
-> Kriterium bewegt sich dadurch; nur Karteileichen sind weg.
->
-> - `FIRMS_MAP_KEY` **entfernt** aus `core/config.py` und `.env.example`.
->   Kein Code hat es je gelesen — es stand nur in der Vorlage und forderte
->   einen NASA-Zugang, der nichts bewirkt hätte. Belegt durch den neuen
->   `tests/test_config.py::test_jedes_settings_feld_wird_irgendwo_gelesen`:
->   er prüft alle 34 Settings-Felder statisch und wurde rot genau bei diesem
->   einen. Gegenprobe: Feld wieder eingefügt → wieder rot. Der Plan für
->   aktive Brände bleibt in `docs/satellite.md:46` stehen.
-> - Drei unbenutzte Importnamen aus `core/tools/satellite_tools.py` raus:
->   `GRENZE_FAKTOR`, `UeberwachungAbgelehnt`, `pruefe_anfrage`.
->
-> **Korrektur an einem Befund von außen:** `pruefe_anfrage` ist *kein* toter
-> Code. In `core/tools/satellite_tools.py` war der Import unbenutzt, die
-> Überwachungssperre selbst hängt aber an `core/agents.py:362`
-> (`vorpruefung=pruefe_anfrage`) und wird in `core/agents.py:238-247`
-> abgefangen und als `ToolResult(ok=False)` mit Begründung zurückgegeben.
-> Wer die drei Namen als „tote Imports" pauschal löscht, ohne das zu prüfen,
-> löscht beim nächsten Mal die Sperre mit.
+> **26.08.2026 — Aufräumen (Inbetriebnahme-Befund, Schritt 5d).** Der Befund
+> gilt projektweit und steht einmal, bei Phase 4. Er hat hier dreimal
+> wörtlich gestanden — und trug seine veraltete Zahl damit viermal.
 
 Gebaut: `Dockerfile`, `docker-compose.yml`, `.dockerignore`,
 `scripts/backup.py`, `scripts/migrate.py`, `scripts/measure.py`,
@@ -1400,17 +1349,55 @@ Die Liste wird **gerechnet, nicht abgeschrieben**: alles ohne
 bestätigungspflichtiges Werkzeug fällt damit automatisch heraus, statt hier
 vergessen zu werden — und genau das prüft ein zweiter Test.
 
-### Vier bestätigte, aber kosmetische — bewusst offen
+### Die vier kosmetischen — abgeräumt, und zwei davon waren anders als gemeldet
 
-Drei Typografie-Rollenklassen in `system.css`, die kein Element setzt; zwei
-ids in `index.html`, die niemand anfasst; `mtime_von()` in
-`core/vault_index.py`, das nur ein Test ruft; die Ausnahme `Verworfen` in
-`core/weltlage.py`, die nirgends geworfen wird. Alle vier sind Reste, keine
-Fehler — sie kosten ein paar Zeilen und niemand merkt etwas. Sie stehen
-hier, damit sie beim nächsten Aufräumen nicht wieder verteidigt werden
-müssen.
+**Drei Typografie-Rollenklassen, die nichts formatierten.** `.kenngroesse`,
+`.etikett` und `.marke-kopf` standen als Klassen in `system.css` — gemessen
+**null** Treffer als `class="…"` oder `classList` in beiden Seiten und im
+Globus. Schlimmer als die 36 toten Zeilen war die Doppeldeutigkeit: das
+Design-System sagte, die Rollen *seien* Klassen, während die Oberfläche sie
+an über einem Dutzend Stellen aus `var(--etikett)` und `var(--kenngroesse)`
+neu zusammensetzte. Zwei Quellen für dieselbe Regel, eine davon in Betrieb.
+Klassen raus, **Token bleiben** — die sind der echte Vertrag.
 
-**Suite:** `python3 -m pytest -q` → **1135 passed**, 0 Fehler, 0
+**„Zwei ids" waren eine.** Nachgemessen: von 29 ids in `index.html` hat
+genau **eine** keinen Zugriff, `id="reaktor"`. Das Element wird durchgehend
+über `.brand-mark` angesprochen. Entfernt.
+
+**`Verworfen` wurde nie geworfen.** Eine Ausnahmeklasse aus einem früheren
+Entwurf; die Verwerfung läuft über den Rückgabewert. Entfernt.
+
+**`mtime_von()` ist *kein* toter Code — die Meldung war falsch.** Es hat
+einen Benutzer: `tests/test_vault.py`. Irreführend war nur, dass man ihm das
+nicht ansah — eine Test-Hilfe mitten im Produktionsmodul. Sie bleibt (als
+rohes SQL im Test hinge der Test am Tabellenschema statt am Modul), sagt
+jetzt aber im Docstring, was sie ist und warum der Betrieb sie nicht
+braucht.
+
+### Und eine Zahl, die im selben Lauf zweimal verrottet ist
+
+Ein Prüfer meldete: ein 21-Zeilen-Block steht **viermal wörtlich** in
+STATUS.md und trägt seine veraltete Zahl viermal. Nachgemessen: stimmt, vier
+identische Kopien.
+
+Beim Beheben ist die Falle zugeschnappt. Ich hatte am selben Tag „alle 32
+Settings-Felder" an vier Stellen auf 34 korrigiert — und mit
+`wissen_cache_stunden` im selben Lauf **35** daraus gemacht. Eine
+handgeschriebene Zahl in Prosa, viermal gepflegt, verrottet zwangsläufig.
+
+Also die Ursache statt der Zahl: drei Kopien durch einen Zeiger ersetzt, und
+die Zahl ganz raus — „er prüft **jedes** Settings-Feld". Dazu
+`test_status_md_schreibt_keine_feldzahl_von_hand`, der jede Behauptung der
+Form *„N Settings-Felder"* in allen `.md`-Dateien gegen
+`len(Settings.model_fields)` hält.
+
+> Der Wächter hat beim ersten Lauf prompt **meine eigene Zeile** erwischt,
+> die den alten Fehler zitierte — dieselbe Falle wie beim Blau-Wächter, zum
+> vierten Mal in diesem Projekt. Umformuliert statt den Test aufgeweicht:
+> eine Ausnahme für „das ist ja nur zitiert" lässt sich mit derselben
+> Ausrede immer umgehen.
+
+**Suite:** `python3 -m pytest -q` → **1136 passed**, 0 Fehler, 0
 übersprungen.
 
 ## Die Beschaffungsliste — `docs/BESCHAFFUNG.md`
@@ -1513,7 +1500,7 @@ Umso peinlicher:
 |---|---|
 | Kopf: „Abschnitt 5 abgenommen, 6 bis 8 stehen aus" | 6 und 7 sind seit fünf Commits gebaut. Der Kopf war **einen Tag und fünf Commits alt** |
 | „4.601 → 9.512 Zeichen" als „nicht schöngeredet" | 9.736 — der Stand vor meinem eigenen `satellite_compare`-Umbau |
-| „alle 32 Settings-Felder", viermal | 34 (`len(Settings.model_fields)`) |
+| eine feste Feldzahl (32), viermal wörtlich | falsch — und die Korrektur auf 34 war **noch am selben Tag** wieder falsch, weil `wissen_cache_stunden` dazukam. Die Zahl steht jetzt nirgends mehr: „**jedes** Settings-Feld". Eine handgeschriebene Zahl an vier Stellen verrottet zwangsläufig |
 | „Alle acht Verwechslungspaare", dann sechs aufgezählt | acht im Test, die zwei mit `web_search` fehlten in der Liste |
 
 Die Zahlen stehen jetzt so da, wie ein Befehl sie liefert, mit dem Befehl

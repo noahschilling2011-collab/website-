@@ -38,10 +38,6 @@ BILD_TIMEOUT_S = 5.0
 CACHE_TTL_MINUTEN = 60
 
 
-class Verworfen(ValueError):
-    """Eine Meldung, die den Datenvertrag nicht erfuellt."""
-
-
 @dataclass
 class Quellbild:
     """Was der Verlag selbst als Vorschaubild bereitstellt - sonst nichts."""
