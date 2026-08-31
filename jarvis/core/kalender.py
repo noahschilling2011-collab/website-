@@ -384,10 +384,34 @@ async def hole(quelle: str, *, db_path, jetzt: float | None = None) -> tuple[str
     except KalenderFehler:
         raise
     except Exception as exc:                       # noqa: BLE001
+        # NIEMALS `exc` in den Text der Ausnahme. httpx haengt die volle URL
+        # an seine Fehlermeldung:
+        #
+        #   Client error '404 Not Found' for url
+        #   'https://calendar.google.com/calendar/ical/<GEHEIM>/basic.ics'
+        #
+        # Und diese Adresse IST das Geheimnis - drei Zeilen weiter oben steht
+        # genau deshalb, dass wir Weiterleitungen nicht folgen. Der Text
+        # dieser Ausnahme wird zum ToolResult.error, landet im Prompt und
+        # geht damit an den Modellanbieter. Wer den Kalender-Link hat,
+        # sieht den ganzen Kalender - ohne jede Anmeldung.
+        #
+        # Gefunden am 31.08.2026, von zwei Pruefern unabhaengig, und mit
+        # einem echten httpx-404 nachgestellt.
+        #
+        # Ins LOG darf der Grund, dort steht die URL ohnehin nicht drin.
         if datei.is_file():
-            log.warning("Kalender: Abruf gescheitert (%s), nehme den Cache.", exc)
+            log.warning("Kalender: Abruf gescheitert (%s), nehme den Cache.",
+                        type(exc).__name__)
             return datei.read_text(encoding="utf-8", errors="replace"), True
-        raise KalenderFehler(f"Kalender nicht erreichbar: {exc}") from exc
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+        log.warning("Kalender: Abruf gescheitert (%s)", type(exc).__name__)
+        raise KalenderFehler(
+            "Kalender nicht erreichbar"
+            + (f" (HTTP {status})" if status else f" ({type(exc).__name__})")
+            + ". Die Adresse steht absichtlich nicht in dieser Meldung - sie "
+            "ist das Geheimnis. Pruefe KALENDER_QUELLE in der .env."
+        ) from exc
 
     if "BEGIN:VCALENDAR" not in text:
         # Ein Abo, das eine Anmeldeseite ausliefert, kommt als HTTP 200.

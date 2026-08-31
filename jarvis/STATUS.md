@@ -1293,6 +1293,78 @@ fehlen die Benutzer. `--dauer-tupf`, `--dauer-raus` und `--dauer-zahl` hatten
 null Treffer im ganzen Projekt, daneben stehen neun handgeschriebene `200ms`
 und fünf verschiedene Erscheinungsdauern.
 
+## Zweite Prüfrunde: sechs Achsen, die die erste nicht angefasst hat
+
+Noah fragte, was ich noch verbessern muss. Statt zu antworten: sechs neue
+Achsen — Ereignisstrom Ende-zu-Ende, die Kette Planer→Runner→Schleife,
+Fehlerpfade, Geheimnisse, die zwei Seiten, Zeit und Zeitzonen. Jeder Fund
+von zwei Skeptikern angegriffen.
+
+**29 Funde halten stand, 16 sind gefallen. Drei sind Blocker.**
+
+*(Zwölf Prüfagenten liefen ins Sitzungslimit, darunter der Musteranalytiker,
+der meine eigenen Wiederholungsfehler untersuchen sollte. Die Achse
+`zeit-und-ort` ist deshalb nur teilweise gegengeprüft.)*
+
+### Blocker 1: die geheime Kalenderadresse ging an den Modellanbieter
+
+`core/kalender.py:390` stand auf
+`KalenderFehler(f"Kalender nicht erreichbar: {exc}")`. httpx hängt an seine
+Fehlermeldung die **volle URL**:
+
+```
+Client error '404 Not Found' for url
+'https://calendar.google.com/calendar/ical/<GEHEIM>/basic.ics'
+```
+
+Dieser Text wird zu `ToolResult.error`, landet im Prompt — und geht damit an
+Groq. **Wer diese Adresse hat, sieht den kompletten Kalender, ohne jede
+Anmeldung.** Ein abgelaufener Abo-Link genügte.
+
+Die Ironie: **drei Zeilen darüber** verweigert derselbe Code Weiterleitungen
+mit der ausdrücklichen Begründung *„bei einem Kalender-Abo ist die Adresse
+selbst das Geheimnis"*. Die Regel war gedacht — aber nur an einer Stelle.
+
+Von zwei Prüfern unabhängig gefunden (Achse `fehlerpfade` **und** Achse
+`geheimnis`), mit einem echten httpx-404 nachgestellt. Behoben: die Meldung
+nennt jetzt nur noch Statuscode oder Ausnahmeklasse; der Grund geht ins Log,
+wo die URL ohnehin nicht steht.
+
+**Wächter:** `test_die_geheime_abo_adresse_leckt_bei_keinem_fehler` prüft
+sechs Statuscodes (401/403/404/410/500/503) plus einen Verbindungsfehler
+ohne Antwortobjekt. Mutation: das alte `{exc}` zurück → rot, mit der
+Geheimadresse im Klartext.
+
+### Und derselbe Fehler ein zweites Mal, an anderer Stelle
+
+`core/tools/memory_tools.py:114` gab bei einem Vault-Schreibfehler den
+**vollständigen absoluten Pfad** in `display` aus — also in die sichtbare
+Chat-Ausgabe. FIX-07 verbietet Pfade außerhalb der Wurzeln in *jeder*
+UI-Ausgabe, ausdrücklich auch in Fehlermeldungen. Für die Datei-Werkzeuge
+war das umgesetzt, für den Vault nicht.
+
+**Das ist das eigentliche Muster:** beide Male war die Regel korrekt
+formuliert und an *einer* Stelle umgesetzt — statt am Grundsatz.
+
+> Mein erster Wächter dafür war wertlos: er benutzte einen nicht
+> existierenden Pfad, den `mkdir(parents=True)` einfach anlegt. Der Test
+> übersprang — und wäre damit auch **mit** dem Leck grün gewesen. Jetzt
+> blockiert eine Datei die Stelle, an der der Ordner entstehen müsste; die
+> Mutation zeigt prompt den vollen Pfad.
+
+**Suite:** `python3 -m pytest -q` → **1141 passed**, 0 Fehler, 0
+übersprungen.
+
+### Was von den 29 noch offen ist
+
+26 Funde, darunter ein dritter Blocker (`core/agents.py:463`: der
+weltlage-Agent lässt erfundene URLs durch, weil die Quellenregel in
+`core/verify.py:60` an einem **Agentennamen** hängt statt an einem Merkmal).
+Dazu unter anderem: der Server geht nicht aus, solange ein Browser den
+Ereignisstrom hält; es gibt nirgends einen Wiederverbindungspfad; ein
+einziger fehlgeschlagener GET sperrt die Eingabe dauerhaft; der Kalender
+rechnet Zeitzonen nicht um.
+
 ## Die Gegenprüfung ist durch — 8 von 36 halten stand
 
 36 Funde, jeder von drei Skeptikern angegriffen, die ihn **widerlegen**

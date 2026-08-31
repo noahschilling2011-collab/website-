@@ -8,12 +8,15 @@ loeschbar.
 
 from __future__ import annotations
 
+import logging
 import time
 from pathlib import Path
 
 from core import memory
 from core.contracts import Permission, Tool, ToolResult
 from core.tools.registry import register
+
+log = logging.getLogger("jarvis")
 
 
 class _MitDatenbank(Tool):
@@ -110,8 +113,22 @@ class Remember(_MitDatenbank):
             return ToolResult(ok=False, error=str(exc), display=str(exc),
                               duration_ms=dauer())
         except OSError as exc:
-            return ToolResult(ok=False, error=str(exc),
-                              display=f"Vault nicht beschreibbar: {exc}",
+            # KEIN `exc` in error oder display. Ein OSError traegt den
+            # vollstaendigen Pfad in seinem Text ("[Errno 2] No such file or
+            # directory: '/home/noah/vault/2026/notiz.md'"), und `display`
+            # ist die sichtbare Chat-Ausgabe - der Pfad stuende damit im
+            # Fenster und im Prompt.
+            #
+            # FIX-07 verbietet Pfade ausserhalb der Wurzeln in JEDER
+            # UI-Ausgabe, ausdruecklich auch in Fehlermeldungen. Fuer die
+            # Datei-Werkzeuge war das umgesetzt, fuer den Vault nicht - hier
+            # war die Regel nur an einer Stelle gedacht statt am Grundsatz.
+            # Gefunden am 31.08.2026.
+            log.warning("Vault nicht beschreibbar: %s", exc)
+            hinweis = (f"Vault nicht beschreibbar ({type(exc).__name__}). "
+                       "Pruefe VAULT_PFAD in der .env und die Schreibrechte. "
+                       "Der Pfad steht im Serverlog, nicht hier.")
+            return ToolResult(ok=False, error=hinweis, display=hinweis,
                               duration_ms=dauer())
 
         # Ohne Vault bleibt die Anzeige wortgleich zu vorher: "#7" ist eine

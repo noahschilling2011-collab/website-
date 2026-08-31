@@ -345,3 +345,46 @@ def test_unbekannter_fakt_gibt_404(client):
     assert client.delete("/api/memory/999", headers=TOKEN).status_code == 404
     assert client.patch("/api/memory/999", json={"text": "x"},
                         headers=TOKEN).status_code == 404
+
+
+def test_ein_vault_schreibfehler_zeigt_keinen_pfad(tmp_path, monkeypatch):
+    """FIX-07 verbietet Pfade ausserhalb der Wurzeln in JEDER UI-Ausgabe -
+    ausdruecklich auch in Fehlermeldungen.
+
+    Fuer die Datei-Werkzeuge war das umgesetzt, fuer den Vault nicht: ein
+    OSError traegt den vollstaendigen Pfad in seinem Text
+    ("[Errno 2] No such file or directory: '/home/noah/vault/...'"), und der
+    stand bis zum 31.08.2026 in `display` - also in der sichtbaren
+    Chat-Ausgabe und damit im Prompt.
+
+    Die Regel war nur an einer Stelle gedacht statt am Grundsatz.
+    """
+    from core import db as dbmod
+    from core.tools import registry
+
+    db = tmp_path / "m.db"
+    conn = dbmod.connect(db)
+    dbmod.init_db(conn)          # ohne das fehlt vault_notizen
+    conn.close()
+    tool = registry.get("remember")
+    alt_db, alt_vault = tool.db_path, tool.vault_pfad
+    try:
+        tool.db_path = db
+        # Ein Pfad, der WIRKLICH nicht anlegbar ist: eine Datei blockiert die
+        # Stelle, an der ein Ordner entstehen muesste. Ein bloss fehlender
+        # Pfad reicht nicht - `mkdir(parents=True)` legt den einfach an, und
+        # der Test uebersprang. Ein Test, der ueberspringt, waere auch mit
+        # dem Leck gruen gewesen.
+        sperre = tmp_path / "GEHEIMER-ORDNER-xyz"
+        sperre.write_text("ich bin eine Datei, kein Ordner", encoding="utf-8")
+        tool.vault_pfad = sperre / "tiefer" / "vault"
+        ergebnis = run(tool.execute(text="Noah mag Kaffee"))
+    finally:
+        tool.db_path, tool.vault_pfad = alt_db, alt_vault
+
+    assert ergebnis.ok is False, (
+        "der Vault-Zweig hat nicht gegriffen - der Test misst nichts")
+    for feld in (ergebnis.display or "", ergebnis.error or ""):
+        assert "GEHEIMER-ORDNER-xyz" not in feld, feld
+        assert str(tmp_path) not in feld, feld
+    assert "VAULT_PFAD" in (ergebnis.display or ""), ergebnis.display

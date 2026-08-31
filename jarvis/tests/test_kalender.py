@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 from pathlib import Path
+from unittest import mock
 
 import pytest
 
@@ -305,3 +306,87 @@ def test_das_werkzeug_ist_lesend_und_braucht_keine_bestaetigung():
         assert t is not None, name
         assert t.permission is Permission.READ, name
         assert t.requires_confirmation is False, name
+
+
+# --- Die Abo-Adresse darf NIE in einer Meldung stehen ----------------------
+
+
+def test_die_geheime_abo_adresse_leckt_bei_keinem_fehler(tmp_path):
+    """Die Kalender-Abo-URL IST das Geheimnis: wer sie hat, sieht den ganzen
+    Kalender ohne jede Anmeldung. Genau deshalb folgt `hole()` keinen
+    Weiterleitungen.
+
+    Drei Zeilen darunter stand bis zum 31.08.2026 aber
+    `KalenderFehler(f"Kalender nicht erreichbar: {exc}")` - und httpx haengt
+    an seine Fehlermeldung die VOLLE URL:
+
+        Client error '404 Not Found' for url
+        'https://calendar.google.com/calendar/ical/<GEHEIM>/basic.ics'
+
+    Dieser Text wird zu ToolResult.error, landet im Prompt und geht damit an
+    den Modellanbieter. Ein abgelaufener Abo-Link genuegte.
+
+    Gefunden von zwei Pruefern unabhaengig (Achse "fehlerpfade" und Achse
+    "geheimnis").
+    """
+    import httpx
+
+    from core.db import connect
+    from core.kalender import KalenderFehler, hole
+
+    GEHEIM = "https://calendar.google.com/calendar/ical/GEHEIM-TOKEN-xyz/basic.ics"
+    db = tmp_path / "k.db"
+    connect(db).close()
+
+    # Jeder Statuscode, der in freier Wildbahn vorkommt.
+    for status in (401, 403, 404, 410, 500, 503):
+        def handler(request, _s=status):
+            return httpx.Response(_s, request=request)
+
+        echt = httpx.AsyncClient
+
+        def fake(*a, _h=handler, **k):
+            k["transport"] = httpx.MockTransport(_h)
+            return echt(*a, **k)
+
+        with mock.patch("httpx.AsyncClient", fake):
+            with pytest.raises(KalenderFehler) as fehler:
+                run(hole(GEHEIM, db_path=db))
+
+        text = str(fehler.value)
+        assert "GEHEIM-TOKEN-xyz" not in text, f"HTTP {status}: {text}"
+        assert "calendar.google.com" not in text, f"HTTP {status}: {text}"
+        assert "/ical/" not in text, f"HTTP {status}: {text}"
+        # Und die Meldung muss trotzdem etwas taugen.
+        assert str(status) in text or "nicht erreichbar" in text, text
+
+
+def test_auch_ein_netzfehler_ohne_antwort_leckt_nichts(tmp_path):
+    """Ein Verbindungsfehler hat keine `response` - der Zweig darf nicht
+    versehentlich auf `exc` zurueckfallen. httpx nennt die URL auch in
+    ConnectError."""
+    import httpx
+
+    from core.db import connect
+    from core.kalender import KalenderFehler, hole
+
+    GEHEIM = "https://calendar.google.com/calendar/ical/GEHEIM-TOKEN-xyz/basic.ics"
+    db = tmp_path / "k.db"
+    connect(db).close()
+
+    def handler(request):
+        raise httpx.ConnectError("keine Verbindung", request=request)
+
+    echt = httpx.AsyncClient
+
+    def fake(*a, **k):
+        k["transport"] = httpx.MockTransport(handler)
+        return echt(*a, **k)
+
+    with mock.patch("httpx.AsyncClient", fake):
+        with pytest.raises(KalenderFehler) as fehler:
+            run(hole(GEHEIM, db_path=db))
+
+    text = str(fehler.value)
+    assert "GEHEIM-TOKEN-xyz" not in text, text
+    assert "calendar.google.com" not in text, text
