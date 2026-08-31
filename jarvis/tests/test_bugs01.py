@@ -831,7 +831,30 @@ def test_fund15_die_erlaubten_agenten_gehen_weiterhin_durch(suche_ohne_netz=None
                                  {"agent": "research", "task": "Helme"}))
     finally:
         kontext.reset(marke)
-    assert ergebnis.ok is True, ergebnis.error
+
+    # Hier stand `assert ergebnis.ok is True`. Das war ein STELLVERTRETER
+    # fuer "die Grenze hat ihn durchgelassen" - und er traegt nicht mehr,
+    # seit `ask_agent` die Unterantwort verifiziert
+    # (Verknuepfungspruefung 31.08.2026: auf dem Delegationspfad griff die
+    # Verifikation vorher ueberhaupt nicht). `research` liefert unter
+    # FakeLLMProvider keine Quelle, also faellt der Unterauftrag jetzt zu
+    # Recht durch die Quellenregel - aus einem Grund, der mit der
+    # Agenten-Freigabeliste nichts zu tun hat.
+    #
+    # Der Test wird deshalb NICHT aufgeweicht, sondern praezisiert: gemessen
+    # wird ab jetzt genau das, was im Docstring steht. Die Freigabeliste ist
+    # die Grenze, um die es geht - und die hat den Ruf durchgelassen.
+    fehler = ergebnis.error or ""
+    assert "nicht rufen" not in fehler, (
+        f"die Freigabeliste hat 'research' abgewiesen: {fehler}")
+    assert "darf" not in fehler, fehler
+    # Und der Unterauftrag ist wirklich gelaufen - sonst waere "durchgelassen"
+    # nur die Abwesenheit einer Fehlermeldung.
+    assert ergebnis.data.get("agent") == "research", ergebnis.data
+    assert ergebnis.data.get("subtask_id"), ergebnis.data
+    # Der einzige Grund, aus dem er scheitern DARF, ist die Quellenregel.
+    if not ergebnis.ok:
+        assert "Quelle" in fehler, fehler
 
 
 # --- Fund 16: /api/chat hat kein Budget ----------------------------------

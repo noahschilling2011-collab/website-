@@ -213,7 +213,22 @@ async def _lauf(
             agenten={n: a.description for n, a in verfuegbar.items()
                      if n != "jarvis"},
             max_steps=PLAN_MAX_STEPS,
+            # Verknuepfungspruefung 31.08.2026, Fund 3: der Planner darf bis
+            # zu drei bezahlte Zuege machen (ein Versuch plus zwei
+            # Reparaturen). Der Pruefpunkt oben deckt nur den ERSTEN ab; ohne
+            # Durchreichen lief der Rest nach einem Abbruch weiter. Siehe die
+            # Begruendung am Kopf der Schleife in core/planner.py.
+            pruefpunkt=pruefpunkt,
         )
+    except LaufBeendet as ende:
+        # Der Pruefpunkt hat zwischen zwei Planungszuegen geworfen. Es gibt
+        # noch keinen Plan und keinen Schritt - also nichts zu ueberspringen
+        # und erst recht keine Zusammenfassung, die noch einen Zug kosten
+        # wuerde.
+        await lauf_beenden(ende, 0)
+        task.result = f"Abgebrochen waehrend der Planung. {ende.grund}".strip()
+        await laufzeit.task(task)
+        return task
     except PlanungFehlgeschlagen as exc:
         task.status = "failed"
         task.result = str(exc)
@@ -258,7 +273,35 @@ async def _lauf(
         if await budget_reissleine(i):
             break
 
-        agent = verfuegbar.get(schritt.agent or "jarvis") or verfuegbar["jarvis"]
+        # Verknuepfungspruefung 31.08.2026, Fund 2 - hier war ein Fehler:
+        # WAS war falsch: `verfuegbar.get(name) or verfuegbar["jarvis"]` fing
+        #   einen Agentennamen, den es gar nicht gibt, stillschweigend auf.
+        #   Kein Log, keine Notiz - und `schritt.agent` behielt den falschen
+        #   Namen, wurde so gespeichert und an die Oberflaeche gemeldet
+        #   (api/tasks.py sendet "agent": s.agent).
+        # WARUM ist das falsch: zwei Dinge gehen dabei schief. Erstens sieht
+        #   der Nutzer "[Recherche]" an einem Schritt, den in Wahrheit jarvis
+        #   erledigt hat - mit STANDARD_PROMPT und ohne jedes Netzwerkzeug,
+        #   also aus dem Gedaechtnis geantwortet. Zweitens urteilt
+        #   core/verify.py:60 ueber `step.agent`: die Quellenregel fuer
+        #   "research" greift nicht, wenn dort ein Fantasiename steht.
+        #   Ein Rueckfall, den niemand sieht, ist ein Rueckfall, den niemand
+        #   reparieren kann.
+        # WIE repariert: den Fehlgriff benennen (log.warning) und
+        #   `schritt.agent` auf den Agenten korrigieren, der tatsaechlich
+        #   laeuft - BEVOR laufzeit.step() ihn meldet und bevor verifiziere()
+        #   darueber urteilt. Ein leeres `schritt.agent` bleibt leer: das
+        #   heisst "jarvis macht es selbst" und ist kein Fehlgriff.
+        gewuenscht = schritt.agent or None
+        agent = verfuegbar.get(gewuenscht or "jarvis") or verfuegbar["jarvis"]
+        if gewuenscht is not None and gewuenscht not in verfuegbar:
+            log.warning(
+                "task %s Schritt %d: Agent %r gibt es nicht - der Schritt "
+                "laeuft auf %r. Bekannt sind: %s",
+                task.id, i + 1, gewuenscht, agent.name,
+                ", ".join(sorted(verfuegbar)),
+            )
+            schritt.agent = agent.name
 
         gerissen = False
         while True:
@@ -321,7 +364,28 @@ async def _lauf(
         # BUGS-01 Fund 4: NACH dem Schritt, nicht erst vor dem naechsten.
         # Sonst endet ein Ein-Schritt-Plan auf "done", obwohl er das Budget
         # ueberzogen hat.
-        if await budget_reissleine(i + 1):
+        #
+        # Verknuepfungspruefung 31.08.2026, Fund 1 - hier war ein Fehler:
+        # WAS war falsch: nach dem LETZTEN Schritt lief diese Pruefung mit
+        #   allen Grenzen, also auch mit `max_steps`. `max_steps` zaehlt in
+        #   core/contracts.py alle Schritte mit `attempts > 0`; nach dem
+        #   12. von 12 Schritten steht dort 12 >= 12, und die Grenze riss.
+        # WARUM ist das falsch: `max_steps` ist eine STRUKTURgrenze - sie soll
+        #   verhindern, dass noch ein weiterer Schritt anlaeuft. Nach dem
+        #   letzten Schritt steht keiner mehr aus, es gibt also nichts mehr zu
+        #   verhindern. Ein vollstaendig gelungener Auftrag meldete sich
+        #   deshalb als "aborted_budget" mit "max_steps erreicht (12/12)",
+        #   ohne dass auch nur ein Schritt uebersprungen wurde. PLAN_MAX_STEPS
+        #   und BUDGET_MAX_STEPS in .env sind beide 12 - der Fall war mit der
+        #   Standardkonfiguration erreichbar. Der Nutzer sah "Abgebrochen",
+        #   der Weltlage-Weg machte daraus ein HTTP 502.
+        # WIE repariert: nach dem letzten Schritt nur noch die
+        #   VERBRAUCHSgrenzen pruefen (`nur_verbrauch=True` laesst genau
+        #   `max_steps` und `max_depth` aus). Damit bleibt BUGS-01 Fund 4
+        #   erhalten: ein Ein-Schritt-Plan, der Tokens, Kosten, Zeit oder
+        #   Werkzeugaufrufe ueberzogen hat, meldet weiterhin "aborted_budget".
+        letzter_schritt = i + 1 >= len(task.steps)
+        if await budget_reissleine(i + 1, nur_verbrauch=letzter_schritt):
             break
 
         # BUGS-01 Fund 1b: NACH dem Schritt noch einmal pruefen. Vorher lag

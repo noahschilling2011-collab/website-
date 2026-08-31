@@ -333,7 +333,27 @@ class ToolAgent(Agent):
 
         return ToolResult(
             ok=bool(text.strip()),
-            data={"tool_calls": [a.to_dict() for a in aufrufe]},
+            data={
+                "tool_calls": [a.to_dict() for a in aufrufe],
+                # Verknuepfungspruefung 31.08.2026: `core/verify.py` bekommt
+                # nur `Step` und `ToolResult` - nicht den Agenten und nicht den
+                # Task. Es konnte deshalb bisher nur am NAMEN des Agenten
+                # haengen ("research"), und genau daran ist die Quellenregel am
+                # `weltlage`-Agenten vorbeigelaufen.
+                #
+                # Hier stehen deshalb die zwei TATSACHEN, die die Regel
+                # braucht. Bewusst Tatsachen und kein fertiges Urteil: ein
+                # Agent, der selbst entscheidet, ob er geprueft werden muss,
+                # ist derselbe Selbstbeleg, gegen den `core/belege.py`
+                # geschrieben wurde. Entschieden wird in `core/verify.py`.
+                #
+                # `links_gefiltert=False` heisst: was das Modell an Adressen
+                # erfunden hat, steht unveraendert im `display` - und damit
+                # auch im Schritt-Display, das `core/runner.py` als Beleg
+                # weiterreicht.
+                "links_gefiltert": self._links_pruefen,
+                "ziel": task.goal,
+            },
             error=None if text.strip() else "Der Agent hat nichts geliefert.",
             display=text,
             sources=quellen,
@@ -460,6 +480,22 @@ def baue_agenten(
             #    Quellseite anschliessend wirklich. Eine erfundene URL faellt
             #    dort durch - nicht weil jemand sie fuer echt haelt, sondern
             #    weil sie nicht antwortet.
+            #
+            # NACHTRAG, Verknuepfungspruefung 31.08.2026: Grund 2 gilt NUR auf
+            # dem Weg ueber `api/weltlage.py`. Der Planner bietet `weltlage`
+            # aber jedem Auftrag an (`core/runner.py` nimmt nur `jarvis` aus
+            # der Liste), und auf dem Weg /api/tasks laeuft weder der Parser
+            # noch die Nachpruefung. Dort war die erfundene Adresse damit
+            # ungeprueft im Schritt-Display - und weil `core/runner.py` genau
+            # diese Displays an `belegte_urls()` gibt, hat sie sich selbst
+            # belegt und stand woertlich in der Endantwort.
+            #
+            # Der Filter bleibt trotzdem aus - er wuerde den Datensatz
+            # zerstoeren (siehe Grund 1). Stattdessen traegt der Agent seither
+            # `links_gefiltert` und `ziel` in `ToolResult.data` ein, und die
+            # Quellenregel in `core/verify.py` entscheidet damit: ohne Quelle
+            # geht so ein Schritt nur durch, wenn er fuer die Weltlage-Seite
+            # laeuft - also dort, wo die quell_url wirklich geholt wird.
             links_pruefen=False,
             on_reply=on_reply,
             on_call=on_call,

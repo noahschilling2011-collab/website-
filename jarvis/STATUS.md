@@ -1293,6 +1293,84 @@ fehlen die Benutzer. `--dauer-tupf`, `--dauer-raus` und `--dauer-zahl` hatten
 null Treffer im ganzen Projekt, daneben stehen neun handgeschriebene `200ms`
 und fünf verschiedene Erscheinungsdauern.
 
+## Die 26 Funde abgearbeitet — von neun Agenten, mit Abnahme
+
+Noah wollte, dass die Agenten weitermachen. Neun Bauer-Agenten, jeder mit
+**exklusivem Dateibesitz**, damit sie parallel arbeiten können, ohne sich zu
+überschreiben. Danach je ein **unabhängiger Abnehmer**, der nichts ändern
+darf — nur nachmessen.
+
+**Alle 26 behoben. Sieben von neun Abnahmen sauber, zwei mit echten
+Mängeln.** Genau dafür gibt es die zweite Instanz.
+
+**Suite: 1220 Tests, 0 Fehler, 0 übersprungen** (vorher 1141; +79 aus den
+Reparaturen). 29 Dateien, +2.958 Zeilen.
+
+### Ein Bauer hat den Prüfer widerlegt — und lag richtig
+
+Der Blocker war: die Quellenregel hängt an einem **Agentennamen**. Der
+Prüfer schlug vor, sie an ein Merkmal zu hängen und für `research` **und**
+`weltlage` zu setzen. Der Bauer hat das **gemessen statt geglaubt**: damit
+gingen `test_weltlage.py` und `test_belege.py` von 67 passed auf **24
+FAILED**. Grund: die Weltlage-*Seite* läuft über denselben Runner, und dort
+antwortet der Agent ohne Werkzeugaufruf — `sources` ist leer. Die Regel
+hätte die ganze Weltlage-Seite mit HTTP 502 lahmgelegt.
+
+Seine Lösung stattdessen: der Agent meldet zwei **Tatsachen** im
+`ToolResult` (`links_gefiltert`, `ziel`), und `core/verify.py` entscheidet
+daraus. Bewusst Tatsachen statt eines fertigen Urteils — ein Agent, der
+selbst entscheidet, ob er geprüft werden muss, wäre derselbe Selbstbeleg,
+gegen den `core/belege.py` geschrieben wurde.
+
+### Zwei Abnahmen mit Mängeln — beide behoben
+
+**1. Die Reparatur hat `/api/chat` kaputtgemacht.** `suche()` wirft jetzt
+`IndexFehler` statt still `[]` zu liefern — richtig. Aber `api/routes.py`
+rief `kontextblock()` **ohne Fangzweig**: ein beschädigter FTS-Index hätte
+den Chat bei **jeder Nachricht** mit HTTP 500 beendet, die Nutzernachricht
+schon in der Datenbank, der Zug tot vor dem Modellaufruf.
+
+Der Abnehmer hat das gefunden, weil er über die Dateigrenze seines Bauers
+hinausgemessen hat. Selbst reproduziert (`DROP TABLE vault_fts`), behoben —
+und **nicht still**: der Grund geht ins Log *und* als Satz in den
+Systemprompt. Sonst sagt das Modell „davon weiß ich nichts", obwohl nur die
+Suche kaputt ist — die Verwechslung, gegen die der ganze Fund geschrieben
+wurde.
+
+**2. Die Leertaste startete das Mikrofon weiter — auf einem anderen Weg.**
+Der erste Test ging über `#tab-welt` und maß damit nur den Zustand *nach*
+`miniAn()`. Der Normalfall ist ein anderer: Startansicht, Knopf „Globus
+laden", und während der **ganzen Ladephase** (der eigene Ladetest gesteht
+ihr bis zu 60 Sekunden zu) stand `hoerenErlaubt` auf `true`.
+
+Ursache: `starte()` setzte es fest verdrahtet, mit der Begründung, auf
+`weltlage.html` sei die Weltansicht die ganze Seite. Stimmt dort — nur ruft
+`index.html` dieselbe Funktion. Jetzt entscheidet der **Aufrufer**
+(`starte(…, {hoeren: true|false})`), Voreinstellung *nicht* hören: ein
+Mikrofon, das nicht angeht, ist ein kleinerer Fehler als eines, das
+unsichtbar angeht.
+
+> **Und mein Test dafür war wertlos.** Er fragte `window.__micStarts` ab —
+> **diese Variable gibt es nicht**, der Zähler heißt `window.__mic`. Mit
+> `|| 0` war er immer grün, auch mit dem Fehler drin. Ich hatte einen Namen
+> erfunden, statt den vorhandenen Helfer zu lesen — exakt der wertlose Test,
+> den der Abnehmer eine Stunde vorher beim Bauer angeprangert hatte.
+> Aufgefallen ist es nur, weil die Mutation grün durchlief.
+
+### Die Regression, die kein Agent sehen konnte
+
+`test_bugs01.py::test_fund15_die_erlaubten_agenten_gehen_weiterhin_durch`
+wurde rot — in einer Datei, die **keiner Gruppe zugeteilt war** und die
+deshalb niemand laufen ließ. Ursache: `ask_agent` verifiziert jetzt die
+Unterantwort, und `research` liefert unter `FakeLLMProvider` keine Quelle.
+
+Das ist **richtig so**. Der Test wurde nicht aufgeweicht, sondern
+präzisiert: `ok is True` war ein *Stellvertreter* für „die Freigabeliste hat
+ihn durchgelassen", und der trägt nicht mehr, seit `ok` auch das Prüfurteil
+enthält. Gemessen wird jetzt genau das, was im Docstring steht — plus, dass
+der Unterauftrag wirklich lief. Gegenprobe: Freigabeliste ausgeschaltet →
+der Nachbartest wird rot.
+
 ## Zweite Prüfrunde: sechs Achsen, die die erste nicht angefasst hat
 
 Noah fragte, was ich noch verbessern muss. Statt zu antworten: sechs neue

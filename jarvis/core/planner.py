@@ -23,6 +23,7 @@ import json
 import logging
 import re
 import uuid
+from typing import Callable
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -101,8 +102,15 @@ async def erstelle_plan(
     *,
     agenten: dict[str, str] | None = None,
     max_steps: int = 12,
+    pruefpunkt: Callable[[], None] | None = None,
 ) -> list[Step]:
-    """Fragt das Modell nach einem Plan und gibt ihn als `Step`s zurueck."""
+    """Fragt das Modell nach einem Plan und gibt ihn als `Step`s zurueck.
+
+    `pruefpunkt` ist die Funktion aus `core/abbruch.py`; sie wirft
+    `LaufBeendet`, wenn der Nutzer abgebrochen hat oder eine Verbrauchsgrenze
+    gerissen ist. Ohne sie ist der Parameter None und nichts aendert sich -
+    die Planner-Tests rufen `erstelle_plan` direkt.
+    """
     beschreibung = (
         "\n".join(f"- {name}: {zweck}" for name, zweck in (agenten or {}).items())
         or "- (keine)"
@@ -117,6 +125,24 @@ async def erstelle_plan(
 
     letzter_fehler = ""
     for versuch in range(MAX_REPARATUREN + 1):
+        # Verknuepfungspruefung 31.08.2026, Fund 3 - hier fehlte etwas:
+        # WAS war falsch: zwischen den bis zu MAX_REPARATUREN + 1 = 3
+        #   Planungszuegen stand kein einziger Pruefpunkt. Der Runner prueft
+        #   einmal VOR der Planung, danach lief diese Schleife blind durch.
+        # WARUM ist das falsch: jeder dieser Zuege ist ein bezahlter
+        #   Modellaufruf. Wer waehrend des ersten Planungszuges auf Abbrechen
+        #   drueckt, bezahlte gemessen noch zwei weitere - der Abbruch-Wunsch
+        #   wurde erst nach der Planung wieder angesehen. Dieselbe Regel wie
+        #   in core/tools/loop.py: vor jedem bezahlten Zug wird geprueft, und
+        #   der Pruefpunkt wirft, statt etwas zurueckzugeben, das jemand
+        #   vergessen kann auszuwerten.
+        # WIE repariert: den Pruefpunkt des Runners durchreichen und am Kopf
+        #   der Schleife rufen. Der Zug, der gerade laeuft, laeuft zu Ende;
+        #   der naechste faellt aus. Der Runner faengt `LaufBeendet` an der
+        #   Aufrufstelle und beendet den Task ordentlich.
+        if pruefpunkt is not None:
+            pruefpunkt()
+
         reply = await provider.complete(verlauf, system=system)
         roh = _json_aus_text(reply.text)
 

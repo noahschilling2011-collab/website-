@@ -1248,51 +1248,122 @@ button, input, textarea { font: inherit; color: inherit; }
   // und einem Reader gelesen, der Token bleibt im Header.
   //
   // Der Strom ersetzt das Polling: es gibt keinen Timer mehr, der nachfragt.
-  function ereignisStrom(beiEreignis, beiAbbruch) {
-    var steuerung = new AbortController();
-    var offen = true;
+  //
+  /* Verknuepfungspruefung 31.08.2026, Fund 1 - WIEDERVERBINDUNG.
+     WAS war falsch: diese Funktion hatte keinerlei Wiederholung. Der
+     `.catch` meldete den Abriss einmal und war fertig; endete der Strom
+     sauber (`stueck.done`), rief sie `beiAbbruch(null)` und war ebenfalls
+     fertig. Beide Aufrufer geben danach auf - der Chat schliesst, das
+     Command Center setzt `ccStrom = null`. Einen Ersatz durch Polling gibt
+     es bewusst nicht: der einzige Timer im ganzen Frontend ist die Uhr in
+     Zone 1.
+     WARUM ist das falsch: nach jedem WLAN-Aussetzer, jedem Ruhezustand des
+     Laptops und jedem Server-Neustart stand das Command Center still und
+     zeigte weiter Zahlen, die nach live aussahen. Wiederbelebt wurde es nur
+     durch einen Wechsel in eine andere Ansicht und zurueck.
+     WIE es jetzt laeuft: nach einem Abriss wird mit wachsender Pause neu
+     verbunden (1 s, 2 s, 4 s, 8 s, 16 s, danach 30 s als Deckel), hoechstens
+     STROM_VERSUCHE mal hintereinander. Erst wenn auch der letzte Versuch
+     scheitert, faellt `beiAbbruch` - der Aufrufer bekommt sein "endgueltig
+     weg" also weiterhin, nur spaeter. Steht die Verbindung wieder, fangen
+     Zaehler und Pause von vorn an, und `beiWiederverbindung` laeuft: die
+     waehrend der Luecke gesendeten Ereignisse sind ersatzlos weg, der
+     Aufrufer muss den Stand einmal nachziehen.
+     Das ist KEIN Polling: solange die Verbindung steht, laeuft hier kein
+     Timer und geht keine Anfrage hinaus. Der Timer existiert nur waehrend
+     einer Stoerung. */
+  var STROM_PAUSE_START = 1000;   // erste Wartezeit in ms
+  var STROM_PAUSE_MAX = 30000;    // Deckel fuer die Wartezeit
+  var STROM_VERSUCHE = 6;         // so oft hintereinander, dann ist Schluss
 
-    fetch('/api/events', {
-      headers: { 'X-Jarvis-Token': TOKEN },
-      signal: steuerung.signal
-    }).then(function (res) {
-      if (!res.ok || !res.body) throw new Error('Ereignisstrom nicht verfuegbar (HTTP ' + res.status + ')');
-      var leser = res.body.getReader();
-      var dekoder = new TextDecoder();
-      var puffer = '';
+  function ereignisStrom(beiEreignis, beiAbbruch, beiWiederverbindung) {
+    var steuerung = null;
+    var gewollt = true;           // will der Aufrufer den Strom noch?
+    var pause = STROM_PAUSE_START;
+    var uebrig = STROM_VERSUCHE;
+    var timer = null;
+    var verbindungen = 0;
 
-      function weiter() {
-        return leser.read().then(function (stueck) {
-          if (stueck.done) { offen = false; if (beiAbbruch) beiAbbruch(null); return; }
-          puffer += dekoder.decode(stueck.value, { stream: true });
+    function nochmal(err) {
+      if (!gewollt) return;
+      if (uebrig <= 0) { if (beiAbbruch) beiAbbruch(err); return; }
+      uebrig -= 1;
+      timer = setTimeout(function () { timer = null; verbinde(); }, pause);
+      pause = Math.min(pause * 2, STROM_PAUSE_MAX);
+    }
 
-          // Ein Ereignis endet bei der Leerzeile. Alles davor gehoert zusammen.
-          var grenze;
-          while ((grenze = puffer.indexOf('\n\n')) !== -1) {
-            var roh = puffer.slice(0, grenze);
-            puffer = puffer.slice(grenze + 2);
-            var typ = null, daten = null;
-            roh.split('\n').forEach(function (zeile) {
-              if (zeile.indexOf('event: ') === 0) typ = zeile.slice(7).trim();
-              else if (zeile.indexOf('data: ') === 0) {
-                try { daten = JSON.parse(zeile.slice(6)); } catch (e) { daten = null; }
-              }
-              // ": herzschlag" faellt hier durch - genau richtig.
-            });
-            if (typ && daten) beiEreignis(typ, daten);
-          }
-          return weiter();
-        });
-      }
-      return weiter();
-    }).catch(function (err) {
-      offen = false;
-      if (err && err.name === 'AbortError') return;
-      if (beiAbbruch) beiAbbruch(err);
-    });
+    function verbinde() {
+      if (!gewollt) return;
+      steuerung = new AbortController();
+      fetch('/api/events', {
+        headers: { 'X-Jarvis-Token': TOKEN },
+        signal: steuerung.signal
+      }).then(function (res) {
+        if (!res.ok || !res.body) throw new Error('Ereignisstrom nicht verfuegbar (HTTP ' + res.status + ')');
+        var leser = res.body.getReader();
+        var dekoder = new TextDecoder();
+        var puffer = '';
+        var steht = false;
+
+        /* Zurueckgesetzt wird erst, wenn wirklich etwas ANKOMMT - nicht
+           schon beim 200er. Ein Server, der die Verbindung annimmt und
+           sofort wieder schliesst, wuerde sonst die Pause bei jedem Versuch
+           auf 1 s zuruecksetzen; aus der wachsenden Pause waere eine
+           Anfrage pro Sekunde geworden, also genau das Polling, das der
+           Strom ersetzt hat. Der Server schickt sein `hello` sofort, eine
+           gesunde Verbindung landet hier also im ersten Stueck. */
+        function verbindungSteht() {
+          if (steht) return;
+          steht = true;
+          verbindungen += 1;
+          uebrig = STROM_VERSUCHE;
+          pause = STROM_PAUSE_START;
+          if (verbindungen > 1 && beiWiederverbindung) beiWiederverbindung();
+        }
+
+        function weiter() {
+          return leser.read().then(function (stueck) {
+            // Der Server beendet den Strom von sich aus nie (api/events.py:
+            // `while True`). Ein sauberes Ende heisst also: die Verbindung
+            // ist weg. Deshalb hier dasselbe Vorgehen wie bei einem Fehler.
+            if (stueck.done) { nochmal(null); return; }
+            verbindungSteht();
+            puffer += dekoder.decode(stueck.value, { stream: true });
+
+            // Ein Ereignis endet bei der Leerzeile. Alles davor gehoert zusammen.
+            var grenze;
+            while ((grenze = puffer.indexOf('\n\n')) !== -1) {
+              var roh = puffer.slice(0, grenze);
+              puffer = puffer.slice(grenze + 2);
+              var typ = null, daten = null;
+              roh.split('\n').forEach(function (zeile) {
+                if (zeile.indexOf('event: ') === 0) typ = zeile.slice(7).trim();
+                else if (zeile.indexOf('data: ') === 0) {
+                  try { daten = JSON.parse(zeile.slice(6)); } catch (e) { daten = null; }
+                }
+                // ": herzschlag" faellt hier durch - genau richtig.
+              });
+              if (typ && daten) beiEreignis(typ, daten);
+            }
+            return weiter();
+          });
+        }
+        return weiter();
+      }).catch(function (err) {
+        if (err && err.name === 'AbortError') return;
+        nochmal(err);
+      });
+    }
+
+    verbinde();
 
     return {
-      schliessen: function () { if (offen) { offen = false; steuerung.abort(); } }
+      schliessen: function () {
+        if (!gewollt) return;
+        gewollt = false;
+        if (timer) { clearTimeout(timer); timer = null; }
+        if (steuerung) steuerung.abort();
+      }
     };
   }
 
@@ -1410,6 +1481,51 @@ button, input, textarea { font: inherit; color: inherit; }
         return k + '=' + JSON.stringify(args[k]);
       }).join(', ');
     } catch (e) { return ''; }
+  }
+
+  /* --- Zeitstempel: UTC kommt herein, Ortszeit geht heraus ----------------
+
+     Verknuepfungspruefung 31.08.2026, Fund 8.
+     WAS war falsch: alle `created_at` aus der Datenbank sind UTC mit `Z`
+     (core/db.py). Vier Stellen im Frontend schnitten daraus Text heraus,
+     statt sie in eine Date zu geben: `created_at.slice(11, 19)` (Werkzeuge
+     im Command Center und in der Werkzeugansicht),
+     `created_at.replace('T', ' ').replace('Z', '')` (Auftragskarten) und
+     `created_at.slice(0, 10)` (Gedaechtnis).
+     WARUM ist das falsch: direkt daneben laufen die Uhr in Zone 1 und der
+     Ereignisstrom in Zone 4 ueber `new Date().getHours()`, also in
+     ORTSZEIT. In Europe/Berlin standen damit zwei Stunden zwischen der Uhr
+     und der Werkzeugtabelle, ohne eine Beschriftung, die das erklaert - wer
+     die Kostentabelle zur Fehlersuche benutzt, sucht in der falschen
+     Stunde. Das Wort "UTC" kam im ganzen Frontend kein einziges Mal vor.
+     static/globus.js machte es an seinen Meldungen laengst richtig
+     (`new Date(...)` plus toLocale*); die App war mit sich selbst uneinig.
+
+     Kein Format-Rateraten: ist der Wert leer oder unlesbar, steht der
+     Rohwert bzw. ein Strich da. Eine erfundene Zeit waere schlimmer als
+     gar keine. */
+  function alsDatum(iso) {
+    if (!iso) return null;
+    var d = new Date(iso);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function zeitText(iso) {
+    var d = alsDatum(iso);
+    return d ? d.toLocaleTimeString('de-DE') : (iso ? String(iso) : '—');
+  }
+
+  function datumText(iso) {
+    var d = alsDatum(iso);
+    return d ? d.toLocaleDateString('de-DE',
+      { day: '2-digit', month: '2-digit', year: 'numeric' })
+      : (iso ? String(iso) : '—');
+  }
+
+  function datumZeitText(iso) {
+    var d = alsDatum(iso);
+    return d ? (datumText(iso) + ' ' + zeitText(iso))
+             : (iso ? String(iso) : '—');
   }
 
   function toolsNode(calls) {
@@ -1547,7 +1663,26 @@ button, input, textarea { font: inherit; color: inherit; }
       el.chip.textContent = h.model;
       el.phase.textContent = 'Phase ' + h.phase;
       el.healthDot.className = 'dot ' + (h.status === 'ok' ? 'is-ok' : 'is-bad');
-      if (h.provider_error) {
+      /* Verknuepfungspruefung 31.08.2026, Fund 5.
+         WAS war falsch: `GET /api/health` faengt Datenbankfehler ab und
+         setzt `database = f"fehler: {exc}"` - der Kommentar in
+         api/routes.py sagt ausdruecklich "die Meldung soll die Ursache
+         zeigen". Gelesen wurde das Feld nirgends: `grep -c database
+         index.html weltlage.html` lieferte 0 und 0.
+         WARUM ist das falsch: bei einem Datenbankschaden setzt dieselbe
+         Route `totals = {}`, also `spend.calls = 0`. Der Punkt wurde rot
+         (status "degraded"), und der Text daneben fiel durch die Kette
+         hindurch bis zu `spendText(h.spend)` - und das gab "noch kein
+         Modellaufruf" zurueck. Der Nutzer bekam also eine positive
+         Behauptung ueber den Betriebszustand vorgesetzt und suchte die
+         Ursache beim Anbieter oder beim Schluessel, waehrend der Server
+         "fehler: no such table: messages" in derselben Antwort schon
+         mitgeliefert hatte.
+         Der Zweig steht VOR provider_error, weil eine kaputte Datenbank
+         auch die Zahlen daneben wertlos macht. */
+      if (h.database && h.database !== 'ok') {
+        el.healthTxt.textContent = 'Datenbank: ' + h.database;
+      } else if (h.provider_error) {
         el.healthTxt.textContent = h.provider_error;
       } else if (h.provider === 'fake') {
         el.healthTxt.textContent = 'Fake-Anbieter — kein echtes Modell, keine Kosten';
@@ -1829,7 +1964,21 @@ button, input, textarea { font: inherit; color: inherit; }
         }).catch(function (err) {
           laeuft = false;
           appendError(err.message);
+          /* Verknuepfungspruefung 31.08.2026, Fund 2.
+             WAS war falsch: hier fehlte `setBusy(false)`. `beenden()` setzt
+             `fertig = true` und schliesst den Strom - damit sind die drei
+             anderen Stellen mit `setBusy(false)` unerreichbar: die eine
+             liegt im catch des POST, die zwei anderen in `abschluss` und im
+             Strom-Rueckruf, und beide steigen mit `if (fertig) return`
+             sofort aus.
+             WARUM ist das falsch: `setBusy(true)` hat `el.input.disabled`
+             und `el.send.disabled` gesetzt. Ein einziger Aussetzer bei
+             GET /api/tasks/{id} sperrte Eingabefeld und Senden-Knopf damit
+             dauerhaft - der Nutzer sah eine Fehlerblase und konnte danach
+             nichts mehr tippen, nur ein Neuladen der Seite half. */
+          setBusy(false);
           beenden();
+          el.input.focus();
         });
       }
 
@@ -1841,7 +1990,6 @@ button, input, textarea { font: inherit; color: inherit; }
         reaktorFehl = (daten.status !== 'done');
         reaktorFertig = !reaktorFehl;
         reaktorZustand();
-        platzhalter.remove();
         var antwort = messageNode('assistant', daten.result || 'Kein Ergebnis.');
         if (planBox) planBox.after(antwort); else el.thread.appendChild(antwort);
         scrollDown();
@@ -1859,6 +2007,23 @@ button, input, textarea { font: inherit; color: inherit; }
       function beenden() {
         fertig = true;
         if (strom) { strom.schliessen(); strom = null; }
+        /* Verknuepfungspruefung 31.08.2026, Fund 4.
+           WAS war falsch: `platzhalter.remove()` stand genau einmal, in
+           `abschluss`. Der Strom-Abbruchpfad und der zeichne-Fehlerpfad
+           entfernten den Knoten nicht, und `abschluss` war danach durch
+           `if (fertig) return` gesperrt.
+           WARUM ist das falsch: der Knoten kommt aus `thinkingNode()` und
+           traegt eine dauerlaufende Punkte-Animation mit
+           aria-label="JARVIS denkt nach". Unter der Fehlermeldung
+           "Ereignisstrom abgerissen" pulsierten die Punkte also weiter, und
+           der Screenreader sagte weiter "JARVIS denkt nach" - die
+           Oberflaeche behauptete zu arbeiten, waehrend sie eine Zeile
+           darueber zugab, dass sie nichts mehr hoert.
+           Jetzt raeumt jeder Abbruchweg auf, denn `abschluss` ruft
+           `beenden()` ohnehin als erstes. `remove()` auf einem schon
+           entfernten Knoten ist ein No-op, doppeltes Aufraeumen schadet
+           also nicht. */
+        platzhalter.remove();
       }
 
       strom = ereignisStrom(function (typ, daten) {
@@ -1872,13 +2037,19 @@ button, input, textarea { font: inherit; color: inherit; }
         if (!gehoertUns) return;
         zeichne();
       }, function (err) {
-        // Der Strom ist weg. Lieber einmal ehrlich melden als still
-        // wieder anfangen zu pollen.
+        // Der Strom ist weg - und zwar endgueltig, `ereignisStrom` hat
+        // vorher mehrfach neu verbunden (Fund 1). Lieber einmal ehrlich
+        // melden als still wieder anfangen zu pollen.
         if (fertig) return;
         beenden();
         appendError(err ? ('Ereignisstrom abgerissen: ' + err.message)
                         : 'Ereignisstrom abgerissen.');
         setBusy(false);
+      }, function () {
+        // Wiederverbunden. Was waehrend der Luecke passiert ist, hat der
+        // Strom nicht nachgeliefert - einmal den echten Stand holen.
+        if (fertig) return;
+        zeichne();
       });
 
       // Einmal sofort zeichnen: der Auftrag kann schon laufen, bevor der
@@ -1941,7 +2112,7 @@ button, input, textarea { font: inherit; color: inherit; }
     zeile.appendChild(kat);
 
     var wann = document.createElement('span');
-    wann.textContent = fakt.created_at.slice(0, 10);
+    wann.textContent = datumText(fakt.created_at);
     zeile.appendChild(wann);
 
     var luecke = document.createElement('span');
@@ -2247,7 +2418,10 @@ button, input, textarea { font: inherit; color: inherit; }
     // Import-Map im <head> gilt auch dafuer ('three' loest auf).
     return import('/static/globus.js').then(function (modul) {
       globusModul = modul;                   // ab hier ist pausiere() erreichbar
-      var fertig = modul.starte(ziel, TOKEN);
+      // Kein `hoeren` - in index.html gehoert die Leertaste dem Chat,
+      // und waehrend des Ladens ist die Weltansicht ueberhaupt nicht im
+      // Bild. Erst `weiter()` beim Tabwechsel gibt sie dem Globus.
+      var fertig = modul.starte(ziel, TOKEN, { hoeren: false });
       // `starte()` hat die Schleife im selben Zug schon angeworfen; erst
       // danach laedt es die Grenzen. Wer inzwischen weggeklickt hat, soll
       // sie nicht laufen sehen - und zwar sofort, nicht in zehn Sekunden.
@@ -2381,7 +2555,7 @@ button, input, textarea { font: inherit; color: inherit; }
     var zeile = document.createElement('div');
     zeile.className = 'karte-zeile';
     zeile.appendChild(zustandNode(t.status));
-    [t.created_at.replace('T', ' ').replace('Z', ''),
+    [datumZeitText(t.created_at),
      t.spent_tokens + ' Token',
      t.spent_tool_calls + ' Werkzeuge',
      (t.spent_cost_eur || 0).toFixed(4) + ' €'].forEach(function (text) {
@@ -2731,6 +2905,18 @@ button, input, textarea { font: inherit; color: inherit; }
       + ' · ' + (d.duration_ms == null ? '—' : d.duration_ms + ' ms');
     if (typ === 'confirmation') return 'Rückfrage: ' + (d.tool || '');
     if (typ === 'hello') return (d.listeners || 1) + ' Zuhörer';
+    /* Verknuepfungspruefung 31.08.2026, Fund 3.
+       WAS war falsch: die Aufrufstelle im Strom-Rueckruf baut
+       `{ status: 'abgerissen: ' + err.message }` und uebergibt es mit dem
+       Typ 'strom' - hier fiel das auf `return ''` durch. Dasselbe galt fuer
+       'dropped', das der Server bei vollem Puffer wirklich sendet
+       (api/events.py, EventBus._verdraengen).
+       WARUM ist das falsch: im Ereignisprotokoll stand nach einem Abriss
+       nur "HH:MM:SS strom" ohne jede Erklaerung, ein Ereignisverlust als
+       nacktes "dropped". Der Grund, warum das Dashboard gerade eingefroren
+       ist, wurde formuliert und dann verworfen. */
+    if (typ === 'strom') return d.status || '';
+    if (typ === 'dropped') return 'Ereignisse verworfen — Puffer war voll';
     return '';
   }
 
@@ -2753,6 +2939,11 @@ button, input, textarea { font: inherit; color: inherit; }
     ccEl.kennzahl.tools.wert.classList.toggle('ist-leer', !werkzeuge);
     // Die Kosten bekommen KEIN `ist-leer`: `0,0000 €` ist eine Messung,
     // kein fehlender Wert. Genau das ist DoD 5 aus Abschnitt 6.
+    // Weggenommen wird die Klasse hier trotzdem: `ccKennzahlenFehler`
+    // (Fund 6) setzt sie auf allen vier Kacheln, und was ein Fehlerpfad
+    // setzt, muss der Erfolgspfad wieder abraeumen - sonst bliebe die
+    // Kachel nach einem einzigen Aussetzer fuer immer grau.
+    ccEl.kennzahl.kosten.wert.classList.remove('ist-leer');
     ccEl.kennzahl.calls.fussnote.textContent = !gabEs
       ? 'Noch kein Modellaufruf gelaufen.'
       : ((g.fehler || 0) ? (g.fehler + ' fehlgeschlagen') : '');
@@ -2775,6 +2966,32 @@ button, input, textarea { font: inherit; color: inherit; }
       ? 'Preise nicht in .env eingetragen' : 'aus llm_calls, nicht geschätzt';
   }
 
+  /* Verknuepfungspruefung 31.08.2026, Fund 6.
+     WAS war falsch: `ccHole()` startet fuenf Abrufe nebeneinander. Vier
+     davon meldeten einen Fehler sichtbar; der fuenfte,
+     `api('/api/stats').then(ccZeichneKennzahlen).catch(function () {})`,
+     hatte einen leeren Handler.
+     WARUM ist das falsch: fiel /api/stats aus, behielten die vier Kacheln,
+     was zuletzt drin stand - beim ersten Laden der Aufbauzustand (Wert "—",
+     Fussnote leer), nach einem frueheren Erfolg die alten Zahlen ohne jede
+     Kennzeichnung. Genau darueber unterscheidet ccZeichneKennzahlen
+     peinlich genau zwischen "—" und "0" (6.3 und DoD 5), und der leere
+     Fehlerfall machte diese Unterscheidung wieder zunichte: ein Fehler sah
+     aus wie "noch nichts gemessen". Daneben standen im selben Raster drei
+     Zonen mit sichtbarer Fehlermeldung - der Nutzer schloss daraus, die
+     Kennzahlen stimmten.
+     Zone 5 ist kein ccZone-Koerper, sondern vier Kacheln; deshalb hier
+     Strich plus echte Meldung in der Fussnote statt `ccLeer`. */
+  function ccKennzahlenFehler(err) {
+    var text = (err && err.message) ? err.message : 'Kennzahlen nicht abrufbar';
+    Object.keys(ccEl.kennzahl).forEach(function (k) {
+      var kachel = ccEl.kennzahl[k];
+      kachel.wert.textContent = '—';
+      kachel.wert.classList.add('ist-leer');
+      kachel.fussnote.textContent = text;
+    });
+  }
+
   // --- Zone 6 ---------------------------------------------------------------
 
   function ccZeichneWerkzeuge(liste) {
@@ -2789,7 +3006,7 @@ button, input, textarea { font: inherit; color: inherit; }
       // Die 45-ms-Kette aus static/system.css traegt die Staffelung, ohne
       // dass hier eine einzige Zeile CSS dazukommt.
       tr.className = 'zone-rein';
-      [['t', r.created_at.slice(11, 19)],
+      [['t', zeitText(r.created_at)],
        ['', r.name],
        [r.ok ? 'ok' : 'weg', r.ok ? '✓' : '✕'],
        ['ms', null]].forEach(function (paar) {
@@ -2926,6 +3143,7 @@ button, input, textarea { font: inherit; color: inherit; }
     platz.textContent = '';
     if (globusModul && globusModul.miniAn && globusModul.miniAn(platz)) {
       ccGlobusDrin = true;
+      ccGlobusKlickBinden(platz);
       return;
     }
     // Three.js sind 2,0 MB. Die Startansicht laedt die nicht ungefragt -
@@ -2947,6 +3165,54 @@ button, input, textarea { font: inherit; color: inherit; }
     platz.appendChild(hinweis);
   }
 
+  /* Verknuepfungspruefung 31.08.2026, Fund 7.
+     WAS war falsch: `miniAn(platz)` haengt das Canvas samt aller
+     Zeiger-Handler in Zone 2 - aber NUR das Canvas. Der Handler
+     `zeigerFertig` in static/globus.js ruft bei einem Klick `waehle()`, das
+     ueber `ladeLand()` bei ausbleibendem Cache-Treffer
+     `POST /api/weltlage/<ISO>` absetzt. Diese Route legt einen echten Task
+     an und ruft `fuehre_task_aus` - also Budget, Audit und ein bezahlter
+     Modellaufruf. Die Ausgabe dieses Aufrufs (Kopfzeile #land, Landtafel,
+     Kartenspalte #karten, Statuszeile #gesagt) bleibt aber in #view-welt,
+     und das traegt auf der Startansicht display:none.
+     WARUM ist das falsch: gemessen nach einem Klick auf die kleine Kugel
+     stand in #land "France" und in #karten der Ergebnistext - beide 0 x 0
+     Pixel gross, POST /api/weltlage/FRA war gelaufen. Der Nutzer sah ausser
+     der Ringmarkierung nichts. Wer nichts sieht, klickt noch einmal - und
+     zahlt noch einmal. STATUS.md verbietet fuer Zone 8 ausdruecklich genau
+     das ("Ein automatischer POST waere ein Modellaufruf und Geld, ausgeloest
+     vom blossen Oeffnen der Startansicht"); Zone 2 daneben brauchte dafuer
+     einen einzigen Klick.
+     WIE es jetzt laeuft: ein Klick auf den Mini-Globus fuehrt in die
+     Weltansicht. Der teure Pfad laeuft damit nur noch dort, wo seine
+     Ausgabe auch zu sehen ist.
+     Warum die BLASENPHASE am Elternteil und nicht die Erfassungsphase: der
+     Globus-Handler haengt am Canvas selbst und muss VORHER laufen. Er
+     rechnet den Klickpunkt ueber die Groesse und Lage des Canvas in einen
+     Punkt auf der Kugel um - wuerde hier zuerst umgeschaltet, haette
+     `miniAus()` das Canvas mitten im Klick verschoben und der Strahl haette
+     das falsche Land getroffen.
+     Die 5 Pixel sind keine neue Zahl: es ist ZIEH_SCHWELLE aus
+     static/globus.js. Wer dreht, waehlt nichts aus und will auch nicht
+     weggeschaltet werden. */
+  function ccGlobusKlickBinden(platz) {
+    if (platz.dataset.klickGebunden) return;   // Zone 2 wird mehrfach gebaut
+    platz.dataset.klickGebunden = '1';
+    var startX = 0, startY = 0, hatStart = false;
+    platz.addEventListener('pointerdown', function (ev) {
+      startX = ev.clientX; startY = ev.clientY; hatStart = true;
+    });
+    platz.addEventListener('pointerup', function (ev) {
+      if (!hatStart) return;
+      hatStart = false;
+      var weg = Math.sqrt(Math.pow(ev.clientX - startX, 2)
+                        + Math.pow(ev.clientY - startY, 2));
+      if (weg > 5) return;
+      if (aktiveAnsicht !== 'cc') return;
+      zeigeAnsicht('welt');
+    });
+  }
+
   function ccGlobusZurueck() {
     if (!ccGlobusDrin) return;
     ccGlobusDrin = false;
@@ -2961,7 +3227,7 @@ button, input, textarea { font: inherit; color: inherit; }
     return Promise.all([
       api('/api/tasks').then(ccZeichneAuftraege).catch(function (e) {
         ccSetze(ccEl.auftraege, ccLeer(e.message)); }),
-      api('/api/stats').then(ccZeichneKennzahlen).catch(function () {}),
+      api('/api/stats').then(ccZeichneKennzahlen).catch(ccKennzahlenFehler),
       api('/api/tool-calls?limit=20').then(ccZeichneWerkzeuge).catch(function (e) {
         ccSetze(ccEl.werkzeuge, ccLeer(e.message)); }),
       api('/api/stats/verlauf?stunden=24').then(ccZeichneVerlauf).catch(function (e) {
@@ -2995,8 +3261,22 @@ button, input, textarea { font: inherit; color: inherit; }
         if (typ === 'hello') return;
         ccHole();
       }, function (err) {
-        if (err) ccStromZeile('strom', { status: 'abgerissen: ' + err.message });
+        /* Verknuepfungspruefung 31.08.2026, Fund 1: `beiAbbruch` faellt
+           erst, wenn auch der letzte Wiederverbindungsversuch gescheitert
+           ist. Endet der Strom sauber, ist `err` null - und dann stand hier
+           frueher wegen `if (err)` nicht einmal eine Zeile im Protokoll.
+           Ein Dashboard, das ohne ein Wort einfriert, ist schlimmer als
+           eines, das sagt, dass es eingefroren ist. */
+        ccStromZeile('strom', {
+          status: err ? ('abgerissen: ' + err.message)
+                      : 'abgerissen — Verbindung weg, Anzeige eingefroren'
+        });
         ccStrom = null;
+      }, function () {
+        // Wiederverbunden: die Ereignisse aus der Luecke sind weg, also
+        // einmal den echten Stand aller Zonen nachziehen.
+        ccStromZeile('strom', { status: 'wieder verbunden' });
+        ccHole();
       });
     }
     return ccHole();
@@ -3016,7 +3296,7 @@ button, input, textarea { font: inherit; color: inherit; }
       ziel.textContent = '';
       if (!liste || !liste.length) { ziel.appendChild(leer('Noch kein Werkzeug gelaufen.')); return; }
       ziel.appendChild(tabelle([
-        { titel: 'Zeit', wert: function (r) { return r.created_at.slice(11, 19); } },
+        { titel: 'Zeit', wert: function (r) { return zeitText(r.created_at); } },
         { titel: 'Werkzeug', wert: function (r) { return r.name; } },
         { titel: 'Argumente', wert: function (r) { return argumentText(r.arguments).slice(0, 70); } },
         { titel: 'ok', wert: function (r) { return r.ok ? '✓' : '✕'; } },

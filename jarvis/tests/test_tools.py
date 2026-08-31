@@ -14,6 +14,7 @@ from datetime import datetime
 import httpx
 import pytest
 
+from core.abbruch import LaufBeendet
 from core.contracts import Permission, Tool, ToolResult
 from core.llm import FakeLLMProvider, FakeTurn, LLMMessage, ToolUse
 from core.tools import registry
@@ -376,3 +377,173 @@ def test_loop_ohne_werkzeugvorschlag_antwortet_direkt():
     ))
     assert antwort == "Direkt geantwortet." and aufrufe == []
     assert len(antworten) == 1
+
+
+# --- Verknuepfungspruefung 31.08.2026, Gruppe schleife ---------------------
+#
+# Zwei Funde am Teilergebnis der Werkzeugrunde. Beide sitzen an derselben
+# Stelle: dort, wo `pruefpunkt()` eine `LaufBeendet` wirft und der Loop noch
+# schnell `ende.teiltext` fuellt, bevor die Ausnahme nach oben laeuft.
+#
+#   Fund 1: der teiltext trug nur den Text des letzten Modellzuges. Die
+#           bereits gelaufenen Werkzeugergebnisse (`aufrufe`) wurden
+#           weggeworfen.
+#   Fund 2: die Endnotiz lautete immer '[Budget des Auftrags aufgebraucht:
+#           ...]', auch bei einem Nutzerabbruch.
+#
+# Die Tests pruefen die Ursache, nicht den Wortlaut der Oberflaeche: dass die
+# Werkzeugertraege ueberhaupt eingesammelt werden, und dass die Notiz aus
+# `LaufBeendet.status` kommt und nicht aus dem Grundtext.
+
+
+def _pruefpunkt_der_beim_n_ten_ruf_wirft(n: int, grund: str, status: str):
+    """Ein Pruefpunkt wie der aus `core.abbruch`, nur vorhersagbar.
+
+    Der Loop ruft ihn vor jedem bezahlten Zug UND vor jedem Werkzeug. Ueber
+    `n` laesst sich damit genau bestimmen, an welcher der beiden Stellen der
+    Lauf endet.
+    """
+    zaehler = {"i": 0}
+
+    def pruefpunkt() -> None:
+        zaehler["i"] += 1
+        if zaehler["i"] >= n:
+            raise LaufBeendet(grund, status=status)
+
+    return pruefpunkt
+
+
+def _lauf_bis_zum_ende(replies, n: int, grund: str, status: str):
+    """Laesst den Loop laufen, bis der Pruefpunkt wirft. Gibt (Ausnahme, Aufrufe)."""
+    gesehen: list = []
+
+    async def on_call(aufruf):
+        gesehen.append(aufruf)
+
+    provider = FakeLLMProvider(replies=replies)
+    with pytest.raises(LaufBeendet) as ende:
+        run(run_tool_loop(
+            provider, [LLMMessage("user", "Wie spaet?")], system="S",
+            on_call=on_call,
+            pruefpunkt=_pruefpunkt_der_beim_n_ten_ruf_wirft(n, grund, status),
+        ))
+    return ende.value, gesehen
+
+
+def test_fund1_teiltext_traegt_das_werkzeugergebnis_nicht_nur_das_geplauder():
+    """Der clock-Ertrag darf beim Abbruch nicht verlorengehen.
+
+    Vorher stand im teiltext nur 'Ich hole die Uhrzeit.' - der Fuellsatz des
+    Modells - waehrend die bezahlte und erfolgreich gelaufene Uhrzeit
+    weggeworfen wurde. Pruefreihenfolge: erst wird belegt, dass clock wirklich
+    etwas geliefert hat, dann dass genau das im teiltext steht.
+    """
+    ende, gesehen = _lauf_bis_zum_ende(
+        [FakeTurn(text="Ich hole die Uhrzeit.",
+                  tool_uses=(ToolUse("t1", "clock", {}),)),
+         "wird nie erreicht"],
+        n=3, grund="Vom Nutzer abgebrochen.", status="cancelled",
+    )
+
+    assert len(gesehen) == 1, "clock muss vor dem Abbruch gelaufen sein"
+    ertrag = gesehen[0].result.display
+    assert ertrag.strip(), "Vorbedingung: clock liefert einen display-Text"
+
+    assert ertrag in ende.teiltext
+    assert "Ich hole die Uhrzeit." in ende.teiltext
+
+
+def test_fund1_teiltext_bleibt_ohne_modelltext_nicht_leer():
+    """Der haeufige Fall: ein reiner tool_use-Zug ohne Text.
+
+    Da griff der alte Code auf einen leeren String zu und der Nutzer bekam
+    nichts als die Endnotiz - obwohl das Werkzeug geliefert hatte.
+    """
+    ende, gesehen = _lauf_bis_zum_ende(
+        [FakeTurn(tool_uses=(ToolUse("t1", "clock", {}),)),
+         "wird nie erreicht"],
+        n=3, grund="Vom Nutzer abgebrochen.", status="cancelled",
+    )
+
+    ertrag = gesehen[0].result.display
+    assert ertrag.strip()
+    assert ertrag in ende.teiltext
+    # Ohne die Reparatur bleibt exakt die nackte Notiz uebrig.
+    assert ende.teiltext.strip() != "[Vom Nutzer abgebrochen.]"
+
+
+def test_fund1_auch_der_pruefpunkt_vor_dem_werkzeug_rettet_die_ertraege():
+    """Die zweite Abbruchstelle im Loop - die zwischen zwei Werkzeugen.
+
+    Zwei Zuege, im zweiten wirft der Pruefpunkt vor dem Werkzeug. Der Ertrag
+    des ersten Zuges muss trotzdem im teiltext stehen.
+    """
+    ende, gesehen = _lauf_bis_zum_ende(
+        [FakeTurn(tool_uses=(ToolUse("t1", "clock", {}),)),
+         FakeTurn(text="Noch mal nachsehen.",
+                  tool_uses=(ToolUse("t2", "clock", {}),)),
+         "wird nie erreicht"],
+        n=4, grund="Vom Nutzer abgebrochen.", status="cancelled",
+    )
+
+    assert len(gesehen) == 1, "der zweite clock-Aufruf darf nicht mehr laufen"
+    assert gesehen[0].result.display in ende.teiltext
+    assert "Noch mal nachsehen." in ende.teiltext
+
+
+def test_fund1_ein_fehlgeschlagener_aufruf_wandert_nicht_ins_teilergebnis():
+    """Gegenprobe zu Fund 1: eingesammelt wird nur, was wirklich gelang.
+
+    Sonst waere die Reparatur ein 'alles anhaengen' und der Nutzer bekaeme
+    Fehlermeldungen als Teilergebnis serviert.
+    """
+    ende, gesehen = _lauf_bis_zum_ende(
+        [FakeTurn(text="Ich rechne.",
+                  tool_uses=(ToolUse("t1", "calculator", {"expression": "1/0"}),)),
+         "wird nie erreicht"],
+        n=3, grund="Vom Nutzer abgebrochen.", status="cancelled",
+    )
+
+    assert gesehen[0].result.ok is False, "Vorbedingung: 1/0 scheitert"
+    assert gesehen[0].result.error
+    assert gesehen[0].result.error not in ende.teiltext
+    assert "Ich rechne." in ende.teiltext
+
+
+def test_fund2_die_endnotiz_kommt_aus_dem_status_nicht_aus_dem_grundtext():
+    """Ein Nutzerabbruch darf nicht als aufgebrauchtes Budget erklaert werden.
+
+    Der Kern des Fundes: `LaufBeendet.status` traegt die Unterscheidung, wurde
+    im Loop aber nicht gelesen. Deshalb laeuft hier DERSELBE Grundtext einmal
+    als 'cancelled' und einmal als 'aborted_budget' durch - wer die Notiz am
+    Text statt am Status festmacht, bekommt zweimal dasselbe und faellt hier.
+    """
+    grund = "Vom Nutzer abgebrochen."
+    zuege = [FakeTurn(text="Zwischenstand.",
+                      tool_uses=(ToolUse("t1", "clock", {}),)),
+             "wird nie erreicht"]
+
+    abgebrochen, _ = _lauf_bis_zum_ende(zuege, 3, grund, "cancelled")
+    budget, _ = _lauf_bis_zum_ende(zuege, 3, grund, "aborted_budget")
+
+    assert abgebrochen.status == "cancelled"
+    assert "Budget" not in abgebrochen.teiltext
+    assert grund in abgebrochen.teiltext
+
+    assert budget.status == "aborted_budget"
+    assert "[Budget des Auftrags aufgebraucht: " + grund + "]" in budget.teiltext
+
+    assert abgebrochen.teiltext != budget.teiltext
+
+
+def test_fund2_auch_vor_dem_werkzeug_wird_der_abbruch_richtig_benannt():
+    """Beide Abbruchstellen im Loop muessen dieselbe Unterscheidung treffen."""
+    ende, _ = _lauf_bis_zum_ende(
+        [FakeTurn(text="Ich hole die Uhrzeit.",
+                  tool_uses=(ToolUse("t1", "clock", {}),)),
+         "wird nie erreicht"],
+        n=2, grund="Vom Nutzer abgebrochen.", status="cancelled",
+    )
+
+    assert "Budget" not in ende.teiltext
+    assert "Vom Nutzer abgebrochen." in ende.teiltext

@@ -108,7 +108,27 @@ def pruefe(meldung: Meldung, *, jetzt: datetime | None = None) -> str | None:
         return "Bild ohne Herkunft"
 
     bezug = jetzt or _jetzt()
-    if abs((bezug - meldung.veroeffentlicht).days) > MAX_ALTER_TAGE:
+    # Verknuepfungspruefung 31.08.2026, Fund 3: hier stand
+    # `abs((bezug - meldung.veroeffentlicht).days) > MAX_ALTER_TAGE`.
+    #
+    # WAS WAR FALSCH: `timedelta.days` rundet ab (Richtung minus unendlich),
+    # nicht zur Null hin - und `abs()` stand ausserhalb, wirkte also erst auf
+    # die schon abgerundete Tageszahl.
+    #
+    # WARUM DAS FALSCH IST: in die Vergangenheit ergab 3 Tage 23:59
+    # `.days == 3` und ging durch; in die Zukunft ergab 3 Tage 00:01
+    # `timedelta(days=-4, seconds=86340)`, also `.days == -4` und `abs() == 4`,
+    # und wurde verworfen. Das Fenster war damit (-4 Tage, +3 Tage] statt der
+    # versprochenen drei. Der Fehler lief immer in dieselbe Richtung: die Lage
+    # war systematisch bis zu einen Tag aelter als der Verwerfungstext daneben
+    # und der Kommentar oben ("Weltlage heisst Lage, nicht Archiv") behaupten,
+    # und kuenftig datierte Meldungen - falsche Zeitzone in der Quelle,
+    # Vorabmeldungen - landeten einen Tag zu frueh im Zaehler der Verworfenen.
+    #
+    # In Sekunden gerechnet ist das Fenster symmetrisch und heisst genau das,
+    # was der Konstantenname sagt. `abs()` gehoert dabei um die Differenz,
+    # nicht um eine daraus abgeleitete Zahl.
+    if abs((bezug - meldung.veroeffentlicht).total_seconds()) > MAX_ALTER_TAGE * 86400:
         return f"aelter als {MAX_ALTER_TAGE} Tage"
     return None
 

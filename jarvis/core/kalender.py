@@ -162,7 +162,43 @@ def _zone(tzid: str):
         return timezone.utc
 
 
-def lies_zeit(wert: str, params: dict[str, str]) -> tuple[datetime | date, bool]:
+# --- Anzeigezone ------------------------------------------------------------
+#
+# Verknuepfungspruefung 31.08.2026, Funde 2 und 3: der Kalender rechnete
+# nirgends in eine Zone um. Ueberall, wo hier `zone` steht, gilt:
+#
+#   zone is None  ->  die Ortszeit DIESES Rechners, so wie `clock` sie ohne
+#                     Argument liefert (core/tools/builtin.py:51). Dafuer
+#                     wird `astimezone()` OHNE Argument benutzt, nicht ein
+#                     einmal eingesammeltes `datetime.now().astimezone()
+#                     .tzinfo`: letzteres ist ein FESTER Versatz fuer den
+#                     Moment des Einsammelns und wuerde einen Termin im
+#                     Dezember mit dem Sommerversatz rechnen.
+#   zone gesetzt  ->  genau diese Zone (Tests geben ZoneInfo herein, damit
+#                     sie nicht von der TZ des Testrechners abhaengen).
+
+
+def _mit_zone(naiv: datetime, zone) -> datetime:
+    """Naive Ortszeit zu einem Zeitpunkt machen - sommerzeitrichtig."""
+    return naiv.astimezone() if zone is None else naiv.replace(tzinfo=zone)
+
+
+def in_anzeigezone(x: datetime, zone=None) -> datetime:
+    """Einen Zeitpunkt in die Anzeigezone umrechnen (verschiebt nichts real)."""
+    return x.astimezone() if zone is None else x.astimezone(zone)
+
+
+def zonenname(bezug: date, zone=None) -> str:
+    """Wie die Anzeigezone AN DIESEM TAG heisst - 'CEST', 'CET', 'UTC'.
+
+    Mit Bezugstag, weil der Name mit der Sommerzeit wechselt.
+    """
+    return _mit_zone(
+        datetime(bezug.year, bezug.month, bezug.day), zone
+    ).tzname() or "UTC"
+
+
+def lies_zeit(wert: str, params: dict[str, str], zone=None) -> tuple[datetime | date, bool]:
     """Gibt (Zeitpunkt, ganztaegig) zurueck. RFC 5545, 3.3.4 und 3.3.5."""
     wert = wert.strip()
     if params.get("VALUE", "").upper() == "DATE" or (
@@ -187,10 +223,17 @@ def lies_zeit(wert: str, params: dict[str, str]) -> tuple[datetime | date, bool]
     if tzid:                                   # FORM #3
         return roh.replace(tzinfo=_zone(tzid)), False
     # FORM #1: Ortszeit ohne Zone. Die Norm laesst sie ausdruecklich zu und
-    # meint damit "die Zeit da, wo der Betrachter ist". Wir haengen UTC
-    # dran, damit der Vergleich im Zeitfenster ueberhaupt geht - und sagen
-    # es nicht als Wahrheit, sondern behandeln es als Naeherung.
-    return roh.replace(tzinfo=timezone.utc), False
+    # meint damit "die Zeit da, wo der Betrachter ist".
+    #
+    # WAS WAR FALSCH: hier stand `roh.replace(tzinfo=timezone.utc)`. Solange
+    # die Ausgabe die Wanduhrzeit des Objekts druckte, fiel das nicht auf -
+    # 14:00 kam als 14:00 heraus. Seit Fund 2 wird fuer die Anzeige in die
+    # Anzeigezone umgerechnet, und damit WAERE aus 14:00 in Berlin 16:00
+    # geworden: aus einem stillen Fehler ein sichtbarer. WARUM UTC falsch
+    # ist: die Norm sagt "Zeit des Betrachters", und das ist genau die
+    # Anzeigezone - nicht UTC. (Verknuepfungspruefung 31.08.2026, Fund 2
+    # nennt diese Zeile ausdruecklich mit.)
+    return _mit_zone(roh, zone), False
 
 
 # --- Zerlegen ---------------------------------------------------------------
@@ -224,13 +267,27 @@ def _teile(zeile: str) -> tuple[str, dict[str, str], str]:
     return name, params, wert
 
 
-def parse(roh: str, *, kalendername: str = "") -> tuple[list[Termin], int]:
-    """Alle VEVENTs. Gibt (Termine, Zahl der wiederkehrenden) zurueck.
+def parse(roh: str, *, kalendername: str = "", zone=None) -> tuple[list[Termin], int, int]:
+    """Alle VEVENTs. Gibt (Termine, wiederkehrende, unlesbare) zurueck.
 
     Wiederkehrende werden **gezaehlt und weggelassen**, nicht geraten.
+
+    WAS WAR FALSCH (Verknuepfungspruefung 31.08.2026, Fund 1): dasselbe
+    Versprechen galt fuer unlesbare VEVENTs NICHT. Ein VEVENT ohne DTSTART
+    oder mit einer DTSTART-Form, die `lies_zeit` nicht kennt, gab in
+    `_baue` `None` zurueck und wurde in der Schleife hier still
+    uebersprungen - kein Zaehler, kein Log. Die Antwort sagte dann
+    "N Termine" mit einem zu niedrigen N.
+    WARUM DAS FALSCH IST: ein Kalender, der einen Termin verschweigt, ist
+    schlechter als keiner, und der Nutzer hat keinen Anhaltspunkt, dass
+    etwas fehlt. Genau deshalb werden Wiederkehrende zwei Zeilen weiter
+    unten gezaehlt und nach oben gereicht. api/weltlage.py:100-108 macht es
+    fuer unlesbare Meldungen schon so. Ab jetzt gilt hier dieselbe Regel:
+    weglassen ja, verschweigen nein.
     """
     termine: list[Termin] = []
     wiederkehrend = 0
+    unlesbar = 0
     name_des_kalenders = kalendername
 
     aktuell: dict | None = None
@@ -247,9 +304,11 @@ def parse(roh: str, *, kalendername: str = "") -> tuple[list[Termin], int]:
                 if aktuell.get("rrule"):
                     wiederkehrend += 1
                 else:
-                    fertig = _baue(aktuell, name_des_kalenders)
+                    fertig = _baue(aktuell, name_des_kalenders, zone)
                     if fertig is not None:
                         termine.append(fertig)
+                    else:
+                        unlesbar += 1
             aktuell = None
             continue
 
@@ -273,20 +332,29 @@ def parse(roh: str, *, kalendername: str = "") -> tuple[list[Termin], int]:
         # Zugangscodes und gelegentlich Passwoerter. Wenn Noah sie braucht,
         # wird das ein eigener Parameter, der ausdruecklich gesetzt werden
         # muss (FIX-07 Abschnitt 4.3).
-    return termine, wiederkehrend
+    return termine, wiederkehrend, unlesbar
 
 
-def _baue(roh: dict, kalendername: str) -> Termin | None:
+def _baue(roh: dict, kalendername: str, zone=None) -> Termin | None:
+    """`None` heisst: dieses VEVENT ist nicht lesbar.
+
+    Der Aufrufer MUSS das zaehlen (siehe `parse`). Das Log hier nennt den
+    Titel, damit die Ursachensuche nicht bei "irgendein Termin" anfaengt.
+    """
     if "beginn" not in roh:
+        log.warning("Kalender: VEVENT %r ohne DTSTART, wird weggelassen.",
+                    roh.get("titel", "(ohne Titel)"))
         return None
     try:
-        beginn, ganztaegig = lies_zeit(*roh["beginn"])
-    except (KalenderFehler, ValueError):
+        beginn, ganztaegig = lies_zeit(*roh["beginn"], zone)
+    except (KalenderFehler, ValueError) as exc:
+        log.warning("Kalender: DTSTART von %r nicht lesbar (%s), wird "
+                    "weggelassen.", roh.get("titel", "(ohne Titel)"), exc)
         return None
 
     if "ende" in roh:
         try:
-            ende, _ = lies_zeit(*roh["ende"])
+            ende, _ = lies_zeit(*roh["ende"], zone)
         except (KalenderFehler, ValueError):
             ende = beginn
     elif ganztaegig:
@@ -309,23 +377,43 @@ def _baue(roh: dict, kalendername: str) -> Termin | None:
 # --- Zeitfenster ------------------------------------------------------------
 
 
-def _als_utc(x: datetime | date) -> datetime:
+def _als_utc(x: datetime | date, zone=None) -> datetime:
+    """Vergleichbar machen. Ein Ganztagstermin (`date`) hat keine Uhrzeit -
+    sein Tag beginnt dort, wo der Betrachter steht, also in der Anzeigezone
+    und nicht in UTC. Sonst waere er im Fenster um den Zonenversatz
+    verschoben, genau wie die Fenstergrenzen es vor Fund 3 waren."""
     if isinstance(x, datetime):
-        return x if x.tzinfo else x.replace(tzinfo=timezone.utc)
-    return datetime(x.year, x.month, x.day, tzinfo=timezone.utc)
+        return x if x.tzinfo else _mit_zone(x, zone)
+    return _mit_zone(datetime(x.year, x.month, x.day), zone)
 
 
-def im_fenster(termine: list[Termin], von: date, bis: date) -> list[Termin]:
+def im_fenster(termine: list[Termin], von: date, bis: date, *, zone=None) -> list[Termin]:
     """Alles, was das Fenster beruehrt. `DTEND` ist nicht einschliessend
     (RFC 5545, 3.6.1) - ein Termin, der genau bei `von` endet, zaehlt
-    deshalb nicht mehr dazu."""
-    a = datetime(von.year, von.month, von.day, tzinfo=timezone.utc)
-    b = datetime(bis.year, bis.month, bis.day, tzinfo=timezone.utc) + timedelta(days=1)
+    deshalb nicht mehr dazu.
+
+    WAS WAR FALSCH (Verknuepfungspruefung 31.08.2026, Fund 3): hier stand
+    `datetime(von.year, von.month, von.day, tzinfo=timezone.utc)`. `von`
+    und `bis` sind aber Ortsdaten - sie kommen aus `date.today()` oder aus
+    dem, was das Modell vom `clock`-Werkzeug bekommen hat, und das ist
+    Ortszeit (core/tools/builtin.py:51). Aus einem Ortsdatum wurde so ein
+    UTC-Fenster: fuer Europe/Berlin lag es im Sommer zwei Stunden, im
+    Winter eine hinter dem, was der Nutzer "heute" nennt.
+    WARUM DAS FALSCH IST: auf "was habe ich heute vor" fiel ein Termin
+    zwischen 00:00 und 02:00 Ortszeit stillschweigend aus der Antwort, und
+    einer von morgen frueh wurde als heute gemeldet - ohne jede Warnung.
+    Jetzt ist Mitternacht Mitternacht IN der Anzeigezone, also aus
+    derselben Quelle wie das Datum selbst."""
+    # Erst den Tag rechnen, DANN die Zone dranhaengen. Andersherum
+    # (`+ timedelta(days=1)` auf einen fertigen Zeitpunkt) haette an einem
+    # Zeitumstellungswochenende den alten Versatz mitgeschleppt.
+    a = _mit_zone(datetime(von.year, von.month, von.day), zone)
+    b = _mit_zone(datetime(bis.year, bis.month, bis.day) + timedelta(days=1), zone)
     treffer = [
         t for t in termine
-        if _als_utc(t.beginn) < b and _als_utc(t.ende) > a
+        if _als_utc(t.beginn, zone) < b and _als_utc(t.ende, zone) > a
     ]
-    return sorted(treffer, key=lambda t: _als_utc(t.beginn))
+    return sorted(treffer, key=lambda t: _als_utc(t.beginn, zone))
 
 
 # --- Quelle holen -----------------------------------------------------------

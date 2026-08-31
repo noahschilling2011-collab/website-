@@ -19,6 +19,7 @@ den man vergisst, und der dort staendig passiert.
 from __future__ import annotations
 
 import logging
+import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -30,6 +31,45 @@ log = logging.getLogger("jarvis")
 # Editoren schreiben mehrfach hintereinander. Ohne Entprellung indexiert man
 # dieselbe Datei fuenfmal.
 ENTPRELLUNG_S = 0.8
+
+
+class IndexFehler(RuntimeError):
+    """Der Index war nicht befragbar. Das ist ein Fehler, kein leeres Ergebnis.
+
+    Woher der Befund kommt: Verknuepfungspruefung 31.08.2026, Fund 1.
+
+    WAS WAR FALSCH: `suche()` hat die FTS-Abfrage in ein `except Exception`
+    gepackt, eine Warnung geloggt und `[]` zurueckgegeben.
+
+    WARUM DAS FALSCH IST: fuer die Aufrufer ist diese leere Liste nicht von
+    "kein Treffer" zu unterscheiden. `core/tools/memory_tools.py`
+    (`_aus_dem_vault`) macht daraus ein ToolResult mit `ok=True`,
+    `data={'hits': 0}` und dem Satz "Nichts zu ... im Vault." - eine positive
+    Aussage ueber den Vault, die auf einem Datenbankfehler beruht; das Modell
+    gibt sie als Tatsache weiter. `core/gedaechtnis.liste` fuehrt dieselbe
+    leere Liste ins Panel, wo ohne Filter dieselben Notizen sichtbar bleiben:
+    der Nutzer sieht, dass etwas da ist, und bekommt beim Tippen "nichts".
+    Genau das verbietet FIX-04: *Eine leere Liste im Panel als "noch nichts
+    da" anzeigen. Wenn der Index leer ist und der Vault nicht, ist das ein
+    Fehler und muss als Fehler dastehen.*
+
+    Der Waechter dagegen, `core.gedaechtnis.fehlbestand`, greift hier aus zwei
+    unabhaengigen Gruenden nicht: `api/routes.py` ruft ihn nur im Zweig ohne
+    Suchbegriff auf - und dieser Zweig laeuft ueber `alle()`, das gar kein
+    `except` hat und einen Datenbankfehler schon immer korrekt bis zum 500
+    durchreicht. Und er misst Dateien im Vault gegen Zeilen in
+    `vault_notizen`; dass `vault_notizen` voll ist und allein die FTS-Abfrage
+    scheitert, ist fuer ihn unsichtbar.
+
+    `suche()` verhaelt sich damit jetzt wie `alle()`: ein Datenbankfehler
+    kommt oben an. Ueber `core/tools/dispatch.run_tool` wird daraus ein
+    `ToolResult(ok=False)` statt "Nichts zu X im Vault", ueber
+    `/api/memory` ein 500 statt HTTP 200 mit leerer Liste.
+
+    Ein eigener Typ statt der rohen sqlite3-Ausnahme, damit ein Aufrufer den
+    Index-Ausfall gezielt abfangen kann, ohne jeden Datenbankfehler des
+    Prozesses mitzunehmen.
+    """
 
 
 @dataclass(frozen=True)
@@ -148,9 +188,29 @@ def suche(db_path, frage: str, limit: int = 5) -> list[Treffer]:
                 "WHERE vault_fts MATCH ? ORDER BY rank LIMIT ?",
                 (ausdruck, limit),
             ).fetchall()
-        except Exception as exc:            # noqa: BLE001 - FTS-Syntax des Nutzers
-            log.warning("Vault-Suche fehlgeschlagen: %s", exc)
-            return []
+        except sqlite3.Error as exc:
+            # Verknuepfungspruefung 31.08.2026, Fund 1: hier stand
+            # `except Exception` mit `return []`. Warum das falsch ist, steht
+            # ausfuehrlich bei `IndexFehler` oben.
+            #
+            # Die "FTS-Syntax des Nutzers", die der alte Kommentar als Grund
+            # nannte, kann an dieser Abfrage gar nicht mehr scheitern: `worte`
+            # laesst nur Alphanumerisches stehen, und jedes Wort geht in
+            # Anfuehrungszeichen als Phrase in `ausdruck`. Was hier ankommt,
+            # ist ein Fehler der Datenbank - gesperrte Datei unter Last,
+            # beschaedigter FTS5-Index, fehlende Tabelle nach einem halb
+            # eingespielten Schema.
+            #
+            # Die sqlite3-Meldung bleibt im Log. In den Text der Ausnahme
+            # gehoert sie nicht: der geht ueber `run_tool` ins
+            # Werkzeugprotokoll und damit vor das Modell, und FIX-07 verbietet
+            # Pfade in jeder Ausgabe nach draussen.
+            log.error("Vault-Suche fehlgeschlagen: %s", exc)
+            raise IndexFehler(
+                "Der Vault-Index konnte nicht durchsucht werden "
+                f"({type(exc).__name__}). Das ist kein leeres Gedaechtnis - "
+                "'python -m scripts.reindex' baut den Index neu auf."
+            ) from exc
     return [
         Treffer(id=z[0], text=z[1], pfad=z[2], typ=z[3], quelle=z[4], erfasst=z[5],
                 snapshot=z[6], tags=[t for t in (z[7] or "").split(",") if t],

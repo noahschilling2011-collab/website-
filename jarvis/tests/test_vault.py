@@ -404,3 +404,115 @@ def test_mehrfaches_speichern_gibt_einen_eintrag_mit_dem_letzten_stand(db, vault
     treffer = [e for e in liste(db, str(vault)) if "Mehrfach" in e.text]
     assert len(treffer) == 1, "eine Datei, ein Eintrag"
     assert "Fassung 4" in treffer[0].text, "der letzte Stand muss gewinnen"
+
+
+# --- Verknuepfungspruefung 31.08.2026, Fund 1 -------------------------------
+#
+# `suche()` hat jeden Datenbankfehler der FTS-Abfrage geloggt und `[]`
+# zurueckgegeben. Fuer die Aufrufer ist diese leere Liste nicht von "kein
+# Treffer" zu unterscheiden: `recall` machte daraus `ok=True` und "Nichts zu X
+# im Vault.", das Panel eine leere Liste mit HTTP 200 - waehrend dieselben
+# Notizen ohne Filter weiter sichtbar waren.
+#
+# Der Waechter dagegen, `gedaechtnis.fehlbestand`, greift hier nicht: er wird
+# nur im Zweig OHNE Suchbegriff gerufen (und der laeuft ueber `alle()`, das
+# schon immer korrekt durchreicht), und er zaehlt Dateien gegen Zeilen in
+# `vault_notizen` - ein kaputter FTS-Index ist fuer ihn unsichtbar.
+#
+# Die Tests unten pruefen die URSACHE in `core/vault_index.suche` und nicht
+# die Oberflaeche. Sie loeschen `vault_fts` und lassen `vault_notizen` voll -
+# genau der Zustand, den `fehlbestand()` nicht sehen kann.
+
+
+def _fts_zerstoeren(db: Path) -> None:
+    """Nimmt dem Index die FTS-Tabelle, laesst die Notizen aber stehen.
+
+    Steht stellvertretend fuer alles, was zur Abfragezeit schiefgehen kann:
+    gesperrte Datenbank unter Last, beschaedigter FTS5-Index, I/O-Fehler,
+    fehlende Tabelle nach einem halb eingespielten Schema.
+    """
+    with session(db) as conn:
+        conn.execute("DROP TABLE vault_fts")
+
+
+def test_fund1_ein_datenbankfehler_in_der_suche_ist_kein_leeres_ergebnis(db, vault):
+    """Der Kern: `suche()` wirft, statt stillschweigend `[]` zu liefern."""
+    from core.vault_index import IndexFehler
+
+    pfad = schreibe(vault, notiz("Noah faehrt ein Fahrrad der Marke Canyon."))
+    aktualisiere(db, vault, pfad)
+    assert [t.text for t in suche(db, "Fahrrad")] == [
+        "Noah faehrt ein Fahrrad der Marke Canyon."]
+
+    _fts_zerstoeren(db)
+
+    with pytest.raises(IndexFehler):
+        suche(db, "Fahrrad")
+
+    # Und der Vault ist dabei nachweislich NICHT leer - genau deshalb waere
+    # eine leere Trefferliste hier eine falsche Aussage und kein Leerstand.
+    assert len(alle(db)) == 1
+
+
+def test_fund1_der_waechter_fehlbestand_sieht_diesen_zustand_nicht(db, vault):
+    """Warum die Reparatur in `suche()` sitzen muss und nicht im Waechter.
+
+    `fehlbestand()` vergleicht Dateien mit `id:` gegen Zeilen in
+    `vault_notizen`. Beide Zahlen stimmen hier - kaputt ist nur die
+    FTS-Tabelle. Wer sich auf den Waechter verlaesst, merkt nichts.
+    """
+    from core.gedaechtnis import fehlbestand
+
+    pfad = schreibe(vault, notiz("Noah faehrt ein Fahrrad der Marke Canyon."))
+    aktualisiere(db, vault, pfad)
+    _fts_zerstoeren(db)
+
+    assert fehlbestand(db, vault) is None, (
+        "Wenn der Waechter das faende, waere er die richtige Stelle - "
+        "er findet es aber nicht."
+    )
+
+
+def test_fund1_recall_behauptet_nicht_mehr_nichts_im_vault(db, vault):
+    """Die Aussage, die beim Nutzer ankommt.
+
+    Ueber `run_tool` wird aus der Ausnahme ein `ToolResult(ok=False)`. Vorher
+    stand hier `ok=True` mit dem Satz "Nichts zu 'Fahrrad' im Vault." - eine
+    positive Aussage ueber den Vault, die auf einem Datenbankfehler beruhte
+    und die das Modell als Tatsache weitergibt.
+    """
+    import api.app  # noqa: F401  - registriert die Werkzeuge
+    from core.tools import registry
+    from core.tools.dispatch import run_tool
+    from tests.conftest import run as lauf
+
+    pfad = schreibe(vault, notiz("Noah faehrt ein Fahrrad der Marke Canyon."))
+    aktualisiere(db, vault, pfad)
+
+    werkzeug = registry.get("recall")
+    werkzeug.db_path = db
+    werkzeug.vault_pfad = str(vault)
+
+    gut = lauf(run_tool("recall", {"query": "Fahrrad"}))
+    assert gut.ok and "Canyon" in gut.display
+
+    _fts_zerstoeren(db)
+
+    kaputt = lauf(run_tool("recall", {"query": "Fahrrad"}))
+    assert kaputt.ok is False, (
+        f"recall meldet {kaputt.display!r} als Erfolg, obwohl der Index nicht "
+        f"befragt werden konnte."
+    )
+    assert "Nichts zu" not in (kaputt.display or "")
+    assert (kaputt.data or {}).get("hits") != 0
+
+
+def test_fund1_kein_treffer_bleibt_ein_leeres_ergebnis(db, vault):
+    """Die Gegenprobe zur Reparatur: aus "nichts gefunden" wird kein Fehler.
+
+    Ohne diesen Test waere ein `suche()`, das immer wirft, auch gruen.
+    """
+    pfad = schreibe(vault, notiz("Noah faehrt ein Fahrrad der Marke Canyon."))
+    aktualisiere(db, vault, pfad)
+    assert suche(db, "Rennrad") == []
+    assert suche(db, "ab") == []

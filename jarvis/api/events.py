@@ -116,6 +116,18 @@ async def strom(
     queue = bus.subscribe()
     try:
         yield sse({"type": "hello", "data": {"listeners": bus.anzahl}})
+        # Dieses `while True` endet NUR, wenn der Client geht - und das ist so
+        # gewollt. Es hat aber eine Folge, die nicht hierher gehoert und
+        # trotzdem hier auffaellt: beim Herunterfahren schickt uvicorn einer
+        # schon laufenden Antwort kein `http.disconnect`, es setzt nur
+        # `cycle.keep_alive = False`. `getrennt` bleibt also False und der
+        # Strom laeuft weiter, waehrend uvicorn auf ihn wartet.
+        #
+        # Die Bremse dafuer sitzt nicht hier, sondern am Serverstart:
+        # `--timeout-graceful-shutdown` im CMD des Dockerfiles und
+        # `HERUNTERFAHREN_SEKUNDEN` in main.py. Wer die entfernt, haengt den
+        # Server an genau dieser Zeile auf - Verknuepfungspruefung 31.08.2026,
+        # Gruppe shutdown, Fund 1. Hier ist bewusst NICHTS geaendert worden.
         while True:
             try:
                 ereignis = await asyncio.wait_for(queue.get(), timeout=herzschlag)

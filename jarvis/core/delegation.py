@@ -17,8 +17,10 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
+from core.abbruch import LaufBeendet
 from core.contracts import Permission, Step, StepStatus, Task, Tool, ToolResult
 from core.tools.registry import register
+from core.verify import verifiziere
 
 if TYPE_CHECKING:
     from core.agents import ToolAgent
@@ -149,13 +151,61 @@ class AskAgent(Tool):
             rufer=None,
         ))
         try:
-            ergebnis = await ziel_agent.run(unterauftrag, schritt)
-        finally:
-            kontext.reset(eigener)
+            try:
+                ergebnis = await ziel_agent.run(unterauftrag, schritt)
+            finally:
+                kontext.reset(eigener)
+        except LaufBeendet as ende:
+            # Verknuepfungspruefung 31.08.2026, Fund 2, zweiter Teil.
+            # `LaufBeendet` laeuft ab hier nach oben durch (der Dispatcher
+            # gibt sie jetzt weiter, siehe core/tools/dispatch.py) - damit
+            # wurde aber alles unterhalb uebersprungen, auch der zweite
+            # `on_subtask`-Ruf. Der Unterauftrag und sein Schritt blieben
+            # deshalb in der tasks- und steps-Tabelle fuer immer auf
+            # "running": `api/tasks.py` persistiert beides nur ueber diesen
+            # Rueckruf, und einen dritten gibt es nicht.
+            #
+            # Also hier abschliessen, bevor die Ausnahme weiterlaeuft. Der
+            # Endzustand ist der der Ausnahme ("cancelled" oder
+            # "aborted_budget"), nicht "failed" - der Unterauftrag ist nicht
+            # gescheitert, er wurde beendet. Der Teiltext bleibt als
+            # Ergebnis stehen, damit ein Teilergebnis moeglich bleibt (0.5).
+            unterauftrag.status = ende.status
+            unterauftrag.result = ende.teiltext
+            schritt.status = StepStatus.FAILED
+            schritt.note = ende.grund
+            # Verbraucht ist verbraucht - auch ein abgebrochener
+            # Unterauftrag hat das Budget des Hauptauftrags belastet.
+            ctx.task.spent_tokens += unterauftrag.spent_tokens
+            ctx.task.spent_cost_eur += unterauftrag.spent_cost_eur
+            if ctx.on_subtask:
+                await ctx.on_subtask(unterauftrag, ctx.task.id)
+            raise
 
+        # Verknuepfungspruefung 31.08.2026, Fund 1: hier stand
+        #     schritt.status = DONE if ergebnis.ok else FAILED
+        # und sonst nichts. Das war falsch, weil `ergebnis.ok` gar keine
+        # Verifikation ist: `ToolAgent._run` setzt es auf `bool(text.strip())`
+        # (core/agents.py) - jede nichtleere Antwort war damit "ok".
+        #
+        # `verifiziere()` (core/verify.py) wurde im Produktivcode an genau
+        # EINER Stelle gerufen, in der Schrittschleife des Runners
+        # (core/runner.py). Ein Unterauftrag ueber `ask_agent` laeuft aber
+        # nicht durch diese Schleife, sondern ruft `ziel_agent.run` direkt.
+        # Folge: fuer delegierte Schritte fielen ALLE drei Regeln aus -
+        # die Quellenpflicht fuer `research`, die Preisregel und die
+        # Aufgegeben-Regel. Dieselbe quellenlose Antwort desselben
+        # research-Agenten war als Planschritt FAILED, als Unterauftrag von
+        # hermes aber DONE. Wer `research` ueber hermes rief statt direkt,
+        # umging die Quellenpflicht vollstaendig.
+        #
+        # Deshalb dieselbe Pruefung wie im Runner, an derselben Stelle im
+        # Ablauf: erst verifizieren, dann Status und note daraus setzen.
+        bestanden, begruendung = verifiziere(schritt, ergebnis)
         schritt.result = ergebnis
-        schritt.status = StepStatus.DONE if ergebnis.ok else StepStatus.FAILED
-        unterauftrag.status = "done" if ergebnis.ok else "failed"
+        schritt.note = begruendung
+        schritt.status = StepStatus.DONE if bestanden else StepStatus.FAILED
+        unterauftrag.status = "done" if bestanden else "failed"
         unterauftrag.result = ergebnis.display
         # Was der Unterauftrag verbraucht hat, gehoert dem Hauptauftrag.
         ctx.task.spent_tokens += unterauftrag.spent_tokens
@@ -163,13 +213,24 @@ class AskAgent(Tool):
         if ctx.on_subtask:
             await ctx.on_subtask(unterauftrag, ctx.task.id)
 
+        # Die Begruendung muss beim Rufer ankommen, sonst hat die Pruefung
+        # keine Wirkung: hermes verarbeitet das Teilergebnis weiter, ohne zu
+        # merken, dass es die Quellenpflicht gerissen hat. `run_tool_loop`
+        # (core/tools/loop.py) reicht `display` an das Modell und faellt nur
+        # auf `error` zurueck, wenn `display` leer ist - deshalb steht die
+        # Begruendung in BEIDEN Feldern. `ok=False` setzt zusaetzlich
+        # `is_error` im tool_result-Block.
+        #
         # Herkunft ist Pflicht: kennzeichnen, welcher Teil von wem kam.
+        anzeige = f"[{agent}] {ergebnis.display}"
+        if not bestanden:
+            anzeige = f"{anzeige}\n\n[Nicht bestanden: {begruendung}]".strip()
         return ToolResult(
-            ok=ergebnis.ok,
+            ok=bestanden,
             data={"agent": agent, "subtask_id": unterauftrag.id,
                   "sources": list(ergebnis.sources)},
-            error=ergebnis.error,
-            display=f"[{agent}] {ergebnis.display}",
+            error=ergebnis.error if bestanden else begruendung,
+            display=anzeige,
             sources=list(ergebnis.sources),
             duration_ms=dauer(),
         )

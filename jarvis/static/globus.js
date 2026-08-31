@@ -9,10 +9,26 @@
  * Duplikat, nur eine Ebene tiefer. So gibt es einen Ort: diese Datei.
  *
  * **Warum der Token ein Parameter ist.** `/static` wird von einem
- * StaticFiles-Mount roh ausgeliefert (`api/app.py:205`); den Platzhalter
- * `__JARVIS_TOKEN__` ersetzt nur die HTML-Route (`api/routes.py:515` und
- * `:533`). Stuende der Token hier in der Datei, ginge jeder API-Aufruf mit
- * dem Platzhalter raus und bekaeme 401. Die Seite reicht ihn herein.
+ * StaticFiles-Mount roh ausgeliefert - api/app.py, die Zeile mit
+ * app.mount("/static", ...). Den Platzhalter `__JARVIS_TOKEN__` ersetzen nur
+ * die beiden HTML-Routen in api/routes.py, index() und weltlage_seite().
+ * Stuende der Token hier in der Datei, ginge jeder API-Aufruf mit dem
+ * Platzhalter raus und bekaeme 401. Die Seite reicht ihn herein.
+ *
+ * **Warum hier Namen stehen und keine Zeilennummern.**
+ * Verknuepfungspruefung 31.08.2026, Fund 3: WAS war falsch - acht Verweise
+ * in genau den Kommentaren, die diese Naht erklaeren, zeigten mit einer
+ * Zeilennummer auf api/app.py, api/routes.py und index.html. WARUM ist das
+ * falsch - keine einzige davon stimmte noch. Der Verweis auf den
+ * StaticFiles-Mount landete in einem Absatz ueber Copernicus-Konten, die
+ * beiden Verweise auf die Klassen .karte und .status in .brand-mark- und
+ * .btn-mic-Regeln, die auf die HTML-Routen rund zweihundert Zeilen zu
+ * frueh. Diese Kommentare sind die einzige Dokumentation der Naht zwischen
+ * den beiden Seiten; wer sie nachschlug, hatte danach drei falsche
+ * Annahmen mehr. Eine Nummer verrutscht bei jeder Aenderung ueber ihr, ein
+ * Symbolname nicht - deshalb stehen ab hier nur noch Namen.
+ * tests/test_designsystem.py haelt beides fest: keine Zeilenverweise mehr,
+ * und jedes genannte Symbol muss es wirklich geben.
  *
  * Drei Ausfuhren, mehr braucht der Einbau nicht:
  *
@@ -22,7 +38,7 @@
  *   weiter()                   Schleife an, Groesse neu messen.
  *
  * Warum `pausiere()` und nicht der IntersectionObserver: `index.html`
- * blendet Ansichten mit `display:none` um (`index.html:446`). Ob ein
+ * blendet Ansichten mit `display:none` um - die Regel .view dort. Ob ein
  * Observer dabei feuert, haengt am Browser - abschalten laesst sich nicht
  * daran aufhaengen. Der Observer bleibt trotzdem drin, fuer die eigene
  * Seite und fuers Scrollen.
@@ -33,9 +49,9 @@ import * as THREE from 'three';
 const STIL = `
 /* Alles unter .globus-wurzel. Zwei Gruende, beide gemessen:
 
-   1. Klassennamen. 'karte' und 'status' gibt es in index.html schon
-      ('index.html:450' und ':129'). Ohne Schachtelung faerbt der Globus die
-      Auftragskarten des Chats um - und umgekehrt. Nachgezaehlt wurden alle
+   1. Klassennamen. 'karte' und 'status' gibt es in index.html schon - die
+      Regeln '.karte' und '.status' dort. Ohne Schachtelung faerbt der Globus
+      die Auftragskarten des Chats um - und umgekehrt. Nachgezaehlt wurden alle
       31 Globus-Klassen gegen die 99 aus index.html; genau diese zwei
       ueberschneiden sich. Die drei Eigenschaften, die index.html an ihnen
       setzt und der Globus bisher nicht, stehen unten ausdruecklich drin.
@@ -176,9 +192,10 @@ const STIL = `
   backdrop-filter:blur(20px) saturate(150%);
   display:flex;flex-direction:column;min-height:0;
   animation:globus-auf var(--dauer-rein) var(--kurve-rein) both;
-  /* Gegen index.html:454-455. Dort hat '.karte' Innen- und Aussenabstand;
-     hier machen das '.block' und der 'gap' der Spalte. Ohne diese zwei
-     Zeilen sitzt im eingebauten Tab ploetzlich Luft um jede Karte. */
+  /* Gegen die Regel '.karte' in index.html. Dort hat sie Innen- und
+     Aussenabstand; hier machen das '.block' und der 'gap' der Spalte. Ohne
+     diese zwei Zeilen sitzt im eingebauten Tab ploetzlich Luft um jede
+     Karte. */
   padding:0;margin-bottom:0;
 }
 @keyframes globus-auf{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
@@ -239,8 +256,9 @@ const STIL = `
   display:flex;align-items:center;gap:1rem;flex-wrap:wrap;
   padding:.5rem 1rem;font-size:.76rem;color:var(--text-leise);
   background:linear-gradient(0deg,rgba(10,10,12,.92),rgba(10,10,12,0));
-  /* Gegen index.html:130. Dort schiebt '.status' sich mit margin-left:auto
-     in der Kopfleiste nach rechts; hier ist es eine volle Leiste. */
+  /* Gegen die Regel '.status' in index.html. Dort schiebt sie sich mit
+     margin-left:auto in der Kopfleiste nach rechts; hier ist es eine volle
+     Leiste. */
   margin-left:0;
 }
 .globus-wurzel .status b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
@@ -388,6 +406,24 @@ let kartenNachholen = null;
 let geometrieFertig = Promise.resolve();
 let gestartet = false;
 let aktiv = false;
+/* Verknuepfungspruefung 31.08.2026, Fund 1: WAS war falsch - der
+   Push-to-Talk-Handler am Fenster hat sich mit 'aktiv' abgesichert, und der
+   Kommentar dort behauptete "aktiv ist nur wahr, solange die Weltansicht
+   laeuft". WARUM ist das falsch - seit FIX-06 Zone 2 bedeutet 'aktiv' zwei
+   verschiedene Dinge: "Zeichenschleife laeuft" UND, frueher, "Weltansicht
+   offen". miniAn() haengt das Canvas in die Startansicht und ruft dafuer
+   weiter(), und weiter() setzt 'aktiv'. Damit war das Mikrofon auf dem
+   Dashboard scharf, wo es gar kein sichtbares Bedienelement dafuer gibt -
+   gemessen: eine Leertaste auf der Startansicht baut ein
+   SpeechRecognition-Objekt (Delta 1), der Mikrofonknopf ist dabei 0 Pixel
+   breit, weil er in #view-welt unter display:none steht.
+
+   Deshalb dieses zweite Flag: es bedeutet NUR "die Weltansicht ist offen,
+   die Leertaste gehoert dem Globus". starte() und weiter() setzen es,
+   pausiere() nimmt es zurueck - und miniAn() setzt es ausdruecklich wieder
+   auf false, obwohl es weiter() ruft. Das Zeichnen soll in der Startansicht
+   weiterlaufen, das Zuhoeren nicht. */
+let hoerenErlaubt = false;
 /* FIX-06 Zone 2: dasselbe Canvas, an einer anderen Stelle im Dokument.
    Ein zweiter Renderer waere ein zweiter WebGL-Kontext, und Browser
    verwerfen den aelteren ohne Vorwarnung, sobald die Zahl reisst. Beide
@@ -407,10 +443,31 @@ function stilEinsetzen(){
 }
 
 /** Globus in `behaelter` aufbauen. Loest auf, wenn die Grenzen geladen sind. */
-export async function starte(behaelter, token){
+export async function starte(behaelter, token, opt){
   if (gestartet){ weiter(); return geometrieFertig; }
   gestartet = true;
   aktiv = true;
+  /* Wer die Leertaste bekommt, entscheidet der AUFRUFER - und niemand sonst.
+     Hier stand 'hoerenErlaubt = true' fest verdrahtet, mit der Begruendung,
+     auf weltlage.html sei die Weltansicht die ganze Seite. Das stimmt dort
+     auch. Nur ruft index.html dieselbe Funktion, waehrend das COMMAND
+     CENTER im Bild ist - und miniAn() dreht das Flag erst zurueck, wenn die
+     Geometrie geladen ist.
+
+     Dazwischen liegt die GANZE Ladephase: 2 MB Three.js plus Grenzen. Der
+     eigene Test dieser Phase gesteht ihr bis zu 60 Sekunden zu. In dieser
+     Zeit startete ein Druck auf die Leertaste das Mikrofon des Globus - auf
+     einer Ansicht, die gar keinen Mikrofonknopf zeigt, und die Taste wurde
+     zusaetzlich geschluckt.
+
+     Gefunden vom Abnehmer der Gruppe "globus", nachdem die erste Reparatur
+     nur den Zustand NACH miniAn() abgesichert hatte. Der Weg dorthin:
+     Startansicht, Knopf "Globus laden" in Zone 2, waehrend des Ladens
+     Leertaste.
+
+     Voreinstellung ist NICHT hoeren. Ein Mikrofon, das nicht angeht, ist
+     ein kleinerer Fehler als eines, das unsichtbar angeht. */
+  hoerenErlaubt = !!(opt && opt.hoeren);
   behaelter.classList.add('globus-wurzel');
   stilEinsetzen();
   behaelter.insertAdjacentHTML('beforeend', MARKUP);
@@ -1676,11 +1733,16 @@ export async function starte(behaelter, token){
   }
   el('btn-globus-mic').addEventListener('mousedown', starteHoeren);
   el('btn-globus-mic').addEventListener('mouseup', stoppeHoeren);
-  /* Leertaste haelt das Mikrofon. FIX-05 B: ein `addEventListener` ohne Ziel
+  /* Leertaste haelt das Mikrofon. FIX-05 B: ein 'addEventListener' ohne Ziel
      haengt am FENSTER - im eingebauten Tab ist das Fenster der ganze Chat.
      Ohne die zwei Schranken startet die Leertaste im Chatfeld die
-     Laendersuche des Globus. `aktiv` ist nur wahr, solange die Weltansicht
-     laeuft; `tippt` haelt Eingabefelder frei. */
+     Laendersuche des Globus. 'hoerenErlaubt' ist nur wahr, solange die
+     Weltansicht offen ist; 'tippt' haelt Eingabefelder frei.
+
+     Verknuepfungspruefung 31.08.2026, Fund 1: hier stand 'aktiv'. Das war
+     falsch, seit miniAn() ueber weiter() dasselbe Flag auch fuer die
+     Startansicht setzt - siehe die Begruendung an der Deklaration von
+     'hoerenErlaubt'. */
   function tippt(ziel){
     return !!ziel && (/^(INPUT|TEXTAREA|SELECT)$/.test(ziel.tagName)
                       || ziel.isContentEditable);
@@ -1690,11 +1752,11 @@ export async function starte(behaelter, token){
     return ziel === document.body || behaelter.contains(ziel);
   }
   window.addEventListener('keydown', ev => {
-    if (!aktiv || ev.repeat || ev.code !== 'Space' || !fuerUns(ev.target)) return;
+    if (!hoerenErlaubt || ev.repeat || ev.code !== 'Space' || !fuerUns(ev.target)) return;
     ev.preventDefault(); starteHoeren();
   });
   window.addEventListener('keyup', ev => {
-    if (!aktiv || ev.code !== 'Space' || !fuerUns(ev.target)) return;
+    if (!hoerenErlaubt || ev.code !== 'Space' || !fuerUns(ev.target)) return;
     ev.preventDefault(); stoppeHoeren();
   });
 
@@ -1708,6 +1770,7 @@ export async function starte(behaelter, token){
 /** Zeichenschleife aus. Nach dem Tabwechsel faellt die Last auf null. */
 export function pausiere(){
   aktiv = false;
+  hoerenErlaubt = false;
   if (hoerenAbstellen) hoerenAbstellen();   // ein laufendes Mikrofon auch
   if (renderer) renderer.setAnimationLoop(null);
 }
@@ -1716,6 +1779,10 @@ export function pausiere(){
 export function weiter(){
   if (!gestartet) return;
   aktiv = true;
+  // Wer weiter() ruft, zeigt die Weltansicht - ausser miniAn(), das den
+  // Wert direkt danach wieder zurueckdreht (Verknuepfungspruefung
+  // 31.08.2026, Fund 1).
+  hoerenErlaubt = true;
   if (kartenNachholen) requestAnimationFrame(kartenNachholen);
   if (!renderer) return;
   if (sichtbarSetzen) sichtbarSetzen(true);
@@ -1741,10 +1808,19 @@ export function laeuftGerade(){ return aktiv; }
 export function miniAn(behaelter){
   if (!leinwand || !behaelter) return false;
   if (leinwand.parentNode !== behaelter) behaelter.appendChild(leinwand);
-  // `resize()` haengt an einem ResizeObserver auf dem Canvas selbst - der
-  // feuert nach dem Umhaengen von allein. `weiter()` misst zusaetzlich
+  // 'resize()' haengt an einem ResizeObserver auf dem Canvas selbst - der
+  // feuert nach dem Umhaengen von allein. 'weiter()' misst zusaetzlich
   // sofort nach, damit nicht ein Bild lang die alte Groesse steht.
   weiter();
+  /* Verknuepfungspruefung 31.08.2026, Fund 1: WAS war falsch - hier endete
+     der Aufruf, und weiter() liess das Push-to-Talk-Flag angeschaltet
+     zurueck. WARUM ist das falsch - das Canvas haengt jetzt in der
+     Startansicht, der Mikrofonknopf des Globus bleibt aber in #view-welt
+     unter display:none und ist 0 Pixel breit. Die Leertaste haette dort ein
+     Mikrofon geoeffnet, das kein Bedienelement ankuendigt, und einen
+     verstandenen Landesnamen als bezahlten POST hinausgeschickt. Zeichnen
+     ja, zuhoeren nein. */
+  hoerenErlaubt = false;
   return true;
 }
 

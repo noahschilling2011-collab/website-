@@ -593,3 +593,286 @@ def test_bei_reduzierter_bewegung_steht_der_ring_still_und_bleibt(server):
             assert r["groesse"] > 0.99, r["groesse"]
         finally:
             br.close()
+
+
+# --- Verknuepfungspruefung 31.08.2026, Fund 1 -------------------------------
+#
+# Der Push-to-Talk-Handler haengt am FENSTER. Sein Torwaechter war 'aktiv',
+# und 'aktiv' bedeutete nach FIX-06 Zone 2 zwei verschiedene Dinge:
+# "Zeichenschleife laeuft" und "Weltansicht offen". miniAn() haengt das
+# Canvas in die Startansicht und ruft dabei weiter() - damit war das
+# Mikrofon auf dem Dashboard scharf, obwohl der Knopf dafuer in #view-welt
+# unter display:none steht und 0 Pixel breit ist.
+#
+# Gemessen vor der Reparatur (repro1.py):
+#   mic_delta_auf_startansicht                    1
+#   leertaste_defaultPrevented_auf_startansicht   true
+#   mic_knopf_breite                              0
+#   mic_delta_im_chat                             0
+#
+# Der vorhandene Waechter tests/test_globus_tab.py:528 deckt nur den
+# Chat-Tab ab - die Startansicht gab es beim Schreiben noch nicht.
+
+# Untergeschobener SpeechRecognition-Konstruktor. Er zaehlt nur; er nimmt
+# kein Mikrofon in Anspruch und ruft nichts. Ueber den Knopf 'aria-pressed'
+# zu messen taugt nicht: 'onerror' setzt ihn binnen Millisekunden zurueck.
+_MIC_ZAEHLER = """
+window.__mic = 0;
+function FakeErkennung(){
+  window.__mic++;
+  this.lang = ''; this.continuous = false; this.interimResults = false;
+  this.onresult = null; this.onend = null; this.onerror = null;
+  this.start = function(){}; this.stop = function(){};
+}
+window.SpeechRecognition = FakeErkennung;
+window.webkitSpeechRecognition = FakeErkennung;
+"""
+
+# Die Leertaste genau so, wie der Browser sie schickt, und die Antwort auf
+# beide Fragen in einem Zug: hat der Globus zugehoert, und hat er die Taste
+# geschluckt?
+_LEERTASTE = """() => {
+  const vorher = window.__mic;
+  const ev = new KeyboardEvent('keydown', {
+    key: ' ', code: 'Space', bubbles: true, cancelable: true});
+  document.body.dispatchEvent(ev);
+  return {mic: window.__mic - vorher, geschluckt: ev.defaultPrevented};
+}"""
+
+
+def _lade_dashboard(seite, basis):
+    """index.html oeffnen. Startansicht ist seit FIX-06 Abschnitt 6 das
+    COMMAND CENTER - kein 'networkidle', die Ansicht haelt eine SSE-
+    Verbindung offen und wird nie still."""
+    seite.goto(basis + "/", wait_until="domcontentloaded")
+    seite.wait_for_selector("#tab-welt")
+    seite.wait_for_selector("#view-cc .cc")
+
+
+def test_die_leertaste_auf_der_startansicht_startet_nicht_den_globus(server):
+    """Fund 1. Das Canvas liegt in Zone 2 des COMMAND CENTER und zeichnet -
+    das soll es. Zuhoeren soll es dort nicht.
+
+    Geprueft wird die Ursache und nicht die Oberflaeche: gezaehlt wird, ob
+    der Handler wirklich eine Spracherkennung BAUT. Und zur Gegenprobe im
+    selben Test, dass er es im Welt-Tab noch tut - ein Fix, der das
+    Push-to-Talk ueberall abschaltet, waere kein Fix.
+    """
+    basis, _ = server
+    with playwright.sync_playwright() as pw:
+        br, seite = _browser(pw)
+        try:
+            seite.add_init_script(_MIC_ZAEHLER)
+            _lade_dashboard(seite, basis)
+
+            # Erst den Globus laden (der Welt-Tab tut das), dann zurueck auf
+            # die Startansicht. Genau dieser Weg fuehrt durch miniAn().
+            seite.click("#tab-welt")
+            seite.wait_for_function("() => document.body.dataset.laender",
+                                    timeout=60000)
+            seite.wait_for_timeout(400)
+            seite.click("#tab-cc")
+            seite.wait_for_timeout(1200)
+
+            # Ohne das liegt der Globus gar nicht in der Startansicht, und
+            # der Test waere gruen, ohne etwas geprueft zu haben.
+            wo = seite.evaluate("""() => {
+              const c = document.getElementById('globus');
+              return c && c.parentNode ? c.parentNode.className : 'keins';
+            }""")
+            assert "cc-globus-platz" in wo, f"Canvas liegt in {wo!r}"
+            assert seite.evaluate("() => window.__globusSchleife || 0") >= 0
+
+            # Der Knopf, der Push-to-Talk ankuendigen wuerde, ist hier nicht
+            # zu sehen - das ist der Grund, warum die Taste hier nichts darf.
+            breite = seite.evaluate("""() => {
+              const b = document.getElementById('btn-globus-mic');
+              return b ? b.getBoundingClientRect().width : null;
+            }""")
+            assert breite == 0, f"Mikrofonknopf ist {breite} px breit"
+
+            seite.evaluate("() => document.body.focus()")
+            auf_cc = seite.evaluate(_LEERTASTE)
+            seite.wait_for_timeout(200)
+            assert auf_cc["mic"] == 0, \
+                "die Leertaste hat auf der Startansicht eine Spracherkennung gebaut"
+            assert auf_cc["geschluckt"] is False, \
+                "die Leertaste wurde auf der Startansicht vom Globus geschluckt"
+
+            # Gegenprobe: im Welt-Tab gehoert die Leertaste dem Globus.
+            seite.click("#tab-welt")
+            seite.wait_for_timeout(600)
+            seite.evaluate("() => document.body.focus()")
+            im_welt = seite.evaluate(_LEERTASTE)
+            seite.wait_for_timeout(200)
+            assert im_welt["mic"] == 1, \
+                "im Welt-Tab startet die Leertaste das Mikrofon nicht mehr"
+            assert im_welt["geschluckt"] is True, im_welt
+        finally:
+            br.close()
+
+
+def test_auf_der_eigenen_seite_haelt_die_leertaste_weiter_das_mikrofon(server):
+    """Die zweite Haelfte derselben Reparatur. weltlage.html ruft nur
+    starte() - dort IST der Globus die Seite, und die Leertaste ist das
+    einzige Push-to-Talk. Wer den Fund ueber ein pauschales Abschalten
+    behebt, macht diesen Test rot."""
+    basis, _ = server
+    with playwright.sync_playwright() as pw:
+        br, seite = _browser(pw)
+        try:
+            seite.add_init_script(_MIC_ZAEHLER)
+            _lade(seite, basis)
+            seite.evaluate("() => document.body.focus()")
+            erg = seite.evaluate(_LEERTASTE)
+            seite.wait_for_timeout(200)
+            assert erg["mic"] == 1, "Push-to-Talk auf /weltlage ist tot"
+            assert erg["geschluckt"] is True, erg
+        finally:
+            br.close()
+
+
+# --- Verknuepfungspruefung 31.08.2026, Fund 2 -------------------------------
+
+
+def test_weltlage_sagt_es_wenn_three_nicht_geladen_werden_kann(server):
+    """Fund 2. Faellt einer der beiden Vendor-Brocken aus, scheitert schon
+    das Auswerten des Moduls in weltlage.html - vor jeder Zeile Rumpf.
+
+    Gemessen vor der Reparatur: `document.body.innerText` war die leere
+    Zeichenkette, in der Konsole stand ein einzelnes ERR_FAILED. Der
+    Welt-Tab in index.html meldet denselben Ausfall im Klartext.
+
+    Der Test blockiert absichtlich `three.module.js` und nicht `globus.js`
+    selbst: nur so scheitert der IMPORT. Ein `.catch` allein am
+    `starte()`-Aufruf - bei statischem Import die einzige Moeglichkeit -
+    liefe hier ins Leere, weil der Rumpf gar nicht erst laeuft. Genau das
+    ist die Ursache, und genau die prueft dieser Test.
+    """
+    basis, _ = server
+    with playwright.sync_playwright() as pw:
+        br, seite = _browser(pw)
+        try:
+            seite.route("**/static/vendor/three.module.js",
+                        lambda route: route.abort())
+            seite.goto(basis + "/weltlage", wait_until="domcontentloaded")
+            # Der fehlgeschlagene Import braucht einen Moment; 3 s sind
+            # reichlich fuer ein abgebrochenes lokales Laden.
+            seite.wait_for_timeout(3000)
+
+            text = seite.evaluate("() => document.body.innerText").strip()
+            assert text != "", \
+                "die Seite bleibt bei ausgefallenem three.js voellig leer"
+            assert "Globus" in text, f"kein verstaendlicher Hinweis: {text!r}"
+
+            # Der Kasten muss auch wirklich zu sehen sein - ein Knoten mit
+            # display:none haette denselben innerText-Test bestanden, wenn
+            # er in einem sichtbaren Elternteil haenge. Hier: gemessene
+            # Flaeche.
+            kasten = seite.evaluate("""() => {
+              const e = document.querySelector('.ersatz');
+              if (!e) return null;
+              const r = e.getBoundingClientRect();
+              return {breite: r.width, hoehe: r.height,
+                      sichtbar: getComputedStyle(e).display !== 'none'};
+            }""")
+            assert kasten is not None, "kein .ersatz-Kasten im Dokument"
+            assert kasten["sichtbar"] is True, kasten
+            assert kasten["breite"] > 100 and kasten["hoehe"] > 100, kasten
+        finally:
+            br.close()
+
+
+def test_weltlage_zeigt_ohne_ausfall_keinen_ersatzkasten(server):
+    """Die Gegenprobe zum Test darueber: wer den Kasten fest einbaut, statt
+    ihn an den Fehlerfall zu haengen, faellt hier durch."""
+    basis, _ = server
+    with playwright.sync_playwright() as pw:
+        br, seite = _browser(pw)
+        try:
+            _lade(seite, basis)
+            seite.wait_for_timeout(400)
+            assert seite.evaluate(
+                "() => document.querySelectorAll('.ersatz').length") == 0, \
+                "der Ersatzkasten steht auch im Normalfall in der Seite"
+        finally:
+            br.close()
+
+
+def test_die_leertaste_waehrend_des_ladens_startet_nichts(server):
+    """Der Weg, den die erste Reparatur offen liess.
+
+    `test_die_leertaste_auf_der_startansicht_...` geht ueber #tab-welt und
+    misst damit nur den Zustand NACH `miniAn()`. Der Normalfall beim ersten
+    Oeffnen ist ein anderer: die Startansicht laedt Three.js absichtlich
+    nicht ungefragt, der Nutzer drueckt in Zone 2 den Knopf "Globus laden" -
+    und starrt dann den Hinweis "2 MB Three.js, das dauert einen Moment" an.
+
+    In genau dieser Phase stand `hoerenErlaubt` auf true: `starte()` setzte
+    es fest verdrahtet, und `miniAn()` drehte es erst zurueck, wenn die
+    Geometrie da war. Der eigene Ladetest gesteht dieser Phase bis zu 60
+    Sekunden zu - es sind also keine Millisekunden.
+
+    Gefunden vom Abnehmer, nicht vom Bauer. Deshalb steht der Test hier.
+    """
+    basis, _ = server
+    with playwright.sync_playwright() as pw:
+        br, seite = _browser(pw)
+        try:
+            seite.add_init_script(_MIC_ZAEHLER)
+            _lade_dashboard(seite, basis)
+
+            knopf = seite.locator(".cc-globus-hinweis button")
+            assert knopf.count() == 1, "der Lade-Knopf in Zone 2 fehlt"
+            knopf.click()
+
+            # NICHT auf die Geometrie warten - genau das Fenster ist gemeint.
+            # Mehrfach druecken, ueber die ganze Ladephase verteilt.
+            #
+            # Ueber _LEERTASTE, nicht ueber seite.keyboard.press: die Taste
+            # muss am document.body ankommen, wo der Handler des Globus
+            # haengt. Meine erste Fassung fragte ausserdem
+            # `window.__micStarts` ab - diese Variable gibt es nicht, der
+            # Zaehler heisst `window.__mic`. Mit `|| 0` war der Test damit
+            # IMMER gruen, auch mit dem Fehler drin. Genau der wertlose Test,
+            # den die Abnahme eine Stunde vorher beim Bauer angeprangert hat.
+            gedrueckt = []
+            for _ in range(12):
+                gedrueckt.append(seite.evaluate(_LEERTASTE))
+                seite.wait_for_timeout(50)
+
+            starts = sum(g["mic"] for g in gedrueckt)
+            geschluckt = sum(1 for g in gedrueckt if g["geschluckt"])
+            assert starts == 0, (
+                f"{starts} Mikrofonstart(s) waehrend des Ladens - auf einer "
+                f"Ansicht ohne sichtbaren Mikrofonknopf")
+            assert geschluckt == 0, (
+                f"{geschluckt}x die Leertaste geschluckt, obwohl der Globus "
+                f"gar nicht im Bild ist")
+
+            # Gegenprobe, damit der Test nicht bloss deshalb gruen ist, weil
+            # gar nichts geladen wurde: der Globus muss wirklich anlaufen.
+            seite.wait_for_function("() => document.body.dataset.laender",
+                                    timeout=60000)
+            assert seite.evaluate(_LEERTASTE)["mic"] == 0
+        finally:
+            br.close()
+
+
+def test_auf_der_eigenen_seite_hoert_der_globus_sehr_wohl(server):
+    """Gegenprobe zum Test darueber. `hoeren` steht jetzt auf `false`, wenn
+    der Aufrufer nichts sagt - eine Voreinstellung, die zu weit greift,
+    wuerde die Sprachsuche auf /weltlage still abschalten, wo sie das
+    einzige Bedienelement neben der Maus ist."""
+    basis, _ = server
+    with playwright.sync_playwright() as pw:
+        br, seite = _browser(pw)
+        try:
+            _lade(seite, basis)
+            erlaubt = seite.evaluate("""() => {
+              const b = document.getElementById('btn-globus-mic');
+              return !!b && b.getBoundingClientRect().width > 0;
+            }""")
+            assert erlaubt, "auf /weltlage fehlt der Mikrofonknopf"
+        finally:
+            br.close()

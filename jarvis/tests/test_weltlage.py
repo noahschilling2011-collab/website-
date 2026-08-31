@@ -625,3 +625,83 @@ def test_fund5_weltlage_aufrufe_stehen_in_llm_calls(client, db):
     # Und was die Oberflaeche anzeigt, kommt aus derselben Tabelle.
     stats = client.get("/api/stats", headers=TOKEN).json()
     assert stats["total"]["calls"] == nachher["calls"], stats
+
+
+# --- Verknuepfungspruefung 31.08.2026, Fund 3 -------------------------------
+#
+# Das Altersfenster war asymmetrisch und bis zu 24 Stunden zu weit: die alte
+# Zeile rechnete `abs((bezug - veroeffentlicht).days)`. `timedelta.days`
+# rundet Richtung minus unendlich ab, und `abs()` stand ausserhalb - es wirkte
+# also auf die schon abgerundete Tageszahl. Ergebnis: das Fenster war
+# (-4 Tage, +3 Tage] statt der drei, die MAX_ALTER_TAGE verspricht.
+#
+# Die Tests unten pruefen die URSACHE, nicht die Oberflaeche: sie rechnen mit
+# MAX_ALTER_TAGE statt mit einer festen 3 und fassen genau die Stellen an, an
+# denen `.days` und `total_seconds()` auseinanderlaufen - Bruchteile eines
+# Tages jenseits der Grenze, in beide Richtungen. Ein Test mit "9 Tage alt"
+# (den gibt es weiter oben) haelt den Fehler nicht fest, weil beide Rechnungen
+# dort dasselbe sagen.
+
+
+def _meldung_mit_alter(bezug, versatz):
+    """Eine sonst makellose Meldung, nur `veroeffentlicht` wird verschoben."""
+    return Meldung(schlagzeile="S", kurz="K", medium="Reuters",
+                   veroeffentlicht=bezug + versatz,
+                   quell_url="https://x.example/a", land_iso="DEU")
+
+
+def test_fund3_knapp_ueber_der_grenze_faellt_raus_auch_am_selben_tag():
+    """MAX_ALTER_TAGE + eine Minute ist aelter als MAX_ALTER_TAGE - Punkt.
+
+    Mit `.days` ging alles bis MAX_ALTER_TAGE + 23:59 durch, weil die
+    abgerundete Tageszahl noch MAX_ALTER_TAGE lautete.
+    """
+    from core.weltlage import MAX_ALTER_TAGE
+
+    bezug = datetime(2026, 8, 30, 12, 0, 0, tzinfo=timezone.utc)
+    grund = f"aelter als {MAX_ALTER_TAGE} Tage"
+
+    knapp_drueber = -timedelta(days=MAX_ALTER_TAGE, minutes=1)
+    assert pruefe(_meldung_mit_alter(bezug, knapp_drueber), jetzt=bezug) == grund
+
+    fast_ein_tag_drueber = -timedelta(days=MAX_ALTER_TAGE, hours=23, minutes=59)
+    assert pruefe(_meldung_mit_alter(bezug, fast_ein_tag_drueber), jetzt=bezug) == grund, (
+        "Eine Meldung, die fast einen ganzen Tag zu alt ist, steht in der "
+        "Weltlage - 'Weltlage heisst Lage, nicht Archiv'."
+    )
+
+
+def test_fund3_knapp_unter_der_grenze_bleibt_drin():
+    """Die Gegenrichtung: das Fenster darf nicht zu eng werden.
+
+    Sonst waere der Test oben auch mit `MAX_ALTER_TAGE = 0` gruen.
+    """
+    from core.weltlage import MAX_ALTER_TAGE
+
+    bezug = datetime(2026, 8, 30, 12, 0, 0, tzinfo=timezone.utc)
+    knapp_drunter = -timedelta(days=MAX_ALTER_TAGE, minutes=-1)
+    assert pruefe(_meldung_mit_alter(bezug, knapp_drunter), jetzt=bezug) is None
+    genau_auf_der_grenze = -timedelta(days=MAX_ALTER_TAGE)
+    assert pruefe(_meldung_mit_alter(bezug, genau_auf_der_grenze), jetzt=bezug) is None
+
+
+def test_fund3_das_fenster_ist_symmetrisch():
+    """Gleicher Abstand vor und zurueck, gleiches Urteil.
+
+    Kuenftig datierte Meldungen gibt es wirklich - falsche Zeitzone in der
+    Quelle, Vorabmeldungen. Mit `.days` war die Regel nach vorne um genau
+    einen Tag strenger als nach hinten, und die Verwerfungen landeten im
+    Zaehler, ohne dass etwas falsch war.
+    """
+    from core.weltlage import MAX_ALTER_TAGE
+
+    bezug = datetime(2026, 8, 30, 12, 0, 0, tzinfo=timezone.utc)
+    for stunden in (1, 23, 24 * MAX_ALTER_TAGE - 1, 24 * MAX_ALTER_TAGE,
+                    24 * MAX_ALTER_TAGE + 1, 24 * MAX_ALTER_TAGE + 23):
+        abstand = timedelta(hours=stunden)
+        zurueck = pruefe(_meldung_mit_alter(bezug, -abstand), jetzt=bezug)
+        vorwaerts = pruefe(_meldung_mit_alter(bezug, abstand), jetzt=bezug)
+        assert zurueck == vorwaerts, (
+            f"{stunden} h Abstand: zurueck={zurueck!r}, vorwaerts={vorwaerts!r} - "
+            f"das Fenster ist nicht symmetrisch."
+        )

@@ -53,6 +53,11 @@ ARTIKEL_HTML = (
 
 class KiwixAttrappe(BaseHTTPRequestHandler):
     leer = False
+    # Verknuepfungspruefung 31.08.2026, Fund 2: /search antwortet mit HTTP 200
+    # und diesem Koerper statt mit XML, wenn gesetzt. Genau das liefert ein
+    # kiwix-serve mit falschem WIKI_ZIM, eine aeltere Version oder ein Reverse
+    # Proxy davor - und `raise_for_status()` sieht davon nichts.
+    statt_xml: str | None = None
 
     def do_GET(self):  # noqa: N802 - von BaseHTTPRequestHandler vorgegeben
         teile = urlparse(self.path)
@@ -61,6 +66,9 @@ class KiwixAttrappe(BaseHTTPRequestHandler):
             # Die Doku verlangt books.name und pattern - fehlt eins, 400.
             if "pattern" not in felder or "books.name" not in felder:
                 self.send_response(400); self.end_headers(); return
+            if type(self).statt_xml is not None:
+                self._sende(type(self).statt_xml, "text/html")
+                return
             koerper = ("<rss version='2.0'><channel></channel></rss>"
                        if type(self).leer else SUCH_XML)
             self._sende(koerper, "application/xml")
@@ -84,6 +92,7 @@ class KiwixAttrappe(BaseHTTPRequestHandler):
 @pytest.fixture
 def kiwix():
     KiwixAttrappe.leer = False
+    KiwixAttrappe.statt_xml = None
     server = HTTPServer(("127.0.0.1", 0), KiwixAttrappe)
     faden = threading.Thread(target=server.serve_forever, daemon=True)
     faden.start()
@@ -410,3 +419,96 @@ def test_die_voreinstellung_ist_endlich():
     st = Settings(_env_file=None)
     assert st.wissen_cache_stunden > 0, "der Cache verfiele wieder nie"
     assert st.wissen_cache_stunden <= 24 * 7, st.wissen_cache_stunden
+
+
+# --- Verknuepfungspruefung 31.08.2026, Fund 2 -------------------------------
+#
+# `_erster_treffer()` hat einen `ET.ParseError` zu `(None, "")` gemacht - dem
+# gleichen Rueckgabewert wie "die Suche hat nichts gefunden". Der Aufrufer
+# prueft nur `if pfad is None` und antwortete daraufhin mit `ok=True`,
+# `data={'hits': 0}` und "Nichts zu X in der lokalen Kopie" - eine Aussage
+# ueber den Inhalt der ZIM-Datei, obwohl die lokale Wikipedia nie befragt
+# wurde. Geloggt wurde nichts, und `raise_for_status()` sieht nichts: der Fall
+# tritt gerade bei HTTP 200 auf.
+#
+# Die Tests unten pruefen die URSACHE - dass eine nicht parsbare Antwort im
+# Werkzeug als Fehlschlag ankommt und nicht als Leerstand - und halten
+# daneben fest, dass ein echter Nulltreffer weiter `ok=True` bleibt.
+
+# Eine Fehlerseite, wie ein Server sie ausliefert: HTML, nicht wohlgeformt
+# (`<meta charset="utf-8">` bleibt offen). Genau daran scheitert ET.
+KEINE_XML_ANTWORT = (
+    '<!DOCTYPE html>\n'
+    '<html lang="en"><head><meta charset="utf-8">'
+    "<title>Content not found</title></head>"
+    "<body><h1>Not Found</h1><p>No such book</p></body></html>"
+)
+
+
+def test_fund2_antwort_ohne_xml_ist_ein_fehlschlag_kein_leerstand(lokal, caplog):
+    """kiwix antwortet 200 mit HTML - das darf nicht "steht nicht drin" heissen."""
+    import logging
+
+    KiwixAttrappe.statt_xml = KEINE_XML_ANTWORT
+    with caplog.at_level(logging.WARNING, logger="jarvis"):
+        ergebnis = run(run_tool("wiki_lokal", {"begriff": "Sentinel-2"}))
+
+    assert ergebnis.ok is False, (
+        f"wiki_lokal meldet {ergebnis.display!r} als Erfolg, obwohl die lokale "
+        f"Kopie gar nicht befragt wurde."
+    )
+    assert "Nichts zu" not in (ergebnis.display or "")
+    assert (ergebnis.data or {}).get("hits") != 0
+    assert "WIKI_ZIM" in (ergebnis.error or ""), (
+        "Die Meldung muss auf die wahrscheinliche Ursache zeigen - sonst "
+        "unterscheidet sie sich fuer den Nutzer nicht von 'kennt den Begriff nicht'."
+    )
+    assert any("kein XML" in eintrag.message or "kein XML" in eintrag.getMessage()
+               for eintrag in caplog.records), (
+        "Ohne Log gibt es keinen Hinweis darauf, dass die lokale Wikipedia "
+        "nie befragt wurde - weder fuer den Nutzer noch im Serverlog."
+    )
+
+
+def test_fund2_die_drei_lagen_sind_wieder_auseinanderzuhalten(lokal, db, monkeypatch):
+    """'kennt den Begriff nicht', 'antwortet falsch', 'nicht erreichbar'.
+
+    Drei verschiedene Lagen, drei verschiedene Antworten. Vorher fielen die
+    ersten beiden zusammen.
+    """
+    KiwixAttrappe.leer = True
+    kennt_es_nicht = run(run_tool("wiki_lokal", {"begriff": "Gibtesnicht"}))
+    assert kennt_es_nicht.ok is True and kennt_es_nicht.data["hits"] == 0
+    assert "Nichts zu" in kennt_es_nicht.display
+
+    KiwixAttrappe.leer = False
+    KiwixAttrappe.statt_xml = KEINE_XML_ANTWORT
+    antwortet_falsch = run(run_tool("wiki_lokal", {"begriff": "Sentinel-2"}))
+    assert antwortet_falsch.ok is False
+    assert "kein XML" in antwortet_falsch.error
+
+    KiwixAttrappe.statt_xml = None
+    monkeypatch.setattr(lokal, "basis", "http://127.0.0.1:1", raising=False)
+    nicht_erreichbar = run(run_tool("wiki_lokal", {"begriff": "Sentinel-2"}))
+    assert nicht_erreichbar.ok is False
+    assert "nicht erreichbar" in nicht_erreichbar.error
+
+    assert len({kennt_es_nicht.display, antwortet_falsch.display,
+                nicht_erreichbar.display}) == 3
+
+
+def test_fund2_erster_treffer_verschluckt_den_parsefehler_nicht_mehr(lokal):
+    """Direkt an der Ursache: die Hilfsfunktion selbst darf nicht schweigen.
+
+    Wenn sie den Fehler wieder zu `(None, "")` macht, wird sie von execute()
+    nicht mehr von einem leeren Suchergebnis unterschieden - egal, wie
+    execute() danach umgebaut wird.
+    """
+    import xml.etree.ElementTree as ET
+
+    with pytest.raises(ET.ParseError):
+        lokal._erster_treffer(KEINE_XML_ANTWORT)
+
+    # Wohlgeformtes RSS ohne Treffer bleibt ein leeres Ergebnis, kein Fehler.
+    assert lokal._erster_treffer(
+        "<rss version='2.0'><channel></channel></rss>") == (None, "")

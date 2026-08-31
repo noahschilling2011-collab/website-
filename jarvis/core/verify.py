@@ -29,6 +29,41 @@ PREIS = re.compile(
     re.IGNORECASE,
 )
 
+# Verknuepfungspruefung 31.08.2026, Fund "erfundene URL erreicht den Nutzer".
+#
+# WAS WAR FALSCH: Die Quellenregel weiter unten hing an `step.agent ==
+# "research"`. Der `weltlage`-Agent ist aber der einzige Agent OHNE
+# Link-Filter (`links_pruefen=False` in `core/agents.py`) - bei ihm bleibt
+# jede erfundene Adresse woertlich im Ergebnis stehen. Ausgerechnet er wurde
+# von der Quellenregel nicht erfasst.
+#
+# WARUM IST DAS FALSCH: Der Planner bietet `weltlage` JEDEM Auftrag an
+# (`core/runner.py` nimmt nur `jarvis` aus der Liste). Auf dem Weg
+# /api/tasks laeuft dann weder der Parser aus `core/weltlage.py` noch die
+# Nachpruefung aus `api/weltlage.py` - beide Stuetzen, mit denen die Ausnahme
+# begruendet ist, fallen weg. Gemessen mit demselben Auftrag und derselben
+# erfundenen Adresse: ueber `research` scheitert der Schritt, ueber
+# `weltlage` stand die Adresse woertlich in der Endantwort, die der Nutzer
+# als Beleg liest. Sie ueberlebt sogar den Schlussfilter, weil
+# `core/runner.py` die Schritt-Displays an `belegte_urls()` gibt und die
+# Adresse sich damit selbst belegt.
+#
+# Die Regel haengt deshalb jetzt an einem MERKMAL statt an einem Namen: ein
+# Agent, dessen Links niemand gefiltert hat, traegt alles weiter, was das
+# Modell erfunden hat - so einer braucht eine Quelle. Ein neuer Agent mit
+# `links_pruefen=False` ist damit automatisch erfasst und nicht erst, wenn
+# jemand daran denkt, hier einen Namen nachzutragen.
+#
+# Die eine Ausnahme, die bleibt: die Weltlage-SEITE. Nur dort holt
+# `api/weltlage.py` die quell_url anschliessend wirklich, und nur dort ist
+# die Ausnahme also gedeckt. Erkennbar am Ziel, das `api/weltlage.py` selbst
+# baut ("Weltlage: ..." bzw. "Weltlage RUS: ..."). Bewusst am Anfang
+# verankert: das Ziel steht im Auftrag ganz vorn, ein Modell kann sich die
+# Ausnahme also nicht durch angehaengten Text erschleichen. Und wenn jemand
+# die Formulierung dort aendert, faellt die Ausnahme WEG - die Weltlage-Seite
+# scheitert dann laut, statt dass hier still eine Luecke aufgeht.
+WELTLAGE_SEITE = re.compile(r"^Weltlage(?: [A-Z]{3})?: ")
+
 AUFGEGEBEN = re.compile(
     r"\b(konnte nichts|nichts gefunden|keine (?:quelle|informationen|angaben|daten)"
     r"|nicht heraus(?:finden|gefunden)|kann ich nicht beantworten"
@@ -63,6 +98,21 @@ def verifiziere(step: Step, ergebnis: ToolResult | None) -> tuple[bool, str]:
             "eine URL - such und lies die Seite, statt aus dem Gedaechtnis zu "
             "antworten."
         )
+
+    # Die Quellenregel fuer Agenten ohne Link-Filter - Begruendung oben bei
+    # WELTLAGE_SEITE. `data` ist `Any`: nur ein Agent legt dort ein dict mit
+    # diesen Schluesseln ab, jedes Werkzeugergebnis faellt auf den Default
+    # zurueck und bleibt unberuehrt.
+    daten = ergebnis.data if isinstance(ergebnis.data, dict) else {}
+    if daten.get("links_gefiltert", True) is False and not ergebnis.sources:
+        ziel = daten.get("ziel") or ""
+        if not (isinstance(ziel, str) and WELTLAGE_SEITE.match(ziel)):
+            return False, (
+                "Die Links dieses Schritts hat niemand geprueft, und ein "
+                "Werkzeug hat keine einzige Seite geholt. Jede Adresse im "
+                "Ergebnis ist damit geraten - such die Seite und lies sie, "
+                "statt aus dem Gedaechtnis zu antworten."
+            )
 
     if PREIS.search(text) and not ergebnis.sources:
         return False, (

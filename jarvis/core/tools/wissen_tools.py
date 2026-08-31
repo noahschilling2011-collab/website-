@@ -11,6 +11,7 @@ Abschnitt 2 es verlangt.
 
 from __future__ import annotations
 
+import logging
 import re
 import time
 import urllib.parse
@@ -23,6 +24,8 @@ from core.contracts import Permission, Tool, ToolResult
 from core.netz import fuer_dienst, nach_draussen
 from core.tools.registry import register
 from core.wissen import Wissen, aus_cache, in_cache, snapshot_aus_zimname
+
+log = logging.getLogger("jarvis")
 
 # Wikimedia verlangt einen aussagekraeftigen User-Agent mit Kontakt. Ohne den
 # faellt man in die niedrigste Limitklasse.
@@ -183,6 +186,20 @@ class WikiLokal(_MitCache):
                                            else f"{self.basis}/{pfad}")
                 artikel.raise_for_status()
                 text = self._nur_text(artikel.text)
+        except ET.ParseError as exc:
+            # Verknuepfungspruefung 31.08.2026, Fund 2. "nicht erreichbar",
+            # "antwortet falsch" und "kennt den Begriff nicht" sind drei
+            # verschiedene Lagen und muessen drei verschiedene Antworten
+            # geben. Vorher war die mittlere von der letzten nicht zu
+            # unterscheiden - und stand in keinem Log.
+            #
+            # `ok=False` wie beim Fall "nicht eingerichtet" weiter oben
+            # (fehlendes WIKI_ZIM): das Werkzeug hat nichts nachgeschlagen,
+            # also darf es nichts ueber den Inhalt der Kopie behaupten.
+            log.warning("wiki_lokal: kiwix-serve hat kein XML geliefert - %s", exc)
+            fehler = "kiwix-serve hat kein XML geliefert - stimmt WIKI_ZIM?"
+            return ToolResult(ok=False, error=fehler, display=fehler,
+                              duration_ms=int((time.monotonic() - begonnen) * 1000))
         except httpx.HTTPError as exc:
             fehler = f"kiwix-serve nicht erreichbar ({exc.__class__.__name__})."
             return ToolResult(ok=False, error=fehler, display=fehler,
@@ -195,11 +212,29 @@ class WikiLokal(_MitCache):
 
     @staticmethod
     def _erster_treffer(xml_text: str) -> tuple[str | None, str]:
-        """Die XML-Antwort ist ein OpenSearch-RSS. Erster `item` gewinnt."""
-        try:
-            baum = ET.fromstring(xml_text)
-        except ET.ParseError:
-            return None, ""
+        """Die XML-Antwort ist ein OpenSearch-RSS. Erster `item` gewinnt.
+
+        Wirft `ET.ParseError`, wenn die Antwort kein XML ist. Das ist Absicht -
+        siehe den Fangzweig in `execute()`.
+        """
+        # Verknuepfungspruefung 31.08.2026, Fund 2: hier stand ein
+        # `try/except ET.ParseError: return None, ""`.
+        #
+        # WAS WAR FALSCH: der Parsefehler wurde stillschweigend zum selben
+        # Rueckgabewert wie "die Suche hat nichts gefunden".
+        #
+        # WARUM DAS FALSCH IST: der Aufrufer prueft nur `if pfad is None` und
+        # antwortet daraufhin mit `ok=True`, `data={'hits': 0}` und "Nichts zu
+        # X in der lokalen Kopie" - eine Aussage ueber den Inhalt der ZIM-Datei,
+        # obwohl die lokale Wikipedia gar nicht befragt wurde. Ein falsch
+        # gesetztes WIKI_ZIM, eine aeltere kiwix-Version oder ein Reverse Proxy
+        # davor liefert genau das: HTTP 200 mit HTML statt XML.
+        # `raise_for_status()` faengt das nicht ab, denn der Status ist 200 -
+        # derselbe Fallstrick, den `core/kalender.py` (Zeile 394) fuer Abos
+        # kennt: "Ein Abo, das eine Anmeldeseite ausliefert, kommt als HTTP
+        # 200." Deshalb wird auch hier der Inhalt geprueft, nicht nur der
+        # Status.
+        baum = ET.fromstring(xml_text)
         for eintrag in baum.iter():
             marke = eintrag.tag.rsplit("}", 1)[-1]
             if marke != "item":

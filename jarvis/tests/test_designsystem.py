@@ -471,3 +471,137 @@ def test_die_akzentfarbe_erreicht_wirklich_die_dreidimensionale_szene(server):
             assert fehler == [], fehler
         finally:
             br.close()
+
+
+# --- Verknuepfungspruefung 31.08.2026, Fund 3 -------------------------------
+#
+# Die Kommentare in static/globus.js und weltlage.html sind die einzige
+# Dokumentation der Naht zwischen den beiden Seiten: warum der Token ein
+# Parameter ist, warum alles unter .globus-wurzel haengt, welche zwei
+# Klassennamen sich mit index.html ueberschneiden. Acht davon zeigten mit
+# einer Zeilennummer ins Leere.
+#
+# Gemessen vor der Reparatur:
+#   static/globus.js:12  nannte api/app.py:205 fuer den StaticFiles-Mount
+#                        -> dort steht ein Absatz ueber Copernicus-Konten,
+#                           app.mount("/static", ...) steht in Zeile 270
+#   static/globus.js:13  nannte api/routes.py:515 und :533 fuer die Routen
+#                        -> die stehen in 690 und 703
+#   static/globus.js:25  nannte index.html:446 fuer .view
+#                        -> .view steht in 503, 446 ist eine .brand-mark-Regel
+#   static/globus.js:37  nannte index.html:450 und :129 fuer .karte/.status
+#                        -> die stehen in 740 und 170
+#   static/globus.js:179 nannte index.html:454-455 -> .karte steht in 740-746
+#   static/globus.js:242 nannte index.html:130     -> .status steht in 170-171
+#   weltlage.html:57/:59 wiederholten die beiden Backend-Nummern
+#
+# Eine Nummer verrutscht bei jeder Aenderung ueber ihr. Ein Symbolname nicht.
+# Die zwei Tests hier halten beides fest.
+
+# Nur die zwei Dateien der Naht - der Rest des Projekts ist nicht Gegenstand
+# dieses Fundes und gehoert anderen.
+_NAHT = ("static/globus.js", "weltlage.html")
+
+# `pfad.endung:zahl`, mit oder ohne Bereich. Der Pfad muss eine Endung haben,
+# damit "127.0.0.1:8000" und CSS-Pseudoklassen nicht hineinfallen.
+_ZEILENVERWEIS = re.compile(
+    r"[A-Za-z0-9_/.-]+\.(?:py|js|jsx|html|css|md|json|txt):\d+")
+
+
+def test_die_naht_kommentiert_ohne_zeilennummern():
+    """Fund 3. Ein Verweis auf eine Datei DIESES Projekts darf keine
+    Zeilennummer tragen.
+
+    Geprueft wird die Ursache und nicht die acht Einzelstellen: solange
+    ueberhaupt eine Nummer dasteht, wandert sie bei der naechsten Aenderung
+    darueber weg, ohne dass irgendetwas rot wird. Verweise auf Dateien, die
+    es hier gar nicht gibt - die eingefrorene Vorlage jarvis-scene.jsx zum
+    Beispiel - bleiben erlaubt: die aendert dieses Projekt nicht.
+    """
+    treffer = []
+    for name in _NAHT:
+        pfad = WURZEL / name
+        for nr, zeile in enumerate(pfad.read_text(encoding="utf-8").splitlines(), 1):
+            for verweis in _ZEILENVERWEIS.findall(zeile):
+                datei = verweis.rsplit(":", 1)[0]
+                if (WURZEL / datei).is_file():
+                    treffer.append(f"{name}:{nr}: {verweis}")
+    assert treffer == [], (
+        "Zeilenverweis in einem Kommentar der Naht - nimm den Symbolnamen:\n"
+        + "\n".join(treffer))
+
+
+def test_die_symbole_aus_den_nahtkommentaren_gibt_es_wirklich():
+    """Die zweite Haelfte: Namen statt Nummern nuetzt nur, wenn die Namen
+    stimmen. Jede Behauptung der Kommentare wird hier nachgeschlagen.
+
+    Der Ankertext ist absichtlich der, der auch im Kommentar steht - wer
+    eine der Regeln umbenennt, macht diesen Test rot und findet ueber ihn
+    die Kommentare, die dann nachzuziehen sind.
+    """
+    app_py = (WURZEL / "api" / "app.py").read_text(encoding="utf-8")
+    routes_py = (WURZEL / "api" / "routes.py").read_text(encoding="utf-8")
+    index = (WURZEL / "index.html").read_text(encoding="utf-8")
+    globus = (WURZEL / "static" / "globus.js").read_text(encoding="utf-8")
+    weltlage = (WURZEL / "weltlage.html").read_text(encoding="utf-8")
+
+    # Der Mount, der /static roh ausliefert - der Grund, warum der Token ein
+    # Parameter ist und nicht in globus.js steht.
+    assert 'app.mount("/static"' in app_py
+    assert 'app.mount("/static", ...)' in globus
+    assert 'app.mount("/static", ...)' in weltlage
+
+    # Die beiden HTML-Routen, die den Platzhalter ersetzen.
+    for symbol in ("async def index(", "async def weltlage_seite("):
+        assert symbol in routes_py, symbol
+    assert "index() und weltlage_seite()" in globus
+    assert "weltlage_seite()" in weltlage
+    assert "__JARVIS_TOKEN__" in routes_py or "__JARVIS_TOKEN__" in app_py
+
+    # Die drei Regeln aus index.html, auf die sich der Globus stuetzt - und
+    # jeweils die Eigenschaft, die der Kommentar von ihnen behauptet.
+    def regel(text, selektor):
+        treffer = re.search(re.escape(selektor) + r"\s*\{([^}]*)\}", text)
+        assert treffer, f"{selektor} gibt es in index.html nicht mehr"
+        return treffer.group(1).replace(" ", "")
+
+    assert "display:none" in regel(index, ".view"), \
+        ".view blendet nicht mehr mit display:none um"
+    karte = regel(index, ".karte")
+    assert "padding:" in karte and "margin-bottom:" in karte, \
+        ".karte hat keinen Innen- und Aussenabstand mehr"
+    assert "margin-left:auto" in regel(index, ".status"), \
+        ".status schiebt sich nicht mehr mit margin-left:auto"
+
+    # Und der Globus haelt genau dagegen - sonst waere der Kommentar wahr
+    # und der Code trotzdem falsch.
+    assert "padding:0;margin-bottom:0;" in globus
+    assert "margin-left:0;" in globus
+
+
+def test_genau_zwei_klassennamen_ueberschneiden_sich_mit_index_html():
+    """Die Behauptung im STIL-Block von globus.js, nachgerechnet statt
+    erzaehlt: 'karte' und 'status' gibt es in index.html schon, und nur
+    die zwei.
+
+    Genau das ist der Grund, warum alles unter '.globus-wurzel' geschachtelt
+    ist. Kommt ein dritter gemeinsamer Name dazu, faerbt der Globus wieder
+    etwas im Chat um - und dieser Test sagt es, bevor es jemand sieht.
+    """
+    globus = (WURZEL / "static" / "globus.js").read_text(encoding="utf-8")
+    stil = globus[globus.index("const STIL = `"):globus.index("const MARKUP = `")]
+    index = (WURZEL / "index.html").read_text(encoding="utf-8")
+    # Nur der <style>-Teil von index.html; im Skript stehen Klassennamen als
+    # Zeichenketten, die hier nichts zu suchen haben.
+    stil_index = "\n".join(re.findall(r"<style>(.*?)</style>", index, re.S))
+
+    def klassen(text):
+        # Kommentare raus, sonst zaehlen erklaerende Beispiele mit.
+        ohne = re.sub(r"/\*.*?\*/", " ", text, flags=re.S)
+        return set(re.findall(r"\.([a-z][a-z0-9-]*)", ohne))
+
+    globus_klassen = {k for k in klassen(stil) if k != "globus-wurzel"}
+    gemeinsam = globus_klassen & klassen(stil_index)
+    assert gemeinsam == {"karte", "status"}, (
+        "die Ueberschneidung ist nicht mehr genau {'karte','status'}: "
+        f"{sorted(gemeinsam)}")

@@ -8,6 +8,10 @@ maechtigeres Werkzeug in die Liste geschrieben wird.
 Reihenfolge: gibt es das Tool → darf der Aufrufer → stimmen die Argumente →
 ausfuehren mit Timeout. Jeder Fehlschlag ist ein `ToolResult(ok=False)`,
 niemals eine Ausnahme nach oben.
+
+Genau EINE Ausnahme davon: `LaufBeendet`. Das ist kein Fehlschlag des
+Werkzeugs, sondern das Ende des Laufs - siehe die Begruendung unten am
+`except LaufBeendet` (Verknuepfungspruefung 31.08.2026, Fund 2).
 """
 
 from __future__ import annotations
@@ -17,6 +21,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Iterable
 
+from core.abbruch import LaufBeendet
 from core.contracts import Permission, Tool, ToolResult
 from core.tools import registry
 from core.tools.validate import pruefe
@@ -157,6 +162,29 @@ async def run_tool(
         ergebnis = await asyncio.wait_for(
             tool.execute(**argumente), timeout=tool.timeout_s
         )
+    except LaufBeendet:
+        # Verknuepfungspruefung 31.08.2026, Fund 2: dieser Zweig fehlte, und
+        # das allgemeine `except Exception` weiter unten hat den Abbruch
+        # gefressen. `LaufBeendet` (core/abbruch.py) ist eine gewoehnliche
+        # Exception - genau deshalb faengt `ToolAgent._run` sie ausdruecklich
+        # ab und wirft sie weiter, mit dem Kommentar: "Wer das hier in ein
+        # ToolResult verwandelt, macht aus dem Abbruch einen misslungenen
+        # Schritt."
+        #
+        # Ueber `ask_agent` lief sie aber durch den Dispatcher: bricht der
+        # Nutzer waehrend eines Unterauftrags ab, wirft der Pruefpunkt des
+        # Unteragenten (core/tools/loop.py) `LaufBeendet`, die Ausnahme laeuft
+        # durch `AskAgent.execute` nach oben - und wurde hier zu
+        # "ask_agent ist mit einem Fehler ausgestiegen" degradiert. Dabei ging
+        # dreierlei verloren: der Teiltext des Unteragenten (die Ausnahme mit
+        # `teiltext` wurde verworfen), der zweite `on_subtask`-Ruf (der
+        # Unterauftrag blieb in der tasks-Tabelle fuer immer auf "running"),
+        # und im Werkzeugprotokoll stand ein Fehler, den niemand verursacht
+        # hat.
+        #
+        # Der Dispatcher darf jeden Werkzeugfehler abfangen - aber nicht das
+        # Ende des Laufs. Diese eine Ausnahme geht durch.
+        raise
     except asyncio.TimeoutError:
         return ToolResult(
             ok=False,

@@ -60,4 +60,23 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD ["python", "-m", "scripts.healthcheck"]
 
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# --timeout-graceful-shutdown hat hier GEFEHLT - gefunden bei der
+# Verknuepfungspruefung am 31.08.2026 (Gruppe shutdown, Fund 1).
+#
+# Ohne den Schalter ist uvicorns `timeout_graceful_shutdown` None und der
+# Server wartet UNBEGRENZT auf noch offene Antworten. Der Ereignisstrom
+# `strom()` in api/events.py ist genau so eine Antwort: er laeuft in
+# `while True` und endet nur, wenn der Client geht - beim Herunterfahren
+# bekommt er aber kein `http.disconnect`, uvicorn setzt fuer eine laufende
+# Antwort nur `cycle.keep_alive = False`. Ein offener Browser-Tab auf dem
+# Command Center genuegte damit, dass `docker stop` die vollen 10 s wartet
+# und den Container dann per SIGKILL abschiesst - und weil uvicorn den
+# lifespan-Shutdown erst NACH dem Warten auf die Verbindungen ausfuehrt, kam
+# der finally-Block in api/app.py nie dran: `tasks.stop_alle()` und
+# `provider.aclose()` wurden uebersprungen.
+#
+# 5 Sekunden, derselbe Wert wie HERUNTERFAHREN_SEKUNDEN in main.py - dort
+# steht die ausfuehrliche Begruendung samt Messung. tests/test_events.py
+# haelt beide Stellen zusammen und prueft den Wert am laufenden Server nach.
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", \
+     "--timeout-graceful-shutdown", "5"]

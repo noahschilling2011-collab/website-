@@ -788,3 +788,121 @@ def test_und_umgekehrt_bekommt_die_globus_karte_keinen_chat_abstand(server):
             assert werte == {"padding": "0px", "rand": "0px"}, werte
         finally:
             br.close()
+
+
+# ===========================================================================
+# Verknuepfungspruefung 31.08.2026, Fund 7 - Gruppe frontend
+# ===========================================================================
+
+
+def _mini_globus_laden(seite, basis):
+    """Zone 2 der Startansicht dazu bringen, das Canvas wirklich zu zeigen.
+
+    Der Knopf ist Absicht: die Startansicht laedt Three.js nicht ungefragt
+    (FIX-05 B-2). Erst nach dem Klick haengt `miniAn()` das Canvas um.
+    """
+    seite.goto(basis + "/", wait_until="domcontentloaded")
+    seite.wait_for_selector("#view-cc .cc", timeout=20000)
+    seite.click(".cc-globus-hinweis button")
+    seite.wait_for_selector(".cc-globus-platz canvas", timeout=60000)
+    seite.wait_for_function(
+        "() => window.zustand && window.zustand.laender"
+        " && window.zustand.laender.length > 0", timeout=60000)
+
+
+def test_fund7_ein_klick_auf_den_mini_globus_zeigt_sein_ergebnis(server):
+    """Ein Klick in Zone 2 startete eine bezahlte Recherche ins Unsichtbare.
+
+    Reproduktion vor der Reparatur (Startansicht, Kugel auf Frankreich
+    gedreht, ein Klick in die Mitte des Mini-Canvas):
+
+        weltlage-Anfragen : GET /api/weltlage/FRA, POST /api/weltlage/FRA
+        #view-welt aktiv  : False
+        #land             : "France"   Groesse 0 x 0
+        #karten                        Groesse 0 x 0
+
+    `miniAn()` haengt NUR das Canvas um. Kopfzeile, Landtafel, Kartenspalte
+    und Statuszeile bleiben in #view-welt, und das traegt auf der
+    Startansicht display:none. Der POST legt einen echten Task an und ruft
+    `fuehre_task_aus` - Budget, Audit, bezahlter Modellaufruf. Wer nichts
+    sieht, klickt noch einmal.
+
+    Geprueft wird die Ursache, nicht die Ringmarkierung: laeuft der teure
+    Pfad, muss seine Ausgabe sichtbar sein. Gemessen wird deshalb die
+    Groesse der Ausgabebehaelter, nicht ihr Text.
+    """
+    with playwright.sync_playwright() as pw:
+        br, seite = _browser(pw)
+        anfragen = []
+        try:
+            seite.on("request", lambda r: anfragen.append(r.method + " " + r.url))
+            _mini_globus_laden(seite, server)
+            _dreh_zu(seite, 2.5, 46.5)          # Frankreich in die Mitte
+            seite.wait_for_timeout(2500)        # der Flug braucht seine Zeit
+
+            kasten = seite.locator(".cc-globus-platz canvas").bounding_box()
+            vorher = len([a for a in anfragen if "/api/weltlage/" in a])
+            seite.mouse.click(kasten["x"] + kasten["width"] / 2,
+                              kasten["y"] + kasten["height"] / 2)
+            seite.wait_for_timeout(2500)
+
+            # 1. Der Klick fuehrt dahin, wo die Ausgabe steht.
+            assert seite.eval_on_selector(
+                "#view-welt", "e => e.classList.contains('is-active')"), \
+                "der Klick laesst den Nutzer in der Startansicht zurueck"
+
+            # 2. Und die Ausgabebehaelter sind dort wirklich zu sehen.
+            masse = seite.evaluate("""() => {
+              const raus = {};
+              ['land', 'karten', 'gesagt'].forEach(function (id) {
+                const e = document.getElementById(id);
+                const k = e ? e.getBoundingClientRect() : null;
+                raus[id] = k ? {w: Math.round(k.width), h: Math.round(k.height)} : null;
+              });
+              return raus;
+            }""")
+            for name in ("land", "karten"):
+                assert masse[name], (name, masse)
+                assert masse[name]["w"] > 0 and masse[name]["h"] > 0, masse
+
+            # 3. Die Gegenprobe, dass ueberhaupt etwas passiert ist: der
+            #    Klick hat den teuren Pfad wirklich angestossen. Ohne sie
+            #    waere der Test auch dann gruen, wenn der Klick ins Leere
+            #    ginge.
+            neu = [a for a in anfragen if "/api/weltlage/" in a][vorher:]
+            assert any("/api/weltlage/FRA" in a for a in neu), neu
+        finally:
+            br.close()
+
+
+def test_fund7_wer_den_mini_globus_dreht_wird_nicht_weggeschaltet(server):
+    """Die Gegenprobe zur Reparatur: Ziehen ist keine Auswahl.
+
+    Dieselbe Schwelle wie in static/globus.js (ZIEH_SCHWELLE, 5 Pixel). Wer
+    die Kugel in der Startansicht dreht, will dort bleiben - sonst waere aus
+    der Reparatur eine neue Zumutung geworden.
+    """
+    with playwright.sync_playwright() as pw:
+        br, seite = _browser(pw)
+        anfragen = []
+        try:
+            seite.on("request", lambda r: anfragen.append(r.method + " " + r.url))
+            _mini_globus_laden(seite, server)
+            kasten = seite.locator(".cc-globus-platz canvas").bounding_box()
+            mx = kasten["x"] + kasten["width"] / 2
+            my = kasten["y"] + kasten["height"] / 2
+            seite.mouse.move(mx, my)
+            seite.mouse.down()
+            for schritt in range(1, 7):
+                seite.mouse.move(mx + schritt * 12, my)
+            seite.mouse.up()
+            seite.wait_for_timeout(800)
+
+            assert seite.eval_on_selector(
+                "#view-cc", "e => e.classList.contains('is-active')"), \
+                "eine Drehung hat die Ansicht gewechselt"
+            posts = [a for a in anfragen
+                     if a.startswith("POST") and "/api/weltlage/" in a]
+            assert posts == [], posts
+        finally:
+            br.close()

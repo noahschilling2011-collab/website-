@@ -52,14 +52,60 @@ body{
 <noscript><div class="ersatz">Für den Globus wird JavaScript gebraucht.</div></noscript>
 
 <script type="module">
-import { starte } from '/static/globus.js';
+/* Der Token wird beim Ausliefern eingesetzt - api/routes.py, die Route
+   weltlage_seite(). Er muss HIER stehen und nicht in `static/globus.js`:
+   /static geht durch einen StaticFiles-Mount (api/app.py, die Zeile mit
+   app.mount("/static", ...)), und dort ersetzt niemand etwas. Stuende der
+   Platzhalter in der Modul-Datei, ginge jeder API-Aufruf mit
+   `__JARVIS_TOKEN__` raus und bekaeme 401.
 
-/* Der Token wird beim Ausliefern eingesetzt (`api/routes.py:533`). Er muss
-   HIER stehen und nicht in `static/globus.js`: /static geht durch einen
-   StaticFiles-Mount (`api/app.py:205`), und dort ersetzt niemand etwas.
-   Stuende der Platzhalter in der Modul-Datei, ginge jeder API-Aufruf mit
-   `__JARVIS_TOKEN__` raus und bekaeme 401. */
-starte(document.getElementById('welt'), '__JARVIS_TOKEN__');
+   Verknuepfungspruefung 31.08.2026, Fund 3: hier standen statt der Namen
+   zwei Zeilennummern, eine fuer die Route und eine fuer den Mount. Beide
+   zeigten woanders hin - die Route steht laengst rund zweihundert Zeilen
+   weiter unten, und die Mount-Nummer traf einen Absatz ueber
+   Copernicus-Konten. Namen verrutschen nicht, Nummern schon. */
+
+/* Verknuepfungspruefung 31.08.2026, Fund 2.
+
+   WAS war falsch: hier stand ein statisches `import { starte } from
+   '/static/globus.js'` und darunter ein `starte(...)` ohne jeden
+   Fehlerzweig.
+
+   WARUM ist das falsch: `globus.js` importiert selbst `three`, und das sind
+   zwei Brocken von zusammen rund 2 MB. Faellt einer davon aus, scheitert
+   schon das Auswerten dieses Moduls - der Rumpf laeuft nie, und kein
+   `try`/`catch` in ihm kann greifen. Das `<noscript>` oben hilft auch
+   nicht: es zeigt nur, wenn JavaScript ganz aus ist. Der Nutzer sah eine
+   schwarze Flaeche, die von den zwei Zeilen im eigenen <style> gemalt wird -
+   ohne Meldung, und da diese Seite kein einziges <a href> fuehrt, auch ohne
+   Weg weiter. Gemessen mit blockiertem /static/vendor/three.module.js:
+   `document.body.innerText` war die leere Zeichenkette, in der Konsole
+   stand ein einzelnes "Failed to load resource: net::ERR_FAILED".
+   `index.html` behandelt denselben Ausfall seit jeher und schreibt
+   "Globus nicht geladen: ..." in die Ansicht - zwei Verhalten fuer
+   denselben Fehler.
+
+   Deshalb: der Import ist jetzt dynamisch. Erst damit ist der Fehlschlag
+   ein abfangbares abgelehntes Promise statt eines toten Moduls, und
+   derselbe `.catch` deckt beides ab - den Import UND das spaetere
+   `starte()`. Angezeigt wird der `.ersatz`-Kasten, den die Seite fuer
+   `<noscript>` schon definiert hat. */
+function zeigeAusfall(grund){
+  const kasten = document.createElement('div');
+  kasten.className = 'ersatz';
+  kasten.textContent =
+    'Der Globus konnte nicht geladen werden: ' + grund
+    + ' — bitte die Seite neu laden.';
+  // An den Koerper, nicht in #welt: liegt dort schon ein halb aufgebauter
+  // Globus, deckt der Kasten ihn ab, statt sich dahinter zu verstecken.
+  document.body.appendChild(kasten);
+}
+
+import('/static/globus.js')
+  .then(modul => modul.starte(document.getElementById('welt'), '__JARVIS_TOKEN__',
+                              { hoeren: true }))
+  .catch(fehler => zeigeAusfall(
+    fehler && fehler.message ? fehler.message : String(fehler)));
 </script>
 </body>
 </html>

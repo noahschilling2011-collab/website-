@@ -295,3 +295,64 @@ def test_fortschritt_wird_gemeldet():
                         laufzeit=Laufzeit(on_step=on_step)))
     assert "0:pending" in ereignisse and "0:running" in ereignisse
     assert ereignisse[-1] == "0:done"
+
+
+# --- Verknuepfungspruefung 31.08.2026, Fund 3 ------------------------------
+# Zwischen den Reparaturversuchen des Planners stand kein Pruefpunkt. Der
+# Runner prueft einmal VOR der Planung; danach lief die Schleife in
+# core/planner.py bis zu MAX_REPARATUREN + 1 = 3 bezahlte Zuege blind durch.
+# Wer waehrend des ersten Planungszuges abbrach, bezahlte noch zwei weitere.
+# Geprueft wird die Ursache - die Zahl der Modellzuege -, nicht die Anzeige.
+
+
+def test_fund3_planner_ruft_den_pruefpunkt_vor_jedem_zug():
+    """Der Pruefpunkt steht am Kopf der Schleife, nicht nur davor."""
+    from core.abbruch import LaufBeendet
+
+    gezaehlt = {"n": 0}
+
+    def pruefpunkt() -> None:
+        gezaehlt["n"] += 1
+        # Der erste Zug darf laufen, der zweite nicht mehr - so wie der
+        # Nutzer waehrend des ersten Zuges abbricht.
+        if gezaehlt["n"] > 1:
+            raise LaufBeendet("Vom Nutzer abgebrochen.", status="cancelled")
+
+    p = FakeLLMProvider(replies=["kaputt", "kaputt", "kaputt"])
+    with pytest.raises(LaufBeendet):
+        run(erstelle_plan(p, "x", pruefpunkt=pruefpunkt))
+    assert len(p.calls) == 1, (
+        f"nach dem Abbruch darf kein weiterer Zug kommen, es waren {len(p.calls)}"
+    )
+
+
+def test_fund3_ohne_pruefpunkt_bleibt_der_planner_wie_er_war():
+    """Der Parameter ist optional - die direkten Planner-Tests rufen ohne ihn."""
+    p = FakeLLMProvider(replies=["kaputt", "kaputt", "kaputt"])
+    with pytest.raises(PlanungFehlgeschlagen):
+        run(erstelle_plan(p, "x"))
+    assert len(p.calls) == 3
+
+
+def test_fund3_abbruch_waehrend_der_planung_stoppt_die_reparaturversuche():
+    """Der Fund im Ganzen: der Runner reicht den Pruefpunkt durch.
+
+    Der Abbruch kommt WAEHREND des ersten Planungszuges. Vorher liefen
+    danach noch zwei weitere bezahlte Zuege, und der Task meldete sich als
+    'failed' ("kein gueltiges JSON"), obwohl der Nutzer abgebrochen hatte.
+    """
+    abbruch = asyncio.Event()
+
+    class BrichtWaehrendDesZugesAb(FakeLLMProvider):
+        async def complete(self, messages, *, system, tools=None):
+            abbruch.set()
+            return await super().complete(messages, system=system, tools=tools)
+
+    p = BrichtWaehrendDesZugesAb(replies=["kaputt", "kaputt", "kaputt"])
+    t = run(fuehre_task_aus(p, "x", budget=TaskBudget(), kosten=OHNE_KOSTEN,
+                            laufzeit=Laufzeit(abbruch=abbruch)))
+    assert len(p.calls) == 1, (
+        f"nur der laufende Zug, keine Reparaturversuche - es waren {len(p.calls)}"
+    )
+    assert t.status == "cancelled"
+    assert t.abort_reason == "Vom Nutzer abgebrochen."

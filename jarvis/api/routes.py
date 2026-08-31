@@ -51,6 +51,7 @@ from core.llm import (
     ab_erster_nutzernachricht,
 )
 from core.tools import registry
+from core.vault_index import IndexFehler
 from core.tools.dispatch import ToolCall
 from core.tools.loop import run_tool_loop
 
@@ -221,9 +222,35 @@ async def post_chat(request: Request, body: ChatRequest) -> ChatResponse:
     # FIX-04: derselbe Leseweg wie das Panel und wie `recall`. Vorher las
     # diese Zeile nur `facts` - mit gesetztem VAULT_PFAD kam hier IMMER ein
     # leerer Block heraus, und Phase-3-DoD 2 war still kaputt.
-    gedaechtnis_block = await asyncio.to_thread(
-        gedaechtnis.kontextblock, settings.db_path, settings.vault_pfad, text
-    )
+    # Seit dem 31.08.2026 wirft `vault_index.suche()` bei einem
+    # Datenbankfehler `IndexFehler`, statt still `[]` zu liefern - richtig
+    # so, ein kaputter Index ist kein leeres Gedaechtnis. Nur: der Chat rief
+    # `kontextblock` ohne Fangzweig, und damit haette EIN beschaedigter
+    # FTS-Index den Chat bei JEDER Nachricht mit HTTP 500 beendet. Die
+    # Nutzernachricht liegt zu dem Zeitpunkt schon in der Datenbank
+    # (Zeile 155), der Zug stirbt vor dem Modellaufruf.
+    #
+    # Gefunden vom Abnehmer der Gruppe "backend-fehler", der die Folge
+    # ausserhalb der Dateien seines Bauers gemessen hat. Genau dafuer gibt
+    # es die Abnahme.
+    #
+    # Der Chat laeuft jetzt weiter, aber NICHT stillschweigend: der Grund
+    # geht ins Log UND als Satz in den Systemprompt. Sonst antwortet das
+    # Modell mit "davon weiss ich nichts", obwohl in Wahrheit nur die Suche
+    # kaputt ist - und das ist die Verwechslung, gegen die der ganze Fund
+    # geschrieben wurde.
+    try:
+        gedaechtnis_block = await asyncio.to_thread(
+            gedaechtnis.kontextblock, settings.db_path, settings.vault_pfad, text
+        )
+    except IndexFehler as exc:
+        log.error("Chat: Gedaechtnis nicht durchsuchbar (%s)", exc)
+        gedaechtnis_block = (
+            "HINWEIS AN DICH: Dein Gedaechtnis ist gerade nicht durchsuchbar "
+            "(der Vault-Index ist beschaedigt). Du weisst in diesem Zug also "
+            "NICHT, was du ueber den Nutzer gespeichert hast. Sag das, statt "
+            "zu behaupten, du wuesstest nichts ueber ihn."
+        )
     systemprompt = (
         f"{settings.system_prompt}\n\n{gedaechtnis_block}"
         if gedaechtnis_block
