@@ -1293,6 +1293,96 @@ fehlen die Benutzer. `--dauer-tupf`, `--dauer-raus` und `--dauer-zahl` hatten
 null Treffer im ganzen Projekt, daneben stehen neun handgeschriebene `200ms`
 und fünf verschiedene Erscheinungsdauern.
 
+## Die dritte Runde — und sie war die wichtigste
+
+Nach den 26 Reparaturen standen **4.060 neue Zeilen und 79 neue Tests
+ungeprüft** im Baum. Fünf Achsen darüber, jeder Fund von zwei Skeptikern
+angegriffen: **16 halten stand, 11 sind gefallen. Vier Blocker.**
+
+Und drei der vier waren **exakt die Klasse, die ich am selben Tag zweimal
+„behoben" hatte.**
+
+### Ich habe die Regel dreimal am Aufrufer repariert statt an der Ursache
+
+Am Morgen: `core/kalender.py` gab die geheime Abo-URL preis, `memory_tools.py`
+den Vault-Pfad. Beide behoben. In STATUS geschrieben: *„beide Male war die
+Regel an EINER Stelle umgesetzt statt am Grundsatz."*
+
+Und dann genau das noch dreimal getan:
+
+| Stelle | Was |
+|---|---|
+| `api/routes.py:373` | Dasselbe Vault-Leck, nur über `POST /api/memory` statt über das Werkzeug. **Beide Zweige rufen dieselbe Funktion** — ich hatte den einen Aufrufer repariert |
+| `core/tools/kalender_tools.py` | Der Kalender-Fix deckte nur den **https**-Zweig ab. `KALENDER_QUELLE` kann laut `docs/FIX-07.md` auch ein **Pfad** sein — und mein Wächter mockt `httpx` und berührt diesen Zweig gar nicht |
+| `core/tools/dispatch.py` | `display` bereinigt, `error` nicht. `docs/FIX-07.md:120` sagt wörtlich: *„für display — UND FÜR DIE FEHLERMELDUNG"*. `error` geht in `tool_calls.error`, in `ChatResponse` und über `GET /api/tool-calls` wieder hinaus |
+
+### Diesmal an der Ursache: `core/fehlertexte.py`
+
+Eine Datei, eine Funktion, `ohne_geheimnis(exc, was, hinweis)`. Sie nimmt
+**nichts** aus dem Ausnahmetext mit — nur den Typ. Denn es sind nicht nur
+Pfade: httpx hängt URLs an, `OSError` Pfade, `sqlite3` Tabellennamen, `json`
+ein Stück des Modelltextes.
+
+**Und ein Wächter, der nicht an einer Stelle sitzt:**
+`tests/test_fehlertexte.py` lässt **jedes registrierte Werkzeug** über
+`run_tool` fliegen, mit einer Ausnahme, die ein Geheimnis trägt — und prüft
+`display` **und** `error`. Ein neues Werkzeug ist automatisch erfasst.
+
+Der Wächter fand beim ersten Lauf sofort **15 weitere Stellen** derselben
+Klasse, in sieben Dateien. Das Leck war nie an fünf Stellen; es war ein
+Muster im ganzen Projekt.
+
+> Und der Wächter selbst hatte den Fehler, den ich beim `--dim`-Wächter
+> schon einmal behoben hatte: er entfernte Docstrings mit `re.sub(…, "")`
+> und **verschob damit jede Zeilennummer danach**. Ein Wächter, der auf die
+> falsche Zeile zeigt, schickt den nächsten Leser in die Irre. Jetzt
+> zeilentreu.
+
+### Zwei Tests, die das Leck festschrieben
+
+`test_ohne_bild_bleiben_die_metadaten_trotzdem_da` verlangte `"403" in
+display`, `test_ein_werkzeug_das_wirft_reisst_nichts_um` verlangte `"bumm"
+in error` — also **genau das, was FIX-07 verbietet**. Nicht gelöscht,
+sondern **umgedreht**: der Grund muss erkennbar bleiben (Ausnahmetyp), der
+Text draußen. Beide Zusicherungen sind jetzt stärker als vorher.
+
+### Der Blocker, der die Suite zur Lügnerin machte
+
+Ein neuer Test schrieb `vault_pfad` auf die **globale** `recall`-Instanz aus
+der Registry — ohne `monkeypatch`, ohne Wiederherstellung. Weil pytest
+alphabetisch arbeitet, lief `test_memory.py` **vor** `test_vault.py`: die
+Suite war grün, der Schaden unsichtbar. Er schlägt zu, sobald jemand
+Dateien einzeln laufen lässt — was hier **jeder** tut, weil die volle Suite
+25 Minuten braucht.
+
+Es gab noch einen zweiten, **älteren** Weg derselben Bauart
+(`test_fix04.py` → `test_memory.py`), den niemand gesucht hatte.
+
+Die Aufräum-Fixture in `conftest.py` gab es längst — sie sicherte eine
+**handgepflegte Liste von vier Feldern** und übersah alles, was seit Phase 3
+dazugekommen ist. Also nicht die Liste ergänzt, sondern den Grundsatz
+durchgesetzt: gesichert wird `vars(tool)`, alles, was auf der Instanz steht.
+Beide Wege sind damit zu.
+
+### Der Blocker, der dein Kontingent gefressen hätte
+
+Die neue Verifikation auf dem Delegationspfad ist richtig — aber ein
+durchgefallener Unterauftrag kommt beim Rufer als Fehler an, und darauf kann
+er nur mit einem **erneuten** `ask_agent` reagieren. Nichts bremste das.
+
+**Gemessen: derselbe Auftrag kostete vorher 7 Modellaufrufe, danach 43** —
+und endete auf `aborted_budget` **ohne Antwort für den Nutzer**. Auf der
+freien Stufe (200.000 Token am Tag) frisst ein einziger solcher Auftrag
+einen spürbaren Teil des Tagesbudgets.
+
+Deckel bei **zwei** Fehlversuchen derselben Anfrage — nicht bei einem: ein
+einzelner Fehlschlag kann an einer schlecht formulierten Teilaufgabe liegen,
+ein zweiter Anlauf ist legitim. Ab dem dritten ist es Trotz. Eine *andere*
+Teilaufgabe läuft weiter, sonst wäre der Deckel eine Sperre statt einer
+Bremse.
+
+**Suite:** `python3 -m pytest -q` → **1244 Tests, 0 Fehler, 0 übersprungen.**
+
 ## Die 26 Funde abgearbeitet — von neun Agenten, mit Abnahme
 
 Noah wollte, dass die Agenten weitermachen. Neun Bauer-Agenten, jeder mit

@@ -263,7 +263,19 @@ def test_ein_werkzeug_das_wirft_reisst_nichts_um(eigene_registry):
             raise RuntimeError("bumm")
 
     ergebnis = run(run_tool("bombe"))
-    assert ergebnis.ok is False and "bumm" in (ergebnis.error or "")
+    # Hier stand `and "bumm" in (ergebnis.error or "")` - also die
+    # Zusicherung, dass der Ausnahmetext im error-Feld landet. Genau das war
+    # das Leck: `error` geht in die Spalte tool_calls.error und ueber
+    # GET /api/tool-calls wieder hinaus, und der Auffangzweig hier faengt
+    # JEDE Ausnahme jedes Werkzeugs - httpx haengt URLs an, OSError Pfade.
+    #
+    # Nicht geloescht, sondern umgedreht: der Fehler muss erkennbar bleiben
+    # (Werkzeugname und Ausnahmetyp), sein Text aber draussen.
+    assert ergebnis.ok is False
+    assert "bombe" in (ergebnis.error or ""), ergebnis.error
+    assert "RuntimeError" in (ergebnis.error or ""), ergebnis.error
+    assert "bumm" not in (ergebnis.error or ""), (
+        "der Ausnahmetext steht wieder im error-Feld")
 
 
 def test_ein_werkzeug_ohne_toolresult_wird_als_vertragsbruch_gemeldet(eigene_registry):

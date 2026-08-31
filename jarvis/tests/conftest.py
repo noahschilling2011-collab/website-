@@ -90,17 +90,40 @@ def werkzeuge_zuruecksetzen():
     Das ist im Betrieb kein Problem (dort laeuft eine App), aber es macht
     Tests voneinander abhaengig. Hier wird deshalb vor und nach jedem Test
     aufgeraeumt.
+
+    Hier stand eine HANDGEPFLEGTE Liste: ("api_key", "transport", "db_path",
+    "outbox"). Sie hat `vault_pfad`, `kalender_quelle`, `datei_wurzeln`,
+    `cache_stunden`, `basis`, `zim`, `kontakt`, `token` und `provider` nicht
+    erfasst - also genau die Felder, die seit Phase 3 dazugekommen sind.
+
+    Am 31.08.2026 ist das aufgeflogen: ein Test schrieb `vault_pfad` auf die
+    globale `recall`-Instanz, und weil pytest die Dateien alphabetisch
+    abarbeitet, lief `test_memory.py` VOR `test_vault.py` - die Suite war
+    gruen, der Schaden unsichtbar. Er schlaegt zu, sobald jemand Dateien
+    einzeln laufen laesst, was hier jeder tut, weil die volle Suite 25
+    Minuten braucht.
+
+    Es gab noch einen zweiten, aelteren Weg derselben Bauart
+    (test_fix04.py -> test_memory.py). Deshalb wird jetzt nicht die Liste
+    ergaenzt, sondern der Grundsatz durchgesetzt: gesichert wird ALLES, was
+    auf der Instanz steht.
     """
     from core.tools import registry
 
-    felder = ("api_key", "transport", "db_path", "outbox")
-    vorher = {
-        tool.name: {f: getattr(tool, f) for f in felder if hasattr(tool, f)}
-        for tool in registry.all_tools()
-    }
+    # `vars(tool)` sind genau die Felder, die jemand auf der INSTANZ gesetzt
+    # hat. Was nur auf der Klasse steht (name, description, permission),
+    # taucht hier nicht auf und soll auch nicht angefasst werden.
+    vorher = {tool.name: dict(vars(tool)) for tool in registry.all_tools()}
     yield
     for tool in registry.all_tools():
-        for feld, wert in vorher.get(tool.name, {}).items():
+        alt_stand = vorher.get(tool.name, {})
+        jetzt = vars(tool)
+        # Was der Test NEU gesetzt hat, muss weg - sonst verdeckt es
+        # dauerhaft den Vorgabewert der Klasse. Genau das war der Fall:
+        # `vault_pfad` gab es vorher gar nicht auf der Instanz.
+        for feld in [f for f in jetzt if f not in alt_stand]:
+            delattr(tool, feld)
+        for feld, wert in alt_stand.items():
             setattr(tool, feld, wert)
 
 

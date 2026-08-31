@@ -193,7 +193,11 @@ def fehlbestand(db_path, vault_pfad) -> str | None:
         im_index = conn.execute("SELECT count(*) FROM vault_notizen").fetchone()[0]
 
     if mit_id and im_index < mit_id:
-        return (f"Der Vault {wurzel} enthaelt {mit_id} Notiz(en) mit 'id', der "
+        # Kein Ausnahmetext, sondern ein handgeschriebener Pfad - deshalb
+        # greift `ohne_geheimnis` hier nicht. Die Zahl sagt alles Noetige;
+        # WO der Vault liegt, weiss der Nutzer selbst, und die Meldung geht
+        # ueber eine HTTP-500-Antwort nach draussen.
+        return (f"Der Vault enthaelt {mit_id} Notiz(en) mit 'id', der "
                 f"Index kennt nur {im_index}. Das ist kein leeres Gedaechtnis, "
                 f"das ist ein kaputter Index - 'python -m scripts.reindex' baut "
                 f"ihn neu auf.")

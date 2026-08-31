@@ -34,6 +34,7 @@ from api.schemas import (
 from api.events import strom
 from api.security import require_token
 from core import db, gedaechtnis, memory
+from core.fehlertexte import ohne_geheimnis
 from core.satellite import bilder
 from core.satellite.ueberflug import (
     UeberflugFehler,
@@ -369,9 +370,15 @@ async def post_memory(request: Request, body: FactCreate) -> FactCreated:
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except OSError as exc:
-        raise HTTPException(
-            status_code=507, detail=f"Vault nicht beschreibbar: {exc}"
-        ) from exc
+        # Dasselbe Leck wie in core/tools/memory_tools.py - dort geschlossen,
+        # hier stehen geblieben. Beide Zweige rufen dieselbe Funktion
+        # `gedaechtnis.anlegen`; der Weg ueber das Werkzeug war dicht, der
+        # ueber POST /api/memory (das Gedaechtnis-Panel) nicht. Der Fix hatte
+        # den Aufrufer repariert statt die Ursache. Jetzt beide auf
+        # core/fehlertexte.py.
+        raise HTTPException(status_code=507, detail=ohne_geheimnis(
+            exc, "Vault nicht beschreibbar",
+            "Pruefe VAULT_PFAD in der .env und die Schreibrechte")) from exc
     return FactCreated(
         fact=FactOut.of(neu),
         conflict=FactOut.of(konflikt) if konflikt else None,
@@ -684,7 +691,7 @@ async def get_satelliten_spur(
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(
             status_code=503,
-            detail=f"Bahndaten nicht verfuegbar: {exc}",
+            detail=ohne_geheimnis(exc, "Bahndaten nicht verfuegbar"),
         ) from exc
 
     satelliten = parse_tle(text)

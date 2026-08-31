@@ -16,6 +16,7 @@ from __future__ import annotations
 import time
 from datetime import date, timedelta
 
+from core.fehlertexte import ohne_geheimnis
 from core.contracts import Permission, Tool, ToolResult
 from core.kalender import (
     AUSBLICK,
@@ -101,8 +102,15 @@ class Kalender(Tool):
             return ToolResult(ok=False, error=str(exc), display=str(exc),
                               duration_ms=dauer())
         except OSError as exc:
-            return ToolResult(ok=False, error=str(exc),
-                              display=f"Kalender nicht lesbar: {exc}",
+            # KALENDER_QUELLE ist laut core/config.py ein Geheimnis - und
+            # laut docs/FIX-07.md kann sie ein PFAD oder eine URL sein. Am
+            # 31.08.2026 wurde nur die URL-Form abgedichtet; der Waechter
+            # dafuer mockt httpx und beruehrt diesen Zweig gar nicht. Der
+            # Pfad stand damit weiter in der sichtbaren Chat-Ausgabe und im
+            # Prompt an den Modellanbieter.
+            satz = ohne_geheimnis(exc, "Kalender nicht lesbar",
+                                  "Pruefe KALENDER_QUELLE in der .env")
+            return ToolResult(ok=False, error=satz, display=satz,
                               duration_ms=dauer())
 
         alle, wiederkehrend, nicht_lesbar = parse(roh)

@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Iterable
 
 from core.abbruch import LaufBeendet
+from core.fehlertexte import ohne_geheimnis
 from core.contracts import Permission, Tool, ToolResult
 from core.tools import registry
 from core.tools.validate import pruefe
@@ -119,8 +120,11 @@ async def run_tool(
     if fehler:
         return ToolResult(
             ok=False,
-            error=f"Ungueltige Argumente: {fehler}",
-            display=f"{name} bekam ungueltige Argumente: {fehler}",
+            # `fehler` kommt aus der eigenen Validierung und nennt nur
+            # Feldnamen und Typen - kein Ausnahmetext, kein Fremdkontext.
+            # Er bleibt, weil das Modell ihn braucht, um es besser zu machen.
+            error="Ungueltige Argumente: " + str(fehler),
+            display=f"{name} bekam ungueltige Argumente: " + str(fehler),
             duration_ms=dauer(),
         )
 
@@ -197,14 +201,25 @@ async def run_tool(
         # Falsche Signatur - das Schema und execute() passen nicht zusammen.
         return ToolResult(
             ok=False,
-            error=f"Aufruf passt nicht zur Signatur: {exc}",
+            error=ohne_geheimnis(exc, f"{name}: Aufruf passt nicht zur Signatur"),
             display=f"{name} konnte mit diesen Argumenten nicht aufgerufen werden.",
             duration_ms=dauer(),
         )
     except Exception as exc:  # noqa: BLE001 - ein Tool reisst nie den Task um
+        # KEIN `{exc}` im error. Hier stand es, und damit lief jede Ausnahme
+        # jedes Werkzeugs ungefiltert nach draussen: `error` geht in die
+        # Spalte tool_calls.error, in ChatResponse.tool_calls[].error und in
+        # GET /api/tool-calls. httpx haengt URLs an, OSError Pfade, sqlite3
+        # Tabellennamen.
+        #
+        # docs/FIX-07.md:120 sagt woertlich: "Das gilt fuer Treffer, fuer
+        # sources, fuer display - UND FUER DIE FEHLERMELDUNG." Umgesetzt war
+        # es nur fuer display. Gefunden am 31.08.2026, nachdem dieselbe
+        # Klasse am selben Tag schon in vier anderen Dateien aufgeschlagen
+        # war - jedes Mal am Aufrufer repariert statt an der Ursache.
         return ToolResult(
             ok=False,
-            error=f"{type(exc).__name__}: {exc}",
+            error=ohne_geheimnis(exc, f"{name} ist mit einem Fehler ausgestiegen"),
             display=f"{name} ist mit einem Fehler ausgestiegen.",
             duration_ms=dauer(),
         )
@@ -219,6 +234,23 @@ async def run_tool(
 
     if not ergebnis.duration_ms:
         ergebnis.duration_ms = dauer()
+
+    # Die ENGSTELLE. Jedes Werkzeugergebnis kommt hier vorbei, egal welches
+    # Werkzeug es gebaut hat und ob dessen Autor an FIX-07 gedacht hat.
+    #
+    # Bis zum 31.08.2026 setzte jedes Werkzeug seine Fehlermeldung selbst,
+    # und mehrere haben dabei einen absoluten Pfad durchgereicht
+    # (datei_tools zweimal, satellite_tools, kalender_tools, memory_tools).
+    # Jeder Waechter dafuer sass an einer Einzelstelle und prueft bis heute
+    # nur `display`, nicht `error`.
+    #
+    # Was hier passiert, ist bewusst STUMPF: kein Umschreiben, kein Erraten,
+    # kein Bereinigen. Ein Werkzeug, das einen Pfad ausgibt, wird nicht
+    # heimlich korrigiert - denn dann faellt es niemandem auf. Es wird
+    # gemeldet, laut, mit Werkzeugnamen. Die Pruefung selbst steht in
+    # tests/test_fehlertexte.py und geht ueber ALLE registrierten Werkzeuge.
+    if ergebnis.error:
+        ergebnis.error = str(ergebnis.error)
 
     if protokollieren and audit is not None:
         await audit(

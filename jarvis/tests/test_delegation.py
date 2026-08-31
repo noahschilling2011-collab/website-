@@ -280,3 +280,85 @@ def test_fund2_gewoehnliche_werkzeugfehler_faengt_der_dispatcher_weiterhin_ab():
 
     assert ergebnis.ok is False
     assert "ValueError" in (ergebnis.error or "")
+
+
+def test_dieselbe_gescheiterte_anfrage_kostet_nicht_endlos_modellaufrufe():
+    """Gemessen am 31.08.2026: derselbe Auftrag kostete vor der Verifikation
+    auf dem Delegationspfad 7 Modellaufrufe, danach 43 - und endete auf
+    aborted_budget OHNE Antwort fuer den Nutzer.
+
+    Der Grund: ein nicht bestandener Unterauftrag kommt beim Rufer als
+    is_error an, und darauf kann er nur mit einem erneuten ask_agent
+    reagieren. Nichts bremste das. Auf der freien Modellstufe (200.000 Token
+    am Tag) frisst ein einziger solcher Auftrag einen spuerbaren Teil des
+    Tagesbudgets.
+
+    Der Deckel ist NICHT der Auftragsdeckel: der greift erst, wenn schon
+    alles verbrannt ist. Er sitzt dort, wo die Wiederholung entsteht.
+    """
+    from core.agents import baue_agenten
+    from core.contracts import Permission, Task, TaskBudget
+    from core.delegation import MAX_FEHLVERSUCHE, DelegationsKontext, kontext
+    from core.llm import FakeLLMProvider
+    from core.tools.dispatch import run_tool
+
+    class Zaehlt(FakeLLMProvider):
+        n = 0
+
+        async def complete(self, *a, **k):
+            Zaehlt.n += 1
+            return await super().complete(*a, **k)
+
+    Zaehlt.n = 0
+    agenten = baue_agenten(Zaehlt(), max_permission=Permission.LOCAL)
+    haupt = Task(goal="x", budget=TaskBudget(max_depth=2), depth=0)
+    marke = kontext.set(DelegationsKontext(
+        task=haupt, agenten=agenten, max_depth=2, rufer="hermes"))
+    try:
+        ergebnisse = [
+            run(run_tool("ask_agent", {"agent": "research", "task": "Helme"}))
+            for _ in range(6)
+        ]
+    finally:
+        kontext.reset(marke)
+
+    # Der Fake liefert nie eine Quelle, also faellt research jedes Mal durch.
+    assert all(e.ok is False for e in ergebnisse), [e.error for e in ergebnisse]
+
+    # Der Kern: ab dem Deckel kostet es NICHTS mehr. Sechs Anfragen, aber
+    # hoechstens MAX_FEHLVERSUCHE echte Laeufe.
+    spaet = [e for e in ergebnisse[MAX_FEHLVERSUCHE:]]
+    assert all("schon" in (e.display or "") for e in spaet), [e.display for e in spaet]
+    assert all(e.data.get("versuche") for e in spaet), [e.data for e in spaet]
+
+    # Und die Zahl selbst: ohne Deckel waeren es sechs volle Delegationen.
+    # Der Fake braucht je Delegation mindestens einen Zug.
+    assert Zaehlt.n <= MAX_FEHLVERSUCHE * 3, (
+        f"{Zaehlt.n} Modellaufrufe fuer {len(ergebnisse)} Anfragen - der "
+        f"Deckel greift nicht")
+
+
+def test_der_deckel_zaehlt_je_anfrage_nicht_pauschal():
+    """Eine ANDERE Teilaufgabe muss weiterhin laufen duerfen - sonst waere
+    der Deckel eine Sperre und keine Bremse."""
+    from core.agents import baue_agenten
+    from core.contracts import Permission, Task, TaskBudget
+    from core.delegation import DelegationsKontext, kontext
+    from core.llm import FakeLLMProvider
+    from core.tools.dispatch import run_tool
+
+    agenten = baue_agenten(FakeLLMProvider(), max_permission=Permission.LOCAL)
+    haupt = Task(goal="x", budget=TaskBudget(max_depth=2), depth=0)
+    marke = kontext.set(DelegationsKontext(
+        task=haupt, agenten=agenten, max_depth=2, rufer="hermes"))
+    try:
+        for _ in range(4):
+            run(run_tool("ask_agent", {"agent": "research", "task": "Helme"}))
+        anders = run(run_tool("ask_agent",
+                              {"agent": "research", "task": "Voellig andere Frage"}))
+    finally:
+        kontext.reset(marke)
+
+    assert "schon" not in (anders.display or ""), anders.display
+    assert anders.data.get("subtask_id"), (
+        "die andere Anfrage wurde gar nicht ausgefuehrt")

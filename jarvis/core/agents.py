@@ -13,6 +13,7 @@ import logging
 import time
 from typing import Awaitable, Callable, Iterable
 
+from core.fehlertexte import ohne_geheimnis
 from core.abbruch import LaufBeendet
 from core.contracts import Agent, Permission, Step, Task, ToolResult
 from core.belege import belegte_urls, ohne_unbelegte_links
@@ -297,8 +298,8 @@ class ToolAgent(Agent):
         except Exception as exc:  # noqa: BLE001 - ein Schritt reisst nie den Task um
             return ToolResult(
                 ok=False,
-                error=f"{type(exc).__name__}: {exc}",
-                display=f"Schritt abgebrochen: {exc}",
+                error=ohne_geheimnis(exc, "Schritt abgebrochen"),
+                display=ohne_geheimnis(exc, "Schritt abgebrochen"),
                 duration_ms=int((time.monotonic() - begonnen) * 1000),
             )
 

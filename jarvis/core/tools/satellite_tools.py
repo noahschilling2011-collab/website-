@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from dataclasses import replace
 from pathlib import Path
 
+from core.fehlertexte import ohne_geheimnis
 from core.contracts import Permission, Tool, ToolResult
 from core.satellite.analysis import grenzsatz, vergleichbar, vergleiche_raster
 from core.orte import OrtFehler, aus_tabelle, bbox_um, finde_ort
@@ -189,8 +190,9 @@ class SatelliteSearch(Tool):
         except (CDSEFehler, BildFehler, OSError) as exc:
             # Kein Grund, den ganzen Aufruf scheitern zu lassen: die
             # Metadaten sind da und sind etwas wert. Aber es wird gesagt.
-            log.warning("Satellitenbild nicht gerendert: %s", exc)
-            bild_notiz = f"\n\nKein Bild gerendert: {exc}"
+            # `bild_notiz` haengt an der SICHTBAREN Ausgabe. Ein OSError von
+            # der Bilddatei traegt den absoluten Pfad in seinem Text.
+            bild_notiz = "\n\n" + ohne_geheimnis(exc, "Kein Bild gerendert")
 
         zeilen = [s.steckbrief() for s in szenen[:5]]
         daten = [s.als_dict() for s in szenen[:5]]
@@ -271,8 +273,10 @@ class SatelliteCompare(Tool):
             a = datetime.fromisoformat(before_date.replace("Z", "+00:00"))
             b = datetime.fromisoformat(after_date.replace("Z", "+00:00"))
         except ValueError as exc:
-            return ToolResult(ok=False, error=f"Datum unlesbar: {exc}",
-                              display=f"Datum unlesbar: {exc}", duration_ms=dauer())
+            satz = ohne_geheimnis(exc, "Datum unlesbar",
+                                  "Erwartet wird ISO, also 2024-07-14")
+            return ToolResult(ok=False, error=satz, display=satz,
+                              duration_ms=dauer())
 
         passt, grund = vergleichbar(a, b, before_cloud_pct, after_cloud_pct)
         if not passt:

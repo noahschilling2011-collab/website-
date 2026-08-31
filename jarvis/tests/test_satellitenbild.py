@@ -455,7 +455,18 @@ def test_ohne_bild_bleiben_die_metadaten_trotzdem_da(tmp_path):
     assert ergebnis.data["preview_url"] is None
     assert "Szene(n) gefunden" in ergebnis.display
     assert "Kein Bild gerendert" in ergebnis.display
-    assert "403" in ergebnis.display
+    # Hier stand `assert "403" in ergebnis.display`. Diese Zusicherung
+    # verlangte, dass der AUSNAHMETEXT in der sichtbaren Ausgabe steht -
+    # und genau das verbietet FIX-07. (31.08.2026: fuenf Lecks derselben
+    # Klasse an einem Tag, eines davon httpx, das seine volle URL an die
+    # Meldung haengt.) Die Zeile 202 weiter oben bleibt: dort wird die
+    # EIGENE Ausnahme geprueft, nicht die sichtbare Ausgabe.
+    #
+    # Nicht geloescht, sondern umgedreht: der Grund muss weiterhin
+    # erkennbar sein - ueber den Ausnahmetyp - und der Text draussen.
+    assert "CDSEFehler" in ergebnis.display, ergebnis.display
+    assert "403" not in ergebnis.display, (
+        "der Ausnahmetext steht wieder in der sichtbaren Ausgabe")
 
 
 # --- Die Oberflaeche -------------------------------------------------------

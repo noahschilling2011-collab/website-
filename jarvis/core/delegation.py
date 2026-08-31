@@ -41,7 +41,17 @@ class DelegationsKontext:
     # bis hierher reine Deko. `ToolAgent.run` setzt sie fuer die Dauer seines
     # Laufs; None heisst "kein Agent ruft" (Direktaufruf im Test).
     rufer: str | None = None
+    # Wie oft dieselbe (agent, task)-Anfrage in diesem Auftrag schon durch
+    # die Verifikation gefallen ist. Ohne diesen Zaehler laeuft der Rufer in
+    # eine Trotzschleife - gemessen 43 statt 7 Modellaufrufen (31.08.2026).
+    durchgefallen: dict[tuple[str, str], int] = field(default_factory=dict)
 
+
+# Zwei Fehlversuche derselben Anfrage, dann ist Schluss. Zwei, nicht einer:
+# ein einzelner Fehlschlag kann an einer schlecht formulierten Teilaufgabe
+# liegen, und ein zweiter Anlauf mit anderem Wortlaut ist legitim. Ab dem
+# dritten ist es Trotz, und der kostet den Nutzer echtes Kontingent.
+MAX_FEHLVERSUCHE = 2
 
 kontext: ContextVar[DelegationsKontext | None] = ContextVar(
     "delegationskontext", default=None
@@ -132,6 +142,19 @@ class AskAgent(Tool):
                 duration_ms=dauer(),
             )
 
+        # Schon zweimal an derselben Anfrage gescheitert? Dann NICHT noch
+        # einmal rechnen. Der Rufer bekommt dieselbe Begruendung zurueck,
+        # ohne dass ein weiterer Modellaufruf bezahlt wird.
+        schluessel = (agent, task.strip())
+        versuche = ctx.durchgefallen.get(schluessel, 0)
+        if versuche >= MAX_FEHLVERSUCHE:
+            satz = (f"{agent} ist an dieser Anfrage schon {versuche}-mal "
+                    f"gescheitert. Ich frage nicht noch einmal - formulier "
+                    f"die Teilaufgabe anders oder mach ohne sie weiter.")
+            return ToolResult(ok=False, error=satz, display=satz,
+                              data={"agent": agent, "versuche": versuche},
+                              duration_ms=dauer())
+
         # Der Unterauftrag bekommt KEIN eigenes Budget. Er zaehlt auf dasselbe -
         # sonst waere max_cost_eur eine Zahl ohne Bedeutung.
         unterauftrag = Task(goal=task, budget=ctx.task.budget,
@@ -202,6 +225,27 @@ class AskAgent(Tool):
         # Deshalb dieselbe Pruefung wie im Runner, an derselben Stelle im
         # Ablauf: erst verifizieren, dann Status und note daraus setzen.
         bestanden, begruendung = verifiziere(schritt, ergebnis)
+
+        # DECKEL gegen die Trotzschleife. Gemessen am 31.08.2026: derselbe
+        # Auftrag kostete vor der Verifikation 7 Modellaufrufe, danach 43 -
+        # und endete auf aborted_budget OHNE Antwort fuer den Nutzer.
+        #
+        # Der Grund: ein nicht bestandener Unterauftrag kommt beim Rufer als
+        # is_error an, und darauf kann er nur mit einem erneuten ask_agent
+        # reagieren. Nichts bremste das - der Unterauftrag erfuhr nicht
+        # einmal, dass er schon einmal durchgefallen war (anders als
+        # core/runner.py, das die Begruendung an die Schrittbeschreibung
+        # haengt).
+        #
+        # Auf der freien Modellstufe (200.000 Token am Tag) frisst ein
+        # einziger solcher Auftrag einen spuerbaren Teil des Tagesbudgets.
+        #
+        # Ab dem zweiten Fehlschlag derselben Anfrage wird deshalb NICHT
+        # mehr gerechnet: dieselbe Begruendung kommt zurueck, ohne einen
+        # weiteren Modellaufruf. Der Rufer darf trotzig bleiben, es kostet
+        # nur nichts mehr.
+        if not bestanden:
+            ctx.durchgefallen[schluessel] = versuche + 1
         schritt.result = ergebnis
         schritt.note = begruendung
         schritt.status = StepStatus.DONE if bestanden else StepStatus.FAILED

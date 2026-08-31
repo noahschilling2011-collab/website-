@@ -473,7 +473,7 @@ def test_fund1_der_waechter_fehlbestand_sieht_diesen_zustand_nicht(db, vault):
     )
 
 
-def test_fund1_recall_behauptet_nicht_mehr_nichts_im_vault(db, vault):
+def test_fund1_recall_behauptet_nicht_mehr_nichts_im_vault(monkeypatch, db, vault):
     """Die Aussage, die beim Nutzer ankommt.
 
     Ueber `run_tool` wird aus der Ausnahme ein `ToolResult(ok=False)`. Vorher
@@ -490,8 +490,10 @@ def test_fund1_recall_behauptet_nicht_mehr_nichts_im_vault(db, vault):
     aktualisiere(db, vault, pfad)
 
     werkzeug = registry.get("recall")
-    werkzeug.db_path = db
-    werkzeug.vault_pfad = str(vault)
+    # `registry.get(...)` liefert die GLOBALE Instanz - eine blosse
+    # Zuweisung ueberlebt den Test und vergiftet jeden spaeteren.
+    monkeypatch.setattr(werkzeug, "db_path", db, raising=False)
+    monkeypatch.setattr(werkzeug, "vault_pfad", str(vault), raising=False)
 
     gut = lauf(run_tool("recall", {"query": "Fahrrad"}))
     assert gut.ok and "Canyon" in gut.display

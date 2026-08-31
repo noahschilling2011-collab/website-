@@ -34,6 +34,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+from core.fehlertexte import ohne_geheimnis
 from core.contracts import Permission, Tool, ToolResult
 from core.dateien import (
     PfadAbgelehnt,
@@ -135,9 +136,14 @@ class DateiSuchen(_MitWurzeln):
                 max_kb=int(self.datei_max_kb),
             )
         except OSError as exc:
-            return ToolResult(ok=False, error=str(exc),
-                              display="Der Ordner liess sich nicht lesen.",
-                              duration_ms=dauer())
+            # `display` war sauber, `error` nicht - und `error` geht in die
+            # Spalte tool_calls.error und ueber GET /api/tool-calls wieder
+            # hinaus. FIX-07 nennt die Fehlermeldung ausdruecklich mit.
+            return ToolResult(
+                ok=False,
+                error=ohne_geheimnis(exc, "Der Ordner liess sich nicht lesen"),
+                display="Der Ordner liess sich nicht lesen.",
+                duration_ms=dauer())
 
         if not treffer:
             return ToolResult(

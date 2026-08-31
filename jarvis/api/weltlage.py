@@ -22,6 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from api.security import require_token
 from api.tasks import LaufenderTask, baue_laufzeit
 from core import db
+from core.fehlertexte import ohne_geheimnis
 from core.db import session
 from core.weltlage import (
     CACHE_TTL_MINUTEN,
@@ -267,7 +268,10 @@ async def post_weltlage(request: Request, land_iso: str) -> dict:
             laufzeit=baue_laufzeit(request, eintrag),
         )
     except Exception as exc:                      # noqa: BLE001
-        raise HTTPException(status_code=502, detail=f"{type(exc).__name__}: {exc}") from exc
+        raise HTTPException(
+            status_code=502,
+            detail=ohne_geheimnis(exc, "Die Weltlage liess sich nicht holen"),
+        ) from exc
     finally:
         await asyncio.to_thread(db.save_task, settings.db_path, task)
         request.app.state.tasks.remove(task.id)
@@ -298,7 +302,8 @@ async def post_weltlage(request: Request, land_iso: str) -> dict:
     except (ValueError, TypeError) as exc:
         raise HTTPException(
             status_code=502,
-            detail=f"Das Modell hat kein verwertbares JSON geliefert ({exc}).",
+            detail=ohne_geheimnis(
+                exc, "Das Modell hat kein verwertbares JSON geliefert"),
         ) from exc
     if not isinstance(daten, dict):
         raise HTTPException(

@@ -9,6 +9,7 @@ import time
 from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from core.fehlertexte import ohne_geheimnis
 from core.contracts import Permission, Tool, ToolResult
 from core.tools.registry import register
 
@@ -213,13 +214,18 @@ class Calculator(Tool):
             return ToolResult(
                 ok=False,
                 error=str(exc),
-                display=f"{expression} → {exc}",
+                # Der Ausdruck bleibt - er kommt vom Modell und ist der
+                # eigentliche Hinweis. Der Ausnahmetext geht: bei einem
+                # Rechenfehler sagt der TYP alles, und eine Ausnahme ist nie
+                # so harmlos, dass man ihren Text ungeprueft nach draussen
+                # reicht.
+                display=f"{expression} → " + ohne_geheimnis(exc, "geht nicht"),
                 duration_ms=int((time.monotonic() - begonnen) * 1000),
             )
         except (ArithmeticError, TypeError, ValueError) as exc:
             return ToolResult(
                 ok=False,
-                error=f"Rechenfehler: {exc}",
+                error=ohne_geheimnis(exc, "Rechenfehler"),
                 display=f"{expression} → Rechenfehler",
                 duration_ms=int((time.monotonic() - begonnen) * 1000),
             )

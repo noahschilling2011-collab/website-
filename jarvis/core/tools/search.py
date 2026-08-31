@@ -22,6 +22,7 @@ from typing import Any
 
 import httpx
 
+from core.fehlertexte import ohne_geheimnis
 from core.contracts import Permission, Tool, ToolResult
 from core.netz import nach_draussen
 from core.tools.registry import register
@@ -128,7 +129,9 @@ class WebSearch(Tool):
         except httpx.HTTPError as exc:
             return ToolResult(
                 ok=False,
-                error=f"Suche fehlgeschlagen: {exc}",
+                # httpx haengt die volle URL an - und die traegt bei Brave den
+            # Suchbegriff in der Abfrage.
+            error=ohne_geheimnis(exc, "Suche fehlgeschlagen"),
                 display="Die Such-API war nicht erreichbar.",
                 duration_ms=dauer(),
             )
@@ -422,13 +425,16 @@ class FetchUrl(Tool):
             return ToolResult(
                 ok=False,
                 error=str(exc),
-                display=f"{url} wurde nicht geholt: {exc}",
+                # Die URL bleibt: sie kommt vom Modell, es hat sie selbst
+            # genannt. Der Ausnahmetext geht - httpx haengt dort die
+            # aufgeloeste Adresse an, samt Weiterleitungszielen.
+            display=f"{url}: " + ohne_geheimnis(exc, "wurde nicht geholt"),
                 duration_ms=dauer(),
             )
         except httpx.HTTPError as exc:
             return ToolResult(
                 ok=False,
-                error=f"Abruf fehlgeschlagen: {exc}",
+                error=ohne_geheimnis(exc, "Abruf fehlgeschlagen"),
                 display=f"{url} war nicht erreichbar.",
                 duration_ms=dauer(),
             )
