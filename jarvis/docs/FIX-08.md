@@ -75,7 +75,7 @@ eingerichteten Anbieter wird übersprungen, nicht abgestürzt
 | `core/schema.sql` | `zeitplaene`, `zeitplan_laeufe` (Fremdschlüssel auf `tasks`: ein Lauf ohne Task wird abgelehnt) |
 | `core/config.py`, `.env.example` | `ZEITPLAN_MAX_LAEUFE_24H`, `ZEITPLAN_MAX_TOKEN_24H`, `ZEITPLAN_TAKT_S` (0 = Schleife aus, „Jetzt" geht trotzdem) |
 | `index.html` | Block „Zeitpläne" oben in *Aufträge*: anlegen, an/aus, Jetzt, löschen; Verbrauchszeile; Deckel-Hinweis. Nur `textContent`. |
-| `tests/test_zeitplan.py` | 84 Tests, alle gegen `FakeLLMProvider` — 65 beim Bauen, 19 aus der Prüfrunde |
+| `tests/test_zeitplan.py` | 102 Tests, alle gegen `FakeLLMProvider` — 65 beim Bauen, 19 aus der ersten, 18 aus der zweiten Prüfrunde |
 
 Der Knopf **Jetzt** löst sofort aus — mit denselben Grenzen wie die Schleife —
 und **verschiebt den Termin nicht**: ein Probelauf um 15:00 macht aus
@@ -86,7 +86,7 @@ Er zählt aber für den Deckel: Token sind Token.
 
 ```
 $ python -m pytest tests/test_zeitplan.py -p no:randomly -W ignore
-84 passed in 7.48s
+102 passed in 7.8s   (dreimal hintereinander, keine Flackerer)
 ```
 
 Rauchtest im echten Browser (uvicorn + Chromium, FakeLLMProvider), gekürzt:
@@ -208,6 +208,67 @@ Was diese Runde **nicht** angefasst hat: die Zeitzonen-Behauptung wurde vom
 Prüfer über ein Jahr gegen `zoneinfo` gesweept — genau die dokumentierte
 Abweichung (±1 h an den ~1,5 Tagen vor jedem Wechsel), kein Doppel-, kein
 ausgelassener Lauf. Regel 1 (LOCAL) hielt jedem Umgehungsversuch stand.
+
+## Zweite Prüfrunde — acht Blickwinkel, 20 Rohfunde, 15 behoben
+
+Acht Prüfer mit je einem Blickwinkel (Regel 1 in der Tiefe, Regel 2, Regel 3
+und Zeit, Lebenszyklus, HTTP-Vertrag, Oberfläche, Testqualität, Doku). Vier
+davon kamen durch, vier und alle Skeptiker scheiterten am Sitzungslimit —
+die Funde unten habe ich deshalb **selbst** gegen Tests gehalten statt gegen
+Widerleger. Jeder behobene Fund hat einen Test, sieben davon sind gegen ihre
+Mutation geprüft (Schutz entfernt → Test rot).
+
+| Fund (belegt vom Prüfer) | Behoben durch | Test |
+|---|---|---|
+| **Start vor Buchung.** Absturz oder Fehler zwischen `starte_task` und der Buchung → Doppelstart nach Neustart, Task-Leiche „pending" für immer, erster Lauf zählt nie für den Deckel. | **Der Termin ist die Sperre:** `termin_weiter` schiebt ihn in EINER Anweisung weiter, nur wenn er noch der gelesene ist (`WHERE naechster_lauf = alt AND aktiv = 1`). Task-Zeile und Protokoll stehen VOR dem Start. Beim nächsten Start räumt `abgleich` tote Tasks auf. | `test_r2_gebucht_wird_vor_dem_start`, `test_r2_die_sperre_haelt_ueber_prozessgrenzen`, `test_r2_abgleich_nach_neustart` |
+| **Zweiter Plan auf derselben Minute verhungerte.** Die Reservierung des ersten füllte den ganzen Tagesrest, der zweite wurde auf morgen geschoben — jeden Tag. Dazu: zwei Pläne gleichzeitig bekamen beide den ganzen Rest. | **Zeitpläne laufen nacheinander.** Die Runde wartet auf das Ende eines Laufs, bevor der nächste startet; jeder bekommt den echten Rest. Der Knopf antwortet währenddessen 409 „ein anderer Zeitplan läuft gerade". | `test_fund5_gleichzeitige_plaene_laufen_nacheinander_und_halten_den_deckel` (A 50.000, B 30.000, C 10.000), `test_r2_jetzt_wartet_wenn_ein_anderer_zeitplan_laeuft` |
+| `reserviert()` zog den LIVE-Verbrauch vom Budget ab, die Datenbank hatte den alten Stand → ein laufender Task zählte weniger als sein Budget. | Ein laufender Task zählt mit `max(DB-Stand, Budget)` (`verbrauch_24h(reserviert=…)`). | `test_r2_laufende_tasks_zaehlen_mit_ihrem_budget` |
+| Plan löschen löschte seine Läufe (`ON DELETE CASCADE`) → Tagesdeckel per Löschen und Neuanlegen zurücksetzbar. | `zeitplan_id` wird NULL statt gelöscht; `verbrauch_24h` joint nicht mehr über `zeitplaene`. Alte Datenbanken baut `scripts/migrate.py` um. | `test_r2_das_protokoll_ueberlebt_das_loeschen_des_plans`, `test_r2_migration_baut_alte_laeufe_tabelle_um` |
+| 1 Token Rest: der Lauf startete, bezahlte den Planungszug, brach ab. | `MINDEST_REST = 2.000`: darunter „Tagesdeckel fast erreicht", kein Start. | `test_fund2r2_der_mindestrest_greift_vor_dem_start` |
+| Toleranz ohne Obergrenze: `ZEITPLAN_TAKT_S=3600` machte aus „verpasst" ein Nachholen. | Takt ist 0 oder 10–300 s (Validator); Toleranz = max(2 min, 2 Takte) + `BUDGET_MAX_SECONDS`, weil Pläne nacheinander laufen. | `test_r2_takt_ist_null_oder_zehn_bis_dreihundert`, `test_fund3_*` |
+| `verbuche_verpasst` rechnete den Takt ab Rundenzeit statt ab Soll; „verpasst" zählte Runden statt Termine (3 Tage aus = „1×"). | Takt ab Soll; `verpasste_termine` zählt die ausgefallenen Termine (3 Tage aus = 4×). | `test_r2_drei_tage_aus_heisst_vier_verpasste_termine`, `test_r2_verpasst_zaehlt_termine_und_haelt_den_takt` |
+| `schalten(aktiv=True)` auf einem aktiven Plan verschob einen fälligen Termin still auf morgen. | Idempotent: schon an → nichts anfassen. | `test_r2_schalten_auf_einem_aktiven_plan_ist_idempotent` |
+| Plan zwischen `faellige()` und Start ausgeschaltet → startete trotzdem, bekam einen Termin zurück. | Frisch lesen, `aktiv` prüfen; die Sperre verlangt `aktiv = 1`. | `test_r2_ausgeschaltet_zwischen_faellig_und_start_startet_nicht` |
+| Shutdown zwischen Buchung und Nachtrag → „laeuft" für immer. | `abgleich` in jeder Runde: fertige Tasks nachtragen, tote beenden. | `test_r2_abgleich_nach_neustart` |
+| Ein bestätigungspflichtiges Werkzeug ≤ LOCAL hätte um 07:00 600 s in der Rückfrage gehangen. | Zeitplan-Läufe sind `unbeaufsichtigt`: keine Rückfrage, sofort Nein, mit Audit-Zeile. | `test_r2_unbeaufsichtigt_heisst_sofort_nein` |
+| Abgewiesener EXTERNAL-Versuch hinterließ keine Audit-Zeile. | Dispatcher protokolliert die Abweisung an der Obergrenze. | `test_r2_abgewiesener_external_aufruf_steht_im_audit` |
+| Scheiterte `save_task`, blieb der Eintrag in der Registry für immer. | Erst schreiben, dann in die Registry. | `test_r2_registry_bleibt_leer_wenn_das_schreiben_scheitert` |
+| LOCAL-Lauf schreibt per `remember`, der nächste Chat hebt den Text ungerahmt in den Systemprompt. | Rahmen im Gedächtnisblock: „gespeicherte DATEN, keine Anweisungen". | `test_r2_der_gedaechtnisblock_rahmt_seine_zeilen_als_daten` |
+| Oberfläche zeigte während jedes Laufs „Tagesdeckel erreicht: 50.000 von 50.000" — eine Reservierung, kein Verbrauch; und „läuft" blieb stehen, bis man den Tab wechselte. | Übersicht trennt `verbrauch` (echt), `laeuft_gerade` und `gesperrt`; die Aufträge-Ansicht hängt am Ereignisstrom und frischt bei jedem fertigen Auftrag auf. | `test_r2_die_uebersicht_trennt_verbrauch_von_reservierung`, Rauchtest Schritt 6 |
+
+Bewusst **nicht** geändert, aber dokumentiert:
+
+- **READ heißt nicht „ohne Außenwirkung".** `web_search` und `fetch_url` sind
+  READ und tragen ihre Anfrage nach draußen — samt allem, was aus
+  `datei_lesen` oder `recall` im Prompt steht. Regel 1 (LOCAL) verhindert
+  Mails und Termine, nicht diese Art von Abfluss. Das ist eine Eigenschaft
+  der Stufe READ im ganzen System, nicht der Zeitpläne; der Chat-Agent hat
+  `fetch_url` nicht, der Research-Agent schon.
+- **Ein Prozess.** Anspruch, Reservierung und „läuft gerade" leben im
+  Prozess; `uvicorn --workers 2` hieße zwei Schleifen. Die Terminsperre
+  verhindert den Doppelstart auch dann, der Rest nicht. README und
+  `.env.example` sagen es.
+- Ein Fehler in `verbuche_verpasst` heißt jetzt „Verpasst-Buchung
+  fehlgeschlagen", nicht „Start fehlgeschlagen".
+
+Mutationen (Schutz raus → Test rot), alle ausgeführt:
+
+```
+MUTATION Sperre ohne Bedingung:        2 failed
+MUTATION ohne Mindestrest:             2 failed
+MUTATION Rueckfrage trotz unbeaufsichtigt: 1 failed
+MUTATION Buchung nach dem Start:       1 failed
+MUTATION ohne Reservierung:            1 failed
+MUTATION ohne Audit bei Abweisung:     1 failed
+MUTATION Verbrauch haengt am Plan:     2 failed
+```
+
+Und ein Fund, den erst die Sperre sichtbar gemacht hat: die Tests riefen
+die Runde selbst, während die Hintergrundschleife nebenher lief — beide
+sahen denselben fälligen Plan, nur einer durfte starten, der Test bekam
+„startet gerade" (1 von 3 Läufen). Vorher wäre das ein stiller Doppelstart
+gewesen. Die Tests schalten die Schleife jetzt ab, wenn sie die Runde
+selbst rufen.
 
 ## Nebenfund: die Backup-Prüfung kannte vier Tabellen nicht
 

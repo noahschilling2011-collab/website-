@@ -2268,7 +2268,7 @@ an/aus, Jetzt, löschen, Verbrauchszeile.
 | Verpasste Läufe werden **gezählt, nicht nachgeholt** | sonst feuern drei Pläne gleichzeitig, wenn der Rechner hochfährt | `test_regel_3_verpasst_wird_gezaehlt_nicht_nachgeholt`, `test_einschalten_rechnet_den_termin_neu_statt_sofort_zu_feuern` |
 
 **Ausgeführt:** `python -m pytest tests/test_zeitplan.py -p no:randomly -W ignore`
-→ `84 passed in 7.48s` (65 beim Bauen, 19 aus der Prüfrunde). Rauchtest im echten Chromium gegen uvicorn +
+→ `102 passed` (65 beim Bauen, 19 aus der ersten, 18 aus der zweiten Prüfrunde). Rauchtest im echten Chromium gegen uvicorn +
 FakeLLMProvider: anlegen, falsche Regel abgewiesen, an/aus, Jetzt (Auftrag
 lief durch, `done`, 448 Token in der Verbrauchszeile), löschen, sechs
 Fokusringe im Akzent. Protokoll in `docs/FIX-08.md`.
@@ -2284,6 +2284,19 @@ per `text_content()` und merkte es nicht. Jetzt: Plan wird beansprucht,
 bevor er gelesen wird; laufende Tasks reservieren, was sie noch dürfen, und
 kein Lauf bekommt mehr als den Rest des Tages; der Takt zählt ab Soll;
 Meldungen stehen im Block. Drei Tests gegen ihre Mutation geprüft.
+
+**Zweite Prüfrunde — acht Blickwinkel, 20 Rohfunde, 15 behoben** (die
+Skeptiker scheiterten am Sitzungslimit; jeder Fund wurde stattdessen gegen
+einen eigenen Test gehalten, sieben davon gegen Mutation). Die drei, die am
+meisten gewogen haben: Buchung stand NACH dem Start (Absturz dazwischen =
+Doppelstart nach Neustart) — jetzt ist der Termin die Sperre, in einer
+Anweisung, und gebucht wird vor dem Start; zwei Pläne auf derselben Minute
+verhungerten an der Reservierung — jetzt laufen Zeitpläne nacheinander,
+jeder mit dem echten Rest; das Protokoll starb mit dem Plan (Deckel per
+Löschen zurücksetzbar) — jetzt überlebt es, alte Datenbanken zieht
+`scripts/migrate.py` nach. Dazu: unbeaufsichtigte Läufe ohne Rückfrage,
+Audit auch bei Abweisung, Mindestrest, „verpasst" zählt Termine, Abgleich
+nach Neustart, Takt 10–300 s. Tabelle in `docs/FIX-08.md`.
 
 **Ein Fehler beim Bauen, und er war ein guter:** mein erster Test erfand
 Task-IDs, die Datenbank lehnte sie ab (`FOREIGN KEY constraint failed`). Der

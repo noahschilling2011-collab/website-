@@ -17,6 +17,7 @@ an. Zweimal laufen lassen schadet nicht.
 from __future__ import annotations
 
 import argparse
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -115,9 +116,37 @@ def fehlende_spalten(conn: sqlite3.Connection) -> list[tuple[str, str, str]]:
     return fehlt
 
 
+def zeitplan_laeufe_nachziehen(conn: sqlite3.Connection, *, dry_run: bool) -> list[str]:
+    """FIX-08, zweite Pruefrunde: `zeitplan_laeufe.zeitplan_id` war NOT NULL
+    mit ON DELETE CASCADE - beim Loeschen eines Plans verschwand sein
+    Protokoll, und mit ihm der Verbrauch aus dem Tagesdeckel. Jetzt wird die
+    Spalte NULL. SQLite kann einen Fremdschluessel nicht aendern, also wird
+    die Tabelle neu gebaut und der Inhalt kopiert."""
+    zeile = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='zeitplan_laeufe'"
+    ).fetchone()
+    sql = (zeile[0] if zeile else "") or ""
+    alt_ = "CASCADE" in sql or re.search(r"zeitplan_id\s+TEXT\s+NOT\s+NULL", sql)
+    if zeile is None or not alt_:
+        return []
+    befehl = "zeitplan_laeufe neu bauen (zeitplan_id: ON DELETE CASCADE -> SET NULL)"
+    if dry_run:
+        return [befehl]
+    conn.execute("ALTER TABLE zeitplan_laeufe RENAME TO zeitplan_laeufe_alt")
+    db.init_db(conn)                       # legt die neue Tabelle an
+    conn.execute(
+        "INSERT INTO zeitplan_laeufe (id, zeitplan_id, task_id, gestartet_am, ausloeser) "
+        "SELECT id, zeitplan_id, task_id, gestartet_am, ausloeser FROM zeitplan_laeufe_alt"
+    )
+    conn.execute("DROP TABLE zeitplan_laeufe_alt")   # nimmt den alten Index mit
+    db.init_db(conn)                       # ... und der Index kommt neu
+    return [befehl]
+
+
 def migriere(db_pfad: Path, *, dry_run: bool = False) -> list[str]:
     getan: list[str] = []
     with db.session(db_pfad) as conn:
+        getan.extend(zeitplan_laeufe_nachziehen(conn, dry_run=dry_run))
         # Erst das Schema anwenden: neue Tabellen, Indizes und Trigger
         # entstehen dadurch von selbst.
         if not dry_run:

@@ -103,6 +103,14 @@ async def run_tool(
         )
 
     if tool.permission > max_permission:
+        # "Alles ab EXTERNAL wird protokolliert, egal wie es ausgeht" - auch
+        # dieser Ausgang. Wer morgens /api/audit liest, soll sehen, dass ein
+        # Zeitplan nachts nach draussen wollte (zweite Pruefrunde FIX-08).
+        if tool.permission >= Permission.EXTERNAL and audit is not None:
+            await audit(tool=tool.name, arguments=argumente,
+                        permission=tool.permission.name, decision="denied",
+                        executed=False,
+                        detail=f"Obergrenze dieses Laufs: {max_permission.name}.")
         return ToolResult(
             ok=False,
             error=(

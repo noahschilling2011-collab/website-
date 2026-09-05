@@ -83,7 +83,8 @@ class TaskRegistry:
         self._laufend.clear()
 
 
-def baue_laufzeit(app: FastAPI, eintrag: "LaufenderTask") -> Laufzeit:
+def baue_laufzeit(app: FastAPI, eintrag: "LaufenderTask", *,
+                  unbeaufsichtigt: bool = False) -> Laufzeit:
     """Verdrahtet die Fortschrittsmeldungen des Runners mit der Datenbank.
 
     Nimmt die App, nicht den Request: bis FIX-08 stand hier `request`, und
@@ -91,6 +92,11 @@ def baue_laufzeit(app: FastAPI, eintrag: "LaufenderTask") -> Laufzeit:
     kommen. Ein Zeitplan (core/zeitplan.py) startet Auftraege OHNE Request -
     um 07:00, ohne dass jemand tippt. Wer einen Request hat, gibt
     `request.app`.
+
+    `unbeaufsichtigt`: niemand sitzt vor dem Bildschirm. Dann gibt es keine
+    Rueckfrage - der Dispatcher antwortet auf ein bestaetigungspflichtiges
+    Werkzeug sofort mit Nein und protokolliert das, statt 600 Sekunden in
+    einer Frage zu haengen, die keiner sieht (zweite Pruefrunde FIX-08).
     """
     settings = app.state.settings
     pfad = settings.db_path
@@ -239,7 +245,7 @@ def baue_laufzeit(app: FastAPI, eintrag: "LaufenderTask") -> Laufzeit:
 
     return Laufzeit(on_task=on_task, on_step=on_step, on_call=on_call,
                     on_subtask=on_subtask, on_reply=on_reply,
-                    bestaetigung=bestaetigung,
+                    bestaetigung=None if unbeaufsichtigt else bestaetigung,
                     audit=audit, abbruch=abbruch)
 
 
@@ -247,6 +253,8 @@ async def starte_task(app: FastAPI, ziel: str, *, voice: bool = False,
                       max_permission: Permission | None = None,
                       am_ende: Callable[[Task], Awaitable[None]] | None = None,
                       budget: TaskBudget | None = None,
+                      task: Task | None = None,
+                      unbeaufsichtigt: bool = False,
                       ) -> Task:
     """Legt einen Task an und startet ihn im Hintergrund.
 
@@ -262,6 +270,12 @@ async def starte_task(app: FastAPI, ziel: str, *, voice: bool = False,
     `budget` kann die Vorgaben aus der .env nur UNTERSCHREITEN. Jedes Feld,
     das hoeher waere, wird auf die Vorgabe gedrueckt - CLAUDE.md Regel 6
     gilt auch fuer Aufrufer im eigenen Haus.
+
+    `task`: ein Aufrufer, der die Zeile schon geschrieben hat (ein Zeitplan
+    bucht VOR dem Start, damit ein Absturz dazwischen keinen zweiten Lauf
+    erzeugt), gibt seinen Task mit. Sein Budget wird genauso gedeckelt.
+
+    `unbeaufsichtigt`: siehe `baue_laufzeit`.
     """
     settings = app.state.settings
     registry: TaskRegistry = app.state.tasks
@@ -270,18 +284,25 @@ async def starte_task(app: FastAPI, ziel: str, *, voice: bool = False,
         obergrenze = max_permission
 
     vorgabe = TaskBudget.from_settings(settings)
-    if budget is not None:
+    gewuenscht = budget if budget is not None else (task.budget if task is not None else None)
+    if gewuenscht is not None:
         for feld in fields(TaskBudget):
-            wert, grenze = getattr(budget, feld.name), getattr(vorgabe, feld.name)
+            wert, grenze = getattr(gewuenscht, feld.name), getattr(vorgabe, feld.name)
             setattr(vorgabe, feld.name, min(wert, grenze))
-    task = Task(goal=ziel, budget=vorgabe)
+    if task is None:
+        task = Task(goal=ziel, budget=vorgabe)
+    else:
+        task.budget = vorgabe
     eintrag = LaufenderTask(task=task)
-    registry.add(eintrag)
 
+    # Erst schreiben, DANN in die Registry: scheitert ein Schreibvorgang
+    # (Datenbank gesperrt), bleibt sonst ein Eintrag ohne Lauf fuer immer
+    # stehen (zweite Pruefrunde FIX-08).
     await asyncio.to_thread(db.save_task, settings.db_path, task)
     # Der Verlauf ist unabhaengig vom Task: was der Nutzer getippt hat, darf
     # auch dann nicht verloren gehen, wenn der Task scheitert.
     await asyncio.to_thread(db.add_message, settings.db_path, "user", ziel)
+    registry.add(eintrag)
 
     async def lauf() -> None:
         try:
@@ -292,7 +313,7 @@ async def starte_task(app: FastAPI, ziel: str, *, voice: bool = False,
                 kosten=settings.cost_eur,
                 max_permission=obergrenze,
                 task=task,
-                laufzeit=baue_laufzeit(app, eintrag),
+                laufzeit=baue_laufzeit(app, eintrag, unbeaufsichtigt=unbeaufsichtigt),
                 antwortstil=SPRACHSTIL if voice else "",
             )
         except asyncio.CancelledError:

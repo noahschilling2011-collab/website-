@@ -348,7 +348,10 @@ CREATE TABLE IF NOT EXISTS zeitplaene (
 
 CREATE TABLE IF NOT EXISTS zeitplan_laeufe (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    zeitplan_id   TEXT    NOT NULL REFERENCES zeitplaene(id) ON DELETE CASCADE,
+    -- NULL nach dem Loeschen des Plans, NICHT mitgeloescht: sonst liesse
+    -- sich der Tagesdeckel durch Loeschen und Neuanlegen zuruecksetzen
+    -- (zweite Pruefrunde FIX-08). Alte Datenbanken zieht scripts/migrate.py nach.
+    zeitplan_id   TEXT    REFERENCES zeitplaene(id) ON DELETE SET NULL,
     task_id       TEXT    REFERENCES tasks(id) ON DELETE SET NULL,
     gestartet_am  TEXT    NOT NULL,            -- UTC, 'Z'
     ausloeser     TEXT    NOT NULL             -- 'zeitplan' | 'hand'

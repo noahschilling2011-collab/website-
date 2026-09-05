@@ -195,12 +195,22 @@ class Settings(BaseSettings):
             )
         return value
 
-    @field_validator("zeitplan_max_laeufe_24h", "zeitplan_max_token_24h",
-                     "zeitplan_takt_s")
+    @field_validator("zeitplan_max_laeufe_24h", "zeitplan_max_token_24h")
     @classmethod
     def _nicht_negativ(cls, value: int) -> int:
         if value < 0:
             raise ValueError("Zeitplan-Werte sind 0 oder groesser.")
+        return value
+
+    @field_validator("zeitplan_takt_s")
+    @classmethod
+    def _takt_im_rahmen(cls, value: int) -> int:
+        """0 (aus) oder 10 bis 300 Sekunden. Die Toleranz fuer 'verpasst'
+        haengt am Takt (core/zeitplan.toleranz_fuer); ein Takt von einer
+        Stunde machte daraus ein Nachholen - genau das, was Regel 3
+        verbietet (zweite Pruefrunde FIX-08)."""
+        if value != 0 and not 10 <= value <= 300:
+            raise ValueError("ZEITPLAN_TAKT_S ist 0 (aus) oder 10 bis 300 Sekunden.")
         return value
 
     @property

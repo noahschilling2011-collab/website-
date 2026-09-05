@@ -2549,6 +2549,7 @@ button, input, textarea { font: inherit; color: inherit; }
     // Bleiben sie stehen, laeuft ein Timer im Chat weiter und der Globus
     // zeichnet in einen unsichtbaren Behaelter.
     if (vorher === 'cc' && name !== 'cc') ccVerlassen();
+    if (vorher === 'tasks' && name !== 'tasks') tasksVerlassen();
     // FIX-05 B-4: Klassen umschalten haelt keinen Renderloop an. Ohne die
     // naechsten Zeilen zeichnet der Globus weiter, waehrend du chattest -
     // und genau das ist das Ruckeln, um das es geht.
@@ -2620,6 +2621,19 @@ button, input, textarea { font: inherit; color: inherit; }
 
   // --- Aufträge ---
 
+  // Der Strom der Auftraege-Ansicht: wenn ein Auftrag fertig wird (auch
+  // einer, den ein Zeitplan gestartet hat), frischen Liste und Zeitplaene
+  // von selbst auf. Vorher blieb "laeuft" stehen, bis man den Tab wechselte
+  // (zweite Pruefrunde FIX-08). Wie beim COMMAND CENTER: offen, solange die
+  // Ansicht offen ist, sonst geschlossen - kein Polling.
+  var tasksStrom = null;
+  var zeitplanCtx = null;
+
+  function tasksVerlassen() {
+    if (tasksStrom) { tasksStrom.schliessen(); tasksStrom = null; }
+    zeitplanCtx = null;
+  }
+
   function ladeTasks() {
     var ziel = document.getElementById('view-tasks');
     ziel.textContent = '';
@@ -2627,6 +2641,18 @@ button, input, textarea { font: inherit; color: inherit; }
     var liste = document.createElement('div');
     liste.className = 'auftraege';
     ziel.appendChild(liste);
+    if (!tasksStrom) {
+      tasksStrom = ereignisStrom(function (typ, daten) {
+        if (typ !== 'task' || !daten.final) return;
+        ladeAuftraege();
+        if (zeitplanCtx) ladeZeitplaene(zeitplanCtx);
+      }, function () {
+        tasksStrom = null;          // abgerissen - beim naechsten Oeffnen neu
+      }, function () {
+        ladeAuftraege();
+        if (zeitplanCtx) ladeZeitplaene(zeitplanCtx);
+      });
+    }
     return ladeAuftraege(liste);
   }
 
@@ -2733,7 +2759,8 @@ button, input, textarea { font: inherit; color: inherit; }
     liste.className = 'zeitplan-liste';
     box.appendChild(liste);
 
-    var ctx = { liste: liste, sag: sag, falte: falte, deckel: null, erstesMal: true };
+    var ctx = { liste: liste, sag: sag, falte: falte, deckel: null, gesperrt: null, erstesMal: true };
+    zeitplanCtx = ctx;
     ladeZeitplaene(ctx);
     return box;
   }
@@ -2743,6 +2770,7 @@ button, input, textarea { font: inherit; color: inherit; }
     return api('/api/zeitplaene').then(function (d) {
       liste.textContent = '';
       ctx.deckel = d.deckel || null;
+      ctx.gesperrt = d.gesperrt || null;
       var v = d.verbrauch || {};
       var zeile = document.createElement('div');
       zeile.className = 'karte-zeile';
@@ -2761,6 +2789,14 @@ button, input, textarea { font: inherit; color: inherit; }
         warn.className = 'zeitplan-deckel';
         warn.textContent = d.deckel;
         liste.appendChild(warn);
+      } else if (d.laeuft_gerade && d.laeuft_gerade.length) {
+        // Kein Deckel, aber ein Lauf: Zeitplaene laufen nacheinander.
+        var lauf = document.createElement('p');
+        lauf.className = 'zeitplan-hinweis';
+        lauf.textContent = 'Ein Zeitplan läuft gerade (Auftrag ' + d.laeuft_gerade[0].task_id
+          + ', bis zu ' + ccZahl(d.laeuft_gerade[0].reserviert) + ' Token). '
+          + 'Bis er fertig ist, startet kein zweiter.';
+        liste.appendChild(lauf);
       }
       var plaene = d.zeitplaene || [];
       // Beim ersten Laden: ohne Pläne ist das Formular offen, sonst zu.
@@ -2850,9 +2886,9 @@ button, input, textarea { font: inherit; color: inherit; }
       b.textContent = a[1];
       b.setAttribute('data-plan', p.id);
       b.setAttribute('data-aktion', a[0]);
-      if (a[0] === 'jetzt' && ctx.deckel) {
+      if (a[0] === 'jetzt' && (ctx.deckel || ctx.gesperrt)) {
         b.disabled = true;
-        b.title = ctx.deckel;
+        b.title = ctx.deckel || ctx.gesperrt;
       }
       b.addEventListener('click', function () {
         if (b.disabled) return;

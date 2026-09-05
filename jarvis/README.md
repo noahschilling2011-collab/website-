@@ -111,8 +111,11 @@ Drei Dinge, die man wissen muss, bevor man einen anlegt:
   läuft der Plan morgen um 07:00 — nicht drei Pläne auf einmal beim Start.
   Der Zähler „verpasst" zeigt es an.
 
-`ZEITPLAN_TAKT_S=0` schaltet die Schleife ab; Pläne bleiben dann anlegbar und
-über „Jetzt" von Hand auslösbar. Belege und Grenzen: `docs/FIX-08.md`.
+`ZEITPLAN_TAKT_S=0` schaltet die Schleife ab (sonst 10 bis 300 Sekunden);
+Pläne bleiben dann anlegbar und über „Jetzt" von Hand auslösbar. Zeitpläne
+laufen **nacheinander**, nie gleichzeitig. Und JARVIS läuft als **ein
+Prozess** — kein `--workers`: Anspruch und Reservierung leben im Prozess,
+zwei Prozesse hießen zwei Schleifen. Belege und Grenzen: `docs/FIX-08.md`.
 
 ### Docker
 

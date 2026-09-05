@@ -36,6 +36,24 @@ Die drei Regeln, die diese Datei wichtiger machen als ihre Groesse
    Rechner, und drei Zeitplaene feuern gleichzeitig. Der verpasste Lauf
    wird gezaehlt (`verpasst`) und angezeigt, nicht verschwiegen.
 
+Was die zweite Pruefrunde dazu gebracht hat (docs/FIX-08.md)
+------------------------------------------------------------
+
+- DER TERMIN IST DIE SPERRE. Bevor ein Lauf startet, wird der Termin in
+  EINER Anweisung weitergeschoben - und nur, wenn er noch der alte ist
+  (`termin_weiter`). Wer den alten Termin nicht mehr vorfindet, startet
+  nicht. Das haelt auch ueber Prozessgrenzen, und ein Absturz zwischen
+  Buchung und Start kann keinen zweiten Lauf mehr erzeugen.
+- DAS PROTOKOLL UEBERLEBT DEN PLAN. `zeitplan_laeufe.zeitplan_id` wird
+  beim Loeschen NULL, nicht mitgeloescht - sonst liesse sich der
+  Tagesdeckel durch Loeschen und Neuanlegen zuruecksetzen.
+- LAUFENDE TASKS ZAEHLEN MIT IHREM BUDGET, nicht mit dem, was zufaellig
+  schon in der Datenbank steht (`verbrauch_24h(reserviert=...)`).
+- EIN LAUF BRAUCHT EINEN MINDESTREST (`MINDEST_REST`). Ein Token uebrig
+  heisst: der Planungszug kostet, dann Abbruch - das ist kein Lauf.
+- VERPASST ZAEHLT TERMINE, NICHT RUNDEN (`verpasste_termine`), und der
+  naechste Takt zaehlt ab dem Soll - auch nach einem verpassten Lauf.
+
 Zeit und Zeitzone
 -----------------
 
@@ -75,11 +93,25 @@ PERMISSION_DECKEL = Permission.LOCAL
 TOLERANZ = timedelta(minutes=2)
 
 
-def toleranz_fuer(takt_s: int | float) -> timedelta:
-    """Die Toleranz muss zum Takt passen. Prueft die Schleife nur alle
-    180 Sekunden, waere jeder Lauf mit fester 2-Minuten-Toleranz "verpasst" -
-    taeglich. Zwei Takte sind der Spielraum, mindestens die zwei Minuten."""
-    return max(TOLERANZ, timedelta(seconds=2 * max(0, float(takt_s))))
+def toleranz_fuer(takt_s: int | float, max_seconds: int | float = 0) -> timedelta:
+    """Die Toleranz muss zum Takt UND zur Laufzeit passen.
+
+    Prueft die Schleife nur alle 180 Sekunden, waere jeder Lauf mit fester
+    2-Minuten-Toleranz "verpasst" - taeglich. Und weil Zeitplaene
+    NACHEINANDER laufen (api/zeitplan.py), kann ein Plan, der waehrend eines
+    anderen Laufs faellig wird, erst nach dessen Ende drankommen - also
+    kommt die laengste erlaubte Laufzeit eines Auftrags dazu. Nach oben ist
+    das begrenzt, weil ZEITPLAN_TAKT_S hoechstens 300 sein darf
+    (core/config.py): sonst wuerde aus der Toleranz ein Nachholen.
+    """
+    grund = max(TOLERANZ, timedelta(seconds=2 * max(0, float(takt_s))))
+    return grund + timedelta(seconds=max(0, float(max_seconds)))
+
+
+# Unter so vielen Token uebrig startet kein Lauf mehr: der Planungszug
+# allein kostet einige hundert, danach kaeme sofort "max_tokens erreicht" -
+# ein bezahlter Abbruch mit zwei Chat-Nachrichten und ohne Ergebnis.
+MINDEST_REST = 2_000
 
 _TAEGLICH = re.compile(r"^taeglich (\d{1,2}):(\d{2})$")
 _STUNDEN = re.compile(r"^alle (\d{1,3}) stunden?$")
@@ -234,6 +266,10 @@ def schalten(db_path: Path | str, zeitplan_id: str, aktiv: bool) -> dict | None:
     plan = hole(db_path, zeitplan_id)
     if plan is None:
         return None
+    if aktiv and plan["aktiv"] and plan.get("naechster_lauf"):
+        # Schon an: nichts anfassen. Sonst schiebt ein zweiter Klick (oder
+        # ein zweiter Browser-Tab) einen faelligen Termin still auf morgen.
+        return plan
     naechster = naechster_lauf(lies_regel(plan["regel"])) if aktiv else None
     with session(db_path) as conn:
         conn.execute(
@@ -267,66 +303,99 @@ def ist_verpasst(plan: dict, jetzt: datetime | None = None,
     return ist - soll > (toleranz or TOLERANZ)
 
 
-def verbuche_start(db_path: Path | str, plan: dict, task_id: str | None,
-                   *, ausloeser: str, status: str,
-                   jetzt: datetime | None = None) -> None:
-    """Ein Lauf hat begonnen (oder wurde uebersprungen): Protokoll schreiben
-    und den naechsten Termin setzen.
+def termin_weiter(db_path: Path | str, plan: dict, status: str,
+                  jetzt: datetime | None = None) -> bool:
+    """Den Termin weiterschieben - in EINER Anweisung, und nur, wenn er noch
+    der ist, den der Aufrufer gelesen hat. Das ist die Sperre gegen jeden
+    Doppelstart: wer False bekommt, war zu spaet (ein anderer Aufrufer, ein
+    anderer Prozess, oder der Nutzer hat den Plan inzwischen ausgeschaltet).
 
-    Geschrieben wird NUR, was sich aendert. Der `plan`, den der Aufrufer
-    hier hereingibt, kann Sekunden alt sein - inzwischen hat vielleicht ein
-    Handlauf `letzter_task_id` gesetzt. Wer alte Werte zurueckschreibt,
-    macht genau das rueckgaengig (erste Pruefrunde, Fund 1).
-
-    `ausloeser='hand'` (der Knopf "Jetzt") laesst den Termin, wie er ist: ein
-    Probelauf um 15:00 verschiebt "taeglich 07:00" nicht und setzt auch
-    "alle 6 stunden" nicht neu an. Er zaehlt aber fuer den Deckel - Token
-    sind Token, egal wer den Lauf ausgeloest hat.
-
-    Der naechste Takt zaehlt ab dem SOLL-Termin, nicht ab dem Zeitpunkt, an
-    dem die Schleife ihn bemerkt hat. Sonst schiebt jede Runde den Takt um
-    ihre Verzoegerung nach hinten - 18 Minuten am Tag bei "alle 1 stunde",
-    gemessen in der ersten Pruefrunde (Fund 4).
+    Der naechste Takt zaehlt ab dem SOLL-Termin, nicht ab jetzt: sonst
+    schiebt jede Runde den Takt um ihre Verzoegerung nach hinten (erste
+    Pruefrunde, Fund 4 - 18 Minuten am Tag).
     """
+    if not plan.get("naechster_lauf"):
+        return False
     regel = lies_regel(plan["regel"])
     zeitpunkt = (jetzt or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    soll = _aus_z(plan["naechster_lauf"]) if plan.get("naechster_lauf") else zeitpunkt
+    soll = _aus_z(plan["naechster_lauf"])
     with session(db_path) as conn:
-        if task_id:
-            conn.execute(
-                "INSERT INTO zeitplan_laeufe (zeitplan_id, task_id, gestartet_am, "
-                "ausloeser) VALUES (?, ?, ?, ?)",
-                (plan["id"], task_id, _als_z(zeitpunkt), ausloeser),
-            )
-            conn.execute(
-                "UPDATE zeitplaene SET letzter_lauf = ?, letzter_task_id = ?, "
-                "letzter_status = ? WHERE id = ?",
-                (_als_z(zeitpunkt), task_id, status, plan["id"]),
-            )
-        else:
-            conn.execute(
-                "UPDATE zeitplaene SET letzter_status = ? WHERE id = ?",
-                (status, plan["id"]),
-            )
-        if ausloeser != "hand":
-            conn.execute(
-                "UPDATE zeitplaene SET naechster_lauf = ? WHERE id = ?",
-                (naechster_lauf(regel, ab=zeitpunkt, letzter=soll), plan["id"]),
-            )
+        cur = conn.execute(
+            "UPDATE zeitplaene SET naechster_lauf = ?, letzter_status = ? "
+            "WHERE id = ? AND naechster_lauf = ? AND aktiv = 1",
+            (naechster_lauf(regel, ab=zeitpunkt, letzter=soll), status,
+             plan["id"], plan["naechster_lauf"]),
+        )
+    return cur.rowcount > 0
 
 
-def verbuche_verpasst(db_path: Path | str, plan: dict,
-                      jetzt: datetime | None = None) -> None:
-    """Regel 3, die Buchung: zaehlen, Termin weiterschieben, nicht starten."""
-    regel = lies_regel(plan["regel"])
+def setze_status(db_path: Path | str, zeitplan_id: str, status: str) -> None:
+    with session(db_path) as conn:
+        conn.execute("UPDATE zeitplaene SET letzter_status = ? WHERE id = ?",
+                     (status, zeitplan_id))
+
+
+def verbuche_start(db_path: Path | str, plan: dict, task_id: str,
+                   *, ausloeser: str, status: str = "laeuft",
+                   jetzt: datetime | None = None) -> None:
+    """Ein Lauf hat begonnen: Protokollzeile und letzter Lauf am Plan.
+
+    Den Termin fasst diese Funktion NICHT an. Fuer die Schleife hat ihn
+    `termin_weiter` schon vor dem Start weitergeschoben (die Sperre); ein
+    Handlauf ("Jetzt") laesst ihn ohnehin, wie er ist. Beide zaehlen fuer
+    den Deckel - Token sind Token, egal wer den Lauf ausgeloest hat.
+
+    Geschrieben wird nur, was sich aendert: der `plan` des Aufrufers kann
+    Sekunden alt sein.
+    """
     zeitpunkt = (jetzt or datetime.now(timezone.utc)).astimezone(timezone.utc)
     with session(db_path) as conn:
         conn.execute(
-            "UPDATE zeitplaene SET verpasst = verpasst + 1, "
-            "letzter_status = ?, naechster_lauf = ? WHERE id = ?",
-            (f"verpasst ({plan['naechster_lauf']}), nicht nachgeholt",
-             naechster_lauf(regel, ab=zeitpunkt), plan["id"]),
+            "INSERT INTO zeitplan_laeufe (zeitplan_id, task_id, gestartet_am, "
+            "ausloeser) VALUES (?, ?, ?, ?)",
+            (plan["id"], task_id, _als_z(zeitpunkt), ausloeser),
         )
+        conn.execute(
+            "UPDATE zeitplaene SET letzter_lauf = ?, letzter_task_id = ?, "
+            "letzter_status = ? WHERE id = ?",
+            (_als_z(zeitpunkt), task_id, status, plan["id"]),
+        )
+
+
+def verpasste_termine(regel: Regel, soll: datetime, jetzt: datetime) -> int:
+    """Wie viele Termine zwischen Soll (einschliesslich) und jetzt lagen.
+    Drei Tage aus heisst bei 'taeglich' vier verpasste Termine, nicht einer.
+    Bei 'taeglich' ueber 24-Stunden-Schritte gerechnet - an einem
+    Zeitumstellungstag kann das um einen danebenliegen (siehe UNSICHER im
+    Modulkopf)."""
+    schritt = timedelta(days=1) if regel.art == "taeglich" else timedelta(hours=regel.alle)
+    if jetzt < soll:
+        return 0
+    return int((jetzt - soll) // schritt) + 1
+
+
+def verbuche_verpasst(db_path: Path | str, plan: dict,
+                      jetzt: datetime | None = None) -> bool:
+    """Regel 3, die Buchung: Termine zaehlen, Takt ab Soll weiterschieben,
+    nicht starten. Dieselbe Sperre wie `termin_weiter`: nur, wenn der
+    Termin noch der gelesene ist und der Plan an ist."""
+    if not plan.get("naechster_lauf"):
+        return False
+    regel = lies_regel(plan["regel"])
+    zeitpunkt = (jetzt or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    soll = _aus_z(plan["naechster_lauf"])
+    anzahl = verpasste_termine(regel, soll, zeitpunkt)
+    with session(db_path) as conn:
+        cur = conn.execute(
+            "UPDATE zeitplaene SET verpasst = verpasst + ?, "
+            "letzter_status = ?, naechster_lauf = ? "
+            "WHERE id = ? AND naechster_lauf = ? AND aktiv = 1",
+            (anzahl,
+             f"verpasst ({plan['naechster_lauf']}), nicht nachgeholt",
+             naechster_lauf(regel, ab=zeitpunkt, letzter=soll),
+             plan["id"], plan["naechster_lauf"]),
+        )
+    return cur.rowcount > 0
 
 
 def nachtrag_ergebnis(db_path: Path | str, task_id: str, status: str) -> None:
@@ -339,25 +408,79 @@ def nachtrag_ergebnis(db_path: Path | str, task_id: str, status: str) -> None:
         )
 
 
+ENDZUSTAENDE = ("done", "failed", "aborted_budget", "cancelled")
+
+
+def abgleich(db_path: Path | str, laufende_ids: set[str] | frozenset[str]) -> list[str]:
+    """Nach einem Neustart: Plaene, die noch 'laeuft' oder 'startet' sagen,
+    obwohl ihr Task laengst fertig ist - und Tasks, die nie zu Ende liefen.
+
+    Ein Task, der in der Datenbank noch 'pending' oder 'running' steht,
+    aber in keinem Speicher mehr laeuft, ist beim Herunterfahren gestorben
+    (oder der Start ist nach der Buchung gescheitert). Er bekommt 'failed'
+    mit dem Grund, damit die Auftragsliste nicht ewig einen laufenden
+    Auftrag zeigt - und der Plan den Ausgang, falls er noch 'laeuft' sagt.
+    """
+    geaendert: list[str] = []
+    with session(db_path) as conn:
+        zeilen = conn.execute(
+            "SELECT z.id, z.letzter_status, z.letzter_task_id AS task_id, t.status "
+            "FROM zeitplaene z JOIN tasks t ON t.id = z.letzter_task_id "
+            "WHERE z.letzter_status IN ('laeuft', 'startet') "
+            "   OR t.status IN ('pending', 'running')"
+        ).fetchall()
+        for z in zeilen:
+            if z["task_id"] in laufende_ids:
+                continue
+            if z["status"] in ENDZUSTAENDE:
+                neu = z["status"]
+            else:
+                neu = "abgebrochen: Neustart waehrend des Laufs"
+                conn.execute(
+                    "UPDATE tasks SET status = 'failed', abort_reason = ?, "
+                    "finished_at = ? WHERE id = ? AND status IN ('pending', 'running')",
+                    ("Neustart waehrend des Laufs.", utcnow(), z["task_id"]),
+                )
+            if z["letzter_status"] in ("laeuft", "startet"):
+                conn.execute("UPDATE zeitplaene SET letzter_status = ? WHERE id = ?",
+                             (neu, z["id"]))
+            geaendert.append(z["id"])
+    return geaendert
+
+
 @dataclass(frozen=True)
 class Verbrauch:
     laeufe: int
     token: int
 
 
-def verbrauch_24h(db_path: Path | str, jetzt: datetime | None = None) -> Verbrauch:
+def verbrauch_24h(db_path: Path | str, jetzt: datetime | None = None,
+                  reserviert: dict[str, int] | None = None) -> Verbrauch:
     """Regel 2, die Messung: was ALLE Zeitplaene in den letzten 24 Stunden
     gestartet und verbraucht haben. Ueber die echten Tasks gerechnet, nicht
-    ueber einen Zaehler, den jemand von Hand pflegt."""
+    ueber einen Zaehler, den jemand von Hand pflegt.
+
+    `reserviert` sind laufende Tasks (task_id -> Budget in Token). Ein
+    laufender Task zaehlt mit seinem Budget - denn was in der Datenbank
+    steht, ist der Stand nach der Planung, nicht der Stand jetzt (zweite
+    Pruefrunde). Das Protokoll ueberlebt das Loeschen eines Plans
+    (zeitplan_id wird NULL), deshalb wird hier nicht ueber zeitplaene
+    gejoint.
+    """
     seit = _als_z((jetzt or datetime.now(timezone.utc)) - timedelta(hours=24))
+    reserviert = reserviert or {}
     with session(db_path) as conn:
-        z = conn.execute(
-            "SELECT COUNT(l.id) AS laeufe, COALESCE(SUM(t.spent_tokens), 0) AS token "
+        zeilen = conn.execute(
+            "SELECT l.task_id, COALESCE(t.spent_tokens, 0) AS spent "
             "FROM zeitplan_laeufe l LEFT JOIN tasks t ON t.id = l.task_id "
             "WHERE l.gestartet_am >= ?",
             (seit,),
-        ).fetchone()
-    return Verbrauch(laeufe=int(z["laeufe"] or 0), token=int(z["token"] or 0))
+        ).fetchall()
+    token = 0
+    for z in zeilen:
+        spent = int(z["spent"] or 0)
+        token += max(spent, reserviert.get(z["task_id"], 0))
+    return Verbrauch(laeufe=len(zeilen), token=token)
 
 
 def _de(n: int) -> str:
@@ -373,4 +496,8 @@ def deckel_erreicht(verbrauch: Verbrauch, *, max_laeufe: int, max_token: int) ->
     if verbrauch.token >= max_token:
         return (f"Tagesdeckel erreicht: {_de(verbrauch.token)} von {_de(max_token)} "
                 f"Token in 24 Stunden (ZEITPLAN_MAX_TOKEN_24H).")
+    rest = max_token - verbrauch.token
+    if rest < MINDEST_REST:
+        return (f"Tagesdeckel fast erreicht: nur noch {_de(rest)} Token uebrig, "
+                f"ein Lauf braucht mindestens {_de(MINDEST_REST)} (ZEITPLAN_MAX_TOKEN_24H).")
     return None
