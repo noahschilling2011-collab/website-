@@ -1,0 +1,3968 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>__ASSISTENT_NAME__</title>
+
+<!-- Nur die Zuordnung, KEIN Import. Three.js sind 2,0 MB
+     (three.module.js 635 KB + three.core.js 1410 KB); statisch geladen
+     waeren sie in jedem Seitenaufruf drin, auch wenn niemand die
+     Weltansicht oeffnet. Geladen wird erst beim ersten Klick auf "Welt",
+     per dynamischem import() - siehe ladeGlobus(). -->
+<script type="importmap">
+{ "imports": { "three": "/static/vendor/three.module.js" } }
+</script>
+
+<!-- Als data-URL eingebettet: sonst fragt der Browser /favicon.ico an und
+     bekommt einen 404 in die Konsole. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20rx%3D%226%22%20fill%3D%22%230a0a0c%22/%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23f0b45c%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223.2%22/%3E%3Cpath%20d%3D%22M12%202.6v3.2M12%2018.2v3.2M2.6%2012h3.2M18.2%2012h3.2%22/%3E%3C/g%3E%3C/svg%3E">
+
+<!-- FIX-06 Abschnitt 5: die Palette steht EINMAL, hier und in
+     weltlage.html eingebunden, und static/globus.js erbt sie ueber
+     :root. Vor dem eigenen <style>, damit seiteneigene Abweichungen
+     bei gleicher Spezifitaet gewinnen. -->
+<link rel="stylesheet" href="/static/system.css">
+<style>
+/* ---------------------------------------------------------------------------
+   JARVIS — Phase 1, Walking Skeleton.
+
+   Ein linearer Verlauf, kein Konversations-Browser: das Schema aus
+   docs/phases/PHASE-01.md kennt genau eine Tabelle `messages`.
+
+   Akzent ist ein warmes Bernstein — bewusst nicht das übliche Indigo. Genau
+   eine Akzentfarbe, sonst Graustufen (0.3).
+--------------------------------------------------------------------------- */
+
+/* Die Palette stand frueher hier. Seit FIX-06 Abschnitt 5 liegt sie in
+   `static/system.css` — einmal, fuer beide Seiten und fuer den Globus. Die
+   englischen Namen (`--bg-0`, `--accent`, `--line`, `--ease` …) gibt es dort
+   weiter, aber nur noch als Zeiger auf die deutschen. So bleibt jede Regel
+   in dieser Datei gueltig, ohne dass die Werte an zwei Orten stehen. */
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif;
+  font-size: var(--step-0);
+  line-height: 1.55;
+  color: var(--text);
+  background-color: var(--bg-0);
+  /* Struktur hinter dem Glas. Ohne das ist backdrop-filter sinnlos. */
+  background-image:
+    /* Hier standen zwei Farben, die keiner Palette angehoerten: ein
+       vierter Bernstein dicht neben --akzent, und der zweite Akzent, den
+       der Kopf von static/system.css fuer abgeschafft erklaert. Jetzt
+       zweimal derselbe Akzent, unten schwaecher.
+       Die alten Werte stehen ABSICHTLICH nicht hier: der Waechter
+       durchsucht auch Kommentare, und ein Kommentar, der ihn rot macht,
+       ist genau die Falle, die er verhindern soll. Sie stehen in
+       test_nur_die_eine_akzentfarbe_und_die_zwei_signalfarben. */
+    radial-gradient(900px 620px at 12% -8%,  rgba(240, 180, 92, 0.10), transparent 62%),
+    radial-gradient(760px 560px at 92% 108%, rgba(240, 180, 92, 0.06), transparent 60%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, textarea { font: inherit; color: inherit; }
+
+/* `:focus-visible`, `.glass` und der Reduced-Motion-Block stehen seit
+   FIX-06 Abschnitt 5 in `static/system.css`. */
+
+/* --- Gerüst --------------------------------------------------------------- */
+
+.app {
+  display: grid;
+  /* Die Spalte muss ausdrücklich begrenzt werden: eine implizite Grid-Spalte
+     ist auto = max-content und wächst mit dem breitesten Kind. */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100dvh;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+/* --- Der Reaktor ---------------------------------------------------------
+   Das Markensymbol ist der einzige Ort, an dem JARVIS dauernd sichtbar ist.
+   Statt eines Kaestchens mit Rahmen zeigt es jetzt, was das System gerade
+   TUT - acht Zustaende, eine Rangfolge.
+   Kasten und Rahmen fallen weg: das Symbol selbst traegt den Zustand, ein
+   Rahmen drumherum wuerde nur mit ihm konkurrieren. */
+.brand-mark {
+  width: 30px; height: 30px;
+  flex: none;
+  display: grid; place-items: center;
+  color: var(--akzent);
+}
+.brand-mark .kern   { opacity: 1; }
+.brand-mark .strahl { opacity: .3; }
+.brand-mark .reaktor-ring { opacity: 0; }
+
+/* Rangfolge, von unten nach oben: was den Nutzer BRAUCHT, schlaegt jeden
+   Betriebszustand. Entschieden wird sie in `reaktorZustand()`, nicht hier -
+   CSS kennt keine Rangfolge, nur Spezifitaet, und die waere die falsche
+   Sprache dafuer. */
+.brand-mark[data-zustand="ruhe"]   { color: var(--text-leise); }
+.brand-mark[data-zustand="ruhe"]   .kern   { opacity: .45; }
+.brand-mark[data-zustand="ruhe"]   .strahl { opacity: .25; }
+
+.brand-mark[data-zustand="wartet"] .kern   { opacity: 1; }
+.brand-mark[data-zustand="wartet"] .strahl { opacity: .4; }
+
+/* Kein Drehen: das Symbol ist 16 px gross, da wird Rotation zu Flimmern.
+   Nur der Kern atmet. */
+@keyframes reaktor-atmet { 0% { opacity: .7; } 50% { opacity: 1; } 100% { opacity: 1; } }
+.brand-mark[data-zustand="denkt"]  .kern   { animation: reaktor-atmet 2.4s ease-in-out infinite; }
+.brand-mark[data-zustand="denkt"]  .strahl { opacity: .85; }
+
+.brand-mark[data-zustand="werkzeug"] .kern   { opacity: 1; }
+.brand-mark[data-zustand="werkzeug"] .strahl { opacity: .3; }
+
+/* Hoeren und Sprechen: dieselbe Welle, gegenlaeufig. Nach innen heisst
+   "kommt herein", nach aussen "geht hinaus". */
+@keyframes reaktor-rein { from { transform: scale(1.9); opacity: 0; }
+                          50% { opacity: .55; }
+                          to   { transform: scale(1);   opacity: 0; } }
+@keyframes reaktor-raus { from { transform: scale(1);   opacity: 0; }
+                          50% { opacity: .55; }
+                          to   { transform: scale(1.9); opacity: 0; } }
+.brand-mark[data-zustand="hoert"]   { color: var(--ab); }
+.brand-mark[data-zustand="hoert"]   .reaktor-ring { animation: reaktor-rein 1.1s linear infinite; }
+.brand-mark[data-zustand="spricht"] { color: var(--akzent); }
+.brand-mark[data-zustand="spricht"] .reaktor-ring { animation: reaktor-raus 1.1s linear infinite; }
+
+/* Einmalig, nicht endlos: ein Fehlschlag ist ein Ereignis, kein Zustand.
+   Die Vorlage nennt 180 ms und 400 ms. Beides waere eine fuenfte und sechste
+   Dauer; `--dauer-tupf` (140) und `--dauer-rein` (380) liegen so nah daran,
+   dass der Unterschied nicht zu sehen ist - der Bruch im System dagegen
+   schon. */
+@keyframes reaktor-blitz        { from { opacity: 1; } to { opacity: .35; } }
+@keyframes reaktor-blitz-strahl { from { opacity: 1; } to { opacity: .25; } }
+.brand-mark[data-zustand="fehl"] { color: var(--ab); }
+.brand-mark[data-zustand="fehl"] .kern   { animation: reaktor-blitz var(--dauer-tupf) linear 1 both; }
+.brand-mark[data-zustand="fehl"] .strahl { animation: reaktor-blitz-strahl var(--dauer-tupf) linear 1 both; }
+
+@keyframes reaktor-abkuehlen { from { opacity: 1; } to { opacity: .6; } }
+.brand-mark[data-zustand="fertig"] { color: var(--auf); }
+.brand-mark[data-zustand="fertig"] svg    { animation: reaktor-abkuehlen var(--dauer-rein) linear 1 both; }
+.brand-mark[data-zustand="fertig"] .kern  { opacity: 1; }
+.brand-mark[data-zustand="fertig"] .strahl{ opacity: .6; }
+.brand-name {
+  margin: 0;
+  font-size: var(--step-0);
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  color: var(--text-loud);
+}
+.brand-phase { font-size: 11px; letter-spacing: 0.06em; color: var(--text-dim); }
+
+.status {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); flex: none; }
+.dot.is-ok  { background: var(--ok); }
+.dot.is-bad { background: var(--danger); }
+.status-text {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.model-chip {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.thread {
+  /* display kommt aus .thread.is-active - sonst bleibt der Chat sichtbar,
+     wenn eine andere Ansicht aktiv ist. */
+  display: none;
+  overflow-y: auto;
+  padding: var(--s-5) var(--s-5) var(--s-6);
+  flex-direction: column;
+  gap: var(--s-4);
+  scroll-behavior: smooth;
+}
+
+.msg { max-width: min(70ch, 88%); animation: rise var(--dauer-rein) var(--kurve-rein) both; }
+.msg-user { align-self: flex-end; }
+.msg-assistant, .msg-error { align-self: flex-start; }
+
+.bubble {
+  padding: var(--s-3) var(--s-4);
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--bg-1);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.msg-user .bubble {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  border-bottom-right-radius: 5px;
+}
+.msg-assistant .bubble { border-bottom-left-radius: 5px; }
+.msg-error .bubble { border-color: rgba(242, 114, 107, 0.45); color: #ffd9d6; }
+
+/* --- Gedächtnis-Ansicht (Phase 3) ---------------------------------------- */
+
+.kopf-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color var(--dauer-tupf) var(--kurve-rein), border-color var(--dauer-tupf) var(--kurve-rein),
+              background var(--dauer-tupf) var(--kurve-rein);
+}
+.kopf-btn:hover { color: var(--text-loud); border-color: var(--accent-line); }
+.kopf-btn[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.panel {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: 30;
+  width: min(460px, 92vw);
+  display: flex;
+  flex-direction: column;
+  border-width: 0 0 0 1px;
+  border-radius: 0;
+  transform: translateX(102%);
+  /* Asymmetrisch, wie alles andere: rein 380 ms mit der Rein-Kurve, raus
+     220 ms mit der Raus-Kurve. Vorher fuhr es in beide Richtungen gleich. */
+  transition: transform var(--dauer-raus) var(--kurve-raus);
+}
+.panel.is-open { transform: none; }
+.panel.is-open { transition: transform var(--dauer-rein) var(--kurve-rein); }
+.panel-kopf {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--line);
+}
+.panel-kopf h2 {
+  margin: 0;
+  font-size: var(--step-0);
+  font-weight: 500;
+  color: var(--text-loud);
+}
+.panel-zu {
+  margin-left: auto;
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  border: 0; border-radius: 8px;
+  background: none; color: var(--text-dim); cursor: pointer;
+}
+.panel-zu:hover { background: var(--bg-2); color: var(--text); }
+.panel-koerper { flex: 1; min-height: 0; overflow-y: auto; padding: var(--s-4) var(--s-5); }
+.panel-fuss {
+  padding: var(--s-3) var(--s-5) max(var(--s-4), env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: var(--s-2);
+}
+.panel-fuss input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-0);
+}
+.panel-fuss button {
+  flex: none;
+  padding: 8px var(--s-3);
+  border: 0; border-radius: 10px;
+  background: var(--accent); color: var(--on-accent);
+  cursor: pointer;
+}
+
+.fakt {
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--line);
+  animation: rise var(--dauer-rein) var(--kurve-rein) both;
+}
+.fakt-text { overflow-wrap: anywhere; }
+.fakt-text[contenteditable="true"] {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+.fakt-zeile {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.fakt-kat {
+  padding: 1px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+.fakt-konflikt {
+  margin-top: 6px;
+  padding: 6px var(--s-3);
+  border-radius: 8px;
+  border: 1px solid rgba(242, 114, 107, 0.45);
+  background: rgba(242, 114, 107, 0.08);
+  color: #ffd9d6;
+  font-size: 11px;
+}
+.fakt-aktion {
+  border: 0; background: none; padding: 2px 6px;
+  color: var(--text-dim); cursor: pointer; font-size: 11px;
+  border-radius: 6px;
+}
+.fakt-aktion:hover { background: var(--bg-2); color: var(--text); }
+.fakt-aktion.is-loeschen:hover { color: var(--danger); }
+.panel-leer { color: var(--text-dim); text-align: center; padding: var(--s-6) 0; }
+
+/* --- Plan eines Auftrags (Phase 4) --------------------------------------- */
+
+.plan {
+  margin-top: var(--s-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+.plan-kopf {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 8px var(--s-3);
+  font-size: 11px;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--line);
+}
+.plan-abbrechen {
+  margin-left: auto;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 2px 10px;
+  cursor: pointer;
+}
+.plan-abbrechen:hover { color: var(--danger); border-color: rgba(242,114,107,0.5); }
+
+.schritt {
+  display: flex;
+  gap: var(--s-3);
+  padding: 8px var(--s-3);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: var(--step--1);
+}
+.schritt:first-of-type { border-top: 0; }
+.schritt-marke {
+  flex: none;
+  width: 16px; height: 16px;
+  margin-top: 3px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-dim);
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  color: var(--bg-0);
+}
+.schritt.is-running .schritt-marke {
+  border-color: var(--accent);
+  animation: puls 2.4s ease-in-out infinite;
+}
+.schritt.is-done .schritt-marke { background: var(--ok); border-color: var(--ok); }
+.schritt.is-failed .schritt-marke { background: var(--danger); border-color: var(--danger); }
+.schritt.is-skipped { opacity: 0.5; }
+.schritt-koerper { min-width: 0; flex: 1; }
+.schritt-agent {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 7px;
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  font-size: 10px;
+  color: var(--accent);
+}
+.schritt-note { margin-top: 3px; font-size: 11px; color: var(--text-dim); }
+.schritt.is-failed .schritt-note { color: var(--ab); }
+.plan-fuss {
+  padding: 6px var(--s-3);
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.plan-fuss.is-abbruch { color: var(--ab); }
+
+/* `box-shadow` malt in jedem Bild neu; `transform` und `opacity` laufen
+   auf dem Compositor. Bei einer Endlosanimation ist das der Unterschied
+   zwischen "kostet nichts" und "malt die Zone sechzigmal je Sekunde". */
+@keyframes puls {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%      { opacity: .55; transform: scale(1.12); }
+}
+
+/* --- Sprache (Phase 9) ---------------------------------------------------- */
+
+.btn-mic {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px; height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: color var(--dauer-tupf) var(--kurve-rein), border-color var(--dauer-tupf) var(--kurve-rein),
+              background var(--dauer-tupf) var(--kurve-rein), transform var(--dauer-tupf) var(--kurve-rein);
+}
+.btn-mic:hover { color: var(--text-loud); border-color: var(--accent-line); }
+.btn-mic.is-hoert {
+  color: var(--on-accent);
+  background: var(--danger);
+  border-color: var(--danger);
+  animation: puls 1.1s ease-in-out infinite;
+}
+.btn-mic[disabled] { opacity: 0.35; cursor: not-allowed; }
+.btn-mic.is-spricht { color: var(--accent); border-color: var(--accent-line); }
+
+.sprache {
+  flex: none;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 11px;
+  cursor: pointer;
+}
+.sprache:hover { color: var(--text-loud); border-color: var(--accent-line); }
+
+/* --- Ansichten (Phase 7) -------------------------------------------------- */
+
+/* `wrap` seit FIX-06 Abschnitt 6: mit dem sechsten Tab passte die Reihe
+   bei 360 px nicht mehr in die Zeile und schob die Seite um 44 px zur
+   Seite. Gemessen: scrollWidth 404 bei innerWidth 360, Taeter #tab-welt. */
+.tabs { display: flex; gap: 2px; flex-wrap: wrap; min-width: 0; }
+.tab {
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color var(--dauer-tupf) var(--kurve-rein), background var(--dauer-tupf) var(--kurve-rein);
+}
+.tab:hover { color: var(--text-loud); }
+/* Deckend, nicht halbtransparent — und das ist kein Geschmack, sondern
+   Messbarkeit. Diese Flaeche liegt auf dem Glas der Kopfleiste, also
+   Transparenz auf Transparenz. Der Kontrastpruefer von `web-selfcheck`
+   bricht seine Suche nach dem Untergrund bei der zweiten getoenten Schicht
+   ab und rechnet gegen WEISS: gemeldet 1,69:1, tatsaechlich gemalt 7,68:1.
+   `--akzent-glut-fest` ist dieselbe Farbe, vorkomponiert. Optisch
+   unveraendert, aber jetzt misst jeder dasselbe wie das Auge sieht. */
+.tab[aria-selected="true"] { background: var(--akzent-glut-fest); color: var(--akzent); }
+
+.view { display: none; overflow-y: auto; padding: var(--s-5); }
+/* Der Wechsel bekommt eine Einblende - vorher schaltete er hart um.
+   Dieselbe Bewegung wie eine Zone, damit die Sprache eine bleibt. */
+.view.is-active { display: block;
+                  animation: zone-rein var(--dauer-rein) var(--kurve-rein) both; }
+/* Keine eigene Dauer fuer das COMMAND CENTER: eine laengere Einblende der
+   ganzen Ansicht wuerde die Staffelung der acht Zonen ueberdecken, die sie
+   zeigen soll. Die Zonen bringen ihren Takt selbst mit. */
+
+/* --- COMMAND CENTER (FIX-06 Abschnitt 6) --------------------------------- */
+
+/* Zwoelf Spalten brauchen Platz. Der Rest der App bleibt bei 900 px - ein
+   Dashboard in einer 900-px-Spalte ist kein Dashboard, sondern eine Liste.
+   Die Klasse haengt an `.app` und wird in `zeigeAnsicht()` gesetzt. */
+.app.is-weit { max-width: 1500px; }
+
+/* DoD 1: kein Scrollen bei 1440x900. Deshalb `overflow: hidden` statt
+   `auto` - was nicht passt, faellt auf, statt sich wegzuscrollen. */
+/* Ganze Zonen laufen weiter ein als einzelne Elemente: 12 px gegen 8.
+   Der Wert geht als Custom Property an `@keyframes zone-rein` in
+   static/system.css, damit dort nur EINE Regel steht. */
+#view-cc { padding: var(--s-4); overflow: hidden; --zone-weg: 12px; }
+
+.cc { border: 1px solid var(--kante); border-radius: 12px; overflow: hidden;
+      grid-auto-rows: min-content; }
+/* Ein Polster fuer alle Zonen statt drei verschiedene. 16 px kosten
+   Hoehe - dass DoD 1 (kein Scrollen bei 1440x900) weiter haelt, misst
+   `test_dod_1_kein_scrollen_bei_1440x900`. */
+.cc > .zone { padding: var(--s-4); min-width: 0; display: flex;
+              flex-direction: column; gap: 11px; }
+
+.z3  { grid-column: span 3; }
+.z4  { grid-column: span 4; }
+.z5  { grid-column: span 5; }
+.z6  { grid-column: span 6; }
+.z12 { grid-column: span 12; }
+
+.zone-kopf {
+  display: flex; align-items: baseline; gap: var(--s-3);
+  font-size: var(--etikett); letter-spacing: .11em; text-transform: uppercase;
+  color: var(--text-leise);
+}
+.zone-kopf .zahl-rechts { margin-left: auto; font-variant-numeric: tabular-nums; }
+/* Der Strich aus 6.3: die Zone bleibt stehen, der Inhalt ist ehrlich leer.
+   Er steht in derselben Groesse wie eine Kennzahl - "hier waere eine Zahl,
+   es gibt nur keine" liest sich anders als ein kleiner grauer Strich. */
+.zone-leer { margin: 0; color: var(--text-leise); font-size: 14px;
+             line-height: 1.6; max-width: 340px; }
+.zone-leer::before { content: "—"; display: block; color: var(--text-leise);
+                     font-size: 34px; font-weight: 600; line-height: 1;
+                     letter-spacing: -0.03em; margin-bottom: 8px; }
+/* Zone 8 ist breit und flach. Dort steht der Strich NEBEN dem Satz statt
+   darueber - mit 48 px uebereinander wurde der Satz unten abgeschnitten,
+   und `#view-cc` scrollt laut DoD 1 nicht, klippt also. */
+.cc > .zone.z12 .zone-leer { display: flex; align-items: baseline; gap: 14px;
+                             max-width: none; }
+.cc > .zone.z12 .zone-leer::before { margin-bottom: 0; }
+
+/* Zone 1 --------------------------------------------------------------- */
+/* `.cc > .zone` sind zwei Klassen und schlagen eine einzelne - ohne den
+   zusammengesetzten Selektor bleibt die Kopfzeile eine Spalte. Gemessen:
+   Marke und Anbieter standen untereinander statt nebeneinander. */
+.cc > .zone.cc-kopf { flex-direction: row; align-items: center; gap: var(--s-4); }
+.cc-marke { font-size: var(--step-0); letter-spacing: .14em; color: var(--text-laut);
+            font-weight: 500; }
+.cc-marke b { color: var(--akzent); font-weight: 500; }
+/* Nicht `--kenngroesse`: das ist die Groesse fuer EINE Heldenzahl. Als Uhr
+   in der Kopfzeile war sie 64 px hoch und hat die ganze Zeile erschlagen. */
+.cc-uhr { margin-left: auto; font-family: var(--mono);
+          font-variant-numeric: tabular-nums; font-size: var(--step-1);
+          line-height: 1; color: var(--text-laut); letter-spacing: .04em; }
+.cc-uhr small { font-size: var(--etikett); color: var(--text-leise);
+                margin-left: 8px; letter-spacing: .11em; }
+.cc-anbieter { font-size: var(--etikett); color: var(--text-leise);
+               letter-spacing: .11em; }
+
+/* Zone 2 --------------------------------------------------------------- */
+.cc-globus { position: relative; min-height: 215px; padding: 0; }
+.cc-globus .zone-kopf { position: absolute; inset: 9px 13px auto; z-index: 2;
+                        pointer-events: none; }
+.cc-globus-platz { flex: 1; min-height: 0; position: relative; }
+/* Das Canvas kommt aus der Weltansicht herueber. Dort galt
+   `.globus-wurzel #globus{position:absolute;inset:0}` - hier greift die
+   Regel nicht mehr, also braucht es eine eigene. */
+/* `inset` reicht hier NICHT. Ein <canvas> ist ein ersetztes Element: steht
+   `width: auto`, nimmt CSS die intrinsische Groesse (300x150) und ignoriert
+   eine der beiden Kanten - gemessen, canvasW war 300px trotz left und
+   right. Deshalb Breite und Hoehe ausdruecklich. */
+.cc-globus-platz canvas { position: absolute; top: 22px; left: 10px;
+                          width: calc(100% - 20px); height: calc(100% - 30px);
+                          display: block; cursor: grab; }
+.cc-globus-hinweis { position: absolute; inset: 22px 13px 9px; margin: 0;
+                     display: flex; flex-direction: column; align-items: center;
+                     justify-content: center; text-align: center;
+                     font-size: var(--step--1); color: var(--text-leise); }
+.cc-globus-hinweis button {
+  display: block; margin: 8px auto 0; padding: 5px 12px; border-radius: 8px;
+  border: 1px solid var(--akzent-linie); background: var(--akzent-glut-fest);
+  color: var(--akzent); cursor: pointer; font-size: var(--step--1);
+}
+
+/* Zone 3 --------------------------------------------------------------- */
+.cc-auftrag { display: flex; flex-direction: column; gap: 3px; }
+.cc-auftrag + .cc-auftrag { margin-top: 7px; }
+.cc-auftrag-ziel { font-size: var(--step--1); color: var(--text-laut);
+                   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cc-auftrag-zeile { display: flex; gap: var(--s-2); font-size: var(--etikett);
+                    color: var(--text-leise); font-variant-numeric: tabular-nums; }
+.cc-balken { height: 3px; background: var(--kante); overflow: hidden; }
+/* `scaleX` statt `width`: `width` loest ein Layout aus, `transform` nicht -
+   und diese Ansicht darf laut DoD 1 nicht scrollen, da will man kein
+   Nachrechnen der Nachbarzonen bei jedem Fortschritt.
+   Hier stand `var(--dauer-normal)`, und das Token gibt es in keiner Datei.
+   Damit war die ganze Deklaration ungueltig und der Balken sprang hart -
+   ausgerechnet an der Stelle, die Fortschritt zeigen soll. Gefunden beim
+   Abgleich mit Noahs Bewegtbild-Vorlage, festgehalten in
+   `test_kein_undefiniertes_custom_property`. */
+.cc-balken i { display: block; height: 100%; width: 100%;
+               background: var(--akzent);
+               transform-origin: left center; transform: scaleX(0);
+               transition: transform var(--dauer-zahl) var(--kurve-rein); }
+
+/* Zone 4 --------------------------------------------------------------- */
+.cc-strom { flex: 1; min-height: 0; overflow-y: auto; font-family: var(--mono);
+            font-size: 11.5px; line-height: 1.45; display: flex;
+            flex-direction: column; justify-content: flex-end; }
+/* Zwei Spalten statt Fliesstext: die Zeitstempel fluchten, und der Blick
+   findet die Ereignisart, ohne jede Zeile von vorn zu lesen.
+   KEIN `animation-delay`: der Takt kommt aus dem echten SSE-Strom, nicht
+   aus einer Staffelung. Eine gestaffelte Einblendung wuerde eine Ordnung
+   behaupten, die die Ereignisse nicht haben. */
+@keyframes strom-rein { from { opacity: 0; transform: translateY(6px); }
+                        to   { opacity: 1; transform: none; } }
+/* DREI Spalten, nicht zwei: die Zeile hat Zeit, Art und Text. Mit zwei
+   Spalten rutschte der Text in eine zweite Rasterzeile und der Strom las
+   sich doppelt so hoch wie er ist. */
+.cc-strom div { display: grid; grid-template-columns: 68px 92px 1fr; gap: 8px;
+                overflow: hidden; color: var(--text);
+                animation: strom-rein var(--dauer-rein) var(--kurve-rein) both; }
+.cc-strom div > :last-child { overflow: hidden; text-overflow: ellipsis;
+                              white-space: nowrap; }
+.cc-strom div:last-child { color: var(--text-laut); }
+.cc-strom .t  { color: var(--text-leise); font-variant-numeric: tabular-nums; }
+.cc-strom .n  { color: var(--text-leise); }
+
+/* Zone 5 --------------------------------------------------------------- */
+.cc-kennzahlen { display: grid; grid-template-columns: repeat(4, 1fr);
+                 gap: 1px; background: var(--kante); }
+.cc-kennzahl { background: var(--ebene-1); padding: 7px 13px 9px; min-width: 0; }
+/* Etikett oben, Zahl rechtsbuendig darunter - so stehen vier Zahlen
+   untereinander auf derselben Kante, statt links an verschieden langen
+   Woertern zu haengen. `tabular-nums` haelt sie auch beim Hochzaehlen
+   ruhig. */
+.cc-kennzahl .name { display: block; font-size: var(--etikett);
+                     letter-spacing: .11em; text-transform: uppercase;
+                     color: var(--text-leise); }
+.cc-kennzahl .wert { display: block; font-size: 44px; font-weight: 600;
+                     line-height: 1.05; letter-spacing: -0.03em;
+                     text-align: right; font-variant-numeric: tabular-nums;
+                     color: var(--text-laut); margin-top: 4px; }
+/* Ein Strich ist keine Zahl. Er steht in derselben Groesse, aber leiser. */
+.cc-kennzahl .wert.ist-leer { color: var(--text-leise); }
+.cc-kennzahl .fussnote { display: block; font-size: 11.5px; line-height: 1.3;
+                         color: var(--text-leise); margin-top: 9px;
+                         text-align: right; }
+.z-kennzahlen { padding: 0; gap: 0; }
+
+/* Zone 6 --------------------------------------------------------------- */
+.cc-tabelle { width: 100%; border-collapse: collapse; font-size: var(--step--1); }
+.cc-tabelle td { padding: 2px 0; border-bottom: 1px solid var(--kante);
+                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cc-tabelle tr:last-child td { border-bottom: 0; }
+.cc-tabelle .t { color: var(--text-leise); font-family: var(--mono);
+                 width: 1%; padding-right: 12px;
+                 font-variant-numeric: tabular-nums; }
+.cc-tabelle .ms { text-align: right; font-variant-numeric: tabular-nums;
+                  color: var(--text-leise); width: 1%; padding-left: 12px; }
+/* Zahl und Einheit trennen: die Einheit ist kleiner und leiser, damit die
+   Zahl die Spalte fuehrt. */
+.cc-tabelle .ms span { font-size: .8em; color: var(--text-leise); }
+.cc-tabelle .ok  { color: var(--auf); width: 1%; text-align: center; }
+.cc-tabelle .weg { color: var(--ab); width: 1%; text-align: center; }
+
+/* Zone 7 --------------------------------------------------------------- */
+.cc-diagramm { flex: 1; min-height: 64px; position: relative; }
+.cc-diagramm svg { width: 100%; height: 100%; display: block; }
+/* Der Verlauf deckt sich einmal von links nach rechts auf - eine Blende in
+   der Zonenfarbe, die zur Seite faehrt. Nur `transform`, also kein Neumalen.
+   Einmalig, nicht endlos: `both` friert sie am Ende ein, und bei
+   `prefers-reduced-motion` schrumpft die Dauer auf 0,01 ms, dann ist sie
+   sofort weg statt hektisch. */
+@keyframes aufdecken { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+.cc-diagramm::after { content: ""; position: absolute; inset: 0;
+                      background: var(--ebene-1); transform-origin: right center;
+                      animation: aufdecken var(--dauer-zahl) var(--kurve-rein) both;
+                      pointer-events: none; }
+
+/* Zone 8 --------------------------------------------------------------- */
+.cc-meldungen { display: grid; grid-template-columns: repeat(3, 1fr);
+                gap: var(--s-3); }
+.cc-meldung { display: flex; gap: var(--s-3); min-width: 0; }
+.cc-meldung img { width: 62px; height: 46px; object-fit: cover; border-radius: 6px;
+                  flex: none; background: var(--ebene-2); }
+.cc-meldung-text { min-width: 0; }
+.cc-meldung h4 { margin: 0; font-size: var(--step--1); font-weight: 500;
+                 color: var(--text-laut); display: -webkit-box;
+                 -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+                 overflow: hidden; }
+.cc-meldung p { margin: 2px 0 0; font-size: var(--etikett); color: var(--text-leise); }
+
+/* DoD 6: bei 360 px stapeln sich die Zonen, nichts scrollt seitlich. */
+@media (max-width: 900px) {
+  #view-cc { overflow-y: auto; }
+  /* Bei 360 px quetschte die Kopfzeile die Marke auf drei Zeilen und den
+     Anbieter auf vier. Gestapelt liest sich das. */
+  .cc > .zone.cc-kopf { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .cc-uhr { margin-left: 0; }
+  .cc > .zone { grid-column: span 12 !important; }
+  .cc-kennzahlen { grid-template-columns: repeat(2, 1fr); }
+  .cc-meldungen { grid-template-columns: 1fr; }
+  .cc-globus { min-height: 220px; }
+}
+
+/* FIX-05 B-5: der Globus fuellt seinen BEHAELTER, nicht das Fenster. Kein
+   Innenabstand, kein Scrollbalken - er zeichnet bis an die Kante, und
+   `position:relative` macht ihn zum Bezugssystem fuer alles, was
+   static/globus.js absolut darin platziert. */
+#view-welt { padding: 0; overflow: hidden; position: relative; }
+/* 2,0 MB brauchen sichtbar Zeit. Bis dahin steht hier, was los ist. */
+.globus-laedt {
+  position: absolute; inset: 0; z-index: 9;
+  display: grid; place-items: center;
+  padding: var(--s-5); text-align: center;
+  color: var(--text-dim); font-size: var(--step--1);
+}
+.thread.is-active { display: flex; }
+
+.karte {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-1);
+  padding: var(--s-4);
+  margin-bottom: var(--s-3);
+  animation: rise var(--dauer-rein) var(--kurve-rein) both;
+}
+.karte h3 {
+  margin: 0 0 var(--s-2);
+  font-size: var(--step-0);
+  font-weight: 500;
+  color: var(--text-loud);
+}
+.karte-zeile {
+  display: flex;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.zustand {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+}
+.zustand.is-done { color: var(--ok); border-color: rgba(95,207,142,0.4); }
+.zustand.is-failed, .zustand.is-aborted_budget { color: var(--danger); border-color: rgba(242,114,107,0.4); }
+.zustand.is-running, .zustand.is-pending { color: var(--accent); border-color: var(--accent-line); }
+
+/* --- Herkunft und Zustellung (FIX-09) ------------------------------------ */
+.herkunft {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  margin: 0 0 4px;
+}
+.msg.is-zeitplan > .bubble { border-left: 2px solid var(--accent-line); }
+.tab .badge {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* --- Zeitpläne (FIX-08) --------------------------------------------------
+   Nur vorhandene Tokens, keine neue Dauer, keine neue Farbe: die Guards in
+   tests/test_designsystem.py lesen diesen Block mit. */
+.zeitplan-titel {
+  margin: 0 0 var(--s-2);
+  font-size: var(--step--1);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.zeitplan-hinweis { margin: 0 0 var(--s-3); font-size: var(--step--1); color: var(--text-dim); }
+.zeitplan-neu > summary {
+  cursor: pointer;
+  font-size: var(--step--1);
+  color: var(--accent);
+  margin-bottom: var(--s-2);
+}
+.zeitplan-form { display: flex; flex-wrap: wrap; gap: var(--s-2); margin: var(--s-2) 0 var(--s-3); }
+.zeitplan-form input {
+  flex: 1 1 160px;
+  min-width: 0;
+  padding: 8px var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-0);
+}
+.zeitplan-form input.is-breit { flex-basis: 100%; }
+.zeitplan-form button {
+  flex: none;
+  padding: 8px var(--s-3);
+  border: 0; border-radius: 10px;
+  background: var(--accent); color: var(--on-accent);
+  cursor: pointer;
+}
+/* Die Meldungen des Blocks stehen IM Block. `#hint` liegt im Composer und
+   ist ausserhalb des Chats versteckt - dort kam bis zur ersten Pruefrunde
+   jede Antwort des Servers unsichtbar an. */
+.zeitplan-meldung {
+  margin: 0 0 var(--s-3);
+  font-size: var(--step--1);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.zeitplan-meldung.is-fehler { color: var(--danger); }
+.zeitplan-deckel { margin: 0 0 var(--s-3); font-size: var(--step--1); color: var(--danger); }
+.zeitplan { border-top: 1px solid var(--line); padding: var(--s-3) 0; }
+.zeitplan-kopf { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); min-width: 0; }
+.zeitplan-kopf strong { font-weight: 500; color: var(--text-loud); overflow-wrap: anywhere; min-width: 0; }
+.zeitplan-regel { font-size: 11px; color: var(--text-dim); }
+.zeitplan-ziel { margin: var(--s-2) 0; font-size: var(--step--1); white-space: pre-wrap; overflow-wrap: anywhere; }
+/* "Aus" dimmt den Text, nicht die Knoepfe - die muessen lesbar bleiben. */
+.zeitplan.is-aus .zeitplan-kopf strong,
+.zeitplan.is-aus .zeitplan-ziel { color: var(--text-dim); }
+.zeitplan-grund { color: var(--danger); overflow-wrap: anywhere; }
+.zustand.is-verpasst, .zustand.is-uebersprungen { color: var(--danger); border-color: rgba(242,114,107,0.4); }
+.zeitplan-aktionen { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-2); }
+.zeitplan-knopf {
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font-size: var(--step--1);
+  cursor: pointer;
+}
+.zeitplan-knopf:hover { background: var(--bg-2); }
+.zeitplan-knopf.is-loeschen { color: var(--danger); }
+.zeitplan-knopf:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.tabelle { width: 100%; border-collapse: collapse; font-size: var(--step--1); }
+.tabelle th, .tabelle td {
+  text-align: left;
+  padding: 6px var(--s-2);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.tabelle th { color: var(--text-dim); font-weight: 500; font-size: 11px; }
+.tabelle td.zahl, .tabelle th.zahl { text-align: right; font-variant-numeric: tabular-nums; }
+.tabelle-wrap { overflow-x: auto; }
+
+.kpi { display: flex; flex-wrap: wrap; gap: var(--s-3); margin-bottom: var(--s-4); }
+.kpi > div {
+  flex: 1 1 140px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: var(--s-3) var(--s-4);
+  background: var(--bg-1);
+}
+.kpi dt { font-size: 11px; color: var(--text-dim); margin: 0; }
+.kpi dd {
+  margin: 4px 0 0;
+  font-size: var(--step-1);
+  color: var(--text-loud);
+  font-variant-numeric: tabular-nums;
+}
+
+.balken { height: 4px; border-radius: 2px; background: var(--accent); margin-top: 4px; }
+
+/* --- Unteraufträge (Phase 6) --------------------------------------------- */
+
+.unter {
+  margin: 0 var(--s-3) var(--s-3);
+  border-left: 2px solid var(--accent-line);
+  padding-left: var(--s-3);
+}
+.unter > summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-dim);
+  padding: 4px 0;
+}
+.unter > summary::-webkit-details-marker { display: none; }
+.unter > summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform var(--dauer-tupf) var(--kurve-rein);
+}
+.unter[open] > summary::before { transform: rotate(90deg); }
+.unter > summary:hover { color: var(--text); }
+.unter-ziel { font-size: var(--step--1); padding: 4px 0 2px; }
+.unter-agent { color: var(--accent); font-size: 11px; }
+.unter-ergebnis {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 160px;
+  overflow-y: auto;
+  padding-bottom: var(--s-2);
+}
+
+/* --- Rückfrage vor einer Aktion mit Außenwirkung (Phase 5) ---------------- */
+
+.frage {
+  margin: var(--s-2) var(--s-3) var(--s-3);
+  border: 1px solid var(--accent-line);
+  border-radius: 12px;
+  background: var(--accent-soft);
+  overflow: hidden;
+}
+.frage-kopf {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 8px var(--s-3);
+  font-size: 11px;
+  color: var(--accent);
+  border-bottom: 1px solid var(--accent-line);
+}
+.frage-stufe {
+  margin-left: auto;
+  padding: 1px 8px;
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  font-size: 10px;
+}
+.frage pre {
+  margin: 0;
+  padding: var(--s-3);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--step--1);
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.frage-knoepfe {
+  display: flex;
+  gap: var(--s-2);
+  padding: 0 var(--s-3) var(--s-3);
+}
+.frage-knoepfe button {
+  padding: 7px var(--s-4);
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 500;
+}
+.frage-ja { background: var(--accent); color: var(--on-accent); }
+.frage-nein {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--line) !important;
+}
+.frage-nein:hover { color: var(--danger); border-color: rgba(242,114,107,0.5) !important; }
+.frage-hinweis { padding: 0 var(--s-3) var(--s-3); font-size: 11px; color: var(--text-dim); }
+
+/* --- Werkzeugaufrufe, aufklappbar (Phase 2, DoD 6) ------------------------ */
+
+.tools {
+  margin-top: var(--s-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+.tools > summary {
+  padding: 6px var(--s-3);
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition: color var(--dauer-tupf) var(--kurve-rein), background var(--dauer-tupf) var(--kurve-rein);
+}
+.tools > summary::-webkit-details-marker { display: none; }
+.tools > summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform var(--dauer-tupf) var(--kurve-rein);
+}
+.tools[open] > summary::before { transform: rotate(90deg); }
+.tools > summary:hover { color: var(--text); background: var(--bg-2); }
+
+.tool {
+  padding: var(--s-3);
+  border-top: 1px solid var(--line);
+  font-size: var(--step--1);
+}
+.tool-kopf {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+.tool-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--accent);
+}
+.tool-name.is-bad { color: var(--danger); }
+.tool-dauer { font-size: 11px; color: var(--text-dim); margin-left: auto; }
+.tool pre {
+  margin: var(--s-2) 0 0;
+  padding: var(--s-2) var(--s-3);
+  border-radius: 8px;
+  background: var(--bg-0);
+  color: var(--text-dim);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.tool-bild {
+  margin: 10px 0 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(0,0,0,.25);
+}
+.tool-bild img {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* Ein Satellitenbild ist Bildinformation, keine Illustration - nichts
+     zuschneiden, nichts weichzeichnen. */
+  image-rendering: auto;
+}
+.tool-bild figcaption {
+  padding: 6px 10px;
+  font-size: 12px;
+  /* Stand frueher als `var(--dim, #9aa)` da. `--dim` ist in keiner Datei
+     definiert — die Farbe kam immer aus dem Ersatzwert. Eine Variable, die
+     es nicht gibt, ist eine Falle: wer sie eines Tages anlegt, aendert
+     stillschweigend diese zwei Zeilen. */
+  color: var(--text-leise);
+}
+.tool-bild-fehler { padding: 10px; font-size: 13px; color: var(--text-leise); }
+.tool-quellen {
+  margin: var(--s-2) 0 0;
+  padding-left: 1.1em;
+  font-size: 11px;
+}
+.tool-quellen a { color: var(--accent); overflow-wrap: anywhere; }
+
+.empty {
+  margin: auto;
+  max-width: 46ch;
+  text-align: center;
+  color: var(--text-dim);
+  animation: rise var(--dauer-rein) var(--kurve-rein) both;
+}
+.empty h2 {
+  margin: 0 0 var(--s-2);
+  font-size: var(--step-1);
+  font-weight: 500;
+  color: var(--text-loud);
+  letter-spacing: -0.01em;
+}
+.empty p { margin: 0; }
+
+.typing { display: inline-flex; gap: 5px; align-items: center; height: 1.55em; }
+.typing i {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  animation: pulse 2.4s ease-in-out infinite;
+}
+.typing i:nth-child(2) { animation-delay: 0.3s; }
+.typing i:nth-child(3) { animation-delay: 0.6s; }
+
+/* --- Eingabe -------------------------------------------------------------- */
+
+.composer-wrap {
+  padding: 0 var(--s-5) max(var(--s-5), env(safe-area-inset-bottom, 0px));
+}
+.composer-wrap[hidden] { display: none; }
+
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-2) var(--s-2) var(--s-4);
+  border-radius: 16px;
+  transition: border-color var(--dauer-tupf) var(--kurve-rein);
+}
+.composer:focus-within { border-color: var(--accent-line); }
+
+.composer textarea {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: transparent;
+  padding: 10px 0;
+  min-height: 1.5em;
+  max-height: 200px;
+  line-height: 1.5;
+}
+.composer textarea::placeholder { color: var(--text-dim); }
+/* Das outline:none oben schlägt die globale :focus-visible-Regel (höhere
+   Spezifität). Ohne diesen Ersatz wäre das Feld per Tastatur unsichtbar. */
+.composer textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+.btn-send {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px; height: 38px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--accent);
+  color: var(--on-accent);
+  cursor: pointer;
+  transition: background var(--dauer-tupf) var(--kurve-rein), opacity var(--dauer-tupf) var(--kurve-rein);
+}
+/* Kein Versatz beim Hover. Die Vorlage sagt woertlich: nur Flaeche und
+   Textfarbe, kein Verschieben, kein Skalieren. Das war der einzige
+   Hover-Versatz der ganzen App - die uebrigen elf aendern schon Farbe,
+   Rahmen oder Flaeche. `--akzent-satt` ist laut system.css ausdruecklich
+   die Flaechenvariante des Akzents. */
+.btn-send:hover:not(:disabled) { background: var(--akzent-satt); }
+.btn-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.hint {
+  margin: var(--s-2) var(--s-1) 0;
+  font-size: 11px;
+  color: var(--text-dim);
+  min-height: 1.4em;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.25; transform: translateY(0); }
+  50%      { opacity: 1;    transform: translateY(-3px); }
+}
+
+@media (max-width: 600px) {
+  .thread, .composer-wrap { padding-left: var(--s-4); padding-right: var(--s-4); }
+  .topbar { padding-left: var(--s-4); padding-right: var(--s-4); }
+  .msg { max-width: 94%; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="topbar glass">
+    <span class="brand-mark" role="img" aria-label="__ASSISTENT_NAME__ ist bereit">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+           style="overflow: visible">
+        <circle class="kern" cx="12" cy="12" r="3.2"></circle>
+        <!-- Kein Pfaddatum aendert sich, nur die Aufteilung: aus zwei
+             Sammelpfaden werden acht einzeln ansprechbare Strahlen, im
+             Uhrzeigersinn ab 12 Uhr. In einem Sammelpfad ist kein einzelner
+             Strahl adressierbar. -->
+        <path class="strahl" d="M12 2.6v3.2"></path>
+        <path class="strahl" d="M18.6 5.4l-2.3 2.3"></path>
+        <path class="strahl" d="M18.2 12h3.2"></path>
+        <path class="strahl" d="M16.3 16.3l2.3 2.3"></path>
+        <path class="strahl" d="M12 18.2v3.2"></path>
+        <path class="strahl" d="M7.7 16.3l-2.3 2.3"></path>
+        <path class="strahl" d="M2.6 12h3.2"></path>
+        <path class="strahl" d="M5.4 5.4l2.3 2.3"></path>
+        <!-- Duenner als die 1,8 der Strahlen, damit der Ring als Welle
+             liest und nicht als zweite Kontur. -->
+        <circle class="reaktor-ring" cx="12" cy="12" r="3.2" stroke-width="1.1"
+                style="transform-origin: 12px 12px; opacity: 0"></circle>
+      </svg>
+    </span>
+    <h1 class="brand-name">__ASSISTENT_NAME__</h1>
+    <span class="brand-phase" id="brand-phase"></span>
+    <nav class="tabs" role="tablist">
+      <button class="tab" id="tab-cc" role="tab" aria-selected="true">Center</button>
+      <button class="tab" id="tab-chat" role="tab" aria-selected="false">Chat</button>
+      <button class="tab" id="tab-tasks" role="tab" aria-selected="false">Aufträge</button>
+      <button class="tab" id="tab-tools" role="tab" aria-selected="false">Werkzeuge</button>
+      <button class="tab" id="tab-kosten" role="tab" aria-selected="false">Kosten</button>
+      <button class="tab" id="tab-welt" role="tab" aria-selected="false">Welt</button>
+    </nav>
+    <button class="kopf-btn" id="btn-memory" type="button" aria-pressed="false">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <path d="M12 3a4 4 0 0 0-4 4v10a4 4 0 0 0 8 0V7a4 4 0 0 0-4-4zM8 9h8M8 15h8"></path>
+      </svg>
+      Gedächtnis
+    </button>
+    <span class="status">
+      <span class="dot" id="health-dot"></span>
+      <span class="status-text" id="health-text">verbinde…</span>
+      <span class="model-chip" id="model-chip">—</span>
+    </span>
+  </header>
+
+  <section class="view is-active" id="view-cc" aria-label="Command Center"></section>
+  <div class="thread" id="thread" aria-live="polite" aria-busy="false"></div>
+  <section class="view" id="view-tasks" aria-label="Aufträge"></section>
+  <section class="view" id="view-tools" aria-label="Werkzeuge"></section>
+  <section class="view" id="view-kosten" aria-label="Kosten"></section>
+  <section class="view" id="view-welt" aria-label="Welt"></section>
+
+  <div class="composer-wrap">
+    <form class="composer glass" id="composer">
+      <textarea id="input" rows="1" placeholder="Schreib etwas…" aria-label="Nachricht"></textarea>
+      <button class="sprache" id="btn-sprache" type="button"
+              title="Sprache für Erkennung und Ausgabe">DE</button>
+      <button class="btn-mic" id="btn-mic" type="button"
+              aria-label="Zum Sprechen gedrückt halten"
+              title="Gedrückt halten und sprechen">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="9" y="3" width="6" height="11" rx="3"></rect>
+          <path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path>
+        </svg>
+      </button>
+      <button class="btn-send" id="btn-send" type="submit" aria-label="Senden">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4.5 12h13M12 5.5l6 6.5-6 6.5"></path>
+        </svg>
+      </button>
+    </form>
+    <p class="hint" id="hint"></p>
+  </div>
+
+  <aside class="panel glass" id="memory-panel" aria-label="Gedächtnis" aria-hidden="true">
+    <div class="panel-kopf">
+      <h2>Was __ASSISTENT_NAME__ über dich weiß</h2>
+      <button class="panel-zu" id="memory-zu" type="button" aria-label="Schließen">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <path d="M6 6l12 12M18 6L6 18"></path>
+        </svg>
+      </button>
+    </div>
+    <div class="panel-koerper" id="memory-liste"></div>
+    <form class="panel-fuss" id="memory-form">
+      <input id="memory-neu" placeholder="Fakt hinzufügen…" aria-label="Neuer Fakt">
+      <button type="submit">Merken</button>
+    </form>
+  </aside>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // Wird beim Ausliefern vom Backend eingesetzt. Das ist der JARVIS-Token,
+  // nicht der Modell-Key — der verlässt das Backend nie (0.4.1).
+  var TOKEN = '__JARVIS_TOKEN__';
+  // FIX-09: wie der Assistent heisst (ASSISTENT_NAME). Wird wie der Token
+  // beim Ausliefern eingesetzt; der Server laesst nur Buchstaben, Ziffern,
+  // Leerzeichen, Punkt und Bindestrich durch.
+  var NAME = '__ASSISTENT_NAME__';
+
+  // Zustand lebt in Variablen, nicht in localStorage: in manchen Umgebungen
+  // ist die API nicht verfügbar und die Seite stürbe an der ersten Zeile.
+  var busy = false;
+
+  var el = {
+    thread:    document.getElementById('thread'),
+    form:      document.getElementById('composer'),
+    input:     document.getElementById('input'),
+    send:      document.getElementById('btn-send'),
+    hint:      document.getElementById('hint'),
+    chip:      document.getElementById('model-chip'),
+    phase:     document.getElementById('brand-phase'),
+    mic:       document.getElementById('btn-mic'),
+    sprache:   document.getElementById('btn-sprache'),
+    healthDot: document.getElementById('health-dot'),
+    healthTxt: document.getElementById('health-text'),
+    memBtn:    document.getElementById('btn-memory'),
+    memPanel:  document.getElementById('memory-panel'),
+    memZu:     document.getElementById('memory-zu'),
+    memListe:  document.getElementById('memory-liste'),
+    memForm:   document.getElementById('memory-form'),
+    memNeu:    document.getElementById('memory-neu')
+  };
+
+  function api(path, options) {
+    var opts = options || {};
+    opts.headers = { 'X-Jarvis-Token': TOKEN };
+    if (opts.body !== undefined) {
+      opts.headers['content-type'] = 'application/json';
+      opts.body = JSON.stringify(opts.body);
+    }
+    return fetch(path, opts).then(function (res) {
+      return res.text().then(function (raw) {
+        var data = null;
+        try { data = raw ? JSON.parse(raw) : null; } catch (e) { data = null; }
+        if (!res.ok) {
+          var detail = data && data.detail;
+          if (Array.isArray(detail)) {
+            // pydantic-Liste: Feld und Satz, nie das Feld input - das kann die
+            // ganze Eingabe sein (10.000 Zeichen, erste Pruefrunde FIX-08).
+            detail = detail.map(function (d) {
+              var feld = (d && d.loc || []).slice(1).join('.');
+              return (feld ? feld + ': ' : '') + ((d && d.msg) || 'ungültig');
+            }).join('; ');
+          } else if (detail && typeof detail !== 'string') {
+            detail = JSON.stringify(detail);
+          }
+          // Kein JSON: nur Klartext zeigen, nie eine fremde Fehlerseite.
+          if (!detail) detail = (raw && !/^\s*</.test(raw)) ? raw.slice(0, 300) : ('HTTP ' + res.status);
+          var err = new Error(detail);
+          err.status = res.status;
+          throw err;
+        }
+        return data;
+      });
+    });
+  }
+
+  // --- Ein Strom je Seite (FIX-09, Pruefrunde) ----------------------------
+  //
+  // Vorher oeffnete jede Ansicht ihre eigene Verbindung zu /api/events:
+  // Command Center, Auftraege, der laufende Chat-Auftrag und die Zustellung.
+  // Chromium erlaubt sechs Verbindungen je Host - drei offene Tabs im
+  // Command Center, und jeder weitere fetch der Seite wartete. Jetzt gibt
+  // es genau EINE Verbindung, und wer Ereignisse braucht, abonniert sie:
+  // dieselbe Schnittstelle wie ereignisStrom (Ereignis, Abbruch,
+  // Wiederverbindung, schliessen), nur geteilt.
+  var zentrale = { zuhoerer: [], strom: null };
+
+  function stromAbonnieren(beiEreignis, beiAbbruch, beiWiederverbindung) {
+    var eintrag = { e: beiEreignis, a: beiAbbruch, w: beiWiederverbindung };
+    zentrale.zuhoerer.push(eintrag);
+    if (!zentrale.strom) {
+      zentrale.strom = ereignisStrom(function (typ, daten) {
+        zentrale.zuhoerer.slice().forEach(function (z) {
+          try { z.e(typ, daten); } catch (e) { /* ein Zuhoerer bremst die anderen nicht */ }
+        });
+      }, function (err) {
+        // Endgueltig abgerissen: alle erfahren es, und der naechste
+        // Abonnent baut die Verbindung neu auf.
+        var alle = zentrale.zuhoerer.slice();
+        zentrale.zuhoerer = [];
+        zentrale.strom = null;
+        alle.forEach(function (z) { if (z.a) { try { z.a(err); } catch (e) { /* s. o. */ } } });
+      }, function () {
+        zentrale.zuhoerer.slice().forEach(function (z) {
+          if (z.w) { try { z.w(); } catch (e) { /* s. o. */ } }
+        });
+      });
+    }
+    return {
+      schliessen: function () {
+        var i = zentrale.zuhoerer.indexOf(eintrag);
+        if (i !== -1) zentrale.zuhoerer.splice(i, 1);
+        if (!zentrale.zuhoerer.length && zentrale.strom) {
+          zentrale.strom.schliessen();
+          zentrale.strom = null;
+        }
+      }
+    };
+  }
+
+  // --- Ereignisstrom (Phase 7, DoD 1) ---------------------------------------
+  //
+  // Kein EventSource: das kann keine Header setzen, der JARVIS-Token muesste
+  // dann in die URL - und landet damit in jedem Zugriffslog. Der Server
+  // liefert an /api/events einen text/event-stream; hier wird der mit fetch
+  // und einem Reader gelesen, der Token bleibt im Header.
+  //
+  // Der Strom ersetzt das Polling: es gibt keinen Timer mehr, der nachfragt.
+  //
+  /* Verknuepfungspruefung 31.08.2026, Fund 1 - WIEDERVERBINDUNG.
+     WAS war falsch: diese Funktion hatte keinerlei Wiederholung. Der
+     `.catch` meldete den Abriss einmal und war fertig; endete der Strom
+     sauber (`stueck.done`), rief sie `beiAbbruch(null)` und war ebenfalls
+     fertig. Beide Aufrufer geben danach auf - der Chat schliesst, das
+     Command Center setzt `ccStrom = null`. Einen Ersatz durch Polling gibt
+     es bewusst nicht: der einzige Timer im ganzen Frontend ist die Uhr in
+     Zone 1.
+     WARUM ist das falsch: nach jedem WLAN-Aussetzer, jedem Ruhezustand des
+     Laptops und jedem Server-Neustart stand das Command Center still und
+     zeigte weiter Zahlen, die nach live aussahen. Wiederbelebt wurde es nur
+     durch einen Wechsel in eine andere Ansicht und zurueck.
+     WIE es jetzt laeuft: nach einem Abriss wird mit wachsender Pause neu
+     verbunden (1 s, 2 s, 4 s, 8 s, 16 s, danach 30 s als Deckel), hoechstens
+     STROM_VERSUCHE mal hintereinander. Erst wenn auch der letzte Versuch
+     scheitert, faellt `beiAbbruch` - der Aufrufer bekommt sein "endgueltig
+     weg" also weiterhin, nur spaeter. Steht die Verbindung wieder, fangen
+     Zaehler und Pause von vorn an, und `beiWiederverbindung` laeuft: die
+     waehrend der Luecke gesendeten Ereignisse sind ersatzlos weg, der
+     Aufrufer muss den Stand einmal nachziehen.
+     Das ist KEIN Polling: solange die Verbindung steht, laeuft hier kein
+     Timer und geht keine Anfrage hinaus. Der Timer existiert nur waehrend
+     einer Stoerung. */
+  var STROM_PAUSE_START = 1000;   // erste Wartezeit in ms
+  var STROM_PAUSE_MAX = 30000;    // Deckel fuer die Wartezeit
+  var STROM_VERSUCHE = 6;         // so oft hintereinander, dann ist Schluss
+
+  function ereignisStrom(beiEreignis, beiAbbruch, beiWiederverbindung) {
+    var steuerung = null;
+    var gewollt = true;           // will der Aufrufer den Strom noch?
+    var pause = STROM_PAUSE_START;
+    var uebrig = STROM_VERSUCHE;
+    var timer = null;
+    var verbindungen = 0;
+
+    function nochmal(err) {
+      if (!gewollt) return;
+      if (uebrig <= 0) { if (beiAbbruch) beiAbbruch(err); return; }
+      uebrig -= 1;
+      timer = setTimeout(function () { timer = null; verbinde(); }, pause);
+      pause = Math.min(pause * 2, STROM_PAUSE_MAX);
+    }
+
+    function verbinde() {
+      if (!gewollt) return;
+      steuerung = new AbortController();
+      fetch('/api/events', {
+        headers: { 'X-Jarvis-Token': TOKEN },
+        signal: steuerung.signal
+      }).then(function (res) {
+        if (!res.ok || !res.body) throw new Error('Ereignisstrom nicht verfuegbar (HTTP ' + res.status + ')');
+        var leser = res.body.getReader();
+        var dekoder = new TextDecoder();
+        var puffer = '';
+        var steht = false;
+
+        /* Zurueckgesetzt wird erst, wenn wirklich etwas ANKOMMT - nicht
+           schon beim 200er. Ein Server, der die Verbindung annimmt und
+           sofort wieder schliesst, wuerde sonst die Pause bei jedem Versuch
+           auf 1 s zuruecksetzen; aus der wachsenden Pause waere eine
+           Anfrage pro Sekunde geworden, also genau das Polling, das der
+           Strom ersetzt hat. Der Server schickt sein `hello` sofort, eine
+           gesunde Verbindung landet hier also im ersten Stueck. */
+        function verbindungSteht() {
+          if (steht) return;
+          steht = true;
+          verbindungen += 1;
+          uebrig = STROM_VERSUCHE;
+          pause = STROM_PAUSE_START;
+          if (verbindungen > 1 && beiWiederverbindung) beiWiederverbindung();
+        }
+
+        function weiter() {
+          return leser.read().then(function (stueck) {
+            // Der Server beendet den Strom von sich aus nie (api/events.py:
+            // `while True`). Ein sauberes Ende heisst also: die Verbindung
+            // ist weg. Deshalb hier dasselbe Vorgehen wie bei einem Fehler.
+            if (stueck.done) { nochmal(null); return; }
+            verbindungSteht();
+            puffer += dekoder.decode(stueck.value, { stream: true });
+
+            // Ein Ereignis endet bei der Leerzeile. Alles davor gehoert zusammen.
+            var grenze;
+            while ((grenze = puffer.indexOf('\n\n')) !== -1) {
+              var roh = puffer.slice(0, grenze);
+              puffer = puffer.slice(grenze + 2);
+              var typ = null, daten = null;
+              roh.split('\n').forEach(function (zeile) {
+                if (zeile.indexOf('event: ') === 0) typ = zeile.slice(7).trim();
+                else if (zeile.indexOf('data: ') === 0) {
+                  try { daten = JSON.parse(zeile.slice(6)); } catch (e) { daten = null; }
+                }
+                // ": herzschlag" faellt hier durch - genau richtig.
+              });
+              if (typ && daten) beiEreignis(typ, daten);
+            }
+            return weiter();
+          });
+        }
+        return weiter();
+      }).catch(function (err) {
+        if (err && err.name === 'AbortError') return;
+        nochmal(err);
+      });
+    }
+
+    verbinde();
+
+    return {
+      schliessen: function () {
+        if (!gewollt) return;
+        gewollt = false;
+        if (timer) { clearTimeout(timer); timer = null; }
+        if (steuerung) steuerung.abort();
+      }
+    };
+  }
+
+  function toolNode(call) {
+    var box = document.createElement('div');
+    box.className = 'tool';
+
+    var kopf = document.createElement('div');
+    kopf.className = 'tool-kopf';
+
+  function zeigeBild(box, pfad, attribution) {
+    var figur = document.createElement('figure');
+    figur.className = 'tool-bild';
+
+    var bild = document.createElement('img');
+    bild.alt = 'Satellitenaufnahme';
+    bild.loading = 'lazy';
+    figur.appendChild(bild);
+
+    // Attribution ist Pflicht, nicht Deko: Copernicus-Daten duerfen ohne
+    // sie nicht angezeigt werden (core/satellite/contracts.py).
+    if (attribution) {
+      var bildunterschrift = document.createElement('figcaption');
+      bildunterschrift.textContent = attribution;
+      figur.appendChild(bildunterschrift);
+    }
+    box.appendChild(figur);
+
+    fetch(pfad, { headers: { 'X-Jarvis-Token': TOKEN } })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.blob();
+      })
+      .then(function (blob) {
+        var url = URL.createObjectURL(blob);
+        bild.src = url;
+        // Aufraeumen, sobald das Bild steht - eine Blob-URL haelt sonst
+        // die Bytes bis zum Neuladen der Seite im Speicher.
+        bild.onload = function () { URL.revokeObjectURL(url); };
+      })
+      .catch(function (fehler) {
+        figur.removeChild(bild);
+        var hinweis = document.createElement('p');
+        hinweis.className = 'tool-bild-fehler';
+        hinweis.textContent = 'Bild konnte nicht geladen werden: ' + fehler.message;
+        figur.insertBefore(hinweis, figur.firstChild);
+      });
+  }
+
+    var name = document.createElement('span');
+    name.className = 'tool-name' + (call.ok ? '' : ' is-bad');
+    name.textContent = call.name + '(' + argumentText(call.arguments) + ')';
+
+    var dauer = document.createElement('span');
+    dauer.className = 'tool-dauer';
+    dauer.textContent = (call.ok ? '' : 'fehlgeschlagen · ') + (call.duration_ms || 0) + ' ms';
+
+    kopf.appendChild(name);
+    kopf.appendChild(dauer);
+    box.appendChild(kopf);
+
+    var ausgabe = call.display || call.error || '';
+    if (ausgabe) {
+      var pre = document.createElement('pre');
+      pre.textContent = ausgabe;
+      box.appendChild(pre);
+    }
+
+    // Satellitenbild (Phase 8). Bis hierher hatte diese Datei null <img>.
+    //
+    // Geholt wird per fetch() mit dem Token-Header, nicht ueber ein nacktes
+    // <img src>: ein img-Tag schickt keine eigenen Header, der Token muesste
+    // sonst in die Adresse — und stuende damit im Verlauf, im Referrer und
+    // in jedem Log. Aus den Bytes wird eine Blob-URL.
+    var vorschau = call.data && call.data.preview_url;
+    if (vorschau) {
+      // Nicht den Pfad aus dem Ergebnis fetchen, sondern die ID daraus
+      // ziehen, gegen die Form pruefen und die Adresse selbst bauen. Der
+      // Unterschied ist klein und wichtig: `preview_url` kommt aus einem
+      // Werkzeugergebnis, also mittelbar aus einem Modell.
+      var id = String(vorschau).split('/').pop();
+      if (/^[0-9a-f]{32}$/.test(id)) {
+        zeigeBild(box, '/api/bild/' + id, call.data.attribution || '');
+      }
+    }
+
+    if (call.sources && call.sources.length) {
+      var liste = document.createElement('ul');
+      liste.className = 'tool-quellen';
+      call.sources.forEach(function (url) {
+        var li = document.createElement('li');
+        // Nur http(s) wird verlinkt — eine URL aus dem Netz ist nichts,
+        // dem man ein href blind anvertraut.
+        if (/^https?:\/\//i.test(url)) {
+          var a = document.createElement('a');
+          a.href = url;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          a.textContent = url;
+          li.appendChild(a);
+        } else {
+          li.textContent = url;
+        }
+        liste.appendChild(li);
+      });
+      box.appendChild(liste);
+    }
+    return box;
+  }
+
+  function argumentText(args) {
+    if (!args) return '';
+    try {
+      return Object.keys(args).map(function (k) {
+        return k + '=' + JSON.stringify(args[k]);
+      }).join(', ');
+    } catch (e) { return ''; }
+  }
+
+  /* --- Zeitstempel: UTC kommt herein, Ortszeit geht heraus ----------------
+
+     Verknuepfungspruefung 31.08.2026, Fund 8.
+     WAS war falsch: alle `created_at` aus der Datenbank sind UTC mit `Z`
+     (core/db.py). Vier Stellen im Frontend schnitten daraus Text heraus,
+     statt sie in eine Date zu geben: `created_at.slice(11, 19)` (Werkzeuge
+     im Command Center und in der Werkzeugansicht),
+     `created_at.replace('T', ' ').replace('Z', '')` (Auftragskarten) und
+     `created_at.slice(0, 10)` (Gedaechtnis).
+     WARUM ist das falsch: direkt daneben laufen die Uhr in Zone 1 und der
+     Ereignisstrom in Zone 4 ueber `new Date().getHours()`, also in
+     ORTSZEIT. In Europe/Berlin standen damit zwei Stunden zwischen der Uhr
+     und der Werkzeugtabelle, ohne eine Beschriftung, die das erklaert - wer
+     die Kostentabelle zur Fehlersuche benutzt, sucht in der falschen
+     Stunde. Das Wort "UTC" kam im ganzen Frontend kein einziges Mal vor.
+     static/globus.js machte es an seinen Meldungen laengst richtig
+     (`new Date(...)` plus toLocale*); die App war mit sich selbst uneinig.
+
+     Kein Format-Rateraten: ist der Wert leer oder unlesbar, steht der
+     Rohwert bzw. ein Strich da. Eine erfundene Zeit waere schlimmer als
+     gar keine. */
+  function alsDatum(iso) {
+    if (!iso) return null;
+    var d = new Date(iso);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function zeitText(iso) {
+    var d = alsDatum(iso);
+    return d ? d.toLocaleTimeString('de-DE') : (iso ? String(iso) : '—');
+  }
+
+  function datumText(iso) {
+    var d = alsDatum(iso);
+    return d ? d.toLocaleDateString('de-DE',
+      { day: '2-digit', month: '2-digit', year: 'numeric' })
+      : (iso ? String(iso) : '—');
+  }
+
+  function datumZeitText(iso) {
+    var d = alsDatum(iso);
+    return d ? (datumText(iso) + ' ' + zeitText(iso))
+             : (iso ? String(iso) : '—');
+  }
+
+  function toolsNode(calls) {
+    var details = document.createElement('details');
+    details.className = 'tools';
+    var summary = document.createElement('summary');
+    var fehler = calls.filter(function (c) { return !c.ok; }).length;
+    summary.textContent = calls.length + (calls.length === 1 ? ' Werkzeug' : ' Werkzeuge')
+      + ': ' + calls.map(function (c) { return c.name; }).join(', ')
+      + (fehler ? ' · ' + fehler + ' fehlgeschlagen' : '');
+    details.appendChild(summary);
+    calls.forEach(function (c) { details.appendChild(toolNode(c)); });
+    return details;
+  }
+
+  function messageNode(role, content, toolCalls, herkunft) {
+    var wrap = document.createElement('div');
+    wrap.className = 'msg msg-' + role;
+    // FIX-09: was ein Zeitplan angestossen hat, sieht nicht aus wie getippt.
+    if (herkunft && (herkunft.art === 'zeitplan' || herkunft.art === 'erinnerung')) {
+      wrap.classList.add('is-zeitplan');
+      var marke = document.createElement('div');
+      marke.className = 'herkunft';
+      if (herkunft.art === 'erinnerung') {
+        marke.textContent = 'Erinnerung „' + (herkunft.zeitplan_name || '') + '“';
+      } else {
+        marke.textContent = (role === 'user' ? 'Zeitplan „' : 'Ergebnis von „')
+          + (herkunft.zeitplan_name || 'Zeitplan') + '“'
+          + (role === 'user' ? ' hat das angestoßen' : '');
+      }
+      wrap.appendChild(marke);
+    }
+    var bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    // textContent, niemals innerHTML: der Inhalt kommt aus einem Modell.
+    bubble.textContent = content;
+    wrap.appendChild(bubble);
+    if (toolCalls && toolCalls.length) wrap.appendChild(toolsNode(toolCalls));
+    return wrap;
+  }
+
+  function showEmpty() {
+    el.thread.textContent = '';
+    var box = document.createElement('div');
+    box.className = 'empty';
+    var h = document.createElement('h2');
+    h.textContent = 'Womit fangen wir an?';
+    var p = document.createElement('p');
+    p.textContent = 'Der Verlauf liegt lokal in SQLite und ist nach einem Neustart noch da.';
+    box.appendChild(h); box.appendChild(p);
+    el.thread.appendChild(box);
+  }
+
+  function scrollDown() {
+    requestAnimationFrame(function () { el.thread.scrollTop = el.thread.scrollHeight; });
+  }
+
+  function appendError(text) {
+    var wrap = document.createElement('div');
+    wrap.className = 'msg msg-error';
+    var bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = text;
+    wrap.appendChild(bubble);
+    el.thread.appendChild(wrap);
+    scrollDown();
+  }
+
+  function thinkingNode() {
+    var wrap = document.createElement('div');
+    wrap.className = 'msg msg-assistant';
+    var bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    var dots = document.createElement('span');
+    dots.className = 'typing';
+    dots.setAttribute('aria-label', NAME + ' denkt nach');
+    for (var i = 0; i < 3; i++) dots.appendChild(document.createElement('i'));
+    bubble.appendChild(dots);
+    wrap.appendChild(bubble);
+    return wrap;
+  }
+
+  /* --- Der Reaktor: was JARVIS gerade tut ---------------------------------
+
+     Acht Zustaende, EINE Rangfolge - und die steht hier, nicht im CSS. CSS
+     kennt keine Rangfolge, nur Spezifitaet, und die waere die falsche
+     Sprache dafuer.
+
+     Die Reihenfolge ist nicht beliebig: was den NUTZER braucht, schlaegt
+     jeden Betriebszustand. Eine offene Rueckfrage ist wichtiger als "denkt
+     nach", ein Fehlschlag wichtiger als "hoert zu".
+
+     Vorher konnten zwei Dinge gleichzeitig pulsieren - der laufende Schritt
+     und das Mikrofon, mit zwei verschiedenen Perioden nebeneinander. Ein
+     Symbol, das zwei Sachen gleichzeitig sagt, sagt keine. */
+  var reaktorFehl = false;      // letzter Auftrag ging schief
+  var reaktorFertig = false;    // letzter Auftrag ist gerade fertig geworden
+  var reaktorWerkzeug = false;  // gerade laeuft ein Werkzeug
+  var reaktorWartet = false;    // eine Rueckfrage steht offen
+
+  function reaktorZustand() {
+    var mark = document.querySelector('.brand-mark');
+    if (!mark) return;
+    var z = reaktorWartet ? 'wartet'
+          : reaktorFehl ? 'fehl'
+          : (erkennung ? 'hoert'
+          : (voice.sprichtGerade() ? 'spricht'
+          : (reaktorWerkzeug ? 'werkzeug'
+          : (busy ? 'denkt'
+          : (reaktorFertig ? 'fertig' : 'ruhe')))));
+    if (mark.dataset.zustand === z) return;   // sonst startet jede
+    mark.dataset.zustand = z;                 // Animation bei jedem Ereignis neu
+    mark.setAttribute('aria-label', REAKTOR_TEXT[z] || NAME);
+  }
+
+  var REAKTOR_TEXT = {
+    ruhe:     NAME + ' ist bereit',
+    wartet:   NAME + ' wartet auf deine Bestätigung',
+    denkt:    NAME + ' denkt nach',
+    werkzeug: NAME + ' benutzt ein Werkzeug',
+    hoert:    NAME + ' hört zu',
+    spricht:  NAME + ' spricht',
+    fehl:     'Der letzte Auftrag ist fehlgeschlagen',
+    fertig:   'Der Auftrag ist fertig'
+  };
+
+  function setBusy(value) {
+    busy = value;
+    if (!value && zustellungAusstehend) {
+      zustellungAusstehend = false;
+      loadHistory().catch(function () {});
+    }
+    el.send.disabled = value;
+    el.input.disabled = value;
+    el.thread.setAttribute('aria-busy', value ? 'true' : 'false');
+    if (value) { reaktorFehl = false; reaktorFertig = false; }
+    reaktorZustand();
+  }
+
+  // --- Seit du weg warst (FIX-09) -----------------------------------------
+  //
+  // Ergebnisse von Zeitplaenen landen im Chat. Wer nicht hinsieht, bekommt
+  // eine Zahl am Chat-Tab: wie viele Antworten von Zeitplaenen seit dem
+  // letzten Blick dazugekommen sind. Gemerkt wird die letzte gesehene
+  // Nachricht im Browser (localStorage) - ein Komfort, keine Wahrheit; ohne
+  // Speicher zaehlt die Seite einfach ab dem Neuladen.
+
+  // Ohne localStorage (Websitedaten blockiert, manche private Fenster) zaehlt
+  // die Seite ab dem ersten Blick nach dem Laden - im Speicher, nicht "alles
+  // je Erzeugte" bei jedem Laden.
+  var gelesenImSpeicher = null;
+
+  function gelesenBis() {
+    try {
+      var roh = localStorage.getItem('jarvis.gelesenBis');
+      if (roh !== null) return parseInt(roh, 10) || 0;
+    } catch (e) { /* kein Speicher */ }
+    return gelesenImSpeicher;        // null = noch nie etwas gesehen
+  }
+
+  function merkeGelesen(id) {
+    gelesenImSpeicher = id;
+    try { localStorage.setItem('jarvis.gelesenBis', String(id)); } catch (e) { /* egal */ }
+  }
+
+  // Vom Server zaehlen, nicht DOM+1: zwei Tabs desselben Browsers teilen
+  // sich gelesenBis, und nur der Verlauf weiss, was wirklich neu ist.
+  function zaehleUngelesen() {
+    return api('/api/messages').then(function (messages) {
+      var bis = gelesenBis(), neu = 0;
+      (messages || []).forEach(function (m) {
+        if (m.herkunft && m.role === 'assistant' && (bis === null || m.id > bis)) neu += 1;
+      });
+      zeigeUngelesen(neu);
+    }).catch(function () { /* der Zaehler ist Beiwerk */ });
+  }
+
+  function zeigeUngelesen(anzahl) {
+    var tab = document.getElementById('tab-chat');
+    var alt = tab.querySelector('.badge');
+    if (alt) alt.remove();
+    if (!anzahl) { tab.removeAttribute('title'); return; }
+    var b = document.createElement('span');
+    b.className = 'badge';
+    b.textContent = String(anzahl);
+    b.setAttribute('aria-label', anzahl + ' neue Ergebnisse von Zeitplänen');
+    tab.appendChild(b);
+    tab.title = anzahl + ' neue Ergebnisse von Zeitplänen seit deinem letzten Blick';
+  }
+
+  function loadHistory() {
+    return api('/api/messages').then(function (messages) {
+      if (!messages || !messages.length) { showEmpty(); zeigeUngelesen(0); return; }
+      el.thread.textContent = '';
+      var bis = gelesenBis(), neu = 0, letzte = 0;
+      messages.forEach(function (m) { if (m.id > letzte) letzte = m.id; });
+      // Noch nie etwas gesehen (erstes Laden, kein Speicher): ab jetzt zaehlen.
+      if (bis === null) { merkeGelesen(letzte); bis = letzte; }
+      messages.forEach(function (m) {
+        el.thread.appendChild(messageNode(m.role, m.content, m.tool_calls, m.herkunft));
+        if (m.herkunft && m.role === 'assistant' && m.id > bis) neu += 1;
+      });
+      scrollDown();
+      if (aktiveAnsicht === 'chat') { merkeGelesen(letzte); zeigeUngelesen(0); }
+      else zeigeUngelesen(neu);
+    });
+  }
+
+  // Ein Strom fuer die Zustellung: sobald ein Zeitplan-Auftrag fertig ist,
+  // holt der Chat den Verlauf neu (wenn er offen ist) oder zaehlt hoch.
+  var zustellStrom = null;
+  var zustellungAusstehend = false;   // kam etwas an, waehrend ein eigener Auftrag lief?
+
+  function zustellen() {
+    // Waehrend ein eigener Auftrag laeuft, wird der Chat NICHT neu gebaut:
+    // das wuerde Plan-Kasten und eine offene Rueckfrage wegwischen
+    // (Pruefrunde FIX-09). Nachgeholt wird, sobald der Auftrag fertig ist.
+    if (aktiveAnsicht !== 'chat') { zaehleUngelesen(); return; }
+    if (busy) { zustellungAusstehend = true; return; }
+    loadHistory().catch(function () {});
+  }
+
+  function zustellungStarten() {
+    if (zustellStrom) return;
+    zustellStrom = stromAbonnieren(function (typ, daten) {
+      if (typ !== 'task' || !daten.final || !daten.herkunft) return;
+      zustellen();
+    }, function () {
+      // Abgerissen (Server laenger als eine Minute weg). Neu aufgebaut wird
+      // beim naechsten Ansichtswechsel, beim Sichtbarwerden des Tabs oder
+      // wenn das Netz zurueckkommt - nicht nie.
+      zustellStrom = null;
+    }, function () { zustellen(); });
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) zustellungStarten();
+  });
+  window.addEventListener('online', zustellungStarten);
+
+  function loadHealth() {
+    return api('/api/health').then(function (h) {
+      el.chip.textContent = h.model;
+      el.phase.textContent = 'Phase ' + h.phase;
+      el.healthDot.className = 'dot ' + (h.status === 'ok' ? 'is-ok' : 'is-bad');
+      /* Verknuepfungspruefung 31.08.2026, Fund 5.
+         WAS war falsch: `GET /api/health` faengt Datenbankfehler ab und
+         setzt `database = f"fehler: {exc}"` - der Kommentar in
+         api/routes.py sagt ausdruecklich "die Meldung soll die Ursache
+         zeigen". Gelesen wurde das Feld nirgends: `grep -c database
+         index.html weltlage.html` lieferte 0 und 0.
+         WARUM ist das falsch: bei einem Datenbankschaden setzt dieselbe
+         Route `totals = {}`, also `spend.calls = 0`. Der Punkt wurde rot
+         (status "degraded"), und der Text daneben fiel durch die Kette
+         hindurch bis zu `spendText(h.spend)` - und das gab "noch kein
+         Modellaufruf" zurueck. Der Nutzer bekam also eine positive
+         Behauptung ueber den Betriebszustand vorgesetzt und suchte die
+         Ursache beim Anbieter oder beim Schluessel, waehrend der Server
+         "fehler: no such table: messages" in derselben Antwort schon
+         mitgeliefert hatte.
+         Der Zweig steht VOR provider_error, weil eine kaputte Datenbank
+         auch die Zahlen daneben wertlos macht. */
+      if (h.database && h.database !== 'ok') {
+        el.healthTxt.textContent = 'Datenbank: ' + h.database;
+      } else if (h.provider_error) {
+        el.healthTxt.textContent = h.provider_error;
+      } else if (h.provider === 'fake') {
+        el.healthTxt.textContent = 'Fake-Anbieter — kein echtes Modell, keine Kosten';
+      } else {
+        el.healthTxt.textContent = spendText(h.spend);
+      }
+    }).catch(function (err) {
+      el.healthDot.className = 'dot is-bad';
+      el.healthTxt.textContent = err.status === 401
+        ? 'Token abgelehnt — Seite neu laden'
+        : 'Backend nicht erreichbar';
+    });
+  }
+
+  function spendText(spend) {
+    if (!spend || !spend.calls) return 'noch kein Modellaufruf';
+    var s = spend.calls + ' Aufrufe · ' + (spend.in_tokens + spend.out_tokens) + ' Token';
+    return spend.prices_configured
+      ? s + ' · ' + spend.cost_eur.toFixed(4) + ' €'
+      : s + ' · Preise nicht in .env eingetragen';
+  }
+
+  // --- Plan eines Auftrags (Phase 4) --------------------------------------
+
+  var MARKE = { done: '✓', failed: '✕', skipped: '–', running: '', pending: '' };
+
+  function schrittNode(schritt) {
+    var box = document.createElement('div');
+    box.className = 'schritt is-' + schritt.status;
+
+    var marke = document.createElement('span');
+    marke.className = 'schritt-marke';
+    marke.textContent = MARKE[schritt.status] || '';
+    box.appendChild(marke);
+
+    var koerper = document.createElement('div');
+    koerper.className = 'schritt-koerper';
+
+    var titel = document.createElement('div');
+    // Der Runner haengt bei einem Retry den Grund an die Beschreibung — für
+    // die Liste reicht die erste Zeile.
+    titel.textContent = schritt.description.split('\n')[0];
+    if (schritt.agent) {
+      var agent = document.createElement('span');
+      agent.className = 'schritt-agent';
+      agent.textContent = schritt.agent;
+      titel.appendChild(agent);
+    }
+    koerper.appendChild(titel);
+
+    var hinweise = [];
+    if (schritt.attempts > 1) hinweise.push(schritt.attempts + ' Versuche');
+    if (schritt.status === 'failed' && schritt.note) hinweise.push(schritt.note);
+    if (hinweise.length) {
+      var note = document.createElement('div');
+      note.className = 'schritt-note';
+      note.textContent = hinweise.join(' · ');
+      koerper.appendChild(note);
+    }
+
+    box.appendChild(koerper);
+    return box;
+  }
+
+  function unterauftraegeNode(ids) {
+    var details = document.createElement('details');
+    details.className = 'unter';
+    var summary = document.createElement('summary');
+    summary.textContent = ids.length
+      + (ids.length === 1 ? ' Unterauftrag' : ' Unteraufträge');
+    details.appendChild(summary);
+
+    var geladen = false;
+    details.addEventListener('toggle', function () {
+      if (!details.open || geladen) return;
+      geladen = true;
+      ids.forEach(function (id) {
+        api('/api/tasks/' + id).then(function (kind) {
+          var box = document.createElement('div');
+
+          var ziel = document.createElement('div');
+          ziel.className = 'unter-ziel';
+          ziel.textContent = kind.goal;
+          var agent = kind.steps[0] && kind.steps[0].agent;
+          if (agent) {
+            var marke = document.createElement('span');
+            marke.className = 'unter-agent';
+            marke.textContent = ' [' + agent + ']';
+            ziel.appendChild(marke);
+          }
+          box.appendChild(ziel);
+
+          if (kind.result) {
+            var erg = document.createElement('div');
+            erg.className = 'unter-ergebnis';
+            erg.textContent = kind.result;
+            box.appendChild(erg);
+          }
+          // Ein Unterauftrag kann selbst delegiert haben — dann geht es
+          // rekursiv weiter, bis max_depth.
+          if (kind.children && kind.children.length) {
+            box.appendChild(unterauftraegeNode(kind.children));
+          }
+          details.appendChild(box);
+        }).catch(function () { /* Kind noch nicht geschrieben — egal */ });
+      });
+    });
+    return details;
+  }
+
+  function frageNode(daten) {
+    var frage = daten.confirmation;
+    // Der einzige Zustand, der den Nutzer BRAUCHT - deshalb ganz oben in
+    // der Rangfolge.
+    reaktorWartet = true;
+    reaktorZustand();
+    var box = document.createElement('div');
+    box.className = 'frage';
+
+    var kopf = document.createElement('div');
+    kopf.className = 'frage-kopf';
+    kopf.textContent = NAME + ' möchte ' + frage.tool + ' ausführen';
+    var stufe = document.createElement('span');
+    stufe.className = 'frage-stufe';
+    stufe.textContent = frage.permission;
+    kopf.appendChild(stufe);
+    box.appendChild(kopf);
+
+    // Exakt das, was passieren würde — textContent, der Inhalt kommt aus
+    // einem Modell.
+    var pre = document.createElement('pre');
+    pre.textContent = frage.preview;
+    box.appendChild(pre);
+
+    var knoepfe = document.createElement('div');
+    knoepfe.className = 'frage-knoepfe';
+
+    function antworte(erlauben) {
+      knoepfe.textContent = '';
+      var warte = document.createElement('span');
+      warte.className = 'frage-hinweis';
+      warte.textContent = erlauben ? 'wird ausgeführt…' : 'abgelehnt';
+      knoepfe.appendChild(warte);
+      reaktorWartet = false;
+      reaktorZustand();
+      api('/api/tasks/' + daten.id + '/confirm', {
+        method: 'POST', body: { approve: erlauben }
+      }).catch(function (err) { meldung(err.message); });
+    }
+
+    var ja = document.createElement('button');
+    ja.type = 'button';
+    ja.className = 'frage-ja';
+    ja.textContent = 'Ausführen';
+    ja.addEventListener('click', function () { antworte(true); });
+
+    var nein = document.createElement('button');
+    nein.type = 'button';
+    nein.className = 'frage-nein';
+    nein.textContent = 'Nicht ausführen';
+    nein.addEventListener('click', function () { antworte(false); });
+
+    knoepfe.appendChild(ja);
+    knoepfe.appendChild(nein);
+    box.appendChild(knoepfe);
+
+    var hinweis = document.createElement('p');
+    hinweis.className = 'frage-hinweis';
+    hinweis.textContent = 'Ohne Antwort passiert nichts. Nach '
+      + Math.round((frage.timeout_s || 600) / 60) + ' Minuten wird der Auftrag abgebrochen.';
+    box.appendChild(hinweis);
+
+    return box;
+  }
+
+  function planNode(daten, onAbbruch) {
+    var box = document.createElement('div');
+    box.className = 'plan';
+
+    var kopf = document.createElement('div');
+    kopf.className = 'plan-kopf';
+    var laeuft = daten.status === 'running' || daten.status === 'pending';
+    var fertig = daten.steps.filter(function (s) { return s.status === 'done'; }).length;
+    kopf.textContent = laeuft
+      ? 'Plan läuft — ' + fertig + '/' + daten.steps.length + ' Schritten'
+      : 'Plan · ' + daten.status + ' · ' + fertig + '/' + daten.steps.length;
+
+    if (laeuft && onAbbruch) {
+      var stop = document.createElement('button');
+      stop.type = 'button';
+      stop.className = 'plan-abbrechen';
+      stop.textContent = 'abbrechen';
+      stop.addEventListener('click', onAbbruch);
+      kopf.appendChild(stop);
+    }
+    box.appendChild(kopf);
+
+    daten.steps.forEach(function (schritt) { box.appendChild(schrittNode(schritt)); });
+
+    if (daten.confirmation) box.appendChild(frageNode(daten));
+    if (daten.children && daten.children.length) {
+      box.appendChild(unterauftraegeNode(daten.children));
+    }
+
+    var fuss = document.createElement('div');
+    fuss.className = 'plan-fuss';
+    var teile = [];
+    if (daten.spent_tokens) teile.push(daten.spent_tokens + ' Token');
+    if (daten.spent_tool_calls) teile.push(daten.spent_tool_calls + ' Werkzeugaufrufe');
+    if (daten.spent_cost_eur) teile.push(daten.spent_cost_eur.toFixed(4) + ' €');
+    if (daten.abort_reason) {
+      fuss.className += ' is-abbruch';
+      teile.unshift('Abgebrochen: ' + daten.abort_reason);
+    }
+    fuss.textContent = teile.join(' · ');
+    if (teile.length) box.appendChild(fuss);
+
+    return box;
+  }
+
+  var ENDZUSTAENDE = ['done', 'failed', 'aborted_budget', 'cancelled'];
+
+  function send(text) {
+    setBusy(true);
+    el.hint.textContent = '';
+
+    if (el.thread.querySelector('.empty')) el.thread.textContent = '';
+    el.thread.appendChild(messageNode('user', text));
+
+    var wartend = thinkingNode();
+    el.thread.appendChild(wartend);
+    scrollDown();
+
+    var started = Date.now();
+    var planBox = null;
+
+    var warSprache = sprachModus;
+    sprachModus = false;
+
+    api('/api/tasks', { method: 'POST', body: { goal: text, voice: warSprache } })
+      .then(function (start) {
+        return neuerPlan(start.task_id, wartend, started);
+      })
+      .catch(function (err) {
+        wartend.remove();
+        appendError(err.message);
+        setBusy(false);
+        el.input.focus();
+      });
+
+    function neuerPlan(taskId, platzhalter, begonnen) {
+      // Kein Timer. Der Server schiebt; geholt wird nur, wenn ein Ereignis
+      // sagt, dass es etwas zu holen gibt.
+      var abgebrochen = false;
+      var fertig = false;
+      var laeuft = false;      // eine Abfrage gleichzeitig, sonst ueberholen sie sich
+      var nachholen = false;
+      var strom = null;
+
+      function abbrechen() {
+        abgebrochen = true;
+        api('/api/tasks/' + taskId + '/cancel', { method: 'POST' })
+          .catch(function (err) { meldung(err.message); });
+      }
+
+      function zeichne() {
+        if (fertig) return Promise.resolve();
+        if (laeuft) { nachholen = true; return Promise.resolve(); }
+        laeuft = true;
+        return api('/api/tasks/' + taskId).then(function (daten) {
+          laeuft = false;
+          var neuerKasten = planNode(daten, abgebrochen ? null : abbrechen);
+          if (planBox) { planBox.replaceWith(neuerKasten); }
+          else { platzhalter.before(neuerKasten); }
+          planBox = neuerKasten;
+
+          if (ENDZUSTAENDE.indexOf(daten.status) !== -1) return abschluss(daten);
+          if (nachholen) { nachholen = false; return zeichne(); }
+        }).catch(function (err) {
+          laeuft = false;
+          appendError(err.message);
+          /* Verknuepfungspruefung 31.08.2026, Fund 2.
+             WAS war falsch: hier fehlte `setBusy(false)`. `beenden()` setzt
+             `fertig = true` und schliesst den Strom - damit sind die drei
+             anderen Stellen mit `setBusy(false)` unerreichbar: die eine
+             liegt im catch des POST, die zwei anderen in `abschluss` und im
+             Strom-Rueckruf, und beide steigen mit `if (fertig) return`
+             sofort aus.
+             WARUM ist das falsch: `setBusy(true)` hat `el.input.disabled`
+             und `el.send.disabled` gesetzt. Ein einziger Aussetzer bei
+             GET /api/tasks/{id} sperrte Eingabefeld und Senden-Knopf damit
+             dauerhaft - der Nutzer sah eine Fehlerblase und konnte danach
+             nichts mehr tippen, nur ein Neuladen der Seite half. */
+          setBusy(false);
+          beenden();
+          el.input.focus();
+        });
+      }
+
+      function abschluss(daten) {
+        if (fertig) return;
+        beenden();
+        reaktorWartet = false;
+        reaktorWerkzeug = false;
+        reaktorFehl = (daten.status !== 'done');
+        reaktorFertig = !reaktorFehl;
+        reaktorZustand();
+        var antwort = messageNode('assistant', daten.result || 'Kein Ergebnis.');
+        if (planBox) planBox.after(antwort); else el.thread.appendChild(antwort);
+        scrollDown();
+
+        el.hint.textContent = 'Fertig in ' + ((Date.now() - begonnen) / 1000).toFixed(1)
+          + ' s · Vorgang ' + taskId + ' · ' + daten.status;
+        // Nur vorlesen, was gesprochen gefragt wurde.
+        if (warSprache && daten.result) lieseVor(daten.result);
+        if (el.memPanel.classList.contains('is-open')) ladeGedaechtnis();
+        setBusy(false);
+        el.input.focus();
+        return loadHealth();
+      }
+
+      function beenden() {
+        fertig = true;
+        if (strom) { strom.schliessen(); strom = null; }
+        /* Verknuepfungspruefung 31.08.2026, Fund 4.
+           WAS war falsch: `platzhalter.remove()` stand genau einmal, in
+           `abschluss`. Der Strom-Abbruchpfad und der zeichne-Fehlerpfad
+           entfernten den Knoten nicht, und `abschluss` war danach durch
+           `if (fertig) return` gesperrt.
+           WARUM ist das falsch: der Knoten kommt aus `thinkingNode()` und
+           traegt eine dauerlaufende Punkte-Animation mit
+           aria-label="JARVIS denkt nach". Unter der Fehlermeldung
+           "Ereignisstrom abgerissen" pulsierten die Punkte also weiter, und
+           der Screenreader sagte weiter "JARVIS denkt nach" - die
+           Oberflaeche behauptete zu arbeiten, waehrend sie eine Zeile
+           darueber zugab, dass sie nichts mehr hoert.
+           Jetzt raeumt jeder Abbruchweg auf, denn `abschluss` ruft
+           `beenden()` ohnehin als erstes. `remove()` auf einem schon
+           entfernten Knoten ist ein No-op, doppeltes Aufraeumen schadet
+           also nicht. */
+        platzhalter.remove();
+      }
+
+      strom = stromAbonnieren(function (typ, daten) {
+        if (fertig) return;
+        // `tool` kommt, WAEHREND das Werkzeug laeuft. Der Zustand haelt bis
+        // zum naechsten Modellzug - laenger waere gelogen.
+        if (typ === 'tool') { reaktorWerkzeug = true; reaktorZustand(); }
+        if (typ === 'step') { reaktorWerkzeug = false; reaktorZustand(); }
+        var gehoertUns = (typ === 'task' && daten.id === taskId)
+          || (typ === 'step' && daten.task_id === taskId);
+        if (!gehoertUns) return;
+        zeichne();
+      }, function (err) {
+        // Der Strom ist weg - und zwar endgueltig, `ereignisStrom` hat
+        // vorher mehrfach neu verbunden (Fund 1). Lieber einmal ehrlich
+        // melden als still wieder anfangen zu pollen.
+        if (fertig) return;
+        beenden();
+        appendError(err ? ('Ereignisstrom abgerissen: ' + err.message)
+                        : 'Ereignisstrom abgerissen.');
+        setBusy(false);
+      }, function () {
+        // Wiederverbunden. Was waehrend der Luecke passiert ist, hat der
+        // Strom nicht nachgeliefert - einmal den echten Stand holen.
+        if (fertig) return;
+        zeichne();
+      });
+
+      // Einmal sofort zeichnen: der Auftrag kann schon laufen, bevor der
+      // Strom steht. Das ist kein Polling, das passiert genau einmal.
+      return zeichne();
+    }
+  }
+
+  el.form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var text = el.input.value.trim();
+    if (!text || busy) return;
+    el.input.value = '';
+    autogrow();
+    send(text);
+  });
+
+  el.input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      el.form.requestSubmit();
+    }
+  });
+
+  function autogrow() {
+    el.input.style.height = 'auto';
+    el.input.style.height = Math.min(el.input.scrollHeight, 200) + 'px';
+  }
+  el.input.addEventListener('input', autogrow);
+
+  // --- Gedächtnis (Phase 3) ---------------------------------------------
+
+  var fakten = [];
+
+  function faktNode(fakt) {
+    var box = document.createElement('div');
+    box.className = 'fakt';
+
+    var text = document.createElement('div');
+    text.className = 'fakt-text';
+    text.textContent = fakt.text;
+    box.appendChild(text);
+
+    if (fakt.conflicts_with) {
+      var partner = fakten.filter(function (f) { return f.id === fakt.conflicts_with; })[0];
+      var warnung = document.createElement('div');
+      warnung.className = 'fakt-konflikt';
+      warnung.textContent = 'Widerspricht möglicherweise #' + fakt.conflicts_with
+        + (partner ? ': ' + partner.text : '')
+        + ' — beide stehen noch da. Was gilt, entscheidest du.';
+      box.appendChild(warnung);
+    }
+
+    var zeile = document.createElement('div');
+    zeile.className = 'fakt-zeile';
+
+    var kat = document.createElement('span');
+    kat.className = 'fakt-kat';
+    kat.textContent = fakt.category;
+    zeile.appendChild(kat);
+
+    var wann = document.createElement('span');
+    wann.textContent = datumText(fakt.created_at);
+    zeile.appendChild(wann);
+
+    var luecke = document.createElement('span');
+    luecke.style.marginLeft = 'auto';
+    zeile.appendChild(luecke);
+
+    var bearbeiten = document.createElement('button');
+    bearbeiten.type = 'button';
+    bearbeiten.className = 'fakt-aktion';
+    bearbeiten.textContent = 'bearbeiten';
+    bearbeiten.addEventListener('click', function () {
+      if (text.isContentEditable) { text.blur(); return; }
+      text.contentEditable = 'true';
+      text.focus();
+      bearbeiten.textContent = 'speichern';
+    });
+    text.addEventListener('blur', function () {
+      if (!text.isContentEditable) return;
+      text.contentEditable = 'false';
+      bearbeiten.textContent = 'bearbeiten';
+      var neu = text.textContent.trim();
+      if (!neu || neu === fakt.text) { text.textContent = fakt.text; return; }
+      api('/api/memory/' + fakt.id, { method: 'PATCH', body: { text: neu } })
+        .then(ladeGedaechtnis)
+        .catch(function (err) { text.textContent = fakt.text; meldung(err.message); });
+    });
+    text.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); text.blur(); }
+      if (e.key === 'Escape') { text.textContent = fakt.text; text.blur(); }
+    });
+    zeile.appendChild(bearbeiten);
+
+    if (fakt.conflicts_with) {
+      var loesen = document.createElement('button');
+      loesen.type = 'button';
+      loesen.className = 'fakt-aktion';
+      loesen.textContent = 'Widerspruch erledigt';
+      loesen.addEventListener('click', function () {
+        api('/api/memory/' + fakt.id, { method: 'PATCH', body: { resolve_conflict: true } })
+          .then(ladeGedaechtnis).catch(function (err) { meldung(err.message); });
+      });
+      zeile.appendChild(loesen);
+    }
+
+    var loeschen = document.createElement('button');
+    loeschen.type = 'button';
+    loeschen.className = 'fakt-aktion is-loeschen';
+    loeschen.textContent = 'löschen';
+    loeschen.addEventListener('click', function () {
+      if (!window.confirm('Diesen Eintrag löschen?\n\n' + fakt.text)) return;
+      api('/api/memory/' + fakt.id, { method: 'DELETE' })
+        .then(ladeGedaechtnis).catch(function (err) { meldung(err.message); });
+    });
+    zeile.appendChild(loeschen);
+
+    box.appendChild(zeile);
+    return box;
+  }
+
+  function meldung(text) { el.hint.textContent = text; }
+
+  function ladeGedaechtnis() {
+    return api('/api/memory').then(function (liste) {
+      fakten = liste || [];
+      el.memListe.textContent = '';
+      if (!fakten.length) {
+        var leer = document.createElement('p');
+        leer.className = 'panel-leer';
+        leer.textContent = 'Noch nichts gemerkt. ' + NAME + ' merkt sich nur, worum du '
+          + 'ihn bittest — nicht den ganzen Chat.';
+        el.memListe.appendChild(leer);
+        return;
+      }
+      fakten.forEach(function (f, i) {
+        var node = faktNode(f);
+        node.style.animationDelay = Math.min(i, 8) * 40 + 'ms';
+        el.memListe.appendChild(node);
+      });
+    }).catch(function (err) { meldung('Gedächtnis: ' + err.message); });
+  }
+
+  function memoryOffen(offen) {
+    el.memPanel.classList.toggle('is-open', offen);
+    el.memPanel.setAttribute('aria-hidden', offen ? 'false' : 'true');
+    el.memBtn.setAttribute('aria-pressed', offen ? 'true' : 'false');
+    if (offen) ladeGedaechtnis();
+  }
+
+  el.memBtn.addEventListener('click', function () {
+    memoryOffen(!el.memPanel.classList.contains('is-open'));
+  });
+  el.memZu.addEventListener('click', function () { memoryOffen(false); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') memoryOffen(false);
+  });
+
+  el.memForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var text = el.memNeu.value.trim();
+    if (!text) return;
+    el.memNeu.value = '';
+    api('/api/memory', { method: 'POST', body: { text: text } })
+      .then(function (d) {
+        if (d && d.conflict) {
+          meldung('Achtung: widerspricht möglicherweise "' + d.conflict.text + '"');
+        }
+        return ladeGedaechtnis();
+      })
+      .catch(function (err) { meldung(err.message); });
+  });
+
+  // --- Sprache (Phase 9) --------------------------------------------------
+  //
+  // VoiceProvider ist eine Abstraktion mit genau einer Implementierung: der
+  // Web Speech API des Browsers. Sie kostet nichts, braucht keinen Key und
+  // läuft in Chrome. Ein besserer Anbieter kommt später dahinter — dann
+  // ändert sich diese Datei und nichts sonst.
+  //
+  // Push-to-Talk, kein Wake Word. Dauerhorchen ist ein eigenes, deutlich
+  // größeres Problem (Falschauslösungen, Mikrofonrechte, Energieverbrauch)
+  // und in dieser Phase ausdrücklich verboten.
+
+  function BrowserVoice() {
+    var Erkennung = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var synth = window.speechSynthesis || null;
+    var laeuft = null;
+
+    return {
+      sttVerfuegbar: !!Erkennung,
+      ttsVerfuegbar: !!synth,
+
+      hoere: function (sprache, beiErgebnis, beiFehler) {
+        if (!Erkennung) { beiFehler('Dieser Browser kann keine Spracherkennung.'); return null; }
+        var r = new Erkennung();
+        r.lang = sprache;
+        // Kein Streaming-STT in dieser Phase: ein Ergebnis, wenn losgelassen wird.
+        r.interimResults = false;
+        r.continuous = false;
+        r.maxAlternatives = 1;
+        r.onresult = function (e) {
+          var text = '';
+          for (var i = 0; i < e.results.length; i++) text += e.results[i][0].transcript;
+          beiErgebnis(text.trim());
+        };
+        r.onerror = function (e) {
+          beiFehler(e.error === 'not-allowed'
+            ? 'Kein Zugriff aufs Mikrofon — im Browser erlauben.'
+            : 'Spracherkennung fehlgeschlagen: ' + e.error);
+        };
+        try { r.start(); } catch (err) { beiFehler(String(err)); return null; }
+        return r;
+      },
+
+      sprich: function (text, sprache, beiEnde) {
+        if (!synth) { if (beiEnde) beiEnde(); return; }
+        this.stopp();
+        var u = new SpeechSynthesisUtterance(text);
+        u.lang = sprache;
+        u.onend = function () { laeuft = null; if (beiEnde) beiEnde(); };
+        u.onerror = function () { laeuft = null; if (beiEnde) beiEnde(); };
+        laeuft = u;
+        synth.speak(u);
+      },
+
+      stopp: function () {
+        if (synth && (synth.speaking || synth.pending)) synth.cancel();
+        laeuft = null;
+      },
+
+      sprichtGerade: function () { return !!(synth && synth.speaking); }
+    };
+  }
+
+  var voice = BrowserVoice();
+  var SPRACHEN = { DE: 'de-DE', EN: 'en-US' };
+  var sprachModus = false;     // war die letzte Eingabe gesprochen?
+  var sprache = 'DE';
+  var erkennung = null;
+
+  function sprachcodeAktiv() { return SPRACHEN[sprache]; }
+
+  el.sprache.addEventListener('click', function () {
+    sprache = sprache === 'DE' ? 'EN' : 'DE';
+    el.sprache.textContent = sprache;
+    el.sprache.title = 'Erkennung und Ausgabe: ' + sprachcodeAktiv();
+  });
+
+  function hoerenStarten() {
+    if (busy || erkennung) return;
+    // Unterbrechbarkeit: läuft gerade eine Ausgabe, stoppt sie hier.
+    voice.stopp();
+    el.mic.classList.remove('is-spricht');
+
+    if (!voice.sttVerfuegbar) {
+      meldung('Dieser Browser kann keine Spracherkennung. Chrome kann es.');
+      return;
+    }
+    el.mic.classList.add('is-hoert');
+    meldung('Ich höre… loslassen zum Senden.');
+    // `erkennung` wird erst unten gesetzt; der Reaktor braucht den Zustand
+    // aber jetzt, sonst haengt er ein ganzes Sprachfenster hinterher.
+    setTimeout(reaktorZustand, 0);
+    erkennung = voice.hoere(sprachcodeAktiv(), function (text) {
+      hoerenBeenden();
+      if (!text) { meldung('Nichts verstanden.'); return; }
+      sprachModus = true;
+      el.input.value = '';
+      send(text);
+    }, function (fehler) {
+      hoerenBeenden();
+      meldung(fehler);
+    });
+  }
+
+  function hoerenBeenden() {
+    el.mic.classList.remove('is-hoert');
+    if (erkennung) { try { erkennung.stop(); } catch (e) { /* schon aus */ } }
+    erkennung = null;
+    reaktorZustand();
+  }
+
+  el.mic.addEventListener('mousedown', hoerenStarten);
+  el.mic.addEventListener('touchstart', function (e) { e.preventDefault(); hoerenStarten(); });
+  ['mouseup', 'mouseleave', 'touchend'].forEach(function (ereignis) {
+    el.mic.addEventListener(ereignis, function () {
+      if (erkennung) hoerenBeenden();
+    });
+  });
+  // Tastatur: Leertaste oder Enter auf dem Knopf hält ebenfalls.
+  el.mic.addEventListener('keydown', function (e) {
+    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); hoerenStarten(); }
+  });
+  el.mic.addEventListener('keyup', function (e) {
+    if (e.key === ' ' || e.key === 'Enter') hoerenBeenden();
+  });
+
+  /* `speechSynthesis` meldet nicht, wann es fertig ist - es gibt nur
+     `speaking`. Also wird nachgesehen, solange gesprochen wird, und danach
+     nicht mehr. Ein Timer, der immer laeuft, waere genau das Polling, das
+     dieses Projekt sich verboten hat. */
+  function reaktorBeobachteSprache() {
+    reaktorZustand();
+    if (voice.sprichtGerade()) setTimeout(reaktorBeobachteSprache, 250);
+  }
+
+  function lieseVor(text) {
+    if (!voice.ttsVerfuegbar || !text) return;
+    el.mic.classList.add('is-spricht');
+    el.mic.setAttribute('aria-label', 'Vorlesen abbrechen');
+    reaktorBeobachteSprache();
+    voice.sprich(text, sprachcodeAktiv(), function () {
+      el.mic.classList.remove('is-spricht');
+      el.mic.setAttribute('aria-label', 'Zum Sprechen gedrückt halten');
+      reaktorZustand();
+    });
+  }
+
+  if (!voice.sttVerfuegbar) {
+    el.mic.disabled = true;
+    el.mic.title = 'Dieser Browser kann keine Spracherkennung (Chrome kann es).';
+  }
+
+  // --- Weltansicht (FIX-05 Schritt B) --------------------------------------
+
+  /* Der Globus wohnt in `static/globus.js` - derselben Datei, die auch
+     `/weltlage` benutzt. Zwei Kopien waeren zwei Orte fuer jeden Fehler.
+
+     Der ganze Anti-Lag-Trick steckt in zwei Zeilen: der Import passiert
+     ERST beim ersten Klick auf "Welt", und beim Verlassen der Ansicht
+     wird die Zeichenschleife abgeschaltet (siehe zeigeAnsicht). Wer den
+     Tab nie oeffnet, laedt nie 2,0 MB. */
+  var globusModul = null;
+  var globusLaedt = false;
+  /* Ist die Weltansicht GERADE die aktive? Nicht dasselbe wie "der Globus
+     ist fertig geladen" - und genau daran hing ein Fehler:
+
+     Wer auf "Welt" klickt und noch waehrend der 2,0 MB zurueck auf "Chat"
+     geht, hatte den Renderloop danach dauerhaft im Chat laufen. Die
+     Pause-Zeile in zeigeAnsicht() prueft `globusModul`, und das wurde
+     frueher erst gesetzt, wenn `starte()` durch war - also nach dem Import
+     UND den beiden Geometrie-Abrufen. Bis dahin lief die Schleife schon.
+     Gemessen bei 250 kB/s: 114 Schleifendurchlaeufe in 2 Sekunden, waehrend
+     der Chat zu sehen war, und die Leertaste blieb beim Globus haengen.
+     Deshalb jetzt: `globusModul` sofort nach dem Import, und dieses Flag
+     als Wahrheit darueber, was der Nutzer sehen will. */
+  var globusGewollt = false;
+
+  // Gibt ein Promise zurueck: das COMMAND CENTER wartet darauf, bevor es
+  // das Canvas in Zone 2 haengt.
+  function ladeGlobus() {
+    globusGewollt = true;
+    if (globusModul) { globusModul.weiter(); return Promise.resolve(); }
+    if (globusLaedt) return Promise.resolve(); // zweimal klicken laedt nicht zweimal
+    globusLaedt = true;
+
+    var ziel = document.getElementById('view-welt');
+    var hinweis = document.createElement('div');
+    hinweis.className = 'globus-laedt';
+    hinweis.textContent = 'Globus wird geladen — 2 MB Three.js, das dauert einen Moment.';
+    ziel.appendChild(hinweis);
+
+    // Dynamischer Import aus einem klassischen <script>: erlaubt, und die
+    // Import-Map im <head> gilt auch dafuer ('three' loest auf).
+    return import('/static/globus.js').then(function (modul) {
+      globusModul = modul;                   // ab hier ist pausiere() erreichbar
+      // Kein `hoeren` - in index.html gehoert die Leertaste dem Chat,
+      // und waehrend des Ladens ist die Weltansicht ueberhaupt nicht im
+      // Bild. Erst `weiter()` beim Tabwechsel gibt sie dem Globus.
+      var fertig = modul.starte(ziel, TOKEN, { hoeren: false, name: NAME });
+      // `starte()` hat die Schleife im selben Zug schon angeworfen; erst
+      // danach laedt es die Grenzen. Wer inzwischen weggeklickt hat, soll
+      // sie nicht laufen sehen - und zwar sofort, nicht in zehn Sekunden.
+      if (!globusGewollt) modul.pausiere();
+      return fertig;
+    }).then(function () {
+      hinweis.remove();
+      if (globusGewollt) globusModul.weiter(); else globusModul.pausiere();
+    }).catch(function (err) {
+      hinweis.textContent = 'Globus nicht geladen: ' + err.message;
+    }).then(function () {
+      globusLaedt = false;
+    });
+  }
+
+  // --- Ansichten (Phase 7) ------------------------------------------------
+
+  var ANSICHTEN = {
+    cc:     { tab: 'tab-cc',     el: 'view-cc',     laden: ladeCommandCenter },
+    chat:   { tab: 'tab-chat',   el: 'thread',      laden: null },
+    tasks:  { tab: 'tab-tasks',  el: 'view-tasks',  laden: ladeTasks },
+    tools:  { tab: 'tab-tools',  el: 'view-tools',  laden: ladeWerkzeuge },
+    kosten: { tab: 'tab-kosten', el: 'view-kosten', laden: ladeKosten },
+    welt:   { tab: 'tab-welt',   el: 'view-welt',   laden: ladeGlobus }
+  };
+  // FIX-06 Abschnitt 6: das COMMAND CENTER ist die Startansicht. Der Chat
+  // bleibt ein eigener Tab.
+  var aktiveAnsicht = 'cc';
+  // Die Ansicht braucht Platz. Nur sie - der Chat bleibt bei 900 px.
+  var WEITE_ANSICHTEN = { cc: true };
+
+  function zeigeAnsicht(name) {
+    var vorher = aktiveAnsicht;
+    aktiveAnsicht = name;
+    Object.keys(ANSICHTEN).forEach(function (k) {
+      var a = ANSICHTEN[k];
+      document.getElementById(a.tab).setAttribute('aria-selected', k === name ? 'true' : 'false');
+      document.getElementById(a.el).classList.toggle('is-active', k === name);
+    });
+    // Die Eingabe gehört zum Chat, nicht zum Dashboard.
+    document.querySelector('.composer-wrap').hidden = name !== 'chat';
+    document.querySelector('.app').classList.toggle('is-weit', !!WEITE_ANSICHTEN[name]);
+    // Uhr, SSE-Verbindung und das umgehaengte Canvas gehoeren zur Ansicht.
+    // Bleiben sie stehen, laeuft ein Timer im Chat weiter und der Globus
+    // zeichnet in einen unsichtbaren Behaelter.
+    if (vorher === 'cc' && name !== 'cc') ccVerlassen();
+    if (vorher === 'tasks' && name !== 'tasks') tasksVerlassen();
+    // FIX-05 B-4: Klassen umschalten haelt keinen Renderloop an. Ohne die
+    // naechsten Zeilen zeichnet der Globus weiter, waehrend du chattest -
+    // und genau das ist das Ruckeln, um das es geht.
+    // Das Flag wird IMMER gesetzt, auch wenn das Modul noch laedt: sonst
+    // faengt der Globus nach dem Laden im Chat an zu zeichnen.
+    if (vorher === 'welt' && name !== 'welt') {
+      globusGewollt = false;
+      if (globusModul) globusModul.pausiere();
+    }
+    if (ANSICHTEN[name].laden) ANSICHTEN[name].laden();
+    // FIX-09: wer den Chat ansieht, hat die Ergebnisse gesehen.
+    if (name === 'chat' && vorher !== 'chat') loadHistory().catch(function () {});
+    zustellungStarten();     // no-op, solange der Strom steht
+  }
+
+  Object.keys(ANSICHTEN).forEach(function (k) {
+    document.getElementById(ANSICHTEN[k].tab)
+      .addEventListener('click', function () { zeigeAnsicht(k); });
+  });
+
+  function karte(titel) {
+    var box = document.createElement('div');
+    box.className = 'karte';
+    if (titel) {
+      var h = document.createElement('h3');
+      h.textContent = titel;
+      box.appendChild(h);
+    }
+    return box;
+  }
+
+  function zustandNode(status) {
+    var s = document.createElement('span');
+    s.className = 'zustand is-' + status;
+    s.textContent = status;
+    return s;
+  }
+
+  function tabelle(spalten, zeilen) {
+    var wrap = document.createElement('div');
+    wrap.className = 'tabelle-wrap';
+    var t = document.createElement('table');
+    t.className = 'tabelle';
+    var kopf = document.createElement('tr');
+    spalten.forEach(function (sp) {
+      var th = document.createElement('th');
+      if (sp.zahl) th.className = 'zahl';
+      th.textContent = sp.titel;
+      kopf.appendChild(th);
+    });
+    t.appendChild(kopf);
+    zeilen.forEach(function (zeile) {
+      var tr = document.createElement('tr');
+      spalten.forEach(function (sp) {
+        var td = document.createElement('td');
+        if (sp.zahl) td.className = 'zahl';
+        td.textContent = sp.wert(zeile);
+        tr.appendChild(td);
+      });
+      t.appendChild(tr);
+    });
+    wrap.appendChild(t);
+    return wrap;
+  }
+
+  function leer(text) {
+    var p = document.createElement('p');
+    p.className = 'panel-leer';
+    p.textContent = text;
+    return p;
+  }
+
+  // --- Aufträge ---
+
+  // Der Strom der Auftraege-Ansicht: wenn ein Auftrag fertig wird (auch
+  // einer, den ein Zeitplan gestartet hat), frischen Liste und Zeitplaene
+  // von selbst auf. Vorher blieb "laeuft" stehen, bis man den Tab wechselte
+  // (zweite Pruefrunde FIX-08). Wie beim COMMAND CENTER: offen, solange die
+  // Ansicht offen ist, sonst geschlossen - kein Polling.
+  var tasksStrom = null;
+  var zeitplanCtx = null;
+
+  function tasksVerlassen() {
+    if (tasksStrom) { tasksStrom.schliessen(); tasksStrom = null; }
+    zeitplanCtx = null;
+  }
+
+  function ladeTasks() {
+    var ziel = document.getElementById('view-tasks');
+    ziel.textContent = '';
+    ziel.appendChild(zeitplanBlock());
+    var liste = document.createElement('div');
+    liste.className = 'auftraege';
+    ziel.appendChild(liste);
+    if (!tasksStrom) {
+      tasksStrom = stromAbonnieren(function (typ, daten) {
+        if (typ !== 'task' || !daten.final) return;
+        ladeAuftraege();
+        if (zeitplanCtx) ladeZeitplaene(zeitplanCtx);
+      }, function () {
+        tasksStrom = null;          // abgerissen - beim naechsten Oeffnen neu
+      }, function () {
+        ladeAuftraege();
+        if (zeitplanCtx) ladeZeitplaene(zeitplanCtx);
+      });
+    }
+    return ladeAuftraege(liste);
+  }
+
+  function ladeAuftraege(liste) {
+    liste = liste || document.querySelector('#view-tasks .auftraege');
+    if (!liste) return Promise.resolve();
+    return api('/api/tasks').then(function (alle) {
+      liste.textContent = '';
+      var oberste = (alle || []).filter(function (t) { return !t.parent_task_id; });
+      if (!oberste.length) { liste.appendChild(leer('Noch kein Auftrag gelaufen.')); return; }
+      oberste.forEach(function (t) { liste.appendChild(taskKarte(t)); });
+    }).catch(function (err) { liste.textContent = ''; liste.appendChild(leer(err.message)); });
+  }
+
+  // --- Zeitpläne (FIX-08) -------------------------------------------------
+  //
+  // JARVIS wiederholt eigene Aufträge von selbst. Die Regeln (höchstens
+  // LOCAL, ein Deckel über 24 h für alle Pläne zusammen, verpasste Läufe
+  // werden nicht nachgeholt) stehen in core/zeitplan.py. Hier wird nur
+  // angezeigt, angelegt und geschaltet — alles über textContent.
+  //
+  // Der Block wird EINMAL gebaut; danach tauscht nur die Liste. Sonst
+  // verliert der Nutzer bei jedem Klick Fokus, Scrollposition und das halb
+  // ausgefüllte Formular (erste Prüfrunde, Fund 6).
+
+  function zeitplanBlock() {
+    var box = karte();
+    box.classList.add('zeitplaene');
+
+    var titel = document.createElement('div');
+    titel.className = 'zeitplan-titel';
+    titel.textContent = 'Zeitpläne';
+    box.appendChild(titel);
+
+    var hinweis = document.createElement('p');
+    hinweis.className = 'zeitplan-hinweis';
+    hinweis.textContent = NAME + ' wiederholt einen Auftrag von selbst. Höchstens lokal '
+      + '(keine Mail, kein Termin — niemand ist da, um zu bestätigen), ein Tagesdeckel '
+      + 'für alle Pläne zusammen, verpasste Läufe werden nicht nachgeholt.';
+    box.appendChild(hinweis);
+
+    var status = document.createElement('p');
+    status.className = 'zeitplan-meldung';
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    status.hidden = true;
+    function sag(text, fehler) {
+      status.textContent = text || '';
+      status.hidden = !text;
+      status.classList.toggle('is-fehler', !!fehler);
+    }
+
+    var falte = document.createElement('details');
+    falte.className = 'zeitplan-neu';
+    var zu = document.createElement('summary');
+    zu.textContent = 'Neuen Zeitplan anlegen';
+    falte.appendChild(zu);
+
+    var form = document.createElement('form');
+    form.className = 'zeitplan-form';
+    var felder = {};
+    [['name', 'Name des Zeitplans', 'Name, z. B. Morgenlage', 80],
+     ['regel', 'Regel', 'taeglich 07:00 · alle 6 stunden · einmal 2026-09-06 18:00', 40],
+     ['ziel', 'Auftrag', 'Was ' + NAME + ' jedes Mal tun soll', 10000]].forEach(function (f) {
+      var input = document.createElement('input');
+      input.name = f[0];
+      input.setAttribute('aria-label', f[1]);
+      input.placeholder = f[2];
+      input.maxLength = f[3];
+      input.required = true;
+      input.autocomplete = 'off';
+      if (f[0] === 'ziel') input.className = 'is-breit';
+      felder[f[0]] = input;
+      form.appendChild(input);
+    });
+    var knopf = document.createElement('button');
+    knopf.type = 'submit';
+    knopf.textContent = 'Zeitplan anlegen';
+    form.appendChild(knopf);
+    // FIX-09: eine Vorlage, die nur aus Bausteinen besteht, die wirklich
+    // eingerichtet sind - der Server weiss, was fehlt.
+    var vorlage = document.createElement('button');
+    vorlage.type = 'button';
+    vorlage.className = 'zeitplan-knopf';
+    vorlage.textContent = 'Vorlage: Morgenlage';
+    vorlage.addEventListener('click', function () {
+      vorlage.disabled = true;
+      api('/api/zeitplaene/vorlagen').then(function (liste) {
+        var v = (liste || [])[0];
+        if (!v) { sag('Keine Vorlage verfügbar.', true); return; }
+        felder.name.value = v.name;
+        felder.regel.value = v.regel;
+        felder.ziel.value = v.ziel;
+        falte.open = true;
+        sag('Vorlage eingesetzt. ' + (v.hinweis || '') + ' Prüfen, dann „Zeitplan anlegen“.');
+        felder.ziel.focus();
+      }).catch(function (err) { sag(err.message, true); })
+        .then(function () { vorlage.disabled = false; });
+    });
+    form.appendChild(vorlage);
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (knopf.disabled) return;
+      var body = {
+        name: felder.name.value.trim(),
+        regel: felder.regel.value.trim(),
+        ziel: felder.ziel.value.trim()
+      };
+      if (!body.name || !body.regel || !body.ziel) { sag('Name, Regel und Auftrag brauchen alle drei einen Inhalt.', true); return; }
+      knopf.disabled = true;
+      api('/api/zeitplaene', { method: 'POST', body: body })
+        .then(function (p) {
+          form.reset();
+          sag('Zeitplan „' + p.name + '“ angelegt, ' + p.regel + '.');
+          return ladeZeitplaene(ctx);
+        })
+        .catch(function (err) { sag(err.message, true); })
+        .then(function () { knopf.disabled = false; });
+    });
+    falte.appendChild(form);
+    box.appendChild(falte);
+    box.appendChild(status);
+
+    var liste = document.createElement('div');
+    liste.className = 'zeitplan-liste';
+    box.appendChild(liste);
+
+    var ctx = { liste: liste, sag: sag, falte: falte, deckel: null, gesperrt: null, erstesMal: true };
+    zeitplanCtx = ctx;
+    ladeZeitplaene(ctx);
+    return box;
+  }
+
+  function ladeZeitplaene(ctx) {
+    var liste = ctx.liste;
+    return api('/api/zeitplaene').then(function (d) {
+      liste.textContent = '';
+      ctx.deckel = d.deckel || null;
+      ctx.gesperrt = d.gesperrt || null;
+      var v = d.verbrauch || {};
+      var zeile = document.createElement('div');
+      zeile.className = 'karte-zeile';
+      ['Letzte 24 h: ' + v.laeufe + ' von ' + v.max_laeufe + ' Läufen, '
+         + ccZahl(v.token) + ' von ' + ccZahl(v.max_token) + ' Token',
+       'höchstens lokal',
+       d.schleife ? 'läuft von selbst' : 'nur von Hand (Schleife aus)'
+      ].forEach(function (text) {
+        var s = document.createElement('span');
+        s.textContent = text;
+        zeile.appendChild(s);
+      });
+      liste.appendChild(zeile);
+      if (d.deckel) {
+        var warn = document.createElement('p');
+        warn.className = 'zeitplan-deckel';
+        warn.textContent = d.deckel;
+        liste.appendChild(warn);
+      } else if (d.laeuft_gerade && d.laeuft_gerade.length) {
+        // Kein Deckel, aber ein Lauf: Zeitplaene laufen nacheinander.
+        var lauf = document.createElement('p');
+        lauf.className = 'zeitplan-hinweis';
+        lauf.textContent = 'Ein Zeitplan läuft gerade (Auftrag ' + d.laeuft_gerade[0].task_id
+          + ', bis zu ' + ccZahl(d.laeuft_gerade[0].reserviert) + ' Token). '
+          + 'Bis er fertig ist, startet kein zweiter.';
+        liste.appendChild(lauf);
+      }
+      var plaene = d.zeitplaene || [];
+      // Beim ersten Laden: ohne Pläne ist das Formular offen, sonst zu.
+      if (ctx.erstesMal) { ctx.falte.open = !plaene.length; ctx.erstesMal = false; }
+      if (!plaene.length) { liste.appendChild(leer('Noch kein Zeitplan.')); return; }
+      plaene.forEach(function (p) { liste.appendChild(zeitplanNode(p, ctx)); });
+    }).catch(function (err) { liste.textContent = ''; liste.appendChild(leer(err.message)); });
+  }
+
+  function zustandPille(text, klasse) {
+    var s = document.createElement('span');
+    s.className = 'zustand' + (klasse ? ' is-' + klasse : '');
+    s.textContent = text;
+    return s;
+  }
+
+  function zeitplanNode(p, ctx) {
+    var box = document.createElement('div');
+    box.className = 'zeitplan' + (p.aktiv ? '' : ' is-aus');
+
+    var kopf = document.createElement('div');
+    kopf.className = 'zeitplan-kopf';
+    var name = document.createElement('strong');
+    name.textContent = p.name;
+    kopf.appendChild(name);
+    var einmalig = (p.regel || '').indexOf('einmal ') === 0;
+    var erledigt = einmalig && !p.aktiv && !p.naechster_lauf;
+    kopf.appendChild(zustandPille(erledigt ? 'erledigt' : (p.aktiv ? 'aktiv' : 'aus'), erledigt ? 'done' : ''));
+    if (p.art === 'erinnerung') kopf.appendChild(zustandPille('Erinnerung', ''));
+    if (einmalig) kopf.appendChild(zustandPille('einmalig', ''));
+    var regel = document.createElement('span');
+    regel.className = 'zeitplan-regel';
+    regel.textContent = p.regel;
+    kopf.appendChild(regel);
+    box.appendChild(kopf);
+
+    var ziel = document.createElement('p');
+    ziel.className = 'zeitplan-ziel';
+    ziel.textContent = p.ziel;
+    box.appendChild(ziel);
+
+    var zeile = document.createElement('div');
+    zeile.className = 'karte-zeile';
+    var infos = [];
+    infos.push(p.aktiv && p.naechster_lauf
+      ? 'nächster Lauf ' + datumZeitText(p.naechster_lauf) : 'kein nächster Lauf');
+    if (p.letzter_lauf) infos.push('zuletzt ' + datumZeitText(p.letzter_lauf));
+    if (p.verpasst) infos.push(p.verpasst + '× verpasst, nicht nachgeholt');
+    infos.forEach(function (text) {
+      var s = document.createElement('span');
+      s.textContent = text;
+      zeile.appendChild(s);
+    });
+    // Der letzte Ausgang: kurze Zustände als Pille wie auf den
+    // Auftragskarten, ein Grund ("uebersprungen: …") sichtbar in Rot —
+    // das ist das eine, was der Nutzer laut Regel 2 sehen soll.
+    var st = p.letzter_status || '';
+    if (st === 'laeuft') {
+      zeile.appendChild(zustandPille('läuft', 'running'));
+    } else if (/^[a-z_]+$/.test(st)) {
+      zeile.appendChild(zustandPille(st, st));
+    } else if (st.indexOf('verpasst') === 0) {
+      zeile.appendChild(zustandPille('verpasst', 'verpasst'));
+    } else if (st.indexOf('pausiert') === 0) {
+      // FIX-09: die Bremse. Der Grund steht dabei, der Weg zurück ist "An".
+      zeile.appendChild(zustandPille('pausiert', 'uebersprungen'));
+      var warum = document.createElement('span');
+      warum.className = 'zeitplan-grund';
+      warum.textContent = st;
+      zeile.appendChild(warum);
+    } else if (st) {
+      var ist = st.indexOf('uebersprungen: ') === 0;
+      zeile.appendChild(zustandPille(ist ? 'übersprungen' : 'fehlgeschlagen', 'uebersprungen'));
+      var grund = document.createElement('span');
+      grund.className = 'zeitplan-grund';
+      grund.textContent = ist ? st.slice('uebersprungen: '.length) : st;
+      zeile.appendChild(grund);
+    }
+    box.appendChild(zeile);
+
+    var aktionen = document.createElement('div');
+    aktionen.className = 'zeitplan-aktionen';
+    [['schalten', p.aktiv ? 'Aus' : 'An', function () {
+        return api('/api/zeitplaene/' + p.id + '/schalten',
+                   { method: 'POST', body: { aktiv: !p.aktiv } });
+      }, erledigt],                          // eine erledigte Erinnerung hat kein "An"
+     ['jetzt', 'Jetzt', function () {
+        return api('/api/zeitplaene/' + p.id + '/jetzt', { method: 'POST' });
+      }],
+     ['loeschen', 'Löschen', function () {
+        if (!window.confirm('Diesen Zeitplan löschen?\n\n' + p.name)) return null;
+        return api('/api/zeitplaene/' + p.id, { method: 'DELETE' });
+      }]
+    ].forEach(function (a) {
+      if (a[3]) return;                      // dieser Knopf ergibt hier keinen Sinn
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'zeitplan-knopf' + (a[0] === 'loeschen' ? ' is-loeschen' : '');
+      b.textContent = a[1];
+      b.setAttribute('data-plan', p.id);
+      b.setAttribute('data-aktion', a[0]);
+      if (a[0] === 'jetzt' && (ctx.deckel || ctx.gesperrt)) {
+        b.disabled = true;
+        b.title = ctx.deckel || ctx.gesperrt;
+      }
+      b.addEventListener('click', function () {
+        if (b.disabled) return;
+        var lauf = a[2]();
+        if (!lauf) return;                    // Rückfrage verneint
+        b.disabled = true;                    // kein Doppelklick
+        lauf.then(function (d) {
+          if (d && d.task_id) ctx.sag('Zeitplan „' + p.name + '“ läuft jetzt (Auftrag ' + d.task_id + ').');
+          else if (d && d.geloescht) ctx.sag('Zeitplan „' + p.name + '“ gelöscht.');
+          else ctx.sag('');
+          return ladeZeitplaene(ctx);
+        }).then(function () {
+          // Fokus bleibt, wo er war - der Knopf wurde neu gebaut.
+          var wieder = ctx.liste.querySelector('[data-plan="' + p.id + '"][data-aktion="' + a[0] + '"]');
+          if (wieder) wieder.focus();
+          if (a[0] === 'jetzt') return ladeAuftraege();
+        }).catch(function (err) {
+          ctx.sag(err.message, true);
+          b.disabled = false;
+        });
+      });
+      aktionen.appendChild(b);
+    });
+    box.appendChild(aktionen);
+    return box;
+  }
+
+  function taskKarte(t) {
+    var box = karte(t.goal);
+
+    var zeile = document.createElement('div');
+    zeile.className = 'karte-zeile';
+    zeile.appendChild(zustandNode(t.status));
+    [datumZeitText(t.created_at),
+     t.spent_tokens + ' Token',
+     t.spent_tool_calls + ' Werkzeuge',
+     (t.spent_cost_eur || 0).toFixed(4) + ' €'].forEach(function (text) {
+      var s = document.createElement('span');
+      s.textContent = text;
+      zeile.appendChild(s);
+    });
+    box.appendChild(zeile);
+
+    var details = document.createElement('details');
+    details.className = 'unter';
+    var summary = document.createElement('summary');
+    summary.textContent = 'Schritte, Prompt und Antwort';
+    details.appendChild(summary);
+
+    var geladen = false;
+    details.addEventListener('toggle', function () {
+      if (!details.open || geladen) return;
+      geladen = true;
+      api('/api/tasks/' + t.id).then(function (voll) {
+        details.appendChild(planNode(voll, null));
+        voll.steps.forEach(function (schritt) {
+          var d = document.createElement('details');
+          d.className = 'tools';
+          var sm = document.createElement('summary');
+          sm.textContent = 'Schritt ' + (schritt.index + 1) + ': '
+            + schritt.description.split('\n')[0];
+          d.appendChild(sm);
+
+          ['Prompt', 'Antwort'].forEach(function (was) {
+            var abschnitt = document.createElement('div');
+            abschnitt.className = 'tool';
+            var kopf = document.createElement('div');
+            kopf.className = 'tool-kopf';
+            var name = document.createElement('span');
+            name.className = 'tool-name';
+            name.textContent = was;
+            kopf.appendChild(name);
+            abschnitt.appendChild(kopf);
+            var pre = document.createElement('pre');
+            pre.textContent = was === 'Prompt'
+              ? (schritt.prompt || '(nicht aufgezeichnet)')
+              : ((schritt.result && schritt.result.display) || '(kein Ergebnis)');
+            abschnitt.appendChild(pre);
+            d.appendChild(abschnitt);
+          });
+
+          var aufrufe = (schritt.result && schritt.result.data
+                         && schritt.result.data.tool_calls) || [];
+          aufrufe.forEach(function (a) {
+            d.appendChild(toolNode({
+              name: a.name, arguments: a.arguments,
+              ok: a.result ? a.result.ok : false,
+              display: a.result ? a.result.display : '',
+              error: a.result ? a.result.error : null,
+              sources: a.result ? a.result.sources : [],
+              duration_ms: a.result ? a.result.duration_ms : 0
+            }));
+          });
+          details.appendChild(d);
+        });
+      }).catch(function (err) { details.appendChild(leer(err.message)); });
+    });
+    box.appendChild(details);
+    return box;
+  }
+
+  // --- COMMAND CENTER (FIX-06 Abschnitt 6) --------------------------------
+  //
+  // Acht Zonen, jede mit einer echten Quelle. Zone 7 haengt an einem
+  // Endpunkt, den es vorher nicht gab (`GET /api/stats/verlauf`).
+  //
+  // Aktualisiert wird ueber den SSE-Strom, der seit Phase 7 da ist - kein
+  // `setInterval` auf einen Endpunkt. Die einzige Ausnahme ist die Uhr in
+  // Zone 1: einmal pro Sekunde, lokal, ohne Netz.
+
+  var ccStrom = null;       // die SSE-Verbindung, solange die Ansicht offen ist
+  var ccUhr = null;         // der eine erlaubte Timer
+  var ccGebaut = false;
+  var ccEl = {};            // Griffe auf die Zonen, damit nur Inhalte tauschen
+  var ccGlobusDrin = false; // liegt das Canvas gerade in Zone 2?
+  var ccHolt = false;       // eine Sammelabfrage gleichzeitig
+
+  function ccZone(klassen, titel, rechts) {
+    var z = document.createElement('section');
+    z.className = 'zone ' + klassen;
+    if (titel !== null) {
+      var k = document.createElement('div');
+      k.className = 'zone-kopf';
+      var t = document.createElement('span');
+      t.textContent = titel;
+      k.appendChild(t);
+      if (rechts !== undefined) {
+        var r = document.createElement('span');
+        r.className = 'zahl-rechts';
+        r.textContent = rechts;
+        k.appendChild(r);
+        z.rechts = r;
+      }
+      z.appendChild(k);
+    }
+    var koerper = document.createElement('div');
+    koerper.className = 'zone-koerper';
+    koerper.style.minHeight = '0';
+    koerper.style.flex = '1';
+    z.appendChild(koerper);
+    z.koerper = koerper;
+    return z;
+  }
+
+  // 6.3: der leere Zustand ist der Normalfall, nicht der Fehlerfall. Strich
+  // plus ein Satz, der sagt, was passieren muss. Keine Nullen als Daten.
+  function ccLeer(satz) {
+    var p = document.createElement('p');
+    p.className = 'zone-leer';
+    p.textContent = satz;
+    return p;
+  }
+
+  function ccSetze(zone, knoten) {
+    zone.koerper.textContent = '';
+    zone.koerper.appendChild(knoten);
+  }
+
+  function ccZahl(n) {
+    return (n || 0).toLocaleString('de-DE');
+  }
+
+  /* Eine Kennzahl zaehlt EINMAL hoch, beim ersten Erscheinen - danach nie
+     wieder. Ein Wert, der bei jeder Aktualisierung neu hochzaehlt, ist kein
+     Effekt mehr, sondern Zappeln: der Strom liefert Ereignisse im
+     Sekundentakt.
+
+     `--dauer-zahl` ist 600 ms; die Kurve ist easeOutQuart, also schnell
+     los und weich aus. Bei `prefers-reduced-motion` steht der Wert sofort
+     da - der globale Block in system.css greift nur bei CSS-Animationen,
+     eine Schleife in JavaScript muss selbst nachsehen. */
+  function ccZaehle(el, ziel) {
+    if (el.dataset.gezaehlt) { el.textContent = ccZahl(ziel); return; }
+    el.dataset.gezaehlt = '1';
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      el.textContent = ccZahl(ziel);
+      return;
+    }
+    var t0 = performance.now();
+    (function schritt(t) {
+      var p = Math.min((t - t0) / 600, 1);
+      el.textContent = ccZahl(Math.round(ziel * (1 - Math.pow(1 - p, 4))));
+      if (p < 1) requestAnimationFrame(schritt);
+    })(t0);
+  }
+
+  function baueCommandCenter() {
+    var ziel = document.getElementById('view-cc');
+    ziel.textContent = '';
+    var raster = document.createElement('div');
+    raster.className = 'zonen cc';
+
+    // Zone 1 - Kopf, Uhr, Anbieter/Modell. Quelle: GET /api/health + lokale Uhr
+    var z1 = document.createElement('section');
+    z1.className = 'zone z12 cc-kopf zone-rein';
+    var marke = document.createElement('span');
+    marke.className = 'cc-marke';
+    // Kein innerHTML - auch nicht fuer zwei Schraegstriche. Die Regel gilt
+    // ohne Ausnahme (tests/test_api.py::test_seite_setzt_niemals_innerhtml),
+    // und eine Ausnahme "nur diesmal" ist genau die, die spaeter jemand
+    // kopiert und mit einer Modellantwort fuellt.
+    marke.appendChild(document.createTextNode(NAME + ' '));
+    var strich = document.createElement('b');
+    strich.textContent = '//';
+    marke.appendChild(strich);
+    marke.appendChild(document.createTextNode(' COMMAND CENTER'));
+    var anbieter = document.createElement('span');
+    anbieter.className = 'cc-anbieter';
+    anbieter.textContent = 'verbinde…';
+    var uhr = document.createElement('span');
+    uhr.className = 'cc-uhr';
+    z1.appendChild(marke);
+    z1.appendChild(anbieter);
+    z1.appendChild(uhr);
+    ccEl.anbieter = anbieter;
+    ccEl.uhr = uhr;
+    raster.appendChild(z1);
+
+    // Zone 2 - Mini-Globus. Dieselbe Szene wie die Weltansicht, dasselbe
+    // Canvas: es wird umgehaengt, nicht kopiert. Ein zweiter WebGL-Kontext
+    // ist im Auftrag ausdruecklich verboten, und Browser verwerfen den
+    // aelteren ohne Vorwarnung.
+    var z2 = ccZone('z3 cc-globus zone-rein', 'GLOBUS');
+    z2.koerper.className = 'cc-globus-platz';
+    ccEl.globus = z2;
+    raster.appendChild(z2);
+
+    // Zone 3 - laufende Auftraege. Quelle: GET /api/tasks (+ Detail je Auftrag)
+    ccEl.auftraege = ccZone('z4 zone-rein', 'AUFTRÄGE', '');
+    raster.appendChild(ccEl.auftraege);
+
+    // Zone 4 - Ereignisstrom. Quelle: SSE aus api/events.py
+    ccEl.strom = ccZone('z5 zone-rein', 'EREIGNISSE');
+    ccEl.strom.koerper.className = 'cc-strom';
+    ccSetze(ccEl.strom, ccLeer('Der Strom ist offen. Hier steht, was passiert, sobald etwas passiert.'));
+    raster.appendChild(ccEl.strom);
+
+    // Zone 5 - vier Kennzahlen. Quelle: GET /api/stats
+    var z5 = document.createElement('section');
+    z5.className = 'zone z12 z-kennzahlen zone-rein';
+    var kz = document.createElement('div');
+    kz.className = 'cc-kennzahlen';
+    ccEl.kennzahl = {};
+    [['calls', 'Modellaufrufe'], ['tokens', 'Token'], ['kosten', 'Kosten'],
+     ['tools', 'Werkzeugaufrufe']].forEach(function (paar) {
+      var k = document.createElement('div');
+      k.className = 'cc-kennzahl';
+      var w = document.createElement('span');
+      w.className = 'wert';
+      w.textContent = '—';
+      var n = document.createElement('span');
+      n.className = 'name';
+      n.textContent = paar[1];
+      var f = document.createElement('span');
+      f.className = 'fussnote';
+      k.appendChild(n); k.appendChild(w); k.appendChild(f);
+      kz.appendChild(k);
+      ccEl.kennzahl[paar[0]] = { wert: w, fussnote: f };
+    });
+    z5.appendChild(kz);
+    raster.appendChild(z5);
+
+    // Zone 6 - Werkzeuge zuletzt. Quelle: GET /api/tool-calls
+    ccEl.werkzeuge = ccZone('z6 zone-rein', 'WERKZEUGE ZULETZT');
+    raster.appendChild(ccEl.werkzeuge);
+
+    // Zone 7 - Token-Verlauf. Quelle: GET /api/stats/verlauf
+    ccEl.verlauf = ccZone('z6 zone-rein', 'TOKEN-VERLAUF · RELATIV, KEINE ABSOLUTWERTE', '');
+    ccEl.verlauf.koerper.className = 'cc-diagramm';
+    raster.appendChild(ccEl.verlauf);
+
+    // Zone 8 - Meldungen weltweit. Quelle: GET /api/weltlage/WELT
+    ccEl.meldungen = ccZone('z12 zone-rein', 'MELDUNGEN WELTWEIT');
+    raster.appendChild(ccEl.meldungen);
+
+    ziel.appendChild(raster);
+    ccGebaut = true;
+  }
+
+  // --- Zone 1: die Uhr. Der einzige Timer in dieser Ansicht. ---------------
+
+  function ccUhrTick() {
+    if (!ccEl.uhr) return;
+    var d = new Date();
+    function zwei(n) { return n < 10 ? '0' + n : String(n); }
+    ccEl.uhr.textContent = zwei(d.getHours()) + ':' + zwei(d.getMinutes())
+      + ':' + zwei(d.getSeconds());
+    var s = document.createElement('small');
+    s.textContent = d.toLocaleDateString('de-DE',
+      { weekday: 'short', day: '2-digit', month: '2-digit' });
+    ccEl.uhr.appendChild(s);
+  }
+
+  // --- Zone 3 ---------------------------------------------------------------
+
+  function ccZeichneAuftraege(liste) {
+    var laufend = (liste || []).filter(function (t) {
+      return !t.parent_task_id && (t.status === 'running' || t.status === 'pending');
+    });
+    ccEl.auftraege.rechts.textContent = laufend.length
+      ? laufend.length + ' laufend' : '';
+    if (!laufend.length) {
+      ccSetze(ccEl.auftraege, ccLeer('Kein Auftrag läuft. Stell im Chat eine Frage.'));
+      return;
+    }
+    ccEl.auftraege.koerper.textContent = '';
+    laufend.slice(0, 4).forEach(function (t) {
+      var box = document.createElement('div');
+      box.className = 'cc-auftrag';
+      var ziel = document.createElement('div');
+      ziel.className = 'cc-auftrag-ziel';
+      ziel.textContent = t.goal;
+      var zeile = document.createElement('div');
+      zeile.className = 'cc-auftrag-zeile';
+      var schritte = document.createElement('span');
+      schritte.textContent = '…';
+      var kosten = document.createElement('span');
+      kosten.textContent = ccZahl(t.spent_tokens) + ' Token';
+      zeile.appendChild(schritte);
+      zeile.appendChild(kosten);
+      var balken = document.createElement('div');
+      balken.className = 'cc-balken';
+      var fuell = document.createElement('i');
+      fuell.style.transform = 'scaleX(0)';
+      balken.appendChild(fuell);
+      box.appendChild(ziel); box.appendChild(zeile); box.appendChild(balken);
+      ccEl.auftraege.koerper.appendChild(box);
+
+      // `GET /api/tasks` liefert keine Schritte (in FIX-06 Abschnitt 5
+      // nachgemessen und dort vermerkt). Fuer n/m muss das Detail her -
+      // aber nur fuer die wenigen laufenden, und nur auf ein Ereignis hin.
+      api('/api/tasks/' + t.id).then(function (d) {
+        var alle = d.steps || [];
+        var fertig = alle.filter(function (x) { return x.status === 'done'; }).length;
+        if (!alle.length) { schritte.textContent = 'Plan wird gebaut'; return; }
+        schritte.textContent = 'Schritt ' + Math.min(fertig + 1, alle.length)
+          + '/' + alle.length;
+        fuell.style.transform = 'scaleX(' + (fertig / alle.length).toFixed(4) + ')';
+      }).catch(function () { schritte.textContent = ''; });
+    });
+  }
+
+  // --- Zone 4 ---------------------------------------------------------------
+
+  var CC_STROM_MAX = 40;
+
+  function ccStromZeile(typ, daten) {
+    if (!ccEl.strom) return;
+    if (ccEl.strom.koerper.querySelector('.zone-leer')) {
+      ccEl.strom.koerper.textContent = '';
+    }
+    var d = new Date();
+    function zwei(n) { return n < 10 ? '0' + n : String(n); }
+    var zeile = document.createElement('div');
+    var t = document.createElement('span');
+    t.className = 't';
+    t.textContent = zwei(d.getHours()) + ':' + zwei(d.getMinutes())
+      + ':' + zwei(d.getSeconds()) + ' ';
+    var n = document.createElement('span');
+    n.className = 'n';
+    n.textContent = typ + ' ';
+    var rest = document.createElement('span');
+    // textContent, nie innerHTML: `goal` und `name` kommen mittelbar aus
+    // einem Modell.
+    rest.textContent = ccStromText(typ, daten);
+    zeile.appendChild(t);
+    zeile.appendChild(n);
+    zeile.appendChild(rest);
+    ccEl.strom.koerper.appendChild(zeile);
+    while (ccEl.strom.koerper.children.length > CC_STROM_MAX) {
+      ccEl.strom.koerper.removeChild(ccEl.strom.koerper.firstChild);
+    }
+    ccEl.strom.koerper.scrollTop = ccEl.strom.koerper.scrollHeight;
+  }
+
+  function ccStromText(typ, d) {
+    if (typ === 'task') return (d.status || '') + ' · ' + (d.goal || d.id || '');
+    if (typ === 'step') return '#' + (d.index + 1) + ' ' + (d.status || '')
+      + ' · ' + (d.description || '');
+    if (typ === 'tool') return (d.name || '') + ' · ' + (d.ok ? 'ok' : 'fehlgeschlagen')
+      + ' · ' + (d.duration_ms == null ? '—' : d.duration_ms + ' ms');
+    if (typ === 'confirmation') return 'Rückfrage: ' + (d.tool || '');
+    if (typ === 'hello') return (d.listeners || 1) + ' Zuhörer';
+    /* Verknuepfungspruefung 31.08.2026, Fund 3.
+       WAS war falsch: die Aufrufstelle im Strom-Rueckruf baut
+       `{ status: 'abgerissen: ' + err.message }` und uebergibt es mit dem
+       Typ 'strom' - hier fiel das auf `return ''` durch. Dasselbe galt fuer
+       'dropped', das der Server bei vollem Puffer wirklich sendet
+       (api/events.py, EventBus._verdraengen).
+       WARUM ist das falsch: im Ereignisprotokoll stand nach einem Abriss
+       nur "HH:MM:SS strom" ohne jede Erklaerung, ein Ereignisverlust als
+       nacktes "dropped". Der Grund, warum das Dashboard gerade eingefroren
+       ist, wurde formuliert und dann verworfen. */
+    if (typ === 'strom') return d.status || '';
+    if (typ === 'dropped') return 'Ereignisse verworfen — Puffer war voll';
+    return '';
+  }
+
+  // --- Zone 5 ---------------------------------------------------------------
+
+  function ccZeichneKennzahlen(st) {
+    var g = st.total || {};
+    var token = (g.in_tokens || 0) + (g.out_tokens || 0);
+    var werkzeuge = (st.per_tool || []).reduce(function (a, r) { return a + (r.calls || 0); }, 0);
+
+    // 6.3: bei einer frischen Datenbank steht hier ein Strich, keine Null.
+    // Eine Null sieht aus wie eine Messung; sie ist hier aber nur die
+    // Abwesenheit einer. Sobald ein Aufruf gelaufen ist, stehen die echten
+    // Zahlen da - auch wenn eine davon dann wirklich 0 ist.
+    var gabEs = (g.calls || 0) > 0;
+    if (gabEs) ccZaehle(ccEl.kennzahl.calls.wert, g.calls);
+    else ccEl.kennzahl.calls.wert.textContent = '—';
+    ccEl.kennzahl.calls.wert.classList.toggle('ist-leer', !gabEs);
+    ccEl.kennzahl.tokens.wert.classList.toggle('ist-leer', !gabEs);
+    ccEl.kennzahl.tools.wert.classList.toggle('ist-leer', !werkzeuge);
+    // Die Kosten bekommen KEIN `ist-leer`: `0,0000 €` ist eine Messung,
+    // kein fehlender Wert. Genau das ist DoD 5 aus Abschnitt 6.
+    // Weggenommen wird die Klasse hier trotzdem: `ccKennzahlenFehler`
+    // (Fund 6) setzt sie auf allen vier Kacheln, und was ein Fehlerpfad
+    // setzt, muss der Erfolgspfad wieder abraeumen - sonst bliebe die
+    // Kachel nach einem einzigen Aussetzer fuer immer grau.
+    ccEl.kennzahl.kosten.wert.classList.remove('ist-leer');
+    ccEl.kennzahl.calls.fussnote.textContent = !gabEs
+      ? 'Noch kein Modellaufruf gelaufen.'
+      : ((g.fehler || 0) ? (g.fehler + ' fehlgeschlagen') : '');
+    if (gabEs) ccZaehle(ccEl.kennzahl.tokens.wert, token);
+    else ccEl.kennzahl.tokens.wert.textContent = '—';
+    ccEl.kennzahl.tokens.fussnote.textContent = gabEs
+      ? (ccZahl(g.in_tokens) + ' rein · ' + ccZahl(g.out_tokens) + ' raus')
+      : 'Zählt mit, sobald ein Modell antwortet.';
+    if (werkzeuge) ccZaehle(ccEl.kennzahl.tools.wert, werkzeuge);
+    else ccEl.kennzahl.tools.wert.textContent = '—';
+    ccEl.kennzahl.tools.fussnote.textContent = werkzeuge
+      ? (st.per_tool.length + ' verschiedene') : 'Noch kein Werkzeug gelaufen.';
+
+    // 6.2: die einzige echte Geldzahl im System. Steht sie auf 0, dann steht
+    // sie auf 0 - mit dem Satz daneben, warum. Nichts wird geschaetzt.
+    var eur = g.cost_eur || 0;
+    ccEl.kennzahl.kosten.wert.textContent =
+      eur.toFixed(4).replace('.', ',') + ' €';
+    ccEl.kennzahl.kosten.fussnote.textContent = eur === 0
+      ? 'Preise nicht in .env eingetragen' : 'aus llm_calls, nicht geschätzt';
+  }
+
+  /* Verknuepfungspruefung 31.08.2026, Fund 6.
+     WAS war falsch: `ccHole()` startet fuenf Abrufe nebeneinander. Vier
+     davon meldeten einen Fehler sichtbar; der fuenfte,
+     `api('/api/stats').then(ccZeichneKennzahlen).catch(function () {})`,
+     hatte einen leeren Handler.
+     WARUM ist das falsch: fiel /api/stats aus, behielten die vier Kacheln,
+     was zuletzt drin stand - beim ersten Laden der Aufbauzustand (Wert "—",
+     Fussnote leer), nach einem frueheren Erfolg die alten Zahlen ohne jede
+     Kennzeichnung. Genau darueber unterscheidet ccZeichneKennzahlen
+     peinlich genau zwischen "—" und "0" (6.3 und DoD 5), und der leere
+     Fehlerfall machte diese Unterscheidung wieder zunichte: ein Fehler sah
+     aus wie "noch nichts gemessen". Daneben standen im selben Raster drei
+     Zonen mit sichtbarer Fehlermeldung - der Nutzer schloss daraus, die
+     Kennzahlen stimmten.
+     Zone 5 ist kein ccZone-Koerper, sondern vier Kacheln; deshalb hier
+     Strich plus echte Meldung in der Fussnote statt `ccLeer`. */
+  function ccKennzahlenFehler(err) {
+    var text = (err && err.message) ? err.message : 'Kennzahlen nicht abrufbar';
+    Object.keys(ccEl.kennzahl).forEach(function (k) {
+      var kachel = ccEl.kennzahl[k];
+      kachel.wert.textContent = '—';
+      kachel.wert.classList.add('ist-leer');
+      kachel.fussnote.textContent = text;
+    });
+  }
+
+  // --- Zone 6 ---------------------------------------------------------------
+
+  function ccZeichneWerkzeuge(liste) {
+    if (!liste || !liste.length) {
+      ccSetze(ccEl.werkzeuge, ccLeer('Noch kein Werkzeug gelaufen.'));
+      return;
+    }
+    var t = document.createElement('table');
+    t.className = 'cc-tabelle';
+    liste.slice(0, 6).forEach(function (r) {
+      var tr = document.createElement('tr');
+      // Die 45-ms-Kette aus static/system.css traegt die Staffelung, ohne
+      // dass hier eine einzige Zeile CSS dazukommt.
+      tr.className = 'zone-rein';
+      [['t', zeitText(r.created_at)],
+       ['', r.name],
+       [r.ok ? 'ok' : 'weg', r.ok ? '✓' : '✕'],
+       ['ms', null]].forEach(function (paar) {
+        var td = document.createElement('td');
+        if (paar[0]) td.className = paar[0];
+        if (paar[1] === null) {
+          // Zahl und Einheit getrennt: die Einheit ist kleiner und leiser.
+          // `== null` und nicht `|| 0`: eine Dauer, die nicht gemessen wurde,
+          // ist kein Nullwert.
+          if (r.duration_ms == null) {
+            td.textContent = '—';
+          } else {
+            td.appendChild(document.createTextNode(String(r.duration_ms)));
+            var e = document.createElement('span');
+            e.textContent = ' ms';
+            td.appendChild(e);
+          }
+        } else {
+          td.textContent = paar[1];
+        }
+        tr.appendChild(td);
+      });
+      t.appendChild(tr);
+    });
+    ccSetze(ccEl.werkzeuge, t);
+  }
+
+  // --- Zone 7: Flaechendiagramm, von Hand als SVG ---------------------------
+
+  function ccZeichneVerlauf(d) {
+    var punkte = d.stunden || [];
+    ccEl.verlauf.rechts.textContent = d.fenster_h ? (d.fenster_h + ' h') : '';
+
+    // Eine Flaeche auf der Nulllinie sieht aus wie eine Messung, ist aber
+    // keine Aussage. 6.3 verbietet Nullen, die wie Daten aussehen.
+    if (!d.summe || !d.summe.tokens) {
+      ccSetze(ccEl.verlauf, ccLeer('In den letzten ' + (d.fenster_h || 24)
+        + ' Stunden lief kein Modellaufruf.'));
+      return;
+    }
+
+    var B = 100, H = 30, hoch = d.hoechstwert || 1;
+    var schritt = punkte.length > 1 ? B / (punkte.length - 1) : B;
+    var weg = [];
+    punkte.forEach(function (p, i) {
+      var x = (i * schritt).toFixed(2);
+      var y = (H - (p.tokens / hoch) * (H - 1)).toFixed(2);
+      weg.push((i ? 'L' : 'M') + x + ' ' + y);
+    });
+
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + B + ' ' + H);
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', 'Token je Stunde, Höchstwert '
+      + d.hoechstwert + ' in ' + d.fenster_h + ' Stunden');
+
+    // Ein echter Verlauf statt einer Volltonflaeche: oben am Kurvenzug
+    // kraeftig, zur Grundlinie hin auf null. Die Farbe kommt aus dem
+    // Akzent-Token, nicht als zweite Kopie des Hexwerts - `getComputedStyle`
+    // liest sie zur Laufzeit.
+    var akzent = getComputedStyle(document.documentElement)
+      .getPropertyValue('--akzent').trim() || '#f0b45c';
+    var defs = document.createElementNS(svg.namespaceURI, 'defs');
+    var lauf = document.createElementNS(svg.namespaceURI, 'linearGradient');
+    lauf.setAttribute('id', 'cc-verlauf');
+    lauf.setAttribute('x1', '0'); lauf.setAttribute('y1', '0');
+    lauf.setAttribute('x2', '0'); lauf.setAttribute('y2', '1');
+    [[0, '0.34'], [1, '0']].forEach(function (paar) {
+      var stop = document.createElementNS(svg.namespaceURI, 'stop');
+      stop.setAttribute('offset', String(paar[0]));
+      stop.setAttribute('stop-color', akzent);
+      stop.setAttribute('stop-opacity', paar[1]);
+      lauf.appendChild(stop);
+    });
+    defs.appendChild(lauf);
+    svg.appendChild(defs);
+
+    var flaeche = document.createElementNS(svg.namespaceURI, 'path');
+    flaeche.setAttribute('d', weg.join(' ') + ' L' + B + ' ' + H + ' L0 ' + H + ' Z');
+    flaeche.setAttribute('fill', 'url(#cc-verlauf)');
+    var linie = document.createElementNS(svg.namespaceURI, 'path');
+    linie.setAttribute('d', weg.join(' '));
+    linie.setAttribute('fill', 'none');
+    linie.setAttribute('stroke', 'var(--akzent)');
+    linie.setAttribute('stroke-width', '1.6');
+    linie.setAttribute('vector-effect', 'non-scaling-stroke');
+    svg.appendChild(flaeche);
+    svg.appendChild(linie);
+    ccSetze(ccEl.verlauf, svg);
+  }
+
+  // --- Zone 8 ---------------------------------------------------------------
+
+  function ccZeichneMeldungen(d) {
+    var m = (d && d.meldungen) || [];
+    if (!m.length) {
+      // Kein stiller POST: der kostet einen Modellaufruf und Geld.
+      ccSetze(ccEl.meldungen, ccLeer(
+        'Keine Weltmeldungen im Zwischenspeicher. Sie entstehen, wenn du in '
+        + 'der Weltansicht ein Land auswählst — das kostet einen Modellaufruf.'));
+      return;
+    }
+    var gitter = document.createElement('div');
+    gitter.className = 'cc-meldungen';
+    m.slice(0, 3).forEach(function (x) {
+      var karte = document.createElement('article');
+      karte.className = 'cc-meldung';
+      if (x.bild_url) {
+        var bild = document.createElement('img');
+        bild.src = x.bild_url;
+        bild.loading = 'lazy';
+        bild.alt = x.bild_beschreibung || '';
+        karte.appendChild(bild);
+      }
+      var text = document.createElement('div');
+      text.className = 'cc-meldung-text';
+      var h = document.createElement('h4');
+      h.textContent = x.schlagzeile;
+      var p = document.createElement('p');
+      // Herkunft ist Pflicht, nicht Deko.
+      p.textContent = x.medium + (x.bild_herkunft ? ' · Bild: ' + x.bild_herkunft : '');
+      text.appendChild(h); text.appendChild(p);
+      karte.appendChild(text);
+      gitter.appendChild(karte);
+    });
+    ccSetze(ccEl.meldungen, gitter);
+  }
+
+  // --- Zone 2: das Canvas umhaengen, nicht ein zweites bauen ---------------
+
+  function ccGlobusAnbieten() {
+    var platz = ccEl.globus.koerper;
+    platz.textContent = '';
+    if (globusModul && globusModul.miniAn && globusModul.miniAn(platz)) {
+      ccGlobusDrin = true;
+      ccGlobusKlickBinden(platz);
+      return;
+    }
+    // Three.js sind 2,0 MB. Die Startansicht laedt die nicht ungefragt -
+    // das war der ganze Punkt von FIX-05 B-2.
+    var hinweis = document.createElement('p');
+    hinweis.className = 'cc-globus-hinweis';
+    hinweis.textContent = 'Der Globus wird erst geladen, wenn du ihn brauchst — 2,0 MB.';
+    var knopf = document.createElement('button');
+    knopf.type = 'button';
+    knopf.textContent = 'Globus laden';
+    knopf.addEventListener('click', function () {
+      hinweis.textContent = 'lädt…';
+      knopf.remove();
+      ladeGlobus().then(function () {
+        if (aktiveAnsicht === 'cc') ccGlobusAnbieten();
+      });
+    });
+    hinweis.appendChild(knopf);
+    platz.appendChild(hinweis);
+  }
+
+  /* Verknuepfungspruefung 31.08.2026, Fund 7.
+     WAS war falsch: `miniAn(platz)` haengt das Canvas samt aller
+     Zeiger-Handler in Zone 2 - aber NUR das Canvas. Der Handler
+     `zeigerFertig` in static/globus.js ruft bei einem Klick `waehle()`, das
+     ueber `ladeLand()` bei ausbleibendem Cache-Treffer
+     `POST /api/weltlage/<ISO>` absetzt. Diese Route legt einen echten Task
+     an und ruft `fuehre_task_aus` - also Budget, Audit und ein bezahlter
+     Modellaufruf. Die Ausgabe dieses Aufrufs (Kopfzeile #land, Landtafel,
+     Kartenspalte #karten, Statuszeile #gesagt) bleibt aber in #view-welt,
+     und das traegt auf der Startansicht display:none.
+     WARUM ist das falsch: gemessen nach einem Klick auf die kleine Kugel
+     stand in #land "France" und in #karten der Ergebnistext - beide 0 x 0
+     Pixel gross, POST /api/weltlage/FRA war gelaufen. Der Nutzer sah ausser
+     der Ringmarkierung nichts. Wer nichts sieht, klickt noch einmal - und
+     zahlt noch einmal. STATUS.md verbietet fuer Zone 8 ausdruecklich genau
+     das ("Ein automatischer POST waere ein Modellaufruf und Geld, ausgeloest
+     vom blossen Oeffnen der Startansicht"); Zone 2 daneben brauchte dafuer
+     einen einzigen Klick.
+     WIE es jetzt laeuft: ein Klick auf den Mini-Globus fuehrt in die
+     Weltansicht. Der teure Pfad laeuft damit nur noch dort, wo seine
+     Ausgabe auch zu sehen ist.
+     Warum die BLASENPHASE am Elternteil und nicht die Erfassungsphase: der
+     Globus-Handler haengt am Canvas selbst und muss VORHER laufen. Er
+     rechnet den Klickpunkt ueber die Groesse und Lage des Canvas in einen
+     Punkt auf der Kugel um - wuerde hier zuerst umgeschaltet, haette
+     `miniAus()` das Canvas mitten im Klick verschoben und der Strahl haette
+     das falsche Land getroffen.
+     Die 5 Pixel sind keine neue Zahl: es ist ZIEH_SCHWELLE aus
+     static/globus.js. Wer dreht, waehlt nichts aus und will auch nicht
+     weggeschaltet werden. */
+  function ccGlobusKlickBinden(platz) {
+    if (platz.dataset.klickGebunden) return;   // Zone 2 wird mehrfach gebaut
+    platz.dataset.klickGebunden = '1';
+    var startX = 0, startY = 0, hatStart = false;
+    platz.addEventListener('pointerdown', function (ev) {
+      startX = ev.clientX; startY = ev.clientY; hatStart = true;
+    });
+    platz.addEventListener('pointerup', function (ev) {
+      if (!hatStart) return;
+      hatStart = false;
+      var weg = Math.sqrt(Math.pow(ev.clientX - startX, 2)
+                        + Math.pow(ev.clientY - startY, 2));
+      if (weg > 5) return;
+      if (aktiveAnsicht !== 'cc') return;
+      zeigeAnsicht('welt');
+    });
+  }
+
+  function ccGlobusZurueck() {
+    if (!ccGlobusDrin) return;
+    ccGlobusDrin = false;
+    if (globusModul && globusModul.miniAus) globusModul.miniAus();
+  }
+
+  // --- Sammelabruf. Ausgeloest beim Oeffnen und von Ereignissen. -----------
+
+  function ccHole() {
+    if (ccHolt) return Promise.resolve();
+    ccHolt = true;
+    return Promise.all([
+      api('/api/tasks').then(ccZeichneAuftraege).catch(function (e) {
+        ccSetze(ccEl.auftraege, ccLeer(e.message)); }),
+      api('/api/stats').then(ccZeichneKennzahlen).catch(ccKennzahlenFehler),
+      api('/api/tool-calls?limit=20').then(ccZeichneWerkzeuge).catch(function (e) {
+        ccSetze(ccEl.werkzeuge, ccLeer(e.message)); }),
+      api('/api/stats/verlauf?stunden=24').then(ccZeichneVerlauf).catch(function (e) {
+        ccSetze(ccEl.verlauf, ccLeer(e.message)); }),
+      api('/api/health').then(function (h) {
+        ccEl.anbieter.textContent = (h.provider || '?') + ' · ' + (h.model || '?')
+          + (h.api_key_configured ? '' : ' · kein Schlüssel');
+      }).catch(function () { ccEl.anbieter.textContent = 'Anbieter unbekannt'; })
+    ]).then(function () { ccHolt = false; })
+      .catch(function () { ccHolt = false; });
+  }
+
+  function ladeCommandCenter() {
+    if (!ccGebaut) baueCommandCenter();
+
+    ccUhrTick();
+    if (!ccUhr) ccUhr = setInterval(ccUhrTick, 1000);
+
+    ccGlobusAnbieten();
+
+    // Zone 8 einmal beim Oeffnen - Weltmeldungen aendern sich nicht im
+    // Sekundentakt und haengen an keinem Ereignis.
+    api('/api/weltlage/WELT').then(ccZeichneMeldungen).catch(function (e) {
+      ccSetze(ccEl.meldungen, ccLeer(e.message));
+    });
+
+    // 6.4: kein Polling. Der Strom sagt, wann es etwas zu holen gibt.
+    if (!ccStrom) {
+      ccStrom = stromAbonnieren(function (typ, daten) {
+        ccStromZeile(typ, daten);
+        if (typ === 'hello') return;
+        ccHole();
+      }, function (err) {
+        /* Verknuepfungspruefung 31.08.2026, Fund 1: `beiAbbruch` faellt
+           erst, wenn auch der letzte Wiederverbindungsversuch gescheitert
+           ist. Endet der Strom sauber, ist `err` null - und dann stand hier
+           frueher wegen `if (err)` nicht einmal eine Zeile im Protokoll.
+           Ein Dashboard, das ohne ein Wort einfriert, ist schlimmer als
+           eines, das sagt, dass es eingefroren ist. */
+        ccStromZeile('strom', {
+          status: err ? ('abgerissen: ' + err.message)
+                      : 'abgerissen — Verbindung weg, Anzeige eingefroren'
+        });
+        ccStrom = null;
+      }, function () {
+        // Wiederverbunden: die Ereignisse aus der Luecke sind weg, also
+        // einmal den echten Stand aller Zonen nachziehen.
+        ccStromZeile('strom', { status: 'wieder verbunden' });
+        ccHole();
+      });
+    }
+    return ccHole();
+  }
+
+  function ccVerlassen() {
+    if (ccUhr) { clearInterval(ccUhr); ccUhr = null; }
+    if (ccStrom) { ccStrom.schliessen(); ccStrom = null; }
+    ccGlobusZurueck();
+  }
+
+  // --- Werkzeuge ---
+
+  function ladeWerkzeuge() {
+    var ziel = document.getElementById('view-tools');
+    return api('/api/tool-calls?limit=200').then(function (liste) {
+      ziel.textContent = '';
+      if (!liste || !liste.length) { ziel.appendChild(leer('Noch kein Werkzeug gelaufen.')); return; }
+      ziel.appendChild(tabelle([
+        { titel: 'Zeit', wert: function (r) { return zeitText(r.created_at); } },
+        { titel: 'Werkzeug', wert: function (r) { return r.name; } },
+        { titel: 'Argumente', wert: function (r) { return argumentText(r.arguments).slice(0, 70); } },
+        { titel: 'ok', wert: function (r) { return r.ok ? '✓' : '✕'; } },
+        { titel: 'ms', zahl: true, wert: function (r) { return r.duration_ms; } }
+      ], liste));
+    }).catch(function (err) { ziel.textContent = ''; ziel.appendChild(leer(err.message)); });
+  }
+
+  // --- Kosten ---
+
+  function ladeKosten() {
+    var ziel = document.getElementById('view-kosten');
+    return api('/api/stats').then(function (st) {
+      ziel.textContent = '';
+
+      var kpi = document.createElement('dl');
+      kpi.className = 'kpi';
+      [['Modellaufrufe', st.total.calls],
+       ['Token gesamt', (st.total.in_tokens || 0) + (st.total.out_tokens || 0)],
+       ['Kosten gesamt', (st.total.cost_eur || 0).toFixed(4) + ' €'],
+       ['Fehlerrate', (st.total.fehlerrate * 100).toFixed(1) + ' %']
+      ].forEach(function (paar) {
+        var d = document.createElement('div');
+        var dt = document.createElement('dt'); dt.textContent = paar[0];
+        var dd = document.createElement('dd'); dd.textContent = paar[1];
+        d.appendChild(dt); d.appendChild(dd); kpi.appendChild(d);
+      });
+      ziel.appendChild(kpi);
+
+      var proTag = karte('Kosten pro Tag');
+      if (st.per_day.length) {
+        var max = Math.max.apply(null, st.per_day.map(function (r) { return r.cost_eur || 0; })) || 1;
+        proTag.appendChild(tabelle([
+          { titel: 'Tag', wert: function (r) { return r.tag; } },
+          { titel: 'Aufrufe', zahl: true, wert: function (r) { return r.calls; } },
+          { titel: 'Token', zahl: true, wert: function (r) { return (r.in_tokens || 0) + (r.out_tokens || 0); } },
+          { titel: 'Fehler', zahl: true, wert: function (r) { return r.fehler || 0; } },
+          { titel: '€', zahl: true, wert: function (r) { return (r.cost_eur || 0).toFixed(4); } }
+        ], st.per_day));
+        st.per_day.slice(0, 1).forEach(function (r) {
+          var b = document.createElement('div');
+          b.className = 'balken';
+          b.style.width = Math.round(((r.cost_eur || 0) / max) * 100) + '%';
+          proTag.appendChild(b);
+        });
+      } else { proTag.appendChild(leer('Noch keine Modellaufrufe.')); }
+      ziel.appendChild(proTag);
+
+      var proModell = karte('Verbrauch pro Modell');
+      proModell.appendChild(tabelle([
+        { titel: 'Modell', wert: function (r) { return r.model; } },
+        { titel: 'Aufrufe', zahl: true, wert: function (r) { return r.calls; } },
+        { titel: 'rein', zahl: true, wert: function (r) { return r.in_tokens; } },
+        { titel: 'raus', zahl: true, wert: function (r) { return r.out_tokens; } },
+        { titel: '€', zahl: true, wert: function (r) { return (r.cost_eur || 0).toFixed(4); } }
+      ], st.per_model));
+      ziel.appendChild(proModell);
+
+      var proWerkzeug = karte('Werkzeuge');
+      proWerkzeug.appendChild(tabelle([
+        { titel: 'Werkzeug', wert: function (r) { return r.name; } },
+        { titel: 'Aufrufe', zahl: true, wert: function (r) { return r.calls; } },
+        { titel: 'Fehler', zahl: true, wert: function (r) { return r.fehler || 0; } },
+        { titel: 'Ø ms', zahl: true, wert: function (r) { return r.ms || 0; } }
+      ], st.per_tool));
+      ziel.appendChild(proWerkzeug);
+
+      var aufträge = karte('Aufträge');
+      aufträge.appendChild(tabelle([
+        { titel: 'gesamt', zahl: true, wert: function (r) { return r.gesamt || 0; } },
+        { titel: 'done', zahl: true, wert: function (r) { return r.done || 0; } },
+        { titel: 'failed', zahl: true, wert: function (r) { return r.failed || 0; } },
+        { titel: 'Budget', zahl: true, wert: function (r) { return r.aborted_budget || 0; } },
+        { titel: 'abgebrochen', zahl: true, wert: function (r) { return r.cancelled || 0; } }
+      ], [st.tasks]));
+      ziel.appendChild(aufträge);
+    }).catch(function (err) { ziel.textContent = ''; ziel.appendChild(leer(err.message)); });
+  }
+
+  el.hint.textContent = 'Enter senden · Umschalt+Enter neue Zeile';
+  showEmpty();
+  zeigeAnsicht('cc');
+  reaktorZustand();
+  loadHealth();
+  loadHistory().catch(function (err) { appendError(err.message); });
+  zustellungStarten();
+})();
+</script>
+</body>
+</html>

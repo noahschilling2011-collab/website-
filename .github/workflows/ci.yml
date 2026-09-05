@@ -71,3 +71,62 @@ jobs:
         run: |
           npx tsx src/replay/make-fixtures.ts
           git diff --exit-code -- fixtures/
+
+  jarvis:
+    name: JARVIS
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: jarvis
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: jarvis/requirements.txt
+
+      - run: pip install -r requirements.txt
+
+      - name: Chromium fuer die Browser-Tests
+        # Sechs Testdateien fahren die Oberflaeche in einem echten Chromium
+        # hoch. tests/conftest.py findet den Browser dort, wo dieser Schritt
+        # ihn ablegt; einen festen Pfad gibt es nicht mehr.
+        run: python -m playwright install --with-deps chromium
+
+      - name: Tests
+        # Die Suite sperrt echte Netzwerkverbindungen. Sie braucht also weder
+        # einen API-Key noch Netz - und kann in CI nichts kosten.
+        run: pytest -q
+
+      - name: Rauchtest
+        # Faehrt die App gegen eine temporaere Datenbank hoch und geht den
+        # ganzen Weg einmal durch. Fake-Anbieter, kein echter Modellaufruf.
+        run: python -m scripts.smoke
+
+      - name: Migration ist idempotent
+        # Zweimal migrieren darf nichts kaputtmachen. Faellt hier auf, bevor
+        # es jemandem die eigene Datenbank zerlegt.
+        run: |
+          python -m scripts.migrate --dry-run
+          python -m scripts.migrate --dry-run
+
+      - name: Backup und Restore
+        # Ein Restore, der nie eingespielt wurde, ist kein Backup (DoD 4).
+        # Der Rauchtest laeuft gegen eine temporaere Datenbank - hier braucht
+        # es deshalb eine echte Datei.
+        run: |
+          python - <<'PY'
+          from core import db
+          from core.config import get_settings
+
+          pfad = get_settings().db_path
+          conn = db.connect(pfad)
+          db.init_db(conn)
+          conn.close()
+          db.add_message(pfad, "user", "CI-Zeile")
+          print("Datenbank angelegt:", pfad)
+          PY
+          python -m scripts.backup sichern data/ci-backup.db
+          python -m scripts.backup pruefen data/ci-backup.db
+          python -m scripts.backup einspielen data/ci-backup.db --force

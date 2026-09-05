@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>__ASSISTENT_NAME__ · Weltlage</title>
+<!-- Als data-URL eingebettet, genau wie in index.html: sonst fragt der
+     Browser /favicon.ico an und bekommt einen 404 in die Konsole. Der
+     tauchte in der Abnahme A6 als einziger Fehler auf. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20rx%3D%226%22%20fill%3D%22%230a0a0c%22/%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23f0b45c%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223.2%22/%3E%3Cpath%20d%3D%22M12%202.6v3.2M12%2018.2v3.2M2.6%2012h3.2M18.2%2012h3.2%22/%3E%3C/g%3E%3C/svg%3E">
+
+<!-- Import-Map mit fester Version. Lokal statt CDN: die Seite soll ohne Netz
+     laufen, und ohne Netz ist ein CDN eine leere Flaeche. -->
+<script type="importmap">
+{ "imports": { "three": "/static/vendor/three.module.js" } }
+</script>
+
+<!-- FIX-06 Abschnitt 5: dieselbe Palette wie index.html, aus einer Datei.
+     Muss VOR dem eigenen <style> stehen und vor globus.js, das seinen Block
+     zur Laufzeit ans Ende von <head> haengt. -->
+<link rel="stylesheet" href="/static/system.css">
+
+<style>
+/* Nur noch die Seite selbst. Kopf, Karten, Ortspanel, Statusleiste und der
+   ganze Globus stecken seit FIX-05 Schritt B in `static/globus.js` -
+   derselben Datei, die `index.html` als fuenften Tab laedt. Zwei Kopien
+   waeren zwei Orte fuer jeden Fehler. */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  /* Farben und Schrift kommen aus static/system.css. Diese zwei Zeilen
+     malen den Grund, BEVOR globus.js ueberhaupt geladen ist - ohne sie
+     blitzt beim Aufruf kurz Weiss auf. */
+  background:var(--grund); color:var(--text);
+  font:15px/1.55 var(--schriftfamilie);
+  /* Kein Scrollbalken, nirgends. */
+  overflow:hidden;
+}
+/* Hier IST der Globus die Seite, also haengt er am Fenster. In index.html
+   ist er ein Tab und fuellt seinen Behaelter - deshalb steht das `fixed`
+   an dieser Stelle und nicht in globus.js. Der Selektor ist eine ID und
+   gewinnt damit gegen das `position:relative`, das `.globus-wurzel`
+   mitbringt. */
+#welt{position:fixed;inset:0}
+.ersatz{position:fixed;inset:0;display:grid;place-items:center;padding:2rem;
+        text-align:center;color:var(--text-leise)}
+</style>
+</head>
+<body>
+
+<div id="welt"></div>
+<noscript><div class="ersatz">Für den Globus wird JavaScript gebraucht.</div></noscript>
+
+<script type="module">
+/* Der Token wird beim Ausliefern eingesetzt - api/routes.py, die Route
+   weltlage_seite(). Er muss HIER stehen und nicht in `static/globus.js`:
+   /static geht durch einen StaticFiles-Mount (api/app.py, die Zeile mit
+   app.mount("/static", ...)), und dort ersetzt niemand etwas. Stuende der
+   Platzhalter in der Modul-Datei, ginge jeder API-Aufruf mit
+   `__JARVIS_TOKEN__` raus und bekaeme 401.
+
+   Verknuepfungspruefung 31.08.2026, Fund 3: hier standen statt der Namen
+   zwei Zeilennummern, eine fuer die Route und eine fuer den Mount. Beide
+   zeigten woanders hin - die Route steht laengst rund zweihundert Zeilen
+   weiter unten, und die Mount-Nummer traf einen Absatz ueber
+   Copernicus-Konten. Namen verrutschen nicht, Nummern schon. */
+
+/* Verknuepfungspruefung 31.08.2026, Fund 2.
+
+   WAS war falsch: hier stand ein statisches `import { starte } from
+   '/static/globus.js'` und darunter ein `starte(...)` ohne jeden
+   Fehlerzweig.
+
+   WARUM ist das falsch: `globus.js` importiert selbst `three`, und das sind
+   zwei Brocken von zusammen rund 2 MB. Faellt einer davon aus, scheitert
+   schon das Auswerten dieses Moduls - der Rumpf laeuft nie, und kein
+   `try`/`catch` in ihm kann greifen. Das `<noscript>` oben hilft auch
+   nicht: es zeigt nur, wenn JavaScript ganz aus ist. Der Nutzer sah eine
+   schwarze Flaeche, die von den zwei Zeilen im eigenen <style> gemalt wird -
+   ohne Meldung, und da diese Seite kein einziges <a href> fuehrt, auch ohne
+   Weg weiter. Gemessen mit blockiertem /static/vendor/three.module.js:
+   `document.body.innerText` war die leere Zeichenkette, in der Konsole
+   stand ein einzelnes "Failed to load resource: net::ERR_FAILED".
+   `index.html` behandelt denselben Ausfall seit jeher und schreibt
+   "Globus nicht geladen: ..." in die Ansicht - zwei Verhalten fuer
+   denselben Fehler.
+
+   Deshalb: der Import ist jetzt dynamisch. Erst damit ist der Fehlschlag
+   ein abfangbares abgelehntes Promise statt eines toten Moduls, und
+   derselbe `.catch` deckt beides ab - den Import UND das spaetere
+   `starte()`. Angezeigt wird der `.ersatz`-Kasten, den die Seite fuer
+   `<noscript>` schon definiert hat. */
+function zeigeAusfall(grund){
+  const kasten = document.createElement('div');
+  kasten.className = 'ersatz';
+  kasten.textContent =
+    'Der Globus konnte nicht geladen werden: ' + grund
+    + ' — bitte die Seite neu laden.';
+  // An den Koerper, nicht in #welt: liegt dort schon ein halb aufgebauter
+  // Globus, deckt der Kasten ihn ab, statt sich dahinter zu verstecken.
+  document.body.appendChild(kasten);
+}
+
+import('/static/globus.js')
+  .then(modul => modul.starte(document.getElementById('welt'), '__JARVIS_TOKEN__',
+                              { hoeren: true, name: '__ASSISTENT_NAME__' }))
+  .catch(fehler => zeigeAusfall(
+    fehler && fehler.message ? fehler.message : String(fehler)));
+</script>
+</body>
+</html>

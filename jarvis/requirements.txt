@@ -1,0 +1,51 @@
+# JARVIS. Der Stack steht in CLAUDE.md und wird nicht verhandelt.
+#
+# Kein anthropic-SDK: httpx ist als HTTP-Client festgelegt, und der Provider
+# spricht die dokumentierte Messages-API direkt. Wenn das SDK doch rein soll,
+# ist das eine Stack-Aenderung und gehoert vorher besprochen.
+fastapi>=0.115
+uvicorn[standard]>=0.30
+httpx>=0.27
+pydantic-settings>=2.4
+
+# Zum Testen. Kein pytest-asyncio noetig - tests/conftest.py hat ein
+# run()-Helferlein.
+pytest>=8.0
+
+# Die drei standen hier NICHT, obwohl die Suite sie braucht - gefunden bei
+# der Verknuepfungspruefung am 29.08.2026. Sie fehlten unbemerkt, weil die
+# Tests sie ueber `pytest.importorskip` holen: ohne sie werden die
+# betroffenen Tests still UEBERSPRUNGEN statt rot. Ein "alles gruen" auf
+# einer frischen Installation haette dann sechs Testdateien gar nicht
+# ausgefuehrt.
+#
+# playwright braucht ausserdem einen Browser. In dieser Umgebung liegt er
+# unter /opt/pw-browsers; auf einer neuen Maschine holt ihn
+# `playwright install chromium`.
+playwright>=1.40      # 6 Testdateien: der Globus und beide Oberflaechen
+Pillow>=10.0          # tests/test_satellitenbild.py: prueft echte PNG-Bytes
+PyYAML>=6.0           # liest das Frontmatter der Skills in .claude/skills/
+
+# Der Vault-Index braucht keine eigene Abhaengigkeit. Hier stand watchdog,
+# solange der Ordner im Hintergrund beobachtet wurde. Seit FIX-04 Schritt 3
+# zieht core.gedaechtnis.frisch_halten beim Lesen nach - mit pathlib und
+# stdlib-sqlite3, ohne Thread und ohne Paket ausserhalb von CLAUDE.md:31.
+
+# ---- Stack-Aenderung, ausdruecklich freigegeben --------------------------
+#
+# CLAUDE.md legt den Stack fest und `skyfield` stand nicht darin. Noah hat
+# es am 26.08.2026 zugesagt, fuer PHASE-08 DoD 5: Satellitenueberfluege aus
+# echten TLE-Bahndaten, mit skyfield gerechnet statt geschaetzt.
+#
+# Der Preis, damit er nicht spaeter ueberrascht: skyfield zieht numpy
+# (~17 MB), sgp4 und jplephem mit. Das ist die groesste Abhaengigkeit im
+# Projekt - und die einzige, die nicht reines Python ist.
+#
+# Nicht dabei ist eine Ephemeriden-Datei (de421.bsp, ~16 MB Download).
+# Deshalb wird die Geometrie der Ueberfluege gerechnet, aber NICHT, ob man
+# sie mit blossem Auge sieht - dafuer braeuchte es Sonnenstand und
+# Erdschatten. Was nicht gerechnet wird, wird auch nicht behauptet.
+#
+# Version festgenagelt: eine neue Minor-Version koennte still das
+# Ereignisverhalten von find_events aendern.
+skyfield==1.55
