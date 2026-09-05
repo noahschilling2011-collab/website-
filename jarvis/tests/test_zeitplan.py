@@ -694,12 +694,19 @@ def test_fund1_schleife_und_knopf_starten_denselben_plan_nur_einmal(settings, mo
             _faellig_seit(settings.db_path, plan["id"], 10)
 
             async def beide():
+                from api.zeitplan import laufende
                 async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),
                                              base_url="http://t") as hc:
                     r, proto = await asyncio.gather(
                         hc.post(f"/api/zeitplaene/{plan['id']}/jetzt", headers=TOKEN),
                         runde(app))
-                await asyncio.sleep(0.2)
+                # Auf das ENDE des Laufs warten, nicht eine feste Zeit: auf dem
+                # CI-Runner war der vorige Lauf nach 0,2 s noch nicht aufgeraeumt,
+                # und die naechste Runde sah "ein anderer Zeitplan laeuft gerade".
+                for _ in range(500):
+                    if not laufende(app):
+                        break
+                    await asyncio.sleep(0.02)
                 return r.status_code, proto
 
             code, proto = c.portal.call(beide)
