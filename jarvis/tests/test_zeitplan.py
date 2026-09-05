@@ -136,13 +136,17 @@ def test_taeglich_trifft_die_ortszeit_und_liegt_in_der_zukunft(ortszeit):
 
 
 def test_taeglich_heute_wenn_die_uhrzeit_noch_kommt(ortszeit):
-    jetzt_lokal = datetime.now().astimezone().replace(second=0, microsecond=0)
-    spaeter = jetzt_lokal + timedelta(minutes=5)
-    if spaeter.date() != jetzt_lokal.date():
-        spaeter = jetzt_lokal   # kurz vor Mitternacht: dann eben morgen
-    regel = zeitplan.lies_regel(f"taeglich {spaeter.hour:02d}:{spaeter.minute:02d}")
+    """Mit festem "jetzt" (10:00 Ortszeit) statt der echten Uhr: in der CI
+    lief dieser Test um 23:56 Ortszeit (Asia/Kolkata) und bekam "morgen",
+    weil 5 Minuten spaeter schon der naechste Tag war."""
+    jetzt_lokal = datetime.now().astimezone().replace(hour=10, minute=0, second=0, microsecond=0)
+    regel = zeitplan.lies_regel("taeglich 10:05")
     naechster = zeitplan._aus_z(zeitplan.naechster_lauf(regel, ab=jetzt_lokal))
-    assert naechster - jetzt_lokal <= timedelta(minutes=5)
+    assert naechster - jetzt_lokal == timedelta(minutes=5)
+    # Und wenn die Uhrzeit heute schon vorbei ist: morgen, nicht sofort.
+    regel = zeitplan.lies_regel("taeglich 09:55")
+    naechster = zeitplan._aus_z(zeitplan.naechster_lauf(regel, ab=jetzt_lokal))
+    assert timedelta(hours=23) <= naechster - jetzt_lokal <= timedelta(hours=25)
 
 
 def test_stundentakt_zaehlt_ab_dem_letzten_lauf_und_holt_nicht_nach():
