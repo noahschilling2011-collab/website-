@@ -833,7 +833,7 @@ def test_fund8_zeitstempel_stehen_in_ortszeit(server):
 
             # Stelle 3: die Auftragskarten.
             seite.click("#tab-tasks")
-            seite.wait_for_selector("#view-tasks .karte", timeout=20000)
+            seite.wait_for_selector("#view-tasks .auftraege .karte", timeout=20000)
             auftraege = seite.inner_text("#view-tasks")
             assert ORTSDATUM in auftraege, auftraege
             assert ORTSZEIT in auftraege, auftraege
