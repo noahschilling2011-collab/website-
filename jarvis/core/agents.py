@@ -35,7 +35,7 @@ SPRACHMODUS: Deine Antwort wird VORGELESEN, nicht gelesen.
 - Wenn die vollstaendige Antwort laenger waere: gib die Kernaussage und sag,
   dass die Einzelheiten im Text stehen."""
 
-RECHERCHE_PROMPT = """Du bist der Research Agent von JARVIS.
+RECHERCHE_PROMPT = """Du bist der Research Agent von {name}.
 
 Du beantwortest genau den Arbeitsschritt, den du bekommst - nicht mehr.
 
@@ -60,7 +60,7 @@ REGELN, die deine Arbeit ungueltig machen, wenn du sie brichst:
 
 Antworte knapp und in Prosa. Am Ende eine Zeile "Quellen:" mit den URLs."""
 
-WELTLAGE_PROMPT = """Du bist der Weltlage-Agent von JARVIS.
+WELTLAGE_PROMPT = """Du bist der Weltlage-Agent von {name}.
 
 Du lieferst hoechstens 5 belegte Meldungen zu einem Land oder zur Weltlage.
 
@@ -111,7 +111,7 @@ Antworte AUSSCHLIESSLICH mit JSON in genau dieser Form:
 "gesagt": "ein Satz fuer die Statusleiste"}"""
 
 
-SATELLIT_PROMPT = """Du bist der Satellite Agent von JARVIS.
+SATELLIT_PROMPT = """Du bist der Satellite Agent von {name}.
 
 Du arbeitest mit frei verfuegbaren Erdbeobachtungsdaten. Deine wichtigste
 Eigenschaft ist, dass du weisst, was du NICHT sehen kannst.
@@ -156,7 +156,7 @@ GRENZE     <was bei dieser Aufloesung nicht beurteilbar ist>
 Du beobachtest keine Grundstuecke und keine Personen. Wenn danach gefragt
 wird, lehnst du ab und erklaerst kurz warum."""
 
-HERMES_PROMPT = """Du bist Hermes, der Orchestrator von JARVIS.
+HERMES_PROMPT = """Du bist Hermes, der Orchestrator von {name}.
 
 Du erledigst deinen Schritt, indem du Teilauftraege an andere Agenten gibst -
 mit `ask_agent`. Du recherchierst nicht selbst; dafuer gibt es `research`.
@@ -173,7 +173,17 @@ REGELN:
 
 Antworte knapp und in Prosa."""
 
-STANDARD_PROMPT = """Du bist JARVIS und erledigst genau einen Arbeitsschritt.
+# FIX-09: wie der Assistent heisst. Wird beim App-Start aus ASSISTENT_NAME
+# gesetzt (api/app.py) und in jeden Prompt eingesetzt, in dem {name} steht.
+# Modulweit statt als Parameter, damit keine der Signaturen hier wandert.
+ASSISTENT_NAME = "JARVIS"
+
+
+def mit_name(prompt: str) -> str:
+    return prompt.replace("{name}", ASSISTENT_NAME)
+
+
+STANDARD_PROMPT = """Du bist {name} und erledigst genau einen Arbeitsschritt.
 
 Benutze deine Werkzeuge, statt zu raten. Rechne nie im Kopf - dafuer gibt es
 calculator. Rate keine Uhrzeit - dafuer gibt es clock.
@@ -411,7 +421,7 @@ def baue_agenten(
         in `core/satellite/policy.py`: eine Regel, die vom Tagesform eines
         Modells abhaengt, ist keine Regel.
         """
-        return f"{heute_zeile()}\n\n{prompt}{antwortstil}"
+        return f"{heute_zeile()}\n\n{mit_name(prompt)}{antwortstil}"
 
     hermes = ToolAgent(
         provider,
@@ -463,7 +473,7 @@ def baue_agenten(
             ),
             # Ohne Sprachstil (die Antwort ist JSON), aber MIT Datum -
             # eine Nachrichtenlage ohne heutiges Datum ist wertlos.
-            system_prompt=f"{heute_zeile()}\n\n{WELTLAGE_PROMPT}",  # ohne Sprachstil:
+            system_prompt=f"{heute_zeile()}\n\n{mit_name(WELTLAGE_PROMPT)}",  # ohne Sprachstil:
                                                 # die Antwort ist JSON, kein Fliesstext
             tools=["wiki_lokal", "wiki_live", "wikidata", "web_search", "fetch_url"],
             max_permission=Permission.READ,
@@ -523,8 +533,10 @@ def baue_agenten(
             # FIX-07: datei_suchen, datei_lesen und kalender kommen dazu.
             # `max_permission` bleibt unveraendert - die drei sind READ, und
             # SENSITIVE bleibt zu.
+            # FIX-09: wetter (READ, ohne Key) und erinnerung_anlegen (LOCAL).
             tools=["clock", "calculator", "recall", "remember", "send_email",
-                   "datei_suchen", "datei_lesen", "kalender"],
+                   "datei_suchen", "datei_lesen", "kalender",
+                   "wetter", "erinnerung_anlegen"],
             max_permission=max_permission,
             on_reply=on_reply,
             on_call=on_call,

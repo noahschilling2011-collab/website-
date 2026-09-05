@@ -115,6 +115,16 @@ MINDEST_REST = 2_000
 
 _TAEGLICH = re.compile(r"^taeglich (\d{1,2}):(\d{2})$")
 _STUNDEN = re.compile(r"^alle (\d{1,3}) stunden?$")
+# FIX-09: einmalig. "einmal 2026-09-06 18:00" - das Wort "einmal" darf
+# fehlen, ein Datum mit Uhrzeit ist eindeutig genug.
+_EINMAL = re.compile(r"^(?:einmal )?(\d{4})-(\d{2})-(\d{2}) (\d{1,2}):(\d{2})$")
+
+# FIX-09: mehr Plaene als das braucht niemand - und ein Modell, das ueber
+# erinnerung_anlegen Plaene anlegt, soll nicht unbegrenzt welche erzeugen.
+MAX_PLAENE = 50
+# FIX-09: nach so vielen Fehlschlaegen in Folge pausiert ein Plan sich
+# selbst, mit Grund - statt jeden Morgen Planer-Token zu verbrennen.
+MAX_FEHLSCHLAEGE = 3
 
 
 class RegelUngueltig(ValueError):
@@ -123,16 +133,23 @@ class RegelUngueltig(ValueError):
 
 @dataclass(frozen=True)
 class Regel:
-    art: str            # 'taeglich' | 'stunden'
-    stunde: int = 0     # taeglich: 0..23
-    minute: int = 0     # taeglich: 0..59
+    art: str            # 'taeglich' | 'stunden' | 'einmal'
+    stunde: int = 0     # taeglich, einmal: 0..23
+    minute: int = 0     # taeglich, einmal: 0..59
     alle: int = 0       # stunden: 1..168
+    datum: str = ""     # einmal: JJJJ-MM-TT (Ortszeit)
 
     @property
     def text(self) -> str:
         if self.art == "taeglich":
             return f"taeglich {self.stunde:02d}:{self.minute:02d}"
+        if self.art == "einmal":
+            return f"einmal {self.datum} {self.stunde:02d}:{self.minute:02d}"
         return f"alle {self.alle} stunden"
+
+    @property
+    def einmalig(self) -> bool:
+        return self.art == "einmal"
 
 
 def lies_regel(roh: str) -> Regel:
@@ -161,9 +178,17 @@ def lies_regel(roh: str) -> Regel:
         if not (1 <= n <= 168):
             raise RegelUngueltig(f"'{roh}': zwischen 1 und 168 Stunden (eine Woche).")
         return Regel(art="stunden", alle=n)
+    m = _EINMAL.match(text)
+    if m:
+        j, mo, t, h, mi = (int(g) for g in m.groups())
+        try:
+            datetime(j, mo, t, h, mi)
+        except ValueError as exc:
+            raise RegelUngueltig(f"'{roh}': kein gueltiger Zeitpunkt ({exc}).") from exc
+        return Regel(art="einmal", stunde=h, minute=mi, datum=f"{j:04d}-{mo:02d}-{t:02d}")
     raise RegelUngueltig(
-        f"'{roh}' verstehe ich nicht. Erlaubt sind genau zwei Formen: "
-        f"'taeglich 07:00' oder 'alle 6 stunden'."
+        f"'{roh}' verstehe ich nicht. Erlaubt sind genau drei Formen: "
+        f"'taeglich 07:00', 'alle 6 stunden' oder 'einmal 2026-09-06 18:00'."
     )
 
 
@@ -186,6 +211,12 @@ def naechster_lauf(regel: Regel, ab: datetime | None = None,
     Stundentakt ein Takt und driftet nicht mit jeder Schleifenverzoegerung.
     """
     jetzt = (ab or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    if regel.art == "einmal":
+        # Ein fester Zeitpunkt in Ortszeit - ob er noch kommt, prueft
+        # `anlegen`; hier wird er nur umgerechnet.
+        j, mo, t = (int(x) for x in regel.datum.split("-"))
+        lokal = datetime(j, mo, t, regel.stunde, regel.minute).astimezone()
+        return _als_z(lokal)
     if regel.art == "taeglich":
         # Ortszeit des Rechners - dieselbe Zone wie die Kalenderanzeige.
         # Siehe den UNSICHER-Absatz im Modulkopf zur Zeitumstellung.
@@ -215,6 +246,13 @@ def anlegen(db_path: Path | str, *, name: str, ziel: str, regel_text: str) -> di
         raise ValueError("Ein Zeitplan braucht einen Namen.")
     if not ziel:
         raise ValueError("Ein Zeitplan braucht einen Auftragstext.")
+    termin = naechster_lauf(regel)
+    if regel.einmalig and termin <= utcnow():
+        raise RegelUngueltig(f"'{regel.text}' liegt in der Vergangenheit.")
+    with session(db_path) as conn:
+        anzahl = conn.execute("SELECT COUNT(*) FROM zeitplaene").fetchone()[0]
+    if anzahl >= MAX_PLAENE:
+        raise ValueError(f"Hoechstens {MAX_PLAENE} Zeitplaene. Loesche erst einen.")
     eintrag = {
         "id": uuid.uuid4().hex[:12],
         "name": name,
@@ -222,7 +260,7 @@ def anlegen(db_path: Path | str, *, name: str, ziel: str, regel_text: str) -> di
         "regel": regel.text,
         "aktiv": 1,
         "erstellt_am": utcnow(),
-        "naechster_lauf": naechster_lauf(regel),
+        "naechster_lauf": termin,
         "letzter_lauf": None,
         "letzter_task_id": None,
         "letzter_status": None,
@@ -270,11 +308,22 @@ def schalten(db_path: Path | str, zeitplan_id: str, aktiv: bool) -> dict | None:
         # Schon an: nichts anfassen. Sonst schiebt ein zweiter Klick (oder
         # ein zweiter Browser-Tab) einen faelligen Termin still auf morgen.
         return plan
-    naechster = naechster_lauf(lies_regel(plan["regel"])) if aktiv else None
+    regel = lies_regel(plan["regel"])
+    naechster = naechster_lauf(regel) if aktiv else None
+    if aktiv and regel.einmalig and naechster <= utcnow():
+        # Eine Erinnerung, deren Zeitpunkt vorbei ist, laesst sich nicht
+        # wieder einschalten - sie wuerde sofort als verpasst gebucht.
+        with session(db_path) as conn:
+            conn.execute("UPDATE zeitplaene SET letzter_status = ? WHERE id = ?",
+                         ("einmalig, Zeitpunkt vorbei", zeitplan_id))
+        return hole(db_path, zeitplan_id)
     with session(db_path) as conn:
+        # FIX-09: Einschalten setzt die Fehlschlaege zurueck - das ist der
+        # Weg, einen selbst pausierten Plan wieder laufen zu lassen.
         conn.execute(
-            "UPDATE zeitplaene SET aktiv = ?, naechster_lauf = ? WHERE id = ?",
-            (1 if aktiv else 0, naechster, zeitplan_id),
+            "UPDATE zeitplaene SET aktiv = ?, naechster_lauf = ?, "
+            "fehlschlaege = CASE WHEN ? THEN 0 ELSE fehlschlaege END WHERE id = ?",
+            (1 if aktiv else 0, naechster, 1 if aktiv else 0, zeitplan_id),
         )
     return hole(db_path, zeitplan_id)
 
@@ -320,12 +369,20 @@ def termin_weiter(db_path: Path | str, plan: dict, status: str,
     zeitpunkt = (jetzt or datetime.now(timezone.utc)).astimezone(timezone.utc)
     soll = _aus_z(plan["naechster_lauf"])
     with session(db_path) as conn:
-        cur = conn.execute(
-            "UPDATE zeitplaene SET naechster_lauf = ?, letzter_status = ? "
-            "WHERE id = ? AND naechster_lauf = ? AND aktiv = 1",
-            (naechster_lauf(regel, ab=zeitpunkt, letzter=soll), status,
-             plan["id"], plan["naechster_lauf"]),
-        )
+        if regel.einmalig:
+            # Erledigt heisst erledigt: kein naechster Termin, Plan aus.
+            cur = conn.execute(
+                "UPDATE zeitplaene SET naechster_lauf = NULL, aktiv = 0, letzter_status = ? "
+                "WHERE id = ? AND naechster_lauf = ? AND aktiv = 1",
+                (status, plan["id"], plan["naechster_lauf"]),
+            )
+        else:
+            cur = conn.execute(
+                "UPDATE zeitplaene SET naechster_lauf = ?, letzter_status = ? "
+                "WHERE id = ? AND naechster_lauf = ? AND aktiv = 1",
+                (naechster_lauf(regel, ab=zeitpunkt, letzter=soll), status,
+                 plan["id"], plan["naechster_lauf"]),
+            )
     return cur.rowcount > 0
 
 
@@ -368,9 +425,11 @@ def verpasste_termine(regel: Regel, soll: datetime, jetzt: datetime) -> int:
     Bei 'taeglich' ueber 24-Stunden-Schritte gerechnet - an einem
     Zeitumstellungstag kann das um einen danebenliegen (siehe UNSICHER im
     Modulkopf)."""
-    schritt = timedelta(days=1) if regel.art == "taeglich" else timedelta(hours=regel.alle)
     if jetzt < soll:
         return 0
+    if regel.einmalig:
+        return 1
+    schritt = timedelta(days=1) if regel.art == "taeglich" else timedelta(hours=regel.alle)
     return int((jetzt - soll) // schritt) + 1
 
 
@@ -385,27 +444,59 @@ def verbuche_verpasst(db_path: Path | str, plan: dict,
     zeitpunkt = (jetzt or datetime.now(timezone.utc)).astimezone(timezone.utc)
     soll = _aus_z(plan["naechster_lauf"])
     anzahl = verpasste_termine(regel, soll, zeitpunkt)
+    status = f"verpasst ({plan['naechster_lauf']}), nicht nachgeholt"
     with session(db_path) as conn:
-        cur = conn.execute(
-            "UPDATE zeitplaene SET verpasst = verpasst + ?, "
-            "letzter_status = ?, naechster_lauf = ? "
-            "WHERE id = ? AND naechster_lauf = ? AND aktiv = 1",
-            (anzahl,
-             f"verpasst ({plan['naechster_lauf']}), nicht nachgeholt",
-             naechster_lauf(regel, ab=zeitpunkt, letzter=soll),
-             plan["id"], plan["naechster_lauf"]),
-        )
+        if regel.einmalig:
+            cur = conn.execute(
+                "UPDATE zeitplaene SET verpasst = verpasst + ?, letzter_status = ?, "
+                "naechster_lauf = NULL, aktiv = 0 "
+                "WHERE id = ? AND naechster_lauf = ? AND aktiv = 1",
+                (anzahl, status, plan["id"], plan["naechster_lauf"]),
+            )
+        else:
+            cur = conn.execute(
+                "UPDATE zeitplaene SET verpasst = verpasst + ?, "
+                "letzter_status = ?, naechster_lauf = ? "
+                "WHERE id = ? AND naechster_lauf = ? AND aktiv = 1",
+                (anzahl, status, naechster_lauf(regel, ab=zeitpunkt, letzter=soll),
+                 plan["id"], plan["naechster_lauf"]),
+            )
     return cur.rowcount > 0
+
+
+FEHLSCHLAG = ("failed", "aborted_budget")
 
 
 def nachtrag_ergebnis(db_path: Path | str, task_id: str, status: str) -> None:
     """Wenn der Task fertig ist: den Ausgang an den Zeitplan schreiben, damit
-    die Liste 'done' oder 'failed' zeigt und nicht ewig 'laeuft'."""
+    die Liste 'done' oder 'failed' zeigt und nicht ewig 'laeuft'.
+
+    FIX-09, die Bremse: Fehlschlaege in Folge werden gezaehlt ('done' setzt
+    zurueck). Ab MAX_FEHLSCHLAEGE schaltet sich der Plan aus und sagt
+    warum - ein Plan, der jeden Morgen an einem fehlenden Kalender
+    scheitert, verbrennt sonst taeglich Planer-Token, und niemand merkt es.
+    Einschalten setzt den Zaehler zurueck (`schalten`).
+    """
     with session(db_path) as conn:
         conn.execute(
-            "UPDATE zeitplaene SET letzter_status = ? WHERE letzter_task_id = ?",
-            (status, task_id),
+            "UPDATE zeitplaene SET letzter_status = ?, "
+            "fehlschlaege = CASE WHEN ? THEN fehlschlaege + 1 "
+            "                    WHEN ? THEN 0 ELSE fehlschlaege END "
+            "WHERE letzter_task_id = ?",
+            (status, 1 if status in FEHLSCHLAG else 0, 1 if status == "done" else 0,
+             task_id),
         )
+        z = conn.execute(
+            "SELECT id, fehlschlaege, aktiv FROM zeitplaene WHERE letzter_task_id = ?",
+            (task_id,),
+        ).fetchone()
+        if z and z["aktiv"] and z["fehlschlaege"] >= MAX_FEHLSCHLAEGE:
+            conn.execute(
+                "UPDATE zeitplaene SET aktiv = 0, naechster_lauf = NULL, letzter_status = ? "
+                "WHERE id = ?",
+                (f"pausiert nach {z['fehlschlaege']} Fehlschlaegen in Folge ({status}). "
+                 f"Einschalten setzt den Zaehler zurueck.", z["id"]),
+            )
 
 
 ENDZUSTAENDE = ("done", "failed", "aborted_budget", "cancelled")

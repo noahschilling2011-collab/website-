@@ -151,7 +151,7 @@ def test_der_verlauf_geht_wirklich_ans_modell(client, fake):
 
 def test_systemprompt_wird_mitgeschickt(client, fake, settings):
     client.post("/api/chat", json={"message": "x"}, headers=TOKEN)
-    assert fake.calls[0]["system"] == settings.system_prompt
+    assert fake.calls[0]["system"] == settings.system_prompt_mit_name
 
 
 def test_verlaufsfenster_wird_eingehalten(client, fake, settings):

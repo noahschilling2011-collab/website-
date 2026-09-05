@@ -11,6 +11,7 @@ eine sichtbare Luecke.
 from __future__ import annotations
 
 from functools import lru_cache
+import re
 from pathlib import Path
 
 from pydantic import AliasChoices, Field, field_validator
@@ -18,8 +19,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
+# {name} wird beim Gebrauch durch ASSISTENT_NAME ersetzt (FIX-09): der
+# Assistent heisst, wie der Nutzer ihn nennt - das Projekt heisst JARVIS.
 DEFAULT_SYSTEM_PROMPT = (
-    "Du bist JARVIS, ein persoenliches Assistenzsystem. Du antwortest auf "
+    "Du bist {name}, ein persoenliches Assistenzsystem. Du antwortest auf "
     "Deutsch und duzt. Du fasst dich kurz und sagst klar, wenn du etwas nicht "
     "weisst, statt zu raten. Erfinde keine Fakten, keine Quellen und keine "
     "Zahlen."
@@ -154,6 +157,16 @@ class Settings(BaseSettings):
     # Schleife weckt den Prozess, und bei 1 Sekunde waere das ein Poller.
     zeitplan_takt_s: int = 60
 
+    # --- FIX-09 ---
+    # Wie der Assistent heisst. Noah, 05.09.2026: "nenn ihn Mehmet". Der
+    # Name steht in der Oberflaeche und in jedem Systemprompt; der Code und
+    # die Doku heissen weiter JARVIS.
+    assistent_name: str = "Mehmet"
+    # Der Ort fuer das Wetter-Werkzeug, wenn keiner genannt wird, und fuer
+    # die Vorlage "Morgenlage". Leer = das Werkzeug fragt nach einem Ort.
+    jarvis_ort: str = ""
+
+
     # --- Betrieb ---
     # 0.6: Timeout pro LLM-Call 60 s.
     llm_timeout_seconds: float = 60.0
@@ -202,6 +215,18 @@ class Settings(BaseSettings):
             raise ValueError("Zeitplan-Werte sind 0 oder groesser.")
         return value
 
+    @field_validator("assistent_name")
+    @classmethod
+    def _name_passt_in_die_seite(cls, value: str) -> str:
+        """Der Name wird roh in HTML und JavaScript eingesetzt. Buchstaben,
+        Ziffern, Leerzeichen, Punkt und Bindestrich - kein Anfuehrungszeichen,
+        keine spitze Klammer, hoechstens 40 Zeichen."""
+        wert = " ".join(str(value or "").split())
+        if not wert or len(wert) > 40 or not re.fullmatch(r"[\w .\-]+", wert):
+            raise ValueError("ASSISTENT_NAME: 1 bis 40 Zeichen, nur Buchstaben, Ziffern, "
+                             "Leerzeichen, Punkt und Bindestrich.")
+        return wert
+
     @field_validator("zeitplan_takt_s")
     @classmethod
     def _takt_im_rahmen(cls, value: int) -> int:
@@ -212,6 +237,11 @@ class Settings(BaseSettings):
         if value != 0 and not 10 <= value <= 300:
             raise ValueError("ZEITPLAN_TAKT_S ist 0 (aus) oder 10 bis 300 Sekunden.")
         return value
+
+    @property
+    def system_prompt_mit_name(self) -> str:
+        """Der Systemprompt mit dem eingesetzten Namen des Assistenten."""
+        return self.system_prompt.replace("{name}", self.assistent_name)
 
     @property
     def prices_configured(self) -> bool:

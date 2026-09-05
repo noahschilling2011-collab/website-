@@ -49,6 +49,8 @@ class MessageOut(BaseModel):
     content: str
     created_at: str
     tool_calls: list[ToolCallOut] = []
+    # FIX-09: None fuer getippte Nachrichten.
+    herkunft: dict | None = None
 
     @classmethod
     def of(
@@ -60,6 +62,7 @@ class MessageOut(BaseModel):
             content=message.content,
             created_at=message.created_at,
             tool_calls=[ToolCallOut.of(t) for t in (tool_calls or [])],
+            herkunft=getattr(message, "herkunft", None),
         )
 
 

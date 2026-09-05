@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>JARVIS</title>
+<title>__ASSISTENT_NAME__</title>
 
 <!-- Nur die Zuordnung, KEIN Import. Three.js sind 2,0 MB
      (three.module.js 635 KB + three.core.js 1410 KB); statisch geladen
@@ -767,6 +767,27 @@ button, input, textarea { font: inherit; color: inherit; }
 .zustand.is-failed, .zustand.is-aborted_budget { color: var(--danger); border-color: rgba(242,114,107,0.4); }
 .zustand.is-running, .zustand.is-pending { color: var(--accent); border-color: var(--accent-line); }
 
+/* --- Herkunft und Zustellung (FIX-09) ------------------------------------ */
+.herkunft {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  margin: 0 0 4px;
+}
+.msg.is-zeitplan > .bubble { border-left: 2px solid var(--accent-line); }
+.tab .badge {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
 /* --- Zeitpläne (FIX-08) --------------------------------------------------
    Nur vorhandene Tokens, keine neue Dauer, keine neue Farbe: die Guards in
    tests/test_designsystem.py lesen diesen Block mit. */
@@ -1159,7 +1180,7 @@ button, input, textarea { font: inherit; color: inherit; }
 
 <div class="app">
   <header class="topbar glass">
-    <span class="brand-mark" role="img" aria-label="JARVIS ist bereit">
+    <span class="brand-mark" role="img" aria-label="__ASSISTENT_NAME__ ist bereit">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
            style="overflow: visible">
@@ -1182,7 +1203,7 @@ button, input, textarea { font: inherit; color: inherit; }
                 style="transform-origin: 12px 12px; opacity: 0"></circle>
       </svg>
     </span>
-    <h1 class="brand-name">JARVIS</h1>
+    <h1 class="brand-name">__ASSISTENT_NAME__</h1>
     <span class="brand-phase" id="brand-phase"></span>
     <nav class="tabs" role="tablist">
       <button class="tab" id="tab-cc" role="tab" aria-selected="true">Center</button>
@@ -1262,6 +1283,10 @@ button, input, textarea { font: inherit; color: inherit; }
   // Wird beim Ausliefern vom Backend eingesetzt. Das ist der JARVIS-Token,
   // nicht der Modell-Key — der verlässt das Backend nie (0.4.1).
   var TOKEN = '__JARVIS_TOKEN__';
+  // FIX-09: wie der Assistent heisst (ASSISTENT_NAME). Wird wie der Token
+  // beim Ausliefern eingesetzt; der Server laesst nur Buchstaben, Ziffern,
+  // Leerzeichen, Punkt und Bindestrich durch.
+  var NAME = '__ASSISTENT_NAME__';
 
   // Zustand lebt in Variablen, nicht in localStorage: in manchen Umgebungen
   // ist die API nicht verfügbar und die Seite stürbe an der ersten Zeile.
@@ -1622,9 +1647,19 @@ button, input, textarea { font: inherit; color: inherit; }
     return details;
   }
 
-  function messageNode(role, content, toolCalls) {
+  function messageNode(role, content, toolCalls, herkunft) {
     var wrap = document.createElement('div');
     wrap.className = 'msg msg-' + role;
+    // FIX-09: was ein Zeitplan angestossen hat, sieht nicht aus wie getippt.
+    if (herkunft && herkunft.art === 'zeitplan') {
+      wrap.classList.add('is-zeitplan');
+      var marke = document.createElement('div');
+      marke.className = 'herkunft';
+      marke.textContent = (role === 'user' ? 'Zeitplan „' : 'Ergebnis von „')
+        + (herkunft.zeitplan_name || 'Zeitplan') + '“'
+        + (role === 'user' ? ' hat das angestoßen' : '');
+      wrap.appendChild(marke);
+    }
     var bubble = document.createElement('div');
     bubble.className = 'bubble';
     // textContent, niemals innerHTML: der Inhalt kommt aus einem Modell.
@@ -1668,7 +1703,7 @@ button, input, textarea { font: inherit; color: inherit; }
     bubble.className = 'bubble';
     var dots = document.createElement('span');
     dots.className = 'typing';
-    dots.setAttribute('aria-label', 'JARVIS denkt nach');
+    dots.setAttribute('aria-label', NAME + ' denkt nach');
     for (var i = 0; i < 3; i++) dots.appendChild(document.createElement('i'));
     bubble.appendChild(dots);
     wrap.appendChild(bubble);
@@ -1705,16 +1740,16 @@ button, input, textarea { font: inherit; color: inherit; }
           : (reaktorFertig ? 'fertig' : 'ruhe')))));
     if (mark.dataset.zustand === z) return;   // sonst startet jede
     mark.dataset.zustand = z;                 // Animation bei jedem Ereignis neu
-    mark.setAttribute('aria-label', REAKTOR_TEXT[z] || 'JARVIS');
+    mark.setAttribute('aria-label', REAKTOR_TEXT[z] || NAME);
   }
 
   var REAKTOR_TEXT = {
-    ruhe:     'JARVIS ist bereit',
-    wartet:   'JARVIS wartet auf deine Bestätigung',
-    denkt:    'JARVIS denkt nach',
-    werkzeug: 'JARVIS benutzt ein Werkzeug',
-    hoert:    'JARVIS hört zu',
-    spricht:  'JARVIS spricht',
+    ruhe:     NAME + ' ist bereit',
+    wartet:   NAME + ' wartet auf deine Bestätigung',
+    denkt:    NAME + ' denkt nach',
+    werkzeug: NAME + ' benutzt ein Werkzeug',
+    hoert:    NAME + ' hört zu',
+    spricht:  NAME + ' spricht',
     fehl:     'Der letzte Auftrag ist fehlgeschlagen',
     fertig:   'Der Auftrag ist fertig'
   };
@@ -1728,14 +1763,67 @@ button, input, textarea { font: inherit; color: inherit; }
     reaktorZustand();
   }
 
+  // --- Seit du weg warst (FIX-09) -----------------------------------------
+  //
+  // Ergebnisse von Zeitplaenen landen im Chat. Wer nicht hinsieht, bekommt
+  // eine Zahl am Chat-Tab: wie viele Antworten von Zeitplaenen seit dem
+  // letzten Blick dazugekommen sind. Gemerkt wird die letzte gesehene
+  // Nachricht im Browser (localStorage) - ein Komfort, keine Wahrheit; ohne
+  // Speicher zaehlt die Seite einfach ab dem Neuladen.
+
+  function gelesenBis() {
+    try { return parseInt(localStorage.getItem('jarvis.gelesenBis') || '0', 10) || 0; }
+    catch (e) { return 0; }
+  }
+
+  function merkeGelesen(id) {
+    try { localStorage.setItem('jarvis.gelesenBis', String(id)); } catch (e) { /* egal */ }
+  }
+
+  function zeigeUngelesen(anzahl) {
+    var tab = document.getElementById('tab-chat');
+    var alt = tab.querySelector('.badge');
+    if (alt) alt.remove();
+    if (!anzahl) { tab.removeAttribute('title'); return; }
+    var b = document.createElement('span');
+    b.className = 'badge';
+    b.textContent = String(anzahl);
+    b.setAttribute('aria-label', anzahl + ' neue Ergebnisse von Zeitplänen');
+    tab.appendChild(b);
+    tab.title = anzahl + ' neue Ergebnisse von Zeitplänen seit deinem letzten Blick';
+  }
+
   function loadHistory() {
     return api('/api/messages').then(function (messages) {
-      if (!messages || !messages.length) { showEmpty(); return; }
+      if (!messages || !messages.length) { showEmpty(); zeigeUngelesen(0); return; }
       el.thread.textContent = '';
+      var bis = gelesenBis(), neu = 0, letzte = 0;
       messages.forEach(function (m) {
-        el.thread.appendChild(messageNode(m.role, m.content, m.tool_calls));
+        el.thread.appendChild(messageNode(m.role, m.content, m.tool_calls, m.herkunft));
+        if (m.herkunft && m.role === 'assistant' && m.id > bis) neu += 1;
+        if (m.id > letzte) letzte = m.id;
       });
       scrollDown();
+      if (aktiveAnsicht === 'chat') { merkeGelesen(letzte); zeigeUngelesen(0); }
+      else zeigeUngelesen(neu);
+    });
+  }
+
+  // Ein Strom fuer die Zustellung: sobald ein Zeitplan-Auftrag fertig ist,
+  // holt der Chat den Verlauf neu (wenn er offen ist) oder zaehlt hoch.
+  var zustellStrom = null;
+  function zustellungStarten() {
+    if (zustellStrom) return;
+    zustellStrom = ereignisStrom(function (typ, daten) {
+      if (typ !== 'task' || !daten.final || !daten.herkunft) return;
+      if (aktiveAnsicht === 'chat') loadHistory().catch(function () {});
+      else {
+        var tab = document.getElementById('tab-chat');
+        var alt = tab.querySelector('.badge');
+        zeigeUngelesen((alt ? parseInt(alt.textContent, 10) || 0 : 0) + 1);
+      }
+    }, function () { zustellStrom = null; }, function () {
+      if (aktiveAnsicht === 'chat') loadHistory().catch(function () {});
     });
   }
 
@@ -1885,7 +1973,7 @@ button, input, textarea { font: inherit; color: inherit; }
 
     var kopf = document.createElement('div');
     kopf.className = 'frage-kopf';
-    kopf.textContent = 'JARVIS möchte ' + frage.tool + ' ausführen';
+    kopf.textContent = NAME + ' möchte ' + frage.tool + ' ausführen';
     var stufe = document.createElement('span');
     stufe.className = 'frage-stufe';
     stufe.textContent = frage.permission;
@@ -2560,6 +2648,8 @@ button, input, textarea { font: inherit; color: inherit; }
       if (globusModul) globusModul.pausiere();
     }
     if (ANSICHTEN[name].laden) ANSICHTEN[name].laden();
+    // FIX-09: wer den Chat ansieht, hat die Ergebnisse gesehen.
+    if (name === 'chat' && vorher !== 'chat') loadHistory().catch(function () {});
   }
 
   Object.keys(ANSICHTEN).forEach(function (k) {
@@ -2689,7 +2779,7 @@ button, input, textarea { font: inherit; color: inherit; }
 
     var hinweis = document.createElement('p');
     hinweis.className = 'zeitplan-hinweis';
-    hinweis.textContent = 'JARVIS wiederholt einen Auftrag von selbst. Höchstens lokal '
+    hinweis.textContent = NAME + ' wiederholt einen Auftrag von selbst. Höchstens lokal '
       + '(keine Mail, kein Termin — niemand ist da, um zu bestätigen), ein Tagesdeckel '
       + 'für alle Pläne zusammen, verpasste Läufe werden nicht nachgeholt.';
     box.appendChild(hinweis);
@@ -2715,7 +2805,7 @@ button, input, textarea { font: inherit; color: inherit; }
     form.className = 'zeitplan-form';
     var felder = {};
     [['name', 'Name des Zeitplans', 'Name, z. B. Morgenlage', 80],
-     ['regel', 'Regel', 'taeglich 07:00 oder alle 6 stunden', 40],
+     ['regel', 'Regel', 'taeglich 07:00 · alle 6 stunden · einmal 2026-09-06 18:00', 40],
      ['ziel', 'Auftrag', 'Was JARVIS jedes Mal tun soll', 10000]].forEach(function (f) {
       var input = document.createElement('input');
       input.name = f[0];
@@ -2732,6 +2822,27 @@ button, input, textarea { font: inherit; color: inherit; }
     knopf.type = 'submit';
     knopf.textContent = 'Zeitplan anlegen';
     form.appendChild(knopf);
+    // FIX-09: eine Vorlage, die nur aus Bausteinen besteht, die wirklich
+    // eingerichtet sind - der Server weiss, was fehlt.
+    var vorlage = document.createElement('button');
+    vorlage.type = 'button';
+    vorlage.className = 'zeitplan-knopf';
+    vorlage.textContent = 'Vorlage: Morgenlage';
+    vorlage.addEventListener('click', function () {
+      vorlage.disabled = true;
+      api('/api/zeitplaene/vorlagen').then(function (liste) {
+        var v = (liste || [])[0];
+        if (!v) { sag('Keine Vorlage verfügbar.', true); return; }
+        felder.name.value = v.name;
+        felder.regel.value = v.regel;
+        felder.ziel.value = v.ziel;
+        falte.open = true;
+        sag('Vorlage eingesetzt. ' + (v.hinweis || '') + ' Prüfen, dann „Zeitplan anlegen“.');
+        felder.ziel.focus();
+      }).catch(function (err) { sag(err.message, true); })
+        .then(function () { vorlage.disabled = false; });
+    });
+    form.appendChild(vorlage);
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       if (knopf.disabled) return;
@@ -2823,6 +2934,7 @@ button, input, textarea { font: inherit; color: inherit; }
     name.textContent = p.name;
     kopf.appendChild(name);
     kopf.appendChild(zustandPille(p.aktiv ? 'aktiv' : 'aus', ''));
+    if ((p.regel || '').indexOf('einmal ') === 0) kopf.appendChild(zustandPille('einmalig', ''));
     var regel = document.createElement('span');
     regel.className = 'zeitplan-regel';
     regel.textContent = p.regel;
@@ -2856,6 +2968,13 @@ button, input, textarea { font: inherit; color: inherit; }
       zeile.appendChild(zustandPille(st, st));
     } else if (st.indexOf('verpasst') === 0) {
       zeile.appendChild(zustandPille('verpasst', 'verpasst'));
+    } else if (st.indexOf('pausiert') === 0) {
+      // FIX-09: die Bremse. Der Grund steht dabei, der Weg zurück ist "An".
+      zeile.appendChild(zustandPille('pausiert', 'uebersprungen'));
+      var warum = document.createElement('span');
+      warum.className = 'zeitplan-grund';
+      warum.textContent = st;
+      zeile.appendChild(warum);
     } else if (st) {
       var ist = st.indexOf('uebersprungen: ') === 0;
       zeile.appendChild(zustandPille(ist ? 'übersprungen' : 'fehlgeschlagen', 'uebersprungen'));
@@ -3090,7 +3209,7 @@ button, input, textarea { font: inherit; color: inherit; }
     // ohne Ausnahme (tests/test_api.py::test_seite_setzt_niemals_innerhtml),
     // und eine Ausnahme "nur diesmal" ist genau die, die spaeter jemand
     // kopiert und mit einer Modellantwort fuellt.
-    marke.appendChild(document.createTextNode('JARVIS '));
+    marke.appendChild(document.createTextNode(NAME + ' '));
     var strich = document.createElement('b');
     strich.textContent = '//';
     marke.appendChild(strich);
@@ -3749,6 +3868,7 @@ button, input, textarea { font: inherit; color: inherit; }
   reaktorZustand();
   loadHealth();
   loadHistory().catch(function (err) { appendError(err.message); });
+  zustellungStarten();
 })();
 </script>
 </body>

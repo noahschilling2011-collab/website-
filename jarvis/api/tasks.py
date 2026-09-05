@@ -255,6 +255,7 @@ async def starte_task(app: FastAPI, ziel: str, *, voice: bool = False,
                       budget: TaskBudget | None = None,
                       task: Task | None = None,
                       unbeaufsichtigt: bool = False,
+                      herkunft: dict[str, Any] | None = None,
                       ) -> Task:
     """Legt einen Task an und startet ihn im Hintergrund.
 
@@ -276,6 +277,12 @@ async def starte_task(app: FastAPI, ziel: str, *, voice: bool = False,
     erzeugt), gibt seinen Task mit. Sein Budget wird genauso gedeckelt.
 
     `unbeaufsichtigt`: siehe `baue_laufzeit`.
+
+    `herkunft` (FIX-09): woher der Auftrag kommt, z. B.
+    {"art": "zeitplan", "zeitplan_id": ..., "zeitplan_name": ...}. Steht
+    dann an beiden Nachrichten im Verlauf und im letzten Ereignis - sonst
+    saehe ein Zeitplan-Auftrag im Chat aus wie etwas, das der Nutzer
+    getippt hat.
     """
     settings = app.state.settings
     registry: TaskRegistry = app.state.tasks
@@ -301,7 +308,13 @@ async def starte_task(app: FastAPI, ziel: str, *, voice: bool = False,
     await asyncio.to_thread(db.save_task, settings.db_path, task)
     # Der Verlauf ist unabhaengig vom Task: was der Nutzer getippt hat, darf
     # auch dann nicht verloren gehen, wenn der Task scheitert.
-    await asyncio.to_thread(db.add_message, settings.db_path, "user", ziel)
+    frage = await asyncio.to_thread(db.add_message, settings.db_path, "user", ziel)
+    if herkunft:
+        await asyncio.to_thread(db.set_herkunft, settings.db_path, frage.id,
+                                art=herkunft.get("art", "zeitplan"),
+                                zeitplan_id=herkunft.get("zeitplan_id"),
+                                zeitplan_name=herkunft.get("zeitplan_name", ""),
+                                task_id=task.id)
     registry.add(eintrag)
 
     async def lauf() -> None:
@@ -331,6 +344,12 @@ async def starte_task(app: FastAPI, ziel: str, *, voice: bool = False,
             nachricht = await asyncio.to_thread(
                 db.add_message, settings.db_path, "assistant", antwort
             )
+            if herkunft:
+                await asyncio.to_thread(db.set_herkunft, settings.db_path, nachricht.id,
+                                        art=herkunft.get("art", "zeitplan"),
+                                        zeitplan_id=herkunft.get("zeitplan_id"),
+                                        zeitplan_name=herkunft.get("zeitplan_name", ""),
+                                        task_id=task.id)
             await asyncio.to_thread(
                 db.attach_tool_calls, settings.db_path,
                 list(eintrag.aufruf_ids), nachricht.id,
@@ -349,6 +368,7 @@ async def starte_task(app: FastAPI, ziel: str, *, voice: bool = False,
                 "spent_cost_eur": round(task.spent_cost_eur, 6),
                 "spent_tool_calls": task.spent_tool_calls,
                 "result": task.result, "abort_reason": task.abort_reason,
+                "herkunft": herkunft,
                 "final": True,
             })
             registry.remove(task.id)

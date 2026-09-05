@@ -33,14 +33,22 @@ class Message:
     role: Role
     content: str
     created_at: str
+    # FIX-09: None fuer getippte Nachrichten; sonst z. B.
+    # {"art": "zeitplan", "zeitplan_id": ..., "zeitplan_name": ..., "task_id": ...}
+    herkunft: dict | None = None
 
     @classmethod
     def from_row(cls, row: sqlite3.Row) -> "Message":
+        herkunft = None
+        if "h_art" in row.keys() and row["h_art"]:
+            herkunft = {"art": row["h_art"], "zeitplan_id": row["h_zeitplan_id"],
+                        "zeitplan_name": row["h_zeitplan_name"], "task_id": row["h_task_id"]}
         return cls(
             id=row["id"],
             role=row["role"],
             content=row["content"],
             created_at=row["created_at"],
+            herkunft=herkunft,
         )
 
 
@@ -124,18 +132,39 @@ def add_message(db_path: Path | str, role: Role, content: str) -> Message:
         return Message(id=cur.lastrowid, role=role, content=content, created_at=now)
 
 
+_MIT_HERKUNFT = (
+    "SELECT m.*, h.art AS h_art, h.zeitplan_id AS h_zeitplan_id, "
+    "h.zeitplan_name AS h_zeitplan_name, h.task_id AS h_task_id "
+    "FROM messages m LEFT JOIN nachricht_herkunft h ON h.message_id = m.id"
+)
+
+
 def list_messages(db_path: Path | str, limit: int | None = None) -> list[Message]:
     """Verlauf in Reihenfolge. `limit` liefert die *letzten* n, aufsteigend sortiert."""
     with session(db_path) as conn:
         if limit is None:
-            rows = conn.execute("SELECT * FROM messages ORDER BY id ASC").fetchall()
+            rows = conn.execute(_MIT_HERKUNFT + " ORDER BY m.id ASC").fetchall()
         else:
             rows = conn.execute(
-                "SELECT * FROM (SELECT * FROM messages ORDER BY id DESC LIMIT ?) "
+                "SELECT * FROM (" + _MIT_HERKUNFT + " ORDER BY m.id DESC LIMIT ?) "
                 "ORDER BY id ASC",
                 (limit,),
             ).fetchall()
         return [Message.from_row(row) for row in rows]
+
+
+def set_herkunft(db_path: Path | str, message_id: int, *, art: str,
+                 zeitplan_id: str | None = None, zeitplan_name: str = "",
+                 task_id: str | None = None) -> None:
+    """FIX-09: markiert eine Nachricht als Ergebnis eines Zeitplans."""
+    with session(db_path) as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO nachricht_herkunft "
+            "(message_id, art, zeitplan_id, zeitplan_name, task_id, erstellt_am) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (message_id, art, zeitplan_id, zeitplan_name or "", task_id, utcnow()),
+        )
+
 
 
 def count_messages(db_path: Path | str) -> int:

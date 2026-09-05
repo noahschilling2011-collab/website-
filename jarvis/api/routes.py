@@ -253,9 +253,9 @@ async def post_chat(request: Request, body: ChatRequest) -> ChatResponse:
             "zu behaupten, du wuesstest nichts ueber ihn."
         )
     systemprompt = (
-        f"{settings.system_prompt}\n\n{gedaechtnis_block}"
+        f"{settings.system_prompt_mit_name}\n\n{gedaechtnis_block}"
         if gedaechtnis_block
-        else settings.system_prompt
+        else settings.system_prompt_mit_name
     )
     if gedaechtnis_block:
         # Gezaehlt werden die Zeilen, die wirklich ein Fakt sind - die erste
@@ -730,7 +730,8 @@ async def index(request: Request) -> HTMLResponse:
     Platzhalter. Der **LLM**-Key kommt hier niemals hin (0.4.1).
     """
     html = request.app.state.index_path.read_text(encoding="utf-8")
-    return HTMLResponse(html.replace("__JARVIS_TOKEN__", request.app.state.token))
+    return HTMLResponse(html.replace("__JARVIS_TOKEN__", request.app.state.token)
+                        .replace("__ASSISTENT_NAME__", request.app.state.settings.assistent_name))
 
 
 @router.get("/weltlage", include_in_schema=False)
@@ -748,4 +749,5 @@ async def weltlage_seite(request: Request) -> HTMLResponse:
     if not seite.exists():
         raise HTTPException(status_code=404, detail="weltlage.html fehlt.")
     html = seite.read_text(encoding="utf-8")
-    return HTMLResponse(html.replace("__JARVIS_TOKEN__", request.app.state.token))
+    return HTMLResponse(html.replace("__JARVIS_TOKEN__", request.app.state.token)
+                        .replace("__ASSISTENT_NAME__", request.app.state.settings.assistent_name))

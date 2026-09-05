@@ -33,6 +33,8 @@ SPALTEN = [
     # FIX-04 Schritt 4
     ("vault_notizen", "widerspruch", "TEXT"),
     ("vault_notizen", "bestaetigt", "INTEGER NOT NULL DEFAULT 0"),
+    # FIX-09
+    ("zeitplaene", "fehlschlaege", "INTEGER NOT NULL DEFAULT 0"),
 ]
 
 

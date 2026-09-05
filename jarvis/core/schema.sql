@@ -343,7 +343,10 @@ CREATE TABLE IF NOT EXISTS zeitplaene (
     letzter_lauf    TEXT,                      -- UTC, 'Z'
     letzter_task_id TEXT    REFERENCES tasks(id) ON DELETE SET NULL,
     letzter_status  TEXT,                      -- 'done' | 'failed' | 'uebersprungen: ...'
-    verpasst        INTEGER NOT NULL DEFAULT 0 -- Laeufe, die nicht nachgeholt wurden
+    verpasst        INTEGER NOT NULL DEFAULT 0,
+    -- FIX-09: Fehlschlaege in Folge. Ab MAX_FEHLSCHLAEGE (core/zeitplan.py)
+    -- pausiert der Plan sich selbst, statt jeden Morgen Token zu verbrennen.
+    fehlschlaege    INTEGER NOT NULL DEFAULT 0 -- Laeufe, die nicht nachgeholt wurden
 );
 
 CREATE TABLE IF NOT EXISTS zeitplan_laeufe (
@@ -357,3 +360,15 @@ CREATE TABLE IF NOT EXISTS zeitplan_laeufe (
     ausloeser     TEXT    NOT NULL             -- 'zeitplan' | 'hand'
 );
 CREATE INDEX IF NOT EXISTS zeitplan_laeufe_zeit ON zeitplan_laeufe(gestartet_am);
+
+-- FIX-09: woher eine Nachricht im Verlauf kommt. Ohne diese Tabelle sieht
+-- ein Auftrag, den ein Zeitplan um 07:00 gestartet hat, im Chat aus wie
+-- etwas, das der Nutzer getippt hat. Additiv: `messages` bleibt, wie es ist.
+CREATE TABLE IF NOT EXISTS nachricht_herkunft (
+    message_id    INTEGER PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
+    art           TEXT    NOT NULL,                 -- 'zeitplan'
+    zeitplan_id   TEXT,
+    zeitplan_name TEXT    NOT NULL DEFAULT '',
+    task_id       TEXT,
+    erstellt_am   TEXT    NOT NULL
+);

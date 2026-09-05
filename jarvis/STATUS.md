@@ -4,7 +4,7 @@
 > und aktualisiert sie am Ende jeder Phase. Von Hand korrigieren ist erlaubt.
 
 AKTUELL: FIX-06 — COMMAND CENTER, siehe `docs/FIX-06.md`. Abschnitte 5 (Design-System), 6 (COMMAND CENTER) und 7 (WELT-NETZ) sind gebaut; **8 (MÄRKTE) steht aus und ist blockiert** — der Auftragstext dafür liegt nicht im Repo, nur der Name in der Kopfzeile von `docs/FIX-06.md`.
-LETZTE ÄNDERUNG: 2026-09-05 (FIX-08 Zeitpläne: JARVIS wiederholt eigene Aufträge — LOCAL als harte Grenze, Tagesdeckel über alle Pläne, verpasste Läufe werden gezählt statt nachgeholt; siehe `docs/FIX-08.md`)
+LETZTE ÄNDERUNG: 2026-09-05 (FIX-09: der Assistent heißt Mehmet; Herkunft und Zustellung von Zeitplan-Ergebnissen, einmalige Erinnerungen auch aus dem Gespräch, Bremse für scheiternde Pläne, Wetter ohne Key, Vorlage Morgenlage — siehe `docs/FIX-09.md`. Davor FIX-08 mit zwei Prüfrunden.)
 
 > **Abweichung von der Arbeitsweise, auf Ansage:** es wurden alle Phasen
 > gebaut, nicht eine nach der anderen. Das widerspricht CLAUDE.md
@@ -2320,3 +2320,27 @@ von Hand — acht Tabellen, das Schema hatte zwölf. `lookups`,
 `vault_notizen` und die zwei Weltlage-Tabellen fehlten still, die zwei neuen
 hätten auch gefehlt. Jetzt wird gezählt, was in der Datei ist;
 `tests/test_backup_zaehlt_alles.py` hält das gegen `core/schema.sql`.
+
+## FIX-09 — Was ein JARVIS wirklich braucht
+
+> Noah, 05.09.2026: „mach da Sachen rein, was du denkst, was für einen JARVIS
+> richtig wichtig ist" und „nenn ihn Mehmet". Auswahl und Belege in
+> `docs/FIX-09.md`.
+
+**Gebaut:** (1) `ASSISTENT_NAME`, Vorgabe **Mehmet** — Seite, Weltlage,
+jeder Prompt; geprüft, damit kein Name die Seite bricht. (2) Herkunft im
+Verlauf (`nachricht_herkunft`, additiv): Zeitplan-Nachrichten sind als
+solche markiert. (3) Zustellung: ein Strom holt den Chat neu, wenn ein
+Zeitplan fertig ist, sonst zählt der Chat-Tab. (4) Regelform
+`einmal 2026-09-06 18:00`. (5) Werkzeug `erinnerung_anlegen` (LOCAL) beim
+Chat-Agenten, höchstens 50 Pläne. (6) Bremse: drei Fehlschläge in Folge →
+Plan pausiert mit Grund. (7) Werkzeug `wetter` über Open-Meteo, ohne Key,
+Doku nachgeschlagen, eine Stunde Cache. (8) Vorlage „Morgenlage" aus
+eingerichteten Bausteinen, ein Knopf.
+
+**Ausgeführt:** `tests/test_fix09.py` 36 passed; fünf Mutationen kippen ihre
+Tests; Rauchtest im Chromium (Name, Vorlage, Erinnerung, Zähler, Herkunft).
+**NICHT AUSGEFÜHRT:** ein echter Aufruf gegen Open-Meteo (Tests sperren das
+Netz) — nur Mock mit den Antwortformen aus der Doku.
+
+**Nicht gebaut:** ein Akzent für Mehmet — das wäre eine Karikatur.

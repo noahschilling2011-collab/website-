@@ -194,7 +194,9 @@ async def starte_plan(app: FastAPI, plan: dict[str, Any], *, ausloeser: str,
     try:
         await starte_task(app, plan["ziel"], task=task,
                           max_permission=zeitplan.PERMISSION_DECKEL,
-                          am_ende=am_ende, unbeaufsichtigt=True)
+                          am_ende=am_ende, unbeaufsichtigt=True,
+                          herkunft={"art": "zeitplan", "zeitplan_id": plan["id"],
+                                    "zeitplan_name": plan["name"]})
     except Exception:
         _zeitplan_tasks(app).pop(task.id, None)
         raise
@@ -372,6 +374,37 @@ def _uebersicht(app: FastAPI) -> dict[str, Any]:
 @zeitplan_router.get("")
 async def get_zeitplaene(request: Request) -> dict[str, Any]:
     return await asyncio.to_thread(_uebersicht, request.app)
+
+
+def vorlagen(settings: Any) -> list[dict[str, Any]]:
+    """FIX-09: Vorlagen, deren Auftragstext nur aus Bausteinen besteht, die
+    bei diesem Nutzer wirklich eingerichtet sind. Eine Morgenlage, die nach
+    dem Kalender fragt, obwohl es keinen gibt, scheitert jeden Morgen - und
+    zahlt jeden Morgen den Planer."""
+    bausteine: list[str] = []
+    fehlt: list[str] = []
+    if settings.jarvis_ort:
+        bausteine.append(f"das Wetter heute in {settings.jarvis_ort} (Werkzeug wetter)")
+    else:
+        fehlt.append("Wetter: JARVIS_ORT in der .env eintragen")
+    if settings.kalender_quelle:
+        bausteine.append("meine Termine heute (Werkzeug kalender)")
+    else:
+        fehlt.append("Termine: KALENDER_QUELLE in der .env eintragen")
+    bausteine.append("was du dir ueber mich gemerkt hast, sofern es heute wichtig ist (Werkzeug recall)")
+    ziel = ("Erstelle meine Morgenlage: " + "; ".join(bausteine)
+            + ". Kurz, in Stichpunkten, auf Deutsch. Erfinde nichts, was die Werkzeuge nicht liefern.")
+    return [{
+        "name": "Morgenlage",
+        "regel": "taeglich 07:00",
+        "ziel": ziel,
+        "hinweis": ("Enthaelt nur, was eingerichtet ist." + (" Fehlt: " + "; ".join(fehlt) + "." if fehlt else "")),
+    }]
+
+
+@zeitplan_router.get("/vorlagen")
+async def get_vorlagen(request: Request) -> list[dict[str, Any]]:
+    return vorlagen(request.app.state.settings)
 
 
 @zeitplan_router.post("", status_code=201)

@@ -117,6 +117,25 @@ laufen **nacheinander**, nie gleichzeitig. Und JARVIS läuft als **ein
 Prozess** — kein `--workers`: Anspruch und Reservierung leben im Prozess,
 zwei Prozesse hießen zwei Schleifen. Belege und Grenzen: `docs/FIX-08.md`.
 
+### Mehmet, Erinnerungen und Wetter (FIX-09)
+
+Der Assistent heißt, wie du ihn nennst: `ASSISTENT_NAME` in der `.env`,
+Vorgabe **Mehmet**. Das Projekt heißt weiter JARVIS.
+
+- **Erinnerungen:** „Erinnere mich morgen um 8 an den Zahnarzt" legt einen
+  Zeitplan mit der Regel `einmal 2026-09-06 08:00` an — im Formular oder im
+  Gespräch (Werkzeug `erinnerung_anlegen`). Die Erinnerung kommt als
+  Antwort im Chat, markiert als Ergebnis des Zeitplans; ist der Chat nicht
+  offen, zählt der Chat-Tab mit.
+- **Bremse:** scheitert ein Plan dreimal in Folge, pausiert er sich selbst
+  und sagt warum. „An" setzt den Zähler zurück.
+- **Wetter:** Werkzeug `wetter` über Open-Meteo, ohne Key. `JARVIS_ORT` in
+  der `.env` ist dein Standardort.
+- **Vorlage Morgenlage:** ein Knopf im Block „Zeitpläne" füllt das Formular
+  mit dem, was bei dir eingerichtet ist — und sagt, was fehlt.
+
+Belege: `docs/FIX-09.md`.
+
 ### Docker
 
 ```bash

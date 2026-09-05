@@ -179,6 +179,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         post = registry.get("send_email")
         if post is not None:
             post.outbox = settings.outbox_path
+        # FIX-09: der Name des Assistenten in jedem Prompt; Wetter und
+        # Erinnerungen bekommen Datenbank und Standardort.
+        from core import agents as _agents
+
+        _agents.ASSISTENT_NAME = settings.assistent_name
+        wetter = registry.get("wetter")
+        if wetter is not None:
+            wetter.standard_ort = settings.jarvis_ort
+            wetter.db_path = settings.db_path
+        erinnerung = registry.get("erinnerung_anlegen")
+        if erinnerung is not None:
+            erinnerung.db_path = settings.db_path
+        if not settings.jarvis_ort:
+            log.info("JARVIS_ORT fehlt - wetter fragt nach einem Ort, die Vorlage "
+                     "Morgenlage laesst das Wetter weg.")
         satellit = registry.get("satellite_search")
         if satellit is not None:
             from core.satellite.cdse import CDSEProvider

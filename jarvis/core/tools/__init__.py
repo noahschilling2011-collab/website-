@@ -13,7 +13,9 @@ from core.tools import (  # noqa: F401  - Registrierung per Import
     outbox,
     satellite_tools,
     search,
+    wetter,
     wissen_tools,
+    zeitplan_tools,
 )
 from core.tools.dispatch import ToolCall, run_tool
 from core.tools.loop import run_tool_loop
