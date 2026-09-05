@@ -215,7 +215,7 @@ ausgelassener Lauf. Regel 1 (LOCAL) hielt jedem Umgehungsversuch stand.
 Tabellen. `core/schema.sql` hat zwölf eigene (ohne Volltextindizes).
 `lookups`, `vault_notizen`, `weltlage_cache`, `weltlage_zaehler` fehlten
 still, und `zeitplaene`, `zeitplan_laeufe` hätten auch gefehlt. Dieselbe
-Fehlerklasse wie die „32 Settings-Felder": eine Zahl oder Liste von Hand,
+Fehlerklasse wie die von Hand gezählten Settings-Felder in STATUS.md: eine Zahl oder Liste,
 die niemand nachzählt. Jetzt wird abgeleitet, was in der Datei ist;
 `tests/test_backup_zaehlt_alles.py` hält es gegen das Schema.
 
