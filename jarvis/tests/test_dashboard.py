@@ -297,9 +297,19 @@ def test_dod_4_abbruch_stoppt_den_task_wirklich(client):
     Schritte, die man ueberspringen koennte. Der Fall davor hat seit FIX-03
     Schritt 3a einen eigenen Test.
     """
+    import asyncio as _asyncio
     import time as _t
 
-    langsam = FakeLLMProvider(replies=[
+    class Langsam(FakeLLMProvider):
+        """Jeder Modellzug dauert einen Moment. Ohne das war der Test ein
+        Wettrennen: auf dem CI-Runner waren alle drei Schritte fertig,
+        bevor der Abbruch ankam - cancelled, aber nichts uebersprungen."""
+
+        async def complete(self, *args, **kwargs):  # noqa: ANN002, ANN003, ANN201
+            await _asyncio.sleep(0.15)
+            return await super().complete(*args, **kwargs)
+
+    langsam = Langsam(replies=[
         '{"steps":[{"description":"A"},{"description":"B"},{"description":"C"}]}',
         "A erledigt.", "B erledigt.", "C erledigt.", "Fertig.",
     ])
