@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 import pytest
 
 playwright = pytest.importorskip("playwright.sync_api")
-CHROMIUM = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"
+from tests.conftest import CHROMIUM  # eine Stelle, siehe dort
 
 
 def _tle_text() -> str:

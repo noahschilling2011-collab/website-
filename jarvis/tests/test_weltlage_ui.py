@@ -19,7 +19,7 @@ import pytest
 from core.llm import FakeLLMProvider
 
 playwright = pytest.importorskip("playwright.sync_api")
-CHROMIUM = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"
+from tests.conftest import CHROMIUM  # eine Stelle, siehe dort
 
 # Ein 1x1-PNG, damit ein <img> wirklich laedt statt in den Fehlerpfad zu gehen.
 PNG = bytes.fromhex(

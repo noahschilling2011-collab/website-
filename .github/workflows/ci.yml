@@ -88,6 +88,12 @@ jobs:
 
       - run: pip install -r requirements.txt
 
+      - name: Chromium fuer die Browser-Tests
+        # Sechs Testdateien fahren die Oberflaeche in einem echten Chromium
+        # hoch. tests/conftest.py findet den Browser dort, wo dieser Schritt
+        # ihn ablegt; einen festen Pfad gibt es nicht mehr.
+        run: python -m playwright install --with-deps chromium
+
       - name: Tests
         # Die Suite sperrt echte Netzwerkverbindungen. Sie braucht also weder
         # einen API-Key noch Netz - und kann in CI nichts kosten.

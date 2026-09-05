@@ -27,7 +27,7 @@ AKZENT = "#f0b45c"
 AKZENT_RGB = (240, 180, 92)
 
 playwright = pytest.importorskip("playwright.sync_api")
-CHROMIUM = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"
+from tests.conftest import CHROMIUM  # eine Stelle, siehe dort
 
 
 # --- Ohne Browser -----------------------------------------------------------

@@ -19,7 +19,7 @@ import time
 import pytest
 
 playwright = pytest.importorskip("playwright.sync_api")
-CHROMIUM = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"
+from tests.conftest import CHROMIUM  # eine Stelle, siehe dort
 
 FRANKREICH = (3.3, 47.0)
 OZEAN = (-150.0, 30.0)

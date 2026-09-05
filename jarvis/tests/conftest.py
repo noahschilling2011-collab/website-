@@ -28,6 +28,39 @@ def run(coro: Coroutine[Any, Any, T]) -> T:
     return asyncio.run(coro)
 
 
+def chromium_pfad() -> str | None:
+    """Wo Chromium fuer die Browser-Tests liegt - an EINER Stelle.
+
+    Bis 05.09.2026 stand in sechs Testdateien derselbe feste Pfad
+    (/opt/pw-browsers/chromium-1194/...). Auf dem GitHub-Runner gibt es den
+    nicht, und die CI war fuer jede Browser-Datei rot - nicht wegen eines
+    Fehlers in der Oberflaeche, sondern wegen eines Pfads.
+
+    Reihenfolge: JARVIS_CHROMIUM aus der Umgebung; sonst der erste Chromium-
+    Build unter PLAYWRIGHT_BROWSERS_PATH (oder Playwrights Standardordner);
+    sonst None - dann nimmt Playwright den Browser, den
+    `python -m playwright install chromium` abgelegt hat.
+    """
+    import glob
+    import os
+
+    fest = os.environ.get("JARVIS_CHROMIUM")
+    if fest:
+        return fest
+    wurzeln = [os.environ.get("PLAYWRIGHT_BROWSERS_PATH") or "",
+               os.path.expanduser("~/.cache/ms-playwright")]
+    for wurzel in wurzeln:
+        if not wurzel:
+            continue
+        treffer = sorted(glob.glob(os.path.join(wurzel, "chromium-*", "chrome-linux", "chrome")))
+        if treffer:
+            return treffer[-1]
+    return None
+
+
+CHROMIUM = chromium_pfad()
+
+
 class NetzwerkImTestVerboten(RuntimeError):
     pass
 
