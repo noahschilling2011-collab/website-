@@ -180,7 +180,9 @@ def _ist_planungsanfrage(system: str) -> bool:
     """
     from core.planner import PLANNER_MARKER   # spaet: planner importiert llm
 
-    return PLANNER_MARKER in system
+    # Der Marker ist namensfrei und steht am Anfang; der Name des
+    # Assistenten kommt erst danach.
+    return system.startswith(PLANNER_MARKER)
 
 
 def _fake_plan(history: list[LLMMessage]) -> str:

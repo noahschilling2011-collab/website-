@@ -103,7 +103,7 @@ function zeigeAusfall(grund){
 
 import('/static/globus.js')
   .then(modul => modul.starte(document.getElementById('welt'), '__JARVIS_TOKEN__',
-                              { hoeren: true }))
+                              { hoeren: true, name: '__ASSISTENT_NAME__' }))
   .catch(fehler => zeigeAusfall(
     fehler && fehler.message ? fehler.message : String(fehler)));
 </script>

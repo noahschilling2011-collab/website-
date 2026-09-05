@@ -215,13 +215,23 @@ class Settings(BaseSettings):
             raise ValueError("Zeitplan-Werte sind 0 oder groesser.")
         return value
 
+    @field_validator("assistent_name", mode="before")
+    @classmethod
+    def _leerer_name_ist_die_vorgabe(cls, value: object) -> object:
+        """ASSISTENT_NAME= (leer) in der .env heisst Vorgabe, nicht Startabbruch."""
+        return "Mehmet" if isinstance(value, str) and not value.strip() else value
+
     @field_validator("assistent_name")
     @classmethod
     def _name_passt_in_die_seite(cls, value: str) -> str:
         """Der Name wird roh in HTML und JavaScript eingesetzt. Buchstaben,
         Ziffern, Leerzeichen, Punkt und Bindestrich - kein Anfuehrungszeichen,
-        keine spitze Klammer, hoechstens 40 Zeichen."""
-        wert = " ".join(str(value or "").split())
+        keine spitze Klammer, hoechstens 40 Zeichen. Vorher in NFC gebracht:
+        ein Umlaut aus Basisbuchstabe plus Kombinationszeichen (macOS,
+        manche Zwischenablagen) sieht gleich aus und wuerde sonst abgelehnt."""
+        import unicodedata
+
+        wert = unicodedata.normalize("NFC", " ".join(str(value or "").split()))
         if not wert or len(wert) > 40 or not re.fullmatch(r"[\w .\-]+", wert):
             raise ValueError("ASSISTENT_NAME: 1 bis 40 Zeichen, nur Buchstaben, Ziffern, "
                              "Leerzeichen, Punkt und Bindestrich.")
@@ -269,4 +279,13 @@ class Settings(BaseSettings):
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    return Settings()
+    try:
+        return Settings()
+    except UnicodeDecodeError as exc:
+        # FIX-09: die ersten .env-Werte mit Umlauten (ASSISTENT_NAME, JARVIS_ORT).
+        # Ein Windows-Editor speichert "ANSI", python-dotenv liest UTF-8, und
+        # der Start endete in einem nackten Traceback ohne das Wort ".env".
+        raise SystemExit(
+            "Die .env ist nicht als UTF-8 gespeichert (Umlaut in einem Wert?). "
+            "Im Editor 'Speichern unter' -> Kodierung UTF-8 waehlen und neu starten."
+        ) from exc

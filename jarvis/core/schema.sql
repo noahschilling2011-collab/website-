@@ -346,7 +346,10 @@ CREATE TABLE IF NOT EXISTS zeitplaene (
     verpasst        INTEGER NOT NULL DEFAULT 0,
     -- FIX-09: Fehlschlaege in Folge. Ab MAX_FEHLSCHLAEGE (core/zeitplan.py)
     -- pausiert der Plan sich selbst, statt jeden Morgen Token zu verbrennen.
-    fehlschlaege    INTEGER NOT NULL DEFAULT 0 -- Laeufe, die nicht nachgeholt wurden
+    fehlschlaege    INTEGER NOT NULL DEFAULT 0,
+    -- FIX-09: 'auftrag' laeuft durch Planer und Werkzeuge; 'erinnerung' wird
+    -- ohne Modell zugestellt - der Text selbst ist die Nachricht.
+    art             TEXT    NOT NULL DEFAULT 'auftrag' -- Laeufe, die nicht nachgeholt wurden
 );
 
 CREATE TABLE IF NOT EXISTS zeitplan_laeufe (

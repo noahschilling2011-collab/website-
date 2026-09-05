@@ -19,7 +19,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Awaitable, Callable
 
-from core.agents import ToolAgent, baue_agenten
+from core.agents import ToolAgent, baue_agenten, mit_name
 from core.delegation import DelegationsKontext, kontext as delegationskontext
 from core.abbruch import LaufBeendet, baue_pruefpunkt
 from core.belege import belegte_urls, ohne_unbelegte_links
@@ -67,8 +67,11 @@ class gebucht:
     async def aclose(self) -> None:
         return None
 
-ABSCHLUSS_PROMPT = """Du bist JARVIS und fasst die Ergebnisse eines Auftrags
-fuer den Nutzer zusammen.
+# Namensfrei, damit `system.startswith(ABSCHLUSS_PROMPT)` fuer jeden Namen
+# gilt (die Fakes in test_bugs01/test_fix03 unterscheiden daran). Wer da
+# spricht, steht in ABSCHLUSS_NAME und wird dahinter angehaengt.
+ABSCHLUSS_PROMPT = """Du fasst die Ergebnisse eines Auftrags fuer den Nutzer
+zusammen.
 
 REGELN:
 1. Antworte nur mit dem, was in den Schritt-Ergebnissen steht. Ergaenze nichts
@@ -78,6 +81,8 @@ REGELN:
 3. Wenn ein Schritt fehlgeschlagen ist, sag welcher und was dadurch offen
    bleibt. Tu nicht so, als waere alles beantwortet.
 4. Knapp. Keine Einleitung, kein "Gerne!"."""
+
+ABSCHLUSS_NAME = "\n\nDu bist {name}."
 
 
 @dataclass
@@ -499,7 +504,7 @@ async def _fasse_zusammen(
         pruefpunkt()
         reply = await provider.complete(
             [LLMMessage("user", "\n".join(teile))],
-            system=ABSCHLUSS_PROMPT + antwortstil,
+            system=ABSCHLUSS_PROMPT + mit_name(ABSCHLUSS_NAME) + antwortstil,
         )
         await buche(reply)
         text = reply.text.strip()

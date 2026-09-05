@@ -1,13 +1,14 @@
 """Erinnerungen aus dem Gespraech heraus (FIX-09).
 
 "Erinnere mich morgen um acht an den Zahnarzt" - das legt einen Zeitplan
-an (core/zeitplan.py), einmalig oder wiederkehrend. Zur Zeit startet JARVIS
-daraus einen ganz normalen Auftrag, dessen Antwort die Erinnerung ist; sie
-erscheint im Chat mit Herkunft "Zeitplan" und als Hinweis am Chat-Tab.
+an (core/zeitplan.py), einmalig oder wiederkehrend. Der Text selbst ist
+die Nachricht: zur faelligen Zeit schreibt die Schleife ihn mit Herkunft
+"Erinnerung" in den Verlauf und meldet ihn der Oberflaeche - ohne Planer,
+ohne Werkzeuge, ohne Modellaufruf (Pruefrunde FIX-09: ein Lauf mit
+Werkzeugen waere eine Flaeche fuer Anweisungen im Text gewesen).
 
-Was das Werkzeug NICHT kann: Rechte ausweiten. Der Lauf hat die Grenzen
-jedes Zeitplans - hoechstens LOCAL, Tagesdeckel, unbeaufsichtigt. Und mehr
-als MAX_PLAENE Plaene gibt es nicht, egal wer sie anlegt.
+Was das Werkzeug NICHT kann: mehr als MAX_PLAENE lebende Plaene anlegen,
+egal wer es ruft - und Texte laenger als MAX_TEXT ablegen.
 """
 
 from __future__ import annotations
@@ -24,9 +25,9 @@ from core.tools.registry import register
 class ErinnerungAnlegen(Tool):
     name = "erinnerung_anlegen"
     description = (
-        "Legt eine Erinnerung oder einen wiederkehrenden Auftrag an, den JARVIS spaeter von selbst ausfuehrt.\n"
-        "Nimm es fuer: \"erinnere mich morgen um 8 an den Zahnarzt\", \"jeden Morgen um 7 die Morgenlage\", \"alle 6 Stunden nachsehen\". Rechne die Uhrzeit vorher mit clock aus, wenn der Nutzer relativ spricht (\"in zwei Stunden\", \"morgen\").\n"
-        "Nimm es NICHT fuer: Dinge, die JARVIS jetzt sofort tun soll - die machst du direkt; auch nicht fuer Termine in einem Kalender (das ist kalender, und der ist hier nur lesbar).\n"
+        "Legt eine Erinnerung an, die spaeter von selbst im Chat erscheint - einmalig oder wiederkehrend.\n"
+        "Nimm es fuer: \"erinnere mich morgen um 8 an den Zahnarzt\", \"jeden Morgen um 7 ans Wasser trinken\". Rechne die Uhrzeit vorher mit clock in Ortszeit aus, wenn der Nutzer relativ spricht (\"in zwei Stunden\", \"morgen\"); das Datum im Prompt ist UTC.\n"
+        "Nimm es NICHT fuer: Dinge, die jetzt sofort zu tun sind - die machst du direkt; nicht fuer Auftraege, die Werkzeuge brauchen (dafuer gibt es die Zeitplaene in der Oberflaeche); nicht fuer Termine in einem Kalender (das ist kalender, und der ist hier nur lesbar).\n"
         "Beispiel: erinnerung_anlegen(text=\"Zahnarzt anrufen\", wann=\"einmal 2026-09-06 08:00\")"
     )
     parameters = {
@@ -51,6 +52,9 @@ class ErinnerungAnlegen(Tool):
 
     # Wird beim App-Start gesetzt (api/app.py), nicht importiert.
     db_path: Path | str = ""
+    # Ein Erinnerungstext ist ein Satz. Ein Dokument ist keiner - und ein
+    # Modell, das eines hier ablegt, tut es aus Versehen oder auf Anweisung.
+    MAX_TEXT = 500
 
     async def execute(self, text: str, wann: str) -> ToolResult:
         begonnen = time.monotonic()
@@ -60,14 +64,17 @@ class ErinnerungAnlegen(Tool):
         text = " ".join(str(text or "").split())
         if not text:
             return ToolResult(ok=False, error="Kein Text.", display="Woran soll ich erinnern?")
+        if len(text) > self.MAX_TEXT:
+            hinweis = (f"Der Erinnerungstext ist zu lang ({len(text)} Zeichen, hoechstens "
+                       f"{self.MAX_TEXT}). Fasse ihn in einem Satz zusammen.")
+            return ToolResult(ok=False, error=hinweis, display=hinweis)
         try:
             regel = zeitplan.lies_regel(wann)
+            # art='erinnerung': der Text IST die Nachricht. Kein Planer, keine
+            # Werkzeuge, null Token - und keine Flaeche fuer Anweisungen im Text.
             plan = zeitplan.anlegen(
-                self.db_path,
-                name=text[:40],
-                ziel=(f"Erinnere den Nutzer jetzt daran: {text}. Antworte mit genau "
-                      f"einer kurzen Erinnerung in einem Satz, ohne Werkzeuge."),
-                regel_text=regel.text,
+                self.db_path, name=text[:40], ziel=text, regel_text=regel.text,
+                art="erinnerung",
             )
         except ValueError as exc:      # RegelUngueltig ist ein ValueError
             return ToolResult(ok=False, error=str(exc), display=str(exc),

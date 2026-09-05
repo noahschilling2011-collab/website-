@@ -378,8 +378,13 @@ def heute_zeile() -> str:
     # waere in einem deutschen Prompt halb englisch - %A und %B haengen an
     # der Locale des Servers - und ein zweiter Ausdruck desselben Datums ist
     # eine zweite Stelle, die falsch sein kann.
+    # FIX-09: dazu das Datum in Ortszeit - Zeitplaene und Erinnerungen
+    # ("einmal 2026-09-06 08:00") rechnen in Ortszeit, und zwischen
+    # Mitternacht und 02:00 Sommerzeit nennt UTC noch den Vortag.
+    lokal = time.strftime('%Y-%m-%d %H:%M', time.localtime())
     return (
-        f"Heute ist der {time.strftime('%Y-%m-%d', time.gmtime())} (UTC). "
+        f"Heute ist der {time.strftime('%Y-%m-%d', time.gmtime())} (UTC), "
+        f"in Ortszeit {lokal}. "
         f"Rechne nicht mit einem anderen Jahr, auch wenn dein Training "
         f"aelter ist. Brauchst du die Uhrzeit genauer, nimm das Werkzeug "
         f"clock, falls du es hast."

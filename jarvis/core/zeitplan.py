@@ -238,7 +238,21 @@ def naechster_lauf(regel: Regel, ab: datetime | None = None,
 # --- Datenbank -------------------------------------------------------------
 
 
-def anlegen(db_path: Path | str, *, name: str, ziel: str, regel_text: str) -> dict:
+ARTEN = ("auftrag", "erinnerung")
+
+
+def _zeit_existiert(regel: Regel) -> bool:
+    """FIX-09: '02:30' am Tag der Zeitumstellung gibt es nicht - Python legt
+    sie still eine Stunde frueher. Rueckrechnung entlarvt das."""
+    if not regel.einmalig:
+        return True
+    j, mo, t = (int(x) for x in regel.datum.split("-"))
+    naiv = datetime(j, mo, t, regel.stunde, regel.minute)
+    return naiv.astimezone().replace(tzinfo=None) == naiv
+
+
+def anlegen(db_path: Path | str, *, name: str, ziel: str, regel_text: str,
+            art: str = "auftrag") -> dict:
     regel = lies_regel(regel_text)
     name = " ".join(str(name or "").split())[:80]
     ziel = str(ziel or "").strip()
@@ -246,13 +260,14 @@ def anlegen(db_path: Path | str, *, name: str, ziel: str, regel_text: str) -> di
         raise ValueError("Ein Zeitplan braucht einen Namen.")
     if not ziel:
         raise ValueError("Ein Zeitplan braucht einen Auftragstext.")
+    if art not in ARTEN:
+        raise ValueError(f"Unbekannte Art {art!r}.")
     termin = naechster_lauf(regel)
     if regel.einmalig and termin <= utcnow():
         raise RegelUngueltig(f"'{regel.text}' liegt in der Vergangenheit.")
-    with session(db_path) as conn:
-        anzahl = conn.execute("SELECT COUNT(*) FROM zeitplaene").fetchone()[0]
-    if anzahl >= MAX_PLAENE:
-        raise ValueError(f"Hoechstens {MAX_PLAENE} Zeitplaene. Loesche erst einen.")
+    if not _zeit_existiert(regel):
+        raise RegelUngueltig(f"'{regel.text}': diese Uhrzeit gibt es an dem Tag nicht "
+                             f"(Zeitumstellung). Nimm eine Stunde spaeter.")
     eintrag = {
         "id": uuid.uuid4().hex[:12],
         "name": name,
@@ -265,15 +280,28 @@ def anlegen(db_path: Path | str, *, name: str, ziel: str, regel_text: str) -> di
         "letzter_task_id": None,
         "letzter_status": None,
         "verpasst": 0,
+        "fehlschlaege": 0,
+        "art": art,
+        "max": MAX_PLAENE,
     }
     with session(db_path) as conn:
-        conn.execute(
+        # Obergrenze und Einfuegen in EINER Anweisung: zwei gleichzeitige
+        # Aufrufer koennen sie sonst beide unterlaufen. Gezaehlt werden nur
+        # LEBENDE Plaene - erledigte Erinnerungen fuellen die Grenze nicht.
+        cur = conn.execute(
             "INSERT INTO zeitplaene (id, name, ziel, regel, aktiv, erstellt_am, "
-            "naechster_lauf, letzter_lauf, letzter_task_id, letzter_status, verpasst) "
-            "VALUES (:id, :name, :ziel, :regel, :aktiv, :erstellt_am, :naechster_lauf, "
-            ":letzter_lauf, :letzter_task_id, :letzter_status, :verpasst)",
+            "naechster_lauf, letzter_lauf, letzter_task_id, letzter_status, verpasst, "
+            "fehlschlaege, art) "
+            "SELECT :id, :name, :ziel, :regel, :aktiv, :erstellt_am, :naechster_lauf, "
+            ":letzter_lauf, :letzter_task_id, :letzter_status, :verpasst, :fehlschlaege, :art "
+            "WHERE (SELECT COUNT(*) FROM zeitplaene "
+            "       WHERE aktiv = 1 OR naechster_lauf IS NOT NULL) < :max",
             eintrag,
         )
+        if cur.rowcount == 0:
+            raise ValueError(f"Hoechstens {MAX_PLAENE} aktive Zeitplaene. Loesche oder "
+                             f"schalte erst einen aus.")
+    eintrag.pop("max")
     return eintrag
 
 
@@ -312,11 +340,11 @@ def schalten(db_path: Path | str, zeitplan_id: str, aktiv: bool) -> dict | None:
     naechster = naechster_lauf(regel) if aktiv else None
     if aktiv and regel.einmalig and naechster <= utcnow():
         # Eine Erinnerung, deren Zeitpunkt vorbei ist, laesst sich nicht
-        # wieder einschalten - sie wuerde sofort als verpasst gebucht.
-        with session(db_path) as conn:
-            conn.execute("UPDATE zeitplaene SET letzter_status = ? WHERE id = ?",
-                         ("einmalig, Zeitpunkt vorbei", zeitplan_id))
-        return hole(db_path, zeitplan_id)
+        # wieder einschalten - sie wuerde sofort als verpasst gebucht. Der
+        # Status bleibt, wie er war ('done' ist eine Wahrheit, keine
+        # Anzeige); der Grund geht als Fehler an den Aufrufer.
+        raise RegelUngueltig("Diese Erinnerung ist einmalig und ihr Zeitpunkt ist vorbei. "
+                             "Leg eine neue an.")
     with session(db_path) as conn:
         # FIX-09: Einschalten setzt die Fehlschlaege zurueck - das ist der
         # Weg, einen selbst pausierten Plan wieder laufen zu lassen.
@@ -416,6 +444,25 @@ def verbuche_start(db_path: Path | str, plan: dict, task_id: str,
             "UPDATE zeitplaene SET letzter_lauf = ?, letzter_task_id = ?, "
             "letzter_status = ? WHERE id = ?",
             (_als_z(zeitpunkt), task_id, status, plan["id"]),
+        )
+
+
+def verbuche_erinnerung(db_path: Path | str, plan: dict, *, ausloeser: str,
+                        jetzt: datetime | None = None) -> None:
+    """FIX-09: eine Erinnerung wurde zugestellt - ohne Task. Protokollzeile
+    ohne task_id (zaehlt fuer den Laeufe-Deckel, kostet null Token) und
+    'done' am Plan. Den Termin hat `termin_weiter` schon weitergeschoben
+    bzw. bei einmalig auf NULL gesetzt."""
+    zeitpunkt = (jetzt or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    with session(db_path) as conn:
+        conn.execute(
+            "INSERT INTO zeitplan_laeufe (zeitplan_id, task_id, gestartet_am, ausloeser) "
+            "VALUES (?, NULL, ?, ?)",
+            (plan["id"], _als_z(zeitpunkt), ausloeser),
+        )
+        conn.execute(
+            "UPDATE zeitplaene SET letzter_lauf = ?, letzter_status = 'done' WHERE id = ?",
+            (_als_z(zeitpunkt), plan["id"]),
         )
 
 

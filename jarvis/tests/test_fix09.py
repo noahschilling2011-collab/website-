@@ -108,10 +108,20 @@ def test_die_app_setzt_den_namen_beim_start(settings):
         assert "<title>Aylin</title>" in c.get("/").text
 
 
-@pytest.mark.parametrize("wert", ["", "<b>x</b>", "a'b", "x" * 41, "Name\"", "a\\nb"])
+@pytest.mark.parametrize("wert", ["<b>x</b>", "a'b", "x" * 41, "Name\"", "a\\nb", "a\u200bb"])
 def test_ein_name_der_die_seite_bricht_wird_abgelehnt(wert):
     with pytest.raises(ValueError):
         Settings(_env_file=None, assistent_name=wert)
+
+
+def test_leerer_name_ist_die_vorgabe_und_nfd_wird_angenommen():
+    """ASSISTENT_NAME= (leer) in der .env ist kein Startabbruch; ein Umlaut
+    aus Basisbuchstabe plus Kombinationszeichen (macOS) geht wie der
+    zusammengesetzte durch."""
+    assert Settings(_env_file=None, assistent_name="").assistent_name == "Mehmet"
+    assert Settings(_env_file=None, assistent_name="   ").assistent_name == "Mehmet"
+    nfd = "Mehmet O\u0308ztu\u0308rk"
+    assert Settings(_env_file=None, assistent_name=nfd).assistent_name == "Mehmet Öztürk"
 
 
 @pytest.mark.parametrize("wert", ["Mehmet", "J.A.R.V.I.S", "Frau Müller-Lüdenscheid", "R2 D2"])
@@ -230,12 +240,17 @@ def test_einmal_verpasst_heisst_aus(settings):
     assert zeitplan.verbuche_verpasst(settings.db_path, f) is True
     danach = zeitplan.hole(settings.db_path, plan["id"])
     assert danach["verpasst"] == 1 and danach["aktiv"] == 0 and danach["naechster_lauf"] is None
-    # Einschalten: Zeitpunkt vorbei -> bleibt aus, mit Grund.
+    # Einschalten: Zeitpunkt vorbei -> Fehler mit Grund; der Status bleibt,
+    # wie er war (Pruefrunde: vorher wurde 'done' mit einem Hinweis
+    # ueberschrieben, und die Oberflaeche zeigte rot 'fehlgeschlagen').
     with session(settings.db_path) as conn:
         conn.execute("UPDATE zeitplaene SET regel = ? WHERE id = ?",
                      ("einmal 2020-01-01 10:00", plan["id"]))
-    wieder = zeitplan.schalten(settings.db_path, plan["id"], True)
-    assert wieder["aktiv"] == 0 and "vorbei" in wieder["letzter_status"]
+    with pytest.raises(zeitplan.RegelUngueltig) as info:
+        zeitplan.schalten(settings.db_path, plan["id"], True)
+    assert "vorbei" in str(info.value)
+    wieder = zeitplan.hole(settings.db_path, plan["id"])
+    assert wieder["aktiv"] == 0 and wieder["letzter_status"].startswith("verpasst")
 
 
 def test_die_schleife_fuehrt_eine_erinnerung_genau_einmal_aus(client, settings):
@@ -267,7 +282,7 @@ def test_erinnerung_anlegen_legt_einen_plan_an(settings):
     [plan] = zeitplan.alle(settings.db_path)
     assert plan["name"] == "Zahnarzt anrufen"
     assert plan["regel"].startswith("einmal ")
-    assert "Zahnarzt anrufen" in plan["ziel"] and "ohne Werkzeuge" in plan["ziel"]
+    assert plan["ziel"] == "Zahnarzt anrufen" and plan["art"] == "erinnerung"
     assert ergebnis.data["id"] == plan["id"]
     # Wiederkehrend geht auch.
     assert asyncio.run(werkzeug.execute(text="Morgenlage", wann="taeglich 07:00")).ok
@@ -524,3 +539,260 @@ def test_vorlage_ueber_http_und_die_oberflaeche_ruft_sie(client):
     assert antwort.status_code == 200 and antwort.json()[0]["name"] == "Morgenlage"
     assert client.get("/api/zeitplaene/vorlagen").status_code == 401
     assert "/api/zeitplaene/vorlagen" in client.get("/").text
+
+
+# --- Pruefrunde FIX-09: was die drei Pruefer gefunden haben -----------------
+
+
+def test_r_der_name_steht_auch_im_planer_und_im_abschluss(settings, monkeypatch):
+    """Vorher sagten 2 von 3 Modellaufrufen je Auftrag weiter 'JARVIS'."""
+    from core import agents
+    from core.llm import FakeLLMProvider
+    monkeypatch.setattr(agents, "ASSISTENT_NAME", "Mehmet")
+    with TestClient(create_app(settings)) as c:
+        fake = c.app.state.provider
+        assert isinstance(fake, FakeLLMProvider)
+        c.post("/api/tasks", json={"goal": "Wie spaet ist es?"}, headers=TOKEN)
+        assert _warte_bis(lambda: len(fake.calls) >= 3)
+    systeme = [call["system"] for call in fake.calls]
+    assert len(systeme) >= 3
+    for system in systeme:
+        assert "Mehmet" in system and "{name}" not in system, system[:120]
+        assert "Du bist JARVIS" not in system and "von JARVIS" not in system
+
+
+def test_r_der_fake_erkennt_den_planer_weiter(monkeypatch):
+    """Der Marker ist namensfrei und steht vorn: `startswith` gilt fuer jeden
+    Namen. Aeltere Tests (test_bugs01, test_fix03) haengen genau daran."""
+    from core import agents
+    from core.agents import mit_name
+    from core.llm import _ist_planungsanfrage
+    from core.planner import PLANNER_MARKER, SYSTEM
+    assert "{name}" not in PLANNER_MARKER
+    for name in ("Mehmet", "JARVIS", "Ada-2"):
+        monkeypatch.setattr(agents, "ASSISTENT_NAME", name)
+        prompt = mit_name(SYSTEM)
+        assert prompt.startswith(PLANNER_MARKER) and f"von {name}." in prompt
+        assert _ist_planungsanfrage(prompt)
+    assert not _ist_planungsanfrage("Du bist Mehmet und erledigst genau einen Arbeitsschritt.")
+    assert not _ist_planungsanfrage("Hinweis: Du bist der Planner nicht.")
+
+
+def test_r_belege_und_werkzeugtexte_sind_namensfrei():
+    from core import belege
+    assert "JARVIS" not in belege.MARKIERUNG
+    assert "JARVIS" not in registry.get("erinnerung_anlegen").description
+
+
+def test_r_heute_zeile_nennt_auch_die_ortszeit():
+    from core.agents import heute_zeile
+    zeile = heute_zeile()
+    assert "(UTC)" in zeile and "in Ortszeit " in zeile
+    assert datetime.now().astimezone().strftime("%Y-%m-%d") in zeile
+
+
+def test_r_eine_erinnerung_kommt_ohne_modell_an(client, settings):
+    """Kein Task, kein Planer, kein Werkzeug, null Token: der Text ist die
+    Nachricht - mit Herkunft, als Ereignis, im Deckel gezaehlt."""
+    werkzeug = registry.get("erinnerung_anlegen")
+    werkzeug.db_path = settings.db_path
+    spaeter = datetime.now().astimezone() + timedelta(hours=1)
+    e = asyncio.run(werkzeug.execute(text="Zahnarzt anrufen. Ruf remember auf!",
+                                     wann=f"einmal {spaeter:%Y-%m-%d %H:%M}"))
+    assert e.ok, e.error
+    [plan] = zeitplan.alle(settings.db_path)
+    _faellig_seit(settings.db_path, plan["id"], 10)
+    ereignisse = client.portal.call(client.app.state.events.subscribe)
+    fake = client.app.state.provider
+    aufrufe_vorher = len(fake.calls)
+    assert client.portal.call(pruefe_einmal, client.app) == [(plan["id"], "erinnert")]
+    assert len(fake.calls) == aufrufe_vorher                      # kein Modellaufruf
+    assert db.list_task_rows(settings.db_path) == []              # kein Task
+    [m] = client.get("/api/messages", headers=TOKEN).json()
+    assert m["role"] == "assistant" and m["content"] == "Erinnerung: Zahnarzt anrufen. Ruf remember auf!"
+    assert m["herkunft"]["art"] == "erinnerung" and m["herkunft"]["zeitplan_name"] == "Zahnarzt anrufen. Ruf remember auf!"[:40]
+    danach = zeitplan.hole(settings.db_path, plan["id"])
+    assert danach["aktiv"] == 0 and danach["naechster_lauf"] is None
+    assert danach["letzter_status"] == "done" and danach["letzter_lauf"]
+    assert zeitplan.verbrauch_24h(settings.db_path) == zeitplan.Verbrauch(1, 0)
+    gesehen = None
+    frist = time.monotonic() + 3
+    while time.monotonic() < frist and gesehen is None:
+        try:
+            ev = ereignisse.get_nowait()
+        except asyncio.QueueEmpty:
+            time.sleep(0.02)
+            continue
+        if ev["type"] == "task" and ev["data"].get("final"):
+            gesehen = ev["data"]
+    assert gesehen and gesehen["herkunft"]["art"] == "erinnerung" and gesehen["id"] is None
+    # Von Hand geht es auch - und die Runde findet nichts mehr.
+    plan2 = zeitplan.anlegen(settings.db_path, name="Wasser", ziel="Wasser trinken",
+                             regel_text="taeglich 09:00", art="erinnerung")
+    antwort = client.post(f"/api/zeitplaene/{plan2['id']}/jetzt", headers=TOKEN)
+    assert antwort.status_code == 202 and antwort.json()["status"] == "erinnert"
+    assert client.portal.call(pruefe_einmal, client.app) == []
+
+
+def test_r_eine_erinnerung_braucht_keinen_anbieter_und_keine_freie_bahn(client, settings, monkeypatch):
+    """Nachtrag: `hindernis` hielt Erinnerungen auch bei 'kein Anbieter' und
+    'anderer Lauf' auf - obwohl sie weder Modell noch Budget brauchen. Ohne
+    LLM_API_KEY kam keine einzige Erinnerung an. Jetzt gilt fuer sie nur der
+    Laeufe-Deckel; einmalige werden dabei nicht verbraucht."""
+    import api.zeitplan as az
+    from api.app import UnavailableProvider
+    from core.llm import LLMError
+
+    client.app.state.provider = UnavailableProvider(LLMError("kein Key"), name="", model="")
+    monkeypatch.setattr(az, "_laeuft_noch", lambda app, plan: True)
+    monkeypatch.setattr(az, "_anderer_laeuft", lambda app, plan_id: True)
+    # Token-Deckel voll, Laeufe-Deckel frei: eine Erinnerung kostet null Token.
+    monkeypatch.setattr(az, "verbrauch", lambda app, jetzt=None: zeitplan.Verbrauch(0, 10**9))
+
+    plan = zeitplan.anlegen(settings.db_path, name="Wasser", ziel="Wasser trinken",
+                            regel_text="taeglich 09:00", art="erinnerung")
+    _faellig_seit(settings.db_path, plan["id"], 10)
+    assert client.portal.call(pruefe_einmal, client.app) == [(plan["id"], "erinnert")]
+    [m] = client.get("/api/messages", headers=TOKEN).json()
+    assert m["content"] == "Erinnerung: Wasser trinken" and m["herkunft"]["art"] == "erinnerung"
+    # Ein Auftrag dagegen bleibt an genau diesen Hindernissen haengen.
+    auftrag = zeitplan.anlegen(settings.db_path, name="Lage", ziel="Lage",
+                               regel_text="taeglich 09:00")
+    _faellig_seit(settings.db_path, auftrag["id"], 10)
+    [(pid, grund)] = client.portal.call(pruefe_einmal, client.app)
+    assert pid == auftrag["id"] and grund.startswith("uebersprungen:")
+
+    # Der Laeufe-Deckel gilt auch fuer Erinnerungen - und verbraucht eine
+    # einmalige dabei nicht.
+    monkeypatch.setattr(az, "verbrauch", lambda app, jetzt=None: zeitplan.Verbrauch(
+        settings.zeitplan_max_laeufe_24h, 0))
+    spaeter = datetime.now().astimezone() + timedelta(hours=1)
+    einmal = zeitplan.anlegen(settings.db_path, name="Zahnarzt", ziel="Zahnarzt anrufen",
+                              regel_text=f"einmal {spaeter:%Y-%m-%d %H:%M}", art="erinnerung")
+    _faellig_seit(settings.db_path, einmal["id"], 10)
+    ergebnis = dict(client.portal.call(pruefe_einmal, client.app))
+    assert "Laeufen in 24 Stunden" in ergebnis[einmal["id"]]
+    danach = zeitplan.hole(settings.db_path, einmal["id"])
+    assert danach["aktiv"] == 1 and danach["naechster_lauf"] is not None
+    assert len(client.get("/api/messages", headers=TOKEN).json()) == 1
+    antwort = client.post(f"/api/zeitplaene/{einmal['id']}/jetzt", headers=TOKEN)
+    assert antwort.status_code == 409 and "Laeufen in 24 Stunden" in antwort.json()["detail"]
+
+
+def test_r_eine_faellige_erinnerung_wird_nicht_vom_hindernis_verbraucht(client, settings):
+    """Vorher: Sperre vor Hindernis - bei vollem Deckel war die einmalige
+    Erinnerung weg, ohne je zu laufen."""
+    settings.zeitplan_max_laeufe_24h = 0                            # Deckel voll
+    spaeter = datetime.now().astimezone() + timedelta(hours=1)
+    plan = zeitplan.anlegen(settings.db_path, name="Zahnarzt", ziel="Zahnarzt",
+                            regel_text=f"einmal {spaeter:%Y-%m-%d %H:%M}", art="erinnerung")
+    _faellig_seit(settings.db_path, plan["id"], 10)
+    [(pid, was)] = client.portal.call(pruefe_einmal, client.app)
+    assert "Tagesdeckel" in was
+    danach = zeitplan.hole(settings.db_path, plan["id"])
+    assert danach["aktiv"] == 1 and danach["naechster_lauf"]        # steht noch
+    # Deckel wieder frei: die naechste Runde stellt zu.
+    settings.zeitplan_max_laeufe_24h = 24
+    assert client.portal.call(pruefe_einmal, client.app) == [(pid, "erinnert")]
+
+
+def test_r_max_plaene_zaehlt_nur_lebende_und_ist_atomar(settings):
+    with session(settings.db_path) as conn:
+        db.init_db(conn)
+    for i in range(zeitplan.MAX_PLAENE):
+        _plan(settings.db_path, name=f"p{i}")
+    with pytest.raises(ValueError):
+        _plan(settings.db_path, name="zu viel")
+    # Erledigte / ausgeschaltete zaehlen nicht mehr.
+    erster = zeitplan.alle(settings.db_path)[0]
+    zeitplan.schalten(settings.db_path, erster["id"], False)
+    assert _plan(settings.db_path, name="passt wieder")["name"] == "passt wieder"
+    # Die Grenze steht in derselben Anweisung wie das Einfuegen.
+    import inspect
+    quelle = inspect.getsource(zeitplan.anlegen)
+    assert "INSERT INTO zeitplaene" in quelle and "WHERE (SELECT COUNT(*)" in quelle
+
+
+def test_r_erinnerungstext_ist_begrenzt(settings):
+    with session(settings.db_path) as conn:
+        db.init_db(conn)
+    werkzeug = registry.get("erinnerung_anlegen")
+    werkzeug.db_path = settings.db_path
+    # Der Fund: 100.000 Zeichen landeten im Plan, im Chat und in drei
+    # Modellzuegen. Die Zahl steht fest, damit eine hochgesetzte Grenze
+    # den Test wieder rot macht - nicht nur "MAX_TEXT + 1".
+    assert werkzeug.MAX_TEXT <= 1_000, werkzeug.MAX_TEXT
+    for zu_lang in ("x" * 100_000, "x" * (werkzeug.MAX_TEXT + 1)):
+        e = asyncio.run(werkzeug.execute(text=zu_lang, wann="taeglich 07:00"))
+        assert not e.ok and "zu lang" in e.error and str(werkzeug.MAX_TEXT) in e.error
+    assert zeitplan.alle(settings.db_path) == []
+    assert asyncio.run(werkzeug.execute(text="x" * werkzeug.MAX_TEXT, wann="taeglich 07:00")).ok
+
+
+def test_r_zeitumstellungsluecke_wird_abgelehnt(settings, monkeypatch):
+    """'einmal 2027-03-28 02:30' gibt es in Europe/Berlin nicht - vorher
+    feuerte die Erinnerung still um 01:30."""
+    if not hasattr(time, "tzset"):
+        pytest.fail("braucht time.tzset (Unix)")
+    monkeypatch.setenv("TZ", "Europe/Berlin")
+    time.tzset()
+    try:
+        with session(settings.db_path) as conn:
+            db.init_db(conn)
+        with pytest.raises(zeitplan.RegelUngueltig) as info:
+            zeitplan.anlegen(settings.db_path, name="x", ziel="y", regel_text="einmal 2027-03-28 02:30")
+        assert "Zeitumstellung" in str(info.value)
+        assert zeitplan.anlegen(settings.db_path, name="x", ziel="y", regel_text="einmal 2027-03-28 03:30")
+    finally:
+        monkeypatch.delenv("TZ", raising=False)
+        time.tzset()
+
+
+def test_r_nachricht_und_herkunft_in_einer_transaktion(db_path):
+    with session(db_path) as conn:
+        db.init_db(conn)
+    m = db.add_message(db_path, "user", "x", {"art": "zeitplan", "zeitplan_id": "p", "zeitplan_name": "P", "task_id": "t"})
+    assert m.herkunft["zeitplan_name"] == "P"
+    [gelesen] = db.list_messages(db_path)
+    assert gelesen.herkunft == {"art": "zeitplan", "zeitplan_id": "p", "zeitplan_name": "P", "task_id": "t"}
+    import inspect
+    quelle = inspect.getsource(db.add_message)
+    assert quelle.count("with session(") == 1
+
+
+def test_r_ein_fehler_beim_nachlauf_laesst_den_task_nicht_ewig_laufen(settings, monkeypatch):
+    """Wirft das Schreiben der Antwort, muessen Endzustand, Ereignis,
+    Registry und am_ende trotzdem kommen."""
+    echt = db.add_message
+    zaehler = {"n": 0}
+
+    def wackelig(pfad, role, content, herkunft=None):  # noqa: ANN001
+        if role == "assistant":
+            zaehler["n"] += 1
+            raise RuntimeError("database is locked")
+        return echt(pfad, role, content, herkunft)
+
+    monkeypatch.setattr("api.tasks.db.add_message", wackelig)
+    with TestClient(create_app(settings)) as c:
+        plan = _plan(settings.db_path)
+        antwort = c.post(f"/api/zeitplaene/{plan['id']}/jetzt", headers=TOKEN)
+        assert antwort.status_code == 202
+        tid = antwort.json()["task_id"]
+        assert _warte_bis(lambda: c.app.state.tasks.get(tid) is None)
+        assert _warte_bis(lambda: db.get_task_row(settings.db_path, tid)["status"] == "done")
+        assert _warte_bis(lambda: zeitplan.hole(settings.db_path, plan["id"])["letzter_status"] == "done")
+        assert not c.app.state.zeitplan_tasks
+    assert zaehler["n"] == 1
+
+
+def test_r_schalten_auf_vorbei_gibt_409_und_laesst_done_stehen(client, settings):
+    spaeter = datetime.now().astimezone() + timedelta(hours=1)
+    plan = zeitplan.anlegen(settings.db_path, name="x", ziel="y",
+                            regel_text=f"einmal {spaeter:%Y-%m-%d %H:%M}", art="erinnerung")
+    _faellig_seit(settings.db_path, plan["id"], 10)
+    assert client.portal.call(pruefe_einmal, client.app) == [(plan["id"], "erinnert")]
+    with session(settings.db_path) as conn:
+        conn.execute("UPDATE zeitplaene SET regel = 'einmal 2020-01-01 10:00' WHERE id = ?", (plan["id"],))
+    antwort = client.post(f"/api/zeitplaene/{plan['id']}/schalten", headers=TOKEN, json={"aktiv": True})
+    assert antwort.status_code == 409 and "vorbei" in antwort.json()["detail"]
+    assert zeitplan.hole(settings.db_path, plan["id"])["letzter_status"] == "done"

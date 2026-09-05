@@ -124,9 +124,10 @@ Vorgabe **Mehmet**. Das Projekt heißt weiter JARVIS.
 
 - **Erinnerungen:** „Erinnere mich morgen um 8 an den Zahnarzt" legt einen
   Zeitplan mit der Regel `einmal 2026-09-06 08:00` an — im Formular oder im
-  Gespräch (Werkzeug `erinnerung_anlegen`). Die Erinnerung kommt als
-  Antwort im Chat, markiert als Ergebnis des Zeitplans; ist der Chat nicht
-  offen, zählt der Chat-Tab mit.
+  Gespräch (Werkzeug `erinnerung_anlegen`). Die Erinnerung kommt ohne
+  Modell als Nachricht in den Chat, markiert als Erinnerung des Zeitplans;
+  ist der Chat nicht offen, zählt der Chat-Tab mit. Sie braucht keinen
+  API-Key und keine Token, nur einen freien Platz im Tagesdeckel der Läufe.
 - **Bremse:** scheitert ein Plan dreimal in Folge, pausiert er sich selbst
   und sagt warum. „An" setzt den Zähler zurück.
 - **Wetter:** Werkzeug `wetter` über Open-Meteo, ohne Key. `JARVIS_ORT` in

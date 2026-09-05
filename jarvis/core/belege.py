@@ -37,7 +37,7 @@ _SATZENDE = ".,;:!?"
 
 MARKIERUNG = (
     "[{n} Link(e) entfernt: in diesem Lauf wurde nichts nachgeschlagen. "
-    "JARVIS haengt nur Quellen an, die ein Werkzeug wirklich geholt hat.]"
+    "Angehaengt werden nur Quellen, die ein Werkzeug wirklich geholt hat.]"
 )
 
 

@@ -1260,7 +1260,7 @@ button, input, textarea { font: inherit; color: inherit; }
 
   <aside class="panel glass" id="memory-panel" aria-label="Gedächtnis" aria-hidden="true">
     <div class="panel-kopf">
-      <h2>Was JARVIS über dich weiß</h2>
+      <h2>Was __ASSISTENT_NAME__ über dich weiß</h2>
       <button class="panel-zu" id="memory-zu" type="button" aria-label="Schließen">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="2" stroke-linecap="round" aria-hidden="true">
@@ -1344,6 +1344,50 @@ button, input, textarea { font: inherit; color: inherit; }
         return data;
       });
     });
+  }
+
+  // --- Ein Strom je Seite (FIX-09, Pruefrunde) ----------------------------
+  //
+  // Vorher oeffnete jede Ansicht ihre eigene Verbindung zu /api/events:
+  // Command Center, Auftraege, der laufende Chat-Auftrag und die Zustellung.
+  // Chromium erlaubt sechs Verbindungen je Host - drei offene Tabs im
+  // Command Center, und jeder weitere fetch der Seite wartete. Jetzt gibt
+  // es genau EINE Verbindung, und wer Ereignisse braucht, abonniert sie:
+  // dieselbe Schnittstelle wie ereignisStrom (Ereignis, Abbruch,
+  // Wiederverbindung, schliessen), nur geteilt.
+  var zentrale = { zuhoerer: [], strom: null };
+
+  function stromAbonnieren(beiEreignis, beiAbbruch, beiWiederverbindung) {
+    var eintrag = { e: beiEreignis, a: beiAbbruch, w: beiWiederverbindung };
+    zentrale.zuhoerer.push(eintrag);
+    if (!zentrale.strom) {
+      zentrale.strom = ereignisStrom(function (typ, daten) {
+        zentrale.zuhoerer.slice().forEach(function (z) {
+          try { z.e(typ, daten); } catch (e) { /* ein Zuhoerer bremst die anderen nicht */ }
+        });
+      }, function (err) {
+        // Endgueltig abgerissen: alle erfahren es, und der naechste
+        // Abonnent baut die Verbindung neu auf.
+        var alle = zentrale.zuhoerer.slice();
+        zentrale.zuhoerer = [];
+        zentrale.strom = null;
+        alle.forEach(function (z) { if (z.a) { try { z.a(err); } catch (e) { /* s. o. */ } } });
+      }, function () {
+        zentrale.zuhoerer.slice().forEach(function (z) {
+          if (z.w) { try { z.w(); } catch (e) { /* s. o. */ } }
+        });
+      });
+    }
+    return {
+      schliessen: function () {
+        var i = zentrale.zuhoerer.indexOf(eintrag);
+        if (i !== -1) zentrale.zuhoerer.splice(i, 1);
+        if (!zentrale.zuhoerer.length && zentrale.strom) {
+          zentrale.strom.schliessen();
+          zentrale.strom = null;
+        }
+      }
+    };
   }
 
   // --- Ereignisstrom (Phase 7, DoD 1) ---------------------------------------
@@ -1651,13 +1695,17 @@ button, input, textarea { font: inherit; color: inherit; }
     var wrap = document.createElement('div');
     wrap.className = 'msg msg-' + role;
     // FIX-09: was ein Zeitplan angestossen hat, sieht nicht aus wie getippt.
-    if (herkunft && herkunft.art === 'zeitplan') {
+    if (herkunft && (herkunft.art === 'zeitplan' || herkunft.art === 'erinnerung')) {
       wrap.classList.add('is-zeitplan');
       var marke = document.createElement('div');
       marke.className = 'herkunft';
-      marke.textContent = (role === 'user' ? 'Zeitplan „' : 'Ergebnis von „')
-        + (herkunft.zeitplan_name || 'Zeitplan') + '“'
-        + (role === 'user' ? ' hat das angestoßen' : '');
+      if (herkunft.art === 'erinnerung') {
+        marke.textContent = 'Erinnerung „' + (herkunft.zeitplan_name || '') + '“';
+      } else {
+        marke.textContent = (role === 'user' ? 'Zeitplan „' : 'Ergebnis von „')
+          + (herkunft.zeitplan_name || 'Zeitplan') + '“'
+          + (role === 'user' ? ' hat das angestoßen' : '');
+      }
       wrap.appendChild(marke);
     }
     var bubble = document.createElement('div');
@@ -1756,6 +1804,10 @@ button, input, textarea { font: inherit; color: inherit; }
 
   function setBusy(value) {
     busy = value;
+    if (!value && zustellungAusstehend) {
+      zustellungAusstehend = false;
+      loadHistory().catch(function () {});
+    }
     el.send.disabled = value;
     el.input.disabled = value;
     el.thread.setAttribute('aria-busy', value ? 'true' : 'false');
@@ -1771,13 +1823,34 @@ button, input, textarea { font: inherit; color: inherit; }
   // Nachricht im Browser (localStorage) - ein Komfort, keine Wahrheit; ohne
   // Speicher zaehlt die Seite einfach ab dem Neuladen.
 
+  // Ohne localStorage (Websitedaten blockiert, manche private Fenster) zaehlt
+  // die Seite ab dem ersten Blick nach dem Laden - im Speicher, nicht "alles
+  // je Erzeugte" bei jedem Laden.
+  var gelesenImSpeicher = null;
+
   function gelesenBis() {
-    try { return parseInt(localStorage.getItem('jarvis.gelesenBis') || '0', 10) || 0; }
-    catch (e) { return 0; }
+    try {
+      var roh = localStorage.getItem('jarvis.gelesenBis');
+      if (roh !== null) return parseInt(roh, 10) || 0;
+    } catch (e) { /* kein Speicher */ }
+    return gelesenImSpeicher;        // null = noch nie etwas gesehen
   }
 
   function merkeGelesen(id) {
+    gelesenImSpeicher = id;
     try { localStorage.setItem('jarvis.gelesenBis', String(id)); } catch (e) { /* egal */ }
+  }
+
+  // Vom Server zaehlen, nicht DOM+1: zwei Tabs desselben Browsers teilen
+  // sich gelesenBis, und nur der Verlauf weiss, was wirklich neu ist.
+  function zaehleUngelesen() {
+    return api('/api/messages').then(function (messages) {
+      var bis = gelesenBis(), neu = 0;
+      (messages || []).forEach(function (m) {
+        if (m.herkunft && m.role === 'assistant' && (bis === null || m.id > bis)) neu += 1;
+      });
+      zeigeUngelesen(neu);
+    }).catch(function () { /* der Zaehler ist Beiwerk */ });
   }
 
   function zeigeUngelesen(anzahl) {
@@ -1798,10 +1871,12 @@ button, input, textarea { font: inherit; color: inherit; }
       if (!messages || !messages.length) { showEmpty(); zeigeUngelesen(0); return; }
       el.thread.textContent = '';
       var bis = gelesenBis(), neu = 0, letzte = 0;
+      messages.forEach(function (m) { if (m.id > letzte) letzte = m.id; });
+      // Noch nie etwas gesehen (erstes Laden, kein Speicher): ab jetzt zaehlen.
+      if (bis === null) { merkeGelesen(letzte); bis = letzte; }
       messages.forEach(function (m) {
         el.thread.appendChild(messageNode(m.role, m.content, m.tool_calls, m.herkunft));
         if (m.herkunft && m.role === 'assistant' && m.id > bis) neu += 1;
-        if (m.id > letzte) letzte = m.id;
       });
       scrollDown();
       if (aktiveAnsicht === 'chat') { merkeGelesen(letzte); zeigeUngelesen(0); }
@@ -1812,20 +1887,33 @@ button, input, textarea { font: inherit; color: inherit; }
   // Ein Strom fuer die Zustellung: sobald ein Zeitplan-Auftrag fertig ist,
   // holt der Chat den Verlauf neu (wenn er offen ist) oder zaehlt hoch.
   var zustellStrom = null;
+  var zustellungAusstehend = false;   // kam etwas an, waehrend ein eigener Auftrag lief?
+
+  function zustellen() {
+    // Waehrend ein eigener Auftrag laeuft, wird der Chat NICHT neu gebaut:
+    // das wuerde Plan-Kasten und eine offene Rueckfrage wegwischen
+    // (Pruefrunde FIX-09). Nachgeholt wird, sobald der Auftrag fertig ist.
+    if (aktiveAnsicht !== 'chat') { zaehleUngelesen(); return; }
+    if (busy) { zustellungAusstehend = true; return; }
+    loadHistory().catch(function () {});
+  }
+
   function zustellungStarten() {
     if (zustellStrom) return;
-    zustellStrom = ereignisStrom(function (typ, daten) {
+    zustellStrom = stromAbonnieren(function (typ, daten) {
       if (typ !== 'task' || !daten.final || !daten.herkunft) return;
-      if (aktiveAnsicht === 'chat') loadHistory().catch(function () {});
-      else {
-        var tab = document.getElementById('tab-chat');
-        var alt = tab.querySelector('.badge');
-        zeigeUngelesen((alt ? parseInt(alt.textContent, 10) || 0 : 0) + 1);
-      }
-    }, function () { zustellStrom = null; }, function () {
-      if (aktiveAnsicht === 'chat') loadHistory().catch(function () {});
-    });
+      zustellen();
+    }, function () {
+      // Abgerissen (Server laenger als eine Minute weg). Neu aufgebaut wird
+      // beim naechsten Ansichtswechsel, beim Sichtbarwerden des Tabs oder
+      // wenn das Netz zurueckkommt - nicht nie.
+      zustellStrom = null;
+    }, function () { zustellen(); });
   }
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) zustellungStarten();
+  });
+  window.addEventListener('online', zustellungStarten);
 
   function loadHealth() {
     return api('/api/health').then(function (h) {
@@ -2195,7 +2283,7 @@ button, input, textarea { font: inherit; color: inherit; }
         platzhalter.remove();
       }
 
-      strom = ereignisStrom(function (typ, daten) {
+      strom = stromAbonnieren(function (typ, daten) {
         if (fertig) return;
         // `tool` kommt, WAEHREND das Werkzeug laeuft. Der Zustand haelt bis
         // zum naechsten Modellzug - laenger waere gelogen.
@@ -2350,7 +2438,7 @@ button, input, textarea { font: inherit; color: inherit; }
       if (!fakten.length) {
         var leer = document.createElement('p');
         leer.className = 'panel-leer';
-        leer.textContent = 'Noch nichts gemerkt. JARVIS merkt sich nur, worum du '
+        leer.textContent = 'Noch nichts gemerkt. ' + NAME + ' merkt sich nur, worum du '
           + 'ihn bittest — nicht den ganzen Chat.';
         el.memListe.appendChild(leer);
         return;
@@ -2590,7 +2678,7 @@ button, input, textarea { font: inherit; color: inherit; }
       // Kein `hoeren` - in index.html gehoert die Leertaste dem Chat,
       // und waehrend des Ladens ist die Weltansicht ueberhaupt nicht im
       // Bild. Erst `weiter()` beim Tabwechsel gibt sie dem Globus.
-      var fertig = modul.starte(ziel, TOKEN, { hoeren: false });
+      var fertig = modul.starte(ziel, TOKEN, { hoeren: false, name: NAME });
       // `starte()` hat die Schleife im selben Zug schon angeworfen; erst
       // danach laedt es die Grenzen. Wer inzwischen weggeklickt hat, soll
       // sie nicht laufen sehen - und zwar sofort, nicht in zehn Sekunden.
@@ -2650,6 +2738,7 @@ button, input, textarea { font: inherit; color: inherit; }
     if (ANSICHTEN[name].laden) ANSICHTEN[name].laden();
     // FIX-09: wer den Chat ansieht, hat die Ergebnisse gesehen.
     if (name === 'chat' && vorher !== 'chat') loadHistory().catch(function () {});
+    zustellungStarten();     // no-op, solange der Strom steht
   }
 
   Object.keys(ANSICHTEN).forEach(function (k) {
@@ -2732,7 +2821,7 @@ button, input, textarea { font: inherit; color: inherit; }
     liste.className = 'auftraege';
     ziel.appendChild(liste);
     if (!tasksStrom) {
-      tasksStrom = ereignisStrom(function (typ, daten) {
+      tasksStrom = stromAbonnieren(function (typ, daten) {
         if (typ !== 'task' || !daten.final) return;
         ladeAuftraege();
         if (zeitplanCtx) ladeZeitplaene(zeitplanCtx);
@@ -2806,7 +2895,7 @@ button, input, textarea { font: inherit; color: inherit; }
     var felder = {};
     [['name', 'Name des Zeitplans', 'Name, z. B. Morgenlage', 80],
      ['regel', 'Regel', 'taeglich 07:00 · alle 6 stunden · einmal 2026-09-06 18:00', 40],
-     ['ziel', 'Auftrag', 'Was JARVIS jedes Mal tun soll', 10000]].forEach(function (f) {
+     ['ziel', 'Auftrag', 'Was ' + NAME + ' jedes Mal tun soll', 10000]].forEach(function (f) {
       var input = document.createElement('input');
       input.name = f[0];
       input.setAttribute('aria-label', f[1]);
@@ -2933,8 +3022,11 @@ button, input, textarea { font: inherit; color: inherit; }
     var name = document.createElement('strong');
     name.textContent = p.name;
     kopf.appendChild(name);
-    kopf.appendChild(zustandPille(p.aktiv ? 'aktiv' : 'aus', ''));
-    if ((p.regel || '').indexOf('einmal ') === 0) kopf.appendChild(zustandPille('einmalig', ''));
+    var einmalig = (p.regel || '').indexOf('einmal ') === 0;
+    var erledigt = einmalig && !p.aktiv && !p.naechster_lauf;
+    kopf.appendChild(zustandPille(erledigt ? 'erledigt' : (p.aktiv ? 'aktiv' : 'aus'), erledigt ? 'done' : ''));
+    if (p.art === 'erinnerung') kopf.appendChild(zustandPille('Erinnerung', ''));
+    if (einmalig) kopf.appendChild(zustandPille('einmalig', ''));
     var regel = document.createElement('span');
     regel.className = 'zeitplan-regel';
     regel.textContent = p.regel;
@@ -2990,7 +3082,7 @@ button, input, textarea { font: inherit; color: inherit; }
     [['schalten', p.aktiv ? 'Aus' : 'An', function () {
         return api('/api/zeitplaene/' + p.id + '/schalten',
                    { method: 'POST', body: { aktiv: !p.aktiv } });
-      }],
+      }, erledigt],                          // eine erledigte Erinnerung hat kein "An"
      ['jetzt', 'Jetzt', function () {
         return api('/api/zeitplaene/' + p.id + '/jetzt', { method: 'POST' });
       }],
@@ -2999,6 +3091,7 @@ button, input, textarea { font: inherit; color: inherit; }
         return api('/api/zeitplaene/' + p.id, { method: 'DELETE' });
       }]
     ].forEach(function (a) {
+      if (a[3]) return;                      // dieser Knopf ergibt hier keinen Sinn
       var b = document.createElement('button');
       b.type = 'button';
       b.className = 'zeitplan-knopf' + (a[0] === 'loeschen' ? ' is-loeschen' : '');
@@ -3742,7 +3835,7 @@ button, input, textarea { font: inherit; color: inherit; }
 
     // 6.4: kein Polling. Der Strom sagt, wann es etwas zu holen gibt.
     if (!ccStrom) {
-      ccStrom = ereignisStrom(function (typ, daten) {
+      ccStrom = stromAbonnieren(function (typ, daten) {
         ccStromZeile(typ, daten);
         if (typ === 'hello') return;
         ccHole();

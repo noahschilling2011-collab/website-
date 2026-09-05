@@ -343,7 +343,7 @@ const MARKUP = `
         aria-label="Globus. Ziehen dreht, Pfeiltasten drehen, Plus und Minus zoomen. Länder sind anwählbar."></canvas>
 
 <header class="kopf">
-  <div class="marke">JARVIS <span>· Weltlage</span></div>
+  <div class="marke">__NAME__ <span>· Weltlage</span></div>
   <div class="land" id="land">weltweit</div>
   <div class="luecke"></div>
   <form class="ortsuche" id="ortsuche">
@@ -381,7 +381,7 @@ const MARKUP = `
 </section>
 
 <main class="karten" id="karten" aria-live="polite">
-  <div class="laedt">Wähl ein Land, dann sucht JARVIS Quellen dafür und ordnet sie ein.</div>
+  <div class="laedt">Wähl ein Land, dann sucht __NAME__ Quellen dafür und ordnet sie ein.</div>
 </main>
 
 <footer class="status">
@@ -424,6 +424,10 @@ let aktiv = false;
    auf false, obwohl es weiter() ruft. Das Zeichnen soll in der Startansicht
    weiterlaufen, das Zuhoeren nicht. */
 let hoerenErlaubt = false;
+/* FIX-09: wie der Assistent heisst. Kommt vom Aufrufer (opt.name), der
+   den Platzhalter __ASSISTENT_NAME__ vom Server eingesetzt bekommt; diese
+   Datei wird statisch ausgeliefert, hier ersetzt niemand etwas. */
+let assistentName = 'JARVIS';
 /* FIX-06 Zone 2: dasselbe Canvas, an einer anderen Stelle im Dokument.
    Ein zweiter Renderer waere ein zweiter WebGL-Kontext, und Browser
    verwerfen den aelteren ohne Vorwarnung, sobald die Zahl reisst. Beide
@@ -468,9 +472,10 @@ export async function starte(behaelter, token, opt){
      Voreinstellung ist NICHT hoeren. Ein Mikrofon, das nicht angeht, ist
      ein kleinerer Fehler als eines, das unsichtbar angeht. */
   hoerenErlaubt = !!(opt && opt.hoeren);
+  if (opt && typeof opt.name === 'string' && opt.name) assistentName = opt.name;
   behaelter.classList.add('globus-wurzel');
   stilEinsetzen();
-  behaelter.insertAdjacentHTML('beforeend', MARKUP);
+  behaelter.insertAdjacentHTML('beforeend', MARKUP.replace(/__NAME__/g, assistentName));
 
   const TOKEN = token;
 
@@ -576,7 +581,7 @@ export async function starte(behaelter, token, opt){
     if (m.einordnung){
       ein.appendChild(textKnoten('p', null, m.einordnung));
       ein.appendChild(textKnoten('div','hinweis',
-        'Von JARVIS, nicht aus der Quelle. Kein Beleg.'));
+        'Von ' + assistentName + ', nicht aus der Quelle. Kein Beleg.'));
     } else {
       ein.appendChild(textKnoten('p', null,
         m.einordnung_fehlt || 'Dazu habe ich keinen Kontext.'));
@@ -783,7 +788,7 @@ export async function starte(behaelter, token, opt){
     // "nichts gefunden". Mit derselben Klasse sah der Wartezustand fuer
     // jeden Beobachter - Test wie Mensch - schon nach dem Endergebnis aus.
     el('karten').appendChild(textKnoten('div', 'laedt',
-      'JARVIS liest Quellen für das gewählte Land. Der Globus dreht, '
+      assistentName + ' liest Quellen für das gewählte Land. Der Globus dreht, '
       + 'solange gesucht wird.'));
 
     return api('/api/weltlage/' + encodeURIComponent(iso))

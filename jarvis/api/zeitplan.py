@@ -65,6 +65,7 @@ class Schalten(BaseModel):
     aktiv: bool
 
 
+ERINNERT = "erinnert"
 STARTET_GERADE = "uebersprungen: dieser Zeitplan startet gerade."
 ANDERER_LAEUFT = "uebersprungen: ein anderer Zeitplan laeuft gerade."
 AUSGESCHALTET = "uebersprungen: ausgeschaltet."
@@ -137,26 +138,55 @@ def _anderer_laeuft(app: FastAPI, plan_id: str) -> bool:
 
 
 def hindernis(app: FastAPI, plan: dict[str, Any],
-              jetzt: datetime | None = None) -> str | None:
+              jetzt: datetime | None = None, *, ohne_modell: bool = False) -> str | None:
     """Warum dieser Plan JETZT nicht starten darf - oder None.
 
     Die Reihenfolge ist Absicht: erst das Billige (laeuft ein anderer?),
     dann der Anbieter, dann der Deckel, der eine Datenbankabfrage kostet.
     Blockierend - der Aufrufer legt es in einen Thread.
+
+    `ohne_modell` (Erinnerungen): kein Modell, null Token, kein Task - also
+    kein Anbieter noetig, kein Warten auf einen anderen Lauf, kein
+    Token-Deckel. Nur der Laeufe-Deckel gilt, weil er die Zahl der
+    unbeaufsichtigten Dinge am Tag begrenzt - und eine Erinnerung ist eins.
     """
     settings = app.state.settings
-    if _laeuft_noch(app, plan):
-        return "uebersprungen: der vorige Lauf dieses Zeitplans laeuft noch."
-    if _anderer_laeuft(app, plan["id"]):
-        return ANDERER_LAEUFT
-    if _anbieter_fehlt(app):
-        return "uebersprungen: kein Anbieter eingerichtet (LLM_API_KEY fehlt)."
+    if not ohne_modell:
+        if _laeuft_noch(app, plan):
+            return "uebersprungen: der vorige Lauf dieses Zeitplans laeuft noch."
+        if _anderer_laeuft(app, plan["id"]):
+            return ANDERER_LAEUFT
+        if _anbieter_fehlt(app):
+            return "uebersprungen: kein Anbieter eingerichtet (LLM_API_KEY fehlt)."
+    stand = verbrauch(app, jetzt)
+    if ohne_modell:
+        stand = zeitplan.Verbrauch(laeufe=stand.laeufe, token=0)
     grund = zeitplan.deckel_erreicht(
-        verbrauch(app, jetzt),
+        stand,
         max_laeufe=settings.zeitplan_max_laeufe_24h,
         max_token=settings.zeitplan_max_token_24h,
     )
     return f"uebersprungen: {grund}" if grund else None
+
+
+async def erinnere(app: FastAPI, plan: dict[str, Any], *, ausloeser: str,
+                   jetzt: datetime | None = None) -> None:
+    """FIX-09: eine Erinnerung braucht kein Modell. Der Text ist die
+    Nachricht - sie geht mit Herkunft in den Verlauf und als Ereignis an die
+    Oberflaeche. Kein Planer, keine Werkzeuge, null Token - und damit auch
+    keine Flaeche fuer einen Text, der Anweisungen enthaelt."""
+    pfad = app.state.settings.db_path
+    herkunft = {"art": "erinnerung", "zeitplan_id": plan["id"],
+                "zeitplan_name": plan["name"], "task_id": None}
+    text = f"Erinnerung: {plan['ziel']}"
+    nachricht = await asyncio.to_thread(db.add_message, pfad, "assistant", text, herkunft)
+    await asyncio.to_thread(zeitplan.verbuche_erinnerung, pfad, plan,
+                            ausloeser=ausloeser, jetzt=jetzt)
+    app.state.events.publish("task", {
+        "id": None, "goal": plan["ziel"], "status": "done", "result": text,
+        "message_id": nachricht.id, "herkunft": herkunft, "final": True,
+    })
+    log.info("zeitplan %s (%s): Erinnerung zugestellt (%s)", plan["id"], plan["name"], ausloeser)
 
 
 async def starte_plan(app: FastAPI, plan: dict[str, Any], *, ausloeser: str,
@@ -225,13 +255,37 @@ async def versuche_start(app: FastAPI, plan_id: str, *, ausloeser: str,
         plan = await asyncio.to_thread(zeitplan.hole, pfad, plan_id)
         if plan is None:
             return None, GELOESCHT
+        einmalig = zeitplan.lies_regel(plan["regel"]).einmalig
+        erinnerung = plan.get("art") == "erinnerung"
+        geprueft = False
         if ausloeser == "zeitplan":
             if not plan["aktiv"]:
                 return None, AUSGESCHALTET
+            if einmalig:
+                # Eine Erinnerung wird nicht "verbraucht", weil gerade der
+                # Deckel voll ist: erst das Hindernis, dann die Sperre. Der
+                # Termin bleibt stehen, die naechste Runde versucht es
+                # innerhalb der Toleranz erneut (Pruefrunde FIX-09).
+                grund = await asyncio.to_thread(hindernis, app, plan, jetzt,
+                                                ohne_modell=erinnerung)
+                if grund:
+                    return None, grund
+                geprueft = True
             if not await asyncio.to_thread(zeitplan.termin_weiter, pfad, plan,
                                            "startet", jetzt):
                 return None, STARTET_GERADE
         try:
+            if erinnerung:
+                # Nur der Laeufe-Deckel haelt eine Erinnerung auf - sie
+                # braucht weder Anbieter noch freie Bahn (Nachtrag FIX-09).
+                grund = None if geprueft else await asyncio.to_thread(
+                    hindernis, app, plan, jetzt, ohne_modell=True)
+                if grund:
+                    if ausloeser == "zeitplan":
+                        await asyncio.to_thread(zeitplan.setze_status, pfad, plan_id, grund)
+                    return None, grund
+                await erinnere(app, plan, ausloeser=ausloeser, jetzt=jetzt)
+                return None, ERINNERT
             grund = await asyncio.to_thread(hindernis, app, plan, jetzt)
             if grund:
                 if ausloeser == "zeitplan":
@@ -312,7 +366,7 @@ async def pruefe_einmal(app: FastAPI,
             # Nacheinander: der naechste Plan wartet, bis dieser fertig ist.
             await _warte_auf(app, task.id, settings.budget_max_seconds + 30)
             continue
-        if grund not in (GELOESCHT, STARTET_GERADE, AUSGESCHALTET):
+        if grund not in (GELOESCHT, STARTET_GERADE, AUSGESCHALTET, ERINNERT):
             log.warning("zeitplan %s (%s): %s", pid, name, grund)
         protokoll.append((pid, grund or ""))
     return protokoll
@@ -430,7 +484,10 @@ async def delete_zeitplan(request: Request, zeitplan_id: str) -> dict[str, Any]:
 async def schalte_zeitplan(request: Request, zeitplan_id: str,
                            body: Schalten) -> dict[str, Any]:
     pfad = request.app.state.settings.db_path
-    plan = await asyncio.to_thread(zeitplan.schalten, pfad, zeitplan_id, body.aktiv)
+    try:
+        plan = await asyncio.to_thread(zeitplan.schalten, pfad, zeitplan_id, body.aktiv)
+    except zeitplan.RegelUngueltig as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if plan is None:
         raise HTTPException(status_code=404, detail="Zeitplan nicht gefunden.")
     return plan
@@ -445,6 +502,8 @@ async def zeitplan_jetzt(request: Request, zeitplan_id: str) -> dict[str, Any]:
     task, grund = await versuche_start(request.app, zeitplan_id, ausloeser="hand")
     if task is not None:
         return {"id": zeitplan_id, "task_id": task.id, "status": "laeuft"}
+    if grund == ERINNERT:
+        return {"id": zeitplan_id, "task_id": None, "status": ERINNERT}
     if grund == GELOESCHT:
         raise HTTPException(status_code=404, detail="Zeitplan nicht gefunden.")
     raise HTTPException(status_code=409, detail=grund)

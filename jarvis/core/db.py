@@ -121,7 +121,11 @@ def session(db_path: Path | str) -> Iterator[sqlite3.Connection]:
 # --- Nachrichten ----------------------------------------------------------
 
 
-def add_message(db_path: Path | str, role: Role, content: str) -> Message:
+def add_message(db_path: Path | str, role: Role, content: str,
+                herkunft: dict | None = None) -> Message:
+    """Eine Nachricht - mit ihrer Herkunft in DERSELBEN Transaktion (FIX-09).
+    Zwei Transaktionen hiessen: scheitert die zweite, steht ein
+    Zeitplan-Auftrag als getippte Nachricht im Verlauf."""
     with session(db_path) as conn:
         now = utcnow()
         cur = conn.execute(
@@ -129,7 +133,16 @@ def add_message(db_path: Path | str, role: Role, content: str) -> Message:
             (role, content, now),
         )
         assert cur.lastrowid is not None
-        return Message(id=cur.lastrowid, role=role, content=content, created_at=now)
+        if herkunft:
+            conn.execute(
+                "INSERT OR REPLACE INTO nachricht_herkunft "
+                "(message_id, art, zeitplan_id, zeitplan_name, task_id, erstellt_am) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (cur.lastrowid, herkunft.get("art", "zeitplan"), herkunft.get("zeitplan_id"),
+                 herkunft.get("zeitplan_name") or "", herkunft.get("task_id"), now),
+            )
+        return Message(id=cur.lastrowid, role=role, content=content, created_at=now,
+                       herkunft=dict(herkunft) if herkunft else None)
 
 
 _MIT_HERKUNFT = (

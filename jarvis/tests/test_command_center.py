@@ -319,11 +319,18 @@ def test_beim_verlassen_gehen_uhr_und_strom_aus(server):
             seite.wait_for_timeout(1600)
             assert seite.inner_text(".cc-uhr") == a, "die Uhr laeuft im Chat weiter"
 
+            # FIX-09 (Pruefrunde): es gibt genau EINEN Strom je Seite, den sich
+            # alle Ansichten teilen. Zurueckkommen oeffnet also KEINE zweite
+            # Verbindung - vorher tat es das, und drei Tabs im Command Center
+            # belegten alle sechs Verbindungen des Browsers.
             vorher = len([u for u in gerufen if "/api/events" in u])
+            assert vorher == 1, f"{vorher} Stroeme statt einem"
             seite.click("#tab-cc")
             seite.wait_for_timeout(700)
             nachher = len([u for u in gerufen if "/api/events" in u])
-            assert nachher == vorher + 1, "der Strom wird beim Zurueckkommen nicht neu geoeffnet"
+            assert nachher == vorher, "beim Zurueckkommen wurde ein zweiter Strom geoeffnet"
+            seite.wait_for_timeout(1200)
+            assert seite.inner_text(".cc-uhr") != a, "die Uhr laeuft im Command Center nicht wieder an"
         finally:
             br.close()
 

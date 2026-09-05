@@ -4,7 +4,7 @@
 > und aktualisiert sie am Ende jeder Phase. Von Hand korrigieren ist erlaubt.
 
 AKTUELL: FIX-06 — COMMAND CENTER, siehe `docs/FIX-06.md`. Abschnitte 5 (Design-System), 6 (COMMAND CENTER) und 7 (WELT-NETZ) sind gebaut; **8 (MÄRKTE) steht aus und ist blockiert** — der Auftragstext dafür liegt nicht im Repo, nur der Name in der Kopfzeile von `docs/FIX-06.md`.
-LETZTE ÄNDERUNG: 2026-09-05 (FIX-09: der Assistent heißt Mehmet; Herkunft und Zustellung von Zeitplan-Ergebnissen, einmalige Erinnerungen auch aus dem Gespräch, Bremse für scheiternde Pläne, Wetter ohne Key, Vorlage Morgenlage — siehe `docs/FIX-09.md`. Davor FIX-08 mit zwei Prüfrunden.)
+LETZTE ÄNDERUNG: 2026-09-05 (FIX-09 mit Prüfrunde, 23 Funde behoben: der Assistent heißt Mehmet; Herkunft und Zustellung von Zeitplan-Ergebnissen, einmalige Erinnerungen auch aus dem Gespräch, Bremse für scheiternde Pläne, Wetter ohne Key, Vorlage Morgenlage — siehe `docs/FIX-09.md`. Davor FIX-08 mit zwei Prüfrunden.)
 
 > **Abweichung von der Arbeitsweise, auf Ansage:** es wurden alle Phasen
 > gebaut, nicht eine nach der anderen. Das widerspricht CLAUDE.md
@@ -2344,3 +2344,20 @@ Tests; Rauchtest im Chromium (Name, Vorlage, Erinnerung, Zähler, Herkunft).
 Netz) — nur Mock mit den Antwortformen aus der Doku.
 
 **Nicht gebaut:** ein Akzent für Mehmet — das wäre eine Karikatur.
+
+**Prüfrunde — drei Blickwinkel, 23 Rohfunde, 23 behoben** (Skeptiker wieder
+am Sitzungslimit; jeder Fund gegen einen eigenen Test, fünf gegen Mutation).
+Die drei mit Gewicht: eine **fällige Erinnerung wurde bei jedem Hindernis
+verbraucht, ohne zu laufen** — jetzt wird das Hindernis vor dem Termin
+geprüft, und Erinnerungen kommen **ohne Modell** an (Spalte `art`; vorher
+lief der Text als unbeaufsichtigter Auftrag, der sich selbst fortpflanzen
+konnte); der **Zustell-Strom baute den Chat neu, während ein Auftrag lief**
+(Rückfrage weg) — jetzt wartet er; und **Planner und Abschluss sagten weiter
+„JARVIS"** — 2 von 3 Modellaufrufen je Auftrag. Dazu: ein Strom je Seite
+statt drei (Chromium-Limit), Zählung vom Server statt DOM+1, Nachricht und
+Herkunft in einer Transaktion, abgesicherte Nachläufe, `MAX_PLAENE` atomar
+und nur für lebende Pläne, Erinnerungstext ≤ 500, Zeitumstellungslücke
+abgelehnt, leerer Name = Vorgabe, NFC-Namen, .env-Kodierung mit Hinweis.
+Nachtrag beim Gegenlesen: Erinnerungen hingen am Anbieter — ohne Key kam
+keine an; jetzt hält sie nur der Läufe-Deckel auf. Tabelle in
+`docs/FIX-09.md`. `tests/test_fix09.py` 50 passed.

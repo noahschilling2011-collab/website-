@@ -37,13 +37,16 @@ MAX_REPARATUREN = 2
 # Woran ein Anbieter erkennt, dass gerade ein Plan verlangt wird - ohne den
 # Prompt zu zerlegen. Der FakeLLMProvider haengt daran; deshalb steht der
 # Marker hier und wird nicht dort noch einmal getippt.
-PLANNER_MARKER = "Du bist der Planner von JARVIS."
+# Der Marker ist namensfrei: der Name des Assistenten (ASSISTENT_NAME,
+# core/agents.mit_name) folgt erst danach. So gilt fuer jeden Namen
+# `system.startswith(PLANNER_MARKER)` - die Tests haengen daran.
+PLANNER_MARKER = "Du bist der Planner"
 
 # Der Umschlag, in dem das Ziel zum Modell geht. Auch das teilen sich
 # Planner und Fake, statt es zweimal zu kennen.
 ZIEL_PRAEFIX = "Ziel: "
 
-SYSTEM = PLANNER_MARKER + """ Du zerlegst ein Ziel in Schritte.
+SYSTEM = PLANNER_MARKER + """ von {name}. Du zerlegst ein Ziel in Schritte.
 
 DIE WICHTIGSTE REGEL: Wenn das Ziel mit einem einzigen Schritt zu erledigen
 ist, gibst du GENAU EINEN Schritt zurueck. Die meisten Ziele sind das.
@@ -57,7 +60,7 @@ Verfuegbare Agenten:
 <<AGENTEN>>
 
 Ein Schritt bekommt einen Agenten, wenn er dessen Faehigkeiten braucht.
-Sonst bleibt "agent" leer - dann erledigt JARVIS den Schritt selbst mit
+Sonst bleibt "agent" leer - dann erledigt {name} den Schritt selbst mit
 seinen Werkzeugen.
 
 Antworte AUSSCHLIESSLICH mit JSON in genau dieser Form, ohne Text davor oder
@@ -118,7 +121,9 @@ async def erstelle_plan(
     # Kein %-Formatieren und kein .format(): der Prompt enthaelt sowohl
     # Prozentzeichen ("17 % von 4380") als auch geschweifte Klammern (das
     # JSON-Beispiel). Beides wuerde dort zur Formatanweisung.
-    system = SYSTEM.replace("<<AGENTEN>>", beschreibung).replace(
+    from core.agents import mit_name
+
+    system = mit_name(SYSTEM).replace("<<AGENTEN>>", beschreibung).replace(
         "<<MAX_STEPS>>", str(max_steps)
     )
     verlauf: list[LLMMessage] = [LLMMessage("user", ZIEL_PRAEFIX + ziel)]

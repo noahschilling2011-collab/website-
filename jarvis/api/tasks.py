@@ -308,13 +308,8 @@ async def starte_task(app: FastAPI, ziel: str, *, voice: bool = False,
     await asyncio.to_thread(db.save_task, settings.db_path, task)
     # Der Verlauf ist unabhaengig vom Task: was der Nutzer getippt hat, darf
     # auch dann nicht verloren gehen, wenn der Task scheitert.
-    frage = await asyncio.to_thread(db.add_message, settings.db_path, "user", ziel)
-    if herkunft:
-        await asyncio.to_thread(db.set_herkunft, settings.db_path, frage.id,
-                                art=herkunft.get("art", "zeitplan"),
-                                zeitplan_id=herkunft.get("zeitplan_id"),
-                                zeitplan_name=herkunft.get("zeitplan_name", ""),
-                                task_id=task.id)
+    quelle = dict(herkunft, task_id=task.id) if herkunft else None
+    await asyncio.to_thread(db.add_message, settings.db_path, "user", ziel, quelle)
     registry.add(eintrag)
 
     async def lauf() -> None:
@@ -341,25 +336,29 @@ async def starte_task(app: FastAPI, ziel: str, *, voice: bool = False,
             await asyncio.to_thread(db.save_task, settings.db_path, task)
         finally:
             antwort = (task.result or task.abort_reason or "Kein Ergebnis.").strip()
-            nachricht = await asyncio.to_thread(
-                db.add_message, settings.db_path, "assistant", antwort
-            )
-            if herkunft:
-                await asyncio.to_thread(db.set_herkunft, settings.db_path, nachricht.id,
-                                        art=herkunft.get("art", "zeitplan"),
-                                        zeitplan_id=herkunft.get("zeitplan_id"),
-                                        zeitplan_name=herkunft.get("zeitplan_name", ""),
-                                        task_id=task.id)
-            await asyncio.to_thread(
-                db.attach_tool_calls, settings.db_path,
-                list(eintrag.aufruf_ids), nachricht.id,
-            )
-            await asyncio.to_thread(
-                memory.log_task, settings.db_path, task.id,
-                goal=ziel,
-                outcome=task.status,
-                summary=(task.result or task.abort_reason or "")[:500],
-            )
+            # Die Nachlaeufe einzeln absichern: wirft einer (Datenbank
+            # gesperrt), duerfen Endzustand, Ereignis, Registry und am_ende
+            # nicht ausfallen - sonst bleibt der Task ewig "running", die
+            # Oberflaeche auf "laeuft", und kein Zeitplan startet mehr.
+            try:
+                nachricht = await asyncio.to_thread(
+                    db.add_message, settings.db_path, "assistant", antwort, quelle
+                )
+                await asyncio.to_thread(
+                    db.attach_tool_calls, settings.db_path,
+                    list(eintrag.aufruf_ids), nachricht.id,
+                )
+            except Exception:  # noqa: BLE001
+                log.exception("task %s: Antwort nicht in den Verlauf geschrieben", task.id)
+            try:
+                await asyncio.to_thread(
+                    memory.log_task, settings.db_path, task.id,
+                    goal=ziel,
+                    outcome=task.status,
+                    summary=(task.result or task.abort_reason or "")[:500],
+                )
+            except Exception:  # noqa: BLE001
+                log.exception("task %s: task_log nicht geschrieben", task.id)
             # Jetzt erst: der Task ist fertig UND alles ist geschrieben.
             await asyncio.to_thread(db.save_task, settings.db_path, task)
             app.state.events.publish("task", {

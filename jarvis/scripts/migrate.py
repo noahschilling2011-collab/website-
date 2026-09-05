@@ -35,6 +35,7 @@ SPALTEN = [
     ("vault_notizen", "bestaetigt", "INTEGER NOT NULL DEFAULT 0"),
     # FIX-09
     ("zeitplaene", "fehlschlaege", "INTEGER NOT NULL DEFAULT 0"),
+    ("zeitplaene", "art", "TEXT NOT NULL DEFAULT 'auftrag'"),
 ]
 
 
