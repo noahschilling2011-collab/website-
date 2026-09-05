@@ -265,7 +265,7 @@ async def post_weltlage(request: Request, land_iso: str) -> dict:
             kosten=settings.cost_eur,
             max_permission=Permission(settings.max_permission),
             task=task,
-            laufzeit=baue_laufzeit(request, eintrag),
+            laufzeit=baue_laufzeit(request.app, eintrag),
         )
     except Exception as exc:                      # noqa: BLE001
         raise HTTPException(

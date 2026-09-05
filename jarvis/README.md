@@ -91,6 +91,29 @@ Gesichert wird über SQLites Backup-API, nicht mit `cp`: bei eingeschaltetem
 WAL liegen die letzten Schreibvorgänge in `-wal`, und eine kopierte `.db`
 allein ist unvollständig.
 
+### Zeitpläne — Aufträge, die von selbst laufen (FIX-08)
+
+Im Tab *Aufträge* steht oben der Block „Zeitpläne": ein Auftragstext plus
+eine von genau zwei Regeln — `taeglich 07:00` (Ortszeit des Rechners) oder
+`alle 6 stunden`. JARVIS legt daraus zur fälligen Zeit einen ganz normalen
+Auftrag an, mit denselben Agenten, Werkzeugen und Budgets wie ein getippter.
+
+Drei Dinge, die man wissen muss, bevor man einen anlegt:
+
+- **Höchstens LOCAL.** Kein Zeitplan schickt eine Mail oder legt einen
+  Termin an — um 07:00 sitzt niemand da, der das bestätigen könnte. Das ist
+  hart im Code (`core/zeitplan.py`), keine `.env`-Einstellung.
+- **Ein Tagesdeckel für alle Pläne zusammen:** `ZEITPLAN_MAX_LAEUFE_24H=24`
+  und `ZEITPLAN_MAX_TOKEN_24H=50000`. Ist er erreicht, wird übersprungen und
+  der Grund steht am Plan. Das Groq-Tageskontingent (200.000 Token) liegt
+  darüber, mit Absicht.
+- **Verpasste Läufe werden nicht nachgeholt.** War der Rechner um 07:00 aus,
+  läuft der Plan morgen um 07:00 — nicht drei Pläne auf einmal beim Start.
+  Der Zähler „verpasst" zeigt es an.
+
+`ZEITPLAN_TAKT_S=0` schaltet die Schleife ab; Pläne bleiben dann anlegbar und
+über „Jetzt" von Hand auslösbar. Belege und Grenzen: `docs/FIX-08.md`.
+
 ### Docker
 
 ```bash

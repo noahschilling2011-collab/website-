@@ -13,9 +13,9 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Awaitable, Callable
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import FastAPI, APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from api.security import require_token
@@ -83,11 +83,18 @@ class TaskRegistry:
         self._laufend.clear()
 
 
-def baue_laufzeit(request: Request, eintrag: "LaufenderTask") -> Laufzeit:
-    """Verdrahtet die Fortschrittsmeldungen des Runners mit der Datenbank."""
-    settings = request.app.state.settings
+def baue_laufzeit(app: FastAPI, eintrag: "LaufenderTask") -> Laufzeit:
+    """Verdrahtet die Fortschrittsmeldungen des Runners mit der Datenbank.
+
+    Nimmt die App, nicht den Request: bis FIX-08 stand hier `request`, und
+    alle drei Aufrufer reichten ihn nur durch, um an `request.app.state` zu
+    kommen. Ein Zeitplan (core/zeitplan.py) startet Auftraege OHNE Request -
+    um 07:00, ohne dass jemand tippt. Wer einen Request hat, gibt
+    `request.app`.
+    """
+    settings = app.state.settings
     pfad = settings.db_path
-    bus = request.app.state.events
+    bus = app.state.events
     task, abbruch = eintrag.task, eintrag.abbruch
 
     ENDZUSTAENDE = ("done", "failed", "aborted_budget", "cancelled")
@@ -236,10 +243,26 @@ def baue_laufzeit(request: Request, eintrag: "LaufenderTask") -> Laufzeit:
                     audit=audit, abbruch=abbruch)
 
 
-async def starte_task(request: Request, ziel: str, *, voice: bool = False) -> Task:
-    """Legt einen Task an und startet ihn im Hintergrund."""
-    settings = request.app.state.settings
-    registry: TaskRegistry = request.app.state.tasks
+async def starte_task(app: FastAPI, ziel: str, *, voice: bool = False,
+                      max_permission: Permission | None = None,
+                      am_ende: Callable[[Task], Awaitable[None]] | None = None,
+                      ) -> Task:
+    """Legt einen Task an und startet ihn im Hintergrund.
+
+    `max_permission` ueberschreibt die Obergrenze aus der .env nach UNTEN -
+    nie nach oben. Ein Zeitplan gibt hier LOCAL mit, weil um 07:00 niemand
+    da ist, der eine E-Mail bestaetigen koennte (core/zeitplan.py, Regel 1).
+
+    `am_ende` wird EINMAL gerufen, wenn der Task fertig ist und alles
+    geschrieben wurde - egal wie er endete. Ein Zeitplan traegt damit den
+    Ausgang an sich selbst nach. Ein Fehler darin bleibt im Log; der Task
+    ist zu dem Zeitpunkt schon abgeschlossen.
+    """
+    settings = app.state.settings
+    registry: TaskRegistry = app.state.tasks
+    obergrenze = Permission(settings.max_permission)
+    if max_permission is not None and max_permission < obergrenze:
+        obergrenze = max_permission
 
     task = Task(goal=ziel, budget=TaskBudget.from_settings(settings))
     eintrag = LaufenderTask(task=task)
@@ -253,13 +276,13 @@ async def starte_task(request: Request, ziel: str, *, voice: bool = False) -> Ta
     async def lauf() -> None:
         try:
             await fuehre_task_aus(
-                request.app.state.provider,
+                app.state.provider,
                 ziel,
                 budget=task.budget,
                 kosten=settings.cost_eur,
-                max_permission=Permission(settings.max_permission),
+                max_permission=obergrenze,
                 task=task,
-                laufzeit=baue_laufzeit(request, eintrag),
+                laufzeit=baue_laufzeit(app, eintrag),
                 antwortstil=SPRACHSTIL if voice else "",
             )
         except asyncio.CancelledError:
@@ -289,7 +312,7 @@ async def starte_task(request: Request, ziel: str, *, voice: bool = False) -> Ta
             )
             # Jetzt erst: der Task ist fertig UND alles ist geschrieben.
             await asyncio.to_thread(db.save_task, settings.db_path, task)
-            request.app.state.events.publish("task", {
+            app.state.events.publish("task", {
                 "id": task.id, "goal": task.goal, "status": task.status,
                 "depth": task.depth, "spent_tokens": task.spent_tokens,
                 "spent_cost_eur": round(task.spent_cost_eur, 6),
@@ -298,6 +321,11 @@ async def starte_task(request: Request, ziel: str, *, voice: bool = False) -> Ta
                 "final": True,
             })
             registry.remove(task.id)
+            if am_ende is not None:
+                try:
+                    await am_ende(task)
+                except Exception:  # noqa: BLE001 - der Task ist schon fertig
+                    log.exception("task %s: am_ende ist ausgestiegen", task.id)
 
     eintrag.future = asyncio.create_task(lauf())
     return task
@@ -344,7 +372,7 @@ async def post_task(request: Request, body: TaskCreate) -> dict[str, str]:
     ziel = body.goal.strip()
     if not ziel:
         raise HTTPException(status_code=422, detail="Das Ziel ist leer.")
-    task = await starte_task(request, ziel, voice=body.voice)
+    task = await starte_task(request.app, ziel, voice=body.voice)
     return {"task_id": task.id, "status": task.status}
 
 

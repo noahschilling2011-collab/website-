@@ -320,3 +320,37 @@ CREATE TABLE IF NOT EXISTS weltlage_zaehler (
     abfragen   INTEGER NOT NULL DEFAULT 0,   -- echte Auftraege
     verworfen  INTEGER NOT NULL DEFAULT 0
 );
+
+-- ---------------------------------------------------------------------------
+-- FIX-08: Zeitplaene - Auftraege, die JARVIS von selbst wiederholt.
+--
+-- Zwei Tabellen, beide NEU (kein ALTER TABLE noetig, CREATE IF NOT EXISTS
+-- reicht fuer alte wie frische Datenbanken).
+--
+-- `zeitplaene` ist der Plan, `zeitplan_laeufe` das Protokoll. Getrennt,
+-- weil das Tagesbudget ueber das Protokoll gerechnet wird - ueber die
+-- tatsaechlich gestarteten Tasks der letzten 24 Stunden, nicht ueber eine
+-- Zahl, die jemand von Hand hochzaehlt.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS zeitplaene (
+    id              TEXT    PRIMARY KEY,
+    name            TEXT    NOT NULL,
+    ziel            TEXT    NOT NULL,          -- der Auftragstext, woertlich
+    regel           TEXT    NOT NULL,          -- 'taeglich 07:00' | 'alle 6 stunden'
+    aktiv           INTEGER NOT NULL DEFAULT 1,
+    erstellt_am     TEXT    NOT NULL,          -- UTC, 'Z'
+    naechster_lauf  TEXT,                      -- UTC, 'Z'. NULL = pausiert
+    letzter_lauf    TEXT,                      -- UTC, 'Z'
+    letzter_task_id TEXT    REFERENCES tasks(id) ON DELETE SET NULL,
+    letzter_status  TEXT,                      -- 'done' | 'failed' | 'uebersprungen: ...'
+    verpasst        INTEGER NOT NULL DEFAULT 0 -- Laeufe, die nicht nachgeholt wurden
+);
+
+CREATE TABLE IF NOT EXISTS zeitplan_laeufe (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    zeitplan_id   TEXT    NOT NULL REFERENCES zeitplaene(id) ON DELETE CASCADE,
+    task_id       TEXT    REFERENCES tasks(id) ON DELETE SET NULL,
+    gestartet_am  TEXT    NOT NULL,            -- UTC, 'Z'
+    ausloeser     TEXT    NOT NULL             -- 'zeitplan' | 'hand'
+);
+CREATE INDEX IF NOT EXISTS zeitplan_laeufe_zeit ON zeitplan_laeufe(gestartet_am);

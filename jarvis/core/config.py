@@ -141,6 +141,19 @@ class Settings(BaseSettings):
     budget_max_seconds: int = 180
     budget_max_cost_eur: float = 0.50
 
+    # --- FIX-08: Zeitplaene ---
+    # Ein Deckel ueber ALLE Zeitplaene zusammen, rollierend ueber 24 Stunden.
+    # Ein Zeitplan laeuft, waehrend niemand hinsieht - deshalb ist das hier
+    # kein Komfort, sondern die Bremse. Die Vorgaben sind absichtlich klein:
+    # 50.000 Token sind ein Viertel der freien Groq-Stufe (200.000 am Tag),
+    # 24 Laeufe sind einer je Stunde. Wer mehr will, stellt es hier ein -
+    # still erhoeht wird es nicht (CLAUDE.md, Regel 6).
+    zeitplan_max_laeufe_24h: int = 24
+    zeitplan_max_token_24h: int = 50_000
+    # Wie oft die Schleife nachsieht, in Sekunden. Nicht unter 10: die
+    # Schleife weckt den Prozess, und bei 1 Sekunde waere das ein Poller.
+    zeitplan_takt_s: int = 60
+
     # --- Betrieb ---
     # 0.6: Timeout pro LLM-Call 60 s.
     llm_timeout_seconds: float = 60.0

@@ -164,7 +164,7 @@ async def post_ort(request: Request, anfrage: OrtAnfrage) -> dict:
             kosten=settings.cost_eur,
             max_permission=Permission(settings.max_permission),
             task=task,
-            laufzeit=baue_laufzeit(request, eintrag),
+            laufzeit=baue_laufzeit(request.app, eintrag),
         )
         text = task.result or ""
     except Exception as exc:                      # noqa: BLE001

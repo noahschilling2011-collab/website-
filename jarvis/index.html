@@ -767,6 +767,36 @@ button, input, textarea { font: inherit; color: inherit; }
 .zustand.is-failed, .zustand.is-aborted_budget { color: var(--danger); border-color: rgba(242,114,107,0.4); }
 .zustand.is-running, .zustand.is-pending { color: var(--accent); border-color: var(--accent-line); }
 
+/* --- Zeitpläne (FIX-08) --------------------------------------------------
+   Nur vorhandene Tokens, keine neue Dauer, keine neue Farbe: die Guards in
+   tests/test_designsystem.py lesen diesen Block mit. */
+.zeitplan-hinweis { margin: 0 0 var(--s-3); font-size: var(--step--1); color: var(--text-dim); }
+.zeitplan-form { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-bottom: var(--s-3); }
+.zeitplan-form input {
+  flex: 1 1 160px;
+  min-width: 0;
+  padding: 8px var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-0);
+}
+.zeitplan-form input.is-breit { flex-basis: 100%; }
+.zeitplan-form button {
+  flex: none;
+  padding: 8px var(--s-3);
+  border: 0; border-radius: 10px;
+  background: var(--accent); color: var(--on-accent);
+  cursor: pointer;
+}
+.zeitplan-deckel { margin: 0 0 var(--s-3); font-size: var(--step--1); color: var(--danger); }
+.zeitplan { border-top: 1px solid var(--line); padding: var(--s-3) 0; }
+.zeitplan.is-aus { opacity: 0.55; }
+.zeitplan-kopf { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); }
+.zeitplan-kopf strong { font-weight: 500; color: var(--text-loud); }
+.zeitplan-regel { font-size: 11px; color: var(--text-dim); }
+.zeitplan-ziel { margin: var(--s-2) 0; font-size: var(--step--1); white-space: pre-wrap; }
+.zeitplan-aktionen { display: flex; gap: var(--s-2); margin-top: var(--s-2); }
+
 .tabelle { width: 100%; border-collapse: collapse; font-size: var(--step--1); }
 .tabelle th, .tabelle td {
   text-align: left;
@@ -2543,10 +2573,168 @@ button, input, textarea { font: inherit; color: inherit; }
     var ziel = document.getElementById('view-tasks');
     return api('/api/tasks').then(function (liste) {
       ziel.textContent = '';
+      ziel.appendChild(zeitplanBlock());
       var oberste = (liste || []).filter(function (t) { return !t.parent_task_id; });
       if (!oberste.length) { ziel.appendChild(leer('Noch kein Auftrag gelaufen.')); return; }
       oberste.forEach(function (t) { ziel.appendChild(taskKarte(t)); });
     }).catch(function (err) { ziel.textContent = ''; ziel.appendChild(leer(err.message)); });
+  }
+
+  // --- Zeitpläne (FIX-08) -------------------------------------------------
+  //
+  // JARVIS wiederholt eigene Aufträge von selbst. Die Regeln (höchstens
+  // LOCAL, ein Deckel über 24 h für alle Pläne zusammen, verpasste Läufe
+  // werden nicht nachgeholt) stehen in core/zeitplan.py. Hier wird nur
+  // angezeigt, angelegt und geschaltet — alles über textContent.
+
+  function zeitplanBlock() {
+    var box = karte('Zeitpläne');
+    var hinweis = document.createElement('p');
+    hinweis.className = 'zeitplan-hinweis';
+    hinweis.textContent = 'JARVIS wiederholt einen Auftrag von selbst. Höchstens lokal '
+      + '(keine Mail, kein Termin — niemand ist da, um zu bestätigen), ein Tagesdeckel '
+      + 'für alle Pläne zusammen, verpasste Läufe werden nicht nachgeholt.';
+    box.appendChild(hinweis);
+
+    var form = document.createElement('form');
+    form.className = 'zeitplan-form';
+    var felder = {};
+    [['name', 'Name des Zeitplans', 'Name, z. B. Morgenlage'],
+     ['regel', 'Regel', 'taeglich 07:00 oder alle 6 stunden'],
+     ['ziel', 'Auftrag', 'Was JARVIS jedes Mal tun soll']].forEach(function (f) {
+      var input = document.createElement('input');
+      input.name = f[0];
+      input.setAttribute('aria-label', f[1]);
+      input.placeholder = f[2];
+      input.required = true;
+      input.autocomplete = 'off';
+      if (f[0] === 'ziel') input.className = 'is-breit';
+      felder[f[0]] = input;
+      form.appendChild(input);
+    });
+    var knopf = document.createElement('button');
+    knopf.type = 'submit';
+    knopf.textContent = 'Zeitplan anlegen';
+    form.appendChild(knopf);
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      api('/api/zeitplaene', { method: 'POST', body: {
+        name: felder.name.value.trim(),
+        regel: felder.regel.value.trim(),
+        ziel: felder.ziel.value.trim()
+      } }).then(function () { form.reset(); return ladeZeitplaene(liste); })
+        .catch(function (err) { meldung(err.message); });
+    });
+    box.appendChild(form);
+
+    var liste = document.createElement('div');
+    liste.className = 'zeitplan-liste';
+    box.appendChild(liste);
+    ladeZeitplaene(liste);
+    return box;
+  }
+
+  function ladeZeitplaene(liste) {
+    return api('/api/zeitplaene').then(function (d) {
+      liste.textContent = '';
+      var v = d.verbrauch || {};
+      var zeile = document.createElement('div');
+      zeile.className = 'karte-zeile';
+      ['Letzte 24 h: ' + v.laeufe + ' von ' + v.max_laeufe + ' Läufen, '
+         + v.token + ' von ' + v.max_token + ' Token',
+       'Obergrenze ' + d.obergrenze,
+       d.schleife ? 'Schleife läuft' : 'Schleife aus (ZEITPLAN_TAKT_S=0)'
+      ].forEach(function (text) {
+        var s = document.createElement('span');
+        s.textContent = text;
+        zeile.appendChild(s);
+      });
+      liste.appendChild(zeile);
+      if (d.deckel) {
+        var warn = document.createElement('p');
+        warn.className = 'zeitplan-deckel';
+        warn.textContent = d.deckel;
+        liste.appendChild(warn);
+      }
+      var plaene = d.zeitplaene || [];
+      if (!plaene.length) { liste.appendChild(leer('Noch kein Zeitplan.')); return; }
+      plaene.forEach(function (p) { liste.appendChild(zeitplanNode(p, liste)); });
+    }).catch(function (err) { liste.textContent = ''; liste.appendChild(leer(err.message)); });
+  }
+
+  function zeitplanNode(p, liste) {
+    var box = document.createElement('div');
+    box.className = 'zeitplan' + (p.aktiv ? '' : ' is-aus');
+
+    var kopf = document.createElement('div');
+    kopf.className = 'zeitplan-kopf';
+    var name = document.createElement('strong');
+    name.textContent = p.name;
+    kopf.appendChild(name);
+    kopf.appendChild(zustandNode(p.aktiv ? 'running' : 'aus'));
+    kopf.lastChild.textContent = p.aktiv ? 'aktiv' : 'aus';
+    var regel = document.createElement('span');
+    regel.className = 'zeitplan-regel';
+    regel.textContent = p.regel;
+    kopf.appendChild(regel);
+    box.appendChild(kopf);
+
+    var ziel = document.createElement('p');
+    ziel.className = 'zeitplan-ziel';
+    ziel.textContent = p.ziel;
+    box.appendChild(ziel);
+
+    var zeile = document.createElement('div');
+    zeile.className = 'karte-zeile';
+    var infos = [];
+    infos.push(p.aktiv && p.naechster_lauf
+      ? 'nächster Lauf ' + datumZeitText(p.naechster_lauf) : 'kein nächster Lauf');
+    if (p.letzter_lauf) infos.push('zuletzt ' + datumZeitText(p.letzter_lauf));
+    if (p.verpasst) infos.push(p.verpasst + '× verpasst, nicht nachgeholt');
+    infos.forEach(function (text) {
+      var s = document.createElement('span');
+      s.textContent = text;
+      zeile.appendChild(s);
+    });
+    if (p.letzter_status) {
+      // Kurze Zustände (done, failed, laeuft) bekommen die Farbe der
+      // Auftragskarten; ein ganzer Satz ("uebersprungen: …") bleibt Text.
+      zeile.appendChild(/^[a-z_]+$/.test(p.letzter_status)
+        ? zustandNode(p.letzter_status === 'laeuft' ? 'running' : p.letzter_status)
+        : document.createTextNode(p.letzter_status));
+      if (p.letzter_status === 'laeuft') zeile.lastChild.textContent = 'läuft';
+    }
+    box.appendChild(zeile);
+
+    var aktionen = document.createElement('div');
+    aktionen.className = 'zeitplan-aktionen';
+    [[p.aktiv ? 'Aus' : 'An', function () {
+        return api('/api/zeitplaene/' + p.id + '/schalten',
+                   { method: 'POST', body: { aktiv: !p.aktiv } });
+      }, false],
+     ['Jetzt', function () {
+        return api('/api/zeitplaene/' + p.id + '/jetzt', { method: 'POST' });
+      }, false],
+     ['Löschen', function () {
+        return api('/api/zeitplaene/' + p.id, { method: 'DELETE' });
+      }, true]
+    ].forEach(function (a) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'fakt-aktion' + (a[2] ? ' is-loeschen' : '');
+      b.textContent = a[0];
+      b.addEventListener('click', function () {
+        a[1]().then(function (d) {
+          if (d && d.task_id) meldung('Zeitplan „' + p.name + '" läuft jetzt (Auftrag ' + d.task_id + ').');
+          // "Jetzt" legt einen Auftrag an - die ganze Ansicht neu, damit er
+          // unten auch erscheint. Sonst nur die Liste.
+          return a[0] === 'Jetzt' ? ladeTasks() : ladeZeitplaene(liste);
+        }).catch(function (err) { meldung(err.message); });
+      });
+      aktionen.appendChild(b);
+    });
+    box.appendChild(aktionen);
+    return box;
   }
 
   function taskKarte(t) {

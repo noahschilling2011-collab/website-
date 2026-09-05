@@ -23,6 +23,7 @@ from core.db import connect, init_db
 from core.llm import LLMError, LLMProvider, build_provider
 from api.ort import ort_router
 from api.weltlage import weltlage_router
+from api.zeitplan import zeitplan_router, zeitplan_schleife
 from core.tools import registry
 
 log = logging.getLogger("jarvis")
@@ -234,9 +235,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "Trag ihn in die .env ein, sonst aendert er sich bei jedem Start.",
                 app.state.token,
             )
+        # FIX-08: die Schleife, die Zeitplaene ausloest. Sie startet NACH
+        # dem "bereit", damit ihre erste Runde einen fertigen Zustand sieht.
+        # ZEITPLAN_TAKT_S=0 schaltet sie ab - die Plaene bleiben dann
+        # anlegbar und von Hand ausloesbar, laufen aber nicht von selbst.
+        app.state.zeitplan_task = None
+        if settings.zeitplan_takt_s > 0:
+            app.state.zeitplan_task = asyncio.create_task(zeitplan_schleife(app))
+        else:
+            log.info("ZEITPLAN_TAKT_S=0 - Zeitplaene laufen nicht von selbst.")
         try:
             yield
         finally:
+            # Erst die Schleife, dann die Tasks: sonst startet sie zwischen
+            # stop_alle und dem Ende noch einen neuen.
+            schleife = app.state.zeitplan_task
+            if schleife is not None:
+                schleife.cancel()
+                try:
+                    await schleife
+                except asyncio.CancelledError:
+                    pass
             # Laufende Tasks beenden, bevor der Prozess geht - sonst haengen
             # Modellaufrufe in der Luft, die schon Geld gekostet haben.
             await app.state.tasks.stop_alle()
@@ -272,5 +291,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(weltlage_router)
     app.include_router(api)
     app.include_router(tasks_router)
+    app.include_router(zeitplan_router)
     app.include_router(router)
     return app

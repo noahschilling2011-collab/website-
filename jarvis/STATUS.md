@@ -4,7 +4,7 @@
 > und aktualisiert sie am Ende jeder Phase. Von Hand korrigieren ist erlaubt.
 
 AKTUELL: FIX-06 — COMMAND CENTER, siehe `docs/FIX-06.md`. Abschnitte 5 (Design-System), 6 (COMMAND CENTER) und 7 (WELT-NETZ) sind gebaut; **8 (MÄRKTE) steht aus und ist blockiert** — der Auftragstext dafür liegt nicht im Repo, nur der Name in der Kopfzeile von `docs/FIX-06.md`.
-LETZTE ÄNDERUNG: 2026-08-29 (CDSE-Zugang: die Anleitung war falsch, der Code auch — zwei Dashboards, ein Token ohne Ablauf, ein Kontingent um Faktor 5 daneben)
+LETZTE ÄNDERUNG: 2026-09-05 (FIX-08 Zeitpläne: JARVIS wiederholt eigene Aufträge — LOCAL als harte Grenze, Tagesdeckel über alle Pläne, verpasste Läufe werden gezählt statt nachgeholt; siehe `docs/FIX-08.md`)
 
 > **Abweichung von der Arbeitsweise, auf Ansage:** es wurden alle Phasen
 > gebaut, nicht eine nach der anderen. Das widerspricht CLAUDE.md
@@ -2246,3 +2246,52 @@ eine Stack-Änderung** (`python-dateutil`) und braucht seine Zusage.
 | 2026-08-25 | Fehlgeschlagene Modellaufrufe kommen auch in `llm_calls` | Sonst fällt eine Retry-Schleife, die Geld verbrennt, erst auf der Rechnung auf. |
 | 2026-08-25 | Brave Search als Suchanbieter | Doku nachgeschlagen, Endpunkt und Header verifiziert. Ein Wechsel ist ein neuer `Tool`, kein Umbau. |
 | 2026-08-25 | Chat-Agent läuft mit `max_permission = READ` | Er darf lesen und rechnen, aber nichts schreiben und nichts nach außen schicken. Höher zu gehen ist eine bewusste Entscheidung. |
+
+## FIX-08 — Zeitpläne: Aufgaben automatisieren
+
+> Noah, 05.09.2026: „dass er auch Aufgaben automatisieren kann". Auftrag
+> und Belege in `docs/FIX-08.md`. Hier nur, was steht und was nicht.
+
+**Gebaut.** Ein Zeitplan ist ein Auftragstext plus eine von zwei Regeln —
+`taeglich 07:00` (Ortszeit) oder `alle 6 stunden`. Eine Schleife im
+Lebenszyklus der App (`ZEITPLAN_TAKT_S`, Vorgabe 60 s) startet fällige Pläne
+über **denselben** `starte_task` wie ein getippter Auftrag; es gibt keinen
+zweiten Runner. Oberfläche: Block „Zeitpläne" oben in *Aufträge* — anlegen,
+an/aus, Jetzt, löschen, Verbrauchszeile.
+
+**Drei Regeln, jede mit einem Test, der fällt, wenn man sie streicht:**
+
+| Regel | Warum | Test |
+|---|---|---|
+| Obergrenze **LOCAL**, egal was `MAX_PERMISSION` sagt | um 07:00 sitzt niemand da, der eine Mail bestätigt | `test_regel_1_die_obergrenze_ist_local_egal_was_die_env_sagt` (+ Gegenprobe: getippt bleibt EXTERNAL) |
+| **Tagesdeckel** über alle Pläne, Läufe *und* Token, über die echten Tasks gerechnet | ein Stundenplan mit 8.000 Token frisst das Groq-Kontingent still an einem Tag | `test_verbrauch_zaehlt_alle_plaene_ueber_24_stunden`, `test_der_deckel_ist_nicht_stillschweigend_erhoeht_worden` |
+| Verpasste Läufe werden **gezählt, nicht nachgeholt** | sonst feuern drei Pläne gleichzeitig, wenn der Rechner hochfährt | `test_regel_3_verpasst_wird_gezaehlt_nicht_nachgeholt`, `test_einschalten_rechnet_den_termin_neu_statt_sofort_zu_feuern` |
+
+**Ausgeführt:** `python -m pytest tests/test_zeitplan.py -p no:randomly -W ignore`
+→ `65 passed in 3.75s`. Rauchtest im echten Chromium gegen uvicorn +
+FakeLLMProvider: anlegen, falsche Regel abgewiesen, an/aus, Jetzt (Auftrag
+lief durch, `done`, 448 Token in der Verbrauchszeile), löschen, sechs
+Fokusringe im Akzent. Protokoll in `docs/FIX-08.md`.
+
+**Ein Fehler beim Bauen, und er war ein guter:** mein erster Test erfand
+Task-IDs, die Datenbank lehnte sie ab (`FOREIGN KEY constraint failed`). Der
+Fremdschlüssel bleibt und ist jetzt selbst getestet.
+
+**UNSICHER, dokumentiert:** die Ortszeit ist ein fester Versatz, keine
+IANA-Zone — der eine Lauf direkt nach einer Zeitumstellung kann eine Stunde
+danebenliegen, ab dem zweiten stimmt es wieder. In vier Zonen getestet
+(`TZ` + `tzset`, Linux).
+
+**Nicht gebaut, mit Absicht:** Wochentage/Cron, Nachholen, EXTERNAL im
+Zeitplan (bräuchte eine Freigabe im Voraus — eigener Auftrag). Im
+Chat-Verlauf erscheint der Auftragstext eines Zeitplans als Nutzer-Nachricht,
+wie ein getippter; die Herkunft steht am Zeitplan, nicht im Verlauf.
+
+**Kein Computer-Agent.** JARVIS wiederholt seine eigenen Aufträge. Non-Goal
+aus `CLAUDE.md` unverändert gestrichen.
+
+**Nebenfund, behoben:** `scripts/backup.py` zählte beim Prüfen eine Liste
+von Hand — acht Tabellen, das Schema hatte zwölf. `lookups`,
+`vault_notizen` und die zwei Weltlage-Tabellen fehlten still, die zwei neuen
+hätten auch gefehlt. Jetzt wird gezählt, was in der Datei ist;
+`tests/test_backup_zaehlt_alles.py` hält das gegen `core/schema.sql`.

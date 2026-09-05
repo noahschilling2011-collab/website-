@@ -24,8 +24,17 @@ from pathlib import Path
 
 from core.config import get_settings
 
-TABELLEN = ("messages", "llm_calls", "tool_calls", "facts", "task_log",
-            "tasks", "steps", "audit_log")
+# Keine Liste von Hand mehr. Die gab es bis FIX-08 - und sie kannte weder
+# `lookups` noch `vault_notizen` noch die zwei Weltlage-Tabellen, alle
+# spaeter dazugekommen. "pruefen" meldete also Zeilenzahlen fuer acht
+# Tabellen und schwieg zu vier. Jetzt zaehlt es, was in der Datei IST:
+# jede eigene Tabelle ausser den abgeleiteten Volltextindizes (*_fts und
+# ihre Schattentabellen) und SQLites eigenen (sqlite_*).
+def tabellen(conn: sqlite3.Connection) -> list[str]:
+    namen = [r[0] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")]
+    return [n for n in namen
+            if not n.startswith("sqlite_") and "_fts" not in n]
 
 
 def sichern(quelle: Path, ziel: Path) -> Path:
@@ -48,14 +57,9 @@ def sichern(quelle: Path, ziel: Path) -> Path:
 def zaehle(datei: Path) -> dict[str, int]:
     conn = sqlite3.connect(datei)
     try:
-        vorhanden = {
-            r[0] for r in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            )
-        }
         return {
-            t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
-            for t in TABELLEN if t in vorhanden
+            t: conn.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0]
+            for t in tabellen(conn)
         }
     finally:
         conn.close()
