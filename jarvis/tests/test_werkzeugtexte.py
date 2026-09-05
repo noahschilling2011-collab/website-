@@ -140,8 +140,12 @@ def test_die_archivierten_staende_stimmen_mit_dem_code_ueberein():
 def test_der_vorher_stand_ist_noch_da_und_ist_ein_anderer():
     """Ohne ihn laesst sich Schritt B nicht belegen, sondern nur behaupten."""
     vorher = json.loads(VORHER.read_text(encoding="utf-8"))
-    assert set(vorher) == set(_texte())
-    assert vorher != _texte()
+    # Der Vorher-Stand ist die Messung vom 30.08.2026 ueber die 18 Werkzeuge,
+    # die es damals gab. Werkzeuge, die spaeter dazukamen (FIX-09: wetter,
+    # erinnerung_anlegen), haben kein "vorher" - sie duerfen fehlen, aber
+    # kein damals gemessenes Werkzeug darf verschwinden.
+    assert set(vorher) <= set(_texte())
+    assert {k: v for k, v in _texte().items() if k in vorher} != vorher
     # Der dokumentierte Ausgangswert.
     assert sum(len(v) for v in vorher.values()) == 4601
 
