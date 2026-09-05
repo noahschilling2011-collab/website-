@@ -74,6 +74,13 @@ PERMISSION_DECKEL = Permission.LOCAL
 # Hochfahren drei Zeitplaene auf einmal loest.
 TOLERANZ = timedelta(minutes=2)
 
+
+def toleranz_fuer(takt_s: int | float) -> timedelta:
+    """Die Toleranz muss zum Takt passen. Prueft die Schleife nur alle
+    180 Sekunden, waere jeder Lauf mit fester 2-Minuten-Toleranz "verpasst" -
+    taeglich. Zwei Takte sind der Spielraum, mindestens die zwei Minuten."""
+    return max(TOLERANZ, timedelta(seconds=2 * max(0, float(takt_s))))
+
 _TAEGLICH = re.compile(r"^taeglich (\d{1,2}):(\d{2})$")
 _STUNDEN = re.compile(r"^alle (\d{1,3}) stunden?$")
 
@@ -106,6 +113,10 @@ def lies_regel(roh: str) -> Regel:
     """
     text = " ".join(str(roh or "").strip().lower().split())
     text = text.replace("täglich", "taeglich").replace("stunde ", "stunden ")
+    # Was in der Absage zitiert wird: hoechstens 40 Zeichen. Wer 10.000
+    # Zeichen in das Regelfeld schiebt, bekommt sie nicht zurueckgespiegelt.
+    roh = str(roh or "")
+    roh = roh if len(roh) <= 40 else roh[:40] + "…"
     m = _TAEGLICH.match(text)
     if m:
         h, mi = int(m.group(1)), int(m.group(2))
@@ -244,14 +255,16 @@ def faellige(db_path: Path | str, jetzt: datetime | None = None) -> list[dict]:
     return [dict(z) for z in zeilen]
 
 
-def ist_verpasst(plan: dict, jetzt: datetime | None = None) -> bool:
-    """Regel 3: faellig seit laenger als TOLERANZ heisst verpasst, nicht
-    nachholen. Passiert, wenn der Rechner aus war."""
+def ist_verpasst(plan: dict, jetzt: datetime | None = None,
+                 toleranz: timedelta | None = None) -> bool:
+    """Regel 3: faellig seit laenger als die Toleranz heisst verpasst, nicht
+    nachholen. Passiert, wenn der Rechner aus war. Die Schleife gibt
+    `toleranz_fuer(takt)` mit; ohne Angabe gilt TOLERANZ."""
     if not plan.get("naechster_lauf"):
         return False
     soll = _aus_z(plan["naechster_lauf"])
     ist = (jetzt or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    return ist - soll > TOLERANZ
+    return ist - soll > (toleranz or TOLERANZ)
 
 
 def verbuche_start(db_path: Path | str, plan: dict, task_id: str | None,
@@ -260,17 +273,24 @@ def verbuche_start(db_path: Path | str, plan: dict, task_id: str | None,
     """Ein Lauf hat begonnen (oder wurde uebersprungen): Protokoll schreiben
     und den naechsten Termin setzen.
 
+    Geschrieben wird NUR, was sich aendert. Der `plan`, den der Aufrufer
+    hier hereingibt, kann Sekunden alt sein - inzwischen hat vielleicht ein
+    Handlauf `letzter_task_id` gesetzt. Wer alte Werte zurueckschreibt,
+    macht genau das rueckgaengig (erste Pruefrunde, Fund 1).
+
     `ausloeser='hand'` (der Knopf "Jetzt") laesst den Termin, wie er ist: ein
     Probelauf um 15:00 verschiebt "taeglich 07:00" nicht und setzt auch
     "alle 6 stunden" nicht neu an. Er zaehlt aber fuer den Deckel - Token
-    sind Token, egal wer den Lauf ausgeloest hat."""
+    sind Token, egal wer den Lauf ausgeloest hat.
+
+    Der naechste Takt zaehlt ab dem SOLL-Termin, nicht ab dem Zeitpunkt, an
+    dem die Schleife ihn bemerkt hat. Sonst schiebt jede Runde den Takt um
+    ihre Verzoegerung nach hinten - 18 Minuten am Tag bei "alle 1 stunde",
+    gemessen in der ersten Pruefrunde (Fund 4).
+    """
     regel = lies_regel(plan["regel"])
     zeitpunkt = (jetzt or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    if ausloeser == "hand":
-        naechster = plan.get("naechster_lauf")
-    else:
-        naechster = naechster_lauf(regel, ab=zeitpunkt,
-                                   letzter=zeitpunkt if task_id else None)
+    soll = _aus_z(plan["naechster_lauf"]) if plan.get("naechster_lauf") else zeitpunkt
     with session(db_path) as conn:
         if task_id:
             conn.execute(
@@ -278,15 +298,21 @@ def verbuche_start(db_path: Path | str, plan: dict, task_id: str | None,
                 "ausloeser) VALUES (?, ?, ?, ?)",
                 (plan["id"], task_id, _als_z(zeitpunkt), ausloeser),
             )
-        conn.execute(
-            "UPDATE zeitplaene SET letzter_lauf = ?, letzter_task_id = ?, "
-            "letzter_status = ?, naechster_lauf = ? WHERE id = ?",
-            (_als_z(zeitpunkt) if task_id else plan.get("letzter_lauf"),
-             task_id or plan.get("letzter_task_id"),
-             status,
-             naechster,
-             plan["id"]),
-        )
+            conn.execute(
+                "UPDATE zeitplaene SET letzter_lauf = ?, letzter_task_id = ?, "
+                "letzter_status = ? WHERE id = ?",
+                (_als_z(zeitpunkt), task_id, status, plan["id"]),
+            )
+        else:
+            conn.execute(
+                "UPDATE zeitplaene SET letzter_status = ? WHERE id = ?",
+                (status, plan["id"]),
+            )
+        if ausloeser != "hand":
+            conn.execute(
+                "UPDATE zeitplaene SET naechster_lauf = ? WHERE id = ?",
+                (naechster_lauf(regel, ab=zeitpunkt, letzter=soll), plan["id"]),
+            )
 
 
 def verbuche_verpasst(db_path: Path | str, plan: dict,
@@ -334,12 +360,17 @@ def verbrauch_24h(db_path: Path | str, jetzt: datetime | None = None) -> Verbrau
     return Verbrauch(laeufe=int(z["laeufe"] or 0), token=int(z["token"] or 0))
 
 
+def _de(n: int) -> str:
+    """50.000, nicht 50,000 - dieselbe Schreibweise wie die Oberflaeche."""
+    return f"{n:,}".replace(",", ".")
+
+
 def deckel_erreicht(verbrauch: Verbrauch, *, max_laeufe: int, max_token: int) -> str | None:
     """Regel 2, die Entscheidung. Gibt den Grund zurueck oder None."""
     if verbrauch.laeufe >= max_laeufe:
         return (f"Tagesdeckel erreicht: {verbrauch.laeufe} von {max_laeufe} "
                 f"Laeufen in 24 Stunden (ZEITPLAN_MAX_LAEUFE_24H).")
     if verbrauch.token >= max_token:
-        return (f"Tagesdeckel erreicht: {verbrauch.token:,} von {max_token:,} "
+        return (f"Tagesdeckel erreicht: {_de(verbrauch.token)} von {_de(max_token)} "
                 f"Token in 24 Stunden (ZEITPLAN_MAX_TOKEN_24H).")
     return None

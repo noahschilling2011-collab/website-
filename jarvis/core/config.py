@@ -181,6 +181,28 @@ class Settings(BaseSettings):
     def _absoluter_pfad(cls, value: Path) -> Path:
         return value if value.is_absolute() else PROJECT_ROOT / value
 
+    @field_validator("max_permission")
+    @classmethod
+    def _stufe_gibt_es(cls, value: int) -> int:
+        """MAX_PERMISSION=9 fiel bis FIX-08 erst beim ersten Auftrag auf -
+        als 500 im Browser. Ein Einrichtungsfehler gehoert an den Start."""
+        from core.contracts import Permission
+
+        if value not in {p.value for p in Permission}:
+            raise ValueError(
+                f"MAX_PERMISSION={value} ist keine Stufe. Erlaubt: "
+                + ", ".join(f"{p.value} ({p.name})" for p in Permission)
+            )
+        return value
+
+    @field_validator("zeitplan_max_laeufe_24h", "zeitplan_max_token_24h",
+                     "zeitplan_takt_s")
+    @classmethod
+    def _nicht_negativ(cls, value: int) -> int:
+        if value < 0:
+            raise ValueError("Zeitplan-Werte sind 0 oder groesser.")
+        return value
+
     @property
     def prices_configured(self) -> bool:
         return (

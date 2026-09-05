@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from typing import Any, Awaitable, Callable
 
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, Request
@@ -246,6 +246,7 @@ def baue_laufzeit(app: FastAPI, eintrag: "LaufenderTask") -> Laufzeit:
 async def starte_task(app: FastAPI, ziel: str, *, voice: bool = False,
                       max_permission: Permission | None = None,
                       am_ende: Callable[[Task], Awaitable[None]] | None = None,
+                      budget: TaskBudget | None = None,
                       ) -> Task:
     """Legt einen Task an und startet ihn im Hintergrund.
 
@@ -257,6 +258,10 @@ async def starte_task(app: FastAPI, ziel: str, *, voice: bool = False,
     geschrieben wurde - egal wie er endete. Ein Zeitplan traegt damit den
     Ausgang an sich selbst nach. Ein Fehler darin bleibt im Log; der Task
     ist zu dem Zeitpunkt schon abgeschlossen.
+
+    `budget` kann die Vorgaben aus der .env nur UNTERSCHREITEN. Jedes Feld,
+    das hoeher waere, wird auf die Vorgabe gedrueckt - CLAUDE.md Regel 6
+    gilt auch fuer Aufrufer im eigenen Haus.
     """
     settings = app.state.settings
     registry: TaskRegistry = app.state.tasks
@@ -264,7 +269,12 @@ async def starte_task(app: FastAPI, ziel: str, *, voice: bool = False,
     if max_permission is not None and max_permission < obergrenze:
         obergrenze = max_permission
 
-    task = Task(goal=ziel, budget=TaskBudget.from_settings(settings))
+    vorgabe = TaskBudget.from_settings(settings)
+    if budget is not None:
+        for feld in fields(TaskBudget):
+            wert, grenze = getattr(budget, feld.name), getattr(vorgabe, feld.name)
+            setattr(vorgabe, feld.name, min(wert, grenze))
+    task = Task(goal=ziel, budget=vorgabe)
     eintrag = LaufenderTask(task=task)
     registry.add(eintrag)
 

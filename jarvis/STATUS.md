@@ -2268,10 +2268,22 @@ an/aus, Jetzt, löschen, Verbrauchszeile.
 | Verpasste Läufe werden **gezählt, nicht nachgeholt** | sonst feuern drei Pläne gleichzeitig, wenn der Rechner hochfährt | `test_regel_3_verpasst_wird_gezaehlt_nicht_nachgeholt`, `test_einschalten_rechnet_den_termin_neu_statt_sofort_zu_feuern` |
 
 **Ausgeführt:** `python -m pytest tests/test_zeitplan.py -p no:randomly -W ignore`
-→ `65 passed in 3.75s`. Rauchtest im echten Chromium gegen uvicorn +
+→ `84 passed in 7.48s` (65 beim Bauen, 19 aus der Prüfrunde). Rauchtest im echten Chromium gegen uvicorn +
 FakeLLMProvider: anlegen, falsche Regel abgewiesen, an/aus, Jetzt (Auftrag
 lief durch, `done`, 448 Token in der Verbrauchszeile), löschen, sechs
 Fokusringe im Akzent. Protokoll in `docs/FIX-08.md`.
+
+**Prüfrunde mit zwei Skeptikern — 18 bestätigte Funde, alle behoben,
+alle in `docs/FIX-08.md` mit Beleg.** Die vier, die Geld gekostet hätten:
+Schleife und „Jetzt"-Knopf starteten denselben Plan doppelt (20 von 20
+Versuchen); der Token-Deckel zählte laufende Tasks mit 0, drei
+gleichzeitige Pläne konnten ihn verdreifachen; „alle N stunden" driftete
+18 Minuten am Tag; und in der Oberfläche war **jede** Meldung unsichtbar,
+weil sie in den versteckten Composer ging — der erste Rauchtest las den Text
+per `text_content()` und merkte es nicht. Jetzt: Plan wird beansprucht,
+bevor er gelesen wird; laufende Tasks reservieren, was sie noch dürfen, und
+kein Lauf bekommt mehr als den Rest des Tages; der Takt zählt ab Soll;
+Meldungen stehen im Block. Drei Tests gegen ihre Mutation geprüft.
 
 **Ein Fehler beim Bauen, und er war ein guter:** mein erster Test erfand
 Task-IDs, die Datenbank lehnte sie ab (`FOREIGN KEY constraint failed`). Der

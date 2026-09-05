@@ -14,6 +14,7 @@ Alles gegen FakeLLMProvider - kein Modellaufruf, kein Netz.
 from __future__ import annotations
 
 import asyncio
+import functools
 import os
 import time
 from datetime import datetime, timedelta, timezone
@@ -243,8 +244,9 @@ def test_verbuche_start_schreibt_protokoll_und_neuen_termin(settings):
     assert danach["letzter_task_id"] == tid
     assert danach["letzter_status"] == "laeuft"
     assert danach["letzter_lauf"] == zeitplan._als_z(jetzt)
-    assert zeitplan._aus_z(danach["naechster_lauf"]) == (
-        zeitplan._aus_z(zeitplan._als_z(jetzt)) + timedelta(hours=6))
+    # Der naechste Takt zaehlt ab SOLL (f["naechster_lauf"]), nicht ab jetzt.
+    soll = zeitplan._aus_z(f["naechster_lauf"])
+    assert zeitplan._aus_z(danach["naechster_lauf"]) == soll + timedelta(hours=6)
     assert zeitplan.verbrauch_24h(settings.db_path).laeufe == 1
 
 
@@ -591,3 +593,309 @@ def test_die_oberflaeche_ruft_jede_route(client):
     for stueck in ("/api/zeitplaene'", "/schalten'", "/jetzt'", "{ method: 'DELETE' }"):
         assert stueck in html, stueck
     assert "Zeitpläne" in html
+
+
+# --- Erste Pruefrunde (docs/FIX-08.md): sechs Funde, sechs Tests ---------
+
+
+def test_fund4_der_stundentakt_driftet_nicht(settings):
+    """Soll 07:00, die Schleife merkt es um 07:00:45 - der naechste Lauf ist
+    08:00:00, nicht 08:00:45. Vorher: 18 Minuten Drift am Tag."""
+    with session(settings.db_path) as conn:
+        db.init_db(conn)
+    plan = _plan(settings.db_path, regel="alle 1 stunde")
+    soll = datetime(2026, 9, 5, 7, 0, tzinfo=timezone.utc)
+    with session(settings.db_path) as conn:
+        conn.execute("UPDATE zeitplaene SET naechster_lauf = ? WHERE id = ?",
+                     (zeitplan._als_z(soll), plan["id"]))
+    for i in range(24):
+        f = zeitplan.hole(settings.db_path, plan["id"])
+        bemerkt = zeitplan._aus_z(f["naechster_lauf"]) + timedelta(seconds=45)
+        tid = _task(settings.db_path)
+        zeitplan.verbuche_start(settings.db_path, f, tid, ausloeser="zeitplan",
+                                status="laeuft", jetzt=bemerkt)
+    ende = zeitplan._aus_z(zeitplan.hole(settings.db_path, plan["id"])["naechster_lauf"])
+    assert ende == soll + timedelta(hours=24)
+    # Uebersprungen (kein Task) haelt den Takt genauso.
+    f = zeitplan.hole(settings.db_path, plan["id"])
+    zeitplan.verbuche_start(settings.db_path, f, None, ausloeser="zeitplan",
+                            status="uebersprungen: Test", jetzt=ende + timedelta(seconds=50))
+    assert zeitplan._aus_z(zeitplan.hole(settings.db_path, plan["id"])["naechster_lauf"]) \
+        == soll + timedelta(hours=25)
+
+
+def test_fund1_buchung_schreibt_keine_alten_werte_zurueck(settings):
+    """Der Plan, den die Schleife in der Hand hat, ist Sekunden alt. Was sie
+    NICHT aendert, darf sie auch nicht zurueckschreiben."""
+    with session(settings.db_path) as conn:
+        db.init_db(conn)
+    plan = _plan(settings.db_path, regel="alle 6 stunden")
+    alt = dict(plan)                                  # der veraltete Stand
+    # Inzwischen: ein Handlauf hat letzter_task_id gesetzt ...
+    t_hand = _task(settings.db_path)
+    zeitplan.verbuche_start(settings.db_path, plan, t_hand, ausloeser="hand", status="laeuft")
+    # ... und die Schleife bucht mit dem ALTEN dict ein Ueberspringen.
+    zeitplan.verbuche_start(settings.db_path, alt, None, ausloeser="zeitplan",
+                            status="uebersprungen: Test")
+    danach = zeitplan.hole(settings.db_path, plan["id"])
+    assert danach["letzter_task_id"] == t_hand           # nicht auf None zurueck
+    assert danach["letzter_lauf"] is not None
+    # Und der Handlauf mit altem dict verschiebt den Termin nicht zurueck.
+    _faellig_seit(settings.db_path, plan["id"], 10)
+    f = zeitplan.hole(settings.db_path, plan["id"])
+    zeitplan.verbuche_start(settings.db_path, f, None, ausloeser="zeitplan", status="x")
+    neu = zeitplan.hole(settings.db_path, plan["id"])["naechster_lauf"]
+    zeitplan.verbuche_start(settings.db_path, f, _task(settings.db_path),
+                            ausloeser="hand", status="laeuft")
+    assert zeitplan.hole(settings.db_path, plan["id"])["naechster_lauf"] == neu
+
+
+def test_fund1_schleife_und_knopf_starten_denselben_plan_nur_einmal(settings, monkeypatch):
+    """gather(/jetzt, Runde) - vorher 20 von 20 Mal zwei Tasks."""
+    import httpx
+    from api.zeitplan import pruefe_einmal as runde
+    gestartet: list[str] = []
+
+    async def stub(provider, ziel, *, task, **_):  # noqa: ANN001
+        gestartet.append(task.id)
+        await asyncio.sleep(0.05)
+        task.status = "done"
+
+    monkeypatch.setattr("api.tasks.fuehre_task_aus", stub)
+    with TestClient(create_app(settings)) as c:
+        app = c.app
+        for _ in range(10):
+            gestartet.clear()
+            plan = _plan(settings.db_path)
+            _faellig_seit(settings.db_path, plan["id"], 10)
+
+            async def beide():
+                async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),
+                                             base_url="http://t") as hc:
+                    r, proto = await asyncio.gather(
+                        hc.post(f"/api/zeitplaene/{plan['id']}/jetzt", headers=TOKEN),
+                        runde(app))
+                await asyncio.sleep(0.2)
+                return r.status_code, proto
+
+            code, proto = c.portal.call(beide)
+            assert len(gestartet) == 1, (code, proto, gestartet)
+            assert code in (202, 409)
+            zeitplan.loeschen(settings.db_path, plan["id"])
+
+
+def test_fund2_ein_kaputter_plan_kostet_den_naechsten_nicht_seinen_lauf(client, settings, monkeypatch):
+    a = _plan(settings.db_path, name="A", ziel="kaputt")
+    b = _plan(settings.db_path, name="B", ziel="heil")
+    _faellig_seit(settings.db_path, a["id"], 10)
+    _faellig_seit(settings.db_path, b["id"], 5)
+    echt = __import__("api.zeitplan", fromlist=["starte_plan"]).starte_plan
+
+    async def wackelig(app, plan, **kw):  # noqa: ANN001
+        if plan["ziel"] == "kaputt":
+            raise RuntimeError("/geheim/pfad/zur.env")
+        return await echt(app, plan, **kw)
+
+    monkeypatch.setattr("api.zeitplan.starte_plan", wackelig)
+    protokoll = dict(client.portal.call(pruefe_einmal, client.app))
+    assert protokoll[b["id"]] == "gestartet"
+    assert protokoll[a["id"]].startswith("Start fehlgeschlagen (RuntimeError)")
+    assert "/geheim" not in protokoll[a["id"]]
+    a2 = zeitplan.hole(settings.db_path, a["id"])
+    assert a2["letzter_status"] == protokoll[a["id"]]
+    assert a2["naechster_lauf"] > db.utcnow()             # neuer Termin, kein Haengen
+    assert zeitplan.hole(settings.db_path, b["id"])["letzter_task_id"]
+    assert client.portal.call(pruefe_einmal, client.app) == []
+
+
+def test_fund3_die_toleranz_folgt_dem_takt():
+    assert zeitplan.toleranz_fuer(60) == zeitplan.TOLERANZ
+    assert zeitplan.toleranz_fuer(0) == zeitplan.TOLERANZ
+    assert zeitplan.toleranz_fuer(180) == timedelta(seconds=360)
+    plan = {"naechster_lauf": "2026-09-05T07:00:00Z"}
+    um = datetime(2026, 9, 5, 7, 2, 30, tzinfo=timezone.utc)
+    assert zeitplan.ist_verpasst(plan, um) is True                  # feste 2 min
+    assert zeitplan.ist_verpasst(plan, um, zeitplan.toleranz_fuer(180)) is False
+    assert zeitplan.ist_verpasst(plan, um + timedelta(minutes=10),
+                                 zeitplan.toleranz_fuer(180)) is True
+
+
+def test_fund3_die_runde_nimmt_die_toleranz_des_takts(client, settings):
+    settings.zeitplan_takt_s = 180
+    plan = _plan(settings.db_path)
+    _faellig_seit(settings.db_path, plan["id"], 150)      # 2,5 min: bei 60 s Takt verpasst
+    assert client.portal.call(pruefe_einmal, client.app) == [(plan["id"], "gestartet")]
+
+
+def test_fund5_gleichzeitige_plaene_reissen_den_token_deckel_nicht(settings, monkeypatch):
+    """Drei Plaene, Deckel 50.000, Budget je Task 60.000. Vorher: jeder sah
+    0 verbrauchte Token und bekam 60.000 - 180.000 gegen 50.000."""
+    settings.zeitplan_max_token_24h = 50_000
+    settings.budget_max_tokens = 60_000
+    budgets: list[int] = []
+    laeuft = asyncio.Event()
+
+    async def stub(provider, ziel, *, task, **_):  # noqa: ANN001
+        budgets.append(task.budget.max_tokens)
+        await laeuft.wait()
+        task.status = "done"
+
+    monkeypatch.setattr("api.tasks.fuehre_task_aus", stub)
+    with TestClient(create_app(settings)) as c:
+        plaene = [_plan(settings.db_path, name=n) for n in "ABC"]
+        for p in plaene:
+            _faellig_seit(settings.db_path, p["id"], 5)
+        protokoll = dict(c.portal.call(pruefe_einmal, c.app))
+        from api.zeitplan import reserviert, verbrauch
+        assert c.portal.call(lambda: asyncio.sleep(0)) is None
+        r = reserviert(c.app)
+        v = verbrauch(c.app)
+        c.portal.call(laeuft.set)
+        assert _warte_bis(lambda: all(c.app.state.tasks.get(t) is None
+                                      for t in list(c.app.state.zeitplan_tasks)) or
+                          not c.app.state.zeitplan_tasks)
+    # Der erste bekam den ganzen Rest (50.000), der Deckel war danach voll.
+    assert budgets == [50_000]
+    assert r == 50_000 and v.token == 50_000
+    werte = list(protokoll.values())
+    assert werte.count("gestartet") == 1
+    assert sum(1 for w in werte if "Tagesdeckel" in w) == 2
+
+
+def test_fund5_ein_lauf_bekommt_hoechstens_den_rest_des_tages(settings, monkeypatch):
+    settings.zeitplan_max_token_24h = 10_000
+    gesehen: list[int] = []
+
+    async def stub(provider, ziel, *, task, **_):  # noqa: ANN001
+        gesehen.append(task.budget.max_tokens)
+        task.status = "done"
+
+    monkeypatch.setattr("api.tasks.fuehre_task_aus", stub)
+    with TestClient(create_app(settings)) as c:
+        plan = _plan(settings.db_path)
+        alt = _task(settings.db_path, token=7_500)              # heute schon verbraucht
+        zeitplan.verbuche_start(settings.db_path, plan, alt, ausloeser="hand", status="done")
+        antwort = c.post(f"/api/zeitplaene/{plan['id']}/jetzt", headers=TOKEN)
+        assert antwort.status_code == 202, antwort.text
+        assert _warte_bis(lambda: gesehen != [])
+    assert gesehen == [2_500]
+    assert settings.budget_max_tokens == 60_000                  # Vorgabe unangetastet
+
+
+def test_starte_task_laesst_ein_budget_nur_nach_unten(settings, monkeypatch):
+    """CLAUDE.md Regel 6 auch fuer Aufrufer im eigenen Haus."""
+    from api.tasks import starte_task
+    gesehen = {}
+
+    async def stub(provider, ziel, *, task, **_):  # noqa: ANN001
+        gesehen.update(vars(task.budget))
+        task.status = "done"
+
+    monkeypatch.setattr("api.tasks.fuehre_task_aus", stub)
+    frech = TaskBudget(max_steps=999, max_depth=9, max_tool_calls=999,
+                       max_tokens=10 ** 9, max_seconds=1, max_cost_eur=99.0)
+    with TestClient(create_app(settings)) as c:
+        c.portal.call(functools.partial(starte_task, c.app, "x", budget=frech))
+        assert _warte_bis(lambda: gesehen != {})
+    vorgabe = TaskBudget.from_settings(settings)
+    assert gesehen["max_tokens"] == vorgabe.max_tokens
+    assert gesehen["max_steps"] == vorgabe.max_steps
+    assert gesehen["max_seconds"] == 1                            # kleiner ist erlaubt
+
+
+def test_fund_status_race_laeuft_bleibt_nicht_haengen(settings, monkeypatch):
+    """Task fertig, bevor die Buchung seine ID kennt - trotzdem 'done'."""
+    async def blitz(provider, ziel, *, task, **_):  # noqa: ANN001
+        task.status = "done"
+
+    monkeypatch.setattr("api.tasks.fuehre_task_aus", blitz)
+    langsam = zeitplan.verbuche_start
+
+    def traege(*a, **kw):
+        time.sleep(0.3)                    # der Task ist laengst durch
+        return langsam(*a, **kw)
+
+    monkeypatch.setattr("core.zeitplan.verbuche_start", traege)
+    with TestClient(create_app(settings)) as c:
+        plan = _plan(settings.db_path)
+        antwort = c.post(f"/api/zeitplaene/{plan['id']}/jetzt", headers=TOKEN)
+        assert antwort.status_code == 202
+        assert _warte_bis(lambda: zeitplan.hole(settings.db_path, plan["id"])["letzter_status"] == "done")
+
+
+def test_beobachtung7_jetzt_geht_auch_bei_aus(client, settings):
+    """'aus' heisst 'laeuft nicht von selbst', nicht 'darf nie laufen'.
+    Dokumentiert in api/zeitplan.py; wer das aendert, aendert diesen Test."""
+    plan = _plan(settings.db_path)
+    zeitplan.schalten(settings.db_path, plan["id"], False)
+    assert client.post(f"/api/zeitplaene/{plan['id']}/jetzt", headers=TOKEN).status_code == 202
+    assert client.portal.call(pruefe_einmal, client.app) == []       # die Schleife nicht
+
+
+def test_regel3_die_startrunde_holt_nicht_nach(settings):
+    """Plan von VOR dem Start, drei Stunden faellig: verpasst, kein Task."""
+    with session(settings.db_path) as conn:
+        db.init_db(conn)
+    plan = _plan(settings.db_path, regel="taeglich 07:00")
+    _faellig_seit(settings.db_path, plan["id"], 3 * 3600)
+    settings.zeitplan_takt_s = 1
+    with TestClient(create_app(settings)) as c:
+        assert _warte_bis(lambda: zeitplan.hole(settings.db_path, plan["id"])["verpasst"] == 1)
+        assert c.app.state.tasks.get(zeitplan.hole(settings.db_path, plan["id"])["letzter_task_id"] or "") is None
+    assert db.list_task_rows(settings.db_path) == []
+
+
+def test_max_permission_muss_eine_stufe_sein():
+    from core.config import Settings
+    with pytest.raises(ValueError) as info:
+        Settings(_env_file=None, max_permission=9)
+    assert "MAX_PERMISSION=9" in str(info.value) and "4 (SENSITIVE)" in str(info.value)
+    for stufe in range(5):
+        assert Settings(_env_file=None, max_permission=stufe).max_permission == stufe
+    with pytest.raises(ValueError):
+        Settings(_env_file=None, zeitplan_takt_s=-1)
+
+
+def test_regelabsage_zitiert_hoechstens_40_zeichen():
+    with pytest.raises(zeitplan.RegelUngueltig) as info:
+        zeitplan.lies_regel("x" * 10_000)
+    assert len(str(info.value)) < 200 and "…" in str(info.value)
+
+
+def test_deckeltext_schreibt_deutsche_tausender():
+    text = zeitplan.deckel_erreicht(zeitplan.Verbrauch(0, 50_000), max_laeufe=9, max_token=50_000)
+    assert "50.000 von 50.000" in text and "50,000" not in text
+
+
+# --- Oberflaeche: was die Pruefrunde dort fand -----------------------------
+
+
+def test_ui_der_block_meldet_im_block_nicht_im_versteckten_composer(client):
+    html = client.get("/").text
+    start = html.index("function zeitplanBlock")
+    block = html[start:html.index("COMMAND CENTER (FIX-06", start)]
+    assert "meldung(" not in block                 # #hint ist ausserhalb des Chats unsichtbar
+    assert "zeitplan-meldung" in block and "aria-live" in block
+
+
+def test_ui_eingaben_haben_eine_laenge_und_langtext_bricht_um(client):
+    html = client.get("/").text
+    assert "input.maxLength = f[3]" in html
+    css = html[html.index("/* --- Zeitpläne (FIX-08)"):html.index(".tabelle { width: 100%;")]
+    assert ".zeitplan-ziel" in css and css.count("overflow-wrap: anywhere") >= 3
+    assert "opacity: 0.55" not in css              # 'aus' dimmt nicht die Knoepfe
+
+
+def test_ui_knoepfe_sperren_sich_und_loeschen_fragt(client):
+    html = client.get("/").text
+    start = html.index("function zeitplanNode")
+    block = html[start:html.index("COMMAND CENTER (FIX-06", start)]
+    assert "b.disabled = true" in block
+    assert "window.confirm('Diesen Zeitplan löschen?" in block
+
+
+def test_ui_api_zeigt_nie_die_eingabe_aus_einer_pydantic_liste(client):
+    html = client.get("/").text
+    api_js = html[html.index("function api(path, options)"):html.index("// --- Ereignisstrom")]
+    assert "Array.isArray(detail)" in api_js and "d.msg" in api_js
+    assert ".input" not in api_js.split("Array.isArray(detail)")[1].split("join('; ')")[0]
