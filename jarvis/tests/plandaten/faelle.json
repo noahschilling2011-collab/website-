@@ -1,0 +1,377 @@
+[
+ {
+  "id": "einzel-01",
+  "auftrag": "Sag mal, welcher Wochentag ist heute eigentlich?",
+  "werkzeuge": [
+   "clock"
+  ],
+  "kanten": [],
+  "begruendung": "Der Wochentag steht direkt im Ergebnis von clock, das laut Beschreibung immer bei Fragen nach Zeit, Datum oder Wochentag zu benutzen ist - es gibt nichts zu rechnen oder nachzuschlagen.",
+  "kategorie": "einzel"
+ },
+ {
+  "id": "einzel-02",
+  "auftrag": "Was sind 23 Prozent von 6340?",
+  "werkzeuge": [
+   "calculator"
+  ],
+  "kanten": [],
+  "begruendung": "Reine Arithmetik mit zwei gegebenen Zahlen - calculator loest das in einem Ausdruck (6340 * 0.23), und ohne calculator waere es das ausdruecklich verbotene Kopfrechnen; die Zahlen sind bewusst andere als im Beispiel der Werkzeugbeschreibung, damit der Fall nicht durch Abschreiben loesbar ist.",
+  "kategorie": "einzel"
+ },
+ {
+  "id": "einzel-03",
+  "auftrag": "Zeig mir meine Termine fuer die naechsten sieben Tage.",
+  "werkzeuge": [
+   "kalender"
+  ],
+  "kanten": [],
+  "begruendung": "Genau das ist das Standardfenster von kalender (heute bis in sieben Tagen), also braucht es kein clock vorher, um von und bis zu bestimmen.",
+  "kategorie": "einzel"
+ },
+ {
+  "id": "einzel-04",
+  "auftrag": "In welchem Ordner liegt eigentlich meine Datei ndvi_notizen? Ich brauch nur den Pfad.",
+  "werkzeuge": [
+   "datei_suchen"
+  ],
+  "kanten": [],
+  "begruendung": "datei_suchen liefert Pfade und Metadaten, und mehr als den Pfad will Noah ausdruecklich nicht - ein anschliessendes datei_lesen waere ungefragte Zusatzarbeit.",
+  "kategorie": "einzel"
+ },
+ {
+  "id": "einzel-05",
+  "auftrag": "Zeig mir die ersten 40 Zeilen von /home/noah/jarvis/README.md.",
+  "werkzeuge": [
+   "datei_lesen"
+  ],
+  "kanten": [],
+  "begruendung": "Der vollstaendige Pfad steht im Auftrag, deshalb entfaellt die Suche - datei_lesen kann mit pfad, ab_zeile und zeilen direkt starten.",
+  "kategorie": "einzel"
+ },
+ {
+  "id": "einzel-06",
+  "auftrag": "Was steht in meiner lokalen Wikipedia-Kopie zum Stichwort Phaenologie? Ich will den Artikel, nicht deine eigene Erklaerung.",
+  "werkzeuge": [
+   "wiki_lokal"
+  ],
+  "kanten": [],
+  "begruendung": "Noah verlangt ausdruecklich den nachgeschlagenen Artikeltext statt einer Erklaerung aus dem Modellwissen, damit ist genau ein wiki_lokal-Aufruf noetig; wiki_live scheidet aus, weil der Begriff feststehend ist und die lokale Kopie laut Regel zuerst dran ist.",
+  "kategorie": "einzel"
+ },
+ {
+  "id": "einzel-07",
+  "auftrag": "Merk dir bitte, dass ich Entfernungen immer in Kilometern will, nicht in Meilen.",
+  "werkzeuge": [
+   "remember"
+  ],
+  "kanten": [],
+  "begruendung": "Eine dauerhafte Vorliebe, die Noah ausdruecklich gespeichert haben will - ein einziger remember-Aufruf, kein Nachschlagen vorher.",
+  "kategorie": "einzel"
+ },
+ {
+  "id": "einzel-08",
+  "auftrag": "Welche Satelliten fliegen in den naechsten drei Stunden ueber 48.80 Nord, 9.79 Ost?",
+  "werkzeuge": [
+   "satellite_passes"
+  ],
+  "kanten": [],
+  "begruendung": "Die Koordinaten stehen schon im Auftrag, also braucht satellite_passes kein find_place davor, und das Zeitfenster ab jetzt setzt das Werkzeug ueber hours selbst - clock waere ueberfluessig.",
+  "kategorie": "einzel"
+ },
+ {
+  "id": "kette-01",
+  "auftrag": "Ich hab gelesen, dass die ESA die Wolkenmaske von Sentinel-2 umgestellt hat. Such das raus und lies mir die Seite dazu wirklich durch, nicht nur den Snippet.",
+  "werkzeuge": [
+   "web_search",
+   "fetch_url"
+  ],
+  "kanten": [
+   [
+    "web_search",
+    "fetch_url"
+   ]
+  ],
+  "begruendung": "fetch_url darf laut Beschreibung keine URL raten - die Adresse, die es oeffnet, entsteht erst als Treffer von web_search, also ist die Suche die Eingabe des Abrufs.",
+  "kategorie": "kette"
+ },
+ {
+  "id": "kette-02",
+  "auftrag": "Welche Satelliten kommen in den naechsten sechs Stunden ueber Reykjavik rueber?",
+  "werkzeuge": [
+   "find_place",
+   "satellite_passes"
+  ],
+  "kanten": [
+   [
+    "find_place",
+    "satellite_passes"
+   ]
+  ],
+  "begruendung": "satellite_passes verlangt lat und lon als Pflichtparameter, im Auftrag steht aber nur ein Ortsname - die Koordinaten liefert find_place.",
+  "kategorie": "kette"
+ },
+ {
+  "id": "kette-03",
+  "auftrag": "Irgendwo bei mir liegt eine Notiz zum Router im Ferienhaus. Find die Datei und zeig mir die Stelle.",
+  "werkzeuge": [
+   "datei_suchen",
+   "datei_lesen"
+  ],
+  "kanten": [
+   [
+    "datei_suchen",
+    "datei_lesen"
+   ]
+  ],
+  "begruendung": "datei_suchen gibt ausdruecklich nur Pfade und Metadaten zurueck, keinen Inhalt; datei_lesen braucht aber genau diesen Pfad als Pflichtparameter, und den kennt niemand vor der Suche.",
+  "kategorie": "kette"
+ },
+ {
+  "id": "kette-04",
+  "auftrag": "Im Schurwald bei Schorndorf haben sie viel Fichte rausgeholt. Vergleich da mal die Vegetation von Juni 2024 mit Juni 2025 - wie viel ist wirklich weg?",
+  "werkzeuge": [
+   "find_place",
+   "satellite_search",
+   "satellite_compare"
+  ],
+  "kanten": [
+   [
+    "find_place",
+    "satellite_search"
+   ],
+   [
+    "satellite_search",
+    "satellite_compare"
+   ]
+  ],
+  "begruendung": "find_place macht aus dem Ortsnamen die bbox, satellite_search laeuft damit zweimal (Juni 2024 und Juni 2025, gleicher Ausschnitt, gleiche Jahreszeit) und liefert erst die beiden Raster, die satellite_compare als before und after zwingend braucht.",
+  "kategorie": "kette"
+ },
+ {
+  "id": "kette-05",
+  "auftrag": "Wie viele Einwohner haben Stuttgart und Ulm zusammen?",
+  "werkzeuge": [
+   "wikidata",
+   "calculator"
+  ],
+  "kanten": [
+   [
+    "wikidata",
+    "calculator"
+   ]
+  ],
+  "begruendung": "Die beiden Einwohnerzahlen sind Zahlen, also Wikidata-Sache, und der Ausdruck fuer den calculator laesst sich erst hinschreiben, wenn diese Zahlen vorliegen.",
+  "kategorie": "kette"
+ },
+ {
+  "id": "kette-06",
+  "auftrag": "Wie viele Tage sind es eigentlich noch bis Heiligabend?",
+  "werkzeuge": [
+   "clock",
+   "calculator"
+  ],
+  "kanten": [
+   [
+    "clock",
+    "calculator"
+   ]
+  ],
+  "begruendung": "Die Differenz bis zum 24.12. haengt am heutigen Datum, das laut clock-Beschreibung nie geraten werden darf - clock liefert den Startwert, den der calculator einsetzt, denn im Kopf gerechnet wird nicht.",
+  "kategorie": "kette"
+ },
+ {
+  "id": "kette-07",
+  "auftrag": "Wo ist Robert Bosch eigentlich geboren? Zeig mir ein Satellitenbild von dem Kaff.",
+  "werkzeuge": [
+   "wiki_lokal",
+   "find_place",
+   "satellite_search"
+  ],
+  "kanten": [
+   [
+    "wiki_lokal",
+    "find_place"
+   ],
+   [
+    "find_place",
+    "satellite_search"
+   ]
+  ],
+  "begruendung": "Der Ortsname steht nicht im Auftrag, sondern faellt erst beim Nachschlagen an und wird dann Eingabe von find_place, dessen bbox wiederum satellite_search braucht; wiki_live steht bewusst nicht dabei, weil ein Geburtsort von 1861 im lokalen Snapshot sicher enthalten ist - und selbst bei einem Fehlschlag waere wiki_lokal -> wiki_live nur eine Reihenfolge-Empfehlung, keine Datenkante, denn wiki_live bekaeme denselben Begriff vom Nutzer.",
+  "kategorie": "kette"
+ },
+ {
+  "id": "kette-08",
+  "auftrag": "Wie hiess nochmal das Dorf in Schweden, wo wir letzten Sommer waren? Zeig mir ein aktuelles Satellitenbild davon.",
+  "werkzeuge": [
+   "recall",
+   "find_place",
+   "satellite_search"
+  ],
+  "kanten": [
+   [
+    "recall",
+    "find_place"
+   ],
+   [
+    "find_place",
+    "satellite_search"
+   ]
+  ],
+  "begruendung": "Der Ortsname existiert nur im Gedaechtnis und muss erst aus recall kommen, bevor find_place daraus eine bbox machen kann, mit der satellite_search ueberhaupt suchen darf; anders als kette-07 misst dieser Fall, ob die Quelle des Namens das Gedaechtnis statt einer Nachschlagequelle ist.",
+  "kategorie": "kette"
+ },
+ {
+  "id": "kette-09",
+  "auftrag": "Schick an tobias@example.org eine Mail mit meinen Terminen fuer die naechsten sieben Tage.",
+  "werkzeuge": [
+   "kalender",
+   "send_email"
+  ],
+  "kanten": [
+   [
+    "kalender",
+    "send_email"
+   ]
+  ],
+  "begruendung": "Der Mailtext ist die Terminliste, also ist body von send_email erst schreibbar, wenn der Kalender geantwortet hat; die Empfaengeradresse steht absichtlich im Auftrag (kein recall) und das Zeitfenster ist genau das Standardfenster von kalender, damit keine strittige Kante clock -> kalender entsteht.",
+  "kategorie": "kette"
+ },
+ {
+  "id": "kette-10",
+  "auftrag": "Auf https://www.stadtwerke-beispiel.de/tarife/strom steht der Arbeitspreis pro kWh. Rechne mir aus, was 3400 kWh im Jahr kosten.",
+  "werkzeuge": [
+   "fetch_url",
+   "calculator"
+  ],
+  "kanten": [
+   [
+    "fetch_url",
+    "calculator"
+   ]
+  ],
+  "begruendung": "Die URL kommt vom Nutzer, also entfaellt web_search, aber der Preis pro kWh steht erst nach dem Abruf fest und ist damit die Eingabe des Rechenausdrucks.",
+  "kategorie": "kette"
+ },
+ {
+  "id": "parallel-01",
+  "auftrag": "Wie spaet ist es eigentlich gerade, und was steht in den naechsten sieben Tagen bei mir im Kalender?",
+  "werkzeuge": [
+   "clock",
+   "kalender"
+  ],
+  "kanten": [],
+  "begruendung": "Zwei getrennte Fragen: die Uhrzeit kommt aus clock, die Termine holt kalender in seinem Standardfenster heute bis in sieben Tagen - genau dieses Fenster nennt der Auftrag, also braucht kalender keine Ausgabe von clock und es gehoert keine Kante hin.",
+  "kategorie": "parallel"
+ },
+ {
+  "id": "parallel-02",
+  "auftrag": "Schau mal, was mein lokales Wiki zu Perowskit-Solarzellen hergibt, und such parallel im Web, ob es dazu was Neues gibt.",
+  "werkzeuge": [
+   "wiki_lokal",
+   "web_search"
+  ],
+  "kanten": [],
+  "begruendung": "Noah verlangt ausdruecklich beide Quellen nebeneinander - der Wiki-Artikel und die Websuche laufen mit demselben Stichwort aus dem Auftrag los, keine der beiden liefert der anderen ihre Eingabe.",
+  "kategorie": "parallel"
+ },
+ {
+  "id": "parallel-03",
+  "auftrag": "Wie viele Einwohner hat Aalen genau, und was schreibt das lokale Wiki sonst so ueber die Stadt?",
+  "werkzeuge": [
+   "wikidata",
+   "wiki_lokal"
+  ],
+  "kanten": [],
+  "begruendung": "Die Einwohnerzahl ist eine Zahl und gehoert zu wikidata, der Fliesstext zu wiki_lokal; beide bekommen den Ortsnamen direkt aus dem Auftrag und koennen in beliebiger Reihenfolge laufen.",
+  "kategorie": "parallel"
+ },
+ {
+  "id": "parallel-04",
+  "auftrag": "Such mir die aktuellen Strompreise raus, lies die beste Seite auch wirklich durch, und rechne mir nebenbei aus, was 2450 kWh bei 34,2 Cent kosten.",
+  "werkzeuge": [
+   "web_search",
+   "fetch_url",
+   "calculator"
+  ],
+  "kanten": [
+   [
+    "web_search",
+    "fetch_url"
+   ]
+  ],
+  "begruendung": "fetch_url braucht die URL aus dem Suchtreffer, deshalb genau diese eine Kante; die Rechnung steht mit festen Zahlen im Auftrag und haengt an keinem der beiden Rechercheschritte - der Fall misst also die Abwesenheit der Kante fetch_url -> calculator, die kette-10 misst.",
+  "kategorie": "parallel"
+ },
+ {
+  "id": "parallel-05",
+  "auftrag": "Weisst du noch, welches Objektiv ich mir letztens merken lassen hab? Und guck bitte gleich mit, ob in den naechsten sieben Tagen schon was im Kalender steht.",
+  "werkzeuge": [
+   "recall",
+   "kalender"
+  ],
+  "kanten": [],
+  "begruendung": "Die Gedaechtnisfrage und der Kalenderblick sind zwei unabhaengige Anliegen in einer Nachricht - recall liefert kein Zeitfenster fuer kalender und kalender kein Stichwort fuer recall; das genannte Fenster ist das Standardfenster von kalender, also kommt auch kein clock als Vorstufe dazu.",
+  "kategorie": "parallel"
+ },
+ {
+  "id": "parallel-06",
+  "auftrag": "Merk dir bitte, dass ich bei Satellitenbildern immer hoechstens 10 % Wolken will. Und such mir in meinen Ordnern die NDVI-Skripte raus.",
+  "werkzeuge": [
+   "remember",
+   "datei_suchen"
+  ],
+  "kanten": [],
+  "begruendung": "Die dauerhafte Vorliebe geht an remember, die Dateisuche laeuft mit dem Muster aus dem Auftrag - der gemerkte Wolken-Schwellwert ist keine Eingabe fuer die Suche, also keine Kante.",
+  "kategorie": "parallel"
+ },
+ {
+  "id": "leer-01",
+  "auftrag": "Erklaer mir mal in einfachen Worten, warum ein Satellit im Orbit nicht einfach runterfaellt, obwohl die Erde ihn ja die ganze Zeit anzieht.",
+  "werkzeuge": [],
+  "kanten": [],
+  "begruendung": "Reine physikalische Erklaerung aus dem Modellwissen - es wird kein bestimmter Satellit, kein Ort und kein Zeitpunkt genannt, also liefert weder satellite_passes noch eine Nachschlagequelle etwas, was die Antwort braucht.",
+  "kategorie": "leer"
+ },
+ {
+  "id": "leer-02",
+  "auftrag": "Warum ist Teilen durch Null eigentlich nicht definiert? Ich versteh nicht, warum man da nicht einfach unendlich sagt.",
+  "werkzeuge": [],
+  "kanten": [],
+  "begruendung": "Es gibt keinen Ausdruck auszurechnen, sondern nur ein Konzept zu erklaeren - calculator waere hier ein Reflex auf das Wort 'Teilen', kein echter Bedarf.",
+  "kategorie": "leer"
+ },
+ {
+  "id": "leer-03",
+  "auftrag": "Erklaer mir bitte, warum es ueberhaupt Schaltjahre gibt und warum die Regel mit den 100ern und 400ern so verdreht ist. Nicht ob dieses Jahr eins ist, nur das Warum.",
+  "werkzeuge": [],
+  "kanten": [],
+  "begruendung": "Der Auftrag schliesst den Bezug auf das laufende Jahr ausdruecklich aus, damit bleibt eine zeitlose Erklaerung des Kalenderprinzips und clock hat nichts beizutragen.",
+  "kategorie": "leer"
+ },
+ {
+  "id": "leer-04",
+  "auftrag": "Ich verwechsle staendig Laengengrad und Breitengrad. Denk dir mal eine Eselsbruecke aus, mit der ich mir das endlich merken kann.",
+  "werkzeuge": [],
+  "kanten": [],
+  "begruendung": "Gefragt ist eine selbst erdachte Merkhilfe, also eine kreative Leistung - es gibt keine Tatsache nachzuschlagen, nichts ueber Noah zu erinnern und nichts zu merken, denn Noah bittet nicht um Speicherung.",
+  "kategorie": "leer"
+ },
+ {
+  "id": "unmoeglich-01",
+  "auftrag": "Trag mir bitte Freitag um 15 Uhr Zahnarzt in den Kalender ein.",
+  "werkzeuge": [],
+  "kanten": [],
+  "begruendung": "Das Werkzeug kalender kann Termine in einem Zeitfenster nur lesen, nicht anlegen oder aendern - JARVIS muss sagen, dass er den Eintrag nicht schreiben kann, statt ersatzweise den Kalender abzufragen.",
+  "kategorie": "unmoeglich"
+ },
+ {
+  "id": "unmoeglich-02",
+  "auftrag": "Mach mir mal die Heizung im Wohnzimmer auf 22 Grad, mir ist kalt.",
+  "werkzeuge": [],
+  "kanten": [],
+  "begruendung": "Keines der 18 Werkzeuge steuert Geraete in der Wohnung; die richtige Antwort ist der Hinweis auf die fehlende Faehigkeit, nicht ein Notgriff zu web_search oder send_email.",
+  "kategorie": "unmoeglich"
+ }
+]

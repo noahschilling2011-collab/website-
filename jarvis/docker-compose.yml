@@ -1,0 +1,30 @@
+# JARVIS, Phase 10.
+#
+#   cp .env.example .env    # Werte eintragen
+#   docker compose up
+#
+# NICHT AUSGEFUEHRT: in der Umgebung, in der diese Datei entstand, war kein
+# Docker-Daemon erreichbar.
+
+services:
+  jarvis:
+    build: .
+    # Nur an die eigene Maschine veroeffentlichen (0.4.3). Ohne das "127.0.0.1:"
+    # haengt JARVIS am ganzen Netz - genau das, was der Abschnitt verbietet.
+    ports:
+      - "127.0.0.1:${JARVIS_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      # Im Container immer diese Pfade, egal was in der .env steht.
+      JARVIS_HOST: 0.0.0.0
+      JARVIS_PORT: 8000
+      JARVIS_DB_PATH: /app/data/jarvis.db
+      JARVIS_OUTBOX_PATH: /app/data/outbox.jsonl
+    volumes:
+      # Die Datenbank ueberlebt jedes Neubauen des Images.
+      - jarvis-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  jarvis-data:

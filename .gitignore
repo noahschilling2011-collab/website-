@@ -20,3 +20,15 @@ app/**/*.g.dart.bak
 .idea/
 .vscode/
 *.iml
+
+# Python / JARVIS
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+data/
+*.db
+*.db-wal
+*.db-shm
+selfcheck-out/

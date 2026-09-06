@@ -1,0 +1,165 @@
+"""Formen, die ueber HTTP gehen."""
+
+from __future__ import annotations
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from core.db import Message, ToolCallRow
+from core.memory import MAX_FAKT_TEXT, Fact, TaskLogRow
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=100_000)
+
+
+class ChatResponse(BaseModel):
+    """Die Form aus PHASE-01 (`{reply, task_id}`), plus die Werkzeugaufrufe.
+
+    Phase 2 verlangt, dass im UI je Antwort sichtbar ist, welche Werkzeuge mit
+    welchen Argumenten liefen. Ohne dieses Feld muesste die Oberflaeche direkt
+    nach dem Senden noch einmal den ganzen Verlauf holen.
+    """
+
+    reply: str
+    task_id: str
+    tool_calls: list[ToolCallOut] = []
+
+
+class ToolCallOut(BaseModel):
+    name: str
+    arguments: dict = {}
+    ok: bool = True
+    display: str = ""
+    error: str | None = None
+    sources: list[str] = []
+    duration_ms: int = 0
+
+    @classmethod
+    def of(cls, row: ToolCallRow) -> "ToolCallOut":
+        return cls(
+            name=row.name, arguments=row.arguments, ok=row.ok,
+            display=row.display, error=row.error, sources=row.sources,
+            duration_ms=row.duration_ms,
+        )
+
+
+class MessageOut(BaseModel):
+    id: int
+    role: str
+    content: str
+    created_at: str
+    tool_calls: list[ToolCallOut] = []
+    # FIX-09: None fuer getippte Nachrichten.
+    herkunft: dict | None = None
+
+    @classmethod
+    def of(
+        cls, message: Message, tool_calls: list[ToolCallRow] | None = None
+    ) -> "MessageOut":
+        return cls(
+            id=message.id,
+            role=message.role,
+            content=message.content,
+            created_at=message.created_at,
+            tool_calls=[ToolCallOut.of(t) for t in (tool_calls or [])],
+            herkunft=getattr(message, "herkunft", None),
+        )
+
+
+class SpendOut(BaseModel):
+    calls: int = 0
+    in_tokens: int = 0
+    out_tokens: int = 0
+    cost_eur: float = 0.0
+    prices_configured: bool = False
+
+
+class HealthOut(BaseModel):
+    status: str
+    phase: int
+    provider: str
+    model: str
+    api_key_configured: bool
+    api_key_hint: str
+    provider_error: str | None = None
+    database: str
+    messages: int
+    spend: SpendOut
+    # FIX-11, additiv. `schema`: ob die Migration beim Start alles nachziehen
+    # konnte ("aktuell") oder etwas offen blieb ("veraltet" - dann ist auch
+    # `status` degraded). Im JSON heisst das Feld `schema`; in Python
+    # `schema_status`, weil `BaseModel.schema` schon vergeben ist und
+    # pydantic bei jedem Start davor warnen wuerde. `populate_by_name`, damit
+    # beide Namen beim Bauen gehen. `letzte_sicherung`: Zeitpunkt (ISO, UTC)
+    # der juengsten eigenen Sicherung, None wenn keine gelang - NIE ein Pfad.
+    model_config = ConfigDict(populate_by_name=True)
+
+    schema_status: str = Field(default="aktuell", alias="schema")
+    letzte_sicherung: str | None = None
+
+
+class FactOut(BaseModel):
+    """Ein Fakt, wie ihn das Panel sieht.
+
+    FIX-04: `id` ist `int | str`. Ohne Vault ist es die Zeilennummer, mit
+    Vault die `id` aus dem Frontmatter (`f_395043`). Eine Vault-Notiz in eine
+    Zahl zu pressen hiesse, ihren Schluessel wegzuwerfen - und der Schluessel
+    ist genau das, was ein Umbenennen in Obsidian ueberlebt.
+
+    `pfad` ist die Datei im Vault, damit im Panel sichtbar ist, WO die
+    Wahrheit liegt. Ohne Vault bleibt er leer.
+    """
+
+    id: int | str
+    text: str
+    category: str
+    source_message_id: int | None = None
+    created_at: str
+    confirmed: bool = False
+    conflicts_with: int | str | None = None
+    pfad: str = ""
+
+    @classmethod
+    def of(cls, eintrag) -> "FactOut":
+        return cls(
+            id=eintrag.id, text=eintrag.text, category=eintrag.category,
+            source_message_id=getattr(eintrag, "source_message_id", None),
+            created_at=eintrag.created_at, confirmed=eintrag.confirmed,
+            conflicts_with=eintrag.conflicts_with,
+            pfad=getattr(eintrag, "pfad", ""),
+        )
+
+
+class FactCreate(BaseModel):
+    # FIX-11: dieselbe Zahl wie der Pruefpunkt in core/memory - sonst nennt
+    # die OpenAPI-Beschreibung 2.000 und der Kern lehnt bei 1.001 ab.
+    text: str = Field(min_length=1, max_length=MAX_FAKT_TEXT)
+    category: str = Field(default="allgemein", max_length=64)
+
+
+class FactUpdate(BaseModel):
+    text: str | None = Field(default=None, min_length=1, max_length=MAX_FAKT_TEXT)
+    category: str | None = Field(default=None, max_length=64)
+    confirmed: bool | None = None
+    # true loest den Widerspruch auf: der Verweis wird geloescht.
+    resolve_conflict: bool = False
+
+
+class FactCreated(BaseModel):
+    fact: FactOut
+    conflict: FactOut | None = None
+
+
+class TaskLogOut(BaseModel):
+    task_id: str
+    goal: str
+    outcome: str
+    summary: str = ""
+    created_at: str
+
+    @classmethod
+    def of(cls, row: TaskLogRow) -> "TaskLogOut":
+        return cls(
+            task_id=row.task_id, goal=row.goal, outcome=row.outcome,
+            summary=row.summary, created_at=row.created_at,
+        )
