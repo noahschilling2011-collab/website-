@@ -494,19 +494,38 @@ def test_ui_umschalter_und_meldeschalter_stehen_im_block(client):
 
 # Zaehlende Stuebe fuer die drei Reaktionen. `Notification.permission` kommt
 # weiter vom echten Browser - so misst derselbe Stub mit und ohne Erlaubnis.
-STUBS_JS = """
+# Der Erlaubnisstand kommt aus dem Stub, NICHT aus dem echten Browser.
+#
+# Was war falsch: `Object.defineProperty(..., get: () => echt.permission)`
+# fragte Chromium. Lokal gab das mit `grant_permissions` "granted" und ohne
+# "default" - auf dem GitHub-Runner IMMER "denied" (headless ohne
+# Benachrichtigungsdienst). Drei Tests waren dort rot, obwohl an JARVIS
+# nichts falsch war (CI-Lauf 34037831848).
+#
+# Geprueft wird hier das Verhalten UNSERER Seite bei einem gegebenen Stand -
+# ob Chromium eine Erlaubnis erteilt, ist Browsersache und nicht unser Test.
+# Deshalb setzt `_stubs_js(stand)` den Stand fest; `requestPermission()`
+# verhaelt sich wie im Browser: aus "default" wird "granted", "denied"
+# bleibt "denied".
+def _stubs_js(stand: str) -> str:
+    assert stand in ("granted", "default", "denied"), stand
+    return STUBS_JS_VORLAGE.replace("__STAND__", stand)
+
+
+STUBS_JS_VORLAGE = """
 window.__stubs = { ton: [], meldung: [], vorlesen: [], erlaubnis: 0 };
 (function () {
-  var echt = window.Notification;
+  var stand = '__STAND__';
   function StubNotification(titel, opts) {
     window.__stubs.meldung.push({ titel: titel, body: (opts && opts.body) || '' });
   }
   Object.defineProperty(StubNotification, 'permission', {
-    get: function () { return echt ? echt.permission : 'denied'; }
+    get: function () { return stand; }
   });
   StubNotification.requestPermission = function () {
     window.__stubs.erlaubnis += 1;
-    return Promise.resolve(echt ? echt.permission : 'denied');
+    if (stand === 'default') stand = 'granted';
+    return Promise.resolve(stand);
   };
   window.Notification = StubNotification;
 
@@ -534,15 +553,17 @@ window.__stubs = { ton: [], meldung: [], vorlesen: [], erlaubnis: 0 };
 """
 
 
-def _browser(pw, erlaubnis: bool):
+def _browser(pw, erlaubnis: bool | str):
+    """`erlaubnis` ist True (granted), False (default) oder der Stand als Text
+    ('granted' | 'default' | 'denied') - er gilt im Stub, nicht im Browser."""
     from tests.conftest import CHROMIUM
+    stand = erlaubnis if isinstance(erlaubnis, str) else (
+        "granted" if erlaubnis else "default")
     br = pw.chromium.launch(executable_path=CHROMIUM,
                             args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
     kontext = br.new_context(viewport={"width": 1440, "height": 900}, reduced_motion="reduce")
-    if erlaubnis:
-        kontext.grant_permissions(["notifications"])
     seite = kontext.new_page()
-    seite.add_init_script(STUBS_JS)
+    seite.add_init_script(_stubs_js(stand))
     return br, seite
 
 
@@ -687,6 +708,39 @@ def test_ui_ohne_erlaubnis_und_mit_schaltern_aus_bleibt_es_still(live_server):
             st = _stuebe(seite)
             assert len(st["ton"]) == 1 and len(st["vorlesen"]) == 1 and st["meldung"] == [], st
             assert len([u for u in gerufen if "/api/events" in u]) == 1
+            assert fehler == [], fehler
+        finally:
+            br.close()
+
+
+def test_ui_bei_gesperrten_benachrichtigungen_sagt_der_knopf_das_und_bleibt_still(live_server):
+    """Genau der Zustand, in dem der GitHub-Runner steht ('denied' - headless
+    ohne Benachrichtigungsdienst) und an dem drei Tests einmal gescheitert
+    sind, ohne dass an JARVIS etwas falsch war. Jetzt ein eigener Fall:
+    der Knopf sagt es, ist gesperrt, es kommt keine Meldung - Ton und
+    Vorlesen laufen trotzdem."""
+    playwright = pytest.importorskip("playwright.sync_api")
+    with playwright.sync_playwright() as pw:
+        br, seite = _browser(pw, "denied")
+        gerufen: list[str] = []
+        fehler: list[str] = []
+        try:
+            _oeffne(seite, live_server, gerufen, fehler)
+            seite.click("#tab-tasks")
+            seite.wait_for_selector(".zeitplan-form")
+            knopf = seite.locator("[data-aktion=erinnerungen-melden]")
+            assert knopf.text_content() == "Benachrichtigungen im Browser gesperrt"
+            assert not knopf.is_enabled()
+
+            _erinnerung_zustellen(live_server, "Zahnarzt anrufen")
+            seite.wait_for_function(
+                "() => window.__stubs.ton.length && window.__stubs.vorlesen.length",
+                timeout=15000)
+            st = _stuebe(seite)
+            assert st["meldung"] == [], st            # gesperrt heisst gesperrt
+            assert len(st["ton"]) == 1 and len(st["vorlesen"]) == 1, st
+            assert "Zahnarzt anrufen" in st["vorlesen"][0]
+            assert st["erlaubnis"] == 0               # gar nicht erst gefragt
             assert fehler == [], fehler
         finally:
             br.close()
