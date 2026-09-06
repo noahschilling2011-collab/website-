@@ -4,6 +4,12 @@ Ein Fakt wird **nur** gespeichert, wenn das Modell ihn ausdruecklich als
 merkenswert markiert - deshalb ein Werkzeug und kein automatisches Absaugen
 des Chats. Was gemerkt wird, ist damit im Werkzeug-Log sichtbar und im UI
 loeschbar.
+
+Was `remember` NICHT kann (FIX-11): Texte laenger als `memory.MAX_FAKT_TEXT`
+ablegen. Die Grenze sitzt nicht hier, sondern in `core.gedaechtnis.anlegen`
+bzw. `core.memory` - derselbe Pruefpunkt fuer das Werkzeug und fuer
+`POST /api/memory`. Das Werkzeug reicht den Satz als `ok=False` weiter,
+mit der Zahl und der Bitte, zu kuerzen.
 """
 
 from __future__ import annotations
@@ -107,6 +113,8 @@ class Remember(_MitDatenbank):
                 self.pfad(), self.vault_pfad, text, category=category
             )
         except ValueError as exc:
+            # Leer oder zu lang (memory.MAX_FAKT_TEXT). Der Satz nennt die
+            # Zahlen und die Bitte zu kuerzen - kein Pfad, kein Geheimnis.
             return ToolResult(ok=False, error=str(exc), display=str(exc),
                               duration_ms=dauer())
         except VaultKonflikt as exc:
@@ -258,6 +266,10 @@ class Recall(_MitDatenbank):
             ok=True,
             data={"query": query, "hits": len(zeilen),
                   "facts": [f.id for f in fakten]},
-            display="\n".join(zeilen),
+            # FIX-11 (Abnahme): der Vault-Weg oben hat `MAX_ZEICHEN`, dieser
+            # Weg hatte nichts - sechs Fakten aus der Zeit vor
+            # `memory.MAX_FAKT_TEXT` gaben 132.125 Zeichen ans Modell zurueck.
+            # Derselbe Deckel wie im Kontextblock, mit Hinweis im Text.
+            display=memory.kappe_block("", zeilen, deckel=self.MAX_ZEICHEN),
             duration_ms=dauer,
         )

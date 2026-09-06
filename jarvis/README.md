@@ -64,6 +64,23 @@ Steht kein `JARVIS_TOKEN` in der `.env`, würfelt JARVIS beim Start einen und
 schreibt ihn ins Log. Der Schutz ist damit nie aus — der Token ändert sich
 aber bei jedem Neustart.
 
+**Host-Sperre (FIX-11).** Weil die Seite den Token trägt, liefert JARVIS sie
+nur an Anfragen aus, deren `Host`-Header auf diesen Rechner zeigt:
+`127.0.0.1`, `localhost` und `JARVIS_HOST`, mit oder ohne Port. Alles andere
+bekommt `400` — auch mit gültigem Token, auch auf `/api/…`. Das schließt den
+Weg über DNS-Rebinding: eine fremde Seite, deren Name plötzlich auf
+`127.0.0.1` zeigt, sieht die Seite nicht. Rufst du JARVIS unter einem anderen
+Namen auf (Container-Name, `rechner.fritz.box`), trag ihn in
+`JARVIS_ERLAUBTE_HOSTS` ein, mehrere durch Komma. Zwei Grenzen: `[::1]` im
+Browser sperrt Starlette 1.6 mit aus (sein Vergleich schneidet am ersten
+Doppelpunkt ab — nimm `localhost`), und ein `JARVIS_HOST`, der kein Loopback
+ist (`0.0.0.0`), bekommt beim Start eine Warnung: dann bekommt jeder im Netz,
+der die Seite laden darf, mit ihr den Token. Ein nackter `*` in
+`JARVIS_ERLAUBTE_HOSTS` schaltet die Sperre ganz aus (Starlette liest ihn als
+„jeder Host") — das geht, aber nur mit einer Warnung im Log; `*.fritz.box`
+dagegen ist die Domain-Wildcard und bleibt eine Sperre. Ein Stern mitten im
+Namen wird mit einer Log-Zeile übersprungen, statt den Start abzubrechen.
+
 ## Prüfen
 
 ```bash
@@ -80,10 +97,10 @@ die httpx-Transportschicht für die ganze Testsitzung und lässt nur
 ## Betrieb
 
 ```bash
-python -m scripts.backup sichern              # Backup nach data/backup-<zeit>.db
+python -m scripts.backup sichern              # Backup nach data/sicherungen/backup-<UTC-zeit>.db
 python -m scripts.backup pruefen datei.db     # Integrität und Zeilenzahlen
-python -m scripts.backup einspielen datei.db  # Restore, legt die alte DB beiseite
-python -m scripts.migrate                     # Datenbank einer älteren Phase nachziehen
+python -m scripts.backup einspielen [datei.db]  # Restore, legt die alte DB beiseite; ohne Datei: die jüngste
+python -m scripts.migrate [--dry-run]         # Datenbank einer älteren Phase nachziehen
 python -m scripts.measure                     # misst, ob SQLite noch reicht
 ```
 
@@ -91,22 +108,52 @@ Gesichert wird über SQLites Backup-API, nicht mit `cp`: bei eingeschaltetem
 WAL liegen die letzten Schreibvorgänge in `-wal`, und eine kopierte `.db`
 allein ist unvollständig.
 
+**Der Start macht das seit FIX-11 selbst**, in dieser Reihenfolge
+(`api/app.py`, `datenbank_start`):
+
+1. `PRAGMA quick_check`. Ist die Datei keine lesbare Datenbank, bricht der
+   Start mit einem Satz ab, der den Zeitpunkt der jüngsten Sicherung und
+   den Befehl zum Einspielen nennt — kein Pfad.
+2. Sicherung nach `data/sicherungen/backup-<UTC-zeit>.db`: einmal je 24
+   Stunden, und **immer**, wenn eine Migration ansteht. Jede neue Sicherung
+   wird sofort geprüft; dann bleiben die jüngsten **7**. Gelöscht wird nur in
+   diesem Ordner und nur nach diesem Namensmuster — nie die Datenbank, nie
+   eine Datei, die anders heißt. Eine Sicherung von Hand landet im selben
+   Ordner und zählt mit. Scheitert die Sicherung (volle Platte), startet
+   JARVIS trotzdem: Warnung im Log, `letzte_sicherung: null` im Health.
+3. Schema anlegen und Migration mit einer Log-Zeile je Befehl. Bleibt
+   etwas offen, meldet `/api/health` `schema: "veraltet"` und
+   `status: "degraded"` statt `ok`.
+
+`/api/health` trägt dazu zwei Felder: `schema` (`aktuell`/`veraltet`) und
+`letzte_sicherung` (ISO-Zeit in UTC oder `null`). Eine Datenbankstörung zur
+Laufzeit steht dort als Ausnahmetyp ohne Tabellennamen; der Grund steht im
+Serverlog. Die Sicherung liegt auf derselben Platte wie die Datenbank: sie
+schützt vor Fehl-Migration, Beschädigung und versehentlichem Löschen, nicht
+vor Plattentod. `data/bilder` und die Outbox werden nicht mitgesichert.
+
 ### Zeitpläne — Aufträge, die von selbst laufen (FIX-08)
 
 Im Tab *Aufträge* steht oben der Block „Zeitpläne": ein Auftragstext plus
-eine von genau zwei Regeln — `taeglich 07:00` (Ortszeit des Rechners) oder
-`alle 6 stunden`. JARVIS legt daraus zur fälligen Zeit einen ganz normalen
-Auftrag an, mit denselben Agenten, Werkzeugen und Budgets wie ein getippter.
+eine Regel — `taeglich 07:00` (Ortszeit des Rechners), `alle 6 stunden` oder
+`einmal 2026-09-06 18:00`. Als Eingabe gehen auch `in 20 minuten` und
+`in 2 stunden`; sie werden beim Anlegen zur `einmal`-Form gerechnet. JARVIS
+legt daraus zur fälligen Zeit einen ganz normalen Auftrag an, mit denselben
+Agenten, Werkzeugen und Budgets wie ein getippter — oder stellt eine
+**Erinnerung** zu, die gar kein Modell braucht (Umschalter im Formular).
 
 Drei Dinge, die man wissen muss, bevor man einen anlegt:
 
-- **Höchstens LOCAL.** Kein Zeitplan schickt eine Mail oder legt einen
-  Termin an — um 07:00 sitzt niemand da, der das bestätigen könnte. Das ist
-  hart im Code (`core/zeitplan.py`), keine `.env`-Einstellung.
+- **Höchstens READ.** Ein Zeitplan liest (Wetter, Kalender, Gedächtnis,
+  Dateien, Web), aber er merkt sich nichts, legt nichts an und schickt
+  nichts — um 07:00 sitzt niemand da, der mitliest oder bestätigt. Das ist
+  hart im Code (`core/zeitplan.py`), keine `.env`-Einstellung. Seit FIX-11;
+  vorher LOCAL.
 - **Ein Tagesdeckel für alle Pläne zusammen:** `ZEITPLAN_MAX_LAEUFE_24H=24`
   und `ZEITPLAN_MAX_TOKEN_24H=50000`. Ist er erreicht, wird übersprungen und
   der Grund steht am Plan. Das Groq-Tageskontingent (200.000 Token) liegt
-  darüber, mit Absicht.
+  darüber, mit Absicht. Erinnerungen kosten keine Token und zählen in einen
+  eigenen Topf: `ZEITPLAN_MAX_ERINNERUNGEN_24H=24`.
 - **Verpasste Läufe werden nicht nachgeholt.** War der Rechner um 07:00 aus,
   läuft der Plan morgen um 07:00 — nicht drei Pläne auf einmal beim Start.
   Der Zähler „verpasst" zeigt es an.
@@ -124,10 +171,14 @@ Vorgabe **Mehmet**. Das Projekt heißt weiter JARVIS.
 
 - **Erinnerungen:** „Erinnere mich morgen um 8 an den Zahnarzt" legt einen
   Zeitplan mit der Regel `einmal 2026-09-06 08:00` an — im Formular oder im
-  Gespräch (Werkzeug `erinnerung_anlegen`). Die Erinnerung kommt ohne
-  Modell als Nachricht in den Chat, markiert als Erinnerung des Zeitplans;
-  ist der Chat nicht offen, zählt der Chat-Tab mit. Sie braucht keinen
-  API-Key und keine Token, nur einen freien Platz im Tagesdeckel der Läufe.
+  Gespräch (Werkzeug `erinnerung_anlegen`), oder mit dem Umschalter im
+  Formular. Die Erinnerung kommt ohne Modell als Nachricht in den Chat,
+  markiert als Erinnerung des Zeitplans; ist der Chat nicht offen, zählt der
+  Chat-Tab mit. Seit FIX-11 meldet sie sich außerdem mit einem kurzen Ton,
+  einer Browser-Benachrichtigung (nach einem Klick auf „Erinnerungen
+  melden") und Vorlesen — jede der drei Reaktionen einzeln abschaltbar. Sie
+  braucht keinen API-Key und keine Token, nur einen freien Platz im eigenen
+  Tagesdeckel `ZEITPLAN_MAX_ERINNERUNGEN_24H`.
 - **Bremse:** scheitert ein Plan dreimal in Folge, pausiert er sich selbst
   und sagt warum. „An" setzt den Zähler zurück.
 - **Wetter:** Werkzeug `wetter` über Open-Meteo, ohne Key. `JARVIS_ORT` in
@@ -144,9 +195,13 @@ cp .env.example .env    # Werte eintragen
 docker compose up
 ```
 
-Das Port-Mapping veröffentlicht bewusst nur an `127.0.0.1`. **Ungeprüft:** in
-der Umgebung, in der diese Dateien entstanden sind, war kein Docker-Daemon
-erreichbar.
+Das Port-Mapping veröffentlicht bewusst nur an `127.0.0.1`. Im Container
+lauscht JARVIS auf `0.0.0.0` (Dockerfile, Compose) — die Start-Warnung
+„JARVIS_HOST=0.0.0.0 ist kein Loopback" erscheint dort bei jedem Start und ist
+durch das Port-Mapping gegenstandslos; die Host-Sperre gilt weiter, also
+`127.0.0.1`/`localhost` im Browser oder den Namen in `JARVIS_ERLAUBTE_HOSTS`.
+**Ungeprüft:** in der Umgebung, in der diese Dateien entstanden sind, war kein
+Docker-Daemon erreichbar.
 
 ## Aufbau
 

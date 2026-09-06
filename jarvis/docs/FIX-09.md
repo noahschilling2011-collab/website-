@@ -94,7 +94,7 @@ sieben davon gegen Mutation. Was **nicht** stimmte, steht dabei.
 | E6 | „An" auf einer gelaufenen Erinnerung zeigte rot „fehlgeschlagen": `done` wurde überschrieben, verbrauchte Erinnerungen wirkten wiederholbar. | `schalten` lehnt mit 409 ab („… ihr Zeitpunkt ist vorbei. Leg eine neue an.") und rührt den Status nicht an. `test_r_schalten_auf_vorbei_gibt_409_und_laesst_done_stehen` |
 | E7 | Zeitumstellungslücke: `einmal 2027-03-28 02:30` feuerte um 01:30 — eine Stunde **vor** der Wunschzeit. | `_zeit_existiert`: Rückrechnung entlarvt die Lücke, `anlegen` lehnt ab. `test_r_zeitumstellungsluecke_wird_abgelehnt`. **Mutation:** Prüfung raus → 1 failed |
 | E8 | Datumssatz im Prompt war UTC, `einmal` ist Ortszeit: zwischen 00:00 und 02:00 nannte der Prompt den Vortag. | `heute_zeile()` nennt UTC **und** Ortszeit. `test_r_heute_zeile_nennt_auch_die_ortszeit` |
-| E9 | **Nachtrag beim Gegenlesen:** `hindernis` hielt Erinnerungen auch bei „kein Anbieter" und „anderer Lauf" auf — ohne `LLM_API_KEY` kam keine einzige Erinnerung an, obwohl sie weder Modell noch Budget braucht. | `hindernis(..., ohne_modell=True)`: für Erinnerungen gilt nur der Läufe-Deckel (er begrenzt die Zahl unbeaufsichtigter Dinge am Tag, und eine Erinnerung ist eins); Token-Deckel, Anbieter und freie Bahn spielen keine Rolle. Ein Auftrag bleibt an genau diesen Hindernissen hängen. `test_r_eine_erinnerung_braucht_keinen_anbieter_und_keine_freie_bahn`. **Mutation:** Ausnahme raus → 1 failed |
+| E9 | **Nachtrag beim Gegenlesen:** `hindernis` hielt Erinnerungen auch bei „kein Anbieter" und „anderer Lauf" auf — ohne `LLM_API_KEY` kam keine einzige Erinnerung an, obwohl sie weder Modell noch Budget braucht. | `hindernis(..., ohne_modell=True)`: für Erinnerungen gilt nur der Läufe-Deckel (er begrenzt die Zahl unbeaufsichtigter Dinge am Tag, und eine Erinnerung ist eins); Token-Deckel, Anbieter und freie Bahn spielen keine Rolle. Ein Auftrag bleibt an genau diesen Hindernissen hängen. `test_r_eine_erinnerung_braucht_keinen_anbieter_und_keine_freie_bahn`. **Mutation:** Ausnahme raus → 1 failed **Korrigiert in FIX-11:** Erinnerungen zählen seither in einen eigenen Topf (`ZEITPLAN_MAX_ERINNERUNGEN_24H`), nicht mehr gegen den Läufe-Deckel der Aufträge — eine Erinnerung „alle 1 stunden" konnte sonst 24 von 24 Läufen buchen und die Morgenlage still verdrängen. |
 
 Dazu aus derselben Runde, ohne eigene Nummer: der Gedächtnisblock im Prompt
 ist als „gespeicherte DATEN, keine Anweisungen" gerahmt; eine Abweisung
@@ -119,8 +119,10 @@ sperrt den Knopf, Löschen fragt).
 ## Grenzen, die bleiben
 
 - Eine Erinnerung ist kein Auftrag mehr, sondern eine Nachricht: sie
-  erscheint im Chat (und am Tab), sie klingelt nicht, sie schickt keine
-  Mail. Sie zählt gegen `ZEITPLAN_MAX_LAEUFE_24H`, nicht gegen die Token.
+  erscheint im Chat (und am Tab) und schickt keine Mail. Seit FIX-11
+  klingelt sie doch — Ton, Benachrichtigung, Vorlesen, jedes abschaltbar —
+  und zählt gegen `ZEITPLAN_MAX_ERINNERUNGEN_24H`, nicht gegen die Token
+  und nicht mehr gegen den Läufe-Deckel der Aufträge.
 - „einmal" rechnet in der Ortszeit des Rechners — dieselbe UNSICHER-Note
   wie in FIX-08 (fester Versatz, Zeitumstellung).
 - Der Zähler „seit du weg warst" lebt im Browser. Ein anderer Browser

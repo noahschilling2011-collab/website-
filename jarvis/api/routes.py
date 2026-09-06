@@ -75,12 +75,23 @@ async def health(request: Request) -> HealthOut:
         anzahl = await asyncio.to_thread(db.count_messages, settings.db_path)
         totals = await asyncio.to_thread(db.llm_call_totals, settings.db_path)
         database = "ok"
-    except Exception as exc:  # die Meldung soll die Ursache zeigen
-        anzahl, totals, database = 0, {}, f"fehler: {exc}"
+    except Exception as exc:
+        # FIX-11: bis hier stand `f"fehler: {exc}"` - und sqlite3 haengt
+        # Tabellen- und Spaltennamen an. Der Typ reicht der Oberflaeche;
+        # die Ursache steht im Serverlog (core/fehlertexte.py).
+        anzahl, totals = 0, {}
+        database = ohne_geheimnis(exc, "Die Datenbank antwortet nicht")
 
     provider_error = getattr(provider, "reason", None)
+    # FIX-11: beides setzt der lifespan in api/app.py. getattr, weil ein Test
+    # den Handler auch ohne lifespan treffen kann.
+    schema = getattr(request.app.state, "schema", "aktuell")
+    letzte_sicherung = getattr(request.app.state, "letzte_sicherung", None)
+    gesund = database == "ok" and provider_error is None and schema == "aktuell"
     return HealthOut(
-        status="ok" if database == "ok" and provider_error is None else "degraded",
+        status="ok" if gesund else "degraded",
+        schema_status=schema,
+        letzte_sicherung=letzte_sicherung,
         phase=2,
         provider=provider.name,
         model=provider.model,

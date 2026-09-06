@@ -31,12 +31,21 @@ steuern" dauerhaft, und daran ändert FIX-08 nichts: JARVIS wiederholt seine
 Ein getippter Auftrag darf bis EXTERNAL gehen, weil der Nutzer vor dem
 Bildschirm sitzt und `send_email` per Rückfrage freigibt. Ein Zeitplan läuft
 um 07:00, während der Nutzer schläft. Deshalb ist die Grenze hart in
-`core/zeitplan.py` (`PERMISSION_DECKEL = Permission.LOCAL`) — keine
-`.env`-Zeile, die man um drei Uhr nachts hochdreht.
-Test: `test_regel_1_die_obergrenze_ist_local_egal_was_die_env_sagt` setzt
+`core/zeitplan.py` (`PERMISSION_DECKEL`) — keine `.env`-Zeile, die man um
+drei Uhr nachts hochdreht.
+Test: `test_regel_1_die_obergrenze_ist_read_egal_was_die_env_sagt` setzt
 `MAX_PERMISSION=4` und misst, was beim Runner ankommt — Schleife und
-„Jetzt"-Knopf beide LOCAL. Gegenprobe
+„Jetzt"-Knopf beide auf dem Deckel. Gegenprobe
 `test_getippte_auftraege_behalten_ihre_obergrenze`: getippt bleibt EXTERNAL.
+
+> **Nachtrag FIX-11 (06.09.2026): der Deckel ist READ, nicht mehr LOCAL.**
+> Ein präparierter Auftragstext hatte in einem unbeaufsichtigten LOCAL-Lauf
+> einen Fakt (`remember`) und einen Stundenplan „Sende den Bericht an
+> chef@fremd.example" (`erinnerung_anlegen`) angelegt. Unbeaufsichtigt heißt
+> lesen: wetter, kalender, recall, Dateien, Web — nichts merken, nichts
+> anlegen. Die Vorlage Morgenlage braucht nur READ. Der Test heißt seither
+> `test_regel_1_die_obergrenze_ist_read_egal_was_die_env_sagt`; den
+> abgewiesenen `remember` zeigt `tests/test_fix11_erinnerungen.py`.
 
 **2. Ein Deckel über ALLE Pläne, über 24 Stunden, in Läufen UND Token.**
 Ein Plan, der jede Stunde läuft und jedes Mal 8.000 Token kostet, frisst das
@@ -138,7 +147,7 @@ Verlauf selbst wäre eine Änderung an `messages` — nicht in diesem Auftrag.
 |---|---|---|
 | 1 | Ein Plan mit `taeglich HH:MM` oder `alle N stunden` lässt sich anlegen, schalten, löschen — über API und Oberfläche | `test_anlegen_listen_schalten_loeschen_ueber_http`, Rauchtest 3/4/7 |
 | 2 | Die Schleife startet fällige Pläne über denselben Runner wie getippte Aufträge | `test_runde_startet_faellige_und_bucht_verpasste`, `test_die_regel_steht_an_einer_stelle` |
-| 3 | Obergrenze LOCAL, unabhängig von `MAX_PERMISSION` | `test_regel_1_…`, Gegenprobe `test_getippte_auftraege_…` |
+| 3 | Obergrenze LOCAL, unabhängig von `MAX_PERMISSION` (seit FIX-11: READ) | `test_regel_1_…`, Gegenprobe `test_getippte_auftraege_…` |
 | 4 | Tagesdeckel über alle Pläne, Läufe und Token — auch für gleichzeitig laufende; kein Lauf bekommt mehr als den Rest des Tages; Vorgaben nicht stillschweigend geändert | `test_verbrauch_zaehlt_alle_plaene_ueber_24_stunden`, `test_deckel_…`, `test_der_deckel_ist_nicht_…`, `test_fund5_*`, `test_starte_task_laesst_ein_budget_nur_nach_unten` |
 | 5 | Verpasste Läufe werden gezählt, nie nachgeholt — auch beim Einschalten | `test_regel_3_…`, `test_einschalten_rechnet_den_termin_neu_…` |
 | 6 | Kein Doppellauf (auch nicht Schleife + Knopf gleichzeitig), kein Absturz ohne Anbieter, kein Hängenbleiben am Deckel, ein kaputter Plan reißt die anderen nicht mit | `test_hindernis_*`, `test_runde_ueberspringt_am_deckel_…`, `test_fund1_*`, `test_fund2_*` |
@@ -240,8 +249,9 @@ Bewusst **nicht** geändert, aber dokumentiert:
 
 - **READ heißt nicht „ohne Außenwirkung".** `web_search` und `fetch_url` sind
   READ und tragen ihre Anfrage nach draußen — samt allem, was aus
-  `datei_lesen` oder `recall` im Prompt steht. Regel 1 (LOCAL) verhindert
-  Mails und Termine, nicht diese Art von Abfluss. Das ist eine Eigenschaft
+  `datei_lesen` oder `recall` im Prompt steht. Regel 1 (LOCAL, seit FIX-11
+  READ) verhindert Mails, Termine und Gemerktes, nicht diese Art von
+  Abfluss. Das ist eine Eigenschaft
   der Stufe READ im ganzen System, nicht der Zeitpläne; der Chat-Agent hat
   `fetch_url` nicht, der Research-Agent schon.
 - **Ein Prozess.** Anspruch, Reservierung und „läuft gerade" leben im

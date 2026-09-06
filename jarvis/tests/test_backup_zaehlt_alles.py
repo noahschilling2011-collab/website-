@@ -3,6 +3,9 @@
 Bis FIX-08 stand in scripts/backup.py eine Liste von Hand. Sie hatte acht
 Eintraege; das Schema hatte zwoelf eigene Tabellen. Vier fehlten still.
 Dieser Test haelt die Zaehlung gegen das Schema selbst.
+
+FIX-11: die Zaehlung wohnt in core/sicherung.py; scripts/backup.py ist nur
+noch die Huelle. Geprueft wird das Original, nicht der Re-Export.
 """
 
 from __future__ import annotations
@@ -11,7 +14,7 @@ import re
 from pathlib import Path
 
 from core import db
-from scripts import backup
+from core import sicherung as backup
 
 WURZEL = Path(__file__).resolve().parent.parent
 

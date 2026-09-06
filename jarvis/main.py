@@ -10,10 +10,19 @@ from __future__ import annotations
 
 import logging
 
-from api.app import create_app
+from api.app import create_app, datenbank_start
 from core.config import get_settings
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
+# FIX-11: Pruefung, Sicherung und Migration laufen HIER, vor `create_app` -
+# und damit auf beiden Startwegen (`uvicorn main:app` und `python main.py`).
+# Im lifespan laeuft dasselbe noch einmal, idempotent (nichts zu migrieren,
+# die Sicherung ist juenger als 24 h). Der Unterschied ist, was der Nutzer
+# sieht: hier steht bei einer beschaedigten Datenbank EIN Satz. Im lifespan
+# wickelt Starlette den `SystemExit` in eine ExceptionGroup samt Traceback -
+# gemessen, deshalb diese Zeile.
+datenbank_start(get_settings())
 
 app = create_app()
 

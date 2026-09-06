@@ -7,17 +7,22 @@ koennen dadurch eine eigene `Settings` uebergeben, ohne das Modul neu zu laden.
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import logging
+import sqlite3
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from api.events import EventBus
 from api.routes import api, router
 from api.tasks import TaskRegistry, tasks_router
 from api.security import ensure_token
+from core import migration, sicherung
 from core.config import PROJECT_ROOT, Settings, get_settings
 from core.db import connect, init_db
 from core.llm import LLMError, LLMProvider, build_provider
@@ -97,16 +102,118 @@ def diagnose(settings: Settings) -> list[str]:
     return zeilen
 
 
+# FIX-11: die Seite traegt den Token, und `GET /` lieferte sie an JEDEN
+# Host-Header aus (`Host: evil.example` -> 200 mit Token). DNS-Rebinding aus
+# dem Browser heraus war damit ein Weg zum Token. Jetzt bedient JARVIS nur
+# Anfragen, deren Host-Header auf diesen Rechner zeigt.
+LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "[::1]")
+
+
+def erlaubte_hosts(settings: Settings) -> list[str]:
+    """Die Host-Namen, die die TrustedHostMiddleware durchlaesst.
+
+    Starlette 1.6 vergleicht den Host-Header OHNE Port (`split(":")[0]`,
+    geprueft in starlette/middleware/trustedhost.py). Ein Eintrag mit Port
+    wuerde deshalb nie treffen - der Port wird hier abgeschnitten. Dieselbe
+    Stelle macht `[::1]` wirkungslos: `[::1]:8000` wird zu `[`. Der Eintrag
+    bleibt trotzdem drin, als Absicht; wer IPv6-Loopback im Browser will,
+    nimmt bis zu einer Starlette-Aenderung `localhost`.
+    """
+    roh = [*LOOPBACK_HOSTS, settings.jarvis_host,
+           *settings.jarvis_erlaubte_hosts.split(",")]
+    hosts: list[str] = []
+    for eintrag in roh:
+        host = eintrag.strip().lower()
+        if not host:
+            continue
+        if not host.startswith("[") and host.count(":") == 1:
+            host = host.split(":")[0]
+        if "*" in host[1:]:
+            # Starlette erlaubt einen Stern nur ganz vorn (`*.fritz.box`) und
+            # bricht sonst mit einem AssertionError beim Bauen der App ab -
+            # ein Tippfehler in der .env waere ein Traceback statt einer Zeile.
+            log.warning("JARVIS_ERLAUBTE_HOSTS: '%s' uebersprungen - ein Stern "
+                        "ist nur am Anfang erlaubt (z. B. *.fritz.box).", host)
+            continue
+        if host not in hosts:
+            hosts.append(host)
+    return hosts
+
+
+def ist_loopback(host: str) -> bool:
+    """Lauscht JARVIS nur auf dieser Maschine? `0.0.0.0`, `::` und jede
+    Netzadresse sind es nicht - dann bekommt jeder im Netz mit der Seite
+    auch den Token."""
+    wert = host.strip().strip("[]").lower()
+    if wert == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(wert).is_loopback
+    except ValueError:
+        return False
+
+
+def datenbank_start(settings: Settings) -> tuple[str | None, str]:
+    """Pruefung -> Sicherung -> Schema -> Migration, in dieser Reihenfolge.
+
+    Gibt (letzte_sicherung als ISO-Zeit oder None, schema) fuer Health
+    zurueck. Bricht mit `SystemExit` und EINEM Satz ohne Pfad ab, wenn die
+    Datei keine lesbare Datenbank ist - nach dem Vorbild von `get_settings()`
+    bei einer nicht-UTF-8-.env. Eine gescheiterte Sicherung verhindert den
+    Start NIE: Warnung im Log, None im Health.
+    """
+    db_pfad = Path(settings.db_path)
+    bestand = db_pfad.exists()
+    try:
+        conn = connect(db_pfad)
+    except sqlite3.DatabaseError as exc:
+        log.error("Datenbank nicht lesbar: %s: %s", type(exc).__name__, exc)
+        raise SystemExit(sicherung.beschaedigt_satz(db_pfad)) from exc
+    try:
+        try:
+            befund = conn.execute("PRAGMA quick_check").fetchone()[0]
+            if befund != "ok":
+                raise sqlite3.DatabaseError(befund)
+        except sqlite3.DatabaseError as exc:
+            log.error("quick_check: %s: %s", type(exc).__name__, exc)
+            raise SystemExit(sicherung.beschaedigt_satz(db_pfad)) from exc
+
+        letzte_sicherung: str | None = None
+        if bestand:
+            # Vor einer anstehenden Migration IMMER sichern, sonst einmal je
+            # 24 h. Eine neue Datei hat nichts, was zu verlieren waere.
+            try:
+                steht_an = bool(migration.ausstehend(conn))
+                zeit = sicherung.sichere_taeglich(
+                    db_pfad, datetime.now(timezone.utc), erzwingen=steht_an)
+                letzte_sicherung = zeit.isoformat() if zeit else None
+            except Exception as exc:  # noqa: BLE001 - jeder Grund ist eine Warnung
+                log.warning("Sicherung fehlgeschlagen - JARVIS startet trotzdem: "
+                            "%s: %s", type(exc).__name__, exc)
+
+        init_db(conn)
+        schema = "aktuell"
+        try:
+            for befehl in migration.migriere(conn):
+                log.info("Migration: %s", befehl)
+            if migration.ausstehend(conn):
+                schema = "veraltet"
+        except sqlite3.Error as exc:
+            log.error("Migration fehlgeschlagen: %s: %s", type(exc).__name__, exc)
+            schema = "veraltet"
+    finally:
+        conn.close()
+    return letzte_sicherung, schema
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        conn = connect(settings.db_path)
-        try:
-            init_db(conn)
-        finally:
-            conn.close()
+        app.state.letzte_sicherung, app.state.schema = datenbank_start(settings)
+        if app.state.schema != "aktuell":
+            log.warning("Das Datenbankschema ist veraltet - Health meldet es.")
 
         try:
             app.state.provider = build_provider(settings)
@@ -244,6 +351,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app.state.provider.model,
             settings.db_path,
         )
+        if not ist_loopback(settings.jarvis_host):
+            log.warning(
+                "JARVIS_HOST=%s ist kein Loopback: JARVIS lauscht im Netz, und "
+                "jeder, der die Seite laden darf, bekommt mit ihr den Token. "
+                "Erlaubte Host-Namen: %s (JARVIS_ERLAUBTE_HOSTS).",
+                settings.jarvis_host, ", ".join(erlaubte_hosts(settings)),
+            )
         if app.state.token_generated:
             log.warning(
                 "JARVIS_TOKEN war leer. Fuer diesen Lauf gewuerfelt: %s\n"
@@ -288,6 +402,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.tasks = TaskRegistry()
     app.state.events = EventBus()
     app.state.token, app.state.token_generated = ensure_token(settings.jarvis_token)
+    # FIX-11: Host-Sperre. Laeuft VOR dem Routing, also auch vor der
+    # Token-Pruefung: ein fremder Host bekommt 400 - Starlettes eigener
+    # Kurztext, ohne Pfad, ohne Token -, egal was er sonst mitschickt.
+    hosts = erlaubte_hosts(settings)
+    if "*" in hosts:
+        # Starlette: ein nackter Stern heisst "jeder Host". Das ist die Sperre
+        # AUS - erlaubt, aber nie stillschweigend.
+        log.warning("JARVIS_ERLAUBTE_HOSTS enthaelt '*': die Host-Sperre ist damit "
+                    "AUS, jeder Host-Header kommt durch - mit der Seite auch der Token.")
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=hosts)
 
     @app.exception_handler(LLMError)
     async def _llm_error(_: Request, exc: LLMError) -> JSONResponse:

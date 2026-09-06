@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from core.db import Message, ToolCallRow
-from core.memory import Fact, TaskLogRow
+from core.memory import MAX_FAKT_TEXT, Fact, TaskLogRow
 
 
 class ChatRequest(BaseModel):
@@ -85,6 +85,17 @@ class HealthOut(BaseModel):
     database: str
     messages: int
     spend: SpendOut
+    # FIX-11, additiv. `schema`: ob die Migration beim Start alles nachziehen
+    # konnte ("aktuell") oder etwas offen blieb ("veraltet" - dann ist auch
+    # `status` degraded). Im JSON heisst das Feld `schema`; in Python
+    # `schema_status`, weil `BaseModel.schema` schon vergeben ist und
+    # pydantic bei jedem Start davor warnen wuerde. `populate_by_name`, damit
+    # beide Namen beim Bauen gehen. `letzte_sicherung`: Zeitpunkt (ISO, UTC)
+    # der juengsten eigenen Sicherung, None wenn keine gelang - NIE ein Pfad.
+    model_config = ConfigDict(populate_by_name=True)
+
+    schema_status: str = Field(default="aktuell", alias="schema")
+    letzte_sicherung: str | None = None
 
 
 class FactOut(BaseModel):
@@ -120,12 +131,14 @@ class FactOut(BaseModel):
 
 
 class FactCreate(BaseModel):
-    text: str = Field(min_length=1, max_length=2000)
+    # FIX-11: dieselbe Zahl wie der Pruefpunkt in core/memory - sonst nennt
+    # die OpenAPI-Beschreibung 2.000 und der Kern lehnt bei 1.001 ab.
+    text: str = Field(min_length=1, max_length=MAX_FAKT_TEXT)
     category: str = Field(default="allgemein", max_length=64)
 
 
 class FactUpdate(BaseModel):
-    text: str | None = Field(default=None, min_length=1, max_length=2000)
+    text: str | None = Field(default=None, min_length=1, max_length=MAX_FAKT_TEXT)
     category: str | None = Field(default=None, max_length=64)
     confirmed: bool | None = None
     # true loest den Widerspruch auf: der Verweis wird geloescht.

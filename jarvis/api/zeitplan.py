@@ -36,7 +36,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -57,8 +57,12 @@ class ZeitplanAnlegen(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     ziel: str = Field(min_length=1, max_length=10_000)
     # Keine Obergrenze hier: `lies_regel` lehnt selbst ab und nennt dabei die
-    # zwei erlaubten Formen. pydantic wuerde nur "string_too_long" sagen.
+    # erlaubten Formen. pydantic wuerde nur "string_too_long" sagen.
     regel: str = Field(min_length=1)
+    # FIX-11, additiv: 'erinnerung' heisst nur Nachricht, kein Modell, null
+    # Token (core/zeitplan.ARTEN). Vorher konnte das Formular nur Auftraege
+    # anlegen - "einmal ... 11:23" wurde ein Modell-Auftrag mit drei Aufrufen.
+    art: Literal["auftrag", "erinnerung"] = "auftrag"
 
 
 class Schalten(BaseModel):
@@ -147,8 +151,10 @@ def hindernis(app: FastAPI, plan: dict[str, Any],
 
     `ohne_modell` (Erinnerungen): kein Modell, null Token, kein Task - also
     kein Anbieter noetig, kein Warten auf einen anderen Lauf, kein
-    Token-Deckel. Nur der Laeufe-Deckel gilt, weil er die Zahl der
-    unbeaufsichtigten Dinge am Tag begrenzt - und eine Erinnerung ist eins.
+    Token-Deckel und (FIX-11) auch kein Laeufe-Deckel: Erinnerungen haben
+    ihren eigenen Topf (ZEITPLAN_MAX_ERINNERUNGEN_24H), damit eine
+    Erinnerung "alle 1 stunden" nicht die Morgenlage verdraengt - und ein
+    voller Auftrags-Topf keine Erinnerung verschluckt.
     """
     settings = app.state.settings
     if not ohne_modell:
@@ -160,12 +166,14 @@ def hindernis(app: FastAPI, plan: dict[str, Any],
             return "uebersprungen: kein Anbieter eingerichtet (LLM_API_KEY fehlt)."
     stand = verbrauch(app, jetzt)
     if ohne_modell:
-        stand = zeitplan.Verbrauch(laeufe=stand.laeufe, token=0)
-    grund = zeitplan.deckel_erreicht(
-        stand,
-        max_laeufe=settings.zeitplan_max_laeufe_24h,
-        max_token=settings.zeitplan_max_token_24h,
-    )
+        grund = zeitplan.deckel_erreicht(
+            stand, max_erinnerungen=settings.zeitplan_max_erinnerungen_24h)
+    else:
+        grund = zeitplan.deckel_erreicht(
+            stand,
+            max_laeufe=settings.zeitplan_max_laeufe_24h,
+            max_token=settings.zeitplan_max_token_24h,
+        )
     return f"uebersprungen: {grund}" if grund else None
 
 
@@ -191,9 +199,10 @@ async def erinnere(app: FastAPI, plan: dict[str, Any], *, ausloeser: str,
 
 async def starte_plan(app: FastAPI, plan: dict[str, Any], *, ausloeser: str,
                       jetzt: datetime | None = None) -> Task:
-    """Startet den Auftrag eines Plans - gebucht VOR dem Start, LOCAL als
-    harte Obergrenze, hoechstens der Token-Rest des Tages als Budget,
-    unbeaufsichtigt (keine Rueckfrage, die niemand beantwortet).
+    """Startet den Auftrag eines Plans - gebucht VOR dem Start, READ als
+    harte Obergrenze (core/zeitplan.PERMISSION_DECKEL), hoechstens der
+    Token-Rest des Tages als Budget, unbeaufsichtigt (keine Rueckfrage, die
+    niemand beantwortet).
 
     Der Aufrufer hat `hindernis` schon gefragt und den Plan beansprucht.
     """
@@ -276,8 +285,9 @@ async def versuche_start(app: FastAPI, plan_id: str, *, ausloeser: str,
                 return None, STARTET_GERADE
         try:
             if erinnerung:
-                # Nur der Laeufe-Deckel haelt eine Erinnerung auf - sie
-                # braucht weder Anbieter noch freie Bahn (Nachtrag FIX-09).
+                # Nur der Erinnerungs-Deckel haelt eine Erinnerung auf - sie
+                # braucht weder Anbieter noch freie Bahn (Nachtrag FIX-09,
+                # eigener Topf seit FIX-11).
                 grund = None if geprueft else await asyncio.to_thread(
                     hindernis, app, plan, jetzt, ohne_modell=True)
                 if grund:
@@ -406,6 +416,10 @@ def _uebersicht(app: FastAPI) -> dict[str, Any]:
     deckel_echt = zeitplan.deckel_erreicht(
         echt, max_laeufe=settings.zeitplan_max_laeufe_24h,
         max_token=settings.zeitplan_max_token_24h)
+    # FIX-11: der Erinnerungs-Topf hat seinen eigenen Deckel - er sperrt nur
+    # Erinnerungen, nicht den "Jetzt"-Knopf eines Auftrags.
+    erinnerungs_deckel = zeitplan.deckel_erreicht(
+        echt, max_erinnerungen=settings.zeitplan_max_erinnerungen_24h)
     return {
         "zeitplaene": zeitplan.alle(settings.db_path),
         "verbrauch": {
@@ -413,6 +427,8 @@ def _uebersicht(app: FastAPI) -> dict[str, Any]:
             "token": echt.token,
             "max_laeufe": settings.zeitplan_max_laeufe_24h,
             "max_token": settings.zeitplan_max_token_24h,
+            "erinnerungen": echt.erinnerungen,
+            "max_erinnerungen": settings.zeitplan_max_erinnerungen_24h,
         },
         "laeuft_gerade": [{"task_id": tid, "reserviert": budget}
                           for tid, budget in laufend.items()],
@@ -420,6 +436,7 @@ def _uebersicht(app: FastAPI) -> dict[str, Any]:
         # geht, wenn nur ein Lauf im Weg steht (Hinweis, nicht rot).
         "deckel": deckel_echt,
         "gesperrt": deckel if deckel and not deckel_echt else None,
+        "erinnerungs_deckel": erinnerungs_deckel,
         "obergrenze": zeitplan.PERMISSION_DECKEL.name,
         "schleife": bool(settings.zeitplan_takt_s > 0),
     }
@@ -467,7 +484,7 @@ async def post_zeitplan(request: Request, body: ZeitplanAnlegen) -> dict[str, An
     try:
         return await asyncio.to_thread(
             zeitplan.anlegen, pfad, name=body.name, ziel=body.ziel,
-            regel_text=body.regel)
+            regel_text=body.regel, art=body.art)
     except ValueError as exc:      # RegelUngueltig ist ein ValueError
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -496,7 +513,7 @@ async def schalte_zeitplan(request: Request, zeitplan_id: str,
 @zeitplan_router.post("/{zeitplan_id}/jetzt", status_code=202)
 async def zeitplan_jetzt(request: Request, zeitplan_id: str) -> dict[str, Any]:
     """Von Hand ausloesen - ein Probelauf. Dieselben Grenzen wie die Schleife
-    (LOCAL, Deckel, nacheinander), der Termin des Plans bleibt, wie er
+    (READ, Deckel, nacheinander), der Termin des Plans bleibt, wie er
     ist. Geht auch bei einem ausgeschalteten Plan: "aus" heisst "laeuft
     nicht von selbst", nicht "darf nie laufen"."""
     task, grund = await versuche_start(request.app, zeitplan_id, ausloeser="hand")

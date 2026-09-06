@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     # --- Zugang zu JARVIS selbst (0.4) ---
     jarvis_token: str = ""
     jarvis_host: str = "127.0.0.1"
+    # FIX-11: Die Seite traegt den Token. Sie wird nur an Anfragen
+    # ausgeliefert, deren Host-Header auf diesen Rechner zeigt (127.0.0.1,
+    # localhost, [::1], JARVIS_HOST). Weitere Namen, durch Komma getrennt -
+    # z. B. der Container-Name; leer = nur die Vorgabe.
+    jarvis_erlaubte_hosts: str = ""
     jarvis_port: int = 8000
 
     # --- LLM-Provider ---
@@ -153,6 +158,11 @@ class Settings(BaseSettings):
     # still erhoeht wird es nicht (CLAUDE.md, Regel 6).
     zeitplan_max_laeufe_24h: int = 24
     zeitplan_max_token_24h: int = 50_000
+    # FIX-11: Erinnerungen kosten null Token und laufen ohne Modell. Sie
+    # zaehlen deshalb in einen EIGENEN Topf, damit eine Erinnerung "alle 1
+    # stunden" nicht den Laeufe-Deckel der Auftraege frisst (Nachtrag zu
+    # FIX-09 E9). Ein Deckel, keine Erhoehung.
+    zeitplan_max_erinnerungen_24h: int = 24
     # Wie oft die Schleife nachsieht, in Sekunden. Nicht unter 10: die
     # Schleife weckt den Prozess, und bei 1 Sekunde waere das ein Poller.
     zeitplan_takt_s: int = 60
@@ -208,7 +218,8 @@ class Settings(BaseSettings):
             )
         return value
 
-    @field_validator("zeitplan_max_laeufe_24h", "zeitplan_max_token_24h")
+    @field_validator("zeitplan_max_laeufe_24h", "zeitplan_max_token_24h",
+                     "zeitplan_max_erinnerungen_24h")
     @classmethod
     def _nicht_negativ(cls, value: int) -> int:
         if value < 0:

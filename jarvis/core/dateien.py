@@ -22,7 +22,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 
 class PfadAbgelehnt(PermissionError):
@@ -166,6 +166,33 @@ def _relativ(p: Path, wurzeln: list[Path]) -> str:
     return p.name
 
 
+def pruefe_muster(muster: str) -> None:
+    """Lehnt Suchmuster ab, die aus der Wurzel hinausfuehren koennten.
+
+    Abgelehnt wird `..` - egal wo im Muster - und jeder absolute Pfad,
+    POSIX wie Windows (`/etc/*`, `C:\\Users\\*`, `\\\\server\\*`). Der
+    Fehlertext nennt das Muster NICHT: er geht ans Modell und in die
+    Oberflaeche, und das Muster kann selbst ein Pfad sein.
+    """
+    if ".." in muster:
+        raise PfadAbgelehnt(
+            "Das Suchmuster darf kein '..' enthalten - gesucht wird nur "
+            "innerhalb der freigegebenen Ordner."
+        )
+    # Auch laufwerksrelativ (`C:*.txt`): kein absoluter Pfad im Sinne von
+    # `is_absolute()`, aber unter Windows laesst `rglob` jedes Muster mit
+    # Laufwerk oder Wurzel mit NotImplementedError platzen - Absage statt Platzer.
+    if (PurePosixPath(muster).is_absolute()
+            or PureWindowsPath(muster).is_absolute()
+            or PureWindowsPath(muster).drive
+            or muster.startswith(("/", "\\"))):
+        raise PfadAbgelehnt(
+            "Das Suchmuster darf kein absoluter Pfad sein - gesucht wird nur "
+            "innerhalb der freigegebenen Ordner. Gib einen Namensteil oder "
+            "ein Muster wie '*.md' an."
+        )
+
+
 def suche(
     muster: str,
     wurzeln: list[Path],
@@ -184,11 +211,20 @@ def suche(
     muster = (muster or "").strip()
     if not muster:
         return []
+    if not inhalt:
+        # FIX-11: das Muster ging roh an `rglob`, und `..` war ausdruecklich
+        # erlaubt. `datei_suchen('../**/*.txt')` listete damit Namen und
+        # Groessen AUSSERHALB der Wurzeln - die Allowlist aus FIX-07 galt
+        # fuers Lesen, nicht fuers Auflisten. Ein absolutes Muster liess
+        # `rglob` mit NotImplementedError platzen. Beides: klare Absage.
+        # Bei `inhalt=True` ist das Muster ein Suchwort und beruehrt keinen Pfad.
+        pruefe_muster(muster)
     hoechstens = max(1, min(int(hoechstens), 100))
     gefunden: list[Fund] = []
     glob = muster if any(z in muster for z in "*?[") else f"*{muster}*"
 
     for w in wurzeln:
+        wr = w.resolve()
         for p in sorted(w.rglob("*" if inhalt else glob)):
             if len(gefunden) >= hoechstens:
                 return gefunden
@@ -196,6 +232,18 @@ def suche(
                 continue
             rel = p.relative_to(w)
             if gesperrt(rel) is not None:
+                continue
+            # Dieselbe Pruefung wie `pruefe()`: ZUERST aufloesen, DANN
+            # vergleichen. Ein Symlink in der Wurzel, der nach draussen
+            # zeigt, wird damit auch nicht aufgelistet - vorher stand er mit
+            # Namen und Groesse in der Trefferliste.
+            try:
+                pr = p.resolve(strict=True)
+            except (OSError, RuntimeError):
+                continue
+            if not (pr == wr or pr.is_relative_to(wr)):
+                continue
+            if gesperrt(pr.relative_to(wr)) is not None:
                 continue
             try:
                 gross = p.stat().st_size

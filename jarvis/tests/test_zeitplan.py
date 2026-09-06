@@ -3,7 +3,7 @@
 Drei Regeln aus core/zeitplan.py, jede mit einem Test, der kippt, wenn man
 sie entfernt:
 
-1. Obergrenze LOCAL, egal was MAX_PERMISSION sagt.
+1. Obergrenze READ (bis FIX-10 LOCAL), egal was MAX_PERMISSION sagt.
 2. Ein Deckel ueber ALLE Plaene, ueber 24 Stunden, in Laeufen und Token.
 3. Verpasste Laeufe werden gezaehlt, nicht nachgeholt.
 
@@ -363,13 +363,21 @@ def test_der_deckel_ist_nicht_stillschweigend_erhoeht_worden():
     assert f"ZEITPLAN_MAX_TOKEN_24H={s.zeitplan_max_token_24h}" in beispiel
     assert f"ZEITPLAN_TAKT_S={s.zeitplan_takt_s}" in beispiel
     assert s.zeitplan_max_token_24h <= 200_000     # unter dem Groq-Tageskontingent
+    # FIX-11: der Erinnerungs-Topf ist ein eigener Deckel, keine Erhoehung -
+    # eine Erinnerung je Stunde, wie bei den Laeufen.
+    assert f"ZEITPLAN_MAX_ERINNERUNGEN_24H={s.zeitplan_max_erinnerungen_24h}" in beispiel
+    assert s.zeitplan_max_erinnerungen_24h <= 24
+    assert s.zeitplan_max_laeufe_24h <= 24
 
 
-# --- Regel 1: LOCAL, immer ------------------------------------------------
+# --- Regel 1: READ, immer -------------------------------------------------
 
 
-def test_regel_1_die_obergrenze_ist_local_egal_was_die_env_sagt(settings, monkeypatch):
-    """Ein Zeitplan darf nicht mailen, auch wenn MAX_PERMISSION=4 steht."""
+def test_regel_1_die_obergrenze_ist_read_egal_was_die_env_sagt(settings, monkeypatch):
+    """Ein Zeitplan darf weder mailen noch sich etwas merken, auch wenn
+    MAX_PERMISSION=4 steht. Bis FIX-10 war die Grenze LOCAL; seit FIX-11
+    READ - ein unbeaufsichtigter Lauf liest, er hinterlaesst nichts
+    (tests/test_fix11_erinnerungen.py zeigt den abgewiesenen remember)."""
     settings.max_permission = Permission.SENSITIVE.value
     gesehen: list[Permission] = []
 
@@ -393,8 +401,8 @@ def test_regel_1_die_obergrenze_ist_local_egal_was_die_env_sagt(settings, monkey
         antwort = c.post(f"/api/zeitplaene/{plan['id']}/jetzt", headers=TOKEN)
         assert antwort.status_code == 202, antwort.text
         assert _warte_bis(lambda: len(gesehen) == 2)
-    assert gesehen == [Permission.LOCAL, Permission.LOCAL]
-    assert zeitplan.PERMISSION_DECKEL is Permission.LOCAL
+    assert gesehen == [Permission.READ, Permission.READ]
+    assert zeitplan.PERMISSION_DECKEL is Permission.READ
 
 
 def test_getippte_auftraege_behalten_ihre_obergrenze(settings, monkeypatch):
@@ -556,11 +564,13 @@ def test_anlegen_listen_schalten_loeschen_ueber_http(client, settings):
 
     liste = client.get("/api/zeitplaene", headers=TOKEN).json()
     assert [p["id"] for p in liste["zeitplaene"]] == [plan["id"]]
-    assert liste["obergrenze"] == "LOCAL"
-    assert liste["deckel"] is None
+    assert liste["obergrenze"] == "READ"
+    assert liste["deckel"] is None and liste["erinnerungs_deckel"] is None
     assert liste["verbrauch"] == {"laeufe": 0, "token": 0,
                                   "max_laeufe": settings.zeitplan_max_laeufe_24h,
-                                  "max_token": settings.zeitplan_max_token_24h}
+                                  "max_token": settings.zeitplan_max_token_24h,
+                                  "erinnerungen": 0,
+                                  "max_erinnerungen": settings.zeitplan_max_erinnerungen_24h}
     assert liste["schleife"] is False            # Takt 0 in diesen Tests
 
     aus = client.post(f"/api/zeitplaene/{plan['id']}/schalten", headers=TOKEN,

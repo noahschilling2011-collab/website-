@@ -294,7 +294,7 @@ def test_erinnerung_anlegen_lehnt_unbrauchbares_ab(settings):
     werkzeug = registry.get("erinnerung_anlegen")
     werkzeug.db_path = settings.db_path
     e = asyncio.run(werkzeug.execute(text="x", wann="morgen frueh"))
-    assert not e.ok and "drei Formen" in e.error
+    assert not e.ok and "fuenf Formen" in e.error          # FIX-11: plus 'in N minuten/stunden'
     e = asyncio.run(werkzeug.execute(text="x", wann="einmal 2020-01-01 10:00"))
     assert not e.ok and "Vergangenheit" in e.error
     e = asyncio.run(werkzeug.execute(text="   ", wann="taeglich 07:00"))
@@ -614,7 +614,9 @@ def test_r_eine_erinnerung_kommt_ohne_modell_an(client, settings):
     danach = zeitplan.hole(settings.db_path, plan["id"])
     assert danach["aktiv"] == 0 and danach["naechster_lauf"] is None
     assert danach["letzter_status"] == "done" and danach["letzter_lauf"]
-    assert zeitplan.verbrauch_24h(settings.db_path) == zeitplan.Verbrauch(1, 0)
+    # FIX-11: eine Erinnerung zaehlt in ihren eigenen Topf, nicht in die
+    # Laeufe der Auftraege (Nachtrag E9 korrigiert).
+    assert zeitplan.verbrauch_24h(settings.db_path) == zeitplan.Verbrauch(0, 0, erinnerungen=1)
     gesehen = None
     frist = time.monotonic() + 3
     while time.monotonic() < frist and gesehen is None:
@@ -638,7 +640,8 @@ def test_r_eine_erinnerung_braucht_keinen_anbieter_und_keine_freie_bahn(client, 
     """Nachtrag: `hindernis` hielt Erinnerungen auch bei 'kein Anbieter' und
     'anderer Lauf' auf - obwohl sie weder Modell noch Budget brauchen. Ohne
     LLM_API_KEY kam keine einzige Erinnerung an. Jetzt gilt fuer sie nur der
-    Laeufe-Deckel; einmalige werden dabei nicht verbraucht."""
+    Erinnerungs-Deckel (FIX-11: ein eigener Topf, ZEITPLAN_MAX_ERINNERUNGEN_24H);
+    einmalige werden dabei nicht verbraucht."""
     import api.zeitplan as az
     from api.app import UnavailableProvider
     from core.llm import LLMError
@@ -662,37 +665,37 @@ def test_r_eine_erinnerung_braucht_keinen_anbieter_und_keine_freie_bahn(client, 
     [(pid, grund)] = client.portal.call(pruefe_einmal, client.app)
     assert pid == auftrag["id"] and grund.startswith("uebersprungen:")
 
-    # Der Laeufe-Deckel gilt auch fuer Erinnerungen - und verbraucht eine
-    # einmalige dabei nicht.
+    # Der Erinnerungs-Deckel gilt fuer Erinnerungen - und verbraucht eine
+    # einmalige dabei nicht. (Bis FIX-11 war das der Laeufe-Deckel.)
     monkeypatch.setattr(az, "verbrauch", lambda app, jetzt=None: zeitplan.Verbrauch(
-        settings.zeitplan_max_laeufe_24h, 0))
+        0, 0, erinnerungen=settings.zeitplan_max_erinnerungen_24h))
     spaeter = datetime.now().astimezone() + timedelta(hours=1)
     einmal = zeitplan.anlegen(settings.db_path, name="Zahnarzt", ziel="Zahnarzt anrufen",
                               regel_text=f"einmal {spaeter:%Y-%m-%d %H:%M}", art="erinnerung")
     _faellig_seit(settings.db_path, einmal["id"], 10)
     ergebnis = dict(client.portal.call(pruefe_einmal, client.app))
-    assert "Laeufen in 24 Stunden" in ergebnis[einmal["id"]]
+    assert "Erinnerungen in 24 Stunden" in ergebnis[einmal["id"]]
     danach = zeitplan.hole(settings.db_path, einmal["id"])
     assert danach["aktiv"] == 1 and danach["naechster_lauf"] is not None
     assert len(client.get("/api/messages", headers=TOKEN).json()) == 1
     antwort = client.post(f"/api/zeitplaene/{einmal['id']}/jetzt", headers=TOKEN)
-    assert antwort.status_code == 409 and "Laeufen in 24 Stunden" in antwort.json()["detail"]
+    assert antwort.status_code == 409 and "Erinnerungen in 24 Stunden" in antwort.json()["detail"]
 
 
 def test_r_eine_faellige_erinnerung_wird_nicht_vom_hindernis_verbraucht(client, settings):
     """Vorher: Sperre vor Hindernis - bei vollem Deckel war die einmalige
     Erinnerung weg, ohne je zu laufen."""
-    settings.zeitplan_max_laeufe_24h = 0                            # Deckel voll
+    settings.zeitplan_max_erinnerungen_24h = 0                      # Deckel voll (FIX-11: eigener Topf)
     spaeter = datetime.now().astimezone() + timedelta(hours=1)
     plan = zeitplan.anlegen(settings.db_path, name="Zahnarzt", ziel="Zahnarzt",
                             regel_text=f"einmal {spaeter:%Y-%m-%d %H:%M}", art="erinnerung")
     _faellig_seit(settings.db_path, plan["id"], 10)
     [(pid, was)] = client.portal.call(pruefe_einmal, client.app)
-    assert "Tagesdeckel" in was
+    assert "Erinnerungs-Deckel" in was
     danach = zeitplan.hole(settings.db_path, plan["id"])
     assert danach["aktiv"] == 1 and danach["naechster_lauf"]        # steht noch
     # Deckel wieder frei: die naechste Runde stellt zu.
-    settings.zeitplan_max_laeufe_24h = 24
+    settings.zeitplan_max_erinnerungen_24h = 24
     assert client.portal.call(pruefe_einmal, client.app) == [(pid, "erinnert")]
 
 

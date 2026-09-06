@@ -135,6 +135,11 @@ class DateiSuchen(_MitWurzeln):
                 hoechstens=int(hoechstens),
                 max_kb=int(self.datei_max_kb),
             )
+        except PfadAbgelehnt as exc:
+            # FIX-11: `..` oder ein absoluter Pfad im Muster. Der Text ist
+            # handgeschrieben und nennt weder Muster noch Pfad.
+            return ToolResult(ok=False, error=str(exc), display=str(exc),
+                              duration_ms=dauer())
         except OSError as exc:
             # `display` war sauber, `error` nicht - und `error` geht in die
             # Spalte tool_calls.error und ueber GET /api/tool-calls wieder

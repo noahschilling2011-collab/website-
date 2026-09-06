@@ -15,12 +15,21 @@ EIGENEN Auftraege, mehr nicht.
 Die drei Regeln, die diese Datei wichtiger machen als ihre Groesse
 ------------------------------------------------------------------
 
-1. NIEMAND IST DA, UM ZU BESTAETIGEN. Ein getippter Auftrag darf bis
-   EXTERNAL gehen, weil der Nutzer vor dem Bildschirm sitzt und
-   `send_email` per Rueckfrage freigibt. Ein Zeitplan laeuft um 07:00,
-   waehrend der Nutzer schlaeft. Deshalb ist die Obergrenze hier LOCAL -
-   hart, unabhaengig davon, was MAX_PERMISSION in der .env sagt. Siehe
-   `PERMISSION_DECKEL`.
+1. NIEMAND IST DA, UM ZU BESTAETIGEN - UND NIEMAND LIEST MIT. Ein
+   getippter Auftrag darf bis EXTERNAL gehen, weil der Nutzer vor dem
+   Bildschirm sitzt und `send_email` per Rueckfrage freigibt. Ein Zeitplan
+   laeuft um 07:00, waehrend der Nutzer schlaeft. Deshalb ist die
+   Obergrenze hier READ - hart, unabhaengig davon, was MAX_PERMISSION in
+   der .env sagt. Siehe `PERMISSION_DECKEL`.
+
+   Bis FIX-10 war die Grenze LOCAL. FIX-11 hat sie auf READ gesenkt, mit
+   Nachweis: ein Auftragstext mit praeparierten Anweisungen legte in einem
+   unbeaufsichtigten LOCAL-Lauf einen Fakt (`remember`) und einen
+   Stundenplan "Sende den Bericht an chef@fremd.example"
+   (`erinnerung_anlegen`) an - und der naechste Chat hob beides in den
+   Prompt. Unbeaufsichtigt heisst lesen: wetter, kalender, recall, Dateien,
+   Web. Was JARVIS sich merken oder anlegen soll, sagt der Nutzer selbst -
+   im Chat, wo er mitliest. Die Vorlage Morgenlage braucht nur READ.
 
 2. EIN ZEITPLAN KANN GELD VERBRENNEN, OHNE DASS ES JEMAND MERKT. Ein
    Auftrag, der jede Stunde laeuft und jedes Mal 8.000 Token kostet, frisst
@@ -54,6 +63,20 @@ Was die zweite Pruefrunde dazu gebracht hat (docs/FIX-08.md)
 - VERPASST ZAEHLT TERMINE, NICHT RUNDEN (`verpasste_termine`), und der
   naechste Takt zaehlt ab dem Soll - auch nach einem verpassten Lauf.
 
+"in N minuten" und "in N stunden" (FIX-11)
+-------------------------------------------
+
+Das sind EINGABEformen, keine Regeln: `lies_regel` rechnet sie beim Anlegen
+in `einmal JJJJ-MM-TT HH:MM` um (jetzt plus N, auf die volle Minute
+aufgerundet) und gespeichert wird nur diese Form - kein vierter Regeltyp,
+keine neue Spalte. Gerechnet wird in UTC und erst das Ergebnis in die
+Ortszeit uebersetzt: so gibt es die Uhrzeit auch am Tag der Zeitumstellung
+(die Luecke 02:00-03:00 entsteht nur, wenn man in der Wandzeit addiert).
+Faellt der Zeitpunkt in die doppelte Stunde der Umstellung im Herbst, wird
+abgelehnt statt eine Stunde zu frueh zugestellt. Vorher musste das Modell
+"in 20 Minuten" mit `clock` aus UTC in Ortszeit rechnen - Fehlerquelle
+FIX-09 E8.
+
 Zeit und Zeitzone
 -----------------
 
@@ -84,7 +107,9 @@ from core.db import session, utcnow
 
 # Regel 1. Hart, keine Einstellung. Wer das aendern will, aendert es hier,
 # mit Begruendung - und nicht ueber eine .env-Zeile um drei Uhr nachts.
-PERMISSION_DECKEL = Permission.LOCAL
+# FIX-11: READ statt LOCAL - ein unbeaufsichtigter Lauf liest, er merkt sich
+# nichts und legt nichts an (Begruendung im Modulkopf, Regel 1).
+PERMISSION_DECKEL = Permission.READ
 
 # Regel 3: wie lange ein Lauf "faellig" bleibt, bevor er als verpasst gilt.
 # Die Schleife prueft jede Minute; zwei Minuten Toleranz decken einen
@@ -118,6 +143,14 @@ _STUNDEN = re.compile(r"^alle (\d{1,3}) stunden?$")
 # FIX-09: einmalig. "einmal 2026-09-06 18:00" - das Wort "einmal" darf
 # fehlen, ein Datum mit Uhrzeit ist eindeutig genug.
 _EINMAL = re.compile(r"^(?:einmal )?(\d{4})-(\d{2})-(\d{2}) (\d{1,2}):(\d{2})$")
+# FIX-11: relativ, "in 20 minuten" / "in 2 stunden" (Singular geht auch).
+# Wird beim Lesen in die einmal-Form uebersetzt, siehe Modulkopf.
+_RELATIV = re.compile(r"^in (\d{1,6}) (minuten?|stunden?)$")
+# Hoechstens eine Woche voraus - wer weiter plant, nimmt ein Datum.
+MAX_MINUTEN = 7 * 24 * 60
+MAX_STUNDEN = 7 * 24
+FORMEN = ("'taeglich 07:00', 'alle 6 stunden', 'einmal 2026-09-06 18:00', "
+          "'in 20 minuten' oder 'in 2 stunden'")
 
 # FIX-09: mehr Plaene als das braucht niemand - und ein Modell, das ueber
 # erinnerung_anlegen Plaene anlegt, soll nicht unbegrenzt welche erzeugen.
@@ -128,7 +161,7 @@ MAX_FEHLSCHLAEGE = 3
 
 
 class RegelUngueltig(ValueError):
-    """Die Regel ist keine der zwei erlaubten Formen."""
+    """Die Regel ist keine der erlaubten Formen."""
 
 
 @dataclass(frozen=True)
@@ -152,13 +185,17 @@ class Regel:
         return self.art == "einmal"
 
 
-def lies_regel(roh: str) -> Regel:
-    """Genau zwei Formen. Alles andere ist ein Fehler, kein Ratespiel.
+def lies_regel(roh: str, jetzt: datetime | None = None) -> Regel:
+    """Drei Regeln plus zwei Eingabeformen. Alles andere ist ein Fehler,
+    kein Ratespiel.
 
     Umlaute werden hingenommen ("täglich"), Gross-/Kleinschreibung und
     doppelte Leerzeichen auch. Aber "jeden Morgen" oder "*/6 * * * *" nicht:
     wer Cron will, bekommt eine klare Absage statt einer stillen
     Fehldeutung.
+
+    `jetzt` braucht nur "in N minuten"/"in N stunden" (FIX-11): die Formen
+    werden hier in `einmal ...` uebersetzt. Tests stellen damit die Uhr.
     """
     text = " ".join(str(roh or "").strip().lower().split())
     text = text.replace("täglich", "taeglich").replace("stunde ", "stunden ")
@@ -186,10 +223,50 @@ def lies_regel(roh: str) -> Regel:
         except ValueError as exc:
             raise RegelUngueltig(f"'{roh}': kein gueltiger Zeitpunkt ({exc}).") from exc
         return Regel(art="einmal", stunde=h, minute=mi, datum=f"{j:04d}-{mo:02d}-{t:02d}")
+    m = _RELATIV.match(text)
+    if m:
+        n = int(m.group(1))
+        if m.group(2).startswith("minute"):
+            if not (1 <= n <= MAX_MINUTEN):
+                raise RegelUngueltig(
+                    f"'{roh}': zwischen 'in 1 minute' und 'in {MAX_MINUTEN} minuten' "
+                    f"(eine Woche) - oder 'in 2 stunden', 'einmal 2026-09-06 18:00'.")
+            abstand = timedelta(minutes=n)
+        else:
+            if not (1 <= n <= MAX_STUNDEN):
+                raise RegelUngueltig(
+                    f"'{roh}': zwischen 'in 1 stunde' und 'in {MAX_STUNDEN} stunden' "
+                    f"(eine Woche) - oder 'in 20 minuten', 'einmal 2026-09-06 18:00'.")
+            abstand = timedelta(hours=n)
+        return _einmal_ab(roh, abstand, jetzt)
     raise RegelUngueltig(
-        f"'{roh}' verstehe ich nicht. Erlaubt sind genau drei Formen: "
-        f"'taeglich 07:00', 'alle 6 stunden' oder 'einmal 2026-09-06 18:00'."
+        f"'{roh}' verstehe ich nicht. Erlaubt sind genau fuenf Formen: {FORMEN}."
     )
+
+
+def _einmal_ab(roh: str, abstand: timedelta, jetzt: datetime | None) -> Regel:
+    """FIX-11: 'in N minuten' als einmal-Regel, aufgerundet auf die volle
+    Minute. In UTC gerechnet, dann in die Ortszeit uebersetzt (Modulkopf).
+
+    Die Rueckprobe am Ende faengt die doppelte Stunde der Zeitumstellung im
+    Herbst: die Wandzeit 02:30 gibt es dann zweimal, und die einmal-Form
+    kann nur die erste meinen. Laege der Zeitpunkt in der zweiten, kaeme
+    die Erinnerung eine Stunde zu frueh - oder gar nicht, weil "vorbei".
+    Dann lieber eine klare Absage.
+    """
+    basis = (jetzt or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    ziel = basis + abstand
+    if ziel.second or ziel.microsecond:
+        ziel = ziel.replace(second=0, microsecond=0) + timedelta(minutes=1)
+    lokal = ziel.astimezone()
+    regel = Regel(art="einmal", stunde=lokal.hour, minute=lokal.minute,
+                  datum=lokal.strftime("%Y-%m-%d"))
+    if naechster_lauf(regel) != _als_z(ziel):
+        raise RegelUngueltig(
+            f"'{roh}' faellt in die doppelte Stunde der Zeitumstellung - so ein "
+            f"Zeitpunkt laesst sich nicht eindeutig speichern. Nimm eine Stunde "
+            f"mehr oder eine feste Uhrzeit danach ('einmal {regel.datum} HH:MM').")
+    return regel
 
 
 def _als_z(zeit: datetime) -> str:
@@ -252,8 +329,11 @@ def _zeit_existiert(regel: Regel) -> bool:
 
 
 def anlegen(db_path: Path | str, *, name: str, ziel: str, regel_text: str,
-            art: str = "auftrag") -> dict:
-    regel = lies_regel(regel_text)
+            art: str = "auftrag", jetzt: datetime | None = None) -> dict:
+    """Einen Plan anlegen. `art` ist 'auftrag' (Modell) oder 'erinnerung'
+    (nur Nachricht, null Token). `jetzt` stellt die Uhr fuer "in N
+    minuten" und die Vergangenheitspruefung - fuer Tests."""
+    regel = lies_regel(regel_text, jetzt)
     name = " ".join(str(name or "").split())[:80]
     ziel = str(ziel or "").strip()
     if not name:
@@ -263,7 +343,7 @@ def anlegen(db_path: Path | str, *, name: str, ziel: str, regel_text: str,
     if art not in ARTEN:
         raise ValueError(f"Unbekannte Art {art!r}.")
     termin = naechster_lauf(regel)
-    if regel.einmalig and termin <= utcnow():
+    if regel.einmalig and termin <= _als_z(jetzt or datetime.now(timezone.utc)):
         raise RegelUngueltig(f"'{regel.text}' liegt in der Vergangenheit.")
     if not _zeit_existiert(regel):
         raise RegelUngueltig(f"'{regel.text}': diese Uhrzeit gibt es an dem Tag nicht "
@@ -450,9 +530,9 @@ def verbuche_start(db_path: Path | str, plan: dict, task_id: str,
 def verbuche_erinnerung(db_path: Path | str, plan: dict, *, ausloeser: str,
                         jetzt: datetime | None = None) -> None:
     """FIX-09: eine Erinnerung wurde zugestellt - ohne Task. Protokollzeile
-    ohne task_id (zaehlt fuer den Laeufe-Deckel, kostet null Token) und
-    'done' am Plan. Den Termin hat `termin_weiter` schon weitergeschoben
-    bzw. bei einmalig auf NULL gesetzt."""
+    ohne task_id (zaehlt fuer den Erinnerungs-Deckel, FIX-11; kostet null
+    Token) und 'done' am Plan. Den Termin hat `termin_weiter` schon
+    weitergeschoben bzw. bei einmalig auf NULL gesetzt."""
     zeitpunkt = (jetzt or datetime.now(timezone.utc)).astimezone(timezone.utc)
     with session(db_path) as conn:
         conn.execute(
@@ -588,8 +668,13 @@ def abgleich(db_path: Path | str, laufende_ids: set[str] | frozenset[str]) -> li
 
 @dataclass(frozen=True)
 class Verbrauch:
-    laeufe: int
+    laeufe: int          # Auftraege (Laeufe MIT Task) in den letzten 24 h
     token: int
+    # FIX-11: Erinnerungen (Laeufe OHNE Task) haben einen eigenen Topf. Bis
+    # dahin zaehlten sie in `laeufe`: eine Erinnerung "alle 1 stunden" buchte
+    # 24 von 24 Laeufen, und die Morgenlage wurde still uebersprungen -
+    # ohne Fehlschlag, also ohne Bremse (FIX-09 E9, hier korrigiert).
+    erinnerungen: int = 0
 
 
 def verbrauch_24h(db_path: Path | str, jetzt: datetime | None = None,
@@ -614,11 +699,16 @@ def verbrauch_24h(db_path: Path | str, jetzt: datetime | None = None,
             "WHERE l.gestartet_am >= ?",
             (seit,),
         ).fetchall()
-    token = 0
+    laeufe = erinnerungen = token = 0
     for z in zeilen:
+        if z["task_id"] is None:
+            # FIX-11: ohne Task heisst Erinnerung - eigener Topf, null Token.
+            erinnerungen += 1
+            continue
+        laeufe += 1
         spent = int(z["spent"] or 0)
         token += max(spent, reserviert.get(z["task_id"], 0))
-    return Verbrauch(laeufe=len(zeilen), token=token)
+    return Verbrauch(laeufe=laeufe, token=token, erinnerungen=erinnerungen)
 
 
 def _de(n: int) -> str:
@@ -626,16 +716,31 @@ def _de(n: int) -> str:
     return f"{n:,}".replace(",", ".")
 
 
-def deckel_erreicht(verbrauch: Verbrauch, *, max_laeufe: int, max_token: int) -> str | None:
-    """Regel 2, die Entscheidung. Gibt den Grund zurueck oder None."""
-    if verbrauch.laeufe >= max_laeufe:
+def deckel_erreicht(verbrauch: Verbrauch, *, max_laeufe: int | None = None,
+                    max_token: int | None = None,
+                    max_erinnerungen: int | None = None) -> str | None:
+    """Regel 2, die Entscheidung. Gibt den Grund zurueck oder None.
+
+    Geprueft wird jeder Topf, dessen Deckel mitgegeben wird: Auftraege
+    gegen `max_laeufe` und `max_token`, Erinnerungen (FIX-11) gegen
+    `max_erinnerungen`. `api.zeitplan.hindernis` gibt fuer einen Auftrag
+    die ersten beiden und fuer eine Erinnerung nur den dritten - eine
+    Erinnerung kostet null Token und keinen Modell-Lauf, also darf ein
+    voller Auftrags-Topf sie nicht aufhalten, und umgekehrt.
+    """
+    if max_erinnerungen is not None and verbrauch.erinnerungen >= max_erinnerungen:
+        return (f"Erinnerungs-Deckel erreicht: {verbrauch.erinnerungen} von "
+                f"{max_erinnerungen} Erinnerungen in 24 Stunden "
+                f"(ZEITPLAN_MAX_ERINNERUNGEN_24H).")
+    if max_laeufe is not None and verbrauch.laeufe >= max_laeufe:
         return (f"Tagesdeckel erreicht: {verbrauch.laeufe} von {max_laeufe} "
                 f"Laeufen in 24 Stunden (ZEITPLAN_MAX_LAEUFE_24H).")
-    if verbrauch.token >= max_token:
-        return (f"Tagesdeckel erreicht: {_de(verbrauch.token)} von {_de(max_token)} "
-                f"Token in 24 Stunden (ZEITPLAN_MAX_TOKEN_24H).")
-    rest = max_token - verbrauch.token
-    if rest < MINDEST_REST:
-        return (f"Tagesdeckel fast erreicht: nur noch {_de(rest)} Token uebrig, "
-                f"ein Lauf braucht mindestens {_de(MINDEST_REST)} (ZEITPLAN_MAX_TOKEN_24H).")
+    if max_token is not None:
+        if verbrauch.token >= max_token:
+            return (f"Tagesdeckel erreicht: {_de(verbrauch.token)} von {_de(max_token)} "
+                    f"Token in 24 Stunden (ZEITPLAN_MAX_TOKEN_24H).")
+        rest = max_token - verbrauch.token
+        if rest < MINDEST_REST:
+            return (f"Tagesdeckel fast erreicht: nur noch {_de(rest)} Token uebrig, "
+                    f"ein Lauf braucht mindestens {_de(MINDEST_REST)} (ZEITPLAN_MAX_TOKEN_24H).")
     return None

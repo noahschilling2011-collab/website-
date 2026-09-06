@@ -291,6 +291,7 @@ def add_tool_call(
     sources: list[str] | None = None,
     duration_ms: int = 0,
 ) -> ToolCallRow:
+    arguments = kurze_argumente(arguments)
     with session(db_path) as conn:
         now = utcnow()
         cur = conn.execute(
@@ -499,4 +500,27 @@ def list_audit(db_path: Path | str, limit: int = 200) -> list[AuditRow]:
         rows = conn.execute(
             "SELECT * FROM audit_log ORDER BY id DESC LIMIT ?", (limit,)
         ).fetchall()
-    return [AuditRow.from_row(r) for r in rows]
+    return [AuditRow.from_row(r) for r in rows]# FIX-11: Ein Modell darf ein Werkzeug mit 100.000 Zeichen aufrufen; die
+# Grenzen im Werkzeug lehnen das ab, aber der Aufruf selbst wurde bisher
+# vollstaendig gespeichert und ging ueber /api/messages an die Oberflaeche.
+# Gespeichert wird nur, was zum Nachvollziehen reicht - mit sichtbarer Marke,
+# damit niemand die Kuerzung fuer den echten Aufruf haelt.
+MAX_ARGUMENT_ZEICHEN = 2000
+
+
+def kurze_argumente(arguments: dict) -> dict:
+    """Lange Zeichenketten in Werkzeug-Argumenten kappen, mit Marke."""
+    gekappt = {}
+    for schluessel, wert in (arguments or {}).items():
+        if isinstance(wert, str) and len(wert) > MAX_ARGUMENT_ZEICHEN:
+            rest = len(wert) - MAX_ARGUMENT_ZEICHEN
+            gekappt[schluessel] = (
+                wert[:MAX_ARGUMENT_ZEICHEN]
+                + f" […gekuerzt, {rest} weitere Zeichen]"
+            )
+        else:
+            gekappt[schluessel] = wert
+    return gekappt
+
+
+

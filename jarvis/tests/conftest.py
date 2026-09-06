@@ -100,12 +100,24 @@ def kein_echtes_netz(monkeypatch: pytest.MonkeyPatch) -> None:
                         blocked_async)
 
 
+# FIX-11: die Host-Sperre (api/app.py, TrustedHostMiddleware) laesst nur
+# Anfragen durch, deren Host-Header auf diesen Rechner zeigt. Starlettes
+# TestClient schickt `testserver`, ein httpx.ASGITransport in
+# tests/test_zeitplan.py `t`. Beide werden ueber JARVIS_ERLAUBTE_HOSTS
+# erlaubt - als Umgebungsvariable, weil pydantic-settings sie auch bei
+# `Settings(_env_file=None, ...)` liest und so JEDER Test sie bekommt, auch
+# die 19 Dateien, die ihre Settings selbst bauen. Gesetzt wird sie NACH dem
+# Leeren der Umgebung, sonst raeumt `saubere_umgebung` sie gleich wieder weg.
+TEST_HOSTS = "testserver,t"
+
+
 @pytest.fixture(autouse=True)
 def saubere_umgebung(monkeypatch: pytest.MonkeyPatch):
     """Keine .env und keine Shell-Variable faerbt auf einen Test ab."""
     for name in list(os.environ):
         if name.startswith(("JARVIS_", "LLM_", "BUDGET_")):
             monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("JARVIS_ERLAUBTE_HOSTS", TEST_HOSTS)
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

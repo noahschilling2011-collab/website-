@@ -799,6 +799,24 @@ button, input, textarea { font: inherit; color: inherit; }
   color: var(--text-dim);
 }
 .zeitplan-hinweis { margin: 0 0 var(--s-3); font-size: var(--step--1); color: var(--text-dim); }
+/* FIX-11: die drei Reaktionen auf eine Erinnerung (Ton, Benachrichtigung,
+   Vorlesen) und der Umschalter Erinnerung/Auftrag - nur vorhandene Tokens. */
+.zeitplan-melden {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: var(--s-2) var(--s-3);
+  margin: 0 0 var(--s-3);
+  font-size: var(--step--1);
+  color: var(--text-dim);
+}
+.zeitplan-melden label, .zeitplan-art label {
+  display: inline-flex; align-items: center; gap: 6px;
+  cursor: pointer;
+  color: var(--text);
+}
+.zeitplan-art { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-3); flex-basis: 100%; font-size: var(--step--1); }
+/* Die Radioknoepfe erben sonst das Textfeld-Rezept von `.zeitplan-form input`
+   (flex 160px, Rahmen, Fuellung) und stehen weit weg von ihrem Wort. */
+.zeitplan-form .zeitplan-art input { flex: none; width: auto; min-width: 0; margin: 0; padding: 0; border: 0; background: none; }
 .zeitplan-neu > summary {
   cursor: pointer;
   font-size: var(--step--1);
@@ -1898,10 +1916,94 @@ button, input, textarea { font: inherit; color: inherit; }
     loadHistory().catch(function () {});
   }
 
+  // --- Erinnerungen fuer Menschen (FIX-11) --------------------------------
+  //
+  // Eine Erinnerung kam bis FIX-10 stumm an: eine Zeile im Chat, sonst
+  // nichts. Jetzt drei Reaktionen, jede einzeln abschaltbar: ein kurzer Ton
+  // (Web Audio, ein Oszillator, kein Asset), eine Benachrichtigung des
+  // Browsers (nur nach Erlaubnis - und die gibt es nur aus einer Nutzergeste
+  // heraus, dem Knopf "Erinnerungen melden") und Vorlesen ueber lieseVor().
+  // In der Benachrichtigung steht NUR der Erinnerungstext: keine IDs, keine
+  // Pfade. Die Wahl liegt im Browser (localStorage, ein Komfort); ohne
+  // Speicher gilt sie bis zum Neuladen.
+  var ERINNERUNG_SCHALTER = { ton: 'Ton', melden: 'Benachrichtigung', vorlesen: 'Vorlesen' };
+  var erinnerungWahl = {};                 // im Speicher, falls localStorage fehlt
+
+  function erinnerungSchalter(name) {
+    if (Object.prototype.hasOwnProperty.call(erinnerungWahl, name)) return erinnerungWahl[name];
+    try {
+      var roh = localStorage.getItem('jarvis.erinnerung.' + name);
+      if (roh !== null) return roh === '1';
+    } catch (e) { /* kein Speicher */ }
+    return true;                           // Vorgabe: an
+  }
+
+  function erinnerungSchalterSetzen(name, an) {
+    erinnerungWahl[name] = !!an;
+    try { localStorage.setItem('jarvis.erinnerung.' + name, an ? '1' : '0'); } catch (e) { /* egal */ }
+  }
+
+  function erinnerungsTon() {
+    var Klasse = window.AudioContext || window.webkitAudioContext;
+    if (!Klasse) return;
+    // Ein Ton ohne vorherige Nutzergeste: der Browser haelt den Kontext an,
+    // dann bleibt es still - aber es bricht nichts.
+    var ctx = new Klasse();
+    var osc = ctx.createOscillator();
+    var laut = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 880;
+    laut.gain.value = 0.05;
+    osc.connect(laut);
+    laut.connect(ctx.destination);
+    osc.onended = function () { try { ctx.close(); } catch (e) { /* egal */ } };
+    try { ctx.resume().catch(function () { /* bleibt still */ }); } catch (e) { /* egal */ }
+    osc.start();
+    osc.stop(ctx.currentTime + 0.25);
+  }
+
+  function erinnerungMelden(daten) {
+    var text = String(daten.goal || daten.result || '').trim();
+    if (!text) return;
+    if (erinnerungSchalter('ton')) {
+      try { erinnerungsTon(); } catch (e) { /* kein Ton ist kein Fehler */ }
+    }
+    if (erinnerungSchalter('melden') && window.Notification && Notification.permission === 'granted') {
+      try { new Notification(NAME, { body: text }); } catch (e) { /* s. o. */ }
+    }
+    if (erinnerungSchalter('vorlesen')) {
+      try { lieseVor(String(daten.result || text)); } catch (e) { /* s. o. */ }
+    }
+  }
+
+  function erinnerungErlaubnisAnzeigen(knopf) {
+    if (!window.Notification) { knopf.hidden = true; return; }
+    var stand = Notification.permission;
+    knopf.disabled = stand !== 'default';
+    knopf.textContent = stand === 'granted' ? 'Erinnerungen werden gemeldet'
+      : (stand === 'denied' ? 'Benachrichtigungen im Browser gesperrt' : 'Erinnerungen melden');
+  }
+
+  function erinnerungErlaubnisHolen(knopf) {
+    if (!window.Notification || Notification.permission !== 'default') return;
+    // MDN: Notification.requestPermission() gibt ein Promise zurueck, das zu
+    // 'granted', 'denied' oder 'default' wird; die alte Callback-Form gibt
+    // undefined. Gerufen wird nur hier - aus dem Klick, einer Nutzergeste.
+    try {
+      var p = Notification.requestPermission();
+      if (p && typeof p.then === 'function') {
+        p.then(function () { erinnerungErlaubnisAnzeigen(knopf); },
+               function () { erinnerungErlaubnisAnzeigen(knopf); });
+      }
+    } catch (e) { erinnerungErlaubnisAnzeigen(knopf); }
+  }
+
   function zustellungStarten() {
     if (zustellStrom) return;
     zustellStrom = stromAbonnieren(function (typ, daten) {
       if (typ !== 'task' || !daten.final || !daten.herkunft) return;
+      // FIX-11: eine Erinnerung darf nicht stumm ankommen.
+      if (daten.herkunft.art === 'erinnerung') erinnerungMelden(daten);
       zustellen();
     }, function () {
       // Abgerissen (Server laenger als eine Minute weg). Neu aufgebaut wird
@@ -2868,10 +2970,39 @@ button, input, textarea { font: inherit; color: inherit; }
 
     var hinweis = document.createElement('p');
     hinweis.className = 'zeitplan-hinweis';
-    hinweis.textContent = NAME + ' wiederholt einen Auftrag von selbst. Höchstens lokal '
-      + '(keine Mail, kein Termin — niemand ist da, um zu bestätigen), ein Tagesdeckel '
-      + 'für alle Pläne zusammen, verpasste Läufe werden nicht nachgeholt.';
+    hinweis.textContent = NAME + ' wiederholt einen Auftrag von selbst. Höchstens lesen '
+      + '(kein Merken, keine Mail, kein Termin — niemand ist da, um mitzulesen oder zu '
+      + 'bestätigen), ein Tagesdeckel für alle Pläne zusammen, verpasste Läufe werden nicht '
+      + 'nachgeholt. Eine Erinnerung ist nur eine Nachricht: kein Modell, null Token.';
     box.appendChild(hinweis);
+
+    // FIX-11: was passiert, wenn eine Erinnerung kommt - drei Reaktionen,
+    // jede einzeln abschaltbar (erinnerungMelden). Die Erlaubnis fuer
+    // Benachrichtigungen holt nur der Knopf, aus der Nutzergeste heraus.
+    var melden = document.createElement('div');
+    melden.className = 'zeitplan-melden';
+    var meldenTitel = document.createElement('span');
+    meldenTitel.textContent = 'Wenn eine Erinnerung kommt:';
+    melden.appendChild(meldenTitel);
+    Object.keys(ERINNERUNG_SCHALTER).forEach(function (k) {
+      var label = document.createElement('label');
+      var kasten = document.createElement('input');
+      kasten.type = 'checkbox';
+      kasten.name = 'erinnerung-' + k;
+      kasten.checked = erinnerungSchalter(k);
+      kasten.addEventListener('change', function () { erinnerungSchalterSetzen(k, kasten.checked); });
+      label.appendChild(kasten);
+      label.appendChild(document.createTextNode(ERINNERUNG_SCHALTER[k]));
+      melden.appendChild(label);
+    });
+    var erlaubnis = document.createElement('button');
+    erlaubnis.type = 'button';
+    erlaubnis.className = 'zeitplan-knopf';
+    erlaubnis.setAttribute('data-aktion', 'erinnerungen-melden');
+    erlaubnis.addEventListener('click', function () { erinnerungErlaubnisHolen(erlaubnis); });
+    erinnerungErlaubnisAnzeigen(erlaubnis);
+    melden.appendChild(erlaubnis);
+    box.appendChild(melden);
 
     var status = document.createElement('p');
     status.className = 'zeitplan-meldung';
@@ -2894,7 +3025,7 @@ button, input, textarea { font: inherit; color: inherit; }
     form.className = 'zeitplan-form';
     var felder = {};
     [['name', 'Name des Zeitplans', 'Name, z. B. Morgenlage', 80],
-     ['regel', 'Regel', 'taeglich 07:00 · alle 6 stunden · einmal 2026-09-06 18:00', 40],
+     ['regel', 'Regel', 'in 20 minuten · in 2 stunden · einmal 2026-09-06 18:00 · taeglich 07:00 · alle 6 stunden', 40],
      ['ziel', 'Auftrag', 'Was ' + NAME + ' jedes Mal tun soll', 10000]].forEach(function (f) {
       var input = document.createElement('input');
       input.name = f[0];
@@ -2907,6 +3038,44 @@ button, input, textarea { font: inherit; color: inherit; }
       felder[f[0]] = input;
       form.appendChild(input);
     });
+    // FIX-11: Erinnerung (nur Nachricht, 0 Token) oder Auftrag (Modell).
+    // Die Vorgabe folgt der Regel - "einmal ..." und "in N ..." sind
+    // Erinnerungen -, bis der Nutzer selbst umschaltet.
+    var artWahl = document.createElement('div');
+    artWahl.className = 'zeitplan-art';
+    var arten = {};
+    var artVonHand = false;
+    [['erinnerung', 'Erinnerung (nur Nachricht, 0 Token)'],
+     ['auftrag', 'Auftrag (Modell)']].forEach(function (a) {
+      var label = document.createElement('label');
+      var wahl = document.createElement('input');
+      wahl.type = 'radio';
+      wahl.name = 'art';
+      wahl.value = a[0];
+      wahl.defaultChecked = a[0] === 'auftrag';
+      wahl.addEventListener('change', function () { artVonHand = true; artAnzeigen(); });
+      arten[a[0]] = wahl;
+      label.appendChild(wahl);
+      label.appendChild(document.createTextNode(a[1]));
+      artWahl.appendChild(label);
+    });
+    function artGewaehlt() { return arten.erinnerung.checked ? 'erinnerung' : 'auftrag'; }
+    function artAnzeigen() {
+      var erinnerung = artGewaehlt() === 'erinnerung';
+      felder.ziel.placeholder = erinnerung
+        ? 'Woran ' + NAME + ' dich erinnern soll — der Text ist die Nachricht'
+        : 'Was ' + NAME + ' jedes Mal tun soll';
+      felder.ziel.setAttribute('aria-label', erinnerung ? 'Erinnerungstext' : 'Auftrag');
+    }
+    function artNachRegel() {
+      if (artVonHand) return;
+      var regel = felder.regel.value.trim().toLowerCase();
+      arten[/^(einmal\b|in\s+\d|\d{4}-\d{2}-\d{2}\b)/.test(regel) ? 'erinnerung' : 'auftrag'].checked = true;
+      artAnzeigen();
+    }
+    felder.regel.addEventListener('input', artNachRegel);
+    form.appendChild(artWahl);
+    artAnzeigen();
     var knopf = document.createElement('button');
     knopf.type = 'submit';
     knopf.textContent = 'Zeitplan anlegen';
@@ -2925,6 +3094,8 @@ button, input, textarea { font: inherit; color: inherit; }
         felder.name.value = v.name;
         felder.regel.value = v.regel;
         felder.ziel.value = v.ziel;
+        artVonHand = false;
+        artNachRegel();                    // die Vorlage ist ein Auftrag
         falte.open = true;
         sag('Vorlage eingesetzt. ' + (v.hinweis || '') + ' Prüfen, dann „Zeitplan anlegen“.');
         felder.ziel.focus();
@@ -2938,14 +3109,17 @@ button, input, textarea { font: inherit; color: inherit; }
       var body = {
         name: felder.name.value.trim(),
         regel: felder.regel.value.trim(),
-        ziel: felder.ziel.value.trim()
+        ziel: felder.ziel.value.trim(),
+        art: artGewaehlt()
       };
-      if (!body.name || !body.regel || !body.ziel) { sag('Name, Regel und Auftrag brauchen alle drei einen Inhalt.', true); return; }
+      if (!body.name || !body.regel || !body.ziel) { sag('Name, Regel und Text brauchen alle drei einen Inhalt.', true); return; }
       knopf.disabled = true;
       api('/api/zeitplaene', { method: 'POST', body: body })
         .then(function (p) {
           form.reset();
-          sag('Zeitplan „' + p.name + '“ angelegt, ' + p.regel + '.');
+          artVonHand = false;
+          artAnzeigen();
+          sag((p.art === 'erinnerung' ? 'Erinnerung „' : 'Zeitplan „') + p.name + '“ angelegt, ' + p.regel + '.');
           return ladeZeitplaene(ctx);
         })
         .catch(function (err) { sag(err.message, true); })
@@ -2959,7 +3133,8 @@ button, input, textarea { font: inherit; color: inherit; }
     liste.className = 'zeitplan-liste';
     box.appendChild(liste);
 
-    var ctx = { liste: liste, sag: sag, falte: falte, deckel: null, gesperrt: null, erstesMal: true };
+    var ctx = { liste: liste, sag: sag, falte: falte, deckel: null, gesperrt: null,
+                erinnerungsDeckel: null, erstesMal: true };
     zeitplanCtx = ctx;
     ladeZeitplaene(ctx);
     return box;
@@ -2971,12 +3146,14 @@ button, input, textarea { font: inherit; color: inherit; }
       liste.textContent = '';
       ctx.deckel = d.deckel || null;
       ctx.gesperrt = d.gesperrt || null;
+      ctx.erinnerungsDeckel = d.erinnerungs_deckel || null;
       var v = d.verbrauch || {};
       var zeile = document.createElement('div');
       zeile.className = 'karte-zeile';
-      ['Letzte 24 h: ' + v.laeufe + ' von ' + v.max_laeufe + ' Läufen, '
-         + ccZahl(v.token) + ' von ' + ccZahl(v.max_token) + ' Token',
-       'höchstens lokal',
+      ['Letzte 24 h: ' + v.laeufe + ' von ' + v.max_laeufe + ' Aufträgen, '
+         + ccZahl(v.token) + ' von ' + ccZahl(v.max_token) + ' Token, '
+         + v.erinnerungen + ' von ' + v.max_erinnerungen + ' Erinnerungen',
+       'höchstens lesen',
        d.schleife ? 'läuft von selbst' : 'nur von Hand (Schleife aus)'
       ].forEach(function (text) {
         var s = document.createElement('span');
@@ -2984,6 +3161,13 @@ button, input, textarea { font: inherit; color: inherit; }
         zeile.appendChild(s);
       });
       liste.appendChild(zeile);
+      if (d.erinnerungs_deckel) {
+        // FIX-11: der eigene Topf der Erinnerungen - sperrt nur die.
+        var warnE = document.createElement('p');
+        warnE.className = 'zeitplan-deckel';
+        warnE.textContent = d.erinnerungs_deckel;
+        liste.appendChild(warnE);
+      }
       if (d.deckel) {
         var warn = document.createElement('p');
         warn.className = 'zeitplan-deckel';
@@ -3098,9 +3282,12 @@ button, input, textarea { font: inherit; color: inherit; }
       b.textContent = a[1];
       b.setAttribute('data-plan', p.id);
       b.setAttribute('data-aktion', a[0]);
-      if (a[0] === 'jetzt' && (ctx.deckel || ctx.gesperrt)) {
+      // Eine Erinnerung haengt nur an ihrem eigenen Topf (FIX-11), ein
+      // Auftrag am Tagesdeckel und an einem laufenden Zeitplan.
+      var sperre = p.art === 'erinnerung' ? ctx.erinnerungsDeckel : (ctx.deckel || ctx.gesperrt);
+      if (a[0] === 'jetzt' && sperre) {
         b.disabled = true;
-        b.title = ctx.deckel || ctx.gesperrt;
+        b.title = sperre;
       }
       b.addEventListener('click', function () {
         if (b.disabled) return;
@@ -3109,6 +3296,7 @@ button, input, textarea { font: inherit; color: inherit; }
         b.disabled = true;                    // kein Doppelklick
         lauf.then(function (d) {
           if (d && d.task_id) ctx.sag('Zeitplan „' + p.name + '“ läuft jetzt (Auftrag ' + d.task_id + ').');
+          else if (d && d.status === 'erinnert') ctx.sag('Erinnerung „' + p.name + '“ zugestellt — sie steht jetzt im Chat.');
           else if (d && d.geloescht) ctx.sag('Zeitplan „' + p.name + '“ gelöscht.');
           else ctx.sag('');
           return ladeZeitplaene(ctx);

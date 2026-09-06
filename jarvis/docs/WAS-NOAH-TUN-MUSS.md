@@ -223,3 +223,46 @@ wenn es scheitert.
 Alles außer Punkt 3. Ohne die vier Punkte oben kann ich weiter aufräumen,
 prüfen und absichern — aber **nichts Neues belegen**. Ab da wäre es
 Behauptung, und genau das tut dieses Projekt nicht.
+
+---
+
+## Nachtrag 06.09.2026 (FIX-11, Punkt 1) — zwei Dinge, die du wissen musst
+
+Beides braucht keine Handlung, wenn du JARVIS wie bisher über
+`http://127.0.0.1:8000` aufrufst. Steht hier, damit dich nichts überrascht.
+
+### JARVIS sichert seine Datenbank jetzt selbst
+
+Beim Start, einmal je 24 Stunden und immer vor einer Migration, nach
+`data/sicherungen/backup-<UTC-Zeit>.db`. Es bleiben die jüngsten **7**; in
+diesem Ordner wird nach diesem Namensmuster gelöscht, sonst nirgends. Die
+Statuszeile bekommt ein Feld `letzte_sicherung` (die Anzeige kommt mit Punkt 7).
+
+Wenn der Start einmal mit **„Die Datenbank ist beschädigt …"** abbricht:
+
+```
+python -m scripts.backup einspielen
+```
+
+nimmt ohne weitere Angabe die jüngste Sicherung und legt die kaputte Datei
+vorher beiseite. Nichts davon geht verloren. Die Sicherung liegt auf
+derselben Platte — vor einem Plattentod schützt sie nicht, dafür müsstest du
+den Ordner `data/sicherungen` gelegentlich woandershin kopieren.
+
+### Die Seite geht nur noch an deinen eigenen Rechner
+
+`GET /` trägt deinen Token. Bisher bekam ihn jeder, der die Seite mit
+irgendeinem `Host`-Header abrief — auch eine fremde Webseite, die ihren
+Namen per DNS auf `127.0.0.1` umbiegt. Jetzt antwortet JARVIS nur auf
+`127.0.0.1`, `localhost` und `JARVIS_HOST`; alles andere bekommt `400`.
+
+**Nur wenn** du JARVIS unter einem anderen Namen aufrufst (Docker-Container,
+`rechner.fritz.box`, Handy im WLAN), trägst du ihn ein:
+
+```
+JARVIS_ERLAUBTE_HOSTS=rechner.fritz.box
+```
+
+Mehrere durch Komma. Und `http://[::1]:8000` geht im Browser nicht mehr —
+Starlette vergleicht den Host ohne Port und schneidet dabei am ersten
+Doppelpunkt ab; `localhost` tut dasselbe.

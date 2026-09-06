@@ -9,6 +9,13 @@ Werkzeugen waere eine Flaeche fuer Anweisungen im Text gewesen).
 
 Was das Werkzeug NICHT kann: mehr als MAX_PLAENE lebende Plaene anlegen,
 egal wer es ruft - und Texte laenger als MAX_TEXT ablegen.
+
+FIX-11: "in 20 minuten" und "in 2 stunden" nimmt `core/zeitplan.lies_regel`
+direkt und rechnet sie selbst in `einmal ...` um - das Modell muss nicht
+mehr mit clock aus UTC in Ortszeit rechnen (Fehlerquelle FIX-09 E8). Und:
+das Werkzeug ist LOCAL, ein Zeitplan-Lauf ist seit FIX-11 auf READ
+gedeckelt - aus einem unbeaufsichtigten Lauf heraus legt niemand mehr
+Plaene an, aus dem Chat weiterhin.
 """
 
 from __future__ import annotations
@@ -26,7 +33,7 @@ class ErinnerungAnlegen(Tool):
     name = "erinnerung_anlegen"
     description = (
         "Legt eine Erinnerung an, die spaeter von selbst im Chat erscheint - einmalig oder wiederkehrend.\n"
-        "Nimm es fuer: \"erinnere mich morgen um 8 an den Zahnarzt\", \"jeden Morgen um 7 ans Wasser trinken\". Rechne die Uhrzeit vorher mit clock in Ortszeit aus, wenn der Nutzer relativ spricht (\"in zwei Stunden\", \"morgen\"); das Datum im Prompt ist UTC.\n"
+        "Nimm es fuer: \"erinnere mich in 20 Minuten ans Wasser\", \"morgen um 8 an den Zahnarzt\", \"jeden Morgen um 7\". \"in N minuten\" und \"in N stunden\" gibst du woertlich als wann weiter - nicht umrechnen. Nur fuer \"morgen um 8\" brauchst du das Datum in Ortszeit, das liefert clock; das Datum im Prompt ist UTC.\n"
         "Nimm es NICHT fuer: Dinge, die jetzt sofort zu tun sind - die machst du direkt; nicht fuer Auftraege, die Werkzeuge brauchen (dafuer gibt es die Zeitplaene in der Oberflaeche); nicht fuer Termine in einem Kalender (das ist kalender, und der ist hier nur lesbar).\n"
         "Beispiel: erinnerung_anlegen(text=\"Zahnarzt anrufen\", wann=\"einmal 2026-09-06 08:00\")"
     )
@@ -40,8 +47,10 @@ class ErinnerungAnlegen(Tool):
             "wann": {
                 "type": "string",
                 "description": (
-                    "Genau eine von drei Formen: 'einmal JJJJ-MM-TT HH:MM' (Ortszeit), "
-                    "'taeglich HH:MM' oder 'alle N stunden'."
+                    "Genau eine von fuenf Formen: 'in N minuten' (1 bis 10080), "
+                    "'in N stunden' (1 bis 168), 'einmal JJJJ-MM-TT HH:MM' (Ortszeit), "
+                    "'taeglich HH:MM' oder 'alle N stunden'. Relativ heisst ab jetzt, "
+                    "auf die volle Minute aufgerundet."
                 ),
             },
         },

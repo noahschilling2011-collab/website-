@@ -4,7 +4,7 @@
 > und aktualisiert sie am Ende jeder Phase. Von Hand korrigieren ist erlaubt.
 
 AKTUELL: FIX-06 — COMMAND CENTER, siehe `docs/FIX-06.md`. Abschnitte 5 (Design-System), 6 (COMMAND CENTER) und 7 (WELT-NETZ) sind gebaut; **8 (MÄRKTE) steht aus und ist blockiert** — der Auftragstext dafür liegt nicht im Repo, nur der Name in der Kopfzeile von `docs/FIX-06.md`.
-LETZTE ÄNDERUNG: 2026-09-05 (FIX-09 mit Prüfrunde, 23 Funde behoben: der Assistent heißt Mehmet; Herkunft und Zustellung von Zeitplan-Ergebnissen, einmalige Erinnerungen auch aus dem Gespräch, Bremse für scheiternde Pläne, Wetter ohne Key, Vorlage Morgenlage — siehe `docs/FIX-09.md`. Davor FIX-08 mit zwei Prüfrunden.)
+LETZTE ÄNDERUNG: 2026-09-06 (FIX-11 Welle 1: Start prüft, sichert und migriert von selbst; Host-Sperre für die Seite mit dem Token; Grenzen an Modell-Argumenten; Erinnerungen im Formular, „in 20 minuten", eigener Deckel-Topf, Ton/Meldung/Vorlesen, Zeitpläne nur noch READ — siehe `docs/FIX-11.md`. Davor FIX-09 mit Prüfrunde, 23 Funde behoben: der Assistent heißt Mehmet; Herkunft und Zustellung von Zeitplan-Ergebnissen, einmalige Erinnerungen auch aus dem Gespräch, Bremse für scheiternde Pläne, Wetter ohne Key, Vorlage Morgenlage — siehe `docs/FIX-09.md`. Davor FIX-08 mit zwei Prüfrunden.)
 
 > **Abweichung von der Arbeitsweise, auf Ansage:** es wurden alle Phasen
 > gebaut, nicht eine nach der anderen. Das widerspricht CLAUDE.md
@@ -2320,6 +2320,54 @@ von Hand — acht Tabellen, das Schema hatte zwölf. `lookups`,
 `vault_notizen` und die zwei Weltlage-Tabellen fehlten still, die zwei neuen
 hätten auch gefehlt. Jetzt wird gezählt, was in der Datei ist;
 `tests/test_backup_zaehlt_alles.py` hält das gegen `core/schema.sql`.
+
+## FIX-11 — Verlässlich, dicht, im Alltag brauchbar (Welle 1)
+
+> Noah, 06.09.2026: „Mach weiter." Auswahl aus einer Vorschlagsrunde mit vier
+> Blickwinkeln und drei Richtern; Begründung, Paket und Belege in
+> `docs/FIX-11.md`. `FIX-10.md` ist die Messstrecke vom 27.08., deshalb FIX-11.
+
+**Gebaut (Punkte 1 bis 3 von 7).**
+
+1. **Der Start prüft, sichert und migriert von selbst.** `PRAGMA quick_check`,
+   dann eine Sicherung (immer vor einer anstehenden Migration, sonst einmal je
+   24 Stunden, Rotation auf 7), dann `init_db`, dann `migriere()` mit einer
+   Log-Zeile je Befehl. Eine Datenbank von vor FIX-09 gab bisher einen 500 bei
+   `health: ok`; eine kaputte Datei einen Traceback. Jetzt: 201 ohne
+   Handmigration, und bei einer kaputten Datei **ein Satz** ohne Pfad, der die
+   jüngste Sicherung nennt. `core/sicherung.py` und `core/migration.py` tragen
+   die Arbeit, die Skripte sind Hüllen.
+2. **Die Seite mit dem Token geht nur an diesen Rechner.** `GET /` lieferte sie
+   an jeden `Host`-Header — ein Weg zum Token per DNS-Rebinding.
+   `TrustedHostMiddleware` mit Loopback, `JARVIS_HOST` und
+   `JARVIS_ERLAUBTE_HOSTS`; fremder Host bekommt 400 ohne Token, auch mit
+   richtigem Token auf `/api/…`.
+3. **Grenzen an Modell-Argumenten.** `remember` hatte keine Längengrenze
+   (100.000 Zeichen gespeichert, nächster Systemprompt 100.703 Zeichen);
+   `datei_suchen` listete mit `..` Dateien außerhalb der `DATEI_WURZELN`.
+   Jetzt: 1.000 Zeichen je Fakt, 6.000 je Gedächtnisblock (mit Hinweis auf die
+   Kürzung), Muster mit `..` oder absolutem Pfad abgelehnt, jeder Treffer
+   aufgelöst geprüft.
+4. **Erinnerungen für Menschen.** Das Formular kann jetzt `art=erinnerung`
+   (ohne Modell, ohne Key), `in 20 minuten` und `in 2 stunden` werden beim
+   Anlegen zur `einmal`-Form gerechnet, Erinnerungen zählen in einen eigenen
+   Topf (`ZEITPLAN_MAX_ERINNERUNGEN_24H`) statt den Läufe-Deckel der Aufträge
+   zu fressen, und sie melden sich mit Ton, Browser-Benachrichtigung und
+   Vorlesen — jedes einzeln abschaltbar.
+5. **Zeitpläne dürfen nur noch lesen.** `PERMISSION_DECKEL` ist READ statt
+   LOCAL: ein unbeaufsichtigter Lauf legte im Nachweis einen Fakt und einen
+   Stundenplan „Sende den Bericht an chef@fremd.example" an. Regel 1 in
+   `docs/FIX-08.md` und README sind nachgezogen.
+
+**Ausgeführt:** drei neue Testdateien (`test_fix11_start`, `_grenzen`,
+`_erinnerungen`), 32 Mutationen der Bauer plus drei eigene, `scripts.smoke`
+bestanden, Browser-Nachweis der Zustellung mit Stubs.
+**Eigene Abnahme, fünf Funde** (zwei Skeptiker starben am Sitzungslimit) —
+darunter eine **stehengebliebene Mutation** (`PERMISSION_DECKEL = LOCAL  #
+MUTATION`) und ein Rauchtest, der nach der Host-Sperre 400 gab. Tabelle in
+`docs/FIX-11.md`.
+**Offen:** Punkte 4 bis 7 (Auftrag stirbt, Rahmen um fremden Text,
+`fetch_url`-Herkunft, Chat-Pfad statt Auftrag je Nachricht).
 
 ## FIX-09 — Was ein JARVIS wirklich braucht
 

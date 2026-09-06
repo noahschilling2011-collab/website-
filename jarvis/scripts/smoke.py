@@ -60,13 +60,18 @@ def main() -> int:
                 fehler("--real braucht LLM_PROVIDER, LLM_API_KEY und LLM_MODEL in .env.")
                 return 2
             settings = echt.model_copy(
-                update={"db_path": tmp / "smoke.db", "jarvis_token": "smoke-token"}
+                update={"db_path": tmp / "smoke.db", "jarvis_token": "smoke-token",
+                        # Der TestClient schickt den Host "testserver"; seit
+                        # FIX-11 sperrt TrustedHostMiddleware fremde Hosts ab
+                        # (sonst gaebe der Rauchtest ueberall 400).
+                        "jarvis_erlaubte_hosts": "testserver"}
             )
             print(f"{ROT}Achtung:{AUS} echter Modellaufruf an {settings.llm_model}. "
                   f"Das kostet Geld.")
         else:
             settings = Settings(
-                _env_file=None, db_path=tmp / "smoke.db", jarvis_token="smoke-token"
+                _env_file=None, db_path=tmp / "smoke.db", jarvis_token="smoke-token",
+                jarvis_erlaubte_hosts="testserver",
             )
 
         kopf = {"X-Jarvis-Token": settings.jarvis_token}
