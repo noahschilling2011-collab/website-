@@ -1026,3 +1026,162 @@ def test_eine_riesige_antwort_kommt_gar_nicht_erst_in_den_speicher(wd, monkeypat
 
 def test_der_antwortdeckel_steht_auf_einer_abgesprochenen_zahl():
     assert MAX_ANTWORT_BYTES == 2_000_000
+
+
+# ===========================================================================
+# Abnahme 07.09.2026: was beim Bauen offen blieb
+# ===========================================================================
+
+
+def test_ein_artikel_mit_offenen_skriptmarken_haelt_den_server_nicht_an():
+    """Der teuerste Fund dieser Runde - und der einzige, den kein `ok=False`
+    heilt.
+
+    `_nur_text` schnitt `<script>`/`<style>` mit `<(script|style)[^>]*>.*?</\\1>`
+    heraus. Fehlt die schliessende Marke, sucht `.*?` fuer JEDE oeffnende bis
+    ans Ende; der Aufwand waechst mit dem Produkt aus beidem. Gemessen an
+    `_nur_text` allein: 24 KB -> 0,17 s, 120 KB -> 4,0 s, 480 KB -> 63,7 s.
+    Beim Deckel von 2 MB waeren das rund zwanzig Minuten.
+
+    Und es ist keine langsame Antwort, sondern ein Stillstand: der Ausdruck
+    laeuft SYNCHRON in der Ereignisschleife, also greift weder der Timeout des
+    Klienten noch `asyncio.wait_for` im Dispatcher - beide brauchen ein
+    `await`, um abzubrechen. So lange beantwortet der ganze Server nichts
+    mehr. Genau das verbietet der Auftrag: "Fehlende Dienste duerfen keinen
+    Crash des Gesamtsystems verursachen."
+
+    Die Schranke steht bewusst weit (5 s statt der gemessenen 0,008 s): sie
+    soll die Groessenordnung fangen, nicht die Tagesform der Maschine.
+    """
+    import time as uhr
+
+    from core.tools.wissen_tools import WikiLokal
+
+    html = "<script foo>" * 40_000 + "A" * 100     # rund 480 KB
+    begonnen = uhr.monotonic()
+    WikiLokal._nur_text(html)
+    gebraucht = uhr.monotonic() - begonnen
+
+    assert gebraucht < 5.0, f"{gebraucht:.1f}s fuer {len(html)} Zeichen"
+
+
+@pytest.mark.parametrize("html,erwartet", [
+    # Der Normalfall darf sich NICHT geaendert haben: Skript raus, Text bleibt.
+    ("<p>Ein Orbit.</p><script>var x=1;</script>", "Ein Orbit."),
+    ("<style>p{color:red}</style><p>Hallo &amp; Welt</p>", "Hallo & Welt"),
+    ("<p>A</p><script type='x'>weg</script><p>B</p>", "A B"),
+    # Und die offene Marke verschluckt den Rest, statt ihn roh durchzureichen.
+    ("<p>A</p><script>var x=1;", "A"),
+])
+def test_skript_und_stil_verschwinden_weiterhin(html, erwartet):
+    """Gegenprobe zum Test darueber. Eine Beschleunigung, die einfach nicht
+    mehr putzt, waere keine Reparatur - dann stuende JavaScript im Prompt."""
+    from core.tools.wissen_tools import WikiLokal
+
+    assert WikiLokal._nur_text(html) == erwartet
+
+
+def test_ein_unerreichbarer_cache_verhindert_das_nachschlagen_nicht(lokal, monkeypatch, tmp_path):
+    """Der Cache ist eine Abkuerzung, keine Voraussetzung.
+
+    Zeigt JARVIS_DB auf einen Ordner, den es nicht gibt, warf `aus_cache` bis
+    in den Auffangzweig des Dispatchers durch. Noah las dann "wiki_lokal ist
+    mit einem Fehler ausgestiegen (OperationalError)" - fuer eine lokale
+    Wikipedia, die einwandfrei geantwortet haette.
+    """
+    monkeypatch.setattr(lokal, "db_path", tmp_path / "gibtsnicht" / "x.db",
+                        raising=False)
+    monkeypatch.setattr(lokal, "transport",
+                        antwortet(httpx.Response(200, text=SUCH_XML),
+                                  httpx.Response(200, text=ARTIKEL_HTML)),
+                        raising=False)
+
+    ergebnis = run(run_tool("wiki_lokal", {"begriff": "Sonnensynchroner Orbit"}))
+
+    assert ergebnis.ok is True, ergebnis.error
+    assert "Umlaufbahn" in kern(ergebnis)
+    assert "OperationalError" not in (ergebnis.error or "")
+
+
+def test_ein_nicht_schreibbarer_cache_wirft_den_treffer_nicht_weg(live, monkeypatch, tmp_path):
+    """Gegenstueck: lesen ging, schreiben nicht (Datei da, Tabelle fehlt).
+
+    Den fertigen Treffer deswegen wegzuwerfen waere die teuerste aller
+    Reaktionen - die Anfrage hat bereits ein Ratenlimit gekostet.
+    """
+    import sqlite3 as _sq
+
+    leer = tmp_path / "ohne_tabellen.db"
+    _sq.connect(leer).close()
+    monkeypatch.setattr(live, "db_path", leer, raising=False)
+    monkeypatch.setattr(live, "transport",
+                        antwortet(json_antwort(LIVE_TREFFER)), raising=False)
+
+    ergebnis = run(run_tool("wiki_live", {"begriff": "Sonnensynchroner Orbit"}))
+
+    assert ergebnis.ok is True, ergebnis.error
+    assert "Erdumlaufbahn" in kern(ergebnis)
+
+
+def test_eine_antwort_genau_auf_dem_deckel_gilt_noch_als_ganz(live, monkeypatch):
+    """Der Deckel sagt "mehr als 2 MB" - dann muss "genau 2 MB" durchgehen.
+
+    Gelesen wurde bis `>= MAX_ANTWORT_BYTES`, und der Aufrufer verglich
+    genauso: eine vollstaendig empfangene Antwort von exakt 2.000.000 Byte
+    wurde mit einem Satz abgelehnt, der nicht stimmt.
+    """
+    rest = MAX_ANTWORT_BYTES - len(json.dumps(
+        {"pages": [{"id": 1, "key": "k", "title": "Orbit", "description": ""}]}))
+    roh = json.dumps({"pages": [{"id": 1, "key": "k", "title": "Orbit",
+                                 "description": "D" * rest}]}).encode()
+    assert len(roh) == MAX_ANTWORT_BYTES
+
+    monkeypatch.setattr(live, "transport", antwortet(httpx.Response(
+        200, content=roh, headers={"content-type": "application/json"})),
+        raising=False)
+
+    ergebnis = run(run_tool("wiki_live", {"begriff": "Orbit"}))
+
+    assert ergebnis.ok is True, ergebnis.error
+    assert "2 MB" not in kern(ergebnis)
+    assert len(kern(ergebnis)) <= PROMPT_DECKEL
+
+
+def test_ein_byte_ueber_dem_deckel_wird_abgelehnt(live, monkeypatch):
+    """Gegenprobe zum Test darueber: der Deckel muss ueberhaupt greifen."""
+    rest = MAX_ANTWORT_BYTES + 1 - len(json.dumps(
+        {"pages": [{"id": 1, "key": "k", "title": "Orbit", "description": ""}]}))
+    roh = json.dumps({"pages": [{"id": 1, "key": "k", "title": "Orbit",
+                                 "description": "D" * rest}]}).encode()
+    assert len(roh) == MAX_ANTWORT_BYTES + 1
+
+    monkeypatch.setattr(live, "transport", antwortet(httpx.Response(
+        200, content=roh, headers={"content-type": "application/json"})),
+        raising=False)
+
+    ergebnis = run(run_tool("wiki_live", {"begriff": "Orbit"}))
+
+    assert ergebnis.ok is False
+    assert "2 MB" in kern(ergebnis)
+
+
+def test_eine_riesige_suchantwort_nennt_die_groesse_statt_die_zim_datei(lokal, monkeypatch):
+    """Abgeschnittenes XML ist kein XML mehr - und wurde deshalb zu "kein XML
+    geliefert - stimmt WIKI_ZIM?". Das ist die falsche Faehrte: WIKI_ZIM
+    stimmt, die Antwort war nur zu gross. Beim ARTIKEL bleibt der Schnitt
+    richtig, dort ist der Anfang lesbar; geprueft wird das nebenan in
+    `test_lokal_sehr_grosser_artikel_kommt_gekappt_in_den_prompt`.
+    """
+    riesig = ("<rss><channel>" + "<item><title>x</title>"
+              "<link>/content/a</link></item>" * 60_000 + "</channel></rss>")
+    assert len(riesig.encode()) > MAX_ANTWORT_BYTES
+    monkeypatch.setattr(lokal, "transport",
+                        antwortet(httpx.Response(200, text=riesig)),
+                        raising=False)
+
+    ergebnis = run(run_tool("wiki_lokal", {"begriff": "Orbit"}))
+
+    assert ergebnis.ok is False
+    assert "2 MB" in kern(ergebnis)
+    assert "WIKI_ZIM" not in kern(ergebnis)
+    assert len(kern(ergebnis)) <= PROMPT_DECKEL

@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import sqlite3
 import time
 import urllib.parse
 import xml.etree.ElementTree as ET
@@ -77,6 +78,13 @@ async def _hole_begrenzt(
     Gibt (Antwort, Rumpf) zurueck. Bei allem ausser 2xx bleibt der Rumpf leer:
     der Text einer Fehlerseite gehoert weder in den Prompt noch in den
     Speicher. Dasselbe Vorgehen wie in `core/tools/search.hole_gepruefte_kette`.
+
+    Abnahme 07.09.2026, Fund 3: gelesen wird EIN Byte ueber den Deckel hinaus.
+    Vorher brach die Schleife schon bei `>= MAX_ANTWORT_BYTES` ab, und die
+    Aufrufer verglichen genauso - eine Antwort von exakt 2.000.000 Byte war
+    damit vollstaendig da, wurde aber mit "hat mehr als 2 MB geschickt"
+    abgelehnt. Das ueberzaehlige Byte ist der Unterschied zwischen "genau voll"
+    und "laeuft ueber", und nur so kann der Aufrufer ihn ueberhaupt sehen.
     """
     async with client.stream(methode, url, **weitere) as antwort:
         if not (200 <= antwort.status_code < 300):
@@ -84,9 +92,9 @@ async def _hole_begrenzt(
         roh = bytearray()
         async for stueck in antwort.aiter_bytes():
             roh += stueck
-            if len(roh) >= MAX_ANTWORT_BYTES:
+            if len(roh) > MAX_ANTWORT_BYTES:
                 break
-        return antwort, bytes(roh[:MAX_ANTWORT_BYTES])
+        return antwort, bytes(roh[:MAX_ANTWORT_BYTES + 1])
 
 
 def _als_text(antwort: httpx.Response, roh: bytes) -> str:
@@ -201,7 +209,20 @@ class _MitCache(Tool):
         if not (self.cache_an and pfad):
             return None
         grenze = self.cache_stunden if self.cache_stunden > 0 else None
-        return aus_cache(pfad, begriff, quelle, max_alter_stunden=grenze)
+        try:
+            return aus_cache(pfad, begriff, quelle, max_alter_stunden=grenze)
+        except (sqlite3.Error, OSError) as exc:
+            # Abnahme 07.09.2026, Fund 2. Der Cache ist eine Abkuerzung, keine
+            # Voraussetzung. Steht JARVIS_DB auf einem Ordner, den es nicht
+            # gibt, oder fehlt die Tabelle `lookups`, dann warf diese Zeile
+            # bis hierher durch - und Noah bekam vom Auffangzweig des
+            # Dispatchers "wiki_lokal ist mit einem Fehler ausgestiegen
+            # (OperationalError)", obwohl die Wikipedia gar nicht befragt
+            # worden war. Ein kaputter Cache heisst ab jetzt: einmal nicht
+            # nachgeschaut, nachgeschlagen wird trotzdem.
+            log.warning("%s: Cache nicht lesbar (%s) - es wird frisch "
+                        "nachgeschlagen", quelle, type(exc).__name__)
+            return None
 
     def _merken(self, treffer: Wissen) -> None:
         """In den Cache - gekappt, und niemals leer.
@@ -220,11 +241,19 @@ class _MitCache(Tool):
             return
         if not (treffer.text or "").strip():
             return
-        in_cache(pfad, replace(
-            treffer,
-            titel=_kappe(treffer.titel, MAX_HERKUNFT),
-            text=_kappe(treffer.text, MAX_ZEICHEN),
-        ))
+        try:
+            in_cache(pfad, replace(
+                treffer,
+                titel=_kappe(treffer.titel, MAX_HERKUNFT),
+                text=_kappe(treffer.text, MAX_ZEICHEN),
+            ))
+        except (sqlite3.Error, OSError) as exc:
+            # Gegenstueck zu `_gecached`: der Treffer ist da und richtig. Ihn
+            # wegzuwerfen, weil das Merken nicht klappt, waere die teuerste
+            # aller Reaktionen - die naechste Anfrage kostet dann wieder ein
+            # Ratenlimit, aber Noah bekommt seine Antwort.
+            log.warning("%s: Cache nicht schreibbar (%s) - der Treffer geht "
+                        "trotzdem raus", treffer.quelle, type(exc).__name__)
 
     @staticmethod
     def _antwort(treffer: Wissen, begonnen: float, aus_cache_: bool) -> ToolResult:
@@ -360,6 +389,16 @@ class WikiLokal(_MitCache):
                     log.warning("wiki_lokal: Suche -> HTTP %s", suche.status_code)
                     return ToolResult(ok=False, error=satz, display=satz,
                                       duration_ms=int((time.monotonic() - begonnen) * 1000))
+                if len(roh) > MAX_ANTWORT_BYTES:
+                    # Abnahme 07.09.2026, Fund 4. Beim ARTIKEL ist ein Schnitt
+                    # harmlos - der Anfang bleibt lesbar, und genau darauf
+                    # zaehlt der Deckel. Bei der SUCHE nicht: abgeschnittenes
+                    # XML ist kein XML mehr, und der Fangzweig darunter machte
+                    # daraus "kein XML geliefert - stimmt WIKI_ZIM?". Das ist
+                    # die falsche Faehrte; WIKI_ZIM stimmt ja.
+                    return self._zu_gross(
+                        "Die lokale Wikipedia", begonnen,
+                        "Frag einen engeren Begriff ab.")
                 pfad, titel = self._erster_treffer(_als_text(suche, roh))
                 if pfad is None:
                     return ToolResult(
@@ -458,9 +497,36 @@ class WikiLokal(_MitCache):
                 return link, titel
         return None, ""
 
-    @staticmethod
-    def _nur_text(html: str) -> str:
-        ohne_skript = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", html)
+    # Abnahme 07.09.2026, Fund 1. Hier stand `<(script|style)[^>]*>.*?</\1>`.
+    # Fehlt die schliessende Marke, sucht `.*?` fuer JEDE oeffnende Marke bis
+    # ans Ende der Zeichenkette - der Aufwand waechst also mit dem Produkt aus
+    # beidem. Gemessen an `_nur_text` allein, mit lauter unverschlossenen
+    # `<script foo>`:
+    #
+    #      24 KB ->   0,17 s        240 KB ->  15,9 s
+    #      60 KB ->   1,05 s        480 KB ->  63,7 s
+    #     120 KB ->   4,02 s
+    #
+    # Beim Deckel von 2 MB waeren das rund zwanzig Minuten. Und das ist keine
+    # langsame Antwort, sondern ein STILLSTAND: der Ausdruck laeuft
+    # synchron im Ereignisschleifen-Faden, also greift weder der Timeout des
+    # Klienten noch `asyncio.wait_for` im Dispatcher - beide koennen nur an
+    # einem `await` abbrechen. Solange er laeuft, beantwortet der ganze
+    # Server keine einzige Anfrage mehr.
+    #
+    # Ausloesen kann das jeder ZIM-Inhalt: kiwix-serve liefert aus, was in der
+    # Datei steht, und ein mit zimit selbst gebautes Archiv enthaelt beliebiges
+    # HTML. Genau deshalb traegt dieses Werkzeug `fremder_text = True`.
+    #
+    # `\Z` als zweiter Ausgang beendet das: eine oeffnende Marke ohne
+    # Gegenstueck verschluckt den Rest in EINEM Treffer statt in tausenden
+    # Versuchen. Fuer wohlgeformtes HTML aendert sich nichts - der faule
+    # Quantor probiert `</script>` zuerst, und `\Z` passt nur ganz am Ende.
+    SKRIPT_MARKE = re.compile(r"(?is)<(script|style)[^>]*>.*?(?:</\1\s*>|\Z)")
+
+    @classmethod
+    def _nur_text(cls, html: str) -> str:
+        ohne_skript = cls.SKRIPT_MARKE.sub(" ", html)
         text = re.sub(r"(?s)<[^>]+>", " ", ohne_skript)
         text = (text.replace("&nbsp;", " ").replace("&amp;", "&")
                     .replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", '"'))
@@ -573,7 +639,7 @@ class WikiLive(_MitCache):
                                 antwort.status_code, sprache)
                     return ToolResult(ok=False, error=satz, display=satz,
                                       duration_ms=int((time.monotonic() - begonnen) * 1000))
-                if len(roh) >= MAX_ANTWORT_BYTES:
+                if len(roh) > MAX_ANTWORT_BYTES:
                     return self._zu_gross("Wikipedia", begonnen,
                                           "Frag einen engeren Begriff ab.")
                 daten = json.loads(roh)
@@ -702,7 +768,7 @@ class WikidataFrage(_MitCache):
                                 antwort.status_code)
                     return ToolResult(ok=False, error=satz, display=satz,
                                       duration_ms=int((time.monotonic() - begonnen) * 1000))
-                if len(roh) >= MAX_ANTWORT_BYTES:
+                if len(roh) > MAX_ANTWORT_BYTES:
                     return self._zu_gross(
                         "Wikidata", begonnen,
                         "Schraenke die Abfrage ein, zum Beispiel mit LIMIT.")
