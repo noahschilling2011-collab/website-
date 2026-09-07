@@ -1,0 +1,276 @@
+/*
+ * Zurueckhaltend mit Absicht.
+ *
+ * Die Nicht-Liste im Entwurf nennt "alles Blaue". Ein Werkzeug, das
+ * eigenstaendig Mails schreibt, gewinnt kein Vertrauen durch Farbe,
+ * sondern durch Lesbarkeit: was steht da, was geht gleich raus, was
+ * ist schon passiert.
+ */
+
+:root {
+  --papier: #fbfaf8;
+  --tinte: #1c1b19;
+  --gedaempft: #6b6862;
+  --linie: #e3e0da;
+  --karte: #ffffff;
+  --wartet: #8a5a00;
+  --wartet-flaeche: #fdf6e7;
+  --laeuft: #7a2e2e;
+  --laeuft-flaeche: #fbeeee;
+  --fertig: #3f6b46;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --papier: #161513;
+    --tinte: #eceae6;
+    --gedaempft: #9b968d;
+    --linie: #2e2c28;
+    --karte: #1e1d1a;
+    --wartet: #e0b055;
+    --wartet-flaeche: #2a2317;
+    --laeuft: #dd9a9a;
+    --laeuft-flaeche: #2a1c1c;
+    --fertig: #8fc098;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--papier);
+  color: var(--tinte);
+  font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+main {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 5rem;
+}
+
+a {
+  color: inherit;
+}
+
+h1 {
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.25rem;
+}
+
+.kopf {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.leise {
+  color: var(--gedaempft);
+  font-size: 0.875rem;
+}
+
+/* --- Die Liste: das eine Element, das den Bildschirm traegt ------------- */
+
+.liste {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.zeile {
+  display: block;
+  background: var(--karte);
+  border: 1px solid var(--linie);
+  border-radius: 10px;
+  padding: 0.9rem 1.1rem;
+  text-decoration: none;
+}
+
+.zeile.dringend {
+  border-color: color-mix(in srgb, var(--wartet) 45%, var(--linie));
+  background: var(--wartet-flaeche);
+}
+
+.zeile.laeuft {
+  border-color: color-mix(in srgb, var(--laeuft) 40%, var(--linie));
+  background: var(--laeuft-flaeche);
+}
+
+.zeile-titel {
+  font-weight: 600;
+  margin-bottom: 0.15rem;
+}
+
+.zeile-stand {
+  font-size: 0.875rem;
+  color: var(--gedaempft);
+}
+
+.zeile-kopf {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.abschnitt {
+  margin: 2rem 0 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gedaempft);
+}
+
+.abschnitt:first-child {
+  margin-top: 0;
+}
+
+/* --- Knoepfe ----------------------------------------------------------- */
+
+button,
+.knopf {
+  font: inherit;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--tinte);
+  background: var(--tinte);
+  color: var(--papier);
+  padding: 0.45rem 1rem;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+button.leise-knopf,
+.knopf.leise-knopf {
+  background: transparent;
+  color: var(--tinte);
+  border-color: var(--linie);
+  font-weight: 500;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* --- Detail ------------------------------------------------------------ */
+
+.karte {
+  background: var(--karte);
+  border: 1px solid var(--linie);
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.wortlaut {
+  white-space: pre-wrap;
+  font: 0.9rem/1.6 ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+  margin: 0;
+}
+
+textarea {
+  width: 100%;
+  min-height: 12rem;
+  font: 0.9rem/1.6 ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+  color: inherit;
+  background: var(--papier);
+  border: 1px solid var(--linie);
+  border-radius: 8px;
+  padding: 0.75rem;
+  resize: vertical;
+}
+
+input[type='email'],
+input[type='text'],
+input[type='url'] {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  background: var(--papier);
+  border: 1px solid var(--linie);
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+}
+
+label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+}
+
+.feld {
+  margin-bottom: 1rem;
+}
+
+.verlauf {
+  border-left: 2px solid var(--linie);
+  padding-left: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.verlauf-kopf {
+  font-size: 0.8rem;
+  color: var(--gedaempft);
+  margin-bottom: 0.35rem;
+}
+
+.fuss {
+  margin-top: 3rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--linie);
+  font-size: 0.875rem;
+  color: var(--gedaempft);
+  display: flex;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.hinweis {
+  border: 1px solid color-mix(in srgb, var(--wartet) 40%, var(--linie));
+  background: var(--wartet-flaeche);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  margin-bottom: 1.5rem;
+}
+
+.leer {
+  text-align: center;
+  padding: 4rem 1rem;
+  color: var(--gedaempft);
+}
+
+code {
+  font: 0.875em ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: color-mix(in srgb, var(--linie) 45%, transparent);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  word-break: break-all;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+td,
+th {
+  text-align: left;
+  padding: 0.5rem 0.75rem 0.5rem 0;
+  border-bottom: 1px solid var(--linie);
+  vertical-align: top;
+}
