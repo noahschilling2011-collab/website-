@@ -497,10 +497,14 @@ class CDSEProvider:
                 "Die Katalogantwort von CDSE enthielt keine Trefferliste. Das "
                 "heisst NICHT, dass es kein Bild gibt - ich weiss es nur nicht."
             )
-        # Gemessen: der Katalog kann mehr liefern, als `$top` erlaubt. 50.000
-        # Treffer waren 8,9 MB und 50.000 Szenenobjekte - fuer eine Anfrage,
-        # die nach zehn gefragt hat. Was ueber die eigene Bitte hinausgeht,
-        # wird gar nicht erst ausgepackt.
+        # UNSICHER, ob der echte Katalog jemals mehr liefert, als `$top`
+        # erlaubt - die OData-Doku sagt dazu nichts Eindeutiges, und ohne
+        # Zugangsdaten und ohne Netz im Test laesst es sich nicht messen.
+        # NACHGESTELLT (httpx.MockTransport, kein Netz) ist der Fall selbst:
+        # 50.000 Treffer waren 8,9 MB und wurden zu 50.000 Szenenobjekten -
+        # fuer eine Anfrage, die nach zehn gefragt hat. Der Deckel ist
+        # deshalb rein defensiv: er schneidet auf das, wonach gefragt wurde,
+        # und aendert am dokumentierten Normalfall nichts.
         if len(treffer) > hoechstens:
             log.warning("CDSE lieferte %d Treffer, gefragt waren %d.",
                         len(treffer), hoechstens)
