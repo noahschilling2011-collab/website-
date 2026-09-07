@@ -983,3 +983,108 @@ def test_die_pruefung_selbst_bleibt_dieselbe(monkeypatch):
                         lambda url: "Ziel ist intern." if "intern" in url else None)
     assert run(search.ziel_geprueft("https://intern.example")) == "Ziel ist intern."
     assert run(search.ziel_geprueft("https://aussen.example")) is None
+
+
+# --- Dritter Durchgang: die Abnahme ---------------------------------------
+#
+# Nachgestellt am 07.09.2026 gegen den bereits reparierten Stand. Zwei Wege
+# waren noch offen, beide gemessen, bevor hier etwas geaendert wurde:
+#
+#   * `brave_suche` lud den Koerper der Such-API vollstaendig, bevor
+#     irgendein Deckel greifen konnte: ein 46-MB-Koerper liess den Speicher
+#     des Prozesses um 70 MB steigen, und nach oben war nichts offen. Der
+#     Deckel auf Treffer, Titel und Auszug schuetzt den Prompt - nicht den
+#     Arbeitsspeicher.
+#   * Die Adresse einer abgewiesenen Weiterleitungsstation schreibt der
+#     fremde Server. Eine Weiterleitung auf eine 60.000 Zeichen lange
+#     Adresse ergab eine 60.097 Zeichen lange Fehlermeldung; die steht in
+#     tool_calls.error, in /api/tool-calls und in der Oberflaeche.
+
+
+def _stroemende_antwort(stueck: bytes, wieoft: int, gezogen: list[int],
+                        status: int = 200):
+    """Eine Antwort, die ihren Koerper stueckweise herausgibt und mitzaehlt.
+
+    Nur so laesst sich der Unterschied zwischen "liest bis zum Deckel" und
+    "liest alles und wirft danach weg" ueberhaupt messen: `gezogen` ist die
+    Liste der Stuecke, die die Gegenseite wirklich loswurde.
+    """
+    async def koerper():
+        for i in range(wieoft):
+            gezogen.append(i)
+            yield stueck
+
+    return httpx.Response(status, content=koerper(),
+                          headers={"content-type": "application/json"})
+
+
+def test_eine_antwort_ohne_ende_frisst_nicht_den_ganzen_speicher():
+    """Die Gegenseite bestimmt, wie gross ihre Antwort ist - nicht, wie viel
+    Speicher JARVIS dafuer hergibt."""
+    gezogen: list[int] = []
+    ergebnis, _ = _suche(_stroemende_antwort(b"x" * 1_000_000, 200, gezogen))
+
+    assert ergebnis.ok is False
+    assert "Such-API" in ergebnis.display
+    assert "gross" in ergebnis.display
+    # Der Beweis, dass abgebrochen und nicht bloss weggeworfen wurde: die
+    # 200 MB sind nie angefordert worden.
+    assert len(gezogen) < 200, len(gezogen)
+    assert len(gezogen) <= search.MAX_ANTWORT_BYTES // 1_000_000 + 1, len(gezogen)
+
+
+def test_die_zu_grosse_antwort_verraet_weder_key_noch_innenleben():
+    gezogen: list[int] = []
+    ergebnis, _ = _suche(_stroemende_antwort(b"y" * 1_000_000, 200, gezogen))
+
+    for feld in (ergebnis.display, ergebnis.error or ""):
+        assert not ist_verdaechtig(feld, [
+            KEY, "api_key", "x-subscription-token", "MAX_ANTWORT_BYTES",
+            "brave_suche", "core.tools.search", "/home", "RuntimeError",
+        ]), feld
+
+
+def test_ein_fehlerstatus_wird_entschieden_bevor_der_koerper_gelesen_wird():
+    """Eine 200-MB-Fehlerseite laedt niemand, nur um sie wegzuwerfen."""
+    gezogen: list[int] = []
+    ergebnis, _ = _suche(_stroemende_antwort(b"z" * 1_000_000, 200, gezogen,
+                                             status=500))
+
+    assert ergebnis.ok is False
+    assert "500" in ergebnis.display
+    assert gezogen == [], gezogen
+
+
+def test_eine_weiterleitung_auf_eine_endlose_adresse_blaeht_die_meldung_nicht(
+        falscher_resolver):
+    """Der location-Kopf kommt vom fremden Server, die Fehlermeldung geht in
+    die Datenbank und in die Oberflaeche. Gemessen vorher: 60.097 Zeichen."""
+    lang = "http://innen.example/" + "p" * 60_000
+    ergebnis, netz = _holen(_kette(lang), url="http://aussen.example/um")
+
+    assert ergebnis.ok is False
+    assert "Station 2" in (ergebnis.error or "")
+    assert "innen.example" in (ergebnis.error or "")
+    assert len(ergebnis.error or "") < 2_500, len(ergebnis.error or "")
+    assert len(ergebnis.display) < 2_500, len(ergebnis.display)
+    # Und die verbotene Station wurde weiterhin nie abgefragt.
+    assert netz.angekommen == ["http://aussen.example/um"], netz.angekommen
+
+
+def test_eine_normale_station_steht_unverkuerzt_in_der_meldung(falscher_resolver):
+    """Gegenprobe zum Deckel: eine gewoehnliche Adresse wird nicht beschnitten -
+    eine gekuerzte Adresse waere eine falsche Adresse."""
+    ergebnis, _ = _holen(_kette("http://innen.example/admin"),
+                         url="http://aussen.example/um")
+
+    assert "http://innen.example/admin" in (ergebnis.error or ""), ergebnis.error
+    assert "…" not in (ergebnis.error or "")
+
+
+def test_eine_grosse_aber_brauchbare_antwort_bleibt_ein_ergebnis():
+    """Der Speicherdeckel darf den Trefferdeckel nicht ersetzen: eine Antwort
+    unterhalb der Grenze ergibt weiterhin Treffer und keinen Fehlschlag."""
+    ergebnis, _ = _suche(httpx.Response(200, json=_treffer(20_000)), count=3)
+
+    assert ergebnis.ok is True, ergebnis.error
+    assert len(ergebnis.data["results"]) == 3

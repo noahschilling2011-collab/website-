@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
+import json
 import re
 import socket
 import time
@@ -43,6 +44,22 @@ MAX_AUSZUG = 500
 # Adresse. Ein Treffer mit einer laengeren faellt raus; `fetch_url` wuerde ihn
 # ohnehin ablehnen (FetchUrl.MAX_URL_LAENGE, dieselbe Zahl).
 MAX_TREFFER_URL = 2048
+# Wie viel Antwort hier hoechstens gelesen wird. Wie gross die Antwort ist,
+# entscheidet die Gegenseite - wie viel Speicher JARVIS dafuer ausgibt, nicht.
+# `client.get` lud den ganzen Koerper, BEVOR irgendein Deckel greifen konnte;
+# gemessen am 07.09.2026 gegen MockTransport liess ein 46-MB-Koerper den
+# Speicher des Prozesses um 70 MB steigen, und nach oben war nichts offen.
+#
+# Die Zahl liegt ABSICHTLICH hoch: eine echte Brave-Antwort mit 20 Treffern
+# hat einige Zehntel Megabyte, und die Deckel, die den Prompt schuetzen,
+# sitzen weiter unten am einzelnen Treffer (MAX_TITEL, MAX_AUSZUG) und an der
+# Trefferzahl. Eine grosse, aber brauchbare Antwort soll weiterhin fuenf
+# Treffer ergeben und keinen Fehlschlag - das nageln
+# `test_fuenfzigtausend_treffer_fluten_den_prompt_nicht` (4,5 MB) und
+# `test_ein_einzelner_riesiger_auszug_fuellt_den_prompt_nicht` (5 MB) fest.
+# Dieser Deckel beantwortet nur die andere Frage: wie viel Speicher eine
+# Gegenseite JARVIS abverlangen kann, die gar nicht mehr aufhoert.
+MAX_ANTWORT_BYTES = 16_000_000
 
 
 def _kurz(wert: Any, deckel: int) -> str:
@@ -64,20 +81,33 @@ async def brave_suche(
     Parameter ist eine Bestellung, keine Zusicherung.
     """
     wieviele = max(1, min(count, 20))
+    # Gestroemt und bei MAX_ANTWORT_BYTES abgebrochen - genauso wie
+    # `hole_gepruefte_kette` es fuer Webseiten macht. Ein Fehlerstatus wird
+    # dabei entschieden, BEVOR der Koerper gelesen wird: eine 200-MB-
+    # Fehlerseite laedt niemand, nur um sie wegzuwerfen.
+    roh = bytearray()
     async with httpx.AsyncClient(timeout=timeout, transport=transport) as client:
-        antwort = await client.get(
+        async with client.stream(
+            "GET",
             BRAVE_URL,
             params={"q": query, "count": wieviele},
             headers={
                 "Accept": "application/json",
                 "X-Subscription-Token": api_key,
             },
-        )
-    if antwort.status_code == 401:
-        raise PermissionError("SEARCH_API_KEY wurde abgelehnt (401).")
-    if antwort.status_code == 429:
-        raise RuntimeError("Ratenlimit der Such-API erreicht (429).")
-    antwort.raise_for_status()
+        ) as antwort:
+            if antwort.status_code == 401:
+                raise PermissionError("SEARCH_API_KEY wurde abgelehnt (401).")
+            if antwort.status_code == 429:
+                raise RuntimeError("Ratenlimit der Such-API erreicht (429).")
+            antwort.raise_for_status()
+            async for stueck in antwort.aiter_bytes():
+                roh += stueck
+                if len(roh) > MAX_ANTWORT_BYTES:
+                    raise RuntimeError(
+                        "Die Antwort der Such-API war unerwartet gross und "
+                        "wurde nicht ausgewertet."
+                    )
 
     # Eine Antwort mit Status 200 ist noch keine Antwort in der zugesagten
     # Form. Gemessen am 07.09.2026 gegen MockTransport flogen hier drei
@@ -87,7 +117,7 @@ async def brave_suche(
     # "web_search ist mit einem Fehler ausgestiegen" statt zu erfahren, dass
     # die Such-API Unsinn geschickt hat.
     try:
-        daten: Any = antwort.json()
+        daten: Any = json.loads(bytes(roh))
     except ValueError as exc:            # json.JSONDecodeError ist ein ValueError
         raise RuntimeError(
             "Die Such-API hat geantwortet, aber nicht lesbar."
@@ -443,12 +473,21 @@ async def hole_gepruefte_kette(
     ziel = url
     for nummer in range(1, MAX_STATIONEN + 2):
         grund = await ziel_geprueft(ziel)
+        # Die Adresse einer Station schreibt der fremde Server in seinen
+        # location-Kopf, und dieser Text landet als `error` in der Datenbank,
+        # in /api/tool-calls und in der Oberflaeche. Gemessen am 07.09.2026:
+        # eine Weiterleitung auf eine 60.000 Zeichen lange Adresse ergab eine
+        # 60.097 Zeichen lange Fehlermeldung. Dieselbe Grenze wie bei einer
+        # Trefferadresse - laenger ist keine Adresse mehr, sondern Fracht.
         if grund is not None:
-            raise ZielVerboten(f"Station {nummer} ({ziel}): {grund}")
+            raise ZielVerboten(
+                f"Station {nummer} ({_kurz(ziel, MAX_TREFFER_URL)}): {grund}"
+            )
         if nummer > MAX_STATIONEN:
             raise ZielVerboten(
-                f"Mehr als {MAX_STATIONEN} Weiterleitungen ab {url} - "
-                f"Station {nummer} waere {ziel}."
+                f"Mehr als {MAX_STATIONEN} Weiterleitungen ab "
+                f"{_kurz(url, MAX_TREFFER_URL)} - Station {nummer} waere "
+                f"{_kurz(ziel, MAX_TREFFER_URL)}."
             )
         stationen.append(ziel)
 
@@ -466,7 +505,9 @@ async def hole_gepruefte_kette(
                     break
             return antwort, bytes(roh[:max_bytes]), stationen
 
-    raise ZielVerboten(f"Weiterleitungskette ab {url} endet nicht.")
+    raise ZielVerboten(
+        f"Weiterleitungskette ab {_kurz(url, MAX_TREFFER_URL)} endet nicht."
+    )
 
 
 @register
