@@ -41,6 +41,9 @@ from pathlib import Path
 
 import httpx
 
+from core.fehlertexte import ohne_geheimnis
+from core.netz import nach_draussen
+
 log = logging.getLogger("jarvis")
 
 SPARQL_ENDPUNKT = "https://query.wikidata.org/sparql"
@@ -53,6 +56,12 @@ PUNKT = re.compile(r"Point\(\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s*\)", re.I
 
 # Ein Grad Breite in Metern; fuer die Laenge kommt der Kosinus dazu.
 GRAD_M = 111_320.0
+
+# So lang darf ein Ortsname hoechstens sein - beim Hinschicken (`maskiere`)
+# UND beim Zurueckkommen (`_auswerten`). Der Name aus der Antwort landet
+# ueber `display` im Prompt; ein Dienst, der 200.000 Zeichen schickt, soll
+# nicht 200.000 Zeichen ins Modell schieben. Gemessen: genau das ging.
+NAME_MAX = 120
 
 
 class OrtFehler(RuntimeError):
@@ -98,7 +107,7 @@ def maskiere(name: str) -> str:
     sauber = (name or "").strip()
     if not sauber:
         raise OrtFehler("Kein Ortsname angegeben.")
-    if len(sauber) > 120:
+    if len(sauber) > NAME_MAX:
         raise OrtFehler("Der Ortsname ist unsinnig lang.")
     if any(z in sauber for z in "\n\r\t"):
         raise OrtFehler("Ein Ortsname enthaelt keine Zeilenumbrueche.")
@@ -125,20 +134,47 @@ def lies_punkt(wkt: str) -> tuple[float, float]:
     weil der Rest des Programms (lat, lon) spricht - und der Tausch soll an
     genau einer Stelle passieren, nicht an fuenf.
     """
-    treffer = PUNKT.search(wkt or "")
+    treffer = PUNKT.search(wkt if isinstance(wkt, str) else "")
     if not treffer:
-        raise OrtFehler(f"Keine lesbare Koordinate: {wkt!r}")
+        # OHNE `wkt`: was hier ankommt, hat der fremde Dienst geschrieben,
+        # und diese Meldung landet ueber `error` im Prompt und im Protokoll
+        # (core/fehlertexte.py). Der Rohwert gehoert ins Serverlog.
+        log.warning("Wikidata lieferte keine lesbare Koordinate: %r", wkt)
+        raise OrtFehler("Wikidata lieferte keine lesbare Koordinate.")
     lon, lat = float(treffer.group(1)), float(treffer.group(2))
     if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
         raise OrtFehler(f"Koordinate ausserhalb der Erde: {lat}, {lon}")
     return lat, lon
 
 
+def _wert(zeile: dict, feld: str) -> str:
+    """Der Textwert eines SPARQL-Feldes - egal, was der Dienst da hinschreibt.
+
+    Gemessen: eine Antwort, die statt der erwarteten Objekte eine Liste
+    oder eine Zeichenkette enthaelt, liess `.get()` mit AttributeError
+    fliegen - und die faengt weder `finde_ort` noch `find_place` ab. Ein
+    fremder Dienst haelt sich aber nicht deshalb an seine Form, weil wir
+    es annehmen.
+    """
+    eintrag = zeile.get(feld)
+    if not isinstance(eintrag, dict):
+        return ""
+    wert = eintrag.get("value")
+    return wert if isinstance(wert, str) else ""
+
+
 def _auswerten(payload: dict) -> Ort | None:
-    zeilen = (payload.get("results") or {}).get("bindings") or []
+    if not isinstance(payload, dict):
+        raise OrtFehler("Wikidata antwortete nicht in der erwarteten Form.")
+    ergebnisse = payload.get("results")
+    zeilen = ergebnisse.get("bindings") if isinstance(ergebnisse, dict) else None
+    if not isinstance(zeilen, list):
+        zeilen = []
     gesehen: dict[str, dict] = {}
     for zeile in zeilen:
-        uri = (zeile.get("ort") or {}).get("value", "")
+        if not isinstance(zeile, dict):
+            continue
+        uri = _wert(zeile, "ort")
         if not uri or uri in gesehen:
             # Derselbe Ort kommt mehrfach, wenn er mehrere
             # Einwohner-Angaben hat. Die erste gewinnt: sortiert ist
@@ -149,15 +185,17 @@ def _auswerten(payload: dict) -> Ort | None:
         return None
 
     uri, erste = next(iter(gesehen.items()))
-    roh_ew = (erste.get("einwohner") or {}).get("value")
+    roh_ew = _wert(erste, "einwohner")
     try:
         einwohner = int(float(roh_ew)) if roh_ew else None
     except (TypeError, ValueError):
         einwohner = None
-    lat, lon = lies_punkt((erste.get("koord") or {}).get("value", ""))
+    lat, lon = lies_punkt(_wert(erste, "koord"))
     return Ort(
-        qid=uri.rsplit("/", 1)[-1],
-        name=(erste.get("ortLabel") or {}).get("value") or "?",
+        qid=uri.rsplit("/", 1)[-1][:NAME_MAX],
+        # Gekuerzt, weil dieser Name aus der fremden Antwort ueber `display`
+        # in den Prompt geht - gemessen: 200.000 Zeichen kamen ungekuerzt an.
+        name=_wert(erste, "ortLabel")[:NAME_MAX] or "?",
         lat=lat,
         lon=lon,
         einwohner=einwohner,
@@ -314,10 +352,24 @@ async def finde_ort(
         "user-agent": USER_AGENT_VORLAGE.format(kontakt=kontakt),
         "accept": "application/sparql-results+json",
     }
-    async with httpx.AsyncClient(timeout=timeout, transport=transport) as client:
-        antwort = await client.get(
-            SPARQL_ENDPUNKT, params={"query": frage}, headers=kopf
-        )
+    # `nach_draussen` statt eines nackten Klienten: Wikidata ist ein FREMDES
+    # Ziel, und der Klient dorthin darf keine Anmeldedaten tragen
+    # (core/netz.py). Das war hier die einzige Ausgangsstelle ohne diese
+    # Sperre.
+    try:
+        async with nach_draussen(timeout=timeout, transport=transport) as client:
+            antwort = await client.get(
+                SPARQL_ENDPUNKT, params={"query": frage}, headers=kopf
+            )
+    except httpx.HTTPError as exc:
+        # Gemessen: ohne diesen Zweig flogen Zeitueberschreitung und
+        # Verbindungsfehler roh nach oben - durch `find_place` hindurch (das
+        # faengt nur OrtFehler) und in `POST /api/ort` bis in den 500er.
+        # httpx haengt dabei die volle URL an seinen Text.
+        raise OrtFehler(
+            ohne_geheimnis(exc, "Wikidata war nicht erreichbar",
+                           "Spaeter noch einmal versuchen")
+        ) from exc
     if antwort.status_code >= 400:
         raise OrtFehler(
             f"Wikidata antwortete mit HTTP {antwort.status_code}."
@@ -325,7 +377,9 @@ async def finde_ort(
     try:
         payload = antwort.json()
     except ValueError as exc:
-        raise OrtFehler(f"Wikidata antwortete kein JSON: {exc}") from exc
+        # OHNE `{exc}`: der Ausnahmetext eines Parsers traegt ein Stueck der
+        # fremden Antwort mit sich (core/fehlertexte.py).
+        raise OrtFehler(ohne_geheimnis(exc, "Wikidata antwortete kein JSON")) from exc
     return _auswerten(payload)
 
 
