@@ -92,6 +92,8 @@ class WebSearch(Tool):
     }
     permission = Permission.READ
     timeout_s = 20
+    # Titel und Auszug der Treffer schreibt der jeweilige Seitenbetreiber.
+    fremder_text = True
 
     # Wird beim Start aus den Settings gesetzt. Kein Modul-Import von config,
     # damit das Tool in Tests ohne Umgebung baubar bleibt.
@@ -379,10 +381,21 @@ class FetchUrl(Tool):
     }
     permission = Permission.READ
     timeout_s = 20
+    # Der reine Fall: der Text einer fremden Webseite.
+    fremder_text = True
 
     # Mehr als das laedt niemand, um einen Text zu lesen - und es verhindert,
     # dass ein 200-MB-Download den Task auffrisst.
     MAX_BYTES = 2_000_000
+
+    # FIX-11 Punkt 6. Eine Adresse ist ein Wegweiser, kein Frachtraum. Wer
+    # Daten aus dem Rechner schaffen will, haengt sie an die Abfrage
+    # ("...?d=<halbe Steuerakte>") - dagegen hilft die Herkunftspruefung in
+    # core/tools/loop.py, aber sie greift nur dort, wo eine Schleife laeuft.
+    # Diese Grenze steht im Werkzeug selbst und gilt damit auf JEDEM Weg,
+    # auch bei einem direkten `run_tool("fetch_url", ...)`. 2.048 Zeichen
+    # sind grosszuegig: die laengste Adresse in diesem Projekt hat 76.
+    MAX_URL_LAENGE = 2048
 
     transport: httpx.AsyncBaseTransport | None = None
 
@@ -391,6 +404,17 @@ class FetchUrl(Tool):
 
         def dauer() -> int:
             return int((time.monotonic() - begonnen) * 1000)
+
+        # Vor der Namensaufloesung: eine 100.000-Zeichen-Adresse soll nicht
+        # erst noch durch DNS gehen.
+        if len(url) > self.MAX_URL_LAENGE:
+            satz = (
+                f"Die Adresse ist zu lang: {len(url)} Zeichen, erlaubt sind "
+                f"{self.MAX_URL_LAENGE}."
+            )
+            # Ohne die Adresse selbst - sie IST hier das Problem.
+            return ToolResult(ok=False, error=satz, display=satz,
+                              duration_ms=dauer())
 
         grund = oeffentliches_ziel(url)
         if grund is not None:
