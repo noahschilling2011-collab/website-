@@ -76,6 +76,17 @@ MINDESTHOEHE_GRAD = 10.0
 # seine Fehlermeldung bekommen hat.
 MAX_SATELLITEN = 1000
 
+# Wie viel von der CelesTrak-Antwort hoechstens gelesen wird.
+#
+# `MAX_SATELLITEN` deckelt das RECHNEN, nicht das Holen: die Antwort wurde
+# bis hierher am Stueck geladen und in voller Laenge auf die Platte
+# geschrieben, bevor irgendjemand sie angesehen hat. Gemessen: 10.000
+# TLE-Saetze sind 1,5 MB, der ganze CelesTrak-Katalog laege bei rund 5 MB -
+# angefragt werden aber nur `visual` (157) und `stations` (21), also rund
+# 25 KB. 8 MB sind damit sehr weit weg vom Normalfall und trotzdem eine
+# Grenze. Dieselbe Bauart wie `core/kalender.py` und `core/tools/search.py`.
+MAX_ANTWORT_BYTES = 8_000_000
+
 HIMMELSRICHTUNGEN = (
     "N", "NNO", "NO", "ONO", "O", "OSO", "SO", "SSO",
     "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW",
@@ -182,6 +193,33 @@ def cache_datei(gruppe: str, *, db_path: Path | str) -> Path:
     return Path(db_path).parent / "tle" / f"{gruppe}.tle"
 
 
+async def _rumpf(antwort) -> str:
+    """Der Antwortrumpf als Text - hoechstens `MAX_ANTWORT_BYTES`.
+
+    Wie `core/kalender._rumpf`: gestroemt und abgebrochen, statt am Stueck
+    geladen. Dekodiert wie `httpx.Response.text` (Kodierung aus dem
+    Content-Type, sonst UTF-8, kaputte Bytes ersetzt statt geworfen) - ein
+    TLE-Satz ist ASCII, ein einzelnes krummes Byte darf die Bahndaten der
+    ganzen Gruppe nicht wertlos machen.
+    """
+    roh = bytearray()
+    async for stueck in antwort.aiter_bytes():
+        roh += stueck
+        if len(roh) > MAX_ANTWORT_BYTES:
+            raise UeberflugFehler(
+                f"CelesTrak hat mehr als "
+                f"{MAX_ANTWORT_BYTES // 1_000_000} MB Bahndaten geschickt - "
+                "so viel lese ich nicht. Damit rechne ich keinen Ueberflug; "
+                "mit dem halben Datensatz waere die Antwort nur scheinbar "
+                "vollstaendig."
+            )
+    try:
+        return bytes(roh).decode(antwort.charset_encoding or "utf-8",
+                                 errors="replace")
+    except LookupError:
+        return bytes(roh).decode("utf-8", errors="replace")
+
+
 async def hole_tle(
     gruppe: str = STANDARDGRUPPE,
     *,
@@ -207,9 +245,14 @@ async def hole_tle(
 
     try:
         async with httpx.AsyncClient(timeout=30.0, transport=transport) as client:
-            antwort = await client.get(
-                CELESTRAK_URL, params={"GROUP": gruppe, "FORMAT": "tle"}
-            )
+            # Gestroemt statt am Stueck: eine Antwort, mit der niemand
+            # gerechnet hat, soll den Speicher gar nicht erst fuellen. Der
+            # Status wird vor dem Rumpf geprueft - genau wie vorher.
+            async with client.stream(
+                "GET", CELESTRAK_URL, params={"GROUP": gruppe, "FORMAT": "tle"}
+            ) as antwort:
+                status = antwort.status_code
+                text = "" if status >= 400 else await _rumpf(antwort)
     except httpx.HTTPError as exc:
         # Bis hierher fing dieser Aufruf gar nichts ab: ein `ReadTimeout`
         # oder ein `ConnectError` lief als httpx-Ausnahme durch das ganze
@@ -227,21 +270,20 @@ async def hole_tle(
             exc, "CelesTrak ist gerade nicht erreichbar",
             "Ohne Bahndaten kann ich keinen Ueberflug rechnen - und alte "
             "liegen hier auch nicht")) from exc
-    if antwort.status_code >= 400:
+    if status >= 400:
         # CelesTrak bittet ausdruecklich darum, bei Fehlern aufzuhoeren und
         # es einem Menschen zu melden, statt weiter anzufragen.
         if datei.is_file():
             log.warning(
                 "CelesTrak antwortete mit HTTP %s - es wird der alte "
-                "Cachestand benutzt.", antwort.status_code,
+                "Cachestand benutzt.", status,
             )
             return datei.read_text(encoding="utf-8"), False
         raise UeberflugFehler(
-            f"CelesTrak antwortete mit HTTP {antwort.status_code}. "
+            f"CelesTrak antwortete mit HTTP {status}. "
             "Es wird nicht erneut angefragt."
         )
 
-    text = antwort.text
     parse_tle(text)          # wirft, wenn es keine Bahndaten sind
     datei.parent.mkdir(parents=True, exist_ok=True)
     vorlaeufig = datei.with_suffix(".teil")

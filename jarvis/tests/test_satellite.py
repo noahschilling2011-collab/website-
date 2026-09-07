@@ -1290,3 +1290,145 @@ def test_der_deckel_rechnet_wirklich_nur_die_ersten_saetze():
     davor = [muell] * (MAX_SATELLITEN - 1) + [iss]
     assert ueberfluege(davor, lat=48.8, lon=9.79, von=von, bis=bis), \
         "vor dem Deckel muss die ISS gerechnet werden"
+
+
+# --- Der Rumpf der CelesTrak-Antwort hat einen Deckel --------------------
+#
+# Nachgetragen bei der Abnahme (07.09.2026). Der Code kam ohne Tests an;
+# beide Mutationsproben - "Bahndaten ungebremst geladen" und "Deckel still
+# hochgesetzt" - blieben gruen.
+
+
+def _celestrak_stroemt(stueck: bytes, wie_oft: int, gezaehlt: dict):
+    """Ein CelesTrak, der `wie_oft` Bloecke schickt und mitzaehlt."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        async def haeppchen():
+            for _ in range(wie_oft):
+                gezaehlt["bytes"] += len(stueck)
+                yield stueck
+
+        return httpx.Response(200, headers={"content-type": "text/plain"},
+                              content=haeppchen())
+
+    return handler
+
+
+def test_eine_endlose_bahndatenantwort_wird_abgebrochen(tmp_path):
+    """`MAX_SATELLITEN` deckelt das RECHNEN, nicht das Holen: die Antwort
+    wurde bis dahin am Stueck geladen und in voller Laenge auf die Platte
+    geschrieben, bevor irgendjemand sie angesehen hat."""
+    from core.satellite.ueberflug import MAX_ANTWORT_BYTES
+
+    gezaehlt = {"bytes": 0}
+    stueck = b"X" * 1_000_000
+    bereit = 40 * len(stueck)          # 40 MB stuenden zur Verfuegung
+    werkzeug = _passes_werkzeug(tmp_path)
+    with _ohne_celestrak(_celestrak_stroemt(stueck, 40, gezaehlt)):
+        e = run(run_tool("satellite_passes", {"lat": 48.8, "lon": 9.79}))
+
+    assert e.ok is False
+    assert "MB" in (e.error or ""), e.error
+    # Nicht "kaputte Bahndaten": der Dienst hat sauber geantwortet, nur zu viel.
+    assert "ausgestiegen" not in (e.error or ""), e.error
+    # Gegenprobe, dann die Zusage: es wurde gestroemt, aber nicht alles.
+    assert gezaehlt["bytes"] > 0, "es wurde gar nicht erst gestroemt"
+    assert gezaehlt["bytes"] <= MAX_ANTWORT_BYTES + len(stueck), gezaehlt
+    assert gezaehlt["bytes"] < bereit, gezaehlt
+
+    # Und nichts Halbes liegt auf der Platte: ein halber Datensatz waere
+    # schlimmer als keiner, weil der naechste Lauf ihn fuer gueltig haelt.
+    from core.satellite.ueberflug import cache_datei
+    datei = cache_datei("visual", db_path=werkzeug.db_path)
+    assert not datei.is_file(), datei.read_text(encoding="utf-8")[:200]
+
+
+def test_der_bahndatendeckel_steht_auf_einer_abgesprochenen_zahl():
+    """Gemessen: 10.000 TLE-Saetze sind 1,5 MB, der ganze CelesTrak-Katalog
+    laege bei rund 5 MB - angefragt werden aber nur `visual` (157) und
+    `stations` (21), also rund 25 KB. 8 MB sind sehr weit weg vom Normalfall
+    und trotzdem eine Grenze. Wer die Zahl aendert, aendert diese Rechnung."""
+    from core.satellite.ueberflug import MAX_ANTWORT_BYTES
+
+    assert MAX_ANTWORT_BYTES == 8_000_000
+
+
+def test_eine_gewoehnliche_antwort_geht_weiterhin_glatt_durch(tmp_path):
+    """Gegenprobe - sonst waere jede Antwort ein Fehler."""
+    gezaehlt = {"bytes": 0}
+    _passes_werkzeug(tmp_path)
+    with _ohne_celestrak(_celestrak_stroemt(ISS_TLE.encode(), 1, gezaehlt)):
+        e = run(run_tool("satellite_passes",
+                         {"lat": 48.8, "lon": 9.79, "hours": 24}))
+    assert e.ok is True, e.error
+
+
+def test_ein_krummes_byte_macht_die_ganze_gruppe_nicht_wertlos(tmp_path):
+    """Ein TLE-Satz ist ASCII. Kommt ein einzelnes Byte kaputt an, wird es
+    ersetzt statt geworfen - sonst haengt die Bahnrechnung fuer alle
+    Satelliten an der Kodierung eines Zeichens."""
+    gezaehlt = {"bytes": 0}
+    krumm = (ISS_TLE + "\r\n").encode() + b"\xff\xfe"
+    _passes_werkzeug(tmp_path)
+    with _ohne_celestrak(_celestrak_stroemt(krumm, 1, gezaehlt)):
+        e = run(run_tool("satellite_passes",
+                         {"lat": 48.8, "lon": 9.79, "hours": 24}))
+    assert e.ok is True, e.error
+
+
+# --- Abnahme FIX-12: was VOR dem Deckel passiert --------------------------
+#
+# `MAX_SATELLITEN` deckelt das Rechnen. Das Holen war ungedeckelt: die
+# Antwort wurde am Stueck geladen und in voller Laenge auf die Platte
+# geschrieben, bevor irgendjemand sie angesehen hat. Nachgemessen am
+# Kalender, der dieselbe Bauart hatte: 37,7 MB Antwort waren 438 MB
+# Speicher. Der Deckel ist derselbe wie in `core/kalender.py`.
+
+
+def test_eine_masslos_grosse_celestrak_antwort_wird_abgebrochen(tmp_path):
+    """Kein Absturz, kein volllaufender Speicher, ein deutscher Satz - und
+    nichts davon landet im Zwischenspeicher."""
+    from core.satellite.ueberflug import MAX_ANTWORT_BYTES, cache_datei
+
+    zeilen = ISS_TLE.splitlines()
+    block = f"SAT\r\n{zeilen[1]}\r\n{zeilen[2]}\r\n"
+    zu_gross = block * (MAX_ANTWORT_BYTES // len(block) + 2)
+    assert len(zu_gross.encode()) > MAX_ANTWORT_BYTES
+
+    werkzeug = _passes_werkzeug(tmp_path)
+    with _ohne_celestrak(lambda r: httpx.Response(200, request=r,
+                                                  text=zu_gross)):
+        e = run(run_tool("satellite_passes", {"lat": 48.8, "lon": 9.79}))
+    assert e.ok is False, e.display
+    assert "ausgestiegen" not in (e.error or ""), e.error
+    assert "CelesTrak" in (e.error or "")
+    assert "MB" in (e.error or "")
+    assert not cache_datei("visual", db_path=werkzeug.db_path).exists(), \
+        "eine abgebrochene Antwort wurde als Bahndaten abgelegt"
+
+
+def test_der_deckel_laesst_eine_gewoehnliche_antwort_unangetastet(tmp_path):
+    """Gegenprobe: `visual` sind rund 25 KB - der Deckel darf im Alltag
+    nichts kosten und nichts abschneiden."""
+    from core.satellite.ueberflug import cache_datei
+
+    werkzeug = _passes_werkzeug(tmp_path)
+    with _ohne_celestrak(lambda r: httpx.Response(200, request=r,
+                                                  text=ISS_TLE)):
+        e = run(run_tool("satellite_passes", {"lat": 48.8, "lon": 9.79}))
+    assert e.ok is True, e.error
+    assert e.data["geprueft"] == 1
+    assert cache_datei("visual", db_path=werkzeug.db_path).read_text(
+        encoding="utf-8") == ISS_TLE
+
+
+def test_bahndaten_mit_einem_krummen_byte_bleiben_lesbar(tmp_path):
+    """`antwort.text` hat kaputte Bytes ersetzt statt zu werfen. Der eigene
+    Leser muss das genauso halten - sonst kostet ein einzelnes Byte die
+    Bahndaten der ganzen Gruppe."""
+    roh = ISS_TLE.encode("utf-8").replace(b"ISS", b"I\xffS")
+    _passes_werkzeug(tmp_path)
+    with _ohne_celestrak(lambda r: httpx.Response(200, request=r,
+                                                  content=roh)):
+        e = run(run_tool("satellite_passes", {"lat": 48.8, "lon": 9.79}))
+    assert e.ok is True, e.error
+    assert e.data["geprueft"] == 1
