@@ -24,7 +24,7 @@ import httpx
 from core.fehlertexte import ohne_geheimnis
 from core.contracts import Permission, Tool, ToolResult
 from core.satellite.analysis import grenzsatz, vergleichbar, vergleiche_raster
-from core.orte import OrtFehler, aus_tabelle, bbox_um, finde_ort
+from core.orte import NAME_MAX, OrtFehler, aus_tabelle, bbox_um, finde_ort
 from core.satellite.bilder import BildFehler
 from core.satellite.bilder import speichere as speichere_bild
 from core.satellite.ueberflug import (
@@ -558,6 +558,13 @@ class OrtFinden(Tool):
         def dauer() -> int:
             return int((time.monotonic() - begonnen) * 1000)
 
+        # Der Name kommt aus dem Modell und steht unten in JEDER Meldung.
+        # Gemessen am 07.09.2026: ein Name mit 200.000 Zeichen ergab einen
+        # `display` mit 200.468 Zeichen - der geht woertlich zurueck in den
+        # Prompt. `wetter` deckelt an derselben Stelle (ORT_MAX), hier fehlte
+        # es. Dieselbe Zahl, damit beide Werkzeuge gleich antworten.
+        kurz = str(name)[:NAME_MAX]
+
         try:
             ort = await finde_ort(name, kontakt=self.kontakt,
                                   transport=self.transport)
@@ -570,7 +577,7 @@ class OrtFinden(Tool):
                 # irrefuehrend: der Ort steht ausserdem nicht in der
                 # eingebauten Tabelle, und das waere auch mit Kontakt so.
                 grund = (
-                    f"{name!r} steht nicht in der eingebauten Tabelle "
+                    f"{kurz!r} steht nicht in der eingebauten Tabelle "
                     f"(jedes Land, jede Hauptstadt), und live nachschlagen "
                     f"geht auch nicht: {exc}"
                 )
@@ -582,14 +589,26 @@ class OrtFinden(Tool):
                 ok=False,
                 error="Ort nicht gefunden.",
                 display=(
-                    f"Kein Ort namens {name!r} gefunden. Jedes Land und jede "
+                    f"Kein Ort namens {kurz!r} gefunden. Jedes Land und jede "
                     f"Hauptstadt ist eingebaut; alles andere kommt von "
                     f"Wikidata - vielleicht anders geschrieben?"
                 ),
                 duration_ms=dauer(),
             )
 
-        box = bbox_um(ort.lat, ort.lon, kante_km=float(kante_km))
+        # Der Deckel steht im Schema, aber das Werkzeug soll auch ohne den
+        # Dispatcher nicht platzen - wie bei `wetter`. Gemessen: kante_km=-3
+        # liess OrtFehler roh nach oben fliegen, kante_km="viel" ValueError,
+        # kante_km=None TypeError. `NaN` kam sogar durch das Schema, weil
+        # jeder Vergleich mit NaN False ist (jetzt in bbox_um abgewiesen).
+        try:
+            box = bbox_um(ort.lat, ort.lon, kante_km=float(kante_km))
+        except (OrtFehler, TypeError, ValueError) as exc:
+            text = ("Die Kantenlaenge ergibt keinen Ausschnitt. Nenn eine "
+                    "Zahl zwischen 0,5 und 2000 (Kilometer).")
+            log.warning("find_place: kante_km unbrauchbar (%r): %s", kante_km, exc)
+            return ToolResult(ok=False, error=text, display=text,
+                              duration_ms=dauer())
         aufloesung = effektive_aufloesung_m(box, BILD_KANTE, BILD_KANTE)
         return ToolResult(
             ok=True,

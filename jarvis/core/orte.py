@@ -391,8 +391,14 @@ def bbox_um(lat: float, lon: float, kante_km: float = 12.0) -> tuple[float, floa
     Schaerfste, was hier ueberhaupt zu holen ist. Ein ganzes Land auf
     dieselben 512 Pixel waeren Kilometer je Pixel.
     """
-    if kante_km <= 0:
-        raise OrtFehler("Die Kantenlaenge muss groesser als null sein.")
+    # `math.isfinite` ZUERST, nicht `<= 0`: jeder Vergleich mit NaN ist
+    # False, also kommt NaN an einer reinen Groessenpruefung vorbei. Gemessen
+    # am 07.09.2026: `kante_km=NaN` ergab ok=True mit "Ausschnitt nan km" und
+    # einer bbox ueber die GANZE ERDE ([-180, -90, 180, 90]) - halb_lat wird
+    # NaN, und `max`/`min` geben dann die Grenze zurueck. Das Modell haette
+    # das fuer einen 12-km-Ausschnitt gehalten und damit weitergerechnet.
+    if not math.isfinite(kante_km) or kante_km <= 0:
+        raise OrtFehler("Die Kantenlaenge muss eine Zahl groesser als null sein.")
     halb_lat = (kante_km * 1000.0 / 2.0) / GRAD_M
     # Nahe den Polen wird der Kosinus winzig; ohne Untergrenze wuerde der
     # Ausschnitt in Laengenrichtung um die halbe Erde laufen.

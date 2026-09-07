@@ -835,3 +835,85 @@ def test_ein_kaputter_cache_kostet_nicht_den_wetterbericht(wetter, pfad, tmp_pat
     assert ergebnis.ok, ergebnis.error
     assert _verraet(ergebnis) == []
     assert "lookups" not in (ergebnis.error or "")
+
+
+# ==========================================================================
+# Abnahme 07.09.2026: zwei Luecken, die die Bau-Runde offen gelassen hat
+# ==========================================================================
+
+
+@pytest.mark.parametrize("kante", [
+    float("nan"),      # kommt durch das Schema: jeder Vergleich mit NaN ist False
+    float("inf"),
+    -3.0,
+    0.0,
+    "viel",            # ueber execute() direkt, ohne Dispatcher
+    None,
+])
+def test_ort_eine_unbrauchbare_kante_ist_ein_satz_kein_wurf(ortsuche, kante):
+    """Ungueltige Eingabe: `kante_km` ergibt keinen Ausschnitt.
+
+    VORHER (gemessen am 07.09.2026 ueber execute()):
+      kante_km=-3      -> WURF OrtFehler
+      kante_km="viel"  -> WURF ValueError
+      kante_km=None    -> WURF TypeError
+      kante_km=NaN     -> ok=TRUE, "Ausschnitt nan km",
+                          bbox=[-180.0000, -90.0000, 180.0000, 90.0000]
+      kante_km=inf     -> dasselbe
+
+    Der NaN-Fall ist der schlimme: er kommt AUCH durch den Dispatcher, weil
+    `NaN < 0.5` und `NaN > 2000` beide False sind - und `json.loads` liest
+    `NaN` klaglos. Das Modell haette die ganze Erde fuer einen 12-km-
+    Ausschnitt gehalten und damit `satellite_search` gefuettert.
+    """
+    ortsuche.transport = _ort_transport(_antwort(KILI))
+    e = _fuehre_aus(ortsuche, name=LIVE, kante_km=kante)
+    assert e.ok is False, f"{kante!r} ergab ok=True: {e.display}"
+    assert "Kantenlaenge" in e.display
+    assert "nan" not in e.display.lower(), "kein NaN im Text"
+    assert _verraet(e) == []
+
+
+def test_ort_nan_kommt_auch_durch_den_dispatcher_nicht_durch(ortsuche):
+    """Derselbe Fall ueber `run_tool` - da, wo das Modell wirklich anklopft."""
+    ortsuche.transport = _ort_transport(_antwort(KILI))
+    e = run(run_tool("find_place", {"name": LIVE, "kante_km": float("nan")},
+                     max_permission=Permission.READ))
+    assert e.ok is False, e.display
+    assert "ist mit einem Fehler ausgestiegen" not in (e.error or "")
+    assert "-180" not in (e.display or ""), "die ganze Erde als Ausschnitt"
+    assert _verraet(e) == []
+
+
+def test_ort_bbox_um_weist_nan_ab():
+    """Die Sperre sitzt in `bbox_um` und nicht am Aufrufer - `POST /api/ort`
+    ruft dieselbe Funktion."""
+    from core.orte import bbox_um
+
+    assert len(bbox_um(48.8, 9.8, kante_km=12.0)) == 4
+    for kaputt in (float("nan"), float("inf"), float("-inf"), 0.0, -1.0):
+        with pytest.raises(OrtFehler):
+            bbox_um(48.8, 9.8, kante_km=kaputt)
+
+
+def test_ort_ein_riesiger_gefragter_name_kommt_nicht_zurueck_in_den_prompt(ortsuche):
+    """Sehr grosse EINGABE: der Name aus dem Modell steht in jeder Meldung.
+
+    VORHER (gemessen ueber run_tool, Name mit 200.000 Zeichen):
+      len(display) = 200.468 - woertlich zurueck in den Prompt.
+    `wetter` deckelt an derselben Stelle laengst (ORT_MAX); hier fehlte es.
+    """
+    def darf_nicht(_: httpx.Request) -> httpx.Response:  # pragma: no cover
+        raise AssertionError("ein unsinnig langer Name geht nicht raus")
+
+    ortsuche.transport = _ort_transport(darf_nicht)
+    e = _fuehre_aus(ortsuche, name="N" * 200_000)
+    assert e.ok is False
+    assert len(e.display) < 1000, f"{len(e.display)} Zeichen gehen ins Modell"
+    assert e.display.count("N") <= NAME_MAX
+    assert _verraet(e) == []
+
+    # Und der Zweig "nichts gefunden" - der zweite Ort, an dem der Name steht.
+    ortsuche.transport = _ort_transport(_antwort(_sparql()))
+    e = _fuehre_aus(ortsuche, name="N" * 150)
+    assert e.ok is False and e.display.count("N") <= NAME_MAX
