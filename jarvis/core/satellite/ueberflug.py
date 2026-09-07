@@ -37,6 +37,8 @@ from pathlib import Path
 
 import httpx
 
+from core.fehlertexte import ohne_geheimnis
+
 log = logging.getLogger("jarvis")
 
 CELESTRAK_URL = "https://celestrak.org/NORAD/elements/gp.php"
@@ -61,6 +63,18 @@ TLE_WARNT_AB_TAGEN = 7.0
 # Unter dieser Hoehe steht der Satellit praktisch im Horizont: Haeuser,
 # Baeume, Berge. 10 Grad ist die uebliche Schwelle.
 MINDESTHOEHE_GRAD = 10.0
+
+# Wie viele Satellitensaetze hoechstens durchgerechnet werden.
+#
+# Gemessen auf dieser Maschine: 6,8 ms je Satellit fuer ein 24-h-Fenster
+# (10 Saetze 0,12 s / 100 Saetze 0,64 s / 500 Saetze 3,41 s). Die echten
+# Gruppen sind klein - `visual` 157, `stations` 21 -, aber die Zahl kommt
+# aus einer Antwort von draussen: bei 10.000 Saetzen waren es gemessen
+# 10,5 s fuer eine EINZIGE Stunde, bei 24 h waere die Zeitgrenze des
+# Werkzeugs (60 s) gerissen. Und `asyncio.to_thread` laesst sich nicht
+# abbrechen - der Server haette weitergerechnet, lange nachdem der Nutzer
+# seine Fehlermeldung bekommen hat.
+MAX_SATELLITEN = 1000
 
 HIMMELSRICHTUNGEN = (
     "N", "NNO", "NO", "ONO", "O", "OSO", "SO", "SSO",
@@ -191,10 +205,28 @@ async def hole_tle(
     if datei.is_file() and (uhr - datei.stat().st_mtime) < TLE_HOECHSTALTER_S:
         return datei.read_text(encoding="utf-8"), False
 
-    async with httpx.AsyncClient(timeout=30.0, transport=transport) as client:
-        antwort = await client.get(
-            CELESTRAK_URL, params={"GROUP": gruppe, "FORMAT": "tle"}
-        )
+    try:
+        async with httpx.AsyncClient(timeout=30.0, transport=transport) as client:
+            antwort = await client.get(
+                CELESTRAK_URL, params={"GROUP": gruppe, "FORMAT": "tle"}
+            )
+    except httpx.HTTPError as exc:
+        # Bis hierher fing dieser Aufruf gar nichts ab: ein `ReadTimeout`
+        # oder ein `ConnectError` lief als httpx-Ausnahme durch das ganze
+        # Werkzeug, und im Chat stand "satellite_passes ist mit einem
+        # Fehler ausgestiegen". Dabei gilt fuer den Ausfall des Netzes
+        # genau dasselbe wie zehn Zeilen weiter unten fuer HTTP 500: ein
+        # alter Cachestand ist besser als gar keine Antwort. Bahndaten von
+        # gestern rechnen einen Ueberflug immer noch brauchbar - dass sie
+        # alt sind, sagt der Steckbrief selbst.
+        if datei.is_file():
+            log.warning("CelesTrak nicht erreichbar (%s) - es wird der alte "
+                        "Cachestand benutzt.", type(exc).__name__)
+            return datei.read_text(encoding="utf-8"), False
+        raise UeberflugFehler(ohne_geheimnis(
+            exc, "CelesTrak ist gerade nicht erreichbar",
+            "Ohne Bahndaten kann ich keinen Ueberflug rechnen - und alte "
+            "liegen hier auch nicht")) from exc
     if antwort.status_code >= 400:
         # CelesTrak bittet ausdruecklich darum, bei Fehlern aufzuhoeren und
         # es einem Menschen zu melden, statt weiter anzufragen.
@@ -249,6 +281,13 @@ def ueberfluege(
         raise UeberflugFehler(f"Laenge {lon} liegt ausserhalb -180..180.")
     if bis <= von:
         raise UeberflugFehler("Das Zeitfenster endet vor seinem Anfang.")
+    if len(satelliten) > MAX_SATELLITEN:
+        # Der Deckel ist keine Optimierung, sondern eine Notbremse gegen eine
+        # Antwort, mit der niemand gerechnet hat - siehe MAX_SATELLITEN. Wer
+        # ihn erreicht, erfaehrt es (das Werkzeug sagt "N von M").
+        log.warning("Bahndaten enthalten %d Satelliten - gerechnet werden die "
+                    "ersten %d.", len(satelliten), MAX_SATELLITEN)
+        satelliten = satelliten[:MAX_SATELLITEN]
 
     # builtin=True ist die Vorgabe: keine Datei, kein Download. Geprueft -
     # sonst wuerde `pytest` am Netzverbot scheitern.

@@ -38,6 +38,7 @@ from typing import Any
 
 import httpx
 
+from core.fehlertexte import ohne_geheimnis
 from core.satellite.contracts import Scene, SzeneUngueltig
 
 log = logging.getLogger("jarvis")
@@ -111,6 +112,30 @@ class CDSEFehler(RuntimeError):
     pass
 
 
+def _nutzlast(antwort: httpx.Response, was: str) -> dict[str, Any]:
+    """Die Antwort als JSON-Objekt - oder ein CDSEFehler mit einem Satz.
+
+    Gemessen mit httpx.MockTransport: `antwort.json()` wirft bei einem
+    leeren Koerper (`JSONDecodeError`), und eine Liste statt eines Objekts
+    laesst jedes `.get()` danach mit `AttributeError` fliegen. Beides kam
+    bis hierher ungebremst aus dem Werkzeug heraus, und der Nutzer las
+    "satellite_search ist mit einem Fehler ausgestiegen".
+    """
+    try:
+        daten = antwort.json()
+    except ValueError as exc:
+        raise CDSEFehler(
+            f"{was} war nicht lesbar - was kam, ist kein JSON. Das liegt am "
+            "Dienst, nicht an deiner Frage."
+        ) from exc
+    if not isinstance(daten, dict):
+        raise CDSEFehler(
+            f"{was} hatte eine Form, mit der ich nicht rechne. Das liegt am "
+            "Dienst, nicht an deiner Frage."
+        )
+    return daten
+
+
 def effektive_aufloesung_m(
     bbox: tuple[float, float, float, float], breite: int, hoehe: int
 ) -> float:
@@ -180,15 +205,27 @@ def baue_filter(
 
 
 def _attribut(produkt: dict[str, Any], name: str) -> Any:
-    for att in produkt.get("Attributes") or []:
-        if att.get("Name") == name:
+    # `Attributes` kommt von draussen: steht dort eine Zeichenkette statt
+    # einer Liste, iteriert die Schleife ueber die Buchstaben und `att.get`
+    # fliegt. Was nicht die erwartete Form hat, gilt als "nicht da".
+    werte = produkt.get("Attributes")
+    if not isinstance(werte, list):
+        return None
+    for att in werte:
+        if isinstance(att, dict) and att.get("Name") == name:
             return att.get("Value")
     return None
 
 
 def als_szene(produkt: dict[str, Any], bbox) -> Scene | None:
     """Wandelt einen OData-Treffer in eine Szene. Ungueltige werden verworfen."""
-    roh = produkt.get("ContentDate", {}).get("Start") or produkt.get("OriginDate")
+    if not isinstance(produkt, dict):
+        # Ein Katalog, der Zeichenketten statt Objekten liefert, ist kaputt -
+        # aber er darf das Werkzeug nicht mitreissen.
+        return None
+    inhalt = produkt.get("ContentDate")
+    roh = (inhalt.get("Start") if isinstance(inhalt, dict) else None) \
+        or produkt.get("OriginDate")
     if not roh:
         return None
     try:
@@ -251,6 +288,36 @@ class CDSEProvider:
             self.username and self.password
         )
 
+    async def _anfrage(self, methode: str, url: str, **kw: Any) -> httpx.Response:
+        """Eine Anfrage an CDSE - jede Netzstoerung wird zum CDSEFehler.
+
+        Vorher baute jede der drei Stellen (Token, Katalog, Bild) ihren
+        Klienten selbst und fing NICHTS ab. Ein `ReadTimeout` oder ein
+        `ConnectError` lief damit als httpx-Ausnahme durch das ganze
+        Werkzeug hindurch; im Chat stand "satellite_search ist mit einem
+        Fehler ausgestiegen", und beim Bild war sogar die schon gefundene
+        Szene verloren - obwohl der Code drei Zeilen weiter ausdruecklich
+        sagt, dass die Metadaten etwas wert sind. Ein fehlender Dienst ist
+        eine Auskunft, kein Absturz.
+
+        Die Adresse steht nicht in der Meldung: sie traegt bei der
+        Process-API den Bearer-Token im Kopf, und `ohne_geheimnis` nimmt
+        grundsaetzlich nichts aus dem Ausnahmetext mit.
+        """
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout,
+                                         transport=self.transport) as client:
+                return await client.request(methode, url, **kw)
+        except httpx.TimeoutException as exc:
+            raise CDSEFehler(ohne_geheimnis(
+                exc, f"CDSE hat nicht innerhalb von {self.timeout:.0f} s geantwortet",
+                "Das liegt am Dienst, nicht an deiner Frage - versuch es "
+                "spaeter noch einmal")) from exc
+        except httpx.HTTPError as exc:
+            raise CDSEFehler(ohne_geheimnis(
+                exc, "CDSE ist gerade nicht erreichbar",
+                "Ohne den Dienst gibt es kein Satellitenbild")) from exc
+
     def _token_form(self) -> dict[str, str]:
         if self.client_id and self.client_secret:
             return {
@@ -284,15 +351,13 @@ class CDSEProvider:
                 "CDSE_CLIENT_SECRET in die .env ein - ein Konto gibt es "
                 "kostenlos auf dataspace.copernicus.eu."
             )
-        async with httpx.AsyncClient(timeout=self.timeout,
-                                     transport=self.transport) as client:
-            antwort = await client.post(TOKEN_URL, data=self._token_form())
+        antwort = await self._anfrage("POST", TOKEN_URL, data=self._token_form())
         if antwort.status_code >= 400:
             raise CDSEFehler(
                 f"CDSE hat den Zugang abgelehnt (HTTP {antwort.status_code}). "
                 "Stimmen CDSE_CLIENT_ID und CDSE_CLIENT_SECRET?"
             )
-        nutzlast = antwort.json()
+        nutzlast = _nutzlast(antwort, "Die Zugangsantwort von CDSE")
         self._token = str(nutzlast.get("access_token") or "")
         if not self._token:
             raise CDSEFehler("CDSE lieferte kein access_token.")
@@ -358,12 +423,10 @@ class CDSEProvider:
             },
             "evalscript": EVALSCRIPT_ECHTFARBE,
         }
-        async with httpx.AsyncClient(timeout=self.timeout,
-                                     transport=self.transport) as client:
-            antwort = await client.post(
-                PROCESS_URL, json=koerper,
-                headers={"Authorization": f"Bearer {zugang}"},
-            )
+        antwort = await self._anfrage(
+            "POST", PROCESS_URL, json=koerper,
+            headers={"Authorization": f"Bearer {zugang}"},
+        )
         if antwort.status_code >= 400:
             # Bewusst ohne den Antworttext: er kann die Anfrage spiegeln,
             # und in der steht nichts Geheimes - aber das Secret steckt im
@@ -410,21 +473,38 @@ class CDSEProvider:
         # ihn wirklich verlangt. Ausserdem spart das den Token-Aufruf bei
         # jeder Suche: `satellite_search` laeuft damit auch dann, wenn gar
         # keine Zugangsdaten eingetragen sind.
+        hoechstens = max(1, min(limit, 50))
         params = {
             "$filter": baue_filter(bbox, start, end, max_cloud_pct),
             "$orderby": "ContentDate/Start desc",
-            "$top": str(max(1, min(limit, 50))),
+            "$top": str(hoechstens),
             "$expand": "Attributes",
         }
-        async with httpx.AsyncClient(timeout=self.timeout,
-                                     transport=self.transport) as client:
-            antwort = await client.get(KATALOG_URL, params=params)
+        antwort = await self._anfrage("GET", KATALOG_URL, params=params)
         if antwort.status_code >= 400:
             raise CDSEFehler(
                 f"Katalogsuche fehlgeschlagen (HTTP {antwort.status_code})."
             )
 
-        treffer = antwort.json().get("value") or []
+        treffer = _nutzlast(antwort, "Die Katalogantwort von CDSE").get("value")
+        if not isinstance(treffer, list):
+            # `[]` heisst "nichts gefunden" und ist eine Antwort. Fehlt das
+            # Feld oder steht dort `null` oder eine Zeichenkette, dann ist die
+            # Antwort kaputt - und das ist etwas anderes als ein leeres
+            # Ergebnis. Vorher wurde beides zu "Kein Sentinel-2-Bild unter
+            # 20 % Wolken": eine Auskunft, die es so nicht gab.
+            raise CDSEFehler(
+                "Die Katalogantwort von CDSE enthielt keine Trefferliste. Das "
+                "heisst NICHT, dass es kein Bild gibt - ich weiss es nur nicht."
+            )
+        # Gemessen: der Katalog kann mehr liefern, als `$top` erlaubt. 50.000
+        # Treffer waren 8,9 MB und 50.000 Szenenobjekte - fuer eine Anfrage,
+        # die nach zehn gefragt hat. Was ueber die eigene Bitte hinausgeht,
+        # wird gar nicht erst ausgepackt.
+        if len(treffer) > hoechstens:
+            log.warning("CDSE lieferte %d Treffer, gefragt waren %d.",
+                        len(treffer), hoechstens)
+            treffer = treffer[:hoechstens]
         szenen = [s for s in (als_szene(p, bbox) for p in treffer) if s is not None]
         # Das jüngste zuerst - "aktuell" heisst: das juengste Bild unter dem
         # Schwellwert im Suchfenster (A.2).
