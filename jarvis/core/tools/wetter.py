@@ -119,6 +119,9 @@ class Wetter(Tool):
         "additionalProperties": False,
     }
     permission = Permission.READ
+    # Ortsname und Region kommen aus der Geokodierung eines fremden
+    # Dienstes und stehen unveraendert im Bericht.
+    fremder_text = True
 
     # Werden beim App-Start gesetzt (api/app.py), nicht importiert.
     standard_ort: str = ""

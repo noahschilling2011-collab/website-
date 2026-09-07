@@ -57,6 +57,15 @@ class Tool:
     permission: Permission
     requires_confirmation: bool = False
     timeout_s: int = 30
+    # ERGAENZT gegenueber docs/contracts.md, rein additiv mit Default
+    # (FIX-11 Punkt 5): Liefert dieses Werkzeug Text, den jemand anderes
+    # geschrieben hat - eine Webseite, ein Kalendereintrag, eine Datei, eine
+    # Wikipedia-Zeile? Dann rahmt der Dispatcher `display` als DATEN ein
+    # (core/rahmen.py, ENGSTELLE in core/tools/dispatch.py). Das Flag steht
+    # am Vertrag und nicht in einer Liste im Dispatcher, damit ein neues
+    # Werkzeug die Entscheidung dort trifft, wo sie hingehoert - und damit
+    # der Waechter in tests/test_fix11_rahmen.py sie einfordern kann.
+    fremder_text: bool = False
 
     async def execute(self, **kwargs) -> ToolResult:
         raise NotImplementedError

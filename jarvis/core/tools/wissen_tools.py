@@ -141,6 +141,9 @@ class WikiLokal(_MitCache):
     }
     permission = Permission.READ
     timeout_s = 5
+    # Auch die lokale Kopie ist fremder Text: der Artikel im ZIM-Archiv
+    # stammt aus Wikipedia, nicht von Noah.
+    fremder_text = True
 
     basis: str = "http://127.0.0.1:8080"
     zim: str = ""
@@ -303,6 +306,8 @@ class WikiLive(_MitCache):
     }
     permission = Permission.READ
     timeout_s = 10
+    # Der Auszug kommt woertlich aus dem Artikel.
+    fremder_text = True
 
     kontakt: str = ""       # Pflicht laut User-Agent-Richtlinie
     token: str = ""         # optional, hebt 500/h auf 5.000/h
@@ -414,6 +419,8 @@ class WikidataFrage(_MitCache):
     }
     permission = Permission.READ
     timeout_s = 20
+    # Labels und Beschreibungen aus Wikidata schreibt die Allgemeinheit.
+    fremder_text = True
 
     kontakt: str = ""
     transport: httpx.AsyncBaseTransport | None = None

@@ -100,6 +100,8 @@ class SatelliteSearch(Tool):
     }
     permission = Permission.READ
     timeout_s = 60
+    # Szenennamen und Sammlungsbezeichner kommen aus dem CDSE-Katalog.
+    fremder_text = True
 
     provider: CDSEProvider | None = None
     # Wird beim Start gesetzt, wie bei remember/recall.
@@ -368,6 +370,9 @@ class SatellitePasses(Tool):
     }
     permission = Permission.READ
     timeout_s = 60
+    # Die Satellitennamen stammen aus den TLE-Bahndaten von Celestrak,
+    # also von draussen, und stehen im Steckbrief jedes Ueberflugs.
+    fremder_text = True
 
     db_path: Path = PROJECT_ROOT / "data" / "jarvis.db"
 
@@ -487,6 +492,9 @@ class OrtFinden(Tool):
     }
     permission = Permission.READ
     timeout_s = 30
+    # Ortsnamen und Verwaltungsangaben kommen aus OpenStreetMap bzw.
+    # Wikidata - beides schreibt jeder, der dort mitmacht.
+    fremder_text = True
 
     kontakt: str = ""      # WIKI_KONTAKT, beim Start gesetzt
 

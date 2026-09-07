@@ -62,6 +62,11 @@ class Kalender(Tool):
     }
     permission = Permission.READ
     timeout_s = 25
+    # Ein Termintitel ist Text, den jemand anderes geschrieben hat - der
+    # Kalender ist ein Abo, jeder mit der Adresse kann eine Einladung
+    # hineinlegen. Genau damit ist der Befund zu FIX-11 Punkt 5
+    # nachgewiesen worden.
+    fremder_text = True
 
     # Werden beim App-Start gesetzt, wie db_path bei den anderen.
     kalender_quelle: str = ""
