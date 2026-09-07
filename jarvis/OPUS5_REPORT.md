@@ -197,6 +197,24 @@ Systemprompts über `remember`.
   Das steht im README; ein Deployment darf es nicht übersehen.
 - **CDSE ungeprüft.** Ohne Zugangsdaten kann ich nicht sagen, wie der echte
   Dienst auf Timeouts, 429 oder Teilantworten reagiert.
+- **DNS-Rebinding zwischen Auflösen und Verbinden (TOCTOU).** `fetch_url` prüft
+  den aufgelösten Namen und verbindet danach; wer die Antwort des Resolvers in
+  diesem Fenster ändert, umgeht die Prüfung. Das steht seit FIX-03 als
+  Kommentar im Code, ist **vorbestehend** und durch den Faden-Umbau weder
+  größer noch kleiner geworden. Die Reparatur wäre, gegen die bereits
+  aufgelöste Adresse zu verbinden statt gegen den Namen — ein eigener Auftrag,
+  kein Nebenbei.
+- **Der Arbeitsfaden der Namensauflösung wird nicht abgebrochen.**
+  `asyncio.to_thread` gibt die Ereignisschleife frei — das war der Zweck —,
+  aber der Faden läuft weiter, bis der Resolver von selbst aufgibt. Das
+  Werkzeug bricht ab, der Faden nicht.
+- **Für `web_search` bei hängendem DNS nicht gemessen.** Dort löst httpx
+  selbst asynchron auf; ob das ebenso pünktlich abbricht, ist ohne Netz nicht
+  prüfbar und deshalb **NICHT AUSGEFÜHRT**.
+- **Kein `Retry-After` bei 429**, weder bei Open-Meteo noch bei Wikidata noch
+  bei CelesTrak. Ob diese Dienste den Kopf überhaupt setzen, ist nicht
+  nachgeschlagen; erfunden wird deshalb keine Wartezeit. Fehlender Komfort,
+  kein Fehlverhalten.
 
 **Nicht getan, weil verboten:** keine Secrets committet, keine `.env` committet,
 keine API-Keys erzeugt oder geraten, keine Auth umgangen, keine Pfadprüfung
