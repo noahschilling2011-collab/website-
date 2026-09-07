@@ -1408,8 +1408,10 @@ def test_eine_masslos_grosse_celestrak_antwort_wird_abgebrochen(tmp_path):
 
 def test_der_deckel_laesst_eine_gewoehnliche_antwort_unangetastet(tmp_path):
     """Gegenprobe: `visual` sind rund 25 KB - der Deckel darf im Alltag
-    nichts kosten und nichts abschneiden."""
-    from core.satellite.ueberflug import cache_datei
+    nichts kosten und nichts abschneiden. Verglichen werden die BAHNDATEN,
+    nicht die Bytes: `Path.read_text` macht aus CRLF ein LF (universelle
+    Zeilenenden), und das war schon vor dem Deckel so."""
+    from core.satellite.ueberflug import cache_datei, parse_tle
 
     werkzeug = _passes_werkzeug(tmp_path)
     with _ohne_celestrak(lambda r: httpx.Response(200, request=r,
@@ -1417,18 +1419,38 @@ def test_der_deckel_laesst_eine_gewoehnliche_antwort_unangetastet(tmp_path):
         e = run(run_tool("satellite_passes", {"lat": 48.8, "lon": 9.79}))
     assert e.ok is True, e.error
     assert e.data["geprueft"] == 1
-    assert cache_datei("visual", db_path=werkzeug.db_path).read_text(
-        encoding="utf-8") == ISS_TLE
+    abgelegt = cache_datei("visual", db_path=werkzeug.db_path)
+    assert parse_tle(abgelegt.read_text(encoding="utf-8")) == parse_tle(ISS_TLE)
 
 
-def test_bahndaten_mit_einem_krummen_byte_bleiben_lesbar(tmp_path):
-    """`antwort.text` hat kaputte Bytes ersetzt statt zu werfen. Der eigene
-    Leser muss das genauso halten - sonst kostet ein einzelnes Byte die
-    Bahndaten der ganzen Gruppe."""
-    roh = ISS_TLE.encode("utf-8").replace(b"ISS", b"I\xffS")
-    _passes_werkzeug(tmp_path)
-    with _ohne_celestrak(lambda r: httpx.Response(200, request=r,
-                                                  content=roh)):
+def test_ein_fehlerstatus_wird_gemeldet_ohne_den_fehlerrumpf_zu_lesen(tmp_path):
+    """Die Mutation, die zuerst ueberlebt hat: den Rumpf AUCH bei HTTP 500
+    zu lesen, sah folgenlos aus. Ist die Fehlerseite aber groesser als der
+    Deckel, meldet das Werkzeug dann "mehr als 8 MB" statt "HTTP 500" - und
+    verliert dabei den Rueckfall auf den alten Cachestand, obwohl der da
+    ist. Der Status wird deshalb vor dem Rumpf geprueft, und der Rumpf einer
+    Fehlerantwort gar nicht erst angefasst."""
+    gezaehlt = {"bytes": 0}
+    stueck = b"<html>Wartung</html>" * 100_000        # 2 MB Fehlerseite
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        async def haeppchen():
+            for _ in range(20):                       # 40 MB stuenden bereit
+                gezaehlt["bytes"] += len(stueck)
+                yield stueck
+
+        return httpx.Response(500, content=haeppchen())
+
+    werkzeug = _passes_werkzeug(tmp_path, cache=ISS_TLE)
+    import os
+    from core.satellite.ueberflug import cache_datei
+    os.utime(cache_datei("visual", db_path=werkzeug.db_path), (0, 0))
+
+    with _ohne_celestrak(handler):
         e = run(run_tool("satellite_passes", {"lat": 48.8, "lon": 9.79}))
+
+    # Der alte Cachestand rettet die Antwort - das ist die Zusage, die die
+    # Mutation kaputtmacht.
     assert e.ok is True, e.error
-    assert e.data["geprueft"] == 1
+    assert "Zwischenspeicher" in e.display
+    assert gezaehlt["bytes"] == 0, "die Fehlerseite wurde geladen"

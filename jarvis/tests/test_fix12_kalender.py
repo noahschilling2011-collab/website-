@@ -504,3 +504,139 @@ def test_ein_frischer_zwischenspeicher_wird_nicht_als_alt_gemeldet(tmp_path):
     assert zweit.data["aus_cache"] is True
     assert "gerade geholt" in zweit.display, zweit.display
     assert "Tage alt" not in zweit.display
+
+
+# ===========================================================================
+# Abnahme FIX-12: die Antwort selbst, nicht nur das, was daraus wird
+# ===========================================================================
+#
+# `MAX_TERMINE` deckelt, was in den Prompt geht. Das HOLEN war ungedeckelt:
+# `antwort.text` laedt, was kommt, und `hole` schrieb es danach in voller
+# Laenge in den Zwischenspeicher. Nachgemessen mit httpx.MockTransport: eine
+# ICS mit 400.000 Terminen sind 37,7 MB, der Abruf brauchte 5,7 s und 438 MB
+# Speicher, und `parse` laeuft dabei IN der Ereignisschleife des Servers.
+# Ein Abo, das kaputt oder feindlich ist, haette damit nicht nur den
+# Kalender, sondern JARVIS insgesamt umgeworfen - genau das, was der Auftrag
+# ausschliesst.
+
+
+def _stroemt(stueck: bytes, wie_oft: int, gezaehlt: dict):
+    """Ein Kalenderabo, das `wie_oft` Bloecke schickt und mitzaehlt."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        async def haeppchen():
+            for _ in range(wie_oft):
+                gezaehlt["bytes"] += len(stueck)
+                yield stueck
+
+        return httpx.Response(200, headers={"content-type": "text/calendar"},
+                              content=haeppchen())
+
+    return handler
+
+
+def test_eine_endlose_kalenderantwort_wird_abgebrochen(tmp_path):
+    """Der Beleg, dass wirklich gestroemt und abgebrochen wird: der Zaehler
+    im Transport zeigt, wie viel das Abo losgeworden ist. Vorher waeren es
+    alle 40 MB gewesen."""
+    from core.kalender import MAX_ANTWORT_BYTES, cache_datei
+
+    gezaehlt = {"bytes": 0}
+    stueck = b"BEGIN:VCALENDAR\r\n" + b"X" * 1_000_000
+    bereit = 40 * len(stueck)
+
+    e = _lauf(_stroemt(stueck, 40, gezaehlt), tmp_path)
+    assert e.ok is False
+    assert "MB" in e.display, e.display
+    assert "keine Termine hast" in e.display     # kein "du hast frei"
+    assert _leckt(e) == [], _leckt(e)
+    assert gezaehlt["bytes"] > 0, "es wurde gar nicht erst gestroemt"
+    assert gezaehlt["bytes"] <= MAX_ANTWORT_BYTES + len(stueck), gezaehlt
+    assert gezaehlt["bytes"] < bereit, gezaehlt
+
+    # Und nichts Halbes im Zwischenspeicher: ein halber Kalender saehe fuer
+    # die naechsten 15 Minuten aus wie ein ganzer.
+    datei = cache_datei(tmp_path / "k.db")
+    assert not datei.is_file()
+    assert not datei.with_suffix(".teil").exists()
+
+
+def test_der_kalenderdeckel_steht_auf_einer_abgesprochenen_zahl():
+    """8 MB sind rund 80.000 Termine - weit weg von jedem echten Kalender
+    und trotzdem eine Grenze. Wer die Zahl aendert, aendert diese Rechnung.
+    Und nach unten darf sie nicht: 10.000 Termine (1,2 MB) muessen durch."""
+    from core.kalender import MAX_ANTWORT_BYTES
+
+    assert MAX_ANTWORT_BYTES == 8_000_000
+
+
+def test_ein_gewoehnlicher_kalender_geht_glatt_durch(tmp_path):
+    """Gegenprobe - sonst waere jede Antwort ein Fehler."""
+    gezaehlt = {"bytes": 0}
+    e = _lauf(_stroemt(ICS_EIN_TERMIN.encode("utf-8"), 1, gezaehlt), tmp_path,
+              von="2026-08-28", bis="2026-08-28")
+    assert e.ok is True, e.error
+    assert e.data["termine_gesamt"] == 1
+
+
+@pytest.mark.parametrize("kodierung,kopf", [
+    ("utf-8", "text/calendar; charset=utf-8"),
+    ("iso-8859-1", "text/calendar; charset=iso-8859-1"),
+    ("utf-8", "text/calendar"),                    # ohne Angabe: UTF-8
+    ("utf-8", "text/calendar; charset=gibtsnicht-9"),   # erfundene Kodierung
+])
+def test_umlaute_ueberleben_den_eigenen_leser(kodierung, kopf, tmp_path):
+    """`antwort.text` hat die Kodierung aus dem Content-Type genommen und
+    sonst UTF-8. Der eigene Leser muss das genauso halten, sonst heisst der
+    Zahnarzt ab jetzt "Fr??hst??ck"."""
+    ics = ICS_EIN_TERMIN.replace("Zahnarzt", "Frühstück")
+    e = _lauf(lambda r: httpx.Response(
+        200, request=r, content=ics.encode(kodierung),
+        headers={"content-type": kopf}), tmp_path,
+        von="2026-08-28", bis="2026-08-28")
+    assert e.ok is True, e.error
+    # Auch die erfundene Kodierung: dann wird auf UTF-8 zurueckgefallen,
+    # statt zu werfen - der Kalender ist wichtiger als der Kopfzeilenwert.
+    assert "Frühstück" in e.display, e.display
+
+
+def test_ein_krummes_byte_kostet_nicht_den_ganzen_kalender(tmp_path):
+    """Kaputte Bytes werden ersetzt statt geworfen - genau wie httpx es
+    getan hat. Ein Termin mit einem krummen Zeichen darf nicht die ganze
+    Antwort kosten."""
+    roh = ICS_EIN_TERMIN.encode("utf-8").replace(b"Zahnarzt", b"Zahn\xffarzt")
+    e = _lauf(lambda r: httpx.Response(200, request=r, content=roh), tmp_path,
+              von="2026-08-28", bis="2026-08-28")
+    assert e.ok is True, e.error
+    assert e.data["termine_gesamt"] == 1
+
+
+def test_der_zwischenspeicher_wird_nie_halb_unter_seinem_namen_geschrieben(
+    tmp_path
+):
+    """`core/satellite/ueberflug.py` und `core/satellite/bilder.py` schreiben
+    beide erst daneben und benennen dann um; der Kalender schrieb direkt auf
+    die Zieldatei. Zwei Fragen kurz hintereinander laufen nebeneinander durch
+    `hole` - wer dann die halb geschriebene Datei liest, bekommt fuer die
+    naechsten 15 Minuten einen abgeschnittenen Kalender als vollstaendigen
+    serviert.
+
+    Geprueft wird die Zusage selbst: unter dem ENDGUELTIGEN Namen wird nie
+    geschrieben, nur umbenannt."""
+    from core.kalender import cache_datei
+
+    ziel = cache_datei(tmp_path / "k.db")
+    geschrieben: list[str] = []
+    echt = Path.write_text
+
+    def merke(self, *a, **k):
+        geschrieben.append(str(self))
+        return echt(self, *a, **k)
+
+    with mock.patch.object(Path, "write_text", merke):
+        e = _lauf(lambda r: httpx.Response(200, request=r,
+                                           text=ICS_EIN_TERMIN), tmp_path)
+    assert e.ok is True, e.error
+    assert ziel.is_file(), "der Zwischenspeicher wurde gar nicht angelegt"
+    assert str(ziel) not in geschrieben, geschrieben
+    assert str(ziel.with_suffix(".teil")) in geschrieben, geschrieben
+    assert not ziel.with_suffix(".teil").exists(), "die Teildatei blieb liegen"
