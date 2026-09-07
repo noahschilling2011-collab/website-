@@ -188,6 +188,31 @@ Vorgabe **Mehmet**. Das Projekt heißt weiter JARVIS.
 
 Belege: `docs/FIX-09.md`.
 
+### Gespräch oder Auftrag (FIX-11)
+
+Im Composer steht ein Schalter mit zwei Stellungen. Er entscheidet, welchen
+Weg deine Nachricht nimmt:
+
+| Stellung | Route | Modellaufrufe je Nachricht | kennt den Verlauf | Plan, Schritte, Rückfragen |
+|---|---|---|---|---|
+| **Gespräch** (Vorgabe) | `POST /api/chat` | 1 | ja, samt Gedächtnisblock | nein |
+| **Auftrag** | `POST /api/tasks` | 3 | nein | ja |
+
+Vorher ging **jede** Nachricht als Auftrag raus — „Hallo" kostete drei
+Modellaufrufe, und weder Planner noch Schritt sahen den Verlauf, „und
+morgen?" nach einer Wetterfrage war eine Frage ohne Zusammenhang. Der
+Gedächtnisblock (`gedaechtnis.kontextblock`) hängt an `/api/chat` und wurde
+von der Oberfläche nie gerufen: über den Browser hatte Mehmet sein
+Langzeitgedächtnis noch nie.
+
+Die Stellung merkt sich der Browser (`localStorage`, Komfort — ohne Speicher
+startet jede Sitzung im Gespräch). Werkzeuge, Budget und Bestätigungen
+gelten auf beiden Wegen; nur Plan-Kasten, Zwischenschritte und Abbruch
+gehören dem Auftrag. Was ein Zeitplan zugestellt hat, wird im Modellverlauf
+als Inhalt und nicht als Anweisung markiert.
+
+Belege: `docs/FIX-11.md` Punkt 7, `tests/test_fix11_chat.py`.
+
 ### Docker
 
 ```bash

@@ -1255,6 +1255,8 @@ button, input, textarea { font: inherit; color: inherit; }
   <div class="composer-wrap">
     <form class="composer glass" id="composer">
       <textarea id="input" rows="1" placeholder="Schreib etwas…" aria-label="Nachricht"></textarea>
+      <button class="sprache" id="btn-modus" type="button" aria-pressed="false"
+              title="Gespräch: eine Antwort, mit Verlauf. Auftrag: Plan, Schritte, Rückfragen.">Gespräch</button>
       <button class="sprache" id="btn-sprache" type="button"
               title="Sprache für Erkennung und Ausgabe">DE</button>
       <button class="btn-mic" id="btn-mic" type="button"
@@ -1320,6 +1322,7 @@ button, input, textarea { font: inherit; color: inherit; }
     phase:     document.getElementById('brand-phase'),
     mic:       document.getElementById('btn-mic'),
     sprache:   document.getElementById('btn-sprache'),
+    modus:     document.getElementById('btn-modus'),
     healthDot: document.getElementById('health-dot'),
     healthTxt: document.getElementById('health-text'),
     memBtn:    document.getElementById('btn-memory'),
@@ -2044,9 +2047,11 @@ button, input, textarea { font: inherit; color: inherit; }
       } else if (h.provider_error) {
         el.healthTxt.textContent = h.provider_error;
       } else if (h.provider === 'fake') {
-        el.healthTxt.textContent = 'Fake-Anbieter — kein echtes Modell, keine Kosten';
+        el.healthTxt.textContent = 'Fake-Anbieter — kein echtes Modell, keine Kosten'
+          + sicherungText(h.letzte_sicherung);
       } else {
-        el.healthTxt.textContent = spendText(h.spend);
+        el.healthTxt.textContent = spendText(h.spend)
+          + sicherungText(h.letzte_sicherung);
       }
     }).catch(function (err) {
       el.healthDot.className = 'dot is-bad';
@@ -2054,6 +2059,29 @@ button, input, textarea { font: inherit; color: inherit; }
         ? 'Token abgelehnt — Seite neu laden'
         : 'Backend nicht erreichbar';
     });
+  }
+
+  /* Wie alt ist die letzte Sicherung? Relative Zeit, nie ein Pfad — wo die
+     Datei liegt, geht die Oberflaeche nichts an (core/fehlertexte.py).
+
+     Nur an die beiden gesunden Zweige angehaengt: steht dort schon
+     "Datenbank: ..." oder ein Anbieterfehler, ist das Alter der Sicherung
+     die zweitwichtigste Nachricht und wuerde die erste verduennen.
+
+     `letzte_sicherung` ist ISO-Zeit in UTC. Date.parse gibt NaN, wenn der
+     Server etwas Unerwartetes schickt — dann lieber schweigen als eine
+     Zahl erfinden. Eine Sicherung aus der Zukunft (schiefe Serveruhr) gilt
+     als "gerade eben", nicht als "vor -3 h". */
+  function sicherungText(iso) {
+    if (iso === null || iso === undefined) return ' · Sicherung: noch nie';
+    var ms = Date.parse(iso);
+    if (isNaN(ms)) return '';
+    var min = Math.floor((Date.now() - ms) / 60000);
+    if (min < 1) return ' · Sicherung: gerade eben';
+    if (min < 60) return ' · Sicherung: vor ' + min + ' min';
+    var std = Math.floor(min / 60);
+    if (std < 48) return ' · Sicherung: vor ' + std + ' h';
+    return ' · Sicherung: vor ' + Math.floor(std / 24) + ' Tagen';
   }
 
   function spendText(spend) {
@@ -2264,6 +2292,63 @@ button, input, textarea { font: inherit; color: inherit; }
 
   var ENDZUSTAENDE = ['done', 'failed', 'aborted_budget', 'cancelled'];
 
+  // --- Gespräch oder Auftrag? (FIX-11 Punkt 7) ------------------------------
+  //
+  // Bis zum 07.09.2026 ging JEDE getippte Nachricht an POST /api/tasks.
+  // Gemessen gegen den FakeLLMProvider:
+  //
+  //   Auftragspfad: 3 Modellaufrufe je Nachricht, Zug 2 kennt Zug 1 nicht,
+  //                 kein Fakt aus dem Gedächtnis im Systemprompt
+  //   Chat-Pfad:    1 Modellaufruf, Verlauf ist dabei, Gedächtnis auch
+  //
+  // Der Chat-Pfad lag fertig und getestet daneben und wurde nie gerufen.
+  // Für „Wie spät ist es?" einen Planer laufen zu lassen, der das Ziel in
+  // Schritte zerlegt, ist dreimal bezahlt und einmal gedacht.
+  //
+  // Der Auftragspfad bleibt vollständig — er ist der einzige mit Plan,
+  // Schritten, Rückfrage bei EXTERNAL und Abbruch. Wer ihn will, schaltet
+  // um; die Wahl merkt sich der Browser (localStorage, ein Komfort).
+  var alsAuftrag = false;
+  try { alsAuftrag = localStorage.getItem('jarvis.alsAuftrag') === '1'; } catch (e) { /* egal */ }
+
+  function modusAnzeigen() {
+    el.modus.textContent = alsAuftrag ? 'Auftrag' : 'Gespräch';
+    el.modus.setAttribute('aria-pressed', alsAuftrag ? 'true' : 'false');
+    el.input.placeholder = alsAuftrag ? 'Was soll ich erledigen?…' : 'Schreib etwas…';
+  }
+
+  el.modus.addEventListener('click', function () {
+    alsAuftrag = !alsAuftrag;
+    try { localStorage.setItem('jarvis.alsAuftrag', alsAuftrag ? '1' : '0'); } catch (e) { /* egal */ }
+    modusAnzeigen();
+    el.input.focus();
+  });
+  modusAnzeigen();
+
+  function sendeGespraech(text, wartend, warSprache) {
+    // Ein Zug, eine Antwort. Kein Plan-Kasten, keine Rückfrage, kein
+    // Abbruch — dafür gibt es den Auftrag. Das Budget gilt trotzdem: der
+    // Zug bekommt in api/routes.py dieselbe Buchhaltung wie ein Auftrag.
+    api('/api/chat', { method: 'POST', body: { message: text, voice: warSprache } })
+      .then(function (antwort) {
+        wartend.remove();
+        var knoten = messageNode('assistant', antwort.reply, antwort.tool_calls || []);
+        el.thread.appendChild(knoten);
+        scrollDown();
+        if (warSprache && antwort.reply) lieseVor(antwort.reply);
+        // Kein Eingriff in den Zähler „seit du weg warst": der zählt nur
+        // Nachrichten mit Herkunft (Zeitpläne). Ein eigener Zug hat keine.
+      })
+      .catch(function (err) {
+        wartend.remove();
+        appendError(err.message);
+      })
+      .then(function () {
+        setBusy(false);
+        el.input.focus();
+      });
+  }
+
   function send(text) {
     setBusy(true);
     el.hint.textContent = '';
@@ -2280,6 +2365,8 @@ button, input, textarea { font: inherit; color: inherit; }
 
     var warSprache = sprachModus;
     sprachModus = false;
+
+    if (!alsAuftrag) { sendeGespraech(text, wartend, warSprache); return; }
 
     api('/api/tasks', { method: 'POST', body: { goal: text, voice: warSprache } })
       .then(function (start) {

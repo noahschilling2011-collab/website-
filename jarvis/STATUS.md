@@ -4,7 +4,7 @@
 > und aktualisiert sie am Ende jeder Phase. Von Hand korrigieren ist erlaubt.
 
 AKTUELL: FIX-06 — COMMAND CENTER, siehe `docs/FIX-06.md`. Abschnitte 5 (Design-System), 6 (COMMAND CENTER) und 7 (WELT-NETZ) sind gebaut; **8 (MÄRKTE) steht aus und ist blockiert** — der Auftragstext dafür liegt nicht im Repo, nur der Name in der Kopfzeile von `docs/FIX-06.md`.
-LETZTE ÄNDERUNG: 2026-09-06 (FIX-11 Welle 1: Start prüft, sichert und migriert von selbst; Host-Sperre für die Seite mit dem Token; Grenzen an Modell-Argumenten; Erinnerungen im Formular, „in 20 minuten", eigener Deckel-Topf, Ton/Meldung/Vorlesen, Zeitpläne nur noch READ — siehe `docs/FIX-11.md`. Davor FIX-09 mit Prüfrunde, 23 Funde behoben: der Assistent heißt Mehmet; Herkunft und Zustellung von Zeitplan-Ergebnissen, einmalige Erinnerungen auch aus dem Gespräch, Bremse für scheiternde Pläne, Wetter ohne Key, Vorlage Morgenlage — siehe `docs/FIX-09.md`. Davor FIX-08 mit zwei Prüfrunden.)
+LETZTE ÄNDERUNG: 2026-09-07 (FIX-11 Welle 2: jeder Auftrag bekommt einen Endzustand, auch wenn er stirbt; fremder Text wird an der Engstelle gerahmt; `fetch_url` holt nur genannte Adressen; **normale Nachrichten gehen über den Chat-Pfad** — ein Modellaufruf statt drei, mit Verlauf und Gedächtnisblock, Auftrag hinter einem Schalter — siehe `docs/FIX-11.md`. Davor Welle 1: Start prüft, sichert und migriert von selbst; Host-Sperre für die Seite mit dem Token; Grenzen an Modell-Argumenten; Erinnerungen im Formular, „in 20 minuten", eigener Deckel-Topf, Ton/Meldung/Vorlesen, Zeitpläne nur noch READ. Davor FIX-09 mit Prüfrunde, 23 Funde behoben — siehe `docs/FIX-09.md`. Davor FIX-08 mit zwei Prüfrunden.)
 
 > **Abweichung von der Arbeitsweise, auf Ansage:** es wurden alle Phasen
 > gebaut, nicht eine nach der anderen. Das widerspricht CLAUDE.md
@@ -2321,13 +2321,13 @@ von Hand — acht Tabellen, das Schema hatte zwölf. `lookups`,
 hätten auch gefehlt. Jetzt wird gezählt, was in der Datei ist;
 `tests/test_backup_zaehlt_alles.py` hält das gegen `core/schema.sql`.
 
-## FIX-11 — Verlässlich, dicht, im Alltag brauchbar (Welle 1)
+## FIX-11 — Verlässlich, dicht, im Alltag brauchbar
 
 > Noah, 06.09.2026: „Mach weiter." Auswahl aus einer Vorschlagsrunde mit vier
 > Blickwinkeln und drei Richtern; Begründung, Paket und Belege in
 > `docs/FIX-11.md`. `FIX-10.md` ist die Messstrecke vom 27.08., deshalb FIX-11.
 
-**Gebaut (Punkte 1 bis 3 von 7).**
+### Welle 1 — Punkte 1 bis 3
 
 1. **Der Start prüft, sichert und migriert von selbst.** `PRAGMA quick_check`,
    dann eine Sicherung (immer vor einer anstehenden Migration, sonst einmal je
@@ -2366,8 +2366,41 @@ bestanden, Browser-Nachweis der Zustellung mit Stubs.
 darunter eine **stehengebliebene Mutation** (`PERMISSION_DECKEL = LOCAL  #
 MUTATION`) und ein Rauchtest, der nach der Host-Sperre 400 gab. Tabelle in
 `docs/FIX-11.md`.
-**Offen:** Punkte 4 bis 7 (Auftrag stirbt, Rahmen um fremden Text,
-`fetch_url`-Herkunft, Chat-Pfad statt Auftrag je Nachricht).
+### Welle 2 — Punkte 4 bis 7
+
+6. **Jeder Auftrag bekommt einen Endzustand, auch wenn er stirbt.** Starb der
+   Prozess mitten im Lauf, stand der Task für immer auf `running`.
+   `core.db.tote_tasks_beenden` räumt beim Start auf: `failed` mit Grund,
+   angefangene Schritte `skipped`, eine Zeile im Verlauf (bei alten Leichen
+   höchstens eine Sammelzeile).
+7. **Fremder Text wird an der Engstelle gerahmt**, nicht je Werkzeug — eine
+   Stelle statt sieben, die man einzeln vergessen kann.
+8. **`fetch_url` holt nur Adressen, die jemand genannt hat.**
+9. **Normale Nachrichten gehen über den Chat-Pfad.** Bisher schickte die
+   Oberfläche **jede** Nachricht als Auftrag: drei Modellaufrufe je „Hallo",
+   und weder Planner noch Schritt sahen den Verlauf. Der Gedächtnisblock hängt
+   an `/api/chat` und wurde vom Browser nie gerufen — Mehmet hatte über die
+   Oberfläche **nie** sein Langzeitgedächtnis. Jetzt entscheidet ein Schalter
+   im Composer: **Gespräch** (Vorgabe, ein Aufruf, mit Verlauf und
+   Gedächtnisblock) oder **Auftrag** (Plan, Schritte, Rückfragen — unverändert).
+   Dazu `voice` an `/api/chat` (additiv), ein Herkunfts-Präfix für zugestellte
+   Zeitplan-Nachrichten im Modellverlauf, und das Alter der letzten Sicherung
+   in der Statuszeile.
+
+**Ausgeführt (Welle 2):** `tests/test_fix11_chat.py` mit 28 Tests (18
+Backend/node, 10 Chromium), volle Suite **1909 grün**, `scripts.smoke`
+bestanden, sechs Mutationsproben — darunter „Auftrag statt Gespräch als
+Vorgabe", die 8 von 9 UI-Tests rot macht.
+**Drei bestehende Command-Center-Tests** messen Zusagen des Auftragspfads und
+sind darauf festgenagelt (Klick auf `#btn-modus`); dieselben Zusagen für den
+Chat-Pfad stehen als **eigene** Tests daneben — keine Assertion wurde
+abgeschwächt.
+Die offene Entscheidung aus `docs/FIX-01.md` (`/api/chat` löschen oder
+behalten?) ist damit beantwortet: keiner der drei Wege, sondern ein vierter —
+beide Pfade bleiben und teilen sich die Arbeit.
+
+**Offen:** nichts aus dem Paket. Grenzen, die bleiben, stehen in
+`docs/FIX-11.md`.
 
 ## FIX-09 — Was ein JARVIS wirklich braucht
 

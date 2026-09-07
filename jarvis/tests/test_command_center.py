@@ -385,6 +385,13 @@ def test_der_reaktor_zeigt_den_lauf_und_danach_das_ergebnis(server):
             seite.wait_for_timeout(200)
             assert seite.get_attribute(".brand-mark", "data-zustand") == "ruhe"
 
+            # Seit FIX-11 ist das Gespraech die Vorgabe. Dieser Test misst den
+            # Reaktor "am echten Auftrag", also wird dorthin geschaltet; sonst
+            # ist der Zug so kurz, dass "denkt" zwischen wait_for_function und
+            # get_attribute schon wieder vorbei ist. Dass der Chat-Pfad
+            # ebenfalls "denkt" zeigt, belegt test_fix11_chat.py rennfrei.
+            if seite.inner_text("#btn-modus").strip() != "Auftrag":
+                seite.click("#btn-modus")
             seite.fill("#input", "Wie spaet ist es?")
             seite.press("#input", "Enter")
             # Waehrend der Auftrag laeuft, ist es nicht mehr Ruhe.
@@ -549,6 +556,13 @@ def _chat_mit_kaputtem_task_abruf(seite, basis):
     _warte_auf_cc(seite, basis)
     seite.click("#tab-chat")
     seite.wait_for_timeout(300)
+    # Seit FIX-11 geht eine normale Nachricht ueber /api/chat. Der Aussetzer
+    # aus Fund 2 und 4 sitzt aber im Auftragspfad, also wird hier bewusst
+    # dorthin geschaltet. Die gleiche Zusage fuer den Chat-Pfad steht in
+    # tests/test_fix11_chat.py - beide Wege muessen sie halten.
+    if seite.inner_text("#btn-modus").strip() != "Auftrag":
+        seite.click("#btn-modus")
+    assert seite.inner_text("#btn-modus").strip() == "Auftrag"
     seite.fill("#input", "Wie spaet ist es?")
     seite.press("#input", "Enter")
     seite.wait_for_selector("#thread .msg-error", timeout=20000, state="attached")
