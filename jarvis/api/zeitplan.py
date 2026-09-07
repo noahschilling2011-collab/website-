@@ -42,7 +42,7 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from api.security import require_token
-from api.tasks import starte_task
+from api.tasks import STOERUNG_GRUND, starte_task
 from core import db, zeitplan
 from core.contracts import Task, TaskBudget
 from core.fehlertexte import ohne_geheimnis
@@ -227,8 +227,13 @@ async def starte_plan(app: FastAPI, plan: dict[str, Any], *, ausloeser: str,
 
     async def am_ende(fertig: Task) -> None:
         _zeitplan_tasks(app).pop(fertig.id, None)
+        # FIX-11: eine Stoerung (kein Netz, 5xx, Ratenlimit) ist kein
+        # Fehlschlag DIESES Plans - `api/tasks.py` setzt dafuer einen
+        # eigenen Grund. Ohne diese Unterscheidung hat dreimal kein Netz
+        # die Morgenlage ausgeschaltet, obwohl an ihr nichts falsch war.
+        stoerung = (fertig.abort_reason or "") == STOERUNG_GRUND
         await asyncio.to_thread(zeitplan.nachtrag_ergebnis, pfad, fertig.id,
-                                fertig.status)
+                                fertig.status, stoerung=stoerung)
 
     try:
         await starte_task(app, plan["ziel"], task=task,

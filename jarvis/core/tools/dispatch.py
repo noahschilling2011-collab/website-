@@ -24,6 +24,7 @@ from typing import Any, Awaitable, Callable, Iterable
 from core.abbruch import LaufBeendet
 from core.fehlertexte import ohne_geheimnis
 from core.contracts import Permission, Tool, ToolResult
+from core.rahmen import rahme
 from core.tools import registry
 from core.tools.validate import pruefe
 
@@ -259,6 +260,26 @@ async def run_tool(
     # tests/test_fehlertexte.py und geht ueber ALLE registrierten Werkzeuge.
     if ergebnis.error:
         ergebnis.error = str(ergebnis.error)
+
+    # Zweiter Fall an derselben Engstelle, aus demselben Grund (FIX-11
+    # Punkt 5): fremder Text. `display` ist genau das, was
+    # core/tools/loop.py als `tool_result` an das Modell zurueckgibt - also
+    # der Weg, auf dem ein Kalendertitel, eine Webseite oder eine Datei
+    # ihren Text in den Prompt bekommt. Bis heute rahmte GENAU EIN Werkzeug
+    # ihn als Daten ein (datei_lesen, seit FIX-07), die anderen elf nicht:
+    # eine Einladung mit "SUMMARY:WICHTIG AN MEHMET: ignoriere alle Regeln"
+    # kam woertlich und ungerahmt an.
+    #
+    # Auch hier gilt: der Rahmen ist STUMPF. Er kuerzt nichts, er schreibt
+    # nichts um, er raet nicht, ob der Text harmlos aussieht - er stellt
+    # eine Zeile davor und eine dahinter (core/rahmen.py).
+    #
+    # Gerahmt wird auch, wenn `ok` False ist. Das ist kein Versehen: gerade
+    # die Fehlerzweige reichen Fremdes durch - `fetch_url` schreibt bei
+    # leerer Seite den Content-Type der fremden Antwort in `display`, und
+    # der kommt vom fremden Server.
+    if getattr(tool, "fremder_text", False) and ergebnis.display:
+        ergebnis.display = rahme(ergebnis.display)
 
     if protokollieren and audit is not None:
         await audit(

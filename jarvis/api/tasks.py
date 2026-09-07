@@ -21,7 +21,8 @@ from pydantic import BaseModel, Field
 from api.security import require_token
 from core import db, memory
 from core.contracts import Permission, Step, StepStatus, Task, TaskBudget, Tool
-from core.llm import LLMReply
+from core.fehlertexte import ohne_geheimnis
+from core.llm import LLMError, LLMReply
 from core.agents import SPRACHSTIL
 from core.runner import Laufzeit, fuehre_task_aus
 from core.tools.dispatch import ToolCall
@@ -45,6 +46,16 @@ class Bestaetigen(BaseModel):
 # 0.5 / Phase 5: unbeantwortete Rueckfragen laufen nach zehn Minuten ab.
 # Danach gilt der Task als abgebrochen - nicht als bestaetigt.
 BESTAETIGUNG_TIMEOUT_S = 600
+
+# FIX-11: eine Stoerung ist kein Fehler des Auftrags. Kein Netz, ein 5xx
+# oder ein Ratenlimit (`LLMError.retryable`) heisst: nichts ist passiert,
+# gleich noch einmal. `api/zeitplan.am_ende` liest genau diesen Grund und
+# zaehlt den Lauf dann NICHT als Fehlschlag - sonst pausiert dreimal kein
+# Netz die Morgenlage.
+STOERUNG_GRUND = "Stoerung: Anbieter nicht erreichbar"
+STOERUNG_ANTWORT = ("Der Modellanbieter war gerade nicht erreichbar, deshalb "
+                    "habe ich den Auftrag nicht zu Ende gebracht. Es liegt "
+                    "nicht an deinem Auftrag - versuch es gleich noch einmal.")
 
 
 @dataclass
@@ -313,6 +324,13 @@ async def starte_task(app: FastAPI, ziel: str, *, voice: bool = False,
     registry.add(eintrag)
 
     async def lauf() -> None:
+        async def zustand_sichern() -> None:
+            """Ein Schreibversuch, der den Nachlauf nicht mitreisst."""
+            try:
+                await asyncio.to_thread(db.save_task, settings.db_path, task)
+            except Exception:  # noqa: BLE001
+                log.exception("task %s: Zustand nicht geschrieben", task.id)
+
         try:
             await fuehre_task_aus(
                 app.state.provider,
@@ -329,11 +347,31 @@ async def starte_task(app: FastAPI, ziel: str, *, voice: bool = False,
             task.abort_reason = "Abgebrochen."
             await asyncio.to_thread(db.save_task, settings.db_path, task)
             raise
+        except LLMError as exc:
+            # VOR `except Exception`, weil ein Anbieterfehler zwei Dinge
+            # anders macht: eine Stoerung (kein Netz, 5xx, 429) bekommt einen
+            # eigenen Grund - der Zeitplan zaehlt sie dann nicht als
+            # Fehlschlag -, und die uebrigen LLMError-Texte kommen aus
+            # core/llm.py, enthalten keinen Key und helfen weiter
+            # ("Stimmt LLM_API_KEY?"). Sie bleiben deshalb, wie sie sind.
+            log.warning("task %s: Modellaufruf gescheitert (%s): %s",
+                        task.id, exc.kind, exc)
+            task.status = "failed"
+            if exc.retryable:
+                task.abort_reason = STOERUNG_GRUND
+                task.result = STOERUNG_ANTWORT
+            else:
+                task.result = str(exc)
+            await zustand_sichern()
         except Exception as exc:  # noqa: BLE001 - der Task darf den Server nicht mitreissen
             log.exception("task %s ist ausgestiegen", task.id)
             task.status = "failed"
-            task.result = f"{type(exc).__name__}: {exc}"
-            await asyncio.to_thread(db.save_task, settings.db_path, task)
+            # FIX-11: hier stand `f"{type(exc).__name__}: {exc}"`. Ein
+            # OSError haengt den vollen Pfad an, httpx die volle URL - und
+            # der Text ging als Antwort in den Chat, in `tasks.result`, ins
+            # `task_log` und beim naechsten Zug als Verlauf an den Anbieter.
+            task.result = ohne_geheimnis(exc, "Der Auftrag ist abgebrochen")
+            await zustand_sichern()
         finally:
             antwort = (task.result or task.abort_reason or "Kein Ergebnis.").strip()
             # Die Nachlaeufe einzeln absichern: wirft einer (Datenbank
@@ -359,23 +397,33 @@ async def starte_task(app: FastAPI, ziel: str, *, voice: bool = False,
                 )
             except Exception:  # noqa: BLE001
                 log.exception("task %s: task_log nicht geschrieben", task.id)
-            # Jetzt erst: der Task ist fertig UND alles ist geschrieben.
-            await asyncio.to_thread(db.save_task, settings.db_path, task)
-            app.state.events.publish("task", {
-                "id": task.id, "goal": task.goal, "status": task.status,
-                "depth": task.depth, "spent_tokens": task.spent_tokens,
-                "spent_cost_eur": round(task.spent_cost_eur, 6),
-                "spent_tool_calls": task.spent_tool_calls,
-                "result": task.result, "abort_reason": task.abort_reason,
-                "herkunft": herkunft,
-                "final": True,
-            })
-            registry.remove(task.id)
-            if am_ende is not None:
+            # FIX-11: Endzustand und Ereignis standen hier UNGESCHUETZT vor
+            # `registry.remove`. Scheiterte der letzte Schreibvorgang (volle
+            # Platte), blieb der Task fuer immer in der Registry: die
+            # Uebersicht meldete 50.000 Token reserviert, und jeder Zeitplan
+            # bekam 409 - bis zum Neustart. Aufraeumen passiert jetzt in
+            # einem eigenen `finally`, damit es auch dann laeuft.
+            try:
+                await zustand_sichern()
                 try:
-                    await am_ende(task)
-                except Exception:  # noqa: BLE001 - der Task ist schon fertig
-                    log.exception("task %s: am_ende ist ausgestiegen", task.id)
+                    app.state.events.publish("task", {
+                        "id": task.id, "goal": task.goal, "status": task.status,
+                        "depth": task.depth, "spent_tokens": task.spent_tokens,
+                        "spent_cost_eur": round(task.spent_cost_eur, 6),
+                        "spent_tool_calls": task.spent_tool_calls,
+                        "result": task.result, "abort_reason": task.abort_reason,
+                        "herkunft": herkunft,
+                        "final": True,
+                    })
+                except Exception:  # noqa: BLE001
+                    log.exception("task %s: Ereignis nicht veroeffentlicht", task.id)
+            finally:
+                registry.remove(task.id)
+                if am_ende is not None:
+                    try:
+                        await am_ende(task)
+                    except Exception:  # noqa: BLE001 - der Task ist schon fertig
+                        log.exception("task %s: am_ende ist ausgestiegen", task.id)
 
     eintrag.future = asyncio.create_task(lauf())
     return task

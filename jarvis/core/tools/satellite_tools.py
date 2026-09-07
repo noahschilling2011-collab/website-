@@ -13,18 +13,22 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import time
 from datetime import datetime, timedelta, timezone
 from dataclasses import replace
 from pathlib import Path
 
+import httpx
+
 from core.fehlertexte import ohne_geheimnis
 from core.contracts import Permission, Tool, ToolResult
 from core.satellite.analysis import grenzsatz, vergleichbar, vergleiche_raster
-from core.orte import OrtFehler, aus_tabelle, bbox_um, finde_ort
+from core.orte import NAME_MAX, OrtFehler, aus_tabelle, bbox_um, finde_ort
 from core.satellite.bilder import BildFehler
 from core.satellite.bilder import speichere as speichere_bild
 from core.satellite.ueberflug import (
+    MAX_SATELLITEN,
     MINDESTHOEHE_GRAD,
     STANDARDGRUPPE,
     UeberflugFehler,
@@ -55,6 +59,36 @@ BBOX_SCHEMA = {
     ),
     "items": {"type": "number"},
 }
+
+
+def _endliche_zahlen(werte, feld: str) -> list[float]:
+    """Die Rasterwerte als endliche Zahlen - oder ein ValueError mit einem Satz.
+
+    Der Dispatcher prueft das Schema und faengt Zeichenketten, `null` und
+    eine zu kleine `resolution_m` schon ab (core/tools/validate.py).
+    NaN und Infinity kommen durch: sie SIND Zahlen vom Typ float. Gemessen
+    ueber `run_tool` mit `before=[nan]*100`: das Werkzeug antwortete ok=True
+    und schrieb "Mittlere Aenderung +nan" in den Chat, und in `data` stand
+    `NaN` - das ist kein gueltiges JSON (`json.dumps(..., allow_nan=False)`
+    wirft), also bricht jeder strenge Leser der HTTP-Antwort daran.
+
+    Ein NDVI liegt zwischen -1 und 1. Was nicht einmal endlich ist, ist kein
+    Messwert, und daraus eine Hektarzahl zu rechnen waere erfundene Genauigkeit.
+    """
+    try:
+        zahlen = [float(w) for w in werte]
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"{feld} muss eine Liste von Zahlen sein - die NDVI-Werte des "
+            f"Rasters."
+        ) from exc
+    if any(not math.isfinite(z) for z in zahlen):
+        raise ValueError(
+            f"In {feld} stehen Werte, die keine Zahl sind (NaN oder "
+            f"unendlich). Damit laesst sich keine Flaeche rechnen; ein "
+            f"NDVI-Wert liegt zwischen -1 und 1."
+        )
+    return zahlen
 
 
 def _bbox(werte) -> tuple[float, float, float, float]:
@@ -100,6 +134,8 @@ class SatelliteSearch(Tool):
     }
     permission = Permission.READ
     timeout_s = 60
+    # Szenennamen und Sammlungsbezeichner kommen aus dem CDSE-Katalog.
+    fremder_text = True
 
     provider: CDSEProvider | None = None
     # Wird beim Start gesetzt, wie bei remember/recall.
@@ -285,8 +321,15 @@ class SatelliteCompare(Tool):
                               duration_ms=dauer())
 
         try:
+            if not math.isfinite(resolution_m) or resolution_m <= 0:
+                raise ValueError(
+                    "resolution_m muss eine positive Zahl sein - Meter je "
+                    "Pixel der Szene, aus der die Werte stammen."
+                )
             ergebnis = vergleiche_raster(
-                list(before), list(after), aufloesung_m=resolution_m
+                _endliche_zahlen(before, "before"),
+                _endliche_zahlen(after, "after"),
+                aufloesung_m=resolution_m,
             )
         except ValueError as exc:
             return ToolResult(ok=False, error=str(exc), display=str(exc),
@@ -368,6 +411,9 @@ class SatellitePasses(Tool):
     }
     permission = Permission.READ
     timeout_s = 60
+    # Die Satellitennamen stammen aus den TLE-Bahndaten von Celestrak,
+    # also von draussen, und stehen im Steckbrief jedes Ueberflugs.
+    fremder_text = True
 
     db_path: Path = PROJECT_ROOT / "data" / "jarvis.db"
 
@@ -410,18 +456,28 @@ class SatellitePasses(Tool):
             return ToolResult(ok=False, error=str(exc), display=str(exc),
                               duration_ms=dauer())
 
+        # `ueberfluege` rechnet hoechstens MAX_SATELLITEN Saetze durch
+        # (Notbremse gegen eine unerwartet grosse Antwort). Wer gedeckelt
+        # wird, erfaehrt es - eine Zahl im Kopf, die zu hoch ist, waere
+        # dieselbe stille Luege wie ein verschwiegener Termin.
+        geprueft = min(len(satelliten), MAX_SATELLITEN)
         kopf = (
             f"Ort {lat:.4f}, {lon:.4f} - naechste {stunden} h, "
             f"ab {min_elevation_deg:.0f} Grad ueber dem Horizont. "
-            f"{len(satelliten)} Satelliten der Gruppe {group!r} geprueft "
+            f"{geprueft} Satelliten der Gruppe {group!r} geprueft "
             f"({'frisch geholt' if frisch else 'aus dem Zwischenspeicher'})."
         )
+        if len(satelliten) > geprueft:
+            kopf += (
+                f" Die Bahndaten enthielten {len(satelliten)} Saetze; mehr "
+                f"als {MAX_SATELLITEN} rechne ich nicht durch."
+            )
         if not gefunden:
             # Kein Fehler. Ueber einem Pol kommt bei der ISS null heraus,
             # weil ihre Bahnneigung 51,6 Grad ist - das ist die Wahrheit.
             return ToolResult(
                 ok=True,
-                data={"passes": [], "geprueft": len(satelliten),
+                data={"passes": [], "geprueft": geprueft,
                       "gruppe": group, "stunden": stunden},
                 display=(
                     f"{kopf}\n\nKein Ueberflug in diesem Zeitfenster.\n\n"
@@ -436,7 +492,7 @@ class SatellitePasses(Tool):
             ok=True,
             data={
                 "passes": [u.als_dict() for u in gefunden],
-                "geprueft": len(satelliten),
+                "geprueft": geprueft,
                 "gruppe": group,
                 "stunden": stunden,
             },
@@ -487,8 +543,14 @@ class OrtFinden(Tool):
     }
     permission = Permission.READ
     timeout_s = 30
+    # Ortsnamen und Verwaltungsangaben kommen aus OpenStreetMap bzw.
+    # Wikidata - beides schreibt jeder, der dort mitmacht.
+    fremder_text = True
 
     kontakt: str = ""      # WIKI_KONTAKT, beim Start gesetzt
+    # Wie bei `wetter`: damit ein Test den Ausfall des fremden Dienstes mit
+    # httpx.MockTransport nachstellen kann, statt wirklich ins Netz zu gehen.
+    transport: httpx.AsyncBaseTransport | None = None
 
     async def execute(self, name: str, kante_km: float = 12.0) -> ToolResult:
         begonnen = time.monotonic()
@@ -496,8 +558,16 @@ class OrtFinden(Tool):
         def dauer() -> int:
             return int((time.monotonic() - begonnen) * 1000)
 
+        # Der Name kommt aus dem Modell und steht unten in JEDER Meldung.
+        # Gemessen am 07.09.2026: ein Name mit 200.000 Zeichen ergab einen
+        # `display` mit 200.468 Zeichen - der geht woertlich zurueck in den
+        # Prompt. `wetter` deckelt an derselben Stelle (ORT_MAX), hier fehlte
+        # es. Dieselbe Zahl, damit beide Werkzeuge gleich antworten.
+        kurz = str(name)[:NAME_MAX]
+
         try:
-            ort = await finde_ort(name, kontakt=self.kontakt)
+            ort = await finde_ort(name, kontakt=self.kontakt,
+                                  transport=self.transport)
         except OrtFehler as exc:
             # Ohne WIKI_KONTAKT geht nur die Tabelle. Das ist kein Grund,
             # gar nichts zu liefern - Laender und Hauptstaedte stehen drin.
@@ -507,7 +577,7 @@ class OrtFinden(Tool):
                 # irrefuehrend: der Ort steht ausserdem nicht in der
                 # eingebauten Tabelle, und das waere auch mit Kontakt so.
                 grund = (
-                    f"{name!r} steht nicht in der eingebauten Tabelle "
+                    f"{kurz!r} steht nicht in der eingebauten Tabelle "
                     f"(jedes Land, jede Hauptstadt), und live nachschlagen "
                     f"geht auch nicht: {exc}"
                 )
@@ -519,14 +589,26 @@ class OrtFinden(Tool):
                 ok=False,
                 error="Ort nicht gefunden.",
                 display=(
-                    f"Kein Ort namens {name!r} gefunden. Jedes Land und jede "
+                    f"Kein Ort namens {kurz!r} gefunden. Jedes Land und jede "
                     f"Hauptstadt ist eingebaut; alles andere kommt von "
                     f"Wikidata - vielleicht anders geschrieben?"
                 ),
                 duration_ms=dauer(),
             )
 
-        box = bbox_um(ort.lat, ort.lon, kante_km=float(kante_km))
+        # Der Deckel steht im Schema, aber das Werkzeug soll auch ohne den
+        # Dispatcher nicht platzen - wie bei `wetter`. Gemessen: kante_km=-3
+        # liess OrtFehler roh nach oben fliegen, kante_km="viel" ValueError,
+        # kante_km=None TypeError. `NaN` kam sogar durch das Schema, weil
+        # jeder Vergleich mit NaN False ist (jetzt in bbox_um abgewiesen).
+        try:
+            box = bbox_um(ort.lat, ort.lon, kante_km=float(kante_km))
+        except (OrtFehler, TypeError, ValueError) as exc:
+            text = ("Die Kantenlaenge ergibt keinen Ausschnitt. Nenn eine "
+                    "Zahl zwischen 0,5 und 2000 (Kilometer).")
+            log.warning("find_place: kante_km unbrauchbar (%r): %s", kante_km, exc)
+            return ToolResult(ok=False, error=text, display=text,
+                              duration_ms=dauer())
         aufloesung = effektive_aufloesung_m(box, BILD_KANTE, BILD_KANTE)
         return ToolResult(
             ok=True,
@@ -536,6 +618,14 @@ class OrtFinden(Tool):
                 f"{ort.name}: {ort.lat:.4f}, {ort.lon:.4f}"
                 + (f" ({ort.art}, {ort.iso3})" if ort.art else "")
                 + (f", {ort.einwohner} Einwohner" if ort.einwohner else "")
+                # Die Mehrdeutigkeit stand bisher nur in `data`, und `data`
+                # sieht das Modell nicht. Gemessen (core/orte.py): "São
+                # Paulo" liefert nach Einwohnern sortiert den STAAT, nicht
+                # die Stadt - wer das nicht erfaehrt, fliegt 200 km daneben.
+                + (f"\nAchtung: {ort.weitere_treffer} weitere(r) Treffer mit "
+                   f"diesem Namen; der groesste gewinnt. Wenn ein anderer "
+                   f"gemeint ist, genauer benennen."
+                   if ort.weitere_treffer else "")
                 + f"\nAusschnitt {kante_km:.0f} km: bbox="
                 + "[" + ", ".join(f"{x:.4f}" for x in box) + "]"
                 + f"\nDaraus wuerden {aufloesung:.0f} m je Bildpixel - "

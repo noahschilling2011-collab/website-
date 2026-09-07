@@ -607,3 +607,850 @@ def test_der_grenzhinweis_steht_im_werkzeugergebnis():
     # Der allgemeine Grenzsatz bleibt in beiden Faellen stehen.
     for r in (klein, gross):
         assert "nicht beurteilbar" in r.display
+
+
+# ===========================================================================
+# FIX-12, Gruppe 4: was passiert, wenn CDSE und CelesTrak fehlen
+# ===========================================================================
+#
+# Der Auftrag: "Features muessen auch dann stabil bleiben, wenn folgende
+# Dienste fehlen: echtes LLM, CDSE, externer Kalender, externe APIs.
+# Fehlende Dienste duerfen keinen Crash des Gesamtsystems verursachen."
+#
+# Nachgestellt wird jeder Ausfall mit `httpx.MockTransport` - kein Netz.
+# Gemessen VOR der Reparatur (ueber `run_tool`, also auf dem Weg, den das
+# Modell wirklich nimmt):
+#
+#   Katalog-Timeout      -> ReadTimeout flog aus dem Werkzeug,
+#                           "satellite_search ist mit einem Fehler ausgestiegen"
+#   Katalog kaputtes JSON-> JSONDecodeError, dieselbe Meldung
+#   Katalog value=null   -> ok=True, "Kein Sentinel-2-Bild unter 20 % Wolken"
+#                           (eine Auskunft, die es so nicht gab)
+#   Bilddienst weg       -> ConnectError, die schon gefundene Szene war weg
+#   CelesTrak weg        -> ConnectError, "satellite_passes ist mit einem
+#                           Fehler ausgestiegen"
+#
+# Zwei Zusagen laufen mit: kein Wurf schlaegt nach oben durch, und weder
+# Secret noch Token stehen jemals in einer Ausgabe.
+
+import json as _json
+from unittest import mock as _mock
+
+GEHEIM_ID = "KUNDE-GEHEIM-xyz"
+GEHEIM_SECRET = "SECRET-GEHEIM-xyz"
+GEHEIM_TOKEN = "TOKEN-GEHEIM-xyz"
+CDSE_GEHEIMNISSE = [GEHEIM_ID, GEHEIM_SECRET, GEHEIM_TOKEN]
+
+EIN_TREFFER = {"value": [
+    {"Id": "neu", "ContentDate": {"Start": "2026-08-20T10:00:00.000Z"},
+     "Attributes": [{"Name": "cloudCover", "Value": 3.0},
+                    {"Name": "instrumentShortName", "Value": "MSI"}]},
+]}
+PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 200
+
+
+def _wirft(klasse, text="kaputt"):
+    def handler(request):
+        raise klasse(text, request=request)
+    return handler
+
+
+def _cdse(token_h=None, katalog_h=None, bild_h=None):
+    """Ein Transport, der die drei CDSE-Endpunkte auseinanderhaelt."""
+    def token_standard(r):
+        return httpx.Response(200, request=r,
+                              json={"access_token": GEHEIM_TOKEN,
+                                    "expires_in": 600})
+
+    def katalog_standard(r):
+        return httpx.Response(200, request=r, json=EIN_TREFFER)
+
+    def bild_standard(r):
+        return httpx.Response(200, request=r, content=PNG,
+                              headers={"content-type": "image/png"})
+
+    def handler(request):
+        adresse = str(request.url)
+        if "token" in adresse:
+            return (token_h or token_standard)(request)
+        if "sh.dataspace" in adresse:
+            return (bild_h or bild_standard)(request)
+        return (katalog_h or katalog_standard)(request)
+
+    return httpx.MockTransport(handler)
+
+
+def _leckt_cdse(ergebnis) -> list[str]:
+    text = (f"{ergebnis.display or ''} {ergebnis.error or ''} "
+            f"{_json.dumps(ergebnis.data, default=str)}")
+    return [g for g in CDSE_GEHEIMNISSE if g in text]
+
+
+def _suche(satellit, tmp_path, transport, **kw):
+    satellit.provider = CDSEProvider(GEHEIM_ID, GEHEIM_SECRET,
+                                     transport=transport)
+    satellit.db_path = tmp_path / "jarvis.db"
+    return run(run_tool("satellite_search", {"bbox": list(BBOX), **kw}))
+
+
+# --- Fall 1 und 2: Zeitueberschreitung und Verbindungsfehler --------------
+
+
+@pytest.mark.parametrize("klasse", [
+    httpx.ReadTimeout, httpx.TimeoutException, httpx.ConnectTimeout,
+    httpx.ConnectError, httpx.ReadError,
+])
+def test_ein_katalogausfall_ist_eine_auskunft_und_kein_absturz(
+    klasse, satellit_ohne_netz, tmp_path
+):
+    e = _suche(satellit_ohne_netz, tmp_path, _cdse(katalog_h=_wirft(klasse)))
+    assert e.ok is False
+    assert "ausgestiegen" not in (e.error or ""), e.error
+    assert "CDSE" in (e.error or "")
+    assert klasse.__name__ in (e.error or "")
+    assert _leckt_cdse(e) == [], _leckt_cdse(e)
+
+
+def test_ein_timeout_wird_als_zeitueberschreitung_benannt():
+    """Ein Dienst, der nicht antwortet, ist etwas anderes als einer, der
+    nicht erreichbar ist - beim ersten hilft warten."""
+    provider = CDSEProvider(GEHEIM_ID, GEHEIM_SECRET,
+                            transport=_cdse(katalog_h=_wirft(httpx.ReadTimeout)))
+    with pytest.raises(CDSEFehler, match="nicht innerhalb"):
+        run(provider.search(BBOX, JETZT - timedelta(days=30), JETZT))
+
+
+@pytest.mark.parametrize("klasse", [httpx.ReadTimeout, httpx.ConnectError])
+def test_ein_ausfall_des_bilddienstes_wirft_die_szene_nicht_weg(
+    klasse, satellit_ohne_netz, tmp_path
+):
+    """Der Code sagt selbst: "Kein Grund, den ganzen Aufruf scheitern zu
+    lassen: die Metadaten sind da und sind etwas wert." Fuer CDSEFehler galt
+    das auch - fuer einen Netzausfall nicht: der ConnectError lief an dem
+    `except` vorbei und riss die schon gefundene Szene mit."""
+    e = _suche(satellit_ohne_netz, tmp_path, _cdse(bild_h=_wirft(klasse)))
+    assert e.ok is True, e.error
+    assert e.data["scenes"][0]["scene_id"] == "neu"
+    assert e.data["preview_url"] is None
+    assert "Kein Bild gerendert" in e.display
+    assert _leckt_cdse(e) == [], _leckt_cdse(e)
+
+
+# --- Fall 3 und 4: HTTP 500, HTTP 429 mit und ohne Retry-After ------------
+
+
+@pytest.mark.parametrize("status,kopfzeilen", [
+    (500, {}), (502, {}), (429, {}), (429, {"Retry-After": "60"}),
+    (403, {}),
+])
+def test_ein_fehlerstatus_des_katalogs_nennt_die_zahl(
+    status, kopfzeilen, satellit_ohne_netz, tmp_path
+):
+    e = _suche(satellit_ohne_netz, tmp_path, _cdse(
+        katalog_h=lambda r: httpx.Response(status, request=r,
+                                           headers=kopfzeilen)))
+    assert e.ok is False
+    assert f"HTTP {status}" in (e.error or "")
+    assert _leckt_cdse(e) == [], _leckt_cdse(e)
+
+
+@pytest.mark.parametrize("status", [401, 429, 500])
+def test_ein_fehlerstatus_beim_token_gilt_nicht_als_erfolg(
+    status, satellit_ohne_netz, tmp_path
+):
+    """Ohne Token gibt es kein Bild - aber die Metadaten bleiben. Wichtig
+    ist, dass daraus kein stiller Erfolg wird: `preview_url` bleibt None und
+    es steht dabei, dass kein Bild kam."""
+    e = _suche(satellit_ohne_netz, tmp_path, _cdse(
+        token_h=lambda r: httpx.Response(status, request=r,
+                                         json={"error": "invalid_client"})))
+    assert e.ok is True
+    assert e.data["preview_url"] is None
+    assert "Kein Bild gerendert" in e.display
+    assert _leckt_cdse(e) == [], _leckt_cdse(e)
+
+
+# --- Fall 5: unerwartete Form --------------------------------------------
+
+
+@pytest.mark.parametrize("antwort", [
+    {"text": "{das ist kein json"},
+    {"text": "<html>Wartung</html>"},
+])
+def test_eine_katalogantwort_ohne_json_wird_gemeldet(
+    antwort, satellit_ohne_netz, tmp_path
+):
+    e = _suche(satellit_ohne_netz, tmp_path, _cdse(
+        katalog_h=lambda r: httpx.Response(200, request=r, **antwort)))
+    assert e.ok is False
+    assert "kein JSON" in (e.error or "")
+    assert "ausgestiegen" not in (e.error or "")
+
+
+@pytest.mark.parametrize("koerper", [
+    {"value": None},
+    {"value": "keine Liste"},
+    {"kein_value": 1},
+    [1, 2, 3],
+])
+def test_eine_kaputte_trefferliste_ist_kein_leeres_ergebnis(
+    koerper, satellit_ohne_netz, tmp_path
+):
+    """Der gefaehrlichste der sechs Faelle: vorher kam bei `value: null`
+    ok=True und "Kein Sentinel-2-Bild unter 20 % Wolken in den letzten 30
+    Tagen" heraus, samt Rat, das Suchfenster zu vergroessern. Das ist eine
+    Auskunft ueber Wolken, die es nie gegeben hat.
+
+    "Nichts gefunden" und "die Antwort war kaputt" sind zwei verschiedene
+    Dinge - genauso wie beim Kalender ein leerer und ein nicht eingerichteter
+    Kalender."""
+    e = _suche(satellit_ohne_netz, tmp_path, _cdse(
+        katalog_h=lambda r: httpx.Response(200, request=r, json=koerper)))
+    assert e.ok is False, e.display
+    assert "Kein Sentinel-2-Bild" not in e.display
+    assert "weiss es nur nicht" in (e.error or "") or "Form" in (e.error or "")
+
+
+@pytest.mark.parametrize("koerper", [
+    {"access_token": None},
+    {"foo": "bar"},
+    {"access_token": ""},
+])
+def test_eine_tokenantwort_ohne_token_gilt_nicht_als_zugang(koerper):
+    provider = CDSEProvider(GEHEIM_ID, GEHEIM_SECRET, transport=_cdse(
+        token_h=lambda r: httpx.Response(200, request=r, json=koerper)))
+    with pytest.raises(CDSEFehler, match="access_token"):
+        run(provider.token())
+
+
+@pytest.mark.parametrize("antwort", [
+    {"text": ""},
+    {"text": "{kaputt"},
+    {"json": [1, 2, 3]},
+])
+def test_eine_unlesbare_tokenantwort_wirft_keinen_json_fehler(antwort):
+    """Gemessen: `antwort.json()` warf `JSONDecodeError` bei leerem Koerper
+    und `.get()` einen `AttributeError`, wenn eine Liste kam. Beides lief
+    ungebremst durch das Werkzeug."""
+    provider = CDSEProvider(GEHEIM_ID, GEHEIM_SECRET, transport=_cdse(
+        token_h=lambda r: httpx.Response(200, request=r, **antwort)))
+    with pytest.raises(CDSEFehler):
+        run(provider.token())
+
+
+def test_ein_katalogtreffer_in_falscher_form_kippt_die_suche_nicht():
+    """Zeichenketten statt Objekten, `ContentDate` als Liste, `Attributes`
+    als Text - alles gemessen und alles vorher ein AttributeError."""
+    kaputt = {"value": [
+        "nur text", 42, None,
+        {"Id": "x", "ContentDate": ["2026-08-20"], "Attributes": []},
+        {"Id": "y", "ContentDate": {"Start": "2026-08-20T10:00:00.000Z"},
+         "Attributes": "keine Liste"},
+        {"Id": "gut", "ContentDate": {"Start": "2026-08-20T10:00:00.000Z"},
+         "Attributes": [{"Name": "cloudCover", "Value": 3.0}]},
+    ]}
+    provider = CDSEProvider(GEHEIM_ID, GEHEIM_SECRET, transport=_cdse(
+        katalog_h=lambda r: httpx.Response(200, request=r, json=kaputt)))
+    szenen = run(provider.search(BBOX, JETZT - timedelta(days=30), JETZT))
+    assert [s.scene_id for s in szenen] == ["gut"]
+
+
+def test_attribute_die_sich_gar_nicht_durchlaufen_lassen(monkeypatch):
+    """Nachgetragen bei der Abnahme. Der Test darueber deckt `Attributes` als
+    Text ab - und blieb gruen, als die Formpruefung entfernt wurde: ueber
+    eine Zeichenkette laesst sich laufen, jedes Zeichen ist nur kein `dict`.
+
+    Eine Zahl ist der Fall, der wirklich bricht: `for att in 42` wirft
+    TypeError, und der kaeme roh aus dem Werkzeug heraus.
+    """
+    kaputt = {"value": [
+        {"Id": "zahl", "ContentDate": {"Start": "2026-08-20T10:00:00.000Z"},
+         "Attributes": 42},
+        {"Id": "null", "ContentDate": {"Start": "2026-08-20T10:00:00.000Z"},
+         "Attributes": None},
+        {"Id": "gut", "ContentDate": {"Start": "2026-08-20T10:00:00.000Z"},
+         "Attributes": [{"Name": "cloudCover", "Value": 3.0}]},
+    ]}
+    provider = CDSEProvider(GEHEIM_ID, GEHEIM_SECRET, transport=_cdse(
+        katalog_h=lambda r: httpx.Response(200, request=r, json=kaputt)))
+    szenen = run(provider.search(BBOX, JETZT - timedelta(days=30), JETZT))
+    # Ohne Bewoelkungsangabe faellt eine Szene durch den Schwellwert; keine
+    # davon darf das Werkzeug zum Absturz bringen.
+    assert "gut" in [s.scene_id for s in szenen]
+
+
+def _top(url: str) -> str | None:
+    """Der Wert von `$top` aus einer Katalogadresse, exakt."""
+    import urllib.parse
+
+    werte = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)
+    return (werte.get("$top") or [None])[0]
+
+
+def test_der_katalog_bestellt_hoechstens_fuenfzig_treffer():
+    """`$top` ist die Bestellmenge. Ein Modell, das `limit=5000` schreibt,
+    darf nicht 5.000 Produkte anfordern - jedes davon wird ausgepackt und
+    bewertet. Die Zahl steht in der Adresse, also wird sie dort gemessen."""
+    gesehen: list[str] = []
+
+    def katalog(request: httpx.Request) -> httpx.Response:
+        gesehen.append(str(request.url))
+        return httpx.Response(200, request=request, json={"value": []})
+
+    provider = CDSEProvider(GEHEIM_ID, GEHEIM_SECRET,
+                            transport=_cdse(katalog_h=katalog))
+    run(provider.search(BBOX, JETZT - timedelta(days=30), JETZT, limit=5000))
+    assert gesehen, "der Katalog wurde gar nicht gefragt"
+    # Genau gelesen, nicht als Teilzeichenkette gesucht: "$top=50" steckt
+    # auch in "$top=5000", und der Test war damit gruen, obwohl der Deckel
+    # weg war.
+    assert _top(gesehen[0]) == "50", gesehen[0]
+
+
+def test_ein_kleiner_wunsch_bleibt_klein():
+    """Gegenprobe: der Deckel ist eine Obergrenze, keine Vorgabe."""
+    gesehen: list[str] = []
+
+    def katalog(request: httpx.Request) -> httpx.Response:
+        gesehen.append(str(request.url))
+        return httpx.Response(200, request=request, json={"value": []})
+
+    provider = CDSEProvider(GEHEIM_ID, GEHEIM_SECRET,
+                            transport=_cdse(katalog_h=katalog))
+    run(provider.search(BBOX, JETZT - timedelta(days=30), JETZT, limit=3))
+    assert _top(gesehen[0]) == "3", gesehen[0]
+
+
+# --- Fall 6: leere und sehr grosse Antwort -------------------------------
+
+
+def test_eine_leere_trefferliste_bleibt_ein_leeres_ergebnis(
+    satellit_ohne_netz, tmp_path
+):
+    """Gegenprobe zu `test_eine_kaputte_trefferliste_ist_kein_leeres_ergebnis`
+    - sonst waere jede Antwort ein Fehler."""
+    e = _suche(satellit_ohne_netz, tmp_path, _cdse(
+        katalog_h=lambda r: httpx.Response(200, request=r, json={"value": []})))
+    assert e.ok is True
+    assert e.data["scenes"] == []
+    assert "Kein Sentinel-2-Bild" in e.display
+
+
+def test_fuenfzigtausend_treffer_werden_nicht_ausgepackt(
+    satellit_ohne_netz, tmp_path
+):
+    """Gemessen: eine Katalogantwort mit 50.000 Treffern (8,9 MB) wurde
+    vollstaendig in 50.000 Szenenobjekte verwandelt, obwohl `$top` nach
+    zehn gefragt hatte - und der Kopf meldete dann "50000 Szene(n)
+    gefunden". Was ueber die eigene Bitte hinausgeht, wird gar nicht erst
+    ausgepackt."""
+    viele = {"value": [
+        {"Id": f"S2A_{i}", "ContentDate": {"Start": "2026-08-20T10:00:00.000Z"},
+         "Attributes": [{"Name": "cloudCover", "Value": 3.0}]}
+        for i in range(50_000)
+    ]}
+    provider = CDSEProvider(GEHEIM_ID, GEHEIM_SECRET, transport=_cdse(
+        katalog_h=lambda r: httpx.Response(200, request=r, json=viele)))
+    szenen = run(provider.search(BBOX, JETZT - timedelta(days=30), JETZT,
+                                 limit=10))
+    assert len(szenen) == 10, len(szenen)
+
+    e = _suche(satellit_ohne_netz, tmp_path, _cdse(
+        katalog_h=lambda r: httpx.Response(200, request=r, json=viele)))
+    assert e.ok is True
+    assert len(e.data["scenes"]) <= 5
+    assert len(e.display) < 5000, len(e.display)
+
+
+# --- Ohne Zugangsdaten, und der Token bleibt drinnen ----------------------
+
+
+def test_ohne_zugangsdaten_wird_nichts_geraten_und_nichts_geworfen(
+    satellit_ohne_netz, tmp_path
+):
+    """CDSE hat in diesem Projekt keine Zugangsdaten. Das ist der Normalfall
+    und muss ein Satz sein, kein Fehlerweg."""
+    satellit_ohne_netz.provider = CDSEProvider()
+    e = run(run_tool("satellite_search", {"bbox": list(BBOX)}))
+    assert e.ok is False
+    assert "CDSE_CLIENT_ID" in e.display
+    assert "ausgestiegen" not in (e.error or "")
+
+    satellit_ohne_netz.provider = None
+    e = run(run_tool("satellite_search", {"bbox": list(BBOX)}))
+    assert e.ok is False and "CDSE_CLIENT_ID" in e.display
+
+
+def test_ein_abgelaufener_token_steht_in_keiner_ausgabe(
+    satellit_ohne_netz, tmp_path
+):
+    """Der Token liegt im Speicher des Providers. Laeuft er ab und lehnt
+    CDSE die Erneuerung ab, ist der Weg zum Nutzer der Fehlerweg - und
+    genau dort darf er nicht auftauchen."""
+    provider = CDSEProvider(GEHEIM_ID, GEHEIM_SECRET, transport=_cdse(
+        token_h=lambda r: httpx.Response(401, request=r,
+                                         json={"error": "invalid_token"})))
+    provider._token = GEHEIM_TOKEN
+    provider._token_bis = time.monotonic() - 1          # abgelaufen
+    satellit_ohne_netz.provider = provider
+    satellit_ohne_netz.db_path = tmp_path / "jarvis.db"
+
+    e = run(run_tool("satellite_search", {"bbox": list(BBOX)}))
+    assert _leckt_cdse(e) == [], _leckt_cdse(e)
+    with pytest.raises(CDSEFehler) as fehler:
+        run(provider.token())
+    assert GEHEIM_TOKEN not in str(fehler.value)
+    assert GEHEIM_SECRET not in str(fehler.value)
+
+
+@pytest.mark.parametrize("wo", ["token", "katalog", "bild"])
+def test_kein_fehlerweg_verraet_secret_oder_token(wo, satellit_ohne_netz,
+                                                  tmp_path):
+    """Ueber alle drei Endpunkte, mit einer Ausnahme, die das Geheimnis
+    mitbringt - so, wie httpx es in freier Wildbahn tut."""
+    def platzt(request):
+        raise httpx.ConnectError(
+            f"connection failed to {request.url} (secret={GEHEIM_SECRET})",
+            request=request)
+
+    transport = _cdse(**{f"{wo}_h": platzt})
+    e = _suche(satellit_ohne_netz, tmp_path, transport)
+    assert _leckt_cdse(e) == [], _leckt_cdse(e)
+
+
+# --- satellite_passes: CelesTrak faellt aus ------------------------------
+
+
+def _passes_werkzeug(tmp_path, cache: str | None = None):
+    from core.satellite.ueberflug import cache_datei
+
+    werkzeug = registry.get("satellite_passes")
+    werkzeug.db_path = tmp_path / "jarvis.db"
+    if cache is not None:
+        ziel = cache_datei("visual", db_path=werkzeug.db_path)
+        ziel.parent.mkdir(parents=True, exist_ok=True)
+        ziel.write_text(cache, encoding="utf-8")
+    return werkzeug
+
+
+ISS_TLE = "\r\n".join([
+    "ISS (ZARYA)",
+    "1 25544U 98067A   26238.54791667  .00016717  00000-0  10270-3 0  9004",
+    "2 25544  51.6392 339.6224 0004612  86.5764 273.5714 15.50017523424692",
+]) + "\r\n"
+
+
+def _ohne_celestrak(handler):
+    echt = httpx.AsyncClient
+
+    def fake(*a, **k):
+        k["transport"] = httpx.MockTransport(handler)
+        return echt(*a, **k)
+
+    return _mock.patch("httpx.AsyncClient", fake)
+
+
+@pytest.mark.parametrize("klasse", [
+    httpx.ReadTimeout, httpx.TimeoutException, httpx.ConnectError,
+])
+def test_celestrak_weg_und_kein_cache_gibt_einen_satz(klasse, tmp_path):
+    """Vorher flog die httpx-Ausnahme aus dem Werkzeug: "satellite_passes ist
+    mit einem Fehler ausgestiegen"."""
+    _passes_werkzeug(tmp_path)
+    with _ohne_celestrak(_wirft(klasse)):
+        e = run(run_tool("satellite_passes", {"lat": 48.8, "lon": 9.79}))
+    assert e.ok is False
+    assert "ausgestiegen" not in (e.error or ""), e.error
+    assert "CelesTrak" in (e.error or "")
+    assert klasse.__name__ in (e.error or "")
+
+
+@pytest.mark.parametrize("klasse", [httpx.ReadTimeout, httpx.ConnectError])
+def test_celestrak_weg_aber_bahndaten_von_gestern_da(klasse, tmp_path):
+    """Fuer HTTP 500 stand es schon im Code: ein alter Cachestand ist besser
+    als keine Antwort. Fuer den Netzausfall galt es nicht - dabei ist er der
+    haeufigere Fall."""
+    werkzeug = _passes_werkzeug(tmp_path, cache=ISS_TLE)
+    import os
+    from core.satellite.ueberflug import cache_datei
+    os.utime(cache_datei("visual", db_path=werkzeug.db_path), (0, 0))
+
+    with _ohne_celestrak(_wirft(klasse)):
+        e = run(run_tool("satellite_passes", {"lat": 48.8, "lon": 9.79}))
+    assert e.ok is True, e.error
+    assert "Zwischenspeicher" in e.display
+    assert e.data["geprueft"] == 1
+
+
+@pytest.mark.parametrize("status,kopfzeilen", [
+    (500, {}), (429, {}), (429, {"Retry-After": "3600"}), (503, {}),
+])
+def test_ein_fehlerstatus_von_celestrak_wird_benannt(status, kopfzeilen,
+                                                     tmp_path):
+    _passes_werkzeug(tmp_path)
+    with _ohne_celestrak(lambda r: httpx.Response(status, request=r,
+                                                  headers=kopfzeilen)):
+        e = run(run_tool("satellite_passes", {"lat": 48.8, "lon": 9.79}))
+    assert e.ok is False
+    assert f"HTTP {status}" in (e.error or "")
+    assert "nicht erneut" in (e.error or "")
+
+
+@pytest.mark.parametrize("koerper,erwartet", [
+    ("", "leere Antwort"),
+    ("Invalid query: unknown group", "abgelehnt"),
+    ("<html>Wartung</html>", "kein einziger vollstaendiger TLE-Satz"),
+    ("ISS (ZARYA)\r\n1 25544U 98067A...\r\n", "kein einziger vollstaendiger"),
+])
+def test_eine_unbrauchbare_celestrak_antwort_wird_nicht_als_bahndaten_abgelegt(
+    koerper, erwartet, tmp_path
+):
+    """CelesTrak antwortet auf eine ungueltige Gruppe mit HTTP 200 und dem
+    Text "Invalid query" - der Status allein genuegt nicht."""
+    werkzeug = _passes_werkzeug(tmp_path)
+    with _ohne_celestrak(lambda r: httpx.Response(200, request=r,
+                                                  text=koerper)):
+        e = run(run_tool("satellite_passes", {"lat": 48.8, "lon": 9.79}))
+    assert e.ok is False
+    assert erwartet in (e.error or ""), e.error
+
+    from core.satellite.ueberflug import cache_datei
+    assert not cache_datei("visual", db_path=werkzeug.db_path).exists(), \
+        "Muell wurde als Bahndaten zwischengespeichert"
+
+
+def test_eine_unerwartet_grosse_bahndatenantwort_wird_gedeckelt(tmp_path):
+    """Gemessen: 10.000 TLE-Saetze brauchten 10,5 s fuer ein Fenster von
+    EINER Stunde; bei 24 h waere die Zeitgrenze des Werkzeugs (60 s)
+    gerissen - und `asyncio.to_thread` laesst sich nicht abbrechen, der
+    Server haette weitergerechnet.
+
+    Der Deckel muss ausserdem ehrlich sein: die Zahl im Kopf ist die der
+    wirklich gerechneten Satelliten, nicht die der gelieferten."""
+    from core.satellite.ueberflug import MAX_SATELLITEN
+
+    viele = "".join(
+        f"SAT {i}\r\n{ISS_TLE.splitlines()[1]}\r\n{ISS_TLE.splitlines()[2]}\r\n"
+        for i in range(MAX_SATELLITEN + 25)
+    )
+    _passes_werkzeug(tmp_path)
+    with _ohne_celestrak(lambda r: httpx.Response(200, request=r, text=viele)):
+        e = run(run_tool("satellite_passes",
+                         {"lat": 89.9, "lon": 0.0, "hours": 1}))
+    assert e.ok is True, e.error
+    assert e.data["geprueft"] == MAX_SATELLITEN
+    assert f"{MAX_SATELLITEN} Satelliten" in e.display
+    assert f"{MAX_SATELLITEN + 25} Saetze" in e.display
+
+
+def test_der_satellitendeckel_steht_auf_einer_abgesprochenen_zahl():
+    """Der Test darueber baut seine Bahndaten AUS `MAX_SATELLITEN` - er
+    bleibt deshalb gruen, wenn jemand die Zahl still hochsetzt, und genau
+    das ist bei der Abnahme passiert (Probe "Deckel still hochgesetzt").
+
+    Die Zahl ist gemessen und nicht geraten: 6,8 ms je Satellit fuer ein
+    24-h-Fenster, macht bei 1.000 Saetzen rund 6,8 s - Platz unter der
+    Zeitgrenze des Werkzeugs (60 s), mit Luft fuer eine langsamere
+    Maschine. Wer sie aendert, aendert diese Rechnung; diese Zeile macht
+    das sichtbar, statt es beim naechsten roten Test nebenbei zu tun.
+    """
+    from core.satellite.ueberflug import MAX_SATELLITEN
+
+    assert MAX_SATELLITEN == 1000
+
+
+def test_ohne_deckel_wird_nichts_beschnitten(tmp_path):
+    """Gegenprobe: die echten Gruppen (visual 157, stations 21) laufen
+    vollstaendig durch, und der Kopf nennt keine Deckelung."""
+    _passes_werkzeug(tmp_path, cache=ISS_TLE)
+    e = run(run_tool("satellite_passes", {"lat": 48.8, "lon": 9.79,
+                                          "hours": 1}))
+    assert e.ok is True
+    assert e.data["geprueft"] == 1
+    assert "rechne ich nicht durch" not in e.display
+
+
+# --- satellite_compare: Werte, die keine Zahlen sind ---------------------
+
+
+@pytest.mark.parametrize("wert", [float("nan"), float("inf"), float("-inf")])
+def test_nan_und_unendlich_sind_keine_ndvi_werte(wert):
+    """Der Dispatcher prueft das Schema, aber NaN IST eine Zahl vom Typ
+    float und kam durch. Gemessen ueber `run_tool`: ok=True, "Mittlere
+    Aenderung +nan" im Chat und `NaN` in `data` - und `NaN` ist kein
+    gueltiges JSON, jeder strenge Leser der HTTP-Antwort bricht daran."""
+    e = run(run_tool("satellite_compare", {
+        "before": [wert] * 100, "after": [0.2] * 100,
+        "before_date": "2026-06-15", "after_date": "2026-07-15",
+        "resolution_m": 10,
+    }))
+    assert e.ok is False, e.display
+    assert "keine Zahl" in e.display
+    assert "nan" not in e.display.lower() or "keine Zahl" in e.display
+    _json.dumps(e.data, allow_nan=False)      # wirft, wenn NaN durchkommt
+
+
+@pytest.mark.parametrize("wert", [float("nan"), float("inf")])
+def test_eine_unsinnige_aufloesung_wird_keine_hektarzahl(wert):
+    """Dieselbe Luecke wie bei den Rasterwerten, eine Ebene hoeher: aus
+    `resolution_m=nan` wird eine Flaeche von `nan` Hektar, und `data` ist
+    danach kein gueltiges JSON mehr. Nachgetragen bei der Abnahme - die
+    Mutationsprobe "resolution_m ungeprueft" blieb gruen.
+
+    Genau diese beiden Werte sind der Fall: `-inf` faengt schon der
+    Schema-Pruefer ab ("kleiner als 0.1"), `nan` und `+inf` nicht - ein
+    Vergleich mit `nan` ist immer falsch, und `+inf` ist groesser als jede
+    Untergrenze.
+    """
+    e = run(run_tool("satellite_compare", {
+        "before": [0.8] * 100, "after": [0.2] * 100,
+        "before_date": "2026-06-15", "after_date": "2026-07-15",
+        "resolution_m": wert,
+    }))
+    assert e.ok is False, e.display
+    assert "positive Zahl" in e.display
+    _json.dumps(e.data, allow_nan=False)
+
+
+def test_minus_unendlich_faengt_schon_der_schemapruefer():
+    """Die Gegenprobe zur Aufteilung oben - damit sie stimmt und nicht nur
+    behauptet ist."""
+    e = run(run_tool("satellite_compare", {
+        "before": [0.8] * 100, "after": [0.2] * 100,
+        "before_date": "2026-06-15", "after_date": "2026-07-15",
+        "resolution_m": float("-inf"),
+    }))
+    assert e.ok is False
+    assert "kleiner als" in e.display
+    _json.dumps(e.data, allow_nan=False)
+
+
+def test_eine_aufloesung_von_null_oder_darunter_ergibt_keine_flaeche():
+    """Null Meter je Pixel hiesse null Hektar, egal wie viel sich geaendert
+    hat; ein negativer Wert ergaebe eine negative Flaeche."""
+    for wert in (0, -10):
+        e = run(run_tool("satellite_compare", {
+            "before": [0.8] * 100, "after": [0.2] * 100,
+            "before_date": "2026-06-15", "after_date": "2026-07-15",
+            "resolution_m": wert,
+        }))
+        assert e.ok is False, (wert, e.display)
+
+
+def test_der_vergleich_rechnet_weiter_wie_bisher():
+    """Gegenprobe - die Pruefung darf den Happy Path nicht kosten."""
+    e = run(run_tool("satellite_compare", {
+        "before": [0.8] * 100, "after": [0.2] * 100,
+        "before_date": "2026-06-15", "after_date": "2026-07-15",
+        "resolution_m": 10,
+    }))
+    assert e.ok is True
+    assert e.data["changed_ha"] == pytest.approx(1.0)
+    _json.dumps(e.data, allow_nan=False)
+
+
+def test_ganzzahlen_und_ganzzahlige_werte_bleiben_erlaubt():
+    """`_endliche_zahlen` darf nicht strenger sein als noetig: ein Modell
+    schreibt `0` statt `0.0`."""
+    e = run(run_tool("satellite_compare", {
+        "before": [1] * 100, "after": [0] * 100,
+        "before_date": "2026-06-15", "after_date": "2026-07-15",
+        "resolution_m": 10,
+    }))
+    assert e.ok is True
+    assert e.data["changed_pixels"] == 100
+
+
+def test_der_deckel_rechnet_wirklich_nur_die_ersten_saetze():
+    """Die Mutation, die ueberlebt hat.
+
+    Der erste Anlauf prueft nur, was der KOPF sagt ("N von M geprueft") -
+    und diese Zahl rechnet das Werkzeug selbst aus. Nimmt man den Deckel in
+    `ueberfluege` heraus, bleibt der Test gruen, obwohl der Server wieder
+    alle Saetze durchrechnet: die Meldung waere dann sogar eine Luege.
+
+    Also die Wirkung selbst: hinter dem Deckel steht die ISS, davor nur
+    Muell-Saetze (die liefern nachweislich null Ereignisse, siehe
+    tests/test_ueberflug.py). Wird der Deckel eingehalten, kommt kein
+    einziger Ueberflug heraus."""
+    from core.satellite.ueberflug import MAX_SATELLITEN, ueberfluege
+
+    muell = ("MUELL", "1 " + "x" * 60, "2 " + "y" * 60)
+    iss = tuple(ISS_TLE.strip().splitlines())
+    von = datetime(2026, 8, 26, tzinfo=timezone.utc)
+    bis = von + timedelta(hours=6)
+
+    hinter_dem_deckel = [muell] * MAX_SATELLITEN + [iss]
+    assert ueberfluege(hinter_dem_deckel, lat=48.8, lon=9.79,
+                       von=von, bis=bis) == [], \
+        "der Satz hinter dem Deckel wurde trotzdem gerechnet"
+
+    # Gegenprobe: derselbe Satz DAVOR wird gerechnet - sonst wuerde der
+    # Test auch bei einem Deckel von null gruen.
+    davor = [muell] * (MAX_SATELLITEN - 1) + [iss]
+    assert ueberfluege(davor, lat=48.8, lon=9.79, von=von, bis=bis), \
+        "vor dem Deckel muss die ISS gerechnet werden"
+
+
+# --- Der Rumpf der CelesTrak-Antwort hat einen Deckel --------------------
+#
+# Nachgetragen bei der Abnahme (07.09.2026). Der Code kam ohne Tests an;
+# beide Mutationsproben - "Bahndaten ungebremst geladen" und "Deckel still
+# hochgesetzt" - blieben gruen.
+
+
+def _celestrak_stroemt(stueck: bytes, wie_oft: int, gezaehlt: dict):
+    """Ein CelesTrak, der `wie_oft` Bloecke schickt und mitzaehlt."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        async def haeppchen():
+            for _ in range(wie_oft):
+                gezaehlt["bytes"] += len(stueck)
+                yield stueck
+
+        return httpx.Response(200, headers={"content-type": "text/plain"},
+                              content=haeppchen())
+
+    return handler
+
+
+def test_eine_endlose_bahndatenantwort_wird_abgebrochen(tmp_path):
+    """`MAX_SATELLITEN` deckelt das RECHNEN, nicht das Holen: die Antwort
+    wurde bis dahin am Stueck geladen und in voller Laenge auf die Platte
+    geschrieben, bevor irgendjemand sie angesehen hat."""
+    from core.satellite.ueberflug import MAX_ANTWORT_BYTES
+
+    gezaehlt = {"bytes": 0}
+    stueck = b"X" * 1_000_000
+    bereit = 40 * len(stueck)          # 40 MB stuenden zur Verfuegung
+    werkzeug = _passes_werkzeug(tmp_path)
+    with _ohne_celestrak(_celestrak_stroemt(stueck, 40, gezaehlt)):
+        e = run(run_tool("satellite_passes", {"lat": 48.8, "lon": 9.79}))
+
+    assert e.ok is False
+    assert "MB" in (e.error or ""), e.error
+    # Nicht "kaputte Bahndaten": der Dienst hat sauber geantwortet, nur zu viel.
+    assert "ausgestiegen" not in (e.error or ""), e.error
+    # Gegenprobe, dann die Zusage: es wurde gestroemt, aber nicht alles.
+    assert gezaehlt["bytes"] > 0, "es wurde gar nicht erst gestroemt"
+    assert gezaehlt["bytes"] <= MAX_ANTWORT_BYTES + len(stueck), gezaehlt
+    assert gezaehlt["bytes"] < bereit, gezaehlt
+
+    # Und nichts Halbes liegt auf der Platte: ein halber Datensatz waere
+    # schlimmer als keiner, weil der naechste Lauf ihn fuer gueltig haelt.
+    from core.satellite.ueberflug import cache_datei
+    datei = cache_datei("visual", db_path=werkzeug.db_path)
+    assert not datei.is_file(), datei.read_text(encoding="utf-8")[:200]
+
+
+def test_der_bahndatendeckel_steht_auf_einer_abgesprochenen_zahl():
+    """Gemessen: 10.000 TLE-Saetze sind 1,5 MB, der ganze CelesTrak-Katalog
+    laege bei rund 5 MB - angefragt werden aber nur `visual` (157) und
+    `stations` (21), also rund 25 KB. 8 MB sind sehr weit weg vom Normalfall
+    und trotzdem eine Grenze. Wer die Zahl aendert, aendert diese Rechnung."""
+    from core.satellite.ueberflug import MAX_ANTWORT_BYTES
+
+    assert MAX_ANTWORT_BYTES == 8_000_000
+
+
+def test_eine_gewoehnliche_antwort_geht_weiterhin_glatt_durch(tmp_path):
+    """Gegenprobe - sonst waere jede Antwort ein Fehler."""
+    gezaehlt = {"bytes": 0}
+    _passes_werkzeug(tmp_path)
+    with _ohne_celestrak(_celestrak_stroemt(ISS_TLE.encode(), 1, gezaehlt)):
+        e = run(run_tool("satellite_passes",
+                         {"lat": 48.8, "lon": 9.79, "hours": 24}))
+    assert e.ok is True, e.error
+
+
+def test_ein_krummes_byte_macht_die_ganze_gruppe_nicht_wertlos(tmp_path):
+    """Ein TLE-Satz ist ASCII. Kommt ein einzelnes Byte kaputt an, wird es
+    ersetzt statt geworfen - sonst haengt die Bahnrechnung fuer alle
+    Satelliten an der Kodierung eines Zeichens."""
+    gezaehlt = {"bytes": 0}
+    krumm = (ISS_TLE + "\r\n").encode() + b"\xff\xfe"
+    _passes_werkzeug(tmp_path)
+    with _ohne_celestrak(_celestrak_stroemt(krumm, 1, gezaehlt)):
+        e = run(run_tool("satellite_passes",
+                         {"lat": 48.8, "lon": 9.79, "hours": 24}))
+    assert e.ok is True, e.error
+
+
+# --- Abnahme FIX-12: was VOR dem Deckel passiert --------------------------
+#
+# `MAX_SATELLITEN` deckelt das Rechnen. Das Holen war ungedeckelt: die
+# Antwort wurde am Stueck geladen und in voller Laenge auf die Platte
+# geschrieben, bevor irgendjemand sie angesehen hat. Nachgemessen am
+# Kalender, der dieselbe Bauart hatte: 37,7 MB Antwort waren 438 MB
+# Speicher. Der Deckel ist derselbe wie in `core/kalender.py`.
+
+
+def test_eine_masslos_grosse_celestrak_antwort_wird_abgebrochen(tmp_path):
+    """Kein Absturz, kein volllaufender Speicher, ein deutscher Satz - und
+    nichts davon landet im Zwischenspeicher."""
+    from core.satellite.ueberflug import MAX_ANTWORT_BYTES, cache_datei
+
+    zeilen = ISS_TLE.splitlines()
+    block = f"SAT\r\n{zeilen[1]}\r\n{zeilen[2]}\r\n"
+    zu_gross = block * (MAX_ANTWORT_BYTES // len(block) + 2)
+    assert len(zu_gross.encode()) > MAX_ANTWORT_BYTES
+
+    werkzeug = _passes_werkzeug(tmp_path)
+    with _ohne_celestrak(lambda r: httpx.Response(200, request=r,
+                                                  text=zu_gross)):
+        e = run(run_tool("satellite_passes", {"lat": 48.8, "lon": 9.79}))
+    assert e.ok is False, e.display
+    assert "ausgestiegen" not in (e.error or ""), e.error
+    assert "CelesTrak" in (e.error or "")
+    assert "MB" in (e.error or "")
+    assert not cache_datei("visual", db_path=werkzeug.db_path).exists(), \
+        "eine abgebrochene Antwort wurde als Bahndaten abgelegt"
+
+
+def test_der_deckel_laesst_eine_gewoehnliche_antwort_unangetastet(tmp_path):
+    """Gegenprobe: `visual` sind rund 25 KB - der Deckel darf im Alltag
+    nichts kosten und nichts abschneiden. Verglichen werden die BAHNDATEN,
+    nicht die Bytes: `Path.read_text` macht aus CRLF ein LF (universelle
+    Zeilenenden), und das war schon vor dem Deckel so."""
+    from core.satellite.ueberflug import cache_datei, parse_tle
+
+    werkzeug = _passes_werkzeug(tmp_path)
+    with _ohne_celestrak(lambda r: httpx.Response(200, request=r,
+                                                  text=ISS_TLE)):
+        e = run(run_tool("satellite_passes", {"lat": 48.8, "lon": 9.79}))
+    assert e.ok is True, e.error
+    assert e.data["geprueft"] == 1
+    abgelegt = cache_datei("visual", db_path=werkzeug.db_path)
+    assert parse_tle(abgelegt.read_text(encoding="utf-8")) == parse_tle(ISS_TLE)
+
+
+def test_ein_fehlerstatus_wird_gemeldet_ohne_den_fehlerrumpf_zu_lesen(tmp_path):
+    """Die Mutation, die zuerst ueberlebt hat: den Rumpf AUCH bei HTTP 500
+    zu lesen, sah folgenlos aus. Ist die Fehlerseite aber groesser als der
+    Deckel, meldet das Werkzeug dann "mehr als 8 MB" statt "HTTP 500" - und
+    verliert dabei den Rueckfall auf den alten Cachestand, obwohl der da
+    ist. Der Status wird deshalb vor dem Rumpf geprueft, und der Rumpf einer
+    Fehlerantwort gar nicht erst angefasst."""
+    gezaehlt = {"bytes": 0}
+    stueck = b"<html>Wartung</html>" * 100_000        # 2 MB Fehlerseite
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        async def haeppchen():
+            for _ in range(20):                       # 40 MB stuenden bereit
+                gezaehlt["bytes"] += len(stueck)
+                yield stueck
+
+        return httpx.Response(500, content=haeppchen())
+
+    werkzeug = _passes_werkzeug(tmp_path, cache=ISS_TLE)
+    import os
+    from core.satellite.ueberflug import cache_datei
+    os.utime(cache_datei("visual", db_path=werkzeug.db_path), (0, 0))
+
+    with _ohne_celestrak(handler):
+        e = run(run_tool("satellite_passes", {"lat": 48.8, "lon": 9.79}))
+
+    # Der alte Cachestand rettet die Antwort - das ist die Zusage, die die
+    # Mutation kaputtmacht.
+    assert e.ok is True, e.error
+    assert "Zwischenspeicher" in e.display
+    assert gezaehlt["bytes"] == 0, "die Fehlerseite wurde geladen"

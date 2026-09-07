@@ -311,8 +311,18 @@ das, Regel 5 verlangt melden statt nebenbei reparieren.
 | **B** — `/api/chat` behalten, in `NUR_API` eingetragen lassen | Nichts geht verloren, die Doppelung bleibt sichtbar dokumentiert. |
 | **C** — `/api/chat` trotzdem löschen | Verlauf und `settings.system_prompt` sind danach unbenutzt. Ehrlich, aber ärmer. |
 
-Bis zur Entscheidung steht `/api/chat` in `NUR_API` in
+Bis zur Entscheidung stand `/api/chat` in `NUR_API` in
 `tests/test_routen_haben_einen_nutzer.py`, mit genau dieser Begründung.
+
+> **Entschieden in FIX-11, Punkt 7 — ein vierter Weg.** Weder A noch B noch C:
+> `/api/chat` ist jetzt der **Standardweg** der Oberfläche, der Auftragspfad
+> liegt hinter einem Schalter im Composer. Damit ist die Doppelung keine
+> Doppelung mehr, sondern eine Aufteilung: ein Zug im Gespräch geht über
+> `/api/chat` (ein Modellaufruf, mit Verlauf und Gedächtnisblock), ein
+> mehrschrittiger Auftrag über `/api/tasks` (Plan, Schritte, Rückfragen).
+> Verlauf und `settings.system_prompt` sind damit nicht tot, sondern der
+> Normalfall. Der Eintrag in `NUR_API` ist entfallen; die Zusagen stehen in
+> `tests/test_fix11_chat.py`.
 
 ## Was in Schritt 7 erledigt ist
 

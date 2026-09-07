@@ -24,7 +24,7 @@ from api.tasks import TaskRegistry, tasks_router
 from api.security import ensure_token
 from core import migration, sicherung
 from core.config import PROJECT_ROOT, Settings, get_settings
-from core.db import connect, init_db
+from core.db import connect, init_db, tote_tasks_beenden
 from core.llm import LLMError, LLMProvider, build_provider
 from api.ort import ort_router
 from api.weltlage import weltlage_router
@@ -214,6 +214,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.letzte_sicherung, app.state.schema = datenbank_start(settings)
         if app.state.schema != "aktuell":
             log.warning("Das Datenbankschema ist veraltet - Health meldet es.")
+
+        # FIX-11: Auftraege, die beim letzten Beenden mitten im Lauf
+        # standen, laeuft nach dem Start niemand mehr - sie blieben aber
+        # fuer immer 'running' in der Uebersicht, und im Chat stand eine
+        # Frage ohne Antwort. Hier ist der einzige Ort, an dem sicher NICHTS
+        # laeuft, deshalb der volle Durchgang (leere Menge). Ein Fehler
+        # dabei darf den Start nie verhindern.
+        try:
+            tot = await asyncio.to_thread(tote_tasks_beenden, settings.db_path, set())
+            if tot:
+                log.warning("%d Auftrag/Auftraege standen noch mitten im Lauf - "
+                            "beendet und im Verlauf vermerkt.", len(tot))
+        except Exception as exc:  # noqa: BLE001 - jeder Grund ist eine Warnung
+            log.warning("Tote Auftraege nicht aufgeraeumt - JARVIS startet "
+                        "trotzdem: %s: %s", type(exc).__name__, exc)
 
         try:
             app.state.provider = build_provider(settings)

@@ -10,6 +10,10 @@ from core.memory import MAX_FAKT_TEXT, Fact, TaskLogRow
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=100_000)
+    # FIX-11: gesprochen heisst kuerzer antworten. Additiv, Vorgabe False -
+    # ein alter Client, der das Feld nicht kennt, verhaelt sich wie bisher.
+    # Denselben Schalter kennt der Auftragspfad seit Phase 5 (api/tasks.py).
+    voice: bool = False
 
 
 class ChatResponse(BaseModel):

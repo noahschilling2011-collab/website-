@@ -165,7 +165,7 @@ def main() -> int:
                 print(f"    {GRAU}Hinweis: LLM_PRICE_*_PER_MTOK sind leer - "
                       f"deshalb 0 EUR statt einer geschaetzten Zahl.{AUS}")
 
-            schritt(10, "Auftrag - der Weg, den die Oberflaeche wirklich geht")
+            schritt(10, "Auftrag - der Weg hinter dem Schalter \"Auftrag\"")
             import time as _zeit
 
             angelegt = zweiter_start.post(

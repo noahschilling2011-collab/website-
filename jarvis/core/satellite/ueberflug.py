@@ -37,6 +37,8 @@ from pathlib import Path
 
 import httpx
 
+from core.fehlertexte import ohne_geheimnis
+
 log = logging.getLogger("jarvis")
 
 CELESTRAK_URL = "https://celestrak.org/NORAD/elements/gp.php"
@@ -61,6 +63,29 @@ TLE_WARNT_AB_TAGEN = 7.0
 # Unter dieser Hoehe steht der Satellit praktisch im Horizont: Haeuser,
 # Baeume, Berge. 10 Grad ist die uebliche Schwelle.
 MINDESTHOEHE_GRAD = 10.0
+
+# Wie viele Satellitensaetze hoechstens durchgerechnet werden.
+#
+# Gemessen auf dieser Maschine: 6,8 ms je Satellit fuer ein 24-h-Fenster
+# (10 Saetze 0,12 s / 100 Saetze 0,64 s / 500 Saetze 3,41 s). Die echten
+# Gruppen sind klein - `visual` 157, `stations` 21 -, aber die Zahl kommt
+# aus einer Antwort von draussen: bei 10.000 Saetzen waren es gemessen
+# 10,5 s fuer eine EINZIGE Stunde, bei 24 h waere die Zeitgrenze des
+# Werkzeugs (60 s) gerissen. Und `asyncio.to_thread` laesst sich nicht
+# abbrechen - der Server haette weitergerechnet, lange nachdem der Nutzer
+# seine Fehlermeldung bekommen hat.
+MAX_SATELLITEN = 1000
+
+# Wie viel von der CelesTrak-Antwort hoechstens gelesen wird.
+#
+# `MAX_SATELLITEN` deckelt das RECHNEN, nicht das Holen: die Antwort wurde
+# bis hierher am Stueck geladen und in voller Laenge auf die Platte
+# geschrieben, bevor irgendjemand sie angesehen hat. Gemessen: 10.000
+# TLE-Saetze sind 1,5 MB, der ganze CelesTrak-Katalog laege bei rund 5 MB -
+# angefragt werden aber nur `visual` (157) und `stations` (21), also rund
+# 25 KB. 8 MB sind damit sehr weit weg vom Normalfall und trotzdem eine
+# Grenze. Dieselbe Bauart wie `core/kalender.py` und `core/tools/search.py`.
+MAX_ANTWORT_BYTES = 8_000_000
 
 HIMMELSRICHTUNGEN = (
     "N", "NNO", "NO", "ONO", "O", "OSO", "SO", "SSO",
@@ -168,6 +193,33 @@ def cache_datei(gruppe: str, *, db_path: Path | str) -> Path:
     return Path(db_path).parent / "tle" / f"{gruppe}.tle"
 
 
+async def _rumpf(antwort) -> str:
+    """Der Antwortrumpf als Text - hoechstens `MAX_ANTWORT_BYTES`.
+
+    Wie `core/kalender._rumpf`: gestroemt und abgebrochen, statt am Stueck
+    geladen. Dekodiert wie `httpx.Response.text` (Kodierung aus dem
+    Content-Type, sonst UTF-8, kaputte Bytes ersetzt statt geworfen) - ein
+    TLE-Satz ist ASCII, ein einzelnes krummes Byte darf die Bahndaten der
+    ganzen Gruppe nicht wertlos machen.
+    """
+    roh = bytearray()
+    async for stueck in antwort.aiter_bytes():
+        roh += stueck
+        if len(roh) > MAX_ANTWORT_BYTES:
+            raise UeberflugFehler(
+                f"CelesTrak hat mehr als "
+                f"{MAX_ANTWORT_BYTES // 1_000_000} MB Bahndaten geschickt - "
+                "so viel lese ich nicht. Damit rechne ich keinen Ueberflug; "
+                "mit dem halben Datensatz waere die Antwort nur scheinbar "
+                "vollstaendig."
+            )
+    try:
+        return bytes(roh).decode(antwort.charset_encoding or "utf-8",
+                                 errors="replace")
+    except LookupError:
+        return bytes(roh).decode("utf-8", errors="replace")
+
+
 async def hole_tle(
     gruppe: str = STANDARDGRUPPE,
     *,
@@ -191,25 +243,47 @@ async def hole_tle(
     if datei.is_file() and (uhr - datei.stat().st_mtime) < TLE_HOECHSTALTER_S:
         return datei.read_text(encoding="utf-8"), False
 
-    async with httpx.AsyncClient(timeout=30.0, transport=transport) as client:
-        antwort = await client.get(
-            CELESTRAK_URL, params={"GROUP": gruppe, "FORMAT": "tle"}
-        )
-    if antwort.status_code >= 400:
+    try:
+        async with httpx.AsyncClient(timeout=30.0, transport=transport) as client:
+            # Gestroemt statt am Stueck: eine Antwort, mit der niemand
+            # gerechnet hat, soll den Speicher gar nicht erst fuellen. Der
+            # Status wird vor dem Rumpf geprueft - genau wie vorher.
+            async with client.stream(
+                "GET", CELESTRAK_URL, params={"GROUP": gruppe, "FORMAT": "tle"}
+            ) as antwort:
+                status = antwort.status_code
+                text = "" if status >= 400 else await _rumpf(antwort)
+    except httpx.HTTPError as exc:
+        # Bis hierher fing dieser Aufruf gar nichts ab: ein `ReadTimeout`
+        # oder ein `ConnectError` lief als httpx-Ausnahme durch das ganze
+        # Werkzeug, und im Chat stand "satellite_passes ist mit einem
+        # Fehler ausgestiegen". Dabei gilt fuer den Ausfall des Netzes
+        # genau dasselbe wie zehn Zeilen weiter unten fuer HTTP 500: ein
+        # alter Cachestand ist besser als gar keine Antwort. Bahndaten von
+        # gestern rechnen einen Ueberflug immer noch brauchbar - dass sie
+        # alt sind, sagt der Steckbrief selbst.
+        if datei.is_file():
+            log.warning("CelesTrak nicht erreichbar (%s) - es wird der alte "
+                        "Cachestand benutzt.", type(exc).__name__)
+            return datei.read_text(encoding="utf-8"), False
+        raise UeberflugFehler(ohne_geheimnis(
+            exc, "CelesTrak ist gerade nicht erreichbar",
+            "Ohne Bahndaten kann ich keinen Ueberflug rechnen - und alte "
+            "liegen hier auch nicht")) from exc
+    if status >= 400:
         # CelesTrak bittet ausdruecklich darum, bei Fehlern aufzuhoeren und
         # es einem Menschen zu melden, statt weiter anzufragen.
         if datei.is_file():
             log.warning(
                 "CelesTrak antwortete mit HTTP %s - es wird der alte "
-                "Cachestand benutzt.", antwort.status_code,
+                "Cachestand benutzt.", status,
             )
             return datei.read_text(encoding="utf-8"), False
         raise UeberflugFehler(
-            f"CelesTrak antwortete mit HTTP {antwort.status_code}. "
+            f"CelesTrak antwortete mit HTTP {status}. "
             "Es wird nicht erneut angefragt."
         )
 
-    text = antwort.text
     parse_tle(text)          # wirft, wenn es keine Bahndaten sind
     datei.parent.mkdir(parents=True, exist_ok=True)
     vorlaeufig = datei.with_suffix(".teil")
@@ -249,6 +323,13 @@ def ueberfluege(
         raise UeberflugFehler(f"Laenge {lon} liegt ausserhalb -180..180.")
     if bis <= von:
         raise UeberflugFehler("Das Zeitfenster endet vor seinem Anfang.")
+    if len(satelliten) > MAX_SATELLITEN:
+        # Der Deckel ist keine Optimierung, sondern eine Notbremse gegen eine
+        # Antwort, mit der niemand gerechnet hat - siehe MAX_SATELLITEN. Wer
+        # ihn erreicht, erfaehrt es (das Werkzeug sagt "N von M").
+        log.warning("Bahndaten enthalten %d Satelliten - gerechnet werden die "
+                    "ersten %d.", len(satelliten), MAX_SATELLITEN)
+        satelliten = satelliten[:MAX_SATELLITEN]
 
     # builtin=True ist die Vorgabe: keine Datei, kein Download. Geprueft -
     # sonst wuerde `pytest` am Netzverbot scheitern.

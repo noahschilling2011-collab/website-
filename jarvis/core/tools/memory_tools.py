@@ -191,6 +191,11 @@ class Recall(_MitDatenbank):
         "additionalProperties": False,
     }
     permission = Permission.READ
+    # Was hier herauskommt, hat frueher einmal jemand gesagt oder in
+    # eine Notiz geschrieben - unter anderem ein fremder Text, den
+    # das Modell selbst gemerkt hat. Der Rahmen kostet wenig und
+    # schliesst den Weg 'einmal untergeschoben, spaeter geglaubt'.
+    fremder_text = True
 
     def _aus_dem_vault(self, query: str, begonnen: float) -> ToolResult:
         """Sucht ueber den Index, gibt hoechstens `MAX_NOTIZEN` Notizen zurueck.

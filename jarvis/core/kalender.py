@@ -69,6 +69,25 @@ log = logging.getLogger("jarvis")
 # lange falsch stehen.
 HOECHSTALTER_S = 15 * 60
 
+# Wie viel von der Antwort hoechstens gelesen wird.
+#
+# Bis hierher stand hier gar nichts: `antwort.text` laedt, was kommt. Das
+# ist genau die Luecke, die `core/tools/search.py` (MAX_ANTWORT_BYTES),
+# `core/tools/wissen_tools.py` und `core/llm.py` an ihren Stellen schon
+# geschlossen haben - nur der Kalender fehlte. Gemessen mit
+# httpx.MockTransport: eine ICS mit 400.000 Terminen sind 37,7 MB, und der
+# Abruf brauchte 5,7 s bei 438 MB Speicher; die Antwort wurde ausserdem in
+# voller Laenge in den Zwischenspeicher geschrieben. Hochgerechnet reisst
+# ein Abo, das ein paar hundert Megabyte schickt - kaputt, feindlich oder
+# einfach falsch konfiguriert -, den ganzen Server mit, und `parse` laeuft
+# dabei IN der Ereignisschleife.
+#
+# 8 MB sind rund 80.000 Termine. Was darueber liegt, wird nicht
+# abgeschnitten, sondern gemeldet: ein halber Kalender saehe aus wie ein
+# ganzer, und "weglassen ja, verschweigen nein" gilt hier wie ueberall in
+# dieser Datei.
+MAX_ANTWORT_BYTES = 8_000_000
+
 AUSBLICK = (
     "Wiederkehrende Termine werden nicht aufgeloest. `RRULE` richtig zu "
     "rechnen heisst FREQ, INTERVAL, BYDAY, BYMONTHDAY, COUNT, UNTIL, dazu "
@@ -155,11 +174,21 @@ def entschluessele(wert: str) -> str:
 
 
 def _zone(tzid: str):
+    """Die Zone zu einem TZID - oder `None`, wenn dieser Rechner sie nicht kennt.
+
+    WAS WAR FALSCH: hier stand `return timezone.utc` und daneben eine
+    Logzeile. Als Rechnung ist das richtig (irgendetwas muss herauskommen),
+    als Auskunft ist es dieselbe Klasse wie Fund 2: ein Outlook-Export
+    schreibt `TZID:W. Europe Standard Time`, und diesen Namen kennt die
+    IANA-Datenbank nicht. Jeder Termin des Kalenders lag damit ein bis zwei
+    Stunden daneben - ohne ein Wort, an dem jemand haette stutzig werden
+    koennen. Wer `None` zurueckbekommt, kann es dazusagen; `parse` sammelt
+    diese Namen und `kalender` schreibt sie in die Antwort.
+    """
     try:
         return ZoneInfo(tzid)
     except (ZoneInfoNotFoundError, ValueError, KeyError):
-        log.warning("Kalender: Zeitzone %r unbekannt, nehme UTC.", tzid)
-        return timezone.utc
+        return None
 
 
 # --- Anzeigezone ------------------------------------------------------------
@@ -221,7 +250,9 @@ def lies_zeit(wert: str, params: dict[str, str], zone=None) -> tuple[datetime | 
         return roh.replace(tzinfo=timezone.utc), False
     tzid = params.get("TZID", "")
     if tzid:                                   # FORM #3
-        return roh.replace(tzinfo=_zone(tzid)), False
+        # Kennt dieser Rechner die Zone nicht, bleibt nur UTC - geraten wird
+        # nicht. Dass geraten WERDEN musste, meldet `parse` nach oben.
+        return roh.replace(tzinfo=_zone(tzid) or timezone.utc), False
     # FORM #1: Ortszeit ohne Zone. Die Norm laesst sie ausdruecklich zu und
     # meint damit "die Zeit da, wo der Betrachter ist".
     #
@@ -267,8 +298,11 @@ def _teile(zeile: str) -> tuple[str, dict[str, str], str]:
     return name, params, wert
 
 
-def parse(roh: str, *, kalendername: str = "", zone=None) -> tuple[list[Termin], int, int]:
-    """Alle VEVENTs. Gibt (Termine, wiederkehrende, unlesbare) zurueck.
+def parse(
+    roh: str, *, kalendername: str = "", zone=None
+) -> tuple[list[Termin], int, int, list[str]]:
+    """Alle VEVENTs. Gibt (Termine, wiederkehrende, unlesbare, unbekannte
+    Zeitzonen) zurueck.
 
     Wiederkehrende werden **gezaehlt und weggelassen**, nicht geraten.
 
@@ -288,6 +322,7 @@ def parse(roh: str, *, kalendername: str = "", zone=None) -> tuple[list[Termin],
     termine: list[Termin] = []
     wiederkehrend = 0
     unlesbar = 0
+    zonen: set[str] = set()
     name_des_kalenders = kalendername
 
     aktuell: dict | None = None
@@ -324,15 +359,35 @@ def parse(roh: str, *, kalendername: str = "", zone=None) -> tuple[list[Termin],
             aktuell["ort"] = entschluessele(wert).strip()
         elif name == "DTSTART":
             aktuell["beginn"] = (wert, params)
+            if params.get("TZID"):
+                zonen.add(params["TZID"])
         elif name == "DTEND":
             aktuell["ende"] = (wert, params)
+            if params.get("TZID"):
+                zonen.add(params["TZID"])
         elif name == "RRULE":
             aktuell["rrule"] = wert.strip()
         # DESCRIPTION wird bewusst nicht gelesen: dort stehen Meeting-Links,
         # Zugangscodes und gelegentlich Passwoerter. Wenn Noah sie braucht,
         # wird das ein eigener Parameter, der ausdruecklich gesetzt werden
         # muss (FIX-07 Abschnitt 4.3).
-    return termine, wiederkehrend, unlesbar
+
+    if aktuell is not None:
+        # Ein BEGIN:VEVENT ohne END:VEVENT - abgeschnittene Datei, kaputte
+        # Syntax, halb uebertragene Antwort. Bis hierher fiel dieser Termin
+        # beim Verlassen der Schleife spurlos weg: nachgestellt mit einer
+        # abgeschnittenen ICS kam "0 Termine" heraus, ohne Zaehler und ohne
+        # Log. Das ist Fund 1 noch einmal, nur eine Zeile spaeter - und es
+        # gilt dieselbe Regel: weglassen ja, verschweigen nein.
+        log.warning("Kalender: VEVENT %r ohne END:VEVENT, wird weggelassen.",
+                    aktuell.get("titel", "(ohne Titel)"))
+        unlesbar += 1
+
+    unbekannte_zonen = sorted(z for z in zonen if _zone(z) is None)
+    if unbekannte_zonen:
+        log.warning("Kalender: unbekannte Zeitzonen %s - als UTC gerechnet.",
+                    ", ".join(unbekannte_zonen))
+    return termine, wiederkehrend, unlesbar, unbekannte_zonen
 
 
 def _baue(roh: dict, kalendername: str, zone=None) -> Termin | None:
@@ -419,8 +474,52 @@ def im_fenster(termine: list[Termin], von: date, bis: date, *, zone=None) -> lis
 # --- Quelle holen -----------------------------------------------------------
 
 
+def ist_ical(text: str) -> bool:
+    """Sieht das ueberhaupt nach iCalendar aus?
+
+    Der Status genuegt nicht: ein Abo, das eine Anmeldeseite ausliefert,
+    kommt als HTTP 200. Und eine Datei, die keine ICS ist, las sich bis
+    hierher als "0 Termine" - also genau wie ein leerer Kalender. Die
+    Unterscheidung zwischen "du hast frei" und "ich weiss es nicht" ist der
+    Grund, warum es dieses Modul in dieser Form gibt (siehe
+    core/tools/kalender_tools.py, Modulkopf).
+    """
+    return "BEGIN:VCALENDAR" in text
+
+
 def cache_datei(db_path) -> Path:
     return Path(db_path).parent / "kalender" / "quelle.ics"
+
+
+async def _rumpf(antwort) -> str:
+    """Der Antwortrumpf als Text - hoechstens `MAX_ANTWORT_BYTES`.
+
+    Gestroemt, nicht am Stueck geladen: bei einer Antwort, die zu gross ist,
+    soll der Speicher gar nicht erst volllaufen. Dieselbe Bauart wie
+    `core/tools/search.py` und `core/tools/wissen_tools.py`.
+
+    Die Dekodierung macht nach, was `httpx.Response.text` tut: die Kodierung
+    aus dem `Content-Type`, sonst UTF-8, und kaputte Bytes werden ersetzt
+    statt zu werfen (httpx 0.28, `_models.py`). Ein Kalender mit einem
+    einzelnen krummen Byte ist immer noch ein Kalender.
+    """
+    roh = bytearray()
+    async for stueck in antwort.aiter_bytes():
+        roh += stueck
+        if len(roh) > MAX_ANTWORT_BYTES:
+            raise KalenderFehler(
+                f"Der Kalender ist groesser als {MAX_ANTWORT_BYTES // 1_000_000} "
+                "MB - so viel lese ich nicht. Das heisst NICHT, dass du keine "
+                "Termine hast: ich habe abgebrochen, statt den halben Kalender "
+                "als ganzen auszugeben. Trag ein Abo mit einem kuerzeren "
+                "Zeitraum ein."
+            )
+    kodierung = antwort.charset_encoding or "utf-8"
+    try:
+        return bytes(roh).decode(kodierung, errors="replace")
+    except LookupError:
+        # Ein Anbieter, der eine Kodierung nennt, die es nicht gibt.
+        return bytes(roh).decode("utf-8", errors="replace")
 
 
 async def hole(quelle: str, *, db_path, jetzt: float | None = None) -> tuple[str, bool]:
@@ -444,7 +543,16 @@ async def hole(quelle: str, *, db_path, jetzt: float | None = None) -> tuple[str
         p = Path(quelle).expanduser()
         if not p.is_file():
             raise KalenderFehler("Die Kalenderdatei gibt es nicht.")
-        return p.read_text(encoding="utf-8", errors="replace"), False
+        text = p.read_text(encoding="utf-8", errors="replace")
+        if not ist_ical(text):
+            # Der Pfad steht NICHT in der Meldung: KALENDER_QUELLE ist laut
+            # core/config.py ein Geheimnis, und sie kann ein Pfad sein.
+            raise KalenderFehler(
+                "Die Kalenderdatei enthaelt kein iCalendar. Das heisst NICHT, "
+                "dass du keine Termine hast - die Datei ist nur keine "
+                "ICS-Datei. Pruefe KALENDER_QUELLE in der .env."
+            )
+        return text, False
 
     from core.netz import nach_draussen
 
@@ -460,15 +568,19 @@ async def hole(quelle: str, *, db_path, jetzt: float | None = None) -> tuple[str
         # einem ICS-Abo IST die Adresse das Geheimnis - eine Weiterleitung
         # auf einen fremden Host wuerde sie dorthin mitnehmen.
         async with nach_draussen(timeout=20.0) as client:
-            antwort = await client.get(quelle)
-        if antwort.is_redirect:
-            raise KalenderFehler(
-                "Die Adresse leitet weiter. Dem folge ich nicht - bei einem "
-                "Kalender-Abo ist die Adresse selbst das Geheimnis. Trag die "
-                "endgueltige Adresse ein."
-            )
-        antwort.raise_for_status()
-        text = antwort.text
+            # `stream` statt `get`: erst der Kopf, dann der Rumpf in
+            # Stuecken. Nur so kann `_rumpf` abbrechen, BEVOR eine zu grosse
+            # Antwort im Speicher steht. `is_redirect` und
+            # `raise_for_status` brauchen den Rumpf nicht (httpx 0.28).
+            async with client.stream("GET", quelle) as antwort:
+                if antwort.is_redirect:
+                    raise KalenderFehler(
+                        "Die Adresse leitet weiter. Dem folge ich nicht - bei "
+                        "einem Kalender-Abo ist die Adresse selbst das "
+                        "Geheimnis. Trag die endgueltige Adresse ein."
+                    )
+                antwort.raise_for_status()
+                text = await _rumpf(antwort)
     except KalenderFehler:
         raise
     except Exception as exc:                       # noqa: BLE001
@@ -501,7 +613,7 @@ async def hole(quelle: str, *, db_path, jetzt: float | None = None) -> tuple[str
             "ist das Geheimnis. Pruefe KALENDER_QUELLE in der .env."
         ) from exc
 
-    if "BEGIN:VCALENDAR" not in text:
+    if not ist_ical(text):
         # Ein Abo, das eine Anmeldeseite ausliefert, kommt als HTTP 200.
         # Derselbe Fall wie CelesTrak mit "Invalid query" - deshalb dieselbe
         # Vorsicht: Inhalt pruefen, nicht nur den Status.
@@ -511,5 +623,15 @@ async def hole(quelle: str, *, db_path, jetzt: float | None = None) -> tuple[str
         )
 
     datei.parent.mkdir(parents=True, exist_ok=True)
-    datei.write_text(text, encoding="utf-8")
+    # Erst daneben schreiben, dann umbenennen - wie
+    # `core/satellite/ueberflug.hole_tle` und `core/satellite/bilder.speichere`
+    # es schon tun. Hier stand ein direktes `write_text`, und der Kalender ist
+    # die Stelle, an der das am ehesten schiefgeht: zwei Fragen kurz
+    # hintereinander laufen nebeneinander durch `hole`, und wer dann die halb
+    # geschriebene Datei liest, bekommt fuer die naechsten 15 Minuten einen
+    # abgeschnittenen Kalender als vollstaendigen serviert. `replace` ist auf
+    # POSIX ein atomarer Ersatz.
+    vorlaeufig = datei.with_suffix(".teil")
+    vorlaeufig.write_text(text, encoding="utf-8")
+    vorlaeufig.replace(datei)
     return text, False

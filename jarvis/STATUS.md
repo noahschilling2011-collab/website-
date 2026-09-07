@@ -4,7 +4,7 @@
 > und aktualisiert sie am Ende jeder Phase. Von Hand korrigieren ist erlaubt.
 
 AKTUELL: FIX-06 — COMMAND CENTER, siehe `docs/FIX-06.md`. Abschnitte 5 (Design-System), 6 (COMMAND CENTER) und 7 (WELT-NETZ) sind gebaut; **8 (MÄRKTE) steht aus und ist blockiert** — der Auftragstext dafür liegt nicht im Repo, nur der Name in der Kopfzeile von `docs/FIX-06.md`.
-LETZTE ÄNDERUNG: 2026-09-06 (FIX-11 Welle 1: Start prüft, sichert und migriert von selbst; Host-Sperre für die Seite mit dem Token; Grenzen an Modell-Argumenten; Erinnerungen im Formular, „in 20 minuten", eigener Deckel-Topf, Ton/Meldung/Vorlesen, Zeitpläne nur noch READ — siehe `docs/FIX-11.md`. Davor FIX-09 mit Prüfrunde, 23 Funde behoben: der Assistent heißt Mehmet; Herkunft und Zustellung von Zeitplan-Ergebnissen, einmalige Erinnerungen auch aus dem Gespräch, Bremse für scheiternde Pläne, Wetter ohne Key, Vorlage Morgenlage — siehe `docs/FIX-09.md`. Davor FIX-08 mit zwei Prüfrunden.)
+LETZTE ÄNDERUNG: 2026-09-07 (FIX-12 Ausfallmatrix: **der API-Key fällt aus jeder Fehlermeldung heraus**; der DNS hält die Ereignisschleife nicht mehr an; „ich weiß es nicht" ist keine leere Terminliste; NaN wird keine Hektarzahl und keine bbox über die ganze Erde; ein kaputter Cache ist kein Grund, gar nicht nachzuschlagen; Antworten von draußen werden geströmt statt geladen — siehe `OPUS5_REPORT.md`. Davor FIX-11 Welle 2: jeder Auftrag bekommt einen Endzustand, auch wenn er stirbt; fremder Text wird an der Engstelle gerahmt; `fetch_url` holt nur genannte Adressen; **normale Nachrichten gehen über den Chat-Pfad** — ein Modellaufruf statt drei, mit Verlauf und Gedächtnisblock, Auftrag hinter einem Schalter — siehe `docs/FIX-11.md`. Davor Welle 1: Start prüft, sichert und migriert von selbst; Host-Sperre; Grenzen an Modell-Argumenten; Erinnerungen für Menschen; Zeitpläne nur noch READ. Davor FIX-09 mit Prüfrunde, 23 Funde behoben — siehe `docs/FIX-09.md`.)
 
 > **Abweichung von der Arbeitsweise, auf Ansage:** es wurden alle Phasen
 > gebaut, nicht eine nach der anderen. Das widerspricht CLAUDE.md
@@ -2232,7 +2232,7 @@ eine Stack-Änderung** (`python-dateutil`) und braucht seine Zusage.
 | Der Plan wird **nicht** auf `budget.max_steps` gekürzt | Sonst könnte `max_steps` nie greifen und der Nutzer sähe nie, dass sein Ziel größer war als das Budget. Der Plan darf zu groß sein; das Budget stoppt ihn während der Ausführung, mit Teilergebnis. |
 | `max_steps` zählt gelaufene, nicht geplante Schritte | Sonst reißt die Grenze, bevor ein Schritt lief — und es gäbe nie ein Teilergebnis. |
 | `GET /api/tasks` aus Phase 3 heißt jetzt `GET /api/task-log` | Phase 4 belegt `/api/tasks` mit der Task-Struktur. Der episodische Log ist etwas anderes. |
-| Der Endzustand eines Tasks wird zuletzt geschrieben, nicht vom Runner | Sonst meldet `GET /api/tasks/{id}` `done`, bevor die Antwort im Verlauf steht — ein Client, der sofort nachlädt, sieht sie nicht. Preis: stirbt der Prozess genau dazwischen, steht der Task dauerhaft auf `running`. Das ist ehrlicher als ein `done` ohne Ergebnis. |
+| Der Endzustand eines Tasks wird zuletzt geschrieben, nicht vom Runner | Sonst meldet `GET /api/tasks/{id}` `done`, bevor die Antwort im Verlauf steht — ein Client, der sofort nachlädt, sieht sie nicht. Das ist ehrlicher als ein `done` ohne Ergebnis. Der Preis war, dass ein Task dauerhaft auf `running` stand, wenn der Prozess genau dazwischen starb; seit FIX-11 (Punkt 4) räumt `core.db.tote_tasks_beenden` das beim Start auf: `failed` mit dem Grund „Neustart während des Laufs", angefangene Schritte `skipped`, und im Verlauf eine Zeile, dass abgebrochen wurde (bei alten Leichen höchstens eine Sammelzeile). |
 | `max_permission` von LOCAL auf EXTERNAL angehoben | Erst mit dem Bestätigungs-Flow aus Phase 5 gibt es einen Schutz, der das trägt. SENSITIVE bleibt zu. |
 
 ## Entscheidungslog
@@ -2321,13 +2321,13 @@ von Hand — acht Tabellen, das Schema hatte zwölf. `lookups`,
 hätten auch gefehlt. Jetzt wird gezählt, was in der Datei ist;
 `tests/test_backup_zaehlt_alles.py` hält das gegen `core/schema.sql`.
 
-## FIX-11 — Verlässlich, dicht, im Alltag brauchbar (Welle 1)
+## FIX-11 — Verlässlich, dicht, im Alltag brauchbar
 
 > Noah, 06.09.2026: „Mach weiter." Auswahl aus einer Vorschlagsrunde mit vier
 > Blickwinkeln und drei Richtern; Begründung, Paket und Belege in
 > `docs/FIX-11.md`. `FIX-10.md` ist die Messstrecke vom 27.08., deshalb FIX-11.
 
-**Gebaut (Punkte 1 bis 3 von 7).**
+### Welle 1 — Punkte 1 bis 3
 
 1. **Der Start prüft, sichert und migriert von selbst.** `PRAGMA quick_check`,
    dann eine Sicherung (immer vor einer anstehenden Migration, sonst einmal je
@@ -2366,8 +2366,72 @@ bestanden, Browser-Nachweis der Zustellung mit Stubs.
 darunter eine **stehengebliebene Mutation** (`PERMISSION_DECKEL = LOCAL  #
 MUTATION`) und ein Rauchtest, der nach der Host-Sperre 400 gab. Tabelle in
 `docs/FIX-11.md`.
-**Offen:** Punkte 4 bis 7 (Auftrag stirbt, Rahmen um fremden Text,
-`fetch_url`-Herkunft, Chat-Pfad statt Auftrag je Nachricht).
+### Welle 2 — Punkte 4 bis 7
+
+6. **Jeder Auftrag bekommt einen Endzustand, auch wenn er stirbt.** Starb der
+   Prozess mitten im Lauf, stand der Task für immer auf `running`.
+   `core.db.tote_tasks_beenden` räumt beim Start auf: `failed` mit Grund,
+   angefangene Schritte `skipped`, eine Zeile im Verlauf (bei alten Leichen
+   höchstens eine Sammelzeile).
+7. **Fremder Text wird an der Engstelle gerahmt**, nicht je Werkzeug — eine
+   Stelle statt sieben, die man einzeln vergessen kann.
+8. **`fetch_url` holt nur Adressen, die jemand genannt hat.**
+9. **Normale Nachrichten gehen über den Chat-Pfad.** Bisher schickte die
+   Oberfläche **jede** Nachricht als Auftrag: drei Modellaufrufe je „Hallo",
+   und weder Planner noch Schritt sahen den Verlauf. Der Gedächtnisblock hängt
+   an `/api/chat` und wurde vom Browser nie gerufen — Mehmet hatte über die
+   Oberfläche **nie** sein Langzeitgedächtnis. Jetzt entscheidet ein Schalter
+   im Composer: **Gespräch** (Vorgabe, ein Aufruf, mit Verlauf und
+   Gedächtnisblock) oder **Auftrag** (Plan, Schritte, Rückfragen — unverändert).
+   Dazu `voice` an `/api/chat` (additiv), ein Herkunfts-Präfix für zugestellte
+   Zeitplan-Nachrichten im Modellverlauf, und das Alter der letzten Sicherung
+   in der Statuszeile.
+
+**Ausgeführt (Welle 2):** `tests/test_fix11_chat.py` mit 28 Tests (18
+Backend/node, 10 Chromium), volle Suite **1909 grün**, `scripts.smoke`
+bestanden, sechs Mutationsproben — darunter „Auftrag statt Gespräch als
+Vorgabe", die 8 von 9 UI-Tests rot macht.
+**Drei bestehende Command-Center-Tests** messen Zusagen des Auftragspfads und
+sind darauf festgenagelt (Klick auf `#btn-modus`); dieselben Zusagen für den
+Chat-Pfad stehen als **eigene** Tests daneben — keine Assertion wurde
+abgeschwächt.
+Die offene Entscheidung aus `docs/FIX-01.md` (`/api/chat` löschen oder
+behalten?) ist damit beantwortet: keiner der drei Wege, sondern ein vierter —
+beide Pfade bleiben und teilen sich die Arbeit.
+
+**Offen:** nichts aus dem Paket. Grenzen, die bleiben, stehen in
+`docs/FIX-11.md`.
+
+## FIX-12 — Die Ausfallmatrix
+
+Eine Inventur über **alle** Werkzeuge, mit derselben Matrix je Werkzeug:
+fehlende Konfiguration, fehlende Zugangsdaten, Timeout, Verbindungsabbruch,
+HTTP 4xx/5xx, Ratenlimit, Status 200 mit Unsinn im Körper, unerwartete Form,
+leeres Ergebnis, riesiges Ergebnis.
+
+**Befund:** fehlende *Konfiguration* war gut abgedeckt. *Laufzeitausfälle*
+kaum. Der schwerste Fund: **der API-Key stand in Fehlermeldungen des
+Anbieters** und ging von dort in den Chat, in `tasks.result`, in die Datenbank
+und im nächsten Zug als Verlauf zurück zum Anbieter — OpenAI-kompatible
+Dienste schicken den geschickten Key in der 401 wörtlich zurück.
+
+Danach: ein blockierender DNS hielt die ganze Ereignisschleife an;
+`kante_km=NaN` ergab eine bbox über die ganze Erde; eine Datei ohne
+iCalendar las sich als „0 Termine"; ein unbekanntes `TZID` wurde still zu
+UTC; ein kaputter Cache riss den Nachschlag ab; eine Binärdatei ging als
+Ergebnis in den Prompt.
+
+**Eigene Abnahme, acht Lücken** — alle nach demselben Muster: ein Deckel, den
+kein Test misst, weil ein äußerer Deckel das Ergebnis ohnehin klein hält. Dazu
+Tests, die ihre Testdaten **aus der Konstanten bauen**, die sie prüfen sollen,
+und deshalb ein stilles Hochsetzen nicht bemerken (Regel 6). Zwei Tests, die
+ich selbst geschrieben hatte, waren vakuum.
+
+**Ausgeführt:** volle Suite **2275 grün** und der Rauchtest, beides auf einem
+frischen Checkout des Branch-Kopfes — der erste Versuch war im
+Arbeitsverzeichnis grün und auf dem sauberen Baum rot, weil eine Konstante in
+einer noch nicht committeten Datei stand. Rund 40 Mutationsproben.
+Belege: `OPUS5_REPORT.md`, Abschnitt 7a.
 
 ## FIX-09 — Was ein JARVIS wirklich braucht
 

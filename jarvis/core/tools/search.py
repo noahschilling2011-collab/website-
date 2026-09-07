@@ -13,11 +13,14 @@ tun als haette es gesucht.
 
 from __future__ import annotations
 
+import asyncio
 import ipaddress
+import json
 import re
 import socket
 import time
 import urllib.parse
+from itertools import islice
 from typing import Any
 
 import httpx
@@ -30,6 +33,40 @@ from core.tools.registry import register
 BRAVE_URL = "https://api.search.brave.com/res/v1/web/search"
 
 
+# Was ein Treffer hoechstens beitragen darf. Titel und Auszug schreibt der
+# Seitenbetreiber, und `display` geht unveraendert in den Prompt: ohne Deckel
+# genuegt EIN Treffer mit einem Fuenf-Megabyte-Auszug, um das Kontextfenster
+# zu fuellen. Gemessen an echten Brave-Antworten sind Auszuege rund 200
+# Zeichen lang - diese Deckel schneiden im Alltag nichts ab.
+MAX_TITEL = 200
+MAX_AUSZUG = 500
+# Eine Adresse wird NICHT gekuerzt - eine gekuerzte Adresse ist eine falsche
+# Adresse. Ein Treffer mit einer laengeren faellt raus; `fetch_url` wuerde ihn
+# ohnehin ablehnen (FetchUrl.MAX_URL_LAENGE, dieselbe Zahl).
+MAX_TREFFER_URL = 2048
+# Wie viel Antwort hier hoechstens gelesen wird. Wie gross die Antwort ist,
+# entscheidet die Gegenseite - wie viel Speicher JARVIS dafuer ausgibt, nicht.
+# `client.get` lud den ganzen Koerper, BEVOR irgendein Deckel greifen konnte;
+# gemessen am 07.09.2026 gegen MockTransport liess ein 46-MB-Koerper den
+# Speicher des Prozesses um 70 MB steigen, und nach oben war nichts offen.
+#
+# Die Zahl liegt ABSICHTLICH hoch: eine echte Brave-Antwort mit 20 Treffern
+# hat einige Zehntel Megabyte, und die Deckel, die den Prompt schuetzen,
+# sitzen weiter unten am einzelnen Treffer (MAX_TITEL, MAX_AUSZUG) und an der
+# Trefferzahl. Eine grosse, aber brauchbare Antwort soll weiterhin fuenf
+# Treffer ergeben und keinen Fehlschlag - das nageln
+# `test_fuenfzigtausend_treffer_fluten_den_prompt_nicht` (4,5 MB) und
+# `test_ein_einzelner_riesiger_auszug_fuellt_den_prompt_nicht` (5 MB) fest.
+# Dieser Deckel beantwortet nur die andere Frage: wie viel Speicher eine
+# Gegenseite JARVIS abverlangen kann, die gar nicht mehr aufhoert.
+MAX_ANTWORT_BYTES = 16_000_000
+
+
+def _kurz(wert: Any, deckel: int) -> str:
+    text = str(wert).strip()
+    return text if len(text) <= deckel else text[:deckel] + "…"
+
+
 async def brave_suche(
     query: str,
     *,
@@ -38,32 +75,73 @@ async def brave_suche(
     timeout: float = 15.0,
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> list[dict[str, str]]:
-    """Fragt Brave und gibt Treffer als {title, url, description} zurueck."""
+    """Fragt Brave und gibt Treffer als {title, url, description} zurueck.
+
+    Hoechstens `count` Treffer, auch wenn die Gegenseite mehr schickt: der
+    Parameter ist eine Bestellung, keine Zusicherung.
+    """
+    wieviele = max(1, min(count, 20))
+    # Gestroemt und bei MAX_ANTWORT_BYTES abgebrochen - genauso wie
+    # `hole_gepruefte_kette` es fuer Webseiten macht. Ein Fehlerstatus wird
+    # dabei entschieden, BEVOR der Koerper gelesen wird: eine 200-MB-
+    # Fehlerseite laedt niemand, nur um sie wegzuwerfen.
+    roh = bytearray()
     async with httpx.AsyncClient(timeout=timeout, transport=transport) as client:
-        antwort = await client.get(
+        async with client.stream(
+            "GET",
             BRAVE_URL,
-            params={"q": query, "count": max(1, min(count, 20))},
+            params={"q": query, "count": wieviele},
             headers={
                 "Accept": "application/json",
                 "X-Subscription-Token": api_key,
             },
-        )
-    if antwort.status_code == 401:
-        raise PermissionError("SEARCH_API_KEY wurde abgelehnt (401).")
-    if antwort.status_code == 429:
-        raise RuntimeError("Ratenlimit der Such-API erreicht (429).")
-    antwort.raise_for_status()
+        ) as antwort:
+            if antwort.status_code == 401:
+                raise PermissionError("SEARCH_API_KEY wurde abgelehnt (401).")
+            if antwort.status_code == 429:
+                raise RuntimeError("Ratenlimit der Such-API erreicht (429).")
+            antwort.raise_for_status()
+            async for stueck in antwort.aiter_bytes():
+                roh += stueck
+                if len(roh) > MAX_ANTWORT_BYTES:
+                    raise RuntimeError(
+                        "Die Antwort der Such-API war unerwartet gross und "
+                        "wurde nicht ausgewertet."
+                    )
 
-    daten: dict[str, Any] = antwort.json()
-    treffer = ((daten.get("web") or {}).get("results")) or []
+    # Eine Antwort mit Status 200 ist noch keine Antwort in der zugesagten
+    # Form. Gemessen am 07.09.2026 gegen MockTransport flogen hier drei
+    # Faelle ungebremst nach oben - leerer Koerper und kaputtes JSON als
+    # JSONDecodeError, eine JSON-Liste statt eines Objekts als AttributeError.
+    # Der Dispatcher hat sie zwar aufgefangen, aber Noah las dann
+    # "web_search ist mit einem Fehler ausgestiegen" statt zu erfahren, dass
+    # die Such-API Unsinn geschickt hat.
+    try:
+        daten: Any = json.loads(bytes(roh))
+    except ValueError as exc:            # json.JSONDecodeError ist ein ValueError
+        raise RuntimeError(
+            "Die Such-API hat geantwortet, aber nicht lesbar."
+        ) from exc
+    if not isinstance(daten, dict):
+        raise RuntimeError("Die Such-API hat geantwortet, aber nicht lesbar.")
+
+    web = daten.get("web")
+    treffer = (web.get("results") if isinstance(web, dict) else None) or []
+    if not isinstance(treffer, list):
+        treffer = []
+    brauchbar = (
+        t for t in treffer
+        if isinstance(t, dict)
+        and t.get("url")
+        and len(str(t["url"]).strip()) <= MAX_TREFFER_URL
+    )
     return [
         {
-            "title": str(t.get("title", "")).strip(),
-            "url": str(t.get("url", "")).strip(),
-            "description": str(t.get("description", "")).strip(),
+            "title": _kurz(t.get("title", ""), MAX_TITEL),
+            "url": str(t["url"]).strip(),
+            "description": _kurz(t.get("description", ""), MAX_AUSZUG),
         }
-        for t in treffer
-        if isinstance(t, dict) and t.get("url")
+        for t in islice(brauchbar, wieviele)
     ]
 
 
@@ -92,6 +170,8 @@ class WebSearch(Tool):
     }
     permission = Permission.READ
     timeout_s = 20
+    # Titel und Auszug der Treffer schreibt der jeweilige Seitenbetreiber.
+    fremder_text = True
 
     # Wird beim Start aus den Settings gesetzt. Kein Modul-Import von config,
     # damit das Tool in Tests ohne Umgebung baubar bleibt.
@@ -126,6 +206,20 @@ class WebSearch(Tool):
         except PermissionError as exc:
             return ToolResult(ok=False, error=str(exc), display=str(exc),
                               duration_ms=dauer())
+        except httpx.HTTPStatusError as exc:
+            # Ein Server, der mit 500 antwortet, ist erreichbar - er ist nur
+            # kaputt. Vorher stand hier fuer beide Faelle "war nicht
+            # erreichbar"; das schickt Noah auf die Suche nach seinem
+            # Anschluss, obwohl das Problem bei Brave liegt.
+            satz = (
+                f"Die Such-API antwortete mit HTTP {exc.response.status_code}."
+            )
+            return ToolResult(
+                ok=False,
+                error=ohne_geheimnis(exc, "Suche fehlgeschlagen", satz),
+                display=satz,
+                duration_ms=dauer(),
+            )
         except httpx.HTTPError as exc:
             return ToolResult(
                 ok=False,
@@ -178,6 +272,30 @@ ENTITAETEN = {
     "&nbsp;": " ", "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"',
     "&#39;": "'", "&apos;": "'", "&euro;": "€", "&mdash;": "—", "&ndash;": "–",
 }
+
+
+# Woran man sieht, dass eine Antwort HTML ist, obwohl kein Kopf es sagt.
+_SIEHT_NACH_HTML_AUS = re.compile(r"<\s*(!doctype\s+html|html|head|body|p|div|a)\b",
+                                  re.IGNORECASE)
+
+# Zeichen, die in einem Text nichts verloren haben: das Ersatzzeichen der
+# Dekodierung und die Steuerzeichen ausser Tabulator, Zeilenumbruch,
+# Wagenruecklauf.
+_UNLESBAR = re.compile(r"[�\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+# Ab diesem Anteil ist das kein Text mehr, sondern eine Datei, die als Text
+# ausgegeben wird. Gemessen: ein PNG-Rumpf liegt bei rund 50 %, ein deutscher
+# Satz, dessen Kodierung falsch angesagt war ("Gruesse aus Muenchen" als
+# latin-1 unter charset=utf-8), bei 18 %.
+MAX_ANTEIL_UNLESBAR = 0.30
+
+
+def sieht_lesbar_aus(text: str) -> bool:
+    """Ist das Text - oder eine Binaerdatei, die durch die Dekodierung ging?"""
+    if not text:
+        return True
+    probe = text[:4000]
+    return len(_UNLESBAR.findall(probe)) / len(probe) <= MAX_ANTEIL_UNLESBAR
 
 
 def html_zu_text(html: str) -> str:
@@ -293,6 +411,33 @@ def oeffentliches_ziel(url: str) -> str | None:
     return None
 
 
+async def ziel_geprueft(url: str) -> str | None:
+    """`oeffentliches_ziel`, ohne die Ereignisschleife anzuhalten.
+
+    `socket.getaddrinfo` ist eine BLOCKIERENDE Auskunft. Steht der DNS-Server
+    nicht zur Verfuegung - der Fall "ein Dienst fehlt" -, wartet sie mehrere
+    Sekunden, und zwar im Faden der Ereignisschleife. Gemessen am 07.09.2026
+    mit einer Aufloesung, die drei Sekunden braucht:
+
+        Werkzeug-Timeout 1 s -> Aufruf dauerte 3,00 s
+        Ticks einer nebenher laufenden Aufgabe waehrend des Abrufs: 0
+
+    Beides ist schlimm. Der Deckel des Dispatchers (`asyncio.wait_for`) greift
+    nicht, weil er nur zwischen zwei await-Punkten schneiden kann - und der
+    ganze Server steht so lange still: keine zweite Anfrage, kein
+    Lebenszeichen, kein Abbruchknopf. Bei einer Kette aus fuenf Stationen
+    fuenfmal hintereinander.
+
+    Im Arbeitsfaden wartet weiterhin jemand - aber nur der Faden. Die Schleife
+    laeuft, der Timeout schneidet, und der Faden endet von selbst, wenn der
+    Resolver aufgibt.
+
+    Der Name wird ABSICHTLICH erst hier nachgeschlagen: Tests ersetzen
+    `oeffentliches_ziel` im Modul, und das soll wirken.
+    """
+    return await asyncio.to_thread(oeffentliches_ziel, url)
+
+
 # FIX-03 Schritt 2 Punkt 4. Eine Weiterleitung auf 127.0.0.1 ist der
 # Standardweg um eine Eingangspruefung herum: geprueft wird die URL, die das
 # Modell nennt - geholt wird, worauf der fremde Server zeigt. Deshalb folgt
@@ -327,13 +472,22 @@ async def hole_gepruefte_kette(
     stationen: list[str] = []
     ziel = url
     for nummer in range(1, MAX_STATIONEN + 2):
-        grund = oeffentliches_ziel(ziel)
+        grund = await ziel_geprueft(ziel)
+        # Die Adresse einer Station schreibt der fremde Server in seinen
+        # location-Kopf, und dieser Text landet als `error` in der Datenbank,
+        # in /api/tool-calls und in der Oberflaeche. Gemessen am 07.09.2026:
+        # eine Weiterleitung auf eine 60.000 Zeichen lange Adresse ergab eine
+        # 60.097 Zeichen lange Fehlermeldung. Dieselbe Grenze wie bei einer
+        # Trefferadresse - laenger ist keine Adresse mehr, sondern Fracht.
         if grund is not None:
-            raise ZielVerboten(f"Station {nummer} ({ziel}): {grund}")
+            raise ZielVerboten(
+                f"Station {nummer} ({_kurz(ziel, MAX_TREFFER_URL)}): {grund}"
+            )
         if nummer > MAX_STATIONEN:
             raise ZielVerboten(
-                f"Mehr als {MAX_STATIONEN} Weiterleitungen ab {url} - "
-                f"Station {nummer} waere {ziel}."
+                f"Mehr als {MAX_STATIONEN} Weiterleitungen ab "
+                f"{_kurz(url, MAX_TREFFER_URL)} - Station {nummer} waere "
+                f"{_kurz(ziel, MAX_TREFFER_URL)}."
             )
         stationen.append(ziel)
 
@@ -351,7 +505,9 @@ async def hole_gepruefte_kette(
                     break
             return antwort, bytes(roh[:max_bytes]), stationen
 
-    raise ZielVerboten(f"Weiterleitungskette ab {url} endet nicht.")
+    raise ZielVerboten(
+        f"Weiterleitungskette ab {_kurz(url, MAX_TREFFER_URL)} endet nicht."
+    )
 
 
 @register
@@ -379,10 +535,21 @@ class FetchUrl(Tool):
     }
     permission = Permission.READ
     timeout_s = 20
+    # Der reine Fall: der Text einer fremden Webseite.
+    fremder_text = True
 
     # Mehr als das laedt niemand, um einen Text zu lesen - und es verhindert,
     # dass ein 200-MB-Download den Task auffrisst.
     MAX_BYTES = 2_000_000
+
+    # FIX-11 Punkt 6. Eine Adresse ist ein Wegweiser, kein Frachtraum. Wer
+    # Daten aus dem Rechner schaffen will, haengt sie an die Abfrage
+    # ("...?d=<halbe Steuerakte>") - dagegen hilft die Herkunftspruefung in
+    # core/tools/loop.py, aber sie greift nur dort, wo eine Schleife laeuft.
+    # Diese Grenze steht im Werkzeug selbst und gilt damit auf JEDEM Weg,
+    # auch bei einem direkten `run_tool("fetch_url", ...)`. 2.048 Zeichen
+    # sind grosszuegig: die laengste Adresse in diesem Projekt hat 76.
+    MAX_URL_LAENGE = 2048
 
     transport: httpx.AsyncBaseTransport | None = None
 
@@ -392,7 +559,18 @@ class FetchUrl(Tool):
         def dauer() -> int:
             return int((time.monotonic() - begonnen) * 1000)
 
-        grund = oeffentliches_ziel(url)
+        # Vor der Namensaufloesung: eine 100.000-Zeichen-Adresse soll nicht
+        # erst noch durch DNS gehen.
+        if len(url) > self.MAX_URL_LAENGE:
+            satz = (
+                f"Die Adresse ist zu lang: {len(url)} Zeichen, erlaubt sind "
+                f"{self.MAX_URL_LAENGE}."
+            )
+            # Ohne die Adresse selbst - sie IST hier das Problem.
+            return ToolResult(ok=False, error=satz, display=satz,
+                              duration_ms=dauer())
+
+        grund = await ziel_geprueft(url)
         if grund is not None:
             return ToolResult(
                 ok=False,
@@ -453,7 +631,31 @@ class FetchUrl(Tool):
         except (LookupError, UnicodeDecodeError):
             inhalt = roh.decode("utf-8", errors="replace")
 
-        text = html_zu_text(inhalt) if "html" in typ.lower() else inhalt.strip()
+        # Ohne Content-Type entscheidet der Inhalt. Vorher ging eine Antwort
+        # ohne Kopf ungefiltert durch, und der Prompt bekam den rohen
+        # HTML-Quelltext samt Skript-Bloecken statt des Seitentextes.
+        ist_html = "html" in typ.lower() or (
+            not typ.strip() and bool(_SIEHT_NACH_HTML_AUS.search(inhalt[:2000]))
+        )
+        text = html_zu_text(inhalt) if ist_html else inhalt.strip()
+
+        # Ein Bild, ein PDF, ein Zip: dekodiert wird daraus eine Wand aus
+        # Ersatzzeichen, und die ging vorher als ok=True in den Prompt
+        # (gemessen: 2.048 Zeichen Muell aus einer 2-KB-PNG-Attrappe). Das
+        # ist kein Ergebnis, das ist ein Fehlschlag mit Deckmantel.
+        if not sieht_lesbar_aus(text):
+            return ToolResult(
+                ok=False,
+                error="Die Antwort war kein lesbarer Text.",
+                display=(
+                    f"{url} lieferte keinen lesbaren Text, sondern eine Datei "
+                    f"(Content-Type: {typ or 'unbekannt'}). fetch_url liest "
+                    "nur Seiten und Textdateien."
+                ),
+                sources=[str(antwort.url)],
+                duration_ms=dauer(),
+            )
+
         gekuerzt = len(text) > max_chars
         if gekuerzt:
             text = text[:max_chars] + "\n\n[…gekuerzt]"

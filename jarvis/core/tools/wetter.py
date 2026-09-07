@@ -63,6 +63,33 @@ WMO = {
 }
 
 
+# So lang darf ein Ortsname hoechstens sein - hin wie zurueck. Hin: ein
+# 5.000 Zeichen langer Name aus dem Modell wuerde ungeprueft in die Abfrage
+# wandern. Zurueck: der Name aus der fremden Antwort steht in `display` und
+# geht damit ins Modell - gemessen kamen 200.000 Zeichen ungekuerzt an.
+# Dieselbe Zahl wie in core/orte.py.
+ORT_MAX = 120
+
+# Mehr Tage, als angefragt wurden, werden nicht ausgegeben. Open-Meteo
+# haelt sich an `forecast_days`, aber `display` ist genau der Text, der ins
+# Modell geht: eine Antwort mit 50.000 Tagen ergab 5,9 MB Bericht.
+TAGE_MAX = 3
+
+
+def _objekt(wert: Any) -> dict[str, Any]:
+    """Nur ein Objekt ist ein Objekt. Alles andere wird zu {}.
+
+    Gemessen: eine Antwort, die eine JSON-Liste statt eines Objekts
+    schickte, liess `.get()` mit AttributeError fliegen - und AttributeError
+    faengt hier niemand ab.
+    """
+    return wert if isinstance(wert, dict) else {}
+
+
+def _liste(wert: Any) -> list[Any]:
+    return wert if isinstance(wert, list) else []
+
+
 def wetter_text(code: Any) -> str:
     try:
         return WMO.get(int(code), f"Wettercode {int(code)}")
@@ -119,6 +146,9 @@ class Wetter(Tool):
         "additionalProperties": False,
     }
     permission = Permission.READ
+    # Ortsname und Region kommen aus der Geokodierung eines fremden
+    # Dienstes und stehen unveraendert im Bericht.
+    fremder_text = True
 
     # Werden beim App-Start gesetzt (api/app.py), nicht importiert.
     standard_ort: str = ""
@@ -129,16 +159,29 @@ class Wetter(Tool):
 
     async def execute(self, ort: str | None = None, tage: int | None = None) -> ToolResult:
         begonnen = time.monotonic()
-        ort = (ort or self.standard_ort or "").strip()
+
+        def dauer() -> int:
+            return int((time.monotonic() - begonnen) * 1000)
+
+        # `str(...)`, nicht `ort or ...`: kommt eine Zahl statt eines Namens
+        # an, flog hier bisher AttributeError ('int' has no 'strip') roh nach
+        # oben. Der Dispatcher prueft das Schema zwar - aber das Werkzeug
+        # soll auch ohne ihn nicht platzen.
+        ort = (str(ort if ort is not None else "").strip()
+               or str(self.standard_ort or "").strip())
         if not ort:
             hinweis = ("Kein Ort angegeben, und JARVIS_ORT ist leer. Nenn einen Ort "
                        "oder trag JARVIS_ORT in die .env ein.")
             return ToolResult(ok=False, error=hinweis, display=hinweis)
+        if len(ort) > ORT_MAX:
+            hinweis = "Der Ortsname ist unsinnig lang. Nenn nur den Ort."
+            return ToolResult(ok=False, error=hinweis, display=hinweis,
+                              duration_ms=dauer())
         try:
             tage = int(tage) if tage is not None else 2
         except (TypeError, ValueError):
             tage = 2
-        tage = max(1, min(3, tage))
+        tage = max(1, min(TAGE_MAX, tage))
 
         gecached = self._aus_cache(ort, tage)
         if gecached is not None:
@@ -152,12 +195,12 @@ class Wetter(Tool):
                 geo = await client.get(GEO_URL, params={
                     "name": ort, "count": 1, "language": "de", "format": "json"})
                 geo.raise_for_status()
-                treffer = (geo.json() or {}).get("results") or []
+                treffer = _liste(_objekt(geo.json()).get("results"))
                 if not treffer:
                     text = f"Den Ort {ort!r} kennt der Wetterdienst nicht."
                     return ToolResult(ok=False, error=text, display=text,
                                       duration_ms=int((time.monotonic() - begonnen) * 1000))
-                platz = treffer[0]
+                platz = _objekt(treffer[0])
                 antwort = await client.get(VORHERSAGE_URL, params={
                     "latitude": platz["latitude"], "longitude": platz["longitude"],
                     "current": "temperature_2m,weather_code",
@@ -166,7 +209,7 @@ class Wetter(Tool):
                               "wind_speed_10m_max,sunrise,sunset"),
                     "timezone": "auto", "forecast_days": tage})
                 antwort.raise_for_status()
-                daten = antwort.json() or {}
+                daten = _objekt(antwort.json())
         except httpx.HTTPError as exc:
             text = ohne_geheimnis(exc, "Wetterdienst nicht erreichbar",
                                   "Spaeter noch einmal versuchen")
@@ -177,40 +220,72 @@ class Wetter(Tool):
             return ToolResult(ok=False, error=text, display=text,
                               duration_ms=int((time.monotonic() - begonnen) * 1000))
 
+        jetzt = _objekt(daten.get("current"))
+        vorhersage = self._nur_angefragte_tage(daten, tage)
+        if not jetzt and not vorhersage.get("time"):
+            # Weder ein Jetzt noch ein Morgen: das ist kein Bericht, sondern
+            # eine leere Antwort. Bisher kam sie als ok=True heraus, mit dem
+            # Ortsnamen und sonst nichts.
+            text = ("Der Wetterdienst hat zu diesem Ort keine Wetterdaten "
+                    "geliefert. Spaeter noch einmal versuchen.")
+            return ToolResult(ok=False, error=text, display=text,
+                              duration_ms=dauer())
+
         try:
-            anzeige = self._formatiere(platz, daten)
+            anzeige = self._formatiere(platz, jetzt, vorhersage)
         except (KeyError, TypeError, ValueError, IndexError) as exc:
             text = ohne_geheimnis(exc, "Wetterdaten unvollstaendig")
             return ToolResult(ok=False, error=text, display=text,
-                              duration_ms=int((time.monotonic() - begonnen) * 1000))
+                              duration_ms=dauer())
         self._merken(ort, tage, platz, anzeige)
         return ToolResult(
             ok=True,
-            data={"ort": platz.get("name"), "land": platz.get("country_code"),
+            data={"ort": self._name(platz), "land": platz.get("country_code"),
                   "latitude": platz.get("latitude"), "longitude": platz.get("longitude"),
-                  "aktuell": daten.get("current"), "tage": daten.get("daily"),
+                  "aktuell": jetzt or None, "tage": vorhersage or None,
                   "cache": False},
             display=anzeige,
             sources=[QUELLE],
-            duration_ms=int((time.monotonic() - begonnen) * 1000),
+            duration_ms=dauer(),
         )
 
     # --- Text -----------------------------------------------------------
 
     @staticmethod
-    def _formatiere(platz: dict[str, Any], daten: dict[str, Any]) -> str:
-        wo = platz.get("name", "?")
-        region = ", ".join(x for x in (platz.get("country_code"), platz.get("admin1")) if x)
+    def _name(platz: dict[str, Any]) -> str:
+        """Der Ortsname aus der fremden Antwort - gekuerzt.
+
+        Er steht in `display` und geht damit woertlich ins Modell. Gemessen:
+        ein Name mit 200.000 Zeichen kam ungekuerzt durch.
+        """
+        return str(platz.get("name") or "?")[:ORT_MAX]
+
+    @staticmethod
+    def _nur_angefragte_tage(daten: dict[str, Any], tage: int) -> dict[str, Any]:
+        """Die Vorhersage auf so viele Tage kuerzen, wie angefragt wurden.
+
+        `forecast_days` steht in der Anfrage; was darueber hinaus
+        zurueckkommt, ist nicht bestellt. Gemessen: eine Antwort mit 50.000
+        Tagen ergab einen Bericht von 5,9 MB - und `display` ist genau der
+        Text, der ins Modell geht.
+        """
+        tag = _objekt(daten.get("daily"))
+        return {schluessel: _liste(werte)[:tage] for schluessel, werte in tag.items()}
+
+    @classmethod
+    def _formatiere(cls, platz: dict[str, Any], jetzt: dict[str, Any],
+                    tag: dict[str, Any]) -> str:
+        wo = cls._name(platz)
+        region = ", ".join(str(x)[:ORT_MAX] for x in
+                           (platz.get("country_code"), platz.get("admin1")) if x)
         zeilen = []
-        jetzt = daten.get("current") or {}
         if jetzt:
             zeilen.append(f"{wo} ({region}): jetzt {_de(jetzt.get('temperature_2m'))} °C, "
                           f"{wetter_text(jetzt.get('weather_code'))}.")
         else:
             zeilen.append(f"{wo} ({region}):")
-        tag = daten.get("daily") or {}
         namen = ["Heute", "Morgen", "Uebermorgen"]
-        for i, datum in enumerate(tag.get("time") or []):
+        for i, datum in enumerate(_liste(tag.get("time"))):
             zeilen.append(
                 f"{namen[i] if i < len(namen) else datum} ({_tag(datum)}): "
                 f"{_de(tag['temperature_2m_min'][i])} bis {_de(tag['temperature_2m_max'][i])} °C, "
@@ -231,8 +306,17 @@ class Wetter(Tool):
             return None
         from core.wissen import aus_cache
 
-        treffer = aus_cache(self.db_path, f"{ort.lower()}|{tage}", "wetter",
-                            max_alter_stunden=self.cache_stunden)
+        try:
+            treffer = aus_cache(self.db_path, f"{ort.lower()}|{tage}", "wetter",
+                                max_alter_stunden=self.cache_stunden)
+        except Exception:  # noqa: BLE001 - der Cache ist Beiwerk, wie beim Schreiben
+            # Gemessen: eine Datenbank, die es nicht gibt oder in der die
+            # Tabelle fehlt, liess sqlite3.OperationalError roh nach oben
+            # fliegen - und damit fiel der ganze Wetterbericht aus, obwohl
+            # die Antwort aus dem Netz in Ordnung war. Beim SCHREIBEN war
+            # das schon abgefangen, beim LESEN nicht.
+            log.exception("wetter: Cache nicht gelesen")
+            return None
         return treffer.text if treffer else None
 
     def _merken(self, ort: str, tage: int, platz: dict[str, Any], text: str) -> None:

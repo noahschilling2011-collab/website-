@@ -28,9 +28,6 @@ from core.config import Settings
 NUR_API = {
     "/api/audit": "Revisionsspur. Wird gelesen, wenn jemand nachsehen will, nicht laufend.",
     "/api/task-log": "Eine Zeile je Auftrag, fuer Auswertung von aussen.",
-    "/api/chat": "Rest aus Phase 1. Der einzige Pfad, der Verlauf und "
-                 "settings.system_prompt ans Modell gibt - siehe docs/FIX-01.md, "
-                 "Befund zu Schritt 7. Die Oberflaeche benutzt ihn nicht.",
     "/openapi.json": "Von FastAPI erzeugt.",
     "/docs": "Von FastAPI erzeugt.",
     "/docs/oauth2-redirect": "Von FastAPI erzeugt.",
