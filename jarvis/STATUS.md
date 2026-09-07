@@ -4,7 +4,7 @@
 > und aktualisiert sie am Ende jeder Phase. Von Hand korrigieren ist erlaubt.
 
 AKTUELL: FIX-06 — COMMAND CENTER, siehe `docs/FIX-06.md`. Abschnitte 5 (Design-System), 6 (COMMAND CENTER) und 7 (WELT-NETZ) sind gebaut; **8 (MÄRKTE) steht aus und ist blockiert** — der Auftragstext dafür liegt nicht im Repo, nur der Name in der Kopfzeile von `docs/FIX-06.md`.
-LETZTE ÄNDERUNG: 2026-09-07 (FIX-11 Welle 2: jeder Auftrag bekommt einen Endzustand, auch wenn er stirbt; fremder Text wird an der Engstelle gerahmt; `fetch_url` holt nur genannte Adressen; **normale Nachrichten gehen über den Chat-Pfad** — ein Modellaufruf statt drei, mit Verlauf und Gedächtnisblock, Auftrag hinter einem Schalter — siehe `docs/FIX-11.md`. Davor Welle 1: Start prüft, sichert und migriert von selbst; Host-Sperre für die Seite mit dem Token; Grenzen an Modell-Argumenten; Erinnerungen im Formular, „in 20 minuten", eigener Deckel-Topf, Ton/Meldung/Vorlesen, Zeitpläne nur noch READ. Davor FIX-09 mit Prüfrunde, 23 Funde behoben — siehe `docs/FIX-09.md`. Davor FIX-08 mit zwei Prüfrunden.)
+LETZTE ÄNDERUNG: 2026-09-07 (FIX-12 Ausfallmatrix: **der API-Key fällt aus jeder Fehlermeldung heraus**; der DNS hält die Ereignisschleife nicht mehr an; „ich weiß es nicht" ist keine leere Terminliste; NaN wird keine Hektarzahl und keine bbox über die ganze Erde; ein kaputter Cache ist kein Grund, gar nicht nachzuschlagen; Antworten von draußen werden geströmt statt geladen — siehe `OPUS5_REPORT.md`. Davor FIX-11 Welle 2: jeder Auftrag bekommt einen Endzustand, auch wenn er stirbt; fremder Text wird an der Engstelle gerahmt; `fetch_url` holt nur genannte Adressen; **normale Nachrichten gehen über den Chat-Pfad** — ein Modellaufruf statt drei, mit Verlauf und Gedächtnisblock, Auftrag hinter einem Schalter — siehe `docs/FIX-11.md`. Davor Welle 1: Start prüft, sichert und migriert von selbst; Host-Sperre; Grenzen an Modell-Argumenten; Erinnerungen für Menschen; Zeitpläne nur noch READ. Davor FIX-09 mit Prüfrunde, 23 Funde behoben — siehe `docs/FIX-09.md`.)
 
 > **Abweichung von der Arbeitsweise, auf Ansage:** es wurden alle Phasen
 > gebaut, nicht eine nach der anderen. Das widerspricht CLAUDE.md
@@ -2401,6 +2401,37 @@ beide Pfade bleiben und teilen sich die Arbeit.
 
 **Offen:** nichts aus dem Paket. Grenzen, die bleiben, stehen in
 `docs/FIX-11.md`.
+
+## FIX-12 — Die Ausfallmatrix
+
+Eine Inventur über **alle** Werkzeuge, mit derselben Matrix je Werkzeug:
+fehlende Konfiguration, fehlende Zugangsdaten, Timeout, Verbindungsabbruch,
+HTTP 4xx/5xx, Ratenlimit, Status 200 mit Unsinn im Körper, unerwartete Form,
+leeres Ergebnis, riesiges Ergebnis.
+
+**Befund:** fehlende *Konfiguration* war gut abgedeckt. *Laufzeitausfälle*
+kaum. Der schwerste Fund: **der API-Key stand in Fehlermeldungen des
+Anbieters** und ging von dort in den Chat, in `tasks.result`, in die Datenbank
+und im nächsten Zug als Verlauf zurück zum Anbieter — OpenAI-kompatible
+Dienste schicken den geschickten Key in der 401 wörtlich zurück.
+
+Danach: ein blockierender DNS hielt die ganze Ereignisschleife an;
+`kante_km=NaN` ergab eine bbox über die ganze Erde; eine Datei ohne
+iCalendar las sich als „0 Termine"; ein unbekanntes `TZID` wurde still zu
+UTC; ein kaputter Cache riss den Nachschlag ab; eine Binärdatei ging als
+Ergebnis in den Prompt.
+
+**Eigene Abnahme, acht Lücken** — alle nach demselben Muster: ein Deckel, den
+kein Test misst, weil ein äußerer Deckel das Ergebnis ohnehin klein hält. Dazu
+Tests, die ihre Testdaten **aus der Konstanten bauen**, die sie prüfen sollen,
+und deshalb ein stilles Hochsetzen nicht bemerken (Regel 6). Zwei Tests, die
+ich selbst geschrieben hatte, waren vakuum.
+
+**Ausgeführt:** volle Suite **2275 grün** und der Rauchtest, beides auf einem
+frischen Checkout des Branch-Kopfes — der erste Versuch war im
+Arbeitsverzeichnis grün und auf dem sauberen Baum rot, weil eine Konstante in
+einer noch nicht committeten Datei stand. Rund 40 Mutationsproben.
+Belege: `OPUS5_REPORT.md`, Abschnitt 7a.
 
 ## FIX-09 — Was ein JARVIS wirklich braucht
 

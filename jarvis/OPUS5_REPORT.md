@@ -150,11 +150,15 @@ rot — die Zusage hängt nicht an einem einzigen Test.
 
 ```
 $ pytest -p no:randomly
-1909 passed, 1 warning in 460.24s (0:07:40)
+2275 passed, 1 warning in 493.72s (0:08:13)
 
 $ python -m scripts.smoke
 Rauchtest bestanden.
 ```
+
+Beides auf einem **frischen Checkout des Branch-Kopfes** (`git worktree`), nicht
+im Arbeitsverzeichnis — der erste Versuch war dort grün und auf dem sauberen
+Baum rot, weil eine Konstante in einer noch nicht committeten Datei stand.
 
 Browser-Nachweis (Chromium über `tests.conftest.CHROMIUM`, echter uvicorn):
 
@@ -205,22 +209,71 @@ einen Test abgeschaltet.
 
 1. **FIX-06 MÄRKTE** — blockiert, siehe Blocker (2). Wartet auf die
    ursprüngliche Spezifikation.
-2. **Ausfallmatrix-Ergebnisse abnehmen.** Eine Inventur über alle Werkzeuge hat
-   gezeigt: fehlende *Konfiguration* ist gut abgedeckt, *Laufzeitausfälle*
-   kaum. Die daraus entstandenen Änderungen an `core/orte.py` und
-   `core/tools/{wetter,wissen_tools,satellite_tools,search}.py` plus
-   `tests/test_fix12_{wetter,wissen}.py` liegen **noch nicht committet** im
-   Arbeitsverzeichnis und brauchen dieselbe Abnahme wie alles andere.
-3. **Drei Kleinfunde**, gefunden, nicht repariert:
+2. **Drei Kleinfunde**, gefunden, nicht repariert:
    - `recall` wirft, wo `remember` ein Ergebnis liefert — zwei Werkzeuge
      desselben Paars mit unterschiedlichem Fehlerverhalten.
    - `remember` gibt internes Vokabular an den Nutzer weiter.
    - Kein Stemming im Gedächtnis: „fahre" findet „fährt" nicht.
-4. **Ein Randfall im Chat-Pfad**, dokumentiert und bewusst offen: ist eine
+3. **Ein Randfall im Chat-Pfad**, dokumentiert und bewusst offen: ist eine
    zugestellte Erinnerung die **allererste** Nachricht im Verlauf, fällt sie aus
    dem Modellverlauf, weil `ab_erster_nutzernachricht()` ab der ersten
    `user`-Zeile schneidet (BUGS-01 Fund 23: ein Verlauf, der mit `assistant`
    beginnt, wird von echten Anbietern abgelehnt).
+
+---
+
+## 7a. Zweite Runde: die Ausfallmatrix
+
+Nach FIX-11 habe ich eine Inventur über **alle** Werkzeuge gemacht, mit einer
+festen Matrix je Werkzeug: fehlende Konfiguration, fehlende Zugangsdaten,
+Timeout, Verbindungsabbruch, HTTP 4xx/5xx, Ratenlimit, Antwort mit Status 200
+und Unsinn im Körper, unerwartete Form, leeres Ergebnis, riesiges Ergebnis.
+
+**Befund:** fehlende *Konfiguration* war gut abgedeckt (kein Key, keine Wurzel,
+kein Ort — überall ein Satz). *Laufzeitausfälle* kaum. Neun Commits später:
+
+| Datei | was jetzt hält |
+|---|---|
+| `core/llm.py` | **Der API-Key fällt aus jeder Fehlermeldung heraus.** OpenAI-kompatible Dienste schicken den Key in der 401 wörtlich zurück; der Text ging in den Chat, in `tasks.result`, in die Datenbank und im nächsten Zug zurück zum Anbieter. Dazu: kaputte Tokenzahl reißt den Zug nicht mehr ab, Antwortdeckel, `max_retries=-1`. |
+| `core/kalender.py` | „Ich weiß es nicht" ist keine leere Terminliste: eine Datei ohne iCalendar las sich als „0 Termine". Ein unbekanntes `TZID` (Outlook: `W. Europe Standard Time`) wurde still zu UTC — jeder Termin ein bis zwei Stunden daneben, ohne ein Wort. |
+| `core/orte.py` | `kante_km=NaN` ergab eine bbox über die **ganze Erde** — `math.isfinite` muss vor `<= 0` stehen, weil jeder Vergleich mit NaN False ist. Dazu Netzfehler, unerwartete Formen, Namensdeckel, `nach_draussen`. |
+| `core/tools/search.py` | Der blockierende DNS hielt die **ganze Ereignisschleife** an: kein Timeout griff, keine zweite Anfrage kam durch. Dazu: 200 mit Unsinn, Antwort ohne Content-Type, Binärdatei als „Ergebnis", Streaming statt Laden. |
+| `core/tools/wissen_tools.py` | Ein kaputter Cache ist kein Grund, gar nicht nachzuschlagen. Dazu ein Byte zu wenig gelesen: eine Antwort von exakt 2.000.000 Byte war vollständig da und wurde als „zu groß" abgelehnt. |
+| `core/satellite/*` | NaN wird keine Hektarzahl; der Kopf zählt die wirklich gerechneten Satelliten statt aller gelieferten; CelesTrak-Ausfall fällt auf den alten Cachestand zurück; Bahndaten werden geströmt. |
+| `core/tools/wetter.py` | Namensgrenze hin wie zurück, Tagesdeckel (50.000 Tage ergaben 5,9 MB Bericht). |
+
+**Meine eigene Abnahme fand acht Lücken**, die die Bauer nicht gesehen hatten —
+alle nach demselben Muster: **ein Deckel, den kein Test misst.**
+
+- `MAX_ZELLE` und `MAX_ANTWORT_BYTES` in `wissen_tools`, `MAX_SATELLITEN` in
+  `ueberflug`, `$top` in `cdse` — wegzunehmen machte **keinen** Test rot, weil
+  ein äußerer Deckel das Ergebnis trotzdem klein hielt. Gestaffelte
+  Verteidigung, die niemand misst, ist nur ein Wort.
+- Mehrere Tests bauten ihre Testdaten **aus der Konstanten**, die sie prüfen
+  sollten (`"Z" * (MAX_ANTWORT_BYTES + 10_000)`) — und blieben deshalb grün,
+  wenn jemand die Zahl still hochsetzt. Dagegen stehen jetzt Zeilen, die die
+  abgesprochene Zahl festnageln (Regel 6).
+- `core/tools/search.py` hatte den Fadenwechsel an **einer** Aufrufstelle
+  ungeprüft; ein Tick-Zähler genügte nicht, weil die zweite Stelle die Schleife
+  ohnehin drehen ließ. Gemessen wird jetzt exakt: **auf welchem Faden** lief die
+  Namensauflösung?
+- Zwei Tests, die ich selbst geschrieben hatte, waren **vakuum**: einer
+  benutzte einen synchronen Generator, wo httpx einen asynchronen verlangt (er
+  war grün, ohne je ein Byte geliefert zu haben), der andere suchte `$top=50`
+  als Teilzeichenkette — und die steckt auch in `$top=5000`.
+
+`tests/test_fix03.py::test_schritt2_eine_riesige_antwort_wird_nicht_ganz_geladen`
+war zusätzlich lastabhängig: es zählte, wie viele Bytes der **Sender**
+losgeworden ist, und verlangte weniger als die Hälfte. Gemessen auf einer
+belasteten Maschine, sechs Läufe je Stand: **5 von 6 rot ohne** und **1 von 6
+mit** meinem Faden-Umbau — der Verdächtige war es also nicht, die Schwelle lag
+zu dicht am Messwert. Gemessen wird jetzt der **Empfänger**, und der ist
+deterministisch.
+
+**Stand nach der Runde:** `2275 passed`, Rauchtest bestanden, jeder Commit
+einzeln auf einem frischen Checkout geprüft — der erste Versuch war grün im
+Arbeitsverzeichnis und **rot auf einem sauberen Baum**, weil eine Konstante in
+einer noch nicht committeten Datei stand.
 
 ---
 
@@ -239,6 +292,9 @@ umbenannt oder umgebaut.
 | `core/db.py` | `tote_tasks_beenden(db_path, laufende_ids)` — **braucht die Menge der wirklich laufenden Task-IDs**. Bei mehr als einem Prozess ist diese Menge prozesslokal und die Aufräumung würde fremde Läufe töten. Das ist die Stelle, an der „ein Prozess, kein `--workers`" hart wird. |
 | `core/rahmen.py`, `core/tools/dispatch.py` | Der Rahmen um fremden Text sitzt an **einer** Stelle. Ein neues Werkzeug erbt ihn automatisch — es darf ihn nicht selbst noch einmal legen. |
 | `index.html` | Der Schalter `#btn-modus` entscheidet die Route. Wer den Composer umbaut, muss ihn mitnehmen; die Zusagen dazu stehen in `tests/test_fix11_chat.py`. |
+| `core/llm.py` | `LLMProvider._ohne_key` läuft über **jede** Ausgabe. Wer eine neue Fehlermeldung baut, schickt sie da hindurch — sonst steht der Key im Verlauf. `FakeLLMProvider` nimmt jetzt `LLMError` in `replies`: damit lässt sich ein Anbieterausfall bis in `api/tasks.py` durchspielen, ohne HTTP nachzubauen. |
+| `core/kalender.py` | `parse()` gibt **vier** Werte zurück (Termine, wiederkehrende, unlesbare, unbekannte Zeitzonen). Ein externer Aufrufer muss mitziehen; im Baum gibt es genau einen. |
+| Deckel-Konstanten | `MAX_ANTWORT_BYTES` steht jetzt in vier Modulen mit **unterschiedlichen** Werten (LLM 2 MB, Wissen 2 MB, CelesTrak 8 MB, Suche 16 MB) — je nachdem, was der Normalfall ist. Sie sind absichtlich nicht zusammengelegt; jede Zahl trägt ihre eigene Messung im Kommentar. Je eine Testzeile nagelt sie fest. |
 
 **Was ich nicht angefasst habe und du also unverändert vorfindest:** Task-Pfad,
 Runner, alle Verträge, `history_limit` (bleibt bei der Groq-Grenze von 8k TPM),
