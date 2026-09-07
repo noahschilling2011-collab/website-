@@ -555,17 +555,34 @@ def test_schritt2_eine_riesige_antwort_wird_nicht_ganz_geladen():
         ERLAUBT_INTERN.discard(marke)
         server.shutdown()
 
-    # Der Sender hat, als abgebrochen wurde, schon in die Socket-Puffer
-    # geschrieben - das laesst sich nicht verhindern und ist auch nicht der
-    # Punkt. Der Punkt ist, dass die Uebertragung frueh endet statt bis zum
-    # letzten Byte zu laufen.
-    voll = 200 * len(block)
-    assert gesendet["bytes"] < voll // 2, (
-        f"{gesendet['bytes']} von {voll} Bytes gingen raus - "
-        "die Uebertragung wurde nicht abgebrochen"
-    )
+    # Die eigentliche Zusage, und die einzige, die hier unter unserer
+    # Kontrolle steht: der EMPFAENGER hat bei MAX_BYTES aufgehoert. Das
+    # steht in `chars` und ist deterministisch.
     assert ergebnis.ok is True, ergebnis.error
     assert (ergebnis.data or {}).get("truncated") is True, ergebnis.data
+    gelesen = (ergebnis.data or {}).get("chars") or 0
+    assert 0 < gelesen <= FetchUrl.MAX_BYTES, (gelesen, FetchUrl.MAX_BYTES)
+
+    # Und der SENDER kam nicht durch. Wie weit er kam, entscheiden die
+    # Socket-Puffer und die Last auf der Maschine, nicht unser Code - der
+    # Sender laeuft in einem eigenen Faden und schreibt weiter, bis der
+    # abgebrochene Anschluss bei ihm ankommt.
+    #
+    # Hier stand `< voll // 2`. Gemessen am 07.09.2026 auf einer belasteten
+    # Maschine, sechs Laeufe je Stand: 6.976.000 von 12.800.000 Bytes,
+    # also 54 % - der Test wurde rot, obwohl der Abbruch tadellos
+    # funktionierte. Und zwar in 5 von 6 Laeufen OHNE und in 1 von 6 MIT
+    # dem Faden-Umbau in `ziel_geprueft`, der Verdaechtige war es also
+    # nicht: die Schwelle selbst lag zu dicht am Messwert.
+    #
+    # Die Schwelle ist deshalb jetzt die Aussage, die der Test wirklich
+    # macht - "nicht bis zum letzten Byte" - statt einer Zahl, die vom
+    # Puffer der Maschine abhaengt.
+    voll = 200 * len(block)
+    assert gesendet["bytes"] < voll, (
+        f"{gesendet['bytes']} von {voll} Bytes gingen raus - "
+        "die Uebertragung wurde ueberhaupt nicht abgebrochen"
+    )
 
 
 def test_schritt2_die_gepruefte_kette_haelt_den_bytedeckel_genau_ein():
