@@ -47,6 +47,14 @@ RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 529})
 # Seiten: was von aussen kommt, hat eine Obergrenze.
 MAX_ANTWORT_BYTES = 2_000_000
 
+# Wieviel vom zitierten Fehlertext des Anbieters in die Meldung darf. Der
+# Nicht-JSON-Zweig in `_error_from` kappte laengst bei 300 Zeichen, der
+# JSON-Zweig gar nicht: ein Gateway mit 3 MB in `error.message` schickte
+# 3 MB durch `str(exc)` in den Chat, in `tasks.result`, in die Datenbank und
+# im naechsten Zug als Verlauf zurueck zum Anbieter. Derselbe Weg, den
+# MAX_ANTWORT_BYTES fuer die geglueckte Antwort schliesst.
+MAX_FEHLERTEXT_ZEICHEN = 300
+
 
 def _zahl(wert: Any) -> int:
     """Eine Tokenzahl aus der Antwort - oder 0, wenn dort Unsinn steht.
@@ -463,9 +471,16 @@ class _HTTPAnbieter(LLMProvider):
             header = response.headers.get("retry-after")
             if header:
                 try:
-                    return max(0.0, min(60.0, float(header)))
+                    wert = float(header)
                 except ValueError:
                     pass
+                else:
+                    # `float("nan")` wirft nicht, und jeder Vergleich damit
+                    # ist False - `min(60.0, nan)` ergibt 60.0. Ein kaputter
+                    # Kopf holte damit die laengstmoegliche Wartezeit heraus.
+                    # `nan != nan` ist die Probe, die ohne Import auskommt.
+                    if wert == wert:
+                        return max(0.0, min(60.0, wert))
         return float(2**attempt)
 
     def _ohne_key(self, text: str) -> str:
@@ -485,11 +500,21 @@ class _HTTPAnbieter(LLMProvider):
     def _error_from(self, response: httpx.Response) -> LLMError:
         status = response.status_code
         detail = ""
-        try:
-            payload = response.json()
-        except ValueError:
-            detail = response.text[:300].strip()
+        rumpf = response.content
+        if len(rumpf) > MAX_ANTWORT_BYTES:
+            # Nicht einmal lesen: ein Fehlerrumpf dieser Groesse ist selbst
+            # der Fehler, und `json()` darauf kostet nur Speicher. Der Status
+            # allein sagt genug.
+            log.warning("Fehlerrumpf des Anbieters ist %d Bytes gross - "
+                        "nicht ausgewertet", len(rumpf))
+            payload = None
         else:
+            try:
+                payload = response.json()
+            except ValueError:
+                payload = None
+                detail = response.text[:MAX_FEHLERTEXT_ZEICHEN].strip()
+        if payload is not None:
             # `error` ist laut Doku ein Objekt mit `message` - aber ein
             # Gateway dazwischen haelt sich nicht an die Doku. Frueher rief
             # der Code `.get` auf allem, was dort stand: bei `"error": "text"`
@@ -500,7 +525,9 @@ class _HTTPAnbieter(LLMProvider):
                 detail = str(fehler.get("message", "")).strip()
             elif isinstance(fehler, str):
                 detail = fehler.strip()
-        detail = self._ohne_key(detail)
+        # Erst schwaerzen, dann kappen - umgekehrt bliebe ein halber Key
+        # stehen, den `_ohne_key` nicht mehr wiedererkennt.
+        detail = self._ohne_key(detail)[:MAX_FEHLERTEXT_ZEICHEN].strip()
 
         readable = {
             400: "Der Anbieter hat die Anfrage abgelehnt (400).",
@@ -683,8 +710,15 @@ class AnthropicProvider(_HTTPAnbieter):
         blocks = [b for b in (payload.get("content") or []) if isinstance(b, dict)]
         # Nur Textbloecke in den Text. Denk-Bloecke kommen mit leerem Text und
         # haben in der Konversation nichts verloren.
+        #
+        # `isinstance` ist nicht Zierde: bei `{"type": "text", "text": 42}`
+        # warf `"".join` einen rohen TypeError mitten durch `complete()` -
+        # der Auftrag brach mit "Der Auftrag ist abgebrochen" ab, statt zu
+        # sagen, was los war. Gleiche Regel wie im Groq-Zweig: was keine
+        # Zeichenkette ist, ist kein Text.
         text = "".join(
-            block.get("text", "") for block in blocks if block.get("type") == "text"
+            block["text"] for block in blocks
+            if block.get("type") == "text" and isinstance(block.get("text"), str)
         ).strip()
 
         tool_uses = tuple(

@@ -642,3 +642,106 @@ def test_auch_ein_formfehler_traegt_den_hash_fuers_kostenprotokoll(anbieter: str
     fehler = _fehler(anbieter, lambda _: httpx.Response(200, text="{kein JSON"))
     assert fehler.kind == "bad_response"
     assert len(fehler.prompt_hash) == 16
+
+
+# --- Abnahme: was in der ersten Runde noch durchschlug ---------------------
+#
+# Drei Faelle, die derselben Klasse angehoeren wie die oben, aber vom Bauer
+# nicht geprueft waren. Zwei davon schlugen roh durch.
+
+
+@pytest.mark.parametrize("wert", [42, None, ["a", "b"], {"x": 1}, True])
+def test_anthropic_textblock_der_kein_text_ist(wert):
+    """`{"type": "text", "text": 42}` warf einen rohen TypeError.
+
+    Der Groq-Zweig prueft `content` seit FIX-12 mit `isinstance`; der
+    Anthropic-Zweig gab denselben Wert ungeprueft an `"".join` weiter, und
+    `join` nimmt keine Zahl. Der Wurf lief durch `complete()` hindurch bis in
+    `api/tasks.py` und wurde dort zu "Der Auftrag ist abgebrochen".
+    """
+    fehler = _fehler("anthropic", lambda _: httpx.Response(200, json={
+        "content": [{"type": "text", "text": wert}], "stop_reason": "end_turn",
+    }))
+    assert fehler.kind == "empty_response"
+    assert fehler.retryable is False
+
+
+def test_anthropic_kaputter_textblock_kostet_die_gueltigen_nicht():
+    """Ein kaputter Block wirft die Antwort nicht weg - die guten zaehlen."""
+    antwort = _frage("anthropic", lambda _: httpx.Response(200, json={
+        "content": [
+            {"type": "text", "text": 42},
+            {"type": "text", "text": "Das hier ist echt."},
+        ],
+        "stop_reason": "end_turn",
+    }))
+    assert antwort.text == "Das hier ist echt."
+
+
+@pytest.mark.parametrize("anbieter", BEIDE)
+def test_ein_masslos_grosser_fehlerrumpf_kommt_nicht_in_die_meldung(anbieter: str):
+    """Der Deckel galt nur fuer die geglueckte Antwort, nicht fuer den Fehler.
+
+    `MAX_ANTWORT_BYTES` sitzt in `_payload` und damit nur auf dem Erfolgsweg.
+    Ein Gateway mit 3 MB in `error.message` schickte sie ungebremst durch
+    `str(exc)` - und der Text geht bei einem nicht wiederholbaren Status als
+    `tasks.result` in die Datenbank, in den Chat und im naechsten Zug als
+    Verlauf zurueck zum Anbieter.
+    """
+    muell = "M" * 3_000_000
+    fehler = _fehler(anbieter, lambda _: httpx.Response(
+        400, json={"error": {"message": muell}}))
+    assert fehler.status == 400
+    assert len(str(fehler)) < 1000, "der Fehlerrumpf gehoert nicht in die Meldung"
+    assert "M" * 100 not in str(fehler)
+
+
+@pytest.mark.parametrize("anbieter", BEIDE)
+def test_ein_langer_fehlertext_wird_gekappt_aber_nicht_verschluckt(anbieter: str):
+    """Unter dem Rumpf-Deckel, aber trotzdem zu lang fuer eine Meldung."""
+    fehler = _fehler(anbieter, lambda _: httpx.Response(
+        400, json={"error": {"message": "Grund: " + "g" * 50_000}}))
+    assert "Grund: " in str(fehler), "der Anfang hilft weiter und bleibt"
+    assert len(str(fehler)) < 500
+
+
+@pytest.mark.parametrize("anbieter", BEIDE)
+def test_ein_kurzer_fehlertext_bleibt_vollstaendig(anbieter: str):
+    """Gegenprobe zum Deckel: der normale Fall wird nicht angeschnitten."""
+    fehler = _fehler(anbieter, lambda _: httpx.Response(
+        400, json={"error": {"message": "model is not supported"}}))
+    assert "model is not supported" in str(fehler)
+
+
+@pytest.mark.parametrize("anbieter", BEIDE)
+def test_der_key_faellt_auch_aus_einem_langen_fehlertext(anbieter: str):
+    """Das Kappen darf die Schwaerzung nicht ueberholen.
+
+    Wer erst kappt und dann schwaerzt, laesst ein halbes Anmeldedatum stehen,
+    das `_ohne_key` nicht mehr wiedererkennt.
+    """
+    key = _schluessel(anbieter)
+    fehler = _fehler(anbieter, lambda _: httpx.Response(401, json={
+        "error": {"message": f"Incorrect API key provided: {key}" + " x" * 5000}}))
+    assert key not in str(fehler)
+    assert key[:20] not in str(fehler), "auch kein halber Key"
+
+
+@pytest.mark.parametrize("kopf,erwartet", [("nan", 1.0), ("NaN", 1.0), ("inf", 60.0)])
+def test_retry_after_nan_holt_nicht_die_laengste_wartezeit(kopf: str, erwartet: float):
+    """`float("nan")` wirft nicht, und jeder Vergleich damit ist False.
+
+    `min(60.0, nan)` ergibt deshalb 60.0 - ein kaputter Kopf holte sich damit
+    die laengstmoegliche Wartezeit. Ohne Zahl gilt die eigene Kurve.
+    """
+    gewartet: list[float] = []
+
+    async def merken(sekunden: float) -> None:
+        gewartet.append(sekunden)
+
+    _fehler(
+        "anthropic",
+        lambda _: httpx.Response(429, headers={"retry-after": kopf}, json={}),
+        max_retries=1, sleep=merken,
+    )
+    assert gewartet == [erwartet]
