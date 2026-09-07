@@ -21,6 +21,7 @@ from core.contracts import Permission, Tool, ToolResult
 from core.kalender import (
     AUSBLICK,
     KalenderFehler,
+    cache_datei,
     hole,
     im_fenster,
     in_anzeigezone,
@@ -29,11 +30,53 @@ from core.kalender import (
 )
 from core.tools.registry import register
 
+# Wie viele Termine hoechstens aufgezaehlt werden.
+#
+# `display` geht in den Prompt und damit an den Modellanbieter. Nachgestellt
+# mit einer ICS aus 10.000 Terminen an einem Tag: die Antwort auf "was habe
+# ich heute vor" war 600 KB Text mit 10.000 Zeilen - eine Zahl, die von der
+# Groesse des Kalenders abhaengt und von nichts sonst. Was darueber liegt,
+# wird gezaehlt statt aufgezaehlt; die Gesamtzahl steht weiter im Kopf und
+# in `data`, es verschwindet also nichts unbemerkt.
+MAX_TERMINE = 50
+
+# Ausserhalb dieser Grenzen wird nicht mehr gerechnet. `im_fenster` hebt
+# Mitternacht in die Anzeigezone, und `astimezone()` auf den 01.01.0001
+# laeuft westlich von Greenwich in "year 0 is out of range" - ein nackter
+# ValueError, der bis hierher aus dem Werkzeug herausflog. Der Nutzer las
+# dann "kalender ist mit einem Fehler ausgestiegen" (core/tools/dispatch.py),
+# und das sagt ihm nichts. Ein Kalender, der bis 2200 reicht, reicht.
+FRUEHESTES = date(1900, 1, 1)
+SPAETESTES = date(2200, 12, 31)
+
 
 def _datum(wert: str | None, ersatz: date) -> date:
     if not wert:
         return ersatz
     return date.fromisoformat(str(wert).strip()[:10])
+
+
+def _alter(db_path) -> str:
+    """Wie alt der zwischengespeicherte Kalender wirklich ist.
+
+    Hier stand fest "hoechstens 15 Minuten alt". Fuer den gewoehnlichen
+    Cachetreffer stimmt das - `hole` fragt innerhalb von HOECHSTALTER_S gar
+    nicht erst nach. In denselben Zweig fuehrt aber ein zweiter Weg: ist der
+    Abruf gescheitert, nimmt `hole` den alten Stand, und der kann Tage alt
+    sein. Genau dann steht die Zahl im Text, auf die es ankommt - und "15
+    Minuten" waere dort eine stille Fehlauskunft.
+    """
+    try:
+        alter_s = time.time() - cache_datei(db_path).stat().st_mtime
+    except OSError:
+        return ""
+    if alter_s < 90:
+        return ", gerade geholt"
+    if alter_s < 3600:
+        return f", {alter_s / 60:.0f} Minuten alt"
+    if alter_s < 86400:
+        return f", {alter_s / 3600:.0f} Stunden alt"
+    return f", {alter_s / 86400:.0f} Tage alt"
 
 
 @register
@@ -96,6 +139,14 @@ class Kalender(Tool):
             )
         if b < a:
             a, b = b, a
+        if a < FRUEHESTES or b > SPAETESTES:
+            satz = (
+                f"Mit diesem Zeitfenster rechne ich nicht - es muss zwischen "
+                f"{FRUEHESTES.year} und {SPAETESTES.year} liegen. Frag mit "
+                f"einem Fenster in der Naehe von heute."
+            )
+            return ToolResult(ok=False, error=satz, display=satz,
+                              duration_ms=dauer())
 
         try:
             roh, aus_cache = await hole(
@@ -118,12 +169,17 @@ class Kalender(Tool):
             return ToolResult(ok=False, error=satz, display=satz,
                               duration_ms=dauer())
 
-        alle, wiederkehrend, nicht_lesbar = parse(roh)
+        alle, wiederkehrend, nicht_lesbar, fremde_zonen = parse(roh)
         treffer = im_fenster(alle, a, b)
         zone_heisst = zonenname(a)
 
+        # Nur die ersten MAX_TERMINE landen im Text UND in `data` - beides
+        # geht weiter (data ueber die HTTP-Antwort in die Oberflaeche), und
+        # beides war vorher unbegrenzt.
+        gezeigt = treffer[:MAX_TERMINE]
+
         zeilen = []
-        for t in treffer:
+        for t in gezeigt:
             if t.ganztaegig:
                 # Ein Ganztagstermin ist ein DATUM, kein Zeitpunkt (RFC 5545,
                 # 3.3.4) - da gibt es nichts umzurechnen.
@@ -152,6 +208,25 @@ class Kalender(Tool):
                 f"\n\n{wiederkehrend} wiederkehrende Termine im Kalender nicht "
                 f"aufgeloest - siehe Kalender-App. {AUSBLICK}"
             )
+        if len(treffer) > len(gezeigt):
+            hinweis += (
+                f"\n\nEs stehen {len(treffer)} Termine in diesem Fenster; "
+                f"aufgezaehlt sind die ersten {len(gezeigt)}. Frag ein "
+                f"kleineres Fenster ab, wenn du die uebrigen brauchst."
+            )
+        if fremde_zonen:
+            # Dieselbe Zusage wie fuer wiederkehrende und unlesbare Termine.
+            # Eine Zeitzone, die dieser Rechner nicht kennt (Outlook schreibt
+            # z. B. "W. Europe Standard Time"), wird als UTC gerechnet - die
+            # Uhrzeit kann damit um Stunden danebenliegen, und das darf nicht
+            # stillschweigend passieren.
+            namen = ", ".join(z[:40] for z in fremde_zonen[:3])
+            hinweis += (
+                f"\n\nZeitzonen, die dieser Rechner nicht kennt: {namen}"
+                + (" und weitere" if len(fremde_zonen) > 3 else "")
+                + ". Diese Termine sind als UTC gerechnet und koennen um "
+                "Stunden danebenliegen."
+            )
         if nicht_lesbar:
             # Fund 1: dasselbe Versprechen wie fuer wiederkehrende Termine.
             # Weglassen ja, verschweigen nein - sonst nennt die Antwort eine
@@ -166,17 +241,19 @@ class Kalender(Tool):
             f" (alle Zeiten in {zone_heisst})"
         )
         if aus_cache:
-            kopf += " (aus dem Zwischenspeicher, hoechstens 15 Minuten alt)"
+            kopf += f" (aus dem Zwischenspeicher{_alter(self.db_path)})"
 
         return ToolResult(
             ok=True,
             data={
-                "termine": [t.als_dict() for t in treffer],
+                "termine": [t.als_dict() for t in gezeigt],
+                "termine_gesamt": len(treffer),
                 "von": a.isoformat(),
                 "bis": b.isoformat(),
                 "zeitzone": zone_heisst,
                 "wiederkehrend_nicht_aufgeloest": wiederkehrend,
                 "nicht_lesbar": nicht_lesbar,
+                "unbekannte_zeitzonen": fremde_zonen,
                 "aus_cache": aus_cache,
             },
             display=kopf + (":\n" + "\n".join(zeilen) if zeilen else ".") + hinweis,

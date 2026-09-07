@@ -138,7 +138,7 @@ def test_die_drei_formen_von_dtstart():
 
 
 def test_dod_6_kalender_liefert_echte_termine():
-    termine, _, _ = parse(ICS)
+    termine, _, _, _ = parse(ICS)
     nach_titel = {t.titel: t for t in termine}
 
     assert "Mathe-Klausur" in nach_titel
@@ -162,7 +162,7 @@ def test_dod_6_kalender_liefert_echte_termine():
 
 
 def test_dod_7_gefaltete_zeilen_ueberleben():
-    termine, _, _ = parse(ICS)
+    termine, _, _, _ = parse(ICS)
     lang = [t for t in termine if t.titel.startswith("Elternabend")]
     assert len(lang) == 1
     titel = lang[0].titel
@@ -176,7 +176,7 @@ def test_dod_7_gefaltete_zeilen_ueberleben():
 
 
 def test_dod_8_wiederkehrende_werden_gezaehlt_nicht_erfunden(tmp_path):
-    termine, wiederkehrend, _ = parse(ICS)
+    termine, wiederkehrend, _, _ = parse(ICS)
     assert wiederkehrend == 1
     assert all("Fussball" not in t.titel for t in termine), \
         "ein wiederkehrender Termin wurde als Einzeltermin erfunden"
@@ -220,7 +220,7 @@ def test_ein_wirklich_leerer_kalender_sagt_null(tmp_path):
 
 
 def test_das_fenster_schneidet_richtig():
-    termine, _, _ = parse(ICS)
+    termine, _, _, _ = parse(ICS)
     nur_28 = im_fenster(termine, date(2026, 8, 28), date(2026, 8, 28))
     assert [t.titel for t in nur_28] == ["Mathe-Klausur"]
 
@@ -233,7 +233,7 @@ def test_das_fenster_schneidet_richtig():
 
 
 def test_termine_kommen_sortiert():
-    termine, _, _ = parse(ICS)
+    termine, _, _, _ = parse(ICS)
     fenster = im_fenster(termine, date(2026, 8, 1), date(2026, 9, 30))
     titel = [t.titel for t in fenster]
     assert titel == ["Mathe-Klausur", "Wandertag", "Zahnarzt", titel[3]]
@@ -252,7 +252,7 @@ def test_ohne_dtend_gilt_die_regel_aus_der_norm():
         "END:VEVENT",
         "END:VCALENDAR", "",
     ])
-    termine, _, _ = parse(ohne)
+    termine, _, _, _ = parse(ohne)
     tag = [t for t in termine if t.titel == "Ganzer Tag"][0]
     assert tag.ende == date(2026, 9, 2), "DATE ohne DTEND: genau ein Tag"
     punkt = [t for t in termine if t.titel == "Punkt"][0]
@@ -269,7 +269,7 @@ def test_die_beschreibung_kommt_nicht_mit():
         "SUMMARY:Mathe-Klausur",
         "DESCRIPTION:Zugangscode 4711\\, Passwort hunter2\r\nSUMMARY:Mathe-Klausur",
     )
-    termine, _, _ = parse(mit)
+    termine, _, _, _ = parse(mit)
     alles = " ".join(str(t.als_dict()) for t in termine)
     assert "hunter2" not in alles
     assert "4711" not in alles
@@ -474,7 +474,7 @@ def test_fund_1_unlesbare_vevents_werden_gezaehlt_statt_verschwiegen():
     werden wiederkehrende Termine gezaehlt und namentlich gemeldet. Der
     Beleg des Pruefers: 5 VEVENTs im ICS, 2 geliefert, 1 gezaehlt,
     2 spurlos weg."""
-    termine, wiederkehrend, unlesbar = parse(ICS_MIT_SCHROTT)
+    termine, wiederkehrend, unlesbar, _ = parse(ICS_MIT_SCHROTT)
 
     assert [t.titel for t in termine] == ["Zahnarzt"]
     assert wiederkehrend == 1
@@ -599,7 +599,7 @@ ICS_NACHTS = "\r\n".join([
 def test_fund_3_das_tagesfenster_ist_ortszeit_nicht_utc():
     """Der Beleg des Pruefers: gefragt war der 27.08. als Ortsdatum,
     geliefert wurde der Termin vom 28.08. - und der vom 27.08. fehlte."""
-    termine, _, _ = parse(ICS_NACHTS, zone=BERLIN)
+    termine, _, _, _ = parse(ICS_NACHTS, zone=BERLIN)
     heute = im_fenster(termine, date(2026, 8, 27), date(2026, 8, 27),
                        zone=BERLIN)
     assert [t.titel for t in heute] == ["Nacht auf den 27."]
@@ -628,7 +628,7 @@ def test_fund_3_ganztaegige_rutschen_nicht_ueber_die_zonengrenze():
     verankert, waehrend das Fenster in Ortszeit gebaut wird, haenge er in
     Berlin zwei Stunden in den Folgetag hinein - der Wandertag vom 29. waere
     auch am 30. dabei."""
-    termine, _, _ = parse(ICS, zone=BERLIN)
+    termine, _, _, _ = parse(ICS, zone=BERLIN)
     for tag, erwartet in ((28, []), (29, ["Wandertag"]), (30, [])):
         titel = [t.titel for t in
                  im_fenster(termine, date(2026, 8, tag), date(2026, 8, tag),
@@ -648,7 +648,7 @@ def test_fund_3_ueber_die_zeitumstellung_bleibt_mitternacht_mitternacht():
         "SUMMARY:Kurz vor Mitternacht", "END:VEVENT",
         "END:VCALENDAR", "",
     ])
-    termine, _, _ = parse(ICS_UMSTELLUNG, zone=BERLIN)
+    termine, _, _, _ = parse(ICS_UMSTELLUNG, zone=BERLIN)
     drin = im_fenster(termine, date(2026, 10, 25), date(2026, 10, 25),
                       zone=BERLIN)
     assert [t.titel for t in drin] == ["Kurz vor Mitternacht"]
