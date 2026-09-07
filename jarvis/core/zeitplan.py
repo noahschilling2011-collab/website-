@@ -103,7 +103,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from core.contracts import Permission
-from core.db import session, utcnow
+from core.db import schreibe_nachricht, session, tote_tasks_beenden, utcnow
 
 # Regel 1. Hart, keine Einstellung. Wer das aendern will, aendert es hier,
 # mit Begruendung - und nicht ueber eine .env-Zeile um drei Uhr nachts.
@@ -593,8 +593,18 @@ def verbuche_verpasst(db_path: Path | str, plan: dict,
 
 FEHLSCHLAG = ("failed", "aborted_budget")
 
+# FIX-11: kein Netz, ein 5xx oder ein Ratenlimit ist eine STOERUNG, kein
+# Fehlschlag des Plans. Vorher zaehlte beides gleich: dreimal kein Netz
+# (Zug fuhr durch einen Tunnel, Anbieter kurz weg) hat die Morgenlage
+# ausgeschaltet, und der Nutzer stand morgens ohne Lage da, obwohl an
+# seinem Plan nichts falsch war. Der Zaehler bleibt deshalb stehen - weder
+# hoch noch zurueck -, und der Status sagt, was los war.
+STOERUNG_STATUS = ("Stoerung: Anbieter nicht erreichbar. Kein Fehlschlag - "
+                   "der Plan bleibt an und versucht es beim naechsten Termin.")
 
-def nachtrag_ergebnis(db_path: Path | str, task_id: str, status: str) -> None:
+
+def nachtrag_ergebnis(db_path: Path | str, task_id: str, status: str, *,
+                      stoerung: bool = False) -> None:
     """Wenn der Task fertig ist: den Ausgang an den Zeitplan schreiben, damit
     die Liste 'done' oder 'failed' zeigt und nicht ewig 'laeuft'.
 
@@ -603,8 +613,23 @@ def nachtrag_ergebnis(db_path: Path | str, task_id: str, status: str) -> None:
     warum - ein Plan, der jeden Morgen an einem fehlenden Kalender
     scheitert, verbrennt sonst taeglich Planer-Token, und niemand merkt es.
     Einschalten setzt den Zaehler zurueck (`schalten`).
+
+    FIX-11, zwei Nachtraege:
+
+    * `stoerung=True` (der Anbieter war nicht erreichbar, `LLMError` mit
+      `retryable`): der Zaehler bleibt unveraendert, nur der Status sagt es.
+      Sonst pausiert dreimal kein Netz die Morgenlage.
+    * Greift die Bremse, steht das jetzt auch im VERLAUF. Bis dahin stand es
+      nur in der Zeitplan-Liste - wer die nicht oeffnet, merkt erst nach
+      Tagen, dass morgens nichts mehr kommt.
     """
     with session(db_path) as conn:
+        if stoerung:
+            conn.execute(
+                "UPDATE zeitplaene SET letzter_status = ? WHERE letzter_task_id = ?",
+                (STOERUNG_STATUS, task_id),
+            )
+            return
         conn.execute(
             "UPDATE zeitplaene SET letzter_status = ?, "
             "fehlschlaege = CASE WHEN ? THEN fehlschlaege + 1 "
@@ -614,15 +639,23 @@ def nachtrag_ergebnis(db_path: Path | str, task_id: str, status: str) -> None:
              task_id),
         )
         z = conn.execute(
-            "SELECT id, fehlschlaege, aktiv FROM zeitplaene WHERE letzter_task_id = ?",
+            "SELECT id, name, fehlschlaege, aktiv FROM zeitplaene "
+            "WHERE letzter_task_id = ?",
             (task_id,),
         ).fetchone()
         if z and z["aktiv"] and z["fehlschlaege"] >= MAX_FEHLSCHLAEGE:
+            grund = (f"pausiert nach {z['fehlschlaege']} Fehlschlaegen in Folge "
+                     f"({status}). Einschalten setzt den Zaehler zurueck.")
             conn.execute(
                 "UPDATE zeitplaene SET aktiv = 0, naechster_lauf = NULL, letzter_status = ? "
                 "WHERE id = ?",
-                (f"pausiert nach {z['fehlschlaege']} Fehlschlaegen in Folge ({status}). "
-                 f"Einschalten setzt den Zaehler zurueck.", z["id"]),
+                (grund, z["id"]),
+            )
+            schreibe_nachricht(
+                conn, utcnow(),
+                f'Zeitplan "{z["name"]}" {grund}',
+                {"art": "zeitplan", "zeitplan_id": z["id"],
+                 "zeitplan_name": z["name"], "task_id": task_id},
             )
 
 
@@ -633,13 +666,15 @@ def abgleich(db_path: Path | str, laufende_ids: set[str] | frozenset[str]) -> li
     """Nach einem Neustart: Plaene, die noch 'laeuft' oder 'startet' sagen,
     obwohl ihr Task laengst fertig ist - und Tasks, die nie zu Ende liefen.
 
-    Ein Task, der in der Datenbank noch 'pending' oder 'running' steht,
-    aber in keinem Speicher mehr laeuft, ist beim Herunterfahren gestorben
-    (oder der Start ist nach der Buchung gescheitert). Er bekommt 'failed'
-    mit dem Grund, damit die Auftragsliste nicht ewig einen laufenden
-    Auftrag zeigt - und der Plan den Ausgang, falls er noch 'laeuft' sagt.
+    Das Beenden selbst macht `core.db.tote_tasks_beenden` - dieselbe
+    Funktion, die `api/app.py` beim Start ueber ALLE Auftraege laufen laesst.
+    Hier gilt sie nur fuer die Tasks dieser Plaene (`nur_tasks`): diese
+    Funktion laeuft in JEDER Runde der Zeitplan-Schleife, und die kennt nur
+    die laufenden ZEITPLAN-Tasks - ein gerade getippter Auftrag wuerde sonst
+    mitten im Lauf fuer tot erklaert. Und ohne Nachricht: "JARVIS wurde neu
+    gestartet" waere hier oft schlicht falsch (ein Start, der nach der
+    Buchung gescheitert ist, ist kein Neustart).
     """
-    geaendert: list[str] = []
     with session(db_path) as conn:
         zeilen = conn.execute(
             "SELECT z.id, z.letzter_status, z.letzter_task_id AS task_id, t.status "
@@ -647,18 +682,23 @@ def abgleich(db_path: Path | str, laufende_ids: set[str] | frozenset[str]) -> li
             "WHERE z.letzter_status IN ('laeuft', 'startet') "
             "   OR t.status IN ('pending', 'running')"
         ).fetchall()
-        for z in zeilen:
-            if z["task_id"] in laufende_ids:
-                continue
-            if z["status"] in ENDZUSTAENDE:
+    offen = [z for z in zeilen if z["task_id"] not in laufende_ids]
+    if not offen:
+        return []
+    beendet = set(tote_tasks_beenden(
+        db_path, laufende_ids,
+        nur_tasks={z["task_id"] for z in offen},
+        mit_nachricht=False,
+    ))
+    geaendert: list[str] = []
+    with session(db_path) as conn:
+        for z in offen:
+            if z["task_id"] in beendet:
+                neu = "abgebrochen: Neustart waehrend des Laufs"
+            elif z["status"] in ENDZUSTAENDE:
                 neu = z["status"]
             else:
-                neu = "abgebrochen: Neustart waehrend des Laufs"
-                conn.execute(
-                    "UPDATE tasks SET status = 'failed', abort_reason = ?, "
-                    "finished_at = ? WHERE id = ? AND status IN ('pending', 'running')",
-                    ("Neustart waehrend des Laufs.", utcnow(), z["task_id"]),
-                )
+                continue
             if z["letzter_status"] in ("laeuft", "startet"):
                 conn.execute("UPDATE zeitplaene SET letzter_status = ? WHERE id = ?",
                              (neu, z["id"]))

@@ -14,7 +14,7 @@ import json
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator, Literal
 
@@ -524,3 +524,136 @@ def kurze_argumente(arguments: dict) -> dict:
 
 
 
+# --- Neustart: Auftraege, die mitten im Lauf gestorben sind (FIX-11) -------
+#
+# Ein Task, der in der Datenbank 'pending' oder 'running' sagt, aber in
+# keinem Speicher mehr laeuft, ist beim Herunterfahren gestorben - oder der
+# Start ist nach der Buchung gescheitert. Bis FIX-11 fand ihn nur
+# `core/zeitplan.abgleich`, und das joint ueber `zeitplaene`: ein GETIPPTER
+# Auftrag blieb nach dem Neustart fuer immer 'running', die Uebersicht zeigte
+# ewig einen laufenden Auftrag, und im Chat stand eine Frage ohne Antwort.
+# Deshalb steht das Aufraeumen jetzt hier, an einer Stelle, und beide Wege
+# benutzen es.
+
+NEUSTART_GRUND = "Neustart waehrend des Laufs."
+NEUSTART_TEXT = ("Abgebrochen: JARVIS wurde neu gestartet, bevor der Auftrag "
+                 "fertig war.")
+
+# Der Fund des Richters zu FIX-11: bei einer alten Datenbank mit vielen
+# Leichen erscheinen sonst auf einen Schlag zwanzig "Abgebrochen"-Zeilen im
+# Chat - aus dem Aufraeumen wird eine Nachrichtenflut, und die eine Zeile,
+# auf die der Nutzer wirklich wartet, geht darin unter. Zwei Grenzen:
+#
+# 1. Eine Zeile bekommt nur, wer in den letzten NEUSTART_FENSTER_H Stunden
+#    gestartet wurde. Auf die Antwort eines Auftrags von vorgestern wartet
+#    niemand mehr; dass er gescheitert ist, steht in der Auftragsliste.
+# 2. Sind es mehr als NEUSTART_MAX_EINZELN frische, wird EINE Sammelzeile
+#    geschrieben. Die Zahl steht drin, verloren geht nichts.
+NEUSTART_FENSTER_H = 24
+NEUSTART_MAX_EINZELN = 3
+
+
+def _sammel_text(anzahl: int) -> str:
+    return ("Abgebrochen: JARVIS wurde neu gestartet, bevor "
+            f"{anzahl} Auftraege fertig waren.")
+
+
+def _herkunft_zu_task(conn: sqlite3.Connection, task_id: str) -> dict | None:
+    """Die Herkunft der NUTZER-Nachricht dieses Tasks - oder None.
+
+    Ein Zeitplan-Auftrag steht mit Herkunft im Verlauf; die Absage gehoert
+    zur selben Zeile, sonst sieht sie im Chat aus wie etwas, das der Nutzer
+    ausgeloest hat. Ein getippter Auftrag hat keine - dann bleibt auch die
+    Absage ohne.
+    """
+    row = conn.execute(
+        "SELECT h.art, h.zeitplan_id, h.zeitplan_name, h.task_id "
+        "FROM nachricht_herkunft h JOIN messages m ON m.id = h.message_id "
+        "WHERE h.task_id = ? AND m.role = 'user' ORDER BY m.id ASC LIMIT 1",
+        (task_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    return {"art": row["art"], "zeitplan_id": row["zeitplan_id"],
+            "zeitplan_name": row["zeitplan_name"], "task_id": row["task_id"]}
+
+
+def schreibe_nachricht(conn: sqlite3.Connection, wann: str, text: str,
+                       herkunft: dict | None) -> None:
+    """Eine Assistenten-Zeile in einer SCHON OFFENEN Transaktion.
+
+    Der normale Weg ist `add_message`. Wer aber eine Nachricht zusammen mit
+    einer anderen Aenderung schreibt (Task beenden, Plan pausieren), nimmt
+    diese Fassung: eine zweite Verbindung koennte scheitern, und dann waere
+    der Task beendet und die Absage fehlte.
+    """
+    cur = conn.execute(
+        "INSERT INTO messages (role, content, created_at) VALUES ('assistant', ?, ?)",
+        (text, wann),
+    )
+    if herkunft:
+        conn.execute(
+            "INSERT OR REPLACE INTO nachricht_herkunft "
+            "(message_id, art, zeitplan_id, zeitplan_name, task_id, erstellt_am) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (cur.lastrowid, herkunft.get("art", "zeitplan"),
+             herkunft.get("zeitplan_id"), herkunft.get("zeitplan_name") or "",
+             herkunft.get("task_id"), wann),
+        )
+
+
+def tote_tasks_beenden(db_path: Path | str,
+                       laufende_ids: set[str] | frozenset[str],
+                       *, nur_tasks: set[str] | frozenset[str] | None = None,
+                       mit_nachricht: bool = True) -> list[str]:
+    """Tasks, die niemand mehr laeuft, sauber beenden. Gibt ihre IDs zurueck.
+
+    `laufende_ids` sind die Tasks, die in DIESEM Prozess wirklich laufen -
+    sie bleiben unangetastet. Beim Start ist das die leere Menge.
+
+    `nur_tasks` grenzt die Kandidaten ein. `core/zeitplan.abgleich` laeuft
+    in JEDER Runde der Zeitplan-Schleife und kennt dort nur die laufenden
+    ZEITPLAN-Tasks; ohne diese Grenze wuerde es einen gerade getippten
+    Auftrag mitten im Lauf fuer tot erklaeren. Der volle Durchgang gehoert
+    an den Start (api/app.py), wo nichts laeuft.
+
+    `mit_nachricht=False` fuer Aufraeumen im laufenden Betrieb: dort ist
+    "JARVIS wurde neu gestartet" schlicht nicht wahr.
+    """
+    laufend = set(laufende_ids or ())
+    with session(db_path) as conn:
+        zeilen = conn.execute(
+            "SELECT id, created_at FROM tasks "
+            "WHERE status IN ('pending', 'running') ORDER BY created_at ASC, rowid ASC"
+        ).fetchall()
+        tot = [z for z in zeilen
+               if z["id"] not in laufend
+               and (nur_tasks is None or z["id"] in nur_tasks)]
+        if not tot:
+            return []
+        wann = utcnow()
+        for z in tot:
+            conn.execute(
+                "UPDATE tasks SET status = 'failed', abort_reason = ?, finished_at = ? "
+                "WHERE id = ? AND status IN ('pending', 'running')",
+                (NEUSTART_GRUND, wann, z["id"]),
+            )
+            # Ein Schritt, der beim Absturz lief oder auf eine Rueckfrage
+            # wartete, ist nicht 'failed' - er ist nie zu Ende gekommen.
+            conn.execute(
+                "UPDATE steps SET status = 'skipped', updated_at = ? "
+                "WHERE task_id = ? AND status IN ('running', 'needs_confirmation')",
+                (wann, z["id"]),
+            )
+        if mit_nachricht:
+            grenze = (datetime.now(timezone.utc)
+                      - timedelta(hours=NEUSTART_FENSTER_H)
+                      ).isoformat(timespec="seconds").replace("+00:00", "Z")
+            frisch = [z for z in tot if (z["created_at"] or "") >= grenze]
+            if len(frisch) > NEUSTART_MAX_EINZELN:
+                schreibe_nachricht(conn, wann, _sammel_text(len(frisch)), None)
+            else:
+                for z in frisch:
+                    schreibe_nachricht(conn, wann, NEUSTART_TEXT,
+                                        _herkunft_zu_task(conn, z["id"]))
+    return [z["id"] for z in tot]

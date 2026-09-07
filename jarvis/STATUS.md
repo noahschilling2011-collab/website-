@@ -2232,7 +2232,7 @@ eine Stack-Änderung** (`python-dateutil`) und braucht seine Zusage.
 | Der Plan wird **nicht** auf `budget.max_steps` gekürzt | Sonst könnte `max_steps` nie greifen und der Nutzer sähe nie, dass sein Ziel größer war als das Budget. Der Plan darf zu groß sein; das Budget stoppt ihn während der Ausführung, mit Teilergebnis. |
 | `max_steps` zählt gelaufene, nicht geplante Schritte | Sonst reißt die Grenze, bevor ein Schritt lief — und es gäbe nie ein Teilergebnis. |
 | `GET /api/tasks` aus Phase 3 heißt jetzt `GET /api/task-log` | Phase 4 belegt `/api/tasks` mit der Task-Struktur. Der episodische Log ist etwas anderes. |
-| Der Endzustand eines Tasks wird zuletzt geschrieben, nicht vom Runner | Sonst meldet `GET /api/tasks/{id}` `done`, bevor die Antwort im Verlauf steht — ein Client, der sofort nachlädt, sieht sie nicht. Preis: stirbt der Prozess genau dazwischen, steht der Task dauerhaft auf `running`. Das ist ehrlicher als ein `done` ohne Ergebnis. |
+| Der Endzustand eines Tasks wird zuletzt geschrieben, nicht vom Runner | Sonst meldet `GET /api/tasks/{id}` `done`, bevor die Antwort im Verlauf steht — ein Client, der sofort nachlädt, sieht sie nicht. Das ist ehrlicher als ein `done` ohne Ergebnis. Der Preis war, dass ein Task dauerhaft auf `running` stand, wenn der Prozess genau dazwischen starb; seit FIX-11 (Punkt 4) räumt `core.db.tote_tasks_beenden` das beim Start auf: `failed` mit dem Grund „Neustart während des Laufs", angefangene Schritte `skipped`, und im Verlauf eine Zeile, dass abgebrochen wurde (bei alten Leichen höchstens eine Sammelzeile). |
 | `max_permission` von LOCAL auf EXTERNAL angehoben | Erst mit dem Bestätigungs-Flow aus Phase 5 gibt es einen Schutz, der das trägt. SENSITIVE bleibt zu. |
 
 ## Entscheidungslog
