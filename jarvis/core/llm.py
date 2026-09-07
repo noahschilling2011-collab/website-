@@ -18,12 +18,17 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Iterable
 
 import httpx
+
+from core.netz import GEHEIME_KOEPFE
+
+log = logging.getLogger("jarvis")
 
 ANTHROPIC_VERSION = "2023-06-01"
 # Groq spricht das OpenAI-Format unter einem eigenen Praefix.
@@ -33,6 +38,32 @@ GROQ_BASIS = "https://api.groq.com"
 # Wiederholbar laut Fehlertabelle des Anbieters. Alles andere ist ein Fehler
 # in der Anfrage und wird durch Wiederholen nicht besser.
 RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 529})
+
+# Deckel fuer den Antwortrumpf. Ein Zug mit `max_tokens=4096` sind rund 16 KB
+# Text, selbst 100.000 Token blieben unter 500 KB. Was darueber liegt, ist
+# kaputt oder boesartig - und wanderte ungebremst in `text`, von dort in die
+# Datenbank, in den naechsten Prompt und damit zurueck zum Anbieter. Gleiche
+# Groessenordnung wie `core/tools/search.FetchUrl.MAX_BYTES` fuer fremde
+# Seiten: was von aussen kommt, hat eine Obergrenze.
+MAX_ANTWORT_BYTES = 2_000_000
+
+
+def _zahl(wert: Any) -> int:
+    """Eine Tokenzahl aus der Antwort - oder 0, wenn dort Unsinn steht.
+
+    `int(None)` und `int("viel")` werfen. Vorher schlug dieser Wurf durch
+    `complete()` hindurch bis in den Aufrufer: ein `usage`-Feld mit `null`
+    riss den ganzen Zug ab, obwohl der Text schon da war. Eine kaputte
+    Zaehlung ist kein Grund, eine fertige Antwort wegzuwerfen - sie wird wie
+    ein fehlendes Feld behandelt (0) und im Serverlog vermerkt.
+    """
+    try:
+        return int(wert)
+    except (TypeError, ValueError):
+        # Nur der Typ, nicht der Wert: der Wert kommt vom Anbieter.
+        log.warning("Tokenzahl des Anbieters unbrauchbar (%s) - als 0 gezaehlt",
+                    type(wert).__name__)
+        return 0
 
 
 @dataclass(frozen=True)
@@ -224,6 +255,12 @@ class FakeLLMProvider(LLMProvider):
     Nutzernachricht enthaelt. Mit `replies` gibt er die Liste der Reihe nach
     aus und wiederholt danach den letzten Eintrag.
 
+    Ein Eintrag darf auch ein `LLMError` sein - dann wirft dieser Zug, statt
+    zu antworten (FIX-12). Damit laesst sich ein Ausfall des Anbieters bis in
+    `api/tasks.py` durchspielen, ohne HTTP nachzubauen. Der Aufruf steht
+    trotzdem in `calls`: ein verschluckter Aufruf waere eine Luege ueber das,
+    was das Backend getan hat.
+
     `calls` protokolliert jeden Aufruf - Tests pruefen damit, was das Backend
     tatsaechlich hochgeschickt haette.
     """
@@ -232,10 +269,12 @@ class FakeLLMProvider(LLMProvider):
 
     def __init__(
         self,
-        replies: Iterable[str | FakeTurn] | None = None,
+        replies: Iterable[str | FakeTurn | LLMError] | None = None,
         model: str = "fake-echo-1",
     ) -> None:
-        self._replies: list[str | FakeTurn] = list(replies) if replies is not None else []
+        self._replies: list[str | FakeTurn | LLMError] = (
+            list(replies) if replies is not None else []
+        )
         self.model = model
         self.calls: list[dict[str, Any]] = []
 
@@ -252,6 +291,8 @@ class FakeLLMProvider(LLMProvider):
         tool_uses: tuple[ToolUse, ...] = ()
         if self._replies:
             zug = self._replies.pop(0) if len(self._replies) > 1 else self._replies[0]
+            if isinstance(zug, LLMError):
+                raise zug
             if isinstance(zug, FakeTurn):
                 text, tool_uses = zug.text, zug.tool_uses
             else:
@@ -326,8 +367,26 @@ class _HTTPAnbieter(LLMProvider):
     ) -> None:
         self.model = model
         self.max_tokens = max_tokens
-        self.max_retries = max_retries
+        # Negativ waere `range(0)`: die Schleife unten liefe kein einziges
+        # Mal, und der `assert` am Ende flog als AssertionError durch jeden
+        # Modellaufruf. Ein Tippfehler in der .env (LLM_MAX_RETRIES=-1) darf
+        # kein Absturz sein - er heisst "gar nicht wiederholen".
+        self.max_retries = max(0, max_retries)
         self._sleep = sleep or asyncio.sleep
+        # Was in den Kopfzeilen an Anmeldedaten steht, darf in keinem Text
+        # wieder auftauchen - siehe `_ohne_key`. Laengste zuerst, damit das
+        # Ersetzen keine Reste stehen laesst.
+        self._geheimnisse = tuple(sorted(
+            {
+                teil
+                for name, wert in headers.items()
+                if name.lower() in GEHEIME_KOEPFE
+                for teil in (wert, wert.removeprefix("Bearer ").strip())
+                if len(teil) >= 8
+            },
+            key=len,
+            reverse=True,
+        ))
         self._client = httpx.AsyncClient(
             base_url=base_url,
             timeout=timeout,
@@ -360,15 +419,19 @@ class _HTTPAnbieter(LLMProvider):
                 response = await self._client.post(url, json=body)
             except httpx.TimeoutException as exc:
                 last_error = LLMError(
-                    f"Zeitueberschreitung beim Modellaufruf: {exc}",
+                    f"Zeitueberschreitung beim Modellaufruf: "
+                    f"{self._ohne_key(str(exc))}",
                     kind="timeout",
                     retryable=True,
                 )
             except httpx.HTTPError as exc:
                 # Der Text einer httpx-Ausnahme enthaelt die URL, aber keine
-                # Header - der Key kann hier nicht durchsickern.
+                # Header. `_ohne_key` steht trotzdem davor: ein Proxy-Fehler
+                # kann die Anfrage zitieren, und diese Annahme haelt nur, bis
+                # sie einmal nicht haelt.
                 last_error = LLMError(
-                    f"Verbindung zum Modellanbieter fehlgeschlagen: {exc}",
+                    f"Verbindung zum Modellanbieter fehlgeschlagen: "
+                    f"{self._ohne_key(str(exc))}",
                     kind="connection",
                     retryable=True,
                 )
@@ -385,7 +448,14 @@ class _HTTPAnbieter(LLMProvider):
             if attempt < self.max_retries:
                 await self._sleep(self._delay(attempt, failed_response))
 
-        assert last_error is not None
+        if last_error is None:  # pragma: no cover - nur ohne jeden Versuch
+            # Frueher ein `assert`. Unter `python -O` faellt der weg, und
+            # `raise None` waere ein TypeError statt einer Meldung.
+            last_error = LLMError(
+                "Der Modellaufruf wurde gar nicht erst versucht.",
+                kind="connection",
+                retryable=True,
+            )
         raise last_error
 
     def _delay(self, attempt: int, response: httpx.Response | None) -> float:
@@ -398,15 +468,39 @@ class _HTTPAnbieter(LLMProvider):
                     pass
         return float(2**attempt)
 
+    def _ohne_key(self, text: str) -> str:
+        """Kein Anmeldedatum in einem Text, den Noah oder das Modell sieht.
+
+        OpenAI-kompatible Dienste schicken den geschickten Key in der
+        401-Meldung woertlich zurueck ("Incorrect API key provided: ..."), und
+        ein Proxy davor zitiert im 500er gern die ganze Anfrage. Dieser Text
+        geht von hier in den Chat, in `tasks.result`, in die Datenbank und im
+        naechsten Zug als Verlauf zurueck zum Anbieter. Deshalb faellt der
+        Key hier raus, bevor irgendjemand ihn zu sehen bekommt.
+        """
+        for geheim in self._geheimnisse:
+            text = text.replace(geheim, "***")
+        return text
+
     def _error_from(self, response: httpx.Response) -> LLMError:
         status = response.status_code
         detail = ""
         try:
             payload = response.json()
-            if isinstance(payload, dict):
-                detail = str(payload.get("error", {}).get("message", "")).strip()
         except ValueError:
             detail = response.text[:300].strip()
+        else:
+            # `error` ist laut Doku ein Objekt mit `message` - aber ein
+            # Gateway dazwischen haelt sich nicht an die Doku. Frueher rief
+            # der Code `.get` auf allem, was dort stand: bei `"error": "text"`
+            # schlug ein AttributeError durch, waehrend gerade ein Fehler
+            # behandelt wurde.
+            fehler = payload.get("error") if isinstance(payload, dict) else None
+            if isinstance(fehler, dict):
+                detail = str(fehler.get("message", "")).strip()
+            elif isinstance(fehler, str):
+                detail = fehler.strip()
+        detail = self._ohne_key(detail)
 
         readable = {
             400: "Der Anbieter hat die Anfrage abgelehnt (400).",
@@ -424,6 +518,61 @@ class _HTTPAnbieter(LLMProvider):
             status=status,
             kind="api_error",
             retryable=status in RETRYABLE_STATUS,
+        )
+
+    def _payload(self, response: httpx.Response, duration_ms: int) -> dict[str, Any]:
+        """Der Rumpf als Objekt - oder ein sauberer Fehler statt eines Absturzes.
+
+        Beide Anbieter brauchen dieselben drei Pruefungen, und beide hatten
+        sie vorher nur halb: der Deckel fehlte ganz, und `payload.get(...)`
+        lief auf allem, was `json()` zurueckgab - eine Liste oder eine
+        Zeichenkette als Antwort war ein AttributeError, kein Fehlertext.
+        """
+        rumpf = response.content
+        if len(rumpf) > MAX_ANTWORT_BYTES:
+            raise LLMError(
+                f"Die Antwort des Anbieters war unerwartet gross "
+                f"({len(rumpf) // 1000} KB, mehr als {MAX_ANTWORT_BYTES // 1000} KB "
+                f"nimmt JARVIS nicht an) und wurde verworfen.",
+                kind="bad_response",
+                duration_ms=duration_ms,
+            )
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            # Der Text von json enthaelt Zeile, Spalte und ein Stueck des
+            # Rumpfs. Das ist Innenleben und gehoert ins Serverlog, nicht in
+            # den Chat und schon gar nicht zurueck zum Anbieter.
+            log.warning("Antwort des Anbieters war kein JSON: %s", exc)
+            raise LLMError(
+                "Die Antwort des Anbieters war kein JSON.",
+                kind="bad_response",
+                duration_ms=duration_ms,
+            ) from exc
+        if not isinstance(payload, dict):
+            log.warning("Antwort des Anbieters ist ein %s statt eines Objekts",
+                        type(payload).__name__)
+            raise LLMError(
+                "Die Antwort des Anbieters hatte nicht die erwartete Form.",
+                kind="bad_response",
+                duration_ms=duration_ms,
+            )
+        return payload
+
+    @staticmethod
+    def _tokens(payload: dict[str, Any], ein: str, aus: str) -> LLMUsage:
+        """Die Tokenzahlen, egal was im `usage`-Feld steht.
+
+        `usage` fehlt bei Groq manchmal ganz und ist bei einem kaputten
+        Gateway auch mal eine Zeichenkette - beides darf den Zug nicht
+        abreissen, denn die Antwort selbst ist da.
+        """
+        usage = payload.get("usage")
+        if not isinstance(usage, dict):
+            usage = {}
+        return LLMUsage(
+            in_tokens=_zahl(usage.get(ein, 0)),
+            out_tokens=_zahl(usage.get(aus, 0)),
         )
 
     async def aclose(self) -> None:
@@ -500,30 +649,30 @@ class AnthropicProvider(_HTTPAnbieter):
             response = await self._post_with_retries(
                 "/v1/messages", self._body(history, system, tools)
             )
+            return self._parse(
+                response, int((time.monotonic() - begonnen) * 1000), fingerabdruck
+            )
         except LLMError as exc:
+            # Auch `_parse` liegt in diesem `try`: sonst trug ein Fehler aus
+            # der Antwortform (kein JSON, leer, unbekannte Form) keinen
+            # `prompt_hash`, und die Zeile, die `api/routes.py` mit
+            # `ok=False` nach `llm_calls` schreibt, wusste nicht, zu welchem
+            # Prompt sie gehoert.
             exc.duration_ms = int((time.monotonic() - begonnen) * 1000)
             exc.prompt_hash = fingerabdruck
             raise
-        return self._parse(
-            response, int((time.monotonic() - begonnen) * 1000), fingerabdruck
-        )
 
     def _parse(
         self, response: httpx.Response, duration_ms: int, fingerabdruck: str
     ) -> LLMReply:
-        try:
-            payload = response.json()
-        except ValueError as exc:
-            raise LLMError(
-                f"Antwort des Anbieters war kein JSON: {exc}",
-                kind="bad_response",
-                duration_ms=duration_ms,
-            ) from exc
+        payload = self._payload(response, duration_ms)
 
         stop_reason = payload.get("stop_reason")
         if stop_reason == "refusal":
             # stop_details ist laut Doku nur bei genau diesem stop_reason gefuellt.
-            details = payload.get("stop_details") or {}
+            details = payload.get("stop_details")
+            if not isinstance(details, dict):
+                details = {}
             raise LLMError(
                 f"Das Modell hat die Anfrage abgelehnt "
                 f"({details.get('category') or 'ohne Kategorie'}).",
@@ -557,14 +706,10 @@ class AnthropicProvider(_HTTPAnbieter):
                 duration_ms=duration_ms,
             )
 
-        usage = payload.get("usage") or {}
         return LLMReply(
             text=text,
-            model=payload.get("model", self.model),
-            usage=LLMUsage(
-                in_tokens=int(usage.get("input_tokens", 0)),
-                out_tokens=int(usage.get("output_tokens", 0)),
-            ),
+            model=str(payload.get("model") or self.model),
+            usage=self._tokens(payload, "input_tokens", "output_tokens"),
             duration_ms=duration_ms,
             stop_reason=stop_reason,
             prompt_hash=fingerabdruck,
@@ -762,46 +907,60 @@ class GroqProvider(_HTTPAnbieter):
             response = await self._post_with_retries(
                 self.PFAD, self._body(history, system, tools)
             )
+            return self._parse(
+                response, int((time.monotonic() - begonnen) * 1000), fingerabdruck
+            )
         except LLMError as exc:
+            # Wie bei Anthropic: `_parse` gehoert mit in den Block, damit
+            # auch ein Formfehler seinen `prompt_hash` fuer `llm_calls` hat.
             exc.duration_ms = int((time.monotonic() - begonnen) * 1000)
             exc.prompt_hash = fingerabdruck
             raise
-        return self._parse(
-            response, int((time.monotonic() - begonnen) * 1000), fingerabdruck
-        )
 
     # --- zurueck: OpenAI-Form -> Anthropic-Form ---------------------------
 
     def _parse(
         self, response: httpx.Response, duration_ms: int, fingerabdruck: str
     ) -> LLMReply:
-        try:
-            payload = response.json()
-        except ValueError as exc:
-            raise LLMError(
-                f"Antwort des Anbieters war kein JSON: {exc}",
-                kind="bad_response",
-                duration_ms=duration_ms,
-            ) from exc
+        payload = self._payload(response, duration_ms)
 
-        auswahl = payload.get("choices") or []
-        if not auswahl or not isinstance(auswahl[0], dict):
+        auswahl = payload.get("choices")
+        # `isinstance` zuerst: bei `"choices": {...}` war `auswahl[0]` frueher
+        # ein KeyError, bei `"choices": "text"` ein Zeichen statt einer Wahl.
+        if (not isinstance(auswahl, list) or not auswahl
+                or not isinstance(auswahl[0], dict)):
             raise LLMError(
                 "Die Antwort enthielt kein 'choices'.",
                 kind="bad_response",
                 duration_ms=duration_ms,
             )
-        nachricht = auswahl[0].get("message") or {}
+        nachricht = auswahl[0].get("message")
+        if not isinstance(nachricht, dict):
+            nachricht = {}
         stop_reason = auswahl[0].get("finish_reason")
 
-        text = (nachricht.get("content") or "").strip()
+        roh_text = nachricht.get("content")
+        text = roh_text.strip() if isinstance(roh_text, str) else ""
         bloecke: list[dict[str, Any]] = []
         if text:
             bloecke.append({"type": "text", "text": text})
 
         tool_uses: list[ToolUse] = []
-        for aufruf in nachricht.get("tool_calls") or []:
-            funktion = aufruf.get("function") or {}
+        aufrufe = nachricht.get("tool_calls")
+        if not isinstance(aufrufe, list):
+            # Eine Zeichenkette waere frueher Zeichen fuer Zeichen
+            # durchlaufen worden - und jedes Zeichen ein AttributeError.
+            aufrufe = []
+        for aufruf in aufrufe:
+            if not isinstance(aufruf, dict):
+                raise LLMError(
+                    "Die Antwort enthielt einen Werkzeugaufruf in unbekannter Form.",
+                    kind="bad_response",
+                    duration_ms=duration_ms,
+                )
+            funktion = aufruf.get("function")
+            if not isinstance(funktion, dict):
+                funktion = {}
             name = str(funktion.get("name", ""))
             roh = funktion.get("arguments")
             if isinstance(roh, str):
@@ -836,15 +995,11 @@ class GroqProvider(_HTTPAnbieter):
                 duration_ms=duration_ms,
             )
 
-        usage = payload.get("usage") or {}
         return LLMReply(
             text=text,
-            model=payload.get("model", self.model),
-            usage=LLMUsage(
-                # OpenAI-Namen, nicht input_tokens/output_tokens.
-                in_tokens=int(usage.get("prompt_tokens", 0)),
-                out_tokens=int(usage.get("completion_tokens", 0)),
-            ),
+            model=str(payload.get("model") or self.model),
+            # OpenAI-Namen, nicht input_tokens/output_tokens.
+            usage=self._tokens(payload, "prompt_tokens", "completion_tokens"),
             duration_ms=duration_ms,
             stop_reason=stop_reason,
             prompt_hash=fingerabdruck,
