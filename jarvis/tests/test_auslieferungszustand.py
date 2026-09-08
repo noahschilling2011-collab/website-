@@ -1,13 +1,12 @@
-"""Der Zustand, in dem JARVIS ausgeliefert wird.
+"""Der ausdrueckliche Demo-Modus von JARVIS.
 
 Alle anderen Task-Tests schieben dem Runner einen skriptierten
 `FakeLLMProvider` unter, der schon einen fertigen Plan im Gepaeck hat. Sie
 pruefen damit den Runner - zu Recht. Nur pruefen sie nicht, was ein Mensch
 bekommt, der die README befolgt und sonst nichts einrichtet.
 
-Genau das steht hier. Kein Provider wird untergeschoben, keine Antwort
-vorgegeben: `create_app` baut den Anbieter selbst aus den Settings, so wie
-beim echten Start.
+Hier baut `create_app` den ausdruecklich gewaehlten Fake aus den Settings.
+Der echte Auslieferungszustand ohne LLM steht in test_astra_integration.
 """
 
 from __future__ import annotations
@@ -41,8 +40,7 @@ def client(settings: Settings):
         yield c
 
 
-def test_die_voreinstellung_ist_wirklich_der_fake(settings: Settings):
-    """Absicherung: dieser Test prueft den Auslieferungszustand, nicht ein Mock."""
+def test_der_gewaehlte_demomodus_ist_wirklich_der_fake(settings: Settings):
     assert isinstance(build_provider(settings), FakeLLMProvider)
 
 

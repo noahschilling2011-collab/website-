@@ -69,8 +69,14 @@ def test_fake_protokolliert_aufrufe():
 # --- Aufbau ---------------------------------------------------------------
 
 
-def test_ohne_llm_provider_kommt_der_fake():
-    assert isinstance(build_provider(Settings(_env_file=None)), FakeLLMProvider)
+def test_ohne_llm_provider_kommt_ein_klarer_konfigurationsfehler():
+    with pytest.raises(LLMError, match="LLM nicht eingerichtet"):
+        build_provider(Settings(_env_file=None))
+
+
+def test_fake_muss_ausdruecklich_gewaehlt_werden():
+    assert isinstance(build_provider(Settings(_env_file=None, llm_provider="fake")),
+                      FakeLLMProvider)
 
 
 def test_unbekannter_provider_wird_gemeldet_statt_geraten():

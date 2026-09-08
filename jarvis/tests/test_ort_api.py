@@ -37,6 +37,12 @@ GMUEND = Ort(qid="Q4037", name="Schwäbisch Gmünd", lat=48.8, lon=9.8,
 @pytest.fixture
 def client(settings):
     with TestClient(create_app(settings)) as c:
+        from core.tools import registry
+
+        # Auch ohne Bild-Credentials ist die Katalogsuche aktiv; Tests
+        # beantworten diesen oeffentlichen Abruf ausdruecklich lokal.
+        registry.get("satellite_search").provider.transport = httpx.MockTransport(
+            lambda _: httpx.Response(200, json={"value": []}))
         yield c
 
 

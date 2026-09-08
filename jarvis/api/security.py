@@ -3,8 +3,8 @@
 Jeder `/api/`-Request braucht `X-Jarvis-Token`. Auch lokal - sonst kann eine
 beliebige Seite im Browser deinen Assistenten fernsteuern.
 
-Wenn in der `.env` kein Token steht, wird beim Start einer gewuerfelt und ins
-Log geschrieben. Der Schutz ist damit nie aus. Ein leerer Wert wuerde sonst
+Wenn in der `.env` kein Token steht, wird beim Start einer gewuerfelt. Sein
+Wert wird niemals protokolliert. Der Schutz ist damit nie aus. Ein leerer Wert wuerde sonst
 jeden Request ohne Header durchlassen - genau das Loch, das dieser Abschnitt
 schliessen soll.
 """
@@ -15,6 +15,8 @@ import logging
 import secrets
 
 from fastapi import Header, HTTPException, Request
+
+from core.konfig_pruefung import token_fehler
 
 log = logging.getLogger("jarvis")
 
@@ -27,6 +29,9 @@ def ensure_token(configured: str) -> tuple[str, bool]:
     startete damit klaglos und gab bei jedem Request 500. Besser gleich
     beim Start sagen, was los ist, als den Nutzer suchen zu lassen.
     """
+    problem = token_fehler(configured or "")
+    if problem:
+        raise ValueError(problem)
     token = (configured or "").strip()
     if token:
         try:
@@ -34,7 +39,7 @@ def ensure_token(configured: str) -> tuple[str, bool]:
         except UnicodeEncodeError as exc:
             raise ValueError(
                 f"JARVIS_TOKEN enthaelt Zeichen, die in einen HTTP-Header nicht "
-                f"hineinpassen ({exc.object[exc.start:exc.end]!r}). "
+                f"hineinpassen. "
                 f"Nimm Buchstaben, Ziffern und -._~ - zum Beispiel die Ausgabe von "
                 f"`python -c \"import secrets; print(secrets.token_urlsafe(32))\"`."
             ) from exc

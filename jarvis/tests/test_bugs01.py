@@ -250,9 +250,18 @@ def test_fund7_auch_hole_quellbild_greift_nicht_ins_eigene_netz(intern):
     assert run(hole_quellbild(intern, medium="X")) is None
 
 
-def test_fund7_oeffentliche_ziele_bleiben_erlaubt():
+def test_fund7_oeffentliche_ziele_bleiben_erlaubt(monkeypatch):
     """Gegenprobe: die Sperre darf das Netz nicht ganz zumachen."""
     from core.tools.search import oeffentliches_ziel
+
+    # Die Gegenprobe gilt der Adresspruefung, nicht dem DNS des Testrechners.
+    # Auch dieser Test muss ohne Netz laufen, wie CLAUDE.md es verlangt.
+    import socket
+
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **k: [
+        (socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "",
+         ("93.184.216.34", 443)),
+    ])
 
     assert oeffentliches_ziel("https://example.com/a") is None
     assert oeffentliches_ziel("http://example.org:8080/b") is None

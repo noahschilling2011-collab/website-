@@ -41,6 +41,7 @@ STATIC_PATH = PROJECT_ROOT / "static"
 # eigenen Status, damit die Oberflaeche "richte das ein" sagen kann statt
 # "der Anbieter spinnt".
 STATUS_BY_KIND = {
+    "missing_provider": 503,
     "missing_api_key": 503,
     "missing_model": 503,
     "unknown_provider": 503,
@@ -360,9 +361,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         if app.state.token_generated:
             log.warning(
-                "JARVIS_TOKEN war leer. Fuer diesen Lauf gewuerfelt: %s\n"
-                "Trag ihn in die .env ein, sonst aendert er sich bei jedem Start.",
-                app.state.token,
+                "JARVIS_TOKEN war leer. Ein temporaerer Zugangstoken wurde erzeugt. "
+                "Fuer einen dauerhaften Zugang JARVIS_TOKEN lokal in .env setzen. "
+                "Der Token wird nicht protokolliert."
             )
         # FIX-08: die Schleife, die Zeitplaene ausloest. Sie startet NACH
         # dem "bereit", damit ihre erste Runde einen fertigen Zustand sieht.

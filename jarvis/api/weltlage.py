@@ -240,6 +240,12 @@ async def post_weltlage(request: Request, land_iso: str) -> dict:
     from core.contracts import Permission, Task, TaskBudget
     from core.runner import fuehre_task_aus
 
+    # Ein fehlendes Modell ist ein Einrichtungszustand (503), kein kaputtes
+    # Modell-JSON (502). Bereits vorhandene Cache-Treffer bleiben oben lesbar.
+    provider_error = getattr(request.app.state.provider, "error", None)
+    if provider_error is not None:
+        raise provider_error
+
     # FIX-02 Schritt 2: KEIN eigener Datenweg neben JARVIS.
     #
     # Vorher rief diese Route provider.complete() direkt auf. Das ging am

@@ -96,6 +96,7 @@ class HealthOut(BaseModel):
 
     schema_status: str = Field(default="aktuell", alias="schema")
     letzte_sicherung: str | None = None
+    integrationen: dict[str, dict[str, str]] = Field(default_factory=dict)
 
 
 class FactOut(BaseModel):

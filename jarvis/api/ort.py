@@ -37,6 +37,7 @@ from api.security import require_token
 from api.tasks import LaufenderTask, baue_laufzeit
 from core import db
 from core.contracts import Permission, Task, TaskBudget
+from core.llm import LLMError
 from core.orte import Ort, OrtFehler, aus_tabelle, bbox_um, finde_ort
 from core.tools.dispatch import run_tool
 
@@ -123,7 +124,7 @@ async def post_ort(request: Request, anfrage: OrtAnfrage) -> dict:
         bild = _bild_aus(ergebnis)
         szene = _szene_aus(ergebnis)
         if bild is None:
-            bild_hinweis = "Zu diesem Ausschnitt kam kein Bild zurueck."
+            bild_hinweis = (ergebnis.data or {}).get("bild_hinweis") or "Zu diesem Ausschnitt kam kein Bild zurueck."
     else:
         bild_hinweis = ergebnis.display or ergebnis.error or "Kein Bild."
 
@@ -171,9 +172,13 @@ async def post_ort(request: Request, anfrage: OrtAnfrage) -> dict:
         # Der Ort und das Bild sind trotzdem etwas wert. Ohne Text, aber
         # mit Hinweis - nicht der ganze Aufruf faellt.
         log.warning("Ort %s: Text nicht erzeugt - %s", ort.name, exc)
+        task.status = "failed"
         bild_hinweis = (bild_hinweis + " " if bild_hinweis else "") + (
-            f"Kein Text erzeugt: {type(exc).__name__}"
+            str(exc) if isinstance(exc, LLMError) and exc.kind in (
+                "missing_provider", "missing_api_key", "missing_model"
+            ) else f"Kein Text erzeugt: {type(exc).__name__}"
         )
+        task.result = bild_hinweis
     finally:
         await asyncio.to_thread(db.save_task, settings.db_path, task)
         request.app.state.tasks.remove(task.id)

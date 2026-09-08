@@ -458,9 +458,12 @@ def test_die_suche_liefert_datum_sensor_aufloesung_und_wolken(satellit_ohne_netz
 
 
 def test_ohne_zugangsdaten_sagt_das_werkzeug_was_fehlt(satellit_ohne_netz):
-    satellit_ohne_netz.provider = CDSEProvider()
+    satellit_ohne_netz.provider = CDSEProvider(transport=httpx.MockTransport(
+        lambda _: httpx.Response(200, json={"value": []})))
     ergebnis = run(run_tool("satellite_search", {"bbox": list(BBOX)}))
-    assert ergebnis.ok is False and "CDSE_CLIENT_ID" in ergebnis.display
+    assert ergebnis.ok is True and "CDSE_CLIENT_ID" in ergebnis.display
+    assert ergebnis.data["scenes"] == []
+    assert not ergebnis.data.get("preview_url")
 
 
 def test_eine_kaputte_bbox_wird_abgelehnt():

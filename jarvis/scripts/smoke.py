@@ -72,6 +72,11 @@ def main() -> int:
             settings = Settings(
                 _env_file=None, db_path=tmp / "smoke.db", jarvis_token="smoke-token",
                 jarvis_erlaubte_hosts="testserver",
+                llm_provider="fake", llm_api_key="", llm_model="",
+                search_api_key="", cdse_client_id="", cdse_client_secret="",
+                vault_pfad="", kalender_quelle="", datei_wurzeln="",
+                wiki_zim="", wiki_kontakt="", wiki_token="",
+                zeitplan_takt_s=0,
             )
 
         kopf = {"X-Jarvis-Token": settings.jarvis_token}
