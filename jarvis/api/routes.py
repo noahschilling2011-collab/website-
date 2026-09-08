@@ -35,6 +35,7 @@ from api.events import strom
 from api.security import require_token
 from core import db, gedaechtnis, memory
 from core.fehlertexte import ohne_geheimnis
+from core.konfig_pruefung import integrationen
 from core.satellite import bilder
 from core.satellite.ueberflug import (
     UeberflugFehler,
@@ -98,6 +99,7 @@ async def health(request: Request) -> HealthOut:
         api_key_configured=bool(settings.llm_api_key),
         api_key_hint=settings.masked_api_key(),
         provider_error=provider_error,
+        integrationen=await asyncio.to_thread(integrationen, settings),
         database=database,
         messages=anzahl,
         spend=SpendOut(

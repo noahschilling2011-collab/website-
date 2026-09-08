@@ -40,4 +40,5 @@ def test_mock_transport_geht_an_der_sperre_vorbei():
 
 
 def test_die_voreinstellung_kostet_nichts():
-    assert isinstance(build_provider(Settings(_env_file=None)), FakeLLMProvider)
+    assert isinstance(build_provider(Settings(_env_file=None, llm_provider="fake")),
+                      FakeLLMProvider)

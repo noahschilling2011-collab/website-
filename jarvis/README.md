@@ -20,26 +20,55 @@ python -m uvicorn main:app --reload
 
 Dann <http://127.0.0.1:8000> öffnen.
 
-Ohne weitere Einrichtung läuft der **FakeLLMProvider**: deterministische
-Antworten, kein Netz, keine Kosten.
+Ohne weitere Einrichtung startet die Oberfläche mit **„LLM nicht eingerichtet“**.
+Health meldet `degraded`; Chat-Anfragen erhalten HTTP 503 und geplante
+Modellaufträge enden als `failed`, nicht mit einem erfundenen Erfolg.
+Erinnerungen über das Formular, das lokale Gedächtnis und konfigurierte
+lesende Werkzeuge bleiben unabhängig vom Modell nutzbar. Die automatische
+Auswahl eines Werkzeugs aus einem frei formulierten Satz braucht weiterhin ein LLM.
 
-Die Oberfläche läuft damit, und Aufträge laufen durch — der Fake liefert dem
-Planner einen Plan mit genau **einem** Schritt, dessen Beschreibung das Ziel
-ist. Aber **es wird kein Werkzeug ausgeführt**: der Fake schlägt nie einen
-Werkzeugaufruf vor. Rechner, Websuche, Gedächtnis und Bestätigungsdialog
-brauchen einen echten Provider mit Key — und der kostet Geld.
+Für einen ausdrücklichen Test-/Demobetrieb gibt es `LLM_PROVIDER=fake`.
+Dieser Modus erzeugt keine echten Auftragsantworten und wählt keine Werkzeuge.
+Tests und der Rauchtest wählen ihn ausdrücklich; er ist kein automatischer Fallback.
+
+## Einrichtung ohne externe Zugangsdaten
+
+Im Verzeichnis `jarvis`:
+
+```bash
+python -m scripts.konfiguration --init
+python -m scripts.konfiguration
+```
+
+`--init` legt eine **neue** `.env` mit einem kryptografischen Zufallstoken an,
+ohne den Wert auszugeben. Eine vorhandene Datei wird nie überschrieben; unter
+POSIX wird sie mit Modus `0600` angelegt. Unter Windows gelten die lokalen ACLs.
+Die Datei bleibt durch `.gitignore` ausgeschlossen.
+
+`JARVIS_ORT` selbst eintragen; `DATEI_WURZELN` nur auf die benötigten
+Unterordner setzen (Windows: `;`, Linux/macOS: `:`). Optional
+`KALENDER_QUELLE` auf eine vorhandene lokale ICS-Datei setzen. Diese persönlichen
+Werte werden nicht geraten und keine Ordner automatisch freigegeben.
+
+Die Diagnose prüft Tokenformat, vorhandene Ordner, den Anfang einer lokalen
+ICS-Datei und die Einrichtungszustände der Module. Sie ruft **keinen** externen
+Dienst auf. `konfiguriert` bedeutet deshalb nicht „live getestet“.
+`--json` liefert denselben Modulbericht wie `/api/health` unter `integrationen`,
+ohne Tokenwerte, private Pfade oder Kalenderadressen.
+
+Der Integrationsbericht dieser Prüfung steht in [ASTRA_REPORT.md](../ASTRA_REPORT.md).
 
 ---
 
 ## Vor dem ersten echten Modellaufruf
 
 ```bash
-cp .env.example .env
+python -m scripts.konfiguration --init  # nur falls noch keine .env existiert
 ```
 
 | Variable | Woher |
 |---|---|
-| `JARVIS_TOKEN` | `python -c "import secrets;print(secrets.token_urlsafe(32))"` |
+| `JARVIS_TOKEN` | Wird durch `python -m scripts.konfiguration --init` direkt in der neuen `.env` gespeichert |
 | `LLM_PROVIDER` | `groq` (kostenlos) oder `anthropic` (kostet Geld). Siehe `.env.example` für den Unterschied |
 | `LLM_API_KEY` | Konto beim Anbieter, Key aus der Console |
 | `LLM_MODEL` | Modell-ID **aus der Doku des Anbieters**, nicht raten |
@@ -60,9 +89,10 @@ Jeder `/api/`-Request braucht den Header `X-Jarvis-Token`. Auch lokal. Die
 Oberfläche bekommt den Token beim Ausliefern von `/` eingesetzt; der
 **LLM-Key** verlässt das Backend nie.
 
-Steht kein `JARVIS_TOKEN` in der `.env`, würfelt JARVIS beim Start einen und
-schreibt ihn ins Log. Der Schutz ist damit nie aus — der Token ändert sich
-aber bei jedem Neustart.
+Steht kein `JARVIS_TOKEN` in der `.env`, würfelt JARVIS beim Start einen.
+Der Wert erscheint nicht im Log. Der Schutz ist damit nie aus — der Token
+ändert sich aber bei jedem Neustart. Der öffentliche Platzhalter aus der alten
+Vorlage und Steuerzeichen in einem konfigurierten Token werden abgelehnt.
 
 **Host-Sperre (FIX-11).** Weil die Seite den Token trägt, liefert JARVIS sie
 nur an Anfragen aus, deren `Host`-Header auf diesen Rechner zeigt:
@@ -276,6 +306,12 @@ Cache-Quote, verworfene Meldungen und die Tageskosten aus `llm_calls`.
 
 **Ohne `SEARCH_API_KEY` findet der Weltlage-Agent keine echten Meldungen.**
 Der Globus, der Cache und die Zähler laufen trotzdem.
+
+Die öffentliche CDSE-Katalogsuche und TLE-Überflüge benötigen keine
+CDSE-Zugangsdaten. Satellitenbilder benötigen weiterhin `CDSE_CLIENT_ID` und
+`CDSE_CLIENT_SECRET`; ohne beide werden weder Token- noch Process-API gerufen.
+Katalogmetadaten bleiben verfügbar, und der fehlende Bildzugang wird getrennt angezeigt.
+NDVI-Rasterbeschaffung bleibt unimplementiert; fehlende Raster werden nicht erfunden.
 
 ## Endpunkte ohne Oberfläche — „nur API, kein UI"
 

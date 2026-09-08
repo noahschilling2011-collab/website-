@@ -184,6 +184,9 @@ def settings(db_path: Path) -> Settings:
         _env_file=None,
         db_path=db_path,
         jarvis_token="test-token-123",
+        # Der Testmodus wird bewusst gewaehlt. Leere Produktionseinstellungen
+        # werden separat in test_astra_integration geprueft.
+        llm_provider="fake",
         # Kurz, damit ein Test nicht 20 s auf ein Lebenszeichen wartet.
         sse_heartbeat_seconds=0.15,
     )

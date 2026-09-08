@@ -45,8 +45,8 @@ class Settings(BaseSettings):
     jarvis_port: int = 8000
 
     # --- LLM-Provider ---
-    # Leer = kein echter Anbieter eingerichtet. Dann laeuft der FakeLLMProvider,
-    # der nicht ins Netz geht und nichts kostet.
+    # Leer = LLM nicht eingerichtet; lokale Module bleiben erreichbar.
+    # FakeLLMProvider nur ausdruecklich mit LLM_PROVIDER=fake fuer Tests/Demos.
     llm_provider: str = ""
     llm_api_key: str = ""
     llm_model: str = ""

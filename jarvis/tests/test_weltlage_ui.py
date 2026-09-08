@@ -14,6 +14,7 @@ import time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+import httpx
 import pytest
 
 from core.llm import FakeLLMProvider
@@ -115,6 +116,18 @@ def server(tmp_path, verlag):
         time.sleep(0.05)
     assert srv.started, "uvicorn ist nicht hochgekommen"
     try:
+        from core.satellite.cdse import KATALOG_URL
+        from core.tools import registry
+
+        # Auch ohne Bild-Credentials wird der oeffentliche Katalog gelesen.
+        # Keine echte Netzabhaengigkeit in den Browser-Integrationspruefungen.
+        def katalog(request):
+            assert request.method == "GET"
+            assert str(request.url).startswith(KATALOG_URL)
+            assert "authorization" not in request.headers
+            return httpx.Response(200, json={"value": []})
+
+        registry.get("satellite_search").provider.transport = httpx.MockTransport(katalog)
         yield f"http://127.0.0.1:{port}", app
     finally:
         srv.should_exit = True
@@ -499,16 +512,18 @@ def test_ein_unbekannter_ort_sagt_das_und_zoomt_nicht(server, monkeypatch):
             br.close()
 
 
-def test_ohne_cdse_kommt_kein_bild_aber_der_ort_bleibt(server, monkeypatch):
+@pytest.mark.parametrize("mit_llm", [True, False])
+def test_ohne_cdse_kommt_kein_bild_aber_der_ort_bleibt(server, monkeypatch, mit_llm):
     """Noahs heutiger Zustand: keine Copernicus-Zugangsdaten. Der Ort und
-    der Text muessen trotzdem da sein, und der Grund fuer das fehlende Bild
-    sichtbar - nicht ein leeres Panel."""
+    der Grund fuer das fehlende Bild bleiben sichtbar. Ohne LLM wird auch
+    der fehlende Text erklaert - keine erfundene Antwort im Panel."""
     basis, app = server
     _ort_stub(monkeypatch)
-    app.state.provider = FakeLLMProvider(replies=[
-        json.dumps({"steps": [{"description": "x", "agent": None}]}),
-        "Ein Text.", "Ein Text.",
-    ])
+    if mit_llm:
+        app.state.provider = FakeLLMProvider(replies=[
+            json.dumps({"steps": [{"description": "x", "agent": None}]}),
+            "Ein Text.", "Ein Text.",
+        ])
 
     with playwright.sync_playwright() as pw:
         br, seite = browser(pw)
@@ -522,6 +537,11 @@ def test_ohne_cdse_kommt_kein_bild_aber_der_ort_bleibt(server, monkeypatch):
             assert seite.is_hidden("#ort-bild-box"), "ohne CDSE kein Bildrahmen"
             assert "CDSE_CLIENT_ID" in seite.text_content("#ort-hinweis")
             assert seite.text_content("#ort-name").strip()
+            if not mit_llm:
+                assert "LLM nicht eingerichtet" in seite.text_content("#ort-hinweis")
+                assert not seite.text_content("#ort-text").strip()
+            else:
+                assert "Ein Text." in seite.text_content("#ort-text")
         finally:
             br.close()
 

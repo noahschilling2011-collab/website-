@@ -119,7 +119,7 @@ class SatelliteSearch(Tool):
             return ToolResult(ok=False, error=str(exc), display=str(exc),
                               duration_ms=dauer())
 
-        if self.provider is None or not self.provider.eingerichtet:
+        if self.provider is None:
             return ToolResult(
                 ok=False,
                 error="CDSE nicht eingerichtet.",
@@ -130,6 +130,13 @@ class SatelliteSearch(Tool):
                 ),
                 duration_ms=dauer(),
             )
+
+        # Der Katalog ist oeffentlich; nur Token- und Process-API brauchen
+        # Credentials. Die Zugangspruefung bleibt am Bildabruf erhalten.
+        cdse_hinweis = "" if self.provider.eingerichtet else (
+            "CDSE-Zugangsdaten fehlen: CDSE_CLIENT_ID und CDSE_CLIENT_SECRET "
+            "sind fuer Bilder erforderlich. Die Katalogsuche bleibt verfuegbar."
+        )
 
         ende = datetime.now(timezone.utc)
         start = ende - timedelta(days=days_back)
@@ -147,7 +154,7 @@ class SatelliteSearch(Tool):
             return ToolResult(
                 ok=True,
                 data={"scenes": [], "max_cloud_pct": max_cloud_pct,
-                      "days_back": days_back},
+                      "days_back": days_back, "bild_hinweis": cdse_hinweis},
                 display=(
                     f"Kein Sentinel-2-Bild unter {max_cloud_pct:.0f} % Wolken in "
                     f"den letzten {days_back} Tagen fuer diesen Ausschnitt.\n\n"
@@ -156,6 +163,7 @@ class SatelliteSearch(Tool):
                     "Aufnahmen bewoelkt. Moeglichkeiten: Suchfenster "
                     "vergroessern oder den Wolken-Schwellwert anheben - dann "
                     "aber mit dem Hinweis, dass das Bild bewoelkt ist."
+                    + ("\n\n" + cdse_hinweis if cdse_hinweis else "")
                 ),
                 duration_ms=dauer(),
             )
@@ -173,20 +181,21 @@ class SatelliteSearch(Tool):
         juengste = szenen[0]
         bild_m = effektive_aufloesung_m(box, BILD_KANTE, BILD_KANTE)
         bild_pfad: str | None = None
-        bild_notiz = ""
+        bild_notiz = "\n\n" + cdse_hinweis if cdse_hinweis else ""
         try:
-            tag = juengste.acquired_at.strftime("%Y-%m-%d")
-            morgen = (juengste.acquired_at + timedelta(days=1)).strftime("%Y-%m-%d")
-            rohbild = await self.provider.render(
-                box,
-                f"{tag}T00:00:00Z",
-                f"{morgen}T00:00:00Z",
-                breite=BILD_KANTE,
-                hoehe=BILD_KANTE,
-            )
-            kennung = speichere_bild(rohbild, db_path=self.db_path)
-            bild_pfad = f"/api/bild/{kennung}"
-            juengste = replace(juengste, preview_url=bild_pfad)
+            if self.provider.eingerichtet:
+                tag = juengste.acquired_at.strftime("%Y-%m-%d")
+                morgen = (juengste.acquired_at + timedelta(days=1)).strftime("%Y-%m-%d")
+                rohbild = await self.provider.render(
+                    box,
+                    f"{tag}T00:00:00Z",
+                    f"{morgen}T00:00:00Z",
+                    breite=BILD_KANTE,
+                    hoehe=BILD_KANTE,
+                )
+                kennung = speichere_bild(rohbild, db_path=self.db_path)
+                bild_pfad = f"/api/bild/{kennung}"
+                juengste = replace(juengste, preview_url=bild_pfad)
         except (CDSEFehler, BildFehler, OSError) as exc:
             # Kein Grund, den ganzen Aufruf scheitern zu lassen: die
             # Metadaten sind da und sind etwas wert. Aber es wird gesagt.
@@ -206,6 +215,7 @@ class SatelliteSearch(Tool):
                 "bild_aufloesung_m": round(bild_m, 1),
                 "bild_kante_px": BILD_KANTE,
                 "attribution": juengste.attribution,
+                "bild_hinweis": bild_notiz.strip(),
             },
             display=(
                 f"{len(szenen)} Szene(n) gefunden, juengste zuerst:\n\n"

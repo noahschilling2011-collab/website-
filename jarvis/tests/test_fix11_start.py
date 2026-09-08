@@ -80,7 +80,8 @@ def _lege_sicherung(db_path: Path, zeit: datetime) -> Path:
 def test_dod_fix08_datenbank_laeuft_ohne_handmigration(tmp_path: Path):
     """Vorher: 500 `no such column: fehlschlaege`, Health `ok`."""
     pfad = _fix08_datenbank(tmp_path / "alt.db")
-    with TestClient(create_app(_einstellungen(pfad))) as c:
+    # Hier wird die Migration geprueft; den Demo-Anbieter ausdruecklich waehlen.
+    with TestClient(create_app(_einstellungen(pfad, llm_provider="fake"))) as c:
         antwort = c.post("/api/zeitplaene", headers=TOKEN,
                          json={"name": "Morgen", "ziel": "Wetter", "regel": "taeglich 07:00"})
         assert antwort.status_code == 201, antwort.text

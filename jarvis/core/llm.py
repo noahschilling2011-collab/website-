@@ -865,8 +865,9 @@ PROVIDERS: dict[str, type[LLMProvider]] = {
 def build_provider(settings: Any) -> LLMProvider:
     """Baut den in `.env` eingestellten Anbieter.
 
-    Ohne `LLM_PROVIDER` laeuft der Fake - so startet JARVIS auch ohne Konto,
-    und man sieht die Oberflaeche, bevor man Geld ausgibt.
+    Ohne `LLM_PROVIDER` bleibt das Modell nicht eingerichtet. Die App faengt
+    diesen Konfigurationsfehler und startet mit UnavailableProvider weiter.
+    Der Fake ist ausschliesslich mit `LLM_PROVIDER=fake` ein Test-/Demomodus.
 
     Hier stand bis zum zweiten Anbieter `return AnthropicProvider(...)` fest
     verdrahtet - der Blick in PROVIDERS war Zierde. Solange es genau einen
@@ -875,7 +876,13 @@ def build_provider(settings: Any) -> LLMProvider:
     bekommen. `test_build_provider_baut_wirklich_groq` haelt das fest.
     """
     key = (settings.llm_provider or "").strip().lower()
-    if key in ("", "fake"):
+    if not key:
+        raise LLMError(
+            "LLM nicht eingerichtet. LLM_PROVIDER, LLM_API_KEY und LLM_MODEL "
+            "in .env eintragen. Erinnerungen bleiben ohne Modell nutzbar.",
+            kind="missing_provider",
+        )
+    if key == "fake":
         return FakeLLMProvider()
     if key not in PROVIDERS:
         raise LLMError(
