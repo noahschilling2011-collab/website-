@@ -7,9 +7,11 @@ Stand: 08.09.2026. Arbeitsbranch: `astra/integration`.
 Der credential-freie Integrationsschritt ist implementiert und lokal geprüft.
 **Keine Gesamtabnahme, keine Phase auf FERTIG gesetzt.** Echte Modellantworten,
 CDSE-Bilder, aktuelle externe Daten und die noch offenen FIX-11-Arbeiten sind
-damit ausdrücklich nicht abgenommen. Die vollständige CI dieses Branches steht
-zum Zeitpunkt dieses Berichtstands noch aus; der lokale Lauf umfasst 1.436
-bestandene Tests und 110 ausdrücklich ausgeschlossene Browserfälle.
+damit ausdrücklich nicht abgenommen. Der erste vollständige CI-Lauf fand zwei
+Browser-Fixture-Probleme; die Korrekturen und eine zusätzliche Browserprüfung
+sind implementiert, ihr vollständiger CI-Nachweis steht noch aus. Der lokale
+Systemlauf vor diesem Nachtrag umfasst 1.436 bestandene Tests und 110
+ausdrücklich ausgeschlossene Browserfälle.
 
 ## Ausgangspunkt und Zusammenarbeit
 
@@ -28,6 +30,9 @@ bestandene Tests und 110 ausdrücklich ausgeschlossene Browserfälle.
 - Eigener isolierter Checkout, eigener Branch. Kein Push auf Claudes Branch,
   kein Merge von PR #11, keine Änderung seiner PR-Beschreibung oder Kommentare.
   Keine fremden Arbeitsbaumänderungen ersetzt. Kein weiterer Agent gestartet.
+- [Eigener Draft-PR #13](https://github.com/noahschilling2011-collab/website-/pull/13)
+  richtet nur den Integrationsdiff gegen Claudes PR-Head. Erster gesicherter
+  Implementierungscommit: `21ee102fce2eb64d7ea3d8c067f6499013d2e8c4`.
 - Claudes Startup/Sicherungs-/Migrationslogik, Erinnerungsformular,
   READ-Grenze für Zeitpläne und UI-Code bleiben erhalten.
 
@@ -105,6 +110,14 @@ Der aktuelle Auftrag wurde nicht als Freigabe zum Einbau eines neuen Computer-Ag
    DNS-Testantwort ersetzt; die eigentliche Adressprüfung bleibt aktiv.
 8. README und `.env.example` sind für den neuen Einrichtungs-/Fehlerpfad
    aktualisiert; die veraltete LOCAL-Angabe in der Vorlage lautet nun READ.
+9. **CI-Nachprüfung der Browserintegration.** Die Orts-Browserfixture
+   beantwortet den öffentlichen Katalog jetzt lokal und prüft Methode, URL
+   sowie fehlenden Authorization-Header. Die Ortsansicht wird zusätzlich
+   ohne LLM auf sichtbaren Einrichtungshinweis geprüft. Die Animationssuite
+   wählt ihren bisherigen Demo-Zustand ausdrücklich; sonst verändert ein
+   gleichzeitig eintreffender längerer LLM-Fehlertext die Tafel-Gesamthöhe.
+   Keine UI-Änderung, keine gelockerte Geometrie-Assertion, keine entfernte
+   Netzsperre.
 
 ## Tests und tatsächliche Ergebnisse
 
@@ -128,7 +141,7 @@ installiert, nicht als neue Produktabhängigkeit aufgenommen.
 | `git diff --check` | Bestanden. |
 | Chromium-Installation/lokaler Browserlauf | Kein abgeschlossener Browsernachweis. Download hier nicht verfügbar; keine Umgehung der Netzwerkgrenze. |
 | Echter Open-Meteo-Aufruf, Testort Berlin | Versucht, aber kein verwertbares Tool-Ergebnis wegen abgebrochener Netzwerkfreigabe. **Nicht live verifiziert**; daraus wird keine Wetterantwort abgeleitet. |
-| Eigene vollständige GitHub-CI | Noch ausstehend; wird nach dem Sichern des Branches geprüft. |
+| [Erste vollständige GitHub-CI #300](https://github.com/noahschilling2011-collab/website-/actions/runs/34207682033) | App und Datenpipeline erfolgreich. JARVIS: zwei Browserfehler; öffentlicher Katalog in einer Fixture nicht beantwortet, Animationstest implizit vom bisherigen Fake-Default abhängig. Beide Testaufbauten korrigiert; erneuter Vollnachweis ausstehend. |
 
 Die ausgeschlossenen Browser-Test-IDs stammen ausschließlich aus den 110
 Playwright-Ausstattungsfehlern der unveränderten Baseline. Produktprüfungen

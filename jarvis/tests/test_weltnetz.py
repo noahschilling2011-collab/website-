@@ -51,7 +51,11 @@ def server(tmp_path):
         port = s_.getsockname()[1]
 
     st = Settings(_env_file=None, db_path=tmp_path / "netz.db",
-                  jarvis_token="netz-token")
+                  jarvis_token="netz-token", llm_provider="fake")
+    # Diese Suite prueft die Geometrie/Animation. Der Demo-Zustand muss
+    # ausdruecklich gewaehlt sein, damit nicht ein gleichzeitig eintreffender
+    # langer LLM-Einrichtungshinweis die Hoehenmessung veraendert.
+    # Den fehlenden Provider pruefen die API- und Orts-Browserregressionen.
     datei = cache_datei("visual", db_path=st.db_path)
     datei.parent.mkdir(parents=True, exist_ok=True)
     datei.write_text(_tle_text(), encoding="utf-8")
