@@ -13,7 +13,7 @@ export class World{
  // nx und nz neigen den Quader um die x- und z-Achse. Ohne sie gäbe es
  // keine Satteldächer, Rampen, Steilhänge oder umgestürzten Stämme.
  box(x,y,z,w,h,d,color=0x999999,rot=0,emissive=false,nx=0,nz=0){const key=color+':'+emissive+':'+Math.floor(x/100)+':'+Math.floor(z/100);let g=this.groups.get(key);if(!g){g={material:mat(color,emissive),items:[]};this.groups.set(key,g);}g.items.push({x,y,z,w,h,d,rot,nx,nz});}
- flush(){const o=new T.Object3D();for(const g of this.groups.values()){const mesh=new T.InstancedMesh(cube,g.material,g.items.length);for(let i=0;i<g.items.length;i++){const a=g.items[i];o.position.set(a.x,a.y,a.z);o.scale.set(a.w,a.h,a.d);o.rotation.set(a.nx||0,a.rot,a.nz||0);o.updateMatrix();mesh.setMatrixAt(i,o.matrix);}mesh.castShadow=true;mesh.receiveShadow=true;mesh.computeBoundingSphere();this.scene.add(mesh);}this.groups.clear();}
+ flush(){const o=new T.Object3D();for(const g of this.groups.values()){const mesh=new T.InstancedMesh(cube,g.material,g.items.length);for(let i=0;i<g.items.length;i++){const a=g.items[i];o.position.set(a.x,a.y,a.z);o.scale.set(a.w,a.h,a.d);o.rotation.set(a.nx||0,a.rot,a.nz||0);o.updateMatrix();mesh.setMatrixAt(i,o.matrix);}mesh.castShadow=true;mesh.receiveShadow=true;mesh.computeBoundingSphere();this.scene.add(mesh);(this.bloecke||=[]).push(mesh);}this.groups.clear();}
  dynbox(g,x,y,z,w,h,d,color){const m=new T.Mesh(cube,mat(color));m.position.set(x,y,z);m.scale.set(w,h,d);m.castShadow=true;m.receiveShadow=true;g.add(m);return m;}
  // Beschriftung ohne Trägerplatte. Vorher standen hier 13-19 m breite,
  // undurchsichtige Tafeln quer in der Stadt, von hinten spiegelverkehrt.
@@ -67,6 +67,22 @@ export class World{
   }this.updateExtras?.(dt,camYaw,camPitch,playing);this.sky.mesh.position.copy(this.camera.position);this.renderer.render(this.scene,this.camera);
  }
  // Sonnenstand, Himmel, Nebel, Umgebungslicht und Belichtung aus einer Quelle.
+ // Die Welt liegt in Blöcken zu 100 m je Farbe vor. Three.js verwirft sie
+ // außerhalb des Sichtkegels, aber nicht nach Entfernung: aus der Innenstadt
+ // heraus wurden Flugfeld und Insel weiter gezeichnet, obwohl sie hinter drei
+ // Dunstschichten liegen. Die Grenze folgt der Nebeldichte — beim Luftbild
+ // (nebelFaktor .06) reicht sie dadurch über die ganze Karte.
+ bloeckeSichten(dichte){
+  if(!this.bloecke)return;
+  // exp2-Nebel: bei d*x = 2.6 bleiben unter 0.1 % Restsicht.
+  const weite=Math.min(2600,Math.max(320,2.6/Math.max(1e-5,dichte)));
+  const k=this.camera.position;
+  for(const m of this.bloecke){
+   const s=m.boundingSphere;
+   if(!s)continue;
+   m.visible=k.distanceTo(s.center)-s.radius<weite;
+  }
+ }
  applySky(dt){
   const s=this.sim,p=s.player;
   const himmel=this.sky.update(s.hour,s.weather,this.camera.position,s.time);
@@ -74,6 +90,7 @@ export class World{
   // nebelFaktor senkt den Dunst für Luftbilder; aus 900 m wäre die Karte
   // sonst eine weiße Fläche.
   this.scene.fog.density=himmel.nebelDichte*(this.nebelFaktor??1);
+  this.bloeckeSichten(himmel.nebelDichte*(this.nebelFaktor??1));
   // Steht die Sonne unter dem Horizont, übernimmt der Mond dieselbe Bahn
   // gespiegelt — sonst wäre die Nacht eine schattenlose graue Fläche.
   const unterHorizont=himmel.richtung.y<0,richtung=this.sonnenRichtung.copy(himmel.richtung);

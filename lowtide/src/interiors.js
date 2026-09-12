@@ -136,6 +136,22 @@ const EINRICHTUNG = {
    w.box(r.rechts - 1.6, .95, r.l.z + oz, 2.2, .9, .3, 0x62506e);
   }
   w.box(r.l.x, 3.7, r.hinten - .3, 6, 1, .15, 0xb05f7a, 0, true);
+  // Hinterzimmer: Akt 4 verlangt einen Tresor an einer bestimmten Stelle
+  // (story.js, TRESOR). Ohne Möbel wäre das ein unsichtbares Ziel auf dem
+  // nackten Boden — also steht hier, was dort stehen muss.
+  const tx = r.l.x + 6, tz = r.l.z - 9;
+  w.box(tx, .7, tz, 1.1, 1.4, .9, 0x33343a);
+  w.box(tx - .58, .7, tz, .08, 1.3, .84, 0x4a4c53);
+  w.box(tx - .63, .78, tz, .06, .34, .34, 0x8d8f96);
+  w.box(tx - .66, .78, tz, .05, .1, .1, 0xc7c2a8, 0, true);
+  w.box(tx, 1.46, tz, 1.2, .1, 1, 0x45474d);
+  // Schreibtisch daneben, Aktenschrank an der Wand.
+  w.box(tx - 2.4, .38, tz + .4, 1.9, .08, 1, 0x5f4c3c);
+  for (const ox of [-.8, .8]) for (const oz of [-.4, .4])
+   w.box(tx - 2.4 + ox, .19, tz + .4 + oz, .08, .38, .08, 0x4a3c30);
+  w.box(tx - 2.4, .46, tz + .4, .5, .06, .36, 0xd8cfb4);
+  w.box(tx - .4, 1, tz + 2.6, .5, 2, 1.4, 0x4e5057);
+  for (const h of [.5, 1.1, 1.7]) w.box(tx - .67, h, tz + 2.6, .06, .38, 1.2, 0x676a71);
  },
  diner(w, r) {
   // Tresen mit Hockern, Nischen, Durchreiche zur Küche.

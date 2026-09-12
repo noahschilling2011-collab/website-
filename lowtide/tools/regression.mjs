@@ -467,6 +467,127 @@ await bilder(1);
 pruefe('P schließt das Telefon und gibt das Spiel frei', await page.evaluate(() =>
  document.getElementById('phone').hidden && !window.LOWTIDE.sim.paused));
 
+console.log('Akt 3 bis 5');
+// Die drei Akte laufen hier direkt gegen die Simulation: die Mechanik ist
+// Physik und Zustand, kein Rendern. Ein Durchlauf im Spieltempo dauerte
+// Minuten, deshalb werden Vorlauf und Position gesetzt statt abgefahren.
+const akte = await page.evaluate(() => {
+ const L = window.LOWTIDE, sim = L.sim, S = L.story, out = {};
+ sim.paused = false;
+ sim.campaign.stage = 4;
+ const ziel = sim.objective();
+ out.zielDiner = Math.hypot(ziel.x - L.orte.diner.x, ziel.z - L.orte.diner.z) < 1;
+ sim.player.car = null; sim.player.x = L.orte.diner.x; sim.player.z = L.orte.diner.z + 2;
+ out.aktion3 = sim.action();
+
+ sim.starteAkt(3);
+ const lkw = sim.cars.find(c => c.type === 'konvoi');
+ out.lkwDa = !!lkw;
+ out.titelVorlauf = sim.missionTitle();
+ sim.campaign.konvoi.vorlauf = 0;
+ const lkwVor = {x: lkw.x, z: lkw.z};
+ for (let i = 0; i < 60; i++) sim.tick(.05);
+ out.lkwFaehrt = Math.hypot(lkw.x - lkwVor.x, lkw.z - lkwVor.z);
+ const auto = sim.cars.find(c => c.type === 'parked' && c.model === 'muscle') || sim.cars[0];
+ sim.player.car = auto; Object.assign(auto, {yaw: lkw.yaw, speed: 22, health: 100, fuel: 100});
+ let stoesse = 0;
+ while (sim.campaign.konvoi.phase === 'faehrt' && stoesse++ < 400) {
+  auto.x = lkw.x + 2.2; auto.z = lkw.z + 1.2; auto.speed = 22;
+  sim.tick(.05, {forward: 1});
+ }
+ out.gestoppt = sim.campaign.konvoi.phase === 'gestoppt';
+ out.stoesse = stoesse;
+ out.fahndungNachRammen = sim.stars;
+ sim.player.car = null; sim.player.x = lkw.x + 1.5; sim.player.z = lkw.z + 1;
+ const geld3 = sim.player.money;
+ out.aktion4 = sim.action();
+ out.lohn3 = sim.player.money - geld3;
+
+ sim.starteAkt(4);
+ sim.hour = 14; sim.player.car = null;
+ sim.player.x = S.TRESOR.x; sim.player.z = S.TRESOR.z;
+ sim.tick(.01, {sneak: true}); sim.action();
+ out.tagsGesperrt = !sim.campaign.tresor.arbeitet;
+ sim.hour = 23; sim.player.sneak = false; sim.action();
+ out.aufrechtGesperrt = !sim.campaign.tresor.arbeitet;
+ sim.stars = 0; sim.heat = 0;
+ sim.tick(.01, {sneak: true}); sim.player.x = S.TRESOR.x; sim.player.z = S.TRESOR.z;
+ sim.action();
+ out.nachtsOffen = !!sim.campaign.tresor.arbeitet;
+ const geld4 = sim.player.money;
+ let takte = 0;
+ for (; takte < 900 && sim.campaign.stage === S.AKT4; takte++) {
+  sim.player.x = S.TRESOR.x; sim.player.z = S.TRESOR.z; sim.tick(.05, {sneak: true});
+  if (sim.campaign.tresor.blockiert) out.wachePausiert = true;
+ }
+ out.takte4 = takte;
+ out.lohn4 = sim.player.money - geld4;
+ out.stageNach4 = sim.campaign.stage;
+ out.dialog4 = sim.aktDialog;
+ sim.aktDialog = null; sim.paused = false;
+
+ const boot = sim.cars.find(c => c.type === 'flucht');
+ out.bootDa = !!boot;
+ out.routeWasser = S.FLUCHT_ROUTE.every(q => L.waterAt(q.x, q.z));
+ const bootVor = {x: boot.x, z: boot.z};
+ for (let i = 0; i < 40; i++) sim.tick(.05);
+ out.bootFaehrt = Math.hypot(boot.x - bootVor.x, boot.z - bootVor.z);
+ const eigenes = sim.cars.find(c => c.model === 'boat' && c !== boot);
+ sim.player.car = eigenes;
+ for (let i = 0; i < 300 && !sim.aktDialog; i++) {
+  eigenes.x = boot.x + 3; eigenes.z = boot.z + 3;
+  sim.player.x = eigenes.x; sim.player.z = eigenes.z;
+  sim.tick(.05);
+ }
+ out.dialog5 = sim.aktDialog;
+ sim.aktDialog = null; sim.paused = false;
+ const geld5 = sim.player.money, ruf = sim.relationship;
+ const ausgang = sim.beendeKampagne('polizei');
+ out.ausgang = ausgang?.ausgang;
+ out.endLohn = sim.player.money - geld5;
+ out.endRuf = sim.relationship - ruf;
+ out.stageEnde = sim.campaign.stage;
+ out.ausgaenge = Object.keys(S.AUSGAENGE).length;
+ sim.player.car = null; sim.stars = 0; sim.heat = 0;
+ return out;
+});
+pruefe('Akt 3 wird am Diner angeboten', akte.zielDiner && akte.aktion3 === 'akt3');
+pruefe('Transport existiert und fährt seine Route', akte.lkwDa && akte.lkwFaehrt > 30, `${akte.lkwFaehrt?.toFixed(1)} m in 3 s`);
+pruefe('Vorlauf steht im Auftragstext', /startet in \d+ s/.test(akte.titelVorlauf || ''), akte.titelVorlauf);
+pruefe('Rammen stoppt den Transport', akte.gestoppt, `${akte.stoesse} Stöße`);
+pruefe('Rammen zählt nicht als Straftat', akte.fahndungNachRammen === 0);
+pruefe('Treffersperre verhindert Dauerschaden', akte.stoesse >= 3, `${akte.stoesse} Stöße`);
+pruefe('Kassenbuch bringt Geld und startet Akt 4', akte.aktion4 === 'akt4start' && akte.lohn3 === 900);
+pruefe('Tresor bleibt tagsüber zu', akte.tagsGesperrt);
+pruefe('Tresor bleibt aufrecht zu', akte.aufrechtGesperrt);
+pruefe('Tresor öffnet nachts und geduckt', akte.nachtsOffen);
+pruefe('Akt 4 zahlt aus und führt in Akt 5', akte.lohn4 === 1400 && akte.stageNach4 === 7 && akte.dialog4 === 'akt5start');
+pruefe('Wache am Tresor unterbricht die Arbeit', akte.wachePausiert === true);
+pruefe('Tresor braucht länger als die reine Knackzeit', akte.takte4 * .05 > 6.5, `${(akte.takte4 * .05).toFixed(1)} s`);
+pruefe('Fluchtroute liegt vollständig im Wasser', akte.routeWasser);
+pruefe('Fluchtboot fährt', akte.bootDa && akte.bootFaehrt > 10, `${akte.bootFaehrt?.toFixed(1)} m in 2 s`);
+pruefe('Verfolgung endet im Schlussdialog', akte.dialog5 === 'ende');
+pruefe('Drei Ausgänge, Übergabe zahlt und hebt das Vertrauen',
+ akte.ausgaenge === 3 && akte.ausgang === 'Übergabe' && akte.endLohn === 1500 && akte.endRuf === 15);
+pruefe('Kampagne erreicht den Endzustand', akte.stageEnde === 8);
+pruefe('Aktfahrzeuge überstehen Speichern und Laden', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ const stand = JSON.parse(JSON.stringify(s.snapshot()));
+ s.restore(stand); s.paused = false;
+ return !!s.cars.find(c => c.type === 'konvoi') && !!s.cars.find(c => c.type === 'flucht')
+  && s.npcs.filter(n => n.aktWache).length === 4;
+}));
+pruefe('Alter Spielstand bekommt die Aktfahrzeuge zurück', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ const stand = JSON.parse(JSON.stringify(s.snapshot()));
+ const autos = stand.cars.length, leute = stand.npcs.length;
+ stand.cars = stand.cars.filter(c => c.type !== 'konvoi' && c.type !== 'flucht');
+ stand.npcs = stand.npcs.filter(n => !n.aktWache);
+ s.restore(stand); s.paused = false;
+ return s.cars.length === autos && s.npcs.length === leute
+  && s.cars[s.cars.length - 1].type === 'flucht';
+}));
+
 console.log('Spielstand');
 pruefe('Speichern und Laden überstehen den Rundlauf', await page.evaluate(() => {
  const s = window.LOWTIDE.sim;
@@ -476,6 +597,41 @@ pruefe('Speichern und Laden überstehen den Rundlauf', await page.evaluate(() =>
  s.restore(stand);
  s.paused = false;
  return s.player.money === 4321;
+}));
+
+console.log('Gang und Sichtweite');
+const gang = await page.evaluate(() => {
+ const L = window.LOWTIDE, welt = L.world, figur = welt.player, u = figur.userData;
+ const out = {gelenke: u.ankles?.length || 0, sohle: [], hang: 0};
+ // Einen Schrittzyklus durchfahren und die Sohlenneigung mitschreiben. Sie
+ // ergibt sich aus Hüfte plus Knie plus Sprunggelenk; ohne Gelenk wäre sie
+ // gleich der Kette und liefe bis ±1,1 rad auf.
+ for (let k = 0; k < 24; k++) {
+  figur.position.x += .09; figur.position.z += .09;
+  welt.animateHuman(figur, 10 + k * .05, 1, false);
+  out.sohle.push(u.legs[0].rotation.x + u.knees[0].rotation.x + (u.ankles?.[0]?.rotation.x || 0));
+ }
+ out.groesste = Math.max(...out.sohle.map(Math.abs));
+ out.kette = Math.max(...u.legs.map(() => 0), ...out.sohle.map(() => 0));
+ // Am Hang im Nationalpark muss die Neigung ungleich null sein.
+ figur.position.set(-470, 0, -400); figur.rotation.y = 1.2;
+ out.hang = Math.abs(welt.bodenNeigung(figur));
+ figur.position.set(0, 0, 0);
+ out.ebene = Math.abs(welt.bodenNeigung(figur));
+ return out;
+});
+pruefe('Figuren haben Sprunggelenke', gang.gelenke === 2);
+pruefe('Sohle bleibt im Schritt annähernd waagerecht', gang.groesste < .62, `max ${gang.groesste.toFixed(2)} rad`);
+pruefe('Bodenneigung greift am Hang und nicht in der Ebene', gang.hang > .05 && gang.ebene < .001,
+ `Hang ${gang.hang.toFixed(2)} rad, Ebene ${gang.ebene.toFixed(3)} rad`);
+pruefe('Ferne Blöcke werden nach Entfernung verworfen', await page.evaluate(() => {
+ const w = window.LOWTIDE.world;
+ window.LOWTIDE.view(-40, 60);
+ w.bloeckeSichten(.0038);
+ const versteckt = w.bloecke.filter(m => !m.visible).length;
+ w.bloeckeSichten(.0002);          // Luftbilddichte: alles muss zurückkommen
+ const wieder = w.bloecke.filter(m => !m.visible).length;
+ return versteckt > 5 && wieder === 0;
 }));
 
 console.log('Rendern');

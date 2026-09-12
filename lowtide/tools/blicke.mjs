@@ -17,6 +17,11 @@ const STANDORTE = {
   insel:      [232, 246, 1.60, .26, 0],
   marina:     [268, 250, 4.60, .26, 0],
   industrie:  [116, -40, 1.90, .34, 0],
+  nordrand:   [-160, -470, 1.60, .20, 0],
+  westrand:   [-540, -150, 1.90, .24, 0],
+  heide:      [-500, 320, 2.60, .22, 0],
+  undertow:   [-210, 16, 3.10, .12, 0],
+  leitung:    [-145, -500, 0.30, -.08, 0],
 };
 const arg = (n, f) => {const i = process.argv.indexOf('--' + n); return i > -1 ? process.argv[i + 1] : f;};
 const orte = arg('orte', Object.keys(STANDORTE).join(',')).split(',');

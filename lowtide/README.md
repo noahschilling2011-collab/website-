@@ -27,6 +27,7 @@ src/
   radio.js          Prozedural erzeugte Radiosender
   lod.js            Grobe Silhouetten für ferne Figuren und Fahrzeuge
   wildlife.js       Möwen, Fische, Delfine, Alligatoren
+  story.js          Akt 3 bis 5 der Kampagne
   bake.js           Backt ein Vorbild nach Material zu einer Geometrie
   art-direction.js  Materialien, Fahrzeug- und Figurenaufbau
   human-model.js    Anatomische Figurenmodelle und Animation
@@ -44,7 +45,8 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 76 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 96 Prüfungen, muss grün sein
+node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 ```
 
 Die drei Werkzeuge in `tools/` mit Browser brauchen Playwright und Chromium.
@@ -68,6 +70,21 @@ LOWTIDE.view(x, z, gier, neigung)           // Figur und Kamera versetzen
 LOWTIDE.luftbild(x, y, z, zx, zy, zz)       // freie Kamera für Luftbilder
 LOWTIDE.radio.waehle(3)                     // Radiosender setzen
 ```
+
+## Kampagne
+
+Fünf Akte. Akt 1 und 2 liegen in `simulation.js` und `campaign.js`, Akt 3 bis 5
+in `story.js`:
+
+1. **Das Lager** — Festplatte aus dem Caldera-Lager, drei Wege hinein.
+2. **Die Ratsakte** — Mara schaltet das Relais ab, Eli holt die Akte, die
+   Zeugin muss von Isla Serena zum Flughafen.
+3. **Der Transport** — ein Konvoi fährt eine feste Route zur Luftfracht und
+   lässt sich nur rammen; erreicht er das Ziel, fährt der nächste.
+4. **Die Wäsche** — Tresor im Hinterzimmer des Undertow, nur nachts, nur
+   geduckt, und die Wache davor bestimmt den Takt.
+5. **Ebbe** — Verfolgung auf dem Wasser, drei Ausgänge: Übergabe, Abfindung
+   oder Abrechnung.
 
 ## Musik
 

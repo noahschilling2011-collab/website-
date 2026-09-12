@@ -45,13 +45,18 @@ export function naturalHuman(color,pants,nah=true){
   seam(g,[[0,1.42,.12],[0,1.20,.119],[0,.99,.10]],0x727b78,.0035);
   add(g,new T.BoxGeometry(.045,.033,.012),mat(0x939b93,.35),0,.926,.111);
  }
- const legs=[],arms=[],knees=[],elbows=[];
+ const legs=[],arms=[],knees=[],elbows=[],ankles=[];
  for(const side of [-1,1]){
   const leg=new T.Group();leg.position.set(side*.105,.91,0);g.add(leg);legs.push(leg);
   add(leg,loft([[0,.098,.092,.095],[-.13,.085,.085,.087],[-.29,.063,.066,.068],[-.43,.055,.053,.055]],18),denim,0,0,0);
   const knee=new T.Group();knee.position.y=-.41;leg.add(knee);knees.push(knee);
   add(knee,loft([[0,.056,.059,.058],[-.12,.062,.062,.069],[-.28,.045,.04,.043],[-.40,.038,.033,.038]],16),denim,0,0,0);
-  oval(knee,0,-.416,.06,.055,.046,.13,dark);oval(knee,0,-.448,.06,.056,.011,.13,mat(0x707572));
+  // Eigenes Sprunggelenk. Vorher hing der Schuh starr am Unterschenkel und
+  // kippte mit ihm mit — beim Ausschreiten zeigte die Sohle nach vorn, beim
+  // Aufsetzen nach hinten. Als eigene Gruppe lässt sich die Sohle gegen die
+  // Kette zurückdrehen und bleibt parallel zum Boden.
+  const ankle=new T.Group();ankle.position.y=-.40;knee.add(ankle);ankles.push(ankle);
+  oval(ankle,0,-.016,.06,.055,.046,.13,dark);oval(ankle,0,-.048,.06,.056,.011,.13,mat(0x707572));
   if(nah)seam(leg,[[side*.091,-.04,.01],[side*.080,-.18,.01],[side*.057,-.38,.01]],0x626b68,.002);
   const arm=new T.Group();arm.position.set(side*.235,1.415,0);g.add(arm);arms.push(arm);
   add(arm,loft([[.025,.071,.071,.068],[-.13,.058,.058,.057],[-.28,.046,.048,.046]],16),cloth,0,0,0);
@@ -67,13 +72,15 @@ export function naturalHuman(color,pants,nah=true){
   }
  }
  const tattoo=add(arms[0],new T.PlaneGeometry(.055,.09),mat(0x314643),0,-.28,.051);tattoo.visible=false;
- const garments=[];g.traverse(o=>{if(o.isMesh&&o.material===cloth)garments.push(o);});g.userData={body,hair,tattoo,legs,arms,knees,elbows,eyes,lids,face,id,garments,rig:'anatomical-v1'};return g;
+ const garments=[];g.traverse(o=>{if(o.isMesh&&o.material===cloth)garments.push(o);});g.userData={body,hair,tattoo,legs,arms,knees,elbows,ankles,eyes,lids,face,id,garments,rig:'anatomical-v2'};return g;
 }
 // Ein voller Schrittzyklus deckt diese Strecke ab. Die Schrittphase läuft
 // deshalb über den zurückgelegten Weg und nicht über die Uhr — nur so bleibt
 // der Fuß beim Aufsetzen stehen, statt über den Boden zu schleifen.
 const SCHRITTZYKLUS=1.95;
-export function animateNaturalHuman(g,time,moving,armed){
+// steigung: Neigung des Bodens unter der Figur im Bogenmaß, aus der
+// Geländehöhe vor und hinter ihr. 0 auf der Ebene, was fast überall gilt.
+export function animateNaturalHuman(g,time,moving,armed,steigung=0){
  const u=g.userData;
  const dt=Math.max(.001,Math.min(.25,time-(u.letzteZeit??time-.016)));u.letzteZeit=time;
  const dx=g.position.x-(u.letzteX??g.position.x),dz=g.position.z-(u.letzteZ??g.position.z);
@@ -90,6 +97,17 @@ export function animateNaturalHuman(g,time,moving,armed){
   const step=Math.sin(phase+i*Math.PI);
   leg.rotation.x=step*.46*amount;
   u.knees[i].rotation.x=Math.max(0,-step)*.72*amount+.025;
+  // Der Fuß wird nicht animiert, sondern aus der Kette gelöst: die Summe aus
+  // Hüft- und Kniewinkel wird zurückgenommen, sodass die Sohle waagerecht
+  // bleibt. steigung neigt sie zusätzlich in den Hang. Dazu zwei Zugaben,
+  // die echtes Gehen ausmachen: Abrollen über die Zehen beim Abstoßen
+  // (step<0, das Bein ist hinten) und Anheben der Fußspitze beim Durchziehen.
+  if(u.ankles?.[i]){
+   const kette=leg.rotation.x+u.knees[i].rotation.x;
+   const abstoss=Math.max(0,-step)*.55*amount;
+   const durchzug=Math.max(0,step)*.22*amount;
+   u.ankles[i].rotation.x=-kette+steigung+abstoss-durchzug;
+  }
  });
  u.arms.forEach((arm,i)=>{
   const gegen=Math.sin(phase+i*Math.PI);

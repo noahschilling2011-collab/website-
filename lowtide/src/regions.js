@@ -711,6 +711,121 @@ function nordFlaechen(w, rng) {
  zaun(w, px - 36, pz + 26, px + 36, pz + 26, 2.2, 0x7f867f, 4);
 }
 
+// ------------------------------------------------------- Ränder der Karte
+// tools/abdeckung.mjs zählt die Bauteile je 100-Meter-Zelle. Zehn Landzellen
+// waren praktisch leer: der Nordrand über den Vororten, ein Streifen westlich
+// des Nationalparks und die Südwestecke hinter dem Sumpf. Wer dort hinfuhr,
+// stand auf einer grauen Platte. Sie bekommen keine Siedlungen — dort gehört
+// nichts hin — aber Gelände, an dem man sich orientieren kann.
+function randgebiete(w, rng) {
+ // Freileitung quer über den Norden. Masten sind das, was leere Landschaft
+ // maßstäblich macht: man sieht an ihnen, wie weit die nächste noch weg ist.
+ const mastZ = -470;
+ let vorher = null;
+ for (let x = -300; x <= 80; x += 62) {
+  const y = groundAt(x, mastZ);
+  for (const seite of [-1, 1]) {
+   w.box(x + seite * 2.6, y + 9, mastZ, .5, 18, .5, 0x6d7176);
+   w.box(x + seite * 1.3, y + 18.6, mastZ, .38, 4.4, .38, 0x6d7176);
+  }
+  for (const h of [7, 12, 17]) w.box(x, y + h, mastZ, 6.2, .34, .34, 0x6d7176);
+  w.box(x, y + 20.6, mastZ, 3.2, .3, .3, 0x6d7176);
+  for (const h of [8.2, 13.2, 18.2]) w.box(x, y + h, mastZ, .9, 1.3, .22, 0x2c3033);
+  // Durchhängende Leitung in drei Segmenten je Feld.
+  if (vorher !== null) {
+   const spanne = x - vorher;
+   for (const versatz of [-2.6, 0, 2.6]) for (let k = 0; k < 3; k++) {
+    const t = (k + .5) / 3, mx = vorher + spanne * t;
+    const durchhang = Math.sin(t * Math.PI) * 2.1;
+    w.box(mx, groundAt(mx, mastZ) + 18.2 - durchhang, mastZ + versatz,
+     spanne / 3, .1, .1, 0x35393c, 0, false, 0, (k - 1) * .09);
+   }
+  }
+  vorher = x;
+ }
+ // Trockenes Buschland darunter. Erster Versuch: flache helle Platten als
+ // Fels und Gras — die lagen wie weggeworfene Matratzen auf der Wiese.
+ // Fels ist jetzt höher als breit, Gras ist niedrig und in der Farbe des
+ // Bodens, und die Kiefern tragen den Maßstab.
+ for (let i = 0; i < 520; i++) {
+  const x = -320 + rng() * 420, z = -540 + rng() * 105;
+  if (aufStrasse(x, z, 9) || w.sim.blocked({x, z}, 3)) continue;
+  const y = groundAt(x, z), r = rng();
+  if (r < .44) {
+   // Büschel aus zwei versetzten niedrigen Kissen.
+   const t = [0x6a7546, 0x5d6c40, 0x74794b][i % 3];
+   w.box(x, y + .16, z, .7 + rng() * .8, .32, .6 + rng() * .7, t);
+   w.box(x + (rng() - .5) * .8, y + .1, z + (rng() - .5) * .8, .5 + rng() * .6, .2, .5 + rng() * .5, t);
+  } else if (r < .62) {
+   const h = .9 + rng() * 1.5, b = h * (.5 + rng() * .35);
+   w.box(x, y + h / 2, z, b, h, b * (.7 + rng() * .5), [0x807a6d, 0x6f6a60, 0x8b8477][i % 3], rng() * 3);
+  } else if (r < .74) {
+   // Bare Erde: bodennah und in Bodennähe gefärbt, damit sie nicht auffällt.
+   // Gedreht, sonst liegen lauter achsparallele Rechtecke in der Wiese.
+   w.box(x, y + .03, z, 2 + rng() * 3.5, .06, 1.8 + rng() * 3, 0x77704f, rng() * 3.1);
+  } else nadelbaum(w, x, z, 6 + rng() * 6, 0x4a5f44);
+ }
+ // Entwässerungsgraben mit Betonkante, wie sie in flachem Land überall liegen.
+ for (let x = -300; x < 80; x += 14) {
+  w.box(x, -.45, -505, 14, .9, 5.5, 0x5c5a48);
+  w.box(x, .12, -507.9, 14, .24, .5, 0x9b968a);
+  w.box(x, .12, -502.1, 14, .24, .5, 0x9b968a);
+ }
+ // Schotterpiste vom Highway hinauf zur Leitungstrasse.
+ // Schotter, nicht Beton: der erste Anlauf mit 0x8d8574 stand unter der
+ // ACES-Belichtung fast weiß in der Wiese.
+ for (let z = -420; z > -510; z -= 6) {
+  w.box(-160, .03, z, 5.4, .06, 6, 0x6e6852);
+  w.box(-160, .05, z + 3, 5.8, .04, .5, 0x7b7460);
+ }
+
+ // Westrand: Vorland des Nationalparks, x um -540, z um -140.
+ for (let i = 0; i < 260; i++) {
+  const x = -580 + rng() * 120, z = -190 + rng() * 100;
+  if (waterAt(x, z)) continue;
+  const y = groundAt(x, z), r = rng();
+  if (r < .62) nadelbaum(w, x, z, 7 + rng() * 8, [0x3a5740, 0x44614a, 0x33513c][i % 3]);
+  else if (r < .84) {
+   const h = 1.1 + rng() * 2.2, b = h * (.55 + rng() * .4);
+   w.box(x, y + h / 2, z, b, h, b * (.7 + rng() * .5), [0x76715f, 0x848070, 0x6a6659][i % 3], rng() * 3);
+  } else w.box(x, y + .14, z, .8 + rng() * 1, .28, .7 + rng() * .9, 0x4f6340);
+ }
+
+ // Südwestecke: Kiefernheide auf Sand, dazwischen alte Fundamente.
+ for (let i = 0; i < 520; i++) {
+  const x = -580 + rng() * 180, z = 200 + rng() * 250;
+  if (waterAt(x, z) || aufStrasse(x, z, 10)) continue;
+  const y = groundAt(x, z), r = rng();
+  if (r < .5) nadelbaum(w, x, z, 6 + rng() * 7, [0x47603f, 0x3d5539, 0x506a44][i % 3]);
+  else if (r < .72) laubbaum(w, x, z, 5 + rng() * 4, 0x5a7048);
+  else if (r < .9) {
+   // Sandblöße: die Heide steht auf Sand, aber flach und gedeckt, nicht als
+   // helle Platte auf der Wiese.
+   w.box(x, y + .03, z, 2.4 + rng() * 4, .06, 2 + rng() * 3.4, [0x7d7455, 0x736b4e, 0x847b5c][i % 3], rng() * 3.1);
+   if (rng() < .5) w.box(x + (rng() - .5) * 3, y + .14, z + (rng() - .5) * 3, .8, .28, .7, 0x5c6b41);
+  } else {
+   const h = .8 + rng() * 1.3, b = h * (.6 + rng() * .4);
+   w.box(x, y + h / 2, z, b, h, b * (.8 + rng() * .4), 0x7d776a, rng() * 3);
+  }
+ }
+ // Vier Fundamentreste einer nie fertig gebauten Siedlung.
+ for (const [fx, fz] of [[-520, 250], [-470, 320], [-545, 385], [-430, 415]]) {
+  const b = 12 + rng() * 6, t = 9 + rng() * 5;
+  w.box(fx, .12, fz, b, .24, t, 0xa9a290);
+  for (const seite of [-1, 1]) {
+   w.box(fx + seite * b / 2, .6, fz, .3, 1.2, t, 0x9a9382);
+   w.box(fx, .6, fz + seite * t / 2, b, 1.2, .3, 0x9a9382);
+  }
+  for (let k = 0; k < 4; k++) w.box(fx - b / 2 + rng() * b, .9, fz - t / 2 + rng() * t, .34, 1.8, .34, 0x8d8776);
+  zaun(w, fx - b, fz - t, fx + b, fz - t, 1, 0x8b8271, 3.2);
+ }
+ // Sandweg, der die Heide erschließt.
+ for (let z = 210; z < 450; z += 7) {
+  const x = -500 + Math.sin(z * .012) * 42;
+  w.box(x, .04, z, 6.6, .07, 7, 0x74694f);
+ }
+}
+
 export function dressRegions(world) {
  const rng = zufall();
  sunsetSuburbs(world, rng);
@@ -723,4 +838,5 @@ export function dressRegions(world) {
  stadtLuecken(world, rng);
  suedFlaechen(world, rng);
  nordFlaechen(world, rng);
+ randgebiete(world, rng);
 }

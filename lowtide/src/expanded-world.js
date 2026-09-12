@@ -116,7 +116,16 @@ export class ExpandedWorld extends World{
   });
  }
  human(color,pants,nah=true){return naturalHuman(color,pants,nah);}
- animateHuman(model,time,moving,armed){if(model.userData.rig)animateNaturalHuman(model,time,moving,armed);else super.animateHuman(model,time,moving,armed);}
+ // Die Bodenneigung unter der Figur, gemessen einen halben Meter vor und
+ // hinter ihr. Auf der Ebene ist sie null; erst am Hang im Cypress-Park
+ // stellt sie die Sohlen sichtbar in den Anstieg.
+ bodenNeigung(model){
+  const x=model.position.x,z=model.position.z,y=model.rotation.y,d=.5;
+  const vx=Math.sin(y)*d,vz=Math.cos(y)*d;
+  const vorne=groundAt(x+vx,z+vz),hinten=groundAt(x-vx,z-vz);
+  return Math.max(-.7,Math.min(.7,Math.atan2(vorne-hinten,d*2)));
+ }
+ animateHuman(model,time,moving,armed){if(model.userData.rig)animateNaturalHuman(model,time,moving,armed,this.bodenNeigung(model));else super.animateHuman(model,time,moving,armed);}
  palm(x,z,h){(this.palmen||=[]).push({x,z,h});}
  // Eine Krone, einmal erzeugt, danach nur noch Matrizen.
  palmenGeometrie(){const positions=[];for(let k=0;k<9;k++){const a=k*Math.PI*2/9;for(let j=0;j<7;j++){const point=(t,side)=>{const len=t*4.4,w=Math.sin(t*Math.PI)*.52;return [Math.sin(a)*len+Math.cos(a)*w*side,Math.sin(t*Math.PI)*.9-t*t*1.7,Math.cos(a)*len-Math.sin(a)*w*side];};const a0=point(j/7,-1),b0=point(j/7,1),c0=point((j+1)/7,-1),d0=point((j+1)/7,1);positions.push(...a0,...b0,...c0,...b0,...d0,...c0);}}const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(positions,3));geo.computeVertexNormals();return geo;}
