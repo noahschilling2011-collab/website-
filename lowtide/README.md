@@ -23,6 +23,8 @@ src/
   facades.js        Sockelgeschosse, Läden, Fensterlaibungen, Dachaufbauten
   regions.js        Vororte, Farm, Nationalpark, Sumpf, Flugfeld, Insel,
                     Industrie, Baulücken, Süd- und Nordflächen
+  interiors.js      Begehbare Innenräume der acht Serviceorte
+  radio.js          Prozedural erzeugte Radiosender
   art-direction.js  Materialien, Fahrzeug- und Figurenaufbau
   human-model.js    Anatomische Figurenmodelle und Animation
   content.js        Weltdaten: Orte, Regionen, Fahrzeugtypen, Waffen
@@ -39,7 +41,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 50 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 58 Prüfungen, muss grün sein
 ```
 
 Die drei Werkzeuge in `tools/` mit Browser brauchen Playwright und Chromium.
@@ -61,4 +63,11 @@ LOWTIDE.sim.hour = 22                       // Tageszeit setzen
 LOWTIDE.sim.weather = 'storm'               // clear | rain | fog | storm
 LOWTIDE.view(x, z, gier, neigung)           // Figur und Kamera versetzen
 LOWTIDE.luftbild(x, y, z, zx, zy, zz)       // freie Kamera für Luftbilder
+LOWTIDE.radio.waehle(3)                     // Radiosender setzen
 ```
+
+## Musik
+
+Die Radiosender in `radio.js` erzeugen ihre Musik zur Laufzeit aus Tempo,
+Tonart, Akkordfolge und Instrumentierungsregeln. Es sind keine Aufnahmen
+eingebunden — weder eigene noch fremde.

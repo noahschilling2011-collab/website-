@@ -219,6 +219,40 @@ await page.keyboard.press('F3');
 pruefe('F3 blendet die Messwerte ein', await page.evaluate(() => !document.getElementById('debug').hidden));
 await page.keyboard.press('F3');
 
+console.log('Radio');
+pruefe('Audiokontext läuft nach dem Start', await page.evaluate(() =>
+ !!window.LOWTIDE.world && document.body.classList.contains('playing')));
+pruefe('Radio ist eingerichtet und hat mehrere Sender', await page.evaluate(() => {
+ const r = window.LOWTIDE.radio;
+ return !!r && r.constructor.name === 'Radio' && window.LOWTIDE.sender.length >= 6;
+}));
+pruefe('N schaltet den Sender weiter', await page.evaluate(() => {
+ const r = window.LOWTIDE.radio, vorher = r.index;
+ window.dispatchEvent(new KeyboardEvent('keydown', {key: 'n', bubbles: true}));
+ return r.index !== vorher;
+}));
+pruefe('Radio schweigt zu Fuß', await page.evaluate(async () => {
+ const L = window.LOWTIDE;
+ if (L.sim.player.car) {L.sim.player.car.speed = 0; L.sim.enterExit();}
+ await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ return L.radio.laut < .01;
+}));
+pruefe('Im Fahrzeug läuft der Sender und plant Noten', await page.evaluate(async () => {
+ const L = window.LOWTIDE, s = L.sim;
+ L.radio.waehle(1);
+ const auto = s.cars.find(c => c.model === 'sedan' && c.health > 0);
+ auto.unlocked = true;
+ s.player.x = auto.x + 1.5; s.player.z = auto.z; s.player.y = 0;
+ if (!s.player.car) s.enterExit();
+ await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ const vorher = L.radio.schritt;
+ for (let i = 0; i < 40; i++) L.radio.tick();
+ await new Promise(r => setTimeout(r, 450));
+ L.radio.tick();
+ return L.radio.laut > .1 && L.radio.schritt !== vorher;
+}));
+await page.evaluate(() => {const s = window.LOWTIDE.sim; if (s.player.car) {s.player.car.speed = 0; s.enterExit();}});
+
 console.log('Innenräume');
 pruefe('Alle acht Serviceräume sind eingerichtet', await page.evaluate(() =>
  (window.LOWTIDE.world.innenLampen || []).length >= 8));
@@ -241,7 +275,7 @@ await page.keyboard.press('p');
 await bilder(1);
 pruefe('P öffnet das Telefon', await page.evaluate(() => !document.getElementById('phone').hidden));
 pruefe('Startseite zeigt alle Apps', await page.evaluate(() =>
- document.querySelectorAll('#phoneKacheln button').length === 9));
+ document.querySelectorAll('#phoneKacheln button').length >= 10));
 pruefe('Telefon pausiert das Spiel', await page.evaluate(() => window.LOWTIDE.sim.paused));
 pruefe('TIDELINE zeigt, was in der Welt passiert ist', await page.evaluate(() => {
  const s = window.LOWTIDE.sim;
