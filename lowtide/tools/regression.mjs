@@ -692,25 +692,48 @@ pruefe('Verdeckung dunkelt tatsächlich ab', keys.aoMin < 245, `dunkelster Wert 
 pruefe('Oberflächendetail liegt auf allen matten Weltmaterialien',
  keys.detail[0] === keys.detail[1] && keys.detail[1] > 50 && keys.detail[2] > 0,
  `${keys.detail[0]} von ${keys.detail[1]}, ${keys.detail[2]} leuchtende ausgenommen`);
-pruefe('Spiegelung läuft nur bei Nässe', await page.evaluate(async () => {
- const L = window.LOWTIDE, w = L.world;
- const bild = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
- L.sim.weather = 'clear';
- // Die Nässe klingt langsam ab; für die Prüfung direkt setzen.
- w.post.spiegelU.nass.value = 0;
- await bild();
- const trocken = w.post.endeU.spiegel.value === w.post.schwarz;
- L.sim.weather = 'storm';
- for (let i = 0; i < 40; i++) w.applySky(.5);
- await bild();
- const nass = w.post.spiegelU.nass.value;
- const anGeschaltet = w.post.endeU.spiegel.value === w.post.spiegelZiel.texture;
- // Weltoben im Blickraum darf nicht die Einheitsachse geblieben sein.
- const achse = w.post.spiegelU.hochAchse.value;
- const gedreht = Math.abs(achse.y - 1) > 1e-4 || Math.abs(achse.z) > 1e-4;
- L.sim.weather = 'clear';
- return {trocken, nass, anGeschaltet, gedreht};
-}).then(r => r.trocken && r.nass > .5 && r.anGeschaltet && r.gedreht));
+// Die Spiegelung lief früher nur bei Nässe; sie läuft jetzt auch auf Wasser,
+// weil das Hafenbecken sonst nur zwei Himmelsfarben zeigt. Geprüft wird
+// deshalb nicht mehr, ob der Durchgang angeschaltet ist, sondern was
+// tatsächlich in seinem Ziel steht.
+const spiegelDeckung = async (x, z, blick, wetter) => {
+ await page.evaluate(([x, z, blick, wetter]) => {
+  const L = window.LOWTIDE;
+  L.sim.hour = 13; L.sim.weather = wetter;
+  L.view(x, z, blick, .08);
+  // Die Nässe klingt mit Nachlauf ab; für die Prüfung einschwingen lassen.
+  for (let i = 0; i < 60; i++) L.world.applySky(.5);
+ }, [x, z, blick, wetter]);
+ await bilder(4);
+ return await page.evaluate(() => {
+  const w = window.LOWTIDE.world;
+  const sz = w.post.szene, szb = new Uint16Array(sz.width * sz.height * 4);
+  w.renderer.readRenderTargetPixels(sz, 0, 0, sz.width, sz.height, szb);
+  let wasser = 0;                            // 0x3800 ist 0,5 als HalfFloat
+  for (let i = 3; i < szb.length; i += 4) if (szb[i] === 0x3800) wasser++;
+  const zl = w.post.spiegelZiel, zb = new Uint16Array(zl.width * zl.height * 4);
+  w.renderer.readRenderTargetPixels(zl, 0, 0, zl.width, zl.height, zb);
+  let sp = 0;
+  for (let i = 3; i < zb.length; i += 4) if (zb[i] !== 0) sp++;
+  const achse = w.post.spiegelU.hochAchse.value;
+  return {wasser: wasser / (szb.length / 4), spiegel: sp / (zb.length / 4),
+   nass: w.post.spiegelU.nass.value,
+   gedreht: Math.abs(achse.y - 1) > 1e-4 || Math.abs(achse.z) > 1e-4};
+ });
+};
+const kueste = await spiegelDeckung(140, 120, -1.5, 'clear');
+const innenTrocken = await spiegelDeckung(-300, -180, 1.2, 'clear');
+const innenNass = await spiegelDeckung(-300, -180, 1.2, 'storm');
+await page.evaluate(() => {window.LOWTIDE.sim.weather = 'clear';});
+pruefe('Wasser trägt seine Marke im Alphakanal', kueste.wasser > .3,
+ `${(kueste.wasser * 100).toFixed(1)} % der Fläche`);
+pruefe('Wasser spiegelt auch bei klarem Wetter', kueste.spiegel > .05,
+ `${(kueste.spiegel * 100).toFixed(1)} % gespiegelt`);
+pruefe('Trockener Asphalt spiegelt nichts', innenTrocken.spiegel < .005,
+ `${(innenTrocken.spiegel * 100).toFixed(2)} % gespiegelt`);
+pruefe('Nasser Asphalt spiegelt', innenNass.spiegel > .02 && innenNass.nass > .5,
+ `${(innenNass.spiegel * 100).toFixed(1)} % bei Nässe ${innenNass.nass.toFixed(2)}`);
+pruefe('Weltoben liegt im Blickraum, nicht auf der Einheitsachse', kueste.gedreht);
 const wolken = await page.evaluate(() => {
  const L = window.LOWTIDE, w = L.world, u = L.wolken;
  // applySky rechnet Stärke, Versatz und Sonnenneigung jedes Bild neu.

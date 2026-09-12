@@ -110,7 +110,13 @@ void main(){
  farbe = mix(farbe, vec3(0.86, 0.90, 0.88) * (0.35 + 0.65 * (1.0 - nacht)), clamp(brandung * 0.62 + gischt * 0.28, 0.0, 0.85));
  farbe = mix(farbe, horizon, dunst * 0.25);
 
- gl_FragColor = vec4(farbe, 1.0);
+ // Der Alphakanal trägt keine Deckung, sondern eine Marke: 0,5 heißt Wasser.
+ // Das Szenenziel wird nur über RGB weitergelesen, also ist der Kanal frei,
+ // und die Spiegelung in post.js braucht eine Kennung, die sie nicht raten
+ // muss. Über die Höhe ginge es nicht — Kai, Strand und Uferstraße liegen
+ // ebenfalls fast auf null. Undurchsichtige Flächen schreiben 1,0, der
+ // Himmel auch, gelöscht wird auf 0,0: 0,5 kollidiert mit keinem davon.
+ gl_FragColor = vec4(farbe, 0.5);
 }`;
 
 // Inseln und Dämme als Vector4 für den Shader. Der Sumpf im Westen hat keine

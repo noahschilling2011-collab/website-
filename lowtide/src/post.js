@@ -131,8 +131,15 @@ void main(){
 // zwanzig Meter weiter.
 //
 // Also ein Strahlmarsch durch die Tiefe, die nach dem Szenendurchgang
-// ohnehin vorliegt. Nur auf waagerechten Flächen und nur bei Nässe: das ist
-// ein Bruchteil des Bildes, und für den Rest wäre es Aufwand ohne Wirkung.
+// ohnehin vorliegt. Nur auf waagerechten Flächen, und nur dort, wo etwas zu
+// spiegeln ist: nasser Asphalt und Wasser. Für den trockenen Rest wäre es
+// Aufwand ohne Wirkung, deshalb steigt der Shader dort nach einer Textur
+// wieder aus.
+//
+// Das Wasser spiegelte bisher nur den Himmel, analytisch aus zwei Farben.
+// In einer Hafenstadt steht damit die halbe Skyline neben einer Fläche, die
+// von ihr nichts weiß. Erkannt wird es an der Marke 0,5 im Alphakanal des
+// Szenenziels, die water.js setzt.
 const SPIEGEL = `
 uniform sampler2D bild, tiefe;
 uniform mat4 projektion, projektionInvers;
@@ -149,9 +156,15 @@ vec3 sichtPunkt(vec2 uv){
 
 void main(){
  gl_FragColor = vec4(0.0);
- if(nass < 0.02) return;
  float d = texture2D(tiefe, vUv).x;
  if(d > 0.9999) return;
+ // Wasser trägt 0,5 im Alphakanal; undurchsichtige Flächen 1,0, gelöscht
+ // wird auf 0,0. Das Fenster ist weit genug, dass ein Regenstrich davor die
+ // Marke nicht aus ihm heraus mischt.
+ float alpha = texture2D(bild, vUv).a;
+ float wasser = step(0.15, alpha) * step(alpha, 0.85);
+ float gewicht = max(nass, wasser);
+ if(gewicht < 0.02) return;
  vec3 p = sichtPunkt(vUv);
  vec3 n = normalize(cross(dFdx(p), dFdy(p)));
  // Nur, was nach oben zeigt. Wände spiegeln bei Regen praktisch nicht.
@@ -161,10 +174,15 @@ void main(){
  // Die aus den Tiefen-Ableitungen gewonnene rauscht auf einer großen Ebene,
  // und damit zeigte der Strahl bei jedem Bildpunkt woanders hin — das Ergebnis
  // waren Flecken statt der Streifen, die nasser Asphalt tatsächlich zeigt.
- n = normalize(mix(n, hochAchse, oben));
+ // Auf Wasser bleibt mehr von der gerechneten Normale stehen: dort ist die
+ // Störung keine Rauschquelle, sondern der Wellengang, und ohne sie stünde
+ // die Skyline gestochen scharf im Hafenbecken.
+ n = normalize(mix(n, hochAchse, oben * mix(1.0, 0.62, wasser)));
  // Und nur in der Nähe: weiter weg ist die Tiefenauflösung zu grob für
- // einen Strahlmarsch, und der Dunst deckt es ohnehin zu.
- float naehe = 1.0 - smoothstep(40.0, 110.0, -p.z);
+ // einen Strahlmarsch, und der Dunst deckt es ohnehin zu. Über Wasser reicht
+ // es weiter — dort steht nichts dazwischen, und der Strahlmarsch kommt aus
+ // 30 Schritten ohnehin nur rund hundert Meter weit.
+ float naehe = 1.0 - smoothstep(mix(40.0, 70.0, wasser), mix(110.0, 190.0, wasser), -p.z);
  if(naehe < 0.02) return;
 
  vec3 blick = normalize(p);
@@ -198,7 +216,7 @@ void main(){
    break;
   }
  }
- gl_FragColor = vec4(treffer, gefunden * oben * naehe * nass * fresnel * staerke);
+ gl_FragColor = vec4(treffer, gefunden * oben * naehe * gewicht * fresnel * staerke);
 }`;
 
 // Zusammensetzen. Hier passiert alles, was den Bildeindruck trägt.
@@ -399,7 +417,12 @@ export class Nachbearbeitung {
 
   // Spiegelung: nur wenn es überhaupt nass ist. Bei trockener Straße wäre
   // der ganze Durchgang Aufwand für ein leeres Ziel.
-  if (this.spiegelAn && this.spiegelU.nass.value > .02) {
+  // Der Durchgang läuft jetzt immer, wenn er überhaupt an ist: ob Wasser im
+  // Bild steht, weiß erst der Shader, und der steigt für trockene Flächen
+  // nach einer Tiefen- und einer Farbtaste wieder aus. Ein halbaufgelöster
+  // Durchgang mit früher Rückkehr kostet weniger als der Versuch, die Frage
+  // auf der CPU zu beantworten.
+  if (this.spiegelAn) {
    this.spiegelU.bild.value = this.szene.texture;
    this.spiegelU.tiefe.value = this.szene.depthTexture;
    this.spiegelU.projektion.value.copy(camera.projectionMatrix);

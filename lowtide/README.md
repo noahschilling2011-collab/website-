@@ -49,9 +49,10 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 149 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 153 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
+node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
 ```
 
 Die drei Werkzeuge in `tools/` mit Browser brauchen Playwright und Chromium.
@@ -85,12 +86,37 @@ Randabdunklung und Korn. Der Renderer selbst tonwertet dabei nicht mehr —
 sonst würde zweimal komprimiert.
 
 Nasser Asphalt spiegelt nicht nur den Himmel: `post.js` marschiert für
-waagerechte Flächen bei Nässe einen Strahl durch dieselbe Tiefe, die schon
-die Verdeckung nutzt, und holt die Neonschilder und Laternen aus dem Bild
-selbst. Auf einer waagerechten Fläche wird dabei nicht die aus den
-Ableitungen gewonnene Normale benutzt, sondern Weltoben — die gerechnete
-rauscht auf einer großen Ebene, und das Ergebnis waren Flecken statt der
-Streifen, die nasser Asphalt tatsächlich zeigt.
+waagerechte Flächen einen Strahl durch dieselbe Tiefe, die schon die
+Verdeckung nutzt, und holt die Neonschilder und Laternen aus dem Bild selbst.
+Auf einer waagerechten Fläche wird dabei nicht die aus den Ableitungen
+gewonnene Normale benutzt, sondern Weltoben — die gerechnete rauscht auf einer
+großen Ebene, und das Ergebnis waren Flecken statt der Streifen, die nasser
+Asphalt tatsächlich zeigt.
+
+**Das Wasser hängt seit Kurzem im selben Durchgang.** Vorher spiegelte es nur
+den Himmel, analytisch aus zwei Farben — in einer Hafenstadt steht damit die
+halbe Skyline neben einer Fläche, die von ihr nichts weiß. Erkannt wird
+Wasser an einer Marke im Alphakanal des Szenenziels: `water.js` schreibt dort
+0,5, undurchsichtige Flächen schreiben 1,0, gelöscht wird auf 0,0. Über die
+Höhe ginge es nicht — Kai, Strand und Uferstraße liegen ebenfalls fast auf
+null. Auf Wasser bleibt mehr von der gerechneten Normale stehen als auf
+Asphalt: dort ist die Störung keine Rauschquelle, sondern der Wellengang, und
+ohne sie stünde die Skyline gestochen scharf im Hafenbecken.
+
+Gemessen mit `tools/spiegelung.mjs`, das die Deckung im Spiegelziel auszählt:
+
+| Blick | Wetter | Wasser im Bild | gespiegelt |
+|---|---|---|---|
+| Küste | klar | 68,6 % | 15,5 % |
+| Strand | klar | 9,8 % | 4,7 % |
+| Innenstadt | klar | 0,1 % | 0,0 % |
+| Innenstadt | Regen | 0,1 % | 19,0 % |
+
+Der erste Messversuch stand an der Hafenmessstelle aus `messung.mjs` und
+meldete null — dort ist gar kein Wasser im Bild. Die Stelle war falsch, nicht
+der Shader. Dass gespiegelte Fläche deutlich kleiner ist als Wasserfläche,
+gehört dazu: der Strahlmarsch kommt aus dreißig Schritten rund hundert Meter
+weit, und was aus dem Bild läuft, gibt es nicht.
 
 `detail.js` hängt sich über `onBeforeCompile` in jedes Weltmaterial und legt
 Farbflecken, Rauheitsschwankung und eine Normalenstörung darüber, dreifach
