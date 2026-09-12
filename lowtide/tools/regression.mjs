@@ -724,9 +724,20 @@ const karte = await page.evaluate(() => {
  const L = window.LOWTIDE, sim = L.sim, w = L.world, out = {};
  const b = L.bounds;
  out.flaeche = +(((b.right - b.left) * (b.bottom - b.top)) / 1e6).toFixed(2);
- // Jede Region muss auf Land liegen und benannt sein.
- out.regionen = L.regionen.map(r => ({name: r.name, wasser: L.waterAt(r.x, r.z)}));
- out.imWasser = out.regionen.filter(r => r.wasser).map(r => r.name);
+ // Erster Versuch: "kein Ankerpunkt im Wasser". Falsche Frage — SALT MARSH
+ // ist ein Sumpf und OUTER KEYS eine Inselgruppe, deren Mitte zwischen den
+ // Inseln liegt. Beides gehört ins Wasser. Die richtige Frage ist, ob es zu
+ // jeder Region eine Stelle gibt, an der man stehen kann und an der regionAt
+ // genau diesen Namen liefert. Eine Region, die man nie betreten kann, wäre
+ // ein Name ohne Ort.
+ out.unerreichbar = L.regionen.filter(r => {
+  for (let dx = -200; dx <= 200; dx += 25) for (let dz = -200; dz <= 200; dz += 25) {
+   const x = r.x + dx, z = r.z + dz;
+   if (x < L.bounds.left || x > L.bounds.right || z < L.bounds.top || z > L.bounds.bottom) continue;
+   if (!L.waterAt(x, z) && L.regionAt({x, z}) === r.name) return false;
+  }
+  return true;
+ }).map(r => r.name);
  // Gelände deckt die ganze Karte ab, nicht nur den alten Ausschnitt.
  const kacheln = w.terrain.map(m => m.position);
  out.westlichste = Math.min(...kacheln.map(p => p.x));
@@ -748,7 +759,8 @@ const karte = await page.evaluate(() => {
  return out;
 });
 pruefe('Die Karte ist über zwei Quadratkilometer groß', karte.flaeche > 2, `${karte.flaeche} km²`);
-pruefe('Keine Region liegt im Wasser', karte.imWasser.length === 0, karte.imWasser.join(', '));
+pruefe('Jede Region hat eine Stelle, an der man stehen kann',
+ karte.unerreichbar.length === 0, karte.unerreichbar.join(', '));
 pruefe('Das Gelände reicht bis an den Westrand', karte.westlichste < -1000, `${karte.westlichste}`);
 pruefe('Das Gelände reicht bis an den Südrand', karte.suedlichste > 800, `${karte.suedlichste}`);
 pruefe('Die vier neuen Gebiete sind begehbar', karte.frei === 4, `${karte.frei} von 4`);
