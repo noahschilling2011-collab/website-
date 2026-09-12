@@ -717,7 +717,7 @@ const dichte = await page.evaluate(() => {
  // Der Bewuchs wird um den Spieler gesetzt. In der Innenstadt steht
  // absichtlich kein Halm, also erst in den Vorort versetzen.
  const g = w.gras;
- g.setzen(-60, -320);
+ g.setzen(-60, -320, true);
  const arr = g.netz.instanceMatrix.array;
  let null_ = 0, ueberBoden = 0;
  for (let i = 0; i < g.netz.count; i++) {

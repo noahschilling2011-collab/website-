@@ -13,6 +13,9 @@ import {groundAt, waterAt, onRoad} from './content.js';
 // Speichergröße, unabhängig von der Kartengröße.
 
 const ANZAHL = 3400, RADIUS = 46, NEUSETZEN = 14;
+// Halme je Bild bei einer Umsetzung. Achteinhalb Bilder für den ganzen Ring;
+// die alten Halme bleiben derweil stehen, sichtbar ist der Übergang nicht.
+const JE_BILD = 400;
 
 // Ein Büschel aus drei gekreuzten Blättern. Eine einzelne Fläche verschwindet,
 // sobald man seitlich draufsieht.
@@ -84,6 +87,7 @@ export class Grasfeld {
   scene.add(this.netz);
   this.hilfe = new T.Object3D();
   this.mitte = {x: 1e9, z: 1e9};
+  this.aufgabe = null;
   this.zufall = (() => {let z = 20260912; return () => {z = (z * 1664525 + 1013904223) >>> 0; return z / 4294967296;};})();
  }
 
@@ -101,18 +105,36 @@ export class Grasfeld {
   return groundAt(x, z) < 1.5;
  }
 
- setzen(px, pz) {
-  const o = this.hilfe, r = this.zufall;
-  // Nur die Hindernisse in Reichweite prüfen; über alle Solids der Welt zu
-  // laufen wäre bei 2600 Halmen je Umsetzung sechsstellig.
-  const nahe = this.sim.solids.filter(b =>
-   Math.abs(b.x - px) < RADIUS + 20 && Math.abs(b.z - pz) < RADIUS + 20);
+ // Beginnt eine Umsetzung. Sie läuft über mehrere Bilder, siehe arbeite().
+ setzen(px, pz, sofort = false) {
+  this.aufgabe = {
+   px, pz, i: 0,
+   // Nur die Hindernisse in Reichweite prüfen; über alle Solids der Welt zu
+   // laufen wäre bei tausenden Halmen je Umsetzung sechsstellig.
+   nahe: this.sim.solids.filter(b =>
+    Math.abs(b.x - px) < RADIUS + 20 && Math.abs(b.z - pz) < RADIUS + 20)
+  };
+  // Sofort merken, wo umgesetzt wird: sonst stellt update() im nächsten Bild
+  // fest, dass der Spieler immer noch weit von der alten Mitte weg ist, und
+  // fängt von vorn an.
+  this.mitte = {x: px, z: pz};
+  if (sofort) while (this.aufgabe) this.arbeite(ANZAHL);
+ }
+
+ // Ein Stück Arbeit. Alle 3400 Halme in einem Bild zu setzen hieß bei 14 m
+ // Auslöseabstand: im Auto alle halbe Sekunde ein sichtbarer Hänger.
+ arbeite(menge) {
+  const a = this.aufgabe;
+  if (!a) return;
+  const o = this.hilfe, r = this.zufall, {px, pz, nahe} = a;
   const farben = this.netz.instanceColor.array;
-  for (let i = 0; i < ANZAHL; i++) {
+  const ende = Math.min(ANZAHL, a.i + menge);
+  for (let i = a.i; i < ende; i++) {
    let x = 0, z = 0, gut = false;
    for (let versuch = 0; versuch < 4 && !gut; versuch++) {
-    const a = r() * Math.PI * 2, d = Math.sqrt(r()) * RADIUS;
-    x = px + Math.cos(a) * d; z = pz + Math.sin(a) * d;
+    // winkel statt a: a ist hier oben schon die laufende Aufgabe.
+    const winkel = r() * Math.PI * 2, d = Math.sqrt(r()) * RADIUS;
+    x = px + Math.cos(winkel) * d; z = pz + Math.sin(winkel) * d;
     gut = this.erlaubt(x, z) && !nahe.some(b =>
      Math.abs(x - b.x) < b.w / 2 + .4 && Math.abs(z - b.z) < b.d / 2 + .4);
    }
@@ -134,14 +156,16 @@ export class Grasfeld {
    farben[i * 3 + 1] = .40 + t * .20;
    farben[i * 3 + 2] = .22 + t * .12;
   }
+  a.i = ende;
   this.netz.instanceMatrix.needsUpdate = true;
   this.netz.instanceColor.needsUpdate = true;
-  this.mitte = {x: px, z: pz};
+  if (a.i >= ANZAHL) this.aufgabe = null;
  }
 
  update(dt, zeit, spieler, wind = 1) {
-  if (Math.hypot(spieler.x - this.mitte.x, spieler.z - this.mitte.z) > NEUSETZEN)
+  if (!this.aufgabe && Math.hypot(spieler.x - this.mitte.x, spieler.z - this.mitte.z) > NEUSETZEN)
    this.setzen(spieler.x, spieler.z);
+  this.arbeite(JE_BILD);
   const u = this.material.userData;
   if (u.gZeit) u.gZeit.value = zeit;
   if (u.gStaerke) u.gStaerke.value = .09 + wind * .16;
