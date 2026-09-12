@@ -2,7 +2,13 @@ import * as T from './vendor/three.module.js';
 import {detailedCar} from './art-direction.js';
 // Erkennungsfarbe: nur das Lackmaterial des Vorbilds trägt sie.
 const LACK_MARKE=0x00ff2a;
-import {roadSegments, groundAt, waterAt, intersections, ampelFrei, AMPEL_TAKT, onRoad} from './content.js';
+import {roadSegments, groundAt, waterAt, intersections, ampelFrei, AMPEL_TAKT, onRoad, locations} from './content.js';
+// Die Serviceräume sind vorn offen und haben nur drei Wände als Körper.
+// sim.blocked meldet ihr Inneres deshalb als frei — dort standen Laternen
+// und Masten mitten im Laden.
+const RAEUME=['garage','shop','clinic','home','club','diner','motel','records']
+ .map(id=>({x:locations[id].x, z:locations[id].z-4, w:(id==='garage'?22:16)/2+2, d:10}));
+function imRaum(x,z){return RAEUME.some(r=>Math.abs(x-r.x)<r.w&&Math.abs(z-r.z)<r.d);}
 // Straßenmöblierung für Port Mercy.
 // Vorher standen an den Straßen Laternen nur im Hafenbecken; der Rest der Stadt
 // war leere Fahrbahn zwischen leeren Grundstücken. Alles hier läuft über die
@@ -73,7 +79,7 @@ export class Street {
  }
 
  frei(x, z, radius = 2) {
-  if (waterAt(x, z)) return false;
+  if (waterAt(x, z) || imRaum(x, z)) return false;
   return !this.world.sim.blocked({x, z}, radius);
  }
 

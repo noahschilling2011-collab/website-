@@ -219,6 +219,23 @@ await page.keyboard.press('F3');
 pruefe('F3 blendet die Messwerte ein', await page.evaluate(() => !document.getElementById('debug').hidden));
 await page.keyboard.press('F3');
 
+console.log('Innenräume');
+pruefe('Alle acht Serviceräume sind eingerichtet', await page.evaluate(() =>
+ (window.LOWTIDE.world.innenLampen || []).length >= 8));
+pruefe('Innenlicht geht an, sobald man den Raum betritt', await page.evaluate(async () => {
+ const L = window.LOWTIDE, s = L.sim;
+ s.player.x = -270; s.player.z = 123;   // Nora’s Diner
+ s.player.car = null; s.player.y = 0;
+ await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ return L.world.innenLichter.some(l => l.visible && l.intensity > 10);
+}));
+pruefe('Innenlicht geht aus, wenn man weit weg ist', await page.evaluate(async () => {
+ const L = window.LOWTIDE, s = L.sim;
+ s.player.x = -40; s.player.z = 60;
+ await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ return L.world.innenLichter.every(l => !l.visible);
+}));
+
 console.log('Telefon');
 await page.keyboard.press('p');
 await bilder(1);

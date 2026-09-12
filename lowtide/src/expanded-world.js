@@ -7,6 +7,7 @@ import {distance} from './simulation.js';
 import {Street} from './street.js';
 import {dressBuildings} from './facades.js';
 import {dressRegions} from './regions.js';
+import {dressInteriors} from './interiors.js';
 const STRASSEN_HEX=[0x333d45,0x3d494f,0x445155];
 const GLAS_HEX=[0x3c5a69,0x486673,0x51737b,0x2c4d52];
 const material=c=>new T.MeshStandardMaterial({color:c,roughness:.7});
@@ -22,7 +23,7 @@ export class ExpandedWorld extends World{
    }
    if(GLAS_HEX.includes(hex)){o.material.metalness=.72;o.material.roughness=.16;o.material.envMapIntensity=1.5;}
   });
-  this.setupStrassenlicht();this.setupFahrlicht();
+  this.setupStrassenlicht();this.setupInnenlicht();this.setupFahrlicht();
   // Suchscheinwerfer des Hubschraubers. Ab fünf Sternen kreist er über der
   // letzten bekannten Position; vorher war er nur ein stummes Modell.
   this.suchlicht=new T.SpotLight(0xdfe9ff,0,220,.16,.4,1);
@@ -37,6 +38,35 @@ export class ExpandedWorld extends World{
   this.strassenLichter=[];
   for(let i=0;i<8;i++){const l=new T.PointLight(0xffd7a0,0,26,1.7);l.visible=false;this.scene.add(l);this.strassenLichter.push(l);}
   this.lichtWechsel=0;
+ }
+ // Innenraumlicht: fünf Punktlichter wandern zum nächstgelegenen Raum.
+ // Innen brennt Licht auch bei Tag, sonst ist jeder Laden eine Höhle.
+ setupInnenlicht(){
+  this.innenLichter=[];
+  for(let i=0;i<5;i++){const l=new T.PointLight(0xffdcae,0,21,1.45);l.visible=false;this.scene.add(l);this.innenLichter.push(l);}
+  this.innenWechsel=0;
+ }
+ updateInnenlicht(p){
+  const lampen=this.innenLampen;if(!lampen?.length||!this.innenLichter)return;
+  // Neu zuordnen im halben Sekundentakt — oder sofort, wenn sich die Figur
+  // seit der letzten Zuordnung deutlich bewegt hat. Sonst bliebe der Laden
+  // beim Betreten einen Moment dunkel.
+  const gesprungen=!this.innenBezug||Math.hypot(p.x-this.innenBezug.x,p.z-this.innenBezug.z)>7;
+  if(this.sim.time>this.innenWechsel||gesprungen){
+   this.innenWechsel=this.sim.time+.5;this.innenBezug={x:p.x,z:p.z};
+   this.naheInnen=lampen
+    .filter(l=>Math.abs(l.x-p.x)<20&&Math.abs(l.z-p.z)<20)
+    .sort((a,b)=>((a.x-p.x)**2+(a.z-p.z)**2)-((b.x-p.x)**2+(b.z-p.z)**2))
+    .slice(0,5);
+  }
+  this.innenLichter.forEach((licht,i)=>{
+   const lampe=this.naheInnen?.[i];
+   // Zusätzlich jedes Bild prüfen: die Zuordnung oben läuft nur alle halbe
+   // Sekunde, ein Sprung aus dem Raum soll aber sofort wirken.
+   const nah=lampe&&Math.abs(lampe.x-p.x)<24&&Math.abs(lampe.z-p.z)<24;
+   licht.visible=!!nah;
+   if(nah){licht.position.set(lampe.x,lampe.y,lampe.z);licht.color.setHex(lampe.farbe);licht.intensity=lampe.staerke||70;}
+  });
  }
  setupFahrlicht(){
   // Zwei Kegel reichen: mehr Lichter mit Reichweite kosten auf schwacher
@@ -63,8 +93,9 @@ export class ExpandedWorld extends World{
   const lampen=this.lampen;if(!lampen||!this.strassenLichter)return;
   if(nacht<.08){for(const l of this.strassenLichter)l.visible=false;return;}
   // Die Zuordnung ist teuer genug, um sie nicht jedes Bild zu machen.
-  if(this.sim.time>this.lichtWechsel){
-   this.lichtWechsel=this.sim.time+.6;
+  const weit=!this.lichtBezug||Math.hypot(p.x-this.lichtBezug.x,p.z-this.lichtBezug.z)>12;
+  if(this.sim.time>this.lichtWechsel||weit){
+   this.lichtWechsel=this.sim.time+.6;this.lichtBezug={x:p.x,z:p.z};
    this.naheLampen=lampen
     .filter(l=>Math.abs(l.x-p.x)<46&&Math.abs(l.z-p.z)<46)
     .sort((a,b)=>((a.x-p.x)**2+(a.z-p.z)**2)-((b.x-p.x)**2+(b.z-p.z)**2))
@@ -108,7 +139,7 @@ export class ExpandedWorld extends World{
   for(const r of roadSegments){const x=(r.x1+r.x2)/2,z=(r.z1+r.z2)/2;this.box(x,.03,z,Math.max(r.w,Math.abs(r.x2-r.x1)),.08,Math.max(r.w,Math.abs(r.z2-r.z1)),0x3d494f);const length=Math.hypot(r.x2-r.x1,r.z2-r.z1);for(let i=0;i<length;i+=16){const t=i/length;this.box(r.x1+(r.x2-r.x1)*t,.08,r.z1+(r.z2-r.z1)*t,r.x1===r.x2?.16:5,.02,r.x1===r.x2?5:.16,0xc4bb97);}}
   for(const b of s.worldBuildings){const base=groundAt(b.x,b.z),co=b.kind==='house'?0xb5a78f:0x869c9c;this.box(b.x,base+b.h/2,b.z,b.w,b.h,b.d,co);this.box(b.x,base+b.h+.3,b.z,b.w+1,.6,b.d+1,0x3e555a);for(let y=3;y<b.h;y+=4)for(let x=-b.w/2+4;x<b.w/2;x+=5)this.box(b.x+x,base+y,b.z+b.d/2+.05,2,2,.1,0x51737b);}
   for(const b of s.roomWalls)this.box(b.x,b.h/2,b.z,b.w,b.h,b.d,0x879e96);
-  for(const [id,l] of Object.entries(locations)){this.text(l.name.toUpperCase(),l.x,4.1+groundAt(l.x,l.z),l.z-10,Math.min(18,l.name.length*.8),'#c6dbc3',Math.PI);if(['garage','shop','clinic','home','club','diner','motel','records'].includes(id)){this.box(l.x,.07,l.z-4,16,.14,16,0x657876);this.box(l.x,1,l.z-9,5,2,1.4,0x40555b);this.box(l.x-4,1.4,l.z-7,1,2.8,1,0x8f997d);}}
+  for(const [id,l] of Object.entries(locations)){this.text(l.name.toUpperCase(),l.x,4.1+groundAt(l.x,l.z),l.z-10,Math.min(18,l.name.length*.8),'#c6dbc3',Math.PI);if(['garage','shop','clinic','home','club','diner','motel','records'].includes(id))this.box(l.x,.04,l.z-4,17,.1,17,0x5a625e);}
   // Court with visible basket and an animated ball.
   const court=locations.court;this.box(court.x,.05,court.z,20,.15,28,0x668b7c);this.box(court.x,.14,court.z-11,15,.04,.15,0xe9d9b1);this.box(court.x,2,court.z-12,.2,4,.2,0x405059);this.box(court.x,3.6,court.z-12,2.4,1.5,.15,0xd5d2bd);const hoop=new T.Mesh(new T.TorusGeometry(.5,.05,6,18),material(0xc28d58));hoop.rotation.x=Math.PI/2;hoop.position.set(court.x,3.1,court.z-11.3);this.scene.add(hoop);this.ball=new T.Mesh(new T.SphereGeometry(.28,12,8),material(0xd79b54));this.scene.add(this.ball);
   // Airport runway, ocean piers, fields and farm rows.
@@ -124,6 +155,7 @@ export class ExpandedWorld extends World{
   // Der Rest der Karte: Vororte, Farmland, Nationalpark, Sumpf, Flugfeld,
   // Insel, Industriegürtel und die Baulücken der Innenstadt.
   dressRegions(this);
+  this.innenLampen=dressInteriors(this);
   this.palmenBauen();
  }
  car(color,police=false,c=null){if(!c)return detailedCar(color,police);const d=vehicleTypes[c.model],g=new T.Group();if(['car','pickup'].includes(d.shape)){const m=detailedCar(color);m.scale.set(...d.scale);if(d.shape==='pickup')this.dynbox(m,0,1.2,-1.3,1.9,.2,1.5,color);m.userData.def=d;return m;}const body=this.dynbox(g,0,.8,0,1.4,.5,3,color);let wheels=[],rotor=null;
@@ -164,6 +196,7 @@ export class ExpandedWorld extends World{
   const c=locations.court;this.ball.position.set(c.x+.8,.6+Math.abs(Math.sin(t*4))*.8,c.z);if(s.activity?.kind==='basketball')this.ball.position.set(c.x,1+Math.sin(s.activity.phase*Math.PI)*5,c.z-s.activity.phase*11);
   this.street?.update(t,Math.min(1,this.sky.uniforms.nacht.value*1.25));
   this.updateFahrlicht(Math.min(1,this.sky.uniforms.nacht.value*1.25));
+  this.updateInnenlicht(p);
   this.palmenSetzen(t,s.weather==='storm'?3.4:s.weather==='rain'?1.8:1);for(const m of this.terrain)m.visible=Math.hypot(m.position.x-p.x,m.position.z-p.z)<650;
   if(!this.barrierMeshes)this.barrierMeshes=[];while(this.barrierMeshes.length<s.barriers.length){const m=new T.Mesh(new T.BoxGeometry(5,1,1.2),new T.MeshStandardMaterial({color:0xe3c485}));this.scene.add(m);this.barrierMeshes.push(m);}this.barrierMeshes.forEach((m,i)=>{const b=s.barriers[i];m.visible=!!b;if(b)m.position.set(b.x,.5,b.z);});if(!this.policeHelicopter){this.policeHelicopter=this.car(0x4b6169,false,{model:'helicopter'});this.scene.add(this.policeHelicopter);}const h=s.policeHeli;this.policeHelicopter.position.set(h.x,h.alt,h.z);this.policeHelicopter.rotation.y=h.yaw;this.policeHelicopter.visible=distance(h,p)<400;if(h.alt>0)this.policeHelicopter.userData.rotor.rotation.y+=dt*40;
   const suchtAktiv=s.stars>=5&&h.alt>8;

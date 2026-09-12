@@ -11,6 +11,11 @@ function zufall(seed = 5501) {
 }
 
 const aufStrasse = onRoad;
+const RAEUME = ['garage','shop','clinic','home','club','diner','motel','records']
+ .filter(id => locations[id])
+ .map(id => ({x: locations[id].x, z: locations[id].z - 4, w: (id === 'garage' ? 22 : 16) / 2 + 2, d: 10}));
+// Wie in street.js: die offenen Läden zählen für sim.blocked nicht als belegt.
+const imRaum = (x, z) => RAEUME.some(r => Math.abs(x - r.x) < r.w && Math.abs(z - r.z) < r.d);
 
 // Satteldach aus zwei geneigten Platten. Erst damit hört ein Haus auf,
 // eine Kiste mit Deckel zu sein.
