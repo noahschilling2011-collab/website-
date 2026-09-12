@@ -599,6 +599,115 @@ pruefe('Speichern und Laden überstehen den Rundlauf', await page.evaluate(() =>
  return s.player.money === 4321;
 }));
 
+console.log('Keys und Bild');
+const keys = await page.evaluate(() => {
+ const L = window.LOWTIDE, w = L.world;
+ const out = {};
+ out.inseln = L.inseln.map(r => ({name: r.name, trocken: !L.waterAt((r.x1 + r.x2) / 2, (r.z1 + r.z2) / 2)}));
+ // Der Keys Highway muss über die ganze Länge Land sein, sonst bricht das
+ // Fahrzeug beim ersten Meter über Wasser ab.
+ out.hoehle = [];
+ for (let x = 124; x <= 358; x += 4) if (L.waterAt(x, 400)) out.hoehle.push(x);
+ out.hoehe = L.groundAt(200, 400);
+ out.region = L.regionAt({x: 266, z: 400});
+ out.kuesten = w.waterUniforms.land.value.length;
+ // Nachbearbeitung
+ out.postAn = !!w.post?.aktiv;
+ out.tonwert = w.renderer.toneMapping;
+ out.keinTonwert = w.renderer.toneMapping === 0;
+ out.tiefe = !!w.post?.szene?.depthTexture;
+ // Verdeckung: die Puffer müssen Werte unter Weiß enthalten.
+ const t = w.post.ao1, buf = new Uint8Array(t.width * t.height * 4);
+ w.renderer.readRenderTargetPixels(t, 0, 0, t.width, t.height, buf);
+ let min = 255;
+ for (let i = 0; i < buf.length; i += 4) min = Math.min(min, buf[i]);
+ out.aoMin = min;
+ // Oberflächendetail liegt auf den Weltmaterialien.
+ // Leuchtflächen sind bewusst ausgenommen — ein Fenster, das von innen
+ // leuchtet, hat keine Körnung. Geprüft wird alles andere.
+ let mitDetail = 0, gesamt = 0, leucht = 0;
+ for (const m of w.bloecke) {
+  if (m.material.emissiveIntensity > 0) {leucht++; continue;}
+  gesamt++; if (m.material.userData.detail) mitDetail++;
+ }
+ out.detail = [mitDetail, gesamt, leucht];
+ return out;
+});
+pruefe('Alle Inseln sind trockenes Land', keys.inseln.every(i => i.trocken),
+ keys.inseln.filter(i => !i.trocken).map(i => i.name).join(', '));
+pruefe('Keys Highway hat keine Lücke im Damm', keys.hoehle.length === 0, keys.hoehle.join(' '));
+pruefe('Der Damm liegt auf Fahrbahnhöhe', keys.hoehe === 0, String(keys.hoehe));
+pruefe('Die Keys haben eine eigene Region', keys.region === 'THE LOWER KEYS', keys.region);
+pruefe('Der Wassershader kennt alle Küsten', keys.kuesten === 9, `${keys.kuesten} Rechtecke`);
+pruefe('Nachbearbeitung ist aktiv und tonwertet selbst', keys.postAn && keys.keinTonwert, `toneMapping=${keys.tonwert}`);
+pruefe('Tiefe steht der Verdeckung zur Verfügung', keys.tiefe);
+pruefe('Verdeckung dunkelt tatsächlich ab', keys.aoMin < 245, `dunkelster Wert ${keys.aoMin}`);
+pruefe('Oberflächendetail liegt auf allen matten Weltmaterialien',
+ keys.detail[0] === keys.detail[1] && keys.detail[1] > 50 && keys.detail[2] > 0,
+ `${keys.detail[0]} von ${keys.detail[1]}, ${keys.detail[2]} leuchtende ausgenommen`);
+pruefe('Sparmodus schaltet die Nachbearbeitung ab', await page.evaluate(() => {
+ const knopf = document.getElementById('qualityBtn'), w = window.LOWTIDE.world;
+ knopf.click();
+ const aus = !w.post.aktiv;
+ knopf.click();
+ return aus && w.post.aktiv;
+}));
+
+console.log('Verkehr, Bewuchs, Geometrie');
+const dichte = await page.evaluate(() => {
+ const L = window.LOWTIDE, sim = L.sim, w = L.world, out = {};
+ const verkehr = sim.cars.filter(c => c.type === 'traffic');
+ out.verkehr = verkehr.length;
+ out.wegImWasser = verkehr.filter(c => c.route.some(p => L.waterAt(p.x, p.z))).length;
+ out.wegImHaus = verkehr.filter(c => c.route.some(p => sim.blocked(p, 1.2))).length;
+ // Bewuchs: keine Matrix mit Skalierung null — die wird singulär und
+ // three zeichnet daraus große schwarze Flächen statt nichts.
+ // Der Bewuchs wird um den Spieler gesetzt. In der Innenstadt steht
+ // absichtlich kein Halm, also erst in den Vorort versetzen.
+ const g = w.gras;
+ g.setzen(-60, -320);
+ const arr = g.netz.instanceMatrix.array;
+ let null_ = 0, ueberBoden = 0;
+ for (let i = 0; i < g.netz.count; i++) {
+  const o = i * 16;
+  const sy = Math.hypot(arr[o + 4], arr[o + 5], arr[o + 6]);
+  if (sy < 1e-6) null_++;
+  if (arr[o + 13] > -1) ueberBoden++;
+ }
+ out.halme = g.netz.count;
+ out.nullSkalierung = null_;
+ out.sichtbareHalme = ueberBoden;
+ out.wind = !!g.material.userData.gStaerke;
+ // Halme dürfen nicht auf der Fahrbahn stehen.
+ let aufStrasse = 0;
+ for (let i = 0; i < g.netz.count; i++) {
+  const o = i * 16;
+  if (arr[o + 13] < -1) continue;
+  if (!g.erlaubt(arr[o + 12], arr[o + 14])) aufStrasse++;
+ }
+ out.aufStrasse = aufStrasse;
+ // Fahrzeuggeometrie wird zwischen Exemplaren geteilt.
+ const autos = w.cars.filter(m => m.userData.body && m.userData.rims);
+ if (autos.length > 1) {
+  const a = new Set(), b = new Set();
+  autos[0].traverse(o => o.isMesh && a.add(o.geometry.uuid));
+  autos[1].traverse(o => o.isMesh && b.add(o.geometry.uuid));
+  out.geteilt = [...a].filter(u => b.has(u)).length;
+  out.formen = a.size;
+ }
+ return out;
+});
+pruefe('Es fahren mindestens dreißig Wagen', dichte.verkehr >= 30, `${dichte.verkehr} Wagen`);
+pruefe('Kein Verkehrsweg führt ins Wasser', dichte.wegImWasser === 0);
+pruefe('Kein Verkehrsweg führt durch ein Gebäude', dichte.wegImHaus === 0);
+pruefe('Bewuchs hat keine entartete Matrix', dichte.nullSkalierung === 0, `${dichte.nullSkalierung} von ${dichte.halme}`);
+pruefe('Bewuchs steht nur auf erlaubtem Grund', dichte.aufStrasse === 0, `${dichte.aufStrasse} Halme daneben`);
+pruefe('Ein Teil der Halme steht sichtbar über dem Boden', dichte.sichtbareHalme > 200,
+ `${dichte.sichtbareHalme} von ${dichte.halme}`);
+pruefe('Der Wind erreicht den Bewuchs', dichte.wind);
+pruefe('Fahrzeuge teilen sich ihre Geometrie', dichte.geteilt === dichte.formen && dichte.formen >= 8,
+ `${dichte.geteilt} von ${dichte.formen}`);
+
 console.log('Gang und Sichtweite');
 const gang = await page.evaluate(() => {
  const L = window.LOWTIDE, welt = L.world, figur = welt.player, u = figur.userData;

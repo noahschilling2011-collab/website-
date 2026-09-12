@@ -19,6 +19,33 @@ export class Campaign extends Simulation{
   const entries=[['compact',-148,101],['suv',-160,107],['super',-280,98],['muscle',-220,97],['pickup',-340,-240],['motorcycle',-140,102],['dirtbike',-455,-355],['quad',-390,36],['truck',-355,265],['bus',-162,157],['boat',123,136],['jetski',127,155],['helicopter',-360,305],['plane',-315,325]];
   this.cars.forEach((c,i)=>Object.assign(c,{model:i===0?'sedan':['compact','sedan','suv','muscle'][i%4],fuel:100,upgrades:{},owner:i===0?'eli':null,alt:0,tires:100,glass:100,lights:100}));
   entries.forEach(([model,x,z],i)=>this.cars.push({id:'LM-'+(700+i),model,x,z,yaw:Math.PI,speed:0,health:100,fuel:100,tires:100,glass:100,lights:100,alt:0,type:'parked',color:[0x568a89,0xc09b62,0x99635d,0x667ca5][i%4],upgrades:{},owner:['motorcycle','boat'].includes(model)?'mara':null}));
+  // Verkehr. Acht fahrende Wagen für eine Stadt dieser Größe waren der
+  // deutlichste Bruch zum Anspruch: die Straßen westlich der Innenstadt, der
+  // Highway, die Küstenstraße und der Keys Highway waren durchgehend leer.
+  // Die Wege folgen dem Straßenraster aus content.js; die Ampellogik in
+  // simulation.js gilt für sie wie für die bisherigen.
+  const LACKE=[0xd9b078,0xcad0c5,0xa75547,0x3c637d,0x6f7a6a,0xb8b2a4,0x8a5f52,0x4c6b74,0xd6c9a8,0x5a6470];
+  const MODELLE=['sedan','compact','suv','muscle','pickup','sedan','compact','sedan'];
+  const RUNDEN=[
+   [[-334,-314],[-334,190],[-166,190],[-166,-314]],
+   [[-274,-174],[-274,74],[-106,74],[-106,-174]],
+   [[-214,-94],[-214,194],[-46,194],[-46,-94]],
+   [[-94,-314],[-94,394],[14,394],[14,-314]],
+   [[-334,-174],[74,-174],[74,74],[-334,74]],
+   [[-334,394],[340,394],[340,394],[-334,394]],
+   [[-94,194],[274,194],[274,194],[-94,194]],
+   [[26,-94],[74,-94],[74,144],[26,144]]
+  ];
+  RUNDEN.forEach((runde,r)=>{
+   const weg=runde.map(([x,z])=>({x,z}));
+   for(let k=0;k<3;k++){
+    const start=weg[k%weg.length];
+    this.cars.push({id:'PM-'+(500+r*3+k),model:MODELLE[(r*3+k)%MODELLE.length],
+     x:start.x,z:start.z,yaw:0,speed:7+this.rng()*5,health:100,type:'traffic',
+     color:LACKE[(r*3+k)%LACKE.length],route:weg,target:(k+1)%weg.length,wait:0,
+     fuel:100,tires:100,glass:100,lights:100,alt:0,upgrades:{},owner:null});
+   }
+  });
   for(let i=18;i<54;i++){const x=i<36?-151-(i%3)*60:-89+(i%3)*54,z=i<36?-152+Math.floor((i-18)/3)*48:-295;const path=[{x,z},{x:x+20,z},{x:x+20,z:z+18},{x,z:z+18}];this.npcs.push({id:i,x,z,yaw:0,state:'normal',timer:0,health:100,path,target:1,personality:['caller','filmer','coward','aggressive'][i%4],pace:1.1+this.rng()*.6,report:null});}
   this.npcs.forEach(n=>{n.home={...n.path[0]};n.work={...n.path[2]};n.originalPath=n.path.map(p=>({...p}));n.schedule='street';n.stun=0;});
   for(let i=6;i<12;i++)this.cops.push({id:i,x:-280+(i-6)*4,z:-180,yaw:0,active:false,health:100,route:[],target:0,repath:0,shot:0});

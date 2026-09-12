@@ -22,6 +22,10 @@ const STANDORTE = {
   heide:      [-500, 320, 2.60, .22, 0],
   undertow:   [-210, 16, 3.10, .12, 0],
   leitung:    [-145, -500, 0.30, -.08, 0],
+  pelican:    [178, 400, 1.55, .16, 0],
+  halcyon:    [266, 400, 1.55, .18, 0],
+  sable:      [330, 398, 4.71, .16, 0],
+  damm:       [140, 400, 1.55, .10, 0],
 };
 const arg = (n, f) => {const i = process.argv.indexOf('--' + n); return i > -1 ? process.argv[i + 1] : f;};
 const orte = arg('orte', Object.keys(STANDORTE).join(',')).split(',');

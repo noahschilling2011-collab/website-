@@ -1,7 +1,7 @@
 import {Simulation,places,distance,clamp} from './simulation.js';
 import {Campaign} from './campaign.js';
 import {ExpandedWorld} from './expanded-world.js';
-import {locations,regions,roadSegments,vehicleTypes,weapons,regionAt,waterAt,bounds,groundAt} from './content.js';
+import {locations,regions,roadSegments,vehicleTypes,weapons,regionAt,waterAt,bounds,groundAt,INSELN} from './content.js';
 import {Radio,SENDER} from './radio.js';
 import {immobilien,schatzOrte,rennen} from './content.js';
 import * as Story from './story.js';
@@ -13,7 +13,7 @@ const debug={sichtbar:false,frames:0,fps:0,fenster:0,zeit:0};
 // schon losgelassen wurde. Das darf die Eingabe nicht abbrechen.
 const fange=(el,id)=>{try{el.setPointerCapture(id);}catch{}};
 window.LOWTIDE={sim,get world(){return world;},get frames(){return debug.frames;},debug,
- get radio(){return radio;},get sender(){return SENDER;},orte:locations,immobilien,waterAt,get schatzOrte(){return schatzOrte;},story:Story,
+ get radio(){return radio;},get sender(){return SENDER;},orte:locations,immobilien,waterAt,groundAt,regionAt,inseln:INSELN,get schatzOrte(){return schatzOrte;},story:Story,
  // Nur fürs Prüfen: setzt Figur und Kamera an eine feste Stelle.
  // hoehe>0 pausiert die Simulation und hebt die Kamera für Übersichtsbilder an.
  view(x,z,blick=yaw,neigung=pitch,hoehe=0){const p=sim.player;p.car=null;p.x=x;p.z=z;p.y=hoehe;p.vy=0;
@@ -58,7 +58,7 @@ function pause(){if(!started||$('dialog').open||$('bigMap').open)return;$('phone
 function resume(){if(sim.player.health<=0)return;$('pause').close();sim.paused=false;}
 function map(){if(!started||$('dialog').open||$('pause').open||phoneOffen())return;sim.paused=true;keys.clear();drawMap($('fullMap'),true);$('bigMap').showModal();}
 function keyAction(key){if(!started)return;if(key==='escape'){if($('pause').open)resume();else pause();return;}if(key==='p'){phoneUmschalten();return;}if(sim.paused)return;if(key==='e')interact();if(key==='q'){if(!sim.player.car){sim.player.armed=!sim.player.armed;tone(320,.06);}}if(key==='r')sim.reload();if(key==='fire')fire();if(key==='m')map();if(key==='tab'){sim.switchCharacter();yaw=sim.player.yaw;}if(key==='x')sim.cycleWeapon();if(key==='f')sim.melee();if(key==='g')sim.grapple();if(key==='v')sim.cover();if(key==='alt')sim.dodge();if(key===' '&&!sim.player.car)sim.jump();if(key==='h')showActions();if(key==='n')senderWechseln();if(key==='f3'){debug.sichtbar=!debug.sichtbar;$('debug').hidden=!debug.sichtbar;}}
-$('startBtn').onclick=()=>{started=true;sim.paused=false;document.body.classList.add('playing');initAudio();toast('Sprich mit Mara am goldenen Marker. E / Aktion.');};$('pauseBtn').onclick=pause;$('resume').onclick=resume;$('restartBtn').onclick=()=>{$('pause').close();dialog('SPIELSTAND','Neu beginnen?','Dadurch wird der lokale Spielstand gelöscht.',[['Neues Spiel',()=>{localStorage.removeItem('lowtide-v2');location.reload();}],['Abbrechen',()=>{}]]);};$('mapBtn').onclick=map;$('closeMap').onclick=()=>{$('bigMap').close();sim.paused=false;};$('soundBtn').onclick=()=>{muted=!muted;$('soundBtn').textContent='Ton: '+(muted?'aus':'an');};let low=false;$('qualityBtn').onclick=()=>{low=!low;world.renderer.setPixelRatio(low?1:Math.min(devicePixelRatio,1.5));world.renderer.shadowMap.enabled=!low;world.resize();$('qualityBtn').textContent='Grafik: '+(low?'sparsam':'normal');};
+$('startBtn').onclick=()=>{started=true;sim.paused=false;document.body.classList.add('playing');initAudio();toast('Sprich mit Mara am goldenen Marker. E / Aktion.');};$('pauseBtn').onclick=pause;$('resume').onclick=resume;$('restartBtn').onclick=()=>{$('pause').close();dialog('SPIELSTAND','Neu beginnen?','Dadurch wird der lokale Spielstand gelöscht.',[['Neues Spiel',()=>{localStorage.removeItem('lowtide-v2');location.reload();}],['Abbrechen',()=>{}]]);};$('mapBtn').onclick=map;$('closeMap').onclick=()=>{$('bigMap').close();sim.paused=false;};$('soundBtn').onclick=()=>{muted=!muted;$('soundBtn').textContent='Ton: '+(muted?'aus':'an');};let low=false;$('qualityBtn').onclick=()=>{low=!low;world.renderer.setPixelRatio(low?1:Math.min(devicePixelRatio,1.5));world.renderer.shadowMap.enabled=!low;if(world.post)world.post.aktiv=!low;world.resize();$('qualityBtn').textContent='Grafik: '+(low?'sparsam':'normal');};
 for(const id of ['dialog','pause','bigMap'])$(id).addEventListener('cancel',e=>{e.preventDefault();if(id==='pause')resume();else if(id==='bigMap'){$(id).close();sim.paused=false;}});
 window.addEventListener('keydown',e=>{if([' ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Tab','F3','Escape'].includes(e.key))e.preventDefault();const k=e.key.toLowerCase();if(!e.repeat)keyAction(k);keys.add(k);});window.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));window.addEventListener('blur',()=>{keys.clear();stick={x:0,y:0};if(started&&!sim.paused)pause();});document.addEventListener('visibilitychange',()=>{if(document.hidden&&started&&!sim.paused)pause();});window.addEventListener('resize',()=>world?.resize());
 $('game').addEventListener('contextmenu',e=>e.preventDefault());$('game').addEventListener('pointerdown',e=>{if(!started||sim.paused)return;drag={id:e.pointerId,x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,time:performance.now()};fange($('game'),e.pointerId);});$('game').addEventListener('pointermove',e=>{if(!drag||drag.id!==e.pointerId)return;yaw-=(e.clientX-drag.x)*.006;pitch=clamp(pitch+(e.clientY-drag.y)*.003,-.2,.8);drag.x=e.clientX;drag.y=e.clientY;});$('game').addEventListener('pointerup',e=>{if(drag&&Math.hypot(e.clientX-drag.startX,e.clientY-drag.startY)<6&&performance.now()-drag.time<300)fire();drag=null;});$('game').addEventListener('pointercancel',()=>drag=null);
@@ -388,7 +388,7 @@ function phoneZeichnen(){
 // wäre der Zeichenpuffer nach dem letzten Frame bereits verworfen.
 function foto(){
  try{
-  world.renderer.render(world.scene,world.camera);
+  world.zeichne();
   const daten=world.renderer.domElement.toDataURL('image/jpeg',.68);
   // Wildtieraufnahmen zählen: was vor der Kamera und nah genug ist.
   const tiere=world.tiere?world.tiere.imBild(sim.player,yaw):0;

@@ -38,9 +38,11 @@ export const TRESOR_DAUER = 6.5;
 
 // Fluchtroute des Bootes. Jeder Punkt liegt im Wasser — sonst würde das Boot
 // im Ufer stecken bleiben; getestet in tools/regression.mjs.
+// Die Punkte werden in tools/regression.mjs gegen waterAt geprüft: mit den
+// Keys kamen Inseln dazu, und der erste Punkt lag danach auf der Anchor Bank.
 export const FLUCHT_ROUTE = [
- {x: 150, z: 60}, {x: 200, z: -40}, {x: 300, z: 60}, {x: 380, z: 180},
- {x: 300, z: 330}, {x: 170, z: 300}, {x: 140, z: 180}
+ {x: 138, z: 96}, {x: 196, z: -46}, {x: 268, z: 62}, {x: 380, z: 176},
+ {x: 300, z: 336}, {x: 226, z: 320}, {x: 136, z: 232}
 ];
 export const FLUCHT_START = {x: 138, z: 118};
 export const FLUCHT_TEMPO = 17, FANG_ABSTAND = 8, FANG_DAUER = 2.2;

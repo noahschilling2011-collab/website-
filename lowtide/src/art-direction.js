@@ -69,37 +69,62 @@ function teil(geometry,x=0,y=0,z=0,rx=0,ry=0,rz=0){
 }
 
 function quad(g,points,material){const a=new T.BufferGeometry();a.setAttribute('position',new T.Float32BufferAttribute(points.flat(),3));a.setIndex([0,1,2,0,2,3]);a.computeVertexNormals();return mesh(g,a,material);}
-export function detailedCar(color,police=false){const g=new T.Group();const paint=new T.MeshPhysicalMaterial({color,roughness:.24,metalness:.65,clearcoat:1,clearcoatRoughness:.12});
- const body=mesh(g,shell([[-2.2,.68,.48,.88],[-1.9,.91,.39,1.04],[-1.25,.99,.36,1.08],[.75,.99,.36,1.07],[1.7,.9,.43,.91],[2.2,.72,.5,.77]]),paint);
+// Die Geometrie eines Fahrzeugs ist für jedes Exemplar dieselbe; nur Lack,
+// Scheinwerfer und Rücklichter gehören dem einzelnen Wagen. Vorher legte
+// jeder Aufruf über fünfzig neue BufferGeometries an — bei dreißig Autos in
+// der Stadt sind das eineinhalbtausend, alle mit identischem Inhalt.
+let FORMEN=null;
+function fahrzeugFormen(){
+ if(FORMEN)return FORMEN;
+ const karosserie=shell([[-2.2,.68,.48,.88],[-1.9,.91,.39,1.04],[-1.25,.99,.36,1.08],[.75,.99,.36,1.07],[1.7,.9,.43,.91],[2.2,.72,.5,.77]]);
+ // Die Höhennormierung gehört zur Form, nicht zum Exemplar: einmal hier,
+ // sonst würde sie sich bei jedem Auto erneut anwenden.
+ karosserie.scale(1,1/.55,1);
+ const lackTeile=[],chromTeile=[],zaehne=[];
+ for(const side of [-1,1]){
+  lackTeile.push(teil(new T.BoxGeometry(.24,.12,.3),side*.99,1.22,.69));
+  chromTeile.push(teil(new T.BoxGeometry(.24,.055,.04),side*.965,1.01,-.05),
+   teil(new T.BoxGeometry(.24,.055,.04),side*.965,1.01,-.85));
+  for(const z of [-.48,.63])lackTeile.push(teil(new T.BoxGeometry(.05,.49,.06),side*.77,1.28,z));
+ }
+ lackTeile.push(teil(shell([[-.9,.73,1.49,1.6],[.48,.73,1.49,1.6]]),0,0,0));
+ for(let x=-.45;x<=.45;x+=.15)zaehne.push(teil(new T.BoxGeometry(.025,.13,.06),x,.56,2.23));
+ zaehne.push(teil(new T.BoxGeometry(1.05,.18,.05),0,.56,2.2));
+ const speichen=[];for(let a=0;a<5;a++)speichen.push(teil(new T.BoxGeometry(.04,.45,.045),0,0,0,a*Math.PI/5));
+ FORMEN={
+  karosserie,
+  kabine:shell([[-1.45,.82,.88,1.0],[-.85,.76,.94,1.58],[.5,.75,.94,1.58],[1.15,.84,.9,1.03]]),
+  lack:verschmelze(lackTeile), chrom:verschmelze(chromTeile), grill:verschmelze(zaehne),
+  speichen:verschmelze(speichen),
+  scheinwerfer:new T.BoxGeometry(.54,.12,.04), ruecklicht:new T.BoxGeometry(.63,.1,.04),
+  reifen:new T.TorusGeometry(.33,.105,8,20), felge:new T.CylinderGeometry(.265,.265,.035,20),
+  balken:new T.BoxGeometry(.48,.14,.3)
+ };
+ return FORMEN;
+}
+
+export function detailedCar(color,police=false){const F=fahrzeugFormen();const g=new T.Group();const paint=new T.MeshPhysicalMaterial({color,roughness:.24,metalness:.65,clearcoat:1,clearcoatRoughness:.12});
+ const body=mesh(g,F.karosserie,paint);
  // Base World scales body damage; normalize to the preserved height convention.
- body.geometry.scale(1,1/.55,1);body.scale.y=.55;
+ body.scale.y=.55;
  const glass=new T.MeshPhysicalMaterial({color:0x355563,roughness:.1,metalness:.3,clearcoat:1,side:T.DoubleSide});
- const cabin=mesh(g,shell([[-1.45,.82,.88,1.0],[-.85,.76,.94,1.58],[.5,.75,.94,1.58],[1.15,.84,.9,1.03]]),glass);
- const roofGeo=shell([[-.9,.73,1.49,1.6],[.48,.73,1.49,1.6]]);
- const lackTeile=[],chromTeile=[];
+ const cabin=mesh(g,F.kabine,glass);
  // Je ein Material für beide Scheinwerfer und beide Rücklichter dieses
  // Wagens. Pro Seite eigene waren zwei Draw Calls zu viel; über mehrere
  // Wagen geteilt werden dürfen sie nicht, weil das Bremslicht am Fahrzeug
  // hängt und sonst alle Autos gleichzeitig aufleuchten.
  const scheinwerfer=new T.MeshStandardMaterial({color:0xf4e4bb,emissive:0xffd6a0,emissiveIntensity:.6});
  const ruecklicht=new T.MeshStandardMaterial({color:0xa73833,emissive:0x932622,emissiveIntensity:.35});
- const lights=[],rueck=[];for(const side of [-1,1]){const lamp=mesh(g,new T.BoxGeometry(.54,.12,.04),scheinwerfer,side*.54,.76,2.14);lights.push(lamp);rueck.push(mesh(g,new T.BoxGeometry(.63,.1,.04),ruecklicht,side*.54,.81,-2.16));
-  lackTeile.push(teil(new T.BoxGeometry(.24,.12,.3),side*.99,1.22,.69));
-  chromTeile.push(teil(new T.BoxGeometry(.24,.055,.04),side*.965,1.01,-.05),
-   teil(new T.BoxGeometry(.24,.055,.04),side*.965,1.01,-.85));
-  for(const z of [-.48,.63])lackTeile.push(teil(new T.BoxGeometry(.05,.49,.06),side*.77,1.28,z));
+ const lights=[],rueck=[];for(const side of [-1,1]){const lamp=mesh(g,F.scheinwerfer,scheinwerfer,side*.54,.76,2.14);lights.push(lamp);rueck.push(mesh(g,F.ruecklicht,ruecklicht,side*.54,.81,-2.16));
  }
- // Lackzubehör wandert in dieselbe Geometrie wie das Dach: beim Umlackieren
+ // Lackzubehör steckt in derselben Geometrie wie das Dach: beim Umlackieren
  // bekommt sie dasselbe Material, also darf sie ein Mesh sein.
- lackTeile.push(teil(roofGeo,0,0,0));
- const roof=mesh(g,verschmelze(lackTeile),paint);
- mesh(g,verschmelze(chromTeile),m(0xb8c2bb,.25,.8));
- const zaehne=[];for(let x=-.45;x<=.45;x+=.15)zaehne.push(teil(new T.BoxGeometry(.025,.13,.06),x,.56,2.23));
- zaehne.push(teil(new T.BoxGeometry(1.05,.18,.05),0,.56,2.2));
- const grille=mesh(g,verschmelze(zaehne),m(0x25333c,.4,.5));
- const wheels=[],rims=[];for(const x of [-.96,.96])for(const z of [-1.35,1.37]){const wheel=new T.Group();wheel.position.set(x,.44,z);const tire=mesh(wheel,new T.TorusGeometry(.33,.105,8,20),m(0x20272c,.97));tire.rotation.y=Math.PI/2;const rim=mesh(wheel,new T.CylinderGeometry(.265,.265,.035,20),m(0xaeb9b9,.24,.85));rim.rotation.z=Math.PI/2;rims.push(rim);const speichen=[];for(let a=0;a<5;a++)speichen.push(teil(new T.BoxGeometry(.04,.45,.045),0,0,0,a*Math.PI/5));mesh(wheel,verschmelze(speichen),m(0x52686d,.3,.8));g.add(wheel);wheels.push(wheel);}
+ const roof=mesh(g,F.lack,paint);
+ mesh(g,F.chrom,m(0xb8c2bb,.25,.8));
+ const grille=mesh(g,F.grill,m(0x25333c,.4,.5));
+ const wheels=[],rims=[];for(const x of [-.96,.96])for(const z of [-1.35,1.37]){const wheel=new T.Group();wheel.position.set(x,.44,z);const tire=mesh(wheel,F.reifen,m(0x20272c,.97));tire.rotation.y=Math.PI/2;const rim=mesh(wheel,F.felge,m(0xaeb9b9,.24,.85));rim.rotation.z=Math.PI/2;rims.push(rim);mesh(wheel,F.speichen,m(0x52686d,.3,.8));g.add(wheel);wheels.push(wheel);}
  const interior=new T.Group();for(const x of [-.4,.4])ellipsoid(interior,x,1.12,0,.24,.27,.2,m(0x333d3d,.9));g.add(interior);
- const policeLights=[];if(police){for(const side of [-1,1])policeLights.push(mesh(g,new T.BoxGeometry(.48,.14,.3),new T.MeshStandardMaterial({color:side<0?0xef5549:0x4b9bd6,emissive:side<0?0xe64a45:0x3c85de,emissiveIntensity:2}),side*.36,1.76,0));}
+ const policeLights=[];if(police){for(const side of [-1,1])policeLights.push(mesh(g,F.balken,new T.MeshStandardMaterial({color:side<0?0xef5549:0x4b9bd6,emissive:side<0?0xe64a45:0x3c85de,emissiveIntensity:2}),side*.36,1.76,0));}
  g.userData={body,wheels,rims,lights:policeLights,headlights:lights,taillights:rueck,glass:cabin,roof,interior,paint,grille};return g;
 }
 // makeEnvironment ist entfallen: die Umgebungsreflexion kommt jetzt aus sky.js

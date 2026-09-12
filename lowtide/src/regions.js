@@ -1,4 +1,4 @@
-import {groundAt, waterAt, locations, onRoad} from './content.js';
+import {groundAt, waterAt, locations, onRoad, INSELN, DAEMME} from './content.js';
 // Der Rest von Solvara.
 // Port Mercy war ausgebaut, alles andere bestand aus Andeutungen: sechs
 // Kisten für die Vororte, ein Feld mit Strichen für Bellweather, 155
@@ -711,6 +711,200 @@ function nordFlaechen(w, rng) {
  zaun(w, px - 36, pz + 26, px + 36, pz + 26, 2.2, 0x7f867f, 4);
 }
 
+// ------------------------------------------------------ Die Keys im Osten
+// Östlich der Küste lagen dreißig Kartenzellen blankes Wasser: eine Insel,
+// ein Damm, sonst nichts. Jetzt eine Kette aus fünf Keys und einer Sandbank,
+// drei davon über den Keys Highway erreichbar, zwei nur mit dem Boot. Das
+// Layout ist eigenes; Vorbild ist die Bauweise einer Küstenkette — Damm auf
+// Pfeilern, Mangrovensaum, Stelzenhäuser, Leuchtfeuer.
+function key(name){return INSELN.find(r => r.name === name);}
+
+// Mangrove: Stelzwurzeln unter einer flachen, breiten Krone. Als eine Kiste
+// sah der Saum aus wie eine Hecke.
+function mangrove(w, x, z, hoehe, rng) {
+ const y = groundAt(x, z);
+ for (let k = 0; k < 5; k++) {
+  const a = k / 5 * Math.PI * 2, r = hoehe * .22;
+  w.box(x + Math.cos(a) * r, y + hoehe * .18, z + Math.sin(a) * r,
+   .09, hoehe * .38, .09, 0x4b4030, 0, false, Math.sin(a) * .3, -Math.cos(a) * .3);
+ }
+ w.box(x, y + hoehe * .42, z, hoehe * .1, hoehe * .34, hoehe * .1, 0x54452f);
+ for (let k = 0; k < 3; k++) {
+  const b = hoehe * (.62 - k * .13);
+  w.box(x + (rng() - .5) * hoehe * .2, y + hoehe * (.62 + k * .13), z + (rng() - .5) * hoehe * .2,
+   b, hoehe * .16, b * .9, [0x33562f, 0x3c6234, 0x2c4a29][k]);
+ }
+}
+
+// Steg auf Pfählen, wie ihn jede dieser Inseln zum Wasser hat.
+function steg(w, x1, z1, x2, z2, breite = 2.4) {
+ const laenge = Math.hypot(x2 - x1, z2 - z1);
+ const dx = (x2 - x1) / laenge, dz = (z2 - z1) / laenge, dreh = Math.atan2(dx, dz);
+ w.box((x1 + x2) / 2, .62, (z1 + z2) / 2, breite, .16, laenge, 0x8a7856, dreh);
+ for (let t = 0; t <= laenge; t += 3.2) {
+  for (const seite of [-1, 1]) {
+   const px = x1 + dx * t - dz * seite * breite * .42, pz = z1 + dz * t + dx * seite * breite * .42;
+   w.box(px, -.4, pz, .22, 2.2, .22, 0x6b5b41);
+   w.box(px, 1.1, pz, .12, .8, .12, 0x7d6c4e);
+  }
+  if (t > 0) w.box(x1 + dx * (t - 1.6), 1.42, z1 + dz * (t - 1.6), breite + .2, .08, .1, 0x8f7d5c, dreh);
+ }
+}
+
+// Stelzenhaus. Auf einer Sandbank baut niemand ebenerdig.
+function stelzenhaus(w, x, z, breite, tiefe, farbe, dach, rng) {
+ const boden = 2.1;
+ for (const ox of [-1, 1]) for (const oz of [-1, 1])
+  w.box(x + ox * breite * .42, boden / 2, z + oz * tiefe * .42, .26, boden, .26, 0x6b5b41);
+ w.box(x, boden + .12, z, breite + .6, .24, tiefe + .6, 0x8a7856);
+ w.box(x, boden + 1.6, z, breite, 2.8, tiefe, farbe);
+ satteldach(w, x, boden + 3.0, z, breite + .9, tiefe + .9, 1.4, dach, rng() < .5);
+ // Veranda mit Geländer zur Wasserseite.
+ w.box(x, boden + .3, z + tiefe * .62, breite * .9, .18, 1.8, 0x8a7856);
+ for (const ox of [-.4, .4]) w.box(x + ox * breite, boden + .8, z + tiefe * .62, .12, 1, .12, farbe);
+ w.box(x, boden + 1.2, z + tiefe * .78, breite * .9, .1, .12, 0x9a8865);
+ // Fenster und Tür.
+ for (const ox of [-.28, .28]) w.box(x + ox * breite, boden + 1.9, z + tiefe / 2 + .06, breite * .2, 1.1, .1, 0x35505c);
+ w.box(x, boden + 1.35, z + tiefe / 2 + .06, 1, 2.1, .12, 0x4b3a2c);
+ // Treppe ins Wasser.
+ for (let k = 0; k < 5; k++)
+  w.box(x + breite * .5 + .6, boden - .1 - k * .42, z + tiefe * .62, 1.2, .12, .8, 0x7d6c4e);
+}
+
+function keysHighway(w, rng) {
+ const damm = DAEMME[1];
+ const z = (damm.z1 + damm.z2) / 2;
+ // Fahrbahn, Mittelstreifen, Randsteine.
+ w.box((damm.x1 + damm.x2) / 2, .05, z, damm.x2 - damm.x1, .12, 13.6, 0x3c4043);
+ for (let x = damm.x1 + 4; x < damm.x2; x += 9) w.box(x, .12, z, 4, .03, .18, 0xc4b98e);
+ for (const seite of [-1, 1]) {
+  w.box((damm.x1 + damm.x2) / 2, .22, z + seite * 7.4, damm.x2 - damm.x1, .44, 1.1, 0x8e8b7f);
+ }
+ // Pfeiler und Geländer nur dort, wo der Damm über Wasser führt — über den
+ // Inseln steht er auf Land, da wären Pfeiler falsch.
+ for (let x = damm.x1 + 3; x < damm.x2; x += 7.5) {
+  if (!waterAt(x, z + 12) && !waterAt(x, z - 12)) continue;
+  for (const seite of [-1, 1]) {
+   w.box(x, -1.6, z + seite * 7.2, 1.5, 3.4, 1.5, 0x7f8580);
+   w.box(x, 1.15, z + seite * 8.1, 7.5, .14, .16, 0xb0b6ac);
+   w.box(x, .72, z + seite * 8.1, .14, .9, .14, 0x9aa09a);
+  }
+  if ((x - damm.x1) % 45 < 7.5) {w.lamp(x, z + 8.6); w.lamp(x, z - 8.6);}
+ }
+ w.text('KEYS HIGHWAY', 132, 4.2, z - 10, 16, '#e6d6a8', Math.PI / 2);
+}
+
+function inselkette(w, rng) {
+ keysHighway(w, rng);
+ const damm = DAEMME[1], strasse = (damm.z1 + damm.z2) / 2;
+
+ // --- Pelican Key: Fischerdorf auf Stelzen.
+ const p = key('Pelican Key');
+ w.box((p.x1 + p.x2) / 2, .06, (p.z1 + p.z2) / 2, p.x2 - p.x1, .14, p.z2 - p.z1, 0x9c8a63);
+ w.box((p.x1 + p.x2) / 2, .09, (p.z1 + p.z2) / 2 + 14, (p.x2 - p.x1) * .7, .1, 16, 0x5f7048);
+ for (let k = 0; k < 4; k++)
+  stelzenhaus(w, p.x1 + 10 + k * 12, p.z1 + 8, 8, 7, [0xc9b89a, 0xa8bcb4, 0xd0bca0, 0xb4a894][k], [0x7a6a55, 0x5f6b72][k % 2], rng);
+ steg(w, p.x1 + 16, p.z1 + 2, p.x1 + 16, p.z1 - 16);
+ steg(w, p.x2 - 12, p.z2 - 4, p.x2 + 14, p.z2 - 4);
+ for (let k = 0; k < 26; k++) {
+  const x = p.x1 + rng() * (p.x2 - p.x1), z = p.z1 + rng() * (p.z2 - p.z1);
+  if (Math.abs(z - strasse) < 12) continue;
+  if (rng() < .55) w.palm(x, z, 6 + rng() * 4); else mangrove(w, x, z, 3.4 + rng() * 2, rng);
+ }
+ // Reusen, Netze, Bojen am Ufer.
+ for (let k = 0; k < 10; k++) {
+  const x = p.x1 + 4 + rng() * (p.x2 - p.x1 - 8), z = p.z2 - 3 - rng() * 5;
+  w.box(x, .5, z, 1.1, .8, .9, 0x6f6247);
+  w.box(x, .95, z, 1.2, .1, 1, 0x8a7f60);
+ }
+ w.text('PELICAN KEY', (p.x1 + p.x2) / 2, 3.4, p.z1 - 3, 15, '#e8dcbc');
+
+ // --- Halcyon Key: Marina, Tankstelle am Wasser, Barackenreihe.
+ const h = key('Halcyon Key');
+ w.box((h.x1 + h.x2) / 2, .06, (h.z1 + h.z2) / 2, h.x2 - h.x1, .14, h.z2 - h.z1, 0x9c8a63);
+ w.box((h.x1 + h.x2) / 2, .09, (h.z1 + h.z2) / 2 - 12, (h.x2 - h.x1) * .8, .1, 18, 0x5f7048);
+ for (let k = 0; k < 3; k++) steg(w, h.x1 + 8 + k * 16, h.z2 - 2, h.x1 + 8 + k * 16, h.z2 + 20);
+ w.box(h.x1 + 12, 1.8, h.z1 + 10, 14, 3.6, 9, 0xb9ae96);
+ satteldach(w, h.x1 + 12, 3.6, h.z1 + 10, 15, 10, 1.8, 0x6b6f68, true);
+ w.text('HALCYON MARINE', h.x1 + 12, 2.7, h.z1 + 15.2, 13, '#dfe6d6');
+ // Zapfsäulen am Steg.
+ for (const ox of [-1.6, 1.6]) {
+  w.box(h.x1 + 24 + ox, 1, h.z2 + 4, .8, 2, .7, 0xc45f4a);
+  w.box(h.x1 + 24 + ox, 1.9, h.z2 + 4, .5, .3, .5, 0x2c3238);
+ }
+ for (let k = 0; k < 22; k++) {
+  const x = h.x1 + rng() * (h.x2 - h.x1), z = h.z1 + rng() * (h.z2 - h.z1);
+  if (Math.abs(z - strasse) < 12) continue;
+  if (rng() < .5) w.palm(x, z, 6 + rng() * 3.5); else mangrove(w, x, z, 3 + rng() * 2, rng);
+ }
+ w.text('HALCYON KEY', (h.x1 + h.x2) / 2, 3.4, h.z1 - 3, 15, '#e8dcbc');
+
+ // --- Sable Key: Leuchtturm am Ende der Straße.
+ const s = key('Sable Key');
+ w.box((s.x1 + s.x2) / 2, .06, (s.z1 + s.z2) / 2, s.x2 - s.x1, .14, s.z2 - s.z1, 0x9c8a63);
+ w.box((s.x1 + s.x2) / 2, .09, (s.z1 + s.z2) / 2 + 10, (s.x2 - s.x1) * .75, .1, 20, 0x5f7048);
+ const lx = s.x2 - 14, lz = s.z2 - 12;
+ for (let k = 0; k < 7; k++) w.box(lx, 2 + k * 3.4, lz, 5.2 - k * .42, 3.4, 5.2 - k * .42, k % 2 ? 0xd8d2c4 : 0xb44a3f);
+ w.box(lx, 25.6, lz, 3.4, 1.6, 3.4, 0x2f3840);
+ w.box(lx, 26.6, lz, 2.4, .8, 2.4, 0xf2e2a8, 0, true);
+ w.box(lx, 27.4, lz, 1.4, 1, 1.4, 0x3a444c);
+ w.box(lx - 6, 1.6, lz + 2, 7, 3.2, 6, 0xc6bda8);
+ satteldach(w, lx - 6, 3.2, lz + 2, 8, 7, 1.5, 0x6b6f68);
+ zaun(w, s.x1 + 6, s.z2 - 4, s.x2 - 6, s.z2 - 4, 1.1, 0x9a8f78, 3);
+ for (let k = 0; k < 20; k++) {
+  const x = s.x1 + rng() * (s.x2 - s.x1), z = s.z1 + rng() * (s.z2 - s.z1);
+  if (Math.abs(z - strasse) < 12 || Math.hypot(x - lx, z - lz) < 12) continue;
+  if (rng() < .45) w.palm(x, z, 5 + rng() * 4); else mangrove(w, x, z, 3 + rng() * 2.4, rng);
+ }
+ w.text('SABLE KEY', (s.x1 + s.x2) / 2, 3.4, s.z1 - 3, 14, '#e8dcbc');
+
+ // --- Windward Key: nur mit dem Boot. Wrack am Strand, Hütte, Feuer.
+ const wk = key('Windward Key');
+ w.box((wk.x1 + wk.x2) / 2, .06, (wk.z1 + wk.z2) / 2, wk.x2 - wk.x1, .14, wk.z2 - wk.z1, 0x9c8a63);
+ w.box((wk.x1 + wk.x2) / 2, .09, (wk.z1 + wk.z2) / 2, (wk.x2 - wk.x1) * .55, .1, (wk.z2 - wk.z1) * .5, 0x5f7048);
+ // Gestrandeter Kutter, zur Seite gekippt.
+ const kx = wk.x1 + 9, kz = wk.z2 - 8;
+ w.box(kx, 1.4, kz, 4.4, 2.6, 12, 0x6d7a72, .35, false, 0, .42);
+ w.box(kx + 1, 3.4, kz + 2, 2.6, 2, 3.4, 0x9aa398, .35, false, 0, .42);
+ w.box(kx + 2.6, 5.6, kz - 3, .3, 6, .3, 0x8a7d62, 0, false, 0, .5);
+ stelzenhaus(w, wk.x2 - 12, wk.z1 + 12, 6, 6, 0xbcae95, 0x6a5c4a, rng);
+ steg(w, wk.x2 - 12, wk.z1 + 8, wk.x2 - 12, wk.z1 - 12);
+ for (let k = 0; k < 18; k++) {
+  const x = wk.x1 + rng() * (wk.x2 - wk.x1), z = wk.z1 + rng() * (wk.z2 - wk.z1);
+  if (rng() < .5) w.palm(x, z, 5 + rng() * 4); else mangrove(w, x, z, 3 + rng() * 2, rng);
+ }
+ w.text('WINDWARD KEY', (wk.x1 + wk.x2) / 2, 3.2, wk.z1 - 3, 13, '#e8dcbc');
+
+ // --- Bone Key: Mangroveninsel mit Bake, sonst nichts. Nicht jede Insel
+ // muss bebaut sein; leere Inseln machen die bebauten glaubwürdig.
+ const b = key('Bone Key');
+ w.box((b.x1 + b.x2) / 2, .05, (b.z1 + b.z2) / 2, b.x2 - b.x1, .12, b.z2 - b.z1, 0x8e8560);
+ w.box((b.x1 + b.x2) / 2, .08, (b.z1 + b.z2) / 2, (b.x2 - b.x1) * .6, .1, (b.z2 - b.z1) * .6, 0x4f6440);
+ for (let k = 0; k < 34; k++) {
+  const x = b.x1 + rng() * (b.x2 - b.x1), z = b.z1 + rng() * (b.z2 - b.z1);
+  mangrove(w, x, z, 2.6 + rng() * 2.6, rng);
+ }
+ const bx = (b.x1 + b.x2) / 2, bz = b.z1 + 6;
+ for (let k = 0; k < 4; k++) w.box(bx, 1.4 + k * 2.6, bz, 1.6 - k * .22, 2.6, 1.6 - k * .22, k % 2 ? 0xd6d0c2 : 0x3c4650);
+ w.box(bx, 12, bz, 1, .7, 1, 0xf0c96e, 0, true);
+
+ // --- Anchor Bank: Sandbank knapp über Wasser, ein Wrackrest, Möwenposten.
+ const a = key('Anchor Bank');
+ w.box((a.x1 + a.x2) / 2, .02, (a.z1 + a.z2) / 2, a.x2 - a.x1, .08, a.z2 - a.z1, 0xa89a72);
+ w.box((a.x1 + a.x2) / 2 + 4, .28, (a.z1 + a.z2) / 2, 6, .5, 2.6, 0x6b6152, .6);
+ for (let k = 0; k < 5; k++) {
+  const x = a.x1 + 5 + rng() * (a.x2 - a.x1 - 10), z = a.z1 + 4 + rng() * (a.z2 - a.z1 - 8);
+  w.box(x, .5, z, .16, 1, .16, 0x6b5b41);
+ }
+
+ // --- Zwei Bojenreihen als Fahrrinne zwischen Küste und Insel.
+ for (let z = 120; z < 380; z += 26) for (const x of [176, 214]) {
+  if (!waterAt(x, z)) continue;
+  w.box(x, .3, z, .7, 1.5, .7, x < 200 ? 0xc4553f : 0x2f5f8a);
+  w.box(x, 1.2, z, .3, .5, .3, 0x2c3238);
+ }
+}
+
 // ------------------------------------------------------- Ränder der Karte
 // tools/abdeckung.mjs zählt die Bauteile je 100-Meter-Zelle. Zehn Landzellen
 // waren praktisch leer: der Nordrand über den Vororten, ein Streifen westlich
@@ -839,4 +1033,5 @@ export function dressRegions(world) {
  suedFlaechen(world, rng);
  nordFlaechen(world, rng);
  randgebiete(world, rng);
+ inselkette(world, rng);
 }

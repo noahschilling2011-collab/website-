@@ -56,7 +56,8 @@ export const regions=[
  {name:'SUNSET SUBURBS',x:-80,z:-310},{name:'BELLWEATHER',x:-355,z:-280},
  {name:'CYPRESS NATIONAL PARK',x:-465,z:-405},{name:'SALT MARSH',x:-460,z:55},
  {name:'MERCY AIRFIELD',x:-360,z:300},{name:'ISLA SERENA',x:290,z:225},
- {name:'SOUTH BEACH',x:100,z:295}
+ {name:'SOUTH BEACH',x:100,z:295},
+ {name:'THE LOWER KEYS',x:230,z:400},{name:'OUTER KEYS',x:270,z:-60}
 ];
 export const vehicleTypes={
  compact:{name:'Finch',mass:950,max:25,accel:11,brake:22,turn:1.8,grip:1,shape:'car',scale:[.85,.9,.82],sound:70,security:1},
@@ -81,7 +82,36 @@ export const weapons={
  shotgun:{name:'Schrotflinte',damage:80,range:23,cone:.94,capacity:6,delay:.8,reload:2.4,price:500},
  taser:{name:'Taser',damage:0,range:12,cone:.98,capacity:2,delay:1.2,reload:2,price:180}
 };
-export function waterAt(x,z){if(x>119){if(x>235&&x<360&&z>150&&z<295)return false;if(z>195&&z<205&&x<260)return false;return true;}return x<-400&&x>-545&&z>-20&&z<130;}
+// Land im Meer. Vorher war östlich der Küste nur die eine Insel und der
+// Damm dorthin; dreißig 100-Meter-Zellen der Karte bestanden aus nichts als
+// Wasser. Die Rechtecke stehen hier zentral, weil vier Stellen sie brauchen:
+// waterAt, das Gelände, die Karte im Telefon und der Wassershader, der um
+// jede Küste Brandung legt.
+// x1,z1,x2,z2 in Weltmetern.
+export const INSELN=[
+ {name:'Isla Serena',   x1:235,z1:150,x2:360,z2:295},
+ {name:'Pelican Key',   x1:150,z1:373,x2:206,z2:427},
+ {name:'Halcyon Key',   x1:238,z1:376,x2:296,z2:430},
+ {name:'Sable Key',     x1:310,z1:370,x2:364,z2:424},
+ {name:'Windward Key',  x1:204,z1:-126,x2:246,z2:-74},
+ {name:'Bone Key',      x1:286,z1:-36,x2:332,z2:16},
+ {name:'Anchor Bank',   x1:148,z1:38,x2:184,z2:72}
+];
+// Fahrbare Dämme. Sie zählen als Land, sonst bricht driveVehicle beim ersten
+// Meter ab und groundAt liefert Wassertiefe statt Fahrbahnhöhe.
+export const DAEMME=[
+ {x1:119,z1:195,x2:260,z2:205},   // zur Insel
+ {x1:119,z1:392,x2:366,z2:408}    // Keys Highway
+];
+const imRechteck=(x,z,r)=>x>r.x1&&x<r.x2&&z>r.z1&&z<r.z2;
+export function waterAt(x,z){
+ if(x>119){
+  for(const r of INSELN)if(imRechteck(x,z,r))return false;
+  for(const d of DAEMME)if(imRechteck(x,z,d))return false;
+  return true;
+ }
+ return x<-400&&x>-545&&z>-20&&z<130;
+}
 export function groundAt(x,z){if(waterAt(x,z))return -1.2;if(x<-380&&z<-240){const a=Math.max(0,1-((x+490)/155)**2-((z+420)/195)**2);return a*a*62;}return 0;}
 // Ampeltakt. Achse 0 regelt den Verkehr in Nord-Süd-Richtung, Achse 1 den
 // in Ost-West-Richtung; die zweite ist um den halben Takt versetzt.
@@ -107,7 +137,9 @@ export const roadSegments=[
  ...[-340,-280,-220,-160].map(x=>({x1:x,z1:-180,x2:x,z2:165,w:15})),
  {x1:-460,z1:-180,x2:100,z2:-180,w:17},{x1:-340,z1:-420,x2:-340,z2:405,w:18},
  {x1:-100,z1:-420,x2:-100,z2:405,w:18},{x1:-340,z1:-320,x2:100,z2:-320,w:14},
- {x1:-340,z1:200,x2:280,z2:200,w:12},{x1:-340,z1:400,x2:100,z2:400,w:16}
+ {x1:-340,z1:200,x2:280,z2:200,w:12},{x1:-340,z1:400,x2:100,z2:400,w:16},
+ // Keys Highway: über den Damm bis zur letzten Insel.
+ {x1:100,z1:400,x2:360,z2:400,w:14}
 ];
 
 // Kreuzungen des Straßenrasters. Achsparallele Segmente schneiden sich, wenn

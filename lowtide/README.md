@@ -28,6 +28,9 @@ src/
   lod.js            Grobe Silhouetten für ferne Figuren und Fahrzeuge
   wildlife.js       Möwen, Fische, Delfine, Alligatoren
   story.js          Akt 3 bis 5 der Kampagne
+  post.js           Überstrahlen, Verdeckung, Farbkurve, Korn
+  detail.js         Oberflächenstruktur aus der Weltposition
+  grass.js          Bewuchs im Ring um den Spieler
   bake.js           Backt ein Vorbild nach Material zu einer Geometrie
   art-direction.js  Materialien, Fahrzeug- und Figurenaufbau
   human-model.js    Anatomische Figurenmodelle und Animation
@@ -71,6 +74,22 @@ LOWTIDE.luftbild(x, y, z, zx, zy, zz)       // freie Kamera für Luftbilder
 LOWTIDE.radio.waehle(3)                     // Radiosender setzen
 ```
 
+## Bild
+
+Die Szene geht nicht mehr direkt auf den Bildschirm, sondern durch `post.js`:
+Szene in ein Ziel, heller Anteil in ein halbes Ziel, Umgebungsverdeckung aus
+der Tiefe desselben Durchgangs, am Ende zusammensetzen, tonwerten, graden,
+Randabdunklung und Korn. Der Renderer selbst tonwertet dabei nicht mehr —
+sonst würde zweimal komprimiert.
+
+`detail.js` hängt sich über `onBeforeCompile` in jedes Weltmaterial und legt
+Farbflecken, Rauheitsschwankung und eine Normalenstörung darüber, dreifach
+aus der Weltposition projiziert. Eine Textur ginge nicht: dieselbe
+Kistengeometrie trägt eine 240-m-Platte und einen 20-cm-Poller.
+
+Der Knopf „Grafik: sparsam" schaltet Nachbearbeitung, Schatten und
+Pixelverhältnis zusammen ab.
+
 ## Kampagne
 
 Fünf Akte. Akt 1 und 2 liegen in `simulation.js` und `campaign.js`, Akt 3 bis 5
@@ -85,6 +104,16 @@ in `story.js`:
    geduckt, und die Wache davor bestimmt den Takt.
 5. **Ebbe** — Verfolgung auf dem Wasser, drei Ausgänge: Übergabe, Abfindung
    oder Abrechnung.
+
+## Die Keys
+
+Östlich der Küste lagen dreißig Kartenzellen blankes Wasser. Jetzt liegen
+dort fünf Inseln und eine Sandbank: Pelican Key mit Stelzenhäusern, Halcyon
+Key mit Marina, Sable Key mit Leuchtturm — alle drei über den Keys Highway
+auf einem Damm erreichbar — sowie Windward Key und Bone Key, die nur mit dem
+Boot zu erreichen sind. Die Rechtecke stehen in `content.js` unter `INSELN`
+und `DAEMME`; `waterAt`, das Gelände, die Karte im Telefon und die Brandung
+im Wassershader lesen dieselbe Liste.
 
 ## Musik
 

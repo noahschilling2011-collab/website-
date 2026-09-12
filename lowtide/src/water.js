@@ -1,4 +1,5 @@
 import * as T from './vendor/three.module.js';
+import {INSELN, DAEMME} from './content.js';
 // Wasser für Solvara.
 // Vorher: eine Ebene mit zwei Farben und einer Sinuswelle, ohne Reflexion,
 // ohne Schaum, ohne Bezug zum Sonnenstand. Wasser ist in dieser Stadt aber
@@ -29,7 +30,8 @@ void main(){
 const FRAGMENT = `
 uniform float zeit, nacht, kuesteX, dunst, art;
 uniform vec3 zenith, horizon, sunColor, sunDir, tief, flach;
-uniform vec4 insel;          // xz-Rechteck der Insel: minX, minZ, maxX, maxZ
+#define LANDZAHL __LANDZAHL__
+uniform vec4 land[LANDZAHL];  // xz-Rechtecke von Inseln und Dämmen: minX, minZ, maxX, maxZ
 uniform vec3 kameraPos;
 varying vec3 vWelt;
 varying vec2 vEbene;
@@ -66,11 +68,14 @@ vec3 kraeuselung(vec2 p, float t){
 // Abstand zur nächsten Küstenlinie: die gerade Uferkante im Westen und das
 // Inselrechteck im Süden. Mehr Küste hat Solvara im Wasserbereich nicht.
 float kuestenAbstand(vec2 p){
- float ufer = abs(p.x - kuesteX);
- vec2 mitte = (insel.xy + insel.zw) * 0.5, halb = (insel.zw - insel.xy) * 0.5;
- vec2 d = abs(p - mitte) - halb;
- float zurInsel = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
- return min(ufer, abs(zurInsel));
+ float nah = abs(p.x - kuesteX);
+ for(int i = 0; i < LANDZAHL; i++){
+  vec2 mitte = (land[i].xy + land[i].zw) * 0.5, halb = (land[i].zw - land[i].xy) * 0.5;
+  vec2 d = abs(p - mitte) - halb;
+  float zum = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
+  nah = min(nah, abs(zum));
+ }
+ return nah;
 }
 
 void main(){
@@ -108,19 +113,25 @@ void main(){
  gl_FragColor = vec4(farbe, 1.0);
 }`;
 
+// Inseln und Dämme als Vector4 für den Shader. Der Sumpf im Westen hat keine
+// Inseln, bekommt aber dieselbe Liste — sein kuesteX liegt weit weg, und die
+// Schleife kostet bei sieben Rechtecken nichts.
+const LANDRECHTECKE = [...INSELN, ...DAEMME].map(r => new T.Vector4(r.x1, r.z1, r.x2, r.z2));
+
 // art: 'ozean' oder 'sumpf'. Der Sumpf ist flach, trüb und grünbraun;
 // mit den Ozeanfarben wurde er zur Tiefsee.
 export function createWater(art = 'ozean') {
  const sumpf = art === 'sumpf';
  const uniforms = {
   zeit: {value: 0}, nacht: {value: 0}, dunst: {value: .12}, art: {value: sumpf ? 1 : 0},
-  kuesteX: {value: sumpf ? -400 : 119}, insel: {value: new T.Vector4(235, 150, 360, 295)},
+  kuesteX: {value: sumpf ? -400 : 119}, land: {value: LANDRECHTECKE},
   zenith: {value: new T.Color(0x2578cc)}, horizon: {value: new T.Color(0xc9dde2)},
   sunColor: {value: new T.Color(0xfff6e6)}, sunDir: {value: new T.Vector3(0, 1, 0)},
   tief: {value: new T.Color(0x0b3040)}, flach: {value: new T.Color(0x2f8f92)},
   kameraPos: {value: new T.Vector3()}
  };
- const material = new T.ShaderMaterial({uniforms, vertexShader: VERTEX, fragmentShader: FRAGMENT, side: T.DoubleSide});
+ const material = new T.ShaderMaterial({uniforms, vertexShader: VERTEX,
+  fragmentShader: FRAGMENT.replace('__LANDZAHL__', String(LANDRECHTECKE.length)), side: T.DoubleSide});
  return {material, uniforms, art};
 }
 

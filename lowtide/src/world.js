@@ -2,14 +2,30 @@ import * as T from './vendor/three.module.js';
 import {roads,places,random} from './simulation.js';
 import {Sky} from './sky.js';
 import {createWater,updateWater} from './water.js';
+import {Nachbearbeitung} from './post.js';
+import {detailAufsetzen,NAESSE} from './detail.js';
 const MONDLICHT=new T.Color(0x9db6d8),NEUTRAL=new T.Color(0xfff4e4);
+// Fünf Hemdfarben über eine Hose waren als Menge erkennbar: dieselben fünf
+// Leute, immer wieder. Zwölf mal sieben ergeben genug Kombinationen, dass
+// eine Straße nicht mehr nach Belegschaft aussieht.
+const HEMDEN=[0xb8bf9f,0x708ba9,0xe2c49c,0xaf6276,0x546a64,0xd8d2c4,0x8a6f9c,0xc47a55,
+ 0x4f7a68,0xbfae86,0x9aa8b4,0x6d5f52];
+const HOSEN=[0x303a48,0x4a4137,0x2c3a34,0x5a5148,0x38424e,0x6a6155,0x25303a];
 const cube=new T.BoxGeometry(1,1,1);
 const mats=new Map();
 // Alle leuchtenden Materialien an einer Stelle, damit die Nacht sie zentral schalten kann.
 export const leuchtMaterialien=[];
-function mat(color,emissive=false){const key=color+':'+emissive;if(!mats.has(key)){const m=new T.MeshStandardMaterial({color,roughness:.78,metalness:.08,emissive:emissive?color:0,emissiveIntensity:emissive?.9:0});mats.set(key,m);if(emissive)leuchtMaterialien.push(m);}return mats.get(key);}
+function mat(color,emissive=false){const key=color+':'+emissive;if(!mats.has(key)){const m=new T.MeshStandardMaterial({color,roughness:.78,metalness:.08,emissive:emissive?color:0,emissiveIntensity:emissive?.9:0});
+ // Leuchtflächen bleiben glatt — ein Fenster, das von innen leuchtet, hat
+ // keine Körnung. Alles andere bekommt Struktur aus der Weltposition.
+ if(!emissive)detailAufsetzen(m);
+ mats.set(key,m);if(emissive)leuchtMaterialien.push(m);}return mats.get(key);}
 export class World{
- constructor(canvas,sim){this.sim=sim;this.scene=new T.Scene();this.scene.fog=new T.FogExp2(0xc6a7a0,.0038);this.renderer=new T.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=T.PCFShadowMap;this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.2;this.sky=new Sky(this.renderer);this.scene.add(this.sky.mesh);this.sonnenRichtung=new T.Vector3();this.blitz=0;this.camera=new T.PerspectiveCamera(58,innerWidth/innerHeight,.45,650);this.camera.position.set(-14,12,98);this.camera.lookAt(-40,3,15);this.groups=new Map();this.rng=random(78);this.hemi=new T.HemisphereLight(0xc4dceb,0x51443e,2.1);this.scene.add(this.hemi);this.sun=new T.DirectionalLight(0xffc995,3);this.sun.position.set(-80,110,20);this.sun.castShadow=true;Object.assign(this.sun.shadow.camera,{left:-130,right:130,top:130,bottom:-130,near:1,far:1500});this.sun.shadow.mapSize.set(2048,2048);this.sun.shadow.bias=-.0006;this.sun.shadow.normalBias=.035;this.scene.add(this.sun);this.scene.add(this.sun.target);this.build();this.flush();this.player=this.human(0xe2a062,0x253442);this.scene.add(this.player);this.npcs=sim.npcs.map((n,i)=>{const m=this.human([0xb8bf9f,0x708ba9,0xe2c49c,0xaf6276,0x546a64][i%5],0x303a48,false);this.scene.add(m);return m;});this.cars=sim.cars.map(c=>{const m=this.car(c.color,false,c);this.scene.add(m);return m;});this.cops=sim.cops.map(()=>{const m=this.car(0xe4e7df,true);this.scene.add(m);return m;});this.contact=this.human(0xd4d2c9,0x242e3c);this.contact.position.set(places.mara.x,0,places.mara.z);this.scene.add(this.contact);this.guard=this.human(0x425164,0x26303c);this.guard.position.set(-73,0,-52);this.scene.add(this.guard);this.marker=new T.Mesh(new T.OctahedronGeometry(.7),new T.MeshBasicMaterial({color:0xeccb80}));this.scene.add(this.marker);this.ring=new T.Mesh(new T.RingGeometry(1.8,2,40),new T.MeshBasicMaterial({color:0xeccb80,side:T.DoubleSide,transparent:true,opacity:.75}));this.ring.rotation.x=-Math.PI/2;this.scene.add(this.ring);this.bulletMeshes=[];this.setupRain();this.resize();}
+ constructor(canvas,sim){this.sim=sim;this.scene=new T.Scene();this.scene.fog=new T.FogExp2(0xc6a7a0,.0038);this.renderer=new T.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=T.PCFShadowMap;this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.2;this.sky=new Sky(this.renderer);this.scene.add(this.sky.mesh);this.sonnenRichtung=new T.Vector3();this.blitz=0;this.camera=new T.PerspectiveCamera(58,innerWidth/innerHeight,.45,650);this.camera.position.set(-14,12,98);this.camera.lookAt(-40,3,15);this.groups=new Map();this.rng=random(78);this.hemi=new T.HemisphereLight(0xc4dceb,0x51443e,2.1);this.scene.add(this.hemi);this.sun=new T.DirectionalLight(0xffc995,3);this.sun.position.set(-80,110,20);this.sun.castShadow=true;Object.assign(this.sun.shadow.camera,{left:-130,right:130,top:130,bottom:-130,near:1,far:1500});this.sun.shadow.mapSize.set(2048,2048);this.sun.shadow.bias=-.0006;this.sun.shadow.normalBias=.035;this.scene.add(this.sun);this.scene.add(this.sun.target);this.build();this.flush();this.player=this.human(0xe2a062,0x253442);this.scene.add(this.player);this.npcs=sim.npcs.map((n,i)=>{const m=this.human(HEMDEN[i%HEMDEN.length],HOSEN[(i*3+i%7)%HOSEN.length],false);this.scene.add(m);return m;});this.cars=sim.cars.map(c=>{const m=this.car(c.color,false,c);this.scene.add(m);return m;});this.cops=sim.cops.map(()=>{const m=this.car(0xe4e7df,true);this.scene.add(m);return m;});this.contact=this.human(0xd4d2c9,0x242e3c);this.contact.position.set(places.mara.x,0,places.mara.z);this.scene.add(this.contact);this.guard=this.human(0x425164,0x26303c);this.guard.position.set(-73,0,-52);this.scene.add(this.guard);this.marker=new T.Mesh(new T.OctahedronGeometry(.7),new T.MeshBasicMaterial({color:0xeccb80}));this.scene.add(this.marker);this.ring=new T.Mesh(new T.RingGeometry(1.8,2,40),new T.MeshBasicMaterial({color:0xeccb80,side:T.DoubleSide,transparent:true,opacity:.75}));this.ring.rotation.x=-Math.PI/2;this.scene.add(this.ring);this.bulletMeshes=[];this.setupRain();
+  // Nachbearbeitung: Überstrahlen, Farbkurve, Randabdunklung, Korn. Ab hier
+  // tonwertet die letzte Stufe, nicht mehr der Renderer.
+  this.post=new Nachbearbeitung(this.renderer);
+  this.resize();}
  // nx und nz neigen den Quader um die x- und z-Achse. Ohne sie gäbe es
  // keine Satteldächer, Rampen, Steilhänge oder umgestürzten Stämme.
  box(x,y,z,w,h,d,color=0x999999,rot=0,emissive=false,nx=0,nz=0){const key=color+':'+emissive+':'+Math.floor(x/100)+':'+Math.floor(z/100);let g=this.groups.get(key);if(!g){g={material:mat(color,emissive),items:[]};this.groups.set(key,g);}g.items.push({x,y,z,w,h,d,rot,nx,nz});}
@@ -57,14 +73,21 @@ export class World{
   const geo=new T.BufferGeometry();geo.setAttribute('position',new T.BufferAttribute(a,3));
   this.rain=new T.LineSegments(geo,new T.LineBasicMaterial({color:0xcfe0e6,transparent:true,opacity:.42,depthWrite:false}));
   this.rainHoehe=38;this.scene.add(this.rain);}
- resize(){this.renderer.setSize(innerWidth,innerHeight);this.camera.aspect=innerWidth/innerHeight;this.camera.updateProjectionMatrix();}
+ resize(){this.renderer.setSize(innerWidth,innerHeight);this.camera.aspect=innerWidth/innerHeight;this.camera.updateProjectionMatrix();this.post?.groesse(innerWidth,innerHeight);}
  update(dt,camYaw,camPitch,playing){const s=this.sim,p=s.player,t=s.time;const himmelJetzt=this.applySky(dt);updateWater(this.waterUniforms,himmelJetzt,t,this.camera);updateWater(this.marshUniforms,himmelJetzt,t,this.camera);this.rain.visible=s.weather==='rain'||s.weather==='storm';this.rain.material.opacity=s.weather==='storm'?.6:.4;if(this.rain.visible){this.rain.position.set(p.x,0,p.z);const a=this.rain.geometry.attributes.position,fall=dt*(s.weather==='storm'?36:26),h=this.rainHoehe;for(let i=0;i<a.count;i++)a.setY(i,(a.getY(i)-fall+h)%h);a.needsUpdate=true;}
   this.player.position.set(p.x,p.sneak?-.35:0,p.z);this.player.rotation.y=p.yaw;this.player.visible=!p.car;this.gun.visible=p.armed;this.player.userData.body.material=mat(p.clothes==='orange'?0xe2a062:0x557da3);this.animateHuman(this.player,t,(s.paused?0:distance2(this.prev,p)>0.001?1:0),p.armed);this.prev={x:p.x,z:p.z};s.npcs.forEach((n,i)=>{const m=this.npcs[i];m.position.set(n.x,n.health<=0?.25:0,n.z);m.rotation.set(n.health<=0?Math.PI/2:0,n.yaw,0);this.animateHuman(m,t+n.id,n.state==='normal'?1:n.state==='flüchtend'?2:0,n.state==='filmend');});s.cars.forEach((c,i)=>{const m=this.cars[i];m.position.set(c.x,0,c.z);m.rotation.y=c.yaw;m.userData.body.scale.y=.55*(.65+.35*c.health/100);m.userData.body.rotation.z=c.health<40?.05:0;});s.cops.forEach((c,i)=>{const m=this.cops[i];m.position.set(c.x,0,c.z);m.rotation.y=c.yaw;for(let j=0;j<2;j++)m.userData.lights[j].visible=c.active&&(Math.floor(t*8)+j)%2===0;});this.contact.position.set(s.mission>=3?places.safe.x:places.mara.x,0,s.mission>=3?places.safe.z:places.mara.z);this.gateMesh.visible=!s.doorOpen;this.disk.visible=s.mission<3;const goal=s.objective();this.marker.position.set(goal.x,4+Math.sin(t*2)*.3,goal.z);this.marker.rotation.y=t;this.marker.visible=s.mission<4;this.ring.position.set(goal.x,.15,goal.z);this.ring.visible=s.mission<4;
   for(const m of this.bulletMeshes){this.scene.remove(m);m.geometry.dispose();m.material.dispose();}this.bulletMeshes=[];for(const tr of s.tracers){const geo=new T.BufferGeometry().setFromPoints([new T.Vector3(tr.x,1.5,tr.z),new T.Vector3(tr.end.x,1.3,tr.end.z)]);const l=new T.Line(geo,new T.LineBasicMaterial({color:0xffe3a3}));this.scene.add(l);this.bulletMeshes.push(l);}
   // freieKamera hängt die Verfolgerkamera aus — für Luftbilder und Prüfläufe.
   if(playing&&!this.freieKamera){const dist=p.car?10:6.5;let target=new T.Vector3(p.x,1.6,p.z);let desired=new T.Vector3(p.x-Math.sin(camYaw)*dist,3.7+camPitch*6+(p.car?1.5:0),p.z-Math.cos(camYaw)*dist); // Camera collision against the same world solids.
    for(let a=.15;a<1;a+=.06){const x=target.x+(desired.x-target.x)*a,z=target.z+(desired.z-target.z)*a,y=target.y+(desired.y-target.y)*a;if(s.solids.some(b=>Math.abs(x-b.x)<b.w/2+.15&&Math.abs(z-b.z)<b.d/2+.15&&y<b.h+.2)){desired.lerpVectors(target,desired,Math.max(.13,a-.07));break;}}const elevation=(this.sim.ground?.(p)||0)+(p.y||0);desired.y+=elevation;this.camera.position.lerp(desired,this.kameraSofort?1:1-Math.exp(-dt*10));this.kameraSofort=false;this.camera.lookAt(p.x,1.5+elevation,p.z);
-  }this.updateExtras?.(dt,camYaw,camPitch,playing);this.sky.mesh.position.copy(this.camera.position);this.renderer.render(this.scene,this.camera);
+  }this.updateExtras?.(dt,camYaw,camPitch,playing);this.sky.mesh.position.copy(this.camera.position);this.zeichne();
+ }
+ // Ein Bild ausgeben. Steht als eigene Methode da, weil auch die Kamera-App
+ // im Telefon rendert und dasselbe Bild bekommen soll wie der Bildschirm.
+ zeichne(){
+  const nacht=this.sky?.uniforms?.nacht?.value??0;
+  if(this.post)this.post.render(this.scene,this.camera,this.sim.time,nacht);
+  else this.renderer.render(this.scene,this.camera);
  }
  // Sonnenstand, Himmel, Nebel, Umgebungslicht und Belichtung aus einer Quelle.
  // Die Welt liegt in Blöcken zu 100 m je Farbe vor. Three.js verwirft sie
@@ -110,7 +133,23 @@ export class World{
   this.blitz=Math.max(0,this.blitz-dt*4.2);
   if(s.weather==='storm'&&Math.random()<dt*.14)this.blitz=1;
   if(this.blitz>0){const f=this.blitz*this.blitz;this.hemi.intensity+=f*6;this.sun.intensity+=f*2.5;}
-  this.renderer.toneMappingExposure=himmel.belichtung*(1+this.blitz*.3);
+  // Die Belichtung geht jetzt an die Nachbearbeitung: der Renderer tonwertet
+  // nicht mehr selbst, toneMappingExposure liefe dort ins Leere.
+  // Nässe folgt dem Wetter mit Nachlauf: der Asphalt trocknet nicht in dem
+  // Moment, in dem der Regen aufhört.
+  const nassZiel=s.weather==='storm'?1:s.weather==='rain'?.82:0;
+  NAESSE.value+=(nassZiel-NAESSE.value)*Math.min(1,dt*(nassZiel>NAESSE.value?.5:.12));
+  const belichtung=himmel.belichtung*(1+this.blitz*.3);
+  this.renderer.toneMappingExposure=belichtung;
+  if(this.post){
+   this.post.endeU.belichtung.value=belichtung;
+   // Nachts strahlen Lampen und Fenster stärker über, tagsüber würde
+   // dieselbe Stärke die Fassaden ausbrennen.
+   this.post.endeU.staerke.value=.42+himmel.nacht*.55;
+   this.post.endeU.schwelle=this.post.hellU.schwelle;
+   this.post.hellU.schwelle.value=.92-himmel.nacht*.34;
+   this.post.endeU.koernung.value=.026+himmel.nacht*.028;
+  }
   const nachtAnteil=Math.min(1,himmel.nacht*1.25);
   for(const m of leuchtMaterialien)m.emissiveIntensity=.06+nachtAnteil*1.45;
   this.updateStrassenlicht?.(nachtAnteil,p);
