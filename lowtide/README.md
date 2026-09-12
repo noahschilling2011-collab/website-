@@ -33,7 +33,7 @@ src/
   grass.js          Bewuchs im Ring um den Spieler
   bake.js           Backt ein Vorbild nach Material zu einer Geometrie
   art-direction.js  Materialien, Fahrzeug- und Figurenaufbau
-  human-model.js    Anatomische Figurenmodelle und Animation
+  human-model.js    Anatomische Figurenmodelle, Gang und Ruhebewegung
   content.js        Weltdaten: Orte, Regionen, Fahrzeugtypen, Waffen
   navigation.js     A* auf Gitter für Polizei und Wachen
   vendor/           Three.js r185 (MIT), unverändert

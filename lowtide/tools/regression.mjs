@@ -818,6 +818,21 @@ pruefe('Keine doppelten Figurennummern', leute.doppelt === 0);
 pruefe('Figuren teilen sich ihre Geometrie', leute.geteilt >= 8, `${leute.geteilt} von ${leute.formen}`);
 pruefe('Gesichter gibt es je Hautton, nicht je Kopf',
  leute.gesichter === 5 && leute.hauttoene === 5, `${leute.gesichter} Formen, ${leute.hauttoene} Töne`);
+pruefe('Figuren haben einen drehbaren Kopf', await page.evaluate(() => {
+ const w = window.LOWTIDE.world;
+ return w.npcs.every(m => m.userData.kopf && m.userData.kopf.children.length > 4);
+}));
+pruefe('Im Stand sieht sich die Menge um, und nicht im Gleichtakt', await page.evaluate(async () => {
+ const L = window.LOWTIDE, w = L.world;
+ // Ein paar Bilder laufen lassen und die Kopfdrehungen einsammeln.
+ for (let i = 0; i < 3; i++) await new Promise(r => requestAnimationFrame(r));
+ const winkel = w.npcs.slice(0, 40).map(m => +m.userData.kopf.rotation.y.toFixed(3));
+ const bewegt = winkel.filter(v => Math.abs(v) > .02).length;
+ // Ein Gleichtakt wäre daran zu erkennen, dass alle denselben Wert haben.
+ const verschieden = new Set(winkel).size;
+ return bewegt > 8 && verschieden > 15;
+}));
+
 pruefe('Neon und Fenster gehen nachts an', leute.heller > 20,
  `${leute.heller} von ${leute.leuchten} Leuchtmaterialien heller`);
 

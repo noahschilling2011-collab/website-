@@ -44,6 +44,12 @@ export function naturalHuman(color,pants,nah=true){
  const cloth=mat(color,.94),denim=mat(pants,.96),dark=mat(0x292e31),hairColor=[0x302820,0x554332,0x251f1b,0x6b5238][id%4];
  // Pelvis, waist, rib cage and shoulders have different cross sections.
  const body=add(g,loft([[.86,.14,.095,.10],[.91,.18,.11,.105],[1.02,.145,.09,.10],[1.15,.17,.115,.105],[1.32,.21,.12,.105],[1.43,.23,.10,.085],[1.48,.13,.075,.07],[1.49,.065,.057,.052]],28),cloth,0,0,0);
+ // Ab hier beginnt der Kopf. Alles zwischen dieser Marke und dem Ende der
+ // Haare wird gleich in eine eigene Gruppe umgehängt, damit er sich drehen
+ // kann. Die Teile werden mit absoluten Höhen gebaut; die Gruppe bekommt
+ // deshalb den Halsansatz als Ursprung und die Kinder ihre Höhe abzüglich
+ // desselben Werts.
+ const kopfAb = g.children.length;
  add(g,new T.CylinderGeometry(.057,.065,.12,16),skin,0,1.51,0);
  // Jaw, cheekbones, temple, forehead and cranium; no spherical mask.
  // Das Gesicht trägt seine Farbe in den Eckpunkten. Es darf deshalb nicht
@@ -105,7 +111,15 @@ export function naturalHuman(color,pants,nah=true){
   }
  }
  const tattoo=add(arms[0],new T.PlaneGeometry(.055,.09),mat(0x314643),0,-.28,.051);tattoo.visible=false;
- const garments=[];g.traverse(o=>{if(o.isMesh&&o.material===cloth)garments.push(o);});g.userData={body,hair,tattoo,legs,arms,knees,elbows,ankles,eyes,lids,face,id,garments,rig:'anatomical-v2'};return g;
+ // Kopf umhängen. Reihenfolge und Weltlage bleiben gleich, nur der Elternteil
+ // wechselt — ohne das steht jede Figur der Stadt mit starrem Blick geradeaus.
+ const HALS = 1.5;
+ const kopf = new T.Group();
+ kopf.position.set(0, HALS, 0);
+ const kopfTeile = g.children.slice(kopfAb);
+ for (const o of kopfTeile) {o.position.y -= HALS; kopf.add(o);}
+ g.add(kopf);
+ const garments=[];g.traverse(o=>{if(o.isMesh&&o.material===cloth)garments.push(o);});g.userData={body,hair,tattoo,legs,arms,knees,elbows,ankles,eyes,lids,face,kopf,id,garments,rig:'anatomical-v3'};return g;
 }
 // Ein voller Schrittzyklus deckt diese Strecke ab. Die Schrittphase läuft
 // deshalb über den zurückgelegten Weg und nicht über die Uhr — nur so bleibt
@@ -157,6 +171,36 @@ export function animateNaturalHuman(g,time,moving,armed,steigung=0){
  u.neigung=(u.neigung||0)+((-dreh/dt*.055-0)*Math.min(1,amount)-(u.neigung||0))*Math.min(1,dt*6);
  u.neigung=Math.max(-.3,Math.min(.3,u.neigung));
  u.vorlage=amount*.06;
+ // Ruhebewegung. Eine Stadt aus hundertsiebenundfünfzig Leuten, die alle
+ // exakt still stehen, sieht aus wie ein Schaufenster. Niemand steht still:
+ // das Gewicht wandert von einem Bein aufs andere, der Kopf dreht sich zu
+ // dem, was gerade vorbeigeht, die Arme hängen nicht wie angenagelt.
+ // Der Anteil geht auf null, sobald die Figur losläuft.
+ const ruhe=Math.max(0,1-amount*3.2);
+ if(ruhe>.01){
+  const eigen=u.id*1.73;
+  // Gewichtsverlagerung, etwa alle sieben Sekunden ein Wechsel.
+  const wiegen=Math.sin(time*.44+eigen);
+  u.body.rotation.z=wiegen*.028*ruhe;
+  u.legs[0].rotation.z=wiegen*.035*ruhe;
+  u.legs[1].rotation.z=wiegen*.035*ruhe;
+  u.knees[Math.sin(time*.44+eigen)>0?0:1].rotation.x+=Math.abs(wiegen)*.10*ruhe;
+  // Arme folgen der Verlagerung mit Versatz, sonst wirkt es mechanisch.
+  u.arms.forEach((arm,i)=>{arm.rotation.x+=Math.sin(time*.51+eigen+i*.7)*.045*ruhe;});
+  // Kopf: langsame Drehung mit einer schnelleren Überlagerung, damit es
+  // nicht wie ein Ventilator aussieht.
+  if(u.kopf){
+   const t2=time*.33+eigen;
+   u.kopf.rotation.y=(Math.sin(t2)*.34+Math.sin(t2*2.7)*.07)*ruhe;
+   u.kopf.rotation.x=Math.sin(t2*.71+1.3)*.09*ruhe;
+   u.kopf.rotation.z=Math.sin(t2*.53)*.05*ruhe;
+  }
+ } else if(u.kopf){
+  // Im Gehen schaut der Kopf leicht in die Kurve, sonst geradeaus.
+  u.kopf.rotation.y+=(-(u.neigung||0)*.8-u.kopf.rotation.y)*Math.min(1,dt*5);
+  u.kopf.rotation.x+=(0-u.kopf.rotation.x)*Math.min(1,dt*5);
+  u.kopf.rotation.z+=(0-u.kopf.rotation.z)*Math.min(1,dt*5);
+ }
  const blink=(time+u.id*.39)%4.9<.11;
  u.eyes.forEach(e=>e.visible=!blink);u.lids.forEach(e=>e.visible=blink);
  u.body.scale.z=1+Math.sin(time*1.6+u.id)*.009;
