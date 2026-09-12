@@ -158,7 +158,14 @@ export class ExpandedWorld extends World{
   // Dazu ein Sandsaum: wer nicht im Wasser steht, aber zehn Meter daneben,
   // bekommt Strandfarbe statt Wiese. Ohne den stieß Gras direkt ans Meer.
   const amWasser=(px,pz)=>waterAt(px+10,pz)||waterAt(px-10,pz)||waterAt(px,pz+10)||waterAt(px,pz-10);
-  this.terrain=[];for(let x=-580;x<390;x+=100)for(let z=-540;z<460;z+=100){const g=new T.PlaneGeometry(100,100,12,12);g.rotateX(-Math.PI/2);const a=g.attributes.position,colors=[];for(let i=0;i<a.count;i++){const px=x+50+a.getX(i),pz=z+50+a.getZ(i);a.setY(i,waterAt(px,pz)?-3.4:groundAt(px,pz)-.12);const c=new T.Color(waterAt(px,pz)?0x2f5450:amWasser(px,pz)?0x9a8a63:px<-380&&pz<-240?0x4f5c43:pz<-230?0x5a6249:px<-390?0x4f5d47:0x6c6d58);colors.push(c.r,c.g,c.b);}g.setAttribute('color',new T.Float32BufferAttribute(colors,3));g.computeVertexNormals();const m=new T.Mesh(g,new T.MeshStandardMaterial({vertexColors:true,roughness:1}));m.position.set(x+50,0,z+50);m.receiveShadow=true;this.scene.add(m);this.terrain.push(m);}
+  this.terrain=[];for(let x=-580;x<390;x+=100)for(let z=-540;z<460;z+=100){const g=new T.PlaneGeometry(100,100,12,12);g.rotateX(-Math.PI/2);const a=g.attributes.position,colors=[];for(let i=0;i<a.count;i++){const px=x+50+a.getX(i),pz=z+50+a.getZ(i);a.setY(i,waterAt(px,pz)?-3.4:groundAt(px,pz)-.12);const c=new T.Color(waterAt(px,pz)?0x2f5450:amWasser(px,pz)?0x9a8a63:px<-380&&pz<-240?0x4f5c43:pz<-230?0x5a6249:px<-390?0x4f5d47:0x6c6d58);colors.push(c.r,c.g,c.b);}g.setAttribute('color',new T.Float32BufferAttribute(colors,3));g.computeVertexNormals();const m=new T.Mesh(g,new T.MeshStandardMaterial({vertexColors:true,roughness:1}));m.position.set(x+50,0,z+50);m.receiveShadow=true;
+   // Kacheln, die ganz unter Wasser liegen, sieht man nie: der Wassershader
+   // ist undurchsichtig. Sie werden nur beim Tauchen eingeblendet. Ohne das
+   // kosteten allein die dreißig neuen Meereskacheln im Osten am Strand über
+   // vierhundert Draw Calls für nichts.
+   m.userData.nurWasser=[[0,0],[100,0],[0,100],[100,100],[50,50],[25,75],[75,25]]
+    .every(([ox,oz])=>waterAt(x+ox,z+oz));
+   this.scene.add(m);this.terrain.push(m);}
   const umland=new T.Mesh(new T.PlaneGeometry(3800,3800,16,16),new T.MeshStandardMaterial({color:0x3a4636,roughness:1}));
   umland.rotation.x=-Math.PI/2;umland.position.set(-230,-2.4,-40);umland.renderOrder=-1;this.scene.add(umland);
   this.box(297,-.3,222,125,.5,145,0x66714f);this.box(185,.08,200,152,.5,10,0x5b6c70);for(let x=121;x<254;x+=14){this.box(x,1.1,195,.2,2,.2,0xbebc9d);this.box(x,1.1,205,.2,2,.2,0xbebc9d);}this.box(106,-.05,280,24,.12,300,0x9c8e6b);
@@ -246,7 +253,11 @@ export class ExpandedWorld extends World{
   this.autoFern.ende();
   this.figurFern.beginn();
   s.npcs.forEach((n,i)=>{const m=this.npcs[i],weg=distance(n,p);
-   const nah=weg<42;m.visible=nah&&weg<150;
+   // Umschaltweite von 42 auf 34 m. Eine Figur aus 42 m ist bei 58° Blickfeld
+   // gut zwanzig Bildpunkte hoch; 34 Meshes dafür sind nicht zu rechtfertigen.
+   // Am Strand mit dreißig Leuten in Sichtweite kostete das über
+   // vierhundert Draw Calls.
+   const nah=weg<34;m.visible=nah&&weg<150;
    if(!nah&&weg<165&&n.health>0&&n.stun<=0)this.figurFern.hinzu(n.x,groundAt(n.x,n.z),n.z,n.yaw);
    if(!nah)return;
    m.position.y=groundAt(n.x,n.z)+(n.health<=0||n.stun>0?.2:(m.userData.bob||0));
@@ -265,7 +276,8 @@ export class ExpandedWorld extends World{
   this.tiere.update(dt,t,p);
   // Wind aus dem Wetter: bei Sturm wogt es deutlich, bei klarem Himmel kaum.
   this.gras.update(dt,t,p,s.weather==='storm'?1:s.weather==='rain'?.6:.25);
-  this.palmenSetzen(t,s.weather==='storm'?3.4:s.weather==='rain'?1.8:1);for(const m of this.terrain)m.visible=Math.hypot(m.position.x-p.x,m.position.z-p.z)<650;
+  this.palmenSetzen(t,s.weather==='storm'?3.4:s.weather==='rain'?1.8:1);const unterWasser=(p.y||0)<-.2;
+  for(const m of this.terrain)m.visible=(!m.userData.nurWasser||unterWasser)&&Math.hypot(m.position.x-p.x,m.position.z-p.z)<650;
   if(!this.barrierMeshes)this.barrierMeshes=[];while(this.barrierMeshes.length<s.barriers.length){const m=new T.Mesh(new T.BoxGeometry(5,1,1.2),new T.MeshStandardMaterial({color:0xe3c485}));this.scene.add(m);this.barrierMeshes.push(m);}this.barrierMeshes.forEach((m,i)=>{const b=s.barriers[i];m.visible=!!b;if(b)m.position.set(b.x,.5,b.z);});if(!this.policeHelicopter){this.policeHelicopter=this.car(0x4b6169,false,{model:'helicopter'});this.scene.add(this.policeHelicopter);}const h=s.policeHeli;this.policeHelicopter.position.set(h.x,h.alt,h.z);this.policeHelicopter.rotation.y=h.yaw;this.policeHelicopter.visible=distance(h,p)<400;if(h.alt>0)this.policeHelicopter.userData.rotor.rotation.y+=dt*40;
   const suchtAktiv=s.stars>=5&&h.alt>8;
   this.suchlicht.visible=suchtAktiv;this.suchfleck.visible=suchtAktiv;

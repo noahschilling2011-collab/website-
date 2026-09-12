@@ -90,6 +90,21 @@ Kistengeometrie trägt eine 240-m-Platte und einen 20-cm-Poller.
 Der Knopf „Grafik: sparsam" schaltet Nachbearbeitung, Schatten und
 Pixelverhältnis zusammen ab.
 
+## Was Zeichenaufrufe kostet
+
+Draw Calls sind hier die knappe Größe, nicht Dreiecke. Drei Dinge halten sie
+unten, und alle drei sind aus Messungen entstanden, nicht aus Vermutungen:
+
+- **Detailstufe.** Figuren wechseln ab 34 m, Fahrzeuge ab 52 m auf eine
+  Silhouette in einem gemeinsamen InstancedMesh. Bei 42 m kosteten dreißig
+  Leute am Strand über vierhundert Draw Calls für Figuren von zwanzig
+  Bildpunkten Höhe.
+- **Entfernung.** Weltblöcke jenseits der Nebelgrenze werden verworfen;
+  Geländekacheln, die vollständig unter Wasser liegen, nur beim Tauchen
+  gezeichnet — der Wassershader ist undurchsichtig.
+- **Geteilte Geometrie.** Fahrzeuge teilen sich elf Formen, Figuren neun;
+  Gesichter gibt es fünfmal, einmal je Hautton.
+
 ## Kampagne
 
 Fünf Akte. Akt 1 und 2 liegen in `simulation.js` und `campaign.js`, Akt 3 bis 5
