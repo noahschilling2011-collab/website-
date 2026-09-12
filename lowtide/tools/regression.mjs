@@ -785,6 +785,80 @@ pruefe('Figuren stehen im selben Schattenfeld', wolken.figur[0] === wolken.figur
  `${wolken.figur[0]} von ${wolken.figur[1]}`);
 pruefe('Fahrzeuge stehen im selben Schattenfeld', wolken.wagen[0] === wolken.wagen[1] && wolken.wagen[1] > 5,
  `${wolken.wagen[0]} von ${wolken.wagen[1]}`);
+// Fahrbahnen müssen dem Gelände folgen. Vorher lag jedes Segment als ein
+// Quader auf y = 0,03 — auf dem Talon Ridge damit sechsundachtzig Meter
+// unter der Kuppe, unsichtbar, aber für aufStrasse() trotzdem vorhanden.
+//
+// Gelesen wird aus world.bloecke, nicht aus world.groups: flush() leert die
+// Sammler, sobald die Instanzennetze stehen. Der erste Anlauf dieser Prüfung
+// hat genau das gemeldet — null Stücke gefunden, obwohl sie im Bild stehen.
+const strassenHoehe = await page.evaluate(() => {
+ const L = window.LOWTIDE, w = L.world;
+ let schlimmster = 0, wo = null, gezaehlt = 0, obenAufDemRuecken = 0, kuppe = 0;
+ for (const netz of w.bloecke || []) {
+  const arr = netz.instanceMatrix.array;
+  for (let i = 0; i < netz.count; i++) {
+   const o = i * 16;
+   const x = arr[o + 12], y = arr[o + 13], z = arr[o + 14];
+   const sx = Math.hypot(arr[o], arr[o + 1], arr[o + 2]);
+   const sy = Math.hypot(arr[o + 4], arr[o + 5], arr[o + 6]);
+   const sz = Math.hypot(arr[o + 8], arr[o + 9], arr[o + 10]);
+   if (y > 58 && y < 100 && Math.hypot(x + 900, (z + 160) * .76) < 140) kuppe++;
+   // Fahrbahn wird nicht über die Materialfarbe erkannt — die Netze sind
+   // nach Farbe und Kachel gebündelt, und die Suche nach dem Asphaltton kam
+   // im zweiten Anlauf auf null Treffer. Stattdessen geometrisch: flach,
+   // breit, und der Punkt liegt auf einer Fahrbahn.
+   if (sy > .2 || Math.max(sx, sz) < 6) continue;
+   if (!L.onRoad(x, z, 0)) continue;
+   // Nur, was auf der Fahrbahn liegt, nicht was darüber hängt: ein Vordach
+   // oder ein Kirchendach ist flach und breit und stünde sonst als
+   // Abweichung von fünfzehn Metern in der Statistik. Der ursprüngliche
+   // Fehler — Fahrbahn auf Meereshöhe unter einem 86 m hohen Rücken — wird
+   // davon nicht verdeckt: die läge unter dem Gelände, nicht darüber.
+   if (y > L.groundAt(x, z) + 1) continue;
+   gezaehlt++;
+   if (y > 60) obenAufDemRuecken++;
+   const ab = Math.abs(y - .03 - L.groundAt(x, z));
+   if (ab > schlimmster) {schlimmster = ab; wo = [Math.round(x), Math.round(z), Math.round(y)];}
+  }
+ }
+ return {schlimmster, wo, gezaehlt, obenAufDemRuecken, kuppe};
+});
+pruefe('Fahrbahnen liegen auf dem Gelände', strassenHoehe.schlimmster < 1.2,
+ `größte Abweichung ${strassenHoehe.schlimmster.toFixed(2)} m bei ${JSON.stringify(strassenHoehe.wo)}`);
+pruefe('Die Straße über den Talon Ridge liegt auf dem Rücken',
+ strassenHoehe.obenAufDemRuecken > 5, `${strassenHoehe.obenAufDemRuecken} Stücke über 60 m`);
+pruefe('Die Fahrbahn ist in Stücke geteilt, nicht ein Quader je Segment',
+ strassenHoehe.gezaehlt > 300, `${strassenHoehe.gezaehlt} Stücke`);
+pruefe('Über der Baumgrenze steht Fels', strassenHoehe.kuppe > 200,
+ `${strassenHoehe.kuppe} Teile auf der Kuppe`);
+// Nichts Großes darf in einer Fahrbahn stehen. sim.blocked kennt nur
+// registrierte Gebäude; Wasserturm, Kirche und anderes Beiwerk aus
+// regions.js stehen dort nicht drin und sind bisher durch jedes Netz
+// gefallen.
+const hindernisse = await page.evaluate(() => {
+ const L = window.LOWTIDE, w = L.world, treffer = [];
+ for (const netz of w.bloecke || []) {
+  const arr = netz.instanceMatrix.array;
+  for (let i = 0; i < netz.count; i++) {
+   const o = i * 16;
+   const x = arr[o + 12], y = arr[o + 13], z = arr[o + 14];
+   const sx = Math.hypot(arr[o], arr[o + 1], arr[o + 2]);
+   const sy = Math.hypot(arr[o + 4], arr[o + 5], arr[o + 6]);
+   const sz = Math.hypot(arr[o + 8], arr[o + 9], arr[o + 10]);
+   // Hoch genug, um ein Auto zu stoppen, und breit genug, um kein Pfosten
+   // zu sein. Die Unterkante muss dabei unter Fahrzeughöhe liegen — eine
+   // Brücke oder ein Ausleger darüber ist erlaubt.
+   if (sy < 2.5 || Math.min(sx, sz) < 3) continue;
+   if (y - sy / 2 > L.groundAt(x, z) + 2.6) continue;
+   if (!L.onRoad(x, z, 0)) continue;
+   treffer.push([Math.round(x), Math.round(z), Math.round(sx), Math.round(sz)]);
+  }
+ }
+ return treffer;
+});
+pruefe('Nichts Großes steht in einer Fahrbahn', hindernisse.length === 0,
+ `${hindernisse.length} Stück, zuerst ${JSON.stringify(hindernisse.slice(0, 4))}`);
 pruefe('Sparmodus schaltet die Nachbearbeitung ab', await page.evaluate(() => {
  const knopf = document.getElementById('qualityBtn'), w = window.LOWTIDE.world;
  knopf.click();

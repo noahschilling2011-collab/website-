@@ -357,9 +357,13 @@ function airfield(w, rng) {
   w.box(bahnX + 74 + ox, 6.3, 250, 7.4, 1, 7.4, 0x8d938a);
  }
  w.text('AVGAS', bahnX + 78, 7.6, 246, 8, '#d8b25a');
- w.box(bahnX + 34, 3.2, 400, 46, 6.4, 16, 0xbcb9a8);
- satteldach(w, bahnX + 34, 6.5, 400, 47, 17, 2.4, 0x5e6a68, true);
- w.text('MERCY AIRFIELD', bahnX + 34, 5.6, 391.4, 22, '#e0d3a8', Math.PI);
+ // Die Abfertigung stand auf z = 400 — genau auf der Ost-West-Achse, die
+ // dort mit sechzehn Metern Breite entlangläuft. 46 mal 16 Meter Gebäude
+ // quer über der Fahrbahn. Fünfundzwanzig Meter nach Süden, innerhalb des
+ // Zauns, ist frei.
+ w.box(bahnX + 34, 3.2, 375, 46, 6.4, 16, 0xbcb9a8);
+ satteldach(w, bahnX + 34, 6.5, 375, 47, 17, 2.4, 0x5e6a68, true);
+ w.text('MERCY AIRFIELD', bahnX + 34, 5.6, 366.4, 22, '#e0d3a8', Math.PI);
  zaun(w, bahnX - 40, 235, bahnX + 100, 235, 2.2, 0x808780, 5);
  zaun(w, bahnX - 40, 235, bahnX - 40, 410, 2.2, 0x808780, 5);
  zaun(w, bahnX + 100, 235, bahnX + 100, 410, 2.2, 0x808780, 5);
@@ -410,8 +414,12 @@ function islaSerena(w, rng) {
  // Resortvillen mit Pools, an einer Ringstraße.
  w.box(297, .06, 222, 88, .14, 6, 0x8d8877);
  for (let k = 0; k < 6; k++) {
-  const vx = 268 + (k % 3) * 30, vz = k < 3 ? 196 : 254;
-  if (w.sim.blocked({x: vx, z: vz}, 12)) continue;
+  // Die nördliche Reihe stand auf z = 196; der Damm nach Isla Serena läuft
+  // auf z = 200 mit zwölf Metern Breite, die Villen ragten also mit ihrer
+  // halben Tiefe in die Fahrbahn. sim.blocked kennt nur registrierte
+  // Gebäude und hat davon nichts gewusst.
+  const vx = 268 + (k % 3) * 30, vz = k < 3 ? 180 : 254;
+  if (w.sim.blocked({x: vx, z: vz}, 12) || aufStrasse(vx, vz, 10)) continue;
   w.box(vx, 2.6, vz, 15, 5.2, 12, 0xd8d0be);
   w.box(vx, 5.4, vz, 16.4, .5, 13.4, 0xc0b7a3);
   for (const ox of [-4.4, 0, 4.4]) w.box(vx + ox, 3.4, vz + 6.1, 3.2, 2.4, .12, 0x3d5f6b);
@@ -680,10 +688,12 @@ function nordFlaechen(w, rng) {
   w.box(x, .45, z, 1, .9, .28, 0x9a9a92);
   w.box(x, .95, z, 1, .22, .34, 0x8d8d86);
  }
- w.box(fx, 2.6, fz + 20, 10, 5.2, 8, 0xc0b7a3);
- satteldach(w, fx, 5.3, fz + 20, 11, 9, 2.6, 0x5f6663, true);
- w.box(fx, 8.4, fz + 20, .3, 2.4, .3, 0x8d8d86);
- w.box(fx, 8.4, fz + 20, 1.2, .3, .3, 0x8d8d86);
+ // Das Vereinsheim lag auf fz + 20 = -230 und damit im Nordring (z = -228,
+ // sechzehn Meter breit). Jetzt auf der abgewandten Seite des Feldes.
+ w.box(fx, 2.6, fz - 20, 10, 5.2, 8, 0xc0b7a3);
+ satteldach(w, fx, 5.3, fz - 20, 11, 9, 2.6, 0x5f6663, true);
+ w.box(fx, 8.4, fz - 20, .3, 2.4, .3, 0x8d8d86);
+ w.box(fx, 8.4, fz - 20, 1.2, .3, .3, 0x8d8d86);
  for (const [x1, z1, x2, z2] of [[fx - 26, fz - 22, fx + 26, fz - 22], [fx - 26, fz + 22, fx + 26, fz + 22], [fx - 26, fz - 22, fx - 26, fz + 22], [fx + 26, fz - 22, fx + 26, fz + 22]]) {
   const laenge = Math.hypot(x2 - x1, z2 - z1);
   w.box((x1 + x2) / 2, .8, (z1 + z2) / 2, Math.abs(x2 - x1) || 1.4, 1.6, Math.abs(z2 - z1) || 1.4, 0x3f5c3c);
@@ -1076,7 +1086,12 @@ function rosalind(w, rng) {
   }
  }
  // Wasserturm auf Stelzen — die Landmarke jeder Kleinstadt.
- const tx = -1020, tz = 340;
+ // Stand bis zuletzt auf z = 340, also mitten auf der Hauptstraße: vier
+ // Stelzen in der Fahrbahn, der Tank elf Meter breit darüber. Aufgefallen
+ // ist es keinem Auge, sondern der Prüfung auf Fahrbahnhöhe — die fand ein
+ // flaches breites Teil fünfzehn Meter über einer Straße und hat damit auf
+ // den Kirchturm gezeigt, der dasselbe Problem hatte.
+ const tx = -1020, tz = 360;
  for (const ox of [-1, 1]) for (const oz of [-1, 1]) {
   w.box(tx + ox * 4, 9, tz + oz * 4, .45, 18, .45, 0x7d837f);
   w.box(tx + ox * 4, 9, tz, .3, .3, 8.4, 0x7d837f, 0, false, 0, .5);
@@ -1085,8 +1100,10 @@ function rosalind(w, rng) {
  w.box(tx, 24.2, tz, 9, 2.4, 9, 0x9aa098);
  w.box(tx, 25.8, tz, .3, 1.6, .3, 0x6f7570);
  w.text('ROSALIND', tx, 20.5, tz - 5.7, 12, '#5c6b62');
- // Kirche mit Turm am Ostende.
- const kx = -740, kz = 342;
+ // Kirche mit Turm am Ostende. Sie stand mit ihrer nördlichen Hälfte in der
+ // Hauptstraße — 20 m tief um z = 342, während die Fahrbahn von 332 bis 348
+ // reicht. Jetzt nördlich davon, wie das Straßenraster es hergibt.
+ const kx = -734, kz = 368;
  w.box(kx, 3.4, kz, 14, 6.8, 20, 0xd0c8b4);
  satteldach(w, kx, 6.8, kz, 15, 21, 3.2, 0x6b6f68, true);
  w.box(kx - 8, 6, kz - 7, 7, 12, 7, 0xd0c8b4);
@@ -1172,11 +1189,71 @@ function talonRidge(w, rng) {
   const x = -1090 + rng() * 520, z = -530 + rng() * 620;
   if (aufStrasse(x, z, 10) || w.sim.blocked({x, z}, 3)) continue;
   const y = groundAt(x, z);
-  if (y > 62) continue;
+  // Über 62 m wächst kein Baum mehr — das stand hier von Anfang an, war
+  // aber als "gar nichts" umgesetzt. Die obersten 26 Meter des Rückens
+  // waren dadurch eine glatte grüne Kuppel; die Regionsvermessung in
+  // tools/schwachstellen.mjs hat TALON RIDGE mit Abstand als flachste
+  // Gegend der Karte ausgewiesen (örtlicher Kontrast 6,03 gegen 13,25 im
+  // Schnitt). Oberhalb der Baumgrenze steht jetzt Fels.
+  if (y > 62) {
+   const art = rng();
+   if (art < .30) {
+    // Findling: zwei versetzte Blöcke, damit die Silhouette nicht würfelt.
+    const b = 1.6 + rng() * 3.4;
+    w.box(x, y + b * .34, z, b, b * .72, b * .86, [0x8a8175, 0x7b7368, 0x948b7d][i % 3], rng() * 3.1);
+    w.box(x + b * .22, y + b * .78, z - b * .18, b * .62, b * .5, b * .58,
+     [0x7b7368, 0x8a8175][i % 2], rng() * 3.1);
+   } else if (art < .52) {
+    // Aufragende Felsrippe, quer zum Hang.
+    const l = 4 + rng() * 9, hh = 1.4 + rng() * 3.2;
+    w.box(x, y + hh * .42, z, l, hh, 1.2 + rng() * 2, 0x827a6e, rng() * 3.1, false, 0, (rng() - .5) * .3);
+   } else if (art < .74) {
+    // Geröllfeld: flach, breit, kaum höher als der Boden.
+    const r = 3 + rng() * 6;
+    w.box(x, y + .16, z, r, .32, r * .7, [0x968d7f, 0x877f72][i % 2], rng() * 3.1);
+    for (let k = 0; k < 3; k++)
+     w.box(x + (rng() - .5) * r, y + .3, z + (rng() - .5) * r, .5 + rng(), .5, .5 + rng(), 0x9d9486, rng() * 3.1);
+   } else {
+    // Windgebeugter Krüppelstrauch. Auf dem Kamm steht nichts aufrecht.
+    const h = .7 + rng() * 1.1;
+    w.box(x, y + h / 2, z, h * 1.9, h, h * 1.5, [0x4c5a44, 0x5a6349][i % 2], rng() * 3.1);
+   }
+   continue;
+  }
   if (rng() < .62) nadelbaum(w, x, z, 6 + rng() * 9, y > 30 ? 0x36523c : 0x40603f);
   else {
    const h = 1 + rng() * 2.4, b = h * (.6 + rng() * .4);
    w.box(x, y + h / 2, z, b, h, b, [0x847d70, 0x736c60][i % 2], rng() * 3);
+  }
+ }
+ // Der Streuwurf oben deckt 520 mal 620 Meter mit 620 Stück ab — ein Objekt
+ // je 520 Quadratmeter, also alle dreiundzwanzig Meter eines. Auf dem Kamm
+ // ist das nicht zu sehen: nach dem ersten Anlauf stand der Kontrast
+ // unverändert bei 6,04. Die Regel war richtig, die Dichte war es nicht.
+ //
+ // Deshalb ein eigener Wurf nur für die Kuppe. Sie ist die Ellipse, auf der
+ // groundAt über 60 m liegt: Mittelpunkt -900/-160, Halbachsen 92 und 120,
+ // rund 35.000 Quadratmeter. 900 Stück darauf sind eines je vierzig
+ // Quadratmeter.
+ for (let i = 0; i < 900; i++) {
+  const t = rng() * Math.PI * 2, r = Math.sqrt(rng());
+  const x = -900 + Math.cos(t) * r * 96, z = -160 + Math.sin(t) * r * 126;
+  if (aufStrasse(x, z, 9) || w.sim.blocked({x, z}, 3)) continue;
+  const y = groundAt(x, z);
+  if (y < 58) continue;
+  const art = rng();
+  if (art < .34) {
+   const b = .9 + rng() * 2.6;
+   w.box(x, y + b * .3, z, b, b * .64, b * .8, [0x8a8175, 0x7b7368, 0x948b7d][i % 3], rng() * 3.1);
+  } else if (art < .58) {
+   const l = 2.5 + rng() * 7, hh = .8 + rng() * 2.4;
+   w.box(x, y + hh * .4, z, l, hh, .9 + rng() * 1.8, 0x827a6e, rng() * 3.1, false, 0, (rng() - .5) * .34);
+  } else if (art < .82) {
+   const rr = 2 + rng() * 4.5;
+   w.box(x, y + .14, z, rr, .28, rr * .7, [0x968d7f, 0x877f72][i % 2], rng() * 3.1);
+  } else {
+   const h = .5 + rng() * .9;
+   w.box(x, y + h / 2, z, h * 2.1, h, h * 1.6, [0x4c5a44, 0x5a6349][i % 2], rng() * 3.1);
   }
  }
 }

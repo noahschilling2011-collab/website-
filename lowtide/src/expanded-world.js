@@ -173,7 +173,38 @@ export class ExpandedWorld extends World{
   const umland=new T.Mesh(new T.PlaneGeometry(3800,3800,16,16),new T.MeshStandardMaterial({color:0x3a4636,roughness:1}));
   umland.rotation.x=-Math.PI/2;umland.position.set(-230,-2.4,-40);umland.renderOrder=-1;this.scene.add(umland);
   this.box(297,-.3,222,125,.5,145,0x66714f);this.box(185,.08,200,152,.5,10,0x5b6c70);for(let x=121;x<254;x+=14){this.box(x,1.1,195,.2,2,.2,0xbebc9d);this.box(x,1.1,205,.2,2,.2,0xbebc9d);}this.box(106,-.05,280,24,.12,300,0x9c8e6b);
-  for(const r of roadSegments){const x=(r.x1+r.x2)/2,z=(r.z1+r.z2)/2;this.box(x,.03,z,Math.max(r.w,Math.abs(r.x2-r.x1)),.08,Math.max(r.w,Math.abs(r.z2-r.z1)),0x3d494f);const length=Math.hypot(r.x2-r.x1,r.z2-r.z1);for(let i=0;i<length;i+=16){const t=i/length;this.box(r.x1+(r.x2-r.x1)*t,.08,r.z1+(r.z2-r.z1)*t,r.x1===r.x2?.16:5,.02,r.x1===r.x2?5:.16,0xc4bb97);}}
+  // Fahrbahnen folgen dem Gelände. Vorher lag jedes Segment als ein Quader
+  // auf y = 0,03 — auf ebener Karte richtig, auf dem Talon Ridge nicht: die
+  // Zufahrt bei z = -160 lag damit sechsundachtzig Meter unter der Kuppe.
+  // Sichtbar war dort keine Straße, blockiert hat sie trotzdem: aufStrasse()
+  // rechnet in der Ebene und hielt den Bewuchs von einem Streifen fern, auf
+  // dem gar nichts lag. Gefunden über tools/schwachstellen.mjs, das TALON
+  // RIDGE als flachste Gegend auswies, und von dort rückwärts.
+  for(const r of roadSegments){
+   const laenge=Math.hypot(r.x2-r.x1,r.z2-r.z1);
+   const nordSued=r.x1===r.x2;
+   // Zwölf Meter je Stück: kürzer bringt nichts, weil groundAt so glatt ist,
+   // länger setzt auf dem Rücken sichtbare Stufen.
+   const stuecke=Math.max(1,Math.round(laenge/12));
+   for(let k=0;k<stuecke;k++){
+    const t=(k+.5)/stuecke;
+    const mx=r.x1+(r.x2-r.x1)*t,mz=r.z1+(r.z2-r.z1)*t;
+    const l=laenge/stuecke+.4;
+    const y=groundAt(mx,mz);
+    // Am Hang bekommt die Fahrbahn eine Berme: eine Straße, die sich in
+    // einen Rücken schneidet, hört nicht an der Kante der Decke auf. In der
+    // Ebene entfällt sie, dort gibt es keinen Ein- oder Anschnitt.
+    if(y>2){
+     this.box(mx,y-.06,mz,nordSued?r.w+5.5:l,.16,nordSued?l:r.w+5.5,0x6f6a5c);
+     this.box(mx,y-.34,mz,nordSued?r.w+9:l,.5,nordSued?l:r.w+9,0x5c6350);
+    }
+    this.box(mx,y+.03,mz,nordSued?r.w:l,.08,nordSued?l:r.w,0x3d494f);
+   }
+   for(let i=0;i<laenge;i+=16){
+    const t=i/laenge,mx=r.x1+(r.x2-r.x1)*t,mz=r.z1+(r.z2-r.z1)*t;
+    this.box(mx,groundAt(mx,mz)+.08,mz,nordSued?.16:5,.02,nordSued?5:.16,0xc4bb97);
+   }
+  }
   for(const b of s.worldBuildings){const base=groundAt(b.x,b.z),co=b.kind==='house'?0xb5a78f:0x869c9c;this.box(b.x,base+b.h/2,b.z,b.w,b.h,b.d,co);this.box(b.x,base+b.h+.3,b.z,b.w+1,.6,b.d+1,0x3e555a);
    // Hochhäuser bekommen Rücksprünge, eine Krone und ein Blinkfeuer. Ein
    // Turm ohne Absatz ist aus der Ferne nur ein längerer Quader.

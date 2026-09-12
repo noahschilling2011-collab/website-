@@ -49,11 +49,12 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 153 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 158 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
 node tools/statistik.mjs                         # Sättigung und örtlicher Kontrast
+node tools/schwachstellen.mjs                    # welche Region ist am flachsten
 ```
 
 Die drei Werkzeuge in `tools/` mit Browser brauchen Playwright und Chromium.
@@ -263,6 +264,54 @@ Vorher: 13 Uhr 81,1 — 7 Uhr 28,6 bei 66,9 % abgesoffen. Was bei flacher Sonne
 übrig bleibt, ist der Schatten der Häuserzeile über der Fahrbahn; den hebt
 keine Belichtung mehr an, ohne das Bild flach zu machen. Es bleibt dunkel,
 aber es ist nicht mehr dunkler als die Nacht.
+
+## Wo die Karte noch nach Prototyp aussieht
+
+Bis hierher habe ich Mängel durch Hinsehen gesucht. Die Trefferquote war
+schlecht: auf fünf belegte Verbesserungen kamen sieben widerlegte
+Vermutungen. `tools/schwachstellen.mjs` dreht das um — es fährt jede der
+fünfzehn Regionen an, misst dort örtlichen Kontrast, Sättigung und
+Helligkeit und sortiert nach dem schwächsten Wert. Niedriger Kontrast heißt
+große glatte Flächen: unfertig.
+
+Der erste Lauf war eindeutig. TALON RIDGE stand bei **6,03** gegen 13,25 im
+Schnitt, mit Abstand die flachste Gegend. Von dort rückwärts kamen vier
+Fehler heraus, von denen keiner beim Spielen aufgefallen war:
+
+**Oberhalb von 62 Metern stand nichts.** Die Regel „über der Baumgrenze
+wächst kein Baum" war als `continue` umgesetzt, also als gar nichts. Die
+obersten sechsundzwanzig Meter des Rückens waren eine glatte grüne Kuppel.
+Jetzt stehen dort Findlinge, Felsrippen, Geröllfelder und Krüppelsträucher.
+
+**Die Dichte reichte nicht.** Der erste Anlauf hängte den Fels an den
+vorhandenen Streuwurf: 620 Stück auf 520 mal 620 Meter, eines je 520
+Quadratmeter. Der Kontrast blieb bei 6,04. Deshalb ein eigener Wurf nur für
+die Kuppe, 900 Stück auf 35.000 Quadratmeter.
+
+**Fahrbahnen lagen auf Meereshöhe.** Jedes Straßensegment war ein einziger
+Quader auf y = 0,03 — auf ebener Karte richtig, unter einem
+achtundachtzig Meter hohen Rücken nicht. Die Zufahrt bei z = -160 lag damit
+sechsundachtzig Meter unter der Kuppe: unsichtbar, aber `aufStrasse()`
+rechnet in der Ebene und hielt den Bewuchs trotzdem von einem Streifen fern,
+auf dem nichts lag. Fahrbahnen werden jetzt in Zwölf-Meter-Stücke geteilt und
+folgen dem Gelände, am Hang mit Berme.
+
+**Fünf Bauwerke standen in Fahrbahnen.** Die Höhenprüfung fand ein flaches
+breites Teil fünfzehn Meter über einer Straße — den Kirchturm von Rosalind.
+Die Kirche stand mit ihrer nördlichen Hälfte in der Hauptstraße, der
+Wasserturm mit allen vier Stelzen mittendrin. Eine daraus abgeleitete
+Prüfung fand drei weitere: die Abfertigung des Flugfelds (46 mal 16 Meter
+quer über der Achse bei z = 400), eine Resortvilla auf Isla Serena im Damm,
+und das Vereinsheim der Vororte im Nordring. `sim.blocked` kennt nur
+registrierte Gebäude; alles, was `regions.js` als Kulisse setzt, ist durch
+jedes bisherige Netz gefallen.
+
+| Region | Kontrast vorher | nachher |
+|---|---|---|
+| TALON RIDGE | 6,03 | 7,72 |
+
+Der Rest der Liste ist unverändert und steht als Arbeitsliste: MERCY
+RESERVOIR 8,29 und HARBOR DISTRICT 9,38 sind die nächsten.
 
 ## Was Zeichenaufrufe kostet
 
