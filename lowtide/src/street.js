@@ -326,8 +326,10 @@ export class Street {
    }
    const schirmFarbe = [0xc9603f, 0x3f7a86, 0xd4a54a, 0xb0526e][Math.floor(rng() * 4)];
    w.box(gx, 1.15, z, .09, 2.3, .09, 0x8f8a7c);
-   w.box(gx, 2.28, z, 3.4, .13, 3.4, schirmFarbe, dreh);
-   w.box(gx, 2.42, z, 2.2, .13, 2.2, schirmFarbe, dreh + .78);
+   w.box(gx, 2.16, z, 3.4, .1, 3.4, schirmFarbe, dreh + .78);
+   w.box(gx, 2.3, z, 2.5, .1, 2.5, schirmFarbe, dreh + .4);
+   w.box(gx, 2.42, z, 1.4, .1, 1.4, schirmFarbe, dreh);
+   w.box(gx, 2.5, z, .3, .16, .3, 0x8f8a7c);
   }
   // Beachvolleyball: zwei Felder mit Netz.
   for (const z of [205, 340]) {
@@ -337,12 +339,16 @@ export class Street {
   }
   // Strandbar mit Tresen, Hockern und Schilfdach.
   const bx = 103, bz = 262;
-  w.box(bx, 1.3, bz, 7, 2.6, 5, 0xa8845c);
-  w.box(bx, 2.85, bz, 8.4, .5, 6.4, 0x8d7a4e);
-  w.box(bx, 3.2, bz, 7.6, .3, 5.8, 0x9c8a5c);
-  w.box(bx + 4.4, 1.05, bz, 1.4, .2, 5, 0x6f5a41);
-  for (let e = -1.8; e <= 1.8; e += 1.2) w.box(bx + 5.4, .5, bz + e, .45, 1, .45, 0x6f5a41);
-  w.text('LOW TIDE BAR', bx + 4.6, 3.9, bz, 6.5, '#f0d49a', Math.PI / 2);
+  // Offene Bauweise: Pfosten und Rückwand, damit man hindurchsieht.
+  for (const ox of [-3.2, 3.2]) for (const oz of [-2.3, 0, 2.3]) w.box(bx + ox, 1.65, bz + oz, .24, 3.3, .24, 0x7d6446);
+  w.box(bx - 3.3, 1.65, bz, .3, 3.3, 5, 0xa8845c);
+  w.box(bx, 1.05, bz + 2.5, 6.6, .2, 1.1, 0x8d6f4c);
+  w.box(bx, .55, bz + 2.5, 6.4, 1.1, .7, 0x9a7a52);
+  for (let e = -2.4; e <= 2.4; e += 1.2) w.box(bx + e, .5, bz + 3.6, .42, 1, .42, 0x6f5a41);
+  w.box(bx, 1.9, bz - 2.2, 6.2, 1.4, .3, 0x6d5b3f);
+  w.box(bx, 3.55, bz, 8.6, .4, 6.6, 0x8d7a4e);
+  w.box(bx, 3.9, bz, 7.4, .35, 5.6, 0x9c8a5c);
+  w.text('LOW TIDE BAR', bx, 4.6, bz + 3.4, 6.5, '#f0d49a');
  }
 
  // Ampelphasen: grün, gelb, rot je Achse, versetzt zueinander.

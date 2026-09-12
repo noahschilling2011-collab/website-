@@ -117,5 +117,11 @@ export function dressBuildings(world, gebaeude) {
    world.box(b.x + b.w * .28, dach + 1.4, b.z - b.d * .3, .1, 2.8, .1, 0x6d7472);
    world.box(b.x + b.w * .28, dach + 2.7, b.z - b.d * .3, 1.1, .55, 1.1, 0xa8aca2);  // Satellitenschüssel
   }
+
+  // Zum Schluss: der Kollisionskörper wächst auf das Sockelgeschoss mit,
+  // sonst läuft die Figur in das Schaufenster hinein. b ist dasselbe Objekt,
+  // das die Simulation als solid führt — die sichtbare Grundgeometrie steht
+  // zu diesem Zeitpunkt schon und ändert sich dadurch nicht mehr.
+  b.w += .8; b.d += .8;
  }
 }
