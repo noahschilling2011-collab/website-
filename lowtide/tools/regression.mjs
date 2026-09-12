@@ -512,6 +512,16 @@ const akte = await page.evaluate(() => {
  // gesucht habe.
  sim.stars = 0; sim.heat = 0; sim.lastSeen = null; sim.description = null;
  for (const c of sim.cops) c.active = false;
+ // Eine Prüfung, die nur "rot" sagt, kostet je Anlauf eine halbe Stunde. Sie
+ // schreibt jetzt mit, wer die Fahndung auslöst, und gibt es im Fehlertext
+ // aus. Drei Anläufe lang habe ich die Ursache stattdessen geraten.
+ out.ausloeser = [];
+ const echtesReport = sim.report.bind(sim), echtesCrime = sim.crime.bind(sim);
+ sim.report = function (sev, pos, inc) {
+  out.ausloeser.push('report ' + sev + ' bei ' + Math.round(pos?.x ?? 0) + '/' + Math.round(pos?.z ?? 0));
+  return echtesReport(sev, pos, inc);
+ };
+ sim.crime = function (sev) {out.ausloeser.push('crime ' + sev); return echtesCrime(sev);};
  let stoesse = 0;
  while (sim.campaign.konvoi.phase === 'faehrt' && stoesse++ < 400) {
   auto.x = lkw.x + 2.2; auto.z = lkw.z + 1.2; auto.speed = 22;
@@ -519,7 +529,10 @@ const akte = await page.evaluate(() => {
  }
  out.gestoppt = sim.campaign.konvoi.phase === 'gestoppt';
  out.stoesse = stoesse;
+ sim.report = echtesReport; sim.crime = echtesCrime;
  out.fahndungNachRammen = sim.stars;
+ out.ausloeser = out.ausloeser.slice(0, 6);
+ out.bewaffnet = !!sim.player.armed;
  for (const [art, id, x, z] of out.beiseite) {
   const o = (art === 'w' ? sim.cars : sim.npcs).find(v => v.id === id);
   if (o) {o.x = x; o.z = z;}
@@ -582,7 +595,8 @@ pruefe('Akt 3 wird am Diner angeboten', akte.zielDiner && akte.aktion3 === 'akt3
 pruefe('Transport existiert und fährt seine Route', akte.lkwDa && akte.lkwFaehrt > 30, `${akte.lkwFaehrt?.toFixed(1)} m in 3 s`);
 pruefe('Vorlauf steht im Auftragstext', /startet in \d+ s/.test(akte.titelVorlauf || ''), akte.titelVorlauf);
 pruefe('Rammen stoppt den Transport', akte.gestoppt, `${akte.stoesse} Stöße`);
-pruefe('Rammen zählt nicht als Straftat', akte.fahndungNachRammen === 0);
+pruefe('Rammen zählt nicht als Straftat', akte.fahndungNachRammen === 0,
+ `${akte.fahndungNachRammen} Sterne, bewaffnet=${akte.bewaffnet}, Auslöser: ${akte.ausloeser.join(' | ') || 'keine'}`);
 pruefe('Treffersperre verhindert Dauerschaden', akte.stoesse >= 3, `${akte.stoesse} Stöße`);
 pruefe('Kassenbuch bringt Geld und startet Akt 4', akte.aktion4 === 'akt4start' && akte.lohn3 === 900);
 pruefe('Tresor bleibt tagsüber zu', akte.tagsGesperrt);
