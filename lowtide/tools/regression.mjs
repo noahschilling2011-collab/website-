@@ -219,6 +219,30 @@ await page.keyboard.press('F3');
 pruefe('F3 blendet die Messwerte ein', await page.evaluate(() => !document.getElementById('debug').hidden));
 await page.keyboard.press('F3');
 
+console.log('Detailstufen');
+pruefe('Ferne Figuren und Fahrzeuge laufen über die grobe Stufe', await page.evaluate(async () => {
+ const L = window.LOWTIDE, s = L.sim;
+ if (s.player.car) {s.player.car.speed = 0; s.enterExit();}
+ s.player.x = -40; s.player.z = 60;
+ await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ const w = L.world;
+ return w.figurFern.anzahl + w.autoFern.anzahl > 0;
+}));
+pruefe('Die grobe Stufe kostet wenige Draw Calls', await page.evaluate(() => {
+ const w = window.LOWTIDE.world;
+ // Zwei Vorbilder mit je einer Handvoll Materialien, unabhängig von der Zahl
+ // der Exemplare.
+ return w.figurFern.netze.length <= 6 && w.autoFern.netze.length <= 6;
+}));
+pruefe('Nahe Exemplare bleiben detailliert', await page.evaluate(async () => {
+ const L = window.LOWTIDE, s = L.sim, w = L.world;
+ const n = s.npcs.find(x => x.health > 0);
+ s.player.x = n.x + 2; s.player.z = n.z + 2;
+ await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ const i = s.npcs.indexOf(n);
+ return w.npcs[i].visible;
+}));
+
 console.log('Aktivitäten');
 pruefe('Rennen verlangt das passende Fahrzeug', await page.evaluate(() => {
  const s = window.LOWTIDE.sim;

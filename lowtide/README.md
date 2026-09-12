@@ -25,6 +25,8 @@ src/
                     Industrie, Baulücken, Süd- und Nordflächen
   interiors.js      Begehbare Innenräume der acht Serviceorte
   radio.js          Prozedural erzeugte Radiosender
+  lod.js            Grobe Silhouetten für ferne Figuren und Fahrzeuge
+  bake.js           Backt ein Vorbild nach Material zu einer Geometrie
   art-direction.js  Materialien, Fahrzeug- und Figurenaufbau
   human-model.js    Anatomische Figurenmodelle und Animation
   content.js        Weltdaten: Orte, Regionen, Fahrzeugtypen, Waffen
@@ -41,7 +43,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 68 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 71 Prüfungen, muss grün sein
 ```
 
 Die drei Werkzeuge in `tools/` mit Browser brauchen Playwright und Chromium.

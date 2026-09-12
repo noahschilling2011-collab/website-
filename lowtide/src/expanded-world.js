@@ -8,6 +8,7 @@ import {Street} from './street.js';
 import {dressBuildings} from './facades.js';
 import {dressRegions} from './regions.js';
 import {dressInteriors} from './interiors.js';
+import {Fernstufe,grobesAuto,grobeFigur} from './lod.js';
 const STRASSEN_HEX=[0x333d45,0x3d494f,0x445155];
 const GLAS_HEX=[0x3c5a69,0x486673,0x51737b,0x2c4d52];
 const material=c=>new T.MeshStandardMaterial({color:c,roughness:.7});
@@ -23,7 +24,7 @@ export class ExpandedWorld extends World{
    }
    if(GLAS_HEX.includes(hex)){o.material.metalness=.72;o.material.roughness=.16;o.material.envMapIntensity=1.5;}
   });
-  this.setupStrassenlicht();this.setupInnenlicht();this.setupFahrlicht();
+  this.setupStrassenlicht();this.setupInnenlicht();this.setupFahrlicht();this.setupFernstufen(sim);
   // Suchscheinwerfer des Hubschraubers. Ab fünf Sternen kreist er über der
   // letzten bekannten Position; vorher war er nur ein stummes Modell.
   this.suchlicht=new T.SpotLight(0xdfe9ff,0,220,.16,.4,1);
@@ -41,6 +42,12 @@ export class ExpandedWorld extends World{
  }
  // Innenraumlicht: fünf Punktlichter wandern zum nächstgelegenen Raum.
  // Innen brennt Licht auch bei Tag, sonst ist jeder Laden eine Höhle.
+ // Ab welcher Entfernung die grobe Stufe übernimmt. Vierzig Meter sind der
+ // Punkt, ab dem Finger, Sitze und Scheinwerferlinsen ohnehin verschwinden.
+ setupFernstufen(sim){
+  this.autoFern=new Fernstufe(this.scene,grobesAuto(),sim.cars.length+sim.cops.length+4);
+  this.figurFern=new Fernstufe(this.scene,grobeFigur(),sim.npcs.length+8);
+ }
  setupInnenlicht(){
   this.innenLichter=[];
   for(let i=0;i<5;i++){const l=new T.PointLight(0xffdcae,0,21,1.45);l.visible=false;this.scene.add(l);this.innenLichter.push(l);}
@@ -190,13 +197,27 @@ export class ExpandedWorld extends World{
   }
   this.gun.scale.z=p.weapon==='rifle'?2.4:p.weapon==='shotgun'?2.1:1;this.gun.scale.x=p.weapon==='taser'?1.3:1;this.player.position.y=groundAt(p.x,p.z)+(p.y||0)-(p.sneak?.35:0)+(this.player.userData.bob||0);
   this.player.rotation.x=this.player.userData.vorlage||0;this.player.scale.set(1,s.active===1?.96:1,1);this.player.rotation.z=s.dodgeTime>0?.65:(this.player.userData.neigung||0);this.player.userData.arms[0].rotation.x=s.meleeTime>0?-1.5:this.player.userData.arms[0].rotation.x;this.player.userData.hair.scale.y=p.hair===1?1.35:p.hair===2?.4:1.08;this.player.userData.tattoo.visible=p.tattoo;for(const part of this.player.userData.garments||[])part.material=this.player.userData.body.material;this.player.userData.body.material.color.setHex(p.clothes==='orange'?0xe2a062:p.clothes==='blue'?0x557da3:0x6b8b70);
-  s.cars.forEach((c,i)=>{const m=this.cars[i],d=vehicleTypes[c.model];if(!m)return;m.visible=distance(c,p)<320;const water=d.medium==='water';m.position.y=water?Math.sin(t*1.8+c.x)*.15-.4:groundAt(c.x,c.z)+(c.alt||0);if(m.userData.rotor)m.userData.rotor.rotation[d.shape==='plane'?'z':'y']+=dt*(c===p.car?35:2);if(m.userData.bodyHeight)m.userData.body.scale.y=m.userData.bodyHeight*(.6+.4*c.health/100);if(!m.userData.paint||m.userData.paint!==c.color){m.userData.body.material=new T.MeshPhysicalMaterial({color:c.color,roughness:.25,metalness:.65,clearcoat:1,clearcoatRoughness:.13});if(m.userData.roof)m.userData.roof.material=m.userData.body.material;m.userData.paint=c.color;}m.rotation.z=['bike','jetski'].includes(d.shape)?Math.sin(t*3)*.015*Math.abs(c.speed):Math.sin(t*6)*.006*Math.min(3,Math.abs(c.speed));if(c.upgrades.suspension)m.position.y-=.12;this.applyUpgrades(m,c);if(m.userData.glass)m.userData.glass.visible=c.glass>20;const nachtAnteil=Math.min(1,this.sky.uniforms.nacht.value*1.25);
+  this.autoFern.beginn();
+  s.cars.forEach((c,i)=>{const m=this.cars[i],d=vehicleTypes[c.model];if(!m)return;
+   const weg=distance(c,p),grob=weg>52&&['car','pickup'].includes(d.shape)&&c!==p.car;
+   if(grob&&weg<330){this.autoFern.hinzu(c.x,groundAt(c.x,c.z)+(c.alt||0),c.z,c.yaw,
+    Math.max(d.scale?.[0]||1,d.scale?.[2]||1));m.visible=false;return;}
+   m.visible=weg<320;const water=d.medium==='water';m.position.y=water?Math.sin(t*1.8+c.x)*.15-.4:groundAt(c.x,c.z)+(c.alt||0);if(m.userData.rotor)m.userData.rotor.rotation[d.shape==='plane'?'z':'y']+=dt*(c===p.car?35:2);if(m.userData.bodyHeight)m.userData.body.scale.y=m.userData.bodyHeight*(.6+.4*c.health/100);if(!m.userData.paint||m.userData.paint!==c.color){m.userData.body.material=new T.MeshPhysicalMaterial({color:c.color,roughness:.25,metalness:.65,clearcoat:1,clearcoatRoughness:.13});if(m.userData.roof)m.userData.roof.material=m.userData.body.material;m.userData.paint=c.color;}m.rotation.z=['bike','jetski'].includes(d.shape)?Math.sin(t*3)*.015*Math.abs(c.speed):Math.sin(t*6)*.006*Math.min(3,Math.abs(c.speed));if(c.upgrades.suspension)m.position.y-=.12;this.applyUpgrades(m,c);if(m.userData.glass)m.userData.glass.visible=c.glass>20;const nachtAnteil=Math.min(1,this.sky.uniforms.nacht.value*1.25);
    if(m.userData.headlights)for(const l of m.userData.headlights){l.visible=c.lights>15;l.material.emissiveIntensity=.12+nachtAnteil*3.6;}
    // Rücklichter glimmen und leuchten beim Bremsen deutlich auf.
    if(m.userData.taillights){const bremst=c===p.car&&(s.bremst||c.speed<-.3);
     for(const l of m.userData.taillights){l.visible=c.lights>15;l.material.emissiveIntensity=(bremst?2.6:.2)+nachtAnteil*1.1;}}if(m.userData.wheels)for(const w of m.userData.wheels)w.rotation.x+=dt*c.speed;});
-  s.npcs.forEach((n,i)=>{const m=this.npcs[i];m.visible=distance(n,p)<150;m.position.y=groundAt(n.x,n.z)+(n.health<=0||n.stun>0?.2:(m.userData.bob||0));
-  if(n.health>0&&n.stun<=0){m.rotation.z=m.userData.neigung||0;m.rotation.x=m.userData.vorlage||0;}if(n.stun>0)m.rotation.x=Math.PI/2;if(n.state==='tanzend'){m.rotation.z=Math.sin(t*5)*.1;m.userData.arms.forEach((a,i)=>a.rotation.x=-1+Math.sin(t*5+i)*.6);}});s.cops.forEach((c,i)=>{const m=this.cops[i];m.visible=distance(c,p)<230;m.position.y=groundAt(c.x,c.z);});
+  s.cops.forEach((c,i)=>{const m=this.cops[i],weg=distance(c,p);
+   if(weg>52&&weg<330){this.autoFern.hinzu(c.x,groundAt(c.x,c.z),c.z,c.yaw);m.visible=false;}});
+  this.autoFern.ende();
+  this.figurFern.beginn();
+  s.npcs.forEach((n,i)=>{const m=this.npcs[i],weg=distance(n,p);
+   const nah=weg<42;m.visible=nah&&weg<150;
+   if(!nah&&weg<165&&n.health>0&&n.stun<=0)this.figurFern.hinzu(n.x,groundAt(n.x,n.z),n.z,n.yaw);
+   if(!nah)return;
+   m.position.y=groundAt(n.x,n.z)+(n.health<=0||n.stun>0?.2:(m.userData.bob||0));
+  if(n.health>0&&n.stun<=0){m.rotation.z=m.userData.neigung||0;m.rotation.x=m.userData.vorlage||0;}if(n.stun>0)m.rotation.x=Math.PI/2;if(n.state==='tanzend'){m.rotation.z=Math.sin(t*5)*.1;m.userData.arms.forEach((a,i)=>a.rotation.x=-1+Math.sin(t*5+i)*.6);}});
+  this.figurFern.ende();s.cops.forEach((c,i)=>{const m=this.cops[i];const weg=distance(c,p);if(weg<=52)m.visible=weg<230;m.position.y=groundAt(c.x,c.z);});
   const other=s.characters[1-s.active];this.contact.position.set(other.x,groundAt(other.x,other.z),other.z);if(s.mission===3&&s.campaign.stage===0)this.contact.position.set(-77,0,73);this.contact.visible=!other.car&&distance(other,p)<150;
   const goal=s.objective();this.marker.visible=s.mission<4||s.campaign.stage>0&&s.campaign.stage<4||!!s.activity;this.ring.visible=this.marker.visible;this.marker.position.set(goal.x,groundAt(goal.x,goal.z)+4+Math.sin(t*2)*.3,goal.z);this.ring.position.set(goal.x,groundAt(goal.x,goal.z)+.12,goal.z);
   if(!this.chute){this.chute=new T.Mesh(new T.SphereGeometry(2.8,16,8,0,Math.PI*2,0,Math.PI/2),new T.MeshStandardMaterial({color:0xd3b96f,side:T.DoubleSide}));this.scene.add(this.chute);}this.chute.visible=p.parachute;this.chute.position.set(p.x,this.player.position.y+4,p.z);
