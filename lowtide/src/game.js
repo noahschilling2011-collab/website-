@@ -1,7 +1,7 @@
 import {Simulation,places,distance,clamp} from './simulation.js';
 import {Campaign} from './campaign.js';
 import {ExpandedWorld} from './expanded-world.js';
-import {locations,regions,roadSegments,vehicleTypes,weapons,regionAt,waterAt} from './content.js';
+import {locations,regions,roadSegments,vehicleTypes,weapons,regionAt,waterAt,bounds,groundAt} from './content.js';
 const $=id=>document.getElementById(id),sim=new Campaign();let world,started=false,last=0,yaw=Math.PI,pitch=.15,stick={x:0,y:0},drag=null,muted=false,audio=null,engine=null,engineGain=null,toastTime=0,hudTime=0,failedShown=false;
 const keys=new Set();$('startBtn').disabled=true;
 const debug={sichtbar:false,frames:0,fps:0,fenster:0,zeit:0};
@@ -35,7 +35,113 @@ for(const id of ['dialog','pause','bigMap'])$(id).addEventListener('cancel',e=>{
 window.addEventListener('keydown',e=>{if([' ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Tab','F3','Escape'].includes(e.key))e.preventDefault();const k=e.key.toLowerCase();if(!e.repeat)keyAction(k);keys.add(k);});window.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));window.addEventListener('blur',()=>{keys.clear();stick={x:0,y:0};if(started&&!sim.paused)pause();});document.addEventListener('visibilitychange',()=>{if(document.hidden&&started&&!sim.paused)pause();});window.addEventListener('resize',()=>world?.resize());
 $('game').addEventListener('contextmenu',e=>e.preventDefault());$('game').addEventListener('pointerdown',e=>{if(!started||sim.paused)return;drag={id:e.pointerId,x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,time:performance.now()};fange($('game'),e.pointerId);});$('game').addEventListener('pointermove',e=>{if(!drag||drag.id!==e.pointerId)return;yaw-=(e.clientX-drag.x)*.006;pitch=clamp(pitch+(e.clientY-drag.y)*.003,-.2,.8);drag.x=e.clientX;drag.y=e.clientY;});$('game').addEventListener('pointerup',e=>{if(drag&&Math.hypot(e.clientX-drag.startX,e.clientY-drag.startY)<6&&performance.now()-drag.time<300)fire();drag=null;});$('game').addEventListener('pointercancel',()=>drag=null);
 let stickId=null;function moveStick(e){const r=$('stick').getBoundingClientRect(),x=e.clientX-r.left-r.width/2,y=e.clientY-r.top-r.height/2,len=Math.max(40,Math.hypot(x,y));stick={x:x/len,y:y/len};$('knob').style.transform=`translate(${stick.x*34}px,${stick.y*34}px)`;}$('stick').onpointerdown=e=>{stickId=e.pointerId;fange($('stick'),e.pointerId);moveStick(e);};$('stick').onpointermove=e=>{if(e.pointerId===stickId)moveStick(e);};const releaseStick=()=>{stickId=null;stick={x:0,y:0};$('knob').style.transform='';};$('stick').onpointerup=releaseStick;$('stick').onpointercancel=releaseStick;for(const b of document.querySelectorAll('[data-key]')){b.onpointerdown=e=>{e.preventDefault();fange(b,e.pointerId);const key=b.dataset.key;keys.add(key);keyAction(key);};b.onpointerup=()=>keys.delete(b.dataset.key);b.onpointercancel=()=>keys.delete(b.dataset.key);}
-function drawMap(canvas,full=false){const ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height,p=sim.player;ctx.fillStyle='#203630';ctx.fillRect(0,0,w,h);const scale=full?w/1080:1.1,cx=full?-90:p.x,cz=full?-40:p.z,tx=x=>w/2+(x-cx)*scale,tz=z=>h/2+(z-cz)*scale;ctx.fillStyle='#284f56';ctx.fillRect(tx(119),0,w,h);ctx.fillRect(tx(-545),tz(-20),145*scale,150*scale);ctx.fillStyle='#7c9275';ctx.fillRect(tx(235),tz(150),125*scale,145*scale);ctx.fillStyle='#687372';for(const r of roadSegments)ctx.fillRect(tx(Math.min(r.x1,r.x2)-r.w/2),tz(Math.min(r.z1,r.z2)-r.w/2),Math.max(r.w,Math.abs(r.x2-r.x1))*scale,Math.max(r.w,Math.abs(r.z2-r.z1))*scale);ctx.fillStyle='#9a9f8c';for(const b of sim.solids)ctx.fillRect(tx(b.x-b.w/2),tz(b.z-b.d/2),b.w*scale,b.d*scale);function dot(x,z,r,color){ctx.beginPath();ctx.arc(tx(x),tz(z),r,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();}if(sim.lastSeen){ctx.beginPath();ctx.arc(tx(sim.lastSeen.x),tz(sim.lastSeen.z),35*scale,0,Math.PI*2);ctx.fillStyle='#d9768144';ctx.fill();}for(const c of sim.cars)dot(c.x,c.z,full?2:2.5,'#83abbe');for(const c of sim.cops)if(c.active)dot(c.x,c.z,3,'#ef7b76');if(full){ctx.font='bold 11px Arial';for(const r of regions){ctx.fillStyle='#d7d7b4';ctx.fillText(r.name,tx(r.x)-20,tz(r.z)-14);}ctx.font='10px Arial';for(const [id,l]of Object.entries(locations)){dot(l.x,l.z,3,'#91d9bb');ctx.fillStyle='#cee0cd';ctx.fillText(l.name,tx(l.x)+5,tz(l.z));}}const goal=sim.objective();dot(goal.x,goal.z,5,'#efca88');const other=sim.characters[1-sim.active];dot(other.x,other.z,4,'#c3a5d8');ctx.save();ctx.translate(tx(p.x),tz(p.z));ctx.rotate(-p.yaw);ctx.beginPath();ctx.moveTo(0,7);ctx.lineTo(-5,-5);ctx.lineTo(0,-2);ctx.lineTo(5,-5);ctx.closePath();ctx.fillStyle='#a2f0db';ctx.fill();ctx.restore();ctx.fillStyle='#d0dcd1';ctx.font='12px Arial';ctx.fillText('N',w-18,18);}
+// Karte von Solvara.
+// Die statische Ebene — Wasser, Gelände, Straßen, Gebäude — wird einmal für
+// die ganze Welt in ein Offscreen-Canvas gezeichnet. Vorher lief jede
+// Minimap-Aktualisierung, achtmal pro Sekunde, über sämtliche
+// Kollisionskörper und zeichnete jede Straße neu.
+const KARTE_PX_PRO_M=1.5;
+let karteStatisch=null;
+
+function karteBauen(){
+ const w=Math.round((bounds.right-bounds.left)*KARTE_PX_PRO_M);
+ const h=Math.round((bounds.bottom-bounds.top)*KARTE_PX_PRO_M);
+ const c=document.createElement('canvas');c.width=w;c.height=h;
+ const g=c.getContext('2d');
+ const X=x=>(x-bounds.left)*KARTE_PX_PRO_M,Z=z=>(z-bounds.top)*KARTE_PX_PRO_M,S=m=>m*KARTE_PX_PRO_M;
+
+ g.fillStyle='#3f4a35';g.fillRect(0,0,w,h);
+ // Wasser aus derselben Funktion, die auch das Gelände formt — so kann die
+ // Küstenlinie auf der Karte nicht von der in der Welt abweichen.
+ const raster=4;
+ g.fillStyle='#17414d';
+ for(let x=bounds.left;x<bounds.right;x+=raster)for(let z=bounds.top;z<bounds.bottom;z+=raster)
+  if(waterAt(x+raster/2,z+raster/2))g.fillRect(X(x),Z(z),S(raster)+1,S(raster)+1);
+ // Flachwassersaum entlang der Küste.
+ g.fillStyle='#2a6a70';
+ for(let z=bounds.top;z<bounds.bottom;z+=raster)
+  if(waterAt(122,z))g.fillRect(X(119),Z(z),S(9),S(raster)+1);
+
+ // Geländezonen: Hügelwald, Strand, Felder, Rollbahn.
+ // Bewaldeter Hang: alles, was messbar über der Ebene liegt.
+ for(let x=bounds.left;x<-370;x+=raster)for(let z=bounds.top;z<-235;z+=raster){
+  const hoehe=groundAt(x+raster/2,z+raster/2);
+  if(hoehe<=.3)continue;
+  g.fillStyle=hoehe>22?'#22351f':hoehe>7?'#2b4128':'#354c31';
+  g.fillRect(X(x),Z(z),S(raster)+1,S(raster)+1);
+ }
+ g.fillStyle='#9c8a63';g.fillRect(X(94),Z(130),S(25),S(300));
+ g.fillStyle='#66714f';g.fillRect(X(235),Z(150),S(125),S(145));
+ g.fillStyle='#9c8a63';g.fillRect(X(236),Z(150),S(123),S(15));
+ g.fillRect(X(236),Z(281),S(123),S(14));
+ for(const [fx,fz,fw,fd] of [[-443,-276,86,56],[-394,-400,72,58],[-457,-284,46,62],[-393,-243,42,36]])
+  {g.fillStyle='#5c6a3c';g.fillRect(X(fx),Z(fz),S(fw),S(fd));}
+ g.fillStyle='#39424a';g.fillRect(X(-328),Z(238),S(26),S(154));
+
+ // Straßen mit Hierarchie: dunkle Einfassung, hellerer Kern.
+ const strassen=(farbe,zugabe)=>{g.fillStyle=farbe;for(const r of roadSegments){
+  const bx=Math.min(r.x1,r.x2)-r.w/2-zugabe,bz=Math.min(r.z1,r.z2)-r.w/2-zugabe;
+  g.fillRect(X(bx),Z(bz),S(Math.abs(r.x2-r.x1)+r.w+zugabe*2),S(Math.abs(r.z2-r.z1)+r.w+zugabe*2));}};
+ strassen('#23292c',1.6);
+ strassen('#5d666a',0);
+ g.fillStyle='#4b5457';
+ for(const z of [-260,-305,-350,-395])g.fillRect(X(-130),Z(z-4),S(210),S(8));
+
+ // Bebautes Gebiet: jedes Gebäude stempelt einen weichen Hof, die Überlagerung
+ // ergibt von selbst die Silhouette der Stadt.
+ g.globalAlpha=.10;g.fillStyle='#b9c2ae';
+ for(const b of sim.solids){
+  if(!['building','newbuilding','house','warehouse'].includes(b.kind))continue;
+  g.fillRect(X(b.x-b.w/2-26),Z(b.z-b.d/2-26),S(b.w+52),S(b.d+52));
+ }
+ g.globalAlpha=1;
+ // Damm nach Isla Serena.
+ g.fillStyle='#5d666a';g.fillRect(X(119),Z(194),S(140),S(12));
+ // Gebäude.
+ g.fillStyle='#8f9a92';
+ for(const b of sim.solids){
+  if(!['building','newbuilding','house','warehouse','room'].includes(b.kind))continue;
+  g.fillRect(X(b.x-b.w/2),Z(b.z-b.d/2),Math.max(2,S(b.w)),Math.max(2,S(b.d)));
+ }
+ karteStatisch={canvas:c,X,Z};
+}
+
+function drawMap(canvas,full=false){
+ if(!karteStatisch)karteBauen();
+ const ctx=canvas.getContext('2d'),w=canvas.width,p=sim.player,K=karteStatisch;
+ const spanne=full?Math.max(bounds.right-bounds.left,bounds.bottom-bounds.top)+30:180;
+ const cx=full?(bounds.left+bounds.right)/2:p.x,cz=full?(bounds.top+bounds.bottom)/2:p.z;
+ const px=w/spanne,tx=x=>(x-cx)*px+w/2,tz=z=>(z-cz)*px+w/2;
+ ctx.fillStyle='#0d1b22';ctx.fillRect(0,0,w,w);
+ ctx.drawImage(K.canvas,K.X(cx-spanne/2),K.Z(cz-spanne/2),spanne*KARTE_PX_PRO_M,spanne*KARTE_PX_PRO_M,0,0,w,w);
+
+ const punkt=(x,z,r,farbe)=>{ctx.beginPath();ctx.arc(tx(x),tz(z),r,0,Math.PI*2);ctx.fillStyle=farbe;ctx.fill();};
+ const beschriftung=(text,x,y,farbe,groesse)=>{
+  ctx.font='bold '+groesse+'px Arial';ctx.lineWidth=3;ctx.lineJoin='round';
+  ctx.strokeStyle='rgba(6,14,18,.85)';ctx.strokeText(text,x,y);ctx.fillStyle=farbe;ctx.fillText(text,x,y);
+ };
+ if(sim.lastSeen){ctx.beginPath();ctx.arc(tx(sim.lastSeen.x),tz(sim.lastSeen.z),35*px,0,Math.PI*2);
+  ctx.fillStyle='#d9768133';ctx.fill();ctx.strokeStyle='#d97681aa';ctx.lineWidth=1.5;ctx.stroke();}
+ for(const c of sim.cars)if(c.type!=='parked')punkt(c.x,c.z,full?1.8:2.5,'#83abbe');
+ for(const c of sim.cops)if(c.active)punkt(c.x,c.z,3,'#ef7b76');
+ if(full){
+  ctx.textAlign='left';
+  for(const [id,l] of Object.entries(locations)){punkt(l.x,l.z,2.6,'#91d9bb');beschriftung(l.name,tx(l.x)+5,tz(l.z)+3,'#cfe4d2',10);}
+  for(const r of regions)beschriftung(r.name,tx(r.x)-24,tz(r.z)-13,'#e8dcae',11);
+  // Maßstab.
+  const meter=200,laenge=meter*px;
+  ctx.fillStyle='#e0e6dc';ctx.fillRect(w-laenge-18,w-24,laenge,3);
+  for(const e of [0,laenge])ctx.fillRect(w-laenge-18+e,w-29,2,13);
+  ctx.textAlign='center';beschriftung(meter+' m',w-laenge/2-18,w-32,'#e0e6dc',10);
+  ctx.textAlign='left';
+ }
+ const goal=sim.objective();punkt(goal.x,goal.z,full?4:5,'#efca88');
+ const andere=sim.characters[1-sim.active];punkt(andere.x,andere.z,full?3:4,'#c3a5d8');
+ ctx.save();ctx.translate(tx(p.x),tz(p.z));ctx.rotate(-p.yaw);
+ ctx.beginPath();ctx.moveTo(0,8);ctx.lineTo(-5.5,-5.5);ctx.lineTo(0,-2.5);ctx.lineTo(5.5,-5.5);ctx.closePath();
+ ctx.fillStyle='#a2f0db';ctx.fill();ctx.strokeStyle='#0d1b22';ctx.lineWidth=1.2;ctx.stroke();ctx.restore();
+ ctx.textAlign='left';beschriftung('N',w-16,16,'#d0dcd1',11);
+}
 function updateHUD(){const p=sim.player;$('clock').textContent=String(Math.floor(sim.hour)).padStart(2,'0')+':'+String(Math.floor(sim.hour%1*60)).padStart(2,'0')+' · '+({clear:'Klar',rain:'Regen',fog:'Nebel',storm:'Gewitter'}[sim.weather]);$('district').textContent=regionAt(p);$('actor').textContent=p.name;$('stars').textContent='★'.repeat(sim.stars)+'☆'.repeat(6-sim.stars);$('police').textContent=sim.stars?(sim.spotted?'Sichtkontakt':'Suche · '+Math.floor(sim.unseen)+' s außer Sicht'):'Keine Fahndung';$('health').style.width=p.health+'%';$('money').textContent='$ '+p.money.toLocaleString('de-DE');$('equipment').textContent=p.car?vehicleTypes[p.car.model].name+' · '+Math.ceil(p.car.health)+'% · Tank '+Math.ceil(p.car.fuel)+'%':p.armed?weapons[p.weapon].name+' · '+p.ammo+' / '+p.reserve:p.cover?'In Deckung':p.sneak?'Schleichend':'Ausdauer '+Math.round(p.stamina)+'%';$('speed').textContent=p.car?Math.round(Math.abs(p.car.speed)*3.6)+' km/h'+(p.car.alt>2?' · '+Math.round(p.car.alt)+' m':''):p.y<-.5?'Luft '+Math.round(p.air)+'%':'';$('reticle').style.display=p.armed?'block':'none';$('goal').textContent=sim.missionTitle();$('subgoal').textContent=sim.stars?'Verliere Sichtkontakt und verlasse das Suchgebiet.':sim.campaign.stage?'Goldener Marker auf der Karte · Tab / Figuren zum Wechseln':sim.mission===4?'Mara am Bootshaus oder direkt den nächsten Auftrag starten.':'E / Aktion am goldenen Marker';$('chapter').textContent=sim.campaign.stage?'02–03 / DIE RATS AKTE'.replace('RATS AKTE','RATSAKTE'):'01 / DIE SCHWARZE FLUT';let prompt='';if(sim.unlock)prompt='E / Aktion halten · '+Math.ceil(sim.unlock.remaining)+' s';else if(sim.activity)prompt=sim.activity.kind==='race'?'Kontrollpunkt '+(sim.activity.index+1)+' / '+sim.activity.points.length:sim.activity.kind==='diving'?'C halten: tauchen · E beim Wrackfund':'E / Aktion im richtigen Moment';else if(p.car)prompt='E aussteigen · H / Mehr für Werkstatt & Aktivitäten';else{const l=Object.values(locations).find(l=>distance(l,p)<4.5);if(l)prompt='E / Aktion · '+l.name;else if(distance(p,sim.objective())<5)prompt='E / Aktion · Missionsziel';else if(sim.cars.some(c=>distance(c,p)<5&&c.health>0))prompt='E / Aktion · Einsteigen (bei Schloss halten)';}$('prompt').textContent=prompt;const a=sim.activity;$('activityHud').hidden=!a;if(a){$('activityName').textContent=a.label;$('activityPointer').style.left=((a.phase||0)*100)+'%';$('activityScore').textContent=a.kind==='race'?a.time.toFixed(1)+' s':a.kind==='fishing'?(a.time>=a.biteAt?'BISS! JETZT DRÜCKEN':'Warte auf den Biss …'):a.kind==='diving'?'Zum Wrack schwimmen und abtauchen':(a.score||0)+' Treffer / '+(a.round||0)+' Versuche';$('timingBar').hidden=['race','diving','fishing'].includes(a.kind);}drawMap($('map'));}
 function messwerte(dt){debug.frames++;debug.fenster++;debug.zeit+=dt;if(debug.zeit>=.5){debug.fps=debug.fenster/debug.zeit;debug.fenster=0;debug.zeit=0;}if(!debug.sichtbar||!world)return;const info=world.renderer.info;
  $('debug').textContent=['FPS          '+debug.fps.toFixed(0),'Draw Calls   '+info.render.calls,'Dreiecke     '+info.render.triangles.toLocaleString('de-DE'),'Geometrien   '+info.memory.geometries,'Texturen     '+info.memory.textures,'NPCs         '+sim.npcs.length,'Fahrzeuge    '+sim.cars.length,'Polizei aktiv '+sim.cops.filter(c=>c.active).length,'Uhrzeit      '+sim.hour.toFixed(2),'Wetter       '+sim.weather,'Position     '+Math.round(sim.player.x)+' / '+Math.round(sim.player.z)].join('\n');}

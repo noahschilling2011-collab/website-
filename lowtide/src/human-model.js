@@ -69,4 +69,44 @@ export function naturalHuman(color,pants,nah=true){
  const tattoo=add(arms[0],new T.PlaneGeometry(.055,.09),mat(0x314643),0,-.28,.051);tattoo.visible=false;
  const garments=[];g.traverse(o=>{if(o.isMesh&&o.material===cloth)garments.push(o);});g.userData={body,hair,tattoo,legs,arms,knees,elbows,eyes,lids,face,id,garments,rig:'anatomical-v1'};return g;
 }
-export function animateNaturalHuman(g,time,moving,armed){const u=g.userData,amount=Math.min(1,moving),phase=time*(moving>1?11:7.4);u.legs.forEach((leg,i)=>{const step=Math.sin(phase+i*Math.PI);leg.rotation.x=step*.43*amount;u.knees[i].rotation.x=Math.max(0,-step)*.65*amount+.025;});u.arms.forEach((arm,i)=>{arm.rotation.x=armed?-1.04:-Math.sin(phase+i*Math.PI)*.25*amount;arm.rotation.z=(i?1:-1)*.04;u.elbows[i].rotation.x=armed?-.32:-.12-Math.max(0,Math.sin(phase+i*Math.PI))*.14*amount;});const blink=(time+u.id*.39)%4.9<.11;u.eyes.forEach(e=>e.visible=!blink);u.lids.forEach(e=>e.visible=blink);u.body.scale.z=1+Math.sin(time*1.6+u.id)*.009;}
+// Ein voller Schrittzyklus deckt diese Strecke ab. Die Schrittphase läuft
+// deshalb über den zurückgelegten Weg und nicht über die Uhr — nur so bleibt
+// der Fuß beim Aufsetzen stehen, statt über den Boden zu schleifen.
+const SCHRITTZYKLUS=1.95;
+export function animateNaturalHuman(g,time,moving,armed){
+ const u=g.userData;
+ const dt=Math.max(.001,Math.min(.25,time-(u.letzteZeit??time-.016)));u.letzteZeit=time;
+ const dx=g.position.x-(u.letzteX??g.position.x),dz=g.position.z-(u.letzteZ??g.position.z);
+ u.letzteX=g.position.x;u.letzteZ=g.position.z;
+ // Ein- und Aussteigen, Figurenwechsel und Wiedereinstieg versetzen die Figur
+ // sprunghaft. Ohne diese Grenze dreht der Schrittzyklus dabei durch.
+ const roh=Math.hypot(dx,dz),strecke=roh>dt*14?0:roh,tempo=strecke/dt;
+ u.strecke=(u.strecke||0)+strecke;
+ // moving bleibt der Zustand aus der Simulation; das Tempo bestimmt, wie weit
+ // ausgeholt wird. Bei sehr kleinem Tempo klingt die Bewegung aus.
+ const amount=Math.min(1.25,Math.max(moving>0?.12:0,tempo/5.2));
+ const phase=u.strecke*(Math.PI*2/SCHRITTZYKLUS)+(moving>0&&tempo<.2?time*4:0);
+ u.legs.forEach((leg,i)=>{
+  const step=Math.sin(phase+i*Math.PI);
+  leg.rotation.x=step*.46*amount;
+  u.knees[i].rotation.x=Math.max(0,-step)*.72*amount+.025;
+ });
+ u.arms.forEach((arm,i)=>{
+  const gegen=Math.sin(phase+i*Math.PI);
+  arm.rotation.x=armed?-1.04:gegen*.3*amount;
+  arm.rotation.z=(i?1:-1)*(.04+amount*.03);
+  u.elbows[i].rotation.x=armed?-.32:-.12-Math.max(0,-gegen)*.22*amount;
+ });
+ // Auf- und Abbewegung des Körpers, zweimal je Zyklus. Der Aufrufer addiert
+ // sie auf die Bodenhöhe, weil die hier nicht bekannt ist.
+ u.bob=Math.abs(Math.sin(phase))*.045*Math.min(1,amount);
+ // Neigung in die Kurve und leichtes Vorlehnen beim Laufen.
+ const dreh=Math.atan2(Math.sin(g.rotation.y-(u.letzterYaw??g.rotation.y)),Math.cos(g.rotation.y-(u.letzterYaw??g.rotation.y)));
+ u.letzterYaw=g.rotation.y;
+ u.neigung=(u.neigung||0)+((-dreh/dt*.055-0)*Math.min(1,amount)-(u.neigung||0))*Math.min(1,dt*6);
+ u.neigung=Math.max(-.3,Math.min(.3,u.neigung));
+ u.vorlage=amount*.06;
+ const blink=(time+u.id*.39)%4.9<.11;
+ u.eyes.forEach(e=>e.visible=!blink);u.lids.forEach(e=>e.visible=blink);
+ u.body.scale.z=1+Math.sin(time*1.6+u.id)*.009;
+}

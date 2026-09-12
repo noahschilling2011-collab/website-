@@ -101,6 +101,28 @@ const ausgestiegen = await page.evaluate(() => {
 });
 pruefe('Aussteigen funktioniert', ausgestiegen);
 
+console.log('Fortbewegung');
+// Erst ausschwingen lassen: direkt nach dem Aussteigen steht das Bein noch
+// im letzten Schritt.
+await bilder(3);
+const beinRuhe = await page.evaluate(() => window.LOWTIDE.world.player.userData.legs[0].rotation.x);
+await bilder(3);
+pruefe('Beine stehen still, solange die Figur steht',
+ Math.abs(await page.evaluate(() => window.LOWTIDE.world.player.userData.legs[0].rotation.x) - beinRuhe) < .02);
+await page.keyboard.down('w');
+const winkel = [];
+for (let i = 0; i < 5; i++) {await bilder(1); winkel.push(await page.evaluate(() => window.LOWTIDE.world.player.userData.legs[0].rotation.x));}
+await page.keyboard.up('w');
+pruefe('Beim Gehen schwingen die Beine', Math.max(...winkel) - Math.min(...winkel) > .1,
+ `Spanne ${(Math.max(...winkel) - Math.min(...winkel)).toFixed(3)}`);
+pruefe('Die Schrittphase folgt der Strecke, nicht der Uhr', await page.evaluate(() => {
+ const u = window.LOWTIDE.world.player.userData;
+ return typeof u.strecke === 'number' && u.strecke > 0;
+}));
+await bilder(4);
+pruefe('Nach dem Loslassen kommen die Beine zur Ruhe',
+ Math.abs(await page.evaluate(() => window.LOWTIDE.world.player.userData.legs[0].rotation.x)) < .06);
+
 console.log('Ampeln und Licht');
 pruefe('Verkehr hält bei Rot und fährt bei Grün', await page.evaluate(() => {
  const s = window.LOWTIDE.sim;
