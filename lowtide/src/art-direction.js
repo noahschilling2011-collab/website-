@@ -112,7 +112,13 @@ function fahrzeugFormen(sparsam){
  return FORMEN[schluessel];
 }
 
-export function detailedCar(color,police=false,sparsam=false){const F=fahrzeugFormen(sparsam);const g=new T.Group();const paint=wolkenAufsetzen(new T.MeshPhysicalMaterial({color,roughness:.24,metalness:.65,clearcoat:1,clearcoatRoughness:.12}));
+export function detailedCar(color,police=false,sparsam=false){const F=fahrzeugFormen(sparsam);const g=new T.Group();// Autolack ist kein Metall. Physikalisch ist er ein Dielektrikum mit
+ // Metallflocken darin und einer Klarlackschicht darüber — bei metalness .65
+ // fällt der Diffusanteil auf ein Drittel, und ein dunkler Wagen im Schatten
+ // wird schwarz, weil Metall ohne Spiegelung nichts zu zeigen hat. Gemessen
+ // an einem dunklen Rumpf um 17:30: Leuchtdichte 0,0147 gegen 0,0498 des
+ // Himmels an derselben Stelle. Die Flocken bleiben als kleiner Metallanteil.
+ const paint=wolkenAufsetzen(new T.MeshPhysicalMaterial({color,roughness:.28,metalness:.12,clearcoat:1,clearcoatRoughness:.1}));
  const body=mesh(g,F.karosserie,paint);
  // Base World scales body damage; normalize to the preserved height convention.
  body.scale.y=.55;
