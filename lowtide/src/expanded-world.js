@@ -6,6 +6,7 @@ import {locations,vehicleTypes,roadSegments,groundAt,waterAt,bounds} from './con
 import {distance} from './simulation.js';
 import {Street} from './street.js';
 import {dressBuildings} from './facades.js';
+import {dressRegions} from './regions.js';
 const STRASSEN_HEX=[0x333d45,0x3d494f,0x445155];
 const GLAS_HEX=[0x3c5a69,0x486673,0x51737b,0x2c4d52];
 const material=c=>new T.MeshStandardMaterial({color:c,roughness:.7});
@@ -72,8 +73,10 @@ export class ExpandedWorld extends World{
  build(){super.build();const s=this.sim;
   for(const [i,b] of [...s.buildings,...s.worldBuildings].entries()){if(b.kind==='house')continue;for(let y=5;y<Math.min(b.h,24);y+=5){this.box(b.x,y,b.z+b.d/2+1,b.w*.82,.18,2,0xb4b8ac);this.box(b.x,y+.9,b.z+b.d/2+1.9,b.w*.82,.07,.08,0x61797a);for(let x=-b.w*.38;x<=b.w*.38;x+=3)this.box(b.x+x,y+.45,b.z+b.d/2+1.9,.05,.9,.05,0x61797a);}this.box(b.x+b.w/2-2,2.8,b.z+b.d/2+.7,1.4,.8,1.2,0xa1afa6);this.box(b.x,3.5,b.z+b.d/2+1,Math.min(12,b.w),.12,2,[0x779994,0xb58882,0xcbb783][i%3]);for(let stripe=-5;stripe<5;stripe+=2)this.box(b.x+stripe,3.58,b.z+b.d/2+1,1,.025,2,0xd7d6bc);}
   // Spatially chunked terrain, with actual height beneath vehicles and characters.
-  this.terrain=[];for(let x=-580;x<120;x+=100)for(let z=-540;z<460;z+=100){const g=new T.PlaneGeometry(100,100,12,12);g.rotateX(-Math.PI/2);const a=g.attributes.position,colors=[];for(let i=0;i<a.count;i++){const px=x+50+a.getX(i),pz=z+50+a.getZ(i);a.setY(i,groundAt(px,pz)-.12);const c=new T.Color(waterAt(px,pz)?0x426a67:px<-380&&pz<-240?0x697964:pz<-230?0x768068:px<-390?0x697a64:0x8a8c78);colors.push(c.r,c.g,c.b);}g.setAttribute('color',new T.Float32BufferAttribute(colors,3));g.computeVertexNormals();const m=new T.Mesh(g,new T.MeshStandardMaterial({vertexColors:true,roughness:1}));m.position.set(x+50,0,z+50);m.receiveShadow=true;this.scene.add(m);this.terrain.push(m);}
-  this.box(297,-.3,222,125,.5,145,0x9aa083);this.box(185,.08,200,152,.5,10,0x5b6c70);for(let x=121;x<254;x+=14){this.box(x,1.1,195,.2,2,.2,0xbebc9d);this.box(x,1.1,205,.2,2,.2,0xbebc9d);}this.box(106,-.05,280,24,.12,300,0x9c8e6b);
+  this.terrain=[];for(let x=-580;x<120;x+=100)for(let z=-540;z<460;z+=100){const g=new T.PlaneGeometry(100,100,12,12);g.rotateX(-Math.PI/2);const a=g.attributes.position,colors=[];for(let i=0;i<a.count;i++){const px=x+50+a.getX(i),pz=z+50+a.getZ(i);a.setY(i,waterAt(px,pz)?-3.4:groundAt(px,pz)-.12);const c=new T.Color(waterAt(px,pz)?0x2f5450:px<-380&&pz<-240?0x4f5c43:pz<-230?0x5a6249:px<-390?0x4f5d47:0x6c6d58);colors.push(c.r,c.g,c.b);}g.setAttribute('color',new T.Float32BufferAttribute(colors,3));g.computeVertexNormals();const m=new T.Mesh(g,new T.MeshStandardMaterial({vertexColors:true,roughness:1}));m.position.set(x+50,0,z+50);m.receiveShadow=true;this.scene.add(m);this.terrain.push(m);}
+  const umland=new T.Mesh(new T.PlaneGeometry(3800,3800,16,16),new T.MeshStandardMaterial({color:0x3a4636,roughness:1}));
+  umland.rotation.x=-Math.PI/2;umland.position.set(-230,-2.4,-40);umland.renderOrder=-1;this.scene.add(umland);
+  this.box(297,-.3,222,125,.5,145,0x66714f);this.box(185,.08,200,152,.5,10,0x5b6c70);for(let x=121;x<254;x+=14){this.box(x,1.1,195,.2,2,.2,0xbebc9d);this.box(x,1.1,205,.2,2,.2,0xbebc9d);}this.box(106,-.05,280,24,.12,300,0x9c8e6b);
   for(const r of roadSegments){const x=(r.x1+r.x2)/2,z=(r.z1+r.z2)/2;this.box(x,.03,z,Math.max(r.w,Math.abs(r.x2-r.x1)),.08,Math.max(r.w,Math.abs(r.z2-r.z1)),0x3d494f);const length=Math.hypot(r.x2-r.x1,r.z2-r.z1);for(let i=0;i<length;i+=16){const t=i/length;this.box(r.x1+(r.x2-r.x1)*t,.08,r.z1+(r.z2-r.z1)*t,r.x1===r.x2?.16:5,.02,r.x1===r.x2?5:.16,0xc4bb97);}}
   for(const b of s.worldBuildings){const base=groundAt(b.x,b.z),co=b.kind==='house'?0xb5a78f:0x869c9c;this.box(b.x,base+b.h/2,b.z,b.w,b.h,b.d,co);this.box(b.x,base+b.h+.3,b.z,b.w+1,.6,b.d+1,0x3e555a);for(let y=3;y<b.h;y+=4)for(let x=-b.w/2+4;x<b.w/2;x+=5)this.box(b.x+x,base+y,b.z+b.d/2+.05,2,2,.1,0x51737b);}
   for(const b of s.roomWalls)this.box(b.x,b.h/2,b.z,b.w,b.h,b.d,0x879e96);
@@ -81,7 +84,7 @@ export class ExpandedWorld extends World{
   // Court with visible basket and an animated ball.
   const court=locations.court;this.box(court.x,.05,court.z,20,.15,28,0x668b7c);this.box(court.x,.14,court.z-11,15,.04,.15,0xe9d9b1);this.box(court.x,2,court.z-12,.2,4,.2,0x405059);this.box(court.x,3.6,court.z-12,2.4,1.5,.15,0xd5d2bd);const hoop=new T.Mesh(new T.TorusGeometry(.5,.05,6,18),material(0xc28d58));hoop.rotation.x=Math.PI/2;hoop.position.set(court.x,3.1,court.z-11.3);this.scene.add(hoop);this.ball=new T.Mesh(new T.SphereGeometry(.28,12,8),material(0xd79b54));this.scene.add(this.ball);
   // Airport runway, ocean piers, fields and farm rows.
-  this.box(-315,.09,315,25,.15,155,0x445155);for(let z=250;z<390;z+=16)this.box(-315,.18,z,1,.02,8,0xd2d0af);this.box(114,.2,145,22,.5,6,0x776d58);this.box(-355,-.01,-225,48,.12,36,0x857553);for(let x=-377;x<-331;x+=4)this.box(x,.25,-225,.5,.5,32,0x68845b);
+  this.box(-315,.09,315,25,.15,155,0x445155);for(let z=250;z<390;z+=16)this.box(-315,.18,z,1,.02,8,0xd2d0af);this.box(114,.2,145,22,.5,6,0x776d58);this.box(-393,-.01,-225,42,.12,36,0x7a6a48);for(let x=-411;x<-374;x+=4)this.box(x,.25,-225,.5,.5,32,0x5d7750);
   for(let i=0;i<155;i++){const x=-575+this.rng()*182,z=-530+this.rng()*286;const y=groundAt(x,z),h=4+this.rng()*5;this.box(x,y+h/2,z,.5,h,.5,0x746b51);this.box(x,y+h,z,4,4,4,0x4a715b);}
   for(let i=0;i<45;i++){const x=-535+this.rng()*125,z=this.rng()*110;this.box(x,2.2,z,.4,5,.4,0x697458);this.box(x,5,z,4,1,4,0x668269);}
   for(let z=140;z<435;z+=17)this.palm(91.5,z,7+((z*7)%5));
@@ -90,6 +93,9 @@ export class ExpandedWorld extends World{
   // gemeinsamen Instanz-Sammler von World.flush läuft.
   this.street=new Street(this);this.street.bauen();this.street.strandBauen();this.street.parkendeAutosBauen();
   dressBuildings(this,[...s.buildings,...s.worldBuildings].filter(b=>b.kind!=='house'));
+  // Der Rest der Karte: Vororte, Farmland, Nationalpark, Sumpf, Flugfeld,
+  // Insel, Industriegürtel und die Baulücken der Innenstadt.
+  dressRegions(this);
   this.palmenBauen();
  }
  car(color,police=false,c=null){if(!c)return detailedCar(color,police);const d=vehicleTypes[c.model],g=new T.Group();if(['car','pickup'].includes(d.shape)){const m=detailedCar(color);m.scale.set(...d.scale);if(d.shape==='pickup')this.dynbox(m,0,1.2,-1.3,1.9,.2,1.5,color);m.userData.def=d;return m;}const body=this.dynbox(g,0,.8,0,1.4,.5,3,color);let wheels=[],rotor=null;

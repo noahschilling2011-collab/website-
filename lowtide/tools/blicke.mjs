@@ -9,6 +9,14 @@ const STANDORTE = {
   strand:     [100, 250, 1.40, .22, 0],
   fassade:    [-100, -10, 1.57, .02, 0],
   boulevard:  [-40, -8, 0.05, .10, 0],
+  vorort:     [-60, -305, 1.60, .28, 0],
+  farm:       [-372, -248, 4.60, .30, 0],
+  park:       [-470, -400, 2.20, .30, 0],
+  sumpf:      [-400, 60, 3.10, .24, 0],
+  flugfeld:   [-300, 300, 1.30, .32, 0],
+  insel:      [232, 246, 1.60, .26, 0],
+  marina:     [268, 250, 4.60, .26, 0],
+  industrie:  [116, -40, 1.90, .34, 0],
 };
 const arg = (n, f) => {const i = process.argv.indexOf('--' + n); return i > -1 ? process.argv[i + 1] : f;};
 const orte = arg('orte', Object.keys(STANDORTE).join(',')).split(',');

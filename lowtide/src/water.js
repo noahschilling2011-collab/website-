@@ -12,9 +12,9 @@ varying vec2 vEbene;
 // Drei Wellenzüge unterschiedlicher Richtung und Länge; die Summe bricht das
 // Muster auf, das eine einzelne Sinuswelle unweigerlich zeigt.
 float welle(vec2 p, float t){
- return sin(p.x * 0.085 + t * 0.9) * 0.30
-      + sin(p.y * 0.062 - t * 0.7) * 0.24
-      + sin((p.x + p.y) * 0.041 + t * 1.35) * 0.16;
+ return sin(p.x * 0.085 + t * 0.9) * 0.22
+      + sin(p.y * 0.062 - t * 0.7) * 0.17
+      + sin((p.x + p.y) * 0.041 + t * 1.35) * 0.11;
 }
 
 void main(){
@@ -27,14 +27,24 @@ void main(){
 }`;
 
 const FRAGMENT = `
-uniform float zeit, nacht, kuesteX, dunst;
+uniform float zeit, nacht, kuesteX, dunst, art;
 uniform vec3 zenith, horizon, sunColor, sunDir, tief, flach;
 uniform vec4 insel;          // xz-Rechteck der Insel: minX, minZ, maxX, maxZ
 uniform vec3 kameraPos;
 varying vec3 vWelt;
 varying vec2 vEbene;
 
-float hash(vec2 p){ return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
+// Der übliche sin-Hash bricht zusammen, sobald die Koordinaten in die
+// Hunderte gehen: fract(sin(x)*43758) hat bei x um 30000 in float32 keine
+// Auflösung mehr und liefert statt Rauschen breite Bänder — auf dem Wasser
+// waren das dutzende Meter große Flecken. Diese Variante kommt ohne sin aus,
+// und der Definitionsbereich wird zusätzlich gefaltet.
+float hash(vec2 p){
+ p = mod(p, 512.0);
+ vec3 q = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+ q += dot(q, q.yzx + 33.33);
+ return fract((q.x + q.y) * q.z);
+}
 float noise(vec2 p){
  vec2 i = floor(p), f = fract(p);
  f = f * f * (3.0 - 2.0 * f);
@@ -66,7 +76,10 @@ float kuestenAbstand(vec2 p){
 void main(){
  vec2 p = vWelt.xz;
  float rand = kuestenAbstand(p);
- vec3 n = kraeuselung(p, zeit);
+ float sicht = length(kameraPos - vWelt);
+ // Ab etwa 120 m glättet sich die Normale zur ruhigen Ebene.
+ float schaerfe = exp(-sicht * 0.0085);
+ vec3 n = normalize(mix(vec3(0.0, 1.0, 0.0), kraeuselung(p, zeit), schaerfe));
  vec3 blick = normalize(kameraPos - vWelt);
  float fresnel = pow(1.0 - clamp(dot(n, blick), 0.0, 1.0), 4.0);
  fresnel = mix(0.03, 1.0, fresnel);
@@ -79,36 +92,42 @@ void main(){
  float glanz = pow(max(dot(spiegel, sunDir), 0.0), 220.0);
  float schimmer = pow(max(dot(spiegel, sunDir), 0.0), 9.0);
 
- vec3 koerper = mix(flach, tief, smoothstep(0.0, 55.0, rand));
+ // Der Übergang von Flach- zu Tiefwasser lag bei 55 m und legte einen
+ // türkisen Ring um jede Küste.
+ vec3 koerper = mix(flach, tief, smoothstep(0.0, 30.0, rand));
  vec3 farbe = mix(koerper, himmel, fresnel * 0.86);
- farbe += sunColor * glanz * 3.4 * (1.0 - nacht);
+ farbe += sunColor * glanz * 3.4 * (1.0 - nacht) * schaerfe;
  farbe += sunColor * schimmer * 0.28 * (1.0 - nacht);
 
  // Brandung: ein pulsierendes Band am Ufer plus Gischtflecken davor.
- float brandung = smoothstep(7.5, 0.0, rand) * (0.55 + 0.45 * sin(rand * 1.7 - zeit * 2.2));
- float gischt = smoothstep(0.55, 0.95, noise(p * 0.6 + zeit * 0.5)) * smoothstep(26.0, 4.0, rand);
- farbe = mix(farbe, vec3(0.86, 0.90, 0.88) * (0.35 + 0.65 * (1.0 - nacht)), clamp(brandung * 0.75 + gischt * 0.4, 0.0, 0.92));
+ float brandung = smoothstep(4.2, 0.0, rand) * (0.45 + 0.4 * sin(rand * 1.9 - zeit * 2.2));
+ float gischt = smoothstep(0.55, 0.95, noise(p * 0.6 + zeit * 0.5)) * smoothstep(26.0, 4.0, rand) * schaerfe;
+ farbe = mix(farbe, vec3(0.86, 0.90, 0.88) * (0.35 + 0.65 * (1.0 - nacht)), clamp(brandung * 0.62 + gischt * 0.28, 0.0, 0.85));
  farbe = mix(farbe, horizon, dunst * 0.25);
 
  gl_FragColor = vec4(farbe, 1.0);
 }`;
 
-export function createWater() {
+// art: 'ozean' oder 'sumpf'. Der Sumpf ist flach, trüb und grünbraun;
+// mit den Ozeanfarben wurde er zur Tiefsee.
+export function createWater(art = 'ozean') {
+ const sumpf = art === 'sumpf';
  const uniforms = {
-  zeit: {value: 0}, nacht: {value: 0}, dunst: {value: .12},
-  kuesteX: {value: 119}, insel: {value: new T.Vector4(235, 150, 360, 295)},
+  zeit: {value: 0}, nacht: {value: 0}, dunst: {value: .12}, art: {value: sumpf ? 1 : 0},
+  kuesteX: {value: sumpf ? -400 : 119}, insel: {value: new T.Vector4(235, 150, 360, 295)},
   zenith: {value: new T.Color(0x2578cc)}, horizon: {value: new T.Color(0xc9dde2)},
   sunColor: {value: new T.Color(0xfff6e6)}, sunDir: {value: new T.Vector3(0, 1, 0)},
   tief: {value: new T.Color(0x0b3040)}, flach: {value: new T.Color(0x2f8f92)},
   kameraPos: {value: new T.Vector3()}
  };
  const material = new T.ShaderMaterial({uniforms, vertexShader: VERTEX, fragmentShader: FRAGMENT, side: T.DoubleSide});
- return {material, uniforms};
+ return {material, uniforms, art};
 }
 
 // Übernimmt Himmelsfarben und Sonnenstand, damit Wasser und Himmel nie
 // auseinanderlaufen.
 export function updateWater(uniforms, himmel, zeit, kamera) {
+ const sumpf = uniforms.art.value > .5;
  uniforms.zeit.value = zeit;
  uniforms.nacht.value = himmel.nacht;
  uniforms.dunst.value = himmel.dunst;
@@ -117,7 +136,7 @@ export function updateWater(uniforms, himmel, zeit, kamera) {
  uniforms.sunColor.value.copy(himmel.sun);
  uniforms.sunDir.value.copy(himmel.richtung);
  // Nachts bleibt das Wasser dunkel, aber nicht schwarz — Stadtlicht am Ufer.
- uniforms.tief.value.setHex(0x0b3040).multiplyScalar(1 - himmel.nacht * .72);
- uniforms.flach.value.setHex(0x2f8f92).multiplyScalar(1 - himmel.nacht * .68);
+ uniforms.tief.value.setHex(sumpf ? 0x2c3b2a : 0x0b3040).multiplyScalar(1 - himmel.nacht * .72);
+ uniforms.flach.value.setHex(sumpf ? 0x46543a : 0x2c7a80).multiplyScalar(1 - himmel.nacht * .68);
  uniforms.kameraPos.value.copy(kamera.position);
 }

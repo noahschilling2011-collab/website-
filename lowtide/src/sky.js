@@ -21,10 +21,10 @@ const STUeTZSTELLEN = [
  [0.0, 0x050a16, 0x0b1420, 0x3c4f78, 0.06, 0.20, 1.45],
  [4.6, 0x0a1428, 0x1d2436, 0x6b5a78, 0.10, 0.26, 1.40],
  [6.4, 0x28406a, 0x7d5a56, 0xff8f52, 0.85, 0.52, 1.20],
- [7.2, 0x2b5f9e, 0x9fb0b4, 0xffc48c, 1.95, 0.70, 0.94],
- [10.0, 0x2a72c0, 0xbdd2d8, 0xfff0d8, 2.85, 0.92, 0.85],
- [13.0, 0x2578cc, 0xc9dde2, 0xfff6e6, 3.10, 1.00, 0.80],
- [16.3, 0x2f70b8, 0xc6cec6, 0xffe2ac, 2.45, 0.88, 0.87],
+ [7.2, 0x2b5f9e, 0x9fb0b4, 0xffc48c, 1.75, 0.60, 1.00],
+ [10.0, 0x2a72c0, 0xc2d2d0, 0xffeecb, 2.45, 0.74, 0.94],
+ [13.0, 0x2578cc, 0xcedcd6, 0xfff2d8, 2.70, 0.80, 0.90],
+ [16.3, 0x2f70b8, 0xcbcdbe, 0xffdea2, 2.15, 0.72, 0.96],
  [18.4, 0x3a5c92, 0xd8996a, 0xff9450, 1.45, 0.64, 1.02],
  [19.4, 0x1d3560, 0x8a5566, 0xd6684e, 0.45, 0.38, 1.28],
  [20.6, 0x0a1730, 0x2a2740, 0x6a4a66, 0.12, 0.24, 1.45],
@@ -94,7 +94,13 @@ uniform vec3 zenith, horizon, ground, sunColor, sunDir;
 uniform float dunst, wolken, nacht, zeit;
 varying vec3 vDir;
 
-float hash(vec2 p){ return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
+// Gleicher Grund wie in water.js: der sin-Hash bandet bei großen Werten.
+float hash(vec2 p){
+ p = mod(p, 512.0);
+ vec3 q = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+ q += dot(q, q.yzx + 33.33);
+ return fract((q.x + q.y) * q.z);
+}
 float noise(vec2 p){
  vec2 i = floor(p), f = fract(p);
  f = f * f * (3.0 - 2.0 * f);

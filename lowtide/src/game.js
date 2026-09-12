@@ -12,7 +12,12 @@ window.LOWTIDE={sim,get world(){return world;},get frames(){return debug.frames;
  // Nur fürs Prüfen: setzt Figur und Kamera an eine feste Stelle.
  // hoehe>0 pausiert die Simulation und hebt die Kamera für Übersichtsbilder an.
  view(x,z,blick=yaw,neigung=pitch,hoehe=0){const p=sim.player;p.car=null;p.x=x;p.z=z;p.y=hoehe;p.vy=0;
-  yaw=blick;pitch=neigung;p.yaw=blick;sim.paused=hoehe>0;if(world)world.kameraSofort=true;}};
+  yaw=blick;pitch=neigung;p.yaw=blick;sim.paused=hoehe>0;if(world){world.freieKamera=false;world.nebelFaktor=1;world.kameraSofort=true;}},
+ // Freie Kamera für Luftbilder: Standort, Blickziel, Simulation läuft weiter.
+ luftbild(x,y,z,zx,zy,zz){if(!world)return;world.freieKamera=true;world.nebelFaktor=.06;
+  world.camera.position.set(x,y,z);world.camera.lookAt(zx,zy,zz);
+  world.camera.far=2600;world.camera.updateProjectionMatrix();
+  sim.player.x=x;sim.player.z=z;}};
 try{let saved=null;try{saved=localStorage.getItem('lowtide-v2');}catch{}if(saved){try{sim.restore(JSON.parse(saved));}catch(e){console.warn('Spielstand konnte nicht geladen werden',e);}}world=new ExpandedWorld($('game'),sim);$('loadState').textContent='Port Mercy ist bereit.';$('startBtn').disabled=false;}catch(error){$('loadState').textContent='3D konnte nicht starten. Verwende einen Browser mit WebGL 2 (Safari, Chrome oder Firefox).';console.error(error);}
 function initAudio(){try{audio=new (window.AudioContext||window.webkitAudioContext)();engine=audio.createOscillator();engine.type='sawtooth';engineGain=audio.createGain();engineGain.gain.value=0;engine.connect(engineGain).connect(audio.destination);engine.start();}catch{muted=true;}}
 function tone(freq,duration,volume=.04,type='sine'){if(!audio||muted)return;const o=audio.createOscillator(),g=audio.createGain();o.type=type;o.frequency.setValueAtTime(freq,audio.currentTime);o.frequency.exponentialRampToValueAtTime(Math.max(30,freq*.4),audio.currentTime+duration);g.gain.setValueAtTime(volume,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+duration);o.connect(g).connect(audio.destination);o.start();o.stop(audio.currentTime+duration);}
