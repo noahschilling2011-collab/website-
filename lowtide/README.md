@@ -31,6 +31,7 @@ src/
   post.js           Überstrahlen, Verdeckung, Farbkurve, Korn
   detail.js         Oberflächenstruktur aus der Weltposition
   grass.js          Bewuchs im Ring um den Spieler
+  foliage.js        Baumkronen als gekreuzte Flächen mit Alphakarte
   bake.js           Backt ein Vorbild nach Material zu einer Geometrie
   art-direction.js  Materialien, Fahrzeug- und Figurenaufbau
   human-model.js    Anatomische Figurenmodelle, Gang und Ruhebewegung

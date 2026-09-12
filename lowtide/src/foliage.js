@@ -68,6 +68,11 @@ function kroneGeometrie() {
  g.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
  g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
  g.setAttribute('normal', new T.Float32BufferAttribute(nor, 3));
+ // Weiße Eckenfarben. Ohne sie liest three bei vertexColors ein fehlendes
+ // Attribut als schwarz, und instanceColor kommt gar nicht erst zum Zug.
+ // Derselbe Fehler wie beim Bewuchs — und beim ersten Anlauf hier trotzdem
+ // wieder gemacht, obwohl er im Kommentar von grass.js steht.
+ g.setAttribute('color', new T.Float32BufferAttribute(new Array(pos.length).fill(1), 3));
  g.setIndex(idx);
  return g;
 }
@@ -87,6 +92,13 @@ function windAufsetzen(material) {
     transformed.x += schwung * bStaerke * transformed.y;
     transformed.z += schwung * bStaerke * 0.7 * transformed.y;
    }`);
+  // Rückseiten nicht umdrehen. Bei DoubleSide kehrt three die Normale für
+  // die Rückseite um; bei drei gekreuzten Flächen sieht man aber immer die
+  // Hälfte von hinten, und die stand dann im Schatten. Das war der Grund für
+  // die fast schwarzen Kronen — nicht die Farbe, wie ich zuerst annahm.
+  shader.fragmentShader = shader.fragmentShader
+   .replace('#include <normal_fragment_begin>',
+    '#include <normal_fragment_begin>\n normal = normalize(vNormal);');
  };
  material.needsUpdate = true;
 }

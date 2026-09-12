@@ -913,6 +913,24 @@ pruefe('Bewuchs steht nur auf erlaubtem Grund', dichte.aufStrasse === 0, `${dich
 pruefe('Ein Teil der Halme steht sichtbar über dem Boden', dichte.sichtbareHalme > 200,
  `${dichte.sichtbareHalme} von ${dichte.halme}`);
 pruefe('Der Wind erreicht den Bewuchs', dichte.wind);
+pruefe('Bäume laufen über zwei Instanzennetze mit Alphakarte', await page.evaluate(() => {
+ const w = window.LOWTIDE.world, l = w.laubwerk;
+ if (!l?.kronen || !l.staemme) return false;
+ const g = l.kronen.geometry, m = l.kronen.material;
+ return l.kronen.count > 800                       // die Bäume der ganzen Karte
+  && !!g.attributes.color                          // sonst liest three schwarz
+  && !!l.kronen.instanceColor                      // Farbe je Baum
+  && !!m.map && m.alphaTest > .2                   // Alphakarte, nicht Kiste
+  && (g.index ? g.index.count : 0) / 3 <= 8;       // drei gekreuzte Flächen
+}));
+pruefe('Kronen bleiben von hinten beleuchtet', await page.evaluate(() => {
+ // Bei DoubleSide dreht three die Normale für Rückseiten um; bei gekreuzten
+ // Flächen sieht man immer die Hälfte von hinten. Ohne den Eingriff im
+ // Shader standen die Kronen zur Hälfte im Schatten.
+ const m = window.LOWTIDE.world.laubwerk?.kronen?.material;
+ return !!m && typeof m.onBeforeCompile === 'function'
+  && String(m.onBeforeCompile).includes('normal_fragment_begin');
+}));
 pruefe('Fahrzeuge teilen sich ihre Geometrie', dichte.geteilt === dichte.formen && dichte.formen >= 8,
  `${dichte.geteilt} von ${dichte.formen}`);
 
