@@ -1,7 +1,8 @@
 import * as T from './vendor/three.module.js';
+import {wolkenAufsetzen} from './detail.js';
 // Original, fully 3D models. No photographic billboards replace playable entities.
 const materials=new Map();
-const m=(c,roughness=.65,metalness=0)=>{const key=c+':'+roughness+':'+metalness;if(!materials.has(key))materials.set(key,new T.MeshStandardMaterial({color:c,roughness,metalness}));return materials.get(key);};
+const m=(c,roughness=.65,metalness=0)=>{const key=c+':'+roughness+':'+metalness;if(!materials.has(key))materials.set(key,wolkenAufsetzen(new T.MeshStandardMaterial({color:c,roughness,metalness})));return materials.get(key);};
 function mesh(g,geo,material,x=0,y=0,z=0){const o=new T.Mesh(geo,material);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;g.add(o);return o;}
 const sphere=new T.SphereGeometry(1,16,12);
 function ellipsoid(g,x,y,z,sx,sy,sz,material){const o=mesh(g,sphere,material,x,y,z);o.scale.set(sx,sy,sz);return o;}
@@ -111,11 +112,11 @@ function fahrzeugFormen(sparsam){
  return FORMEN[schluessel];
 }
 
-export function detailedCar(color,police=false,sparsam=false){const F=fahrzeugFormen(sparsam);const g=new T.Group();const paint=new T.MeshPhysicalMaterial({color,roughness:.24,metalness:.65,clearcoat:1,clearcoatRoughness:.12});
+export function detailedCar(color,police=false,sparsam=false){const F=fahrzeugFormen(sparsam);const g=new T.Group();const paint=wolkenAufsetzen(new T.MeshPhysicalMaterial({color,roughness:.24,metalness:.65,clearcoat:1,clearcoatRoughness:.12}));
  const body=mesh(g,F.karosserie,paint);
  // Base World scales body damage; normalize to the preserved height convention.
  body.scale.y=.55;
- const glass=new T.MeshPhysicalMaterial({color:0x355563,roughness:.1,metalness:.3,clearcoat:1,side:T.DoubleSide});
+ const glass=wolkenAufsetzen(new T.MeshPhysicalMaterial({color:0x355563,roughness:.1,metalness:.3,clearcoat:1,side:T.DoubleSide}));
  const cabin=mesh(g,F.kabine,glass);
  // Je ein Material für beide Scheinwerfer und beide Rücklichter dieses
  // Wagens. Pro Seite eigene waren zwei Draw Calls zu viel; über mehrere

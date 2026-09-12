@@ -44,16 +44,115 @@ float dStruktur(vec3 p){
 // Hauswand tut fast nichts.
 export const NAESSE = {value: 0};
 
+// Wolkenschatten.
+//
+// Über der ganzen Karte lag bisher dasselbe Sonnenlicht. Draußen ist das nie
+// so: an einem Küstentag wandern Schattenfelder über Land und Wasser, und
+// daran erkennt das Auge, dass das Licht aus einem Himmel mit Wolken kommt
+// und nicht aus einer Lampe über der Szene.
+//
+// Der Schatten hängt nicht an der Albedo, sondern am direkten Anteil: ein
+// Feld im Wolkenschatten wird dunkler, aber nicht schwarz, weil das
+// Himmelslicht weiterläuft. Deshalb greift der Faktor an
+// reflectedLight.direct*, nicht an diffuseColor.
+export const WOLKEN_VERSATZ = {value: new T.Vector2()};
+export const WOLKEN_STAERKE = {value: 0};
+export const WOLKEN_SONNE = {value: new T.Vector2()};
+
+const WOLKEN_GLSL = `
+uniform vec2 wVersatz, wSonne;
+uniform float wStaerke;
+float wHash(vec2 p){
+ // Periodisch über 512 Zellen, damit der Windversatz im Spiel modulo 512
+ // zurückgesetzt werden kann, ohne dass das Schattenfeld springt. Sonst
+ // wüchse der Versatz über Stunden bis in den Bereich, in dem float die
+ // Feinheit innerhalb einer Zelle nicht mehr auflöst.
+ p = mod(p, 512.0);
+ p = fract(p * vec2(0.3183099, 0.3678794) + vec2(0.71, 0.113));
+ p *= 27.0;
+ return fract(p.x * p.y * (p.x + p.y));
+}
+float wNoise(vec2 x){
+ vec2 i = floor(x), f = fract(x);
+ f = f * f * (3.0 - 2.0 * f);
+ return mix(mix(wHash(i), wHash(i + vec2(1.0, 0.0)), f.x),
+            mix(wHash(i + vec2(0.0, 1.0)), wHash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+// Der Schatten liegt nicht senkrecht unter der Wolke, sondern dort, wo der
+// Sonnenstrahl die Wolkenhöhe schneidet. Ohne diesen Versatz wandert der
+// Schatten an einem hohen Haus nicht mit der Höhe, und bei tiefer Sonne läge
+// er an der falschen Stelle.
+float wolkenLicht(vec3 welt){
+ if(wStaerke < 0.004) return 1.0;
+ vec2 p = welt.xz + wSonne * max(0.0, 320.0 - welt.y);
+ p = p * 0.0026 + wVersatz;
+ float n = wNoise(p) * 0.63 + wNoise(p * 2.9) * 0.37;
+ return mix(1.0 - wStaerke, 1.0, smoothstep(0.40, 0.70, n));
+}
+`;
+
+// Klarlack und Schimmer laufen an reflectedLight vorbei: der Physical-Shader
+// addiert clearcoatSpecularDirect und sheenSpecularDirect erst danach direkt
+// auf das Ergebnis. Ohne diese beiden Zeilen behielte ein Autolack im
+// Wolkenschatten sein volles Sonnenlicht auf dem Dach.
+const WOLKEN_ENDE = `#include <lights_fragment_end>
+ {
+  float wL = wolkenLicht(dWelt);
+  reflectedLight.directDiffuse *= wL;
+  reflectedLight.directSpecular *= wL;
+  #ifdef USE_CLEARCOAT
+   clearcoatSpecularDirect *= wL;
+  #endif
+  #ifdef USE_SHEEN
+   sheenSpecularDirect *= wL;
+  #endif
+ }`;
+
+// Nur der Wolkenschatten, ohne Oberflächenstruktur. Für Figuren und
+// Fahrzeuge: die stehen in derselben Welt und müssen im selben Schattenfeld
+// dunkler werden, aber sie brauchen weder Flecken noch Relief — und die
+// beiden Rauschoktaven der Struktur je Bildpunkt kosten auf Flächen, die
+// ohnehin fast den halben Bildschirm füllen, deutlich mehr als dieses eine.
+export function wolkenAufsetzen(material) {
+ if (material.userData.wolken || material.userData.detail) return material;
+ material.userData.wolken = true;
+ material.onBeforeCompile = shader => {
+  shader.uniforms.wVersatz = WOLKEN_VERSATZ;
+  shader.uniforms.wStaerke = WOLKEN_STAERKE;
+  shader.uniforms.wSonne = WOLKEN_SONNE;
+  shader.vertexShader = shader.vertexShader
+   .replace('#include <common>', '#include <common>\nvarying vec3 dWelt;')
+   .replace('#include <begin_vertex>', `#include <begin_vertex>
+   {
+    vec4 wP = vec4(transformed, 1.0);
+    #ifdef USE_INSTANCING
+     wP = instanceMatrix * wP;
+    #endif
+    dWelt = (modelMatrix * wP).xyz;
+   }`);
+  shader.fragmentShader = shader.fragmentShader
+   .replace('#include <common>', '#include <common>\nvarying vec3 dWelt;\n' + WOLKEN_GLSL)
+   .replace('#include <lights_fragment_end>', WOLKEN_ENDE);
+ };
+ material.customProgramCacheKey = () => 'lowtide-wolken';
+ material.needsUpdate = true;
+ return material;
+}
+
 // Hängt sich in ein bestehendes MeshStandardMaterial ein, ohne es zu ersetzen.
 // staerke steuert, wie stark Farbe und Rauheit schwanken; relief wie stark die
 // Normale gestört wird.
 export function detailAufsetzen(material, staerke = .13, relief = .5) {
  if (material.userData.detail) return material;
  material.userData.detail = true;
+ material.userData.wolken = true;
  material.onBeforeCompile = shader => {
   shader.uniforms.dStaerke = {value: staerke};
   shader.uniforms.dRelief = {value: relief};
   shader.uniforms.dNass = NAESSE;
+  shader.uniforms.wVersatz = WOLKEN_VERSATZ;
+  shader.uniforms.wStaerke = WOLKEN_STAERKE;
+  shader.uniforms.wSonne = WOLKEN_SONNE;
   shader.vertexShader = shader.vertexShader
    .replace('#include <common>', '#include <common>\nvarying vec3 dWelt;\nvarying vec3 dWNormal;')
    // Die Weltposition muss die Instanzmatrix einschließen. Ohne sie liegt
@@ -72,7 +171,7 @@ export function detailAufsetzen(material, staerke = .13, relief = .5) {
     dWNormal = normalize(dM * objectNormal);
    }`);
   shader.fragmentShader = shader.fragmentShader
-   .replace('#include <common>', '#include <common>\nvarying vec3 dWelt;\nvarying vec3 dWNormal;\nuniform float dStaerke, dRelief, dNass;\n' + EINSATZ)
+   .replace('#include <common>', '#include <common>\nvarying vec3 dWelt;\nvarying vec3 dWNormal;\nuniform float dStaerke, dRelief, dNass;\n' + EINSATZ + WOLKEN_GLSL)
    // Farbe: helle und dunkle Flecken, wie sie jede echte Fläche hat. Der
    // Wert wird einmal berechnet und unten für die Rauheit wiederverwendet —
    // zwei getrennte Auswertungen sahen gleich aus und kosteten doppelt.
@@ -105,7 +204,8 @@ export function detailAufsetzen(material, staerke = .13, relief = .5) {
      dNoise((dWelt + vec3(0.0,e,0.0)) * 1.35) - b,
      dNoise((dWelt + vec3(0.0,0.0,e)) * 1.35) - b);
     normal = normalize(normal + (viewMatrix * vec4(g, 0.0)).xyz * dRelief * dNah * 3.0);
-   }`);
+   }`)
+   .replace('#include <lights_fragment_end>', WOLKEN_ENDE);
  };
  // three schlüsselt kompilierte Programme nach den Materialparametern, nicht
  // nach onBeforeCompile. Ohne eigenen Schlüssel könnte ein Material ohne

@@ -3,8 +3,9 @@ import {roads,places,random} from './simulation.js';
 import {Sky} from './sky.js';
 import {createWater,updateWater} from './water.js';
 import {Nachbearbeitung} from './post.js';
-import {detailAufsetzen,NAESSE} from './detail.js';
+import {detailAufsetzen,wolkenAufsetzen,NAESSE,WOLKEN_VERSATZ,WOLKEN_STAERKE,WOLKEN_SONNE} from './detail.js';
 const MONDLICHT=new T.Color(0x9db6d8),NEUTRAL=new T.Color(0xfff4e4);
+const sstep=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t);};
 // Fünf Hemdfarben über eine Hose waren als Menge erkennbar: dieselben fünf
 // Leute, immer wieder. Zwölf mal sieben ergeben genug Kombinationen, dass
 // eine Straße nicht mehr nach Belegschaft aussieht.
@@ -146,6 +147,25 @@ export class World{
   // Moment, in dem der Regen aufhört.
   const nassZiel=s.weather==='storm'?1:s.weather==='rain'?.82:0;
   NAESSE.value+=(nassZiel-NAESSE.value)*Math.min(1,dt*(nassZiel>NAESSE.value?.5:.12));
+  // Wolkenschatten. Am stärksten bei aufgelockerter Decke: unter einer
+  // geschlossenen zieht kein einzelnes Schattenfeld mehr durch, da liegt die
+  // ganze Stadt im Schatten — das erledigt sonnenStaerke. Bei klarem Himmel
+  // gibt es zu wenig Wolke, dazwischen ist das Maximum. Dunst weicht die
+  // Kanten auf, bis nichts mehr davon zu sehen ist, und unter dem Horizont
+  // wirft nichts mehr einen Schatten.
+  const deckung=himmel.wolken;
+  const aufgelockert=sstep(.05,.35,deckung)*(1-sstep(.55,.95,deckung));
+  // Der Dunst geht mit Exponent hoch: bei Sichtweite unter hundert Metern ist
+  // das Licht vollständig gestreut, dann wirft eine Wolkenlücke keinen Rand
+  // mehr. Linear abgezogen blieben im Nebel noch acht Prozent stehen.
+  WOLKEN_STAERKE.value=aufgelockert*Math.pow(1-himmel.dunst,1.4)*Math.min(1,Math.max(0,himmel.richtung.y)*3)*.6;
+  // Der Wind trägt die Decke; das Rauschen ist über 512 Zellen periodisch,
+  // deshalb darf der Versatz dort umlaufen.
+  const windTempo=s.weather==='storm'?24:s.weather==='rain'?13:s.weather==='fog'?3:6;
+  WOLKEN_VERSATZ.value.x=(WOLKEN_VERSATZ.value.x+dt*windTempo*.82*.0026)%512;
+  WOLKEN_VERSATZ.value.y=(WOLKEN_VERSATZ.value.y+dt*windTempo*.57*.0026)%512;
+  const sonneY=Math.max(.2,himmel.richtung.y);
+  WOLKEN_SONNE.value.set(himmel.richtung.x/sonneY,himmel.richtung.z/sonneY);
   const belichtung=himmel.belichtung*(1+this.blitz*.3);
   this.renderer.toneMappingExposure=belichtung;
   if(this.post){

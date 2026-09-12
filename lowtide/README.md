@@ -49,8 +49,9 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 141 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 149 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
+node tools/wolken.mjs                            # wandert der Wolkenschatten
 ```
 
 Die drei Werkzeuge in `tools/` mit Browser brauchen Playwright und Chromium.
@@ -123,6 +124,58 @@ Fragmentshader setzt die Normale deshalb wieder auf `vNormal`.
 Call, Wind ebenfalls im Vertexshader. Verworfene Halme wandern auf y = -60 —
 Skalierung null ergibt eine singuläre Matrix, daraus NaN in der
 Normalenmatrix und daraus große schwarze Flächen statt nichts.
+
+## Wolkenschatten
+
+Über der ganzen Karte lag dasselbe Sonnenlicht. Draußen ist das nie so: an
+einem Küstentag wandern Schattenfelder über Land und Wasser, und daran
+erkennt das Auge, dass das Licht aus einem Himmel mit Wolken kommt und nicht
+aus einer Lampe über der Szene.
+
+Der Faktor greift nicht an der Albedo, sondern an `reflectedLight.direct*`
+hinter `<lights_fragment_end>` — ein Feld im Wolkenschatten wird dunkler,
+aber nicht schwarz, weil das Himmelslicht weiterläuft. Beim Klarlack der
+Autos und beim Schimmer der Haut reicht das nicht: der Physical-Shader
+addiert `clearcoatSpecularDirect` und `sheenSpecularDirect` erst danach
+direkt auf das Ergebnis, die beiden werden getrennt gedämpft. Ohne das behielt
+ein Autodach im Schatten seinen vollen Sonnenglanz.
+
+Gesampelt wird nicht senkrecht unter der Wolke, sondern dort, wo der
+Sonnenstrahl die Wolkenhöhe von 320 m schneidet. Sonst wanderte der Schatten
+an einem hohen Haus nicht mit der Höhe, und bei tiefer Sonne läge er an der
+falschen Stelle. Das Rauschen ist über 512 Zellen periodisch, damit der
+Windversatz nach Stunden Spielzeit umlaufen kann, ohne dass das Feld springt
+— sonst wüchse er in den Bereich, in dem `float` die Feinheit innerhalb einer
+Zelle nicht mehr auflöst.
+
+Die Stärke steht nicht einfach auf der Wolkendeckung:
+
+| Wetter | Deckung | Dunst | Stärke |
+|---|---|---|---|
+| klar | 0,18 | 0,12 | 0,20 |
+| Regen | 0,88 | 0,62 | 0,01 |
+| Nebel | 0,55 | 0,95 | 0,01 |
+| Gewitter | 0,97 | 0,70 | 0,00 |
+
+Am stärksten ist der Effekt bei aufgelockerter Decke. Unter einer
+geschlossenen zieht kein einzelnes Feld mehr durch — da liegt die ganze Stadt
+im Schatten, und das erledigt schon `sonnenStaerke`. Dunst geht mit Exponent
+1,4 ein: bei Sichtweite unter hundert Metern ist das Licht vollständig
+gestreut, dann hat eine Wolkenlücke keinen Rand mehr. Linear abgezogen blieben
+im Nebel noch acht Prozent stehen, was die Prüfung auch gemeldet hat.
+
+Figuren und Fahrzeuge hängen über `wolkenAufsetzen()` im selben Feld, ohne die
+Oberflächenstruktur: sie müssen mitdunkeln, brauchen aber weder Flecken noch
+Relief, und die zwei Rauschoktaven der Struktur kosten auf Flächen, die den
+halben Bildschirm füllen, deutlich mehr als das eine des Schattens. Vier
+Materialien waren zuerst nicht dabei — Lack, Glas, Haut und das Umlackieren
+zur Laufzeit legen `MeshPhysicalMaterial` an anderen Stellen an. Gefunden hat
+sie nicht das Auge, sondern eine Prüfung, die je Figur und Wagen abzählt.
+
+Draw Calls und Dreiecke ändern sich dadurch nicht; die Kosten liegen
+vollständig im Fragmentshader. Unter dem Software-Rendering dieser Umgebung
+ist darüber nichts Belastbares zu messen. Nachts kostet es nichts: unter einer
+Stärke von 0,004 verlässt die Funktion sofort mit 1,0.
 
 ## Was Zeichenaufrufe kostet
 

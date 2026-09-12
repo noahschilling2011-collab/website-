@@ -1,8 +1,9 @@
 import * as T from './vendor/three.module.js';
+import {wolkenAufsetzen} from './detail.js';
 // Anatomical, articulated meshes with independent elbows, knees and eyelids.
 const ball=new T.SphereGeometry(1,16,12);
 const cache=new Map();
-const mat=(color,roughness=.8)=>{const k=color+':'+roughness;if(!cache.has(k))cache.set(k,new T.MeshStandardMaterial({color,roughness}));return cache.get(k);};
+const mat=(color,roughness=.8)=>{const k=color+':'+roughness;if(!cache.has(k))cache.set(k,wolkenAufsetzen(new T.MeshStandardMaterial({color,roughness})));return cache.get(k);};
 function add(parent,geometry,material,x,y,z){const o=new T.Mesh(geometry,material);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;parent.add(o);return o;}
 function oval(p,x,y,z,w,h,d,m){const o=add(p,ball,m,x,y,z);o.scale.set(w,h,d);return o;}
 // Jede Figur baute ihre Querschnitte selbst: fünfzehn Geometrien pro Person,
@@ -40,7 +41,7 @@ let serial=0;
 // nah=false lässt alles weg, was erst aus wenigen Metern sichtbar wird.
 export function naturalHuman(color,pants,nah=true){
  const id=serial++,g=new T.Group();const skinTone=[0xc3987b,0xa67455,0x79513b,0xd4ad8c,0xb68467][id%5];
- const skin=new T.MeshPhysicalMaterial({color:skinTone,roughness:.73,sheen:.14,sheenColor:0xb78d76});
+ const skin=wolkenAufsetzen(new T.MeshPhysicalMaterial({color:skinTone,roughness:.73,sheen:.14,sheenColor:0xb78d76}));
  const cloth=mat(color,.94),denim=mat(pants,.96),dark=mat(0x292e31),hairColor=[0x302820,0x554332,0x251f1b,0x6b5238][id%4];
  // Pelvis, waist, rib cage and shoulders have different cross sections.
  const body=add(g,loft([[.86,.14,.095,.10],[.91,.18,.11,.105],[1.02,.145,.09,.10],[1.15,.17,.115,.105],[1.32,.21,.12,.105],[1.43,.23,.10,.085],[1.48,.13,.075,.07],[1.49,.065,.057,.052]],28),cloth,0,0,0);

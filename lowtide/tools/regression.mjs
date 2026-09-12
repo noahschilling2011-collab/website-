@@ -711,6 +711,57 @@ pruefe('Spiegelung läuft nur bei Nässe', await page.evaluate(async () => {
  L.sim.weather = 'clear';
  return {trocken, nass, anGeschaltet, gedreht};
 }).then(r => r.trocken && r.nass > .5 && r.anGeschaltet && r.gedreht));
+const wolken = await page.evaluate(() => {
+ const L = window.LOWTIDE, w = L.world, u = L.wolken;
+ // applySky rechnet Stärke, Versatz und Sonnenneigung jedes Bild neu.
+ const lies = (stunde, wetter) => {
+  L.sim.hour = stunde; L.sim.weather = wetter;
+  w.applySky(1 / 60);
+  return u.staerke.value;
+ };
+ const mittag = lies(13, 'clear');
+ const nacht = lies(1, 'clear');
+ const nebel = lies(13, 'fog');
+ const sturm = lies(13, 'storm');
+ // Wind: zwei Aufrufe, dazwischen muss der Versatz weitergelaufen sein.
+ L.sim.hour = 13; L.sim.weather = 'clear';
+ w.applySky(1 / 60);
+ const v0 = u.versatz.value.x;
+ for (let i = 0; i < 30; i++) w.applySky(1 / 60);
+ const gewandert = u.versatz.value.x - v0;
+ // Sonnenneigung: bei tiefer Sonne muss der Versatz zur Wolkenhöhe größer
+ // sein als mittags. Sonst läge der Schatten eines Hochhauses falsch.
+ L.sim.hour = 13; w.applySky(1 / 60);
+ const neigungMittag = Math.hypot(u.sonne.value.x, u.sonne.value.y);
+ L.sim.hour = 7.5; w.applySky(1 / 60);
+ const neigungFlach = Math.hypot(u.sonne.value.x, u.sonne.value.y);
+ L.sim.hour = 13; L.sim.weather = 'clear'; w.applySky(1 / 60);
+ // Figuren und Fahrzeuge müssen im selben Schattenfeld liegen wie die Welt.
+ const zaehle = wurzel => {
+  let mit = 0, alle = 0;
+  wurzel.traverse(o => {
+   if (!o.material || o.material.emissive?.getHex()) return;
+   alle++; if (o.material.userData.wolken) mit++;
+  });
+  return [mit, alle];
+ };
+ return {mittag, nacht, nebel, sturm, gewandert, neigungMittag, neigungFlach,
+  figur: zaehle(w.npcs[0]), wagen: zaehle(w.cars[0])};
+});
+pruefe('Wolkenschatten liegt tagsüber auf der Karte', wolken.mittag > .05, String(wolken.mittag));
+pruefe('Nachts wirft keine Wolke einen Schatten', wolken.nacht === 0, String(wolken.nacht));
+pruefe('Nebel löst die Schattenkanten auf', wolken.nebel < wolken.mittag * .35,
+ `Nebel ${wolken.nebel.toFixed(3)} gegen klar ${wolken.mittag.toFixed(3)}`);
+pruefe('Unter geschlossener Decke bleibt kein einzelnes Feld übrig',
+ wolken.sturm < wolken.mittag * .5, `Sturm ${wolken.sturm.toFixed(3)}`);
+pruefe('Der Wind trägt die Decke weiter', wolken.gewandert > 1e-4, String(wolken.gewandert));
+pruefe('Tiefe Sonne versetzt den Schatten stärker als hohe',
+ wolken.neigungFlach > wolken.neigungMittag * 1.5,
+ `${wolken.neigungFlach.toFixed(2)} gegen ${wolken.neigungMittag.toFixed(2)}`);
+pruefe('Figuren stehen im selben Schattenfeld', wolken.figur[0] === wolken.figur[1] && wolken.figur[1] > 5,
+ `${wolken.figur[0]} von ${wolken.figur[1]}`);
+pruefe('Fahrzeuge stehen im selben Schattenfeld', wolken.wagen[0] === wolken.wagen[1] && wolken.wagen[1] > 5,
+ `${wolken.wagen[0]} von ${wolken.wagen[1]}`);
 pruefe('Sparmodus schaltet die Nachbearbeitung ab', await page.evaluate(() => {
  const knopf = document.getElementById('qualityBtn'), w = window.LOWTIDE.world;
  knopf.click();
