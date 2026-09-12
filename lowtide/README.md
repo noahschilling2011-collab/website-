@@ -140,6 +140,23 @@ Die Nachbearbeitung fährt nachts Kontrast, Randabdunklung, Korn und
 Verdeckung zurück. Ohne das drückte dieselbe Kurve, die dem Tag Tiefe gibt,
 die Nacht ins Schwarze.
 
+## Der Westen
+
+Die Karte war 970 auf 1000 Meter — knapp ein Quadratkilometer. Nach Westen
+und Süden verdoppelt liegt sie bei 1490 auf 1440 Metern; das Meer im Osten
+bleibt die Grenze, die Innenstadt bleibt, wo sie war.
+
+- **Rosalind** — zweite Stadt: Hauptstraße mit Geschäftshäusern und Vordach,
+  Wohnstraßen im Raster, Wasserturm, Kirche, Getreidesilos.
+- **Mercy Reservoir** — Stausee mit befahrbarer Staumauer und Überläufen.
+- **Talon Ridge** — Bergrücken auf 88 m mit Windpark und Steinbruch.
+- **Cane Hollow** — Zuckerrohr, Gräben und drei Höfe im Süden.
+- **Hinterland** — Gehölz, Findlinge, Weidezäune und Feldwege dazwischen.
+  Eine breite dünne Streuung, damit keine Zelle leer bleibt.
+
+Der Dunst nimmt mit der Höhe ab. Mit der bodennahen Dichte war der Blick vom
+Talon Ridge eine weiße Fläche und aus dem Flugzeug sah man die Stadt nicht.
+
 ## Die Keys
 
 Östlich der Küste lagen dreißig Kartenzellen blankes Wasser. Jetzt liegen

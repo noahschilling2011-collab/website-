@@ -221,7 +221,10 @@ export class Street {
  // aber ein paar Draw Calls statt tausend.
  parkendeAutosBauen() {
   if (!this.parkplaetze.length) return;
-  const vorbild = detailedCar(LACK_MARKE);
+  // Sparsames Vorbild: geparkte Wagen sind Kulisse. Der Unterschied zum
+ // vollen Modell ist aus zwei Metern zu sehen, aus fünf nicht mehr — und es
+ // stehen vierhundertvierundsiebzig davon auf der Karte.
+ const vorbild = detailedCar(LACK_MARKE, false, true);
   const gebacken = backeNachMaterial(vorbild);
   const objekt = new T.Object3D();
   this.parkendeNetze = [];

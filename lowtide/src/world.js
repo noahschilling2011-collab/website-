@@ -112,8 +112,15 @@ export class World{
   this.scene.fog.color.copy(himmel.nebel);
   // nebelFaktor senkt den Dunst für Luftbilder; aus 900 m wäre die Karte
   // sonst eine weiße Fläche.
-  this.scene.fog.density=himmel.nebelDichte*(this.nebelFaktor??1);
-  this.bloeckeSichten(himmel.nebelDichte*(this.nebelFaktor??1));
+  // Dunst nimmt mit der Höhe ab: über einem Bergrücken oder aus dem
+  // Hubschrauber steht weniger Luft zwischen Auge und Ziel. Mit der
+  // bodennahen Dichte war der Blick vom Talon Ridge eine weiße Fläche, und
+  // aus dem Flugzeug sah man die Stadt gar nicht.
+  const hoehe=Math.max(0,this.camera.position.y);
+  const duenner=.34+.66*Math.exp(-hoehe/85);
+  const dichte=himmel.nebelDichte*(this.nebelFaktor??1)*duenner;
+  this.scene.fog.density=dichte;
+  this.bloeckeSichten(dichte);
   // Steht die Sonne unter dem Horizont, übernimmt der Mond dieselbe Bahn
   // gespiegelt — sonst wäre die Nacht eine schattenlose graue Fläche.
   const unterHorizont=himmel.richtung.y<0,richtung=this.sonnenRichtung.copy(himmel.richtung);

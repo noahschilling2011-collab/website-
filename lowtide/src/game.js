@@ -69,7 +69,10 @@ let stickId=null;function moveStick(e){const r=$('stick').getBoundingClientRect(
 // die ganze Welt in ein Offscreen-Canvas gezeichnet. Vorher lief jede
 // Minimap-Aktualisierung, achtmal pro Sekunde, über sämtliche
 // Kollisionskörper und zeichnete jede Straße neu.
-const KARTE_PX_PRO_M=1.5;
+// Ein Pixel pro Meter statt anderthalb. Mit der verdoppelten Karte wären es
+// sonst 2235 auf 2160 Pixel — eine Textur von rund zwanzig Megabyte, die bei
+// jedem Start neu gezeichnet wird.
+const KARTE_PX_PRO_M=1;
 let karteStatisch=null;
 
 function karteBauen(){

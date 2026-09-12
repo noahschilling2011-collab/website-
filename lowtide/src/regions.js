@@ -1020,6 +1020,255 @@ function randgebiete(w, rng) {
  }
 }
 
+// ---------------------------------------------------------- Der Westen
+// Die Karte war knapp ein Quadratkilometer. Verdoppelt bringt Fläche allein
+// nichts — leeres Land ist schlimmer als keins. Der neue Raum bekommt drei
+// Dinge, die ihn tragen: eine zweite Stadt mit eigenem Charakter, eine
+// Landmarke, die man von weit sieht, und dazwischen Wirtschaft statt Wiese.
+
+// Kleinstadthaus mit Vorgarten und Einfahrt. Rosalind ist niedriger und
+// älter als Port Mercy; keine Sockelgeschosse, keine Glasfronten.
+function kleinstadthaus(w, x, z, rng, richtung) {
+ const WAND = [0xc9c0aa, 0xb6bfb6, 0xd2c2a6, 0xa9b6bd, 0xc4b09c, 0xbdb7a2];
+ const DACH = [0x7b5a4c, 0x5f6b6c, 0x8a7350, 0x63594e, 0x6d7566];
+ const i = Math.floor(rng() * 6);
+ const breite = 9 + rng() * 4, tiefe = 8 + rng() * 3;
+ const wand = WAND[i], dach = DACH[i % 5];
+ w.box(x, 1.6, z, breite, 3.2, tiefe, wand);
+ satteldach(w, x, 3.25, z, breite + 1, tiefe + 1, 1.5, dach, rng() < .5);
+ // Veranda zur Straße, Tür, zwei Fenster.
+ const vz = z + richtung * (tiefe / 2 + 1.2);
+ w.box(x, .16, vz, breite * .75, .32, 2.4, 0xa79f8c);
+ w.box(x, 2.6, vz, breite * .75, .14, 2.8, dach);
+ for (const e of [-.36, .36]) w.box(x + e * breite, 1.4, vz + richtung * 1.2, .12, 2.4, .12, wand);
+ w.box(x, 1.1, z + richtung * (tiefe / 2 + .08), 1, 2.2, .14, 0x4a3a2c);
+ for (const ox of [-.3, .3]) w.box(x + ox * breite, 1.9, z + richtung * (tiefe / 2 + .06), 1.5, 1.2, .1, 0x35505c);
+ // Einfahrt und Briefkasten.
+ w.box(x + breite * .55, .04, z + richtung * (tiefe / 2 + 5), 3, .08, 10, 0x6f6a5e);
+ w.box(x + breite * .55, .6, z + richtung * (tiefe / 2 + 9.5), .12, 1.2, .12, 0x5d5548);
+ w.box(x + breite * .55, 1.25, z + richtung * (tiefe / 2 + 9.5), .5, .3, .32, 0x8a8578);
+ if (rng() < .45) laubbaum(w, x - breite * .6, z + richtung * (tiefe / 2 + 6), 5 + rng() * 3, 0x4e6b45);
+}
+
+function rosalind(w, rng) {
+ // Hauptstraße: zwei Reihen zweigeschossiger Geschäftshäuser mit Vordach.
+ const hz = 340;
+ for (let x = -1000; x < -760; x += 22) {
+   for (const seite of [-1, 1]) {
+    const z = hz + seite * 16;
+    if (w.sim.blocked({x, z}, 10) || aufStrasse(x, z, 13)) continue;
+    const h = 6.5 + rng() * 3;
+    const wand = [0xb9a98c, 0xa6b0ab, 0xc2b294, 0x9fa9ad][Math.floor(rng() * 4)];
+    w.box(x, h / 2, z, 20, h, 13, wand);
+    w.box(x, h + .3, z, 21, .6, 14, 0x4e5a58);
+    // Vordach über dem Bürgersteig, auf Stützen.
+    const vz = z - seite * 7.5;
+    w.box(x, 3.4, vz, 20, .2, 3, [0x8a5a4c, 0x4e6f74, 0x7d6a46][Math.floor(rng() * 3)]);
+    for (const e of [-8, 0, 8]) w.box(x + e, 1.7, vz + -seite * 1.3, .14, 3.4, .14, 0x585f5c);
+    // Schaufenster und Tür.
+    w.box(x, 1.8, z - seite * 6.6, 14, 2.6, .12, 0x2f4650);
+    w.box(x + (rng() - .5) * 8, 1.15, z - seite * 6.5, 1.4, 2.3, .16, 0x3d3228);
+    // Obergeschossfenster.
+    for (const ox of [-6, -2, 2, 6]) w.box(x + ox, 5.4, z - seite * 6.6, 1.5, 1.6, .1, 0x3a5462);
+    w.text(['FEED & SEED', 'ROSALIND DINER', 'HARDWARE', 'GARAGE', 'POST', 'CLINIC', 'BANK', 'BARBER'][Math.floor(rng() * 8)],
+     x, 4.1, z - seite * 6.9, 9, '#e8dcbc', seite > 0 ? Math.PI : 0);
+   }
+ }
+ // Wohnstraßen im Raster, das in content.js als Straßen liegt.
+ for (const strassenZ of [300, 380]) for (let x = -996; x < -764; x += 26) {
+  for (const seite of [-1, 1]) {
+   const z = strassenZ + seite * 20;
+   if (w.sim.blocked({x, z}, 9) || aufStrasse(x, z, 12)) continue;
+   kleinstadthaus(w, x + rng() * 4, z, rng, -seite);
+  }
+ }
+ // Wasserturm auf Stelzen — die Landmarke jeder Kleinstadt.
+ const tx = -1020, tz = 340;
+ for (const ox of [-1, 1]) for (const oz of [-1, 1]) {
+  w.box(tx + ox * 4, 9, tz + oz * 4, .45, 18, .45, 0x7d837f);
+  w.box(tx + ox * 4, 9, tz, .3, .3, 8.4, 0x7d837f, 0, false, 0, .5);
+ }
+ w.box(tx, 20, tz, 11, 7, 11, 0xb9bdb2);
+ w.box(tx, 24.2, tz, 9, 2.4, 9, 0x9aa098);
+ w.box(tx, 25.8, tz, .3, 1.6, .3, 0x6f7570);
+ w.text('ROSALIND', tx, 20.5, tz - 5.7, 12, '#5c6b62');
+ // Kirche mit Turm am Ostende.
+ const kx = -740, kz = 342;
+ w.box(kx, 3.4, kz, 14, 6.8, 20, 0xd0c8b4);
+ satteldach(w, kx, 6.8, kz, 15, 21, 3.2, 0x6b6f68, true);
+ w.box(kx - 8, 6, kz - 7, 7, 12, 7, 0xd0c8b4);
+ satteldach(w, kx - 8, 12, kz - 7, 7.6, 7.6, 5, 0x5f6663, true);
+ w.box(kx - 8, 18.5, kz - 7, .25, 3, .25, 0x8d8d86);
+ w.box(kx - 8, 18.2, kz - 7, 1.3, .25, .25, 0x8d8d86);
+ w.text('FIRST LIGHT', kx, 3.2, kz - 10.3, 11, '#e0d6bc');
+ // Tankstelle und Getreidesilos an der Ausfallstraße.
+ for (let k = 0; k < 3; k++) {
+  const sx = -1040 + k * 15, sz = 470;
+  w.box(sx, 9, sz, 11, 18, 11, 0xb6b2a4);
+  w.box(sx, 18.6, sz, 12, 1.4, 12, 0x8a877c);
+  for (let y = 3; y < 18; y += 4) w.box(sx, y, sz + 5.6, 11.2, .18, .2, 0x8f8c80);
+ }
+ w.box(-1000, .06, 470, 26, .14, 22, 0x6b675c);
+ w.text('CANE CO-OP', -1010, 21, 462, 14, '#d8cfae');
+}
+
+// Stausee mit Damm. Wasser, das nicht Meer ist — und ein Bauwerk, das man
+// befahren kann.
+function stausee(w, rng) {
+ const mx = -700, mz = 80, rx = 120, rz = 90;
+ // Uferböschung als Ring aus Kisten, innen das Wasser.
+ for (let a = 0; a < Math.PI * 2; a += .09) {
+  const x = mx + Math.cos(a) * rx, z = mz + Math.sin(a) * rz;
+  w.box(x, .5, z, 9, 1, 9, 0x6f6a52, a);
+  if (Math.floor(a * 6) % 5 === 0) nadelbaum(w, x + Math.cos(a) * 8, z + Math.sin(a) * 8, 7 + rng() * 5, 0x3d5a3f);
+ }
+ // Wasserfläche: eine dunkle Platte knapp unter Uferhöhe.
+ w.box(mx, .12, mz, rx * 1.72, .2, rz * 1.72, 0x27484f);
+ for (let k = 0; k < 26; k++) {
+  const a = rng() * Math.PI * 2, d = Math.sqrt(rng()) * .8;
+  w.box(mx + Math.cos(a) * rx * d, .2, mz + Math.sin(a) * rz * d,
+   6 + rng() * 14, .04, 5 + rng() * 12, 0x2f5560, rng() * 3);
+ }
+ // Staumauer im Süden, mit Straßenkrone und Überlauf.
+ const dz = mz + rz + 4;
+ w.box(mx, 6, dz, 190, 12, 9, 0x9a9a92);
+ w.box(mx, 12.4, dz, 192, .8, 11, 0x82827b);
+ for (let x = mx - 90; x <= mx + 90; x += 10) w.box(x, 13.4, dz + 5, 1, 1.2, .3, 0xa8a89f);
+ for (const ox of [-30, 0, 30]) {
+  w.box(mx + ox, 4, dz + 5.5, 7, 8, 3, 0x8a8a82);
+  w.box(mx + ox, 8.6, dz + 5.5, 7.6, .5, 3.6, 0x6f6f68);
+ }
+ w.box(mx + 78, 15, dz - 2, 4, 6, 4, 0xb0b0a6);
+ w.box(mx + 78, 18.6, dz - 2, 4.6, 1.2, 4.6, 0x6f7570);
+ w.text('MERCY RESERVOIR', mx, 16, dz + 7, 26, '#dfe2d2');
+ // Zufahrt von der Westumgehung auf die Krone.
+ for (let x = mx - 110; x < mx - 88; x += 6) w.box(x, .06, dz, 6, .12, 9, 0x40474b);
+}
+
+// Der Bergrücken: Windpark auf dem Kamm, Steinbruch an der Flanke,
+// Serpentine hinauf.
+function talonRidge(w, rng) {
+ for (let k = 0; k < 7; k++) {
+  const x = -960 + k * 24, z = -230 + k * 26;
+  const y = groundAt(x, z);
+  if (y < 25) continue;
+  w.box(x, y + 26, z, 2.2, 52, 2.2, 0xdcdcd4);
+  w.box(x, y + 52, z, 4, 3, 4, 0xcfcfc6);
+  // Drei Blätter als flache Balken, in unterschiedlichen Stellungen.
+  const dreh = rng() * 2;
+  for (let b = 0; b < 3; b++) {
+   const a = dreh + b * Math.PI * 2 / 3;
+   w.box(x + Math.cos(a) * 12, y + 52 + Math.sin(a) * 12, z + 2.6,
+    24, 1.4, .35, 0xe4e4dc, 0, false, 0, a);
+  }
+ }
+ // Steinbruch: Terrassen in die Flanke, Förderband, Haufen.
+ const qx = -700, qz = -300;
+ for (let k = 0; k < 5; k++) {
+  const r = 46 - k * 8;
+  w.box(qx, groundAt(qx, qz) - 1 + k * 3, qz, r * 2, 3, r * 1.5, [0x9a9184, 0x8e857a][k % 2]);
+ }
+ w.box(qx + 40, groundAt(qx + 40, qz) + 6, qz, 42, 1.2, 3, 0x6f6a5e, 0, false, 0, -.22);
+ for (let k = 0; k < 9; k++) {
+  const x = qx - 40 + rng() * 80, z = qz - 30 + rng() * 60;
+  w.box(x, groundAt(x, z) + 1.6, z, 5 + rng() * 6, 3.2, 5 + rng() * 6, 0x8a8175);
+ }
+ w.text('TALON QUARRY', qx, groundAt(qx, qz) + 12, qz - 40, 22, '#e2dcc8');
+ // Bewuchs am Hang, dichter im Tal.
+ for (let i = 0; i < 620; i++) {
+  const x = -1090 + rng() * 520, z = -530 + rng() * 620;
+  if (aufStrasse(x, z, 10) || w.sim.blocked({x, z}, 3)) continue;
+  const y = groundAt(x, z);
+  if (y > 62) continue;
+  if (rng() < .62) nadelbaum(w, x, z, 6 + rng() * 9, y > 30 ? 0x36523c : 0x40603f);
+  else {
+   const h = 1 + rng() * 2.4, b = h * (.6 + rng() * .4);
+   w.box(x, y + h / 2, z, b, h, b, [0x847d70, 0x736c60][i % 2], rng() * 3);
+  }
+ }
+}
+
+// Cane Hollow: Zuckerrohr, Entwässerungsgräben, ein paar Höfe. Der Süden ist
+// Landwirtschaft, nicht Wildnis.
+function caneHollow(w, rng) {
+ for (let fx = -1040; fx < 60; fx += 120) for (let fz = 500; fz < 880; fz += 90) {
+  if (aufStrasse(fx, fz, 22)) continue;
+  w.box(fx, .05, fz, 108, .1, 78, [0x6d7a3f, 0x788446, 0x627339][Math.floor(rng() * 3)]);
+  // Reihen im Feld, längs oder quer.
+  const quer = rng() < .5;
+  for (let u = -50; u < 50; u += 4.5) {
+   if (quer) w.box(fx + u, .5, fz, 1.4, .9, 74, [0x7f8c4a, 0x8b9752][Math.abs(u) % 9 < 4.5 ? 0 : 1]);
+   else w.box(fx, .5, fz + u * .74, 104, .9, 1.4, [0x7f8c4a, 0x8b9752][Math.abs(u) % 9 < 4.5 ? 0 : 1]);
+  }
+  // Graben am Feldrand.
+  w.box(fx, -.3, fz + 42, 108, .6, 4, 0x4c5545);
+ }
+ // Drei Höfe an der Südtangente.
+ for (const [hx, hz] of [[-940, 700], [-620, 730], [-300, 690]]) {
+  if (w.sim.blocked({x: hx, z: hz}, 20)) continue;
+  w.box(hx, 2.2, hz, 16, 4.4, 12, 0xc4b79c);
+  satteldach(w, hx, 4.4, hz, 17, 13, 2.4, 0x7a5a4c, true);
+  w.box(hx + 24, 4.5, hz + 4, 22, 9, 16, 0x8a4f42);
+  satteldach(w, hx + 24, 9, hz + 4, 23, 17, 4.5, 0x5f5347, true);
+  for (const oz of [-6, 6]) w.box(hx + 24, 4, hz + 4 + oz, 23.2, 6, .3, 0x7a4438);
+  w.box(hx - 18, 6, hz - 6, 8, 12, 8, 0xb6b2a4);
+  w.box(hx - 18, 12.6, hz - 6, 9, 1.2, 9, 0x8a877c);
+  zaun(w, hx - 30, hz + 18, hx + 40, hz + 18, 1.2, 0x8a7a5e, 3.2);
+  for (let k = 0; k < 6; k++) laubbaum(w, hx - 34 + k * 3, hz - 16 - (k % 2) * 4, 5 + rng() * 3, 0x4e6b45);
+ }
+ // Sandpisten zwischen den Feldern.
+ for (let z = 500; z < 880; z += 90) for (let x = -1050; x < 60; x += 8)
+  w.box(x, .04, z + 44, 8, .08, 6, 0x6e6853);
+}
+
+// Hinterland. Nach dem Ausbau blieben dreizehn Landzellen praktisch leer —
+// Ecken zwischen den gebauten Gebieten, für die keine eigene Region sinnvoll
+// ist. Eine breite, dünne Streuung schließt sie, ohne dass irgendwo etwas
+// Erfundenes steht: Gehölz, Findlinge, Weidezäune, Feldwege.
+function hinterland(w, rng) {
+ const erlaubt = (x, z) => {
+  if (waterAt(x, z) || aufStrasse(x, z, 11)) return false;
+  if (x > -370 && x < 130 && z > -140 && z < 170) return false;   // Innenstadt
+  if (x > 88 && x < 130) return false;                             // Strand
+  if (x > -1010 && x < -730 && z > 270 && z < 410) return false;   // Rosalind
+  if (Math.hypot((x + 700) / 130, (z - 80) / 100) < 1.05) return false; // Stausee
+  return true;
+ };
+ for (let i = 0; i < 4200; i++) {
+  const x = -1095 + rng() * 1215, z = -535 + rng() * 1430;
+  if (!erlaubt(x, z) || w.sim.blocked({x, z}, 4)) continue;
+  const y = groundAt(x, z), r = rng();
+  if (r < .30) nadelbaum(w, x, z, 6 + rng() * 8, y > 30 ? 0x3a5540 : 0x44603f);
+  else if (r < .52) laubbaum(w, x, z, 5 + rng() * 5, [0x4e6b45, 0x577248, 0x455f3d][i % 3]);
+  else if (r < .70) {
+   const h = .9 + rng() * 1.8, b = h * (.55 + rng() * .45);
+   w.box(x, y + h / 2, z, b, h, b * (.8 + rng() * .4), [0x847d70, 0x736c60, 0x8d867a][i % 3], rng() * 3);
+  } else if (r < .86) {
+   const t = [0x66713f, 0x5c6a3a, 0x717a46][i % 3];
+   w.box(x, y + .18, z, .8 + rng() * .9, .36, .7 + rng() * .8, t);
+   w.box(x + (rng() - .5) * .9, y + .11, z + (rng() - .5) * .9, .6, .22, .55, t);
+  } else w.box(x, y + .03, z, 2 + rng() * 4, .06, 1.8 + rng() * 3.4, 0x77704f, rng() * 3.1);
+ }
+ // Weidezäune quer durchs Hinterland: sie geben der Fläche einen Maßstab.
+ for (let k = 0; k < 22; k++) {
+  const x = -1060 + rng() * 900, z = -480 + rng() * 1300;
+  if (!erlaubt(x, z) || aufStrasse(x, z, 18)) continue;
+  const laenge = 40 + rng() * 90, quer = rng() < .5;
+  zaun(w, x, z, quer ? x + laenge : x, quer ? z : z + laenge, 1.15, 0x8a7a5e, 3.4);
+ }
+ // Feldwege, die irgendwo anfangen und irgendwo aufhören — so sieht
+ // Erschließung aus, die älter ist als die Straße daneben.
+ for (let k = 0; k < 9; k++) {
+  const x0 = -1040 + rng() * 860, z0 = -460 + rng() * 1280, quer = rng() < .5;
+  for (let t = 0; t < 140; t += 7) {
+   const x = quer ? x0 + t : x0 + Math.sin(t * .03) * 14;
+   const z = quer ? z0 + Math.sin(t * .03) * 14 : z0 + t;
+   if (!erlaubt(x, z)) continue;
+   w.box(x, groundAt(x, z) + .04, z, 6.4, .08, 7, 0x6e6853);
+  }
+ }
+}
+
 export function dressRegions(world) {
  const rng = zufall();
  sunsetSuburbs(world, rng);
@@ -1034,4 +1283,9 @@ export function dressRegions(world) {
  nordFlaechen(world, rng);
  randgebiete(world, rng);
  inselkette(world, rng);
+ rosalind(world, rng);
+ stausee(world, rng);
+ talonRidge(world, rng);
+ caneHollow(world, rng);
+ hinterland(world, rng);
 }

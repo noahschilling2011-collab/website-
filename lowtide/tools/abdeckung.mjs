@@ -29,7 +29,7 @@ const daten = await page.evaluate(() => {
 
 const zellen = new Map(daten.zellen);
 const {waterAt} = await import('../src/content.js');
-const bounds = {left: -580, right: 390, top: -540, bottom: 460};
+const {bounds} = await import('../src/content.js');
 let land = 0, leer = 0, gesamt = 0;
 const zeilen = [];
 for (let z = bounds.top; z < bounds.bottom; z += 100) {

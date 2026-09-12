@@ -1,5 +1,10 @@
 // Original LOWTIDE content. Dimensions are game metres; handling is arcade physics.
-export const bounds={left:-580,right:390,top:-540,bottom:460};
+// Die Karte war 970 auf 1000 Meter — knapp ein Quadratkilometer. Das ist der
+// eigentliche Abstand zu einer Open World dieser Art, nicht die Grundrissform.
+// Nach Westen und Süden verdoppelt: das Meer im Osten bleibt die Grenze, die
+// Innenstadt bleibt, wo sie war, und der neue Raum trägt eine zweite Stadt,
+// einen Stausee und das Hinterland dazwischen.
+export const bounds={left:-1100,right:390,top:-540,bottom:900};
 export const locations={
  garage:{x:-153,z:83,name:'Pike Customs',kind:'garage'},
  shop:{x:-155,z:23,name:'Supply & Style',kind:'shop'},
@@ -57,7 +62,9 @@ export const regions=[
  {name:'CYPRESS NATIONAL PARK',x:-465,z:-405},{name:'SALT MARSH',x:-460,z:55},
  {name:'MERCY AIRFIELD',x:-360,z:300},{name:'ISLA SERENA',x:290,z:225},
  {name:'SOUTH BEACH',x:100,z:295},
- {name:'THE LOWER KEYS',x:230,z:400},{name:'OUTER KEYS',x:270,z:-60}
+ {name:'THE LOWER KEYS',x:230,z:400},{name:'OUTER KEYS',x:270,z:-60},
+ {name:'ROSALIND',x:-870,z:340},{name:'TALON RIDGE',x:-880,z:-160},
+ {name:'CANE HOLLOW',x:-640,z:640},{name:'MERCY RESERVOIR',x:-700,z:80}
 ];
 export const vehicleTypes={
  compact:{name:'Finch',mass:950,max:25,accel:11,brake:22,turn:1.8,grip:1,shape:'car',scale:[.85,.9,.82],sound:70,security:1},
@@ -112,7 +119,18 @@ export function waterAt(x,z){
  }
  return x<-400&&x>-545&&z>-20&&z<130;
 }
-export function groundAt(x,z){if(waterAt(x,z))return -1.2;if(x<-380&&z<-240){const a=Math.max(0,1-((x+490)/155)**2-((z+420)/195)**2);return a*a*62;}return 0;}
+export function groundAt(x,z){
+ if(waterAt(x,z))return -1.2;
+ // Cypress-Hügel im Nordwesten.
+ if(x<-380&&x>-700&&z<-240){const a=Math.max(0,1-((x+490)/155)**2-((z+420)/195)**2);return a*a*62;}
+ // Talon Ridge: ein langer Rücken im neuen Westen. Ohne Höhe wäre die
+ // doppelte Fläche eine doppelt so große Ebene.
+ if(x<-680&&z<80){
+  const a=Math.max(0,1-((x+900)/230)**2-((z+160)/300)**2);
+  return a*a*88;
+ }
+ return 0;
+}
 // Ampeltakt. Achse 0 regelt den Verkehr in Nord-Süd-Richtung, Achse 1 den
 // in Ost-West-Richtung; die zweite ist um den halben Takt versetzt.
 // Beleuchtung und Verkehr lesen dieselbe Funktion, sonst hielten Autos bei
@@ -138,6 +156,16 @@ export const roadSegments=[
  {x1:-460,z1:-180,x2:100,z2:-180,w:17},{x1:-340,z1:-420,x2:-340,z2:405,w:18},
  {x1:-100,z1:-420,x2:-100,z2:405,w:18},{x1:-340,z1:-320,x2:100,z2:-320,w:14},
  {x1:-340,z1:200,x2:280,z2:200,w:12},{x1:-340,z1:400,x2:100,z2:400,w:16},
+ // Erschließung des Westens und Südens. Zwei Fernstraßen und das Raster von
+ // Rosalind; ohne sie wäre der neue Raum nur mit dem Hubschrauber erreichbar.
+ {x1:-1060,z1:200,x2:-340,z2:200,w:17},   // Westumgehung
+ {x1:-1060,z1:620,x2:100,z2:620,w:16},    // Südtangente
+ {x1:-820,z1:-460,x2:-820,z2:860,w:17},   // Ridge Highway
+ {x1:-560,z1:-180,x2:-560,z2:860,w:16},   // Hollow Road
+ {x1:-1060,z1:-160,x2:-560,z2:-160,w:15}, // Talon Ridge Zufahrt
+ {x1:-960,z1:260,x2:-960,z2:440,w:13},{x1:-900,z1:260,x2:-900,z2:440,w:13},
+ {x1:-1000,z1:300,x2:-760,z2:300,w:13},{x1:-1000,z1:380,x2:-760,z2:380,w:13},
+ {x1:-1030,z1:340,x2:-720,z2:340,w:16},  // Rosalind Main Street
  // Keys Highway: über den Damm bis zur letzten Insel.
  {x1:100,z1:400,x2:360,z2:400,w:14}
 ];

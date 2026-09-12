@@ -45,7 +45,15 @@ export class Campaign extends Simulation{
    [[-334,-174],[74,-174],[74,74],[-334,74]],
    [[-334,394],[340,394],[340,394],[-334,394]],
    [[-94,194],[274,194],[274,194],[-94,194]],
-   [[26,-94],[74,-94],[74,144],[26,144]]
+   [[26,-94],[74,-94],[74,144],[26,144]],
+   // Der Westen. Ohne diese Runden wäre die doppelte Karte doppelt so leer:
+   // Ridge Highway, Westumgehung, Südtangente und Rosalind Main Street.
+   [[-814,-440],[-814,840],[-566,840],[-566,-170]],
+   [[-1050,206],[-346,206],[-346,614],[-1050,614]],
+   // Die Querstraße bei z = 300 endet bei x = -1000 und -760; die Rückfahrt
+   // muss innerhalb dieser Enden bleiben, sonst führt der Weg über die Wiese.
+   [[-1020,346],[-730,346],[-770,304],[-990,304]],
+   [[-954,266],[-954,434],[-906,434],[-906,266]]
   ];
   RUNDEN.forEach((runde,r)=>{
    const weg=runde.map(([x,z])=>({x,z}));

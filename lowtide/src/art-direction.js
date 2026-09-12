@@ -73,9 +73,14 @@ function quad(g,points,material){const a=new T.BufferGeometry();a.setAttribute('
 // Scheinwerfer und Rücklichter gehören dem einzelnen Wagen. Vorher legte
 // jeder Aufruf über fünfzig neue BufferGeometries an — bei dreißig Autos in
 // der Stadt sind das eineinhalbtausend, alle mit identischem Inhalt.
-let FORMEN=null;
-function fahrzeugFormen(){
- if(FORMEN)return FORMEN;
+// sparsam: das Vorbild für die geparkten Wagen. Vierhundertvierundsiebzig
+// Stück stehen über die Karte verteilt und werden alle jedes Bild gezeichnet.
+// Mit Torusreifen, Innenraum und fünf Speichen je Rad waren das 1,4 Millionen
+// Dreiecke für Kulisse, in die niemand einsteigt.
+const FORMEN={};
+function fahrzeugFormen(sparsam){
+ const schluessel=sparsam?'sparsam':'voll';
+ if(FORMEN[schluessel])return FORMEN[schluessel];
  const karosserie=shell([[-2.2,.68,.48,.88],[-1.9,.91,.39,1.04],[-1.25,.99,.36,1.08],[.75,.99,.36,1.07],[1.7,.9,.43,.91],[2.2,.72,.5,.77]]);
  // Die Höhennormierung gehört zur Form, nicht zum Exemplar: einmal hier,
  // sonst würde sie sich bei jedem Auto erneut anwenden.
@@ -91,19 +96,22 @@ function fahrzeugFormen(){
  for(let x=-.45;x<=.45;x+=.15)zaehne.push(teil(new T.BoxGeometry(.025,.13,.06),x,.56,2.23));
  zaehne.push(teil(new T.BoxGeometry(1.05,.18,.05),0,.56,2.2));
  const speichen=[];for(let a=0;a<5;a++)speichen.push(teil(new T.BoxGeometry(.04,.45,.045),0,0,0,a*Math.PI/5));
- FORMEN={
+ FORMEN[schluessel]={
   karosserie,
   kabine:shell([[-1.45,.82,.88,1.0],[-.85,.76,.94,1.58],[.5,.75,.94,1.58],[1.15,.84,.9,1.03]]),
   lack:verschmelze(lackTeile), chrom:verschmelze(chromTeile), grill:verschmelze(zaehne),
-  speichen:verschmelze(speichen),
+  speichen:sparsam?null:verschmelze(speichen),
   scheinwerfer:new T.BoxGeometry(.54,.12,.04), ruecklicht:new T.BoxGeometry(.63,.1,.04),
-  reifen:new T.TorusGeometry(.33,.105,8,20), felge:new T.CylinderGeometry(.265,.265,.035,20),
-  balken:new T.BoxGeometry(.48,.14,.3)
+  // Reifen als kurzer Zylinder statt als Torus: 32 statt 320 Dreiecke.
+  reifen:sparsam?new T.CylinderGeometry(.42,.42,.22,8):new T.TorusGeometry(.33,.105,8,20),
+  reifenQuer:!sparsam,
+  felge:new T.CylinderGeometry(.265,.265,.035,sparsam?8:20),
+  balken:new T.BoxGeometry(.48,.14,.3), sparsam
  };
- return FORMEN;
+ return FORMEN[schluessel];
 }
 
-export function detailedCar(color,police=false){const F=fahrzeugFormen();const g=new T.Group();const paint=new T.MeshPhysicalMaterial({color,roughness:.24,metalness:.65,clearcoat:1,clearcoatRoughness:.12});
+export function detailedCar(color,police=false,sparsam=false){const F=fahrzeugFormen(sparsam);const g=new T.Group();const paint=new T.MeshPhysicalMaterial({color,roughness:.24,metalness:.65,clearcoat:1,clearcoatRoughness:.12});
  const body=mesh(g,F.karosserie,paint);
  // Base World scales body damage; normalize to the preserved height convention.
  body.scale.y=.55;
@@ -122,8 +130,8 @@ export function detailedCar(color,police=false){const F=fahrzeugFormen();const g
  const roof=mesh(g,F.lack,paint);
  mesh(g,F.chrom,m(0xb8c2bb,.25,.8));
  const grille=mesh(g,F.grill,m(0x25333c,.4,.5));
- const wheels=[],rims=[];for(const x of [-.96,.96])for(const z of [-1.35,1.37]){const wheel=new T.Group();wheel.position.set(x,.44,z);const tire=mesh(wheel,F.reifen,m(0x20272c,.97));tire.rotation.y=Math.PI/2;const rim=mesh(wheel,F.felge,m(0xaeb9b9,.24,.85));rim.rotation.z=Math.PI/2;rims.push(rim);mesh(wheel,F.speichen,m(0x52686d,.3,.8));g.add(wheel);wheels.push(wheel);}
- const interior=new T.Group();for(const x of [-.4,.4])ellipsoid(interior,x,1.12,0,.24,.27,.2,m(0x333d3d,.9));g.add(interior);
+ const wheels=[],rims=[];for(const x of [-.96,.96])for(const z of [-1.35,1.37]){const wheel=new T.Group();wheel.position.set(x,.44,z);const tire=mesh(wheel,F.reifen,m(0x20272c,.97));if(F.reifenQuer)tire.rotation.y=Math.PI/2;else tire.rotation.z=Math.PI/2;const rim=mesh(wheel,F.felge,m(0xaeb9b9,.24,.85));rim.rotation.z=Math.PI/2;rims.push(rim);if(F.speichen)mesh(wheel,F.speichen,m(0x52686d,.3,.8));g.add(wheel);wheels.push(wheel);}
+ const interior=new T.Group();if(!sparsam)for(const x of [-.4,.4])ellipsoid(interior,x,1.12,0,.24,.27,.2,m(0x333d3d,.9));g.add(interior);
  const policeLights=[];if(police){for(const side of [-1,1])policeLights.push(mesh(g,F.balken,new T.MeshStandardMaterial({color:side<0?0xef5549:0x4b9bd6,emissive:side<0?0xe64a45:0x3c85de,emissiveIntensity:2}),side*.36,1.76,0));}
  g.userData={body,wheels,rims,lights:policeLights,headlights:lights,taillights:rueck,glass:cabin,roof,interior,paint,grille};return g;
 }
