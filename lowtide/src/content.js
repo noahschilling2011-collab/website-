@@ -20,7 +20,15 @@ export const locations={
  tower:{x:-270,z:-148,name:'Relaisstation',kind:'tower'},
  records:{x:-330,z:-87,name:'Stadtarchiv',kind:'records'},
  ferry:{x:275,z:215,name:'Isla Serena',kind:'ferry'},
- aircargo:{x:-390,z:270,name:'Luftfracht',kind:'aircargo'}
+ aircargo:{x:-390,z:270,name:'Luftfracht',kind:'aircargo'},
+ drag:{x:-315,z:250,name:'Mercy Dragstrip',kind:'race:drag'},
+ moto:{x:-402,z:-248,name:'Cypress Enduro',kind:'race:moto'},
+ boat:{x:252,z:214,name:'Serena Regatta',kind:'race:boot'},
+ jet:{x:127,z:158,name:'Ripple Sprint',kind:'race:jet'},
+ darts:{x:-268,z:120,name:'Dartscheibe',kind:'darts'},
+ pool:{x:-206,z:16,name:'Billardtisch',kind:'pool'},
+ range:{x:-146,z:16,name:'Schießstand',kind:'range'},
+ schatz:{x:-450,z:-330,name:'Bergungsauftrag',kind:'treasure'}
 };
 // Kaufbare Objekte. Jedes wirft täglich etwas ab und dient als Ruhepunkt;
 // teurere Objekte tragen sich langsamer ab, lohnen sich aber auf Dauer.
@@ -115,3 +123,24 @@ export const intersections=(()=>{
  }
  return treffer;
 })();
+
+// Rennstrecken. Alle laufen über dieselbe Kontrollpunkt-Mechanik; sie
+// unterscheiden sich in Kurs, verlangtem Fahrzeug und Preisgeld.
+export const rennen={
+ west:{name:'WEST LOOP',medium:'land',preis:500,ziel:100,punkte:[
+  {x:-280,z:-100},{x:-100,z:-100},{x:-100,z:200},{x:-340,z:200},{x:-340,z:80},{x:-280,z:80}]},
+ drag:{name:'MERCY DRAGSTRIP',medium:'land',preis:300,ziel:22,punkte:[
+  {x:-315,z:262},{x:-315,z:310},{x:-315,z:360},{x:-315,z:386}]},
+ moto:{name:'CYPRESS ENDURO',medium:'land',form:'bike',preis:650,ziel:95,punkte:[
+  {x:-418,z:-262},{x:-452,z:-300},{x:-486,z:-352},{x:-520,z:-410},{x:-470,z:-448},
+  {x:-424,z:-396},{x:-402,z:-310},{x:-402,z:-248}]},
+ boot:{name:'SERENA REGATTA',medium:'water',preis:600,ziel:120,punkte:[
+  {x:180,z:250},{x:210,z:330},{x:300,z:370},{x:380,z:300},{x:390,z:180},{x:300,z:120},{x:180,z:150}]},
+ jet:{name:'RIPPLE SPRINT',medium:'water',preis:420,ziel:70,punkte:[
+  {x:140,z:120},{x:170,z:60},{x:150,z:-10},{x:180,z:-70},{x:145,z:-120},{x:132,z:-40},{x:130,z:110}]}
+};
+
+// Bergungsauftrag: sechs Fundstellen, eine nach der anderen.
+export const schatzOrte=[
+ {x:-452,z:-338},{x:-97,z:-286},{x:163,z:212},{x:-360,z:352},{x:-486,z:70},{x:-268,z:-102}
+];

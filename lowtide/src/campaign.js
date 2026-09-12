@@ -1,5 +1,5 @@
 import {Simulation,clamp,distance,intersects,lineClear,places} from './simulation.js';
-import {bounds,locations,vehicleTypes,weapons,waterAt,groundAt,roadSegments,immobilien} from './content.js';
+import {bounds,locations,vehicleTypes,weapons,waterAt,groundAt,roadSegments,immobilien,rennen,schatzOrte} from './content.js';
 import {findPath} from './navigation.js';
 export class Campaign extends Simulation{
  constructor(){
@@ -53,9 +53,24 @@ export class Campaign extends Simulation{
  loadWeapon(){const p=this.player;const w=p.inventory[p.weapon];p.ammo=w.ammo;p.reserve=w.reserve;}
  cycleWeapon(){if(this.player.car||this.reloadJob)return;this.saveWeapon();const list=Object.keys(this.player.inventory),i=list.indexOf(this.player.weapon);this.player.weapon=list[(i+1)%list.length];this.loadWeapon();this.player.armed=true;this.notify(weapons[this.player.weapon].name);}
  choose(choice){super.choose(choice);if(choice==='leak')this.relationship=80;if(choice==='sell')this.relationship=20;}
- objective(){if(this.activity?.kind==='race')return this.activity.points[this.activity.index]||locations.race;if(this.activity?.kind==='diving')return {x:178,z:190};if(this.campaign?.stage===1)return !this.campaign.relay?locations.tower:locations.records;if(this.campaign?.stage===2)return this.campaign.witness?locations.aircargo:locations.ferry;if(this.campaign?.stage===3)return locations.home;return super.objective();}
+ objective(){if(this.activity?.kind==='treasure')return schatzOrte[this.schatzIndex||0]||locations.schatz;
+  if(this.activity?.kind==='race')return this.activity.points[this.activity.index]||locations.race;if(this.activity?.kind==='diving')return {x:178,z:190};if(this.campaign?.stage===1)return !this.campaign.relay?locations.tower:locations.records;if(this.campaign?.stage===2)return this.campaign.witness?locations.aircargo:locations.ferry;if(this.campaign?.stage===3)return locations.home;return super.objective();}
  missionTitle(){if(this.activity)return this.activity.label;if(this.campaign.stage===1)return this.campaign.relay?'Hole die Ratsakte aus dem Archiv':'Mara: Relais abschalten';if(this.campaign.stage===2)return this.campaign.witness?'Bring die Zeugin zum Flughafen':'Finde die Zeugin auf Isla Serena';if(this.campaign.stage===3)return 'Zurück zur Wohnung — entscheide';if(this.campaign.stage===4)return 'Kampagne abgeschlossen';return ['Sprich mit Mara am Pier','Betritt das Caldera-Lager','Sichere die Festplatte','Bring die Beweise zu Mara','Ein zweiter Name in den Akten'][this.mission];}
- action(){const p=this.player;if(this.activity){if(this.activity.kind==='diving'){if(distance(p,{x:178,z:190})<5&&p.y<-1.5){this.award(220);this.activity=null;this.notify('Wrackfund gesichert. $220.');}else this.notify('Schwimme zum Marker und halte C zum Tauchen.');}else this.activityTap();return null;}if(!p.car){if(this.campaign.stage===1&&distance(p,locations.tower)<5){if(this.active!==1){this.notify('Mara kennt das Relais. Wechsle mit Tab / Figuren.');return null;}this.campaign.relay=true;this.notify('Mara: Signal aus. Eli kann jetzt ins Archiv.');return null;}if(this.campaign.stage===1&&distance(p,locations.records)<5){if(!this.campaign.relay){this.notify('Zuerst muss Mara das Relais abschalten.');return null;}if(this.active!==0){this.notify('Eli besitzt die Zugangskarte. Wechsle die Figur.');return null;}this.campaign.archive=true;this.campaign.stage=2;this.award(400);this.notify('Die Akte nennt eine Zeugin auf Isla Serena.');return null;}if(this.campaign.stage===2&&!this.campaign.witness&&distance(p,locations.ferry)<5){this.campaign.witness=true;this.notify('Nadia folgt dir. Besorge ein Auto und bring sie zur Luftfracht.');return null;}if(this.campaign.stage===2&&this.campaign.witness&&distance(p,locations.aircargo)<6){if(this.stars){this.notify('Nadia steigt erst aus, wenn du die Fahndung verloren hast.');return null;}this.campaign.stage=3;this.award(700);this.notify('Nadia ist sicher. Entscheide zu Hause über die vollständige Akte.');return null;}if(this.campaign.stage===3&&distance(p,locations.home)<5)return 'finale';if(this.mission===4&&this.campaign.stage===0&&distance(p,places.safe)<5)return 'chapter2';}
+ action(){const p=this.player;if(this.activity){
+  if(this.activity.kind==='treasure'){
+   const ziel=schatzOrte[this.schatzIndex||0];
+   if(ziel&&distance(p,ziel)<5){
+    this.schatzIndex=(this.schatzIndex||0)+1;
+    const lohn=180+this.schatzIndex*60;this.award(lohn);
+    this.notify('Fundstelle geborgen. $'+lohn+'.');
+    if(this.schatzIndex>=schatzOrte.length){this.activity=null;this.award(900);
+     this.notify('Alle sechs geborgen. Prämie $900.');
+     this.post('@tideline_lokal','Jemand hat die alten Bergungsmarken abgeräumt. Alle sechs.');}
+    else this.activity.label='BERGUNG · Fundstelle '+(this.schatzIndex+1)+' von '+schatzOrte.length;
+   }else this.notify('Folge dem goldenen Marker.');
+   return null;
+  }
+  if(this.activity.kind==='diving'){if(distance(p,{x:178,z:190})<5&&p.y<-1.5){this.award(220);this.activity=null;this.notify('Wrackfund gesichert. $220.');}else this.notify('Schwimme zum Marker und halte C zum Tauchen.');}else this.activityTap();return null;}if(!p.car){if(this.campaign.stage===1&&distance(p,locations.tower)<5){if(this.active!==1){this.notify('Mara kennt das Relais. Wechsle mit Tab / Figuren.');return null;}this.campaign.relay=true;this.notify('Mara: Signal aus. Eli kann jetzt ins Archiv.');return null;}if(this.campaign.stage===1&&distance(p,locations.records)<5){if(!this.campaign.relay){this.notify('Zuerst muss Mara das Relais abschalten.');return null;}if(this.active!==0){this.notify('Eli besitzt die Zugangskarte. Wechsle die Figur.');return null;}this.campaign.archive=true;this.campaign.stage=2;this.award(400);this.notify('Die Akte nennt eine Zeugin auf Isla Serena.');return null;}if(this.campaign.stage===2&&!this.campaign.witness&&distance(p,locations.ferry)<5){this.campaign.witness=true;this.notify('Nadia folgt dir. Besorge ein Auto und bring sie zur Luftfracht.');return null;}if(this.campaign.stage===2&&this.campaign.witness&&distance(p,locations.aircargo)<6){if(this.stars){this.notify('Nadia steigt erst aus, wenn du die Fahndung verloren hast.');return null;}this.campaign.stage=3;this.award(700);this.notify('Nadia ist sicher. Entscheide zu Hause über die vollständige Akte.');return null;}if(this.campaign.stage===3&&distance(p,locations.home)<5)return 'finale';if(this.mission===4&&this.campaign.stage===0&&distance(p,places.safe)<5)return 'chapter2';}
   const near=Object.entries(locations).find(([id,l])=>distance(p,l)<(p.car?9:4.5)&&(!p.car||['garage','fuel'].includes(id)));if(near)return 'place:'+near[0];
   return super.action();
  }
@@ -135,12 +150,39 @@ export class Campaign extends Simulation{
   if(price)this.buchung(locations[l]?.name||'Ausgabe',-price);
   this.notify('Erledigt · $'+price);return true;
  }
- startActivity(kind){if(this.stars){this.notify('Zuerst die Fahndung verlieren.');return;}if(kind==='race'){if(!this.player.car){this.notify('Starte das Rennen in einem Fahrzeug am West Loop.');return;}this.activity={kind,label:'WEST LOOP · Kontrollpunkte',time:0,index:0,points:[{x:-280,z:-100},{x:-100,z:-100},{x:-100,z:200},{x:-340,z:200},{x:-340,z:80},{x:-280,z:80}]};return;}
+ startActivity(kind){if(this.stars){this.notify('Zuerst die Fahndung verlieren.');return;}
+  // Alle Rennen laufen über dieselbe Mechanik; sie unterscheiden sich in
+  // Kurs, verlangtem Fahrzeug und Preisgeld.
+  if(kind==='race'||kind.startsWith('race:')){
+   const id=kind.includes(':')?kind.split(':')[1]:'west',k=rennen[id];
+   if(!k){this.notify('Diese Strecke gibt es nicht.');return;}
+   const c=this.player.car;
+   if(!c){this.notify(k.name+': Du brauchst ein Fahrzeug.');return;}
+   const d=vehicleTypes[c.model];
+   const medium=d.medium==='water'?'water':d.medium==='air'?'air':'land';
+   if(medium!==k.medium){this.notify(k.name+': '+(k.medium==='water'?'Boot oder Jetski nötig.':'Landfahrzeug nötig.'));return;}
+   if(k.form&&d.shape!==k.form){this.notify(k.name+': nur mit dem Motorrad.');return;}
+   this.activity={kind:'race',kurs:id,label:k.name+' · Kontrollpunkte',time:0,index:0,points:k.punkte};
+   this.notify(k.name+': '+k.punkte.length+' Kontrollpunkte, Richtzeit '+k.ziel+' s.');
+   return;
+  }
+  // Bergungsauftrag: sechs Fundstellen, eine nach der anderen.
+  if(kind==='treasure'){
+   this.schatzIndex=this.schatzIndex||0;
+   if(this.schatzIndex>=schatzOrte.length){this.notify('Alle Fundstellen sind geborgen.');return;}
+   this.activity={kind,label:'BERGUNG · Fundstelle '+(this.schatzIndex+1)+' von '+schatzOrte.length,time:0};
+   this.notify('Marker gesetzt. E an der Fundstelle.');
+   return;
+  }
   if(kind==='diving'){this.activity={kind,label:'TAUCHGANG · Wrackfund',time:0};return;}
+  if(kind==='range'&&!this.player.armed){this.notify('Waffe ziehen: Q.');return;}
   if(kind==='skydive'){this.notify('Nimm den Hubschrauber oder das Flugzeug. Steige über 40 m, E zum Absprung und Leertaste für den Schirm.');return;}
-  this.activity={kind,label:{basketball:'BASKETBALL · Triff das Wurffenster',gym:'TRAINING · Halte den Rhythmus',fishing:'ANGELN · Warte auf den Biss',club:'UNDERTOW · Folge dem Beat'}[kind]||'AKTIVITÄT',time:0,round:0,score:0,phase:0,biteAt:2+this.rng()*4,result:''};
+  this.activity={kind,label:{basketball:'BASKETBALL · Triff das Wurffenster',gym:'TRAINING · Halte den Rhythmus',fishing:'ANGELN · Warte auf den Biss',club:'UNDERTOW · Folge dem Beat',darts:'DARTS · Triff das schmale Feld',pool:'BILLARD · Stoß im richtigen Moment',range:'SCHIESSSTAND · Fünf Scheiben'}[kind]||'AKTIVITÄT',time:0,round:0,score:0,phase:0,biteAt:2+this.rng()*4,result:''};
  }
- activityTap(){const a=this.activity;if(!a)return;if(a.kind==='race'){this.notify('Fahre durch den goldenen Kontrollpunkt.');return;}if(a.kind==='fishing'){if(a.time>=a.biteAt&&a.time<a.biteAt+1){this.player.fish++;this.award(45);this.notify('Gefangen! $45.');}else this.notify('Kein Fang. Beim Biss reagieren.');this.activity=null;return;}if(['gym','basketball','club'].includes(a.kind)){const hit=Math.abs(a.phase-.5)<(a.kind==='basketball'?.13:.17);a.round++;if(hit)a.score++;a.result=hit?'Treffer':'Daneben';a.time+=.31;if(a.round>=5){const score=a.score;if(a.kind==='gym'){this.player.fitness=Math.min(10,this.player.fitness+score);this.player.stamina=100;}else this.award(score*(a.kind==='basketball'?30:15));this.highScores[a.kind]=Math.max(this.highScores[a.kind]||0,score);this.notify(a.label.split(' · ')[0]+': '+score+'/5 erfolgreich.');this.activity=null;}}}
+ activityTap(){const a=this.activity;if(!a)return;if(a.kind==='race'){this.notify('Fahre durch den goldenen Kontrollpunkt.');return;}if(a.kind==='fishing'){if(a.time>=a.biteAt&&a.time<a.biteAt+1){this.player.fish++;this.award(45);this.notify('Gefangen! $45.');}else this.notify('Kein Fang. Beim Biss reagieren.');this.activity=null;return;}if(['gym','basketball','club','darts','pool','range'].includes(a.kind)){
+   const fenster={basketball:.13,gym:.17,club:.17,darts:.075,pool:.11,range:.09}[a.kind];
+   const hit=Math.abs(a.phase-.5)<fenster;a.round++;if(hit)a.score++;a.result=hit?'Treffer':'Daneben';a.time+=.31;if(a.round>=5){const score=a.score;if(a.kind==='gym'){this.player.fitness=Math.min(10,this.player.fitness+score);this.player.stamina=100;}
+    else this.award(score*{basketball:30,club:15,darts:45,pool:55,range:60}[a.kind]||15);this.highScores[a.kind]=Math.max(this.highScores[a.kind]||0,score);this.notify(a.label.split(' · ')[0]+': '+score+'/5 erfolgreich.');this.activity=null;}}}
  cancelActivity(){this.activity=null;this.notify('Aktivität beendet.');}
  tick(dt,input={}){if(this.paused)return;const p=this.player;dt=Math.min(.05,dt);this.tickCount++;if(this.unlock){const c=this.cars.find(c=>c.id===this.unlock.id);if(!input.interact||!c||distance(c,p)>5||input.forward||input.turn){this.unlock=null;}else{this.unlock.remaining-=dt;if(this.unlock.remaining<=0){c.unlocked=true;this.unlock=null;this.board(c);}}}
   if(this.reloadJob){this.reloadJob.remaining-=dt;if(this.reloadJob.remaining<=0){const w=weapons[p.weapon],n=Math.min(w.capacity-p.ammo,p.reserve);p.ammo+=n;p.reserve-=n;this.reloadJob=null;this.saveWeapon();}}
@@ -152,7 +194,14 @@ export class Campaign extends Simulation{
   super.tick(dt,{...input,sprint:input.sprint&&p.stamina>0,sneak:input.sneak||p.cover});this.npcs=all;for(const [n,h] of stunned)n.health=h;
   if(oldWeatherTimer<=dt){this.weatherIndex=(this.weatherIndex+1)%4;this.weather=['clear','rain','fog','storm'][this.weatherIndex];this.notify('Wetterwechsel: '+this.weather);}
   if(!p.car){if(waterAt(p.x,p.z)&&p.y<=0){p.y=input.sneak?Math.max(-3.5,p.y-dt*1.5):Math.min(-.5,p.y+dt*2);p.air=clamp(p.air+(p.y<-1.5?-dt*10:dt*25),0,100);if(!p.air)p.health=Math.max(0,p.health-dt*8);}else{p.vy-=dt*(p.parachute?2:16);p.vy=Math.max(p.parachute?-3:-35,p.vy);p.y+=p.vy*dt;if(p.y<=0){if(p.vy<-13)p.health=Math.max(0,p.health-(-p.vy-13)*3);p.y=0;p.vy=0;if(p.parachute){this.award(60);this.notify('Sicher gelandet. $60.');}p.parachute=false;}}}
-  if(this.activity){const a=this.activity;a.time+=dt;a.phase=(Math.sin(a.time*(a.kind==='club'?5:a.kind==='gym'?3:2.5))+1)/2;if(a.kind==='race'&&distance(p,a.points[a.index])<10){a.index++;if(a.index===a.points.length){this.highScores.race=Math.min(this.highScores.race||99999,a.time);this.award(a.time<100?500:250);this.notify('Rennen beendet: '+a.time.toFixed(1)+' s.');this.activity=null;}}if(a.kind==='fishing'&&a.time>a.biteAt+1){this.notify('Der Fisch ist entkommen.');this.activity=null;}}
+  if(this.activity){const a=this.activity;a.time+=dt;a.phase=(Math.sin(a.time*(a.kind==='club'?5:a.kind==='gym'?3:2.5))+1)/2;if(a.kind==='race'&&distance(p,a.points[a.index])<10){a.index++;if(a.index===a.points.length){
+    const k=rennen[a.kurs||'west'],schluessel='race:'+(a.kurs||'west');
+    this.highScores[schluessel]=Math.min(this.highScores[schluessel]||99999,a.time);
+    const preis=a.time<k.ziel?k.preis:Math.round(k.preis*.45);
+    this.award(preis);
+    this.notify(k.name+' beendet: '+a.time.toFixed(1)+' s · $'+preis);
+    this.post('@tideline_lokal',k.name+': neue Zeit '+a.time.toFixed(1)+' Sekunden.');
+    this.activity=null;}}if(a.kind==='fishing'&&a.time>a.biteAt+1){this.notify('Der Fisch ist entkommen.');this.activity=null;}}
   this.zahltag();this.updateRoutines(dt);this.updateGuards(dt);this.updateEvents(dt);if(this.campaign.witness&&this.campaign.stage===2){if(!this.witness)this.witness={x:p.x-2,z:p.z-2};const d=distance(this.witness,p);if(p.car){this.witness.x=p.x;this.witness.z=p.z;}else if(d>2){this.witness.x+=(p.x-this.witness.x)/d*dt*5;this.witness.z+=(p.z-this.witness.z)/d*dt*5;}}
  }
  updateRoutines(dt){if(this.tickCount%30)return;for(const n of this.npcs){if(n.guard||n.report||n.health<=0||n.state!=='normal')continue;const mode=this.hour>=8&&this.hour<17?'Arbeit':this.hour>=20||this.hour<6?'Zuhause':'Freizeit';if(n.schedule!==mode){n.schedule=mode;const goal=mode==='Zuhause'?n.home:n.work;n.path=mode==='Freizeit'?n.originalPath.map(p=>({...p})):[...findPath(n,goal,p=>this.blocked(p,.3),2,2500),goal];n.target=0;}n.pace=this.weather==='storm'?2:1.1+(n.id%5)*.13;}}
@@ -173,6 +222,6 @@ export class Campaign extends Simulation{
   }
   if(!nowWanted&&this.barriers.length){this.solids=this.solids.filter(b=>!this.barriers.includes(b));this.barriers=[];}const heli=this.policeHeli;if(heli){const target=this.stars>=5?(this.lastSeen||p):{x:-360,z:305};const d=distance(heli,target);heli.alt=Math.min(45,heli.alt+dt*8);if(d>4){heli.yaw=Math.atan2(target.x-heli.x,target.z-heli.z);heli.x+=Math.sin(heli.yaw)*dt*30;heli.z+=Math.cos(heli.yaw)*dt*30;}else if(this.stars<5)heli.alt=Math.max(0,heli.alt-dt*16);if(this.stars>=5&&d<45&&p.y>=0&&lineClear(heli,p,this.solids)){this.spotted=true;this.lastSeen={x:p.x,z:p.z};}}if(nowWanted){if(this.spotted)this.unseen=0;else this.unseen+=dt;if(this.unseen>20+this.stars*4&&this.lastSeen&&distance(p,this.lastSeen)>35){this.stars=0;this.heat=0;this.description=null;this.lastSeen=null;this.notify('Fahndung beendet.');}}
  }
- snapshot(){this.saveWeapon();return {version:2,time:this.time,hour:this.hour,active:this.active,characters:this.characters.map(p=>({...p,car:null,carId:p.car?.id||null})),cars:this.cars,mission:this.mission,doorOpen:this.doorOpen,camera:this.camera,ending:this.ending,campaign:this.campaign,relationship:this.relationship,weather:this.weather,weatherIndex:this.weatherIndex,stars:this.stars,heat:this.heat,lastSeen:this.lastSeen,description:this.description,unseen:this.unseen,cops:this.cops,npcs:this.npcs,motelOwned:this.motelOwned,highScores:this.highScores,feed:this.feed,konto:this.konto,besitz:this.besitz,letzterZahltag:this.letzterZahltag};}
- restore(data){if(data?.version!==2||!Array.isArray(data.characters)||data.characters.length!==2||!Array.isArray(data.cars))throw new Error('Inkompatibler Spielstand');for(const p of data.characters)if(!Number.isFinite(p.x)||!Number.isFinite(p.z)||!p.inventory?.[p.weapon])throw new Error('Ungültiger Spielstand');for(const key of ['time','hour','active','characters','cars','mission','camera','ending','campaign','relationship','weather','weatherIndex','stars','heat','lastSeen','description','unseen','cops','npcs','motelOwned','highScores','feed','konto','besitz','letzterZahltag'])if(data[key]!==undefined)this[key]=data[key];for(const p of this.characters){p.car=this.cars.find(c=>c.id===p.carId)||null;p.cover=false;}this.player=this.characters[this.active];for(const c of this.cops){c.blocking=false;c.blockTarget=null;}if(data.doorOpen)this.openDoor();this.loadWeapon();this.paused=true;}
+ snapshot(){this.saveWeapon();return {version:2,time:this.time,hour:this.hour,active:this.active,characters:this.characters.map(p=>({...p,car:null,carId:p.car?.id||null})),cars:this.cars,mission:this.mission,doorOpen:this.doorOpen,camera:this.camera,ending:this.ending,campaign:this.campaign,relationship:this.relationship,weather:this.weather,weatherIndex:this.weatherIndex,stars:this.stars,heat:this.heat,lastSeen:this.lastSeen,description:this.description,unseen:this.unseen,cops:this.cops,npcs:this.npcs,motelOwned:this.motelOwned,highScores:this.highScores,feed:this.feed,konto:this.konto,besitz:this.besitz,letzterZahltag:this.letzterZahltag,schatzIndex:this.schatzIndex||0};}
+ restore(data){if(data?.version!==2||!Array.isArray(data.characters)||data.characters.length!==2||!Array.isArray(data.cars))throw new Error('Inkompatibler Spielstand');for(const p of data.characters)if(!Number.isFinite(p.x)||!Number.isFinite(p.z)||!p.inventory?.[p.weapon])throw new Error('Ungültiger Spielstand');for(const key of ['time','hour','active','characters','cars','mission','camera','ending','campaign','relationship','weather','weatherIndex','stars','heat','lastSeen','description','unseen','cops','npcs','motelOwned','highScores','feed','konto','besitz','letzterZahltag','schatzIndex'])if(data[key]!==undefined)this[key]=data[key];for(const p of this.characters){p.car=this.cars.find(c=>c.id===p.carId)||null;p.cover=false;}this.player=this.characters[this.active];for(const c of this.cops){c.blocking=false;c.blockTarget=null;}if(data.doorOpen)this.openDoor();this.loadWeapon();this.paused=true;}
 }

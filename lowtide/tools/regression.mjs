@@ -219,6 +219,63 @@ await page.keyboard.press('F3');
 pruefe('F3 blendet die Messwerte ein', await page.evaluate(() => !document.getElementById('debug').hidden));
 await page.keyboard.press('F3');
 
+console.log('Aktivitäten');
+pruefe('Rennen verlangt das passende Fahrzeug', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ s.stars = 0; s.activity = null;
+ if (s.player.car) {s.player.car.speed = 0; s.enterExit();}
+ s.startActivity('race:boot');
+ const ohneFahrzeug = !s.activity;
+ const auto = s.cars.find(c => c.model === 'sedan' && c.health > 0);
+ auto.unlocked = true;
+ s.player.x = auto.x + 1.5; s.player.z = auto.z; s.player.y = 0;
+ if (!s.player.car) s.enterExit();
+ s.startActivity('race:boot');       // Landfahrzeug auf einer Wasserstrecke
+ const falschesMedium = !s.activity;
+ s.startActivity('race:west');
+ const passt = s.activity?.kind === 'race' && s.activity.kurs === 'west';
+ return ohneFahrzeug && falschesMedium && passt;
+}));
+pruefe('Die Strecke wird mit ihren Kontrollpunkten gefahren', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim, a = s.activity;
+ if (!a) return false;
+ const punkte = a.points.length;
+ for (const punkt of a.points) {
+  if (!s.activity) break;
+  s.player.x = punkt.x; s.player.z = punkt.z;
+  if (s.player.car) {s.player.car.x = punkt.x; s.player.car.z = punkt.z;}
+  s.tick(.05, {});
+ }
+ return punkte >= 4 && !s.activity && (s.highScores['race:west'] || 0) > 0;
+}));
+await page.evaluate(() => {const s = window.LOWTIDE.sim; if (s.player.car) {s.player.car.speed = 0; s.enterExit();}});
+pruefe('Der Schießstand verlangt eine gezogene Waffe', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ // Die Streckenfahrt vorher kann Passanten erwischt und damit eine Fahndung
+ // ausgelöst haben; startActivity verweigert dann jede Aktivität.
+ s.stars = 0; s.heat = 0; s.lastSeen = null; s.description = null;
+ s.activity = null; s.player.armed = false;
+ s.startActivity('range');
+ const ohne = !s.activity;
+ s.player.armed = true;
+ s.startActivity('range');
+ const mit = s.activity?.kind === 'range';
+ s.activity = null; s.player.armed = false;
+ return ohne && mit;
+}));
+pruefe('Der Bergungsauftrag zählt Fundstellen und zahlt aus', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim, orte = window.LOWTIDE.schatzOrte;
+ s.schatzIndex = 0; s.activity = null; s.stars = 0;
+ s.startActivity('treasure');
+ if (!s.activity) return false;
+ const geld = s.player.money;
+ const ziel = s.objective();
+ s.player.x = ziel.x; s.player.z = ziel.z; s.player.car = null;
+ s.action();
+ return s.schatzIndex === 1 && s.player.money > geld && orte.length === 6;
+}));
+await page.evaluate(() => {window.LOWTIDE.sim.activity = null; window.LOWTIDE.sim.schatzIndex = 0;});
+
 console.log('Eigentum');
 pruefe('Kaufen scheitert ohne Geld', await page.evaluate(() => {
  const s = window.LOWTIDE.sim;
