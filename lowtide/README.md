@@ -123,6 +123,29 @@ Farbflecken, Rauheitsschwankung und eine Normalenstörung darüber, dreifach
 aus der Weltposition projiziert. Eine Textur ginge nicht: dieselbe
 Kistengeometrie trägt eine 240-m-Platte und einen 20-cm-Poller.
 
+Die kleinste Struktur war lange 0,74 m — aus zwei Metern Abstand ist das eine
+glatte Fläche. Beziffern lässt sich das über den örtlichen Kontrast, den
+mittleren Betrag der Helligkeitsdifferenz zu den Nachbarn zwei Bildpunkte
+weiter: auf Straßenhöhe 6,45 von 255, während ein Foto beim Doppelten bis
+Vierfachen liegt. Dazugekommen ist deshalb eine Oktave bei rund neun
+Zentimetern, die bis 26 m läuft und dort ausgeblendet wird — mit eigenem
+Relief, sonst schwankt die Farbe, aber das Licht wandert nicht.
+
+| Blick | Kontrast vorher | nachher |
+|---|---|---|
+| Innenstadt 13 Uhr | 6,45 | 9,26 |
+| Strand 13 Uhr | 6,99 | 10,12 |
+| Küste 13 Uhr (fast nur Wasser) | 8,21 | 8,37 |
+| Skyline aus 300 m | 17,84 | 17,84 |
+
+Die letzten beiden Zeilen gehören dazu: Wasser hat seinen eigenen Shader, und
+jenseits von 26 m ist das Korn aus. Wo es nicht wirken soll, wirkt es nicht.
+
+Der Maßstab ist gemessen, nicht geschätzt. Bei einer Periode von 6,7 statt 9
+Zentimetern steigt der Kontrast auf 23,3 — und die mittlere Helligkeit fällt
+von 103 auf 87. Eine zu stark gestörte Normale kippt im Mittel von der Sonne
+weg und frisst Licht. Kontrast allein ist deshalb kein Ziel.
+
 Der Knopf „Grafik: sparsam" schaltet Nachbearbeitung, Schatten und
 Pixelverhältnis zusammen ab.
 

@@ -31,8 +31,12 @@ float dNoise(vec3 x){
             mix(mix(dHash(i + vec3(0,0,1)), dHash(i + vec3(1,0,1)), f.x),
                 mix(dHash(i + vec3(0,1,1)), dHash(i + vec3(1,1,1)), f.x), f.y), f.z);
 }
-// Zwei Oktaven: eine grobe für Flecken, eine feine für Korn. Die dritte war
-// bei jedem Bildpunkt acht weitere Hashwerte wert und im Bild nicht zu sehen.
+// Zwei Oktaven: eine grobe für Flecken, eine feine für Korn. Eine dritte über
+// die ganze Sichtweite war acht weitere Hashwerte je Bildpunkt wert und im
+// Bild nicht zu sehen — in der Nähe dagegen fehlt sie: 0,74 m ist die
+// kleinste Struktur, die es bisher gab, und aus zwei Metern Abstand ist das
+// eine glatte Fläche. Gemessen am örtlichen Kontrast auf Straßenhöhe: 6,45
+// von 255, ein Foto liegt beim Doppelten bis Vierfachen.
 float dStruktur(vec3 p){
  return dNoise(p * 0.21) * 0.68 + dNoise(p * 1.35) * 0.32;
 }
@@ -182,11 +186,21 @@ export function detailAufsetzen(material, staerke = .13, relief = .5) {
    // groben Oktave, also dort, wo dWert klein ist.
    float dOben = smoothstep(0.45, 0.85, dWNormal.y);
    float dPfuetze = dNass * dOben * smoothstep(0.62, 0.28, dWert);
-   diffuseColor.rgb *= 1.0 - dNass * dOben * 0.30 - dPfuetze * 0.16;`)
+   diffuseColor.rgb *= 1.0 - dNass * dOben * 0.30 - dPfuetze * 0.16;
+   // Korn für die ersten Meter: rund neun Zentimeter groß, nur bis 26 m, und
+   // von dort weich ausgeblendet. Über die ganze Sichtweite wäre es teuer,
+   // und in der Ferne flimmert es, weil ein Bildpunkt dann mehrere Perioden
+   // überdeckt.
+   float dNahKorn = 1.0 - smoothstep(6.0, 26.0, length(vViewPosition));
+   float dKorn = 0.5;
+   if(dNahKorn > 0.01){
+    dKorn = dNoise(dWelt * 11.0);
+    diffuseColor.rgb *= 1.0 + (dKorn - 0.5) * 0.19 * dNahKorn;
+   }`)
    // Rauheit: gleichmäßig glänzende Flächen sind das sicherste Zeichen für
    // ein Rendering. Die Schwankung nimmt dem Bild diesen Zug.
    .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-   roughnessFactor = clamp(roughnessFactor + (dWert - 0.5) * 0.34, 0.05, 1.0);
+   roughnessFactor = clamp(roughnessFactor + (dWert - 0.5) * 0.34 + (dKorn - 0.5) * 0.26 * dNahKorn, 0.05, 1.0);
    roughnessFactor = mix(roughnessFactor, 0.09, clamp(dPfuetze * 1.25 + dNass * dOben * 0.45, 0.0, 0.92));`)
    // metalnessFactor wird erst im nächsten Baustein angelegt; im
    // Rauheitsblock gäbe es dafür einen Übersetzungsfehler.
@@ -204,6 +218,22 @@ export function detailAufsetzen(material, staerke = .13, relief = .5) {
      dNoise((dWelt + vec3(0.0,e,0.0)) * 1.35) - b,
      dNoise((dWelt + vec3(0.0,0.0,e)) * 1.35) - b);
     normal = normalize(normal + (viewMatrix * vec4(g, 0.0)).xyz * dRelief * dNah * 3.0);
+   }
+   // Feines Relief für dieselben ersten Meter. Ohne das bleibt das Korn eine
+   // aufgemalte Fläche: die Farbe schwankt, aber das Licht wandert nicht.
+   //
+   // Der Maßstab ist gemessen, nicht geschätzt. Bei 15 statt 11 steigt der
+   // örtliche Kontrast von 9,3 auf 23,3 — und die mittlere Helligkeit fällt
+   // von 103 auf 87. Eine zu stark gestörte Normale kippt im Mittel von der
+   // Sonne weg und frisst Licht; das ist Rauschen, das nach Struktur
+   // aussieht. Kontrast allein ist deshalb kein Ziel.
+   if(dNahKorn > 0.02){
+    float fe = 0.022, fb = dNoise(dWelt * 11.0);
+    vec3 fg = vec3(
+     dNoise((dWelt + vec3(fe,0.0,0.0)) * 11.0) - fb,
+     dNoise((dWelt + vec3(0.0,fe,0.0)) * 11.0) - fb,
+     dNoise((dWelt + vec3(0.0,0.0,fe)) * 11.0) - fb);
+    normal = normalize(normal + (viewMatrix * vec4(fg, 0.0)).xyz * dRelief * dNahKorn * 9.0);
    }`)
    .replace('#include <lights_fragment_end>', WOLKEN_ENDE);
  };
