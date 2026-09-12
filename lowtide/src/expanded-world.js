@@ -198,6 +198,19 @@ export class ExpandedWorld extends World{
      this.box(mx,y-.06,mz,nordSued?r.w+5.5:l,.16,nordSued?l:r.w+5.5,0x6f6a5c);
      this.box(mx,y-.34,mz,nordSued?r.w+9:l,.5,nordSued?l:r.w+9,0x5c6350);
     }
+    // Leitplanke, wo es neben der Fahrbahn hinuntergeht. Eine siebzehn Meter
+    // breite Straße quer über einen achtundachtzig Meter hohen Rücken hatte
+    // bisher nichts am Rand. Gesetzt wird sie nur dort, wo der Boden zehn
+    // Meter neben der Achse mehr als anderthalb Meter tiefer liegt — in der
+    // Ebene entsteht dadurch keine einzige Kiste.
+    for(const seite of [-1,1]){
+     const rx=mx+(nordSued?seite*(r.w/2+1.6):0),rz=mz+(nordSued?0:seite*(r.w/2+1.6));
+     const ax=mx+(nordSued?seite*(r.w/2+10):0),az=mz+(nordSued?0:seite*(r.w/2+10));
+     if(y-groundAt(ax,az)<1.5)continue;
+     this.box(rx,y+.62,rz,nordSued?.14:l,.34,nordSued?l:.14,0xb9bcb4);
+     for(let q=-l/2+1;q<l/2;q+=3)
+      this.box(rx+(nordSued?0:q),y+.36,rz+(nordSued?q:0),.16,.72,.16,0x8b8f88);
+    }
     this.box(mx,y+.03,mz,nordSued?r.w:l,.08,nordSued?l:r.w,0x3d494f);
    }
    for(let i=0;i<laenge;i+=16){

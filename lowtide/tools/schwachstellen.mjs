@@ -24,10 +24,24 @@ await p.click('#startBtn');
 await p.waitForTimeout(1200);
 
 const regionen = await p.evaluate(() => window.LOWTIDE.regionen.map(r => ({name: r.name, x: r.x, z: r.z})));
+// Die dritte Person taugt hier nicht: an einer Wand schiebt die Federung die
+// Kamera in die Figur, und dann misst man einen Rücken statt einer Gegend.
+// Bei HARBOR DISTRICT ist genau das passiert — 92,4 mittlere Helligkeit und
+// 9,38 Kontrast waren der Pullover des Spielers. Deshalb freie Kamera, neun
+// Meter über dem Ankerpunkt, Blick sechzig Meter waagerecht hinaus. Der
+// Dunst bleibt dabei auf Spielstärke; luftbild() setzt ihn sonst auf sechs
+// Prozent, was jede Ferne künstlich klar machen würde.
 const messe = async (x, z, blick) => {
  await p.evaluate(([x, z, blick]) => {
   const L = window.LOWTIDE; L.sim.hour = 13; L.sim.weather = 'clear';
-  L.view(x, z, blick, .12);
+  const y = L.groundAt(x, z);
+  // Sechzehn Meter hoch, Ziel fünfundvierzig Meter voraus auf Bodenhöhe:
+  // rund zwanzig Grad Neigung, der Horizont liegt im oberen Drittel. Waagerecht
+  // aus neun Metern lag die halbe Bildhöhe voller Ferne im Dunst, und dann
+  // misst man den Dunst, nicht die Gegend — der Schnitt fiel dadurch von
+  // 13,25 auf 7,73, ohne dass sich an der Karte etwas geändert hätte.
+  L.luftbild(x, y + 16, z, x + Math.sin(blick) * 45, y, z + Math.cos(blick) * 45);
+  L.world.nebelFaktor = 1;
  }, [x, z, blick]);
  const n = await p.evaluate(() => window.LOWTIDE.frames);
  await p.waitForFunction(k => window.LOWTIDE.frames > k + 3, n, {timeout: 120000});

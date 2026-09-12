@@ -859,6 +859,25 @@ const hindernisse = await page.evaluate(() => {
 });
 pruefe('Nichts Großes steht in einer Fahrbahn', hindernisse.length === 0,
  `${hindernisse.length} Stück, zuerst ${JSON.stringify(hindernisse.slice(0, 4))}`);
+// Leitplanken nur dort, wo es neben der Fahrbahn hinuntergeht.
+const planken = await page.evaluate(() => {
+ const w = window.LOWTIDE.world;
+ let hoch = 0, flach = 0;
+ for (const netz of w.bloecke || []) {
+  const f = netz.material.color?.getHexString();
+  if (f !== 'b9bcb4' && f !== '8b8f88') continue;
+  const arr = netz.instanceMatrix.array;
+  for (let i = 0; i < netz.count; i++) {
+   const y = arr[i * 16 + 13];
+   if (y > 20) hoch++; else if (y < 3) flach++;
+  }
+ }
+ return {hoch, flach};
+});
+pruefe('Die Straße über den Rücken hat eine Leitplanke', planken.hoch > 50,
+ `${planken.hoch} Teile über 20 m`);
+pruefe('In der Ebene steht keine Leitplanke', planken.flach === 0,
+ `${planken.flach} Teile unter 3 m`);
 pruefe('Sparmodus schaltet die Nachbearbeitung ab', await page.evaluate(() => {
  const knopf = document.getElementById('qualityBtn'), w = window.LOWTIDE.world;
  knopf.click();

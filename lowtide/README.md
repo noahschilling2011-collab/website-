@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 158 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 160 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -306,12 +306,37 @@ und das Vereinsheim der Vororte im Nordring. `sim.blocked` kennt nur
 registrierte Gebäude; alles, was `regions.js` als Kulisse setzt, ist durch
 jedes bisherige Netz gefallen.
 
-| Region | Kontrast vorher | nachher |
-|---|---|---|
-| TALON RIDGE | 6,03 | 7,72 |
+Dazu kam eine Leitplanke, wo es neben der Fahrbahn hinuntergeht: gesetzt nur
+dort, wo der Boden zehn Meter neben der Achse mehr als anderthalb Meter
+tiefer liegt. In der Ebene entsteht dadurch keine einzige Kiste, und zwei
+Prüfungen halten beides fest.
 
-Der Rest der Liste ist unverändert und steht als Arbeitsliste: MERCY
-RESERVOIR 8,29 und HARBOR DISTRICT 9,38 sind die nächsten.
+**Und das Werkzeug selbst hatte zwei Fehler**, beide erst beim Nachsehen
+aufgefallen. Es maß aus der dritten Person; an einer Wand schiebt die
+Federung die Kamera in die Figur, und bei HARBOR DISTRICT waren die
+gemessenen 9,38 der Pullover des Spielers. Danach maß es waagerecht aus neun
+Metern — da lag die halbe Bildhöhe voller Ferne im Dunst, und der Schnitt
+fiel von 13,25 auf 7,73, ohne dass sich an der Karte etwas geändert hätte.
+Jetzt sechzehn Meter hoch, Ziel fünfundvierzig Meter voraus auf Bodenhöhe.
+
+Die Rangliste danach, und damit die Arbeitsliste:
+
+| Region | örtl. Kontrast | Sättigung | Mittel |
+|---|---|---|---|
+| TALON RIDGE | 4,65 | 7,2 % | 205,0 |
+| MERCY RESERVOIR | 5,52 | 26,7 % | 143,6 |
+| CYPRESS NATIONAL PARK | 7,92 | 10,8 % | 189,0 |
+| … | | | |
+| DOWNTOWN | 14,24 | 27,7 % | 139,3 |
+| SOUTH BEACH | 15,54 | 12,8 % | 200,3 |
+| THE LOWER KEYS | 17,67 | 15,5 % | 191,6 |
+
+Ein Wert taugt hier nur im Vergleich unter gleicher Rahmung. Dass TALON
+RIDGE auch nach den Felsen und der Leitplanke bei 4,65 steht, liegt zum Teil
+am Blick selbst: von der Kuppe aus füllt die dunstige Ferne die untere
+Bildhälfte, und Dunst ist hell und farblos. Ein Werkzeug, das auf den Wert
+optimiert würde, hätte hier ein leichtes Ziel — deshalb steht daneben immer
+die Helligkeit.
 
 ## Was Zeichenaufrufe kostet
 
