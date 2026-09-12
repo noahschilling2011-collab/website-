@@ -14,7 +14,7 @@ const debug={sichtbar:false,frames:0,fps:0,fenster:0,zeit:0};
 // schon losgelassen wurde. Das darf die Eingabe nicht abbrechen.
 const fange=(el,id)=>{try{el.setPointerCapture(id);}catch{}};
 window.LOWTIDE={sim,get world(){return world;},get frames(){return debug.frames;},debug,
- get radio(){return radio;},get sender(){return SENDER;},orte:locations,immobilien,waterAt,groundAt,regionAt,onRoad,bounds,regionen:regions,inseln:INSELN,leuchten:leuchtMaterialien,get schatzOrte(){return schatzOrte;},story:Story,
+ get radio(){return radio;},get sender(){return SENDER;},orte:locations,immobilien,waterAt,groundAt,regionAt,onRoad,bounds,regionen:regions,strassen:roadSegments,inseln:INSELN,leuchten:leuchtMaterialien,get schatzOrte(){return schatzOrte;},story:Story,
  // Nur fürs Prüfen: setzt Figur und Kamera an eine feste Stelle.
  // hoehe>0 pausiert die Simulation und hebt die Kamera für Übersichtsbilder an.
  view(x,z,blick=yaw,neigung=pitch,hoehe=0){const p=sim.player;p.car=null;p.x=x;p.z=z;p.y=hoehe;p.vy=0;

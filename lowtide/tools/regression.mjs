@@ -759,6 +759,31 @@ const karte = await page.evaluate(() => {
  return out;
 });
 pruefe('Die Karte ist über zwei Quadratkilometer groß', karte.flaeche > 2, `${karte.flaeche} km²`);
+pruefe('Kein Gebäude steht in einer Fahrbahn', await page.evaluate(() => {
+ // Ein Haus mitten auf der Straße fällt beim Spielen sofort auf, beim
+ // Bauen aber nicht — die Blöcke werden nach Rastermaß gesetzt, die Straßen
+ // getrennt davon. Diese Prüfung hat einen alten Fehler gefunden: ein Haus
+ // ragte 5,5 m in die Nord-Süd-Achse bei x = -340.
+ const L = window.LOWTIDE, sim = L.sim;
+ const ueber = (b, r) => {
+  const rx1 = Math.min(r.x1, r.x2) - r.w / 2, rx2 = Math.max(r.x1, r.x2) + r.w / 2;
+  const rz1 = Math.min(r.z1, r.z2) - r.w / 2, rz2 = Math.max(r.z1, r.z2) + r.w / 2;
+  const ox = Math.min(b.x + b.w / 2, rx2) - Math.max(b.x - b.w / 2, rx1);
+  const oz = Math.min(b.z + b.d / 2, rz2) - Math.max(b.z - b.d / 2, rz1);
+  return ox > 0 && oz > 0 ? Math.min(ox, oz) : 0;
+ };
+ const schlimmste = [...sim.buildings, ...sim.worldBuildings].reduce((m, b) =>
+  Math.max(m, L.strassen.reduce((q, r) => Math.max(q, ueber(b, r)), 0)), 0);
+ return schlimmste <= 1;
+}));
+pruefe('Keine zwei Gebäude stehen ineinander', await page.evaluate(() => {
+ const alle = [...window.LOWTIDE.sim.buildings, ...window.LOWTIDE.sim.worldBuildings];
+ for (let i = 0; i < alle.length; i++) for (let j = i + 1; j < alle.length; j++) {
+  const a = alle[i], b = alle[j];
+  if (Math.abs(a.x - b.x) < (a.w + b.w) / 2 - 1 && Math.abs(a.z - b.z) < (a.d + b.d) / 2 - 1) return false;
+ }
+ return true;
+}));
 pruefe('Jede Region hat eine Stelle, an der man stehen kann',
  karte.unerreichbar.length === 0, karte.unerreichbar.join(', '));
 pruefe('Das Gelände reicht bis an den Westrand', karte.westlichste < -1000, `${karte.westlichste}`);

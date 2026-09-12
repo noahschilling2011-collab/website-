@@ -23,9 +23,30 @@ export class Campaign extends Simulation{
    b.turm=turm;
    this.worldBuildings.push(b);
   }
+  // Zwei zusätzliche Stadtteile. Port Mercy war eine Innenstadt von etwa
+  // fünfhundert auf dreihundert Metern; alles andere war Vorort, Feld oder
+  // Küste. Eine Stadt dieser Art lebt vom zusammenhängenden bebauten Raum,
+  // nicht von der Gesamtfläche.
+  //
+  // Nordquartier: Geschäftshäuser mittlerer Höhe. Breite 40 statt 44, weil
+  // die Längsstraßen alle 60 Meter stehen und ein 44er Block sonst in die
+  // Fahrbahn ragt — nachgerechnet, nicht geschätzt.
+  for(const x of [-310,-250,-190])for(const [z,tiefe] of [[-204,24],[-160,22]]){
+   const b=this.addSolid(x,z,40,tiefe,'newbuilding',22+Math.floor(this.rng()*34));
+   this.worldBuildings.push(b);
+  }
+  // Wohnviertel im Westen: Wohnscheiben zwischen den beiden neuen Achsen,
+  // dichter gestellt als die Innenstadt und niedriger als die Türme.
+  for(const x of [-432,-372])for(const [z,tiefe] of [[-204,26],[-140,50],[-10,40],[120,40]]){
+   const b=this.addSolid(x,z,30,tiefe,'newbuilding',26+Math.floor(this.rng()*22));
+   this.worldBuildings.push(b);
+  }
   // Small houses and farms are solid, while service buildings are cutaway interiors.
   for(const x of [-65,-10,45])for(const z of [-260,-365])this.worldBuildings.push(this.addSolid(x,z,22,24,'house',7));
-  for(const [x,z,w,d,h] of [[-375,-285,28,22,9],[-360,355,33,25,12],[-405,355,32,24,9],[285,170,30,22,12],[315,265,28,25,9]])this.worldBuildings.push(this.addSolid(x,z,w,d,'house',h));
+  // Das Haus bei -360/355 ragte 5,5 m in die Nord-Süd-Achse bei x = -340 —
+  // ein alter Fehler, gefunden erst, als die Prüfung auf Überschneidung von
+  // Gebäude und Fahrbahn dazukam. Es steht jetzt bei -372.
+  for(const [x,z,w,d,h] of [[-375,-285,28,22,9],[-372,355,33,25,12],[-408,320,32,24,9],[285,170,30,22,12],[315,265,28,25,9]])this.worldBuildings.push(this.addSolid(x,z,w,d,'house',h));
   for(const id of ['garage','shop','clinic','home','club','diner','motel','records']){const l=locations[id],w=id==='garage'?22:16,d=16;for(const wall of [{x:l.x-w/2,z:l.z-4,w:1,d},{x:l.x+w/2,z:l.z-4,w:1,d},{x:l.x,z:l.z-12,w:w+1,d:1}])this.roomWalls.push(this.addSolid(wall.x,wall.z,wall.w,wall.d,'room',5));}
   const entries=[['compact',-148,101],['suv',-160,107],['super',-280,98],['muscle',-220,97],['pickup',-340,-240],['motorcycle',-140,102],['dirtbike',-455,-355],['quad',-390,36],['truck',-355,265],['bus',-162,157],['boat',123,136],['jetski',127,155],['helicopter',-360,305],['plane',-315,325]];
   this.cars.forEach((c,i)=>Object.assign(c,{model:i===0?'sedan':['compact','sedan','suv','muscle'][i%4],fuel:100,upgrades:{},owner:i===0?'eli':null,alt:0,tires:100,glass:100,lights:100}));

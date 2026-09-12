@@ -166,6 +166,15 @@ export const roadSegments=[
  {x1:-960,z1:260,x2:-960,z2:440,w:13},{x1:-900,z1:260,x2:-900,z2:440,w:13},
  {x1:-1000,z1:300,x2:-760,z2:300,w:13},{x1:-1000,z1:380,x2:-760,z2:380,w:13},
  {x1:-1030,z1:340,x2:-720,z2:340,w:16},  // Rosalind Main Street
+ // Erschließung der neuen Stadtteile. Die Lage ist nicht frei gewählt: der
+ // Nordring muss zwischen die Vorortzeile bei z = -260 und die vorhandene
+ // Querstraße bei z = -180 passen, und die beiden Querachsen des Wohnviertels
+ // enden bei x = -348, weil dort die Innenstadt anfängt.
+ {x1:-480,z1:-228,x2:100,z2:-228,w:16},
+ {x1:-462,z1:-228,x2:-462,z2:150,w:15},
+ {x1:-402,z1:-228,x2:-402,z2:150,w:15},
+ {x1:-480,z1:-62,x2:-348,z2:-62,w:14},
+ {x1:-480,z1:62,x2:-348,z2:62,w:14},
  // Keys Highway: über den Damm bis zur letzten Insel.
  {x1:100,z1:400,x2:360,z2:400,w:14}
 ];

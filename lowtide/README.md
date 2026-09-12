@@ -140,6 +140,22 @@ Die Nachbearbeitung fährt nachts Kontrast, Randabdunklung, Korn und
 Verdeckung zurück. Ohne das drückte dieselbe Kurve, die dem Tag Tiefe gibt,
 die Nacht ins Schwarze.
 
+## Die Stadt
+
+Port Mercy war eine Innenstadt von etwa fünfhundert auf dreihundert Metern;
+alles andere war Vorort, Feld oder Küste. Eine Stadt dieser Art lebt vom
+zusammenhängenden bebauten Raum, nicht von der Gesamtfläche. Dazugekommen:
+
+- **Nordquartier** — sechs Geschäftshäuser mittlerer Höhe über der Innenstadt,
+  erschlossen über den Nordring bei z = -228.
+- **Westviertel** — acht Wohnscheiben zwischen zwei neuen Nord-Süd-Achsen.
+
+Die Blockmaße sind nachgerechnet, nicht geschätzt: die Längsstraßen stehen
+alle sechzig Meter, ein 44 Meter breiter Block ragt damit in die Fahrbahn.
+Zwei Prüfungen halten das fest — kein Gebäude in einer Fahrbahn, keine zwei
+Gebäude ineinander. Die erste hat einen alten Fehler gefunden, der seit dem
+ersten Ausbau der Karte drinsteckte.
+
 ## Der Westen
 
 Die Karte war 970 auf 1000 Meter — knapp ein Quadratkilometer. Nach Westen
