@@ -39,5 +39,33 @@ export function detailedCar(color,police=false){const g=new T.Group();const pain
  const policeLights=[];if(police){for(const side of [-1,1])policeLights.push(mesh(g,new T.BoxGeometry(.48,.14,.3),new T.MeshStandardMaterial({color:side<0?0xef5549:0x4b9bd6,emissive:side<0?0xe64a45:0x3c85de,emissiveIntensity:2}),side*.36,1.76,0));}
  g.userData={body,wheels,rims,lights:policeLights,headlights:lights,glass:cabin,roof,interior,paint,grille};return g;
 }
-export function makeEnvironment(renderer){const c=document.createElement('canvas');c.width=512;c.height=256;const ctx=c.getContext('2d'),grad=ctx.createLinearGradient(0,0,0,256);grad.addColorStop(0,'#647e9a');grad.addColorStop(.45,'#c7d5d7');grad.addColorStop(.53,'#f0c7a0');grad.addColorStop(.65,'#7a8a83');grad.addColorStop(1,'#34434c');ctx.fillStyle=grad;ctx.fillRect(0,0,512,256);const glow=ctx.createRadialGradient(90,110,1,90,110,45);glow.addColorStop(0,'#fff9df');glow.addColorStop(.12,'#fff3d1');glow.addColorStop(1,'#efd6b100');ctx.fillStyle=glow;ctx.fillRect(0,0,512,256);const texture=new T.CanvasTexture(c);texture.mapping=T.EquirectangularReflectionMapping;texture.colorSpace=T.SRGBColorSpace;const pmrem=new T.PMREMGenerator(renderer),target=pmrem.fromEquirectangular(texture);texture.dispose();pmrem.dispose();return target.texture;}
-export function asphaltTexture(){const c=document.createElement('canvas');c.width=c.height=256;const ctx=c.getContext('2d'),pixels=ctx.createImageData(256,256);let seed=45;for(let i=0;i<pixels.data.length;i+=4){seed=(seed*1664525+1013904223)>>>0;const v=75+(seed%32);pixels.data[i]=v;pixels.data[i+1]=v+4;pixels.data[i+2]=v+7;pixels.data[i+3]=255;}ctx.putImageData(pixels,0,0);const t=new T.CanvasTexture(c);t.wrapS=t.wrapT=T.RepeatWrapping;t.repeat.set(8,8);t.colorSpace=T.SRGBColorSpace;return t;}
+// makeEnvironment ist entfallen: die Umgebungsreflexion kommt jetzt aus sky.js
+// und folgt damit dem tatsächlichen Sonnenstand.
+// Asphalt bei Tageslicht hat eine Albedo um 0,2 und wirkt mittelgrau, nicht schwarz.
+// Die alte Textur war fast schwarz und wurde zusätzlich mit einer dunklen
+// Materialfarbe multipliziert — der Boden verschwand komplett.
+export function asphaltTexture(){
+ const c=document.createElement('canvas');c.width=c.height=512;const ctx=c.getContext('2d');
+ const pixels=ctx.createImageData(512,512);let seed=45;
+ const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+ for(let y=0;y<512;y++)for(let x=0;x<512;x++){
+  const i=(y*512+x)*4;
+  // Nur feiner Splitt. Niederfrequente Muster ergaben sichtbare Bänder,
+  // weil dieselbe Kachel über hunderte Meter Straße läuft.
+  const korn=rnd()*15;
+  const v=63+korn;
+  pixels.data[i]=v+2;pixels.data[i+1]=v;pixels.data[i+2]=v-3;pixels.data[i+3]=255;
+ }
+ ctx.putImageData(pixels,0,0);
+ // Risse und geflickte Nähte, damit die Fläche nicht wie Filz aussieht.
+ // Bewusst nur kurze, schwache Risse: längere Strukturen zieht die Streckung
+ // der Fahrbahn zu durchgehenden Streifen aus.
+ ctx.lineCap='round';
+ for(let n=0;n<70;n++){
+  ctx.strokeStyle='rgba(48,52,56,'+(.10+rnd()*.14)+')';ctx.lineWidth=.6+rnd()*1.1;
+  let x=rnd()*512,y=rnd()*512;ctx.beginPath();ctx.moveTo(x,y);
+  for(let k=0;k<3;k++){x+=(rnd()-.5)*17;y+=(rnd()-.5)*17;ctx.lineTo(x,y);}
+  ctx.stroke();
+ }
+ const t=new T.CanvasTexture(c);t.wrapS=t.wrapT=T.RepeatWrapping;t.repeat.set(12,12);
+ t.colorSpace=T.SRGBColorSpace;t.anisotropy=4;return t;}
