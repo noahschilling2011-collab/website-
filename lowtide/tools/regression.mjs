@@ -719,6 +719,56 @@ pruefe('Sparmodus schaltet die Nachbearbeitung ab', await page.evaluate(() => {
  return aus && w.post.aktiv;
 }));
 
+console.log('Die ganze Karte');
+const karte = await page.evaluate(() => {
+ const L = window.LOWTIDE, sim = L.sim, w = L.world, out = {};
+ const b = L.bounds;
+ out.flaeche = +(((b.right - b.left) * (b.bottom - b.top)) / 1e6).toFixed(2);
+ // Jede Region muss auf Land liegen und benannt sein.
+ out.regionen = L.regionen.map(r => ({name: r.name, wasser: L.waterAt(r.x, r.z)}));
+ out.imWasser = out.regionen.filter(r => r.wasser).map(r => r.name);
+ // Gelände deckt die ganze Karte ab, nicht nur den alten Ausschnitt.
+ const kacheln = w.terrain.map(m => m.position);
+ out.westlichste = Math.min(...kacheln.map(p => p.x));
+ out.suedlichste = Math.max(...kacheln.map(p => p.z));
+ // Die neuen Gebiete sind zu Fuß erreichbar, also nicht von Solids zugestellt.
+ out.frei = [[-870, 340], [-700, 190], [-880, -120], [-620, 660]]
+  .filter(([x, z]) => !sim.blocked({x, z}, .5)).length;
+ // Rosalinds Hauptstraße ist eine echte Straße, keine gepflasterte Wiese.
+ out.hauptstrasse = L.onRoad(-870, 340, 4);
+ // Talon Ridge trägt Höhe.
+ out.gipfel = Math.round(L.groundAt(-900, -160));
+ // Dunst nimmt mit der Höhe ab.
+ const unten = w.scene.fog.density;
+ w.camera.position.y = 200; w.applySky(.016);
+ const oben = w.scene.fog.density;
+ w.camera.position.y = 3; w.applySky(.016);
+ out.dunstUnten = +unten.toFixed(5);
+ out.dunstOben = +oben.toFixed(5);
+ return out;
+});
+pruefe('Die Karte ist über zwei Quadratkilometer groß', karte.flaeche > 2, `${karte.flaeche} km²`);
+pruefe('Keine Region liegt im Wasser', karte.imWasser.length === 0, karte.imWasser.join(', '));
+pruefe('Das Gelände reicht bis an den Westrand', karte.westlichste < -1000, `${karte.westlichste}`);
+pruefe('Das Gelände reicht bis an den Südrand', karte.suedlichste > 800, `${karte.suedlichste}`);
+pruefe('Die vier neuen Gebiete sind begehbar', karte.frei === 4, `${karte.frei} von 4`);
+pruefe('Rosalinds Hauptstraße ist befahrbar', karte.hauptstrasse);
+pruefe('Talon Ridge trägt Höhe', karte.gipfel > 70, `${karte.gipfel} m`);
+pruefe('Dunst nimmt mit der Höhe ab', karte.dunstOben < karte.dunstUnten * .6,
+ `${karte.dunstUnten} unten, ${karte.dunstOben} auf 200 m`);
+pruefe('Geparkte Wagen nutzen das sparsame Vorbild', await page.evaluate(() => {
+ // 796 statt 3084 Dreiecke je Wagen: keine Torusreifen, kein Innenraum,
+ // keine Speichen. Prüfbar an der Dreieckszahl der gebackenen Instanzen.
+ const w = window.LOWTIDE.world;
+ let groesste = 0;
+ w.scene.traverse(o => {
+  if (!o.isInstancedMesh || o.count < 100 || !o.geometry) return;
+  const g = o.geometry, n = (g.index ? g.index.count : g.attributes.position.count) / 3;
+  groesste = Math.max(groesste, n);
+ });
+ return groesste < 400;
+}));
+
 console.log('Publikum und Neon');
 const leute = await page.evaluate(() => {
  const L = window.LOWTIDE, sim = L.sim, w = L.world, out = {};
