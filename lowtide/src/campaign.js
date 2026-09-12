@@ -11,7 +11,18 @@ export class Campaign extends Simulation{
  }
  expandWorld(){
   // Eight new downtown blocks, separated by the existing streets extended west.
-  for(const x of [-310,-250,-190])for(const z of [-130,-70,-10,50]){if(x===-190||x===-250&&z===-10||x===-310&&z===-70)continue;const b=this.addSolid(x,z,35,34,'newbuilding',30+Math.floor(this.rng()*45));this.worldBuildings.push(b);}
+  // Innenstadt. Alle Blöcke lagen zwischen 30 und 75 m — aus der Luft ergibt
+  // das eine gleichmäßige Platte, keine Skyline. Vier Grundstücke tragen
+  // jetzt Hochhäuser; die Silhouette entsteht erst aus dem Unterschied.
+  const TUERME=[[-310,-130],[-250,-70],[-310,50],[-250,-130]];
+  for(const x of [-310,-250,-190])for(const z of [-130,-70,-10,50]){
+   if(x===-190||x===-250&&z===-10||x===-310&&z===-70)continue;
+   const turm=TUERME.some(([tx,tz])=>tx===x&&tz===z);
+   const hoehe=turm?98+Math.floor(this.rng()*52):30+Math.floor(this.rng()*45);
+   const b=this.addSolid(x,z,turm?29:35,turm?28:34,'newbuilding',hoehe);
+   b.turm=turm;
+   this.worldBuildings.push(b);
+  }
   // Small houses and farms are solid, while service buildings are cutaway interiors.
   for(const x of [-65,-10,45])for(const z of [-260,-365])this.worldBuildings.push(this.addSolid(x,z,22,24,'house',7));
   for(const [x,z,w,d,h] of [[-375,-285,28,22,9],[-360,355,33,25,12],[-405,355,32,24,9],[285,170,30,22,12],[315,265,28,25,9]])this.worldBuildings.push(this.addSolid(x,z,w,d,'house',h));
@@ -66,6 +77,46 @@ export class Campaign extends Simulation{
    path,target:1,personality:['caller','filmer','coward','aggressive'][k%4],pace:.9+(k%5)*.16,
    report:null,stun:0,schedule:'street',home:{...path[0]},work:{...(path[2]||path[path.length-1])},
    originalPath:path.map(q=>({...q}))}));
+  // Publikum. Sechsundachtzig Leute auf einer Karte dieser Größe heißt: der
+  // Strand ist leer, die Promenade ist leer, die Marina ist leer. Auf den
+  // Referenzbildern ist genau das der Unterschied. Die Ferndarstellung aus
+  // lod.js trägt die Zahl — jenseits von 42 m ist eine Figur ohnehin eine
+  // Silhouette in einem gemeinsamen Draw Call.
+  const menge=[];
+  // Mercy Beach und South Beach: Handtuchreihen und Leute am Wasser.
+  for(let i=0;i<30;i++){
+   const x=101+(i%4)*4.5, z=-60+i*12;
+   menge.push([x,z,[{x,z},{x:x+7,z:z+5},{x:x+2,z:z+11},{x,z}]]);
+  }
+  // Promenade dahinter, längs.
+  for(let i=0;i<14;i++){
+   const x=94+(i%2)*3, z=110+i*21;
+   menge.push([x,z,[{x,z},{x,z:z+26}]]);
+  }
+  // Gehwege der westlichen Innenstadt.
+  for(let i=0;i<18;i++){
+   const x=-316+(i%3)*60, z=-124+Math.floor(i/3)*32;
+   menge.push([x,z,[{x,z},{x:x+16,z},{x:x+16,z:z+13},{x,z:z+13}]]);
+  }
+  // Marina und Strandpromenade auf Isla Serena.
+  for(let i=0;i<10;i++){
+   const x=246+i*11, z=(i%2)?163:288;
+   menge.push([x,z,[{x,z},{x:x+9,z},{x:x+9,z:z+(i%2?9:-9)},{x,z}]]);
+  }
+  // Die Keys: wenige Leute, aber nicht null.
+  for(let i=0;i<8;i++){
+   const x=[168,186,252,270,326,344,180,262][i], z=(i%2)?386:418;
+   menge.push([x,z,[{x,z},{x:x+7,z},{x:x+7,z:z+6},{x,z:z+6}]]);
+  }
+  menge.forEach(([x,z,path],k)=>{
+   if(this.blocked({x,z},1.2)||waterAt(x,z))return;
+   this.npcs.push({id:200+k,x,z,yaw:0,state:'normal',timer:0,health:100,
+    path,target:1,personality:['caller','filmer','coward','aggressive'][k%4],
+    pace:.85+(k%7)*.13,report:null,stun:0,schedule:'street',
+    home:{...path[0]},work:{...(path[2]||path[path.length-1])},
+    originalPath:path.map(q=>({...q}))});
+  });
+
   // Transport, Fluchtboot und die vier Aktwachen. Sie entstehen hier und
   // nicht erst beim Missionsstart, weil die Meshes einmalig nach Index
   // angelegt werden — später eingefügte Fahrzeuge blieben unsichtbar.

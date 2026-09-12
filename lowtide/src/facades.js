@@ -8,6 +8,11 @@ const SOCKEL = [0x6d6a60, 0x5d6668, 0x736659, 0x5f6b66];
 const MARKISEN = [0x9c5b52, 0x4e6f74, 0x8a7546, 0x51704f, 0x7a5470];
 const LADEN = ['CAFÉ', 'LAVANDERÍA', 'MERCADO', 'BARBER', 'PHARMACY', 'TACOS',
  'LIQUOR', 'PAWN', 'NAILS', 'BODEGA', 'CAMBIO', 'DELI'];
+// Neon. Emissive Flächen landen in leuchtMaterialien und werden von world.js
+// zentral mit der Nacht hochgefahren — tagsüber sind es matte Röhren, nachts
+// tragen sie die Straße. Bisher leuchteten nur Wohnungsfenster; eine
+// Geschäftsstraße ohne Schrift bleibt nachts eine Reihe dunkler Kisten.
+const NEON = [0xff5f8a, 0x4fd6ff, 0xffd166, 0x8affc1, 0xb08cff, 0xff8a5f];
 
 function zufall(seed = 2207) {
  return () => {seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296;};
@@ -59,6 +64,22 @@ export function dressBuildings(world, gebaeude) {
    // Erdgeschoss austauschbar.
    world.text(LADEN[(i * 2 + (seite > 0 ? 1 : 0)) % LADEN.length], b.x, basis + 3.5, z + seite * .18,
     Math.min(7, b.w * .5), '#e8d3a4', seite > 0 ? 0 : Math.PI);
+   // Neonröhre unter der Markise und ein Band über dem Schaufenster.
+   const ton = NEON[(i * 5 + (seite > 0 ? 2 : 0)) % NEON.length];
+   world.box(tx, basis + 2.72, z + seite * 1.42, 3.1, .1, .1, ton, 0, true);
+   world.box(b.x, basis + 2.98, z + seite * .2, b.w * .84, .12, .1, ton, 0, true);
+   // Jedes dritte Haus bekommt ein hochkantes Auslegerschild. Sie ragen in
+   // die Straße und sind das, was eine Geschäftszeile nachts von einer
+   // Wohnzeile unterscheidet.
+   if ((i + (seite > 0 ? 1 : 0)) % 3 === 0) {
+    const sx = b.x + b.w * .38 * (seite > 0 ? 1 : -1);
+    const zweit = NEON[(i * 7 + 3) % NEON.length];
+    world.box(sx, basis + 4.9, z + seite * .55, .18, 3.4, 1.05, 0x2b3136);
+    world.box(sx + .11, basis + 4.9, z + seite * .55, .04, 3.0, .8, zweit, 0, true);
+    world.box(sx - .11, basis + 4.9, z + seite * .55, .04, 3.0, .8, zweit, 0, true);
+    world.box(sx, basis + 6.72, z + seite * .55, .3, .3, .3, 0x39424a);
+    world.box(sx, basis + 3.1, z + seite * .3, .1, .1, .6, 0x39424a);
+   }
   }
 
   // Senkrechte Lisenen gliedern die sonst fugenlose Wand.

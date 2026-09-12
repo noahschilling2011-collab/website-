@@ -152,12 +152,33 @@ export class ExpandedWorld extends World{
  build(){super.build();const s=this.sim;
   for(const [i,b] of [...s.buildings,...s.worldBuildings].entries()){if(b.kind==='house')continue;for(let y=5;y<Math.min(b.h,24);y+=5){this.box(b.x,y,b.z+b.d/2+1,b.w*.82,.18,2,0xb4b8ac);this.box(b.x,y+.9,b.z+b.d/2+1.9,b.w*.82,.07,.08,0x61797a);for(let x=-b.w*.38;x<=b.w*.38;x+=3)this.box(b.x+x,y+.45,b.z+b.d/2+1.9,.05,.9,.05,0x61797a);}this.box(b.x+b.w/2-2,2.8,b.z+b.d/2+.7,1.4,.8,1.2,0xa1afa6);this.box(b.x,3.5,b.z+b.d/2+1,Math.min(12,b.w),.12,2,[0x779994,0xb58882,0xcbb783][i%3]);for(let stripe=-5;stripe<5;stripe+=2)this.box(b.x+stripe,3.58,b.z+b.d/2+1,1,.025,2,0xd7d6bc);}
   // Spatially chunked terrain, with actual height beneath vehicles and characters.
-  this.terrain=[];for(let x=-580;x<120;x+=100)for(let z=-540;z<460;z+=100){const g=new T.PlaneGeometry(100,100,12,12);g.rotateX(-Math.PI/2);const a=g.attributes.position,colors=[];for(let i=0;i<a.count;i++){const px=x+50+a.getX(i),pz=z+50+a.getZ(i);a.setY(i,waterAt(px,pz)?-3.4:groundAt(px,pz)-.12);const c=new T.Color(waterAt(px,pz)?0x2f5450:px<-380&&pz<-240?0x4f5c43:pz<-230?0x5a6249:px<-390?0x4f5d47:0x6c6d58);colors.push(c.r,c.g,c.b);}g.setAttribute('color',new T.Float32BufferAttribute(colors,3));g.computeVertexNormals();const m=new T.Mesh(g,new T.MeshStandardMaterial({vertexColors:true,roughness:1}));m.position.set(x+50,0,z+50);m.receiveShadow=true;this.scene.add(m);this.terrain.push(m);}
+  // Das Gelände endete bei x = 120, also an der Küste. Unter den Keys lag
+  // damit nichts als die Wasserebene; die Inseln schwammen auf ihren eigenen
+  // Sandplatten. Jetzt reicht das Raster bis an den Kartenrand.
+  // Dazu ein Sandsaum: wer nicht im Wasser steht, aber zehn Meter daneben,
+  // bekommt Strandfarbe statt Wiese. Ohne den stieß Gras direkt ans Meer.
+  const amWasser=(px,pz)=>waterAt(px+10,pz)||waterAt(px-10,pz)||waterAt(px,pz+10)||waterAt(px,pz-10);
+  this.terrain=[];for(let x=-580;x<390;x+=100)for(let z=-540;z<460;z+=100){const g=new T.PlaneGeometry(100,100,12,12);g.rotateX(-Math.PI/2);const a=g.attributes.position,colors=[];for(let i=0;i<a.count;i++){const px=x+50+a.getX(i),pz=z+50+a.getZ(i);a.setY(i,waterAt(px,pz)?-3.4:groundAt(px,pz)-.12);const c=new T.Color(waterAt(px,pz)?0x2f5450:amWasser(px,pz)?0x9a8a63:px<-380&&pz<-240?0x4f5c43:pz<-230?0x5a6249:px<-390?0x4f5d47:0x6c6d58);colors.push(c.r,c.g,c.b);}g.setAttribute('color',new T.Float32BufferAttribute(colors,3));g.computeVertexNormals();const m=new T.Mesh(g,new T.MeshStandardMaterial({vertexColors:true,roughness:1}));m.position.set(x+50,0,z+50);m.receiveShadow=true;this.scene.add(m);this.terrain.push(m);}
   const umland=new T.Mesh(new T.PlaneGeometry(3800,3800,16,16),new T.MeshStandardMaterial({color:0x3a4636,roughness:1}));
   umland.rotation.x=-Math.PI/2;umland.position.set(-230,-2.4,-40);umland.renderOrder=-1;this.scene.add(umland);
   this.box(297,-.3,222,125,.5,145,0x66714f);this.box(185,.08,200,152,.5,10,0x5b6c70);for(let x=121;x<254;x+=14){this.box(x,1.1,195,.2,2,.2,0xbebc9d);this.box(x,1.1,205,.2,2,.2,0xbebc9d);}this.box(106,-.05,280,24,.12,300,0x9c8e6b);
   for(const r of roadSegments){const x=(r.x1+r.x2)/2,z=(r.z1+r.z2)/2;this.box(x,.03,z,Math.max(r.w,Math.abs(r.x2-r.x1)),.08,Math.max(r.w,Math.abs(r.z2-r.z1)),0x3d494f);const length=Math.hypot(r.x2-r.x1,r.z2-r.z1);for(let i=0;i<length;i+=16){const t=i/length;this.box(r.x1+(r.x2-r.x1)*t,.08,r.z1+(r.z2-r.z1)*t,r.x1===r.x2?.16:5,.02,r.x1===r.x2?5:.16,0xc4bb97);}}
-  for(const b of s.worldBuildings){const base=groundAt(b.x,b.z),co=b.kind==='house'?0xb5a78f:0x869c9c;this.box(b.x,base+b.h/2,b.z,b.w,b.h,b.d,co);this.box(b.x,base+b.h+.3,b.z,b.w+1,.6,b.d+1,0x3e555a);for(let y=3;y<b.h;y+=4)for(let x=-b.w/2+4;x<b.w/2;x+=5)this.box(b.x+x,base+y,b.z+b.d/2+.05,2,2,.1,0x51737b);}
+  for(const b of s.worldBuildings){const base=groundAt(b.x,b.z),co=b.kind==='house'?0xb5a78f:0x869c9c;this.box(b.x,base+b.h/2,b.z,b.w,b.h,b.d,co);this.box(b.x,base+b.h+.3,b.z,b.w+1,.6,b.d+1,0x3e555a);
+   // Hochhäuser bekommen Rücksprünge, eine Krone und ein Blinkfeuer. Ein
+   // Turm ohne Absatz ist aus der Ferne nur ein längerer Quader.
+   if(b.turm){
+    const oben=base+b.h;
+    this.box(b.x,oben+5,b.z,b.w*.74,10,b.d*.74,co);
+    this.box(b.x,oben+10.4,b.z,b.w*.78,.8,b.d*.78,0x3e555a);
+    this.box(b.x,oben+15,b.z,b.w*.46,9,b.d*.46,co);
+    this.box(b.x,oben+20,b.z,b.w*.5,.7,b.d*.5,0x3e555a);
+    this.box(b.x,oben+26,b.z,1.1,12,1.1,0x6b7378);
+    this.box(b.x,oben+32.4,b.z,.9,.9,.9,0xff5a4a,0,true);
+    for(const e of [-1,1]){
+     this.box(b.x+e*b.w*.3,oben+3,b.z,1.6,6,1.6,0x76858a);
+     this.box(b.x,oben+3,b.z+e*b.d*.3,1.6,6,1.6,0x76858a);
+    }
+   }for(let y=3;y<b.h;y+=4)for(let x=-b.w/2+4;x<b.w/2;x+=5)this.box(b.x+x,base+y,b.z+b.d/2+.05,2,2,.1,0x51737b);}
   for(const b of s.roomWalls)this.box(b.x,b.h/2,b.z,b.w,b.h,b.d,0x879e96);
   for(const [id,l] of Object.entries(locations)){this.text(l.name.toUpperCase(),l.x,4.1+groundAt(l.x,l.z),l.z-10,Math.min(18,l.name.length*.8),'#c6dbc3',Math.PI);if(['garage','shop','clinic','home','club','diner','motel','records'].includes(id))this.box(l.x,.04,l.z-4,17,.1,17,0x5a625e);}
   // Court with visible basket and an animated ball.

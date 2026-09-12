@@ -489,6 +489,16 @@ const akte = await page.evaluate(() => {
  for (let i = 0; i < 60; i++) sim.tick(.05);
  out.lkwFaehrt = Math.hypot(lkw.x - lkwVor.x, lkw.z - lkwVor.z);
  const auto = sim.cars.find(c => c.type === 'parked' && c.model === 'muscle') || sim.cars[0];
+ // Der übrige Verkehr wird für den Rammtest beiseite gesetzt. Auf einer
+ // belebten Straße trifft man beim Rammen zwangsläufig auch Zivilwagen, und
+ // das ist zu Recht eine Straftat — geprüft werden soll aber, dass der
+ // Transport selbst keine auslöst.
+ out.beiseite = [];
+ for (const c of sim.cars) {
+  if (c === auto || c === lkw) continue;
+  out.beiseite.push([c.id, c.x, c.z]);
+  c.x += 4000;
+ }
  sim.player.car = auto; Object.assign(auto, {yaw: lkw.yaw, speed: 22, health: 100, fuel: 100});
  let stoesse = 0;
  while (sim.campaign.konvoi.phase === 'faehrt' && stoesse++ < 400) {
@@ -498,6 +508,8 @@ const akte = await page.evaluate(() => {
  out.gestoppt = sim.campaign.konvoi.phase === 'gestoppt';
  out.stoesse = stoesse;
  out.fahndungNachRammen = sim.stars;
+ for (const [id, x, z] of out.beiseite) {const c = sim.cars.find(v => v.id === id); if (c) {c.x = x; c.z = z;}}
+ delete out.beiseite;
  sim.player.car = null; sim.player.x = lkw.x + 1.5; sim.player.z = lkw.z + 1;
  const geld3 = sim.player.money;
  out.aktion4 = sim.action();
@@ -652,6 +664,46 @@ pruefe('Sparmodus schaltet die Nachbearbeitung ab', await page.evaluate(() => {
  knopf.click();
  return aus && w.post.aktiv;
 }));
+
+console.log('Publikum und Neon');
+const leute = await page.evaluate(() => {
+ const L = window.LOWTIDE, sim = L.sim, w = L.world, out = {};
+ out.anzahl = sim.npcs.length;
+ out.imWasser = sim.npcs.filter(n => L.waterAt(n.x, n.z)).length;
+ // Radius 0: geprüft wird, ob jemand wirklich in einer Wand steckt. Mit .5
+ // schlug schon an, wer sich beim Vorbeigehen an eine Wand drückt.
+ out.imHaus = sim.npcs.filter(n => sim.blocked(n, 0)).length;
+ // Ohne originalPath, home und work stürzt updateRoutines beim Tageswechsel.
+ out.ohneWeg = sim.npcs.filter(n => !n.guard && (!n.originalPath || !n.home || !n.work)).length;
+ out.doppelt = sim.npcs.length - new Set(sim.npcs.map(n => n.id)).size;
+ // Figurengeometrie wird geteilt; Gesichter nur je Hautton.
+ const a = new Set(), b = new Set();
+ w.npcs[0].traverse(o => o.isMesh && a.add(o.geometry.uuid));
+ w.npcs[7].traverse(o => o.isMesh && b.add(o.geometry.uuid));
+ out.geteilt = [...a].filter(u => b.has(u)).length;
+ out.formen = a.size;
+ out.gesichter = new Set(w.npcs.slice(0, 20).map(m => m.userData.face.geometry.uuid)).size;
+ out.hauttoene = new Set(w.npcs.slice(0, 20)
+  .map(m => m.userData.face.geometry.attributes.color.getX(10).toFixed(4))).size;
+ // Neon: die Leuchtmaterialien werden mit der Nacht hochgefahren.
+ sim.hour = 13; w.applySky(.016);
+ const tags = L.leuchten.map(m => m.emissiveIntensity);
+ sim.hour = 23; w.applySky(.016);
+ const nachts = L.leuchten.map(m => m.emissiveIntensity);
+ out.leuchten = tags.length;
+ out.heller = nachts.filter((v, i) => v > tags[i] + .05).length;
+ return out;
+});
+pruefe('Mindestens hundertfünfzig Leute in der Stadt', leute.anzahl >= 150, `${leute.anzahl}`);
+pruefe('Niemand steht im Wasser oder in einer Wand', leute.imWasser === 0 && leute.imHaus === 0,
+ `${leute.imWasser} im Wasser, ${leute.imHaus} in Wänden`);
+pruefe('Jede Figur hat Weg, Wohnung und Arbeit', leute.ohneWeg === 0, `${leute.ohneWeg} ohne`);
+pruefe('Keine doppelten Figurennummern', leute.doppelt === 0);
+pruefe('Figuren teilen sich ihre Geometrie', leute.geteilt >= 8, `${leute.geteilt} von ${leute.formen}`);
+pruefe('Gesichter gibt es je Hautton, nicht je Kopf',
+ leute.gesichter === 5 && leute.hauttoene === 5, `${leute.gesichter} Formen, ${leute.hauttoene} Töne`);
+pruefe('Neon und Fenster gehen nachts an', leute.heller > 20,
+ `${leute.heller} von ${leute.leuchten} Leuchtmaterialien heller`);
 
 console.log('Verkehr, Bewuchs, Geometrie');
 const dichte = await page.evaluate(() => {

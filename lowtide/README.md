@@ -105,6 +105,18 @@ in `story.js`:
 5. **Ebbe** — Verfolgung auf dem Wasser, drei Ausgänge: Übergabe, Abfindung
    oder Abrechnung.
 
+## Stadt bei Nacht
+
+Die Sockelgeschosse tragen Neonröhren unter den Markisen, ein Leuchtband über
+jedem Schaufenster und auf jedem dritten Haus ein hochkantes Auslegerschild.
+Alle diese Flächen liegen in `leuchtMaterialien` und werden in `world.js`
+zentral mit dem Sonnenstand hochgefahren — tagsüber matte Röhren, nachts die
+Beleuchtung der Straße.
+
+Die Nachbearbeitung fährt nachts Kontrast, Randabdunklung, Korn und
+Verdeckung zurück. Ohne das drückte dieselbe Kurve, die dem Tag Tiefe gibt,
+die Nacht ins Schwarze.
+
 ## Die Keys
 
 Östlich der Küste lagen dreißig Kartenzellen blankes Wasser. Jetzt liegen

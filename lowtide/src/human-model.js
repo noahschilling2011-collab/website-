@@ -5,8 +5,37 @@ const cache=new Map();
 const mat=(color,roughness=.8)=>{const k=color+':'+roughness;if(!cache.has(k))cache.set(k,new T.MeshStandardMaterial({color,roughness}));return cache.get(k);};
 function add(parent,geometry,material,x,y,z){const o=new T.Mesh(geometry,material);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;parent.add(o);return o;}
 function oval(p,x,y,z,w,h,d,m){const o=add(p,ball,m,x,y,z);o.scale.set(w,h,d);return o;}
-function loft(rows,segments=24){const pos=[],uv=[],indices=[];for(let j=0;j<rows.length;j++){const [y,w,front,back,offset=0]=rows[j];for(let i=0;i<=segments;i++){const angle=i/segments*Math.PI*2,c=Math.cos(angle),s=Math.sin(angle);pos.push(w*s,y,offset+c*(c>=0?front:back));uv.push(i/segments,j/(rows.length-1));}}for(let j=0;j<rows.length-1;j++)for(let i=0;i<segments;i++){const a=j*(segments+1)+i,b=a+segments+1;if(rows.at(-1)[0]>rows[0][0])indices.push(a,a+1,b,a+1,b+1,b);else indices.push(a,b,a+1,a+1,b,b+1);}const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(pos,3));g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));g.setIndex(indices);g.computeVertexNormals();return g;}
+// Jede Figur baute ihre Querschnitte selbst: fünfzehn Geometrien pro Person,
+// von denen vierzehn bei jeder Person identisch sind. Bei anderthalbhundert
+// Leuten in der Stadt sind das zweitausend gleiche Puffer. Der Schlüssel ist
+// die Zeilenliste selbst — unterschiedliche Körper bekämen weiterhin eigene.
+const loftCache=new Map();
+function loft(rows,segments=24){
+ const schluessel=segments+':'+rows.map(r=>r.join(',')).join(';');
+ if(loftCache.has(schluessel))return loftCache.get(schluessel);
+ const g=loftBauen(rows,segments);
+ loftCache.set(schluessel,g);
+ return g;
+}
+function loftBauen(rows,segments=24){const pos=[],uv=[],indices=[];for(let j=0;j<rows.length;j++){const [y,w,front,back,offset=0]=rows[j];for(let i=0;i<=segments;i++){const angle=i/segments*Math.PI*2,c=Math.cos(angle),s=Math.sin(angle);pos.push(w*s,y,offset+c*(c>=0?front:back));uv.push(i/segments,j/(rows.length-1));}}for(let j=0;j<rows.length-1;j++)for(let i=0;i<segments;i++){const a=j*(segments+1)+i,b=a+segments+1;if(rows.at(-1)[0]>rows[0][0])indices.push(a,a+1,b,a+1,b+1,b);else indices.push(a,b,a+1,a+1,b,b+1);}const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(pos,3));g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));g.setIndex(indices);g.computeVertexNormals();return g;}
 function seam(parent,points,color,radius=.003){const path=new T.CatmullRomCurve3(points.map(p=>new T.Vector3(...p)));return add(parent,new T.TubeGeometry(path,Math.max(5,points.length*3),radius,5,false),mat(color),0,0,0);}
+const gesichtCache=new Map();
+function gesichtGeometrie(skinTone){
+ if(gesichtCache.has(skinTone))return gesichtCache.get(skinTone);
+ const g=loftBauen([[1.55,.025,.046,.033,.027],[1.57,.065,.065,.053,.018],[1.62,.081,.078,.067,.009],[1.68,.092,.091,.079],[1.72,.092,.092,.084],[1.76,.087,.087,.085],[1.80,.087,.086,.084],[1.85,.067,.064,.065],[1.88,.02,.023,.022],[1.883,.001,.001,.001]],32);
+ const colors=[],base=new T.Color(skinTone),attr=g.attributes.position;
+ for(let i=0;i<attr.count;i++){
+  const x=attr.getX(i),y=attr.getY(i),z=attr.getZ(i);
+  const shade=1+.015*Math.sin(i*23.71);
+  const c=base.clone().multiplyScalar(shade);
+  // Wangenpartie eine Spur wärmer.
+  if(z>.045&&y>1.64&&y<1.71&&Math.abs(x)>.035)c.lerp(new T.Color(0xb87865),.10);
+  colors.push(c.r,c.g,c.b);
+ }
+ g.setAttribute('color',new T.Float32BufferAttribute(colors,3));
+ gesichtCache.set(skinTone,g);
+ return g;
+}
 let serial=0;
 // nah=false lässt alles weg, was erst aus wenigen Metern sichtbar wird.
 export function naturalHuman(color,pants,nah=true){
@@ -17,8 +46,12 @@ export function naturalHuman(color,pants,nah=true){
  const body=add(g,loft([[.86,.14,.095,.10],[.91,.18,.11,.105],[1.02,.145,.09,.10],[1.15,.17,.115,.105],[1.32,.21,.12,.105],[1.43,.23,.10,.085],[1.48,.13,.075,.07],[1.49,.065,.057,.052]],28),cloth,0,0,0);
  add(g,new T.CylinderGeometry(.057,.065,.12,16),skin,0,1.51,0);
  // Jaw, cheekbones, temple, forehead and cranium; no spherical mask.
- const face=add(g,loft([[1.55,.025,.046,.033,.027],[1.57,.065,.065,.053,.018],[1.62,.081,.078,.067,.009],[1.68,.092,.091,.079],[1.72,.092,.092,.084],[1.76,.087,.087,.085],[1.80,.087,.086,.084],[1.85,.067,.064,.065],[1.88,.02,.023,.022],[1.883,.001,.001,.001]],32),skin,0,0,0);
- const colors=[];const base=new T.Color(skinTone),attr=face.geometry.attributes.position;for(let i=0;i<attr.count;i++){const x=attr.getX(i),y=attr.getY(i),z=attr.getZ(i);const shade=1+.015*Math.sin(i*23.71);const c=base.clone().multiplyScalar(shade);if(z>.045&&y>1.64&&y<1.71&&Math.abs(x)>.035)c.lerp(new T.Color(0xb87865),.10);colors.push(c.r,c.g,c.b);}face.geometry.setAttribute('color',new T.Float32BufferAttribute(colors,3));face.material=skin.clone();face.material.color.setHex(0xffffff);face.material.vertexColors=true;
+ // Das Gesicht trägt seine Farbe in den Eckpunkten. Es darf deshalb nicht
+ // aus demselben Puffer kommen wie alle anderen: sonst bekäme die ganze
+ // Stadt den Hautton der zuletzt gebauten Person. Es gibt aber nur fünf
+ // Töne, also fünf Gesichter statt eines pro Kopf.
+ const face=add(g,gesichtGeometrie(skinTone),skin,0,0,0);
+ face.material=skin.clone();face.material.color.setHex(0xffffff);face.material.vertexColors=true;
  const eyes=[],lids=[];for(const side of [-1,1]){
   const eye=oval(g,side*.036,1.737,.082,.022,.0105,.012,mat(0xd4d2c8,.34));eyes.push(eye);
   oval(eye,0,0,.83,.37,.77,.22,mat([0x53614b,0x6d5236,0x506975][id%3],.22));oval(eye,0,0,1,.15,.45,.07,mat(0x192326,.15));

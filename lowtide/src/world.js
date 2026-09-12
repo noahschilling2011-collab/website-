@@ -148,7 +148,12 @@ export class World{
    this.post.endeU.staerke.value=.42+himmel.nacht*.55;
    this.post.endeU.schwelle=this.post.hellU.schwelle;
    this.post.hellU.schwelle.value=.92-himmel.nacht*.34;
-   this.post.endeU.koernung.value=.026+himmel.nacht*.028;
+   // Korn nachts nur leicht anheben. Mit .054 lag über der ganzen Nachtstadt
+   // ein Rauschteppich, der wie ein Videofehler aussah.
+   this.post.endeU.koernung.value=.021+himmel.nacht*.011;
+   // Verdeckung nachts zurücknehmen: es gibt kaum Umgebungslicht, das sie
+   // wegnehmen könnte, und die Kanten wurden dadurch tiefschwarz.
+   this.post.aoU.staerke.value=.7*(1-himmel.nacht*.55);
   }
   const nachtAnteil=Math.min(1,himmel.nacht*1.25);
   for(const m of leuchtMaterialien)m.emissiveIntensity=.06+nachtAnteil*1.45;

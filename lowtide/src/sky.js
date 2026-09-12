@@ -18,8 +18,12 @@ export function sunDirection(hour, out = new T.Vector3()) {
 // gut genug, weil die Abstände klein sind und die Farben nah beieinander liegen.
 // [Stunde, Zenit, Horizont, Sonnenfarbe, Sonnenstärke, Himmelslicht, Belichtung]
 const STUeTZSTELLEN = [
- [0.0, 0x050a16, 0x0b1420, 0x3c4f78, 0.06, 0.20, 1.45],
- [4.6, 0x0a1428, 0x1d2436, 0x6b5a78, 0.10, 0.26, 1.40],
+ // Belichtung nachts angehoben (1.45 → 1.78) und das Himmelslicht mit ihr.
+ // Mit der Nachbearbeitung war die Nacht lesbar nur noch dort, wo eine
+ // Lampe stand; eine Küstenstadt hat auch zwischen den Lampen ein Grundlicht
+ // aus Himmel, Wasser und Streulicht der Stadt.
+ [0.0, 0x070e1e, 0x101a28, 0x3c4f78, 0.06, 0.30, 1.78],
+ [4.6, 0x0c182e, 0x222a3e, 0x6b5a78, 0.10, 0.36, 1.72],
  [6.4, 0x28406a, 0x7d5a56, 0xff8f52, 0.85, 0.52, 1.20],
  [7.2, 0x2b5f9e, 0x9fb0b4, 0xffc48c, 1.75, 0.60, 1.00],
  [10.0, 0x2a72c0, 0xc2d2d0, 0xffeecb, 2.45, 0.74, 0.94],
@@ -27,8 +31,8 @@ const STUeTZSTELLEN = [
  [16.3, 0x2f70b8, 0xcbcdbe, 0xffdea2, 2.15, 0.72, 0.96],
  [18.4, 0x3a5c92, 0xd8996a, 0xff9450, 1.45, 0.64, 1.02],
  [19.4, 0x1d3560, 0x8a5566, 0xd6684e, 0.45, 0.38, 1.28],
- [20.6, 0x0a1730, 0x2a2740, 0x6a4a66, 0.12, 0.24, 1.45],
- [24.0, 0x050a16, 0x0b1420, 0x3c4f78, 0.06, 0.20, 1.45]
+ [20.6, 0x0c1b38, 0x302d48, 0x6a4a66, 0.12, 0.33, 1.74],
+ [24.0, 0x070e1e, 0x101a28, 0x3c4f78, 0.06, 0.30, 1.78]
 ];
 
 const mischFarbe = new T.Color(), zweiteFarbe = new T.Color();

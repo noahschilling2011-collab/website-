@@ -160,19 +160,27 @@ void main(){
  vec3 schatten = vec3(0.011, 0.016, 0.023) * (1.0 - nacht * 0.35);
  vec3 lichter = vec3(1.020, 1.004, 0.974);
  c = mix(schatten, lichter, c);
- // S-Kurve um die Mitte. Ohne sie wirkt jede Anhebung wie Dunst.
- c = clamp((c - 0.5) * 1.11 + 0.5, 0.0, 1.0);
+ // S-Kurve um die Mitte. Ohne sie wirkt jede Anhebung wie Dunst. Nachts
+ // liegt aber fast das ganze Bild unterhalb der Mitte: dieselbe Kurve drückte
+ // eine Straße, die vorher lesbar war, ins Schwarze. Also nachts flacher.
+ float kontrast = mix(1.11, 1.01, nacht);
+ c = clamp((c - 0.5) * kontrast + 0.5, 0.0, 1.0);
  c = c * c * (3.0 - 2.0 * c) * 0.16 + c * 0.84;
  // Sättigung anheben, aber nicht in den Lichtern.
  float grau = dot(c, vec3(0.2126, 0.7152, 0.0722));
  c = mix(vec3(grau), c, 1.08 - 0.10 * grau);
 
  // Randabdunklung.
- c *= mix(1.0, 1.0 - vignette, smoothstep(0.16, 0.72, r2));
+ // Randabdunklung nachts halbieren: dort ist der Rand ohnehin dunkel, und
+ // die Vignette frisst genau die Neonschilder am Bildrand.
+ c *= mix(1.0, 1.0 - vignette * (1.0 - nacht * 0.55), smoothstep(0.16, 0.72, r2));
 
  // Korn. Ohne Zeit im Hash steht es fest im Bild und wirkt wie Schmutz.
+ // Im fast Schwarzen wird es ausgeblendet: dort ist es das einzige Signal
+ // und sieht nach Videofehler aus, nicht nach Film. Am stärksten in den
+ // Mitteltönen, wo echtes Korn auch sitzt.
  float rauschen = fract(sin(dot(vUv * groesse + zeit, vec2(12.9898, 78.233))) * 43758.5453);
- c += (rauschen - 0.5) * koernung * (1.0 - grau * 0.6);
+ c += (rauschen - 0.5) * koernung * smoothstep(0.0, 0.16, grau) * (1.0 - grau * 0.55);
 
  // Zum Schluss von linear nach sRGB. Der Renderer nimmt einem das sonst ab,
  // aber nur für seine eigenen Materialien — ein ShaderMaterial, das direkt
