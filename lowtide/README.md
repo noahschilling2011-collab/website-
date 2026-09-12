@@ -82,6 +82,14 @@ der Tiefe desselben Durchgangs, am Ende zusammensetzen, tonwerten, graden,
 Randabdunklung und Korn. Der Renderer selbst tonwertet dabei nicht mehr —
 sonst würde zweimal komprimiert.
 
+Nasser Asphalt spiegelt nicht nur den Himmel: `post.js` marschiert für
+waagerechte Flächen bei Nässe einen Strahl durch dieselbe Tiefe, die schon
+die Verdeckung nutzt, und holt die Neonschilder und Laternen aus dem Bild
+selbst. Auf einer waagerechten Fläche wird dabei nicht die aus den
+Ableitungen gewonnene Normale benutzt, sondern Weltoben — die gerechnete
+rauscht auf einer großen Ebene, und das Ergebnis waren Flecken statt der
+Streifen, die nasser Asphalt tatsächlich zeigt.
+
 `detail.js` hängt sich über `onBeforeCompile` in jedes Weltmaterial und legt
 Farbflecken, Rauheitsschwankung und eine Normalenstörung darüber, dreifach
 aus der Weltposition projiziert. Eine Textur ginge nicht: dieselbe

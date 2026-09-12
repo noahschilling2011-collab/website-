@@ -122,9 +122,88 @@ void main(){
  gl_FragColor = vec4(vec3(mix(1.0, ao, staerke * naehe)), 1.0);
 }`;
 
+// Spiegelung im Bildraum.
+//
+// Nasse Fahrbahn ist auf den Referenzbildern das, was eine Nachtstraße
+// ausmacht: die Schilder stehen zweimal im Bild, einmal an der Wand und
+// einmal auf dem Asphalt. Die Rauheit abzusenken reicht dafür nicht — die
+// Umgebungsreflexion kommt aus der Himmelssonde und kennt keine Neonröhre
+// zwanzig Meter weiter.
+//
+// Also ein Strahlmarsch durch die Tiefe, die nach dem Szenendurchgang
+// ohnehin vorliegt. Nur auf waagerechten Flächen und nur bei Nässe: das ist
+// ein Bruchteil des Bildes, und für den Rest wäre es Aufwand ohne Wirkung.
+const SPIEGEL = `
+uniform sampler2D bild, tiefe;
+uniform mat4 projektion, projektionInvers;
+uniform vec3 hochAchse;      // Weltoben im Blickraum
+uniform float nass, staerke;
+varying vec2 vUv;
+
+vec3 sichtPunkt(vec2 uv){
+ float d = texture2D(tiefe, uv).x;
+ vec4 clip = vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
+ vec4 p = projektionInvers * clip;
+ return p.xyz / p.w;
+}
+
+void main(){
+ gl_FragColor = vec4(0.0);
+ if(nass < 0.02) return;
+ float d = texture2D(tiefe, vUv).x;
+ if(d > 0.9999) return;
+ vec3 p = sichtPunkt(vUv);
+ vec3 n = normalize(cross(dFdx(p), dFdy(p)));
+ // Nur, was nach oben zeigt. Wände spiegeln bei Regen praktisch nicht.
+ float oben = smoothstep(0.72, 0.94, dot(n, hochAchse));
+ if(oben < 0.02) return;
+ // Auf einer waagerechten Fläche ist die Normale bekannt: sie ist Weltoben.
+ // Die aus den Tiefen-Ableitungen gewonnene rauscht auf einer großen Ebene,
+ // und damit zeigte der Strahl bei jedem Bildpunkt woanders hin — das Ergebnis
+ // waren Flecken statt der Streifen, die nasser Asphalt tatsächlich zeigt.
+ n = normalize(mix(n, hochAchse, oben));
+ // Und nur in der Nähe: weiter weg ist die Tiefenauflösung zu grob für
+ // einen Strahlmarsch, und der Dunst deckt es ohnehin zu.
+ float naehe = 1.0 - smoothstep(40.0, 110.0, -p.z);
+ if(naehe < 0.02) return;
+
+ vec3 blick = normalize(p);
+ vec3 strahl = reflect(blick, n);
+ // Streifender Blick spiegelt stark, steiler Blick kaum: Fresnel, grob.
+ float fresnel = pow(1.0 - max(0.0, dot(-blick, n)), 3.0);
+
+ vec3 pos = p + n * 0.05;
+ float schritt = 0.28;
+ vec3 treffer = vec3(0.0);
+ float gefunden = 0.0;
+ for(int i = 0; i < 30; i++){
+  pos += strahl * schritt;
+  schritt *= 1.14;                       // grob logarithmisch, spart Tasten
+  vec4 sp = projektion * vec4(pos, 1.0);
+  vec2 suv = sp.xy / sp.w * 0.5 + 0.5;
+  if(suv.x < 0.0 || suv.x > 1.0 || suv.y < 0.0 || suv.y > 1.0) break;
+  float dz = texture2D(tiefe, suv).x;
+  if(dz > 0.9999) continue;              // Himmel: kein Treffer, weiterlaufen
+  float flaecheZ = sichtPunkt(suv).z;
+  float dicke = flaecheZ - pos.z;
+  // Getroffen, wenn der Strahl hinter die Fläche gelaufen ist, aber nicht
+  // beliebig weit dahinter — sonst spiegelt eine Hauswand den Himmel hinter
+  // sich.
+  if(dicke > 0.02 && dicke < schritt * 2.4 + 0.6){
+   // Zum Rand hin ausblenden: was aus dem Bild läuft, gibt es nicht.
+   vec2 rand = abs(suv - 0.5) * 2.0;
+   float kante = (1.0 - smoothstep(0.72, 1.0, max(rand.x, rand.y)));
+   treffer = texture2D(bild, suv).rgb;
+   gefunden = kante;
+   break;
+  }
+ }
+ gl_FragColor = vec4(treffer, gefunden * oben * naehe * nass * fresnel * staerke);
+}`;
+
 // Zusammensetzen. Hier passiert alles, was den Bildeindruck trägt.
 const ENDE = `
-uniform sampler2D bild, glanz, verdeckung;
+uniform sampler2D bild, glanz, verdeckung, spiegel;
 uniform float staerke, belichtung, koernung, zeit, vignette, saum, nacht;
 uniform vec2 groesse;
 varying vec2 vUv;
@@ -148,6 +227,9 @@ void main(){
  // Verdeckung wirkt vor dem Überstrahlen: eine Ecke, die dunkel ist, soll
  // auch nicht strahlen.
  c *= texture2D(verdeckung, vUv).r;
+ // Spiegelung dazu, gewichtet mit ihrer eigenen Deckung.
+ vec4 sp = texture2D(spiegel, vUv);
+ c = mix(c, c * 0.35 + sp.rgb, clamp(sp.a, 0.0, 0.85));
  c += texture2D(glanz, vUv).rgb * staerke;
  c *= belichtung;
  c = aces(c);
@@ -216,6 +298,10 @@ export class Nachbearbeitung {
   const grau = {type: T.UnsignedByteType, colorSpace: T.LinearSRGBColorSpace, depthBuffer: false};
   this.ao1 = new T.WebGLRenderTarget(2, 2, grau);
   this.ao2 = new T.WebGLRenderTarget(2, 2, grau);
+  // Die Spiegelung trägt Farbe und Deckung, also volle Kanäle in halber
+  // Auflösung. Kein Weichzeichnen: eine verwischte Spiegelung sieht nach
+  // Nebel aus, nicht nach nassem Asphalt.
+  this.spiegelZiel = new T.WebGLRenderTarget(2, 2, {...optionen, depthBuffer: false});
 
   this.aoU = {
    tiefe: {value: null}, projektion: {value: new T.Matrix4()},
@@ -223,13 +309,20 @@ export class Nachbearbeitung {
    radius: {value: .6}, staerke: {value: .7}, nah: {value: .45}, fern: {value: 650}
   };
   this.ao = stufe(AO, this.aoU);
+  this.spiegelU = {
+   bild: {value: null}, tiefe: {value: null},
+   projektion: {value: new T.Matrix4()}, projektionInvers: {value: new T.Matrix4()},
+   hochAchse: {value: new T.Vector3(0, 1, 0)}, nass: {value: 0}, staerke: {value: .85}
+  };
+  this.spiegel = stufe(SPIEGEL, this.spiegelU);
+  this.spiegelAn = true;
   this.hellU = {bild: {value: null}, schwelle: {value: .86}, weich: {value: .55}};
   this.weichU = {bild: {value: null}, richtung: {value: new T.Vector2()}};
   this.endeU = {
    bild: {value: null}, glanz: {value: null}, staerke: {value: .58},
    belichtung: {value: 1.2}, koernung: {value: .035}, zeit: {value: 0},
    vignette: {value: .24}, saum: {value: .0016}, nacht: {value: 0},
-   verdeckung: {value: null}, groesse: {value: new T.Vector2(1, 1)}
+   verdeckung: {value: null}, spiegel: {value: null}, groesse: {value: new T.Vector2(1, 1)}
   };
   this.hell = stufe(HELL, this.hellU);
   this.weich = stufe(WEICH, this.weichU);
@@ -239,6 +332,9 @@ export class Nachbearbeitung {
   // nichts weg.
   this.weiss = new T.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
   this.weiss.needsUpdate = true;
+  // Ersatz, wenn die Spiegelung aus ist: Deckung null, also unsichtbar.
+  this.schwarz = new T.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1);
+  this.schwarz.needsUpdate = true;
   this.gruppe = new T.Scene();
  }
 
@@ -251,6 +347,7 @@ export class Nachbearbeitung {
   this.b.setSize(hw, hh);
   this.ao1.setSize(hw, hh);
   this.ao2.setSize(hw, hh);
+  this.spiegelZiel.setSize(hw, hh);
   this.endeU.groesse.value.set(w, h);
   this.aoU.groesse.value.set(hw, hh);
  }
@@ -299,6 +396,19 @@ export class Nachbearbeitung {
    this.zeichne(this.weich, this.ao1);
    this.endeU.verdeckung.value = this.ao1.texture;
   } else this.endeU.verdeckung.value = this.weiss;
+
+  // Spiegelung: nur wenn es überhaupt nass ist. Bei trockener Straße wäre
+  // der ganze Durchgang Aufwand für ein leeres Ziel.
+  if (this.spiegelAn && this.spiegelU.nass.value > .02) {
+   this.spiegelU.bild.value = this.szene.texture;
+   this.spiegelU.tiefe.value = this.szene.depthTexture;
+   this.spiegelU.projektion.value.copy(camera.projectionMatrix);
+   this.spiegelU.projektionInvers.value.copy(camera.projectionMatrixInverse);
+   // Weltoben im Blickraum: daran erkennt der Shader waagerechte Flächen.
+   this.spiegelU.hochAchse.value.set(0, 1, 0).transformDirection(camera.matrixWorldInverse);
+   this.zeichne(this.spiegel, this.spiegelZiel);
+   this.endeU.spiegel.value = this.spiegelZiel.texture;
+  } else this.endeU.spiegel.value = this.schwarz;
 
   this.hellU.bild.value = this.szene.texture;
   this.zeichne(this.hell, this.a);

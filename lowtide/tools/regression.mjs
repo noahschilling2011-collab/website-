@@ -692,6 +692,25 @@ pruefe('Verdeckung dunkelt tatsächlich ab', keys.aoMin < 245, `dunkelster Wert 
 pruefe('Oberflächendetail liegt auf allen matten Weltmaterialien',
  keys.detail[0] === keys.detail[1] && keys.detail[1] > 50 && keys.detail[2] > 0,
  `${keys.detail[0]} von ${keys.detail[1]}, ${keys.detail[2]} leuchtende ausgenommen`);
+pruefe('Spiegelung läuft nur bei Nässe', await page.evaluate(async () => {
+ const L = window.LOWTIDE, w = L.world;
+ const bild = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ L.sim.weather = 'clear';
+ // Die Nässe klingt langsam ab; für die Prüfung direkt setzen.
+ w.post.spiegelU.nass.value = 0;
+ await bild();
+ const trocken = w.post.endeU.spiegel.value === w.post.schwarz;
+ L.sim.weather = 'storm';
+ for (let i = 0; i < 40; i++) w.applySky(.5);
+ await bild();
+ const nass = w.post.spiegelU.nass.value;
+ const anGeschaltet = w.post.endeU.spiegel.value === w.post.spiegelZiel.texture;
+ // Weltoben im Blickraum darf nicht die Einheitsachse geblieben sein.
+ const achse = w.post.spiegelU.hochAchse.value;
+ const gedreht = Math.abs(achse.y - 1) > 1e-4 || Math.abs(achse.z) > 1e-4;
+ L.sim.weather = 'clear';
+ return {trocken, nass, anGeschaltet, gedreht};
+}).then(r => r.trocken && r.nass > .5 && r.anGeschaltet && r.gedreht));
 pruefe('Sparmodus schaltet die Nachbearbeitung ab', await page.evaluate(() => {
  const knopf = document.getElementById('qualityBtn'), w = window.LOWTIDE.world;
  knopf.click();

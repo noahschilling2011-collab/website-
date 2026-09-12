@@ -154,6 +154,11 @@ export class World{
    // Verdeckung nachts zurücknehmen: es gibt kaum Umgebungslicht, das sie
    // wegnehmen könnte, und die Kanten wurden dadurch tiefschwarz.
    this.post.aoU.staerke.value=.7*(1-himmel.nacht*.55);
+   // Dieselbe Nässe wie im Oberflächenshader; die Spiegelung darf nicht vor
+   // dem nassen Asphalt da sein.
+   this.post.spiegelU.nass.value=NAESSE.value;
+   // Nachts spiegelt es kräftiger — dann steht auch etwas zu spiegeln da.
+   this.post.spiegelU.staerke.value=.55+himmel.nacht*.5;
   }
   const nachtAnteil=Math.min(1,himmel.nacht*1.25);
   for(const m of leuchtMaterialien)m.emissiveIntensity=.06+nachtAnteil*1.45;
