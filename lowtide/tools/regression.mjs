@@ -489,15 +489,20 @@ const akte = await page.evaluate(() => {
  for (let i = 0; i < 60; i++) sim.tick(.05);
  out.lkwFaehrt = Math.hypot(lkw.x - lkwVor.x, lkw.z - lkwVor.z);
  const auto = sim.cars.find(c => c.type === 'parked' && c.model === 'muscle') || sim.cars[0];
- // Der übrige Verkehr wird für den Rammtest beiseite gesetzt. Auf einer
- // belebten Straße trifft man beim Rammen zwangsläufig auch Zivilwagen, und
- // das ist zu Recht eine Straftat — geprüft werden soll aber, dass der
- // Transport selbst keine auslöst.
+ // Für den Rammtest bleibt nur der Transport auf der Karte. Auf einer
+ // belebten Straße trifft man beim Rammen zwangsläufig Zivilwagen und
+ // Fußgänger, und beides ist zu Recht eine Straftat — geprüft werden soll
+ // aber, dass der Transport selbst keine auslöst. Erster Versuch: nur die
+ // Fahrzeuge beiseite. Es blieben die hundertsiebenundfünfzig Leute.
  out.beiseite = [];
  for (const c of sim.cars) {
   if (c === auto || c === lkw) continue;
-  out.beiseite.push([c.id, c.x, c.z]);
+  out.beiseite.push(['w', c.id, c.x, c.z]);
   c.x += 4000;
+ }
+ for (const n of sim.npcs) {
+  out.beiseite.push(['n', n.id, n.x, n.z]);
+  n.x += 4000;
  }
  sim.player.car = auto; Object.assign(auto, {yaw: lkw.yaw, speed: 22, health: 100, fuel: 100});
  let stoesse = 0;
@@ -508,7 +513,10 @@ const akte = await page.evaluate(() => {
  out.gestoppt = sim.campaign.konvoi.phase === 'gestoppt';
  out.stoesse = stoesse;
  out.fahndungNachRammen = sim.stars;
- for (const [id, x, z] of out.beiseite) {const c = sim.cars.find(v => v.id === id); if (c) {c.x = x; c.z = z;}}
+ for (const [art, id, x, z] of out.beiseite) {
+  const o = (art === 'w' ? sim.cars : sim.npcs).find(v => v.id === id);
+  if (o) {o.x = x; o.z = z;}
+ }
  delete out.beiseite;
  sim.player.car = null; sim.player.x = lkw.x + 1.5; sim.player.z = lkw.z + 1;
  const geld3 = sim.player.money;
