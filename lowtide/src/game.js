@@ -11,7 +11,7 @@ const debug={sichtbar:false,frames:0,fps:0,fenster:0,zeit:0};
 // schon losgelassen wurde. Das darf die Eingabe nicht abbrechen.
 const fange=(el,id)=>{try{el.setPointerCapture(id);}catch{}};
 window.LOWTIDE={sim,get world(){return world;},get frames(){return debug.frames;},debug,
- get radio(){return radio;},get sender(){return SENDER;},orte:locations,immobilien,get schatzOrte(){return schatzOrte;},
+ get radio(){return radio;},get sender(){return SENDER;},orte:locations,immobilien,waterAt,get schatzOrte(){return schatzOrte;},
  // Nur fürs Prüfen: setzt Figur und Kamera an eine feste Stelle.
  // hoehe>0 pausiert die Simulation und hebt die Kamera für Übersichtsbilder an.
  view(x,z,blick=yaw,neigung=pitch,hoehe=0){const p=sim.player;p.car=null;p.x=x;p.z=z;p.y=hoehe;p.vy=0;
@@ -268,6 +268,7 @@ function phoneZeichnen(){
   b.onclick=()=>{foto();phoneApp='galerie';phoneZeichnen();};
   inhalt.append(b);
   el('div','zeile','Die Aufnahme zeigt den Ausschnitt hinter dem Telefon. Fotos bleiben in dieser Sitzung.');
+  el('div','zeile','Möwen, Fische, Delfine und Alligatoren im Bild bringen Geld.');
   return;
  }
 
@@ -278,7 +279,7 @@ function phoneZeichnen(){
   fotos.slice(0,6).forEach((f,i)=>{
    const z=el('div','zeile');
    const bild=document.createElement('img');bild.src=f.daten;bild.alt='Aufnahme '+(i+1);z.append(bild);
-   const u=document.createElement('div');u.className='wer';u.textContent=f.ort+' · '+uhrzeit(f.stunde);z.append(u);
+   const u=document.createElement('div');u.className='wer';u.textContent=f.ort+' · '+uhrzeit(f.stunde)+(f.tiere?' · '+f.tiere+' Tiere':'');z.append(u);
    if(!f.gepostet){
     const b=document.createElement('button');b.textContent='Auf TIDELINE stellen';b.style.marginTop='6px';
     b.onclick=()=>{f.gepostet=true;sim.post('@'+sim.player.name.split(' ')[0].toLowerCase(),
@@ -368,7 +369,11 @@ function foto(){
  try{
   world.renderer.render(world.scene,world.camera);
   const daten=world.renderer.domElement.toDataURL('image/jpeg',.68);
-  (sim.fotos||=[]).unshift({daten,ort:regionAt(sim.player),stunde:sim.hour,gepostet:false});
+  // Wildtieraufnahmen zählen: was vor der Kamera und nah genug ist.
+  const tiere=world.tiere?world.tiere.imBild(sim.player,yaw):0;
+  if(tiere){const lohn=Math.min(240,tiere*30);sim.award(lohn);
+   toast(tiere+' Tiere im Bild · $'+lohn);}
+  (sim.fotos||=[]).unshift({daten,ort:regionAt(sim.player),stunde:sim.hour,gepostet:false,tiere});
   if(sim.fotos.length>6)sim.fotos.pop();
  }catch(e){toast('Aufnahme nicht möglich.');console.warn(e);}
 }

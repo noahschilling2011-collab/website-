@@ -9,6 +9,7 @@ import {dressBuildings} from './facades.js';
 import {dressRegions} from './regions.js';
 import {dressInteriors} from './interiors.js';
 import {Fernstufe,grobesAuto,grobeFigur} from './lod.js';
+import {Tierwelt} from './wildlife.js';
 const STRASSEN_HEX=[0x333d45,0x3d494f,0x445155];
 const GLAS_HEX=[0x3c5a69,0x486673,0x51737b,0x2c4d52];
 const material=c=>new T.MeshStandardMaterial({color:c,roughness:.7});
@@ -24,7 +25,7 @@ export class ExpandedWorld extends World{
    }
    if(GLAS_HEX.includes(hex)){o.material.metalness=.72;o.material.roughness=.16;o.material.envMapIntensity=1.5;}
   });
-  this.setupStrassenlicht();this.setupInnenlicht();this.setupFahrlicht();this.setupFernstufen(sim);
+  this.setupStrassenlicht();this.setupInnenlicht();this.setupFahrlicht();this.setupFernstufen(sim);this.tiere=new Tierwelt(this.scene);
   // Suchscheinwerfer des Hubschraubers. Ab fünf Sternen kreist er über der
   // letzten bekannten Position; vorher war er nur ein stummes Modell.
   this.suchlicht=new T.SpotLight(0xdfe9ff,0,220,.16,.4,1);
@@ -226,6 +227,9 @@ export class ExpandedWorld extends World{
   this.street?.update(t,Math.min(1,this.sky.uniforms.nacht.value*1.25));
   this.updateFahrlicht(Math.min(1,this.sky.uniforms.nacht.value*1.25));
   this.updateInnenlicht(p);
+  // Schüsse schrecken die Tiere auf.
+  if(this.letzteSchuesse!==s.shots){this.letzteSchuesse=s.shots;this.tiere.aufschrecken();}
+  this.tiere.update(dt,t,p);
   this.palmenSetzen(t,s.weather==='storm'?3.4:s.weather==='rain'?1.8:1);for(const m of this.terrain)m.visible=Math.hypot(m.position.x-p.x,m.position.z-p.z)<650;
   if(!this.barrierMeshes)this.barrierMeshes=[];while(this.barrierMeshes.length<s.barriers.length){const m=new T.Mesh(new T.BoxGeometry(5,1,1.2),new T.MeshStandardMaterial({color:0xe3c485}));this.scene.add(m);this.barrierMeshes.push(m);}this.barrierMeshes.forEach((m,i)=>{const b=s.barriers[i];m.visible=!!b;if(b)m.position.set(b.x,.5,b.z);});if(!this.policeHelicopter){this.policeHelicopter=this.car(0x4b6169,false,{model:'helicopter'});this.scene.add(this.policeHelicopter);}const h=s.policeHeli;this.policeHelicopter.position.set(h.x,h.alt,h.z);this.policeHelicopter.rotation.y=h.yaw;this.policeHelicopter.visible=distance(h,p)<400;if(h.alt>0)this.policeHelicopter.userData.rotor.rotation.y+=dt*40;
   const suchtAktiv=s.stars>=5&&h.alt>8;

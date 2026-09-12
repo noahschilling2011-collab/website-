@@ -219,6 +219,42 @@ await page.keyboard.press('F3');
 pruefe('F3 blendet die Messwerte ein', await page.evaluate(() => !document.getElementById('debug').hidden));
 await page.keyboard.press('F3');
 
+console.log('Tierwelt');
+pruefe('Möwen, Fische, Delfine und Alligatoren sind angelegt', await page.evaluate(() => {
+ const w = window.LOWTIDE.world.tiere;
+ return w.moewen.length > 40 && w.fische.length > 60 && w.delfine.length >= 5 && w.alligatoren.length >= 6;
+}));
+pruefe('Die Tiere bewegen sich', await page.evaluate(async () => {
+ const w = window.LOWTIDE.world.tiere;
+ const vorher = w.fische.slice(0, 5).map(f => f.x + f.z);
+ await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ return w.fische.slice(0, 5).some((f, i) => Math.abs(f.x + f.z - vorher[i]) > 1e-4);
+}));
+pruefe('Fische bleiben im Wasser', await page.evaluate(() => {
+ const w = window.LOWTIDE.world.tiere, wasser = window.LOWTIDE.waterAt;
+ return w.fische.every(f => wasser(f.x, f.z));
+}));
+pruefe('Ein Schuss schreckt sie auf', await page.evaluate(async () => {
+ const L = window.LOWTIDE, s = L.sim;
+ L.world.tiere.scheu = 0;
+ s.player.armed = true; s.player.cooldown = 0; s.player.ammo = 12; s.shoot();
+ await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ const geschreckt = L.world.tiere.scheu > .3;
+ s.player.armed = false; s.stars = 0; s.heat = 0; s.lastSeen = null; s.description = null;
+ return geschreckt;
+}));
+pruefe('Die Kamera erkennt Tiere im Bild', await page.evaluate(() => {
+ const L = window.LOWTIDE, t = L.world.tiere;
+ // Einen Alligator direkt vor die Figur setzen und in seine Richtung schauen.
+ const a = t.alligatoren[0];
+ L.sim.player.x = a.x; L.sim.player.z = a.z - 12;
+ // Andere Tiere können zufällig auch im Blickfeld liegen; entscheidend ist,
+ // dass die Blickrichtung überhaupt zählt.
+ const vorn = t.imBild({x: a.x, z: a.z - 12}, 0);
+ const hinten = t.imBild({x: a.x, z: a.z - 12}, Math.PI);
+ return vorn >= 1 && hinten < vorn;
+}));
+
 console.log('Detailstufen');
 pruefe('Ferne Figuren und Fahrzeuge laufen über die grobe Stufe', await page.evaluate(async () => {
  const L = window.LOWTIDE, s = L.sim;
