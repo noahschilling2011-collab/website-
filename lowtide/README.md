@@ -53,6 +53,7 @@ node tools/regression.mjs                        # 153 Prüfungen, muss grün se
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
+node tools/statistik.mjs                         # Sättigung und örtlicher Kontrast
 ```
 
 Die drei Werkzeuge in `tools/` mit Browser brauchen Playwright und Chromium.
@@ -126,8 +127,8 @@ Kistengeometrie trägt eine 240-m-Platte und einen 20-cm-Poller.
 Die kleinste Struktur war lange 0,74 m — aus zwei Metern Abstand ist das eine
 glatte Fläche. Beziffern lässt sich das über den örtlichen Kontrast, den
 mittleren Betrag der Helligkeitsdifferenz zu den Nachbarn zwei Bildpunkte
-weiter: auf Straßenhöhe 6,45 von 255, während ein Foto beim Doppelten bis
-Vierfachen liegt. Dazugekommen ist deshalb eine Oktave bei rund neun
+weiter — `tools/statistik.mjs` misst ihn: auf Straßenhöhe 6,45 von 255,
+während ein Foto beim Doppelten bis Vierfachen liegt. Dazugekommen ist deshalb eine Oktave bei rund neun
 Zentimetern, die bis 26 m läuft und dort ausgeblendet wird — mit eigenem
 Relief, sonst schwankt die Farbe, aber das Licht wandert nicht.
 
