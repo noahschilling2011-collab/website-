@@ -512,6 +512,12 @@ const akte = await page.evaluate(() => {
  // gesucht habe.
  sim.stars = 0; sim.heat = 0; sim.lastSeen = null; sim.description = null;
  for (const c of sim.cops) c.active = false;
+ // Und die vorgemerkten Zeugenmeldungen. crime() hängt jedem Zeugen ein
+ // report mit Zeitzünder an; die Abschnitte über Waffen und Nahkampf laufen
+ // vorher, und deren Zeugen melden mitten im Rammtest. Das Protokoll hat sie
+ // verraten: "report 1 bei -164/14" — ein Ort, an dem der Transport nie war.
+ for (const n of sim.npcs) {n.report = null; n.timer = 0; if (n.state !== 'tanzend') n.state = 'normal';}
+ sim.reported = new Set();
  // Eine Prüfung, die nur "rot" sagt, kostet je Anlauf eine halbe Stunde. Sie
  // schreibt jetzt mit, wer die Fahndung auslöst, und gibt es im Fehlertext
  // aus. Drei Anläufe lang habe ich die Ursache stattdessen geraten.
