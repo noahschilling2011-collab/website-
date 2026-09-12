@@ -26,10 +26,10 @@ function dialog(speaker,title,text,choices){sim.paused=true;keys.clear();stick={
 function interact(){const a=sim.action();if(a?.startsWith('place:')){showPlace(a.split(':')[1]);return;}if(a==='chapter2'){dialog('MARA QUINN','Ein zweiter Name.','Die Ratsakte führt zu Nadia, einer Zeugin auf Isla Serena. Mara muss zuerst das Relais abschalten, Eli kann danach mit seiner Karte ins Stadtarchiv. Wache und Kamera reagieren auf auffälliges Verhalten.',[['Auftrag annehmen',()=>{sim.campaign.stage=1;toast('Tab / Figuren: Wechsel zu Mara. Relais auf der Karte.');}],['Später',()=>{}]]);return;}if(a==='finale'){dialog('ELI & MARA','Alles auf den Tisch.','Nadia ist sicher. Ihr habt nun die vollständige Akte. Veröffentlichung beendet Calderas Einfluss; ein Deal kauft euch Freiheit und lässt die Verantwortlichen davonkommen.',[['Alles veröffentlichen',()=>{sim.campaign.stage=4;sim.relationship=Math.min(100,sim.relationship+20);sim.award(1800);saveGame();toast('Port Mercy kennt die Wahrheit. Kampagne abgeschlossen.');}],['Einen Deal schließen',()=>{sim.campaign.stage=4;sim.relationship=Math.max(0,sim.relationship-25);sim.award(3000);saveGame();toast('Der Deal ist durch. Kampagne abgeschlossen.');}]]);return;}if(a==='mara')dialog('MARA QUINN','Ein einfacher Auftrag.','Caldera schickt nachts Tanker ohne Ladungspapiere raus. Im Lager liegt eine Festplatte. Hol sie mir. Du kannst den Wachmann bezahlen, die Sicherung an der Ostwand ziehen oder den Eingang aufbrechen.',['accept'].map(()=>['Ich hole die Festplatte.',()=>sim.choose('accept')]).concat([['Noch nicht.',()=>{}]]));if(a==='guard')dialog('CALDERA · NACHTWACHE','Hier gibt es nichts zu sehen.','Der Wachmann mustert dich. Hinter ihm läuft eine Überwachungskamera. An der rechten Außenwand findest du den Stromkasten.',[['$150 anbieten — der Wachmann lässt dich durch',()=>sim.choose('bribe')],['Schloss aufbrechen — löst Alarm aus',()=>sim.choose('force')],['Zurück. Ich suche die Sicherung.',()=>{}]]);if(a==='ending')dialog('MARA QUINN','Was soll mit der Wahrheit passieren?','Die Daten belegen: Caldera verklappt Chemikalien vor der Küste. Ein Stadtrat kassiert mit. Mara will die Beweise veröffentlichen. Caldera bietet dir Geld fürs Schweigen.',[['Veröffentlichen · $800 · Maras Vertrauen',()=>finish('leak')],['An Caldera verkaufen · $2.000 · Mara verlieren',()=>finish('sell')]]);}
 function finish(choice){sim.choose(choice);dialog('AUFTRAG ABGESCHLOSSEN',choice==='leak'?'Die Flut bringt alles zurück.':'Der Preis des Schweigens.',choice==='leak'?'Die Presse veröffentlicht die Dokumente. Der Hafen steht still. Mara schickt dir eine Nachricht: „Das war erst der Anfang.“ Du kannst Port Mercy weiter erkunden.':'Caldera überweist das Geld. Maras Nummer ist nicht mehr erreichbar. Draußen am Hafen gehen die Lichter wieder an. Du kannst Port Mercy weiter erkunden.',[['Zurück in die Stadt',()=>{}],['Nächster Auftrag',()=>{sim.campaign.stage=1;toast('Mara muss das Relais abschalten. Tab / Figuren zum Wechseln.');}]]);}
 function fire(){if(sim.paused)return;const before=sim.shots;sim.shoot();if(sim.shots>before)tone(125,.14,.11,'sawtooth');}
-function pause(){if(!started||$('dialog').open||$('bigMap').open)return;sim.paused=true;keys.clear();stick={x:0,y:0};$('pause').showModal();}
+function pause(){if(!started||$('dialog').open||$('bigMap').open)return;$('phone').hidden=true;sim.paused=true;keys.clear();stick={x:0,y:0};$('pause').showModal();}
 function resume(){if(sim.player.health<=0)return;$('pause').close();sim.paused=false;}
-function map(){if(!started||$('dialog').open||$('pause').open)return;sim.paused=true;keys.clear();drawMap($('fullMap'),true);$('bigMap').showModal();}
-function keyAction(key){if(!started)return;if(key==='escape'){if($('pause').open)resume();else pause();return;}if(sim.paused)return;if(key==='e')interact();if(key==='q'){if(!sim.player.car){sim.player.armed=!sim.player.armed;tone(320,.06);}}if(key==='r')sim.reload();if(key==='fire')fire();if(key==='m')map();if(key==='tab'){sim.switchCharacter();yaw=sim.player.yaw;}if(key==='x')sim.cycleWeapon();if(key==='f')sim.melee();if(key==='g')sim.grapple();if(key==='v')sim.cover();if(key==='alt')sim.dodge();if(key===' '&&!sim.player.car)sim.jump();if(key==='h')showActions();if(key==='f3'){debug.sichtbar=!debug.sichtbar;$('debug').hidden=!debug.sichtbar;}}
+function map(){if(!started||$('dialog').open||$('pause').open||phoneOffen())return;sim.paused=true;keys.clear();drawMap($('fullMap'),true);$('bigMap').showModal();}
+function keyAction(key){if(!started)return;if(key==='escape'){if($('pause').open)resume();else pause();return;}if(key==='p'){phoneUmschalten();return;}if(sim.paused)return;if(key==='e')interact();if(key==='q'){if(!sim.player.car){sim.player.armed=!sim.player.armed;tone(320,.06);}}if(key==='r')sim.reload();if(key==='fire')fire();if(key==='m')map();if(key==='tab'){sim.switchCharacter();yaw=sim.player.yaw;}if(key==='x')sim.cycleWeapon();if(key==='f')sim.melee();if(key==='g')sim.grapple();if(key==='v')sim.cover();if(key==='alt')sim.dodge();if(key===' '&&!sim.player.car)sim.jump();if(key==='h')showActions();if(key==='f3'){debug.sichtbar=!debug.sichtbar;$('debug').hidden=!debug.sichtbar;}}
 $('startBtn').onclick=()=>{started=true;sim.paused=false;document.body.classList.add('playing');initAudio();toast('Sprich mit Mara am goldenen Marker. E / Aktion.');};$('pauseBtn').onclick=pause;$('resume').onclick=resume;$('restartBtn').onclick=()=>{$('pause').close();dialog('SPIELSTAND','Neu beginnen?','Dadurch wird der lokale Spielstand gelöscht.',[['Neues Spiel',()=>{localStorage.removeItem('lowtide-v2');location.reload();}],['Abbrechen',()=>{}]]);};$('mapBtn').onclick=map;$('closeMap').onclick=()=>{$('bigMap').close();sim.paused=false;};$('soundBtn').onclick=()=>{muted=!muted;$('soundBtn').textContent='Ton: '+(muted?'aus':'an');};let low=false;$('qualityBtn').onclick=()=>{low=!low;world.renderer.setPixelRatio(low?1:Math.min(devicePixelRatio,1.5));world.renderer.shadowMap.enabled=!low;world.resize();$('qualityBtn').textContent='Grafik: '+(low?'sparsam':'normal');};
 for(const id of ['dialog','pause','bigMap'])$(id).addEventListener('cancel',e=>{e.preventDefault();if(id==='pause')resume();else if(id==='bigMap'){$(id).close();sim.paused=false;}});
 window.addEventListener('keydown',e=>{if([' ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Tab','F3','Escape'].includes(e.key))e.preventDefault();const k=e.key.toLowerCase();if(!e.repeat)keyAction(k);keys.add(k);});window.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));window.addEventListener('blur',()=>{keys.clear();stick={x:0,y:0};if(started&&!sim.paused)pause();});document.addEventListener('visibilitychange',()=>{if(document.hidden&&started&&!sim.paused)pause();});window.addEventListener('resize',()=>world?.resize());
@@ -142,10 +142,196 @@ function drawMap(canvas,full=false){
  ctx.fillStyle='#a2f0db';ctx.fill();ctx.strokeStyle='#0d1b22';ctx.lineWidth=1.2;ctx.stroke();ctx.restore();
  ctx.textAlign='left';beschriftung('N',w-16,16,'#d0dcd1',11);
 }
+// Telefon. Karte, Nachrichten, TIDELINE, Bank, Wetter, Kamera, Kontakte und
+// Aufträge — die Apps lesen den Spielzustand, sie halten keinen eigenen.
+const APPS = [
+ ['karte', '▣', 'KARTE'], ['nachrichten', '✉', 'NACHRICHTEN'], ['tideline', '◍', 'TIDELINE'],
+ ['bank', '$', 'BANK'], ['wetter', '☁', 'WETTER'], ['kamera', '◉', 'KAMERA'],
+ ['kontakte', '☏', 'KONTAKTE'], ['auftraege', '★', 'AUFTRÄGE'], ['galerie', '▤', 'GALERIE']
+];
+let phoneApp = 'home';
+
+function phoneOffen(){return !$('phone').hidden;}
+function phoneUmschalten(){
+ if(!started||$('dialog').open||$('pause').open||$('bigMap').open)return;
+ // Beim Schließen darf die Pause nicht aufgehoben werden, wenn die Figur
+ // am Boden liegt — sonst läuft die Welt hinter dem Festnahme-Dialog weiter.
+ if(phoneOffen()){$('phone').hidden=true;sim.paused=sim.player.health<=0;return;}
+ if(sim.player.health<=0)return;
+ sim.paused=true;keys.clear();stick={x:0,y:0};phoneApp='home';
+ $('phone').hidden=false;phoneZeichnen();
+}
+const uhrzeit=h=>String(Math.floor(h)).padStart(2,'0')+':'+String(Math.floor(h%1*60)).padStart(2,'0');
+
+function phoneZeichnen(){
+ const inhalt=$('phoneInhalt'),p=sim.player;
+ $('phoneUhr').textContent=uhrzeit(sim.hour);
+ $('phoneNetz').textContent=regionAt(p).slice(0,18);
+ $('phoneAkku').textContent=Math.max(12,100-Math.floor(sim.time/90))+'%';
+ inhalt.replaceChildren();
+ const el=(tag,klasse,text)=>{const e=document.createElement(tag);if(klasse)e.className=klasse;if(text!=null)e.textContent=text;inhalt.append(e);return e;};
+ const titel=t=>el('h4',null,t);
+ const zeile=(wer,text,wann,klasse)=>{
+  const z=el('div','zeile');
+  if(wann){const w=document.createElement('span');w.className='wann';w.textContent=wann;z.append(w);}
+  if(wer){const a=document.createElement('div');a.className='wer';a.textContent=wer;z.append(a);}
+  const b=document.createElement('div');if(klasse)b.className=klasse;b.textContent=text;z.append(b);
+  return z;
+ };
+
+ if(phoneApp==='home'){
+  const gitter=el('div');gitter.id='phoneKacheln';
+  for(const [id,zeichen,name] of APPS){
+   const b=document.createElement('button');
+   const i=document.createElement('b');i.textContent=zeichen;
+   b.append(i,document.createTextNode(name));
+   b.onclick=()=>{phoneApp=id;phoneZeichnen();};
+   gitter.append(b);
+  }
+  const fuss=el('div','zeile');
+  fuss.textContent=p.name+' · $ '+p.money.toLocaleString('de-DE')+' · Vertrauen '+sim.relationship+'/100';
+  return;
+ }
+
+ if(phoneApp==='karte'){
+  titel('PORT MERCY');
+  const c=document.createElement('canvas');c.width=c.height=520;inhalt.append(c);
+  drawMap(c,true);
+  el('div','zeile','Türkis: du · Gold: Ziel · Rot: Polizei · Violett: zweite Figur');
+  return;
+ }
+
+ if(phoneApp==='nachrichten'){
+  titel('NACHRICHTEN');
+  const stufe=sim.campaign.stage;
+  const verlauf=[['MARA','Der Umschlag liegt am Pier. Komm allein.']];
+  if(sim.mission>=1)verlauf.push(['MARA','Caldera-Lager. Wachmann, Kamera, Sicherung an der Ostwand. Deine Wahl.']);
+  if(sim.mission>=3)verlauf.push(['MARA','Du hast sie. Bootshaus, so schnell du kannst.']);
+  if(stufe>=1)verlauf.push(['MARA','Das Relais nehme ich. Du kommst mit deiner Karte ins Archiv.']);
+  if(sim.campaign.relay)verlauf.push(['MARA','Signal ist aus. Jetzt du.']);
+  if(stufe>=2)verlauf.push(['ELI','Nadia sitzt auf Isla Serena fest. Ich brauche ein Auto.']);
+  if(sim.campaign.witness)verlauf.push(['NADIA','Ich steige nur aus, wenn keine Streife hinter uns ist.']);
+  if(stufe>=3)verlauf.push(['MARA','Alles liegt auf dem Tisch. Entscheide zu Hause.']);
+  if(stufe>=4)verlauf.push(['MARA',sim.relationship>=50?'Du hast das Richtige getan. Das war erst der Anfang.':'Ruf mich nicht mehr an.']);
+  if(sim.stars)verlauf.push(['UNBEKANNT','Halt dich raus, bis die Streifen weg sind.']);
+  for(const [wer,text] of verlauf.slice(-9))zeile(wer,text);
+  return;
+ }
+
+ if(phoneApp==='tideline'){
+  titel('TIDELINE');
+  const feed=sim.feed||[];
+  if(!feed.length)el('div','zeile','Noch nichts los in Port Mercy.');
+  for(const e of feed.slice(0,14))zeile(e.autor,e.text,uhrzeit(e.stunde));
+  return;
+ }
+
+ if(phoneApp==='bank'){
+  titel('SOLVARA FIRST');
+  zeile(p.name,'Kontostand $ '+p.money.toLocaleString('de-DE'));
+  zeile(null,'Verdient in dieser Sitzung: $ '+(sim.moneyEarned||0).toLocaleString('de-DE'));
+  const konto=sim.konto||[];
+  if(!konto.length)el('div','zeile','Keine Bewegungen.');
+  for(const b of konto.slice(0,12))
+   zeile(null,b.text+'   '+(b.betrag>0?'+':'−')+' $ '+Math.abs(b.betrag).toLocaleString('de-DE'),
+    uhrzeit(b.stunde),b.betrag>0?'plus':'minus');
+  return;
+ }
+
+ if(phoneApp==='wetter'){
+  titel('SOLVARA WETTER');
+  const namen={clear:'Klar',rain:'Regen',fog:'Nebel',storm:'Gewitter'};
+  const folge=['clear','rain','fog','storm'];
+  zeile('JETZT',namen[sim.weather]+' · '+regionAt(p),uhrzeit(sim.hour));
+  for(let i=1;i<=3;i++){
+   const k=folge[((sim.weatherIndex||0)+i)%4];
+   zeile(null,namen[k],uhrzeit((sim.hour+i*1.4)%24));
+  }
+  zeile(null,sim.weather==='rain'||sim.weather==='storm'
+   ?'Nasse Fahrbahn. Weniger Grip, längerer Bremsweg.'
+   :'Trockene Fahrbahn.');
+  return;
+ }
+
+ if(phoneApp==='kamera'){
+  titel('KAMERA');
+  const b=document.createElement('button');b.textContent='Aufnehmen';b.style.width='100%';
+  b.onclick=()=>{foto();phoneApp='galerie';phoneZeichnen();};
+  inhalt.append(b);
+  el('div','zeile','Die Aufnahme zeigt den Ausschnitt hinter dem Telefon. Fotos bleiben in dieser Sitzung.');
+  return;
+ }
+
+ if(phoneApp==='galerie'){
+  titel('GALERIE');
+  const fotos=sim.fotos||[];
+  if(!fotos.length)el('div','zeile','Noch keine Aufnahmen.');
+  fotos.slice(0,6).forEach((f,i)=>{
+   const z=el('div','zeile');
+   const bild=document.createElement('img');bild.src=f.daten;bild.alt='Aufnahme '+(i+1);z.append(bild);
+   const u=document.createElement('div');u.className='wer';u.textContent=f.ort+' · '+uhrzeit(f.stunde);z.append(u);
+   if(!f.gepostet){
+    const b=document.createElement('button');b.textContent='Auf TIDELINE stellen';b.style.marginTop='6px';
+    b.onclick=()=>{f.gepostet=true;sim.post('@'+sim.player.name.split(' ')[0].toLowerCase(),
+     'Aufnahme aus '+f.ort+'.');phoneApp='tideline';phoneZeichnen();};
+    z.append(b);
+   }
+  });
+  return;
+ }
+
+ if(phoneApp==='kontakte'){
+  titel('KONTAKTE');
+  const andere=sim.characters[1-sim.active];
+  const eintrag=(name,hinweis,fn)=>{
+   const z=zeile(name,hinweis);
+   const b=document.createElement('button');b.textContent='Anrufen';b.style.marginTop='6px';b.onclick=fn;z.append(b);
+  };
+  eintrag(andere.name,'Übernehmen und weiterspielen',()=>{
+   if(sim.switchCharacter())yaw=sim.player.yaw;phoneZeichnen();});
+  eintrag('PIKE CUSTOMS','Werkstatt am West Loop markieren',()=>{
+   toast('Pike Customs auf der Karte markiert.');phoneApp='karte';phoneZeichnen();});
+  eintrag('NORA’S DINER','Essen und Ausruhen',()=>{
+   toast('Nora’s Diner: '+Math.round(distance(sim.player,locations.diner))+' m entfernt.');});
+  eintrag('LEITSTELLE','Nur im Notfall',()=>{
+   toast(sim.stars?'Die suchen dich bereits.':'Aufgelegt.');});
+  return;
+ }
+
+ if(phoneApp==='auftraege'){
+  titel('AUFTRÄGE');
+  zeile('AKTUELL',sim.missionTitle());
+  const ziel=sim.objective();
+  zeile(null,'Entfernung: '+Math.round(distance(p,ziel))+' m');
+  zeile(null,'Kapitel: '+(sim.campaign.stage?'02–03 · Die Ratsakte':'01 · Die schwarze Flut'));
+  if(sim.activity)zeile('AKTIVITÄT',sim.activity.label);
+  const hs=sim.highScores||{};
+  for(const [k,v] of Object.entries(hs))
+   zeile(null,{race:'West Loop Bestzeit',gym:'Training',basketball:'Basketball',club:'Undertow'}[k]||k+': '
+    +(k==='race'?v.toFixed(1)+' s':v+'/5'));
+  return;
+ }
+}
+
+// Ein Bild wird auf Anforderung neu gerendert und sofort ausgelesen; ohne das
+// wäre der Zeichenpuffer nach dem letzten Frame bereits verworfen.
+function foto(){
+ try{
+  world.renderer.render(world.scene,world.camera);
+  const daten=world.renderer.domElement.toDataURL('image/jpeg',.68);
+  (sim.fotos||=[]).unshift({daten,ort:regionAt(sim.player),stunde:sim.hour,gepostet:false});
+  if(sim.fotos.length>6)sim.fotos.pop();
+ }catch(e){toast('Aufnahme nicht möglich.');console.warn(e);}
+}
+
+$('phoneBtn').onclick=phoneUmschalten;
+$('phoneZu').onclick=phoneUmschalten;
+$('phoneHome').onclick=()=>{phoneApp='home';phoneZeichnen();};
+
 function updateHUD(){const p=sim.player;$('clock').textContent=String(Math.floor(sim.hour)).padStart(2,'0')+':'+String(Math.floor(sim.hour%1*60)).padStart(2,'0')+' · '+({clear:'Klar',rain:'Regen',fog:'Nebel',storm:'Gewitter'}[sim.weather]);$('district').textContent=regionAt(p);$('actor').textContent=p.name;$('stars').textContent='★'.repeat(sim.stars)+'☆'.repeat(6-sim.stars);$('police').textContent=sim.stars?(sim.spotted?'Sichtkontakt':'Suche · '+Math.floor(sim.unseen)+' s außer Sicht'):'Keine Fahndung';$('health').style.width=p.health+'%';$('money').textContent='$ '+p.money.toLocaleString('de-DE');$('equipment').textContent=p.car?vehicleTypes[p.car.model].name+' · '+Math.ceil(p.car.health)+'% · Tank '+Math.ceil(p.car.fuel)+'%':p.armed?weapons[p.weapon].name+' · '+p.ammo+' / '+p.reserve:p.cover?'In Deckung':p.sneak?'Schleichend':'Ausdauer '+Math.round(p.stamina)+'%';$('speed').textContent=p.car?Math.round(Math.abs(p.car.speed)*3.6)+' km/h'+(p.car.alt>2?' · '+Math.round(p.car.alt)+' m':''):p.y<-.5?'Luft '+Math.round(p.air)+'%':'';$('reticle').style.display=p.armed?'block':'none';$('goal').textContent=sim.missionTitle();$('subgoal').textContent=sim.stars?'Verliere Sichtkontakt und verlasse das Suchgebiet.':sim.campaign.stage?'Goldener Marker auf der Karte · Tab / Figuren zum Wechseln':sim.mission===4?'Mara am Bootshaus oder direkt den nächsten Auftrag starten.':'E / Aktion am goldenen Marker';$('chapter').textContent=sim.campaign.stage?'02–03 / DIE RATS AKTE'.replace('RATS AKTE','RATSAKTE'):'01 / DIE SCHWARZE FLUT';let prompt='';if(sim.unlock)prompt='E / Aktion halten · '+Math.ceil(sim.unlock.remaining)+' s';else if(sim.activity)prompt=sim.activity.kind==='race'?'Kontrollpunkt '+(sim.activity.index+1)+' / '+sim.activity.points.length:sim.activity.kind==='diving'?'C halten: tauchen · E beim Wrackfund':'E / Aktion im richtigen Moment';else if(p.car)prompt='E aussteigen · H / Mehr für Werkstatt & Aktivitäten';else{const l=Object.values(locations).find(l=>distance(l,p)<4.5);if(l)prompt='E / Aktion · '+l.name;else if(distance(p,sim.objective())<5)prompt='E / Aktion · Missionsziel';else if(sim.cars.some(c=>distance(c,p)<5&&c.health>0))prompt='E / Aktion · Einsteigen (bei Schloss halten)';}$('prompt').textContent=prompt;const a=sim.activity;$('activityHud').hidden=!a;if(a){$('activityName').textContent=a.label;$('activityPointer').style.left=((a.phase||0)*100)+'%';$('activityScore').textContent=a.kind==='race'?a.time.toFixed(1)+' s':a.kind==='fishing'?(a.time>=a.biteAt?'BISS! JETZT DRÜCKEN':'Warte auf den Biss …'):a.kind==='diving'?'Zum Wrack schwimmen und abtauchen':(a.score||0)+' Treffer / '+(a.round||0)+' Versuche';$('timingBar').hidden=['race','diving','fishing'].includes(a.kind);}drawMap($('map'));}
 function messwerte(dt){debug.frames++;debug.fenster++;debug.zeit+=dt;if(debug.zeit>=.5){debug.fps=debug.fenster/debug.zeit;debug.fenster=0;debug.zeit=0;}if(!debug.sichtbar||!world)return;const info=world.renderer.info;
  $('debug').textContent=['FPS          '+debug.fps.toFixed(0),'Draw Calls   '+info.render.calls,'Dreiecke     '+info.render.triangles.toLocaleString('de-DE'),'Geometrien   '+info.memory.geometries,'Texturen     '+info.memory.textures,'NPCs         '+sim.npcs.length,'Fahrzeuge    '+sim.cars.length,'Polizei aktiv '+sim.cops.filter(c=>c.active).length,'Uhrzeit      '+sim.hour.toFixed(2),'Wetter       '+sim.weather,'Position     '+Math.round(sim.player.x)+' / '+Math.round(sim.player.z)].join('\n');}
-function frame(ms){const dt=Math.min(.05,(ms-last)/1000||.016);last=ms;messwerte(dt);if(world){if(started&&!sim.paused){if(keys.has('arrowleft'))yaw+=dt*1.8;if(keys.has('arrowright'))yaw-=dt*1.8;const forward=(keys.has('w')||keys.has('arrowup')?1:0)-(keys.has('s')||keys.has('arrowdown')?1:0)-stick.y,turn=(keys.has('d')?1:0)-(keys.has('a')?1:0)+stick.x;sim.tick(dt,{forward:clamp(forward,-1,1),turn:clamp(turn,-1,1),yaw,sprint:keys.has('shift'),sneak:keys.has('c'),brake:keys.has(' '),jump:keys.has(' '),interact:keys.has('e')});if(sim.player.car&&!drag)yaw+=Math.atan2(Math.sin(sim.player.yaw-yaw),Math.cos(sim.player.yaw-yaw))*Math.min(1,dt*3);if(keys.has('fire'))fire();if(engineGain){engineGain.gain.setTargetAtTime(!muted&&sim.player.car?.health>0?.017:0,audio.currentTime,.1);engine.frequency.setTargetAtTime((vehicleTypes[sim.player.car?.model]?.sound||45)+Math.abs(sim.player.car?.speed||0)*3,audio.currentTime,.1);}}else if(engineGain)engineGain.gain.setTargetAtTime(0,audio.currentTime,.1);world.update(dt,yaw,pitch,started);if(sim.events.length)toast(sim.events.pop()),sim.events.length=0;toastTime-=dt;if(toastTime<=0)$('toast').style.opacity='0';hudTime-=dt;if(hudTime<=0){updateHUD();hudTime=.12;}if(sim.player.health<=0&&!failedShown){failedShown=true;dialog('PORT MERCY POLICE','Festgenommen.','Der Auftrag ist gescheitert. Verliere beim nächsten Versuch zuerst den Sichtkontakt, wechsle bei Bedarf das Fahrzeug und verlasse das markierte Suchgebiet.',[['An der Klinik weiterspielen',()=>{const p=sim.player;p.health=100;p.money=Math.max(0,p.money-100);p.x=locations.clinic.x;p.z=locations.clinic.z+7;p.y=0;p.car=null;sim.stars=0;sim.heat=0;sim.lastSeen=null;sim.description=null;sim.activity=null;failedShown=false;saveGame();}]]);}}requestAnimationFrame(frame);}requestAnimationFrame(frame);
+function frame(ms){const dt=Math.min(.05,(ms-last)/1000||.016);last=ms;messwerte(dt);if(world){if(started&&!sim.paused){if(keys.has('arrowleft'))yaw+=dt*1.8;if(keys.has('arrowright'))yaw-=dt*1.8;const forward=(keys.has('w')||keys.has('arrowup')?1:0)-(keys.has('s')||keys.has('arrowdown')?1:0)-stick.y,turn=(keys.has('d')?1:0)-(keys.has('a')?1:0)+stick.x;sim.tick(dt,{forward:clamp(forward,-1,1),turn:clamp(turn,-1,1),yaw,sprint:keys.has('shift'),sneak:keys.has('c'),brake:keys.has(' '),jump:keys.has(' '),interact:keys.has('e')});if(sim.player.car&&!drag)yaw+=Math.atan2(Math.sin(sim.player.yaw-yaw),Math.cos(sim.player.yaw-yaw))*Math.min(1,dt*3);if(keys.has('fire'))fire();if(engineGain){engineGain.gain.setTargetAtTime(!muted&&sim.player.car?.health>0?.017:0,audio.currentTime,.1);engine.frequency.setTargetAtTime((vehicleTypes[sim.player.car?.model]?.sound||45)+Math.abs(sim.player.car?.speed||0)*3,audio.currentTime,.1);}}else if(engineGain)engineGain.gain.setTargetAtTime(0,audio.currentTime,.1);world.update(dt,yaw,pitch,started);if(sim.events.length)toast(sim.events.pop()),sim.events.length=0;toastTime-=dt;if(toastTime<=0)$('toast').style.opacity='0';hudTime-=dt;if(hudTime<=0){updateHUD();if(phoneOffen())$('phoneUhr').textContent=uhrzeit(sim.hour);hudTime=.12;}if(sim.player.health<=0&&!failedShown){failedShown=true;dialog('PORT MERCY POLICE','Festgenommen.','Der Auftrag ist gescheitert. Verliere beim nächsten Versuch zuerst den Sichtkontakt, wechsle bei Bedarf das Fahrzeug und verlasse das markierte Suchgebiet.',[['An der Klinik weiterspielen',()=>{const p=sim.player;p.health=100;p.money=Math.max(0,p.money-100);p.x=locations.clinic.x;p.z=locations.clinic.z+7;p.y=0;p.car=null;sim.stars=0;sim.heat=0;sim.lastSeen=null;sim.description=null;sim.activity=null;failedShown=false;saveGame();}]]);}}requestAnimationFrame(frame);}requestAnimationFrame(frame);
 
 function saveGame(){try{localStorage.setItem('lowtide-v2',JSON.stringify(sim.snapshot()));toast('Spielstand gespeichert.');}catch(e){toast('Spielstand konnte auf diesem Gerät nicht gespeichert werden.');}}
 function showPlace(id){const l=locations[id];sim.serviceLocation=id;const buy=(label,item)=>[label,()=>{sim.buy(item);saveGame();}];let options=[];

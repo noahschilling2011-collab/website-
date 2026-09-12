@@ -219,6 +219,39 @@ await page.keyboard.press('F3');
 pruefe('F3 blendet die Messwerte ein', await page.evaluate(() => !document.getElementById('debug').hidden));
 await page.keyboard.press('F3');
 
+console.log('Telefon');
+await page.keyboard.press('p');
+await bilder(1);
+pruefe('P öffnet das Telefon', await page.evaluate(() => !document.getElementById('phone').hidden));
+pruefe('Startseite zeigt alle Apps', await page.evaluate(() =>
+ document.querySelectorAll('#phoneKacheln button').length === 9));
+pruefe('Telefon pausiert das Spiel', await page.evaluate(() => window.LOWTIDE.sim.paused));
+pruefe('TIDELINE zeigt, was in der Welt passiert ist', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ s.post('@pruefung', 'Ein Beitrag aus dem Prüflauf.');
+ [...document.querySelectorAll('#phoneKacheln button')].find(b => b.textContent.includes('TIDELINE')).click();
+ return document.getElementById('phoneInhalt').textContent.includes('Ein Beitrag aus dem Prüflauf.');
+}));
+await page.click('#phoneHome');
+pruefe('Bank zeigt Kontostand und Bewegungen', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ s.buchung('Prüflauf', -77);
+ [...document.querySelectorAll('#phoneKacheln button')].find(b => b.textContent.includes('BANK')).click();
+ const text = document.getElementById('phoneInhalt').textContent;
+ return text.includes('Kontostand') && text.includes('Prüflauf');
+}));
+await page.click('#phoneHome');
+pruefe('Kamera nimmt ein echtes Bild auf', await page.evaluate(() => {
+ [...document.querySelectorAll('#phoneKacheln button')].find(b => b.textContent.includes('KAMERA')).click();
+ [...document.querySelectorAll('#phoneInhalt button')].find(b => b.textContent === 'Aufnehmen').click();
+ const f = window.LOWTIDE.sim.fotos?.[0];
+ return !!f && f.daten.startsWith('data:image/jpeg') && f.daten.length > 4000;
+}));
+await page.keyboard.press('p');
+await bilder(1);
+pruefe('P schließt das Telefon und gibt das Spiel frei', await page.evaluate(() =>
+ document.getElementById('phone').hidden && !window.LOWTIDE.sim.paused));
+
 console.log('Spielstand');
 pruefe('Speichern und Laden überstehen den Rundlauf', await page.evaluate(() => {
  const s = window.LOWTIDE.sim;
