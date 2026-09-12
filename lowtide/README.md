@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 96 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 141 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 ```
 
@@ -98,6 +98,31 @@ Kistengeometrie trägt eine 240-m-Platte und einen 20-cm-Poller.
 
 Der Knopf „Grafik: sparsam" schaltet Nachbearbeitung, Schatten und
 Pixelverhältnis zusammen ab.
+
+## Grün
+
+Bäume waren gestapelte Quader, drei bis vier übereinander. Aus zweihundert
+Metern geht das durch, aus zwanzig sieht ein Wald damit aus wie ein Regal.
+
+`foliage.js` setzt je Krone drei gekreuzte Flächen mit einer Alphakarte, die
+zur Laufzeit auf ein Canvas gezeichnet wird: 260 gestreute Ellipsen, dichter
+zur Mitte, ausgefranst am Rand. Es wird kein Bild geladen, die HTML bleibt
+eigenständig. Der Wind steht im Vertexshader und bewegt nur die Krone, der
+Stamm bleibt stehen. Rund dreitausend Bäume liegen am Ende in zwei
+InstancedMeshes für die ganze Karte.
+
+Zwei der drei Fehler dabei waren Wiederholungen aus dem Bewuchs: Kronen ohne
+`color`-Attribut werden bei `vertexColors` schwarz gelesen, und eine
+senkrechte Fläche mit waagerechter Normale bekommt von der Mittagssonne
+keinen Diffusanteil. Der dritte war neu und der eigentliche Grund für die
+schwarzen Kronen: bei `DoubleSide` dreht three die Normale für Rückseiten um,
+und bei gekreuzten Flächen sieht man immer die Hälfte von hinten. Der
+Fragmentshader setzt die Normale deshalb wieder auf `vNormal`.
+
+`grass.js` streut zusätzlich 3400 Büschel im Ring um den Spieler, ein Draw
+Call, Wind ebenfalls im Vertexshader. Verworfene Halme wandern auf y = -60 —
+Skalierung null ergibt eine singuläre Matrix, daraus NaN in der
+Normalenmatrix und daraus große schwarze Flächen statt nichts.
 
 ## Was Zeichenaufrufe kostet
 
