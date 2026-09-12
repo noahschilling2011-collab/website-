@@ -22,6 +22,27 @@ export const locations={
  ferry:{x:275,z:215,name:'Isla Serena',kind:'ferry'},
  aircargo:{x:-390,z:270,name:'Luftfracht',kind:'aircargo'}
 };
+// Kaufbare Objekte. Jedes wirft täglich etwas ab und dient als Ruhepunkt;
+// teurere Objekte tragen sich langsamer ab, lohnen sich aber auf Dauer.
+export const immobilien={
+ loft:{name:'Harbor Loft',x:-44,z:44,preis:2400,ertrag:110,art:'Wohnung',
+  text:'Zwei Zimmer über dem Hafenbecken. Laut, aber niemand fragt nach.'},
+ motel:{name:'Last Light Motel',x:-355,z:132,preis:900,ertrag:60,art:'Betrieb',
+  text:'Vierzehn Zimmer an der Ausfallstraße. Die Hälfte steht leer.'},
+ werkstatt:{name:'Anteil Pike Customs',x:-153,z:83,preis:3200,ertrag:170,art:'Betrieb',
+  text:'Ein Drittel der Werkstatt. Reparaturen kosten dich danach nichts mehr.'},
+ diner:{name:'Anteil Nora’s Diner',x:-270,z:127,preis:1800,ertrag:95,art:'Betrieb',
+  text:'Nora will sich zurückziehen und sucht jemanden für die Nachtschicht.'},
+ liegeplatz:{name:'Liegeplatz Serena',x:250,z:245,preis:1500,ertrag:70,art:'Stellplatz',
+  text:'Ein Platz an der Marina. Boote liegen dort sicherer als am Pier.'},
+ villa:{name:'Villa Isla Serena',x:268,z:196,preis:9500,ertrag:420,art:'Wohnung',
+  text:'Weiß, still, weit weg von Port Mercy. Genau deshalb teuer.'},
+ trailer:{name:'Trailer am Park',x:-178,z:258,preis:600,ertrag:35,art:'Wohnung',
+  text:'Kein Fundament, kein Papierkram, kein Nachbar, der sich erinnert.'},
+ halle:{name:'Lagerhalle Pier 6',x:20,z:296,preis:5200,ertrag:260,art:'Betrieb',
+  text:'Vierhundert Quadratmeter am Wasser. Niemand fragt, was drinsteht.'}
+};
+
 export const regions=[
  {name:'HARBOR DISTRICT',x:0,z:0}, {name:'DOWNTOWN',x:-250,z:-20},
  {name:'SUNSET SUBURBS',x:-80,z:-310},{name:'BELLWEATHER',x:-355,z:-280},

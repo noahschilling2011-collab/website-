@@ -219,6 +219,53 @@ await page.keyboard.press('F3');
 pruefe('F3 blendet die Messwerte ein', await page.evaluate(() => !document.getElementById('debug').hidden));
 await page.keyboard.press('F3');
 
+console.log('Eigentum');
+pruefe('Kaufen scheitert ohne Geld', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ s.besitz = {}; s.player.money = 10;
+ return s.kaufeImmobilie('villa') === false && !s.besitz.villa;
+}));
+pruefe('Kaufen bucht ab und trägt ein', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ s.player.money = 5000;
+ const ok = s.kaufeImmobilie('trailer');
+ return ok && !!s.besitz.trailer && s.player.money === 4400 && s.ertraege() === 35;
+}));
+pruefe('Dasselbe Objekt lässt sich nicht zweimal kaufen', await page.evaluate(() =>
+ window.LOWTIDE.sim.kaufeImmobilie('trailer') === false));
+pruefe('Der Zahltag schreibt die Erträge gut', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ const vorher = s.player.money;
+ s.letzterZahltag = -1;
+ s.zahltag();
+ const einmal = s.player.money - vorher;
+ s.zahltag();   // derselbe Tag darf nicht doppelt zahlen
+ return einmal === 35 && s.player.money - vorher === 35;
+}));
+pruefe('Werkstattanteil senkt die Reparaturkosten', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim, l = window.LOWTIDE.orte;
+ s.player.money = 9000; s.besitz = {};
+ s.player.x = l.garage.x; s.player.z = l.garage.z; s.serviceLocation = 'garage';
+ const auto = s.cars.find(c => c.model === 'sedan');
+ auto.x = l.garage.x; auto.z = l.garage.z; auto.health = 40;
+ const vorOhne = s.player.money; s.buy('car:repair');
+ const ohne = vorOhne - s.player.money;
+ s.besitz.werkstatt = {seit: 0};
+ auto.health = 40;
+ const vorMit = s.player.money; s.buy('car:repair');
+ const mit = vorMit - s.player.money;
+ s.besitz = {};
+ return ohne === 150 && mit < ohne;
+}));
+pruefe('Eigentum übersteht den Spielstand-Rundlauf', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ s.besitz = {loft: {seit: 1}};
+ const stand = JSON.parse(JSON.stringify(s.snapshot()));
+ s.besitz = {};
+ s.restore(stand); s.paused = false;
+ return !!s.besitz.loft && s.ertraege() === 110;
+}));
+
 console.log('Radio');
 pruefe('Audiokontext läuft nach dem Start', await page.evaluate(() =>
  !!window.LOWTIDE.world && document.body.classList.contains('playing')));

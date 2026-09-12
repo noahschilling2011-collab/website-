@@ -2,7 +2,7 @@ import * as T from './vendor/three.module.js';
 import {World} from './world.js';
 import {naturalHuman,animateNaturalHuman} from './human-model.js';
 import {detailedHuman,detailedCar,asphaltTexture} from './art-direction.js';
-import {locations,vehicleTypes,roadSegments,groundAt,waterAt,bounds} from './content.js';
+import {locations,vehicleTypes,roadSegments,groundAt,waterAt,bounds,immobilien} from './content.js';
 import {distance} from './simulation.js';
 import {Street} from './street.js';
 import {dressBuildings} from './facades.js';
@@ -150,6 +150,14 @@ export class ExpandedWorld extends World{
   for(let z=150;z<430;z+=23)this.palm(101,z,6+((z*3)%4));this.camera.far=1100;this.camera.updateProjectionMatrix();
   // Straßenmöblierung zuletzt, damit sie freie Flächen kennt und noch in den
   // gemeinsamen Instanz-Sammler von World.flush läuft.
+  // Verkaufsschilder: ohne Marke in der Welt findet niemand die Objekte.
+  for(const o of Object.values(immobilien)){
+   const y=groundAt(o.x,o.z);
+   this.box(o.x,y+1.3,o.z,.12,2.6,.12,0x6b5c44);
+   this.box(o.x+.9,y+1.3,o.z,.12,2.6,.12,0x6b5c44);
+   this.box(o.x+.45,y+2.35,o.z,1.5,1,.1,0xdcd2b4);
+   this.text('ZU VERKAUFEN',o.x+.45,y+2.35,o.z-.09,1.9,'#3c4a52',Math.PI);
+  }
   this.street=new Street(this);this.street.bauen();this.street.strandBauen();this.street.parkendeAutosBauen();
   dressBuildings(this,[...s.buildings,...s.worldBuildings].filter(b=>b.kind!=='house'));
   // Der Rest der Karte: Vororte, Farmland, Nationalpark, Sumpf, Flugfeld,

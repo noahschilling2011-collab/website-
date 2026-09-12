@@ -1,11 +1,11 @@
 import {Simulation,clamp,distance,intersects,lineClear,places} from './simulation.js';
-import {bounds,locations,vehicleTypes,weapons,waterAt,groundAt,roadSegments} from './content.js';
+import {bounds,locations,vehicleTypes,weapons,waterAt,groundAt,roadSegments,immobilien} from './content.js';
 import {findPath} from './navigation.js';
 export class Campaign extends Simulation{
  constructor(){
   super();this.active=0;Object.assign(this.player,{id:'eli',name:'ELI VOSS',stamina:100,fitness:0,y:0,vy:0,weapon:'pistol',inventory:{pistol:{ammo:12,reserve:72}},cover:false,hair:0,tattoo:false,air:100,parachute:false,fish:0});
   this.characters=[this.player,{...this.player,id:'mara',name:'MARA QUINN',x:-25,z:73,money:600,clothes:'blue',inventory:{pistol:{ammo:12,reserve:48},taser:{ammo:2,reserve:12}},weapon:'taser',car:null}];
-  this.relationship=50;this.campaign={stage:0,choice:null,relay:false,archive:false,witness:false,delivered:false};this.activity=null;this.unlock=null;this.reloadJob=null;this.dodgeTime=0;this.meleeTime=0;this.tickCount=0;this.weatherIndex=0;this.currentEvent=null;this.nextEvent=25;this.policeHeli={x:-360,z:305,alt:0,yaw:0};this.checkpoints=[];this.barriers=[];this.cameras=[];this.navRevision=0;this.homeOwned=true;this.motelOwned=false;this.highScores={};this.worldBuildings=[];this.roomWalls=[];this.moneyEarned=0;this.feed=[];this.konto=[];this.fotos=[];
+  this.relationship=50;this.campaign={stage:0,choice:null,relay:false,archive:false,witness:false,delivered:false};this.activity=null;this.unlock=null;this.reloadJob=null;this.dodgeTime=0;this.meleeTime=0;this.tickCount=0;this.weatherIndex=0;this.currentEvent=null;this.nextEvent=25;this.policeHeli={x:-360,z:305,alt:0,yaw:0};this.checkpoints=[];this.barriers=[];this.cameras=[];this.navRevision=0;this.homeOwned=true;this.motelOwned=false;this.highScores={};this.worldBuildings=[];this.roomWalls=[];this.moneyEarned=0;this.feed=[];this.konto=[];this.fotos=[];this.besitz={};this.letzterZahltag=0;
   this.expandWorld();
  }
  expandWorld(){
@@ -94,6 +94,29 @@ export class Campaign extends Simulation{
  jump(){const p=this.player;if(p.car)return;if(p.y>4){p.parachute=true;this.notify('Fallschirm geöffnet. Steuere mit WASD / Stick.');}else if(p.y>=0&&p.y<.2){p.vy=6.5;}}
  dodge(){const p=this.player;if(p.stamina<20||p.car)return;p.stamina-=20;this.dodgeTime=.45;this.move(p,-Math.cos(p.yaw)*2.5,Math.sin(p.yaw)*2.5);}
  award(n){this.player.money+=n;this.moneyEarned+=n;this.buchung('Eingang',n);}
+ // Eigentum. Der Ertrag fällt einmal je Spieltag an, unabhängig davon, wo
+ // sich die Figur gerade aufhält.
+ kaufeImmobilie(id){
+  const o=immobilien[id];if(!o)return false;
+  if(this.besitz[id]){this.notify('Gehört dir bereits.');return false;}
+  if(this.player.money<o.preis){this.notify('Du brauchst $'+o.preis.toLocaleString('de-DE')+'.');return false;}
+  this.player.money-=o.preis;this.buchung('Kauf '+o.name,-o.preis);
+  this.besitz[id]={seit:this.time,gekauftVon:this.player.id};
+  if(id==='motel')this.motelOwned=true;
+  this.notify(o.name+' gehört jetzt dir. Ertrag $'+o.ertrag+' pro Tag.');
+  this.post('@tideline_lokal','Neuer Eigentümer für '+o.name+'. Niemand kennt den Namen.');
+  return true;
+ }
+ ertraege(){return Object.keys(this.besitz).reduce((s,id)=>s+(immobilien[id]?.ertrag||0),0);}
+ zahltag(){
+  const tag=Math.floor(this.time/1440*60);   // ein Spieltag sind 1920 s Echtzeit
+  if(tag<=this.letzterZahltag)return;
+  this.letzterZahltag=tag;
+  const summe=this.ertraege();if(!summe)return;
+  this.player.money+=summe;this.moneyEarned+=summe;
+  this.buchung('Mieten und Anteile',summe);
+  this.notify('Tageseinnahmen aus Eigentum: $'+summe.toLocaleString('de-DE'));
+ }
  buy(item){const p=this.player,l=this.serviceLocation;if(!l||distance(p,locations[l])>10)return false;let price=0,apply=()=>{};
   if(item.startsWith('weapon:')){const id=item.split(':')[1];if(!weapons[id]||p.inventory[id])return false;price=weapons[id].price;apply=()=>p.inventory[id]={ammo:weapons[id].capacity,reserve:weapons[id].capacity*4};}
   else if(item==='ammo'){price=60;apply=()=>{p.reserve+=weapons[p.weapon].capacity*4;this.saveWeapon();};}
@@ -105,7 +128,9 @@ export class Campaign extends Simulation{
   else if(item==='motel'){if(this.motelOwned)return false;price=900;apply=()=>this.motelOwned=true;}
   else if(item==='rest'){if(this.stars){this.notify('Während einer Fahndung kein Ausruhen.');return false;}price=l==='motel'&&!this.motelOwned?60:0;apply=()=>{p.health=100;p.stamina=100;this.hour=(this.hour+6)%24;};}
   else if(item==='fuel'){const c=p.car||this.cars.find(c=>distance(c,p)<9);if(!c)return false;price=35;apply=()=>c.fuel=100;}
-  else if(item.startsWith('car:')){const c=p.car||this.cars.find(c=>distance(c,p)<12);if(!c){this.notify('Bring ein Fahrzeug in die Werkstatt.');return false;}const id=item.split(':')[1];price=id==='repair'?150:id==='paint'?120:id==='engine'?400:100;if(id==='engine'&&(c.upgrades.engine||0)>=3)return false;apply=()=>{if(id==='repair'){c.health=100;c.tires=100;c.glass=100;c.lights=100;}else if(id==='paint')c.color=[0x548d88,0x9b546b,0xdfb35f,0x324a6b][((c.upgrades.paint||0)+1)%4];if(id==='tires')c.tires=100;c.upgrades[id]=(c.upgrades[id]||0)+1;};}
+  else if(item.startsWith('car:')){const c=p.car||this.cars.find(c=>distance(c,p)<12);if(!c){this.notify('Bring ein Fahrzeug in die Werkstatt.');return false;}const id=item.split(':')[1];price=id==='repair'?150:id==='paint'?120:id==='engine'?400:100;
+   // Ein Anteil an Pike Customs drückt den Werkstattpreis.
+   if(this.besitz.werkstatt)price=Math.round(price*.35);if(id==='engine'&&(c.upgrades.engine||0)>=3)return false;apply=()=>{if(id==='repair'){c.health=100;c.tires=100;c.glass=100;c.lights=100;}else if(id==='paint')c.color=[0x548d88,0x9b546b,0xdfb35f,0x324a6b][((c.upgrades.paint||0)+1)%4];if(id==='tires')c.tires=100;c.upgrades[id]=(c.upgrades[id]||0)+1;};}
   else return false;if(p.money<price){this.notify('Nicht genug Geld.');return false;}p.money-=price;apply();
   if(price)this.buchung(locations[l]?.name||'Ausgabe',-price);
   this.notify('Erledigt · $'+price);return true;
@@ -128,7 +153,7 @@ export class Campaign extends Simulation{
   if(oldWeatherTimer<=dt){this.weatherIndex=(this.weatherIndex+1)%4;this.weather=['clear','rain','fog','storm'][this.weatherIndex];this.notify('Wetterwechsel: '+this.weather);}
   if(!p.car){if(waterAt(p.x,p.z)&&p.y<=0){p.y=input.sneak?Math.max(-3.5,p.y-dt*1.5):Math.min(-.5,p.y+dt*2);p.air=clamp(p.air+(p.y<-1.5?-dt*10:dt*25),0,100);if(!p.air)p.health=Math.max(0,p.health-dt*8);}else{p.vy-=dt*(p.parachute?2:16);p.vy=Math.max(p.parachute?-3:-35,p.vy);p.y+=p.vy*dt;if(p.y<=0){if(p.vy<-13)p.health=Math.max(0,p.health-(-p.vy-13)*3);p.y=0;p.vy=0;if(p.parachute){this.award(60);this.notify('Sicher gelandet. $60.');}p.parachute=false;}}}
   if(this.activity){const a=this.activity;a.time+=dt;a.phase=(Math.sin(a.time*(a.kind==='club'?5:a.kind==='gym'?3:2.5))+1)/2;if(a.kind==='race'&&distance(p,a.points[a.index])<10){a.index++;if(a.index===a.points.length){this.highScores.race=Math.min(this.highScores.race||99999,a.time);this.award(a.time<100?500:250);this.notify('Rennen beendet: '+a.time.toFixed(1)+' s.');this.activity=null;}}if(a.kind==='fishing'&&a.time>a.biteAt+1){this.notify('Der Fisch ist entkommen.');this.activity=null;}}
-  this.updateRoutines(dt);this.updateGuards(dt);this.updateEvents(dt);if(this.campaign.witness&&this.campaign.stage===2){if(!this.witness)this.witness={x:p.x-2,z:p.z-2};const d=distance(this.witness,p);if(p.car){this.witness.x=p.x;this.witness.z=p.z;}else if(d>2){this.witness.x+=(p.x-this.witness.x)/d*dt*5;this.witness.z+=(p.z-this.witness.z)/d*dt*5;}}
+  this.zahltag();this.updateRoutines(dt);this.updateGuards(dt);this.updateEvents(dt);if(this.campaign.witness&&this.campaign.stage===2){if(!this.witness)this.witness={x:p.x-2,z:p.z-2};const d=distance(this.witness,p);if(p.car){this.witness.x=p.x;this.witness.z=p.z;}else if(d>2){this.witness.x+=(p.x-this.witness.x)/d*dt*5;this.witness.z+=(p.z-this.witness.z)/d*dt*5;}}
  }
  updateRoutines(dt){if(this.tickCount%30)return;for(const n of this.npcs){if(n.guard||n.report||n.health<=0||n.state!=='normal')continue;const mode=this.hour>=8&&this.hour<17?'Arbeit':this.hour>=20||this.hour<6?'Zuhause':'Freizeit';if(n.schedule!==mode){n.schedule=mode;const goal=mode==='Zuhause'?n.home:n.work;n.path=mode==='Freizeit'?n.originalPath.map(p=>({...p})):[...findPath(n,goal,p=>this.blocked(p,.3),2,2500),goal];n.target=0;}n.pace=this.weather==='storm'?2:1.1+(n.id%5)*.13;}}
  updateGuards(dt){for(const n of this.npcs.filter(n=>n.guard)){if(n.health<=0||n.stun>0)continue;n.shot=(n.shot||0)-dt;const p=this.player;const suspicious=this.campaign.stage===1&&!this.campaign.relay||p.armed||this.stars;const sees=distance(n,p)<25&&lineClear(n,p,this.solids);if(suspicious&&sees&&n.shot<=0){n.shot=2.5;if(!this.campaign.relay){this.report(1);this.notify('Archivwache hat dich erkannt.');}if(this.stars>=2&&this.dodgeTime===0)p.health-=p.cover?2:7;}}}
@@ -148,6 +173,6 @@ export class Campaign extends Simulation{
   }
   if(!nowWanted&&this.barriers.length){this.solids=this.solids.filter(b=>!this.barriers.includes(b));this.barriers=[];}const heli=this.policeHeli;if(heli){const target=this.stars>=5?(this.lastSeen||p):{x:-360,z:305};const d=distance(heli,target);heli.alt=Math.min(45,heli.alt+dt*8);if(d>4){heli.yaw=Math.atan2(target.x-heli.x,target.z-heli.z);heli.x+=Math.sin(heli.yaw)*dt*30;heli.z+=Math.cos(heli.yaw)*dt*30;}else if(this.stars<5)heli.alt=Math.max(0,heli.alt-dt*16);if(this.stars>=5&&d<45&&p.y>=0&&lineClear(heli,p,this.solids)){this.spotted=true;this.lastSeen={x:p.x,z:p.z};}}if(nowWanted){if(this.spotted)this.unseen=0;else this.unseen+=dt;if(this.unseen>20+this.stars*4&&this.lastSeen&&distance(p,this.lastSeen)>35){this.stars=0;this.heat=0;this.description=null;this.lastSeen=null;this.notify('Fahndung beendet.');}}
  }
- snapshot(){this.saveWeapon();return {version:2,time:this.time,hour:this.hour,active:this.active,characters:this.characters.map(p=>({...p,car:null,carId:p.car?.id||null})),cars:this.cars,mission:this.mission,doorOpen:this.doorOpen,camera:this.camera,ending:this.ending,campaign:this.campaign,relationship:this.relationship,weather:this.weather,weatherIndex:this.weatherIndex,stars:this.stars,heat:this.heat,lastSeen:this.lastSeen,description:this.description,unseen:this.unseen,cops:this.cops,npcs:this.npcs,motelOwned:this.motelOwned,highScores:this.highScores,feed:this.feed,konto:this.konto};}
- restore(data){if(data?.version!==2||!Array.isArray(data.characters)||data.characters.length!==2||!Array.isArray(data.cars))throw new Error('Inkompatibler Spielstand');for(const p of data.characters)if(!Number.isFinite(p.x)||!Number.isFinite(p.z)||!p.inventory?.[p.weapon])throw new Error('Ungültiger Spielstand');for(const key of ['time','hour','active','characters','cars','mission','camera','ending','campaign','relationship','weather','weatherIndex','stars','heat','lastSeen','description','unseen','cops','npcs','motelOwned','highScores','feed','konto'])if(data[key]!==undefined)this[key]=data[key];for(const p of this.characters){p.car=this.cars.find(c=>c.id===p.carId)||null;p.cover=false;}this.player=this.characters[this.active];for(const c of this.cops){c.blocking=false;c.blockTarget=null;}if(data.doorOpen)this.openDoor();this.loadWeapon();this.paused=true;}
+ snapshot(){this.saveWeapon();return {version:2,time:this.time,hour:this.hour,active:this.active,characters:this.characters.map(p=>({...p,car:null,carId:p.car?.id||null})),cars:this.cars,mission:this.mission,doorOpen:this.doorOpen,camera:this.camera,ending:this.ending,campaign:this.campaign,relationship:this.relationship,weather:this.weather,weatherIndex:this.weatherIndex,stars:this.stars,heat:this.heat,lastSeen:this.lastSeen,description:this.description,unseen:this.unseen,cops:this.cops,npcs:this.npcs,motelOwned:this.motelOwned,highScores:this.highScores,feed:this.feed,konto:this.konto,besitz:this.besitz,letzterZahltag:this.letzterZahltag};}
+ restore(data){if(data?.version!==2||!Array.isArray(data.characters)||data.characters.length!==2||!Array.isArray(data.cars))throw new Error('Inkompatibler Spielstand');for(const p of data.characters)if(!Number.isFinite(p.x)||!Number.isFinite(p.z)||!p.inventory?.[p.weapon])throw new Error('Ungültiger Spielstand');for(const key of ['time','hour','active','characters','cars','mission','camera','ending','campaign','relationship','weather','weatherIndex','stars','heat','lastSeen','description','unseen','cops','npcs','motelOwned','highScores','feed','konto','besitz','letzterZahltag'])if(data[key]!==undefined)this[key]=data[key];for(const p of this.characters){p.car=this.cars.find(c=>c.id===p.carId)||null;p.cover=false;}this.player=this.characters[this.active];for(const c of this.cops){c.blocking=false;c.blockTarget=null;}if(data.doorOpen)this.openDoor();this.loadWeapon();this.paused=true;}
 }

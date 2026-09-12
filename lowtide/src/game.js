@@ -3,6 +3,7 @@ import {Campaign} from './campaign.js';
 import {ExpandedWorld} from './expanded-world.js';
 import {locations,regions,roadSegments,vehicleTypes,weapons,regionAt,waterAt,bounds,groundAt} from './content.js';
 import {Radio,SENDER} from './radio.js';
+import {immobilien} from './content.js';
 const $=id=>document.getElementById(id),sim=new Campaign();let world,started=false,last=0,yaw=Math.PI,pitch=.15,stick={x:0,y:0},drag=null,muted=false,audio=null,engine=null,engineGain=null,toastTime=0,hudTime=0,failedShown=false;
 const keys=new Set();$('startBtn').disabled=true;
 const debug={sichtbar:false,frames:0,fps:0,fenster:0,zeit:0};
@@ -10,7 +11,7 @@ const debug={sichtbar:false,frames:0,fps:0,fenster:0,zeit:0};
 // schon losgelassen wurde. Das darf die Eingabe nicht abbrechen.
 const fange=(el,id)=>{try{el.setPointerCapture(id);}catch{}};
 window.LOWTIDE={sim,get world(){return world;},get frames(){return debug.frames;},debug,
- get radio(){return radio;},get sender(){return SENDER;},
+ get radio(){return radio;},get sender(){return SENDER;},orte:locations,immobilien,
  // Nur fürs Prüfen: setzt Figur und Kamera an eine feste Stelle.
  // hoehe>0 pausiert die Simulation und hebt die Kamera für Übersichtsbilder an.
  view(x,z,blick=yaw,neigung=pitch,hoehe=0){const p=sim.player;p.car=null;p.x=x;p.z=z;p.y=hoehe;p.vy=0;
@@ -154,7 +155,7 @@ const APPS = [
  ['karte', '▣', 'KARTE'], ['nachrichten', '✉', 'NACHRICHTEN'], ['tideline', '◍', 'TIDELINE'],
  ['bank', '$', 'BANK'], ['wetter', '☁', 'WETTER'], ['kamera', '◉', 'KAMERA'],
  ['kontakte', '☏', 'KONTAKTE'], ['auftraege', '★', 'AUFTRÄGE'], ['galerie', '▤', 'GALERIE'],
- ['radio', '◎', 'RADIO']
+ ['radio', '◎', 'RADIO'], ['besitz', '⌂', 'BESITZ']
 ];
 let phoneApp = 'home';
 
@@ -237,6 +238,7 @@ function phoneZeichnen(){
   titel('SOLVARA FIRST');
   zeile(p.name,'Kontostand $ '+p.money.toLocaleString('de-DE'));
   zeile(null,'Verdient in dieser Sitzung: $ '+(sim.moneyEarned||0).toLocaleString('de-DE'));
+  zeile(null,'Aus Eigentum: $ '+sim.ertraege().toLocaleString('de-DE')+' pro Tag');
   const konto=sim.konto||[];
   if(!konto.length)el('div','zeile','Keine Bewegungen.');
   for(const b of konto.slice(0,12))
@@ -287,6 +289,28 @@ function phoneZeichnen(){
   return;
  }
 
+ if(phoneApp==='besitz'){
+  titel('EIGENTUM');
+  const meins=Object.keys(sim.besitz||{});
+  zeile(null,'Tageseinnahmen: $ '+sim.ertraege().toLocaleString('de-DE')
+   +(meins.length?'':' — noch nichts gekauft'));
+  for(const [id,o] of Object.entries(immobilien)){
+   const hat=!!sim.besitz?.[id],weg=Math.round(distance(p,o));
+   const z=zeile(o.name+(hat?' · gehört dir':''),o.text,weg+' m');
+   const info=document.createElement('div');info.className='wer';
+   info.textContent=o.art+' · $ '+o.preis.toLocaleString('de-DE')+' · $ '+o.ertrag+' pro Tag';
+   z.append(info);
+   if(!hat){
+    const b=document.createElement('button');b.style.marginTop='6px';
+    const nah=weg<=25;
+    b.textContent=nah?'Kaufen':'Zu weit weg';b.disabled=!nah||p.money<o.preis;
+    b.onclick=()=>{if(sim.kaufeImmobilie(id))phoneZeichnen();};
+    z.append(b);
+   }
+  }
+  el('div','zeile','Gekauft wird vor Ort. Erträge kommen einmal je Spieltag aufs Konto.');
+  return;
+ }
  if(phoneApp==='radio'){
   titel('AUTORADIO');
   if(!radio){el('div','zeile','Ton ist aus.');return;}
