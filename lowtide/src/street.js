@@ -286,6 +286,65 @@ export class Street {
   }
  }
 
+ // Mercy Beach war eine leere Sandfläche von 24 auf 300 Metern.
+ // Promenade, Liegen, Schirme, Rettungstürme, Netze und eine Strandbar.
+ strandBauen() {
+  const w = this.world, rng = this.rng;
+  // Holzpromenade zwischen Straße und Sand.
+  w.box(96, .28, 280, 5.5, .3, 300, 0x8a6f4e);
+  for (let z = 132; z < 428; z += 2.2) w.box(96, .45, z, 5.5, .06, .9, 0x9a7d58);
+  for (let z = 134; z < 428; z += 11) {
+   for (const x of [93.5, 98.5]) {
+    w.box(x, .78, z, .13, 1, .13, 0x6f5a41);
+    w.box(x, 1.2, z, .16, .1, 11, 0x6f5a41);
+   }
+  }
+  for (let z = 140; z < 425; z += 46) {
+   // Rettungsturm auf Stelzen, mit Leiter und Flagge.
+   const x = 108;
+   for (const ox of [-1.6, 1.6]) for (const oz of [-1.6, 1.6]) w.box(x + ox, 1.5, z + oz, .2, 3, .2, 0x8a6a4c);
+   w.box(x, 3.15, z, 4.2, .3, 4.2, 0xb08a5e);
+   w.box(x, 4.1, z, 4, 1.6, 4, 0xd8c193);
+   w.box(x, 5.05, z, 4.6, .3, 4.6, 0xa9533f);
+   w.box(x - 2.6, 2.9, z, .1, 3.2, .1, 0x8a6a4c);
+   w.box(x + 2.6, 5.9, z, .08, 1.6, .08, 0x77726a);
+   w.box(x + 3.1, 6.4, z, 1, .6, .05, 0xc9553f);
+   // Duschsäule und Abfalltonne an der Promenade.
+   w.box(99.5, 1.2, z + 8, .16, 2.4, .16, 0x8b938d);
+   w.box(99.5, 2.3, z + 8, .5, .12, .5, 0x8b938d);
+   w.box(100.5, .55, z + 12, .74, 1.1, .74, 0x3e5750);
+  }
+  // Liegen mit Schirmen, paarweise, leicht gedreht.
+  for (let z = 138; z < 426; z += 9) {
+   if (rng() > .78) continue;
+   const gx = 104 + rng() * 9, dreh = (rng() - .5) * .7;
+   for (const versatz of [-1.3, 1.3]) {
+    const lx = gx + Math.cos(dreh) * versatz, lz = z + Math.sin(dreh) * versatz;
+    w.box(lx, .3, lz, .75, .12, 2, 0xd6cdb4, dreh);
+    for (const e of [-.85, .85]) w.box(lx, .14, lz + e, .6, .28, .1, 0x9aa39b, dreh);
+    w.box(lx, .52, lz - .78, .72, .5, .12, 0xd6cdb4, dreh + .35);
+   }
+   const schirmFarbe = [0xc9603f, 0x3f7a86, 0xd4a54a, 0xb0526e][Math.floor(rng() * 4)];
+   w.box(gx, 1.15, z, .09, 2.3, .09, 0x8f8a7c);
+   w.box(gx, 2.28, z, 3.4, .13, 3.4, schirmFarbe, dreh);
+   w.box(gx, 2.42, z, 2.2, .13, 2.2, schirmFarbe, dreh + .78);
+  }
+  // Beachvolleyball: zwei Felder mit Netz.
+  for (const z of [205, 340]) {
+   for (const ox of [-4.5, 4.5]) w.box(112 + ox, 1.2, z, .12, 2.4, .12, 0x7f776a);
+   w.box(112, 1.9, z, 9, .9, .05, 0xdcd7c4);
+   for (const e of [[-4.5, -8], [4.5, -8], [-4.5, 8], [4.5, 8]]) w.box(112 + e[0], .09, z + e[1], .3, .1, .3, 0xc9c2a6);
+  }
+  // Strandbar mit Tresen, Hockern und Schilfdach.
+  const bx = 103, bz = 262;
+  w.box(bx, 1.3, bz, 7, 2.6, 5, 0xa8845c);
+  w.box(bx, 2.85, bz, 8.4, .5, 6.4, 0x8d7a4e);
+  w.box(bx, 3.2, bz, 7.6, .3, 5.8, 0x9c8a5c);
+  w.box(bx + 4.4, 1.05, bz, 1.4, .2, 5, 0x6f5a41);
+  for (let e = -1.8; e <= 1.8; e += 1.2) w.box(bx + 5.4, .5, bz + e, .45, 1, .45, 0x6f5a41);
+  w.text('LOW TIDE BAR', bx + 4.6, 3.9, bz, 6.5, '#f0d49a', Math.PI / 2);
+ }
+
  // Ampelphasen: grün, gelb, rot je Achse, versetzt zueinander.
  update(zeit, nacht) {
   if (!this.lichtGruppen) return;

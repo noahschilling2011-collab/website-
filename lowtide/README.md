@@ -15,10 +15,13 @@ src/
   game.js           Einstiegspunkt: DOM, Eingabe, HUD, Dialoge, Karte
   simulation.js     Basis-Simulation ohne WebGL und DOM
   campaign.js       Kampagne, Fahrzeugphysik, Polizei, Aktivitäten
-  world.js          Renderer, Basisgeometrie, Kamera
+  world.js          Renderer, Basisgeometrie, Kamera, Licht
   expanded-world.js Erweiterte Welt: Gelände, Regionen, Fahrzeugmodelle
-  sky.js            Sonnenstand, Himmelskuppel, Belichtung
-  art-direction.js  Materialien, Fahrzeug- und Umgebungsaufbau
+  sky.js            Sonnenstand, Himmelskuppel, Nebel, Belichtung
+  water.js          Wellen, Spiegelung, Brandung
+  street.js         Bordsteine, Laternen, Ampeln, Möblierung, Strand
+  facades.js        Sockelgeschosse, Läden, Fensterlaibungen, Dachaufbauten
+  art-direction.js  Materialien, Fahrzeug- und Figurenaufbau
   human-model.js    Anatomische Figurenmodelle und Animation
   content.js        Weltdaten: Orte, Regionen, Fahrzeugtypen, Waffen
   navigation.js     A* auf Gitter für Polizei und Wachen
@@ -28,12 +31,19 @@ src/
 ## Bauen
 
 ```
-node build.mjs          # schreibt LOWTIDE.html
-node tools/smoke.mjs    # rendert headless, prüft Konsole, macht Screenshots
+node build.mjs                                   # schreibt LOWTIDE.html
+node --experimental-vm-modules tools/check.mjs   # Syntax aller Module
+node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
+node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
+node tools/messung.mjs                           # Draw Calls und Dreiecke
 ```
 
-`tools/smoke.mjs` braucht Playwright und Chromium. Ohne die beiden lässt sich
-`LOWTIDE.html` trotzdem bauen und im Browser öffnen.
+Die drei Werkzeuge in `tools/` mit Browser brauchen Playwright und Chromium.
+Ohne die beiden lässt sich `LOWTIDE.html` trotzdem bauen und öffnen.
+
+Zur Bildrate: diese Werkzeuge laufen hier gegen einen Software-Rasterizer.
+Die dort gemessenen fps sagen nichts über echte Hardware. Aussagekräftig sind
+Draw Calls und Dreiecke aus `messung.mjs` — die sind hardwareunabhängig.
 
 ## Debug
 

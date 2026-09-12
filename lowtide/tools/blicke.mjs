@@ -7,7 +7,8 @@ const STANDORTE = {
   downtown:   [-280, 20, 2.20, .34, 0],
   kreuzung:   [-100, 20, 1.30, .30, 0],
   strand:     [100, 250, 1.40, .22, 0],
-  ueberblick: [-170, 20, 2.30, .55, 95],
+  fassade:    [-100, -10, 1.57, .02, 0],
+  boulevard:  [-40, -8, 0.05, .10, 0],
 };
 const arg = (n, f) => {const i = process.argv.indexOf('--' + n); return i > -1 ? process.argv[i + 1] : f;};
 const orte = arg('orte', Object.keys(STANDORTE).join(',')).split(',');

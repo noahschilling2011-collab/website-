@@ -5,6 +5,7 @@ import {detailedHuman,detailedCar,asphaltTexture} from './art-direction.js';
 import {locations,vehicleTypes,roadSegments,groundAt,waterAt,bounds} from './content.js';
 import {distance} from './simulation.js';
 import {Street} from './street.js';
+import {dressBuildings} from './facades.js';
 const STRASSEN_HEX=[0x333d45,0x3d494f,0x445155];
 const GLAS_HEX=[0x3c5a69,0x486673,0x51737b,0x2c4d52];
 const material=c=>new T.MeshStandardMaterial({color:c,roughness:.7});
@@ -48,7 +49,25 @@ export class ExpandedWorld extends World{
  }
  human(color,pants){return naturalHuman(color,pants);}
  animateHuman(model,time,moving,armed){if(model.userData.rig)animateNaturalHuman(model,time,moving,armed);else super.animateHuman(model,time,moving,armed);}
- palm(x,z,h){const g=new T.Group(),trunk=new T.Mesh(new T.CylinderGeometry(.12,.27,h,8,5),new T.MeshStandardMaterial({color:0x8a7958,roughness:1}));trunk.position.y=h/2;trunk.rotation.z=.045;g.add(trunk);const positions=[];for(let k=0;k<9;k++){const a=k*Math.PI*2/9;for(let j=0;j<7;j++){const point=(t,side)=>{const len=t*4.4,w=Math.sin(t*Math.PI)*.52;return [Math.sin(a)*len+Math.cos(a)*w*side,Math.sin(t*Math.PI)*.9-t*t*1.7,Math.cos(a)*len-Math.sin(a)*w*side];};const a0=point(j/7,-1),b0=point(j/7,1),c0=point((j+1)/7,-1),d0=point((j+1)/7,1);positions.push(...a0,...b0,...c0,...b0,...d0,...c0);}}const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(positions,3));geo.computeVertexNormals();const crown=new T.Mesh(geo,new T.MeshStandardMaterial({color:0x3f7250,roughness:.8,side:T.DoubleSide}));crown.position.set(-.3,h,0);g.add(crown);g.position.set(x,groundAt(x,z),z);g.traverse(m=>{m.castShadow=true;});this.scene.add(g);(this.palmCrowns||=[]).push(crown);}
+ palm(x,z,h){(this.palmen||=[]).push({x,z,h});}
+ // Eine Krone, einmal erzeugt, danach nur noch Matrizen.
+ palmenGeometrie(){const positions=[];for(let k=0;k<9;k++){const a=k*Math.PI*2/9;for(let j=0;j<7;j++){const point=(t,side)=>{const len=t*4.4,w=Math.sin(t*Math.PI)*.52;return [Math.sin(a)*len+Math.cos(a)*w*side,Math.sin(t*Math.PI)*.9-t*t*1.7,Math.cos(a)*len-Math.sin(a)*w*side];};const a0=point(j/7,-1),b0=point(j/7,1),c0=point((j+1)/7,-1),d0=point((j+1)/7,1);positions.push(...a0,...b0,...c0,...b0,...d0,...c0);}}const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(positions,3));geo.computeVertexNormals();return geo;}
+ palmenBauen(){const liste=this.palmen;if(!liste?.length)return;
+  const stamm=new T.CylinderGeometry(.12,.27,1,8,3);stamm.translate(0,.5,0);
+  this.palmStaemme=new T.InstancedMesh(stamm,new T.MeshStandardMaterial({color:0x8a7958,roughness:1}),liste.length);
+  this.palmKronen=new T.InstancedMesh(this.palmenGeometrie(),new T.MeshStandardMaterial({color:0x3f7250,roughness:.8,side:T.DoubleSide}),liste.length);
+  for(const netz of [this.palmStaemme,this.palmKronen]){netz.castShadow=true;netz.receiveShadow=true;netz.frustumCulled=false;this.scene.add(netz);}
+  this.palmHilfe=new T.Object3D();this.palmenSetzen(0);}
+ // Wind: die Kronen neigen sich, der Stamm bleibt stehen.
+ palmenSetzen(zeit,staerke=1){const liste=this.palmen,o=this.palmHilfe;if(!liste)return;
+  liste.forEach((p,i)=>{const y=groundAt(p.x,p.z);
+   o.position.set(p.x,y,p.z);o.rotation.set(0,0,.045);o.scale.set(1,p.h,1);o.updateMatrix();
+   this.palmStaemme.setMatrixAt(i,o.matrix);
+   o.position.set(p.x-.3,y+p.h,p.z);o.scale.set(1,1,1);
+   o.rotation.set(Math.cos(zeit*.7+p.z*.11)*.02*staerke,p.x*.7,Math.sin(zeit*.8+p.x*.13)*.03*staerke);
+   o.updateMatrix();this.palmKronen.setMatrixAt(i,o.matrix);});
+  this.palmStaemme.instanceMatrix.needsUpdate=true;this.palmKronen.instanceMatrix.needsUpdate=true;
+  this.palmStaemme.computeBoundingSphere();this.palmKronen.computeBoundingSphere();}
 
  build(){super.build();const s=this.sim;
   for(const [i,b] of [...s.buildings,...s.worldBuildings].entries()){if(b.kind==='house')continue;for(let y=5;y<Math.min(b.h,24);y+=5){this.box(b.x,y,b.z+b.d/2+1,b.w*.82,.18,2,0xb4b8ac);this.box(b.x,y+.9,b.z+b.d/2+1.9,b.w*.82,.07,.08,0x61797a);for(let x=-b.w*.38;x<=b.w*.38;x+=3)this.box(b.x+x,y+.45,b.z+b.d/2+1.9,.05,.9,.05,0x61797a);}this.box(b.x+b.w/2-2,2.8,b.z+b.d/2+.7,1.4,.8,1.2,0xa1afa6);this.box(b.x,3.5,b.z+b.d/2+1,Math.min(12,b.w),.12,2,[0x779994,0xb58882,0xcbb783][i%3]);for(let stripe=-5;stripe<5;stripe+=2)this.box(b.x+stripe,3.58,b.z+b.d/2+1,1,.025,2,0xd7d6bc);}
@@ -65,10 +84,13 @@ export class ExpandedWorld extends World{
   this.box(-315,.09,315,25,.15,155,0x445155);for(let z=250;z<390;z+=16)this.box(-315,.18,z,1,.02,8,0xd2d0af);this.box(114,.2,145,22,.5,6,0x776d58);this.box(-355,-.01,-225,48,.12,36,0x857553);for(let x=-377;x<-331;x+=4)this.box(x,.25,-225,.5,.5,32,0x68845b);
   for(let i=0;i<155;i++){const x=-575+this.rng()*182,z=-530+this.rng()*286;const y=groundAt(x,z),h=4+this.rng()*5;this.box(x,y+h/2,z,.5,h,.5,0x746b51);this.box(x,y+h,z,4,4,4,0x4a715b);}
   for(let i=0;i<45;i++){const x=-535+this.rng()*125,z=this.rng()*110;this.box(x,2.2,z,.4,5,.4,0x697458);this.box(x,5,z,4,1,4,0x668269);}
-  for(let z=170;z<435;z+=25)this.palm(92,z,8);this.camera.far=1100;this.camera.updateProjectionMatrix();
+  for(let z=140;z<435;z+=17)this.palm(91.5,z,7+((z*7)%5));
+  for(let z=150;z<430;z+=23)this.palm(101,z,6+((z*3)%4));this.camera.far=1100;this.camera.updateProjectionMatrix();
   // Straßenmöblierung zuletzt, damit sie freie Flächen kennt und noch in den
   // gemeinsamen Instanz-Sammler von World.flush läuft.
-  this.street=new Street(this);this.street.bauen();this.street.parkendeAutosBauen();
+  this.street=new Street(this);this.street.bauen();this.street.strandBauen();this.street.parkendeAutosBauen();
+  dressBuildings(this,[...s.buildings,...s.worldBuildings].filter(b=>b.kind!=='house'));
+  this.palmenBauen();
  }
  car(color,police=false,c=null){if(!c)return detailedCar(color,police);const d=vehicleTypes[c.model],g=new T.Group();if(['car','pickup'].includes(d.shape)){const m=detailedCar(color);m.scale.set(...d.scale);if(d.shape==='pickup')this.dynbox(m,0,1.2,-1.3,1.9,.2,1.5,color);m.userData.def=d;return m;}const body=this.dynbox(g,0,.8,0,1.4,.5,3,color);let wheels=[],rotor=null;
   if(['bike','quad'].includes(d.shape)){body.scale.set(d.shape==='bike'?.35:1.2,.5,1.5);this.dynbox(g,0,1.4,.8,1,.1,.15,0x263c40);for(const z of [-.9,.9])for(const x of d.shape==='bike'?[0]:[-.65,.65]){const wheel=new T.Mesh(new T.CylinderGeometry(.45,.45,.22,10),material(0x26343a));wheel.rotation.z=Math.PI/2;wheel.position.set(x,.45,z);g.add(wheel);wheels.push(wheel);}this.dynbox(g,0,1.05,-.25,.45,.2,.8,0x394149);}
@@ -101,7 +123,7 @@ export class ExpandedWorld extends World{
   if(s.witness){if(!this.witness){this.witness=this.human(0x879b83,0x303e4c);this.scene.add(this.witness);}this.witness.visible=s.campaign.stage===2&&!p.car;this.witness.position.set(s.witness.x,groundAt(s.witness.x,s.witness.z),s.witness.z);this.animateHuman(this.witness,t,1,false);}
   const c=locations.court;this.ball.position.set(c.x+.8,.6+Math.abs(Math.sin(t*4))*.8,c.z);if(s.activity?.kind==='basketball')this.ball.position.set(c.x,1+Math.sin(s.activity.phase*Math.PI)*5,c.z-s.activity.phase*11);
   this.street?.update(t,Math.min(1,this.sky.uniforms.nacht.value*1.25));
-  for(const crown of this.palmCrowns||[])crown.rotation.z=Math.sin(t*.8+crown.parent.position.x)*.025*(s.weather==='storm'?3:1);for(const m of this.terrain)m.visible=Math.hypot(m.position.x-p.x,m.position.z-p.z)<650;
+  this.palmenSetzen(t,s.weather==='storm'?3.4:s.weather==='rain'?1.8:1);for(const m of this.terrain)m.visible=Math.hypot(m.position.x-p.x,m.position.z-p.z)<650;
   if(!this.barrierMeshes)this.barrierMeshes=[];while(this.barrierMeshes.length<s.barriers.length){const m=new T.Mesh(new T.BoxGeometry(5,1,1.2),new T.MeshStandardMaterial({color:0xe3c485}));this.scene.add(m);this.barrierMeshes.push(m);}this.barrierMeshes.forEach((m,i)=>{const b=s.barriers[i];m.visible=!!b;if(b)m.position.set(b.x,.5,b.z);});if(!this.policeHelicopter){this.policeHelicopter=this.car(0x4b6169,false,{model:'helicopter'});this.scene.add(this.policeHelicopter);}const h=s.policeHeli;this.policeHelicopter.position.set(h.x,h.alt,h.z);this.policeHelicopter.rotation.y=h.yaw;this.policeHelicopter.visible=distance(h,p)<400;if(h.alt>0)this.policeHelicopter.userData.rotor.rotation.y+=dt*40;
   if(!this.placeMarkers){this.placeMarkers=[];for(const l of Object.values(locations)){const m=new T.Mesh(new T.OctahedronGeometry(.35),new T.MeshBasicMaterial({color:0x8bd4c1}));m.position.set(l.x,groundAt(l.x,l.z)+2.6,l.z);this.scene.add(m);this.placeMarkers.push(m);}}for(const m of this.placeMarkers){m.visible=Math.hypot(m.position.x-p.x,m.position.z-p.z)<65;m.rotation.y=t;}
  }
