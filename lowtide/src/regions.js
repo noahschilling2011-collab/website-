@@ -36,23 +36,16 @@ function satteldach(w, x, y, z, breite, tiefe, hoehe, farbe, quer = false) {
  }
 }
 
-// Nadelbaum aus drei gestapelten Lagen; als eine Kiste sah der Wald aus
-// wie ein Regal.
+// Nadelbaum. Erst waren es drei gestapelte Kisten — aus zwanzig Metern sah
+// der Wald aus wie ein Regal. Jetzt gehen beide Baumarten an das Laubwerk in
+// foliage.js: gekreuzte Flächen mit Alphakarte, zwei InstancedMeshes für die
+// ganze Karte statt fünf Kisten je Baum.
 function nadelbaum(w, x, z, hoehe, farbe = 0x3d5f47) {
- const y = groundAt(x, z);
- w.box(x, y + hoehe * .24, z, hoehe * .035, hoehe * .5, hoehe * .035, 0x5f5039);
- for (let k = 0; k < 4; k++) {
-  const t = k / 4, breite = hoehe * (.30 - t * .062);
-  w.box(x, y + hoehe * (.42 + t * .17), z, breite, hoehe * .2, breite, farbe);
- }
+ w.baum(x, z, hoehe, 'nadel', farbe);
 }
 
 function laubbaum(w, x, z, hoehe, farbe = 0x4d6f4a) {
- const y = groundAt(x, z);
- w.box(x, y + hoehe * .3, z, hoehe * .055, hoehe * .6, hoehe * .055, 0x63523c);
- w.box(x, y + hoehe * .76, z, hoehe * .46, hoehe * .34, hoehe * .44, farbe);
- w.box(x + hoehe * .13, y + hoehe * .62, z - hoehe * .08, hoehe * .3, hoehe * .24, hoehe * .28, farbe);
- w.box(x - hoehe * .1, y + hoehe * .66, z + hoehe * .1, hoehe * .26, hoehe * .2, hoehe * .24, farbe);
+ w.baum(x, z, hoehe, 'laub', farbe);
 }
 
 function zaun(w, x1, z1, x2, z2, hoehe = 1.2, farbe = 0x8a7a5e, abstand = 2.4) {

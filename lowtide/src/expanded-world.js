@@ -11,6 +11,7 @@ import {dressInteriors} from './interiors.js';
 import {Fernstufe,grobesAuto,grobeFigur} from './lod.js';
 import {Tierwelt} from './wildlife.js';
 import {Grasfeld} from './grass.js';
+import {Laubwerk} from './foliage.js';
 const STRASSEN_HEX=[0x333d45,0x3d494f,0x445155];
 const GLAS_HEX=[0x3c5a69,0x486673,0x51737b,0x2c4d52];
 const material=c=>new T.MeshStandardMaterial({color:c,roughness:.7});
@@ -130,6 +131,8 @@ export class ExpandedWorld extends World{
  }
  animateHuman(model,time,moving,armed){if(model.userData.rig)animateNaturalHuman(model,time,moving,armed,this.bodenNeigung(model));else super.animateHuman(model,time,moving,armed);}
  palm(x,z,h){(this.palmen||=[]).push({x,z,h});}
+ // Bäume sammeln statt sie als Kisten zu setzen; gebaut wird einmal am Ende.
+ baum(x,z,hoehe,art,farbe){(this.laubwerk||=new Laubwerk(this.scene)).hinzu(x,z,hoehe,art,farbe);}
  // Eine Krone, einmal erzeugt, danach nur noch Matrizen.
  palmenGeometrie(){const positions=[];for(let k=0;k<9;k++){const a=k*Math.PI*2/9;for(let j=0;j<7;j++){const point=(t,side)=>{const len=t*4.4,w=Math.sin(t*Math.PI)*.52;return [Math.sin(a)*len+Math.cos(a)*w*side,Math.sin(t*Math.PI)*.9-t*t*1.7,Math.cos(a)*len-Math.sin(a)*w*side];};const a0=point(j/7,-1),b0=point(j/7,1),c0=point((j+1)/7,-1),d0=point((j+1)/7,1);positions.push(...a0,...b0,...c0,...b0,...d0,...c0);}}const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(positions,3));geo.computeVertexNormals();return geo;}
  palmenBauen(){const liste=this.palmen;if(!liste?.length)return;
@@ -213,6 +216,7 @@ export class ExpandedWorld extends World{
   dressRegions(this);
   this.innenLampen=dressInteriors(this);
   this.palmenBauen();
+  this.laubwerk?.bauen();
  }
  car(color,police=false,c=null){if(!c)return detailedCar(color,police);const d=vehicleTypes[c.model],g=new T.Group();if(['car','pickup'].includes(d.shape)){const m=detailedCar(color);m.scale.set(...d.scale);if(d.shape==='pickup')this.dynbox(m,0,1.2,-1.3,1.9,.2,1.5,color);m.userData.def=d;return m;}const body=this.dynbox(g,0,.8,0,1.4,.5,3,color);let wheels=[],rotor=null;
   if(['bike','quad'].includes(d.shape)){body.scale.set(d.shape==='bike'?.35:1.2,.5,1.5);this.dynbox(g,0,1.4,.8,1,.1,.15,0x263c40);for(const z of [-.9,.9])for(const x of d.shape==='bike'?[0]:[-.65,.65]){const wheel=new T.Mesh(new T.CylinderGeometry(.45,.45,.22,10),material(0x26343a));wheel.rotation.z=Math.PI/2;wheel.position.set(x,.45,z);g.add(wheel);wheels.push(wheel);}this.dynbox(g,0,1.05,-.25,.45,.2,.8,0x394149);}
@@ -276,7 +280,8 @@ export class ExpandedWorld extends World{
   this.tiere.update(dt,t,p);
   // Wind aus dem Wetter: bei Sturm wogt es deutlich, bei klarem Himmel kaum.
   this.gras.update(dt,t,p,s.weather==='storm'?1:s.weather==='rain'?.6:.25);
-  this.palmenSetzen(t,s.weather==='storm'?3.4:s.weather==='rain'?1.8:1);const unterWasser=(p.y||0)<-.2;
+  this.palmenSetzen(t,s.weather==='storm'?3.4:s.weather==='rain'?1.8:1);
+  this.laubwerk?.update(t,s.weather==='storm'?1:s.weather==='rain'?.6:.28);const unterWasser=(p.y||0)<-.2;
   for(const m of this.terrain)m.visible=(!m.userData.nurWasser||unterWasser)&&Math.hypot(m.position.x-p.x,m.position.z-p.z)<650;
   if(!this.barrierMeshes)this.barrierMeshes=[];while(this.barrierMeshes.length<s.barriers.length){const m=new T.Mesh(new T.BoxGeometry(5,1,1.2),new T.MeshStandardMaterial({color:0xe3c485}));this.scene.add(m);this.barrierMeshes.push(m);}this.barrierMeshes.forEach((m,i)=>{const b=s.barriers[i];m.visible=!!b;if(b)m.position.set(b.x,.5,b.z);});if(!this.policeHelicopter){this.policeHelicopter=this.car(0x4b6169,false,{model:'helicopter'});this.scene.add(this.policeHelicopter);}const h=s.policeHeli;this.policeHelicopter.position.set(h.x,h.alt,h.z);this.policeHelicopter.rotation.y=h.yaw;this.policeHelicopter.visible=distance(h,p)<400;if(h.alt>0)this.policeHelicopter.userData.rotor.rotation.y+=dt*40;
   const suchtAktiv=s.stars>=5&&h.alt>8;
