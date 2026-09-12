@@ -29,7 +29,7 @@ export function detailedCar(color,police=false){const g=new T.Group();const pain
  const glass=new T.MeshPhysicalMaterial({color:0x355563,roughness:.1,metalness:.3,clearcoat:1,side:T.DoubleSide});
  const cabin=mesh(g,shell([[-1.45,.82,.88,1.0],[-.85,.76,.94,1.58],[.5,.75,.94,1.58],[1.15,.84,.9,1.03]]),glass);
  const roof=mesh(g,shell([[-.9,.73,1.49,1.6],[.48,.73,1.49,1.6]]),paint);
- const lights=[];for(const side of [-1,1]){const lamp=mesh(g,new T.BoxGeometry(.54,.12,.04),new T.MeshStandardMaterial({color:0xf4e4bb,emissive:0xffd6a0,emissiveIntensity:.6}),side*.54,.76,2.14);lights.push(lamp);mesh(g,new T.BoxGeometry(.63,.1,.04),new T.MeshStandardMaterial({color:0xa73833,emissive:0x932622,emissiveIntensity:.35}),side*.54,.81,-2.16);
+ const lights=[],rueck=[];for(const side of [-1,1]){const lamp=mesh(g,new T.BoxGeometry(.54,.12,.04),new T.MeshStandardMaterial({color:0xf4e4bb,emissive:0xffd6a0,emissiveIntensity:.6}),side*.54,.76,2.14);lights.push(lamp);rueck.push(mesh(g,new T.BoxGeometry(.63,.1,.04),new T.MeshStandardMaterial({color:0xa73833,emissive:0x932622,emissiveIntensity:.35}),side*.54,.81,-2.16));
   mesh(g,new T.BoxGeometry(.24,.12,.3),paint,side*.99,1.22,.69);mesh(g,new T.BoxGeometry(.24,.055,.04),m(0xb8c2bb,.25,.8),side*.965,1.01,-.05);mesh(g,new T.BoxGeometry(.24,.055,.04),m(0xb8c2bb,.25,.8),side*.965,1.01,-.85);
   for(const z of [-.48,.63])mesh(g,new T.BoxGeometry(.05,.49,.06),paint,side*.77,1.28,z);
  }
@@ -37,7 +37,7 @@ export function detailedCar(color,police=false){const g=new T.Group();const pain
  const wheels=[],rims=[];for(const x of [-.96,.96])for(const z of [-1.35,1.37]){const wheel=new T.Group();wheel.position.set(x,.44,z);const tire=mesh(wheel,new T.TorusGeometry(.33,.105,8,20),m(0x20272c,.97));tire.rotation.y=Math.PI/2;const rim=mesh(wheel,new T.CylinderGeometry(.265,.265,.035,20),m(0xaeb9b9,.24,.85));rim.rotation.z=Math.PI/2;rims.push(rim);for(let a=0;a<5;a++){const spoke=mesh(wheel,new T.BoxGeometry(.04,.45,.045),m(0x52686d,.3,.8));spoke.rotation.x=a*Math.PI/5;}g.add(wheel);wheels.push(wheel);}
  const interior=new T.Group();for(const x of [-.4,.4])ellipsoid(interior,x,1.12,0,.24,.27,.2,m(0x333d3d,.9));g.add(interior);
  const policeLights=[];if(police){for(const side of [-1,1])policeLights.push(mesh(g,new T.BoxGeometry(.48,.14,.3),new T.MeshStandardMaterial({color:side<0?0xef5549:0x4b9bd6,emissive:side<0?0xe64a45:0x3c85de,emissiveIntensity:2}),side*.36,1.76,0));}
- g.userData={body,wheels,rims,lights:policeLights,headlights:lights,glass:cabin,roof,interior,paint,grille};return g;
+ g.userData={body,wheels,rims,lights:policeLights,headlights:lights,taillights:rueck,glass:cabin,roof,interior,paint,grille};return g;
 }
 // makeEnvironment ist entfallen: die Umgebungsreflexion kommt jetzt aus sky.js
 // und folgt damit dem tatsächlichen Sonnenstand.

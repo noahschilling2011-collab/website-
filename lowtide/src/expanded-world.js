@@ -22,7 +22,7 @@ export class ExpandedWorld extends World{
    }
    if(GLAS_HEX.includes(hex)){o.material.metalness=.72;o.material.roughness=.16;o.material.envMapIntensity=1.5;}
   });
-  this.setupStrassenlicht();}
+  this.setupStrassenlicht();this.setupFahrlicht();}
 
  // Acht Punktlichter wandern zu den nächstgelegenen Laternen. Mehr wäre auf
  // schwacher Hardware nicht tragbar, weniger liest sich nachts nicht als Stadt.
@@ -30,6 +30,27 @@ export class ExpandedWorld extends World{
   this.strassenLichter=[];
   for(let i=0;i<8;i++){const l=new T.PointLight(0xffd7a0,0,26,1.7);l.visible=false;this.scene.add(l);this.strassenLichter.push(l);}
   this.lichtWechsel=0;
+ }
+ setupFahrlicht(){
+  // Zwei Kegel reichen: mehr Lichter mit Reichweite kosten auf schwacher
+  // Hardware mehr, als sie zeigen.
+  this.fahrlicht=[0,1].map(()=>{
+   const l=new T.SpotLight(0xfff0c8,0,80,.5,.5,1.2);l.visible=false;
+   this.scene.add(l);this.scene.add(l.target);return l;});
+ }
+ updateFahrlicht(nacht){
+  const c=this.sim.player.car,d=c&&vehicleTypes[c.model];
+  const an=!!c&&c.lights>15&&c.health>0&&nacht>.15&&d.medium!=='water';
+  const y=c?groundAt(c.x,c.z)+(c.alt||0):0;
+  this.fahrlicht.forEach((l,i)=>{
+   l.visible=an;if(!an)return;
+   const seite=(i?1:-1)*.8;
+   l.position.set(c.x+Math.sin(c.yaw)*2.1+Math.cos(c.yaw)*seite,y+.85,
+                  c.z+Math.cos(c.yaw)*2.1-Math.sin(c.yaw)*seite);
+   l.target.position.set(c.x+Math.sin(c.yaw)*42,y-2,c.z+Math.cos(c.yaw)*42);
+   l.target.updateMatrixWorld();
+   l.intensity=nacht*220;
+  });
  }
  updateStrassenlicht(nacht,p){
   const lampen=this.lampen;if(!lampen||!this.strassenLichter)return;
@@ -121,7 +142,11 @@ export class ExpandedWorld extends World{
    }
   }
   this.gun.scale.z=p.weapon==='rifle'?2.4:p.weapon==='shotgun'?2.1:1;this.gun.scale.x=p.weapon==='taser'?1.3:1;this.player.position.y=groundAt(p.x,p.z)+(p.y||0)-(p.sneak?.35:0);this.player.scale.set(1,s.active===1?.96:1,1);this.player.rotation.z=s.dodgeTime>0?.65:0;this.player.userData.arms[0].rotation.x=s.meleeTime>0?-1.5:this.player.userData.arms[0].rotation.x;this.player.userData.hair.scale.y=p.hair===1?1.35:p.hair===2?.4:1.08;this.player.userData.tattoo.visible=p.tattoo;for(const part of this.player.userData.garments||[])part.material=this.player.userData.body.material;this.player.userData.body.material.color.setHex(p.clothes==='orange'?0xe2a062:p.clothes==='blue'?0x557da3:0x6b8b70);
-  s.cars.forEach((c,i)=>{const m=this.cars[i],d=vehicleTypes[c.model];if(!m)return;m.visible=distance(c,p)<320;const water=d.medium==='water';m.position.y=water?Math.sin(t*1.8+c.x)*.15-.4:groundAt(c.x,c.z)+(c.alt||0);if(m.userData.rotor)m.userData.rotor.rotation[d.shape==='plane'?'z':'y']+=dt*(c===p.car?35:2);if(m.userData.bodyHeight)m.userData.body.scale.y=m.userData.bodyHeight*(.6+.4*c.health/100);if(!m.userData.paint||m.userData.paint!==c.color){m.userData.body.material=new T.MeshPhysicalMaterial({color:c.color,roughness:.25,metalness:.65,clearcoat:1,clearcoatRoughness:.13});if(m.userData.roof)m.userData.roof.material=m.userData.body.material;m.userData.paint=c.color;}m.rotation.z=['bike','jetski'].includes(d.shape)?Math.sin(t*3)*.015*Math.abs(c.speed):Math.sin(t*6)*.006*Math.min(3,Math.abs(c.speed));if(c.upgrades.suspension)m.position.y-=.12;this.applyUpgrades(m,c);if(m.userData.glass)m.userData.glass.visible=c.glass>20;if(m.userData.headlights)for(const l of m.userData.headlights)l.visible=c.lights>15;if(m.userData.wheels)for(const w of m.userData.wheels)w.rotation.x+=dt*c.speed;});
+  s.cars.forEach((c,i)=>{const m=this.cars[i],d=vehicleTypes[c.model];if(!m)return;m.visible=distance(c,p)<320;const water=d.medium==='water';m.position.y=water?Math.sin(t*1.8+c.x)*.15-.4:groundAt(c.x,c.z)+(c.alt||0);if(m.userData.rotor)m.userData.rotor.rotation[d.shape==='plane'?'z':'y']+=dt*(c===p.car?35:2);if(m.userData.bodyHeight)m.userData.body.scale.y=m.userData.bodyHeight*(.6+.4*c.health/100);if(!m.userData.paint||m.userData.paint!==c.color){m.userData.body.material=new T.MeshPhysicalMaterial({color:c.color,roughness:.25,metalness:.65,clearcoat:1,clearcoatRoughness:.13});if(m.userData.roof)m.userData.roof.material=m.userData.body.material;m.userData.paint=c.color;}m.rotation.z=['bike','jetski'].includes(d.shape)?Math.sin(t*3)*.015*Math.abs(c.speed):Math.sin(t*6)*.006*Math.min(3,Math.abs(c.speed));if(c.upgrades.suspension)m.position.y-=.12;this.applyUpgrades(m,c);if(m.userData.glass)m.userData.glass.visible=c.glass>20;const nachtAnteil=Math.min(1,this.sky.uniforms.nacht.value*1.25);
+   if(m.userData.headlights)for(const l of m.userData.headlights){l.visible=c.lights>15;l.material.emissiveIntensity=.12+nachtAnteil*3.6;}
+   // Rücklichter glimmen und leuchten beim Bremsen deutlich auf.
+   if(m.userData.taillights){const bremst=c===p.car&&(s.bremst||c.speed<-.3);
+    for(const l of m.userData.taillights){l.visible=c.lights>15;l.material.emissiveIntensity=(bremst?2.6:.2)+nachtAnteil*1.1;}}if(m.userData.wheels)for(const w of m.userData.wheels)w.rotation.x+=dt*c.speed;});
   s.npcs.forEach((n,i)=>{const m=this.npcs[i];m.visible=distance(n,p)<150;m.position.y=groundAt(n.x,n.z)+(n.health<=0||n.stun>0?.2:0);if(n.stun>0)m.rotation.x=Math.PI/2;if(n.state==='tanzend'){m.rotation.z=Math.sin(t*5)*.1;m.userData.arms.forEach((a,i)=>a.rotation.x=-1+Math.sin(t*5+i)*.6);}});s.cops.forEach((c,i)=>{const m=this.cops[i];m.visible=distance(c,p)<230;m.position.y=groundAt(c.x,c.z);});
   const other=s.characters[1-s.active];this.contact.position.set(other.x,groundAt(other.x,other.z),other.z);if(s.mission===3&&s.campaign.stage===0)this.contact.position.set(-77,0,73);this.contact.visible=!other.car&&distance(other,p)<150;
   const goal=s.objective();this.marker.visible=s.mission<4||s.campaign.stage>0&&s.campaign.stage<4||!!s.activity;this.ring.visible=this.marker.visible;this.marker.position.set(goal.x,groundAt(goal.x,goal.z)+4+Math.sin(t*2)*.3,goal.z);this.ring.position.set(goal.x,groundAt(goal.x,goal.z)+.12,goal.z);
@@ -129,6 +154,7 @@ export class ExpandedWorld extends World{
   if(s.witness){if(!this.witness){this.witness=this.human(0x879b83,0x303e4c);this.scene.add(this.witness);}this.witness.visible=s.campaign.stage===2&&!p.car;this.witness.position.set(s.witness.x,groundAt(s.witness.x,s.witness.z),s.witness.z);this.animateHuman(this.witness,t,1,false);}
   const c=locations.court;this.ball.position.set(c.x+.8,.6+Math.abs(Math.sin(t*4))*.8,c.z);if(s.activity?.kind==='basketball')this.ball.position.set(c.x,1+Math.sin(s.activity.phase*Math.PI)*5,c.z-s.activity.phase*11);
   this.street?.update(t,Math.min(1,this.sky.uniforms.nacht.value*1.25));
+  this.updateFahrlicht(Math.min(1,this.sky.uniforms.nacht.value*1.25));
   this.palmenSetzen(t,s.weather==='storm'?3.4:s.weather==='rain'?1.8:1);for(const m of this.terrain)m.visible=Math.hypot(m.position.x-p.x,m.position.z-p.z)<650;
   if(!this.barrierMeshes)this.barrierMeshes=[];while(this.barrierMeshes.length<s.barriers.length){const m=new T.Mesh(new T.BoxGeometry(5,1,1.2),new T.MeshStandardMaterial({color:0xe3c485}));this.scene.add(m);this.barrierMeshes.push(m);}this.barrierMeshes.forEach((m,i)=>{const b=s.barriers[i];m.visible=!!b;if(b)m.position.set(b.x,.5,b.z);});if(!this.policeHelicopter){this.policeHelicopter=this.car(0x4b6169,false,{model:'helicopter'});this.scene.add(this.policeHelicopter);}const h=s.policeHeli;this.policeHelicopter.position.set(h.x,h.alt,h.z);this.policeHelicopter.rotation.y=h.yaw;this.policeHelicopter.visible=distance(h,p)<400;if(h.alt>0)this.policeHelicopter.userData.rotor.rotation.y+=dt*40;
   if(!this.placeMarkers){this.placeMarkers=[];for(const l of Object.values(locations)){const m=new T.Mesh(new T.OctahedronGeometry(.35),new T.MeshBasicMaterial({color:0x8bd4c1}));m.position.set(l.x,groundAt(l.x,l.z)+2.6,l.z);this.scene.add(m);this.placeMarkers.push(m);}}for(const m of this.placeMarkers){m.visible=Math.hypot(m.position.x-p.x,m.position.z-p.z)<65;m.rotation.y=t;}

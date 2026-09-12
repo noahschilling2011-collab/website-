@@ -101,6 +101,42 @@ const ausgestiegen = await page.evaluate(() => {
 });
 pruefe('Aussteigen funktioniert', ausgestiegen);
 
+console.log('Ampeln und Licht');
+pruefe('Verkehr hält bei Rot und fährt bei Grün', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ // Kreuzung des Rasters bei x = -100, z = 20; das Fahrzeug steht zwölf Meter
+ // davor und fährt Richtung +z, also auf der Nord-Süd-Achse.
+ const auto = {x: -100, z: 8, yaw: 0};
+ const merk = s.time;
+ s.time = 20; const beiRot = s.haeltVorAmpel(auto);
+ s.time = 5;  const beiGruen = s.haeltVorAmpel(auto);
+ s.time = merk;
+ return beiRot && !beiGruen;
+}));
+pruefe('Quer stehende Achse hat gleichzeitig frei', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim, merk = s.time;
+ const laengs = {x: -112, z: 20, yaw: Math.PI / 2};
+ s.time = 20; const frei = !s.haeltVorAmpel(laengs);
+ s.time = merk;
+ return frei;
+}));
+pruefe('Scheinwerfer schalten sich nachts ein', await page.evaluate(async () => {
+ const L = window.LOWTIDE, s = L.sim;
+ s.hour = 22;
+ const auto = s.cars.find(c => c.model === 'sedan' && c.health > 0);
+ auto.unlocked = true; auto.lights = 100;
+ s.player.x = auto.x + 1.5; s.player.z = auto.z; s.player.y = 0;
+ if (!s.player.car) s.enterExit();
+ return !!s.player.car;
+}));
+await bilder(3);
+pruefe('Scheinwerferkegel leuchtet', await page.evaluate(() =>
+ window.LOWTIDE.world.fahrlicht.every(l => l.visible && l.intensity > 10)));
+await page.evaluate(() => {const s = window.LOWTIDE.sim; s.player.car.speed = 0; s.enterExit(); s.hour = 13;});
+await bilder(2);
+pruefe('Scheinwerfer aus, sobald niemand fährt', await page.evaluate(() =>
+ window.LOWTIDE.world.fahrlicht.every(l => !l.visible)));
+
 console.log('Fahndung');
 await page.evaluate(() => window.LOWTIDE.sim.report(4));
 pruefe('Meldung erzeugt Sterne', await page.evaluate(() => window.LOWTIDE.sim.stars) > 0);

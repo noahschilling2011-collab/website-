@@ -1,4 +1,4 @@
-import {groundAt, waterAt, locations, roadSegments} from './content.js';
+import {groundAt, waterAt, locations, onRoad} from './content.js';
 // Der Rest von Solvara.
 // Port Mercy war ausgebaut, alles andere bestand aus Andeutungen: sechs
 // Kisten für die Vororte, ein Feld mit Strichen für Bellweather, 155
@@ -10,16 +10,7 @@ function zufall(seed = 5501) {
  return () => {seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296;};
 }
 
-// sim.blocked kennt nur Gebäude. Straßen sind reine Geometrie — ohne diese
-// Prüfung landete die Scheune mitten auf dem Highway.
-function aufStrasse(x, z, rand = 6) {
- for (const r of roadSegments) {
-  const minX = Math.min(r.x1, r.x2) - r.w / 2 - rand, maxX = Math.max(r.x1, r.x2) + r.w / 2 + rand;
-  const minZ = Math.min(r.z1, r.z2) - r.w / 2 - rand, maxZ = Math.max(r.z1, r.z2) + r.w / 2 + rand;
-  if (x > minX && x < maxX && z > minZ && z < maxZ) return true;
- }
- return false;
-}
+const aufStrasse = onRoad;
 
 // Satteldach aus zwei geneigten Platten. Erst damit hört ein Haus auf,
 // eine Kiste mit Deckel zu sein.
@@ -684,7 +675,7 @@ function nordFlaechen(w, rng) {
  w.text('GROVE 12', ox0 + 30, 3, oz0 - 38, 12, '#dfd0a0', Math.PI);
 
  // Friedhof mit Kapelle und Hecke.
- const fx = -150, fz = -250;
+ const fx = -184, fz = -250;
  w.box(fx, .05, fz, 52, .12, 44, 0x5f7549);
  for (let r = 0; r < 6; r++) for (let k = 0; k < 11; k++) {
   const x = fx - 22 + k * 4.4, z = fz - 16 + r * 6.4;
@@ -701,8 +692,9 @@ function nordFlaechen(w, rng) {
  }
  w.text('MERCY REST', fx, 3.2, fz - 23, 14, '#d5dcc8', Math.PI);
 
- // Solarfeld an der Nordstraße.
- const px = -60, pz = -250;
+ // Solarfeld im Nordwesten. Am ursprünglichen Platz lag es mitten in einer
+ // Wohnstraße der Vororte.
+ const px = -280, pz = -400;
  w.box(px, .04, pz, 70, .1, 50, 0x6b6a54);
  for (let r = 0; r < 5; r++) for (let k = 0; k < 9; k++) {
   const x = px - 32 + k * 8, z = pz - 20 + r * 10;

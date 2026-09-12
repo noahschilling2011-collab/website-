@@ -1,4 +1,5 @@
 // Deterministic gameplay simulation, independent of WebGL and the DOM.
+import {intersections,ampelFrei} from './content.js';
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 export const roads=[-100,-40,20,80];
@@ -22,6 +23,19 @@ export class Simulation{
   for(let i=0;i<8;i++){const x=i<4?-100:20,z=-100+(i%4)*48;this.cars.push({id:'PM-'+(400+i),x:x+3,z,yaw:0,speed:8+this.rng()*3,health:100,type:'traffic',color:[0xd9b078,0xcad0c5,0xa75547,0x3c637d][i%4],route:[{x:x+3,z:83},{x:x+63,z:83},{x:x+63,z:-103},{x:x+3,z:-103}],target:0,wait:0});}
   for(let i=0;i<6;i++)this.cops.push({id:i,x:83+i*3,z:-105,yaw:0,speed:0,active:false,route:[],target:0,repath:0,health:100,shot:0});
  }
+ // Steht das Fahrzeug vor einer roten Ampel? Die Achse ergibt sich aus der
+ // Fahrtrichtung; nur Kreuzungen voraus und in Spurbreite zählen.
+ haeltVorAmpel(c){
+  const achse=Math.abs(Math.sin(c.yaw))>Math.abs(Math.cos(c.yaw))?1:0;
+  if(ampelFrei(this.time,achse))return false;
+  const sin=Math.sin(c.yaw),cos=Math.cos(c.yaw);
+  for(const k of intersections){
+   const dx=k.x-c.x,dz=k.z-c.z;
+   const voraus=dx*sin+dz*cos, seitlich=Math.abs(dx*cos-dz*sin);
+   if(voraus>1.5&&voraus<15&&seitlich<9)return true;
+  }
+  return false;
+ }
  blocked(p,r=.4){return p.x<-119+r||p.x>112-r||p.z<-119+r||p.z>113-r||this.solids.some(b=>intersects(p,b,r));}
  move(o,dx,dz,r=.4){let hit=false;const steps=Math.max(1,Math.ceil(Math.hypot(dx,dz)/.25));for(let i=0;i<steps;i++){if(!this.blocked({x:o.x+dx/steps,z:o.z},r))o.x+=dx/steps;else hit=true;if(!this.blocked({x:o.x,z:o.z+dz/steps},r))o.z+=dz/steps;else hit=true;}return hit;}
  openDoor(){this.doorOpen=true;this.solids=this.solids.filter(s=>s!==this.gate);}
@@ -36,7 +50,7 @@ export class Simulation{
  tick(dt,input={}){if(this.paused)return;dt=Math.min(.05,dt);this.time+=dt;this.hour=(this.hour+dt/80)%24;this.weatherTimer-=dt;if(this.weatherTimer<=0){this.weather=this.weather==='clear'?'rain':'clear';this.weatherTimer=80;this.notify(this.weather==='rain'?'Eine Regenfront zieht über den Hafen. Weniger Grip auf den Straßen.':'Der Regen lässt nach.');}const p=this.player;p.cooldown=Math.max(0,p.cooldown-dt);this.tracers=this.tracers.filter(t=>(t.life-=dt)>0);p.sneak=!!input.sneak;
   if(p.car&&this.driveVehicle){this.driveVehicle(dt,input);}else if(p.car){const c=p.car;const accel=input.forward||0,turn=input.turn||0;const grip=this.weather==='rain'?.68:1;c.speed+=accel*12*dt;if(!accel)c.speed*=Math.pow(.97,dt*60);if(input.brake)c.speed*=Math.pow(.90,dt*60);c.speed=clamp(c.speed,-8,26*Math.max(.25,c.health/100));if(Math.abs(c.speed)>.15)c.yaw-=turn*dt*1.5*clamp(c.speed/7,-1,1)*(input.brake?1.6:grip);const hit=this.move(c,Math.sin(c.yaw)*c.speed*dt,Math.cos(c.yaw)*c.speed*dt,1.45);if(hit&&Math.abs(c.speed)>2){c.health=clamp(c.health-Math.abs(c.speed)*.9,0,100);c.speed*=-.2;this.collisions++;if(c.health===0){p.health-=10;this.notify('Motor ausgefallen. Steig aus und suche ein anderes Auto.');}}p.x=c.x;p.z=c.z;p.yaw=c.yaw;for(const n of this.npcs){if(n.health>0&&distance(c,n)<1.8&&Math.abs(c.speed)>4){n.health=0;n.state='verletzt';this.injured++;c.speed*=.75;this.crime(3);}}for(const other of this.cars){if(other!==c&&distance(c,other)<3&&Math.abs(c.speed)>3){other.wait=5;other.health-=8;c.health=Math.max(0,c.health-5);c.speed*=-.2;this.collisions++;this.crime(1);}}}
   else{const f=input.forward||0,t=input.turn||0,yaw=input.yaw??p.yaw;const speed=p.sneak?2:input.sprint?8:4.5;const len=Math.max(1,Math.hypot(f,t));const dx=(Math.sin(yaw)*f-Math.cos(yaw)*t)*speed*dt/len,dz=(Math.cos(yaw)*f+Math.sin(yaw)*t)*speed*dt/len;this.move(p,dx,dz,.42);if(p.armed)p.yaw=yaw;else if(f||t)p.yaw=Math.atan2(dx,dz);}
-  for(const c of this.cars){if(c===p.car||c.type!=='traffic')continue;c.wait=Math.max(0,c.wait-dt);if(c.wait||c.health<=0)continue;const next=c.route[c.target],d=distance(c,next);if(d<1.2){c.target=(c.target+1)%c.route.length;continue;}c.yaw=Math.atan2(next.x-c.x,next.z-c.z);if(distance(c,p)<5&&!p.car)continue;c.x+=Math.sin(c.yaw)*c.speed*dt;c.z+=Math.cos(c.yaw)*c.speed*dt;}
+  for(const c of this.cars){if(c===p.car||c.type!=='traffic')continue;c.wait=Math.max(0,c.wait-dt);if(c.wait||c.health<=0)continue;const next=c.route[c.target],d=distance(c,next);if(d<1.2){c.target=(c.target+1)%c.route.length;continue;}c.yaw=Math.atan2(next.x-c.x,next.z-c.z);if(distance(c,p)<5&&!p.car)continue;if(this.haeltVorAmpel(c))continue;c.x+=Math.sin(c.yaw)*c.speed*dt;c.z+=Math.cos(c.yaw)*c.speed*dt;}
   for(const n of this.npcs){if(n.health<=0||n.state==='tanzend')continue;n.timer-=dt;if(n.report&&n.timer<=0){this.report(n.report.severity,n.report,n.report.incident);n.report=null;n.state='flüchtend';n.timer=9;}if(p.armed&&distance(n,p)<17&&lineClear(n,p,this.solids)&&n.state==='normal'){n.state='aufmerksam';n.timer=1.4;}if(n.state==='aufmerksam'&&n.timer<=0){n.state='flüchtend';n.timer=6;}if(n.state==='erschrocken'&&n.timer<3)n.state='Polizei rufend';if(n.state==='filmend'||n.state==='Polizei rufend'||n.state==='erschrocken'){n.yaw=Math.atan2(p.x-n.x,p.z-n.z);continue;}if(n.state==='flüchtend'){n.yaw=Math.atan2(n.x-p.x,n.z-p.z);this.move(n,Math.sin(n.yaw)*3*dt,Math.cos(n.yaw)*3*dt,.3);if(n.timer<=0){n.state='normal';n.target=(n.target+1)%n.path.length;}}else{const dest=n.path[n.target],d=distance(n,dest);if(d<1)n.target=(n.target+1)%n.path.length;else{n.yaw=Math.atan2(dest.x-n.x,dest.z-n.z);this.move(n,Math.sin(n.yaw)*n.pace*(this.weather==='rain'?1.5:1)*dt,Math.cos(n.yaw)*n.pace*(this.weather==='rain'?1.5:1)*dt,.3);}}}
   this.updatePolice(dt);this.eventTimer-=dt;if(this.eventTimer<=0){this.eventTimer=55;const c=this.cars.find(c=>c.type==='traffic'&&c!==p.car);if(c){c.wait=14;this.notify('Verkehrsfunk: Pannenfahrzeug auf der Harbor Avenue.');}}
   if(p.health<=0){p.health=0;this.paused=true;this.notify('Festgenommen. Starte den Auftrag erneut.');}

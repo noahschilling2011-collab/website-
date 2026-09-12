@@ -54,6 +54,24 @@ export const weapons={
 };
 export function waterAt(x,z){if(x>119){if(x>235&&x<360&&z>150&&z<295)return false;if(z>195&&z<205&&x<260)return false;return true;}return x<-400&&x>-545&&z>-20&&z<130;}
 export function groundAt(x,z){if(waterAt(x,z))return -1.2;if(x<-380&&z<-240){const a=Math.max(0,1-((x+490)/155)**2-((z+420)/195)**2);return a*a*62;}return 0;}
+// Ampeltakt. Achse 0 regelt den Verkehr in Nord-Süd-Richtung, Achse 1 den
+// in Ost-West-Richtung; die zweite ist um den halben Takt versetzt.
+// Beleuchtung und Verkehr lesen dieselbe Funktion, sonst hielten Autos bei
+// Grün und führen bei Rot.
+// Liegt der Punkt auf oder dicht neben einer Fahrbahn? sim.blocked kennt
+// nur Gebäude, Straßen sind reine Geometrie.
+export function onRoad(x,z,rand=6){
+ for(const r of roadSegments){
+  if(x>Math.min(r.x1,r.x2)-r.w/2-rand&&x<Math.max(r.x1,r.x2)+r.w/2+rand&&
+     z>Math.min(r.z1,r.z2)-r.w/2-rand&&z<Math.max(r.z1,r.z2)+r.w/2+rand)return true;
+ }
+ return false;
+}
+export const AMPEL_TAKT=26;
+export function ampelFrei(zeit,achse){
+ const t=((zeit%AMPEL_TAKT)+AMPEL_TAKT)%AMPEL_TAKT;
+ return (achse?(t+AMPEL_TAKT/2)%AMPEL_TAKT:t)<12.5;
+}
 export function regionAt(p){return [...regions].sort((a,b)=>Math.hypot(a.x-p.x,a.z-p.z)-Math.hypot(b.x-p.x,b.z-p.z))[0].name;}
 export const roadSegments=[
  ...[-100,-40,20,80].flatMap(r=>[{x1:r,z1:-120,x2:r,z2:150,w:15},{x1:-340,z1:r,x2:112,z2:r,w:15}]),
@@ -62,3 +80,17 @@ export const roadSegments=[
  {x1:-100,z1:-420,x2:-100,z2:405,w:18},{x1:-340,z1:-320,x2:100,z2:-320,w:14},
  {x1:-340,z1:200,x2:280,z2:200,w:12},{x1:-340,z1:400,x2:100,z2:400,w:16}
 ];
+
+// Kreuzungen des Straßenrasters. Achsparallele Segmente schneiden sich, wenn
+// ihre Spannen überlappen — Diagonalen gibt es in Port Mercy nicht.
+export const intersections=(()=>{
+ const laengs=r=>Math.abs(r.z2-r.z1)>=Math.abs(r.x2-r.x1);
+ const senkrecht=roadSegments.filter(laengs),waagerecht=roadSegments.filter(r=>!laengs(r)),treffer=[];
+ for(const v of senkrecht)for(const h of waagerecht){
+  const x=v.x1,z=h.z1;
+  if(x<Math.min(h.x1,h.x2)-1||x>Math.max(h.x1,h.x2)+1)continue;
+  if(z<Math.min(v.z1,v.z2)-1||z>Math.max(v.z1,v.z2)+1)continue;
+  treffer.push({x,z,breite:Math.max(v.w,h.w)});
+ }
+ return treffer;
+})();

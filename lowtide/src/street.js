@@ -2,7 +2,7 @@ import * as T from './vendor/three.module.js';
 import {detailedCar} from './art-direction.js';
 // Erkennungsfarbe: nur das Lackmaterial des Vorbilds trägt sie.
 const LACK_MARKE=0x00ff2a;
-import {roadSegments, groundAt, waterAt} from './content.js';
+import {roadSegments, groundAt, waterAt, intersections, ampelFrei, AMPEL_TAKT, onRoad} from './content.js';
 // Straßenmöblierung für Port Mercy.
 // Vorher standen an den Straßen Laternen nur im Hafenbecken; der Rest der Stadt
 // war leere Fahrbahn zwischen leeren Grundstücken. Alles hier läuft über die
@@ -23,21 +23,6 @@ function segmentInfo(r) {
  const laenge = Math.hypot(r.x2 - r.x1, r.z2 - r.z1);
  const senkrecht = Math.abs(r.z2 - r.z1) >= Math.abs(r.x2 - r.x1);
  return {laenge, senkrecht, dx: (r.x2 - r.x1) / laenge, dz: (r.z2 - r.z1) / laenge};
-}
-
-// Kreuzungen des Rasters. Zwei achsparallele Segmente schneiden sich, wenn ihre
-// Spannen einander überlappen — das reicht hier, Diagonalen gibt es nicht.
-function kreuzungen(segmente) {
- const treffer = [];
- const senkrechte = segmente.filter(r => segmentInfo(r).senkrecht);
- const waagerechte = segmente.filter(r => !segmentInfo(r).senkrecht);
- for (const v of senkrechte) for (const h of waagerechte) {
-  const x = v.x1, z = h.z1;
-  if (x < Math.min(h.x1, h.x2) - 1 || x > Math.max(h.x1, h.x2) + 1) continue;
-  if (z < Math.min(v.z1, v.z2) - 1 || z > Math.max(v.z1, v.z2) + 1) continue;
-  treffer.push({x, z, breite: Math.max(v.w, h.w)});
- }
- return treffer;
 }
 
 // Fasst alle Meshes eines Vorbilds nach Material zusammen und liefert je Material
@@ -84,12 +69,18 @@ export class Street {
   this.rng = zufall();
   this.ampelPhase = 0;
   this.parkplaetze = [];
-  this.kreuzungsListe = kreuzungen(roadSegments);
+  this.kreuzungsListe = intersections;
  }
 
  frei(x, z, radius = 2) {
   if (waterAt(x, z)) return false;
   return !this.world.sim.blocked({x, z}, radius);
+ }
+
+ // Für Strandmöbel: alles, was am Wasser steht, muss zusätzlich von der
+ // Fahrbahn weg. Die Uferstraße bei z = 200 kreuzt den Strand.
+ freiAmStrand(x, z, radius = 2) {
+  return this.frei(x, z, radius) && !onRoad(x, z, 9);
  }
 
  // Wird aus ExpandedWorld.build gerufen, also noch vor World.flush.
@@ -302,6 +293,7 @@ export class Street {
   for (let z = 140; z < 425; z += 46) {
    // Rettungsturm auf Stelzen, mit Leiter und Flagge.
    const x = 108;
+   if (!this.freiAmStrand(x, z, 6)) continue;
    for (const ox of [-1.6, 1.6]) for (const oz of [-1.6, 1.6]) w.box(x + ox, 1.5, z + oz, .2, 3, .2, 0x8a6a4c);
    w.box(x, 3.15, z, 4.2, .3, 4.2, 0xb08a5e);
    w.box(x, 4.1, z, 4, 1.6, 4, 0xd8c193);
@@ -318,6 +310,7 @@ export class Street {
   for (let z = 138; z < 426; z += 9) {
    if (rng() > .78) continue;
    const gx = 104 + rng() * 9, dreh = (rng() - .5) * .7;
+   if (!this.freiAmStrand(gx, z, 4)) continue;
    for (const versatz of [-1.3, 1.3]) {
     const lx = gx + Math.cos(dreh) * versatz, lz = z + Math.sin(dreh) * versatz;
     w.box(lx, .3, lz, .75, .12, 2, 0xd6cdb4, dreh);
@@ -332,7 +325,8 @@ export class Street {
    w.box(gx, 2.5, z, .3, .16, .3, 0x8f8a7c);
   }
   // Beachvolleyball: zwei Felder mit Netz.
-  for (const z of [205, 340]) {
+  for (const z of [214, 340]) {
+   if (!this.freiAmStrand(112, z, 10)) continue;
    for (const ox of [-4.5, 4.5]) w.box(112 + ox, 1.2, z, .12, 2.4, .12, 0x7f776a);
    w.box(112, 1.9, z, 9, .9, .05, 0xdcd7c4);
    for (const e of [[-4.5, -8], [4.5, -8], [-4.5, 8], [4.5, 8]]) w.box(112 + e[0], .09, z + e[1], .3, .1, .3, 0xc9c2a6);
@@ -354,10 +348,11 @@ export class Street {
  // Ampelphasen: grün, gelb, rot je Achse, versetzt zueinander.
  update(zeit, nacht) {
   if (!this.lichtGruppen) return;
-  const takt = 26, t = zeit % takt;
+  const t = zeit % AMPEL_TAKT;
   for (let achse = 0; achse < 2; achse++) {
-   const versetzt = achse ? (t + takt / 2) % takt : t;
-   // 0 = rot oben, 1 = gelb, 2 = grün unten.
+   const versetzt = achse ? (t + AMPEL_TAKT / 2) % AMPEL_TAKT : t;
+   // 0 = rot oben, 1 = gelb, 2 = grün unten. ampelFrei in content.js deckt
+   // grün und gelb ab und wird vom Verkehr gelesen.
    const leuchtet = versetzt < 10 ? 2 : versetzt < 12.5 ? 1 : 0;
    this.lichtGruppen[achse].forEach((eintrag, i) => {
     const an = i === leuchtet;
