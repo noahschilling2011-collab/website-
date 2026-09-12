@@ -505,6 +505,13 @@ const akte = await page.evaluate(() => {
   n.x += 4000;
  }
  sim.player.car = auto; Object.assign(auto, {yaw: lkw.yaw, speed: 22, health: 100, fuel: 100});
+ // Fahndung zurücksetzen. Die Abschnitte über Polizei und Fahndung laufen
+ // vorher und lassen Sterne stehen; ohne diese Zeile misst die Prüfung nicht
+ // das Rammen, sondern den Rest des vorigen Abschnitts. Genau daran ist sie
+ // zweimal gescheitert, während ich die Ursache bei Verkehr und Fußgängern
+ // gesucht habe.
+ sim.stars = 0; sim.heat = 0; sim.lastSeen = null; sim.description = null;
+ for (const c of sim.cops) c.active = false;
  let stoesse = 0;
  while (sim.campaign.konvoi.phase === 'faehrt' && stoesse++ < 400) {
   auto.x = lkw.x + 2.2; auto.z = lkw.z + 1.2; auto.speed = 22;
