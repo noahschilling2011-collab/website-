@@ -59,10 +59,22 @@ export class Campaign extends Simulation{
  driveVehicle(dt,input){this.bremst=!!input.brake;const p=this.player,c=p.car,d=vehicleTypes[c.model],wet=this.weather==='rain'||this.weather==='storm',upgrade=1+(c.upgrades.engine||0)*.14;const f=c.health>0&&c.fuel>0?(input.forward||0):0;c.speed+=f*d.accel*upgrade*dt;c.speed*=Math.exp(-dt*(input.brake&&d.medium!=='air'?d.brake/5:!f?.65:.04));c.speed=clamp(c.speed,-Math.min(10,d.max/3),d.max*upgrade*Math.max(.2,c.health/100));const tireGrip=Math.max(.45,c.tires/100);c.yaw-=(input.turn||0)*dt*d.turn*clamp(c.speed/6,-1,1)*(wet?.72:1)*tireGrip*d.grip*(1+(c.upgrades.tires||0)*.03)*(input.brake?1.45:1)*(this.active===0?1.08:1);
   c.fuel=Math.max(0,c.fuel-dt*(.012+Math.abs(c.speed)*.002));let alt=c.alt||0;
   if(d.medium==='air'){if(d.shape==='helicopter'||Math.abs(c.speed)>22)alt+=((input.jump?1:0)-(input.sneak?1:0))*dt*12;if(c.fuel<=0||c.health<=0)alt-=dt*12;if(d.shape==='plane'&&Math.abs(c.speed)<19&&alt>0)alt-=dt*8;c.alt=clamp(alt,0,170);}
-  const dx=Math.sin(c.yaw)*c.speed*dt,dz=Math.cos(c.yaw)*c.speed*dt,next={x:c.x+dx,z:c.z+dz};let hit=false;
+  // Querbewegung. Bisher fuhr jedes Fahrzeug exakt dorthin, wohin es zeigte:
+  // kein Untersteuern, kein Ausbrechen, keine Wirkung der Handbremse außer
+  // Bremsen. Der Schlupf baut sich mit der Fliehkraft auf und klingt mit dem
+  // Grip wieder ab.
+  const griff=tireGrip*d.grip*(wet?.66:1)*(input.brake?.45:1)
+   *(wet&&Math.abs(c.speed)>d.max*.62?.55:1);   // Aquaplaning bei hohem Tempo
+  const fliehkraft=Math.abs(c.speed)*(input.turn||0)*d.turn*.085*Math.sign(c.speed||1);
+  c.slip=(c.slip||0)+((fliehkraft/Math.max(.35,griff))-(c.slip||0))*Math.min(1,dt*5);
+  c.slip=clamp(c.slip,-7,7);
+  if(d.medium==='air')c.slip=0;
+  const quer=Math.cos(c.yaw)*c.slip*dt,querZ=-Math.sin(c.yaw)*c.slip*dt;
+  const dx=Math.sin(c.yaw)*c.speed*dt+quer,dz=Math.cos(c.yaw)*c.speed*dt+querZ,next={x:c.x+dx,z:c.z+dz};let hit=false;
   if(d.medium==='water'){if(waterAt(next.x,next.z)&&!this.blocked(next,.8)){c.x=next.x;c.z=next.z;}else hit=true;}
   else if(d.medium==='air'&&c.alt>2){if(this.blockedAir(next,c.alt)){hit=true;}else{c.x=next.x;c.z=next.z;}}
   else{if(waterAt(next.x,next.z)){hit=true;c.health-=dt*3;}else hit=this.move(c,dx,dz,['bike','quad'].includes(d.shape)?.65:d.shape==='truck'||d.shape==='bus'?1.7:1.15);}
+  if(Math.abs(c.slip||0)>2.2)c.tires=Math.max(20,c.tires-dt*Math.abs(c.slip)*.5);
   if(hit&&Math.abs(c.speed)>1){const impact=Math.abs(c.speed);c.health=clamp(c.health-impact*.65,0,100);c.glass=Math.max(0,c.glass-impact*2);c.lights=Math.max(0,c.lights-impact);c.tires=Math.max(0,c.tires-impact*.15);c.speed*=-.15;this.collisions++;}
   for(const other of this.cars){if(other===c||distance(other,c)>3||(c.alt||0)>3||(other.alt||0)>3)continue;if(Math.abs(c.speed)>4){other.wait=5;other.health=Math.max(0,other.health-6);c.health=Math.max(0,c.health-3);c.speed*=-.2;this.crime(1);}}
   for(const n of this.npcs){if(n.health>0&&c.alt<2&&distance(c,n)<1.6&&Math.abs(c.speed)>5){n.health=0;n.state='verletzt';c.speed*=.6;this.crime(3);}}

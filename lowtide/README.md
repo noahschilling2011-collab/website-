@@ -18,9 +18,11 @@ src/
   world.js          Renderer, Basisgeometrie, Kamera, Licht
   expanded-world.js Erweiterte Welt: Gelände, Regionen, Fahrzeugmodelle
   sky.js            Sonnenstand, Himmelskuppel, Nebel, Belichtung
-  water.js          Wellen, Spiegelung, Brandung
+  water.js          Wellen, Spiegelung, Brandung, Sumpf
   street.js         Bordsteine, Laternen, Ampeln, Möblierung, Strand
   facades.js        Sockelgeschosse, Läden, Fensterlaibungen, Dachaufbauten
+  regions.js        Vororte, Farm, Nationalpark, Sumpf, Flugfeld, Insel,
+                    Industrie, Baulücken, Süd- und Nordflächen
   art-direction.js  Materialien, Fahrzeug- und Figurenaufbau
   human-model.js    Anatomische Figurenmodelle und Animation
   content.js        Weltdaten: Orte, Regionen, Fahrzeugtypen, Waffen
@@ -36,6 +38,8 @@ node --experimental-vm-modules tools/check.mjs   # Syntax aller Module
 node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
+node tools/luftbild.mjs                          # Luftbilder über die Karte
+node tools/regression.mjs                        # 43 Prüfungen, muss grün sein
 ```
 
 Die drei Werkzeuge in `tools/` mit Browser brauchen Playwright und Chromium.
@@ -49,3 +53,12 @@ Draw Calls und Dreiecke aus `messung.mjs` — die sind hardwareunabhängig.
 
 `window.LOWTIDE` gibt im Browser Zugriff auf `sim`, `world` und den Frame-Zähler.
 F3 blendet die Messwerte ein: FPS, Draw Calls, Dreiecke, NPCs, Fahrzeuge.
+
+Zum Prüfen von außen:
+
+```js
+LOWTIDE.sim.hour = 22                       // Tageszeit setzen
+LOWTIDE.sim.weather = 'storm'               // clear | rain | fog | storm
+LOWTIDE.view(x, z, gier, neigung)           // Figur und Kamera versetzen
+LOWTIDE.luftbild(x, y, z, zx, zy, zz)       // freie Kamera für Luftbilder
+```

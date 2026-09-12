@@ -159,6 +159,37 @@ await bilder(2);
 pruefe('Scheinwerfer aus, sobald niemand fährt', await page.evaluate(() =>
  window.LOWTIDE.world.fahrlicht.every(l => !l.visible)));
 
+pruefe('Fahrzeug bricht bei voller Lenkung aus', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim, auto = s.cars.find(c => c.model === 'muscle') || s.cars[0];
+ auto.unlocked = true; auto.slip = 0; auto.speed = 0;
+ s.player.x = auto.x + 1.5; s.player.z = auto.z; s.player.y = 0;
+ if (!s.player.car) s.enterExit();
+ for (let i = 0; i < 60; i++) s.driveVehicle(.05, {forward: 1, turn: 1});
+ const ausbruch = Math.abs(s.player.car.slip);
+ // Geradeaus muss der Schlupf wieder abklingen.
+ for (let i = 0; i < 60; i++) s.driveVehicle(.05, {forward: 1, turn: 0});
+ const gerade = Math.abs(s.player.car.slip);
+ s.player.car.speed = 0;
+ return ausbruch > .5 && gerade < ausbruch * .3;
+}));
+await page.evaluate(() => {const s = window.LOWTIDE.sim; if (s.player.car) {s.player.car.speed = 0; s.enterExit();}});
+
+pruefe('Suchscheinwerfer erst ab fünf Sternen', await page.evaluate(() => {
+ const w = window.LOWTIDE.world;
+ return !w.suchlicht.visible;
+}));
+await page.evaluate(() => {const s = window.LOWTIDE.sim; s.stars = 5; s.heat = 10; s.policeHeli.alt = 40;
+ s.policeHeli.x = s.player.x; s.policeHeli.z = s.player.z; s.lastSeen = {x: s.player.x, z: s.player.z};});
+await bilder(2);
+pruefe('Suchscheinwerfer leuchtet bei fünf Sternen', await page.evaluate(() =>
+ window.LOWTIDE.world.suchlicht.visible && window.LOWTIDE.world.suchfleck.visible));
+// dispatchTimer mit zurücksetzen: sonst steht die Ausrückungssperre aus
+// diesem Abschnitt noch, wenn die Fahndungsprüfung gleich meldet.
+await page.evaluate(() => {const s = window.LOWTIDE.sim; s.stars = 0; s.heat = 0; s.lastSeen = null;
+ s.description = null; s.policeHeli.alt = 0; s.dispatchTimer = 0;
+ for (const c of s.cops) {c.active = false; c.route = []; c.blockTarget = null; c.blocking = false;}});
+await bilder(2);
+
 console.log('Fahndung');
 await page.evaluate(() => window.LOWTIDE.sim.report(4));
 pruefe('Meldung erzeugt Sterne', await page.evaluate(() => window.LOWTIDE.sim.stars) > 0);

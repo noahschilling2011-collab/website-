@@ -22,7 +22,14 @@ export class ExpandedWorld extends World{
    }
    if(GLAS_HEX.includes(hex)){o.material.metalness=.72;o.material.roughness=.16;o.material.envMapIntensity=1.5;}
   });
-  this.setupStrassenlicht();this.setupFahrlicht();}
+  this.setupStrassenlicht();this.setupFahrlicht();
+  // Suchscheinwerfer des Hubschraubers. Ab fünf Sternen kreist er über der
+  // letzten bekannten Position; vorher war er nur ein stummes Modell.
+  this.suchlicht=new T.SpotLight(0xdfe9ff,0,220,.16,.4,1);
+  this.suchlicht.visible=false;this.scene.add(this.suchlicht);this.scene.add(this.suchlicht.target);
+  this.suchfleck=new T.Mesh(new T.RingGeometry(4.4,9.5,32),
+   new T.MeshBasicMaterial({color:0xcfe0ff,transparent:true,opacity:.28,side:T.DoubleSide,depthWrite:false}));
+  this.suchfleck.rotation.x=-Math.PI/2;this.suchfleck.visible=false;this.scene.add(this.suchfleck);}
 
  // Acht Punktlichter wandern zu den nächstgelegenen Laternen. Mehr wäre auf
  // schwacher Hardware nicht tragbar, weniger liest sich nachts nicht als Stadt.
@@ -159,6 +166,17 @@ export class ExpandedWorld extends World{
   this.updateFahrlicht(Math.min(1,this.sky.uniforms.nacht.value*1.25));
   this.palmenSetzen(t,s.weather==='storm'?3.4:s.weather==='rain'?1.8:1);for(const m of this.terrain)m.visible=Math.hypot(m.position.x-p.x,m.position.z-p.z)<650;
   if(!this.barrierMeshes)this.barrierMeshes=[];while(this.barrierMeshes.length<s.barriers.length){const m=new T.Mesh(new T.BoxGeometry(5,1,1.2),new T.MeshStandardMaterial({color:0xe3c485}));this.scene.add(m);this.barrierMeshes.push(m);}this.barrierMeshes.forEach((m,i)=>{const b=s.barriers[i];m.visible=!!b;if(b)m.position.set(b.x,.5,b.z);});if(!this.policeHelicopter){this.policeHelicopter=this.car(0x4b6169,false,{model:'helicopter'});this.scene.add(this.policeHelicopter);}const h=s.policeHeli;this.policeHelicopter.position.set(h.x,h.alt,h.z);this.policeHelicopter.rotation.y=h.yaw;this.policeHelicopter.visible=distance(h,p)<400;if(h.alt>0)this.policeHelicopter.userData.rotor.rotation.y+=dt*40;
+  const suchtAktiv=s.stars>=5&&h.alt>8;
+  this.suchlicht.visible=suchtAktiv;this.suchfleck.visible=suchtAktiv;
+  if(suchtAktiv){
+   const ziel=s.lastSeen||p, wackeln=Math.sin(t*.9)*11, wackelnZ=Math.cos(t*1.3)*9;
+   const zx=ziel.x+wackeln, zz=ziel.z+wackelnZ, zy=groundAt(zx,zz);
+   this.suchlicht.position.set(h.x,h.alt-1.5,h.z);
+   this.suchlicht.target.position.set(zx,zy,zz);this.suchlicht.target.updateMatrixWorld();
+   this.suchlicht.intensity=430;
+   this.suchfleck.position.set(zx,zy+.14,zz);
+   this.suchfleck.material.opacity=.10+Math.min(1,this.sky.uniforms.nacht.value)*.16;
+  }
   if(!this.placeMarkers){this.placeMarkers=[];for(const l of Object.values(locations)){const m=new T.Mesh(new T.OctahedronGeometry(.35),new T.MeshBasicMaterial({color:0x8bd4c1}));m.position.set(l.x,groundAt(l.x,l.z)+2.6,l.z);this.scene.add(m);this.placeMarkers.push(m);}}for(const m of this.placeMarkers){m.visible=Math.hypot(m.position.x-p.x,m.position.z-p.z)<65;m.rotation.y=t;}
  }
 }
