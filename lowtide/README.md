@@ -203,6 +203,43 @@ vollständig im Fragmentshader. Unter dem Software-Rendering dieser Umgebung
 ist darüber nichts Belastbares zu messen. Nachts kostet es nichts: unter einer
 Stärke von 0,004 verlässt die Funktion sofort mit 1,0.
 
+## Belichtung über den Tag
+
+Die Nacht wurde einmal angehoben, damit sie zwischen den Lampen lesbar
+bleibt. Der Tag ist dabei mitgezogen worden, ohne dass es jemand nachgemessen
+hätte: eine sonnenbeschienene Innenstadt kam bei einer mittleren Helligkeit
+von 81 von 255 heraus. Ein Mittelgrau wären rund 140.
+
+Der Grund liegt nicht in der Kurve, sondern in der Rechnung davor. Albedo
+durch π mal Sonnenstärke landet für eine Fahrbahn unter 0,18, und ACES
+komprimiert das anschließend noch. Die Tagesstützstellen sind deshalb um
+Faktor 1,35 angehoben.
+
+Beim Nachmessen über den ganzen Tag kam ein zweiter Fehler heraus, den kein
+einzelnes Bild gezeigt hätte: um 7 und um 18:30 lagen zwei Drittel des Bildes
+unter 6 von 255 — die Dämmerung war dunkler als Mitternacht. Das liegt an
+derselben angehobenen Nacht: sie zieht die Kurve an ihren Enden hoch, die
+Dämmerung dazwischen aber nicht. Jetzt fällt die Belichtung monoton von der
+Nacht in den Mittag und steigt monoton zurück, und das Himmelslicht bei
+flacher Sonne ist mit angehoben — bei Sonnenaufgang ist der Himmel die große
+Lichtquelle, nicht die Sonne.
+
+| Uhr | mittlere Helligkeit | ausgefressen | abgesoffen |
+|---|---|---|---|
+| 1 | 49,0 | 0 % | 0 % |
+| 7 | 40,7 | 0 % | 40,0 % |
+| 9 | 82,4 | 0 % | 1,9 % |
+| 13 | 105,2 | 0 % | 2,2 % |
+| 16 | 87,7 | 0 % | 2,9 % |
+| 18:30 | 27,9 | 0 % | 61,4 % |
+| 20 | 53,2 | 0,03 % | 0 % |
+| 22 | 50,9 | 0,02 % | 0 % |
+
+Vorher: 13 Uhr 81,1 — 7 Uhr 28,6 bei 66,9 % abgesoffen. Was bei flacher Sonne
+übrig bleibt, ist der Schatten der Häuserzeile über der Fahrbahn; den hebt
+keine Belichtung mehr an, ohne das Bild flach zu machen. Es bleibt dunkel,
+aber es ist nicht mehr dunkler als die Nacht.
+
 ## Was Zeichenaufrufe kostet
 
 Draw Calls sind hier die knappe Größe, nicht Dreiecke. Drei Dinge halten sie

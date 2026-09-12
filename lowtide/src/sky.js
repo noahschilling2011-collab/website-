@@ -19,18 +19,31 @@ export function sunDirection(hour, out = new T.Vector3()) {
 // [Stunde, Zenit, Horizont, Sonnenfarbe, Sonnenstärke, Himmelslicht, Belichtung]
 const STUeTZSTELLEN = [
  // Belichtung nachts angehoben (1.45 → 1.78) und das Himmelslicht mit ihr.
+ // Der Tag lag danach ein Drittel zu dunkel: eine sonnenbeschienene Fahrbahn
+ // kam im fertigen Bild bei einer mittleren Helligkeit von 81 von 255 heraus,
+ // ein Mittelgrau wären 140. Der Grund ist nicht die Kurve, sondern die
+ // Rechnung davor — Albedo durch π mal Sonnenstärke landet unter 0,18, und
+ // ACES komprimiert das dann noch. Die Tageswerte sind deshalb um den Faktor
+ // 1,35 angehoben; die Nacht bleibt, wie sie war.
+ //
+ // Dabei kam ein zweiter Fehler heraus, den die Messung über den ganzen Tag
+ // zeigte: um 7 und um 18:30 lagen zwei Drittel des Bildes unter 6 von 255,
+ // die Dämmerung war damit dunkler als Mitternacht. Der Grund ist die
+ // angehobene Nacht — sie zieht die Kurve an ihren Enden hoch, die Dämmerung
+ // dazwischen aber nicht. Die Belichtung fällt jetzt monoton von der Nacht
+ // in den Mittag und steigt monoton zurück.
  // Mit der Nachbearbeitung war die Nacht lesbar nur noch dort, wo eine
  // Lampe stand; eine Küstenstadt hat auch zwischen den Lampen ein Grundlicht
  // aus Himmel, Wasser und Streulicht der Stadt.
  [0.0, 0x070e1e, 0x101a28, 0x3c4f78, 0.06, 0.30, 1.78],
  [4.6, 0x0c182e, 0x222a3e, 0x6b5a78, 0.10, 0.36, 1.72],
- [6.4, 0x28406a, 0x7d5a56, 0xff8f52, 0.85, 0.52, 1.20],
- [7.2, 0x2b5f9e, 0x9fb0b4, 0xffc48c, 1.75, 0.60, 1.00],
- [10.0, 0x2a72c0, 0xc2d2d0, 0xffeecb, 2.45, 0.74, 0.94],
- [13.0, 0x2578cc, 0xcedcd6, 0xfff2d8, 2.70, 0.80, 0.90],
- [16.3, 0x2f70b8, 0xcbcdbe, 0xffdea2, 2.15, 0.72, 0.96],
- [18.4, 0x3a5c92, 0xd8996a, 0xff9450, 1.45, 0.64, 1.02],
- [19.4, 0x1d3560, 0x8a5566, 0xd6684e, 0.45, 0.38, 1.28],
+ [6.4, 0x28406a, 0x7d5a56, 0xff8f52, 0.85, 0.74, 1.85],
+ [7.2, 0x2b5f9e, 0x9fb0b4, 0xffc48c, 1.75, 0.80, 1.58],
+ [10.0, 0x2a72c0, 0xc2d2d0, 0xffeecb, 2.45, 0.74, 1.27],
+ [13.0, 0x2578cc, 0xcedcd6, 0xfff2d8, 2.70, 0.80, 1.22],
+ [16.3, 0x2f70b8, 0xcbcdbe, 0xffdea2, 2.15, 0.72, 1.30],
+ [18.4, 0x3a5c92, 0xd8996a, 0xff9450, 1.45, 0.82, 1.50],
+ [19.4, 0x1d3560, 0x8a5566, 0xd6684e, 0.45, 0.54, 1.70],
  [20.6, 0x0c1b38, 0x302d48, 0x6a4a66, 0.12, 0.33, 1.74],
  [24.0, 0x070e1e, 0x101a28, 0x3c4f78, 0.06, 0.30, 1.78]
 ];
