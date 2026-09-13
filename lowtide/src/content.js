@@ -5,25 +5,46 @@
 // Innenstadt bleibt, wo sie war, und der neue Raum trägt eine zweite Stadt,
 // einen Stausee und das Hinterland dazwischen.
 export const bounds={left:-1100,right:390,top:-540,bottom:900};
+// Die acht Servicegebäude sind keine Punkte, sondern Räume: sechzehn Meter
+// breit und sechzehn tief (die Werkstatt zweiundzwanzig), von der Rückwand
+// bei z-12 bis zur offenen Front bei z+4. Der Marker steht an der Front.
+//
+// Vier davon standen an Kreuzungen mitten auf der Fahrbahn — Pike Customs,
+// Supply & Style, die Klinik und die Wohnung lagen drei Meter nördlich der
+// Querstraßen bei z = 80, 20, -40 und -100 und fünf Meter östlich der
+// Nord-Süd-Achse bei x = -160. Bei sechzehn Metern Raumtiefe heißt das:
+// beide Fahrbahnen liefen mitten durch das Gebäude. Auf dem Luftbild steht
+// der Laden als weißer Klotz zwischen zwei Fahrspuren, links und rechts
+// davon fährt Verkehr. Zusammen mit Club, Diner, Motel und Archiv waren es
+// fünfundzwanzig Wandstücke, die eine Fahrbahn schnitten.
+//
+// Die neuen Plätze sind nicht geschätzt, sondern gesucht: für jeden Raum
+// alle Punkte im Umkreis von sechzig Metern, die mit zweieinhalb Metern Luft
+// jede Fahrbahn freilassen, sechs Meter offenen Vorplatz haben, kein anderes
+// registriertes Hindernis berühren und auf ebenem, trockenem Grund liegen —
+// davon der nächstgelegene. Vierzehn bis dreißig Meter Versatz, und in
+// keinem der acht Rechtecke steht danach noch stehende Kulisse. Die vier
+// Innenstadthäuser bilden weiterhin eine Reihe, jetzt an der Südseite ihrer
+// Querstraße statt darin.
 export const locations={
- garage:{x:-153,z:83,name:'Pike Customs',kind:'garage'},
- shop:{x:-155,z:23,name:'Supply & Style',kind:'shop'},
- clinic:{x:-155,z:-37,name:'Mercy Clinic',kind:'clinic'},
- home:{x:-155,z:-97,name:'Voss Apartment',kind:'home'},
+ garage:{x:-138,z:62,name:'Pike Customs',kind:'garage'},
+ shop:{x:-137,z:-1,name:'Supply & Style',kind:'shop'},
+ clinic:{x:-140,z:-58,name:'Mercy Clinic',kind:'clinic'},
+ home:{x:-139,z:-118,name:'Voss Apartment',kind:'home'},
  court:{x:-210,z:125,name:'Basketball',kind:'basketball'},
  gym:{x:-145,z:135,name:'Iron Tide Gym',kind:'gym'},
  fish:{x:108,z:143,name:'Angelpier',kind:'fishing'},
  dive:{x:158,z:170,name:'Wracktauchen',kind:'diving'},
- club:{x:-213,z:23,name:'Club Undertow',kind:'club'},
- diner:{x:-270,z:127,name:'Nora’s Diner',kind:'diner'},
+ club:{x:-202,z:2,name:'Club Undertow',kind:'club'},
+ diner:{x:-261,z:116,name:'Nora’s Diner',kind:'diner'},
  race:{x:-280,z:80,name:'West Loop',kind:'race'},
  skydive:{x:-360,z:300,name:'Mercy Airfield',kind:'skydive'},
  ranger:{x:-450,z:-370,name:'Cypress Nationalpark',kind:'ranger'},
  farm:{x:-365,z:-265,name:'Bellweather Farm',kind:'farm'},
- motel:{x:-355,z:132,name:'Last Light Motel',kind:'motel'},
+ motel:{x:-360,z:155,name:'Last Light Motel',kind:'motel'},
  fuel:{x:-100,z:140,name:'Northstar Fuel',kind:'fuel'},
  tower:{x:-270,z:-148,name:'Relaisstation',kind:'tower'},
- records:{x:-330,z:-87,name:'Stadtarchiv',kind:'records'},
+ records:{x:-319,z:-75,name:'Stadtarchiv',kind:'records'},
  ferry:{x:275,z:215,name:'Isla Serena',kind:'ferry'},
  aircargo:{x:-390,z:270,name:'Luftfracht',kind:'aircargo'},
  drag:{x:-315,z:250,name:'Mercy Dragstrip',kind:'race:drag'},
@@ -35,16 +56,24 @@ export const locations={
  range:{x:-146,z:16,name:'Schießstand',kind:'range'},
  schatz:{x:-450,z:-330,name:'Bergungsauftrag',kind:'treasure'}
 };
+// Dartscheibe und Billardtisch stehen in ihren Räumen, sieben Meter hinter
+// der Front; der Schießstand liegt im Freien östlich neben dem Laden. Als
+// eigene Koordinaten blieben alle drei beim Umzug der Gebäude stehen — der
+// Schießstand lag ohnehin schon in der Querstraße bei z = 20. Deshalb sind
+// sie an ihren Wirt gebunden statt selbst eingetragen.
+for(const [ziel,wirt,dx,dz] of [['darts','diner',2,-7],['pool','club',7,-7],['range','shop',13,-7]]){
+ locations[ziel].x=locations[wirt].x+dx;locations[ziel].z=locations[wirt].z+dz;
+}
 // Kaufbare Objekte. Jedes wirft täglich etwas ab und dient als Ruhepunkt;
 // teurere Objekte tragen sich langsamer ab, lohnen sich aber auf Dauer.
 export const immobilien={
  loft:{name:'Harbor Loft',x:-44,z:44,preis:2400,ertrag:110,art:'Wohnung',
   text:'Zwei Zimmer über dem Hafenbecken. Laut, aber niemand fragt nach.'},
- motel:{name:'Last Light Motel',x:-355,z:132,preis:900,ertrag:60,art:'Betrieb',
+ motel:{name:'Last Light Motel',x:locations.motel.x,z:locations.motel.z,preis:900,ertrag:60,art:'Betrieb',
   text:'Vierzehn Zimmer an der Ausfallstraße. Die Hälfte steht leer.'},
- werkstatt:{name:'Anteil Pike Customs',x:-153,z:83,preis:3200,ertrag:170,art:'Betrieb',
+ werkstatt:{name:'Anteil Pike Customs',x:locations.garage.x,z:locations.garage.z,preis:3200,ertrag:170,art:'Betrieb',
   text:'Ein Drittel der Werkstatt. Reparaturen kosten dich danach nichts mehr.'},
- diner:{name:'Anteil Nora’s Diner',x:-270,z:127,preis:1800,ertrag:95,art:'Betrieb',
+ diner:{name:'Anteil Nora’s Diner',x:locations.diner.x,z:locations.diner.z,preis:1800,ertrag:95,art:'Betrieb',
   text:'Nora will sich zurückziehen und sucht jemanden für die Nachtschicht.'},
  liegeplatz:{name:'Liegeplatz Serena',x:250,z:245,preis:1500,ertrag:70,art:'Stellplatz',
   text:'Ein Platz an der Marina. Boote liegen dort sicherer als am Pier.'},

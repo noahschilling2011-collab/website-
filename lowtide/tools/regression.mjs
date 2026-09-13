@@ -179,6 +179,13 @@ pruefe('Scheinwerfer aus, sobald niemand fährt', await page.evaluate(() =>
 pruefe('Fahrzeug bricht bei voller Lenkung aus', await page.evaluate(() => {
  const s = window.LOWTIDE.sim, auto = s.cars.find(c => c.model === 'muscle') || s.cars[0];
  auto.unlocked = true; auto.slip = 0; auto.speed = 0;
+ // Der Wagen stand da, wo die Prüfungen davor ihn gelassen hatten. Bei
+ // vollem Gas und vollem Einschlag sind das in drei Sekunden gut sechzig
+ // Meter Bogen — und irgendwann steht dort ein Haus. Zuletzt fuhr er in
+ // Supply & Style, blieb mit -0,7 m/s an der Wand kleben, und die Prüfung
+ // meldete einen Fahrfehler, den es nicht gab. Jetzt ein fester Platz auf
+ // der Südtangente: siebzig Meter in jede Richtung frei, trocken, eben.
+ auto.x = -700; auto.z = 620; auto.yaw = Math.PI / 2;
  s.player.x = auto.x + 1.5; s.player.z = auto.z; s.player.y = 0;
  if (!s.player.car) s.enterExit();
  for (let i = 0; i < 60; i++) s.driveVehicle(.05, {forward: 1, turn: 1});
@@ -483,6 +490,45 @@ await page.keyboard.press('p');
 await bilder(1);
 pruefe('P schließt das Telefon und gibt das Spiel frei', await page.evaluate(() =>
  document.getElementById('phone').hidden && !window.LOWTIDE.sim.paused));
+
+console.log('Akt 1: das Lagerhaus');
+// Der erste Akt hatte keine Prüfung. Er läuft über vier feste Punkte im
+// Lagerhaus — Tür, Sicherung, Festplatte, Treffpunkt —, und jeder davon
+// muss betretbar sein und den nächsten Schritt auslösen. Ohne diese
+// Prüfung wäre jede Verschiebung des Gebäudes ein Blindflug.
+const akt1 = await page.evaluate(() => {
+ const L = window.LOWTIDE, sim = L.sim, P = L.plaetze, out = {};
+ sim.paused = false; sim.stars = 0; sim.heat = 0;
+ const p = sim.player; p.car = null; p.y = 0;
+ const hin = (o, dz = 0) => {p.x = o.x; p.z = o.z + dz; p.y = 0;};
+ // Jeder Punkt muss frei stehen — eine Wand darin hieße: nicht erreichbar.
+ out.freiTuer = !sim.blocked(P.door, .4);
+ out.freiSicherung = !sim.blocked(P.fuse, .4);
+ out.freiPlatte = !sim.blocked(P.disk, .4);
+ out.freiTreff = !sim.blocked(P.safe, .4);
+ sim.mission = 1; sim.doorOpen = false; sim.camera = true;
+ hin(P.door, 2); out.tuer = sim.action();
+ hin(P.fuse, 1); out.sicherung = sim.action(); out.nachSicherung = sim.mission;
+ hin(P.disk, 1); out.platte = sim.action(); out.nachPlatte = sim.mission;
+ hin(P.safe, 2); out.finale = sim.action();
+ // Und der Weg vom Tor zur Festplatte darf nicht durch eine Wand gehen.
+ const tor = L.world.sim.gate;
+ let frei = true;
+ for (let t = 0; t <= 1; t += .04) {
+  const x = tor.x + (P.disk.x - tor.x) * t, z = tor.z + 2 + (P.disk.z - (tor.z + 2)) * t;
+  if (sim.blocked({x, z}, .35)) {frei = false; break;}
+ }
+ out.wegFrei = frei;
+ return out;
+});
+pruefe('Alle vier Punkte des ersten Akts sind betretbar',
+ akt1.freiTuer && akt1.freiSicherung && akt1.freiPlatte && akt1.freiTreff,
+ JSON.stringify([akt1.freiTuer, akt1.freiSicherung, akt1.freiPlatte, akt1.freiTreff]));
+pruefe('Am Tor meldet sich der Wachmann', akt1.tuer === 'guard', String(akt1.tuer));
+pruefe('Die Sicherung öffnet das Tor und schaltet auf Akt 2', akt1.nachSicherung === 2, String(akt1.nachSicherung));
+pruefe('Die Festplatte schaltet auf Akt 3', akt1.nachPlatte === 3, String(akt1.nachPlatte));
+pruefe('Am Bootshaus endet der erste Akt', akt1.finale === 'ending', String(akt1.finale));
+pruefe('Vom Tor zur Festplatte steht keine Wand im Weg', akt1.wegFrei);
 
 console.log('Akt 3 bis 5');
 // Die drei Akte laufen hier direkt gegen die Simulation: die Mechanik ist
@@ -882,6 +928,41 @@ const hindernisse = await page.evaluate(() => {
 });
 pruefe('Nichts Großes steht in einer Fahrbahn', hindernisse.length === 0,
  `${hindernisse.length} Stück, zuerst ${JSON.stringify(hindernisse.slice(0, 4))}`);
+// Die Prüfung oben greift nur bei dicken Klötzen. Die Zimmerwände der
+// Servicegebäude sind einen Meter dick und sechzehn lang und fielen
+// deshalb durch — vier von ihnen standen jahrelang quer über der
+// Fahrbahn. Hier zählt die Fläche, nicht der Mittelpunkt.
+const wandInStrasse = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim, treffer = [];
+ const strassen = L.strassen.map(r => ({
+  x1: Math.min(r.x1, r.x2) - r.w / 2, x2: Math.max(r.x1, r.x2) + r.w / 2,
+  z1: Math.min(r.z1, r.z2) - r.w / 2, z2: Math.max(r.z1, r.z2) + r.w / 2}));
+ for (const o of s.solids) {
+  const a = {x1: o.x - o.w / 2, x2: o.x + o.w / 2, z1: o.z - o.d / 2, z2: o.z + o.d / 2};
+  for (const r of strassen) {
+   const ux = Math.min(a.x2, r.x2) - Math.max(a.x1, r.x1);
+   const uz = Math.min(a.z2, r.z2) - Math.max(a.z1, r.z1);
+   if (ux > 0 && uz > 0 && ux * uz > 2) {treffer.push([o.kind, Math.round(o.x), Math.round(o.z), Math.round(ux * uz)]); break;}
+  }
+ }
+ return treffer;
+});
+pruefe('Keine Hinderniswand liegt in einer Fahrbahn',
+ wandInStrasse.length === 0,
+ `${wandInStrasse.length} Stück, zuerst ${JSON.stringify(wandInStrasse.slice(0, 3))}`);
+// Und die Marker der Innenräume bleiben in ihren Räumen.
+pruefe('Dartscheibe und Billard stehen im Raum, der Schießstand daneben', await page.evaluate(() => {
+ const o = window.LOWTIDE.orte;
+ const drin = [['darts', 'diner', 16], ['pool', 'club', 16]].every(([z, w, b]) => {
+  const m = o[z], l = o[w];
+  return Math.abs(m.x - l.x) < b / 2 && m.z > l.z - 12 && m.z < l.z + 4;
+ });
+ // Der Schießstand liegt im Freien neben dem Laden, nicht darin. Für ihn
+ // zählt: dicht am Gebäude und selbst nicht auf der Fahrbahn.
+ const stand = Math.hypot(o.range.x - o.shop.x, o.range.z - o.shop.z) < 20 &&
+  !window.LOWTIDE.onRoad(o.range.x, o.range.z, 0);
+ return drin && stand;
+}));
 // Leitplanken nur dort, wo es neben der Fahrbahn hinuntergeht.
 const planken = await page.evaluate(() => {
  const w = window.LOWTIDE.world;

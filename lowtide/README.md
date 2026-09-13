@@ -582,6 +582,82 @@ Er liegt jetzt ganz im nördlichen Becken, 530 statt 743 Meter, Zielzeit
 entsprechend 86 statt 120 Sekunden. Der Jetski-Punkt liegt westlich der Bank,
 im Kanal zwischen Küste und Sandbank.
 
+## Zehn Ampeln standen doppelt
+
+Die Kreuzungsliste ist gerechnet, nicht getippt: alle Längssegmente gegen
+alle Quersegmente, Treffer, wo sich die Spannen überlappen. Das überlebt
+jede neue Straße — nur zählt es dieselbe Kreuzung mehrfach, wenn eine Achse
+aus zwei Segmenten besteht. Bei x = -100 und x = -340 liegt neben der kurzen
+Rasterstraße der lange Boulevard, bei z = 200 und z = 400 stoßen Uferstraße
+und Keys Highway aneinander.
+
+Im laufenden Spiel gemessen: **76 gebaute Kreuzungen auf 66 Plätzen.** An
+zehn davon steckten vier Masten, vier Ausleger, vier Gehäuse und zwölf
+Lichtlinsen deckungsgleich ineinander — als Flimmern an den Gehäuseflächen
+zu sehen, dazu 240 Instanzen umsonst. Jetzt werden die Treffer nach Position
+zusammengefasst, mit der größeren der beiden Fahrbahnbreiten.
+
+## Vier Läden und ein Lagerhaus standen auf der Straße
+
+Die acht Servicegebäude sind keine Punkte, sondern Räume: sechzehn Meter
+breit, sechzehn tief, von der Rückwand bis zur offenen Front. Der Marker
+steht an der Front. Pike Customs, Supply & Style, die Klinik und die Wohnung
+lagen drei Meter nördlich der Querstraßen bei z = 80, 20, -40 und -100 und
+fünf Meter östlich der Nord-Süd-Achse bei x = -160 — bei sechzehn Metern
+Raumtiefe liefen damit **beide** Fahrbahnen mitten durch das Gebäude. Auf dem
+Luftbild steht der Laden als weißer Klotz zwischen zwei Fahrspuren, links und
+rechts davon fährt Verkehr.
+
+Gefunden hat es keine Sichtprüfung, sondern die Frage, warum ein Marker
+`onRoad` meldet. Die bestehende Prüfung „Nichts Großes steht in einer
+Fahrbahn" konnte es nicht finden: sie verlangt drei Meter Kantenlänge in
+beiden Richtungen und testet den Mittelpunkt. Die Zimmerwände sind einen
+Meter dick und sechzehn lang, ihr Mittelpunkt liegt neben der Fahrbahn, ihre
+Fläche darin. Zusammen mit Club, Diner, Motel und Archiv waren es
+**fünfundzwanzig Wandstücke in einer Fahrbahn**.
+
+Die neuen Plätze sind gesucht, nicht geschätzt: für jeden Raum alle Punkte im
+Umkreis von sechzig Metern, die mit zweieinhalb Metern Luft jede Fahrbahn
+freilassen, sechs Meter offenen Vorplatz haben, kein anderes registriertes
+Hindernis berühren und auf ebenem, trockenem Grund liegen — davon der
+nächstgelegene. Vierzehn bis dreißig Meter Versatz, und in keinem der acht
+Rechtecke steht danach noch stehende Kulisse. Die vier Innenstadthäuser
+bilden weiterhin eine Reihe, jetzt an der Südseite ihrer Querstraße statt
+darin. Dartscheibe und Billardtisch hängen jetzt am Gebäude statt an eigenen
+Koordinaten, sonst wären sie beim Umzug stehengeblieben; der Schießstand lag
+ohnehin schon in der Querstraße.
+
+Das Lagerhaus des ersten Akts war der größte Fall: die Westwand lag
+fünfeinhalb Meter tief in der achtzehn Meter breiten Nord-Süd-Achse — eine
+dreiundvierzig Meter lange, sieben Meter hohe Wand quer über der Fahrspur.
+Zwischen den Achsen bleiben 43,5 Meter frei und das Gebäude ist 43 Meter
+breit; es passt, aber nur mit einem halben Meter Luft auf jeder Seite. Der
+Gehweg bleibt dabei nicht frei — dafür wäre der Missionsraum auf dreißig
+Meter zu schrumpfen. Frei ist, worauf gefahren wird. Verschoben wurde alles
+mit: Wände, Tor, drei Kisten, Boden, Dachbinder, Schriftzug, Festplatte und
+die drei Missionspunkte. Der Sicherungskasten hing an der Ostwand, wo jetzt
+ein halber Meter Platz ist; er sitzt an der Südwand, wo drei Meter bleiben.
+
+Der erste Akt hatte bis dahin **keine einzige Prüfung**. Er hat jetzt sechs:
+alle vier Punkte betretbar, Wachmann am Tor, Sicherung öffnet und schaltet
+weiter, Festplatte schaltet weiter, Bootshaus beendet den Akt, und der Weg
+vom Tor zur Festplatte ist frei. Ohne die wäre das Verschieben ein Blindflug
+gewesen.
+
+Danach: **null Wandstücke in einer Fahrbahn**, 197 Prüfungen bestanden.
+
+## Die Fahrprüfung fuhr in einen Laden
+
+Nebenbefund und eigene Schuld: die Prüfung „Fahrzeug bricht bei voller
+Lenkung aus" ließ den Wagen dort stehen, wo die Prüfungen davor ihn gelassen
+hatten. Bei vollem Gas und vollem Einschlag sind das in drei Sekunden gut
+sechzig Meter Bogen. Nach dem Umzug lag Supply & Style im Weg, der Wagen
+blieb mit -0,7 m/s an der Wand kleben, und die Prüfung meldete einen
+Fahrfehler, den es nicht gab. Der Wagen startet jetzt an einem festen Platz
+auf der Südtangente: siebzig Meter in jede Richtung frei, trocken, eben.
+Dieselbe Sorte Fehler wie beim Bremstest — ein Messplatz, der sich mit der
+Karte ändert, misst irgendwann etwas anderes als gemeint.
+
 ## Was geprüft wurde und in Ordnung war
 
 Nicht jede Messung findet etwas, und das gehört genauso hierher.

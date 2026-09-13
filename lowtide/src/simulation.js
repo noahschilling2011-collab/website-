@@ -3,7 +3,7 @@ import {intersections,ampelFrei,onRoad} from './content.js';
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 export const roads=[-100,-40,20,80];
-export const places={mara:{x:-27,z:73},door:{x:-77,z:-53},fuse:{x:-54,z:-81},disk:{x:-78,z:-82},safe:{x:-77,z:73},station:{x:80,z:-100}};
+export const places={mara:{x:-27,z:73},door:{x:-69,z:-49},fuse:{x:-52,z:-91},disk:{x:-70,z:-78},safe:{x:-77,z:73},station:{x:80,z:-100}};
 export function random(seed=41){return ()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};}
 export function intersects(a,b,r=0){return a.x>b.x-b.w/2-r&&a.x<b.x+b.w/2+r&&a.z>b.z-b.d/2-r&&a.z<b.z+b.d/2+r;}
 export function lineClear(a,b,solids){const d=distance(a,b),n=Math.max(1,Math.ceil(d/.65));for(let i=1;i<n;i++){const p={x:a.x+(b.x-a.x)*i/n,z:a.z+(b.z-a.z)*i/n};if(solids.some(s=>intersects(p,s)))return false;}return true;}
@@ -26,8 +26,25 @@ export class Simulation{
  makeWorld(){
   for(let ix=0;ix<3;ix++)for(let iz=0;iz<3;iz++){const x=roads[ix]+30,z=roads[iz]+30;if(ix===0&&iz===0)continue;for(let j=0;j<2;j++){const b=this.addSolid(x+(j?11:-11),z,18,38,'building',9+Math.floor(this.rng()*32));this.buildings.push(b);}}
   // Warehouse: solid walls with a real 8 m front opening.
-  this.addSolid(-98,-74,1,38,'warehouse',7);this.addSolid(-56,-74,1,38,'warehouse',7);this.addSolid(-77,-93,43,1,'warehouse',7);this.addSolid(-90,-55,17,1,'warehouse',7);this.addSolid(-64,-55,17,1,'warehouse',7);this.gate=this.addSolid(-77,-55,8,1,'gate',5);
-  this.addSolid(-87,-78,6,6,'crate',2.8);this.addSolid(-65,-85,7,5,'crate',2.4);this.addSolid(-67,-64,5,5,'crate',2.7);
+  // Das Lagerhaus stand acht Meter zu weit westlich und vier zu weit
+  // südlich: die Westwand lag fünfeinhalb Meter tief in der Nord-Süd-Achse
+  // bei x = -100, die Südwand streifte die Querstraße bei z = -100. Sieben
+  // Meter breite Wand quer über der Fahrbahn, sieben Meter hoch. Zwischen
+  // den beiden Achsen bleiben fünfundvierzig Meter frei, das Gebäude ist
+  // dreiundvierzig breit und neununddreißig tief. Es passt also, aber knapp:
+  // ein halber Meter Luft zur Fahrbahn nach Westen und Osten, drei Meter
+  // nach Süden und Norden. Der Gehweg bleibt dabei nicht frei — dafür wäre
+  // das Gebäude auf dreißig Meter zu schrumpfen, und das ist der Missionsraum
+  // des ersten Akts. Frei ist, worauf gefahren wird. Verschoben wurde alles
+  // mit: Wände, Tor, Kisten, Boden, Dach, Schriftzug, Festplatte,
+  // Sicherungskasten und die drei Missionspunkte.
+  // Der Sicherungskasten hing an der Ostwand, und dort ist zwischen Wand
+  // und Fahrbahn jetzt ein halber Meter. Er sitzt deshalb an der Südwand:
+  // dort bleiben drei Meter Gehweg zwischen Gebäude und Querstraße, und
+  // der Weg um das Haus herum ist der bessere Auftakt als einer über die
+  // Fahrspur.
+  this.addSolid(-90,-70,1,38,'warehouse',7);this.addSolid(-48,-70,1,38,'warehouse',7);this.addSolid(-69,-89,43,1,'warehouse',7);this.addSolid(-82,-51,17,1,'warehouse',7);this.addSolid(-56,-51,17,1,'warehouse',7);this.gate=this.addSolid(-69,-51,8,1,'gate',5);
+  this.addSolid(-79,-74,6,6,'crate',2.8);this.addSolid(-57,-81,7,5,'crate',2.4);this.addSolid(-59,-60,5,5,'crate',2.7);
   const loop=[{x:-31,z:90},{x:-31,z:29},{x:11,z:29},{x:11,z:90}];
   for(let i=0;i<18;i++){const block=i%3;const path=loop.map(p=>({x:p.x+(block===1?60:block===2?-60:0),z:p.z-(i%2?120:0)}));const p=path[i%4];this.npcs.push({id:i,x:p.x,z:p.z,yaw:0,state:'normal',timer:0,health:100,path,target:(i+1)%4,personality:['caller','filmer','coward'][i%3],pace:1.1+this.rng()*.8,report:null});}
   this.cars.push({id:'VOSS-07',x:-34,z:75,yaw:Math.PI,speed:0,health:100,type:'player',color:0x49a8a4});
