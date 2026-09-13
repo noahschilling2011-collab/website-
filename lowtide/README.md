@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 185 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 186 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -575,6 +575,13 @@ Abweichung zwischen Karte und Welt kann es gar nicht geben.
 **Geparkte Wagen in Gebäuden oder ineinander**: nein. Der Erzeuger prüft
 freien Grund, ebenen Boden, Abstand zu Kreuzungen und 5,8 Meter zum nächsten
 Platz.
+
+**Die Tierwelt** kennt die neuen Dämme durch den Sumpf nicht — ihr Revier ist
+ein festes Rechteck. Trotzdem liegt kein Tier an Land, und das ist kein
+Zufall: Alligatoren werden nur auf Wasser gesetzt (`while(!waterAt)` neu
+würfeln), und ihre Bewegung prüft vor jedem Schritt `waterAt` und dreht ab,
+statt an Land zu kriechen. Über vier Beobachtungsrunden mit 106 Tieren:
+keiner. Hier war der Code schon vorher richtig gebaut.
 
 **Das Fensterraster der Innenstadthäuser**: vermutet fest verdrahtet und
 damit bei breiten Wänden lückenhaft. Nachgemessen sind alle sechzehn Häuser

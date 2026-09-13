@@ -1185,6 +1185,24 @@ pruefe('Alle acht Innenräume sind vorhanden', innen.length === 8, `${innen.leng
 pruefe('In jeden Innenraum führt ein freier Weg',
  innen.every(q => q.blockiert === 0 && q.mitte),
  JSON.stringify(innen.filter(q => q.blockiert || !q.mitte)));
+// Tiere bleiben in ihrem Element. Der Sumpfbereich der Tierwelt ist ein
+// festes Rechteck, das die neuen Dämme nicht kennt — die Bewegung prüft
+// waterAt und dreht ab, statt an Land zu kriechen. Diese Prüfung hält fest,
+// dass das so bleibt.
+const tiere = await page.evaluate(async () => {
+ const L = window.LOWTIDE, t = L.world.tiere;
+ const bild = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ let anLand = 0, gesamt = 0;
+ for (let runde = 0; runde < 4; runde++) {
+  await bild();
+  for (const g of ['fische', 'delfine', 'alligatoren']) {
+   for (const o of t[g] || []) {gesamt++; if (!L.waterAt(o.x, o.z)) anLand++;}
+  }
+ }
+ return {anLand, gesamt};
+});
+pruefe('Kein Tier liegt an Land', tiere.anLand === 0,
+ `${tiere.anLand} von ${tiere.gesamt} Beobachtungen`);
 pruefe('Sparmodus schaltet die Nachbearbeitung ab', await page.evaluate(() => {
  const knopf = document.getElementById('qualityBtn'), w = window.LOWTIDE.world;
  knopf.click();
