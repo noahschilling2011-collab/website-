@@ -235,7 +235,12 @@ export class ExpandedWorld extends World{
     }
    }for(let y=3;y<b.h;y+=4)for(let x=-b.w/2+4;x<b.w/2;x+=5)this.box(b.x+x,base+y,b.z+b.d/2+.05,2,2,.1,0x51737b);}
   for(const b of s.roomWalls)this.box(b.x,b.h/2,b.z,b.w,b.h,b.d,0x879e96);
-  for(const [id,l] of Object.entries(locations)){this.text(l.name.toUpperCase(),l.x,4.1+groundAt(l.x,l.z),l.z-10,Math.min(18,l.name.length*.8),'#c6dbc3',Math.PI);if(['garage','shop','clinic','home','club','diner','motel','records'].includes(id))this.box(l.x,.04,l.z-4,17,.1,17,0x5a625e);}
+  // Jeder Ort bekam eine schwebende Schrift zehn Meter davor. Wo das Bauwerk
+  // ein eigenes Schild trägt — Tankstelle, Gym, Fähranleger, Luftfracht —,
+  // stand der Name danach zweimal da, der schwebende schräg in der Fassade.
+  // Diese vier tragen ihre Beschriftung selbst.
+  const EIGENES_SCHILD=new Set(['fuel','gym','ferry','aircargo']);
+  for(const [id,l] of Object.entries(locations)){if(!EIGENES_SCHILD.has(id))this.text(l.name.toUpperCase(),l.x,4.1+groundAt(l.x,l.z),l.z-10,Math.min(18,l.name.length*.8),'#c6dbc3',Math.PI);if(['garage','shop','clinic','home','club','diner','motel','records'].includes(id))this.box(l.x,.04,l.z-4,17,.1,17,0x5a625e);}
   // Court with visible basket and an animated ball.
   const court=locations.court;this.box(court.x,.05,court.z,20,.15,28,0x668b7c);this.box(court.x,.14,court.z-11,15,.04,.15,0xe9d9b1);this.box(court.x,2,court.z-12,.2,4,.2,0x405059);this.box(court.x,3.6,court.z-12,2.4,1.5,.15,0xd5d2bd);const hoop=new T.Mesh(new T.TorusGeometry(.5,.05,6,18),material(0xc28d58));hoop.rotation.x=Math.PI/2;hoop.position.set(court.x,3.1,court.z-11.3);this.scene.add(hoop);this.ball=new T.Mesh(new T.SphereGeometry(.28,12,8),material(0xd79b54));this.scene.add(this.ball);
   // Airport runway, ocean piers, fields and farm rows.

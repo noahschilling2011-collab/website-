@@ -32,7 +32,7 @@ export const locations={
  clinic:{x:-140,z:-58,name:'Mercy Clinic',kind:'clinic'},
  home:{x:-139,z:-118,name:'Voss Apartment',kind:'home'},
  court:{x:-210,z:125,name:'Basketball',kind:'basketball'},
- gym:{x:-145,z:135,name:'Iron Tide Gym',kind:'gym'},
+ gym:{x:-147,z:119,name:'Iron Tide Gym',kind:'gym'},
  fish:{x:108,z:143,name:'Angelpier',kind:'fishing'},
  dive:{x:158,z:170,name:'Wracktauchen',kind:'diving'},
  club:{x:-202,z:2,name:'Club Undertow',kind:'club'},
@@ -45,8 +45,8 @@ export const locations={
  fuel:{x:-124,z:136,name:'Northstar Fuel',kind:'fuel'},
  tower:{x:-270,z:-148,name:'Relaisstation',kind:'tower'},
  records:{x:-319,z:-75,name:'Stadtarchiv',kind:'records'},
- ferry:{x:275,z:215,name:'Isla Serena',kind:'ferry'},
- aircargo:{x:-390,z:270,name:'Luftfracht',kind:'aircargo'},
+ ferry:{x:243,z:172,name:'Isla Serena',kind:'ferry'},
+ aircargo:{x:-389,z:270,name:'Luftfracht',kind:'aircargo'},
  drag:{x:-315,z:250,name:'Mercy Dragstrip',kind:'race:drag'},
  moto:{x:-402,z:-248,name:'Cypress Enduro',kind:'race:moto'},
  boat:{x:252,z:214,name:'Serena Regatta',kind:'race:boot'},
@@ -56,6 +56,21 @@ export const locations={
  range:{x:-146,z:16,name:'Schießstand',kind:'range'},
  schatz:{x:-450,z:-330,name:'Bergungsauftrag',kind:'treasure'}
 };
+// Drei Orte hatten einen Namen und kein Bauwerk: Fähranleger, Luftfracht und
+// Gym. Der Fähranleger lag dazu vierzig Meter im Landesinneren — Isla Serena
+// ist das Rechteck 235 bis 360, die Westküste eine gerade Linie bei x = 235,
+// und der Marker stand bei x = 275 mitten auf der Insel. Der erste Versuch
+// bei z = 215 setzte die festgemachte Fähre quer über den Damm bei z = 200;
+// sichtbar wurde das erst auf dem Bild, auf dem Autos neben dem Schiffsrumpf
+// fuhren. Gesucht wurde deshalb: die z-Lage entlang der Westküste, an der
+// Landseite (x 234–258) und Wasserseite (x 214–236) je drei Meter Abstand zu
+// jeder Fahrbahn haben, die Landseite trocken und die Wasserseite nass ist
+// und keine vorhandene Kulisse im Weg steht. Von 121 geprüften Lagen bleiben
+// drei übrig, alle bei z ≈ 171 — der Rest der Küste ist Palmen und Marina.
+//
+// Alle drei Marker stehen hier und nicht in regions.js: die Kulisse rechnet
+// sich aus dem Marker, nicht umgekehrt.
+
 // Northstar Fuel war ein Name auf einem schwebenden Marker, neun Meter tief
 // im achtzehn Meter breiten Boulevard bei x = -100. Tanken funktionierte —
 // man stand dabei auf der Fahrspur, und ein Bauwerk gab es nicht: fünf

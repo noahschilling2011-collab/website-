@@ -986,6 +986,38 @@ pruefe('Northstar Fuel steht als Bauwerk in der Welt', tanke.n >= 20 && !tanke.a
  `${tanke.n} stehende Teile, auf Fahrbahn: ${tanke.aufStrasse}`);
 pruefe('Das Vordach hat echtes Licht, nicht nur leuchtende Flächen',
  tanke.lampen >= 3 && tanke.imVorrat >= 3, `${tanke.lampen} Lampen, ${tanke.imVorrat} im Vorrat`);
+// Dasselbe für die drei anderen Orte, die nur ein Name waren: Gym,
+// Luftfracht und Fähranleger. Der Anleger muss zusätzlich am Wasser liegen —
+// er lag vierzig Meter im Landesinneren.
+const orteOhneHaus = await page.evaluate(() => {
+ const L = window.LOWTIDE, aus = {};
+ const teile = [];
+ for (const netz of L.world.bloecke || []) {
+  const a = netz.instanceMatrix.array;
+  for (let i = 0; i < netz.count; i++) {
+   const o = i * 16, y = a[o + 13], sy = Math.hypot(a[o + 4], a[o + 5], a[o + 6]);
+   if (y + sy / 2 < 1.2) continue;
+   teile.push([a[o + 12], a[o + 14]]);
+  }
+ }
+ for (const id of ['gym', 'aircargo', 'ferry']) {
+  const l = L.orte[id];
+  aus[id] = teile.filter(t => Math.hypot(t[0] - l.x, t[1] - l.z) < 18).length;
+ }
+ // Wasser in Rufweite des Anlegers, und kein Baum in den vier Grundrissen.
+ const f = L.orte.ferry;
+ aus.wasserAmKai = [10, 14, 18, 22].some(d => L.waterAt(f.x - d, f.z));
+ const liste = L.world.laubwerk?.liste || [];
+ aus.baeume = [[-413, 270, -369, 302], [-148, 107, -120, 129], [236, 153, 260, 191], [-145, 124, -111, 152]]
+  .reduce((n, [x1, z1, x2, z2]) => n + liste.filter(t => t.x >= x1 && t.x <= x2 && t.z >= z1 && t.z <= z2).length, 0);
+ return aus;
+});
+pruefe('Gym, Luftfracht und Fähranleger sind gebaut, nicht nur benannt',
+ orteOhneHaus.gym >= 10 && orteOhneHaus.aircargo >= 10 && orteOhneHaus.ferry >= 10,
+ `Gym ${orteOhneHaus.gym}, Luftfracht ${orteOhneHaus.aircargo}, Anleger ${orteOhneHaus.ferry}`);
+pruefe('Der Fähranleger liegt am Wasser', orteOhneHaus.wasserAmKai);
+pruefe('Kein Baum steht in den vier neuen Grundrissen', orteOhneHaus.baeume === 0,
+ `${orteOhneHaus.baeume} Stück`);
 // Leitplanken nur dort, wo es neben der Fahrbahn hinuntergeht.
 const planken = await page.evaluate(() => {
  const w = window.LOWTIDE.world;

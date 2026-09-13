@@ -1348,6 +1348,8 @@ function tankstelle(w) {
  // nur noch der Himmel, und ein blaustichiges Grau wird darunter zu einer
  // blauen Fläche — auf dem ersten Bild sah der Vorplatz aus wie ein Becken.
  // Jetzt ein warmes Betongrau, das auch unter reinem Himmelslicht Beton bleibt.
+ baumfrei(w, fx + hof.versatzX - hof.breite / 2, fz + hof.versatzZ - hof.tiefe / 2,
+  fx + hof.versatzX + hof.breite / 2, fz + hof.versatzZ + hof.tiefe / 2);
  w.box(fx + hof.versatzX, .05, fz + hof.versatzZ, hof.breite, .12, hof.tiefe, 0x6b665c);
  for (const s of [-1, 1]) {
   w.box(fx + hof.versatzX, .16, fz + hof.versatzZ + s * hof.tiefe / 2, hof.breite, .22, .5, 0x8e8b7f);
@@ -1406,6 +1408,132 @@ function tankstelle(w) {
  w.text('4.29', tx, 5.7, tz - .3, 2.2, '#2f3a3e', Math.PI);
 }
 
+// Bäume werden während dressRegions gesammelt und erst danach gesetzt. Wer
+// spät ein Gebäude auf eine Fläche stellt, bekommt sie durchs Dach — auf dem
+// ersten Bild der Luftfracht wuchsen Bäume durch die Halle. Diese Funktion
+// nimmt die Einträge im Rechteck wieder aus der Liste, bevor sie gebaut wird.
+function baumfrei(w, x1, z1, x2, z2) {
+ const liste = w.laubwerk?.liste;
+ if (!liste) return 0;
+ const vorher = liste.length;
+ w.laubwerk.liste = liste.filter(t => t.x < x1 || t.x > x2 || t.z < z1 || t.z > z2);
+ return vorher - w.laubwerk.liste.length;
+}
+
+// Iron Tide Gym. Zwei stehende Teile im Umkreis von achtzehn Metern, und
+// beide gehörten zum Nachbarn. Der Bau steht westlich der alten Markierung,
+// wo das nächste freie Rechteck von 26 mal 20 Metern liegt; die Front zeigt
+// zur Straße im Westen.
+function gym(w) {
+ // Der Marker steht vor dem Eingang; das Haus liegt dreizehn Meter dahinter.
+ const l = locations.gym, gx = l.x + 13, gz = l.z - 1;
+ baumfrei(w, gx - 14, gz - 11, gx + 14, gz + 11);
+ w.box(gx, .05, gz, 26, .12, 20, 0x6b665c);
+ w.box(gx, 3.5, gz + 1, 22, 7, 14, 0xb0a597);
+ w.box(gx, 7.2, gz + 1, 23, .5, 15, 0x8d9490);
+ // Glasfront nach Westen, nachts von innen hell.
+ w.box(gx - 11.08, 3.1, gz + 1, .16, 4.2, 10, 0x9fc3cc, 0, true);
+ w.box(gx - 11.1, 1.15, gz - 4.4, .2, 2.3, 1.5, 0x4a5457);
+ w.box(gx - 11.6, 2.9, gz - 4.4, 1.4, .25, 2.6, 0x8d9490);
+ // Dachschild und Beschriftung an der Fassade.
+ w.box(gx - 11.3, 9.1, gz + 1, .5, 3.2, 13, 0x2f3a3e);
+ w.text('IRON TIDE GYM', gx - 11.6, 9.1, gz + 1, 13, '#e2ecec', -Math.PI / 2);
+ // Draußen: Klimmzuggerüst, zwei Bänke, ein Reifenstapel.
+ for (const oz of [-1, 1]) w.box(gx - 15.5, 1.2, gz + 1 + oz * 2.2, .16, 2.4, .16, 0x50595c);
+ w.box(gx - 15.5, 2.34, gz + 1, .12, .12, 4.8, 0x50595c);
+ for (const oz of [-6.5, 7.5]) {
+  w.box(gx - 15.2, .45, gz + oz, 1.9, .16, .5, 0x8a7856);
+  for (const ox of [-.7, .7]) w.box(gx - 15.2 + ox, .22, gz + oz, .12, .45, .45, 0x50595c);
+ }
+ for (let k = 0; k < 3; k++) w.box(gx + 8, .35 + k * .55, gz - 8.5, 1.5, .5, 1.5, 0x2c3236);
+ w.sim.addSolid(gx, gz + 1, 22, 14, 'gym', 7);
+ (w.zusatzLampen ||= []).push({x: gx - 8, y: 3.4, z: gz + 1, farbe: 0xdfe7ea, staerke: 54});
+}
+
+// Mercy Air Cargo. Ein Marker mit einer einzigen Instanz daneben, obwohl
+// Akt 2 die Zeugin genau dorthin bringt. Jetzt Halle, Vorfeld, Container,
+// Paletten, Zaun und Windsack.
+function luftfracht(w) {
+ // Der Marker steht an der Hallenfront, das Vorfeld sechzehn Meter dahinter.
+ const l = locations.aircargo, ax = l.x - 2, az = l.z + 16;
+ baumfrei(w, ax - 22, az - 16, ax + 22, az + 16);
+ w.box(ax, .05, az, 42, .12, 30, 0x63625b);
+ for (let u = -18; u <= 18; u += 6) w.box(ax + u, .13, az + 8, .18, .02, 12, 0xc8c2a0);
+ // Halle mit Tonnendach und offenem Tor nach Süden.
+ w.box(ax, 4.5, az + 4, 26, 9, 18, 0xa8ada6);
+ w.box(ax, 9.4, az + 4, 27, 1, 19, 0x7c837e);
+ w.box(ax, 10.4, az + 4, 20, 1.1, 14, 0x6e756f);
+ w.box(ax, 3.2, az - 5.1, 12, 6.4, .3, 0x3f4a4d);
+ for (let u = -5; u <= 5; u += 2.5) w.box(ax + u, 3.2, az - 5.25, .18, 6.2, .12, 0x59656a);
+ w.text('MERCY AIR CARGO', ax, 7.6, az - 5.3, 22, '#e6ead8', Math.PI);
+ w.box(ax, 6.6, az - 5.4, 26.4, .5, .5, 0xc4553f);
+ w.sim.addSolid(ax, az + 4, 26, 18, 'halle', 9);
+ // Container in zwei Reihen, Paletten und eine Waage davor.
+ const farben = [0xc4553f, 0x4d6f8a, 0x7d8a5a, 0xb08c4a];
+ for (let k = 0; k < 6; k++) {
+  const cx = ax - 16 + (k % 3) * 7.4, cz = az + 11 - Math.floor(k / 3) * 3.2;
+  w.box(cx, 1.3, cz, 6.8, 2.6, 2.6, farben[k % 4]);
+  if (k % 2 === 0) w.box(cx, 3.9, cz, 6.8, 2.6, 2.6, farben[(k + 2) % 4]);
+ }
+ for (let k = 0; k < 4; k++) w.box(ax + 12 + (k % 2) * 2.6, .5, az - 10 - Math.floor(k / 2) * 2.4, 2.2, .9, 2, 0x9a8258);
+ w.box(ax - 14, .45, az - 11, 3.4, .8, 3.4, 0x50595c);
+ w.box(ax - 14, 1.5, az - 12.6, 3.4, 1.3, .2, 0x2c3236);
+ // Windsack am Zaun, damit das Vorfeld zum Flugfeld gehört.
+ w.box(ax + 20, 3.2, az - 12, .22, 6.4, .22, 0xb0b5ae);
+ w.box(ax + 21.4, 6, az - 12, 2.6, .9, .9, 0xd8763f);
+ zaun(w, ax - 21, az - 15, ax + 21, az - 15, 2.2, 0x808780, 5);
+ zaun(w, ax - 21, az - 15, ax - 21, az + 15, 2.2, 0x808780, 5);
+ zaun(w, ax + 21, az - 15, ax + 21, az + 15, 2.2, 0x808780, 5);
+ (w.zusatzLampen ||= []).push({x: ax, y: 5.4, z: az - 7, farbe: 0xffeccb, staerke: 62});
+}
+
+// Der Fähranleger von Isla Serena. Der Marker lag vierzig Meter im
+// Landesinneren; die Westküste der Insel ist eine gerade Linie bei x = 235.
+// Kai, Steg auf Pfählen, Wartedach, Kassenhaus, Poller — und eine
+// festgemachte Fähre, weil ein Anleger ohne Schiff daran nur ein Steg ist.
+function faehre(w) {
+ // Kaikante bei x = 235, der Marker steht auf dem Kai.
+ const kx = locations.ferry.x + 1, kz = locations.ferry.z;
+ baumfrei(w, kx - 8, kz - 19, kx + 16, kz + 19);
+ w.box(kx + 4, .06, kz, 20, .14, 34, 0x6b665c);
+ w.box(235.6, .35, kz, 1.4, .7, 34, 0x8e8b7f);
+ steg(w, 235, kz - 5, 219, kz - 5, 3.2);
+ steg(w, 235, kz + 6, 223, kz + 6, 3.2);
+ // Wartedach über dem Kai.
+ for (const ox of [-1, 1]) for (const oz of [-1, 1])
+  w.box(kx + 1 + ox * 5, 1.6, kz + oz * 6, .3, 3.2, .3, 0x8a8f88);
+ w.box(kx + 1, 3.4, kz, 12.5, .35, 14, 0xcfcabb);
+ w.box(kx + 1, 3.05, kz, 11.5, .35, 13, 0x9aa39c);
+ for (const oz of [-4.5, 0, 4.5]) {
+  w.box(kx + 1, .5, kz + oz, 2.2, .18, .55, 0x8a7856);
+  for (const ox of [-.8, .8]) w.box(kx + 1 + ox, .25, kz + oz, .14, .5, .5, 0x50595c);
+ }
+ w.box(kx + 1, 3.15, kz - 7.1, 12.5, .5, .5, 0x3f6f7a, 0, true);
+ w.text('ISLA SERENA · FÄHRE', kx + 1, 3.15, kz - 7.25, 12, '#e6f0ee', Math.PI);
+ // Kassenhaus mit Schalterfenster.
+ w.box(kx + 12, 1.9, kz + 10, 7, 3.8, 6, 0xc2bcae);
+ w.box(kx + 12, 3.95, kz + 10, 7.6, .35, 6.6, 0x8d9490);
+ w.box(kx + 8.45, 2.1, kz + 10, .12, 1.5, 3.4, 0x9fc3cc, 0, true);
+ w.text('TICKETS', kx + 8.35, 3.3, kz + 10, 4.4, '#3d4a4e', -Math.PI / 2);
+ w.sim.addSolid(kx + 12, kz + 10, 7, 6, 'kasse', 3.8);
+ // Poller entlang der Kante, Rettungsring, Fahrplantafel.
+ for (let z = kz - 14; z <= kz + 14; z += 5.6) w.box(236.4, .55, z, .55, 1.1, .55, 0x4b5457);
+ w.box(237.4, 1.35, kz - 9, .2, .9, .9, 0xc4553f);
+ w.box(kx - 3, 1.5, kz + 13, .18, 3, .18, 0x6f7570);
+ w.box(kx - 3, 2.7, kz + 13, .12, 1.6, 2.4, 0xe4e0d2);
+ // Festgemachte Fähre am nördlichen Steg.
+ const fx = 224, fz = kz - 11;
+ w.box(fx, .55, fz, 9, 1.9, 22, 0xcdd3cd);
+ w.box(fx, 1.75, fz, 8.4, .5, 21, 0x4f5f68);
+ w.box(fx, 3.1, fz + 3, 6, 2.2, 9, 0xdfe3dc);
+ w.box(fx, 4.35, fz + 3, 6.4, .35, 9.4, 0x8d9490);
+ for (const oz of [-2, 0, 2]) w.box(fx - 3.06, 3.3, fz + 3 + oz, .12, 1.1, 2.2, 0x9fc3cc, 0, true);
+ w.box(fx, 5.4, fz + 5, .6, 2, .6, 0xb8bdb6);
+ w.box(fx, 6.6, fz + 5, 1.6, .6, 1.6, 0x3f4a4d);
+ w.text('SERENA LINE', fx - 4.6, 3.2, fz - 3, 9, '#dfe7e2', -Math.PI / 2);
+ (w.zusatzLampen ||= []).push({x: kx + 1, y: 3, z: kz, farbe: 0xffeccb, staerke: 58});
+}
+
 export function dressRegions(world) {
  const rng = zufall();
  sunsetSuburbs(world, rng);
@@ -1416,7 +1544,6 @@ export function dressRegions(world) {
  islaSerena(world, rng);
  harborIndustry(world, rng);
  stadtLuecken(world, rng);
- tankstelle(world);
  suedFlaechen(world, rng);
  nordFlaechen(world, rng);
  randgebiete(world, rng);
@@ -1426,4 +1553,12 @@ export function dressRegions(world) {
  talonRidge(world, rng);
  caneHollow(world, rng);
  hinterland(world, rng);
+ // Zum Schluss die vier Orte, die vorher nur Marker waren. Sie stehen hier
+ // und nicht weiter oben, weil baumfrei() nur Bäume entfernen kann, die
+ // schon gemeldet sind — bei einem früheren Aufruf pflanzten die Funktionen
+ // danach wieder in die Halle hinein. Gemessen: drei Bäume blieben stehen.
+ tankstelle(world);
+ gym(world);
+ luftfracht(world);
+ faehre(world);
 }

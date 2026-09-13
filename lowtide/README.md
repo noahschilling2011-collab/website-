@@ -700,8 +700,48 @@ dem sich die Innenräume bedienen. Nachts ist die Tankstelle damit das, was
 eine Tankstelle nachts ist: eine helle Decke über hellem Beton in einer
 dunklen Straße.
 
-Die Karte hat noch drei solche Orte — Fähranleger, Luftfracht und das Gym.
-Sie stehen als Nächstes an.
+## Und die drei anderen
+
+Iron Tide Gym, Mercy Air Cargo und der Fähranleger von Isla Serena, in
+derselben Ordnung: Platz suchen, bauen, prüfen.
+
+**Das Gym** steht jetzt als Halle mit Glasfront zur Straße, Dachschild,
+Eingangsvordach, Klimmzuggerüst, zwei Bänken und einem Reifenstapel. Zwölf
+stehende Teile statt zwei.
+
+**Mercy Air Cargo** ist die Adresse, an die Akt 2 die Zeugin bringt, und
+bestand aus einer einzigen Instanz. Jetzt: Halle mit Tonnendach und
+segmentiertem Tor, Vorfeld mit Markierung, sechs Container in zwei Reihen,
+Paletten, Waage, Zaun und Windsack. Siebzehn statt eins.
+
+**Der Fähranleger** lag vierzig Meter im Landesinneren. Isla Serena ist das
+Rechteck 235 bis 360, die Westküste eine gerade Linie bei x = 235 — der
+Marker stand bei x = 275, mitten auf der Insel. Der erste Versuch bei z = 215
+setzte die festgemachte Fähre quer über den Damm bei z = 200; sichtbar wurde
+das erst auf dem Bild, auf dem Autos direkt neben dem Schiffsrumpf fuhren.
+Gesucht wurde deshalb die z-Lage entlang der Küste, an der Landseite und
+Wasserseite je drei Meter Abstand zu jeder Fahrbahn haben, die Landseite
+trocken und die Wasserseite nass ist und keine Kulisse im Weg steht: von 121
+geprüften Lagen bleiben drei übrig, alle bei z ≈ 171. Dort steht jetzt Kai,
+zwei Stege auf Pfählen, Wartedach mit Bänken, Kassenhaus, Poller,
+Fahrplantafel und eine festgemachte Fähre.
+
+Zwei Dinge kamen dabei heraus, die nichts mit den drei Orten zu tun haben:
+
+**Bäume wachsen durch spät gebaute Häuser.** Das Laubwerk sammelt seine
+Einträge während `dressRegions` und pflanzt sie erst danach. Wer am Ende ein
+Gebäude hinstellt, bekommt Stämme durchs Dach — auf dem ersten Bild der
+Luftfracht war das gut zu sehen. Die vier Grundrisse räumen ihre Rechtecke
+jetzt selbst frei. Der erste Versuch reichte nicht: die Funktionen liefen
+mitten in `dressRegions`, und die Regionen danach pflanzten wieder hinein.
+Drei Bäume blieben stehen. Jetzt laufen sie als Letzte.
+
+**Jeder Ort trug seinen Namen zweimal.** Zehn Meter vor jedem Marker
+schwebt eine Schrift mit dem Ortsnamen. Bei einem Gebäude mit eigenem
+Schild stand der Name danach zweimal da, der schwebende schräg in der
+Fassade. Die vier neuen Orte beschriften sich selbst.
+
+202 Prüfungen bestanden, keine gefallen.
 
 ## Was geprüft wurde und in Ordnung war
 
