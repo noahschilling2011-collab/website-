@@ -818,6 +818,61 @@ ist die Oberkante.
 
 214 Prüfungen bestanden, keine gefallen.
 
+## Die Landstraße war eine Stadtstraße mit Feldern daneben
+
+Nach der Zählung der Parkplätze: **306 von 503 lagen weiter als 45 Meter vom
+nächsten Gebäude entfernt**, 67 davon allein in Cane Hollow. Das Bild dazu
+ist eindeutig — eine Landstraße durch Ackerland mit zwei durchgehenden
+Parkreihen bis zum Horizont, dazu vier Meter Gehweg, Bordstein, Laternen alle
+vierzig Meter, Hydranten, Mülltonnen, Zeitungskästen und Gullis.
+
+Der Grund ist einfach: der Straßenbauer kannte nur eine Sorte Straße. Als die
+Karte nach Westen und Süden verdoppelt wurde, bekam jede neue Fernstraße den
+vollen Stadtausbau. Von 15,8 Kilometern Straße liegen 6,8 im freien Land —
+also 43 Prozent.
+
+`imStadtgebiet()` in `content.js` führt jetzt sieben Rechtecke: Innenstadt und
+Hafen, Nordquartier, Westviertel, Sunset Suburbs, Rosalind, die Ringstraße von
+Isla Serena und die Promenade an South Beach. Rechtecke statt Radien, weil die
+bebauten Flächen rechteckig sind — es sind die Straßenraster selbst.
+
+Daran hängen jetzt: Bordstein, Gehweg, Laternen, Gullis, Kleinkram und
+Parkbuchten. Auf dem Land bekommt die Straße stattdessen ein Bankett aus
+anderthalb Metern Schotter; ohne das läge sie als nacktes Asphaltband auf der
+Wiese, und genau so sah Cane Hollow nach dem ersten Versuch aus. Laternen
+stehen draußen nur noch im Umkreis von 34 Metern um eine Kreuzung.
+
+Bordstein und Gehweg waren bisher **ein** Quader je Segment. Eine
+Ausfallstraße beginnt aber in der Stadt und endet im Feld, also entstehen sie
+jetzt in zusammenhängenden Läufen entlang der Strecke.
+
+| | vorher | jetzt |
+|---|---|---|
+| Parkbuchten | 503 | 217 |
+| davon ohne Gebäude im Umkreis von 45 m | 306 | 62 |
+| Dreiecke Kreuzung Downtown 13 Uhr | 1.981.024 | 1.524.656 |
+| Dreiecke Strand 13 Uhr | 1.499.858 | 1.043.238 |
+| Draw Calls Kreuzung Downtown 13 Uhr | 1856 | 1817 |
+
+Die 460.000 Dreiecke weniger sind kein Optimierungserfolg, sondern die Folge:
+286 Wagen und einige Kilometer Gehweg, die dort nie hingehörten. Innerhalb
+der Stadt ist die Dichte unverändert — dieselbe Regel, dieselbe Streuung.
+
+Zwei Prüfungen dazu, und eine davon war zuerst falsch gestellt: „Die
+Landstraße trägt keinen Gehweg" suchte nach Platten von 4,2 Metern Breite und
+18 Zentimetern Höhe und meldete zwei Bootsstege in Pelican Key, die zufällig
+dasselbe Maß haben. Auch die zusätzliche Bedingung „höchstens zwölf Meter
+neben einer Fahrbahn" half nicht — die Stege liegen zehn Meter neben dem Keys
+Highway. Der Erbauer führt seine Gehwegläufe jetzt selbst mit; über das Maß
+allein ist eine Platte nicht sicher zu erkennen.
+
+Die dritte Prüfung war die alte: „Es stehen genug Wagen am Bordstein" verlangte
+mehr als 250 Plätze und fiel bei 217. Die Zahl allein sagt nichts über eine
+Stadt, wenn die Hälfte davon auf dem Land stand. Sie verlangt jetzt 190 und
+bekommt eine zweite Prüfung an die Seite: kein Wagen parkt an einer Landstraße.
+
+216 Prüfungen bestanden, keine gefallen.
+
 ## Was geprüft wurde und in Ordnung war
 
 Nicht jede Messung findet etwas, und das gehört genauso hierher.

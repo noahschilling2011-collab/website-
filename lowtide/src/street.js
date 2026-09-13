@@ -3,7 +3,7 @@ import {detailedCar} from './art-direction.js';
 import {backeNachMaterial} from './bake.js';
 // Erkennungsfarbe: nur das Lackmaterial des Vorbilds trägt sie.
 const LACK_MARKE=0x00ff2a;
-import {roadSegments, groundAt, waterAt, intersections, ampelFrei, AMPEL_TAKT, onRoad, locations} from './content.js';
+import {roadSegments, groundAt, waterAt, intersections, ampelFrei, AMPEL_TAKT, onRoad, locations, imStadtgebiet} from './content.js';
 // Die Serviceräume sind vorn offen und haben nur drei Wände als Körper.
 // sim.blocked meldet ihr Inneres deshalb als frei — dort standen Laternen
 // und Masten mitten im Laden.
@@ -47,6 +47,7 @@ export class Street {
   // Sekunden, 147 von 519 Plätzen betroffen, engster Abstand 0,11 Meter.
   // wagenVoraus() kann davon nichts wissen: die Kulisse steht nicht in
   // sim.cars.
+  this.gehwege = [];
   this.fahrlinien = [];
   for (const c of world.sim.cars) {
    if (c.type !== 'traffic' || !c.route) continue;
@@ -75,25 +76,64 @@ export class Street {
    const {laenge, senkrecht, dx, dz} = segmentInfo(r);
    if (laenge < 30) continue;
    const halb = r.w / 2;
-   // Bordstein und Gehweg begleiten jede Straße auf beiden Seiten.
+   // Liegt dieser Punkt der Strecke in bebautem Gebiet? Alles, was zur Stadt
+   // gehört — Bordstein, Gehweg, Laternen, Gullis, Kleinkram, Parkbuchten —,
+   // hängt daran. Vorher trug auch die Landstraße durch Cane Hollow vier
+   // Meter Gehweg, Hydranten und zwei durchgehende Parkreihen.
+   const staedtisch = t => imStadtgebiet(r.x1 + dx * t, r.z1 + dz * t);
+
+   // Bordstein und Gehweg in zusammenhängenden Läufen, nicht als ein Quader
+   // je Segment: eine Ausfallstraße beginnt in der Stadt und endet im Feld.
+   //
+   // Auf dem Land steht dafür ein Bankett: anderthalb Meter Schotter neben
+   // der Fahrbahn. Ohne das läge die Straße als nacktes Asphaltband auf der
+   // Wiese, und genau so sah Cane Hollow nach dem ersten Versuch aus.
    for (const seite of [-1, 1]) {
-    const ox = senkrecht ? seite * (halb + .5) : 0, oz = senkrecht ? 0 : seite * (halb + .5);
-    const mx = (r.x1 + r.x2) / 2 + ox, mz = (r.z1 + r.z2) / 2 + oz;
-    w.box(mx, .13, mz, senkrecht ? 1 : laenge, .26, senkrecht ? laenge : 1, 0x8e8b7f);
-    const gx = senkrecht ? seite * (halb + 2.6) : 0, gz = senkrecht ? 0 : seite * (halb + 2.6);
-    w.box((r.x1 + r.x2) / 2 + gx, .09, (r.z1 + r.z2) / 2 + gz,
-     senkrecht ? 4.2 : laenge, .18, senkrecht ? laenge : 4.2, 0x82806f);
+    let anfang = 0, artVorher = staedtisch(0);
+    const legen = (von, bis, stadt) => {
+     const lauf = bis - von;
+     if (lauf < 6) return;
+     const mitte = von + lauf / 2;
+     const versatz = (o) => ({
+      x: r.x1 + dx * mitte + (senkrecht ? seite * o : 0),
+      z: r.z1 + dz * mitte + (senkrecht ? 0 : seite * o)});
+     if (stadt) {
+      const b = versatz(halb + .5);
+      w.box(b.x, .13, b.z, senkrecht ? 1 : lauf, .26, senkrecht ? lauf : 1, 0x8e8b7f);
+      const g = versatz(halb + 2.6);
+      w.box(g.x, .09, g.z, senkrecht ? 4.2 : lauf, .18, senkrecht ? lauf : 4.2, 0x82806f);
+      // Für die Prüfung: eine Platte ist über ihr Maß nicht sicher von einem
+      // Bootssteg zu unterscheiden — zwei in Pelican Key haben zufällig
+      // dieselben 8,9 auf 4,2 Meter. Deshalb führt der Erbauer Buch.
+      this.gehwege.push({x: g.x, z: g.z, laenge: lauf});
+     } else {
+      const b = versatz(halb + .85);
+      w.box(b.x, .04, b.z, senkrecht ? 1.7 : lauf, .1, senkrecht ? lauf : 1.7, 0x9a9078);
+     }
+    };
+    for (let t = 6; t <= laenge; t += 6) {
+     const art = staedtisch(Math.min(t, laenge));
+     if (art !== artVorher || t + 6 > laenge) {
+      legen(anfang, Math.min(t, laenge), artVorher);
+      anfang = t; artVorher = art;
+     }
+    }
    }
 
+   // Laternen: in der Stadt in gleichem Abstand, auf dem Land nur an den
+   // Kreuzungen. Eine beleuchtete Landstraße gibt es nicht.
    for (let s = 12; s < laenge - 12; s += ABSTAND_LATERNE) {
     const seite = (Math.floor(s / ABSTAND_LATERNE) % 2) ? 1 : -1;
     const bx = r.x1 + dx * s + (senkrecht ? seite * (halb + 1.6) : 0);
     const bz = r.z1 + dz * s + (senkrecht ? 0 : seite * (halb + 1.6));
+    if (!staedtisch(s) && !this.kreuzungsListe.some(k => Math.hypot(k.x - bx, k.z - bz) < 34)) continue;
     if (this.frei(bx, bz, 1.2)) w.lamp(bx, bz);
    }
 
-   // Gullis in der Rinne, an beiden Seiten versetzt.
+   // Gullis in der Rinne, an beiden Seiten versetzt. Eine Rinne hat nur, was
+   // einen Bordstein hat.
    for (let s = 20; s < laenge - 10; s += 31) {
+    if (!staedtisch(s)) continue;
     for (const seite of [-1, 1]) {
      const gx = r.x1 + dx * s + (senkrecht ? seite * (halb - .8) : 0);
      const gz = r.z1 + dz * s + (senkrecht ? 0 : seite * (halb - .8));
@@ -103,6 +143,7 @@ export class Street {
 
    // Kleinkram am Gehwegrand: Hydranten, Tonnen, Bänke, Zeitungskästen, Poller.
    for (let s = 18; s < laenge - 12; s += ABSTAND_KLEINKRAM) {
+    if (!staedtisch(s)) continue;
     const seite = rng() < .5 ? -1 : 1;
     const x = r.x1 + dx * s + (senkrecht ? seite * (halb + 2.4) : 0);
     const z = r.z1 + dz * s + (senkrecht ? 0 : seite * (halb + 2.4));
@@ -173,6 +214,7 @@ export class Street {
    // Parkbuchten am Bordstein sammeln; die Fahrzeuge kommen später als Instanzen.
    for (let s = 24; s < laenge - 20; s += 6.4) {
     if (rng() > .34) continue;
+    if (!staedtisch(s)) continue;
     // Beide Seiten versuchen, die gewürfelte zuerst. Vorher wurde nur eine
     // geprüft und bei Kollision aufgegeben — nachdem die Plätze auf den
     // Fahrlinien wegfielen, kostete das ein Drittel der übrigen: 301 statt

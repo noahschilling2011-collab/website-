@@ -1354,7 +1354,25 @@ const parken = await page.evaluate(() => {
  }
  return {park: park.length, aufDerLinie, engster: +engster.toFixed(2)};
 });
-pruefe('Es stehen genug Wagen am Bordstein', parken.park > 250, `${parken.park} Plätze`);
+// Bis zur Trennung von Stadt und Land waren es 503 Plätze, davon 306 weiter
+// als 45 Meter vom nächsten Gebäude — Parkreihen entlang leerer Landstraßen.
+// Jetzt entstehen Parkbuchten nur noch in bebautem Gebiet: 217. Die Zahl
+// allein sagt nichts, deshalb kommt die Lage dazu.
+pruefe('Es stehen genug Wagen am Bordstein', parken.park > 190, `${parken.park} Plätze`);
+pruefe('Kein Wagen parkt an einer Landstraße', await page.evaluate(() => {
+ const L = window.LOWTIDE;
+ return (L.world.street.parkplaetze || []).every(o => L.imStadtgebiet(o.x, o.z));
+}));
+pruefe('Die Landstraße trägt keinen Gehweg', await page.evaluate(() => {
+ const L = window.LOWTIDE;
+ // Der Erbauer führt seine Gehwegläufe selbst mit: über das Maß allein ist
+ // eine Platte nicht sicher zu erkennen — zwei Bootsstege in Pelican Key
+ // haben zufällig dieselben 8,9 auf 4,2 Meter.
+ return (L.world.street.gehwege || []).every(g => L.imStadtgebiet(g.x, g.z));
+}), await page.evaluate(() => {
+ const L = window.LOWTIDE, g = L.world.street.gehwege || [];
+ return `${g.length} Läufe, ${g.filter(o => !L.imStadtgebiet(o.x, o.z)).length} davon im Land`;
+}));
 pruefe('Kein geparkter Wagen steht auf einer Fahrlinie', parken.aufDerLinie === 0,
  `${parken.aufDerLinie} Plätze, engster Abstand ${parken.engster} m`);
 // Keine Fahrbahn über offenem Wasser. Drei Segmente liefen quer durch den

@@ -273,6 +273,27 @@ export const roadSegments=[
  {x1:100,z1:400,x2:360,z2:400,w:14}
 ];
 
+// Bebautes Gebiet. Auf dem Land trug jede Straße den vollen Stadtausbau:
+// Bordstein, vier Meter Gehweg, Laternen alle vierzig Meter, Hydranten,
+// Mülltonnen, Zeitungskästen, Gullis — und beidseitig geparkte Wagen bis zum
+// Horizont. Gemessen: 306 von 503 Parkplätzen lagen weiter als 45 Meter vom
+// nächsten Gebäude entfernt, 67 davon allein in Cane Hollow. Auf dem Bild
+// ist es eine Landstraße durch Ackerland mit zwei durchgehenden Parkreihen.
+//
+// Rechtecke statt Radien, weil die bebauten Flächen rechteckig sind — es
+// sind die Straßenraster selbst. Wer ein Raster ergänzt, muss das Rechteck
+// mitziehen; die Prüfung meldet es, wenn ein Gehweg im Nirgendwo endet.
+export const STADTGEBIETE=[
+ {x1:-360,z1:-140,x2:130,z2:185},    // Port Mercy: Innenstadt und Hafen
+ {x1:-500,z1:-250,x2:130,z2:-140},   // Nordquartier bis zur Vorortzeile
+ {x1:-500,z1:-140,x2:-340,z2:170},   // Westviertel
+ {x1:-200,z1:-380,x2:60,z2:-250},    // Sunset Suburbs
+ {x1:-1045,z1:245,x2:-700,z2:400},   // Rosalind
+ {x1:235,z1:150,x2:360,z2:295},      // Isla Serena, Ringstraße und Marina
+ {x1:60,z1:250,x2:190,z2:340}        // South Beach, Promenade
+];
+export const imStadtgebiet=(x,z)=>STADTGEBIETE.some(g=>x>=g.x1&&x<=g.x2&&z>=g.z1&&z<=g.z2);
+
 // Kreuzungen des Straßenrasters. Achsparallele Segmente schneiden sich, wenn
 // ihre Spannen überlappen — Diagonalen gibt es in Port Mercy nicht.
 //
