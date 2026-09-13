@@ -33,6 +33,51 @@ function fensterRahmen(w, x, y, z, breite, hoehe, achse, farbe) {
  }
 }
 
+// Eine Ladenzeile an einer Wand. achse 'z' heißt: die Wand steht quer zu z und
+// die Zeile läuft in x; bei 'x' umgekehrt. Alle Maße stehen als (laengs, hoehe,
+// dick) da — laengs entlang der Wand, dick durch sie hindurch —, damit dieselbe
+// Beschreibung für beide Achsen gilt und nicht zwei Fassungen auseinanderlaufen.
+function ladenzeile(w, rng, i, basis, mx, mz, wand, laenge, achse, seite, sockelFarbe) {
+ const inZ = achse === 'z';
+ const kasten = (u, y, tiefe, laengs, hoehe, dick, farbe, leucht = false) => {
+  const x = inZ ? mx + u : mx + seite * (wand + tiefe);
+  const z = inZ ? mz + seite * (wand + tiefe) : mz + u;
+  w.box(x, y, z, inZ ? laengs : dick, hoehe, inZ ? dick : laengs, farbe, 0, leucht);
+ };
+ // Schaufensterband mit Pfosten dazwischen.
+ kasten(0, basis + 1.75, 0, laenge * .86, 2.3, .12, 0x2c4149);
+ for (let u = -laenge * .43; u <= laenge * .43; u += 2.4) kasten(u, basis + 1.75, .06, .16, 2.4, .18, sockelFarbe);
+ kasten(0, basis + .32, .05, laenge * .88, .64, .22, sockelFarbe);
+ // Eingang, versetzt, damit die Front nicht symmetrisch bleibt.
+ const tu = (rng() - .5) * laenge * .45;
+ kasten(tu, basis + 1.15, .16, 1.5, 2.3, .14, 0x35302a);
+ kasten(tu, basis + 1.15, .24, .12, .5, .1, 0xb6a37c);
+ // Markise über dem Eingang.
+ const kennung = i * 2 + (seite > 0 ? 1 : 0) + (inZ ? 0 : 6);
+ kasten(tu, basis + 2.85, .75, 3.4, .16, 1.5, MARKISEN[kennung % MARKISEN.length]);
+ for (const e of [-1.6, 1.6]) kasten(tu + e, basis + 2.6, 1.4, .07, .5, .07, 0x4c5354);
+ // Ladenname über dem Schaufenster. Ohne Beschriftung bleibt jedes
+ // Erdgeschoss austauschbar.
+ const dreh = inZ ? (seite > 0 ? 0 : Math.PI) : (seite > 0 ? Math.PI / 2 : -Math.PI / 2);
+ const s0 = inZ ? {x: mx, z: mz + seite * (wand + .18)} : {x: mx + seite * (wand + .18), z: mz};
+ w.text(LADEN[kennung % LADEN.length], s0.x, basis + 3.5, s0.z, Math.min(7, laenge * .5), '#e8d3a4', dreh);
+ // Neonröhre unter der Markise und ein Band über dem Schaufenster.
+ const ton = NEON[(i * 5 + (seite > 0 ? 2 : 0) + (inZ ? 0 : 3)) % NEON.length];
+ kasten(tu, basis + 2.72, 1.42, 3.1, .1, .1, ton, true);
+ kasten(0, basis + 2.98, .2, laenge * .84, .12, .1, ton, true);
+ // Jede dritte Wand bekommt ein hochkantes Auslegerschild. Sie ragen in die
+ // Straße und sind das, was eine Geschäftszeile nachts von einer Wohnzeile
+ // unterscheidet.
+ if (kennung % 3 === 0) {
+  const su = laenge * .38 * (seite > 0 ? 1 : -1);
+  const zweit = NEON[(i * 7 + 3) % NEON.length];
+  kasten(su, basis + 4.9, .55, .18, 3.4, 1.05, 0x2b3136);
+  for (const e of [-.11, .11]) kasten(su + e, basis + 4.9, .55, .04, 3.0, .8, zweit, true);
+  kasten(su, basis + 6.72, .55, .3, .3, .3, 0x39424a);
+  kasten(su, basis + 3.1, .3, .1, .1, .6, 0x39424a);
+ }
+}
+
 export function dressBuildings(world, gebaeude) {
  // Rückgabe: nichts. Alles landet in den Instanz-Sammlern von World.
  const rng = zufall();
@@ -46,41 +91,26 @@ export function dressBuildings(world, gebaeude) {
   world.box(b.x, basis + sockelHoehe / 2, b.z, b.w + .7, sockelHoehe, b.d + .7, sockelFarbe);
   world.box(b.x, basis + sockelHoehe + .12, b.z, b.w + 1.1, .24, b.d + 1.1, 0x3f4a4a);
 
-  for (const seite of [-1, 1]) {
-   const z = b.z + seite * (b.d / 2 + .4);
-   // Schaufensterband mit Pfosten dazwischen.
-   world.box(b.x, basis + 1.75, z, b.w * .86, 2.3, .12, 0x2c4149);
-   for (let u = -b.w * .43; u <= b.w * .43; u += 2.4) world.box(b.x + u, basis + 1.75, z + seite * .06, .16, 2.4, .18, sockelFarbe);
-   world.box(b.x, basis + .32, z + seite * .05, b.w * .88, .64, .22, sockelFarbe);
-   // Eingang, versetzt, damit die Front nicht symmetrisch bleibt.
-   const tx = b.x + (rng() - .5) * b.w * .45;
-   world.box(tx, basis + 1.15, z + seite * .16, 1.5, 2.3, .14, 0x35302a);
-   world.box(tx, basis + 1.15, z + seite * .24, .12, .5, .1, 0xb6a37c);
-   // Markise über dem Eingang.
-   const markise = MARKISEN[(i * 3 + (seite > 0 ? 1 : 0)) % MARKISEN.length];
-   world.box(tx, basis + 2.85, z + seite * .75, 3.4, .16, 1.5, markise);
-   for (const e of [-1.6, 1.6]) world.box(tx + e, basis + 2.6, z + seite * 1.4, .07, .5, .07, 0x4c5354);
-   // Ladenname über dem Schaufenster. Ohne Beschriftung bleibt jedes
-   // Erdgeschoss austauschbar.
-   world.text(LADEN[(i * 2 + (seite > 0 ? 1 : 0)) % LADEN.length], b.x, basis + 3.5, z + seite * .18,
-    Math.min(7, b.w * .5), '#e8d3a4', seite > 0 ? 0 : Math.PI);
-   // Neonröhre unter der Markise und ein Band über dem Schaufenster.
-   const ton = NEON[(i * 5 + (seite > 0 ? 2 : 0)) % NEON.length];
-   world.box(tx, basis + 2.72, z + seite * 1.42, 3.1, .1, .1, ton, 0, true);
-   world.box(b.x, basis + 2.98, z + seite * .2, b.w * .84, .12, .1, ton, 0, true);
-   // Jedes dritte Haus bekommt ein hochkantes Auslegerschild. Sie ragen in
-   // die Straße und sind das, was eine Geschäftszeile nachts von einer
-   // Wohnzeile unterscheidet.
-   if ((i + (seite > 0 ? 1 : 0)) % 3 === 0) {
-    const sx = b.x + b.w * .38 * (seite > 0 ? 1 : -1);
-    const zweit = NEON[(i * 7 + 3) % NEON.length];
-    world.box(sx, basis + 4.9, z + seite * .55, .18, 3.4, 1.05, 0x2b3136);
-    world.box(sx + .11, basis + 4.9, z + seite * .55, .04, 3.0, .8, zweit, 0, true);
-    world.box(sx - .11, basis + 4.9, z + seite * .55, .04, 3.0, .8, zweit, 0, true);
-    world.box(sx, basis + 6.72, z + seite * .55, .3, .3, .3, 0x39424a);
-    world.box(sx, basis + 3.1, z + seite * .3, .1, .1, .6, 0x39424a);
+  // Ladenzeilen. Bis hierher lief diese Schleife nur über die beiden
+  // z-Seiten — und die Innenstadthäuser sind 18 mal 38 Meter, ihre langen
+  // Seiten zeigen also in x. Genau die standen als fugenlose Platten an der
+  // Straße: kein Schaufenster, keine Tür, kein Schild, kein Neon. Vom
+  // Boulevard aus war das die auffälligste leere Fläche auf Augenhöhe.
+  //
+  // Gebaut wird jetzt an jeder Wand, vor der Platz ist. Der Zwilling eines
+  // Innenstadtpaares steht vier Meter neben seinem Partner; eine Ladenzeile
+  // in einem vier Meter breiten Spalt wäre falsch, deshalb die Platzprobe
+  // drei Meter vor der Wand.
+  const belegt = (px, pz) => gebaeude.some(o => o !== b &&
+   Math.abs(px - o.x) < o.w / 2 + 2.5 && Math.abs(pz - o.z) < o.d / 2 + 2.5);
+  for (const [achse, laenge] of [['z', b.w], ['x', b.d]])
+   for (const seite of [-1, 1]) {
+    const halb = (achse === 'z' ? b.d : b.w) / 2;
+    const px = achse === 'z' ? b.x : b.x + seite * (halb + 3);
+    const pz = achse === 'z' ? b.z + seite * (halb + 3) : b.z;
+    if (belegt(px, pz)) continue;
+    ladenzeile(world, rng, i, basis, b.x, b.z, halb + .4, laenge, achse, seite, sockelFarbe);
    }
-  }
 
   // Senkrechte Lisenen gliedern die sonst fugenlose Wand.
   for (const seite of [-1, 1]) {

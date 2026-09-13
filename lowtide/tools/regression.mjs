@@ -1823,6 +1823,49 @@ pruefe('Die Ladentür ist offen', front.every(q => q.tuer === 3),
 pruefe('Die Brüstung bleibt unter Kamerahöhe',
  front.every(q => q.hoch.length === 2 && q.hoch.every(h => h <= 1.4)),
  JSON.stringify(front.map(q => q.hoch)));
+// Ladenzeilen liefen früher nur über die beiden z-Seiten. Die Innenstadthäuser
+// sind 18,8 mal 38,8 Meter — ihre langen Wände zeigen in x und standen als
+// fugenlose Platten an der Straße. Gezählt werden die Schaufensterbänder
+// (0x2c4149) an den Instanzmatrizen, nicht am Bild.
+const zeilen = await page.evaluate(() => {
+ const L = window.LOWTIDE, w = L.world, s = L.sim, bands = [];
+ for (const im of w.bloecke) {
+  if (im.material?.color?.getHexString() !== '2c4149') continue;
+  const a = im.instanceMatrix.array;
+  for (let i = 0; i < im.count; i++) bands.push({x: a[i * 16 + 12], z: a[i * 16 + 14]});
+ }
+ const H = [...s.buildings, ...s.worldBuildings].filter(b => b.kind !== 'house');
+ // Freiraum: wie weit kommt man senkrecht von der Wand weg, bevor ein anderes
+ // Gebäude im Weg steht? Eine Ladenzeile in einem Spalt wäre falsch.
+ const frei = (px, pz, dx, dz) => {
+  for (let t = .5; t <= 30; t += .5) {
+   const x = px + dx * t, z = pz + dz * t;
+   if (H.some(o => Math.abs(x - o.x) < o.w / 2 && Math.abs(z - o.z) < o.d / 2)) return t;
+  }
+  return 30;
+ };
+ let ohneX = 0, engste = 99;
+ for (const h of H) {
+  let xSeiten = 0;
+  for (const [achse, seite] of [['x', -1], ['x', 1], ['z', -1], ['z', 1]]) {
+   const wx = achse === 'x' ? h.x + seite * (h.w / 2 + .4) : h.x;
+   const wz = achse === 'x' ? h.z : h.z + seite * (h.d / 2 + .4);
+   const da = achse === 'x'
+    ? bands.some(q => Math.abs(q.x - wx) < 1.2 && Math.abs(q.z - h.z) < h.d / 2)
+    : bands.some(q => Math.abs(q.z - wz) < 1.2 && Math.abs(q.x - h.x) < h.w / 2);
+   if (!da) continue;
+   if (achse === 'x') xSeiten++;
+   engste = Math.min(engste, frei(wx, wz, achse === 'x' ? seite : 0, achse === 'x' ? 0 : seite));
+  }
+  if (!xSeiten) ohneX++;
+ }
+ return {baender: bands.length, haeuser: H.length, ohneX, engste};
+});
+pruefe('Auch die langen Hauswände tragen eine Ladenzeile',
+ zeilen.haeuser >= 30 && zeilen.ohneX === 0 && zeilen.baender > 100,
+ `${zeilen.baender} Schaufensterbänder, ${zeilen.ohneX} von ${zeilen.haeuser} Häusern ohne`);
+pruefe('Keine Ladenzeile steht in einem Spalt', zeilen.engste >= 8,
+ `engster Freiraum ${zeilen.engste} m`);
 // Tiere bleiben in ihrem Element. Der Sumpfbereich der Tierwelt ist ein
 // festes Rechteck, das die neuen Dämme nicht kennt — die Bewegung prüft
 // waterAt und dreht ab, statt an Land zu kriechen. Diese Prüfung hält fest,

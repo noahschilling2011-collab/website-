@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 253 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 255 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1318,6 +1318,47 @@ wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
 besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
+
+## Die langen Hauswände waren fugenlose Platten
+
+Vom Boulevard aus stand links und rechts der Straße je eine glatte Wand. In
+`facades.js` steht warum: die Schleife, die Schaufenster, Tür, Markise, Schild
+und Neon setzt, lief über `for (const seite of [-1, 1])` — und darin nur über
+die **beiden z-Seiten**. Die Innenstadthäuser sind 18,8 mal 38,8 Meter; ihre
+langen Wände zeigen in x. Genau die standen ohne alles an der Straße.
+
+Statt den Block ein zweites Mal für x hinzuschreiben, ist er jetzt eine
+Funktion `ladenzeile()`, deren Maße als (laengs, hoehe, dick) notiert sind —
+laengs entlang der Wand, dick durch sie hindurch. Dieselbe Beschreibung gilt
+damit für beide Achsen, und es können nicht zwei Fassungen auseinanderlaufen.
+
+Gebaut wird an jeder Wand, vor der Platz ist: drei Meter vor der Wand wird
+geprüft, ob dort ein anderes Gebäude steht. Von 144 möglichen Wänden bekommen
+124 eine Zeile, 20 fallen weg.
+
+**Eine falsche Annahme dabei, von der Messung widerlegt.** Ich hielt die
+Innenstadtpaare für vier Meter auseinanderstehend und die Platzprobe für
+nötig, um eine Ladenzeile in einem Spalt zu verhindern. Nachgemessen stehen
+die Paare auf x = -21 und -59 bei 18,8 Metern Breite — dazwischen liegen
+**19,2 Meter**, eine echte Nebenstraße. Der engste Freiraum vor irgendeiner
+gebauten Ladenzeile auf der ganzen Karte beträgt 19 Meter. Die Probe schadet
+nicht, aber der Grund, den ich für sie hatte, stimmte nicht.
+
+Was es kostet:
+
+| Ort | Uhr | vorher | nachher |
+|---|---|---|---|
+| Kreuzung Downtown | 13 | 1802 | 1842 |
+| Kreuzung Downtown | 22 | 2056 | 2089 |
+| Hafen | 13 | 1639 | 1663 |
+| Strand | 13 | 1287 | 1287 |
+
+Vierzig Draw Calls für die doppelte Zahl an Ladenzeilen — die Bänder landen in
+denselben InstancedMeshes wie alles andere, was `World.box` erzeugt. Nachts
+ist der Unterschied am größten: die Neonbänder laufen jetzt an beiden
+Straßenseiten entlang, wo vorher zwei dunkle Platten standen.
+
+255 Prüfungen bestanden, keine gefallen.
 
 ## Acht Puppenstuben ohne vordere Wand
 
