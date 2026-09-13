@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 250 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 253 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1318,6 +1318,46 @@ wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
 besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
+
+## Acht Puppenstuben ohne vordere Wand
+
+Vom Gehweg aus sah man in den Undertow hinein wie in ein aufgeschnittenes
+Modell: Tanzfläche, Tresen, Möbel, kein Stück Fassade davor. Dasselbe bei
+allen acht Servicegebäuden. Das war kein Versehen — es steht so in
+`interiors.js`: „Die Vorderseite bleibt offen: eine Schnittdarstellung statt
+Ladetüren. Der Spieler läuft ohne Übergang hinein, die Kamera hat freie
+Sicht."
+
+Der Grund trägt. Eine volle Wand mit Tür wäre der ehrlichere Bau, kostet aber
+genau das, was der Satz nennt: die Verfolgerkamera prüft Solids nur bis
+Kopfhöhe (`y < b.h + .2`) und würde, sobald man drinnen in einer Ecke steht,
+gegen eine fünf Meter hohe Front gedrückt.
+
+Der Mittelweg steht jetzt da: eine **Brüstung von 1,1 Metern** links und
+rechts einer **mittigen Tür von 4,5 Metern**. Hoch genug, dass niemand mehr
+durch das Schaufenster spaziert; niedrig genug, dass die Kamera darüber
+hinwegsieht. Dazu Türpfosten, ein Kämpfer und Sprossen alle 1,6 Meter — als
+Kulisse, die nichts blockiert.
+
+**Glas gibt es nicht.** `w.box` kann keine Durchsicht. Eine undurchsichtige
+Scheibe würde den Raum zumauern, den sie zeigen soll, und eine Scheibe, durch
+die man hindurchläuft, wäre schlechter als gar keine. Ein Rahmen ohne Scheibe
+liest sich als sehr sauber geputztes Schaufenster.
+
+Nachgemessen an allen acht Räumen:
+
+| | Ergebnis |
+|---|---|
+| Freier Weg von draußen bis in die Raummitte | 0 blockierte Schritte, 8 von 8 |
+| Durch das Schaufenster bei ±4 und ±6 Metern | 0 Durchgänge, 8 von 8 |
+| Durch die Tür bei ±1,5 Metern | 3 von 3 Proben frei, 8 von 8 |
+| Höhe der Brüstung | 1,1 m, zwei Stück je Raum |
+
+Die Brüstung kommt als Solid aus `campaign.js` und wird von der Schleife in
+`expanded-world.js` mitgezeichnet, die schon vorher alle Raumwände zeichnet —
+eine Stelle geändert, zwei Wirkungen.
+
+253 Prüfungen bestanden, keine gefallen.
 
 ## Der Boden war die einzige Fläche ohne Oberfläche
 

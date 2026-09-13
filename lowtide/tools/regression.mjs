@@ -1799,6 +1799,30 @@ pruefe('Alle acht Innenräume sind vorhanden', innen.length === 8, `${innen.leng
 pruefe('In jeden Innenraum führt ein freier Weg',
  innen.every(q => q.blockiert === 0 && q.mitte),
  JSON.stringify(innen.filter(q => q.blockiert || !q.mitte)));
+// Die Front war ganz offen — von der Straße aus acht Puppenstuben ohne
+// vordere Wand. Jetzt steht dort eine Brüstung von 1,1 Metern mit einer
+// mittigen Tür von 4,5 Metern. Beides muss gelten: durch das Schaufenster
+// kommt niemand, durch die Tür jeder. Die Brüstung bleibt niedrig, damit die
+// Verfolgerkamera darüber hinwegsieht — sie prüft Solids nur bis Kopfhöhe.
+const front = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim;
+ return ['garage', 'shop', 'clinic', 'home', 'club', 'diner', 'motel', 'records']
+  .filter(k => L.orte[k]).map(k => {
+   const l = L.orte[k];
+   const durch = [-6, -4, 4, 6].filter(ox => !s.blocked({x: l.x + ox, z: l.z + 4}, .45)).length;
+   const tuer = [-1.5, 0, 1.5].filter(ox => !s.blocked({x: l.x + ox, z: l.z + 4}, .45)).length;
+   const hoch = (s.roomWalls || []).filter(b => Math.abs(b.z - (l.z + 4)) < .6).map(b => b.h);
+   return {k, durch, tuer, hoch};
+  });
+});
+pruefe('Durch das Schaufenster kommt niemand',
+ front.length === 8 && front.every(q => q.durch === 0),
+ JSON.stringify(front.filter(q => q.durch)));
+pruefe('Die Ladentür ist offen', front.every(q => q.tuer === 3),
+ JSON.stringify(front.filter(q => q.tuer !== 3)));
+pruefe('Die Brüstung bleibt unter Kamerahöhe',
+ front.every(q => q.hoch.length === 2 && q.hoch.every(h => h <= 1.4)),
+ JSON.stringify(front.map(q => q.hoch)));
 // Tiere bleiben in ihrem Element. Der Sumpfbereich der Tierwelt ist ein
 // festes Rechteck, das die neuen Dämme nicht kennt — die Bewegung prüft
 // waterAt und dreht ab, statt an Land zu kriechen. Diese Prüfung hält fest,

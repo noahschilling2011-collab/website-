@@ -47,7 +47,24 @@ export class Campaign extends Simulation{
   // ein alter Fehler, gefunden erst, als die Prüfung auf Überschneidung von
   // Gebäude und Fahrbahn dazukam. Es steht jetzt bei -372.
   for(const [x,z,w,d,h] of [[-375,-285,28,22,9],[-372,355,33,25,12],[-408,320,32,24,9],[285,170,30,22,12],[315,265,28,25,9]])this.worldBuildings.push(this.addSolid(x,z,w,d,'house',h));
-  for(const id of ['garage','shop','clinic','home','club','diner','motel','records']){const l=locations[id],w=id==='garage'?22:16,d=16;for(const wall of [{x:l.x-w/2,z:l.z-4,w:1,d},{x:l.x+w/2,z:l.z-4,w:1,d},{x:l.x,z:l.z-12,w:w+1,d:1}])this.roomWalls.push(this.addSolid(wall.x,wall.z,wall.w,wall.d,'room',5));}
+  // Drei volle Wände je Raum — und seit dieser Runde eine Brüstung in der
+  // vierten. Die Front war ganz offen, "eine Schnittdarstellung statt
+  // Ladetüren": von der Straße aus sah man in acht Puppenstuben, denen die
+  // vordere Wand fehlt. Eine volle Wand mit Tür wäre der ehrlichere Bau,
+  // kostet aber die freie Sicht der Verfolgerkamera, sobald man drinnen in
+  // einer Ecke steht — sie prüft Solids nur bis Kopfhöhe.
+  //
+  // Deshalb eine Brüstung von 1,1 Metern links und rechts der Tür: hoch
+  // genug, dass niemand mehr durch das Schaufenster spaziert, niedrig genug,
+  // dass die Kamera darüber hinwegsieht. Die Tür ist 4,5 Meter breit und
+  // mittig; die Begehbarkeitsprüfung läuft auf x = l.x geradewegs hinein und
+  // braucht dort 0,45 Meter Luft.
+  const TUER=4.5;
+  for(const id of ['garage','shop','clinic','home','club','diner','motel','records']){const l=locations[id],w=id==='garage'?22:16,d=16;
+   const brueste=(w-TUER)/2,mitte=TUER/2+brueste/2;
+   for(const wall of [{x:l.x-w/2,z:l.z-4,w:1,d},{x:l.x+w/2,z:l.z-4,w:1,d},{x:l.x,z:l.z-12,w:w+1,d:1},
+    {x:l.x-mitte,z:l.z+4,w:brueste,d:.7,h:1.1},{x:l.x+mitte,z:l.z+4,w:brueste,d:.7,h:1.1}])
+    this.roomWalls.push(this.addSolid(wall.x,wall.z,wall.w,wall.d,'room',wall.h??5));}
   const entries=[['compact',-148,101],['suv',-160,107],['super',-280,98],['muscle',-220,97],['pickup',-340,-240],['motorcycle',-140,102],['dirtbike',-455,-355],['quad',-390,36],['truck',-355,265],['bus',-162,157],['boat',123,136],['jetski',127,155],['helicopter',-360,305],['plane',-315,325]];
   this.cars.forEach((c,i)=>Object.assign(c,{model:i===0?'sedan':['compact','sedan','suv','muscle'][i%4],fuel:100,upgrades:{},owner:i===0?'eli':null,alt:0,tires:100,glass:100,lights:100}));
   entries.forEach(([model,x,z],i)=>this.cars.push({id:'LM-'+(700+i),model,x,z,yaw:Math.PI,speed:0,health:100,fuel:100,tires:100,glass:100,lights:100,alt:0,type:'parked',color:[0x568a89,0xc09b62,0x99635d,0x667ca5][i%4],upgrades:{},owner:['motorcycle','boat'].includes(model)?'mara':null}));

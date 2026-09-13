@@ -25,6 +25,21 @@ function grundriss(w, id, bodenFarbe, wandFarbe) {
  // Innenseite der Wände etwas heller als die Fassade.
  for (const s of [-1, 1]) w.box(r.l.x + s * (r.breite / 2 - .55), 2.5, r.l.z - 4, .18, 4.8, 15.2, wandFarbe);
  w.box(r.l.x, 2.5, r.hinten - .5, r.breite - .8, 4.8, .18, wandFarbe);
+ // Schaufensterfront. Die Brüstung selbst kommt als Solid aus campaign.js und
+ // wird dort auch gezeichnet; hier stehen nur Rahmen und Pfosten, die nichts
+ // blockieren: zwei Türpfosten, ein Kämpfer über der Brüstung und Sprossen
+ // alle 1,6 Meter. Glas gibt es nicht — w.box kann keine Durchsicht, und eine
+ // undurchsichtige Scheibe würde den Raum zumauern, den sie zeigen soll. Ein
+ // Rahmen ohne Scheibe liest sich als sehr sauberes Schaufenster; eine
+ // Scheibe, durch die man läuft, wäre schlechter.
+ const TUER = 4.5, zf = r.vorn + .4;
+ for (const s of [-1, 1]) {
+  const innen = s * TUER / 2, aussen = s * (r.breite / 2 - .55);
+  w.box(r.l.x + innen, 2.1, zf, .22, 4.2, .34, wandFarbe);           // Türpfosten
+  w.box(r.l.x + (innen + aussen) / 2, 3.05, zf, Math.abs(aussen - innen), .14, .3, wandFarbe); // Kämpfer
+  for (let a = Math.abs(innen) + 1.6; a < Math.abs(aussen) - .3; a += 1.6)
+   w.box(r.l.x + s * a, 2.55, zf, .1, 2.9, .26, wandFarbe);          // Sprosse
+ }
  // Deckenleuchten: nachts von außen sichtbar, weil die Front offen ist.
  for (let z = r.hinten + 2; z < r.vorn - 1; z += 4.6)
   for (const ox of id === 'garage' ? [-5, 5] : [0]) {
