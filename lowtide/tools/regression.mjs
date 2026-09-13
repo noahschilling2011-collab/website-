@@ -1203,6 +1203,35 @@ const tiere = await page.evaluate(async () => {
 });
 pruefe('Kein Tier liegt an Land', tiere.anLand === 0,
  `${tiere.anLand} von ${tiere.gesamt} Beobachtungen`);
+// Die fünf Rennstrecken haben feste Kontrollpunkte, und die Karte hat sich
+// seither mehrfach geändert. Landrennen brauchen festen Boden, Wasserrennen
+// Wasser — geprüft werden Punkte und die Strecke dazwischen alle acht Meter.
+const strecken = await page.evaluate(() => {
+ const L = window.LOWTIDE;
+ const R = {
+  west: {m: 'land', p: [{x:-280,z:-100},{x:-100,z:-100},{x:-100,z:200},{x:-340,z:200},{x:-340,z:80},{x:-280,z:80}]},
+  drag: {m: 'land', p: [{x:-315,z:262},{x:-315,z:310},{x:-315,z:360},{x:-315,z:386}]},
+  moto: {m: 'land', p: [{x:-418,z:-262},{x:-452,z:-300},{x:-486,z:-352},{x:-520,z:-410},{x:-470,z:-448},{x:-424,z:-396},{x:-402,z:-310},{x:-402,z:-248}]},
+  boot: {m: 'water', p: [{x:158,z:306},{x:160,z:348},{x:300,z:352},{x:384,z:334},{x:388,z:302},{x:250,z:302}]},
+  jet: {m: 'water', p: [{x:140,z:120},{x:138,z:60},{x:150,z:-10},{x:180,z:-70},{x:145,z:-120},{x:132,z:-40},{x:130,z:110}]}
+ };
+ const schlecht = [];
+ for (const [k, r] of Object.entries(R)) {
+  const falsch = (x, z) => r.m === 'land' ? L.waterAt(x, z) : !L.waterAt(x, z);
+  r.p.forEach((q, i) => {if (falsch(q.x, q.z)) schlecht.push(k + ' P' + i);});
+  for (let i = 0; i < r.p.length; i++) {
+   const a = r.p[i], b = r.p[(i + 1) % r.p.length];
+   const n = Math.max(1, Math.round(Math.hypot(b.x - a.x, b.z - a.z) / 8));
+   for (let t = 0; t <= n; t++) {
+    const x = a.x + (b.x - a.x) * t / n, z = a.z + (b.z - a.z) * t / n;
+    if (falsch(x, z)) {schlecht.push(k + ' S' + i + '@' + Math.round(x) + '/' + Math.round(z)); break;}
+   }
+  }
+ }
+ return schlecht;
+});
+pruefe('Alle fünf Rennstrecken liegen im richtigen Element', strecken.length === 0,
+ JSON.stringify(strecken.slice(0, 5)));
 pruefe('Sparmodus schaltet die Nachbearbeitung ab', await page.evaluate(() => {
  const knopf = document.getElementById('qualityBtn'), w = window.LOWTIDE.world;
  knopf.click();

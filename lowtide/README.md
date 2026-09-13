@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 186 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 187 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -556,6 +556,31 @@ sonst schöbe der Verkehr ihn von hinten an.
 
 Danach: **null Paare** unter 3,6 Metern, engster Abstand 4,97 Meter. Zwei
 Prüfungen halten Dichte und Abstand fest.
+
+## Zwei Rennen führten über Land
+
+Fünf Rennstrecken mit festen Kontrollpunkten, und die Karte hat sich seither
+mehrfach geändert. Abgetastet werden Punkte und Strecke alle acht Meter.
+
+Die drei Landrennen sind sauber. Die beiden Wasserrennen nicht:
+
+- **RIPPLE SPRINT**, Kontrollpunkt zwei auf 170/60 — das liegt auf der
+  **Anchor Bank**, einer Sandbank aus dem Kartenausbau. Ein Jetski kommt dort
+  nicht hin, und weil die Punkte der Reihe nach zählen, endet das Rennen
+  dort.
+- **SERENA REGATTA**, zwei von dreiundneunzig Proben an Land: eine auf dem
+  **Damm nach Isla Serena** bei z = 200, eine an der Südostecke der Insel.
+
+Der Damm ist der interessantere Fall. Die Regatta umrundete die Insel, und
+das geht nicht mehr: nördlich und südlich liegt Wasser, aber dazwischen gibt
+es keinen Durchlass. Der Damm steht zwar auf Pfeilern — durchfahren kann man
+ihn trotzdem nicht, weil `waterAt` sein Rechteck als Land führt. Das
+auseinanderzunehmen hieße, befahrbare Fläche und Wasser darunter getrennt zu
+behandeln; dafür ist der Kurs der kleinere Eingriff.
+
+Er liegt jetzt ganz im nördlichen Becken, 530 statt 743 Meter, Zielzeit
+entsprechend 86 statt 120 Sekunden. Der Jetski-Punkt liegt westlich der Bank,
+im Kanal zwischen Küste und Sandbank.
 
 ## Was geprüft wurde und in Ordnung war
 

@@ -228,10 +228,23 @@ export const rennen={
  moto:{name:'CYPRESS ENDURO',medium:'land',form:'bike',preis:650,ziel:95,punkte:[
   {x:-418,z:-262},{x:-452,z:-300},{x:-486,z:-352},{x:-520,z:-410},{x:-470,z:-448},
   {x:-424,z:-396},{x:-402,z:-310},{x:-402,z:-248}]},
- boot:{name:'SERENA REGATTA',medium:'water',preis:600,ziel:120,punkte:[
-  {x:180,z:250},{x:210,z:330},{x:300,z:370},{x:380,z:300},{x:390,z:180},{x:300,z:120},{x:180,z:150}]},
+ // Die Regatta umrundete Isla Serena und kreuzte dabei den Damm bei z = 200:
+ // der ist Land, ein Boot kommt dort nicht durch. Aufgefallen ist es nicht
+ // beim Fahren, sondern beim Abtasten der Strecke alle acht Meter — zwei von
+ // dreiundneunzig Proben lagen an Land, die eine auf dem Damm, die andere an
+ // der Südostecke der Insel. Beides ist erst mit dem Kartenausbau entstanden.
+ //
+ // Eine Umrundung ist damit nicht mehr möglich: nördlich und südlich der
+ // Insel liegt Wasser, aber zwischen beiden gibt es keinen Durchlass. Der
+ // Kurs liegt jetzt ganz im nördlichen Becken. Er ist mit 530 statt 743
+ // Metern kürzer, die Zielzeit entsprechend von 120 auf 86 Sekunden.
+ boot:{name:'SERENA REGATTA',medium:'water',preis:600,ziel:86,punkte:[
+  {x:158,z:306},{x:160,z:348},{x:300,z:352},{x:384,z:334},{x:388,z:302},{x:250,z:302}]},
+ // Kontrollpunkt zwei lag auf 170/60 und damit auf der Anchor Bank, einer
+ // Sandbank aus dem Kartenausbau. Ein Jetski erreicht ihn nicht. Jetzt
+ // westlich davon, im Kanal zwischen Küste und Bank.
  jet:{name:'RIPPLE SPRINT',medium:'water',preis:420,ziel:70,punkte:[
-  {x:140,z:120},{x:170,z:60},{x:150,z:-10},{x:180,z:-70},{x:145,z:-120},{x:132,z:-40},{x:130,z:110}]}
+  {x:140,z:120},{x:138,z:60},{x:150,z:-10},{x:180,z:-70},{x:145,z:-120},{x:132,z:-40},{x:130,z:110}]}
 };
 
 // Bergungsauftrag: sechs Fundstellen, eine nach der anderen.
