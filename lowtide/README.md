@@ -403,6 +403,43 @@ jetzt See.
 |---|---|---|
 | MERCY RESERVOIR, örtl. Kontrast | 5,52 | 10,28 |
 
+## Die Sichtweite war der teuerste Kompromiss, den niemand bezahlt hat
+
+Bei klarem Wetter stand die Nebeldichte auf 0,0022: die Hälfte des Lichts
+war nach **391 Metern** verschluckt. Für einen klaren Küstentag ist das viel
+zu viel — die Skyline stand als blasse Ahnung hinter Dunst, jeder weite Blick
+war ein Wisch, und vom Talon Ridge sah man die Stadt praktisch nicht.
+
+Die naheliegende Annahme war, dass der Dunst die Zeichenlast deckelt: die
+Entfernungsverwerfung leitet ihre Reichweite aus der Nebeldichte ab. Nur
+stimmt sie nicht. Gemessen mit sinkender Dichte an drei Standorten:
+
+| Faktor | Sicht (50 %) | Draw Calls Innenstadt | Strand | Bergrücken |
+|---|---|---|---|---|
+| 1,00 | 391 m | 1954 | 3582 | 4594 |
+| 0,42 | 930 m | — | 3585 | 4594 |
+| 0,25 | 1565 m | 1977 | — | — |
+
+Dreiecke blieben in allen Fällen gleich. Die Verwerfung greift schon vorher,
+der Dunst kostet nichts und deckt nichts — er hat nur das Bild zugezogen.
+
+Jetzt 0,0009, rund 925 Meter. Schlechtes Wetter bleibt dicht, da gehört es
+hin: Regen 0,0075, Nebel 0,0135, Gewitter 0,0090.
+
+Was das über die ganze Karte ausmacht, in derselben Rangliste wie oben:
+
+| Region | vorher | nachher |
+|---|---|---|
+| TALON RIDGE | 4,75 | 10,38 |
+| MERCY RESERVOIR | 10,28 | 11,69 |
+| Schnitt über alle fünfzehn | 10,93 | 13,93 |
+
+TALON RIDGE stand die ganze Zeit auf Platz eins der Arbeitsliste, und ich
+habe Felsen, Leitplanken und Fahrbahnen dorthin gebaut. Der größte Anteil an
+seinem schlechten Wert war aber gar nicht die Gegend, sondern der Dunst über
+allem, was man von dort aus sieht. Das ist der Grund, warum die Liste
+Arbeitsliste heißt und nicht Urteil.
+
 ## Was Zeichenaufrufe kostet
 
 Draw Calls sind hier die knappe Größe, nicht Dreiecke. Drei Dinge halten sie

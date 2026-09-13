@@ -53,7 +53,15 @@ function mische(a, b, t, ziel) { ziel.setHex(a); zweiteFarbe.setHex(b); return z
 
 // Wetterlagen dämpfen Sonne und Sättigung und heben den Dunst an.
 const WETTER = {
- clear: {sonne: 1, dunst: .12, wolken: .18, nebel: .0022, graustich: 0, streuung: 1},
+ // Der Nebel bei klarem Wetter stand auf .0022: die Hälfte des Lichts war
+ // nach 391 Metern verschluckt, was für einen klaren Küstentag viel zu viel
+ // ist — die Skyline stand als blasse Ahnung hinter Dunst, und jeder weite
+ // Blick war ein Wisch. Nachgemessen kostet mehr Sichtweite hier praktisch
+ // nichts: bei einem Viertel der Dichte stiegen die Draw Calls in der Stadt
+ // von 1954 auf 1977 und am Strand von 3582 auf 3585, die Dreiecke blieben
+ // gleich. Die Entfernungsverwerfung greift schon vorher. Jetzt .0009, also
+ // rund 925 Meter. Schlechtes Wetter bleibt dicht — da gehört es hin.
+ clear: {sonne: 1, dunst: .12, wolken: .18, nebel: .0009, graustich: 0, streuung: 1},
  rain: {sonne: .38, dunst: .62, wolken: .88, nebel: .0075, graustich: .55, streuung: 1.5},
  fog: {sonne: .30, dunst: .95, wolken: .55, nebel: .0135, graustich: .62, streuung: 1.7},
  storm: {sonne: .22, dunst: .70, wolken: .97, nebel: .0090, graustich: .68, streuung: 1.3}
