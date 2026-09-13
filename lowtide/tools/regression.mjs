@@ -176,6 +176,36 @@ await bilder(2);
 pruefe('Scheinwerfer aus, sobald niemand fährt', await page.evaluate(() =>
  window.LOWTIDE.world.fahrlicht.every(l => !l.visible)));
 
+// Bremsweg und Ausrollen. Gemessen war der Weg aus 100 km/h 5,2 Meter beim
+// Kestrel und 9,8 beim Atlas Hauler, und ohne Gas rollte jedes Fahrzeug in
+// 41 Metern aus — das ist keine Motorbremse, das ist eine Handbremse.
+const bremswege = await page.evaluate(() => {
+ const s = window.LOWTIDE.sim, aus = {};
+ for (const modell of ['sedan', 'truck']) {
+  const c = s.cars.find(x => x.model === modell);
+  if (!c) continue;
+  const setzen = () => {c.x = -700; c.z = 620; c.yaw = Math.PI / 2; c.slip = 0; c.alt = 0;
+   c.health = 100; c.fuel = 100; c.tires = 100; c.unlocked = true;
+   s.player.car = c; s.player.x = c.x; s.player.z = c.z; s.player.y = 0; s.stars = 0;
+   s.weather = 'clear'; c.speed = 100 / 3.6;};
+  setzen();
+  let x0 = c.x, z0 = c.z;
+  for (let i = 0; i < 400 && Math.abs(c.speed) > 1; i++) s.driveVehicle(.05, {forward: 0, brake: 1, turn: 0});
+  aus[modell + 'Bremse'] = Math.hypot(c.x - x0, c.z - z0);
+  setzen(); x0 = c.x; z0 = c.z;
+  for (let i = 0; i < 900 && Math.abs(c.speed) > 1; i++) s.driveVehicle(.05, {forward: 0, turn: 0});
+  aus[modell + 'Rollen'] = Math.hypot(c.x - x0, c.z - z0);
+  s.player.car = null;
+ }
+ return aus;
+});
+pruefe('Der Bremsweg aus 100 km/h ist der eines Autos',
+ bremswege.sedanBremse > 30 && bremswege.sedanBremse < 60 && bremswege.truckBremse > bremswege.sedanBremse,
+ `Kestrel ${bremswege.sedanBremse.toFixed(0)} m, Atlas Hauler ${bremswege.truckBremse.toFixed(0)} m`);
+pruefe('Ohne Gas rollt der Wagen weit aus',
+ bremswege.sedanRollen > 90, `${bremswege.sedanRollen.toFixed(0)} m`);
+await page.evaluate(() => {const s = window.LOWTIDE.sim; if (s.player.car) {s.player.car.speed = 0; s.enterExit();}});
+
 pruefe('Fahrzeug bricht bei voller Lenkung aus', await page.evaluate(() => {
  const s = window.LOWTIDE.sim, auto = s.cars.find(c => c.model === 'muscle') || s.cars[0];
  auto.unlocked = true; auto.slip = 0; auto.speed = 0;

@@ -382,7 +382,24 @@ export class Campaign extends Simulation{
  }
  enterExit(){const p=this.player;if(p.car){const c=p.car,def=vehicleTypes[c.model];if(def.medium==='air'&&c.alt>5){p.car=null;p.y=c.alt;p.vy=-2;p.parachute=false;p.x=c.x+3;p.z=c.z;this.notify('Freier Fall — Leertaste / Sprung öffnet den Fallschirm.');return;}if(Math.abs(c.speed)>3){this.notify('Zuerst abbremsen.');return;}for(const side of [1,-1]){const v={x:c.x+Math.cos(c.yaw)*3.2*side,z:c.z-Math.sin(c.yaw)*3.2*side};if(!this.blocked(v,.4)){p.x=v.x;p.z=v.z;p.car=null;p.y=waterAt(p.x,p.z)?-.5:0;return;}}this.notify('Tür blockiert.');return;}const c=this.cars.find(c=>distance(c,p)<5&&c.health>0);if(!c)return;const def=vehicleTypes[c.model];if(c.owner===p.id||c.unlocked||def.security===0){this.board(c);return;}if(!this.unlock){this.unlock={id:c.id,remaining:def.security*(this.active===1?.7:1),total:def.security};this.notify('E / Aktion halten: Fahrzeug öffnen. Bewegung bricht ab.');}}
  board(c){if(this.characters.some(p=>p!==this.player&&p.car===c)){this.notify('Die andere Figur sitzt in diesem Fahrzeug.');return;}this.player.car=c;this.player.armed=false;this.player.cover=false;this.player.y=0;c.speed=0;if(c.type==='traffic'||!c.owner&&vehicleTypes[c.model].security>0){c.type='stolen';this.crime(2);}this.player.x=c.x;this.player.z=c.z;this.notify(vehicleTypes[c.model].name+' · '+(vehicleTypes[c.model].medium==='air'?'W Gas · Sprung steigen · C sinken':'W/S Gas · Leertaste bremsen'));}
- driveVehicle(dt,input){this.bremst=!!input.brake;const p=this.player,c=p.car,d=vehicleTypes[c.model],wet=this.weather==='rain'||this.weather==='storm',upgrade=1+(c.upgrades.engine||0)*.14;const f=c.health>0&&c.fuel>0?(input.forward||0):0;c.speed+=f*d.accel*upgrade*dt;c.speed*=Math.exp(-dt*(input.brake&&d.medium!=='air'?d.brake/5:!f?.65:.04));c.speed=clamp(c.speed,-Math.min(10,d.max/3),d.max*upgrade*Math.max(.2,c.health/100));const tireGrip=Math.max(.45,c.tires/100);c.yaw-=(input.turn||0)*dt*d.turn*clamp(c.speed/6,-1,1)*(wet?.72:1)*tireGrip*d.grip*(1+(c.upgrades.tires||0)*.03)*(input.brake?1.45:1)*(this.active===0?1.08:1);
+ driveVehicle(dt,input){this.bremst=!!input.brake;const p=this.player,c=p.car,d=vehicleTypes[c.model],wet=this.weather==='rain'||this.weather==='storm',upgrade=1+(c.upgrades.engine||0)*.14;const f=c.health>0&&c.fuel>0?(input.forward||0):0;c.speed+=f*d.accel*upgrade*dt;// Bremsen und Ausrollen als Verzögerung in Metern je Sekundenquadrat statt
+  // als pauschaler Exponentialabfall. Gemessen war der Bremsweg aus 100 km/h
+  // 5,2 Meter beim Kestrel, 6,4 beim Banshee, 9,8 beim Atlas Hauler — ein
+  // Auto braucht rund vierzig. Ohne Gas rollte jedes Fahrzeug in 41 Metern
+  // aus; das ist keine Motorbremse, das ist eine Handbremse.
+  //
+  // brake bleibt die Kennzahl aus content.js, mal 0,39 ergibt die
+  // Verzögerung: Kestrel 9,0 m/s² (39 m), Vesper 11,7 (33 m), Atlas Hauler
+  // 4,7 (82 m). Nasse Fahrbahn und abgefahrene Reifen verlängern den Weg.
+  // Ausrollen ist Rollwiderstand plus Luftwiderstand, quadratisch mit dem
+  // Tempo — aus 100 km/h rund hundert Meter statt einundvierzig.
+  if(input.brake&&d.medium!=='air'){
+   const a=d.brake*.39*(wet?.78:1)*Math.max(.5,c.tires/100);
+   c.speed-=Math.sign(c.speed)*Math.min(Math.abs(c.speed),a*dt);
+  }else if(!f){
+   const a=d.medium==='water'?.9+Math.abs(c.speed)*.07:1.6+c.speed*c.speed*.004;
+   c.speed-=Math.sign(c.speed)*Math.min(Math.abs(c.speed),a*dt);
+  }else c.speed*=Math.exp(-dt*.04);c.speed=clamp(c.speed,-Math.min(10,d.max/3),d.max*upgrade*Math.max(.2,c.health/100));const tireGrip=Math.max(.45,c.tires/100);c.yaw-=(input.turn||0)*dt*d.turn*clamp(c.speed/6,-1,1)*(wet?.72:1)*tireGrip*d.grip*(1+(c.upgrades.tires||0)*.03)*(input.brake?1.45:1)*(this.active===0?1.08:1);
   c.fuel=Math.max(0,c.fuel-dt*(.012+Math.abs(c.speed)*.002));let alt=c.alt||0;
   if(d.medium==='air'){if(d.shape==='helicopter'||Math.abs(c.speed)>22)alt+=((input.jump?1:0)-(input.sneak?1:0))*dt*12;if(c.fuel<=0||c.health<=0)alt-=dt*12;if(d.shape==='plane'&&Math.abs(c.speed)<19&&alt>0)alt-=dt*8;c.alt=clamp(alt,0,170);}
   // Querbewegung. Bisher fuhr jedes Fahrzeug exakt dorthin, wohin es zeigte:

@@ -1110,6 +1110,49 @@ Sterne, kein Wagen fährt ins Wasser, und weit genug weg endet sie wieder.
 
 234 Prüfungen bestanden, keine gefallen.
 
+## Aus hundert Sachen in fünf Metern zum Stehen
+
+Das Fahren ist der Kern des Spiels und war nie gemessen. Fünfzehn Fahrzeuge,
+je Höchstgeschwindigkeit, Beschleunigung, Bremsweg und Wendekreis:
+
+| | Spitze | 0–100 km/h | Wendekreis |
+|---|---|---|---|
+| Finch (compact) | 90 km/h | — | 7 m |
+| Kestrel S (sedan) | 108 | 2,4 s | 12 m |
+| Banshee 68 (muscle) | 133 | 1,9 s | 16 m |
+| Vesper R (super) | 176 | 1,6 s | 8 m |
+| Wraith (motorcycle) | 151 | 1,6 s | 8 m |
+| Atlas Hauler (truck) | 83 | — | 20 m |
+| Cormorant (plane) | 234 | 3,3 s | — |
+
+Spitzen und Wendekreise sind stimmig, die Beschleunigung ist arcadehaft
+schnell — das ist eine Entscheidung, keine Panne, und sie bleibt.
+
+Der Bremsweg war eine Panne. **Aus 100 km/h stand der Kestrel nach 5,2
+Metern**, der Banshee nach 6,4, der Atlas Hauler nach 9,8. Und ohne Gas
+rollte jedes Fahrzeug in 41 Metern aus. Beides kam aus derselben Zeile: Tempo
+mal einem Exponentialfaktor je Bild, mit `brake/5` als Rate. Ein
+Exponentialabfall bremst am Anfang brutal und am Ende gar nicht — das genaue
+Gegenteil einer Bremse.
+
+Jetzt ist beides eine Verzögerung in Metern je Sekundenquadrat. `brake` aus
+`content.js` bleibt die Kennzahl, mal 0,39 ergibt die Verzögerung: Kestrel
+9,0 m/s², Vesper 11,7, Atlas Hauler 4,7. Nasse Fahrbahn und abgefahrene
+Reifen verlängern den Weg. Das Ausrollen ist Rollwiderstand plus
+Luftwiderstand, quadratisch mit dem Tempo.
+
+| aus 100 km/h | vorher | jetzt |
+|---|---|---|
+| Kestrel, Vollbremsung | 5,2 m | 42,3 m |
+| Banshee, Vollbremsung | 6,4 m | 51,4 m |
+| Atlas Hauler, Vollbremsung | 9,8 m | 57 m (aus 83 km/h) |
+| Kestrel, ohne Gas ausrollen | 41 m | 133 m |
+
+Der Verkehr und die Polizei fahren nicht über `driveVehicle`; die Änderung
+betrifft nur das Fahrzeug unter dem Spieler.
+
+236 Prüfungen bestanden, keine gefallen.
+
 ## Was geprüft wurde und in Ordnung war
 
 Nicht jede Messung findet etwas, und das gehört genauso hierher.
