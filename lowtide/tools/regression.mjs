@@ -80,6 +80,40 @@ pruefe('Nachladen füllt das Magazin', await page.evaluate(() => {
  for (let i = 0; i < 40; i++) s.tick(.05, {});
  return s.player.ammo > 2;
 }));
+// Jede Waffe trifft innerhalb ihrer Reichweite und dahinter nicht. Vierzig
+// Schuss je Entfernung auf ein Ziel genau voraus. Der Taser richtet keinen
+// Schaden an, er betäubt — eine Prüfung nur auf Lebenspunkte hielte ihn für
+// wirkungslos.
+const schuesse = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim, q = s.player, aus = {};
+ const merk = {x: q.x, z: q.z, waffe: q.weapon, armed: q.armed};
+ for (const name of ['pistol', 'rifle', 'shotgun', 'taser']) {
+  q.armed = true; q.weapon = name; q.car = null; s.stars = 0; s.heat = 0;
+  q.inventory[name] = {ammo: 999, reserve: 999}; q.ammo = 999; q.reserve = 999;
+  q.x = -100; q.z = 40; q.y = 0; q.yaw = 0;
+  aus[name] = {};
+  for (const dist of [10, 30, 60]) {
+   const opfer = s.npcs[0];
+   let n = 0;
+   for (let k = 0; k < 40; k++) {
+    opfer.x = q.x; opfer.z = q.z + dist; opfer.health = 100; opfer.state = 'normal'; opfer.stun = 0;
+    q.cooldown = 0; s.reloadJob = null; q.ammo = 999;
+    s.shoot();
+    if (opfer.health < 100 || (opfer.stun || 0) > 0) n++;
+   }
+   aus[name][dist] = n;
+  }
+ }
+ q.x = merk.x; q.z = merk.z; q.weapon = merk.waffe; q.armed = merk.armed;
+ s.stars = 0; s.heat = 0; s.lastSeen = null; s.description = null;
+ return aus;
+});
+pruefe('Jede Waffe trifft innerhalb ihrer Reichweite',
+ schuesse.pistol[30] === 40 && schuesse.rifle[60] === 40 &&
+ schuesse.shotgun[10] === 40 && schuesse.taser[10] === 40,
+ Object.entries(schuesse).map(([k, v]) => `${k} ${v[10]}/${v[30]}/${v[60]}`).join(', '));
+pruefe('Und dahinter nicht',
+ schuesse.shotgun[30] === 0 && schuesse.taser[30] === 0 && schuesse.pistol[60] === 40);
 await page.keyboard.press('q');
 await bilder(1);
 

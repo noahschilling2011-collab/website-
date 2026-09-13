@@ -1282,6 +1282,21 @@ würfeln), und ihre Bewegung prüft vor jedem Schritt `waterAt` und dreht ab,
 statt an Land zu kriechen. Über vier Beobachtungsrunden mit 106 Tieren:
 keiner. Hier war der Code schon vorher richtig gebaut.
 
+**Die vier Waffen** treffen innerhalb ihrer Reichweite und dahinter nicht.
+Vierzig Schuss je Entfernung auf ein Ziel genau voraus:
+
+| | 10 m | 30 m | 60 m | Reichweite laut Tabelle |
+|---|---|---|---|---|
+| Pistole | 40/40 | 40/40 | 40/40 | 65 m |
+| Karabiner | 40/40 | 40/40 | 40/40 | 110 m |
+| Schrotflinte | 40/40 | 0/40 | 0/40 | 23 m |
+| Taser | 40/40 | 0/40 | 0/40 | 12 m |
+
+Der erste Durchgang hielt den Taser für wirkungslos — er richtet keinen
+Schaden an, er betäubt, und die Messung sah nur auf Lebenspunkte. Vierte
+Prüfung in dieser Sitzung, die falsch gestellt war, diesmal vor dem
+Eintragen bemerkt.
+
 **Der Spielstand** überlebt den vollen Rundlauf. Die Prüfung stand auf einem
 einzigen Feld — Geld —; jetzt auf achtundzwanzig: Ort, Leben, Waffe mit
 Magazin und Reserve, Kleidung, Haar, Tattoo, Fitness, Fänge, Uhrzeit, Wetter,
