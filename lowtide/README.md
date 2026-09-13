@@ -1232,6 +1232,30 @@ gebracht (siehe Korrektur weiter unten).
 
 239 Prüfungen bestanden, keine gefallen.
 
+## Die Straße über den Rücken war eine Treppe
+
+Derselbe Bilddurchgang, Talon Ridge: die Straße den Hang hinauf besteht aus
+einer Reihe dunkler Platten mit Lücken dazwischen. Die Fahrbahn wird seit
+Langem in Zwölf-Meter-Stücken gebaut, damit sie dem Gelände folgt — aber
+jedes Stück liegt **waagerecht**. Am Hang steht damit die eine Kante in der
+Luft und die andere im Boden.
+
+Die vorhandene Prüfung „Fahrbahnen liegen auf dem Gelände" fand nichts, weil
+sie die Mitte jedes Stücks misst, und die Mitte stimmt. Erst der Blick aus
+zweihundert Metern zeigt die Treppe.
+
+Jedes Stück nimmt jetzt die Neigung aus seinen eigenen beiden Enden —
+Nord-Süd-Straßen kippen um die x-Achse, Ost-West um die z-Achse. Berme,
+Leitplanke und Decke kippen mit. Dieselbe Behandlung bekommen die Feldwege
+im Hinterland und die Schotterpiste zur Leitungstrasse: zweiunddreißig
+Platten, die als schwebende Rhomben den Hang hinunterliefen, liegen jetzt
+mit bis zu dreißig Grad Neigung auf.
+
+Die neue Prüfung zählt Deckenstücke über sechs Meter Geländehöhe und
+verlangt, dass die geneigten überwiegen.
+
+240 Prüfungen bestanden, keine gefallen.
+
 ## Was geprüft wurde und in Ordnung war
 
 Nicht jede Messung findet etwas, und das gehört genauso hierher.

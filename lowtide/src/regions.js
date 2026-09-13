@@ -12,6 +12,18 @@ function zufall(seed = 5501) {
 
 const aufStrasse = onRoad;
 
+// Eine waagerechte Platte auf einem Hang steht mit einer Kante in der Luft
+// und mit der anderen im Boden. Auf Talon Ridge lag ein Feldweg als Reihe
+// schwebender Rhomben den Hang hinunter — 32 Platten, gut sichtbar aus
+// zweihundert Metern. Hier wird die Neigung aus dem Geländeanstieg genommen.
+function bodenPlatte(w, x, z, breite, tiefe, farbe, dicke = .08) {
+ const e = 2.5;
+ const steigungZ = (groundAt(x, z + e) - groundAt(x, z - e)) / (2 * e);
+ const steigungX = (groundAt(x + e, z) - groundAt(x - e, z)) / (2 * e);
+ w.box(x, groundAt(x, z) + dicke, z, breite, dicke, tiefe, farbe, 0, false,
+  -Math.atan(steigungZ), Math.atan(steigungX));
+}
+
 // Passt ein Bauwerk dieser Grundfläche hierhin, ohne eine Fahrbahn zu
 // berühren? aufStrasse() prüft einen Punkt mit einem Zuschlag, und der
 // Zuschlag war überall geraten. In Rosalind stand er auf 13 — bei einem
@@ -1025,7 +1037,7 @@ function randgebiete(w, rng) {
  // Schotter, nicht Beton: der erste Anlauf mit 0x8d8574 stand unter der
  // ACES-Belichtung fast weiß in der Wiese.
  for (let z = -420; z > -510; z -= 6) {
-  w.box(-160, .03, z, 5.4, .06, 6, 0x6e6852);
+  bodenPlatte(w, -160, z, 5.4, 6, 0x6e6852, .06);
   w.box(-160, .05, z + 3, 5.8, .04, .5, 0x7b7460);
  }
 
@@ -1432,7 +1444,7 @@ function hinterland(w, rng) {
    const x = quer ? x0 + t : x0 + Math.sin(t * .03) * 14;
    const z = quer ? z0 + Math.sin(t * .03) * 14 : z0 + t;
    if (!erlaubt(x, z)) continue;
-   w.box(x, groundAt(x, z) + .04, z, 6.4, .08, 7, 0x6e6853);
+   bodenPlatte(w, x, z, 6.4, 7, 0x6e6853);
   }
  }
 }

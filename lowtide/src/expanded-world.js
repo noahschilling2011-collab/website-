@@ -191,12 +191,22 @@ export class ExpandedWorld extends World{
     const mx=r.x1+(r.x2-r.x1)*t,mz=r.z1+(r.z2-r.z1)*t;
     const l=laenge/stuecke+.4;
     const y=groundAt(mx,mz);
+    // Jedes Stück lag waagerecht. Am Hang steht damit die eine Kante in der
+    // Luft und die andere im Boden — auf dem Talon Ridge las sich die Straße
+    // aus zweihundert Metern als Treppe dunkler Platten. Die Prüfung auf
+    // Geländehöhe fand nichts, weil sie die Mitte misst und die stimmt.
+    // Neigung aus den beiden Enden des Stücks selbst.
+    const halb=l/2;
+    const yA=groundAt(mx-(nordSued?0:halb),mz-(nordSued?halb:0));
+    const yB=groundAt(mx+(nordSued?0:halb),mz+(nordSued?halb:0));
+    const steig=(yB-yA)/l;
+    const nx=nordSued?-Math.atan(steig):0, nz=nordSued?0:Math.atan(steig);
     // Am Hang bekommt die Fahrbahn eine Berme: eine Straße, die sich in
     // einen Rücken schneidet, hört nicht an der Kante der Decke auf. In der
     // Ebene entfällt sie, dort gibt es keinen Ein- oder Anschnitt.
     if(y>2){
-     this.box(mx,y-.06,mz,nordSued?r.w+5.5:l,.16,nordSued?l:r.w+5.5,0x6f6a5c);
-     this.box(mx,y-.34,mz,nordSued?r.w+9:l,.5,nordSued?l:r.w+9,0x5c6350);
+     this.box(mx,y-.06,mz,nordSued?r.w+5.5:l,.16,nordSued?l:r.w+5.5,0x6f6a5c,0,false,nx,nz);
+     this.box(mx,y-.34,mz,nordSued?r.w+9:l,.5,nordSued?l:r.w+9,0x5c6350,0,false,nx,nz);
     }
     // Leitplanke, wo es neben der Fahrbahn hinuntergeht. Eine siebzehn Meter
     // breite Straße quer über einen achtundachtzig Meter hohen Rücken hatte
@@ -207,11 +217,11 @@ export class ExpandedWorld extends World{
      const rx=mx+(nordSued?seite*(r.w/2+1.6):0),rz=mz+(nordSued?0:seite*(r.w/2+1.6));
      const ax=mx+(nordSued?seite*(r.w/2+10):0),az=mz+(nordSued?0:seite*(r.w/2+10));
      if(y-groundAt(ax,az)<1.5)continue;
-     this.box(rx,y+.62,rz,nordSued?.14:l,.34,nordSued?l:.14,0xb9bcb4);
+     this.box(rx,y+.62,rz,nordSued?.14:l,.34,nordSued?l:.14,0xb9bcb4,0,false,nx,nz);
      for(let q=-l/2+1;q<l/2;q+=3)
       this.box(rx+(nordSued?0:q),y+.36,rz+(nordSued?q:0),.16,.72,.16,0x8b8f88);
     }
-    this.box(mx,y+.03,mz,nordSued?r.w:l,.08,nordSued?l:r.w,0x3d494f);
+    this.box(mx,y+.03,mz,nordSued?r.w:l,.08,nordSued?l:r.w,0x3d494f,0,false,nx,nz);
    }
    for(let i=0;i<laenge;i+=16){
     const t=i/laenge,mx=r.x1+(r.x2-r.x1)*t,mz=r.z1+(r.z2-r.z1)*t;

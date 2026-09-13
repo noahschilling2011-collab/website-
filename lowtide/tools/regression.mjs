@@ -1106,6 +1106,41 @@ const strassenHoehe = await page.evaluate(() => {
  }
  return {schlimmster, wo, gezaehlt, obenAufDemRuecken, kuppe};
 });
+// Jedes Fahrbahnstück lag waagerecht. Am Hang steht damit die eine Kante in
+// der Luft und die andere im Boden — auf dem Talon Ridge las sich die Straße
+// aus zweihundert Metern als Treppe dunkler Platten. Die Höhenprüfung fand
+// nichts, weil sie die Mitte misst, und die stimmt.
+pruefe('Fahrbahnstücke am Hang sind geneigt', await page.evaluate(() => {
+ const L = window.LOWTIDE;
+ let geneigt = 0, flachAmHang = 0;
+ for (const netz of L.world.bloecke || []) {
+  const a = netz.instanceMatrix.array;
+  for (let i = 0; i < netz.count; i++) {
+   const o = i * 16, x = a[o + 12], y = a[o + 13], z = a[o + 14];
+   const sy = Math.hypot(a[o + 4], a[o + 5], a[o + 6]);
+   if (Math.abs(sy - .08) > .01) continue;               // Deckenstärke
+   if (!L.onRoad(x, z, 0)) continue;
+   if (L.groundAt(x, z) < 6) continue;                   // nur am Hang
+   const winkel = Math.acos(Math.min(1, Math.abs(a[o + 5] / sy))) * 180 / Math.PI;
+   if (winkel > 1.5) geneigt++; else flachAmHang++;
+  }
+ }
+ return geneigt > 20 && geneigt > flachAmHang;
+}), await page.evaluate(() => {
+ const L = window.LOWTIDE;
+ let geneigt = 0, flach = 0;
+ for (const netz of L.world.bloecke || []) {
+  const a = netz.instanceMatrix.array;
+  for (let i = 0; i < netz.count; i++) {
+   const o = i * 16;
+   const sy = Math.hypot(a[o + 4], a[o + 5], a[o + 6]);
+   if (Math.abs(sy - .08) > .01 || !L.onRoad(a[o + 12], a[o + 14], 0)) continue;
+   if (L.groundAt(a[o + 12], a[o + 14]) < 6) continue;
+   (Math.acos(Math.min(1, Math.abs(a[o + 5] / sy))) * 180 / Math.PI > 1.5 ? geneigt++ : flach++);
+  }
+ }
+ return `${geneigt} geneigt, ${flach} waagerecht`;
+}));
 pruefe('Fahrbahnen liegen auf dem Gelände', strassenHoehe.schlimmster < 1.2,
  `größte Abweichung ${strassenHoehe.schlimmster.toFixed(2)} m bei ${JSON.stringify(strassenHoehe.wo)}`);
 pruefe('Die Straße über den Talon Ridge liegt auf dem Rücken',
