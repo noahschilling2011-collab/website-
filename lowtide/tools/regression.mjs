@@ -1034,6 +1034,25 @@ pruefe('Die Teststelle liegt überhaupt auf einer Fahrbahn', bremsen.aufFahrbahn
 pruefe('Ohne Hindernis fährt der Wagen', bremsen.frei > .5, `${bremsen.frei} m in zwölf Ticks`);
 pruefe('Mit einem Fußgänger vier Meter voraus hält er', bremsen.gebremst < .05,
  `${bremsen.gebremst} m in zwölf Ticks`);
+// Figuren, die ineinander stehen. Sie kommen aus fünf Quellen, und keine
+// kennt die Stellen der anderen: gemessen einundfünfzig Paare näher als 0,55
+// Meter, engster Abstand 0,00.
+//
+// Kein Nullwert als Schwelle, sondern eine kleine Zahl: zwei Leute, die
+// aneinander vorbeigehen, kommen sich zwangsläufig nahe, und die Prüfung
+// läuft mitten im Spiel und nicht beim Aufbau.
+const gedraenge = await page.evaluate(() => {
+ const n = window.LOWTIDE.sim.npcs.filter(v => v.health > 0);
+ let paare = 0, engster = 99;
+ for (let i = 0; i < n.length; i++) for (let j = i + 1; j < n.length; j++) {
+  const d = Math.hypot(n[i].x - n[j].x, n[i].z - n[j].z);
+  if (d < .55) paare++;
+  if (d < engster) engster = d;
+ }
+ return {paare, engster: +engster.toFixed(2), figuren: n.length};
+});
+pruefe('Keine Figuren stehen ineinander', gedraenge.paare < 5,
+ `${gedraenge.paare} Paare unter 0,55 m bei ${gedraenge.figuren} Figuren, engster ${gedraenge.engster} m`);
 pruefe('Sparmodus schaltet die Nachbearbeitung ab', await page.evaluate(() => {
  const knopf = document.getElementById('qualityBtn'), w = window.LOWTIDE.world;
  knopf.click();

@@ -246,6 +246,32 @@ export class Campaign extends Simulation{
    if(n.originalPath?.[0]){n.originalPath[0].x+=dx; n.originalPath[0].z+=dz;}
   }
 
+  // Und auseinanderschieben, wer aufeinander steht. Die Figuren kommen aus
+  // fünf Quellen — Rundgänge, Blöcke, Wachen, Strandmenge, Gehwege —, und
+  // keine kennt die Stellen der anderen. Gemessen einundfünfzig Paare näher
+  // als 0,55 Meter, engster Abstand 0,00: einige standen exakt ineinander.
+  //
+  // Einmal beim Aufbau, quadratisch über 413 Figuren sind das
+  // hundertsiebzigtausend Vergleiche und damit nicht der Rede wert; zur
+  // Laufzeit wäre es das sehr wohl.
+  const gesetzt=[];
+  for(const n of this.npcs){
+   if(n.guard){gesetzt.push(n);continue;}   // Wachen stehen, wo sie stehen
+   for(let versuch=0;versuch<8;versuch++){
+    const zuNah=gesetzt.find(m=>Math.hypot(m.x-n.x,m.z-n.z)<1.15);
+    if(!zuNah)break;
+    const a=Math.atan2(n.z-zuNah.z,n.x-zuNah.x)+(versuch?versuch*.9:0);
+    const x=zuNah.x+Math.cos(a)*1.3, z=zuNah.z+Math.sin(a)*1.3;
+    if(onRoad(x,z,0)||this.blocked({x,z},1.1)||waterAt(x,z))continue;
+    const dx=x-n.x, dz=z-n.z;
+    n.x=x; n.z=z;
+    if(n.path?.[0]){n.path[0].x+=dx; n.path[0].z+=dz;}
+    if(n.home){n.home.x+=dx; n.home.z+=dz;}
+    if(n.originalPath?.[0]){n.originalPath[0].x+=dx; n.originalPath[0].z+=dz;}
+   }
+   gesetzt.push(n);
+  }
+
   // Transport, Fluchtboot und die vier Aktwachen. Sie entstehen hier und
   // nicht erst beim Missionsstart, weil die Meshes einmalig nach Index
   // angelegt werden — später eingefügte Fahrzeuge blieben unsichtbar.

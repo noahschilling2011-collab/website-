@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 177 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 178 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -556,6 +556,33 @@ sonst schöbe der Verkehr ihn von hinten an.
 
 Danach: **null Paare** unter 3,6 Metern, engster Abstand 4,97 Meter. Zwei
 Prüfungen halten Dichte und Abstand fest.
+
+## Einundfünfzig Paare standen ineinander
+
+Dieselbe Frage wie beim Verkehr, eine Ebene tiefer: stehen die Figuren
+ineinander? Bei 413 auf schmalen Gehwegen keine müßige Frage. Gemessen
+**einundfünfzig Paare** näher als 0,55 Meter, engster Abstand **0,00** —
+einige standen exakt auf demselben Punkt.
+
+Der Grund ist derselbe wie bei den Bauwerken in den Fahrbahnen: die Figuren
+kommen aus fünf Quellen — Rundgänge aus `simulation.js`, Blöcke aus
+`campaign.js`, Wachen, Strandmenge, Gehwege —, und keine kennt die Stellen
+der anderen. Wo zwei Straßensegmente kreuzen, erzeugt der Gehwegwurf denselben
+Punkt zweimal.
+
+Ein Nachlauf beim Aufbau schiebt sie auseinander, quadratisch über 413
+Figuren, also hundertsiebzigtausend Vergleiche — beim Aufbau nicht der Rede
+wert, zur Laufzeit sehr wohl. Wachen bleiben, wo sie stehen.
+
+| | vorher | nachher |
+|---|---|---|
+| Paare unter 0,55 m beim Start | 51 | 0 |
+| engster Abstand beim Start | 0,00 m | 1,30 m |
+| engster Abstand nach zehn Sekunden | 0,00 m | 0,98 m |
+
+Die 0,98 Meter nach zehn Sekunden sind zwei Leute, die aneinander
+vorbeigehen. Deshalb prüft die Regression auch nicht auf null, sondern auf
+weniger als fünf Paare: sie läuft mitten im Spiel, nicht beim Aufbau.
 
 ## Der Verkehr sieht jetzt auch Fußgänger
 
