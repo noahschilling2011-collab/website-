@@ -184,7 +184,13 @@ const imRechteck=(x,z,r)=>x>r.x1&&x<r.x2&&z>r.z1&&z<r.z2;
 // Wasser und war für jede Abfrage trockener Boden — man lief darüber. Als
 // Ellipse, weil sein Ufer als Ellipse gebaut ist; ein Rechteck ragte an den
 // Diagonalen über die Böschung hinaus.
-export const SEEN=[{x:-700,z:80,rx:118,rz:88}];
+// Der Stausee reichte mit seiner Westspitze bis x = -818. Der Ridge Highway
+// liegt bei x = -820 und ist siebzehn Meter breit, seine Ostkante also bei
+// -811,5 — der See lag sechseinhalb Meter unter der Fahrbahn. Gemessen an
+// den fahrenden Wagen: vier von 1905 Proben standen im Wasser, alle bei
+// x = -815. Halbachse von 118 auf 106; die Uferböschung in regions.js zieht
+// mit, sonst bliebe zwischen Wasserkante und Böschung ein trockener Ring.
+export const SEEN=[{x:-700,z:80,rx:106,rz:88}];
 export function imSee(x,z){
  for(const s of SEEN)if(Math.hypot((x-s.x)/s.rx,(z-s.z)/s.rz)<1)return true;
  return false;

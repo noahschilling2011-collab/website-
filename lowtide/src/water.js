@@ -1,5 +1,5 @@
 import * as T from './vendor/three.module.js';
-import {INSELN, DAEMME, WEST_DAEMME} from './content.js';
+import {INSELN, DAEMME, WEST_DAEMME, SEEN} from './content.js';
 // Wasser für Solvara.
 // Vorher: eine Ebene mit zwei Farben und einer Sinuswelle, ohne Reflexion,
 // ohne Schaum, ohne Bezug zum Sonnenstand. Wasser ist in dieser Stadt aber
@@ -168,7 +168,10 @@ export function createWater(art = 'ozean') {
  const uniforms = {
   zeit: {value: 0}, nacht: {value: 0}, dunst: {value: .12},
   art: {value: see ? 2 : sumpf ? 1 : 0},
-  seeEllipse: {value: new T.Vector4(-700, 80, 118, 88)},
+  // Die Ellipse stand hier ein zweites Mal — einmal in content.js für
+  // waterAt(), einmal hier für den Shader. Beim Verkleinern des Sees wäre
+  // die eine ohne die andere geblieben. Jetzt eine Quelle.
+  seeEllipse: {value: new T.Vector4(SEEN[0].x, SEEN[0].z, SEEN[0].rx, SEEN[0].rz)},
   kraeuselStaerke: {value: see ? .34 : sumpf ? .6 : .8},
   kuesteX: {value: sumpf ? -400 : 119}, land: {value: LANDRECHTECKE},
   zenith: {value: new T.Color(0x2578cc)}, horizon: {value: new T.Color(0xc9dde2)},

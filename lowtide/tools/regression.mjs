@@ -1808,6 +1808,47 @@ console.log('Rendern');
 const info = await page.evaluate(() => {const i = window.LOWTIDE.world.renderer.info; return {c: i.render.calls, t: i.render.triangles};});
 pruefe('Es wird tatsächlich gezeichnet', info.c > 100, `${info.c} Draw Calls, ${info.t.toLocaleString('de-DE')} Dreiecke`);
 
+// Die Routen liegen auf der Straße — fährt der Verkehr auch darauf? Dreißig
+// Sekunden Simulation, jede Sekunde jeder fahrende Wagen geprüft.
+//
+// Dieser Abschnitt steht als letzter vor dem Schließen des Browsers, weil er
+// die Simulation weiterlaufen lässt: Uhr, Wetter, Figurenzustände und
+// Ereignisse wandern dabei mit. Weiter oben eingesetzt ließ er 'Akt 4 zahlt
+// aus und führt in Akt 5' fallen — dieselbe Sorte Fehler wie damals bei der
+// Bremsprüfung, nur diesmal von der neuen Prüfung verursacht statt gefunden.
+await page.evaluate(() => {window.__fahrt = {proben: 0, neben: 0, nass: 0, steht: 0};});
+// In zehn Abschnitten statt in einem, damit der Renderer zwischendurch
+// drankommt.
+for (let teil = 0; teil < 10; teil++) {
+ await page.evaluate(() => {
+  const L = window.LOWTIDE, s = L.sim, z = window.__fahrt;
+  for (let i = 0; i < 60; i++) {
+   s.tick(.05, {});
+   if (i % 20) continue;
+   for (const c of s.cars) {
+    if (c.type !== 'traffic') continue;
+    z.proben++;
+    if (Math.abs(c.speed) < .5) z.steht++;
+    if (L.waterAt(c.x, c.z)) z.nass++;
+    if (!L.onRoad(c.x, c.z, 0)) z.neben++;
+   }
+  }
+ });
+}
+const gefahren = await page.evaluate(() => window.__fahrt);
+pruefe('Kein fahrender Wagen verlässt die Fahrbahn', gefahren.neben === 0,
+ `${gefahren.neben} von ${gefahren.proben} Proben`);
+pruefe('Kein fahrender Wagen steht im Wasser', gefahren.nass === 0,
+ `${gefahren.nass} von ${gefahren.proben} Proben`);
+// Der Ridge Highway lag sechseinhalb Meter über der Westspitze des Stausees.
+pruefe('Kein Baum steht im Wasser', await page.evaluate(() => {
+ const L = window.LOWTIDE;
+ return (L.world.laubwerk?.liste || []).every(t => !L.waterAt(t.x, t.z));
+}), await page.evaluate(() => {
+ const L = window.LOWTIDE, l = L.world.laubwerk?.liste || [];
+ return `${l.filter(t => L.waterAt(t.x, t.z)).length} von ${l.length}`;
+}));
+
 // Die Touch-Oberfläche hängt an `@media(pointer:coarse)` und ist auf einem
 // Zeigergerät ausgeblendet. Dafür braucht es einen eigenen Browser mit
 // Berührungsemulation, sonst prüft man nur unsichtbare Knöpfe. Der erste

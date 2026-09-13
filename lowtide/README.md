@@ -916,6 +916,33 @@ zurück.
 
 218 Prüfungen bestanden, keine gefallen.
 
+## Der Verkehr fährt auch wirklich dort
+
+Routen auf der Straße heißt nicht, dass die Wagen darauf bleiben. Dreißig
+Sekunden Simulation, jede Sekunde jeder fahrende Wagen: **1905 Proben, null
+neben der Fahrbahn, null stehengeblieben** — und vier im Wasser.
+
+Die vier standen alle bei x = -815. Der Ridge Highway liegt bei x = -820 und
+ist siebzehn Meter breit, seine Ostkante also bei -811,5. Der Stausee reichte
+mit seiner Westspitze bis -818: sechseinhalb Meter Fahrbahn lagen über dem
+See. Die Halbachse ist jetzt 106 statt 118, die Uferböschung in `regions.js`
+zieht mit (sonst bliebe zwischen Wasserkante und Böschung ein trockener Ring),
+und die Ellipse steht nur noch an einer Stelle — vorher einmal in `content.js`
+für `waterAt()` und einmal in `water.js` für den Shader.
+
+Beim Nachzählen fielen **sechzehn Fichten im See** auf. Sie kommen aus dem
+Bewuchs von Talon Ridge: dessen Streubereich reicht im Südosten bis x = -570
+und z = 90 und damit in den Stausee, und er prüfte auf Straße und Hindernis,
+aber nicht auf Wasser.
+
+Drei Prüfungen dazu. Die erste Fassung stand vor den Aktprüfungen und ließ
+„Akt 4 zahlt aus und führt in Akt 5" fallen — dreißig Sekunden Simulation
+bewegen Uhr, Wetter und Figurenzustände weiter. Dieselbe Sorte Fehler wie
+damals bei der Bremsprüfung, nur diesmal von der neuen Prüfung verursacht
+statt gefunden. Sie steht jetzt als letzte vor dem Schließen des Browsers.
+
+221 Prüfungen bestanden, keine gefallen.
+
 ## Was geprüft wurde und in Ordnung war
 
 Nicht jede Messung findet etwas, und das gehört genauso hierher.

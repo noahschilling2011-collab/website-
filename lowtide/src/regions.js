@@ -1,4 +1,4 @@
-import {groundAt, waterAt, locations, onRoad, INSELN, DAEMME, TANKSTELLE} from './content.js';
+import {groundAt, waterAt, locations, onRoad, INSELN, DAEMME, TANKSTELLE, SEEN} from './content.js';
 // Der Rest von Solvara.
 // Port Mercy war ausgebaut, alles andere bestand aus Andeutungen: sechs
 // Kisten für die Vororte, ein Feld mit Strichen für Bellweather, 155
@@ -1146,12 +1146,20 @@ function rosalind(w, rng) {
 // Stausee mit Damm. Wasser, das nicht Meer ist — und ein Bauwerk, das man
 // befahren kann.
 function stausee(w, rng) {
- const mx = -700, mz = 80, rx = 120, rz = 90;
+ // Halbachsen zwei Meter größer als die Wasserfläche in content.js: die
+ // Böschung liegt außen herum, nicht darin.
+ const mx = SEEN[0].x, mz = SEEN[0].z, rx = SEEN[0].rx + 2, rz = SEEN[0].rz + 2;
  // Uferböschung als Ring aus Kisten, innen das Wasser.
  for (let a = 0; a < Math.PI * 2; a += .09) {
   const x = mx + Math.cos(a) * rx, z = mz + Math.sin(a) * rz;
   w.box(x, .5, z, 9, 1, 9, 0x6f6a52, a);
-  if (Math.floor(a * 6) % 5 === 0) nadelbaum(w, x + Math.cos(a) * 8, z + Math.sin(a) * 8, 7 + rng() * 5, 0x3d5a3f);
+  // Der Baum sitzt acht Meter radial nach außen. Bei einer Ellipse ist das
+  // nicht dasselbe wie senkrecht zur Uferlinie — sechzehn Fichten standen
+  // dadurch im See. waterAt() entscheidet, nicht die Rechnung.
+  if (Math.floor(a * 6) % 5 === 0) {
+   const bx = x + Math.cos(a) * 8, bz = z + Math.sin(a) * 8;
+   if (!waterAt(bx, bz)) nadelbaum(w, bx, bz, 7 + rng() * 5, 0x3d5a3f);
+  }
  }
  // Die Wasserfläche war hier eine dunkle Platte mit sechsundzwanzig helleren
  // Kisten darauf. Sie liegt jetzt als Wassershader in world.js, und der See
@@ -1204,7 +1212,10 @@ function talonRidge(w, rng) {
  // Bewuchs am Hang, dichter im Tal.
  for (let i = 0; i < 620; i++) {
   const x = -1090 + rng() * 520, z = -530 + rng() * 620;
-  if (aufStrasse(x, z, 10) || w.sim.blocked({x, z}, 3)) continue;
+  // Der Streubereich reicht im Südosten bis x = -570 und z = 90 und damit in
+  // den Stausee hinein: sechzehn Fichten standen im Wasser. Gefunden nicht
+  // mit dem Auge, sondern beim Zählen der Kulisse über waterAt().
+  if (waterAt(x, z) || aufStrasse(x, z, 10) || w.sim.blocked({x, z}, 3)) continue;
   const y = groundAt(x, z);
   // Über 62 m wächst kein Baum mehr — das stand hier von Anfang an, war
   // aber als "gar nichts" umgesetzt. Die obersten 26 Meter des Rückens
