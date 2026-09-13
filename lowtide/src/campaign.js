@@ -161,7 +161,22 @@ export class Campaign extends Simulation{
      fuel:100,tires:100,glass:100,lights:100,alt:0,upgrades:{},owner:null});
    }
   });
-  for(let i=18;i<54;i++){const x=i<36?-151-(i%3)*60:-89+(i%3)*54,z=i<36?-152+Math.floor((i-18)/3)*48:-295;const path=[{x,z},{x:x+20,z},{x:x+20,z:z+18},{x,z:z+18}];this.npcs.push({id:i,x,z,yaw:0,state:'normal',timer:0,health:100,path,target:1,personality:['caller','filmer','coward','aggressive'][i%4],pace:1.1+this.rng()*.6,report:null});}
+  // Achtzehn Figuren im Norden auf sechs mal drei Rechtecken — und achtzehn
+  // im Süden, die alle auf **drei** lagen: für i >= 36 war z fest auf -295
+  // und x hatte nur die drei Werte aus (i%3). Sechs Figuren liefen also
+  // denselben Ring, vom selben Startpunkt aus, in Gleichschritt.
+  //
+  // Aufgefallen ist das erst, als ferne Figuren aufhörten, im Zwölfteltempo
+  // zu kriechen: vorher standen sie weit genug auseinander, danach meldete
+  // die Prüfung fünf dauerhaft ineinanderstehende Paare, darunter 42/48 und
+  // 46/52 auf demselben Punkt. Jetzt bekommt jede Dreiergruppe im Süden sieben
+  // Meter Versatz, und der Startpunkt auf dem Ring wechselt mit i.
+  for(let i=18;i<54;i++){
+   const versatz=i<36?0:Math.floor((i-36)/3)*7;
+   const x=(i<36?-151-(i%3)*60:-89+(i%3)*54)+versatz;
+   const z=i<36?-152+Math.floor((i-18)/3)*48:-295;
+   const path=[{x,z},{x:x+20,z},{x:x+20,z:z+18},{x,z:z+18}];
+   this.npcs.push({id:i,x,z,yaw:0,state:'normal',timer:0,health:100,path,target:1+(i%3),personality:['caller','filmer','coward','aggressive'][i%4],pace:1.1+this.rng()*.6,report:null});}
   this.npcs.forEach(n=>{n.home={...n.path[0]};n.work={...n.path[2]};n.originalPath=n.path.map(p=>({...p}));n.schedule='street';n.stun=0;});
   for(let i=6;i<12;i++)this.cops.push({id:i,x:-280+(i-6)*4,z:-180,yaw:0,active:false,health:100,route:[],target:0,repath:0,shot:0});
   this.cops.forEach(c=>{c.base={x:c.x,z:c.z};c.role=c.id>=6?'tactical':'patrol';c.stun=0;});
@@ -313,6 +328,47 @@ export class Campaign extends Simulation{
     home:{...path[0]},work:{...(path[2]||path[path.length-1])},
     originalPath:path.map(q=>({...q}))});
   });
+
+  // Arbeitsplätze. updateRoutines() schickt jede Figur um 8 Uhr zu n.work und
+  // um 20 Uhr zu n.home — nur waren beide bisher derselbe Punkt: work kam aus
+  // path[2], und der Weg der Menge ist [{x,z}, ziel, {x,z}]. Nachgemessen
+  // hatten **382 von 530 Figuren (72 Prozent) Heim und Arbeit unter einem
+  // Meter auseinander**, Median null. Zweimal am Tag lief für jede von ihnen
+  // eine Wegsuche, die sie auf den Fleck zurückschickte, auf dem sie stand.
+  //
+  // Jetzt bekommt, wer nicht direkt an seinem Wohnort arbeitet, den Wohnort
+  // einer anderen Figur als Arbeitsplatz — das hält den Weg auf dem Gehweg,
+  // weil beide Punkte aus derselben Bordsteinschleife stammen. Zwischen 120
+  // und 400 Metern: kürzer wäre kein Pendeln, länger würde die Wegsuche teuer
+  // und der Fußweg unglaubwürdig. Jede vierte Figur bleibt ohne Arbeitsweg —
+  // Ladeninhaber, Anwohner, Leute im Ruhestand.
+  // Der Topf enthält nur die Wohnorte von Pendlern. Nimmt man alle, bekommt
+  // eine Figur den Wohnort eines Nichtpendlers als Arbeitsplatz — und der
+  // sitzt tagsüber dort, weil er nirgends hingeht. Genau das waren die fünf
+  // bleibenden Paare mit einem Zentimeter Abstand, die die Prüfung meldete.
+  // So ist der Arbeitsplatz immer der Wohnort von jemandem, der tagsüber
+  // selbst unterwegs ist.
+  const wohnorte=this.npcs.filter(n=>n.id>=200&&n.home&&n.id%4!==0).map(n=>({x:n.home.x,z:n.home.z}));
+  // Jeder Arbeitsplatz wird nur einmal vergeben. Ohne das landeten mehrere
+  // Pendler auf demselben Punkt und standen dort ineinander — die Prüfung
+  // "Keine Figuren stehen ineinander" meldete sieben Paare unter 0,55 m.
+  const vergeben=new Set();
+  let pendler=0;
+  for(const n of this.npcs){
+   if(n.id<200||!n.home||n.id%4===0)continue;
+   // Deterministischer Startpunkt je Figur, damit nicht alle dieselbe Wahl
+   // treffen und die Zuordnung über Läufe hinweg gleich bleibt.
+   const start=(n.id*37)%wohnorte.length;
+   for(let k=0;k<wohnorte.length;k++){
+    const i=(start+k)%wohnorte.length;
+    if(vergeben.has(i))continue;
+    const w=wohnorte[i];
+    const d=Math.hypot(w.x-n.home.x,w.z-n.home.z);
+    if(d<120||d>400)continue;
+    vergeben.add(i);n.work={x:w.x,z:w.z};pendler++;break;
+   }
+  }
+  this.pendler=pendler;
 
   // Wer auf der Fahrbahn steht, wird an den Rand geschoben. Die Figuren
   // entstehen an vier Stellen mit unterschiedlicher Absicht — Rundgänge aus
@@ -565,8 +621,29 @@ export class Campaign extends Simulation{
   if(input.forward||input.turn)p.cover=false;if(input.sprint&&!p.car){p.stamina=Math.max(0,p.stamina-dt*12/(1+p.fitness*.04));}else p.stamina=Math.min(100,p.stamina+dt*9);
   const oldWeatherTimer=this.weatherTimer;const all=this.npcs;const stunned=new Map();for(const n of [...all,...this.cops]){n.stun=Math.max(0,(n.stun||0)-dt);if(n.stun>0){stunned.set(n,n.health);n.health=0;}}
   // Distant civilians receive coarse updates; pending witness calls stay active.
+  //
+  // Der Grobtakt hatte einen Fehler, der erst mit den Arbeitswegen auffiel:
+  // ferne Figuren wurden jeden zwölften Tick verarbeitet, aber mit demselben
+  // dt. Dort lief die Welt damit mit einem Zwölftel Geschwindigkeit. Gemessen
+  // am Berufsverkehr: nach fünf Minuten Spielzeit hatten alle 334 Pendler auf
+  // "Arbeit" umgestellt, aber nur 100 sich überhaupt mehr als vierzig Meter
+  // bewegt und **sieben** ihren Arbeitsplatz erreicht.
+  //
+  // Die Bewegung hängt an pace mal dt. Im Grobtakt bekommt deshalb, wer weiter
+  // als 180 Meter weg ist, für diesen einen Tick das Zwölffache — dieselbe
+  // Strecke im Mittel, in Schritten von 24 Zentimetern statt 2. Was damit
+  // nicht mitwächst, sind die Zeitgeber der Figuren; ein ferner Zeuge
+  // telefoniert also weiter im Zwölftelttempo. Das ist gewollt: er wird beim
+  // Näherkommen ohnehin wieder fein getaktet, und die Meldung soll nicht
+  // schneller kommen, nur weil niemand hinsieht.
+  const grob=this.tickCount%12===0;
+  const fern=grob?all.filter(n=>distance(n,p)>=180&&!n.report):null;
+  const paceVorher=fern?fern.map(n=>n.pace):null;
+  if(fern)for(const n of fern)n.pace=(n.pace||1)*12;
   this.npcs=all.filter(n=>distance(n,p)<180||n.report||this.tickCount%12===0);
-  super.tick(dt,{...input,sprint:input.sprint&&p.stamina>0,sneak:input.sneak||p.cover});this.npcs=all;for(const [n,h] of stunned)n.health=h;
+  super.tick(dt,{...input,sprint:input.sprint&&p.stamina>0,sneak:input.sneak||p.cover});
+  if(fern)fern.forEach((n,i)=>{n.pace=paceVorher[i];});
+  this.npcs=all;for(const [n,h] of stunned)n.health=h;
   if(oldWeatherTimer<=dt){this.weatherIndex=(this.weatherIndex+1)%4;this.weather=['clear','rain','fog','storm'][this.weatherIndex];this.notify('Wetterwechsel: '+this.weather);}
   if(!p.car){if(waterAt(p.x,p.z)&&p.y<=0){p.y=input.sneak?Math.max(-3.5,p.y-dt*1.5):Math.min(-.5,p.y+dt*2);p.air=clamp(p.air+(p.y<-1.5?-dt*10:dt*25),0,100);if(!p.air)p.health=Math.max(0,p.health-dt*8);}else{p.vy-=dt*(p.parachute?2:16);p.vy=Math.max(p.parachute?-3:-35,p.vy);p.y+=p.vy*dt;if(p.y<=0){if(p.vy<-13)p.health=Math.max(0,p.health-(-p.vy-13)*3);p.y=0;p.vy=0;if(p.parachute){this.award(60);this.notify('Sicher gelandet. $60.');}p.parachute=false;}}}
   if(this.activity){const a=this.activity;a.time+=dt;a.phase=(Math.sin(a.time*(a.kind==='club'?5:a.kind==='gym'?3:2.5))+1)/2;if(a.kind==='race'&&distance(p,a.points[a.index])<10){a.index++;if(a.index===a.points.length){
@@ -579,7 +656,45 @@ export class Campaign extends Simulation{
     this.activity=null;}}if(a.kind==='fishing'&&a.time>a.biteAt+1){this.notify('Der Fisch ist entkommen.');this.activity=null;}}
   this.zahltag();storyTick(this,dt);this.updateRoutines(dt);this.updateGuards(dt);this.updateEvents(dt);if(this.campaign.witness&&this.campaign.stage===2){if(!this.witness)this.witness={x:p.x-2,z:p.z-2};const d=distance(this.witness,p);if(p.car){this.witness.x=p.x;this.witness.z=p.z;}else if(d>2){this.witness.x+=(p.x-this.witness.x)/d*dt*5;this.witness.z+=(p.z-this.witness.z)/d*dt*5;}}
  }
- updateRoutines(dt){if(this.tickCount%30)return;for(const n of this.npcs){if(n.guard||n.report||n.health<=0||n.state!=='normal')continue;const mode=this.hour>=8&&this.hour<17?'Arbeit':this.hour>=20||this.hour<6?'Zuhause':'Freizeit';if(n.schedule!==mode){n.schedule=mode;const goal=mode==='Zuhause'?n.home:n.work;n.path=mode==='Freizeit'?n.originalPath.map(p=>({...p})):[...findPath(n,goal,p=>this.blocked(p,.3),2,2500),goal];n.target=0;}n.pace=this.weather==='storm'?2:1.1+(n.id%5)*.13;}}
+ // Tageslauf: um 8 Uhr zur Arbeit, um 20 Uhr nach Hause, dazwischen der
+ // eigene Rundgang. Zwei Deckel darin, beide aus einer Messung und nicht
+ // geschätzt.
+ //
+ // Erstens die Schrittweite. Eine Wegsuche mit Schrittweite 2 und 2500 Knoten
+ // kostet auf dieser Karte 4,7 ms — nicht wegen blocked(), das liegt bei 0,53
+ // Mikrosekunden bei 104 Solids, sondern wegen der schieren Knotenzahl. Für
+ // einen Fußgänger auf einem sieben Meter breiten Gehweg reicht ein Raster von
+ // vier Metern; das viertelt die Fläche und damit die Knoten.
+ //
+ // Zweitens die Zahl je Durchlauf. Als alle 334 Pendler ihren Weg im selben
+ // Tick suchten, stand das Spiel **1613 Millisekunden** still — gemessen, ein
+ // einzelner Tick gegen 0,46 ms im Ruhezustand. Jetzt stellen sich höchstens
+ // drei je Durchlauf um; der Rest kommt beim nächsten. Bei einem Durchlauf
+ // alle dreißig Ticks braucht der Berufsverkehr damit rund anderthalb Minuten,
+ // bis alle unterwegs sind — was besser aussieht als ein Ruck, bei dem die
+ // ganze Stadt gleichzeitig losgeht.
+ updateRoutines(dt){
+  if(this.tickCount%30)return;
+  const mode=this.hour>=8&&this.hour<17?'Arbeit':this.hour>=20||this.hour<6?'Zuhause':'Freizeit';
+  let umgestellt=0;
+  for(const n of this.npcs){
+   if(n.guard||n.report||n.health<=0||n.state!=='normal')continue;
+   if(n.schedule!==mode&&umgestellt<3){
+    umgestellt++;
+    n.schedule=mode;
+    const goal=mode==='Zuhause'?n.home:n.work;
+    // Fußgänger gehen auf dem Gehweg. findPath kennt seit den Streifenwagen
+    // Feldkosten; für Leute ist das Vorzeichen umgekehrt — die Fahrbahn ist
+    // begehbar, aber teuer. Ohne das liefen die Pendler mitten auf der
+    // Straße: 65 von 530 Figuren standen gleichzeitig in einer Fahrspur, die
+    // Prüfung lässt zehn Prozent zu.
+    n.path=mode==='Freizeit'?n.originalPath.map(p=>({...p}))
+     :[...findPath(n,goal,p=>this.blocked(p,.3),4,1200,p=>onRoad(p.x,p.z,0)?5:1),goal];
+    n.target=0;
+   }
+   n.pace=this.weather==='storm'?2:1.1+(n.id%5)*.13;
+  }
+ }
  updateGuards(dt){for(const n of this.npcs.filter(n=>n.guard&&!n.aktWache)){if(n.health<=0||n.stun>0)continue;n.shot=(n.shot||0)-dt;const p=this.player;const suspicious=this.campaign.stage===1&&!this.campaign.relay||p.armed||this.stars;const sees=distance(n,p)<25&&lineClear(n,p,this.solids);if(suspicious&&sees&&n.shot<=0){n.shot=2.5;if(!this.campaign.relay){this.report(1);this.notify('Archivwache hat dich erkannt.');}if(this.stars>=2&&this.dodgeTime===0)p.health-=p.cover?2:7;}}}
  updateEvents(dt){for(const n of this.npcs){if(n.state==='tanzend'&&this.time>n.danceUntil)n.state='normal';if(n.state==='aggressiv'&&n.health>0&&n.stun<=0){const target=this.npcs.find(v=>v!==n&&v.health>0&&distance(v,n)<8);if(target){const d=distance(n,target);if(d>1.5)this.move(n,(target.x-n.x)/d*dt*2,(target.z-n.z)/d*dt*2,.3);else{target.health=Math.max(0,target.health-dt*4);target.state='flüchtend';target.timer=4;}}if(this.time>n.aggressiveUntil)n.state='normal';}}this.nextEvent-=dt;if(this.currentEvent){this.currentEvent.ttl-=dt;if(this.currentEvent.ttl<=0)this.currentEvent=null;}if(this.nextEvent>0)return;this.nextEvent=50;const kinds=['Panne','Streit','Straßenrennen','Überfall','Party'];const kind=kinds[Math.floor(this.time/50)%kinds.length];const n=this.npcs.find(n=>!n.guard&&n.health>0&&distance(n,this.player)<60);this.currentEvent={kind,x:n?.x||-160,z:n?.z||80,ttl:25,npcId:n?.id};if(kind==='Streit'||kind==='Überfall'){if(n){n.state='aggressiv';n.aggressiveUntil=this.time+15;}}if(kind==='Straßenrennen'){const c=this.cars.find(c=>c.type==='traffic');if(c)c.speed=22;}if(kind==='Party'&&n){n.state='tanzend';n.danceUntil=this.time+20;}if(kind==='Panne'){const c=this.cars.find(c=>c.type==='traffic');if(c)c.wait=20;}this.notify('In der Nähe: '+kind);
   this.post('@tideline_lokal',{Panne:'Liegengebliebener Wagen blockiert eine Spur.',

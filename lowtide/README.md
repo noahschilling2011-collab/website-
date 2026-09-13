@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 256 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 261 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1318,6 +1318,100 @@ wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
 besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
+
+## Die Stadt ging nie zur Arbeit
+
+`updateRoutines()` schickt jede Figur um 8 Uhr zu `n.work` und um 20 Uhr zu
+`n.home`. Der Code lief, zweimal am Tag, für jede Figur. Nur waren beide
+Punkte derselbe: `work` kam aus `path[2]`, `home` aus `path[0]`, und der Weg
+der Menge ist `[{x,z}, ziel, {x,z}]`.
+
+Nachgemessen: **382 von 530 Figuren (72 Prozent) hatten Heim und Arbeit unter
+einem Meter auseinander. Median null.** Zweimal täglich suchte jede von ihnen
+einen Weg zu dem Fleck, auf dem sie schon stand.
+
+Jetzt bekommt jede vierte Figur keinen Arbeitsweg (Ladeninhaber, Anwohner) und
+der Rest den Wohnort einer **anderen pendelnden** Figur, jeder nur einmal
+vergeben, zwischen 120 und 400 Metern. Median **151,3 Meter**, längster Weg
+399,8.
+
+**Und dann stand das Spiel 1,6 Sekunden still.** Ein einzelner Tick am
+Tageswechsel: **1613 ms** gegen 0,46 ms im Ruhezustand, weil 334 Wegsuchen im
+selben Tick liefen. Eine Wegsuche mit Schrittweite 2 und 2500 Knoten kostet
+auf dieser Karte 4,7 ms — nicht wegen `blocked()`, das liegt bei 0,53
+Mikrosekunden bei 104 Solids, sondern wegen der Knotenzahl. Zwei Deckel, beide
+gemessen: Schrittweite 4 statt 2 (für einen Fußgänger auf sieben Meter
+breitem Gehweg genug) und höchstens drei Umstellungen je Durchlauf. Danach
+**2 ms**, und der Berufsverkehr setzt sich über anderthalb Minuten in
+Bewegung statt mit einem Ruck.
+
+### Die halbe Karte lief mit einem Zwölftel Geschwindigkeit
+
+Danach waren zwar alle 334 auf „Arbeit" umgestellt, aber nach fünf Minuten
+Spielzeit hatten sich nur 100 überhaupt mehr als vierzig Meter bewegt und
+**sieben** ihren Arbeitsplatz erreicht.
+
+Der Grund saß im Grobtakt und ist älter als die Arbeitswege: ferne Figuren
+werden jeden zwölften Tick verarbeitet — aber mit demselben `dt`. Dort lief
+die Welt also mit einem Zwölftel Geschwindigkeit. Solange niemand weite Wege
+hatte, ist das nie aufgefallen.
+
+Die Bewegung hängt an `pace * dt`. Im Grobtakt bekommt deshalb, wer weiter als
+180 Meter weg ist, für diesen einen Tick das Zwölffache — dieselbe Strecke im
+Mittel, in Schritten von 24 Zentimetern statt 2. Danach: 316 bewegt, 58 am
+Ziel. Was nicht mitwächst, sind die Zeitgeber der Figuren; ein ferner Zeuge
+telefoniert weiter im Zwölfteltempo, und das ist gewollt.
+
+### Was am Ende messbar ist
+
+Die Wege sind Ringe — nach dem letzten Punkt geht es zurück zum ersten —,
+„am Ziel angekommen" ist deshalb die falsche Frage. Die richtige ist, ob die
+Stadt tagsüber woanders ist als nachts:
+
+| | 9 Uhr | 22 Uhr | 9 Uhr (Wdh.) |
+|---|---|---|---|
+| mittlere Entfernung vom Wohnort | 176 m | **62 m** | 181 m |
+| mittlere Entfernung vom Arbeitsplatz | 90 m | **203 m** | 85 m |
+| näher am Arbeitsplatz als am Wohnort | 230 von 334 | **36** | 243 |
+
+### Drei Prüfungen fielen, und alle drei zu Recht
+
+Keine davon war Rauschen, und zwei meiner ersten Erklärungen waren falsch.
+
+**„Und dahinter nicht"** — die Pistole traf auf 60 Meter nur noch 37 von 40.
+Erster Verdacht: Wagen in der Schusslinie; nachgemessen standen dort auch
+wirklich drei. Nur kann ein Wagen gar nichts abfangen — `shoot()` sucht das
+nächste Ziel unter `npcs` **und den aktiven Streifen**, Fahrzeuge kommen darin
+nicht vor. Der wahre Grund ist die Prüfung selbst: jeder Schuss ruft `crime()`
+auf, vierzig Schüsse treiben die Fahndungsstufe hoch, und ab da steht eine
+Streife im Weg. Jetzt wird vor jedem Schuss die Fahndung zurückgesetzt.
+
+**„Die Menge wohnt nicht in den Fahrspuren"** — 71 von 530 auf einer Fahrbahn,
+erlaubt waren zehn Prozent. Nachgezählt hatten davon aber nur **13 überhaupt
+einen Wegpunkt auf der Fahrbahn**; die übrigen 58 waren unterwegs hinüber, und
+genau das nennt der Kommentar der Prüfung selbst zulässig. Solange ferne
+Figuren im Zwölfteltempo krochen, war fast nie jemand mitten im Überqueren.
+Gefragt wird jetzt nach der Absicht (2,5 Prozent), die bloße Anwesenheit
+bleibt als weiter gefasste zweite Schranke.
+
+**„Keine Figuren stehen ineinander"** — sieben Paare. Erster Verdacht:
+Arbeitsplätze doppelt vergeben. Falsch, das Eindeutigmachen änderte nichts.
+Die Messung zeigte: beim Aufbau null Paare, nach 400 Ticks zehn, nach 2000
+wieder zehn — aber **andere**. Also Vorbeigehende. Die Prüfung zählt jetzt nur
+noch, wer über eine halbe Sekunde hinweg überlappt, und meldete damit fünf
+echte. Deren Kennnummern verrieten den Rest: 42/48 und 46/52 standen auf
+demselben Punkt. Im Erzeuger war für `i >= 36` das `z` fest auf -295 und `x`
+hatte nur drei Werte — **achtzehn Figuren auf drei identischen Ringen, alle
+vom selben Startpunkt aus im Gleichschritt.** Ein Fehler von Anfang an,
+verdeckt davon, dass diese Figuren fast stillstanden. Jetzt sieben Meter
+Versatz je Dreiergruppe und ein wechselnder Startpunkt auf dem Ring.
+
+**Nicht behoben:** Figuren weichen einander nicht aus. Zwei, die sich
+begegnen, gehen durcheinander hindurch. Das sind die „flüchtigen" Paare in der
+Prüfung, und ein Ausweichverhalten wäre ein eigener Umbau mit eigenem
+Stau-Risiko.
+
+261 Prüfungen bestanden, keine gefallen.
 
 ## Der Nationalpark war ein lichter Hain
 

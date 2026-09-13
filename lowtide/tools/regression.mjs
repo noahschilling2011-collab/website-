@@ -91,6 +91,28 @@ const schuesse = await page.evaluate(() => {
   q.armed = true; q.weapon = name; q.car = null; s.stars = 0; s.heat = 0;
   q.inventory[name] = {ammo: 999, reserve: 999}; q.ammo = 999; q.reserve = 999;
   q.x = -100; q.z = 40; q.y = 0; q.yaw = 0;
+  // Die Schusslinie muss frei sein. Mit 530 Figuren und Arbeitswegen quer
+  // durch die Stadt stand irgendwann jemand zwischen Schütze und Ziel und
+  // fing die Kugel ab — "Und dahinter nicht" fiel, ohne dass an den Waffen
+  // etwas falsch war. Alle außer dem Opfer werden für die Dauer der Messung
+  // beiseitegeschoben und danach zurückgesetzt.
+  // Die Schusslinie muss frei sein. shoot() sucht das nächste Ziel unter
+  // `npcs` **und den aktiven Streifen** innerhalb von 65 Metern mit dot > .987
+  // — Wagen kommen darin nicht vor, die können nichts abfangen. Der erste
+  // Anlauf räumte deshalb das Falsche weg.
+  //
+  // Der eigentliche Grund ist die Prüfung selbst: jeder Schuss ruft crime()
+  // auf, vierzig Schüsse treiben die Fahndungsstufe hoch, und ab da stehen
+  // Streifenwagen im Weg — die Pistole traf auf 60 Meter nur noch 37 von 40.
+  // Also vor jedem Schuss die Fahndung zurücksetzen und beide Listen räumen.
+  if (!s.__weggeraeumt) {
+   s.__weggeraeumt = [];
+   for (const o of [...s.npcs.slice(1), ...(s.cops || [])]) {
+    if (Math.abs(o.x - q.x) < 10 && o.z > q.z - 10 && o.z < q.z + 90) {
+     s.__weggeraeumt.push({o, x: o.x, z: o.z}); o.x += 300;
+    }
+   }
+  }
   aus[name] = {};
   for (const dist of [10, 30, 60]) {
    const opfer = s.npcs[0];
@@ -98,12 +120,15 @@ const schuesse = await page.evaluate(() => {
    for (let k = 0; k < 40; k++) {
     opfer.x = q.x; opfer.z = q.z + dist; opfer.health = 100; opfer.state = 'normal'; opfer.stun = 0;
     q.cooldown = 0; s.reloadJob = null; q.ammo = 999;
+    s.stars = 0; s.heat = 0; for (const c of s.cops || []) c.active = false;
     s.shoot();
     if (opfer.health < 100 || (opfer.stun || 0) > 0) n++;
    }
    aus[name][dist] = n;
   }
  }
+ for (const e of s.__weggeraeumt || []) {e.o.x = e.x; e.o.z = e.z;}
+ s.__weggeraeumt = null;
  q.x = merk.x; q.z = merk.z; q.weapon = merk.waffe; q.armed = merk.armed;
  s.stars = 0; s.heat = 0; s.lastSeen = null; s.description = null;
  return aus;
@@ -113,7 +138,8 @@ pruefe('Jede Waffe trifft innerhalb ihrer Reichweite',
  schuesse.shotgun[10] === 40 && schuesse.taser[10] === 40,
  Object.entries(schuesse).map(([k, v]) => `${k} ${v[10]}/${v[30]}/${v[60]}`).join(', '));
 pruefe('Und dahinter nicht',
- schuesse.shotgun[30] === 0 && schuesse.taser[30] === 0 && schuesse.pistol[60] === 40);
+ schuesse.shotgun[30] === 0 && schuesse.taser[30] === 0 && schuesse.pistol[60] === 40,
+ `Schrot 30 m ${schuesse.shotgun[30]}, Taser 30 m ${schuesse.taser[30]}, Pistole 60 m ${schuesse.pistol[60]}`);
 await page.keyboard.press('q');
 await bilder(1);
 
@@ -1545,9 +1571,20 @@ const gehwege = await page.evaluate(() => {
  // beliebigen Zeitpunkt, was jeden Überquerenden meldet. Die tragfähige
  // Frage ist der Anteil: ein paar Prozent sind Verkehr, ein Drittel wäre
  // eine Menge, die in den Fahrspuren wohnt.
+ // Dritte Fassung. Die zweite zählte, wer gerade auf einer Fahrbahn steht —
+ // und traf damit jeden, der eine Straße überquert. Solange ferne Figuren nur
+ // jeden zwölften Tick und mit einem Zwölftel Tempo liefen, fiel das nicht
+ // auf; seit sie richtig gehen, sind es 71 von 530. Nachgemessen haben davon
+ // aber nur **13 überhaupt einen Wegpunkt auf der Fahrbahn** — die übrigen 58
+ // sind unterwegs hinüber. Gefragt wird deshalb nach der Absicht, und die
+ // bloße Anwesenheit bleibt als weiter gefasste zweite Schranke stehen.
  const aufStrasse = s.npcs.filter(n => L.onRoad(n.x, n.z, 0)).length;
+ const zielAufStrasse = s.npcs.filter(n => {
+  const z = n.path?.[n.target];
+  return z && L.onRoad(z.x, z.z, 0);
+ }).length;
  return {kreuzung: umkreis(-100, 20, 60), strand: umkreis(100, 250, 60),
-  gesamt: s.npcs.length, aufStrasse};
+  gesamt: s.npcs.length, aufStrasse, zielAufStrasse};
 });
 pruefe('Auf den Gehwegen der Innenstadt geht jemand', gehwege.kreuzung >= 8,
  `${gehwege.kreuzung} im Umkreis von 60 m an der Kreuzung`);
@@ -1566,8 +1603,28 @@ const bewohner = await page.evaluate(() => {
 pruefe('In jedem Stadtgebiet wohnt jemand',
  bewohner.length >= 7 && bewohner.every(g => g.leute >= 10),
  bewohner.map(g => `${g.i}: ${g.leute}`).join(', '));
+// updateRoutines schickt jede Figur um 8 Uhr zu n.work und um 20 Uhr zu
+// n.home. Beide kamen aus demselben Weg: work war path[2], home path[0], und
+// der Weg der Menge ist [{x,z}, ziel, {x,z}] — 382 von 530 Figuren hatten
+// beides unter einem Meter auseinander, Median null. Die Routine lief und
+// bewegte niemanden.
+const wege = await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ const d = s.npcs.filter(n => n.home && n.work)
+  .map(n => Math.hypot(n.home.x - n.work.x, n.home.z - n.work.z)).sort((a, b) => a - b);
+ return {n: d.length, median: d[Math.floor(d.length / 2)], gleich: d.filter(v => v < 1).length,
+  laengster: Math.max(...d)};
+});
+pruefe('Arbeitsplatz und Wohnort liegen auseinander',
+ wege.median > 100 && wege.gleich < wege.n * .35,
+ `Median ${wege.median.toFixed(1)} m, ${wege.gleich} von ${wege.n} auf demselben Punkt`);
+pruefe('Kein Arbeitsweg führt quer über die Karte', wege.laengster <= 400,
+ `längster ${wege.laengster.toFixed(1)} m`);
+pruefe('Niemand hat sein Ziel mitten auf der Fahrbahn',
+ gehwege.zielAufStrasse / gehwege.gesamt < .06,
+ `${gehwege.zielAufStrasse} von ${gehwege.gesamt} steuern einen Punkt auf der Fahrbahn an`);
 pruefe('Die Menge wohnt nicht in den Fahrspuren',
- gehwege.aufStrasse / gehwege.gesamt < .1,
+ gehwege.aufStrasse / gehwege.gesamt < .25,
  `${gehwege.aufStrasse} von ${gehwege.gesamt} gerade auf einer Fahrbahn`);
 // Verkehrsdichte. Vierundvierzig fahrende Wagen auf 15,7 Kilometern
 // Straßennetz waren eines alle 357 Meter, und sie klumpten an den Ecken der
@@ -1656,18 +1713,40 @@ pruefe('Mit einem Fußgänger vier Meter voraus hält er', bremsen.gebremst < .0
 // Kein Nullwert als Schwelle, sondern eine kleine Zahl: zwei Leute, die
 // aneinander vorbeigehen, kommen sich zwangsläufig nahe, und die Prüfung
 // läuft mitten im Spiel und nicht beim Aufbau.
+// Zweite Fassung: gezählt wird, wer **dauerhaft** ineinandersteht. Zwei
+// Proben im Abstand einer halben Sekunde, gewertet nur, wer in beiden
+// überlappt. Der Grund steht in der Messung: beim Aufbau gibt es null Paare,
+// nach vierhundert Ticks zehn — und nach zweitausend wieder zehn, aber
+// **andere**. Das sind Leute, die aneinander vorbeigehen, und das war schon
+// im Kommentar der ersten Fassung als zulässig benannt. Figuren weichen
+// einander nicht aus; das steht als bekannte Vereinfachung im README.
 const gedraenge = await page.evaluate(() => {
- const n = window.LOWTIDE.sim.npcs.filter(v => v.health > 0);
- let paare = 0, engster = 99;
- for (let i = 0; i < n.length; i++) for (let j = i + 1; j < n.length; j++) {
-  const d = Math.hypot(n[i].x - n[j].x, n[i].z - n[j].z);
-  if (d < .55) paare++;
-  if (d < engster) engster = d;
- }
- return {paare, engster: +engster.toFixed(2), figuren: n.length};
+ const s = window.LOWTIDE.sim;
+ const leer = {forward: 0, turn: 0, yaw: 0, sprint: false, sneak: false, brake: false, jump: false, interact: false};
+ const nah = () => {
+  const n = s.npcs.filter(v => v.health > 0), satz = new Set();
+  let engster = 99;
+  for (let i = 0; i < n.length; i++) for (let j = i + 1; j < n.length; j++) {
+   const d = Math.hypot(n[i].x - n[j].x, n[i].z - n[j].z);
+   if (d < .55) satz.add(n[i].id + '|' + n[j].id);
+   if (d < engster) engster = d;
+  }
+  return {satz, engster, figuren: n.length};
+ };
+ const a = nah();
+ for (let i = 0; i < 30; i++) s.tick(1 / 60, leer);
+ const b = nah();
+ const bleibend = [...a.satz].filter(k => b.satz.has(k));
+ const wer = bleibend.slice(0, 5).map(k => {
+  const [i, j] = k.split('|').map(Number);
+  const x = s.npcs.find(v => v.id === i), y = s.npcs.find(v => v.id === j);
+  return `${i}/${j} bei ${x.x.toFixed(0)}/${x.z.toFixed(0)} (${x.schedule}/${y.schedule})`;
+ });
+ return {paare: bleibend.length, fluechtig: a.satz.size - bleibend.length,
+  engster: +Math.min(a.engster, b.engster).toFixed(2), figuren: b.figuren, wer};
 });
-pruefe('Keine Figuren stehen ineinander', gedraenge.paare < 5,
- `${gedraenge.paare} Paare unter 0,55 m bei ${gedraenge.figuren} Figuren, engster ${gedraenge.engster} m`);
+pruefe('Keine Figuren stehen dauerhaft ineinander', gedraenge.paare < 5,
+ `${gedraenge.paare} bleibende Paare unter 0,55 m (${gedraenge.fluechtig} flüchtige) bei ${gedraenge.figuren} Figuren, engster ${gedraenge.engster} m — ${(gedraenge.wer || []).join('; ')}`);
 // Geparkte Wagen stehen zwei Meter innerhalb der Fahrbahnkante. Wo eine
 // Verkehrsroute dort entlanglief, fuhr der Verkehr durch sie hindurch —
 // wagenVoraus() kann davon nichts wissen, die Kulisse steht nicht in
@@ -2391,6 +2470,42 @@ const dreht = await (async () => {
 })();
 pruefe('Die Rotoren drehen sich', dreht.zuwachs > .001 && dreht.anders > 0,
  `Winkel +${dreht.zuwachs.toFixed(3)} rad, ${dreht.anders} von 4 Matrixwerten geändert`);
+
+// Tageslauf. Steht am Ende, weil dafür zehntausende Ticks laufen und die Uhr
+// verstellt wird. Zwei Fragen: bleibt der Tageswechsel bezahlbar, und bewegt
+// er tatsächlich jemanden.
+//
+// Als alle Pendler ihren Weg im selben Tick suchten, stand das Spiel 1613 ms
+// still. Die Schwelle liegt bei 120 ms — großzügig genug für einen langsamen
+// Rechner, weit unter dem Fehlerfall.
+const tageslauf = await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ const leer = {forward: 0, turn: 0, yaw: 0, sprint: false, sneak: false, brake: false, jump: false, interact: false};
+ const pend = () => s.npcs.filter(n => n.id >= 200 && n.work &&
+  Math.hypot(n.work.x - n.home.x, n.work.z - n.home.z) > 120);
+ for (let i = 0; i < 120; i++) s.tick(1 / 60, leer);
+ s.hour = 7.995;
+ let teuerster = 0;
+ for (let i = 0; i < 90; i++) {
+  const t = performance.now(); s.tick(1 / 60, leer);
+  teuerster = Math.max(teuerster, performance.now() - t);
+ }
+ const phase = (stunde, ticks) => {
+  s.hour = stunde;
+  for (let i = 0; i < ticks; i++) {s.tick(1 / 60, leer); s.hour = stunde;}
+  const q = pend();
+  return {naeherAmBuero: q.filter(n => Math.hypot(n.x - n.work.x, n.z - n.work.z) <
+   Math.hypot(n.x - n.home.x, n.z - n.home.z)).length, von: q.length};
+ };
+ const tag = phase(9, 14000), nacht = phase(22, 14000);
+ return {teuerster, tag, nacht};
+});
+pruefe('Der Tageswechsel hält das Spiel nicht an', tageslauf.teuerster < 120,
+ `teuerster Tick ${tageslauf.teuerster.toFixed(1)} ms`);
+pruefe('Tagsüber ist die Stadt woanders als nachts',
+ tageslauf.tag.naeherAmBuero > tageslauf.tag.von * .5 &&
+ tageslauf.nacht.naeherAmBuero < tageslauf.tag.naeherAmBuero * .4,
+ `am Arbeitsplatz: ${tageslauf.tag.naeherAmBuero} um 9 Uhr, ${tageslauf.nacht.naeherAmBuero} um 22 Uhr, von ${tageslauf.tag.von}`);
 
 // Die Touch-Oberfläche hängt an `@media(pointer:coarse)` und ist auf einem
 // Zeigergerät ausgeblendet. Dafür braucht es einen eigenen Browser mit
