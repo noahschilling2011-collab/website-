@@ -245,8 +245,16 @@ export class ExpandedWorld extends World{
   const court=locations.court;this.box(court.x,.05,court.z,20,.15,28,0x668b7c);this.box(court.x,.14,court.z-11,15,.04,.15,0xe9d9b1);this.box(court.x,2,court.z-12,.2,4,.2,0x405059);this.box(court.x,3.6,court.z-12,2.4,1.5,.15,0xd5d2bd);const hoop=new T.Mesh(new T.TorusGeometry(.5,.05,6,18),material(0xc28d58));hoop.rotation.x=Math.PI/2;hoop.position.set(court.x,3.1,court.z-11.3);this.scene.add(hoop);this.ball=new T.Mesh(new T.SphereGeometry(.28,12,8),material(0xd79b54));this.scene.add(this.ball);
   // Airport runway, ocean piers, fields and farm rows.
   this.box(-315,.09,315,25,.15,155,0x445155);for(let z=250;z<390;z+=16)this.box(-315,.18,z,1,.02,8,0xd2d0af);this.box(114,.2,145,22,.5,6,0x776d58);this.box(-393,-.01,-225,42,.12,36,0x7a6a48);for(let x=-411;x<-374;x+=4)this.box(x,.25,-225,.5,.5,32,0x5d7750);
-  for(let i=0;i<155;i++){const x=-575+this.rng()*182,z=-530+this.rng()*286;const y=groundAt(x,z),h=4+this.rng()*5;this.box(x,y+h/2,z,.5,h,.5,0x746b51);this.box(x,y+h,z,4,4,4,0x4a715b);}
-  for(let i=0;i<45;i++){const x=-535+this.rng()*125,z=this.rng()*110;this.box(x,2.2,z,.4,5,.4,0x697458);this.box(x,5,z,4,1,4,0x668269);}
+  // 155 Bäume im Nationalpark und 45 Mangroven im Sumpf bestanden aus einem
+  // Pfosten und einem Würfel beziehungsweise einer flachen Kiste obendrauf.
+  // Aus der Ferne geht das durch, aus zwanzig Metern nicht: der Sumpf sah
+  // aus wie ein Lagerplatz für grüne Paletten auf Stelzen. Beide gehen
+  // jetzt über dasselbe Laubwerk wie jeder andere Baum — ein Instanzennetz
+  // für die ganze Karte, also kein zusätzlicher Draw Call.
+  for(let i=0;i<155;i++){const x=-575+this.rng()*182,z=-530+this.rng()*286;const h=7+this.rng()*6;
+   this.baum(x,z,h,this.rng()<.45?'nadel':'laub',[0x4a715b,0x40684f,0x53795f][i%3]);}
+  for(let i=0;i<45;i++){const x=-535+this.rng()*125,z=this.rng()*110;
+   this.box(x,2.2,z,.4,5,.4,0x697458);this.baum(x,z,6.5,'mangrove',0x668269);}
   for(let z=140;z<435;z+=17)this.palm(91.5,z,7+((z*7)%5));
   for(let z=150;z<430;z+=23)this.palm(101,z,6+((z*3)%4));this.camera.far=1100;this.camera.updateProjectionMatrix();
   // Straßenmöblierung zuletzt, damit sie freie Flächen kennt und noch in den

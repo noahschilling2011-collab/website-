@@ -2093,9 +2093,11 @@ pruefe('Keine Figur läuft durch eine Wand', gefahren.leuteImHaus === 0,
 // Der Ridge Highway lag sechseinhalb Meter über der Westspitze des Stausees.
 pruefe('Kein Baum steht im Wasser', await page.evaluate(() => {
  const L = window.LOWTIDE;
- return (L.world.laubwerk?.liste || []).every(t => !L.waterAt(t.x, t.z));
+ // Mangroven stehen im Wasser, dafür sind sie Mangroven.
+ return (L.world.laubwerk?.liste || []).filter(t => t.art !== 'mangrove')
+  .every(t => !L.waterAt(t.x, t.z));
 }), await page.evaluate(() => {
- const L = window.LOWTIDE, l = L.world.laubwerk?.liste || [];
+ const L = window.LOWTIDE, l = (L.world.laubwerk?.liste || []).filter(t => t.art !== 'mangrove');
  return `${l.filter(t => L.waterAt(t.x, t.z)).length} von ${l.length}`;
 }));
 

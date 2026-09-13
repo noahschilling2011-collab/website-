@@ -292,7 +292,13 @@ function saltMarsh(w, rng) {
    const a = s * Math.PI / 2 + rng();
    w.box(x + Math.sin(a) * .8, -.6 + h * .22, z + Math.cos(a) * .8, .22, h * .8, .22, 0x5b4c39, 0, false, Math.sin(a) * .22, Math.cos(a) * .22);
   }
-  w.box(x, -.6 + h * .78, z, h * .95, h * .5, h * .9, rng() < .5 ? 0x3f6047 : 0x4a6d4a);
+  // Die Krone war eine einzige Kiste von h·0,95 auf h·0,5 auf h·0,9 — bei
+  // 260 Stück las sich der Sumpf aus jeder Nähe als Lagerplatz für grüne
+  // Paletten auf Stelzen. Sie geht jetzt über dasselbe Laubwerk wie jeder
+  // andere Baum: gekreuzte Flächen mit Alphakarte, ein Instanzennetz für die
+  // ganze Karte, also kein zusätzlicher Draw Call. Die Art heißt 'mangrove',
+  // damit die Prüfung „kein Baum steht im Wasser" sie auslässt.
+  w.baum(x, z, h * 1.15, 'mangrove', rng() < .5 ? 0x3f6047 : 0x4a6d4a);
  }
  for (let k = 0; k < 340; k++) {
   const x = -545 + rng() * 145, z = -20 + rng() * 150;
@@ -332,13 +338,17 @@ function saltMarsh(w, rng) {
 // ------------------------------------------------------------ Mercy Airfield
 function airfield(w, rng) {
  const bahnX = -315;
- // Die Bahn hatte Schwellenbalken, Randbefeuerung und Grasschultern — aber
- // keinen Belag. Die Markierungen lagen auf der Wiese, und die Kennung '27'
- // stand als drei Meter hohes Brett quer über der Bahn, weil text() nur
- // senkrechte Tafeln kannte. Jetzt Asphalt, unterbrochene Mittellinie und
- // aufgemalte Kennungen an beiden Enden.
- w.box(bahnX, .08, 315, 24, .16, 158, 0x3f4448);
- for (let z = 244; z < 388; z += 12) w.box(bahnX, .17, z, .5, .02, 7, 0xd2d0af);
+ // Die Kennung '27' stand als drei Meter hohes Brett quer über der Bahn,
+ // weil text() nur senkrechte Tafeln kannte. Jetzt liegt sie flach, und am
+ // anderen Ende steht die Gegenrichtung.
+ //
+ // Hier lag zwischendurch auch ein Belag von mir — ein Fehler: die Bahn hat
+ // längst einen, er wird in expanded-world.js gebaut (`box(-315,.09,315,25,
+ // .15,155)`), zusammen mit ihrer Mittellinie. Ich hatte nur airfield()
+ // gelesen, dort Markierungen ohne Fahrbahn gefunden und daraus geschlossen,
+ // es gäbe keine. Zwei Decken auf derselben Höhe flimmern gegeneinander,
+ // zwei Strichfolgen mit verschiedenem Abstand liegen sichtbar übereinander.
+ // Der Belag steht dort, wo er stand.
  // Schwellenmarkierung, Randbefeuerung, Schultern.
  for (const ende of [242, 388]) {
   for (let e = -9; e <= 9; e += 3) w.box(bahnX + e, .19, ende + (ende < 300 ? 6 : -6), 1.6, .02, 12, 0xd2d0af);
@@ -770,12 +780,16 @@ function mangrove(w, x, z, hoehe, rng) {
   w.box(x + Math.cos(a) * r, y + hoehe * .18, z + Math.sin(a) * r,
    .09, hoehe * .38, .09, 0x4b4030, 0, false, Math.sin(a) * .3, -Math.cos(a) * .3);
  }
- w.box(x, y + hoehe * .42, z, hoehe * .1, hoehe * .34, hoehe * .1, 0x54452f);
- for (let k = 0; k < 3; k++) {
-  const b = hoehe * (.62 - k * .13);
-  w.box(x + (rng() - .5) * hoehe * .2, y + hoehe * (.62 + k * .13), z + (rng() - .5) * hoehe * .2,
-   b, hoehe * .16, b * .9, [0x33562f, 0x3c6234, 0x2c4a29][k]);
- }
+ w.box(x, y + hoehe * .36, z, hoehe * .1, hoehe * .3, hoehe * .1, 0x54452f);
+ // Die Krone bestand aus drei flachen Kisten von je einem Sechstel der Höhe.
+ // Aus der Nähe las sich der Sumpf damit als Lagerplatz für grüne Paletten
+ // auf Stelzen — hunderte davon, und es fällt in jedem Bild sofort auf.
+ // Sie geht jetzt über dasselbe Laubwerk wie jeder andere Baum: gekreuzte
+ // Flächen mit Alphakarte, ein Instanzennetz für die ganze Karte. Die Art
+ // heißt 'mangrove', damit die Prüfung „kein Baum steht im Wasser" sie
+ // auslässt — ein Mangrovenwald steht genau dort.
+ w.baum(x + (rng() - .5) * hoehe * .12, z + (rng() - .5) * hoehe * .12,
+  hoehe * 1.2, 'mangrove', [0x33562f, 0x3c6234, 0x2c4a29][Math.floor(rng() * 3)]);
 }
 
 // Steg auf Pfählen, wie ihn jede dieser Inseln zum Wasser hat.

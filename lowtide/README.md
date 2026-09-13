@@ -778,6 +778,22 @@ verbunden; die Boote schwimmen bei 214, das Hafenhaus bleibt an Land.
 
 205 Prüfungen bestanden, keine gefallen.
 
+## Die Landebahn hatte Markierungen — und einen Belag, den ich übersehen habe
+
+**Korrektur zum Abschnitt unten.** Die Behauptung „die Piste hatte keinen
+Asphalt" war falsch. Sie hat einen, gebaut in `expanded-world.js`
+(`box(-315, .09, 315, 25, .15, 155)`) samt Mittellinie. Ich hatte nur
+`airfield()` in `regions.js` gelesen, dort Markierungen ohne Fahrbahn
+gefunden und daraus geschlossen, es gäbe keine — statt nachzusehen, wo sonst
+noch gebaut wird. Meine zweite Decke lag auf einem Zentimeter Abstand über
+der ersten, mit einer zweiten Strichfolge in anderem Abstand: Flimmern und
+doppelte Linien. Sie ist wieder draußen.
+
+Was von dem Abschnitt bleibt: die flach liegenden Bahnkennungen (`text()` hat
+jetzt einen `flach`-Parameter, vorher stand die „27" als drei Meter hohes
+Brett quer über der Bahn), die Rennausstattung des Dragstrips und
+`bahnRaeumen()`, das sieben Kulissenteile vom Asphalt geholt hat.
+
 ## Die Landebahn hatte Markierungen, aber keinen Belag
 
 Mercy Dragstrip hatte drei stehende Teile im Umkreis von achtzehn Metern und
@@ -1183,6 +1199,36 @@ weiterlaufen, und die Verteilung kippte. Für die Dauer der Prüfung bleibt
 jetzt genau ein Alligator übrig; zusätzlich muss er aus neunzig Metern
 Entfernung nicht mehr zählen. Das ist innerhalb dieser Sitzung die dritte
 Prüfung, die selbst falsch gestellt war.
+
+239 Prüfungen bestanden, keine gefallen.
+
+## Der Sumpf war ein Lagerplatz für grüne Paletten
+
+Ein Bilddurchgang über fünf Gegenden, so wie er vorher die Marina und
+Rosalind gefunden hat. Der Salt Marsh: hunderte flacher grüner Kisten auf
+dünnen Stelzen, dicht an dicht über dem Wasser. Aus der Ferne geht das als
+Mangrovendickicht durch, aus zwanzig Metern nicht.
+
+Drei Quellen, alle mit demselben Muster — Pfosten plus Kiste:
+
+| Ort | Zahl | Krone vorher |
+|---|---|---|
+| `saltMarsh()` in regions.js | 260 | eine Kiste, h·0,95 × h·0,5 × h·0,9 |
+| `mangrove()` in regions.js (Keys) | ~90 | drei gestapelte Platten |
+| `build()` in expanded-world.js, Sumpf | 45 | eine Kiste 4 × 1 × 4 |
+| `build()` in expanded-world.js, Nationalpark | 155 | ein Würfel 4 × 4 × 4 |
+
+Alle vier gehen jetzt über dasselbe Laubwerk wie jeder andere Baum: gekreuzte
+Flächen mit zur Laufzeit gezeichneter Alphakarte, zwei Instanzennetze für die
+ganze Karte. Das kostet **keinen** zusätzlichen Draw Call — die Bäume liefen
+schon vorher über diese beiden Netze, es kommen nur Einträge dazu. Gemessen
+an der Kreuzung: 1817 → 1802 Draw Calls, 1.524.656 → 1.543.028 Dreiecke.
+
+Die Art heißt bei Mangroven `'mangrove'`, damit die Prüfung „kein Baum steht
+im Wasser" sie auslässt — ein Mangrovenwald steht genau dort.
+
+Der Bilddurchgang hat außerdem die falsche Landebahn-Behauptung ans Licht
+gebracht (siehe Korrektur weiter unten).
 
 239 Prüfungen bestanden, keine gefallen.
 
