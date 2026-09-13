@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 244 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 246 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1255,6 +1255,69 @@ Die neue Prüfung zählt Deckenstücke über sechs Meter Geländehöhe und
 verlangt, dass die geneigten überwiegen.
 
 240 Prüfungen bestanden, keine gefallen.
+
+## Der Boden war überall gleich grün
+
+Die Farbe des Geländes kam aus einer einzigen Frage: in welchem Rechteck der
+Karte liegt der Punkt. Vier Rechtecke, dazu Wasser und ein Sandsaum — das war
+alles. Jeder Scheitelpunkt einer Region bekam damit denselben Wert: eine
+Kachel von hundert Metern trug 169 Punkte in exakt einem Grün, die Kuppe von
+TALON RIDGE auf 88 Metern dasselbe Grün wie die Wiese auf Meereshöhe, und
+eine Steilflanke dasselbe wie der Acker davor. Der Boden ist die größte
+Fläche in jedem Bild draußen.
+
+Drei Größen kommen dazu, alle rein aus der Weltposition gerechnet, damit zwei
+aneinandergrenzende Kacheln am gemeinsamen Rand denselben Wert bekommen und
+keine Naht entsteht:
+
+* **Höhe** — über 40 Metern wird die Wiese trocken, über 72 Metern ist sie Fels.
+* **Neigung** — was steiler als etwa fünfzehn Grad steht, hält keine Grasnarbe.
+* **Rauschen** — grob (34 Meter Wellenlänge) für Flecken aus Fels und Moos,
+  fein für ±8,5 Prozent Helligkeit von Punkt zu Punkt.
+
+Nachgemessen an den Scheitelfarben, nicht am Bild — das ist von Grafikkarte
+und Uhrzeit unabhängig. Innerhalb desselben Farbrechtecks (x < -600, z > -230,
+also der Rücken und sein Fuß) hat der Boden oben einen Grünstich von **-0,0072**
+und unten von **+0,0302**; oben ist er außerdem heller (0,144 gegen 0,081).
+Von Punkt zu Punkt gleich sind noch 18 Prozent aller Nachbarpaare — das sind
+die Wasserkacheln, die absichtlich einfarbig bleiben.
+
+**Zwei Fehler dabei, beide von der Messung gefangen.**
+
+Das Rauschen lief zuerst über `offsetHSL(0, 0, ±0,05)`. Das rechnet im
+linearen Arbeitsraum, und dort hebt +0,05 einen dunklen Ton in sRGB weit
+stärker, als -0,05 ihn senkt. SALT MARSH ist die dunkelste Gegend der Karte
+und sprang dadurch von 128,7 auf **155,8** mittlere Helligkeit, die Sättigung
+fiel von 39,4 auf **23,0** Prozent — aus einem Sumpf wurde eine helle Fläche.
+Ein Faktor statt eines Summanden lässt Farbton und Sättigung, wo sie sind:
+128,7 und 39,4 Prozent, unverändert.
+
+Der erste Felston war `0x8b8377` — fast genau die Farbe der Findlinge, die
+darauf liegen (`0x8a8175`). Die Kuppe war damit richtig steinig statt grün,
+aber Block und Boden waren gleich hell, und der örtliche Kontrast blieb bei
+9,75 stehen. Farbe richtig, Wirkung null. Jetzt ist der Boden mit `0x6e685d`
+dunkler als das, was darauf liegt, und `0x5c6046` setzt Moosflecken dazwischen.
+
+**Und ein Befund über das Werkzeug selbst.** TALON RIDGE steht in
+`tools/schwachstellen.mjs` ganz oben auf der Arbeitsliste, aber sein Wert hat
+sich über vier Umbauten des Bodens nicht bewegt: 9,73 → 9,71 → 9,75 → 9,74,
+und die mittlere Helligkeit blieb in allen vier Läufen bei **185,2**, auf die
+Stelle genau. Das ist keine Messung der Kuppe. Die Sonde steht sechzehn Meter
+über dem Ankerpunkt und blickt fünfundvierzig Meter voraus; von einem
+88-Meter-Gipfel fällt der Boden dabei so schnell weg, dass die untere
+Bildhälfte Ferne im Dunst zeigt statt Gelände. Von zwei Richtungen wird die
+mit dem höheren Kontrast gewertet, und das ist zuverlässig die Panoramaseite.
+Der oberste Eintrag der Arbeitsliste misst also etwas anderes als die Gegend,
+die er benennt. Das steht hier als Befund, nicht als behobene Sache — geändert
+ist am Werkzeug nichts.
+
+Im Bild ist der Unterschied da, wo man ihn erwartet: die Kuppe ist nicht mehr
+Wiesengrün, sondern trockener Fels mit Flecken. Der Schnitt über alle fünfzehn
+Gegenden geht von 13,76 auf 13,79; ROSALIND von 10,61 auf 10,80. Das ist
+wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
+besser aussieht.
+
+246 Prüfungen bestanden, keine gefallen.
 
 ## Was geprüft wurde und in Ordnung war
 

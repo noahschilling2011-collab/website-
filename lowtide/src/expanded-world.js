@@ -162,7 +162,57 @@ export class ExpandedWorld extends World{
   // Dazu ein Sandsaum: wer nicht im Wasser steht, aber zehn Meter daneben,
   // bekommt Strandfarbe statt Wiese. Ohne den stieß Gras direkt ans Meer.
   const amWasser=(px,pz)=>waterAt(px+10,pz)||waterAt(px-10,pz)||waterAt(px,pz+10)||waterAt(px,pz-10);
-  this.terrain=[];for(let x=bounds.left;x<bounds.right;x+=100)for(let z=bounds.top;z<bounds.bottom;z+=100){const g=new T.PlaneGeometry(100,100,12,12);g.rotateX(-Math.PI/2);const a=g.attributes.position,colors=[];for(let i=0;i<a.count;i++){const px=x+50+a.getX(i),pz=z+50+a.getZ(i);a.setY(i,waterAt(px,pz)?-3.4:groundAt(px,pz)-.12);const c=new T.Color(waterAt(px,pz)?0x2f5450:amWasser(px,pz)?0x9a8a63:px<-380&&pz<-240?0x4f5c43:pz<-230?0x5a6249:px<-390?0x4f5d47:0x6c6d58);colors.push(c.r,c.g,c.b);}g.setAttribute('color',new T.Float32BufferAttribute(colors,3));g.computeVertexNormals();const m=new T.Mesh(g,new T.MeshStandardMaterial({vertexColors:true,roughness:1}));m.position.set(x+50,0,z+50);m.receiveShadow=true;
+  // Die Bodenfarbe kannte bis hierher nur die Frage "in welchem Rechteck der
+  // Karte liegt der Punkt". Jeder Scheitelpunkt einer Region bekam damit
+  // exakt denselben Wert: eine Kachel von hundert Metern trug 169 Punkte in
+  // einem einzigen Grün, die Kuppe von TALON RIDGE auf 88 Metern dasselbe
+  // Grün wie die Wiese auf Meereshöhe, und eine Steilwand dasselbe wie der
+  // Acker davor. Der Boden ist die größte Fläche in jedem Bild draußen —
+  // deshalb steht in tools/schwachstellen.mjs alles Ländliche unten.
+  //
+  // Drei Größen kommen dazu, alle rein aus der Weltposition gerechnet, damit
+  // zwei aneinandergrenzende Kacheln am gemeinsamen Rand denselben Wert
+  // bekommen und keine Naht entsteht:
+  //   Höhe    — über 40 m wird die Wiese trocken, über 72 m ist sie Fels.
+  //   Neigung — was steiler als etwa 15 Grad steht, hält keine Grasnarbe.
+  //   Rauschen— +/- 5 % Helligkeit, damit benachbarte Punkte nicht gleich sind.
+  // FELS ist dunkler als die Findlinge, die darauf liegen (0x8a8175). Der
+  // erste Anlauf nahm fast denselben Ton: die Kuppe wurde zwar richtig
+  // steinig statt grün, aber Block und Boden waren dann gleich hell, und der
+  // örtliche Kontrast von TALON RIDGE blieb bei 9,75 stehen. Farbe richtig,
+  // Wirkung null. Dazu MOOS in Flecken — über der Baumgrenze steht kein Baum
+  // mehr, aber Polster und Flechten schon, und eine einfarbige Kuppe ist
+  // genauso unfertig wie eine einfarbige Wiese.
+  const FELS=new T.Color(0x6e685d),MOOS=new T.Color(0x5c6046),TROCKEN=new T.Color(0x7d7550);
+  const rauschen=(px,pz)=>{const a=Math.sin(px*.0731+pz*.0417)*43758.5453,b=Math.sin(px*.0193-pz*.0629)*24634.6345;
+   return ((a-Math.floor(a))+(b-Math.floor(b)))*.5;};
+  // Grobes Rauschen mit rund 34 Metern Wellenlänge — das ist die Größe eines
+  // Flecks, nicht die eines Kiesels. Glatt, weil es aus Sinus kommt: an der
+  // Kachelnaht liefert es links und rechts denselben Wert.
+  const flecken=(px,pz)=>(Math.sin(px*.185)*Math.cos(pz*.152)+Math.sin((px+pz)*.101)*.7)*.42+.5;
+  const neigung=(px,pz)=>{const d=5,gx=(groundAt(px+d,pz)-groundAt(px-d,pz))/(2*d),gz=(groundAt(px,pz+d)-groundAt(px,pz-d))/(2*d);
+   return Math.hypot(gx,gz);};
+  // Das Rauschen wird multipliziert, nicht per offsetHSL addiert. Der erste
+  // Anlauf tat das Zweite, und offsetHSL rechnet im linearen Arbeitsraum:
+  // dort hebt +0,05 einen dunklen Ton in sRGB weit stärker, als -0,05 ihn
+  // senkt. SALT MARSH ist die dunkelste Gegend der Karte und sprang dadurch
+  // von 128,7 auf 155,8 mittlere Helligkeit, die Sättigung fiel von 39,4 auf
+  // 23,0 Prozent — aus einem Sumpf wurde eine helle Fläche. Ein Faktor lässt
+  // Farbton und Sättigung, wo sie sind, und wirkt auf hell wie dunkel gleich.
+  const bodenFarbe=(px,pz,y)=>{
+   if(waterAt(px,pz))return new T.Color(0x2f5450);
+   const c=new T.Color(amWasser(px,pz)?0x9a8a63:px<-380&&pz<-240?0x4f5c43:pz<-230?0x5a6249:px<-390?0x4f5d47:0x6c6d58);
+   if(!amWasser(px,pz)){
+    const hoch=Math.min(1,Math.max(0,(y-40)/32));
+    const steil=Math.min(1,Math.max(0,(neigung(px,pz)-.27)/.45));
+    if(hoch>0)c.lerp(TROCKEN,hoch*.62);
+    const kahl=Math.max(steil,hoch*hoch);
+    if(kahl>0){const f=flecken(px,pz);
+     if(f<.44)c.lerp(MOOS,kahl*.55);else c.lerp(FELS,kahl*.85);}
+   }
+   c.multiplyScalar(1+(rauschen(px,pz)-.5)*.17);
+   return c;};
+  this.terrain=[];for(let x=bounds.left;x<bounds.right;x+=100)for(let z=bounds.top;z<bounds.bottom;z+=100){const g=new T.PlaneGeometry(100,100,12,12);g.rotateX(-Math.PI/2);const a=g.attributes.position,colors=[];for(let i=0;i<a.count;i++){const px=x+50+a.getX(i),pz=z+50+a.getZ(i);const gy=groundAt(px,pz);a.setY(i,waterAt(px,pz)?-3.4:gy-.12);const c=bodenFarbe(px,pz,gy);colors.push(c.r,c.g,c.b);}g.setAttribute('color',new T.Float32BufferAttribute(colors,3));g.computeVertexNormals();const m=new T.Mesh(g,new T.MeshStandardMaterial({vertexColors:true,roughness:1}));m.position.set(x+50,0,z+50);m.receiveShadow=true;
    // Kacheln, die ganz unter Wasser liegen, sieht man nie: der Wassershader
    // ist undurchsichtig. Sie werden nur beim Tauchen eingeblendet. Ohne das
    // kosteten allein die dreißig neuen Meereskacheln im Osten am Strand über

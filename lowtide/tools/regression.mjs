@@ -1493,6 +1493,37 @@ pruefe('Der Stausee ist Wasser, kein bemalter Boden', stausee.mitte && stausee.b
 pruefe('Man schwimmt im Stausee, statt darauf zu stehen', stausee.y < -.2, `y = ${stausee.y.toFixed(2)}`);
 pruefe('Unter dem See liegt eine Wanne', stausee.tiefste < -3, `tiefster Punkt ${stausee.tiefste}`);
 pruefe('Die Böschung ist Land', !stausee.ufer);
+// Die Bodenfarbe kannte nur die Frage "in welchem Rechteck liegt der Punkt".
+// Die Kuppe von TALON RIDGE auf 88 Metern trug damit dasselbe Grün wie die
+// Wiese auf Meereshöhe. Geprüft wird an den Scheitelfarben selbst, nicht am
+// Bild: das ist von Grafikkarte und Uhrzeit unabhängig.
+const boden = await page.evaluate(() => {
+ const L = window.LOWTIDE;
+ // Verglichen wird nur innerhalb desselben Rechtecks der Grundfarbe: x < -600
+ // und z > -230 liefert überall dieselbe Ausgangsfarbe, also unterscheiden
+ // sich hoch und tief allein durch Höhe und Neigung. Der Boden liegt auf
+ // groundAt - 0.12; flaches Land steht damit bei -0,12, nicht bei 0.
+ let hoch = {r: 0, g: 0, n: 0}, tief = {r: 0, g: 0, n: 0}, gleich = 0, paare = 0;
+ for (const m of L.world.terrain) {
+  const pos = m.geometry.attributes.position, col = m.geometry.attributes.color;
+  for (let i = 0; i < col.count; i++) {
+   const px = m.position.x + pos.getX(i), pz = m.position.z + pos.getZ(i);
+   if (i) {paare++; if (Math.abs(col.getX(i) - col.getX(i - 1)) < 1e-5) gleich++;}
+   if (px > -600 || pz < -230) continue;
+   const y = pos.getY(i), r = col.getX(i), g = col.getY(i);
+   if (y > 70) {hoch.r += r; hoch.g += g; hoch.n++;}
+   else if (y > -1 && y < 6) {tief.r += r; tief.g += g; tief.n++;}
+  }
+ }
+ // Grünstich = Grünkanal minus Rotkanal. Wiese ist positiv, Fels negativ.
+ return {oben: hoch.n ? (hoch.g - hoch.r) / hoch.n : null, unten: tief.n ? (tief.g - tief.r) / tief.n : null,
+  hochN: hoch.n, tiefN: tief.n, gleichAnteil: gleich / paare};
+});
+pruefe('Über der Baumgrenze ist der Boden Fels, nicht Wiese',
+ boden.hochN > 150 && boden.tiefN > 500 && boden.oben < boden.unten - .004,
+ `Grünstich oben ${boden.oben?.toFixed(4)} (${boden.hochN} Punkte), unten ${boden.unten?.toFixed(4)} (${boden.tiefN})`);
+pruefe('Zwei Nachbarpunkte des Bodens haben nicht dieselbe Farbe',
+ boden.gleichAnteil < .25, `${(boden.gleichAnteil * 100).toFixed(1)} % gleich`);
 // Die Innenstadt war leer: an der Hauptkreuzung standen vier Leute im
 // Umkreis von sechzig Metern, am Strand vierundzwanzig.
 const gehwege = await page.evaluate(() => {
