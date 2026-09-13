@@ -1319,6 +1319,54 @@ besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
 
+## Felsbänder auf dem Rücken — und zwei widerlegte Vermutungen
+
+Mit der reparierten Sonde steht TALON RIDGE mit **5,70** als schlechteste
+Gegend der Karte da. Nachgesehen, warum: der Rücken kommt aus einer glatten
+Formel. Gemessen in Zwanzigmeterschritten steigt er von z = -400 bis z = -160
+auf 88 Meter und fällt wieder, **ohne eine einzige Kante**. Darauf lagen 900
+Steine zwischen einem und neun Metern — Kiesel auf einer Kuppel.
+
+Dazu kommen jetzt 46 **Felsbänder**: je drei versetzte Stufen, quer zum
+Gefälle gelegt, wie eine herauswitternde Schicht es täte. Die Richtung kommt
+aus dem Gradienten von `groundAt`, nicht aus dem Würfel; die unterste Stufe
+springt talwärts vor, und am Fuß liegen zwei bis vier Sturzblöcke. Längste
+Kante 25,3 Meter, 219 Teile, davon 28 im Umkreis von 70 Metern um die Kuppe.
+
+**Und dann bewegte sich die Zahl nicht. 5,70 gegen 5,70.**
+
+Zwei Vermutungen, warum, beide geprüft und beide falsch:
+
+1. *Die Bänder wurden gar nicht gebaut.* Nachgezählt an den Instanzmatrizen:
+   38 × 3 Stufen plus 105 Sturzblöcke, 219 Teile. Sie stehen da.
+2. *Die Sonde rendert ohne Schattenwurf, weil die Schattenkamera am Spieler
+   hängt und der in der Innenstadt steht — 800 Meter weit weg.* Klang
+   zwingend, `world.js` setzt `sun.position` tatsächlich relativ zu `p.x/p.z`.
+   Direkt gegengemessen: mit dem Spieler auf dem Rücken 181,8 mittlere
+   Helligkeit und 8,5 Prozent dunkle Bildpunkte, ohne ihn 181,8 und 8,4. Kein
+   Unterschied. Die Änderung ist wieder draußen — eine Zeile mit einer
+   widerlegten Begründung ist schlechter als keine.
+
+Was übrig bleibt, ist die einfachste Erklärung und die, die ich in dieser
+Sitzung schon zweimal aufgeschrieben habe: **der örtliche Kontrast zählt
+Kanten zwischen benachbarten Bildpunkten.** 219 Teile auf 35.000
+Quadratmetern füllen davon fast nichts; der weitaus größte Teil jedes Bildes
+vom Rücken ist ruhige, gleichmäßig belichtete Bodenfläche, und die ist bei
+einer Bergkuppe über der Baumgrenze richtig so.
+
+Damit ist „TALON RIDGE steht unten" **kein Befund**, sondern eine Eigenschaft
+der Landschaft. Eine Rangliste, die eine kahle Kuppe mit einem Straßenraster
+in einen Topf wirft, vergleicht Dinge, die nicht vergleichbar sind. Nützlich
+bleibt die Liste dort, wo sie zwei ähnliche Gegenden nebeneinanderstellt —
+Rosalind gegen Downtown, Sunset Suburbs gegen Bellweather — und dort, wo ein
+Wert **springt**, nachdem etwas verändert wurde.
+
+Die Bänder bleiben trotzdem drin: sie sind richtige Geometrie, und der Rücken
+liest sich mit gestuften Schichten wie ein verwitterter Kamm statt wie eine
+Kuppel mit Kieseln. Nur belegen kann ich das mit diesem Werkzeug nicht.
+
+256 Prüfungen bestanden, keine gefallen.
+
 ## Die Arbeitsliste zeigte auf drei Stellen, an denen nichts zu sehen war
 
 `tools/schwachstellen.mjs` sortiert die fünfzehn Gegenden nach örtlichem

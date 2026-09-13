@@ -1377,6 +1377,49 @@ function talonRidge(w, rng) {
    w.box(x, y + h / 2, z, h * 2.1, h, h * 1.6, [0x4c5a44, 0x5a6349][i % 2], rng() * 3.1);
   }
  }
+ // Felsbänder. Der Rücken kommt aus einer glatten Formel: von z = -400 bis 0
+ // steigt und fällt er ohne eine einzige Kante, gemessen in
+ // Zwanzigmeterschritten. Darauf lagen 900 Steine zwischen einem und neun
+ // Metern — Kiesel auf einer Kuppel. Nach der Reparatur der Regionssonde
+ // (siehe README) steht TALON RIDGE mit 5,70 als schlechteste Gegend der
+ // Karte da, und der Grund ist nicht die Farbe, sondern die fehlende Kante:
+ // örtlicher Kontrast entsteht an Schattenwürfen, und ein Stein von zwei
+ // Metern wirft keinen, den man aus fünfzig sieht.
+ //
+ // Ein Band liegt quer zum Gefälle, so wie eine herauswitternde Schicht es
+ // täte — die Richtung kommt aus dem Gradienten von groundAt, nicht aus dem
+ // Würfel. Drei versetzte Stufen je Band, damit die Oberkante nicht gerade
+ // durchläuft, und die unterste springt talwärts vor.
+ for (let i = 0; i < 46; i++) {
+  const t = rng() * Math.PI * 2, r = .25 + Math.sqrt(rng()) * .75;
+  const x = -900 + Math.cos(t) * r * 96, z = -160 + Math.sin(t) * r * 126;
+  if (aufStrasse(x, z, 12) || w.sim.blocked({x, z}, 6)) continue;
+  const y = groundAt(x, z);
+  if (y < 52) continue;
+  // Gefälle: die Richtung, in die es am stärksten bergab geht.
+  const d = 8, gx = groundAt(x + d, z) - groundAt(x - d, z), gz = groundAt(x, z + d) - groundAt(x, z - d);
+  const gefaelle = Math.hypot(gx, gz) / (2 * d);
+  const quer = Math.atan2(gz, gx) + Math.PI / 2;   // entlang der Höhenlinie
+  const laenge = 11 + rng() * 15, hoch = 1.3 + rng() * 1.9;
+  for (let k = 0; k < 3; k++) {
+   const versatz = (k - 1) * (2.2 + rng() * 1.4);
+   const px = x + Math.cos(quer + Math.PI / 2) * versatz, pz = z + Math.sin(quer + Math.PI / 2) * versatz;
+   const py = groundAt(px, pz);
+   const h = hoch * (1 - Math.abs(k - 1) * .34);
+   w.box(px, py + h / 2 - .3, pz, laenge * (1 - Math.abs(k - 1) * .22), h, 2.4 + rng() * 1.8,
+    [0x6a635a, 0x5d574f, 0x746c62][k], quer, false, 0, Math.min(.26, gefaelle) * (k - 1));
+  }
+  // Sturzblöcke am Fuß des Bandes, talwärts.
+  const tal = Math.atan2(-gz, -gx);
+  for (let k = 0; k < 2 + Math.floor(rng() * 3); k++) {
+   const ab = 4 + rng() * 9, seit = (rng() - .5) * laenge;
+   const px = x + Math.cos(tal) * ab + Math.cos(quer) * seit;
+   const pz = z + Math.sin(tal) * ab + Math.sin(quer) * seit;
+   if (aufStrasse(px, pz, 8)) continue;
+   const b = 1.4 + rng() * 2.2;
+   w.box(px, groundAt(px, pz) + b * .34, pz, b, b * .78, b * .9, [0x5f5850, 0x6e6659][k % 2], rng() * 3.1);
+  }
+ }
 }
 
 // Cane Hollow: Zuckerrohr, Entwässerungsgräben, ein paar Höfe. Der Süden ist
