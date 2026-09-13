@@ -1524,6 +1524,14 @@ pruefe('Über der Baumgrenze ist der Boden Fels, nicht Wiese',
  `Grünstich oben ${boden.oben?.toFixed(4)} (${boden.hochN} Punkte), unten ${boden.unten?.toFixed(4)} (${boden.tiefN})`);
 pruefe('Zwei Nachbarpunkte des Bodens haben nicht dieselbe Farbe',
  boden.gleichAnteil < .25, `${(boden.gleichAnteil * 100).toFixed(1)} % gleich`);
+// Scheitel liegen 8,33 Meter auseinander — feiner als rund siebzehn Meter ist
+// über Scheitelfarben nichts darstellbar. Die Struktur darunter kommt aus
+// demselben Shader, den jede Kiste der Welt trägt; der Boden hatte ihn nicht.
+pruefe('Der Boden trägt denselben Oberflächen-Shader wie alles andere',
+ await page.evaluate(() => {
+  const t = window.LOWTIDE.world.terrain;
+  return t.length > 100 && t.every(m => m.material === t[0].material) && !!t[0].material.userData.detail;
+ }));
 // Die Innenstadt war leer: an der Hauptkreuzung standen vier Leute im
 // Umkreis von sechzig Metern, am Strand vierundzwanzig.
 const gehwege = await page.evaluate(() => {

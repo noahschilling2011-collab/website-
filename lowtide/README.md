@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 249 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 250 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1318,6 +1318,46 @@ wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
 besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
+
+## Der Boden war die einzige Fläche ohne Oberfläche
+
+`world.js` hängt jedem Material der Welt `detailAufsetzen()` an: Flecken in
+Farbe und Rauheit, Korn in den ersten Metern, eine gestörte Normale, nasser
+Glanz bei Regen. Jede Kiste, jede Wand, jeder Findling trägt das. Der Boden
+nicht — die Geländekacheln bekamen ein nacktes `MeshStandardMaterial` und
+waren damit die einzige große Fläche im Bild, auf der nichts passiert.
+
+Das erklärt auch, warum die Höhen- und Neigungsregel des vorigen Abschnitts
+so wenig gebracht hat. Scheitel liegen 8,33 Meter auseinander; über
+Scheitelfarben ist unterhalb von rund siebzehn Metern gar keine Struktur
+darstellbar, egal wie fein man das Rauschen macht. Der Shader rechnet je
+Bildpunkt und kann genau das, was dem Netz fehlt.
+
+Eine Zeile, und dazu ein Material für alle 225 Kacheln statt 225 gleicher.
+Die Kosten sind messbar null:
+
+| | vorher | nachher |
+|---|---|---|
+| Kreuzung Downtown, 13 Uhr | 1802 Draw Calls | 1802 |
+| Hafen, 13 Uhr | 1639 | 1639 |
+| Strand, 13 Uhr | 1287 | 1287 |
+
+**Und zwei Dinge, die die Zahlen nicht zeigen.** Der Schnitt in
+`tools/schwachstellen.mjs` geht von 13,80 auf 13,84 — fast nichts, obwohl der
+Unterschied im Bild sofort auffällt. Der Grund steht im Shader selbst: das
+Korn wird zwischen sechs und sechsundzwanzig Metern ausgeblendet, weil es in
+der Ferne flimmert. Die Sonde steht sechzehn Meter hoch und blickt
+fünfundvierzig Meter voraus — der größte Teil der gemessenen Bildhälfte liegt
+jenseits dieser Grenze. Gemessen wird also gerade das, was der Shader
+absichtlich nicht anfasst.
+
+Dasselbe gilt für die Flecken, die die ebene Wiese seit diesem Abschnitt
+bekommt: 34 Meter Wellenlänge, weich verlaufend. Der örtliche Kontrast
+vergleicht benachbarte Bildpunkte, und ein weicher Verlauf über 34 Meter
+hinterlässt dort nichts. Sichtbar ist er aus der Höhe, messbar mit diesem
+Werkzeug nicht.
+
+250 Prüfungen bestanden, keine gefallen.
 
 ## Sieben Windräder, die ineinander fuhren
 

@@ -1,5 +1,5 @@
 import * as T from './vendor/three.module.js';
-import {wolkenAufsetzen} from './detail.js';
+import {wolkenAufsetzen,detailAufsetzen} from './detail.js';
 import {World} from './world.js';
 import {naturalHuman,animateNaturalHuman} from './human-model.js';
 import {detailedHuman,detailedCar,asphaltTexture} from './art-direction.js';
@@ -207,12 +207,27 @@ export class ExpandedWorld extends World{
     const steil=Math.min(1,Math.max(0,(neigung(px,pz)-.27)/.45));
     if(hoch>0)c.lerp(TROCKEN,hoch*.62);
     const kahl=Math.max(steil,hoch*hoch);
-    if(kahl>0){const f=flecken(px,pz);
-     if(f<.44)c.lerp(MOOS,kahl*.55);else c.lerp(FELS,kahl*.85);}
+    const f=flecken(px,pz);
+    // Auch die ebene Wiese ist fleckig. Ohne das half die Höhenregel nur
+    // dem Rücken: auf Meereshöhe blieb der Boden eine einzige Fläche, und
+    // das ist die halbe Bildhöhe in jeder Aufnahme über Land. Der Fleck ist
+    // dieselbe grobe Welle wie oben, nur schwächer und in Richtung trocken.
+    if(kahl<1)c.lerp(TROCKEN,(1-kahl)*Math.max(0,f-.42)*.46);
+    if(kahl>0){if(f<.44)c.lerp(MOOS,kahl*.55);else c.lerp(FELS,kahl*.85);}
    }
    c.multiplyScalar(1+(rauschen(px,pz)-.5)*.17);
    return c;};
-  this.terrain=[];for(let x=bounds.left;x<bounds.right;x+=100)for(let z=bounds.top;z<bounds.bottom;z+=100){const g=new T.PlaneGeometry(100,100,12,12);g.rotateX(-Math.PI/2);const a=g.attributes.position,colors=[];for(let i=0;i<a.count;i++){const px=x+50+a.getX(i),pz=z+50+a.getZ(i);const gy=groundAt(px,pz);a.setY(i,waterAt(px,pz)?-3.4:gy-.12);const c=bodenFarbe(px,pz,gy);colors.push(c.r,c.g,c.b);}g.setAttribute('color',new T.Float32BufferAttribute(colors,3));g.computeVertexNormals();const m=new T.Mesh(g,new T.MeshStandardMaterial({vertexColors:true,roughness:1}));m.position.set(x+50,0,z+50);m.receiveShadow=true;
+  // Jede Kiste der Welt bekommt in world.js detailAufsetzen(): Flecken in
+  // Farbe und Rauheit, Korn in den ersten Metern, gestörte Normale, nasser
+  // Glanz bei Regen. Der Boden — die größte Fläche in jedem Bild draußen —
+  // hatte davon nichts und war ein gleichmäßig eingefärbtes Netz. Scheitel
+  // liegen 8,33 Meter auseinander; über Scheitelfarben ist unterhalb von
+  // rund siebzehn Metern gar keine Struktur darstellbar. Der Shader rechnet
+  // dagegen je Bildpunkt und kann genau das.
+  //
+  // Ein Material für alle 225 Kacheln: der Shader wird einmal übersetzt.
+  const bodenMaterial=detailAufsetzen(new T.MeshStandardMaterial({vertexColors:true,roughness:1}),.16,.7);
+  this.terrain=[];for(let x=bounds.left;x<bounds.right;x+=100)for(let z=bounds.top;z<bounds.bottom;z+=100){const g=new T.PlaneGeometry(100,100,12,12);g.rotateX(-Math.PI/2);const a=g.attributes.position,colors=[];for(let i=0;i<a.count;i++){const px=x+50+a.getX(i),pz=z+50+a.getZ(i);const gy=groundAt(px,pz);a.setY(i,waterAt(px,pz)?-3.4:gy-.12);const c=bodenFarbe(px,pz,gy);colors.push(c.r,c.g,c.b);}g.setAttribute('color',new T.Float32BufferAttribute(colors,3));g.computeVertexNormals();const m=new T.Mesh(g,bodenMaterial);m.position.set(x+50,0,z+50);m.receiveShadow=true;
    // Kacheln, die ganz unter Wasser liegen, sieht man nie: der Wassershader
    // ist undurchsichtig. Sie werden nur beim Tauchen eingeblendet. Ohne das
    // kosteten allein die dreißig neuen Meereskacheln im Osten am Strand über
