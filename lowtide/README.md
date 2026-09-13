@@ -943,6 +943,27 @@ statt gefunden. Sie steht jetzt als letzte vor dem Schließen des Browsers.
 
 221 Prüfungen bestanden, keine gefallen.
 
+## Sechs Leute liefen ins Meer
+
+Dieselbe Messung für die Figuren: 12.420 Proben über dreißig Sekunden.
+**Null in einer Wand.** 6,9 Prozent auf einer Fahrbahn — das sind die
+Überquerenden, die dort hingehören. Und **28 Proben im Wasser**, alle bei
+x ≈ 120 am Ostufer, verteilt auf sechs Personen.
+
+Der Grund steht in der Platzierung: Startpunkt und Ziel eines Rundgangs
+werden beide geprüft, aber der Startpunkt gegen Straße, Hindernis **und**
+Wasser, das Ziel nur gegen Straße und Hindernis. Wer am Ufer steht und
+zwanzig Meter nach Osten läuft, läuft ins Meer.
+
+Dazu ein zweiter Nachlauf, nach demselben Muster wie der für die Fahrbahnen:
+die Figuren entstehen an vier Stellen mit unterschiedlicher Absicht, und die
+Rundgänge aus `simulation.js` und die Menge führen über feste Strecken. Ein
+Wegpunkt darin kann im Meer liegen, auch wenn niemand dort steht. Solche
+Punkte werden jetzt durch die Standposition ersetzt — die Runde wird kürzer,
+aber sie bleibt an Land.
+
+223 Prüfungen bestanden, keine gefallen.
+
 ## Was geprüft wurde und in Ordnung war
 
 Nicht jede Messung findet etwas, und das gehört genauso hierher.

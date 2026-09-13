@@ -1816,7 +1816,8 @@ pruefe('Es wird tatsächlich gezeichnet', info.c > 100, `${info.c} Draw Calls, $
 // Ereignisse wandern dabei mit. Weiter oben eingesetzt ließ er 'Akt 4 zahlt
 // aus und führt in Akt 5' fallen — dieselbe Sorte Fehler wie damals bei der
 // Bremsprüfung, nur diesmal von der neuen Prüfung verursacht statt gefunden.
-await page.evaluate(() => {window.__fahrt = {proben: 0, neben: 0, nass: 0, steht: 0};});
+await page.evaluate(() => {window.__fahrt = {proben: 0, neben: 0, nass: 0, steht: 0,
+ leute: 0, leuteNass: 0, leuteImHaus: 0};});
 // In zehn Abschnitten statt in einem, damit der Renderer zwischendurch
 // drankommt.
 for (let teil = 0; teil < 10; teil++) {
@@ -1832,6 +1833,15 @@ for (let teil = 0; teil < 10; teil++) {
     if (L.waterAt(c.x, c.z)) z.nass++;
     if (!L.onRoad(c.x, c.z, 0)) z.neben++;
    }
+   // Dieselbe Frage für die Figuren. Auf der Fahrbahn zu stehen ist erlaubt —
+   // wer eine Straße überquert, tut genau das. Im Wasser oder in einer Wand
+   // nicht.
+   for (const n of (s._alleNpcs || s.npcs)) {
+    if (n.health <= 0) continue;
+    z.leute++;
+    if (L.waterAt(n.x, n.z)) z.leuteNass++;
+    if (s.blocked({x: n.x, z: n.z}, .2)) z.leuteImHaus++;
+   }
   }
  });
 }
@@ -1840,6 +1850,10 @@ pruefe('Kein fahrender Wagen verlässt die Fahrbahn', gefahren.neben === 0,
  `${gefahren.neben} von ${gefahren.proben} Proben`);
 pruefe('Kein fahrender Wagen steht im Wasser', gefahren.nass === 0,
  `${gefahren.nass} von ${gefahren.proben} Proben`);
+pruefe('Keine Figur läuft ins Wasser', gefahren.leuteNass === 0,
+ `${gefahren.leuteNass} von ${gefahren.leute} Proben`);
+pruefe('Keine Figur läuft durch eine Wand', gefahren.leuteImHaus === 0,
+ `${gefahren.leuteImHaus} von ${gefahren.leute} Proben`);
 // Der Ridge Highway lag sechseinhalb Meter über der Westspitze des Stausees.
 pruefe('Kein Baum steht im Wasser', await page.evaluate(() => {
  const L = window.LOWTIDE;

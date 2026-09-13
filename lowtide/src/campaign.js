@@ -233,7 +233,10 @@ export class Campaign extends Simulation{
     // Der Weg läuft am Bordstein entlang, Richtung wechselt je Person.
     const l=(gefunden%2?1:-1)*(16+(gefunden%3)*8);
     const ziel=nordSued?{x,z:z+l}:{x:x+l,z};
-    if(onRoad(ziel.x,ziel.z,0)||this.blocked(ziel,1.4))continue;
+    // waterAt fehlte hier: der Startpunkt wurde gegen Wasser geprüft, das
+   // Ziel nicht. Sechs Leute liefen dadurch am Ostufer bei x = 120 ins
+   // Meer — 28 von 12.420 Proben über dreißig Sekunden.
+   if(onRoad(ziel.x,ziel.z,0)||this.blocked(ziel,1.4)||waterAt(ziel.x,ziel.z))continue;
     menge.push([x,z,[{x,z},ziel,{x,z}]]);
     gefunden++;
    }
@@ -283,6 +286,23 @@ export class Campaign extends Simulation{
    if(n.path?.[0]){n.path[0].x+=dx; n.path[0].z+=dz;}
    if(n.home){n.home.x+=dx; n.home.z+=dz;}
    if(n.originalPath?.[0]){n.originalPath[0].x+=dx; n.originalPath[0].z+=dz;}
+  }
+
+  // Und derselbe Nachlauf für Wegpunkte im Wasser. Die vier Quellen prüfen
+  // ihre Startpunkte, aber die Rundgänge aus simulation.js und die Menge
+  // führen über feste Strecken; ein Wegpunkt darin kann im Meer liegen,
+  // auch wenn niemand dort steht. Ein Punkt im Wasser wird durch die
+  // Standposition ersetzt — die Runde wird kürzer, aber sie bleibt an Land.
+  for(const n of this.npcs){
+   for(const weg of [n.path,n.originalPath]){
+    if(!weg)continue;
+    for(const q of weg){
+     if(!waterAt(q.x,q.z))continue;
+     q.x=n.x; q.z=n.z;
+    }
+   }
+   if(n.home&&waterAt(n.home.x,n.home.z)){n.home.x=n.x;n.home.z=n.z;}
+   if(n.work&&waterAt(n.work.x,n.work.z)){n.work.x=n.x;n.work.z=n.z;}
   }
 
   // Und auseinanderschieben, wer aufeinander steht. Die Figuren kommen aus
