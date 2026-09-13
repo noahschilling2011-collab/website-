@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 174 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 177 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -556,6 +556,42 @@ sonst schöbe der Verkehr ihn von hinten an.
 
 Danach: **null Paare** unter 3,6 Metern, engster Abstand 4,97 Meter. Zwei
 Prüfungen halten Dichte und Abstand fest.
+
+## Der Verkehr sieht jetzt auch Fußgänger
+
+Nach dem Abstand zwischen den Wagen die nächste Frage: fahren sie durch die
+Menge? Gemessen ja — in zehn Sekunden einunddreißig Fälle, in denen ein
+fahrender Wagen einen Fußgänger auf der Fahrbahn näher als 1,8 Meter vor sich
+hatte, engster Abstand 0,66 Meter. Keine Figur nahm dabei Schaden, keine
+Kollision wurde gezählt: die Simulation hat es nicht einmal bemerkt.
+
+`fussgaengerVoraus()` bremst jetzt, mit derselben Kegelprüfung wie beim
+Abstand zwischen Wagen. Die Liste der Leute auf der Fahrbahn wird alle
+Zehntelsekunde neu gebildet — der Verkehr gegen alle Figuren zu prüfen wären
+bei 116 Wagen und 413 Figuren achtundvierzigtausend Abstände je Bild.
+
+**Drei Fehlmessungen auf dem Weg dahin**, und sie sind der eigentliche Ertrag:
+
+1. Die erste Zählung nahm jeden Wagen, der einer Figur nahe kam — auch die,
+   die dicht an Leuten auf dem **Gehweg** vorbeifahren. Das ist normal, der
+   Bordstein liegt einen halben Meter neben der Spur.
+2. Die zweite zählte stehende Wagen mit. Ein bremsender Wagen behält seine
+   gespeicherte Geschwindigkeit und bewegt sich trotzdem nicht; die Fälle mit
+   `laengs` 1,3 und wachsendem Abstand waren wartende Wagen, also genau das
+   gewünschte Verhalten.
+3. Die dritte zählte Figuren **hinter** dem Wagen mit.
+
+Übrig bleiben einunddreißig echte Fälle in zehn Sekunden bei 116 Wagen —
+0,018 je Wagen und Sekunde, gegen 210 Bremsungen im selben Zeitraum. Es sind
+Leute, die von der Seite in einen anfahrenden Wagen laufen. Ich habe das
+nicht auf null gebracht und schreibe es hin, statt die Zahl wegzudefinieren.
+
+**Und die Prüfung dazu musste vom statistischen auf den gezielten Test
+umgestellt werden.** Über sechshundert Ticks gezählt meldete sie im
+Regressionslauf null Bremsungen, während derselbe Code einzeln zweihundertzehn
+ergab — der Unterschied war der Zustand, den die vorherigen Prüfungen
+hinterlassen. Jetzt steht ein Wagen auf einer freien Geraden, einmal mit und
+einmal ohne jemanden vier Meter voraus: ohne fährt er, mit hält er.
 
 ## Was Zeichenaufrufe kostet
 

@@ -994,6 +994,46 @@ pruefe('Das grobe Fahrzeug hat Lampenflächen', fernlicht.lampen === 2,
 pruefe('Tagsüber leuchtet der ferne Verkehr nicht', fernlicht.tag.every(v => v === 0),
  JSON.stringify(fernlicht.tag));
 pruefe('Nachts leuchtet er', fernlicht.nacht.every(v => v > 1), JSON.stringify(fernlicht.nacht));
+// Der Verkehr bremst für Fußgänger auf der Fahrbahn. Vorher fuhr er durch
+// die Menge hindurch, ohne dass irgendetwas es bemerkte — keine Figur nahm
+// Schaden, keine Kollision wurde gezählt.
+//
+// Gezielt statt statistisch: die erste Fassung zählte Bremsungen über
+// sechshundert Ticks und meldete im Regressionslauf null, während derselbe
+// Code einzeln zweihundertzehn ergab. Der Unterschied war der Zustand, den
+// die vorherigen Prüfungen hinterlassen — eine Prüfung, die davon abhängt,
+// prüft nicht das, was sie behauptet.
+const bremsen = await page.evaluate(async () => {
+ const L = window.LOWTIDE, s = L.sim;
+ const bild = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ const c = s.cars.find(v => v.type === 'traffic');
+ // Wagen auf eine freie Gerade setzen und geradeaus ausrichten.
+ c.x = -100; c.z = 0; c.yaw = 0; c.speed = 9; c.wait = 0;
+ c.route = [{x: -100, z: 60}, {x: -100, z: -60}]; c.target = 0;
+ const n = s.npcs.find(v => v.health > 0 && !v.guard);
+ const heim = {x: n.x, z: n.z};
+ // Erst ohne jemanden davor: der Wagen muss fahren.
+ n.x = -100; n.z = -400;
+ s._aufFahrbahn = null;
+ const a0 = {x: c.x, z: c.z};
+ for (let k = 0; k < 12; k++) s.tick(1 / 60, {});
+ const frei = Math.hypot(c.x - a0.x, c.z - a0.z);
+ // Jetzt vier Meter voraus auf die Fahrbahn.
+ c.x = -100; c.z = 0; c.yaw = 0;
+ n.x = -100; n.z = 4;
+ s._aufFahrbahn = null;
+ const a1 = {x: c.x, z: c.z};
+ for (let k = 0; k < 12; k++) s.tick(1 / 60, {});
+ const gebremst = Math.hypot(c.x - a1.x, c.z - a1.z);
+ n.x = heim.x; n.z = heim.z; s._aufFahrbahn = null;
+ await bild();
+ return {frei: +frei.toFixed(2), gebremst: +gebremst.toFixed(2),
+  aufFahrbahn: L.onRoad(-100, 4, 0)};
+});
+pruefe('Die Teststelle liegt überhaupt auf einer Fahrbahn', bremsen.aufFahrbahn);
+pruefe('Ohne Hindernis fährt der Wagen', bremsen.frei > .5, `${bremsen.frei} m in zwölf Ticks`);
+pruefe('Mit einem Fußgänger vier Meter voraus hält er', bremsen.gebremst < .05,
+ `${bremsen.gebremst} m in zwölf Ticks`);
 pruefe('Sparmodus schaltet die Nachbearbeitung ab', await page.evaluate(() => {
  const knopf = document.getElementById('qualityBtn'), w = window.LOWTIDE.world;
  knopf.click();
