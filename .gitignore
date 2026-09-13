@@ -20,3 +20,4 @@ app/**/*.g.dart.bak
 .idea/
 .vscode/
 *.iml
+lowtide/shots/

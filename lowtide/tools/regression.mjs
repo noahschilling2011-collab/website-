@@ -1,0 +1,1572 @@
+// Regressionsprüfung: die Funktionen, die nie kaputtgehen dürfen.
+// Eingaben laufen als echte Tastaturereignisse durch dieselbe Kette wie im
+// Spiel; alles, was ohne WebGL prüfbar ist, geht direkt an die Simulation.
+import {chromium} from '/opt/node22/lib/node_modules/playwright/index.mjs';
+import {fileURLToPath} from 'node:url';
+
+const browser = await chromium.launch({
+ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+ args: ['--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader', '--no-sandbox']
+});
+const page = await browser.newPage({viewport: {width: 900, height: 520}});
+const konsole = [];
+page.on('pageerror', e => konsole.push('pageerror: ' + (e.stack || e.message)));
+page.on('console', m => {if (m.type() === 'error') konsole.push('console: ' + m.text());});
+
+let bestanden = 0, gefallen = 0;
+const pruefe = (name, ok, zusatz = '') => {
+ if (ok) {bestanden++; console.log('  ok      ' + name);}
+ else {gefallen++; console.log('  FEHLER  ' + name + (zusatz ? ' — ' + zusatz : ''));}
+};
+// Auf echte Bilder warten statt auf Zeit: im Software-Rendering dauert
+// ein Bild über eine Sekunde.
+const bilder = async n => {
+ const start = await page.evaluate(() => window.LOWTIDE.frames);
+ await page.waitForFunction(k => window.LOWTIDE.frames > k, start + n - 1, {timeout: 90000});
+};
+
+await page.goto('file://' + fileURLToPath(new URL('../LOWTIDE.html', import.meta.url)), {waitUntil: 'load'});
+
+console.log('Start');
+await page.waitForFunction(() => !document.getElementById('startBtn').disabled, null, {timeout: 180000});
+pruefe('Ladezustand meldet bereit', (await page.textContent('#loadState')).includes('bereit'));
+pruefe('window.LOWTIDE vorhanden', await page.evaluate(() => !!window.LOWTIDE?.sim));
+await page.click('#startBtn');
+await bilder(2);
+pruefe('Bildschleife läuft', await page.evaluate(() => window.LOWTIDE.frames) > 1);
+pruefe('Spiel nicht pausiert', await page.evaluate(() => !window.LOWTIDE.sim.paused));
+
+console.log('Steuerung');
+const vorher = await page.evaluate(() => ({x: window.LOWTIDE.sim.player.x, z: window.LOWTIDE.sim.player.z}));
+await page.keyboard.down('w');
+await bilder(4);
+await page.keyboard.up('w');
+const nachher = await page.evaluate(() => ({x: window.LOWTIDE.sim.player.x, z: window.LOWTIDE.sim.player.z}));
+pruefe('W bewegt die Figur', Math.hypot(nachher.x - vorher.x, nachher.z - vorher.z) > .3,
+ `Δ=${Math.hypot(nachher.x - vorher.x, nachher.z - vorher.z).toFixed(2)}`);
+
+const kameraVor = await page.evaluate(() => window.LOWTIDE.world.camera.position.toArray().map(v => +v.toFixed(2)));
+await page.mouse.move(450, 260);
+await page.mouse.down();
+await page.mouse.move(620, 260, {steps: 6});
+await page.mouse.up();
+await bilder(2);
+const kameraNach = await page.evaluate(() => window.LOWTIDE.world.camera.position.toArray().map(v => +v.toFixed(2)));
+pruefe('Maus dreht die Kamera', kameraVor.some((v, i) => Math.abs(v - kameraNach[i]) > .2));
+
+console.log('Figurenwechsel');
+const figurVor = await page.evaluate(() => window.LOWTIDE.sim.player.name);
+await page.keyboard.press('Tab');
+await bilder(1);
+const figurNach = await page.evaluate(() => window.LOWTIDE.sim.player.name);
+pruefe('Tab wechselt die Figur', figurVor !== figurNach, `${figurVor} → ${figurNach}`);
+await page.keyboard.press('Tab');
+await bilder(1);
+pruefe('Tab wechselt zurück', await page.evaluate(() => window.LOWTIDE.sim.player.name) === figurVor);
+
+console.log('Waffen');
+await page.keyboard.press('q');
+await bilder(1);
+pruefe('Q zieht die Waffe', await page.evaluate(() => window.LOWTIDE.sim.player.armed));
+const munitionVor = await page.evaluate(() => window.LOWTIDE.sim.player.ammo);
+await page.evaluate(() => {window.LOWTIDE.sim.player.cooldown = 0; window.LOWTIDE.sim.shoot();});
+pruefe('Schuss verbraucht Munition', await page.evaluate(() => window.LOWTIDE.sim.player.ammo) === munitionVor - 1);
+// Nachladen dauert 1,4 Sekunden Simulationszeit. Im Software-Rendering
+// wären das dutzende Bilder, also wird die Zeit direkt vorgespult.
+pruefe('Nachladen füllt das Magazin', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ s.player.ammo = 2; s.reloadJob = null; s.player.cooldown = 0;
+ s.reload();
+ for (let i = 0; i < 40; i++) s.tick(.05, {});
+ return s.player.ammo > 2;
+}));
+await page.keyboard.press('q');
+await bilder(1);
+
+console.log('Fahrzeuge');
+const eingestiegen = await page.evaluate(() => {
+ const s = window.LOWTIDE.sim, auto = s.cars.find(c => c.model === 'sedan' && c.health > 0);
+ s.player.x = auto.x + 1.5; s.player.z = auto.z; s.player.y = 0;
+ auto.unlocked = true;
+ s.enterExit();
+ return !!s.player.car;
+});
+pruefe('Einsteigen funktioniert', eingestiegen);
+await page.keyboard.down('w');
+await bilder(4);
+await page.keyboard.up('w');
+pruefe('Fahrzeug beschleunigt', await page.evaluate(() => Math.abs(window.LOWTIDE.sim.player.car?.speed || 0)) > .5);
+const ausgestiegen = await page.evaluate(() => {
+ const s = window.LOWTIDE.sim; s.player.car.speed = 0; s.enterExit(); return !s.player.car;
+});
+pruefe('Aussteigen funktioniert', ausgestiegen);
+
+console.log('Fortbewegung');
+// Erst ausschwingen lassen: direkt nach dem Aussteigen steht das Bein noch
+// im letzten Schritt.
+await bilder(3);
+const beinRuhe = await page.evaluate(() => window.LOWTIDE.world.player.userData.legs[0].rotation.x);
+await bilder(3);
+pruefe('Beine stehen still, solange die Figur steht',
+ Math.abs(await page.evaluate(() => window.LOWTIDE.world.player.userData.legs[0].rotation.x) - beinRuhe) < .02);
+await page.keyboard.down('w');
+const winkel = [];
+for (let i = 0; i < 5; i++) {await bilder(1); winkel.push(await page.evaluate(() => window.LOWTIDE.world.player.userData.legs[0].rotation.x));}
+await page.keyboard.up('w');
+pruefe('Beim Gehen schwingen die Beine', Math.max(...winkel) - Math.min(...winkel) > .1,
+ `Spanne ${(Math.max(...winkel) - Math.min(...winkel)).toFixed(3)}`);
+pruefe('Die Schrittphase folgt der Strecke, nicht der Uhr', await page.evaluate(() => {
+ const u = window.LOWTIDE.world.player.userData;
+ return typeof u.strecke === 'number' && u.strecke > 0;
+}));
+await bilder(4);
+pruefe('Nach dem Loslassen kommen die Beine zur Ruhe',
+ Math.abs(await page.evaluate(() => window.LOWTIDE.world.player.userData.legs[0].rotation.x)) < .06);
+
+console.log('Ampeln und Licht');
+pruefe('Verkehr hält bei Rot und fährt bei Grün', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ // Kreuzung des Rasters bei x = -100, z = 20; das Fahrzeug steht zwölf Meter
+ // davor und fährt Richtung +z, also auf der Nord-Süd-Achse.
+ const auto = {x: -100, z: 8, yaw: 0};
+ const merk = s.time;
+ s.time = 20; const beiRot = s.haeltVorAmpel(auto);
+ s.time = 5;  const beiGruen = s.haeltVorAmpel(auto);
+ s.time = merk;
+ return beiRot && !beiGruen;
+}));
+// Zwei Kreuzungen auf demselben Fleck fallen im Spiel nicht als Zahl auf,
+// sondern als Flimmern an den Ampelgehäusen. Die Liste wird aus den
+// Straßensegmenten gerechnet, und dieselbe Achse besteht stellenweise aus
+// zwei Segmenten — jede neue Straße kann den Fall zurückbringen.
+pruefe('Keine zwei Ampeln auf demselben Platz', await page.evaluate(() => {
+ const a = window.LOWTIDE.world.street.ampeln, m = new Set();
+ for (const k of a) m.add(k.x + '|' + k.z);
+ return m.size === a.length;
+}), await page.evaluate(() => {
+ const a = window.LOWTIDE.world.street.ampeln, m = new Set();
+ for (const k of a) m.add(k.x + '|' + k.z);
+ return `${a.length} Kreuzungen auf ${m.size} Plätzen`;
+}));
+pruefe('Jede Ampel steht an einer Fahrbahn und nicht im Wasser', await page.evaluate(() => {
+ const L = window.LOWTIDE;
+ return L.world.street.ampeln.every(k => L.onRoad(k.x, k.z, 0) && !L.waterAt(k.x, k.z));
+}));
+pruefe('Quer stehende Achse hat gleichzeitig frei', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim, merk = s.time;
+ const laengs = {x: -112, z: 20, yaw: Math.PI / 2};
+ s.time = 20; const frei = !s.haeltVorAmpel(laengs);
+ s.time = merk;
+ return frei;
+}));
+pruefe('Scheinwerfer schalten sich nachts ein', await page.evaluate(async () => {
+ const L = window.LOWTIDE, s = L.sim;
+ s.hour = 22;
+ const auto = s.cars.find(c => c.model === 'sedan' && c.health > 0);
+ auto.unlocked = true; auto.lights = 100;
+ s.player.x = auto.x + 1.5; s.player.z = auto.z; s.player.y = 0;
+ if (!s.player.car) s.enterExit();
+ return !!s.player.car;
+}));
+await bilder(3);
+pruefe('Scheinwerferkegel leuchtet', await page.evaluate(() =>
+ window.LOWTIDE.world.fahrlicht.every(l => l.visible && l.intensity > 10)));
+await page.evaluate(() => {const s = window.LOWTIDE.sim; s.player.car.speed = 0; s.enterExit(); s.hour = 13;});
+await bilder(2);
+pruefe('Scheinwerfer aus, sobald niemand fährt', await page.evaluate(() =>
+ window.LOWTIDE.world.fahrlicht.every(l => !l.visible)));
+
+pruefe('Fahrzeug bricht bei voller Lenkung aus', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim, auto = s.cars.find(c => c.model === 'muscle') || s.cars[0];
+ auto.unlocked = true; auto.slip = 0; auto.speed = 0;
+ s.player.x = auto.x + 1.5; s.player.z = auto.z; s.player.y = 0;
+ if (!s.player.car) s.enterExit();
+ for (let i = 0; i < 60; i++) s.driveVehicle(.05, {forward: 1, turn: 1});
+ const ausbruch = Math.abs(s.player.car.slip);
+ // Geradeaus muss der Schlupf wieder abklingen.
+ for (let i = 0; i < 60; i++) s.driveVehicle(.05, {forward: 1, turn: 0});
+ const gerade = Math.abs(s.player.car.slip);
+ s.player.car.speed = 0;
+ return ausbruch > .5 && gerade < ausbruch * .3;
+}));
+await page.evaluate(() => {const s = window.LOWTIDE.sim; if (s.player.car) {s.player.car.speed = 0; s.enterExit();}});
+
+pruefe('Suchscheinwerfer erst ab fünf Sternen', await page.evaluate(() => {
+ const w = window.LOWTIDE.world;
+ return !w.suchlicht.visible;
+}));
+await page.evaluate(() => {const s = window.LOWTIDE.sim; s.stars = 5; s.heat = 10; s.policeHeli.alt = 40;
+ s.policeHeli.x = s.player.x; s.policeHeli.z = s.player.z; s.lastSeen = {x: s.player.x, z: s.player.z};});
+await bilder(2);
+pruefe('Suchscheinwerfer leuchtet bei fünf Sternen', await page.evaluate(() =>
+ window.LOWTIDE.world.suchlicht.visible && window.LOWTIDE.world.suchfleck.visible));
+// dispatchTimer mit zurücksetzen: sonst steht die Ausrückungssperre aus
+// diesem Abschnitt noch, wenn die Fahndungsprüfung gleich meldet.
+await page.evaluate(() => {const s = window.LOWTIDE.sim; s.stars = 0; s.heat = 0; s.lastSeen = null;
+ s.description = null; s.policeHeli.alt = 0; s.dispatchTimer = 0;
+ for (const c of s.cops) {c.active = false; c.route = []; c.blockTarget = null; c.blocking = false;}});
+await bilder(2);
+
+console.log('Fahndung');
+await page.evaluate(() => window.LOWTIDE.sim.report(4));
+pruefe('Meldung erzeugt Sterne', await page.evaluate(() => window.LOWTIDE.sim.stars) > 0);
+await bilder(2);
+pruefe('Polizei rückt aus', await page.evaluate(() => window.LOWTIDE.sim.cops.some(c => c.active)));
+await page.evaluate(() => {const s = window.LOWTIDE.sim; s.stars = 0; s.heat = 0; s.lastSeen = null; s.description = null;});
+
+console.log('Oberfläche');
+await page.keyboard.press('m');
+await bilder(1);
+pruefe('M öffnet die Karte', await page.evaluate(() => document.getElementById('bigMap').open));
+await page.click('#closeMap');
+await bilder(1);
+pruefe('Karte schließt und Spiel läuft weiter', await page.evaluate(() => !document.getElementById('bigMap').open && !window.LOWTIDE.sim.paused));
+pruefe('Minimap wird gezeichnet', await page.evaluate(() => {
+ const c = document.getElementById('map'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+ for (let i = 0; i < d.length; i += 4) if (d[i] || d[i + 1] || d[i + 2]) return true;
+ return false;
+}));
+await page.keyboard.press('Escape');
+await bilder(1);
+pruefe('Escape pausiert', await page.evaluate(() => document.getElementById('pause').open && window.LOWTIDE.sim.paused));
+await page.click('#resume');
+await bilder(1);
+pruefe('Weiterspielen hebt die Pause auf', await page.evaluate(() => !window.LOWTIDE.sim.paused));
+await page.keyboard.press('F3');
+pruefe('F3 blendet die Messwerte ein', await page.evaluate(() => !document.getElementById('debug').hidden));
+await page.keyboard.press('F3');
+
+console.log('Tierwelt');
+pruefe('Möwen, Fische, Delfine und Alligatoren sind angelegt', await page.evaluate(() => {
+ const w = window.LOWTIDE.world.tiere;
+ return w.moewen.length > 40 && w.fische.length > 60 && w.delfine.length >= 5 && w.alligatoren.length >= 6;
+}));
+pruefe('Die Tiere bewegen sich', await page.evaluate(async () => {
+ const w = window.LOWTIDE.world.tiere;
+ const vorher = w.fische.slice(0, 5).map(f => f.x + f.z);
+ await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ return w.fische.slice(0, 5).some((f, i) => Math.abs(f.x + f.z - vorher[i]) > 1e-4);
+}));
+pruefe('Fische bleiben im Wasser', await page.evaluate(() => {
+ const w = window.LOWTIDE.world.tiere, wasser = window.LOWTIDE.waterAt;
+ return w.fische.every(f => wasser(f.x, f.z));
+}));
+pruefe('Ein Schuss schreckt sie auf', await page.evaluate(async () => {
+ const L = window.LOWTIDE, s = L.sim;
+ L.world.tiere.scheu = 0;
+ s.player.armed = true; s.player.cooldown = 0; s.player.ammo = 12; s.shoot();
+ await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ const geschreckt = L.world.tiere.scheu > .3;
+ s.player.armed = false; s.stars = 0; s.heat = 0; s.lastSeen = null; s.description = null;
+ return geschreckt;
+}));
+pruefe('Die Kamera erkennt Tiere im Bild', await page.evaluate(() => {
+ const L = window.LOWTIDE, t = L.world.tiere;
+ // Einen Alligator direkt vor die Figur setzen und in seine Richtung schauen.
+ const a = t.alligatoren[0];
+ L.sim.player.x = a.x; L.sim.player.z = a.z - 12;
+ // Andere Tiere können zufällig auch im Blickfeld liegen; entscheidend ist,
+ // dass die Blickrichtung überhaupt zählt.
+ const vorn = t.imBild({x: a.x, z: a.z - 12}, 0);
+ const hinten = t.imBild({x: a.x, z: a.z - 12}, Math.PI);
+ return vorn >= 1 && hinten < vorn;
+}));
+
+console.log('Detailstufen');
+pruefe('Ferne Figuren und Fahrzeuge laufen über die grobe Stufe', await page.evaluate(async () => {
+ const L = window.LOWTIDE, s = L.sim;
+ if (s.player.car) {s.player.car.speed = 0; s.enterExit();}
+ s.player.x = -40; s.player.z = 60;
+ await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ const w = L.world;
+ return w.figurFern.anzahl + w.autoFern.anzahl > 0;
+}));
+pruefe('Die grobe Stufe kostet wenige Draw Calls', await page.evaluate(() => {
+ const w = window.LOWTIDE.world;
+ // Zwei Vorbilder mit je einer Handvoll Materialien, unabhängig von der Zahl
+ // der Exemplare.
+ return w.figurFern.netze.length <= 6 && w.autoFern.netze.length <= 6;
+}));
+pruefe('Nahe Exemplare bleiben detailliert', await page.evaluate(async () => {
+ const L = window.LOWTIDE, s = L.sim, w = L.world;
+ const n = s.npcs.find(x => x.health > 0);
+ s.player.x = n.x + 2; s.player.z = n.z + 2;
+ await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ const i = s.npcs.indexOf(n);
+ return w.npcs[i].visible;
+}));
+
+console.log('Aktivitäten');
+pruefe('Rennen verlangt das passende Fahrzeug', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ s.stars = 0; s.activity = null;
+ if (s.player.car) {s.player.car.speed = 0; s.enterExit();}
+ s.startActivity('race:boot');
+ const ohneFahrzeug = !s.activity;
+ const auto = s.cars.find(c => c.model === 'sedan' && c.health > 0);
+ auto.unlocked = true;
+ s.player.x = auto.x + 1.5; s.player.z = auto.z; s.player.y = 0;
+ if (!s.player.car) s.enterExit();
+ s.startActivity('race:boot');       // Landfahrzeug auf einer Wasserstrecke
+ const falschesMedium = !s.activity;
+ s.startActivity('race:west');
+ const passt = s.activity?.kind === 'race' && s.activity.kurs === 'west';
+ return ohneFahrzeug && falschesMedium && passt;
+}));
+pruefe('Die Strecke wird mit ihren Kontrollpunkten gefahren', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim, a = s.activity;
+ if (!a) return false;
+ const punkte = a.points.length;
+ for (const punkt of a.points) {
+  if (!s.activity) break;
+  s.player.x = punkt.x; s.player.z = punkt.z;
+  if (s.player.car) {s.player.car.x = punkt.x; s.player.car.z = punkt.z;}
+  s.tick(.05, {});
+ }
+ return punkte >= 4 && !s.activity && (s.highScores['race:west'] || 0) > 0;
+}));
+await page.evaluate(() => {const s = window.LOWTIDE.sim; if (s.player.car) {s.player.car.speed = 0; s.enterExit();}});
+pruefe('Der Schießstand verlangt eine gezogene Waffe', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ // Die Streckenfahrt vorher kann Passanten erwischt und damit eine Fahndung
+ // ausgelöst haben; startActivity verweigert dann jede Aktivität.
+ s.stars = 0; s.heat = 0; s.lastSeen = null; s.description = null;
+ s.activity = null; s.player.armed = false;
+ s.startActivity('range');
+ const ohne = !s.activity;
+ s.player.armed = true;
+ s.startActivity('range');
+ const mit = s.activity?.kind === 'range';
+ s.activity = null; s.player.armed = false;
+ return ohne && mit;
+}));
+pruefe('Der Bergungsauftrag zählt Fundstellen und zahlt aus', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim, orte = window.LOWTIDE.schatzOrte;
+ s.schatzIndex = 0; s.activity = null; s.stars = 0;
+ s.startActivity('treasure');
+ if (!s.activity) return false;
+ const geld = s.player.money;
+ const ziel = s.objective();
+ s.player.x = ziel.x; s.player.z = ziel.z; s.player.car = null;
+ s.action();
+ return s.schatzIndex === 1 && s.player.money > geld && orte.length === 6;
+}));
+await page.evaluate(() => {window.LOWTIDE.sim.activity = null; window.LOWTIDE.sim.schatzIndex = 0;});
+
+console.log('Eigentum');
+pruefe('Kaufen scheitert ohne Geld', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ s.besitz = {}; s.player.money = 10;
+ return s.kaufeImmobilie('villa') === false && !s.besitz.villa;
+}));
+pruefe('Kaufen bucht ab und trägt ein', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ s.player.money = 5000;
+ const ok = s.kaufeImmobilie('trailer');
+ return ok && !!s.besitz.trailer && s.player.money === 4400 && s.ertraege() === 35;
+}));
+pruefe('Dasselbe Objekt lässt sich nicht zweimal kaufen', await page.evaluate(() =>
+ window.LOWTIDE.sim.kaufeImmobilie('trailer') === false));
+pruefe('Der Zahltag schreibt die Erträge gut', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ const vorher = s.player.money;
+ s.letzterZahltag = -1;
+ s.zahltag();
+ const einmal = s.player.money - vorher;
+ s.zahltag();   // derselbe Tag darf nicht doppelt zahlen
+ return einmal === 35 && s.player.money - vorher === 35;
+}));
+pruefe('Werkstattanteil senkt die Reparaturkosten', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim, l = window.LOWTIDE.orte;
+ s.player.money = 9000; s.besitz = {};
+ s.player.x = l.garage.x; s.player.z = l.garage.z; s.serviceLocation = 'garage';
+ const auto = s.cars.find(c => c.model === 'sedan');
+ auto.x = l.garage.x; auto.z = l.garage.z; auto.health = 40;
+ const vorOhne = s.player.money; s.buy('car:repair');
+ const ohne = vorOhne - s.player.money;
+ s.besitz.werkstatt = {seit: 0};
+ auto.health = 40;
+ const vorMit = s.player.money; s.buy('car:repair');
+ const mit = vorMit - s.player.money;
+ s.besitz = {};
+ return ohne === 150 && mit < ohne;
+}));
+pruefe('Eigentum übersteht den Spielstand-Rundlauf', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ s.besitz = {loft: {seit: 1}};
+ const stand = JSON.parse(JSON.stringify(s.snapshot()));
+ s.besitz = {};
+ s.restore(stand); s.paused = false;
+ return !!s.besitz.loft && s.ertraege() === 110;
+}));
+
+console.log('Radio');
+pruefe('Audiokontext läuft nach dem Start', await page.evaluate(() =>
+ !!window.LOWTIDE.world && document.body.classList.contains('playing')));
+pruefe('Radio ist eingerichtet und hat mehrere Sender', await page.evaluate(() => {
+ const r = window.LOWTIDE.radio;
+ return !!r && r.constructor.name === 'Radio' && window.LOWTIDE.sender.length >= 6;
+}));
+pruefe('N schaltet den Sender weiter', await page.evaluate(() => {
+ const r = window.LOWTIDE.radio, vorher = r.index;
+ window.dispatchEvent(new KeyboardEvent('keydown', {key: 'n', bubbles: true}));
+ return r.index !== vorher;
+}));
+pruefe('Radio schweigt zu Fuß', await page.evaluate(async () => {
+ const L = window.LOWTIDE;
+ if (L.sim.player.car) {L.sim.player.car.speed = 0; L.sim.enterExit();}
+ await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ return L.radio.laut < .01;
+}));
+pruefe('Im Fahrzeug läuft der Sender und plant Noten', await page.evaluate(async () => {
+ const L = window.LOWTIDE, s = L.sim;
+ L.radio.waehle(1);
+ const auto = s.cars.find(c => c.model === 'sedan' && c.health > 0);
+ auto.unlocked = true;
+ s.player.x = auto.x + 1.5; s.player.z = auto.z; s.player.y = 0;
+ if (!s.player.car) s.enterExit();
+ await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ const vorher = L.radio.schritt;
+ for (let i = 0; i < 40; i++) L.radio.tick();
+ await new Promise(r => setTimeout(r, 450));
+ L.radio.tick();
+ return L.radio.laut > .1 && L.radio.schritt !== vorher;
+}));
+await page.evaluate(() => {const s = window.LOWTIDE.sim; if (s.player.car) {s.player.car.speed = 0; s.enterExit();}});
+
+console.log('Innenräume');
+pruefe('Alle acht Serviceräume sind eingerichtet', await page.evaluate(() =>
+ (window.LOWTIDE.world.innenLampen || []).length >= 8));
+pruefe('Innenlicht geht an, sobald man den Raum betritt', await page.evaluate(async () => {
+ const L = window.LOWTIDE, s = L.sim;
+ s.player.x = -270; s.player.z = 123;   // Nora’s Diner
+ s.player.car = null; s.player.y = 0;
+ await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ return L.world.innenLichter.some(l => l.visible && l.intensity > 10);
+}));
+pruefe('Innenlicht geht aus, wenn man weit weg ist', await page.evaluate(async () => {
+ const L = window.LOWTIDE, s = L.sim;
+ s.player.x = -40; s.player.z = 60;
+ await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ return L.world.innenLichter.every(l => !l.visible);
+}));
+
+console.log('Telefon');
+await page.keyboard.press('p');
+await bilder(1);
+pruefe('P öffnet das Telefon', await page.evaluate(() => !document.getElementById('phone').hidden));
+pruefe('Startseite zeigt alle Apps', await page.evaluate(() =>
+ document.querySelectorAll('#phoneKacheln button').length >= 10));
+pruefe('Telefon pausiert das Spiel', await page.evaluate(() => window.LOWTIDE.sim.paused));
+pruefe('TIDELINE zeigt, was in der Welt passiert ist', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ s.post('@pruefung', 'Ein Beitrag aus dem Prüflauf.');
+ [...document.querySelectorAll('#phoneKacheln button')].find(b => b.textContent.includes('TIDELINE')).click();
+ return document.getElementById('phoneInhalt').textContent.includes('Ein Beitrag aus dem Prüflauf.');
+}));
+await page.click('#phoneHome');
+pruefe('Bank zeigt Kontostand und Bewegungen', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ s.buchung('Prüflauf', -77);
+ [...document.querySelectorAll('#phoneKacheln button')].find(b => b.textContent.includes('BANK')).click();
+ const text = document.getElementById('phoneInhalt').textContent;
+ return text.includes('Kontostand') && text.includes('Prüflauf');
+}));
+await page.click('#phoneHome');
+pruefe('Kamera nimmt ein echtes Bild auf', await page.evaluate(() => {
+ [...document.querySelectorAll('#phoneKacheln button')].find(b => b.textContent.includes('KAMERA')).click();
+ [...document.querySelectorAll('#phoneInhalt button')].find(b => b.textContent === 'Aufnehmen').click();
+ const f = window.LOWTIDE.sim.fotos?.[0];
+ return !!f && f.daten.startsWith('data:image/jpeg') && f.daten.length > 4000;
+}));
+await page.keyboard.press('p');
+await bilder(1);
+pruefe('P schließt das Telefon und gibt das Spiel frei', await page.evaluate(() =>
+ document.getElementById('phone').hidden && !window.LOWTIDE.sim.paused));
+
+console.log('Akt 3 bis 5');
+// Die drei Akte laufen hier direkt gegen die Simulation: die Mechanik ist
+// Physik und Zustand, kein Rendern. Ein Durchlauf im Spieltempo dauerte
+// Minuten, deshalb werden Vorlauf und Position gesetzt statt abgefahren.
+const akte = await page.evaluate(() => {
+ const L = window.LOWTIDE, sim = L.sim, S = L.story, out = {};
+ sim.paused = false;
+ sim.campaign.stage = 4;
+ const ziel = sim.objective();
+ out.zielDiner = Math.hypot(ziel.x - L.orte.diner.x, ziel.z - L.orte.diner.z) < 1;
+ sim.player.car = null; sim.player.x = L.orte.diner.x; sim.player.z = L.orte.diner.z + 2;
+ out.aktion3 = sim.action();
+
+ sim.starteAkt(3);
+ const lkw = sim.cars.find(c => c.type === 'konvoi');
+ out.lkwDa = !!lkw;
+ out.titelVorlauf = sim.missionTitle();
+ sim.campaign.konvoi.vorlauf = 0;
+ const lkwVor = {x: lkw.x, z: lkw.z};
+ for (let i = 0; i < 60; i++) sim.tick(.05);
+ out.lkwFaehrt = Math.hypot(lkw.x - lkwVor.x, lkw.z - lkwVor.z);
+ const auto = sim.cars.find(c => c.type === 'parked' && c.model === 'muscle') || sim.cars[0];
+ // Für den Rammtest bleibt nur der Transport auf der Karte. Auf einer
+ // belebten Straße trifft man beim Rammen zwangsläufig Zivilwagen und
+ // Fußgänger, und beides ist zu Recht eine Straftat — geprüft werden soll
+ // aber, dass der Transport selbst keine auslöst. Erster Versuch: nur die
+ // Fahrzeuge beiseite. Es blieben die hundertsiebenundfünfzig Leute.
+ out.beiseite = [];
+ for (const c of sim.cars) {
+  if (c === auto || c === lkw) continue;
+  out.beiseite.push(['w', c.id, c.x, c.z]);
+  c.x += 4000;
+ }
+ for (const n of sim.npcs) {
+  out.beiseite.push(['n', n.id, n.x, n.z]);
+  n.x += 4000;
+ }
+ sim.player.car = auto; Object.assign(auto, {yaw: lkw.yaw, speed: 22, health: 100, fuel: 100});
+ // Fahndung zurücksetzen. Die Abschnitte über Polizei und Fahndung laufen
+ // vorher und lassen Sterne stehen; ohne diese Zeile misst die Prüfung nicht
+ // das Rammen, sondern den Rest des vorigen Abschnitts. Genau daran ist sie
+ // zweimal gescheitert, während ich die Ursache bei Verkehr und Fußgängern
+ // gesucht habe.
+ sim.stars = 0; sim.heat = 0; sim.lastSeen = null; sim.description = null;
+ for (const c of sim.cops) c.active = false;
+ // Und die vorgemerkten Zeugenmeldungen. crime() hängt jedem Zeugen ein
+ // report mit Zeitzünder an; die Abschnitte über Waffen und Nahkampf laufen
+ // vorher, und deren Zeugen melden mitten im Rammtest. Das Protokoll hat sie
+ // verraten: "report 1 bei -164/14" — ein Ort, an dem der Transport nie war.
+ for (const n of sim.npcs) {n.report = null; n.timer = 0; if (n.state !== 'tanzend') n.state = 'normal';}
+ sim.reported = new Set();
+ // Eine Prüfung, die nur "rot" sagt, kostet je Anlauf eine halbe Stunde. Sie
+ // schreibt jetzt mit, wer die Fahndung auslöst, und gibt es im Fehlertext
+ // aus. Drei Anläufe lang habe ich die Ursache stattdessen geraten.
+ out.ausloeser = [];
+ const echtesReport = sim.report.bind(sim), echtesCrime = sim.crime.bind(sim);
+ sim.report = function (sev, pos, inc) {
+  out.ausloeser.push('report ' + sev + ' bei ' + Math.round(pos?.x ?? 0) + '/' + Math.round(pos?.z ?? 0));
+  return echtesReport(sev, pos, inc);
+ };
+ sim.crime = function (sev) {out.ausloeser.push('crime ' + sev); return echtesCrime(sev);};
+ let stoesse = 0;
+ while (sim.campaign.konvoi.phase === 'faehrt' && stoesse++ < 400) {
+  auto.x = lkw.x + 2.2; auto.z = lkw.z + 1.2; auto.speed = 22;
+  sim.tick(.05, {forward: 1});
+ }
+ out.gestoppt = sim.campaign.konvoi.phase === 'gestoppt';
+ out.stoesse = stoesse;
+ sim.report = echtesReport; sim.crime = echtesCrime;
+ out.fahndungNachRammen = sim.stars;
+ out.ausloeser = out.ausloeser.slice(0, 6);
+ out.bewaffnet = !!sim.player.armed;
+ for (const [art, id, x, z] of out.beiseite) {
+  const o = (art === 'w' ? sim.cars : sim.npcs).find(v => v.id === id);
+  if (o) {o.x = x; o.z = z;}
+ }
+ delete out.beiseite;
+ sim.player.car = null; sim.player.x = lkw.x + 1.5; sim.player.z = lkw.z + 1;
+ const geld3 = sim.player.money;
+ out.aktion4 = sim.action();
+ out.lohn3 = sim.player.money - geld3;
+
+ sim.starteAkt(4);
+ sim.hour = 14; sim.player.car = null;
+ sim.player.x = S.TRESOR.x; sim.player.z = S.TRESOR.z;
+ sim.tick(.01, {sneak: true}); sim.action();
+ out.tagsGesperrt = !sim.campaign.tresor.arbeitet;
+ sim.hour = 23; sim.player.sneak = false; sim.action();
+ out.aufrechtGesperrt = !sim.campaign.tresor.arbeitet;
+ sim.stars = 0; sim.heat = 0;
+ sim.tick(.01, {sneak: true}); sim.player.x = S.TRESOR.x; sim.player.z = S.TRESOR.z;
+ sim.action();
+ out.nachtsOffen = !!sim.campaign.tresor.arbeitet;
+ const geld4 = sim.player.money;
+ let takte = 0;
+ for (; takte < 900 && sim.campaign.stage === S.AKT4; takte++) {
+  sim.player.x = S.TRESOR.x; sim.player.z = S.TRESOR.z; sim.tick(.05, {sneak: true});
+  if (sim.campaign.tresor.blockiert) out.wachePausiert = true;
+ }
+ out.takte4 = takte;
+ out.lohn4 = sim.player.money - geld4;
+ out.stageNach4 = sim.campaign.stage;
+ out.dialog4 = sim.aktDialog;
+ sim.aktDialog = null; sim.paused = false;
+
+ const boot = sim.cars.find(c => c.type === 'flucht');
+ out.bootDa = !!boot;
+ out.routeWasser = S.FLUCHT_ROUTE.every(q => L.waterAt(q.x, q.z));
+ const bootVor = {x: boot.x, z: boot.z};
+ for (let i = 0; i < 40; i++) sim.tick(.05);
+ out.bootFaehrt = Math.hypot(boot.x - bootVor.x, boot.z - bootVor.z);
+ const eigenes = sim.cars.find(c => c.model === 'boat' && c !== boot);
+ sim.player.car = eigenes;
+ for (let i = 0; i < 300 && !sim.aktDialog; i++) {
+  eigenes.x = boot.x + 3; eigenes.z = boot.z + 3;
+  sim.player.x = eigenes.x; sim.player.z = eigenes.z;
+  sim.tick(.05);
+ }
+ out.dialog5 = sim.aktDialog;
+ sim.aktDialog = null; sim.paused = false;
+ const geld5 = sim.player.money, ruf = sim.relationship;
+ const ausgang = sim.beendeKampagne('polizei');
+ out.ausgang = ausgang?.ausgang;
+ out.endLohn = sim.player.money - geld5;
+ out.endRuf = sim.relationship - ruf;
+ out.stageEnde = sim.campaign.stage;
+ out.ausgaenge = Object.keys(S.AUSGAENGE).length;
+ sim.player.car = null; sim.stars = 0; sim.heat = 0;
+ return out;
+});
+pruefe('Akt 3 wird am Diner angeboten', akte.zielDiner && akte.aktion3 === 'akt3');
+pruefe('Transport existiert und fährt seine Route', akte.lkwDa && akte.lkwFaehrt > 30, `${akte.lkwFaehrt?.toFixed(1)} m in 3 s`);
+pruefe('Vorlauf steht im Auftragstext', /startet in \d+ s/.test(akte.titelVorlauf || ''), akte.titelVorlauf);
+pruefe('Rammen stoppt den Transport', akte.gestoppt, `${akte.stoesse} Stöße`);
+pruefe('Rammen zählt nicht als Straftat', akte.fahndungNachRammen === 0,
+ `${akte.fahndungNachRammen} Sterne, bewaffnet=${akte.bewaffnet}, Auslöser: ${akte.ausloeser.join(' | ') || 'keine'}`);
+pruefe('Treffersperre verhindert Dauerschaden', akte.stoesse >= 3, `${akte.stoesse} Stöße`);
+pruefe('Kassenbuch bringt Geld und startet Akt 4', akte.aktion4 === 'akt4start' && akte.lohn3 === 900);
+pruefe('Tresor bleibt tagsüber zu', akte.tagsGesperrt);
+pruefe('Tresor bleibt aufrecht zu', akte.aufrechtGesperrt);
+pruefe('Tresor öffnet nachts und geduckt', akte.nachtsOffen);
+pruefe('Akt 4 zahlt aus und führt in Akt 5', akte.lohn4 === 1400 && akte.stageNach4 === 7 && akte.dialog4 === 'akt5start');
+pruefe('Wache am Tresor unterbricht die Arbeit', akte.wachePausiert === true);
+pruefe('Tresor braucht länger als die reine Knackzeit', akte.takte4 * .05 > 6.5, `${(akte.takte4 * .05).toFixed(1)} s`);
+pruefe('Fluchtroute liegt vollständig im Wasser', akte.routeWasser);
+pruefe('Fluchtboot fährt', akte.bootDa && akte.bootFaehrt > 10, `${akte.bootFaehrt?.toFixed(1)} m in 2 s`);
+pruefe('Verfolgung endet im Schlussdialog', akte.dialog5 === 'ende');
+pruefe('Drei Ausgänge, Übergabe zahlt und hebt das Vertrauen',
+ akte.ausgaenge === 3 && akte.ausgang === 'Übergabe' && akte.endLohn === 1500 && akte.endRuf === 15);
+pruefe('Kampagne erreicht den Endzustand', akte.stageEnde === 8);
+pruefe('Aktfahrzeuge überstehen Speichern und Laden', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ const stand = JSON.parse(JSON.stringify(s.snapshot()));
+ s.restore(stand); s.paused = false;
+ return !!s.cars.find(c => c.type === 'konvoi') && !!s.cars.find(c => c.type === 'flucht')
+  && s.npcs.filter(n => n.aktWache).length === 4;
+}));
+pruefe('Alter Spielstand bekommt die Aktfahrzeuge zurück', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ const stand = JSON.parse(JSON.stringify(s.snapshot()));
+ const autos = stand.cars.length, leute = stand.npcs.length;
+ stand.cars = stand.cars.filter(c => c.type !== 'konvoi' && c.type !== 'flucht');
+ stand.npcs = stand.npcs.filter(n => !n.aktWache);
+ s.restore(stand); s.paused = false;
+ return s.cars.length === autos && s.npcs.length === leute
+  && s.cars[s.cars.length - 1].type === 'flucht';
+}));
+
+console.log('Spielstand');
+pruefe('Speichern und Laden überstehen den Rundlauf', await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ s.player.money = 4321;
+ const stand = JSON.parse(JSON.stringify(s.snapshot()));
+ s.player.money = 0;
+ s.restore(stand);
+ s.paused = false;
+ return s.player.money === 4321;
+}));
+
+console.log('Keys und Bild');
+const keys = await page.evaluate(() => {
+ const L = window.LOWTIDE, w = L.world;
+ const out = {};
+ out.inseln = L.inseln.map(r => ({name: r.name, trocken: !L.waterAt((r.x1 + r.x2) / 2, (r.z1 + r.z2) / 2)}));
+ // Der Keys Highway muss über die ganze Länge Land sein, sonst bricht das
+ // Fahrzeug beim ersten Meter über Wasser ab.
+ out.hoehle = [];
+ for (let x = 124; x <= 358; x += 4) if (L.waterAt(x, 400)) out.hoehle.push(x);
+ out.hoehe = L.groundAt(200, 400);
+ out.region = L.regionAt({x: 266, z: 400});
+ out.kuesten = w.waterUniforms.land.value.length;
+ // Aus den Daten statt aus einer festen Zahl: die Liste ist gewachsen, als
+ // die drei Dämme durch den Salzsumpf dazukamen, und eine hart notierte
+ // Neun hätte nur gemeldet, dass sich etwas geändert hat — nicht, ob es
+ // zusammenpasst.
+ out.kuestenSoll = L.inseln.length + (L.daemme?.length ?? 0) + (L.westDaemme?.length ?? 0);
+ // Nachbearbeitung
+ out.postAn = !!w.post?.aktiv;
+ out.tonwert = w.renderer.toneMapping;
+ out.keinTonwert = w.renderer.toneMapping === 0;
+ out.tiefe = !!w.post?.szene?.depthTexture;
+ // Verdeckung: die Puffer müssen Werte unter Weiß enthalten.
+ const t = w.post.ao1, buf = new Uint8Array(t.width * t.height * 4);
+ w.renderer.readRenderTargetPixels(t, 0, 0, t.width, t.height, buf);
+ let min = 255;
+ for (let i = 0; i < buf.length; i += 4) min = Math.min(min, buf[i]);
+ out.aoMin = min;
+ // Oberflächendetail liegt auf den Weltmaterialien.
+ // Leuchtflächen sind bewusst ausgenommen — ein Fenster, das von innen
+ // leuchtet, hat keine Körnung. Geprüft wird alles andere.
+ let mitDetail = 0, gesamt = 0, leucht = 0;
+ for (const m of w.bloecke) {
+  if (m.material.emissiveIntensity > 0) {leucht++; continue;}
+  gesamt++; if (m.material.userData.detail) mitDetail++;
+ }
+ out.detail = [mitDetail, gesamt, leucht];
+ return out;
+});
+pruefe('Alle Inseln sind trockenes Land', keys.inseln.every(i => i.trocken),
+ keys.inseln.filter(i => !i.trocken).map(i => i.name).join(', '));
+pruefe('Keys Highway hat keine Lücke im Damm', keys.hoehle.length === 0, keys.hoehle.join(' '));
+pruefe('Der Damm liegt auf Fahrbahnhöhe', keys.hoehe === 0, String(keys.hoehe));
+pruefe('Die Keys haben eine eigene Region', keys.region === 'THE LOWER KEYS', keys.region);
+pruefe('Der Wassershader kennt alle Küsten', keys.kuesten === keys.kuestenSoll,
+ `${keys.kuesten} im Shader gegen ${keys.kuestenSoll} in den Daten`);
+pruefe('Nachbearbeitung ist aktiv und tonwertet selbst', keys.postAn && keys.keinTonwert, `toneMapping=${keys.tonwert}`);
+pruefe('Tiefe steht der Verdeckung zur Verfügung', keys.tiefe);
+pruefe('Verdeckung dunkelt tatsächlich ab', keys.aoMin < 245, `dunkelster Wert ${keys.aoMin}`);
+pruefe('Oberflächendetail liegt auf allen matten Weltmaterialien',
+ keys.detail[0] === keys.detail[1] && keys.detail[1] > 50 && keys.detail[2] > 0,
+ `${keys.detail[0]} von ${keys.detail[1]}, ${keys.detail[2]} leuchtende ausgenommen`);
+// Die Spiegelung lief früher nur bei Nässe; sie läuft jetzt auch auf Wasser,
+// weil das Hafenbecken sonst nur zwei Himmelsfarben zeigt. Geprüft wird
+// deshalb nicht mehr, ob der Durchgang angeschaltet ist, sondern was
+// tatsächlich in seinem Ziel steht.
+const spiegelDeckung = async (x, z, blick, wetter) => {
+ await page.evaluate(([x, z, blick, wetter]) => {
+  const L = window.LOWTIDE;
+  L.sim.hour = 13; L.sim.weather = wetter;
+  L.view(x, z, blick, .08);
+  // Die Nässe klingt mit Nachlauf ab; für die Prüfung einschwingen lassen.
+  for (let i = 0; i < 60; i++) L.world.applySky(.5);
+ }, [x, z, blick, wetter]);
+ await bilder(4);
+ return await page.evaluate(() => {
+  const w = window.LOWTIDE.world;
+  const sz = w.post.szene, szb = new Uint16Array(sz.width * sz.height * 4);
+  w.renderer.readRenderTargetPixels(sz, 0, 0, sz.width, sz.height, szb);
+  let wasser = 0;                            // 0x3800 ist 0,5 als HalfFloat
+  for (let i = 3; i < szb.length; i += 4) if (szb[i] === 0x3800) wasser++;
+  const zl = w.post.spiegelZiel, zb = new Uint16Array(zl.width * zl.height * 4);
+  w.renderer.readRenderTargetPixels(zl, 0, 0, zl.width, zl.height, zb);
+  let sp = 0;
+  for (let i = 3; i < zb.length; i += 4) if (zb[i] !== 0) sp++;
+  const achse = w.post.spiegelU.hochAchse.value;
+  return {wasser: wasser / (szb.length / 4), spiegel: sp / (zb.length / 4),
+   nass: w.post.spiegelU.nass.value,
+   gedreht: Math.abs(achse.y - 1) > 1e-4 || Math.abs(achse.z) > 1e-4};
+ });
+};
+const kueste = await spiegelDeckung(140, 120, -1.5, 'clear');
+const innenTrocken = await spiegelDeckung(-300, -180, 1.2, 'clear');
+const innenNass = await spiegelDeckung(-300, -180, 1.2, 'storm');
+await page.evaluate(() => {window.LOWTIDE.sim.weather = 'clear';});
+pruefe('Wasser trägt seine Marke im Alphakanal', kueste.wasser > .3,
+ `${(kueste.wasser * 100).toFixed(1)} % der Fläche`);
+pruefe('Wasser spiegelt auch bei klarem Wetter', kueste.spiegel > .05,
+ `${(kueste.spiegel * 100).toFixed(1)} % gespiegelt`);
+pruefe('Trockener Asphalt spiegelt nichts', innenTrocken.spiegel < .005,
+ `${(innenTrocken.spiegel * 100).toFixed(2)} % gespiegelt`);
+pruefe('Nasser Asphalt spiegelt', innenNass.spiegel > .02 && innenNass.nass > .5,
+ `${(innenNass.spiegel * 100).toFixed(1)} % bei Nässe ${innenNass.nass.toFixed(2)}`);
+pruefe('Weltoben liegt im Blickraum, nicht auf der Einheitsachse', kueste.gedreht);
+const wolken = await page.evaluate(() => {
+ const L = window.LOWTIDE, w = L.world, u = L.wolken;
+ // applySky rechnet Stärke, Versatz und Sonnenneigung jedes Bild neu.
+ const lies = (stunde, wetter) => {
+  L.sim.hour = stunde; L.sim.weather = wetter;
+  w.applySky(1 / 60);
+  return u.staerke.value;
+ };
+ const mittag = lies(13, 'clear');
+ const nacht = lies(1, 'clear');
+ const nebel = lies(13, 'fog');
+ const sturm = lies(13, 'storm');
+ // Wind: zwei Aufrufe, dazwischen muss der Versatz weitergelaufen sein.
+ L.sim.hour = 13; L.sim.weather = 'clear';
+ w.applySky(1 / 60);
+ const v0 = u.versatz.value.x;
+ for (let i = 0; i < 30; i++) w.applySky(1 / 60);
+ const gewandert = u.versatz.value.x - v0;
+ // Sonnenneigung: bei tiefer Sonne muss der Versatz zur Wolkenhöhe größer
+ // sein als mittags. Sonst läge der Schatten eines Hochhauses falsch.
+ L.sim.hour = 13; w.applySky(1 / 60);
+ const neigungMittag = Math.hypot(u.sonne.value.x, u.sonne.value.y);
+ L.sim.hour = 7.5; w.applySky(1 / 60);
+ const neigungFlach = Math.hypot(u.sonne.value.x, u.sonne.value.y);
+ L.sim.hour = 13; L.sim.weather = 'clear'; w.applySky(1 / 60);
+ // Figuren und Fahrzeuge müssen im selben Schattenfeld liegen wie die Welt.
+ const zaehle = wurzel => {
+  let mit = 0, alle = 0;
+  wurzel.traverse(o => {
+   if (!o.material || o.material.emissive?.getHex()) return;
+   alle++; if (o.material.userData.wolken) mit++;
+  });
+  return [mit, alle];
+ };
+ return {mittag, nacht, nebel, sturm, gewandert, neigungMittag, neigungFlach,
+  figur: zaehle(w.npcs[0]), wagen: zaehle(w.cars[0])};
+});
+pruefe('Wolkenschatten liegt tagsüber auf der Karte', wolken.mittag > .05, String(wolken.mittag));
+pruefe('Nachts wirft keine Wolke einen Schatten', wolken.nacht === 0, String(wolken.nacht));
+pruefe('Nebel löst die Schattenkanten auf', wolken.nebel < wolken.mittag * .35,
+ `Nebel ${wolken.nebel.toFixed(3)} gegen klar ${wolken.mittag.toFixed(3)}`);
+pruefe('Unter geschlossener Decke bleibt kein einzelnes Feld übrig',
+ wolken.sturm < wolken.mittag * .5, `Sturm ${wolken.sturm.toFixed(3)}`);
+pruefe('Der Wind trägt die Decke weiter', wolken.gewandert > 1e-4, String(wolken.gewandert));
+pruefe('Tiefe Sonne versetzt den Schatten stärker als hohe',
+ wolken.neigungFlach > wolken.neigungMittag * 1.5,
+ `${wolken.neigungFlach.toFixed(2)} gegen ${wolken.neigungMittag.toFixed(2)}`);
+pruefe('Figuren stehen im selben Schattenfeld', wolken.figur[0] === wolken.figur[1] && wolken.figur[1] > 5,
+ `${wolken.figur[0]} von ${wolken.figur[1]}`);
+pruefe('Fahrzeuge stehen im selben Schattenfeld', wolken.wagen[0] === wolken.wagen[1] && wolken.wagen[1] > 5,
+ `${wolken.wagen[0]} von ${wolken.wagen[1]}`);
+// Fahrbahnen müssen dem Gelände folgen. Vorher lag jedes Segment als ein
+// Quader auf y = 0,03 — auf dem Talon Ridge damit sechsundachtzig Meter
+// unter der Kuppe, unsichtbar, aber für aufStrasse() trotzdem vorhanden.
+//
+// Gelesen wird aus world.bloecke, nicht aus world.groups: flush() leert die
+// Sammler, sobald die Instanzennetze stehen. Der erste Anlauf dieser Prüfung
+// hat genau das gemeldet — null Stücke gefunden, obwohl sie im Bild stehen.
+const strassenHoehe = await page.evaluate(() => {
+ const L = window.LOWTIDE, w = L.world;
+ let schlimmster = 0, wo = null, gezaehlt = 0, obenAufDemRuecken = 0, kuppe = 0;
+ for (const netz of w.bloecke || []) {
+  const arr = netz.instanceMatrix.array;
+  for (let i = 0; i < netz.count; i++) {
+   const o = i * 16;
+   const x = arr[o + 12], y = arr[o + 13], z = arr[o + 14];
+   const sx = Math.hypot(arr[o], arr[o + 1], arr[o + 2]);
+   const sy = Math.hypot(arr[o + 4], arr[o + 5], arr[o + 6]);
+   const sz = Math.hypot(arr[o + 8], arr[o + 9], arr[o + 10]);
+   if (y > 58 && y < 100 && Math.hypot(x + 900, (z + 160) * .76) < 140) kuppe++;
+   // Fahrbahn wird nicht über die Materialfarbe erkannt — die Netze sind
+   // nach Farbe und Kachel gebündelt, und die Suche nach dem Asphaltton kam
+   // im zweiten Anlauf auf null Treffer. Stattdessen geometrisch: flach,
+   // breit, und der Punkt liegt auf einer Fahrbahn.
+   if (sy > .2 || Math.max(sx, sz) < 6) continue;
+   if (!L.onRoad(x, z, 0)) continue;
+   // Nur, was auf der Fahrbahn liegt, nicht was darüber hängt: ein Vordach
+   // oder ein Kirchendach ist flach und breit und stünde sonst als
+   // Abweichung von fünfzehn Metern in der Statistik. Der ursprüngliche
+   // Fehler — Fahrbahn auf Meereshöhe unter einem 86 m hohen Rücken — wird
+   // davon nicht verdeckt: die läge unter dem Gelände, nicht darüber.
+   if (y > L.groundAt(x, z) + 1) continue;
+   gezaehlt++;
+   if (y > 60) obenAufDemRuecken++;
+   const ab = Math.abs(y - .03 - L.groundAt(x, z));
+   if (ab > schlimmster) {schlimmster = ab; wo = [Math.round(x), Math.round(z), Math.round(y)];}
+  }
+ }
+ return {schlimmster, wo, gezaehlt, obenAufDemRuecken, kuppe};
+});
+pruefe('Fahrbahnen liegen auf dem Gelände', strassenHoehe.schlimmster < 1.2,
+ `größte Abweichung ${strassenHoehe.schlimmster.toFixed(2)} m bei ${JSON.stringify(strassenHoehe.wo)}`);
+pruefe('Die Straße über den Talon Ridge liegt auf dem Rücken',
+ strassenHoehe.obenAufDemRuecken > 5, `${strassenHoehe.obenAufDemRuecken} Stücke über 60 m`);
+pruefe('Die Fahrbahn ist in Stücke geteilt, nicht ein Quader je Segment',
+ strassenHoehe.gezaehlt > 300, `${strassenHoehe.gezaehlt} Stücke`);
+pruefe('Über der Baumgrenze steht Fels', strassenHoehe.kuppe > 200,
+ `${strassenHoehe.kuppe} Teile auf der Kuppe`);
+// Nichts Großes darf in einer Fahrbahn stehen. sim.blocked kennt nur
+// registrierte Gebäude; Wasserturm, Kirche und anderes Beiwerk aus
+// regions.js stehen dort nicht drin und sind bisher durch jedes Netz
+// gefallen.
+const hindernisse = await page.evaluate(() => {
+ const L = window.LOWTIDE, w = L.world, treffer = [];
+ for (const netz of w.bloecke || []) {
+  const arr = netz.instanceMatrix.array;
+  for (let i = 0; i < netz.count; i++) {
+   const o = i * 16;
+   const x = arr[o + 12], y = arr[o + 13], z = arr[o + 14];
+   const sx = Math.hypot(arr[o], arr[o + 1], arr[o + 2]);
+   const sy = Math.hypot(arr[o + 4], arr[o + 5], arr[o + 6]);
+   const sz = Math.hypot(arr[o + 8], arr[o + 9], arr[o + 10]);
+   // Hoch genug, um ein Auto zu stoppen, und breit genug, um kein Pfosten
+   // zu sein. Die Unterkante muss dabei unter Fahrzeughöhe liegen — eine
+   // Brücke oder ein Ausleger darüber ist erlaubt.
+   if (sy < 2.5 || Math.min(sx, sz) < 3) continue;
+   if (y - sy / 2 > L.groundAt(x, z) + 2.6) continue;
+   if (!L.onRoad(x, z, 0)) continue;
+   treffer.push([Math.round(x), Math.round(z), Math.round(sx), Math.round(sz)]);
+  }
+ }
+ return treffer;
+});
+pruefe('Nichts Großes steht in einer Fahrbahn', hindernisse.length === 0,
+ `${hindernisse.length} Stück, zuerst ${JSON.stringify(hindernisse.slice(0, 4))}`);
+// Leitplanken nur dort, wo es neben der Fahrbahn hinuntergeht.
+const planken = await page.evaluate(() => {
+ const w = window.LOWTIDE.world;
+ let hoch = 0, flach = 0;
+ for (const netz of w.bloecke || []) {
+  const f = netz.material.color?.getHexString();
+  if (f !== 'b9bcb4' && f !== '8b8f88') continue;
+  const arr = netz.instanceMatrix.array;
+  for (let i = 0; i < netz.count; i++) {
+   const y = arr[i * 16 + 13];
+   if (y > 20) hoch++; else if (y < 3) flach++;
+  }
+ }
+ return {hoch, flach};
+});
+pruefe('Die Straße über den Rücken hat eine Leitplanke', planken.hoch > 50,
+ `${planken.hoch} Teile über 20 m`);
+pruefe('In der Ebene steht keine Leitplanke', planken.flach === 0,
+ `${planken.flach} Teile unter 3 m`);
+// Die Bildunterschrift der Minikarte stand fest in shell.html und meldete
+// überall HARBOR DISTRICT — auf dem Talon Ridge, im Nationalpark, in
+// Rosalind. Sichtbar auf jedem Bildschirmfoto dieser Sitzung, und trotzdem
+// erst aufgefallen, als eines danebenlag.
+const gegend = await page.evaluate(async () => {
+ const L = window.LOWTIDE;
+ const bild = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ const lies = async (x, z) => {
+  L.view(x, z, 0, .1);
+  await bild(); await bild();
+  return [document.getElementById('district').textContent,
+          document.getElementById('mapDistrict').textContent];
+ };
+ const stadt = await lies(-60, 40);
+ const ruecken = await lies(-880, -160);
+ // Zurück in die Stadt und zwei Bilder abwarten. Ohne das Warten bleibt die
+ // Kamera in der Luft über dem Rücken stehen, und die nächste Prüfung liest
+ // die Nebeldichte in neunzig Metern Höhe statt am Boden — genau das ist
+ // beim ersten Lauf passiert.
+ L.view(-60, 40, 0, .1);
+ await bild(); await bild();
+ return {stadt, ruecken};
+});
+pruefe('Die Minikarte nennt dieselbe Gegend wie die Kopfzeile',
+ gegend.stadt[0] === gegend.stadt[1] && gegend.ruecken[0] === gegend.ruecken[1],
+ `${JSON.stringify(gegend.stadt)} / ${JSON.stringify(gegend.ruecken)}`);
+pruefe('Die Gegend wechselt beim Ortswechsel', gegend.stadt[0] !== gegend.ruecken[0],
+ `${gegend.stadt[0]} gegen ${gegend.ruecken[0]}`);
+// Der Stausee war eine bemalte Platte: er sah aus wie Wasser und war für
+// jede Abfrage trockener Boden. Jetzt steht er in waterAt().
+const stausee = await page.evaluate(async () => {
+ const L = window.LOWTIDE;
+ const bild = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ L.view(-700, 80, 0, .1);
+ await bild(); await bild(); await bild();
+ const y = L.sim.player.y;
+ // Geländekachel unter dem See muss eine Wanne sein, keine Ebene.
+ const kachel = L.world.terrain.find(m => Math.abs(m.position.x + 700) < 60 && Math.abs(m.position.z - 80) < 60);
+ let tiefste = 9;
+ if (kachel) {const a = kachel.geometry.attributes.position;
+  for (let i = 0; i < a.count; i++) tiefste = Math.min(tiefste, a.getY(i));}
+ // Und die Ellipse muss enden: an der Böschung ist wieder Land.
+ const ufer = L.waterAt(-700, -15) || L.waterAt(-700, 175) || L.waterAt(-840, 80);
+ L.view(-60, 40, 0, .1);
+ await bild(); await bild();
+ return {mitte: L.waterAt(-700, 80), boden: L.groundAt(-700, 80), y, tiefste, ufer};
+});
+pruefe('Der Stausee ist Wasser, kein bemalter Boden', stausee.mitte && stausee.boden < -1,
+ `waterAt ${stausee.mitte}, groundAt ${stausee.boden}`);
+pruefe('Man schwimmt im Stausee, statt darauf zu stehen', stausee.y < -.2, `y = ${stausee.y.toFixed(2)}`);
+pruefe('Unter dem See liegt eine Wanne', stausee.tiefste < -3, `tiefster Punkt ${stausee.tiefste}`);
+pruefe('Die Böschung ist Land', !stausee.ufer);
+// Die Innenstadt war leer: an der Hauptkreuzung standen vier Leute im
+// Umkreis von sechzig Metern, am Strand vierundzwanzig.
+const gehwege = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim;
+ const umkreis = (x, z, r) => s.npcs.filter(n => Math.hypot(n.x - x, n.z - z) < r).length;
+ // Wie viele stehen gerade in einer Fahrspur? "Keiner" wäre die falsche
+ // Frage: ein Fußgänger, der eine Straße überquert, steht darauf, und das
+ // soll er. Zwei Fassungen davor sind daran gescheitert — erst gegen
+ // path[0] geprüft, was die Rundgänge aus simulation.js falsch trifft (die
+ // setzen die Figur auf path[i%4]), dann gegen die Position zu einem
+ // beliebigen Zeitpunkt, was jeden Überquerenden meldet. Die tragfähige
+ // Frage ist der Anteil: ein paar Prozent sind Verkehr, ein Drittel wäre
+ // eine Menge, die in den Fahrspuren wohnt.
+ const aufStrasse = s.npcs.filter(n => L.onRoad(n.x, n.z, 0)).length;
+ return {kreuzung: umkreis(-100, 20, 60), strand: umkreis(100, 250, 60),
+  gesamt: s.npcs.length, aufStrasse};
+});
+pruefe('Auf den Gehwegen der Innenstadt geht jemand', gehwege.kreuzung >= 8,
+ `${gehwege.kreuzung} im Umkreis von 60 m an der Kreuzung`);
+pruefe('Die Menge ist über die Stadt verteilt, nicht nur am Strand',
+ gehwege.gesamt >= 250, `${gehwege.gesamt} Figuren`);
+pruefe('Die Menge wohnt nicht in den Fahrspuren',
+ gehwege.aufStrasse / gehwege.gesamt < .1,
+ `${gehwege.aufStrasse} von ${gehwege.gesamt} gerade auf einer Fahrbahn`);
+// Verkehrsdichte. Vierundvierzig fahrende Wagen auf 15,7 Kilometern
+// Straßennetz waren eines alle 357 Meter, und sie klumpten an den Ecken der
+// Runden, weil der Startpunkt ein Wegpunkt war statt einer Stelle auf der
+// Strecke.
+const verkehr = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim;
+ const fahrend = s.cars.filter(c => c.type === 'traffic');
+ let laenge = 0;
+ for (const r of L.strassen) laenge += Math.hypot(r.x2 - r.x1, r.z2 - r.z1);
+ let zuNah = 0;
+ for (let i = 0; i < fahrend.length; i++) for (let j = i + 1; j < fahrend.length; j++)
+  if (Math.hypot(fahrend[i].x - fahrend[j].x, fahrend[i].z - fahrend[j].z) < 3.6) zuNah++;
+ return {fahrend: fahrend.length, meterJeWagen: laenge / fahrend.length, zuNah};
+});
+pruefe('Der Verkehr ist dicht genug für eine Stadt', verkehr.meterJeWagen < 200,
+ `ein Wagen alle ${Math.round(verkehr.meterJeWagen)} m`);
+pruefe('Die Wagen klumpen nicht ineinander', verkehr.zuNah <= 3,
+ `${verkehr.zuNah} Paare näher als 3,6 m bei ${verkehr.fahrend} Wagen`);
+// Ferner Verkehr trägt nachts Licht. Das volle Fahrzeugmodell schaltet seine
+// Scheinwerfer mit dem Sonnenstand — jenseits von 52 Metern gibt es dieses
+// Modell aber nicht mehr, und damit war eine nächtliche Straße ab dieser
+// Entfernung unbeleuchtet.
+const fernlicht = await page.evaluate(async () => {
+ const L = window.LOWTIDE, w = L.world;
+ const lies = () => w.autoFern.netze
+  .filter(n => n.material.emissive && n.material.emissive.getHex() !== 0)
+  .map(n => +n.material.emissiveIntensity.toFixed(2));
+ const bild = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ L.sim.hour = 13; await bild(); await bild();
+ const tag = lies();
+ L.sim.hour = 22; await bild(); await bild();
+ const nacht = lies();
+ L.sim.hour = 13; await bild();
+ return {tag, nacht, lampen: tag.length, fern: w.autoFern.anzahl};
+});
+pruefe('Das grobe Fahrzeug hat Lampenflächen', fernlicht.lampen === 2,
+ `${fernlicht.lampen} Materialien mit Eigenfarbe`);
+pruefe('Tagsüber leuchtet der ferne Verkehr nicht', fernlicht.tag.every(v => v === 0),
+ JSON.stringify(fernlicht.tag));
+pruefe('Nachts leuchtet er', fernlicht.nacht.every(v => v > 1), JSON.stringify(fernlicht.nacht));
+// Der Verkehr bremst für Fußgänger auf der Fahrbahn. Vorher fuhr er durch
+// die Menge hindurch, ohne dass irgendetwas es bemerkte — keine Figur nahm
+// Schaden, keine Kollision wurde gezählt.
+//
+// Gezielt statt statistisch: die erste Fassung zählte Bremsungen über
+// sechshundert Ticks und meldete im Regressionslauf null, während derselbe
+// Code einzeln zweihundertzehn ergab. Der Unterschied war der Zustand, den
+// die vorherigen Prüfungen hinterlassen — eine Prüfung, die davon abhängt,
+// prüft nicht das, was sie behauptet.
+const bremsen = await page.evaluate(async () => {
+ const L = window.LOWTIDE, s = L.sim;
+ const bild = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ const c = s.cars.find(v => v.type === 'traffic');
+ // Wagen auf eine freie Gerade setzen und geradeaus ausrichten.
+ c.x = -100; c.z = 0; c.yaw = 0; c.speed = 9; c.wait = 0;
+ c.route = [{x: -100, z: 60}, {x: -100, z: -60}]; c.target = 0;
+ const n = s.npcs.find(v => v.health > 0 && !v.guard);
+ const heim = {x: n.x, z: n.z};
+ // Erst ohne jemanden davor: der Wagen muss fahren.
+ n.x = -100; n.z = -400;
+ s._aufFahrbahn = null;
+ const a0 = {x: c.x, z: c.z};
+ for (let k = 0; k < 12; k++) s.tick(1 / 60, {});
+ const frei = Math.hypot(c.x - a0.x, c.z - a0.z);
+ // Jetzt vier Meter voraus auf die Fahrbahn.
+ c.x = -100; c.z = 0; c.yaw = 0;
+ n.x = -100; n.z = 4;
+ s._aufFahrbahn = null;
+ const a1 = {x: c.x, z: c.z};
+ for (let k = 0; k < 12; k++) s.tick(1 / 60, {});
+ const gebremst = Math.hypot(c.x - a1.x, c.z - a1.z);
+ n.x = heim.x; n.z = heim.z; s._aufFahrbahn = null;
+ await bild();
+ return {frei: +frei.toFixed(2), gebremst: +gebremst.toFixed(2),
+  aufFahrbahn: L.onRoad(-100, 4, 0)};
+});
+pruefe('Die Teststelle liegt überhaupt auf einer Fahrbahn', bremsen.aufFahrbahn);
+pruefe('Ohne Hindernis fährt der Wagen', bremsen.frei > .5, `${bremsen.frei} m in zwölf Ticks`);
+pruefe('Mit einem Fußgänger vier Meter voraus hält er', bremsen.gebremst < .05,
+ `${bremsen.gebremst} m in zwölf Ticks`);
+// Figuren, die ineinander stehen. Sie kommen aus fünf Quellen, und keine
+// kennt die Stellen der anderen: gemessen einundfünfzig Paare näher als 0,55
+// Meter, engster Abstand 0,00.
+//
+// Kein Nullwert als Schwelle, sondern eine kleine Zahl: zwei Leute, die
+// aneinander vorbeigehen, kommen sich zwangsläufig nahe, und die Prüfung
+// läuft mitten im Spiel und nicht beim Aufbau.
+const gedraenge = await page.evaluate(() => {
+ const n = window.LOWTIDE.sim.npcs.filter(v => v.health > 0);
+ let paare = 0, engster = 99;
+ for (let i = 0; i < n.length; i++) for (let j = i + 1; j < n.length; j++) {
+  const d = Math.hypot(n[i].x - n[j].x, n[i].z - n[j].z);
+  if (d < .55) paare++;
+  if (d < engster) engster = d;
+ }
+ return {paare, engster: +engster.toFixed(2), figuren: n.length};
+});
+pruefe('Keine Figuren stehen ineinander', gedraenge.paare < 5,
+ `${gedraenge.paare} Paare unter 0,55 m bei ${gedraenge.figuren} Figuren, engster ${gedraenge.engster} m`);
+// Geparkte Wagen stehen zwei Meter innerhalb der Fahrbahnkante. Wo eine
+// Verkehrsroute dort entlanglief, fuhr der Verkehr durch sie hindurch —
+// wagenVoraus() kann davon nichts wissen, die Kulisse steht nicht in
+// sim.cars.
+const parken = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim, w = L.world;
+ const park = w.street?.parkplaetze || [];
+ const strecken = [];
+ for (const c of s.cars) {
+  if (c.type !== 'traffic' || !c.route) continue;
+  for (let i = 0; i < c.route.length; i++) {
+   const a = c.route[i], b = c.route[(i + 1) % c.route.length];
+   if (!strecken.some(t => t.a === a && t.b === b)) strecken.push({a, b});
+  }
+ }
+ let aufDerLinie = 0, engster = 999;
+ for (const q of park) {
+  let m = 999;
+  for (const t of strecken) {
+   const dx = t.b.x - t.a.x, dz = t.b.z - t.a.z, l2 = dx * dx + dz * dz || 1;
+   const u = Math.max(0, Math.min(1, ((q.x - t.a.x) * dx + (q.z - t.a.z) * dz) / l2));
+   m = Math.min(m, Math.hypot(q.x - (t.a.x + dx * u), q.z - (t.a.z + dz * u)));
+  }
+  if (m < 2.6) aufDerLinie++;
+  if (m < engster) engster = m;
+ }
+ return {park: park.length, aufDerLinie, engster: +engster.toFixed(2)};
+});
+pruefe('Es stehen genug Wagen am Bordstein', parken.park > 250, `${parken.park} Plätze`);
+pruefe('Kein geparkter Wagen steht auf einer Fahrlinie', parken.aufDerLinie === 0,
+ `${parken.aufDerLinie} Plätze, engster Abstand ${parken.engster} m`);
+// Keine Fahrbahn über offenem Wasser. Drei Segmente liefen quer durch den
+// Salzsumpf — sichtbar war davon nichts, weil groundAt über Wasser -1,2
+// liefert und die Fahrbahn damit unter der Sumpffläche lag. Geblockt hat sie
+// trotzdem: der Bewuchs mied einen Streifen, auf dem nichts lag.
+const nasseStrassen = await page.evaluate(() => {
+ const L = window.LOWTIDE;
+ const schlecht = [];
+ for (const r of L.strassen) {
+  const laenge = Math.hypot(r.x2 - r.x1, r.z2 - r.z1);
+  const schritte = Math.max(2, Math.round(laenge / 4));
+  let nass = 0;
+  for (let k = 0; k <= schritte; k++) {
+   const t = k / schritte;
+   if (L.waterAt(r.x1 + (r.x2 - r.x1) * t, r.z1 + (r.z2 - r.z1) * t)) nass++;
+  }
+  if (nass) schlecht.push([Math.round(r.x1), Math.round(r.z1), Math.round(nass / schritte * 100)]);
+ }
+ return schlecht;
+});
+pruefe('Keine Fahrbahn liegt über offenem Wasser', nasseStrassen.length === 0,
+ `${nasseStrassen.length} Segmente, ${JSON.stringify(nasseStrassen.slice(0, 3))}`);
+// Laternen und Leitungsmasten gehören an den Bordstein. Sie werden an sechs
+// Stellen gesetzt, und nicht alle kannten die Fahrbahn: gemessen
+// vierundachtzig Pfosten drei Meter oder tiefer in einer Spur, der tiefste
+// mit neun Metern auf der Mittellinie einer achtzehn Meter breiten Straße.
+const pfosten = await page.evaluate(() => {
+ const L = window.LOWTIDE, w = L.world;
+ const tiefe = (x, z) => {
+  let t = -99;
+  for (const r of L.strassen) {
+   const minx = Math.min(r.x1, r.x2) - r.w / 2, maxx = Math.max(r.x1, r.x2) + r.w / 2;
+   const minz = Math.min(r.z1, r.z2) - r.w / 2, maxz = Math.max(r.z1, r.z2) + r.w / 2;
+   if (x < minx || x > maxx || z < minz || z > maxz) continue;
+   t = Math.max(t, Math.min(x - minx, maxx - x, z - minz, maxz - z));
+  }
+  return t;
+ };
+ let drin = 0, tiefster = 0;
+ for (const netz of w.bloecke || []) {
+  const f = netz.material.color?.getHexString();
+  if (f !== '3a4a50' && f !== '6b5c48') continue;        // Laterne, Mast
+  const a = netz.instanceMatrix.array;
+  for (let i = 0; i < netz.count; i++) {
+   const o = i * 16;
+   const sy = Math.hypot(a[o + 4], a[o + 5], a[o + 6]);
+   if (sy < 2) continue;                                  // nur die Masten selbst
+   const t = tiefe(a[o + 12], a[o + 14]);
+   if (t > 1.5) {drin++; tiefster = Math.max(tiefster, t);}
+  }
+ }
+ return {drin, tiefster: +tiefster.toFixed(1)};
+});
+pruefe('Kein Mast steht in einer Fahrspur', pfosten.drin === 0,
+ `${pfosten.drin} Masten, tiefster ${pfosten.tiefster} m innerhalb`);
+// Jede Fundstelle der Schatzsuche muss erreichbar sein. Geborgen wird bei
+// einem Abstand unter fünf Metern, und die Stellen kommen der Reihe nach —
+// eine, an die man nicht herankommt, bricht die Kette ab. Die vierte lag in
+// einem Haus, der nächste begehbare Punkt exakt fünf Meter entfernt.
+const schaetze = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim;
+ return L.schatzOrte.map((o, i) => {
+  // Reicht es, irgendwo im Umkreis von 4,5 Metern zu sein? Wasser zählt als
+  // erreichbar — man schwimmt hin, und die zweite Fundstelle liegt bewusst
+  // draußen im Meer. Die erste Fassung dieser Prüfung hat sie als Fehler
+  // gemeldet und damit vor allem sich selbst.
+  let erreichbar = !s.blocked(o, .5);
+  for (let r = 1; r <= 4.5 && !erreichbar; r += .5)
+   for (let k = 0; k < 12 && !erreichbar; k++) {
+    const a = k * Math.PI / 6, x = o.x + Math.cos(a) * r, z = o.z + Math.sin(a) * r;
+    if (!s.blocked({x, z}, .5)) erreichbar = true;
+   }
+  return {i, erreichbar};
+ }).filter(q => !q.erreichbar).map(q => q.i);
+});
+pruefe('Jede Fundstelle ist erreichbar', schaetze.length === 0,
+ `nicht erreichbar: ${JSON.stringify(schaetze)}`);
+// Die acht Innenräume müssen begehbar bleiben. Ihre Front ist offen, der
+// Raum reicht von l.z+3,6 bis l.z-11,4 — ein Solid, das sich davorschiebt,
+// sperrt einen Laden aus, ohne dass irgendetwas es meldet. Bei einer Karte,
+// die sich laufend ändert, ist das kein theoretischer Fall.
+const innen = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim;
+ return ['garage', 'shop', 'clinic', 'home', 'club', 'diner', 'motel', 'records']
+  .filter(k => L.orte[k])
+  .map(k => {
+   const l = L.orte[k];
+   let blockiert = 0;
+   for (let z = l.z + 8; z > l.z - 4; z -= .8) if (s.blocked({x: l.x, z}, .45)) blockiert++;
+   return {k, blockiert, mitte: !s.blocked({x: l.x, z: l.z - 4}, .5)};
+  });
+});
+pruefe('Alle acht Innenräume sind vorhanden', innen.length === 8, `${innen.length} gefunden`);
+pruefe('In jeden Innenraum führt ein freier Weg',
+ innen.every(q => q.blockiert === 0 && q.mitte),
+ JSON.stringify(innen.filter(q => q.blockiert || !q.mitte)));
+// Tiere bleiben in ihrem Element. Der Sumpfbereich der Tierwelt ist ein
+// festes Rechteck, das die neuen Dämme nicht kennt — die Bewegung prüft
+// waterAt und dreht ab, statt an Land zu kriechen. Diese Prüfung hält fest,
+// dass das so bleibt.
+const tiere = await page.evaluate(async () => {
+ const L = window.LOWTIDE, t = L.world.tiere;
+ const bild = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ let anLand = 0, gesamt = 0;
+ for (let runde = 0; runde < 4; runde++) {
+  await bild();
+  for (const g of ['fische', 'delfine', 'alligatoren']) {
+   for (const o of t[g] || []) {gesamt++; if (!L.waterAt(o.x, o.z)) anLand++;}
+  }
+ }
+ return {anLand, gesamt};
+});
+pruefe('Kein Tier liegt an Land', tiere.anLand === 0,
+ `${tiere.anLand} von ${tiere.gesamt} Beobachtungen`);
+// Die fünf Rennstrecken haben feste Kontrollpunkte, und die Karte hat sich
+// seither mehrfach geändert. Landrennen brauchen festen Boden, Wasserrennen
+// Wasser — geprüft werden Punkte und die Strecke dazwischen alle acht Meter.
+const strecken = await page.evaluate(() => {
+ const L = window.LOWTIDE;
+ const R = {
+  west: {m: 'land', p: [{x:-280,z:-100},{x:-100,z:-100},{x:-100,z:200},{x:-340,z:200},{x:-340,z:80},{x:-280,z:80}]},
+  drag: {m: 'land', p: [{x:-315,z:262},{x:-315,z:310},{x:-315,z:360},{x:-315,z:386}]},
+  moto: {m: 'land', p: [{x:-418,z:-262},{x:-452,z:-300},{x:-486,z:-352},{x:-520,z:-410},{x:-470,z:-448},{x:-424,z:-396},{x:-402,z:-310},{x:-402,z:-248}]},
+  boot: {m: 'water', p: [{x:158,z:306},{x:160,z:348},{x:300,z:352},{x:384,z:334},{x:388,z:302},{x:250,z:302}]},
+  jet: {m: 'water', p: [{x:140,z:120},{x:138,z:60},{x:150,z:-10},{x:180,z:-70},{x:145,z:-120},{x:132,z:-40},{x:130,z:110}]}
+ };
+ const schlecht = [];
+ for (const [k, r] of Object.entries(R)) {
+  const falsch = (x, z) => r.m === 'land' ? L.waterAt(x, z) : !L.waterAt(x, z);
+  r.p.forEach((q, i) => {if (falsch(q.x, q.z)) schlecht.push(k + ' P' + i);});
+  for (let i = 0; i < r.p.length; i++) {
+   const a = r.p[i], b = r.p[(i + 1) % r.p.length];
+   const n = Math.max(1, Math.round(Math.hypot(b.x - a.x, b.z - a.z) / 8));
+   for (let t = 0; t <= n; t++) {
+    const x = a.x + (b.x - a.x) * t / n, z = a.z + (b.z - a.z) * t / n;
+    if (falsch(x, z)) {schlecht.push(k + ' S' + i + '@' + Math.round(x) + '/' + Math.round(z)); break;}
+   }
+  }
+ }
+ return schlecht;
+});
+pruefe('Alle fünf Rennstrecken liegen im richtigen Element', strecken.length === 0,
+ JSON.stringify(strecken.slice(0, 5)));
+pruefe('Sparmodus schaltet die Nachbearbeitung ab', await page.evaluate(() => {
+ const knopf = document.getElementById('qualityBtn'), w = window.LOWTIDE.world;
+ knopf.click();
+ const aus = !w.post.aktiv;
+ knopf.click();
+ return aus && w.post.aktiv;
+}));
+
+console.log('Die ganze Karte');
+const karte = await page.evaluate(() => {
+ const L = window.LOWTIDE, sim = L.sim, w = L.world, out = {};
+ const b = L.bounds;
+ out.flaeche = +(((b.right - b.left) * (b.bottom - b.top)) / 1e6).toFixed(2);
+ // Erster Versuch: "kein Ankerpunkt im Wasser". Falsche Frage — SALT MARSH
+ // ist ein Sumpf und OUTER KEYS eine Inselgruppe, deren Mitte zwischen den
+ // Inseln liegt. Beides gehört ins Wasser. Die richtige Frage ist, ob es zu
+ // jeder Region eine Stelle gibt, an der man stehen kann und an der regionAt
+ // genau diesen Namen liefert. Eine Region, die man nie betreten kann, wäre
+ // ein Name ohne Ort.
+ out.unerreichbar = L.regionen.filter(r => {
+  for (let dx = -200; dx <= 200; dx += 25) for (let dz = -200; dz <= 200; dz += 25) {
+   const x = r.x + dx, z = r.z + dz;
+   if (x < L.bounds.left || x > L.bounds.right || z < L.bounds.top || z > L.bounds.bottom) continue;
+   if (!L.waterAt(x, z) && L.regionAt({x, z}) === r.name) return false;
+  }
+  return true;
+ }).map(r => r.name);
+ // Gelände deckt die ganze Karte ab, nicht nur den alten Ausschnitt.
+ const kacheln = w.terrain.map(m => m.position);
+ out.westlichste = Math.min(...kacheln.map(p => p.x));
+ out.suedlichste = Math.max(...kacheln.map(p => p.z));
+ // Die neuen Gebiete sind zu Fuß erreichbar, also nicht von Solids zugestellt.
+ out.frei = [[-870, 340], [-700, 190], [-880, -120], [-620, 660]]
+  .filter(([x, z]) => !sim.blocked({x, z}, .5)).length;
+ // Rosalinds Hauptstraße ist eine echte Straße, keine gepflasterte Wiese.
+ out.hauptstrasse = L.onRoad(-870, 340, 4);
+ // Talon Ridge trägt Höhe.
+ out.gipfel = Math.round(L.groundAt(-900, -160));
+ // Dunst nimmt mit der Höhe ab.
+ const unten = w.scene.fog.density;
+ w.camera.position.y = 200; w.applySky(.016);
+ const oben = w.scene.fog.density;
+ w.camera.position.y = 3; w.applySky(.016);
+ out.dunstUnten = +unten.toFixed(5);
+ out.dunstOben = +oben.toFixed(5);
+ return out;
+});
+pruefe('Die Karte ist über zwei Quadratkilometer groß', karte.flaeche > 2, `${karte.flaeche} km²`);
+pruefe('Kein Gebäude steht in einer Fahrbahn', await page.evaluate(() => {
+ // Ein Haus mitten auf der Straße fällt beim Spielen sofort auf, beim
+ // Bauen aber nicht — die Blöcke werden nach Rastermaß gesetzt, die Straßen
+ // getrennt davon. Diese Prüfung hat einen alten Fehler gefunden: ein Haus
+ // ragte 5,5 m in die Nord-Süd-Achse bei x = -340.
+ const L = window.LOWTIDE, sim = L.sim;
+ const ueber = (b, r) => {
+  const rx1 = Math.min(r.x1, r.x2) - r.w / 2, rx2 = Math.max(r.x1, r.x2) + r.w / 2;
+  const rz1 = Math.min(r.z1, r.z2) - r.w / 2, rz2 = Math.max(r.z1, r.z2) + r.w / 2;
+  const ox = Math.min(b.x + b.w / 2, rx2) - Math.max(b.x - b.w / 2, rx1);
+  const oz = Math.min(b.z + b.d / 2, rz2) - Math.max(b.z - b.d / 2, rz1);
+  return ox > 0 && oz > 0 ? Math.min(ox, oz) : 0;
+ };
+ const schlimmste = [...sim.buildings, ...sim.worldBuildings].reduce((m, b) =>
+  Math.max(m, L.strassen.reduce((q, r) => Math.max(q, ueber(b, r)), 0)), 0);
+ return schlimmste <= 1;
+}));
+pruefe('Keine zwei Gebäude stehen ineinander', await page.evaluate(() => {
+ const alle = [...window.LOWTIDE.sim.buildings, ...window.LOWTIDE.sim.worldBuildings];
+ for (let i = 0; i < alle.length; i++) for (let j = i + 1; j < alle.length; j++) {
+  const a = alle[i], b = alle[j];
+  if (Math.abs(a.x - b.x) < (a.w + b.w) / 2 - 1 && Math.abs(a.z - b.z) < (a.d + b.d) / 2 - 1) return false;
+ }
+ return true;
+}));
+pruefe('Jede Region hat eine Stelle, an der man stehen kann',
+ karte.unerreichbar.length === 0, karte.unerreichbar.join(', '));
+pruefe('Das Gelände reicht bis an den Westrand', karte.westlichste < -1000, `${karte.westlichste}`);
+pruefe('Das Gelände reicht bis an den Südrand', karte.suedlichste > 800, `${karte.suedlichste}`);
+pruefe('Die vier neuen Gebiete sind begehbar', karte.frei === 4, `${karte.frei} von 4`);
+pruefe('Rosalinds Hauptstraße ist befahrbar', karte.hauptstrasse);
+pruefe('Talon Ridge trägt Höhe', karte.gipfel > 70, `${karte.gipfel} m`);
+pruefe('Dunst nimmt mit der Höhe ab', karte.dunstOben < karte.dunstUnten * .6,
+ `${karte.dunstUnten} unten, ${karte.dunstOben} auf 200 m`);
+pruefe('Geparkte Wagen nutzen das sparsame Vorbild', await page.evaluate(() => {
+ // 796 statt 3084 Dreiecke je Wagen: keine Torusreifen, kein Innenraum,
+ // keine Speichen. Prüfbar an der Dreieckszahl der gebackenen Instanzen.
+ const w = window.LOWTIDE.world;
+ let groesste = 0;
+ w.scene.traverse(o => {
+  if (!o.isInstancedMesh || o.count < 100 || !o.geometry) return;
+  const g = o.geometry, n = (g.index ? g.index.count : g.attributes.position.count) / 3;
+  groesste = Math.max(groesste, n);
+ });
+ return groesste < 400;
+}));
+
+console.log('Publikum und Neon');
+const leute = await page.evaluate(() => {
+ const L = window.LOWTIDE, sim = L.sim, w = L.world, out = {};
+ out.anzahl = sim.npcs.length;
+ out.imWasser = sim.npcs.filter(n => L.waterAt(n.x, n.z)).length;
+ // Radius 0: geprüft wird, ob jemand wirklich in einer Wand steckt. Mit .5
+ // schlug schon an, wer sich beim Vorbeigehen an eine Wand drückt.
+ out.imHaus = sim.npcs.filter(n => sim.blocked(n, 0)).length;
+ // Ohne originalPath, home und work stürzt updateRoutines beim Tageswechsel.
+ out.ohneWeg = sim.npcs.filter(n => !n.guard && (!n.originalPath || !n.home || !n.work)).length;
+ out.doppelt = sim.npcs.length - new Set(sim.npcs.map(n => n.id)).size;
+ // Figurengeometrie wird geteilt; Gesichter nur je Hautton.
+ const a = new Set(), b = new Set();
+ w.npcs[0].traverse(o => o.isMesh && a.add(o.geometry.uuid));
+ w.npcs[7].traverse(o => o.isMesh && b.add(o.geometry.uuid));
+ out.geteilt = [...a].filter(u => b.has(u)).length;
+ out.formen = a.size;
+ out.gesichter = new Set(w.npcs.slice(0, 20).map(m => m.userData.face.geometry.uuid)).size;
+ out.hauttoene = new Set(w.npcs.slice(0, 20)
+  .map(m => m.userData.face.geometry.attributes.color.getX(10).toFixed(4))).size;
+ // Neon: die Leuchtmaterialien werden mit der Nacht hochgefahren.
+ sim.hour = 13; w.applySky(.016);
+ const tags = L.leuchten.map(m => m.emissiveIntensity);
+ sim.hour = 23; w.applySky(.016);
+ const nachts = L.leuchten.map(m => m.emissiveIntensity);
+ out.leuchten = tags.length;
+ out.heller = nachts.filter((v, i) => v > tags[i] + .05).length;
+ return out;
+});
+pruefe('Mindestens hundertfünfzig Leute in der Stadt', leute.anzahl >= 150, `${leute.anzahl}`);
+pruefe('Niemand steht im Wasser oder in einer Wand', leute.imWasser === 0 && leute.imHaus === 0,
+ `${leute.imWasser} im Wasser, ${leute.imHaus} in Wänden`);
+pruefe('Jede Figur hat Weg, Wohnung und Arbeit', leute.ohneWeg === 0, `${leute.ohneWeg} ohne`);
+pruefe('Keine doppelten Figurennummern', leute.doppelt === 0);
+pruefe('Figuren teilen sich ihre Geometrie', leute.geteilt >= 8, `${leute.geteilt} von ${leute.formen}`);
+pruefe('Gesichter gibt es je Hautton, nicht je Kopf',
+ leute.gesichter === 5 && leute.hauttoene === 5, `${leute.gesichter} Formen, ${leute.hauttoene} Töne`);
+pruefe('Figuren haben einen drehbaren Kopf', await page.evaluate(() => {
+ const w = window.LOWTIDE.world;
+ return w.npcs.every(m => m.userData.kopf && m.userData.kopf.children.length > 4);
+}));
+pruefe('Im Stand sieht sich die Menge um, und nicht im Gleichtakt', await page.evaluate(async () => {
+ const L = window.LOWTIDE, w = L.world;
+ // Ein paar Bilder laufen lassen und die Kopfdrehungen einsammeln.
+ for (let i = 0; i < 3; i++) await new Promise(r => requestAnimationFrame(r));
+ const winkel = w.npcs.slice(0, 40).map(m => +m.userData.kopf.rotation.y.toFixed(3));
+ const bewegt = winkel.filter(v => Math.abs(v) > .02).length;
+ // Ein Gleichtakt wäre daran zu erkennen, dass alle denselben Wert haben.
+ const verschieden = new Set(winkel).size;
+ return bewegt > 8 && verschieden > 15;
+}));
+
+pruefe('Neon und Fenster gehen nachts an', leute.heller > 20,
+ `${leute.heller} von ${leute.leuchten} Leuchtmaterialien heller`);
+
+console.log('Verkehr, Bewuchs, Geometrie');
+const dichte = await page.evaluate(() => {
+ const L = window.LOWTIDE, sim = L.sim, w = L.world, out = {};
+ const verkehr = sim.cars.filter(c => c.type === 'traffic');
+ out.verkehr = verkehr.length;
+ out.wegImWasser = verkehr.filter(c => c.route.some(p => L.waterAt(p.x, p.z))).length;
+ out.wegImHaus = verkehr.filter(c => c.route.some(p => sim.blocked(p, 1.2))).length;
+ // Bewuchs: keine Matrix mit Skalierung null — die wird singulär und
+ // three zeichnet daraus große schwarze Flächen statt nichts.
+ // Der Bewuchs wird um den Spieler gesetzt. In der Innenstadt steht
+ // absichtlich kein Halm, also erst in den Vorort versetzen.
+ const g = w.gras;
+ g.setzen(-60, -320, true);
+ const arr = g.netz.instanceMatrix.array;
+ let null_ = 0, ueberBoden = 0;
+ for (let i = 0; i < g.netz.count; i++) {
+  const o = i * 16;
+  const sy = Math.hypot(arr[o + 4], arr[o + 5], arr[o + 6]);
+  if (sy < 1e-6) null_++;
+  if (arr[o + 13] > -1) ueberBoden++;
+ }
+ out.halme = g.netz.count;
+ out.nullSkalierung = null_;
+ out.sichtbareHalme = ueberBoden;
+ out.wind = !!g.material.userData.gStaerke;
+ // Halme dürfen nicht auf der Fahrbahn stehen.
+ let aufStrasse = 0;
+ for (let i = 0; i < g.netz.count; i++) {
+  const o = i * 16;
+  if (arr[o + 13] < -1) continue;
+  if (!g.erlaubt(arr[o + 12], arr[o + 14])) aufStrasse++;
+ }
+ out.aufStrasse = aufStrasse;
+ // Fahrzeuggeometrie wird zwischen Exemplaren geteilt.
+ const autos = w.cars.filter(m => m.userData.body && m.userData.rims);
+ if (autos.length > 1) {
+  const a = new Set(), b = new Set();
+  autos[0].traverse(o => o.isMesh && a.add(o.geometry.uuid));
+  autos[1].traverse(o => o.isMesh && b.add(o.geometry.uuid));
+  out.geteilt = [...a].filter(u => b.has(u)).length;
+  out.formen = a.size;
+ }
+ return out;
+});
+pruefe('Es fahren mindestens dreißig Wagen', dichte.verkehr >= 30, `${dichte.verkehr} Wagen`);
+pruefe('Kein Verkehrsweg führt ins Wasser', dichte.wegImWasser === 0);
+pruefe('Kein Verkehrsweg führt durch ein Gebäude', dichte.wegImHaus === 0);
+pruefe('Bewuchs hat keine entartete Matrix', dichte.nullSkalierung === 0, `${dichte.nullSkalierung} von ${dichte.halme}`);
+pruefe('Bewuchs steht nur auf erlaubtem Grund', dichte.aufStrasse === 0, `${dichte.aufStrasse} Halme daneben`);
+pruefe('Ein Teil der Halme steht sichtbar über dem Boden', dichte.sichtbareHalme > 200,
+ `${dichte.sichtbareHalme} von ${dichte.halme}`);
+pruefe('Der Wind erreicht den Bewuchs', dichte.wind);
+pruefe('Bäume laufen über zwei Instanzennetze mit Alphakarte', await page.evaluate(() => {
+ const w = window.LOWTIDE.world, l = w.laubwerk;
+ if (!l?.kronen || !l.staemme) return false;
+ const g = l.kronen.geometry, m = l.kronen.material;
+ return l.kronen.count > 800                       // die Bäume der ganzen Karte
+  && !!g.attributes.color                          // sonst liest three schwarz
+  && !!l.kronen.instanceColor                      // Farbe je Baum
+  && !!m.map && m.alphaTest > .2                   // Alphakarte, nicht Kiste
+  && (g.index ? g.index.count : 0) / 3 <= 8;       // drei gekreuzte Flächen
+}));
+pruefe('Kronen bleiben von hinten beleuchtet', await page.evaluate(() => {
+ // Bei DoubleSide dreht three die Normale für Rückseiten um; bei gekreuzten
+ // Flächen sieht man immer die Hälfte von hinten. Ohne den Eingriff im
+ // Shader standen die Kronen zur Hälfte im Schatten.
+ const m = window.LOWTIDE.world.laubwerk?.kronen?.material;
+ return !!m && typeof m.onBeforeCompile === 'function'
+  && String(m.onBeforeCompile).includes('normal_fragment_begin');
+}));
+pruefe('Fahrzeuge teilen sich ihre Geometrie', dichte.geteilt === dichte.formen && dichte.formen >= 8,
+ `${dichte.geteilt} von ${dichte.formen}`);
+
+console.log('Gang und Sichtweite');
+const gang = await page.evaluate(() => {
+ const L = window.LOWTIDE, welt = L.world, figur = welt.player, u = figur.userData;
+ const out = {gelenke: u.ankles?.length || 0, sohle: [], hang: 0};
+ // Einen Schrittzyklus durchfahren und die Sohlenneigung mitschreiben. Sie
+ // ergibt sich aus Hüfte plus Knie plus Sprunggelenk; ohne Gelenk wäre sie
+ // gleich der Kette und liefe bis ±1,1 rad auf.
+ for (let k = 0; k < 24; k++) {
+  figur.position.x += .09; figur.position.z += .09;
+  welt.animateHuman(figur, 10 + k * .05, 1, false);
+  out.sohle.push(u.legs[0].rotation.x + u.knees[0].rotation.x + (u.ankles?.[0]?.rotation.x || 0));
+ }
+ out.groesste = Math.max(...out.sohle.map(Math.abs));
+ out.kette = Math.max(...u.legs.map(() => 0), ...out.sohle.map(() => 0));
+ // Am Hang im Nationalpark muss die Neigung ungleich null sein.
+ figur.position.set(-470, 0, -400); figur.rotation.y = 1.2;
+ out.hang = Math.abs(welt.bodenNeigung(figur));
+ figur.position.set(0, 0, 0);
+ out.ebene = Math.abs(welt.bodenNeigung(figur));
+ return out;
+});
+pruefe('Figuren haben Sprunggelenke', gang.gelenke === 2);
+pruefe('Sohle bleibt im Schritt annähernd waagerecht', gang.groesste < .62, `max ${gang.groesste.toFixed(2)} rad`);
+pruefe('Bodenneigung greift am Hang und nicht in der Ebene', gang.hang > .05 && gang.ebene < .001,
+ `Hang ${gang.hang.toFixed(2)} rad, Ebene ${gang.ebene.toFixed(3)} rad`);
+pruefe('Ferne Blöcke werden nach Entfernung verworfen', await page.evaluate(() => {
+ const w = window.LOWTIDE.world;
+ window.LOWTIDE.view(-40, 60);
+ w.bloeckeSichten(.0038);
+ const versteckt = w.bloecke.filter(m => !m.visible).length;
+ w.bloeckeSichten(.0002);          // Luftbilddichte: alles muss zurückkommen
+ const wieder = w.bloecke.filter(m => !m.visible).length;
+ return versteckt > 5 && wieder === 0;
+}));
+
+console.log('Rendern');
+const info = await page.evaluate(() => {const i = window.LOWTIDE.world.renderer.info; return {c: i.render.calls, t: i.render.triangles};});
+pruefe('Es wird tatsächlich gezeichnet', info.c > 100, `${info.c} Draw Calls, ${info.t.toLocaleString('de-DE')} Dreiecke`);
+
+// Die Touch-Oberfläche hängt an `@media(pointer:coarse)` und ist auf einem
+// Zeigergerät ausgeblendet. Dafür braucht es einen eigenen Browser mit
+// Berührungsemulation, sonst prüft man nur unsichtbare Knöpfe. Der erste
+// Browser wird vorher geschlossen: zwei Seiten gleichzeitig im
+// Software-Rendering bringen jede Playwright-Zeitgrenze zum Platzen.
+await browser.close();
+
+console.log('Berührungssteuerung');
+const mobilBrowser = await chromium.launch({
+ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+ args: ['--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader', '--no-sandbox']
+});
+const mobil = await mobilBrowser.newContext({viewport: {width: 430, height: 860}, hasTouch: true, isMobile: true});
+const handy = await mobil.newPage();
+handy.on('pageerror', e => konsole.push('mobil pageerror: ' + (e.stack || e.message)));
+handy.on('console', m => {if (m.type() === 'error') konsole.push('mobil console: ' + m.text());});
+await handy.goto('file://' + fileURLToPath(new URL('../LOWTIDE.html', import.meta.url)), {waitUntil: 'load'});
+await handy.waitForFunction(() => !document.getElementById('startBtn').disabled, null, {timeout: 180000});
+pruefe('Startknopf liegt im Bild', await handy.evaluate(() => {
+ const r = document.getElementById('startBtn').getBoundingClientRect();
+ return r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth;
+}));
+await handy.evaluate(() => document.getElementById('startBtn').click());
+await handy.waitForFunction(() => window.LOWTIDE.frames > 1, null, {timeout: 180000});
+pruefe('Touch-Oberfläche wird eingeblendet', await handy.evaluate(() =>
+ getComputedStyle(document.getElementById('touch')).display !== 'none'));
+pruefe('Alle Touch-Knöpfe vorhanden', await handy.evaluate(() => document.querySelectorAll('#actions [data-key]').length >= 6));
+pruefe('Kein waagerechtes Überlaufen', await handy.evaluate(() =>
+ document.documentElement.scrollWidth <= innerWidth + 1));
+const stickKasten = await handy.evaluate(() => {
+ const r = document.getElementById('stick').getBoundingClientRect();
+ return {x: r.x, y: r.y, w: r.width, h: r.height};
+});
+pruefe('Stick ist groß genug zum Treffen', stickKasten.w >= 60, `${Math.round(stickKasten.w)} px`);
+pruefe('Stick nimmt Berührungen an', await handy.evaluate(k => {
+ const stick = document.getElementById('stick');
+ const mitteX = k.x + k.w / 2, mitteY = k.y + k.h / 2;
+ stick.dispatchEvent(new PointerEvent('pointerdown', {bubbles: true, pointerId: 7, clientX: mitteX, clientY: k.y + 4}));
+ stick.dispatchEvent(new PointerEvent('pointermove', {bubbles: true, pointerId: 7, clientX: mitteX, clientY: k.y + 4}));
+ const versetzt = getComputedStyle(document.getElementById('knob')).transform !== 'none';
+ stick.dispatchEvent(new PointerEvent('pointerup', {bubbles: true, pointerId: 7}));
+ return versetzt;
+}, stickKasten));
+pruefe('Aktionsknopf löst aus', await handy.evaluate(() => {
+ const knopf = document.querySelector('[data-key="q"]');
+ const vor = window.LOWTIDE.sim.player.armed;
+ knopf.dispatchEvent(new PointerEvent('pointerdown', {bubbles: true, pointerId: 1}));
+ knopf.dispatchEvent(new PointerEvent('pointerup', {bubbles: true, pointerId: 1}));
+ return window.LOWTIDE.sim.player.armed !== vor;
+}));
+await handy.screenshot({path: 'shots/mobil.png'});
+await mobilBrowser.close();
+
+console.log(`\n${bestanden} bestanden, ${gefallen} gefallen`);
+if (konsole.length) {
+ console.log('Konsolenausgaben:');
+ for (const k of [...new Set(konsole)]) console.log('  -', k.slice(0, 300));
+}
+process.exitCode = gefallen || konsole.length ? 1 : 0;
