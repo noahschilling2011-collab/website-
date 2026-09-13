@@ -29,6 +29,8 @@ void main(){
 
 const FRAGMENT = `
 uniform float zeit, nacht, kuesteX, dunst, art;
+uniform vec4 seeRect;   // Uferrechteck des Stausees, nur bei art > 1.5
+uniform float kraeuselStaerke;
 uniform vec3 zenith, horizon, sunColor, sunDir, tief, flach;
 #define LANDZAHL __LANDZAHL__
 uniform vec4 land[LANDZAHL];  // xz-Rechtecke von Inseln und Dämmen: minX, minZ, maxX, maxZ
@@ -62,12 +64,25 @@ vec3 kraeuselung(vec2 p, float t){
  float h  = noise(q) + noise(q * 2.3 + 5.0) * 0.5 + noise(q * 5.1 - 3.0) * 0.25;
  float hx = noise(q + vec2(e,0.0)) + noise((q + vec2(e,0.0)) * 2.3 + 5.0) * 0.5 + noise((q + vec2(e,0.0)) * 5.1 - 3.0) * 0.25;
  float hz = noise(q + vec2(0.0,e)) + noise((q + vec2(0.0,e)) * 2.3 + 5.0) * 0.5 + noise((q + vec2(0.0,e)) * 5.1 - 3.0) * 0.25;
- return normalize(vec3((h - hx) * 1.5, 1.0, (h - hz) * 1.5));
+ // Der Faktor war fest 1,5 und damit für jedes Gewässer gleich steil. Auf
+ // einem Binnensee ergab das eine weiße Decke: die Fresnelzahl springt bei
+ // steilen Normalen zwischen 0,03 und 1, und damit wechselt jeder zweite
+ // Bildpunkt zwischen Wasserkörper und hellem Himmel. Ein See kräuselt
+ // flacher als offene See.
+ return normalize(vec3((h - hx) * kraeuselStaerke, 1.0, (h - hz) * kraeuselStaerke));
 }
 
 // Abstand zur nächsten Küstenlinie: die gerade Uferkante im Westen und das
 // Inselrechteck im Süden. Mehr Küste hat Solvara im Wasserbereich nicht.
 float kuestenAbstand(vec2 p){
+ // Ein Binnensee hat keine Küstenlinie im Sinne des Ozeans: sein Ufer ist
+ // der Rand seines eigenen Rechtecks, von innen gesehen. Ohne diesen Zweig
+ // läge die Brandung an einer Geraden irgendwo östlich in der Stadt.
+ if(art > 1.5){
+  vec2 m = (seeRect.xy + seeRect.zw) * 0.5, h = (seeRect.zw - seeRect.xy) * 0.5;
+  vec2 d = abs(p - m) - h;
+  return abs(length(max(d, 0.0)) + min(max(d.x, d.y), 0.0));
+ }
  float nah = abs(p.x - kuesteX);
  for(int i = 0; i < LANDZAHL; i++){
   vec2 mitte = (land[i].xy + land[i].zw) * 0.5, halb = (land[i].zw - land[i].xy) * 0.5;
@@ -94,8 +109,16 @@ void main(){
  // eine Fläche dieser Größe zu teuer.
  vec3 spiegel = reflect(-blick, n);
  vec3 himmel = mix(horizon, zenith, clamp(spiegel.y * 1.6, 0.0, 1.0));
- float glanz = pow(max(dot(spiegel, sunDir), 0.0), 220.0);
- float schimmer = pow(max(dot(spiegel, sunDir), 0.0), 9.0);
+ // Der Glitzerpfad. Ohne ihn lag das Sonnenlicht als weiße Decke über der
+ // ganzen Fläche: die Kräuselung streut die Spiegelrichtung so weit, dass
+ // die enge Sonnenkeule überall irgendwo getroffen wird. Draußen sitzt das
+ // Glitzern in einem Band zwischen Auge und Sonne, und außerhalb davon ist
+ // Wasser dunkel. Maßgeblich dafür ist die Spiegelrichtung der ruhigen
+ // Ebene, nicht die der einzelnen Welle.
+ vec3 spiegelEben = reflect(-blick, vec3(0.0, 1.0, 0.0));
+ float pfad = pow(max(dot(spiegelEben, sunDir), 0.0), 2.2);
+ float glanz = pow(max(dot(spiegel, sunDir), 0.0), 220.0) * pfad;
+ float schimmer = pow(max(dot(spiegel, sunDir), 0.0), 9.0) * pfad;
 
  // Der Übergang von Flach- zu Tiefwasser lag bei 55 m und legte einen
  // türkisen Ring um jede Küste.
@@ -127,9 +150,12 @@ const LANDRECHTECKE = [...INSELN, ...DAEMME].map(r => new T.Vector4(r.x1, r.z1, 
 // art: 'ozean' oder 'sumpf'. Der Sumpf ist flach, trüb und grünbraun;
 // mit den Ozeanfarben wurde er zur Tiefsee.
 export function createWater(art = 'ozean') {
- const sumpf = art === 'sumpf';
+ const sumpf = art === 'sumpf', see = art === 'see';
  const uniforms = {
-  zeit: {value: 0}, nacht: {value: 0}, dunst: {value: .12}, art: {value: sumpf ? 1 : 0},
+  zeit: {value: 0}, nacht: {value: 0}, dunst: {value: .12},
+  art: {value: see ? 2 : sumpf ? 1 : 0},
+  seeRect: {value: new T.Vector4(-803, 3, -597, 157)},
+  kraeuselStaerke: {value: see ? .34 : sumpf ? .6 : .8},
   kuesteX: {value: sumpf ? -400 : 119}, land: {value: LANDRECHTECKE},
   zenith: {value: new T.Color(0x2578cc)}, horizon: {value: new T.Color(0xc9dde2)},
   sunColor: {value: new T.Color(0xfff6e6)}, sunDir: {value: new T.Vector3(0, 1, 0)},
@@ -144,7 +170,8 @@ export function createWater(art = 'ozean') {
 // Übernimmt Himmelsfarben und Sonnenstand, damit Wasser und Himmel nie
 // auseinanderlaufen.
 export function updateWater(uniforms, himmel, zeit, kamera) {
- const sumpf = uniforms.art.value > .5;
+ const sumpf = uniforms.art.value > .5 && uniforms.art.value < 1.5;
+ const see = uniforms.art.value > 1.5;
  uniforms.zeit.value = zeit;
  uniforms.nacht.value = himmel.nacht;
  uniforms.dunst.value = himmel.dunst;
@@ -153,7 +180,8 @@ export function updateWater(uniforms, himmel, zeit, kamera) {
  uniforms.sunColor.value.copy(himmel.sun);
  uniforms.sunDir.value.copy(himmel.richtung);
  // Nachts bleibt das Wasser dunkel, aber nicht schwarz — Stadtlicht am Ufer.
- uniforms.tief.value.setHex(sumpf ? 0x2c3b2a : 0x0b3040).multiplyScalar(1 - himmel.nacht * .72);
- uniforms.flach.value.setHex(sumpf ? 0x46543a : 0x2c7a80).multiplyScalar(1 - himmel.nacht * .68);
+ // Süßwasser über Fels ist grüner und weniger türkis als die Küste.
+ uniforms.tief.value.setHex(see ? 0x14343a : sumpf ? 0x2c3b2a : 0x0b3040).multiplyScalar(1 - himmel.nacht * .72);
+ uniforms.flach.value.setHex(see ? 0x35706a : sumpf ? 0x46543a : 0x2c7a80).multiplyScalar(1 - himmel.nacht * .68);
  uniforms.kameraPos.value.copy(kamera.position);
 }

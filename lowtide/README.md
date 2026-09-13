@@ -338,6 +338,46 @@ Bildhälfte, und Dunst ist hell und farblos. Ein Werkzeug, das auf den Wert
 optimiert würde, hätte hier ein leichtes Ziel — deshalb steht daneben immer
 die Helligkeit.
 
+## Der Stausee war keiner
+
+`schwachstellen.mjs` hatte MERCY RESERVOIR als zweitflachste Gegend
+ausgewiesen. Der Grund war nicht die Umgebung: der See selbst war eine
+bemalte Platte von 206 mal 155 Metern mit ein paar helleren Kisten darauf,
+die aus der Nähe genau danach aussahen. Kein Wellengang, keine Spiegelung,
+kein Ufersaum.
+
+Jetzt ist es Wasser, über dasselbe Muster wie der Salzsumpf: eine dritte
+Fläche mit eigenem `art`-Wert. Ein Binnensee hat keine Küstenlinie im Sinne
+des Ozeans, sein Ufer ist der Rand des eigenen Rechtecks von innen gesehen —
+dafür bekam `kuestenAbstand()` einen Zweig. Nachgerechnet: Mitte 77 m,
+Uferkante 7 m, Ecke 3 m.
+
+**Zweimal daneben geraten, bis die Messung es geklärt hat.** Die neue
+Wasserfläche lag bei Tag unter einer weißen Decke. Erste Vermutung: Gischt.
+Zweite: Sonnenglitzer, also einen Glitzerpfad eingebaut — der ist physikalisch
+richtig und bleibt drin, war aber nicht die Ursache. Der Nachtblick hat es
+entschieden: nachts war der See sauber, das Weiße hing also an der Sonne,
+aber nicht an ihrer Spiegelkeule. Es war die Fresnelzahl. Die Kräuselung hatte
+einen fest verdrahteten Steigungsfaktor von 1,5 für jedes Gewässer; bei so
+steilen Normalen springt Fresnel zwischen 0,03 und 1, und damit wechselt
+jeder zweite Bildpunkt zwischen Wasserkörper und hellem Himmel.
+
+Die Steigung hängt jetzt am Gewässer: See 0,34, Sumpf 0,6, offene See 0,8.
+Auch das Meer war zu steil.
+
+| Region | vorher | nachher |
+|---|---|---|
+| MERCY RESERVOIR | 5,52 | 7,31 |
+| OUTER KEYS | 14,75 | 12,38 |
+| SOUTH BEACH | 15,54 | 13,64 |
+| THE LOWER KEYS | 17,67 | 14,74 |
+
+Die drei unteren Zeilen sind der Preis, und er ist gewollt: die ruhigere
+Kräuselung nimmt dem Wasser genau das hochfrequente Flimmern, das den
+Kontrastwert hochgetrieben hat. Der Schnitt über alle Regionen fällt von
+11,14 auf 10,72. Das ist der Fall, vor dem im Kopf von `statistik.mjs` steht,
+dass Kontrast allein kein Ziel ist.
+
 ## Was Zeichenaufrufe kostet
 
 Draw Calls sind hier die knappe Größe, nicht Dreiecke. Drei Dinge halten sie

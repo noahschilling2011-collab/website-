@@ -61,6 +61,13 @@ export class World{
   const sumpf=createWater('sumpf');this.marshUniforms=sumpf.uniforms;
   this.marsh=new T.Mesh(new T.PlaneGeometry(150,155,30,32),sumpf.material);
   this.marsh.rotation.x=-Math.PI/2;this.marsh.position.set(-472,-.62,55);this.scene.add(this.marsh);
+  // Der Stausee war eine bemalte Platte von 206 mal 155 Metern mit hellen
+  // Flecken darauf — aus der Nähe erkennbar als das, was es war: Kisten.
+  // Jetzt dieselbe Fläche als Wasser, mit Wellengang, Sonnenglanz, Ufersaum
+  // und der Marke im Alphakanal, über die post.js spiegelt.
+  const see=createWater('see');this.seeUniforms=see.uniforms;
+  this.see=new T.Mesh(new T.PlaneGeometry(206,155,42,32),see.material);
+  this.see.rotation.x=-Math.PI/2;this.see.position.set(-700,.28,80);this.scene.add(this.see);
  }
  palm(x,z,h){this.box(x,h/2,z,.45,h,.45,0x8e7b59,.06);for(let i=0;i<7;i++){const a=i*Math.PI*2/7;this.box(x+Math.sin(a)*2,h,z+Math.cos(a)*2,1,.18,5,0x426c5b,a);}}
  lamp(x,z){this.box(x,3.3,z,.15,6.6,.15,0x3a4a50);this.box(x+.6,6.5,z,1.4,.15,.3,0x3a4a50);this.box(x+1,6.4,z,.5,.08,.3,0xffe2a4,0,true);(this.lampen||=[]).push({x:x+1,y:6.2,z});}
@@ -75,7 +82,7 @@ export class World{
   this.rain=new T.LineSegments(geo,new T.LineBasicMaterial({color:0xcfe0e6,transparent:true,opacity:.42,depthWrite:false}));
   this.rainHoehe=38;this.scene.add(this.rain);}
  resize(){this.renderer.setSize(innerWidth,innerHeight);this.camera.aspect=innerWidth/innerHeight;this.camera.updateProjectionMatrix();this.post?.groesse(innerWidth,innerHeight);}
- update(dt,camYaw,camPitch,playing){const s=this.sim,p=s.player,t=s.time;const himmelJetzt=this.applySky(dt);updateWater(this.waterUniforms,himmelJetzt,t,this.camera);updateWater(this.marshUniforms,himmelJetzt,t,this.camera);this.rain.visible=s.weather==='rain'||s.weather==='storm';this.rain.material.opacity=s.weather==='storm'?.6:.4;if(this.rain.visible){this.rain.position.set(p.x,0,p.z);const a=this.rain.geometry.attributes.position,fall=dt*(s.weather==='storm'?36:26),h=this.rainHoehe;for(let i=0;i<a.count;i++)a.setY(i,(a.getY(i)-fall+h)%h);a.needsUpdate=true;}
+ update(dt,camYaw,camPitch,playing){const s=this.sim,p=s.player,t=s.time;const himmelJetzt=this.applySky(dt);updateWater(this.waterUniforms,himmelJetzt,t,this.camera);updateWater(this.marshUniforms,himmelJetzt,t,this.camera);updateWater(this.seeUniforms,himmelJetzt,t,this.camera);this.rain.visible=s.weather==='rain'||s.weather==='storm';this.rain.material.opacity=s.weather==='storm'?.6:.4;if(this.rain.visible){this.rain.position.set(p.x,0,p.z);const a=this.rain.geometry.attributes.position,fall=dt*(s.weather==='storm'?36:26),h=this.rainHoehe;for(let i=0;i<a.count;i++)a.setY(i,(a.getY(i)-fall+h)%h);a.needsUpdate=true;}
   this.player.position.set(p.x,p.sneak?-.35:0,p.z);this.player.rotation.y=p.yaw;this.player.visible=!p.car;this.gun.visible=p.armed;this.player.userData.body.material=mat(p.clothes==='orange'?0xe2a062:0x557da3);this.animateHuman(this.player,t,(s.paused?0:distance2(this.prev,p)>0.001?1:0),p.armed);this.prev={x:p.x,z:p.z};s.npcs.forEach((n,i)=>{const m=this.npcs[i];m.position.set(n.x,n.health<=0?.25:0,n.z);m.rotation.set(n.health<=0?Math.PI/2:0,n.yaw,0);this.animateHuman(m,t+n.id,n.state==='normal'?1:n.state==='flüchtend'?2:0,n.state==='filmend');});s.cars.forEach((c,i)=>{const m=this.cars[i];m.position.set(c.x,0,c.z);m.rotation.y=c.yaw;m.userData.body.scale.y=.55*(.65+.35*c.health/100);m.userData.body.rotation.z=c.health<40?.05:0;});s.cops.forEach((c,i)=>{const m=this.cops[i];m.position.set(c.x,0,c.z);m.rotation.y=c.yaw;for(let j=0;j<2;j++)m.userData.lights[j].visible=c.active&&(Math.floor(t*8)+j)%2===0;});this.contact.position.set(s.mission>=3?places.safe.x:places.mara.x,0,s.mission>=3?places.safe.z:places.mara.z);this.gateMesh.visible=!s.doorOpen;this.disk.visible=s.mission<3;const goal=s.objective();this.marker.position.set(goal.x,4+Math.sin(t*2)*.3,goal.z);this.marker.rotation.y=t;this.marker.visible=s.mission<4;this.ring.position.set(goal.x,.15,goal.z);this.ring.visible=s.mission<4;
   for(const m of this.bulletMeshes){this.scene.remove(m);m.geometry.dispose();m.material.dispose();}this.bulletMeshes=[];for(const tr of s.tracers){const geo=new T.BufferGeometry().setFromPoints([new T.Vector3(tr.x,1.5,tr.z),new T.Vector3(tr.end.x,1.3,tr.end.z)]);const l=new T.Line(geo,new T.LineBasicMaterial({color:0xffe3a3}));this.scene.add(l);this.bulletMeshes.push(l);}
   // freieKamera hängt die Verfolgerkamera aus — für Luftbilder und Prüfläufe.
