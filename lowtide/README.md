@@ -574,17 +574,20 @@ Behoben nicht durch eine Ausweichlogik, sondern bei der Erzeugung: ein Platz,
 der näher als 2,6 Meter an einer Fahrlinie liegt, wird verworfen. Das sind
 zwei halbe Wagenbreiten plus eine Handbreit.
 
-| | vorher | nachher |
-|---|---|---|
-| Parkplätze | 519 | 301 |
-| Durchfahrten in fünfzehn Sekunden | 1304 | 0 |
-| engster Abstand | 0,11 m | 4,34 m |
-| Dreiecke Kreuzung 13 Uhr | 2.047.720 | 1.700.244 |
+Das kostete zunächst 218 Plätze, 519 auf 301. Der Grund war aber nicht die
+neue Bedingung, sondern eine alte Schwäche daneben: der Erzeuger würfelt eine
+Straßenseite und gibt bei Kollision auf, statt die andere zu versuchen. Mit
+beiden Seiten kommen 496 der 519 zurück — und keiner davon steht auf einer
+Fahrlinie.
 
-Die 218 verworfenen Plätze sind kein Verlust: es waren genau die, die in
-einer Fahrspur standen. Nebenbei fallen dadurch **17 Prozent der Dreiecke**
-weg — die betroffenen Plätze lagen an den befahrenen Straßen und damit dort,
-wo die Kamera meistens steht.
+| | vorher | nur verworfen | beide Seiten |
+|---|---|---|---|
+| Parkplätze | 519 | 301 | 496 |
+| Durchfahrten in fünfzehn Sekunden | 1304 | 0 | 0 |
+| engster Abstand | 0,11 m | 4,34 m | 3,60 m |
+
+Die verworfenen Plätze sind kein Verlust: es waren genau die, die in einer
+Fahrspur standen.
 
 ## Einundfünfzig Paare standen ineinander
 

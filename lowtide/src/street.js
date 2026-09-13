@@ -169,17 +169,24 @@ export class Street {
    // Parkbuchten am Bordstein sammeln; die Fahrzeuge kommen später als Instanzen.
    for (let s = 24; s < laenge - 20; s += 6.4) {
     if (rng() > .34) continue;
-    const seite = rng() < .5 ? -1 : 1;
-    const x = r.x1 + dx * s + (senkrecht ? seite * (halb - 2.1) : 0);
-    const z = r.z1 + dz * s + (senkrecht ? 0 : seite * (halb - 2.1));
-    if (!this.frei(x, z, 1.6) || Math.abs(groundAt(x, z)) > .2) continue;
-    // Nicht in die Kreuzung und nicht ineinander parken.
-    if (this.kreuzungsListe.some(k => Math.abs(k.x - x) < 15 && Math.abs(k.z - z) < 15)) continue;
-    if (this.parkplaetze.some(p => (p.x - x) ** 2 + (p.z - z) ** 2 < 34)) continue;
-    // Und nicht auf der Fahrlinie. 2,6 Meter sind zwei halbe Wagenbreiten
-    // plus eine Handbreit; darunter berühren sich die Modelle.
-    if (this.aufFahrlinie(x, z, 2.6)) continue;
-    this.parkplaetze.push({x, z, yaw: (senkrecht ? 0 : Math.PI / 2) + (seite < 0 ? Math.PI : 0), lack: LACKE[Math.floor(rng() * LACKE.length)]});
+    // Beide Seiten versuchen, die gewürfelte zuerst. Vorher wurde nur eine
+    // geprüft und bei Kollision aufgegeben — nachdem die Plätze auf den
+    // Fahrlinien wegfielen, kostete das ein Drittel der übrigen: 301 statt
+    // 519. Die Gegenseite ist in den meisten Fällen frei.
+    const ersteSeite = rng() < .5 ? -1 : 1;
+    for (const seite of [ersteSeite, -ersteSeite]) {
+     const x = r.x1 + dx * s + (senkrecht ? seite * (halb - 2.1) : 0);
+     const z = r.z1 + dz * s + (senkrecht ? 0 : seite * (halb - 2.1));
+     if (!this.frei(x, z, 1.6) || Math.abs(groundAt(x, z)) > .2) continue;
+     // Nicht in die Kreuzung und nicht ineinander parken.
+     if (this.kreuzungsListe.some(k => Math.abs(k.x - x) < 15 && Math.abs(k.z - z) < 15)) continue;
+     if (this.parkplaetze.some(p => (p.x - x) ** 2 + (p.z - z) ** 2 < 34)) continue;
+     // Und nicht auf der Fahrlinie. 2,6 Meter sind zwei halbe Wagenbreiten
+     // plus eine Handbreit; darunter berühren sich die Modelle.
+     if (this.aufFahrlinie(x, z, 2.6)) continue;
+     this.parkplaetze.push({x, z, yaw: (senkrecht ? 0 : Math.PI / 2) + (seite < 0 ? Math.PI : 0), lack: LACKE[Math.floor(rng() * LACKE.length)]});
+     break;
+    }
    }
   }
 
