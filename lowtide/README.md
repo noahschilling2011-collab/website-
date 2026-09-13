@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 183 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 185 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -556,6 +556,30 @@ sonst schöbe der Verkehr ihn von hinten an.
 
 Danach: **null Paare** unter 3,6 Metern, engster Abstand 4,97 Meter. Zwei
 Prüfungen halten Dichte und Abstand fest.
+
+## Was geprüft wurde und in Ordnung war
+
+Nicht jede Messung findet etwas, und das gehört genauso hierher.
+
+**Die acht Innenräume** sind alle begehbar: kein blockierter Schritt auf dem
+Weg von draußen bis in die Raummitte, Mitte frei, in sieben von acht Räumen
+auch der Ring von drei Metern. Im Motel sind fünf von acht Richtungen frei —
+das sind die Betten. Zwei Prüfungen halten es jetzt fest, weil sich die Karte
+laufend ändert und ein Solid vor der offenen Front einen Laden aussperren
+würde, ohne dass es irgendetwas meldet.
+
+**Die Karte im Telefon** baut ihr Wasser aus derselben `waterAt`-Funktion wie
+das Gelände. Stausee und Sumpfdämme erscheinen darauf automatisch; eine
+Abweichung zwischen Karte und Welt kann es gar nicht geben.
+
+**Geparkte Wagen in Gebäuden oder ineinander**: nein. Der Erzeuger prüft
+freien Grund, ebenen Boden, Abstand zu Kreuzungen und 5,8 Meter zum nächsten
+Platz.
+
+**Das Fensterraster der Innenstadthäuser**: vermutet fest verdrahtet und
+damit bei breiten Wänden lückenhaft. Nachgemessen sind alle sechzehn Häuser
+18,8 mal 38,8 Meter, das Raster deckt 14 von 18,8 und 32 von 38,8 — kein
+Fenster ragt über eine Kante.
 
 ## Eine Fundstelle, an die man nicht herankam
 

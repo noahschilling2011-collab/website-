@@ -1166,6 +1166,25 @@ const schaetze = await page.evaluate(() => {
 });
 pruefe('Jede Fundstelle ist erreichbar', schaetze.length === 0,
  `nicht erreichbar: ${JSON.stringify(schaetze)}`);
+// Die acht Innenräume müssen begehbar bleiben. Ihre Front ist offen, der
+// Raum reicht von l.z+3,6 bis l.z-11,4 — ein Solid, das sich davorschiebt,
+// sperrt einen Laden aus, ohne dass irgendetwas es meldet. Bei einer Karte,
+// die sich laufend ändert, ist das kein theoretischer Fall.
+const innen = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim;
+ return ['garage', 'shop', 'clinic', 'home', 'club', 'diner', 'motel', 'records']
+  .filter(k => L.orte[k])
+  .map(k => {
+   const l = L.orte[k];
+   let blockiert = 0;
+   for (let z = l.z + 8; z > l.z - 4; z -= .8) if (s.blocked({x: l.x, z}, .45)) blockiert++;
+   return {k, blockiert, mitte: !s.blocked({x: l.x, z: l.z - 4}, .5)};
+  });
+});
+pruefe('Alle acht Innenräume sind vorhanden', innen.length === 8, `${innen.length} gefunden`);
+pruefe('In jeden Innenraum führt ein freier Weg',
+ innen.every(q => q.blockiert === 0 && q.mitte),
+ JSON.stringify(innen.filter(q => q.blockiert || !q.mitte)));
 pruefe('Sparmodus schaltet die Nachbearbeitung ab', await page.evaluate(() => {
  const knopf = document.getElementById('qualityBtn'), w = window.LOWTIDE.world;
  knopf.click();
