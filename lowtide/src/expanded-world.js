@@ -337,6 +337,48 @@ export class ExpandedWorld extends World{
   this.innenLampen=[...dressInteriors(this),...(this.zusatzLampen||[])];
   this.palmenBauen();
   this.laubwerk?.bauen();
+  this.rotorenBauen();
+ }
+ // Die drei Windräder auf dem Kamm. regions.js meldet nur Nabe, Achse und
+ // Phase an; die Blätter liegen hier, weil sie sich drehen müssen und alles
+ // in w.box() gebacken und danach unbeweglich ist.
+ //
+ // Neun Blätter in einer InstancedMesh: ein Draw Call, egal wie viele
+ // Anlagen dazukommen. Die Matrix je Blatt ist
+ //   T(Nabe) · Ry(Achse) · T(0,0,2.6) · Rz(Winkel) · T(12,0,0) · S(24,1.4,.35)
+ // — von rechts gelesen: Würfel auf Blattmaß strecken, Wurzel an die Nabe
+ // schieben, um die Achse drehen, vor den Turm setzen, ausrichten, absetzen.
+ rotorenBauen(){
+  if(!this.rotoren||!this.rotoren.length)return;
+  const mat=new T.MeshStandardMaterial({color:0xe4e4dc,roughness:.75});
+  const netz=new T.InstancedMesh(new T.BoxGeometry(1,1,1),mat,this.rotoren.length*3);
+  netz.castShadow=true;netz.receiveShadow=true;
+  this.scene.add(netz);this.rotorNetz=netz;this.rotorWinkel=0;
+  this.rotorSetzen(0);
+  netz.computeBoundingSphere();
+  // Die Instanzmatrizen ändern sich jedes Bild; die einmal berechnete Kugel
+  // muss deshalb den ganzen überstrichenen Kreis fassen, nicht die Stellung
+  // von jetzt. Ein Blattradius Zuschlag reicht dafür sicher.
+  if(netz.boundingSphere)netz.boundingSphere.radius+=26;
+  // In this.bloecke eingereiht, damit bloeckeSichten() die Rotoren mit
+  // derselben Nebelgrenze ausblendet wie die Türme. Ohne das hingen die
+  // Blätter aus der Innenstadt heraus ohne Turm in der Luft.
+  (this.bloecke||=[]).push(netz);
+ }
+ rotorSetzen(winkel){
+  const m=new T.Matrix4(),nabe=new T.Matrix4(),vor=new T.Matrix4(),
+   dreh=new T.Matrix4(),arm=new T.Matrix4(),mass=new T.Matrix4();
+  vor.makeTranslation(0,0,2.6);arm.makeTranslation(12,0,0);mass.makeScale(24,1.4,.35);
+  let i=0;
+  for(const r of this.rotoren){
+   nabe.makeRotationY(r.yaw);nabe.setPosition(r.x,r.y,r.z);
+   for(let b=0;b<3;b++){
+    dreh.makeRotationZ(winkel+r.phase+b*Math.PI*2/3);
+    m.copy(nabe).multiply(vor).multiply(dreh).multiply(arm).multiply(mass);
+    this.rotorNetz.setMatrixAt(i++,m);
+   }
+  }
+  this.rotorNetz.instanceMatrix.needsUpdate=true;
  }
  car(color,police=false,c=null){if(!c)return detailedCar(color,police);const d=vehicleTypes[c.model],g=new T.Group();if(['car','pickup'].includes(d.shape)){const m=detailedCar(color);m.scale.set(...d.scale);if(d.shape==='pickup')this.dynbox(m,0,1.2,-1.3,1.9,.2,1.5,color);m.userData.def=d;return m;}const body=this.dynbox(g,0,.8,0,1.4,.5,3,color);let wheels=[],rotor=null;
   if(['bike','quad'].includes(d.shape)){body.scale.set(d.shape==='bike'?.35:1.2,.5,1.5);this.dynbox(g,0,1.4,.8,1,.1,.15,0x263c40);for(const z of [-.9,.9])for(const x of d.shape==='bike'?[0]:[-.65,.65]){const wheel=new T.Mesh(new T.CylinderGeometry(.45,.45,.22,10),material(0x26343a));wheel.rotation.z=Math.PI/2;wheel.position.set(x,.45,z);g.add(wheel);wheels.push(wheel);}this.dynbox(g,0,1.05,-.25,.45,.2,.8,0x394149);}
@@ -348,6 +390,13 @@ export class ExpandedWorld extends World{
  }
  applyUpgrades(m,c){const signature=JSON.stringify(c.upgrades);if(signature===m.userData.upgradeSignature)return;m.userData.upgradeSignature=signature;if(m.userData.kit)m.remove(m.userData.kit);const kit=new T.Group();m.add(kit);m.userData.kit=kit;const u=c.upgrades;if(u.body){this.dynbox(kit,0,1.15,-1.8,2.1,.1,.4,c.color);for(const x of [-.75,.75])this.dynbox(kit,x,.98,-1.8,.08,.35,.08,0x35464b);for(const x of [-1,1])this.dynbox(kit,x,.35,0,.12,.14,2.8,c.color);}if(u.exhaust){for(const x of [-.7,.7]){const pipe=new T.Mesh(new T.CylinderGeometry(.09,.09,.5,12),new T.MeshStandardMaterial({color:0x9caaa6,metalness:.85,roughness:.2}));pipe.rotation.x=Math.PI/2;pipe.position.set(x,.45,-2.22);kit.add(pipe);}}if(u.rims)for(const rim of m.userData.rims||[])rim.material=new T.MeshStandardMaterial({color:u.rims%2?0xbfa66e:0x35434a,metalness:.8,roughness:.2});if(u.interior&&m.userData.interior)m.userData.interior.traverse(o=>{if(o.isMesh)o.material=new T.MeshStandardMaterial({color:u.interior%2?0xad8a66:0x3a515d,roughness:.9});});if(u.lights){const strip=this.dynbox(kit,0,.23,0,1.6,.025,3,0x729dbc);strip.material=new T.MeshStandardMaterial({color:0x63bdd1,emissive:0x63bdd1,emissiveIntensity:2});} }
  updateExtras(dt,camYaw,camPitch,playing){const s=this.sim,p=s.player,t=s.time;
+  // Die Rotoren drehen sich mit dem Wetter: bei Klar rund neun Umdrehungen
+  // je Minute, im Sturm gut zwanzig. Steht das Spiel, stehen sie auch —
+  // sonst dreht sich im Pausenbild etwas weiter.
+  if(this.rotorNetz&&!s.paused&&dt>0){
+   this.rotorWinkel+=dt*({clear:.95,fog:.5,rain:1.35,storm:2.15}[s.weather]??.95);
+   this.rotorSetzen(this.rotorWinkel);
+  }
   // Licht, Himmel und Belichtung kommen aus World.applySky.
   // Nasser Asphalt: dunkler, viel glatter, spiegelt Himmel und Lichter.
   // Er trocknet deutlich langsamer, als der Regen aufhört.

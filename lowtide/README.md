@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 246 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 249 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1318,6 +1318,58 @@ wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
 besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
+
+## Sieben Windräder, die ineinander fuhren
+
+Vom Kamm aus stand im Bild ein Lattenzaun aus vier weißen Säulen. Nachgesehen
+waren es die Türme des Windparks: sieben Stück auf einer Diagonalen quer über
+die Flanke, alle 35,4 Meter einer. Ein Blatt ist vierundzwanzig Meter lang und
+sitzt mit der Wurzel an der Nabe — der Rotor hat damit **achtundvierzig Meter
+Durchmesser**. Die Kreise zweier Nachbarn überlappten sich um dreizehn Meter;
+die Blätter fuhren durcheinander hindurch. Gedreht hat sich außerdem keines:
+sie steckten als gebackene Klötze in der Blockliste, so unbeweglich wie ein
+Zaunpfahl.
+
+Zuerst gemessen, wie viel Platz da überhaupt ist. Der Kamm läuft auf x = -900
+und liegt zwischen z = -370 und z = +40 über fünfundzwanzig Metern, das sind
+rund 410 Meter Länge; über siebzig Metern bleiben nur noch 190. Quer zum Wind
+ist der übliche Abstand einer Reihe drei Rotordurchmesser. Das sind hier 144
+Meter — und damit passen **drei** Anlagen auf den Kamm, nicht sieben.
+
+Jetzt stehen sie auf -900 bei z = -300, -156 und -12, die Naben auf 105,8,
+140,0 und 102,4 Metern. Die Reihe läuft in z, die Nabenachse zeigt deshalb in
+x: quer zum Kamm, nicht die Reihe entlang, sonst stünde jede Anlage im
+Windschatten der davor.
+
+Der Turm bleibt gebacken, denn er bewegt sich nicht. Die neun Blätter liegen
+in einer eigenen `InstancedMesh` — ein Draw Call, egal wie viele Anlagen
+dazukommen. Die Matrix je Blatt ist
+
+    T(Nabe) · Ry(Achse) · T(0,0,2.6) · Rz(Winkel) · T(12,0,0) · S(24, 1.4, .35)
+
+von rechts gelesen: Würfel auf Blattmaß strecken, Wurzel an die Nabe schieben,
+um die Achse drehen, vor den Turm setzen, ausrichten, absetzen. Die Drehzahl
+hängt am Wetter — 0,95 rad/s bei Klar sind gut neun Umdrehungen je Minute, im
+Sturm 2,15 rad/s und damit gut zwanzig.
+
+Zwei Dinge, die dabei leicht schiefgehen und hier ausdrücklich mitgebaut sind:
+die einmal berechnete Hüllkugel bekommt einen Blattradius Zuschlag, weil sich
+die Instanzmatrizen jedes Bild ändern und die Kugel den ganzen überstrichenen
+Kreis fassen muss statt der Stellung von jetzt; und die Rotor-Mesh steht mit
+in `world.bloecke`, damit `bloeckeSichten()` sie an derselben Nebelgrenze
+ausblendet wie die Türme. Ohne das hätten aus der Innenstadt heraus neun
+Blätter ohne Turm in der Luft gehangen.
+
+**Einmal falsch gemessen.** Der erste Prüflauf las den Rotorwinkel nach
+anderthalb Sekunden und bekam exakt null zurück; die zweite Probe hängte sich
+in `updateExtras` und zählte null Aufrufe. Es sah nach totem Code aus. In
+Wirklichkeit rendert SwiftShader diese Szene mit rund einem Bild alle sechs
+Sekunden — in anderthalb Sekunden passiert schlicht kein Bild. Über sieben
+Sekunden gemessen wuchs der Winkel um **0,0475 rad**, und das ist auf die
+Stelle genau dt = 0,05 mal 0,95. Der Code war die ganze Zeit richtig, die
+Wartezeit war falsch.
+
+249 Prüfungen bestanden, keine gefallen.
 
 ## Was geprüft wurde und in Ordnung war
 

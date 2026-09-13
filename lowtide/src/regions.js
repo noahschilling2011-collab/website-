@@ -1260,19 +1260,30 @@ function stausee(w, rng) {
 // Der Bergrücken: Windpark auf dem Kamm, Steinbruch an der Flanke,
 // Serpentine hinauf.
 function talonRidge(w, rng) {
- for (let k = 0; k < 7; k++) {
-  const x = -960 + k * 24, z = -230 + k * 26;
-  const y = groundAt(x, z);
+ // Der Windpark stand vorher als sieben Türme auf einer Diagonalen quer über
+ // die Flanke, alle 35,4 Meter einer. Ein Blatt ist 24 Meter lang und sitzt
+ // mit seiner Wurzel an der Nabe, der Rotor hat also 48 Meter Durchmesser:
+ // die Kreise zweier Nachbarn überlappten sich um dreizehn Meter, die Blätter
+ // fuhren durcheinander hindurch. Gedreht hat sich außerdem keines — sie
+ // waren gebackene Klötze wie ein Zaunpfahl.
+ //
+ // Nachgemessen läuft der Kamm auf x = -900 und liegt zwischen z = -370 und
+ // z = +40 über fünfundzwanzig Metern, das sind rund 410 Meter. Quer zum Wind
+ // ist der übliche Abstand einer Reihe drei Rotordurchmesser; hier also 144
+ // Meter, und damit passen drei Anlagen auf den Kamm statt sieben.
+ //
+ // Die Reihe läuft in z, die Nabenachse zeigt deshalb in x. Der Turm bleibt
+ // gebacken; nur die Blätter kommen in eine eigene InstancedMesh, die
+ // expanded-world.js je Bild dreht — neun Instanzen, ein Draw Call.
+ const KAMM = -900;
+ for (const z of [-300, -156, -12]) {
+  const y = groundAt(KAMM, z);
   if (y < 25) continue;
-  w.box(x, y + 26, z, 2.2, 52, 2.2, 0xdcdcd4);
-  w.box(x, y + 52, z, 4, 3, 4, 0xcfcfc6);
-  // Drei Blätter als flache Balken, in unterschiedlichen Stellungen.
-  const dreh = rng() * 2;
-  for (let b = 0; b < 3; b++) {
-   const a = dreh + b * Math.PI * 2 / 3;
-   w.box(x + Math.cos(a) * 12, y + 52 + Math.sin(a) * 12, z + 2.6,
-    24, 1.4, .35, 0xe4e4dc, 0, false, 0, a);
-  }
+  w.box(KAMM, y + 26, z, 2.2, 52, 2.2, 0xdcdcd4);
+  w.box(KAMM, y + 52, z, 6.5, 3, 3.4, 0xcfcfc6);
+  // Phase je Anlage verschieden: drei gleich stehende Rotoren sehen aus wie
+  // eine Textur, nicht wie drei Maschinen.
+  (w.rotoren ||= []).push({x: KAMM, y: y + 52, z, yaw: Math.PI / 2, phase: rng() * 2.1});
  }
  // Steinbruch: Terrassen in die Flanke, Förderband, Haufen.
  const qx = -700, qz = -300;

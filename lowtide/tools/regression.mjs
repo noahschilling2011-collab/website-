@@ -2271,6 +2271,39 @@ pruefe('Streifenwagen fahren auf der Fahrbahn', streife.neben === 0 && streife.n
  `${streife.neben} neben der Fahrbahn, ${streife.nass} im Wasser, von ${streife.proben} Proben`);
 pruefe('Weit genug weg endet die Fahndung', streife.danach === 0, String(streife.danach));
 
+// Windpark auf dem Kamm. Der Rotordurchmesser ist 48 Meter (Blattlänge 24,
+// Wurzel an der Nabe); die Anlagen standen vorher 35,4 Meter auseinander und
+// fuhren dadurch durcheinander hindurch. Steht am Ende des Laufs, weil die
+// zweite Prüfung Bilder braucht und dafür die Pause aufheben muss.
+const park = await page.evaluate(() => {
+ const w = window.LOWTIDE.world, r = w.rotoren || [];
+ let naechster = Infinity;
+ for (let i = 0; i < r.length; i++) for (let k = i + 1; k < r.length; k++)
+  naechster = Math.min(naechster, Math.hypot(r[i].x - r[k].x, r[i].z - r[k].z));
+ return {anzahl: r.length, naechster, blaetter: w.rotorNetz ? w.rotorNetz.count : 0,
+  gesichtet: !!(w.bloecke || []).includes(w.rotorNetz)};
+});
+pruefe('Die Windräder greifen nicht ineinander', park.anzahl >= 3 && park.naechster > 96,
+ `${park.anzahl} Anlagen, nächster Abstand ${park.naechster} m bei 48 m Rotordurchmesser`);
+pruefe('Die Rotoren werden mit den Türmen ausgeblendet', park.gesichtet && park.blaetter === park.anzahl * 3,
+ `${park.blaetter} Blätter, in bloecke: ${park.gesichtet}`);
+const dreht = await (async () => {
+ await page.evaluate(() => {window.LOWTIDE.sim.paused = false;});
+ const vorher = await page.evaluate(() => {
+  const n = window.LOWTIDE.world.rotorNetz;
+  return {winkel: window.LOWTIDE.world.rotorWinkel, m: [...n.instanceMatrix.array.slice(0, 4)]};
+ });
+ await bilder(2);
+ return await page.evaluate(v => {
+  const w = window.LOWTIDE.world, a = w.rotorNetz.instanceMatrix.array;
+  let anders = 0;
+  for (let i = 0; i < 4; i++) if (Math.abs(a[i] - v.m[i]) > 1e-4) anders++;
+  return {zuwachs: w.rotorWinkel - v.winkel, anders};
+ }, vorher);
+})();
+pruefe('Die Rotoren drehen sich', dreht.zuwachs > .001 && dreht.anders > 0,
+ `Winkel +${dreht.zuwachs.toFixed(3)} rad, ${dreht.anders} von 4 Matrixwerten geändert`);
+
 // Die Touch-Oberfläche hängt an `@media(pointer:coarse)` und ist auf einem
 // Zeigergerät ausgeblendet. Dafür braucht es einen eigenen Browser mit
 // Berührungsemulation, sonst prüft man nur unsichtbare Knöpfe. Der erste
