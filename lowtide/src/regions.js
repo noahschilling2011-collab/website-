@@ -1,4 +1,4 @@
-import {groundAt, waterAt, locations, onRoad, INSELN, DAEMME, TANKSTELLE, SEEN} from './content.js';
+import {groundAt, waterAt, locations, onRoad, roadSegments, INSELN, DAEMME, TANKSTELLE, SEEN} from './content.js';
 // Der Rest von Solvara.
 // Port Mercy war ausgebaut, alles andere bestand aus Andeutungen: sechs
 // Kisten für die Vororte, ein Feld mit Strichen für Bellweather, 155
@@ -11,6 +11,24 @@ function zufall(seed = 5501) {
 }
 
 const aufStrasse = onRoad;
+
+// Passt ein Bauwerk dieser Grundfläche hierhin, ohne eine Fahrbahn zu
+// berühren? aufStrasse() prüft einen Punkt mit einem Zuschlag, und der
+// Zuschlag war überall geraten. In Rosalind stand er auf 13 — bei einem
+// Abstand von 16 Metern zwischen Straßenachse und Hausmitte hieß das:
+// **alle zweiundzwanzig Läden der Hauptstraße wurden übersprungen**, und die
+// zweite Stadt bestand aus Straßen, Laternen, Ampeln und leeren Blöcken.
+// Gefunden nicht am Bild, sondern beim Nachrechnen der Bedingung.
+// Der Zuschlag ist ein halber Meter, nicht mehr: in einer Kleinstadt steht
+// die Ladenzeile direkt am Gehweg, und das Vordach ragt darüber. Verboten
+// ist die Fahrbahn, nicht der Bürgersteig.
+function passtNebenStrasse(x, z, breite, tiefe, luft = .5) {
+ const x1 = x - breite / 2 - luft, x2 = x + breite / 2 + luft;
+ const z1 = z - tiefe / 2 - luft, z2 = z + tiefe / 2 + luft;
+ return !roadSegments.some(r =>
+  x1 < Math.max(r.x1, r.x2) + r.w / 2 && x2 > Math.min(r.x1, r.x2) - r.w / 2 &&
+  z1 < Math.max(r.z1, r.z2) + r.w / 2 && z2 > Math.min(r.z1, r.z2) - r.w / 2);
+}
 const RAEUME = ['garage','shop','clinic','home','club','diner','motel','records']
  .filter(id => locations[id])
  .map(id => ({x: locations[id].x, z: locations[id].z - 4, w: (id === 'garage' ? 22 : 16) / 2 + 2, d: 10}));
@@ -1080,7 +1098,7 @@ function rosalind(w, rng) {
  for (let x = -1000; x < -760; x += 22) {
    for (const seite of [-1, 1]) {
     const z = hz + seite * 16;
-    if (w.sim.blocked({x, z}, 10) || aufStrasse(x, z, 13)) continue;
+    if (w.sim.blocked({x, z}, 10) || !passtNebenStrasse(x, z, 21, 14)) continue;
     const h = 6.5 + rng() * 3;
     const wand = [0xb9a98c, 0xa6b0ab, 0xc2b294, 0x9fa9ad][Math.floor(rng() * 4)];
     w.box(x, h / 2, z, 20, h, 13, wand);
@@ -1099,12 +1117,45 @@ function rosalind(w, rng) {
    }
  }
  // Wohnstraßen im Raster, das in content.js als Straßen liegt.
- for (const strassenZ of [300, 380]) for (let x = -996; x < -764; x += 26) {
-  for (const seite of [-1, 1]) {
-   const z = strassenZ + seite * 20;
-   if (w.sim.blocked({x, z}, 9) || aufStrasse(x, z, 12)) continue;
-   kleinstadthaus(w, x + rng() * 4, z, rng, -seite);
+ //
+ // Nur auf der von der Hauptstraße abgewandten Seite. Der Block zwischen
+ // z = 300 und z = 340 ist vierzig Meter tief; die Ladenzeile steht bei 324
+ // und ist vierzehn Meter tief, die Häuser standen bei 320 und sind zwölf
+ // tief — sie steckten ineinander. Elf solche Paare, gemessen, nachdem die
+ // Läden zum ersten Mal überhaupt gebaut wurden. Jetzt Geschäfte an der
+ // Hauptstraße, Wohnen an den äußeren Seiten der Nebenstraßen.
+ for (const [strassenZ, seite] of [[300, -1], [380, 1]]) for (let x = -996; x < -764; x += 26) {
+  const z = strassenZ + seite * 20;
+  if (w.sim.blocked({x, z}, 9) || !passtNebenStrasse(x, z, 14, 12)) continue;
+  kleinstadthaus(w, x + rng() * 4, z, rng, -seite);
+ }
+ // Hinterhöfe zwischen Ladenzeile und Nebenstraße: Garage, Schuppen, Zaun,
+ // Beet. Der Block ist dort noch zwölf Meter tief, mehr als eine Reihe
+ // flacher Anbauten passt nicht hinein — und mehr steht in einer Kleinstadt
+ // hinter der Hauptstraße auch nicht.
+ // Bis x = -762, nicht weiter: dahinter steht die Kirche mit ihrem
+ // Grundstück, und der letzte Hof lag mit sechzehn Quadratmetern darin.
+ for (const [zHof, richtung] of [[311, -1], [369, 1]]) for (let x = -1002; x < -762; x += 17) {
+  const z = zHof + (rng() - .5) * 2;
+  if (w.sim.blocked({x, z}, 6) || !passtNebenStrasse(x, z, 12, 9)) continue;
+  const art = rng();
+  if (art < .34) {                                   // Garage mit Tor
+   w.box(x, 1.5, z, 7.5, 3, 6, [0xa8a293, 0xb4ab97, 0x9fa8a4][Math.floor(rng() * 3)]);
+   w.box(x, 3.15, z, 8, .35, 6.5, 0x5f6663);
+   w.box(x, 1.2, z - richtung * 3.06, 5.4, 2.4, .12, 0x4e5a58);
+  } else if (art < .58) {                            // Geräteschuppen mit Pultdach
+   const h = 2.2 + rng() * .8;
+   w.box(x, h / 2, z, 4.4, h, 3.6, [0x8a7a5e, 0x7d6f56][Math.floor(rng() * 2)]);
+   w.box(x, h + .2, z, 4.8, .25, 4, 0x5c5548, 0, false, 0, .12);
+  } else if (art < .78) {                            // Beet mit Stangen
+   w.box(x, .12, z, 8, .2, 5, 0x6a5a3e);
+   for (let k = -3; k <= 3; k += 1.5) w.box(x + k, .8, z + (rng() - .5) * 3, .07, 1.6, .07, 0x7f7a5e);
+  } else {                                           // Hof mit Fässern und Palette
+   for (let k = 0; k < 3; k++)
+    w.box(x + (rng() - .5) * 5, .55, z + (rng() - .5) * 4, .8, 1.1, .8, [0x4e6f74, 0x8a5a4c][k % 2]);
+   w.box(x + 2, .16, z - 1.5, 2.2, .28, 1.8, 0x9a8258);
   }
+  zaun(w, x - 8, z + richtung * 4.5, x + 8, z + richtung * 4.5, 1.5, 0x8a7a5e, 2.6);
  }
  // Wasserturm auf Stelzen — die Landmarke jeder Kleinstadt.
  // Stand bis zuletzt auf z = 340, also mitten auf der Hauptstraße: vier
@@ -1204,9 +1255,14 @@ function talonRidge(w, rng) {
   w.box(qx, groundAt(qx, qz) - 1 + k * 3, qz, r * 2, 3, r * 1.5, [0x9a9184, 0x8e857a][k % 2]);
  }
  w.box(qx + 40, groundAt(qx + 40, qz) + 6, qz, 42, 1.2, 3, 0x6f6a5e, 0, false, 0, -.22);
+ // Neun Betriebsgebäude, vorher frei gewürfelt in einem Feld von 80 auf 60
+ // Metern — acht Paare davon standen ineinander. Jetzt ein Raster von drei
+ // mal drei mit Versatz: dieselbe Unordnung im Bild, aber kein Bauwerk im
+ // anderen.
  for (let k = 0; k < 9; k++) {
-  const x = qx - 40 + rng() * 80, z = qz - 30 + rng() * 60;
-  w.box(x, groundAt(x, z) + 1.6, z, 5 + rng() * 6, 3.2, 5 + rng() * 6, 0x8a8175);
+  const x = qx - 27 + (k % 3) * 27 + (rng() - .5) * 6;
+  const z = qz - 20 + Math.floor(k / 3) * 20 + (rng() - .5) * 5;
+  w.box(x, groundAt(x, z) + 1.6, z, 7 + rng() * 4, 3.2, 6 + rng() * 3, 0x8a8175);
  }
  w.text('TALON QUARRY', qx, groundAt(qx, qz) + 12, qz - 40, 22, '#e2dcc8');
  // Bewuchs am Hang, dichter im Tal.

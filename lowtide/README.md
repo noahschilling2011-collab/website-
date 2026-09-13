@@ -964,6 +964,52 @@ aber sie bleibt an Land.
 
 223 Prüfungen bestanden, keine gefallen.
 
+## Rosalind war eine Stadt aus Straßen ohne Häuser
+
+Die Regionsvermessung führt Rosalind seit Langem in der Arbeitsliste. Das
+Bild erklärt warum: ein Straßenraster mit Gehwegen, Laternen, Ampeln,
+Leitungsmasten und parkenden Wagen — und leeren Blöcken dazwischen.
+
+Der Grund war nicht fehlende Kulisse, sondern eine Bedingung. Die Ladenzeile
+der Hauptstraße steht sechzehn Meter neben der Straßenachse und wird mit
+`aufStrasse(x, z, 13)` gegen die Fahrbahn geprüft. Die Hauptstraße ist
+sechzehn Meter breit, ihr Rand liegt also acht Meter von der Achse; mit einem
+Zuschlag von dreizehn reicht die Prüfzone bis 21 Meter. **Alle zweiundzwanzig
+Läden wurden übersprungen** — die zweite Stadt hatte nie ein einziges
+Geschäft. Gefunden nicht am Bild, sondern beim Nachrechnen der Bedingung.
+
+`passtNebenStrasse()` prüft jetzt die Grundfläche gegen die Fahrbahnen statt
+einen Punkt mit geratenem Zuschlag, mit einem halben Meter Luft: in einer
+Kleinstadt steht die Ladenzeile am Gehweg, und das Vordach ragt darüber.
+Verboten ist die Fahrbahn, nicht der Bürgersteig.
+
+Damit standen zwölf Läden — **und steckten in der Wohnhausreihe.** Der Block
+zwischen z = 300 und z = 340 ist vierzig Meter tief; die Läden sitzen bei 324
+und sind vierzehn Meter tief, die Häuser saßen bei 320 und sind zwölf tief.
+Elf überlappende Paare. Vorher gab es das Problem nicht, weil es die Läden
+nicht gab. Jetzt: Geschäfte an der Hauptstraße, Wohnen an den äußeren Seiten
+der Nebenstraßen, und dazwischen Hinterhöfe mit Garage, Schuppen, Beet und
+Zaun.
+
+Die Prüfung dazu zählt nur Baukörper — mindestens drei Meter hoch, sieben
+Meter in der kürzeren Kante, nicht flacher als ein Viertel davon, mit dem Fuß
+auf dem Boden — und erst ab zwölf Metern Abstand der Mittelpunkte sind es
+zwei Gebäude statt Sockel, Turm und Anbau desselben. Ohne diese beiden Filter
+meldete sie 54 Paare, von denen 52 keine waren: Sockelgeschosse unter ihren
+Türmen und sechs Betriebsgebäude, die auf der Sohle des Steinbruchs stehen.
+Übrig bleiben zwei alte Fälle, beide gewollt.
+
+Ein Ergebnis gegen die Erwartung: **der örtliche Kontrast von Rosalind ist
+gesunken**, von 11,04 auf 10,74, obwohl die Stadt jetzt Häuser hat. Der
+Schnitt über alle Regionen fiel von 13,93 auf 13,67. Das liegt nicht an
+Rosalind, sondern an der Landstraße: parkende Wagen, Gehwegplatten und
+Hydranten sind hochfrequente Kanten, und das Maß zählt Kanten. Cane Hollow
+fiel von 14,36 auf 13,78, weil dort 67 Wagen weniger am Feldrand stehen. Das
+Maß war gut darin, kahle Flächen zu finden — den glatten grünen Kuppelgipfel
+auf Talon Ridge —, aber es ist keine Note für Qualität.
+
+225 Prüfungen bestanden, keine gefallen.
+
 ## Was geprüft wurde und in Ordnung war
 
 Nicht jede Messung findet etwas, und das gehört genauso hierher.

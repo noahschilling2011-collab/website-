@@ -1161,6 +1161,58 @@ pruefe('Der Dragstrip hat Startbaum, Zeitnahme und Tribüne', await page.evaluat
  }
  return n >= 25;
 }));
+// Steht ein Haus in einem anderen? Gezählt werden nur Baukörper: mindestens
+// drei Meter hoch, mindestens sieben Meter in der kürzeren Kante und nicht
+// flacher als ein Viertel davon (sonst wären Höfe und Vorfelder dabei), mit
+// dem Fuß auf dem Boden. Teile desselben Hauses — Sockel, Turm, Anbau —
+// liegen dicht beieinander und zählen nicht; erst ab zwölf Metern Abstand
+// der Mittelpunkte sind es zwei Gebäude.
+//
+// Der Anlass: nachdem die Ladenzeile von Rosalind zum ersten Mal überhaupt
+// gebaut wurde, steckte sie in der Wohnhausreihe — elf Paare. Übrig bleiben
+// zwei alte Fälle, beide gewollt: der Kontrollturm des Flugplatzes steht in
+// der Ecke der Abfertigung, und am Hafen lehnt ein Bau an einer Halle.
+const ineinander = await page.evaluate(() => {
+ const L = window.LOWTIDE, haus = [];
+ for (const netz of L.world.bloecke || []) {
+  const a = netz.instanceMatrix.array;
+  for (let i = 0; i < netz.count; i++) {
+   const o = i * 16, y = a[o + 13];
+   const sx = Math.hypot(a[o], a[o + 1], a[o + 2]), sy = Math.hypot(a[o + 4], a[o + 5], a[o + 6]),
+    sz = Math.hypot(a[o + 8], a[o + 9], a[o + 10]);
+   if (sy < 3 || Math.min(sx, sz) < 7 || sy < .25 * Math.min(sx, sz)) continue;
+   if (y - sy / 2 > L.groundAt(a[o + 12], a[o + 14]) + 2) continue;
+   haus.push({x: a[o + 12], z: a[o + 14], w: sx, d: sz});
+  }
+ }
+ const treffer = [];
+ for (let i = 0; i < haus.length; i++) for (let j = i + 1; j < haus.length; j++) {
+  const a = haus[i], b = haus[j];
+  if (Math.hypot(a.x - b.x, a.z - b.z) < 12) continue;
+  const ux = Math.min(a.x + a.w / 2, b.x + b.w / 2) - Math.max(a.x - a.w / 2, b.x - b.w / 2);
+  const uz = Math.min(a.z + a.d / 2, b.z + b.d / 2) - Math.max(a.z - a.d / 2, b.z - b.d / 2);
+  if (ux > 1 && uz > 1 && ux * uz > 12) treffer.push([Math.round(a.x), Math.round(a.z), Math.round(ux * uz)]);
+ }
+ return {haeuser: haus.length, treffer};
+});
+pruefe('Kein Haus steht in einem anderen',
+ ineinander.treffer.length <= 2 && ineinander.treffer.every(t => t[2] <= 45),
+ `${ineinander.haeuser} Baukörper, ${ineinander.treffer.length} Paare: ${JSON.stringify(ineinander.treffer)}`);
+// Und die Ladenzeile von Rosalind steht überhaupt.
+pruefe('Rosalind hat eine Ladenzeile', await page.evaluate(() => {
+ const L = window.LOWTIDE;
+ let n = 0;
+ for (const netz of L.world.bloecke || []) {
+  const a = netz.instanceMatrix.array;
+  for (let i = 0; i < netz.count; i++) {
+   const o = i * 16, x = a[o + 12], z = a[o + 14];
+   const sx = Math.hypot(a[o], a[o + 1], a[o + 2]), sy = Math.hypot(a[o + 4], a[o + 5], a[o + 6]);
+   if (sy < 6 || sx < 18) continue;
+   if (x > -1010 && x < -750 && Math.abs(Math.abs(z - 340) - 16) < 3) n++;
+  }
+ }
+ return n >= 8;
+}));
 // Leitplanken nur dort, wo es neben der Fahrbahn hinuntergeht.
 const planken = await page.evaluate(() => {
  const w = window.LOWTIDE.world;
