@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 160 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 162 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -67,6 +67,13 @@ Draw Calls und Dreiecke aus `messung.mjs` — die sind hardwareunabhängig.
 ## Debug
 
 `window.LOWTIDE` gibt im Browser Zugriff auf `sim`, `world` und den Frame-Zähler.
+Unter der Minikarte stand die Gegend fest in `shell.html` — auf dem Talon
+Ridge, im Nationalpark und in Rosalind meldete sie HARBOR DISTRICT. Sie steht
+auf jedem Bildschirmfoto dieser Sitzung, und aufgefallen ist sie erst, als
+eines davon offensichtlich danebenlag. Zwei Prüfungen halten jetzt fest, dass
+Kopfzeile und Minikarte dieselbe Gegend nennen und dass sie sich beim
+Ortswechsel ändert.
+
 F3 blendet die Messwerte ein: FPS, Draw Calls, Dreiecke, NPCs, Fahrzeuge.
 
 Zum Prüfen von außen:

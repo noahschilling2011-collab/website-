@@ -878,6 +878,34 @@ pruefe('Die Straße über den Rücken hat eine Leitplanke', planken.hoch > 50,
  `${planken.hoch} Teile über 20 m`);
 pruefe('In der Ebene steht keine Leitplanke', planken.flach === 0,
  `${planken.flach} Teile unter 3 m`);
+// Die Bildunterschrift der Minikarte stand fest in shell.html und meldete
+// überall HARBOR DISTRICT — auf dem Talon Ridge, im Nationalpark, in
+// Rosalind. Sichtbar auf jedem Bildschirmfoto dieser Sitzung, und trotzdem
+// erst aufgefallen, als eines danebenlag.
+const gegend = await page.evaluate(async () => {
+ const L = window.LOWTIDE;
+ const bild = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ const lies = async (x, z) => {
+  L.view(x, z, 0, .1);
+  await bild(); await bild();
+  return [document.getElementById('district').textContent,
+          document.getElementById('mapDistrict').textContent];
+ };
+ const stadt = await lies(-60, 40);
+ const ruecken = await lies(-880, -160);
+ // Zurück in die Stadt und zwei Bilder abwarten. Ohne das Warten bleibt die
+ // Kamera in der Luft über dem Rücken stehen, und die nächste Prüfung liest
+ // die Nebeldichte in neunzig Metern Höhe statt am Boden — genau das ist
+ // beim ersten Lauf passiert.
+ L.view(-60, 40, 0, .1);
+ await bild(); await bild();
+ return {stadt, ruecken};
+});
+pruefe('Die Minikarte nennt dieselbe Gegend wie die Kopfzeile',
+ gegend.stadt[0] === gegend.stadt[1] && gegend.ruecken[0] === gegend.ruecken[1],
+ `${JSON.stringify(gegend.stadt)} / ${JSON.stringify(gegend.ruecken)}`);
+pruefe('Die Gegend wechselt beim Ortswechsel', gegend.stadt[0] !== gegend.ruecken[0],
+ `${gegend.stadt[0]} gegen ${gegend.ruecken[0]}`);
 pruefe('Sparmodus schaltet die Nachbearbeitung ab', await page.evaluate(() => {
  const knopf = document.getElementById('qualityBtn'), w = window.LOWTIDE.world;
  knopf.click();
