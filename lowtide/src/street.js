@@ -150,19 +150,23 @@ export class Street {
      const x = r.x1 + dx * s + (senkrecht ? seite * (halb + 4.2) : 0);
      const z = r.z1 + dz * s + (senkrecht ? 0 : seite * (halb + 4.2));
      if (!this.frei(x, z, 1)) {vorher = null; continue;}
-     w.box(x, 4.4, z, .3, 8.8, .3, 0x6b5c48);
-     w.box(x, 8.2, z, senkrecht ? 2.6 : .16, .16, senkrecht ? .16 : 2.6, 0x6b5c48);
+     // 4,2 Meter hinter der eigenen Fahrbahnkante liegt an einer Kreuzung
+     // mitten in der querenden Straße. w.nebenDerFahrbahn() schiebt heraus,
+     // was hineinragt, und lässt alles andere stehen.
+     const frei = w.nebenDerFahrbahn(x, z);
+     w.box(frei.x, 4.4, frei.z, .3, 8.8, .3, 0x6b5c48);
+     w.box(frei.x, 8.2, frei.z, senkrecht ? 2.6 : .16, .16, senkrecht ? .16 : 2.6, 0x6b5c48);
      if (vorher) {
-      const spanne = Math.hypot(x - vorher.x, z - vorher.z);
+      const spanne = Math.hypot(frei.x - vorher.x, frei.z - vorher.z);
       for (const versatz of [-1, 1]) {
-       const wx = (x + vorher.x) / 2 + (senkrecht ? versatz : 0);
-       const wz = (z + vorher.z) / 2 + (senkrecht ? 0 : versatz);
+       const wx = (frei.x + vorher.x) / 2 + (senkrecht ? versatz : 0);
+       const wz = (frei.z + vorher.z) / 2 + (senkrecht ? 0 : versatz);
        // Ein durchhängendes Kabel ginge nur mit eigener Geometrie; hier bleibt
        // es eine gerade Spanne, die aus Straßenhöhe nicht auffällt.
        w.box(wx, 8.05, wz, senkrecht ? .05 : spanne, .05, senkrecht ? spanne : .05, 0x2b2f31);
       }
      }
-     vorher = {x, z};
+     vorher = {x: frei.x, z: frei.z};
     }
    }
 

@@ -1111,6 +1111,39 @@ const nasseStrassen = await page.evaluate(() => {
 });
 pruefe('Keine Fahrbahn liegt über offenem Wasser', nasseStrassen.length === 0,
  `${nasseStrassen.length} Segmente, ${JSON.stringify(nasseStrassen.slice(0, 3))}`);
+// Laternen und Leitungsmasten gehören an den Bordstein. Sie werden an sechs
+// Stellen gesetzt, und nicht alle kannten die Fahrbahn: gemessen
+// vierundachtzig Pfosten drei Meter oder tiefer in einer Spur, der tiefste
+// mit neun Metern auf der Mittellinie einer achtzehn Meter breiten Straße.
+const pfosten = await page.evaluate(() => {
+ const L = window.LOWTIDE, w = L.world;
+ const tiefe = (x, z) => {
+  let t = -99;
+  for (const r of L.strassen) {
+   const minx = Math.min(r.x1, r.x2) - r.w / 2, maxx = Math.max(r.x1, r.x2) + r.w / 2;
+   const minz = Math.min(r.z1, r.z2) - r.w / 2, maxz = Math.max(r.z1, r.z2) + r.w / 2;
+   if (x < minx || x > maxx || z < minz || z > maxz) continue;
+   t = Math.max(t, Math.min(x - minx, maxx - x, z - minz, maxz - z));
+  }
+  return t;
+ };
+ let drin = 0, tiefster = 0;
+ for (const netz of w.bloecke || []) {
+  const f = netz.material.color?.getHexString();
+  if (f !== '3a4a50' && f !== '6b5c48') continue;        // Laterne, Mast
+  const a = netz.instanceMatrix.array;
+  for (let i = 0; i < netz.count; i++) {
+   const o = i * 16;
+   const sy = Math.hypot(a[o + 4], a[o + 5], a[o + 6]);
+   if (sy < 2) continue;                                  // nur die Masten selbst
+   const t = tiefe(a[o + 12], a[o + 14]);
+   if (t > 1.5) {drin++; tiefster = Math.max(tiefster, t);}
+  }
+ }
+ return {drin, tiefster: +tiefster.toFixed(1)};
+});
+pruefe('Kein Mast steht in einer Fahrspur', pfosten.drin === 0,
+ `${pfosten.drin} Masten, tiefster ${pfosten.tiefster} m innerhalb`);
 pruefe('Sparmodus schaltet die Nachbearbeitung ab', await page.evaluate(() => {
  const knopf = document.getElementById('qualityBtn'), w = window.LOWTIDE.world;
  knopf.click();

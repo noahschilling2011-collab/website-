@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 181 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 182 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -556,6 +556,41 @@ sonst schöbe der Verkehr ihn von hinten an.
 
 Danach: **null Paare** unter 3,6 Metern, engster Abstand 4,97 Meter. Zwei
 Prüfungen halten Dichte und Abstand fest.
+
+## Masten in der Fahrspur
+
+Aus derselben Auszählung wie die Straßen über dem Wasser: von den 340 dünnen,
+hohen Dingen in einer Fahrbahn blieben nach den Dämmen 139 übrig. Wie tief
+stehen sie darin?
+
+| Tiefe in der Fahrbahn | Anzahl |
+|---|---|
+| 0–2 m | 55 |
+| 3–5 m | 33 |
+| 5–9 m | 51 |
+
+Bis zwei Meter ist Bordstein. Ab drei Metern steht ein Mast in einer Spur,
+und der tiefste stand mit neun Metern genau auf der Mittellinie einer
+achtzehn Meter breiten Straße.
+
+Zwei Ursachen. Die Laternen werden an fünf verschiedenen Stellen gesetzt —
+Straßenzug, Steg, Damm, Strandpromenade, Uferstraße — und nur die erste
+rechnet mit der Fahrbahn. Die Leitungsmasten stehen 4,2 Meter hinter der
+Kante **ihrer eigenen** Straße; an einer Kreuzung liegt das mitten in der
+querenden.
+
+`World.nebenDerFahrbahn()` schiebt heraus, was hineinragt, und lässt alles
+andere stehen. Einmal an einer Stelle statt sechsmal an den Aufrufstellen —
+dasselbe Muster wie beim Wegschieben der Figuren von der Straße.
+
+| | vorher | nach den Dämmen | nach dem Schutz |
+|---|---|---|---|
+| dünne Pfosten in einer Fahrbahn | 340 | 139 | 75 |
+| davon drei Meter oder tiefer | — | 84 | 28 |
+
+Die restlichen 28 sind Zaunpfähle und Stegpfähle: ein Zaun, der eine Straße
+quert, ist am Flugfeld gewollt, und die Pfähle unter einem Damm gehören unter
+die Fahrbahn. Die Prüfung nimmt deshalb nur Laternen und Masten.
 
 ## Drei Straßen liefen über offenes Wasser
 

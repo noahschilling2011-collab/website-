@@ -1,5 +1,6 @@
 import * as T from './vendor/three.module.js';
 import {roads,places,random} from './simulation.js';
+import {roadSegments} from './content.js';
 import {Sky} from './sky.js';
 import {createWater,updateWater} from './water.js';
 import {Nachbearbeitung} from './post.js';
@@ -70,7 +71,39 @@ export class World{
   this.see.rotation.x=-Math.PI/2;this.see.position.set(-700,-.38,80);this.scene.add(this.see);
  }
  palm(x,z,h){this.box(x,h/2,z,.45,h,.45,0x8e7b59,.06);for(let i=0;i<7;i++){const a=i*Math.PI*2/7;this.box(x+Math.sin(a)*2,h,z+Math.cos(a)*2,1,.18,5,0x426c5b,a);}}
- lamp(x,z){this.box(x,3.3,z,.15,6.6,.15,0x3a4a50);this.box(x+.6,6.5,z,1.4,.15,.3,0x3a4a50);this.box(x+1,6.4,z,.5,.08,.3,0xffe2a4,0,true);(this.lampen||=[]).push({x:x+1,y:6.2,z});}
+ // Alles, was am Bordstein steht, aus der Fahrbahn schieben: Laternen und
+ // Leitungsmasten. Sie werden an sechs Stellen gesetzt — Straßenzug, Steg,
+ // Damm, Strandpromenade, Uferstraße, Mastenreihe —, und nicht alle kennen
+ // die Fahrbahn. Gemessen vierundachtzig Pfosten drei Meter oder tiefer in
+ // einer Spur, der tiefste mit neun Metern genau auf der Mittellinie einer
+ // achtzehn Meter breiten Straße.
+ //
+ // Die Masten stehen 4,2 Meter hinter der Kante ihrer eigenen Straße — an
+ // einer Kreuzung liegt das mitten in der querenden. Deshalb prüft der
+ // Schutz gegen alle Segmente und nicht gegen eines.
+ //
+ // Er steht hier statt sechsmal an den Aufrufstellen. Wer schon draußen
+ // steht, bleibt, wo er ist.
+ nebenDerFahrbahn(x,z){
+  for(let runde=0;runde<3;runde++){
+   let tiefste=null,tiefe=0;
+   for(const r of roadSegments){
+    const minx=Math.min(r.x1,r.x2)-r.w/2,maxx=Math.max(r.x1,r.x2)+r.w/2;
+    const minz=Math.min(r.z1,r.z2)-r.w/2,maxz=Math.max(r.z1,r.z2)+r.w/2;
+    if(x<minx||x>maxx||z<minz||z>maxz)continue;
+    const t=Math.min(x-minx,maxx-x,z-minz,maxz-z);
+    if(t>tiefe){tiefe=t;tiefste={minx,maxx,minz,maxz};}
+   }
+   if(!tiefste)break;
+   // Auf der kürzesten Seite hinaus, anderthalb Meter hinter die Kante.
+   const k=tiefste;
+   const raus=[[k.minx-1.5-x,0],[k.maxx+1.5-x,0],[0,k.minz-1.5-z],[0,k.maxz+1.5-z]]
+    .sort((a,b)=>Math.hypot(a[0],a[1])-Math.hypot(b[0],b[1]))[0];
+   x+=raus[0];z+=raus[1];
+  }
+  return {x,z};
+ }
+ lamp(x,z){({x,z}=this.nebenDerFahrbahn(x,z));this.box(x,3.3,z,.15,6.6,.15,0x3a4a50);this.box(x+.6,6.5,z,1.4,.15,.3,0x3a4a50);this.box(x+1,6.4,z,.5,.08,.3,0xffe2a4,0,true);(this.lampen||=[]).push({x:x+1,y:6.2,z});}
  human(color,pants){const g=new T.Group();this.dynbox(g,0,1.18,0,.57,.72,.33,color);this.dynbox(g,0,1.79,0,.34,.38,.33,0xb68c6e);this.dynbox(g,0,2,0,.37,.1,.35,0x302e2b);const legs=[];for(const s of [-1,1]){const leg=new T.Group();leg.position.set(s*.16,.86,0);this.dynbox(leg,0,-.37,0,.23,.75,.26,pants);this.dynbox(leg,0,-.77,.09,.25,.13,.4,0x1d2b31);g.add(leg);legs.push(leg);}const arms=[];for(const s of [-1,1]){const arm=new T.Group();arm.position.set(s*.4,1.45,0);this.dynbox(arm,0,-.24,0,.19,.5,.24,color);this.dynbox(arm,0,-.55,0,.17,.17,.19,0xb68c6e);g.add(arm);arms.push(arm);}g.userData={legs,arms,body:g.children[0]};return g;}
  car(color,police=false){const g=new T.Group();const body=this.dynbox(g,0,.85,0,1.95,.55,4.3,color);this.dynbox(g,0,1.35,-.15,1.68,.62,2.15,0x283e48);this.dynbox(g,0,1.7,-.2,1.7,.15,2.2,police?0x203243:color);this.dynbox(g,0,.77,2.2,1.8,.2,.12,0xb8beb2);this.dynbox(g,0,.7,-2.2,1.8,.18,.1,0x353e43);for(const x of [-.65,.65]){this.dynbox(g,x,1,2.17,.5,.22,.06,0xffe2a4);this.dynbox(g,x,1,-2.17,.5,.18,.06,0xb75049);}const wheels=[];for(const x of [-1,1])for(const z of [-1.35,1.35]){const w=new T.Mesh(new T.CylinderGeometry(.42,.42,.24,12),mat(0x20262c));w.rotation.z=Math.PI/2;w.position.set(x,.46,z);g.add(w);wheels.push(w);this.dynbox(g,x*1.13,.46,z,.02,.32,.32,0xa5b2b5);}let lights=[];if(police){this.dynbox(g,0,1.88,0,1.4,.13,.4,0x263139);lights=[this.dynbox(g,-.44,2,0,.5,.16,.35,0xce5056),this.dynbox(g,.44,2,0,.5,.16,.35,0x3a8ac8)];}g.userData={body,wheels,lights};return g;}
  setupRain(){this.gun=new T.Group();this.dynbox(this.gun,0,0,.18,.12,.16,.43,0x263138);this.dynbox(this.gun,0,-.12,.04,.11,.2,.12,0x353a3c);this.player.userData.arms[1].add(this.gun);this.gun.position.set(0,-.59,0);this.gun.rotation.x=1.2;// Tropfen als kurze Striche. Als Points waren es bildschirmparallele Quadrate,
