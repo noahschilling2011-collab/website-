@@ -325,8 +325,8 @@ export class ExpandedWorld extends World{
   if(!this.chute){this.chute=new T.Mesh(new T.SphereGeometry(2.8,16,8,0,Math.PI*2,0,Math.PI/2),new T.MeshStandardMaterial({color:0xd3b96f,side:T.DoubleSide}));this.scene.add(this.chute);}this.chute.visible=p.parachute;this.chute.position.set(p.x,this.player.position.y+4,p.z);
   if(s.witness){if(!this.witness){this.witness=this.human(0x879b83,0x303e4c);this.scene.add(this.witness);}this.witness.visible=s.campaign.stage===2&&!p.car;this.witness.position.set(s.witness.x,groundAt(s.witness.x,s.witness.z),s.witness.z);this.animateHuman(this.witness,t,1,false);}
   const c=locations.court;this.ball.position.set(c.x+.8,.6+Math.abs(Math.sin(t*4))*.8,c.z);if(s.activity?.kind==='basketball')this.ball.position.set(c.x,1+Math.sin(s.activity.phase*Math.PI)*5,c.z-s.activity.phase*11);
-  this.street?.update(t,Math.min(1,this.sky.uniforms.nacht.value*1.25));
-  this.updateFahrlicht(Math.min(1,this.sky.uniforms.nacht.value*1.25));
+  this.street?.update(t,this.sky.lampen??0);
+  this.updateFahrlicht(this.sky.lampen??0);
   this.updateInnenlicht(p);
   // Schüsse schrecken die Tiere auf.
   if(this.letzteSchuesse!==s.shots){this.letzteSchuesse=s.shots;this.tiere.aufschrecken();}

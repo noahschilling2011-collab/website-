@@ -1045,6 +1045,48 @@ innerhalb einer Sitzung der zweite Fall derselben Sorte.
 
 228 Prüfungen bestanden, keine gefallen.
 
+## Das Spiel begann im dunkelsten Moment des Tages
+
+LOWTIDE startet um 18:40 Uhr am Hafen. Gemessen an genau dieser Stelle über
+den ganzen Tag:
+
+| Uhrzeit | Mittel vorher | unter 10/255 | Mittel jetzt | unter 10/255 |
+|---|---|---|---|---|
+| 6:00 | 71,1 | 4,2 % | 81,8 | 0,0 % |
+| 7:00 | 71,3 | 19,2 % | 99,4 | 0,3 % |
+| 13:00 | 111,9 | 5,5 % | 111,9 | 5,5 % |
+| 18:00 | 64,6 | 21,6 % | 77,7 | 6,8 % |
+| **18:40** | **48,2** | **38,9 %** | **80,9** | **1,8 %** |
+| 19:30 | 60,7 | 10,0 % | 75,4 | 0,0 % |
+| 23:00 | 64,2 | 0,0 % | 64,2 | 0,0 % |
+
+Der Startzeitpunkt war der dunkelste Moment des ganzen Tages — dunkler als
+Mitternacht, mit **fast vierzig Prozent der Bildfläche unter 10 von 255**.
+Ein früherer Anlauf hatte die Belichtungskurve schon monoton gemacht; das
+war nötig, aber nicht die Ursache.
+
+Die Ursache ist `nacht`. Der Wert steuert Sterne, Himmelsfarbe **und** alles
+künstliche Licht, und er ist bei null, solange die Sonne höher als etwa
+sieben Grad steht. Um 18:40 steht sie bei acht Grad: zu tief, um zwischen den
+Häusern die Straße zu erreichen, und zu hoch, um die Laternen einzuschalten.
+Eine halbe Stunde ohne Sonne und ohne Licht.
+
+`lampen` ist derselbe Gedanke, nur früher: der Wert steigt, sobald die Sonne
+unter fünfundzwanzig Grad fällt, und daran hängt jetzt alles Künstliche —
+Straßenlaternen, Fenster, Scheinwerfer, Rücklichter, Ampeln, ferne Fahrzeuge
+und die Schattenaufhellung der Nachbearbeitung. Sterne und Himmelsfarbe
+bleiben an `nacht`. Straßenbeleuchtung geht in Wirklichkeit auch vor
+Sonnenuntergang an.
+
+Der Startbildschirm: mittlere Helligkeit 67,5 → 89,7, abgesoffene Fläche
+28 % → 3,7 %, Sättigung 54,6 % → 36,2 %. Dieselbe Dämmerungsstimmung, nur
+lesbar.
+
+Drei Prüfungen: keine Stunde dunkler als Mitternacht, nirgends säuft ein
+Fünftel des Bildes ab, und am Mittag brennt keine Laterne.
+
+231 Prüfungen bestanden, keine gefallen.
+
 ## Was geprüft wurde und in Ordnung war
 
 Nicht jede Messung findet etwas, und das gehört genauso hierher.

@@ -79,7 +79,7 @@ const WETTER = {
 const zustand = {
  zenith: new T.Color(), horizon: new T.Color(), sun: new T.Color(),
  boden: new T.Color(), nebel: new T.Color(),
- sonnenStaerke: 0, himmelStaerke: 0, belichtung: 1, nacht: 0, nebelDichte: .003,
+ sonnenStaerke: 0, himmelStaerke: 0, belichtung: 1, nacht: 0, lampen: 0, nebelDichte: .003,
  richtung: new T.Vector3()
 };
 
@@ -109,6 +109,19 @@ export function skyState(hour, weather = 'clear') {
  }
  sunDirection(h, zustand.richtung);
  zustand.nacht = 1 - Math.min(1, Math.max(0, zustand.richtung.y + .12) * 4.5);
+ // nacht steuert Sterne und Himmelsfarbe und ist deshalb streng: erst wenn
+ // die Sonne unter etwa sieben Grad steht, ist sie größer als null. Für
+ // künstliches Licht ist das zu spät. Gemessen an der Startstelle über den
+ // Tag lag 18:40 Uhr bei einer mittleren Bildhelligkeit von 48,2 und 38,9
+ // Prozent der Fläche unter 10 von 255 — der dunkelste Moment des ganzen
+ // Tages, dunkler als Mitternacht (64,2 und 0,0 Prozent). Der Grund: die
+ // Sonne steht mit y = 0,144 zu tief, um die Straße zwischen den Häusern zu
+ // erreichen, und die Laternen sind noch aus.
+ //
+ // lampen ist derselbe Gedanke, nur früher: Straßenbeleuchtung geht an,
+ // wenn die Sonne unter etwa fünfundzwanzig Grad fällt, nicht erst nach
+ // Sonnenuntergang. Sterne bleiben an nacht hängen.
+ zustand.lampen = Math.min(1, Math.max(0, (.42 - zustand.richtung.y) / .42));
  // Der Nebel nimmt die Horizontfarbe an, sonst steht ferne Geometrie als
  // fremdfarbiges Band vor dem Himmel.
  zustand.nebel.copy(zustand.horizon).multiplyScalar(1.08);
@@ -229,6 +242,7 @@ export class Sky {
   u.dunst.value = s.dunst;
   u.wolken.value = s.wolken;
   u.nacht.value = s.nacht;
+  this.lampen = s.lampen;
   u.zeit.value = zeit;
   if (kameraPosition) this.mesh.position.copy(kameraPosition);
   return s;

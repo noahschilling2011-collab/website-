@@ -140,7 +140,7 @@ export class World{
  // Ein Bild ausgeben. Steht als eigene Methode da, weil auch die Kamera-App
  // im Telefon rendert und dasselbe Bild bekommen soll wie der Bildschirm.
  zeichne(){
-  const nacht=this.sky?.uniforms?.nacht?.value??0;
+  const nacht=this.sky?.lampen??0;
   if(this.post)this.post.render(this.scene,this.camera,this.sim.time,nacht);
   else this.renderer.render(this.scene,this.camera);
  }
@@ -226,22 +226,25 @@ export class World{
    this.post.endeU.belichtung.value=belichtung;
    // Nachts strahlen Lampen und Fenster stärker über, tagsüber würde
    // dieselbe Stärke die Fassaden ausbrennen.
-   this.post.endeU.staerke.value=.42+himmel.nacht*.55;
+   this.post.endeU.staerke.value=.42+himmel.lampen*.55;
    this.post.endeU.schwelle=this.post.hellU.schwelle;
-   this.post.hellU.schwelle.value=.92-himmel.nacht*.34;
+   this.post.hellU.schwelle.value=.92-himmel.lampen*.34;
    // Korn nachts nur leicht anheben. Mit .054 lag über der ganzen Nachtstadt
    // ein Rauschteppich, der wie ein Videofehler aussah.
-   this.post.endeU.koernung.value=.021+himmel.nacht*.011;
+   this.post.endeU.koernung.value=.021+himmel.lampen*.011;
    // Verdeckung nachts zurücknehmen: es gibt kaum Umgebungslicht, das sie
    // wegnehmen könnte, und die Kanten wurden dadurch tiefschwarz.
-   this.post.aoU.staerke.value=.7*(1-himmel.nacht*.55);
+   this.post.aoU.staerke.value=.7*(1-himmel.lampen*.55);
    // Dieselbe Nässe wie im Oberflächenshader; die Spiegelung darf nicht vor
    // dem nassen Asphalt da sein.
    this.post.spiegelU.nass.value=NAESSE.value;
    // Nachts spiegelt es kräftiger — dann steht auch etwas zu spiegeln da.
-   this.post.spiegelU.staerke.value=.55+himmel.nacht*.5;
+   this.post.spiegelU.staerke.value=.55+himmel.lampen*.5;
   }
-  const nachtAnteil=Math.min(1,himmel.nacht*1.25);
+  // Alles künstliche Licht hängt an lampen, nicht an nacht: sonst bleibt die
+  // Dämmerung unbeleuchtet, während die Sonne die Straße schon nicht mehr
+  // erreicht.
+  const nachtAnteil=himmel.lampen;
   for(const m of leuchtMaterialien)m.emissiveIntensity=.06+nachtAnteil*1.45;
   this.updateStrassenlicht?.(nachtAnteil,p);
   const env=this.sky.refreshEnvironment(s.hour,s.weather);

@@ -1860,6 +1860,45 @@ console.log('Rendern');
 const info = await page.evaluate(() => {const i = window.LOWTIDE.world.renderer.info; return {c: i.render.calls, t: i.render.triangles};});
 pruefe('Es wird tatsächlich gezeichnet', info.c > 100, `${info.c} Draw Calls, ${info.t.toLocaleString('de-DE')} Dreiecke`);
 
+// Kein Moment des Tages darf dunkler sein als Mitternacht. Der Startpunkt des
+// Spiels lag bei 18:40 Uhr genau in einer solchen Senke: mittlere Helligkeit
+// 48,2 gegen 64,2 um Mitternacht, und 38,9 Prozent der Fläche unter 10 von
+// 255. Die Sonne stand zu tief für die Straße, die Laternen waren noch aus.
+const tagesgang = {};
+for (const h of [7, 13, 18, 18.7, 23]) {
+ await page.evaluate(x => {const L = window.LOWTIDE; L.sim.hour = x; L.sim.weather = 'clear';
+  L.luftbild(-24, 3.7, 86, -30, 1.6, 78);}, h);
+ const n0 = await page.evaluate(() => window.LOWTIDE.frames);
+ await page.waitForFunction(k => window.LOWTIDE.frames > k + 4, n0, {timeout: 60000});
+ tagesgang[h] = await page.evaluate(() => {
+  const L = window.LOWTIDE; L.world.zeichne();
+  const gl = L.world.renderer.getContext();
+  const w = gl.drawingBufferWidth, h2 = gl.drawingBufferHeight;
+  const px = new Uint8Array(w * h2 * 4);
+  gl.readPixels(0, 0, w, h2, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  let sum = 0, dunkel = 0, n = 0;
+  for (let i = 0; i < px.length; i += 4) {
+   const g = .2126 * px[i] + .7152 * px[i + 1] + .0722 * px[i + 2];
+   sum += g; n++; if (g < 10) dunkel++;
+  }
+  return {mittel: sum / n, dunkel: 100 * dunkel / n};
+ });
+}
+pruefe('Keine Stunde ist dunkler als Mitternacht',
+ [7, 13, 18, 18.7].every(h => tagesgang[h].mittel >= tagesgang[23].mittel),
+ Object.entries(tagesgang).map(([h, m]) => `${h}h ${m.mittel.toFixed(0)}`).join(', '));
+pruefe('Nirgends säuft ein Fünftel des Bildes ab',
+ Object.values(tagesgang).every(m => m.dunkel < 12),
+ Object.entries(tagesgang).map(([h, m]) => `${h}h ${m.dunkel.toFixed(1)} %`).join(', '));
+pruefe('Am Mittag brennt keine Laterne', await page.evaluate(() => {
+ const L = window.LOWTIDE;
+ L.sim.hour = 13; L.world.sky.update(13, 'clear', L.world.camera.position, 0);
+ const mittag = L.world.sky.lampen;
+ L.world.sky.update(18.7, 'clear', L.world.camera.position, 0);
+ const daemmerung = L.world.sky.lampen;
+ return mittag === 0 && daemmerung > .5;
+}));
+
 // Auch dieser Abschnitt steht am Ende: er stellt Uhrzeit, Wetter und Kamera
 // um. Weiter oben eingesetzt ließ er 'Akt 4 zahlt aus und führt in Akt 5'
 // fallen, weil der vierte Akt bei Nacht spielt.
