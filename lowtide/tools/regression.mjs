@@ -1144,6 +1144,28 @@ const pfosten = await page.evaluate(() => {
 });
 pruefe('Kein Mast steht in einer Fahrspur', pfosten.drin === 0,
  `${pfosten.drin} Masten, tiefster ${pfosten.tiefster} m innerhalb`);
+// Jede Fundstelle der Schatzsuche muss erreichbar sein. Geborgen wird bei
+// einem Abstand unter fünf Metern, und die Stellen kommen der Reihe nach —
+// eine, an die man nicht herankommt, bricht die Kette ab. Die vierte lag in
+// einem Haus, der nächste begehbare Punkt exakt fünf Meter entfernt.
+const schaetze = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim;
+ return L.schatzOrte.map((o, i) => {
+  // Reicht es, irgendwo im Umkreis von 4,5 Metern zu sein? Wasser zählt als
+  // erreichbar — man schwimmt hin, und die zweite Fundstelle liegt bewusst
+  // draußen im Meer. Die erste Fassung dieser Prüfung hat sie als Fehler
+  // gemeldet und damit vor allem sich selbst.
+  let erreichbar = !s.blocked(o, .5);
+  for (let r = 1; r <= 4.5 && !erreichbar; r += .5)
+   for (let k = 0; k < 12 && !erreichbar; k++) {
+    const a = k * Math.PI / 6, x = o.x + Math.cos(a) * r, z = o.z + Math.sin(a) * r;
+    if (!s.blocked({x, z}, .5)) erreichbar = true;
+   }
+  return {i, erreichbar};
+ }).filter(q => !q.erreichbar).map(q => q.i);
+});
+pruefe('Jede Fundstelle ist erreichbar', schaetze.length === 0,
+ `nicht erreichbar: ${JSON.stringify(schaetze)}`);
 pruefe('Sparmodus schaltet die Nachbearbeitung ab', await page.evaluate(() => {
  const knopf = document.getElementById('qualityBtn'), w = window.LOWTIDE.world;
  knopf.click();

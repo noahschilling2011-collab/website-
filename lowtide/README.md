@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 182 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 183 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -556,6 +556,29 @@ sonst schöbe der Verkehr ihn von hinten an.
 
 Danach: **null Paare** unter 3,6 Metern, engster Abstand 4,97 Meter. Zwei
 Prüfungen halten Dichte und Abstand fest.
+
+## Eine Fundstelle, an die man nicht herankam
+
+Nach Stausee, Dämmen und geländefolgenden Straßen die Gegenprobe: liegt noch
+jeder Ort, jede Immobilie und jeder Missionspunkt auf begehbarem Boden?
+Zweiundvierzig Punkte abgefragt. Drei liegen im Wasser — Tauchplatz,
+Jetskiverleih und eine Fundstelle, alle drei absichtlich. Zwei liegen in
+Gebäuden — Pool und Schießstand, beide in ihrem Gebäude, wo sie hingehören.
+
+Einer nicht: die **vierte Fundstelle der Schatzsuche** lag auf -360/352 und
+damit in einem Haus von 33 mal 25 Metern. Geborgen wird bei einem Abstand
+unter fünf Metern; der nächste Punkt, an dem man überhaupt stehen kann, war
+exakt **fünf Meter** entfernt. Knapp zu weit — und weil die Fundstellen der
+Reihe nach kommen, hätte das die ganze Kette abgebrochen.
+
+Jetzt auf -351/352, mit freiem Ring von zweieinhalb Metern ringsum.
+
+**Zwei Fehlmessungen dabei.** Die erste meldete zwei übereinanderstehende
+Häuser an dieser Stelle — es war eines, doppelt gezählt: der Test verkettete
+`solids`, `buildings` und `worldBuildings`, und ein Haus steht in zweien
+davon. Die zweite war die neue Prüfung selbst: sie zählte Wasser als
+unerreichbar und meldete prompt die Fundstelle im Meer, die bewusst dort
+liegt. Man schwimmt hin.
 
 ## Masten in der Fahrspur
 

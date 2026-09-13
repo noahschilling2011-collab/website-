@@ -235,6 +235,14 @@ export const rennen={
 };
 
 // Bergungsauftrag: sechs Fundstellen, eine nach der anderen.
+// Fundstellen der Schatzsuche. Sie werden der Reihe nach geborgen, und
+// geborgen wird bei einem Abstand unter fünf Metern — eine Stelle, an die man
+// nicht nah genug herankommt, bricht die ganze Kette ab.
+//
+// Die vierte lag auf -360/352 und damit in einem Haus von 33 mal 25 Metern.
+// Der nächste Punkt, an dem man überhaupt stehen kann, war exakt fünf Meter
+// entfernt: knapp zu weit. Jetzt auf -351/352, mit freiem Ring von zweieinhalb
+// Metern ringsum.
 export const schatzOrte=[
- {x:-452,z:-338},{x:-97,z:-286},{x:163,z:212},{x:-360,z:352},{x:-486,z:70},{x:-268,z:-102}
+ {x:-452,z:-338},{x:-97,z:-286},{x:163,z:212},{x:-351,z:352},{x:-486,z:70},{x:-268,z:-102}
 ];
