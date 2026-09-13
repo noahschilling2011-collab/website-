@@ -61,10 +61,19 @@ const WETTER = {
  // von 1954 auf 1977 und am Strand von 3582 auf 3585, die Dreiecke blieben
  // gleich. Die Entfernungsverwerfung greift schon vorher. Jetzt .0009, also
  // rund 925 Meter. Schlechtes Wetter bleibt dicht — da gehört es hin.
- clear: {sonne: 1, dunst: .12, wolken: .18, nebel: .0009, graustich: 0, streuung: 1},
- rain: {sonne: .38, dunst: .62, wolken: .88, nebel: .0075, graustich: .55, streuung: 1.5},
- fog: {sonne: .30, dunst: .95, wolken: .55, nebel: .0135, graustich: .62, streuung: 1.7},
- storm: {sonne: .22, dunst: .70, wolken: .97, nebel: .0090, graustich: .68, streuung: 1.3}
+ // helligkeit multipliziert die Belichtung. Ohne sie hob die erhöhte
+ // Streuung fast genau auf, was die gedämpfte Sonne wegnahm: gemessen an
+ // derselben Kreuzung um 13 Uhr lagen klar bei 148,1 mittlerer Helligkeit,
+ // Regen bei 145,8, Gewitter bei 139,5 und Nebel bei 136,2 — zwölf von 255
+ // zwischen wolkenlosem Mittag und Gewitter. Vier Wetter, die man auf einem
+ // Standbild nicht auseinanderhalten kann.
+ //
+ // Nebel bleibt dabei fast so hell wie klar: Nebel streut das Licht, er
+ // nimmt es nicht weg. Er kostet Kontrast und Sicht, nicht Helligkeit.
+ clear: {sonne: 1, dunst: .12, wolken: .18, nebel: .0009, graustich: 0, streuung: 1, helligkeit: 1},
+ rain: {sonne: .38, dunst: .62, wolken: .88, nebel: .0075, graustich: .55, streuung: 1.35, helligkeit: .80},
+ fog: {sonne: .30, dunst: .95, wolken: .55, nebel: .0135, graustich: .62, streuung: 1.7, helligkeit: .93},
+ storm: {sonne: .22, dunst: .70, wolken: .97, nebel: .0090, graustich: .68, streuung: 1.2, helligkeit: .73}
 };
 
 const zustand = {
@@ -89,7 +98,7 @@ export function skyState(hour, weather = 'clear') {
  // Unter einer geschlossenen Decke kommt weniger direktes, aber mehr
  // gestreutes Licht an — sonst wirkt jedes Schlechtwetter wie Nacht.
  zustand.himmelStaerke = (a[5] + (b[5] - a[5]) * t) * w.streuung;
- zustand.belichtung = a[6] + (b[6] - a[6]) * t;
+ zustand.belichtung = (a[6] + (b[6] - a[6]) * t) * (w.helligkeit ?? 1);
 
  // Bei schlechtem Wetter zieht alles Richtung Blaugrau, aber nie ganz.
  if (w.graustich) {

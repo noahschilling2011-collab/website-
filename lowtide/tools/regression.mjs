@@ -1860,6 +1860,44 @@ console.log('Rendern');
 const info = await page.evaluate(() => {const i = window.LOWTIDE.world.renderer.info; return {c: i.render.calls, t: i.render.triangles};});
 pruefe('Es wird tatsächlich gezeichnet', info.c > 100, `${info.c} Draw Calls, ${info.t.toLocaleString('de-DE')} Dreiecke`);
 
+// Auch dieser Abschnitt steht am Ende: er stellt Uhrzeit, Wetter und Kamera
+// um. Weiter oben eingesetzt ließ er 'Akt 4 zahlt aus und führt in Akt 5'
+// fallen, weil der vierte Akt bei Nacht spielt.
+// Vier Wetter, die man auf einem Standbild auseinanderhalten kann. Gemessen
+// an derselben Kreuzung um 13 Uhr lagen sie vorher zwischen 136,2 und 148,1
+// mittlerer Helligkeit — zwölf von 255 zwischen wolkenlosem Mittag und
+// Gewitter, weil die erhöhte Streuung fast genau aufhob, was die gedämpfte
+// Sonne wegnahm.
+const wetterHelligkeit = {};
+for (const wetter of ['clear', 'rain', 'fog', 'storm']) {
+ await page.evaluate(w => {const L = window.LOWTIDE; L.sim.hour = 13; L.sim.weather = w;
+  L.luftbild(-175, 8, 20, -100, 4, 60);}, wetter);
+ const n0 = await page.evaluate(() => window.LOWTIDE.frames);
+ await page.waitForFunction(k => window.LOWTIDE.frames > k + 4, n0, {timeout: 60000});
+ wetterHelligkeit[wetter] = await page.evaluate(() => {
+  const L = window.LOWTIDE; L.world.zeichne();
+  const gl = L.world.renderer.getContext();
+  const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+  const px = new Uint8Array(w * h * 4);
+  gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  let sum = 0;
+  for (let i = 0; i < px.length; i += 4) sum += .2126 * px[i] + .7152 * px[i + 1] + .0722 * px[i + 2];
+  return sum / (px.length / 4);
+ });
+}
+await page.evaluate(() => {const L = window.LOWTIDE; L.sim.weather = 'clear'; L.world.freieKamera = false;});
+await bilder(3);
+pruefe('Gewitter ist deutlich dunkler als klarer Mittag',
+ wetterHelligkeit.clear - wetterHelligkeit.storm > 25,
+ Object.entries(wetterHelligkeit).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(', '));
+pruefe('Nebel nimmt Sicht, nicht Helligkeit',
+ wetterHelligkeit.clear - wetterHelligkeit.fog < 25 && wetterHelligkeit.fog > wetterHelligkeit.storm);
+pruefe('Regen ist dichter als vorher', await page.evaluate(() => {
+ const w = window.LOWTIDE.world;
+ // Tropfen je Quadratmeter im Feld um die Kamera.
+ return w.rainTropfen / (46 * 46) > .8;
+}));
+
 // Die Routen liegen auf der Straße — fährt der Verkehr auch darauf? Dreißig
 // Sekunden Simulation, jede Sekunde jeder fahrende Wagen geprüft.
 //

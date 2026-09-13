@@ -1010,6 +1010,41 @@ auf Talon Ridge —, aber es ist keine Note für Qualität.
 
 225 Prüfungen bestanden, keine gefallen.
 
+## Vier Wetter, die man nicht auseinanderhalten konnte
+
+Gemessen an derselben Kreuzung um 13 Uhr, mittlere Bildhelligkeit von 255:
+
+| Wetter | vorher | jetzt |
+|---|---|---|
+| klar | 148,1 | 148,1 |
+| Regen | 145,8 | 127,7 |
+| Nebel | 136,2 | 131,0 |
+| Gewitter | 139,5 | 116,0 |
+
+**Zwölf von 255 lagen zwischen wolkenlosem Mittag und Gewitter.** Nicht, weil
+das Wetter nichts täte — die Sonne wird bei Gewitter auf 22 Prozent gedämpft
+—, sondern weil die Streuung im selben Atemzug auf das 1,3-fache steigt. Der
+Kommentar dazu steht seit Langem im Code: „sonst wirkt jedes Schlechtwetter
+wie Nacht". Der Ausgleich war nur zu genau; er hob die Dämpfung fast
+vollständig auf.
+
+Jedes Wetter hat jetzt zusätzlich einen Faktor auf die Belichtung: Regen
+0,80, Nebel 0,93, Gewitter 0,73. Nebel bleibt fast so hell wie klar, und das
+ist richtig so — Nebel streut das Licht, er nimmt es nicht weg. Er kostet
+Sicht und Kontrast, nicht Helligkeit.
+
+Der Regen selbst war zu dünn: 1900 Striche in einem Feld von 74 auf 74 Metern
+sind 0,35 Tropfen je Quadratmeter, und die Hälfte davon fiel jenseits der
+Sichtgrenze. Jetzt 2600 Striche auf 46 auf 46 Meter — 1,23 je Quadratmeter —,
+kürzer, und bei Regen werden zwei Drittel davon gezeichnet, bei Gewitter alle.
+
+Drei Prüfungen dazu. Sie stehen am Ende des Laufs, weil sie Uhrzeit, Wetter
+und Kamera umstellen: weiter oben eingesetzt ließen sie „Akt 4 zahlt aus und
+führt in Akt 5" fallen, weil der vierte Akt bei Nacht spielt. Das ist
+innerhalb einer Sitzung der zweite Fall derselben Sorte.
+
+228 Prüfungen bestanden, keine gefallen.
+
 ## Was geprüft wurde und in Ordnung war
 
 Nicht jede Messung findet etwas, und das gehört genauso hierher.
