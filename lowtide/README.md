@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 162 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 166 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -384,6 +384,24 @@ Kräuselung nimmt dem Wasser genau das hochfrequente Flimmern, das den
 Kontrastwert hochgetrieben hat. Der Schnitt über alle Regionen fällt von
 11,14 auf 10,72. Das ist der Fall, vor dem im Kopf von `statistik.mjs` steht,
 dass Kontrast allein kein Ziel ist.
+
+**Und dann bis zu Ende gebaut.** Im ersten Anlauf war der See nur optisch
+Wasser: `waterAt()` kannte ihn nicht, man lief darüber wie über die alte
+Platte. Etwas, das wie Wasser aussieht und trockener Boden ist, ist genau die
+Art halbes Feature, die dieses Projekt nicht haben soll. Jetzt steht er in
+`waterAt()` — als Ellipse, weil sein Ufer als Ellipse gebaut ist; ein Rechteck
+ragte an den Diagonalen über die Böschung hinaus und schnitt als gerade Kante
+durch den Uferbewuchs. Die Fläche verwirft im Shader, was außerhalb liegt.
+
+Gemessen an der Seemitte: `waterAt` wahr, `groundAt` −1,2, die Figur sackt auf
+y = −0,5 und schwimmt, die Geländekachel darunter bildet eine Wanne bis −3,4,
+und fünfzehn Meter vor der Böschung ist wieder Land. Vier Prüfungen halten
+das fest. Die Karte hat dadurch 182 → 178 Landzellen: die vier fehlenden sind
+jetzt See.
+
+| | vorher | nachher |
+|---|---|---|
+| MERCY RESERVOIR, örtl. Kontrast | 5,52 | 10,28 |
 
 ## Was Zeichenaufrufe kostet
 

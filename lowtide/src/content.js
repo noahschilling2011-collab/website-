@@ -111,12 +111,22 @@ export const DAEMME=[
  {x1:119,z1:392,x2:366,z2:408}    // Keys Highway
 ];
 const imRechteck=(x,z,r)=>x>r.x1&&x<r.x2&&z>r.z1&&z<r.z2;
+// Binnengewässer. Der Stausee war bisher eine bemalte Platte: er sah aus wie
+// Wasser und war für jede Abfrage trockener Boden — man lief darüber. Als
+// Ellipse, weil sein Ufer als Ellipse gebaut ist; ein Rechteck ragte an den
+// Diagonalen über die Böschung hinaus.
+export const SEEN=[{x:-700,z:80,rx:118,rz:88}];
+export function imSee(x,z){
+ for(const s of SEEN)if(Math.hypot((x-s.x)/s.rx,(z-s.z)/s.rz)<1)return true;
+ return false;
+}
 export function waterAt(x,z){
  if(x>119){
   for(const r of INSELN)if(imRechteck(x,z,r))return false;
   for(const d of DAEMME)if(imRechteck(x,z,d))return false;
   return true;
  }
+ if(imSee(x,z))return true;
  return x<-400&&x>-545&&z>-20&&z<130;
 }
 export function groundAt(x,z){

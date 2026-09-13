@@ -29,7 +29,7 @@ void main(){
 
 const FRAGMENT = `
 uniform float zeit, nacht, kuesteX, dunst, art;
-uniform vec4 seeRect;   // Uferrechteck des Stausees, nur bei art > 1.5
+uniform vec4 seeEllipse;   // Mitte x/z und Halbachsen des Stausees, nur bei art > 1.5
 uniform float kraeuselStaerke;
 uniform vec3 zenith, horizon, sunColor, sunDir, tief, flach;
 #define LANDZAHL __LANDZAHL__
@@ -79,9 +79,11 @@ float kuestenAbstand(vec2 p){
  // der Rand seines eigenen Rechtecks, von innen gesehen. Ohne diesen Zweig
  // läge die Brandung an einer Geraden irgendwo östlich in der Stadt.
  if(art > 1.5){
-  vec2 m = (seeRect.xy + seeRect.zw) * 0.5, h = (seeRect.zw - seeRect.xy) * 0.5;
-  vec2 d = abs(p - m) - h;
-  return abs(length(max(d, 0.0)) + min(max(d.x, d.y), 0.0));
+  // Genäherter Abstand zur Ellipsenkante: der normierte Radius mal der
+  // kleineren Halbachse. Für einen Ufersaum von wenigen Metern reicht das,
+  // die exakte Lösung wäre eine Newton-Iteration je Bildpunkt.
+  float r = length((p - seeEllipse.xy) / seeEllipse.zw);
+  return abs(1.0 - r) * min(seeEllipse.z, seeEllipse.w);
  }
  float nah = abs(p.x - kuesteX);
  for(int i = 0; i < LANDZAHL; i++){
@@ -95,6 +97,11 @@ float kuestenAbstand(vec2 p){
 
 void main(){
  vec2 p = vWelt.xz;
+ // Die Seefläche ist ein Rechteck aus Segmenten, das Ufer eine Ellipse. Was
+ // außerhalb liegt, gehört nicht dazu — sonst schnitten die Ecken der Platte
+ // über die Böschung hinaus, und das war im Bild als gerade Kante quer durch
+ // den Uferbewuchs zu sehen.
+ if(art > 1.5 && length((p - seeEllipse.xy) / seeEllipse.zw) > 1.0) discard;
  float rand = kuestenAbstand(p);
  float sicht = length(kameraPos - vWelt);
  // Ab etwa 120 m glättet sich die Normale zur ruhigen Ebene.
@@ -154,7 +161,7 @@ export function createWater(art = 'ozean') {
  const uniforms = {
   zeit: {value: 0}, nacht: {value: 0}, dunst: {value: .12},
   art: {value: see ? 2 : sumpf ? 1 : 0},
-  seeRect: {value: new T.Vector4(-803, 3, -597, 157)},
+  seeEllipse: {value: new T.Vector4(-700, 80, 118, 88)},
   kraeuselStaerke: {value: see ? .34 : sumpf ? .6 : .8},
   kuesteX: {value: sumpf ? -400 : 119}, land: {value: LANDRECHTECKE},
   zenith: {value: new T.Color(0x2578cc)}, horizon: {value: new T.Color(0xc9dde2)},

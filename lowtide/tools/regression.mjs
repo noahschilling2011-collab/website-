@@ -906,6 +906,30 @@ pruefe('Die Minikarte nennt dieselbe Gegend wie die Kopfzeile',
  `${JSON.stringify(gegend.stadt)} / ${JSON.stringify(gegend.ruecken)}`);
 pruefe('Die Gegend wechselt beim Ortswechsel', gegend.stadt[0] !== gegend.ruecken[0],
  `${gegend.stadt[0]} gegen ${gegend.ruecken[0]}`);
+// Der Stausee war eine bemalte Platte: er sah aus wie Wasser und war für
+// jede Abfrage trockener Boden. Jetzt steht er in waterAt().
+const stausee = await page.evaluate(async () => {
+ const L = window.LOWTIDE;
+ const bild = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ L.view(-700, 80, 0, .1);
+ await bild(); await bild(); await bild();
+ const y = L.sim.player.y;
+ // Geländekachel unter dem See muss eine Wanne sein, keine Ebene.
+ const kachel = L.world.terrain.find(m => Math.abs(m.position.x + 700) < 60 && Math.abs(m.position.z - 80) < 60);
+ let tiefste = 9;
+ if (kachel) {const a = kachel.geometry.attributes.position;
+  for (let i = 0; i < a.count; i++) tiefste = Math.min(tiefste, a.getY(i));}
+ // Und die Ellipse muss enden: an der Böschung ist wieder Land.
+ const ufer = L.waterAt(-700, -15) || L.waterAt(-700, 175) || L.waterAt(-840, 80);
+ L.view(-60, 40, 0, .1);
+ await bild(); await bild();
+ return {mitte: L.waterAt(-700, 80), boden: L.groundAt(-700, 80), y, tiefste, ufer};
+});
+pruefe('Der Stausee ist Wasser, kein bemalter Boden', stausee.mitte && stausee.boden < -1,
+ `waterAt ${stausee.mitte}, groundAt ${stausee.boden}`);
+pruefe('Man schwimmt im Stausee, statt darauf zu stehen', stausee.y < -.2, `y = ${stausee.y.toFixed(2)}`);
+pruefe('Unter dem See liegt eine Wanne', stausee.tiefste < -3, `tiefster Punkt ${stausee.tiefste}`);
+pruefe('Die Böschung ist Land', !stausee.ufer);
 pruefe('Sparmodus schaltet die Nachbearbeitung ab', await page.evaluate(() => {
  const knopf = document.getElementById('qualityBtn'), w = window.LOWTIDE.world;
  knopf.click();

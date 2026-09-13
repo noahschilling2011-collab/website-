@@ -1132,13 +1132,9 @@ function stausee(w, rng) {
   w.box(x, .5, z, 9, 1, 9, 0x6f6a52, a);
   if (Math.floor(a * 6) % 5 === 0) nadelbaum(w, x + Math.cos(a) * 8, z + Math.sin(a) * 8, 7 + rng() * 5, 0x3d5a3f);
  }
- // Wasserfläche: eine dunkle Platte knapp unter Uferhöhe.
- w.box(mx, .12, mz, rx * 1.72, .2, rz * 1.72, 0x27484f);
- for (let k = 0; k < 26; k++) {
-  const a = rng() * Math.PI * 2, d = Math.sqrt(rng()) * .8;
-  w.box(mx + Math.cos(a) * rx * d, .2, mz + Math.sin(a) * rz * d,
-   6 + rng() * 14, .04, 5 + rng() * 12, 0x2f5560, rng() * 3);
- }
+ // Die Wasserfläche war hier eine dunkle Platte mit sechsundzwanzig helleren
+ // Kisten darauf. Sie liegt jetzt als Wassershader in world.js, und der See
+ // steht in waterAt() — man läuft nicht mehr darüber, man schwimmt.
  // Staumauer im Süden, mit Straßenkrone und Überlauf.
  const dz = mz + rz + 4;
  w.box(mx, 6, dz, 190, 12, 9, 0x9a9a92);

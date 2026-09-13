@@ -66,8 +66,8 @@ export class World{
   // Jetzt dieselbe Fläche als Wasser, mit Wellengang, Sonnenglanz, Ufersaum
   // und der Marke im Alphakanal, über die post.js spiegelt.
   const see=createWater('see');this.seeUniforms=see.uniforms;
-  this.see=new T.Mesh(new T.PlaneGeometry(206,155,42,32),see.material);
-  this.see.rotation.x=-Math.PI/2;this.see.position.set(-700,.28,80);this.scene.add(this.see);
+  this.see=new T.Mesh(new T.PlaneGeometry(240,180,48,36),see.material);
+  this.see.rotation.x=-Math.PI/2;this.see.position.set(-700,-.38,80);this.scene.add(this.see);
  }
  palm(x,z,h){this.box(x,h/2,z,.45,h,.45,0x8e7b59,.06);for(let i=0;i<7;i++){const a=i*Math.PI*2/7;this.box(x+Math.sin(a)*2,h,z+Math.cos(a)*2,1,.18,5,0x426c5b,a);}}
  lamp(x,z){this.box(x,3.3,z,.15,6.6,.15,0x3a4a50);this.box(x+.6,6.5,z,1.4,.15,.3,0x3a4a50);this.box(x+1,6.4,z,.5,.08,.3,0xffe2a4,0,true);(this.lampen||=[]).push({x:x+1,y:6.2,z});}
