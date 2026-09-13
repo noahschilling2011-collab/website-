@@ -658,6 +658,11 @@ const keys = await page.evaluate(() => {
  out.hoehe = L.groundAt(200, 400);
  out.region = L.regionAt({x: 266, z: 400});
  out.kuesten = w.waterUniforms.land.value.length;
+ // Aus den Daten statt aus einer festen Zahl: die Liste ist gewachsen, als
+ // die drei Dämme durch den Salzsumpf dazukamen, und eine hart notierte
+ // Neun hätte nur gemeldet, dass sich etwas geändert hat — nicht, ob es
+ // zusammenpasst.
+ out.kuestenSoll = L.inseln.length + (L.daemme?.length ?? 0) + (L.westDaemme?.length ?? 0);
  // Nachbearbeitung
  out.postAn = !!w.post?.aktiv;
  out.tonwert = w.renderer.toneMapping;
@@ -685,7 +690,8 @@ pruefe('Alle Inseln sind trockenes Land', keys.inseln.every(i => i.trocken),
 pruefe('Keys Highway hat keine Lücke im Damm', keys.hoehle.length === 0, keys.hoehle.join(' '));
 pruefe('Der Damm liegt auf Fahrbahnhöhe', keys.hoehe === 0, String(keys.hoehe));
 pruefe('Die Keys haben eine eigene Region', keys.region === 'THE LOWER KEYS', keys.region);
-pruefe('Der Wassershader kennt alle Küsten', keys.kuesten === 9, `${keys.kuesten} Rechtecke`);
+pruefe('Der Wassershader kennt alle Küsten', keys.kuesten === keys.kuestenSoll,
+ `${keys.kuesten} im Shader gegen ${keys.kuestenSoll} in den Daten`);
 pruefe('Nachbearbeitung ist aktiv und tonwertet selbst', keys.postAn && keys.keinTonwert, `toneMapping=${keys.tonwert}`);
 pruefe('Tiefe steht der Verdeckung zur Verfügung', keys.tiefe);
 pruefe('Verdeckung dunkelt tatsächlich ab', keys.aoMin < 245, `dunkelster Wert ${keys.aoMin}`);
@@ -1084,6 +1090,27 @@ const parken = await page.evaluate(() => {
 pruefe('Es stehen genug Wagen am Bordstein', parken.park > 250, `${parken.park} Plätze`);
 pruefe('Kein geparkter Wagen steht auf einer Fahrlinie', parken.aufDerLinie === 0,
  `${parken.aufDerLinie} Plätze, engster Abstand ${parken.engster} m`);
+// Keine Fahrbahn über offenem Wasser. Drei Segmente liefen quer durch den
+// Salzsumpf — sichtbar war davon nichts, weil groundAt über Wasser -1,2
+// liefert und die Fahrbahn damit unter der Sumpffläche lag. Geblockt hat sie
+// trotzdem: der Bewuchs mied einen Streifen, auf dem nichts lag.
+const nasseStrassen = await page.evaluate(() => {
+ const L = window.LOWTIDE;
+ const schlecht = [];
+ for (const r of L.strassen) {
+  const laenge = Math.hypot(r.x2 - r.x1, r.z2 - r.z1);
+  const schritte = Math.max(2, Math.round(laenge / 4));
+  let nass = 0;
+  for (let k = 0; k <= schritte; k++) {
+   const t = k / schritte;
+   if (L.waterAt(r.x1 + (r.x2 - r.x1) * t, r.z1 + (r.z2 - r.z1) * t)) nass++;
+  }
+  if (nass) schlecht.push([Math.round(r.x1), Math.round(r.z1), Math.round(nass / schritte * 100)]);
+ }
+ return schlecht;
+});
+pruefe('Keine Fahrbahn liegt über offenem Wasser', nasseStrassen.length === 0,
+ `${nasseStrassen.length} Segmente, ${JSON.stringify(nasseStrassen.slice(0, 3))}`);
 pruefe('Sparmodus schaltet die Nachbearbeitung ab', await page.evaluate(() => {
  const knopf = document.getElementById('qualityBtn'), w = window.LOWTIDE.world;
  knopf.click();

@@ -1,5 +1,5 @@
 import * as T from './vendor/three.module.js';
-import {INSELN, DAEMME} from './content.js';
+import {INSELN, DAEMME, WEST_DAEMME} from './content.js';
 // Wasser für Solvara.
 // Vorher: eine Ebene mit zwei Farben und einer Sinuswelle, ohne Reflexion,
 // ohne Schaum, ohne Bezug zum Sonnenstand. Wasser ist in dieser Stadt aber
@@ -102,6 +102,13 @@ void main(){
  // über die Böschung hinaus, und das war im Bild als gerade Kante quer durch
  // den Uferbewuchs zu sehen.
  if(art > 1.5 && length((p - seeEllipse.xy) / seeEllipse.zw) > 1.0) discard;
+ // Der Sumpf endet an den Dämmen. Ohne das läge die Wasserfläche über den
+ // drei Straßen, die jetzt auf festem Grund durch ihn hindurchführen.
+ if(art > 0.5 && art < 1.5){
+  for(int i = 0; i < LANDZAHL; i++){
+   if(p.x > land[i].x && p.x < land[i].z && p.y > land[i].y && p.y < land[i].w) discard;
+  }
+ }
  float rand = kuestenAbstand(p);
  float sicht = length(kameraPos - vWelt);
  // Ab etwa 120 m glättet sich die Normale zur ruhigen Ebene.
@@ -152,7 +159,7 @@ void main(){
 // Inseln und Dämme als Vector4 für den Shader. Der Sumpf im Westen hat keine
 // Inseln, bekommt aber dieselbe Liste — sein kuesteX liegt weit weg, und die
 // Schleife kostet bei sieben Rechtecken nichts.
-const LANDRECHTECKE = [...INSELN, ...DAEMME].map(r => new T.Vector4(r.x1, r.z1, r.x2, r.z2));
+const LANDRECHTECKE = [...INSELN, ...DAEMME, ...WEST_DAEMME].map(r => new T.Vector4(r.x1, r.z1, r.x2, r.z2));
 
 // art: 'ozean' oder 'sumpf'. Der Sumpf ist flach, trüb und grünbraun;
 // mit den Ozeanfarben wurde er zur Tiefsee.

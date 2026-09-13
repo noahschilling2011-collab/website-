@@ -120,6 +120,20 @@ export function imSee(x,z){
  for(const s of SEEN)if(Math.hypot((x-s.x)/s.rx,(z-s.z)/s.rz)<1)return true;
  return false;
 }
+// Dämme im Westen. Drei Straßen liefen quer durch den Salzsumpf — zwei
+// Nord-Süd-Achsen mit je 146 Metern und eine Querstraße mit 82, zusammen 374
+// Meter Fahrbahn über offenem Wasser. Sichtbar war davon nichts: groundAt
+// liefert über Wasser -1,2, die Fahrbahn lag damit unter der Sumpffläche.
+// Geblockt hat sie trotzdem — der Bewuchs mied einen Streifen, auf dem
+// nichts lag, und der Verkehr fuhr über das Wasser.
+//
+// Statt die Straßen zu verlegen bekommen sie einen Damm: die Rechtecke sind
+// zwei Meter breiter als die Fahrbahn und nehmen dem Sumpf diesen Streifen.
+export const WEST_DAEMME=[
+ {x1:-472.5,z1:-25,x2:-451.5,z2:135},
+ {x1:-412.5,z1:-25,x2:-391.5,z2:135},
+ {x1:-548,z1:53,x2:-346,z2:71}
+];
 export function waterAt(x,z){
  if(x>119){
   for(const r of INSELN)if(imRechteck(x,z,r))return false;
@@ -127,6 +141,7 @@ export function waterAt(x,z){
   return true;
  }
  if(imSee(x,z))return true;
+ for(const d of WEST_DAEMME)if(imRechteck(x,z,d))return false;
  return x<-400&&x>-545&&z>-20&&z<130;
 }
 export function groundAt(x,z){

@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 180 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 181 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -556,6 +556,40 @@ sonst schöbe der Verkehr ihn von hinten an.
 
 Danach: **null Paare** unter 3,6 Metern, engster Abstand 4,97 Meter. Zwei
 Prüfungen halten Dichte und Abstand fest.
+
+## Drei Straßen liefen über offenes Wasser
+
+Gefunden über eine Frage, die zunächst nichts damit zu tun hatte: stehen
+dünne, hohe Dinge — Laternen, Pfähle, Stämme — in einer Fahrbahn? Die
+Auszählung meldete 340, davon 202 in derselben braunen Farbe. Das sind die
+Stelzen der Mangroven im Salzsumpf, und die stehen dort, wo `waterAt` wahr
+ist. Beides zugleich kann nicht sein.
+
+Es war beides zugleich. Drei Straßensegmente laufen durch den Sumpf:
+
+| Segment | über Wasser |
+|---|---|
+| x = -462, z = -228 … 150 | 146 m (39 %) |
+| x = -402, z = -228 … 150 | 146 m (39 %) |
+| z = 62, x = -480 … -348 | 82 m (62 %) |
+
+Sichtbar war davon nichts: `groundAt` liefert über Wasser -1,2, die Fahrbahn
+lag damit unter der Sumpffläche. Geblockt hat sie trotzdem — der Bewuchs mied
+einen Streifen, auf dem nichts lag, und der Verkehr fuhr über das Wasser.
+Dieselbe Bauart Fehler wie beim Talon Ridge, nur unter statt über dem Boden.
+
+Die Straßen bekommen jetzt einen Damm: drei Rechtecke, zwei Meter breiter als
+die Fahrbahn, die dem Sumpf diesen Streifen nehmen. Der Sumpfshader verwirft,
+was darin liegt, sonst stünde die Wasserfläche über der Straße.
+
+Nachgemessen an sechs Punkten: auf dem Damm kein Wasser und Boden 0, zwanzig
+Meter daneben Wasser und Boden -1,2. Eine Prüfung tastet jetzt jedes Segment
+alle vier Meter ab.
+
+**Und eine Prüfung daneben war zu schwach.** „Der Wassershader kennt alle
+Küsten" verglich mit einer hart notierten Neun. Als die drei Dämme dazukamen,
+meldete sie nur, dass sich etwas geändert hat — nicht, ob es zusammenpasst.
+Sie rechnet die Sollzahl jetzt aus den Daten.
 
 ## Der Verkehr fuhr durch die geparkten Wagen
 
