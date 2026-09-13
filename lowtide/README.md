@@ -440,6 +440,20 @@ seinem schlechten Wert war aber gar nicht die Gegend, sondern der Dunst über
 allem, was man von dort aus sieht. Das ist der Grund, warum die Liste
 Arbeitsliste heißt und nicht Urteil.
 
+Mit der besseren Sicht kam die Frage nach der Schattenreichweite zurück: das
+erste Nein dazu war bei 391 Metern Sichtweite gemessen, könnte also vom Dunst
+verdeckt gewesen sein. Es war es nicht. In der Spielansicht bei 925 Metern:
+
+| Schattenweite | Karte | Mittel | dunkler als 40 % | Draw Calls |
+|---|---|---|---|---|
+| 130 m | 2048 | 96,2 | 69,5 % | 2094 |
+| 300 m | 2048 | 96,3 | 69,6 % | 3107 |
+| 300 m | 4096 | 96,2 | 69,5 % | 3107 |
+| 520 m | 4096 | 96,3 | 69,6 % | 3753 |
+
+Achtundvierzig Prozent mehr Draw Calls für ein Bild, das sich in der zweiten
+Nachkommastelle unterscheidet. Bleibt bei 130 Metern.
+
 ## Was Zeichenaufrufe kostet
 
 Draw Calls sind hier die knappe Größe, nicht Dreiecke. Drei Dinge halten sie
