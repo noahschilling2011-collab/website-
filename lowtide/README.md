@@ -873,6 +873,49 @@ bekommt eine zweite Prüfung an die Seite: kein Wagen parkt an einer Landstraße
 
 216 Prüfungen bestanden, keine gefallen.
 
+## Zweiundzwanzig Prozent des Verkehrs fuhren über die Wiese
+
+Die Gegenprobe zur Landstraße: fährt dort überhaupt jemand? Vier von 34
+Straßensegmenten hatten keinen Verkehr — die beiden Längsachsen des
+Westviertels und seine zwei Querstraßen. Ein Wohnviertel, eigens für die
+größere Karte gebaut, mit vier toten Straßen.
+
+Die Runde dafür war schnell ergänzt. Die Prüfung, die dabei entstand, war der
+eigentliche Fund: **716 von 3209 Proben entlang aller Verkehrsrouten lagen
+neben der Fahrbahn.** Zwölf von fünfzehn Runden verließen mindestens einmal
+die Straße. Drei Ursachen:
+
+- Der Spurversatz war fest getippt, sechs bis zehn Meter. Auf der zwölf Meter
+  breiten Uferstraße liegt ein Versatz von zehn Metern vier Meter **hinter**
+  der Kante — 91 von 92 Proben einer Kante daneben.
+- Die Rückfahrt einer Runde lief 408 Meter entlang x = -1050. Dort gibt es
+  keine Straße; die Westumgehung und die Südtangente enden beide bei x = -1060,
+  ohne Verbindung dazwischen.
+- Zwei Runden schlossen sich über eine Diagonale durchs freie Feld, eine davon
+  367 Meter lang.
+
+Eine der fünfzehn Runden trug schon einen Kommentar dazu: „die Rückfahrt muss
+innerhalb dieser Enden bleiben, sonst führt der Weg über die Wiese". Der Fall
+war einmal gesehen und für diese eine Runde behoben worden.
+
+Jetzt nennt eine Runde nur noch vier Achsen. `ring()` sucht die Straßen, die
+den Bereich wirklich abdecken, und setzt die Ecken um eine Spurbreite nach
+innen — überall so, dass 3,2 Meter Fahrbahn zwischen Wagenmitte und Kante
+bleiben, unabhängig von der Breite. Findet es keine Straße, entsteht die Runde
+gar nicht, statt Wagen über die Wiese zu schicken. Wo sich keine Runde
+schließt — Keys Highway, Uferstraße nach Isla Serena, Ostteil der Südtangente
+—, fährt der Verkehr hin und zurück, auf der einen Spur hin, auf der anderen
+zurück.
+
+| | vorher | jetzt |
+|---|---|---|
+| Runden | 15 | 17 |
+| fahrende Wagen | 116 | 127 |
+| Straßensegmente mit Verkehr | 30 von 34 | 34 von 34 |
+| Proben neben der Fahrbahn | 716 von 3209 | 0 |
+
+218 Prüfungen bestanden, keine gefallen.
+
 ## Was geprüft wurde und in Ordnung war
 
 Nicht jede Messung findet etwas, und das gehört genauso hierher.

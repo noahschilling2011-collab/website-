@@ -214,6 +214,35 @@ await page.evaluate(() => {const s = window.LOWTIDE.sim; s.stars = 0; s.heat = 0
  for (const c of s.cops) {c.active = false; c.route = []; c.blockTarget = null; c.blocking = false;}});
 await bilder(2);
 
+// Vier von 34 Straßensegmenten hatten keinen Verkehr: die beiden Längsachsen
+// des Westviertels und seine zwei Querstraßen. Ein Wohnviertel, das eigens
+// für die größere Karte gebaut wurde, und keine einzige Runde fuhr hindurch.
+const netz = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim;
+ const routen = [...new Set(s.cars.filter(c => c.type === 'traffic' && c.route)
+  .map(c => JSON.stringify(c.route)))].map(JSON.parse);
+ const beruehrt = new Set();
+ let neben = 0, proben = 0;
+ for (const rt of routen) for (let i = 0; i < rt.length; i++) {
+  const a = rt[i], b = rt[(i + 1) % rt.length];
+  const laenge = Math.hypot(b.x - a.x, b.z - a.z);
+  for (let t = 0; t <= 1; t += Math.max(.01, 4 / Math.max(laenge, 1))) {
+   const x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t;
+   proben++;
+   if (!L.onRoad(x, z, 0)) neben++;
+   L.strassen.forEach((r, k) => {
+    if (x > Math.min(r.x1, r.x2) - r.w / 2 - 2 && x < Math.max(r.x1, r.x2) + r.w / 2 + 2 &&
+        z > Math.min(r.z1, r.z2) - r.w / 2 - 2 && z < Math.max(r.z1, r.z2) + r.w / 2 + 2) beruehrt.add(k);
+   });
+  }
+ }
+ return {segmente: L.strassen.length, beruehrt: beruehrt.size, routen: routen.length, neben, proben};
+});
+pruefe('Auf jeder Straße fährt Verkehr', netz.beruehrt === netz.segmente,
+ `${netz.beruehrt} von ${netz.segmente} Segmenten, ${netz.routen} Runden`);
+pruefe('Keine Verkehrsrunde führt über die Wiese', netz.neben === 0,
+ `${netz.neben} von ${netz.proben} Proben neben der Fahrbahn`);
+
 console.log('Fahndung');
 await page.evaluate(() => window.LOWTIDE.sim.report(4));
 pruefe('Meldung erzeugt Sterne', await page.evaluate(() => window.LOWTIDE.sim.stars) > 0);

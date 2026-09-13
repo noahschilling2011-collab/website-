@@ -58,24 +58,61 @@ export class Campaign extends Simulation{
   // simulation.js gilt für sie wie für die bisherigen.
   const LACKE=[0xd9b078,0xcad0c5,0xa75547,0x3c637d,0x6f7a6a,0xb8b2a4,0x8a5f52,0x4c6b74,0xd6c9a8,0x5a6470];
   const MODELLE=['sedan','compact','suv','muscle','pickup','sedan','compact','sedan'];
+  // Verkehrsrunden. Vorher vier getippte Eckpunkte je Runde, mit einem festen
+  // Versatz von sechs bis zehn Metern zur Straßenachse. Gemessen: bei zwölf
+  // von fünfzehn Runden lag mindestens eine Kante neben der Fahrbahn, über
+  // alle Runden 716 von 3209 Proben — zweiundzwanzig Prozent. Drei Ursachen:
+  // ein Versatz von zehn Metern auf einer zwölf Meter breiten Straße liegt
+  // außerhalb; eine Rückfahrt entlang x = -1050 hat dort gar keine Straße;
+  // und zwei Runden schlossen sich über eine Diagonale durchs Feld.
+  //
+  // Jetzt werden die Ecken aus den Straßen gerechnet. Eine Runde nennt nur
+  // noch die vier Achsen; ring() sucht die Segmente, die den Bereich wirklich
+  // abdecken, und setzt die Ecken um eine Spurbreite nach innen. Findet es
+  // keine Straße, entsteht die Runde nicht — statt Wagen über die Wiese zu
+  // schicken. Der Versatz ist überall so gewählt, dass 3,2 Meter Fahrbahn
+  // zwischen Wagenmitte und Kante bleiben, unabhängig von der Breite.
+  const laengsR=r=>Math.abs(r.z2-r.z1)>=Math.abs(r.x2-r.x1);
+  const spur=r=>Math.max(1.6,r.w/2-3.2);
+  const senkrechteBei=(x,za,zb)=>roadSegments.find(r=>laengsR(r)&&Math.abs(r.x1-x)<1&&
+   Math.min(r.z1,r.z2)<=Math.min(za,zb)+1&&Math.max(r.z1,r.z2)>=Math.max(za,zb)-1);
+  const waagerechteBei=(z,xa,xb)=>roadSegments.find(r=>!laengsR(r)&&Math.abs(r.z1-z)<1&&
+   Math.min(r.x1,r.x2)<=Math.min(xa,xb)+1&&Math.max(r.x1,r.x2)>=Math.max(xa,xb)-1);
+  const ring=(xl,xr,zo,zu)=>{
+   const l=senkrechteBei(xl,zo,zu),r=senkrechteBei(xr,zo,zu);
+   const o=waagerechteBei(zo,xl,xr),u=waagerechteBei(zu,xl,xr);
+   if(!l||!r||!o||!u)return null;
+   return [[xl+spur(l),zo+spur(o)],[xl+spur(l),zu-spur(u)],
+           [xr-spur(r),zu-spur(u)],[xr-spur(r),zo+spur(o)]];
+  };
+  // Wo sich keine Runde schließt — Sackgassen, Enden von Fernstraßen —, fährt
+  // der Verkehr hin und zurück: auf der einen Seite hin, auf der anderen
+  // zurück. Beide Spuren liegen auf derselben Straße.
+  const hinUndZurueck=(z,xa,xb)=>{
+   const r=waagerechteBei(z,xa,xb);
+   if(!r)return null;
+   const v=spur(r);
+   return [[xa+8,z+v],[xb-8,z+v],[xb-8,z-v],[xa+8,z-v]];
+  };
   const RUNDEN=[
-   [[-334,-314],[-334,190],[-166,190],[-166,-314]],
-   [[-274,-174],[-274,74],[-106,74],[-106,-174]],
-   [[-214,-94],[-214,194],[-46,194],[-46,-94]],
-   [[-94,-314],[-94,394],[14,394],[14,-314]],
-   [[-334,-174],[74,-174],[74,74],[-334,74]],
-   [[-334,394],[340,394],[340,394],[-334,394]],
-   [[-94,194],[274,194],[274,194],[-94,194]],
-   [[26,-94],[74,-94],[74,144],[26,144]],
-   // Der Westen. Ohne diese Runden wäre die doppelte Karte doppelt so leer:
-   // Ridge Highway, Westumgehung, Südtangente und Rosalind Main Street.
-   [[-814,-440],[-814,840],[-566,840],[-566,-170]],
-   [[-1050,206],[-346,206],[-346,614],[-1050,614]],
-   // Die Querstraße bei z = 300 endet bei x = -1000 und -760; die Rückfahrt
-   // muss innerhalb dieser Enden bleiben, sonst führt der Weg über die Wiese.
-   [[-1020,346],[-730,346],[-770,304],[-990,304]],
-   [[-954,266],[-954,434],[-906,434],[-906,266]]
-  ];
+   ring(-340,-160,-180,80),   // Innenstadt West
+   ring(-340,-100,-320,-180), // Nordquartier
+   ring(-280,-220,-100,80),   // Raster Mitte
+   ring(-220,-160,-100,80),
+   ring(-100,20,-100,80),     // Raster Ost
+   ring(-40,80,-40,20),       // Hafenblock
+   ring(-340,-100,80,200),    // bis zur Uferstraße
+   ring(-340,-100,200,400),   // Uferstraße bis Nordstraße
+   ring(-462,-402,-228,-62),  // Westviertel, Nordteil
+   ring(-462,-402,-62,62),    // Westviertel, Südteil
+   ring(-820,-560,-160,200),  // Ridge Highway und Hollow Road, Nord
+   ring(-820,-560,200,620),   // dieselben, Süd
+   ring(-960,-900,300,340),   // Rosalind, zwei Blöcke
+   ring(-960,-900,340,380),
+   hinUndZurueck(400,100,360),   // Keys Highway
+   hinUndZurueck(200,-100,280),  // Uferstraße nach Isla Serena
+   hinUndZurueck(620,-560,100)   // Südtangente, Ostteil
+  ].filter(Boolean);
   // Drei Wagen je Runde, gestartet auf drei Eckpunkten: gemessen ergab das
   // vierundvierzig fahrende Fahrzeuge auf 15.728 Metern Straßennetz, also
   // eines alle 357 Meter. Dazu klumpten sie an den Ecken, weil der Startpunkt
@@ -93,7 +130,9 @@ export class Campaign extends Simulation{
    }
    return {x:weg[0].x,z:weg[0].z,ziel:1};
   };
-  const PRO_RUNDE=9;
+  // Siebzehn Runden statt fünfzehn: bei neun Wagen je Runde wären es 153
+  // statt 125. Sieben halten die Zahl dort, wo sie gemessen wurde.
+  const PRO_RUNDE=7;
   RUNDEN.forEach((runde,r)=>{
    const weg=runde.map(([x,z])=>({x,z}));
    for(let k=0;k<PRO_RUNDE;k++){
