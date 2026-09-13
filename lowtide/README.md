@@ -1363,10 +1363,30 @@ beiden InstancedMeshes des Laubwerks:
 | Strand | 13 | 1250 → 1284 | 1.050.262 → 1.119.490 |
 
 Die Dreiecke steigen überall um rund 59.000, auch in der Innenstadt, wo vom
-Park nichts zu sehen ist: die Laubwerk-Meshes werden nicht je Instanz
-verworfen, ihre Dreiecke zählen also immer mit. Auf 1,6 Millionen sind das
-3,8 Prozent. Ein Beschnitt je Instanz wäre die saubere Lösung und ist nicht
-gebaut.
+Park nichts zu sehen ist: alle Bäume der Karte liegen in **zwei**
+InstancedMeshes mit einer einzigen Hüllkugel, die über die ganze Karte
+reicht. Sie werden deshalb nie verworfen.
+
+**Nachgemessen, was das insgesamt ausmacht** — und die erste Messung war
+falsch. Ein- und Ausschalten der beiden Meshes ergab beim ersten Paar 414
+Draw Calls und 375.000 Dreiecke Unterschied; wiederholt man dasselbe Paar,
+sind es 84 und 286.000. Der erste Messwert nach einer Zustandsänderung taugt
+hier nicht: `bloeckeSichten()`, Nebel und Verkehr brauchen ein paar Bilder,
+bis sie sich eingeschwungen haben. Belastbar ist das zweite Paar:
+
+**4510 Bäume kosten rund 286.000 Dreiecke — 63 je Baum, knapp ein Fünftel
+des Bildes — und werden immer gezeichnet.**
+
+**Und trotzdem nicht behoben, mit Grund.** Der naheliegende Umbau — das
+Laubwerk in Zellen von 200 Metern zerlegen und wie die Blöcke nach Entfernung
+ausblenden — tauscht Dreiecke gegen Draw Calls: zwei Meshes je besetzter
+Zelle statt zwei insgesamt, also je nach Blick fünfzehn bis vierzig
+zusätzliche Aufrufe gegen bis zu 250.000 gesparte Dreiecke. Ob das ein Gewinn
+ist, hängt daran, was auf der Zielhardware bremst — und genau das kann diese
+Umgebung nicht beantworten: sie rendert per SwiftShader in Software. Einen
+Umbau auf gut Glück zu bauen, dessen Nutzen man nicht messen kann, wäre
+dasselbe Raten, das dieser Text an anderer Stelle korrigiert. Die Zahl steht
+hier, damit sie jemand mit echter Hardware entscheiden kann.
 
 256 Prüfungen bestanden, keine gefallen.
 
