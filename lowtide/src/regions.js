@@ -314,7 +314,14 @@ function saltMarsh(w, rng) {
 // ------------------------------------------------------------ Mercy Airfield
 function airfield(w, rng) {
  const bahnX = -315;
- // Schwellenmarkierung, Mittellinie und Randbefeuerung.
+ // Die Bahn hatte Schwellenbalken, Randbefeuerung und Grasschultern — aber
+ // keinen Belag. Die Markierungen lagen auf der Wiese, und die Kennung '27'
+ // stand als drei Meter hohes Brett quer über der Bahn, weil text() nur
+ // senkrechte Tafeln kannte. Jetzt Asphalt, unterbrochene Mittellinie und
+ // aufgemalte Kennungen an beiden Enden.
+ w.box(bahnX, .08, 315, 24, .16, 158, 0x3f4448);
+ for (let z = 244; z < 388; z += 12) w.box(bahnX, .17, z, .5, .02, 7, 0xd2d0af);
+ // Schwellenmarkierung, Randbefeuerung, Schultern.
  for (const ende of [242, 388]) {
   for (let e = -9; e <= 9; e += 3) w.box(bahnX + e, .19, ende + (ende < 300 ? 6 : -6), 1.6, .02, 12, 0xd2d0af);
  }
@@ -324,7 +331,8 @@ function airfield(w, rng) {
   }
   w.box(bahnX + seite * 13.5, .1, 315, 3, .16, 155, 0x6f7a6a);
  }
- w.text('27', bahnX, .22, 250, 12, '#d8d6b8');
+ w.text('27', bahnX, .19, 252, 12, '#d8d6b8', 0, true);
+ w.text('09', bahnX, .19, 378, 12, '#d8d6b8', Math.PI, true);
  // Rollweg und Vorfeld.
  w.box(bahnX + 34, .1, 315, 40, .16, 120, 0x4a565a);
  w.box(bahnX + 18, .1, 300, 34, .16, 12, 0x4a565a);
@@ -1433,6 +1441,92 @@ function baumfrei(w, x1, z1, x2, z2) {
  return vorher - w.laubwerk.liste.length;
 }
 
+// Was im Bahnprofil steht, kommt weg. Solange die Welt gebaut wird, liegen
+// alle Klötze noch als Liste in world.groups — erst flush() macht daraus
+// InstancedMeshes. Bis dahin lässt sich nachträglich aussortieren.
+//
+// Nötig wurde das, als die Landebahn ihren Belag bekam: auf dem Asphalt
+// standen ein vierzehn Meter hoher Mast, fünf Pfosten und ein Kasten, alle
+// aus Funktionen, die nach airfield() laufen und von der Bahn nichts wissen.
+// Auf der unbefestigten Wiese davor fiel es nicht auf.
+// Maßgeblich ist die Oberkante, nicht die Dicke: zwei Bleche von zehn und
+// zwanzig Zentimetern Stärke hingen in anderthalb Metern Höhe über der
+// Bahnschwelle und blieben bei einer Prüfung auf Bauteilhöhe stehen.
+function bahnRaeumen(w, x1, z1, x2, z2, oberkante = .6) {
+ let weg = 0;
+ for (const g of w.groups.values()) {
+  const rest = g.items.filter(i => !(i.x > x1 && i.x < x2 && i.z > z1 && i.z < z2 && i.y + i.h / 2 >= oberkante));
+  weg += g.items.length - rest.length;
+  g.items = rest;
+ }
+ return weg;
+}
+
+// Mercy Dragstrip. Der Marker liegt an der Schwelle der Landebahn — das
+// Rennen fährt über die Bahn, und das ist auch richtig so: Beschleunigungs-
+// rennen auf einer Piste gibt es wirklich. Es fehlte nur alles, was ein
+// Rennen daraus macht. Der erste Versuch legte eine zweite, eigene Fahrbahn
+// darüber, samt Leitplanken auf der Randbefeuerung — das war doppelt
+// gebaut, weil ich die Bahn für unbefestigt hielt (sie hatte tatsächlich
+// keinen Belag, aber der gehört zur Bahn, nicht zum Rennen). Hier steht
+// jetzt nur, was zum Rennen gehört, und alles Feste liegt neben der Bahn.
+function dragstrip(w) {
+ const l = locations.drag, bx = l.x, start = l.z + 14, ziel = l.z + 136;
+ // Westlich der Bahn liegt die Nord-Süd-Achse bei x = -340 mit achtzehn
+ // Metern Breite; zwischen Bahnrand (-327) und Fahrbahnrand (-331) sind vier
+ // Meter. Zeitnahme und Tribüne standen dort mitten auf der Straße — gefunden
+ // von der Prüfung, die zwei Commits vorher für die Läden dazukam. Alles
+ // Feste steht deshalb östlich, auf dem Vorfeld bei x = -301 bis -261.
+ baumfrei(w, bx + 10, start - 16, bx + 34, ziel);
+ // Aufgemalt: Startlinie, Ziellinie, Startfelder, Entfernungsangabe.
+ w.box(bx, .18, start, 22, .02, 1.2, 0xe8e3c8);
+ w.box(bx, .18, ziel, 22, .02, 1.2, 0xe8e3c8);
+ for (const ox of [-5, 5]) {
+  for (const oz of [-3.2, -1.6]) w.box(bx + ox, .18, start + oz, 3.6, .02, .5, 0xcfcaa8);
+  w.box(bx + ox, .18, start - 8, .35, .02, 9, 0xcfcaa8);
+ }
+ // Ein 'STAGE' auf den Asphalt lag genau über der Bahnkennung '27' — beides
+ // flach, beides bei z = 252. Die Kennung gehört der Bahn, also fällt es weg.
+ w.text('1/8 MILE', bx + 5, .19, ziel - 9, 6.6, '#e8e3c8', 0, true);
+ // Startbaum am westlichen Bahnrand, nicht zwischen den Spuren: auf einer
+ // Piste steht dort nichts Festes.
+ const sx = bx + 15.5;
+ w.box(sx, .35, start - 4, 2.2, .7, 1.4, 0x39444a);
+ w.box(sx, 3.1, start - 4, .7, 6.2, .7, 0x2f3a3e);
+ for (const oz of [-.42, .42]) {
+  for (let k = 0; k < 3; k++) w.box(sx - .38, 4.6 - k * .62, start - 4 + oz, .1, .3, .3, 0xe0a844, 0, true);
+  w.box(sx - .38, 2.68, start - 4 + oz, .1, .3, .3, 0x5fbe72, 0, true);
+  w.box(sx - .38, 2.06, start - 4 + oz, .1, .3, .3, 0xd8453c, 0, true);
+ }
+ // Zeitnahmehütte und kleine Tribüne, beide westlich der Bahn und innerhalb
+ // des Flugplatzzauns bei x = bahnX - 40.
+ const hx = bx + 22;
+ w.box(hx, 1.8, start - 2, 6, 3.6, 5, 0xc2bcae);
+ w.box(hx, 3.75, start - 2, 6.6, .35, 5.6, 0x8d9490);
+ w.box(hx - 3.06, 2.3, start - 2, .12, 1.3, 3.4, 0x9fc3cc, 0, true);
+ w.text('ZEITNAHME', hx, 3.1, start - 4.6, 5.4, '#3d4a4e', Math.PI);
+ w.sim.addSolid(hx, start - 2, 6, 5, 'zeitnahme', 3.6);
+ const gx = bx + 30;
+ for (let k = 0; k < 4; k++) {
+  w.box(gx + k * 1.5, .45 + k * .75, start + 26, 1.5, .9 + k * 1.5, 26, 0xb4b0a2);
+  w.box(gx + k * 1.5, .9 + k * .75, start + 26, 1.4, .12, 25, 0x8a8f88);
+ }
+ for (let z = start + 14; z <= start + 38; z += 4) w.box(gx + 6, 3.9, z, .1, 1.1, .1, 0x6f7570);
+ w.box(gx + 6, 4.4, start + 26, .12, .1, 25, 0x6f7570);
+ w.sim.addSolid(gx + 2.5, start + 26, 8, 26, 'tribuene', 3.6);
+ // Reifenstapel und Absperrung entlang der Zuschauerseite.
+ for (let k = 0; k < 8; k++) w.box(bx + 17.5, .45, start - 6 + k * 5, 1.2, .9, 1.2, 0x2c3236);
+ for (let z = start + 8; z <= start + 46; z += 5) w.box(bx + 18.5, .55, z, .12, 1.1, .12, 0x8b9089);
+ w.box(bx + 18.5, .95, start + 27, .1, .1, 40, 0xb0b6ac);
+ // Zielmarke: zwei Pfosten mit Fahnen, weit außerhalb des Bahnprofils.
+ for (const ox of [-16, 16]) {
+  w.box(bx + ox, 2.6, ziel, .3, 5.2, .3, 0x4b5457);
+  w.box(bx + ox - Math.sign(ox) * .9, 4.6, ziel, 1.8, 1.2, .1, 0xd8453c);
+ }
+ (w.zusatzLampen ||= []).push(
+  {x: bx + 12, y: 6, z: start + 6, farbe: 0xffeccb, staerke: 62});
+}
+
 // Iron Tide Gym. Zwei stehende Teile im Umkreis von achtzehn Metern, und
 // beide gehörten zum Nachbarn. Der Bau steht westlich der alten Markierung,
 // wo das nächste freie Rechteck von 26 mal 20 Metern liegt; die Front zeigt
@@ -1570,8 +1664,12 @@ export function dressRegions(world) {
  // und nicht weiter oben, weil baumfrei() nur Bäume entfernen kann, die
  // schon gemeldet sind — bei einem früheren Aufruf pflanzten die Funktionen
  // danach wieder in die Halle hinein. Gemessen: drei Bäume blieben stehen.
+ // Erst räumen, dann bauen: sonst nimmt die Räumung die eigene Ausstattung
+ // gleich wieder mit.
+ bahnRaeumen(world, -327.5, 238, -302.5, 392);
  tankstelle(world);
  gym(world);
+ dragstrip(world);
  luftfracht(world);
  faehre(world);
 }

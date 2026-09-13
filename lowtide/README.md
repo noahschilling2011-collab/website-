@@ -778,6 +778,46 @@ verbunden; die Boote schwimmen bei 214, das Hafenhaus bleibt an Land.
 
 205 Prüfungen bestanden, keine gefallen.
 
+## Die Landebahn hatte Markierungen, aber keinen Belag
+
+Mercy Dragstrip hatte drei stehende Teile im Umkreis von achtzehn Metern und
+vier Kontrollpunkte auf einer Geraden von 124 Metern. Beim Nachsehen zeigte
+sich: der Marker liegt an der Schwelle der Landebahn — das Rennen fährt über
+die Piste, und das ist auch richtig so. Nur hatte die Piste Schwellenbalken,
+Randbefeuerung und Grasschultern, **aber keinen Asphalt**. Die Markierungen
+lagen auf der Wiese.
+
+Und die Bahnkennung „27" stand als drei Meter hohes Brett quer über der Bahn,
+weil `text()` nur senkrechte Tafeln kannte. Das ist jetzt ein Parameter: mit
+`flach` liegt eine Schrift auf dem Boden. Kennungen an beiden Enden, 27 und 09.
+
+Mein erster Versuch legte eine **zweite** Fahrbahn über die Piste, mit
+Leitplanken auf der Randbefeuerung — doppelt gebaut, weil ich den fehlenden
+Belag für einen fehlenden Dragstrip hielt. Der Belag gehört zur Bahn, die
+Rennausstattung daneben. Jetzt: Asphalt und unterbrochene Mittellinie für die
+Bahn; Startlinie, Startfelder und „1/8 MILE" aufgemalt; Startbaum,
+Zeitnahmehütte, Tribüne, Reifenstapel und Zielpfosten für das Rennen.
+
+Zwei Fehler dabei, beide von eigenen Prüfungen gefangen:
+
+**Zeitnahme und Tribüne standen auf der Straße.** Westlich der Bahn läuft die
+Nord-Süd-Achse bei x = -340 mit achtzehn Metern Breite; zwischen Bahnrand und
+Fahrbahnrand sind vier Meter. Die Prüfung „Keine Hinderniswand liegt in einer
+Fahrbahn", zwei Commits vorher für die Läden geschrieben, hat es sofort
+gemeldet: 30 und 143 Quadratmeter. Alles Feste steht jetzt östlich, auf dem
+Vorfeld.
+
+**Auf dem Asphalt stand Kulisse.** Ein vierzehn Meter hoher Mast, fünf
+Pfosten und ein Kasten, alle aus Funktionen, die nach `airfield()` laufen und
+von der Bahn nichts wissen. Solange die Welt gebaut wird, liegen alle Klötze
+noch als Liste in `world.groups` — erst `flush()` macht InstancedMeshes
+daraus. Bis dahin lässt sich nachträglich aussortieren. Der erste Anlauf
+filterte nach Bauteilhöhe und ließ zwei Bleche von zehn Zentimetern Stärke
+stehen, die in anderthalb Metern Höhe über der Schwelle hingen. Maßgeblich
+ist die Oberkante.
+
+214 Prüfungen bestanden, keine gefallen.
+
 ## Was geprüft wurde und in Ordnung war
 
 Nicht jede Messung findet etwas, und das gehört genauso hierher.

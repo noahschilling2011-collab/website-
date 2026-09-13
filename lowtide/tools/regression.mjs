@@ -580,6 +580,33 @@ pruefe('Die Festplatte schaltet auf Akt 3', akt1.nachPlatte === 3, String(akt1.n
 pruefe('Am Bootshaus endet der erste Akt', akt1.finale === 'ending', String(akt1.finale));
 pruefe('Vom Tor zur Festplatte steht keine Wand im Weg', akt1.wegFrei);
 
+console.log('Akt 2: die Ratsakte');
+// Akt 2 hatte keine Prüfung, und er hängt an vier Orten, von denen drei in
+// dieser Runde umgezogen sind: Archiv, Fähranleger und Luftfracht. Ohne
+// Prüfung wäre nach dem Umzug nicht zu sagen, ob die Kette noch läuft.
+const akt2 = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim, o = L.orte, aus = {};
+ s.stars = 0; s.heat = 0; s.activity = null; s.mission = 4;
+ s.campaign = {stage: 1, choice: null, relay: false, archive: false, witness: false, delivered: false};
+ const hin = l => {const p = s.player; p.x = l.x; p.z = l.z + 2; p.y = 0; p.car = null;};
+ aus.erreichbar = ['tower', 'records', 'ferry', 'aircargo', 'home'].every(id => !s.blocked({x: o[id].x, z: o[id].z + 2}, .4));
+ hin(o.tower); s.active = 0; s.action();
+ aus.eliKannNicht = !s.campaign.relay;         // das Relais gehört Mara
+ s.active = 1; s.action(); aus.relais = s.campaign.relay;
+ hin(o.records); s.active = 0; s.action();
+ aus.archiv = s.campaign.archive; aus.stufe2 = s.campaign.stage;
+ hin(o.ferry); s.action(); aus.zeugin = s.campaign.witness;
+ hin(o.aircargo); s.action(); aus.stufe3 = s.campaign.stage;
+ hin(o.home); aus.finale = s.action();
+ return aus;
+});
+pruefe('Alle fünf Orte des zweiten Akts sind betretbar', akt2.erreichbar);
+pruefe('Das Relais schaltet nur Mara ab', akt2.eliKannNicht && akt2.relais);
+pruefe('Eli kommt mit der Karte ins Archiv', akt2.archiv && akt2.stufe2 === 2);
+pruefe('Die Zeugin steigt am Fähranleger zu', akt2.zeugin);
+pruefe('Die Übergabe an der Luftfracht schaltet auf Akt 3', akt2.stufe3 === 3, String(akt2.stufe3));
+pruefe('Zu Hause öffnet sich die Entscheidung', akt2.finale === 'finale', String(akt2.finale));
+
 console.log('Akt 3 bis 5');
 // Die drei Akte laufen hier direkt gegen die Simulation: die Mechanik ist
 // Physik und Zustand, kein Rendern. Ein Durchlauf im Spieltempo dauerte
@@ -1068,6 +1095,43 @@ pruefe('Gym, Luftfracht und Fähranleger sind gebaut, nicht nur benannt',
 pruefe('Der Fähranleger liegt am Wasser', orteOhneHaus.wasserAmKai);
 pruefe('Kein Baum steht in den vier neuen Grundrissen', orteOhneHaus.baeume === 0,
  `${orteOhneHaus.baeume} Stück`);
+// Die Landebahn hatte Schwellenbalken, Randbefeuerung und Grasschultern,
+// aber keinen Belag — und auf dem unbefestigten Profil stand Kulisse aus
+// Funktionen, die nach airfield() laufen: ein vierzehn Meter hoher Mast,
+// fünf Pfosten, ein Kasten. Auf Wiese fiel das nicht auf, auf Asphalt schon.
+const bahn = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim;
+ const imProfil = (x, z) => Math.abs(x + 315) < 13 && z > 238 && z < 392;
+ let belag = 0, steht = 0;
+ for (const netz of L.world.bloecke || []) {
+  const a = netz.instanceMatrix.array;
+  for (let i = 0; i < netz.count; i++) {
+   const o = i * 16, y = a[o + 13];
+   const sx = Math.hypot(a[o], a[o + 1], a[o + 2]), sy = Math.hypot(a[o + 4], a[o + 5], a[o + 6]),
+    sz = Math.hypot(a[o + 8], a[o + 9], a[o + 10]);
+   if (!imProfil(a[o + 12], a[o + 14])) continue;
+   if (sy < .4 && sx > 20 && sz > 100) belag++;      // die Bahndecke selbst
+   if (y + sy / 2 >= 1.2) steht++;
+  }
+ }
+ return {belag, steht};
+});
+pruefe('Die Landebahn hat einen Belag', bahn.belag >= 1, `${bahn.belag} Deckenteile`);
+pruefe('Auf der Landebahn steht nichts', bahn.steht === 0, `${bahn.steht} stehende Teile`);
+// Und der Dragstrip hat, was ein Rennen ausmacht.
+pruefe('Der Dragstrip hat Startbaum, Zeitnahme und Tribüne', await page.evaluate(() => {
+ const L = window.LOWTIDE, l = L.orte.drag;
+ let n = 0;
+ for (const netz of L.world.bloecke || []) {
+  const a = netz.instanceMatrix.array;
+  for (let i = 0; i < netz.count; i++) {
+   const o = i * 16, y = a[o + 13], sy = Math.hypot(a[o + 4], a[o + 5], a[o + 6]);
+   if (y + sy / 2 < 1.2) continue;
+   if (Math.hypot(a[o + 12] - l.x, a[o + 14] - l.z) < 45) n++;
+  }
+ }
+ return n >= 25;
+}));
 // Leitplanken nur dort, wo es neben der Fahrbahn hinuntergeht.
 const planken = await page.evaluate(() => {
  const w = window.LOWTIDE.world;
