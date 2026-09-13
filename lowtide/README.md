@@ -475,16 +475,25 @@ das Raster der Stadt ändert.
 
 | | vorher | jetzt |
 |---|---|---|
-| Figuren gesamt | 157 | 297 |
-| an der Kreuzung, Umkreis 60 m | 4 | 12 |
+| Figuren gesamt | 157 | 413 |
+| an der Kreuzung, Umkreis 60 m | 4 | 17 |
 | Draw Calls Kreuzung 13 Uhr | 1697 | 1790 |
 | Dreiecke Kreuzung 13 Uhr | 1.933.960 | 1.986.664 |
 
-Gedeckelt ist es bei hundertvierzig zusätzlichen Figuren. Der ungebremste
-Lauf ergab 283 und damit 440 insgesamt; die Grenze ist dabei nicht die
-Zeichenlast — die stieg an der Kreuzung nur von 1975 auf 2130 Draw Calls —,
-sondern die Simulation: bei jedem Tageswechsel um 8, 17 und 20 Uhr sucht
-jede Figur im selben Tick einen neuen Weg.
+Gedeckelt ist es bei 260 zusätzlichen Figuren, also 413 insgesamt. Der erste
+Deckel lag bei 140, begründet mit der Simulationslast beim Tageswechsel — und
+**diese Begründung war geraten, nicht gemessen.** Nachgemessen:
+
+| | |
+|---|---|
+| Simulationsschritt bei 413 Figuren und 133 Wagen | 0,30 ms |
+| Anteil an einem Sechzehntelsekunden-Bild | 1,8 % |
+| teuerster Fall, Tageswechsel um 8, 17, 20 Uhr | 1,4–1,7 ms |
+
+Der Grund steht in `tick()`: verarbeitet wird nur, wer näher als 180 Meter
+ist, alle anderen nur jeden zwölften Tick. Die Zahl der Figuren geht deshalb
+kaum in die Kosten ein. Was tatsächlich mitwächst, ist die Zeichenlast — an
+der Kreuzung 1839 auf 1902 Draw Calls.
 
 **Und ein alter Fehler kam dabei heraus.** Die neue Prüfung fragte, wer auf
 einer Fahrbahn steht, und meldete dreiundzwanzig. Die stammten aus den

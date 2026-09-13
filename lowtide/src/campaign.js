@@ -174,12 +174,19 @@ export class Campaign extends Simulation{
    if(laenge<30)continue;
    const nordSued=r.x1===r.x2;
    const versatz=r.w/2+3;
-   // Gedeckelt: der ungebremste Lauf ergab 283 zusätzliche Figuren und damit
-   // 440 insgesamt. Das ist nicht die Zeichenlast — die stieg an der
-   // Kreuzung nur von 1975 auf 2130 Draw Calls —, sondern die Simulation:
-   // bei jedem Tageswechsel um 8, 17 und 20 Uhr sucht jede Figur in
-   // demselben Tick einen neuen Weg. Hundertvierzig sind der Kompromiss.
-   for(let d=14;d<laenge-14&&gefunden<140;d+=18)for(const seite of [-1,1]){
+   // Gedeckelt bei 260. Der erste Deckel lag bei 140, begründet mit der
+   // Simulationslast beim Tageswechsel — und diese Begründung war geraten,
+   // nicht gemessen. Nachgemessen liegt ein Simulationsschritt bei 413
+   // Figuren und 133 Wagen bei 0,30 ms, also 1,8 Prozent eines
+   // Sechzehntelsekunden-Bildes; im teuersten Fall, dem Tageswechsel um 8,
+   // 17 und 20 Uhr, bei 1,4 bis 1,7 ms. Der Grund dafür steht weiter unten
+   // in tick(): verarbeitet wird nur, wer näher als 180 Meter ist, alle
+   // anderen nur jeden zwölften Tick. Die Zahl der Figuren geht deshalb
+   // kaum in die Kosten ein.
+   //
+   // Was tatsächlich mitwächst, ist die Zeichenlast: an der Kreuzung 1839
+   // auf 1902 Draw Calls.
+   for(let d=14;d<laenge-14&&gefunden<260;d+=18)for(const seite of [-1,1]){
     const t=d/laenge;
     const x=r.x1+(r.x2-r.x1)*t+(nordSued?seite*versatz:0);
     const z=r.z1+(r.z2-r.z1)*t+(nordSued?0:seite*versatz);
