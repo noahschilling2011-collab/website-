@@ -69,20 +69,81 @@ const messe = async (x, z, blick) => {
  });
 };
 
+// Der Ankerpunkt einer Region ist eine Beschriftung, kein Standpunkt. Drei
+// von fünfzehn Sonden haben deshalb etwas anderes gemessen als die Gegend,
+// die sie benennen — und weil sie es immer taten, standen genau diese drei
+// oben auf der Arbeitsliste und rührten sich über sechs Umbauten der Karte
+// nicht um eine Stelle:
+//
+//   MERCY RESERVOIR  Anker liegt im See (waterAt true, Grund -1,2)
+//   HARBOR DISTRICT  Anker an der Kaikante, beide Richtungen übers Becken
+//   TALON RIDGE      Anker auf 88 m Gipfel, beide Richtungen in den Dunst
+//
+// Eine Sonde muss dort stehen, wo ein Spieler steht, und die Gegend ansehen.
+// Geprüft wird das nicht am Bild, sondern an der Welt: entlang der Blicklinie
+// dreiundzwanzig Punkte von fünf bis sechzig Metern. Mindestens 70 Prozent
+// davon müssen Land sein, und der Boden darf nicht mehr als zwölf Meter unter
+// dem Standpunkt wegfallen — sonst füllt Ferne im Dunst die untere Bildhälfte,
+// und man misst den Dunst.
+const tauglich = async (x, y, z, blick) => await p.evaluate(([x, y, z, blick]) => {
+ const L = window.LOWTIDE;
+ let land = 0, eben = 0, n = 0;
+ for (let d = 5; d <= 60; d += 2.5) {
+  const px = x + Math.sin(blick) * d, pz = z + Math.cos(blick) * d;
+  n++;
+  if (!L.waterAt(px, pz)) land++;
+  if (Math.abs(L.groundAt(px, pz) - y) < 12) eben++;
+ }
+ return land / n >= .7 && eben / n >= .7;
+}, [x, y, z, blick]);
+
+// Standpunkt: der Anker, wenn er taugt, sonst der nächste Punkt in Ringen
+// darum, der auf Land liegt, nicht in einem Gebäude steckt und von dem aus
+// mindestens drei Richtungen taugen.
+const RICHTUNGEN = [0, 1, 2, 3, 4, 5].map(k => .7 + k * Math.PI / 3);
+const standort = async (ax, az) => {
+ for (const radius of [0, 25, 50, 75, 110, 160, 220]) {
+  for (let k = 0; k < (radius ? 8 : 1); k++) {
+   const w = k * Math.PI / 4;
+   const x = ax + Math.cos(w) * radius, z = az + Math.sin(w) * radius;
+   const gut = await p.evaluate(([x, z]) => {
+    const L = window.LOWTIDE;
+    return !L.waterAt(x, z) && !L.sim.blocked({x, z}, 1.5) ? L.groundAt(x, z) : null;
+   }, [x, z]);
+   if (gut === null) continue;
+   const passend = [];
+   for (const blick of RICHTUNGEN) if (await tauglich(x, gut, z, blick)) passend.push(blick);
+   if (passend.length >= 3) return {x, z, y: gut, richtungen: passend, radius};
+  }
+ }
+ return null;
+};
+
 const zeilen = [];
 for (const r of regionen) {
- // Zwei Blickrichtungen je Region, damit nicht eine zufällig leere Ecke
- // über die ganze Gegend entscheidet. Gewertet wird die bessere.
- const a = await messe(r.x, r.z, 0.7);
- const c = await messe(r.x, r.z, 0.7 + Math.PI);
- const best = a.kon >= c.kon ? a : c;
- zeilen.push({name: r.name, ...best});
+ // Gemittelt über alle tauglichen Richtungen statt "die bessere von zweien".
+ // Die beste von zwei zu nehmen war die zweite Hälfte des Fehlers: von einem
+ // Gipfel gewinnt zuverlässig die Panoramaseite.
+ const st = await standort(r.x, r.z);
+ if (!st) {zeilen.push({name: r.name, kon: NaN, sat: NaN, m: NaN, n: 0, versetzt: 0}); continue;}
+ const werte = [];
+ for (const blick of st.richtungen) werte.push(await messe(st.x, st.z, blick));
+ const mittel = f => werte.reduce((s, w) => s + w[f], 0) / werte.length;
+ zeilen.push({name: r.name, kon: mittel('kon'), sat: mittel('sat'), m: mittel('m'),
+  n: werte.length, versetzt: Math.round(Math.hypot(st.x - r.x, st.z - r.z))});
 }
-zeilen.sort((u, v) => u.kon - v.kon);
-console.log('Region                     örtl. Kontrast   Sättigung   Mittel');
+zeilen.sort((u, v) => (u.n ? u.kon : Infinity) - (v.n ? v.kon : Infinity));
+console.log('Region                     örtl. Kontrast   Sättigung   Mittel   Blicke  Versatz');
 for (const z of zeilen)
- console.log(`${z.name.padEnd(26)} ${z.kon.toFixed(2).padStart(9)}   ${z.sat.toFixed(1).padStart(8)} %  ${z.m.toFixed(1).padStart(6)}`);
-const schnitt = zeilen.reduce((s, z) => s + z.kon, 0) / zeilen.length;
-console.log(`\nSchnitt ${schnitt.toFixed(2)} — die obersten drei sind die Arbeitsliste.`);
+ console.log(z.n
+  ? `${z.name.padEnd(26)} ${z.kon.toFixed(2).padStart(9)}   ${z.sat.toFixed(1).padStart(8)} %  ${z.m.toFixed(1).padStart(6)}   ${String(z.n).padStart(5)}   ${z.versetzt + ' m'}`
+  : `${z.name.padEnd(26)} ${'kein Land'.padStart(9)}`);
+// Eine Gegend, die ganz aus Wasser besteht, hat keinen Standpunkt. Sie steht
+// als "kein Land" in der Liste und geht nicht in den Schnitt ein — sonst wird
+// er NaN und die ganze Ausgabe wertlos.
+const gemessen = zeilen.filter(z => z.n > 0);
+const schnitt = gemessen.reduce((s, z) => s + z.kon, 0) / gemessen.length;
+console.log(`\nSchnitt ${schnitt.toFixed(2)} über ${gemessen.length} von ${zeilen.length} Gegenden` +
+ ` — die obersten drei sind die Arbeitsliste.`);
 await b.close();
 if (fehler.length) {console.log('\nFehler:'); for (const f of [...new Set(fehler)]) console.log(' -', f.slice(0, 250)); process.exitCode = 1;}

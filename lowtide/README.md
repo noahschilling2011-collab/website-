@@ -1319,6 +1319,73 @@ besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
 
+## Die Arbeitsliste zeigte auf drei Stellen, an denen nichts zu sehen war
+
+`tools/schwachstellen.mjs` sortiert die fünfzehn Gegenden nach örtlichem
+Kontrast und sagt damit, woran als Nächstes zu arbeiten ist. Über sechs
+Umbauten der Karte hinweg sind mir drei Zeilen aufgefallen, die sich **um
+keine Stelle** bewegt haben — HARBOR DISTRICT stand in jedem einzelnen Lauf
+auf 10,81 / 40,7 % / 115,7, TALON RIDGE auf 185,2 mittlerer Helligkeit.
+
+Nachgesehen, was diese Sonden im Bild haben:
+
+| Gegend | was die Sonde sah |
+|---|---|
+| MERCY RESERVOIR | der Ankerpunkt liegt **im See** — `waterAt` true, Grund -1,2 |
+| HARBOR DISTRICT | Anker an der Kaikante, beide Richtungen über das Hafenbecken |
+| TALON RIDGE | Anker auf 88 m Gipfel, beide Richtungen in die Ferne im Dunst |
+
+Der Ankerpunkt einer Region ist eine **Beschriftung**, kein Standpunkt. Und
+„von zwei Richtungen die bessere" war die zweite Hälfte des Fehlers: von einem
+Gipfel gewinnt zuverlässig die Panoramaseite.
+
+Beides ist jetzt anders. Eine Sonde muss dort stehen, wo ein Spieler steht,
+und die Gegend ansehen — geprüft nicht am Bild, sondern an der Welt: entlang
+jeder Blicklinie dreiundzwanzig Punkte von fünf bis sechzig Metern.
+Mindestens 70 Prozent müssen Land sein, und der Boden darf nicht mehr als
+zwölf Meter unter dem Standpunkt wegfallen. Taugt der Anker nicht, sucht die
+Sonde in Ringen von 25 bis 220 Metern den nächsten Punkt, der auf Land liegt,
+in keinem Gebäude steckt und von dem aus mindestens drei Richtungen taugen.
+Gemessen wird über alle tauglichen Richtungen, gemittelt statt ausgewählt.
+
+Was das ändert:
+
+| Gegend | alt | neu | Versatz | Blicke |
+|---|---|---|---|---|
+| TALON RIDGE | 9,90 | **5,70** | 0 m | 5 |
+| CYPRESS NATIONAL PARK | 14,44 | **7,79** | 0 m | 4 |
+| ISLA SERENA | 13,62 | 10,97 | 0 m | 6 |
+| HARBOR DISTRICT | 10,81 | **14,83** | 25 m | 6 |
+| OUTER KEYS | 14,92 | 15,25 | 160 m | 3 |
+| DOWNTOWN | 17,85 | 17,05 | 0 m | 6 |
+| MERCY RESERVOIR | 11,01 | **17,45** | 110 m | 3 |
+| **Schnitt** | 13,93 | **12,52** | | |
+
+Die beiden Gegenden, die ich für die zweit- und drittschlechteste der Karte
+hielt, sind in Wirklichkeit die **beste und die viertbeste**. Und die Arbeit,
+die tatsächlich ansteht, stand nicht auf der Liste: CYPRESS NATIONAL PARK auf
+7,79. Der Schnitt fällt nicht, weil die Karte schlechter geworden wäre,
+sondern weil die alten Zahlen mit Dunst und Wasser aufgefüllt waren.
+
+TALON RIDGE steht weiterhin oben, jetzt aber mit einer Zahl, die den Boden
+misst statt das Panorama — und 5,70 ist deutlich schlechter als die 9,90, die
+dort vorher stand. Das ist zum Teil selbst verschuldet: die Kuppe war vorher
+grünes Gras mit grauen Findlingen darauf, jetzt ist sie trockener Fels mit
+grauen Findlingen darauf. Farblich richtiger, im Kontrast ärmer. Das ist die
+nächste Baustelle.
+
+**Zwei eigene Fehler im neuen Werkzeug, im ersten Lauf gefunden.** OUTER KEYS
+fand in 110 Metern keinen Standpunkt — die Gegend ist fast ganz Wasser — und
+lieferte NaN, was den Schnitt der ganzen Tabelle zu NaN machte. Jetzt reicht
+die Suche bis 220 Meter, und eine Gegend ohne Standpunkt stünde als „kein
+Land" da und ginge nicht in den Schnitt ein.
+
+Wiederholbarkeit: zwei Läufe hintereinander liegen auf ±0,02 auseinander. Die
+Restbewegung sind Figuren und Verkehr, die sich zwischen den Läufen bewegen.
+
+Am Spiel selbst ändert dieser Abschnitt nichts — nur an der Frage, woran als
+Nächstes gearbeitet wird. Die Prüfliste bleibt bei 256.
+
 ## Rosalind hatte null Einwohner
 
 Eine zweite Stadt mit Bank, Futtermittelhandel, Markisen, Schildern und
