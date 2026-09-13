@@ -1136,6 +1136,20 @@ würfeln), und ihre Bewegung prüft vor jedem Schritt `waterAt` und dreht ab,
 statt an Land zu kriechen. Über vier Beobachtungsrunden mit 106 Tieren:
 keiner. Hier war der Code schon vorher richtig gebaut.
 
+**Der Spielstand** überlebt den vollen Rundlauf. Die Prüfung stand auf einem
+einzigen Feld — Geld —; jetzt auf achtundzwanzig: Ort, Leben, Waffe mit
+Magazin und Reserve, Kleidung, Haar, Tattoo, Fitness, Fänge, Uhrzeit, Wetter,
+Vertrauen, Mission, Aktstufe, Relaisschalter, Besitz, Bestwerte, Kontoauszug,
+Bergungsstand, Fahrzeugtuning, Fahrzeugzustand, Tankfüllung und die Frage, ob
+die Figur beim Laden wieder in demselben Wagen sitzt. Kein Feld geht
+verloren; ein Spielstand ist 203 KB groß.
+
+Zusätzlich außerhalb der Prüfliste einmal von Hand nachgestellt, weil der
+Rundlauf im Speicher nicht dasselbe ist wie einer über die Platte: Zustand
+setzen, Seite neu laden, Spiel starten. Geld, Ort, Leben, Waffe, Kleidung,
+Uhrzeit, Mission, Aktstufe, Vertrauen, Motelbesitz und Bestwerte kommen alle
+zurück.
+
 **Das Fensterraster der Innenstadthäuser**: vermutet fest verdrahtet und
 damit bei breiten Wänden lückenhaft. Nachgemessen sind alle sechzehn Häuser
 18,8 mal 38,8 Meter, das Raster deckt 14 von 18,8 und 32 von 38,8 — kein

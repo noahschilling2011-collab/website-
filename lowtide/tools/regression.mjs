@@ -805,15 +805,43 @@ pruefe('Alter Spielstand bekommt die Aktfahrzeuge zurück', await page.evaluate(
 }));
 
 console.log('Spielstand');
-pruefe('Speichern und Laden überstehen den Rundlauf', await page.evaluate(() => {
- const s = window.LOWTIDE.sim;
- s.player.money = 4321;
+// Die Prüfung stand auf einem einzigen Feld: Geld. Ein Spielstand trägt
+// achtundzwanzig, und der Rundlauf ist erst dann etwas wert, wenn keines
+// davon unterwegs verlorengeht.
+const rundlauf = await page.evaluate(() => {
+ const s = window.LOWTIDE.sim, q = s.player;
+ const merkeAuto = s.cars.find(c => c.model === 'muscle');
+ q.money = 4321; q.x = -317; q.z = -75; q.y = 0; q.health = 63; q.fitness = 4; q.fish = 3;
+ q.weapon = 'shotgun'; q.inventory.shotgun = {ammo: 5, reserve: 20}; q.ammo = 5; q.reserve = 20;
+ q.clothes = 'blue'; q.hair = 2; q.tattoo = true;
+ s.hour = 21.5; s.weather = 'rain'; s.relationship = 71; s.mission = 4;
+ s.campaign = {stage: 2, choice: null, relay: true, archive: true, witness: true, delivered: false};
+ s.besitz = {motel: true}; s.motelOwned = true; s.highScores = {darts: 4, pool: 3};
+ s.konto = [{text: 'Test', betrag: -50, stunde: 20}]; s.schatzIndex = 2;
+ merkeAuto.upgrades = {engine: 2, tires: 1}; merkeAuto.health = 71; merkeAuto.fuel = 44;
+ merkeAuto.unlocked = true; q.car = merkeAuto;
+ const nimm = () => {
+  const a = s.cars.find(c => c.id === merkeAuto.id), p = s.player;
+  return JSON.stringify([p.money, Math.round(p.x), Math.round(p.z), p.health, p.weapon, p.ammo,
+   p.reserve, p.clothes, p.hair, p.tattoo, p.fitness, p.fish, +s.hour.toFixed(2), s.weather,
+   s.relationship, s.mission, s.campaign.stage, s.campaign.relay, JSON.stringify(s.besitz),
+   s.motelOwned, JSON.stringify(s.highScores), s.konto.length, s.schatzIndex,
+   JSON.stringify(a && a.upgrades), a && a.health, a && a.fuel, !!p.car, p.car && p.car.id]);
+ };
+ const vorher = nimm();
  const stand = JSON.parse(JSON.stringify(s.snapshot()));
- s.player.money = 0;
- s.restore(stand);
- s.paused = false;
- return s.player.money === 4321;
-}));
+ // Alles kaputtmachen, dann zurückholen.
+ q.money = 0; q.x = 0; q.z = 0; q.health = 100; q.weapon = 'pistol'; q.clothes = 'orange';
+ q.hair = 0; q.tattoo = false; q.fitness = 0; q.fish = 0; q.car = null;
+ s.hour = 8; s.weather = 'clear'; s.relationship = 50; s.mission = 0;
+ s.campaign = {stage: 0, choice: null, relay: false, archive: false, witness: false, delivered: false};
+ s.besitz = {}; s.motelOwned = false; s.highScores = {}; s.konto = []; s.schatzIndex = 0;
+ merkeAuto.upgrades = {}; merkeAuto.health = 100; merkeAuto.fuel = 100;
+ s.restore(stand); s.paused = false;
+ return {gleich: nimm() === vorher, vorher, nachher: nimm(), groesse: JSON.stringify(stand).length};
+});
+pruefe('Speichern und Laden überstehen den Rundlauf', rundlauf.gleich,
+ rundlauf.gleich ? `${Math.round(rundlauf.groesse / 1024)} KB` : `${rundlauf.vorher} → ${rundlauf.nachher}`);
 
 console.log('Keys und Bild');
 const keys = await page.evaluate(() => {
