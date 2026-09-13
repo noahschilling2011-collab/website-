@@ -135,6 +135,23 @@ pruefe('Verkehr hält bei Rot und fährt bei Grün', await page.evaluate(() => {
  s.time = merk;
  return beiRot && !beiGruen;
 }));
+// Zwei Kreuzungen auf demselben Fleck fallen im Spiel nicht als Zahl auf,
+// sondern als Flimmern an den Ampelgehäusen. Die Liste wird aus den
+// Straßensegmenten gerechnet, und dieselbe Achse besteht stellenweise aus
+// zwei Segmenten — jede neue Straße kann den Fall zurückbringen.
+pruefe('Keine zwei Ampeln auf demselben Platz', await page.evaluate(() => {
+ const a = window.LOWTIDE.world.street.ampeln, m = new Set();
+ for (const k of a) m.add(k.x + '|' + k.z);
+ return m.size === a.length;
+}), await page.evaluate(() => {
+ const a = window.LOWTIDE.world.street.ampeln, m = new Set();
+ for (const k of a) m.add(k.x + '|' + k.z);
+ return `${a.length} Kreuzungen auf ${m.size} Plätzen`;
+}));
+pruefe('Jede Ampel steht an einer Fahrbahn und nicht im Wasser', await page.evaluate(() => {
+ const L = window.LOWTIDE;
+ return L.world.street.ampeln.every(k => L.onRoad(k.x, k.z, 0) && !L.waterAt(k.x, k.z));
+}));
 pruefe('Quer stehende Achse hat gleichzeitig frei', await page.evaluate(() => {
  const s = window.LOWTIDE.sim, merk = s.time;
  const laengs = {x: -112, z: 20, yaw: Math.PI / 2};

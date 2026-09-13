@@ -206,16 +206,29 @@ export const roadSegments=[
 
 // Kreuzungen des Straßenrasters. Achsparallele Segmente schneiden sich, wenn
 // ihre Spannen überlappen — Diagonalen gibt es in Port Mercy nicht.
+//
+// Dieselbe Achse besteht stellenweise aus zwei Segmenten: bei x = -100 und
+// x = -340 liegt neben der kurzen Rasterstraße der lange Boulevard, bei
+// z = 200 und z = 400 stoßen Uferstraße und Keys Highway aneinander. Jedes
+// der beiden Teilstücke traf dieselbe Querstraße, und damit stand die
+// Kreuzung zweimal in der Liste. Gemessen im laufenden Spiel: 76 gebaute
+// Kreuzungen auf 66 Plätzen. Zehnmal steckten vier Masten, vier Ausleger,
+// vier Gehäuse und zwölf Lichtlinsen deckungsgleich ineinander — sichtbar
+// als Flimmern an den Gehäuseflächen, dazu 240 Instanzen umsonst.
+// Deshalb nach Position zusammengefasst, mit der größeren der beiden
+// Fahrbahnbreiten: die Masten stehen sonst zu eng an der breiteren Straße.
 export const intersections=(()=>{
  const laengs=r=>Math.abs(r.z2-r.z1)>=Math.abs(r.x2-r.x1);
- const senkrecht=roadSegments.filter(laengs),waagerecht=roadSegments.filter(r=>!laengs(r)),treffer=[];
+ const senkrecht=roadSegments.filter(laengs),waagerecht=roadSegments.filter(r=>!laengs(r)),treffer=new Map();
  for(const v of senkrecht)for(const h of waagerecht){
   const x=v.x1,z=h.z1;
   if(x<Math.min(h.x1,h.x2)-1||x>Math.max(h.x1,h.x2)+1)continue;
   if(z<Math.min(v.z1,v.z2)-1||z>Math.max(v.z1,v.z2)+1)continue;
-  treffer.push({x,z,breite:Math.max(v.w,h.w)});
+  const schluessel=x+'|'+z,breite=Math.max(v.w,h.w),da=treffer.get(schluessel);
+  if(da)da.breite=Math.max(da.breite,breite);
+  else treffer.set(schluessel,{x,z,breite});
  }
- return treffer;
+ return [...treffer.values()];
 })();
 
 // Rennstrecken. Alle laufen über dieselbe Kontrollpunkt-Mechanik; sie
