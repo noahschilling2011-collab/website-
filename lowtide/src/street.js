@@ -41,6 +41,20 @@ export class Street {
   this.ampelPhase = 0;
   this.parkplaetze = [];
   this.kreuzungsListe = intersections;
+  // Die Fahrlinien des Verkehrs, einmal eingesammelt. Geparkte Wagen stehen
+  // zwei Meter innerhalb der Fahrbahnkante — wo eine Route dort entlangläuft,
+  // fährt der Verkehr durch sie hindurch. Gemessen 1304 Fälle in fünfzehn
+  // Sekunden, 147 von 519 Plätzen betroffen, engster Abstand 0,11 Meter.
+  // wagenVoraus() kann davon nichts wissen: die Kulisse steht nicht in
+  // sim.cars.
+  this.fahrlinien = [];
+  for (const c of world.sim.cars) {
+   if (c.type !== 'traffic' || !c.route) continue;
+   for (let i = 0; i < c.route.length; i++) {
+    const a = c.route[i], b = c.route[(i + 1) % c.route.length];
+    if (!this.fahrlinien.some(t => t.a === a && t.b === b)) this.fahrlinien.push({a, b});
+   }
+  }
  }
 
  frei(x, z, radius = 2) {
@@ -162,6 +176,9 @@ export class Street {
     // Nicht in die Kreuzung und nicht ineinander parken.
     if (this.kreuzungsListe.some(k => Math.abs(k.x - x) < 15 && Math.abs(k.z - z) < 15)) continue;
     if (this.parkplaetze.some(p => (p.x - x) ** 2 + (p.z - z) ** 2 < 34)) continue;
+    // Und nicht auf der Fahrlinie. 2,6 Meter sind zwei halbe Wagenbreiten
+    // plus eine Handbreit; darunter berühren sich die Modelle.
+    if (this.aufFahrlinie(x, z, 2.6)) continue;
     this.parkplaetze.push({x, z, yaw: (senkrecht ? 0 : Math.PI / 2) + (seite < 0 ? Math.PI : 0), lack: LACKE[Math.floor(rng() * LACKE.length)]});
    }
   }
@@ -219,6 +236,16 @@ export class Street {
  // Geparkte Fahrzeuge. Ein einziges Vorbild wird nach Material gebacken und
  // als Instanzen verteilt — dieselbe Karosserie wie bei fahrbaren Autos,
  // aber ein paar Draw Calls statt tausend.
+ // Abstand eines Punktes zur nächsten Fahrlinie, Strecke für Strecke.
+ aufFahrlinie(x, z, grenze) {
+  for (const t of this.fahrlinien) {
+   const dx = t.b.x - t.a.x, dz = t.b.z - t.a.z, l2 = dx * dx + dz * dz || 1;
+   const u = Math.max(0, Math.min(1, ((x - t.a.x) * dx + (z - t.a.z) * dz) / l2));
+   if (Math.hypot(x - (t.a.x + dx * u), z - (t.a.z + dz * u)) < grenze) return true;
+  }
+  return false;
+ }
+
  parkendeAutosBauen() {
   if (!this.parkplaetze.length) return;
   // Sparsames Vorbild: geparkte Wagen sind Kulisse. Der Unterschied zum

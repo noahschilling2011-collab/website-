@@ -1053,6 +1053,37 @@ const gedraenge = await page.evaluate(() => {
 });
 pruefe('Keine Figuren stehen ineinander', gedraenge.paare < 5,
  `${gedraenge.paare} Paare unter 0,55 m bei ${gedraenge.figuren} Figuren, engster ${gedraenge.engster} m`);
+// Geparkte Wagen stehen zwei Meter innerhalb der Fahrbahnkante. Wo eine
+// Verkehrsroute dort entlanglief, fuhr der Verkehr durch sie hindurch —
+// wagenVoraus() kann davon nichts wissen, die Kulisse steht nicht in
+// sim.cars.
+const parken = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim, w = L.world;
+ const park = w.street?.parkplaetze || [];
+ const strecken = [];
+ for (const c of s.cars) {
+  if (c.type !== 'traffic' || !c.route) continue;
+  for (let i = 0; i < c.route.length; i++) {
+   const a = c.route[i], b = c.route[(i + 1) % c.route.length];
+   if (!strecken.some(t => t.a === a && t.b === b)) strecken.push({a, b});
+  }
+ }
+ let aufDerLinie = 0, engster = 999;
+ for (const q of park) {
+  let m = 999;
+  for (const t of strecken) {
+   const dx = t.b.x - t.a.x, dz = t.b.z - t.a.z, l2 = dx * dx + dz * dz || 1;
+   const u = Math.max(0, Math.min(1, ((q.x - t.a.x) * dx + (q.z - t.a.z) * dz) / l2));
+   m = Math.min(m, Math.hypot(q.x - (t.a.x + dx * u), q.z - (t.a.z + dz * u)));
+  }
+  if (m < 2.6) aufDerLinie++;
+  if (m < engster) engster = m;
+ }
+ return {park: park.length, aufDerLinie, engster: +engster.toFixed(2)};
+});
+pruefe('Es stehen genug Wagen am Bordstein', parken.park > 250, `${parken.park} Plätze`);
+pruefe('Kein geparkter Wagen steht auf einer Fahrlinie', parken.aufDerLinie === 0,
+ `${parken.aufDerLinie} Plätze, engster Abstand ${parken.engster} m`);
 pruefe('Sparmodus schaltet die Nachbearbeitung ab', await page.evaluate(() => {
  const knopf = document.getElementById('qualityBtn'), w = window.LOWTIDE.world;
  knopf.click();

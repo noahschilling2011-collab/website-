@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 178 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 180 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -556,6 +556,35 @@ sonst schöbe der Verkehr ihn von hinten an.
 
 Danach: **null Paare** unter 3,6 Metern, engster Abstand 4,97 Meter. Zwei
 Prüfungen halten Dichte und Abstand fest.
+
+## Der Verkehr fuhr durch die geparkten Wagen
+
+Geparkte Wagen stehen zwei Meter innerhalb der Fahrbahnkante — das ist
+richtig so, dort parkt man. Wo eine Verkehrsroute genau dort entlanglief,
+fuhr der Verkehr durch sie hindurch, und `wagenVoraus()` konnte davon nichts
+wissen: die Kulisse steht nicht in `sim.cars`.
+
+Gemessen: **1304 Fälle** in fünfzehn Sekunden, **147 von 519 Plätzen**
+betroffen, engster Abstand **0,11 Meter**. Nachgerechnet an der Geometrie
+statt an der Bewegung: 200 der 519 Plätze liegen näher als zwei Meter an
+einer Fahrlinie, der engste bei 0,10 — sie stehen auf der Fahrspur, nicht
+daneben.
+
+Behoben nicht durch eine Ausweichlogik, sondern bei der Erzeugung: ein Platz,
+der näher als 2,6 Meter an einer Fahrlinie liegt, wird verworfen. Das sind
+zwei halbe Wagenbreiten plus eine Handbreit.
+
+| | vorher | nachher |
+|---|---|---|
+| Parkplätze | 519 | 301 |
+| Durchfahrten in fünfzehn Sekunden | 1304 | 0 |
+| engster Abstand | 0,11 m | 4,34 m |
+| Dreiecke Kreuzung 13 Uhr | 2.047.720 | 1.700.244 |
+
+Die 218 verworfenen Plätze sind kein Verlust: es waren genau die, die in
+einer Fahrspur standen. Nebenbei fallen dadurch **17 Prozent der Dreiecke**
+weg — die betroffenen Plätze lagen an den befahrenen Straßen und damit dort,
+wo die Kamera meistens steht.
 
 ## Einundfünfzig Paare standen ineinander
 
