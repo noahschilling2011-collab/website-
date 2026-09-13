@@ -1992,6 +1992,43 @@ pruefe('Kein Baum steht im Wasser', await page.evaluate(() => {
  return `${l.filter(t => L.waterAt(t.x, t.z)).length} von ${l.length}`;
 }));
 
+// Streifenwagen fahren auf Straßen. findPath() kannte nur „frei" und
+// „blockiert" und schickte sie quer über Plätze und Grünflächen: elf von
+// fünfundneunzig Proben während einer Verfolgung lagen neben jeder Fahrbahn.
+// Ein Gewicht statt einer Sperre — Straße kostet 1, alles andere 3,5 — hält
+// sie darauf, ohne sie einzusperren.
+const streife = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim;
+ s.stars = 0; s.heat = 0; s.lastSeen = null; s.description = null; s.dispatchTimer = 0;
+ for (const c of s.cops) {c.active = false; c.route = []; c.blockTarget = null; c.blocking = false;}
+ s.player.car = null; s.player.x = -100; s.player.z = 40; s.player.y = 0; s.player.health = 100;
+ s.crime(3);
+ let proben = 0, neben = 0, nass = 0, aktiv = 0;
+ for (let i = 0; i < 400; i++) {
+  s.tick(.05, {});
+  if (i % 10) continue;
+  for (const c of s.cops) {
+   if (!c.active || c.health <= 0) continue;
+   proben++; aktiv = Math.max(aktiv, s.cops.filter(x => x.active).length);
+   if (!L.onRoad(c.x, c.z, 0)) neben++;
+   if (L.waterAt(c.x, c.z)) nass++;
+  }
+ }
+ const sterne = s.stars;
+ // Flucht: weit weg und lange genug, dann muss die Fahndung enden.
+ s.player.x = -880; s.player.z = 340; s.spotted = false;
+ for (let i = 0; i < 1600; i++) s.tick(.05, {});
+ const danach = s.stars;
+ s.stars = 0; s.heat = 0; s.lastSeen = null; s.description = null;
+ for (const c of s.cops) {c.active = false; c.route = [];}
+ return {proben, neben, nass, aktiv, sterne, danach};
+});
+pruefe('Eine Straftat ruft Streifen und hebt die Fahndung',
+ streife.aktiv >= 2 && streife.sterne >= 1, `${streife.aktiv} Streifen, ${streife.sterne} Sterne`);
+pruefe('Streifenwagen fahren auf der Fahrbahn', streife.neben === 0 && streife.nass === 0,
+ `${streife.neben} neben der Fahrbahn, ${streife.nass} im Wasser, von ${streife.proben} Proben`);
+pruefe('Weit genug weg endet die Fahndung', streife.danach === 0, String(streife.danach));
+
 // Die Touch-Oberfläche hängt an `@media(pointer:coarse)` und ist auf einem
 // Zeigergerät ausgeblendet. Dafür braucht es einen eigenen Browser mit
 // Berührungsemulation, sonst prüft man nur unsichtbare Knöpfe. Der erste

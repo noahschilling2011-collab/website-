@@ -1087,6 +1087,29 @@ Fünftel des Bildes ab, und am Mittag brennt keine Laterne.
 
 231 Prüfungen bestanden, keine gefallen.
 
+## Streifenwagen fuhren über Plätze und Grünflächen
+
+Dieselbe Frage wie beim Verkehr, jetzt für die Polizei: eine Straftat, zwanzig
+Sekunden Verfolgung, alle halbe Sekunde jeder aktive Streifenwagen geprüft.
+**Elf von fünfundneunzig Proben lagen neben jeder Fahrbahn.**
+
+`findPath()` kannte nur zwei Zustände, frei und blockiert. Für Fußgänger
+reicht das; ein Wagen quert damit jeden Platz, jede Wiese und jeden Vorhof,
+solange nichts darauf steht. Die Funktion nimmt jetzt eine dritte Angabe: ein
+Gewicht je Feld. Straße kostet 1, alles andere 3,5. Der Wagen nimmt den Umweg
+über die Straße, solange er nicht ein Vielfaches länger ist — und kann eine
+Grünfläche immer noch überqueren, wenn es keinen anderen Weg gibt. Die
+A*-Heuristik bleibt zulässig, weil kein Feld weniger als 1 kostet.
+
+Danach: null von fünfundneunzig. Die Annäherung dauert dafür etwas länger —
+nach zwanzig Sekunden ist der nächste Wagen 131,8 statt 116,5 Meter entfernt.
+Das ist der Preis dafür, dass er die Straße nimmt.
+
+Was in Ordnung war: vier Streifen rücken aus, die Fahndung steigt auf zwei
+Sterne, kein Wagen fährt ins Wasser, und weit genug weg endet sie wieder.
+
+234 Prüfungen bestanden, keine gefallen.
+
 ## Was geprüft wurde und in Ordnung war
 
 Nicht jede Messung findet etwas, und das gehört genauso hierher.
