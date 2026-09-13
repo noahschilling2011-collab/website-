@@ -176,11 +176,54 @@ await bilder(2);
 pruefe('Scheinwerfer aus, sobald niemand fährt', await page.evaluate(() =>
  window.LOWTIDE.world.fahrlicht.every(l => !l.visible)));
 
+// Nicken und Wanken der Karosserie. Bis hierher stand der Wagen starr auf der
+// Straße: eine Vollbremsung aus hundert Sachen bewegte kein Grad.
+const karosserie = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim, w = L.world;
+ const c = s.cars.find(x => x.model === 'sedan'), m = w.cars[s.cars.indexOf(c)];
+ // Position der Figur merken und am Ende zurücksetzen: dieser Abschnitt
+ // schickt sie auf die Südtangente, und die Kameraprüfung im Telefon
+ // braucht sie später dort, wo Tiere sind.
+ const heim = {x: s.player.x, z: s.player.z, y: s.player.y};
+ const setzen = () => {c.x = -700; c.z = 620; c.yaw = Math.PI / 2; c.slip = 0; c.alt = 0;
+  c.health = 100; c.fuel = 100; c.tires = 100; c.unlocked = true; s.weather = 'clear';
+  s.player.car = c; s.player.x = c.x; s.player.z = c.z; s.player.y = 0; s.stars = 0;
+  c._nick = 0; c._wank = 0; c._tempoVorher = undefined; c._gierVorher = undefined;};
+ const grad = r => r * 180 / Math.PI;
+ const aus = {};
+ setzen(); c.speed = 0;
+ for (let k = 0; k < 20; k++) {s.driveVehicle(.05, {forward: 1, turn: 0}); w.update(.05, 0, 0, true);}
+ aus.gas = grad(m.rotation.x);
+ c.speed = 100 / 3.6;
+ for (let k = 0; k < 12; k++) {s.driveVehicle(.05, {forward: 0, brake: 1, turn: 0}); w.update(.05, 0, 0, true);}
+ aus.bremse = grad(m.rotation.x);
+ setzen(); c.speed = 60 / 3.6;
+ for (let k = 0; k < 24; k++) {s.driveVehicle(.05, {forward: .6, turn: 1}); w.update(.05, 0, 0, true);}
+ aus.rechts = grad(m.rotation.z);
+ setzen(); c.speed = 60 / 3.6;
+ for (let k = 0; k < 24; k++) {s.driveVehicle(.05, {forward: .6, turn: -1}); w.update(.05, 0, 0, true);}
+ aus.links = grad(m.rotation.z);
+ setzen(); c.speed = 0;
+ for (let k = 0; k < 40; k++) {s.driveVehicle(.05, {forward: 0, turn: 0}); w.update(.05, 0, 0, true);}
+ aus.stand = Math.abs(grad(m.rotation.x)) + Math.abs(grad(m.rotation.z));
+ s.player.car = null;
+ s.player.x = heim.x; s.player.z = heim.z; s.player.y = heim.y;
+ return aus;
+});
+pruefe('Die Nase taucht beim Bremsen und hebt sich beim Gasgeben',
+ karosserie.bremse > 1.5 && karosserie.gas < -1.5,
+ `Bremse ${karosserie.bremse.toFixed(1)}°, Gas ${karosserie.gas.toFixed(1)}°`);
+pruefe('Der Wagen legt sich in die Kurve, seitenrichtig',
+ karosserie.rechts < -1.5 && karosserie.links > 1.5,
+ `rechts ${karosserie.rechts.toFixed(1)}°, links ${karosserie.links.toFixed(1)}°`);
+pruefe('Im Stand steht er waagerecht', karosserie.stand < .2, `${karosserie.stand.toFixed(2)}°`);
+
 // Bremsweg und Ausrollen. Gemessen war der Weg aus 100 km/h 5,2 Meter beim
 // Kestrel und 9,8 beim Atlas Hauler, und ohne Gas rollte jedes Fahrzeug in
 // 41 Metern aus — das ist keine Motorbremse, das ist eine Handbremse.
 const bremswege = await page.evaluate(() => {
  const s = window.LOWTIDE.sim, aus = {};
+ const heim = {x: s.player.x, z: s.player.z, y: s.player.y};
  for (const modell of ['sedan', 'truck']) {
   const c = s.cars.find(x => x.model === modell);
   if (!c) continue;
@@ -197,6 +240,7 @@ const bremswege = await page.evaluate(() => {
   aus[modell + 'Rollen'] = Math.hypot(c.x - x0, c.z - z0);
   s.player.car = null;
  }
+ s.player.x = heim.x; s.player.z = heim.z; s.player.y = heim.y;
  return aus;
 });
 pruefe('Der Bremsweg aus 100 km/h ist der eines Autos',
@@ -328,14 +372,19 @@ pruefe('Ein Schuss schreckt sie auf', await page.evaluate(async () => {
 }));
 pruefe('Die Kamera erkennt Tiere im Bild', await page.evaluate(() => {
  const L = window.LOWTIDE, t = L.world.tiere;
- // Einen Alligator direkt vor die Figur setzen und in seine Richtung schauen.
- const a = t.alligatoren[0];
- L.sim.player.x = a.x; L.sim.player.z = a.z - 12;
- // Andere Tiere können zufällig auch im Blickfeld liegen; entscheidend ist,
- // dass die Blickrichtung überhaupt zählt.
- const vorn = t.imBild({x: a.x, z: a.z - 12}, 0);
- const hinten = t.imBild({x: a.x, z: a.z - 12}, Math.PI);
- return vorn >= 1 && hinten < vorn;
+ // imBild() zählt alle Tiere im Sichtkegel. Die Prüfung verglich einfach
+ // „nach vorn" gegen „nach hinten" und verließ sich darauf, dass hinter der
+ // Figur zufällig weniger Möwen und Fische liegen als davor. Sobald ein
+ // anderer Abschnitt die Tierwelt ein paar Sekunden weiterlaufen ließ, kippte
+ // sie. Jetzt bleibt für die Dauer der Prüfung genau ein Alligator übrig.
+ const merk = {m: t.moewen, f: t.fische, d: t.delfine, a: t.alligatoren};
+ const einer = t.alligatoren[0];
+ t.moewen = []; t.fische = []; t.delfine = []; t.alligatoren = [einer];
+ const vorn = t.imBild({x: einer.x, z: einer.z - 12}, 0);
+ const hinten = t.imBild({x: einer.x, z: einer.z - 12}, Math.PI);
+ const weit = t.imBild({x: einer.x, z: einer.z - 90}, 0);
+ t.moewen = merk.m; t.fische = merk.f; t.delfine = merk.d; t.alligatoren = merk.a;
+ return vorn === 1 && hinten === 0 && weit === 0;
 }));
 
 console.log('Detailstufen');

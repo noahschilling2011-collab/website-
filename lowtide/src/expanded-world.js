@@ -299,7 +299,21 @@ export class ExpandedWorld extends World{
    const weg=distance(c,p),grob=weg>52&&['car','pickup'].includes(d.shape)&&c!==p.car;
    if(grob&&weg<330){this.autoFern.hinzu(c.x,groundAt(c.x,c.z)+(c.alt||0),c.z,c.yaw,
     Math.max(d.scale?.[0]||1,d.scale?.[2]||1));m.visible=false;return;}
-   m.visible=weg<320;const water=d.medium==='water';m.position.y=water?Math.sin(t*1.8+c.x)*.15-.4:groundAt(c.x,c.z)+(c.alt||0);if(m.userData.rotor)m.userData.rotor.rotation[d.shape==='plane'?'z':'y']+=dt*(c===p.car?35:2);if(m.userData.bodyHeight)m.userData.body.scale.y=m.userData.bodyHeight*(.6+.4*c.health/100);if(!m.userData.paint||m.userData.paint!==c.color){m.userData.body.material=wolkenAufsetzen(new T.MeshPhysicalMaterial({color:c.color,roughness:.28,metalness:.12,clearcoat:1,clearcoatRoughness:.1}));if(m.userData.roof)m.userData.roof.material=m.userData.body.material;m.userData.paint=c.color;}m.rotation.z=['bike','jetski'].includes(d.shape)?Math.sin(t*3)*.015*Math.abs(c.speed):Math.sin(t*6)*.006*Math.min(3,Math.abs(c.speed));if(c.upgrades.suspension)m.position.y-=.12;this.applyUpgrades(m,c);if(m.userData.glass)m.userData.glass.visible=c.glass>20;const nachtAnteil=Math.min(1,this.sky.uniforms.nacht.value*1.25);
+   m.visible=weg<320;const water=d.medium==='water';m.position.y=water?Math.sin(t*1.8+c.x)*.15-.4:groundAt(c.x,c.z)+(c.alt||0);if(m.userData.rotor)m.userData.rotor.rotation[d.shape==='plane'?'z':'y']+=dt*(c===p.car?35:2);if(m.userData.bodyHeight)m.userData.body.scale.y=m.userData.bodyHeight*(.6+.4*c.health/100);if(!m.userData.paint||m.userData.paint!==c.color){m.userData.body.material=wolkenAufsetzen(new T.MeshPhysicalMaterial({color:c.color,roughness:.28,metalness:.12,clearcoat:1,clearcoatRoughness:.1}));if(m.userData.roof)m.userData.roof.material=m.userData.body.material;m.userData.paint=c.color;}// Nicken und Wanken. Die Karosserie stand starr auf der Straße: eine
+   // Vollbremsung aus hundert Sachen bewegte kein Grad, und in der Kurve
+   // blieb der Wagen waagerecht. Beides kommt aus der Bewegung selbst —
+   // Längsbeschleunigung kippt die Nase, Gierrate mal Tempo legt ihn in die
+   // Kurve. Geglättet, damit ein einzelner Schlag nicht zuckt.
+   const dtSicher=Math.max(dt,.001);
+   const laengs=(c.speed-(c._tempoVorher??c.speed))/dtSicher; c._tempoVorher=c.speed;
+   let gier=(c.yaw-(c._gierVorher??c.yaw)+Math.PI)%(Math.PI*2)-Math.PI; c._gierVorher=c.yaw;
+   gier/=dtSicher;
+   const nickZiel=Math.max(-.06,Math.min(.06,-laengs*.006));
+   const wankZiel=Math.max(-.07,Math.min(.07,gier*c.speed*.0035));
+   c._nick=(c._nick??0)+(nickZiel-(c._nick??0))*Math.min(1,dt*7);
+   c._wank=(c._wank??0)+(wankZiel-(c._wank??0))*Math.min(1,dt*6);
+   m.rotation.x=c._nick;
+   m.rotation.z=(['bike','jetski'].includes(d.shape)?Math.sin(t*3)*.015*Math.abs(c.speed):Math.sin(t*6)*.006*Math.min(3,Math.abs(c.speed)))+c._wank*(['bike','jetski'].includes(d.shape)?2.2:1);if(c.upgrades.suspension)m.position.y-=.12;this.applyUpgrades(m,c);if(m.userData.glass)m.userData.glass.visible=c.glass>20;const nachtAnteil=Math.min(1,this.sky.uniforms.nacht.value*1.25);
    if(m.userData.headlights)for(const l of m.userData.headlights){l.visible=c.lights>15;l.material.emissiveIntensity=.12+nachtAnteil*3.6;}
    this.autoFern?.leuchten(nachtAnteil);
    // Rücklichter glimmen und leuchten beim Bremsen deutlich auf.

@@ -1153,6 +1153,39 @@ betrifft nur das Fahrzeug unter dem Spieler.
 
 236 Prüfungen bestanden, keine gefallen.
 
+## Die Karosserie stand starr auf der Straße
+
+Mit ehrlichen Bremswegen fiel auf, dass sich beim Bremsen nichts bewegt. Der
+Wagen hatte genau eine Neigung: ein Wackeln um die Längsachse, proportional
+zum Tempo, plus fünf Hundertstel Schräglage bei unter vierzig Prozent
+Fahrzeugzustand. Kein Nicken, kein Wanken.
+
+Beides kommt jetzt aus der Bewegung selbst: die Längsbeschleunigung kippt die
+Nase, Gierrate mal Tempo legt den Wagen in die Kurve, beides geglättet, damit
+ein einzelner Schlag nicht zuckt. Gemessen am Kestrel:
+
+| | Nicken | Wanken |
+|---|---|---|
+| Vollgas aus dem Stand | -3,4° (Nase hoch) | 0 |
+| Vollbremsung aus 100 km/h | +3,0° (Nase runter) | 0 |
+| Rechtskurve bei 60 km/h | | -4,0° (rechts runter) |
+| Linkskurve bei 60 km/h | | +4,0° |
+| Stand | 0,00° | 0,00° |
+
+Motorräder und Jetskis legen sich mit dem 2,2-fachen Winkel.
+
+Dabei fiel eine Prüfung, die nichts damit zu tun hatte: „Die Kamera erkennt
+Tiere im Bild". Sie setzte die Figur zwölf Meter vor einen Alligator, zählte
+die Tiere im Blickfeld nach vorn und nach hinten und verlangte, dass vorn
+mehr sind. Das stimmt nur, solange hinter der Figur zufällig weniger Möwen
+und Fische liegen als davor — mein Abschnitt ließ die Tierwelt sechs Sekunden
+weiterlaufen, und die Verteilung kippte. Für die Dauer der Prüfung bleibt
+jetzt genau ein Alligator übrig; zusätzlich muss er aus neunzig Metern
+Entfernung nicht mehr zählen. Das ist innerhalb dieser Sitzung die dritte
+Prüfung, die selbst falsch gestellt war.
+
+239 Prüfungen bestanden, keine gefallen.
+
 ## Was geprüft wurde und in Ordnung war
 
 Nicht jede Messung findet etwas, und das gehört genauso hierher.
