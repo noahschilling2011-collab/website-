@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 169 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 171 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -501,6 +501,34 @@ geprüft — trifft die Rundgänge falsch, die auf `path[i%4]` starten. Dann
 gegen die Position zu einem beliebigen Zeitpunkt — meldet jeden
 Überquerenden. Tragfähig ist der Anteil: ein paar Prozent sind Verkehr, ein
 Drittel wäre eine Menge, die in den Fahrspuren wohnt.
+
+## Verkehr, der einander sieht
+
+Vierundvierzig fahrende Wagen auf 15.728 Metern Straßennetz sind einer alle
+**357 Meter**. Dazu klumpten sie: der Startpunkt war ein Wegpunkt der Runde,
+also standen drei Wagen je Runde auf drei Ecken. Jetzt werden sie über den
+Umfang verteilt, neun je Runde.
+
+| | vorher | jetzt |
+|---|---|---|
+| fahrende Wagen | 44 | 116 |
+| ein Wagen alle | 357 m | 136 m |
+| im Umkreis 120 m der Kreuzung | 8 | 19 |
+| Draw Calls Kreuzung 13 Uhr | 1790 | 1836 |
+
+**Die Grenze war nicht die Zeichenlast, sondern dass die Wagen einander nicht
+sahen.** Sie sind ineinander gefahren, sobald mehrere an derselben Ampel
+standen — bei vierundvierzig über die ganze Karte verteilt fiel das kaum auf,
+bei hundertsechzehn schon: fünf Paare mit weniger als 3,6 Metern Abstand, bei
+4,4 Metern Wagenlänge also echte Durchdringung.
+
+`wagenVoraus()` prüft jetzt, was voraus und in der eigenen Spur liegt: bis
+sieben Meter nach vorn, gut zwei Meter seitlich, mit einer billigen
+Vorabschätzung über die Manhattan-Distanz. Der Wagen des Spielers zählt mit,
+sonst schöbe der Verkehr ihn von hinten an.
+
+Danach: **null Paare** unter 3,6 Metern, engster Abstand 4,97 Meter. Zwei
+Prüfungen halten Dichte und Abstand fest.
 
 ## Was Zeichenaufrufe kostet
 

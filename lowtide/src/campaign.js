@@ -76,13 +76,32 @@ export class Campaign extends Simulation{
    [[-1020,346],[-730,346],[-770,304],[-990,304]],
    [[-954,266],[-954,434],[-906,434],[-906,266]]
   ];
+  // Drei Wagen je Runde, gestartet auf drei Eckpunkten: gemessen ergab das
+  // vierundvierzig fahrende Fahrzeuge auf 15.728 Metern Straßennetz, also
+  // eines alle 357 Meter. Dazu klumpten sie an den Ecken, weil der Startpunkt
+  // ein Wegpunkt war und nicht eine Stelle auf der Strecke.
+  //
+  // Jetzt werden sie über den Umfang der Runde verteilt. Das erhöht die
+  // Dichte und löst das Klumpen in einem.
+  const umfang=weg=>{let l=0;for(let i=0;i<weg.length;i++){const a=weg[i],b=weg[(i+1)%weg.length];l+=Math.hypot(b.x-a.x,b.z-a.z);}return l;};
+  const punktAuf=(weg,t)=>{
+   let l=umfang(weg)*t;
+   for(let i=0;i<weg.length;i++){
+    const a=weg[i],b=weg[(i+1)%weg.length],d=Math.hypot(b.x-a.x,b.z-a.z);
+    if(l<=d)return {x:a.x+(b.x-a.x)*(l/d),z:a.z+(b.z-a.z)*(l/d),ziel:(i+1)%weg.length};
+    l-=d;
+   }
+   return {x:weg[0].x,z:weg[0].z,ziel:1};
+  };
+  const PRO_RUNDE=9;
   RUNDEN.forEach((runde,r)=>{
    const weg=runde.map(([x,z])=>({x,z}));
-   for(let k=0;k<3;k++){
-    const start=weg[k%weg.length];
-    this.cars.push({id:'PM-'+(500+r*3+k),model:MODELLE[(r*3+k)%MODELLE.length],
-     x:start.x,z:start.z,yaw:0,speed:7+this.rng()*5,health:100,type:'traffic',
-     color:LACKE[(r*3+k)%LACKE.length],route:weg,target:(k+1)%weg.length,wait:0,
+   for(let k=0;k<PRO_RUNDE;k++){
+    const q=punktAuf(weg,k/PRO_RUNDE);
+    const n=r*PRO_RUNDE+k;
+    this.cars.push({id:'PM-'+(500+n),model:MODELLE[n%MODELLE.length],
+     x:q.x,z:q.z,yaw:0,speed:7+this.rng()*5,health:100,type:'traffic',
+     color:LACKE[n%LACKE.length],route:weg,target:q.ziel,wait:0,
      fuel:100,tires:100,glass:100,lights:100,alt:0,upgrades:{},owner:null});
    }
   });

@@ -954,6 +954,24 @@ pruefe('Die Menge ist über die Stadt verteilt, nicht nur am Strand',
 pruefe('Die Menge wohnt nicht in den Fahrspuren',
  gehwege.aufStrasse / gehwege.gesamt < .1,
  `${gehwege.aufStrasse} von ${gehwege.gesamt} gerade auf einer Fahrbahn`);
+// Verkehrsdichte. Vierundvierzig fahrende Wagen auf 15,7 Kilometern
+// Straßennetz waren eines alle 357 Meter, und sie klumpten an den Ecken der
+// Runden, weil der Startpunkt ein Wegpunkt war statt einer Stelle auf der
+// Strecke.
+const verkehr = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim;
+ const fahrend = s.cars.filter(c => c.type === 'traffic');
+ let laenge = 0;
+ for (const r of L.strassen) laenge += Math.hypot(r.x2 - r.x1, r.z2 - r.z1);
+ let zuNah = 0;
+ for (let i = 0; i < fahrend.length; i++) for (let j = i + 1; j < fahrend.length; j++)
+  if (Math.hypot(fahrend[i].x - fahrend[j].x, fahrend[i].z - fahrend[j].z) < 3.6) zuNah++;
+ return {fahrend: fahrend.length, meterJeWagen: laenge / fahrend.length, zuNah};
+});
+pruefe('Der Verkehr ist dicht genug für eine Stadt', verkehr.meterJeWagen < 200,
+ `ein Wagen alle ${Math.round(verkehr.meterJeWagen)} m`);
+pruefe('Die Wagen klumpen nicht ineinander', verkehr.zuNah <= 3,
+ `${verkehr.zuNah} Paare näher als 3,6 m bei ${verkehr.fahrend} Wagen`);
 pruefe('Sparmodus schaltet die Nachbearbeitung ab', await page.evaluate(() => {
  const knopf = document.getElementById('qualityBtn'), w = window.LOWTIDE.world;
  knopf.click();
