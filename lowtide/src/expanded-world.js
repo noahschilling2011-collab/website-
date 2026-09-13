@@ -259,7 +259,9 @@ export class ExpandedWorld extends World{
   // Der Rest der Karte: Vororte, Farmland, Nationalpark, Sumpf, Flugfeld,
   // Insel, Industriegürtel und die Baulücken der Innenstadt.
   dressRegions(this);
-  this.innenLampen=dressInteriors(this);
+  // dressRegions setzt zusaetzliche Lampen (Tankstellenvordach); dressInteriors
+  // leert seine eigene Liste bei jedem Aufruf, deshalb erst danach anhaengen.
+  this.innenLampen=[...dressInteriors(this),...(this.zusatzLampen||[])];
   this.palmenBauen();
   this.laubwerk?.bauen();
  }

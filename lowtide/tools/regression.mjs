@@ -963,6 +963,29 @@ pruefe('Dartscheibe und Billard stehen im Raum, der Schießstand daneben', await
   !window.LOWTIDE.onRoad(o.range.x, o.range.z, 0);
  return drin && stand;
 }));
+// Ein Ort mit Namen, Marker und Dienstleistung, aber ohne ein einziges
+// Bauwerk, ist ein Versprechen ohne Deckung. Northstar Fuel war genau das:
+// fünf stehende Instanzen im Umkreis von achtzehn Metern, und die gehörten
+// zum Nachbarhaus. Der Marker lag dabei neun Meter tief im Boulevard.
+const tanke = await page.evaluate(() => {
+ const L = window.LOWTIDE, l = L.orte.fuel;
+ let n = 0;
+ for (const netz of L.world.bloecke || []) {
+  const a = netz.instanceMatrix.array;
+  for (let i = 0; i < netz.count; i++) {
+   const o = i * 16, y = a[o + 13], sy = Math.hypot(a[o + 4], a[o + 5], a[o + 6]);
+   if (y + sy / 2 < 1.2) continue;
+   if (Math.hypot(a[o + 12] - l.x, a[o + 14] - l.z) < 18) n++;
+  }
+ }
+ return {n, aufStrasse: L.onRoad(l.x, l.z, 0), imWasser: L.waterAt(l.x, l.z),
+  lampen: (L.world.zusatzLampen || []).length,
+  imVorrat: (L.world.innenLampen || []).filter(x => Math.hypot(x.x - l.x, x.z - l.z) < 18).length};
+});
+pruefe('Northstar Fuel steht als Bauwerk in der Welt', tanke.n >= 20 && !tanke.aufStrasse && !tanke.imWasser,
+ `${tanke.n} stehende Teile, auf Fahrbahn: ${tanke.aufStrasse}`);
+pruefe('Das Vordach hat echtes Licht, nicht nur leuchtende Flächen',
+ tanke.lampen >= 3 && tanke.imVorrat >= 3, `${tanke.lampen} Lampen, ${tanke.imVorrat} im Vorrat`);
 // Leitplanken nur dort, wo es neben der Fahrbahn hinuntergeht.
 const planken = await page.evaluate(() => {
  const w = window.LOWTIDE.world;

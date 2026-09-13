@@ -42,7 +42,7 @@ export const locations={
  ranger:{x:-450,z:-370,name:'Cypress Nationalpark',kind:'ranger'},
  farm:{x:-365,z:-265,name:'Bellweather Farm',kind:'farm'},
  motel:{x:-360,z:155,name:'Last Light Motel',kind:'motel'},
- fuel:{x:-100,z:140,name:'Northstar Fuel',kind:'fuel'},
+ fuel:{x:-124,z:136,name:'Northstar Fuel',kind:'fuel'},
  tower:{x:-270,z:-148,name:'Relaisstation',kind:'tower'},
  records:{x:-319,z:-75,name:'Stadtarchiv',kind:'records'},
  ferry:{x:275,z:215,name:'Isla Serena',kind:'ferry'},
@@ -56,6 +56,24 @@ export const locations={
  range:{x:-146,z:16,name:'Schießstand',kind:'range'},
  schatz:{x:-450,z:-330,name:'Bergungsauftrag',kind:'treasure'}
 };
+// Northstar Fuel war ein Name auf einem schwebenden Marker, neun Meter tief
+// im achtzehn Meter breiten Boulevard bei x = -100. Tanken funktionierte —
+// man stand dabei auf der Fahrspur, und ein Bauwerk gab es nicht: fünf
+// stehende Instanzen im Umkreis von achtzehn Metern, und die gehörten zum
+// Nachbarhaus. Der Platz ist gesucht wie bei den Läden: das nächstgelegene
+// freie Rechteck von 34 mal 28 Metern mit zwei Metern Abstand zur Fahrbahn,
+// höchstens acht Meter von einer entfernt, ohne stehende Kulisse darin.
+// Achtundzwanzig Meter westlich. Der Grundriss steht hier, damit Hindernis
+// und Kulisse nicht auseinanderlaufen — beim Lagerhaus liegen sie in zwei
+// Dateien, und genau das musste beim Umzug von Hand nachgezogen werden.
+export const TANKSTELLE={
+ get x(){return locations.fuel.x;}, get z(){return locations.fuel.z;},
+ dach:{breite:22,tiefe:14,hoehe:5.4},   // Vordach über den Zapfsäulen
+ hof:{versatzX:-4,versatzZ:2,breite:34,tiefe:28},
+ kiosk:{versatzX:-14,versatzZ:12,breite:12,tiefe:8,hoehe:4.2},
+ insel:{versatzX:6,breite:6,tiefe:3.4}  // zwei, gespiegelt um die Mitte
+};
+
 // Dartscheibe und Billardtisch stehen in ihren Räumen, sieben Meter hinter
 // der Front; der Schießstand liegt im Freien östlich neben dem Laden. Als
 // eigene Koordinaten blieben alle drei beim Umzug der Gebäude stehen — der

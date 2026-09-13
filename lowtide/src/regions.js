@@ -1,4 +1,4 @@
-import {groundAt, waterAt, locations, onRoad, INSELN, DAEMME} from './content.js';
+import {groundAt, waterAt, locations, onRoad, INSELN, DAEMME, TANKSTELLE} from './content.js';
 // Der Rest von Solvara.
 // Port Mercy war ausgebaut, alles andere bestand aus Andeutungen: sechs
 // Kisten für die Vororte, ein Feld mit Strichen für Bellweather, 155
@@ -1335,6 +1335,77 @@ function hinterland(w, rng) {
  }
 }
 
+// Northstar Fuel. Der Ort hatte einen Namen, eine Tankfunktion und keinen
+// einzigen Klotz. Hier steht er: Vorplatz, Vordach auf vier Stützen mit
+// Deckenlicht, zwei Zapfinseln mit vier Säulen, Kiosk und Preistotem an der
+// Straße. Die Maße kommen aus content.js, damit Hindernis und Kulisse
+// zusammenbleiben.
+function tankstelle(w) {
+ const T = TANKSTELLE, fx = T.x, fz = T.z;
+ const hof = T.hof;
+ // Vorplatz mit Bordkante, damit er nicht als graues Rechteck im Gras liegt.
+ // Der Hof lag zuerst in 0x565e60. Im Schatten des Vordachs beleuchtet ihn
+ // nur noch der Himmel, und ein blaustichiges Grau wird darunter zu einer
+ // blauen Fläche — auf dem ersten Bild sah der Vorplatz aus wie ein Becken.
+ // Jetzt ein warmes Betongrau, das auch unter reinem Himmelslicht Beton bleibt.
+ w.box(fx + hof.versatzX, .05, fz + hof.versatzZ, hof.breite, .12, hof.tiefe, 0x6b665c);
+ for (const s of [-1, 1]) {
+  w.box(fx + hof.versatzX, .16, fz + hof.versatzZ + s * hof.tiefe / 2, hof.breite, .22, .5, 0x8e8b7f);
+  w.box(fx + hof.versatzX + s * hof.breite / 2, .16, fz + hof.versatzZ, .5, .22, hof.tiefe, 0x8e8b7f);
+ }
+ // Vordach. Die Unterseite trägt drei Leuchtbänder — nachts ist eine
+ // Tankstelle vor allem das: eine helle Decke über dunklem Beton.
+ const d = T.dach;
+ w.box(fx, d.hoehe + .4, fz, d.breite, .8, d.tiefe, 0xd9d5c7);
+ w.box(fx, d.hoehe - .05, fz, d.breite - .6, .3, d.tiefe - .6, 0xb4b0a2);
+ for (const oz of [-4.4, 0, 4.4])
+  w.box(fx, d.hoehe - .22, fz + oz, d.breite - 3, .12, .7, 0xfff1d2, 0, true);
+ // Die leuchtenden Bänder erhellen nichts — sie sind nur helle Flächen. Eine
+ // Tankstelle ist nachts aber vor allem eine helle Decke über dunklem Beton,
+ // und ohne echtes Licht blieb der Vorplatz schwarz. Vier Lampen gehen an
+ // denselben Vorrat, aus dem sich die Innenräume bedienen: fünf Punktlichter
+ // wandern zu den nächstgelegenen Einträgen im Umkreis von zwanzig Metern.
+ (w.zusatzLampen ||= []).push(
+  ...[-7, 0, 7].map(ox => ({x: fx + ox, y: d.hoehe - .5, z: fz, farbe: 0xffeccb, staerke: 88})),
+  {x: fx + T.kiosk.versatzX, y: 3.4, z: fz + T.kiosk.versatzZ - T.kiosk.tiefe / 2 - 1.5, farbe: 0xdfe7ea, staerke: 46});
+ w.box(fx, d.hoehe + .95, fz - d.tiefe / 2 + .1, d.breite, .3, .3, 0xc4553f);
+ w.text('NORTHSTAR FUEL', fx, d.hoehe + .4, fz - d.tiefe / 2 - .05, 15, '#f0ead2');
+ for (const ox of [-1, 1]) for (const oz of [-1, 1])
+  w.box(fx + ox * (d.breite / 2 - 1.5), d.hoehe / 2, fz + oz * (d.tiefe / 2 - 1.5), .7, d.hoehe, .7, 0xb9b5a6);
+ // Zapfinseln. Je Insel zwei Säulen mit dunklem Kopf und Schlauchbügel.
+ for (const s of [-1, 1]) {
+  const ix = fx + s * T.insel.versatzX;
+  w.box(ix, .2, fz, T.insel.breite, .32, T.insel.tiefe, 0x8e8b7f);
+  w.sim.addSolid(ix, fz, T.insel.breite, T.insel.tiefe, 'zapfinsel', 1.9);
+  for (const oz of [-1.05, 1.05]) {
+   w.box(ix, 1.25, fz + oz, .95, 1.8, .62, 0xc9553f);
+   w.box(ix, 2.22, fz + oz, .66, .34, .5, 0x2c3238);
+   w.box(ix, 2.24, fz + oz - .26, .34, .16, .04, 0xe9dfae, 0, true);
+   w.box(ix + .58, 1.5, fz + oz, .12, 1.1, .12, 0x3a4145);
+  }
+ }
+ // Kiosk mit Fensterband und Vordachlippe.
+ const k = T.kiosk, kx = fx + k.versatzX, kz = fz + k.versatzZ;
+ w.box(kx, k.hoehe / 2, kz, k.breite, k.hoehe, k.tiefe, 0xcfcabb);
+ w.box(kx, k.hoehe + .18, kz, k.breite + .8, .36, k.tiefe + .8, 0x8d9490);
+ w.box(kx, 2.5, kz - k.tiefe / 2 - .06, k.breite - 2.4, 1.9, .12, 0x9fc3cc, 0, true);
+ w.box(kx + k.breite / 2 - 1.6, 1.1, kz - k.tiefe / 2 - .07, 1.1, 2.2, .1, 0x5f6a6c);
+ w.text('SHOP', kx - k.breite / 2 + 2.4, 3.9, kz - k.tiefe / 2 - .1, 3.4, '#3d4a4e');
+ w.sim.addSolid(kx, kz, k.breite, k.tiefe, 'kiosk', k.hoehe);
+ // Luft und Wasser an der Kioskecke, zwei Mülleimer, vier Poller.
+ w.box(kx + k.breite / 2 + 1.4, .9, kz + 1, .7, 1.8, .7, 0x4f5a5e);
+ for (const oz of [-1.6, 1.6]) w.box(kx - k.breite / 2 - 1.2, .55, kz + oz, .7, 1.1, .7, 0x3f484a);
+ for (const ox of [-2.4, 2.4]) for (const s of [-1, 1])
+  w.box(fx + s * (T.insel.versatzX + T.insel.breite / 2 + .9), .5, fz + ox, .22, 1, .22, 0xc9b45f);
+ // Preistotem zur Fahrbahn hin.
+ const tx = fx + 12, tz = fz - 9;
+ w.box(tx, 3.2, tz, .5, 6.4, .5, 0x6f7570);
+ w.box(tx, 6.3, tz, 4.4, 2.6, .45, 0xe4e0d2);
+ w.box(tx, 6.9, tz - .25, 3.6, 1, .05, 0xc4553f, 0, true);
+ w.text('NORTHSTAR', tx, 6.9, tz - .3, 3.2, '#f4efdc', Math.PI);
+ w.text('4.29', tx, 5.7, tz - .3, 2.2, '#2f3a3e', Math.PI);
+}
+
 export function dressRegions(world) {
  const rng = zufall();
  sunsetSuburbs(world, rng);
@@ -1345,6 +1416,7 @@ export function dressRegions(world) {
  islaSerena(world, rng);
  harborIndustry(world, rng);
  stadtLuecken(world, rng);
+ tankstelle(world);
  suedFlaechen(world, rng);
  nordFlaechen(world, rng);
  randgebiete(world, rng);

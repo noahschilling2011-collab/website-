@@ -658,6 +658,51 @@ auf der Südtangente: siebzig Meter in jede Richtung frei, trocken, eben.
 Dieselbe Sorte Fehler wie beim Bremstest — ein Messplatz, der sich mit der
 Karte ändert, misst irgendwann etwas anderes als gemeint.
 
+## Ein Ort, der nur ein Name war
+
+Nach dem Umzug der Gebäude die naheliegende nächste Frage: Welcher benannte
+Ort hat überhaupt ein Bauwerk? Gezählt wurden stehende Instanzen — Oberkante
+über 1,2 Meter — im Umkreis von achtzehn Metern um jeden der achtundzwanzig
+Marker. Die Rangliste von unten:
+
+| Ort | stehende Teile |
+| --- | --- |
+| Isla Serena (Fähre) | 0 |
+| Luftfracht | 1 |
+| Iron Tide Gym | 2 |
+| Mercy Dragstrip | 3 |
+| Basketball | 4 |
+| **Northstar Fuel** | **5** |
+| Relaisstation | 753 |
+
+Die fünf bei Northstar Fuel gehörten zum Nachbarhaus. Tanken funktionierte,
+der Ort hatte einen Namen, ein Menü und einen Preis — und kein Gebäude. Der
+Marker lag neun Meter tief im achtzehn Meter breiten Boulevard: man tankte
+auf der Fahrspur.
+
+Jetzt steht dort eine Tankstelle: Vorplatz mit Bordkante, Vordach auf vier
+Stützen mit drei Leuchtbändern, zwei Zapfinseln mit vier Säulen, Kiosk mit
+Fensterband, Poller, Mülleimer und ein Preistotem zur Straße. **32 stehende
+Teile** statt fünf. Zapfinseln und Kiosk sind auch Hindernisse, nicht nur
+Bilder.
+
+Zwei Dinge, die dabei auffielen und ohne Bild nicht aufgefallen wären:
+
+Der Vorplatz lag zuerst in einem blaustichigen Grau. Im Schatten des Vordachs
+beleuchtet ihn nur noch der Himmel — auf dem ersten Bild sah der Vorplatz aus
+wie ein Schwimmbecken. Ein warmes Betongrau bleibt auch unter reinem
+Himmelslicht Beton.
+
+Und die Leuchtbänder unter dem Dach erhellten nichts. Leuchtende Flächen sind
+in dieser Welt nur helle Flächen; der Vorplatz blieb nachts schwarz, während
+das Dach hell war. Vier echte Punktlichter hängen jetzt am selben Vorrat, aus
+dem sich die Innenräume bedienen. Nachts ist die Tankstelle damit das, was
+eine Tankstelle nachts ist: eine helle Decke über hellem Beton in einer
+dunklen Straße.
+
+Die Karte hat noch drei solche Orte — Fähranleger, Luftfracht und das Gym.
+Sie stehen als Nächstes an.
+
 ## Was geprüft wurde und in Ordnung war
 
 Nicht jede Messung findet etwas, und das gehört genauso hierher.
