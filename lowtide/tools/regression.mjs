@@ -360,6 +360,56 @@ pruefe('Der Bergungsauftrag zählt Fundstellen und zahlt aus', await page.evalua
 }));
 await page.evaluate(() => {window.LOWTIDE.sim.activity = null; window.LOWTIDE.sim.schatzIndex = 0;});
 
+// Vier von fünf Rennen waren nicht zu starten. Der Dialog am Marker ging nur
+// zu Fuß auf — im Fahrzeug zählten nur Werkstatt und Tankstelle —, und
+// startActivity verlangt ein Fahrzeug. Beides zugleich ging nicht.
+const rennstart = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim, aus = {};
+ const fahrzeug = {race: 'muscle', drag: 'muscle', moto: 'motorcycle', boat: 'boat', jet: 'jetski'};
+ for (const [marke, modell] of Object.entries(fahrzeug)) {
+  const l = L.orte[marke], c = s.cars.find(c => c.model === modell);
+  if (!c) {aus[marke] = 'kein ' + modell; continue;}
+  s.stars = 0; s.heat = 0; s.activity = null;
+  c.health = 100; c.fuel = 100; c.unlocked = true; c.speed = 0;
+  const wasser = ['boat', 'jetski'].includes(modell);
+  let platz = null;
+  for (let d = 0; d <= 12 && !platz; d += .5) for (let a = 0; a < 360; a += 8) {
+   const x = l.x + Math.cos(a * Math.PI / 180) * d, z = l.z + Math.sin(a * Math.PI / 180) * d;
+   if (wasser !== !!L.waterAt(x, z) || s.blocked({x, z}, .8)) continue;
+   platz = {x, z}; break;
+  }
+  if (!platz) {aus[marke] = 'kein Platz für ' + modell; continue;}
+  c.x = platz.x; c.z = platz.z;
+  s.player.car = c; s.player.x = c.x; s.player.z = c.z; s.player.y = 0;
+  const antwort = s.action();
+  if (typeof antwort === 'string' && antwort.startsWith('place:')) s.startActivity(l.kind);
+  aus[marke] = s.activity ? s.activity.kurs : 'kein Rennen (' + antwort + ')';
+  s.activity = null; s.player.car = null;
+ }
+ return aus;
+});
+pruefe('Alle fünf Rennen lassen sich am Marker starten',
+ rennstart.race === 'west' && rennstart.drag === 'drag' && rennstart.moto === 'moto' &&
+ rennstart.boat === 'boot' && rennstart.jet === 'jet', JSON.stringify(rennstart));
+// Ein Bootsrennen braucht Wasser in Reichweite des Markers, sonst kommt man
+// mit dem Boot nie nah genug heran. Der Regattamarker lag achtzehn Meter
+// landeinwärts.
+pruefe('Die Wasserrennen haben Wasser am Marker', await page.evaluate(() => {
+ const L = window.LOWTIDE;
+ return ['boat', 'jet'].every(id => {
+  const l = L.orte[id];
+  for (let d = 0; d <= 8; d += .5) for (let a = 0; a < 360; a += 10)
+   if (L.waterAt(l.x + Math.cos(a * Math.PI / 180) * d, l.z + Math.sin(a * Math.PI / 180) * d)) return true;
+  return false;
+ });
+}));
+// Die Marina lag mit Steg und Booten auf Sand und Wiese.
+pruefe('Die Marina liegt im Wasser', await page.evaluate(() => {
+ const L = window.LOWTIDE;
+ // Hauptsteg, Fingerstege und Bootsreihe müssen über Wasser stehen.
+ return [226, 217, 214].every(x => [220, 245, 270].every(z => L.waterAt(x, z)));
+}));
+
 console.log('Eigentum');
 pruefe('Kaufen scheitert ohne Geld', await page.evaluate(() => {
  const s = window.LOWTIDE.sim;

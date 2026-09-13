@@ -743,6 +743,41 @@ Fassade. Die vier neuen Orte beschriften sich selbst.
 
 202 Prüfungen bestanden, keine gefallen.
 
+## Vier von fünf Rennen waren nicht zu starten
+
+Der nächste Marker nach derselben Zählung war die Serena Regatta: achtzehn
+Meter landeinwärts. Ein Bootsrennen verlangt, dass die Figur in einem Boot
+sitzt, und ein Boot bewegt sich nur über Wasser — näher als neun Meter kam
+man dem Marker mit einem Boot nie. Beim Nachsehen war der Fehler größer als
+die Marke.
+
+`action()` liefert den Dialog eines Ortes nur, wenn man **nicht** im Fahrzeug
+sitzt; im Fahrzeug zählen ausgerechnet nur Werkstatt und Tankstelle.
+`startActivity` verlangt umgekehrt ein Fahrzeug mit dem passenden Medium.
+Beides zugleich geht nicht: **zu Fuß geht der Dialog auf und meldet „Du
+brauchst ein Fahrzeug", im Fahrzeug geht er gar nicht auf.** Startbar war
+allein der West Loop, und zwar über das H-Menü, weil dort ein eigener
+Eintrag mit fester Prüfung auf genau diese eine Strecke steht.
+
+Betroffen: Mercy Dragstrip, Cypress Enduro, Serena Regatta, Ripple Sprint.
+Vier Strecken mit Kurs, Preisgeld, Richtzeit und Kontrollpunkten, die nie
+jemand fahren konnte. Der Dialogtext sagt seit jeher „Rennen starten (im
+Fahrzeug)".
+
+Jetzt zählen Rennmarken auch im Fahrzeug, und der H-Eintrag startet die
+nächstgelegene Strecke statt immer den West Loop. Alle fünf laufen, im
+Spiel geprüft: Fahrzeug an den Marker, `action()`, Dialogeintrag.
+
+## Die Marina lag an Land
+
+Dabei aufgefallen: Serena Marina — Hauptsteg bei x = 250, Fingerstege bis
+234, vertäute Boote bei 238. Die Westküste der Insel ist die Linie x = 235.
+Die ganze Anlage stand auf Sand und Wiese, die Boote inklusive. Der Steg
+liegt jetzt bei x = 226 im Wasser, über einen Landgang mit dem Ufer
+verbunden; die Boote schwimmen bei 214, das Hafenhaus bleibt an Land.
+
+205 Prüfungen bestanden, keine gefallen.
+
 ## Was geprüft wurde und in Ordnung war
 
 Nicht jede Messung findet etwas, und das gehört genauso hierher.

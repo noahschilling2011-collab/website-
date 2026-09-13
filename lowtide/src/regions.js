@@ -394,8 +394,20 @@ function islaSerena(w, rng) {
  for (let x = 246; x < 356; x += 15) {w.palm(x, 156, 6 + rng() * 3); w.palm(x, 289, 6 + rng() * 2);}
 
  // Marina: Hauptsteg mit Fingerstegen und vertäuten Booten.
- const mx = 250, mz = 245;
+ //
+ // Der Hauptsteg stand bei x = 250, die Fingerstege reichten bis 234, die
+ // Boote lagen bei 238. Die Westküste von Isla Serena ist eine gerade Linie
+ // bei x = 235 — die ganze Anlage lag an Land, und die vertäuten Boote
+ // standen auf Sand und Wiese. Auf dem Luftbild ist es nicht zu übersehen,
+ // sobald man einmal hinsieht. Der Steg liegt jetzt im Wasser bei x = 226,
+ // über einen Landgang mit dem Ufer verbunden; die Boote schwimmen bei 214.
+ // Das Hafenhaus bleibt an Land.
+ const mx = 226, mz = 245;
  w.box(mx, .55, mz, 5, .3, 66, 0x9a8158);
+ // Landgang vom Ufer auf den Steg.
+ w.box(mx + 7.5, .55, mz, 15, .3, 4, 0x9a8158);
+ for (const oz of [-2, 2]) for (let x = mx + 3; x < mx + 15; x += 4)
+  w.box(x, -.3, mz + oz, .22, 1.8, .22, 0x6b5b41);
  for (let z = mz - 28; z <= mz + 28; z += 11) {
   w.box(mx - 9, .55, z, 14, .3, 2.6, 0x9a8158);
   for (const oz of [-3.4, 3.4]) {
@@ -407,9 +419,10 @@ function islaSerena(w, rng) {
   }
   w.box(mx - 16.4, .9, z, .2, .9, .2, 0x6d6357);
  }
- w.box(mx, 1.6, mz + 36, 7, 2.4, 6, 0xb09a6f);
- satteldach(w, mx, 2.9, mz + 36, 8, 7, 1.4, 0x6a7a6a, true);
- w.text('SERENA MARINA', mx, 4.3, mz + 32.6, 12, '#efd9a4', Math.PI);
+ // Hafenhaus an Land, am Kopf des Landgangs.
+ w.box(mx + 20, 1.6, mz + 12, 7, 2.4, 6, 0xb09a6f);
+ satteldach(w, mx + 20, 2.9, mz + 12, 8, 7, 1.4, 0x6a7a6a, true);
+ w.text('SERENA MARINA', mx + 20, 4.3, mz + 8.6, 12, '#efd9a4', Math.PI);
 
  // Resortvillen mit Pools, an einer Ringstraße.
  w.box(297, .06, 222, 88, .14, 6, 0x8d8877);

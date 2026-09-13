@@ -49,13 +49,20 @@ export const locations={
  aircargo:{x:-389,z:270,name:'Luftfracht',kind:'aircargo'},
  drag:{x:-315,z:250,name:'Mercy Dragstrip',kind:'race:drag'},
  moto:{x:-402,z:-248,name:'Cypress Enduro',kind:'race:moto'},
- boat:{x:252,z:214,name:'Serena Regatta',kind:'race:boot'},
+ boat:{x:237,z:238,name:'Serena Regatta',kind:'race:boot'},
  jet:{x:127,z:158,name:'Ripple Sprint',kind:'race:jet'},
  darts:{x:-268,z:120,name:'Dartscheibe',kind:'darts'},
  pool:{x:-206,z:16,name:'Billardtisch',kind:'pool'},
  range:{x:-146,z:16,name:'Schießstand',kind:'range'},
  schatz:{x:-450,z:-330,name:'Bergungsauftrag',kind:'treasure'}
 };
+// Die Regatta war nicht zu starten. Ein Bootsrennen verlangt, dass die Figur
+// in einem Boot sitzt (startActivity prüft das Medium), und ein Boot bewegt
+// sich nur über Wasser. Der Marker lag achtzehn Meter landeinwärts — näher
+// als neun Meter kam man mit einem Boot nie heran. Er steht jetzt am Kopf
+// des Marina-Landgangs, zwei Meter hinter der Wasserlinie; ein Boot davor
+// liegt vier Meter entfernt. Dasselbe für den Liegeplatz.
+
 // Drei Orte hatten einen Namen und kein Bauwerk: Fähranleger, Luftfracht und
 // Gym. Der Fähranleger lag dazu vierzig Meter im Landesinneren — Isla Serena
 // ist das Rechteck 235 bis 360, die Westküste eine gerade Linie bei x = 235,
@@ -108,7 +115,7 @@ export const immobilien={
   text:'Ein Drittel der Werkstatt. Reparaturen kosten dich danach nichts mehr.'},
  diner:{name:'Anteil Nora’s Diner',x:locations.diner.x,z:locations.diner.z,preis:1800,ertrag:95,art:'Betrieb',
   text:'Nora will sich zurückziehen und sucht jemanden für die Nachtschicht.'},
- liegeplatz:{name:'Liegeplatz Serena',x:250,z:245,preis:1500,ertrag:70,art:'Stellplatz',
+ liegeplatz:{name:'Liegeplatz Serena',x:237,z:252,preis:1500,ertrag:70,art:'Stellplatz',
   text:'Ein Platz an der Marina. Boote liegen dort sicherer als am Pier.'},
  villa:{name:'Villa Isla Serena',x:268,z:196,preis:9500,ertrag:420,art:'Wohnung',
   text:'Weiß, still, weit weg von Port Mercy. Genau deshalb teuer.'},
