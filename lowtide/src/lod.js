@@ -32,6 +32,20 @@ export function grobesAuto(farbe = 0x9aa2a6) {
   const r = teil(g, rad, gummi, x, .38, z);
   r.rotation.z = Math.PI / 2;
  }
+ // Licht auch in der Ferne. Die Scheinwerfer des vollen Modells schaltet
+ // expanded-world.js mit dem Sonnenstand hoch — jenseits von 52 Metern gibt
+ // es dieses Modell aber nicht mehr, und damit war eine nächtliche Straße
+ // ab dieser Entfernung unbeleuchtet. Bei Nacht ist von fernem Verkehr fast
+ // nur das Licht zu sehen; ohne es wirkt die Stadt tot.
+ //
+ // Zwei zusätzliche Materialien heißen zwei zusätzliche Draw Calls für die
+ // gesamte ferne Flotte, unabhängig von ihrer Zahl.
+ const vorn = new T.MeshStandardMaterial({color: 0xf4e4bb, emissive: 0xffd9a4, emissiveIntensity: 0});
+ const hinten = new T.MeshStandardMaterial({color: 0xa73833, emissive: 0xd33a30, emissiveIntensity: 0});
+ for (const x of [-.62, .62]) {
+  teil(g, wuerfel, vorn, x, .74, 2.14, .5, .16, .1);
+  teil(g, wuerfel, hinten, x, .8, -2.16, .56, .14, .1);
+ }
  return g;
 }
 
@@ -70,6 +84,23 @@ export class Fernstufe {
  }
 
  beginn() {this.anzahl = 0;}
+
+ // Nachts leuchten die Lampenflächen der Vorbilder. Betroffen ist nur, was
+ // im Vorbild eine Eigenfarbe trägt — Lack, Glas und Gummi bleiben, wie sie
+ // sind. Der Faktor ist derselbe Nachtanteil, mit dem das volle Modell
+ // seine Scheinwerfer hochfährt.
+ leuchten(nacht) {
+  for (const netz of this.netze) {
+   const m = netz.material;
+   if (!m.emissive || m.emissive.getHex() === 0) continue;
+   // Rücklicht oder Scheinwerfer? Über Rot gegen Grün ginge es knapp
+   // daneben: das warme Scheinwerferweiß 0xffd9a4 hat linear r = 1,00 und
+   // g = 0,71 und wäre damit auch "rot". Der Blauanteil trennt sauber —
+   // 0,37 gegen 0,03.
+   const rot = m.emissive.b < .12;
+   m.emissiveIntensity = nacht * (rot ? 1.6 : 3.2);
+  }
+ }
 
  hinzu(x, y, z, yaw, skalierung = 1) {
   if (this.anzahl >= this.maximal) return;

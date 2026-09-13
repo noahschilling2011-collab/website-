@@ -972,6 +972,28 @@ pruefe('Der Verkehr ist dicht genug für eine Stadt', verkehr.meterJeWagen < 200
  `ein Wagen alle ${Math.round(verkehr.meterJeWagen)} m`);
 pruefe('Die Wagen klumpen nicht ineinander', verkehr.zuNah <= 3,
  `${verkehr.zuNah} Paare näher als 3,6 m bei ${verkehr.fahrend} Wagen`);
+// Ferner Verkehr trägt nachts Licht. Das volle Fahrzeugmodell schaltet seine
+// Scheinwerfer mit dem Sonnenstand — jenseits von 52 Metern gibt es dieses
+// Modell aber nicht mehr, und damit war eine nächtliche Straße ab dieser
+// Entfernung unbeleuchtet.
+const fernlicht = await page.evaluate(async () => {
+ const L = window.LOWTIDE, w = L.world;
+ const lies = () => w.autoFern.netze
+  .filter(n => n.material.emissive && n.material.emissive.getHex() !== 0)
+  .map(n => +n.material.emissiveIntensity.toFixed(2));
+ const bild = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+ L.sim.hour = 13; await bild(); await bild();
+ const tag = lies();
+ L.sim.hour = 22; await bild(); await bild();
+ const nacht = lies();
+ L.sim.hour = 13; await bild();
+ return {tag, nacht, lampen: tag.length, fern: w.autoFern.anzahl};
+});
+pruefe('Das grobe Fahrzeug hat Lampenflächen', fernlicht.lampen === 2,
+ `${fernlicht.lampen} Materialien mit Eigenfarbe`);
+pruefe('Tagsüber leuchtet der ferne Verkehr nicht', fernlicht.tag.every(v => v === 0),
+ JSON.stringify(fernlicht.tag));
+pruefe('Nachts leuchtet er', fernlicht.nacht.every(v => v > 1), JSON.stringify(fernlicht.nacht));
 pruefe('Sparmodus schaltet die Nachbearbeitung ab', await page.evaluate(() => {
  const knopf = document.getElementById('qualityBtn'), w = window.LOWTIDE.world;
  knopf.click();

@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 171 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 174 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -501,6 +501,24 @@ geprüft — trifft die Rundgänge falsch, die auf `path[i%4]` starten. Dann
 gegen die Position zu einem beliebigen Zeitpunkt — meldet jeden
 Überquerenden. Tragfähig ist der Anteil: ein paar Prozent sind Verkehr, ein
 Drittel wäre eine Menge, die in den Fahrspuren wohnt.
+
+## Licht auch in der Ferne
+
+Die Scheinwerfer des vollen Fahrzeugmodells fahren mit dem Sonnenstand hoch.
+Jenseits von zweiundfünfzig Metern gibt es dieses Modell aber nicht mehr,
+dort steht die Silhouette aus `lod.js` — und die hatte keine Lampen. Eine
+nächtliche Straße war damit ab dieser Entfernung unbeleuchtet, obwohl
+achtundsiebzig Wagen darauf fuhren. Bei Nacht ist von fernem Verkehr fast nur
+das Licht zu sehen; ohne es wirkt die Stadt tot.
+
+Das grobe Vorbild hat jetzt zwei Lampenpaare. Zwei zusätzliche Materialien
+heißen zwei zusätzliche Draw Calls für die **gesamte** ferne Flotte,
+unabhängig von ihrer Zahl — gemessen 3254 auf 3258.
+
+Ob eine Lampenfläche Rücklicht oder Scheinwerfer ist, entscheidet der
+Blauanteil und nicht Rot gegen Grün: das warme Scheinwerferweiß 0xffd9a4 hat
+linear r = 1,00 und g = 0,71 und wäre über diesen Vergleich ebenfalls „rot"
+gewesen. Über Blau trennt es sauber, 0,37 gegen 0,03.
 
 ## Verkehr, der einander sieht
 
