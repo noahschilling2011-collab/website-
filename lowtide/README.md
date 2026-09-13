@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 166 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 169 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -453,6 +453,54 @@ verdeckt gewesen sein. Es war es nicht. In der Spielansicht bei 925 Metern:
 
 Achtundvierzig Prozent mehr Draw Calls für ein Bild, das sich in der zweiten
 Nachkommastelle unterscheidet. Bleibt bei 130 Metern.
+
+## Eine Innenstadt, in der jemand geht
+
+Gemessen standen an der Hauptkreuzung **vier** Leute im Umkreis von sechzig
+Metern, am Strand vierundzwanzig. Eine Stadt, in der niemand zu Fuß
+unterwegs ist, ist der auffälligste Unterschied zu jeder Aufnahme einer
+echten Stadt — und er war nie Absicht, nur nie nachgezählt.
+
+Der erste Versuch rasterte den Kern in Dreizehnmeterschritten ab und nahm,
+was neben einer Fahrbahn liegt. Er fand dort **null** Stellen: das Gehwegband
+ist sieben Meter breit, das Raster war doppelt so grob und ist immer daran
+vorbeigesprungen. Nachgezählt an fünfundvierzig Proben im Kern —
+einundzwanzig auf der Fahrbahn, vierundzwanzig zu weit weg, keine einzige
+dazwischen.
+
+Jetzt wird nicht gerastert, sondern die Fahrbahnen werden entlanggegangen:
+alle achtzehn Meter, beidseitig, drei Meter hinter der Bordsteinkante. Der
+Gehweg kommt damit aus der Straße selbst und stimmt auch dann noch, wenn sich
+das Raster der Stadt ändert.
+
+| | vorher | jetzt |
+|---|---|---|
+| Figuren gesamt | 157 | 297 |
+| an der Kreuzung, Umkreis 60 m | 4 | 12 |
+| Draw Calls Kreuzung 13 Uhr | 1697 | 1790 |
+| Dreiecke Kreuzung 13 Uhr | 1.933.960 | 1.986.664 |
+
+Gedeckelt ist es bei hundertvierzig zusätzlichen Figuren. Der ungebremste
+Lauf ergab 283 und damit 440 insgesamt; die Grenze ist dabei nicht die
+Zeichenlast — die stieg an der Kreuzung nur von 1975 auf 2130 Draw Calls —,
+sondern die Simulation: bei jedem Tageswechsel um 8, 17 und 20 Uhr sucht
+jede Figur im selben Tick einen neuen Weg.
+
+**Und ein alter Fehler kam dabei heraus.** Die neue Prüfung fragte, wer auf
+einer Fahrbahn steht, und meldete dreiundzwanzig. Die stammten aus den
+älteren Mengen-Schleifen, die nie gegen Straßen geprüft haben —
+Handtuchreihen, die über die Uferstraße reichen, und von Hand gesetzte
+Gehwegpunkte. Die Figuren entstehen an vier Stellen mit unterschiedlicher
+Absicht; statt dieselbe Prüfung viermal einzubauen, schiebt jetzt ein
+Nachlauf an einer Stelle jeden aus der Spur.
+
+Die Prüfung selbst musste dreimal umformuliert werden, und das ist der
+lehrreiche Teil: „niemand steht auf der Fahrbahn" ist die falsche Frage, denn
+ein Fußgänger, der eine Straße überquert, tut genau das. Erst gegen `path[0]`
+geprüft — trifft die Rundgänge falsch, die auf `path[i%4]` starten. Dann
+gegen die Position zu einem beliebigen Zeitpunkt — meldet jeden
+Überquerenden. Tragfähig ist der Anteil: ein paar Prozent sind Verkehr, ein
+Drittel wäre eine Menge, die in den Fahrspuren wohnt.
 
 ## Was Zeichenaufrufe kostet
 

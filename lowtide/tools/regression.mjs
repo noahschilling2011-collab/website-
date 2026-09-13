@@ -930,6 +930,30 @@ pruefe('Der Stausee ist Wasser, kein bemalter Boden', stausee.mitte && stausee.b
 pruefe('Man schwimmt im Stausee, statt darauf zu stehen', stausee.y < -.2, `y = ${stausee.y.toFixed(2)}`);
 pruefe('Unter dem See liegt eine Wanne', stausee.tiefste < -3, `tiefster Punkt ${stausee.tiefste}`);
 pruefe('Die Böschung ist Land', !stausee.ufer);
+// Die Innenstadt war leer: an der Hauptkreuzung standen vier Leute im
+// Umkreis von sechzig Metern, am Strand vierundzwanzig.
+const gehwege = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim;
+ const umkreis = (x, z, r) => s.npcs.filter(n => Math.hypot(n.x - x, n.z - z) < r).length;
+ // Wie viele stehen gerade in einer Fahrspur? "Keiner" wäre die falsche
+ // Frage: ein Fußgänger, der eine Straße überquert, steht darauf, und das
+ // soll er. Zwei Fassungen davor sind daran gescheitert — erst gegen
+ // path[0] geprüft, was die Rundgänge aus simulation.js falsch trifft (die
+ // setzen die Figur auf path[i%4]), dann gegen die Position zu einem
+ // beliebigen Zeitpunkt, was jeden Überquerenden meldet. Die tragfähige
+ // Frage ist der Anteil: ein paar Prozent sind Verkehr, ein Drittel wäre
+ // eine Menge, die in den Fahrspuren wohnt.
+ const aufStrasse = s.npcs.filter(n => L.onRoad(n.x, n.z, 0)).length;
+ return {kreuzung: umkreis(-100, 20, 60), strand: umkreis(100, 250, 60),
+  gesamt: s.npcs.length, aufStrasse};
+});
+pruefe('Auf den Gehwegen der Innenstadt geht jemand', gehwege.kreuzung >= 8,
+ `${gehwege.kreuzung} im Umkreis von 60 m an der Kreuzung`);
+pruefe('Die Menge ist über die Stadt verteilt, nicht nur am Strand',
+ gehwege.gesamt >= 250, `${gehwege.gesamt} Figuren`);
+pruefe('Die Menge wohnt nicht in den Fahrspuren',
+ gehwege.aufStrasse / gehwege.gesamt < .1,
+ `${gehwege.aufStrasse} von ${gehwege.gesamt} gerade auf einer Fahrbahn`);
 pruefe('Sparmodus schaltet die Nachbearbeitung ab', await page.evaluate(() => {
  const knopf = document.getElementById('qualityBtn'), w = window.LOWTIDE.world;
  knopf.click();

@@ -1,5 +1,5 @@
 import {Simulation,clamp,distance,intersects,lineClear,places} from './simulation.js';
-import {bounds,locations,vehicleTypes,weapons,waterAt,groundAt,roadSegments,immobilien,rennen,schatzOrte} from './content.js';
+import {bounds,locations,vehicleTypes,weapons,waterAt,groundAt,roadSegments,immobilien,rennen,schatzOrte,onRoad} from './content.js';
 import {findPath} from './navigation.js';
 import {storyAufbau,storyZiel,storyTitel,storyAktion,storyTick,konvoiRammen,starteAkt,beendeKampagne,storyReparieren} from './story.js';
 export class Campaign extends Simulation{
@@ -127,6 +127,52 @@ export class Campaign extends Simulation{
    const x=-316+(i%3)*60, z=-124+Math.floor(i/3)*32;
    menge.push([x,z,[{x,z},{x:x+16,z},{x:x+16,z:z+13},{x,z:z+13}]]);
   }
+  // Gehwege der Kernstadt. Gemessen standen an der Hauptkreuzung vier Leute
+  // im Umkreis von sechzig Metern, am Strand vierundzwanzig — eine
+  // Innenstadt, in der niemand geht, ist der auffälligste Unterschied zu
+  // jeder Aufnahme einer echten Stadt.
+  //
+  // Die Stellen werden nicht von Hand gesetzt, sondern gesucht: ein Raster
+  // über den Kern, und genommen wird, was neben einer Fahrbahn liegt, aber
+  // nicht darauf — das ist die Definition eines Gehwegs. Damit landet
+  // niemand in einer Wand oder auf der Straße, auch wenn sich das Raster
+  // der Stadt noch einmal ändert.
+  // Der erste Versuch rasterte den Kern in Dreizehnmeterschritten ab und
+  // nahm, was neben einer Fahrbahn liegt. Er fand dort null Stellen: das
+  // Gehwegband ist sieben Meter breit, das Raster war doppelt so grob und
+  // ist immer daran vorbeigesprungen. Nachgezählt an fünfundvierzig Proben
+  // im Kern — einundzwanzig auf der Fahrbahn, vierundzwanzig zu weit weg,
+  // keine einzige dazwischen.
+  //
+  // Also nicht rastern, sondern die Fahrbahnen entlanggehen und den Gehweg
+  // aus der Straße selbst ableiten: alle achtzehn Meter, beidseitig, drei
+  // Meter hinter der Bordsteinkante.
+  let gefunden=0;
+  for(const r of roadSegments){
+   const mx=(r.x1+r.x2)/2, mz=(r.z1+r.z2)/2;
+   if(mx<-360||mx>70||mz<-160||mz>120)continue;
+   const laenge=Math.hypot(r.x2-r.x1,r.z2-r.z1);
+   if(laenge<30)continue;
+   const nordSued=r.x1===r.x2;
+   const versatz=r.w/2+3;
+   // Gedeckelt: der ungebremste Lauf ergab 283 zusätzliche Figuren und damit
+   // 440 insgesamt. Das ist nicht die Zeichenlast — die stieg an der
+   // Kreuzung nur von 1975 auf 2130 Draw Calls —, sondern die Simulation:
+   // bei jedem Tageswechsel um 8, 17 und 20 Uhr sucht jede Figur in
+   // demselben Tick einen neuen Weg. Hundertvierzig sind der Kompromiss.
+   for(let d=14;d<laenge-14&&gefunden<140;d+=18)for(const seite of [-1,1]){
+    const t=d/laenge;
+    const x=r.x1+(r.x2-r.x1)*t+(nordSued?seite*versatz:0);
+    const z=r.z1+(r.z2-r.z1)*t+(nordSued?0:seite*versatz);
+    if(onRoad(x,z,0)||this.blocked({x,z},1.4)||waterAt(x,z))continue;
+    // Der Weg läuft am Bordstein entlang, Richtung wechselt je Person.
+    const l=(gefunden%2?1:-1)*(16+(gefunden%3)*8);
+    const ziel=nordSued?{x,z:z+l}:{x:x+l,z};
+    if(onRoad(ziel.x,ziel.z,0)||this.blocked(ziel,1.4))continue;
+    menge.push([x,z,[{x,z},ziel,{x,z}]]);
+    gefunden++;
+   }
+  }
   // Marina und Strandpromenade auf Isla Serena.
   for(let i=0;i<10;i++){
    const x=246+i*11, z=(i%2)?163:288;
@@ -138,13 +184,41 @@ export class Campaign extends Simulation{
    menge.push([x,z,[{x,z},{x:x+7,z},{x:x+7,z:z+6},{x,z:z+6}]]);
   }
   menge.forEach(([x,z,path],k)=>{
-   if(this.blocked({x,z},1.2)||waterAt(x,z))return;
+   // onRoad war hier nie dabei: dreiundzwanzig Leute aus den älteren
+   // Schleifen standen auf der Fahrbahn — Handtuchreihen am Strand, die über
+   // die Uferstraße reichen, und Gehwegpunkte der westlichen Innenstadt, die
+   // von Hand gesetzt wurden. Gefunden hat sie die neue Prüfung, nicht das
+   // Auge. Wegpunkte dürfen weiter über die Straße führen; ein Fußgänger,
+   // der eine Straße überquert, tut genau das.
+   if(this.blocked({x,z},1.2)||waterAt(x,z)||onRoad(x,z,0))return;
    this.npcs.push({id:200+k,x,z,yaw:0,state:'normal',timer:0,health:100,
     path,target:1,personality:['caller','filmer','coward','aggressive'][k%4],
     pace:.85+(k%7)*.13,report:null,stun:0,schedule:'street',
     home:{...path[0]},work:{...(path[2]||path[path.length-1])},
     originalPath:path.map(q=>({...q}))});
   });
+
+  // Wer auf der Fahrbahn steht, wird an den Rand geschoben. Die Figuren
+  // entstehen an vier Stellen mit unterschiedlicher Absicht — Rundgänge aus
+  // simulation.js, Blöcke aus campaign.js, Wachen, Menge —, und keine davon
+  // hat je gegen die Straßen geprüft. Ein Nachlauf an einer Stelle ist
+  // sauberer als dieselbe Prüfung viermal einzubauen: neunzehn Leute standen
+  // in einer Fahrspur, gefunden von der Prüfung, nicht vom Auge.
+  for(const n of this.npcs){
+   if(!onRoad(n.x,n.z,0))continue;
+   let weg=null;
+   for(let r=2.5;r<=12&&!weg;r+=2.5)for(let a=0;a<8&&!weg;a++){
+    const x=n.x+Math.cos(a*Math.PI/4)*r, z=n.z+Math.sin(a*Math.PI/4)*r;
+    if(onRoad(x,z,0)||this.blocked({x,z},1.2)||waterAt(x,z))continue;
+    weg={x,z};
+   }
+   if(!weg)continue;
+   const dx=weg.x-n.x, dz=weg.z-n.z;
+   n.x=weg.x; n.z=weg.z;
+   if(n.path?.[0]){n.path[0].x+=dx; n.path[0].z+=dz;}
+   if(n.home){n.home.x+=dx; n.home.z+=dz;}
+   if(n.originalPath?.[0]){n.originalPath[0].x+=dx; n.originalPath[0].z+=dz;}
+  }
 
   // Transport, Fluchtboot und die vier Aktwachen. Sie entstehen hier und
   // nicht erst beim Missionsstart, weil die Meshes einmalig nach Index
