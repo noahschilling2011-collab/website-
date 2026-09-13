@@ -1,5 +1,5 @@
 import {Simulation,clamp,distance,intersects,lineClear,places} from './simulation.js';
-import {bounds,locations,vehicleTypes,weapons,waterAt,groundAt,roadSegments,immobilien,rennen,schatzOrte,onRoad} from './content.js';
+import {bounds,locations,vehicleTypes,weapons,waterAt,groundAt,roadSegments,immobilien,rennen,schatzOrte,onRoad,STADTGEBIETE} from './content.js';
 import {findPath} from './navigation.js';
 import {storyAufbau,storyZiel,storyTitel,storyAktion,storyTick,konvoiRammen,starteAkt,beendeKampagne,storyReparieren} from './story.js';
 export class Campaign extends Simulation{
@@ -222,10 +222,40 @@ export class Campaign extends Simulation{
   // Also nicht rastern, sondern die Fahrbahnen entlanggehen und den Gehweg
   // aus der Straße selbst ableiten: alle achtzehn Meter, beidseitig, drei
   // Meter hinter der Bordsteinkante.
+  // Wo die Menge entsteht, stand als festes Rechteck da: x von -360 bis 70,
+  // z von -160 bis 120. Das war die Innenstadt, bevor die Karte sich
+  // verdoppelt hat, und danach ist es nie nachgezogen worden. Nachgemessen
+  // im laufenden Spiel: **Rosalind hatte null Einwohner**, der nächste
+  // Mensch stand 528 Meter entfernt — eine zweite Stadt mit Bank, Läden,
+  // Markisen und Verkehr, in der niemand wohnt. Im Nordquartier standen
+  // zwei Leute im Umkreis von sechzig Metern, im Westviertel sieben; 240 von
+  // 414 Figuren, also 58 Prozent, drängten sich im Umkreis von 250 Metern
+  // der alten Hauptkreuzung.
+  //
+  // Dieselbe Klasse Fehler wie bei den Verkehrsrunden und den Gehwegen auf
+  // dem Land: von Hand notierte Koordinaten, die an eine Karte gebunden
+  // sind, die es nicht mehr gibt. Gefragt wird jetzt STADTGEBIETE — dieselbe
+  // Liste, die auch über Bordstein und Laterne entscheidet.
+  //
+  // Je Gebiet ein eigener Deckel, sonst frisst die Innenstadt das ganze
+  // Kontingent, bevor die Schleife bei Rosalind ankommt. Und ein eigener
+  // Abstand: Port Mercy alle achtzehn Meter wie bisher, eine Landstadt alle
+  // vierunddreißig. Ein Segment gehört dem ersten Gebiet, das es enthält —
+  // die Rechtecke stoßen an z = -140 aneinander, und ohne die Regel stünden
+  // dort zwei Leute auf demselben Fleck.
   let gefunden=0;
+  const zuGebiet=new Map();
   for(const r of roadSegments){
    const mx=(r.x1+r.x2)/2, mz=(r.z1+r.z2)/2;
-   if(mx<-360||mx>70||mz<-160||mz>120)continue;
+   const gi=STADTGEBIETE.findIndex(g=>mx>=g.x1&&mx<=g.x2&&mz>=g.z1&&mz<=g.z2);
+   if(gi>=0)(zuGebiet.get(gi)||zuGebiet.set(gi,[]).get(gi)).push(r);
+  }
+  for(const [gi,segmente] of zuGebiet){
+   const kern=gi===0;
+   const schritt=kern?18:34, deckel=kern?260:70;
+   let hier=0;
+   for(const r of segmente){
+   if(hier>=deckel)break;
    const laenge=Math.hypot(r.x2-r.x1,r.z2-r.z1);
    if(laenge<30)continue;
    const nordSued=r.x1===r.x2;
@@ -242,7 +272,7 @@ export class Campaign extends Simulation{
    //
    // Was tatsächlich mitwächst, ist die Zeichenlast: an der Kreuzung 1839
    // auf 1902 Draw Calls.
-   for(let d=14;d<laenge-14&&gefunden<260;d+=18)for(const seite of [-1,1]){
+   for(let d=14;d<laenge-14&&hier<deckel;d+=schritt)for(const seite of [-1,1]){
     const t=d/laenge;
     const x=r.x1+(r.x2-r.x1)*t+(nordSued?seite*versatz:0);
     const z=r.z1+(r.z2-r.z1)*t+(nordSued?0:seite*versatz);
@@ -255,7 +285,8 @@ export class Campaign extends Simulation{
    // Meer — 28 von 12.420 Proben über dreißig Sekunden.
    if(onRoad(ziel.x,ziel.z,0)||this.blocked(ziel,1.4)||waterAt(ziel.x,ziel.z))continue;
     menge.push([x,z,[{x,z},ziel,{x,z}]]);
-    gefunden++;
+    gefunden++;hier++;
+   }
    }
   }
   // Marina und Strandpromenade auf Isla Serena.

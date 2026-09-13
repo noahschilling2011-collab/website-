@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 255 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 256 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1318,6 +1318,81 @@ wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
 besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
+
+## Rosalind hatte null Einwohner
+
+Eine zweite Stadt mit Bank, Futtermittelhandel, Markisen, Schildern und
+Verkehr — und niemandem darin. Nachgemessen im laufenden Spiel stand der
+nächste Mensch **528 Meter** entfernt.
+
+Die Verteilung insgesamt:
+
+| Ort | Leute im Umkreis von 60 m | nächster Mensch |
+|---|---|---|
+| Rosalind | 0 | 528 m |
+| Nordquartier | 2 | 35 m |
+| Westviertel | 7 | 48 m |
+| Hauptkreuzung Port Mercy | 14 | 17 m |
+| Undertow | 25 | 9 m |
+
+240 von 414 Figuren, **58 Prozent**, drängten sich im Umkreis von 250 Metern
+der alten Hauptkreuzung.
+
+Der Grund stand in einer Zeile in `campaign.js`:
+
+```js
+if(mx<-360||mx>70||mz<-160||mz>120)continue;
+```
+
+Das war die Innenstadt, bevor die Karte sich verdoppelt hat, und danach ist
+es nie nachgezogen worden. Dieselbe Klasse Fehler wie bei den Verkehrsrunden
+und den Gehwegen auf dem Land: von Hand notierte Koordinaten, gebunden an
+eine Karte, die es nicht mehr gibt.
+
+Gefragt wird jetzt `STADTGEBIETE` — dieselbe Liste, die auch über Bordstein,
+Laterne und Parkbucht entscheidet. Dazu zwei Regeln, die vorher nicht nötig
+waren:
+
+* **Ein Deckel je Gebiet.** Sonst frisst die Innenstadt das ganze Kontingent,
+  bevor die Schleife bei Rosalind ankommt: 260 für Port Mercy wie bisher, 70
+  für jedes andere.
+* **Ein eigener Abstand je Gebiet.** Port Mercy alle achtzehn Meter wie
+  bisher, eine Landstadt alle vierunddreißig.
+* Ein Segment gehört dem **ersten** Gebiet, das es enthält. Die Rechtecke
+  stoßen bei z = -140 aneinander; ohne die Regel stünden dort zwei Leute auf
+  demselben Fleck.
+
+Danach:
+
+| Stadtgebiet | Leute darin |
+|---|---|
+| Port Mercy | 276 |
+| Nordquartier | 56 |
+| Sunset Suburbs | 47 |
+| Westviertel | 37 |
+| Rosalind | 33 |
+| South Beach | 14 |
+| Isla Serena | 12 |
+
+414 → 530 Figuren, und in Rosalind steht der nächste Mensch jetzt elf Meter
+statt 528 entfernt.
+
+**Was es kostet: fast nichts.** An der Kreuzung 1842 → 1846 Draw Calls, am
+Strand 1287 → 1250. Der Grund steht in `tick()`: verarbeitet wird nur, wer
+näher als 180 Meter ist, und wer weiter weg ist, wird als grobe Silhouette
+instanziert. Der Simulationsschritt liegt bei 530 Figuren und 144 Wagen bei
+**0,50 ms**, im teuersten Fall — dem Tageswechsel um 8 Uhr — bei **0,76 ms**.
+Das sind drei beziehungsweise viereinhalb Prozent eines
+Sechzehntelsekunden-Bildes.
+
+**Ein Rest, der nicht behoben ist.** Das Nordquartier hat 56 Einwohner auf
+einem Rechteck von 630 Metern Länge, und an meinem Probepunkt standen
+weiterhin nur zwei. Nachgezählt liegen dort nur **zwei Straßensegmente** über
+dreißig Metern — die Menge entsteht am Bordstein, und wo keine Straße ist,
+steht auch niemand. Das ist eine Frage des Straßennetzes, nicht des
+Erzeugers, und bleibt offen.
+
+256 Prüfungen bestanden, keine gefallen.
 
 ## Die langen Hauswände waren fugenlose Platten
 

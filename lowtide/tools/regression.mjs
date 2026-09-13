@@ -1553,6 +1553,19 @@ pruefe('Auf den Gehwegen der Innenstadt geht jemand', gehwege.kreuzung >= 8,
  `${gehwege.kreuzung} im Umkreis von 60 m an der Kreuzung`);
 pruefe('Die Menge ist über die Stadt verteilt, nicht nur am Strand',
  gehwege.gesamt >= 250, `${gehwege.gesamt} Figuren`);
+// Wo die Menge entsteht, stand als festes Rechteck da — die Innenstadt, bevor
+// sich die Karte verdoppelt hat. Rosalind hatte dadurch null Einwohner, der
+// nächste Mensch stand 528 Meter entfernt. Gefragt wird jetzt STADTGEBIETE,
+// dieselbe Liste, die über Bordstein und Laterne entscheidet; geprüft wird
+// gegen genau diese Liste und nicht gegen abgeschriebene Koordinaten.
+const bewohner = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim;
+ return L.stadtgebiete.map((g, i) => ({i,
+  leute: s.npcs.filter(q => q.x >= g.x1 && q.x <= g.x2 && q.z >= g.z1 && q.z <= g.z2).length}));
+});
+pruefe('In jedem Stadtgebiet wohnt jemand',
+ bewohner.length >= 7 && bewohner.every(g => g.leute >= 10),
+ bewohner.map(g => `${g.i}: ${g.leute}`).join(', '));
 pruefe('Die Menge wohnt nicht in den Fahrspuren',
  gehwege.aufStrasse / gehwege.gesamt < .1,
  `${gehwege.aufStrasse} von ${gehwege.gesamt} gerade auf einer Fahrbahn`);
