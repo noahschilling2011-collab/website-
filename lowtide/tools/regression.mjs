@@ -656,6 +656,39 @@ await bilder(1);
 pruefe('P öffnet das Telefon', await page.evaluate(() => !document.getElementById('phone').hidden));
 pruefe('Startseite zeigt alle Apps', await page.evaluate(() =>
  document.querySelectorAll('#phoneKacheln button').length >= 10));
+// Jede App muss etwas anzeigen. Eine Kachel, die auf eine leere Seite führt,
+// ist ein Menüpunkt und kein Programm — geprüft wird die Textlänge, die Zahl
+// der Knöpfe und ob eine Leinwand darin steckt.
+const appInhalte = await page.evaluate(() => {
+ const namen = [...document.querySelectorAll('#phoneKacheln button')].map(b => b.textContent.trim());
+ const aus = {};
+ for (const n of namen) {
+  const b = [...document.querySelectorAll('#phoneKacheln button')].find(x => x.textContent.trim() === n);
+  b.click();
+  const i = document.getElementById('phoneInhalt');
+  const text = (i?.textContent || '').replace(/\s+/g, ' ').trim();
+  aus[n] = {laenge: text.length, teile: i ? i.querySelectorAll('button, canvas, img').length : 0};
+  document.getElementById('phoneHome')?.click();
+ }
+ return aus;
+});
+pruefe('Jede App des Telefons zeigt etwas an',
+ Object.values(appInhalte).every(a => a.laenge >= 25 || a.teile > 0),
+ Object.entries(appInhalte).map(([k, v]) => `${k} ${v.laenge}`).join(', '));
+// Und die Kamera legt ihre Aufnahme wirklich in der Galerie ab.
+pruefe('Die Kamera füllt die Galerie', await page.evaluate(async () => {
+ const hin = n => {const b = [...document.querySelectorAll('#phoneKacheln button')].find(x => x.textContent.includes(n)); b && b.click();};
+ hin('KAMERA');
+ const vorher = (window.LOWTIDE.sim.fotos || []).length;
+ document.querySelector('#phoneInhalt button')?.click();
+ await new Promise(r => setTimeout(r, 400));
+ const nachher = (window.LOWTIDE.sim.fotos || []).length;
+ document.getElementById('phoneHome')?.click();
+ hin('GALERIE');
+ const bilder = document.getElementById('phoneInhalt')?.querySelectorAll('img, canvas').length || 0;
+ document.getElementById('phoneHome')?.click();
+ return nachher === vorher + 1 && bilder >= 1;
+}));
 pruefe('Telefon pausiert das Spiel', await page.evaluate(() => window.LOWTIDE.sim.paused));
 pruefe('TIDELINE zeigt, was in der Welt passiert ist', await page.evaluate(() => {
  const s = window.LOWTIDE.sim;

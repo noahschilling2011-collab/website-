@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 187 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 244 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1297,6 +1297,16 @@ Schaden an, er betäubt, und die Messung sah nur auf Lebenspunkte. Vierte
 Prüfung in dieser Sitzung, die falsch gestellt war, diesmal vor dem
 Eintragen bemerkt.
 
+**Das Telefon** war das letzte Teilsystem, das in dieser Sitzung noch keiner
+nachgemessen hatte — Verdacht: eine der elf Kacheln führt auf eine leere
+Seite. Tut sie nicht. Alle elf (Karte, Nachrichten, Tideline, Bank, Wetter,
+Kamera, Kontakte, Aufträge, Galerie, Radio, Besitz) zeigen echten Inhalt:
+die Karte eine gezeichnete Leinwand, das Radio sieben Sender, Besitz acht
+Immobilien, der Rest Text. Auch der Weg Kamera → Galerie schließt sich:
+`sim.fotos` wächst von 0 auf 1, und in der Galerie steht die Aufnahme mit
+Ort, Uhrzeit und dem Knopf zum Posten. Zwei Prüfungen halten das jetzt fest,
+weil eine App, die niemand aufruft, still kaputtgehen kann.
+
 **Der Spielstand** überlebt den vollen Rundlauf. Die Prüfung stand auf einem
 einzigen Feld — Geld —; jetzt auf achtundzwanzig: Ort, Leben, Waffe mit
 Magazin und Reserve, Kleidung, Haar, Tattoo, Fitness, Fänge, Uhrzeit, Wetter,
@@ -1315,6 +1325,8 @@ zurück.
 damit bei breiten Wänden lückenhaft. Nachgemessen sind alle sechzehn Häuser
 18,8 mal 38,8 Meter, das Raster deckt 14 von 18,8 und 32 von 38,8 — kein
 Fenster ragt über eine Kante.
+
+244 Prüfungen bestanden, keine gefallen.
 
 ## Eine Fundstelle, an die man nicht herankam
 
