@@ -1319,6 +1319,57 @@ besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
 
+## Der Nationalpark war ein lichter Hain
+
+Mit der reparierten Sonde steht CYPRESS NATIONAL PARK auf 7,79 — zweitletzter
+Platz. Anders als beim kahlen Bergrücken ist das bei einem Wald ein Befund
+und keine Eigenschaft: ein Wald besteht aus Kanten.
+
+Nachgezählt: **620 Bäume auf 200 mal 300 Metern**, einer je 97 Quadratmeter.
+Ein Nadelwald steht bei einem Baum je zehn bis fünfundzwanzig. Unterholz gab
+es überhaupt keines — 22 umgestürzte Stämme auf sechs Hektar, einer je 2,7
+Hektar, und sonst nichts zwischen Krone und Boden.
+
+Jetzt **1700 Bäume** (einer je 35 Quadratmeter; dichter geht am Hang nicht,
+ohne dass Serpentine und Zeltplätze zuwachsen) und **900 Stück Unterholz**,
+eines je siebzig Quadratmeter: Farnbüschel aus drei geneigten Wedeln,
+Baumstrünke mit abgebrochener Kante, Totholz mit zwei Ästen, bemooste Blöcke
+und flache Laubflecken. Alle drei neuen Sorten weichen Straße und Zeltplatz
+aus.
+
+**Und wieder zeigt der örtliche Kontrast in die falsche Richtung: 7,82 → 7,68.**
+Zwei andere Werte derselben Messung tun es nicht:
+
+| | vorher | nachher |
+|---|---|---|
+| örtlicher Kontrast | 7,82 | 7,68 |
+| Sättigung | 25,8 % | **31,8 %** |
+| mittlere Helligkeit | 165,7 | **159,9** |
+
+Das Bild ist dunkler und satter geworden, weil Kronen den hellen Boden
+verdecken — genau das, was ein dichter Wald tut. Der Kantenzähler sieht davon
+nichts, weil er benachbarte Bildpunkte vergleicht und zwei Nadelbäume
+nebeneinander dieselbe Farbe haben. Das ist der dritte Fall in dieser
+Sitzung, in dem diese eine Zahl eine belegbare Verbesserung nicht abbildet;
+Sättigung und Helligkeit aus derselben Messung schon.
+
+**Was es kostet.** Draw Calls praktisch nichts — die Bäume liegen in den
+beiden InstancedMeshes des Laubwerks:
+
+| Ort | Uhr | Draw Calls | Dreiecke |
+|---|---|---|---|
+| Kreuzung Downtown | 13 | 1846 → 1849 | 1.558.994 → 1.617.846 |
+| Hafen | 13 | 1663 → 1662 | 1.506.286 → 1.565.574 |
+| Strand | 13 | 1250 → 1284 | 1.050.262 → 1.119.490 |
+
+Die Dreiecke steigen überall um rund 59.000, auch in der Innenstadt, wo vom
+Park nichts zu sehen ist: die Laubwerk-Meshes werden nicht je Instanz
+verworfen, ihre Dreiecke zählen also immer mit. Auf 1,6 Millionen sind das
+3,8 Prozent. Ein Beschnitt je Instanz wäre die saubere Lösung und ist nicht
+gebaut.
+
+256 Prüfungen bestanden, keine gefallen.
+
 ## Felsbänder auf dem Rücken — und zwei widerlegte Vermutungen
 
 Mit der reparierten Sonde steht TALON RIDGE mit **5,70** als schlechteste

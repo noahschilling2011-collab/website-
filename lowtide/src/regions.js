@@ -232,14 +232,57 @@ function bellweather(w, rng) {
 function cypressPark(w, rng) {
  // Der Hang aus groundAt bekommt Wald in Höhenbändern, Felsen, Wege,
  // Zeltplätze, eine Rangerstation und eine Aussichtsplattform.
- for (let k = 0; k < 620; k++) {
+ // Dichte: 620 Bäume auf 200 mal 300 Metern waren einer je 97 Quadratmeter —
+ // ein lichter Hain, kein Nationalpark. Ein Nadelwald steht bei einem Baum je
+ // zehn bis fünfundzwanzig Quadratmetern. 1700 Stück sind hier einer je 35;
+ // dichter geht am Hang nicht, ohne dass der Weg und die Zeltplätze zuwachsen.
+ // Die Bäume liegen in den beiden InstancedMeshes des Laubwerks, kosten also
+ // keine zusätzlichen Draw Calls.
+ for (let k = 0; k < 1700; k++) {
   const x = -580 + rng() * 200, z = -540 + rng() * 300;
   const y = groundAt(x, z);
-  if (waterAt(x, z) || w.sim.blocked({x, z}, 3)) continue;
+  if (waterAt(x, z) || w.sim.blocked({x, z}, 3) || aufStrasse(x, z, 4)) continue;
   const hoch = y > 26;
   if (hoch) nadelbaum(w, x, z, 7 + rng() * 7, rng() < .5 ? 0x36573f : 0x2f4c3a);
   else if (rng() < .62) nadelbaum(w, x, z, 8 + rng() * 8);
   else laubbaum(w, x, z, 7 + rng() * 6, 0x557a4c);
+ }
+ // Unterholz. Unter den Bäumen lag nichts: der Waldboden war dieselbe glatte
+ // Fläche wie eine Wiese, und im Bild vom Parkinneren gab es zwischen Krone
+ // und Boden keine einzige Kante. 900 Stück auf sechs Hektar sind eines je
+ // siebzig Quadratmeter — Farn, Strunk, Totholz, bemooster Block, Laubfleck.
+ for (let k = 0; k < 900; k++) {
+  const x = -578 + rng() * 196, z = -538 + rng() * 296;
+  if (waterAt(x, z) || w.sim.blocked({x, z}, 2) || aufStrasse(x, z, 3.5)) continue;
+  const y = groundAt(x, z), art = rng();
+  if (art < .34) {
+   // Farnbüschel: drei flache Wedel, unterschiedlich gedreht und geneigt.
+   const h = .5 + rng() * .7;
+   for (let f = 0; f < 3; f++)
+    w.box(x + (rng() - .5) * .8, y + h * .5, z + (rng() - .5) * .8, h * 1.8, h * .18, h * .9,
+     [0x3c5a34, 0x476a3c, 0x33502e][f % 3], rng() * 3.1, false, (rng() - .5) * .5, (rng() - .5) * .5);
+  } else if (art < .56) {
+   // Strunk mit abgebrochener Kante.
+   const d = .4 + rng() * .5, h = .5 + rng() * .8;
+   w.box(x, y + h / 2, z, d, h, d, 0x4c3c2a, rng() * 3.1);
+   w.box(x + d * .2, y + h + .08, z, d * .8, .16, d * .8, 0x5e4c34, rng() * 3.1, false, .18, .12);
+  } else if (art < .74) {
+   // Totholz: ein Stamm auf dem Boden, dazu zwei Äste.
+   const l = 2.5 + rng() * 4, dreh = rng() * 3.1;
+   w.box(x, y + .28, z, .45, .45, l, [0x5c4d38, 0x4e402e][k % 2], dreh, false, .05, (rng() - .5) * .1);
+   for (let e = 0; e < 2; e++)
+    w.box(x + (rng() - .5) * 2, y + .2, z + (rng() - .5) * 2, .18, .18, .8 + rng() * 1.4,
+     0x51422f, rng() * 3.1, false, (rng() - .5) * .4, 0);
+  } else if (art < .88) {
+   // Bemooster Block: Stein mit Moospolster obenauf.
+   const b = .7 + rng() * 1.3;
+   w.box(x, y + b * .3, z, b, b * .6, b * .9, [0x6d6f66, 0x5f6159][k % 2], rng() * 3.1);
+   w.box(x, y + b * .61, z, b * .9, b * .12, b * .8, 0x44603c, rng() * 3.1);
+  } else {
+   // Laubfleck: flach, dunkel, bricht die gleichmäßige Bodenfarbe auf.
+   const r2 = 1.4 + rng() * 2.6;
+   w.box(x, y + .07, z, r2, .1, r2 * .8, [0x4a4130, 0x554a35][k % 2], rng() * 3.1);
+  }
  }
  for (let k = 0; k < 90; k++) {
   const x = -575 + rng() * 190, z = -535 + rng() * 290, y = groundAt(x, z);
