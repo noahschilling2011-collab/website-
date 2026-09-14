@@ -2967,6 +2967,67 @@ pruefe('Fußgänger betreten die Fahrbahn dort, wo die Überwege liegen',
 // Wegeführung über die Überwege waren es 77, 56, 62 und 43. Die Prüfung fängt
 // den Rückfall, nicht die Schwankung.
 
+// Einrichtung. Die acht Innenräume haben Theken, Betten, Regale, eine
+// Hebebühne und einen Billardtisch — gezeichnet, aber nie als Hindernis
+// angemeldet. Gemessen war in sieben von acht Räumen exakt dieselbe Zahl
+// Felder blockiert, 29 von 841: die Brüstung der Schaufensterfront, das
+// einzige Solid, das es je gab. Man lief durch alles andere hindurch.
+const einrichtung = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim, w = L.world, orte = L.orte;
+ const IDS = ['garage', 'shop', 'clinic', 'home', 'club', 'diner', 'motel', 'records'];
+ const raeume = {};
+ for (const id of IDS) {
+  const l = orte[id];
+  if (!l) continue;
+  const b = id === 'garage' ? 22 : 16;
+  const links = l.x - b / 2 + .8, rechts = l.x + b / 2 - .8, hinten = l.z - 11, vorn = l.z + 3.2;
+  const schritt = .5, raster = new Map();
+  let frei = 0;
+  for (let x = links; x <= rechts; x += schritt) for (let z = hinten; z <= vorn; z += schritt) {
+   const ok = !s.blocked({x, z}, .35);
+   raster.set(Math.round(x / schritt) + '|' + Math.round(z / schritt), ok);
+   if (ok) frei++;
+  }
+  // Von der offenen Front aus fluten: ein Raum, in den man nicht kommt, wäre
+  // schlimmer als einer, durch dessen Theke man läuft.
+  const gesehen = new Set(), stapel = [];
+  for (let x = links; x <= rechts; x += schritt) {
+   const k = Math.round(x / schritt) + '|' + Math.round(vorn / schritt);
+   if (raster.get(k)) {gesehen.add(k); stapel.push({x, z: vorn});}
+  }
+  while (stapel.length) {
+   const p = stapel.pop();
+   for (const [dx, dz] of [[schritt, 0], [-schritt, 0], [0, schritt], [0, -schritt]]) {
+    const nx = p.x + dx, nz = p.z + dz;
+    if (nx < links - .01 || nx > rechts + .01 || nz < hinten - .01 || nz > vorn + .01) continue;
+    const k = Math.round(nx / schritt) + '|' + Math.round(nz / schritt);
+    if (gesehen.has(k) || !raster.get(k)) continue;
+    gesehen.add(k); stapel.push({x: nx, z: nz});
+   }
+  }
+  raeume[id] = {anteilFrei: frei / raster.size, anteilErreichbar: gesehen.size / Math.max(1, frei)};
+ }
+ const imHindernis = Object.entries(orte).filter(([, l]) => s.blocked({x: l.x, z: l.z}, .4)).map(([k]) => k);
+ // Und wie viele Hindernisse muss eine Abfrage anfassen? Ohne Ortsraster
+ // alle: die Wegesuche fragt blocked() für jeden geprüften Punkt.
+ let angefasst = 0, abfragen = 0;
+ for (let i = 0; i < 400; i++) {
+  const p = {x: -1100 + Math.random() * 1490, z: -540 + Math.random() * 1440};
+  angefasst += s.nahe(p, .4).length; abfragen++;
+ }
+ return {moebelSolids: w.moebelSolids || 0, solids: s.solids.length, raeume, imHindernis,
+  jeAbfrage: angefasst / abfragen};
+});
+pruefe('Die Einrichtung der Räume ist ein Hindernis',
+ einrichtung.moebelSolids >= 90 && Object.values(einrichtung.raeume).every(r => r.anteilFrei < .95),
+ `${einrichtung.moebelSolids} Möbel angemeldet, freier Boden ${Object.values(einrichtung.raeume).map(r => r.anteilFrei.toFixed(2)).join(' ')}`);
+pruefe('Jeder Raum bleibt von vorn begehbar',
+ Object.values(einrichtung.raeume).every(r => r.anteilErreichbar > .97) && einrichtung.imHindernis.length === 0,
+ `erreichbar ${Object.values(einrichtung.raeume).map(r => r.anteilErreichbar.toFixed(2)).join(' ')}, Marker im Hindernis: ${einrichtung.imHindernis.join(', ') || 'keiner'}`);
+pruefe('Hindernisse werden über ein Ortsraster gesucht',
+ einrichtung.solids > 150 && einrichtung.jeAbfrage < 5,
+ `${einrichtung.jeAbfrage.toFixed(1)} von ${einrichtung.solids} Hindernissen je Abfrage`);
+
 // Kulisse auf der Fahrbahn. Die Prüfung „Nichts Großes steht in einer
 // Fahrbahn" fängt nur, was mindestens drei Meter breit und zweieinhalb hoch
 // ist. Darunter standen 268 Gegenstände mitten auf einer Fahrspur:

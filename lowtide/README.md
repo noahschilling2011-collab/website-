@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 318 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 321 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1318,6 +1318,87 @@ wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
 besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
+
+## Man lief durch jede Theke
+
+Die acht Innenräume haben Boden, Decke, Licht und Einrichtung: Theken,
+Betten, Regale, eine Hebebühne, einen Billardtisch. Angemeldet als Hindernis
+war nichts davon. Gemessen, Raum für Raum auf einem Halbmeterraster
+abgetastet: in **sieben von acht Räumen exakt dieselbe Zahl blockierter
+Felder, 29 von 841** — das ist die Brüstung der Schaufensterfront, das
+einzige Solid, das es je gab.
+
+Statt jeden der rund zweihundert Zeichenaufrufe umzuschreiben, wird `box()`
+für die Dauer der Einrichtung abgefangen und angemeldet, was wirklich im Weg
+steht: Grundfläche mindestens einen halben Meter, Oberkante über 45
+Zentimetern, Unterkante unter 1,10 Metern. **107 Möbelstücke.** Freier Boden
+danach zwischen 57 Prozent (Diner) und 83 (Laden, Motel), und jeder Raum
+bleibt von der offenen Front aus vollständig begehbar.
+
+Der Marker des Ortes bleibt frei. Verschieben ließe er sich nicht — der ganze
+Raum rechnet sich aus ihm —, also bleibt das Möbelstück durchlässig, das ihn
+überdeckt: die Lücke in der Theke, an der der Kunde steht. Ohne das lagen die
+Marker von Diner und Archiv in einem Hindernis.
+
+## Und dann eine falsche Zuordnung, die sich gelohnt hat
+
+Mit den 107 neuen Hindernissen stieg der Simulationsschritt von 1,70 auf 2,16
+Millisekunden. Mein erster Schluss: `blocked()` läuft über alle Solids, und
+das sind jetzt 211 statt 104.
+
+Nachgemessen stimmt der Schluss nicht. `blocked()` kostet **0,10 von 2,16
+Millisekunden**. Und der Ausgangswert stimmte auch nicht: die 0,50 ms, die im
+PR standen, sind Monate alt — vor Lenkung, Entflechtung und Überwegen lag der
+Schritt bei 1,70, nicht bei 0,50. Die Einrichtung kostet 0,46 ms, nicht 1,4.
+
+Die Messung hat stattdessen den wirklichen Posten gezeigt:
+
+```
+wagenVoraus          1.674 ms   103 Rufe je Takt
+fussgaengerVoraus    0.199 ms    93
+blocked              0.103 ms   328
+```
+
+`wagenVoraus` war meine eigene Änderung aus der Verkehrsrunde. Sie schlägt
+zwei Nachschlagewerke und **zwei Winkelfunktionen je Fahrzeugpaar** auf, und
+zwar *vor* dem Abstandsfilter: bei 144 Fahrzeugen und 103 Aufrufen je Takt
+sind das fünfzehntausend Sinus- und Kosinusaufrufe in jedem Takt, fast alle
+für Wagen, die dreihundert Meter entfernt sind.
+
+Jetzt steht der Abstandsfilter vorn, und der Winkel zwischen zwei Wagen kommt
+aus den Additionstheoremen statt aus zwei neuen Aufrufen. Dazu ein Ortsraster
+für die Hindernisse — 24-Meter-Zellen, jedes Hindernis mit 2,2 Metern Rand
+eingetragen, sodass eine Abfrage die eine Zelle genügt. Statt 211 Hindernissen
+fasst eine Abfrage jetzt **0,8** an.
+
+| | vorher | nachher |
+|---|---|---|
+| Simulationsschritt | 2,16 ms | **0,83 ms** |
+| `wagenVoraus` | 1,674 ms | 0,510 ms |
+| Hindernisse je `blocked` | 211 | 0,8 |
+
+Also schneller als vor der Einrichtung, mit doppelt so vielen Hindernissen.
+
+### Was die neuen Hindernisse sonst noch umgeworfen haben
+
+Vier vorhandene Prüfungen fielen sofort um, und jede zu Recht:
+
+- **„Alle fünf Orte des zweiten Akts sind betretbar"** fragt den Standplatz
+  zwei Meter vor dem Marker ab, **„In jeden Innenraum führt ein freier Weg"**
+  die Raummitte vier Meter dahinter. Beide lagen jetzt in einer Theke. Statt
+  die Prüfungen zu lockern, bleibt ein Gang frei: 2,6 Meter breit auf der
+  Achse des Ortes, von der Front bis fünf Meter hinter den Marker.
+- **„Niemand steht im Wasser oder in einer Wand"** und **„Keine Figur läuft
+  durch eine Wand"** — die Figuren stehen und laufen seit dem Aufbau, die
+  Einrichtung meldet sich erst beim Bauen der Welt an. Ein Nachlauf versetzt
+  danach jede Figur und jeden Wegpunkt, der in einem Möbel liegt.
+
+Und ein Fehler von mir dazwischen: `sim.figurenAusHindernissen()` statt
+`this.sim...` — die Seite lud danach gar nicht mehr, `ReferenceError: sim is
+not defined`. Aufgefallen ist es, weil die nächste Sonde nach 180 Sekunden
+aufgab; die Konsole nennt den Fehler in der ersten Zeile.
+
+321 Prüfungen bestanden, keine gefallen.
 
 ## Zweihundertachtundsechzig Gegenstände auf der Fahrbahn
 

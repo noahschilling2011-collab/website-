@@ -474,7 +474,7 @@ export class Campaign extends Simulation{
   // angelegt werden — später eingefügte Fahrzeuge blieben unsichtbar.
   storyAufbau(this);
  }
- blocked(p,r=.4){return p.x<bounds.left+r||p.x>bounds.right-r||p.z<bounds.top+r||p.z>bounds.bottom-r||(this.solids||[]).some(b=>intersects(p,b,r));}
+ blocked(p,r=.4){return p.x<bounds.left+r||p.x>bounds.right-r||p.z<bounds.top+r||p.z>bounds.bottom-r||this.nahe(p,r).some(b=>intersects(p,b,r));}
  ground(p){return groundAt(p.x,p.z);}
  crime(severity=1){super.crime(severity);for(const n of this.npcs)if(n.report&&!n.report.description)n.report.description={clothes:this.player.clothes,plate:this.player.car?.id||null};}
  report(severity,pos=this.player,incident=null){
@@ -566,10 +566,10 @@ export class Campaign extends Simulation{
   p.x=c.x;p.z=c.z;p.yaw=c.yaw;p.y=c.alt;
  }
  blockedAir(p,alt){return p.x<bounds.left||p.x>bounds.right||p.z<bounds.top||p.z>bounds.bottom||this.solids.some(b=>intersects(p,b,1.2)&&groundAt(b.x,b.z)+b.h>alt);}
- shoot(){const p=this.player,w=weapons[p.weapon];if(!p.armed||p.cooldown>0||this.reloadJob||p.car)return;if(p.ammo<=0){this.notify('Leer. R / Nachladen.');return;}p.ammo--;p.cooldown=w.delay;this.shots++;let hit=null,nearest=w.range;const dir={x:Math.sin(p.yaw),z:Math.cos(p.yaw)};for(const n of [...this.npcs,...this.cops.filter(c=>c.active)]){const d=distance(p,n);if(n.health<=0||d>nearest||d<.01)continue;const dot=((n.x-p.x)*dir.x+(n.z-p.z)*dir.z)/d;if(dot>w.cone&&lineClear(p,n,this.solids)){nearest=d;hit=n;}}let end={x:p.x+dir.x*w.range,z:p.z+dir.z*w.range};if(hit){if(p.weapon==='taser')hit.stun=12;else hit.health=Math.max(0,hit.health-w.damage*(p.weapon==='shotgun'?Math.max(.3,1-nearest/35):1));hit.state=hit.health<=0?'verletzt':'flüchtend';hit.timer=12;end={x:hit.x,z:hit.z};}else{for(let d=1;d<w.range;d+=.5){const v={x:p.x+dir.x*d,z:p.z+dir.z*d};if(this.solids.some(b=>intersects(v,b))){end=v;break;}}}this.tracers.push({x:p.x,z:p.z,end,life:.12});this.crime(hit?2:1);this.saveWeapon();}
+ shoot(){const p=this.player,w=weapons[p.weapon];if(!p.armed||p.cooldown>0||this.reloadJob||p.car)return;if(p.ammo<=0){this.notify('Leer. R / Nachladen.');return;}p.ammo--;p.cooldown=w.delay;this.shots++;let hit=null,nearest=w.range;const dir={x:Math.sin(p.yaw),z:Math.cos(p.yaw)};for(const n of [...this.npcs,...this.cops.filter(c=>c.active)]){const d=distance(p,n);if(n.health<=0||d>nearest||d<.01)continue;const dot=((n.x-p.x)*dir.x+(n.z-p.z)*dir.z)/d;if(dot>w.cone&&this.sichtFrei(p,n)){nearest=d;hit=n;}}let end={x:p.x+dir.x*w.range,z:p.z+dir.z*w.range};if(hit){if(p.weapon==='taser')hit.stun=12;else hit.health=Math.max(0,hit.health-w.damage*(p.weapon==='shotgun'?Math.max(.3,1-nearest/35):1));hit.state=hit.health<=0?'verletzt':'flüchtend';hit.timer=12;end={x:hit.x,z:hit.z};}else{for(let d=1;d<w.range;d+=.5){const v={x:p.x+dir.x*d,z:p.z+dir.z*d};if(this.solids.some(b=>intersects(v,b))){end=v;break;}}}this.tracers.push({x:p.x,z:p.z,end,life:.12});this.crime(hit?2:1);this.saveWeapon();}
  reload(){const p=this.player,w=weapons[p.weapon];if(this.reloadJob||p.ammo>=w.capacity||!p.reserve)return;this.reloadJob={remaining:w.reload};p.cooldown=w.reload;this.notify('Nachladen …');}
- melee(){const p=this.player;if(p.car||p.cooldown>0)return;const target=this.npcs.filter(n=>n.health>0&&distance(n,p)<2.6&&lineClear(p,n,this.solids)).sort((a,b)=>distance(a,p)-distance(b,p))[0];p.cooldown=.7;this.meleeTime=.4;if(!target)return;const facing=(Math.sin(target.yaw)*(p.x-target.x)+Math.cos(target.yaw)*(p.z-target.z))/Math.max(.1,distance(p,target));if(p.sneak&&facing<-.2){target.stun=30;this.notify('Leiser Takedown.');}else{target.health=Math.max(0,target.health-25);target.stun=1;target.state='aggressiv';this.crime(1);}}
- grapple(){const n=this.npcs.find(n=>n.health>0&&distance(n,this.player)<2&&lineClear(n,this.player,this.solids));if(!n||this.player.cooldown>0)return;n.stun=4;this.player.cooldown=2;this.meleeTime=.8;this.crime(1);this.notify('Gegner kurz festgesetzt.');}
+ melee(){const p=this.player;if(p.car||p.cooldown>0)return;const target=this.npcs.filter(n=>n.health>0&&distance(n,p)<2.6&&this.sichtFrei(p,n)).sort((a,b)=>distance(a,p)-distance(b,p))[0];p.cooldown=.7;this.meleeTime=.4;if(!target)return;const facing=(Math.sin(target.yaw)*(p.x-target.x)+Math.cos(target.yaw)*(p.z-target.z))/Math.max(.1,distance(p,target));if(p.sneak&&facing<-.2){target.stun=30;this.notify('Leiser Takedown.');}else{target.health=Math.max(0,target.health-25);target.stun=1;target.state='aggressiv';this.crime(1);}}
+ grapple(){const n=this.npcs.find(n=>n.health>0&&distance(n,this.player)<2&&this.sichtFrei(n,this.player));if(!n||this.player.cooldown>0)return;n.stun=4;this.player.cooldown=2;this.meleeTime=.8;this.crime(1);this.notify('Gegner kurz festgesetzt.');}
  cover(){if(this.player.car)return;this.player.cover=!this.player.cover&&this.solids.some(b=>distance(this.player,b)<Math.hypot(b.w,b.d)/2+1.5);this.notify(this.player.cover?'In Deckung. Bewegung verlässt die Deckung.':'Keine Deckung / Deckung verlassen.');}
  jump(){const p=this.player;if(p.car)return;if(p.y>4){p.parachute=true;this.notify('Fallschirm geöffnet. Steuere mit WASD / Stick.');}else if(p.y>=0&&p.y<.2){p.vy=6.5;}}
  dodge(){const p=this.player;if(p.stamina<20||p.car)return;p.stamina-=20;this.dodgeTime=.45;this.move(p,-Math.cos(p.yaw)*2.5,Math.sin(p.yaw)*2.5);}
@@ -746,7 +746,7 @@ export class Campaign extends Simulation{
    n.pace=this.weather==='storm'?2:1.1+(n.id%5)*.13;
   }
  }
- updateGuards(dt){for(const n of this.npcs.filter(n=>n.guard&&!n.aktWache)){if(n.health<=0||n.stun>0)continue;n.shot=(n.shot||0)-dt;const p=this.player;const suspicious=this.campaign.stage===1&&!this.campaign.relay||p.armed||this.stars;const sees=distance(n,p)<25&&lineClear(n,p,this.solids);if(suspicious&&sees&&n.shot<=0){n.shot=2.5;if(!this.campaign.relay){this.report(1);this.notify('Archivwache hat dich erkannt.');}if(this.stars>=2&&this.dodgeTime===0)p.health-=p.cover?2:7;}}}
+ updateGuards(dt){for(const n of this.npcs.filter(n=>n.guard&&!n.aktWache)){if(n.health<=0||n.stun>0)continue;n.shot=(n.shot||0)-dt;const p=this.player;const suspicious=this.campaign.stage===1&&!this.campaign.relay||p.armed||this.stars;const sees=distance(n,p)<25&&this.sichtFrei(n,p);if(suspicious&&sees&&n.shot<=0){n.shot=2.5;if(!this.campaign.relay){this.report(1);this.notify('Archivwache hat dich erkannt.');}if(this.stars>=2&&this.dodgeTime===0)p.health-=p.cover?2:7;}}}
  updateEvents(dt){for(const n of this.npcs){if(n.state==='tanzend'&&this.time>n.danceUntil)n.state='normal';if(n.state==='aggressiv'&&n.health>0&&n.stun<=0){const target=this.npcs.find(v=>v!==n&&v.health>0&&distance(v,n)<8);if(target){const d=distance(n,target);if(d>1.5)this.move(n,(target.x-n.x)/d*dt*2,(target.z-n.z)/d*dt*2,.3);else{target.health=Math.max(0,target.health-dt*4);target.state='flüchtend';target.timer=4;}}if(this.time>n.aggressiveUntil)n.state='normal';}}this.nextEvent-=dt;if(this.currentEvent){this.currentEvent.ttl-=dt;if(this.currentEvent.ttl<=0)this.currentEvent=null;}if(this.nextEvent>0)return;this.nextEvent=50;const kinds=['Panne','Streit','Straßenrennen','Überfall','Party'];const kind=kinds[Math.floor(this.time/50)%kinds.length];const n=this.npcs.find(n=>!n.guard&&n.health>0&&distance(n,this.player)<60);this.currentEvent={kind,x:n?.x||-160,z:n?.z||80,ttl:25,npcId:n?.id};if(kind==='Streit'||kind==='Überfall'){if(n){n.state='aggressiv';n.aggressiveUntil=this.time+15;}}if(kind==='Straßenrennen'){const c=this.cars.find(c=>c.type==='traffic');if(c)c.speed=22;}if(kind==='Party'&&n){n.state='tanzend';n.danceUntil=this.time+20;}if(kind==='Panne'){const c=this.cars.find(c=>c.type==='traffic');if(c)c.wait=20;}this.notify('In der Nähe: '+kind);
   this.post('@tideline_lokal',{Panne:'Liegengebliebener Wagen blockiert eine Spur.',
    'Streit':'Streit auf offener Straße. Bitte Abstand halten.',
@@ -801,6 +801,37 @@ export class Campaign extends Simulation{
  // führen — oder null, wenn die Strecke keine Fahrbahn quert oder kein
  // Überweg nahe genug liegt. Fünfundvierzig Meter Umweg ist die Grenze;
  // darüber läuft die Figur wie bisher direkt.
+ // Nachlauf für neue Hindernisse. Die Einrichtung der Innenräume meldet sich
+ // erst an, wenn die Welt gebaut wird — also nach dem Aufstellen der Figuren
+ // und nach dem Legen ihrer Wege. Ohne diesen Nachlauf stand eine Figur in
+ // einer Theke und dreißig von 15900 Messpunkten lagen in einem Möbel.
+ figurenAusHindernissen(){
+  const frei=(x,z)=>!this.blocked({x,z},.45)&&!waterAt(x,z);
+  const ausweichen=(p,weite=7)=>{
+   for(let r=.6;r<=weite;r+=.6)for(let a=0;a<12;a++){
+    const x=p.x+Math.cos(a*Math.PI/6)*r, z=p.z+Math.sin(a*Math.PI/6)*r;
+    if(frei(x,z))return {x,z};
+   }
+   return null;
+  };
+  let versetzt=0;
+  for(const n of this.npcs){
+   if(this.blocked({x:n.x,z:n.z},.45)){
+    const weg=ausweichen(n);
+    if(weg){n.x=weg.x;n.z=weg.z;versetzt++;}
+   }
+   for(const weg of [n.path,n.originalPath]){
+    if(!weg)continue;
+    for(const q of weg){
+     if(!this.blocked({x:q.x,z:q.z},.45))continue;
+     const neu=ausweichen(q);
+     if(neu){q.x=neu.x;q.z=neu.z;versetzt++;}
+     else {q.x=n.x;q.z=n.z;}
+    }
+   }
+  }
+  return versetzt;
+ }
  ueberwegZwischen(a,b,id=0){
   const dx=b.x-a.x,dz=b.z-a.z,laenge=Math.hypot(dx,dz);
   if(laenge<6)return null;
@@ -875,12 +906,12 @@ export class Campaign extends Simulation{
  updatePolice(dt){if(!this.campaign){super.updatePolice(dt);return;}const p=this.player;this.spotted=false;const nowWanted=this.stars>0;
   for(const camera of this.cameras){if(!nowWanted||this.time<(camera.next||0))continue;const d=distance(p,camera),dot=(Math.sin(camera.yaw)*(p.x-camera.x)+Math.cos(camera.yaw)*(p.z-camera.z))/Math.max(1,d);if(d<camera.range&&dot>.2&&lineClear(camera,p,this.solids)&&p.y<5){camera.next=this.time+5;this.lastSeen={x:p.x,z:p.z};this.spotted=true;}}
   this.dispatchTimer-=dt;const desired=Math.min(12,this.stars*2);if(nowWanted&&this.dispatchTimer<=0){const n=this.cops.filter(c=>c.active&&c.health>0).length;if(n<desired){const c=this.cops.find(c=>!c.active&&c.health>0);if(c){c.active=true;c.repath=0;this.dispatchTimer=2.5;}}}
-  for(const c of this.cops){if(c.health<=0||c.stun>0)continue;if(!nowWanted&&!c.active&&distance(c,c.base)<2)continue;const d=distance(c,p),known=p.car?this.description?.plate===p.car.id:this.description?.clothes===p.clothes;const sees=nowWanted&&p.y<12&&d<(p.sneak||this.active===1?26:52)&&lineClear(c,p,this.solids)&&(known||d<10||p.armed);if(sees){this.spotted=true;this.lastSeen={x:p.x,z:p.z};this.description={clothes:p.clothes,plate:p.car?.id||null};}
+  for(const c of this.cops){if(c.health<=0||c.stun>0)continue;if(!nowWanted&&!c.active&&distance(c,c.base)<2)continue;const d=distance(c,p),known=p.car?this.description?.plate===p.car.id:this.description?.clothes===p.clothes;const sees=nowWanted&&p.y<12&&d<(p.sneak||this.active===1?26:52)&&this.sichtFrei(c,p)&&(known||d<10||p.armed);if(sees){this.spotted=true;this.lastSeen={x:p.x,z:p.z};this.description={clothes:p.clothes,plate:p.car?.id||null};}
    if(!nowWanted&&c.active){c.active=false;c.repath=0;}c.repath-=dt;if(c.repath<=0){let target=nowWanted&&c.active?(sees?p:this.lastSeen):c.base;if(!target)continue;if(nowWanted&&c.id%4===2&&this.stars>=3){if(!c.blockTarget)c.blockTarget=this.sperrstelle(c,p);if(c.blockTarget)target=c.blockTarget;}else if(nowWanted&&c.id%3===2&&this.stars>=3)target={x:target.x+Math.sin(p.yaw)*16,z:target.z+Math.cos(p.yaw)*16};c.route=findPath(c,target,v=>this.blocked(v,1.15)||waterAt(v.x,v.z),4,10000,v=>onRoad(v.x,v.z,0)?1:3.5);c.target=0;c.repath=sees?2.5:6;}
    const target=c.route[c.target];if(target&&!(sees&&d<8)){const td=distance(c,target);if(td<1.1)c.target++;else{c.yaw=Math.atan2(target.x-c.x,target.z-c.z);const speed=nowWanted?10+this.stars*1.4:8;this.move(c,Math.sin(c.yaw)*Math.min(td,speed*dt),Math.cos(c.yaw)*Math.min(td,speed*dt),1.15);}}
    if(nowWanted&&c.blockTarget&&distance(c,c.blockTarget)<7&&!c.blocking){c.blocking=true;const b=this.addSolid(c.x+4,c.z,5,1.2,'barrier',1);this.barriers.push(b);}if(!nowWanted){c.blockTarget=null;c.blocking=false;}c.shot-=dt;if(sees&&d<28&&c.shot<=0){c.shot=c.role==='tactical'?1:1.8;if(this.stars>=2&&this.dodgeTime<=0){p.health-=p.cover?1:p.car?2:c.role==='tactical'?8:5;this.tracers.push({x:c.x,z:c.z,end:{x:p.x,z:p.z},life:.1});}else if(d<4&&this.dodgeTime<=0)p.health-=5;}
   }
-  if(!nowWanted&&this.barriers.length){this.solids=this.solids.filter(b=>!this.barriers.includes(b));this.barriers=[];}const heli=this.policeHeli;if(heli){const target=this.stars>=5?(this.lastSeen||p):{x:-360,z:305};const d=distance(heli,target);heli.alt=Math.min(45,heli.alt+dt*8);if(d>4){heli.yaw=Math.atan2(target.x-heli.x,target.z-heli.z);heli.x+=Math.sin(heli.yaw)*dt*30;heli.z+=Math.cos(heli.yaw)*dt*30;}else if(this.stars<5)heli.alt=Math.max(0,heli.alt-dt*16);if(this.stars>=5&&d<45&&p.y>=0&&lineClear(heli,p,this.solids)){this.spotted=true;this.lastSeen={x:p.x,z:p.z};}}if(nowWanted){if(this.spotted)this.unseen=0;else this.unseen+=dt;if(this.unseen>20+this.stars*4&&this.lastSeen&&distance(p,this.lastSeen)>35){this.stars=0;this.heat=0;this.description=null;this.lastSeen=null;this.notify('Fahndung beendet.');}}
+  if(!nowWanted&&this.barriers.length){this.solids=this.solids.filter(b=>!this.barriers.includes(b));this.barriers=[];this.rasterNeu();}const heli=this.policeHeli;if(heli){const target=this.stars>=5?(this.lastSeen||p):{x:-360,z:305};const d=distance(heli,target);heli.alt=Math.min(45,heli.alt+dt*8);if(d>4){heli.yaw=Math.atan2(target.x-heli.x,target.z-heli.z);heli.x+=Math.sin(heli.yaw)*dt*30;heli.z+=Math.cos(heli.yaw)*dt*30;}else if(this.stars<5)heli.alt=Math.max(0,heli.alt-dt*16);if(this.stars>=5&&d<45&&p.y>=0&&lineClear(heli,p,this.solids)){this.spotted=true;this.lastSeen={x:p.x,z:p.z};}}if(nowWanted){if(this.spotted)this.unseen=0;else this.unseen+=dt;if(this.unseen>20+this.stars*4&&this.lastSeen&&distance(p,this.lastSeen)>35){this.stars=0;this.heat=0;this.description=null;this.lastSeen=null;this.notify('Fahndung beendet.');}}
  }
  snapshot(){this.saveWeapon();return {version:2,time:this.time,hour:this.hour,active:this.active,characters:this.characters.map(p=>({...p,car:null,carId:p.car?.id||null})),cars:this.cars,mission:this.mission,doorOpen:this.doorOpen,camera:this.camera,ending:this.ending,campaign:this.campaign,relationship:this.relationship,weather:this.weather,weatherIndex:this.weatherIndex,stars:this.stars,heat:this.heat,lastSeen:this.lastSeen,description:this.description,unseen:this.unseen,cops:this.cops,npcs:this.npcs,motelOwned:this.motelOwned,highScores:this.highScores,feed:this.feed,konto:this.konto,besitz:this.besitz,letzterZahltag:this.letzterZahltag,schatzIndex:this.schatzIndex||0};}
  restore(data){if(data?.version!==2||!Array.isArray(data.characters)||data.characters.length!==2||!Array.isArray(data.cars))throw new Error('Inkompatibler Spielstand');for(const p of data.characters)if(!Number.isFinite(p.x)||!Number.isFinite(p.z)||!p.inventory?.[p.weapon])throw new Error('Ungültiger Spielstand');for(const key of ['time','hour','active','characters','cars','mission','camera','ending','campaign','relationship','weather','weatherIndex','stars','heat','lastSeen','description','unseen','cops','npcs','motelOwned','highScores','feed','konto','besitz','letzterZahltag','schatzIndex'])if(data[key]!==undefined)this[key]=data[key];for(const p of this.characters){p.car=this.cars.find(c=>c.id===p.carId)||null;p.cover=false;}this.player=this.characters[this.active];storyReparieren(this);for(const c of this.cops){c.blocking=false;c.blockTarget=null;}if(data.doorOpen)this.openDoor();this.loadWeapon();this.paused=true;}

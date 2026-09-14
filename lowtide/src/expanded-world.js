@@ -390,6 +390,10 @@ export class ExpandedWorld extends World{
   // dressRegions setzt zusaetzliche Lampen (Tankstellenvordach); dressInteriors
   // leert seine eigene Liste bei jedem Aufruf, deshalb erst danach anhaengen.
   this.innenLampen=[...dressInteriors(this),...(this.zusatzLampen||[])];
+  // Die Einrichtung ist seit dieser Runde ein Hindernis, und sie meldet sich
+  // erst hier an — nach dem Aufstellen der Figuren. Wer jetzt in einer Theke
+  // steht oder durch eine läuft, wird versetzt.
+  this.moebelVersatz=this.sim.figurenAusHindernissen?.()||0;
   this.palmenBauen();
   this.laubwerk?.bauen();
   this.rotorenBauen();

@@ -230,10 +230,47 @@ const WAND = {garage: 0x6e7674, shop: 0x8d8a7a, clinic: 0xc4ccc4, home: 0x9a8f7c
 
 export function dressInteriors(world) {
  LAMPEN.length = 0;
+ const sim = world.sim;
+ let angemeldet = 0;
  for (const id of Object.keys(EINRICHTUNG)) {
   if (!locations[id]) continue;
   const r = grundriss(world, id, BODEN[id], WAND[id]);
+  // Die Einrichtung wurde gezeichnet, aber nie als Hindernis angemeldet: der
+  // Spieler lief durch jede Theke, jedes Bett, den Billardtisch und die
+  // Hebebühne. Gemessen war in sieben von acht Räumen exakt dieselbe Zahl
+  // Felder blockiert — 29 von 841 —, und das ist die Brüstung der Front, das
+  // einzige Solid, das es je gab.
+  //
+  // Statt jeden der rund zweihundert Aufrufe umzuschreiben, wird world.box
+  // für die Dauer der Einrichtung abgefangen. Angemeldet wird nur, was
+  // wirklich im Weg steht: Grundfläche mindestens einen halben Meter in
+  // beiden Richtungen, Oberkante über 45 Zentimetern, Unterkante unter 1,1
+  // Metern — Hängeschränke, Deckenlampen und Bodenplatten fallen heraus.
+  const echt = world.box.bind(world);
+  const stuecke = [];
+  world.box = (x, y, z, bw, bh, bd, ...rest) => {
+   stuecke.push({x, y, z, w: bw, h: bh, d: bd});
+   return echt(x, y, z, bw, bh, bd, ...rest);
+  };
   EINRICHTUNG[id](world, r);
+  world.box = echt;
+  if (!sim) continue;
+  for (const t of stuecke) {
+   if (Math.min(t.w, t.d) < .5) continue;
+   // Der Gang bleibt frei: ein Streifen von 2,6 Metern Breite auf der Achse
+   // des Ortes, von der offenen Front bis fünf Meter hinter den Marker. Der
+   // Marker selbst lässt sich nicht verschieben — der ganze Raum rechnet sich
+   // aus ihm —, und die vorhandenen Prüfungen fragen genau diese Linie ab:
+   // den Standplatz zwei Meter vor dem Marker und die Raummitte vier Meter
+   // dahinter. Ohne den Gang lagen beide in einer Theke.
+   if (Math.abs(t.x - r.l.x) < t.w / 2 + 1.3 &&
+       t.z - t.d / 2 < r.l.z + 4.2 && t.z + t.d / 2 > r.l.z - 5) continue;
+   if (t.y - t.h / 2 > 1.1) continue;
+   if (t.y + t.h / 2 < .45) continue;
+   sim.addSolid(t.x, t.z, t.w, t.d, 'moebel', t.y + t.h / 2);
+   angemeldet++;
+  }
  }
+ world.moebelSolids = angemeldet;
  return LAMPEN.slice();
 }

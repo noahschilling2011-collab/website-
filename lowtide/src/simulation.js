@@ -5,6 +5,7 @@ export const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 export const roads=[-100,-40,20,80];
 export const places={mara:{x:-27,z:73},door:{x:-69,z:-49},fuse:{x:-52,z:-91},disk:{x:-70,z:-78},safe:{x:-77,z:73},station:{x:80,z:-100}};
 export function random(seed=41){return ()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};}
+const LEER=[];
 export function intersects(a,b,r=0){return a.x>b.x-b.w/2-r&&a.x<b.x+b.w/2+r&&a.z>b.z-b.d/2-r&&a.z<b.z+b.d/2+r;}
 export function lineClear(a,b,solids){const d=distance(a,b),n=Math.max(1,Math.ceil(d/.65));for(let i=1;i<n;i++){const p={x:a.x+(b.x-a.x)*i/n,z:a.z+(b.z-a.z)*i/n};if(solids.some(s=>intersects(p,s)))return false;}return true;}
 export function route(a,b){const nearest=v=>roads.reduce((p,c)=>Math.abs(c-v)<Math.abs(p-v)?c:p);const ax=nearest(a.x),az=nearest(a.z),bx=nearest(b.x),bz=nearest(b.z);const start=Math.abs(a.x-ax)<Math.abs(a.z-az)?{x:ax,z:a.z}:{x:a.x,z:az};return [start,{x:ax,z:az},{x:bx,z:az},{x:bx,z:bz},{x:b.x,z:bz},{x:b.x,z:b.z}].filter((p,i,arr)=>i===0||distance(p,arr[i-1])>.1);}
@@ -22,7 +23,46 @@ export class Simulation{
   (this.konto||=[]).unshift({text,betrag,stunde:this.hour});
   if(this.konto.length>30)this.konto.pop();
  }
- addSolid(x,z,w,d,kind='building',h=8){const b={x,z,w,d,kind,h};this.solids.push(b);return b;}
+ addSolid(x,z,w,d,kind='building',h=8){const b={x,z,w,d,kind,h};this.solids.push(b);this.rasterEin(b);return b;}
+ // Ortsraster für blocked(). Die Funktion lief über alle Solids: bei 104
+ // Stück ging das durch, mit der angemeldeten Einrichtung der acht Räume
+ // waren es 211 — und der Simulationsschritt stieg von 0,76 auf 2,16
+ // Millisekunden. blocked() ist die meistgerufene Funktion der Simulation:
+ // die Wegesuche fragt sie für jeden geprüften Punkt.
+ //
+ // Jedes Hindernis wird in alle Zellen eingetragen, die es mit 2,2 Metern
+ // Rand berührt. Damit genügt für jede Abfrage mit r <= 2,2 die eine Zelle,
+ // in der der Punkt liegt.
+ rasterEin(b){
+  if(!this.raster)this.raster=new Map();
+  const rand=2.2,Z=24;
+  for(let cx=Math.floor((b.x-b.w/2-rand)/Z);cx<=Math.floor((b.x+b.w/2+rand)/Z);cx++)
+   for(let cz=Math.floor((b.z-b.d/2-rand)/Z);cz<=Math.floor((b.z+b.d/2+rand)/Z);cz++){
+    const k=cx+'|'+cz;let a=this.raster.get(k);
+    if(!a){a=[];this.raster.set(k,a);}
+    a.push(b);
+   }
+ }
+ rasterNeu(){this.raster=new Map();for(const b of this.solids)this.rasterEin(b);}
+ // Sichtlinie über dasselbe Raster. lineClear() bekommt eine Liste und prüft
+ // jeden Punkt der Strecke gegen jedes Hindernis darin — bei 211 Solids und
+ // rund vierzig Punkten je Strecke sind das achttausend Vergleiche für eine
+ // einzige Sichtprüfung, und die Menge fragt sie für jede Figur.
+ sichtFrei(a,b){
+  const d=Math.hypot(b.x-a.x,b.z-a.z),n=Math.max(1,Math.ceil(d/.65));
+  for(let i=1;i<n;i++){
+   const p={x:a.x+(b.x-a.x)*i/n,z:a.z+(b.z-a.z)*i/n};
+   const nah=this.nahe(p,0);
+   for(let k=0;k<nah.length;k++)if(intersects(p,nah[k],0))return false;
+  }
+  return true;
+ }
+ // Die Hindernisse in der Nähe eines Punktes, oder alle, wenn der Radius
+ // größer ist als der Rand des Rasters.
+ nahe(p,r){
+  if(r>2.2||!this.raster)return this.solids;
+  return this.raster.get(Math.floor(p.x/24)+'|'+Math.floor(p.z/24))||LEER;
+ }
  makeWorld(){
   for(let ix=0;ix<3;ix++)for(let iz=0;iz<3;iz++){const x=roads[ix]+30,z=roads[iz]+30;if(ix===0&&iz===0)continue;for(let j=0;j<2;j++){const b=this.addSolid(x+(j?11:-11),z,18,38,'building',9+Math.floor(this.rng()*32));this.buildings.push(b);}}
   // Warehouse: solid walls with a real 8 m front opening.
@@ -136,9 +176,19 @@ export class Simulation{
   // Kleinwagen hätte mit vier Metern Überhang aufgeschlossen. Jetzt zählt die
   // Länge beider: 2,5 Meter Luft plus je die halbe Länge.
   const la=vehicleTypes[c.model]?.laenge||4.5, ba=vehicleTypes[c.model]?.breite||2.2;
+  // Der Abstandsfilter steht vor allem anderen. Im ersten Anlauf kamen zuerst
+  // zwei Nachschlagewerke und zwei Winkelfunktionen je Paar, danach erst der
+  // Filter: bei 144 Fahrzeugen und 103 Aufrufen je Takt sind das
+  // fünfzehntausend Sinus- und Kosinusaufrufe, und wagenVoraus kostete 1,674
+  // von 2,0 Millisekunden des ganzen Simulationsschritts.
+  //
+  // 6,5 Meter ist die halbe Länge des längsten Fahrzeugs; weiter kann kein
+  // Hindernis in die eigene Richtung reichen.
+  const grenze=2.5+la/2+6.5+2;
   for(const o of this.cars){
    if(o===c||o.health<=0)continue;
    const dx=o.x-c.x,dz=o.z-c.z;
+   if(Math.abs(dx)+Math.abs(dz)>grenze)continue;
    const lo=vehicleTypes[o.model]?.laenge||4.5, bo=vehicleTypes[o.model]?.breite||2.2;
    // Der andere Wagen steht nicht unbedingt in meiner Richtung. Seine
    // Ausdehnung wird deshalb auf meine Achsen projiziert: ein quer stehender
@@ -146,10 +196,12 @@ export class Simulation{
    // aber 3,7 — mit einer festen Breite war er unsichtbar. Genau daran hingen
    // zwei Wagen ineinander an der Kreuzung [23,18], wo sich die Runden Raster
    // Ost und Hafenblock überschneiden.
-   const d=o.yaw-c.yaw, sd=Math.abs(Math.sin(d)), cd=Math.abs(Math.cos(d));
+   // sin(o.yaw-c.yaw) aus den schon bekannten Werten statt aus zwei neuen
+   // Winkelfunktionen je Paar.
+   const so=Math.sin(o.yaw),co=Math.cos(o.yaw);
+   const sd=Math.abs(so*cos-co*sin), cd=Math.abs(co*cos+so*sin);
    const tiefe=lo/2*cd+bo/2*sd, quer=lo/2*sd+bo/2*cd;
    const weit=2.5+la/2+tiefe;
-   if(Math.abs(dx)+Math.abs(dz)>weit+2)continue;   // billige Vorabschätzung
    const laengs=dx*sin+dz*cos;
    if(laengs<.4||laengs>weit)continue;
    if(Math.abs(dx*cos-dz*sin)>ba/2+quer+.3)continue;
@@ -236,15 +288,15 @@ export class Simulation{
   if(c._rang===undefined){let h=0;for(const z of String(c.id||''))h+=z.charCodeAt(0);c._rang=h%4;}
   return c._rang;
  }
- blocked(p,r=.4){return p.x<-119+r||p.x>112-r||p.z<-119+r||p.z>113-r||this.solids.some(b=>intersects(p,b,r));}
+ blocked(p,r=.4){return p.x<-119+r||p.x>112-r||p.z<-119+r||p.z>113-r||this.nahe(p,r).some(b=>intersects(p,b,r));}
  move(o,dx,dz,r=.4){let hit=false;const steps=Math.max(1,Math.ceil(Math.hypot(dx,dz)/.25));for(let i=0;i<steps;i++){if(!this.blocked({x:o.x+dx/steps,z:o.z},r))o.x+=dx/steps;else hit=true;if(!this.blocked({x:o.x,z:o.z+dz/steps},r))o.z+=dz/steps;else hit=true;}return hit;}
- openDoor(){this.doorOpen=true;this.solids=this.solids.filter(s=>s!==this.gate);}
+ openDoor(){this.doorOpen=true;this.solids=this.solids.filter(s=>s!==this.gate);this.rasterNeu();}
  report(severity,pos=this.player,incident=null){if(incident!==null){if(this.reported.has(incident))return;this.reported.add(incident);}this.heat=clamp(this.heat+severity,0,12);this.stars=Math.ceil(this.heat/2);this.lastSeen={x:pos.x,z:pos.z};this.unseen=0;this.description={clothes:this.player.clothes,plate:this.player.car?.id||null};this.notify('Leitstelle: Meldung bestätigt. Einheiten unterwegs.');}
- crime(severity=1){const incident=++this.incident;let witnesses=0;for(const n of this.npcs){if(n.health<=0||distance(n,this.player)>42||!lineClear(n,this.player,this.solids))continue;n.report={severity,incident,x:this.player.x,z:this.player.z};n.timer=n.personality==='caller'?4:7;n.state=n.personality==='filmer'?'filmend':'erschrocken';witnesses++;
+ crime(severity=1){const incident=++this.incident;let witnesses=0;for(const n of this.npcs){if(n.health<=0||distance(n,this.player)>42||!this.sichtFrei(n,this.player))continue;n.report={severity,incident,x:this.player.x,z:this.player.z};n.timer=n.personality==='caller'?4:7;n.state=n.personality==='filmer'?'filmend':'erschrocken';witnesses++;
    if(n.personality==='filmer'&&this.post)this.post('@hafenblick_'+(n.id%90),
     ['Gerade eben am Hafen. Ich habe alles gefilmt.','Leute, hier läuft was komplett aus dem Ruder.',
-     'Das war zu nah. Video kommt gleich.','Wer war das? Ich habe das Kennzeichen.'][severity%4]);}if(this.cops.some(c=>c.active&&distance(c,this.player)<55&&lineClear(c,this.player,this.solids)))this.report(severity,this.player,incident);else if(witnesses)this.notify(witnesses+' Zeugen reagieren. Die Meldung ist noch nicht raus.');else this.notify('Keine Zeugen in Sicht.');}
- shoot(){const p=this.player;if(!p.armed||p.cooldown>0)return;if(p.ammo<=0){this.notify('Magazin leer. R / Aktion zum Nachladen.');return;}p.ammo--;p.cooldown=.3;this.shots++;const dir={x:Math.sin(p.yaw),z:Math.cos(p.yaw)},end={x:p.x+dir.x*65,z:p.z+dir.z*65};let best=null,dist=65;for(const n of [...this.npcs,...this.cops.filter(c=>c.active)]){const d=distance(n,p);if(n.health<=0||d>dist)continue;const dot=((n.x-p.x)*dir.x+(n.z-p.z)*dir.z)/Math.max(.01,d);if(dot>.987&&lineClear(p,n,this.solids)){best=n;dist=d;}}if(best){best.health-=34;best.state=best.health<=0?'verletzt':'flüchtend';best.timer=12;end.x=best.x;end.z=best.z;this.injured++;}else{for(let d=1;d<65;d+=.6){const v={x:p.x+dir.x*d,z:p.z+dir.z*d};if(this.solids.some(b=>intersects(v,b))){end.x=v.x;end.z=v.z;break;}}}this.tracers.push({x:p.x,z:p.z,end,life:.1});this.crime(best?2:1);}
+     'Das war zu nah. Video kommt gleich.','Wer war das? Ich habe das Kennzeichen.'][severity%4]);}if(this.cops.some(c=>c.active&&distance(c,this.player)<55&&this.sichtFrei(c,this.player)))this.report(severity,this.player,incident);else if(witnesses)this.notify(witnesses+' Zeugen reagieren. Die Meldung ist noch nicht raus.');else this.notify('Keine Zeugen in Sicht.');}
+ shoot(){const p=this.player;if(!p.armed||p.cooldown>0)return;if(p.ammo<=0){this.notify('Magazin leer. R / Aktion zum Nachladen.');return;}p.ammo--;p.cooldown=.3;this.shots++;const dir={x:Math.sin(p.yaw),z:Math.cos(p.yaw)},end={x:p.x+dir.x*65,z:p.z+dir.z*65};let best=null,dist=65;for(const n of [...this.npcs,...this.cops.filter(c=>c.active)]){const d=distance(n,p);if(n.health<=0||d>dist)continue;const dot=((n.x-p.x)*dir.x+(n.z-p.z)*dir.z)/Math.max(.01,d);if(dot>.987&&this.sichtFrei(p,n)){best=n;dist=d;}}if(best){best.health-=34;best.state=best.health<=0?'verletzt':'flüchtend';best.timer=12;end.x=best.x;end.z=best.z;this.injured++;}else{for(let d=1;d<65;d+=.6){const v={x:p.x+dir.x*d,z:p.z+dir.z*d};if(this.solids.some(b=>intersects(v,b))){end.x=v.x;end.z=v.z;break;}}}this.tracers.push({x:p.x,z:p.z,end,life:.1});this.crime(best?2:1);}
  reload(){const p=this.player;if(p.ammo===12||!p.reserve)return;p.cooldown=1.4;const n=Math.min(12-p.ammo,p.reserve);p.ammo+=n;p.reserve-=n;this.notify('Nachladen …');}
  enterExit(){const p=this.player;if(p.car){if(Math.abs(p.car.speed)>3){this.notify('Zum Aussteigen zuerst bremsen.');return;}for(const side of [1,-1]){const v={x:p.car.x+Math.cos(p.car.yaw)*2.8*side,z:p.car.z-Math.sin(p.car.yaw)*2.8*side};if(!this.blocked(v,.5)){p.x=v.x;p.z=v.z;p.car=null;this.notify('Zu Fuß unterwegs.');return;}}this.notify('Die Türen sind blockiert.');return;}const car=this.cars.find(c=>distance(c,p)<4&&c.health>0);if(car){p.car=car;car.wait=0;car.speed=0;p.armed=false;if(car.type==='traffic'){car.type='stolen';this.crime(2);}this.notify('W/S: Gas & Rückwärts · A/D: Lenken · Leertaste: Handbremse');}}
  objective(){return this.mission===0?places.mara:this.mission===1?places.door:this.mission===2?places.disk:places.safe;}
@@ -283,7 +335,7 @@ export class Simulation{
   // verließen danach alle sieben Modelle die Fahrbahn, Pick-up und Muscle Car
   // um 3,5 Meter. Vorher war es ein einziges Modell mit 25 Zentimetern.
   for(const c of this.cars){if(c===p.car||c.type!=='traffic')continue;c.wait=Math.max(0,c.wait-dt);if(c.wait||c.health<=0)continue;const lang=vehicleTypes[c.model]?.laenge||4.5;const n=c.route.length;let a,b,vx,vz,len,t,schritte=0;do{a=c.route[(c.target-1+n)%n];b=c.route[c.target];vx=b.x-a.x;vz=b.z-a.z;len=Math.hypot(vx,vz)||1;t=((c.x-a.x)*vx+(c.z-a.z)*vz)/(len*len);if(t<1||Math.hypot(c.x-b.x,c.z-b.z)>12)break;c.target=(c.target+1)%n;}while(++schritte<n);t=Math.max(0,Math.min(1,t));const Lp=Math.min(6.5,2.5+lang*.55),uebrig=len*(1-t);let zx,zz;if(uebrig>=Lp){zx=a.x+vx*(t+Lp/len);zz=a.z+vz*(t+Lp/len);}else{const e=c.route[(c.target+1)%n],wx=e.x-b.x,wz=e.z-b.z,wl=Math.hypot(wx,wz)||1,u=(Lp-uebrig)/wl;zx=b.x+wx*u;zz=b.z+wz*u;}const ziel=Math.atan2(zx-c.x,zz-c.z);let ab=((ziel-c.yaw+Math.PI*3)%(Math.PI*2))-Math.PI;const rate=2.4*4.5/lang*dt;if(Math.abs(ab)>rate)ab=Math.sign(ab)*rate;c.yaw+=ab;if(!p.car&&this.spielerImWeg(c,p))continue;if(this.haeltVorAmpel(c))continue;if(this.wagenVoraus(c)||this.fussgaengerVoraus(c)){c.stau=(c.stau||0)+dt;continue;}c.stau=0;const rest=Math.abs(((ziel-c.yaw+Math.PI*3)%(Math.PI*2))-Math.PI);const tempo=c.speed*(1-.62*Math.min(1,rest/.7));c.x+=Math.sin(c.yaw)*tempo*dt;c.z+=Math.cos(c.yaw)*tempo*dt;}
-  for(const n of this.npcs){if(n.health<=0||n.state==='tanzend')continue;n.timer-=dt;if(n.report&&n.timer<=0){this.report(n.report.severity,n.report,n.report.incident);n.report=null;n.state='flüchtend';n.timer=9;}if(p.armed&&distance(n,p)<17&&lineClear(n,p,this.solids)&&(n.state==='normal'||n.state==='sitzend')){n.state='aufmerksam';n.timer=1.4;}if(n.state==='aufmerksam'&&n.timer<=0){n.state='flüchtend';n.timer=6;}if(n.state==='erschrocken'&&n.timer<3)n.state='Polizei rufend';if(n.state==='filmend'||n.state==='Polizei rufend'||n.state==='erschrocken'){n.yaw=Math.atan2(p.x-n.x,p.z-n.z);continue;}// Wer sitzt, nimmt am Zustandswechsel oben teil — sonst bemerkt er eine
+  for(const n of this.npcs){if(n.health<=0||n.state==='tanzend')continue;n.timer-=dt;if(n.report&&n.timer<=0){this.report(n.report.severity,n.report,n.report.incident);n.report=null;n.state='flüchtend';n.timer=9;}if(p.armed&&distance(n,p)<17&&this.sichtFrei(n,p)&&(n.state==='normal'||n.state==='sitzend')){n.state='aufmerksam';n.timer=1.4;}if(n.state==='aufmerksam'&&n.timer<=0){n.state='flüchtend';n.timer=6;}if(n.state==='erschrocken'&&n.timer<3)n.state='Polizei rufend';if(n.state==='filmend'||n.state==='Polizei rufend'||n.state==='erschrocken'){n.yaw=Math.atan2(p.x-n.x,p.z-n.z);continue;}// Wer sitzt, nimmt am Zustandswechsel oben teil — sonst bemerkt er eine
    // gezogene Waffe nicht —, bewegt sich aber nicht. Der erste Anlauf ließ ihn
    // ganz oben aus der Schleife springen; damit blieb er blind für alles.
    if(n.state==='sitzend')continue;
@@ -293,7 +345,7 @@ export class Simulation{
   if(p.health<=0){p.health=0;this.paused=true;this.notify('Festgenommen. Starte den Auftrag erneut.');}
  }
  updatePolice(dt){const p=this.player;this.spotted=false;if(this.stars===0){for(const c of this.cops){if(c.active){c.route=route(c,places.station);c.target=0;c.active=false;}const target=c.route[c.target];if(target){if(distance(c,target)<1.5)c.target++;else{c.yaw=Math.atan2(target.x-c.x,target.z-c.z);this.move(c,Math.sin(c.yaw)*9*dt,Math.cos(c.yaw)*9*dt,1.2);}}}return;}this.dispatchTimer-=dt;const desired=Math.min(6,this.stars+1);if(this.dispatchTimer<=0&&this.cops.filter(c=>c.active&&c.health>0).length<desired){const c=this.cops.find(c=>!c.active&&c.health>0);if(c){c.active=true;c.repath=0;c.route=[];this.dispatchTimer=3;}}
-  for(const c of this.cops){if(!c.active||c.health<=0)continue;const d=distance(c,p);const identified=p.car?this.description?.plate===p.car.id:this.description?.clothes===p.clothes;const sees=d<(p.sneak?23:48)&&lineClear(c,p,this.solids)&&(identified||d<11||p.armed);if(sees){this.spotted=true;this.lastSeen={x:p.x,z:p.z};this.description={clothes:p.clothes,plate:p.car?.id||null};}c.repath-=dt;if(c.repath<=0){const target=sees?p:this.lastSeen;if(target){c.route=lineClear(c,target,this.solids)?[{x:target.x,z:target.z}]:route(c,target);c.target=0;}c.repath=sees?1:4;}
+  for(const c of this.cops){if(!c.active||c.health<=0)continue;const d=distance(c,p);const identified=p.car?this.description?.plate===p.car.id:this.description?.clothes===p.clothes;const sees=d<(p.sneak?23:48)&&this.sichtFrei(c,p)&&(identified||d<11||p.armed);if(sees){this.spotted=true;this.lastSeen={x:p.x,z:p.z};this.description={clothes:p.clothes,plate:p.car?.id||null};}c.repath-=dt;if(c.repath<=0){const target=sees?p:this.lastSeen;if(target){c.route=this.sichtFrei(c,target)?[{x:target.x,z:target.z}]:route(c,target);c.target=0;}c.repath=sees?1:4;}
    const target=c.route[c.target];if(target){const td=distance(c,target);if(td<2)c.target++;else{c.yaw=Math.atan2(target.x-c.x,target.z-c.z);const speed=sees&&d<7?0:10+this.stars*1.4;this.move(c,Math.sin(c.yaw)*speed*dt,Math.cos(c.yaw)*speed*dt,1.2);}}
    c.shot-=dt;if(sees&&d<23&&c.shot<=0){c.shot=1.5;if(this.stars>=2){p.health-=p.car?3:7;this.tracers.push({x:c.x,z:c.z,end:{x:p.x,z:p.z},life:.1});}else if(d<5){p.health-=10;this.notify('Polizei: Stehen bleiben!');}}
   }
