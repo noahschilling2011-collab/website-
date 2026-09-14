@@ -280,6 +280,34 @@ export class Simulation{
   }
   return [dx,dz];
  }
+ // Wer sich festfährt, geht seitlich vorbei.
+ //
+ // Der reine Filter hat einen Haken, den erst der volle Prüflauf zeigte: zwei
+ // Figuren, die genau aufeinander zulaufen, streichen sich gegenseitig den
+ // ganzen Schritt und stehen dann dauerhaft. Bei 491 gehenden Figuren waren
+ // das zwei Paare, beide über volle zehn Sekunden auf 0,30 und 0,34 Meter —
+ // keine Durchdringung, eine Verklemmung.
+ //
+ // Der Ausweg ist nicht mehr Kraft, sondern eine andere Richtung: Wer bis auf
+ // ein Viertel seines Schritts blockiert ist, versucht es quer dazu und nimmt
+ // die Seite, auf der mehr übrig bleibt. Auch der Querschritt läuft durch den
+ // Filter, geht also seinerseits in niemanden hinein, und niemand wird
+ // geschoben. Der Aufwand fällt nur bei Blockierten an.
+ schrittUmGehen(n,dx,dz){
+  const gerade=this.schrittOhneDurchdringen(n,dx,dz);
+  const soll=Math.hypot(dx,dz);
+  if(soll<1e-5||Math.hypot(gerade[0],gerade[1])>soll*.25){n.klemmt=0;return gerade;}
+  // Kurz vor jemandem stehenbleiben ist normal und soll so aussehen. Erst wer
+  // ein Zehntel Sekunde nicht vom Fleck kommt, sucht seitlich vorbei. Ohne
+  // diese Schwelle kostete der Ausweichschritt 0,20 ms je Takt (1,11 gegen
+  // 0,91 ohne alles, im selben Lauf gemessen), weil er für jede kurz
+  // blockierte Figur zweimal zusätzlich das Ortsraster abfragte.
+  if((n.klemmt=(n.klemmt||0)+1)<6)return gerade;
+  const rechts=this.schrittOhneDurchdringen(n,dz,-dx),links=this.schrittOhneDurchdringen(n,-dz,dx);
+  const lr=Math.hypot(rechts[0],rechts[1]),ll=Math.hypot(links[0],links[1]);
+  const beste=lr>=ll?rechts:links,laenge=Math.max(lr,ll);
+  return laenge>soll*.25?beste:gerade;
+ }
  // Wie tief zwei Fahrzeuge ineinanderstehen, über die Trennachsen der
  // beiden Rechtecke. Null, wenn sie sich nicht berühren.
  ueberlappung(a,b){
@@ -390,7 +418,7 @@ export class Simulation{
    // gezogene Waffe nicht —, bewegt sich aber nicht. Der erste Anlauf ließ ihn
    // ganz oben aus der Schleife springen; damit blieb er blind für alles.
    if(n.state==='sitzend')continue;
-   if(n.state==='flüchtend'){n.yaw=Math.atan2(n.x-p.x,n.z-p.z);const [fx,fz]=this.schrittOhneDurchdringen(n,Math.sin(n.yaw)*3*dt,Math.cos(n.yaw)*3*dt);this.move(n,fx,fz,.3);if(n.timer<=0){n.state='normal';n.target=(n.target+1)%n.path.length;}}else{const dest=n.path[n.target],d=distance(n,dest);if(d<1)n.target=(n.target+1)%n.path.length;else{n.yaw=Math.atan2(dest.x-n.x,dest.z-n.z);const v=n.pace*(this.weather==='rain'?1.5:1)*dt;const [sx,sz]=this.schrittOhneDurchdringen(n,Math.sin(n.yaw)*v,Math.cos(n.yaw)*v);this.move(n,sx,sz,.3);}}}
+   if(n.state==='flüchtend'){n.yaw=Math.atan2(n.x-p.x,n.z-p.z);const [fx,fz]=this.schrittUmGehen(n,Math.sin(n.yaw)*3*dt,Math.cos(n.yaw)*3*dt);this.move(n,fx,fz,.3);if(n.timer<=0){n.state='normal';n.target=(n.target+1)%n.path.length;}}else{const dest=n.path[n.target],d=distance(n,dest);if(d<1)n.target=(n.target+1)%n.path.length;else{n.yaw=Math.atan2(dest.x-n.x,dest.z-n.z);const v=n.pace*(this.weather==='rain'?1.5:1)*dt;const [sx,sz]=this.schrittUmGehen(n,Math.sin(n.yaw)*v,Math.cos(n.yaw)*v);this.move(n,sx,sz,.3);}}}
   if(((this._entflecht=(this._entflecht||0)+1)%4)===0)this.entflechten();
   this.updatePolice(dt);this.eventTimer-=dt;if(this.eventTimer<=0){this.eventTimer=55;const c=this.cars.find(c=>c.type==='traffic'&&c!==p.car);if(c){c.wait=14;this.notify('Verkehrsfunk: Pannenfahrzeug auf der Harbor Avenue.');}}
   if(p.health<=0){p.health=0;this.paused=true;this.notify('Festgenommen. Starte den Auftrag erneut.');}

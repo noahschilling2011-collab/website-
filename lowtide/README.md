@@ -1403,6 +1403,50 @@ standen damit wieder 1,13 Paare ineinander, engster Abstand drei Zentimeter.
 Fliehende gehen jetzt durch dieselbe Prüfung; sie rennen weiterhin, nur nicht
 mehr durcheinander hindurch.
 
+### Und dann standen zwei Figuren für immer
+
+Das reichte nicht. Der nächste Lauf meldete 2,00 durchdringende Paare, und
+isoliert war davon nichts zu sehen: dieselbe Messung ohne den Prüflauf
+drumherum ergab bei 490 gehenden Figuren **null** Paare und 0,46 Meter
+engsten Abstand. Aus „2.00 Paare" ließ sich nicht sagen, woher sie kamen, also
+notiert die Prüfung seither, wer sich durchdringt und in welchem Zustand.
+
+Der Befund war eindeutig und nicht das, wonach es aussah: zwei Paare, beide
+`normal/normal`, beide in **60 von 60 Messungen** auf 0,30 und 0,34 Meter.
+Keine Durchdringung — eine Verklemmung. Zwei Figuren, die genau aufeinander
+zulaufen, streichen sich gegenseitig den ganzen Schritt und stehen dann
+dauerhaft da. Der Filter kennt nur „nicht hinein", keinen Ausweg.
+
+Also gibt es einen: Wer bis auf ein Viertel seines Schritts blockiert ist,
+versucht es quer dazu und nimmt die Seite, auf der mehr übrig bleibt. Der
+Querschritt läuft durch denselben Filter, geht also seinerseits in niemanden
+hinein, und niemand wird geschoben.
+
+Zwei Zahlen dazu, beide im selben Lauf gemessen:
+
+| | Paare unter 0,50 m | Simulationsschritt (Median aus sechs Blöcken) |
+|---|---|---|
+| ohne Kollision | 1,6 | 0,885 ms |
+| nur Filter | 15,7 | 0,991 ms |
+| Filter und Ausweichen | 1,0 | 0,965 ms |
+
+Der Filter allein staut die Menge also messbar auf — 15,7 Paare drängeln sich
+auf Berührungsabstand, weil sich Verklemmungen nicht auflösen. Mit dem
+Ausweichschritt liegt die Zahl wieder dort, wo sie ohne jede Kollision lag,
+nur eben ohne Durchdringung.
+
+Der Ausweichschritt selbst kostete zuerst 0,20 ms je Takt, weil er für jede
+kurz blockierte Figur zweimal zusätzlich das Ortsraster abfragte. Jetzt zählt
+jede Figur, wie lange sie nicht vom Fleck kommt, und weicht erst nach einem
+Zehntel Sekunde aus — kurz vor jemandem stehenbleiben ist normal und soll so
+aussehen. Damit ist er neben dem Filter nicht mehr messbar.
+
+Eine Warnung an mich selbst steht auch hier: der Frontalfall, den ich als
+Nachweis gebaut habe, löst sich **auch ohne** Ausweichschritt auf — zwei
+Figuren, die ich gegeneinander gestellt habe, kamen in beiden Ständen
+aneinander vorbei. Nachgewiesen ist der Ausweichschritt durch die Zahlen der
+Tabelle und den Prüflauf, nicht durch diesen Testfall.
+
 Noch ein Fehlschlag derselben Runde, aber einer in der Messung: die Prüfung
 „Die Helligkeitsmessung ist eingeschwungen" meldete für Sturm 118,5 gegen
 177,6 und sah aus wie eine unfertige Glättung. Sie war keine. `applySky` setzt
@@ -1412,6 +1456,14 @@ und ein Blitz hebt das Himmelslicht um bis zu 6 und die Sonne um 2,5. Die
 zweite Messung hatte einfach geblitzt. Das Einschwingen setzt den Blitz jetzt
 zum Schluss auf null und rechnet ein Bild nach — beide Intensitäten werden
 jedes Bild neu zugewiesen, nie aufaddiert, damit ist der Zuschlag weg.
+
+Ein dritter Fehlschlag desselben Laufs war gar keiner: „Bei gleicher
+Flügelstellung ist das Bild dasselbe" meldete 8,37 statt 0. Isoliert war der
+Wert dreimal hintereinander exakt 0,000, auch mit demselben Kamerasprung von
+der Straßenlaterne, und im nächsten vollen Lauf war die Prüfung wieder grün.
+Ein Ausreißer also, dessen Ursache ich nicht kenne. Die Prüfung meldet jetzt
+zusätzlich, in welchen Bildzeilen der Unterschied steckt — beim nächsten Mal
+muss ich nicht wieder raten.
 
 323 Prüfungen bestanden, keine gefallen.
 
