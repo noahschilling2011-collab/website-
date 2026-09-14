@@ -308,6 +308,40 @@ export class Simulation{
   const beste=lr>=ll?rechts:links,laenge=Math.max(lr,ll);
   return laenge>soll*.25?beste:gerade;
  }
+ // Wer in einem Hindernis steht, kommt aus eigener Kraft nie wieder heraus.
+ //
+ // move() prüft das Ziel eines Schritts, nicht den Standort. Innerhalb eines
+ // Körpers ist jedes Ziel blockiert, also wird jeder Schritt verworfen — die
+ // Figur steht für den Rest des Spiels da. Genau dieses Bild lieferte der
+ // Prüflauf: null Meter in zehn Sekunden bei einem Ziel in 63 bis 266 Metern.
+ // Hineingeraten kann sie, ohne sich zu bewegen, weil Hindernisse zur Laufzeit
+ // dazukommen — die Einrichtung der Innenräume etwa steht erst danach fest.
+ //
+ // Die erste Fassung hat im Kreis nach einem freien Platz gesucht, bis 4,2
+ // Meter Umkreis. Das reicht nicht: der Körper, in dem die Testfigur stand,
+ // misst 18,8 auf 38,8 Meter, und aus dessen Mitte liegt kein freier Punkt
+ // innerhalb von vier Metern. Gemessen: weiterhin null Meter in fünfzehn
+ // Sekunden.
+ //
+ // Stattdessen wird über die Kante geschoben, in die nächstliegende Richtung:
+ // aus einem Rechteck heraus ist der kürzeste Weg immer die nächste Seite.
+ // Dreimal, weil hinter der einen Kante die nächste Kiste stehen kann.
+ befreie(n){
+  for(let versuch=0;versuch<3;versuch++){
+   const koerper=this.nahe(n,.3).filter(b=>intersects(n,b,.3));
+   if(!koerper.length)return true;
+   let besteStrecke=1e9,zx=n.x,zz=n.z;
+   for(const b of koerper){
+    const kanten=[[b.x-b.w/2-.34,n.z],[b.x+b.w/2+.34,n.z],[n.x,b.z-b.d/2-.34],[n.x,b.z+b.d/2+.34]];
+    for(const [x,z] of kanten){
+     const strecke=Math.hypot(x-n.x,z-n.z);
+     if(strecke<besteStrecke){besteStrecke=strecke;zx=x;zz=z;}
+    }
+   }
+   n.x=zx;n.z=zz;
+  }
+  return !this.blocked(n,.3);
+ }
  // Wie tief zwei Fahrzeuge ineinanderstehen, über die Trennachsen der
  // beiden Rechtecke. Null, wenn sie sich nicht berühren.
  ueberlappung(a,b){
@@ -418,7 +452,19 @@ export class Simulation{
    // gezogene Waffe nicht —, bewegt sich aber nicht. Der erste Anlauf ließ ihn
    // ganz oben aus der Schleife springen; damit blieb er blind für alles.
    if(n.state==='sitzend')continue;
-   if(n.state==='flüchtend'){n.yaw=Math.atan2(n.x-p.x,n.z-p.z);const [fx,fz]=this.schrittUmGehen(n,Math.sin(n.yaw)*3*dt,Math.cos(n.yaw)*3*dt);this.move(n,fx,fz,.3);if(n.timer<=0){n.state='normal';n.target=(n.target+1)%n.path.length;}}else{const dest=n.path[n.target],d=distance(n,dest);if(d<1)n.target=(n.target+1)%n.path.length;else{n.yaw=Math.atan2(dest.x-n.x,dest.z-n.z);const v=n.pace*(this.weather==='rain'?1.5:1)*dt;const [sx,sz]=this.schrittUmGehen(n,Math.sin(n.yaw)*v,Math.cos(n.yaw)*v);this.move(n,sx,sz,.3);}}}
+   if(n.state==='flüchtend'){n.yaw=Math.atan2(n.x-p.x,n.z-p.z);const [fx,fz]=this.schrittUmGehen(n,Math.sin(n.yaw)*3*dt,Math.cos(n.yaw)*3*dt);this.move(n,fx,fz,.3);if(n.timer<=0){n.state='normal';n.target=(n.target+1)%n.path.length;}}else{const dest=n.path[n.target],d=distance(n,dest);if(d<1)n.target=(n.target+1)%n.path.length;else{n.yaw=Math.atan2(dest.x-n.x,dest.z-n.z);const v=n.pace*(this.weather==='rain'?1.5:1)*dt;const [sx,sz]=this.schrittUmGehen(n,Math.sin(n.yaw)*v,Math.cos(n.yaw)*v);const vx=n.x,vz=n.z;this.move(n,sx,sz,.3);
+    // Wer eine Sekunde lang nicht vorankommt, nimmt den nächsten Wegpunkt.
+    //
+    // Im Prüflauf standen Figuren zehn Sekunden auf derselben Stelle, obwohl
+    // ihr nächstes Ziel 63 bis 266 Meter entfernt war und sie 1,2 bis 1,6 m/s
+    // gehen: null bis 1,2 Meter zurückgelegt, wo zwölf hingehörten. Zwei
+    // Ursachen kommen dafür infrage — Geometrie genau auf der Sichtlinie zum
+    // Wegpunkt, oder ein Pulk, aus dem keine Richtung mehr frei ist. Diese
+    // Regel hilft gegen beide, weil sie nicht an der Ursache ansetzt, sondern
+    // am Ergebnis: Ziel unerreichbar, also das nächste nehmen. Eine Sekunde
+    // ist lang genug, dass normales Warten in einer Schlange nicht zählt.
+    if(Math.hypot(n.x-vx,n.z-vz)<v*.25){if((n.fest=(n.fest||0)+1)>60){n.fest=0;if(this.blocked(n,.3))this.befreie(n);else n.target=(n.target+1)%n.path.length;}}
+    else n.fest=0;}}}
   if(((this._entflecht=(this._entflecht||0)+1)%4)===0)this.entflechten();
   this.updatePolice(dt);this.eventTimer-=dt;if(this.eventTimer<=0){this.eventTimer=55;const c=this.cars.find(c=>c.type==='traffic'&&c!==p.car);if(c){c.wait=14;this.notify('Verkehrsfunk: Pannenfahrzeug auf der Harbor Avenue.');}}
   if(p.health<=0){p.health=0;this.paused=true;this.notify('Festgenommen. Starte den Auftrag erneut.');}

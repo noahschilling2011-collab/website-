@@ -1447,6 +1447,50 @@ Figuren, die ich gegeneinander gestellt habe, kamen in beiden Ständen
 aneinander vorbei. Nachgewiesen ist der Ausweichschritt durch die Zahlen der
 Tabelle und den Prüflauf, nicht durch diesen Testfall.
 
+### Und es war auch das nicht
+
+Der nächste Lauf fiel wieder: 2,67 Paare, eins auf **0,01 Meter** über die
+vollen zehn Sekunden. Diesmal sagte die Prüfung, warum. Die Figuren wollten
+laufen — 63 bis 90 Wegknoten, 63 bis 266 Meter zum nächsten Ziel, Tempo 1,2
+bis 1,6 m/s — und hatten sich in zehn Sekunden **null bis 1,2 Meter** bewegt.
+Zwölf wären es gewesen. Eine Figur tauchte in zwei Paaren auf: dort stand ein
+kleiner Pulk auf derselben Stelle.
+
+Das ist weder Durchdringung noch Verklemmung. Das ist Feststecken, und die
+Ursache steht in `move()`:
+
+```js
+move(o,dx,dz,r=.4){ … if(!this.blocked({x:o.x+dx/steps,z:o.z},r))o.x+=dx/steps; … }
+```
+
+Geprüft wird das **Ziel** eines Schritts, nicht der Standort. Innerhalb eines
+Körpers ist jedes Ziel blockiert, also wird jeder Schritt verworfen — wer
+einmal in Geometrie steht, steht dort bis zum Programmende. Hineingeraten
+kann eine Figur, ohne sich zu bewegen: Hindernisse kommen zur Laufzeit dazu,
+die Einrichtung der Innenräume etwa steht erst nach dem Aufbau fest.
+
+Zwei Regeln dagegen, beide am Ergebnis statt an der Ursache:
+
+- Wer eine Sekunde lang nicht vorankommt, nimmt den nächsten Wegpunkt. Eine
+  Sekunde ist lang genug, dass Warten in einer Schlange nicht zählt.
+- Wer dabei in einem Hindernis steht, wird über dessen nächste Kante
+  geschoben, bis zu dreimal, weil hinter der einen Kante die nächste Kiste
+  stehen kann.
+
+Die erste Fassung der Befreiung suchte im Kreis nach einem freien Platz, bis
+4,2 Meter Umkreis — und half nicht: der Testkörper misst 18,8 auf 38,8 Meter,
+aus dessen Mitte liegt kein freier Punkt innerhalb von vier Metern. Gemessen
+weiterhin null Meter in fünfzehn Sekunden. Über die Kante geschoben sind es
+9,8 Meter auf einen Schlag und danach normales Gehen, zusammen 16,2 Meter;
+derselbe Fall im vorigen Stand: **0,00 Meter**. Der Sprung ist sichtbar, wenn
+man danebensteht — die Alternative ist eine Figur, die für immer in einer Wand
+steht.
+
+Zum Verfahren gehört noch eine Beobachtung: dieselbe Prüfung fiel bei
+identischem Stand zweimal und lief einmal durch. Sie ist also stochastisch,
+und ein einzelner grüner Lauf beweist hier nichts. Der Nachweis steht
+deshalb im Einzelfall oben, nicht im Ergebnis eines Laufs.
+
 Noch ein Fehlschlag derselben Runde, aber einer in der Messung: die Prüfung
 „Die Helligkeitsmessung ist eingeschwungen" meldete für Sturm 118,5 gegen
 177,6 und sah aus wie eine unfertige Glättung. Sie war keine. `applySky` setzt
