@@ -2383,12 +2383,23 @@ pruefe('Es wird tatsächlich gezeichnet', info.c > 100, `${info.c} Draw Calls, $
 // Spiels lag bei 18:40 Uhr genau in einer solchen Senke: mittlere Helligkeit
 // 48,2 gegen 64,2 um Mitternacht, und 38,9 Prozent der Fläche unter 10 von
 // 255. Die Sonne stand zu tief für die Straße, die Laternen waren noch aus.
+// Belichtung, Dunst und Sonnenfarbe werden über die Zeit geglättet. Beide
+// Bildmessungen warteten dafür auf **vier Bilder** — und ein Bild ist unter
+// SwiftShader sechs Sekunden Wanduhr, aber nur dt = 0,05 s simulierte
+// Glättung. Gemessen wurde also ein Zustand irgendwo auf halbem Weg, und das
+// Ergebnis hing am Bildtakt: über drei Wiederholungen streuten die Werte um
+// 1,8 bis 3,6 von 255. Mit deterministischem Einschwingen — 240 Aufrufe von
+// applySky mit festem dt, also vier simulierte Sekunden — sind es 0,2 bis 0,8.
+const einschwingen = () => page.evaluate(() => {
+ for (let i = 0; i < 240; i++) window.LOWTIDE.world.applySky(1 / 60);
+});
 const tagesgang = {};
 for (const h of [7, 13, 18, 18.7, 23]) {
  await page.evaluate(x => {const L = window.LOWTIDE; L.sim.hour = x; L.sim.weather = 'clear';
   L.luftbild(-24, 3.7, 86, -30, 1.6, 78);}, h);
  const n0 = await page.evaluate(() => window.LOWTIDE.frames);
  await page.waitForFunction(k => window.LOWTIDE.frames > k + 4, n0, {timeout: 60000});
+ await einschwingen();
  tagesgang[h] = await page.evaluate(() => {
   const L = window.LOWTIDE; L.world.zeichne();
   const gl = L.world.renderer.getContext();
@@ -2426,13 +2437,30 @@ pruefe('Am Mittag brennt keine Laterne', await page.evaluate(() => {
 // mittlerer Helligkeit — zwölf von 255 zwischen wolkenlosem Mittag und
 // Gewitter, weil die erhöhte Streuung fast genau aufhob, was die gedämpfte
 // Sonne wegnahm.
-const wetterHelligkeit = {};
+const wetterHelligkeit = {}, wetterZweit = {};
 for (const wetter of ['clear', 'rain', 'fog', 'storm']) {
  await page.evaluate(w => {const L = window.LOWTIDE; L.sim.hour = 13; L.sim.weather = w;
   L.luftbild(-175, 8, 20, -100, 4, 60);}, wetter);
  const n0 = await page.evaluate(() => window.LOWTIDE.frames);
  await page.waitForFunction(k => window.LOWTIDE.frames > k + 4, n0, {timeout: 60000});
+ await einschwingen();
  wetterHelligkeit[wetter] = await page.evaluate(() => {
+  const L = window.LOWTIDE; L.world.zeichne();
+  const gl = L.world.renderer.getContext();
+  const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+  const px = new Uint8Array(w * h * 4);
+  gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  let sum = 0;
+  for (let i = 0; i < px.length; i += 4) sum += .2126 * px[i] + .7152 * px[i + 1] + .0722 * px[i + 2];
+  return sum / (px.length / 4);
+ });
+ // Zweite Messung nach weiterem Einschwingen. Ein eingeschwungener Zustand
+ // ändert sich nicht mehr; tut er es doch, ist die Messung selbst unbrauchbar
+ // und soll das melden, statt eine Zahl zu liefern, der man nicht trauen kann.
+ // Einmal in dieser Sitzung meldete dieselbe Stelle für Sturm 165,0 statt der
+ // üblichen 117 — ein Ausreißer, den die Streuung oben nicht erklärt.
+ await einschwingen();
+ wetterZweit[wetter] = await page.evaluate(() => {
   const L = window.LOWTIDE; L.world.zeichne();
   const gl = L.world.renderer.getContext();
   const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
@@ -2450,6 +2478,10 @@ pruefe('Gewitter ist deutlich dunkler als klarer Mittag',
  Object.entries(wetterHelligkeit).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(', '));
 pruefe('Nebel nimmt Sicht, nicht Helligkeit',
  wetterHelligkeit.clear - wetterHelligkeit.fog < 25 && wetterHelligkeit.fog > wetterHelligkeit.storm);
+pruefe('Die Helligkeitsmessung ist eingeschwungen',
+ Object.keys(wetterHelligkeit).every(k => Math.abs(wetterHelligkeit[k] - wetterZweit[k]) <= 3),
+ Object.keys(wetterHelligkeit).map(k =>
+  `${k} ${wetterHelligkeit[k].toFixed(1)}/${wetterZweit[k].toFixed(1)}`).join(', '));
 pruefe('Regen ist dichter als vorher', await page.evaluate(() => {
  const w = window.LOWTIDE.world;
  // Tropfen je Quadratmeter im Feld um die Kamera.

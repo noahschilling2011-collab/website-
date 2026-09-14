@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 287 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 288 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1318,6 +1318,48 @@ wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
 besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
+
+## Eine Prüfung, die zweimal dasselbe messen muss
+
+Im vorigen Abschnitt steht eine Beobachtung, die ich nicht stehen lassen
+wollte: zwei Wetterprüfungen fielen in einem Durchgang und waren davor und
+danach grün, ohne dass am Wetter etwas geändert wurde. Eine Zahl aus einer
+Suite, die manchmal anders antwortet, trägt keine einzige Behauptung in
+diesem Dokument.
+
+Die Ursache steckt in der Wartezeit. Belichtung, Dunst und Sonnenfarbe werden
+über die Zeit geglättet; beide Bildmessungen warteten dafür auf **vier
+Bilder**. Ein Bild ist unter SwiftShader rund sechs Sekunden Wanduhr — aber
+nur `dt = 0,05 s` simulierte Glättung, weil `dt` gedeckelt ist. Gemessen wurde
+also ein Zustand irgendwo auf halbem Weg, und wie weit er gekommen war, hing
+am Bildtakt.
+
+Nachgemessen über drei Wiederholungen je Wetterlage:
+
+| Wetterlage | Spanne alt | Spanne eingeschwungen |
+|---|---|---|
+| klar | 2,2 | **0,8** |
+| Regen | 2,1 | **0,2** |
+| Nebel | 1,8 | **0,5** |
+| Sturm | 3,6 | **0,2** |
+
+Eingeschwungen heißt: 240 Aufrufe von `applySky` mit festem `dt`, also vier
+simulierte Sekunden, unabhängig davon, wie viele Bilder die Grafikkarte in
+der Zeit schafft.
+
+**Das erklärt aber nicht alles**, und das ist der wichtigere Teil. Der
+Ausreißer, der den Fehlschlag verursacht hat, meldete für Sturm **165,0**
+statt der üblichen 117 — achtundvierzig Einheiten daneben, während die
+gemessene Streuung bei 3,6 liegt. Dafür habe ich keine Erklärung.
+
+Also misst die Prüfung jetzt **zweimal**: einschwingen, lesen, weiter
+einschwingen, noch einmal lesen. Ein eingeschwungener Zustand ändert sich
+nicht mehr; tut er es doch, meldet die neue Prüfung „Die Helligkeitsmessung
+ist eingeschwungen" das als Fehler, statt eine Zahl zu liefern, der man nicht
+trauen kann. Ein Ausreißer wie der von oben fällt damit als das auf, was er
+ist — eine unbrauchbare Messung —, und nicht als angeblicher Fehler am Wetter.
+
+288 Prüfungen bestanden, keine gefallen.
 
 ## Auf keiner Bank der Karte saß jemand
 
