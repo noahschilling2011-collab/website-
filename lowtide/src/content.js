@@ -135,22 +135,26 @@ export const regions=[
  {name:'ROSALIND',x:-870,z:340},{name:'TALON RIDGE',x:-880,z:-160},
  {name:'CANE HOLLOW',x:-640,z:640},{name:'MERCY RESERVOIR',x:-700,z:80}
 ];
+// laenge und breite sind an den gebauten Meshes gemessen, im Eigensystem des
+// Fahrzeugs und nicht in Weltachsen — mit gedrehtem Wagen mischen sich beide.
+// Der Verkehr braucht sie, um Abstand zu halten: vorher standen dort sieben
+// Meter für jeden, vom Motorrad bis zum Achtmeterbus.
 export const vehicleTypes={
- compact:{name:'Finch',mass:950,max:25,accel:11,brake:22,turn:1.8,grip:1,shape:'car',scale:[.85,.9,.82],sound:70,security:1},
- sedan:{name:'Kestrel S',mass:1500,max:30,accel:12,brake:23,turn:1.4,grip:1,shape:'car',scale:[1,1,1],sound:48,security:2},
- suv:{name:'Ridgeline',mass:2200,max:28,accel:9,brake:19,turn:1.2,grip:.9,shape:'car',scale:[1.15,1.4,1.1],sound:43,security:3},
- super:{name:'Vesper R',mass:1400,max:49,accel:19,brake:30,turn:1.7,grip:1.3,shape:'car',scale:[1.05,.7,1.12],sound:100,security:6},
- muscle:{name:'Banshee 68',mass:1800,max:37,accel:16,brake:19,turn:1.2,grip:.75,shape:'car',scale:[1.1,.9,1.14],sound:35,security:1},
- pickup:{name:'Mason',mass:2300,max:29,accel:9,brake:18,turn:1.15,grip:.95,shape:'pickup',scale:[1.1,1.2,1.2],sound:39,security:2},
- motorcycle:{name:'Wraith',mass:210,max:42,accel:19,brake:26,turn:2.2,grip:1.05,shape:'bike',scale:[1,1,1],sound:110,security:2},
- dirtbike:{name:'Thistle',mass:130,max:29,accel:15,brake:22,turn:2.5,grip:1.2,shape:'bike',scale:[.8,1.15,.9],sound:95,security:1},
- quad:{name:'Bog Runner',mass:350,max:23,accel:11,brake:20,turn:2,grip:1.2,shape:'quad',scale:[1,1,1],sound:75,security:1},
- truck:{name:'Atlas Hauler',mass:9000,max:23,accel:5,brake:12,turn:.7,grip:.85,shape:'truck',scale:[1.3,1.4,1.6],sound:24,security:2},
- bus:{name:'Mercy Transit',mass:11000,max:22,accel:4.5,brake:13,turn:.65,grip:.95,shape:'bus',scale:[1.25,1.4,2],sound:28,security:2},
- boat:{name:'Skimmer',mass:1700,max:28,accel:8,brake:4,turn:.85,grip:.5,shape:'boat',medium:'water',sound:55,security:0},
- jetski:{name:'Ripple',mass:320,max:33,accel:14,brake:7,turn:1.7,grip:.7,shape:'jetski',medium:'water',sound:100,security:0},
- helicopter:{name:'Osprey H2',mass:1900,max:40,accel:8,brake:9,turn:1.2,grip:1,shape:'helicopter',medium:'air',sound:18,security:0},
- plane:{name:'Cormorant',mass:2100,max:65,accel:9,brake:12,turn:.7,grip:1,shape:'plane',medium:'air',sound:38,security:0}
+ compact:{name:'Finch',mass:950,max:25,accel:11,brake:22,turn:1.8,grip:1,shape:'car',scale:[.85,.9,.82],sound:70,security:1,laenge:3.66,breite:1.89},
+ sedan:{name:'Kestrel S',mass:1500,max:30,accel:12,brake:23,turn:1.4,grip:1,shape:'car',scale:[1,1,1],sound:48,security:2,laenge:4.46,breite:2.22},
+ suv:{name:'Ridgeline',mass:2200,max:28,accel:9,brake:19,turn:1.2,grip:.9,shape:'car',scale:[1.15,1.4,1.1],sound:43,security:3,laenge:4.91,breite:2.55},
+ super:{name:'Vesper R',mass:1400,max:49,accel:19,brake:30,turn:1.7,grip:1.3,shape:'car',scale:[1.05,.7,1.12],sound:100,security:6,laenge:5.00,breite:2.33},
+ muscle:{name:'Banshee 68',mass:1800,max:37,accel:16,brake:19,turn:1.2,grip:.75,shape:'car',scale:[1.1,.9,1.14],sound:35,security:1,laenge:5.08,breite:2.44},
+ pickup:{name:'Mason',mass:2300,max:29,accel:9,brake:18,turn:1.15,grip:.95,shape:'pickup',scale:[1.1,1.2,1.2],sound:39,security:2,laenge:5.35,breite:2.44},
+ motorcycle:{name:'Wraith',mass:210,max:42,accel:19,brake:26,turn:2.2,grip:1.05,shape:'bike',scale:[1,1,1],sound:110,security:2,laenge:2.70,breite:1.00},
+ dirtbike:{name:'Thistle',mass:130,max:29,accel:15,brake:22,turn:2.5,grip:1.2,shape:'bike',scale:[.8,1.15,.9],sound:95,security:1,laenge:2.70,breite:1.00},
+ quad:{name:'Bog Runner',mass:350,max:23,accel:11,brake:20,turn:2,grip:1.2,shape:'quad',scale:[1,1,1],sound:75,security:1,laenge:2.70,breite:1.52},
+ truck:{name:'Atlas Hauler',mass:9000,max:23,accel:5,brake:12,turn:.7,grip:.85,shape:'truck',scale:[1.3,1.4,1.6],sound:24,security:2,laenge:7.00,breite:2.70},
+ bus:{name:'Mercy Transit',mass:11000,max:22,accel:4.5,brake:13,turn:.65,grip:.95,shape:'bus',scale:[1.25,1.4,2],sound:28,security:2,laenge:8.00,breite:2.70},
+ boat:{name:'Skimmer',mass:1700,max:28,accel:8,brake:4,turn:.85,grip:.5,shape:'boat',medium:'water',sound:55,security:0,laenge:5.00,breite:2.40},
+ jetski:{name:'Ripple',mass:320,max:33,accel:14,brake:7,turn:1.7,grip:.7,shape:'jetski',medium:'water',sound:100,security:0,laenge:2.50,breite:1.00},
+ helicopter:{name:'Osprey H2',mass:1900,max:40,accel:8,brake:9,turn:1.2,grip:1,shape:'helicopter',medium:'air',sound:18,security:0,laenge:9.26,breite:8.53},
+ plane:{name:'Cormorant',mass:2100,max:65,accel:9,brake:12,turn:.7,grip:1,shape:'plane',medium:'air',sound:38,security:0,laenge:7.15,breite:13.00}
 };
 export const weapons={
  pistol:{name:'Pistole',damage:34,range:65,cone:.987,capacity:12,delay:.3,reload:1.4,price:0},

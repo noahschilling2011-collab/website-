@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 302 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 308 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1318,6 +1318,107 @@ wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
 besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
+
+## Hundertsiebenundzwanzig Fahrzeuge, eine Karosserieform
+
+Der fahrende Verkehr bestand aus fünf Modellen: 46 Limousinen, 32
+Kleinwagen, 17 Geländewagen, 17 Muscle Cars, 15 Pick-ups. Von diesen fünf
+teilen sich vier dieselbe Karosserieform und unterscheiden sich nur im
+Maßstab — auf der Straße sah man also **112 von 127 Fahrzeugen als dieselbe
+Silhouette**. Bus, Lastwagen und Motorrad kamen im Verkehr überhaupt nicht
+vor, obwohl alle drei seit jeher als Typ in `content.js` und als Mesh
+gebaut sind: einer von jedem stand geparkt herum.
+
+Jetzt fahren fünf Busse, sechs Lastwagen und sechs Motorräder mit. Fünf
+Karosserieformen statt zwei, und der Anteil der einen Autoform fällt von 88
+auf 76 Prozent.
+
+Wer wo fährt, hängt an der Länge der Runde und nicht an ihrer Nummer. Die
+siebzehn Verkehrsrunden sind zwischen 171 und 1320 Meter lang; ein
+Achtmeterbus gehört auf die Durchgangsstrecke und nicht auf den 171 Meter
+langen Block in Rosalind. Busse fahren auf Runden ab 800 Metern, Lastwagen
+ab 900. Nachgemessen: kürzeste Busrunde 842 Meter, kürzeste
+Lastwagenrunde 1201.
+
+### Der Abstand war für jeden derselbe
+
+`wagenVoraus` hielt sieben Meter von Wagenmitte zu Wagenmitte frei, für
+jedes Fahrzeug gleich. Zwischen zwei Limousinen sind das 2,5 Meter Luft,
+hinter einem Achtmeterbus noch 0,8 — und ein Bus, der einem Kleinwagen
+folgt, hätte mit vier Metern Überhang aufgeschlossen. Genauso die Breite:
+2,2 Meter quer, unabhängig davon, ob dort ein Motorrad oder ein Lastwagen
+steht.
+
+Länge und Breite jedes Modells stehen jetzt in `vehicleTypes`, gemessen an
+den gebauten Meshes und im Eigensystem des Fahrzeugs, nicht in Weltachsen —
+bei gedrehtem Wagen mischen sich beide. Der Abstand ist 2,5 Meter plus je
+die halbe Länge, die Breite die halbe Summe plus dreißig Zentimeter. Für
+zwei Limousinen ergibt das 6,96 Meter, also praktisch den alten Wert; für
+Bus hinter Limousine 8,73.
+
+Nachgemessen über 150 Sekunden: kein kurzes Fahrzeug verlässt je die
+Fahrbahn. Bus und Lastwagen schon — der Verkehr hat keinen Wendekreis, die
+Fahrtrichtung springt am Wegpunkt um neunzig Grad, und ein Achtmeterbus steht
+dabei kurz schräg. Gemessen: **Lastwagen höchstens 0,25 Meter über dem Rand,
+Bus 0,75.** Das ist ungefähr das, was ein Bus in einer engen Kurve
+tatsächlich überstreicht; die Ursache ist trotzdem nicht der Schleppkurs,
+sondern der fehlende Wendekreis. Die Prüfung hält einen Meter fest, damit ein
+Bus, der drei Meter ins Grün fährt, auffällt.
+
+### Zwei Wagen, die ineinander hingen
+
+Die neue Überlappungsprüfung hat beim ersten Lauf zwei Paare gemeldet, beide
+an derselben Stelle: `suv/traffic auf compact/traffic bei [23,18]`. Dort
+überschneiden sich die Runden Raster Ost und Hafenblock. In einer frisch
+gestarteten Welt passiert es nicht — erst am Ende des Prüflaufs, nach
+zweihundert Prüfungen.
+
+Die Ursache war nicht die neue Verkehrsmischung, sondern eine Annahme in
+`wagenVoraus`, die es seit jeher enthielt: der andere Wagen steht in meiner
+Richtung. Ein quer stehender Kleinwagen ist in meiner Fahrtrichtung nur 1,9
+Meter tief, quer dazu aber 3,7 — gegen eine feste Breite geprüft war er
+unsichtbar, und zwei Wagen konnten sich an einer Kreuzung ineinander
+schieben. Die Ausdehnung des anderen wird jetzt auf meine Achsen projiziert.
+
+Dabei entsteht eine neue Gefahr: zwei Wagen, die einander quer sehen, halten
+beide und blockieren sich für immer. Nach drei bis gut fünf Sekunden
+Stillstand fährt deshalb einer los; die Staffelung steckt in der Kennung,
+damit nicht beide gleichzeitig anfahren.
+
+Kostet der strengere Abstand Durchsatz? Gemessen über dreißig Sekunden,
+mittlerer zurückgelegter Weg je fahrendem Wagen: **130,5 Meter vorher, 130,1
+nachher.** Kein Wagen blieb stehen.
+
+### Und die Regel, die dazu fehlte
+
+Damit waren es im nächsten Lauf nicht weniger Überlappungen, sondern mehr.
+Der Grund steht in der Simulation selbst: `wagenVoraus` verhindert, dass sich
+eine Lücke schließt — zwei Wagen, die schon ineinanderstehen, trennt nichts.
+Zwei Verkehrsrunden können dieselbe Spur benutzen, und dann stehen ihre Wagen
+schon beim Aufbau ineinander; an einer roten Ampel bleiben sie es für immer.
+Gemessen über fünf Minuten Spielzeit an hundertfünfzig Messpunkten: **202
+Überlappungen.**
+
+Alle vier Takte weicht jetzt der hintere zurück, höchstens einen halben
+Meter, auf der eigenen Spur und nicht zur Seite — sonst stünde er im Grün.
+Steht der hintere geparkt, weicht stattdessen der vordere nach vorn.
+
+202 → 107 → 6. Die letzten sechs hingen alle an einem einzigen Wagen.
+
+### Elis Wagen stand auf der Fahrbahn
+
+`VOSS-07`, der Wagen, mit dem das Spiel beginnt, stand bei (-34, 75). Die
+Straße dort ist fünfzehn Meter breit, ihre Achse liegt bei x = -40, und die
+Fahrspur des Verkehrs bei -35,7. Der Wagen stand also anderthalb Meter vom
+Fahrbahnrand entfernt **in der Spur**; vorbeifahrende Wagen streiften ihn.
+
+Der neue Platz ist gesucht: die nächstgelegene Stelle, an der alle vier Ecken
+der Karosserie mit 1,2 Metern Luft neben jeder Fahrbahn liegen, trocken und
+eben sind. Acht Meter weiter, zehn Meter vom Startpunkt der Figur.
+
+Danach: **null Überlappungen** in fünf Minuten.
+
+308 Prüfungen bestanden, keine gefallen.
 
 ## Vierundsechzig Möwen, die nicht mit den Flügeln schlugen
 

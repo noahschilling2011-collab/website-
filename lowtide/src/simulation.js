@@ -1,5 +1,5 @@
 // Deterministic gameplay simulation, independent of WebGL and the DOM.
-import {intersections,ampelFrei,onRoad} from './content.js';
+import {intersections,ampelFrei,onRoad,vehicleTypes} from './content.js';
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 export const roads=[-100,-40,20,80];
@@ -47,7 +47,18 @@ export class Simulation{
   this.addSolid(-79,-74,6,6,'crate',2.8);this.addSolid(-57,-81,7,5,'crate',2.4);this.addSolid(-59,-60,5,5,'crate',2.7);
   const loop=[{x:-31,z:90},{x:-31,z:29},{x:11,z:29},{x:11,z:90}];
   for(let i=0;i<18;i++){const block=i%3;const path=loop.map(p=>({x:p.x+(block===1?60:block===2?-60:0),z:p.z-(i%2?120:0)}));const p=path[i%4];this.npcs.push({id:i,x:p.x,z:p.z,yaw:0,state:'normal',timer:0,health:100,path,target:(i+1)%4,personality:['caller','filmer','coward'][i%3],pace:1.1+this.rng()*.8,report:null});}
-  this.cars.push({id:'VOSS-07',x:-34,z:75,yaw:Math.PI,speed:0,health:100,type:'player',color:0x49a8a4});
+  // Elis eigener Wagen stand bei (-34, 75) mitten auf der Fahrbahn: sechs
+  // Meter von der Achse der fünfzehn Meter breiten Straße bei x = -40, die
+  // Fahrspur des Verkehrs liegt bei -35,7. Vorbeifahrende Wagen streiften ihn
+  // — die Überlappungsprüfung hat ihn sechsmal in fünf Minuten erwischt.
+  // Der neue Platz ist gesucht, nicht geschätzt: die nächstgelegene Stelle,
+  // an der alle vier Ecken der Karosserie und die Mitte mit 1,2 Metern Luft
+  // neben jeder Fahrbahn liegen, trocken, eben und frei von Kulisse sind.
+  // Der erste Fund acht Meter weiter war gegen Straße, Wasser und Gelände
+  // geprüft, aber nicht gegen die Hindernisse der Welt — der Wagen stand in
+  // einer Kulisse und ließ sich nicht bewegen. Die Prüfung „Fahrzeug
+  // beschleunigt" hat es gemeldet.
+  this.cars.push({id:'VOSS-07',x:-29.6,z:91.4,yaw:Math.PI,speed:0,health:100,type:'player',color:0x49a8a4});
   for(let i=0;i<8;i++){const x=i<4?-100:20,z=-100+(i%4)*48;this.cars.push({id:'PM-'+(400+i),x:x+3,z,yaw:0,speed:8+this.rng()*3,health:100,type:'traffic',color:[0xd9b078,0xcad0c5,0xa75547,0x3c637d][i%4],route:[{x:x+3,z:83},{x:x+63,z:83},{x:x+63,z:-103},{x:x+3,z:-103}],target:0,wait:0});}
   for(let i=0;i<6;i++)this.cops.push({id:i,x:83+i*3,z:-105,yaw:0,speed:0,active:false,route:[],target:0,repath:0,health:100,shot:0});
  }
@@ -119,16 +130,95 @@ export class Simulation{
  // mit, sonst schöbe der Verkehr ihn von hinten an.
  wagenVoraus(c){
   const sin=Math.sin(c.yaw),cos=Math.cos(c.yaw);
+  // Der Abstand hing an einer festen Zahl: sieben Meter von Mitte zu Mitte,
+  // für jedes Fahrzeug gleich. Zwischen zwei Limousinen sind das 2,5 Meter
+  // Luft, hinter einem Achtmeterbus nur 0,8 — und ein Bus hinter einem
+  // Kleinwagen hätte mit vier Metern Überhang aufgeschlossen. Jetzt zählt die
+  // Länge beider: 2,5 Meter Luft plus je die halbe Länge.
+  const la=vehicleTypes[c.model]?.laenge||4.5, ba=vehicleTypes[c.model]?.breite||2.2;
   for(const o of this.cars){
    if(o===c||o.health<=0)continue;
    const dx=o.x-c.x,dz=o.z-c.z;
-   if(Math.abs(dx)+Math.abs(dz)>9)continue;      // billige Vorabschätzung
+   const lo=vehicleTypes[o.model]?.laenge||4.5, bo=vehicleTypes[o.model]?.breite||2.2;
+   // Der andere Wagen steht nicht unbedingt in meiner Richtung. Seine
+   // Ausdehnung wird deshalb auf meine Achsen projiziert: ein quer stehender
+   // Kleinwagen ist in meiner Fahrtrichtung nur 1,9 Meter tief, quer dazu
+   // aber 3,7 — mit einer festen Breite war er unsichtbar. Genau daran hingen
+   // zwei Wagen ineinander an der Kreuzung [23,18], wo sich die Runden Raster
+   // Ost und Hafenblock überschneiden.
+   const d=o.yaw-c.yaw, sd=Math.abs(Math.sin(d)), cd=Math.abs(Math.cos(d));
+   const tiefe=lo/2*cd+bo/2*sd, quer=lo/2*sd+bo/2*cd;
+   const weit=2.5+la/2+tiefe;
+   if(Math.abs(dx)+Math.abs(dz)>weit+2)continue;   // billige Vorabschätzung
    const laengs=dx*sin+dz*cos;
-   if(laengs<.4||laengs>7)continue;
-   if(Math.abs(dx*cos-dz*sin)>2.2)continue;
+   if(laengs<.4||laengs>weit)continue;
+   if(Math.abs(dx*cos-dz*sin)>ba/2+quer+.3)continue;
+   // Zwei Wagen, die einander quer sehen, blockierten sich sonst für immer.
+   // Nach drei bis gut fünf Sekunden Stillstand fährt einer los; die
+   // Staffelung steckt in der Kennung, damit nicht beide gleichzeitig
+   // anfahren.
+   if(sd>.7&&(c.stau||0)>3+this.rangVon(c)*.7)continue;
    return true;
   }
   return false;
+ }
+ // Wie tief zwei Fahrzeuge ineinanderstehen, über die Trennachsen der
+ // beiden Rechtecke. Null, wenn sie sich nicht berühren.
+ ueberlappung(a,b){
+  const ta=vehicleTypes[a.model]||{},tb=vehicleTypes[b.model]||{};
+  const la=(ta.laenge||4.5)/2,ba=(ta.breite||2.2)/2;
+  const lb=(tb.laenge||4.5)/2,bb=(tb.breite||2.2)/2;
+  const dx=b.x-a.x,dz=b.z-a.z;
+  const sa=Math.sin(a.yaw),ca=Math.cos(a.yaw),sb=Math.sin(b.yaw),cb=Math.cos(b.yaw);
+  let tief=Infinity;
+  for(const [ux,uz] of [[sa,ca],[ca,-sa],[sb,cb],[cb,-sb]]){
+   const d=Math.abs(dx*ux+dz*uz);
+   const ra=la*Math.abs(sa*ux+ca*uz)+ba*Math.abs(ca*ux-sa*uz);
+   const rb=lb*Math.abs(sb*ux+cb*uz)+bb*Math.abs(cb*ux-sb*uz);
+   if(d>ra+rb)return 0;
+   tief=Math.min(tief,ra+rb-d);
+  }
+  return tief;
+ }
+ // Zwei Wagen, die bereits ineinanderstehen, trennt keine Regel: wagenVoraus
+ // verhindert nur, dass sich eine Lücke schließt. Zwei Runden können dieselbe
+ // Spur benutzen, und dann stehen ihre Wagen schon beim Aufbau ineinander; an
+ // einer roten Ampel bleiben sie es für immer. Gemessen über fünf Minuten:
+ // zweihundertzwei Überlappungen an hundertfünfzig Messpunkten.
+ //
+ // Alle vier Takte weicht der hintere zurück, höchstens einen halben Meter.
+ // Auf der eigenen Spur, nicht zur Seite — sonst stünde er im Grün.
+ entflechten(){
+  const c=this.cars;
+  for(let i=0;i<c.length;i++){
+   const a=c[i];
+   if(a.health<=0||a===this.player.car)continue;
+   for(let j=i+1;j<c.length;j++){
+    const b=c[j];
+    if(b.health<=0||b===this.player.car)continue;
+    if(Math.abs(b.x-a.x)+Math.abs(b.z-a.z)>14)continue;
+    const tief=this.ueberlappung(a,b);
+    if(tief<=0)continue;
+    // Bewegt wird, wer fährt. Steht der hintere geparkt — der eigene Wagen
+    // des Spielers zum Beispiel —, weicht stattdessen der vordere nach vorn:
+    // ein geparkter Wagen in der Spur ist sonst eine Überlappung für immer.
+    const vorA=(b.x-a.x)*Math.sin(a.yaw)+(b.z-a.z)*Math.cos(a.yaw);
+    let hinten=vorA>0?a:b, vorne=vorA>0?b:a;
+    const weg=Math.min(.5,tief+.05);
+    if(hinten.type==='traffic'&&hinten!==this.player.car){
+     hinten.x-=Math.sin(hinten.yaw)*weg;
+     hinten.z-=Math.cos(hinten.yaw)*weg;
+    }else if(vorne.type==='traffic'&&vorne!==this.player.car){
+     vorne.x+=Math.sin(vorne.yaw)*weg;
+     vorne.z+=Math.cos(vorne.yaw)*weg;
+    }
+   }
+  }
+ }
+ // Stabile kleine Zahl aus der Wagenkennung, 0 bis 3.
+ rangVon(c){
+  if(c._rang===undefined){let h=0;for(const z of String(c.id||''))h+=z.charCodeAt(0);c._rang=h%4;}
+  return c._rang;
  }
  blocked(p,r=.4){return p.x<-119+r||p.x>112-r||p.z<-119+r||p.z>113-r||this.solids.some(b=>intersects(p,b,r));}
  move(o,dx,dz,r=.4){let hit=false;const steps=Math.max(1,Math.ceil(Math.hypot(dx,dz)/.25));for(let i=0;i<steps;i++){if(!this.blocked({x:o.x+dx/steps,z:o.z},r))o.x+=dx/steps;else hit=true;if(!this.blocked({x:o.x,z:o.z+dz/steps},r))o.z+=dz/steps;else hit=true;}return hit;}
@@ -147,12 +237,13 @@ export class Simulation{
  tick(dt,input={}){if(this.paused)return;dt=Math.min(.05,dt);this.time+=dt;this.hour=(this.hour+dt/80)%24;this.weatherTimer-=dt;if(this.weatherTimer<=0){this.weather=this.weather==='clear'?'rain':'clear';this.weatherTimer=80;this.post?.('@solvara_wetter',this.weather==='rain'?'Regenband über Port Mercy. Fahrt vorsichtig.':'Aufklarung über der Küste.');this.notify(this.weather==='rain'?'Eine Regenfront zieht über den Hafen. Weniger Grip auf den Straßen.':'Der Regen lässt nach.');}const p=this.player;p.cooldown=Math.max(0,p.cooldown-dt);this.tracers=this.tracers.filter(t=>(t.life-=dt)>0);p.sneak=!!input.sneak;
   if(p.car&&this.driveVehicle){this.driveVehicle(dt,input);}else if(p.car){const c=p.car;const accel=input.forward||0,turn=input.turn||0;const grip=this.weather==='rain'?.68:1;c.speed+=accel*12*dt;if(!accel)c.speed*=Math.pow(.97,dt*60);if(input.brake)c.speed*=Math.pow(.90,dt*60);c.speed=clamp(c.speed,-8,26*Math.max(.25,c.health/100));if(Math.abs(c.speed)>.15)c.yaw-=turn*dt*1.5*clamp(c.speed/7,-1,1)*(input.brake?1.6:grip);const hit=this.move(c,Math.sin(c.yaw)*c.speed*dt,Math.cos(c.yaw)*c.speed*dt,1.45);if(hit&&Math.abs(c.speed)>2){c.health=clamp(c.health-Math.abs(c.speed)*.9,0,100);c.speed*=-.2;this.collisions++;if(c.health===0){p.health-=10;this.notify('Motor ausgefallen. Steig aus und suche ein anderes Auto.');}}p.x=c.x;p.z=c.z;p.yaw=c.yaw;for(const n of this.npcs){if(n.health>0&&distance(c,n)<1.8&&Math.abs(c.speed)>4){n.health=0;n.state='verletzt';this.injured++;c.speed*=.75;this.crime(3);}}for(const other of this.cars){if(other!==c&&distance(c,other)<3&&Math.abs(c.speed)>3){other.wait=5;other.health-=8;c.health=Math.max(0,c.health-5);c.speed*=-.2;this.collisions++;this.crime(1);}}}
   else{const f=input.forward||0,t=input.turn||0,yaw=input.yaw??p.yaw;const speed=p.sneak?2:input.sprint?8:4.5;const len=Math.max(1,Math.hypot(f,t));const dx=(Math.sin(yaw)*f-Math.cos(yaw)*t)*speed*dt/len,dz=(Math.cos(yaw)*f+Math.sin(yaw)*t)*speed*dt/len;this.move(p,dx,dz,.42);if(p.armed)p.yaw=yaw;else if(f||t)p.yaw=Math.atan2(dx,dz);}
-  for(const c of this.cars){if(c===p.car||c.type!=='traffic')continue;c.wait=Math.max(0,c.wait-dt);if(c.wait||c.health<=0)continue;const next=c.route[c.target],d=distance(c,next);if(d<1.2){c.target=(c.target+1)%c.route.length;continue;}c.yaw=Math.atan2(next.x-c.x,next.z-c.z);if(distance(c,p)<5&&!p.car)continue;if(this.haeltVorAmpel(c))continue;if(this.wagenVoraus(c)||this.fussgaengerVoraus(c))continue;c.x+=Math.sin(c.yaw)*c.speed*dt;c.z+=Math.cos(c.yaw)*c.speed*dt;}
+  for(const c of this.cars){if(c===p.car||c.type!=='traffic')continue;c.wait=Math.max(0,c.wait-dt);if(c.wait||c.health<=0)continue;const next=c.route[c.target],d=distance(c,next);if(d<1.2){c.target=(c.target+1)%c.route.length;continue;}c.yaw=Math.atan2(next.x-c.x,next.z-c.z);if(distance(c,p)<5&&!p.car)continue;if(this.haeltVorAmpel(c))continue;if(this.wagenVoraus(c)||this.fussgaengerVoraus(c)){c.stau=(c.stau||0)+dt;continue;}c.stau=0;c.x+=Math.sin(c.yaw)*c.speed*dt;c.z+=Math.cos(c.yaw)*c.speed*dt;}
   for(const n of this.npcs){if(n.health<=0||n.state==='tanzend')continue;n.timer-=dt;if(n.report&&n.timer<=0){this.report(n.report.severity,n.report,n.report.incident);n.report=null;n.state='flüchtend';n.timer=9;}if(p.armed&&distance(n,p)<17&&lineClear(n,p,this.solids)&&(n.state==='normal'||n.state==='sitzend')){n.state='aufmerksam';n.timer=1.4;}if(n.state==='aufmerksam'&&n.timer<=0){n.state='flüchtend';n.timer=6;}if(n.state==='erschrocken'&&n.timer<3)n.state='Polizei rufend';if(n.state==='filmend'||n.state==='Polizei rufend'||n.state==='erschrocken'){n.yaw=Math.atan2(p.x-n.x,p.z-n.z);continue;}// Wer sitzt, nimmt am Zustandswechsel oben teil — sonst bemerkt er eine
    // gezogene Waffe nicht —, bewegt sich aber nicht. Der erste Anlauf ließ ihn
    // ganz oben aus der Schleife springen; damit blieb er blind für alles.
    if(n.state==='sitzend')continue;
    if(n.state==='flüchtend'){n.yaw=Math.atan2(n.x-p.x,n.z-p.z);this.move(n,Math.sin(n.yaw)*3*dt,Math.cos(n.yaw)*3*dt,.3);if(n.timer<=0){n.state='normal';n.target=(n.target+1)%n.path.length;}}else{const dest=n.path[n.target],d=distance(n,dest);if(d<1)n.target=(n.target+1)%n.path.length;else{n.yaw=Math.atan2(dest.x-n.x,dest.z-n.z);this.move(n,Math.sin(n.yaw)*n.pace*(this.weather==='rain'?1.5:1)*dt,Math.cos(n.yaw)*n.pace*(this.weather==='rain'?1.5:1)*dt,.3);}}}
+  if(((this._entflecht=(this._entflecht||0)+1)%4)===0)this.entflechten();
   this.updatePolice(dt);this.eventTimer-=dt;if(this.eventTimer<=0){this.eventTimer=55;const c=this.cars.find(c=>c.type==='traffic'&&c!==p.car);if(c){c.wait=14;this.notify('Verkehrsfunk: Pannenfahrzeug auf der Harbor Avenue.');}}
   if(p.health<=0){p.health=0;this.paused=true;this.notify('Festgenommen. Starte den Auftrag erneut.');}
  }

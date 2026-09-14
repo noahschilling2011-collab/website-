@@ -75,6 +75,21 @@ export class Campaign extends Simulation{
   // simulation.js gilt für sie wie für die bisherigen.
   const LACKE=[0xd9b078,0xcad0c5,0xa75547,0x3c637d,0x6f7a6a,0xb8b2a4,0x8a5f52,0x4c6b74,0xd6c9a8,0x5a6470];
   const MODELLE=['sedan','compact','suv','muscle','pickup','sedan','compact','sedan'];
+  // Der ganze fahrende Verkehr bestand aus fünf Modellen, und vier davon —
+  // 112 von 127 Wagen — tragen dieselbe Karosserieform in anderer Größe. Bus,
+  // Lastwagen und Motorrad kamen auf der Straße nicht vor, obwohl alle drei
+  // seit jeher als Typ und als Mesh vorhanden sind.
+  //
+  // Wer wo fährt, hängt an der Länge der Runde und nicht an ihrer Nummer: ein
+  // Achtmeterbus gehört auf die Durchgangsstrecke, nicht auf den 171 Meter
+  // langen Block in Rosalind. Gemessen reichen die Runden von 171 bis 1320
+  // Metern; drei liegen über 900, fünf über 800.
+  const modellFuer=(r,k,laenge)=>{
+   if(laenge>=900&&(k===2||k===5))return 'truck';
+   if(laenge>=800&&k===1)return 'bus';
+   if((r*7+k)%17===3)return 'motorcycle';
+   return MODELLE[(r*7+k)%MODELLE.length];
+  };
   // Verkehrsrunden. Vorher vier getippte Eckpunkte je Runde, mit einem festen
   // Versatz von sechs bis zehn Metern zur Straßenachse. Gemessen: bei zwölf
   // von fünfzehn Runden lag mindestens eine Kante neben der Fahrbahn, über
@@ -152,10 +167,11 @@ export class Campaign extends Simulation{
   const PRO_RUNDE=7;
   RUNDEN.forEach((runde,r)=>{
    const weg=runde.map(([x,z])=>({x,z}));
+   const rundenLaenge=umfang(weg);
    for(let k=0;k<PRO_RUNDE;k++){
     const q=punktAuf(weg,k/PRO_RUNDE);
     const n=r*PRO_RUNDE+k;
-    this.cars.push({id:'PM-'+(500+n),model:MODELLE[n%MODELLE.length],
+    this.cars.push({id:'PM-'+(500+n),model:modellFuer(r,k,rundenLaenge),
      x:q.x,z:q.z,yaw:0,speed:7+this.rng()*5,health:100,type:'traffic',
      color:LACKE[n%LACKE.length],route:weg,target:q.ziel,wait:0,
      fuel:100,tires:100,glass:100,lights:100,alt:0,upgrades:{},owner:null});
@@ -813,7 +829,9 @@ export class Campaign extends Simulation{
   // Seitlich versetzt je Figur. Ohne das liefen alle zum selben Punkt und
   // standen dort ineinander: die Prüfung meldete sechs bleibende Paare unter
   // 0,55 Metern, engster Abstand zwei Zentimeter.
-  const seit=((id%5)-2)*.55;
+  // Elf Werte statt fünf: mit id%5 bekamen zu viele Figuren denselben Versatz
+  // und standen wieder ineinander — die Prüfung meldete fünf bleibende Paare.
+  const seit=((id%11)/10-.5)*2.4;
   const punkte=[-vorzeichen*rand,vorzeichen*rand].map(e=>({
    x:beste.x+(nordSued?e:seit),z:beste.z+(nordSued?seit:e)}));
   // Ein Einstieg im Wasser oder in einer Wand wäre schlechter als der

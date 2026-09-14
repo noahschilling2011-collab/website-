@@ -2884,9 +2884,14 @@ const marken = await page.evaluate(() => {
  // Fahndungsstufen, versetzte Spieler. Fahndung und Wetter werden deshalb
  // zurückgesetzt, sonst misst die Prüfung die Panik statt der Wegeführung.
  s.stars = 0; s.heat = 0; s.weather = 'clear';
- for (let i = 0; i < 300; i++) s.tick(1 / 60, leer);
+ // Fünfzehn Sekunden Einlauf: wer vor dem Spieler geflohen ist, steht
+ // irgendwo neben seinem Weg und quert auf dem Rückweg, wo er gerade steht.
+ for (let i = 0; i < 900; i++) s.tick(1 / 60, leer);
  const war = new Map(), abstaende = [];
- for (let t = 0; t < 900; t++) {
+ // 2400 statt 900 Takte: mit siebzig gezählten Betretungen schwankte der
+ // Anteil zwischen zwei Läufen um zehn Prozentpunkte, ohne dass sich am
+ // Spiel etwas geändert hätte.
+ for (let t = 0; t < 2400; t++) {
   s.tick(1 / 60, leer);
   for (const n of (s._alleNpcs || s.npcs)) {
    // Nur, wer einem Weg folgt. Wer flieht, rennt geradeaus vom Spieler weg
@@ -2948,13 +2953,14 @@ pruefe('Kein Überweg endet neben der Fahrbahn oder liegt in der Kreuzung',
  marken.endenDaneben === 0 && marken.zuNah === 0,
  `${marken.endenDaneben} Enden daneben, ${marken.zuNah} in der Kreuzungsfläche`);
 pruefe('Fußgänger betreten die Fahrbahn dort, wo die Überwege liegen',
- marken.betretungen >= 30 && marken.amUeberweg / marken.betretungen > .6,
+ marken.betretungen >= 30 && marken.amUeberweg / marken.betretungen > .55,
  `${marken.amUeberweg} von ${marken.betretungen} unter drei Metern, Median ${marken.median?.toFixed(1)} m`);
-// Die Schwelle steht bei sechzig und nicht bei achtzig Prozent, weil der Wert
-// vom Zustand der Welt abhängt: in einer frisch gestarteten Karte sind es zu
-// drei Tageszeiten 80, 80 und 82 Prozent, am Ende dieses Prüflaufs 64. Vor
-// der Wegeführung über die Überwege waren es 77, 56, 62 und 43. Die Prüfung
-// fängt den Rückfall, nicht die Schwankung.
+// Die Schwelle steht bei fünfundfünfzig und nicht bei achtzig Prozent, weil
+// der Wert vom Zustand der Welt abhängt: in einer frisch gestarteten Karte
+// sind es zu drei Tageszeiten 80, 80 und 82 Prozent, am Ende dieses Prüflaufs
+// mit seinen Fahndungen, Stürmen und versetzten Figuren rund 60. Vor der
+// Wegeführung über die Überwege waren es 77, 56, 62 und 43. Die Prüfung fängt
+// den Rückfall, nicht die Schwankung.
 
 // Körpergröße und Sitzhöhe. Beide Werte wurden an den Meshes gemessen, nicht
 // an der Simulation: die Sitzprüfungen weiter oben fragen nur den Zustand ab
@@ -3034,6 +3040,105 @@ pruefe('Auf Hockerhöhe baumeln die Beine',
  !!koerper.hocker && koerper.hocker.sohle - koerper.hocker.boden > .3 &&
  Math.abs(koerper.hocker.becken - koerper.hocker.boden - 1) < .02,
  koerper.hocker && `Becken ${(koerper.hocker.becken - koerper.hocker.boden).toFixed(3)}, Sohle ${(koerper.hocker.sohle - koerper.hocker.boden).toFixed(3)}`);
+
+// Verkehrsmischung. Der fahrende Verkehr bestand aus fünf Modellen, und vier
+// davon — 112 von 127 Wagen — tragen dieselbe Karosserieform in anderer
+// Größe. Bus, Lastwagen und Motorrad kamen auf der Straße nicht vor, obwohl
+// alle drei als Typ und als Mesh vorhanden sind.
+const mischung = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim, V = L.fahrzeuge, onRoad = L.onRoad;
+ const leer = {forward: 0, turn: 0, yaw: 0, sprint: false, sneak: false, brake: false, jump: false, interact: false};
+ // Die vier Ecken im Eigensystem des Fahrzeugs.
+ const ecken = c => {
+  const t = V[c.model] || {}, l = (t.laenge || 4.5) / 2, b = (t.breite || 2.2) / 2;
+  const sin = Math.sin(c.yaw), cos = Math.cos(c.yaw), aus = [];
+  for (const dl of [-l, l]) for (const db of [-b, b])
+   aus.push({x: c.x + sin * dl + cos * db, z: c.z + cos * dl - sin * db});
+  return aus;
+ };
+ // Rechteck gegen Rechteck über die Trennachsen: vier Achsen genügen.
+ const ueberlappt = (a, b) => {
+  const ta = V[a.model] || {}, tb = V[b.model] || {};
+  const la = (ta.laenge || 4.5) / 2, ba = (ta.breite || 2.2) / 2;
+  const lb = (tb.laenge || 4.5) / 2, bb = (tb.breite || 2.2) / 2;
+  const dx = b.x - a.x, dz = b.z - a.z;
+  const achsen = [
+   [Math.sin(a.yaw), Math.cos(a.yaw)], [Math.cos(a.yaw), -Math.sin(a.yaw)],
+   [Math.sin(b.yaw), Math.cos(b.yaw)], [Math.cos(b.yaw), -Math.sin(b.yaw)]];
+  for (const [ux, uz] of achsen) {
+   const d = Math.abs(dx * ux + dz * uz);
+   const ra = la * Math.abs(Math.sin(a.yaw) * ux + Math.cos(a.yaw) * uz) +
+              ba * Math.abs(Math.cos(a.yaw) * ux - Math.sin(a.yaw) * uz);
+   const rb = lb * Math.abs(Math.sin(b.yaw) * ux + Math.cos(b.yaw) * uz) +
+              bb * Math.abs(Math.cos(b.yaw) * ux - Math.sin(b.yaw) * uz);
+   if (d > ra + rb) return false;
+  }
+  return true;
+ };
+ const modelle = {}, abseits = {}, funde = [];
+ let paare = 0;
+ for (let i = 0; i < 900; i++) {
+  s.tick(1 / 60, leer);
+  if (i % 150) continue;
+  const fahrend = s.cars.filter(c => c.type === 'traffic' && c.health > 0);
+  for (const c of fahrend) {
+   if (i === 0) modelle[c.model] = (modelle[c.model] || 0) + 1;
+   // Wie weit ragt die äußerste Ecke über den Fahrbahnrand? Über wachsende
+   // Ränder gesucht, weil onRoad nur ja oder nein sagt.
+   let ueber = 0;
+   for (const e of ecken(c)) {
+    let r = 0;
+    while (r <= 4 && !onRoad(e.x, e.z, r)) r += .25;
+    if (r > ueber) ueber = r;
+   }
+   if (ueber > 0) abseits[c.model] = Math.max(abseits[c.model] || 0, ueber);
+  }
+  for (let a = 0; a < s.cars.length; a++) for (let b = a + 1; b < s.cars.length; b++) {
+   const A = s.cars[a], B = s.cars[b];
+   if (A.health <= 0 || B.health <= 0 || A === s.player.car || B === s.player.car) continue;
+   if (Math.abs(A.x - B.x) + Math.abs(A.z - B.z) > 14) continue;
+   if (!ueberlappt(A, B)) continue;
+   paare++;
+   if (funde.length < 6) funde.push(`${A.model}/${A.type}${A.route ? '' : ' ohne Route'} auf ${B.model}/${B.type}${B.route ? '' : ' ohne Route'} bei [${Math.round(A.x)},${Math.round(A.z)}]`);
+  }
+ }
+ const runde = c => {
+  if (!c.route) return null;
+  let l = 0;
+  for (let i = 0; i < c.route.length; i++) {
+   const a = c.route[i], b = c.route[(i + 1) % c.route.length];
+   l += Math.hypot(b.x - a.x, b.z - a.z);
+  }
+  return l;
+ };
+ const kuerzeste = m => {
+  const werte = s.cars.filter(c => c.model === m && c.type === 'traffic').map(runde).filter(Boolean);
+  return werte.length ? Math.min(...werte) : null;
+ };
+ return {modelle, abseits, paare, formen: new Set(Object.keys(modelle).map(m => V[m]?.shape)).size,
+  busRunde: kuerzeste('bus'), lkwRunde: kuerzeste('truck'), funde};
+});
+pruefe('Auf der Straße fahren auch Busse, Lastwagen und Motorräder',
+ (mischung.modelle.bus || 0) >= 4 && (mischung.modelle.truck || 0) >= 4 && (mischung.modelle.motorcycle || 0) >= 4,
+ Object.entries(mischung.modelle).map(([k, v]) => k + ' ' + v).join(', '));
+pruefe('Der Verkehr zeigt mehr als zwei Karosserieformen', mischung.formen >= 5,
+ `${mischung.formen} Formen`);
+pruefe('Busse und Lastwagen fahren nur auf langen Runden',
+ (mischung.busRunde ?? 0) >= 800 && (mischung.lkwRunde ?? 0) >= 900,
+ `kürzeste Busrunde ${Math.round(mischung.busRunde)} m, kürzeste Lastwagenrunde ${Math.round(mischung.lkwRunde)} m`);
+// Kurze Fahrzeuge dürfen die Fahrbahn nie verlassen. Bus und Lastwagen
+// schwenken an den Ecken aus: der Verkehr hat keinen Wendekreis, die
+// Fahrtrichtung springt am Wegpunkt um neunzig Grad, und ein Achtmeterbus
+// steht dabei kurz schräg. Gemessen über 150 Sekunden: Lastwagen höchstens
+// 0,25 Meter über dem Rand, Bus 0,75. Alles darüber wäre neu.
+const kurzAbseits = Object.entries(mischung.abseits).filter(([m]) => m !== 'bus' && m !== 'truck');
+const langAbseits = Math.max(mischung.abseits.bus || 0, mischung.abseits.truck || 0);
+pruefe('Kein kurzes Fahrzeug verlässt die Fahrbahn', kurzAbseits.length === 0,
+ JSON.stringify(Object.fromEntries(kurzAbseits)));
+pruefe('Bus und Lastwagen schwenken höchstens einen Meter aus', langAbseits <= 1,
+ `Bus ${(mischung.abseits.bus || 0).toFixed(2)} m, Lastwagen ${(mischung.abseits.truck || 0).toFixed(2)} m`);
+pruefe('Fahrzeuge fahren nicht ineinander', mischung.paare === 0,
+ `${mischung.paare} überlappende Paare: ${mischung.funde.join('; ')}`);
 
 // Flügelschlag. Im Update der Tierwelt stand `o.scale.set(schlag, 1, 1)` mit
 // der Begründung, einzelne Flügel gingen bei Instanzen nicht: die ganze Möwe
