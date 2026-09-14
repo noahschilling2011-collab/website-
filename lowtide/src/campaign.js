@@ -673,10 +673,15 @@ export class Campaign extends Simulation{
   const grob=this.tickCount%12===0;
   const fern=grob?all.filter(n=>distance(n,p)>=180&&!n.report):null;
   const paceVorher=fern?fern.map(n=>n.pace):null;
-  if(fern)for(const n of fern)n.pace=(n.pace||1)*12;
+  // Mit der Geschwindigkeit muss auch die Uhr der Figur schneller laufen.
+  // Die Regel gegen Feststecken misst in Sekunden, und ferne Figuren sammeln
+  // die nur jeden zwölften Tick: aus drei Sekunden wurden für sie 36. Eine
+  // Figur, die sich an einer Wand verkeilt hat, stand damit über eine halbe
+  // Minute, bevor überhaupt jemand nachsah.
+  if(fern)for(const n of fern){n.pace=(n.pace||1)*12;n.grobFaktor=12;}
   this.npcs=all.filter(n=>distance(n,p)<180||n.report||this.tickCount%12===0);
   super.tick(dt,{...input,sprint:input.sprint&&p.stamina>0,sneak:input.sneak||p.cover});
-  if(fern)fern.forEach((n,i)=>{n.pace=paceVorher[i];});
+  if(fern)fern.forEach((n,i)=>{n.pace=paceVorher[i];n.grobFaktor=1;});
   this.npcs=all;for(const [n,h] of stunned)n.health=h;
   if(oldWeatherTimer<=dt){this.weatherIndex=(this.weatherIndex+1)%4;this.weather=['clear','rain','fog','storm'][this.weatherIndex];this.notify('Wetterwechsel: '+this.weather);}
   if(!p.car){if(waterAt(p.x,p.z)&&p.y<=0){p.y=input.sneak?Math.max(-3.5,p.y-dt*1.5):Math.min(-.5,p.y+dt*2);p.air=clamp(p.air+(p.y<-1.5?-dt*10:dt*25),0,100);if(!p.air)p.health=Math.max(0,p.health-dt*8);}else{p.vy-=dt*(p.parachute?2:16);p.vy=Math.max(p.parachute?-3:-35,p.vy);p.y+=p.vy*dt;if(p.y<=0){if(p.vy<-13)p.health=Math.max(0,p.health-(-p.vy-13)*3);p.y=0;p.vy=0;if(p.parachute){this.award(60);this.notify('Sicher gelandet. $60.');}p.parachute=false;}}}

@@ -41,6 +41,15 @@ let serial=0;
 // nah=false lässt alles weg, was erst aus wenigen Metern sichtbar wird.
 export function naturalHuman(color,pants,nah=true){
  const id=serial++,g=new T.Group();const skinTone=[0xc3987b,0xa67455,0x79513b,0xd4ad8c,0xb68467][id%5];
+ // Ein fester Zufall je Figur: dieselbe Kennung ergibt immer dasselbe
+ // Aussehen, zwei Figuren nebeneinander trotzdem ein verschiedenes. Derselbe
+ // Streuwert trägt weiter unten schon Körperbau und Gangart.
+ const streu=k=>{const v=Math.sin((id+1)*k)*43758.5453;return v-Math.floor(v);};
+ // Bis hierher trug niemand in dieser Stadt etwas: Hemd, Hose, Haut, Haare,
+ // und das war die ganze Garderobe für 530 Menschen. Drei Stücke ändern das,
+ // jedes an einer anderen Stelle der Silhouette.
+ const traegt={rucksack:streu(3.71)<.26,muetze:streu(9.13)<.18,jacke:streu(5.29)<.34};
+ const jackenStoff=traegt.jacke?mat([0x2f3a42,0x3c3630,0x44404c,0x2b3a34,0x51463c][id%5],.90):null;
  const skin=wolkenAufsetzen(new T.MeshPhysicalMaterial({color:skinTone,roughness:.73,sheen:.14,sheenColor:0xb78d76}));
  const cloth=mat(color,.94),denim=mat(pants,.96),dark=mat(0x292e31),hairColor=[0x302820,0x554332,0x251f1b,0x6b5238][id%4];
  // Pelvis, waist, rib cage and shoulders have different cross sections.
@@ -79,6 +88,13 @@ export function naturalHuman(color,pants,nah=true){
  const hair=new T.Group();g.add(hair);hair.position.y=1.78;
  const cap=add(hair,loft([[0,.090,.090,.084],[.025,.088,.087,.083],[.062,.072,.068,.067],[.106,.01,.013,.013]],28),mat(hairColor,.97),0,0,-.005);
  if(nah)for(let i=0;i<8;i++){const x=-.064+i*.018;seam(hair,[[x,.015,.079],[x+.007,.07,.04],[x-.008,.086,-.016],[x-.016,.038,-.073]],i%2?hairColor:0x40382b,.007);}
+ // Die Mütze gehört an die Haare und damit in die Kopfgruppe — sonst bliebe
+ // sie stehen, wenn die Figur sich umsieht.
+ if(traegt.muetze){
+  const kappe=mat([0x2c3138,0x53342c,0x394a3f,0x6a6155][id%4],.95);
+  add(hair,new T.SphereGeometry(.101,14,9,0,Math.PI*2,0,Math.PI*.54),kappe,0,.004,-.004);
+  add(hair,new T.BoxGeometry(.142,.011,.072),kappe,0,-.012,.086);
+ }
  // Hier endet der Kopf. Ohne diese Marke nahm das Umhängen weiter unten
  // `slice(kopfAb)` und damit alles, was danach gebaut wird: Kragen,
  // Reißverschluss, Gürtel — und Arme und Beine. Die Figur sah im Stand
@@ -92,6 +108,17 @@ export function naturalHuman(color,pants,nah=true){
   seam(g,[[0,1.42,.12],[0,1.20,.119],[0,.99,.10]],0x727b78,.0035);
   add(g,new T.BoxGeometry(.045,.033,.012),mat(0x939b93,.35),0,.926,.111);
  }
+ if(traegt.rucksack){
+  const stoffRucksack=mat([0x394048,0x4a3b32,0x2f4038,0x5b4a3f][id%4],.90);
+  add(g,new T.BoxGeometry(.28,.38,.15),stoffRucksack,0,1.19,-.175);
+  add(g,new T.BoxGeometry(.19,.13,.035),mat(0x22272b,.85),0,1.08,-.255);
+  if(nah)for(const side of [-1,1])
+   seam(g,[[side*.085,1.44,.055],[side*.105,1.30,-.02],[side*.088,1.15,-.095]],0x262b2f,.013);
+ }
+ // Offene Jacke: zwei Blenden über dem Hemd, dazu die Ärmel in derselben
+ // Farbe. Zusammen ist das die zweite Silhouette der Stadt.
+ if(traegt.jacke)for(const side of [-1,1])
+  add(g,new T.BoxGeometry(.062,.43,.022),jackenStoff,side*.082,1.19,.099);
  const legs=[],arms=[],knees=[],elbows=[],ankles=[];
  for(const side of [-1,1]){
   const leg=new T.Group();leg.position.set(side*.105,.91,0);g.add(leg);legs.push(leg);
@@ -106,9 +133,9 @@ export function naturalHuman(color,pants,nah=true){
   oval(ankle,0,-.016,.06,.055,.046,.13,dark);oval(ankle,0,-.048,.06,.056,.011,.13,mat(0x707572));
   if(nah)seam(leg,[[side*.091,-.04,.01],[side*.080,-.18,.01],[side*.057,-.38,.01]],0x626b68,.002);
   const arm=new T.Group();arm.position.set(side*.235,1.415,0);g.add(arm);arms.push(arm);
-  add(arm,loft([[.025,.071,.071,.068],[-.13,.058,.058,.057],[-.28,.046,.048,.046]],16),cloth,0,0,0);
+  add(arm,loft([[.025,.071,.071,.068],[-.13,.058,.058,.057],[-.28,.046,.048,.046]],16),jackenStoff||cloth,0,0,0);
   const elbow=new T.Group();elbow.position.y=-.275;arm.add(elbow);elbows.push(elbow);
-  add(elbow,loft([[.01,.047,.049,.047],[-.10,.045,.043,.043],[-.23,.031,.031,.032]],16),cloth,0,0,0);
+  add(elbow,loft([[.01,.047,.049,.047],[-.10,.045,.043,.043],[-.23,.031,.031,.032]],16),jackenStoff||cloth,0,0,0);
   oval(elbow,0,-.275,.003,.036,.057,.023,skin);
   if(nah){
    for(let f=0;f<4;f++){const finger=oval(elbow,(f-1.5)*.015,-.335+(Math.abs(f-1.5))*.007,.009,.009,.032,.011,skin);finger.rotation.x=.12;}
@@ -136,7 +163,6 @@ export function naturalHuman(color,pants,nah=true){
  // rücken mit den Schultern nach außen, die Beine mit der Hüfte halb so
  // weit; die Rumpftiefe folgt der Breite zu siebzig Prozent, sonst wäre ein
  // breiter Mensch eine Scheibe.
- const streu=k=>{const v=Math.sin((id+1)*k)*43758.5453;return v-Math.floor(v);};
  const bau=.88+streu(31.17)*.26;
  body.scale.set(bau,1,1+(bau-1)*.7);
  arms.forEach((arm,i)=>{arm.position.x=(i?1:-1)*.235*bau;});
@@ -149,7 +175,7 @@ export function naturalHuman(color,pants,nah=true){
  // für 530 Menschen.
  const gang={schritt:.85+streu(53.7)*.33,arm:.7+streu(19.3)*.65,
   wiegen:.75+streu(87.1)*.55,vorlage:.8+streu(11.9)*.5};
- const garments=[];g.traverse(o=>{if(o.isMesh&&o.material===cloth)garments.push(o);});g.userData={body,hair,tattoo,legs,arms,knees,elbows,ankles,eyes,lids,face,kopf,id,garments,bau,gang,rig:'anatomical-v3'};return g;
+ const garments=[];g.traverse(o=>{if(o.isMesh&&o.material===cloth)garments.push(o);});g.userData={body,hair,tattoo,legs,arms,knees,elbows,ankles,eyes,lids,face,kopf,id,garments,bau,gang,traegt,rig:'anatomical-v3'};return g;
 }
 // Ein voller Schrittzyklus deckt diese Strecke ab. Die Schrittphase läuft
 // deshalb über den zurückgelegten Weg und nicht über die Uhr — nur so bleibt

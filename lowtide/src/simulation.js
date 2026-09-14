@@ -342,6 +342,23 @@ export class Simulation{
   }
   return !this.blocked(n,.3);
  }
+ // Der nächste Wegpunkt, den die Figur von hier aus überhaupt sehen kann.
+ //
+ // "Nimm den nächsten Punkt der Liste" reicht nicht, wenn die Figur an einer
+ // Wand hängt: der übernächste liegt oft hinter derselben Wand, und bei 64
+ // Wegpunkten dauert das Durchprobieren bei drei Sekunden je Versuch über drei
+ // Minuten. Gesucht wird deshalb der nächstgelegene Punkt mit freier
+ // Sichtlinie — das ist der, zu dem sie tatsächlich hinlaufen kann.
+ freierWegpunkt(n){
+  let beste=-1,besteD=1e9;
+  for(let i=0;i<n.path.length;i++){
+   const k=n.path[i],d=distance(n,k);
+   if(d<1.5||d>70||d>=besteD)continue;
+   if(!this.sichtFrei(n,k))continue;
+   besteD=d;beste=i;
+  }
+  return beste;
+ }
  // Wie tief zwei Fahrzeuge ineinanderstehen, über die Trennachsen der
  // beiden Rechtecke. Null, wenn sie sich nicht berühren.
  ueberlappung(a,b){
@@ -452,7 +469,7 @@ export class Simulation{
    // gezogene Waffe nicht —, bewegt sich aber nicht. Der erste Anlauf ließ ihn
    // ganz oben aus der Schleife springen; damit blieb er blind für alles.
    if(n.state==='sitzend')continue;
-   if(n.state==='flüchtend'){n.yaw=Math.atan2(n.x-p.x,n.z-p.z);const [fx,fz]=this.schrittUmGehen(n,Math.sin(n.yaw)*3*dt,Math.cos(n.yaw)*3*dt);this.move(n,fx,fz,.3);if(n.timer<=0){n.state='normal';n.target=(n.target+1)%n.path.length;}}else{const dest=n.path[n.target],d=distance(n,dest);if(d<1){n.target=(n.target+1)%n.path.length;n.naeher=undefined;}else{n.yaw=Math.atan2(dest.x-n.x,dest.z-n.z);const v=n.pace*(this.weather==='rain'?1.5:1)*dt;const [sx,sz]=this.schrittUmGehen(n,Math.sin(n.yaw)*v,Math.cos(n.yaw)*v);this.move(n,sx,sz,.3);
+   if(n.state==='flüchtend'){n.yaw=Math.atan2(n.x-p.x,n.z-p.z);const [fx,fz]=this.schrittUmGehen(n,Math.sin(n.yaw)*3*dt,Math.cos(n.yaw)*3*dt);this.move(n,fx,fz,.3);if(n.timer<=0){n.state='normal';n.target=(n.target+1)%n.path.length;}}else{const dest=n.path[n.target],d=distance(n,dest);if(d<1){n.target=(n.target+1)%n.path.length;n.messZeit=0;n.messAbstand=undefined;}else{n.yaw=Math.atan2(dest.x-n.x,dest.z-n.z);const v=n.pace*(this.weather==='rain'?1.5:1)*dt;const [sx,sz]=this.schrittUmGehen(n,Math.sin(n.yaw)*v,Math.cos(n.yaw)*v);this.move(n,sx,sz,.3);
     // Wer eine Sekunde lang nicht vorankommt, nimmt den nächsten Wegpunkt.
     //
     // Im Prüflauf standen Figuren zehn Sekunden auf derselben Stelle, obwohl
@@ -474,10 +491,28 @@ export class Simulation{
     //
     // Drei Sekunden ohne Annäherung, nicht eine: kurz hinter jemandem
     // herzugehen oder an einer Ampel zu warten ist kein Festsitzen.
+    // Gemessen wird gegen das eigene Tempo, nicht gegen "irgendeine
+    // Annäherung". Die erste Fassung galt als zufrieden, sobald der Abstand
+    // um fünf Zentimeter fiel — und genau das tut eine Figur, die seitwärts an
+    // einer Wand entlangschrammt, immer weiter: sie kommt dem Wegpunkt
+    // millimeterweise näher und setzte den Zähler dabei ständig zurück. In
+    // drei Sekunden gehört bei Tempo 1,4 ein Viertelmeter Annäherung zum
+    // Mindesten (ein Fünftel der Strecke), sonst steht sie fest.
     const rest=distance(n,dest);
-    if(rest<(n.naeher??1e9)-.05){n.naeher=rest;n.fest=0;}
-    else if((n.fest=(n.fest||0)+1)>180){n.fest=0;n.naeher=undefined;
-     if(this.blocked(n,.3))this.befreie(n);else n.target=(n.target+1)%n.path.length;}}}}
+    n.messZeit=(n.messZeit||0)+dt*(n.grobFaktor||1);
+    if(n.messZeit>=3){
+     const gewonnen=(n.messAbstand??rest)-rest;
+     // Grundtempo, nicht das im Grobtakt aufgeblasene: dort steht in n.pace
+     // das Zwölffache, und mit dem als Erwartung galt fast jede ferne Figur
+     // als festgefahren. Sie sprang dann dauernd zum nächsten Wegpunkt, und
+     // die mittlere Strecke je Figur fiel von 9,75 auf 4,81 Meter.
+     if(gewonnen<n.pace/(n.grobFaktor||1)*n.messZeit*.2){
+      if(this.blocked(n,.3))this.befreie(n);
+      else{const i=this.freierWegpunkt(n);n.target=i>=0?i:(n.target+1)%n.path.length;}
+     }
+     n.messZeit=0;n.messAbstand=undefined;
+    }
+    if(n.messAbstand===undefined)n.messAbstand=rest;}}}
   if(((this._entflecht=(this._entflecht||0)+1)%4)===0)this.entflechten();
   this.updatePolice(dt);this.eventTimer-=dt;if(this.eventTimer<=0){this.eventTimer=55;const c=this.cars.find(c=>c.type==='traffic'&&c!==p.car);if(c){c.wait=14;this.notify('Verkehrsfunk: Pannenfahrzeug auf der Harbor Avenue.');}}
   if(p.health<=0){p.health=0;this.paused=true;this.notify('Festgenommen. Starte den Auftrag erneut.');}
