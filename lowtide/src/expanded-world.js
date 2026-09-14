@@ -488,7 +488,9 @@ export class ExpandedWorld extends World{
  car(color,police=false,c=null){if(!c)return detailedCar(color,police);const d=vehicleTypes[c.model],g=new T.Group();if(['car','pickup'].includes(d.shape)){const form=KAROSSERIE_JE_MODELL[c.model];// Dreckstufe je Fahrzeug, fest an der Kennung: derselbe Wagen ist immer
    // gleich schmutzig, und nebeneinander stehen nicht zwei gleiche.
    const nummer=parseInt(String(c.id).replace(/\D/g,''),10)||0;
-   const m=detailedCar(color,false,false,form||'limousine',nummer%7===0?3:nummer%3===0?2:nummer%2===0?1:0);if(!form)m.scale.set(...d.scale);if(d.shape==='pickup')this.dynbox(m,0,1.2,-1.3,1.9,.2,1.5,color);m.userData.def=d;
+   const m=detailedCar(color,false,false,form||'limousine',nummer%7===0?3:nummer%3===0?2:nummer%2===0?1:0);if(!form)m.scale.set(...d.scale);// Der aufgesetzte Pritschenklotz entfällt, sobald die Form eine eigene
+   // Ladefläche mitbringt — sonst steht sie zweimal da.
+   if(d.shape==='pickup'&&!form)this.dynbox(m,0,1.2,-1.3,1.9,.2,1.5,color);m.userData.def=d;
    // Der fahrende Verkehr lief als einziger ungebacken durch die Szene: 144
    // Fahrzeuge zu je rund vierzig Einzelmeshes. Gebacken wird alles, was am
    // Wagen fest ist; Räder, Scheinwerfer und Rücklichter bleiben eigene

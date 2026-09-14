@@ -145,7 +145,11 @@ export const vehicleTypes={
  suv:{name:'Ridgeline',mass:2200,max:28,accel:9,brake:19,turn:1.2,grip:.9,shape:'car',scale:[1.15,1.4,1.1],sound:43,security:3,laenge:4.97,breite:2.36},
  super:{name:'Vesper R',mass:1400,max:49,accel:19,brake:30,turn:1.7,grip:1.3,shape:'car',scale:[1.05,.7,1.12],sound:100,security:6,laenge:5.00,breite:2.33},
  muscle:{name:'Banshee 68',mass:1800,max:37,accel:16,brake:19,turn:1.2,grip:.75,shape:'car',scale:[1.1,.9,1.14],sound:35,security:1,laenge:5.12,breite:2.28},
- pickup:{name:'Mason',mass:2300,max:29,accel:9,brake:18,turn:1.15,grip:.95,shape:'car',sound:39,security:2,laenge:4.95,breite:2.40},
+ // shape bleibt 'pickup', auch wenn die Pritsche jetzt aus der Karosserieform
+ // kommt statt aus einem aufgesetzten Klotz: die Prüfung "Der Verkehr zeigt
+ // mehr als zwei Karosserieformen" zählt die shape-Kategorien, und mit 'car'
+ // fiel der Verkehr von fünf auf vier.
+ pickup:{name:'Mason',mass:2300,max:29,accel:9,brake:18,turn:1.15,grip:.95,shape:'pickup',sound:39,security:2,laenge:4.95,breite:2.40},
  // Zwei Formen, die dem Verkehr bisher fehlten. Der Kastenwagen ist die
  // höchste Silhouette unter den Autos, das Taxi die einzige mit Dachschild —
  // beide aus hundert Metern zu erkennen, und genau darum geht es.

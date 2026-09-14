@@ -256,8 +256,11 @@ function kennzeichenAtlas(){
  return schildTextur;
 }
 function schildMaterial(){
- if(!schildStoff)schildStoff=new T.MeshStandardMaterial(
-  {map:kennzeichenAtlas(),roughness:.55,metalness:0});
+ // Mit Wolkenschatten wie jedes andere Weltmaterial: die Prüfung "Fahrzeuge
+ // stehen im selben Schattenfeld" zählt die Materialien mit dem Shader-Haken
+ // und meldete 20 von 21, weil das Schild als einziges ohne durchging.
+ if(!schildStoff)schildStoff=wolkenAufsetzen(new T.MeshStandardMaterial(
+  {map:kennzeichenAtlas(),roughness:.55,metalness:0}));
  return schildStoff;
 }
 // Eine Schildfläche mit fest eingebackenem Ausschnitt: die UV-Koordinaten
