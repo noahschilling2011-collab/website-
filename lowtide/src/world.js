@@ -1,6 +1,6 @@
 import * as T from './vendor/three.module.js';
 import {roads,places,random} from './simulation.js';
-import {roadSegments} from './content.js';
+import {roadSegments,onRoad,groundAt} from './content.js';
 import {Sky} from './sky.js';
 import {createWater,updateWater} from './water.js';
 import {Nachbearbeitung} from './post.js';
@@ -43,8 +43,34 @@ export class World{
   this.resize();}
  // nx und nz neigen den Quader um die x- und z-Achse. Ohne sie gäbe es
  // keine Satteldächer, Rampen, Steilhänge oder umgestürzten Stämme.
- box(x,y,z,w,h,d,color=0x999999,rot=0,emissive=false,nx=0,nz=0){const key=color+':'+emissive+':'+Math.floor(x/100)+':'+Math.floor(z/100);let g=this.groups.get(key);if(!g){g={material:mat(color,emissive),items:[]};this.groups.set(key,g);}g.items.push({x,y,z,w,h,d,rot,nx,nz});}
- flush(){const o=new T.Object3D();for(const g of this.groups.values()){const mesh=new T.InstancedMesh(cube,g.material,g.items.length);for(let i=0;i<g.items.length;i++){const a=g.items[i];o.position.set(a.x,a.y,a.z);o.scale.set(a.w,a.h,a.d);o.rotation.set(a.nx||0,a.rot,a.nz||0);o.updateMatrix();mesh.setMatrixAt(i,o.matrix);}mesh.castShadow=true;mesh.receiveShadow=true;mesh.computeBoundingSphere();this.scene.add(mesh);(this.bloecke||=[]).push(mesh);}this.groups.clear();}
+ // strassenbau merkt sich, ob dieser Aufruf zur Straße selbst gehört —
+ // Decke, Damm, Leitplanke, Markierung. Alles andere wird beim Zusammenbau
+ // verworfen, wenn es klein ist und auf einer Fahrbahn steht.
+ box(x,y,z,w,h,d,color=0x999999,rot=0,emissive=false,nx=0,nz=0){const key=color+':'+emissive+':'+Math.floor(x/100)+':'+Math.floor(z/100);let g=this.groups.get(key);if(!g){g={material:mat(color,emissive),items:[]};this.groups.set(key,g);}g.items.push({x,y,z,w,h,d,rot,nx,nz,strasse:!!this.strassenbau});}
+ // Kulisse auf der Fahrbahn. Gemessen standen 268 Gegenstände mitten auf
+ // einer Fahrspur: Pflanzkübel aus einer Schleife mit festen Koordinaten aus
+ // der alten, halb so großen Karte, Papierkörbe und Parkuhren aus street.js,
+ // Zaunpfähle aus regions.js. Keine dieser Quellen hat je gegen die Straßen
+ // geprüft — dieselbe Art Fehler wie bei den Figuren, den Masten und dem
+ // Verkehr, nur an vier weiteren Stellen.
+ //
+ // Geprüft wird hier, an einer Stelle, statt viermal am Ursprung: klein,
+ // bodennah, nicht als Straßenbau gemeldet und auf einer Fahrbahn.
+ aufDerFahrbahn(a){
+  if(a.strasse)return false;
+  // Nur die Breite begrenzt, nicht die Höhe: ein fünf Meter hoher Stamm von
+  // vierzig Zentimetern Durchmesser mitten in der Fahrspur ist schlimmer
+  // als ein Pflanzkübel, und Decke, Damm und Markierung sind breit.
+  if(Math.max(a.w,a.d)>2.6)return false;
+  if(!onRoad(a.x,a.z,0))return false;
+  // Gegen das Gelände, nicht gegen den Meeresspiegel. Der erste Anlauf
+  // verglich absolut — auf dem 86 Meter hohen Talon Ridge stand damit jeder
+  // Gegenstand „über 2,2 Metern" und wurde verschont.
+  const boden=groundAt(a.x,a.z);
+  if(a.y-a.h/2>boden+2.2)return false;   // hängt darüber, etwa ein Ausleger
+  return a.y+a.h/2>=boden+.35;
+ }
+ flush(){const o=new T.Object3D();this.verworfen=(this.verworfen||0);for(const g of this.groups.values()){g.items=g.items.filter(a=>{if(!this.aufDerFahrbahn(a))return true;this.verworfen++;return false;});if(!g.items.length)continue;const mesh=new T.InstancedMesh(cube,g.material,g.items.length);for(let i=0;i<g.items.length;i++){const a=g.items[i];o.position.set(a.x,a.y,a.z);o.scale.set(a.w,a.h,a.d);o.rotation.set(a.nx||0,a.rot,a.nz||0);o.updateMatrix();mesh.setMatrixAt(i,o.matrix);}mesh.castShadow=true;mesh.receiveShadow=true;mesh.computeBoundingSphere();this.scene.add(mesh);(this.bloecke||=[]).push(mesh);}this.groups.clear();}
  dynbox(g,x,y,z,w,h,d,color){const m=new T.Mesh(cube,mat(color));m.position.set(x,y,z);m.scale.set(w,h,d);m.castShadow=true;m.receiveShadow=true;g.add(m);return m;}
  // Beschriftung ohne Trägerplatte. Vorher standen hier 13-19 m breite,
  // undurchsichtige Tafeln quer in der Stadt, von hinten spiegelverkehrt.

@@ -248,6 +248,9 @@ export class ExpandedWorld extends World{
   // rechnet in der Ebene und hielt den Bewuchs von einem Streifen fern, auf
   // dem gar nichts lag. Gefunden über tools/schwachstellen.mjs, das TALON
   // RIDGE als flachste Gegend auswies, und von dort rückwärts.
+  // Alles zwischen diesen beiden Marken gehört zur Straße selbst und darf
+  // deshalb auf der Fahrbahn stehen: Decke, Damm, Leitplanke, Markierung.
+  this.strassenbau=true;
   for(const r of roadSegments){
    const laenge=Math.hypot(r.x2-r.x1,r.z2-r.z1);
    const nordSued=r.x1===r.x2;
@@ -329,6 +332,7 @@ export class ExpandedWorld extends World{
     this.box(sx,groundAt(sx,sz)+.08,sz,u.nordSued?.72:3.4,.02,u.nordSued?3.4:.72,0xc4bb97);
    }
   }
+  this.strassenbau=false;
   for(const b of s.worldBuildings){const base=groundAt(b.x,b.z),co=b.kind==='house'?0xb5a78f:0x869c9c;this.box(b.x,base+b.h/2,b.z,b.w,b.h,b.d,co);this.box(b.x,base+b.h+.3,b.z,b.w+1,.6,b.d+1,0x3e555a);
    // Hochhäuser bekommen Rücksprünge, eine Krone und ein Blinkfeuer. Ein
    // Turm ohne Absatz ist aus der Ferne nur ein längerer Quader.

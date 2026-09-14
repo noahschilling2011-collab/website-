@@ -2967,6 +2967,37 @@ pruefe('Fußgänger betreten die Fahrbahn dort, wo die Überwege liegen',
 // Wegeführung über die Überwege waren es 77, 56, 62 und 43. Die Prüfung fängt
 // den Rückfall, nicht die Schwankung.
 
+// Kulisse auf der Fahrbahn. Die Prüfung „Nichts Großes steht in einer
+// Fahrbahn" fängt nur, was mindestens drei Meter breit und zweieinhalb hoch
+// ist. Darunter standen 268 Gegenstände mitten auf einer Fahrspur:
+// Pflanzkübel aus einer Schleife mit festen Koordinaten aus der alten, halb
+// so großen Karte, Papierkörbe und Parkuhren aus street.js, Zaunpfähle aus
+// regions.js — und Baumstämme von fünf Metern Höhe.
+const kulisse = await page.evaluate(() => {
+ const L = window.LOWTIDE, w = L.world;
+ const treffer = [];
+ for (const netz of w.bloecke || []) {
+  const a = netz.instanceMatrix.array;
+  for (let i = 0; i < netz.count; i++) {
+   const o = i * 16, x = a[o + 12], y = a[o + 13], z = a[o + 14];
+   const sx = Math.hypot(a[o], a[o + 1], a[o + 2]);
+   const sy = Math.hypot(a[o + 4], a[o + 5], a[o + 6]);
+   const sz = Math.hypot(a[o + 8], a[o + 9], a[o + 10]);
+   // Schmal genug, um Kulisse zu sein, und mit dem Fuß im Fahrbahnbereich.
+   if (Math.max(sx, sz) > 2.6) continue;
+   if (y - sy / 2 > L.groundAt(x, z) + 2.2) continue;   // hängt darüber
+   if (y + sy / 2 < L.groundAt(x, z) + .35) continue;   // liegt flach
+   if (!L.onRoad(x, z, 0)) continue;
+   treffer.push(`[${Math.round(x)},${Math.round(z)}] ${sx.toFixed(1)}×${sy.toFixed(1)}×${sz.toFixed(1)}`);
+  }
+ }
+ return {rest: treffer.length, verworfen: w.verworfen || 0, beispiele: treffer.slice(0, 5)};
+});
+pruefe('Keine Kulisse steht in einer Fahrbahn', kulisse.rest === 0,
+ `${kulisse.rest} übrig, ${kulisse.verworfen} beim Zusammenbau verworfen${kulisse.beispiele.length ? ': ' + kulisse.beispiele.join('; ') : ''}`);
+pruefe('Und die Straße selbst steht noch da', kulisse.verworfen > 200 && kulisse.verworfen < 900,
+ `${kulisse.verworfen} verworfen`);
+
 // Gangart. Im Schrittzyklus stand jede Zahl als Konstante — Ausschlag der
 // Beine .46, des Knies .72, der Arme .30, Auf- und Abbewegung .045. Bei
 // gleichem Tempo lief damit jede Figur exakt gleich, und das Tempo selbst

@@ -1319,7 +1319,15 @@ function talonRidge(w, rng) {
  // gebacken; nur die Blätter kommen in eine eigene InstancedMesh, die
  // expanded-world.js je Bild dreht — neun Instanzen, ein Draw Call.
  const KAMM = -900;
- for (const z of [-300, -156, -12]) {
+ // Die mittlere Anlage stand bei z = -156 mitten auf der Fahrbahn der
+ // Querstraße bei z = -160: fünfzehn Meter breit, also von -167,5 bis
+ // -152,5. Der Turm ist 2,2 Meter dick und 52 hoch — die Prüfung auf große
+ // Hindernisse hat ihn nie gemeldet, weil sie drei Meter Breite verlangt.
+ // Der neue Platz ist gesucht: die nächstgelegene Lage, an der auch der
+ // Rotor mit 24 Metern Halbmesser die Fahrbahn nicht überstreicht. Dreißig
+ // Meter weiter nördlich, Abstand zu den Nachbarn 174 und 114 Meter, beides
+ // mehr als der Rotordurchmesser von 48.
+ for (const z of [-300, -126, -12]) {
   const y = groundAt(KAMM, z);
   if (y < 25) continue;
   w.box(KAMM, y + 26, z, 2.2, 52, 2.2, 0xdcdcd4);

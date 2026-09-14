@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 316 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 318 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1318,6 +1318,50 @@ wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
 besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
+
+## Zweihundertachtundsechzig Gegenstände auf der Fahrbahn
+
+Die Prüfung „Nichts Großes steht in einer Fahrbahn" verlangt drei Meter
+Breite und zweieinhalb Meter Höhe. Darunter passt eine Menge durch. Mit einem
+Netz für alles, was schmaler als 2,6 Meter ist, mit dem Fuß auf Bodenhöhe und
+innerhalb einer Fahrspur steht, kamen **268 Gegenstände** heraus:
+
+- Pflanzkübel aus `world.js`, gesetzt in einer Schleife über feste
+  Koordinaten `z = -43, 16, 77` und `x = -90 … 80`. Diese Zahlen stammen aus
+  der alten, halb so großen Karte — dieselbe Art Fehler wie bei den
+  Verkehrsrunden, der Menge und den Straßensperren, nur an einer vierten
+  Stelle.
+- Papierkörbe und Parkuhren aus `street.js`.
+- Zaunpfähle und Stegpfosten aus `regions.js`.
+- Und Baumstämme von fünf Metern Höhe.
+
+Geprüft wird jetzt an einer Stelle statt an vieren: beim Zusammenbau der
+Instanzennetze fällt heraus, was schmal ist, mit dem Fuß auf dem Boden steht
+und auf einer Fahrbahn liegt. Was zur Straße selbst gehört — Decke, Damm,
+Leitplanke, Markierung — meldet sich über eine Marke an und bleibt.
+**413 Teile verworfen**, 68.439 stehen noch, kein einziger davon in einer
+Fahrspur.
+
+### Und ein Windrad, das ich selbst hineingestellt hatte
+
+Die neue Prüfung meldete beim ersten Lauf einen Fund: `[-900,-156]
+2.2×52.0×2.2`. Das ist der mittlere Turm des Windparks, den ich vor ein paar
+Runden auf den Talon Ridge gesetzt habe — bei z = -156, mitten in der
+fünfzehn Meter breiten Querstraße bei z = -160. Die alte Hindernisprüfung hat
+ihn nie gemeldet, weil ein Turm von 2,2 Metern Durchmesser ihr zu schmal ist.
+
+Der neue Platz ist gesucht statt geschätzt: die nächstgelegene Lage, an der
+auch der Rotor mit 24 Metern Halbmesser die Fahrbahn nicht überstreicht.
+Dreißig Meter weiter, Abstand zu den Nachbarn 174 und 114 Meter.
+
+### Ein Filter, der auf dem Berg nicht griff
+
+Der erste Anlauf verglich die Höhe absolut: `a.y - a.h/2 > 2.2`. Auf dem 86
+Meter hohen Rücken steht damit jeder Gegenstand „über 2,2 Metern" und wurde
+verschont — genau dort, wo das Windrad stand. Jetzt gegen das Gelände an
+seiner Stelle.
+
+318 Prüfungen bestanden, keine gefallen.
 
 ## Fünf Gangarten für fünfhundertdreißig Menschen
 
