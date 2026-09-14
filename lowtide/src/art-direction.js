@@ -79,30 +79,85 @@ function quad(g,points,material){const a=new T.BufferGeometry();a.setAttribute('
 // Mit Torusreifen, Innenraum und fünf Speichen je Rad waren das 1,4 Millionen
 // Dreiecke für Kulisse, in die niemand einsteigt.
 const FORMEN={};
-function fahrzeugFormen(sparsam){
- const schluessel=sparsam?'sparsam':'voll';
+// Vier Karosserien statt einer. Von 127 fahrenden Fahrzeugen trugen 112
+// dieselbe Silhouette: Kleinwagen, Limousine, Geländewagen und Muscle Car
+// waren derselbe Körper in anderem Maßstab — ein Geländewagen war eine um
+// vierzig Prozent in die Höhe gezogene Limousine, ein Kleinwagen dieselbe um
+// fünfzehn Prozent geschrumpft. Dach, Radstand und Überhänge blieben dabei
+// im selben Verhältnis, und genau daran erkennt man ein Auto.
+//
+// Die Maße sind Meter im Endzustand, nicht Faktoren: die Profile bauen den
+// Wagen in seiner wirklichen Größe, und der Maßstab aus vehicleTypes entfällt
+// für diese vier. Jede Zahl ist am fertigen Mesh nachgemessen und steht in
+// content.js unter laenge und breite.
+//
+// Dass es vorher eine Karosserie war, sieht man an den Verhältnissen, die
+// eine Achsenskalierung gar nicht ändern kann. Gemessen am alten Stand für
+// alle vier Modelle: Radstand 0,610 der Länge, vorderer Überhang 0,200,
+// Fahrgastzelle 0,583, ihre Mitte 0,460 — auf drei Stellen dieselbe Zahl.
+const KAROSSERIEN={
+ // Dreistufig: Motorhaube, Fahrgastzelle, Kofferraum. 4,4 Meter.
+ limousine:{
+  profil:[[-2.2,.68,.48,.88],[-1.9,.91,.39,1.04],[-1.25,.99,.36,1.08],[.75,.99,.36,1.07],[1.7,.9,.43,.91],[2.2,.72,.5,.77]],
+  kabine:[[-1.45,.82,.88,1.0],[-.85,.76,.94,1.58],[.5,.75,.94,1.58],[1.15,.84,.9,1.03]],
+  spiegel:[.99,1.22,.69], griff:{x:.965,y:1.01,z:[-.05,-.85]}, leiste:{x:.77,y:1.28,z:[-.48,.63]},
+  dach:[-.9,.73,1.49,1.6,.48], licht:{x:.54,y:.76,z:2.14}, rueck:{x:.54,y:.81,z:-2.16},
+  grill:{y:.56,z:2.2,breite:1.05}, rad:{x:.96,z:[-1.35,1.37],y:.44,r:1}
+ },
+ // Schrägheck: die Zelle reicht fast bis ans Ende, der hintere Überhang ist
+ // kurz. 3,7 Meter, schmal, verhältnismäßig hohes Dach.
+ kompakt:{
+  profil:[[-1.78,.60,.46,.90],[-1.55,.79,.38,1.02],[-1.0,.85,.36,1.06],[.62,.85,.36,1.05],[1.42,.78,.43,.92],[1.88,.62,.48,.78]],
+  kabine:[[-1.52,.72,.88,1.03],[-1.05,.68,.94,1.60],[.30,.67,.94,1.56],[.92,.74,.88,1.02]],
+  spiegel:[.86,1.18,.55], griff:{x:.83,y:.99,z:[-.1,-.7]}, leiste:{x:.66,y:1.24,z:[-.38,.5]},
+  dach:[-.75,.63,1.47,1.57,.35], licht:{x:.46,y:.74,z:1.82}, rueck:{x:.46,y:.79,z:-1.74},
+  grill:{y:.54,z:1.88,breite:.9}, rad:{x:.82,z:[-1.22,1.23],y:.40,r:.88}
+ },
+ // Kastenförmig, hoher Boden, langes Dach bis über die hintere Sitzreihe,
+ // größere Räder. 4,9 Meter und einen halben Meter höher als die Limousine.
+ gelaende:{
+  profil:[[-2.45,.78,.62,1.14],[-2.1,1.0,.54,1.30],[-1.35,1.06,.52,1.34],[.9,1.06,.52,1.34],[1.9,.98,.58,1.18],[2.46,.82,.64,1.02]],
+  kabine:[[-2.0,.94,1.16,1.32],[-1.35,.88,1.22,1.92],[.8,.88,1.22,1.92],[1.42,.94,1.18,1.34]],
+  spiegel:[1.06,1.5,.75], griff:{x:1.03,y:1.28,z:[-.05,-.95]}, leiste:{x:.86,y:1.54,z:[-.5,.7]},
+  dach:[-1.0,.8,1.86,1.98,.8], licht:{x:.6,y:1.02,z:2.4}, rueck:{x:.6,y:1.06,z:-2.42},
+  grill:{y:.82,z:2.46,breite:1.2}, rad:{x:1.03,z:[-1.58,1.6],y:.55,r:1.25}
+ },
+ // Lange Haube, fließendes Heck, flaches Dach weit hinten. 5,1 Meter, breit
+ // und niedrig.
+ muscle:{
+  profil:[[-2.54,.74,.44,.84],[-2.2,1.0,.37,.96],[-1.4,1.02,.35,1.00],[1.0,1.02,.35,1.00],[2.05,.94,.42,.88],[2.54,.76,.48,.76]],
+  kabine:[[-1.95,.86,.86,.96],[-1.25,.82,.92,1.42],[.2,.80,.92,1.44],[.8,.88,.88,1.0]],
+  spiegel:[1.02,1.14,.8], griff:{x:1.0,y:.94,z:[-.2,-1.0]}, leiste:{x:.82,y:1.2,z:[-.55,.5]},
+  dach:[-.8,.7,1.38,1.46,.1], licht:{x:.56,y:.72,z:2.48}, rueck:{x:.56,y:.78,z:-2.5},
+  grill:{y:.56,z:2.52,breite:1.15}, rad:{x:1.0,z:[-1.48,1.5],y:.44,r:1.05}
+ }
+};
+function fahrzeugFormen(sparsam,form='limousine'){
+ const k=KAROSSERIEN[form]?form:'limousine';
+ const schluessel=(sparsam?'sparsam':'voll')+':'+k;
  if(FORMEN[schluessel])return FORMEN[schluessel];
- const karosserie=shell([[-2.2,.68,.48,.88],[-1.9,.91,.39,1.04],[-1.25,.99,.36,1.08],[.75,.99,.36,1.07],[1.7,.9,.43,.91],[2.2,.72,.5,.77]]);
+ const M=KAROSSERIEN[k];
+ const karosserie=shell(M.profil);
  // Die Höhennormierung gehört zur Form, nicht zum Exemplar: einmal hier,
  // sonst würde sie sich bei jedem Auto erneut anwenden.
  karosserie.scale(1,1/.55,1);
  const lackTeile=[],chromTeile=[],zaehne=[];
  for(const side of [-1,1]){
-  lackTeile.push(teil(new T.BoxGeometry(.24,.12,.3),side*.99,1.22,.69));
-  chromTeile.push(teil(new T.BoxGeometry(.24,.055,.04),side*.965,1.01,-.05),
-   teil(new T.BoxGeometry(.24,.055,.04),side*.965,1.01,-.85));
-  for(const z of [-.48,.63])lackTeile.push(teil(new T.BoxGeometry(.05,.49,.06),side*.77,1.28,z));
+  lackTeile.push(teil(new T.BoxGeometry(.24,.12,.3),side*M.spiegel[0],M.spiegel[1],M.spiegel[2]));
+  for(const z of M.griff.z)chromTeile.push(teil(new T.BoxGeometry(.24,.055,.04),side*M.griff.x,M.griff.y,z));
+  for(const z of M.leiste.z)lackTeile.push(teil(new T.BoxGeometry(.05,.49,.06),side*M.leiste.x,M.leiste.y,z));
  }
- lackTeile.push(teil(shell([[-.9,.73,1.49,1.6],[.48,.73,1.49,1.6]]),0,0,0));
- for(let x=-.45;x<=.45;x+=.15)zaehne.push(teil(new T.BoxGeometry(.025,.13,.06),x,.56,2.23));
- zaehne.push(teil(new T.BoxGeometry(1.05,.18,.05),0,.56,2.2));
+ lackTeile.push(teil(shell([[M.dach[0],M.dach[1],M.dach[2],M.dach[3]],[M.dach[4],M.dach[1],M.dach[2],M.dach[3]]]),0,0,0));
+ const halb=M.grill.breite/2-.07;
+ for(let x=-halb;x<=halb+1e-6;x+=M.grill.breite/7)zaehne.push(teil(new T.BoxGeometry(.025,.13,.06),x,M.grill.y,M.grill.z+.03));
+ zaehne.push(teil(new T.BoxGeometry(M.grill.breite,.18,.05),0,M.grill.y,M.grill.z));
  const speichen=[];for(let a=0;a<5;a++)speichen.push(teil(new T.BoxGeometry(.04,.45,.045),0,0,0,a*Math.PI/5));
  FORMEN[schluessel]={
-  karosserie,
-  kabine:shell([[-1.45,.82,.88,1.0],[-.85,.76,.94,1.58],[.5,.75,.94,1.58],[1.15,.84,.9,1.03]]),
+  karosserie, masse:M,
+  kabine:shell(M.kabine),
   lack:verschmelze(lackTeile), chrom:verschmelze(chromTeile), grill:verschmelze(zaehne),
   speichen:sparsam?null:verschmelze(speichen),
-  scheinwerfer:new T.BoxGeometry(.54,.12,.04), ruecklicht:new T.BoxGeometry(.63,.1,.04),
+  scheinwerfer:new T.BoxGeometry(M.licht.x,.12,.04), ruecklicht:new T.BoxGeometry(M.rueck.x*1.17,.1,.04),
   // Reifen als kurzer Zylinder statt als Torus: 32 statt 320 Dreiecke.
   reifen:sparsam?new T.CylinderGeometry(.42,.42,.22,8):new T.TorusGeometry(.33,.105,8,20),
   reifenQuer:!sparsam,
@@ -111,8 +166,7 @@ function fahrzeugFormen(sparsam){
  };
  return FORMEN[schluessel];
 }
-
-export function detailedCar(color,police=false,sparsam=false){const F=fahrzeugFormen(sparsam);const g=new T.Group();// Autolack ist kein Metall. Physikalisch ist er ein Dielektrikum mit
+export function detailedCar(color,police=false,sparsam=false,form='limousine'){const F=fahrzeugFormen(sparsam,form);const M=F.masse;const g=new T.Group();// Autolack ist kein Metall. Physikalisch ist er ein Dielektrikum mit
  // Metallflocken darin und einer Klarlackschicht darüber — bei metalness .65
  // fällt der Diffusanteil auf ein Drittel, und ein dunkler Wagen im Schatten
  // wird schwarz, weil Metall ohne Spiegelung nichts zu zeigen hat. Gemessen
@@ -130,16 +184,16 @@ export function detailedCar(color,police=false,sparsam=false){const F=fahrzeugFo
  // hängt und sonst alle Autos gleichzeitig aufleuchten.
  const scheinwerfer=new T.MeshStandardMaterial({color:0xf4e4bb,emissive:0xffd6a0,emissiveIntensity:.6});
  const ruecklicht=new T.MeshStandardMaterial({color:0xa73833,emissive:0x932622,emissiveIntensity:.35});
- const lights=[],rueck=[];for(const side of [-1,1]){const lamp=mesh(g,F.scheinwerfer,scheinwerfer,side*.54,.76,2.14);lights.push(lamp);rueck.push(mesh(g,F.ruecklicht,ruecklicht,side*.54,.81,-2.16));
+ const lights=[],rueck=[];for(const side of [-1,1]){const lamp=mesh(g,F.scheinwerfer,scheinwerfer,side*M.licht.x,M.licht.y,M.licht.z);lights.push(lamp);rueck.push(mesh(g,F.ruecklicht,ruecklicht,side*M.rueck.x,M.rueck.y,M.rueck.z));
  }
  // Lackzubehör steckt in derselben Geometrie wie das Dach: beim Umlackieren
  // bekommt sie dasselbe Material, also darf sie ein Mesh sein.
  const roof=mesh(g,F.lack,paint);
  mesh(g,F.chrom,m(0xb8c2bb,.25,.8));
  const grille=mesh(g,F.grill,m(0x25333c,.4,.5));
- const wheels=[],rims=[];for(const x of [-.96,.96])for(const z of [-1.35,1.37]){const wheel=new T.Group();wheel.position.set(x,.44,z);const tire=mesh(wheel,F.reifen,m(0x20272c,.97));if(F.reifenQuer)tire.rotation.y=Math.PI/2;else tire.rotation.z=Math.PI/2;const rim=mesh(wheel,F.felge,m(0xaeb9b9,.24,.85));rim.rotation.z=Math.PI/2;rims.push(rim);if(F.speichen)mesh(wheel,F.speichen,m(0x52686d,.3,.8));g.add(wheel);wheels.push(wheel);}
- const interior=new T.Group();if(!sparsam)for(const x of [-.4,.4])ellipsoid(interior,x,1.12,0,.24,.27,.2,m(0x333d3d,.9));g.add(interior);
- const policeLights=[];if(police){for(const side of [-1,1])policeLights.push(mesh(g,F.balken,new T.MeshStandardMaterial({color:side<0?0xef5549:0x4b9bd6,emissive:side<0?0xe64a45:0x3c85de,emissiveIntensity:2}),side*.36,1.76,0));}
+ const wheels=[],rims=[];for(const x of [-M.rad.x,M.rad.x])for(const z of M.rad.z){const wheel=new T.Group();wheel.position.set(x,M.rad.y,z);wheel.scale.setScalar(M.rad.r);const tire=mesh(wheel,F.reifen,m(0x20272c,.97));if(F.reifenQuer)tire.rotation.y=Math.PI/2;else tire.rotation.z=Math.PI/2;const rim=mesh(wheel,F.felge,m(0xaeb9b9,.24,.85));rim.rotation.z=Math.PI/2;rims.push(rim);if(F.speichen)mesh(wheel,F.speichen,m(0x52686d,.3,.8));g.add(wheel);wheels.push(wheel);}
+ const interior=new T.Group();if(!sparsam)for(const x of [-.4,.4])ellipsoid(interior,x,M.kabine[1][2]+.18,0,.24,.27,.2,m(0x333d3d,.9));g.add(interior);
+ const policeLights=[];if(police){for(const side of [-1,1])policeLights.push(mesh(g,F.balken,new T.MeshStandardMaterial({color:side<0?0xef5549:0x4b9bd6,emissive:side<0?0xe64a45:0x3c85de,emissiveIntensity:2}),side*.36,M.kabine[1][3]+.18,0));}
  g.userData={body,wheels,rims,lights:policeLights,headlights:lights,taillights:rueck,glass:cabin,roof,interior,paint,grille};return g;
 }
 // makeEnvironment ist entfallen: die Umgebungsreflexion kommt jetzt aus sky.js

@@ -3,6 +3,9 @@ import {wolkenAufsetzen,detailAufsetzen} from './detail.js';
 import {World,MODELLHOEHE} from './world.js';
 import {naturalHuman,animateNaturalHuman,sitzVersatz} from './human-model.js';
 import {detailedHuman,detailedCar,asphaltTexture} from './art-direction.js';
+// Welches Modell welche Karosserie bekommt. Was hier fehlt, behält den
+// alten Weg: Limousinenkörper mit dem Maßstab aus vehicleTypes.
+const KAROSSERIE_JE_MODELL={compact:'kompakt',sedan:'limousine',suv:'gelaende',muscle:'muscle'};
 import {locations,vehicleTypes,roadSegments,groundAt,waterAt,bounds,immobilien,UEBERWEGE} from './content.js';
 import {distance} from './simulation.js';
 import {Street} from './street.js';
@@ -432,7 +435,10 @@ export class ExpandedWorld extends World{
   }
   this.rotorNetz.instanceMatrix.needsUpdate=true;
  }
- car(color,police=false,c=null){if(!c)return detailedCar(color,police);const d=vehicleTypes[c.model],g=new T.Group();if(['car','pickup'].includes(d.shape)){const m=detailedCar(color);m.scale.set(...d.scale);if(d.shape==='pickup')this.dynbox(m,0,1.2,-1.3,1.9,.2,1.5,color);m.userData.def=d;return m;}const body=this.dynbox(g,0,.8,0,1.4,.5,3,color);let wheels=[],rotor=null;
+ // Vier Modelle haben seit dieser Runde eine eigene Karosserie und bauen
+ // sich in ihrer wirklichen Größe; für sie entfällt der Maßstab aus
+ // vehicleTypes, sonst käme er ein zweites Mal obendrauf.
+ car(color,police=false,c=null){if(!c)return detailedCar(color,police);const d=vehicleTypes[c.model],g=new T.Group();if(['car','pickup'].includes(d.shape)){const form=KAROSSERIE_JE_MODELL[c.model];const m=detailedCar(color,false,false,form||'limousine');if(!form)m.scale.set(...d.scale);if(d.shape==='pickup')this.dynbox(m,0,1.2,-1.3,1.9,.2,1.5,color);m.userData.def=d;return m;}const body=this.dynbox(g,0,.8,0,1.4,.5,3,color);let wheels=[],rotor=null;
   if(['bike','quad'].includes(d.shape)){body.scale.set(d.shape==='bike'?.35:1.2,.5,1.5);this.dynbox(g,0,1.4,.8,1,.1,.15,0x263c40);for(const z of [-.9,.9])for(const x of d.shape==='bike'?[0]:[-.65,.65]){const wheel=new T.Mesh(new T.CylinderGeometry(.45,.45,.22,10),material(0x26343a));wheel.rotation.z=Math.PI/2;wheel.position.set(x,.45,z);g.add(wheel);wheels.push(wheel);}this.dynbox(g,0,1.05,-.25,.45,.2,.8,0x394149);}
   if(['truck','bus'].includes(d.shape)){body.scale.set(2.5,2.6,d.shape==='bus'?8:7);body.position.y=1.8;this.dynbox(g,0,2.2,3.1,2.3,1.1,.15,0x304951);for(const x of [-1.2,1.2])for(const z of [-2.4,2.4]){const w=new T.Mesh(new T.CylinderGeometry(.65,.65,.3,12),material(0x25343c));w.rotation.z=Math.PI/2;w.position.set(x,.6,z);g.add(w);wheels.push(w);}if(d.shape==='bus')for(let z=-3;z<3;z+=1.1){this.dynbox(g,1.26,2.4,z,.04,.8,.7,0x355b65);this.dynbox(g,-1.26,2.4,z,.04,.8,.7,0x355b65);}}
   if(['boat','jetski'].includes(d.shape)){body.scale.set(d.shape==='boat'?2.4:1,.7,d.shape==='boat'?5:2.5);this.dynbox(g,0,1.2,0,d.shape==='boat'?1.6:.5,.5,1.8,0xd0d2be);this.dynbox(g,0,1.55,.5,1,.5,.1,0x395969);}

@@ -140,11 +140,11 @@ export const regions=[
 // Der Verkehr braucht sie, um Abstand zu halten: vorher standen dort sieben
 // Meter für jeden, vom Motorrad bis zum Achtmeterbus.
 export const vehicleTypes={
- compact:{name:'Finch',mass:950,max:25,accel:11,brake:22,turn:1.8,grip:1,shape:'car',scale:[.85,.9,.82],sound:70,security:1,laenge:3.66,breite:1.89},
+ compact:{name:'Finch',mass:950,max:25,accel:11,brake:22,turn:1.8,grip:1,shape:'car',scale:[.85,.9,.82],sound:70,security:1,laenge:3.72,breite:1.96},
  sedan:{name:'Kestrel S',mass:1500,max:30,accel:12,brake:23,turn:1.4,grip:1,shape:'car',scale:[1,1,1],sound:48,security:2,laenge:4.46,breite:2.22},
- suv:{name:'Ridgeline',mass:2200,max:28,accel:9,brake:19,turn:1.2,grip:.9,shape:'car',scale:[1.15,1.4,1.1],sound:43,security:3,laenge:4.91,breite:2.55},
+ suv:{name:'Ridgeline',mass:2200,max:28,accel:9,brake:19,turn:1.2,grip:.9,shape:'car',scale:[1.15,1.4,1.1],sound:43,security:3,laenge:4.97,breite:2.36},
  super:{name:'Vesper R',mass:1400,max:49,accel:19,brake:30,turn:1.7,grip:1.3,shape:'car',scale:[1.05,.7,1.12],sound:100,security:6,laenge:5.00,breite:2.33},
- muscle:{name:'Banshee 68',mass:1800,max:37,accel:16,brake:19,turn:1.2,grip:.75,shape:'car',scale:[1.1,.9,1.14],sound:35,security:1,laenge:5.08,breite:2.44},
+ muscle:{name:'Banshee 68',mass:1800,max:37,accel:16,brake:19,turn:1.2,grip:.75,shape:'car',scale:[1.1,.9,1.14],sound:35,security:1,laenge:5.12,breite:2.28},
  pickup:{name:'Mason',mass:2300,max:29,accel:9,brake:18,turn:1.15,grip:.95,shape:'pickup',scale:[1.1,1.2,1.2],sound:39,security:2,laenge:5.35,breite:2.44},
  motorcycle:{name:'Wraith',mass:210,max:42,accel:19,brake:26,turn:2.2,grip:1.05,shape:'bike',scale:[1,1,1],sound:110,security:2,laenge:2.70,breite:1.00},
  dirtbike:{name:'Thistle',mass:130,max:29,accel:15,brake:22,turn:2.5,grip:1.2,shape:'bike',scale:[.8,1.15,.9],sound:95,security:1,laenge:2.70,breite:1.00},

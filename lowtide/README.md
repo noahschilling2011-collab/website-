@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 308 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 310 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1318,6 +1318,59 @@ wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
 besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
+
+## Vier Autotypen, ein Körper
+
+Kleinwagen, Limousine, Geländewagen und Muscle Car waren dasselbe Mesh in
+anderem Maßstab: `detailedCar` baut eine Karosserie, und `car()` setzte
+darauf `m.scale.set(...d.scale)` — der Geländewagen war eine um vierzig
+Prozent in die Höhe gezogene Limousine, der Kleinwagen dieselbe um fünfzehn
+Prozent geschrumpft.
+
+Der Nachweis steckt in den Verhältnissen entlang der Längsachse, denn die
+kann eine Achsenskalierung gar nicht ändern. Am alten Stand gemessen:
+
+| | Kleinwagen | Limousine | Geländewagen | Muscle |
+|---|---|---|---|---|
+| Radstand / Länge | 0,610 | 0,610 | 0,610 | 0,610 |
+| Vorderer Überhang / Länge | 0,200 | 0,200 | 0,200 | 0,200 |
+| Fahrgastzelle / Länge | 0,583 | 0,583 | 0,583 | 0,583 |
+| Mitte der Zelle | 0,460 | 0,460 | 0,460 | 0,460 |
+
+Auf drei Stellen dieselbe Zahl, viermal. Danach:
+
+| | Kleinwagen | Limousine | Geländewagen | Muscle |
+|---|---|---|---|---|
+| Länge × Breite × Höhe | 3,72 × 1,96 × 1,58 | 4,46 × 2,22 × 1,60 | 4,97 × 2,36 × 1,97 | 5,12 × 2,28 × 1,48 |
+| Radstand / Länge | 0,659 | 0,610 | 0,640 | 0,582 |
+| Vorderer Überhang / Länge | 0,191 | 0,200 | 0,185 | 0,211 |
+| Fahrgastzelle / Länge | 0,656 | 0,583 | 0,688 | 0,537 |
+| Mitte der Zelle | 0,398 | 0,460 | 0,435 | 0,384 |
+| Dachhöhe / Länge | 0,430 | 0,354 | 0,386 | 0,281 |
+
+Der Kleinwagen ist ein Schrägheck: die Zelle reicht fast bis ans Ende, der
+hintere Überhang ist kurz, das Dach steht hoch. Der Geländewagen hat einen
+hohen Boden, ein langes Dach und größere Räder. Das Muscle Car hat die
+längste Haube, die am weitesten hinten sitzende Zelle und das flachste Dach.
+Spiegel, Türgriffe, Zierleisten, Kühlergrill, Scheinwerfer, Rücklichter und
+Radstellen leiten sich jetzt aus dem Maßtabelleneintrag der Form ab statt aus
+festen Zahlen der Limousine.
+
+### Eine Messung, die das Gegenteil zeigte
+
+Zuerst habe ich die Silhouetten verglichen: vier Wagen an derselben Stelle,
+gleiche Kamera, angehaltene Welt, Bild gegen Bild. Der Unterschied zwischen
+zwei Aufnahmen desselben Modells war **0,00** — die Messung ist also sauber.
+Zwischen den Modellen lag er **vorher bei 3,17 bis 8,43 und nachher bei 2,83
+bis 5,73**: nach dieser Zahl waren die alten Wagen *unterschiedlicher*.
+
+Das stimmt sogar. Ein um vierzig Prozent in die Höhe gezogenes Auto sieht
+sehr anders aus als eine Limousine — es sieht nur nicht aus wie ein
+Geländewagen. Die Pixelmessung beantwortet die Frage nicht, die hier zählt,
+und ist deshalb nicht die Grundlage dieser Runde; die Verhältnistabelle oben
+ist es.
+
+310 Prüfungen bestanden, keine gefallen.
 
 ## Hundertsiebenundzwanzig Fahrzeuge, eine Karosserieform
 

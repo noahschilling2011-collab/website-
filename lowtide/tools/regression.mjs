@@ -3140,6 +3140,73 @@ pruefe('Bus und Lastwagen schwenken höchstens einen Meter aus', langAbseits <= 
 pruefe('Fahrzeuge fahren nicht ineinander', mischung.paare === 0,
  `${mischung.paare} überlappende Paare: ${mischung.funde.join('; ')}`);
 
+// Vier Karosserien statt einer. Kleinwagen, Limousine, Geländewagen und
+// Muscle Car waren derselbe Körper in anderem Maßstab. Sichtbar wird das an
+// den Verhältnissen entlang der Längsachse, die eine Achsenskalierung gar
+// nicht ändern kann: gemessen am alten Stand lagen Radstand (0,610 der
+// Länge), vorderer Überhang (0,200), Fahrgastzelle (0,583) und ihre Mitte
+// (0,460) bei allen vier auf drei Stellen gleich.
+const karosserien = await page.evaluate(() => {
+ const L = window.LOWTIDE, w = L.world, s = L.sim, V = L.fahrzeuge;
+ const spanne = (o, achse) => {
+  o.updateMatrixWorld(true);
+  let min = 1e9, max = -1e9;
+  o.traverse(k => {
+   if (!k.isMesh || !k.geometry) return;
+   if (!k.geometry.boundingBox) k.geometry.computeBoundingBox();
+   const bb = k.geometry.boundingBox, e = k.matrixWorld.elements;
+   for (const x of [bb.min.x, bb.max.x]) for (const y of [bb.min.y, bb.max.y]) for (const z of [bb.min.z, bb.max.z]) {
+    const v = achse === 0 ? e[0] * x + e[4] * y + e[8] * z + e[12]
+      : achse === 1 ? e[1] * x + e[5] * y + e[9] * z + e[13]
+      : e[2] * x + e[6] * y + e[10] * z + e[14];
+    if (v < min) min = v; if (v > max) max = v;
+   }
+  });
+  return [min, max];
+ };
+ const aus = {}, abweichung = {};
+ for (const modell of ['compact', 'sedan', 'suv', 'muscle']) {
+  const i = s.cars.findIndex(c => c.model === modell);
+  const m = w.cars[i];
+  if (!m) continue;
+  const merk = {x: m.position.x, y: m.position.y, z: m.position.z, r: m.rotation.y};
+  m.position.set(0, 0, 0); m.rotation.y = 0; m.updateMatrixWorld(true);
+  const z = spanne(m, 2), y = spanne(m, 1), x = spanne(m, 0);
+  const laenge = z[1] - z[0];
+  const raeder = (m.userData.wheels || []).map(k => {k.updateMatrixWorld(true); return k.matrixWorld.elements[14];});
+  const kab = m.userData.glass ? spanne(m.userData.glass, 2) : [0, 0];
+  const kabY = m.userData.glass ? spanne(m.userData.glass, 1) : [0, 0];
+  aus[modell] = {
+   laenge, breite: x[1] - x[0], hoehe: y[1] - y[0],
+   radstand: (Math.max(...raeder) - Math.min(...raeder)) / laenge,
+   ueberhang: (z[1] - Math.max(...raeder)) / laenge,
+   kabine: (kab[1] - kab[0]) / laenge,
+   kabineMitte: ((kab[0] + kab[1]) / 2 - z[0]) / laenge,
+   dach: kabY[1] / laenge
+  };
+  m.position.set(merk.x, merk.y, merk.z); m.rotation.y = merk.r; m.updateMatrixWorld(true);
+ }
+ // Und stimmen die Zahlen in vehicleTypes noch? Der Abstand des Verkehrs
+ // hängt an ihnen.
+ for (const [modell, v] of Object.entries(aus)) {
+  const t = V[modell] || {};
+  abweichung[modell] = Math.max(Math.abs((t.laenge || 0) - v.laenge), Math.abs((t.breite || 0) - v.breite));
+ }
+ const spreizung = feld => {
+  const werte = Object.values(aus).map(v => v[feld]);
+  return Math.max(...werte) - Math.min(...werte);
+ };
+ return {aus, abweichung,
+  radstand: spreizung('radstand'), ueberhang: spreizung('ueberhang'),
+  kabine: spreizung('kabine'), kabineMitte: spreizung('kabineMitte'), dach: spreizung('dach')};
+});
+pruefe('Die vier Autotypen haben eigene Karosserien',
+ karosserien.radstand > .04 && karosserien.kabine > .08 && karosserien.kabineMitte > .04,
+ `Radstand ${karosserien.radstand.toFixed(3)}, Zelle ${karosserien.kabine.toFixed(3)}, Zellenmitte ${karosserien.kabineMitte.toFixed(3)}, Dach ${karosserien.dach.toFixed(3)}`);
+pruefe('Die Maße in vehicleTypes stimmen mit den Meshes überein',
+ Math.max(...Object.values(karosserien.abweichung)) < .15,
+ Object.entries(karosserien.abweichung).map(([k, v]) => k + ' ' + v.toFixed(2)).join(', '));
+
 // Flügelschlag. Im Update der Tierwelt stand `o.scale.set(schlag, 1, 1)` mit
 // der Begründung, einzelne Flügel gingen bei Instanzen nicht: die ganze Möwe
 // wurde um bis zu 28 Prozent breiter und wieder schmaler, die Flügel selbst
