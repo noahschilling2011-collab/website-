@@ -1524,6 +1524,146 @@ muss ich nicht wieder raten.
 
 323 Prüfungen bestanden, keine gefallen.
 
+## Ausbau in vier Paketen: Verkehr, Häuser, Budget
+
+Dieser Abschnitt folgt einem Auftrag mit vier Paketen und harten
+Abnahmezahlen. Gemessen wird mit `tools/inventar.mjs` — headless Chromium,
+1024 auf 576, Startbildschirm, die Welt rendert im Hintergrund. Diese Messung
+ist bewusst eine andere als die in `tools/messung.mjs`, die im Spiel an festen
+Orten misst; Zahlen aus beiden darf man nicht gegeneinander halten.
+
+| | Ausgang | nachher | Ziel |
+|---|---|---|---|
+| Draw Calls (Startbild) | 1409 | **950** | < 700 verfehlt |
+| Dreiecke (Startbild) | 2.337.700 | 2.294.260 | — |
+| Einzel-Meshes | 22.761 | **20.771** | < 9.000 verfehlt |
+| Materialien | 2.149 | **805** | < 900 erreicht |
+| Instanzennetze / Instanzen | 587 / 84.585 | 430 / 88.009 | — |
+| Draw Calls im Spiel (Kreuzung, 13 Uhr) | 900 | **435** | — |
+| Konsolenfehler | 0 | 0 | — |
+
+### Der Schattendurchgang war der teuerste Posten
+
+Aufgeschlüsselt durch Abschalten einzelner Gruppen, Kreuzung Downtown, 13 Uhr:
+von 890 Zeichenaufrufen entfielen **576 auf den Schatten**, davon 294 auf
+Figuren und 115 auf Fahrzeuge — bei zusammen 80.000 Dreiecken. Das ist kein
+Geometrieproblem, sondern Aufruf-Overhead: jede nahe Figur wirft ihren Schatten
+aus 34 Einzelnetzen, jedes Auto aus zwanzig.
+
+Jetzt wirft eine Kapsel je Figur und ein Quader je Wagen, alle Exemplare in je
+einem Instanzennetz — **zwei Aufrufe statt 409**. Der Spieler behält seinen
+echten Schatten, weil der ständig im Bild liegt. Dazu das Schattenfeld von 130
+auf 92 Meter: billiger und zugleich schärfer, weil dieselbe Karte von 2048
+Bildpunkten eine kleinere Fläche deckt.
+
+Bildvergleich gegen den Stand davor, gleiche Kamera, Simulation angehalten:
+mittlere Abweichung 0,162 von 255, aber bis zu 182 an einzelnen Bildpunkten —
+dort, wo der Umriss eines Figurenschattens jetzt eine Kapsel ist. Keine
+Bildzeile über 10.
+
+### Materialien: zwei je Figur, zwei je Wagen
+
+Von den 2149 Materialien gehörten 1134 den Figuren und 722 den Fahrzeugen.
+Pro Figur waren genau zwei unteilbar neu — Haut und ihr Klon fürs Gesicht —,
+bei 533 Figuren also 1066. Es gibt aber nur fünf Hauttöne. Dasselbe bei den
+Wagen: Lack und Scheibe entstanden je Fahrzeug neu, die Scheibe sogar mit
+fester Farbe. Nach Ton beziehungsweise Farbe gecacht: **2149 auf 805**.
+
+Geteilt werden darf nur, was sich nicht je Exemplar ändert. Das Rücklicht
+bleibt deshalb pro Wagen — es leuchtet beim Bremsen —, der Scheinwerfer nicht:
+seine Helligkeit hängt allein am Nachtanteil und ist für alle gleich.
+
+### Warum die Meshes nicht unter 9000 gehen
+
+19.052 der 22.761 Einzel-Meshes sind Figuren, 3099 Fahrzeuge, 494 der Rest.
+Eine Figur hat nach dem Backen des Kopfes 31 Meshes: Rumpf, zwei Arme zu drei
+Teilen, zwei Beine zu vier, Kopf zu vier, sechs Augenteile, zwei Lider,
+Rucksack, Jacke. Für 9000 müsste sie bei zwölf liegen. Das ginge nur ohne
+einzeln bewegliche Ellbogen, Knie, Knöchel und Lider — und daran hängt die
+ganze Animation. Gemessen, nachgerechnet, nicht gemacht.
+
+Beim Backen selbst ist mir der Fehler passiert, vor dem der Auftrag warnt:
+jede Figur und jeder Wagen bekam eine **eigene** gebackene Geometrie, und der
+Prüflauf meldete zu Recht „Figuren teilen sich ihre Geometrie — 6 von 13". Der
+Cache schlüsselt jetzt nach Form statt nach Farbe, denn die Form eines Wagens
+hängt nicht an seinem Lack; die Materialien kommen beim Wiederverwenden aus dem
+Exemplar. Danach: Figuren 9 von 13, Fahrzeuge 14 von 14.
+
+### Drei Karosserien mehr, gemessen statt begutachtet
+
+Neu sind Kastenwagen, Pritschenwagen und Taxi. Ob sie sich unterscheiden, habe
+ich zuerst nach Augenmaß beurteilt — und lag falsch: auf dem ersten Bild hielt
+ich den Kastenwagen für ein Coupé. Das Differenzbild sagt etwas anderes.
+Silhouette in Bildpunkten, gleiche Kamera, mit und ohne Fahrzeug gerendert:
+
+| Modell | Silhouette | Breite/Höhe |
+|---|---|---|
+| muscle | 131 × 51 | 2,57 |
+| sedan | 118 × 52 | 2,27 |
+| pickup | 129 × 58 | 2,22 |
+| taxi | 118 × 54 | 2,19 |
+| suv | 131 × 64 | 2,05 |
+| transporter | 129 × 71 | **1,82** |
+
+Dazu Kennzeichen aus einem Canvas-Atlas mit 32 Nummern — eine Textur, der
+Ausschnitt steckt in den UV-Koordinaten der Platte, kein eigenes Material je
+Wagen. Dabei fiel ein Fehler im eigenen Backwerk auf: es kopierte nur Position
+und Normale, also hätte jedes Schild der Stadt denselben Fleck gezeigt.
+
+Vier Dreckstufen je Fahrzeug heben die Rauheit, senken den Klarlack und
+entsättigen die Farbe. Je Farbe und Stufe entsteht ein Material, das sich alle
+Wagen dieser Kombination teilen — null zusätzliche Zeichenaufrufe.
+
+### 732 Fensterrahmen hingen neben der Wand
+
+Der Auftrag vermutete das aus dem Code: die Rahmenschleifen liefen über feste
+Bereiche (−6 bis 6 und −15 bis 15), unabhängig von `b.w` und `b.d`. Gemessen an
+den 36 Gebäuden, die Rahmen bekommen:
+
+- Breite: Minimum 18,8 m, Median 29,8 → **kein** Gebäude unter den nötigen 14 m
+- Tiefe: Minimum 22,8 m, Median 38,8 → **zwölf** unter den nötigen 32 m
+
+Der Fall kommt also vor, aber nur an der Tiefenachse. Nachgerechnet mit
+denselben Schleifen über die echten Maße: **732 von 7590 Rahmen (9,6 Prozent)**
+lagen außerhalb der Wand. Jetzt 0 von 8932.
+
+### Rücksprünge, Eckhäuser, Balkone
+
+Jedes Gebäude war ein einziger Quader — von weitem eine Reihe Kisten. Ab
+vierzehn Metern sitzt jetzt ab zwei Dritteln der Höhe ein Obergeschoss mit 76
+Prozent der Grundfläche auf einer umlaufenden Dachterrasse. Fensterbänder und
+Laibungen folgen dem Absatz, sonst stünde dort genau das in der Luft, was oben
+gerade behoben wurde.
+
+Bei den Eckhäusern zeigte die Messung, dass das naheliegende Kriterium nichts
+taugt: 67 Kreuzungen, aber 33 von 36 Gebäuden liegen im weiteren Umkreis einer
+— damit bekäme fast jedes eine Sonderbehandlung. Behandelt wird deshalb nur die
+eine Ecke, deren Abstand zur Kreuzungsfläche unter sieben Metern liegt: eine um
+45 Grad gedrehte Schräge über die volle Höhe, Ladeneingang und Vordach genau
+dort. Trifft auf 22 Gebäude zu.
+
+Die elf Wohnhäuser waren nackt, weil `dressBuildings` `kind === 'house'`
+auslässt. `dressHouses` setzt jetzt 92 Balkone mit Brüstung, versetzt statt in
+Reih und Glied, dazu Wäscheleinen an jeder dritten Etage. Die erste
+Verteilungsformel schob den ersten Balkon genau auf die Wandkante und den
+zweiten daneben ins Freie — auf dem Bild war die Fassade leer, und ich hätte es
+fast für einen Fehler im Aufruf gehalten.
+
+### Die Kachelgröße ist ein Tausch, kein Gewinn
+
+Bauteile werden nach Farbe **und** Kachel zu Instanzennetzen gebündelt. Große
+Kacheln heißen weniger Zeichenaufrufe, aber gröberes Wegschneiden und damit
+mehr Dreiecke. Gemessen am Strand um 13 Uhr:
+
+| Kachel | Draw Calls | Dreiecke |
+|---|---|---|
+| 100 m | 394 | 1.399.000 |
+| **130 m** | **366** | **1.523.000** |
+| 160 m | 365 | 1.627.000 |
+
+Bei 160 kommt kein Aufruf mehr dazu, aber hunderttausend Dreiecke. 130 ist der
+Punkt, an dem die Kurve abknickt.
+
 ## Viertausend Netze für ein Bild
 
 Der Zusammenbau gruppiert Bauteile nach **Farbe, Leuchten und
