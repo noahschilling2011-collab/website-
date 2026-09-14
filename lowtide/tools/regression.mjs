@@ -2662,6 +2662,56 @@ const verben = await page.evaluate(() => {
  aus.nachWartezeit = {ammo: p.ammo, reserve: p.reserve, auftrag: !!s.reloadJob};
  return aus;
 });
+// Möbel. Bänke, Liegen und Barhocker standen überall, und auf keinem einzigen
+// saß jemand: jede Figur der Karte ging oder stand. Die Sitzplätze melden
+// sich jetzt beim Bauen an, und ein Teil der Menge nimmt Platz — mit eigener
+// Haltung, denn eine stehende Figur mitten in der Sitzfläche sähe schlechter
+// aus als eine leere Bank.
+const moebel = await page.evaluate(() => {
+ const s = window.LOWTIDE.sim;
+ const leer = {forward: 0, turn: 0, yaw: 0, sprint: false, sneak: false, brake: false, jump: false, interact: false};
+ const plaetze = s.sitzplaetze || [];
+ const arten = {};
+ for (const q of plaetze) arten[q.art] = (arten[q.art] || 0) + 1;
+ const sitzend = s.npcs.filter(n => n.state === 'sitzend');
+ const daneben = sitzend.filter(n => !n.sitzplatz ||
+  Math.hypot(n.x - n.sitzplatz.x, n.z - n.sitzplatz.z) > .1).length;
+ const belegt = new Set();
+ const doppelt = sitzend.filter(n => {
+  const k = n.sitzplatz.x.toFixed(1) + '|' + n.sitzplatz.z.toFixed(1);
+  if (belegt.has(k)) return true; belegt.add(k); return false;
+ }).length;
+ const vor = sitzend.map(n => ({id: n.id, x: n.x, z: n.z}));
+ for (let i = 0; i < 300; i++) s.tick(1 / 60, leer);
+ const gewandert = sitzend.filter(n => {
+  const a = vor.find(v => v.id === n.id);
+  return a && Math.hypot(n.x - a.x, n.z - a.z) > .05;
+ }).length;
+ // Wer sitzt, muss aufstehen, wenn jemand mit gezogener Waffe danebensteht.
+ let aufgestanden = null;
+ const opfer = sitzend[0];
+ if (opfer) {
+  const merk = {x: s.player.x, z: s.player.z, armed: s.player.armed, car: s.player.car};
+  s.player.car = null; s.player.x = opfer.x + 2; s.player.z = opfer.z; s.player.armed = true;
+  for (let i = 0; i < 240; i++) s.tick(1 / 60, leer);
+  aufgestanden = opfer.state !== 'sitzend';
+  s.player.x = merk.x; s.player.z = merk.z; s.player.armed = merk.armed; s.player.car = merk.car;
+  s.stars = 0; s.heat = 0;
+ }
+ return {plaetze: plaetze.length, arten, sitzende: sitzend.length, daneben, doppelt,
+  gewandert, aufgestanden};
+});
+pruefe('Auf Bänken, Liegen und Hockern sitzt jemand',
+ moebel.plaetze >= 100 && moebel.sitzende >= 25,
+ `${moebel.sitzende} Sitzende auf ${moebel.plaetze} Plätzen (${Object.entries(moebel.arten).map(([k, v]) => k + ' ' + v).join(', ')})`);
+pruefe('Niemand sitzt neben dem Möbel oder auf jemandem',
+ moebel.daneben === 0 && moebel.doppelt === 0,
+ `${moebel.daneben} daneben, ${moebel.doppelt} doppelt belegt`);
+pruefe('Wer sitzt, bleibt sitzen', moebel.gewandert === 0,
+ `${moebel.gewandert} von ${moebel.sitzende} sind weggelaufen`);
+pruefe('Wer sitzt, steht bei gezogener Waffe auf', moebel.aufgestanden === true,
+ String(moebel.aufgestanden));
+
 // Straßensperren. Die Stellen waren vier von Hand notierte Punkte, alle in
 // der alten Innenstadt, und nur ein einziger Wagen (id === 2) bekam je einen
 // Auftrag. Nachgemessen lag das Ziel in Rosalind 654 Meter entfernt, auf den

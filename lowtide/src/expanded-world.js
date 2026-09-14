@@ -353,6 +353,10 @@ export class ExpandedWorld extends World{
   this.palmenBauen();
   this.laubwerk?.bauen();
   this.rotorenBauen();
+  // Bänke, Liegen und Barhocker melden sich beim Bauen an. Vorher stand auf
+  // keinem einzigen Möbelstück der Karte jemand — jede Figur ging oder stand.
+  this.sim.sitzplaetze = this.sitzplaetze || [];
+  this.sim.besetzeSitzplaetze?.();
  }
  // Die drei Windräder auf dem Kamm. regions.js meldet nur Nabe, Achse und
  // Phase an; die Blätter liegen hier, weil sie sich drehen müssen und alles

@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 283 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 287 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1318,6 +1318,53 @@ wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
 besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
+
+## Auf keiner Bank der Karte saß jemand
+
+Bänke am Gehweg, Liegen am Strand, Hocker an der Strandbar, Bänke am
+Zeltplatz — und auf keinem einzigen Möbelstück saß eine Figur. Jeder der 530
+Menschen stand oder ging. Das ist im Bild sofort zu sehen: eine Strandzeile
+mit zweiunddreißig leeren Liegen unter Sonnenschirmen, daneben Leute, die
+davorstehen.
+
+Die Möbel melden sich jetzt beim Bauen an. **129 Sitzplätze**: 92 auf Bänken,
+32 auf Liegen, 5 an der Bar. Jede fünfte Figur der Menge nimmt den nächsten
+freien Platz, wenn er höchstens vierzig Meter entfernt liegt — weiter weg
+wäre es nicht mehr die eigene Gegend. **40 sitzen**, keiner daneben, keiner
+auf jemandem, der engste Abstand zweier Plätze beträgt 1,00 Meter.
+
+Dazu eine eigene Haltung: Oberschenkel waagerecht (-1,42 rad), Unterschenkel
+senkrecht (+1,36), Rumpf leicht zurück, Arme auf den Schenkeln, und die ganze
+Figur um Sitzhöhe minus 0,36 Meter abgesenkt. Ohne die wäre eine besetzte
+Bank **schlechter** als eine leere: eine stehende Figur mitten in der
+Sitzfläche.
+
+**Zwei Fehler, beide von den eigenen Prüfungen gefunden.**
+
+Der erste: wer einmal aufgeschreckt wurde, setzte sich nie wieder hin. In der
+freien Messung saßen vierzig — im Regressionslauf, nach den Waffen- und
+Polizeiprüfungen, **null von vierzig**. Jede gezogene Waffe, jede Verfolgung
+leert die Bänke, und zwar endgültig. Jetzt geht, wer wieder ruhig ist, zu
+seinem Platz zurück und setzt sich.
+
+Der zweite ist der interessantere. Meine erste Fassung ließ Sitzende ganz oben
+aus der Figurenschleife springen — elegant, eine Zeile, und komplett falsch:
+damit lief für sie auch die **Wahrnehmung** nicht mehr. Ein Bewaffneter konnte
+sich zwei Meter vor eine Bank stellen, ohne dass jemand aufsah. Gefunden hat
+das die Prüfung „Wer sitzt, steht bei gezogener Waffe auf" — sie meldete
+`false`, und genau dafür hatte ich sie geschrieben. Jetzt läuft die
+Zustandslogik weiter, übersprungen wird nur die Bewegung.
+
+**Und eine Beobachtung über den Prüflauf selbst.** Im Durchgang mit den
+kaputten Sitzenden fielen zusätzlich zwei Wetterprüfungen: „Gewitter ist
+deutlich dunkler als klarer Mittag" meldete Sturm mit 165,0 gegen 144,5 bei
+klarem Himmel. Sie stehen zweihundertfünfzig Zeilen **vor** dem geänderten
+Code und waren im Lauf davor und im Lauf danach grün, ohne dass am Wetter
+etwas angefasst wurde. Ich habe diese Suite bisher als deterministisch
+behandelt; das stimmt nicht für jede Prüfung. Ohne Gegenlauf hätte ich hier
+eine Ursache erfunden.
+
+287 Prüfungen bestanden, keine gefallen.
 
 ## Straßensperren an vier Punkten in der alten Innenstadt
 

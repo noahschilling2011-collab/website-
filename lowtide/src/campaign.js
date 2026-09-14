@@ -679,6 +679,18 @@ export class Campaign extends Simulation{
   let umgestellt=0;
   for(const n of this.npcs){
    if(n.guard||n.report||n.health<=0||n.state!=='normal')continue;
+   // Wer einen Sitzplatz hat und wieder ruhig ist, setzt sich zurück. Ohne
+   // das leeren sich die Bänke über eine Spielsitzung vollständig: jede
+   // Waffe, jede Verfolgung, jeder Schuss schreckt Sitzende auf, und sie
+   // standen danach für immer. Im Regressionslauf waren nach den Waffen- und
+   // Polizeiprüfungen **null von vierzig** noch am Platz.
+   if(n.sitzplatz&&n.state==='normal'){
+    const d=Math.hypot(n.x-n.sitzplatz.x,n.z-n.sitzplatz.z);
+    if(d<2.5){n.x=n.sitzplatz.x;n.z=n.sitzplatz.z;n.yaw=n.sitzplatz.yaw;n.state='sitzend';continue;}
+    if(d<70&&umgestellt<3){umgestellt++;
+     n.path=[...findPath(n,n.sitzplatz,q=>this.blocked(q,.3),4,1200),{x:n.sitzplatz.x,z:n.sitzplatz.z}];
+     n.target=0;n.schedule='Platz';continue;}
+   }
    if(n.schedule!==mode&&umgestellt<3){
     umgestellt++;
     n.schedule=mode;
@@ -702,6 +714,36 @@ export class Campaign extends Simulation{
    'Straßenrennen':'Schon wieder Rennen auf der Harbor Avenue. Jede Nacht dasselbe.',
    'Überfall':'Überfall gemeldet. Bereich weiträumig meiden.',
    'Party':'Irgendwo läuft eine Party und niemand weiß, wo genau.'}[kind]||('Vorfall: '+kind));}
+ // Ein Teil der Menge setzt sich. Aufgerufen, sobald die Welt gebaut ist und
+ // die Sitzplätze bekannt sind — vorher gibt es sie nicht, sie entstehen erst
+ // beim Bauen der Bänke, Liegen und Hocker.
+ //
+ // Wer sitzt, bleibt sitzen, bis ihn etwas aufschreckt: die vorhandene Logik
+ // setzt bei gezogener Waffe 'aufmerksam' und danach 'flüchtend', und damit
+ // steht die Figur von selbst wieder auf und läuft ihren alten Weg.
+ besetzeSitzplaetze(){
+  const frei=[...(this.sitzplaetze||[])];
+  if(!frei.length)return;
+  let gesetzt=0;
+  for(const n of this.npcs){
+   // Nur die Menge, nicht Wachen oder Figuren der Kampagne. Jede fünfte.
+   if(n.id<200||n.guard||n.id%5!==0)continue;
+   let beste=-1,bester=1e9;
+   for(let i=0;i<frei.length;i++){
+    const d=Math.hypot(frei[i].x-n.x,frei[i].z-n.z);
+    if(d<bester){bester=d;beste=i;}
+   }
+   // Vierzig Meter: weiter weg ist es nicht mehr "der Platz vor der Haustür",
+   // und die Figur würde aus ihrer Gegend verschwinden.
+   if(beste<0||bester>40)continue;
+   const s=frei.splice(beste,1)[0];
+   n.x=s.x;n.z=s.z;n.yaw=s.yaw;n.state='sitzend';n.sitzplatz=s;
+   gesetzt++;
+   if(!frei.length)break;
+  }
+  this.sitzende=gesetzt;
+ }
+
  // Wo eine Straßensperre steht. Vorher waren es vier von Hand notierte
  // Punkte, alle in der alten Innenstadt: (-100,80), (-40,-100), (-280,80),
  // (-100,200). Nachgemessen bei vier Sternen und fünfzehn Sekunden Verfolgung

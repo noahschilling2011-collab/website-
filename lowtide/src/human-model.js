@@ -128,6 +128,29 @@ export function naturalHuman(color,pants,nah=true){
 const SCHRITTZYKLUS=1.95;
 // steigung: Neigung des Bodens unter der Figur im Bogenmaß, aus der
 // Geländehöhe vor und hinter ihr. 0 auf der Ebene, was fast überall gilt.
+// Sitzhaltung. Oberschenkel waagerecht nach vorn, Unterschenkel senkrecht
+// nach unten, Rumpf etwas zurück — und die ganze Figur tiefer, sonst schwebt
+// sie über der Bank. Ohne diese Funktion sähe eine besetzte Bank schlechter
+// aus als eine leere: eine stehende Figur mitten in der Sitzfläche.
+export function setzeSitzhaltung(g,sitzt){
+ const u=g.userData;
+ if(!u.legs)return;
+ if(!sitzt){
+  if(!u.sitzt)return;
+  u.sitzt=false;
+  for(const arm of u.arms)arm.rotation.set(0,0,0);
+  return;
+ }
+ u.sitzt=true;
+ u.legs.forEach((leg,i)=>{
+  leg.rotation.x=-1.42;
+  if(u.knees&&u.knees[i])u.knees[i].rotation.x=1.36;
+ });
+ // Arme locker auf den Oberschenkeln.
+ u.arms.forEach((arm,i)=>{arm.rotation.x=-.55;arm.rotation.z=(i?-1:1)*.12;});
+ if(u.body)u.body.rotation.x=.12;
+}
+
 export function animateNaturalHuman(g,time,moving,armed,steigung=0){
  const u=g.userData;
  const dt=Math.max(.001,Math.min(.25,time-(u.letzteZeit??time-.016)));u.letzteZeit=time;

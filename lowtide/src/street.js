@@ -162,6 +162,11 @@ export class Street {
      w.box(x + (senkrecht ? -.24 : 0), .72, z + (senkrecht ? 0 : -.24),
       senkrecht ? .1 : 2.1, .55, senkrecht ? 2.1 : .1, 0x7d6247);
      for (const e of [-.85, .85]) w.box(x + (senkrecht ? 0 : e), .21, z + (senkrecht ? e : 0), .16, .42, .16, 0x39443f);
+     // Zwei Sitzplätze je Bank. Die Lehne steht auf -x (senkrecht) oder -z,
+     // also blickt, wer sitzt, in die andere Richtung.
+     for (const e of [-.5, .5])
+      (w.sitzplaetze ||= []).push({x: x + (senkrecht ? 0 : e), y: .42, z: z + (senkrecht ? e : 0),
+       yaw: senkrecht ? Math.PI / 2 : 0, art: 'bank'});
     } else if (art < .70) {                            // Zeitungskästen
      for (let k = 0; k < 2; k++) {
       const ox = senkrecht ? 0 : (k - .5) * .62, oz = senkrecht ? (k - .5) * .62 : 0;
@@ -370,6 +375,8 @@ export class Street {
     w.box(lx, .3, lz, .75, .12, 2, 0xd6cdb4, dreh);
     for (const e of [-.85, .85]) w.box(lx, .14, lz + e, .6, .28, .1, 0x9aa39b, dreh);
     w.box(lx, .52, lz - .78, .72, .5, .12, 0xd6cdb4, dreh + .35);
+    // Kopfteil liegt auf -z, wer darauf sitzt, schaut aufs Wasser.
+    (w.sitzplaetze ||= []).push({x: lx, y: .36, z: lz + .2, yaw: dreh, art: 'liege'});
    }
    const schirmFarbe = [0xc9603f, 0x3f7a86, 0xd4a54a, 0xb0526e][Math.floor(rng() * 4)];
    w.box(gx, 1.15, z, .09, 2.3, .09, 0x8f8a7c);
@@ -392,7 +399,11 @@ export class Street {
   w.box(bx - 3.3, 1.65, bz, .3, 3.3, 5, 0xa8845c);
   w.box(bx, 1.05, bz + 2.5, 6.6, .2, 1.1, 0x8d6f4c);
   w.box(bx, .55, bz + 2.5, 6.4, 1.1, .7, 0x9a7a52);
-  for (let e = -2.4; e <= 2.4; e += 1.2) w.box(bx + e, .5, bz + 3.6, .42, 1, .42, 0x6f5a41);
+  for (let e = -2.4; e <= 2.4; e += 1.2) {
+   w.box(bx + e, .5, bz + 3.6, .42, 1, .42, 0x6f5a41);
+   // Der Tresen steht auf bz + 2.5, die Hocker blicken also nach -z.
+   (w.sitzplaetze ||= []).push({x: bx + e, y: 1, z: bz + 3.6, yaw: Math.PI, art: 'hocker'});
+  }
   w.box(bx, 1.9, bz - 2.2, 6.2, 1.4, .3, 0x6d5b3f);
   w.box(bx, 3.55, bz, 8.6, .4, 6.6, 0x8d7a4e);
   w.box(bx, 3.9, bz, 7.4, .35, 5.6, 0x9c8a5c);
