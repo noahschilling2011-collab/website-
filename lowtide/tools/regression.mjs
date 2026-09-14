@@ -3130,6 +3130,7 @@ const menge = await page.evaluate(() => {
  const gehend = n => n.health > 0 && n.stun <= 0 && n.state !== 'sitzend';
  let ticks = 0, summe = 0, summeEng = 0, hoechst = 0, durchlaeufe = 0, engster = 9;
  const seite = new Map(), naehe = new Map(), taeter = new Map();
+ const anfang = new Map((s._alleNpcs || s.npcs).map(n => [n.id, {x: n.x, z: n.z}]));
  for (let t = 0; t < 600; t++) {
   s.tick(1 / 60, leer);
   if (t % 10) continue;
@@ -3173,8 +3174,23 @@ const menge = await page.evaluate(() => {
   summe += paare; summeEng += eng;
   if (paare > hoechst) hoechst = paare;
  }
- const schlimmste = [...taeter.entries()].sort((u, v) => v[1].n - u[1].n).slice(0, 4)
-  .map(([k, e]) => `${k} ${e.zustand} ${e.n}x bis ${e.min.toFixed(2)} m`).join('; ');
+ // Zu den schlimmsten Paaren auch, warum sie sich nicht lösen: zurückgelegter
+ // Weg, Weglänge, Abstand zum nächsten Wegpunkt. Standalone gibt es keine
+ // solchen Paare, entartete Wege auch nicht — die Ursache steckt also im
+ // Zustand des Prüflaufs, und ohne diese Angaben rät man weiter.
+ const merkmal = id => {
+  const n = (s._alleNpcs || s.npcs).find(m => m.id === id);
+  if (!n) return '?';
+  const a = anfang.get(id), p = n.path || [];
+  const ziel = p[n.target % Math.max(1, p.length)];
+  return `Weg ${a ? Math.hypot(n.x - a.x, n.z - a.z).toFixed(1) : '?'} m, ${p.length} Knoten,` +
+   ` ${ziel ? Math.hypot(ziel.x - n.x, ziel.z - n.z).toFixed(1) : '?'} m zum Ziel, Tempo ${n.pace}`;
+ };
+ const schlimmste = [...taeter.entries()].sort((u, v) => v[1].n - u[1].n).slice(0, 3)
+  .map(([k, e]) => {
+   const [i, j] = k.split('-').map(Number);
+   return `${k} ${e.zustand} ${e.n}x bis ${e.min.toFixed(2)} m [${merkmal(i)} | ${merkmal(j)}]`;
+  }).join('; ');
  return {mittel: summe / ticks, eng: summeEng / ticks, engster, hoechst, durchlaeufe, schlimmste,
   figuren: (s._alleNpcs || s.npcs).filter(gehend).length};
 });
