@@ -178,6 +178,86 @@ export class Klang {
   } else this.schrittWeg = 0;
  }
 
+ // Der Modulationsoszillator heißt puls und nicht schlag: schlag() ist die
+ // Methode für den dumpfen Teil eines Aufpralls, und eine gleichnamige
+ // Eigenschaft hätte sie verdeckt — aufprall() wäre mit einem TypeError
+ // ausgestiegen, sobald zum ersten Mal ein Motor lief.
+ //
+ // Motor. Vorher: ein Sägezahn, Frequenz = Grundton des Typs plus Tempo mal
+ // drei, Lautstärke fest auf 0,017. Das steigt linear und unbegrenzt, kennt
+ // keine Gänge, keine Last und keinen Unterschied zwischen einem Lastwagen,
+ // einem Boot und einem Hubschrauber — nur den Grundton aus der Tabelle.
+ //
+ // Jetzt drei Teile: ein Sägezahn für den Ton, eine Dreieckwelle eine Oktave
+ // tiefer für den Körper, und eine Amplitudenmodulation für die Medien, die
+ // eine haben — Rotorschlag beim Hubschrauber, Blubbern beim Boot. An Land
+ // gibt es fünf Gänge: die Tonhöhe steigt im Gang und fällt beim Wechsel.
+ motorAnlegen() {
+  const ctx = this.ctx;
+  this.motorTon = ctx.createOscillator(); this.motorTon.type = 'sawtooth';
+  this.motorKoerper = ctx.createOscillator(); this.motorKoerper.type = 'triangle';
+  this.motorRegler = ctx.createGain(); this.motorRegler.gain.value = 0;
+  this.motorKoerperRegler = ctx.createGain(); this.motorKoerperRegler.gain.value = .55;
+  // Die Modulation sitzt als eigener Regler dazwischen: ein Oszillator auf
+  // seinem gain schwankt zwischen 0 und 1, statt den Ton zu verstimmen.
+  this.motorAM = ctx.createGain(); this.motorAM.gain.value = 1;
+  this.puls = ctx.createOscillator(); this.puls.type = 'sine';
+  this.puls.frequency.value = 12;
+  this.pulsTiefe = ctx.createGain(); this.pulsTiefe.gain.value = 0;
+  this.puls.connect(this.pulsTiefe).connect(this.motorAM.gain);
+  this.motorTon.connect(this.motorRegler);
+  this.motorKoerper.connect(this.motorKoerperRegler).connect(this.motorRegler);
+  this.motorRegler.connect(this.motorAM).connect(this.summe);
+  this.motorTon.start(); this.motorKoerper.start(); this.puls.start();
+ }
+
+ // typ: Eintrag aus vehicleTypes. gas: -1..1. Ohne Fahrzeug: aus.
+ motor(dt, typ, tempo, gas) {
+  if (!this.motorTon) this.motorAnlegen();
+  const t = this.ctx.currentTime;
+  if (!typ) {
+   this.motorRegler.gain.setTargetAtTime(0, t, .12);
+   this.pulsTiefe.gain.value = 0;
+   this.gang = 0;
+   this.motorPegel = 0;
+   this.motorHoehe = 0;
+   return;
+  }
+  const v = Math.abs(tempo), medium = typ.medium || 'land';
+  const grund = typ.sound || 45;
+  let hoehe, imGang = 0;
+  if (medium === 'land') {
+   const stufen = 5, spanne = Math.max(4, (typ.max || 30) / stufen);
+   const gang = Math.min(stufen - 1, Math.floor(v / spanne));
+   imGang = KLEMME((v - gang * spanne) / spanne, 0, 1);
+   // Jeder Gang ist länger übersetzt: derselbe Drehzahlhub trägt weiter.
+   hoehe = grund * (.62 + imGang * .78) * (1 + gang * .07);
+   this.gang = gang;
+  } else {
+   // Wasser und Luft haben keine Gänge — dort steigt die Drehzahl glatt.
+   imGang = KLEMME(v / Math.max(6, typ.max || 30), 0, 1);
+   hoehe = grund * (.7 + imGang * 1.5);
+   this.gang = 0;
+  }
+  this.motorTon.frequency.setTargetAtTime(hoehe, t, .06);
+  this.motorKoerper.frequency.setTargetAtTime(hoehe * .5, t, .06);
+  // Last: wer Gas gibt, ist lauter als wer rollt.
+  const pegel = .009 + Math.abs(gas || 0) * .011 + imGang * .005;
+  this.motorRegler.gain.setTargetAtTime(this.an ? pegel : 0, t, .1);
+  // Zuletzt befohlener Sollwert. Der Regler selbst nähert sich ihm über
+  // setTargetAtTime, und die Spielschleife schreibt jedes Bild einen neuen —
+  // wer den Regler misst, misst deshalb den Zustand des Spiels und nicht den
+  // Befehl, den er gerade abgesetzt hat. Genau daran ist die erste Fassung
+  // der Prüfung gescheitert: 0,0025 „mit Gas" gegen 0,0114 „ohne".
+  this.motorPegel = this.an ? pegel : 0;
+  this.motorHoehe = hoehe;
+  // Rotorschlag und Blubbern. An Land moduliert nichts.
+  const tiefe = medium === 'air' ? .55 : medium === 'water' ? .3 : 0;
+  this.puls.frequency.setTargetAtTime(medium === 'air' ? 11 + imGang * 9 : 5 + imGang * 4, t, .2);
+  this.pulsTiefe.gain.value = tiefe;
+  this.motorAM.gain.value = 1 - tiefe * .5;
+ }
+
  // Wie viele einmalige Klänge gerade laufen. Für die Prüfung auf ein Leck.
  get offen() {return this.lebend.size;}
 

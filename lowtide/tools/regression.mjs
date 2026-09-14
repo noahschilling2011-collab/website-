@@ -712,6 +712,64 @@ pruefe('Schritte fallen nach zurückgelegtem Weg',
  ton && `${ton.schritteGehend} auf 30 m gehend, ${ton.schritteGeduckt} geduckt`);
 pruefe('Einmalige Klänge räumen ihre Knoten wieder ab',
  ton && ton.nochOffen <= 4, ton && `${ton.nochOffen} von 80 Knoten noch offen, 1,4 s nach 40 Aufprallen`);
+// Der Motor war ein einzelner Sägezahn: Frequenz = Grundton plus Tempo mal
+// drei, Lautstärke fest. Linear, unbegrenzt, ohne Gänge und ohne Unterschied
+// zwischen Lastwagen, Boot und Hubschrauber.
+const motor = await page.evaluate(async () => {
+ const L = window.LOWTIDE, k = L.klang, T = L.fahrzeuge;
+ if (!k) return null;
+ // Die Tonhöhe kommt aus setTargetAtTime und steht nicht sofort im Wert.
+ // Gemessen wird deshalb die Kurve über die Sollformel — dieselbe, die
+ // Klang.motor() rechnet — und die Regler über eine echte Wartezeit.
+ const kurve = name => {
+  const typ = T[name], medium = typ.medium || 'land', grund = typ.sound || 45, aus = [];
+  for (let v = 0; v <= typ.max; v += typ.max / 24) {
+   let h;
+   if (medium === 'land') {
+    const st = 5, sp = Math.max(4, typ.max / st), g = Math.min(st - 1, Math.floor(v / sp));
+    const ig = Math.max(0, Math.min(1, (v - g * sp) / sp));
+    h = grund * (.62 + ig * .78) * (1 + g * .07);
+   } else {
+    const ig = Math.max(0, Math.min(1, v / Math.max(6, typ.max)));
+    h = grund * (.7 + ig * 1.5);
+   }
+   aus.push(h);
+  }
+  return aus;
+ };
+ const spruenge = a => {let n = 0; for (let i = 1; i < a.length; i++) if (a[i] < a[i - 1] - .5) n++; return n;};
+ const land = ['sedan', 'super', 'truck'].map(n => spruenge(kurve(n)));
+ const frei = ['boat', 'helicopter', 'plane'].map(n => spruenge(kurve(n)));
+ const tiefe = {};
+ for (const n of ['sedan', 'boat', 'helicopter']) {k.motor(1 / 60, T[n], 10, 1); tiefe[n] = k.pulsTiefe.gain.value;}
+ // Gelesen wird der zuletzt befohlene Sollwert, nicht der Regler: der nähert
+ // sich über setTargetAtTime, und die laufende Spielschleife schreibt jedes
+ // Bild einen neuen hinein. Die erste Fassung setzte den Zustand und wartete
+ // 420 ms — und maß dann den Wagen des Spielers statt den eigenen Befehl:
+ // 0,0025 „mit Gas" gegen 0,0114 „ohne".
+ k.motor(1 / 60, T.sedan, 15, 1); const mitGas = k.motorPegel;
+ k.motor(1 / 60, T.sedan, 15, 0); const ohneGas = k.motorPegel;
+ k.motor(1 / 60, null, 0, 0); const ohneWagen = k.motorPegel;
+ let aufprallLaeuft = true;
+ try {k.aufprall(8);} catch (e) {aufprallLaeuft = String(e.message);}
+ return {land, frei, tiefe, mitGas, ohneGas, ohneWagen, aufprallLaeuft};
+});
+pruefe('Der Motor schaltet an Land und nicht auf dem Wasser',
+ motor && motor.land.every(n => n === 4) && motor.frei.every(n => n === 0),
+ motor && `Abwärtssprünge an Land ${motor.land.join('/')}, auf Wasser und in der Luft ${motor.frei.join('/')}`);
+pruefe('Rotor und Schiffsschraube schlagen, ein Autoreifen nicht',
+ motor && motor.tiefe.sedan === 0 && motor.tiefe.boat > 0 && motor.tiefe.helicopter > motor.tiefe.boat,
+ motor && `Wagen ${motor.tiefe.sedan}, Boot ${motor.tiefe.boat}, Hubschrauber ${motor.tiefe.helicopter}`);
+pruefe('Gas geben ist lauter als rollen', motor && motor.mitGas > motor.ohneGas * 1.2,
+ motor && `${motor.mitGas.toFixed(4)} mit Gas, ${motor.ohneGas.toFixed(4)} ohne`);
+pruefe('Ohne Fahrzeug ist der Motor still', motor && motor.ohneWagen < .002,
+ motor && motor.ohneWagen.toFixed(5));
+// schlag() ist die Methode für den dumpfen Teil eines Aufpralls. Der
+// Modulationsoszillator des Motors hieß im ersten Anlauf genauso und hätte
+// sie als Eigenschaft verdeckt — aufprall() wäre beim ersten laufenden Motor
+// mit einem TypeError ausgestiegen.
+pruefe('Der Aufprall überlebt einen laufenden Motor', motor && motor.aufprallLaeuft === true,
+ motor && String(motor.aufprallLaeuft));
 
 console.log('Innenräume');
 pruefe('Alle acht Serviceräume sind eingerichtet', await page.evaluate(() =>

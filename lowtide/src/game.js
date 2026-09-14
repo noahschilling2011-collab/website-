@@ -9,7 +9,7 @@ import {Klang} from './sfx.js';
 import {immobilien,schatzOrte,rennen} from './content.js';
 import * as Story from './story.js';
 const {AUSGAENGE,FANG_DAUER,FANG_ABSTAND}=Story;
-const $=id=>document.getElementById(id),sim=new Campaign();let world,started=false,last=0,yaw=Math.PI,pitch=.15,stick={x:0,y:0},drag=null,muted=false,audio=null,engine=null,engineGain=null,toastTime=0,hudTime=0,failedShown=false;
+const $=id=>document.getElementById(id),sim=new Campaign();let world,started=false,last=0,yaw=Math.PI,pitch=.15,stick={x:0,y:0},drag=null,muted=false,audio=null,toastTime=0,hudTime=0,failedShown=false;
 const keys=new Set();$('startBtn').disabled=true;
 const debug={sichtbar:false,frames:0,fps:0,fenster:0,zeit:0};
 // setPointerCapture wirft, wenn der Zeiger zwischen Ereignis und Handler
@@ -28,7 +28,10 @@ window.LOWTIDE={sim,get world(){return world;},get frames(){return debug.frames;
   sim.player.x=x;sim.player.z=z;}};
 try{let saved=null;try{saved=localStorage.getItem('lowtide-v2');}catch{}if(saved){try{sim.restore(JSON.parse(saved));}catch(e){console.warn('Spielstand konnte nicht geladen werden',e);}}world=new ExpandedWorld($('game'),sim);$('loadState').textContent='Port Mercy ist bereit.';$('startBtn').disabled=false;}catch(error){$('loadState').textContent='3D konnte nicht starten. Verwende einen Browser mit WebGL 2 (Safari, Chrome oder Firefox).';console.error(error);}
 let radio=null,klang=null,letzteFahrt=0;
-function initAudio(){try{audio=new (window.AudioContext||window.webkitAudioContext)();engine=audio.createOscillator();engine.type='sawtooth';engineGain=audio.createGain();engineGain.gain.value=0;engine.connect(engineGain).connect(audio.destination);engine.start();
+// Der Motor lag hier als einzelner Sägezahn, dessen Frequenz linear mit dem
+// Tempo stieg. Er steckt jetzt in Klang.motor() — mit Gängen, Last und einer
+// Modulation für Rotor und Bootsschraube.
+function initAudio(){try{audio=new (window.AudioContext||window.webkitAudioContext)();
  // Radio erst nach der Nutzergeste: vorher gibt es keinen Audiokontext.
  radio=new Radio(audio);radio.waehle(1);
  klang=new Klang(audio);
@@ -414,7 +417,7 @@ function updateHUD(){const p=sim.player;$('clock').textContent=String(Math.floor
 function messwerte(dt){debug.frames++;debug.fenster++;debug.zeit+=dt;if(debug.zeit>=.5){debug.fps=debug.fenster/debug.zeit;debug.fenster=0;debug.zeit=0;}if(!debug.sichtbar||!world)return;const info=world.renderer.info;
  $('debug').textContent=['FPS          '+debug.fps.toFixed(0),'Draw Calls   '+info.render.calls,'Dreiecke     '+info.render.triangles.toLocaleString('de-DE'),'Geometrien   '+info.memory.geometries,'Texturen     '+info.memory.textures,'NPCs         '+sim.npcs.length,'Fahrzeuge    '+sim.cars.length,'Polizei aktiv '+sim.cops.filter(c=>c.active).length,'Uhrzeit      '+sim.hour.toFixed(2),'Wetter       '+sim.weather,'Position     '+Math.round(sim.player.x)+' / '+Math.round(sim.player.z)].join('\n');}
 function frame(ms){const dt=Math.min(.05,(ms-last)/1000||.016);last=ms;messwerte(dt);if(world){if(started&&!sim.paused){if(keys.has('arrowleft'))yaw+=dt*1.8;if(keys.has('arrowright'))yaw-=dt*1.8;const forward=(keys.has('w')||keys.has('arrowup')?1:0)-(keys.has('s')||keys.has('arrowdown')?1:0)-stick.y,turn=(keys.has('d')?1:0)-(keys.has('a')?1:0)+stick.x;sim.tick(dt,{forward:clamp(forward,-1,1),turn:clamp(turn,-1,1),yaw,sprint:keys.has('shift'),sneak:keys.has('c'),brake:keys.has(' '),jump:keys.has(' '),interact:keys.has('e')});if(sim.player.car&&!drag)yaw+=Math.atan2(Math.sin(sim.player.yaw-yaw),Math.cos(sim.player.yaw-yaw))*Math.min(1,dt*3);if(keys.has('fire'))fire();if(radio)radio.lautstaerke(!muted&&sim.player.car&&sim.player.car.health>0?.6:0);
-     if(engineGain){engineGain.gain.setTargetAtTime(!muted&&sim.player.car?.health>0?.017:0,audio.currentTime,.1);engine.frequency.setTargetAtTime((vehicleTypes[sim.player.car?.model]?.sound||45)+Math.abs(sim.player.car?.speed||0)*3,audio.currentTime,.1);}}else{if(engineGain)engineGain.gain.setTargetAtTime(0,audio.currentTime,.1);if(radio)radio.lautstaerke(0);}
+     if(klang){const c=sim.player.car;klang.motor(dt,c&&c.health>0?vehicleTypes[c.model]:null,c?.speed||0,forward);}}else{klang?.motor(dt,null,0,0);if(radio)radio.lautstaerke(0);}
   // Klang. Alles, was das Modul braucht, steht schon im Zustand: Wetter,
   // Tempo, Wasser, Fahndung. Der Aufprall wird hier erkannt und nicht in der
   // Simulation — ein Einbruch der Fahrgeschwindigkeit um mehr als vier Meter

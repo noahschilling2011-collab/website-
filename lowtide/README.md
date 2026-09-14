@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 268 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 273 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1318,6 +1318,54 @@ wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
 besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
+
+## Ein Sägezahn für Lastwagen, Boot und Hubschrauber
+
+Der Motor war eine Zeile: Frequenz gleich Grundton des Typs plus Tempo mal
+drei, Lautstärke fest auf 0,017. Die Fahrzeugtabelle hat für jeden der
+fünfzehn Typen einen eigenen Grundton zwischen 18 und 110 Hz — das ist echt
+und war schon da. Alles andere war es nicht: die Tonhöhe stieg linear und
+unbegrenzt, es gab keine Gänge, keine Last und keinen Unterschied zwischen
+einem Neunziger-Tonner, einem Boot und einem Hubschrauber.
+
+Jetzt drei Teile: ein Sägezahn für den Ton, eine Dreieckwelle eine Oktave
+tiefer für den Körper, und eine Amplitudenmodulation für die Medien, die eine
+haben. An Land fünf Gänge — die Tonhöhe steigt im Gang und fällt beim
+Wechsel, und jeder Gang ist sieben Prozent länger übersetzt.
+
+| Fahrzeug | Tonhöhe von … bis | Abwärtssprünge |
+|---|---|---|
+| Kestrel S (Limousine) | 29,8 → 86,0 Hz | **4** |
+| Vesper R (Sportwagen) | 62,0 → 179,2 Hz | **4** |
+| Atlas Hauler (Lastwagen) | 14,9 → 43,0 Hz | **4** |
+| Skimmer (Boot) | 38,5 → 117,6 Hz | 0 |
+| Osprey H2 (Hubschrauber) | 12,6 → 39,6 Hz | 0 |
+| Cormorant (Flugzeug) | 26,6 → 81,2 Hz | 0 |
+
+Vier Abwärtssprünge sind fünf Gänge. Auf dem Wasser und in der Luft gibt es
+keine, dafür einen Schlag auf der Amplitude: Tiefe 0 beim Wagen, 0,30 beim
+Boot, 0,55 beim Hubschrauber, dessen Rotor mit der Drehzahl von elf auf zwanzig
+Schläge je Sekunde geht. Und wer Gas gibt, ist lauter als wer rollt.
+
+**Zwei Fehler dabei, beide gefangen.**
+
+Der Modulationsoszillator hieß im ersten Anlauf `this.schlag` — genau wie die
+Methode `schlag()`, die den dumpfen Teil eines Aufpralls erzeugt. Eine
+gleichnamige Eigenschaft verdeckt sie, und `aufprall()` wäre mit einem
+TypeError ausgestiegen, sobald zum ersten Mal ein Motor lief. Aufgefallen beim
+Durchlesen des eigenen Diffs, nicht beim Testen; eine Prüfung hält es jetzt
+fest.
+
+Die zweite ist lehrreicher. „Gas geben ist lauter als rollen" meldete **0,0025
+mit Gas gegen 0,0114 ohne** — genau verkehrt. Der Grund war nicht der Motor,
+sondern die Prüfung: sie setzte einen Zustand, wartete 420 Millisekunden und
+las dann den Reglerwert. In diesen 420 Millisekunden schreibt die laufende
+Spielschleife dreißigmal ihren eigenen Sollwert hinein. Gemessen wurde also
+der Wagen des Spielers und nicht der eigene Befehl. `Klang.motor()` merkt sich
+jetzt den zuletzt befohlenen Pegel, und die Prüfung liest ihn im selben
+synchronen Block.
+
+273 Prüfungen bestanden, keine gefallen.
 
 ## Die ganze Stadt hatte zwei Geräusche
 
