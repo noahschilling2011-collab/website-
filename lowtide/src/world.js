@@ -18,6 +18,25 @@ const cube=new T.BoxGeometry(1,1,1);
 const mats=new Map();
 // Alle leuchtenden Materialien an einer Stelle, damit die Nacht sie zentral schalten kann.
 export const leuchtMaterialien=[];
+// Gruppiert wurde nach Farbe, Leuchten und Hundertmeterkachel. Bei 662
+// verschiedenen Materialien ergab das 4162 Instanzennetze für 68.439
+// Bauteile — Median drei Instanzen je Netz, 991 Netze mit genau einer.
+// Gemessen kosteten sie 3221 von 3606 Zeichenaufrufen im Nationalpark.
+//
+// Die Farbe steckt jetzt in der Instanz statt im Material: ein Netz je
+// Kachel für alles, was nicht leuchtet. Leuchtende Teile bleiben nach Farbe
+// getrennt, weil die Emissionsfarbe nicht je Instanz gesetzt werden kann.
+// Die räumliche Auflösung bleibt dieselbe, also auch das Ausblenden nach
+// Entfernung.
+//
+// Und einige Farben brauchen weiterhin ein eigenes Material, weil die
+// abgeleitete Klasse sie an der Materialfarbe wiedererkennt: Asphalt bekommt
+// eine Textur und wird bei Regen glatt und dunkel, Fensterglas wird metallisch
+// und spiegelt. Im ersten Anlauf fielen beide aus — die Suche nach
+// `material.color.getHex()` fand nur noch Weiß —, und das Bild wich in der
+// Innenstadt im Mittel um 16,8 Helligkeitsstufen je Kanal ab, am stärksten im
+// Nahbereich. Die Liste steht in eigeneFarben und wird von der abgeleiteten
+// Klasse gesetzt.
 function mat(color,emissive=false){const key=color+':'+emissive;if(!mats.has(key)){const m=new T.MeshStandardMaterial({color,roughness:.78,metalness:.08,emissive:emissive?color:0,emissiveIntensity:emissive?.9:0});
  // Leuchtflächen bleiben glatt — ein Fenster, das von innen leuchtet, hat
  // keine Körnung. Alles andere bekommt Struktur aus der Weltposition.
@@ -46,7 +65,7 @@ export class World{
  // strassenbau merkt sich, ob dieser Aufruf zur Straße selbst gehört —
  // Decke, Damm, Leitplanke, Markierung. Alles andere wird beim Zusammenbau
  // verworfen, wenn es klein ist und auf einer Fahrbahn steht.
- box(x,y,z,w,h,d,color=0x999999,rot=0,emissive=false,nx=0,nz=0){const key=color+':'+emissive+':'+Math.floor(x/100)+':'+Math.floor(z/100);let g=this.groups.get(key);if(!g){g={material:mat(color,emissive),items:[]};this.groups.set(key,g);}g.items.push({x,y,z,w,h,d,rot,nx,nz,strasse:!!this.strassenbau});}
+ box(x,y,z,w,h,d,color=0x999999,rot=0,emissive=false,nx=0,nz=0){const kachel=Math.floor(x/100)+':'+Math.floor(z/100);const eigen=emissive||this.eigeneFarben?.has(color);const key=eigen?(color+':L:'+kachel):('F:'+kachel);let g=this.groups.get(key);if(!g){g={material:eigen?mat(color,emissive):mat(0xffffff,false),farbig:!eigen,items:[]};this.groups.set(key,g);}g.items.push({x,y,z,w,h,d,rot,nx,nz,color,strasse:!!this.strassenbau});}
  // Kulisse auf der Fahrbahn. Gemessen standen 268 Gegenstände mitten auf
  // einer Fahrspur: Pflanzkübel aus einer Schleife mit festen Koordinaten aus
  // der alten, halb so großen Karte, Papierkörbe und Parkuhren aus street.js,
@@ -70,7 +89,9 @@ export class World{
   if(a.y-a.h/2>boden+2.2)return false;   // hängt darüber, etwa ein Ausleger
   return a.y+a.h/2>=boden+.35;
  }
- flush(){const o=new T.Object3D();this.verworfen=(this.verworfen||0);for(const g of this.groups.values()){g.items=g.items.filter(a=>{if(!this.aufDerFahrbahn(a))return true;this.verworfen++;return false;});if(!g.items.length)continue;const mesh=new T.InstancedMesh(cube,g.material,g.items.length);for(let i=0;i<g.items.length;i++){const a=g.items[i];o.position.set(a.x,a.y,a.z);o.scale.set(a.w,a.h,a.d);o.rotation.set(a.nx||0,a.rot,a.nz||0);o.updateMatrix();mesh.setMatrixAt(i,o.matrix);}mesh.castShadow=true;mesh.receiveShadow=true;mesh.computeBoundingSphere();this.scene.add(mesh);(this.bloecke||=[]).push(mesh);}this.groups.clear();}
+ flush(){const o=new T.Object3D();this.verworfen=(this.verworfen||0);for(const g of this.groups.values()){g.items=g.items.filter(a=>{if(!this.aufDerFahrbahn(a))return true;this.verworfen++;return false;});if(!g.items.length)continue;const mesh=new T.InstancedMesh(cube,g.material,g.items.length);if(g.farbig){const farbe=new T.Color();for(let i=0;i<g.items.length;i++)mesh.setColorAt(i,farbe.setHex(g.items[i].color));// Die Farben zusätzlich als Zahlen ablegen: die Prüfwerkzeuge haben sie
+     // bisher am Material abgelesen, und das ist jetzt für alle dasselbe.
+     mesh.userData.farben=g.items.map(a=>a.color);}for(let i=0;i<g.items.length;i++){const a=g.items[i];o.position.set(a.x,a.y,a.z);o.scale.set(a.w,a.h,a.d);o.rotation.set(a.nx||0,a.rot,a.nz||0);o.updateMatrix();mesh.setMatrixAt(i,o.matrix);}mesh.castShadow=true;mesh.receiveShadow=true;mesh.computeBoundingSphere();this.scene.add(mesh);(this.bloecke||=[]).push(mesh);}this.groups.clear();}
  dynbox(g,x,y,z,w,h,d,color){const m=new T.Mesh(cube,mat(color));m.position.set(x,y,z);m.scale.set(w,h,d);m.castShadow=true;m.receiveShadow=true;g.add(m);return m;}
  // Beschriftung ohne Trägerplatte. Vorher standen hier 13-19 m breite,
  // undurchsichtige Tafeln quer in der Stadt, von hinten spiegelverkehrt.

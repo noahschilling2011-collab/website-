@@ -20,6 +20,7 @@ const STRASSEN_HEX=[0x333d45,0x3d494f,0x445155];
 const GLAS_HEX=[0x3c5a69,0x486673,0x51737b,0x2c4d52];
 const material=c=>new T.MeshStandardMaterial({color:c,roughness:.7});
 export class ExpandedWorld extends World{
+
  constructor(canvas,sim){super(canvas,sim);const asphalt=asphaltTexture();
   this.strassenMaterialien=[];this.nassheit=0;
   this.scene.traverse(o=>{if(!o.isInstancedMesh||!o.material?.color)return;const hex=o.material.color.getHex();
@@ -553,3 +554,10 @@ export class ExpandedWorld extends World{
   if(!this.placeMarkers){this.placeMarkers=[];for(const l of Object.values(locations)){const m=new T.Mesh(new T.OctahedronGeometry(.35),new T.MeshBasicMaterial({color:0x8bd4c1}));m.position.set(l.x,groundAt(l.x,l.z)+2.6,l.z);this.scene.add(m);this.placeMarkers.push(m);}}for(const m of this.placeMarkers){m.visible=Math.hypot(m.position.x-p.x,m.position.z-p.z)<65;m.rotation.y=t;}
  }
 }
+
+// box() wird aus dem Konstruktor der Basisklasse gerufen, also bevor ein
+// Klassenfeld gesetzt wäre — Felder laufen erst nach super(). Deshalb hängt
+// die Liste am Prototyp. Der erste Anlauf als Klassenfeld hatte keine
+// Wirkung: dieselben 415 Netze, dieselben Zeichenaufrufe, dasselbe falsche
+// Bild.
+ExpandedWorld.prototype.eigeneFarben=new Set([...STRASSEN_HEX,...GLAS_HEX]);

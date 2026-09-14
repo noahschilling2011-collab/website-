@@ -1319,6 +1319,85 @@ besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
 
+## Viertausend Netze für ein Bild
+
+Der Zusammenbau gruppiert Bauteile nach **Farbe, Leuchten und
+Hundertmeterkachel**. Bei 662 verschiedenen Materialien ergibt das 4162
+Instanzennetze für 68.439 Bauteile — **Median drei Instanzen je Netz, 991
+Netze mit genau einer.**
+
+Was das kostet, habe ich zum ersten Mal aufgeschlüsselt, indem ich jede
+Gruppe einzeln ausgeblendet und die Zeichenaufrufe gemessen habe. Im
+Nationalpark, Blick in den Wald:
+
+| | Netze | Zeichenaufrufe | Dreiecke |
+|---|---|---|---|
+| Bauteile (Farbe × Kachel) | 4162 | **3221** | 800.000 |
+| Ferndarstellung | 31 | 52 | 754.000 |
+| Laubwerk | 2 | **3** | 74.500 |
+| Fahrzeuge | 144 | 27 | 612 |
+
+Das Laubwerk, das im PR seit Langem als „kostet 286.000 Dreiecke und wird
+nie verworfen" stand, kostet **drei Zeichenaufrufe**. Der Posten sind die
+Bauteile, und dort liegt er an der Gruppierung, nicht an der Menge.
+
+Die Farbe steckt jetzt in der Instanz statt im Material — ein Netz je Kachel
+für alles, was nicht leuchtet. Die räumliche Auflösung bleibt dieselbe, also
+auch das Ausblenden nach Entfernung.
+
+| | vorher | nachher |
+|---|---|---|
+| Instanzennetze | 4162 | **554** |
+| Aufrufe Innenstadt | 1801 | **859** |
+| Aufrufe Nationalpark | 3194 | **795** |
+| Aufrufe Hafen | 1604 | **800** |
+| Dreiecke Innenstadt | 1.648.764 | 1.912.188 |
+
+Dreiecke plus sechzehn Prozent, Zeichenaufrufe minus 52 bis 75. Der Grund
+für die Dreiecke: ein Netz je Kachel hat eine Hüllkugel über die ganze
+Kachel, die kleineren Netze vorher hatten engere. **Das Bild ist dabei Pixel
+für Pixel dasselbe** — mittlere Abweichung 0,000 an drei Standorten —, die
+zusätzlichen Dreiecke liegen also hinter anderen.
+
+### Zwei Fehlversuche, beide vom Bildvergleich gefunden
+
+**Asphalt und Glas fielen aus.** Die abgeleitete Klasse erkennt beide an der
+Materialfarbe: `STRASSEN_HEX.includes(o.material.color.getHex())` gibt der
+Straße ihre Textur und macht sie bei Regen glatt und dunkel, `GLAS_HEX` macht
+Fenster metallisch. Mit einem geteilten weißen Material fand die Suche nur
+noch Weiß. Der Bildvergleich zeigte **16,8 Helligkeitsstufen Abweichung im
+Nahbereich** und 3,1 am Himmel — das Muster wies auf nahe Flächen, nicht auf
+fehlende Ferne. Diese sieben Farben bleiben jetzt eigene Gruppen.
+
+**Und das Klassenfeld kam zu spät.** Die Liste als `eigeneFarben = new Set(…)`
+ins Klassenfeld zu schreiben, half nicht: Klassenfelder werden erst **nach**
+`super()` gesetzt, und `box()` läuft schon aus dem Konstruktor der
+Basisklasse. Messbar war das daran, dass sich gar nichts änderte — dieselben
+415 Netze, dieselben Aufrufe, dasselbe falsche Bild. Die Liste hängt jetzt am
+Prototyp.
+
+### Und sechs Prüfungen, die am Material ablasen
+
+Die Farbe ist der Schlüssel, an dem die Prüfungen ihre Gegenstände
+wiederfinden: Markierungen an `c4bb97`, der Damm an `5c6350`, Leitplanken an
+`b9bcb4`, Schaufensterbänder an `2c4149`. Alle lasen sie am Material ab und
+fanden nach der Bündelung nichts mehr. Die Bauteile führen ihre Farben jetzt
+zusätzlich als Zahlenliste mit, und die Prüfungen lesen dort nach.
+
+Beim ersten Anlauf habe ich das gebaut und den Prüflauf gestartet, **ohne neu
+zu bauen** — fünfundzwanzig Minuten gegen den alten Stand, fünf Fehler, alle
+unecht.
+
+Offizielle Messung nach der Runde, `tools/messung.mjs` bei 1280×720:
+
+| | vorher | nachher |
+|---|---|---|
+| Kreuzung Downtown, 13 Uhr | 1865 | **874** |
+| Hafen, 13 Uhr | 1671 | **816** |
+| Strand, 13 Uhr | 1329 | **939** |
+
+321 Prüfungen bestanden, keine gefallen.
+
 ## Man lief durch jede Theke
 
 Die acht Innenräume haben Boden, Decke, Licht und Einrichtung: Theken,

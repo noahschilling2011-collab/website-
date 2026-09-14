@@ -14,6 +14,7 @@ page.on('pageerror', e => konsole.push('pageerror: ' + (e.stack || e.message)));
 page.on('console', m => {if (m.type() === 'error') konsole.push('console: ' + m.text());});
 
 let bestanden = 0, gefallen = 0;
+
 const pruefe = (name, ok, zusatz = '') => {
  if (ok) {bestanden++; console.log('  ok      ' + name);}
  else {gefallen++; console.log('  FEHLER  ' + name + (zusatz ? ' — ' + zusatz : ''));}
@@ -1573,11 +1574,18 @@ pruefe('Rosalind hat eine Ladenzeile', await page.evaluate(() => {
 const planken = await page.evaluate(() => {
  const w = window.LOWTIDE.world;
  let hoch = 0, flach = 0;
+ // Die Farbe steckt seit der Bündelung in der Instanz, nicht mehr im
+ // Material: ein Netz je Hundertmeterkachel trägt alle Farben.
+ const farbeVon = (netz, i) => {
+  const f = netz.userData?.farben;
+  if (f) return f[i].toString(16).padStart(6, '0');
+  return netz.material?.color?.getHexString();
+ };
  for (const netz of w.bloecke || []) {
-  const f = netz.material.color?.getHexString();
-  if (f !== 'b9bcb4' && f !== '8b8f88') continue;
   const arr = netz.instanceMatrix.array;
   for (let i = 0; i < netz.count; i++) {
+   const f = farbeVon(netz, i);
+   if (f !== 'b9bcb4' && f !== '8b8f88') continue;
    const y = arr[i * 16 + 13];
    if (y > 20) hoch++; else if (y < 3) flach++;
   }
@@ -2042,10 +2050,17 @@ pruefe('Die Brüstung bleibt unter Kamerahöhe',
 // (0x2c4149) an den Instanzmatrizen, nicht am Bild.
 const zeilen = await page.evaluate(() => {
  const L = window.LOWTIDE, w = L.world, s = L.sim, bands = [];
+ const farbeVon = (netz, i) => {
+  const f = netz.userData?.farben;
+  if (f) return f[i].toString(16).padStart(6, '0');
+  return netz.material?.color?.getHexString();
+ };
  for (const im of w.bloecke) {
-  if (im.material?.color?.getHexString() !== '2c4149') continue;
   const a = im.instanceMatrix.array;
-  for (let i = 0; i < im.count; i++) bands.push({x: a[i * 16 + 12], z: a[i * 16 + 14]});
+  for (let i = 0; i < im.count; i++) {
+   if (farbeVon(im, i) !== '2c4149') continue;
+   bands.push({x: a[i * 16 + 12], z: a[i * 16 + 14]});
+  }
  }
  const H = [...s.buildings, ...s.worldBuildings].filter(b => b.kind !== 'house');
  // Freiraum: wie weit kommt man senkrecht von der Wand weg, bevor ein anderes
@@ -2838,10 +2853,15 @@ const marken = await page.evaluate(() => {
  const L = window.LOWTIDE, w = L.world, U = L.ueberwege, onRoad = L.onRoad, s = L.sim;
  const leer = {forward: 0, turn: 0, yaw: 0, sprint: false, sneak: false, brake: false, jump: false, interact: false};
  const treffer = [];
+  const farbeVon = (netz, i) => {
+   const f = netz.userData?.farben;
+   if (f) return f[i].toString(16).padStart(6, '0');
+   return netz.material?.color?.getHexString();
+  };
  for (const netz of w.bloecke || []) {
-  if (netz.material?.color?.getHexString() !== 'c4bb97') continue;
   const m = netz.instanceMatrix.array;
   for (let i = 0; i < netz.count; i++) {
+   if (farbeVon(netz, i) !== 'c4bb97') continue;
    const o = i * 16;
    treffer.push({x: m[o + 12], z: m[o + 14],
     sx: Math.hypot(m[o], m[o + 1], m[o + 2]), sz: Math.hypot(m[o + 8], m[o + 9], m[o + 10])});
@@ -2920,10 +2940,17 @@ const marken = await page.evaluate(() => {
 const damm = await page.evaluate(() => {
  const L = window.LOWTIDE, w = L.world;
  let anzahl = 0, schwebend = 0, groessterSpalt = 0, wo = null;
+ // Die Farbe steckt seit der Bündelung in der Instanz, nicht mehr im
+ // Material: ein Netz je Hundertmeterkachel trägt alle Farben.
+ const farbeVon = (netz, i) => {
+  const f = netz.userData?.farben;
+  if (f) return f[i].toString(16).padStart(6, '0');
+  return netz.material?.color?.getHexString();
+ };
  for (const netz of w.bloecke || []) {
-  if (netz.material?.color?.getHexString() !== '5c6350') continue;
   const a = netz.instanceMatrix.array;
   for (let i = 0; i < netz.count; i++) {
+   if (farbeVon(netz, i) !== '5c6350') continue;
    const o = i * 16, x = a[o + 12], y = a[o + 13], z = a[o + 14];
    const sx = Math.hypot(a[o], a[o + 1], a[o + 2]);
    const sy = Math.hypot(a[o + 4], a[o + 5], a[o + 6]);
