@@ -1,7 +1,7 @@
 import * as T from './vendor/three.module.js';
 import {wolkenAufsetzen,detailAufsetzen} from './detail.js';
-import {World} from './world.js';
-import {naturalHuman,animateNaturalHuman} from './human-model.js';
+import {World,MODELLHOEHE} from './world.js';
+import {naturalHuman,animateNaturalHuman,sitzVersatz} from './human-model.js';
 import {detailedHuman,detailedCar,asphaltTexture} from './art-direction.js';
 import {locations,vehicleTypes,roadSegments,groundAt,waterAt,bounds,immobilien} from './content.js';
 import {distance} from './simulation.js';
@@ -429,7 +429,7 @@ export class ExpandedWorld extends World{
    }
   }
   this.gun.scale.z=p.weapon==='rifle'?2.4:p.weapon==='shotgun'?2.1:1;this.gun.scale.x=p.weapon==='taser'?1.3:1;this.player.position.y=groundAt(p.x,p.z)+(p.y||0)-(p.sneak?.35:0)+(this.player.userData.bob||0);
-  this.player.rotation.x=this.player.userData.vorlage||0;this.player.scale.set(1,s.active===1?.96:1,1);this.player.rotation.z=s.dodgeTime>0?.65:(this.player.userData.neigung||0);this.player.userData.arms[0].rotation.x=s.meleeTime>0?-1.5:this.player.userData.arms[0].rotation.x;this.player.userData.hair.scale.y=p.hair===1?1.35:p.hair===2?.4:1.08;this.player.userData.tattoo.visible=p.tattoo;for(const part of this.player.userData.garments||[])part.material=this.player.userData.body.material;this.player.userData.body.material.color.setHex(p.clothes==='orange'?0xe2a062:p.clothes==='blue'?0x557da3:0x6b8b70);
+  this.player.rotation.x=this.player.userData.vorlage||0;this.player.scale.setScalar((s.active===1?1.68:1.80)/MODELLHOEHE);/* Vorher stand hier scale.set(1,.96,1) für Mara: kein kleinerer Mensch, sondern derselbe Mensch um vier Prozent zusammengedrückt. */this.player.rotation.z=s.dodgeTime>0?.65:(this.player.userData.neigung||0);this.player.userData.arms[0].rotation.x=s.meleeTime>0?-1.5:this.player.userData.arms[0].rotation.x;this.player.userData.hair.scale.y=p.hair===1?1.35:p.hair===2?.4:1.08;this.player.userData.tattoo.visible=p.tattoo;for(const part of this.player.userData.garments||[])part.material=this.player.userData.body.material;this.player.userData.body.material.color.setHex(p.clothes==='orange'?0xe2a062:p.clothes==='blue'?0x557da3:0x6b8b70);
   this.autoFern.beginn();
   s.cars.forEach((c,i)=>{const m=this.cars[i],d=vehicleTypes[c.model];if(!m)return;
    const weg=distance(c,p),grob=weg>52&&['car','pickup'].includes(d.shape)&&c!==p.car;
@@ -465,15 +465,20 @@ export class ExpandedWorld extends World{
    // Am Strand mit dreißig Leuten in Sichtweite kostete das über
    // vierhundert Draw Calls.
    const nah=weg<34;m.visible=nah&&weg<150;
-   if(!nah&&weg<165&&n.health>0&&n.stun<=0)this.figurFern.hinzu(n.x,groundAt(n.x,n.z),n.z,n.yaw);
+   // Die Ferndarstellung bekommt dieselbe Körpergröße, sonst wächst oder
+   // schrumpft jede Figur beim Umschalten auf 34 m.
+   if(!nah&&weg<165&&n.health>0&&n.stun<=0)this.figurFern.hinzu(n.x,groundAt(n.x,n.z),n.z,n.yaw,m.userData.groesse||1);
    if(!nah)return;
-   m.position.y=groundAt(n.x,n.z)+(n.health<=0||n.stun>0?.2:(m.userData.bob||0));
+   // Diese Zeile überschrieb die Sitzhöhe aus der Basisklasse: wer auf einer
+   // Bank saß, saß in Wahrheit auf dem Boden davor, mit waagerechten
+   // Oberschenkeln in der Luft. Sichtbar auf jeder Bank der Karte.
+   m.position.y=groundAt(n.x,n.z)+(n.health<=0||n.stun>0?.2:n.state==='sitzend'?sitzVersatz(m,n.sitzplatz?.y??.42):(m.userData.bob||0));
   if(n.health>0&&n.stun<=0){m.rotation.z=m.userData.neigung||0;m.rotation.x=m.userData.vorlage||0;}if(n.stun>0)m.rotation.x=Math.PI/2;if(n.state==='tanzend'){m.rotation.z=Math.sin(t*5)*.1;m.userData.arms.forEach((a,i)=>a.rotation.x=-1+Math.sin(t*5+i)*.6);}});
   this.figurFern.ende();s.cops.forEach((c,i)=>{const m=this.cops[i];const weg=distance(c,p);if(weg<=52)m.visible=weg<230;m.position.y=groundAt(c.x,c.z);});
   const other=s.characters[1-s.active];this.contact.position.set(other.x,groundAt(other.x,other.z),other.z);if(s.mission===3&&s.campaign.stage===0)this.contact.position.set(-77,0,73);this.contact.visible=!other.car&&distance(other,p)<150;
   const goal=s.objective();this.marker.visible=s.mission<4||s.campaign.stage>0&&s.campaign.stage<4||!!s.activity;this.ring.visible=this.marker.visible;this.marker.position.set(goal.x,groundAt(goal.x,goal.z)+4+Math.sin(t*2)*.3,goal.z);this.ring.position.set(goal.x,groundAt(goal.x,goal.z)+.12,goal.z);
   if(!this.chute){this.chute=new T.Mesh(new T.SphereGeometry(2.8,16,8,0,Math.PI*2,0,Math.PI/2),new T.MeshStandardMaterial({color:0xd3b96f,side:T.DoubleSide}));this.scene.add(this.chute);}this.chute.visible=p.parachute;this.chute.position.set(p.x,this.player.position.y+4,p.z);
-  if(s.witness){if(!this.witness){this.witness=this.human(0x879b83,0x303e4c);this.scene.add(this.witness);}this.witness.visible=s.campaign.stage===2&&!p.car;this.witness.position.set(s.witness.x,groundAt(s.witness.x,s.witness.z),s.witness.z);this.animateHuman(this.witness,t,1,false);}
+  if(s.witness){if(!this.witness){this.witness=this.human(0x879b83,0x303e4c);this.witness.scale.setScalar(1.74/MODELLHOEHE);this.scene.add(this.witness);}this.witness.visible=s.campaign.stage===2&&!p.car;this.witness.position.set(s.witness.x,groundAt(s.witness.x,s.witness.z),s.witness.z);this.animateHuman(this.witness,t,1,false);}
   const c=locations.court;this.ball.position.set(c.x+.8,.6+Math.abs(Math.sin(t*4))*.8,c.z);if(s.activity?.kind==='basketball')this.ball.position.set(c.x,1+Math.sin(s.activity.phase*Math.PI)*5,c.z-s.activity.phase*11);
   this.street?.update(t,this.sky.lampen??0);
   this.updateFahrlicht(this.sky.lampen??0);

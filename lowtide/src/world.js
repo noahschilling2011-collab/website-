@@ -5,7 +5,7 @@ import {Sky} from './sky.js';
 import {createWater,updateWater} from './water.js';
 import {Nachbearbeitung} from './post.js';
 import {detailAufsetzen,wolkenAufsetzen,NAESSE,WOLKEN_VERSATZ,WOLKEN_STAERKE,WOLKEN_SONNE} from './detail.js';
-import {setzeSitzhaltung} from './human-model.js';
+import {setzeSitzhaltung,sitzVersatz} from './human-model.js';
 const MONDLICHT=new T.Color(0x9db6d8),NEUTRAL=new T.Color(0xfff4e4);
 const sstep=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t);};
 // Fünf Hemdfarben über eine Hose waren als Menge erkennbar: dieselben fünf
@@ -23,8 +23,20 @@ function mat(color,emissive=false){const key=color+':'+emissive;if(!mats.has(key
  // keine Körnung. Alles andere bekommt Struktur aus der Weltposition.
  if(!emissive)detailAufsetzen(m);
  mats.set(key,m);if(emissive)leuchtMaterialien.push(m);}return mats.get(key);}
+// Das Modell ist von der Sohle bis zur Haarspitze 1,886 m hoch. Jede der 530
+// Figuren war exakt so groß — eine Stadt aus Basketballspielern. Hemd- und
+// Hosenfarbe streuen über zwölf und sieben Werte, die Körpergröße über
+// keinen. Zwei gemittelte Streuwerte ergeben eine Glockenkurve statt einer
+// Gleichverteilung: der Schwerpunkt liegt bei 1,72 m, die Enden bei 1,53 und
+// 1,91 m bleiben selten. Der Wert hängt nur am Index, ist also über
+// Speicherstände und Prüfläufe hinweg derselbe.
+export const MODELLHOEHE=1.886;
+function koerpergroesse(i){
+ const streu=k=>{const v=Math.sin((i+1)*k)*43758.5453;return v-Math.floor(v);};
+ return 1.72/MODELLHOEHE+(streu(12.9898)+streu(78.233)-1)*.10;
+}
 export class World{
- constructor(canvas,sim){this.sim=sim;this.scene=new T.Scene();this.scene.fog=new T.FogExp2(0xc6a7a0,.0038);this.renderer=new T.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=T.PCFShadowMap;this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.2;this.sky=new Sky(this.renderer);this.scene.add(this.sky.mesh);this.sonnenRichtung=new T.Vector3();this.blitz=0;this.camera=new T.PerspectiveCamera(58,innerWidth/innerHeight,.45,650);this.camera.position.set(-14,12,98);this.camera.lookAt(-40,3,15);this.groups=new Map();this.rng=random(78);this.hemi=new T.HemisphereLight(0xc4dceb,0x51443e,2.1);this.scene.add(this.hemi);this.sun=new T.DirectionalLight(0xffc995,3);this.sun.position.set(-80,110,20);this.sun.castShadow=true;Object.assign(this.sun.shadow.camera,{left:-130,right:130,top:130,bottom:-130,near:1,far:1500});this.sun.shadow.mapSize.set(2048,2048);this.sun.shadow.bias=-.0006;this.sun.shadow.normalBias=.035;this.scene.add(this.sun);this.scene.add(this.sun.target);this.build();this.flush();this.player=this.human(0xe2a062,0x253442);this.scene.add(this.player);this.npcs=sim.npcs.map((n,i)=>{const m=this.human(HEMDEN[i%HEMDEN.length],HOSEN[(i*3+i%7)%HOSEN.length],false);this.scene.add(m);return m;});this.cars=sim.cars.map(c=>{const m=this.car(c.color,false,c);this.scene.add(m);return m;});this.cops=sim.cops.map(()=>{const m=this.car(0xe4e7df,true);this.scene.add(m);return m;});this.contact=this.human(0xd4d2c9,0x242e3c);this.contact.position.set(places.mara.x,0,places.mara.z);this.scene.add(this.contact);this.guard=this.human(0x425164,0x26303c);this.guard.position.set(-73,0,-52);this.scene.add(this.guard);this.marker=new T.Mesh(new T.OctahedronGeometry(.7),new T.MeshBasicMaterial({color:0xeccb80}));this.scene.add(this.marker);this.ring=new T.Mesh(new T.RingGeometry(1.8,2,40),new T.MeshBasicMaterial({color:0xeccb80,side:T.DoubleSide,transparent:true,opacity:.75}));this.ring.rotation.x=-Math.PI/2;this.scene.add(this.ring);this.bulletMeshes=[];this.setupRain();
+ constructor(canvas,sim){this.sim=sim;this.scene=new T.Scene();this.scene.fog=new T.FogExp2(0xc6a7a0,.0038);this.renderer=new T.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=T.PCFShadowMap;this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.2;this.sky=new Sky(this.renderer);this.scene.add(this.sky.mesh);this.sonnenRichtung=new T.Vector3();this.blitz=0;this.camera=new T.PerspectiveCamera(58,innerWidth/innerHeight,.45,650);this.camera.position.set(-14,12,98);this.camera.lookAt(-40,3,15);this.groups=new Map();this.rng=random(78);this.hemi=new T.HemisphereLight(0xc4dceb,0x51443e,2.1);this.scene.add(this.hemi);this.sun=new T.DirectionalLight(0xffc995,3);this.sun.position.set(-80,110,20);this.sun.castShadow=true;Object.assign(this.sun.shadow.camera,{left:-130,right:130,top:130,bottom:-130,near:1,far:1500});this.sun.shadow.mapSize.set(2048,2048);this.sun.shadow.bias=-.0006;this.sun.shadow.normalBias=.035;this.scene.add(this.sun);this.scene.add(this.sun.target);this.build();this.flush();this.player=this.human(0xe2a062,0x253442);this.scene.add(this.player);this.npcs=sim.npcs.map((n,i)=>{const m=this.human(HEMDEN[i%HEMDEN.length],HOSEN[(i*3+i%7)%HOSEN.length],false);m.scale.setScalar(m.userData.groesse=koerpergroesse(i));this.scene.add(m);return m;});this.cars=sim.cars.map(c=>{const m=this.car(c.color,false,c);this.scene.add(m);return m;});this.cops=sim.cops.map(()=>{const m=this.car(0xe4e7df,true);this.scene.add(m);return m;});this.contact=this.human(0xd4d2c9,0x242e3c);this.contact.scale.setScalar(1.68/MODELLHOEHE);this.contact.position.set(places.mara.x,0,places.mara.z);this.scene.add(this.contact);this.guard=this.human(0x425164,0x26303c);this.guard.scale.setScalar(1.86/MODELLHOEHE);this.guard.position.set(-73,0,-52);this.scene.add(this.guard);this.marker=new T.Mesh(new T.OctahedronGeometry(.7),new T.MeshBasicMaterial({color:0xeccb80}));this.scene.add(this.marker);this.ring=new T.Mesh(new T.RingGeometry(1.8,2,40),new T.MeshBasicMaterial({color:0xeccb80,side:T.DoubleSide,transparent:true,opacity:.75}));this.ring.rotation.x=-Math.PI/2;this.scene.add(this.ring);this.bulletMeshes=[];this.setupRain();
   // Nachbearbeitung: Überstrahlen, Farbkurve, Randabdunklung, Korn. Ab hier
   // tonwertet die letzte Stufe, nicht mehr der Renderer.
   this.post=new Nachbearbeitung(this.renderer);
@@ -131,13 +143,16 @@ export class World{
   this.rainTropfen=tropfen;this.rainHoehe=30;this.scene.add(this.rain);}
  resize(){this.renderer.setSize(innerWidth,innerHeight);this.camera.aspect=innerWidth/innerHeight;this.camera.updateProjectionMatrix();this.post?.groesse(innerWidth,innerHeight);}
  update(dt,camYaw,camPitch,playing){const s=this.sim,p=s.player,t=s.time;const himmelJetzt=this.applySky(dt);updateWater(this.waterUniforms,himmelJetzt,t,this.camera);updateWater(this.marshUniforms,himmelJetzt,t,this.camera);updateWater(this.seeUniforms,himmelJetzt,t,this.camera);this.rain.visible=s.weather==='rain'||s.weather==='storm';this.rain.material.opacity=s.weather==='storm'?.6:.42;this.rain.geometry.setDrawRange(0,(s.weather==='storm'?this.rainTropfen:Math.round(this.rainTropfen*.66))*2);if(this.rain.visible){this.rain.position.set(p.x,0,p.z);const a=this.rain.geometry.attributes.position,fall=dt*(s.weather==='storm'?36:26),h=this.rainHoehe;for(let i=0;i<a.count;i++)a.setY(i,(a.getY(i)-fall+h)%h);a.needsUpdate=true;}
+  // Eli ist 1,80 m, Mara 1,68 m. Ohne diese Zeile wechselte beim
+  // Figurenwechsel nur die Jackenfarbe.
+  this.player.scale.setScalar((s.active===1?1.68:1.80)/MODELLHOEHE);
   this.player.position.set(p.x,p.sneak?-.35:0,p.z);this.player.rotation.y=p.yaw;this.player.visible=!p.car;this.gun.visible=p.armed;this.player.userData.body.material=mat(p.clothes==='orange'?0xe2a062:0x557da3);this.animateHuman(this.player,t,(s.paused?0:distance2(this.prev,p)>0.001?1:0),p.armed);this.prev={x:p.x,z:p.z};s.npcs.forEach((n,i)=>{const m=this.npcs[i];
    // Wer sitzt, steht tiefer und bekommt eine eigene Haltung statt des
    // Schrittzyklus. Ohne die Absenkung schwebte die Figur über der Bank.
    const sitzt=n.state==='sitzend';
-   m.position.set(n.x,n.health<=0?.25:sitzt?(n.sitzplatz?.y??.42)-.36:0,n.z);
+   m.position.set(n.x,n.health<=0?.25:sitzt?sitzVersatz(m,n.sitzplatz?.y??.42):0,n.z);
    m.rotation.set(n.health<=0?Math.PI/2:0,n.yaw,0);
-   if(sitzt)setzeSitzhaltung(m,true);
+   if(sitzt)setzeSitzhaltung(m,true,n.sitzplatz?.y??.42);
    else{setzeSitzhaltung(m,false);this.animateHuman(m,t+n.id,n.state==='normal'?1:n.state==='flüchtend'?2:0,n.state==='filmend');}
   });s.cars.forEach((c,i)=>{const m=this.cars[i];m.position.set(c.x,0,c.z);m.rotation.y=c.yaw;m.userData.body.scale.y=.55*(.65+.35*c.health/100);m.userData.body.rotation.z=c.health<40?.05:0;});s.cops.forEach((c,i)=>{const m=this.cops[i];m.position.set(c.x,0,c.z);m.rotation.y=c.yaw;for(let j=0;j<2;j++)m.userData.lights[j].visible=c.active&&(Math.floor(t*8)+j)%2===0;});this.contact.position.set(s.mission>=3?places.safe.x:places.mara.x,0,s.mission>=3?places.safe.z:places.mara.z);this.gateMesh.visible=!s.doorOpen;this.disk.visible=s.mission<3;const goal=s.objective();this.marker.position.set(goal.x,4+Math.sin(t*2)*.3,goal.z);this.marker.rotation.y=t;this.marker.visible=s.mission<4;this.ring.position.set(goal.x,.15,goal.z);this.ring.visible=s.mission<4;
   for(const m of this.bulletMeshes){this.scene.remove(m);m.geometry.dispose();m.material.dispose();}this.bulletMeshes=[];for(const tr of s.tracers){const geo=new T.BufferGeometry().setFromPoints([new T.Vector3(tr.x,1.5,tr.z),new T.Vector3(tr.end.x,1.3,tr.end.z)]);const l=new T.Line(geo,new T.LineBasicMaterial({color:0xffe3a3}));this.scene.add(l);this.bulletMeshes.push(l);}

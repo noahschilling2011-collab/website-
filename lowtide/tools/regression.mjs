@@ -2816,6 +2816,85 @@ pruefe('Tagsüber ist die Stadt woanders als nachts',
  tageslauf.nacht.naeherAmBuero < tageslauf.tag.naeherAmBuero * .4,
  `am Arbeitsplatz: ${tageslauf.tag.naeherAmBuero} um 9 Uhr, ${tageslauf.nacht.naeherAmBuero} um 22 Uhr, von ${tageslauf.tag.von}`);
 
+// Körpergröße und Sitzhöhe. Beide Werte wurden an den Meshes gemessen, nicht
+// an der Simulation: die Sitzprüfungen weiter oben fragen nur den Zustand ab
+// und hätten deshalb nicht gemerkt, dass die abgeleitete Klasse die Sitzhöhe
+// wieder mit `groundAt` überschreibt. Jede Figur saß in Wahrheit auf dem
+// Boden vor der Bank, mit waagerechten Oberschenkeln in der Luft.
+const koerper = await page.evaluate(async () => {
+ const L = window.LOWTIDE, s = L.sim, w = L.world;
+ const leer = {forward: 0, turn: 0, yaw: 0, sprint: false, sneak: false, brake: false, jump: false, interact: false};
+ // Modellhöhe von der Sohle bis zur Haarspitze, aus den Geometrien gerechnet.
+ const spanne = m => {
+  m.updateMatrixWorld(true);
+  let min = 1e9, max = -1e9;
+  m.traverse(o => {
+   if (!o.isMesh || !o.geometry) return;
+   if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+   const bb = o.geometry.boundingBox, e = o.matrixWorld.elements;
+   for (const y of [bb.min.y, bb.max.y]) for (const x of [bb.min.x, bb.max.x]) for (const z of [bb.min.z, bb.max.z]) {
+    const wy = e[1] * x + e[5] * y + e[9] * z + e[13];
+    if (wy < min) min = wy; if (wy > max) max = wy;
+   }
+  });
+  return {unten: min, oben: max};
+ };
+ const groessen = w.npcs.map(m => (m.userData.groesse || 1) * 1.886).sort((a, b) => a - b);
+ const mittel = groessen.reduce((a, b) => a + b, 0) / groessen.length;
+ const aus = {
+  anzahl: groessen.length,
+  verschieden: new Set(groessen.map(g => g.toFixed(3))).size,
+  kleinste: groessen[0], groesste: groessen[groessen.length - 1], mittel,
+  spieler: null, sitz: null, hocker: null
+ };
+ // Der Spieler hängt an der aktiven Figur: Eli 1,80 m, Mara 1,68 m.
+ aus.spieler = (w.player.scale.y * 1.886);
+ const treffer = s.npcs.map((n, i) => ({n, i})).find(o => o.n.state === 'sitzend' && o.n.sitzplatz);
+ if (treffer) {
+  const n = treffer.n, m = w.npcs[treffer.i];
+  // Ohne das Entwaffnen misst diese Prüfung eine stehende Figur: die
+  // Waffentests weiter oben lassen den Spieler bewaffnet zurück, und wer
+  // sitzt, steht auf, sobald jemand mit gezogener Waffe danebensteht.
+  const merk = {x: s.player.x, z: s.player.z, car: s.player.car, armed: s.player.armed};
+  s.player.car = null; s.player.armed = false; s.player.x = n.x + 3; s.player.z = n.z + 3;
+  for (let i = 0; i < 6; i++) s.tick(1 / 60, leer);
+  const f0 = L.frames;
+  await new Promise(r => {const p = () => {L.frames > f0 + 1 ? r() : requestAnimationFrame(p);}; p();});
+  const boden = L.groundAt(n.x, n.z), g = m.userData.groesse || 1;
+  let sp = spanne(m);
+  aus.sitz = {art: n.sitzplatz.art || 'bank', sichtbar: m.visible, zustand: n.state,
+   sitzflaeche: boden + n.sitzplatz.y, becken: m.position.y + .86 * g,
+   sohle: sp.unten, boden, kopf: sp.oben};
+  // Derselbe Platz auf Hockerhöhe: dort dürfen die Beine baumeln.
+  const echt = n.sitzplatz;
+  n.sitzplatz = {...echt, y: 1};
+  const f1 = L.frames;
+  await new Promise(r => {const p = () => {L.frames > f1 + 1 ? r() : requestAnimationFrame(p);}; p();});
+  sp = spanne(m);
+  aus.hocker = {becken: m.position.y + .86 * g, sohle: sp.unten, boden};
+  n.sitzplatz = echt;
+  s.player.x = merk.x; s.player.z = merk.z; s.player.car = merk.car; s.player.armed = merk.armed;
+ }
+ return aus;
+});
+pruefe('Nicht jede Figur ist gleich groß',
+ koerper.verschieden > 100 && koerper.kleinste > 1.45 && koerper.groesste < 1.99,
+ `${koerper.verschieden} Größen unter ${koerper.anzahl} Figuren, ${koerper.kleinste.toFixed(2)}–${koerper.groesste.toFixed(2)} m`);
+pruefe('Die Menge ist im Mittel normal groß',
+ Math.abs(koerper.mittel - 1.72) < .04, `${koerper.mittel.toFixed(3)} m`);
+pruefe('Der Spieler ist so groß wie die aktive Figur',
+ Math.abs(koerper.spieler - 1.80) < .01, `${koerper.spieler.toFixed(2)} m`);
+pruefe('Das Becken liegt auf der Sitzfläche',
+ !!koerper.sitz && Math.abs(koerper.sitz.becken - koerper.sitz.sitzflaeche) < .02,
+ koerper.sitz && `Becken ${koerper.sitz.becken.toFixed(3)}, Sitzfläche ${koerper.sitz.sitzflaeche.toFixed(3)} (${koerper.sitz.art}, ${koerper.sitz.zustand})`);
+pruefe('Auf Bankhöhe stehen die Füße auf dem Boden',
+ !!koerper.sitz && koerper.sitz.sohle - koerper.sitz.boden > -.05 && koerper.sitz.sohle - koerper.sitz.boden < .09,
+ koerper.sitz && `Sohle ${(koerper.sitz.sohle - koerper.sitz.boden).toFixed(3)} über dem Boden`);
+pruefe('Auf Hockerhöhe baumeln die Beine',
+ !!koerper.hocker && koerper.hocker.sohle - koerper.hocker.boden > .3 &&
+ Math.abs(koerper.hocker.becken - koerper.hocker.boden - 1) < .02,
+ koerper.hocker && `Becken ${(koerper.hocker.becken - koerper.hocker.boden).toFixed(3)}, Sohle ${(koerper.hocker.sohle - koerper.hocker.boden).toFixed(3)}`);
+
 // Die Touch-Oberfläche hängt an `@media(pointer:coarse)` und ist auf einem
 // Zeigergerät ausgeblendet. Dafür braucht es einen eigenen Browser mit
 // Berührungsemulation, sonst prüft man nur unsichtbare Knöpfe. Der erste

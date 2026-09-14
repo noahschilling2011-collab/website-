@@ -128,23 +128,44 @@ export function naturalHuman(color,pants,nah=true){
 const SCHRITTZYKLUS=1.95;
 // steigung: Neigung des Bodens unter der Figur im Bogenmaß, aus der
 // Geländehöhe vor und hinter ihr. 0 auf der Ebene, was fast überall gilt.
-// Sitzhaltung. Oberschenkel waagerecht nach vorn, Unterschenkel senkrecht
-// nach unten, Rumpf etwas zurück — und die ganze Figur tiefer, sonst schwebt
-// sie über der Bank. Ohne diese Funktion sähe eine besetzte Bank schlechter
-// aus als eine leere: eine stehende Figur mitten in der Sitzfläche.
-export function setzeSitzhaltung(g,sitzt){
+// Am gebauten Modell gemessen, Standfigur mit Ursprung auf dem Boden:
+// Unterkante Becken .86, Kniegelenk .84, Knie->Knöchel .40, Sohle .076 unter
+// dem Knöchel. Alles in Modelleinheiten, also vor der Größenskalierung.
+const BECKEN=.86,KNIE=.84,SCHIENBEIN=.40,SOHLE=.076;
+// Wie hoch der Ursprung der Figur über dem Boden liegen muss, damit das
+// Becken auf der Sitzfläche aufliegt. sitzhoehe ist die Höhe der Sitzfläche
+// über dem Boden in Metern.
+export function sitzVersatz(g,sitzhoehe){return sitzhoehe-BECKEN*(g.scale?.y||1);}
+// Sitzhaltung. Oberschenkel waagerecht nach vorn, Rumpf etwas zurück, und der
+// Unterschenkel so weit nach vorn geneigt, dass die Sohle den Boden erreicht:
+// auf einer .42 hohen Bank sind das 36 Grad, auf einem Barhocker baumeln die
+// Beine. Vorher stand hier ein fester Kniewinkel von 1.36 — der Unterschenkel
+// hing damit senkrecht und die Sohle blieb bei jeder Sitzhöhe .476 über dem
+// Ursprung. Ohne diese Funktion sähe eine besetzte Bank schlechter aus als
+// eine leere: eine stehende Figur mitten in der Sitzfläche.
+export function setzeSitzhaltung(g,sitzt,sitzhoehe=.42){
  const u=g.userData;
  if(!u.legs)return;
  if(!sitzt){
   if(!u.sitzt)return;
   u.sitzt=false;
   for(const arm of u.arms)arm.rotation.set(0,0,0);
+  // Ohne diese Zeile behielt jeder, der aufgestanden ist, den Sitzknick im
+  // Rumpf: der Gehzyklus schreibt body.rotation.x nie.
+  if(u.body)u.body.rotation.x=0;
   return;
  }
  u.sitzt=true;
+ // Sitzhöhe in Modelleinheiten: eine kleine Figur sitzt auf derselben Bank
+ // relativ höher und muss die Beine weiter ausstrecken.
+ const hoehe=sitzhoehe/(g.scale?.y||1);
+ const knie=hoehe-BECKEN+KNIE,rest=knie-SOHLE;
+ const winkel=Math.acos(Math.max(.06,Math.min(.998,rest/SCHIENBEIN)));
  u.legs.forEach((leg,i)=>{
   leg.rotation.x=-1.42;
-  if(u.knees&&u.knees[i])u.knees[i].rotation.x=1.36;
+  if(u.knees&&u.knees[i])u.knees[i].rotation.x=1.42-winkel;
+  // Der Fuß bleibt waagerecht, sonst gräbt sich die Spitze in den Boden.
+  if(u.ankles&&u.ankles[i])u.ankles[i].rotation.x=winkel;
  });
  // Arme locker auf den Oberschenkeln.
  u.arms.forEach((arm,i)=>{arm.rotation.x=-.55;arm.rotation.z=(i?-1:1)*.12;});

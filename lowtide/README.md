@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 288 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 294 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1318,6 +1318,80 @@ wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
 besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
+
+## Alle saßen einen halben Meter über der Bank
+
+Die Sitzprüfungen der letzten Runde fragten die Simulation ab: Wer sitzt, hat
+einen Sitzplatz, steht nicht daneben, läuft nicht weg, steht bei gezogener
+Waffe auf. Vier Prüfungen, alle grün, und keine einzige hat das Mesh
+angesehen.
+
+`World.update` setzte die Figur auf `sitzplatz.y - .36`. Die abgeleitete
+Klasse überschrieb die Zeile eine Ebene später mit
+`groundAt(n.x, n.z) + bob` und stellte damit jede sitzende Figur wieder auf
+den Boden. Die Sitzhaltung blieb: Oberschenkel waagerecht, Unterschenkel
+senkrecht — eine Figur, die auf einem unsichtbaren Stuhl vor der Bank sitzt,
+die Füße 36 Zentimeter über dem Sand.
+
+Auch die Zahl selbst stimmte nicht. Am Modell nachgemessen (Standfigur,
+Ursprung auf dem Boden): Unterkante Becken .86, Kniegelenk .84,
+Knie→Knöchel .40, Sohle .076 unter dem Knöchel, Haarspitze 1.886. Mit
+`sitzplatz.y - .36` läge das Becken einer Figur auf einer 42 Zentimeter hohen
+Bank bei 92 Zentimetern — einen halben Meter über der Sitzfläche.
+
+Richtig ist `sitzhoehe - .86`, und der Kniewinkel muss sich der Sitzhöhe
+anpassen, statt fest zu sein: Der Unterschenkel überbrückt die Strecke vom
+Knie zur Sohle, also `cos(winkel) = (sitzhoehe - .86 + .84 - .076) / .40`.
+Auf einer Bank sind das 36 Grad Neigung nach vorn, auf einem Barhocker
+baumeln die Beine. Der Knöchel dreht gegen, sonst gräbt sich die Fußspitze
+in den Boden.
+
+Nachgemessen an den Meshes, nicht am Zustand: Becken 0.420 bei einer
+Sitzfläche von 0.420, Sohle 0.025 über dem Boden. Auf Hockerhöhe hängt die
+Sohle 0.5 Meter in der Luft.
+
+Nebenbei aufgefallen: `setzeSitzhaltung` setzte beim Aufstehen die Arme
+zurück, aber nicht `body.rotation.x`. Der Gehzyklus schreibt diesen Wert nie.
+Wer einmal gesessen hatte, lief für den Rest des Spiels mit dem Sitzknick im
+Rumpf herum.
+
+Die neue Prüfung war im ersten Lauf grün — aus dem falschen Grund. Die
+Waffentests weiter oben lassen den Spieler bewaffnet zurück; der Teleport auf
+4,2 Meter Abstand ließ die Figur aufstehen, und bei einer stehenden Figur
+stehen die Füße selbstverständlich auf dem Boden. Erst die zweite Prüfung
+derselben Messung — Becken auf Sitzflächenhöhe — hat es gemeldet. Die
+Prüfung entwaffnet jetzt vorher und gibt den Zustand der Figur mit aus.
+
+294 Prüfungen bestanden, keine gefallen.
+
+## Eine Stadt aus 530 gleich großen Menschen
+
+Beim Nachmessen der Vielfalt der Menge: Hemdfarben 12, Hosenfarben 7,
+Hauttöne 5 (`id % 5`), Haarfarben 4 (`id % 4`), Augenfarben 3 — und
+Körpergrößen 1. Jede der 530 Figuren war exakt 1,886 Meter groß, vom Modell
+bis zur Haarspitze. Eine Stadt aus Basketballspielern, und zwar aus
+Basketballspielern derselben Größe.
+
+Die Größe hängt jetzt am Index und ist damit über Speicherstände und
+Prüfläufe hinweg dieselbe. Zwei gemittelte Streuwerte ergeben eine
+Glockenkurve statt einer Gleichverteilung: Schwerpunkt 1,72 m, die Enden bei
+1,53 und 1,88 m bleiben selten. Die Ferndarstellung bekommt denselben Faktor,
+sonst wüchse jede Figur beim Umschalten auf 34 Meter.
+
+Benannte Figuren haben feste Größen: Eli 1,80 m, Mara 1,68 m, der Wachmann
+1,86 m, die Zeugin 1,74 m. Die Waffe hängt am Arm der Spielerfigur und
+skaliert mit; das Kameraziel steht auf einer festen Höhe und bleibt davon
+unberührt.
+
+Der Figurenwechsel hatte eine Größenänderung — die Prüfung hat sie gefunden,
+weil sie fehlschlug: `scale.set(1, .96, 1)` für Mara. Das ist kein kleinerer
+Mensch, sondern derselbe Mensch um vier Prozent zusammengedrückt, bei
+gleichbleibender Schulterbreite. Jetzt ein gleichmäßiger Maßstab.
+
+Was das nicht ist: eine Änderung der Körperformen. Alle Figuren haben
+dieselben Proportionen, nur einen anderen Maßstab. Breite Menschen, schmale
+Menschen, unterschiedliche Beinlängen — dafür bräuchte das Modell
+Formparameter, die es nicht hat.
 
 ## Eine Prüfung, die zweimal dasselbe messen muss
 
