@@ -452,7 +452,7 @@ export class Simulation{
    // gezogene Waffe nicht —, bewegt sich aber nicht. Der erste Anlauf ließ ihn
    // ganz oben aus der Schleife springen; damit blieb er blind für alles.
    if(n.state==='sitzend')continue;
-   if(n.state==='flüchtend'){n.yaw=Math.atan2(n.x-p.x,n.z-p.z);const [fx,fz]=this.schrittUmGehen(n,Math.sin(n.yaw)*3*dt,Math.cos(n.yaw)*3*dt);this.move(n,fx,fz,.3);if(n.timer<=0){n.state='normal';n.target=(n.target+1)%n.path.length;}}else{const dest=n.path[n.target],d=distance(n,dest);if(d<1)n.target=(n.target+1)%n.path.length;else{n.yaw=Math.atan2(dest.x-n.x,dest.z-n.z);const v=n.pace*(this.weather==='rain'?1.5:1)*dt;const [sx,sz]=this.schrittUmGehen(n,Math.sin(n.yaw)*v,Math.cos(n.yaw)*v);const vx=n.x,vz=n.z;this.move(n,sx,sz,.3);
+   if(n.state==='flüchtend'){n.yaw=Math.atan2(n.x-p.x,n.z-p.z);const [fx,fz]=this.schrittUmGehen(n,Math.sin(n.yaw)*3*dt,Math.cos(n.yaw)*3*dt);this.move(n,fx,fz,.3);if(n.timer<=0){n.state='normal';n.target=(n.target+1)%n.path.length;}}else{const dest=n.path[n.target],d=distance(n,dest);if(d<1){n.target=(n.target+1)%n.path.length;n.naeher=undefined;}else{n.yaw=Math.atan2(dest.x-n.x,dest.z-n.z);const v=n.pace*(this.weather==='rain'?1.5:1)*dt;const [sx,sz]=this.schrittUmGehen(n,Math.sin(n.yaw)*v,Math.cos(n.yaw)*v);this.move(n,sx,sz,.3);
     // Wer eine Sekunde lang nicht vorankommt, nimmt den nächsten Wegpunkt.
     //
     // Im Prüflauf standen Figuren zehn Sekunden auf derselben Stelle, obwohl
@@ -463,8 +463,21 @@ export class Simulation{
     // Regel hilft gegen beide, weil sie nicht an der Ursache ansetzt, sondern
     // am Ergebnis: Ziel unerreichbar, also das nächste nehmen. Eine Sekunde
     // ist lang genug, dass normales Warten in einer Schlange nicht zählt.
-    if(Math.hypot(n.x-vx,n.z-vz)<v*.25){if((n.fest=(n.fest||0)+1)>60){n.fest=0;if(this.blocked(n,.3))this.befreie(n);else n.target=(n.target+1)%n.path.length;}}
-    else n.fest=0;}}}
+    // Fortschritt heißt, dem Ziel näher zu kommen — nicht, sich zu bewegen.
+    // Die erste Fassung maß die zurückgelegte Strecke, und damit entging ihr
+    // der häufigste Fall: an einer Wand entlangschrammen. move() zerlegt den
+    // Schritt in x und z und lässt die freie Achse zu, also läuft die Figur
+    // seitwärts weiter (gemessen 5,87 Meter in fünfzehn Sekunden) und gilt als
+    // in Bewegung, während der Abstand zum Wegpunkt gleich bleibt. Im letzten
+    // Prüflauf blieb genau so ein Paar übrig: 0,6 und 1,6 Meter Weg in zehn
+    // Sekunden, beide mit Hindernis direkt voraus.
+    //
+    // Drei Sekunden ohne Annäherung, nicht eine: kurz hinter jemandem
+    // herzugehen oder an einer Ampel zu warten ist kein Festsitzen.
+    const rest=distance(n,dest);
+    if(rest<(n.naeher??1e9)-.05){n.naeher=rest;n.fest=0;}
+    else if((n.fest=(n.fest||0)+1)>180){n.fest=0;n.naeher=undefined;
+     if(this.blocked(n,.3))this.befreie(n);else n.target=(n.target+1)%n.path.length;}}}}
   if(((this._entflecht=(this._entflecht||0)+1)%4)===0)this.entflechten();
   this.updatePolice(dt);this.eventTimer-=dt;if(this.eventTimer<=0){this.eventTimer=55;const c=this.cars.find(c=>c.type==='traffic'&&c!==p.car);if(c){c.wait=14;this.notify('Verkehrsfunk: Pannenfahrzeug auf der Harbor Avenue.');}}
   if(p.health<=0){p.health=0;this.paused=true;this.notify('Festgenommen. Starte den Auftrag erneut.');}

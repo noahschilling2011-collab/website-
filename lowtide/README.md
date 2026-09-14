@@ -1486,6 +1486,19 @@ derselbe Fall im vorigen Stand: **0,00 Meter**. Der Sprung ist sichtbar, wenn
 man danebensteht — die Alternative ist eine Figur, die für immer in einer Wand
 steht.
 
+Danach fielen die Zahlen auf ein Viertel — 2,67 auf **0,40** durchdringende
+Paare, Paare unter einem halben Meter von 4,87 auf 1,23 —, und übrig blieb
+genau ein Paar, das den nächsten Fehler zeigte: beide Figuren mit „Hindernis
+voraus", 0,6 und 1,6 Meter Weg in zehn Sekunden. Sie schrammten an einer Wand
+entlang. `move()` zerlegt den Schritt in x und z und lässt die freie Achse zu,
+also läuft so eine Figur seitwärts weiter — gemessen 5,87 Meter in fünfzehn
+Sekunden — und galt damit als in Bewegung, während ihr Abstand zum Wegpunkt
+gleich blieb.
+
+Fortschritt heißt jetzt, dem Ziel näher zu kommen, nicht, sich zu bewegen.
+Drei Sekunden ohne Annäherung lösen die Regel aus, nicht eine: kurz hinter
+jemandem herzugehen oder an einer Ampel zu warten ist kein Festsitzen.
+
 Zum Verfahren gehört noch eine Beobachtung: dieselbe Prüfung fiel bei
 identischem Stand zweimal und lief einmal durch. Sie ist also stochastisch,
 und ein einzelner grüner Lauf beweist hier nichts. Der Nachweis steht
