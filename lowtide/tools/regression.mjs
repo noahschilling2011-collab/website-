@@ -3129,7 +3129,7 @@ const menge = await page.evaluate(() => {
  const leer = {forward: 0, turn: 0, yaw: 0, sprint: false, sneak: false, brake: false, jump: false, interact: false};
  const gehend = n => n.health > 0 && n.stun <= 0 && n.state !== 'sitzend';
  let ticks = 0, summe = 0, summeEng = 0, hoechst = 0, durchlaeufe = 0, engster = 9;
- const seite = new Map(), naehe = new Map();
+ const seite = new Map(), naehe = new Map(), taeter = new Map();
  for (let t = 0; t < 600; t++) {
   s.tick(1 / 60, leer);
   if (t % 10) continue;
@@ -3148,7 +3148,17 @@ const menge = await page.evaluate(() => {
      if (b.id <= a.id) continue;
      const d = Math.hypot(a.x - b.x, a.z - b.z);
      if (d < .5) paare++;
-     if (d < .4) eng++;
+     if (d < .4) {
+      eng++;
+      // Wer durchdringt, wird notiert: der Schrittfilter greift nur im
+      // normalen Gehen und in der Flucht, andere Stellen bewegen Figuren
+      // direkt (Streit im Ereignissystem, Missionsfiguren). Ohne die
+      // Zustände im Fehlertext rät man beim nächsten Fehlschlag wieder.
+      const kk = a.id + '-' + b.id;
+      const e = taeter.get(kk) || {n: 0, min: 9, zustand: ''};
+      e.n++; e.min = Math.min(e.min, d); e.zustand = a.state + '/' + b.state;
+      taeter.set(kk, e);
+     }
      if (d < engster) engster = d;
      if (d < 1.2) {
       const k = a.id + '-' + b.id, vor = seite.get(k), s2 = Math.sign(a.x - b.x);
@@ -3163,11 +3173,14 @@ const menge = await page.evaluate(() => {
   summe += paare; summeEng += eng;
   if (paare > hoechst) hoechst = paare;
  }
- return {mittel: summe / ticks, eng: summeEng / ticks, engster, hoechst, durchlaeufe, figuren: (s._alleNpcs || s.npcs).filter(gehend).length};
+ const schlimmste = [...taeter.entries()].sort((u, v) => v[1].n - u[1].n).slice(0, 4)
+  .map(([k, e]) => `${k} ${e.zustand} ${e.n}x bis ${e.min.toFixed(2)} m`).join('; ');
+ return {mittel: summe / ticks, eng: summeEng / ticks, engster, hoechst, durchlaeufe, schlimmste,
+  figuren: (s._alleNpcs || s.npcs).filter(gehend).length};
 });
 pruefe('Die Menge steht nicht ineinander',
  menge.eng < .2 && menge.engster > .38 && menge.durchlaeufe < 2,
- `${menge.eng.toFixed(2)} Paare durchdringen sich, engster Abstand ${menge.engster.toFixed(2)} m, ${menge.durchlaeufe} echte Durchgänge bei ${menge.figuren} gehenden Figuren (${menge.mittel.toFixed(2)} Paare unter 0,50 m, höchstens ${menge.hoechst})`);
+ `${menge.eng.toFixed(2)} Paare durchdringen sich, engster Abstand ${menge.engster.toFixed(2)} m, ${menge.durchlaeufe} echte Durchgänge bei ${menge.figuren} gehenden Figuren (${menge.mittel.toFixed(2)} Paare unter 0,50 m, höchstens ${menge.hoechst})${menge.schlimmste ? ' — ' + menge.schlimmste : ''}`);
 
 // Gangart. Im Schrittzyklus stand jede Zahl als Konstante — Ausschlag der
 // Beine .46, des Knies .72, der Arme .30, Auf- und Abbewegung .045. Bei
@@ -3667,24 +3680,34 @@ const schlag = await (async () => {
  await aufnahme(0, 'tief');
  await aufnahme(Math.PI, 'hoch');
  await aufnahme(0, 'wieder');
+ // Gemessen wird nicht nur der Mittelwert, sondern auch, in welchen
+ // Bildzeilen der Unterschied steckt: einmal meldete die Stabilitätsmessung
+ // 8,37 statt 0,00, und aus einer einzelnen Zahl ließ sich nicht sagen, ob
+ // die Möwe gewandert war, ein Lichtkegel flackerte oder Gelände nachlud.
+ // Isoliert war der Wert dreimal hintereinander exakt 0,000.
  const abstand = (p, q) => page.evaluate(([p, q]) => {
   const a = window.__schlag[p], b = window.__schlag[q];
-  let d = 0, n = 0;
-  for (let y = 160; y < 360; y++) for (let x = 330; x < 570; x++) {
-   const i = (y * 900 + x) * 4;
-   d += Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]);
-   n += 3;
+  let d = 0, n = 0; const zeilen = [];
+  for (let y = 160; y < 360; y++) {
+   let zd = 0;
+   for (let x = 330; x < 570; x++) {
+    const i = (y * 900 + x) * 4;
+    zd += Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]);
+   }
+   zeilen.push([y, zd / (240 * 3)]); d += zd; n += 240 * 3;
   }
-  return d / n;
+  return {mittel: d / n, zeilen: zeilen.sort((u, v) => v[1] - u[1]).slice(0, 4)
+   .map(([y, v]) => `${y}:${v.toFixed(1)}`).join(' ')};
  }, [p, q]);
- return {...vorbereitet, bewegt: await abstand('tief', 'hoch'), stabil: await abstand('tief', 'wieder')};
+ const bewegt = await abstand('tief', 'hoch'), stabil = await abstand('tief', 'wieder');
+ return {...vorbereitet, bewegt: bewegt.mittel, stabil: stabil.mittel, zeilen: stabil.zeilen};
 })();
 pruefe('Die Möwe hat einen Flügelschlag je Tier', !!schlag?.attribut && !!schlag?.uniform,
  schlag ? `${schlag.tiere} Möwen, Attribut ${schlag.attribut}, Uniform ${schlag.uniform}` : 'keine Tierwelt');
 pruefe('Der Flügelschlag bewegt die Geometrie', (schlag?.bewegt ?? 0) > 1,
  `halbe Periode ${schlag?.bewegt.toFixed(3)}, gleiche Stellung ${schlag?.stabil.toFixed(3)}`);
 pruefe('Bei gleicher Flügelstellung ist das Bild dasselbe', (schlag?.stabil ?? 9) < .05,
- `${schlag?.stabil.toFixed(4)}`);
+ `${schlag?.stabil.toFixed(4)}, lauteste Zeilen ${schlag?.zeilen}`);
 
 // Die Touch-Oberfläche hängt an `@media(pointer:coarse)` und ist auf einem
 // Zeigergerät ausgeblendet. Dafür braucht es einen eigenen Browser mit
