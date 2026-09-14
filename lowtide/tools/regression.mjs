@@ -659,6 +659,60 @@ pruefe('Im Fahrzeug läuft der Sender und plant Noten', await page.evaluate(asyn
 }));
 await page.evaluate(() => {const s = window.LOWTIDE.sim; if (s.player.car) {s.player.car.speed = 0; s.enterExit();}});
 
+console.log('Klang');
+// Die Welt hatte zwei Geräusche: den Motor-Oszillator und einen Schuss —
+// nachgezählt an den Aufrufstellen, `tone()` kam genau einmal vor. Wer zu Fuß
+// ging, hörte nichts, obwohl Wetter, Wasser und Fahndungsstufe alle im
+// Zustand stehen. Geprüft wird an den Reglerwerten der Audioknoten, nicht am
+// Klang: hören kann diese Umgebung nichts, und das steht so im README.
+const ton = await page.evaluate(async () => {
+ const k = window.LOWTIDE.klang;
+ if (!k) return null;
+ const lies = () => ({wind: k.wind.regler.gain.value, regen: k.regen.regler.gain.value,
+  brandung: k.brandung.regler.gain.value, sirene: k.sirenenRegler.gain.value});
+ const grund = {wetter: 'clear', tempo: 0, geduckt: false, rennt: false, imWagen: false,
+  wasserAbstand: 999, sterne: 0, polizeiAbstand: 999, pausiert: false};
+ const fahre = (z, n) => {for (let i = 0; i < n; i++) k.update(1 / 60, z); return lies();};
+ const aus = {};
+ aus.klar = fahre(grund, 240);
+ aus.regen = fahre({...grund, wetter: 'rain'}, 240);
+ aus.sturm = fahre({...grund, wetter: 'storm'}, 240);
+ aus.imWagen = fahre({...grund, wetter: 'storm', imWagen: true}, 240);
+ aus.fern = fahre({...grund}, 240);
+ aus.amWasser = fahre({...grund, wasserAbstand: 5}, 240);
+ aus.ruhig = fahre({...grund}, 240);
+ aus.fahndung = fahre({...grund, sterne: 3, polizeiAbstand: 40}, 240);
+ const vorGehen = k.gebaut; fahre({...grund, tempo: 4.5}, Math.round(30 / 4.5 * 60));
+ aus.schritteGehend = k.gebaut - vorGehen;
+ const vorSchleichen = k.gebaut; fahre({...grund, tempo: 2, geduckt: true}, Math.round(30 / 2 * 60));
+ aus.schritteGeduckt = k.gebaut - vorSchleichen;
+ for (let i = 0; i < 40; i++) k.aufprall(10);
+ await new Promise(r => setTimeout(r, 1400));
+ aus.nochOffen = k.offen;
+ fahre(grund, 240);
+ return aus;
+});
+pruefe('Es gibt überhaupt einen Klang', !!ton);
+pruefe('Der Ton kennt das Wetter',
+ ton && ton.klar.wind < ton.regen.wind && ton.regen.wind < ton.sturm.wind &&
+ ton.klar.regen < .001 && ton.sturm.regen > ton.regen.regen,
+ ton && `Wind ${ton.klar.wind.toFixed(4)}/${ton.regen.wind.toFixed(4)}/${ton.sturm.wind.toFixed(4)}, Regen ${ton.regen.regen.toFixed(4)}/${ton.sturm.regen.toFixed(4)}`);
+pruefe('Im Wagen ist es leiser als draußen',
+ ton && ton.imWagen.wind < ton.sturm.wind * .6,
+ ton && `${ton.imWagen.wind.toFixed(4)} gegen ${ton.sturm.wind.toFixed(4)}`);
+pruefe('Am Wasser rauscht die Brandung, sonst nicht',
+ ton && ton.fern.brandung < .002 && ton.amWasser.brandung > .02,
+ ton && `${ton.fern.brandung.toFixed(4)} fern, ${ton.amWasser.brandung.toFixed(4)} nah`);
+pruefe('Die Sirene heult nur bei Fahndung',
+ ton && ton.ruhig.sirene < .001 && ton.fahndung.sirene > .008,
+ ton && `${ton.ruhig.sirene.toFixed(4)} ohne, ${ton.fahndung.sirene.toFixed(4)} bei drei Sternen`);
+pruefe('Schritte fallen nach zurückgelegtem Weg',
+ ton && ton.schritteGehend >= 17 && ton.schritteGehend <= 24 &&
+ ton.schritteGeduckt > ton.schritteGehend,
+ ton && `${ton.schritteGehend} auf 30 m gehend, ${ton.schritteGeduckt} geduckt`);
+pruefe('Einmalige Klänge räumen ihre Knoten wieder ab',
+ ton && ton.nochOffen <= 4, ton && `${ton.nochOffen} von 80 Knoten noch offen, 1,4 s nach 40 Aufprallen`);
+
 console.log('Innenräume');
 pruefe('Alle acht Serviceräume sind eingerichtet', await page.evaluate(() =>
  (window.LOWTIDE.world.innenLampen || []).length >= 8));

@@ -5,6 +5,7 @@ import {leuchtMaterialien} from './world.js';
 import {WOLKEN_VERSATZ,WOLKEN_STAERKE,WOLKEN_SONNE} from './detail.js';
 import {locations,regions,roadSegments,vehicleTypes,weapons,regionAt,waterAt,bounds,groundAt,onRoad,INSELN,DAEMME,WEST_DAEMME,imStadtgebiet,STADTGEBIETE} from './content.js';
 import {Radio,SENDER} from './radio.js';
+import {Klang} from './sfx.js';
 import {immobilien,schatzOrte,rennen} from './content.js';
 import * as Story from './story.js';
 const {AUSGAENGE,FANG_DAUER,FANG_ABSTAND}=Story;
@@ -15,7 +16,7 @@ const debug={sichtbar:false,frames:0,fps:0,fenster:0,zeit:0};
 // schon losgelassen wurde. Das darf die Eingabe nicht abbrechen.
 const fange=(el,id)=>{try{el.setPointerCapture(id);}catch{}};
 window.LOWTIDE={sim,get world(){return world;},get frames(){return debug.frames;},debug,
- get radio(){return radio;},get sender(){return SENDER;},orte:locations,plaetze:places,immobilien,imStadtgebiet,stadtgebiete:STADTGEBIETE,waffen:weapons,fahrzeuge:vehicleTypes,waterAt,groundAt,regionAt,onRoad,bounds,regionen:regions,strassen:roadSegments,inseln:INSELN,daemme:DAEMME,westDaemme:WEST_DAEMME,leuchten:leuchtMaterialien,wolken:{versatz:WOLKEN_VERSATZ,staerke:WOLKEN_STAERKE,sonne:WOLKEN_SONNE},get schatzOrte(){return schatzOrte;},story:Story,
+ get radio(){return radio;},get klang(){return klang;},get sender(){return SENDER;},orte:locations,plaetze:places,immobilien,imStadtgebiet,stadtgebiete:STADTGEBIETE,waffen:weapons,fahrzeuge:vehicleTypes,waterAt,groundAt,regionAt,onRoad,bounds,regionen:regions,strassen:roadSegments,inseln:INSELN,daemme:DAEMME,westDaemme:WEST_DAEMME,leuchten:leuchtMaterialien,wolken:{versatz:WOLKEN_VERSATZ,staerke:WOLKEN_STAERKE,sonne:WOLKEN_SONNE},get schatzOrte(){return schatzOrte;},story:Story,
  // Nur fürs Prüfen: setzt Figur und Kamera an eine feste Stelle.
  // hoehe>0 pausiert die Simulation und hebt die Kamera für Übersichtsbilder an.
  view(x,z,blick=yaw,neigung=pitch,hoehe=0){const p=sim.player;p.car=null;p.x=x;p.z=z;p.y=hoehe;p.vy=0;
@@ -26,10 +27,11 @@ window.LOWTIDE={sim,get world(){return world;},get frames(){return debug.frames;
   world.camera.far=2600;world.camera.updateProjectionMatrix();
   sim.player.x=x;sim.player.z=z;}};
 try{let saved=null;try{saved=localStorage.getItem('lowtide-v2');}catch{}if(saved){try{sim.restore(JSON.parse(saved));}catch(e){console.warn('Spielstand konnte nicht geladen werden',e);}}world=new ExpandedWorld($('game'),sim);$('loadState').textContent='Port Mercy ist bereit.';$('startBtn').disabled=false;}catch(error){$('loadState').textContent='3D konnte nicht starten. Verwende einen Browser mit WebGL 2 (Safari, Chrome oder Firefox).';console.error(error);}
-let radio=null;
+let radio=null,klang=null,letzteFahrt=0;
 function initAudio(){try{audio=new (window.AudioContext||window.webkitAudioContext)();engine=audio.createOscillator();engine.type='sawtooth';engineGain=audio.createGain();engineGain.gain.value=0;engine.connect(engineGain).connect(audio.destination);engine.start();
  // Radio erst nach der Nutzergeste: vorher gibt es keinen Audiokontext.
  radio=new Radio(audio);radio.waehle(1);
+ klang=new Klang(audio);
 }catch{muted=true;}}
 function tone(freq,duration,volume=.04,type='sine'){if(!audio||muted)return;const o=audio.createOscillator(),g=audio.createGain();o.type=type;o.frequency.setValueAtTime(freq,audio.currentTime);o.frequency.exponentialRampToValueAtTime(Math.max(30,freq*.4),audio.currentTime+duration);g.gain.setValueAtTime(volume,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+duration);o.connect(g).connect(audio.destination);o.start();o.stop(audio.currentTime+duration);}
 function toast(message){$('toast').textContent=message;$('toast').style.opacity='1';toastTime=5;}
@@ -59,7 +61,7 @@ function fire(){if(sim.paused)return;const before=sim.shots;sim.shoot();if(sim.s
 function pause(){if(!started||$('dialog').open||$('bigMap').open)return;$('phone').hidden=true;sim.paused=true;keys.clear();stick={x:0,y:0};$('pause').showModal();}
 function resume(){if(sim.player.health<=0)return;$('pause').close();sim.paused=false;}
 function map(){if(!started||$('dialog').open||$('pause').open||phoneOffen())return;sim.paused=true;keys.clear();drawMap($('fullMap'),true);$('bigMap').showModal();}
-function keyAction(key){if(!started)return;if(key==='escape'){if($('pause').open)resume();else pause();return;}if(key==='p'){phoneUmschalten();return;}if(sim.paused)return;if(key==='e')interact();if(key==='q'){if(!sim.player.car){sim.player.armed=!sim.player.armed;tone(320,.06);}}if(key==='r')sim.reload();if(key==='fire')fire();if(key==='m')map();if(key==='tab'){sim.switchCharacter();yaw=sim.player.yaw;}if(key==='x')sim.cycleWeapon();if(key==='f')sim.melee();if(key==='g')sim.grapple();if(key==='v')sim.cover();if(key==='alt')sim.dodge();if(key===' '&&!sim.player.car)sim.jump();if(key==='h')showActions();if(key==='n')senderWechseln();if(key==='f3'){debug.sichtbar=!debug.sichtbar;$('debug').hidden=!debug.sichtbar;}}
+function keyAction(key){if(!started)return;if(key==='escape'){if($('pause').open)resume();else pause();return;}if(key==='p'){phoneUmschalten();return;}if(sim.paused)return;if(key==='e'){const drin=!!sim.player.car;interact();if(!!sim.player.car!==drin)klang?.tuer();}if(key==='q'){if(!sim.player.car){sim.player.armed=!sim.player.armed;tone(320,.06);}}if(key==='r'){const vor=sim.player.ammo;sim.reload();if(sim.player.ammo!==vor||sim.player.reserve)klang?.nachladen();}if(key==='fire')fire();if(key==='m')map();if(key==='tab'){sim.switchCharacter();yaw=sim.player.yaw;}if(key==='x')sim.cycleWeapon();if(key==='f')sim.melee();if(key==='g')sim.grapple();if(key==='v')sim.cover();if(key==='alt')sim.dodge();if(key===' '&&!sim.player.car)sim.jump();if(key==='h')showActions();if(key==='n')senderWechseln();if(key==='f3'){debug.sichtbar=!debug.sichtbar;$('debug').hidden=!debug.sichtbar;}}
 $('startBtn').onclick=()=>{started=true;sim.paused=false;document.body.classList.add('playing');initAudio();toast('Sprich mit Mara am goldenen Marker. E / Aktion.');};$('pauseBtn').onclick=pause;$('resume').onclick=resume;$('restartBtn').onclick=()=>{$('pause').close();dialog('SPIELSTAND','Neu beginnen?','Dadurch wird der lokale Spielstand gelöscht.',[['Neues Spiel',()=>{localStorage.removeItem('lowtide-v2');location.reload();}],['Abbrechen',()=>{}]]);};$('mapBtn').onclick=map;$('closeMap').onclick=()=>{$('bigMap').close();sim.paused=false;};$('soundBtn').onclick=()=>{muted=!muted;$('soundBtn').textContent='Ton: '+(muted?'aus':'an');};let low=false;$('qualityBtn').onclick=()=>{low=!low;world.renderer.setPixelRatio(low?1:Math.min(devicePixelRatio,1.5));world.renderer.shadowMap.enabled=!low;if(world.post)world.post.aktiv=!low;world.resize();$('qualityBtn').textContent='Grafik: '+(low?'sparsam':'normal');};
 for(const id of ['dialog','pause','bigMap'])$(id).addEventListener('cancel',e=>{e.preventDefault();if(id==='pause')resume();else if(id==='bigMap'){$(id).close();sim.paused=false;}});
 window.addEventListener('keydown',e=>{if([' ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Tab','F3','Escape'].includes(e.key))e.preventDefault();const k=e.key.toLowerCase();if(!e.repeat)keyAction(k);keys.add(k);});window.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));window.addEventListener('blur',()=>{keys.clear();stick={x:0,y:0};if(started&&!sim.paused)pause();});document.addEventListener('visibilitychange',()=>{if(document.hidden&&started&&!sim.paused)pause();});window.addEventListener('resize',()=>world?.resize());
@@ -413,6 +415,28 @@ function messwerte(dt){debug.frames++;debug.fenster++;debug.zeit+=dt;if(debug.ze
  $('debug').textContent=['FPS          '+debug.fps.toFixed(0),'Draw Calls   '+info.render.calls,'Dreiecke     '+info.render.triangles.toLocaleString('de-DE'),'Geometrien   '+info.memory.geometries,'Texturen     '+info.memory.textures,'NPCs         '+sim.npcs.length,'Fahrzeuge    '+sim.cars.length,'Polizei aktiv '+sim.cops.filter(c=>c.active).length,'Uhrzeit      '+sim.hour.toFixed(2),'Wetter       '+sim.weather,'Position     '+Math.round(sim.player.x)+' / '+Math.round(sim.player.z)].join('\n');}
 function frame(ms){const dt=Math.min(.05,(ms-last)/1000||.016);last=ms;messwerte(dt);if(world){if(started&&!sim.paused){if(keys.has('arrowleft'))yaw+=dt*1.8;if(keys.has('arrowright'))yaw-=dt*1.8;const forward=(keys.has('w')||keys.has('arrowup')?1:0)-(keys.has('s')||keys.has('arrowdown')?1:0)-stick.y,turn=(keys.has('d')?1:0)-(keys.has('a')?1:0)+stick.x;sim.tick(dt,{forward:clamp(forward,-1,1),turn:clamp(turn,-1,1),yaw,sprint:keys.has('shift'),sneak:keys.has('c'),brake:keys.has(' '),jump:keys.has(' '),interact:keys.has('e')});if(sim.player.car&&!drag)yaw+=Math.atan2(Math.sin(sim.player.yaw-yaw),Math.cos(sim.player.yaw-yaw))*Math.min(1,dt*3);if(keys.has('fire'))fire();if(radio)radio.lautstaerke(!muted&&sim.player.car&&sim.player.car.health>0?.6:0);
      if(engineGain){engineGain.gain.setTargetAtTime(!muted&&sim.player.car?.health>0?.017:0,audio.currentTime,.1);engine.frequency.setTargetAtTime((vehicleTypes[sim.player.car?.model]?.sound||45)+Math.abs(sim.player.car?.speed||0)*3,audio.currentTime,.1);}}else{if(engineGain)engineGain.gain.setTargetAtTime(0,audio.currentTime,.1);if(radio)radio.lautstaerke(0);}
+  // Klang. Alles, was das Modul braucht, steht schon im Zustand: Wetter,
+  // Tempo, Wasser, Fahndung. Der Aufprall wird hier erkannt und nicht in der
+  // Simulation — ein Einbruch der Fahrgeschwindigkeit um mehr als vier Meter
+  // je Sekunde innerhalb eines Bildes ist ein Anstoß, kein Bremsen: die
+  // stärkste Bremse der Tabelle schafft rund 9 m/s², also 0,15 je Bild.
+  if(klang&&started){
+   const sp=sim.player, c=sp.car;
+   const tempo=c?0:(keys.size||stick.x||stick.y)?(keys.has('shift')?8:keys.has('c')?2:4.5):0;
+   if(c){const jetzt=Math.abs(c.speed);
+    if(letzteFahrt-jetzt>4)klang.aufprall(letzteFahrt-jetzt);
+    letzteFahrt=jetzt;}
+   else letzteFahrt=0;
+   let wasser=999;
+   for(let r=0;r<=60;r+=6){let treffer=false;
+    for(let a=0;a<8&&!treffer;a++)if(waterAt(sp.x+Math.cos(a*Math.PI/4)*r,sp.z+Math.sin(a*Math.PI/4)*r))treffer=true;
+    if(treffer){wasser=r;break;}}
+   let polizei=999;
+   for(const k of sim.cops)if(k.active)polizei=Math.min(polizei,Math.hypot(k.x-sp.x,k.z-sp.z));
+   klang.stumm(muted);
+   klang.update(dt,{wetter:sim.weather,tempo,geduckt:keys.has('c'),rennt:keys.has('shift'),
+    imWagen:!!c,wasserAbstand:wasser,sterne:sim.stars,polizeiAbstand:polizei,pausiert:sim.paused});
+  }
   radio?.tick();world.update(dt,yaw,pitch,started);if(sim.aktDialog){const schluessel=sim.aktDialog;sim.aktDialog=null;aktDialog(schluessel);}if(sim.events.length)toast(sim.events.pop()),sim.events.length=0;toastTime-=dt;if(toastTime<=0)$('toast').style.opacity='0';hudTime-=dt;if(hudTime<=0){updateHUD();if(phoneOffen())$('phoneUhr').textContent=uhrzeit(sim.hour);hudTime=.12;}if(sim.player.health<=0&&!failedShown){failedShown=true;dialog('PORT MERCY POLICE','Festgenommen.','Der Auftrag ist gescheitert. Verliere beim nächsten Versuch zuerst den Sichtkontakt, wechsle bei Bedarf das Fahrzeug und verlasse das markierte Suchgebiet.',[['An der Klinik weiterspielen',()=>{const p=sim.player;p.health=100;p.money=Math.max(0,p.money-100);p.x=locations.clinic.x;p.z=locations.clinic.z+7;p.y=0;p.car=null;sim.stars=0;sim.heat=0;sim.lastSeen=null;sim.description=null;sim.activity=null;failedShown=false;saveGame();}]]);}}requestAnimationFrame(frame);}requestAnimationFrame(frame);
 
 function saveGame(){try{localStorage.setItem('lowtide-v2',JSON.stringify(sim.snapshot()));toast('Spielstand gespeichert.');}catch(e){toast('Spielstand konnte auf diesem Gerät nicht gespeichert werden.');}}

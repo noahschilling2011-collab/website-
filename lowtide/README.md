@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 261 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 268 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1318,6 +1318,64 @@ wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
 besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
+
+## Die ganze Stadt hatte zwei Geräusche
+
+Nachgezählt an den Aufrufstellen: einen Sägezahn-Oszillator für den Motor,
+einen Aufruf von `tone()` — den Schuss. Dazu das Radio, das nur im Wagen
+läuft. Wer zu Fuß durch Port Mercy ging, hörte **nichts**: keinen Schritt,
+keinen Wind, keine Brandung, keine Sirene. Dabei stehen Wetter, Wasser und
+Fahndungsstufe längst im Zustand und werden jedes Bild abgefragt.
+
+`src/sfx.js` baut daraus sechs Klänge, alle erzeugt und keine Datei — ein
+Rauschpuffer von zwei Sekunden und ein paar Oszillatoren, dieselbe Bauweise
+wie das Radio:
+
+* **Wind** — gefiltertes Rauschen, Pegel nach Wetter.
+* **Regen** — Rauschen darüber, nur bei Regen und Sturm.
+* **Brandung** — Bandpass, mit einem Oszillator von 0,13 Hz auf dem Regler,
+  damit sie atmet; hörbar bis sechzig Meter.
+* **Sirene** — zwei Töne im Wechsel, nur bei Fahndung, leiser mit dem Abstand
+  zur nächsten Streife.
+* **Schritte** — nach zurückgelegtem Weg, nicht nach der Uhr. Schrittlänge
+  1,45 m gehend, 1,9 rennend, 1,1 geduckt, und geduckt auch dumpfer und leiser.
+* **Aufprall, Nachladen, Türe** — einmalige Stöße.
+
+Der Aufprall wird in `game.js` erkannt und nicht in der Simulation: ein
+Einbruch der Fahrgeschwindigkeit um mehr als vier Meter je Sekunde **innerhalb
+eines Bildes** ist ein Anstoß und kein Bremsen — die stärkste Bremse der
+Tabelle schafft rund 9 m/s², also 0,15 je Bild.
+
+Gemessen wird an den Reglerwerten der Audioknoten:
+
+| Zustand | Wind | Regen | Brandung | Sirene |
+|---|---|---|---|---|
+| klar, im Landesinneren | 0,0092 | 0 | 0 | 0 |
+| Regen | 0,0286 | 0,0351 | 0 | 0 |
+| Sturm | 0,0577 | 0,0780 | 0 | 0 |
+| Sturm, im Wagen | 0,0208 | 0,0273 | 0 | 0 |
+| klar, fünf Meter vom Wasser | 0,0115 | 0 | **0,0405** | 0 |
+| drei Sterne, Streife 40 m | 0,0101 | 0 | 0 | **0,0164** |
+
+Im Wagen bleiben 36 Prozent übrig. Schritte auf dreißig Metern: **20** gehend
+(Schrittlänge 1,45 → 20,7 erwartet), **27** geduckt (1,1 → 27,3).
+
+**Ein Fehler dabei, und einer, der leicht durchgegangen wäre.** Die
+Buchführung über die einmaligen Klänge lief zuerst über einen Zähler: hoch
+beim Anlegen, herunter in `onended`. Im Regressionslauf stand er bei **minus
+vierzig**. Ein Zähler, der negativ werden kann, ist als Nachweis gegen ein
+Leck wertlos — er kann ein Leck genauso gut verdecken, und ich hätte nie
+erfahren, welches von beidem gerade passiert. Jetzt ist es eine Menge lebender
+Knoten: die kann nicht negativ werden, und ein doppeltes `onended` entfernt
+denselben Eintrag zweimal und bleibt dabei richtig. Nach vierzig Aufprallen
+und 1,4 Sekunden sind null von achtzig Knoten offen.
+
+**Was hier nicht geprüft ist: wie es klingt.** Diese Umgebung hat keine
+Tonausgabe. Nachgewiesen sind die Auslöser, die Pegel, die Trennung der
+Wetterlagen und dass nichts anwächst — nicht, ob es gut klingt oder ob die
+Mischung stimmt. Das braucht Ohren.
+
+268 Prüfungen bestanden, keine gefallen.
 
 ## Die Stadt ging nie zur Arbeit
 
