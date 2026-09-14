@@ -1339,15 +1339,41 @@ Langem als offener Punkt im PR, ohne Zahl. Gemessen über zehn Sekunden auf der
 ganzen Karte: **im Mittel ein Paar** näher als ein halber Meter unter 490
 gehenden Figuren, höchstens sieben gleichzeitig, sechs Durchgänge.
 
-**Und der Versuch, es zu beheben, hat es verschlechtert.** Eine Entflechtung
-wie bei den Fahrzeugen — quer zur Verbindungslinie auseinanderschieben, alle
-vier Takte, höchstens acht Zentimeter — ergab **1,93 statt 1,0** Paaren. Mit
-26 Zentimetern Schub wurden es **5,07**. Der Grund liegt auf der Hand, sobald
-man die Zahl sieht: eine Menge, die Wegen folgt, wird durch Verschieben nicht
-entzerrt, sondern in die Nachbarn geschoben, und der Weg zieht jeden gleich
-wieder zurück. Das Richtige wäre Ausweichen vor der Berührung, also Lenkung —
-das ist eine eigene Runde und nicht dies hier. Der Code ist wieder draußen,
-die Zahl steht als Prüfung.
+**Und zwei Versuche, es zu beheben, sind gescheitert.**
+
+Der erste war eine Entflechtung wie bei den Fahrzeugen — quer zur
+Verbindungslinie auseinanderschieben, alle vier Takte, höchstens acht
+Zentimeter. Ergebnis: **1,93 statt 1,0** Paaren, mit 26 Zentimetern Schub
+**5,07**. Eine Menge, die Wegen folgt, wird durch Verschieben nicht entzerrt,
+sondern in die Nachbarn gedrückt, und der Weg zieht jeden gleich wieder
+zurück.
+
+Der zweite war das, was ich nach dem ersten für das Richtige hielt: **lenken
+statt schieben**. Wer jemanden im eigenen Weg hat, dreht ein Stück zur freien
+Seite. Und beim ersten Blick sah es schlechter aus als es ist — mein Maß für
+„Durchgänge" zählte jeden Seitenwechsel innerhalb von 1,2 Metern, also auch
+zwei Leute, die ordentlich aneinander vorbeigehen. Genau das tut eine
+Lenkung, also stieg die Zahl von 6 auf 17.
+
+Mit einem Maß, das nur zählt, was sich beim Seitenwechsel wirklich
+durchdringt, sieht der Vergleich so aus:
+
+| | ohne | mit Lenkung |
+|---|---|---|
+| Paare unter 0,50 m | 1,00 | 0,88 |
+| Paare unter 0,40 m (Körper im Körper) | 0,72 | 0,63 |
+| echte Durchgänge in 10 s | **3** | **10** |
+| engster Abstand | 0,00 m | 0,07 m |
+| Simulationsschritt | 0,83 ms | 1,01 ms |
+
+Ein Achtel weniger Gedränge, dafür dreimal so viele echte Durchgänge und
+zwanzig Prozent mehr Rechenzeit. Der Grund: eine Lenkung ohne Kollision
+schiebt die Figur seitlich **in** die Bahn der anderen, und durchgehen kann
+sie dort weiterhin. Beides wäre erst zusammen eine Lösung — Ausweichen und
+echte Körper —, und das ist eine eigene Runde.
+
+Beide Versuche sind wieder draußen. Der Stand steht als Prüfung, mit dem
+korrigierten Maß.
 
 323 Prüfungen bestanden, keine gefallen.
 

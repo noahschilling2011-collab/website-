@@ -3093,16 +3093,24 @@ pruefe('Und die Straße selbst steht noch da', kulisse.verworfen > 200 && kuliss
 // und um das Hindurchgehen, das jene Prüfung ausdrücklich zulässt.
 //
 // Gemessen über zehn Sekunden: im Mittel ein Paar näher als ein halber Meter,
-// höchstens sieben gleichzeitig, sechs Durchgänge. Ein Versuch, sie
-// auseinanderzuschieben, hat es verschlechtert — 1,0 auf 1,93, mit stärkerem
-// Schub auf 5,07 — und ist wieder draußen. Diese Prüfung hält fest, dass es
-// nicht schlechter wird.
+// höchstens sieben gleichzeitig, und 0,72 Paare, deren Körper sich wirklich
+// durchdringen (unter 0,40 Meter).
+//
+// Zwei Versuche, das zu beheben, sind gescheitert und wieder draußen:
+// auseinanderschieben wie bei den Fahrzeugen (1,0 auf 1,93 Paare, mit
+// stärkerem Schub auf 5,07) und lenken vor der Berührung (0,88 Paare, aber
+// die echten Durchgänge von 3 auf 10). Diese Prüfung hält den Stand fest.
+//
+// „Durchgang" zählt nur, wenn sich zwei Figuren beim Seitenwechsel wirklich
+// durchdringen. Das erste Maß zählte jeden Seitenwechsel innerhalb von 1,2
+// Metern — also auch zwei Leute, die ordentlich aneinander vorbeigehen, und
+// genau deshalb sah das Lenken zuerst dreimal so schlecht aus, wie es ist.
 const menge = await page.evaluate(() => {
  const L = window.LOWTIDE, s = L.sim;
  const leer = {forward: 0, turn: 0, yaw: 0, sprint: false, sneak: false, brake: false, jump: false, interact: false};
  const gehend = n => n.health > 0 && n.stun <= 0 && n.state !== 'sitzend';
- let ticks = 0, summe = 0, hoechst = 0, durchlaeufe = 0;
- const seite = new Map();
+ let ticks = 0, summe = 0, summeEng = 0, hoechst = 0, durchlaeufe = 0;
+ const seite = new Map(), naehe = new Map();
  for (let t = 0; t < 600; t++) {
   s.tick(1 / 60, leer);
   if (t % 10) continue;
@@ -3113,7 +3121,7 @@ const menge = await page.evaluate(() => {
    const k = Math.floor(a.x / Z) + '|' + Math.floor(a.z / Z);
    let l = G.get(k); if (!l) {l = []; G.set(k, l);} l.push(a);
   }
-  let paare = 0;
+  let paare = 0, eng = 0;
   for (const a of n) {
    const cx = Math.floor(a.x / Z), cz = Math.floor(a.z / Z);
    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
@@ -3121,22 +3129,25 @@ const menge = await page.evaluate(() => {
      if (b.id <= a.id) continue;
      const d = Math.hypot(a.x - b.x, a.z - b.z);
      if (d < .5) paare++;
+     if (d < .4) eng++;
      if (d < 1.2) {
       const k = a.id + '-' + b.id, vor = seite.get(k), s2 = Math.sign(a.x - b.x);
-      if (vor !== undefined && vor !== 0 && s2 !== 0 && s2 !== vor) durchlaeufe++;
+      const engVor = naehe.get(k);
+      if (vor !== undefined && vor !== 0 && s2 !== 0 && s2 !== vor && engVor !== undefined && engVor < .45) durchlaeufe++;
       seite.set(k, s2);
-     }
+      naehe.set(k, Math.min(d, engVor ?? 9));
+     } else {seite.delete(a.id + '-' + b.id); naehe.delete(a.id + '-' + b.id);}
     }
    }
   }
-  summe += paare;
+  summe += paare; summeEng += eng;
   if (paare > hoechst) hoechst = paare;
  }
- return {mittel: summe / ticks, hoechst, durchlaeufe, figuren: (s._alleNpcs || s.npcs).filter(gehend).length};
+ return {mittel: summe / ticks, eng: summeEng / ticks, hoechst, durchlaeufe, figuren: (s._alleNpcs || s.npcs).filter(gehend).length};
 });
 pruefe('Die Menge steht nicht ineinander',
- menge.mittel < 3 && menge.hoechst < 14 && menge.durchlaeufe < 15,
- `im Mittel ${menge.mittel.toFixed(2)} Paare unter einem halben Meter bei ${menge.figuren} gehenden Figuren, höchstens ${menge.hoechst}, ${menge.durchlaeufe} Durchgänge`);
+ menge.mittel < 3 && menge.hoechst < 14 && menge.eng < 2.5 && menge.durchlaeufe < 9,
+ `im Mittel ${menge.mittel.toFixed(2)} Paare unter einem halben Meter bei ${menge.figuren} gehenden Figuren (${menge.eng.toFixed(2)} durchdringen sich), höchstens ${menge.hoechst}, ${menge.durchlaeufe} echte Durchgänge`);
 
 // Gangart. Im Schrittzyklus stand jede Zahl als Konstante — Ausschlag der
 // Beine .46, des Knies .72, der Arme .30, Auf- und Abbewegung .045. Bei
