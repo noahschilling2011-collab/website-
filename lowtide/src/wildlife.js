@@ -105,6 +105,41 @@ function verschmelzen(teile) {
  return geo;
 }
 
+// Flügelschlag. Bisher stand im Update `o.scale.set(schlag, 1, 1)` mit der
+// Begründung, einzelne Flügel gingen bei Instanzen nicht — die ganze Möwe
+// wurde also um bis zu 28 Prozent breiter und wieder schmaler, während die
+// Flügel selbst unbewegt blieben. Das stimmt so nicht: der Laubwerkshader in
+// foliage.js bewegt seit Langem einzelne Vertices je Instanz. Hier dasselbe,
+// mit einem Attribut je Tier für Phase und Ratenabweichung.
+//
+// vZeit ist keine Uhr, sondern die aufsummierte Schlagzeit. Bei Störung
+// steigt die Rate; mit der absoluten Zeit im Nenner hätte jede Änderung der
+// Rate einen Sprung in der Phase ergeben.
+function schlagAufsetzen(material, ansatz) {
+ material.onBeforeCompile = shader => {
+  shader.uniforms.vZeit = material.userData.vZeit = {value: 0};
+  shader.vertexShader = shader.vertexShader
+   .replace('#include <common>', '#include <common>\nuniform float vZeit;\nattribute vec2 schlag;')
+   .replace('#include <begin_vertex>', `#include <begin_vertex>
+   {
+    float s = sin(vZeit * schlag.y + schlag.x);
+    // Nur außerhalb des Rumpfs: innen bleibt alles stehen.
+    float arm = max(0., abs(transformed.x) - ${ansatz.toFixed(2)});
+    transformed.y += arm * s * .78;
+    transformed.x -= sign(transformed.x) * arm * abs(s) * .16;
+   }`);
+  // Die Normale dreht mit, sonst bleibt die Fläche gleich hell, egal wie
+  // steil der Flügel steht.
+  shader.vertexShader = shader.vertexShader
+   .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
+   {
+    float sn = sin(vZeit * schlag.y + schlag.x);
+    objectNormal.x += sign(position.x) * sn * .55;
+    objectNormal = normalize(objectNormal);
+   }`);
+ };
+}
+
 function netz(scene, geo, farbe, anzahl, rauheit = .72) {
  const m = new T.InstancedMesh(geo, new T.MeshStandardMaterial({color: farbe, roughness: rauheit}), anzahl);
  m.frustumCulled = false;
@@ -129,6 +164,16 @@ export class Tierwelt {
      tempo: .22 + rng() * .2, versatz: rng() * 6.3, flug: rng() * 6.3});
   }
   this.moewenNetz = netz(scene, moewenGeometrie(), 0xdfe4e0, this.moewen.length, .85);
+  // Je Möwe eine eigene Phase und eine Rate zwischen 0,88 und 1,12 — ein
+  // Schwarm, der im Gleichtakt schlägt, sieht aus wie eine Animation.
+  const schlagWerte = new Float32Array(this.moewen.length * 2);
+  for (let k = 0; k < this.moewen.length; k++) {
+   schlagWerte[k * 2] = this.moewen[k].flug;
+   schlagWerte[k * 2 + 1] = .88 + rng() * .24;
+  }
+  this.moewenNetz.geometry.setAttribute('schlag', new T.InstancedBufferAttribute(schlagWerte, 2));
+  schlagAufsetzen(this.moewenNetz.material, .17);
+  this.schlagZeit = 0;
 
   // Fischschwärme dicht unter der Oberfläche, im Meer und im Sumpf.
   this.fische = [];
@@ -197,16 +242,20 @@ export class Tierwelt {
 
   // Möwen: Kreisbahn, Höhe und Tempo steigen bei Störung.
   const stoerung = Math.min(1, this.scheu);
+  this.schlagZeit += dt * (8 + stoerung * 6);
+  if (this.moewenNetz.material.userData.vZeit)
+   this.moewenNetz.material.userData.vZeit.value = this.schlagZeit;
   this.moewen.forEach((m, i) => {
    m.w += dt * m.tempo * (1 + stoerung * 1.6);
    const x = m.mx + Math.cos(m.w) * m.r, z = m.mz + Math.sin(m.w) * m.r;
    const nah = Math.hypot(x - p.x, z - p.z) < 40 ? 1 : 0;
    const y = m.hoehe + Math.sin(zeit * .5 + m.versatz) * 2.4 + (stoerung + nah) * 9;
    o.position.set(x, y, z);
-   o.rotation.set(0, -m.w + Math.PI / 2, Math.sin(zeit * 6 + m.flug) * .35);
-   // Flügelschlag über die Breite: einzelne Flügel gehen bei Instanzen nicht.
-   const schlag = 1 + Math.sin(zeit * (8 + stoerung * 6) + m.flug) * .28;
-   o.scale.set(schlag, 1, 1);
+   // Schräglage in die Kurve. Vorher lag hier ein Wackeln mit sechs Radiant
+   // je Sekunde und 0,35 Ausschlag, das den fehlenden Flügelschlag ersetzen
+   // sollte; neben einem echten Schlag ist es nur Unruhe.
+   o.rotation.set(0, -m.w + Math.PI / 2, -.24 + Math.sin(zeit * .8 + m.flug) * .1);
+   o.scale.setScalar(1);
    o.updateMatrix();
    this.moewenNetz.setMatrixAt(i, o.matrix);
   });

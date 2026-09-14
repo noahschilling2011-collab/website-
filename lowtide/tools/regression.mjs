@@ -3035,6 +3035,65 @@ pruefe('Auf Hockerhöhe baumeln die Beine',
  Math.abs(koerper.hocker.becken - koerper.hocker.boden - 1) < .02,
  koerper.hocker && `Becken ${(koerper.hocker.becken - koerper.hocker.boden).toFixed(3)}, Sohle ${(koerper.hocker.sohle - koerper.hocker.boden).toFixed(3)}`);
 
+// Flügelschlag. Im Update der Tierwelt stand `o.scale.set(schlag, 1, 1)` mit
+// der Begründung, einzelne Flügel gingen bei Instanzen nicht: die ganze Möwe
+// wurde um bis zu 28 Prozent breiter und wieder schmaler, die Flügel selbst
+// blieben unbewegt. Geprüft wird jetzt am Bild — bei stillgelegter Welt zwei
+// Aufnahmen eine halbe Schlagperiode auseinander.
+//
+// Dieser Block steht am Ende, weil er die Simulation anhält und die Kamera
+// freistellt. Alles danach liefe auf einer eingefrorenen Welt.
+const schlag = await (async () => {
+ const vorbereitet = await page.evaluate(() => {
+  const L = window.LOWTIDE, t = L.world.tiere;
+  if (!t?.moewenNetz) return null;
+  // Ein Aufruf mit weit entferntem Spieler: sonst hebt die Möwe um neun
+  // Meter ab, weil sie ihn in vierzig Metern für eine Störung hält.
+  t.update(1 / 60, 0, {x: -900, z: 900});
+  t.update = () => {};
+  const a = t.moewenNetz.instanceMatrix.array;
+  const x = a[12], y = a[13], z = a[14];
+  // Von unten gegen den Himmel.
+  L.luftbild(x - 2.2, y - 3.4, z - 2.2, x, y, z);
+  L.sim.paused = true;
+  return {attribut: !!t.moewenNetz.geometry.getAttribute('schlag'),
+   uniform: !!t.moewenNetz.material.userData.vZeit, tiere: t.moewen.length};
+ });
+ if (!vorbereitet) return null;
+ const aufnahme = async (wert, name) => {
+  await page.evaluate(v => {window.LOWTIDE.world.tiere.moewenNetz.material.userData.vZeit.value = v;}, wert);
+  const f0 = await page.evaluate(() => window.LOWTIDE.frames);
+  await page.waitForFunction(k => window.LOWTIDE.frames > k + 1, f0, {timeout: 120000});
+  await page.evaluate(n => {
+   const w = window.LOWTIDE.world, g = w.renderer.getContext();
+   w.zeichne();
+   const b = new Uint8Array(900 * 520 * 4);
+   g.readPixels(0, 0, 900, 520, g.RGBA, g.UNSIGNED_BYTE, b);
+   (window.__schlag || (window.__schlag = {}))[n] = b;
+  }, name);
+ };
+ await aufnahme(0, 'tief');
+ await aufnahme(Math.PI, 'hoch');
+ await aufnahme(0, 'wieder');
+ const abstand = (p, q) => page.evaluate(([p, q]) => {
+  const a = window.__schlag[p], b = window.__schlag[q];
+  let d = 0, n = 0;
+  for (let y = 160; y < 360; y++) for (let x = 330; x < 570; x++) {
+   const i = (y * 900 + x) * 4;
+   d += Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]);
+   n += 3;
+  }
+  return d / n;
+ }, [p, q]);
+ return {...vorbereitet, bewegt: await abstand('tief', 'hoch'), stabil: await abstand('tief', 'wieder')};
+})();
+pruefe('Die Möwe hat einen Flügelschlag je Tier', !!schlag?.attribut && !!schlag?.uniform,
+ schlag ? `${schlag.tiere} Möwen, Attribut ${schlag.attribut}, Uniform ${schlag.uniform}` : 'keine Tierwelt');
+pruefe('Der Flügelschlag bewegt die Geometrie', (schlag?.bewegt ?? 0) > 1,
+ `halbe Periode ${schlag?.bewegt.toFixed(3)}, gleiche Stellung ${schlag?.stabil.toFixed(3)}`);
+pruefe('Bei gleicher Flügelstellung ist das Bild dasselbe', (schlag?.stabil ?? 9) < .05,
+ `${schlag?.stabil.toFixed(4)}`);
+
 // Die Touch-Oberfläche hängt an `@media(pointer:coarse)` und ist auf einem
 // Zeigergerät ausgeblendet. Dafür braucht es einen eigenen Browser mit
 // Berührungsemulation, sonst prüft man nur unsichtbare Knöpfe. Der erste

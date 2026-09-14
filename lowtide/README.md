@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 299 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 302 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1318,6 +1318,51 @@ wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
 besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
+
+## Vierundsechzig Möwen, die nicht mit den Flügeln schlugen
+
+Zuerst ein Fehler von mir. Ich habe nach Tieren gesucht, die Trefferliste
+falsch gelesen — sie nannte nur Dateinamen, und „hund" steckt in „hundert" —
+und daraus geschlossen, auf der Karte lebe nichts. Dann habe ich ein
+komplettes Vogelmodul geschrieben. `wildlife.js` gibt es seit Langem: 64
+Möwen in vier Schwärmen, 90 Fische, 7 Delfine, 9 Alligatoren, alle mit
+Schreckreaktion auf Schüsse. Mein Modul ist gelöscht.
+
+Der Befund steckte in der vorhandenen Datei. Im Update stand:
+
+```js
+// Flügelschlag über die Breite: einzelne Flügel gehen bei Instanzen nicht.
+const schlag = 1 + Math.sin(zeit * (8 + stoerung * 6) + m.flug) * .28;
+o.scale.set(schlag, 1, 1);
+```
+
+Die Möwe wurde also achtmal je Sekunde um 28 Prozent breiter und wieder
+schmaler. Die Flügel bewegten sich dabei nicht — der ganze Vogel wurde
+gestaucht und gestreckt, Rumpf eingeschlossen. Und die Begründung stimmt
+nicht: `foliage.js` bewegt in derselben Anwendung seit Langem einzelne
+Vertices je Instanz, über `onBeforeCompile`.
+
+Jetzt dasselbe für die Möwen. Je Tier ein Attribut aus Phase und
+Ratenabweichung (0,88 bis 1,12 — ein Schwarm im Gleichtakt sieht aus wie eine
+Animation), im Vertexshader ein Ausschlag, der erst außerhalb des Rumpfs
+beginnt, und eine mitgedrehte Normale, damit der Flügel beim Aufschlag anders
+steht im Licht. Die Uniform ist keine Uhr, sondern die aufsummierte
+Schlagzeit: mit der absoluten Zeit hätte jede Änderung der Rate bei Störung
+einen Sprung in der Phase ergeben.
+
+Nachgewiesen am Bild, bei angehaltener Welt, Kamera von unten gegen den
+Himmel: zwei Aufnahmen eine halbe Schlagperiode auseinander unterscheiden
+sich im Mittel um **3,23** Helligkeitsstufen je Kanal, zwei Aufnahmen bei
+gleicher Flügelstellung um **0,00**. Die zweite Zahl ist die wichtigere — sie
+zeigt, dass die erste den Flügelschlag misst und nicht Wellen, Verkehr oder
+Tageslicht. Ohne das Anhalten lagen beide Werte bei 3,5 und 5,1, die
+Vergleichsmessung also über der eigentlichen.
+
+Das Wackeln um die Längsachse, das den fehlenden Schlag ersetzen sollte
+(sechs Radiant je Sekunde, 0,35 Ausschlag), ist einer festen Schräglage in
+die Kurve gewichen.
+
+302 Prüfungen bestanden, keine gefallen.
 
 ## Fünfzehneinhalb Kilometer Fahrbahn mit einer einzigen Markierung
 
