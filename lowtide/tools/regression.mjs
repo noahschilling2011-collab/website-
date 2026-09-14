@@ -3183,8 +3183,16 @@ const menge = await page.evaluate(() => {
   if (!n) return '?';
   const a = anfang.get(id), p = n.path || [];
   const ziel = p[n.target % Math.max(1, p.length)];
+  // Zwei Verdächtige: ein Hindernis genau vor der Nase, oder ein Pulk, aus
+  // dem keine Richtung mehr frei ist. Also beides messen — wie viele Figuren
+  // innerhalb eines Meters stehen, und ob der nächste Schritt an Geometrie
+  // scheitert.
+  const nachbarn = (s._alleNpcs || s.npcs).filter(m => m !== n && Math.hypot(m.x - n.x, m.z - n.z) < 1).length;
+  const vor = ziel ? Math.atan2(ziel.x - n.x, ziel.z - n.z) : n.yaw;
+  const versperrt = s.blocked ? !!s.blocked({x: n.x + Math.sin(vor) * .5, z: n.z + Math.cos(vor) * .5}, .3) : '?';
   return `Weg ${a ? Math.hypot(n.x - a.x, n.z - a.z).toFixed(1) : '?'} m, ${p.length} Knoten,` +
-   ` ${ziel ? Math.hypot(ziel.x - n.x, ziel.z - n.z).toFixed(1) : '?'} m zum Ziel, Tempo ${n.pace}`;
+   ` ${ziel ? Math.hypot(ziel.x - n.x, ziel.z - n.z).toFixed(1) : '?'} m zum Ziel, Tempo ${n.pace},` +
+   ` ${nachbarn} Nachbarn, Hindernis voraus ${versperrt}`;
  };
  const schlimmste = [...taeter.entries()].sort((u, v) => v[1].n - u[1].n).slice(0, 3)
   .map(([k, e]) => {
@@ -3192,11 +3200,11 @@ const menge = await page.evaluate(() => {
    return `${k} ${e.zustand} ${e.n}x bis ${e.min.toFixed(2)} m [${merkmal(i)} | ${merkmal(j)}]`;
   }).join('; ');
  return {mittel: summe / ticks, eng: summeEng / ticks, engster, hoechst, durchlaeufe, schlimmste,
-  figuren: (s._alleNpcs || s.npcs).filter(gehend).length};
+  solids: (s.solids || []).length, figuren: (s._alleNpcs || s.npcs).filter(gehend).length};
 });
 pruefe('Die Menge steht nicht ineinander',
  menge.eng < .2 && menge.engster > .38 && menge.durchlaeufe < 2,
- `${menge.eng.toFixed(2)} Paare durchdringen sich, engster Abstand ${menge.engster.toFixed(2)} m, ${menge.durchlaeufe} echte Durchgänge bei ${menge.figuren} gehenden Figuren (${menge.mittel.toFixed(2)} Paare unter 0,50 m, höchstens ${menge.hoechst})${menge.schlimmste ? ' — ' + menge.schlimmste : ''}`);
+ `${menge.eng.toFixed(2)} Paare durchdringen sich, engster Abstand ${menge.engster.toFixed(2)} m, ${menge.durchlaeufe} echte Durchgänge bei ${menge.figuren} gehenden Figuren (${menge.mittel.toFixed(2)} Paare unter 0,50 m, höchstens ${menge.hoechst}, ${menge.solids} Hindernisse)${menge.schlimmste ? ' — ' + menge.schlimmste : ''}`);
 
 // Gangart. Im Schrittzyklus stand jede Zahl als Konstante — Ausschlag der
 // Beine .46, des Knies .72, der Arme .30, Auf- und Abbewegung .045. Bei
