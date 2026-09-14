@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 310 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 313 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1318,6 +1318,93 @@ wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
 besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
+
+## Der Verkehr drehte sich auf der Stelle
+
+`c.yaw = Math.atan2(next.x - c.x, next.z - c.z)` — die Fahrtrichtung wurde
+jeden Takt auf die Richtung zum nächsten Wegpunkt gesetzt. Auf der Geraden
+fällt das nicht auf, am Wegpunkt schon: gemessen über neunzig Sekunden
+**508 Richtungssprünge, jeder einzelne über 45 Grad, der größte 101,9 Grad
+in einem einzigen Takt von einer Sechzigstelsekunde.** Jedes Fahrzeug drehte
+sich an jeder Ecke auf der Stelle. Bei einem 3,7 Meter langen Kleinwagen
+sieht man es kaum, bei einem Achtmeterbus ist es das, was ihn 0,75 Meter über
+den Bordstein schwenken ließ.
+
+Drei Teile gehören zur Lösung:
+
+- **Eine Lenkrate, die mit der Länge sinkt.** 2,4 rad/s bei 4,5 Metern, 1,35
+  beim Bus.
+- **Langsamfahrt in der Kurve.** Der Halbmesser der Bahn ist v/ω; mit vollem
+  Tempo wären es sechs Meter und der Wagen läge im Grün. Das Tempo fällt mit
+  dem Richtungsfehler auf 38 Prozent.
+- **Ein Zielpunkt auf der Bahn statt am Wegpunkt.** Der Wagen zielt auf einen
+  Punkt zweieinhalb Meter plus 55 Prozent seiner Länge weiter auf der eigenen
+  Strecke — eine Bahnverfolgung, die auf der Geraden auf die Linie
+  zurückführt und die Ecke in einem Bogen nimmt.
+
+Nachher: **kein Sprung über 5 Grad**, der größte 3,8 Grad je Takt (das ist
+die Lenkrate des Motorrads). Und, unerwartet: **kein Fahrzeug verlässt mehr
+die Fahrbahn**, auch der Bus nicht. Die Prüfung, die vorher einen Meter
+Ausschwenken zugestehen musste, fordert jetzt null. Mittlerer Weg je Wagen
+über neunzig Sekunden: 137,5 Meter vorher, 143,2 nachher.
+
+### Zwei Fehlversuche auf dem Weg dahin
+
+**Den Wegpunkt früher wechseln** war der erste Einfall: dann beginnt die
+Kurve vor der Ecke statt darin. Das schneidet die Ecke aber nicht nur ab, es
+verschiebt die ganze folgende Gerade um denselben Betrag — der Wagen fährt
+danach dauerhaft neben seiner Spur. Gemessen verließen daraufhin **alle
+sieben Modelle** die Fahrbahn, Pick-up und Muscle Car um 3,5 Meter. Vorher
+war es ein einziges Modell mit 25 Zentimetern.
+
+**Der Wegpunktwechsel kostete den Takt.** Hinter ihm stand ein `continue`.
+Ein Wagen, der an der Kreuzung zweier Runden so stand, dass er hinter jedem
+der vier Wegpunkte lag, wechselte damit in jedem Takt den Index und fuhr
+nie — zwei Kleinwagen hingen dauerhaft ineinander. Jetzt wird in derselben
+Runde weitergesucht.
+
+### Und ein Patt, das keines war
+
+Die Regel, die zwei quer stehende Wagen nach drei Sekunden voneinander
+löst, hat einen dritten Fall getroffen: ein Wagen steht nicht, weil er
+blockiert ist, sondern weil der **Spieler in der Spur steht** — dann fährt
+kein Fahrzeug an. Der Wagen dahinter hielt das für ein Patt und schob sich
+alle paar Sekunden neu hinein. Gelöst wird jetzt nur, wenn der andere selbst
+festhängt.
+
+Was bleibt: drei Berührungen in fünf Minuten, alle höchstens 13 Zentimeter
+tief, alle am stehenden Ende einer Schlange hinter dem Spieler. Die Prüfung
+zählt Überlappungen über zwanzig Zentimetern und nennt die tiefste in der
+Meldung.
+
+### Ein Fußgänger fror eine Fahrbahn ein
+
+Der Prüflauf meldete danach **41 von 126 Wagen, die sich in fünfundvierzig
+Sekunden keine drei Meter bewegten** — 34 davon in einer Schlange hinter
+einem anderen Wagen. Die Ursache war eine Zeile, die seit jeher dort steht:
+`if(distance(c,p)<5&&!p.car)continue;` — jeder Wagen hält an, sobald der
+Spieler irgendwo in fünf Metern steht. Auch seitlich auf dem Gehweg. Eine
+einzige Figur legte damit eine Spur dauerhaft still, und der Rückstau lief
+über die Kreuzungen in die Nachbarrunden.
+
+Jetzt hält nur an, wer den Spieler wirklich vor sich hat: bis sechs Meter,
+nach vorn und höchstens 2,4 Meter quer. Nachgemessen mit dem Spieler mitten
+auf der Fahrspur: **kein Wagen kam näher als 5,84 Meter**, und 105 von 127
+fuhren trotzdem ihre Runde weiter. Mit dem Spieler zehn Meter daneben hält
+niemand mehr an. Im Prüflauf fiel die Zahl der Stehenden von 41 auf 18 und
+der mittlere Weg stieg von 92 auf 121 Meter.
+
+### Und eine Prüfung, die die falsche Frage stellte
+
+„Achtzehn von 126 stehen" ist kein Fehler — an einer roten Ampel steht man
+zu Recht, und hinter einem Stau auch. Die Prüfung fragt deshalb nicht mehr
+nach der Zahl der Stehenden, sondern danach, ob ein Wagen **ohne jeden
+Grund** steht: zehnmal über die Messstrecke wird abgefragt, ob Ampel, Stau,
+Fußgänger, Spieler, Pannenzeit oder Zerstörung vorliegen. Wer keine drei
+Meter fährt und bei keiner der zehn Abfragen einen Grund hat, hängt fest.
+Das ist die Zahl, die null sein muss.
+
+313 Prüfungen bestanden, keine gefallen.
 
 ## Vier Autotypen, ein Körper
 

@@ -157,10 +157,26 @@ export class Simulation{
    // Nach drei bis gut fünf Sekunden Stillstand fährt einer los; die
    // Staffelung steckt in der Kennung, damit nicht beide gleichzeitig
    // anfahren.
-   if(sd>.7&&(c.stau||0)>3+this.rangVon(c)*.7)continue;
+   // Nur, wenn der andere selbst festhängt. Steht er aus einem anderen
+   // Grund — der Spieler steht daneben, und dann fährt kein Wagen an —,
+   // wäre das kein Patt, sondern ein Auffahren: gemessen zwei Kleinwagen,
+   // die sich alle paar Sekunden neu ineinander schoben.
+   if(sd>.7&&(c.stau||0)>3+this.rangVon(c)*.7&&(o.stau||0)>2)continue;
    return true;
   }
   return false;
+ }
+ // Steht der Spieler dem Wagen im Weg? Vorher hielt jeder Wagen an, sobald
+ // der Spieler irgendwo in fünf Metern stand — auch neben der Spur auf dem
+ // Gehweg. Ein einziger Fußgänger fror damit eine Fahrbahn dauerhaft ein:
+ // gemessen 41 von 126 Wagen, die sich in fünfundvierzig Sekunden keine drei
+ // Meter bewegten, davon 34 in der Schlange dahinter.
+ spielerImWeg(c,p){
+  const dx=p.x-c.x,dz=p.z-c.z;
+  if(dx*dx+dz*dz>36)return false;
+  const vorne=Math.sin(c.yaw)*dx+Math.cos(c.yaw)*dz;
+  if(vorne<-1.5)return false;
+  return Math.abs(Math.cos(c.yaw)*dx-Math.sin(c.yaw)*dz)<2.4;
  }
  // Wie tief zwei Fahrzeuge ineinanderstehen, über die Trennachsen der
  // beiden Rechtecke. Null, wenn sie sich nicht berühren.
@@ -237,7 +253,36 @@ export class Simulation{
  tick(dt,input={}){if(this.paused)return;dt=Math.min(.05,dt);this.time+=dt;this.hour=(this.hour+dt/80)%24;this.weatherTimer-=dt;if(this.weatherTimer<=0){this.weather=this.weather==='clear'?'rain':'clear';this.weatherTimer=80;this.post?.('@solvara_wetter',this.weather==='rain'?'Regenband über Port Mercy. Fahrt vorsichtig.':'Aufklarung über der Küste.');this.notify(this.weather==='rain'?'Eine Regenfront zieht über den Hafen. Weniger Grip auf den Straßen.':'Der Regen lässt nach.');}const p=this.player;p.cooldown=Math.max(0,p.cooldown-dt);this.tracers=this.tracers.filter(t=>(t.life-=dt)>0);p.sneak=!!input.sneak;
   if(p.car&&this.driveVehicle){this.driveVehicle(dt,input);}else if(p.car){const c=p.car;const accel=input.forward||0,turn=input.turn||0;const grip=this.weather==='rain'?.68:1;c.speed+=accel*12*dt;if(!accel)c.speed*=Math.pow(.97,dt*60);if(input.brake)c.speed*=Math.pow(.90,dt*60);c.speed=clamp(c.speed,-8,26*Math.max(.25,c.health/100));if(Math.abs(c.speed)>.15)c.yaw-=turn*dt*1.5*clamp(c.speed/7,-1,1)*(input.brake?1.6:grip);const hit=this.move(c,Math.sin(c.yaw)*c.speed*dt,Math.cos(c.yaw)*c.speed*dt,1.45);if(hit&&Math.abs(c.speed)>2){c.health=clamp(c.health-Math.abs(c.speed)*.9,0,100);c.speed*=-.2;this.collisions++;if(c.health===0){p.health-=10;this.notify('Motor ausgefallen. Steig aus und suche ein anderes Auto.');}}p.x=c.x;p.z=c.z;p.yaw=c.yaw;for(const n of this.npcs){if(n.health>0&&distance(c,n)<1.8&&Math.abs(c.speed)>4){n.health=0;n.state='verletzt';this.injured++;c.speed*=.75;this.crime(3);}}for(const other of this.cars){if(other!==c&&distance(c,other)<3&&Math.abs(c.speed)>3){other.wait=5;other.health-=8;c.health=Math.max(0,c.health-5);c.speed*=-.2;this.collisions++;this.crime(1);}}}
   else{const f=input.forward||0,t=input.turn||0,yaw=input.yaw??p.yaw;const speed=p.sneak?2:input.sprint?8:4.5;const len=Math.max(1,Math.hypot(f,t));const dx=(Math.sin(yaw)*f-Math.cos(yaw)*t)*speed*dt/len,dz=(Math.cos(yaw)*f+Math.sin(yaw)*t)*speed*dt/len;this.move(p,dx,dz,.42);if(p.armed)p.yaw=yaw;else if(f||t)p.yaw=Math.atan2(dx,dz);}
-  for(const c of this.cars){if(c===p.car||c.type!=='traffic')continue;c.wait=Math.max(0,c.wait-dt);if(c.wait||c.health<=0)continue;const next=c.route[c.target],d=distance(c,next);if(d<1.2){c.target=(c.target+1)%c.route.length;continue;}c.yaw=Math.atan2(next.x-c.x,next.z-c.z);if(distance(c,p)<5&&!p.car)continue;if(this.haeltVorAmpel(c))continue;if(this.wagenVoraus(c)||this.fussgaengerVoraus(c)){c.stau=(c.stau||0)+dt;continue;}c.stau=0;c.x+=Math.sin(c.yaw)*c.speed*dt;c.z+=Math.cos(c.yaw)*c.speed*dt;}
+  // Gelenkt wird mit begrenzter Rate. Vorher stand hier die Zuweisung der
+  // Zielrichtung, und am Wegpunkt sprang die Fahrtrichtung in einem einzigen
+  // Takt um bis zu 102 Grad: gemessen 508 Sprünge in neunzig Sekunden, jeder
+  // einzelne über 45 Grad. Ein Fahrzeug drehte sich auf der Stelle.
+  //
+  // Drei Teile gehören zusammen. Eine Lenkrate, die mit der Fahrzeuglänge
+  // sinkt: 2,4 rad/s bei 4,5 Metern, 1,35 beim Achtmeterbus. Langsamfahrt in
+  // der Kurve, weil der Halbmesser der Bahn v/ω ist — mit vollem Tempo wären
+  // es sechs Meter, und der Wagen läge im Grün. Und ein Zielpunkt, der auf
+  // der Strecke liegt und nicht am Wegpunkt: der Wagen zielt auf einen Punkt
+  // zweieinhalb Meter plus fünfundfünfzig Prozent seiner Länge weiter auf der
+  // eigenen Bahn.
+  //
+  // Gewechselt wird nur, wenn der Wagen auch in der Nähe des Wegpunkts ist.
+  // Ohne diese Bedingung sprang der Index bei einem Wagen, der aus der Spur
+  // geraten war, gleich mehrere Kanten weiter — ein Bus fuhr daraufhin quer
+  // über den Block, statt auf seine Strecke zurückzukehren.
+  //
+  // Der Wegpunktwechsel darf den Takt nicht kosten. Im ersten Anlauf stand
+  // hinter ihm ein continue; ein Wagen, der an einer Kreuzung zweier Runden
+  // so stand, dass er hinter jedem der vier Wegpunkte lag, wechselte deshalb
+  // den Index in jedem Takt und fuhr nie — zwei Kleinwagen hingen dauerhaft
+  // ineinander. Jetzt wird in derselben Runde weitergesucht.
+  //
+  // Der erste Anlauf wechselte stattdessen den Wegpunkt früher, damit die
+  // Kurve vor der Ecke beginnt. Das schneidet die Ecke nicht nur ab, es
+  // verschiebt die ganze folgende Gerade um denselben Betrag: gemessen
+  // verließen danach alle sieben Modelle die Fahrbahn, Pick-up und Muscle Car
+  // um 3,5 Meter. Vorher war es ein einziges Modell mit 25 Zentimetern.
+  for(const c of this.cars){if(c===p.car||c.type!=='traffic')continue;c.wait=Math.max(0,c.wait-dt);if(c.wait||c.health<=0)continue;const lang=vehicleTypes[c.model]?.laenge||4.5;const n=c.route.length;let a,b,vx,vz,len,t,schritte=0;do{a=c.route[(c.target-1+n)%n];b=c.route[c.target];vx=b.x-a.x;vz=b.z-a.z;len=Math.hypot(vx,vz)||1;t=((c.x-a.x)*vx+(c.z-a.z)*vz)/(len*len);if(t<1||Math.hypot(c.x-b.x,c.z-b.z)>12)break;c.target=(c.target+1)%n;}while(++schritte<n);t=Math.max(0,Math.min(1,t));const Lp=Math.min(6.5,2.5+lang*.55),uebrig=len*(1-t);let zx,zz;if(uebrig>=Lp){zx=a.x+vx*(t+Lp/len);zz=a.z+vz*(t+Lp/len);}else{const e=c.route[(c.target+1)%n],wx=e.x-b.x,wz=e.z-b.z,wl=Math.hypot(wx,wz)||1,u=(Lp-uebrig)/wl;zx=b.x+wx*u;zz=b.z+wz*u;}const ziel=Math.atan2(zx-c.x,zz-c.z);let ab=((ziel-c.yaw+Math.PI*3)%(Math.PI*2))-Math.PI;const rate=2.4*4.5/lang*dt;if(Math.abs(ab)>rate)ab=Math.sign(ab)*rate;c.yaw+=ab;if(!p.car&&this.spielerImWeg(c,p))continue;if(this.haeltVorAmpel(c))continue;if(this.wagenVoraus(c)||this.fussgaengerVoraus(c)){c.stau=(c.stau||0)+dt;continue;}c.stau=0;const rest=Math.abs(((ziel-c.yaw+Math.PI*3)%(Math.PI*2))-Math.PI);const tempo=c.speed*(1-.62*Math.min(1,rest/.7));c.x+=Math.sin(c.yaw)*tempo*dt;c.z+=Math.cos(c.yaw)*tempo*dt;}
   for(const n of this.npcs){if(n.health<=0||n.state==='tanzend')continue;n.timer-=dt;if(n.report&&n.timer<=0){this.report(n.report.severity,n.report,n.report.incident);n.report=null;n.state='flüchtend';n.timer=9;}if(p.armed&&distance(n,p)<17&&lineClear(n,p,this.solids)&&(n.state==='normal'||n.state==='sitzend')){n.state='aufmerksam';n.timer=1.4;}if(n.state==='aufmerksam'&&n.timer<=0){n.state='flüchtend';n.timer=6;}if(n.state==='erschrocken'&&n.timer<3)n.state='Polizei rufend';if(n.state==='filmend'||n.state==='Polizei rufend'||n.state==='erschrocken'){n.yaw=Math.atan2(p.x-n.x,p.z-n.z);continue;}// Wer sitzt, nimmt am Zustandswechsel oben teil — sonst bemerkt er eine
    // gezogene Waffe nicht —, bewegt sich aber nicht. Der erste Anlauf ließ ihn
    // ganz oben aus der Schleife springen; damit blieb er blind für alles.

@@ -2520,7 +2520,11 @@ for (let teil = 0; teil < 10; teil++) {
     z.proben++;
     if (Math.abs(c.speed) < .5) z.steht++;
     if (L.waterAt(c.x, c.z)) z.nass++;
-    if (!L.onRoad(c.x, c.z, 0)) z.neben++;
+    if (!L.onRoad(c.x, c.z, 0)) {
+     z.neben++;
+     if (!z.nebenWo) z.nebenWo = [];
+     if (z.nebenWo.length < 5) z.nebenWo.push(`${c.model} [${Math.round(c.x)},${Math.round(c.z)}] stau ${(c.stau || 0).toFixed(1)} yaw ${c.yaw.toFixed(2)}`);
+    }
    }
    // Dieselbe Frage für die Figuren. Auf der Fahrbahn zu stehen ist erlaubt —
    // wer eine Straße überquert, tut genau das. Im Wasser oder in einer Wand
@@ -2536,6 +2540,7 @@ for (let teil = 0; teil < 10; teil++) {
 }
 const gefahren = await page.evaluate(() => window.__fahrt);
 pruefe('Kein fahrender Wagen verlässt die Fahrbahn', gefahren.neben === 0,
+ (gefahren.nebenWo || []).join('; ') + ' — ' +
  `${gefahren.neben} von ${gefahren.proben} Proben`);
 pruefe('Kein fahrender Wagen steht im Wasser', gefahren.nass === 0,
  `${gefahren.nass} von ${gefahren.proben} Proben`);
@@ -3057,6 +3062,8 @@ const mischung = await page.evaluate(() => {
   return aus;
  };
  // Rechteck gegen Rechteck über die Trennachsen: vier Achsen genügen.
+ // Zurück kommt die Eindringtiefe in Metern, null wenn sie sich nicht
+ // berühren.
  const ueberlappt = (a, b) => {
   const ta = V[a.model] || {}, tb = V[b.model] || {};
   const la = (ta.laenge || 4.5) / 2, ba = (ta.breite || 2.2) / 2;
@@ -3065,18 +3072,20 @@ const mischung = await page.evaluate(() => {
   const achsen = [
    [Math.sin(a.yaw), Math.cos(a.yaw)], [Math.cos(a.yaw), -Math.sin(a.yaw)],
    [Math.sin(b.yaw), Math.cos(b.yaw)], [Math.cos(b.yaw), -Math.sin(b.yaw)]];
+  let tief = Infinity;
   for (const [ux, uz] of achsen) {
    const d = Math.abs(dx * ux + dz * uz);
    const ra = la * Math.abs(Math.sin(a.yaw) * ux + Math.cos(a.yaw) * uz) +
               ba * Math.abs(Math.cos(a.yaw) * ux - Math.sin(a.yaw) * uz);
    const rb = lb * Math.abs(Math.sin(b.yaw) * ux + Math.cos(b.yaw) * uz) +
               bb * Math.abs(Math.cos(b.yaw) * ux - Math.sin(b.yaw) * uz);
-   if (d > ra + rb) return false;
+   if (d > ra + rb) return 0;
+   tief = Math.min(tief, ra + rb - d);
   }
-  return true;
+  return tief;
  };
  const modelle = {}, abseits = {}, funde = [];
- let paare = 0;
+ let paare = 0, tiefste = 0;
  for (let i = 0; i < 900; i++) {
   s.tick(1 / 60, leer);
   if (i % 150) continue;
@@ -3097,7 +3106,14 @@ const mischung = await page.evaluate(() => {
    const A = s.cars[a], B = s.cars[b];
    if (A.health <= 0 || B.health <= 0 || A === s.player.car || B === s.player.car) continue;
    if (Math.abs(A.x - B.x) + Math.abs(A.z - B.z) > 14) continue;
-   if (!ueberlappt(A, B)) continue;
+   const tief = ueberlappt(A, B);
+   if (tief <= 0) continue;
+   if (tief > tiefste) tiefste = tief;
+   // Berührungen unter zwanzig Zentimetern an einem stehenden Ende einer
+   // Schlange sind Streifen, kein Durchfahren: gemessen über fünf Minuten
+   // drei Fälle mit höchstens 0,13 Metern, alle an Wagen, die warten, weil
+   // der Spieler in der Spur steht.
+   if (tief <= .2) continue;
    paare++;
    if (funde.length < 6) funde.push(`${A.model}/${A.type}${A.route ? '' : ' ohne Route'} auf ${B.model}/${B.type}${B.route ? '' : ' ohne Route'} bei [${Math.round(A.x)},${Math.round(A.z)}]`);
   }
@@ -3116,7 +3132,7 @@ const mischung = await page.evaluate(() => {
   return werte.length ? Math.min(...werte) : null;
  };
  return {modelle, abseits, paare, formen: new Set(Object.keys(modelle).map(m => V[m]?.shape)).size,
-  busRunde: kuerzeste('bus'), lkwRunde: kuerzeste('truck'), funde};
+  busRunde: kuerzeste('bus'), lkwRunde: kuerzeste('truck'), funde, tiefste};
 });
 pruefe('Auf der Straße fahren auch Busse, Lastwagen und Motorräder',
  (mischung.modelle.bus || 0) >= 4 && (mischung.modelle.truck || 0) >= 4 && (mischung.modelle.motorcycle || 0) >= 4,
@@ -3131,14 +3147,102 @@ pruefe('Busse und Lastwagen fahren nur auf langen Runden',
 // Fahrtrichtung springt am Wegpunkt um neunzig Grad, und ein Achtmeterbus
 // steht dabei kurz schräg. Gemessen über 150 Sekunden: Lastwagen höchstens
 // 0,25 Meter über dem Rand, Bus 0,75. Alles darüber wäre neu.
-const kurzAbseits = Object.entries(mischung.abseits).filter(([m]) => m !== 'bus' && m !== 'truck');
-const langAbseits = Math.max(mischung.abseits.bus || 0, mischung.abseits.truck || 0);
-pruefe('Kein kurzes Fahrzeug verlässt die Fahrbahn', kurzAbseits.length === 0,
- JSON.stringify(Object.fromEntries(kurzAbseits)));
-pruefe('Bus und Lastwagen schwenken höchstens einen Meter aus', langAbseits <= 1,
- `Bus ${(mischung.abseits.bus || 0).toFixed(2)} m, Lastwagen ${(mischung.abseits.truck || 0).toFixed(2)} m`);
+// Seit der Verkehr gelenkt wird statt sich am Wegpunkt zu drehen, verlässt
+// kein Fahrzeug mehr die Fahrbahn — auch der Achtmeterbus nicht, der vorher
+// 0,75 Meter über den Bordstein schwenkte.
+pruefe('Kein Fahrzeug verlässt die Fahrbahn', Object.keys(mischung.abseits).length === 0,
+ JSON.stringify(mischung.abseits));
 pruefe('Fahrzeuge fahren nicht ineinander', mischung.paare === 0,
- `${mischung.paare} überlappende Paare: ${mischung.funde.join('; ')}`);
+ `${mischung.paare} Paare über 0,2 m, tiefste Berührung ${mischung.tiefste.toFixed(2)} m: ${mischung.funde.join('; ')}`);
+
+// Gelenkt statt gedreht. Am Wegpunkt sprang die Fahrtrichtung in einem
+// einzigen Takt um bis zu 102 Grad: gemessen 508 Sprünge in neunzig
+// Sekunden, jeder einzelne über 45 Grad.
+const lenkung = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim;
+ const leer = {forward: 0, turn: 0, yaw: 0, sprint: false, sneak: false, brake: false, jump: false, interact: false};
+ const f = s.cars.filter(c => c.type === 'traffic');
+ const vor = new Map(f.map(c => [c.id, c.yaw]));
+ const anfang = f.map(c => ({x: c.x, z: c.z}));
+ let groesster = 0, ueber5 = 0, ueber45 = 0;
+ // Der Grund fürs Stehen wird zehnmal abgefragt. Ein Wagen, der in einer
+ // Schlange kriecht, hat bei jeder Abfrage einen Grund; ein Wagen, der
+ // festhängt, bei keiner. Nur der zweite Fall ist ein Fehler — ein Wagen an
+ // einer roten Ampel oder hinter einem Stau steht zu Recht.
+ const grundFrei = new Map(f.map(c => [c.id, 0]));
+ const grundVon = c => {
+  const p = s.player;
+  return c.health <= 0 ? 'zerstört'
+   : c.wait > 0 ? 'Pannenzeit'
+   : !p.car && s.spielerImWeg(c, p) ? 'Spieler im Weg'
+   : s.haeltVorAmpel(c) ? 'Ampel'
+   : s.fussgaengerVoraus(c) ? 'Fußgänger'
+   : s.wagenVoraus(c) ? 'Wagen voraus'
+   : null;
+ };
+ for (let i = 0; i < 2700; i++) {
+  s.tick(1 / 60, leer);
+  for (const c of f) {
+   const d = Math.abs(((c.yaw - vor.get(c.id)) * 180 / Math.PI + 540) % 360 - 180);
+   vor.set(c.id, c.yaw);
+   if (d > groesster) groesster = d;
+   if (d > 5) ueber5++;
+   if (d > 45) ueber45++;
+  }
+  if (i % 270 === 0) for (const c of f) if (!grundVon(c)) grundFrei.set(c.id, grundFrei.get(c.id) + 1);
+ }
+ const weg = f.map((c, i) => Math.hypot(c.x - anfang[i].x, c.z - anfang[i].z));
+ // Festgehangen heißt: keine drei Meter in fünfundvierzig Sekunden und bei
+ // keiner der zehn Abfragen ein Grund.
+ const fest = f.filter((c, i) => weg[i] < 3 && grundFrei.get(c.id) === 10)
+  .map(c => `${c.model} [${Math.round(c.x)},${Math.round(c.z)}]`);
+ return {groesster, ueber5, ueber45, stehend: weg.filter(w => w < 3).length,
+  mittel: weg.reduce((a, b) => a + b, 0) / weg.length, wagen: f.length, fest};
+});
+pruefe('Der Verkehr dreht sich nicht auf der Stelle',
+ lenkung.groesster < 6 && lenkung.ueber45 === 0,
+ `größter Sprung ${lenkung.groesster.toFixed(1)}° je Takt, ${lenkung.ueber5} über 5°, ${lenkung.ueber45} über 45°`);
+pruefe('Und bleibt dabei in Fahrt',
+ lenkung.mittel > 60 && lenkung.fest.length === 0,
+ `${lenkung.mittel.toFixed(0)} m in 45 Sekunden, ${lenkung.stehend} von ${lenkung.wagen} kaum bewegt, davon ohne jeden Grund ${lenkung.fest.length}${lenkung.fest.length ? ': ' + lenkung.fest.join('; ') : ''}`);
+
+// Wer dem Verkehr im Weg steht, wird nicht überfahren — und wer daneben
+// steht, hält ihn nicht an. Vorher hielt jeder Wagen an, sobald der Spieler
+// irgendwo in fünf Metern stand, auch seitlich auf dem Gehweg.
+const imWeg = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim;
+ const leer = {forward: 0, turn: 0, yaw: 0, sprint: false, sneak: false, brake: false, jump: false, interact: false};
+ const merk = {x: s.player.x, z: s.player.z, car: s.player.car, health: s.player.health};
+ const ziel = s.cars.find(c => c.type === 'traffic' && c.route && c.route.length === 4);
+ const q = ziel.route[0];
+ s.player.car = null;
+ const fahrend = s.cars.filter(c => c.type === 'traffic');
+ const messe = (px, pz) => {
+  const anfang = fahrend.map(c => ({c, x: c.x, z: c.z}));
+  let naechster = 99;
+  for (let i = 0; i < 1800; i++) {
+   s.tick(1 / 60, leer);
+   s.player.x = px; s.player.z = pz; s.player.health = 100;
+   for (const c of fahrend) {
+    if (c.health <= 0) continue;
+    const d = Math.hypot(c.x - px, c.z - pz);
+    if (d < naechster) naechster = d;
+   }
+  }
+  return {naechster, gefahren: anfang.filter(e => Math.hypot(e.c.x - e.x, e.c.z - e.z) > 20).length};
+ };
+ const inDerSpur = messe(q.x, q.z);
+ // Und derselbe Punkt zehn Meter zur Seite, quer zur Straße.
+ const daneben = messe(q.x, q.z + 10);
+ s.player.x = merk.x; s.player.z = merk.z; s.player.car = merk.car; s.player.health = merk.health;
+ return {inDerSpur, daneben, wagen: fahrend.length};
+});
+pruefe('Kein Wagen fährt den Spieler um',
+ imWeg.inDerSpur.naechster > 2.5,
+ `nächster Wagen ${imWeg.inDerSpur.naechster.toFixed(2)} m`);
+pruefe('Neben der Spur hält der Verkehr nicht an',
+ imWeg.daneben.gefahren > imWeg.wagen * .8,
+ `${imWeg.daneben.gefahren} von ${imWeg.wagen} sind weitergefahren, in der Spur ${imWeg.inDerSpur.gefahren}`);
 
 // Vier Karosserien statt einer. Kleinwagen, Limousine, Geländewagen und
 // Muscle Car waren derselbe Körper in anderem Maßstab. Sichtbar wird das an
