@@ -342,6 +342,29 @@ export class Simulation{
   }
   return !this.blocked(n,.3);
  }
+ // Wer verkeilt ist, wird ein Stück zur Seite gesetzt.
+ //
+ // befreie() oben hilft nur, wer **in** einem Körper steht. Der Prüflauf zeigte
+ // den anderen Fall: zwei Figuren, beide mit Hindernis direkt voraus, beide
+ // 0,0 Meter in zehn Sekunden, 0,12 Meter voneinander entfernt — in einer Ecke
+ // eingeklemmt, aber nicht in der Geometrie. Für sie findet freierWegpunkt()
+ // keinen sichtbaren Wegpunkt, und das Durchprobieren der Liste ändert nichts,
+ // weil von dieser Stelle aus keiner erreichbar ist.
+ //
+ // Gesucht wird der nächste freie Platz im Umkreis von drei Metern, bevorzugt
+ // in Richtung des Ziels. Das ist ein sichtbarer Versatz — die Alternative ist
+ // eine Figur, die für den Rest des Spiels in der Ecke steht.
+ freiSchieben(n,ziel){
+  let bestX=null,bestZ=null,bestWert=1e9;
+  for(let r=1;r<=3;r+=1)for(let i=0;i<12;i++){
+   const a=i/12*Math.PI*2,x=n.x+Math.sin(a)*r,z=n.z+Math.cos(a)*r;
+   if(this.blocked({x,z},.35))continue;
+   const wert=ziel?Math.hypot(ziel.x-x,ziel.z-z):r;
+   if(wert<bestWert){bestWert=wert;bestX=x;bestZ=z;}
+  }
+  if(bestX===null)return false;
+  n.x=bestX;n.z=bestZ;return true;
+ }
  // Der nächste Wegpunkt, den die Figur von hier aus überhaupt sehen kann.
  //
  // "Nimm den nächsten Punkt der Liste" reicht nicht, wenn die Figur an einer
@@ -534,8 +557,15 @@ export class Simulation{
      // die mittlere Strecke je Figur fiel von 9,75 auf 4,81 Meter.
      if(gewonnen<n.pace/(n.grobFaktor||1)*n.messZeit*.2){
       if(this.blocked(n,.3))this.befreie(n);
-      else{const i=this.freierWegpunkt(n);n.target=i>=0?i:(n.target+1)%n.path.length;}
-     }
+      else{
+       const i=this.freierWegpunkt(n);
+       if(i>=0){n.target=i;n.festRunden=0;}
+       // Zweimal hintereinander ohne sichtbaren Wegpunkt heißt: die Stelle
+       // selbst ist die Falle, nicht die Wahl des Ziels.
+       else if((n.festRunden=(n.festRunden||0)+1)>1){this.freiSchieben(n,dest);n.festRunden=0;}
+       else n.target=(n.target+1)%n.path.length;
+      }
+     }else n.festRunden=0;
      n.messZeit=0;n.messAbstand=undefined;
     }
     if(n.messAbstand===undefined)n.messAbstand=rest;}}}
