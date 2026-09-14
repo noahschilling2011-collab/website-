@@ -402,7 +402,7 @@ export class Campaign extends Simulation{
   for(const n of kandidaten){
    if(n.id%3||belegt.has(n.id))continue;
    for(const m of kandidaten){
-    if(m===n||belegt.has(m.id)||m.fuehrer)continue;
+    if(m===n||belegt.has(m.id)||m.imPaar)continue;
     if(Math.hypot(m.x-n.x,m.z-n.z)>12)continue;
     // Nicht hinterherlaufen, sondern denselben Weg gehen: die Begleitung
     // übernimmt Weg und Wegpunkt des anderen und hält nur seitlich Abstand.
@@ -410,7 +410,13 @@ export class Campaign extends Simulation{
     // Paaren blieben nach dreißig Sekunden genau eines zusammen, einzelne
     // Begleiter standen 32 Meter weit weg. Wer einmal den Anschluss verliert,
     // findet ihn so nie wieder.
-    m.fuehrer=n;n.begleitung=m;m.seite=m.id%2?1:-1;m.pace=n.pace;
+    // Keine Verweise auf andere Figuren **in** der Figur: fuehrer und
+    // begleitung zeigten aufeinander, und jeder JSON.stringify über die Menge
+    // lief damit in einen Zirkel — der Prüflauf brach ab, und der Spielstand
+    // hätte es genauso getroffen. Die Zuordnung liegt deshalb in einer Karte
+    // neben den Figuren, in der Figur steht nur ein Merker.
+    this._paare=this._paare||new Map();
+    this._paare.set(m.id,n);m.imPaar=true;n.imPaar=true;m.seite=m.id%2?1:-1;m.pace=n.pace;
     m.path=n.path;m.target=n.target;m.x=n.x+Math.cos(n.yaw)*m.seite*.85;m.z=n.z-Math.sin(n.yaw)*m.seite*.85;
     belegt.add(n.id);belegt.add(m.id);paare++;
     break;
@@ -807,7 +813,7 @@ export class Campaign extends Simulation{
    // schlechtesten Paare genau das Bild — einer setzt sich auf eine Bank, der
    // andere geht weiter, und danach liegen 32 bis 60 Meter dazwischen. Wer
    // begleitet wird oder selbst begleitet, bleibt stehen und geht mit.
-   if(n.id<200||n.guard||n.id%5!==0||n.fuehrer||n.begleitung)continue;
+   if(n.id<200||n.guard||n.id%5!==0||n.imPaar)continue;
    let beste=-1,bester=1e9;
    for(let i=0;i<frei.length;i++){
     const d=Math.hypot(frei[i].x-n.x,frei[i].z-n.z);

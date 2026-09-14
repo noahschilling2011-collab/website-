@@ -478,11 +478,12 @@ export class Simulation{
     // morgens und abends den ganzen Weg der Figur. Wer nur den Index kopierte,
     // griff danach in die alte, kürzere Liste — "Cannot read properties of
     // undefined", und das Spiel blieb stehen.
-    if(n.fuehrer&&n.fuehrer.health>0&&n.fuehrer.path?.length){n.path=n.fuehrer.path;n.target=n.fuehrer.target;}
+    const fuehrer=n.imPaar?this._paare?.get(n.id):null;
+    if(fuehrer&&fuehrer.health>0&&fuehrer.path?.length){n.path=fuehrer.path;n.target=fuehrer.target;}
     const roh=n.path[n.target]||n.path[0];
     if(!roh)continue;
     let dest=roh,tempo=1;
-    if(n.fuehrer){
+    if(fuehrer){
      const ri=Math.atan2(roh.x-n.x,roh.z-n.z);
      dest={x:roh.x+Math.cos(ri)*n.seite*.85,z:roh.z-Math.sin(ri)*n.seite*.85};
      // Anschluss halten. Derselbe Weg allein reicht nicht: eine Begleitung,
@@ -491,10 +492,10 @@ export class Simulation{
      // deshalb direkt auf den anderen zu und darf dabei schneller gehen —
      // gemessen blieben ohne diese Regel von 42 Paaren 20 bis 28 zusammen,
      // einzelne standen 32 Meter weit weg.
-     const abstand=distance(n,n.fuehrer);
-     if(abstand>3){dest={x:n.fuehrer.x,z:n.fuehrer.z};tempo=Math.min(2.2,1+abstand*.12);}
+     const abstand=distance(n,fuehrer);
+     if(abstand>3){dest={x:fuehrer.x,z:fuehrer.z};tempo=Math.min(2.2,1+abstand*.12);}
     }
-    const d=distance(n,dest);if(d<1&&!n.fuehrer){n.target=(n.target+1)%n.path.length;n.messZeit=0;n.messAbstand=undefined;}else if(d>=.35){n.yaw=Math.atan2(dest.x-n.x,dest.z-n.z);const v=n.pace*tempo*(this.weather==='rain'?1.5:1)*dt;const [sx,sz]=this.schrittUmGehen(n,Math.sin(n.yaw)*v,Math.cos(n.yaw)*v);this.move(n,sx,sz,.3);
+    const d=distance(n,dest);if(d<1&&!fuehrer){n.target=(n.target+1)%n.path.length;n.messZeit=0;n.messAbstand=undefined;}else if(d>=.35){n.yaw=Math.atan2(dest.x-n.x,dest.z-n.z);const v=n.pace*tempo*(this.weather==='rain'?1.5:1)*dt;const [sx,sz]=this.schrittUmGehen(n,Math.sin(n.yaw)*v,Math.cos(n.yaw)*v);this.move(n,sx,sz,.3);
     // Wer eine Sekunde lang nicht vorankommt, nimmt den nächsten Wegpunkt.
     //
     // Im Prüflauf standen Figuren zehn Sekunden auf derselben Stelle, obwohl

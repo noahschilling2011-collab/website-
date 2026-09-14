@@ -2494,7 +2494,14 @@ for (const wetter of ['clear', 'rain', 'fog', 'storm']) {
  });
  wetterLicht[wetter] = [await lichter()];
  wetterHelligkeit[wetter] = await page.evaluate(() => {
-  const L = window.LOWTIDE; L.world.zeichne();
+  const L = window.LOWTIDE;
+  // Blitz unmittelbar vor dem Bild abräumen, im selben Aufruf wie das
+  // Zeichnen: zwischen zwei evaluate-Aufrufen rendert die Seite selbst
+  // weiter, und genau in dieser Lücke schlug es ein. Die Prüfung meldete
+  // deshalb über mehrere Läufe hinweg entweder saubere 118,5 oder exakt
+  // 177,6 — der Unterschied ist ein einzelner Blitz mit voller Stärke.
+  do { L.world.blitz = 0; L.world.applySky(1 / 60); } while (L.world.blitz > 0);
+  L.world.zeichne();
   const gl = L.world.renderer.getContext();
   const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
   const px = new Uint8Array(w * h * 4);
@@ -2511,7 +2518,9 @@ for (const wetter of ['clear', 'rain', 'fog', 'storm']) {
  await einschwingen();
  wetterLicht[wetter].push(await lichter());
  wetterZweit[wetter] = await page.evaluate(() => {
-  const L = window.LOWTIDE; L.world.zeichne();
+  const L = window.LOWTIDE;
+  do { L.world.blitz = 0; L.world.applySky(1 / 60); } while (L.world.blitz > 0);
+  L.world.zeichne();
   const gl = L.world.renderer.getContext();
   const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
   const px = new Uint8Array(w * h * 4);
