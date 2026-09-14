@@ -1,5 +1,5 @@
 import {Simulation,clamp,distance,intersects,lineClear,places} from './simulation.js';
-import {bounds,locations,vehicleTypes,weapons,waterAt,groundAt,roadSegments,immobilien,rennen,schatzOrte,onRoad,STADTGEBIETE,intersections} from './content.js';
+import {bounds,locations,vehicleTypes,weapons,waterAt,groundAt,roadSegments,immobilien,rennen,schatzOrte,onRoad,amUeberweg,UEBERWEGE,STADTGEBIETE,intersections} from './content.js';
 import {findPath} from './navigation.js';
 import {storyAufbau,storyZiel,storyTitel,storyAktion,storyTick,konvoiRammen,starteAkt,beendeKampagne,storyReparieren} from './story.js';
 export class Campaign extends Simulation{
@@ -409,6 +409,24 @@ export class Campaign extends Simulation{
    if(n.work&&waterAt(n.work.x,n.work.z)){n.work.x=n.x;n.work.z=n.z;}
   }
 
+  // Querungen auf die Überwege legen. Die Wegekosten in updateRoutines führen
+  // nur die Pendlerwege über die Markierung; in der Freizeit läuft jede Figur
+  // ihren ursprünglichen Rundgang, und der stammt aus fünf Quellen, von denen
+  // keine die Kreuzungen kennt. Gemessen schwankte der Anteil der Querungen
+  // am Überweg je nach Tageszeit zwischen 43 und 79 Prozent.
+  for(const n of this.npcs){
+   for(const weg of [n.path,n.originalPath]){
+    if(!weg||weg.length<2)continue;
+    const neu=[];
+    for(let i=0;i<weg.length;i++){
+     neu.push(weg[i]);
+     const zwischen=this.ueberwegZwischen(weg[i],weg[(i+1)%weg.length],n.id);
+     if(zwischen)neu.push(...zwischen);
+    }
+    weg.length=0;weg.push(...neu);
+   }
+  }
+
   // Und auseinanderschieben, wer aufeinander steht. Die Figuren kommen aus
   // fünf Quellen — Rundgänge, Blöcke, Wachen, Strandmenge, Gehwege —, und
   // keine kennt die Stellen der anderen. Gemessen einundfünfzig Paare näher
@@ -701,7 +719,12 @@ export class Campaign extends Simulation{
     // Straße: 65 von 530 Figuren standen gleichzeitig in einer Fahrspur, die
     // Prüfung lässt zehn Prozent zu.
     n.path=mode==='Freizeit'?n.originalPath.map(p=>({...p}))
-     :[...findPath(n,goal,p=>this.blocked(p,.3),4,1200,p=>onRoad(p.x,p.z,0)?5:1),goal];
+     // Die Fahrbahn kostet das Siebenfache, ein Überweg nur das Anderthalbfache:
+     // damit lohnt sich ein Umweg von bis zu zweiundzwanzig Metern Gehweg,
+     // um an der Markierung statt irgendwo zu queren. Ohne die zweite Stufe
+     // lag der Anteil der Querungen am Überweg je nach Zustand der Welt
+     // zwischen 43 und 79 Prozent — gemessen, nicht geschätzt.
+     :[...findPath(n,goal,p=>this.blocked(p,.3),4,1200,p=>onRoad(p.x,p.z,0)?(amUeberweg(p.x,p.z)?1.5:7):1),goal];
     n.target=0;
    }
    n.pace=this.weather==='storm'?2:1.1+(n.id%5)*.13;
@@ -758,6 +781,46 @@ export class Campaign extends Simulation{
  // bis zweihundert Meter vom Flüchtenden, und bevorzugt eine, die vor ihm
  // liegt statt hinter ihm. Ohne die Richtung stellt sich die Streife dorthin,
  // wo er herkommt.
+ // Zwei Wegpunkte, die die Strecke a->b über den nächsten Fußgängerüberweg
+ // führen — oder null, wenn die Strecke keine Fahrbahn quert oder kein
+ // Überweg nahe genug liegt. Fünfundvierzig Meter Umweg ist die Grenze;
+ // darüber läuft die Figur wie bisher direkt.
+ ueberwegZwischen(a,b,id=0){
+  const dx=b.x-a.x,dz=b.z-a.z,laenge=Math.hypot(dx,dz);
+  if(laenge<6)return null;
+  // Quert die Strecke überhaupt eine Fahrbahn?
+  let drauf=0,mx=0,mz=0;
+  const schritte=Math.ceil(laenge/3);
+  for(let k=1;k<schritte;k++){
+   const t=k/schritte,x=a.x+dx*t,z=a.z+dz*t;
+   if(!onRoad(x,z,0))continue;
+   drauf++;mx+=x;mz+=z;
+  }
+  if(drauf<2)return null;
+  mx/=drauf;mz/=drauf;
+  // Quer zur Fahrbahn heißt: die Strecke läuft überwiegend in die Richtung,
+  // in der der Überweg seine Streifen ausbreitet.
+  const nordSued=Math.abs(dx)>Math.abs(dz);
+  let beste=null,bestesMass=45;
+  for(const u of UEBERWEGE){
+   if(u.nordSued!==nordSued)continue;
+   const d=Math.hypot(u.x-mx,u.z-mz);
+   if(d<bestesMass){bestesMass=d;beste=u;}
+  }
+  if(!beste)return null;
+  const rand=beste.breite/2+1.6;
+  const vorzeichen=nordSued?Math.sign(dx)||1:Math.sign(dz)||1;
+  // Seitlich versetzt je Figur. Ohne das liefen alle zum selben Punkt und
+  // standen dort ineinander: die Prüfung meldete sechs bleibende Paare unter
+  // 0,55 Metern, engster Abstand zwei Zentimeter.
+  const seit=((id%5)-2)*.55;
+  const punkte=[-vorzeichen*rand,vorzeichen*rand].map(e=>({
+   x:beste.x+(nordSued?e:seit),z:beste.z+(nordSued?seit:e)}));
+  // Ein Einstieg im Wasser oder in einer Wand wäre schlechter als der
+  // direkte Weg.
+  for(const q of punkte)if(waterAt(q.x,q.z)||this.blocked(q,1.1))return null;
+  return punkte;
+ }
  sperrstelle(c,p){
   const richtung={x:Math.sin(p.yaw),z:Math.cos(p.yaw)};
   let beste=null,bester=-Infinity;

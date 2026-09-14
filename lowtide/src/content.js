@@ -326,6 +326,48 @@ export const intersections=(()=>{
  }
  return [...treffer.values()];
 })();
+// Fußgängerüberwege. Fünfzehneinhalb Kilometer Fahrbahn trugen genau eine
+// Markierung: einen gestrichelten Mittelstreifen alle sechzehn Meter. Keine
+// Randlinie, kein Überweg — und Fußgänger querten die fünfzehn Meter breiten
+// Straßen an beliebiger Stelle.
+//
+// Je Kreuzung bis zu vier Überwege, knapp außerhalb der Kreuzungsfläche.
+// Gebaut wird nur, was auch auf einer Fahrbahn liegt: an einer Kreuzung am
+// Ende einer Straße fällt die Hälfte weg.
+export const UEBERWEGE=(()=>{
+ const laengs=r=>Math.abs(r.z2-r.z1)>=Math.abs(r.x2-r.x1);
+ // Die Fahrbahn, die an dieser Stelle in der gesuchten Richtung verläuft.
+ const strasseAn=(x,z,nordSued)=>roadSegments.find(r=>laengs(r)===nordSued&&
+  x>Math.min(r.x1,r.x2)-r.w/2&&x<Math.max(r.x1,r.x2)+r.w/2&&
+  z>Math.min(r.z1,r.z2)-r.w/2&&z<Math.max(r.z1,r.z2)+r.w/2);
+ const aus=[];
+ for(const k of intersections){
+  const ab=k.breite/2+2.8;
+  // nordSued=true: der Überweg quert die Nord-Süd-Fahrbahn und liegt
+  // nördlich oder südlich der Kreuzung; seine Streifen liegen quer zu x.
+  for(const nordSued of [true,false])for(const seite of [-1,1]){
+   const x=k.x+(nordSued?0:seite*ab),z=k.z+(nordSued?seite*ab:0);
+   const r=strasseAn(x,z,nordSued);
+   if(!r||!onRoad(x,z,0))continue;
+   aus.push({x,z,nordSued,breite:r.w});
+  }
+ }
+ return aus;
+})();
+// Rasterabfrage für die Wegesuche: liegt dieser Punkt in einem Überweg? Die
+// Wegesuche geht in Vier-Meter-Schritten, das Raster hat dieselbe Weite.
+const UEBERWEG_RASTER=(()=>{
+ const m=new Set();
+ for(const u of UEBERWEGE){
+  const halb=u.breite/2+1;
+  for(let q=-halb;q<=halb;q+=1.5)for(let l=-2.5;l<=2.5;l+=1.5){
+   const x=u.x+(u.nordSued?q:l),z=u.z+(u.nordSued?l:q);
+   m.add(Math.round(x/4)+'|'+Math.round(z/4));
+  }
+ }
+ return m;
+})();
+export function amUeberweg(x,z){return UEBERWEG_RASTER.has(Math.round(x/4)+'|'+Math.round(z/4));}
 
 // Rennstrecken. Alle laufen über dieselbe Kontrollpunkt-Mechanik; sie
 // unterscheiden sich in Kurs, verlangtem Fahrzeug und Preisgeld.

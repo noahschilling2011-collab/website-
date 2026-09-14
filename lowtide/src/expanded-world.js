@@ -3,7 +3,7 @@ import {wolkenAufsetzen,detailAufsetzen} from './detail.js';
 import {World,MODELLHOEHE} from './world.js';
 import {naturalHuman,animateNaturalHuman,sitzVersatz} from './human-model.js';
 import {detailedHuman,detailedCar,asphaltTexture} from './art-direction.js';
-import {locations,vehicleTypes,roadSegments,groundAt,waterAt,bounds,immobilien} from './content.js';
+import {locations,vehicleTypes,roadSegments,groundAt,waterAt,bounds,immobilien,UEBERWEGE} from './content.js';
 import {distance} from './simulation.js';
 import {Street} from './street.js';
 import {dressBuildings} from './facades.js';
@@ -269,9 +269,21 @@ export class ExpandedWorld extends World{
     // Am Hang bekommt die Fahrbahn eine Berme: eine Straße, die sich in
     // einen Rücken schneidet, hört nicht an der Kante der Decke auf. In der
     // Ebene entfällt sie, dort gibt es keinen Ein- oder Anschnitt.
-    if(y>2){
+    // Wie weit liegt das Gelände am Fahrbahnrand unter der Achse? Die Decke
+    // ist quer waagerecht — auf einem Querhang hängt eine Kante deshalb in
+    // der Luft. Gemessen über alle 1319 Fahrbahnstücke: fünfzig liegen über
+    // einen Meter daneben, vierundzwanzig über drei, der schlimmste Fall
+    // 4,12 Meter an der Zufahrt zum Talon Ridge bei x = -820.
+    const randL=groundAt(mx-(nordSued?r.w/2+4.5:0),mz-(nordSued?0:r.w/2+4.5));
+    const randR=groundAt(mx+(nordSued?r.w/2+4.5:0),mz+(nordSued?0:r.w/2+4.5));
+    const tief=Math.min(randL,randR),quer=y-tief;
+    if(y>2||quer>.6){
      this.box(mx,y-.06,mz,nordSued?r.w+5.5:l,.16,nordSued?l:r.w+5.5,0x6f6a5c,0,false,nx,nz);
-     this.box(mx,y-.34,mz,nordSued?r.w+9:l,.5,nordSued?l:r.w+9,0x5c6350,0,false,nx,nz);
+     // Der Damm war eine halbe Meter dicke Platte. Bei vier Metern Abstand
+     // zum Hangfuß schwebte sie mit. Er reicht jetzt bis unter die tiefere
+     // Seite, mindestens aber einen halben Meter tief.
+     const hoehe=Math.max(.5,quer+.6);
+     this.box(mx,y-.09-hoehe/2,mz,nordSued?r.w+9:l,hoehe,nordSued?l:r.w+9,0x5c6350,0,false,nx,nz);
     }
     // Leitplanke, wo es neben der Fahrbahn hinuntergeht. Eine siebzehn Meter
     // breite Straße quer über einen achtundachtzig Meter hohen Rücken hatte
@@ -287,10 +299,31 @@ export class ExpandedWorld extends World{
       this.box(rx+(nordSued?0:q),y+.36,rz+(nordSued?q:0),.16,.72,.16,0x8b8f88);
     }
     this.box(mx,y+.03,mz,nordSued?r.w:l,.08,nordSued?l:r.w,0x3d494f,0,false,nx,nz);
+    // Randlinien. Die Fahrbahn hatte auf fünfzehneinhalb Kilometern genau
+    // eine Markierung: den gestrichelten Mittelstreifen alle sechzehn
+    // Meter. Eine durchgehende Linie je Seite, siebzig Zentimeter vom
+    // Rand, in derselben Farbe und auf derselben Höhe wie die Striche —
+    // damit fallen sie in dieselbe Instanzgruppe und kosten keinen
+    // zusätzlichen Zeichenaufruf.
+    for(const seite of [-1,1]){
+     const ex=mx+(nordSued?seite*(r.w/2-.7):0),ez=mz+(nordSued?0:seite*(r.w/2-.7));
+     this.box(ex,y+.08,ez,nordSued?.16:l,.02,nordSued?l:.16,0xc4bb97,0,false,nx,nz);
+    }
    }
    for(let i=0;i<laenge;i+=16){
     const t=i/laenge,mx=r.x1+(r.x2-r.x1)*t,mz=r.z1+(r.z2-r.z1)*t;
     this.box(mx,groundAt(mx,mz)+.08,mz,nordSued?.16:5,.02,nordSued?5:.16,0xc4bb97);
+   }
+  }
+  // Fußgängerüberwege an den Kreuzungen. Die Streifen liegen längs zur
+  // Fahrtrichtung der gequerten Fahrbahn und reichen bis neunzig Zentimeter
+  // an den Rand. Jeder Streifen holt seine Geländehöhe selbst: ein Überweg
+  // auf dem Talon Ridge läge sonst mit einem Ende in der Decke.
+  for(const u of UEBERWEGE){
+   const halb=u.breite/2-.9,schritt=1.5;
+   for(let q=-halb;q<=halb-.72;q+=schritt){
+    const sx=u.x+(u.nordSued?q:0),sz=u.z+(u.nordSued?0:q);
+    this.box(sx,groundAt(sx,sz)+.08,sz,u.nordSued?.72:3.4,.02,u.nordSued?3.4:.72,0xc4bb97);
    }
   }
   for(const b of s.worldBuildings){const base=groundAt(b.x,b.z),co=b.kind==='house'?0xb5a78f:0x869c9c;this.box(b.x,base+b.h/2,b.z,b.w,b.h,b.d,co);this.box(b.x,base+b.h+.3,b.z,b.w+1,.6,b.d+1,0x3e555a);

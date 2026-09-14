@@ -1295,7 +1295,11 @@ const strassenHoehe = await page.evaluate(() => {
    // nach Farbe und Kachel gebündelt, und die Suche nach dem Asphaltton kam
    // im zweiten Anlauf auf null Treffer. Stattdessen geometrisch: flach,
    // breit, und der Punkt liegt auf einer Fahrbahn.
-   if (sy > .2 || Math.max(sx, sz) < 6) continue;
+   // Math.min statt Math.max: die Randlinien der Fahrbahn sind ebenso flach
+   // und ebenso lang wie ein Deckenstück, aber sechzehn Zentimeter schmal.
+   // Als Decke gezählt meldeten sie 3,46 Meter Abweichung — das ist die
+   // Querneigung des Geländes am Fahrbahnrand, nicht die Höhe der Decke.
+   if (sy > .2 || Math.min(sx, sz) < 6) continue;
    if (!L.onRoad(x, z, 0)) continue;
    // Nur, was auf der Fahrbahn liegt, nicht was darüber hängt: ein Vordach
    // oder ein Kirchendach ist flach und breit und stünde sonst als
@@ -1373,6 +1377,11 @@ const hindernisse = await page.evaluate(() => {
    // Brücke oder ein Ausleger darüber ist erlaubt.
    if (sy < 2.5 || Math.min(sx, sz) < 3) continue;
    if (y - sy / 2 > L.groundAt(x, z) + 2.6) continue;
+   // Und was ganz unter der Fahrbahndecke liegt, ist kein Hindernis: der
+   // Damm am Hang reicht seit dieser Runde bis unter die tiefere Seite und
+   // ist damit bis zu 4,7 Meter hoch — nach oben endet er aber neun
+   // Zentimeter unter dem Asphalt.
+   if (y + sy / 2 < L.groundAt(x, z) + .5) continue;
    if (!L.onRoad(x, z, 0)) continue;
    treffer.push([Math.round(x), Math.round(z), Math.round(sx), Math.round(sz)]);
   }
@@ -2815,6 +2824,137 @@ pruefe('Tagsüber ist die Stadt woanders als nachts',
  tageslauf.tag.naeherAmBuero > tageslauf.tag.von * .5 &&
  tageslauf.nacht.naeherAmBuero < tageslauf.tag.naeherAmBuero * .4,
  `am Arbeitsplatz: ${tageslauf.tag.naeherAmBuero} um 9 Uhr, ${tageslauf.nacht.naeherAmBuero} um 22 Uhr, von ${tageslauf.tag.von}`);
+
+// Fahrbahnmarkierung. Fünfzehneinhalb Kilometer Fahrbahn trugen genau eine:
+// den gestrichelten Mittelstreifen alle sechzehn Meter. Keine Randlinie, kein
+// Fußgängerüberweg. Geprüft wird an den Instanzmatrizen der gebauten Welt,
+// nicht an der Absicht im Quelltext.
+const marken = await page.evaluate(() => {
+ const L = window.LOWTIDE, w = L.world, U = L.ueberwege, onRoad = L.onRoad, s = L.sim;
+ const leer = {forward: 0, turn: 0, yaw: 0, sprint: false, sneak: false, brake: false, jump: false, interact: false};
+ const treffer = [];
+ for (const netz of w.bloecke || []) {
+  if (netz.material?.color?.getHexString() !== 'c4bb97') continue;
+  const m = netz.instanceMatrix.array;
+  for (let i = 0; i < netz.count; i++) {
+   const o = i * 16;
+   treffer.push({x: m[o + 12], z: m[o + 14],
+    sx: Math.hypot(m[o], m[o + 1], m[o + 2]), sz: Math.hypot(m[o + 8], m[o + 9], m[o + 10])});
+  }
+ }
+ // Randlinie und Strich sind schmal, der Überwegstreifen ist 72 cm breit.
+ const art = t => {
+  const a = Math.min(t.sx, t.sz), b = Math.max(t.sx, t.sz);
+  return a > .5 ? 'überweg' : b < 6 ? 'strich' : 'randlinie';
+ };
+ const arten = {}, danebenArt = {};
+ for (const t of treffer) {
+  const k = art(t);
+  arten[k] = (arten[k] || 0) + 1;
+  if (!onRoad(t.x, t.z, 0)) danebenArt[k] = (danebenArt[k] || 0) + 1;
+ }
+ // Liegen die Enden jedes Überwegs auf der Fahrbahn, und liegt keiner in der
+ // Kreuzungsfläche?
+ let endenDaneben = 0, zuNah = 0;
+ for (const u of U) {
+  const h = u.breite / 2 - .9;
+  for (const e of [-h, h]) {
+   const x = u.x + (u.nordSued ? e : 0), z = u.z + (u.nordSued ? 0 : e);
+   if (!onRoad(x, z, 0)) endenDaneben++;
+  }
+ }
+ for (const k of L.kreuzungen || []) {
+  for (const u of U) {
+   const d = Math.hypot(u.x - k.x, u.z - k.z);
+   if (d < k.breite / 2 + 2 && d > 0) zuNah++;
+  }
+ }
+ // Wo betreten Fußgänger die Fahrbahn — am Überweg oder irgendwo?
+ const quer = (x, z) => {
+  let b = 1e9;
+  for (const u of U) {
+   const laengs = u.nordSued ? Math.abs(x - u.x) : Math.abs(z - u.z);
+   if (laengs > u.breite / 2 + 1) continue;
+   const d = u.nordSued ? Math.abs(z - u.z) : Math.abs(x - u.x);
+   if (d < b) b = d;
+  }
+  return b;
+ };
+ // Die Welt hat an dieser Stelle zweihundert Prüfungen hinter sich: Sturm,
+ // Fahndungsstufen, versetzte Spieler. Fahndung und Wetter werden deshalb
+ // zurückgesetzt, sonst misst die Prüfung die Panik statt der Wegeführung.
+ s.stars = 0; s.heat = 0; s.weather = 'clear';
+ for (let i = 0; i < 300; i++) s.tick(1 / 60, leer);
+ const war = new Map(), abstaende = [];
+ for (let t = 0; t < 900; t++) {
+  s.tick(1 / 60, leer);
+  for (const n of (s._alleNpcs || s.npcs)) {
+   // Nur, wer einem Weg folgt. Wer flieht, rennt geradeaus vom Spieler weg
+   // und quert dabei, wo er gerade steht — das ist richtig so und hat mit
+   // den Überwegen nichts zu tun.
+   if (n.health <= 0 || n.state !== 'normal') continue;
+   const drauf = onRoad(n.x, n.z, 0), vor = war.get(n.id);
+   if (drauf && vor === false) abstaende.push(quer(n.x, n.z));
+   war.set(n.id, drauf);
+  }
+ }
+ abstaende.sort((a, b) => a - b);
+ return {arten, danebenArt, ueberwege: U.length, endenDaneben, zuNah,
+  betretungen: abstaende.length,
+  amUeberweg: abstaende.filter(d => d < 3).length,
+  median: abstaende.length ? abstaende[Math.floor(abstaende.length / 2)] : null};
+});
+// Der Damm unter der Fahrbahn war eine halbe Meter dicke Platte. Die Decke
+// ist quer waagerecht; auf einem Querhang liegt der Fahrbahnrand deshalb bis
+// zu 4,12 Meter über dem Gelände, und die Platte schwebte mit.
+const damm = await page.evaluate(() => {
+ const L = window.LOWTIDE, w = L.world;
+ let anzahl = 0, schwebend = 0, groessterSpalt = 0, wo = null;
+ for (const netz of w.bloecke || []) {
+  if (netz.material?.color?.getHexString() !== '5c6350') continue;
+  const a = netz.instanceMatrix.array;
+  for (let i = 0; i < netz.count; i++) {
+   const o = i * 16, x = a[o + 12], y = a[o + 13], z = a[o + 14];
+   const sx = Math.hypot(a[o], a[o + 1], a[o + 2]);
+   const sy = Math.hypot(a[o + 4], a[o + 5], a[o + 6]);
+   const sz = Math.hypot(a[o + 8], a[o + 9], a[o + 10]);
+   anzahl++;
+   const unten = y - sy / 2;
+   // Nur quer zur Fahrbahn abtasten. Längs folgt der Damm der Neigung der
+   // Decke und ist dort gekippt; die Mitte, die hier gemessen wird, läge
+   // gegen den tiefsten Punkt der Längsrichtung immer im Rückstand.
+   // Querachse ist die längere der beiden: der Damm ist Fahrbahnbreite plus
+   // neun Meter breit und zwölf Meter lang.
+   const quer = sx > sz ? [[sx / 2 - .5, 0], [-(sx / 2 - .5), 0]] : [[0, sz / 2 - .5], [0, -(sz / 2 - .5)]];
+   let tief = 1e9;
+   for (const [dx, dz] of quer) tief = Math.min(tief, L.groundAt(x + dx, z + dz));
+   const spalt = unten - tief;
+   if (spalt > groessterSpalt) {groessterSpalt = spalt; wo = [Math.round(x), Math.round(z)];}
+   if (spalt > .5) schwebend++;
+  }
+ }
+ return {anzahl, schwebend, groessterSpalt, wo};
+});
+pruefe('Der Damm unter der Fahrbahn reicht bis auf das Gelände',
+ damm.anzahl > 50 && damm.schwebend === 0,
+ `${damm.schwebend} von ${damm.anzahl} schweben, größter Spalt ${damm.groessterSpalt.toFixed(2)} m${damm.wo ? ' bei [' + damm.wo + ']' : ''}`);
+pruefe('Jede Fahrbahn hat Randlinien',
+ marken.arten.randlinie >= 2000 && !marken.danebenArt.randlinie,
+ `${marken.arten.randlinie} Randlinien, ${marken.danebenArt.randlinie || 0} neben der Fahrbahn`);
+pruefe('An den Kreuzungen liegen Fußgängerüberwege',
+ marken.ueberwege >= 200 && marken.arten.überweg >= 2000 && !marken.danebenArt.überweg,
+ `${marken.ueberwege} Überwege mit ${marken.arten.überweg} Streifen, ${marken.danebenArt.überweg || 0} neben der Fahrbahn`);
+pruefe('Kein Überweg endet neben der Fahrbahn oder liegt in der Kreuzung',
+ marken.endenDaneben === 0 && marken.zuNah === 0,
+ `${marken.endenDaneben} Enden daneben, ${marken.zuNah} in der Kreuzungsfläche`);
+pruefe('Fußgänger betreten die Fahrbahn dort, wo die Überwege liegen',
+ marken.betretungen >= 30 && marken.amUeberweg / marken.betretungen > .6,
+ `${marken.amUeberweg} von ${marken.betretungen} unter drei Metern, Median ${marken.median?.toFixed(1)} m`);
+// Die Schwelle steht bei sechzig und nicht bei achtzig Prozent, weil der Wert
+// vom Zustand der Welt abhängt: in einer frisch gestarteten Karte sind es zu
+// drei Tageszeiten 80, 80 und 82 Prozent, am Ende dieses Prüflaufs 64. Vor
+// der Wegeführung über die Überwege waren es 77, 56, 62 und 43. Die Prüfung
+// fängt den Rückfall, nicht die Schwankung.
 
 // Körpergröße und Sitzhöhe. Beide Werte wurden an den Meshes gemessen, nicht
 // an der Simulation: die Sitzprüfungen weiter oben fragen nur den Zustand ab

@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 294 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 299 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1318,6 +1318,102 @@ wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
 besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
+
+## Fünfzehneinhalb Kilometer Fahrbahn mit einer einzigen Markierung
+
+Die Straßen der Karte tragen zusammen 15.728 Meter Fahrbahn, zwölf bis
+achtzehn Meter breit. Markierung darauf: ein gestrichelter Mittelstreifen,
+fünf Meter lang, alle sechzehn Meter. Keine Randlinie, kein Fußgängerüberweg,
+keine Haltelinie. Eine fünfzehn Meter breite Fläche aus dunklem Asphalt mit
+einer Perlenschnur in der Mitte.
+
+Dazugekommen sind zwei Dinge, beide aus der vorhandenen Straßenliste
+gerechnet statt von Hand gesetzt:
+
+- **2638 Randlinien**, durchgehend, siebzig Zentimeter vom Fahrbahnrand, je
+  Fahrbahnstück eine pro Seite und mit derselben Neigung wie die Decke.
+- **256 Fußgängerüberwege** mit zusammen **2306 Streifen** an 67 Kreuzungen,
+  je bis zu vier, knapp außerhalb der Kreuzungsfläche. Gebaut wird nur, was
+  auch auf einer Fahrbahn liegt — an einer Kreuzung am Ende einer Straße
+  fällt die Hälfte weg. Jeder Streifen holt seine Geländehöhe selbst, sonst
+  läge ein Überweg auf dem Talon Ridge mit einem Ende in der Decke.
+
+Nachgemessen an den Instanzmatrizen der gebauten Welt: von 4944 neuen
+Markierungen liegt keine einzige neben der Fahrbahn, kein Überweg endet neben
+der Fahrbahn, keiner liegt in der Kreuzungsfläche. (Vierundsechzig
+Markierungen in dieser Farbe liegen abseits — drei Meter lange Striche am
+Flugfeld, die schon vorher dort lagen.)
+
+Und ein Befund, den erst die Randlinien sichtbar gemacht haben: die
+Fahrbahndecke ist quer waagerecht. Auf einem Querhang liegt der Rand deshalb
+neben dem Gelände — gemessen über alle 1319 Fahrbahnstücke **fünfzig über
+einem Meter, vierundzwanzig über drei, der schlimmste 4,12 Meter** an der
+Zufahrt zum Talon Ridge. Die Prüfung „Fahrbahnen liegen auf dem Gelände" hat
+das nie gemeldet, weil sie die Mitte der Decke misst und die stimmt; erst die
+Randlinie, die an derselben Stelle liegt wie der Rand, hat sie ausgelöst. Der
+Damm darunter war eine halbe Meter dicke Platte und schwebte mit. Er reicht
+jetzt bis unter die tiefere Seite.
+
+Kosten: **+16 Zeichenaufrufe und +41.884 Dreiecke** an der Innenstadtkreuzung
+um 13 Uhr, 1865 statt 1849. Die Markierungen tragen dieselbe Farbe wie die
+alten Striche und fallen deshalb meist in dieselbe Instanzgruppe; die
+sechzehn zusätzlichen Aufrufe sind Straßenabschnitte, in deren
+Hundertmeterzelle bisher nichts in dieser Farbe lag.
+
+### Und eine Messung, der ich fast aufgesessen wäre
+
+Frisch gestartet betraten Fußgänger die Fahrbahn schon vorher zu 77 Prozent
+innerhalb von drei Metern eines Überwegs — beides hängt an denselben
+Kreuzungen. Ich hatte daraus geschlossen, dass die Wegeführung nichts mehr
+bringt, und es so ins README geschrieben.
+
+Die Regressionsprüfung hat dieselbe Größe am Ende des Laufs gemessen, in
+einer Welt, durch die zweihundert Prüfungen gegangen waren: **43 Prozent.**
+Die 77 galten für genau einen Zustand. Nachgemessen zu drei Tageszeiten:
+
+| | vorher | nachher |
+|---|---|---|
+| frisch gestartet | 77 % | 80 % |
+| 9 Uhr, Berufsverkehr | 56 % | 80 % |
+| 22 Uhr, Freizeit | 62 % | 82 % |
+
+Median des Abstands zum Überweg um 9 Uhr: 1,9 → 0,7 Meter.
+
+Gebaut ist beides, weil die Wege aus zwei Quellen kommen. Die Pendlerwege
+laufen durch `findPath`; dort kostet die Fahrbahn jetzt das Siebenfache und
+ein Überweg nur das Anderthalbfache, womit sich bis zu zweiundzwanzig Meter
+Umweg über den Gehweg lohnen. Die Freizeitwege dagegen sind feste Rundgänge
+aus fünf verschiedenen Quellen, von denen keine die Kreuzungen kennt; sie
+bekommen beim Aufbau einen Nachlauf, der jede Strecke, die eine Fahrbahn
+quert, über den nächsten Überweg innerhalb von fünfundvierzig Metern führt —
+sofern dessen beide Enden nicht im Wasser oder in einer Wand liegen.
+
+## Was ich gebaut und wieder entfernt habe: der Blick vor dem Bordstein
+
+Im PR stand als offener Punkt: „31 Fälle in zehn Sekunden, in denen jemand
+von der Seite in einen anfahrenden Wagen läuft." Die Zahl ist alt. Neu
+gemessen über die ganze Karte: **dreißig Fahrbahnbetretungen in zehn
+Sekunden, davon drei mit einem heranfahrenden Wagen in fünfundzwanzig Metern
+und zwei in zwölf.** Der engste Fall 4,5 Meter.
+
+Gebaut war der naheliegende Gegenzug: vor dem Betreten der Fahrbahn nach
+links und rechts sehen, mit harter Obergrenze von vier Sekunden, damit
+bremsender Wagen und wartender Fußgänger einander nicht für immer blockieren.
+Gemessen: in zehn Sekunden **zwei** Halte auf der ganzen Karte, und keine
+einzige der drei knappen Betretungen verhindert. Der Grund steht in den
+Zahlen: in diesen Fällen hatte der Wagen längst gebremst — er stand, als der
+Fußgänger losging, und galt damit zu Recht nicht als Gefahr.
+
+Die zweite Vermutung dazu, ebenfalls widerlegt: dass der Verkehr zu früh
+bremst, nämlich schon für Leute am Bordstein. Über fünfzehn Sekunden gemessen
+**874 Bremstakte, und in allen 874 stand tatsächlich jemand auf der
+Fahrbahn** — kein einziger Fall wurde von einem Wartenden am Rand ausgelöst.
+Vierzehn Bremsvorgänge, im Mittel 1,04 Sekunden, der längste 4,37.
+
+Der Code ist wieder draußen. Eine Verhaltensänderung, die keine gemessene
+Zahl bewegt, ist keine Verhaltensänderung, sondern nur mehr Code.
+
+299 Prüfungen bestanden, keine gefallen.
 
 ## Alle saßen einen halben Meter über der Bank
 

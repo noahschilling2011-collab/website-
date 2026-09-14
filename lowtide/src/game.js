@@ -3,7 +3,7 @@ import {Campaign} from './campaign.js';
 import {ExpandedWorld} from './expanded-world.js';
 import {leuchtMaterialien} from './world.js';
 import {WOLKEN_VERSATZ,WOLKEN_STAERKE,WOLKEN_SONNE} from './detail.js';
-import {locations,regions,roadSegments,vehicleTypes,weapons,regionAt,waterAt,bounds,groundAt,onRoad,INSELN,DAEMME,WEST_DAEMME,imStadtgebiet,STADTGEBIETE} from './content.js';
+import {locations,regions,roadSegments,UEBERWEGE,intersections,vehicleTypes,weapons,regionAt,waterAt,bounds,groundAt,onRoad,INSELN,DAEMME,WEST_DAEMME,imStadtgebiet,STADTGEBIETE} from './content.js';
 import {Radio,SENDER} from './radio.js';
 import {Klang} from './sfx.js';
 import {immobilien,schatzOrte,rennen} from './content.js';
@@ -16,7 +16,7 @@ const debug={sichtbar:false,frames:0,fps:0,fenster:0,zeit:0};
 // schon losgelassen wurde. Das darf die Eingabe nicht abbrechen.
 const fange=(el,id)=>{try{el.setPointerCapture(id);}catch{}};
 window.LOWTIDE={sim,get world(){return world;},get frames(){return debug.frames;},debug,
- get radio(){return radio;},get klang(){return klang;},get sender(){return SENDER;},orte:locations,plaetze:places,immobilien,imStadtgebiet,stadtgebiete:STADTGEBIETE,waffen:weapons,fahrzeuge:vehicleTypes,waterAt,groundAt,regionAt,onRoad,bounds,regionen:regions,strassen:roadSegments,inseln:INSELN,daemme:DAEMME,westDaemme:WEST_DAEMME,leuchten:leuchtMaterialien,wolken:{versatz:WOLKEN_VERSATZ,staerke:WOLKEN_STAERKE,sonne:WOLKEN_SONNE},get schatzOrte(){return schatzOrte;},story:Story,
+ get radio(){return radio;},get klang(){return klang;},get sender(){return SENDER;},orte:locations,plaetze:places,immobilien,imStadtgebiet,stadtgebiete:STADTGEBIETE,waffen:weapons,fahrzeuge:vehicleTypes,waterAt,groundAt,regionAt,onRoad,bounds,regionen:regions,strassen:roadSegments,ueberwege:UEBERWEGE,kreuzungen:intersections,inseln:INSELN,daemme:DAEMME,westDaemme:WEST_DAEMME,leuchten:leuchtMaterialien,wolken:{versatz:WOLKEN_VERSATZ,staerke:WOLKEN_STAERKE,sonne:WOLKEN_SONNE},get schatzOrte(){return schatzOrte;},story:Story,
  // Nur fürs Prüfen: setzt Figur und Kamera an eine feste Stelle.
  // hoehe>0 pausiert die Simulation und hebt die Kamera für Übersichtsbilder an.
  view(x,z,blick=yaw,neigung=pitch,hoehe=0){const p=sim.player;p.car=null;p.x=x;p.z=z;p.y=hoehe;p.vy=0;
