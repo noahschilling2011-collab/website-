@@ -74,7 +74,9 @@ export class Campaign extends Simulation{
   // Die Wege folgen dem Straßenraster aus content.js; die Ampellogik in
   // simulation.js gilt für sie wie für die bisherigen.
   const LACKE=[0xd9b078,0xcad0c5,0xa75547,0x3c637d,0x6f7a6a,0xb8b2a4,0x8a5f52,0x4c6b74,0xd6c9a8,0x5a6470];
-  const MODELLE=['sedan','compact','suv','muscle','pickup','sedan','compact','sedan'];
+  // Kastenwagen und Taxi in die Mischung. Ein Taxi auf zehn Wagen ist für eine
+  // Hafenstadt eher zurückhaltend, ein Lieferwagen auf zehn ebenso.
+  const MODELLE=['sedan','compact','suv','muscle','pickup','taxi','sedan','van','compact','sedan'];
   // Der ganze fahrende Verkehr bestand aus fünf Modellen, und vier davon —
   // 112 von 127 Wagen — tragen dieselbe Karosserieform in anderer Größe. Bus,
   // Lastwagen und Motorrad kamen auf der Straße nicht vor, obwohl alle drei
@@ -173,7 +175,7 @@ export class Campaign extends Simulation{
     const n=r*PRO_RUNDE+k;
     this.cars.push({id:'PM-'+(500+n),model:modellFuer(r,k,rundenLaenge),
      x:q.x,z:q.z,yaw:0,speed:7+this.rng()*5,health:100,type:'traffic',
-     color:LACKE[n%LACKE.length],route:weg,target:q.ziel,wait:0,
+     color:modellFuer(r,k,rundenLaenge)==='taxi'?0xe3b53f:LACKE[n%LACKE.length],route:weg,target:q.ziel,wait:0,
      fuel:100,tires:100,glass:100,lights:100,alt:0,upgrades:{},owner:null});
    }
   });
@@ -380,7 +382,11 @@ export class Campaign extends Simulation{
     if(vergeben.has(i))continue;
     const w=wohnorte[i];
     const d=Math.hypot(w.x-n.home.x,w.z-n.home.z);
-    if(d<120||d>400)continue;
+    // Obergrenze 396 statt 400: nach der Vergabe schiebt die Nachbearbeitung
+    // alle, die auf einer Fahrbahn stehen, bis zu zwölf Meter zur Seite, und
+    // das dehnt den Weg nachträglich. Der längste Arbeitsweg lag damit bei
+    // 400,2 Metern und riss die Prüfung um zwanzig Zentimeter.
+    if(d<120||d>396)continue;
     vergeben.add(i);n.work={x:w.x,z:w.z};pendler++;break;
    }
   }

@@ -46,7 +46,13 @@ export function backeNachMaterial(vorbild) {
 //
 // Die Matrizen werden relativ zur Wurzel gerechnet, nicht in Weltkoordinaten —
 // das Modell steht sonst beim ersten Bild doppelt so weit vom Ursprung weg.
-export function backeImModell(wurzel, beweglich = []) {
+// Der Cache ist nicht optional, er ist der Unterschied zwischen einer
+// Optimierung und einem Tausch: ohne ihn bekommt jede Figur und jeder Wagen
+// eine eigene gebackene Geometrie, und der Prüflauf meldet zu Recht "Figuren
+// teilen sich ihre Geometrie — 6 von 13". Gleiche Bauteile mit gleichen
+// Materialien ergeben dieselbe Geometrie; der Schlüssel muss nur alles
+// enthalten, was die Form oder das Material ändert.
+export function backeImModell(wurzel, beweglich = [], cache = null, schluessel = null) {
  wurzel.updateMatrixWorld(true);
  const aus = new Set();
  for (const o of beweglich) {
@@ -72,25 +78,53 @@ export function backeImModell(wurzel, beweglich = []) {
  });
  if (alt.length < 2) return wurzel;
  for (const o of alt) o.parent.remove(o);
+ // Gespeichert werden nur die Geometrien, nicht die Materialien: die Form
+ // eines Wagens hängt nicht an seiner Lackfarbe. Beim Wiederverwenden kommen
+ // die Materialien aus dem Exemplar selbst — in derselben Reihenfolge, in der
+ // sie beim Durchlaufen aufgetreten sind, und die ist bei gleichem Aufbau
+ // dieselbe. Stimmt die Zahl der Töpfe nicht, wird neu gebacken statt falsch
+ // zusammengesetzt.
+ const stoffe = [...eimer.keys()];
+ if (cache && schluessel && cache.get(schluessel)?.length === stoffe.length) {
+  cache.get(schluessel).forEach((geometry, i) => {
+   const netz = new T.Mesh(geometry, stoffe[i]);
+   netz.castShadow = false;
+   netz.receiveShadow = true;
+   wurzel.add(netz);
+  });
+  for (const g of eimer.values()) for (const teil of g) teil.dispose();
+  return wurzel;
+ }
+ const gebacken = [];
  for (const [material, teile] of eimer) {
   let punkte = 0;
   for (const g of teile) punkte += g.attributes.position.count;
+  // Texturkoordinaten müssen mit, sobald ein Teil welche hat: das Kennzeichen
+  // holt sich seinen Ausschnitt aus dem Atlas allein über die UVs, und ohne
+  // sie zeigt jedes Schild der Stadt denselben Fleck. Teile ohne UV bekommen
+  // Nullen — sie tragen ohnehin keine Textur.
+  const mitUV = teile.some(g => g.attributes.uv);
   const pos = new Float32Array(punkte * 3), nor = new Float32Array(punkte * 3);
+  const uvs = mitUV ? new Float32Array(punkte * 2) : null;
   let versatz = 0;
   for (const g of teile) {
    pos.set(g.attributes.position.array, versatz * 3);
    nor.set(g.attributes.normal.array, versatz * 3);
+   if (uvs && g.attributes.uv) uvs.set(g.attributes.uv.array, versatz * 2);
    versatz += g.attributes.position.count;
    g.dispose();
   }
   const zusammen = new T.BufferGeometry();
   zusammen.setAttribute('position', new T.BufferAttribute(pos, 3));
   zusammen.setAttribute('normal', new T.BufferAttribute(nor, 3));
+  if (uvs) zusammen.setAttribute('uv', new T.BufferAttribute(uvs, 2));
   zusammen.computeBoundingSphere();
   const netz = new T.Mesh(zusammen, material);
   netz.castShadow = false;
   netz.receiveShadow = true;
   wurzel.add(netz);
+  gebacken.push(zusammen);
  }
+ if (cache && schluessel) cache.set(schluessel, gebacken);
  return wurzel;
 }

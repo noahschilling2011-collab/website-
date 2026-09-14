@@ -38,7 +38,7 @@ function gesichtGeometrie(skinTone){
  gesichtCache.set(skinTone,g);
  return g;
 }
-const hautCache=new Map(),gesichtStoffCache=new Map();
+const hautCache=new Map(),gesichtStoffCache=new Map(),kopfCache=new Map();
 const hautMaterial=ton=>{
  if(!hautCache.has(ton))hautCache.set(ton,wolkenAufsetzen(new T.MeshPhysicalMaterial(
   {color:ton,roughness:.73,sheen:.14,sheenColor:0xb78d76})));
@@ -175,7 +175,11 @@ export function naturalHuman(color,pants,nah=true){
  // Augen und Lider (Blinzeln) — Hals, Nase, Ohren, Haare und Mütze sind starr
  // und drehen ohnehin gemeinsam mit der Kopfgruppe. Aus zehn bis zwölf Meshes
  // werden vier. Bei 533 Figuren in der Stadt zählt das Mesh für Mesh.
- backeImModell(kopf,[...eyes,...lids]);
+ // Gecacht nach dem, was den Kopf ausmacht: Hautton, Haarfarbe und Mütze.
+ // Ohne Cache bekäme jede der 533 Figuren eine eigene Geometrie — dann wäre
+ // das Backen kein Gewinn, sondern ein Tausch von Zeichenaufrufen gegen
+ // Speicher.
+ backeImModell(kopf,[...eyes,...lids],kopfCache,traegt.muetze?'mitMuetze':'ohne');
  // Körperbau. Die Körpergröße skaliert die ganze Figur gleichmäßig — damit
  // blieb jedes Verhältnis für alle 530 Menschen dasselbe: Schulterbreite
  // geteilt durch Größe, Rumpftiefe geteilt durch Größe, Kopfhöhe geteilt

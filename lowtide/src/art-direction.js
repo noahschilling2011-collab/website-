@@ -122,6 +122,36 @@ const KAROSSERIEN={
   dach:[-1.0,.8,1.86,1.98,.8], licht:{x:.6,y:1.02,z:2.4}, rueck:{x:.6,y:1.06,z:-2.42},
   grill:{y:.82,z:2.46,breite:1.2}, rad:{x:1.03,z:[-1.58,1.6],y:.55,r:1.25}
  },
+ // Kastenwagen. Der Laderaum steht als hoher Block von hinten bis knapp
+ // hinter die Fahrerkabine, die Schnauze ist kurz und fällt steil ab. 5,2
+ // Meter, Dachkante auf 2,25 m — die höchste Silhouette im Verkehr.
+ transporter:{
+  profil:[[-2.60,.92,.44,1.66],[-2.30,.99,.40,1.70],[-.90,1.01,.38,1.70],[.70,1.01,.38,1.62],[1.55,.94,.44,1.10],[2.35,.78,.50,.92]],
+  kabine:[[.30,.90,1.14,1.58],[.75,.88,1.16,1.60],[1.35,.84,1.06,1.42],[1.62,.78,.98,1.24]],
+  spiegel:[1.06,1.42,.95], griff:{x:1.0,y:1.06,z:[.15,-1.4]}, leiste:{x:.86,y:1.34,z:[-1.6,.2]},
+  dach:[-.9,.86,2.22,2.32,2.4], licht:{x:.60,y:.80,z:2.30}, rueck:{x:.62,y:1.24,z:-2.58},
+  grill:{y:.62,z:2.34,breite:1.12}, rad:{x:1.0,z:[-1.75,1.45],y:.46,r:1.05}
+ },
+ // Pritschenwagen. Kabine weit vorn, dahinter eine offene Ladefläche mit
+ // niedrigen Bordwänden — von der Seite zwei Blöcke statt einer Linie.
+ pritsche:{
+  profil:[[-2.45,.98,.46,1.12],[-2.10,1.02,.42,1.16],[-.55,1.04,.40,1.18],[.25,1.04,.40,1.48],[1.35,.98,.44,1.22],[2.45,.82,.50,1.00]],
+  kabine:[[-.50,.88,1.20,1.52],[.05,.90,1.22,1.72],[.75,.88,1.16,1.58],[1.05,.84,1.08,1.34]],
+  spiegel:[1.08,1.40,.62], griff:{x:1.05,y:1.14,z:[-.05,-.55]}, leiste:{x:.88,y:1.44,z:[-.3,.35]},
+  dach:[-.25,.8,1.74,1.84,.95], licht:{x:.60,y:.86,z:2.40}, rueck:{x:.60,y:.94,z:-2.42},
+  grill:{y:.68,z:2.44,breite:1.16}, rad:{x:1.04,z:[-1.55,1.45],y:.50,r:1.14}
+ },
+ // Taxi: dieselbe Grundform wie die Limousine, aber mit Dachschild. Der
+ // Unterschied muss aus hundert Metern lesbar sein, deshalb sitzt das Schild
+ // quer und hoch.
+ taxi:{
+  profil:[[-2.2,.68,.48,.88],[-1.9,.91,.39,1.04],[-1.25,.99,.36,1.08],[.75,.99,.36,1.07],[1.7,.9,.43,.91],[2.2,.72,.5,.77]],
+  kabine:[[-1.45,.82,.88,1.0],[-.85,.76,.94,1.58],[.5,.75,.94,1.58],[1.15,.84,.9,1.03]],
+  spiegel:[.99,1.22,.69], griff:{x:.965,y:1.01,z:[-.05,-.85]}, leiste:{x:.77,y:1.28,z:[-.48,.63]},
+  dach:[-.9,.73,1.49,1.6,.48], licht:{x:.54,y:.76,z:2.14}, rueck:{x:.54,y:.81,z:-2.16},
+  grill:{y:.56,z:2.2,breite:1.05}, rad:{x:.96,z:[-1.35,1.37],y:.44,r:1},
+  schild:{breite:.62,hoehe:.17,tiefe:.20,y:1.66,z:-.1}
+ },
  // Lange Haube, fließendes Heck, flaches Dach weit hinten. 5,1 Meter, breit
  // und niedrig.
  muscle:{
@@ -148,6 +178,10 @@ function fahrzeugFormen(sparsam,form='limousine'){
   for(const z of M.leiste.z)lackTeile.push(teil(new T.BoxGeometry(.05,.49,.06),side*M.leiste.x,M.leiste.y,z));
  }
  lackTeile.push(teil(shell([[M.dach[0],M.dach[1],M.dach[2],M.dach[3]],[M.dach[4],M.dach[1],M.dach[2],M.dach[3]]]),0,0,0));
+ // Dachschild, nur wo die Form eines vorsieht. Es läuft im Chromtopf mit,
+ // damit es sich nicht mit dem Wagenlack umfärbt — ein Taxischild bleibt
+ // hell, egal welche Farbe der Wagen hat.
+ if(M.schild)chromTeile.push(teil(new T.BoxGeometry(M.schild.breite,M.schild.hoehe,M.schild.tiefe),0,M.schild.y,M.schild.z));
  const halb=M.grill.breite/2-.07;
  for(let x=-halb;x<=halb+1e-6;x+=M.grill.breite/7)zaehne.push(teil(new T.BoxGeometry(.025,.13,.06),x,M.grill.y,M.grill.z+.03));
  zaehne.push(teil(new T.BoxGeometry(M.grill.breite,.18,.05),0,M.grill.y,M.grill.z));
@@ -174,11 +208,72 @@ function fahrzeugFormen(sparsam,form='limousine'){
 // Bremslicht und Scheinwerfer bleiben deshalb weiterhin eigene Materialien.
 // Beim Umlackieren wird das Material **getauscht**, nicht verändert.
 const lackCache=new Map();
-export function lackMaterial(color){
- if(!lackCache.has(color))lackCache.set(color,wolkenAufsetzen(new T.MeshPhysicalMaterial(
-  {color,roughness:.28,metalness:.12,clearcoat:1,clearcoatRoughness:.1})));
- return lackCache.get(color);
+// Zustand statt Schaden. Echte Verformung ist zu teuer; ein Wagen, der nie
+// schmutzig wird, sieht aber aus wie aus dem Prospekt. Der Dreckwert läuft in
+// vier Stufen und hebt die Rauheit an, senkt den Klarlack und entsättigt die
+// Farbe leicht — das kostet keinen einzigen Zeichenaufruf, weil je Farbe und
+// Stufe **ein** Material entsteht, das sich alle Wagen dieser Kombination
+// teilen.
+export function lackMaterial(color,dreck=0){
+ const stufe=Math.max(0,Math.min(3,Math.round(dreck)));
+ const k=color+':'+stufe;
+ if(!lackCache.has(k)){
+  const ton=new T.Color(color);
+  if(stufe){const hsl={};ton.getHSL(hsl);ton.setHSL(hsl.h,Math.max(0,hsl.s*(1-stufe*.17)),hsl.l*(1-stufe*.05));}
+  lackCache.set(k,wolkenAufsetzen(new T.MeshPhysicalMaterial(
+   {color:ton.getHex(),roughness:.28+stufe*.13,metalness:.12,
+    clearcoat:Math.max(.15,1-stufe*.28),clearcoatRoughness:.1+stufe*.14})));
+ }
+ return lackCache.get(k);
 }
+// Kennzeichen. Ein Canvas mit 32 Nummern, eine einzige Textur, und jedes
+// Fahrzeug bekommt seinen Ausschnitt über die UV-Koordinaten der Platte —
+// nicht über ein eigenes Material. So teilen sich alle Schilder der Stadt
+// denselben Zeichenaufruf-Topf.
+let schildTextur=null,schildStoff=null;
+const SCHILD_SPALTEN=8,SCHILD_ZEILEN=4;
+function kennzeichenAtlas(){
+ if(schildTextur)return schildTextur;
+ const breite=128,hoehe=44;
+ const c=document.createElement('canvas');
+ c.width=breite*SCHILD_SPALTEN;c.height=hoehe*SCHILD_ZEILEN;
+ const ctx=c.getContext('2d');
+ const buchstaben='ABCDEFGHJKLMNPRSTVWXYZ';
+ let seed=1907;
+ const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+ for(let zeile=0;zeile<SCHILD_ZEILEN;zeile++)for(let spalte=0;spalte<SCHILD_SPALTEN;spalte++){
+  const x=spalte*breite,y=zeile*hoehe;
+  ctx.fillStyle='#e8e6dd';ctx.fillRect(x+2,y+2,breite-4,hoehe-4);
+  ctx.strokeStyle='#2c3338';ctx.lineWidth=2;ctx.strokeRect(x+4,y+4,breite-8,hoehe-8);
+  ctx.fillStyle='#27333c';ctx.font='bold 26px monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+  const text=buchstaben[Math.floor(rnd()*buchstaben.length)]+buchstaben[Math.floor(rnd()*buchstaben.length)]+
+   ' '+String(Math.floor(rnd()*900)+100);
+  ctx.fillText(text,x+breite/2,y+hoehe/2+1);
+ }
+ schildTextur=new T.CanvasTexture(c);
+ schildTextur.colorSpace=T.SRGBColorSpace;
+ schildTextur.anisotropy=4;
+ return schildTextur;
+}
+function schildMaterial(){
+ if(!schildStoff)schildStoff=new T.MeshStandardMaterial(
+  {map:kennzeichenAtlas(),roughness:.55,metalness:0});
+ return schildStoff;
+}
+// Eine Schildfläche mit fest eingebackenem Ausschnitt: die UV-Koordinaten
+// zeigen auf ein Feld des Atlas, deshalb braucht kein Fahrzeug ein eigenes
+// Material.
+function schildFlaeche(nummer){
+ const g=new T.PlaneGeometry(.34,.12);
+ const spalte=nummer%SCHILD_SPALTEN,zeile=Math.floor(nummer/SCHILD_SPALTEN)%SCHILD_ZEILEN;
+ const uv=g.attributes.uv;
+ for(let i=0;i<uv.count;i++){
+  uv.setXY(i,(spalte+uv.getX(i))/SCHILD_SPALTEN,(zeile+uv.getY(i))/SCHILD_ZEILEN);
+ }
+ uv.needsUpdate=true;
+ return g;
+}
+let schildZaehler=0;
 let scheinwerferStoff=null;
 function scheinwerferMaterial(){
  if(!scheinwerferStoff)scheinwerferStoff=new T.MeshStandardMaterial(
@@ -191,13 +286,13 @@ function scheibenMaterial(){
   {color:0x355563,roughness:.1,metalness:.3,clearcoat:1,side:T.DoubleSide}));
  return scheibe;
 }
-export function detailedCar(color,police=false,sparsam=false,form='limousine'){const F=fahrzeugFormen(sparsam,form);const M=F.masse;const g=new T.Group();// Autolack ist kein Metall. Physikalisch ist er ein Dielektrikum mit
+export function detailedCar(color,police=false,sparsam=false,form='limousine',dreck=0){const F=fahrzeugFormen(sparsam,form);const M=F.masse;const g=new T.Group();// Autolack ist kein Metall. Physikalisch ist er ein Dielektrikum mit
  // Metallflocken darin und einer Klarlackschicht darüber — bei metalness .65
  // fällt der Diffusanteil auf ein Drittel, und ein dunkler Wagen im Schatten
  // wird schwarz, weil Metall ohne Spiegelung nichts zu zeigen hat. Gemessen
  // an einem dunklen Rumpf um 17:30: Leuchtdichte 0,0147 gegen 0,0498 des
  // Himmels an derselben Stelle. Die Flocken bleiben als kleiner Metallanteil.
- const paint=lackMaterial(color);
+ const paint=lackMaterial(color,dreck);
  const body=mesh(g,F.karosserie,paint);
  // Base World scales body damage; normalize to the preserved height convention.
  body.scale.y=.55;
@@ -221,7 +316,34 @@ export function detailedCar(color,police=false,sparsam=false,form='limousine'){c
  mesh(g,F.chrom,m(0xb8c2bb,.25,.8));
  const grille=mesh(g,F.grill,m(0x25333c,.4,.5));
  const wheels=[],rims=[];for(const x of [-M.rad.x,M.rad.x])for(const z of M.rad.z){const wheel=new T.Group();wheel.position.set(x,M.rad.y,z);wheel.scale.setScalar(M.rad.r);const tire=mesh(wheel,F.reifen,m(0x20272c,.97));if(F.reifenQuer)tire.rotation.y=Math.PI/2;else tire.rotation.z=Math.PI/2;const rim=mesh(wheel,F.felge,m(0xaeb9b9,.24,.85));rim.rotation.z=Math.PI/2;rims.push(rim);if(F.speichen)mesh(wheel,F.speichen,m(0x52686d,.3,.8));g.add(wheel);wheels.push(wheel);}
- const interior=new T.Group();if(!sparsam)for(const x of [-.4,.4])ellipsoid(interior,x,M.kabine[1][2]+.18,0,.24,.27,.2,m(0x333d3d,.9));g.add(interior);
+ const interior=new T.Group();
+ if(!sparsam){
+  for(const x of [-.4,.4])ellipsoid(interior,x,M.kabine[1][2]+.18,0,.24,.27,.2,m(0x333d3d,.9));
+  // Hinter der Scheibe standen bisher zwei Ellipsoide und sonst nichts. Ein
+  // Armaturenbrett und ein Lenkrad genügen, damit ein Blick durch die Scheibe
+  // nicht ins Leere geht — beides steckt in der gebackenen Karosserie und
+  // kostet deshalb keinen eigenen Zeichenaufruf.
+  const hoehe=M.kabine[1][2];
+  const brett=new T.Mesh(new T.BoxGeometry(1.42,.16,.42),m(0x2a3136,.85));
+  brett.position.set(0,hoehe+.14,M.kabine[2][0]*.42+.35);
+  brett.rotation.x=-.16;interior.add(brett);
+  const lenkrad=new T.Mesh(new T.TorusGeometry(.17,.028,6,14),m(0x1f2529,.8));
+  lenkrad.position.set(-.38,hoehe+.3,M.kabine[2][0]*.42+.2);
+  lenkrad.rotation.x=1.16;interior.add(lenkrad);
+ }
+ g.add(interior);
+ // Kennzeichen vorn und hinten.
+ if(!sparsam){
+  const nummer=schildZaehler++;
+  const stoff=schildMaterial();
+  const vorn=new T.Mesh(schildFlaeche(nummer),stoff);
+  vorn.position.set(0,M.grill.y-.1,M.grill.z+.03);
+  g.add(vorn);
+  const hinten=new T.Mesh(schildFlaeche(nummer),stoff);
+  hinten.position.set(0,M.rueck.y-.14,M.rueck.z-.03);
+  hinten.rotation.y=Math.PI;
+  g.add(hinten);
+ }
  const policeLights=[];if(police){for(const side of [-1,1])policeLights.push(mesh(g,F.balken,new T.MeshStandardMaterial({color:side<0?0xef5549:0x4b9bd6,emissive:side<0?0xe64a45:0x3c85de,emissiveIntensity:2}),side*.36,M.kabine[1][3]+.18,0));}
  g.userData={body,wheels,rims,lights:policeLights,headlights:lights,taillights:rueck,glass:cabin,roof,interior,paint,grille};return g;
 }
