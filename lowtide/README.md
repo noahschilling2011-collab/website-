@@ -1524,6 +1524,33 @@ muss ich nicht wieder raten.
 
 323 Prüfungen bestanden, keine gefallen.
 
+## Zwei Nachträge: verkeilte Figuren und eine widerlegte Vermutung
+
+**Verkeilt ist nicht dasselbe wie eingemauert.** Die Mengenprüfung meldete ein
+Paar über 60 von 60 Messungen auf 0,12 Meter, beide Figuren mit „Hindernis
+voraus" und **null Metern Weg in zehn Sekunden**, mit verschiedenen Wegen — also
+keine Begleitung, sondern zwei Einzelgänger in derselben Ecke. `befreie()` half
+nicht: die greift nur, wer **in** einem Körper steht. Hier steht keiner drin, es
+führt bloß keine Richtung mehr heraus, und `freierWegpunkt()` findet folglich
+gar keinen sichtbaren Wegpunkt. `freiSchieben()` sucht deshalb beim zweiten
+erfolglosen Fenster den nächsten freien Platz im Umkreis von drei Metern.
+Danach ist die Prüfung grün, und in der ruhigen Welt ändert sich nichts
+(träge Figuren 68/68/79 vorher gegen 65/65/88 nachher, mittlere Strecke 10,0 m).
+
+**Und eine Vermutung, die sich nicht bestätigt hat.** Die Überwegprüfung fällt
+im Prüflauf mit 45 Prozent, isoliert gemessen sind es 83,5. Nachgestellt mit
+einer Panikphase — ein Drittel der Menge flieht, danach Fahndung zurück und
+einlaufen lassen — fiel die Quote auf 74,9 Prozent, und der Einbruch saß fast
+ganz bei den Begleitungen: **85,7 auf 43,5 Prozent**, während Einzelgänger nur
+von 82,8 auf 79,6 fielen. Die naheliegende Erklärung war die Aufholjagd: wer den
+Anschluss verloren hat, läuft geradeaus zum anderen, quer über die Fahrbahn.
+
+Die Regel dagegen — Paare ab zwölf Metern auflösen — hat die Zahl um **null**
+Prozentpunkte bewegt. Sie ist wieder draußen. Die Verteilung sagt auch, warum:
+die Paare queren nach Panik nicht knapp daneben, sondern quer verstreut (Median
+4,4 Meter, oberes Viertel 15). Der Grund liegt woanders, und ich habe ihn nicht
+gefunden.
+
 ## Ausbau in vier Paketen: Verkehr, Häuser, Budget
 
 Dieser Abschnitt folgt einem Auftrag mit vier Paketen und harten

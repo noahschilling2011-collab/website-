@@ -516,6 +516,12 @@ export class Simulation{
      // gemessen blieben ohne diese Regel von 42 Paaren 20 bis 28 zusammen,
      // einzelne standen 32 Meter weit weg.
      const abstand=distance(n,fuehrer);
+     // Hier stand ein Versuch, verlorene Paare ab zwölf Metern aufzulösen —
+     // die Vermutung war, dass die geradlinige Aufholjagd die Begleitung an
+     // den Überwegen vorbeiführt. Gemessen nach einer Panikphase hat das die
+     // Quote um **null** Prozentpunkte bewegt (43,5 vor und nach der Regel),
+     // also ist sie wieder draußen. Die Paare queren nach Panik quer verteilt
+     // (Median 4,4 m, oberes Viertel 15 m), nicht knapp am Überweg vorbei.
      if(abstand>3){dest={x:fuehrer.x,z:fuehrer.z};tempo=Math.min(2.2,1+abstand*.12);}
     }
     const d=distance(n,dest);if(d<1&&!fuehrer){n.target=(n.target+1)%n.path.length;n.messZeit=0;n.messAbstand=undefined;}else if(d>=.35){n.yaw=Math.atan2(dest.x-n.x,dest.z-n.z);const v=n.pace*tempo*(this.weather==='rain'?1.5:1)*dt;const [sx,sz]=this.schrittUmGehen(n,Math.sin(n.yaw)*v,Math.cos(n.yaw)*v);this.move(n,sx,sz,.3);
