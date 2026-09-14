@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 273 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 280 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1318,6 +1318,45 @@ wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
 besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
+
+## Sieben Spielerverben, keines davon geprüft
+
+§69 des Pflichtenhefts verbietet Fake-Features: nichts als „umgesetzt"
+melden, was ein TODO, ein Platzhalter, eine leere Funktion oder nie
+aufgerufener Code ist. Also nachgesehen, was der Spieler überhaupt kann —
+Tastenbelegung durchgegangen, jede Fähigkeit einzeln aufgerufen und der
+Zustand vorher und nachher verglichen:
+
+| Verb | Messung |
+|---|---|
+| Nahkampf (`F`) | Leben des Ziels 100 → 75 |
+| Griff (`G`) | Betäubung 4,0 s |
+| Deckung (`V`) | an einer Wand `true`, im Freien `false` |
+| Ausweichen (`Alt`) | 2,50 m für 20 Ausdauer |
+| Sprung (`Leertaste`) | vy 6,5 |
+| Waffenwechsel (`X`) | Pistole → Schrot → Karabiner → Taser → Pistole |
+| Nachladen (`R`) | Auftrag über Zeit: 3 Schuss, nach 200 Ticks 12, Reserve 40 → 31 |
+
+**Alle sieben tun etwas.** Kein Platzhalter, keine leere Funktion. Zwei sahen
+im ersten Durchgang trotzdem falsch aus, und beide Male lag es an der Messung:
+
+Der Waffenwechsel schaltete von Pistole auf Pistole. Kein Fehler — zu
+Spielbeginn besitzt man genau eine Waffe, und dann ist Nichtwechseln richtig.
+Mit gefülltem Inventar geht die Reihe sauber im Kreis.
+
+Das Nachladen ließ das Magazin auf drei Schuss stehen. Auch kein Fehler:
+`CampaignSim` macht daraus einen Auftrag über Zeit statt eines Sprungs. Ich
+hatte zu früh gemessen.
+
+**Der Befund ist ein anderer: keines dieser sieben Verben hatte eine
+Prüfung.** Nicht eine. Sie funktionieren heute und niemand hätte es bemerkt,
+wenn eines davon morgen still eine leere Funktion geworden wäre — was in
+einer Datei, in der ich in dieser Sitzung dreizehnmal etwas verschoben habe,
+kein theoretisches Risiko ist. Jetzt sind es sieben Prüfungen, und die
+Deckung prüft beide Richtungen: sie muss an einer Wand greifen **und** im
+Freien verweigern.
+
+280 Prüfungen bestanden, keine gefallen.
 
 ## Ein Sägezahn für Lastwagen, Boot und Hubschrauber
 

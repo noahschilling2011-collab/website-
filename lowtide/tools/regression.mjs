@@ -2614,6 +2614,71 @@ const tageslauf = await page.evaluate(() => {
 });
 pruefe('Der Tageswechsel hält das Spiel nicht an', tageslauf.teuerster < 120,
  `teuerster Tick ${tageslauf.teuerster.toFixed(1)} ms`);
+// §69 des Pflichtenhefts verbietet Fake-Features. Nachgesehen, was der
+// Spieler überhaupt kann: Nahkampf, Griff, Deckung, Ausweichen, Sprung,
+// Waffenwechsel, Nachladen. Alle sieben tun etwas — und **keines davon war
+// geprüft**. Das ist der Befund: nicht dass sie fehlen, sondern dass nichts
+// sie hält. Steht am Ende, weil dafür der Spieler versetzt wird.
+const verben = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim, p = s.player;
+ const leer = {forward: 0, turn: 0, yaw: 0, sprint: false, sneak: false, brake: false, jump: false, interact: false};
+ const stelle = (x, z) => {p.x = x; p.z = z; p.y = 0; p.car = null; p.health = 100;
+  p.stamina = 100; p.cooldown = 0; s.stars = 0; s.heat = 0; s.reloadJob = null;};
+ const opfer = () => {
+  const n = s.npcs[0];
+  n.x = p.x + Math.sin(p.yaw) * 1.6; n.z = p.z + Math.cos(p.yaw) * 1.6;
+  n.health = 100; n.state = 'normal'; n.stun = 0; return n;
+ };
+ const aus = {};
+ stelle(-100, 20); let o = opfer();
+ s.melee(); aus.nahkampf = 100 - o.health;
+ stelle(-100, 20); o = opfer();
+ s.grapple(); aus.griffStun = o.stun || 0;
+ const b = s.solids.find(q => q.kind === 'building') || s.solids[0];
+ stelle(b.x + b.w / 2 + 1, b.z); p.cover = false; s.cover(); aus.deckungAnDerWand = p.cover;
+ stelle(-100, 300); p.cover = false; s.cover(); aus.deckungImFreien = p.cover;
+ stelle(-100, 20);
+ const xv = p.x, zv = p.z, av = p.stamina;
+ s.dodge();
+ aus.ausweichenStrecke = Math.hypot(p.x - xv, p.z - zv);
+ aus.ausweichenAusdauer = av - p.stamina;
+ stelle(-100, 20); p.vy = 0; s.jump(); aus.sprungVy = p.vy || 0;
+ // Durchschalten braucht mehr als eine Waffe im Inventar — mit nur einer ist
+ // ein Nicht-Wechsel richtig und kein Fehler.
+ stelle(-100, 20);
+ const merkInv = p.inventory, merkW = p.weapon;
+ p.inventory = {pistol: {ammo: 12, reserve: 60}, shotgun: {ammo: 6, reserve: 24},
+  rifle: {ammo: 30, reserve: 90}, taser: {ammo: 5, reserve: 10}};
+ p.weapon = 'pistol';
+ const folge = [p.weapon];
+ for (let i = 0; i < 4; i++) {s.cycleWeapon(); folge.push(p.weapon);}
+ aus.durchschalten = folge;
+ p.inventory = merkInv; p.weapon = merkW;
+ // Nachladen ist ein Auftrag über Zeit, kein sofortiger Sprung.
+ stelle(-100, 20); p.weapon = 'pistol'; p.ammo = 3; p.reserve = 40;
+ s.reload();
+ aus.sofortNachRuf = {ammo: p.ammo, auftrag: !!s.reloadJob};
+ for (let i = 0; i < 200; i++) s.tick(1 / 60, leer);
+ aus.nachWartezeit = {ammo: p.ammo, reserve: p.reserve, auftrag: !!s.reloadJob};
+ return aus;
+});
+pruefe('Nahkampf richtet Schaden an', verben.nahkampf > 0, `${verben.nahkampf} Schaden`);
+pruefe('Der Griff betäubt', verben.griffStun > 1, `${verben.griffStun} s`);
+pruefe('Deckung greift an einer Wand und nicht im Freien',
+ verben.deckungAnDerWand === true && verben.deckungImFreien === false,
+ `an der Wand ${verben.deckungAnDerWand}, im Freien ${verben.deckungImFreien}`);
+pruefe('Ausweichen kostet Ausdauer und bringt Strecke',
+ verben.ausweichenStrecke > 1 && verben.ausweichenAusdauer > 0,
+ `${verben.ausweichenStrecke.toFixed(2)} m für ${verben.ausweichenAusdauer} Ausdauer`);
+pruefe('Der Sprung hebt ab', verben.sprungVy > 1, `vy ${verben.sprungVy.toFixed(2)}`);
+pruefe('Mit vollem Inventar schaltet die Waffe durch',
+ new Set(verben.durchschalten).size >= 4 && verben.durchschalten[4] === verben.durchschalten[0],
+ verben.durchschalten.join(' → '));
+pruefe('Nachladen braucht Zeit und füllt danach auf',
+ verben.sofortNachRuf.ammo === 3 && verben.sofortNachRuf.auftrag &&
+ verben.nachWartezeit.ammo === 12 && verben.nachWartezeit.reserve === 31,
+ `sofort ${verben.sofortNachRuf.ammo}, nach 200 Ticks ${verben.nachWartezeit.ammo} bei Reserve ${verben.nachWartezeit.reserve}`);
+
 pruefe('Tagsüber ist die Stadt woanders als nachts',
  tageslauf.tag.naeherAmBuero > tageslauf.tag.von * .5 &&
  tageslauf.nacht.naeherAmBuero < tageslauf.tag.naeherAmBuero * .4,
