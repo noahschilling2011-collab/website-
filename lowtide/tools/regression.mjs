@@ -1857,7 +1857,9 @@ const gedraenge = await page.evaluate(() => {
   let engster = 99;
   for (let i = 0; i < n.length; i++) for (let j = i + 1; j < n.length; j++) {
    const d = Math.hypot(n[i].x - n[j].x, n[i].z - n[j].z);
-   if (d < .55) satz.add(n[i].id + '|' + n[j].id);
+   // 0,40 statt 0,55 Meter: seit Figuren einander nicht mehr durchdringen,
+   // ist 0,46 der erzwungene Berührungsabstand und kein Fehler mehr.
+   if (d < .40) satz.add(n[i].id + '|' + n[j].id);
    if (d < engster) engster = d;
   }
   return {satz, engster, figuren: n.length};
@@ -1875,7 +1877,7 @@ const gedraenge = await page.evaluate(() => {
   engster: +Math.min(a.engster, b.engster).toFixed(2), figuren: b.figuren, wer};
 });
 pruefe('Keine Figuren stehen dauerhaft ineinander', gedraenge.paare < 5,
- `${gedraenge.paare} bleibende Paare unter 0,55 m (${gedraenge.fluechtig} flüchtige) bei ${gedraenge.figuren} Figuren, engster ${gedraenge.engster} m — ${(gedraenge.wer || []).join('; ')}`);
+ `${gedraenge.paare} bleibende Paare unter 0,40 m (${gedraenge.fluechtig} flüchtige) bei ${gedraenge.figuren} Figuren, engster ${gedraenge.engster} m — ${(gedraenge.wer || []).join('; ')}`);
 // Geparkte Wagen stehen zwei Meter innerhalb der Fahrbahnkante. Wo eine
 // Verkehrsroute dort entlanglief, fuhr der Verkehr durch sie hindurch —
 // wagenVoraus() kann davon nichts wissen, die Kulisse steht nicht in
@@ -2414,8 +2416,19 @@ pruefe('Es wird tatsächlich gezeichnet', info.c > 100, `${info.c} Draw Calls, $
 // Ergebnis hing am Bildtakt: über drei Wiederholungen streuten die Werte um
 // 1,8 bis 3,6 von 255. Mit deterministischem Einschwingen — 240 Aufrufe von
 // applySky mit festem dt, also vier simulierte Sekunden — sind es 0,2 bis 0,8.
+// Der Blitz ist Zufall und stand nicht in dieser Rechnung: applySky setzt bei
+// Sturm mit .14 je Sekunde blitz = 1, und 240 Aufrufe mit dt = 1/60 sind vier
+// simulierte Sekunden — in rund vier von zehn Durchläufen schlägt es also
+// mindestens einmal ein, und ein Blitz hebt hemi um bis zu 6 und sun um 2,5.
+// Genau daran fiel die Einschwing-Prüfung mit storm 118,5 gegen 177,6: nicht
+// die Glättung war unfertig, die zweite Messung hatte einfach geblitzt. Beide
+// Intensitäten werden jedes Bild neu zugewiesen, nie aufaddiert — ein letzter
+// Aufruf mit blitz = 0 räumt den Zuschlag also wieder ab. Die Schleife
+// wiederholt ihn, falls ausgerechnet dieser Aufruf wieder einschlägt.
 const einschwingen = () => page.evaluate(() => {
- for (let i = 0; i < 240; i++) window.LOWTIDE.world.applySky(1 / 60);
+ const w = window.LOWTIDE.world;
+ for (let i = 0; i < 240; i++) w.applySky(1 / 60);
+ do { w.blitz = 0; w.applySky(1 / 60); } while (w.blitz > 0);
 });
 const tagesgang = {};
 for (const h of [7, 13, 18, 18.7, 23]) {
@@ -3092,14 +3105,20 @@ pruefe('Und die Straße selbst steht noch da', kulisse.verworfen > 200 && kuliss
 // Spielers. Hier geht es um den Durchschnitt über alle 490 gehenden Figuren
 // und um das Hindurchgehen, das jene Prüfung ausdrücklich zulässt.
 //
-// Gemessen über zehn Sekunden: im Mittel ein Paar näher als ein halber Meter,
-// höchstens sieben gleichzeitig, und 0,72 Paare, deren Körper sich wirklich
-// durchdringen (unter 0,40 Meter).
+// Gemessen über zehn Sekunden waren es im Mittel 0,72 Paare, deren Körper
+// sich wirklich durchdringen (unter 0,40 Meter), und drei echte Durchgänge.
 //
-// Zwei Versuche, das zu beheben, sind gescheitert und wieder draußen:
-// auseinanderschieben wie bei den Fahrzeugen (1,0 auf 1,93 Paare, mit
-// stärkerem Schub auf 5,07) und lenken vor der Berührung (0,88 Paare, aber
-// die echten Durchgänge von 3 auf 10). Diese Prüfung hält den Stand fest.
+// Zwei Versuche sind daran gescheitert und wieder draußen: auseinanderschieben
+// wie bei den Fahrzeugen (1,0 auf 1,93 Paare unter 0,50 m, mit stärkerem Schub
+// auf 5,07) und lenken vor der Berührung (echte Durchgänge von 3 auf 10).
+// Beide fügten Bewegung hinzu. Der dritte nimmt welche weg: der Anteil eines
+// Schritts, der in einen anderen hineinführt, wird verworfen.
+//
+// Seitdem berühren sich Figuren auf 0,46 Meter — das ist der erzwungene
+// Abstand, kein Fehler. Die Zahl der Paare unter einem halben Meter steigt
+// dadurch von 1,0 auf 7,7, und genau deshalb steht sie hier nicht mehr als
+// Grenze. Gemessen wird, was zählt: Durchdringung, engster Abstand, echte
+// Durchgänge. Wer flieht, ist ausgenommen — Panik darf durcheinandergehen.
 //
 // „Durchgang" zählt nur, wenn sich zwei Figuren beim Seitenwechsel wirklich
 // durchdringen. Das erste Maß zählte jeden Seitenwechsel innerhalb von 1,2
@@ -3109,7 +3128,7 @@ const menge = await page.evaluate(() => {
  const L = window.LOWTIDE, s = L.sim;
  const leer = {forward: 0, turn: 0, yaw: 0, sprint: false, sneak: false, brake: false, jump: false, interact: false};
  const gehend = n => n.health > 0 && n.stun <= 0 && n.state !== 'sitzend';
- let ticks = 0, summe = 0, summeEng = 0, hoechst = 0, durchlaeufe = 0;
+ let ticks = 0, summe = 0, summeEng = 0, hoechst = 0, durchlaeufe = 0, engster = 9;
  const seite = new Map(), naehe = new Map();
  for (let t = 0; t < 600; t++) {
   s.tick(1 / 60, leer);
@@ -3130,6 +3149,7 @@ const menge = await page.evaluate(() => {
      const d = Math.hypot(a.x - b.x, a.z - b.z);
      if (d < .5) paare++;
      if (d < .4) eng++;
+     if (d < engster) engster = d;
      if (d < 1.2) {
       const k = a.id + '-' + b.id, vor = seite.get(k), s2 = Math.sign(a.x - b.x);
       const engVor = naehe.get(k);
@@ -3143,11 +3163,11 @@ const menge = await page.evaluate(() => {
   summe += paare; summeEng += eng;
   if (paare > hoechst) hoechst = paare;
  }
- return {mittel: summe / ticks, eng: summeEng / ticks, hoechst, durchlaeufe, figuren: (s._alleNpcs || s.npcs).filter(gehend).length};
+ return {mittel: summe / ticks, eng: summeEng / ticks, engster, hoechst, durchlaeufe, figuren: (s._alleNpcs || s.npcs).filter(gehend).length};
 });
 pruefe('Die Menge steht nicht ineinander',
- menge.mittel < 3 && menge.hoechst < 14 && menge.eng < 2.5 && menge.durchlaeufe < 9,
- `im Mittel ${menge.mittel.toFixed(2)} Paare unter einem halben Meter bei ${menge.figuren} gehenden Figuren (${menge.eng.toFixed(2)} durchdringen sich), höchstens ${menge.hoechst}, ${menge.durchlaeufe} echte Durchgänge`);
+ menge.eng < .2 && menge.engster > .38 && menge.durchlaeufe < 2,
+ `${menge.eng.toFixed(2)} Paare durchdringen sich, engster Abstand ${menge.engster.toFixed(2)} m, ${menge.durchlaeufe} echte Durchgänge bei ${menge.figuren} gehenden Figuren (${menge.mittel.toFixed(2)} Paare unter 0,50 m, höchstens ${menge.hoechst})`);
 
 // Gangart. Im Schrittzyklus stand jede Zahl als Konstante — Ausschlag der
 // Beine .46, des Knies .72, der Arme .30, Auf- und Abbewegung .045. Bei

@@ -1319,7 +1319,7 @@ besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
 
-## Zwei Messungen ohne Befund, eine mit Rückzieher
+## Zwei Messungen ohne Befund, und drei Anläufe für die Menge
 
 Nicht jede Runde findet etwas. Diese hier hat zwei Eigenschaften geprüft, die
 in Ordnung waren, und eine Idee widerlegt.
@@ -1372,8 +1372,46 @@ schiebt die Figur seitlich **in** die Bahn der anderen, und durchgehen kann
 sie dort weiterhin. Beides wäre erst zusammen eine Lösung — Ausweichen und
 echte Körper —, und das ist eine eigene Runde.
 
-Beide Versuche sind wieder draußen. Der Stand steht als Prüfung, mit dem
-korrigierten Maß.
+### Der dritte Versuch trägt
+
+Beide gescheiterten Ansätze hatten dasselbe gemeinsam: sie **fügten Bewegung
+hinzu**. Der dritte nimmt welche weg. Vor jedem Schritt wird der Anteil
+verworfen, der in eine andere Figur hineinführt — wer vorbeigehen will, geht
+vorbei; wer hineinliefe, bleibt stehen. Kein Schub, keine Drehung, keine
+Energie von außen.
+
+| | ohne | mit Kollision |
+|---|---|---|
+| Paare unter 0,40 m (Körper im Körper) | 0,72 | **0** |
+| echte Durchgänge in 10 s | 3 | **0** |
+| engster Abstand | 0,00 m | **0,46 m** |
+| mittlerer Weg je Figur in 30 s | 6,5 m | 6,8 m |
+| Simulationsschritt | 0,83 ms | 0,85 ms |
+
+Die Zahl, die dabei steigt, ist die der Paare unter einem halben Meter: von
+1,0 auf 7,7. Das ist kein Rückschritt, sondern die Folge — der erzwungene
+Abstand ist 0,46 Meter, also stehen sich berührende Figuren jetzt genau dort.
+Die Prüfung misst deshalb nicht mehr diese Zahl, sondern Durchdringung,
+engsten Abstand und echte Durchgänge. Dieselbe Korrektur hat die ältere
+Prüfung „Keine Figuren stehen dauerhaft ineinander" bekommen: ihre Grenze von
+0,55 Metern ist jetzt der normale Berührungsabstand und keine Auffälligkeit
+mehr.
+
+Ausgenommen war zuerst, wer flieht — Panik darf durcheinandergehen. Am Ende
+des Prüflaufs, wenn vor einer gezogenen Waffe die halbe Innenstadt rennt,
+standen damit wieder 1,13 Paare ineinander, engster Abstand drei Zentimeter.
+Fliehende gehen jetzt durch dieselbe Prüfung; sie rennen weiterhin, nur nicht
+mehr durcheinander hindurch.
+
+Noch ein Fehlschlag derselben Runde, aber einer in der Messung: die Prüfung
+„Die Helligkeitsmessung ist eingeschwungen" meldete für Sturm 118,5 gegen
+177,6 und sah aus wie eine unfertige Glättung. Sie war keine. `applySky` setzt
+bei Sturm mit 0,14 je Sekunde einen Blitz, das Einschwingen sind vier
+simulierte Sekunden — in rund vier von zehn Durchläufen schlägt es also ein,
+und ein Blitz hebt das Himmelslicht um bis zu 6 und die Sonne um 2,5. Die
+zweite Messung hatte einfach geblitzt. Das Einschwingen setzt den Blitz jetzt
+zum Schluss auf null und rechnet ein Bild nach — beide Intensitäten werden
+jedes Bild neu zugewiesen, nie aufaddiert, damit ist der Zuschlag weg.
 
 323 Prüfungen bestanden, keine gefallen.
 

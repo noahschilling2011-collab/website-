@@ -230,6 +230,56 @@ export class Simulation{
   if(vorne<-1.5)return false;
   return Math.abs(Math.cos(c.yaw)*dx-Math.sin(c.yaw)*dz)<2.4;
  }
+ // Figuren, die einander im Weg stehen. Zwei Versuche sind daran gescheitert:
+ // auseinanderschieben drückt eine wegegetriebene Menge nur in die Nachbarn
+ // (1,0 auf 1,93 Paare, mit stärkerem Schub 5,07), und lenken ohne Kollision
+ // schiebt die Figur seitlich in die Bahn der anderen (echte Durchgänge von 3
+ // auf 10). Beide waren Zusätze von Bewegung.
+ //
+ // Dies hier fügt keine Bewegung hinzu, sondern nimmt welche weg: der Anteil
+ // eines Schritts, der in einen anderen hineinführt, wird verworfen. Wer
+ // vorbeigehen will, geht vorbei; wer hineinliefe, bleibt stehen.
+ //
+ // Auch für Fliehende. Der erste Anlauf hat sie ausgenommen — Panik darf
+ // durcheinandergehen —, und am Ende des Prüflaufs, wenn die halbe
+ // Innenstadt vor einer gezogenen Waffe rennt, standen wieder 1,13 Paare
+ // ineinander, engster Abstand drei Zentimeter.
+ figurRasterBauen(){
+  const alle=this._alleNpcs||this.npcs;
+  const r=this._figurRaster||(this._figurRaster=new Map());
+  r.clear();
+  for(const n of alle){
+   if(n.health<=0||n.stun>0)continue;
+   const k=Math.floor(n.x/2)+'|'+Math.floor(n.z/2);
+   let a=r.get(k);if(!a){a=[];r.set(k,a);}a.push(n);
+  }
+ }
+ // Gibt den Schritt zurück, der von der Figur übrig bleibt.
+ schrittOhneDurchdringen(n,dx,dz){
+  const raster=this._figurRaster;
+  if(!raster)return [dx,dz];
+  const ABSTAND=.46;
+  const zx=n.x+dx,zz=n.z+dz;
+  const cx=Math.floor(zx/2),cz=Math.floor(zz/2);
+  for(let ex=-1;ex<=1;ex++)for(let ez=-1;ez<=1;ez++){
+   const liste=raster.get((cx+ex)+'|'+(cz+ez));
+   if(!liste)continue;
+   for(const o of liste){
+    if(o===n||o.state==='sitzend')continue;
+    const ax=zx-o.x,az=zz-o.z;
+    const d=Math.hypot(ax,az);
+    if(d>=ABSTAND)continue;
+    const vx=n.x-o.x,vz=n.z-o.z,vor=Math.hypot(vx,vz);
+    // Nur, wenn der Schritt den Abstand verkleinert. Wer sich löst, darf.
+    if(d>=vor)continue;
+    const l=Math.max(1e-4,vor);
+    const hin=(dx*vx+dz*vz)/l;
+    if(hin>=0)continue;
+    dx-=vx/l*hin;dz-=vz/l*hin;
+   }
+  }
+  return [dx,dz];
+ }
  // Wie tief zwei Fahrzeuge ineinanderstehen, über die Trennachsen der
  // beiden Rechtecke. Null, wenn sie sich nicht berühren.
  ueberlappung(a,b){
@@ -335,11 +385,12 @@ export class Simulation{
   // verließen danach alle sieben Modelle die Fahrbahn, Pick-up und Muscle Car
   // um 3,5 Meter. Vorher war es ein einziges Modell mit 25 Zentimetern.
   for(const c of this.cars){if(c===p.car||c.type!=='traffic')continue;c.wait=Math.max(0,c.wait-dt);if(c.wait||c.health<=0)continue;const lang=vehicleTypes[c.model]?.laenge||4.5;const n=c.route.length;let a,b,vx,vz,len,t,schritte=0;do{a=c.route[(c.target-1+n)%n];b=c.route[c.target];vx=b.x-a.x;vz=b.z-a.z;len=Math.hypot(vx,vz)||1;t=((c.x-a.x)*vx+(c.z-a.z)*vz)/(len*len);if(t<1||Math.hypot(c.x-b.x,c.z-b.z)>12)break;c.target=(c.target+1)%n;}while(++schritte<n);t=Math.max(0,Math.min(1,t));const Lp=Math.min(6.5,2.5+lang*.55),uebrig=len*(1-t);let zx,zz;if(uebrig>=Lp){zx=a.x+vx*(t+Lp/len);zz=a.z+vz*(t+Lp/len);}else{const e=c.route[(c.target+1)%n],wx=e.x-b.x,wz=e.z-b.z,wl=Math.hypot(wx,wz)||1,u=(Lp-uebrig)/wl;zx=b.x+wx*u;zz=b.z+wz*u;}const ziel=Math.atan2(zx-c.x,zz-c.z);let ab=((ziel-c.yaw+Math.PI*3)%(Math.PI*2))-Math.PI;const rate=2.4*4.5/lang*dt;if(Math.abs(ab)>rate)ab=Math.sign(ab)*rate;c.yaw+=ab;if(!p.car&&this.spielerImWeg(c,p))continue;if(this.haeltVorAmpel(c))continue;if(this.wagenVoraus(c)||this.fussgaengerVoraus(c)){c.stau=(c.stau||0)+dt;continue;}c.stau=0;const rest=Math.abs(((ziel-c.yaw+Math.PI*3)%(Math.PI*2))-Math.PI);const tempo=c.speed*(1-.62*Math.min(1,rest/.7));c.x+=Math.sin(c.yaw)*tempo*dt;c.z+=Math.cos(c.yaw)*tempo*dt;}
+  this.figurRasterBauen();
   for(const n of this.npcs){if(n.health<=0||n.state==='tanzend')continue;n.timer-=dt;if(n.report&&n.timer<=0){this.report(n.report.severity,n.report,n.report.incident);n.report=null;n.state='flüchtend';n.timer=9;}if(p.armed&&distance(n,p)<17&&this.sichtFrei(n,p)&&(n.state==='normal'||n.state==='sitzend')){n.state='aufmerksam';n.timer=1.4;}if(n.state==='aufmerksam'&&n.timer<=0){n.state='flüchtend';n.timer=6;}if(n.state==='erschrocken'&&n.timer<3)n.state='Polizei rufend';if(n.state==='filmend'||n.state==='Polizei rufend'||n.state==='erschrocken'){n.yaw=Math.atan2(p.x-n.x,p.z-n.z);continue;}// Wer sitzt, nimmt am Zustandswechsel oben teil — sonst bemerkt er eine
    // gezogene Waffe nicht —, bewegt sich aber nicht. Der erste Anlauf ließ ihn
    // ganz oben aus der Schleife springen; damit blieb er blind für alles.
    if(n.state==='sitzend')continue;
-   if(n.state==='flüchtend'){n.yaw=Math.atan2(n.x-p.x,n.z-p.z);this.move(n,Math.sin(n.yaw)*3*dt,Math.cos(n.yaw)*3*dt,.3);if(n.timer<=0){n.state='normal';n.target=(n.target+1)%n.path.length;}}else{const dest=n.path[n.target],d=distance(n,dest);if(d<1)n.target=(n.target+1)%n.path.length;else{n.yaw=Math.atan2(dest.x-n.x,dest.z-n.z);this.move(n,Math.sin(n.yaw)*n.pace*(this.weather==='rain'?1.5:1)*dt,Math.cos(n.yaw)*n.pace*(this.weather==='rain'?1.5:1)*dt,.3);}}}
+   if(n.state==='flüchtend'){n.yaw=Math.atan2(n.x-p.x,n.z-p.z);const [fx,fz]=this.schrittOhneDurchdringen(n,Math.sin(n.yaw)*3*dt,Math.cos(n.yaw)*3*dt);this.move(n,fx,fz,.3);if(n.timer<=0){n.state='normal';n.target=(n.target+1)%n.path.length;}}else{const dest=n.path[n.target],d=distance(n,dest);if(d<1)n.target=(n.target+1)%n.path.length;else{n.yaw=Math.atan2(dest.x-n.x,dest.z-n.z);const v=n.pace*(this.weather==='rain'?1.5:1)*dt;const [sx,sz]=this.schrittOhneDurchdringen(n,Math.sin(n.yaw)*v,Math.cos(n.yaw)*v);this.move(n,sx,sz,.3);}}}
   if(((this._entflecht=(this._entflecht||0)+1)%4)===0)this.entflechten();
   this.updatePolice(dt);this.eventTimer-=dt;if(this.eventTimer<=0){this.eventTimer=55;const c=this.cars.find(c=>c.type==='traffic'&&c!==p.car);if(c){c.wait=14;this.notify('Verkehrsfunk: Pannenfahrzeug auf der Harbor Avenue.');}}
   if(p.health<=0){p.health=0;this.paused=true;this.notify('Festgenommen. Starte den Auftrag erneut.');}
