@@ -2967,6 +2967,45 @@ pruefe('Fußgänger betreten die Fahrbahn dort, wo die Überwege liegen',
 // Wegeführung über die Überwege waren es 77, 56, 62 und 43. Die Prüfung fängt
 // den Rückfall, nicht die Schwankung.
 
+// Gangart. Im Schrittzyklus stand jede Zahl als Konstante — Ausschlag der
+// Beine .46, des Knies .72, der Arme .30, Auf- und Abbewegung .045. Bei
+// gleichem Tempo lief damit jede Figur exakt gleich, und das Tempo selbst
+// kannte nur fünf Werte. Gemessen am alten Stand, alle Figuren über dieselbe
+// Strecke geführt: **ein** Beinausschlag, **eine** Auf- und Abbewegung, und
+// die Armwerte streuten über 1,7 Prozent, also Rauschen der Abtastung.
+const gangart = await page.evaluate(() => {
+ const w = window.LOWTIDE.world;
+ const daten = [];
+ for (let i = 0; i < w.npcs.length && daten.length < 40; i += 11) {
+  const m = w.npcs[i], u = m?.userData;
+  if (!u?.legs || !u.arms) continue;
+  const merk = {x: m.position.x, strecke: u.strecke, zeit: u.letzteZeit};
+  u.strecke = 0; u.letzteZeit = undefined; u.letzteX = undefined; u.letzteZ = undefined;
+  let armMin = 9, armMax = -9, beinMin = 9, beinMax = -9, bobMax = 0;
+  // Gleiche Strecke, gleiche Zeit für alle: was übrig bleibt, ist die Gangart.
+  for (let k = 0; k < 160; k++) {
+   m.position.x += .025;
+   w.animateHuman(m, k * .0166, 1, false);
+   const a = u.arms[0].rotation.x, b = u.legs[0].rotation.x;
+   if (a < armMin) armMin = a; if (a > armMax) armMax = a;
+   if (b < beinMin) beinMin = b; if (b > beinMax) beinMax = b;
+   if ((u.bob || 0) > bobMax) bobMax = u.bob;
+  }
+  daten.push({arm: armMax - armMin, bein: beinMax - beinMin, bob: bobMax});
+  m.position.x = merk.x; u.strecke = merk.strecke; u.letzteZeit = merk.zeit;
+ }
+ const verschieden = f => new Set(daten.map(d => d[f].toFixed(4))).size;
+ const spanne = f => {
+  const v = daten.map(d => d[f]);
+  return Math.max(...v) / Math.max(1e-6, Math.min(...v));
+ };
+ return {figuren: daten.length, beinVerschieden: verschieden('bein'), bobVerschieden: verschieden('bob'),
+  armSpanne: spanne('arm'), beinSpanne: spanne('bein')};
+});
+pruefe('Nicht jeder Mensch geht gleich',
+ gangart.beinVerschieden > 20 && gangart.armSpanne > 1.3 && gangart.bobVerschieden > 10,
+ `${gangart.beinVerschieden} Beinausschläge und ${gangart.bobVerschieden} Wiegebewegungen unter ${gangart.figuren} Figuren, Armausschlag Faktor ${gangart.armSpanne.toFixed(2)} (vorher 1 Beinausschlag, 1 Wiegebewegung, Arm Faktor 1,02)`);
+
 // Körperbau. Die Körpergröße skaliert die ganze Figur gleichmäßig — damit war
 // jedes Verhältnis für alle 530 Menschen dasselbe: Schulterabstand geteilt
 // durch Größe lag bei jedem auf 0,249. Und beim Nachmessen kam heraus, dass

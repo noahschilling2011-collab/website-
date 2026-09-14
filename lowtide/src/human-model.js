@@ -142,7 +142,14 @@ export function naturalHuman(color,pants,nah=true){
  arms.forEach((arm,i)=>{arm.position.x=(i?1:-1)*.235*bau;});
  legs.forEach((leg,i)=>{leg.position.x=(i?1:-1)*.105*(1+(bau-1)*.6);});
  kopf.scale.setScalar(.95+streu(7.31)*.1);
- const garments=[];g.traverse(o=>{if(o.isMesh&&o.material===cloth)garments.push(o);});g.userData={body,hair,tattoo,legs,arms,knees,elbows,ankles,eyes,lids,face,kopf,id,garments,bau,rig:'anatomical-v3'};return g;
+ // Gangart. Im Schrittzyklus stand jede Zahl als Konstante: Ausschlag der
+ // Beine .46, des Knies .72, der Arme .30, Auf- und Abbewegung .045. Bei
+ // gleichem Tempo lief damit jede Figur der Stadt exakt gleich — und das
+ // Tempo selbst kannte nur fünf Werte (1,1 + id%5 * 0,13). Also fünf Gangarten
+ // für 530 Menschen.
+ const gang={schritt:.85+streu(53.7)*.33,arm:.7+streu(19.3)*.65,
+  wiegen:.75+streu(87.1)*.55,vorlage:.8+streu(11.9)*.5};
+ const garments=[];g.traverse(o=>{if(o.isMesh&&o.material===cloth)garments.push(o);});g.userData={body,hair,tattoo,legs,arms,knees,elbows,ankles,eyes,lids,face,kopf,id,garments,bau,gang,rig:'anatomical-v3'};return g;
 }
 // Ein voller Schrittzyklus deckt diese Strecke ab. Die Schrittphase läuft
 // deshalb über den zurückgelegten Weg und nicht über die Uhr — nur so bleibt
@@ -206,11 +213,17 @@ export function animateNaturalHuman(g,time,moving,armed,steigung=0){
  // moving bleibt der Zustand aus der Simulation; das Tempo bestimmt, wie weit
  // ausgeholt wird. Bei sehr kleinem Tempo klingt die Bewegung aus.
  const amount=Math.min(1.25,Math.max(moving>0?.12:0,tempo/5.2));
- const phase=u.strecke*(Math.PI*2/SCHRITTZYKLUS)+(moving>0&&tempo<.2?time*4:0);
+ const G=u.gang||{schritt:1,arm:1,wiegen:1,vorlage:1};
+ // Der Schrittzyklus hing an einer festen Strecke von 1,95 Metern — eine
+ // Figur von 1,55 Metern machte damit dieselben Schritte wie eine von 1,90.
+ // Er skaliert jetzt mit der Körpergröße: kürzere Beine, kürzere Schritte,
+ // höhere Schrittfrequenz bei gleichem Tempo.
+ const zyklus=SCHRITTZYKLUS*(g.scale?.y||1)*G.schritt;
+ const phase=u.strecke*(Math.PI*2/zyklus)+(moving>0&&tempo<.2?time*4:0);
  u.legs.forEach((leg,i)=>{
   const step=Math.sin(phase+i*Math.PI);
-  leg.rotation.x=step*.46*amount;
-  u.knees[i].rotation.x=Math.max(0,-step)*.72*amount+.025;
+  leg.rotation.x=step*.46*amount*G.schritt;
+  u.knees[i].rotation.x=Math.max(0,-step)*.72*amount*G.schritt+.025;
   // Der Fuß wird nicht animiert, sondern aus der Kette gelöst: die Summe aus
   // Hüft- und Kniewinkel wird zurückgenommen, sodass die Sohle waagerecht
   // bleibt. steigung neigt sie zusätzlich in den Hang. Dazu zwei Zugaben,
@@ -225,19 +238,19 @@ export function animateNaturalHuman(g,time,moving,armed,steigung=0){
  });
  u.arms.forEach((arm,i)=>{
   const gegen=Math.sin(phase+i*Math.PI);
-  arm.rotation.x=armed?-1.04:gegen*.3*amount;
+  arm.rotation.x=armed?-1.04:gegen*.3*amount*G.arm;
   arm.rotation.z=(i?1:-1)*(.04+amount*.03);
   u.elbows[i].rotation.x=armed?-.32:-.12-Math.max(0,-gegen)*.22*amount;
  });
  // Auf- und Abbewegung des Körpers, zweimal je Zyklus. Der Aufrufer addiert
  // sie auf die Bodenhöhe, weil die hier nicht bekannt ist.
- u.bob=Math.abs(Math.sin(phase))*.045*Math.min(1,amount);
+ u.bob=Math.abs(Math.sin(phase))*.045*Math.min(1,amount)*G.wiegen;
  // Neigung in die Kurve und leichtes Vorlehnen beim Laufen.
  const dreh=Math.atan2(Math.sin(g.rotation.y-(u.letzterYaw??g.rotation.y)),Math.cos(g.rotation.y-(u.letzterYaw??g.rotation.y)));
  u.letzterYaw=g.rotation.y;
  u.neigung=(u.neigung||0)+((-dreh/dt*.055-0)*Math.min(1,amount)-(u.neigung||0))*Math.min(1,dt*6);
  u.neigung=Math.max(-.3,Math.min(.3,u.neigung));
- u.vorlage=amount*.06;
+ u.vorlage=amount*.06*G.vorlage;
  // Ruhebewegung. Eine Stadt aus hundertsiebenundfünfzig Leuten, die alle
  // exakt still stehen, sieht aus wie ein Schaufenster. Niemand steht still:
  // das Gewicht wandert von einem Bein aufs andere, der Kopf dreht sich zu

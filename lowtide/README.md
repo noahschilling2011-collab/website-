@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 315 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 316 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1318,6 +1318,32 @@ wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
 besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
+
+## Fünf Gangarten für fünfhundertdreißig Menschen
+
+Im Schrittzyklus steht jede Zahl als Konstante: Ausschlag der Beine .46, des
+Knies .72, der Arme .30, Auf- und Abbewegung .045, Vorlage .06. Der einzige
+Unterschied zwischen zwei Figuren war das Tempo — und das kannte fünf Werte,
+`1,1 + (id % 5) * 0,13`.
+
+Nachgemessen, sechzig Figuren über dieselbe Strecke in derselben Zeit
+geführt: **ein einziger Beinausschlag, eine einzige Wiegebewegung**, und die
+Armwerte streuten über 1,7 Prozent — das ist das Rauschen der Abtastung, nicht
+Vielfalt.
+
+Jetzt vier Werte je Figur aus der Kennung: Schrittweite 0,85 bis 1,18,
+Armschwung 0,70 bis 1,35 (manche Leute schwingen die Arme kaum), Wiegen 0,75
+bis 1,30, Vorlage 0,80 bis 1,30. Dazu eine Kopplung, die vorher fehlte: der
+Schrittzyklus hing an festen 1,95 Metern, eine Figur von 1,55 Metern machte
+also dieselben Schritte wie eine von 1,90. Er skaliert jetzt mit der
+Körpergröße — kürzere Beine, kürzere Schritte, höhere Schrittfrequenz bei
+gleichem Tempo.
+
+Nachher, dieselbe Messung: **58 verschiedene Beinausschläge und 43
+Wiegebewegungen unter sechzig Figuren**, Armausschlag von 0,123 bis 0,236
+Radiant, also Faktor 1,9.
+
+316 Prüfungen bestanden, keine gefallen.
 
 ## Arme und Beine hingen in der Kopfgruppe
 
