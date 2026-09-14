@@ -124,18 +124,30 @@ export function dressBuildings(world, gebaeude) {
 
   // Fensterrahmen über die vorhandenen Scheiben legen. Die Scheiben selbst
   // setzt World.build; hier kommt nur die Laibung dazu.
+  // Die Rahmen liefen über feste Bereiche: -6 bis 6 auf den z-Seiten und
+  // **-15 bis 15** auf den x-Seiten, unabhängig von b.w und b.d. Gemessen an
+  // den 36 Gebäuden, die Rahmen bekommen: keines ist schmaler als 14 Meter,
+  // aber **zwölf sind flacher als 32** — bei denen hing die Laibung neben der
+  // Wand in der Luft. Die Laibung ist zwei Meter breit, also bleibt ein Meter
+  // plus ein Sicherheitsabstand Rand.
   for (let y = 5; y < b.h - 1; y += 3.7) {
    if (y < sockelHoehe + 1.2) continue;
-   for (let u = -6; u <= 6; u += 4) for (const seite of [-1, 1])
-    fensterRahmen(world, b.x + u, basis + y, b.z + seite * (b.d / 2 + .09), 2, 1.9, 'z', sockelFarbe);
-   for (let u = -15; u <= 15; u += 5) for (const seite of [-1, 1])
-    fensterRahmen(world, b.x + seite * (b.w / 2 + .09), basis + y, b.z + u, 2, 1.9, 'x', sockelFarbe);
+   // Über dem Rücksprung ist die Wand schmaler; die Laibung muss mit.
+   const f = b.absatz && y > b.absatz.ab ? b.absatz.faktor : 1;
+   const spanneBreite = Math.max(0, b.w * f / 2 - 2.2), spanneTiefe = Math.max(0, b.d * f / 2 - 2.2);
+   for (let u = -spanneBreite; u <= spanneBreite; u += 4) for (const seite of [-1, 1])
+    fensterRahmen(world, b.x + u, basis + y, b.z + seite * (b.d * f / 2 + .09), 2, 1.9, 'z', sockelFarbe);
+   for (let u = -spanneTiefe; u <= spanneTiefe; u += 5) for (const seite of [-1, 1])
+    fensterRahmen(world, b.x + seite * (b.w * f / 2 + .09), basis + y, b.z + u, 2, 1.9, 'x', sockelFarbe);
   }
 
   // Feuertreppe an einer Längsseite der höheren Häuser.
   if (hoch && i % 2 === 0) {
    const x = b.x + (b.w / 2 + .55) * (i % 4 < 2 ? 1 : -1);
-   for (let y = sockelHoehe + 2.6; y < b.h - 2; y += 3.7) {
+   // Nicht über den Rücksprung hinaus: dort steht keine Wand mehr, an der
+   // eine Feuertreppe hängen könnte.
+   const obergrenze = Math.min(b.h - 2, b.absatz ? b.absatz.ab - 1 : b.h);
+   for (let y = sockelHoehe + 2.6; y < obergrenze; y += 3.7) {
     world.box(x, basis + y, b.z + 4, 1.5, .12, 3.4, 0x4c5450);
     world.box(x + .7, basis + y + .55, b.z + 4, .07, 1.1, 3.4, 0x4c5450);
     for (const e of [-1.6, 1.6]) world.box(x, basis + y + .55, b.z + 4 + e, 1.5, 1.1, .07, 0x4c5450);
@@ -175,4 +187,82 @@ export function dressBuildings(world, gebaeude) {
   // zu diesem Zeitpunkt schon und ändert sich dadurch nicht mehr.
   b.w += .8; b.d += .8;
  }
+}
+
+
+// Balkone und Wäscheleinen an den Wohnzeilen.
+//
+// Die elf Wohnhäuser der Karte (im Mittel 8,5 Meter hoch, 25,7 breit) waren
+// bisher nackte Quader: dressBuildings lässt kind === 'house' aus, weil
+// Sockelgeschoss, Markise und Feuertreppe an ein Wohnhaus nicht gehören. Ein
+// Balkon gehört dahin, und zwar versetzt statt in Reih und Glied — eine
+// Fassade mit gleichmäßigem Raster sieht aus wie ein Bürogebäude.
+export function dressHouses(world, haeuser) {
+ let balkone = 0;
+ for (const [i, b] of haeuser.entries()) {
+  const basis = groundAt(b.x, b.z);
+  const etagen = Math.max(1, Math.floor((b.h - 2.6) / 3.1));
+  for (let e = 0; e < etagen; e++) {
+   const y = basis + 2.9 + e * 3.1;
+   if (y > basis + b.h - 1.1) break;
+   for (const seite of [-1, 1]) {
+    // Zwei bis drei je Fassade, die Lage hängt an Haus, Etage und Seite.
+    const anzahl = 2 + ((i + e) % 2);
+    for (let k = 0; k < anzahl; k++) {
+     // Gleichmäßig über die Wand verteilt, mit einem kleinen Versatz je
+     // Etage. Die erste Fassung rechnete k / (anzahl - 1) und schob damit den
+     // ersten Balkon genau auf die Wandkante und den zweiten daneben ins
+     // Freie — auf dem Bild war die Fassade leer, weil der einzige gesetzte
+     // Balkon hinter der Minikarte lag.
+     const spanne = Math.max(0, b.w / 2 - 2.4);
+     const versatz = spanne * (2 * (k + .5) / anzahl - 1) + ((i + e + k) % 3 - 1) * .9;
+     if (Math.abs(versatz) > spanne) continue;
+     const z = b.z + seite * (b.d / 2 + .62);
+     balkone++;
+     world.box(b.x + versatz, y, z, 2.5, .16, 1.25, 0xb9ab93);
+     world.box(b.x + versatz, y + .52, z + seite * .55, 2.5, .88, .11, 0x8d8471);
+     for (const rand of [-1, 1])
+      world.box(b.x + versatz + rand * 1.2, y + .52, z, .11, .88, 1.25, 0x8d8471);
+     // Wäscheleine zwischen zwei Balkonen derselben Etage, nicht überall.
+     if (k > 0 && (i + e) % 3 === 0)
+      world.box(b.x + versatz - 1.4, y + 1.3, z - seite * .2, 2.4, .04, .04, 0xd8d2c2);
+    }
+   }
+  }
+ }
+ return balkone;
+}
+
+// Eckhäuser. In einem Raster liegt fast jedes Gebäude irgendwie an einer
+// Kreuzung — gemessen 33 von 36 im weiten Umkreis. Behandelt wird deshalb nur
+// die **eine** Ecke, die tatsächlich an der Kreuzungsfläche liegt: eine um 45
+// Grad gedrehte Schräge über die volle Höhe und der Ladeneingang genau dort.
+export function dressCorners(world, gebaeude, kreuzungen) {
+ let behandelt = 0;
+ for (const b of gebaeude) {
+  let beste = null, bestD = 1e9;
+  for (const k of kreuzungen) {
+   for (const ex of [-1, 1]) for (const ez of [-1, 1]) {
+    const cx = b.x + ex * b.w / 2, cz = b.z + ez * b.d / 2;
+    const d = Math.hypot(k.x - cx, k.z - cz) - k.breite / 2;
+    if (d < bestD) {bestD = d; beste = {ex, ez, cx, cz};}
+   }
+  }
+  if (!beste || bestD > 7) continue;
+  behandelt++;
+  const basis = groundAt(b.x, b.z);
+  const hoehe = b.absatz ? b.absatz.ab : b.h;
+  const winkel = Math.atan2(beste.ex, beste.ez);
+  // Die Schräge sitzt auf der Ecke und ist so breit wie die Fase tief ist.
+  world.box(beste.cx - beste.ex * 1.1, basis + hoehe / 2, beste.cz - beste.ez * 1.1,
+   3.4, hoehe, .5, 0x7c8b8c, winkel);
+  // Ladeneingang genau dort: Rahmen, Glas, Vordach.
+  world.box(beste.cx - beste.ex * 1.15, basis + 1.5, beste.cz - beste.ez * 1.15,
+   2.6, 3, .3, 0x2f3b40, winkel);
+  world.box(beste.cx - beste.ex * 1.25, basis + 1.45, beste.cz - beste.ez * 1.25,
+   2.1, 2.5, .12, 0x53707a, winkel);
+  world.box(beste.cx - beste.ex * 1.5, basis + 3.25, beste.cz - beste.ez * 1.5,
+   3.6, .22, 1.4, 0x3f4a4a, winkel);
+ }
+ return behandelt;
 }

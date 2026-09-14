@@ -20,6 +20,18 @@ const HOSEN=[0x303a48,0x4a4137,0x2c3a34,0x5a5148,0x38424e,0x6a6155,0x25303a];
 // Schatten — der liegt ständig im Bild und ist der einzige, dessen Umriss man
 // wirklich liest.
 const ohneSchatten=o=>{o.traverse(c=>{if(c.isMesh)c.castShadow=false;});return o;};
+// Kantenlänge der Bündelungskachel. Bauteile werden nach Farbe **und**
+// Kachel zu Instanzennetzen zusammengefasst: große Kacheln bedeuten weniger
+// Zeichenaufrufe, aber gröberes Wegschneiden und damit mehr Dreiecke.
+// Gemessen am Strand um 13 Uhr, headless:
+//
+//   100 m   394 Aufrufe   1.399.000 Dreiecke
+//   130 m   366 Aufrufe   1.523.000 Dreiecke
+//   160 m   365 Aufrufe   1.627.000 Dreiecke
+//
+// Bei 160 kommt kein Aufruf mehr dazu, aber hunderttausend Dreiecke — 130 ist
+// der Punkt, an dem die Kurve abknickt.
+const KACHEL=130;
 const cube=new T.BoxGeometry(1,1,1);
 const mats=new Map();
 // Alle leuchtenden Materialien an einer Stelle, damit die Nacht sie zentral schalten kann.
@@ -71,7 +83,7 @@ export class World{
  // strassenbau merkt sich, ob dieser Aufruf zur Straße selbst gehört —
  // Decke, Damm, Leitplanke, Markierung. Alles andere wird beim Zusammenbau
  // verworfen, wenn es klein ist und auf einer Fahrbahn steht.
- box(x,y,z,w,h,d,color=0x999999,rot=0,emissive=false,nx=0,nz=0){const kachel=Math.floor(x/100)+':'+Math.floor(z/100);const eigen=emissive||this.eigeneFarben?.has(color);const key=eigen?(color+':L:'+kachel):('F:'+kachel);let g=this.groups.get(key);if(!g){g={material:eigen?mat(color,emissive):mat(0xffffff,false),farbig:!eigen,items:[]};this.groups.set(key,g);}g.items.push({x,y,z,w,h,d,rot,nx,nz,color,strasse:!!this.strassenbau});}
+ box(x,y,z,w,h,d,color=0x999999,rot=0,emissive=false,nx=0,nz=0){const kachel=Math.floor(x/KACHEL)+':'+Math.floor(z/KACHEL);const eigen=emissive||this.eigeneFarben?.has(color);const key=eigen?(color+':L:'+kachel):('F:'+kachel);let g=this.groups.get(key);if(!g){g={material:eigen?mat(color,emissive):mat(0xffffff,false),farbig:!eigen,items:[]};this.groups.set(key,g);}g.items.push({x,y,z,w,h,d,rot,nx,nz,color,strasse:!!this.strassenbau});}
  // Kulisse auf der Fahrbahn. Gemessen standen 268 Gegenstände mitten auf
  // einer Fahrspur: Pflanzkübel aus einer Schleife mit festen Koordinaten aus
  // der alten, halb so großen Karte, Papierkörbe und Parkuhren aus street.js,

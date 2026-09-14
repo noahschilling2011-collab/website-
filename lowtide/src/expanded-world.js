@@ -7,10 +7,10 @@ import {detailedHuman,detailedCar,asphaltTexture} from './art-direction.js';
 // alten Weg: Limousinenkörper mit dem Maßstab aus vehicleTypes.
 const KAROSSERIE_JE_MODELL={compact:'kompakt',sedan:'limousine',suv:'gelaende',muscle:'muscle',
  pickup:'pritsche',van:'transporter',taxi:'taxi'};
-import {locations,vehicleTypes,roadSegments,groundAt,waterAt,bounds,immobilien,UEBERWEGE} from './content.js';
+import {locations,vehicleTypes,roadSegments,groundAt,waterAt,bounds,immobilien,UEBERWEGE,intersections} from './content.js';
 import {distance} from './simulation.js';
 import {Street} from './street.js';
-import {dressBuildings} from './facades.js';
+import {dressBuildings,dressHouses,dressCorners} from './facades.js';
 import {dressRegions} from './regions.js';
 import {dressInteriors} from './interiors.js';
 import {Fernstufe,grobesAuto,grobeFigur,Schattenkoerper} from './lod.js';
@@ -345,7 +345,26 @@ export class ExpandedWorld extends World{
    }
   }
   this.strassenbau=false;
-  for(const b of s.worldBuildings){const base=groundAt(b.x,b.z),co=b.kind==='house'?0xb5a78f:0x869c9c;this.box(b.x,base+b.h/2,b.z,b.w,b.h,b.d,co);this.box(b.x,base+b.h+.3,b.z,b.w+1,.6,b.d+1,0x3e555a);
+  for(const b of s.worldBuildings){const base=groundAt(b.x,b.z),co=b.kind==='house'?0xb5a78f:0x869c9c;
+   // Rücksprung. Jedes Gebäude war ein einziger Quader von b.w x b.d x b.h —
+   // von weitem eine Reihe Kisten, egal wie gut der Sockel ist. Ab vierzehn
+   // Metern sitzt deshalb ab zwei Dritteln der Höhe ein schmaleres
+   // Obergeschoss auf einer umlaufenden Dachterrasse. Türme haben ihre
+   // eigenen Absätze und bleiben, wie sie sind.
+   const absatz=!b.turm&&b.kind!=='house'&&b.h>14;
+   if(absatz){
+    const unten=b.h*.66,faktor=.76;
+    b.absatz={ab:unten,faktor};
+    this.box(b.x,base+unten/2,b.z,b.w,unten,b.d,co);
+    this.box(b.x,base+unten+.16,b.z,b.w+.9,.32,b.d+.9,0x3e555a);
+    // Brüstung der Terrasse, vier Seiten.
+    for(const e of [-1,1]){
+     this.box(b.x+e*(b.w/2+.3),base+unten+.75,b.z,.22,.9,b.d+.9,0x53646a);
+     this.box(b.x,base+unten+.75,b.z+e*(b.d/2+.3),b.w+.9,.9,.22,0x53646a);
+    }
+    this.box(b.x,base+unten+(b.h-unten)/2,b.z,b.w*faktor,b.h-unten,b.d*faktor,co);
+    this.box(b.x,base+b.h+.3,b.z,b.w*faktor+1,.6,b.d*faktor+1,0x3e555a);
+   }else{this.box(b.x,base+b.h/2,b.z,b.w,b.h,b.d,co);this.box(b.x,base+b.h+.3,b.z,b.w+1,.6,b.d+1,0x3e555a);}
    // Hochhäuser bekommen Rücksprünge, eine Krone und ein Blinkfeuer. Ein
    // Turm ohne Absatz ist aus der Ferne nur ein längerer Quader.
    if(b.turm){
@@ -360,7 +379,13 @@ export class ExpandedWorld extends World{
      this.box(b.x+e*b.w*.3,oben+3,b.z,1.6,6,1.6,0x76858a);
      this.box(b.x,oben+3,b.z+e*b.d*.3,1.6,6,1.6,0x76858a);
     }
-   }for(let y=3;y<b.h;y+=4)for(let x=-b.w/2+4;x<b.w/2;x+=5)this.box(b.x+x,base+y,b.z+b.d/2+.05,2,2,.1,0x51737b);}
+   }
+   // Fensterbänder folgen dem Rücksprung, sonst hängen sie über dem Absatz in
+   // der Luft — genau der Fehler, der bei den Fensterrahmen 732-mal drinstand.
+   for(let y=3;y<b.h;y+=4){
+    const f=b.absatz&&y>b.absatz.ab?b.absatz.faktor:1;
+    for(let x=-b.w*f/2+4;x<b.w*f/2;x+=5)this.box(b.x+x,base+y,b.z+b.d*f/2+.05,2,2,.1,0x51737b);
+   }}
   for(const b of s.roomWalls)this.box(b.x,b.h/2,b.z,b.w,b.h,b.d,0x879e96);
   // Jeder Ort bekam eine schwebende Schrift zehn Meter davor. Wo das Bauwerk
   // ein eigenes Schild trägt — Tankstelle, Gym, Fähranleger, Luftfracht —,
@@ -396,6 +421,8 @@ export class ExpandedWorld extends World{
   }
   this.street=new Street(this);this.street.bauen();this.street.strandBauen();this.street.parkendeAutosBauen();
   dressBuildings(this,[...s.buildings,...s.worldBuildings].filter(b=>b.kind!=='house'));
+  this.balkone=dressHouses(this,(s.worldBuildings||[]).filter(b=>b.kind==='house'));
+  this.eckhaeuser=dressCorners(this,[...s.buildings,...s.worldBuildings].filter(b=>b.kind!=='house'),intersections);
   // Der Rest der Karte: Vororte, Farmland, Nationalpark, Sumpf, Flugfeld,
   // Insel, Industriegürtel und die Baulücken der Innenstadt.
   dressRegions(this);
