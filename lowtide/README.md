@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 321 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 323 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1318,6 +1318,38 @@ wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
 besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
+
+## Zwei Messungen ohne Befund, eine mit Rückzieher
+
+Nicht jede Runde findet etwas. Diese hier hat zwei Eigenschaften geprüft, die
+in Ordnung waren, und eine Idee widerlegt.
+
+**Die Nacht ist dunkel, und die Laternen leuchten.** 291 Lampen stehen auf der
+Karte, aber nur sechzehn echte Punktlichter — der Rest ist leuchtende
+Geometrie, und die Lichter wandern mit dem Spieler mit. Ob unter einer Laterne
+etwas heller wird, war damit eine offene Frage. Gemessen, Kamera senkrecht
+nach unten um ein Uhr nachts: **122,7 direkt unter der Laterne, 63,0 in zehn
+Metern Abstand.** Und die Helligkeit über den Tag: Innenstadt 101,5 mittags
+gegen 39,8 um 22 Uhr, Hinterland 125,6 gegen 30,2 — auf dem Land sind nachts
+**null Prozent** der Bildpunkte hell, in der Innenstadt 8,8. Beides ist
+richtig so; beides ist jetzt eine Prüfung.
+
+**Das Gedränge ist klein.** „Figuren weichen einander nicht aus" steht seit
+Langem als offener Punkt im PR, ohne Zahl. Gemessen über zehn Sekunden auf der
+ganzen Karte: **im Mittel ein Paar** näher als ein halber Meter unter 490
+gehenden Figuren, höchstens sieben gleichzeitig, sechs Durchgänge.
+
+**Und der Versuch, es zu beheben, hat es verschlechtert.** Eine Entflechtung
+wie bei den Fahrzeugen — quer zur Verbindungslinie auseinanderschieben, alle
+vier Takte, höchstens acht Zentimeter — ergab **1,93 statt 1,0** Paaren. Mit
+26 Zentimetern Schub wurden es **5,07**. Der Grund liegt auf der Hand, sobald
+man die Zahl sieht: eine Menge, die Wegen folgt, wird durch Verschieben nicht
+entzerrt, sondern in die Nachbarn geschoben, und der Weg zieht jeden gleich
+wieder zurück. Das Richtige wäre Ausweichen vor der Berührung, also Lenkung —
+das ist eine eigene Runde und nicht dies hier. Der Code ist wieder draußen,
+die Zahl steht als Prüfung.
+
+323 Prüfungen bestanden, keine gefallen.
 
 ## Viertausend Netze für ein Bild
 

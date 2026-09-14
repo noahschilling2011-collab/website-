@@ -3086,6 +3086,58 @@ pruefe('Keine Kulisse steht in einer Fahrbahn', kulisse.rest === 0,
 pruefe('Und die Straße selbst steht noch da', kulisse.verworfen > 200 && kulisse.verworfen < 900,
  `${kulisse.verworfen} verworfen`);
 
+// Gedränge über die ganze Karte. „Keine Figuren stehen dauerhaft ineinander"
+// weiter oben misst etwas anderes: Paare, die zwei Messpunkte im Abstand
+// einer halben Sekunde überdauern, und nur unter den Figuren im Umkreis des
+// Spielers. Hier geht es um den Durchschnitt über alle 490 gehenden Figuren
+// und um das Hindurchgehen, das jene Prüfung ausdrücklich zulässt.
+//
+// Gemessen über zehn Sekunden: im Mittel ein Paar näher als ein halber Meter,
+// höchstens sieben gleichzeitig, sechs Durchgänge. Ein Versuch, sie
+// auseinanderzuschieben, hat es verschlechtert — 1,0 auf 1,93, mit stärkerem
+// Schub auf 5,07 — und ist wieder draußen. Diese Prüfung hält fest, dass es
+// nicht schlechter wird.
+const menge = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim;
+ const leer = {forward: 0, turn: 0, yaw: 0, sprint: false, sneak: false, brake: false, jump: false, interact: false};
+ const gehend = n => n.health > 0 && n.stun <= 0 && n.state !== 'sitzend';
+ let ticks = 0, summe = 0, hoechst = 0, durchlaeufe = 0;
+ const seite = new Map();
+ for (let t = 0; t < 600; t++) {
+  s.tick(1 / 60, leer);
+  if (t % 10) continue;
+  ticks++;
+  const n = (s._alleNpcs || s.npcs).filter(gehend);
+  const G = new Map(), Z = 4;
+  for (const a of n) {
+   const k = Math.floor(a.x / Z) + '|' + Math.floor(a.z / Z);
+   let l = G.get(k); if (!l) {l = []; G.set(k, l);} l.push(a);
+  }
+  let paare = 0;
+  for (const a of n) {
+   const cx = Math.floor(a.x / Z), cz = Math.floor(a.z / Z);
+   for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+    for (const b of G.get((cx + dx) + '|' + (cz + dz)) || []) {
+     if (b.id <= a.id) continue;
+     const d = Math.hypot(a.x - b.x, a.z - b.z);
+     if (d < .5) paare++;
+     if (d < 1.2) {
+      const k = a.id + '-' + b.id, vor = seite.get(k), s2 = Math.sign(a.x - b.x);
+      if (vor !== undefined && vor !== 0 && s2 !== 0 && s2 !== vor) durchlaeufe++;
+      seite.set(k, s2);
+     }
+    }
+   }
+  }
+  summe += paare;
+  if (paare > hoechst) hoechst = paare;
+ }
+ return {mittel: summe / ticks, hoechst, durchlaeufe, figuren: (s._alleNpcs || s.npcs).filter(gehend).length};
+});
+pruefe('Die Menge steht nicht ineinander',
+ menge.mittel < 3 && menge.hoechst < 14 && menge.durchlaeufe < 15,
+ `im Mittel ${menge.mittel.toFixed(2)} Paare unter einem halben Meter bei ${menge.figuren} gehenden Figuren, höchstens ${menge.hoechst}, ${menge.durchlaeufe} Durchgänge`);
+
 // Gangart. Im Schrittzyklus stand jede Zahl als Konstante — Ausschlag der
 // Beine .46, des Knies .72, der Arme .30, Auf- und Abbewegung .045. Bei
 // gleichem Tempo lief damit jede Figur exakt gleich, und das Tempo selbst
@@ -3515,6 +3567,34 @@ pruefe('Die vier Autotypen haben eigene Karosserien',
 pruefe('Die Maße in vehicleTypes stimmen mit den Meshes überein',
  Math.max(...Object.values(karosserien.abweichung)) < .15,
  Object.entries(karosserien.abweichung).map(([k, v]) => k + ' ' + v.toFixed(2)).join(', '));
+
+// Straßenlaternen. 291 Lampen, aber nur sechzehn echte Punktlichter — der
+// Rest ist leuchtende Geometrie, und die Lichter wandern mit dem Spieler mit.
+// Die Frage ist, ob unter einer Laterne überhaupt etwas heller wird.
+const laterne = await page.evaluate(async () => {
+ const L = window.LOWTIDE, w = L.world;
+ const l = (w.lampen || [])[0];
+ if (!l) return null;
+ const messe = async (x, z) => {
+  L.sim.hour = 1;
+  L.luftbild(x, 14, z + .01, x, 0, z);
+  const f0 = L.frames;
+  await new Promise(r => {const p = () => {L.frames > f0 + 3 ? r() : requestAnimationFrame(p);}; p();});
+  const g = w.renderer.getContext();
+  w.zeichne();
+  const b = new Uint8Array(900 * 520 * 4);
+  g.readPixels(0, 0, 900, 520, g.RGBA, g.UNSIGNED_BYTE, b);
+  let s = 0, n = 0;
+  for (let y = 200; y < 320; y++) for (let x2 = 380; x2 < 520; x2++) {
+   const i = (y * 900 + x2) * 4; s += (b[i] + b[i + 1] + b[i + 2]) / 3; n++;
+  }
+  return s / n;
+ };
+ return {lampen: (w.lampen || []).length, unter: await messe(l.x, l.z), daneben: await messe(l.x + 10, l.z)};
+});
+pruefe('Unter einer Laterne ist der Boden heller als daneben',
+ !!laterne && laterne.unter > laterne.daneben * 1.4,
+ laterne ? `${laterne.unter.toFixed(1)} gegen ${laterne.daneben.toFixed(1)} bei ${laterne.lampen} Lampen` : 'keine Lampen');
 
 // Flügelschlag. Im Update der Tierwelt stand `o.scale.set(schlag, 1, 1)` mit
 // der Begründung, einzelne Flügel gingen bei Instanzen nicht: die ganze Möwe
