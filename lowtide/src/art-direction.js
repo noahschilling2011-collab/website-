@@ -166,23 +166,52 @@ function fahrzeugFormen(sparsam,form='limousine'){
  };
  return FORMEN[schluessel];
 }
+// Lack und Scheiben wurden pro Fahrzeug neu angelegt: bei 144 Wagen sind das
+// 288 Materialien, die nie zusammen gezeichnet werden können. Die Scheibe hat
+// ohnehin eine feste Farbe, der Lack kommt aus einer Handvoll Paletten.
+//
+// Geteilt werden darf beides, weil keines davon pro Fahrzeug verändert wird —
+// Bremslicht und Scheinwerfer bleiben deshalb weiterhin eigene Materialien.
+// Beim Umlackieren wird das Material **getauscht**, nicht verändert.
+const lackCache=new Map();
+export function lackMaterial(color){
+ if(!lackCache.has(color))lackCache.set(color,wolkenAufsetzen(new T.MeshPhysicalMaterial(
+  {color,roughness:.28,metalness:.12,clearcoat:1,clearcoatRoughness:.1})));
+ return lackCache.get(color);
+}
+let scheinwerferStoff=null;
+function scheinwerferMaterial(){
+ if(!scheinwerferStoff)scheinwerferStoff=new T.MeshStandardMaterial(
+  {color:0xf4e4bb,emissive:0xffd6a0,emissiveIntensity:.6});
+ return scheinwerferStoff;
+}
+let scheibe=null;
+function scheibenMaterial(){
+ if(!scheibe)scheibe=wolkenAufsetzen(new T.MeshPhysicalMaterial(
+  {color:0x355563,roughness:.1,metalness:.3,clearcoat:1,side:T.DoubleSide}));
+ return scheibe;
+}
 export function detailedCar(color,police=false,sparsam=false,form='limousine'){const F=fahrzeugFormen(sparsam,form);const M=F.masse;const g=new T.Group();// Autolack ist kein Metall. Physikalisch ist er ein Dielektrikum mit
  // Metallflocken darin und einer Klarlackschicht darüber — bei metalness .65
  // fällt der Diffusanteil auf ein Drittel, und ein dunkler Wagen im Schatten
  // wird schwarz, weil Metall ohne Spiegelung nichts zu zeigen hat. Gemessen
  // an einem dunklen Rumpf um 17:30: Leuchtdichte 0,0147 gegen 0,0498 des
  // Himmels an derselben Stelle. Die Flocken bleiben als kleiner Metallanteil.
- const paint=wolkenAufsetzen(new T.MeshPhysicalMaterial({color,roughness:.28,metalness:.12,clearcoat:1,clearcoatRoughness:.1}));
+ const paint=lackMaterial(color);
  const body=mesh(g,F.karosserie,paint);
  // Base World scales body damage; normalize to the preserved height convention.
  body.scale.y=.55;
- const glass=wolkenAufsetzen(new T.MeshPhysicalMaterial({color:0x355563,roughness:.1,metalness:.3,clearcoat:1,side:T.DoubleSide}));
+ const glass=scheibenMaterial();
  const cabin=mesh(g,F.kabine,glass);
  // Je ein Material für beide Scheinwerfer und beide Rücklichter dieses
  // Wagens. Pro Seite eigene waren zwei Draw Calls zu viel; über mehrere
  // Wagen geteilt werden dürfen sie nicht, weil das Bremslicht am Fahrzeug
  // hängt und sonst alle Autos gleichzeitig aufleuchten.
- const scheinwerfer=new T.MeshStandardMaterial({color:0xf4e4bb,emissive:0xffd6a0,emissiveIntensity:.6});
+ // Der Scheinwerfer darf geteilt werden, das Rücklicht nicht: die Helligkeit
+ // der Scheinwerfer hängt nur am Nachtanteil und ist für jedes Fahrzeug
+ // dieselbe, das Bremslicht hängt am einzelnen Wagen. 144 gleiche Materialien
+ // weniger.
+ const scheinwerfer=scheinwerferMaterial();
  const ruecklicht=new T.MeshStandardMaterial({color:0xa73833,emissive:0x932622,emissiveIntensity:.35});
  const lights=[],rueck=[];for(const side of [-1,1]){const lamp=mesh(g,F.scheinwerfer,scheinwerfer,side*M.licht.x,M.licht.y,M.licht.z);lights.push(lamp);rueck.push(mesh(g,F.ruecklicht,ruecklicht,side*M.rueck.x,M.rueck.y,M.rueck.z));
  }

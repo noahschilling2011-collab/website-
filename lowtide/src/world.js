@@ -14,6 +14,12 @@ const sstep=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-
 const HEMDEN=[0xb8bf9f,0x708ba9,0xe2c49c,0xaf6276,0x546a64,0xd8d2c4,0x8a6f9c,0xc47a55,
  0x4f7a68,0xbfae86,0x9aa8b4,0x6d5f52];
 const HOSEN=[0x303a48,0x4a4137,0x2c3a34,0x5a5148,0x38424e,0x6a6155,0x25303a];
+// Nimmt einem ganzen Modell den Schattenwurf. Figuren und Fahrzeuge werfen
+// ihren Schatten stattdessen über einen einfachen Körper (siehe lod.js): aus
+// 294 und 115 Zeichenaufrufen werden zwei. Der Spieler behält seinen echten
+// Schatten — der liegt ständig im Bild und ist der einzige, dessen Umriss man
+// wirklich liest.
+const ohneSchatten=o=>{o.traverse(c=>{if(c.isMesh)c.castShadow=false;});return o;};
 const cube=new T.BoxGeometry(1,1,1);
 const mats=new Map();
 // Alle leuchtenden Materialien an einer Stelle, damit die Nacht sie zentral schalten kann.
@@ -55,7 +61,7 @@ function koerpergroesse(i){
  return 1.72/MODELLHOEHE+(streu(12.9898)+streu(78.233)-1)*.10;
 }
 export class World{
- constructor(canvas,sim){this.sim=sim;this.scene=new T.Scene();this.scene.fog=new T.FogExp2(0xc6a7a0,.0038);this.renderer=new T.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=T.PCFShadowMap;this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.2;this.sky=new Sky(this.renderer);this.scene.add(this.sky.mesh);this.sonnenRichtung=new T.Vector3();this.blitz=0;this.camera=new T.PerspectiveCamera(58,innerWidth/innerHeight,.45,650);this.camera.position.set(-14,12,98);this.camera.lookAt(-40,3,15);this.groups=new Map();this.rng=random(78);this.hemi=new T.HemisphereLight(0xc4dceb,0x51443e,2.1);this.scene.add(this.hemi);this.sun=new T.DirectionalLight(0xffc995,3);this.sun.position.set(-80,110,20);this.sun.castShadow=true;Object.assign(this.sun.shadow.camera,{left:-130,right:130,top:130,bottom:-130,near:1,far:1500});this.sun.shadow.mapSize.set(2048,2048);this.sun.shadow.bias=-.0006;this.sun.shadow.normalBias=.035;this.scene.add(this.sun);this.scene.add(this.sun.target);this.build();this.flush();this.player=this.human(0xe2a062,0x253442);this.scene.add(this.player);this.npcs=sim.npcs.map((n,i)=>{const m=this.human(HEMDEN[i%HEMDEN.length],HOSEN[(i*3+i%7)%HOSEN.length],false);m.scale.setScalar(m.userData.groesse=koerpergroesse(i));this.scene.add(m);return m;});this.cars=sim.cars.map(c=>{const m=this.car(c.color,false,c);this.scene.add(m);return m;});this.cops=sim.cops.map(()=>{const m=this.car(0xe4e7df,true);this.scene.add(m);return m;});this.contact=this.human(0xd4d2c9,0x242e3c);this.contact.scale.setScalar(1.68/MODELLHOEHE);this.contact.position.set(places.mara.x,0,places.mara.z);this.scene.add(this.contact);this.guard=this.human(0x425164,0x26303c);this.guard.scale.setScalar(1.86/MODELLHOEHE);this.guard.position.set(-73,0,-52);this.scene.add(this.guard);this.marker=new T.Mesh(new T.OctahedronGeometry(.7),new T.MeshBasicMaterial({color:0xeccb80}));this.scene.add(this.marker);this.ring=new T.Mesh(new T.RingGeometry(1.8,2,40),new T.MeshBasicMaterial({color:0xeccb80,side:T.DoubleSide,transparent:true,opacity:.75}));this.ring.rotation.x=-Math.PI/2;this.scene.add(this.ring);this.bulletMeshes=[];this.setupRain();
+ constructor(canvas,sim){this.sim=sim;this.scene=new T.Scene();this.scene.fog=new T.FogExp2(0xc6a7a0,.0038);this.renderer=new T.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=T.PCFShadowMap;this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.2;this.sky=new Sky(this.renderer);this.scene.add(this.sky.mesh);this.sonnenRichtung=new T.Vector3();this.blitz=0;this.camera=new T.PerspectiveCamera(58,innerWidth/innerHeight,.45,650);this.camera.position.set(-14,12,98);this.camera.lookAt(-40,3,15);this.groups=new Map();this.rng=random(78);this.hemi=new T.HemisphereLight(0xc4dceb,0x51443e,2.1);this.scene.add(this.hemi);this.sun=new T.DirectionalLight(0xffc995,3);this.sun.position.set(-80,110,20);this.sun.castShadow=true;Object.assign(this.sun.shadow.camera,{left:-130,right:130,top:130,bottom:-130,near:1,far:1500});this.sun.shadow.mapSize.set(2048,2048);this.sun.shadow.bias=-.0006;this.sun.shadow.normalBias=.035;this.scene.add(this.sun);this.scene.add(this.sun.target);this.build();this.flush();this.player=this.human(0xe2a062,0x253442);this.player.traverse(o=>{if(o.isMesh)o.castShadow=true;});this.scene.add(this.player);this.npcs=sim.npcs.map((n,i)=>{const m=this.human(HEMDEN[i%HEMDEN.length],HOSEN[(i*3+i%7)%HOSEN.length],false);m.scale.setScalar(m.userData.groesse=koerpergroesse(i));ohneSchatten(m);this.scene.add(m);return m;});this.cars=sim.cars.map(c=>{const m=this.car(c.color,false,c);ohneSchatten(m);this.scene.add(m);return m;});this.cops=sim.cops.map(()=>{const m=this.car(0xe4e7df,true);ohneSchatten(m);this.scene.add(m);return m;});this.contact=this.human(0xd4d2c9,0x242e3c);this.contact.scale.setScalar(1.68/MODELLHOEHE);this.contact.position.set(places.mara.x,0,places.mara.z);this.scene.add(this.contact);this.guard=this.human(0x425164,0x26303c);this.guard.scale.setScalar(1.86/MODELLHOEHE);this.guard.position.set(-73,0,-52);this.scene.add(this.guard);this.marker=new T.Mesh(new T.OctahedronGeometry(.7),new T.MeshBasicMaterial({color:0xeccb80}));this.scene.add(this.marker);this.ring=new T.Mesh(new T.RingGeometry(1.8,2,40),new T.MeshBasicMaterial({color:0xeccb80,side:T.DoubleSide,transparent:true,opacity:.75}));this.ring.rotation.x=-Math.PI/2;this.scene.add(this.ring);this.bulletMeshes=[];this.setupRain();
   // Nachbearbeitung: Überstrahlen, Farbkurve, Randabdunklung, Korn. Ab hier
   // tonwertet die letzte Stufe, nicht mehr der Renderer.
   this.post=new Nachbearbeitung(this.renderer);
@@ -251,7 +257,12 @@ export class World{
   // gespiegelt — sonst wäre die Nacht eine schattenlose graue Fläche.
   const unterHorizont=himmel.richtung.y<0,richtung=this.sonnenRichtung.copy(himmel.richtung);
   if(unterHorizont)richtung.negate();
-  const weite=this.freieKamera?520:130;
+  // Schattenfeld von 130 auf 92 Meter. Zwei Gründe, beide gemessen: im
+  // Schattendurchgang steckten 166 Aufrufe und 871.000 Dreiecke allein für die
+  // Bauteil-Instanzen, und dieselbe Schattenkarte von 2048 Bildpunkten deckt
+  // auf 92 Metern eine um die Hälfte feinere Auflösung ab — der Schatten wird
+  // also billiger **und** schärfer. Weiter draußen trägt ohnehin der Dunst.
+  const weite=this.freieKamera?520:92;
   if(this.sun.shadow.camera.right!==weite){Object.assign(this.sun.shadow.camera,{left:-weite,right:weite,top:weite,bottom:-weite});this.sun.shadow.camera.updateProjectionMatrix();}
   const abstand=this.freieKamera?700:190;
   this.sun.position.set(p.x+richtung.x*abstand,Math.max(6,richtung.y*abstand),p.z+richtung.z*abstand);

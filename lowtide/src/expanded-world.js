@@ -12,7 +12,8 @@ import {Street} from './street.js';
 import {dressBuildings} from './facades.js';
 import {dressRegions} from './regions.js';
 import {dressInteriors} from './interiors.js';
-import {Fernstufe,grobesAuto,grobeFigur} from './lod.js';
+import {Fernstufe,grobesAuto,grobeFigur,Schattenkoerper} from './lod.js';
+import {backeImModell} from './bake.js';
 import {Tierwelt} from './wildlife.js';
 import {Grasfeld} from './grass.js';
 import {Laubwerk} from './foliage.js';
@@ -57,6 +58,12 @@ export class ExpandedWorld extends World{
  setupFernstufen(sim){
   this.autoFern=new Fernstufe(this.scene,grobesAuto(),sim.cars.length+sim.cops.length+4);
   this.figurFern=new Fernstufe(this.scene,grobeFigur(),sim.npcs.length+8);
+  // Schatten von Figuren und Fahrzeugen als einfache Körper, alle in je einem
+  // Instanzennetz. Die Kapsel ist 1,71 m hoch (Radius .28, Schaft 1,15) und
+  // sitzt mit ihrer Mitte auf .95 über dem Boden; der Wagenquader hat die
+  // Maße eines Mittelklassewagens.
+  this.schattenFigur=new Schattenkoerper(this.scene,new T.CapsuleGeometry(.28,1.15,3,7),sim.npcs.length+12,.95);
+  this.schattenWagen=new Schattenkoerper(this.scene,new T.BoxGeometry(1.92,1.28,4.4),sim.cars.length+sim.cops.length+8,.66);
  }
  setupInnenlicht(){
   this.innenLichter=[];
@@ -124,7 +131,9 @@ export class ExpandedWorld extends World{
    if(lampe){licht.position.set(lampe.x,lampe.y,lampe.z);licht.intensity=nacht*34;}
   });
  }
- human(color,pants,nah=true){return naturalHuman(color,pants,nah);}
+ // Kein Modell wirft seinen Schatten selbst — das erledigt der Schattenkörper
+ // in einem einzigen Aufruf. Ausnahme ist der Spieler, siehe world.js.
+ human(color,pants,nah=true){const g=naturalHuman(color,pants,nah);g.traverse(o=>{if(o.isMesh)o.castShadow=false;});return g;}
  // Die Bodenneigung unter der Figur, gemessen einen halben Meter vor und
  // hinter ihr. Auf der Ebene ist sie null; erst am Hang im Cypress-Park
  // stellt sie die Sohlen sichtbar in den Anstieg.
@@ -447,7 +456,14 @@ export class ExpandedWorld extends World{
  // Vier Modelle haben seit dieser Runde eine eigene Karosserie und bauen
  // sich in ihrer wirklichen Größe; für sie entfällt der Maßstab aus
  // vehicleTypes, sonst käme er ein zweites Mal obendrauf.
- car(color,police=false,c=null){if(!c)return detailedCar(color,police);const d=vehicleTypes[c.model],g=new T.Group();if(['car','pickup'].includes(d.shape)){const form=KAROSSERIE_JE_MODELL[c.model];const m=detailedCar(color,false,false,form||'limousine');if(!form)m.scale.set(...d.scale);if(d.shape==='pickup')this.dynbox(m,0,1.2,-1.3,1.9,.2,1.5,color);m.userData.def=d;return m;}const body=this.dynbox(g,0,.8,0,1.4,.5,3,color);let wheels=[],rotor=null;
+ car(color,police=false,c=null){if(!c)return detailedCar(color,police);const d=vehicleTypes[c.model],g=new T.Group();if(['car','pickup'].includes(d.shape)){const form=KAROSSERIE_JE_MODELL[c.model];const m=detailedCar(color,false,false,form||'limousine');if(!form)m.scale.set(...d.scale);if(d.shape==='pickup')this.dynbox(m,0,1.2,-1.3,1.9,.2,1.5,color);m.userData.def=d;
+   // Der fahrende Verkehr lief als einziger ungebacken durch die Szene: 144
+   // Fahrzeuge zu je rund vierzig Einzelmeshes. Gebacken wird alles, was am
+   // Wagen fest ist; Räder, Scheinwerfer und Rücklichter bleiben eigene
+   // Meshes, weil sie drehen und schalten. Die Karosserie bleibt es auch —
+   // World.update staucht sie über userData.body mit dem Schaden.
+   backeImModell(m,[m.userData.body,...m.userData.wheels,...m.userData.headlights,...m.userData.taillights,...(m.userData.lights||[])]);
+   return m;}const body=this.dynbox(g,0,.8,0,1.4,.5,3,color);let wheels=[],rotor=null;
   if(['bike','quad'].includes(d.shape)){body.scale.set(d.shape==='bike'?.35:1.2,.5,1.5);this.dynbox(g,0,1.4,.8,1,.1,.15,0x263c40);for(const z of [-.9,.9])for(const x of d.shape==='bike'?[0]:[-.65,.65]){const wheel=new T.Mesh(new T.CylinderGeometry(.45,.45,.22,10),material(0x26343a));wheel.rotation.z=Math.PI/2;wheel.position.set(x,.45,z);g.add(wheel);wheels.push(wheel);}this.dynbox(g,0,1.05,-.25,.45,.2,.8,0x394149);}
   if(['truck','bus'].includes(d.shape)){body.scale.set(2.5,2.6,d.shape==='bus'?8:7);body.position.y=1.8;this.dynbox(g,0,2.2,3.1,2.3,1.1,.15,0x304951);for(const x of [-1.2,1.2])for(const z of [-2.4,2.4]){const w=new T.Mesh(new T.CylinderGeometry(.65,.65,.3,12),material(0x25343c));w.rotation.z=Math.PI/2;w.position.set(x,.6,z);g.add(w);wheels.push(w);}if(d.shape==='bus')for(let z=-3;z<3;z+=1.1){this.dynbox(g,1.26,2.4,z,.04,.8,.7,0x355b65);this.dynbox(g,-1.26,2.4,z,.04,.8,.7,0x355b65);}}
   if(['boat','jetski'].includes(d.shape)){body.scale.set(d.shape==='boat'?2.4:1,.7,d.shape==='boat'?5:2.5);this.dynbox(g,0,1.2,0,d.shape==='boat'?1.6:.5,.5,1.8,0xd0d2be);this.dynbox(g,0,1.55,.5,1,.5,.1,0x395969);}
@@ -506,13 +522,23 @@ export class ExpandedWorld extends World{
   s.cops.forEach((c,i)=>{const m=this.cops[i],weg=distance(c,p);
    if(weg>52&&weg<330){this.autoFern.hinzu(c.x,groundAt(c.x,c.z),c.z,c.yaw);m.visible=false;}});
   this.autoFern.ende();
-  this.figurFern.beginn();
+  this.figurFern.beginn();this.schattenFigur.beginn();this.schattenWagen.beginn();
+  // Wagenschatten: alles, was im Schattenfeld liegen kann.
+  for(const c of [...s.cars,...s.cops])if(distance(c,p)<110&&c.health>0)
+   this.schattenWagen.hinzu(c.x,groundAt(c.x,c.z),c.z,c.yaw);
   s.npcs.forEach((n,i)=>{const m=this.npcs[i],weg=distance(n,p);
+   if(m&&weg<110&&n.health>0&&n.stun<=0&&n.state!=='sitzend')
+    this.schattenFigur.hinzu(n.x,groundAt(n.x,n.z),n.z,n.yaw,m.userData.groesse||1);
    // Umschaltweite von 42 auf 34 m. Eine Figur aus 42 m ist bei 58° Blickfeld
    // gut zwanzig Bildpunkte hoch; 34 Meshes dafür sind nicht zu rechtfertigen.
    // Am Strand mit dreißig Leuten in Sichtweite kostete das über
    // vierhundert Draw Calls.
-   const nah=weg<34;m.visible=nah&&weg<150;
+   // Umschaltweite von 34 auf 26 Meter. Eine nahe Figur kostet 31 Draw Calls,
+   // eine ferne ein Zweiunddreißigstel davon — die Umschaltweite ist damit der
+   // stärkste einzelne Hebel auf die Bildrate, den dieses Spiel hat. Bei 58°
+   // Blickfeld und 1080 Bildzeilen ist eine Figur in 26 Metern noch 55
+   // Bildpunkte hoch; das grobe Modell trägt dieselbe Silhouette.
+   const nah=weg<26;m.visible=nah&&weg<150;
    // Die Ferndarstellung bekommt dieselbe Körpergröße, sonst wächst oder
    // schrumpft jede Figur beim Umschalten auf 34 m.
    if(!nah&&weg<165&&n.health>0&&n.stun<=0)this.figurFern.hinzu(n.x,groundAt(n.x,n.z),n.z,n.yaw,m.userData.groesse||1);
@@ -522,7 +548,10 @@ export class ExpandedWorld extends World{
    // Oberschenkeln in der Luft. Sichtbar auf jeder Bank der Karte.
    m.position.y=groundAt(n.x,n.z)+(n.health<=0||n.stun>0?.2:n.state==='sitzend'?sitzVersatz(m,n.sitzplatz?.y??.42):(m.userData.bob||0));
   if(n.health>0&&n.stun<=0){m.rotation.z=m.userData.neigung||0;m.rotation.x=m.userData.vorlage||0;}if(n.stun>0)m.rotation.x=Math.PI/2;if(n.state==='tanzend'){m.rotation.z=Math.sin(t*5)*.1;m.userData.arms.forEach((a,i)=>a.rotation.x=-1+Math.sin(t*5+i)*.6);}});
-  this.figurFern.ende();s.cops.forEach((c,i)=>{const m=this.cops[i];const weg=distance(c,p);if(weg<=52)m.visible=weg<230;m.position.y=groundAt(c.x,c.z);});
+  // Auch die Einzelfiguren außerhalb der Menge: Kontakt, Wache, Zeuge.
+  for(const f of [this.contact,this.guard,this.witness])
+   if(f?.visible)this.schattenFigur.hinzu(f.position.x,f.position.y,f.position.z,f.rotation.y,f.scale?.y||1);
+  this.figurFern.ende();this.schattenFigur.ende();this.schattenWagen.ende();s.cops.forEach((c,i)=>{const m=this.cops[i];const weg=distance(c,p);if(weg<=52)m.visible=weg<230;m.position.y=groundAt(c.x,c.z);});
   const other=s.characters[1-s.active];this.contact.position.set(other.x,groundAt(other.x,other.z),other.z);if(s.mission===3&&s.campaign.stage===0)this.contact.position.set(-77,0,73);this.contact.visible=!other.car&&distance(other,p)<150;
   const goal=s.objective();this.marker.visible=s.mission<4||s.campaign.stage>0&&s.campaign.stage<4||!!s.activity;this.ring.visible=this.marker.visible;this.marker.position.set(goal.x,groundAt(goal.x,goal.z)+4+Math.sin(t*2)*.3,goal.z);this.ring.position.set(goal.x,groundAt(goal.x,goal.z)+.12,goal.z);
   if(!this.chute){this.chute=new T.Mesh(new T.SphereGeometry(2.8,16,8,0,Math.PI*2,0,Math.PI/2),new T.MeshStandardMaterial({color:0xd3b96f,side:T.DoubleSide}));this.scene.add(this.chute);}this.chute.visible=p.parachute;this.chute.position.set(p.x,this.player.position.y+4,p.z);

@@ -1,5 +1,6 @@
 import * as T from './vendor/three.module.js';
 import {wolkenAufsetzen} from './detail.js';
+import {backeImModell} from './bake.js';
 // Anatomical, articulated meshes with independent elbows, knees and eyelids.
 const ball=new T.SphereGeometry(1,16,12);
 const cache=new Map();
@@ -37,6 +38,19 @@ function gesichtGeometrie(skinTone){
  gesichtCache.set(skinTone,g);
  return g;
 }
+const hautCache=new Map(),gesichtStoffCache=new Map();
+const hautMaterial=ton=>{
+ if(!hautCache.has(ton))hautCache.set(ton,wolkenAufsetzen(new T.MeshPhysicalMaterial(
+  {color:ton,roughness:.73,sheen:.14,sheenColor:0xb78d76})));
+ return hautCache.get(ton);
+};
+const gesichtMaterial=ton=>{
+ if(!gesichtStoffCache.has(ton)){
+  const m=hautMaterial(ton).clone();m.color.setHex(0xffffff);m.vertexColors=true;
+  gesichtStoffCache.set(ton,m);
+ }
+ return gesichtStoffCache.get(ton);
+};
 let serial=0;
 // nah=false lässt alles weg, was erst aus wenigen Metern sichtbar wird.
 export function naturalHuman(color,pants,nah=true){
@@ -50,7 +64,11 @@ export function naturalHuman(color,pants,nah=true){
  // jedes an einer anderen Stelle der Silhouette.
  const traegt={rucksack:streu(3.71)<.26,muetze:streu(9.13)<.18,jacke:streu(5.29)<.34};
  const jackenStoff=traegt.jacke?mat([0x2f3a42,0x3c3630,0x44404c,0x2b3a34,0x51463c][id%5],.90):null;
- const skin=wolkenAufsetzen(new T.MeshPhysicalMaterial({color:skinTone,roughness:.73,sheen:.14,sheenColor:0xb78d76}));
+ // Haut und Gesicht kamen pro Figur neu: zwei Materialien mal 533 Menschen
+ // sind **1066 der 1134 Figurenmaterialien**. Es gibt aber nur fünf Hauttöne.
+ // Gecacht wird nach Ton, nicht nach Person; das Gesichtsmaterial ist derselbe
+ // Stoff mit Scheitelpunktfarben und weißem Grundton.
+ const skin=hautMaterial(skinTone),gesichtStoff=gesichtMaterial(skinTone);
  const cloth=mat(color,.94),denim=mat(pants,.96),dark=mat(0x292e31),hairColor=[0x302820,0x554332,0x251f1b,0x6b5238][id%4];
  // Pelvis, waist, rib cage and shoulders have different cross sections.
  const body=add(g,loft([[.86,.14,.095,.10],[.91,.18,.11,.105],[1.02,.145,.09,.10],[1.15,.17,.115,.105],[1.32,.21,.12,.105],[1.43,.23,.10,.085],[1.48,.13,.075,.07],[1.49,.065,.057,.052]],28),cloth,0,0,0);
@@ -66,8 +84,7 @@ export function naturalHuman(color,pants,nah=true){
  // aus demselben Puffer kommen wie alle anderen: sonst bekäme die ganze
  // Stadt den Hautton der zuletzt gebauten Person. Es gibt aber nur fünf
  // Töne, also fünf Gesichter statt eines pro Kopf.
- const face=add(g,gesichtGeometrie(skinTone),skin,0,0,0);
- face.material=skin.clone();face.material.color.setHex(0xffffff);face.material.vertexColors=true;
+ const face=add(g,gesichtGeometrie(skinTone),gesichtStoff,0,0,0);
  const eyes=[],lids=[];for(const side of [-1,1]){
   const eye=oval(g,side*.036,1.737,.082,.022,.0105,.012,mat(0xd4d2c8,.34));eyes.push(eye);
   oval(eye,0,0,.83,.37,.77,.22,mat([0x53614b,0x6d5236,0x506975][id%3],.22));oval(eye,0,0,1,.15,.45,.07,mat(0x192326,.15));
@@ -154,6 +171,11 @@ export function naturalHuman(color,pants,nah=true){
  const kopfTeile = g.children.slice(kopfAb, kopfBis);
  for (const o of kopfTeile) {o.position.y -= HALS; kopf.add(o);}
  g.add(kopf);
+ // Den Kopf zusammenbacken. Animiert sind an einer Figur nur Rumpf (Atmung),
+ // Augen und Lider (Blinzeln) — Hals, Nase, Ohren, Haare und Mütze sind starr
+ // und drehen ohnehin gemeinsam mit der Kopfgruppe. Aus zehn bis zwölf Meshes
+ // werden vier. Bei 533 Figuren in der Stadt zählt das Mesh für Mesh.
+ backeImModell(kopf,[...eyes,...lids]);
  // Körperbau. Die Körpergröße skaliert die ganze Figur gleichmäßig — damit
  // blieb jedes Verhältnis für alle 530 Menschen dasselbe: Schulterbreite
  // geteilt durch Größe, Rumpftiefe geteilt durch Größe, Kopfhöhe geteilt

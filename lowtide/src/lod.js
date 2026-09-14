@@ -73,7 +73,12 @@ export class Fernstufe {
   this.hilfe = new T.Object3D();
   this.netze = backeNachMaterial(vorbild).map(({geometry, material}) => {
    const netz = new T.InstancedMesh(geometry, material.clone(), maximal);
-   netz.castShadow = true;
+   // Kein Schattenwurf für die Ferne. Der Schattendurchgang war mit 586 von
+   // 900 Zeichenaufrufen und einer Million Dreiecken der mit Abstand teuerste
+   // Posten des Bildes — und diese Netze stehen mit frustumCulled = false
+   // darin, also immer, egal wo die Sonne steht. Ab vierzig Metern ist der
+   // Schatten einer Figur oder eines Autos ohnehin ein grauer Fleck.
+   netz.castShadow = false;
    netz.receiveShadow = true;
    netz.frustumCulled = false;
    netz.count = 0;
@@ -123,4 +128,44 @@ export class Fernstufe {
  // Wie viele Draw Calls diese Stufe kostet, unabhängig von der Zahl der
  // Exemplare. Für die Messwerte im Debug-Overlay.
  get kosten() {return this.anzahl ? this.netze.length : 0;}
+}
+
+// Schattenkörper. Der Schattendurchgang war mit 576 von 890 Zeichenaufrufen
+// der teuerste Posten des Bildes, und die Aufschlüsselung zeigte, woher:
+// **294 Aufrufe für Figuren und 115 für Fahrzeuge bei zusammen 80.000
+// Dreiecken**. Das ist kein Geometrieproblem, sondern reiner Aufruf-Overhead —
+// jede nahe Figur wirft ihren Schatten aus 34 Einzelnetzen, jedes Auto aus 20.
+//
+// Ein Mensch wirft aus fünf Metern Entfernung keinen Schatten, in dem man
+// Finger zählt. Ein Kapselkörper je Figur, ein Quader je Auto, alle Exemplare
+// in **einem** Instanzennetz: der ganze Personen- und Fahrzeugschatten kostet
+// danach zwei Aufrufe.
+//
+// Das Netz muss sichtbar bleiben — was unsichtbar ist, wirft in three.js auch
+// keinen Schatten. Ein Material ohne Farb- und Tiefenschreiben zeichnet im
+// Farbdurchgang nichts und kostet dort einen Aufruf.
+export class Schattenkoerper {
+ constructor(scene, geometrie, maximal, hoehe = 0) {
+  const material = new T.MeshBasicMaterial({colorWrite: false, depthWrite: false});
+  this.netz = new T.InstancedMesh(geometrie, material, maximal);
+  this.netz.castShadow = true;
+  this.netz.receiveShadow = false;
+  this.netz.frustumCulled = false;
+  this.netz.count = 0;
+  this.hoehe = hoehe;
+  this.hilfe = new T.Object3D();
+  this.n = 0;
+  scene.add(this.netz);
+ }
+ beginn() {this.n = 0;}
+ hinzu(x, y, z, yaw = 0, skalierung = 1) {
+  if (this.n >= this.netz.instanceMatrix.count) return;
+  const h = this.hilfe;
+  h.position.set(x, y + this.hoehe * skalierung, z);
+  h.rotation.set(0, yaw, 0);
+  h.scale.setScalar(skalierung);
+  h.updateMatrix();
+  this.netz.setMatrixAt(this.n++, h.matrix);
+ }
+ ende() {this.netz.count = this.n; this.netz.instanceMatrix.needsUpdate = true;}
 }
