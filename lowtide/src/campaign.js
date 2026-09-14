@@ -386,6 +386,38 @@ export class Campaign extends Simulation{
   }
   this.pendler=pendler;
 
+  // Begleitung. Bis hierher ging jeder dieser 530 Menschen allein durch die
+  // Stadt — 265 mögliche Paare, gemessen null, die länger als ein paar
+  // Sekunden nebeneinander blieben. Eine Fußgängerzone, in der niemand zu
+  // zweit unterwegs ist, sieht auch aus wie eine Menge Einzelgänger.
+  //
+  // Jede dritte Figur der Menge sucht sich jemanden im Umkreis von zwölf
+  // Metern, der noch frei ist. Die Begleitung übernimmt Tempo und Ziel des
+  // Vordermanns und hält seitlich Abstand; die Seite hängt an der Kennung,
+  // damit nicht beide auf derselben landen. Feste Zuordnung beim Aufbau,
+  // nicht je Takt — sonst wechselten die Paare ständig.
+  const kandidaten=this.npcs.filter(n=>n.id>=200&&n.schedule==='street');
+  const belegt=new Set();
+  let paare=0;
+  for(const n of kandidaten){
+   if(n.id%3||belegt.has(n.id))continue;
+   for(const m of kandidaten){
+    if(m===n||belegt.has(m.id)||m.fuehrer)continue;
+    if(Math.hypot(m.x-n.x,m.z-n.z)>12)continue;
+    // Nicht hinterherlaufen, sondern denselben Weg gehen: die Begleitung
+    // übernimmt Weg und Wegpunkt des anderen und hält nur seitlich Abstand.
+    // Der erste Anlauf ließ sie der Position des Vordermanns folgen — von 42
+    // Paaren blieben nach dreißig Sekunden genau eines zusammen, einzelne
+    // Begleiter standen 32 Meter weit weg. Wer einmal den Anschluss verliert,
+    // findet ihn so nie wieder.
+    m.fuehrer=n;n.begleitung=m;m.seite=m.id%2?1:-1;m.pace=n.pace;
+    m.path=n.path;m.target=n.target;m.x=n.x+Math.cos(n.yaw)*m.seite*.85;m.z=n.z-Math.sin(n.yaw)*m.seite*.85;
+    belegt.add(n.id);belegt.add(m.id);paare++;
+    break;
+   }
+  }
+  this.paare=paare;
+
   // Wer auf der Fahrbahn steht, wird an den Rand geschoben. Die Figuren
   // entstehen an vier Stellen mit unterschiedlicher Absicht — Rundgänge aus
   // simulation.js, Blöcke aus campaign.js, Wachen, Menge —, und keine davon
@@ -771,7 +803,11 @@ export class Campaign extends Simulation{
   let gesetzt=0;
   for(const n of this.npcs){
    // Nur die Menge, nicht Wachen oder Figuren der Kampagne. Jede fünfte.
-   if(n.id<200||n.guard||n.id%5!==0)continue;
+   // Und niemand, der zu zweit unterwegs ist: gemessen hatten vier der fünf
+   // schlechtesten Paare genau das Bild — einer setzt sich auf eine Bank, der
+   // andere geht weiter, und danach liegen 32 bis 60 Meter dazwischen. Wer
+   // begleitet wird oder selbst begleitet, bleibt stehen und geht mit.
+   if(n.id<200||n.guard||n.id%5!==0||n.fuehrer||n.begleitung)continue;
    let beste=-1,bester=1e9;
    for(let i=0;i<frei.length;i++){
     const d=Math.hypot(frei[i].x-n.x,frei[i].z-n.z);

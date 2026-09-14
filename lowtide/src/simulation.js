@@ -469,7 +469,32 @@ export class Simulation{
    // gezogene Waffe nicht —, bewegt sich aber nicht. Der erste Anlauf ließ ihn
    // ganz oben aus der Schleife springen; damit blieb er blind für alles.
    if(n.state==='sitzend')continue;
-   if(n.state==='flüchtend'){n.yaw=Math.atan2(n.x-p.x,n.z-p.z);const [fx,fz]=this.schrittUmGehen(n,Math.sin(n.yaw)*3*dt,Math.cos(n.yaw)*3*dt);this.move(n,fx,fz,.3);if(n.timer<=0){n.state='normal';n.target=(n.target+1)%n.path.length;}}else{const dest=n.path[n.target],d=distance(n,dest);if(d<1){n.target=(n.target+1)%n.path.length;n.messZeit=0;n.messAbstand=undefined;}else{n.yaw=Math.atan2(dest.x-n.x,dest.z-n.z);const v=n.pace*(this.weather==='rain'?1.5:1)*dt;const [sx,sz]=this.schrittUmGehen(n,Math.sin(n.yaw)*v,Math.cos(n.yaw)*v);this.move(n,sx,sz,.3);
+   if(n.state==='flüchtend'){n.yaw=Math.atan2(n.x-p.x,n.z-p.z);const [fx,fz]=this.schrittUmGehen(n,Math.sin(n.yaw)*3*dt,Math.cos(n.yaw)*3*dt);this.move(n,fx,fz,.3);if(n.timer<=0){n.state='normal';n.target=(n.target+1)%n.path.length;}}else{
+    // Begleitung: derselbe Weg, derselbe Wegpunkt, nur um 85 Zentimeter quer
+    // versetzt. Der erste Anlauf ließ die Begleitung der Position des anderen
+    // folgen; von 42 Paaren blieb nach dreißig Sekunden eines zusammen, weil
+    // ein einmal verlorener Anschluss nie wieder aufgeholt wird.
+    // Auch den Weg übernehmen, nicht nur den Wegpunkt: updateRoutines ersetzt
+    // morgens und abends den ganzen Weg der Figur. Wer nur den Index kopierte,
+    // griff danach in die alte, kürzere Liste — "Cannot read properties of
+    // undefined", und das Spiel blieb stehen.
+    if(n.fuehrer&&n.fuehrer.health>0&&n.fuehrer.path?.length){n.path=n.fuehrer.path;n.target=n.fuehrer.target;}
+    const roh=n.path[n.target]||n.path[0];
+    if(!roh)continue;
+    let dest=roh,tempo=1;
+    if(n.fuehrer){
+     const ri=Math.atan2(roh.x-n.x,roh.z-n.z);
+     dest={x:roh.x+Math.cos(ri)*n.seite*.85,z:roh.z-Math.sin(ri)*n.seite*.85};
+     // Anschluss halten. Derselbe Weg allein reicht nicht: eine Begleitung,
+     // die an einer Kiste hängen bleibt, während der andere weitergeht, ist
+     // danach für immer zwanzig Meter zurück. Ab drei Metern läuft sie
+     // deshalb direkt auf den anderen zu und darf dabei schneller gehen —
+     // gemessen blieben ohne diese Regel von 42 Paaren 20 bis 28 zusammen,
+     // einzelne standen 32 Meter weit weg.
+     const abstand=distance(n,n.fuehrer);
+     if(abstand>3){dest={x:n.fuehrer.x,z:n.fuehrer.z};tempo=Math.min(2.2,1+abstand*.12);}
+    }
+    const d=distance(n,dest);if(d<1&&!n.fuehrer){n.target=(n.target+1)%n.path.length;n.messZeit=0;n.messAbstand=undefined;}else if(d>=.35){n.yaw=Math.atan2(dest.x-n.x,dest.z-n.z);const v=n.pace*tempo*(this.weather==='rain'?1.5:1)*dt;const [sx,sz]=this.schrittUmGehen(n,Math.sin(n.yaw)*v,Math.cos(n.yaw)*v);this.move(n,sx,sz,.3);
     // Wer eine Sekunde lang nicht vorankommt, nimmt den nächsten Wegpunkt.
     //
     // Im Prüflauf standen Figuren zehn Sekunden auf derselben Stelle, obwohl

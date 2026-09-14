@@ -2474,13 +2474,25 @@ pruefe('Am Mittag brennt keine Laterne', await page.evaluate(() => {
 // mittlerer Helligkeit — zwölf von 255 zwischen wolkenlosem Mittag und
 // Gewitter, weil die erhöhte Streuung fast genau aufhob, was die gedämpfte
 // Sonne wegnahm.
-const wetterHelligkeit = {}, wetterZweit = {};
+const wetterHelligkeit = {}, wetterZweit = {}, wetterLicht = {};
 for (const wetter of ['clear', 'rain', 'fog', 'storm']) {
  await page.evaluate(w => {const L = window.LOWTIDE; L.sim.hour = 13; L.sim.weather = w;
   L.luftbild(-175, 8, 20, -100, 4, 60);}, wetter);
  const n0 = await page.evaluate(() => window.LOWTIDE.frames);
  await page.waitForFunction(k => window.LOWTIDE.frames > k + 4, n0, {timeout: 60000});
  await einschwingen();
+ // Mitgeschrieben wird auch, woran es liegen könnte: Himmelslicht, Sonne,
+ // Blitz, Laternenanteil. Der Sturm meldete über mehrere Läufe hinweg
+ // **exakt** 118,5 gegen 177,6 — also nichts Zufälliges, und weder Blitz noch
+ // Nässe erklären es: dieselbe Messung ohne den Prüflauf drumherum bleibt über
+ // sieben Einschwingstufen zwischen 118,8 und 119,7.
+ const lichter = () => page.evaluate(() => {
+  const w = window.LOWTIDE.world;
+  return {hemi: +w.hemi.intensity.toFixed(2), sonne: +w.sun.intensity.toFixed(2),
+   blitz: +(w.blitz || 0).toFixed(2), lampen: +(w.sky?.lampen ?? 0).toFixed(2),
+   belichtung: +(w.post?.belichtung ?? w.renderer.toneMappingExposure ?? 0).toFixed(3)};
+ });
+ wetterLicht[wetter] = [await lichter()];
  wetterHelligkeit[wetter] = await page.evaluate(() => {
   const L = window.LOWTIDE; L.world.zeichne();
   const gl = L.world.renderer.getContext();
@@ -2497,6 +2509,7 @@ for (const wetter of ['clear', 'rain', 'fog', 'storm']) {
  // Einmal in dieser Sitzung meldete dieselbe Stelle für Sturm 165,0 statt der
  // üblichen 117 — ein Ausreißer, den die Streuung oben nicht erklärt.
  await einschwingen();
+ wetterLicht[wetter].push(await lichter());
  wetterZweit[wetter] = await page.evaluate(() => {
   const L = window.LOWTIDE; L.world.zeichne();
   const gl = L.world.renderer.getContext();
@@ -2518,7 +2531,10 @@ pruefe('Nebel nimmt Sicht, nicht Helligkeit',
 pruefe('Die Helligkeitsmessung ist eingeschwungen',
  Object.keys(wetterHelligkeit).every(k => Math.abs(wetterHelligkeit[k] - wetterZweit[k]) <= 3),
  Object.keys(wetterHelligkeit).map(k =>
-  `${k} ${wetterHelligkeit[k].toFixed(1)}/${wetterZweit[k].toFixed(1)}`).join(', '));
+  `${k} ${wetterHelligkeit[k].toFixed(1)}/${wetterZweit[k].toFixed(1)}` +
+  (Math.abs(wetterHelligkeit[k] - wetterZweit[k]) > 3
+   ? ' [' + wetterLicht[k].map(l => `hemi ${l.hemi} sonne ${l.sonne} blitz ${l.blitz}` +
+     ` lampen ${l.lampen} belichtung ${l.belichtung}`).join(' -> ') + ']' : '')).join(', '));
 pruefe('Regen ist dichter als vorher', await page.evaluate(() => {
  const w = window.LOWTIDE.world;
  // Tropfen je Quadratmeter im Feld um die Kamera.
