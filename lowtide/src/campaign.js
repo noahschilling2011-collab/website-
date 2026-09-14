@@ -1,12 +1,12 @@
 import {Simulation,clamp,distance,intersects,lineClear,places} from './simulation.js';
-import {bounds,locations,vehicleTypes,weapons,waterAt,groundAt,roadSegments,immobilien,rennen,schatzOrte,onRoad,STADTGEBIETE} from './content.js';
+import {bounds,locations,vehicleTypes,weapons,waterAt,groundAt,roadSegments,immobilien,rennen,schatzOrte,onRoad,STADTGEBIETE,intersections} from './content.js';
 import {findPath} from './navigation.js';
 import {storyAufbau,storyZiel,storyTitel,storyAktion,storyTick,konvoiRammen,starteAkt,beendeKampagne,storyReparieren} from './story.js';
 export class Campaign extends Simulation{
  constructor(){
   super();this.active=0;Object.assign(this.player,{id:'eli',name:'ELI VOSS',stamina:100,fitness:0,y:0,vy:0,weapon:'pistol',inventory:{pistol:{ammo:12,reserve:72}},cover:false,hair:0,tattoo:false,air:100,parachute:false,fish:0});
   this.characters=[this.player,{...this.player,id:'mara',name:'MARA QUINN',x:-25,z:73,money:600,clothes:'blue',inventory:{pistol:{ammo:12,reserve:48},taser:{ammo:2,reserve:12}},weapon:'taser',car:null}];
-  this.relationship=50;this.campaign={stage:0,choice:null,relay:false,archive:false,witness:false,delivered:false};this.activity=null;this.unlock=null;this.reloadJob=null;this.dodgeTime=0;this.meleeTime=0;this.tickCount=0;this.weatherIndex=0;this.currentEvent=null;this.nextEvent=25;this.policeHeli={x:-360,z:305,alt:0,yaw:0};this.checkpoints=[];this.barriers=[];this.cameras=[];this.navRevision=0;this.homeOwned=true;this.motelOwned=false;this.highScores={};this.worldBuildings=[];this.roomWalls=[];this.moneyEarned=0;this.feed=[];this.konto=[];this.fotos=[];this.besitz={};this.letzterZahltag=0;
+  this.relationship=50;this.campaign={stage:0,choice:null,relay:false,archive:false,witness:false,delivered:false};this.activity=null;this.unlock=null;this.reloadJob=null;this.dodgeTime=0;this.meleeTime=0;this.tickCount=0;this.weatherIndex=0;this.currentEvent=null;this.nextEvent=25;this.policeHeli={x:-360,z:305,alt:0,yaw:0};this.barriers=[];this.cameras=[];this.navRevision=0;this.homeOwned=true;this.motelOwned=false;this.highScores={};this.worldBuildings=[];this.roomWalls=[];this.moneyEarned=0;this.feed=[];this.konto=[];this.fotos=[];this.besitz={};this.letzterZahltag=0;
   this.expandWorld();
  }
  expandWorld(){
@@ -702,13 +702,60 @@ export class Campaign extends Simulation{
    'Straßenrennen':'Schon wieder Rennen auf der Harbor Avenue. Jede Nacht dasselbe.',
    'Überfall':'Überfall gemeldet. Bereich weiträumig meiden.',
    'Party':'Irgendwo läuft eine Party und niemand weiß, wo genau.'}[kind]||('Vorfall: '+kind));}
+ // Wo eine Straßensperre steht. Vorher waren es vier von Hand notierte
+ // Punkte, alle in der alten Innenstadt: (-100,80), (-40,-100), (-280,80),
+ // (-100,200). Nachgemessen bei vier Sternen und fünfzehn Sekunden Verfolgung
+ // lag das Ziel in Rosalind **654 Meter** entfernt, auf den Keys 386, im
+ // Nordquartier 225 — der eine Wagen fuhr quer über die Karte zu einer
+ // Kreuzung, an der niemand war. Gebaut wurde dabei **keine einzige Sperre**,
+ // an keinem der fünf geprüften Orte. Dieselbe Klasse Fehler wie bei den
+ // Verkehrsrunden und der Menge: Koordinaten aus einer Karte, die es nicht
+ // mehr gibt.
+ //
+ // Jetzt kommt die Stelle aus dem Straßennetz: eine echte Kreuzung, sechzig
+ // bis zweihundert Meter vom Flüchtenden, und bevorzugt eine, die vor ihm
+ // liegt statt hinter ihm. Ohne die Richtung stellt sich die Streife dorthin,
+ // wo er herkommt.
+ sperrstelle(c,p){
+  const richtung={x:Math.sin(p.yaw),z:Math.cos(p.yaw)};
+  let beste=null,bester=-Infinity;
+  for(const k of intersections){
+   const d=distance(k,p);
+   if(d<60||d>200)continue;
+   if(waterAt(k.x,k.z))continue;
+   // Wie weit liegt die Kreuzung in Fahrtrichtung? -1 dahinter, +1 davor.
+   const vorne=((k.x-p.x)*richtung.x+(k.z-p.z)*richtung.z)/Math.max(1,d);
+   // Nah und voraus schlägt fern und seitlich; der Weg der Streife zählt mit.
+   const wert=vorne*2.2-d/130-distance(c,k)/260;
+   if(wert>bester){bester=wert;beste=k;}
+  }
+  if(beste)return {x:beste.x,z:beste.z};
+  // Kein Kreuzungspunkt im Band — auf den Keys gibt es keinen einzigen, der
+  // Damm ist eine durchgehende Fahrbahn. Dann eben mitten auf der Strecke:
+  // dieselbe Bewertung, aber über Punkte alle zwanzig Meter entlang der
+  // Segmente. Der alte Stand stellte dort eine Sperre 386 Meter entfernt auf,
+  // also mitten in der Innenstadt, während der Spieler über den Damm fuhr.
+  for(const r of roadSegments){
+   const laenge=Math.hypot(r.x2-r.x1,r.z2-r.z1);
+   if(laenge<40)continue;
+   for(let t=20;t<laenge-20;t+=20){
+    const k={x:r.x1+(r.x2-r.x1)*t/laenge,z:r.z1+(r.z2-r.z1)*t/laenge};
+    const d=distance(k,p);
+    if(d<60||d>200||waterAt(k.x,k.z))continue;
+    const vorne=((k.x-p.x)*richtung.x+(k.z-p.z)*richtung.z)/Math.max(1,d);
+    const wert=vorne*2.2-d/130-distance(c,k)/260;
+    if(wert>bester){bester=wert;beste=k;}
+   }
+  }
+  return beste?{x:beste.x,z:beste.z}:null;
+ }
  updatePolice(dt){if(!this.campaign){super.updatePolice(dt);return;}const p=this.player;this.spotted=false;const nowWanted=this.stars>0;
   for(const camera of this.cameras){if(!nowWanted||this.time<(camera.next||0))continue;const d=distance(p,camera),dot=(Math.sin(camera.yaw)*(p.x-camera.x)+Math.cos(camera.yaw)*(p.z-camera.z))/Math.max(1,d);if(d<camera.range&&dot>.2&&lineClear(camera,p,this.solids)&&p.y<5){camera.next=this.time+5;this.lastSeen={x:p.x,z:p.z};this.spotted=true;}}
   this.dispatchTimer-=dt;const desired=Math.min(12,this.stars*2);if(nowWanted&&this.dispatchTimer<=0){const n=this.cops.filter(c=>c.active&&c.health>0).length;if(n<desired){const c=this.cops.find(c=>!c.active&&c.health>0);if(c){c.active=true;c.repath=0;this.dispatchTimer=2.5;}}}
   for(const c of this.cops){if(c.health<=0||c.stun>0)continue;if(!nowWanted&&!c.active&&distance(c,c.base)<2)continue;const d=distance(c,p),known=p.car?this.description?.plate===p.car.id:this.description?.clothes===p.clothes;const sees=nowWanted&&p.y<12&&d<(p.sneak||this.active===1?26:52)&&lineClear(c,p,this.solids)&&(known||d<10||p.armed);if(sees){this.spotted=true;this.lastSeen={x:p.x,z:p.z};this.description={clothes:p.clothes,plate:p.car?.id||null};}
-   if(!nowWanted&&c.active){c.active=false;c.repath=0;}c.repath-=dt;if(c.repath<=0){let target=nowWanted&&c.active?(sees?p:this.lastSeen):c.base;if(!target)continue;if(nowWanted&&c.id===2&&this.stars>=3){if(!c.blockTarget)c.blockTarget=[{x:-100,z:80},{x:-40,z:-100},{x:-280,z:80},{x:-100,z:200}].filter(v=>distance(v,p)>30).sort((a,b)=>distance(a,p)-distance(b,p))[0];target=c.blockTarget;}else if(nowWanted&&c.id%3===2&&this.stars>=3)target={x:target.x+Math.sin(p.yaw)*16,z:target.z+Math.cos(p.yaw)*16};c.route=findPath(c,target,v=>this.blocked(v,1.15)||waterAt(v.x,v.z),4,10000,v=>onRoad(v.x,v.z,0)?1:3.5);c.target=0;c.repath=sees?2.5:6;}
+   if(!nowWanted&&c.active){c.active=false;c.repath=0;}c.repath-=dt;if(c.repath<=0){let target=nowWanted&&c.active?(sees?p:this.lastSeen):c.base;if(!target)continue;if(nowWanted&&c.id%4===2&&this.stars>=3){if(!c.blockTarget)c.blockTarget=this.sperrstelle(c,p);if(c.blockTarget)target=c.blockTarget;}else if(nowWanted&&c.id%3===2&&this.stars>=3)target={x:target.x+Math.sin(p.yaw)*16,z:target.z+Math.cos(p.yaw)*16};c.route=findPath(c,target,v=>this.blocked(v,1.15)||waterAt(v.x,v.z),4,10000,v=>onRoad(v.x,v.z,0)?1:3.5);c.target=0;c.repath=sees?2.5:6;}
    const target=c.route[c.target];if(target&&!(sees&&d<8)){const td=distance(c,target);if(td<1.1)c.target++;else{c.yaw=Math.atan2(target.x-c.x,target.z-c.z);const speed=nowWanted?10+this.stars*1.4:8;this.move(c,Math.sin(c.yaw)*Math.min(td,speed*dt),Math.cos(c.yaw)*Math.min(td,speed*dt),1.15);}}
-   if(nowWanted&&c.blockTarget&&distance(c,c.blockTarget)<4&&!c.blocking){c.blocking=true;const b=this.addSolid(c.x+4,c.z,5,1.2,'barrier',1);this.barriers.push(b);}if(!nowWanted){c.blockTarget=null;c.blocking=false;}c.shot-=dt;if(sees&&d<28&&c.shot<=0){c.shot=c.role==='tactical'?1:1.8;if(this.stars>=2&&this.dodgeTime<=0){p.health-=p.cover?1:p.car?2:c.role==='tactical'?8:5;this.tracers.push({x:c.x,z:c.z,end:{x:p.x,z:p.z},life:.1});}else if(d<4&&this.dodgeTime<=0)p.health-=5;}
+   if(nowWanted&&c.blockTarget&&distance(c,c.blockTarget)<7&&!c.blocking){c.blocking=true;const b=this.addSolid(c.x+4,c.z,5,1.2,'barrier',1);this.barriers.push(b);}if(!nowWanted){c.blockTarget=null;c.blocking=false;}c.shot-=dt;if(sees&&d<28&&c.shot<=0){c.shot=c.role==='tactical'?1:1.8;if(this.stars>=2&&this.dodgeTime<=0){p.health-=p.cover?1:p.car?2:c.role==='tactical'?8:5;this.tracers.push({x:c.x,z:c.z,end:{x:p.x,z:p.z},life:.1});}else if(d<4&&this.dodgeTime<=0)p.health-=5;}
   }
   if(!nowWanted&&this.barriers.length){this.solids=this.solids.filter(b=>!this.barriers.includes(b));this.barriers=[];}const heli=this.policeHeli;if(heli){const target=this.stars>=5?(this.lastSeen||p):{x:-360,z:305};const d=distance(heli,target);heli.alt=Math.min(45,heli.alt+dt*8);if(d>4){heli.yaw=Math.atan2(target.x-heli.x,target.z-heli.z);heli.x+=Math.sin(heli.yaw)*dt*30;heli.z+=Math.cos(heli.yaw)*dt*30;}else if(this.stars<5)heli.alt=Math.max(0,heli.alt-dt*16);if(this.stars>=5&&d<45&&p.y>=0&&lineClear(heli,p,this.solids)){this.spotted=true;this.lastSeen={x:p.x,z:p.z};}}if(nowWanted){if(this.spotted)this.unseen=0;else this.unseen+=dt;if(this.unseen>20+this.stars*4&&this.lastSeen&&distance(p,this.lastSeen)>35){this.stars=0;this.heat=0;this.description=null;this.lastSeen=null;this.notify('Fahndung beendet.');}}
  }

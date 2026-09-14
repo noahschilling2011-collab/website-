@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 280 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 283 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1318,6 +1318,64 @@ wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
 besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
+
+## Straßensperren an vier Punkten in der alten Innenstadt
+
+Im Konstruktor der Kampagne standen zwei leere Listen: `barriers` und
+`checkpoints`. `checkpoints` kam im ganzen Projekt **genau einmal** vor — in
+der Zeile, die es anlegt. Tot, ersatzlos entfernt.
+
+`barriers` dagegen ist echt: eine Streife mit `blockTarget` stellt bei
+Ankunft einen Sperrbock als Solid auf, `expanded-world.js` zeichnet ihn, und
+mit dem Ende der Fahndung verschwindet er wieder. Nur woher das Ziel kam, war
+das Problem:
+
+```js
+c.blockTarget=[{x:-100,z:80},{x:-40,z:-100},{x:-280,z:80},{x:-100,z:200}]
+  .filter(v=>distance(v,p)>30).sort(...)[0];
+```
+
+Vier von Hand notierte Punkte, alle in der alten Innenstadt — und nur **ein
+einziger Wagen** (`c.id===2`) bekam je einen Auftrag. Dieselbe Klasse Fehler
+wie bei den Verkehrsrunden, den Gehwegen und der Bevölkerung.
+
+Gemessen über neunzig Sekunden bei vier Sternen, Streifen zwanzig Meter
+neben dem Flüchtenden:
+
+| Ort | vorher: Aufträge / Sperren / Zielabstand | nachher |
+|---|---|---|
+| Innenstadt | 1 / 1 / 60 m | 3 / 3 / 60 m |
+| Rosalind | 1 / 1 / **654 m** | 3 / 2 / **152 m** |
+| Nordquartier | 1 / 1 / **225 m** | 3 / 3 / **166 m** |
+| Flugfeld | 1 / 1 / **234 m** | 3 / 3 / **102 m** |
+| Keys | 1 / 1 / **386 m** | 3 / 3 / **70 m** |
+
+Die Stelle kommt jetzt aus dem Straßennetz: eine echte Kreuzung sechzig bis
+zweihundert Meter vom Flüchtenden, bevorzugt eine, die **vor** ihm liegt —
+ohne die Richtung stellt sich die Streife dorthin, wo er herkommt. Auf den
+Keys gibt es im ganzen Band keine einzige Kreuzung; der Damm ist eine
+durchgehende Fahrbahn. Dafür der Rückfall auf einen Punkt mitten auf der
+Strecke, alle zwanzig Meter abgetastet, mit derselben Bewertung.
+
+**Und eine Behauptung von mir, die ich fast veröffentlicht hätte.** Die
+ersten drei Messungen ergaben „null Sperren gebaut, an keinem Ort" — auch in
+der Innenstadt, auch nach der Reparatur. Ich hielt das für einen zweiten,
+tieferen Fehler und habe eine Streife Tick für Tick verfolgt: sie fuhr
+sauber los, 0,26 Meter je Bild, und blieb dann schlagartig stehen, ohne
+Hindernis, auf freier Straße, `repath` zählte nicht mehr herunter.
+
+Der Grund war nicht die Polizei. Mein wehrlos herumstehender Testspieler wurde
+nach gut einer Sekunde **festgenommen**, `sim.paused` ging auf `true`, und
+damit stand die ganze Simulation. Die Streife war nie steckengeblieben — es
+lief nichts mehr. Mit festgeklemmter Gesundheit baute schon der alte Stand
+überall eine Sperre; der Fehler war nie „keine Sperre", sondern immer „eine
+Sperre, 654 Meter weit weg".
+
+Drei Prüfungen halten es jetzt fest: Zielabstand höchstens 220 Meter an vier
+Orten, mindestens zwei Streifen mit Auftrag, und mindestens eine Sperre, die
+tatsächlich gebaut wird.
+
+283 Prüfungen bestanden, keine gefallen.
 
 ## Sieben Spielerverben, keines davon geprüft
 

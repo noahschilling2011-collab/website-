@@ -2662,6 +2662,56 @@ const verben = await page.evaluate(() => {
  aus.nachWartezeit = {ammo: p.ammo, reserve: p.reserve, auftrag: !!s.reloadJob};
  return aus;
 });
+// Straßensperren. Die Stellen waren vier von Hand notierte Punkte, alle in
+// der alten Innenstadt, und nur ein einziger Wagen (id === 2) bekam je einen
+// Auftrag. Nachgemessen lag das Ziel in Rosalind 654 Meter entfernt, auf den
+// Keys 386 — der Wagen fuhr quer über die Karte, während die Verfolgung
+// woanders lief.
+const sperren = await page.evaluate(() => {
+ const L = window.LOWTIDE, s = L.sim, q = s.player;
+ const leer = {forward: 0, turn: 0, yaw: 0, sprint: false, sneak: false, brake: false, jump: false, interact: false};
+ const orte = {Innenstadt: [-100, 20], Rosalind: [-880, 340], Keys: [230, 400], Flugfeld: [-360, 300]};
+ const aus = {};
+ const merk = {x: q.x, z: q.z, health: q.health, car: q.car};
+ for (const [name, [x, z]] of Object.entries(orte)) {
+  for (const b of s.barriers) s.solids = s.solids.filter(v => v !== b);
+  s.barriers = [];
+  for (const c of s.cops) {c.blockTarget = null; c.blocking = false; c.active = true;
+   c.repath = 0; c.health = 100; c.stun = 0; c.x = x + 20; c.z = z;}
+  q.x = x; q.z = z; q.y = 0; q.car = null; q.yaw = 0;
+  // Fahndung, Gesundheit und Pause festhalten: ein wehrlos stehender Spieler
+  // wird sonst nach einer Sekunde festgenommen, sim.paused wird gesetzt und
+  // die ganze Simulation steht — das sieht aus, als bliebe die Streife stecken.
+  let sperrenMax = 0;
+  for (let i = 0; i < 1500; i++) {
+   s.stars = 4; s.heat = 90; s.lastSeen = {x, z}; s.description = {clothes: q.clothes};
+   q.health = 100; s.paused = false;
+   s.tick(1 / 60, leer);
+   q.health = 100; s.paused = false;
+   sperrenMax = Math.max(sperrenMax, s.barriers.length);
+  }
+  const auftraege = s.cops.filter(c => c.blockTarget).length;
+  const ziel = s.cops.find(c => c.blockTarget)?.blockTarget;
+  aus[name] = {auftraege, sperrenMax,
+   abstand: ziel ? Math.hypot(ziel.x - x, ziel.z - z) : null};
+ }
+ for (const b of s.barriers) s.solids = s.solids.filter(v => v !== b);
+ s.barriers = [];
+ for (const c of s.cops) {c.blockTarget = null; c.blocking = false;}
+ s.stars = 0; s.heat = 0; s.lastSeen = null; s.description = null;
+ q.x = merk.x; q.z = merk.z; q.health = merk.health; q.car = merk.car;
+ return aus;
+});
+const orteListe = Object.entries(sperren);
+pruefe('Straßensperren stehen dort, wo die Verfolgung ist',
+ orteListe.every(([, v]) => v.abstand !== null && v.abstand <= 220),
+ orteListe.map(([k, v]) => `${k} ${v.abstand === null ? '—' : Math.round(v.abstand) + ' m'}`).join(', '));
+pruefe('Mehr als eine Streife kann sperren',
+ orteListe.every(([, v]) => v.auftraege >= 2),
+ orteListe.map(([k, v]) => `${k} ${v.auftraege}`).join(', '));
+pruefe('Die Sperren werden auch wirklich aufgebaut',
+ orteListe.every(([, v]) => v.sperrenMax >= 1),
+ orteListe.map(([k, v]) => `${k} ${v.sperrenMax}`).join(', '));
 pruefe('Nahkampf richtet Schaden an', verben.nahkampf > 0, `${verben.nahkampf} Schaden`);
 pruefe('Der Griff betäubt', verben.griffStun > 1, `${verben.griffStun} s`);
 pruefe('Deckung greift an einer Wand und nicht im Freien',
