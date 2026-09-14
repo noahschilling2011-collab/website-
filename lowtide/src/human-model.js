@@ -79,6 +79,13 @@ export function naturalHuman(color,pants,nah=true){
  const hair=new T.Group();g.add(hair);hair.position.y=1.78;
  const cap=add(hair,loft([[0,.090,.090,.084],[.025,.088,.087,.083],[.062,.072,.068,.067],[.106,.01,.013,.013]],28),mat(hairColor,.97),0,0,-.005);
  if(nah)for(let i=0;i<8;i++){const x=-.064+i*.018;seam(hair,[[x,.015,.079],[x+.007,.07,.04],[x-.008,.086,-.016],[x-.016,.038,-.073]],i%2?hairColor:0x40382b,.007);}
+ // Hier endet der Kopf. Ohne diese Marke nahm das Umhängen weiter unten
+ // `slice(kopfAb)` und damit alles, was danach gebaut wird: Kragen,
+ // Reißverschluss, Gürtel — und Arme und Beine. Die Figur sah im Stand
+ // richtig aus, weil die Höhenverschiebung die Weltlage erhält; sobald der
+ // Kopf sich aber drehte, drehten Arme und Beine mit. Gemessen: bei 1,2
+ // Radiant Kopfdrehung wanderte der Knöchel um 5,8 Zentimeter.
+ const kopfBis = g.children.length;
  // Clothing has a collar, zipper, belt and stitched trouser seams.
  if(nah){
   seam(g,[[0,1.475,.07],[-.058,1.45,.085],[-.064,1.41,.10]],0xc3c5b4,.009);seam(g,[[0,1.475,.07],[.058,1.45,.085],[.064,1.41,.10]],0xc3c5b4,.009);
@@ -117,10 +124,25 @@ export function naturalHuman(color,pants,nah=true){
  const HALS = 1.5;
  const kopf = new T.Group();
  kopf.position.set(0, HALS, 0);
- const kopfTeile = g.children.slice(kopfAb);
+ const kopfTeile = g.children.slice(kopfAb, kopfBis);
  for (const o of kopfTeile) {o.position.y -= HALS; kopf.add(o);}
  g.add(kopf);
- const garments=[];g.traverse(o=>{if(o.isMesh&&o.material===cloth)garments.push(o);});g.userData={body,hair,tattoo,legs,arms,knees,elbows,ankles,eyes,lids,face,kopf,id,garments,rig:'anatomical-v3'};return g;
+ // Körperbau. Die Körpergröße skaliert die ganze Figur gleichmäßig — damit
+ // blieb jedes Verhältnis für alle 530 Menschen dasselbe: Schulterbreite
+ // geteilt durch Größe, Rumpftiefe geteilt durch Größe, Kopfhöhe geteilt
+ // durch Größe. Eine Stadt aus einem Menschen in verschiedenen Maßstäben.
+ //
+ // Zwei Streuwerte aus der Kennung geben Breite und Kopfgröße. Die Arme
+ // rücken mit den Schultern nach außen, die Beine mit der Hüfte halb so
+ // weit; die Rumpftiefe folgt der Breite zu siebzig Prozent, sonst wäre ein
+ // breiter Mensch eine Scheibe.
+ const streu=k=>{const v=Math.sin((id+1)*k)*43758.5453;return v-Math.floor(v);};
+ const bau=.88+streu(31.17)*.26;
+ body.scale.set(bau,1,1+(bau-1)*.7);
+ arms.forEach((arm,i)=>{arm.position.x=(i?1:-1)*.235*bau;});
+ legs.forEach((leg,i)=>{leg.position.x=(i?1:-1)*.105*(1+(bau-1)*.6);});
+ kopf.scale.setScalar(.95+streu(7.31)*.1);
+ const garments=[];g.traverse(o=>{if(o.isMesh&&o.material===cloth)garments.push(o);});g.userData={body,hair,tattoo,legs,arms,knees,elbows,ankles,eyes,lids,face,kopf,id,garments,bau,rig:'anatomical-v3'};return g;
 }
 // Ein voller Schrittzyklus deckt diese Strecke ab. Die Schrittphase läuft
 // deshalb über den zurückgelegten Weg und nicht über die Uhr — nur so bleibt

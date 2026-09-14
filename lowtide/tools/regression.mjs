@@ -2967,6 +2967,53 @@ pruefe('Fußgänger betreten die Fahrbahn dort, wo die Überwege liegen',
 // Wegeführung über die Überwege waren es 77, 56, 62 und 43. Die Prüfung fängt
 // den Rückfall, nicht die Schwankung.
 
+// Körperbau. Die Körpergröße skaliert die ganze Figur gleichmäßig — damit war
+// jedes Verhältnis für alle 530 Menschen dasselbe: Schulterabstand geteilt
+// durch Größe lag bei jedem auf 0,249. Und beim Nachmessen kam heraus, dass
+// Arme und Beine in der Kopfgruppe hingen: `slice(kopfAb)` nahm alles, was
+// nach der Kopfmarke gebaut wird. Im Stand sah das richtig aus, weil die
+// Höhenverschiebung die Weltlage erhält — sobald der Kopf sich drehte,
+// drehten Arme und Beine mit.
+const koerperbau = await page.evaluate(() => {
+ const w = window.LOWTIDE.world;
+ const werte = [], baue = [];
+ for (let i = 0; i < w.npcs.length; i += 5) {
+  const m = w.npcs[i], u = m?.userData;
+  if (!u?.arms || !u.legs) continue;
+  baue.push(u.bau ?? 0);
+  // Schulterabstand im Eigensystem, geteilt durch die Körpergröße. Beides
+  // ohne die Größenskalierung, also ein reines Verhältnis.
+  werte.push(Math.abs(u.arms[1].position.x - u.arms[0].position.x) / 1.886);
+ }
+ // Dreht sich mit dem Kopf noch der Fuß mit?
+ const m = w.npcs[0], u = m.userData;
+ const merk = {x: m.position.x, y: m.position.y, z: m.position.z, ry: m.rotation.y, k: u.kopf.rotation.y};
+ m.position.set(0, 0, 0); m.rotation.set(0, 0, 0);
+ u.kopf.rotation.y = 0; m.updateMatrixWorld(true);
+ const a = u.ankles[0].matrixWorld.elements;
+ const vor = {x: a[12], z: a[14]};
+ u.kopf.rotation.y = 1.2; m.updateMatrixWorld(true);
+ const b = u.ankles[0].matrixWorld.elements;
+ const versatz = Math.hypot(b[12] - vor.x, b[14] - vor.z);
+ const drin = o => {let k = o; while (k) {if (k === u.kopf) return true; k = k.parent;} return false;};
+ const beinImKopf = drin(u.legs[0]), armImKopf = drin(u.arms[0]);
+ u.kopf.rotation.y = merk.k; m.position.set(merk.x, merk.y, merk.z); m.rotation.y = merk.ry;
+ m.updateMatrixWorld(true);
+ return {
+  anzahl: werte.length,
+  verschieden: new Set(werte.map(v => v.toFixed(3))).size,
+  min: Math.min(...werte), max: Math.max(...werte),
+  bauMin: Math.min(...baue), bauMax: Math.max(...baue),
+  versatz, beinImKopf, armImKopf
+ };
+});
+pruefe('Nicht jeder Mensch hat dieselben Proportionen',
+ koerperbau.verschieden > 20 && koerperbau.max - koerperbau.min > .02,
+ `${koerperbau.verschieden} Schulterbreiten unter ${koerperbau.anzahl} Figuren, ${koerperbau.min.toFixed(3)}–${koerperbau.max.toFixed(3)} der Körpergröße (vorher 0,249 bei allen)`);
+pruefe('Die Kopfgruppe enthält nur den Kopf',
+ !koerperbau.beinImKopf && !koerperbau.armImKopf && koerperbau.versatz < .001,
+ `Bein im Kopf ${koerperbau.beinImKopf}, Arm im Kopf ${koerperbau.armImKopf}, Knöchelversatz bei 1,2 rad Kopfdrehung ${koerperbau.versatz.toFixed(3)} m`);
+
 // Körpergröße und Sitzhöhe. Beide Werte wurden an den Meshes gemessen, nicht
 // an der Simulation: die Sitzprüfungen weiter oben fragen nur den Zustand ab
 // und hätten deshalb nicht gemerkt, dass die abgeleitete Klasse die Sitzhöhe

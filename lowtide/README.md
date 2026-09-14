@@ -49,7 +49,7 @@ node tools/smoke.mjs                             # Start, Konsolenfehler, Bilder
 node tools/blicke.mjs --orte kreuzung --hours 22 # Vergleichsbild an einem Ort
 node tools/messung.mjs                           # Draw Calls und Dreiecke
 node tools/luftbild.mjs                          # Luftbilder über die Karte
-node tools/regression.mjs                        # 313 Prüfungen, muss grün sein
+node tools/regression.mjs                        # 315 Prüfungen, muss grün sein
 node tools/abdeckung.mjs                         # Bauteile je 100-Meter-Zelle
 node tools/wolken.mjs                            # wandert der Wolkenschatten
 node tools/spiegelung.mjs                        # spiegelt Wasser die Stadt
@@ -1318,6 +1318,52 @@ wenig, und es ist ehrlicher, das so zu schreiben, als eine Zahl zu suchen, die
 besser aussieht.
 
 246 Prüfungen bestanden, keine gefallen.
+
+## Arme und Beine hingen in der Kopfgruppe
+
+Der Kopf ist eine eigene Gruppe, damit er sich drehen kann. Umgehängt wurde
+er so:
+
+```js
+const kopfAb = g.children.length;   // vor dem ersten Kopfteil
+...                                 // Hals, Gesicht, Augen, Nase, Haare
+...                                 // Kragen, Reißverschluss, Gürtel
+...                                 // Beine, Arme, Hände
+const kopfTeile = g.children.slice(kopfAb);
+for (const o of kopfTeile) {o.position.y -= HALS; kopf.add(o);}
+```
+
+`slice(kopfAb)` nimmt alles, was **nach** der Marke gebaut wird — und das
+sind auch Kragen, Gürtel, Arme und Beine. Im Stand fällt es nicht auf, weil
+die Höhenverschiebung die Weltlage jedes Teils erhält. Sobald der Kopf sich
+dreht, drehen Arme und Beine mit. Nachgemessen: bei 1,2 Radiant Kopfdrehung
+wandert der Knöchel um **5,8 Zentimeter**.
+
+Und der Kopf dreht sich ständig — die Ruhebewegung lässt jede Figur der Stadt
+langsam den Kopf wenden, und jede Figur sieht dem Spieler nach.
+
+Die Marke endet jetzt hinter den Haaren. Knöchelversatz: 0,000.
+
+## Fünfhundertdreißig Menschen mit denselben Proportionen
+
+Dieselbe Sache wie bei den Autos, eine Runde später bemerkt: die Körpergröße
+skaliert die ganze Figur gleichmäßig. Damit war **jedes** Verhältnis für alle
+530 Menschen dasselbe — Schulterabstand geteilt durch Körpergröße lag bei
+jedem auf 0,249.
+
+Jetzt streut ein Bauwert aus der Kennung zwischen 0,88 und 1,14: der Rumpf
+wird breiter, die Arme rücken mit den Schultern nach außen, die Beine mit der
+Hüfte halb so weit, und die Rumpftiefe folgt der Breite zu siebzig Prozent —
+sonst wäre ein breiter Mensch eine Scheibe. Dazu eine Kopfgröße zwischen 0,95
+und 1,05. Gemessen über 76 Figuren: Schulterabstand 0,221 bis 0,357 der
+Körpergröße, 46 verschiedene Werte.
+
+Was das nicht ist: unterschiedliche Beinlängen oder Rumpfhöhen. Das Verhältnis
+von Bein zu Rumpf ist weiterhin bei allen gleich; dafür müsste das Hüftgelenk
+wandern, und daran hängen Sitzhaltung, Schrittzyklus und die gemessene
+Beckenhöhe.
+
+315 Prüfungen bestanden, keine gefallen.
 
 ## Der Verkehr drehte sich auf der Stelle
 
