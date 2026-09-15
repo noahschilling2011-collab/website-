@@ -159,7 +159,7 @@ export class Campaign extends Simulation{
    ring(-960,-900,340,380),
    hinUndZurueck(400,100,360),   // Keys Highway
    hinUndZurueck(200,-100,280),  // Uferstraße nach Isla Serena
-   hinUndZurueckSenkrecht(134,200,400),   // Bay Skyway über die Bucht
+   hinUndZurueckSenkrecht(134,206,394),   // Bay Skyway über die Bucht
    hinUndZurueck(620,-560,100)   // Südtangente, Ostteil
   ].filter(Boolean);
   // Drei Wagen je Runde, gestartet auf drei Eckpunkten: gemessen ergab das

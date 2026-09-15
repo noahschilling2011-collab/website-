@@ -235,7 +235,11 @@ export const DAEMME=[
  // käme kein Fahrzeug einen Meter weit: driveVehicle bricht ab, sobald der
  // nächste Schritt auf Wasser fällt, und die Trasse wäre eine Brücke, die
  // niemand befahren kann.
- {x1:126.5,z1:200,x2:141.5,z2:400}
+ // Das Deck ist breiter als die Fahrbahn: zwanzig Meter Bauwerk für fünfzehn
+ // Meter Spur. Die zweieinhalb Meter Kappe an jeder Seite tragen Leitplanke
+ // und Lichtmasten — ohne sie stünden beide in der Fahrspur, und genau das
+ // hat die Prüfung "Keine Kulisse steht in einer Fahrbahn" gemeldet.
+ {x1:124,z1:200,x2:144,z2:400}
 ];
 // Der Bay Skyway. Eine Hochstraße ist in dieser Welt nur dort möglich, wo sie
 // keine bestehende Fahrbahn kreuzt: groundAt liefert genau eine Höhe je Punkt,
@@ -249,7 +253,7 @@ export const DAEMME=[
 // 11,4 Prozent. Steiler als eine echte Autobahnrampe, flach genug, dass ein
 // Kleinwagen sie mit Anlauf nimmt.
 export const HOCHSTRASSEN=[{
- name:'Bay Skyway',x1:126.5,x2:141.5,
+ name:'Bay Skyway',x1:124,x2:144,
  // z-Marke und Höhe. Dazwischen wird linear interpoliert.
  // Anfang und Ende liegen auf den Dämmen, nicht auf den Querstraßen: bei
  // z = 200 und z = 400 laufen die Fahrbahnen zur Insel und über die Keys,
@@ -373,7 +377,15 @@ export const roadSegments=[
  // Bay Skyway. Als gewöhnliches Straßenstück angemeldet: der Straßenbau in
  // expanded-world.js folgt ohnehin groundAt, also entstehen Decke, Rand und
  // Mittelstreifen auf acht Metern Höhe, ohne dass dafür eine Zeile nötig wäre.
- {x1:134,z1:200,x2:134,z2:400,w:15}
+ //
+ // Das Stück endet sechs Meter vor den beiden Querstraßen und nicht auf
+ // ihnen. Sonst entstehen zwei neue Kreuzungen — und mit ihnen zwei Ampeln
+ // und eine Sperrstelle für die Polizei mitten auf dem Damm. Gemessen: die
+ // Streife auf den Keys bekam den Auftrag, 96 Meter nach Westen zu fahren,
+ // blieb acht Meter neben dem Spieler stehen, weil Verfolgung vor Sperre
+ // geht, und baute nie eine Sperre auf. Die Lücke ist gedeckt: die Fahrbahn
+ // bei z = 200 ist zwölf Meter breit, die bei z = 400 vierzehn.
+ {x1:134,z1:206,x2:134,z2:394,w:15}
 ];
 
 // Bebautes Gebiet. Auf dem Land trug jede Straße den vollen Stadtausbau:

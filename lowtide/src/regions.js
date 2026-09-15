@@ -1966,14 +1966,20 @@ function skyway(w) {
   // eine, sobald das Gelände zehn Meter neben der Achse mehr als anderthalb
   // Meter tiefer liegt — über Wasser ist das immer der Fall. Zwei Geländer
   // ineinander waren im ersten Anlauf genau das, was man auf dem Bild sah.
-  // Beleuchtung auf dem Deck: die Trasse liegt über offenem Wasser und wäre
-  // nachts sonst unsichtbar.
+  // Beleuchtung: die Trasse liegt über offenem Wasser und wäre nachts sonst
+  // unsichtbar. Die Masten stehen auf der Kappe und wechseln die Seite, mit
+  // einem Ausleger über die Fahrbahn. Im ersten Anlauf standen sie auf der
+  // Mittellinie — vier Masten mitten in der Spur, gemeldet von der Prüfung
+  // "Keine Kulisse steht in einer Fahrbahn".
+  let seite = 1;
   for (let z = von + 20; z < bis - 16; z += 40) {
    const y = hochstrasseHoehe(mitte, z);
    if (y === null || y < 2) continue;
-   w.box(mitte, y + 3.2, z, .26, 6.4, .26, 0x9aa09a);
-   w.box(mitte, y + 6.2, z, 3.4, .22, .5, 0x9aa09a);
-   for (const ox of [-1.5, 1.5]) w.box(mitte + ox, y + 6, z, .9, .18, .5, 0xffe6b4, 0, true);
+   const mx = mitte + seite * (breite / 2 - 2);
+   w.box(mx, y + 3.2, z, .26, 6.4, .26, 0x9aa09a);
+   w.box(mx - seite * 1.7, y + 6.2, z, 3.4, .22, .5, 0x9aa09a);
+   w.box(mx - seite * 3, y + 6, z, .9, .18, .5, 0xffe6b4, 0, true);
+   seite = -seite;
   }
  }
  w.strassenbau = false;
