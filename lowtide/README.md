@@ -1537,6 +1537,15 @@ erfolglosen Fenster den nächsten freien Platz im Umkreis von drei Metern.
 Danach ist die Prüfung grün, und in der ruhigen Welt ändert sich nichts
 (träge Figuren 68/68/79 vorher gegen 65/65/88 nachher, mittlere Strecke 10,0 m).
 
+**Auch die Verkehrsprüfung liegt nicht an den neuen Wagen.** „Neben der Spur
+hält der Verkehr nicht an" meldet in vier Läufen hintereinander exakt dieselbe
+Zahl — 100 von 126 —, ist also deterministisch und nicht verrauscht. Gezählt
+werden Fahrzeuge, die in dreißig Sekunden **über zwanzig Meter** schaffen; 26
+bleiben darunter. Der Verdacht lag beim Kastenwagen, der langsamer ist als die
+Limousine. Gemessen in der ruhigen Welt, mit derselben Schwelle: **sieben
+langsame von 127 jetzt, acht vorher** — also nein. Die 26 entstehen erst im
+Zustand nach zweihundert Prüfungen mit Straßensperren und Verfolgungsfahrten.
+
 **Und eine Vermutung, die sich nicht bestätigt hat.** Die Überwegprüfung fällt
 im Prüflauf mit 45 Prozent, isoliert gemessen sind es 83,5. Nachgestellt mit
 einer Panikphase — ein Drittel der Menge flieht, danach Fahndung zurück und
