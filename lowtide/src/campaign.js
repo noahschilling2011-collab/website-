@@ -1,0 +1,1024 @@
+import {Simulation,clamp,distance,intersects,lineClear,places} from './simulation.js';
+import {bounds,locations,vehicleTypes,weapons,waterAt,groundAt,roadSegments,immobilien,rennen,schatzOrte,onRoad,amUeberweg,UEBERWEGE,STADTGEBIETE,intersections,AUTOHAUS,AUTOHAUS_BUCHTEN,UNTERKUNFT_PREIS} from './content.js';
+// Die Lackfarben des Verkehrs. Sie standen als lokale Konstante im Aufbau
+// der Runden; der Fahrzeugkauf braucht dieselbe Palette, sonst hätte ein
+// gekaufter Wagen eine Farbe, die es in dieser Stadt sonst nicht gibt.
+const LACKE=[0xd9b078,0xcad0c5,0xa75547,0x3c637d,0x6f7a6a,0xb8b2a4,0x8a5f52,0x4c6b74,0xd6c9a8,0x5a6470];
+import {findPath} from './navigation.js';
+import {storyAufbau,storyZiel,storyTitel,storyAktion,storyTick,konvoiRammen,starteAkt,beendeKampagne,storyReparieren} from './story.js';
+export class Campaign extends Simulation{
+ constructor(){
+  super();this.active=0;Object.assign(this.player,{id:'eli',name:'ELI VOSS',stamina:100,fitness:0,y:0,vy:0,weapon:'pistol',inventory:{pistol:{ammo:12,reserve:72}},cover:false,hair:0,tattoo:false,air:100,parachute:false,fish:0});
+  this.characters=[this.player,{...this.player,id:'mara',name:'MARA QUINN',x:-25,z:73,money:600,clothes:'blue',inventory:{pistol:{ammo:12,reserve:48},taser:{ammo:2,reserve:12}},weapon:'taser',car:null}];
+  this.relationship=50;this.campaign={stage:0,choice:null,relay:false,archive:false,witness:false,delivered:false};this.activity=null;this.unlock=null;this.reloadJob=null;this.dodgeTime=0;this.meleeTime=0;this.tickCount=0;this.weatherIndex=0;this.currentEvent=null;this.nextEvent=25;this.policeHeli={x:-360,z:305,alt:0,yaw:0};this.barriers=[];this.cameras=[];this.navRevision=0;this.homeOwned=true;this.motelOwned=false;this.highScores={};this.worldBuildings=[];this.roomWalls=[];this.moneyEarned=0;this.feed=[];this.konto=[];this.fotos=[];this.besitz={};this.letzterZahltag=0;
+  this.expandWorld();
+ }
+ expandWorld(){
+  // Eight new downtown blocks, separated by the existing streets extended west.
+  // Innenstadt. Alle Blöcke lagen zwischen 30 und 75 m — aus der Luft ergibt
+  // das eine gleichmäßige Platte, keine Skyline. Vier Grundstücke tragen
+  // jetzt Hochhäuser; die Silhouette entsteht erst aus dem Unterschied.
+  const TUERME=[[-310,-130],[-250,-70],[-310,50],[-250,-130]];
+  for(const x of [-310,-250,-190])for(const z of [-130,-70,-10,50]){
+   if(x===-190||x===-250&&z===-10||x===-310&&z===-70)continue;
+   const turm=TUERME.some(([tx,tz])=>tx===x&&tz===z);
+   const hoehe=turm?98+Math.floor(this.rng()*52):30+Math.floor(this.rng()*45);
+   const b=this.addSolid(x,z,turm?29:35,turm?28:34,'newbuilding',hoehe);
+   b.turm=turm;
+   this.worldBuildings.push(b);
+  }
+  // Zwei zusätzliche Stadtteile. Port Mercy war eine Innenstadt von etwa
+  // fünfhundert auf dreihundert Metern; alles andere war Vorort, Feld oder
+  // Küste. Eine Stadt dieser Art lebt vom zusammenhängenden bebauten Raum,
+  // nicht von der Gesamtfläche.
+  //
+  // Nordquartier: Geschäftshäuser mittlerer Höhe. Breite 40 statt 44, weil
+  // die Längsstraßen alle 60 Meter stehen und ein 44er Block sonst in die
+  // Fahrbahn ragt — nachgerechnet, nicht geschätzt.
+  for(const x of [-310,-250,-190])for(const [z,tiefe] of [[-204,24],[-160,22]]){
+   const b=this.addSolid(x,z,40,tiefe,'newbuilding',22+Math.floor(this.rng()*34));
+   this.worldBuildings.push(b);
+  }
+  // Wohnviertel im Westen: Wohnscheiben zwischen den beiden neuen Achsen,
+  // dichter gestellt als die Innenstadt und niedriger als die Türme.
+  for(const x of [-432,-372])for(const [z,tiefe] of [[-204,26],[-140,50],[-10,40],[120,40]]){
+   const b=this.addSolid(x,z,30,tiefe,'newbuilding',26+Math.floor(this.rng()*22));
+   this.worldBuildings.push(b);
+  }
+  // Small houses and farms are solid, while service buildings are cutaway interiors.
+  for(const x of [-65,-10,45])for(const z of [-260,-365])this.worldBuildings.push(this.addSolid(x,z,22,24,'house',7));
+  // Das Haus bei -360/355 ragte 5,5 m in die Nord-Süd-Achse bei x = -340 —
+  // ein alter Fehler, gefunden erst, als die Prüfung auf Überschneidung von
+  // Gebäude und Fahrbahn dazukam. Es steht jetzt bei -372.
+  for(const [x,z,w,d,h] of [[-375,-285,28,22,9],[-372,355,33,25,12],[-408,320,32,24,9],[285,170,30,22,12],[315,265,28,25,9]])this.worldBuildings.push(this.addSolid(x,z,w,d,'house',h));
+  // Drei volle Wände je Raum — und seit dieser Runde eine Brüstung in der
+  // vierten. Die Front war ganz offen, "eine Schnittdarstellung statt
+  // Ladetüren": von der Straße aus sah man in acht Puppenstuben, denen die
+  // vordere Wand fehlt. Eine volle Wand mit Tür wäre der ehrlichere Bau,
+  // kostet aber die freie Sicht der Verfolgerkamera, sobald man drinnen in
+  // einer Ecke steht — sie prüft Solids nur bis Kopfhöhe.
+  //
+  // Deshalb eine Brüstung von 1,1 Metern links und rechts der Tür: hoch
+  // genug, dass niemand mehr durch das Schaufenster spaziert, niedrig genug,
+  // dass die Kamera darüber hinwegsieht. Die Tür ist 4,5 Meter breit und
+  // mittig; die Begehbarkeitsprüfung läuft auf x = l.x geradewegs hinein und
+  // braucht dort 0,45 Meter Luft.
+  const TUER=4.5;
+  for(const id of ['garage','shop','clinic','home','club','diner','motel','records']){const l=locations[id],w=id==='garage'?22:16,d=16;
+   const brueste=(w-TUER)/2,mitte=TUER/2+brueste/2;
+   for(const wall of [{x:l.x-w/2,z:l.z-4,w:1,d},{x:l.x+w/2,z:l.z-4,w:1,d},{x:l.x,z:l.z-12,w:w+1,d:1},
+    {x:l.x-mitte,z:l.z+4,w:brueste,d:.7,h:1.1},{x:l.x+mitte,z:l.z+4,w:brueste,d:.7,h:1.1}])
+    this.roomWalls.push(this.addSolid(wall.x,wall.z,wall.w,wall.d,'room',wall.h??5));}
+  const entries=[['compact',-148,101],['suv',-160,107],['super',-280,98],['muscle',-220,97],['pickup',-340,-240],['motorcycle',-140,102],['dirtbike',-455,-355],['quad',-390,36],['truck',-355,265],['bus',-162,157],['boat',123,136],['jetski',127,155],['helicopter',-360,305],['plane',-315,325]];
+  this.cars.forEach((c,i)=>Object.assign(c,{model:i===0?'sedan':['compact','sedan','suv','muscle'][i%4],fuel:100,upgrades:{},owner:i===0?'eli':null,alt:0,tires:100,glass:100,lights:100}));
+  entries.forEach(([model,x,z],i)=>this.cars.push({id:'LM-'+(700+i),model,x,z,yaw:Math.PI,speed:0,health:100,fuel:100,tires:100,glass:100,lights:100,alt:0,type:'parked',color:[0x568a89,0xc09b62,0x99635d,0x667ca5][i%4],upgrades:{},owner:['motorcycle','boat'].includes(model)?'mara':null}));
+  // Verkehr. Acht fahrende Wagen für eine Stadt dieser Größe waren der
+  // deutlichste Bruch zum Anspruch: die Straßen westlich der Innenstadt, der
+  // Highway, die Küstenstraße und der Keys Highway waren durchgehend leer.
+  // Die Wege folgen dem Straßenraster aus content.js; die Ampellogik in
+  // simulation.js gilt für sie wie für die bisherigen.
+  // Kastenwagen und Taxi in die Mischung. Ein Taxi auf zehn Wagen ist für eine
+  // Hafenstadt eher zurückhaltend, ein Lieferwagen auf zehn ebenso.
+  const MODELLE=['sedan','compact','suv','muscle','pickup','taxi','sedan','van','compact','sedan'];
+  // Der ganze fahrende Verkehr bestand aus fünf Modellen, und vier davon —
+  // 112 von 127 Wagen — tragen dieselbe Karosserieform in anderer Größe. Bus,
+  // Lastwagen und Motorrad kamen auf der Straße nicht vor, obwohl alle drei
+  // seit jeher als Typ und als Mesh vorhanden sind.
+  //
+  // Wer wo fährt, hängt an der Länge der Runde und nicht an ihrer Nummer: ein
+  // Achtmeterbus gehört auf die Durchgangsstrecke, nicht auf den 171 Meter
+  // langen Block in Rosalind. Gemessen reichen die Runden von 171 bis 1320
+  // Metern; drei liegen über 900, fünf über 800.
+  const modellFuer=(r,k,laenge)=>{
+   if(laenge>=900&&(k===2||k===5))return 'truck';
+   if(laenge>=800&&k===1)return 'bus';
+   if((r*7+k)%17===3)return 'motorcycle';
+   return MODELLE[(r*7+k)%MODELLE.length];
+  };
+  // Verkehrsrunden. Vorher vier getippte Eckpunkte je Runde, mit einem festen
+  // Versatz von sechs bis zehn Metern zur Straßenachse. Gemessen: bei zwölf
+  // von fünfzehn Runden lag mindestens eine Kante neben der Fahrbahn, über
+  // alle Runden 716 von 3209 Proben — zweiundzwanzig Prozent. Drei Ursachen:
+  // ein Versatz von zehn Metern auf einer zwölf Meter breiten Straße liegt
+  // außerhalb; eine Rückfahrt entlang x = -1050 hat dort gar keine Straße;
+  // und zwei Runden schlossen sich über eine Diagonale durchs Feld.
+  //
+  // Jetzt werden die Ecken aus den Straßen gerechnet. Eine Runde nennt nur
+  // noch die vier Achsen; ring() sucht die Segmente, die den Bereich wirklich
+  // abdecken, und setzt die Ecken um eine Spurbreite nach innen. Findet es
+  // keine Straße, entsteht die Runde nicht — statt Wagen über die Wiese zu
+  // schicken. Der Versatz ist überall so gewählt, dass 3,2 Meter Fahrbahn
+  // zwischen Wagenmitte und Kante bleiben, unabhängig von der Breite.
+  const laengsR=r=>Math.abs(r.z2-r.z1)>=Math.abs(r.x2-r.x1);
+  const spur=r=>Math.max(1.6,r.w/2-3.2);
+  const senkrechteBei=(x,za,zb)=>roadSegments.find(r=>laengsR(r)&&Math.abs(r.x1-x)<1&&
+   Math.min(r.z1,r.z2)<=Math.min(za,zb)+1&&Math.max(r.z1,r.z2)>=Math.max(za,zb)-1);
+  const waagerechteBei=(z,xa,xb)=>roadSegments.find(r=>!laengsR(r)&&Math.abs(r.z1-z)<1&&
+   Math.min(r.x1,r.x2)<=Math.min(xa,xb)+1&&Math.max(r.x1,r.x2)>=Math.max(xa,xb)-1);
+  const ring=(xl,xr,zo,zu)=>{
+   const l=senkrechteBei(xl,zo,zu),r=senkrechteBei(xr,zo,zu);
+   const o=waagerechteBei(zo,xl,xr),u=waagerechteBei(zu,xl,xr);
+   if(!l||!r||!o||!u)return null;
+   return [[xl+spur(l),zo+spur(o)],[xl+spur(l),zu-spur(u)],
+           [xr-spur(r),zu-spur(u)],[xr-spur(r),zo+spur(o)]];
+  };
+  // Wo sich keine Runde schließt — Sackgassen, Enden von Fernstraßen —, fährt
+  // der Verkehr hin und zurück: auf der einen Seite hin, auf der anderen
+  // zurück. Beide Spuren liegen auf derselben Straße.
+  const hinUndZurueck=(z,xa,xb)=>{
+   const r=waagerechteBei(z,xa,xb);
+   if(!r)return null;
+   const v=spur(r);
+   return [[xa+8,z+v],[xb-8,z+v],[xb-8,z-v],[xa+8,z-v]];
+  };
+  // Dasselbe für eine Nord-Süd-Achse. Gebraucht für den Bay Skyway: er hängt
+  // an zwei Querstraßen, die sich nicht zu einem Rechteck schließen — die
+  // Fahrbahn bei z = 400 fängt erst bei x = 100 an, die bei z = 200 hört bei
+  // x = 280 auf. ring() findet dafür keine vier Seiten und hätte die Trasse
+  // leer gelassen.
+  const hinUndZurueckSenkrecht=(x,za,zb)=>{
+   const r=senkrechteBei(x,za,zb);
+   if(!r)return null;
+   const v=spur(r);
+   return [[x+v,za+8],[x+v,zb-8],[x-v,zb-8],[x-v,za+8]];
+  };
+  const RUNDEN=[
+   ring(-340,-160,-180,80),   // Innenstadt West
+   ring(-340,-100,-320,-180), // Nordquartier
+   ring(-280,-220,-100,80),   // Raster Mitte
+   ring(-220,-160,-100,80),
+   ring(-100,20,-100,80),     // Raster Ost
+   ring(-40,80,-40,20),       // Hafenblock
+   ring(-340,-100,80,200),    // bis zur Uferstraße
+   ring(-340,-100,200,400),   // Uferstraße bis Nordstraße
+   ring(-462,-402,-228,-62),  // Westviertel, Nordteil
+   ring(-462,-402,-62,62),    // Westviertel, Südteil
+   ring(-820,-560,-160,200),  // Ridge Highway und Hollow Road, Nord
+   ring(-820,-560,200,620),   // dieselben, Süd
+   ring(-960,-900,300,340),   // Rosalind, zwei Blöcke
+   ring(-960,-900,340,380),
+   hinUndZurueck(400,100,360),   // Keys Highway
+   hinUndZurueck(200,-100,280),  // Uferstraße nach Isla Serena
+   hinUndZurueckSenkrecht(134,206,394),   // Bay Skyway über die Bucht
+   hinUndZurueck(620,-560,100)   // Südtangente, Ostteil
+  ].filter(Boolean);
+  // Drei Wagen je Runde, gestartet auf drei Eckpunkten: gemessen ergab das
+  // vierundvierzig fahrende Fahrzeuge auf 15.728 Metern Straßennetz, also
+  // eines alle 357 Meter. Dazu klumpten sie an den Ecken, weil der Startpunkt
+  // ein Wegpunkt war und nicht eine Stelle auf der Strecke.
+  //
+  // Jetzt werden sie über den Umfang der Runde verteilt. Das erhöht die
+  // Dichte und löst das Klumpen in einem.
+  const umfang=weg=>{let l=0;for(let i=0;i<weg.length;i++){const a=weg[i],b=weg[(i+1)%weg.length];l+=Math.hypot(b.x-a.x,b.z-a.z);}return l;};
+  const punktAuf=(weg,t)=>{
+   let l=umfang(weg)*t;
+   for(let i=0;i<weg.length;i++){
+    const a=weg[i],b=weg[(i+1)%weg.length],d=Math.hypot(b.x-a.x,b.z-a.z);
+    if(l<=d)return {x:a.x+(b.x-a.x)*(l/d),z:a.z+(b.z-a.z)*(l/d),ziel:(i+1)%weg.length};
+    l-=d;
+   }
+   return {x:weg[0].x,z:weg[0].z,ziel:1};
+  };
+  // Siebzehn Runden statt fünfzehn: bei neun Wagen je Runde wären es 153
+  // statt 125. Sieben halten die Zahl dort, wo sie gemessen wurde.
+  const PRO_RUNDE=7;
+  RUNDEN.forEach((runde,r)=>{
+   const weg=runde.map(([x,z])=>({x,z}));
+   const rundenLaenge=umfang(weg);
+   for(let k=0;k<PRO_RUNDE;k++){
+    const q=punktAuf(weg,k/PRO_RUNDE);
+    const n=r*PRO_RUNDE+k;
+    this.cars.push({id:'PM-'+(500+n),model:modellFuer(r,k,rundenLaenge),
+     x:q.x,z:q.z,yaw:0,speed:7+this.rng()*5,health:100,type:'traffic',
+     color:modellFuer(r,k,rundenLaenge)==='taxi'?0xe3b53f:LACKE[n%LACKE.length],route:weg,target:q.ziel,wait:0,
+     fuel:100,tires:100,glass:100,lights:100,alt:0,upgrades:{},owner:null});
+   }
+  });
+  // Achtzehn Figuren im Norden auf sechs mal drei Rechtecken — und achtzehn
+  // im Süden, die alle auf **drei** lagen: für i >= 36 war z fest auf -295
+  // und x hatte nur die drei Werte aus (i%3). Sechs Figuren liefen also
+  // denselben Ring, vom selben Startpunkt aus, in Gleichschritt.
+  //
+  // Aufgefallen ist das erst, als ferne Figuren aufhörten, im Zwölfteltempo
+  // zu kriechen: vorher standen sie weit genug auseinander, danach meldete
+  // die Prüfung fünf dauerhaft ineinanderstehende Paare, darunter 42/48 und
+  // 46/52 auf demselben Punkt. Jetzt bekommt jede Dreiergruppe im Süden sieben
+  // Meter Versatz, und der Startpunkt auf dem Ring wechselt mit i.
+  for(let i=18;i<54;i++){
+   const versatz=i<36?0:Math.floor((i-36)/3)*7;
+   const x=(i<36?-151-(i%3)*60:-89+(i%3)*54)+versatz;
+   const z=i<36?-152+Math.floor((i-18)/3)*48:-295;
+   const path=[{x,z},{x:x+20,z},{x:x+20,z:z+18},{x,z:z+18}];
+   this.npcs.push({id:i,x,z,yaw:0,state:'normal',timer:0,health:100,path,target:1+(i%3),personality:['caller','filmer','coward','aggressive'][i%4],pace:1.1+this.rng()*.6,report:null});}
+  this.npcs.forEach(n=>{n.home={...n.path[0]};n.work={...n.path[2]};n.originalPath=n.path.map(p=>({...p}));n.schedule='street';n.stun=0;});
+  for(let i=6;i<12;i++)this.cops.push({id:i,x:-280+(i-6)*4,z:-180,yaw:0,active:false,health:100,route:[],target:0,repath:0,shot:0});
+  this.cops.forEach(c=>{c.base={x:c.x,z:c.z};c.role=c.id>=6?'tactical':'patrol';c.stun=0;});
+  this.cameras=[{x:-54,z:-61,yaw:-Math.PI/2,range:24},{x:-225,z:30,yaw:Math.PI,range:26},{x:-100,z:200,yaw:0,range:28}];
+  for(let i=0;i<3;i++){const x=-327+i*7,z=-105;this.npcs.push({id:54+i,x,z,yaw:0,state:'normal',timer:0,health:100,path:[{x,z},{x,z:z+12}],target:1,personality:'guard',pace:1.8,report:null,stun:0,guard:true,home:{x,z},work:{x,z},shot:0});}
+  // Leben außerhalb der Innenstadt. Mercy Beach, die Promenade, der
+  // Vorortpark und die Marina waren menschenleer.
+  const aussen=[];
+  for(let i=0;i<12;i++){const x=100+(i%3)*6,z=150+i*22;aussen.push([x,z,[{x,z},{x:x+9,z:z+7},{x:x-7,z:z+13},{x,z}]]);}
+  for(let i=0;i<5;i++){const x=96,z=170+i*46;aussen.push([x,z,[{x,z},{x,z:z+34}]]);}
+  for(let i=0;i<4;i++){const x=-95+(i%2)*8,z=-327+i*5;aussen.push([x,z,[{x,z},{x:x+14,z},{x:x+14,z:z+11},{x,z:z+11}]]);}
+  for(let i=0;i<4;i++){const x=250-i*3,z=228+i*11;aussen.push([x,z,[{x,z},{x,z:z+16}]]);}
+  // home, work und originalPath werden weiter oben für alle bisherigen NPCs
+  // gesetzt; diese hier kommen danach und brauchen sie selbst. work greift
+  // auf path[2] zu, das kurze Wege nicht haben.
+  aussen.forEach(([x,z,path],k)=>this.npcs.push({id:57+k,x,z,yaw:0,state:'normal',timer:0,health:100,
+   path,target:1,personality:['caller','filmer','coward','aggressive'][k%4],pace:.9+(k%5)*.16,
+   report:null,stun:0,schedule:'street',home:{...path[0]},work:{...(path[2]||path[path.length-1])},
+   originalPath:path.map(q=>({...q}))}));
+  // Publikum. Sechsundachtzig Leute auf einer Karte dieser Größe heißt: der
+  // Strand ist leer, die Promenade ist leer, die Marina ist leer. Auf den
+  // Referenzbildern ist genau das der Unterschied. Die Ferndarstellung aus
+  // lod.js trägt die Zahl — jenseits von 42 m ist eine Figur ohnehin eine
+  // Silhouette in einem gemeinsamen Draw Call.
+  const menge=[];
+  // Mercy Beach und South Beach: Handtuchreihen und Leute am Wasser.
+  for(let i=0;i<30;i++){
+   const x=101+(i%4)*4.5, z=-60+i*12;
+   menge.push([x,z,[{x,z},{x:x+7,z:z+5},{x:x+2,z:z+11},{x,z}]]);
+  }
+  // Promenade dahinter, längs.
+  for(let i=0;i<14;i++){
+   const x=94+(i%2)*3, z=110+i*21;
+   menge.push([x,z,[{x,z},{x,z:z+26}]]);
+  }
+  // Gehwege der westlichen Innenstadt.
+  for(let i=0;i<18;i++){
+   const x=-316+(i%3)*60, z=-124+Math.floor(i/3)*32;
+   menge.push([x,z,[{x,z},{x:x+16,z},{x:x+16,z:z+13},{x,z:z+13}]]);
+  }
+  // Gehwege der Kernstadt. Gemessen standen an der Hauptkreuzung vier Leute
+  // im Umkreis von sechzig Metern, am Strand vierundzwanzig — eine
+  // Innenstadt, in der niemand geht, ist der auffälligste Unterschied zu
+  // jeder Aufnahme einer echten Stadt.
+  //
+  // Die Stellen werden nicht von Hand gesetzt, sondern gesucht: ein Raster
+  // über den Kern, und genommen wird, was neben einer Fahrbahn liegt, aber
+  // nicht darauf — das ist die Definition eines Gehwegs. Damit landet
+  // niemand in einer Wand oder auf der Straße, auch wenn sich das Raster
+  // der Stadt noch einmal ändert.
+  // Der erste Versuch rasterte den Kern in Dreizehnmeterschritten ab und
+  // nahm, was neben einer Fahrbahn liegt. Er fand dort null Stellen: das
+  // Gehwegband ist sieben Meter breit, das Raster war doppelt so grob und
+  // ist immer daran vorbeigesprungen. Nachgezählt an fünfundvierzig Proben
+  // im Kern — einundzwanzig auf der Fahrbahn, vierundzwanzig zu weit weg,
+  // keine einzige dazwischen.
+  //
+  // Also nicht rastern, sondern die Fahrbahnen entlanggehen und den Gehweg
+  // aus der Straße selbst ableiten: alle achtzehn Meter, beidseitig, drei
+  // Meter hinter der Bordsteinkante.
+  // Wo die Menge entsteht, stand als festes Rechteck da: x von -360 bis 70,
+  // z von -160 bis 120. Das war die Innenstadt, bevor die Karte sich
+  // verdoppelt hat, und danach ist es nie nachgezogen worden. Nachgemessen
+  // im laufenden Spiel: **Rosalind hatte null Einwohner**, der nächste
+  // Mensch stand 528 Meter entfernt — eine zweite Stadt mit Bank, Läden,
+  // Markisen und Verkehr, in der niemand wohnt. Im Nordquartier standen
+  // zwei Leute im Umkreis von sechzig Metern, im Westviertel sieben; 240 von
+  // 414 Figuren, also 58 Prozent, drängten sich im Umkreis von 250 Metern
+  // der alten Hauptkreuzung.
+  //
+  // Dieselbe Klasse Fehler wie bei den Verkehrsrunden und den Gehwegen auf
+  // dem Land: von Hand notierte Koordinaten, die an eine Karte gebunden
+  // sind, die es nicht mehr gibt. Gefragt wird jetzt STADTGEBIETE — dieselbe
+  // Liste, die auch über Bordstein und Laterne entscheidet.
+  //
+  // Je Gebiet ein eigener Deckel, sonst frisst die Innenstadt das ganze
+  // Kontingent, bevor die Schleife bei Rosalind ankommt. Und ein eigener
+  // Abstand: Port Mercy alle achtzehn Meter wie bisher, eine Landstadt alle
+  // vierunddreißig. Ein Segment gehört dem ersten Gebiet, das es enthält —
+  // die Rechtecke stoßen an z = -140 aneinander, und ohne die Regel stünden
+  // dort zwei Leute auf demselben Fleck.
+  let gefunden=0;
+  const zuGebiet=new Map();
+  for(const r of roadSegments){
+   const mx=(r.x1+r.x2)/2, mz=(r.z1+r.z2)/2;
+   const gi=STADTGEBIETE.findIndex(g=>mx>=g.x1&&mx<=g.x2&&mz>=g.z1&&mz<=g.z2);
+   if(gi>=0)(zuGebiet.get(gi)||zuGebiet.set(gi,[]).get(gi)).push(r);
+  }
+  for(const [gi,segmente] of zuGebiet){
+   const kern=gi===0;
+   const schritt=kern?18:34, deckel=kern?260:70;
+   let hier=0;
+   for(const r of segmente){
+   if(hier>=deckel)break;
+   const laenge=Math.hypot(r.x2-r.x1,r.z2-r.z1);
+   if(laenge<30)continue;
+   const nordSued=r.x1===r.x2;
+   const versatz=r.w/2+3;
+   // Gedeckelt bei 260. Der erste Deckel lag bei 140, begründet mit der
+   // Simulationslast beim Tageswechsel — und diese Begründung war geraten,
+   // nicht gemessen. Nachgemessen liegt ein Simulationsschritt bei 413
+   // Figuren und 133 Wagen bei 0,30 ms, also 1,8 Prozent eines
+   // Sechzehntelsekunden-Bildes; im teuersten Fall, dem Tageswechsel um 8,
+   // 17 und 20 Uhr, bei 1,4 bis 1,7 ms. Der Grund dafür steht weiter unten
+   // in tick(): verarbeitet wird nur, wer näher als 180 Meter ist, alle
+   // anderen nur jeden zwölften Tick. Die Zahl der Figuren geht deshalb
+   // kaum in die Kosten ein.
+   //
+   // Was tatsächlich mitwächst, ist die Zeichenlast: an der Kreuzung 1839
+   // auf 1902 Draw Calls.
+   for(let d=14;d<laenge-14&&hier<deckel;d+=schritt)for(const seite of [-1,1]){
+    const t=d/laenge;
+    const x=r.x1+(r.x2-r.x1)*t+(nordSued?seite*versatz:0);
+    const z=r.z1+(r.z2-r.z1)*t+(nordSued?0:seite*versatz);
+    if(onRoad(x,z,0)||this.blocked({x,z},1.4)||waterAt(x,z))continue;
+    // Der Weg läuft am Bordstein entlang, Richtung wechselt je Person.
+    const l=(gefunden%2?1:-1)*(16+(gefunden%3)*8);
+    const ziel=nordSued?{x,z:z+l}:{x:x+l,z};
+    // waterAt fehlte hier: der Startpunkt wurde gegen Wasser geprüft, das
+   // Ziel nicht. Sechs Leute liefen dadurch am Ostufer bei x = 120 ins
+   // Meer — 28 von 12.420 Proben über dreißig Sekunden.
+   if(onRoad(ziel.x,ziel.z,0)||this.blocked(ziel,1.4)||waterAt(ziel.x,ziel.z))continue;
+    menge.push([x,z,[{x,z},ziel,{x,z}]]);
+    gefunden++;hier++;
+   }
+   }
+  }
+  // Marina und Strandpromenade auf Isla Serena.
+  for(let i=0;i<10;i++){
+   const x=246+i*11, z=(i%2)?163:288;
+   menge.push([x,z,[{x,z},{x:x+9,z},{x:x+9,z:z+(i%2?9:-9)},{x,z}]]);
+  }
+  // Die Keys: wenige Leute, aber nicht null.
+  for(let i=0;i<8;i++){
+   const x=[168,186,252,270,326,344,180,262][i], z=(i%2)?386:418;
+   menge.push([x,z,[{x,z},{x:x+7,z},{x:x+7,z:z+6},{x,z:z+6}]]);
+  }
+  menge.forEach(([x,z,path],k)=>{
+   // onRoad war hier nie dabei: dreiundzwanzig Leute aus den älteren
+   // Schleifen standen auf der Fahrbahn — Handtuchreihen am Strand, die über
+   // die Uferstraße reichen, und Gehwegpunkte der westlichen Innenstadt, die
+   // von Hand gesetzt wurden. Gefunden hat sie die neue Prüfung, nicht das
+   // Auge. Wegpunkte dürfen weiter über die Straße führen; ein Fußgänger,
+   // der eine Straße überquert, tut genau das.
+   if(this.blocked({x,z},1.2)||waterAt(x,z)||onRoad(x,z,0))return;
+   this.npcs.push({id:200+k,x,z,yaw:0,state:'normal',timer:0,health:100,
+    path,target:1,personality:['caller','filmer','coward','aggressive'][k%4],
+    pace:.85+(k%7)*.13,report:null,stun:0,schedule:'street',
+    home:{...path[0]},work:{...(path[2]||path[path.length-1])},
+    originalPath:path.map(q=>({...q}))});
+  });
+
+  // Arbeitsplätze. updateRoutines() schickt jede Figur um 8 Uhr zu n.work und
+  // um 20 Uhr zu n.home — nur waren beide bisher derselbe Punkt: work kam aus
+  // path[2], und der Weg der Menge ist [{x,z}, ziel, {x,z}]. Nachgemessen
+  // hatten **382 von 530 Figuren (72 Prozent) Heim und Arbeit unter einem
+  // Meter auseinander**, Median null. Zweimal am Tag lief für jede von ihnen
+  // eine Wegsuche, die sie auf den Fleck zurückschickte, auf dem sie stand.
+  //
+  // Jetzt bekommt, wer nicht direkt an seinem Wohnort arbeitet, den Wohnort
+  // einer anderen Figur als Arbeitsplatz — das hält den Weg auf dem Gehweg,
+  // weil beide Punkte aus derselben Bordsteinschleife stammen. Zwischen 120
+  // und 400 Metern: kürzer wäre kein Pendeln, länger würde die Wegsuche teuer
+  // und der Fußweg unglaubwürdig. Jede vierte Figur bleibt ohne Arbeitsweg —
+  // Ladeninhaber, Anwohner, Leute im Ruhestand.
+  // Der Topf enthält nur die Wohnorte von Pendlern. Nimmt man alle, bekommt
+  // eine Figur den Wohnort eines Nichtpendlers als Arbeitsplatz — und der
+  // sitzt tagsüber dort, weil er nirgends hingeht. Genau das waren die fünf
+  // bleibenden Paare mit einem Zentimeter Abstand, die die Prüfung meldete.
+  // So ist der Arbeitsplatz immer der Wohnort von jemandem, der tagsüber
+  // selbst unterwegs ist.
+  const wohnorte=this.npcs.filter(n=>n.id>=200&&n.home&&n.id%4!==0).map(n=>({x:n.home.x,z:n.home.z}));
+  // Jeder Arbeitsplatz wird nur einmal vergeben. Ohne das landeten mehrere
+  // Pendler auf demselben Punkt und standen dort ineinander — die Prüfung
+  // "Keine Figuren stehen ineinander" meldete sieben Paare unter 0,55 m.
+  const vergeben=new Set();
+  let pendler=0;
+  for(const n of this.npcs){
+   if(n.id<200||!n.home||n.id%4===0)continue;
+   // Deterministischer Startpunkt je Figur, damit nicht alle dieselbe Wahl
+   // treffen und die Zuordnung über Läufe hinweg gleich bleibt.
+   const start=(n.id*37)%wohnorte.length;
+   for(let k=0;k<wohnorte.length;k++){
+    const i=(start+k)%wohnorte.length;
+    if(vergeben.has(i))continue;
+    const w=wohnorte[i];
+    const d=Math.hypot(w.x-n.home.x,w.z-n.home.z);
+    // Obergrenze 396 statt 400: nach der Vergabe schiebt die Nachbearbeitung
+    // alle, die auf einer Fahrbahn stehen, bis zu zwölf Meter zur Seite, und
+    // das dehnt den Weg nachträglich. Der längste Arbeitsweg lag damit bei
+    // 400,2 Metern und riss die Prüfung um zwanzig Zentimeter.
+    if(d<120||d>396)continue;
+    vergeben.add(i);n.work={x:w.x,z:w.z};pendler++;break;
+   }
+  }
+  this.pendler=pendler;
+
+  // Begleitung. Bis hierher ging jeder dieser 530 Menschen allein durch die
+  // Stadt — 265 mögliche Paare, gemessen null, die länger als ein paar
+  // Sekunden nebeneinander blieben. Eine Fußgängerzone, in der niemand zu
+  // zweit unterwegs ist, sieht auch aus wie eine Menge Einzelgänger.
+  //
+  // Jede dritte Figur der Menge sucht sich jemanden im Umkreis von zwölf
+  // Metern, der noch frei ist. Die Begleitung übernimmt Tempo und Ziel des
+  // Vordermanns und hält seitlich Abstand; die Seite hängt an der Kennung,
+  // damit nicht beide auf derselben landen. Feste Zuordnung beim Aufbau,
+  // nicht je Takt — sonst wechselten die Paare ständig.
+  const kandidaten=this.npcs.filter(n=>n.id>=200&&n.schedule==='street');
+  const belegt=new Set();
+  let paare=0;
+  for(const n of kandidaten){
+   if(n.id%3||belegt.has(n.id))continue;
+   for(const m of kandidaten){
+    if(m===n||belegt.has(m.id)||m.imPaar)continue;
+    if(Math.hypot(m.x-n.x,m.z-n.z)>12)continue;
+    // Nicht hinterherlaufen, sondern denselben Weg gehen: die Begleitung
+    // übernimmt Weg und Wegpunkt des anderen und hält nur seitlich Abstand.
+    // Der erste Anlauf ließ sie der Position des Vordermanns folgen — von 42
+    // Paaren blieben nach dreißig Sekunden genau eines zusammen, einzelne
+    // Begleiter standen 32 Meter weit weg. Wer einmal den Anschluss verliert,
+    // findet ihn so nie wieder.
+    // Keine Verweise auf andere Figuren **in** der Figur: fuehrer und
+    // begleitung zeigten aufeinander, und jeder JSON.stringify über die Menge
+    // lief damit in einen Zirkel — der Prüflauf brach ab, und der Spielstand
+    // hätte es genauso getroffen. Die Zuordnung liegt deshalb in einer Karte
+    // neben den Figuren, in der Figur steht nur ein Merker.
+    this._paare=this._paare||new Map();
+    this._paare.set(m.id,n);m.imPaar=true;n.imPaar=true;m.seite=m.id%2?1:-1;m.pace=n.pace;
+    m.path=n.path;m.target=n.target;m.x=n.x+Math.cos(n.yaw)*m.seite*.85;m.z=n.z-Math.sin(n.yaw)*m.seite*.85;
+    belegt.add(n.id);belegt.add(m.id);paare++;
+    break;
+   }
+  }
+  this.paare=paare;
+
+  // Wer auf der Fahrbahn steht, wird an den Rand geschoben. Die Figuren
+  // entstehen an vier Stellen mit unterschiedlicher Absicht — Rundgänge aus
+  // simulation.js, Blöcke aus campaign.js, Wachen, Menge —, und keine davon
+  // hat je gegen die Straßen geprüft. Ein Nachlauf an einer Stelle ist
+  // sauberer als dieselbe Prüfung viermal einzubauen: neunzehn Leute standen
+  // in einer Fahrspur, gefunden von der Prüfung, nicht vom Auge.
+  for(const n of this.npcs){
+   if(!onRoad(n.x,n.z,0))continue;
+   let weg=null;
+   for(let r=2.5;r<=12&&!weg;r+=2.5)for(let a=0;a<8&&!weg;a++){
+    const x=n.x+Math.cos(a*Math.PI/4)*r, z=n.z+Math.sin(a*Math.PI/4)*r;
+    if(onRoad(x,z,0)||this.blocked({x,z},1.2)||waterAt(x,z))continue;
+    weg={x,z};
+   }
+   if(!weg)continue;
+   const dx=weg.x-n.x, dz=weg.z-n.z;
+   n.x=weg.x; n.z=weg.z;
+   if(n.path?.[0]){n.path[0].x+=dx; n.path[0].z+=dz;}
+   if(n.home){n.home.x+=dx; n.home.z+=dz;}
+   if(n.originalPath?.[0]){n.originalPath[0].x+=dx; n.originalPath[0].z+=dz;}
+  }
+
+  // Und derselbe Nachlauf für Wegpunkte im Wasser. Die vier Quellen prüfen
+  // ihre Startpunkte, aber die Rundgänge aus simulation.js und die Menge
+  // führen über feste Strecken; ein Wegpunkt darin kann im Meer liegen,
+  // auch wenn niemand dort steht. Ein Punkt im Wasser wird durch die
+  // Standposition ersetzt — die Runde wird kürzer, aber sie bleibt an Land.
+  for(const n of this.npcs){
+   for(const weg of [n.path,n.originalPath]){
+    if(!weg)continue;
+    for(const q of weg){
+     if(!waterAt(q.x,q.z))continue;
+     q.x=n.x; q.z=n.z;
+    }
+   }
+   if(n.home&&waterAt(n.home.x,n.home.z)){n.home.x=n.x;n.home.z=n.z;}
+   if(n.work&&waterAt(n.work.x,n.work.z)){n.work.x=n.x;n.work.z=n.z;}
+  }
+
+  // Querungen auf die Überwege legen. Die Wegekosten in updateRoutines führen
+  // nur die Pendlerwege über die Markierung; in der Freizeit läuft jede Figur
+  // ihren ursprünglichen Rundgang, und der stammt aus fünf Quellen, von denen
+  // keine die Kreuzungen kennt. Gemessen schwankte der Anteil der Querungen
+  // am Überweg je nach Tageszeit zwischen 43 und 79 Prozent.
+  for(const n of this.npcs){
+   for(const weg of [n.path,n.originalPath]){
+    if(!weg||weg.length<2)continue;
+    const neu=[];
+    for(let i=0;i<weg.length;i++){
+     neu.push(weg[i]);
+     const zwischen=this.ueberwegZwischen(weg[i],weg[(i+1)%weg.length],n.id);
+     if(zwischen)neu.push(...zwischen);
+    }
+    weg.length=0;weg.push(...neu);
+   }
+  }
+
+  // Und auseinanderschieben, wer aufeinander steht. Die Figuren kommen aus
+  // fünf Quellen — Rundgänge, Blöcke, Wachen, Strandmenge, Gehwege —, und
+  // keine kennt die Stellen der anderen. Gemessen einundfünfzig Paare näher
+  // als 0,55 Meter, engster Abstand 0,00: einige standen exakt ineinander.
+  //
+  // Einmal beim Aufbau, quadratisch über 413 Figuren sind das
+  // hundertsiebzigtausend Vergleiche und damit nicht der Rede wert; zur
+  // Laufzeit wäre es das sehr wohl.
+  const gesetzt=[];
+  for(const n of this.npcs){
+   if(n.guard){gesetzt.push(n);continue;}   // Wachen stehen, wo sie stehen
+   for(let versuch=0;versuch<8;versuch++){
+    const zuNah=gesetzt.find(m=>Math.hypot(m.x-n.x,m.z-n.z)<1.15);
+    if(!zuNah)break;
+    const a=Math.atan2(n.z-zuNah.z,n.x-zuNah.x)+(versuch?versuch*.9:0);
+    const x=zuNah.x+Math.cos(a)*1.3, z=zuNah.z+Math.sin(a)*1.3;
+    if(onRoad(x,z,0)||this.blocked({x,z},1.1)||waterAt(x,z))continue;
+    const dx=x-n.x, dz=z-n.z;
+    n.x=x; n.z=z;
+    if(n.path?.[0]){n.path[0].x+=dx; n.path[0].z+=dz;}
+    if(n.home){n.home.x+=dx; n.home.z+=dz;}
+    if(n.originalPath?.[0]){n.originalPath[0].x+=dx; n.originalPath[0].z+=dz;}
+   }
+   gesetzt.push(n);
+  }
+
+  // Transport, Fluchtboot und die vier Aktwachen. Sie entstehen hier und
+  // nicht erst beim Missionsstart, weil die Meshes einmalig nach Index
+  // angelegt werden — später eingefügte Fahrzeuge blieben unsichtbar.
+  storyAufbau(this);
+ }
+ blocked(p,r=.4){return p.x<bounds.left+r||p.x>bounds.right-r||p.z<bounds.top+r||p.z>bounds.bottom-r||this.nahe(p,r).some(b=>intersects(p,b,r));}
+ ground(p){return groundAt(p.x,p.z);}
+ crime(severity=1){super.crime(severity);for(const n of this.npcs)if(n.report&&!n.report.description)n.report.description={clothes:this.player.clothes,plate:this.player.car?.id||null};}
+ report(severity,pos=this.player,incident=null){
+  const vorher=this.stars;super.report(severity,pos,incident);
+  if(pos.description)this.description={...pos.description};
+  if(this.stars>vorher)this.post('@pm_funkverkehr',
+   'Fahndungsstufe '+this.stars+'. Einheiten Richtung '+Math.round(pos.x)+' / '+Math.round(pos.z)+'.');
+ }
+ switchCharacter(){if(this.stars||this.activity||this.unlock||this.player.y>2||this.player.car&&Math.abs(this.player.car.speed)>1){this.notify('Wechsel erst ohne Fahndung, Aktivität und im Stillstand.');return false;}this.saveWeapon();this.player.cover=false;this.active=1-this.active;this.player=this.characters[this.active];this.loadWeapon();this.notify(this.player.name+' · '+(this.active?'leiser unterwegs, schneller an Sicherungen':'besseres Handling und Sprinten'));return true;}
+ saveWeapon(){const p=this.player;p.inventory[p.weapon]={ammo:p.ammo,reserve:p.reserve};}
+ loadWeapon(){const p=this.player;const w=p.inventory[p.weapon];p.ammo=w.ammo;p.reserve=w.reserve;}
+ cycleWeapon(){if(this.player.car||this.reloadJob)return;this.saveWeapon();const list=Object.keys(this.player.inventory),i=list.indexOf(this.player.weapon);this.player.weapon=list[(i+1)%list.length];this.loadWeapon();this.player.armed=true;this.notify(weapons[this.player.weapon].name);}
+ // Zugänge für game.js: die Aktlogik liegt in story.js, die Dialoge im UI.
+ starteAkt(nr){starteAkt(this,nr);}
+ beendeKampagne(welcher){return beendeKampagne(this,welcher);}
+ choose(choice){super.choose(choice);if(choice==='leak')this.relationship=80;if(choice==='sell')this.relationship=20;}
+ objective(){const storyPunkt=storyZiel(this);if(storyPunkt&&!this.activity)return storyPunkt;
+  if(this.activity?.kind==='treasure')return schatzOrte[this.schatzIndex||0]||locations.schatz;
+  if(this.activity?.kind==='race')return this.activity.points[this.activity.index]||locations.race;if(this.activity?.kind==='diving')return {x:178,z:190};if(this.campaign?.stage===1)return !this.campaign.relay?locations.tower:locations.records;if(this.campaign?.stage===2)return this.campaign.witness?locations.aircargo:locations.ferry;if(this.campaign?.stage===3)return locations.home;return super.objective();}
+ missionTitle(){if(this.activity)return this.activity.label;const storyText=storyTitel(this);if(storyText)return storyText;if(this.campaign.stage===1)return this.campaign.relay?'Hole die Ratsakte aus dem Archiv':'Mara: Relais abschalten';if(this.campaign.stage===2)return this.campaign.witness?'Bring die Zeugin zum Flughafen':'Finde die Zeugin auf Isla Serena';if(this.campaign.stage===3)return 'Zurück zur Wohnung — entscheide';if(this.campaign.stage===4)return 'Kampagne abgeschlossen';return ['Sprich mit Mara am Pier','Betritt das Caldera-Lager','Sichere die Festplatte','Bring die Beweise zu Mara','Ein zweiter Name in den Akten'][this.mission];}
+ action(){const p=this.player;if(this.activity){
+  if(this.activity.kind==='treasure'){
+   const ziel=schatzOrte[this.schatzIndex||0];
+   if(ziel&&distance(p,ziel)<5){
+    this.schatzIndex=(this.schatzIndex||0)+1;
+    const lohn=180+this.schatzIndex*60;this.award(lohn);
+    this.notify('Fundstelle geborgen. $'+lohn+'.');
+    if(this.schatzIndex>=schatzOrte.length){this.activity=null;this.award(900);
+     this.notify('Alle sechs geborgen. Prämie $900.');
+     this.post('@tideline_lokal','Jemand hat die alten Bergungsmarken abgeräumt. Alle sechs.');}
+    else this.activity.label='BERGUNG · Fundstelle '+(this.schatzIndex+1)+' von '+schatzOrte.length;
+   }else this.notify('Folge dem goldenen Marker.');
+   return null;
+  }
+  if(this.activity.kind==='diving'){if(distance(p,{x:178,z:190})<5&&p.y<-1.5){this.award(220);this.activity=null;this.notify('Wrackfund gesichert. $220.');}else this.notify('Schwimme zum Marker und halte C zum Tauchen.');}else this.activityTap();return null;}const storySchluessel=storyAktion(this);if(storySchluessel)return storySchluessel;if(!p.car){if(this.campaign.stage===1&&distance(p,locations.tower)<5){if(this.active!==1){this.notify('Mara kennt das Relais. Wechsle mit Tab / Figuren.');return null;}this.campaign.relay=true;this.notify('Mara: Signal aus. Eli kann jetzt ins Archiv.');return null;}if(this.campaign.stage===1&&distance(p,locations.records)<5){if(!this.campaign.relay){this.notify('Zuerst muss Mara das Relais abschalten.');return null;}if(this.active!==0){this.notify('Eli besitzt die Zugangskarte. Wechsle die Figur.');return null;}this.campaign.archive=true;this.campaign.stage=2;this.award(400);this.notify('Die Akte nennt eine Zeugin auf Isla Serena.');return null;}if(this.campaign.stage===2&&!this.campaign.witness&&distance(p,locations.ferry)<5){this.campaign.witness=true;this.notify('Nadia folgt dir. Besorge ein Auto und bring sie zur Luftfracht.');return null;}if(this.campaign.stage===2&&this.campaign.witness&&distance(p,locations.aircargo)<6){if(this.stars){this.notify('Nadia steigt erst aus, wenn du die Fahndung verloren hast.');return null;}this.campaign.stage=3;this.award(700);this.notify('Nadia ist sicher. Entscheide zu Hause über die vollständige Akte.');return null;}if(this.campaign.stage===3&&distance(p,locations.home)<5)return 'finale';if(this.mission===4&&this.campaign.stage===0&&distance(p,places.safe)<5)return 'chapter2';}
+  // Im Fahrzeug zählten nur Werkstatt und Tankstelle. Damit war kein einziges
+  // Rennen zu starten außer dem West Loop über das H-Menü: der Dialog am
+  // Marker geht nur zu Fuß auf, und startActivity verlangt ein Fahrzeug --
+  // beides zugleich geht nicht. Vier von fünf Strecken waren damit tot.
+  // Der Dialog sagt es selbst: 'Rennen starten (im Fahrzeug)'.
+  const near=Object.entries(locations).find(([id,l])=>distance(p,l)<(p.car?9:4.5)&&(!p.car||['garage','fuel'].includes(id)||l.kind.startsWith('race')));if(near)return 'place:'+near[0];
+  return super.action();
+ }
+ enterExit(){const p=this.player;if(p.car){const c=p.car,def=vehicleTypes[c.model];if(def.medium==='air'&&c.alt>5){p.car=null;p.y=c.alt;p.vy=-2;p.parachute=false;p.x=c.x+3;p.z=c.z;this.notify('Freier Fall — Leertaste / Sprung öffnet den Fallschirm.');return;}if(Math.abs(c.speed)>3){this.notify('Zuerst abbremsen.');return;}for(const side of [1,-1]){const v={x:c.x+Math.cos(c.yaw)*3.2*side,z:c.z-Math.sin(c.yaw)*3.2*side};if(!this.blocked(v,.4)){p.x=v.x;p.z=v.z;p.car=null;p.y=waterAt(p.x,p.z)?-.5:0;return;}}this.notify('Tür blockiert.');return;}const c=this.cars.find(c=>distance(c,p)<5&&c.health>0);if(!c)return;const def=vehicleTypes[c.model];if(c.owner===p.id||c.unlocked||def.security===0){this.board(c);return;}if(!this.unlock){this.unlock={id:c.id,remaining:def.security*(this.active===1?.7:1),total:def.security};this.notify('E / Aktion halten: Fahrzeug öffnen. Bewegung bricht ab.');}}
+ board(c){if(this.characters.some(p=>p!==this.player&&p.car===c)){this.notify('Die andere Figur sitzt in diesem Fahrzeug.');return;}this.player.car=c;this.player.armed=false;this.player.cover=false;this.player.y=0;c.speed=0;if(c.type==='traffic'||!c.owner&&vehicleTypes[c.model].security>0){c.type='stolen';this.crime(2);}this.player.x=c.x;this.player.z=c.z;this.notify(vehicleTypes[c.model].name+' · '+(vehicleTypes[c.model].medium==='air'?'W Gas · Sprung steigen · C sinken':'W/S Gas · Leertaste bremsen'));}
+ driveVehicle(dt,input){this.bremst=!!input.brake;const p=this.player,c=p.car,d=vehicleTypes[c.model],wet=this.weather==='rain'||this.weather==='storm',upgrade=1+(c.upgrades.engine||0)*.14;const f=c.health>0&&c.fuel>0?(input.forward||0):0;c.speed+=f*d.accel*upgrade*dt;// Bremsen und Ausrollen als Verzögerung in Metern je Sekundenquadrat statt
+  // als pauschaler Exponentialabfall. Gemessen war der Bremsweg aus 100 km/h
+  // 5,2 Meter beim Kestrel, 6,4 beim Banshee, 9,8 beim Atlas Hauler — ein
+  // Auto braucht rund vierzig. Ohne Gas rollte jedes Fahrzeug in 41 Metern
+  // aus; das ist keine Motorbremse, das ist eine Handbremse.
+  //
+  // brake bleibt die Kennzahl aus content.js, mal 0,39 ergibt die
+  // Verzögerung: Kestrel 9,0 m/s² (39 m), Vesper 11,7 (33 m), Atlas Hauler
+  // 4,7 (82 m). Nasse Fahrbahn und abgefahrene Reifen verlängern den Weg.
+  // Ausrollen ist Rollwiderstand plus Luftwiderstand, quadratisch mit dem
+  // Tempo — aus 100 km/h rund hundert Meter statt einundvierzig.
+  if(input.brake&&d.medium!=='air'){
+   const a=d.brake*.39*(wet?.78:1)*Math.max(.5,c.tires/100);
+   c.speed-=Math.sign(c.speed)*Math.min(Math.abs(c.speed),a*dt);
+  }else if(!f){
+   const a=d.medium==='water'?.9+Math.abs(c.speed)*.07:1.6+c.speed*c.speed*.004;
+   c.speed-=Math.sign(c.speed)*Math.min(Math.abs(c.speed),a*dt);
+  }else c.speed*=Math.exp(-dt*.04);c.speed=clamp(c.speed,-Math.min(10,d.max/3),d.max*upgrade*Math.max(.2,c.health/100));const tireGrip=Math.max(.45,c.tires/100);c.yaw-=(input.turn||0)*dt*d.turn*clamp(c.speed/6,-1,1)*(wet?.72:1)*tireGrip*d.grip*(1+(c.upgrades.tires||0)*.03)*(input.brake?1.45:1)*(this.active===0?1.08:1);
+  c.fuel=Math.max(0,c.fuel-dt*(.012+Math.abs(c.speed)*.002));let alt=c.alt||0;
+  if(d.medium==='air'){if(d.shape==='helicopter'||Math.abs(c.speed)>22)alt+=((input.jump?1:0)-(input.sneak?1:0))*dt*12;if(c.fuel<=0||c.health<=0)alt-=dt*12;if(d.shape==='plane'&&Math.abs(c.speed)<19&&alt>0)alt-=dt*8;c.alt=clamp(alt,0,170);}
+  // Querbewegung. Bisher fuhr jedes Fahrzeug exakt dorthin, wohin es zeigte:
+  // kein Untersteuern, kein Ausbrechen, keine Wirkung der Handbremse außer
+  // Bremsen. Der Schlupf baut sich mit der Fliehkraft auf und klingt mit dem
+  // Grip wieder ab.
+  const griff=tireGrip*d.grip*(wet?.66:1)*(input.brake?.45:1)
+   *(wet&&Math.abs(c.speed)>d.max*.62?.55:1);   // Aquaplaning bei hohem Tempo
+  const fliehkraft=Math.abs(c.speed)*(input.turn||0)*d.turn*.085*Math.sign(c.speed||1);
+  c.slip=(c.slip||0)+((fliehkraft/Math.max(.35,griff))-(c.slip||0))*Math.min(1,dt*5);
+  c.slip=clamp(c.slip,-7,7);
+  if(d.medium==='air')c.slip=0;
+  const quer=Math.cos(c.yaw)*c.slip*dt,querZ=-Math.sin(c.yaw)*c.slip*dt;
+  const dx=Math.sin(c.yaw)*c.speed*dt+quer,dz=Math.cos(c.yaw)*c.speed*dt+querZ,next={x:c.x+dx,z:c.z+dz};let hit=false;
+  if(d.medium==='water'){if(waterAt(next.x,next.z)&&!this.blocked(next,.8)){c.x=next.x;c.z=next.z;}else hit=true;}
+  else if(d.medium==='air'&&c.alt>2){if(this.blockedAir(next,c.alt)){hit=true;}else{c.x=next.x;c.z=next.z;}}
+  else{if(waterAt(next.x,next.z)){hit=true;c.health-=dt*3;}else hit=this.move(c,dx,dz,['bike','quad'].includes(d.shape)?.65:d.shape==='truck'||d.shape==='bus'?1.7:1.15);}
+  if(Math.abs(c.slip||0)>2.2)c.tires=Math.max(20,c.tires-dt*Math.abs(c.slip)*.5);
+  if(hit&&Math.abs(c.speed)>1){const impact=Math.abs(c.speed);c.health=clamp(c.health-impact*.65,0,100);c.glass=Math.max(0,c.glass-impact*2);c.lights=Math.max(0,c.lights-impact);c.tires=Math.max(0,c.tires-impact*.15);c.speed*=-.15;this.collisions++;}
+  for(const other of this.cars){if(other===c||distance(other,c)>3.6||(c.alt||0)>3||(other.alt||0)>3)continue;if(Math.abs(c.speed)>4){
+   // Der Transport aus Akt 3 ist das Ziel des Auftrags: er nimmt mehr Schaden
+   // als ein Zivilfahrzeug, und das Rammen gilt nicht als Straftat.
+   if(other.type==='konvoi'){konvoiRammen(this,Math.abs(c.speed));c.health=Math.max(0,c.health-4);c.speed*=-.25;continue;}
+   other.wait=5;other.health=Math.max(0,other.health-6);c.health=Math.max(0,c.health-3);c.speed*=-.2;this.crime(1);}}
+  for(const n of this.npcs){if(n.health>0&&c.alt<2&&distance(c,n)<1.6&&Math.abs(c.speed)>5){n.health=0;n.state='verletzt';c.speed*=.6;this.crime(3);}}
+  p.x=c.x;p.z=c.z;p.yaw=c.yaw;p.y=c.alt;
+ }
+ blockedAir(p,alt){return p.x<bounds.left||p.x>bounds.right||p.z<bounds.top||p.z>bounds.bottom||this.solids.some(b=>intersects(p,b,1.2)&&groundAt(b.x,b.z)+b.h>alt);}
+ shoot(){const p=this.player,w=weapons[p.weapon];if(!p.armed||p.cooldown>0||this.reloadJob||p.car)return;if(p.ammo<=0){this.notify('Leer. R / Nachladen.');return;}p.ammo--;p.cooldown=w.delay;this.shots++;let hit=null,nearest=w.range;const dir={x:Math.sin(p.yaw),z:Math.cos(p.yaw)};for(const n of [...this.npcs,...this.cops.filter(c=>c.active)]){const d=distance(p,n);if(n.health<=0||d>nearest||d<.01)continue;const dot=((n.x-p.x)*dir.x+(n.z-p.z)*dir.z)/d;if(dot>w.cone&&this.sichtFrei(p,n)){nearest=d;hit=n;}}let end={x:p.x+dir.x*w.range,z:p.z+dir.z*w.range};if(hit){if(p.weapon==='taser')hit.stun=12;else hit.health=Math.max(0,hit.health-w.damage*(p.weapon==='shotgun'?Math.max(.3,1-nearest/35):1));hit.state=hit.health<=0?'verletzt':'flüchtend';hit.timer=12;end={x:hit.x,z:hit.z};}else{for(let d=1;d<w.range;d+=.5){const v={x:p.x+dir.x*d,z:p.z+dir.z*d};if(this.solids.some(b=>intersects(v,b))){end=v;break;}}}this.tracers.push({x:p.x,z:p.z,end,life:.12});this.crime(hit?2:1);this.saveWeapon();}
+ reload(){const p=this.player,w=weapons[p.weapon];if(this.reloadJob||p.ammo>=w.capacity||!p.reserve)return;this.reloadJob={remaining:w.reload};p.cooldown=w.reload;this.notify('Nachladen …');}
+ melee(){const p=this.player;if(p.car||p.cooldown>0)return;const target=this.npcs.filter(n=>n.health>0&&distance(n,p)<2.6&&this.sichtFrei(p,n)).sort((a,b)=>distance(a,p)-distance(b,p))[0];p.cooldown=.7;this.meleeTime=.4;if(!target)return;const facing=(Math.sin(target.yaw)*(p.x-target.x)+Math.cos(target.yaw)*(p.z-target.z))/Math.max(.1,distance(p,target));if(p.sneak&&facing<-.2){target.stun=30;this.notify('Leiser Takedown.');}else{target.health=Math.max(0,target.health-25);target.stun=1;target.state='aggressiv';this.crime(1);}}
+ grapple(){const n=this.npcs.find(n=>n.health>0&&distance(n,this.player)<2&&this.sichtFrei(n,this.player));if(!n||this.player.cooldown>0)return;n.stun=4;this.player.cooldown=2;this.meleeTime=.8;this.crime(1);this.notify('Gegner kurz festgesetzt.');}
+ cover(){if(this.player.car)return;this.player.cover=!this.player.cover&&this.solids.some(b=>distance(this.player,b)<Math.hypot(b.w,b.d)/2+1.5);this.notify(this.player.cover?'In Deckung. Bewegung verlässt die Deckung.':'Keine Deckung / Deckung verlassen.');}
+ jump(){const p=this.player;if(p.car)return;if(p.y>4){p.parachute=true;this.notify('Fallschirm geöffnet. Steuere mit WASD / Stick.');}else if(p.y>=0&&p.y<.2){p.vy=6.5;}}
+ dodge(){const p=this.player;if(p.stamina<20||p.car)return;p.stamina-=20;this.dodgeTime=.45;this.move(p,-Math.cos(p.yaw)*2.5,Math.sin(p.yaw)*2.5);}
+ award(n){this.player.money+=n;this.moneyEarned+=n;this.buchung('Eingang',n);}
+ // Eigentum. Der Ertrag fällt einmal je Spieltag an, unabhängig davon, wo
+ // sich die Figur gerade aufhält.
+ kaufeImmobilie(id){
+  const o=immobilien[id];if(!o)return false;
+  if(this.besitz[id]){this.notify('Gehört dir bereits.');return false;}
+  if(this.player.money<o.preis){this.notify('Du brauchst $'+o.preis.toLocaleString('de-DE')+'.');return false;}
+  this.player.money-=o.preis;this.buchung('Kauf '+o.name,-o.preis);
+  this.besitz[id]={seit:this.time,gekauftVon:this.player.id};
+  if(id==='motel')this.motelOwned=true;
+  this.notify(o.name+' gehört jetzt dir. Ertrag $'+o.ertrag+' pro Tag.');
+  this.post('@tideline_lokal','Neuer Eigentümer für '+o.name+'. Niemand kennt den Namen.');
+  return true;
+ }
+ ertraege(){return Object.keys(this.besitz).reduce((s,id)=>s+(immobilien[id]?.ertrag||0),0);}
+ zahltag(){
+  const tag=Math.floor(this.time/1440*60);   // ein Spieltag sind 1920 s Echtzeit
+  if(tag<=this.letzterZahltag)return;
+  this.letzterZahltag=tag;
+  const summe=this.ertraege();if(!summe)return;
+  this.player.money+=summe;this.moneyEarned+=summe;
+  this.buchung('Mieten und Anteile',summe);
+  this.notify('Tageseinnahmen aus Eigentum: $'+summe.toLocaleString('de-DE'));
+ }
+ buy(item){const p=this.player,l=this.serviceLocation;if(!l||distance(p,locations[l])>10)return false;let price=0,apply=()=>{};
+  if(item.startsWith('weapon:')){const id=item.split(':')[1];if(!weapons[id]||p.inventory[id])return false;price=weapons[id].price;apply=()=>p.inventory[id]={ammo:weapons[id].capacity,reserve:weapons[id].capacity*4};}
+  else if(item==='ammo'){price=60;apply=()=>{p.reserve+=weapons[p.weapon].capacity*4;this.saveWeapon();};}
+  else if(item==='clothes'){price=80;apply=()=>p.clothes=p.clothes==='orange'?'blue':p.clothes==='blue'?'green':'orange';}
+  else if(item==='hair'){price=35;apply=()=>p.hair=(p.hair+1)%3;}
+  else if(item==='tattoo'){price=90;apply=()=>p.tattoo=!p.tattoo;}
+  else if(item==='heal'){price=50;apply=()=>p.health=100;}
+  else if(item==='food'){price=18;apply=()=>{p.health=Math.min(100,p.health+25);p.stamina=100;};}
+  else if(item==='motel'){if(this.motelOwned)return false;price=900;apply=()=>this.motelOwned=true;}
+  else if(item==='rest'){if(this.stars){this.notify('Während einer Fahndung kein Ausruhen.');return false;}price=l==='motel'&&!this.motelOwned?60:0;apply=()=>{p.health=100;p.stamina=100;this.hour=(this.hour+6)%24;};}
+  // Einchecken. Bis hierher war Ausruhen folgenlos: man wachte an derselben
+  // Stelle auf, und wer festgenommen wurde, bekam ein pausiertes Spiel mit
+  // dem Hinweis, den Auftrag neu zu starten — kein Ort, an dem es weitergeht.
+  // Wer eingecheckt ist, wacht in seinem Zimmer auf.
+  else if(item==='einchecken'){
+   if(this.stars){this.notify('Mit Fahndung nimmt dich keiner auf.');return false;}
+   const frei=l==='motel'&&this.motelOwned;
+   price=frei?0:(UNTERKUNFT_PREIS[l]??60);
+   apply=()=>{
+    p.health=100;p.stamina=100;this.hour=(this.hour+6)%24;
+    this.unterkunft=l;
+    this.notify('Eingecheckt im '+(locations[l]?.name||'Zimmer')+'. Von hier geht es weiter, wenn etwas schiefgeht.');
+   };
+  }
+  else if(item==='fuel'){const c=p.car||this.cars.find(c=>distance(c,p)<9);if(!c)return false;price=35;apply=()=>c.fuel=100;}
+  // Fahrzeugkauf. Der Wagen gehört danach der Figur, die ihn gekauft hat,
+  // und steht auf dem Stellplatz vor der Halle — nicht dort, wo der Spieler
+  // gerade steht: der erste Anlauf setzte ihn auf den Spieler, und man stand
+  // im eigenen Auto. Ist der Platz besetzt, rückt der neue Wagen zur Seite.
+  else if(item.startsWith('kaufwagen:')){
+   const modell=item.split(':')[1],d=vehicleTypes[modell],eintrag=AUTOHAUS.find(([m])=>m===modell);
+   if(!d||!eintrag)return false;
+   // Freie Bucht suchen, bevor Geld genommen wird: ein Kauf ohne Stellplatz
+   // wäre ein Kauf ohne Ware.
+   const bucht=AUTOHAUS_BUCHTEN.find(b=>!this.cars.some(c=>Math.hypot(c.x-b.x,c.z-b.z)<3.5));
+   if(!bucht){this.notify('Der Hof ist voll. Fahr einen deiner Wagen weg.');return false;}
+   price=eintrag[1];
+   apply=()=>{
+    const x=bucht.x,z=bucht.z;
+    // Eigenes Kennzeichenkürzel: PM- ist der Verkehr, LM- sind die
+    // abgestellten Wagen der Welt, SM- kommt vom Hof. Ohne das ließe sich
+    // im Spielstand nicht unterscheiden, was gekauft wurde.
+    const wagen={id:'SM-'+(100+this.cars.filter(c=>String(c.id).startsWith('SM-')).length),model:modell,x,z,yaw:bucht.yaw,
+     speed:0,health:100,fuel:100,tires:100,glass:100,lights:100,alt:0,type:'parked',
+     color:LACKE[this.cars.length%LACKE.length],upgrades:{},owner:p.id};
+    this.cars.push(wagen);
+    this.notify(d.name+' gehört dir. Er steht auf dem Hof.');
+   };
+  }
+  else if(item.startsWith('car:')){const c=p.car||this.cars.find(c=>distance(c,p)<12);if(!c){this.notify('Bring ein Fahrzeug in die Werkstatt.');return false;}const id=item.split(':')[1];price=id==='repair'?150:id==='paint'?120:id==='engine'?400:100;
+   // Ein Anteil an Pike Customs drückt den Werkstattpreis.
+   if(this.besitz.werkstatt)price=Math.round(price*.35);if(id==='engine'&&(c.upgrades.engine||0)>=3)return false;apply=()=>{if(id==='repair'){c.health=100;c.tires=100;c.glass=100;c.lights=100;}else if(id==='paint')c.color=[0x548d88,0x9b546b,0xdfb35f,0x324a6b][((c.upgrades.paint||0)+1)%4];if(id==='tires')c.tires=100;c.upgrades[id]=(c.upgrades[id]||0)+1;};}
+  else return false;if(p.money<price){this.notify('Nicht genug Geld.');return false;}p.money-=price;apply();
+  if(price)this.buchung(locations[l]?.name||'Ausgabe',-price);
+  this.notify('Erledigt · $'+price);return true;
+ }
+ startActivity(kind){if(this.stars){this.notify('Zuerst die Fahndung verlieren.');return;}
+  // Alle Rennen laufen über dieselbe Mechanik; sie unterscheiden sich in
+  // Kurs, verlangtem Fahrzeug und Preisgeld.
+  if(kind==='race'||kind.startsWith('race:')){
+   const id=kind.includes(':')?kind.split(':')[1]:'west',k=rennen[id];
+   if(!k){this.notify('Diese Strecke gibt es nicht.');return;}
+   const c=this.player.car;
+   if(!c){this.notify(k.name+': Du brauchst ein Fahrzeug.');return;}
+   const d=vehicleTypes[c.model];
+   const medium=d.medium==='water'?'water':d.medium==='air'?'air':'land';
+   if(medium!==k.medium){this.notify(k.name+': '+(k.medium==='water'?'Boot oder Jetski nötig.':'Landfahrzeug nötig.'));return;}
+   if(k.form&&d.shape!==k.form){this.notify(k.name+': nur mit dem Motorrad.');return;}
+   this.activity={kind:'race',kurs:id,label:k.name+' · Kontrollpunkte',time:0,index:0,points:k.punkte};
+   this.notify(k.name+': '+k.punkte.length+' Kontrollpunkte, Richtzeit '+k.ziel+' s.');
+   return;
+  }
+  // Bergungsauftrag: sechs Fundstellen, eine nach der anderen.
+  if(kind==='treasure'){
+   this.schatzIndex=this.schatzIndex||0;
+   if(this.schatzIndex>=schatzOrte.length){this.notify('Alle Fundstellen sind geborgen.');return;}
+   this.activity={kind,label:'BERGUNG · Fundstelle '+(this.schatzIndex+1)+' von '+schatzOrte.length,time:0};
+   this.notify('Marker gesetzt. E an der Fundstelle.');
+   return;
+  }
+  if(kind==='diving'){this.activity={kind,label:'TAUCHGANG · Wrackfund',time:0};return;}
+  if(kind==='range'&&!this.player.armed){this.notify('Waffe ziehen: Q.');return;}
+  if(kind==='skydive'){this.notify('Nimm den Hubschrauber oder das Flugzeug. Steige über 40 m, E zum Absprung und Leertaste für den Schirm.');return;}
+  this.activity={kind,label:{basketball:'BASKETBALL · Triff das Wurffenster',gym:'TRAINING · Halte den Rhythmus',fishing:'ANGELN · Warte auf den Biss',club:'UNDERTOW · Folge dem Beat',darts:'DARTS · Triff das schmale Feld',pool:'BILLARD · Stoß im richtigen Moment',range:'SCHIESSSTAND · Fünf Scheiben'}[kind]||'AKTIVITÄT',time:0,round:0,score:0,phase:0,biteAt:2+this.rng()*4,result:''};
+ }
+ activityTap(){const a=this.activity;if(!a)return;if(a.kind==='race'){this.notify('Fahre durch den goldenen Kontrollpunkt.');return;}if(a.kind==='fishing'){if(a.time>=a.biteAt&&a.time<a.biteAt+1){this.player.fish++;this.award(45);this.notify('Gefangen! $45.');}else this.notify('Kein Fang. Beim Biss reagieren.');this.activity=null;return;}if(['gym','basketball','club','darts','pool','range'].includes(a.kind)){
+   const fenster={basketball:.13,gym:.17,club:.17,darts:.075,pool:.11,range:.09}[a.kind];
+   const hit=Math.abs(a.phase-.5)<fenster;a.round++;if(hit)a.score++;a.result=hit?'Treffer':'Daneben';a.time+=.31;if(a.round>=5){const score=a.score;if(a.kind==='gym'){this.player.fitness=Math.min(10,this.player.fitness+score);this.player.stamina=100;}
+    else this.award(score*{basketball:30,club:15,darts:45,pool:55,range:60}[a.kind]||15);this.highScores[a.kind]=Math.max(this.highScores[a.kind]||0,score);this.notify(a.label.split(' · ')[0]+': '+score+'/5 erfolgreich.');this.activity=null;}}}
+ cancelActivity(){this.activity=null;this.notify('Aktivität beendet.');}
+ tick(dt,input={}){if(this.paused)return;const p=this.player;dt=Math.min(.05,dt);this.tickCount++;if(this.unlock){const c=this.cars.find(c=>c.id===this.unlock.id);if(!input.interact||!c||distance(c,p)>5||input.forward||input.turn){this.unlock=null;}else{this.unlock.remaining-=dt;if(this.unlock.remaining<=0){c.unlocked=true;this.unlock=null;this.board(c);}}}
+  if(this.reloadJob){this.reloadJob.remaining-=dt;if(this.reloadJob.remaining<=0){const w=weapons[p.weapon],n=Math.min(w.capacity-p.ammo,p.reserve);p.ammo+=n;p.reserve-=n;this.reloadJob=null;this.saveWeapon();}}
+  this.dodgeTime=Math.max(0,this.dodgeTime-dt);this.meleeTime=Math.max(0,this.meleeTime-dt);
+  if(input.forward||input.turn)p.cover=false;if(input.sprint&&!p.car){p.stamina=Math.max(0,p.stamina-dt*12/(1+p.fitness*.04));}else p.stamina=Math.min(100,p.stamina+dt*9);
+  const oldWeatherTimer=this.weatherTimer;const all=this.npcs;const stunned=new Map();for(const n of [...all,...this.cops]){n.stun=Math.max(0,(n.stun||0)-dt);if(n.stun>0){stunned.set(n,n.health);n.health=0;}}
+  // Distant civilians receive coarse updates; pending witness calls stay active.
+  //
+  // Der Grobtakt hatte einen Fehler, der erst mit den Arbeitswegen auffiel:
+  // ferne Figuren wurden jeden zwölften Tick verarbeitet, aber mit demselben
+  // dt. Dort lief die Welt damit mit einem Zwölftel Geschwindigkeit. Gemessen
+  // am Berufsverkehr: nach fünf Minuten Spielzeit hatten alle 334 Pendler auf
+  // "Arbeit" umgestellt, aber nur 100 sich überhaupt mehr als vierzig Meter
+  // bewegt und **sieben** ihren Arbeitsplatz erreicht.
+  //
+  // Die Bewegung hängt an pace mal dt. Im Grobtakt bekommt deshalb, wer weiter
+  // als 180 Meter weg ist, für diesen einen Tick das Zwölffache — dieselbe
+  // Strecke im Mittel, in Schritten von 24 Zentimetern statt 2. Was damit
+  // nicht mitwächst, sind die Zeitgeber der Figuren; ein ferner Zeuge
+  // telefoniert also weiter im Zwölftelttempo. Das ist gewollt: er wird beim
+  // Näherkommen ohnehin wieder fein getaktet, und die Meldung soll nicht
+  // schneller kommen, nur weil niemand hinsieht.
+  const grob=this.tickCount%12===0;
+  const fern=grob?all.filter(n=>distance(n,p)>=180&&!n.report):null;
+  const paceVorher=fern?fern.map(n=>n.pace):null;
+  // Mit der Geschwindigkeit muss auch die Uhr der Figur schneller laufen.
+  // Die Regel gegen Feststecken misst in Sekunden, und ferne Figuren sammeln
+  // die nur jeden zwölften Tick: aus drei Sekunden wurden für sie 36. Eine
+  // Figur, die sich an einer Wand verkeilt hat, stand damit über eine halbe
+  // Minute, bevor überhaupt jemand nachsah.
+  if(fern)for(const n of fern){n.pace=(n.pace||1)*12;n.grobFaktor=12;}
+  this.npcs=all.filter(n=>distance(n,p)<180||n.report||this.tickCount%12===0);
+  super.tick(dt,{...input,sprint:input.sprint&&p.stamina>0,sneak:input.sneak||p.cover});
+  if(fern)fern.forEach((n,i)=>{n.pace=paceVorher[i];n.grobFaktor=1;});
+  this.npcs=all;for(const [n,h] of stunned)n.health=h;
+  if(oldWeatherTimer<=dt){this.weatherIndex=(this.weatherIndex+1)%4;this.weather=['clear','rain','fog','storm'][this.weatherIndex];this.notify('Wetterwechsel: '+this.weather);}
+  if(!p.car){if(waterAt(p.x,p.z)&&p.y<=0){p.y=input.sneak?Math.max(-3.5,p.y-dt*1.5):Math.min(-.5,p.y+dt*2);p.air=clamp(p.air+(p.y<-1.5?-dt*10:dt*25),0,100);if(!p.air)p.health=Math.max(0,p.health-dt*8);}else{p.vy-=dt*(p.parachute?2:16);p.vy=Math.max(p.parachute?-3:-35,p.vy);p.y+=p.vy*dt;if(p.y<=0){if(p.vy<-13)p.health=Math.max(0,p.health-(-p.vy-13)*3);p.y=0;p.vy=0;if(p.parachute){this.award(60);this.notify('Sicher gelandet. $60.');}p.parachute=false;}}}
+  if(this.activity){const a=this.activity;a.time+=dt;a.phase=(Math.sin(a.time*(a.kind==='club'?5:a.kind==='gym'?3:2.5))+1)/2;if(a.kind==='race'&&distance(p,a.points[a.index])<10){a.index++;if(a.index===a.points.length){
+    const k=rennen[a.kurs||'west'],schluessel='race:'+(a.kurs||'west');
+    this.highScores[schluessel]=Math.min(this.highScores[schluessel]||99999,a.time);
+    const preis=a.time<k.ziel?k.preis:Math.round(k.preis*.45);
+    this.award(preis);
+    this.notify(k.name+' beendet: '+a.time.toFixed(1)+' s · $'+preis);
+    this.post('@tideline_lokal',k.name+': neue Zeit '+a.time.toFixed(1)+' Sekunden.');
+    this.activity=null;}}if(a.kind==='fishing'&&a.time>a.biteAt+1){this.notify('Der Fisch ist entkommen.');this.activity=null;}}
+  this.zahltag();storyTick(this,dt);this.updateRoutines(dt);this.updateGuards(dt);this.updateEvents(dt);if(this.campaign.witness&&this.campaign.stage===2){if(!this.witness)this.witness={x:p.x-2,z:p.z-2};const d=distance(this.witness,p);if(p.car){this.witness.x=p.x;this.witness.z=p.z;}else if(d>2){this.witness.x+=(p.x-this.witness.x)/d*dt*5;this.witness.z+=(p.z-this.witness.z)/d*dt*5;}}
+ }
+ // Tageslauf: um 8 Uhr zur Arbeit, um 20 Uhr nach Hause, dazwischen der
+ // eigene Rundgang. Zwei Deckel darin, beide aus einer Messung und nicht
+ // geschätzt.
+ //
+ // Erstens die Schrittweite. Eine Wegsuche mit Schrittweite 2 und 2500 Knoten
+ // kostet auf dieser Karte 4,7 ms — nicht wegen blocked(), das liegt bei 0,53
+ // Mikrosekunden bei 104 Solids, sondern wegen der schieren Knotenzahl. Für
+ // einen Fußgänger auf einem sieben Meter breiten Gehweg reicht ein Raster von
+ // vier Metern; das viertelt die Fläche und damit die Knoten.
+ //
+ // Zweitens die Zahl je Durchlauf. Als alle 334 Pendler ihren Weg im selben
+ // Tick suchten, stand das Spiel **1613 Millisekunden** still — gemessen, ein
+ // einzelner Tick gegen 0,46 ms im Ruhezustand. Jetzt stellen sich höchstens
+ // drei je Durchlauf um; der Rest kommt beim nächsten. Bei einem Durchlauf
+ // alle dreißig Ticks braucht der Berufsverkehr damit rund anderthalb Minuten,
+ // bis alle unterwegs sind — was besser aussieht als ein Ruck, bei dem die
+ // ganze Stadt gleichzeitig losgeht.
+ updateRoutines(dt){
+  if(this.tickCount%30)return;
+  const mode=this.hour>=8&&this.hour<17?'Arbeit':this.hour>=20||this.hour<6?'Zuhause':'Freizeit';
+  let umgestellt=0;
+  for(const n of this.npcs){
+   if(n.guard||n.report||n.health<=0||n.state!=='normal')continue;
+   // Wer einen Sitzplatz hat und wieder ruhig ist, setzt sich zurück. Ohne
+   // das leeren sich die Bänke über eine Spielsitzung vollständig: jede
+   // Waffe, jede Verfolgung, jeder Schuss schreckt Sitzende auf, und sie
+   // standen danach für immer. Im Regressionslauf waren nach den Waffen- und
+   // Polizeiprüfungen **null von vierzig** noch am Platz.
+   if(n.sitzplatz&&n.state==='normal'){
+    const d=Math.hypot(n.x-n.sitzplatz.x,n.z-n.sitzplatz.z);
+    if(d<2.5){n.x=n.sitzplatz.x;n.z=n.sitzplatz.z;n.yaw=n.sitzplatz.yaw;n.state='sitzend';continue;}
+    if(d<70&&umgestellt<3){umgestellt++;
+     n.path=[...findPath(n,n.sitzplatz,q=>this.blocked(q,.3),4,1200),{x:n.sitzplatz.x,z:n.sitzplatz.z}];
+     n.target=0;n.schedule='Platz';continue;}
+   }
+   if(n.schedule!==mode&&umgestellt<3){
+    umgestellt++;
+    n.schedule=mode;
+    const goal=mode==='Zuhause'?n.home:n.work;
+    // Fußgänger gehen auf dem Gehweg. findPath kennt seit den Streifenwagen
+    // Feldkosten; für Leute ist das Vorzeichen umgekehrt — die Fahrbahn ist
+    // begehbar, aber teuer. Ohne das liefen die Pendler mitten auf der
+    // Straße: 65 von 530 Figuren standen gleichzeitig in einer Fahrspur, die
+    // Prüfung lässt zehn Prozent zu.
+    n.path=mode==='Freizeit'?n.originalPath.map(p=>({...p}))
+     // Die Fahrbahn kostet das Siebenfache, ein Überweg nur das Anderthalbfache:
+     // damit lohnt sich ein Umweg von bis zu zweiundzwanzig Metern Gehweg,
+     // um an der Markierung statt irgendwo zu queren. Ohne die zweite Stufe
+     // lag der Anteil der Querungen am Überweg je nach Zustand der Welt
+     // zwischen 43 und 79 Prozent — gemessen, nicht geschätzt.
+     :[...findPath(n,goal,p=>this.blocked(p,.3),4,1200,p=>onRoad(p.x,p.z,0)?(amUeberweg(p.x,p.z)?1.5:7):1),goal];
+    n.target=0;
+   }
+   n.pace=this.weather==='storm'?2:1.1+(n.id%5)*.13;
+  }
+ }
+ updateGuards(dt){for(const n of this.npcs.filter(n=>n.guard&&!n.aktWache)){if(n.health<=0||n.stun>0)continue;n.shot=(n.shot||0)-dt;const p=this.player;const suspicious=this.campaign.stage===1&&!this.campaign.relay||p.armed||this.stars;const sees=distance(n,p)<25&&this.sichtFrei(n,p);if(suspicious&&sees&&n.shot<=0){n.shot=2.5;if(!this.campaign.relay){this.report(1);this.notify('Archivwache hat dich erkannt.');}if(this.stars>=2&&this.dodgeTime===0)p.health-=p.cover?2:7;}}}
+ updateEvents(dt){for(const n of this.npcs){if(n.state==='tanzend'&&this.time>n.danceUntil)n.state='normal';if(n.state==='aggressiv'&&n.health>0&&n.stun<=0){const target=this.npcs.find(v=>v!==n&&v.health>0&&distance(v,n)<8);if(target){const d=distance(n,target);if(d>1.5)this.move(n,(target.x-n.x)/d*dt*2,(target.z-n.z)/d*dt*2,.3);else{target.health=Math.max(0,target.health-dt*4);target.state='flüchtend';target.timer=4;}}if(this.time>n.aggressiveUntil)n.state='normal';}}this.nextEvent-=dt;if(this.currentEvent){this.currentEvent.ttl-=dt;if(this.currentEvent.ttl<=0)this.currentEvent=null;}if(this.nextEvent>0)return;this.nextEvent=50;const kinds=['Panne','Streit','Straßenrennen','Überfall','Party'];const kind=kinds[Math.floor(this.time/50)%kinds.length];const n=this.npcs.find(n=>!n.guard&&n.health>0&&distance(n,this.player)<60);this.currentEvent={kind,x:n?.x||-160,z:n?.z||80,ttl:25,npcId:n?.id};if(kind==='Streit'||kind==='Überfall'){if(n){n.state='aggressiv';n.aggressiveUntil=this.time+15;}}if(kind==='Straßenrennen'){const c=this.cars.find(c=>c.type==='traffic');if(c)c.speed=22;}if(kind==='Party'&&n){n.state='tanzend';n.danceUntil=this.time+20;}if(kind==='Panne'){const c=this.cars.find(c=>c.type==='traffic');if(c)c.wait=20;}this.notify('In der Nähe: '+kind);
+  this.post('@tideline_lokal',{Panne:'Liegengebliebener Wagen blockiert eine Spur.',
+   'Streit':'Streit auf offener Straße. Bitte Abstand halten.',
+   'Straßenrennen':'Schon wieder Rennen auf der Harbor Avenue. Jede Nacht dasselbe.',
+   'Überfall':'Überfall gemeldet. Bereich weiträumig meiden.',
+   'Party':'Irgendwo läuft eine Party und niemand weiß, wo genau.'}[kind]||('Vorfall: '+kind));}
+ // Ein Teil der Menge setzt sich. Aufgerufen, sobald die Welt gebaut ist und
+ // die Sitzplätze bekannt sind — vorher gibt es sie nicht, sie entstehen erst
+ // beim Bauen der Bänke, Liegen und Hocker.
+ //
+ // Wer sitzt, bleibt sitzen, bis ihn etwas aufschreckt: die vorhandene Logik
+ // setzt bei gezogener Waffe 'aufmerksam' und danach 'flüchtend', und damit
+ // steht die Figur von selbst wieder auf und läuft ihren alten Weg.
+ besetzeSitzplaetze(){
+  const frei=[...(this.sitzplaetze||[])];
+  if(!frei.length)return;
+  let gesetzt=0;
+  for(const n of this.npcs){
+   // Nur die Menge, nicht Wachen oder Figuren der Kampagne. Jede fünfte.
+   // Und niemand, der zu zweit unterwegs ist: gemessen hatten vier der fünf
+   // schlechtesten Paare genau das Bild — einer setzt sich auf eine Bank, der
+   // andere geht weiter, und danach liegen 32 bis 60 Meter dazwischen. Wer
+   // begleitet wird oder selbst begleitet, bleibt stehen und geht mit.
+   if(n.id<200||n.guard||n.id%5!==0||n.imPaar)continue;
+   let beste=-1,bester=1e9;
+   for(let i=0;i<frei.length;i++){
+    const d=Math.hypot(frei[i].x-n.x,frei[i].z-n.z);
+    if(d<bester){bester=d;beste=i;}
+   }
+   // Vierzig Meter: weiter weg ist es nicht mehr "der Platz vor der Haustür",
+   // und die Figur würde aus ihrer Gegend verschwinden.
+   if(beste<0||bester>40)continue;
+   const s=frei.splice(beste,1)[0];
+   n.x=s.x;n.z=s.z;n.yaw=s.yaw;n.state='sitzend';n.sitzplatz=s;
+   gesetzt++;
+   if(!frei.length)break;
+  }
+  this.sitzende=gesetzt;
+ }
+
+ // Wo eine Straßensperre steht. Vorher waren es vier von Hand notierte
+ // Punkte, alle in der alten Innenstadt: (-100,80), (-40,-100), (-280,80),
+ // (-100,200). Nachgemessen bei vier Sternen und fünfzehn Sekunden Verfolgung
+ // lag das Ziel in Rosalind **654 Meter** entfernt, auf den Keys 386, im
+ // Nordquartier 225 — der eine Wagen fuhr quer über die Karte zu einer
+ // Kreuzung, an der niemand war. Gebaut wurde dabei **keine einzige Sperre**,
+ // an keinem der fünf geprüften Orte. Dieselbe Klasse Fehler wie bei den
+ // Verkehrsrunden und der Menge: Koordinaten aus einer Karte, die es nicht
+ // mehr gibt.
+ //
+ // Jetzt kommt die Stelle aus dem Straßennetz: eine echte Kreuzung, sechzig
+ // bis zweihundert Meter vom Flüchtenden, und bevorzugt eine, die vor ihm
+ // liegt statt hinter ihm. Ohne die Richtung stellt sich die Streife dorthin,
+ // wo er herkommt.
+ // Zwei Wegpunkte, die die Strecke a->b über den nächsten Fußgängerüberweg
+ // führen — oder null, wenn die Strecke keine Fahrbahn quert oder kein
+ // Überweg nahe genug liegt. Fünfundvierzig Meter Umweg ist die Grenze;
+ // darüber läuft die Figur wie bisher direkt.
+ // Nachlauf für neue Hindernisse. Die Einrichtung der Innenräume meldet sich
+ // erst an, wenn die Welt gebaut wird — also nach dem Aufstellen der Figuren
+ // und nach dem Legen ihrer Wege. Ohne diesen Nachlauf stand eine Figur in
+ // einer Theke und dreißig von 15900 Messpunkten lagen in einem Möbel.
+ figurenAusHindernissen(){
+  const frei=(x,z)=>!this.blocked({x,z},.45)&&!waterAt(x,z);
+  const ausweichen=(p,weite=7)=>{
+   for(let r=.6;r<=weite;r+=.6)for(let a=0;a<12;a++){
+    const x=p.x+Math.cos(a*Math.PI/6)*r, z=p.z+Math.sin(a*Math.PI/6)*r;
+    if(frei(x,z))return {x,z};
+   }
+   return null;
+  };
+  let versetzt=0;
+  for(const n of this.npcs){
+   if(this.blocked({x:n.x,z:n.z},.45)){
+    const weg=ausweichen(n);
+    if(weg){n.x=weg.x;n.z=weg.z;versetzt++;}
+   }
+   for(const weg of [n.path,n.originalPath]){
+    if(!weg)continue;
+    for(const q of weg){
+     if(!this.blocked({x:q.x,z:q.z},.45))continue;
+     const neu=ausweichen(q);
+     if(neu){q.x=neu.x;q.z=neu.z;versetzt++;}
+     else {q.x=n.x;q.z=n.z;}
+    }
+   }
+  }
+  return versetzt;
+ }
+ ueberwegZwischen(a,b,id=0){
+  const dx=b.x-a.x,dz=b.z-a.z,laenge=Math.hypot(dx,dz);
+  if(laenge<6)return null;
+  // Quert die Strecke überhaupt eine Fahrbahn?
+  let drauf=0,mx=0,mz=0;
+  const schritte=Math.ceil(laenge/3);
+  for(let k=1;k<schritte;k++){
+   const t=k/schritte,x=a.x+dx*t,z=a.z+dz*t;
+   if(!onRoad(x,z,0))continue;
+   drauf++;mx+=x;mz+=z;
+  }
+  if(drauf<2)return null;
+  mx/=drauf;mz/=drauf;
+  // Quer zur Fahrbahn heißt: die Strecke läuft überwiegend in die Richtung,
+  // in der der Überweg seine Streifen ausbreitet.
+  const nordSued=Math.abs(dx)>Math.abs(dz);
+  let beste=null,bestesMass=45;
+  for(const u of UEBERWEGE){
+   if(u.nordSued!==nordSued)continue;
+   const d=Math.hypot(u.x-mx,u.z-mz);
+   if(d<bestesMass){bestesMass=d;beste=u;}
+  }
+  if(!beste)return null;
+  const rand=beste.breite/2+1.6;
+  const vorzeichen=nordSued?Math.sign(dx)||1:Math.sign(dz)||1;
+  // Seitlich versetzt je Figur. Ohne das liefen alle zum selben Punkt und
+  // standen dort ineinander: die Prüfung meldete sechs bleibende Paare unter
+  // 0,55 Metern, engster Abstand zwei Zentimeter.
+  // Elf Werte statt fünf: mit id%5 bekamen zu viele Figuren denselben Versatz
+  // und standen wieder ineinander — die Prüfung meldete fünf bleibende Paare.
+  const seit=((id%11)/10-.5)*2.4;
+  const punkte=[-vorzeichen*rand,vorzeichen*rand].map(e=>({
+   x:beste.x+(nordSued?e:seit),z:beste.z+(nordSued?seit:e)}));
+  // Ein Einstieg im Wasser oder in einer Wand wäre schlechter als der
+  // direkte Weg.
+  for(const q of punkte)if(waterAt(q.x,q.z)||this.blocked(q,1.1))return null;
+  return punkte;
+ }
+ sperrstelle(c,p){
+  const richtung={x:Math.sin(p.yaw),z:Math.cos(p.yaw)};
+  let beste=null,bester=-Infinity;
+  for(const k of intersections){
+   const d=distance(k,p);
+   if(d<60||d>200)continue;
+   if(waterAt(k.x,k.z))continue;
+   // Wie weit liegt die Kreuzung in Fahrtrichtung? -1 dahinter, +1 davor.
+   const vorne=((k.x-p.x)*richtung.x+(k.z-p.z)*richtung.z)/Math.max(1,d);
+   // Nah und voraus schlägt fern und seitlich; der Weg der Streife zählt mit.
+   const wert=vorne*2.2-d/130-distance(c,k)/260;
+   if(wert>bester){bester=wert;beste=k;}
+  }
+  if(beste)return {x:beste.x,z:beste.z};
+  // Kein Kreuzungspunkt im Band — auf den Keys gibt es keinen einzigen, der
+  // Damm ist eine durchgehende Fahrbahn. Dann eben mitten auf der Strecke:
+  // dieselbe Bewertung, aber über Punkte alle zwanzig Meter entlang der
+  // Segmente. Der alte Stand stellte dort eine Sperre 386 Meter entfernt auf,
+  // also mitten in der Innenstadt, während der Spieler über den Damm fuhr.
+  for(const r of roadSegments){
+   const laenge=Math.hypot(r.x2-r.x1,r.z2-r.z1);
+   if(laenge<40)continue;
+   for(let t=20;t<laenge-20;t+=20){
+    const k={x:r.x1+(r.x2-r.x1)*t/laenge,z:r.z1+(r.z2-r.z1)*t/laenge};
+    const d=distance(k,p);
+    if(d<60||d>200||waterAt(k.x,k.z))continue;
+    const vorne=((k.x-p.x)*richtung.x+(k.z-p.z)*richtung.z)/Math.max(1,d);
+    const wert=vorne*2.2-d/130-distance(c,k)/260;
+    if(wert>bester){bester=wert;beste=k;}
+   }
+  }
+  return beste?{x:beste.x,z:beste.z}:null;
+ }
+ updatePolice(dt){if(!this.campaign){super.updatePolice(dt);return;}const p=this.player;this.spotted=false;const nowWanted=this.stars>0;
+  for(const camera of this.cameras){if(!nowWanted||this.time<(camera.next||0))continue;const d=distance(p,camera),dot=(Math.sin(camera.yaw)*(p.x-camera.x)+Math.cos(camera.yaw)*(p.z-camera.z))/Math.max(1,d);if(d<camera.range&&dot>.2&&lineClear(camera,p,this.solids)&&p.y<5){camera.next=this.time+5;this.lastSeen={x:p.x,z:p.z};this.spotted=true;}}
+  this.dispatchTimer-=dt;const desired=Math.min(12,this.stars*2);if(nowWanted&&this.dispatchTimer<=0){const n=this.cops.filter(c=>c.active&&c.health>0).length;if(n<desired){const c=this.cops.find(c=>!c.active&&c.health>0);if(c){c.active=true;c.repath=0;this.dispatchTimer=2.5;}}}
+  for(const c of this.cops){if(c.health<=0||c.stun>0)continue;if(!nowWanted&&!c.active&&distance(c,c.base)<2)continue;const d=distance(c,p),known=p.car?this.description?.plate===p.car.id:this.description?.clothes===p.clothes;const sees=nowWanted&&p.y<12&&d<(p.sneak||this.active===1?26:52)&&this.sichtFrei(c,p)&&(known||d<10||p.armed);if(sees){this.spotted=true;this.lastSeen={x:p.x,z:p.z};this.description={clothes:p.clothes,plate:p.car?.id||null};}
+   if(!nowWanted&&c.active){c.active=false;c.repath=0;}c.repath-=dt;if(c.repath<=0){let target=nowWanted&&c.active?(sees?p:this.lastSeen):c.base;if(!target)continue;if(nowWanted&&c.id%4===2&&this.stars>=3){if(!c.blockTarget)c.blockTarget=this.sperrstelle(c,p);if(c.blockTarget)target=c.blockTarget;}else if(nowWanted&&c.id%3===2&&this.stars>=3)target={x:target.x+Math.sin(p.yaw)*16,z:target.z+Math.cos(p.yaw)*16};c.route=findPath(c,target,v=>this.blocked(v,1.15)||waterAt(v.x,v.z),4,10000,v=>onRoad(v.x,v.z,0)?1:3.5);c.target=0;c.repath=sees?2.5:6;}
+   const target=c.route[c.target];if(target&&!(sees&&d<8)){const td=distance(c,target);if(td<1.1)c.target++;else{c.yaw=Math.atan2(target.x-c.x,target.z-c.z);const speed=nowWanted?10+this.stars*1.4:8;this.move(c,Math.sin(c.yaw)*Math.min(td,speed*dt),Math.cos(c.yaw)*Math.min(td,speed*dt),1.15);}}
+   if(nowWanted&&c.blockTarget&&distance(c,c.blockTarget)<7&&!c.blocking){c.blocking=true;const b=this.addSolid(c.x+4,c.z,5,1.2,'barrier',1);this.barriers.push(b);}if(!nowWanted){c.blockTarget=null;c.blocking=false;}c.shot-=dt;if(sees&&d<28&&c.shot<=0){c.shot=c.role==='tactical'?1:1.8;if(this.stars>=2&&this.dodgeTime<=0){p.health-=p.cover?1:p.car?2:c.role==='tactical'?8:5;this.tracers.push({x:c.x,z:c.z,end:{x:p.x,z:p.z},life:.1});}else if(d<4&&this.dodgeTime<=0)p.health-=5;}
+  }
+  if(!nowWanted&&this.barriers.length){this.solids=this.solids.filter(b=>!this.barriers.includes(b));this.barriers=[];this.rasterNeu();}const heli=this.policeHeli;if(heli){const target=this.stars>=5?(this.lastSeen||p):{x:-360,z:305};const d=distance(heli,target);heli.alt=Math.min(45,heli.alt+dt*8);if(d>4){heli.yaw=Math.atan2(target.x-heli.x,target.z-heli.z);heli.x+=Math.sin(heli.yaw)*dt*30;heli.z+=Math.cos(heli.yaw)*dt*30;}else if(this.stars<5)heli.alt=Math.max(0,heli.alt-dt*16);if(this.stars>=5&&d<45&&p.y>=0&&lineClear(heli,p,this.solids)){this.spotted=true;this.lastSeen={x:p.x,z:p.z};}}if(nowWanted){if(this.spotted)this.unseen=0;else this.unseen+=dt;if(this.unseen>20+this.stars*4&&this.lastSeen&&distance(p,this.lastSeen)>35){this.stars=0;this.heat=0;this.description=null;this.lastSeen=null;this.notify('Fahndung beendet.');}}
+ }
+ snapshot(){this.saveWeapon();return {version:2,time:this.time,hour:this.hour,active:this.active,characters:this.characters.map(p=>({...p,car:null,carId:p.car?.id||null})),cars:this.cars,mission:this.mission,doorOpen:this.doorOpen,camera:this.camera,ending:this.ending,campaign:this.campaign,relationship:this.relationship,weather:this.weather,weatherIndex:this.weatherIndex,stars:this.stars,heat:this.heat,lastSeen:this.lastSeen,description:this.description,unseen:this.unseen,cops:this.cops,npcs:this.npcs,motelOwned:this.motelOwned,unterkunft:this.unterkunft||null,highScores:this.highScores,feed:this.feed,konto:this.konto,besitz:this.besitz,letzterZahltag:this.letzterZahltag,schatzIndex:this.schatzIndex||0};}
+ restore(data){if(data?.version!==2||!Array.isArray(data.characters)||data.characters.length!==2||!Array.isArray(data.cars))throw new Error('Inkompatibler Spielstand');for(const p of data.characters)if(!Number.isFinite(p.x)||!Number.isFinite(p.z)||!p.inventory?.[p.weapon])throw new Error('Ungültiger Spielstand');for(const key of ['time','hour','active','characters','cars','mission','camera','ending','campaign','relationship','weather','weatherIndex','stars','heat','lastSeen','description','unseen','cops','npcs','motelOwned','unterkunft','highScores','feed','konto','besitz','letzterZahltag','schatzIndex'])if(data[key]!==undefined)this[key]=data[key];for(const p of this.characters){p.car=this.cars.find(c=>c.id===p.carId)||null;p.cover=false;}this.player=this.characters[this.active];storyReparieren(this);for(const c of this.cops){c.blocking=false;c.blockTarget=null;}if(data.doorOpen)this.openDoor();this.loadWeapon();this.paused=true;}
+}
