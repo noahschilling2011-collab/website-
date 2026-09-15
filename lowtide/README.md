@@ -3541,6 +3541,15 @@ einzelne davon ist vorher und nachher gemessen.
 | Leuchtfarben ohne Kachelung | 710 | 2.300.518 |
 | Unterarm und Hand gebacken | 670 | 2.300.518 |
 
+Im Spiel, an den festen Messorten aus `tools/messung.mjs`: Kreuzung Downtown
+um 13 Uhr von 435 auf **320**, Hafen auf 297, Strand auf 338. Die Szene hat
+statt über zweihundert Texturen noch sechzehn, statt 20.771 Einzel-Meshes noch
+3.970 und statt 2149 Materialien noch 547.
+
+Dass dabei nichts kaputtgegangen ist, sagt `tools/bildvergleich.mjs`: acht
+Standorte, Tag und Nacht, alles Bewegliche aus der Szene genommen. Mittlerer
+Bildunterschied **0,015 von 255**, in der Innenstadt bildpunktgenau null.
+
 **Beschriftungen.** 227 Schilder standen als 227 Meshes mit 227 eigenen
 Leinwänden von je 512×128 Bildpunkten in der Szene; 114 davon lagen im Bild
 und kosteten 114 Aufrufe für zusammen 228 Dreiecke. Sie stehen alle fest.
@@ -3566,6 +3575,16 @@ für rund 1400 Bauteile. Sie werden jetzt gar nicht mehr gekachelt: ein Netz
 je Leuchtfarbe für die ganze Karte. Bezahlt wird das damit, dass Neon nicht
 mehr nach Entfernung wegfällt — gemessen 5.700 Dreiecke mehr auf 2,29
 Millionen, also ein Viertelprozent.
+
+Und noch eine Fehlmessung, die fast durchgegangen wäre. Der erste
+Bildvergleich meldete 1,735 mittleren Unterschied und 6,35 am schlimmsten
+Blick — das hätte bedeutet, dass die Pakete sichtbar etwas verändern. Der
+zweite, mit `visible = false` auf Figuren, Fahrzeugen und Spieler, meldete
+0,179. Auf den zwei Bildern, die ich mir daraufhin angesehen habe, standen
+die Autos aber immer noch da, nur verschoben: `sim.paused` hält die
+Simulationsschritte an, die Detailstufenschleife im Renderer läuft weiter und
+setzt die Sichtbarkeit jedes Bild neu. Erst als die beweglichen Teile aus der
+Szene genommen wurden, maß das Werkzeug das, was draufsteht.
 
 **Unterarm und Hand.** Am Ellbogen hingen sieben Meshes: Ärmel, Handfläche,
 vier Finger, Daumen. Sechs davon teilen sich dasselbe Hautmaterial, und
@@ -3621,8 +3640,14 @@ unten, und alle drei sind aus Messungen entstanden, nicht aus Vermutungen:
   in der Instanz; Asphalt und Glas werden an einer Klasse im Material erkannt
   statt an ihrer Farbe; alle Beschriftungen der Karte liegen in einem Atlas
   und einem Netz.
-- **Geteilte Geometrie.** Fahrzeuge teilen sich elf Formen, Figuren neun;
-  Gesichter gibt es fünfmal, einmal je Hautton.
+- **Geteilte Geometrie.** Fahrzeuge teilen sich elf Formen; bei den Figuren
+  wächst die Zahl der Geometrien nicht mit der Zahl der Menschen — dreißig
+  Figuren brauchen 82 Geometrien für 937 Meshes. Gesichter gibt es fünfmal,
+  einmal je Hautton.
+- **Körper erst in Nähe.** Eine Figur in der Ferne ist eine leere Hülle; die
+  31 Meshes ihres Körpers entstehen erst ab 26 Metern und werden ab 31 wieder
+  abgeräumt. Das ist der Grund, warum in der Szene 3.970 Meshes stehen und
+  nicht 20.771.
 
 ## Kampagne
 
