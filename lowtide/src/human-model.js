@@ -53,8 +53,12 @@ const gesichtMaterial=ton=>{
 };
 let serial=0;
 // nah=false lässt alles weg, was erst aus wenigen Metern sichtbar wird.
-export function naturalHuman(color,pants,nah=true){
- const id=serial++,g=new T.Group();const skinTone=[0xc3987b,0xa67455,0x79513b,0xd4ad8c,0xb68467][id%5];
+// kennung: die Figur bekommt ihr Aussehen aus dieser Zahl statt aus der
+// Reihenfolge des Bauens. Das ist die Voraussetzung dafür, Körper bei Bedarf
+// wegzuwerfen und später **identisch** wieder aufzubauen — ohne sie wechselte
+// eine Figur Hautton, Frisur und Jacke, sobald man ihr zu nahe kommt.
+export function naturalHuman(color,pants,nah=true,kennung=null){
+ const id=kennung??serial++,g=new T.Group();const skinTone=[0xc3987b,0xa67455,0x79513b,0xd4ad8c,0xb68467][id%5];
  // Ein fester Zufall je Figur: dieselbe Kennung ergibt immer dasselbe
  // Aussehen, zwei Figuren nebeneinander trotzdem ein verschiedenes. Derselbe
  // Streuwert trägt weiter unten schon Körperbau und Gangart.

@@ -135,7 +135,7 @@ export class ExpandedWorld extends World{
  }
  // Kein Modell wirft seinen Schatten selbst — das erledigt der Schattenkörper
  // in einem einzigen Aufruf. Ausnahme ist der Spieler, siehe world.js.
- human(color,pants,nah=true){const g=naturalHuman(color,pants,nah);g.traverse(o=>{if(o.isMesh)o.castShadow=false;});return g;}
+ human(color,pants,nah=true,kennung=null){const g=naturalHuman(color,pants,nah,kennung);g.traverse(o=>{if(o.isMesh)o.castShadow=false;});return g;}
  // Die Bodenneigung unter der Figur, gemessen einen halben Meter vor und
  // hinter ihr. Auf der Ebene ist sie null; erst am Hang im Cypress-Park
  // stellt sie die Sohlen sichtbar in den Anstieg.
@@ -575,7 +575,13 @@ export class ExpandedWorld extends World{
    // stärkste einzelne Hebel auf die Bildrate, den dieses Spiel hat. Bei 58°
    // Blickfeld und 1080 Bildzeilen ist eine Figur in 26 Metern noch 55
    // Bildpunkte hoch; das grobe Modell trägt dieselbe Silhouette.
-   const nah=weg<26;m.visible=nah&&weg<150;
+   // Körper an- und abhängen, mit Hysterese: 26 Meter zum Aufbauen, 31 zum
+   // Abräumen. Ohne den Abstand dazwischen baut eine Figur, die genau auf der
+   // Grenze läuft, ihren Körper in jedem zweiten Bild neu auf.
+   const nah=weg<26;
+   if(nah){if(!m.userData.koerper)this.koerperAn(i);}
+   else if(weg>31&&m.userData.koerper)this.koerperAb(i);
+   m.visible=nah&&weg<150;
    // Die Ferndarstellung bekommt dieselbe Körpergröße, sonst wächst oder
    // schrumpft jede Figur beim Umschalten auf 34 m.
    if(!nah&&weg<165&&n.health>0&&n.stun<=0)this.figurFern.hinzu(n.x,groundAt(n.x,n.z),n.z,n.yaw,m.userData.groesse||1);

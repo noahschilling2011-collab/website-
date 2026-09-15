@@ -1257,7 +1257,9 @@ const wolken = await page.evaluate(() => {
   return [mit, alle];
  };
  return {mittag, nacht, nebel, sturm, gewandert, neigungMittag, neigungFlach,
-  figur: zaehle(w.npcs[0]), wagen: zaehle(w.cars[0])};
+  // Der Körper einer Figur entsteht erst in Nähe des Spielers; für die
+ // Prüfung wird er angefordert.
+ figur: zaehle(w.koerperFuer?.(0) || w.npcs[0]), wagen: zaehle(w.cars[0])};
 });
 pruefe('Wolkenschatten liegt tagsüber auf der Karte', wolken.mittag > .05, String(wolken.mittag));
 pruefe('Nachts wirft keine Wolke einen Schatten', wolken.nacht === 0, String(wolken.nacht));
@@ -2251,6 +2253,7 @@ const leute = await page.evaluate(() => {
  out.doppelt = sim.npcs.length - new Set(sim.npcs.map(n => n.id)).size;
  // Figurengeometrie wird geteilt; Gesichter nur je Hautton.
  const a = new Set(), b = new Set();
+ w.koerperFuer?.(0); w.koerperFuer?.(7);
  w.npcs[0].traverse(o => o.isMesh && a.add(o.geometry.uuid));
  w.npcs[7].traverse(o => o.isMesh && b.add(o.geometry.uuid));
  out.geteilt = [...a].filter(u => b.has(u)).length;
@@ -3241,6 +3244,7 @@ const gangart = await page.evaluate(() => {
  const w = window.LOWTIDE.world;
  const daten = [];
  for (let i = 0; i < w.npcs.length && daten.length < 40; i += 11) {
+  w.koerperFuer?.(i);
   const m = w.npcs[i], u = m?.userData;
   if (!u?.legs || !u.arms) continue;
   const merk = {x: m.position.x, strecke: u.strecke, zeit: u.letzteZeit};
@@ -3281,6 +3285,7 @@ const koerperbau = await page.evaluate(() => {
  const w = window.LOWTIDE.world;
  const werte = [], baue = [];
  for (let i = 0; i < w.npcs.length; i += 5) {
+  w.koerperFuer?.(i);
   const m = w.npcs[i], u = m?.userData;
   if (!u?.arms || !u.legs) continue;
   baue.push(u.bau ?? 0);
@@ -3289,6 +3294,7 @@ const koerperbau = await page.evaluate(() => {
   werte.push(Math.abs(u.arms[1].position.x - u.arms[0].position.x) / 1.886);
  }
  // Dreht sich mit dem Kopf noch der Fuß mit?
+ w.koerperFuer?.(0);
  const m = w.npcs[0], u = m.userData;
  const merk = {x: m.position.x, y: m.position.y, z: m.position.z, ry: m.rotation.y, k: u.kopf.rotation.y};
  m.position.set(0, 0, 0); m.rotation.set(0, 0, 0);
@@ -3352,6 +3358,7 @@ const koerper = await page.evaluate(async () => {
  aus.spieler = (w.player.scale.y * 1.886);
  const treffer = s.npcs.map((n, i) => ({n, i})).find(o => o.n.state === 'sitzend' && o.n.sitzplatz);
  if (treffer) {
+  w.koerperFuer?.(treffer.i);
   const n = treffer.n, m = w.npcs[treffer.i];
   // Ohne das Entwaffnen misst diese Prüfung eine stehende Figur: die
   // Waffentests weiter oben lassen den Spieler bewaffnet zurück, und wer

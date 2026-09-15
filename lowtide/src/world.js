@@ -73,7 +73,17 @@ function koerpergroesse(i){
  return 1.72/MODELLHOEHE+(streu(12.9898)+streu(78.233)-1)*.10;
 }
 export class World{
- constructor(canvas,sim){this.sim=sim;this.scene=new T.Scene();this.scene.fog=new T.FogExp2(0xc6a7a0,.0038);this.renderer=new T.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=T.PCFShadowMap;this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.2;this.sky=new Sky(this.renderer);this.scene.add(this.sky.mesh);this.sonnenRichtung=new T.Vector3();this.blitz=0;this.camera=new T.PerspectiveCamera(58,innerWidth/innerHeight,.45,650);this.camera.position.set(-14,12,98);this.camera.lookAt(-40,3,15);this.groups=new Map();this.rng=random(78);this.hemi=new T.HemisphereLight(0xc4dceb,0x51443e,2.1);this.scene.add(this.hemi);this.sun=new T.DirectionalLight(0xffc995,3);this.sun.position.set(-80,110,20);this.sun.castShadow=true;Object.assign(this.sun.shadow.camera,{left:-130,right:130,top:130,bottom:-130,near:1,far:1500});this.sun.shadow.mapSize.set(2048,2048);this.sun.shadow.bias=-.0006;this.sun.shadow.normalBias=.035;this.scene.add(this.sun);this.scene.add(this.sun.target);this.build();this.flush();this.player=this.human(0xe2a062,0x253442);this.player.traverse(o=>{if(o.isMesh)o.castShadow=true;});this.scene.add(this.player);this.npcs=sim.npcs.map((n,i)=>{const m=this.human(HEMDEN[i%HEMDEN.length],HOSEN[(i*3+i%7)%HOSEN.length],false);m.scale.setScalar(m.userData.groesse=koerpergroesse(i));ohneSchatten(m);this.scene.add(m);return m;});this.cars=sim.cars.map(c=>{const m=this.car(c.color,false,c);ohneSchatten(m);this.scene.add(m);return m;});this.cops=sim.cops.map(()=>{const m=this.car(0xe4e7df,true);ohneSchatten(m);this.scene.add(m);return m;});this.contact=this.human(0xd4d2c9,0x242e3c);this.contact.scale.setScalar(1.68/MODELLHOEHE);this.contact.position.set(places.mara.x,0,places.mara.z);this.scene.add(this.contact);this.guard=this.human(0x425164,0x26303c);this.guard.scale.setScalar(1.86/MODELLHOEHE);this.guard.position.set(-73,0,-52);this.scene.add(this.guard);this.marker=new T.Mesh(new T.OctahedronGeometry(.7),new T.MeshBasicMaterial({color:0xeccb80}));this.scene.add(this.marker);this.ring=new T.Mesh(new T.RingGeometry(1.8,2,40),new T.MeshBasicMaterial({color:0xeccb80,side:T.DoubleSide,transparent:true,opacity:.75}));this.ring.rotation.x=-Math.PI/2;this.scene.add(this.ring);this.bulletMeshes=[];this.setupRain();
+ constructor(canvas,sim){this.sim=sim;this.scene=new T.Scene();this.scene.fog=new T.FogExp2(0xc6a7a0,.0038);this.renderer=new T.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=T.PCFShadowMap;this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.2;this.sky=new Sky(this.renderer);this.scene.add(this.sky.mesh);this.sonnenRichtung=new T.Vector3();this.blitz=0;this.camera=new T.PerspectiveCamera(58,innerWidth/innerHeight,.45,650);this.camera.position.set(-14,12,98);this.camera.lookAt(-40,3,15);this.groups=new Map();this.rng=random(78);this.hemi=new T.HemisphereLight(0xc4dceb,0x51443e,2.1);this.scene.add(this.hemi);this.sun=new T.DirectionalLight(0xffc995,3);this.sun.position.set(-80,110,20);this.sun.castShadow=true;Object.assign(this.sun.shadow.camera,{left:-130,right:130,top:130,bottom:-130,near:1,far:1500});this.sun.shadow.mapSize.set(2048,2048);this.sun.shadow.bias=-.0006;this.sun.shadow.normalBias=.035;this.scene.add(this.sun);this.scene.add(this.sun.target);this.build();this.flush();this.player=this.human(0xe2a062,0x253442);this.player.traverse(o=>{if(o.isMesh)o.castShadow=true;});this.scene.add(this.player);this.npcs=sim.npcs.map((n,i)=>{
+   // Nur die Hülle. Der Körper aus 31 Meshes entsteht erst, wenn die Figur
+   // nah genug ist, und wird beim Entfernen wieder abgeräumt — siehe
+   // koerperAn/koerperAb weiter unten.
+   const h=new T.Group();
+   h.userData={kennung:i,hemd:HEMDEN[i%HEMDEN.length],hose:HOSEN[(i*3+i%7)%HOSEN.length],
+    groesse:koerpergroesse(i),koerper:null};
+   h.scale.setScalar(h.userData.groesse);
+   this.scene.add(h);
+   return h;
+  });this.cars=sim.cars.map(c=>{const m=this.car(c.color,false,c);ohneSchatten(m);this.scene.add(m);return m;});this.cops=sim.cops.map(()=>{const m=this.car(0xe4e7df,true);ohneSchatten(m);this.scene.add(m);return m;});this.contact=this.human(0xd4d2c9,0x242e3c);this.contact.scale.setScalar(1.68/MODELLHOEHE);this.contact.position.set(places.mara.x,0,places.mara.z);this.scene.add(this.contact);this.guard=this.human(0x425164,0x26303c);this.guard.scale.setScalar(1.86/MODELLHOEHE);this.guard.position.set(-73,0,-52);this.scene.add(this.guard);this.marker=new T.Mesh(new T.OctahedronGeometry(.7),new T.MeshBasicMaterial({color:0xeccb80}));this.scene.add(this.marker);this.ring=new T.Mesh(new T.RingGeometry(1.8,2,40),new T.MeshBasicMaterial({color:0xeccb80,side:T.DoubleSide,transparent:true,opacity:.75}));this.ring.rotation.x=-Math.PI/2;this.scene.add(this.ring);this.bulletMeshes=[];this.setupRain();
   // Nachbearbeitung: Überstrahlen, Farbkurve, Randabdunklung, Korn. Ab hier
   // tonwertet die letzte Stufe, nicht mehr der Renderer.
   this.post=new Nachbearbeitung(this.renderer);
@@ -206,6 +216,41 @@ export class World{
   // Regen und Gewitter unterscheiden sich in der Dichte, nicht nur in der
   // Deckkraft: bei Regen werden zwei Drittel der Striche gezeichnet.
   this.rainTropfen=tropfen;this.rainHoehe=30;this.scene.add(this.rain);}
+ // Körper einer Figur aufbauen und anhängen. Das Aussehen hängt an der
+ // Kennung, nicht an der Baureihenfolge: dieselbe Figur sieht nach jedem
+ // Wiederaufbau gleich aus.
+ //
+ // Der Grund für den ganzen Aufwand: 530 Figuren zu je 31 Meshes sind 16.500
+ // Einzelnetze, von denen im Bild nie mehr als ein paar Dutzend gebraucht
+ // werden — der Rest steht als grobe Ferndarstellung da. Gebaut wird, was
+ // sichtbar ist.
+ koerperAn(i){
+  const h=this.npcs[i];
+  if(!h||h.userData.koerper)return h?.userData.koerper||null;
+  const u=h.userData;
+  const k=this.human(u.hemd,u.hose,false,u.kennung);
+  k.scale.setScalar(1);
+  h.add(k);
+  u.koerper=k;
+  // Die Animation greift über userData auf Arme, Beine und Kopf zu; die Hülle
+  // reicht sie deshalb durch.
+  Object.assign(u,k.userData,{kennung:u.kennung,hemd:u.hemd,hose:u.hose,groesse:u.groesse,koerper:k});
+  return k;
+ }
+ koerperAb(i){
+  const h=this.npcs[i];
+  if(!h?.userData.koerper)return;
+  const k=h.userData.koerper;
+  h.remove(k);
+  // Geometrien und Materialien sind geteilt (Cache in human-model.js) und
+  // dürfen nicht freigegeben werden — nur die Meshes fallen weg.
+  h.userData.koerper=null;
+  h.userData.rig=null;
+ }
+ // Für Werkzeuge und Prüfungen: gibt den Körper zurück und baut ihn bei
+ // Bedarf auf, damit man eine Figur untersuchen kann, ohne neben ihr zu
+ // stehen.
+ koerperFuer(i){return this.koerperAn(i);}
  resize(){this.renderer.setSize(innerWidth,innerHeight);this.camera.aspect=innerWidth/innerHeight;this.camera.updateProjectionMatrix();this.post?.groesse(innerWidth,innerHeight);}
  update(dt,camYaw,camPitch,playing){const s=this.sim,p=s.player,t=s.time;const himmelJetzt=this.applySky(dt);updateWater(this.waterUniforms,himmelJetzt,t,this.camera);updateWater(this.marshUniforms,himmelJetzt,t,this.camera);updateWater(this.seeUniforms,himmelJetzt,t,this.camera);this.rain.visible=s.weather==='rain'||s.weather==='storm';this.rain.material.opacity=s.weather==='storm'?.6:.42;this.rain.geometry.setDrawRange(0,(s.weather==='storm'?this.rainTropfen:Math.round(this.rainTropfen*.66))*2);if(this.rain.visible){this.rain.position.set(p.x,0,p.z);const a=this.rain.geometry.attributes.position,fall=dt*(s.weather==='storm'?36:26),h=this.rainHoehe;for(let i=0;i<a.count;i++)a.setY(i,(a.getY(i)-fall+h)%h);a.needsUpdate=true;}
   // Eli ist 1,80 m, Mara 1,68 m. Ohne diese Zeile wechselte beim
@@ -217,6 +262,10 @@ export class World{
    const sitzt=n.state==='sitzend';
    m.position.set(n.x,n.health<=0?.25:sitzt?sitzVersatz(m,n.sitzplatz?.y??.42):0,n.z);
    m.rotation.set(n.health<=0?Math.PI/2:0,n.yaw,0);
+   // Ohne Körper gibt es nichts zu animieren. Das spart nebenbei den
+   // Schrittzyklus für alle Figuren, die gar nicht im Bild sind — vorher lief
+   // er für alle 530, jedes Bild.
+   if(!m.userData.koerper)return;
    if(sitzt)setzeSitzhaltung(m,true,n.sitzplatz?.y??.42);
    else{setzeSitzhaltung(m,false);this.animateHuman(m,t+n.id,n.state==='normal'?1:n.state==='flüchtend'?2:0,n.state==='filmend');}
   });s.cars.forEach((c,i)=>{const m=this.cars[i];m.position.set(c.x,0,c.z);m.rotation.y=c.yaw;m.userData.body.scale.y=.55*(.65+.35*c.health/100);m.userData.body.rotation.z=c.health<40?.05:0;});s.cops.forEach((c,i)=>{const m=this.cops[i];m.position.set(c.x,0,c.z);m.rotation.y=c.yaw;for(let j=0;j<2;j++)m.userData.lights[j].visible=c.active&&(Math.floor(t*8)+j)%2===0;});this.contact.position.set(s.mission>=3?places.safe.x:places.mara.x,0,s.mission>=3?places.safe.z:places.mara.z);this.gateMesh.visible=!s.doorOpen;this.disk.visible=s.mission<3;const goal=s.objective();this.marker.position.set(goal.x,4+Math.sin(t*2)*.3,goal.z);this.marker.rotation.y=t;this.marker.visible=s.mission<4;this.ring.position.set(goal.x,.15,goal.z);this.ring.visible=s.mission<4;
