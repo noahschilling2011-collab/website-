@@ -3092,11 +3092,18 @@ pruefe('Fußgänger betreten die Fahrbahn dort, wo die Überwege liegen',
  marken.betretungen >= 30 && marken.amUeberweg / marken.betretungen > .55,
  `${marken.amUeberweg} von ${marken.betretungen} unter drei Metern, Median ${marken.median?.toFixed(1)} m`);
 // Die Schwelle steht bei fünfundfünfzig und nicht bei achtzig Prozent, weil
-// der Wert vom Zustand der Welt abhängt: in einer frisch gestarteten Karte
-// sind es zu drei Tageszeiten 80, 80 und 82 Prozent, am Ende dieses Prüflaufs
-// mit seinen Fahndungen, Stürmen und versetzten Figuren rund 60. Vor der
-// Wegeführung über die Überwege waren es 77, 56, 62 und 43. Die Prüfung fängt
-// den Rückfall, nicht die Schwankung.
+// der Wert vom Zustand der Welt abhängt. Vor der Wegeführung über die
+// Überwege waren es 77, 56, 62 und 43 Prozent; die Prüfung fängt den
+// Rückfall, nicht die Schwankung.
+//
+// Die Zahlen für die frisch gestartete Karte standen hier lange mit 80, 80
+// und 82 Prozent. Nachgemessen stimmen sie nicht mehr: 76,1 / 66,8 / 72,5 zu
+// drei Tageszeiten vor Autohaus, Unterkünften und Hochstraße, 75,2 / 62,6 /
+// 63,7 danach. Drei neue Gebäude heißen andere Laufwege — kein Fehler,
+// sondern der Preis von Inhalt. Am Ende dieses Prüflaufs sind es rund 41
+// Prozent, und damit fällt die Prüfung. Die Schwelle bleibt trotzdem stehen:
+// sie zu senken, damit die eigene Änderung durchgeht, wäre das Gegenteil
+// einer Prüfung. Der saubere Weg bleibt, den Prüflauf zu entkoppeln.
 
 // Einrichtung. Die acht Innenräume haben Theken, Betten, Regale, eine
 // Hebebühne und einen Billardtisch — gezeichnet, aber nie als Hindernis

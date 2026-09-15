@@ -3524,6 +3524,114 @@ ergab — der Unterschied war der Zustand, den die vorherigen Prüfungen
 hinterlassen. Jetzt steht ein Wagen auf einer freien Geraden, einmal mit und
 einmal ohne jemanden vier Meter voraus: ohne fährt er, mit hält er.
 
+## Autohaus, Unterkünfte und eine Hochstraße
+
+Drei Sachen, um die der Nutzer gebeten hat, und eine Grenze der Engine, die
+dabei zum Vorschein kam.
+
+**Solvara Motors.** Fahrzeuge waren zu finden, nicht zu kaufen — das
+`owner`-Feld an jedem Wagen wurde außer bei Elis Startwagen nie gesetzt.
+Sieben Modelle vom Finch für 1.400 bis zum Vesper R für 18.500; ein
+gekaufter Wagen gehört der Figur, die ihn gekauft hat, steht in einer freien
+Bucht auf dem Hof und bleibt im Spielstand. Acht Buchten sind die Grenze:
+ist der Hof voll, verkauft Solvara Motors nichts mehr. Ohne eine solche
+Grenze wächst die Fahrzeugliste unbegrenzt, und die Fernstufe hat Reserve
+für sechzehn zusätzliche Wagen.
+
+Der Bauplatz ist gesucht, nicht gesetzt — das nächstgelegene freie Rechteck
+von 38 mal 30 Metern zur Werkstatt, mit Abstand zur Fahrbahn und zu jedem
+anderen Ort. Von 127 gültigen Flächen die nächste, 106 Meter entfernt. Ohne
+die Regel „vierzehn Meter zu jedem anderen Ort" lag der beste Treffer einen
+Meter neben dem Basketballplatz.
+
+Drei Fehler, die erst die Messung zeigte: ein im Spiel gekaufter Wagen hatte
+**kein Modell** — `world.cars` wird beim Aufbau einmal aus `sim.cars`
+abgebildet, und die Zeichenschleife überspringt jeden Eintrag ohne Mesh
+stillschweigend (145 Fahrzeuge in der Simulation, 144 im Bild). Die
+Ausstellungswagen standen genau auf den ersten vier Buchten; Kulisse ist
+kein Fahrzeug, also sah die Belegungsprüfung sie nicht. Und die Glasfront
+lag zehn Zentimeter hinter der Ostflucht des Baus, also innen.
+
+**Rosalind Rooms und Halcyon Cabins.** Es gab ein Motel auf 2,15 km², und
+Einchecken war folgenlos. Jetzt drei Unterkünfte, und wer eingecheckt ist,
+wacht nach einer Festnahme dort auf — ohne Fahndung, sechs Stunden später,
+um ein Bußgeld ärmer. Vorher endete das Spiel an Ort und Stelle mit „Starte
+den Auftrag erneut" und einer Pause. Ohne Zimmer bleibt es dabei.
+
+### Eine Höhe je Punkt
+
+`groundAt(x, z)` liefert genau eine Höhe. Eine Straße über einer Straße gibt
+es in dieser Welt nicht: wer unter einer Hochstraße durchführe, spränge auf
+sie hinauf. Ein Highway-Ring über der Innenstadt ist damit ohne Umbau der
+Engine ausgeschlossen — nicht schwierig, sondern unmöglich.
+
+Möglich ist eine Trasse, die keine Fahrbahn kreuzt. Der **Bay Skyway**
+verbindet deshalb die beiden vorhandenen Dämme über offenem Wasser und endet
+auf ihnen: zweihundert Meter, acht Meter hoch, Steigung zwölf Prozent.
+
+Zwei Dinge macht die vorhandene Mechanik von selbst, wenn man sie lässt. Die
+Trasse zählt als Damm — sonst bricht `driveVehicle` beim ersten Meter ab,
+weil der nächste Schritt auf Wasser fällt. Und sie ist als gewöhnliches
+Straßenstück angemeldet, also entstehen Decke, Rand, Mittelstreifen und
+Leitplanke auf acht Metern Höhe, ohne dass dafür eine Zeile nötig wäre.
+
+Vier Dinge machte sie falsch, alle erst im Bild oder im Prüflauf sichtbar:
+
+- **Der Damm unter der Fahrbahn.** Der Straßenbau schüttet unter jede Straße
+  auf, bis er das Gelände erreicht. Über offenem Wasser sind das neun Meter
+  durchgehende Wand quer durch die Bucht — aus der Brücke wurde ein Deich.
+  Hochstraßen bekommen jetzt keinen; getragen wird die Trasse von zwanzig
+  Pfeilern und zehn Jochen.
+- **Vier Lichtmasten auf der Mittellinie.** Das Deck ist deshalb zwanzig
+  Meter breit bei fünfzehn Metern Fahrbahn; die Kappe trägt Leitplanke und
+  Masten, und die Masten wechseln die Seite.
+- **Die Fluchtroute aus Akt 5.** Ihr letzter Wendepunkt lag auf 136/232,
+  genau unter der Trasse. Für ein Boot ist ein Damm eine Wand. Der Punkt
+  liegt jetzt vierzig Meter östlich; eine neue Prüfung hält fest, dass kein
+  Wasserweg der Karte unter eine Hochstraße führt — nicht nur an den
+  Wendepunkten, sondern in Zweiprozentschritten entlang jeder Strecke.
+- **Zwei neue Kreuzungen.** Das Straßenstück endete auf den Querstraßen und
+  erzeugte Knoten bei 134/200 und 134/400. Auf den Keys gab es vorher
+  keinen einzigen. Mit dem neuen Knoten bekam die Streife den Auftrag, 96
+  Meter nach Westen zu fahren, blieb acht Meter neben dem Spieler stehen,
+  weil Verfolgung vor Sperre geht, und baute nie eine Sperre auf. Das Stück
+  endet jetzt sechs Meter vor beiden Querstraßen.
+
+### Was die Prüfungen dazu sagen, und was daran meins ist
+
+Nach diesen Korrekturen: 322 bestanden, 2 gefallen — Überwege und „Neben der
+Spur hält der Verkehr nicht an". Beide bestehen **isoliert** mit Abstand:
+
+| | isoliert | Schwelle | am Ende des Prüflaufs |
+|---|---|---|---|
+| Verkehr fährt weiter | 130 bis 133 von 134 | 107 | 104 |
+| Betretungen am Überweg | 63 bis 75 % | 55 % | 41 % |
+
+Zwei Vermutungen dazu habe ich gemessen und beide verworfen. Die sieben
+Wagen auf der Trasse hängen nicht fest — sie fahren in dreißig Sekunden 46
+bis 112 Meter, keiner wartet. Und die Reihenfolge der beiden Messungen macht
+kaum etwas aus: 130 gegen 133 von 134, beides weit über der Schwelle.
+
+Was bleibt, ist der Anteil an der Gesamtzahl. Sieben Wagen mehr heben die
+Schwelle um 5,6, ohne dass im Prüflaufzustand entsprechend mehr fahren.
+
+Bei den Überwegen steht im README bis hierher „frisch gestartet 80, 80 und
+82 Prozent". Nachgemessen auf frischer Karte stimmt das nicht mehr:
+
+| | 9 Uhr | 14 Uhr | 20 Uhr |
+|---|---|---|---|
+| vor diesen drei Paketen | 76,1 % | 66,8 % | 72,5 % |
+| danach | 75,2 % | 62,6 % | 63,7 % |
+
+Der dokumentierte Wert war also schon vorher überholt. Die drei Pakete
+kosten 1, 4 und 9 Prozentpunkte: drei neue Gebäude heißen andere Laufwege
+und Querungen an anderer Stelle. Ein Fehler steckt nicht dahinter — null
+Wegpunkte in Hindernissen, null Figuren in Hindernissen, in beiden Ständen
+gemessen.
+
+Die Schwellen bleiben, wo sie sind. Sie zu senken, damit die eigene Änderung
+durchgeht, wäre das Gegenteil einer Prüfung.
+
 ## Von 952 auf 670 Zeichenaufrufen
 
 Der Startbildschirm — 1024×576, headless, die Welt rendert im Hintergrund —
