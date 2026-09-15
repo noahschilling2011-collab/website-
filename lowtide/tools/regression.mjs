@@ -2251,13 +2251,23 @@ const leute = await page.evaluate(() => {
  // Ohne originalPath, home und work stürzt updateRoutines beim Tageswechsel.
  out.ohneWeg = sim.npcs.filter(n => !n.guard && (!n.originalPath || !n.home || !n.work)).length;
  out.doppelt = sim.npcs.length - new Set(sim.npcs.map(n => n.id)).size;
- // Figurengeometrie wird geteilt; Gesichter nur je Hautton.
- const a = new Set(), b = new Set();
- w.koerperFuer?.(0); w.koerperFuer?.(7);
- w.npcs[0].traverse(o => o.isMesh && a.add(o.geometry.uuid));
- w.npcs[7].traverse(o => o.isMesh && b.add(o.geometry.uuid));
- out.geteilt = [...a].filter(u => b.has(u)).length;
- out.formen = a.size;
+ // Figurengeometrie wird geteilt. Zwei bestimmte Figuren zu vergleichen sagt
+ // darüber nichts: seit jede Figur eine feste Kennung hat, unterscheiden sich
+ // zwei Nachbarn in Mütze, Rucksack und Jacke, und dann teilen sie sich
+ // tatsächlich nichts. Die Eigenschaft steckt im Verhältnis — die Zahl der
+ // verschiedenen Geometrien darf nicht mit der Zahl der Figuren mitwachsen.
+ // Gemessen: 33 Meshes auf 14 Geometrien bei einer Figur, 946 auf 86 bei
+ // dreißig. Der Körper muss dabei festgehalten werden, sonst räumt ihn die
+ // Sichtweite zwischen zwei Abfragen wieder ab.
+ w.koerperFest = true;
+ const formen = new Set();
+ let meshes = 0;
+ for (let i = 0; i < 30 && i < w.npcs.length; i++) {
+  w.koerperFuer?.(i);
+  w.npcs[i].traverse(o => { if (o.isMesh) { meshes++; formen.add(o.geometry.uuid); } });
+ }
+ out.meshes = meshes;
+ out.formen = formen.size;
  // Auch hier den Körper anfordern: die zwanzig Figuren stehen irgendwo auf
  // der Karte und haben ohne Nähe zum Spieler kein Gesicht.
  for (let i = 0; i < 20; i++) w.koerperFuer?.(i);
@@ -2271,6 +2281,7 @@ const leute = await page.evaluate(() => {
  const nachts = L.leuchten.map(m => m.emissiveIntensity);
  out.leuchten = tags.length;
  out.heller = nachts.filter((v, i) => v > tags[i] + .05).length;
+ w.koerperFest = false;
  return out;
 });
 pruefe('Mindestens hundertfünfzig Leute in der Stadt', leute.anzahl >= 150, `${leute.anzahl}`);
@@ -2278,7 +2289,9 @@ pruefe('Niemand steht im Wasser oder in einer Wand', leute.imWasser === 0 && leu
  `${leute.imWasser} im Wasser, ${leute.imHaus} in Wänden`);
 pruefe('Jede Figur hat Weg, Wohnung und Arbeit', leute.ohneWeg === 0, `${leute.ohneWeg} ohne`);
 pruefe('Keine doppelten Figurennummern', leute.doppelt === 0);
-pruefe('Figuren teilen sich ihre Geometrie', leute.geteilt >= 8, `${leute.geteilt} von ${leute.formen}`);
+pruefe('Figuren teilen sich ihre Geometrie',
+ leute.meshes > 600 && leute.formen < 160 && leute.meshes / leute.formen > 5,
+ `${leute.meshes} Meshes auf ${leute.formen} Geometrien`);
 pruefe('Gesichter gibt es je Hautton, nicht je Kopf',
  leute.gesichter === 5 && leute.hauttoene === 5, `${leute.gesichter} Formen, ${leute.hauttoene} Töne`);
 pruefe('Figuren haben einen drehbaren Kopf', await page.evaluate(() => {
