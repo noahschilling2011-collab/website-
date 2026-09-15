@@ -7,7 +7,7 @@ import {detailedHuman,detailedCar,asphaltTexture} from './art-direction.js';
 // alten Weg: Limousinenkörper mit dem Maßstab aus vehicleTypes.
 const KAROSSERIE_JE_MODELL={compact:'kompakt',sedan:'limousine',suv:'gelaende',muscle:'muscle',
  pickup:'pritsche',van:'transporter',taxi:'taxi'};
-import {locations,vehicleTypes,roadSegments,groundAt,waterAt,bounds,immobilien,UEBERWEGE,intersections} from './content.js';
+import {locations,vehicleTypes,roadSegments,groundAt,waterAt,bounds,immobilien,UEBERWEGE,intersections,hochstrasseHoehe} from './content.js';
 import {distance} from './simulation.js';
 import {Street} from './street.js';
 import {dressBuildings,dressHouses,dressCorners} from './facades.js';
@@ -62,14 +62,17 @@ export class ExpandedWorld extends World{
  // Ab welcher Entfernung die grobe Stufe übernimmt. Vierzig Meter sind der
  // Punkt, ab dem Finger, Sitze und Scheinwerferlinsen ohnehin verschwinden.
  setupFernstufen(sim){
-  this.autoFern=new Fernstufe(this.scene,grobesAuto(),sim.cars.length+sim.cops.length+4);
+  // Reserve für Fahrzeuge, die erst im Spiel dazukommen: seit es ein Autohaus
+  // gibt, ist die Fahrzeugliste nicht mehr fest. Vier Plätze reichten für
+  // vier gekaufte Wagen, danach fehlte der fünfte in der Fernstufe.
+  this.autoFern=new Fernstufe(this.scene,grobesAuto(),sim.cars.length+sim.cops.length+16);
   this.figurFern=new Fernstufe(this.scene,grobeFigur(),sim.npcs.length+8);
   // Schatten von Figuren und Fahrzeugen als einfache Körper, alle in je einem
   // Instanzennetz. Die Kapsel ist 1,71 m hoch (Radius .28, Schaft 1,15) und
   // sitzt mit ihrer Mitte auf .95 über dem Boden; der Wagenquader hat die
   // Maße eines Mittelklassewagens.
   this.schattenFigur=new Schattenkoerper(this.scene,new T.CapsuleGeometry(.28,1.15,3,7),sim.npcs.length+12,.95);
-  this.schattenWagen=new Schattenkoerper(this.scene,new T.BoxGeometry(1.92,1.28,4.4),sim.cars.length+sim.cops.length+8,.66);
+  this.schattenWagen=new Schattenkoerper(this.scene,new T.BoxGeometry(1.92,1.28,4.4),sim.cars.length+sim.cops.length+20,.66);
  }
  setupInnenlicht(){
   this.innenLichter=[];
@@ -299,13 +302,22 @@ export class ExpandedWorld extends World{
     const randL=groundAt(mx-(nordSued?r.w/2+4.5:0),mz-(nordSued?0:r.w/2+4.5));
     const randR=groundAt(mx+(nordSued?r.w/2+4.5:0),mz+(nordSued?0:r.w/2+4.5));
     const tief=Math.min(randL,randR),quer=y-tief;
+    // Eine Hochstraße bekommt keinen Damm. Der Damm füllt den Raum zwischen
+    // Fahrbahn und Gelände auf — bei acht Metern über offenem Wasser ist das
+    // eine neun Meter hohe, durchgehende Wand quer durch die Bucht. Aus der
+    // Brücke wurde damit ein Deich. Getragen wird die Trasse von den Pfeilern
+    // in regions.js; die Platte unter der Decke bleibt, sie ist der
+    // Fahrbahnrand und keine Schüttung.
+    const aufStelzen=hochstrasseHoehe(mx,mz)!==null;
     if(y>2||quer>.6){
      this.box(mx,y-.06,mz,nordSued?r.w+5.5:l,.16,nordSued?l:r.w+5.5,0x6f6a5c,0,false,nx,nz);
-     // Der Damm war eine halbe Meter dicke Platte. Bei vier Metern Abstand
-     // zum Hangfuß schwebte sie mit. Er reicht jetzt bis unter die tiefere
-     // Seite, mindestens aber einen halben Meter tief.
-     const hoehe=Math.max(.5,quer+.6);
-     this.box(mx,y-.09-hoehe/2,mz,nordSued?r.w+9:l,hoehe,nordSued?l:r.w+9,0x5c6350,0,false,nx,nz);
+     if(!aufStelzen){
+      // Der Damm war eine halbe Meter dicke Platte. Bei vier Metern Abstand
+      // zum Hangfuß schwebte sie mit. Er reicht jetzt bis unter die tiefere
+      // Seite, mindestens aber einen halben Meter tief.
+      const hoehe=Math.max(.5,quer+.6);
+      this.box(mx,y-.09-hoehe/2,mz,nordSued?r.w+9:l,hoehe,nordSued?l:r.w+9,0x5c6350,0,false,nx,nz);
+     }
     }
     // Leitplanke, wo es neben der Fahrbahn hinuntergeht. Eine siebzehn Meter
     // breite Straße quer über einen achtundachtzig Meter hohen Rücken hatte
@@ -395,7 +407,7 @@ export class ExpandedWorld extends World{
   // ein eigenes Schild trägt — Tankstelle, Gym, Fähranleger, Luftfracht —,
   // stand der Name danach zweimal da, der schwebende schräg in der Fassade.
   // Diese vier tragen ihre Beschriftung selbst.
-  const EIGENES_SCHILD=new Set(['fuel','gym','ferry','aircargo']);
+  const EIGENES_SCHILD=new Set(['fuel','gym','ferry','aircargo','autohaus','hotelwest','hotelkeys']);
   for(const [id,l] of Object.entries(locations)){if(!EIGENES_SCHILD.has(id))this.text(l.name.toUpperCase(),l.x,4.1+groundAt(l.x,l.z),l.z-10,Math.min(18,l.name.length*.8),'#c6dbc3',Math.PI);if(['garage','shop','clinic','home','club','diner','motel','records'].includes(id))this.box(l.x,.04,l.z-4,17,.1,17,0x5a625e);}
   // Court with visible basket and an animated ball.
   const court=locations.court;this.box(court.x,.05,court.z,20,.15,28,0x668b7c);this.box(court.x,.14,court.z-11,15,.04,.15,0xe9d9b1);this.box(court.x,2,court.z-12,.2,4,.2,0x405059);this.box(court.x,3.6,court.z-12,2.4,1.5,.15,0xd5d2bd);const hoop=new T.Mesh(new T.TorusGeometry(.5,.05,6,18),material(0xc28d58));hoop.rotation.x=Math.PI/2;hoop.position.set(court.x,3.1,court.z-11.3);this.scene.add(hoop);this.ball=new T.Mesh(new T.SphereGeometry(.28,12,8),material(0xd79b54));this.scene.add(this.ball);

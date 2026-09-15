@@ -30,6 +30,13 @@ const STANDORTE = {
   stausee:    [-700, 190, 0.05, .12, 0],
   ridge:      [-880, -120, 1.20, .10, 0],
   cane:       [-620, 660, 1.55, .18, 0],
+  autohaus:   [-168, 154, 4.71, .06, 0],
+  autohausluft:[-158, 150, 4.60, .34, 14],
+  hotelwest:  [-898, 265, 1.57, .10, 4],
+  hotelkeys:  [268, 405, 3.14, .12, 4],
+  skyway:     [134, 215, 0.0, .10, 2],
+  skywayluft: [95, 300, 1.57, .02, 7],
+  skywayfern: [60, 250, 1.30, .06, 12],
 };
 const arg = (n, f) => {const i = process.argv.indexOf('--' + n); return i > -1 ? process.argv[i + 1] : f;};
 const orte = arg('orte', Object.keys(STANDORTE).join(',')).split(',');

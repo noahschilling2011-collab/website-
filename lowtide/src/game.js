@@ -6,7 +6,7 @@ import {WOLKEN_VERSATZ,WOLKEN_STAERKE,WOLKEN_SONNE} from './detail.js';
 import {locations,regions,roadSegments,UEBERWEGE,intersections,vehicleTypes,weapons,regionAt,waterAt,bounds,groundAt,onRoad,INSELN,DAEMME,WEST_DAEMME,imStadtgebiet,STADTGEBIETE} from './content.js';
 import {Radio,SENDER} from './radio.js';
 import {Klang} from './sfx.js';
-import {immobilien,schatzOrte,rennen} from './content.js';
+import {immobilien,schatzOrte,rennen,AUTOHAUS,UNTERKUNFT_PREIS} from './content.js';
 import * as Story from './story.js';
 const {AUSGAENGE,FANG_DAUER,FANG_ABSTAND}=Story;
 const $=id=>document.getElementById(id),sim=new Campaign();let world,started=false,last=0,yaw=Math.PI,pitch=.15,stick={x:0,y:0},drag=null,muted=false,audio=null,toastTime=0,hudTime=0,failedShown=false;
@@ -16,7 +16,7 @@ const debug={sichtbar:false,frames:0,fps:0,fenster:0,zeit:0};
 // schon losgelassen wurde. Das darf die Eingabe nicht abbrechen.
 const fange=(el,id)=>{try{el.setPointerCapture(id);}catch{}};
 window.LOWTIDE={sim,get world(){return world;},get frames(){return debug.frames;},debug,
- get radio(){return radio;},get klang(){return klang;},get sender(){return SENDER;},orte:locations,plaetze:places,immobilien,imStadtgebiet,stadtgebiete:STADTGEBIETE,waffen:weapons,fahrzeuge:vehicleTypes,waterAt,groundAt,regionAt,onRoad,bounds,regionen:regions,strassen:roadSegments,ueberwege:UEBERWEGE,kreuzungen:intersections,inseln:INSELN,daemme:DAEMME,westDaemme:WEST_DAEMME,leuchten:leuchtMaterialien,wolken:{versatz:WOLKEN_VERSATZ,staerke:WOLKEN_STAERKE,sonne:WOLKEN_SONNE},get schatzOrte(){return schatzOrte;},story:Story,
+ get radio(){return radio;},get klang(){return klang;},get sender(){return SENDER;},orte:locations,plaetze:places,immobilien,autohaus:AUTOHAUS,imStadtgebiet,stadtgebiete:STADTGEBIETE,waffen:weapons,fahrzeuge:vehicleTypes,waterAt,groundAt,regionAt,onRoad,bounds,regionen:regions,strassen:roadSegments,ueberwege:UEBERWEGE,kreuzungen:intersections,inseln:INSELN,daemme:DAEMME,westDaemme:WEST_DAEMME,leuchten:leuchtMaterialien,wolken:{versatz:WOLKEN_VERSATZ,staerke:WOLKEN_STAERKE,sonne:WOLKEN_SONNE},get schatzOrte(){return schatzOrte;},story:Story,
  // Nur fürs Prüfen: setzt Figur und Kamera an eine feste Stelle.
  // hoehe>0 pausiert die Simulation und hebt die Kamera für Übersichtsbilder an.
  view(x,z,blick=yaw,neigung=pitch,hoehe=0){const p=sim.player;p.car=null;p.x=x;p.z=z;p.y=hoehe;p.vy=0;
@@ -446,11 +446,24 @@ function saveGame(){try{localStorage.setItem('lowtide-v2',JSON.stringify(sim.sna
 function showPlace(id){const l=locations[id];sim.serviceLocation=id;const buy=(label,item)=>[label,()=>{sim.buy(item);saveGame();}];let options=[];
  if(id==='garage')options=[buy('Reparatur · $150','car:repair'),buy('Lack wechseln · $120','car:paint'),buy('Motor-Upgrade · $400 (max. 3)','car:engine'),buy('Sportreifen · $100','car:tires'),buy('Fahrwerk · $100','car:suspension'),buy('Felgen · $100','car:rims'),buy('Auspuff · $100','car:exhaust'),buy('Innenraum · $100','car:interior'),buy('Beleuchtung · $100','car:lights'),buy('Karosserie-Kit · $100','car:body')];
  if(id==='shop')options=[buy('Karabiner · $650','weapon:rifle'),buy('Schrotflinte · $500','weapon:shotgun'),buy('Taser · $180','weapon:taser'),buy('Munition · $60','ammo'),buy('Kleidung · $80','clothes'),buy('Haarschnitt · $35','hair'),buy('Tattoo · $90','tattoo')];
- if(id==='clinic')options=[buy('Behandlung · $50','heal')];if(id==='diner')options=[buy('Essen & Erholung · $18','food')];if(id==='fuel')options=[buy('Volltanken · $35','fuel')];if(id==='home')options=[buy('Sechs Stunden ausruhen','rest'),['Spiel speichern',saveGame]];if(id==='motel')options=[buy('Ausruhen · $60 / als Eigentümer gratis','rest'),buy('Zimmer dauerhaft erwerben · $900','motel')];
+ if(id==='clinic')options=[buy('Behandlung · $50','heal')];if(id==='diner')options=[buy('Essen & Erholung · $18','food')];if(id==='fuel')options=[buy('Volltanken · $35','fuel')];if(id==='home')options=[buy('Sechs Stunden ausruhen','rest'),['Spiel speichern',saveGame]];// Jede Unterkunft, nicht nur das eine Motel: seit es drei gibt, hängt das
+ // Menü an der Art des Ortes und nicht mehr an seiner Kennung. Kaufen lässt
+ // sich weiterhin nur das Last Light Motel — nur das steht in immobilien.
+ if(l.kind==='motel'){
+  const preis=UNTERKUNFT_PREIS[id]??60;
+  const eigen=id==='motel'&&sim.motelOwned;
+  options=[buy('Einchecken · '+(eigen?'gratis':'$'+preis),'einchecken'),
+   buy('Nur ausruhen · '+(eigen?'gratis':'$'+preis),'rest')];
+  if(id==='motel'&&!sim.motelOwned)options.push(buy('Zimmer dauerhaft erwerben · $900','motel'));
+ }
+ // Autohaus: die Liste kommt aus content.js, damit Preis und Modell an einer
+ // Stelle stehen und nicht hier noch einmal.
+ if(id==='autohaus')options=AUTOHAUS.map(([modell,preis])=>
+  buy(vehicleTypes[modell].name+' · $'+preis.toLocaleString('de-DE'),'kaufwagen:'+modell));
  if(['court','gym','fish','club','dive','race','skydive','drag','moto','boat','jet','darts','pool','range','schatz'].includes(id))
   options=[[l.kind.startsWith('race')?'Rennen starten (im Fahrzeug)':id==='schatz'?'Bergungsauftrag annehmen':'Aktivität starten',
    ()=>sim.startActivity(l.kind)]];
- if(!options.length)options=[['Zurück in die Welt',()=>{}]];options.push(['Schließen',()=>{}]);dialog(l.name.toUpperCase(),l.name,id==='garage'?'Bring dein Fahrzeug bis an die offene Werkstatt. Käufe verändern dieses Fahrzeug.':id==='shop'?'Waffenwechsel: X. Geld und Inventar gehören der aktiven Figur.':'Erkunde Solvara. Dein Fortschritt wird auf diesem Gerät gespeichert.',options);}
+ if(!options.length)options=[['Zurück in die Welt',()=>{}]];options.push(['Schließen',()=>{}]);dialog(l.name.toUpperCase(),l.name,id==='garage'?'Bring dein Fahrzeug bis an die offene Werkstatt. Käufe verändern dieses Fahrzeug.':id==='shop'?'Waffenwechsel: X. Geld und Inventar gehören der aktiven Figur.':id==='autohaus'?'Gekaufte Wagen gehören dir und stehen danach auf dem Hof. Sie bleiben im Spielstand.':'Erkunde Solvara. Dein Fortschritt wird auf diesem Gerät gespeichert.',options);}
 function showActions(){dialog('LOWTIDE','Aktionen',sim.player.name+' · Vertrauen '+sim.relationship+'/100',[[sim.characters[1-sim.active].name+' übernehmen',()=>{sim.switchCharacter();yaw=sim.player.yaw;}],['Waffe wechseln',()=>sim.cycleWeapon()],['Nachladen',()=>sim.reload()],['Nahkampf / leiser Takedown',()=>sim.melee()],['Gegner festsetzen',()=>sim.grapple()],['Deckung',()=>sim.cover()],['Ausweichen',()=>sim.dodge()],['Rennen starten (an der nächsten Strecke)',()=>{const nah=Object.values(locations).filter(l=>l.kind.startsWith('race')).map(l=>[distance(sim.player,l),l]).sort((a,b)=>a[0]-b[0])[0];if(nah&&nah[0]<15)sim.startActivity(nah[1].kind);else toast('Keine Strecke in Reichweite. Marker auf der Karte.');}],['Aktivität abbrechen',()=>sim.cancelActivity()],['Spiel speichern',saveGame],['Zurück',()=>{}]]);}
 function senderWechseln(){
  if(!radio){toast('Ton ist aus.');return;}

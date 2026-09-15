@@ -333,7 +333,16 @@ export class World{
    if(!m.userData.koerper)return;
    if(sitzt)setzeSitzhaltung(m,true,n.sitzplatz?.y??.42);
    else{setzeSitzhaltung(m,false);this.animateHuman(m,t+n.id,n.state==='normal'?1:n.state==='flüchtend'?2:0,n.state==='filmend');}
-  });s.cars.forEach((c,i)=>{const m=this.cars[i];m.position.set(c.x,0,c.z);m.rotation.y=c.yaw;m.userData.body.scale.y=.55*(.65+.35*c.health/100);m.userData.body.rotation.z=c.health<40?.05:0;});s.cops.forEach((c,i)=>{const m=this.cops[i];m.position.set(c.x,0,c.z);m.rotation.y=c.yaw;for(let j=0;j<2;j++)m.userData.lights[j].visible=c.active&&(Math.floor(t*8)+j)%2===0;});this.contact.position.set(s.mission>=3?places.safe.x:places.mara.x,0,s.mission>=3?places.safe.z:places.mara.z);this.gateMesh.visible=!s.doorOpen;this.disk.visible=s.mission<3;const goal=s.objective();this.marker.position.set(goal.x,4+Math.sin(t*2)*.3,goal.z);this.marker.rotation.y=t;this.marker.visible=s.mission<4;this.ring.position.set(goal.x,.15,goal.z);this.ring.visible=s.mission<4;
+  });
+  // Ein im Spiel gekaufter Wagen kommt nach dem Aufbau der Welt dazu und
+  // hätte sonst kein Modell: die Liste wird beim Bauen einmal abgebildet,
+  // und die Schleife weiter unten überspringt jeden Eintrag ohne Mesh
+  // stillschweigend. Gemessen: 145 Fahrzeuge in der Simulation, 144 im Bild.
+  while(this.cars.length<s.cars.length){
+   const c=s.cars[this.cars.length],m=this.car(c.color,false,c);
+   ohneSchatten(m);this.scene.add(m);this.cars.push(m);
+  }
+  s.cars.forEach((c,i)=>{const m=this.cars[i];m.position.set(c.x,0,c.z);m.rotation.y=c.yaw;m.userData.body.scale.y=.55*(.65+.35*c.health/100);m.userData.body.rotation.z=c.health<40?.05:0;});s.cops.forEach((c,i)=>{const m=this.cops[i];m.position.set(c.x,0,c.z);m.rotation.y=c.yaw;for(let j=0;j<2;j++)m.userData.lights[j].visible=c.active&&(Math.floor(t*8)+j)%2===0;});this.contact.position.set(s.mission>=3?places.safe.x:places.mara.x,0,s.mission>=3?places.safe.z:places.mara.z);this.gateMesh.visible=!s.doorOpen;this.disk.visible=s.mission<3;const goal=s.objective();this.marker.position.set(goal.x,4+Math.sin(t*2)*.3,goal.z);this.marker.rotation.y=t;this.marker.visible=s.mission<4;this.ring.position.set(goal.x,.15,goal.z);this.ring.visible=s.mission<4;
   for(const m of this.bulletMeshes){this.scene.remove(m);m.geometry.dispose();m.material.dispose();}this.bulletMeshes=[];for(const tr of s.tracers){const geo=new T.BufferGeometry().setFromPoints([new T.Vector3(tr.x,1.5,tr.z),new T.Vector3(tr.end.x,1.3,tr.end.z)]);const l=new T.Line(geo,new T.LineBasicMaterial({color:0xffe3a3}));this.scene.add(l);this.bulletMeshes.push(l);}
   // freieKamera hängt die Verfolgerkamera aus — für Luftbilder und Prüfläufe.
   if(playing&&!this.freieKamera){const dist=p.car?10:6.5;let target=new T.Vector3(p.x,1.6,p.z);let desired=new T.Vector3(p.x-Math.sin(camYaw)*dist,3.7+camPitch*6+(p.car?1.5:0),p.z-Math.cos(camYaw)*dist); // Camera collision against the same world solids.

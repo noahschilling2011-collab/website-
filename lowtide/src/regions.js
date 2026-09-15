@@ -1,4 +1,4 @@
-import {groundAt, waterAt, locations, onRoad, roadSegments, INSELN, DAEMME, TANKSTELLE, SEEN} from './content.js';
+import {groundAt, waterAt, locations, onRoad, roadSegments, INSELN, DAEMME, TANKSTELLE, SEEN, AUTOHAUS_BUCHTEN, HOCHSTRASSEN, hochstrasseHoehe} from './content.js';
 // Der Rest von Solvara.
 // Port Mercy war ausgebaut, alles andere bestand aus Andeutungen: sechs
 // Kisten für die Vororte, ein Feld mit Strichen für Bellweather, 155
@@ -1839,6 +1839,146 @@ function faehre(w) {
  (w.zusatzLampen ||= []).push({x: kx + 1, y: 3, z: kz, farbe: 0xffeccb, staerke: 58});
 }
 
+// Solvara Motors. Ein Autohaus hat drei Teile, die man von der Straße aus
+// liest: eine Glasfront, hinter der Wagen stehen, einen Hof mit Reihen, und
+// ein Schild, das man von weiter weg sieht als das Gebäude.
+//
+// Der Hof zeigt nach Osten zur Straße bei x = -160. Die Ausstellungswagen
+// sind Kulisse, keine fahrbaren Fahrzeuge: ein gekaufter Wagen erscheint
+// auf dem Stellplatz davor (AUTOHAUS_STELLPLATZ), und sieben echte Autos
+// dauerhaft auf dem Hof stehen zu lassen, kostete in der Messung mehr
+// Zeichenaufrufe als der ganze Bau.
+function autohaus(w) {
+ const l = locations.autohaus, hx = l.x - 14, hz = l.z;   // Mitte des Grundstücks
+ baumfrei(w, hx - 20, hz - 16, hx + 20, hz + 16);
+ // Hof: heller Belag mit Stellplatzmarkierung.
+ w.box(hx, .05, hz, 38, .12, 30, 0x7c7b73);
+ // Zwei Reihen zu fünf Buchten, aufgemalt. Die Maße stehen in content.js
+ // unter AUTOHAUS_BUCHTEN; hier wird nur gezeichnet, was dort steht.
+ for (const b of AUTOHAUS_BUCHTEN) {
+  w.box(b.x, .12, b.z - 2.7, 5.4, .04, .16, 0xd6d3bd);
+  w.box(b.x, .12, b.z + 2.7, 5.4, .04, .16, 0xd6d3bd);
+ }
+ // Ausstellungshalle im Westen, Glasfront nach Osten zur Straße.
+ w.box(hx - 8, 3.9, hz, 20, 7.8, 24, 0xa9a89c);
+ w.box(hx - 8, 8, hz, 21, .5, 25, 0x7d837f);
+ // Die Glasfront muss vor der Wand stehen, nicht darin: bei hx + 1.9 lag sie
+ // zehn Zentimeter hinter der Ostflucht des Baus und war unsichtbar.
+ w.box(hx + 2.1, 3.4, hz, .18, 5.6, 22, 0x89b7c4, 0, true);
+ // Eingang: zwei Pfeiler und ein Vordach über der Tür.
+ for (const oz of [-3.2, 3.2]) w.box(hx + 2, 2.6, hz + oz, .5, 5.2, .5, 0x50595c);
+ w.box(hx + 3.4, 5.3, hz, 3.4, .35, 7.4, 0x8d9490);
+ // Dachschild an der Ostkante, quer zur Straße — dort wird es gelesen.
+ // Der erste Anlauf setzte es an die Nordkante: von der Straße aus sah man
+ // die Rückseite.
+ // Drehung +90 Grad zeigt nach Osten, und die Schrift gehört vor die Tafel:
+ // hinter ihr sieht man von der Straße aus nur die Tafel.
+ w.box(hx + 1.6, 10.4, hz, .5, 4, 18, 0x2f3a3e);
+ w.text('SOLVARA MOTORS', hx + 1.95, 10.4, hz, 17, '#e6ddc2', Math.PI / 2);
+ // Ausstellungspodest an der Nordkante mit drei Wagen darauf. Zwei Anläufe
+ // davor waren falsch: auf dem Hof standen sie genau auf den ersten vier
+ // Buchten, und ein gekaufter Wagen wäre in einem von ihnen erschienen — die
+ // Kulisse ist kein Fahrzeug, also sah die Belegungsprüfung sie nicht. Und
+ // hinter der Glasfront sieht sie niemand: box() kennt keine Transparenz,
+ // eine Glaswand ist hier eine hellblaue, leuchtende Fläche.
+ w.box(hx + 5, .3, hz + 13, 20, .5, 7, 0x6d7a75);
+ const lacke = [0x9d3f3a, 0x35576b, 0xc3a55c];
+ lacke.forEach((farbe, k) => {
+  const ax = hx - 2 + k * 7, az = hz + 13;
+  w.box(ax, 1.15, az, 4.6, 1.1, 2.1, farbe);
+  w.box(ax - .3, 1.98, az, 2.4, .7, 1.9, 0x8fb0bd, 0, true);
+  for (const ox of [-1.5, 1.5]) for (const oz of [-.95, .95])
+   w.box(ax + ox, .77, az + oz, .7, .68, .3, 0x20272c);
+ });
+ // Zwei Masten mit Wimpeln, wie sie auf jedem Hof stehen.
+ for (const oz of [-12, 12]) {
+  w.box(hx + 16, 3.4, hz + oz, .22, 6.8, .22, 0xb9bdb4);
+  w.box(hx + 16.6, 6, hz + oz, 1.2, 1.4, .08, 0xd26a4e);
+ }
+ w.sim.addSolid(hx - 8, hz, 20, 24, 'autohaus', 7.8);
+ (w.zusatzLampen ||= []).push({x: hx + 4, y: 5, z: hz, farbe: 0xe8eadf, staerke: 60});
+}
+
+// Die beiden neuen Unterkünfte. Beide nach demselben Muster: ein flacher
+// Riegel mit sechs Türen, ein Vordach vor der Rezeption, ein Schild zur
+// Straße und ein Hof davor. Welche Seite die Vorderseite ist, sagt der
+// Richtungsvektor — der erste Anlauf legte sie immer nach Süden bzw. Westen,
+// und auf den Keys zeigten Türen und Rezeption damit von der Straße weg.
+function unterkunft(w, id, fx, fz, farbe, dachfarbe) {
+ const l = locations[id];
+ const quer = fx !== 0;                            // Front zeigt in x
+ const b = quer ? 14 : 20, t = quer ? 20 : 14;     // Riegel quer zur Front
+ // Das Haus steht hinter dem Marker, elf bzw. zehn Meter in Blickrichtung.
+ const hx = l.x - fx * (quer ? 11 : 0), hz = l.z - fz * (quer ? 0 : 10);
+ baumfrei(w, hx - b / 2 - 3, hz - t / 2 - 3, hx + b / 2 + 3, hz + t / 2 + 3);
+ w.box(hx, .05, hz, b + 8, .12, t + 6, 0x6f6c63);
+ w.box(hx, 2.1, hz, b, 4.2, t, farbe);
+ w.box(hx, 4.35, hz, b + 1.2, .4, t + 1.2, dachfarbe);
+ // Vorderkante: dort sitzen Türen, Fenster, Vordach und Schild.
+ const kante = quer ? b / 2 : t / 2;
+ const vx = hx + fx * (kante + .07), vz = hz + fz * (kante + .07);
+ for (let k = 0; k < 6; k++) {
+  const versatz = (k - 2.5) * ((quer ? t : b) - 3) / 6;
+  const tx = quer ? vx : vx + versatz, tz = quer ? vz + versatz : vz;
+  w.box(tx, 1.05, tz, quer ? .14 : .9, 2.1, quer ? .9 : .14, 0x4a4036);
+  const fensterX = quer ? tx : tx + 1.3, fensterZ = quer ? tz + 1.3 : tz;
+  w.box(fensterX, 2.5, fensterZ, quer ? .14 : 1, 1, quer ? 1 : .14, 0x8fb0bd, 0, true);
+ }
+ // Vordach über der Rezeption, dort steht auch der Marker.
+ const rx = vx + fx * 1.6 - (quer ? 0 : 6), rz = vz + fz * 1.6 - (quer ? 6 : 0);
+ w.box(rx, 3.1, rz, quer ? 3.4 : 5, .3, quer ? 5 : 3.4, dachfarbe);
+ for (const seite of [-1, 1])
+  w.box(rx + (quer ? 0 : seite * 2), 1.55, rz + (quer ? seite * 2 : 0), .2, 3.1, .2, 0x50595c);
+ // Schild an der Vorderkante, Schrift davor und zur Front gedreht.
+ const sx = vx + fx * 2.6, sz = vz + fz * 2.6;
+ w.box(sx, 5.6, sz, quer ? .4 : 11, 2.4, quer ? 11 : .4, 0x2f3a3e);
+ const dreh = quer ? (fx > 0 ? Math.PI / 2 : -Math.PI / 2) : (fz > 0 ? 0 : Math.PI);
+ w.text(l.name.toUpperCase(), sx + fx * .35, 5.6, sz + fz * .35, 11, '#ecd9a8', dreh);
+ w.sim.addSolid(hx, hz, b, t, 'motel', 4.2);
+ (w.zusatzLampen ||= []).push({x: rx, y: 3, z: rz, farbe: 0xffe0a8, staerke: 48});
+}
+
+// Der Bay Skyway braucht, was eine Straße auf dem Boden nicht braucht:
+// Pfeiler, die sie trägt, und eine Leitplanke, hinter der es acht Meter
+// hinunter geht. Die Fahrbahn selbst entsteht im Straßenbau von
+// expanded-world.js, weil die Trasse als gewöhnliches Straßenstück
+// angemeldet ist und der Bau ohnehin groundAt folgt.
+function skyway(w) {
+ // Alles hier gehört zur Straße: ohne die Marke wirft aufDerFahrbahn() jeden
+ // Pfeiler weg, der schmaler als 2,6 Meter ist und auf einer Fahrbahn steht.
+ w.strassenbau = true;
+ for (const h of HOCHSTRASSEN) {
+  const mitte = (h.x1 + h.x2) / 2, breite = h.x2 - h.x1;
+  const von = h.punkte[0][0], bis = h.punkte[h.punkte.length - 1][0];
+  // Pfeilerpaare alle sechzehn Meter, aber nur dort, wo sie im Wasser stehen
+  // und nicht auf einem Damm: an den Rampenfüßen stünden sie sonst quer in
+  // der Querstraße.
+  for (let z = von + 10; z < bis - 8; z += 16) {
+   const y = hochstrasseHoehe(mitte, z);
+   if (y === null || y < 1.6) continue;
+   for (const ox of [-breite / 2 + 2.4, breite / 2 - 2.4]) {
+    w.box(mitte + ox, y / 2 - .6, z, 1.7, y + 1.2, 1.7, 0x8e9086);
+   }
+   // Querriegel unter der Fahrbahn, damit die Pfeiler ein Joch bilden.
+   w.box(mitte, y - .55, z, breite - 2, .7, 2.2, 0x7d7f77);
+  }
+  // Keine eigene Leitplanke: der Straßenbau in expanded-world.js setzt schon
+  // eine, sobald das Gelände zehn Meter neben der Achse mehr als anderthalb
+  // Meter tiefer liegt — über Wasser ist das immer der Fall. Zwei Geländer
+  // ineinander waren im ersten Anlauf genau das, was man auf dem Bild sah.
+  // Beleuchtung auf dem Deck: die Trasse liegt über offenem Wasser und wäre
+  // nachts sonst unsichtbar.
+  for (let z = von + 20; z < bis - 16; z += 40) {
+   const y = hochstrasseHoehe(mitte, z);
+   if (y === null || y < 2) continue;
+   w.box(mitte, y + 3.2, z, .26, 6.4, .26, 0x9aa09a);
+   w.box(mitte, y + 6.2, z, 3.4, .22, .5, 0x9aa09a);
+   for (const ox of [-1.5, 1.5]) w.box(mitte + ox, y + 6, z, .9, .18, .5, 0xffe6b4, 0, true);
+  }
+ }
+ w.strassenbau = false;
+}
+
 export function dressRegions(world) {
  const rng = zufall();
  sunsetSuburbs(world, rng);
@@ -1867,6 +2007,12 @@ export function dressRegions(world) {
  bahnRaeumen(world, -327.5, 238, -302.5, 392);
  tankstelle(world);
  gym(world);
+ autohaus(world);
+ // Rosalind Rooms zeigt nach Westen zur Straße bei x = -900, Halcyon Cabins
+ // nach Norden zum Keys Highway bei z = 400.
+ unterkunft(world, 'hotelwest', -1, 0, 0xbfae92, 0x7a5f4c);
+ unterkunft(world, 'hotelkeys', 0, 1, 0xa8bcae, 0x54616a);
+ skyway(world);
  dragstrip(world);
  luftfracht(world);
  faehre(world);

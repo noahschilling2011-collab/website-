@@ -1,5 +1,5 @@
 // Deterministic gameplay simulation, independent of WebGL and the DOM.
-import {intersections,ampelFrei,onRoad,vehicleTypes} from './content.js';
+import {intersections,ampelFrei,onRoad,vehicleTypes,locations} from './content.js';
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 export const roads=[-100,-40,20,80];
@@ -597,7 +597,25 @@ export class Simulation{
     if(n.messAbstand===undefined)n.messAbstand=rest;}}}
   if(((this._entflecht=(this._entflecht||0)+1)%4)===0)this.entflechten();
   this.updatePolice(dt);this.eventTimer-=dt;if(this.eventTimer<=0){this.eventTimer=55;const c=this.cars.find(c=>c.type==='traffic'&&c!==p.car);if(c){c.wait=14;this.notify('Verkehrsfunk: Pannenfahrzeug auf der Harbor Avenue.');}}
-  if(p.health<=0){p.health=0;this.paused=true;this.notify('Festgenommen. Starte den Auftrag erneut.');}
+  // Festnahme. Vorher endete das Spiel hier: pausiert, mit dem Hinweis, den
+  // Auftrag neu zu starten. Wer in einer Unterkunft eingecheckt ist, wacht
+  // stattdessen dort auf — ohne Fahndung, ohne Waffe in der Hand, sechs
+  // Stunden später und um ein Bußgeld ärmer. Ohne Zimmer bleibt es beim
+  // alten Verhalten; die Wohnung ist kein Ersatz, sie ist der Anfang.
+  if(p.health<=0){
+   p.health=0;
+   const ziel=this.unterkunft&&locations[this.unterkunft];
+   if(ziel){
+    const busse=Math.min(p.money,120+this.stars*90);
+    p.money-=busse;p.health=100;p.stamina=100;p.armed=false;p.car=null;
+    p.x=ziel.x;p.z=ziel.z;p.y=0;p.vy=0;
+    this.stars=0;this.heat=0;this.lastSeen=null;this.description=null;
+    for(const c of this.cops||[])c.active=false;
+    this.hour=(this.hour+6)%24;
+    if(busse)this.buchung?.('Bußgeld',-busse);   // buchung gehört der Kampagne, nicht der Basis
+    this.notify('Festgenommen. Aufgewacht im '+ziel.name+'. Bußgeld $'+busse+'.');
+   }else{this.paused=true;this.notify('Festgenommen. Starte den Auftrag erneut.');}
+  }
  }
  updatePolice(dt){const p=this.player;this.spotted=false;if(this.stars===0){for(const c of this.cops){if(c.active){c.route=route(c,places.station);c.target=0;c.active=false;}const target=c.route[c.target];if(target){if(distance(c,target)<1.5)c.target++;else{c.yaw=Math.atan2(target.x-c.x,target.z-c.z);this.move(c,Math.sin(c.yaw)*9*dt,Math.cos(c.yaw)*9*dt,1.2);}}}return;}this.dispatchTimer-=dt;const desired=Math.min(6,this.stars+1);if(this.dispatchTimer<=0&&this.cops.filter(c=>c.active&&c.health>0).length<desired){const c=this.cops.find(c=>!c.active&&c.health>0);if(c){c.active=true;c.repath=0;c.route=[];this.dispatchTimer=3;}}
   for(const c of this.cops){if(!c.active||c.health<=0)continue;const d=distance(c,p);const identified=p.car?this.description?.plate===p.car.id:this.description?.clothes===p.clothes;const sees=d<(p.sneak?23:48)&&this.sichtFrei(c,p)&&(identified||d<11||p.armed);if(sees){this.spotted=true;this.lastSeen={x:p.x,z:p.z};this.description={clothes:p.clothes,plate:p.car?.id||null};}c.repath-=dt;if(c.repath<=0){const target=sees?p:this.lastSeen;if(target){c.route=this.sichtFrei(c,target)?[{x:target.x,z:target.z}]:route(c,target);c.target=0;}c.repath=sees?1:4;}

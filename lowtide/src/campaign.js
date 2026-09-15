@@ -1,5 +1,9 @@
 import {Simulation,clamp,distance,intersects,lineClear,places} from './simulation.js';
-import {bounds,locations,vehicleTypes,weapons,waterAt,groundAt,roadSegments,immobilien,rennen,schatzOrte,onRoad,amUeberweg,UEBERWEGE,STADTGEBIETE,intersections} from './content.js';
+import {bounds,locations,vehicleTypes,weapons,waterAt,groundAt,roadSegments,immobilien,rennen,schatzOrte,onRoad,amUeberweg,UEBERWEGE,STADTGEBIETE,intersections,AUTOHAUS,AUTOHAUS_BUCHTEN,UNTERKUNFT_PREIS} from './content.js';
+// Die Lackfarben des Verkehrs. Sie standen als lokale Konstante im Aufbau
+// der Runden; der Fahrzeugkauf braucht dieselbe Palette, sonst hätte ein
+// gekaufter Wagen eine Farbe, die es in dieser Stadt sonst nicht gibt.
+const LACKE=[0xd9b078,0xcad0c5,0xa75547,0x3c637d,0x6f7a6a,0xb8b2a4,0x8a5f52,0x4c6b74,0xd6c9a8,0x5a6470];
 import {findPath} from './navigation.js';
 import {storyAufbau,storyZiel,storyTitel,storyAktion,storyTick,konvoiRammen,starteAkt,beendeKampagne,storyReparieren} from './story.js';
 export class Campaign extends Simulation{
@@ -73,7 +77,6 @@ export class Campaign extends Simulation{
   // Highway, die Küstenstraße und der Keys Highway waren durchgehend leer.
   // Die Wege folgen dem Straßenraster aus content.js; die Ampellogik in
   // simulation.js gilt für sie wie für die bisherigen.
-  const LACKE=[0xd9b078,0xcad0c5,0xa75547,0x3c637d,0x6f7a6a,0xb8b2a4,0x8a5f52,0x4c6b74,0xd6c9a8,0x5a6470];
   // Kastenwagen und Taxi in die Mischung. Ein Taxi auf zehn Wagen ist für eine
   // Hafenstadt eher zurückhaltend, ein Lieferwagen auf zehn ebenso.
   const MODELLE=['sedan','compact','suv','muscle','pickup','taxi','sedan','van','compact','sedan'];
@@ -128,6 +131,17 @@ export class Campaign extends Simulation{
    const v=spur(r);
    return [[xa+8,z+v],[xb-8,z+v],[xb-8,z-v],[xa+8,z-v]];
   };
+  // Dasselbe für eine Nord-Süd-Achse. Gebraucht für den Bay Skyway: er hängt
+  // an zwei Querstraßen, die sich nicht zu einem Rechteck schließen — die
+  // Fahrbahn bei z = 400 fängt erst bei x = 100 an, die bei z = 200 hört bei
+  // x = 280 auf. ring() findet dafür keine vier Seiten und hätte die Trasse
+  // leer gelassen.
+  const hinUndZurueckSenkrecht=(x,za,zb)=>{
+   const r=senkrechteBei(x,za,zb);
+   if(!r)return null;
+   const v=spur(r);
+   return [[x+v,za+8],[x+v,zb-8],[x-v,zb-8],[x-v,za+8]];
+  };
   const RUNDEN=[
    ring(-340,-160,-180,80),   // Innenstadt West
    ring(-340,-100,-320,-180), // Nordquartier
@@ -145,6 +159,7 @@ export class Campaign extends Simulation{
    ring(-960,-900,340,380),
    hinUndZurueck(400,100,360),   // Keys Highway
    hinUndZurueck(200,-100,280),  // Uferstraße nach Isla Serena
+   hinUndZurueckSenkrecht(134,200,400),   // Bay Skyway über die Bucht
    hinUndZurueck(620,-560,100)   // Südtangente, Ostteil
   ].filter(Boolean);
   // Drei Wagen je Runde, gestartet auf drei Eckpunkten: gemessen ergab das
@@ -651,7 +666,45 @@ export class Campaign extends Simulation{
   else if(item==='food'){price=18;apply=()=>{p.health=Math.min(100,p.health+25);p.stamina=100;};}
   else if(item==='motel'){if(this.motelOwned)return false;price=900;apply=()=>this.motelOwned=true;}
   else if(item==='rest'){if(this.stars){this.notify('Während einer Fahndung kein Ausruhen.');return false;}price=l==='motel'&&!this.motelOwned?60:0;apply=()=>{p.health=100;p.stamina=100;this.hour=(this.hour+6)%24;};}
+  // Einchecken. Bis hierher war Ausruhen folgenlos: man wachte an derselben
+  // Stelle auf, und wer festgenommen wurde, bekam ein pausiertes Spiel mit
+  // dem Hinweis, den Auftrag neu zu starten — kein Ort, an dem es weitergeht.
+  // Wer eingecheckt ist, wacht in seinem Zimmer auf.
+  else if(item==='einchecken'){
+   if(this.stars){this.notify('Mit Fahndung nimmt dich keiner auf.');return false;}
+   const frei=l==='motel'&&this.motelOwned;
+   price=frei?0:(UNTERKUNFT_PREIS[l]??60);
+   apply=()=>{
+    p.health=100;p.stamina=100;this.hour=(this.hour+6)%24;
+    this.unterkunft=l;
+    this.notify('Eingecheckt im '+(locations[l]?.name||'Zimmer')+'. Von hier geht es weiter, wenn etwas schiefgeht.');
+   };
+  }
   else if(item==='fuel'){const c=p.car||this.cars.find(c=>distance(c,p)<9);if(!c)return false;price=35;apply=()=>c.fuel=100;}
+  // Fahrzeugkauf. Der Wagen gehört danach der Figur, die ihn gekauft hat,
+  // und steht auf dem Stellplatz vor der Halle — nicht dort, wo der Spieler
+  // gerade steht: der erste Anlauf setzte ihn auf den Spieler, und man stand
+  // im eigenen Auto. Ist der Platz besetzt, rückt der neue Wagen zur Seite.
+  else if(item.startsWith('kaufwagen:')){
+   const modell=item.split(':')[1],d=vehicleTypes[modell],eintrag=AUTOHAUS.find(([m])=>m===modell);
+   if(!d||!eintrag)return false;
+   // Freie Bucht suchen, bevor Geld genommen wird: ein Kauf ohne Stellplatz
+   // wäre ein Kauf ohne Ware.
+   const bucht=AUTOHAUS_BUCHTEN.find(b=>!this.cars.some(c=>Math.hypot(c.x-b.x,c.z-b.z)<3.5));
+   if(!bucht){this.notify('Der Hof ist voll. Fahr einen deiner Wagen weg.');return false;}
+   price=eintrag[1];
+   apply=()=>{
+    const x=bucht.x,z=bucht.z;
+    // Eigenes Kennzeichenkürzel: PM- ist der Verkehr, LM- sind die
+    // abgestellten Wagen der Welt, SM- kommt vom Hof. Ohne das ließe sich
+    // im Spielstand nicht unterscheiden, was gekauft wurde.
+    const wagen={id:'SM-'+(100+this.cars.filter(c=>String(c.id).startsWith('SM-')).length),model:modell,x,z,yaw:bucht.yaw,
+     speed:0,health:100,fuel:100,tires:100,glass:100,lights:100,alt:0,type:'parked',
+     color:LACKE[this.cars.length%LACKE.length],upgrades:{},owner:p.id};
+    this.cars.push(wagen);
+    this.notify(d.name+' gehört dir. Er steht auf dem Hof.');
+   };
+  }
   else if(item.startsWith('car:')){const c=p.car||this.cars.find(c=>distance(c,p)<12);if(!c){this.notify('Bring ein Fahrzeug in die Werkstatt.');return false;}const id=item.split(':')[1];price=id==='repair'?150:id==='paint'?120:id==='engine'?400:100;
    // Ein Anteil an Pike Customs drückt den Werkstattpreis.
    if(this.besitz.werkstatt)price=Math.round(price*.35);if(id==='engine'&&(c.upgrades.engine||0)>=3)return false;apply=()=>{if(id==='repair'){c.health=100;c.tires=100;c.glass=100;c.lights=100;}else if(id==='paint')c.color=[0x548d88,0x9b546b,0xdfb35f,0x324a6b][((c.upgrades.paint||0)+1)%4];if(id==='tires')c.tires=100;c.upgrades[id]=(c.upgrades[id]||0)+1;};}
@@ -966,6 +1019,6 @@ export class Campaign extends Simulation{
   }
   if(!nowWanted&&this.barriers.length){this.solids=this.solids.filter(b=>!this.barriers.includes(b));this.barriers=[];this.rasterNeu();}const heli=this.policeHeli;if(heli){const target=this.stars>=5?(this.lastSeen||p):{x:-360,z:305};const d=distance(heli,target);heli.alt=Math.min(45,heli.alt+dt*8);if(d>4){heli.yaw=Math.atan2(target.x-heli.x,target.z-heli.z);heli.x+=Math.sin(heli.yaw)*dt*30;heli.z+=Math.cos(heli.yaw)*dt*30;}else if(this.stars<5)heli.alt=Math.max(0,heli.alt-dt*16);if(this.stars>=5&&d<45&&p.y>=0&&lineClear(heli,p,this.solids)){this.spotted=true;this.lastSeen={x:p.x,z:p.z};}}if(nowWanted){if(this.spotted)this.unseen=0;else this.unseen+=dt;if(this.unseen>20+this.stars*4&&this.lastSeen&&distance(p,this.lastSeen)>35){this.stars=0;this.heat=0;this.description=null;this.lastSeen=null;this.notify('Fahndung beendet.');}}
  }
- snapshot(){this.saveWeapon();return {version:2,time:this.time,hour:this.hour,active:this.active,characters:this.characters.map(p=>({...p,car:null,carId:p.car?.id||null})),cars:this.cars,mission:this.mission,doorOpen:this.doorOpen,camera:this.camera,ending:this.ending,campaign:this.campaign,relationship:this.relationship,weather:this.weather,weatherIndex:this.weatherIndex,stars:this.stars,heat:this.heat,lastSeen:this.lastSeen,description:this.description,unseen:this.unseen,cops:this.cops,npcs:this.npcs,motelOwned:this.motelOwned,highScores:this.highScores,feed:this.feed,konto:this.konto,besitz:this.besitz,letzterZahltag:this.letzterZahltag,schatzIndex:this.schatzIndex||0};}
- restore(data){if(data?.version!==2||!Array.isArray(data.characters)||data.characters.length!==2||!Array.isArray(data.cars))throw new Error('Inkompatibler Spielstand');for(const p of data.characters)if(!Number.isFinite(p.x)||!Number.isFinite(p.z)||!p.inventory?.[p.weapon])throw new Error('Ungültiger Spielstand');for(const key of ['time','hour','active','characters','cars','mission','camera','ending','campaign','relationship','weather','weatherIndex','stars','heat','lastSeen','description','unseen','cops','npcs','motelOwned','highScores','feed','konto','besitz','letzterZahltag','schatzIndex'])if(data[key]!==undefined)this[key]=data[key];for(const p of this.characters){p.car=this.cars.find(c=>c.id===p.carId)||null;p.cover=false;}this.player=this.characters[this.active];storyReparieren(this);for(const c of this.cops){c.blocking=false;c.blockTarget=null;}if(data.doorOpen)this.openDoor();this.loadWeapon();this.paused=true;}
+ snapshot(){this.saveWeapon();return {version:2,time:this.time,hour:this.hour,active:this.active,characters:this.characters.map(p=>({...p,car:null,carId:p.car?.id||null})),cars:this.cars,mission:this.mission,doorOpen:this.doorOpen,camera:this.camera,ending:this.ending,campaign:this.campaign,relationship:this.relationship,weather:this.weather,weatherIndex:this.weatherIndex,stars:this.stars,heat:this.heat,lastSeen:this.lastSeen,description:this.description,unseen:this.unseen,cops:this.cops,npcs:this.npcs,motelOwned:this.motelOwned,unterkunft:this.unterkunft||null,highScores:this.highScores,feed:this.feed,konto:this.konto,besitz:this.besitz,letzterZahltag:this.letzterZahltag,schatzIndex:this.schatzIndex||0};}
+ restore(data){if(data?.version!==2||!Array.isArray(data.characters)||data.characters.length!==2||!Array.isArray(data.cars))throw new Error('Inkompatibler Spielstand');for(const p of data.characters)if(!Number.isFinite(p.x)||!Number.isFinite(p.z)||!p.inventory?.[p.weapon])throw new Error('Ungültiger Spielstand');for(const key of ['time','hour','active','characters','cars','mission','camera','ending','campaign','relationship','weather','weatherIndex','stars','heat','lastSeen','description','unseen','cops','npcs','motelOwned','unterkunft','highScores','feed','konto','besitz','letzterZahltag','schatzIndex'])if(data[key]!==undefined)this[key]=data[key];for(const p of this.characters){p.car=this.cars.find(c=>c.id===p.carId)||null;p.cover=false;}this.player=this.characters[this.active];storyReparieren(this);for(const c of this.cops){c.blocking=false;c.blockTarget=null;}if(data.doorOpen)this.openDoor();this.loadWeapon();this.paused=true;}
 }

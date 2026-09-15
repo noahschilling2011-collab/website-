@@ -54,8 +54,48 @@ export const locations={
  darts:{x:-268,z:120,name:'Dartscheibe',kind:'darts'},
  pool:{x:-206,z:16,name:'Billardtisch',kind:'pool'},
  range:{x:-146,z:16,name:'Schießstand',kind:'range'},
- schatz:{x:-450,z:-330,name:'Bergungsauftrag',kind:'treasure'}
+ schatz:{x:-450,z:-330,name:'Bergungsauftrag',kind:'treasure'},
+ // Solvara Motors. Der Platz ist gesucht, nicht gesetzt: das nächstgelegene
+ // freie Rechteck von 38 mal 30 Metern zur Werkstatt, ohne Gebäude, ohne
+ // stehende Kulisse, mit zwei Metern Abstand zu jeder Fahrbahn und einer
+ // Straße in höchstens zehn Metern — und mindestens vierzehn Meter von jedem
+ // anderen Ort entfernt. Ohne die letzte Regel lag der beste Treffer einen
+ // Meter neben dem Basketballplatz. Von 127 gültigen Flächen ist das die
+ // nächste, 106 Meter von Pike Customs. Der Marker steht auf dem Hof vor der
+ // Glasfront, nicht im Gebäude.
+ autohaus:{x:-176,z:154,name:'Solvara Motors',kind:'autohaus'},
+ // Zwei weitere Unterkünfte. Bis hierher gab es genau ein Motel auf 2,15 km²,
+ // und es lag in der Innenstadt — wer im Westen oder auf den Keys unterwegs
+ // war, hatte keinen Ort zum Einchecken. Beide Grundstücke sind gesucht wie
+ // das Autohaus: freies Rechteck von 20 mal 14 Metern, alle vier Ecken auf
+ // trockenem, ebenem Land, Straße in Reichweite. Die Eckenprüfung ist nicht
+ // kosmetisch — ohne sie lag der beste Treffer auf den Keys mit einer Ecke
+ // sechs Meter über offenem Wasser.
+ hotelwest:{x:-884,z:265,name:'Rosalind Rooms',kind:'motel'},
+ hotelkeys:{x:268,z:394,name:'Halcyon Cabins',kind:'motel'}
 };
+// Was eine Nacht kostet. Das Last Light Motel bleibt bei sechzig; wer dort
+// das Zimmer gekauft hat, zahlt dort nichts mehr.
+export const UNTERKUNFT_PREIS={motel:60,hotelwest:45,hotelkeys:80};
+// Was auf dem Hof steht und was es kostet. Nur Landfahrzeuge: ein Boot am
+// Straßenrand wäre ein Witz, und für Flugzeuge gibt es das Flugfeld.
+// Die Reihenfolge ist die Anzeigereihenfolge im Menü.
+export const AUTOHAUS=[
+ ['compact',1400],['sedan',2600],['pickup',3400],['suv',4200],
+ ['motorcycle',5200],['muscle',7800],['super',18500]
+];
+// Die Stellplätze auf dem Hof, zwei Reihen zu vier. Die fünfte Reihe im
+// Norden gehört dem Ausstellungspodest. Sie sind dieselben
+// Buchten, die auf dem Belag aufgemalt sind — der erste Anlauf setzte jeden
+// weiteren Wagen einfach 5,4 Meter weiter nach Süden, und ab dem dritten
+// standen sie neben dem Grundstück auf fremdem Land.
+//
+// Acht Plätze sind auch die Obergrenze: ist der Hof voll, verkauft Solvara
+// Motors nichts mehr, bis einer weggefahren ist. Ohne eine solche Grenze
+// wächst die Fahrzeugliste unbegrenzt, und die Fernstufe hat nur Reserve
+// für sechzehn zusätzliche Wagen.
+export const AUTOHAUS_BUCHTEN=[-182,-174].flatMap(x=>
+ [143.2,148.6,154,159.4].map(z=>({x,z,yaw:Math.PI/2})));
 // Die Regatta war nicht zu starten. Ein Bootsrennen verlangt, dass die Figur
 // in einem Boot sitzt (startActivity prüft das Medium), und ein Boot bewegt
 // sich nur über Wasser. Der Marker lag achtzehn Meter landeinwärts — näher
@@ -190,8 +230,45 @@ export const INSELN=[
 // Meter ab und groundAt liefert Wassertiefe statt Fahrbahnhöhe.
 export const DAEMME=[
  {x1:119,z1:195,x2:260,z2:205},   // zur Insel
- {x1:119,z1:392,x2:366,z2:408}    // Keys Highway
+ {x1:119,z1:392,x2:366,z2:408},   // Keys Highway
+ // Der Bay Skyway zählt als Land, obwohl er über dem Wasser liegt. Ohne das
+ // käme kein Fahrzeug einen Meter weit: driveVehicle bricht ab, sobald der
+ // nächste Schritt auf Wasser fällt, und die Trasse wäre eine Brücke, die
+ // niemand befahren kann.
+ {x1:126.5,z1:200,x2:141.5,z2:400}
 ];
+// Der Bay Skyway. Eine Hochstraße ist in dieser Welt nur dort möglich, wo sie
+// keine bestehende Fahrbahn kreuzt: groundAt liefert genau eine Höhe je Punkt,
+// eine Straße über einer Straße gibt es nicht — wer unter einer Hochstraße
+// durchführe, spränge auf sie hinauf. Deshalb verbindet sie die beiden
+// vorhandenen Dämme über offenem Wasser und endet auf ihnen, statt sie zu
+// überqueren: von der Inselzufahrt bei z = 200 hinauf auf acht Meter, sechzig
+// Meter Deck, wieder hinunter auf den Keys Highway bei z = 400.
+//
+// Die Steigung ist gerechnet, nicht geschätzt: acht Meter auf siebzig sind
+// 11,4 Prozent. Steiler als eine echte Autobahnrampe, flach genug, dass ein
+// Kleinwagen sie mit Anlauf nimmt.
+export const HOCHSTRASSEN=[{
+ name:'Bay Skyway',x1:126.5,x2:141.5,
+ // z-Marke und Höhe. Dazwischen wird linear interpoliert.
+ // Anfang und Ende liegen auf den Dämmen, nicht auf den Querstraßen: bei
+ // z = 200 und z = 400 laufen die Fahrbahnen zur Insel und über die Keys,
+ // und eine Rampe, die dort schon Höhe hat, wäre eine Schwelle quer durch
+ // eine fremde Straße. Steigung damit 8 m auf 67 bzw. 63 — 12 bzw. 12,7 %.
+ punkte:[[205,0],[272,8],[330,8],[393,0]]
+}];
+export function hochstrasseHoehe(x,z){
+ for(const h of HOCHSTRASSEN){
+  if(x<h.x1||x>h.x2)continue;
+  const p=h.punkte;
+  if(z<p[0][0]||z>p[p.length-1][0])continue;
+  for(let i=0;i<p.length-1;i++){
+   const [za,ya]=p[i],[zb,yb]=p[i+1];
+   if(z>=za&&z<=zb)return ya+(yb-ya)*(z-za)/(zb-za);
+  }
+ }
+ return null;
+}
 const imRechteck=(x,z,r)=>x>r.x1&&x<r.x2&&z>r.z1&&z<r.z2;
 // Binnengewässer. Der Stausee war bisher eine bemalte Platte: er sah aus wie
 // Wasser und war für jede Abfrage trockener Boden — man lief darüber. Als
@@ -233,6 +310,9 @@ export function waterAt(x,z){
  return x<-400&&x>-545&&z>-20&&z<130;
 }
 export function groundAt(x,z){
+ // Vor allem anderen: liegt hier eine Hochstraße, gilt deren Höhe.
+ const hoch=hochstrasseHoehe(x,z);
+ if(hoch!==null)return hoch;
  if(waterAt(x,z))return -1.2;
  // Cypress-Hügel im Nordwesten.
  if(x<-380&&x>-700&&z<-240){const a=Math.max(0,1-((x+490)/155)**2-((z+420)/195)**2);return a*a*62;}
@@ -289,7 +369,11 @@ export const roadSegments=[
  {x1:-480,z1:-62,x2:-348,z2:-62,w:14},
  {x1:-480,z1:62,x2:-348,z2:62,w:14},
  // Keys Highway: über den Damm bis zur letzten Insel.
- {x1:100,z1:400,x2:360,z2:400,w:14}
+ {x1:100,z1:400,x2:360,z2:400,w:14},
+ // Bay Skyway. Als gewöhnliches Straßenstück angemeldet: der Straßenbau in
+ // expanded-world.js folgt ohnehin groundAt, also entstehen Decke, Rand und
+ // Mittelstreifen auf acht Metern Höhe, ohne dass dafür eine Zeile nötig wäre.
+ {x1:134,z1:200,x2:134,z2:400,w:15}
 ];
 
 // Bebautes Gebiet. Auf dem Land trug jede Straße den vollen Stadtausbau:
