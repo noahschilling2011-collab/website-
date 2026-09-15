@@ -1537,6 +1537,19 @@ erfolglosen Fenster den nächsten freien Platz im Umkreis von drei Metern.
 Danach ist die Prüfung grün, und in der ruhigen Welt ändert sich nichts
 (träge Figuren 68/68/79 vorher gegen 65/65/88 nachher, mittlere Strecke 10,0 m).
 
+**Ein Fix, der richtig ist, aber unbewiesen bleibt.** Die Mengenprüfung
+scheiterte zuletzt nur noch an zwei echten Durchgängen. Der Verdacht lag nahe:
+`befreie()` und `freiSchieben()` suchen einen freien Platz gegen die Geometrie,
+aber nicht gegen andere Figuren — und wer mitten in einer anderen Figur landet,
+hat sie per Definition durchdrungen. `platzFrei()` prüft beide Versetzungen
+jetzt gegen das Figurenraster.
+
+Nur: der verkürzte Prüflauf war **vor und nach** dieser Änderung grün, und die
+zwei Durchgänge traten nur im vollen Lauf auf. Die Prüfung schwankt an dieser
+Stelle also zwischen Läufen, und ein einzelner grüner Lauf beweist hier nichts.
+Die Änderung bleibt drin, weil sie für sich genommen richtig ist — nicht, weil
+eine Messung sie trägt. Das ist ein Unterschied, und er gehört hierher.
+
 **Auch die Verkehrsprüfung liegt nicht an den neuen Wagen.** „Neben der Spur
 hält der Verkehr nicht an" meldet in vier Läufen hintereinander exakt dieselbe
 Zahl — 100 von 126 —, ist also deterministisch und nicht verrauscht. Gezählt
