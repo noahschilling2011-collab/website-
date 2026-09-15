@@ -3573,6 +3573,23 @@ gedreht wird die ganze Gruppe — nichts darin bewegt sich für sich. Nach dem
 Backen sind es zwei. Das sind zehn Aufrufe je Figur und zwanzig beim
 Spieler, der als einziger noch seinen echten Schatten wirft.
 
+Und eine Nebenwirkung, die erst der Prüflauf danach gezeigt hat: die beiden
+zustandsabhängigen Prüfungen — Überwege und Gedränge — waren im Lauf davor
+grün und fallen jetzt (138 von 286 unter drei Metern; 1,05 Paare unter 0,50 m).
+An der Simulation ist keine Zeile geändert. Die naheliegende Erklärung ist
+nicht, dass die Pakete den Verkehr kaputtgemacht haben, sondern dass sie das
+Bild schneller machen: der Prüflauf wartet auf Bilder, nicht auf Zeit, und bei
+weniger Zeichenaufrufen laufen bis zu derselben Prüfung mehr Simulationsschritte
+durch. Das ist eine Vermutung und keine Messung — sie zu belegen hieße, den
+Lauf zweimal mit mitgeschriebener Bildnummer laufen zu lassen. Belegt ist nur
+die alte Beobachtung: dieselbe Prüfung liefert im selben Stand 44, 45 und 48,7
+Prozent und einmal bestanden, und isoliert gemessen konstant 83 bis 84.
+
+Damit sich ein grüner Lauf überhaupt gegen einen roten halten lässt, schreibt
+`pruefe()` den Zusatztext ab jetzt auch bei bestandenen Prüfungen ins
+Protokoll. Vorher stand in der grünen Zeile nur „ok" — und die Zahl, um die es
+ging, fehlte genau dort, wo man sie gebraucht hätte.
+
 Was **nicht** funktioniert hat und deshalb nicht drin ist: Geländekacheln,
 die ganz unter Wasser liegen, schon beim Bauen auszublenden statt erst beim
 ersten `update()`. Die Messung sagte dieselben 843 Aufrufe vorher wie

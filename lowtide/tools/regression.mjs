@@ -15,8 +15,13 @@ page.on('console', m => {if (m.type() === 'error') konsole.push('console: ' + m.
 
 let bestanden = 0, gefallen = 0;
 
+// Der Zusatztext steht auch bei bestandenen Prüfungen im Protokoll. Ohne ihn
+// ließ sich ein bestandener Lauf nicht gegen einen gefallenen halten: bei den
+// zustandsabhängigen Prüfungen — Überwege, Gedränge, Verkehr — stand in der
+// grünen Zeile nur "ok", und die Zahl, um die es ging, fehlte genau dort, wo
+// man sie gebraucht hätte.
 const pruefe = (name, ok, zusatz = '') => {
- if (ok) {bestanden++; console.log('  ok      ' + name);}
+ if (ok) {bestanden++; console.log('  ok      ' + name + (zusatz ? ' — ' + zusatz : ''));}
  else {gefallen++; console.log('  FEHLER  ' + name + (zusatz ? ' — ' + zusatz : ''));}
 };
 // Auf echte Bilder warten statt auf Zeit: im Software-Rendering dauert
