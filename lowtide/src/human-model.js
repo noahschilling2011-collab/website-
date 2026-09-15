@@ -38,7 +38,7 @@ function gesichtGeometrie(skinTone){
  gesichtCache.set(skinTone,g);
  return g;
 }
-const hautCache=new Map(),gesichtStoffCache=new Map(),kopfCache=new Map();
+const hautCache=new Map(),gesichtStoffCache=new Map(),kopfCache=new Map(),unterarmCache=new Map();
 const hautMaterial=ton=>{
  if(!hautCache.has(ton))hautCache.set(ton,wolkenAufsetzen(new T.MeshPhysicalMaterial(
   {color:ton,roughness:.73,sheen:.14,sheenColor:0xb78d76})));
@@ -165,6 +165,17 @@ export function naturalHuman(color,pants,nah=true,kennung=null){
    // Ersatz für die Hand: ein geschlossener Block statt fünf Fingern.
    oval(elbow,0,-.318,.008,.032,.045,.026,skin);
   }
+  // Unterarm und Hand backen. Am Ellbogen hängen in der Nahstufe sieben
+  // Meshes: Ärmel, Handfläche, vier Finger, Daumen — und sechs davon teilen
+  // sich dasselbe Hautmaterial. Gedreht wird die ganze Gruppe, nichts
+  // darin bewegt sich für sich, also bleiben nach dem Backen zwei Meshes.
+  // Gemessen zehn Zeichenaufrufe weniger je Figur, beim Spieler zwanzig,
+  // weil er auch noch seinen Schatten wirft.
+  //
+  // Der Schlüssel trägt die Seite: Daumen und Finger stehen gespiegelt.
+  // Die Jacke ändert nur das Material des Ärmels, nicht seine Form — die
+  // Materialien kommen beim Wiederverwenden ohnehin aus dem Exemplar.
+  backeImModell(elbow,[],unterarmCache,'unterarm:'+side+':'+(nah?'nah':'fern'));
  }
  const tattoo=add(arms[0],new T.PlaneGeometry(.055,.09),mat(0x314643),0,-.28,.051);tattoo.visible=false;
  // Kopf umhängen. Reihenfolge und Weltlage bleiben gleich, nur der Elternteil

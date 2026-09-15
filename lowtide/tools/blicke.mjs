@@ -42,7 +42,10 @@ const page = await browser.newPage({viewport: {width: 1280, height: 720}});
 const probleme = [];
 page.on('console', m => {if (m.type() === 'error') probleme.push(m.text());});
 page.on('pageerror', e => probleme.push(String(e.stack || e)));
-await page.goto('file://' + fileURLToPath(new URL('../LOWTIDE.html', import.meta.url)), {waitUntil: 'load'});
+// Mit --datei laesst sich ein anderer Stand aufnehmen, etwa ein Vorher-Bild
+// aus einer Kopie, ohne den Auslieferstand zu ueberschreiben.
+const datei = arg('datei', fileURLToPath(new URL('../LOWTIDE.html', import.meta.url)));
+await page.goto('file://' + datei, {waitUntil: 'load'});
 await page.waitForFunction(() => !document.getElementById('startBtn').disabled, {timeout: 120000});
 await page.click('#startBtn');
 await page.waitForTimeout(1200);

@@ -26,14 +26,18 @@ export class ExpandedWorld extends World{
 
  constructor(canvas,sim){super(canvas,sim);const asphalt=asphaltTexture();
   this.strassenMaterialien=[];this.nassheit=0;
-  this.scene.traverse(o=>{if(!o.isInstancedMesh||!o.material?.color)return;const hex=o.material.color.getHex();
-   if(STRASSEN_HEX.includes(hex)){
+  // Die Klasse steht jetzt im Material, nicht in seiner Farbe — und ein
+  // Material gehört zu vielen Netzen, deshalb jedes nur einmal anfassen.
+  const behandelt=new Set();
+  this.scene.traverse(o=>{if(!o.isInstancedMesh||!o.material?.color||behandelt.has(o.material))return;
+   behandelt.add(o.material);const klasse=o.material.userData?.klasse;
+   if(klasse==='strasse'){
     // Die Textur trägt die Helligkeit; die Materialfarbe darf sie nicht mehr abdunkeln.
     o.material.map=asphalt;o.material.color.setHex(0xffffff);o.material.roughness=.93;
     o.material.metalness=.03;o.material.envMapIntensity=.5;o.material.needsUpdate=true;
     this.strassenMaterialien.push(o.material);
    }
-   if(GLAS_HEX.includes(hex)){o.material.metalness=.72;o.material.roughness=.16;o.material.envMapIntensity=1.5;}
+   if(klasse==='glas'){o.material.metalness=.72;o.material.roughness=.16;o.material.envMapIntensity=1.5;}
   });
   this.setupStrassenlicht();this.setupInnenlicht();this.setupFahrlicht();this.setupFernstufen(sim);this.tiere=new Tierwelt(this.scene);
   // Bewuchs im Ring um den Spieler: ein Draw Call, feste Speichergröße.
@@ -440,6 +444,8 @@ export class ExpandedWorld extends World{
   // keinem einzigen Möbelstück der Karte jemand — jede Figur ging oder stand.
   this.sim.sitzplaetze = this.sitzplaetze || [];
   this.sim.besetzeSitzplaetze?.();
+  // Zuletzt, wenn alle Beschriftungen angemeldet sind: ein Netz, ein Atlas.
+  this.schilderSetzen();
  }
  // Die drei Windräder auf dem Kamm. regions.js meldet nur Nabe, Achse und
  // Phase an; die Blätter liegen hier, weil sie sich drehen müssen und alles
@@ -632,4 +638,10 @@ export class ExpandedWorld extends World{
 // die Liste am Prototyp. Der erste Anlauf als Klassenfeld hatte keine
 // Wirkung: dieselben 415 Netze, dieselben Zeichenaufrufe, dasselbe falsche
 // Bild.
-ExpandedWorld.prototype.eigeneFarben=new Set([...STRASSEN_HEX,...GLAS_HEX]);
+// Asphalt bleibt ohne Instanzfarbe: alle drei Töne werden weiß übermalt, die
+// Textur trägt die Helligkeit. Glas behält seinen Ton je Bauteil — als
+// Instanzfarbe auf einem weißen Material ergibt das dasselbe Bild wie vorher
+// vier getrennte Materialien.
+const KLASSEN=new Map([...STRASSEN_HEX.map(h=>[h,{klasse:'strasse',farbig:false}]),
+ ...GLAS_HEX.map(h=>[h,{klasse:'glas',farbig:true}])]);
+ExpandedWorld.prototype.materialKlasse=function(color){return KLASSEN.get(color)||null;};

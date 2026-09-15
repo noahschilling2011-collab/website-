@@ -43,23 +43,47 @@ export const leuchtMaterialien=[];
 //
 // Die Farbe steckt jetzt in der Instanz statt im Material: ein Netz je
 // Kachel für alles, was nicht leuchtet. Leuchtende Teile bleiben nach Farbe
-// getrennt, weil die Emissionsfarbe nicht je Instanz gesetzt werden kann.
-// Die räumliche Auflösung bleibt dieselbe, also auch das Ausblenden nach
-// Entfernung.
+// getrennt, weil die Emissionsfarbe nicht je Instanz gesetzt werden kann —
+// und sie werden gar nicht mehr gekachelt: ein Netz je Leuchtfarbe für die
+// ganze Karte. Elf Farben auf 225 Kacheln ergaben am Startbildschirm 194
+// Zeichenaufrufe für rund 1400 Bauteile; ohne Kachel sind es zweiundzwanzig.
+// Bezahlt wird das damit, dass Neon nicht mehr nach Entfernung wegfällt: der
+// Umriss der Stadt kostet dadurch rund achtzehntausend Dreiecke mehr, gegen
+// 2,29 Millionen im Bild.
 //
-// Und einige Farben brauchen weiterhin ein eigenes Material, weil die
-// abgeleitete Klasse sie an der Materialfarbe wiedererkennt: Asphalt bekommt
-// eine Textur und wird bei Regen glatt und dunkel, Fensterglas wird metallisch
-// und spiegelt. Im ersten Anlauf fielen beide aus — die Suche nach
-// `material.color.getHex()` fand nur noch Weiß —, und das Bild wich in der
-// Innenstadt im Mittel um 16,8 Helligkeitsstufen je Kanal ab, am stärksten im
-// Nahbereich. Die Liste steht in eigeneFarben und wird von der abgeleiteten
-// Klasse gesetzt.
+// Und einige Bauteile brauchen weiterhin ein eigenes Material, weil die
+// abgeleitete Klasse sie eigens behandelt: Asphalt bekommt eine Textur und
+// wird bei Regen glatt und dunkel, Fensterglas wird metallisch und spiegelt.
+// Im ersten Anlauf fielen beide aus — die Suche nach `material.color.getHex()`
+// fand nur noch Weiß —, und das Bild wich in der Innenstadt im Mittel um 16,8
+// Helligkeitsstufen je Kanal ab, am stärksten im Nahbereich. Erkannt werden
+// sie jetzt an einer Klasse im Material, die materialKlasse() der abgeleiteten
+// Klasse vergibt; siehe klasseMaterial() weiter unten.
 function mat(color,emissive=false){const key=color+':'+emissive;if(!mats.has(key)){const m=new T.MeshStandardMaterial({color,roughness:.78,metalness:.08,emissive:emissive?color:0,emissiveIntensity:emissive?.9:0});
  // Leuchtflächen bleiben glatt — ein Fenster, das von innen leuchtet, hat
  // keine Körnung. Alles andere bekommt Struktur aus der Weltposition.
  if(!emissive)detailAufsetzen(m);
  mats.set(key,m);if(emissive)leuchtMaterialien.push(m);}return mats.get(key);}
+// Straßendecke und Fensterglas behandelt die abgeleitete Klasse eigens:
+// Asphalttextur und Nässe für die eine, Metallglanz und Spiegelung für das
+// andere. Erkannt wurden sie bisher daran, dass ihre Materialfarbe in einer
+// Liste steht — und dafür mussten sie je Farbe getrennt gebündelt bleiben:
+// drei Asphalttöne und vier Glastöne ergaben bis zu sieben Netze je Kachel.
+// Gemessen am Startbildschirm 54 Zeichenaufrufe für die Straße und 44 für
+// das Glas.
+//
+// Jetzt steht die Klasse im Material, und ein Netz je Klasse und Kachel
+// genügt: die drei Asphalttöne werden ohnehin alle weiß übermalt, weil die
+// Textur die Helligkeit trägt, und die vier Glastöne passen als Instanzfarbe
+// in dasselbe Material.
+const klassenMats=new Map();
+function klasseMaterial(klasse){
+ if(!klassenMats.has(klasse)){
+  const m=new T.MeshStandardMaterial({color:0xffffff,roughness:.78,metalness:.08});
+  detailAufsetzen(m);m.userData.klasse=klasse;klassenMats.set(klasse,m);
+ }
+ return klassenMats.get(klasse);
+}
 // Das Modell ist von der Sohle bis zur Haarspitze 1,886 m hoch. Jede der 530
 // Figuren war exakt so groß — eine Stadt aus Basketballspielern. Hemd- und
 // Hosenfarbe streuen über zwölf und sieben Werte, die Körpergröße über
@@ -93,7 +117,7 @@ export class World{
  // strassenbau merkt sich, ob dieser Aufruf zur Straße selbst gehört —
  // Decke, Damm, Leitplanke, Markierung. Alles andere wird beim Zusammenbau
  // verworfen, wenn es klein ist und auf einer Fahrbahn steht.
- box(x,y,z,w,h,d,color=0x999999,rot=0,emissive=false,nx=0,nz=0){const kachel=Math.floor(x/KACHEL)+':'+Math.floor(z/KACHEL);const eigen=emissive||this.eigeneFarben?.has(color);const key=eigen?(color+':L:'+kachel):('F:'+kachel);let g=this.groups.get(key);if(!g){g={material:eigen?mat(color,emissive):mat(0xffffff,false),farbig:!eigen,items:[]};this.groups.set(key,g);}g.items.push({x,y,z,w,h,d,rot,nx,nz,color,strasse:!!this.strassenbau});}
+ box(x,y,z,w,h,d,color=0x999999,rot=0,emissive=false,nx=0,nz=0){const kachel=Math.floor(x/KACHEL)+':'+Math.floor(z/KACHEL);const k=emissive?null:this.materialKlasse?.(color);const key=emissive?(color+':L'):(k?k.klasse+':K:'+kachel:'F:'+kachel);let g=this.groups.get(key);if(!g){g={material:emissive?mat(color,true):(k?klasseMaterial(k.klasse):mat(0xffffff,false)),farbig:emissive?false:(k?k.farbig:true),items:[]};this.groups.set(key,g);}g.items.push({x,y,z,w,h,d,rot,nx,nz,color,strasse:!!this.strassenbau});}
  // Kulisse auf der Fahrbahn. Gemessen standen 268 Gegenstände mitten auf
  // einer Fahrspur: Pflanzkübel aus einer Schleife mit festen Koordinaten aus
  // der alten, halb so großen Karte, Papierkörbe und Parkuhren aus street.js,
@@ -126,7 +150,43 @@ export class World{
  // Schrift als Tafel. Mit flach=true liegt sie auf dem Boden statt zu stehen —
  // Fahrbahn- und Bahnmarkierungen sind aufgemalt, keine Schilder. Die '27'
  // der Landebahn stand vorher als drei Meter hohes Brett quer auf der Bahn.
- text(label,x,y,z,width=12,color='#f3d9ad',rotation=0,flach=false){const c=document.createElement('canvas');c.width=512;c.height=128;const ctx=c.getContext('2d');ctx.clearRect(0,0,512,128);ctx.font='bold 60px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';ctx.lineWidth=11;ctx.strokeStyle='rgba(8,16,22,.78)';ctx.strokeText(label,256,68,470);ctx.fillStyle=color;ctx.fillText(label,256,68,470);const texture=new T.CanvasTexture(c);texture.colorSpace=T.SRGBColorSpace;const m=new T.Mesh(new T.PlaneGeometry(width,width/4),new T.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false,side:T.FrontSide,toneMapped:false}));m.renderOrder=2;m.position.set(x,y,z);if(flach){m.rotation.x=-Math.PI/2;m.rotation.z=-rotation;}else m.rotation.y=rotation;this.scene.add(m);return m;}
+ // Jede Beschriftung war ein eigenes Mesh mit einer eigenen Leinwand von
+ // 512×128 Bildpunkten: 227 Stück auf der Karte, davon am Startbildschirm
+ // 114 im Bild — 114 Zeichenaufrufe für zusammen 228 Dreiecke, und 227
+ // Texturen. Sie stehen alle fest, also sammelt text() nur noch die Angaben
+ // ein; schilderSetzen() malt sie in einen Atlas und legt sie zu einem
+ // einzigen Netz zusammen. Gemessen 952 auf 843 Aufrufe und 16 Texturen.
+ text(label,x,y,z,width=12,color='#f3d9ad',rotation=0,flach=false){const m=new T.Object3D();m.position.set(x,y,z);if(flach){m.rotation.x=-Math.PI/2;m.rotation.z=-rotation;}else m.rotation.y=rotation;m.userData.schild={label,width,color};(this._schilder||(this._schilder=[])).push(m);return m;}
+ // Acht Zellen je Zeile, jede so groß wie die bisherige Einzelleinwand: die
+ // Schrift bleibt genauso scharf wie vorher, der Atlas ist zusammen kaum
+ // größer als die Summe der Einzelbilder, und aus 227 Netzen wird eines.
+ schilderSetzen(){
+  const liste=this._schilder||[];if(!liste.length)return null;
+  const SP=8,BR=512,HO=128,zeilen=Math.ceil(liste.length/SP);
+  const c=document.createElement('canvas');c.width=SP*BR;c.height=zeilen*HO;
+  const ctx=c.getContext('2d');ctx.font='bold 60px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';ctx.lineWidth=11;
+  const pos=[],uv=[],idx=[],e=new T.Vector3();
+  liste.forEach((m,i)=>{
+   const {label,width,color}=m.userData.schild,sx=(i%SP)*BR,sy=Math.floor(i/SP)*HO;
+   ctx.strokeStyle='rgba(8,16,22,.78)';ctx.strokeText(label,sx+256,sy+68,470);
+   ctx.fillStyle=color;ctx.fillText(label,sx+256,sy+68,470);
+   m.updateMatrix();
+   // Reihenfolge und Wicklung wie in PlaneGeometry: links oben, rechts oben,
+   // links unten, rechts unten. Sonst zeigte die Vorderseite nach hinten.
+   const b=pos.length/3,h=width/4,u0=sx/c.width,u1=(sx+BR)/c.width,v0=1-sy/c.height,v1=1-(sy+HO)/c.height;
+   const ecken=[[-width/2,h/2,u0,v0],[width/2,h/2,u1,v0],[-width/2,-h/2,u0,v1],[width/2,-h/2,u1,v1]];
+   for(const [lx,ly,u,v] of ecken){e.set(lx,ly,0).applyMatrix4(m.matrix);pos.push(e.x,e.y,e.z);uv.push(u,v);}
+   idx.push(b,b+2,b+1,b+2,b+3,b+1);
+  });
+  const g=new T.BufferGeometry();
+  g.setAttribute('position',new T.Float32BufferAttribute(pos,3));
+  g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));
+  g.setIndex(idx);
+  const texture=new T.CanvasTexture(c);texture.colorSpace=T.SRGBColorSpace;texture.anisotropy=4;
+  const netz=new T.Mesh(g,new T.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false,side:T.FrontSide,toneMapped:false}));
+  netz.renderOrder=2;netz.frustumCulled=false;netz.name='schilder';
+  this.scene.add(netz);this.schilder=netz;return netz;
+ }
  build(){
   this.box(0,-.6,0,240,1,240,0x857d6f);this.box(158,-4.2,0,85,1,800,0x2b4a4c);this.box(109,-.12,0,9,.2,240,0x9d9583);this.box(114,.45,0,.7,1,240,0xa39d88);
   for(const r of roads){this.box(r,-.04,-2,15,.12,235,0x333d45);this.box(-2,-.035,r,235,.12,15,0x333d45);for(let j=-115;j<113;j+=8){if(!roads.some(v=>Math.abs(j-v)<11)){this.box(r,.035,j,.15,.025,3,0xc9b98e);this.box(j,.035,r,3,.025,.15,0xc9b98e);}}for(const side of [-1,1]){this.box(r+side*8,.075,-2,1,.18,235,0x8e8b7f);this.box(-2,.075,r+side*8,235,.18,1,0x8e8b7f);}}

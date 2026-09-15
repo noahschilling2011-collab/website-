@@ -2,7 +2,7 @@
 // Jedes Modul wird base64-kodiert eingebettet; der Loader in shell.html
 // erzeugt daraus zur Laufzeit Blob-URLs und verdrahtet die relativen Imports.
 import {readFileSync, writeFileSync, readdirSync, statSync} from 'node:fs';
-import {join, relative, sep} from 'node:path';
+import {join, relative, resolve, sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
@@ -32,9 +32,13 @@ if (!shell.includes(marker)) throw new Error('shell.html hat keinen ' + marker +
 
 const payload = 'const embeddedModules=' + JSON.stringify(modules) + ';';
 const html = shell.replace(marker, () => payload);
-writeFileSync(join(root, 'LOWTIDE.html'), html);
+// Ohne Argument wie bisher nach LOWTIDE.html. Mit Argument an einen anderen
+// Ort: so laesst sich ein Stand messen, waehrend die Suite noch auf dem
+// alten laeuft.
+const ziel = process.argv[2] ? resolve(root, process.argv[2]) : join(root, 'LOWTIDE.html');
+writeFileSync(ziel, html);
 
 const kb = n => (n / 1024).toFixed(0).padStart(6) + ' KB';
-console.log('LOWTIDE.html geschrieben —', kb(Buffer.byteLength(html)), 'gesamt');
+console.log(ziel.split('/').pop() + ' geschrieben —', kb(Buffer.byteLength(html)), 'gesamt');
 for (const name of Object.keys(modules).sort((a, b) => modules[b].length - modules[a].length))
   console.log('  ', kb(Buffer.from(modules[name], 'base64').length), name);

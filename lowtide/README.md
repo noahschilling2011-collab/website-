@@ -3524,6 +3524,68 @@ ergab — der Unterschied war der Zustand, den die vorherigen Prüfungen
 hinterlassen. Jetzt steht ein Wagen auf einer freien Geraden, einmal mit und
 einmal ohne jemanden vier Meter voraus: ohne fährt er, mit hält er.
 
+## Von 952 auf 670 Zeichenaufrufen
+
+Der Startbildschirm — 1024×576, headless, die Welt rendert im Hintergrund —
+stand bei 952 Zeichenaufrufen. Erst messen, wer sie verursacht: ein Haken in
+`renderer.renderBufferDirect` schreibt zu jedem Aufruf mit, welches Objekt
+ihn auslöst und ob er zum Farb- oder zum Schattendurchgang gehört. Das
+Ergebnis war eindeutig genug, um vier Pakete daraus zu machen, und jedes
+einzelne davon ist vorher und nachher gemessen.
+
+| Paket | Aufrufe | Dreiecke |
+|---|---|---|
+| Ausgangsstand | 952 | 2.294.674 |
+| Beschriftungen in einem Atlas | 843 | 2.294.674 |
+| Asphalt und Glas über eine Materialklasse | 822 | 2.294.818 |
+| Leuchtfarben ohne Kachelung | 710 | 2.300.518 |
+| Unterarm und Hand gebacken | 670 | 2.300.518 |
+
+**Beschriftungen.** 227 Schilder standen als 227 Meshes mit 227 eigenen
+Leinwänden von je 512×128 Bildpunkten in der Szene; 114 davon lagen im Bild
+und kosteten 114 Aufrufe für zusammen 228 Dreiecke. Sie stehen alle fest.
+`text()` sammelt jetzt nur noch Beschriftung, Ort und Drehung ein;
+`schilderSetzen()` malt am Ende des Aufbaus alle in einen Atlas mit acht
+Zellen je Zeile und legt die Vierecke in ein einziges Netz. Die Zellen sind
+so groß wie die bisherigen Einzelleinwände — die Schrift bleibt gleich
+scharf, der Atlas ist zusammen kaum größer als die Summe der Einzelbilder.
+Aus 227 Texturen wurden 16 in der ganzen Szene.
+
+**Asphalt und Glas.** Beide bekommen in der abgeleiteten Klasse eine eigene
+Behandlung, und erkannt wurden sie bisher an ihrer Materialfarbe. Dafür
+mussten sie je Farbe getrennt gebündelt bleiben: drei Asphalttöne und vier
+Glastöne, jeder mit eigenem Netz je Kachel. Jetzt steht die Klasse im
+Material. Das brachte 21 Aufrufe und nicht die erwarteten siebzig — die
+meisten Kacheln enthalten ohnehin nur einen der Töne. Die Zahl steht hier,
+weil sie kleiner ist als die Schätzung, nicht obwohl.
+
+**Leuchtfarben.** Leuchtende Bauteile ließen sich nicht mit den übrigen
+bündeln, weil die Emissionsfarbe im Material steht und nicht je Instanz
+gesetzt werden kann. Elf Leuchtfarben auf 225 Kacheln ergaben 194 Aufrufe
+für rund 1400 Bauteile. Sie werden jetzt gar nicht mehr gekachelt: ein Netz
+je Leuchtfarbe für die ganze Karte. Bezahlt wird das damit, dass Neon nicht
+mehr nach Entfernung wegfällt — gemessen 5.700 Dreiecke mehr auf 2,29
+Millionen, also ein Viertelprozent.
+
+**Unterarm und Hand.** Am Ellbogen hingen sieben Meshes: Ärmel, Handfläche,
+vier Finger, Daumen. Sechs davon teilen sich dasselbe Hautmaterial, und
+gedreht wird die ganze Gruppe — nichts darin bewegt sich für sich. Nach dem
+Backen sind es zwei. Das sind zehn Aufrufe je Figur und zwanzig beim
+Spieler, der als einziger noch seinen echten Schatten wirft.
+
+Was **nicht** funktioniert hat und deshalb nicht drin ist: Geländekacheln,
+die ganz unter Wasser liegen, schon beim Bauen auszublenden statt erst beim
+ersten `update()`. Die Messung sagte dieselben 843 Aufrufe vorher wie
+nachher — sie sind an dieser Stelle längst unsichtbar. Die Änderung ist
+wieder raus.
+
+Und was gemessen, aber nicht angefasst wurde: ein Fahrzeug besteht aus 25
+Meshes, und das sind bereits 25 verschiedene Materialien. Die vier Räder
+lassen sich nicht zusammenlegen, weil jedes für sich dreht und lenkt, und
+innerhalb eines Rades sind Reifen, Felge und Bremsscheibe schon je ein
+Mesh — die Felge muss eigenständig bleiben, weil ein Umbau in der Werkstatt
+ihr Material tauscht. Backen brächte dort null.
+
 ## Was Zeichenaufrufe kostet
 
 Draw Calls sind hier die knappe Größe, nicht Dreiecke. Drei Dinge halten sie
@@ -3535,7 +3597,13 @@ unten, und alle drei sind aus Messungen entstanden, nicht aus Vermutungen:
   Bildpunkten Höhe.
 - **Entfernung.** Weltblöcke jenseits der Nebelgrenze werden verworfen;
   Geländekacheln, die vollständig unter Wasser liegen, nur beim Tauchen
-  gezeichnet — der Wassershader ist undurchsichtig.
+  gezeichnet — der Wassershader ist undurchsichtig. Leuchtende Bauteile sind
+  davon ausgenommen: sie liegen in einem Netz je Farbe für die ganze Karte,
+  weil das mehr spart, als die Entfernungsgrenze dort je gebracht hat.
+- **Ein Material statt vieler.** Alles, was nicht leuchtet, trägt seine Farbe
+  in der Instanz; Asphalt und Glas werden an einer Klasse im Material erkannt
+  statt an ihrer Farbe; alle Beschriftungen der Karte liegen in einem Atlas
+  und einem Netz.
 - **Geteilte Geometrie.** Fahrzeuge teilen sich elf Formen, Figuren neun;
   Gesichter gibt es fünfmal, einmal je Hautton.
 
