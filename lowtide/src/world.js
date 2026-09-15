@@ -238,6 +238,11 @@ export class World{
   return k;
  }
  koerperAb(i){
+  // koerperFest hält alle aufgebauten Körper fest. Das braucht der Prüfstand:
+  // er fordert Körper für Figuren an, die weit weg stehen, lässt ein paar
+  // Bilder laufen und misst dann — ohne diesen Hebel hätte die Sichtweite sie
+  // vorher wieder abgeräumt, und die Prüfung liefe ins Leere.
+  if(this.koerperFest)return;
   const h=this.npcs[i];
   if(!h?.userData.koerper)return;
   const k=h.userData.koerper;

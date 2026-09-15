@@ -2258,6 +2258,9 @@ const leute = await page.evaluate(() => {
  w.npcs[7].traverse(o => o.isMesh && b.add(o.geometry.uuid));
  out.geteilt = [...a].filter(u => b.has(u)).length;
  out.formen = a.size;
+ // Auch hier den Körper anfordern: die zwanzig Figuren stehen irgendwo auf
+ // der Karte und haben ohne Nähe zum Spieler kein Gesicht.
+ for (let i = 0; i < 20; i++) w.koerperFuer?.(i);
  out.gesichter = new Set(w.npcs.slice(0, 20).map(m => m.userData.face.geometry.uuid)).size;
  out.hauttoene = new Set(w.npcs.slice(0, 20)
   .map(m => m.userData.face.geometry.attributes.color.getX(10).toFixed(4))).size;
@@ -2280,13 +2283,26 @@ pruefe('Gesichter gibt es je Hautton, nicht je Kopf',
  leute.gesichter === 5 && leute.hauttoene === 5, `${leute.gesichter} Formen, ${leute.hauttoene} Töne`);
 pruefe('Figuren haben einen drehbaren Kopf', await page.evaluate(() => {
  const w = window.LOWTIDE.world;
- return w.npcs.every(m => m.userData.kopf && m.userData.kopf.children.length > 4);
+ // Zwölf Figuren quer durch die Liste statt aller 530: Körper entstehen erst
+ // in Nähe des Spielers, und die Eigenschaft hängt am Modell, nicht an der
+ // einzelnen Figur.
+ const proben = [];
+ for (let i = 0; i < w.npcs.length && proben.length < 12; i += 43) {
+  w.koerperFuer?.(i);
+  proben.push(w.npcs[i]);
+ }
+ return proben.length >= 8 && proben.every(m => m.userData.kopf && m.userData.kopf.children.length > 4);
 }));
 pruefe('Im Stand sieht sich die Menge um, und nicht im Gleichtakt', await page.evaluate(async () => {
  const L = window.LOWTIDE, w = L.world;
+ // Vierzig Körper anfordern und für die Dauer der Messung festhalten, sonst
+ // räumt die Sichtweite sie zwischen den Bildern wieder ab.
+ w.koerperFest = true;
+ for (let i = 0; i < 40; i++) w.koerperFuer?.(i);
  // Ein paar Bilder laufen lassen und die Kopfdrehungen einsammeln.
  for (let i = 0; i < 3; i++) await new Promise(r => requestAnimationFrame(r));
  const winkel = w.npcs.slice(0, 40).map(m => +m.userData.kopf.rotation.y.toFixed(3));
+ w.koerperFest = false;
  const bewegt = winkel.filter(v => Math.abs(v) > .02).length;
  // Ein Gleichtakt wäre daran zu erkennen, dass alle denselben Wert haben.
  const verschieden = new Set(winkel).size;
