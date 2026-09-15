@@ -1071,6 +1071,28 @@ pruefe('Akt 4 zahlt aus und führt in Akt 5', akte.lohn4 === 1400 && akte.stageN
 pruefe('Wache am Tresor unterbricht die Arbeit', akte.wachePausiert === true);
 pruefe('Tresor braucht länger als die reine Knackzeit', akte.takte4 * .05 > 6.5, `${(akte.takte4 * .05).toFixed(1)} s`);
 pruefe('Fluchtroute liegt vollständig im Wasser', akte.routeWasser);
+// Jede Hochstraße zählt als Damm — sonst käme kein Fahrzeug darauf. Für ein
+// Boot ist ein Damm eine Wand. Diese Prüfung hält fest, dass keiner der
+// Wasserwege der Karte unter einer Trasse hindurchführt; gefunden wurde der
+// Fall an der Fluchtroute aus Akt 5, deren letzter Wendepunkt genau unter dem
+// Bay Skyway lag.
+pruefe('Kein Wasserweg führt unter eine Hochstraße', await page.evaluate(() => {
+ const L = window.LOWTIDE, S = L.story, r = L.rennen;
+ const wege = [['Flucht', S.FLUCHT_ROUTE], ['Regatta', r.boot.punkte], ['Jetski', r.jet.punkte]];
+ const treffer = [];
+ for (const [name, weg] of wege) for (const q of weg)
+  if (L.hochstrasseHoehe(q.x, q.z) !== null) treffer.push(name + ' ' + q.x + '/' + q.z);
+ // Auch die Strecke zwischen zwei Punkten, nicht nur die Punkte selbst.
+ for (const [name, weg] of wege) for (let i = 0; i < weg.length; i++) {
+  const a = weg[i], b = weg[(i + 1) % weg.length];
+  for (let t = 0; t <= 1; t += .02) {
+   const x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t;
+   if (L.hochstrasseHoehe(x, z) !== null) {treffer.push(name + ' Strecke ' + i); break;}
+  }
+ }
+ window.__hochTreffer = treffer;
+ return treffer.length === 0;
+}), await page.evaluate(() => (window.__hochTreffer || []).join(', ')));
 pruefe('Fluchtboot fährt', akte.bootDa && akte.bootFaehrt > 10, `${akte.bootFaehrt?.toFixed(1)} m in 2 s`);
 pruefe('Verfolgung endet im Schlussdialog', akte.dialog5 === 'ende');
 pruefe('Drei Ausgänge, Übergabe zahlt und hebt das Vertrauen',
@@ -1594,6 +1616,13 @@ const planken = await page.evaluate(() => {
    const f = farbeVon(netz, i);
    if (f !== 'b9bcb4' && f !== '8b8f88') continue;
    const y = arr[i * 16 + 13];
+   // Über Wasser ist eine Leitplanke auch in geringer Höhe richtig: die
+   // Rampen des Bay Skyway beginnen auf null und stehen trotzdem auf
+   // Pfeilern über der Bucht. Gezählt wird deshalb nur, was auf gewöhnlichem
+   // flachem Land steht — zehn Teile an den Rampenfüßen hatten die Prüfung
+   // sonst zu Recht rot gemacht und das Falsche gemeldet.
+   const x = arr[i * 16 + 12], z = arr[i * 16 + 14];
+   if (window.LOWTIDE.hochstrasseHoehe(x, z) !== null) continue;
    if (y > 20) hoch++; else if (y < 3) flach++;
   }
  }

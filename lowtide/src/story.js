@@ -40,9 +40,17 @@ export const TRESOR_DAUER = 6.5;
 // im Ufer stecken bleiben; getestet in tools/regression.mjs.
 // Die Punkte werden in tools/regression.mjs gegen waterAt geprüft: mit den
 // Keys kamen Inseln dazu, und der erste Punkt lag danach auf der Anchor Bank.
+// Der letzte Wendepunkt lag auf 136/232 — und damit genau unter dem Bay
+// Skyway, seit die Trasse dort über der Bucht steht. Eine Hochstraße zählt
+// als Damm, sonst könnte kein Fahrzeug sie befahren; für ein Boot heißt das
+// aber: kein Wasser, kein Weiterkommen. Die Prüfung "Fluchtroute liegt
+// vollständig im Wasser" hat das in derselben Runde gemeldet, in der die
+// Trasse entstand. Der Punkt liegt jetzt vierzig Meter weiter östlich; die
+// Schleife von dort zum ersten Punkt führt bei z = 200 bis 250 über x = 160
+// bis 170 und damit östlich an den Pfeilern vorbei.
 export const FLUCHT_ROUTE = [
  {x: 138, z: 96}, {x: 196, z: -46}, {x: 268, z: 62}, {x: 380, z: 176},
- {x: 300, z: 336}, {x: 226, z: 320}, {x: 136, z: 232}
+ {x: 300, z: 336}, {x: 226, z: 320}, {x: 170, z: 250}
 ];
 export const FLUCHT_START = {x: 138, z: 118};
 export const FLUCHT_TEMPO = 17, FANG_ABSTAND = 8, FANG_DAUER = 2.2;
