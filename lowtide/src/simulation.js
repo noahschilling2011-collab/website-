@@ -338,9 +338,29 @@ export class Simulation{
      if(strecke<besteStrecke){besteStrecke=strecke;zx=x;zz=z;}
     }
    }
+   // Auch hier: nicht in eine andere Figur hinein.
+   if(!this.platzFrei(n,zx,zz)){
+    const weg=Math.atan2(zx-n.x,zz-n.z);
+    zx+=Math.sin(weg)*.6;zz+=Math.cos(weg)*.6;
+   }
    n.x=zx;n.z=zz;
   }
   return !this.blocked(n,.3);
+ }
+ // Steht dort schon jemand? Beide Befreiungen setzen die Figur an einen neuen
+ // Platz, und ein Platz mitten in einer anderen Figur ist genau die
+ // Durchdringung, die der Schrittfilter sonst verhindert — zwei solcher
+ // Versetzungen zählte die Prüfung zuletzt als "echte Durchgänge".
+ platzFrei(n,x,z){
+  const raster=this._figurRaster;
+  if(!raster)return true;
+  const cx=Math.floor(x/2),cz=Math.floor(z/2);
+  for(let ex=-1;ex<=1;ex++)for(let ez=-1;ez<=1;ez++){
+   const liste=raster.get((cx+ex)+'|'+(cz+ez));
+   if(!liste)continue;
+   for(const o of liste)if(o!==n&&Math.hypot(x-o.x,z-o.z)<.52)return false;
+  }
+  return true;
  }
  // Wer verkeilt ist, wird ein Stück zur Seite gesetzt.
  //
@@ -358,7 +378,7 @@ export class Simulation{
   let bestX=null,bestZ=null,bestWert=1e9;
   for(let r=1;r<=3;r+=1)for(let i=0;i<12;i++){
    const a=i/12*Math.PI*2,x=n.x+Math.sin(a)*r,z=n.z+Math.cos(a)*r;
-   if(this.blocked({x,z},.35))continue;
+   if(this.blocked({x,z},.35)||!this.platzFrei(n,x,z))continue;
    const wert=ziel?Math.hypot(ziel.x-x,ziel.z-z):r;
    if(wert<bestWert){bestWert=wert;bestX=x;bestZ=z;}
   }
