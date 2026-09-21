@@ -128,6 +128,8 @@ select#model{
 .body ul,.body ol{margin:0 0 var(--s3);padding-left:22px}
 .body li{margin-bottom:var(--s1)}
 .body li > ul,.body li > ol{margin:var(--s1) 0 0}
+.body li > p{margin:0 0 var(--s2)}
+.body li > p:last-child{margin-bottom:0}
 .body blockquote{border-left:2px solid var(--accent);padding-left:var(--s3);margin:0 0 var(--s3);color:var(--dim)}
 .body a{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
 .body hr{border:0;border-top:1px solid var(--line);margin:var(--s5) 0}
@@ -510,6 +512,68 @@ var RX_HR = /^\s*(-{3,}|\*{3,}|_{3,})\s*$/;
 
 function isSpecial(L) { return RX_H.test(L) || RX_Q.test(L) || RX_UL.test(L) || RX_OL.test(L) || RX_HR.test(L); }
 
+function einzug(L) {
+  return /^[ \t]*/.exec(L)[0].replace(/\t/g, "    ").length;
+}
+
+// Sammelt eine ganze Liste ab lines[start]: Leerzeilen zwischen den Punkten
+// gehoeren dazu (sonst faengt die Nummerierung bei jedem Punkt neu an),
+// staerker eingerueckte Zeilen gehoeren in den laufenden Punkt.
+function listeBauen(lines, start, tiefe) {
+  var geordnet = RX_OL.test(lines[start]);
+  var rx = geordnet ? RX_OL : RX_UL;
+  var basis = einzug(lines[start]);
+  var erste = geordnet ? parseInt(/\d+/.exec(lines[start])[0], 10) : 1;
+  var punkte = [];
+  var i = start;
+
+  while (i < lines.length) {
+    var L = lines[i];
+
+    if (!L.trim()) {                       // Leerzeile nur behalten, wenn die Liste weitergeht
+      var j = i + 1;
+      while (j < lines.length && !lines[j].trim()) j++;
+      if (j >= lines.length) break;
+      var ej = einzug(lines[j]);
+      var istPunktJ = RX_UL.test(lines[j]) || RX_OL.test(lines[j]);
+      if (ej > basis || (istPunktJ && ej >= basis && ej <= basis + 1)) {
+        if (punkte.length) punkte[punkte.length - 1].push("");
+        i = j; continue;
+      }
+      break;
+    }
+
+    var e = einzug(L);
+    if (e < basis) break;
+    var istPunkt = RX_UL.test(L) || RX_OL.test(L);
+
+    if (istPunkt && e <= basis + 1) {
+      if (geordnet !== RX_OL.test(L)) break;        // Listentyp wechselt: neue Liste
+      punkte.push([L.replace(rx, "")]);
+      i++; continue;
+    }
+    if (!punkte.length) break;
+    punkte[punkte.length - 1].push(L.slice(Math.min(e, basis + 2)));   // Einzug abtragen
+    i++;
+  }
+
+  var inhalt = punkte.map(function (zeilen) {
+    return "<li>" + punktInhalt(zeilen, tiefe) + "</li>";
+  }).join("");
+  var tag = geordnet ? "ol" : "ul";
+  var attr = (geordnet && erste !== 1 && erste > 0) ? ' start="' + erste + '"' : "";
+  return { html: "<" + tag + attr + ">" + inhalt + "</" + tag + ">", next: i };
+}
+
+function punktInhalt(zeilen, tiefe) {
+  while (zeilen.length && !zeilen[zeilen.length - 1].trim()) zeilen.pop();
+  if (!zeilen.length) return "";
+  // Ein gewoehnlicher Einzeiler bleibt ohne <p>, sonst wird die Liste luftig
+  if (zeilen.length === 1 && !isSpecial(zeilen[0])) return mdInline(zeilen[0]);
+  if (tiefe >= 8) return mdInline(zeilen.join(" "));      // Tiefe begrenzen
+  return mdBlocks(zeilen, tiefe + 1);
+}
+
 function mdBlocks(lines, tiefe) {
   tiefe = tiefe || 0;
   var out = "", i = 0;
@@ -534,17 +598,10 @@ function mdBlocks(lines, tiefe) {
       continue;
     }
 
-    if (RX_UL.test(L)) {
-      var ul = [];
-      while (i < lines.length && RX_UL.test(lines[i])) { ul.push(lines[i].replace(RX_UL, "")); i++; }
-      out += "<ul>" + ul.map(function (t) { return "<li>" + mdInline(t) + "</li>"; }).join("") + "</ul>";
-      continue;
-    }
-
-    if (RX_OL.test(L)) {
-      var ol = [];
-      while (i < lines.length && RX_OL.test(lines[i])) { ol.push(lines[i].replace(RX_OL, "")); i++; }
-      out += "<ol>" + ol.map(function (t) { return "<li>" + mdInline(t) + "</li>"; }).join("") + "</ol>";
+    if (RX_UL.test(L) || RX_OL.test(L)) {
+      var liste = listeBauen(lines, i, tiefe);
+      out += liste.html;
+      i = liste.next;
       continue;
     }
 
@@ -555,7 +612,7 @@ function mdBlocks(lines, tiefe) {
   return out;
 }
 
-function renderMarkdown(src) {
+function renderMarkdown(src, laeuft) {
   var lines = String(src == null ? "" : src).split("\n");
   var out = "", i = 0;
   while (i < lines.length) {
@@ -568,7 +625,7 @@ function renderMarkdown(src) {
         code.push(lines[i]); i++;
       }
       // Ein beim Streamen noch offener Block wird trotzdem als Codeblock gerendert
-      out += codeBlock(lang, code.join("\n"), !closed);
+      out += codeBlock(lang, code.join("\n"), !closed && !!laeuft);
       continue;
     }
     var chunk = [];
@@ -845,7 +902,7 @@ function stream(chat, msg, nodes) {
     var d = st.nodes;
     if (!d || !d.wrap.isConnected) return;
     updateThinking(d, msg, mitCursor);
-    d.body.innerHTML = renderMarkdown(msg.content);
+    d.body.innerHTML = renderMarkdown(msg.content, mitCursor);
     if (mitCursor) {
       var cur = document.createElement("span");
       cur.className = "cursor";
@@ -898,7 +955,12 @@ function stream(chat, msg, nodes) {
       try { o = JSON.parse(line); } catch (e) { return; } // unparsbare Zeile ignorieren
       if (o.error) throw new Error(o.error);              // Fehler mitten im Stream
       if (o.message) {
-        if (o.message.thinking) { msg.thinking += o.message.thinking; schedule(); }
+        if (o.message.thinking) {
+          msg.thinking += o.message.thinking;
+          // sonst steht "Modell lädt…" noch da, waehrend der Gedankengang laeuft
+          if (first && st.nodes) st.nodes.meta.innerHTML = '<span class="loading">denkt nach…</span>';
+          schedule();
+        }
         if (o.message.content) {
           if (first) { first = false; if (st.nodes) st.nodes.meta.textContent = ""; }
           msg.content += o.message.content;
