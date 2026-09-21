@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nox</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a0a0c'/%3E%3Cpath d='M10 22V10l12 12V10' fill='none' stroke='%23f2b35b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#0a0a0c; --side:#121216; --panel:#1a1a20; --hover:#22222a;
+  --text:#e8e8ec; --head:#f4f4f7; --dim:#8b8b95;
+  --accent:#f2b35b; --accent-soft:rgba(242,179,91,.13);
+  --line:rgba(255,255,255,.08);
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px; --s6:24px; --s8:32px;
+  --r:10px; --r-lg:16px;
+  --composer-h:96px;   /* wird zur Laufzeit gemessen */
+  --font:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,"SF Mono","Cascadia Code",Consolas,monospace;
+  --ease:cubic-bezier(.2,.8,.2,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--text); font-family:var(--font);
+  font-size:15px; line-height:1.6; overflow:hidden;
+  -webkit-text-size-adjust:100%;
+}
+body::before{
+  content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:
+    radial-gradient(60% 50% at 78% 8%, rgba(242,179,91,.055), transparent 70%),
+    radial-gradient(50% 45% at 12% 92%, rgba(120,130,180,.045), transparent 70%);
+}
+button,input,textarea,select{font:inherit;color:inherit}
+button{background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+svg{display:block}
+
+.app{position:relative;z-index:1;display:flex;height:100%}
+
+/* ---------- Sidebar ---------- */
+.side{
+  width:260px; flex:0 0 260px; background:var(--side);
+  border-right:1px solid var(--line); display:flex; flex-direction:column; min-width:0;
+}
+.side-top{padding:var(--s3);border-bottom:1px solid var(--line)}
+.newchat{
+  display:flex;align-items:center;gap:var(--s2);width:100%;
+  padding:var(--s2) var(--s3);border:1px solid var(--line);border-radius:var(--r);
+  color:var(--head);transition:background .15s ease-out,border-color .15s ease-out;
+}
+.newchat:hover{background:var(--hover);border-color:rgba(255,255,255,.14)}
+.chats{flex:1;overflow-y:auto;overflow-x:hidden;padding:var(--s2)}
+.chat-item{
+  display:flex;align-items:center;gap:var(--s2);width:100%;min-width:0;
+  padding:var(--s2) var(--s3);border-radius:var(--r);text-align:left;
+  color:var(--dim);transition:background .15s ease-out,color .15s ease-out;
+}
+.chat-item:hover{background:var(--hover);color:var(--text)}
+.chat-item[aria-current="true"]{background:var(--accent-soft);color:var(--head)}
+.chat-item > span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.chat-del{opacity:0;pointer-events:none;flex:0 0 auto;padding:2px;border-radius:4px;color:var(--dim)}
+.chat-item:hover .chat-del,.chat-del:focus-visible{opacity:1;pointer-events:auto}
+@media (hover:none){ .chat-del{opacity:.55;pointer-events:auto} }   /* Touch kennt kein hover */
+.chat-del:hover{color:#ff8b8b}
+.side-bottom{padding:var(--s3);border-top:1px solid var(--line);display:grid;gap:var(--s2);grid-template-columns:1fr 1fr}
+.side-bottom button{
+  min-width:0;padding:var(--s2);border-radius:var(--r);color:var(--dim);font-size:13px;
+  border:1px solid transparent;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  transition:background .15s ease-out,color .15s ease-out,border-color .15s ease-out;
+}
+.side-bottom button:hover{background:var(--hover);color:var(--text);border-color:var(--line)}
+#btn-settings{grid-column:1 / -1}
+.scrim{display:none;position:fixed;inset:0;z-index:25;background:rgba(0,0,0,.55)}
+
+/* ---------- Main ---------- */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+.top{
+  position:relative;z-index:11;   /* ueber dem Gate: Burger bleibt erreichbar */
+  display:flex;align-items:center;gap:var(--s3);min-width:0;
+  padding:var(--s3) var(--s5);border-bottom:1px solid var(--line);
+}
+.brand{font-size:15px;font-weight:600;color:var(--head);letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:0 0 auto}
+.dot.off{background:#6b6b75}
+.spacer{flex:1;min-width:var(--s2)}
+select#model{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:6px var(--s3);font-size:13px;color:var(--text);cursor:pointer;
+  max-width:220px;min-width:0;
+}
+.icon-btn{padding:var(--s2);border-radius:var(--r);color:var(--dim);flex:0 0 auto;transition:background .15s ease-out,color .15s ease-out}
+.icon-btn:hover{background:var(--hover);color:var(--text)}
+.burger{display:none}
+
+/* ---------- Log ---------- */
+.log{flex:1;overflow-y:auto;overflow-x:hidden;padding:var(--s6) var(--s5);padding-bottom:calc(var(--composer-h) + var(--s6))}
+.col{max-width:760px;margin:0 auto;min-width:0}
+.msg{margin-bottom:var(--s8);animation:rise .38s var(--ease) both;min-width:0}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.who{
+  display:flex;align-items:center;gap:var(--s2);margin-bottom:var(--s2);
+  font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--dim);
+}
+.msg.ai .who{color:var(--accent)}
+.body{max-width:70ch;min-width:0;word-wrap:break-word;overflow-wrap:break-word}
+.msg.me .body{
+  white-space:pre-wrap;
+  background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--r-lg);padding:var(--s3) var(--s4);
+}
+.cursor{
+  display:inline-block;width:8px;height:1.05em;vertical-align:text-bottom;
+  background:var(--accent);margin-left:2px;animation:blink 1.05s steps(2,start) infinite;
+}
+@keyframes blink{50%{opacity:0}}
+.meta{margin-top:var(--s2);font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+.meta .warn{color:#e8a87c}
+.meta .err{color:#ff8b8b}
+.loading{color:var(--dim);font-size:13px}
+
+/* ---------- Markdown ---------- */
+.body p{margin:0 0 var(--s3)}
+.body > *:last-child{margin-bottom:0}
+.body > *:first-child{margin-top:0}
+.body h1,.body h2,.body h3{color:var(--head);margin:var(--s5) 0 var(--s2);line-height:1.3;font-weight:600}
+.body h1{font-size:21px}.body h2{font-size:18px}.body h3{font-size:16px}
+.body ul,.body ol{margin:0 0 var(--s3);padding-left:22px}
+.body li{margin-bottom:var(--s1)}
+.body li > ul,.body li > ol{margin:var(--s1) 0 0}
+.body li > p{margin:0 0 var(--s2)}
+.body li > p:last-child{margin-bottom:0}
+.body blockquote{border-left:2px solid var(--accent);padding-left:var(--s3);margin:0 0 var(--s3);color:var(--dim)}
+.body a{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+.body hr{border:0;border-top:1px solid var(--line);margin:var(--s5) 0}
+.body code{font-family:var(--mono);font-size:.88em;background:rgba(255,255,255,.07);padding:1px 5px;border-radius:4px;word-break:break-word}
+.code{margin:0 0 var(--s3);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:#101014;max-width:100%}
+.code-top{
+  display:flex;align-items:center;justify-content:space-between;gap:var(--s2);
+  padding:6px var(--s3);background:rgba(255,255,255,.03);
+  border-bottom:1px solid var(--line);font-size:12px;color:var(--dim);
+}
+.code-lang{font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.code-copy{flex:0 0 auto;color:var(--dim);font-size:12px;padding:2px 6px;border-radius:4px;transition:color .15s ease-out}
+.code-copy:hover{color:var(--accent)}
+.code pre{margin:0;padding:var(--s3);overflow-x:auto}
+.code code{background:none;padding:0;font-family:var(--mono);font-size:13px;line-height:1.55;display:block;white-space:pre}
+
+/* ---------- Gedankengang ---------- */
+.think{margin:0 0 var(--s3);border:1px solid var(--line);border-radius:var(--r);background:rgba(255,255,255,.02);max-width:70ch}
+.think summary{cursor:pointer;padding:7px var(--s3);font-size:13px;color:var(--dim);list-style:none}
+.think summary::-webkit-details-marker{display:none}
+.think summary::before{content:"\25B8";display:inline-block;margin-right:var(--s2);transition:transform .15s ease-out}
+.think[open] summary::before{transform:rotate(90deg)}
+.think-body{padding:0 var(--s3) var(--s3);font-size:13px;color:var(--dim);white-space:pre-wrap;max-height:260px;overflow-y:auto;word-wrap:break-word;overflow-wrap:break-word}
+
+/* ---------- Composer: das einzige Glas ---------- */
+.composer-wrap{position:absolute;left:0;right:0;bottom:0;padding:var(--s4) var(--s5) var(--s5);pointer-events:none}
+.composer{
+  max-width:760px;margin:0 auto;pointer-events:auto;
+  display:flex;align-items:flex-end;gap:var(--s2);
+  padding:var(--s2) var(--s2) var(--s2) var(--s4);
+  background:rgba(255,255,255,.04);
+  -webkit-backdrop-filter:blur(20px) saturate(150%);
+  backdrop-filter:blur(20px) saturate(150%);
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:var(--r-lg);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07), 0 8px 32px rgba(0,0,0,.35);
+}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .composer{background:rgba(22,22,28,.92)}
+}
+#input{
+  flex:1;min-width:0;background:none;border:0;resize:none;outline:none;
+  padding:var(--s2) 0;max-height:200px;overflow-y:auto;line-height:1.5;
+}
+.composer:focus-within{
+  border-color:rgba(242,179,91,.5);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07), 0 0 0 1px rgba(242,179,91,.2), 0 8px 32px rgba(0,0,0,.35);
+}
+#input::placeholder{color:var(--dim)}
+#input:disabled{opacity:.5}
+.send{
+  flex:0 0 auto;width:36px;height:36px;border-radius:var(--r);
+  display:grid;place-items:center;background:var(--accent);color:#0a0a0c;
+  transition:opacity .15s ease-out;
+}
+.send:hover{opacity:.88}
+.send:disabled{opacity:.3;cursor:not-allowed}
+.send.stop{background:#3a3a44;color:var(--head)}
+.tobottom{
+  position:absolute;left:50%;bottom:calc(var(--composer-h) + var(--s3));transform:translateX(-50%);
+  display:none;align-items:center;gap:6px;padding:6px var(--s3);
+  background:var(--panel);border:1px solid var(--line);border-radius:999px;
+  font-size:13px;color:var(--text);z-index:5;box-shadow:0 4px 16px rgba(0,0,0,.4);
+}
+.tobottom.show{display:flex}
+
+/* ---------- Gate ---------- */
+.gate{position:absolute;inset:0;z-index:10;display:none;place-items:center;padding:72px var(--s5) var(--s5);background:var(--bg);overflow-y:auto}
+.gate.show{display:grid}
+.gate-card{max-width:560px;width:100%}
+.gate h2{font-size:19px;color:var(--head);margin-bottom:var(--s3);font-weight:600}
+.gate p{color:var(--dim);margin-bottom:var(--s4);max-width:60ch}
+.gate p code{font-family:var(--mono);font-size:.9em;background:rgba(255,255,255,.07);padding:1px 5px;border-radius:4px}
+.cmd{
+  display:flex;align-items:center;gap:var(--s2);margin-bottom:var(--s2);min-width:0;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:var(--s2) var(--s3);font-family:var(--mono);font-size:13px;
+}
+.cmd code{flex:1;min-width:0;overflow-x:auto;white-space:nowrap;color:var(--text)}
+.cmd button{flex:0 0 auto;color:var(--dim);font-size:12px;padding:2px 6px;border-radius:4px}
+.cmd button:hover{color:var(--accent)}
+.btn{
+  display:inline-flex;align-items:center;gap:var(--s2);
+  padding:var(--s2) var(--s4);border-radius:var(--r);
+  background:var(--accent);color:#0a0a0c;font-weight:600;font-size:14px;
+  transition:opacity .15s ease-out;
+}
+.btn:hover{opacity:.88}
+.btn.ghost{background:none;color:var(--text);border:1px solid var(--line);font-weight:500}
+.btn.ghost:hover{background:var(--hover);opacity:1}
+.btn.danger{background:#c4544f;color:#fff}
+#gate-card .btn{margin-top:var(--s3)}
+.hint{
+  position:fixed;left:50%;top:var(--s4);transform:translateX(-50%);z-index:100;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:var(--s2) var(--s4);font-size:13px;color:var(--text);max-width:calc(100% - 32px);
+  box-shadow:0 4px 20px rgba(0,0,0,.5);animation:rise .3s var(--ease) both;
+}
+
+/* ---------- Dialoge ---------- */
+dialog{
+  background:var(--panel);color:var(--text);border:1px solid var(--line);
+  border-radius:var(--r-lg);padding:var(--s5);max-width:540px;width:calc(100% - 32px);
+  box-shadow:0 20px 60px rgba(0,0,0,.6);
+}
+dialog::backdrop{background:rgba(0,0,0,.62)}
+dialog h2{font-size:17px;color:var(--head);margin-bottom:var(--s4);font-weight:600}
+.field{margin-bottom:var(--s4)}
+.field label{display:block;font-size:13px;color:var(--dim);margin-bottom:var(--s2)}
+.field input,.field textarea{
+  width:100%;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);
+  padding:var(--s2) var(--s3);outline:none;resize:vertical;
+}
+.field input:focus,.field textarea:focus{border-color:rgba(242,179,91,.5)}
+.field textarea{min-height:110px;line-height:1.5}
+.field small{display:block;margin-top:var(--s2);font-size:12px;color:var(--dim)}
+.row{display:flex;gap:var(--s2);justify-content:flex-end;flex-wrap:wrap}
+
+/* ---------- Schmal ---------- */
+@media (max-width:800px){
+  /* visibility nimmt die geschlossene Schublade aus der Tab-Reihenfolge:
+     sonst landet der Fokus unsichtbar bei x = -248px */
+  .side{position:fixed;z-index:30;top:0;bottom:0;left:0;transform:translateX(-100%);
+        visibility:hidden;transition:transform .25s var(--ease), visibility 0s linear .25s}
+  .side.open{transform:none;visibility:visible;transition:transform .25s var(--ease), visibility 0s}
+  /* nur hier sichtbar: sonst bleibt der Scrim beim Wechsel auf breit stehen */
+  .scrim.show{display:block}
+  .burger{display:grid;place-items:center}
+  .log{padding-left:var(--s4);padding-right:var(--s4)}
+  .composer-wrap{padding:var(--s3)}
+  .top{padding:var(--s3) var(--s4)}
+  select#model{max-width:150px}
+}
+@media (max-width:420px){
+  body{font-size:14px}
+  .log{padding-left:var(--s3);padding-right:var(--s3)}
+  .brand{font-size:14px}
+  select#model{max-width:124px;padding:5px var(--s2);font-size:12px;text-overflow:ellipsis}
+  .composer{padding-left:var(--s3)}
+  dialog{padding:var(--s4)}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
+  .cursor{animation:none;opacity:.85}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scrim" id="scrim"></div>
+  <aside class="side" id="side">
+    <div class="side-top">
+      <button class="newchat" id="newchat" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Neuer Chat
+      </button>
+    </div>
+    <div class="chats" id="chats"></div>
+    <div class="side-bottom">
+      <button id="btn-settings" type="button">Einstellungen</button>
+      <button id="btn-export" type="button">Export</button>
+      <button id="btn-import" type="button">Import</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="top">
+      <button class="icon-btn burger" id="burger" type="button" aria-label="Chats anzeigen">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+      <span class="dot off" id="dot" aria-hidden="true"></span>
+      <span class="brand" id="brand">Nox</span>
+      <span class="spacer"></span>
+      <select id="model" aria-label="Modell wählen"></select>
+    </header>
+
+    <div class="log" id="log" role="log"><div class="col" id="col"></div></div>
+
+    <button class="tobottom" id="tobottom" type="button">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+      Nach unten
+    </button>
+
+    <div class="composer-wrap">
+      <div class="composer">
+        <textarea id="input" rows="1" placeholder="Nachricht…" aria-label="Nachricht"></textarea>
+        <button class="send" id="send" type="button" aria-label="Senden"></button>
+      </div>
+    </div>
+
+    <div class="gate" id="gate"><div class="gate-card" id="gate-card"></div></div>
+  </main>
+</div>
+
+<dialog id="dlg-set">
+  <h2>Einstellungen</h2>
+  <div class="field">
+    <label for="set-name">Name der KI</label>
+    <input id="set-name" type="text" maxlength="40" autocomplete="off">
+  </div>
+  <div class="field">
+    <label for="set-prompt">System-Prompt</label>
+    <textarea id="set-prompt"></textarea>
+    <small><code>{Name}</code> wird durch den Namen ersetzt. Leer lassen = keine System-Nachricht.</small>
+  </div>
+  <div class="row">
+    <button class="btn ghost" id="set-reset" type="button">Standard</button>
+    <button class="btn ghost" id="set-cancel" type="button">Abbrechen</button>
+    <button class="btn" id="set-save" type="button">Speichern</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-del">
+  <h2>Chat löschen?</h2>
+  <p style="color:var(--dim);margin-bottom:20px" id="del-title"></p>
+  <div class="row">
+    <button class="btn ghost" id="del-cancel" type="button">Abbrechen</button>
+    <button class="btn danger" id="del-ok" type="button">Löschen</button>
+  </div>
+</dialog>
+
+<input type="file" id="file" accept="application/json,.json" style="display:none">
+
+<script>
+"use strict";
+
+/* ============ Konstanten ============ */
+var OLLAMA = "http://127.0.0.1:11434";   // nicht localhost: das kann auf IPv6 auflösen
+var KEY = "nox.v1";
+var DEFAULT_NAME = "Nox";
+var DEFAULT_PROMPT = "Du bist {Name}, eine KI, die lokal auf meinem Rechner läuft. Antworte auf Deutsch, locker, per du, kurz und direkt. Bei Code: vollständig und lauffähig.";
+var SCROLL_TOL = 80;
+var TITLE_MAX = 40;
+
+/* ============ Zustand ============ */
+var S = {
+  chats: [],            // {id, title, messages:[msg]}
+  activeId: null,       // msg: {role, content, thinking?, model?, tps?, aborted?, error?}
+  models: [],
+  model: null,
+  settings: { name: DEFAULT_NAME, systemPrompt: DEFAULT_PROMPT },
+  stream: null,
+  storageOk: true
+};
+
+var $ = function (id) { return document.getElementById(id); };
+var el = {
+  log: $("log"), col: $("col"), input: $("input"), send: $("send"), model: $("model"),
+  chats: $("chats"), gate: $("gate"), gateCard: $("gate-card"), dot: $("dot"),
+  brand: $("brand"), toBottom: $("tobottom"), side: $("side"), scrim: $("scrim"),
+  file: $("file"), dlgSet: $("dlg-set"), dlgDel: $("dlg-del"),
+  composerWrap: document.querySelector(".composer-wrap")
+};
+
+/* ============ Speicher: jeder Zugriff in try/catch ============ */
+var speicherGewarnt = false;
+function save() {
+  // Bewusst KEIN dauerhaftes Abschalten: ist der Speicher einmal voll gewesen,
+  // muss es nach dem Loeschen eines grossen Chats wieder klappen duerfen.
+  try {
+    localStorage.setItem(KEY, JSON.stringify({
+      chats: S.chats, activeId: S.activeId, model: S.model, settings: S.settings
+    }));
+    S.storageOk = true;
+    return true;
+  } catch (e) {
+    S.storageOk = false;
+    if (!speicherGewarnt) {
+      speicherGewarnt = true;
+      toast("Speichern geht gerade nicht (Speicher voll oder blockiert) — die App läuft weiter, Chats sind aber nach dem Neuladen weg.");
+    }
+    return false;
+  }
+}
+function load() {
+  var raw = null;
+  try { raw = localStorage.getItem(KEY); }
+  catch (e) { S.storageOk = false; toast("Kein Zugriff auf den Speicher — die App läuft nur im Arbeitsspeicher."); return; }
+  if (!raw) return;
+  try {
+    var d = JSON.parse(raw);
+    if (d && Array.isArray(d.chats)) S.chats = d.chats.filter(isChat);
+    if (d && typeof d.activeId === "string") S.activeId = d.activeId;
+    if (d && typeof d.model === "string") S.model = d.model;
+    if (d && d.settings) {
+      if (typeof d.settings.name === "string" && d.settings.name.trim()) S.settings.name = d.settings.name;
+      if (typeof d.settings.systemPrompt === "string") S.settings.systemPrompt = d.settings.systemPrompt;
+    }
+  } catch (e) { /* kaputter Eintrag: frisch anfangen statt crashen */ }
+}
+function isMsg(m) {
+  return !!m && typeof m.content === "string" &&
+         (m.role === "user" || m.role === "assistant");
+}
+// Fremde oder kaputte Eintraege hier rauswerfen, nicht erst beim Rendern:
+// ein einziger null-Eintrag liess boot() werfen, bevor der Startcheck lief.
+function isChat(c) {
+  if (!c || typeof c.id !== "string" || !Array.isArray(c.messages)) return false;
+  c.messages = c.messages.filter(isMsg);
+  for (var i = 0; i < c.messages.length; i++) {
+    var m = c.messages[i];
+    if (typeof m.thinking !== "string") delete m.thinking;
+    if (typeof m.model !== "string") delete m.model;
+    if (typeof m.tps !== "number") delete m.tps;
+  }
+  if (typeof c.title !== "string") c.title = "";
+  return true;
+}
+
+var toastTimer = null;
+function toast(msg) {
+  var old = document.querySelector(".hint");
+  if (old) old.remove();
+  if (toastTimer) clearTimeout(toastTimer);
+  var t = document.createElement("div");
+  t.className = "hint";
+  t.setAttribute("role", "status");
+  t.textContent = msg;
+  document.body.appendChild(t);
+  toastTimer = setTimeout(function () { t.remove(); }, 5200);
+}
+
+/* ============ Helfer ============ */
+function hatAuswahlIn(node) {
+  var sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.anchorNode) return false;
+  try { return node.contains(sel.anchorNode); } catch (e) { return false; }
+}
+function esc(s) {
+  return String(s)
+    .replace(/[\u0000\u0001]/g, "")   // Platzhalterzeichen: sonst kann das Modell sie faelschen
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+function uid() { return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function activeChat() {
+  for (var i = 0; i < S.chats.length; i++) if (S.chats[i].id === S.activeId) return S.chats[i];
+  return null;
+}
+
+/* ============ Markdown, selbst gebaut ============
+   Regel: IMMER erst escapen, dann HTML bauen. Nie rohes Modell-HTML ins DOM. */
+
+function mdInline(s) {
+  s = esc(s);
+  var geparkt = [];
+  function park(html) { geparkt.push(html); return "\u0001" + (geparkt.length - 1) + "\u0001"; }
+
+  // Inline-Code zuerst rausnehmen, damit **/_ darin nicht verarbeitet werden
+  s = s.replace(/`([^`\n]+)`/g, function (m, c) { return park("<code>" + c + "</code>"); });
+
+  // Links: nur http/https. Die TAGS parken, sonst laeuft die Kursiv-Regel in
+  // target="_blank" hinein und macht daraus target="<em>blank" - der Link
+  // oeffnet dann nicht mehr im neuen Tab. Der Linktext bleibt formatierbar.
+  s = s.replace(/\[([^\]\n]*)\]\((https?:\/\/[^\s)]+)\)/g, function (m, t, u) {
+    return park('<a href="' + u + '" target="_blank" rel="noopener noreferrer">') + (t || u) + park("</a>");
+  });
+  s = s.replace(/\*\*([^\n]+?)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/__([^\n]+?)__/g, "<strong>$1</strong>");
+  s = s.replace(/(^|[^\w*])\*([^*\n]+?)\*(?!\w)/g, "$1<em>$2</em>");
+  s = s.replace(/(^|[^\w_])_([^_\n]+?)_(?!\w)/g, "$1<em>$2</em>");
+  s = s.replace(/\u0001(\d+)\u0001/g, function (m, i) {
+    return geparkt[+i] === undefined ? m : geparkt[+i];
+  });
+  return s;
+}
+
+function codeBlock(lang, code, stillOpen) {
+  return '<div class="code">' +
+    '<div class="code-top"><span class="code-lang">' + esc(lang || "Code") + "</span>" +
+    '<button type="button" class="code-copy">' + (stillOpen ? "…" : "Kopieren") + "</button></div>" +
+    "<pre><code>" + esc(code) + "</code></pre></div>";
+}
+
+var RX_H = /^(#{1,3})\s+(.*)$/;
+var RX_Q = /^\s*>\s?/;
+var RX_UL = /^\s*[-*+]\s+/;
+var RX_OL = /^\s*\d+[.)]\s+/;
+var RX_HR = /^\s*(-{3,}|\*{3,}|_{3,})\s*$/;
+
+function isSpecial(L) { return RX_H.test(L) || RX_Q.test(L) || RX_UL.test(L) || RX_OL.test(L) || RX_HR.test(L); }
+
+function einzug(L) {
+  return /^[ \t]*/.exec(L)[0].replace(/\t/g, "    ").length;
+}
+
+// Sammelt eine ganze Liste ab lines[start]: Leerzeilen zwischen den Punkten
+// gehoeren dazu (sonst faengt die Nummerierung bei jedem Punkt neu an),
+// staerker eingerueckte Zeilen gehoeren in den laufenden Punkt.
+function listeBauen(lines, start, tiefe) {
+  var geordnet = RX_OL.test(lines[start]);
+  var rx = geordnet ? RX_OL : RX_UL;
+  var basis = einzug(lines[start]);
+  var erste = geordnet ? parseInt(/\d+/.exec(lines[start])[0], 10) : 1;
+  var punkte = [];
+  var i = start;
+
+  while (i < lines.length) {
+    var L = lines[i];
+
+    if (!L.trim()) {                       // Leerzeile nur behalten, wenn die Liste weitergeht
+      var j = i + 1;
+      while (j < lines.length && !lines[j].trim()) j++;
+      if (j >= lines.length) break;
+      var ej = einzug(lines[j]);
+      var istPunktJ = RX_UL.test(lines[j]) || RX_OL.test(lines[j]);
+      if (ej > basis || (istPunktJ && ej >= basis && ej <= basis + 1)) {
+        if (punkte.length) punkte[punkte.length - 1].push("");
+        i = j; continue;
+      }
+      break;
+    }
+
+    var e = einzug(L);
+    if (e < basis) break;
+    var istPunkt = RX_UL.test(L) || RX_OL.test(L);
+
+    if (istPunkt && e <= basis + 1) {
+      if (geordnet !== RX_OL.test(L)) break;        // Listentyp wechselt: neue Liste
+      punkte.push([L.replace(rx, "")]);
+      i++; continue;
+    }
+    if (!punkte.length) break;
+    punkte[punkte.length - 1].push(L.slice(Math.min(e, basis + 2)));   // Einzug abtragen
+    i++;
+  }
+
+  var inhalt = punkte.map(function (zeilen) {
+    return "<li>" + punktInhalt(zeilen, tiefe) + "</li>";
+  }).join("");
+  var tag = geordnet ? "ol" : "ul";
+  var attr = (geordnet && erste !== 1 && erste > 0) ? ' start="' + erste + '"' : "";
+  return { html: "<" + tag + attr + ">" + inhalt + "</" + tag + ">", next: i };
+}
+
+function punktInhalt(zeilen, tiefe) {
+  while (zeilen.length && !zeilen[zeilen.length - 1].trim()) zeilen.pop();
+  if (!zeilen.length) return "";
+  // Ein gewoehnlicher Einzeiler bleibt ohne <p>, sonst wird die Liste luftig
+  if (zeilen.length === 1 && !isSpecial(zeilen[0])) return mdInline(zeilen[0]);
+  if (tiefe >= 8) return mdInline(zeilen.join(" "));      // Tiefe begrenzen
+  return mdBlocks(zeilen, tiefe + 1);
+}
+
+function mdBlocks(lines, tiefe) {
+  tiefe = tiefe || 0;
+  var out = "", i = 0;
+  while (i < lines.length) {
+    var L = lines[i];
+    if (!L.trim()) { i++; continue; }
+
+    if (RX_HR.test(L)) { out += "<hr>"; i++; continue; }
+
+    var h = RX_H.exec(L);
+    if (h) { var n = h[1].length; out += "<h" + n + ">" + mdInline(h[2]) + "</h" + n + ">"; i++; continue; }
+
+    if (RX_Q.test(L)) {
+      var q = [];
+      while (i < lines.length && (RX_Q.test(lines[i]) || (q.length && lines[i].trim() && !isSpecial(lines[i])))) {
+        q.push(lines[i].replace(RX_Q, "")); i++;
+      }
+      // Tiefe begrenzen: sonst sprengen tausend ">" vom Modell den Stack
+      out += "<blockquote>" +
+             (tiefe < 8 ? mdBlocks(q, tiefe + 1) : "<p>" + mdInline(q.join("\n")) + "</p>") +
+             "</blockquote>";
+      continue;
+    }
+
+    if (RX_UL.test(L) || RX_OL.test(L)) {
+      var liste = listeBauen(lines, i, tiefe);
+      out += liste.html;
+      i = liste.next;
+      continue;
+    }
+
+    var p = [];
+    while (i < lines.length && lines[i].trim() && !isSpecial(lines[i])) { p.push(lines[i]); i++; }
+    if (p.length) out += "<p>" + mdInline(p.join("\n")).replace(/\n/g, "<br>") + "</p>";
+  }
+  return out;
+}
+
+function renderMarkdown(src, laeuft) {
+  var lines = String(src == null ? "" : src).split("\n");
+  var out = "", i = 0;
+  while (i < lines.length) {
+    var f = /^\s*```(.*)$/.exec(lines[i]);
+    if (f) {
+      var lang = f[1].trim(), code = [], closed = false;
+      i++;
+      while (i < lines.length) {
+        if (/^\s*```\s*$/.test(lines[i])) { closed = true; i++; break; }
+        code.push(lines[i]); i++;
+      }
+      // Ein beim Streamen noch offener Block wird trotzdem als Codeblock gerendert
+      out += codeBlock(lang, code.join("\n"), !closed && !!laeuft);
+      continue;
+    }
+    var chunk = [];
+    while (i < lines.length && !/^\s*```/.test(lines[i])) { chunk.push(lines[i]); i++; }
+    out += mdBlocks(chunk);
+  }
+  return out;
+}
+
+/* ============ Startcheck ============ */
+function gate(html) { el.gateCard.innerHTML = html; el.gate.classList.add("show"); }
+function ungate() { el.gate.classList.remove("show"); }
+function cmdRow(cmd) {
+  return '<div class="cmd"><code>' + esc(cmd) + '</code><button type="button" data-cmd="' + esc(cmd) + '">Kopieren</button></div>';
+}
+function gateFile() {
+  gate(
+    "<h2>Bitte über einen lokalen Server öffnen</h2>" +
+    "<p>Die Seite läuft gerade über <code>file://</code>. Der Browser schickt dann <code>null</code> als Origin, und Ollama lehnt das mit 403 ab. Starte im Ordner dieser Datei einen kleinen Server — Mac/Linux:</p>" +
+    cmdRow("python3 -m http.server 8000 --bind 127.0.0.1") +
+    "<p style=\"margin:16px 0 8px\">Windows:</p>" +
+    cmdRow("py -m http.server 8000 --bind 127.0.0.1") +
+    "<p style=\"margin:16px 0 8px\">Danach im Browser öffnen:</p>" +
+    cmdRow("http://127.0.0.1:8000/ki.html")
+  );
+}
+function gateOffline(detail) {
+  gate(
+    "<h2>Ollama läuft nicht</h2>" +
+    "<p>Unter <code>" + esc(OLLAMA) + "</code> antwortet nichts." + (detail ? " (" + esc(detail) + ")" : "") + " Starte Ollama und versuch es nochmal.</p>" +
+    cmdRow("ollama serve") +
+    '<button class="btn" id="retry" type="button">Nochmal versuchen</button>'
+  );
+  $("retry").addEventListener("click", checkOllama);
+}
+function gateNoModels() {
+  gate(
+    "<h2>Kein Modell installiert</h2>" +
+    "<p>Ollama läuft, hat aber kein Modell. Lade eins und versuch es dann nochmal:</p>" +
+    cmdRow("ollama pull qwen3:4b") +
+    cmdRow("ollama pull llama3.2:3b") +
+    '<button class="btn" id="retry" type="button">Nochmal versuchen</button>'
+  );
+  $("retry").addEventListener("click", checkOllama);
+}
+
+function checkOllama() {
+  ungate();
+  fetch(OLLAMA + "/api/tags", { method: "GET" })
+    .then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then(function (d) {
+      var models = (d && Array.isArray(d.models)) ? d.models : [];
+      if (!models.length) { setOnline(false); setInputEnabled(false); gateNoModels(); return; }
+      S.models = models;
+      fillModels();
+      setOnline(true);
+      ungate();
+      setInputEnabled(true);
+    })
+    .catch(function (e) {
+      setOnline(false); setInputEnabled(false);
+      gateOffline(e && e.message ? e.message : "");
+    });
+}
+function setOnline(on) { el.dot.className = on ? "dot" : "dot off"; }
+
+function fillModels() {
+  el.model.innerHTML = "";
+  var found = false;
+  for (var i = 0; i < S.models.length; i++) {
+    var m = S.models[i];
+    var o = document.createElement("option");
+    o.value = m.name;
+    var ps = m.details && m.details.parameter_size;
+    o.textContent = ps ? (m.name + " · " + ps) : m.name;
+    el.model.appendChild(o);
+    if (m.name === S.model) found = true;
+  }
+  if (!found) S.model = S.models[0].name;   // gemerktes Modell ist weg
+  el.model.value = S.model;
+  save();
+}
+
+function setInputEnabled(on) {
+  el.input.disabled = !on;
+  el.send.disabled = !on;
+  el.input.placeholder = on ? "Nachricht…" : "Kein Modell verfügbar";
+}
+
+/* ============ Rendern ============ */
+function renderSidebar() {
+  el.chats.innerHTML = "";
+  for (var i = 0; i < S.chats.length; i++) {
+    var c = S.chats[i];
+    var b = document.createElement("button");
+    b.className = "chat-item"; b.type = "button";
+    b.setAttribute("aria-current", c.id === S.activeId ? "true" : "false");
+    b.dataset.id = c.id;
+    var sp = document.createElement("span");
+    sp.textContent = c.title || "Neuer Chat";
+    b.appendChild(sp);
+    var d = document.createElement("span");
+    d.className = "chat-del"; d.dataset.del = c.id;
+    d.setAttribute("role", "button"); d.setAttribute("tabindex", "0");
+    d.setAttribute("aria-label", "Chat löschen: " + (c.title || "Neuer Chat"));
+    d.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>';
+    b.appendChild(d);
+    el.chats.appendChild(b);
+  }
+}
+
+function renderChat() {
+  el.col.innerHTML = "";
+  var c = activeChat();
+  if (!c) return;
+  var st = S.stream;
+  for (var i = 0; i < c.messages.length; i++) {
+    var m = c.messages[i];
+    var laeuft = !!(st && st.msg === m && st.chat === c);
+    var nodes = addMsgEl(m, !laeuft);
+    if (laeuft) {                       // laufende Antwort wieder anbinden
+      st.nodes = nodes;
+      nodes.wrap.setAttribute("aria-busy", "true");
+      if (st.repaint) st.repaint();
+    }
+  }
+  scrollToBottom(true);
+}
+
+function addMsgEl(m, finished) {
+  var wrap = document.createElement("div");
+  wrap.className = "msg " + (m.role === "user" ? "me" : "ai");
+
+  var who = document.createElement("div");
+  who.className = "who";
+  who.textContent = m.role === "user" ? "Du" : S.settings.name;
+  wrap.appendChild(who);
+
+  var nodes = { wrap: wrap, think: null, body: null, meta: null };
+
+  var body = document.createElement("div");
+  body.className = "body";
+  if (m.role === "user") body.textContent = m.content || "";
+  else body.innerHTML = renderMarkdown(m.content || "");
+  wrap.appendChild(body);
+  nodes.body = body;
+
+  var meta = document.createElement("div");
+  meta.className = "meta";
+  wrap.appendChild(meta);
+  nodes.meta = meta;
+
+  el.col.appendChild(wrap);
+
+  if (m.role === "assistant") {
+    if (m.thinking) updateThinking(nodes, m, false);
+    if (finished) setMeta(meta, m);
+  }
+  return nodes;
+}
+
+function updateThinking(nodes, m, streaming) {
+  if (!m.thinking) return;
+  if (!nodes.think) {
+    var d = document.createElement("details");
+    d.className = "think";
+    d.open = !!streaming;              // offen, solange gedacht wird
+    var sum = document.createElement("summary");
+    sum.textContent = "Gedankengang";
+    var bd = document.createElement("div");
+    bd.className = "think-body";
+    d.appendChild(sum); d.appendChild(bd);
+    nodes.wrap.insertBefore(d, nodes.body);
+    nodes.think = d;
+  }
+  var bd = nodes.think.querySelector(".think-body");
+  bd.textContent = m.thinking;
+  if (streaming) bd.scrollTop = bd.scrollHeight;   // sonst sieht es aus, als haenge die App
+}
+
+function setMeta(meta, m) {
+  if (m.role !== "assistant") { meta.textContent = ""; return; }
+  if (m.error) { meta.innerHTML = '<span class="err">Fehler: ' + esc(m.error) + "</span>"; return; }
+  var bits = [];
+  if (m.model) bits.push(esc(m.model));
+  if (m.tps) bits.push(esc(String(m.tps)) + " Tok/s");
+  var html = bits.join(" · ");
+  if (m.aborted) html += (html ? " · " : "") + '<span class="warn">abgebrochen</span>';
+  if (m.truncated) html += (html ? " · " : "") + '<span class="warn">unvollständig</span>';
+  meta.innerHTML = html;
+}
+
+/* ============ Scrollen ============ */
+var stick = true;
+var progTop = -1;   // Position, die WIR zuletzt gesetzt haben
+function nearBottom() { return el.log.scrollHeight - el.log.scrollTop - el.log.clientHeight < SCROLL_TOL; }
+el.log.addEventListener("scroll", function () {
+  // Eigener Sprung: das Event kommt verzoegert, inzwischen ist der Inhalt
+  // gewachsen. Wuerde man hier nearBottom() messen, kippt stick faelschlich
+  // auf false und das Mitscrollen bricht mitten in der Antwort ab.
+  if (el.log.scrollTop === progTop) { el.toBottom.classList.toggle("show", !stick); return; }
+  progTop = -1;
+  stick = nearBottom();
+  el.toBottom.classList.toggle("show", !stick);
+});
+function scrollToBottom(force) {
+  if (!force && !stick) return;
+  // bewusst hart springen: smooth haengt beim Streamen hinterher und flutet
+  // das scroll-Event mit Zwischenpositionen -> "Nach unten" flackert
+  el.log.scrollTop = el.log.scrollHeight;
+  progTop = el.log.scrollTop;          // was der Browser daraus gemacht hat
+  stick = true;
+  el.toBottom.classList.remove("show");
+}
+el.toBottom.addEventListener("click", function () { stick = true; scrollToBottom(true); el.input.focus(); });
+
+/* ============ Senden / Streaming ============ */
+function buildMessages(chat) {
+  var out = [];
+  var name = S.settings.name;   // als Funktion ersetzen: $ im Namen ist sonst ein Sondermuster
+  var sys = S.settings.systemPrompt.replace(/\{Name\}/g, function () { return name; });
+  if (sys.trim()) out.push({ role: "system", content: sys });
+  for (var i = 0; i < chat.messages.length; i++) {
+    var m = chat.messages[i];
+    if (!m.content) continue;      // leere Platzhalter raus; sichtbare Teilantworten bleiben drin
+    if (m.role !== "user" && m.role !== "assistant") continue;   // nur erlaubte Rollen
+    out.push({ role: m.role, content: m.content });      // nie thinking mitschicken
+  }
+  return out;
+}
+
+function send() {
+  if (S.stream) { stop(); return; }
+  var text = el.input.value.trim();
+  if (!text || !S.model || el.input.disabled) return;
+
+  var c = activeChat() || newChat();
+
+  var um = { role: "user", content: text };
+  c.messages.push(um);
+  if (!c.title) c.title = text.length > TITLE_MAX ? text.slice(0, TITLE_MAX).trim() + "…" : text;
+  addMsgEl(um, true);
+  renderSidebar();
+
+  el.input.value = "";
+  autoGrow();
+  stick = true;
+  scrollToBottom(true);
+
+  var msg = { role: "assistant", content: "", thinking: "", model: S.model };
+  c.messages.push(msg);
+  var nodes = addMsgEl(msg, false);
+  nodes.wrap.setAttribute("aria-busy", "true");
+  nodes.meta.innerHTML = '<span class="loading">Modell lädt…</span>';
+
+  stream(c, msg, nodes);
+  el.input.focus();
+}
+
+function stream(chat, msg, nodes) {
+  var ctrl = new AbortController();
+  var st = { ctrl: ctrl, msg: msg, nodes: nodes, chat: chat, repaint: null };
+  S.stream = st;
+  setSending(true);
+
+  var first = true, dirty = false, painting = false, rafId = 0, sahDone = false;
+
+  // Immer ueber st.nodes zeichnen, nie ueber die urspruengliche Referenz:
+  // renderChat() baut die Ansicht neu auf und haengt st.nodes dann neu ein.
+  function draw(mitCursor) {
+    var d = st.nodes;
+    if (!d || !d.wrap.isConnected) return;
+    updateThinking(d, msg, mitCursor);
+    d.body.innerHTML = renderMarkdown(msg.content, mitCursor);
+    if (mitCursor) {
+      var cur = document.createElement("span");
+      cur.className = "cursor";
+      d.body.appendChild(cur);
+    }
+  }
+  st.repaint = function () { draw(true); };
+
+  function paint() {
+    painting = false; rafId = 0;
+    if (!dirty) return;
+    var d = st.nodes;
+    // Markiert der Nutzer gerade Text in dieser Antwort, nicht neu zeichnen.
+    // dirty bleibt stehen, das naechste Token versucht es erneut.
+    if (d && hatAuswahlIn(d.body)) return;
+    dirty = false;
+    draw(true);
+    scrollToBottom(false);
+  }
+  function schedule() {                  // höchstens einmal pro Frame neu rendern
+    dirty = true;
+    if (painting) return;
+    painting = true;
+    rafId = requestAnimationFrame(paint);
+  }
+
+  fetch(OLLAMA + "/api/chat", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    // think wird bewusst NICHT mitgeschickt: Modelle, die es können, denken von selbst
+    body: JSON.stringify({ model: S.model, messages: buildMessages(chat), stream: true }),
+    signal: ctrl.signal
+  })
+  .then(function (res) {
+    if (!res.ok) {
+      return res.text().then(function (t) {
+        var m = "HTTP " + res.status;
+        try { var j = JSON.parse(t); if (j && j.error) m = j.error; } catch (e) {}
+        throw new Error(m);
+      });
+    }
+    var reader = res.body.getReader();
+    var dec = new TextDecoder();
+    var buf = "";
+
+    function onLine(line) {
+      line = line.trim();
+      if (!line) return;                                  // Leerzeilen überspringen
+      var o;
+      try { o = JSON.parse(line); } catch (e) { return; } // unparsbare Zeile ignorieren
+      if (o.error) throw new Error(o.error);              // Fehler mitten im Stream
+      if (o.message) {
+        if (o.message.thinking) {
+          msg.thinking += o.message.thinking;
+          // sonst steht "Modell lädt…" noch da, waehrend der Gedankengang laeuft
+          if (first && st.nodes) st.nodes.meta.innerHTML = '<span class="loading">denkt nach…</span>';
+          schedule();
+        }
+        if (o.message.content) {
+          if (first) { first = false; if (st.nodes) st.nodes.meta.textContent = ""; }
+          msg.content += o.message.content;
+          schedule();
+        }
+      }
+      if (o.done) {
+        sahDone = true;
+        if (o.done_reason) msg.done_reason = o.done_reason;
+        if (o.eval_count && o.eval_duration) msg.tps = Math.round(o.eval_count / o.eval_duration * 1e9);
+        if (o.model) msg.model = o.model;
+      }
+    }
+
+    function pump() {
+      return reader.read().then(function (r) {
+        if (r.done) {
+          buf += dec.decode();                            // Mehrbyte-Rest flushen
+          var rest = buf; buf = "";
+          if (rest.trim()) {
+            var parts = rest.split("\n");
+            for (var j = 0; j < parts.length; j++) onLine(parts[j]);
+          }
+          return;
+        }
+        buf += dec.decode(r.value, { stream: true });
+        var lines = buf.split("\n");
+        buf = lines.pop();                                // unvollständige Zeile aufheben
+        for (var i = 0; i < lines.length; i++) onLine(lines[i]);
+        return pump();
+      });
+    }
+    return pump();
+  })
+  .then(function () { finish(sahDone ? null : "ohne-done"); })
+  .catch(function (e) {
+    if (e && e.name === "AbortError") { finish("abort"); return; }   // Abbruch ist kein Fehler
+    finish(e && e.message ? e.message : "Unbekannter Fehler");
+  });
+
+  function finish(err) {
+    S.stream = null;
+    // Offenen Frame abbestellen: sonst malt paint() gleich wieder den Cursor
+    // ueber die fertige Antwort. Passiert, wenn der ganze Stream in einem
+    // Chunk ankommt und finish() als Microtask vor dem Frame laeuft.
+    if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+    painting = false; dirty = false;
+    setSending(false);
+    if (err === "abort") msg.aborted = true;
+    else if (err === "ohne-done") msg.truncated = true;   // Verbindung endete vor done:true
+    else if (err) msg.error = err;
+    var d = st.nodes;
+    if (d && d.wrap.isConnected) {
+      d.wrap.removeAttribute("aria-busy");
+      draw(false);                                        // final, ohne Cursor
+      if (d.think) d.think.open = false;                  // danach zugeklappt
+      setMeta(d.meta, msg);
+    }
+    save();                                               // erst jetzt speichern
+    scrollToBottom(false);
+    var aktiv = document.activeElement;   // nur zurueckholen, wenn niemand woanders ist
+    if (!el.dlgSet.open && !el.dlgDel.open && (!aktiv || aktiv === document.body || aktiv === el.input)) el.input.focus();
+  }
+}
+
+function stop() { if (S.stream) { try { S.stream.ctrl.abort(); } catch (e) {} } }
+
+var ICON_SEND = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>';
+var ICON_STOP = '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>';
+function setSending(on) {
+  el.send.classList.toggle("stop", !!on);
+  el.send.setAttribute("aria-label", on ? "Antwort stoppen" : "Senden");
+  el.send.innerHTML = on ? ICON_STOP : ICON_SEND;
+  el.input.disabled = false;
+  el.send.disabled = false;
+}
+
+/* ============ Chats ============ */
+function newChat() {
+  if (S.stream) stop();          // sonst laeuft die alte Antwort unsichtbar weiter
+  var c = { id: uid(), title: "", messages: [] };
+  S.chats.unshift(c);
+  S.activeId = c.id;
+  renderSidebar(); renderChat(); save();
+  return c;
+}
+function openChat(id) {
+  if (id === S.activeId) { closeSide(); return; }   // schon offen: nichts abbrechen
+  if (S.stream) stop();
+  S.activeId = id;
+  renderSidebar(); renderChat(); save();
+  closeSide();
+}
+var pendingDel = null;
+function askDelete(id) {
+  var c = null;
+  for (var i = 0; i < S.chats.length; i++) if (S.chats[i].id === id) c = S.chats[i];
+  if (!c) return;
+  pendingDel = id;
+  $("del-title").textContent = c.title || "Neuer Chat";
+  el.dlgDel.showModal();
+}
+function delChat(id) {
+  if (S.stream && S.stream.chat && S.stream.chat.id === id) stop();
+  S.chats = S.chats.filter(function (c) { return c.id !== id; });
+  if (S.activeId === id) S.activeId = S.chats.length ? S.chats[0].id : null;
+  if (!S.chats.length) { newChat(); return; }
+  renderSidebar(); renderChat(); save();
+}
+
+/* ============ Export / Import ============ */
+function exportChats() {
+  var payload = { app: "nox", version: 1, settings: S.settings, chats: S.chats };
+  var blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url;
+  a.download = "nox-chats-" + new Date().toISOString().slice(0, 10) + ".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+  toast("Export gestartet.");
+}
+function importChats(file) {
+  if (S.stream) stop();          // Import wechselt den aktiven Chat
+  var r = new FileReader();
+  r.onerror = function () { toast("Datei konnte nicht gelesen werden."); };
+  r.onload = function () {
+    var d;
+    try { d = JSON.parse(String(r.result)); }
+    catch (e) { toast("Import fehlgeschlagen: keine gültige JSON-Datei."); return; }
+    if (!d || !Array.isArray(d.chats)) { toast("Import fehlgeschlagen: keine Chats in der Datei."); return; }
+    var have = {}, n = 0;
+    for (var i = 0; i < S.chats.length; i++) have[S.chats[i].id] = true;
+    for (var j = d.chats.length - 1; j >= 0; j--) {
+      var c = d.chats[j];
+      if (!isChat(c)) continue;          // filtert kaputte Nachrichten mit raus
+      if (have[c.id]) c.id = uid();      // Kollision: neue id statt überschreiben
+      have[c.id] = true;
+      S.chats.unshift(c); n++;
+    }
+    if (d.settings) {                     // beide Felder unabhaengig, wie in load()
+      var geaendert = false;
+      if (typeof d.settings.name === "string" && d.settings.name.trim()) { S.settings.name = d.settings.name; geaendert = true; }
+      if (typeof d.settings.systemPrompt === "string") { S.settings.systemPrompt = d.settings.systemPrompt; geaendert = true; }
+      if (geaendert) applyName();
+    }
+    if (n && S.chats.length) {
+      var pick = null;                      // nicht auf einem leeren Chat landen
+      for (var k = 0; k < S.chats.length; k++) if (S.chats[k].messages.length) { pick = S.chats[k].id; break; }
+      S.activeId = pick || S.chats[0].id;
+    }
+    renderSidebar(); renderChat();
+    var gespeichert = save();
+    toast(n ? (n + (n === 1 ? " Chat importiert." : " Chats importiert.") +
+               (gespeichert ? "" : " Aber nicht gespeichert — nach dem Neuladen weg."))
+            : "Keine gültigen Chats gefunden.");
+  };
+  r.readAsText(file);
+}
+
+/* ============ Einstellungen ============ */
+function applyName() {
+  el.brand.textContent = S.settings.name;
+  document.title = S.settings.name;
+  var whos = el.col.querySelectorAll(".msg.ai .who");
+  for (var i = 0; i < whos.length; i++) whos[i].textContent = S.settings.name;
+}
+function openSettings() {
+  $("set-name").value = S.settings.name;
+  $("set-prompt").value = S.settings.systemPrompt;
+  el.dlgSet.showModal();
+  closeSide();
+}
+$("set-save").addEventListener("click", function () {
+  var n = $("set-name").value.trim();
+  S.settings.name = n || DEFAULT_NAME;
+  S.settings.systemPrompt = $("set-prompt").value;
+  applyName(); save();
+  el.dlgSet.close();
+  el.input.focus();
+});
+$("set-cancel").addEventListener("click", function () { el.dlgSet.close(); });
+$("set-reset").addEventListener("click", function () {
+  $("set-name").value = DEFAULT_NAME;
+  $("set-prompt").value = DEFAULT_PROMPT;
+});
+$("del-cancel").addEventListener("click", function () { el.dlgDel.close(); pendingDel = null; });
+$("del-ok").addEventListener("click", function () {
+  if (pendingDel) delChat(pendingDel);
+  pendingDel = null;
+  el.dlgDel.close();
+});
+
+/* ============ Eingabe & Events ============ */
+function messeComposer() {
+  if (!el.composerWrap) return;
+  var h = Math.round(el.composerWrap.getBoundingClientRect().height);
+  document.documentElement.style.setProperty("--composer-h", h + "px");
+}
+function autoGrow() {
+  el.input.style.height = "auto";
+  el.input.style.height = Math.min(el.input.scrollHeight, 200) + "px";   // ca. 8 Zeilen
+  messeComposer();                 // Log-Polster und "Nach unten" wandern mit
+  scrollToBottom(false);
+}
+window.addEventListener("resize", messeComposer);
+el.input.addEventListener("input", autoGrow);
+el.input.addEventListener("keydown", function (e) {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !e.repeat) { e.preventDefault(); send(); }
+});
+el.send.addEventListener("click", send);
+document.addEventListener("keydown", function (e) {
+  if (e.key !== "Escape") return;
+  if (el.dlgSet.open || el.dlgDel.open) return;              // Esc gehört dann dem Dialog
+  if (el.side.classList.contains("open")) { e.preventDefault(); closeSide(); return; }
+  if (S.stream) { e.preventDefault(); stop(); }
+});
+el.model.addEventListener("change", function () { S.model = el.model.value; save(); });
+$("newchat").addEventListener("click", function () { newChat(); closeSide(); el.input.focus(); });
+$("btn-settings").addEventListener("click", openSettings);
+$("btn-export").addEventListener("click", exportChats);
+$("btn-import").addEventListener("click", function () { el.file.click(); });
+el.file.addEventListener("change", function () {
+  if (el.file.files && el.file.files[0]) importChats(el.file.files[0]);
+  el.file.value = "";
+});
+
+function openSide() {
+  el.side.classList.add("open"); el.scrim.classList.add("show");
+  $("newchat").focus();                 // sonst tabbt man hinter die Ueberlagerung
+}
+function closeSide() {
+  if (!el.side.classList.contains("open")) return;
+  el.side.classList.remove("open"); el.scrim.classList.remove("show");
+  if (el.side.contains(document.activeElement)) $("burger").focus();
+}
+$("burger").addEventListener("click", openSide);
+el.scrim.addEventListener("click", closeSide);
+
+el.chats.addEventListener("click", function (e) {
+  var d = e.target.closest("[data-del]");
+  if (d) { e.stopPropagation(); askDelete(d.dataset.del); return; }
+  var it = e.target.closest(".chat-item");
+  if (it) openChat(it.dataset.id);
+});
+el.chats.addEventListener("keydown", function (e) {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  var d = e.target.closest("[data-del]");
+  if (d) { e.preventDefault(); e.stopPropagation(); askDelete(d.dataset.del); }
+});
+
+/* Kopieren: Gate-Befehle und Codeblöcke */
+document.addEventListener("click", function (e) {
+  var cb = e.target.closest("[data-cmd]");
+  if (cb) { copy(cb.dataset.cmd, cb, cb.parentNode.querySelector("code")); return; }
+  var cc = e.target.closest(".code-copy");
+  if (cc) {
+    var node = cc.closest(".code").querySelector("pre code");
+    copy(node ? node.textContent : "", cc, node);
+  }
+});
+function copy(text, btn, selectNode) {
+  var old = btn.textContent;
+  function done(label) { btn.textContent = label; setTimeout(function () { btn.textContent = old; }, 1500); }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () { done("Kopiert"); })
+      .catch(function () { selectFallback(selectNode); done("Markiert"); });
+  } else { selectFallback(selectNode); done("Markiert"); }
+}
+function selectFallback(node) {
+  // Fallback ohne Clipboard-API: Text markieren, damit man ihn selbst kopieren kann
+  if (!node) return;
+  try {
+    var r = document.createRange(); r.selectNodeContents(node);
+    var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+  } catch (e) {}
+}
+
+/* ============ Start ============ */
+function boot() {
+  try {
+    load();
+    applyName();
+    setSending(false);
+    setInputEnabled(false);
+    if (!S.chats.length) newChat();
+    else {
+      if (!activeChat()) S.activeId = S.chats[0].id;
+      renderSidebar(); renderChat();
+    }
+  } catch (e) {
+    // Lieber mit leerem Verlauf starten als mit toter Seite
+    S.chats = []; S.activeId = null;
+    try { el.col.innerHTML = ""; newChat(); } catch (e2) {}
+    toast("Gespeicherte Chats waren beschädigt und wurden übersprungen.");
+  }
+  messeComposer();
+  if (location.protocol === "file:") { gateFile(); return; }
+  checkOllama();
+}
+boot();
+
+// später: Bilder/Vision, Datei-Upload, Sprache, Tools/Websuche, Syntax-Highlighting,
+// später: Tabellen im Markdown, Antwort neu generieren, Nachrichten bearbeiten,
+// später: Modelle aus der App laden, Temperatur und num_ctx einstellen,
+// später: Startskript per Doppelklick
+</script>
+</body>
+</html>
