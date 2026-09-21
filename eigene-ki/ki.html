@@ -402,7 +402,24 @@ function load() {
     }
   } catch (e) { /* kaputter Eintrag: frisch anfangen statt crashen */ }
 }
-function isChat(c) { return c && typeof c.id === "string" && Array.isArray(c.messages); }
+function isMsg(m) {
+  return !!m && typeof m.content === "string" &&
+         (m.role === "user" || m.role === "assistant");
+}
+// Fremde oder kaputte Eintraege hier rauswerfen, nicht erst beim Rendern:
+// ein einziger null-Eintrag liess boot() werfen, bevor der Startcheck lief.
+function isChat(c) {
+  if (!c || typeof c.id !== "string" || !Array.isArray(c.messages)) return false;
+  c.messages = c.messages.filter(isMsg);
+  for (var i = 0; i < c.messages.length; i++) {
+    var m = c.messages[i];
+    if (typeof m.thinking !== "string") delete m.thinking;
+    if (typeof m.model !== "string") delete m.model;
+    if (typeof m.tps !== "number") delete m.tps;
+  }
+  if (typeof c.title !== "string") c.title = "";
+  return true;
+}
 
 var toastTimer = null;
 function toast(msg) {
@@ -635,7 +652,17 @@ function renderChat() {
   el.col.innerHTML = "";
   var c = activeChat();
   if (!c) return;
-  for (var i = 0; i < c.messages.length; i++) addMsgEl(c.messages[i], true);
+  var st = S.stream;
+  for (var i = 0; i < c.messages.length; i++) {
+    var m = c.messages[i];
+    var laeuft = !!(st && st.msg === m && st.chat === c);
+    var nodes = addMsgEl(m, !laeuft);
+    if (laeuft) {                       // laufende Antwort wieder anbinden
+      st.nodes = nodes;
+      nodes.wrap.setAttribute("aria-busy", "true");
+      if (st.repaint) st.repaint();
+    }
+  }
   scrollToBottom(true);
 }
 
@@ -730,7 +757,8 @@ function buildMessages(chat) {
   if (sys.trim()) out.push({ role: "system", content: sys });
   for (var i = 0; i < chat.messages.length; i++) {
     var m = chat.messages[i];
-    if (m.error || !m.content) continue;                 // Fehlerplätze nicht weiterreichen
+    if (!m.content) continue;      // leere Platzhalter raus; sichtbare Teilantworten bleiben drin
+    if (m.role !== "user" && m.role !== "assistant") continue;   // nur erlaubte Rollen
     out.push({ role: m.role, content: m.content });      // nie thinking mitschicken
   }
   return out;
@@ -766,20 +794,32 @@ function send() {
 
 function stream(chat, msg, nodes) {
   var ctrl = new AbortController();
-  S.stream = { ctrl: ctrl, msg: msg, nodes: nodes, chat: chat };
+  var st = { ctrl: ctrl, msg: msg, nodes: nodes, chat: chat, repaint: null };
+  S.stream = st;
   setSending(true);
 
   var first = true, dirty = false, painting = false, rafId = 0;
+
+  // Immer ueber st.nodes zeichnen, nie ueber die urspruengliche Referenz:
+  // renderChat() baut die Ansicht neu auf und haengt st.nodes dann neu ein.
+  function draw(mitCursor) {
+    var d = st.nodes;
+    if (!d || !d.wrap.isConnected) return;
+    updateThinking(d, msg, mitCursor);
+    d.body.innerHTML = renderMarkdown(msg.content);
+    if (mitCursor) {
+      var cur = document.createElement("span");
+      cur.className = "cursor";
+      d.body.appendChild(cur);
+    }
+  }
+  st.repaint = function () { draw(true); };
 
   function paint() {
     painting = false; rafId = 0;
     if (!dirty) return;
     dirty = false;
-    updateThinking(nodes, msg, true);
-    nodes.body.innerHTML = renderMarkdown(msg.content);
-    var cur = document.createElement("span");
-    cur.className = "cursor";
-    nodes.body.appendChild(cur);
+    draw(true);
     scrollToBottom(false);
   }
   function schedule() {                  // höchstens einmal pro Frame neu rendern
@@ -817,7 +857,7 @@ function stream(chat, msg, nodes) {
       if (o.message) {
         if (o.message.thinking) { msg.thinking += o.message.thinking; schedule(); }
         if (o.message.content) {
-          if (first) { first = false; nodes.meta.textContent = ""; }
+          if (first) { first = false; if (st.nodes) st.nodes.meta.textContent = ""; }
           msg.content += o.message.content;
           schedule();
         }
@@ -863,13 +903,15 @@ function stream(chat, msg, nodes) {
     if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
     painting = false; dirty = false;
     setSending(false);
-    nodes.wrap.removeAttribute("aria-busy");
     if (err === "abort") msg.aborted = true;
     else if (err) msg.error = err;
-    updateThinking(nodes, msg, false);
-    if (nodes.think) nodes.think.open = false;            // danach zugeklappt
-    nodes.body.innerHTML = renderMarkdown(msg.content);   // final, ohne Cursor
-    setMeta(nodes.meta, msg);
+    var d = st.nodes;
+    if (d && d.wrap.isConnected) {
+      d.wrap.removeAttribute("aria-busy");
+      draw(false);                                        // final, ohne Cursor
+      if (d.think) d.think.open = false;                  // danach zugeklappt
+      setMeta(d.meta, msg);
+    }
     save();                                               // erst jetzt speichern
     scrollToBottom(false);
     if (!el.dlgSet.open && !el.dlgDel.open) el.input.focus();
@@ -890,6 +932,7 @@ function setSending(on) {
 
 /* ============ Chats ============ */
 function newChat() {
+  if (S.stream) stop();          // sonst laeuft die alte Antwort unsichtbar weiter
   var c = { id: uid(), title: "", messages: [] };
   S.chats.unshift(c);
   S.activeId = c.id;
@@ -897,6 +940,7 @@ function newChat() {
   return c;
 }
 function openChat(id) {
+  if (id === S.activeId) { closeSide(); return; }   // schon offen: nichts abbrechen
   if (S.stream) stop();
   S.activeId = id;
   renderSidebar(); renderChat(); save();
@@ -932,6 +976,7 @@ function exportChats() {
   toast("Export gestartet.");
 }
 function importChats(file) {
+  if (S.stream) stop();          // Import wechselt den aktiven Chat
   var r = new FileReader();
   r.onerror = function () { toast("Datei konnte nicht gelesen werden."); };
   r.onload = function () {
@@ -943,7 +988,7 @@ function importChats(file) {
     for (var i = 0; i < S.chats.length; i++) have[S.chats[i].id] = true;
     for (var j = d.chats.length - 1; j >= 0; j--) {
       var c = d.chats[j];
-      if (!isChat(c)) continue;
+      if (!isChat(c)) continue;          // filtert kaputte Nachrichten mit raus
       if (have[c.id]) c.id = uid();      // Kollision: neue id statt überschreiben
       have[c.id] = true;
       S.chats.unshift(c); n++;
@@ -1069,14 +1114,21 @@ function selectFallback(node) {
 
 /* ============ Start ============ */
 function boot() {
-  load();
-  applyName();
-  setSending(false);
-  setInputEnabled(false);
-  if (!S.chats.length) newChat();
-  else {
-    if (!activeChat()) S.activeId = S.chats[0].id;
-    renderSidebar(); renderChat();
+  try {
+    load();
+    applyName();
+    setSending(false);
+    setInputEnabled(false);
+    if (!S.chats.length) newChat();
+    else {
+      if (!activeChat()) S.activeId = S.chats[0].id;
+      renderSidebar(); renderChat();
+    }
+  } catch (e) {
+    // Lieber mit leerem Verlauf starten als mit toter Seite
+    S.chats = []; S.activeId = null;
+    try { el.col.innerHTML = ""; newChat(); } catch (e2) {}
+    toast("Gespeicherte Chats waren beschädigt und wurden übersprungen.");
   }
   if (location.protocol === "file:") { gateFile(); return; }
   checkOllama();
