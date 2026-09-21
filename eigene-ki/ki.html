@@ -769,10 +769,10 @@ function stream(chat, msg, nodes) {
   S.stream = { ctrl: ctrl, msg: msg, nodes: nodes, chat: chat };
   setSending(true);
 
-  var first = true, dirty = false, painting = false;
+  var first = true, dirty = false, painting = false, rafId = 0;
 
   function paint() {
-    painting = false;
+    painting = false; rafId = 0;
     if (!dirty) return;
     dirty = false;
     updateThinking(nodes, msg, true);
@@ -786,7 +786,7 @@ function stream(chat, msg, nodes) {
     dirty = true;
     if (painting) return;
     painting = true;
-    requestAnimationFrame(paint);
+    rafId = requestAnimationFrame(paint);
   }
 
   fetch(OLLAMA + "/api/chat", {
@@ -857,7 +857,12 @@ function stream(chat, msg, nodes) {
 
   function finish(err) {
     S.stream = null;
-    setSending(true === false);
+    // Offenen Frame abbestellen: sonst malt paint() gleich wieder den Cursor
+    // ueber die fertige Antwort. Passiert, wenn der ganze Stream in einem
+    // Chunk ankommt und finish() als Microtask vor dem Frame laeuft.
+    if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+    painting = false; dirty = false;
+    setSending(false);
     nodes.wrap.removeAttribute("aria-busy");
     if (err === "abort") msg.aborted = true;
     else if (err) msg.error = err;
