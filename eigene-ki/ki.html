@@ -375,15 +375,23 @@ var el = {
 };
 
 /* ============ Speicher: jeder Zugriff in try/catch ============ */
+var speicherGewarnt = false;
 function save() {
-  if (!S.storageOk) return;
+  // Bewusst KEIN dauerhaftes Abschalten: ist der Speicher einmal voll gewesen,
+  // muss es nach dem Loeschen eines grossen Chats wieder klappen duerfen.
   try {
     localStorage.setItem(KEY, JSON.stringify({
       chats: S.chats, activeId: S.activeId, model: S.model, settings: S.settings
     }));
+    S.storageOk = true;
+    return true;
   } catch (e) {
     S.storageOk = false;
-    toast("Speichern geht nicht (Speicher voll oder blockiert) — die App läuft weiter, Chats sind aber nach dem Neuladen weg.");
+    if (!speicherGewarnt) {
+      speicherGewarnt = true;
+      toast("Speichern geht gerade nicht (Speicher voll oder blockiert) — die App läuft weiter, Chats sind aber nach dem Neuladen weg.");
+    }
+    return false;
   }
 }
 function load() {
@@ -436,7 +444,9 @@ function toast(msg) {
 
 /* ============ Helfer ============ */
 function esc(s) {
-  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+  return String(s)
+    .replace(/[\u0000\u0001]/g, "")   // Platzhalterzeichen: sonst kann das Modell sie faelschen
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 function uid() { return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
@@ -450,18 +460,25 @@ function activeChat() {
 
 function mdInline(s) {
   s = esc(s);
+  var geparkt = [];
+  function park(html) { geparkt.push(html); return "\u0001" + (geparkt.length - 1) + "\u0001"; }
+
   // Inline-Code zuerst rausnehmen, damit **/_ darin nicht verarbeitet werden
-  var codes = [];
-  s = s.replace(/`([^`\n]+)`/g, function (m, c) { codes.push(c); return "\u0001" + (codes.length - 1) + "\u0001"; });
-  // Links: nur http/https, alles andere bleibt Text
+  s = s.replace(/`([^`\n]+)`/g, function (m, c) { return park("<code>" + c + "</code>"); });
+
+  // Links: nur http/https. Die TAGS parken, sonst laeuft die Kursiv-Regel in
+  // target="_blank" hinein und macht daraus target="<em>blank" - der Link
+  // oeffnet dann nicht mehr im neuen Tab. Der Linktext bleibt formatierbar.
   s = s.replace(/\[([^\]\n]*)\]\((https?:\/\/[^\s)]+)\)/g, function (m, t, u) {
-    return '<a href="' + u + '" target="_blank" rel="noopener noreferrer">' + (t || u) + "</a>";
+    return park('<a href="' + u + '" target="_blank" rel="noopener noreferrer">') + (t || u) + park("</a>");
   });
   s = s.replace(/\*\*([^\n]+?)\*\*/g, "<strong>$1</strong>");
   s = s.replace(/__([^\n]+?)__/g, "<strong>$1</strong>");
   s = s.replace(/(^|[^\w*])\*([^*\n]+?)\*(?!\w)/g, "$1<em>$2</em>");
   s = s.replace(/(^|[^\w_])_([^_\n]+?)_(?!\w)/g, "$1<em>$2</em>");
-  s = s.replace(/\u0001(\d+)\u0001/g, function (m, n) { return "<code>" + codes[+n] + "</code>"; });
+  s = s.replace(/\u0001(\d+)\u0001/g, function (m, i) {
+    return geparkt[+i] === undefined ? m : geparkt[+i];
+  });
   return s;
 }
 
@@ -480,7 +497,8 @@ var RX_HR = /^\s*(-{3,}|\*{3,}|_{3,})\s*$/;
 
 function isSpecial(L) { return RX_H.test(L) || RX_Q.test(L) || RX_UL.test(L) || RX_OL.test(L) || RX_HR.test(L); }
 
-function mdBlocks(lines) {
+function mdBlocks(lines, tiefe) {
+  tiefe = tiefe || 0;
   var out = "", i = 0;
   while (i < lines.length) {
     var L = lines[i];
@@ -496,7 +514,11 @@ function mdBlocks(lines) {
       while (i < lines.length && (RX_Q.test(lines[i]) || (q.length && lines[i].trim() && !isSpecial(lines[i])))) {
         q.push(lines[i].replace(RX_Q, "")); i++;
       }
-      out += "<blockquote>" + mdBlocks(q) + "</blockquote>"; continue;
+      // Tiefe begrenzen: sonst sprengen tausend ">" vom Modell den Stack
+      out += "<blockquote>" +
+             (tiefe < 8 ? mdBlocks(q, tiefe + 1) : "<p>" + mdInline(q.join("\n")) + "</p>") +
+             "</blockquote>";
+      continue;
     }
 
     if (RX_UL.test(L)) {
@@ -723,6 +745,7 @@ function setMeta(meta, m) {
   if (m.tps) bits.push(esc(String(m.tps)) + " Tok/s");
   var html = bits.join(" · ");
   if (m.aborted) html += (html ? " · " : "") + '<span class="warn">abgebrochen</span>';
+  if (m.truncated) html += (html ? " · " : "") + '<span class="warn">unvollständig</span>';
   meta.innerHTML = html;
 }
 
@@ -753,7 +776,8 @@ el.toBottom.addEventListener("click", function () { stick = true; scrollToBottom
 /* ============ Senden / Streaming ============ */
 function buildMessages(chat) {
   var out = [];
-  var sys = S.settings.systemPrompt.replace(/\{Name\}/g, S.settings.name);
+  var name = S.settings.name;   // als Funktion ersetzen: $ im Namen ist sonst ein Sondermuster
+  var sys = S.settings.systemPrompt.replace(/\{Name\}/g, function () { return name; });
   if (sys.trim()) out.push({ role: "system", content: sys });
   for (var i = 0; i < chat.messages.length; i++) {
     var m = chat.messages[i];
@@ -798,7 +822,7 @@ function stream(chat, msg, nodes) {
   S.stream = st;
   setSending(true);
 
-  var first = true, dirty = false, painting = false, rafId = 0;
+  var first = true, dirty = false, painting = false, rafId = 0, sahDone = false;
 
   // Immer ueber st.nodes zeichnen, nie ueber die urspruengliche Referenz:
   // renderChat() baut die Ansicht neu auf und haengt st.nodes dann neu ein.
@@ -863,6 +887,7 @@ function stream(chat, msg, nodes) {
         }
       }
       if (o.done) {
+        sahDone = true;
         if (o.done_reason) msg.done_reason = o.done_reason;
         if (o.eval_count && o.eval_duration) msg.tps = Math.round(o.eval_count / o.eval_duration * 1e9);
         if (o.model) msg.model = o.model;
@@ -889,7 +914,7 @@ function stream(chat, msg, nodes) {
     }
     return pump();
   })
-  .then(function () { finish(null); })
+  .then(function () { finish(sahDone ? null : "ohne-done"); })
   .catch(function (e) {
     if (e && e.name === "AbortError") { finish("abort"); return; }   // Abbruch ist kein Fehler
     finish(e && e.message ? e.message : "Unbekannter Fehler");
@@ -904,6 +929,7 @@ function stream(chat, msg, nodes) {
     painting = false; dirty = false;
     setSending(false);
     if (err === "abort") msg.aborted = true;
+    else if (err === "ohne-done") msg.truncated = true;   // Verbindung endete vor done:true
     else if (err) msg.error = err;
     var d = st.nodes;
     if (d && d.wrap.isConnected) {
@@ -914,7 +940,8 @@ function stream(chat, msg, nodes) {
     }
     save();                                               // erst jetzt speichern
     scrollToBottom(false);
-    if (!el.dlgSet.open && !el.dlgDel.open) el.input.focus();
+    var aktiv = document.activeElement;   // nur zurueckholen, wenn niemand woanders ist
+    if (!el.dlgSet.open && !el.dlgDel.open && (!aktiv || aktiv === document.body || aktiv === el.input)) el.input.focus();
   }
 }
 
@@ -993,18 +1020,22 @@ function importChats(file) {
       have[c.id] = true;
       S.chats.unshift(c); n++;
     }
-    if (d.settings && typeof d.settings.name === "string" && d.settings.name.trim()) {
-      S.settings.name = d.settings.name;
-      if (typeof d.settings.systemPrompt === "string") S.settings.systemPrompt = d.settings.systemPrompt;
-      applyName();
+    if (d.settings) {                     // beide Felder unabhaengig, wie in load()
+      var geaendert = false;
+      if (typeof d.settings.name === "string" && d.settings.name.trim()) { S.settings.name = d.settings.name; geaendert = true; }
+      if (typeof d.settings.systemPrompt === "string") { S.settings.systemPrompt = d.settings.systemPrompt; geaendert = true; }
+      if (geaendert) applyName();
     }
     if (n && S.chats.length) {
       var pick = null;                      // nicht auf einem leeren Chat landen
       for (var k = 0; k < S.chats.length; k++) if (S.chats[k].messages.length) { pick = S.chats[k].id; break; }
       S.activeId = pick || S.chats[0].id;
     }
-    renderSidebar(); renderChat(); save();
-    toast(n ? (n + (n === 1 ? " Chat importiert." : " Chats importiert.")) : "Keine gültigen Chats gefunden.");
+    renderSidebar(); renderChat();
+    var gespeichert = save();
+    toast(n ? (n + (n === 1 ? " Chat importiert." : " Chats importiert.") +
+               (gespeichert ? "" : " Aber nicht gespeichert — nach dem Neuladen weg."))
+            : "Keine gültigen Chats gefunden.");
   };
   r.readAsText(file);
 }
@@ -1049,7 +1080,7 @@ function autoGrow() {
 }
 el.input.addEventListener("input", autoGrow);
 el.input.addEventListener("keydown", function (e) {
-  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !e.repeat) { e.preventDefault(); send(); }
 });
 el.send.addEventListener("click", send);
 document.addEventListener("keydown", function (e) {
