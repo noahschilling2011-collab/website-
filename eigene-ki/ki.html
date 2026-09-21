@@ -13,6 +13,7 @@
   --line:rgba(255,255,255,.08);
   --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px; --s6:24px; --s8:32px;
   --r:10px; --r-lg:16px;
+  --composer-h:96px;   /* wird zur Laufzeit gemessen */
   --font:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --mono:ui-monospace,"SF Mono","Cascadia Code",Consolas,monospace;
   --ease:cubic-bezier(.2,.8,.2,1);
@@ -58,8 +59,9 @@ svg{display:block}
 .chat-item:hover{background:var(--hover);color:var(--text)}
 .chat-item[aria-current="true"]{background:var(--accent-soft);color:var(--head)}
 .chat-item > span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
-.chat-del{opacity:0;flex:0 0 auto;padding:2px;border-radius:4px;color:var(--dim)}
-.chat-item:hover .chat-del,.chat-del:focus-visible{opacity:1}
+.chat-del{opacity:0;pointer-events:none;flex:0 0 auto;padding:2px;border-radius:4px;color:var(--dim)}
+.chat-item:hover .chat-del,.chat-del:focus-visible{opacity:1;pointer-events:auto}
+@media (hover:none){ .chat-del{opacity:.55;pointer-events:auto} }   /* Touch kennt kein hover */
 .chat-del:hover{color:#ff8b8b}
 .side-bottom{padding:var(--s3);border-top:1px solid var(--line);display:grid;gap:var(--s2);grid-template-columns:1fr 1fr}
 .side-bottom button{
@@ -70,11 +72,11 @@ svg{display:block}
 .side-bottom button:hover{background:var(--hover);color:var(--text);border-color:var(--line)}
 #btn-settings{grid-column:1 / -1}
 .scrim{display:none;position:fixed;inset:0;z-index:25;background:rgba(0,0,0,.55)}
-.scrim.show{display:block}
 
 /* ---------- Main ---------- */
 .main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
 .top{
+  position:relative;z-index:11;   /* ueber dem Gate: Burger bleibt erreichbar */
   display:flex;align-items:center;gap:var(--s3);min-width:0;
   padding:var(--s3) var(--s5);border-bottom:1px solid var(--line);
 }
@@ -92,7 +94,7 @@ select#model{
 .burger{display:none}
 
 /* ---------- Log ---------- */
-.log{flex:1;overflow-y:auto;overflow-x:hidden;padding:var(--s6) var(--s5) 150px}
+.log{flex:1;overflow-y:auto;overflow-x:hidden;padding:var(--s6) var(--s5);padding-bottom:calc(var(--composer-h) + var(--s6))}
 .col{max-width:760px;margin:0 auto;min-width:0}
 .msg{margin-bottom:var(--s8);animation:rise .38s var(--ease) both;min-width:0}
 @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
@@ -185,7 +187,7 @@ select#model{
 .send:disabled{opacity:.3;cursor:not-allowed}
 .send.stop{background:#3a3a44;color:var(--head)}
 .tobottom{
-  position:absolute;left:50%;bottom:112px;transform:translateX(-50%);
+  position:absolute;left:50%;bottom:calc(var(--composer-h) + var(--s3));transform:translateX(-50%);
   display:none;align-items:center;gap:6px;padding:6px var(--s3);
   background:var(--panel);border:1px solid var(--line);border-radius:999px;
   font-size:13px;color:var(--text);z-index:5;box-shadow:0 4px 16px rgba(0,0,0,.4);
@@ -193,7 +195,7 @@ select#model{
 .tobottom.show{display:flex}
 
 /* ---------- Gate ---------- */
-.gate{position:absolute;inset:0;z-index:10;display:none;place-items:center;padding:var(--s5);background:var(--bg);overflow-y:auto}
+.gate{position:absolute;inset:0;z-index:10;display:none;place-items:center;padding:72px var(--s5) var(--s5);background:var(--bg);overflow-y:auto}
 .gate.show{display:grid}
 .gate-card{max-width:560px;width:100%}
 .gate h2{font-size:19px;color:var(--head);margin-bottom:var(--s3);font-weight:600}
@@ -246,8 +248,13 @@ dialog h2{font-size:17px;color:var(--head);margin-bottom:var(--s4);font-weight:6
 
 /* ---------- Schmal ---------- */
 @media (max-width:800px){
-  .side{position:fixed;z-index:30;top:0;bottom:0;left:0;transform:translateX(-100%);transition:transform .25s var(--ease)}
-  .side.open{transform:none}
+  /* visibility nimmt die geschlossene Schublade aus der Tab-Reihenfolge:
+     sonst landet der Fokus unsichtbar bei x = -248px */
+  .side{position:fixed;z-index:30;top:0;bottom:0;left:0;transform:translateX(-100%);
+        visibility:hidden;transition:transform .25s var(--ease), visibility 0s linear .25s}
+  .side.open{transform:none;visibility:visible;transition:transform .25s var(--ease), visibility 0s}
+  /* nur hier sichtbar: sonst bleibt der Scrim beim Wechsel auf breit stehen */
+  .scrim.show{display:block}
   .burger{display:grid;place-items:center}
   .log{padding-left:var(--s4);padding-right:var(--s4)}
   .composer-wrap{padding:var(--s3)}
@@ -256,7 +263,7 @@ dialog h2{font-size:17px;color:var(--head);margin-bottom:var(--s4);font-weight:6
 }
 @media (max-width:420px){
   body{font-size:14px}
-  .log{padding-left:var(--s3);padding-right:var(--s3);padding-bottom:140px}
+  .log{padding-left:var(--s3);padding-right:var(--s3)}
   .brand{font-size:14px}
   select#model{max-width:124px;padding:5px var(--s2);font-size:12px;text-overflow:ellipsis}
   .composer{padding-left:var(--s3)}
@@ -371,7 +378,8 @@ var el = {
   log: $("log"), col: $("col"), input: $("input"), send: $("send"), model: $("model"),
   chats: $("chats"), gate: $("gate"), gateCard: $("gate-card"), dot: $("dot"),
   brand: $("brand"), toBottom: $("tobottom"), side: $("side"), scrim: $("scrim"),
-  file: $("file"), dlgSet: $("dlg-set"), dlgDel: $("dlg-del")
+  file: $("file"), dlgSet: $("dlg-set"), dlgDel: $("dlg-del"),
+  composerWrap: document.querySelector(".composer-wrap")
 };
 
 /* ============ Speicher: jeder Zugriff in try/catch ============ */
@@ -443,6 +451,11 @@ function toast(msg) {
 }
 
 /* ============ Helfer ============ */
+function hatAuswahlIn(node) {
+  var sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.anchorNode) return false;
+  try { return node.contains(sel.anchorNode); } catch (e) { return false; }
+}
 function esc(s) {
   return String(s)
     .replace(/[\u0000\u0001]/g, "")   // Platzhalterzeichen: sonst kann das Modell sie faelschen
@@ -734,7 +747,9 @@ function updateThinking(nodes, m, streaming) {
     nodes.wrap.insertBefore(d, nodes.body);
     nodes.think = d;
   }
-  nodes.think.querySelector(".think-body").textContent = m.thinking;
+  var bd = nodes.think.querySelector(".think-body");
+  bd.textContent = m.thinking;
+  if (streaming) bd.scrollTop = bd.scrollHeight;   // sonst sieht es aus, als haenge die App
 }
 
 function setMeta(meta, m) {
@@ -842,6 +857,10 @@ function stream(chat, msg, nodes) {
   function paint() {
     painting = false; rafId = 0;
     if (!dirty) return;
+    var d = st.nodes;
+    // Markiert der Nutzer gerade Text in dieser Antwort, nicht neu zeichnen.
+    // dirty bleibt stehen, das naechste Token versucht es erneut.
+    if (d && hatAuswahlIn(d.body)) return;
     dirty = false;
     draw(true);
     scrollToBottom(false);
@@ -1074,20 +1093,28 @@ $("del-ok").addEventListener("click", function () {
 });
 
 /* ============ Eingabe & Events ============ */
+function messeComposer() {
+  if (!el.composerWrap) return;
+  var h = Math.round(el.composerWrap.getBoundingClientRect().height);
+  document.documentElement.style.setProperty("--composer-h", h + "px");
+}
 function autoGrow() {
   el.input.style.height = "auto";
   el.input.style.height = Math.min(el.input.scrollHeight, 200) + "px";   // ca. 8 Zeilen
+  messeComposer();                 // Log-Polster und "Nach unten" wandern mit
+  scrollToBottom(false);
 }
+window.addEventListener("resize", messeComposer);
 el.input.addEventListener("input", autoGrow);
 el.input.addEventListener("keydown", function (e) {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !e.repeat) { e.preventDefault(); send(); }
 });
 el.send.addEventListener("click", send);
 document.addEventListener("keydown", function (e) {
-  if (e.key === "Escape" && S.stream) {
-    if (el.dlgSet.open || el.dlgDel.open) return;   // Esc gehört dann dem Dialog
-    e.preventDefault(); stop();
-  }
+  if (e.key !== "Escape") return;
+  if (el.dlgSet.open || el.dlgDel.open) return;              // Esc gehört dann dem Dialog
+  if (el.side.classList.contains("open")) { e.preventDefault(); closeSide(); return; }
+  if (S.stream) { e.preventDefault(); stop(); }
 });
 el.model.addEventListener("change", function () { S.model = el.model.value; save(); });
 $("newchat").addEventListener("click", function () { newChat(); closeSide(); el.input.focus(); });
@@ -1099,8 +1126,15 @@ el.file.addEventListener("change", function () {
   el.file.value = "";
 });
 
-function openSide() { el.side.classList.add("open"); el.scrim.classList.add("show"); }
-function closeSide() { el.side.classList.remove("open"); el.scrim.classList.remove("show"); }
+function openSide() {
+  el.side.classList.add("open"); el.scrim.classList.add("show");
+  $("newchat").focus();                 // sonst tabbt man hinter die Ueberlagerung
+}
+function closeSide() {
+  if (!el.side.classList.contains("open")) return;
+  el.side.classList.remove("open"); el.scrim.classList.remove("show");
+  if (el.side.contains(document.activeElement)) $("burger").focus();
+}
 $("burger").addEventListener("click", openSide);
 el.scrim.addEventListener("click", closeSide);
 
@@ -1161,6 +1195,7 @@ function boot() {
     try { el.col.innerHTML = ""; newChat(); } catch (e2) {}
     toast("Gespeicherte Chats waren beschädigt und wurden übersprungen.");
   }
+  messeComposer();
   if (location.protocol === "file:") { gateFile(); return; }
   checkOllama();
 }
