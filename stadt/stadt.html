@@ -202,11 +202,18 @@ function strName(i) {
   if (i < 0) return 'Straße';
   return STRASSEN_VOR[Math.floor(i / STRASSEN.length) % STRASSEN_VOR.length] + STRASSEN[i % STRASSEN.length];
 }
+// Straßennamen im Satz: Dativ („an der Neuen Hauptstraße“, „am Oberen Birkenweg“) und Akkusativ
+// („die Neue Hauptstraße“, „den Oberen Birkenweg“).
+const beugen = (n) => n.replace(/^(Neue|Obere|Untere|Äußere|Kleine) /, (m, a) => a + 'n ');
 function ortVon(i) {
   const n = strName(i);
-  if (n.endsWith('weg')) return 'am ' + n.replace(/^(Neue|Obere|Untere|Äußere|Kleine) /, (m, a) => a + 'n ');
-  if (n.endsWith('gasse')) return 'in der ' + n;
-  return 'an der ' + n;
+  if (n.endsWith('weg')) return 'am ' + beugen(n);
+  if (n.endsWith('gasse')) return 'in der ' + beugen(n);
+  return 'an der ' + beugen(n);
+}
+function strAkk(i) {
+  const n = strName(i);
+  return n.endsWith('weg') ? 'den ' + beugen(n) : 'die ' + n;
 }
 function gebOrt(S, b) { return ortVon(S.g.str[b]); }
 
@@ -1325,7 +1332,9 @@ function menschenTag(S) {
     if (at === R.ERWACHSEN * J) {                            // erwachsen geworden
       bedarfStart(S, p); P.jetzt[p] = 1; P.sparSeit[p] = tag; erwachsenZaehlen(S, p);
     }
-    if (at === R.RENTE * J && P.arbeit[p] >= 0 && P.besitz[p] < 0) austreten(S, p);   // Rente
+    // ANNAHME: Mit 67 endet die Anstellung (Rente aus dem Budget). Die Spec sagt nur „job_suchen: 18–67“.
+    // Getestet: freiwilliger Ruhestand statt fester Grenze macht die Bevölkerungswelle größer, nicht kleiner.
+    if (at === R.RENTE * J && P.arbeit[p] >= 0 && P.besitz[p] < 0) austreten(S, p);
     // Geld: Rücklage in Tagen; ohne Arbeit im Erwerbsalter drückt es zusätzlich
     let gz = P.geld[p] / Math.max(20, tageskosten(S, p)) * 2.5;
     if (at < R.RENTE * J && P.arbeit[p] < 0) gz *= 0.6;
@@ -1463,8 +1472,8 @@ function bauamt(S) {
     if (r) {
       S.budget -= r.neu * R.K_STRASSE; st.strassen++;
       buch(S, r.abzweig
-        ? `Das Bauamt legt die ${strName(r.str)} an, Richtung ${RICHTUNG(r.dx, r.dy)}. Es gab keinen freien Bauplatz mehr.`
-        : `Das Bauamt verlängert die ${strName(r.str)} nach ${RICHTUNG(r.dx, r.dy)}. Es gab keinen freien Bauplatz mehr.`);
+        ? `Das Bauamt legt ${strAkk(r.str)} an, Richtung ${RICHTUNG(r.dx, r.dy)}. Es gab keinen freien Bauplatz mehr.`
+        : `Das Bauamt verlängert ${strAkk(r.str)} nach ${RICHTUNG(r.dx, r.dy)}. Es gab keinen freien Bauplatz mehr.`);
     }
   }
   // 3. Zufriedenheit im Viertel unter 50 und Budget übrig → Park
