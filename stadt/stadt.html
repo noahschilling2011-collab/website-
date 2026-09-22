@@ -98,6 +98,36 @@
     border: 1px solid var(--linie); border-radius: 10px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
     color: var(--text-leise); white-space: pre; font-variant-numeric: tabular-nums; }
 
+  /* Personen- und Hauskarte links */
+  #karte { position: fixed; left: var(--s4); top: 232px; bottom: 96px; width: min(380px, calc(100vw - 2 * var(--s4)));
+    overflow-y: auto; background: rgba(24, 27, 36, 0.96); border: 1px solid var(--linie); border-radius: var(--r);
+    padding: var(--s3) var(--s4) var(--s5); font-size: var(--klein); }
+  #karte .kopf { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--s2); min-height: 28px; }
+  #karte .kopf button { background: none; border: 0; color: var(--text-leise); cursor: pointer; padding: 4px 6px; border-radius: 6px; }
+  #karte .kopf button:hover { color: var(--text); background: rgba(255, 255, 255, 0.06); }
+  #karte h2 { margin: 0 0 2px; font-size: var(--gross); font-weight: 500; color: var(--text-stark); letter-spacing: -0.01em; outline: none; }
+  #karte h3 { margin: var(--s4) 0 var(--s2); font-size: 0.78rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--text-leise); }
+  #karte p { margin: 0 0 4px; }
+  #karte .leise { color: var(--text-leise); }
+  .werte { display: grid; grid-template-columns: 7.5em 1fr 2.2em; gap: 6px var(--s2); align-items: center; font-variant-numeric: tabular-nums; }
+  .werte .zahl { text-align: right; color: var(--text-leise); }
+  .balken { height: 6px; background: var(--ebene3); border-radius: 3px; overflow: hidden; }
+  .balken > span { display: block; height: 100%; background: var(--akzent); border-radius: 3px; }
+  .balken.gruen > span { background: var(--gut); }
+  .lebenslauf { list-style: none; margin: 0; padding: 0; }
+  .lebenslauf li { padding: 3px 0; display: grid; grid-template-columns: 4.2em 1fr; gap: var(--s2); }
+  .lebenslauf .tag { color: var(--text-leise); font-variant-numeric: tabular-nums; }
+  .familie { display: grid; grid-template-columns: 5.5em 1fr; gap: 4px var(--s2); }
+  .familie dt { color: var(--text-leise); }
+  .familie dd { margin: 0; }
+  .personenliste { list-style: none; margin: 0; padding: 0; }
+  .personenliste li { display: flex; justify-content: space-between; gap: var(--s2); padding: 4px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+  .personenliste li.neuer-haushalt { border-top: 1px solid var(--linie); }
+  button.haus { background: none; border: 0; padding: 0; cursor: pointer; color: inherit; text-decoration: underline;
+    text-decoration-color: rgba(255, 255, 255, 0.25); text-underline-offset: 2px; font: inherit; }
+  button.haus:hover { color: var(--akzent); }
+
   /* Knopf für Einstellungen unten rechts */
   #einst-knopf { position: fixed; right: var(--s4); bottom: var(--s4); width: 44px; height: 44px; display: grid; place-items: center;
     cursor: pointer; color: var(--text-leise); padding: 0; }
@@ -138,12 +168,14 @@
     z-index: 10; }
   #meldung.fehler { border-color: rgba(242, 153, 138, 0.6); color: var(--schlecht); }
   #meldung.warnung { border-color: rgba(255, 200, 100, 0.55); color: var(--akzent); }
+  body.debug #karte { bottom: 132px; }                    /* nicht über den Debug-Knöpfen */
   #debug-knoepfe { position: fixed; left: var(--s4); bottom: 92px; display: flex; gap: var(--s1); font-size: 12px; }
   #debug-knoepfe .knopf { padding: 4px 8px; font-size: 12px; }
 
   @media (max-width: 720px) {
     #stadtbuch { top: auto; bottom: 76px; max-height: 38svh; }
     #kennzahlen { min-width: 0; }
+    #karte { top: auto; left: var(--s2); right: var(--s2); width: auto; bottom: 76px; max-height: 55svh; z-index: 5; }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important;
@@ -187,6 +219,16 @@
     <span>Stadtbuch</span><svg class="pfeil" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
   </button>
   <ol id="buch-liste" reversed></ol>
+</aside>
+
+<aside id="karte" aria-label="Karte" hidden>
+  <div class="kopf">
+    <button type="button" id="karte-zurueck" hidden>‹ zurück</button><span></span>
+    <button type="button" id="karte-zu" aria-label="Karte schließen">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div id="karte-inhalt"></div>
 </aside>
 
 <div id="debug" hidden></div>
@@ -2211,6 +2253,10 @@ let versionFehler = null;
       speichernErlaubt = false;                           // den alten Stand nicht überschreiben, bevor Noah entscheidet
     }
   }
+  if (DEBUG && URLP.get('umland')) {                      // Testhilfe: größere Stadt (5000-Einwohner-Test). Nicht speichern,
+    Sim.R.UMLAND = Number(URLP.get('umland')) || Sim.R.UMLAND;   // sonst liefe der Stand später mit dem normalen Umland weiter
+    speichernErlaubt = false;
+  }
   if (!S) {
     S = Sim.neueStadt(Number(URLP.get('seed')) || zufallsSeed());
     if (DEBUG && URLP.get('tage')) {                      // Testhilfe: Stadt vorab N Tage laufen lassen
@@ -2302,6 +2348,9 @@ function baueGrafik(THREE, OrbitControls) {
 
   const dummy = new THREE.Object3D();
   const farbe = new THREE.Color();
+  // Zu jeder Instanz das Gebäude merken (für Klicks)
+  const IDS = { haus: new Int32Array(4000), dach: new Int32Array(4000), fenster: new Int32Array(40000),
+    werkstatt: new Int32Array(3000), schlot: new Int32Array(3000), laden: new Int32Array(3000), markise: new Int32Array(3000) };
   const H = Sim.KARTE / 2;
   const wx = (x) => x - H + 0.5;
   function setze(m, i, x, y, z, sx, sy, sz, rotY) {
@@ -2367,8 +2416,9 @@ function baueGrafik(THREE, OrbitControls) {
       if (t === Sim.WOHNHAUS) {
         const stufe = g.stufe[b], geschosse = GESCHOSSE[stufe], hoehe = geschosse * GESCHOSS;
         if (!setze(M.haus, nh, px, 0, pz, 1, hoehe, 1)) continue;
+        IDS.haus[nh] = b;
         M.haus.setColorAt(nh++, HAUSFARBEN[(hash(b) * HAUSFARBEN.length) | 0]);
-        if (stufe < 3) setze(M.dach, nd++, px, hoehe, pz, 1, 1, 1);
+        if (stufe < 3 && setze(M.dach, nd, px, hoehe, pz, 1, 1, 1)) IDS.dach[nd++] = b;
         if (g.auf[b]) {                                   // Aufstockung: Gerüst bis zur neuen Höhe
           setze(M.bau, nbau++, px, 0, pz, 1.08, GESCHOSSE[g.auf[b]] * GESCHOSS + 0.05, 1.08);
         }
@@ -2377,27 +2427,31 @@ function baueGrafik(THREE, OrbitControls) {
         const lit = nacht || tageszeit < 7.5 ? Math.ceil(geschosse * (belegt / cap) * lichtAnteil(tageszeit, b)) : 0;
         for (let s = 0; s < geschosse; s++) {
           if (!setze(M.fenster, nf, px, s * GESCHOSS + 0.16, pz, 1, 0.13, 1)) break;
+          IDS.fenster[nf] = b;
           M.fenster.setColorAt(nf++, s < lit ? LICHT : nacht ? GLAS_NACHT : GLAS_TAG);
         }
       } else if (t === Sim.WERKSTATT) {
         const leer = g.leer[b];
         farbe.copy(WERKSTATT).multiplyScalar(leer ? 0.55 : 1);
         if (!setze(M.werkstatt, nw, px, 0, pz, 1, 1, 1)) continue;
+        IDS.werkstatt[nw] = b;
         M.werkstatt.setColorAt(nw++, farbe);
-        setze(M.schlot, ns++, px + 0.26, 0.7, pz - 0.26, 1, 0.55, 1);
-        if (!leer && !nacht && setze(M.fenster, nf, px, 0.28, pz, 1.1, 0.12, 1.1)) M.fenster.setColorAt(nf++, GLAS_TAG);
+        if (setze(M.schlot, ns, px + 0.26, 0.7, pz - 0.26, 1, 0.55, 1)) IDS.schlot[ns++] = b;
+        if (!leer && !nacht && setze(M.fenster, nf, px, 0.28, pz, 1.1, 0.12, 1.1)) { IDS.fenster[nf] = b; M.fenster.setColorAt(nf++, GLAS_TAG); }
       } else if (t === Sim.LADEN) {
         const leer = g.leer[b], offen = !leer;
         farbe.copy(LADENFARBEN[(hash(b) * LADENFARBEN.length) | 0]).multiplyScalar(leer ? 0.5 : 1);
         if (!setze(M.laden, nl, px, 0, pz, 1, 1, 1)) continue;
+        IDS.laden[nl] = b;
         M.laden.setColorAt(nl++, farbe);
         const r = zurStrasse(x, y), [dx, dy] = RICHT[r];
         setze(M.markise, nm, px + dx * 0.44, 0.42, pz + dy * 0.44, 1, 1, 1, dx !== 0 ? Math.PI / 2 : 0);
+        IDS.markise[nm] = b;
         farbe.copy(MARKISEN[(hash(b + 3) * MARKISEN.length) | 0]).multiplyScalar(leer ? 0.45 : 1);
         M.markise.setColorAt(nm++, farbe);
         // Schaufenster: abends beleuchtet, solange der Laden offen ist
         const lichtLaden = offen && tageszeit >= 17 && tageszeit < 22;
-        if (setze(M.fenster, nf, px, 0.12, pz, 1.03, 0.16, 1.03)) M.fenster.setColorAt(nf++, lichtLaden ? LICHT : nacht ? GLAS_NACHT : GLAS_TAG);
+        if (setze(M.fenster, nf, px, 0.12, pz, 1.03, 0.16, 1.03)) { IDS.fenster[nf] = b; M.fenster.setColorAt(nf++, lichtLaden ? LICHT : nacht ? GLAS_NACHT : GLAS_TAG); }
       } else if (t === Sim.PARK) {
         setze(M.park, np++, px, 0, pz, 1, 1, 1);
         const h = hash(b);
@@ -2409,6 +2463,180 @@ function baueGrafik(THREE, OrbitControls) {
     fertig(M.haus, nh); fertig(M.dach, nd); fertig(M.fenster, nf); fertig(M.werkstatt, nw); fertig(M.schlot, ns);
     fertig(M.laden, nl); fertig(M.markise, nm); fertig(M.park, np); fertig(M.baum, nb); fertig(M.bau, nbau);
   }
+
+  // ─── Figuren: höchstens 300 zufällige Erwachsene, dazu alle Hauptfiguren (mit Markierung) ──
+  const FIG_MAX = 300, HAUPT_MAX = 10, FIG_GES = FIG_MAX + HAUPT_MAX, GEHTEMPO = 22;   // Felder pro Spielstunde
+  const figMesh = inst(new THREE.CapsuleGeometry(0.055, 0.13, 2, 6).translate(0, 0.12, 0), lambert('#ffffff'), FIG_GES);
+  const markMesh = inst(new THREE.OctahedronGeometry(0.065), new THREE.MeshBasicMaterial({ color: '#ffc864' }), HAUPT_MAX);
+  const NULL = new THREE.Matrix4().makeScale(0, 0, 0);
+  const FIGFARBEN = ['#e6d3bd', '#c2d3e6', '#e6c2bd', '#c6e0c2', '#e6dcb8', '#b8d8d8', '#d8c2b0', '#aebfd8'].map(c => new THREE.Color(c));
+  const figuren = [];                                     // { p, gen, route, start, dauer, versatz, ox, oz, haupt }
+  const figIds = new Int32Array(FIG_GES).fill(-1);
+  let hauptIds = [];
+  const wege = new Map();
+  const bfsVon = new Int32Array(F), bfsMarke = new Uint32Array(F), bfsQ = new Int32Array(F);
+  let bfsLauf = 0;
+  function strassenNachbar(b) {
+    const x = S.g.x[b], y = S.g.y[b];
+    for (const [dx, dy] of RICHT) { const c = (y + dy) * Sim.KARTE + (x + dx); if (S.feld[c] === Sim.STRASSE) return c; }
+    return -1;
+  }
+  // Weg von Gebäude a zu Gebäude b: Breitensuche auf dem Straßenraster, einmal je Strecke, dann aus dem Cache
+  function weg(a, b) {
+    const key = a * 65536 + b;
+    let r = wege.get(key);
+    if (r) return r;
+    const K = Sim.KARTE, s0 = strassenNachbar(a), z0 = strassenNachbar(b), pts = [wx(S.g.x[a]), wx(S.g.y[a])];
+    if (s0 >= 0 && z0 >= 0) {
+      bfsLauf++;
+      let kopf = 0, ende = 0, gefunden = s0 === z0;
+      bfsQ[ende++] = s0; bfsMarke[s0] = bfsLauf; bfsVon[s0] = -1;
+      while (kopf < ende && !gefunden) {
+        const c = bfsQ[kopf++], cx = c % K, cy = (c / K) | 0;
+        for (const [dx, dy] of RICHT) {
+          const nx = cx + dx, ny = cy + dy;
+          if (nx < 0 || ny < 0 || nx >= K || ny >= K) continue;
+          const n = ny * K + nx;
+          if (bfsMarke[n] === bfsLauf || S.feld[n] !== Sim.STRASSE) continue;
+          bfsMarke[n] = bfsLauf; bfsVon[n] = c;
+          if (n === z0) { gefunden = true; break; }
+          bfsQ[ende++] = n;
+        }
+      }
+      if (gefunden) {
+        const kette = [];
+        for (let c = z0; c !== -1; c = bfsVon[c]) kette.push(c);
+        for (let i = kette.length - 1; i >= 0; i--) pts.push(wx(kette[i] % K), wx((kette[i] / K) | 0));
+      }
+    }
+    pts.push(wx(S.g.x[b]), wx(S.g.y[b]));
+    const n = pts.length / 2, cum = new Float32Array(n);
+    for (let i = 1; i < n; i++) cum[i] = cum[i - 1] + Math.hypot(pts[2 * i] - pts[2 * i - 2], pts[2 * i + 1] - pts[2 * i - 1]);
+    r = { pts: Float32Array.from(pts), cum, len: cum[n - 1] };
+    if (wege.size > 4000) wege.clear();
+    wege.set(key, r);
+    return r;
+  }
+  function neueFigur(f, p, haupt) {
+    f.p = p; f.gen = S.p.gen[p]; f.route = null; f.haupt = haupt;
+    f.versatz = Math.random() * 0.15; f.ox = (Math.random() - 0.5) * 0.4; f.oz = (Math.random() - 0.5) * 0.4;
+  }
+  // Nach jedem Simulationsschritt: wer läuft in dieser Stunde wohin? (Folgt den Entscheidungen der Leute)
+  function figurenPlanen() {
+    const P = S.p, erw = S.tag - Sim.R.ERWACHSEN * Sim.R.JAHR;
+    // Hauptfiguren in die letzten Plätze
+    while (figuren.length < FIG_GES) figuren.push({ p: -1, gen: 0, route: null, start: 0, dauer: 0, versatz: 0, ox: 0, oz: 0, haupt: false });
+    for (let i = 0; i < HAUPT_MAX; i++) {
+      const f = figuren[FIG_MAX + i], h = hauptIds[i];
+      if (h === undefined || !P.lebt[h]) { f.p = -1; continue; }
+      if (f.p !== h || f.gen !== P.gen[h]) neueFigur(f, h, true);
+    }
+    // Freie Plätze mit zufälligen Erwachsenen füllen (nie doppelt, nie Hauptfiguren)
+    const belegt = new Set();
+    for (const f of figuren) if (f.p >= 0 && P.lebt[f.p] && P.gen[f.p] === f.gen) belegt.add(f.p);
+    let kandidaten = null;
+    for (let i = 0; i < FIG_MAX; i++) {
+      const f = figuren[i];
+      if (f.p >= 0 && P.lebt[f.p] && P.gen[f.p] === f.gen && P.geb[f.p] < erw) continue;
+      f.p = -1;
+      if (!kandidaten) { kandidaten = []; for (let p = 0; p < S.pMax; p++) if (P.lebt[p] && P.geb[p] < erw && !belegt.has(p)) kandidaten.push(p); }
+      while (kandidaten.length) {
+        const j = (Math.random() * kandidaten.length) | 0, p = kandidaten[j];
+        kandidaten[j] = kandidaten[kandidaten.length - 1]; kandidaten.pop();
+        if (!belegt.has(p)) { neueFigur(f, p, false); belegt.add(p); break; }
+      }
+    }
+    const H = S.stunde, jetzt = S.tag * 24 + H;
+    for (let i = 0; i < figuren.length; i++) {
+      const f = figuren[i];
+      if (f.p < 0) continue;
+      const p = f.p, w = P.wohnung[p], arb = P.arbeit[p], frei = P.frei[p], bes = P.besuch[p], st = P.stammladen[p];
+      const arbeitet = arb >= 0 && !frei;
+      let von = -1, nach = -1;
+      if (H === 8 && arbeitet) { von = w; nach = arb; }                 // nach der Entscheidung um 7: zur Arbeit
+      else if (H === 17 && arbeitet) { von = arb; nach = w; }           // Feierabend
+      else if (H === 19 && bes >= 0 && bes !== w) { von = w; nach = bes; }   // nach der Entscheidung um 18: zu Freunden
+      else if (H === 22 && bes >= 0 && bes !== w) { von = bes; nach = w; }
+      else if (H === 10 && !arbeitet && st >= 0) { von = w; nach = st; }     // wer frei hat, geht einkaufen
+      else if (H === 11 && !arbeitet && st >= 0) { von = st; nach = w; }
+      if (von >= 0 && nach >= 0 && von !== nach) {
+        f.route = weg(von, nach);
+        f.start = jetzt + f.versatz;
+        f.dauer = Math.max(0.2, Math.min(0.85, f.route.len / GEHTEMPO));
+      }
+    }
+    for (let i = 0; i < figuren.length; i++) {
+      const f = figuren[i];
+      if (f.p >= 0) figMesh.setColorAt(i, f.haupt ? LICHT : FIGFARBEN[f.p % FIGFARBEN.length]);
+    }
+    if (figMesh.instanceColor) figMesh.instanceColor.needsUpdate = true;
+  }
+  // Jedes Bild: Figuren entlang ihres Weges schieben (ohne neue Objekte)
+  function figurenBewegen(jetzt) {
+    let nm = 0;
+    for (let i = 0; i < figuren.length; i++) {
+      const f = figuren[i], r = f.route;
+      figIds[i] = -1;
+      if (f.p < 0 || !r || jetzt < f.start || jetzt >= f.start + f.dauer || r.len === 0) { figMesh.setMatrixAt(i, NULL); continue; }
+      const d = ((jetzt - f.start) / f.dauer) * r.len, cum = r.cum;
+      let lo = 0, hi = cum.length - 1;
+      while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (cum[mid] <= d) lo = mid; else hi = mid; }
+      const seg = cum[hi] - cum[lo], k = seg > 0 ? (d - cum[lo]) / seg : 0;
+      const x0 = r.pts[2 * lo], z0 = r.pts[2 * lo + 1], x1 = r.pts[2 * hi], z1 = r.pts[2 * hi + 1];
+      const x = x0 + (x1 - x0) * k + f.ox, z = z0 + (z1 - z0) * k + f.oz;
+      dummy.position.set(x, 0.02, z); dummy.scale.set(1, 1, 1); dummy.rotation.set(0, Math.atan2(x1 - x0, z1 - z0), 0);
+      dummy.updateMatrix();
+      figMesh.setMatrixAt(i, dummy.matrix);
+      figIds[i] = f.p;
+      if (f.haupt) {
+        dummy.position.set(x, 0.46 + (REDUZIERT ? 0 : Math.sin(jetzt * 40 + i) * 0.03), z); dummy.rotation.set(0, 0, 0);
+        dummy.updateMatrix();
+        markMesh.setMatrixAt(nm++, dummy.matrix);
+      }
+    }
+    figMesh.count = figuren.length;
+    figMesh.instanceMatrix.needsUpdate = true;
+    figMesh.boundingSphere = null;
+    markMesh.count = nm;
+    markMesh.instanceMatrix.needsUpdate = true;
+  }
+
+  // ─── Klicken: Figur (in Bildschirmnähe) oder Gebäude ───
+  const ray = new THREE.Raycaster(), zeiger = new THREE.Vector2(), treffer = [], v3 = new THREE.Vector3(), m4 = new THREE.Matrix4();
+  const KLICKBAR = [M.haus, M.dach, M.fenster, M.werkstatt, M.schlot, M.laden, M.markise];
+  const KLICK_IDS = [IDS.haus, IDS.dach, IDS.fenster, IDS.werkstatt, IDS.schlot, IDS.laden, IDS.markise];
+  function waehle(cx, cy) {
+    const r = canvas.getBoundingClientRect();
+    // Figuren sind klein: nimm die nächste sichtbare Figur im Umkreis von 16 Pixeln
+    let bestP = -1, bestD = 16 * 16;
+    for (let i = 0; i < figuren.length; i++) {
+      if (figIds[i] < 0) continue;
+      figMesh.getMatrixAt(i, m4);
+      v3.setFromMatrixPosition(m4); v3.y += 0.15; v3.project(camera);
+      const sx = (v3.x + 1) / 2 * r.width + r.left, sy = (1 - v3.y) / 2 * r.height + r.top;
+      const d = (sx - cx) ** 2 + (sy - cy) ** 2;
+      if (d < bestD && v3.z < 1) { bestD = d; bestP = figIds[i]; }
+    }
+    if (bestP >= 0) return { person: bestP, gen: S.p.gen[bestP] };
+    zeiger.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(zeiger, camera);
+    treffer.length = 0;
+    ray.intersectObjects(KLICKBAR, false, treffer);
+    for (const t of treffer) {
+      const k = KLICKBAR.indexOf(t.object);
+      if (k >= 0 && t.instanceId !== undefined && t.instanceId < t.object.count) return { gebaeude: KLICK_IDS[k][t.instanceId] };
+    }
+    return null;
+  }
+  let runter = null;
+  canvas.addEventListener('pointerdown', (e) => { runter = { x: e.clientX, y: e.clientY }; });
+  canvas.addEventListener('pointerup', (e) => {
+    if (!runter || Math.hypot(e.clientX - runter.x, e.clientY - runter.y) > 5) return;
+    runter = null;
+    const w = waehle(e.clientX, e.clientY);
+    if (w && w.person !== undefined) zeigePerson(w.person, w.gen);
+    else if (w && w.gebaeude !== undefined) zeigeGebaeude(w.gebaeude);
+  });
 
   // Tag und Nacht aus der Spielzeit: Stützstellen, dazwischen weich überblenden
   const TAG = [
@@ -2466,10 +2694,12 @@ function baueGrafik(THREE, OrbitControls) {
 
   return {
     stadt, licht, ausrichten,
-    neueStadt() { strassenStand = -1; ausrichten(); stadt(S.stunde); },   // nach einem Import
+    neueStadt() { strassenStand = -1; wege.clear(); for (const f of figuren) f.p = -1; ausrichten(); stadt(S.stunde); },   // nach einem Import
+    figurenPlanen, figurenBewegen,
+    setzeHauptfiguren(ids) { hauptIds = ids.slice(0, HAUPT_MAX); },
     render() { controls.update(); renderer.render(scene, camera); return renderer.info.render; },
     instanzen() { return Object.values(M).reduce((s, m) => s + m.count, 0); },
-    THREE, renderer, scene, camera, controls, M,
+    THREE, renderer, scene, camera, controls, M, figMesh,
   };
 }
 
@@ -2530,6 +2760,76 @@ function buchAnzeigen() {
   buchGesehen = S.buchNr;
 }
 
+// ─── Personenkarte und Hauskarte ─────────────────────────────────────────────────────
+const verlauf = [];                                       // besuchte Karten, für „zurück“
+const ZUEGE = [['fleiss', 'Fleiß'], ['gesellig', 'Geselligkeit'], ['ehrgeiz', 'Ehrgeiz'], ['spar', 'Sparsamkeit'], ['heimat', 'Heimatliebe']];
+const BEDARF = [['geld', 'Geld'], ['wohnen', 'Wohnen'], ['kontakt', 'Kontakt'], ['freizeit', 'Freizeit']];
+const nameKnopf = (r) => r ? (r.lebt ? `<button type="button" class="name" data-p="${r.id}" data-g="${r.gen}">${esc(r.name)}</button>` : `<span class="leise">${esc(r.name)} †</span>`) : '–';
+const hausKnopf = (b, text) => b >= 0 ? `<button type="button" class="haus" data-b="${b}">${text}</button>` : text;
+const balken = (wert, gruen) => `<div class="balken${gruen ? ' gruen' : ''}" role="img" aria-label="${Math.round(wert)} von 100"><span style="width:${Math.max(0, Math.min(100, wert))}%"></span></div>`;
+function zeigePerson(p, gen) { verlauf.push({ art: 'p', id: Number(p), gen: Number(gen) }); karteRendern(true); }
+function zeigeGebaeude(b) { verlauf.push({ art: 'g', id: Number(b) }); karteRendern(true); }
+function karteZu() { verlauf.length = 0; $('karte').hidden = true; }
+$('karte-zu').addEventListener('click', karteZu);
+$('karte-zurueck').addEventListener('click', () => { verlauf.pop(); karteRendern(true); });
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('karte').hidden && !document.querySelector('dialog[open]')) karteZu(); });
+document.addEventListener('click', (e) => {
+  const n = e.target.closest('button.name');
+  if (n) { zeigePerson(n.dataset.p, n.dataset.g); return; }
+  const h = e.target.closest('button.haus');
+  if (h) zeigeGebaeude(h.dataset.b);
+});
+function karteAktualisieren() { if (!$('karte').hidden && verlauf.length) karteRendern(false); }
+function karteRendern(fokus) {
+  const k = verlauf[verlauf.length - 1];
+  if (!k) { karteZu(); return; }
+  $('karte').hidden = false;
+  $('karte-zurueck').hidden = verlauf.length < 2;
+  const ziel = $('karte-inhalt');
+  const scroll = $('karte').scrollTop;
+  ziel.innerHTML = k.art === 'p' ? personHtml(k.id, k.gen) : gebaeudeHtml(k.id);
+  if (fokus) { $('karte').scrollTop = 0; const h = ziel.querySelector('h2'); if (h) h.focus({ preventScroll: true }); }
+  else $('karte').scrollTop = scroll;
+}
+function personHtml(p, gen) {
+  const i = Sim.personInfo(S, p, gen);
+  if (!i) return `<h2 tabindex="-1">Nicht mehr in der Stadt</h2><p class="leise">Diese Person ist gestorben oder weggezogen.</p>`;
+  let h = `<h2 tabindex="-1">${esc(i.name)}</h2>
+    <p class="leise">${i.alter} Jahre${i.kind ? ', Kind' : ''}</p>
+    <p>${buchHtml(i.arbeit)}${i.arbeitsort >= 0 ? ' · ' + hausKnopf(i.arbeitsort, 'Betrieb ansehen') : ''}</p>
+    <p>${i.wohnung >= 0 ? hausKnopf(i.wohnung, esc(i.wohnen)) : esc(i.wohnen)}</p>`;
+  if (!i.kind) h += `<p class="leise">${zahl(i.geld)} Taler${i.ziel ? ` · Ziel: <span style="color:var(--text)">${esc(i.ziel.text)}</span> (noch ${i.ziel.rest} ${i.ziel.rest === 1 ? 'Tag' : 'Tage'})` : ''}</p>`;
+  h += `<h3>Charakter</h3><div class="werte">${ZUEGE.map(([k, n]) => `<span>${n}</span>${balken(i.charakter[k])}<span class="zahl">${i.charakter[k]}</span>`).join('')}</div>`;
+  if (i.beduerfnisse) {
+    h += `<h3>Befinden · zufrieden ${Math.round(i.zufriedenheit)}</h3><div class="werte">${BEDARF.map(([k, n]) => `<span>${n}</span>${balken(i.beduerfnisse[k], true)}<span class="zahl">${Math.round(i.beduerfnisse[k])}</span>`).join('')}</div>`;
+  }
+  h += `<h3>Lebenslauf</h3>` + (i.gedaechtnis.length
+    ? `<ol class="lebenslauf">${i.gedaechtnis.map(m => `<li><span class="tag">Tag ${m.tag}</span><span>${buchHtml(m.text)}</span></li>`).join('')}</ol>`
+    : '<p class="leise">Noch nichts erlebt.</p>');
+  const liste = (a) => a.length ? a.map(nameKnopf).join(', ') : '–';
+  h += `<h3>Familie</h3><dl class="familie">
+    <dt>Partner</dt><dd>${nameKnopf(i.partner)}</dd>
+    <dt>Eltern</dt><dd>${liste(i.eltern)}</dd>
+    <dt>Kinder</dt><dd>${liste(i.kinder)}</dd>
+    <dt>Enkel</dt><dd>${liste(i.enkel)}</dd></dl>`;
+  h += `<h3>Freunde</h3><p>${liste(i.freunde)}</p>`;
+  return h;
+}
+function gebaeudeHtml(b) {
+  const g = Sim.gebaeudeInfo(S, b);
+  if (!g) return '<h2 tabindex="-1">Unbekanntes Gebäude</h2>';
+  let h = `<h2 tabindex="-1">${esc(g.titel)}</h2>${g.zeile ? `<p class="leise">${esc(g.zeile)}</p>` : ''}`;
+  if (!g.personen.length) return h + (g.typ === Sim.PARK ? '' : '<p class="leise">Hier ist gerade niemand.</p>');
+  h += `<h3>${g.typ === Sim.WOHNHAUS ? 'Hier wohnen' : 'Hier arbeiten'} (${g.personen.length})</h3><ul class="personenliste">`;
+  let vorher = null;
+  for (const x of g.personen) {
+    const neu = g.typ === Sim.WOHNHAUS && x.mieter && vorher !== null;
+    h += `<li${neu ? ' class="neuer-haushalt"' : ''}><span>${nameKnopf(x)}</span><span class="leise">${x.rolle ? esc(x.rolle) : x.alter + ' J.'}</span></li>`;
+    vorher = x;
+  }
+  return h + '</ul>';
+}
+
 // ─── Takt ────────────────────────────────────────────────────────────────────────────
 function schritt() {
   const t0 = performance.now();
@@ -2539,7 +2839,8 @@ function schritt() {
 function nachSchritten() {
   kennzahlenAnzeigen();
   buchAnzeigen();
-  if (G) G.stadt(S.stunde);
+  if (G) { G.stadt(S.stunde); G.figurenPlanen(); }
+  karteAktualisieren();
 }
 function simTakt(dt) {
   if (!tempo || aufholenLaeuft) return;
@@ -2552,7 +2853,7 @@ function simTakt(dt) {
 
 // Debug-Ecke: gemessen, nicht geschätzt
 const dbg = { frames: 0, summe: 0, max: 0, letzte: performance.now(), calls: 0, dreiecke: 0 };
-if (DEBUG) $('debug').hidden = false;
+if (DEBUG) { $('debug').hidden = false; document.body.classList.add('debug'); }
 function debugAnzeigen(frameMs, info) {
   dbg.frames++; dbg.summe += frameMs; dbg.max = Math.max(dbg.max, frameMs);
   if (info) { dbg.calls = info.calls; dbg.dreiecke = info.triangles; }
@@ -2575,7 +2876,7 @@ function frame(jetzt) {
   const t = S.stunde + Math.min(0.999, akku / SEK_PRO_STUNDE);   // Tageszeit mit Zwischenwerten
   uhrAnzeigen(t);
   let info = null;
-  if (G) { G.licht(t); info = G.render(); }
+  if (G) { G.licht(t); G.figurenBewegen(S.tag * 24 + t); info = G.render(); }
   if (DEBUG) debugAnzeigen(performance.now() - jetzt, info);
   requestAnimationFrame(frame);
 }
