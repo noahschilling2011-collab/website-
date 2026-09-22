@@ -39,18 +39,18 @@ Ab Phase 1 im Browser: `python3 -m http.server 8000` **im Ordner `stadt/`**, dan
 | 3 | Mit 67 endet die Anstellung, Rente 50/Tag aus dem Budget, solange es reicht | Die Spec nennt nur „job_suchen: 18–67“. Ohne feste Grenze wurde die Bevölkerungswelle getestet größer |
 | 4 | Die Stadt besitzt die Wohnhäuser, Miete geht ins Budget. Budget = 10 % Steuer vom Lohn + Miete | Die Spec sagt „Miete raus“, aber nicht wohin |
 | 5 | Werkstätten verkaufen ans Umland. Erlös je Arbeitstag = min(140, 50.000 / alle Werkstatt-Arbeitenden) | Einzige Geldquelle von außen und als Wachstumsgrenze gedacht (siehe „Bekannte Schwächen“) |
-| 6 | Läden haben eine Kapazität: 2,5 Leute je Stelle (Besitzer zählt mit), also 17 pro Laden. Ist der Laden voll, geht man zum nächsten mit Platz in Reichweite | Sonst schluckt ein Laden in der Mitte die ganze Stadt, und Ladenjobs wachsen nicht mit der Kundschaft |
+| 6 | Läden haben eine Kapazität: 5 Leute je Stelle (Besitzer zählt mit), also 35 pro Laden. Ist der Laden voll, geht man zum nächsten mit Platz in Reichweite. Die Hälfte des Ladenumsatzes geht an Lieferanten außerhalb der Stadt (Wareneinsatz) | Sonst schluckt ein Laden in der Mitte die ganze Stadt. Ohne Wareneinsatz entsteht pro Kopf eine halbe Ladenstelle, und die Stadt schaukelt sich auf (siehe Schwächen) |
 | 7 | Stammladen: Man bleibt beim Laden, solange er offen, in Reichweite und nicht voll ist. Den nächstgelegenen sucht man beim ersten Einkauf oder wenn der eigene wegfällt | Weicht vom Wortlaut „Einkauf beim nächsten Laden“ ab. Ohne das nimmt jeder neue Laden dem Nachbarn sofort die Kundschaft weg |
 | 8 | Wer Erspartes hat, gibt täglich bis 1 % davon (höchstens 15) zusätzlich aus, Sparsame weniger | Sonst sammelt sich das Geld bei den Leuten, und die Läden bekommen nichts ab |
 | 9 | Besitzer zahlen Lohn nach Charakter: wenig sparsam = großzügiger (90–110 % vom Grundlohn) | Gibt `job_wechseln` einen Grund |
 | 10 | Pleite-Betriebe stehen leer und können übernommen werden (40 % der Baukosten). Eine Übernahme zählt als Gründung | Die Spec sagt „Gebäude wird frei“ |
-| 11 | Zuzug: freie Stellen zählen nur, soweit sie nicht schon Arbeitslose der Stadt besetzen könnten | Sonst ziehen Leute für Stellen zu, die Einheimische ohnehin gleich nehmen |
+| 11 | Zuzug: freie Stellen zählen nur, soweit sie nicht schon Arbeitslose der Stadt besetzen könnten. Höchstens 1 + 1 % der Einwohner pro Tag | Sonst ziehen Leute für Stellen zu, die Einheimische ohnehin gleich nehmen, und Wellen schaukeln sich auf |
 | 12 | „Wohnungssuchende“ fürs Bauamt = Leute ohne Wohnung oder mit erfolgloser Suche **plus** Anfragen von außen (Leute, die wegen freier Stellen kämen, aber keine Wohnung finden) | Sonst baut das Bauamt nie vorausschauend, und der Zuzug stockt |
 | 13 | Zufriedenheit = 100 − gewichtetes Mittel 4. Grades der Dringlichkeiten. Das schlimmste Bedürfnis zählt am stärksten. Trauer −15, kein Einkauf −10. Der Zielwert wird alle 6 Spielstunden neu berechnet, die Zufriedenheit gleitet stündlich hin | Mit dem normalen Mittel fällt kaum jemand unter 20, dann zieht niemand weg |
 | 14 | Wohnen = Enge der Wohnung (Haushaltsgröße gegen Wohnungsgröße der Hausstufe) plus Park in der Nähe. Umziehen nur, wenn die neue Wohnung spürbar besser ist. Nach einer erfolglosen Suche 5 Tage Pause | Vorher zogen Haushalte zweimal am Tag hin und her, weil ein Umzug das Problem nicht löste |
 | 15 | Die Partnerwahl achtet nicht auf das Geschlecht (etwa die Hälfte der Paare ist gleichgeschlechtlich). Jedes Paar kann ein Kind bekommen, wenn beide unter 45 und beide über 60 zufrieden sind | Die Spec sagt zu beidem nichts. **Offene Frage an Noah**, ob das so bleiben soll |
 | 16 | Bleiben nach einem Tod oder Wegzug nur Kinder im Haushalt, kommen sie zu Verwandten außerhalb | Kinder haben keine Aktionen und kein Einkommen |
-| 17 | Gründen: Schwelle = Kosten des Betriebs, den man gründen würde (Bau oder Übernahme plus 300 Startkasse). Fehlt in der Nähe ein Laden (oder gehen in Reichweite ≥ 10 Leute leer aus), wird es ein Laden, sonst eine Werkstatt. Lohnt die laut Umlandpreis (geplante Werkstattstellen mitgezählt) nicht, sinkt der Wert. Sparsame schreckt das stärker ab | Ein Laden ohne Mangel in der Nähe bekäme keine Kundschaft, weil alle ihren Stammladen haben |
+| 17 | Gründen nur mit Aussicht: In der Nähe fehlt ein Laden bzw. in Reichweite gehen ≥ 20 Leute leer aus (dann Laden), oder eine Werkstatt lohnt sich laut Umlandpreis mit allen schon geplanten Werkstattstellen (dann Werkstatt). Läden im Bau zählen in ihrer Reichweite schon als Versorgung. Schwelle = Kosten des Betriebs (Bau oder Übernahme plus 300 Startkasse) | Sonst gründen alle am selben Tag in denselben Markt, und Läden ohne Kundschaft gehen mit 0 Leuten pleite |
 | 18 | Wegziehen: Wert = (30 + wie tief unter 20 + wie lange schon im Elend) × (1,6 − 2,2 × Heimatliebe). Wer wenig Heimatliebe hat, geht gleich. Mittlere Heimatliebe geht, wenn das Elend anhält. Ab etwa 60 Heimatliebe bleibt man | Die Spec: „Heimatliebe hoch: bleibt auch in schlechten Zeiten“ |
 | 19 | Die vier Gedächtnis-Wirkungen (Job verloren, Pleite, getrennt, Trauer) laufen über „zuletzt erlebt am Tag X“. Das wird beim Eintrag ins Gedächtnis gesetzt | Sonst verfallen sie früher als nach 30 bzw. 180 Tagen, wenn der 8er-Ring überschrieben wird |
 | 20 | Nach einem Ereignis entscheiden die Betroffenen in der nächsten Stunde (auch Partner, Freund, Eltern). Wer das Ereignis selbst ausgelöst hat, hat gerade entschieden | Spec: „direkt nach einem Ereignis“ |
@@ -64,12 +64,13 @@ Ab Phase 1 im Browser: `python3 -m http.server 8000` **im Ordner `stadt/`**, dan
 
 ## Bekannte Schwächen
 
-**Gate 4 ist nicht erfüllt.** Die Einwohnerzahl pendelt sich nicht ein. Sie schwingt mit großer Amplitude und wächst im
-zweiten Jahr stark (Faktor 1,9–2,2 zwischen Tag 551 und 730 auf den Seeds 1–3). Ursache: Pro Kundin oder Kunde entsteht
-etwa eine halbe Ladenstelle (Ausgaben pro Kopf ÷ Lohn). Das liegt fast so hoch wie der Anteil der Erwachsenen, die arbeiten.
-Die Stadt trägt sich deshalb fast selbst. Schon kleine Verschiebungen der Altersstruktur, etwa mehr Rentner, die weiter
-einkaufen, lösen große Zuzugswellen aus. Der Umlandmarkt bremst dagegen kaum. Lösungsvorschläge stehen in der Lieferung.
+**Gate 4 hält nur auf einem Teil der Seeds.** Mit Wareneinsatz, gedrosseltem Zuzug und Gründen nur mit Aussicht bleibt die
+Einwohnerzahl bei Seed 3 im Band (Faktor 1,06). Seed 1 und 2 schwingen noch mit 1,37 und 1,23. Auf den Seeds 1–6 bestehen
+3 von 6. Vorher verdoppelte sich die Stadt im zweiten Jahr (Faktor 1,9–2,2). Was bleibt, ist ein Echo der ersten
+Generation: Die große Zuzugswelle aus Jahr 1 geht fast gleichzeitig in Rente und stirbt fast gleichzeitig. Dann fehlen
+erst Arbeitskräfte (neuer Zuzug), danach Kundschaft (Pleiten). Getestet und verworfen: Zuzug halb so schnell, Zuzügler
+18–60 statt 18–45, Zuzug über etwa 10 Tage geglättet (jeweils nicht besser auf 6 Seeds).
 
-**Das Budget ist nie knapp.** Ab etwa Tag 60 übersteigen Steuern und Mieten alle Ausgaben um ein Vielfaches (Millionen
-nach einem Jahr). Die Budgetgrenzen des Bauamts greifen deshalb praktisch nie. Gate 3 hält, weil jede Ausgabe vorher
-geprüft wird, nicht weil das Budget eng wäre.
+**Das Budget ist nie knapp.** Ab etwa Tag 60 übersteigen Steuern und Mieten alle Ausgaben um ein Vielfaches. Die
+Budgetgrenzen des Bauamts greifen deshalb praktisch nie. Gate 3 hält, weil jede Ausgabe vorher geprüft wird, nicht weil
+das Budget eng wäre.

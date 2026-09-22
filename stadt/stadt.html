@@ -71,7 +71,8 @@ const R = {
   WOHNUNGEN: [0, 6, 14, 26],    // Wohnungen je Hausstufe
   WOHNGROESSE: [0, 5, 4, 3],    // so viele Personen passen bequem in eine Wohnung
   STELLEN_WERKSTATT: 8, STELLEN_LADEN: 6, STELLEN_STADT: 10,
-  KUNDEN_PRO_KRAFT: 2.5,        // Kundschaft pro Tag je Stelle (Besitzer zählt mit): ein Laden bedient 2,5 × 7 = 17
+  KUNDEN_PRO_KRAFT: 5,          // Kundschaft pro Tag je Stelle (Besitzer zählt mit): ein Laden bedient 5 × 7 = 35
+  WARENEINSATZ: 0.5,            // so viel vom Ladenumsatz geht an Lieferanten außerhalb der Stadt
 
   // Bauen: Kosten und Dauer in Spieltagen
   K_HAUS: 2400, K_AUF: [0, 0, 2800, 5000], K_PARK: 900, K_STRASSE: 50,
@@ -79,7 +80,8 @@ const R = {
   D_HAUS: 3, D_AUF: 3, D_PARK: 2, D_LADEN: 3, D_WERKSTATT: 4,
   REICH_LADEN: 12, REICH_PARK: 5,          // Reichweiten in Feldern (Manhattan)
   LADEN_WAHL: 40,                          // so viele Läden in Reichweite probiert man der Nähe nach durch
-  MANGEL_GRUENDUNG: 10,                    // ab so vielen Leuten ohne Einkauf in Reichweite lohnt ein Laden
+  MANGEL_GRUENDUNG: 20,                    // ab so vielen Leuten ohne Einkauf in Reichweite lohnt ein Laden
+  ZUZUG_MAX: 0.01,                         // höchstens so viele neue Leute pro Tag, gemessen an den Einwohnern
 
   // Stündliche Bedürfnisse
   KONTAKT_ZERFALL: 1.3, KONTAKT_ARBEIT: 0.7, KONTAKT_ZUHAUSE: 0.8,
@@ -179,6 +181,7 @@ const GF = [
   ['laden', Int32Array],                                                   // Wohnhaus: nächster Laden in Reichweite (-1 = keiner)
   ['knapp', Uint8Array],                                                   // Wohnhaus: so viele gingen gestern beim Einkauf leer aus
   ['mangel', Uint16Array],                                                 // Wohnhaus: so viele gingen gestern in Ladenreichweite leer aus
+  ['versorgtBis', Int32Array],                                             // Wohnhaus: ein Laden in Reichweite ist bis zu diesem Tag im Bau
   ['kapaz', Int32Array], ['bedient', Int32Array],                          // Laden: Kundschaft heute möglich / bedient
   ['offeneStellen', Int16Array],                                           // Betrieb: freie Stellen, solange er offen ist (live)
 ];
@@ -894,11 +897,10 @@ function entscheide(S, p, h) {
     }
   }
   // laden_gruenden — Schwelle = was der Betrieb kostet, den man gründen würde (Bau oder Übernahme plus Startkasse).
+  // Nur mit Aussicht: in der Nähe fehlt ein Laden, oder eine Werkstatt lohnt sich laut Umlandpreis.
   // Ehrgeiz treibt, Sparsamkeit bremst; Gedächtnis: Pleite → 180 Tage Sperre (sperreBis wird beim Erinnern gesetzt).
-  if (!istBesitzer && alter < 60 && P.sperreBis[p] <= tag && kannGruenden(S, p)) {
-    const w = P.wohnung[p];
-    const aussicht = ladenFehlt(S, w) || werkstattLohnt(S);
-    v = 90 * (E - 0.5) + 20 * (1 - Sp) + (zg === Z.LADEN ? 30 : 0) - (aussicht ? 0 : 25 + 40 * Sp);
+  if (!istBesitzer && alter < 60 && P.sperreBis[p] <= tag && (ladenFehlt(S, P.wohnung[p]) || werkstattLohnt(S)) && kannGruenden(S, p)) {
+    v = 90 * (E - 0.5) + 20 * (1 - Sp) + (zg === Z.LADEN ? 30 : 0);
     if (v + ZF > best) { v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.GRUENDEN; } }
   }
   // wegziehen — Dringlichkeit: wie tief und wie lange schon im Elend; Gewicht: Heimatliebe hält.
@@ -1081,7 +1083,9 @@ function aktKind(S, p) {
 }
 // Was ein Gründer über den Markt weiß: Fehlt in seiner Straße ein Laden? Lohnt eine Werkstatt noch,
 // wenn man die schon geplanten Werkstattstellen mitzählt?
-function ladenFehlt(S, w) { return w >= 0 && (S.g.laden[w] < 0 || S.g.mangel[w] >= R.MANGEL_GRUENDUNG); }
+function ladenFehlt(S, w) {
+  return w >= 0 && S.tag > S.g.versorgtBis[w] && (S.g.laden[w] < 0 || S.g.mangel[w] >= R.MANGEL_GRUENDUNG);
+}
 function werkstattLohnt(S) {
   return R.UMLAND / (S.werkstattPlaetze + R.STELLEN_WERKSTATT) >= R.LOHN_WERKSTATT + 8;
 }
@@ -1101,17 +1105,23 @@ function mangelRechnen(S) {
     }
   }
 }
-function knappLoeschen(S, b) {   // ein neuer Laden versorgt die Häuser in Reichweite
+// Ein neuer Laden versorgt die Häuser in Reichweite. Bis er offen ist (plus einen Tag Einkauf), zählt dort kein Mangel,
+// sonst gründen während der Bauzeit weitere Leute für dieselbe Kundschaft.
+function knappLoeschen(S, b) {
   const g = S.g, x = g.x[b], y = g.y[b], rv = Math.ceil(R.REICH_LADEN / VK), vx = (x / VK) | 0, vy = (y / VK) | 0;
+  const bis = Math.max(S.tag, g.bauBis[b]) + 1;
   for (let yy = Math.max(0, vy - rv); yy <= Math.min(VN - 1, vy + rv); yy++) {
     for (let xx = Math.max(0, vx - rv); xx <= Math.min(VN - 1, vx + rv); xx++) {
-      for (const h of S.vHaus[yy * VN + xx]) if (Math.abs(g.x[h] - x) + Math.abs(g.y[h] - y) <= R.REICH_LADEN) { g.knapp[h] = 0; g.mangel[h] = 0; }
+      for (const h of S.vHaus[yy * VN + xx]) {
+        if (Math.abs(g.x[h] - x) + Math.abs(g.y[h] - y) > R.REICH_LADEN) continue;
+        g.knapp[h] = 0; g.mangel[h] = 0;
+        if (g.versorgtBis[h] < bis) g.versorgtBis[h] = bis;
+      }
     }
   }
 }
-// Was würde diese Person gründen? Fehlt in der Nähe ein Laden (oder gehen viele leer aus): Laden.
-// Sonst eine Werkstatt. Lohnt die sich laut Umlandpreis nicht, ist das die riskante Gründung (siehe Wert).
-// Ein Laden ohne Mangel in der Nähe bekäme keine Kundschaft, weil alle ihren Stammladen haben.
+// Was würde diese Person gründen? Fehlt in der Nähe ein Laden (oder gehen viele leer aus): Laden, sonst Werkstatt.
+// Gegründet wird nur mit Aussicht (siehe entscheide), die Werkstatt lohnt sich dann laut Umlandpreis.
 function gruendungsTyp(S, p) {
   return ladenFehlt(S, S.p.wohnung[p]) ? LADEN : WERKSTATT;
 }
@@ -1338,7 +1348,7 @@ function wirtschaft(S) {
     const L = S.belegschaft[b];
     let da = 0;
     for (const w of L) if (!P.frei[w]) da++;
-    const einnahmen = t === WERKSTATT ? Math.round(da * S.exportPreis) : g.umsatz[b];
+    const einnahmen = t === WERKSTATT ? Math.round(da * S.exportPreis) : Math.round(g.umsatz[b] * (1 - R.WARENEINSATZ));
     g.umsatz[b] = 0;
     const fix = t === WERKSTATT ? R.FIX_WERKSTATT : R.FIX_LADEN;
     const lohn = g.lohn[b], netto = Math.round(lohn * (1 - R.STEUER));
@@ -1461,7 +1471,7 @@ function zuzug(S) {
   const zf = klemme((S.zufMittel - 25) / 50, 0, 1);
   const basis = 2 + S.einwohner * 0.02;
   const attraktiv = (fw / (fw + 3)) * (fs / (fs + 3)) * zf;
-  let n = Math.min(fw, Math.floor(attraktiv * basis + zufall(S)));
+  let n = Math.min(fw, Math.floor(attraktiv * basis + zufall(S)), 1 + Math.floor(S.einwohner * R.ZUZUG_MAX));
   // Wer kommen würde, aber keine Wohnung findet, zählt beim Bauamt als wohnungssuchend
   S.anfragen = Math.max(0, Math.round((fs / (fs + 3)) * zf * basis) - n);
   const neu = [];
