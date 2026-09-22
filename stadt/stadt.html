@@ -5,26 +5,149 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>STADT</title>
 <style>
+  /* Farben und Maße an einem Ort. Dunkler Grund, ein Akzent: warmes Fensterlicht. */
   :root {
-    --grund: #0c0e13;
-    --text: #e9e6df;
-    --text-leise: #a9a59c;
+    --grund: #0b0d12;
+    --ebene1: #12151c;
+    --ebene2: #1a1e27;
+    --ebene3: #232834;
+    --linie: rgba(255, 255, 255, 0.09);
+    --text: #e8e8ec;
+    --text-stark: #f4f4f7;
+    --text-leise: #a3a3ae;
     --akzent: #ffc864;
+    --akzent-leise: rgba(255, 200, 100, 0.16);
+    --gut: #8fd4a8;
+    --schlecht: #f2998a;
+    --glas: rgba(14, 16, 22, 0.62);
+    --r: 14px;
+    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+    --klein: clamp(0.78rem, 0.76rem + 0.1vw, 0.86rem);
+    --normal: clamp(0.9rem, 0.87rem + 0.15vw, 1rem);
+    --gross: clamp(1.15rem, 1.05rem + 0.4vw, 1.4rem);
+    --schrift: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   }
-  html, body { margin: 0; background: var(--grund); color: var(--text); }
-  body { font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; min-height: 100vh; display: grid; place-items: center; }
-  main { max-width: 38rem; padding: 1.5rem 1rem; }
-  h1 { font-weight: 600; letter-spacing: .02em; margin: 0 0 .5rem; }
-  p { color: var(--text-leise); }
-  code { color: var(--akzent); font-size: .92em; }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--grund); color: var(--text); overflow: hidden; }
+  body { font: var(--normal)/1.5 var(--schrift); letter-spacing: 0.005em; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--akzent); outline-offset: 2px; }
+
+  #szene { position: fixed; inset: 0; display: block; width: 100vw; height: 100svh; }
+  body.ohne-3d #szene { display: none; }
+  body.ohne-3d { background: radial-gradient(120% 90% at 30% 20%, #1a2236 0%, var(--grund) 60%); }
+
+  .glas {
+    background: var(--glas);
+    backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    border: 1px solid var(--linie);
+    border-radius: var(--r);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+  @supports not (backdrop-filter: blur(1px)) { .glas { background: rgba(18, 21, 28, 0.94); } }
+
+  /* Kennzahlen oben links */
+  #kennzahlen { position: fixed; top: var(--s4); left: var(--s4); padding: var(--s3) var(--s4); min-width: 220px;
+    font-variant-numeric: tabular-nums; }
+  #kennzahlen .zeit { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s4);
+    font-size: var(--gross); font-weight: 500; color: var(--text-stark); margin-bottom: var(--s2); }
+  #k-uhr { color: var(--akzent); }
+  #kennzahlen dl { margin: 0; display: grid; gap: 2px; font-size: var(--klein); }
+  #kennzahlen dl div { display: flex; justify-content: space-between; gap: var(--s4); }
+  #kennzahlen dt { color: var(--text-leise); }
+  #kennzahlen dd { margin: 0; color: var(--text); }
+
+  /* Tempo unten mittig */
+  #tempo { position: fixed; left: 50%; bottom: var(--s4); transform: translateX(-50%); display: flex; gap: var(--s1);
+    padding: var(--s1); }
+  #tempo button { min-width: 64px; padding: var(--s2) var(--s3); background: transparent; border: 1px solid transparent;
+    border-radius: 10px; cursor: pointer; color: var(--text-leise); font-variant-numeric: tabular-nums;
+    transition: background-color 150ms ease-out, color 150ms ease-out, border-color 150ms ease-out; }
+  #tempo button:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); }
+  #tempo button[aria-pressed="true"] { background: var(--akzent-leise); border-color: rgba(255, 200, 100, 0.5);
+    color: var(--akzent); font-weight: 500; }
+
+  /* Stadtbuch rechts, einklappbar */
+  #stadtbuch { position: fixed; top: var(--s4); right: var(--s4); width: min(360px, calc(100vw - 2 * var(--s4)));
+    max-height: calc(100svh - 120px); display: flex; flex-direction: column; overflow: hidden; }
+  #buch-knopf { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: var(--s3) var(--s4);
+    background: transparent; border: 0; cursor: pointer; font-weight: 500; color: var(--text-stark); text-align: left; }
+  #buch-knopf .pfeil { transition: transform 200ms cubic-bezier(.2,.8,.2,1); color: var(--text-leise); }
+  #buch-knopf[aria-expanded="false"] .pfeil { transform: rotate(-90deg); }
+  #buch-liste { list-style: none; margin: 0; padding: 0 var(--s4) var(--s3); overflow-y: auto; font-size: var(--klein);
+    border-top: 1px solid var(--linie); }
+  #buch-liste li { padding: var(--s2) 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); line-height: 1.45; }
+  #buch-liste li:last-child { border-bottom: 0; }
+  #buch-liste .tag { display: block; color: var(--text-leise); font-variant-numeric: tabular-nums; font-size: 0.92em; }
+  #buch-liste li.neu { animation: rein 400ms cubic-bezier(.2,.8,.2,1); }
+  @keyframes rein { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  .name { color: var(--text-stark); }
+  button.name { background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline;
+    text-decoration-color: rgba(255, 200, 100, 0.45); text-underline-offset: 2px; }
+  button.name:hover { color: var(--akzent); }
+
+  /* Hinweis, wenn 3D fehlt */
+  .hinweis { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: min(46ch, calc(100vw - 32px)); padding: var(--s5);
+    overflow-wrap: anywhere;
+    background: var(--ebene2); border: 1px solid var(--linie); border-radius: var(--r); line-height: 1.55; }
+  .hinweis strong { color: var(--text-stark); }
+
+  /* Debug-Ecke (nur mit ?debug) */
+  #debug { position: fixed; left: var(--s4); bottom: var(--s4); padding: var(--s2) var(--s3); background: rgba(10, 12, 16, 0.85);
+    border: 1px solid var(--linie); border-radius: 10px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--text-leise); white-space: pre; font-variant-numeric: tabular-nums; }
+
+  @media (max-width: 720px) {
+    #stadtbuch { top: auto; bottom: 76px; max-height: 38svh; }
+    #kennzahlen { min-width: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important; }
+  }
 </style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/"
+  }
+}
+</script>
 </head>
 <body>
-<main>
-  <h1>STADT — Phase 0</h1>
-  <p>Noch keine Grafik. Die Simulation steckt im Block <code>&lt;script id="sim"&gt;</code> und wird ohne Browser getestet:
-  <code>node tools/simtest.mjs --seed 1 --tage 365</code></p>
-</main>
+<canvas id="szene" aria-label="3D-Ansicht der Stadt"></canvas>
+<noscript><div class="hinweis">Für STADT wird JavaScript benötigt.</div></noscript>
+<div id="hinweis" class="hinweis" role="status" hidden></div>
+
+<section id="kennzahlen" class="glas" aria-label="Die Stadt in Zahlen">
+  <div class="zeit"><span id="k-tag">Tag 0</span><span id="k-uhr">06:00</span></div>
+  <dl>
+    <div><dt>Einwohner</dt><dd id="k-einw">0</dd></div>
+    <div><dt>Freie Wohnungen</dt><dd id="k-fw">0</dd></div>
+    <div><dt>Freie Stellen</dt><dd id="k-fs">0</dd></div>
+    <div><dt>Zufriedenheit</dt><dd id="k-zuf">0</dd></div>
+    <div><dt>Budget</dt><dd id="k-budget">0</dd></div>
+  </dl>
+</section>
+
+<nav id="tempo" class="glas" aria-label="Tempo">
+  <button type="button" data-tempo="0" aria-pressed="false">Pause</button>
+  <button type="button" data-tempo="1" aria-pressed="true">1×</button>
+  <button type="button" data-tempo="5" aria-pressed="false">5×</button>
+  <button type="button" data-tempo="20" aria-pressed="false">20×</button>
+</nav>
+
+<aside id="stadtbuch" class="glas" aria-label="Stadtbuch">
+  <button type="button" id="buch-knopf" aria-expanded="true" aria-controls="buch-liste">
+    <span>Stadtbuch</span><svg class="pfeil" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+  </button>
+  <ol id="buch-liste" reversed></ol>
+</aside>
+
+<div id="debug" hidden></div>
+
 
 <script id="sim">
 'use strict';
@@ -1670,6 +1793,391 @@ G.StadtSim = {
   neueStadt, stunde, kennzahlen, name, strName, klartext,
 };
 })(globalThis);
+</script>
+
+<script type="module">
+// =====================================================================================
+// STADT — Darstellung, Oberfläche, Takt. Liest den Sim-Zustand S, ändert ihn nur über StadtSim.
+// =====================================================================================
+const Sim = globalThis.StadtSim;
+const URLP = new URLSearchParams(location.search);
+const DEBUG = URLP.has('debug');
+const REDUZIERT = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const SEK_PRO_STUNDE = 60;                 // bei 1× ist eine echte Minute eine Spielstunde
+const $ = (id) => document.getElementById(id);
+const zahl = (v) => Math.round(v).toLocaleString('de-DE');
+
+// ─── Zustand ─────────────────────────────────────────────────────────────────────────
+let S = Sim.neueStadt(Number(URLP.get('seed')) || 1);
+if (DEBUG && URLP.get('tage')) {                          // Testhilfe: Stadt vorab N Tage laufen lassen
+  const ziel = Math.min(3000, Number(URLP.get('tage')) || 0);
+  while (S.tag < ziel) Sim.stunde(S);
+}
+let tempo = 1;
+let akku = 0;                                             // Spielsekunden seit dem letzten Stundenschritt
+let simMs = 0;                                            // Dauer des letzten Simulationsschritts
+
+// ─── Hinweis, wenn etwas fehlt ───────────────────────────────────────────────────────
+function hinweis(html) { const h = $('hinweis'); h.innerHTML = html; h.hidden = false; }
+
+// ─── 3D, wenn möglich ────────────────────────────────────────────────────────────────
+let G = null;
+try {
+  const THREE = await import('three');
+  const { OrbitControls } = await import('three/addons/controls/OrbitControls.js');
+  G = baueGrafik(THREE, OrbitControls);
+} catch (e) {
+  document.body.classList.add('ohne-3d');
+  hinweis(`<strong>Die 3D-Ansicht startet nicht.</strong><br>${String(e && e.message || e).replace(/[<>&]/g, '')}<br><br>`
+    + 'Die Stadt läuft trotzdem weiter. Zahlen und Stadtbuch siehst du hier. '
+    + 'Ursachen: kein WebGL im Browser, oder Three.js konnte nicht vom CDN geladen werden (kein Netz?).');
+}
+
+function baueGrafik(THREE, OrbitControls) {
+  const canvas = $('szene');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color('#0b1020');
+  scene.fog = new THREE.Fog('#0b1020', 70, 190);
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.5, 600);
+  camera.position.set(38, 48, 58);
+  const controls = new OrbitControls(camera, canvas);
+  controls.target.set(0, 0, 0);
+  controls.enableDamping = !REDUZIERT;
+  controls.dampingFactor = 0.08;
+  controls.minDistance = 10;
+  controls.maxDistance = 160;
+  controls.minPolarAngle = 0.25;                          // nicht senkrecht von oben …
+  controls.maxPolarAngle = 1.2;                           // … und nicht unter den Horizont
+  controls.maxTargetRadius = 60;                          // der Blickpunkt bleibt über der Karte
+  controls.screenSpacePanning = false;                    // Verschieben auf dem Boden
+  controls.update();
+
+  // Licht: Himmel/Boden, Sonne bzw. Mond, und ein schwaches Gegenlicht statt Schatten
+  const himmel = new THREE.HemisphereLight('#9fb8d8', '#2a3326', 0.6);
+  const sonne = new THREE.DirectionalLight('#fff4e0', 2.2);
+  const gegen = new THREE.DirectionalLight('#7f93c8', 0.35);
+  scene.add(himmel, sonne, gegen, sonne.target, gegen.target);
+
+  // Boden
+  const boden = new THREE.Mesh(new THREE.PlaneGeometry(900, 900),   // Rand liegt weit hinter dem Nebel
+    new THREE.MeshLambertMaterial({ color: '#35523b' }));
+  boden.rotation.x = -Math.PI / 2;
+  scene.add(boden);
+
+  // Instanzierte Meshes: ein Mesh (= ein Draw Call) pro Bauteil
+  const box = (w, h, d) => new THREE.BoxGeometry(w, h, d).translate(0, h / 2, 0);
+  const lambert = (farbe, extra) => new THREE.MeshLambertMaterial(Object.assign({ color: farbe }, extra));
+  function inst(geo, mat, kap) {
+    const m = new THREE.InstancedMesh(geo, mat, kap);
+    m.count = 0;
+    m.frustumCulled = false;                              // Grenzen ändern sich laufend; die Stadt ist ohnehin klein
+    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    m.userData.kap = kap;
+    scene.add(m);
+    return m;
+  }
+  const F = Sim.KARTE * Sim.KARTE;
+  const M = {
+    strasse: inst(box(1, 0.02, 1), lambert('#3a3e46'), F),
+    haus: inst(box(0.76, 1, 0.76), lambert('#ffffff'), 4000),
+    dach: inst(new THREE.ConeGeometry(0.58, 0.38, 4).rotateY(Math.PI / 4).translate(0, 0.19, 0), lambert('#8a4f3d'), 4000),
+    fenster: inst(box(0.785, 1, 0.785), new THREE.MeshBasicMaterial({ color: '#ffffff' }), 40000),
+    werkstatt: inst(box(0.86, 0.7, 0.86), lambert('#ffffff'), 3000),
+    schlot: inst(new THREE.CylinderGeometry(0.06, 0.08, 1, 6).translate(0, 0.5, 0), lambert('#59616c'), 3000),
+    laden: inst(box(0.8, 0.55, 0.8), lambert('#ffffff'), 3000),
+    markise: inst(box(0.84, 0.05, 0.22), lambert('#ffffff'), 3000),
+    park: inst(box(0.96, 0.04, 0.96), lambert('#3e6b45'), 2000),
+    baum: inst(new THREE.ConeGeometry(0.17, 0.5, 6).translate(0, 0.25, 0), lambert('#2f5a3a'), 6000),
+    bau: inst(box(0.8, 1, 0.8), lambert('#e0a040', { transparent: true, opacity: 0.42, depthWrite: false }), 3000),
+  };
+
+  const dummy = new THREE.Object3D();
+  const farbe = new THREE.Color();
+  const H = Sim.KARTE / 2;
+  const wx = (x) => x - H + 0.5;
+  function setze(m, i, x, y, z, sx, sy, sz, rotY) {
+    if (i >= m.userData.kap) return false;
+    dummy.position.set(x, y, z); dummy.scale.set(sx, sy, sz); dummy.rotation.set(0, rotY || 0, 0);
+    dummy.updateMatrix();
+    m.setMatrixAt(i, dummy.matrix);
+    return true;
+  }
+  function fertig(m, n) {
+    m.count = Math.min(n, m.userData.kap);
+    m.instanceMatrix.needsUpdate = true;
+    if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    m.boundingSphere = null;                              // für Raycasts neu berechnen lassen
+  }
+  const hash = (b) => ((b * 2654435761) >>> 0) / 4294967296;   // feste „Zufallszahl“ je Gebäude (nur Optik)
+  const HAUSFARBEN = ['#d9cbb3', '#cfc2ae', '#e0d6c4', '#c9b8a0', '#d6c7b8', '#cbbfae'].map(c => new THREE.Color(c));
+  const LADENFARBEN = ['#caa27a', '#9fb8ad', '#d1b48c', '#b5c4a8', '#c9a98f'].map(c => new THREE.Color(c));
+  const MARKISEN = ['#c0584a', '#3f7f86', '#c89a3c', '#6f8f4e'].map(c => new THREE.Color(c));
+  const WERKSTATT = new THREE.Color('#7d8894');
+  const LICHT = new THREE.Color('#ffc864'), GLAS_NACHT = new THREE.Color('#1b222c'), GLAS_TAG = new THREE.Color('#7f93a6');
+  const GESCHOSS = 0.42, GESCHOSSE = [0, 2, 4, 7];
+
+  // Blickrichtung zur Straße (für Markisen): erste Nachbarzelle, die Straße ist
+  const RICHT = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+  function zurStrasse(x, y) {
+    for (let i = 0; i < 4; i++) {
+      const [dx, dy] = RICHT[i];
+      if (S.feld[(y + dy) * Sim.KARTE + (x + dx)] === Sim.STRASSE) return i;
+    }
+    return 0;
+  }
+
+  // Welche Stockwerke leuchten? Nachts bewohnte, je nach Belegung; spät in der Nacht nur noch wenige.
+  function lichtAnteil(stunde, b) {
+    const h = hash(b + 7);
+    const an = 18 + h * 1.5, aus = 22.5 + h * 2.5;           // jedes Haus hat seine eigene Uhrzeit
+    if (stunde >= an && stunde < aus) return 1;
+    if (stunde >= aus || stunde < 5.5) return h < 0.2 ? 0.34 : 0;   // ein paar Nachteulen
+    if (stunde >= 5.5 && stunde < 7 + h) return h < 0.6 ? 0.5 : 0;  // Frühaufsteher
+    return 0;
+  }
+
+  let strassenStand = -1;
+  function stadt(tageszeit) {
+    const g = S.g, K = Sim.KARTE;
+    // Straßen nur neu, wenn welche dazugekommen sind
+    if (S.stat.strassenFelder !== strassenStand) {
+      let n = 0;
+      for (let c = 0; c < F; c++) if (S.feld[c] === Sim.STRASSE) setze(M.strasse, n++, wx(c % K), 0.005, wx((c / K) | 0), 1, 1, 1);
+      fertig(M.strasse, n);
+      strassenStand = S.stat.strassenFelder;
+    }
+    const nacht = tageszeit < 6.5 || tageszeit >= 18.5;
+    let nh = 0, nd = 0, nf = 0, nw = 0, ns = 0, nl = 0, nm = 0, np = 0, nb = 0, nbau = 0;
+    for (let b = 0; b < S.gAnzahl; b++) {
+      const x = g.x[b], y = g.y[b], px = wx(x), pz = wx(y), t = g.typ[b], f = S.feld[y * K + x];
+      if (f === Sim.BAUSTELLE) {                          // Baustelle: halbdurchsichtiger Kasten in Zielhöhe
+        const hoehe = t === Sim.WOHNHAUS ? GESCHOSSE[1] * GESCHOSS : t === Sim.PARK ? 0.12 : 0.6;
+        setze(M.bau, nbau++, px, 0, pz, 1, hoehe, 1);
+        continue;
+      }
+      if (t === Sim.WOHNHAUS) {
+        const stufe = g.stufe[b], geschosse = GESCHOSSE[stufe], hoehe = geschosse * GESCHOSS;
+        if (!setze(M.haus, nh, px, 0, pz, 1, hoehe, 1)) continue;
+        M.haus.setColorAt(nh++, HAUSFARBEN[(hash(b) * HAUSFARBEN.length) | 0]);
+        if (stufe < 3) setze(M.dach, nd++, px, hoehe, pz, 1, 1, 1);
+        if (g.auf[b]) {                                   // Aufstockung: Gerüst bis zur neuen Höhe
+          setze(M.bau, nbau++, px, 0, pz, 1.08, GESCHOSSE[g.auf[b]] * GESCHOSS + 0.05, 1.08);
+        }
+        // Fensterbänder je Stockwerk
+        const cap = Sim.R.WOHNUNGEN[stufe], belegt = g.belegt[b];
+        const lit = nacht || tageszeit < 7.5 ? Math.ceil(geschosse * (belegt / cap) * lichtAnteil(tageszeit, b)) : 0;
+        for (let s = 0; s < geschosse; s++) {
+          if (!setze(M.fenster, nf, px, s * GESCHOSS + 0.16, pz, 1, 0.13, 1)) break;
+          M.fenster.setColorAt(nf++, s < lit ? LICHT : nacht ? GLAS_NACHT : GLAS_TAG);
+        }
+      } else if (t === Sim.WERKSTATT) {
+        const leer = g.leer[b];
+        farbe.copy(WERKSTATT).multiplyScalar(leer ? 0.55 : 1);
+        if (!setze(M.werkstatt, nw, px, 0, pz, 1, 1, 1)) continue;
+        M.werkstatt.setColorAt(nw++, farbe);
+        setze(M.schlot, ns++, px + 0.26, 0.7, pz - 0.26, 1, 0.55, 1);
+        if (!leer && !nacht && setze(M.fenster, nf, px, 0.28, pz, 1.1, 0.12, 1.1)) M.fenster.setColorAt(nf++, GLAS_TAG);
+      } else if (t === Sim.LADEN) {
+        const leer = g.leer[b], offen = !leer;
+        farbe.copy(LADENFARBEN[(hash(b) * LADENFARBEN.length) | 0]).multiplyScalar(leer ? 0.5 : 1);
+        if (!setze(M.laden, nl, px, 0, pz, 1, 1, 1)) continue;
+        M.laden.setColorAt(nl++, farbe);
+        const r = zurStrasse(x, y), [dx, dy] = RICHT[r];
+        setze(M.markise, nm, px + dx * 0.44, 0.42, pz + dy * 0.44, 1, 1, 1, dx !== 0 ? Math.PI / 2 : 0);
+        farbe.copy(MARKISEN[(hash(b + 3) * MARKISEN.length) | 0]).multiplyScalar(leer ? 0.45 : 1);
+        M.markise.setColorAt(nm++, farbe);
+        // Schaufenster: abends beleuchtet, solange der Laden offen ist
+        const lichtLaden = offen && tageszeit >= 17 && tageszeit < 22;
+        if (setze(M.fenster, nf, px, 0.12, pz, 1.03, 0.16, 1.03)) M.fenster.setColorAt(nf++, lichtLaden ? LICHT : nacht ? GLAS_NACHT : GLAS_TAG);
+      } else if (t === Sim.PARK) {
+        setze(M.park, np++, px, 0, pz, 1, 1, 1);
+        const h = hash(b);
+        setze(M.baum, nb++, px - 0.25, 0.04, pz - 0.2, 1, 0.9 + h * 0.4, 1);
+        setze(M.baum, nb++, px + 0.22, 0.04, pz + 0.05, 1, 1.1 - h * 0.3, 1);
+        setze(M.baum, nb++, px - 0.05, 0.04, pz + 0.27, 0.8, 0.8 + h * 0.3, 0.8);
+      }
+    }
+    fertig(M.haus, nh); fertig(M.dach, nd); fertig(M.fenster, nf); fertig(M.werkstatt, nw); fertig(M.schlot, ns);
+    fertig(M.laden, nl); fertig(M.markise, nm); fertig(M.park, np); fertig(M.baum, nb); fertig(M.bau, nbau);
+  }
+
+  // Tag und Nacht aus der Spielzeit: Stützstellen, dazwischen weich überblenden
+  const TAG = [
+    [0, '#0c1224', '#9db2e0', 0.9, 1.5],
+    [5, '#131a33', '#9db2e0', 0.85, 1.4],
+    [6.5, '#d7916b', '#ffb070', 1.3, 0.55],
+    [8.5, '#8fb7de', '#fff2dc', 2.4, 1.0],
+    [16.5, '#8fb7de', '#fff2dc', 2.4, 1.0],
+    [18.5, '#d98a62', '#ff9a5c', 1.3, 0.55],
+    [20, '#182040', '#9db2e0', 0.95, 1.5],
+    [24, '#0c1224', '#9db2e0', 0.9, 1.5],
+  ].map(([h, himmelF, lichtF, s, u]) => [h, new THREE.Color(himmelF), new THREE.Color(lichtF), s, u]);
+  const cA = new THREE.Color(), cB = new THREE.Color();
+  function licht(t) {
+    let i = 0;
+    while (i < TAG.length - 2 && TAG[i + 1][0] <= t) i++;
+    const a = TAG[i], b = TAG[i + 1], k = (t - a[0]) / (b[0] - a[0]);
+    cA.lerpColors(a[1], b[1], k);
+    scene.background.copy(cA); scene.fog.color.copy(cA);
+    cB.lerpColors(a[2], b[2], k);
+    sonne.color.copy(cB);
+    sonne.intensity = a[3] + (b[3] - a[3]) * k;
+    himmel.intensity = a[4] + (b[4] - a[4]) * k;
+    // Sonne zieht von Ost nach West; nachts steht der Mond gegenüber
+    const tag = t >= 6 && t <= 18;
+    const w = tag ? ((t - 6) / 12) * Math.PI : (((t + 6) % 24) / 12) * Math.PI;
+    sonne.position.set(Math.cos(w) * 70, Math.max(12, Math.sin(w) * 80), 35);
+    gegen.position.set(-sonne.position.x, 40, -sonne.position.z);
+  }
+
+  // Startblick: Mitte und Ausdehnung der Bebauung (einmalig, keine Kamerafahrt)
+  function ausrichten() {
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    for (let b = 0; b < S.gAnzahl; b++) {
+      x0 = Math.min(x0, S.g.x[b]); x1 = Math.max(x1, S.g.x[b]); y0 = Math.min(y0, S.g.y[b]); y1 = Math.max(y1, S.g.y[b]);
+    }
+    if (x0 > x1) return;
+    const cx = wx((x0 + x1) / 2), cz = wx((y0 + y1) / 2), r = Math.max(8, (x1 - x0) / 2, (y1 - y0) / 2);
+    controls.target.set(cx, 0, cz);
+    const d = Math.min(controls.maxDistance, 14 + r * 2.1);
+    camera.position.set(cx + d * 0.45, d * 0.62, cz + d * 0.65);
+    controls.update();
+  }
+  ausrichten();
+
+  function groesse() {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (!w || !h) return;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  new ResizeObserver(groesse).observe(canvas);
+  groesse();
+
+  return {
+    stadt, licht, ausrichten,
+    render() { controls.update(); renderer.render(scene, camera); return renderer.info.render; },
+    instanzen() { return Object.values(M).reduce((s, m) => s + m.count, 0); },
+    THREE, renderer, scene, camera, controls, M,
+  };
+}
+
+// ─── Oberfläche ──────────────────────────────────────────────────────────────────────
+const TEMPO_KNOEPFE = [...document.querySelectorAll('#tempo button')];
+function setzeTempo(t) {
+  tempo = t;
+  for (const k of TEMPO_KNOEPFE) k.setAttribute('aria-pressed', String(Number(k.dataset.tempo) === t));
+}
+for (const k of TEMPO_KNOEPFE) k.addEventListener('click', () => setzeTempo(Number(k.dataset.tempo)));
+let tempoVorPause = 1;
+addEventListener('keydown', (e) => {
+  if (e.code !== 'Space' || e.target.closest('input, textarea, button')) return;
+  e.preventDefault();
+  if (tempo) { tempoVorPause = tempo; setzeTempo(0); } else setzeTempo(tempoVorPause);
+});
+
+$('buch-knopf').addEventListener('click', () => {
+  const k = $('buch-knopf'), auf = k.getAttribute('aria-expanded') !== 'true';
+  k.setAttribute('aria-expanded', String(auf));
+  $('buch-liste').hidden = !auf;
+});
+
+function kennzahlenAnzeigen() {
+  const k = Sim.kennzahlen(S);
+  $('k-einw').textContent = zahl(k.einwohner);
+  $('k-fw').textContent = zahl(k.freieWohnungen);
+  $('k-fs').textContent = zahl(k.freieStellen);
+  $('k-zuf').textContent = zahl(k.zufriedenheit);
+  $('k-budget').textContent = zahl(k.budget) + ' T';
+}
+function uhrAnzeigen(t) {
+  const h = Math.floor(t), min = Math.floor((t - h) * 60);
+  $('k-tag').textContent = 'Tag ' + S.tag;
+  $('k-uhr').textContent = String(h).padStart(2, '0') + ':' + String(min).padStart(2, '0');
+}
+
+// Stadtbuch: Namen als Marke \u0001ID/GEN/Name\u0002 → anklickbarer Name (Personenkarte ab Phase 3)
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function buchHtml(text) {
+  return esc(text).replace(/\u0001(\d+)\/(\d+)\/([^\u0002]*)\u0002/g,
+    (m, id, gen, n) => `<button type="button" class="name" data-p="${id}" data-g="${gen}">${n}</button>`);
+}
+let buchGesehen = 0;
+const BUCH_ANZEIGE = 200;
+function buchAnzeigen() {
+  if (S.buchNr === buchGesehen) return;
+  const liste = $('buch-liste'), neu = S.buch.filter(e => e.nr > buchGesehen);
+  const frag = document.createDocumentFragment();
+  for (let i = neu.length - 1; i >= 0; i--) {
+    const e = neu[i], li = document.createElement('li');
+    if (buchGesehen) li.className = 'neu';
+    li.innerHTML = `<span class="tag">Tag ${e.tag}</span>${buchHtml(e.text)}`;
+    frag.appendChild(li);
+  }
+  liste.prepend(frag);
+  while (liste.children.length > BUCH_ANZEIGE) liste.lastElementChild.remove();
+  buchGesehen = S.buchNr;
+}
+
+// ─── Takt ────────────────────────────────────────────────────────────────────────────
+function schritt() {
+  const t0 = performance.now();
+  Sim.stunde(S);
+  simMs = performance.now() - t0;
+}
+function nachSchritten() {
+  kennzahlenAnzeigen();
+  buchAnzeigen();
+  if (G) G.stadt(S.stunde);
+}
+function simTakt(dt) {
+  if (!tempo) return;
+  akku += dt * tempo;
+  let n = 0;
+  while (akku >= SEK_PRO_STUNDE && n < 3) { schritt(); akku -= SEK_PRO_STUNDE; n++; }
+  if (akku >= SEK_PRO_STUNDE) akku = SEK_PRO_STUNDE - 0.001;   // nicht aufstauen
+  if (n) nachSchritten();
+}
+
+// Debug-Ecke: gemessen, nicht geschätzt
+const dbg = { frames: 0, summe: 0, max: 0, letzte: performance.now(), calls: 0, dreiecke: 0 };
+if (DEBUG) $('debug').hidden = false;
+function debugAnzeigen(frameMs, info) {
+  dbg.frames++; dbg.summe += frameMs; dbg.max = Math.max(dbg.max, frameMs);
+  if (info) { dbg.calls = info.calls; dbg.dreiecke = info.triangles; }
+  const jetzt = performance.now();
+  if (jetzt - dbg.letzte < 500) return;
+  const fps = dbg.frames * 1000 / (jetzt - dbg.letzte), mittel = dbg.summe / dbg.frames;
+  $('debug').textContent =
+    `fps ${fps.toFixed(0)}   Frame Ø ${mittel.toFixed(1)} ms  max ${dbg.max.toFixed(1)} ms\n`
+    + `Draw Calls ${dbg.calls}   Dreiecke ${zahl(dbg.dreiecke)}   Instanzen ${G ? zahl(G.instanzen()) : '–'}\n`
+    + `Sim-Schritt ${simMs.toFixed(1)} ms   Einwohner ${zahl(S.einwohner)}   Tempo ${tempo}×`;
+  globalThis.__stadtDebug = { fps, frameMs: mittel, frameMax: dbg.max, calls: dbg.calls, dreiecke: dbg.dreiecke, simMs, einwohner: S.einwohner, tag: S.tag };
+  dbg.frames = 0; dbg.summe = 0; dbg.max = 0; dbg.letzte = jetzt;
+}
+
+let letzte = performance.now();
+function frame(jetzt) {
+  const dt = Math.min(0.25, Math.max(0, (jetzt - letzte) / 1000));
+  letzte = jetzt;
+  simTakt(dt);
+  const t = S.stunde + Math.min(0.999, akku / SEK_PRO_STUNDE);   // Tageszeit mit Zwischenwerten
+  uhrAnzeigen(t);
+  let info = null;
+  if (G) { G.licht(t); info = G.render(); }
+  if (DEBUG) debugAnzeigen(performance.now() - jetzt, info);
+  requestAnimationFrame(frame);
+}
+if (DEBUG) globalThis.__stadt = { S: () => S, Sim, G, setzeTempo, schritt, nachSchritten };   // nur für Tests
+nachSchritten();
+requestAnimationFrame(frame);
 </script>
 </body>
 </html>
