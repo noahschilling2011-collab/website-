@@ -191,6 +191,22 @@ if (flag('kitest')) {
     pruef(zuSpaet === 0, `keine Antwort auf eine nicht mehr offene Anfrage (${zuSpaet})`);
     const buecher = Object.values(S.ki.tagebuch);
     pruef(buecher.every(b => b.length <= Sim.R.TAGEBUCH), `Tagebücher höchstens ${Sim.R.TAGEBUCH} Einträge (${buecher.map(b => b.length).join(', ')})`);
+    // 2b. Eine späte Antwort (Anfrage schon abgelaufen) darf keine neuere Anfrage derselben Figur beantworten
+    {
+      S.ki.an = true;
+      while (S.stunde !== 18) Sim.stunde(S);
+      Sim.stunde(S);
+      const alt = S.ki.anfragen[0];
+      if (alt) {
+        Sim.stunde(S); Sim.stunde(S);                                  // Frist abgelaufen
+        S.p.jetzt[alt.id] = 1; Sim.stunde(S);                          // Ereignis → neue Anfrage derselben Figur
+        const neu = S.ki.anfragen.find(x => x.id === alt.id);
+        const e = Sim.kiEntscheidung(S, alt.id, alt.gen, alt.erlaubt[0], null, 'spät', alt.nr);
+        pruef(!e.ok && (!neu || S.ki.anfragen.includes(neu)), `späte Antwort auf Anfrage ${alt.nr} verworfen, neue Anfrage ${neu ? neu.nr : '–'} bleibt offen`);
+        if (neu) Sim.kiVerwerfen(S, neu.id, neu.gen, neu.nr);
+      }
+      S.ki.an = false;
+    }
     // 3. Hauptfiguren setzen und Grenzen
     const erw = []; for (let p = 0; p < S.pMax && erw.length < 20; p++) if (S.p.lebt[p] && S.tag - S.p.geb[p] >= 18 * Sim.R.JAHR && !Sim.istHaupt(S, p)) erw.push(p);
     for (const p of erw) if (S.ki.haupt.length < Sim.R.HAUPT_MAX) Sim.hauptSetzen(S, p, S.p.gen[p], true);
@@ -199,11 +215,18 @@ if (flag('kitest')) {
     // 4. Gespräch: Erinnerung, neues Ziel, Tagebuch
     const h = S.ki.haupt[0];
     const zielVor = S.p.ziel[h.id];
-    const neuZiel = Sim.ZIELNAMEN[zielVor === 6 ? 5 : 6];
+    const neuZiel = Sim.ZIELNAMEN[zielVor === 5 ? 2 : 5];          // freunde bzw. besserer_job: nie „schon erreicht“
     Sim.kiGespraech(S, h.id, h.gen, 'Wie geht es dir?', 'Gut, danke.', neuZiel);
     const info = Sim.personInfo(S, h.id, h.gen);
     pruef(Sim.ZIELNAMEN[S.p.ziel[h.id]] === neuZiel && info.gedaechtnis.at(-1).text === 'mit Noah geredet' && info.tagebuch.at(-1).art === 'gespraech',
       `Gespräch: Ziel ${Sim.ZIELNAMEN[zielVor]} → ${neuZiel}, Erinnerung „${info.gedaechtnis.at(-1).text}“, Tagebuch „${info.tagebuch.at(-1).noah}“`);
+    // 4b. Ein Ziel, das schon erreicht ist, übernimmt die Figur nicht (sonst sofort „Ziel erreicht“)
+    const erreicht = S.ki.haupt.map(x => x.id).find(p => S.p.bFreizeit[p] >= 70 && S.p.zuf[p] >= 55 && S.p.ziel[p] !== 6);
+    if (erreicht !== undefined) {
+      const zv = S.p.ziel[erreicht];
+      Sim.kiGespraech(S, erreicht, S.p.gen[erreicht], 'Ruh dich aus.', 'Mach ich doch schon.', 'ruhe');
+      pruef(S.p.ziel[erreicht] === zv, `schon erreichtes Ziel „ruhe“ abgelehnt (Ziel bleibt ${Sim.ZIELNAMEN[zv]})`);
+    }
     // 5. Tod einer Hauptfigur: Verlust mit Vorschlägen; Speichern und Laden behält alles
     while (S.tag < 900 && S.ki.verlust.length === 0) Sim.stunde(S);
     const v = S.ki.verlust[0];

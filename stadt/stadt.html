@@ -675,6 +675,7 @@ function erinnertSeit(S, p, code, tage, ref) {
 function entferne(S, q, grund) {
   const P = S.p;
   if (S.ki.haupt.length && istHaupt(S, q)) hauptVerloren(S, q, grund || 'weg');
+  else if (S.ki.tagebuch[q + '/' + P.gen[q]]) delete S.ki.tagebuch[q + '/' + P.gen[q]];
   if (P.besitz[q] >= 0) {
     const b = P.besitz[q];
     const n = schliessen(S, b, false);
@@ -1150,6 +1151,13 @@ function zielWaehlen(S, p) {
   }
   zielSetzen(S, p, best);
 }
+// Ziel vom Sprachmodell oder aus dem Gespräch: gilt ab sofort, außer es ist schon erreicht (wie in zielWaehlen)
+function zielVonAussen(S, p, z) {
+  if (z <= 0 || z === S.p.ziel[p]) return false;
+  if (z !== Z.JOB && z !== Z.FAMILIE && z !== Z.FREUNDE && zielErreicht(S, p, z)) return false;
+  zielSetzen(S, p, z);
+  return true;
+}
 function zielSetzen(S, p, z) {   // Ausgangswert merken, damit „erreicht“ eine Verbesserung heißt
   const P = S.p;
   P.ziel[p] = z; P.zielSeit[p] = S.tag;
@@ -1564,6 +1572,7 @@ function aktWegziehen(S, p) {
 // macht bis zur Antwort weiter wie bisher. Nach R.KI_FRIST Spielstunden ohne gültige Antwort entscheidet
 // das normale Gehirn. Die Oberfläche beantwortet Anfragen nur über kiEntscheidung und kiVerwerfen.
 const schluessel = (S, p) => p + '/' + S.p.gen[p];
+const lebtNoch = (S, id, gen) => id >= 0 && id < S.pMax && S.p.lebt[id] && S.p.gen[id] === gen;
 function istHaupt(S, p) {
   const L = S.ki.haupt, gen = S.p.gen[p];
   for (let i = 0; i < L.length; i++) if (L[i].id === p && L[i].gen === gen) return true;
@@ -1605,14 +1614,14 @@ function kiAktionen(S, p, namen) {
     switch (AKTIONSNAMEN.indexOf(n)) {
       case A.WOHNUNG: satz = P.wohnung[p] < 0 ? 'Du suchst dir eine Wohnung, du hast gerade keine.' : 'Du suchst dir eine andere Wohnung, die jetzige passt nicht gut.'; break;
       case A.JOB: satz = `Du suchst dir Arbeit. In der Stadt ${S.freieStellen === 1 ? 'ist 1 Stelle' : `sind ${S.freieStellen} Stellen`} frei.`; break;
-      case A.WECHSEL: satz = `Du wechselst die Stelle. Anderswo zahlt man ${besterFreierLohn(S)} Taler am Tag, du bekommst ${S.g.lohn[arb]}.`; break;
+      case A.WECHSEL: satz = `Du wechselst die Stelle. Anderswo zahlt man ${besterFreierLohn(S)} Taler am Tag` + (arb >= 0 ? `, du bekommst ${S.g.lohn[arb]}.` : '.'); break;
       case A.KUENDIGEN: satz = `Du kündigst und lebst eine Weile von deinem Ersparten (${geld} Taler).`; break;
       case A.FREI: satz = 'Du nimmst dir heute frei und ruhst dich aus. Der Lohn für heute fällt weg.'; break;
       case A.FREUNDE: satz = 'Du triffst heute Abend Freunde oder lernst neue Leute kennen.'; break;
       case A.PARTNER: satz = 'Du suchst jemanden, mit dem du zusammen sein willst.'; break;
-      case A.ZUSAMMEN: satz = `Du ziehst mit ${pn} zusammen.`; break;
-      case A.TRENNEN: satz = `Du trennst dich von ${pn}. Ihr seid beide seit über zwei Wochen unzufrieden.`; break;
-      case A.KIND: satz = `Du bekommst mit ${pn} ein Kind.`; break;
+      case A.ZUSAMMEN: satz = `Du ziehst mit ${pn || 'deinem Partner'} zusammen.`; break;
+      case A.TRENNEN: satz = `Du trennst dich von ${pn || 'deinem Partner'}. Ihr seid beide seit über zwei Wochen unzufrieden.`; break;
+      case A.KIND: satz = `Du bekommst mit ${pn || 'deinem Partner'} ein Kind.`; break;
       case A.GRUENDEN: {
         const t = gruendungsTyp(S, p), kosten = gruendungsKosten(t, S.leerTyp[t] > 0 && P.geld[p] >= gruendungsKosten(t, true));
         satz = `Du gründest ${t === LADEN ? 'einen eigenen Laden' : 'eine eigene Werkstatt'}. Das kostet ${kosten} Taler, du hast ${geld}.`;
@@ -1641,18 +1650,23 @@ function kiFragen(S, p, h) {
 // Zu Beginn jeder Stunde: Anfragen ohne Antwort nach der Frist → normales Gehirn (mit der Stunde der Anfrage)
 function kiFristen(S) {
   const K = S.ki, jetzt = S.tag * 24 + S.stunde, fertig = [];
-  for (let i = K.anfragen.length - 1; i >= 0; i--) {
-    const a = K.anfragen[i];
-    if (a.frist > jetzt) continue;
+  // erst sammeln, dann abarbeiten: ein Wegzug nimmt die Anfrage des Partners mit aus der Liste
+  for (const a of K.anfragen.filter(x => x.frist <= jetzt)) {
+    const i = K.anfragen.indexOf(a);
+    if (i < 0) continue;
     K.anfragen.splice(i, 1);
     K.abgelaufen++;
-    if (S.p.lebt[a.id] && S.p.gen[a.id] === a.gen) { entscheide(S, a.id, a.stunde); S.p.jetzt[a.id] = 0; fertig.push(a.id); }
+    if (lebtNoch(S, a.id, a.gen)) { entscheide(S, a.id, S.stunde); if (S.p.lebt[a.id]) S.p.jetzt[a.id] = 0; fertig.push(a.id); }
   }
   return fertig;
 }
-function anfrageRaus(S, id, gen) {
+// Stunde, mit der eine späte Antwort geprüft wird: in der Stunde nach der Anfrage noch deren Stunde,
+// danach die aktuelle (sonst ginge „freinehmen“ um 9 Uhr noch und kostete den ganzen Tageslohn)
+function antwortStunde(S, a) { return S.tag * 24 + S.stunde <= a.tag * 24 + a.stunde + 1 ? a.stunde : S.stunde; }
+// nr (optional): genau diese Anfrage. Eine späte Antwort darf keine neuere Anfrage derselben Figur beantworten.
+function anfrageRaus(S, id, gen, nr) {
   const L = S.ki.anfragen;
-  for (let i = 0; i < L.length; i++) if (L[i].id === id && L[i].gen === gen) return L.splice(i, 1)[0];
+  for (let i = 0; i < L.length; i++) if (L[i].id === id && L[i].gen === gen && (nr === undefined || L[i].nr === nr)) return L.splice(i, 1)[0];
   return null;
 }
 function tagebuchEintrag(S, p, e, tag, stunde) {
@@ -1661,40 +1675,49 @@ function tagebuchEintrag(S, p, e, tag, stunde) {
   L.push(Object.assign({ tag: tag === undefined ? S.tag : tag, stunde: stunde === undefined ? S.stunde : stunde }, e));
   if (L.length > R.TAGEBUCH) L.splice(0, L.length - R.TAGEBUCH);
 }
-const lebtNoch = (S, id, gen) => id >= 0 && id < S.pMax && S.p.lebt[id] && S.p.gen[id] === gen;
 // Gültige Antwort des Sprachmodells anwenden. Die Oberfläche hat schon geprüft; hier noch einmal gegen die Sim.
 // Hat sich die Lage seit der Anfrage geändert und die Aktion geht nicht mehr, entscheidet das normale Gehirn.
-function kiEntscheidung(S, id, gen, aktion, ziel, gedanke) {
+function kiEntscheidung(S, id, gen, aktion, ziel, gedanke, nr) {
   const K = S.ki, P = S.p;
-  const a = anfrageRaus(S, id, gen);
+  const a = anfrageRaus(S, id, gen, nr);
   if (!a || !lebtNoch(S, id, gen)) return { ok: false, grund: 'keine offene Anfrage (Frist abgelaufen)' };
   const code = AKTIONSNAMEN.indexOf(aktion), z = ziel ? ZIELNAMEN.indexOf(ziel) : 0;
-  if (code <= 0 || !a.erlaubt.includes(aktion) || z < 0) { entscheide(S, id, a.stunde); P.jetzt[id] = 0; return { ok: false, grund: 'ungültig' }; }
-  if (z > 0 && z !== P.ziel[id]) zielSetzen(S, id, z);
-  tagebuchEintrag(S, id, { art: 'gedanke', text: String(gedanke), aktion, ziel: z > 0 ? ziel : null }, a.tag, a.stunde);
-  let ausgefuehrt = false;
-  if (erlaubteAktionen(S, id, a.stunde).includes(code)) ausgefuehrt = ausfuehren(S, id, code);
-  else entscheide(S, id, a.stunde);
+  if (code <= 0 || !a.erlaubt.includes(aktion) || z < 0) { entscheide(S, id, antwortStunde(S, a)); if (P.lebt[id]) P.jetzt[id] = 0; return { ok: false, grund: 'ungültig' }; }
+  const zielNeu = z > 0 && zielVonAussen(S, id, z);
+  const h = antwortStunde(S, a);
+  const eintrag = { art: 'gedanke', text: String(gedanke), aktion, ziel: zielNeu ? ziel : null, geklappt: false };
+  tagebuchEintrag(S, id, eintrag, a.tag, a.stunde);
+  if (erlaubteAktionen(S, id, h).includes(code)) eintrag.geklappt = ausfuehren(S, id, code);
+  else entscheide(S, id, h);                              // Lage hat sich geändert: normales Gehirn
   if (S.p.lebt[id]) S.p.jetzt[id] = 0;
   K.angewandt++;
-  return { ok: true, ausgefuehrt };
+  return { ok: true, ausgefuehrt: eintrag.geklappt };
 }
 // Ungültige Antwort, Fehler oder Tempo 20×: das normale Gehirn entscheidet sofort
-function kiVerwerfen(S, id, gen) {
-  const a = anfrageRaus(S, id, gen);
+function kiVerwerfen(S, id, gen, nr) {
+  const a = anfrageRaus(S, id, gen, nr);
   if (!a || !lebtNoch(S, id, gen)) return false;
-  entscheide(S, id, a.stunde);
+  entscheide(S, id, antwortStunde(S, a));
   if (S.p.lebt[id]) S.p.jetzt[id] = 0;
   return true;
 }
 // Gespräch mit Noah: wird eine Erinnerung, ein neues Ziel gilt ab sofort. Mehr kann ein Gespräch nicht ändern.
 function kiGespraech(S, id, gen, noah, antwort, ziel) {
   if (!lebtNoch(S, id, gen)) return false;
-  const z = ziel ? ZIELNAMEN.indexOf(ziel) : 0;
-  if (z > 0 && z !== S.p.ziel[id]) zielSetzen(S, id, z);
-  erinnere(S, id, M.NOAH, -1);
-  tagebuchEintrag(S, id, { art: 'gespraech', noah: String(noah), text: String(antwort), ziel: z > 0 ? ziel : null });
+  const P = S.p, z = ziel ? ZIELNAMEN.indexOf(ziel) : 0;
+  const zielNeu = z > 0 && zielVonAussen(S, id, z);
+  // Erinnerung „mit Noah geredet“, aber nur eine pro Tag (sonst drängen Gespräche das übrige Gedächtnis hinaus).
+  // Ein Gespräch löst keine Entscheidung aus: es wirkt über Erinnerung und Ziel bei der nächsten.
+  const letzte = id * R.MEM + (P.memPos[id] + R.MEM - 1) % R.MEM;
+  if (!(P.memCode[letzte] === M.NOAH && P.memTag[letzte] === S.tag)) { const vorher = P.jetzt[id]; erinnere(S, id, M.NOAH, -1); P.jetzt[id] = vorher; }
+  tagebuchEintrag(S, id, { art: 'gespraech', noah: String(noah), text: String(antwort), ziel: zielNeu ? ziel : null });
   return true;
+}
+function kiErlaubtJetzt(S, id, gen) {
+  const a = S.ki.anfragen.find(x => x.id === id && x.gen === gen);
+  if (!a || !lebtNoch(S, id, gen)) return [];
+  const jetzt = erlaubteAktionen(S, id, antwortStunde(S, a)).map(c => AKTIONSNAMEN[c]);
+  return a.erlaubt.filter(n => jetzt.includes(n));
 }
 function kiTagebuch(S, id, gen, text, art) {
   if (!lebtNoch(S, id, gen)) return false;
@@ -1707,7 +1730,7 @@ function hauptSetzen(S, id, gen, an) {
   if (!lebtNoch(S, id, gen)) return false;
   if (!an) {
     K.haupt = K.haupt.filter(h => !(h.id === id && h.gen === gen));
-    anfrageRaus(S, id, gen);
+    if (anfrageRaus(S, id, gen)) S.p.jetzt[id] = 1;         // wartete noch: entscheidet in der nächsten Stunde normal
     return true;
   }
   if (istHaupt(S, id) || K.haupt.length >= R.HAUPT_MAX || !erwachsen(S, id)) return false;
@@ -1723,7 +1746,8 @@ function hauptVerloren(S, q, grund) {
   delete K.tagebuch[k]; delete K.heute[k];
   const vor = [];
   const pa = P.partner[q];
-  if (pa >= 0 && P.lebt[pa] && erwachsen(S, pa)) vor.push({ id: pa, gen: P.gen[pa], name: name(S, pa), rolle: 'partner' });
+  const gehtMit = grund !== 'tod' && P.hh[q] >= 0 && P.hh[pa] === P.hh[q];   // zieht der Partner mit weg?
+  if (pa >= 0 && P.lebt[pa] && erwachsen(S, pa) && !gehtMit) vor.push({ id: pa, gen: P.gen[pa], name: name(S, pa), rolle: 'partner' });
   if (P.kinder[q] > 0) {
     for (let i = 0; i < S.pMax; i++) {
       if (P.lebt[i] && erwachsen(S, i) && ((P.elternA[i] === q && P.elternAGen[i] === gq) || (P.elternB[i] === q && P.elternBGen[i] === gq))) {
@@ -2287,7 +2311,26 @@ function importZustand(d) {
   for (const k of ['feld', 'feldGeb', 'feldStr', 'platz', 'freiLohn', 'leerTyp', 'vZufSumme', 'vZufN', 'vParks']) {
     if (!ArrayBuffer.isView(S[k])) throw new Error('Spielstand unvollständig: ' + k);
   }
+  jsonPruefen(S);
   return S;
+}
+// Was aus dem JSON-Teil in die Oberfläche geht, muss die erwarteten Typen haben (sonst Absturz oder eingeschleustes HTML)
+function jsonPruefen(S) {
+  const zahl = (v) => typeof v === 'number' && Number.isFinite(v), text = (v) => typeof v === 'string';
+  const kaputt = (was) => { throw new Error('Spielstand beschädigt: ' + was); };
+  if (!Array.isArray(S.buch) || !S.buch.every(e => e && zahl(e.nr) && zahl(e.tag) && text(e.art) && text(e.text))) kaputt('Stadtbuch');
+  const K = S.ki;
+  if (!K || typeof K !== 'object' || !Array.isArray(K.haupt) || !Array.isArray(K.anfragen) || !Array.isArray(K.verlust)
+      || !K.tagebuch || typeof K.tagebuch !== 'object' || !K.heute || typeof K.heute !== 'object') kaputt('Hauptfiguren');
+  if (!K.haupt.every(h => h && zahl(h.id) && zahl(h.gen))) kaputt('Hauptfiguren');
+  if (!K.anfragen.every(a => a && zahl(a.nr) && zahl(a.id) && zahl(a.gen) && zahl(a.tag) && zahl(a.stunde) && zahl(a.frist)
+      && Array.isArray(a.erlaubt) && a.erlaubt.every(n => AKTIONSNAMEN.indexOf(n) > 0))) kaputt('KI-Anfragen');
+  for (const L of Object.values(K.tagebuch)) {
+    if (!Array.isArray(L) || !L.every(e => e && zahl(e.tag) && zahl(e.stunde) && text(e.art) && text(e.text) && (e.noah === undefined || text(e.noah))
+        && (e.aktion === undefined || text(e.aktion)) && (e.ziel === undefined || e.ziel === null || text(e.ziel)))) kaputt('Tagebuch');
+  }
+  if (!K.verlust.every(v => v && zahl(v.id) && zahl(v.gen) && text(v.name) && text(v.grund) && Array.isArray(v.vorschlaege)
+      && v.vorschlaege.every(x => x && zahl(x.id) && zahl(x.gen) && text(x.name) && text(x.rolle)))) kaputt('Nachfolge');
 }
 
 // ─── Für die Personenkarte und die Hauskarte (liest nur) ──────────────────────────────
@@ -2432,7 +2475,7 @@ G.StadtSim = {
   M, Z, ZIELNAMEN, AKTIONSNAMEN,
   neueStadt, stunde, tagSchritt, exportZustand, importZustand, kennzahlen, name, strName, klartext, personInfo, gebaeudeInfo, ZIELTEXT,
   // Hauptfiguren und Sprachmodell (Phase 4)
-  istHaupt, hauptSetzen, verlustErledigt, kiSchalten, kiAktionen, kiEntscheidung, kiVerwerfen, kiGespraech, kiTagebuch,
+  istHaupt, hauptSetzen, verlustErledigt, kiSchalten, kiAktionen, kiErlaubtJetzt, kiEntscheidung, kiVerwerfen, kiGespraech, kiTagebuch,
   erlaubteAktionen: (S, p, h) => erlaubteAktionen(S, p, h).map(a => AKTIONSNAMEN[a]),
   entscheide,                                                // nur für tools/simtest.mjs (Abgleich mit erlaubteAktionen)
 };
@@ -2677,6 +2720,7 @@ function baueGrafik(THREE, OrbitControls) {
     const g = S.g, K = Sim.KARTE;
     // Straßen nur neu, wenn welche dazugekommen sind
     if (S.stat.strassenFelder !== strassenStand) {
+      wege.clear();                                       // neue Straßen: Wege neu suchen (kürzere möglich)
       let n = 0;
       for (let c = 0; c < F; c++) if (S.feld[c] === Sim.STRASSE) setze(M.strasse, n++, wx(c % K), 0.005, wx((c / K) | 0), 1, 1, 1);
       fertig(M.strasse, n);
@@ -3012,7 +3056,7 @@ function setzeTempo(t) {
 for (const k of TEMPO_KNOEPFE) k.addEventListener('click', () => setzeTempo(Number(k.dataset.tempo)));
 let tempoVorPause = 1;
 addEventListener('keydown', (e) => {
-  if (e.code !== 'Space' || e.target.closest('input, textarea, button')) return;
+  if (e.code !== 'Space' || e.target.closest('input, textarea, button, select')) return;
   e.preventDefault();
   if (tempo) { tempoVorPause = tempo; setzeTempo(0); } else setzeTempo(tempoVorPause);
 });
@@ -3052,7 +3096,7 @@ function buchAnzeigen() {
   for (let i = neu.length - 1; i >= 0; i--) {
     const e = neu[i], li = document.createElement('li');
     if (buchGesehen) li.className = 'neu';
-    li.innerHTML = `<span class="tag">Tag ${e.tag}</span>${buchHtml(e.text)}`;
+    li.innerHTML = `<span class="tag">Tag ${Number(e.tag)}</span>${buchHtml(String(e.text))}`;
     frag.appendChild(li);
   }
   liste.prepend(frag);
@@ -3067,8 +3111,8 @@ const BEDARF = [['geld', 'Geld'], ['wohnen', 'Wohnen'], ['kontakt', 'Kontakt'], 
 const nameKnopf = (r) => r ? (r.lebt ? `<button type="button" class="name" data-p="${r.id}" data-g="${r.gen}">${esc(r.name)}</button>` : `<span class="leise">${esc(r.name)} †</span>`) : '–';
 const hausKnopf = (b, text) => b >= 0 ? `<button type="button" class="haus" data-b="${b}">${text}</button>` : text;
 const balken = (wert, gruen) => `<div class="balken${gruen ? ' gruen' : ''}" role="img" aria-label="${Math.round(wert)} von 100"><span style="width:${Math.max(0, Math.min(100, wert))}%"></span></div>`;
-function zeigePerson(p, gen) { verlauf.push({ art: 'p', id: Number(p), gen: Number(gen) }); karteRendern(true); }
-function zeigeGebaeude(b) { verlauf.push({ art: 'g', id: Number(b) }); karteRendern(true); }
+function zeigePerson(p, gen) { verlauf.push({ art: 'p', id: Number(p), gen: Number(gen) }); if (verlauf.length > 50) verlauf.shift(); karteRendern(true); }
+function zeigeGebaeude(b) { verlauf.push({ art: 'g', id: Number(b) }); if (verlauf.length > 50) verlauf.shift(); karteRendern(true); }
 function karteZu() { verlauf.length = 0; $('karte').hidden = true; }
 $('karte-zu').addEventListener('click', karteZu);
 $('karte-zurueck').addEventListener('click', () => { verlauf.pop(); karteRendern(true); });
@@ -3096,7 +3140,7 @@ function karteRendern(fokus) {
   if (tbNeu) tbNeu.scrollTop = tbScroll && !tbScroll.unten ? tbScroll.oben : tbNeu.scrollHeight;
   const feldNeu = $('sagen-text');
   if (merk && feldNeu && !feldNeu.disabled) {
-    if (merk.wert) feldNeu.value = merk.wert;
+    if (merk.wert && !feldNeu.readOnly) feldNeu.value = merk.wert;
     if (merk.fokus) { feldNeu.focus({ preventScroll: true }); try { feldNeu.setSelectionRange(merk.a, merk.b); } catch { /* egal */ } }
   }
   if (fokus) { $('karte').scrollTop = 0; const h = ziel.querySelector('h2'); if (h) h.focus({ preventScroll: true }); }
@@ -3197,7 +3241,7 @@ async function ollamaChat(system, frage) {
       const r = await fetch(OLLAMA + '/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body), signal: ctrl.signal });
       let d = null;
-      try { d = await r.json(); } catch { d = null; }
+      try { d = await r.json(); } catch (e) { if (e.name === 'AbortError') throw e; d = null; }
       if (r.ok) {
         const ms = performance.now() - t0;
         ki.stat.ms += ms; ki.stat.msMax = Math.max(ki.stat.msMax, ms);
@@ -3295,9 +3339,11 @@ function pruefeEntscheidung(text, erlaubt) {
 // ─── Der KI-Takt: immer nur ein Aufruf gleichzeitig. Reihenfolge: Gespräch, Entscheidungen, Tagebuch ───
 let kiBusy = false;
 async function kiTakt() {
-  if (kiBusy || aufholenLaeuft) return;
+  if (aufholenLaeuft) return;
+  try { nachfolgePruefen(); } catch (e) { ki.letzterFehler = e.message; }
+  if (kiBusy) return;
   kiBusy = true;
-  try { nachfolgePruefen(); await kiSchritt(); }
+  try { await kiSchritt(); }
   catch (e) { ki.letzterFehler = e.message; }             // nie ein Absturz
   finally { kiBusy = false; }
 }
@@ -3305,7 +3351,7 @@ async function kiAufruf(art, id, system, frage) {
   ki.laeuft = { art, id };
   hauptAnzeigen();
   try { return await ollamaChat(system, frage); }
-  finally { ki.laeuft = null; }
+  finally { ki.laeuft = null; hauptAnzeigen(); }
 }
 function nachKi() { buchAnzeigen(); kennzahlenAnzeigen(); karteAktualisieren(); hauptAnzeigen(); }
 async function kiSchritt() {
@@ -3316,7 +3362,7 @@ async function kiSchritt() {
       if (ki.gespraech && !ki.gespraech.fehler) { ki.gespraech.fehler = 'KI nicht erreichbar.'; karteAktualisieren(); }
       ki.aufholen.length = 0;                             // Ollama aus → Tagebuch nach dem Aufholen überspringen
       if (S.ki.anfragen.length) {                         // Ollama aus → Hauptfiguren entscheiden sofort normal
-        for (const a of S.ki.anfragen.slice()) Sim.kiVerwerfen(S, a.id, a.gen);
+        for (const a of S.ki.anfragen.slice()) Sim.kiVerwerfen(S, a.id, a.gen, a.nr);
         nachKi();
       }
       return;
@@ -3339,6 +3385,9 @@ async function kiSchritt() {
         ki.stat.gueltig++;
         Sim.kiGespraech(S, g.id, g.gen, g.text, antwort, zielWert(o.neues_ziel));
         ki.gespraech = null;
+        nachKi();
+        const feld = $('sagen-text');
+        if (feld && document.activeElement === feld) feld.select();
       }
     } catch (e) {
       ki.stat.fehler++; ki.letzterFehler = e.message;
@@ -3354,20 +3403,22 @@ async function kiSchritt() {
       ki.gesendet.add(a.nr);
       const i = Sim.personInfo(S, a.id, a.gen);
       if (!i) return;
+      const erlaubt = Sim.kiErlaubtJetzt(S, a.id, a.gen);   // die Anfrage kann schon eine Weile warten
+      if (!erlaubt.length) { Sim.kiVerwerfen(S, a.id, a.gen, a.nr); nachKi(); return; }
       let text;
       try {
-        text = await kiAufruf('entscheidung', a.id, entscheidungsAnweisung(i, a.erlaubt), `Es ist Tag ${a.tag}, ${a.stunde} Uhr. Was tust du?`);
+        text = await kiAufruf('entscheidung', a.id, entscheidungsAnweisung(i, erlaubt), `Es ist Tag ${a.tag}, ${a.stunde} Uhr. Was tust du?`);
       } catch (e) {
         ki.stat.fehler++; ki.letzterFehler = e.message;
-        if (S === stadt) Sim.kiVerwerfen(S, a.id, a.gen);
+        if (S === stadt) Sim.kiVerwerfen(S, a.id, a.gen, a.nr);
         nachKi();
         return;
       }
       if (S !== stadt) return;
-      const e = pruefeEntscheidung(text, a.erlaubt);
-      if (!e) { ki.stat.ungueltig++; ki.letzterFehler = 'ungültig: ' + String(text).slice(0, 160); Sim.kiVerwerfen(S, a.id, a.gen); }
-      else if (tempo >= 20) { ki.stat.verworfen20++; Sim.kiVerwerfen(S, a.id, a.gen); }
-      else { ki.stat.gueltig++; if (!Sim.kiEntscheidung(S, a.id, a.gen, e.aktion, e.ziel, e.gedanke).ok) ki.stat.zuSpaet++; }
+      const e = pruefeEntscheidung(text, erlaubt);
+      if (!e) { ki.stat.ungueltig++; ki.letzterFehler = 'ungültig: ' + String(text).slice(0, 160); Sim.kiVerwerfen(S, a.id, a.gen, a.nr); }
+      else if (tempo >= 20) { ki.stat.verworfen20++; Sim.kiVerwerfen(S, a.id, a.gen, a.nr); }
+      else { ki.stat.gueltig++; if (!Sim.kiEntscheidung(S, a.id, a.gen, e.aktion, e.ziel, e.gedanke, a.nr).ok) ki.stat.zuSpaet++; }
       nachKi();
       return;
     }
@@ -3454,21 +3505,27 @@ function tagebuchHtml(i) {
     h += '<p class="leise">Noch leer. Hier steht, was die Figur denkt, wenn die KI für sie entscheidet, und was ihr beide redet.</p>';
   } else {
     h += '<ol class="tagebuch">' + i.tagebuch.map((e) => {
-      const wann = `Tag ${e.tag}, ${e.stunde} Uhr`, ziel = e.ziel ? ` · neues Ziel: ${esc(zielText(e.ziel))}` : '';
+      const wann = `Tag ${Number(e.tag)}, ${Number(e.stunde)} Uhr`, ziel = e.ziel ? ` · neues Ziel: ${esc(zielText(e.ziel))}` : '';
       if (e.art === 'gespraech') return `<li><span class="meta">${wann} · Gespräch${ziel}</span><p class="noah">${esc(e.noah)}</p><p>${esc(e.text)}</p></li>`;
       if (e.art === 'aufholen') return `<li><span class="meta">${wann} · während du weg warst</span><p>${esc(e.text)}</p></li>`;
-      return `<li><span class="meta">${wann} · ${esc(AKTION_TEXT[e.aktion] || e.aktion || '')}${ziel}</span><p>„${esc(e.text)}“</p></li>`;
+      const klappte = e.geklappt === false ? ' (klappte nicht)' : '';
+      return `<li><span class="meta">${wann} · ${esc(AKTION_TEXT[e.aktion] || e.aktion || '')}${klappte}${ziel}</span><p>„${esc(e.text)}“</p></li>`;
     }).join('');
     if (g && !g.fehler) h += `<li><p class="noah">${esc(g.text)}</p><p class="leise">${esc(vorname)} denkt nach …</p></li>`;
     h += '</ol>';
   }
-  const bereit = ki.status === 'bereit', wartet = !!(g && !g.fehler), an = bereit && !wartet;
+  const bereit = ki.status === 'bereit', wartet = !!(g && !g.fehler);
+  const anderes = !g && ki.gespraech && !ki.gespraech.fehler ? Sim.personInfo(S, ki.gespraech.id, ki.gespraech.gen) : null;
+  // Während der Antwort nur schreibgeschützt (nicht gesperrt), damit der Fokus im Feld bleibt: sonst pausiert die Leertaste
+  const vorbelegt = g && g.fehler && !g.gezeigt ? g.text : '';
+  if (vorbelegt) g.gezeigt = true;                        // nur einmal zurückgeben; danach gilt, was im Feld steht
   h += `<form class="sagen" data-p="${i.id}" data-g="${i.gen}">
       <input type="text" id="sagen-text" maxlength="300" autocomplete="off" aria-label="Was du ${esc(vorname)} sagen willst"
-        placeholder="${bereit ? `Sag ${esc(vorname)} etwas …` : 'KI nicht erreichbar'}" value="${g && g.fehler ? esc(g.text) : ''}"${an ? '' : ' disabled'}>
-      <button type="submit" class="knopf"${an ? '' : ' disabled'}>Sagen</button>
+        placeholder="${bereit ? `Sag ${esc(vorname)} etwas …` : 'KI nicht erreichbar'}" value="${esc(vorbelegt)}"${bereit ? '' : ' disabled'}${wartet || anderes ? ' readonly' : ''}>
+      <button type="submit" class="knopf"${bereit && !wartet && !anderes ? '' : ' disabled'}>Sagen</button>
     </form>`;
   if (g && g.fehler) h += `<p class="fehlertext">${esc(g.fehler)}</p>`;
+  else if (anderes) h += `<p class="leise">Erst antwortet ${esc(anderes.name)}, dann geht das nächste Gespräch.</p>`;
   else if (!bereit) h += `<p class="leise">Ollama läuft nicht oder hat kein Modell. Siehe Einstellungen.</p>`;
   return h;
 }
@@ -3494,6 +3551,7 @@ function nachfolgePruefen() {
   const rolle = (x) => `${sein}${x.info.weib ? 'e' : ''} ${x.rolle === 'partner' ? (x.info.weib ? 'Partnerin' : 'Partner') : (x.info.weib ? 'Tochter' : 'Sohn')}`;
   $('nachfolge-titel').textContent = `${v.name} ${v.grund === 'tod' ? 'ist gestorben' : 'hat die Stadt verlassen'}`;
   $('nachfolge-text').textContent = vor.length ? 'Wer übernimmt als Hauptfigur?'
+    : v.vorschlaege.length ? 'Partner und erwachsene Kinder sind schon Hauptfiguren oder nicht mehr in der Stadt. Du kannst auf jeder Personenkarte eine neue Hauptfigur wählen.'
     : 'Es gibt keinen Partner und kein erwachsenes Kind in der Stadt, das übernehmen könnte. Du kannst auf jeder Personenkarte eine neue Hauptfigur wählen.';
   $('nachfolge-knoepfe').innerHTML = vor.map((x, n) => `<button type="button" class="knopf${n === 0 ? ' haupt' : ''}" data-nachfolge="${x.id}/${x.gen}">${esc(x.name)} (${rolle(x)})</button>`).join('')
     + `<button type="button" class="knopf" data-nachfolge="">${vor.length ? 'Niemand' : 'Verstanden'}</button>`;
@@ -3510,9 +3568,14 @@ $('nachfolge-knoepfe').addEventListener('click', (e) => {
 $('nachfolge-dialog').addEventListener('cancel', () => { Sim.verlustErledigt(S); });   // Escape = niemand
 
 // ─── Einstellungen: Modell aus der Liste, die Ollama selbst liefert (kein Modellname aus dem Gedächtnis) ───
+let modellListe = null;
 function kiEinstAnzeigen() {
-  const sel = $('ki-modell');
-  sel.innerHTML = ki.modelle.length ? ki.modelle.map(m => `<option${m === ki.modell ? ' selected' : ''}>${esc(m)}</option>`).join('') : '<option value="">–</option>';
+  const sel = $('ki-modell'), liste = ki.modelle.join('\n');
+  if (liste !== modellListe) {
+    modellListe = liste;
+    sel.innerHTML = ki.modelle.length ? ki.modelle.map(m => `<option>${esc(m)}</option>`).join('') : '<option value="">–</option>';
+  }
+  if (ki.modell && sel.value !== ki.modell) sel.value = ki.modell;
   sel.disabled = !ki.modelle.length;
   const st = kiStatus(), n = ki.stat.gueltig + ki.stat.ungueltig;
   $('ki-einst-status').textContent = st.text + (ki.status === 'nicht_erreichbar' && ki.fehlerText ? ` (${ki.fehlerText})` : '')
@@ -3538,7 +3601,6 @@ function nachSchritten() {
   hauptAnzeigen();
   if (G) { G.stadt(S.stunde); G.figurenPlanen(); }
   karteAktualisieren();
-  nachfolgePruefen();
 }
 function simTakt(dt) {
   Sim.kiSchalten(S, ki.status === 'bereit' && tempo < 20 && !aufholenLaeuft);   // nur dann stellen Hauptfiguren Anfragen
@@ -3575,16 +3637,22 @@ function debugAnzeigen(frameMs, info) {
 }
 
 let letzte = performance.now();
+let frameFehler = false;
 function frame(jetzt) {
-  const dt = Math.min(0.25, Math.max(0, (jetzt - letzte) / 1000));
-  letzte = jetzt;
-  simTakt(dt);
-  const t = S.stunde + Math.min(0.999, akku / SEK_PRO_STUNDE);   // Tageszeit mit Zwischenwerten
-  uhrAnzeigen(t);
-  let info = null;
-  if (G) { G.licht(t); G.figurenBewegen(S.tag * 24 + t); info = G.render(); }
-  if (DEBUG) debugAnzeigen(performance.now() - jetzt, info);
-  requestAnimationFrame(frame);
+  try {
+    const dt = Math.min(0.25, Math.max(0, (jetzt - letzte) / 1000));
+    letzte = jetzt;
+    simTakt(dt);
+    const t = S.stunde + Math.min(0.999, akku / SEK_PRO_STUNDE);   // Tageszeit mit Zwischenwerten
+    uhrAnzeigen(t);
+    let info = null;
+    if (G) { G.licht(t); G.figurenBewegen(S.tag * 24 + t); info = G.render(); }
+    if (DEBUG) debugAnzeigen(performance.now() - jetzt, info);
+  } catch (e) {                                           // einmal melden, weiterzeichnen statt stehen zu bleiben
+    if (!frameFehler) { frameFehler = true; console.error(e); meldung(`Fehler in der Stadt: ${e.message}. Ein Export in den Einstellungen sichert den Stand.`, 'fehler'); }
+  } finally {
+    requestAnimationFrame(frame);
+  }
 }
 // ─── Aufholen ────────────────────────────────────────────────────────────────────────
 // Verpasste Echtzeit → Spielzeit bei 1× (eine Minute = eine Spielstunde), höchstens 90 Spieltage.
@@ -3656,7 +3724,7 @@ function wegKarte(erg) {
       <dt>Gestorben</dt><dd>${zahl(n.tode - v.tode)}</dd>
     </dl>
     <p class="leise">Das Auffälligste aus dem Stadtbuch${abgeschnitten ? ` (es hält nur die letzten ${S.buch.length} von ${zahl(eintraege)} neuen Einträgen)` : ''}:</p>
-    <ol class="auffaellig">${auffaelligste(v.buchNr, 3).map(e => `<li><span class="tag">Tag ${e.tag}</span>${buchHtml(e.text)}</li>`).join('')}</ol>`;
+    <ol class="auffaellig">${auffaelligste(v.buchNr, 3).map(e => `<li><span class="tag">Tag ${Number(e.tag)}</span>${buchHtml(String(e.text))}</li>`).join('')}</ol>`;
   $('weg-dialog').showModal();
 }
 for (const d of document.querySelectorAll('dialog')) {
@@ -3680,14 +3748,18 @@ $('import-datei').addEventListener('change', async (e) => {
   const datei = e.target.files && e.target.files[0];
   e.target.value = '';
   if (!datei) return;
+  const altS = S;
   try {
     const l = spielstandLesen(await datei.text());
+    karteZu();
     S = l.S; akku = 0; buchNeu(); if (G) { G.neueStadt(); }
     ki.gesendet.clear(); ki.gespraech = null; ki.aufholen.length = 0; hauptSchluessel = '';
-    speichernErlaubt = true; speichern(); nachSchritten();
+    nachSchritten();                                      // erst zeichnen: wirft es, bleibt die alte Stadt
+    speichernErlaubt = true; speichern();
     $('einst-dialog').close();
     meldung(`Spielstand geladen: Tag ${S.tag}, ${zahl(S.einwohner)} Einwohner.`);
   } catch (err) {
+    if (S !== altS) { S = altS; buchNeu(); if (G) G.neueStadt(); hauptSchluessel = ''; try { nachSchritten(); } catch { /* alte Stadt lief ja */ } }
     meldung(`Import hat nicht geklappt: ${err.message}`, 'fehler');
   }
 });
