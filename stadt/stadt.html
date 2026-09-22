@@ -28,6 +28,7 @@
     --schrift: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   }
   *, *::before, *::after { box-sizing: border-box; }
+  [hidden] { display: none !important; }                  /* sonst gewinnt ein display: flex aus den Regeln unten */
   html, body { margin: 0; height: 100%; background: var(--grund); color: var(--text); overflow: hidden; }
   body { font: var(--normal)/1.5 var(--schrift); letter-spacing: 0.005em; }
   button { font: inherit; color: inherit; }
@@ -68,9 +69,28 @@
   #tempo button[aria-pressed="true"] { background: var(--akzent-leise); border-color: rgba(255, 200, 100, 0.5);
     color: var(--akzent); font-weight: 500; }
 
-  /* Stadtbuch rechts, einklappbar */
-  #stadtbuch { position: fixed; top: var(--s4); right: var(--s4); width: min(360px, calc(100vw - 2 * var(--s4)));
-    max-height: calc(100svh - 120px); display: flex; flex-direction: column; overflow: hidden; }
+  /* Rechte Spalte: Hauptfiguren oben, darunter das Stadtbuch (einklappbar) */
+  #rechts { position: fixed; top: var(--s4); right: var(--s4); width: min(360px, calc(100vw - 2 * var(--s4)));
+    max-height: calc(100svh - 120px); display: flex; flex-direction: column; gap: var(--s2); }
+  #stadtbuch { min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+  #haupt { flex: none; padding: var(--s2) 0; }
+  #haupt .kopfzeile { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s3); padding: var(--s1) var(--s4) var(--s1); }
+  #haupt .kopfzeile strong { font-weight: 500; color: var(--text-stark); }
+  .ki-status { font-size: var(--klein); color: var(--text-leise); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .ki-status.aus { color: var(--schlecht); }
+  #haupt-liste { list-style: none; margin: 0; padding: 0; max-height: 34svh; overflow-y: auto; }
+  #haupt-liste .leer { padding: var(--s1) var(--s4) var(--s2); font-size: var(--klein); color: var(--text-leise); }
+  .haupt-zeile { display: grid; grid-template-columns: 30px minmax(0, 1fr); column-gap: var(--s3); align-items: center; width: 100%;
+    padding: 5px var(--s4); background: none; border: 0; cursor: pointer; text-align: left; color: var(--text); font-size: var(--klein);
+    transition: background-color 150ms ease-out; }
+  .haupt-zeile:hover { background: rgba(255, 255, 255, 0.05); }
+  .kreis { grid-row: span 2; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 0.74rem;
+    font-weight: 500; letter-spacing: 0.02em; color: var(--akzent); border: 1.5px solid rgba(255, 200, 100, 0.55); background: var(--akzent-leise); }
+  .haupt-zeile .n { color: var(--text-stark); display: flex; gap: var(--s2); align-items: baseline; min-width: 0; line-height: 1.3; }
+  .haupt-zeile .gedanke { color: var(--text-leise); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.35; }
+  .ueberlegt-text { color: #a9cdf0; font-size: 0.9em; font-weight: 400; text-transform: none; letter-spacing: 0; }
+  .ueberlegt .kreis { border-color: rgba(169, 205, 240, 0.8); color: #a9cdf0; background: rgba(169, 205, 240, 0.12); animation: puls 1.8s ease-in-out infinite; }
+  @keyframes puls { 0%, 100% { box-shadow: 0 0 0 0 rgba(169, 205, 240, 0); } 50% { box-shadow: 0 0 0 4px rgba(169, 205, 240, 0.28); } }
   #buch-knopf { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: var(--s3) var(--s4);
     background: transparent; border: 0; cursor: pointer; font-weight: 500; color: var(--text-stark); text-align: left; }
   #buch-knopf .pfeil { transition: transform 200ms cubic-bezier(.2,.8,.2,1); color: var(--text-leise); }
@@ -100,7 +120,7 @@
 
   /* Personen- und Hauskarte links */
   #karte { position: fixed; left: var(--s4); top: 232px; bottom: 96px; width: min(380px, calc(100vw - 2 * var(--s4)));
-    overflow-y: auto; background: rgba(24, 27, 36, 0.96); border: 1px solid var(--linie); border-radius: var(--r);
+    overflow-y: auto; background: #181b24; border: 1px solid var(--linie); border-radius: var(--r);
     padding: var(--s3) var(--s4) var(--s5); font-size: var(--klein); }
   #karte .kopf { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--s2); min-height: 28px; }
   #karte .kopf button { background: none; border: 0; color: var(--text-leise); cursor: pointer; padding: 4px 6px; border-radius: 6px; }
@@ -127,6 +147,23 @@
   button.haus { background: none; border: 0; padding: 0; cursor: pointer; color: inherit; text-decoration: underline;
     text-decoration-color: rgba(255, 255, 255, 0.25); text-underline-offset: 2px; font: inherit; }
   button.haus:hover { color: var(--akzent); }
+  .karte-knoepfe { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); margin-top: var(--s3); }
+  .knopf.klein { padding: 4px 10px; font-size: var(--klein); }
+  .knopf:disabled { opacity: 0.5; cursor: default; }
+  .tagebuch { list-style: none; margin: 0; padding: 0 var(--s1) 0 0; max-height: 260px; overflow-y: auto; }
+  .tagebuch li { padding: var(--s2) 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+  .tagebuch li:last-child { border-bottom: 0; }
+  .tagebuch .meta { display: block; color: var(--text-leise); font-size: 0.92em; margin-bottom: 2px; }
+  .tagebuch p { margin: 0; }
+  .tagebuch .noah { width: fit-content; max-width: 88%; margin: 2px 0 6px auto; padding: 5px 10px; border-radius: 10px;
+    background: var(--akzent-leise); color: var(--text-stark); }
+  .sagen { display: flex; gap: var(--s2); margin-top: var(--s3); }
+  .sagen input { flex: 1; min-width: 0; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--linie); background: var(--ebene1);
+    color: var(--text); font: inherit; }
+  .sagen input::placeholder { color: var(--text-leise); }
+  .fehlertext { color: var(--schlecht); margin-top: var(--s2) !important; }
+  .einst-h { margin: var(--s5) 0 var(--s2); font-size: 0.78rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-leise); }
+  select { font: inherit; color: var(--text); background: var(--ebene3); border: 1px solid var(--linie); border-radius: 10px; padding: 6px 10px; max-width: 100%; }
 
   /* Knopf für Einstellungen unten rechts */
   #einst-knopf { position: fixed; right: var(--s4); bottom: var(--s4); width: 44px; height: 44px; display: grid; place-items: center;
@@ -168,12 +205,15 @@
     z-index: 10; }
   #meldung.fehler { border-color: rgba(242, 153, 138, 0.6); color: var(--schlecht); }
   #meldung.warnung { border-color: rgba(255, 200, 100, 0.55); color: var(--akzent); }
-  body.debug #karte { bottom: 132px; }                    /* nicht über den Debug-Knöpfen */
-  #debug-knoepfe { position: fixed; left: var(--s4); bottom: 92px; display: flex; gap: var(--s1); font-size: 12px; }
+  body.debug #karte { bottom: 152px; }                    /* nicht über den Debug-Knöpfen */
+  #debug-knoepfe { position: fixed; left: var(--s4); bottom: 112px; display: flex; gap: var(--s1); font-size: 12px; }
   #debug-knoepfe .knopf { padding: 4px 8px; font-size: 12px; }
 
   @media (max-width: 720px) {
-    #stadtbuch { top: auto; bottom: 76px; max-height: 38svh; }
+    #rechts { top: auto; bottom: 76px; max-height: 42svh; }
+    #haupt-liste { display: flex; gap: var(--s1); overflow-x: auto; padding: 0 var(--s3); }
+    .haupt-zeile { grid-template-columns: 30px; padding: 4px; }
+    .haupt-zeile .n, .haupt-zeile .gedanke { display: none; }
     #kennzahlen { min-width: 0; }
     #karte { top: auto; left: var(--s2); right: var(--s2); width: auto; bottom: 76px; max-height: 55svh; z-index: 5; }
   }
@@ -214,12 +254,18 @@
   <button type="button" data-tempo="20" aria-pressed="false">20×</button>
 </nav>
 
+<div id="rechts">
+<section id="haupt" class="glas" aria-label="Hauptfiguren">
+  <div class="kopfzeile"><strong>Hauptfiguren</strong><span id="ki-status" class="ki-status" role="status">KI wird gesucht …</span></div>
+  <ul id="haupt-liste"></ul>
+</section>
 <aside id="stadtbuch" class="glas" aria-label="Stadtbuch">
   <button type="button" id="buch-knopf" aria-expanded="true" aria-controls="buch-liste">
     <span>Stadtbuch</span><svg class="pfeil" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
   </button>
   <ol id="buch-liste" reversed></ol>
 </aside>
+</div>
 
 <aside id="karte" aria-label="Karte" hidden>
   <div class="kopf">
@@ -255,6 +301,12 @@
   <div class="knoepfe"><button type="button" class="knopf haupt" data-schliessen autofocus>Weiter</button></div>
 </dialog>
 
+<dialog id="nachfolge-dialog" aria-labelledby="nachfolge-titel">
+  <h2 id="nachfolge-titel">Eine Hauptfigur fehlt</h2>
+  <p id="nachfolge-text"></p>
+  <div class="knoepfe" id="nachfolge-knoepfe"></div>
+</dialog>
+
 <dialog id="version-dialog" aria-labelledby="version-titel">
   <h2 id="version-titel">Spielstand ist von einer älteren Version</h2>
   <p id="version-text">Dieser Spielstand passt nicht zu dieser Version von STADT und kann nicht geladen werden.</p>
@@ -273,6 +325,16 @@
     <button type="button" class="knopf" id="import-knopf">Import …</button>
     <input type="file" id="import-datei" accept="application/json,.json" hidden>
   </div>
+  <h3 class="einst-h">KI für die Hauptfiguren (Ollama)</h3>
+  <p class="leise" id="ki-einst-status">KI wird gesucht …</p>
+  <div class="knoepfe">
+    <label for="ki-modell" class="leise" style="align-self:center">Modell</label>
+    <select id="ki-modell"><option value="">–</option></select>
+    <button type="button" class="knopf" id="ki-suchen">Neu suchen</button>
+  </div>
+  <p class="leise" style="margin-top:var(--s3)">Ollama muss auf diesem Rechner laufen (<code>ollama serve</code> oder die Ollama-App) und mindestens ein Modell haben
+    (<code>ollama list</code>). Die Seite über <code>http://localhost:8000</code> öffnen, dann erlaubt Ollama den Zugriff ohne weitere Einstellung.
+    Läuft Ollama nicht, entscheiden die Hauptfiguren mit dem normalen Gehirn.</p>
   <div class="knoepfe"><button type="button" class="knopf haupt" data-schliessen autofocus>Schließen</button></div>
 </dialog>
 
@@ -287,7 +349,7 @@
 // =====================================================================================
 (function (G) {
 
-const VERSION = 1;
+const VERSION = 2;                    // 2: Hauptfiguren, Tagebuch, KI-Anfragen (Phase 4)
 
 // ─── Karte ───────────────────────────────────────────────────────────────────────────
 const KARTE = 96, FELDER = KARTE * KARTE;
@@ -349,6 +411,12 @@ const R = {
 
   BUCH_MAX: 500,
   START_BUDGET: 6000,
+
+  // Hauptfiguren (Phase 4)
+  HAUPT_START: 5, HAUPT_MAX: 10,
+  KI_PRO_TAG: 3,                           // höchstens so viele Sprachmodell-Entscheidungen je Figur und Spieltag
+  KI_FRIST: 2,                             // Spielstunden bis das normale Gehirn übernimmt
+  TAGEBUCH: 30,                            // so viele Einträge bleiben
 };
 
 // Gedächtnis-Codes
@@ -600,8 +668,9 @@ function erinnertSeit(S, p, code, tage, ref) {
 }
 
 // Person verlässt die Stadt (Tod oder Wegzug). Räumt alle Verweise auf, gibt den Platz frei.
-function entferne(S, q) {
+function entferne(S, q, grund) {
   const P = S.p;
+  if (S.ki.haupt.length && istHaupt(S, q)) hauptVerloren(S, q, grund || 'weg');
   if (P.besitz[q] >= 0) {
     const b = P.besitz[q];
     const n = schliessen(S, b, false);
@@ -662,7 +731,7 @@ function sterben(S, q) {
   for (const n of nah) { if (erwachsen(S, n)) { erinnere(S, n, M.GESTORBEN, q); P.jetzt[n] = 1; } }
   buch(S, 'tod', `${nr(S, q)} stirbt mit ${Math.floor(alterTage(S, q) / R.JAHR)} Jahren.`);
   S.stat.tode++;
-  entferne(S, q);
+  entferne(S, q, 'tod');
 }
 
 // ─── Verwandtschaft, Freundschaft ────────────────────────────────────────────────────
@@ -1075,9 +1144,13 @@ function zielWaehlen(S, p) {
     if (erinnertSeit(S, p, M.ZIEL_AUFGEGEBEN, R.ZIEL_TAGE, z)) v -= 40;   // gerade erst aufgegeben
     if (v > bestW) { bestW = v; best = z; }
   }
-  P.ziel[p] = best; P.zielSeit[p] = S.tag;
-  P.zielWert[p] = best === Z.JOB ? (P.arbeit[p] >= 0 ? S.g.lohn[P.arbeit[p]] : 0)
-    : best === Z.FAMILIE ? P.kinder[p] : best === Z.FREUNDE ? freundeZahl(S, p) : 0;
+  zielSetzen(S, p, best);
+}
+function zielSetzen(S, p, z) {   // Ausgangswert merken, damit „erreicht“ eine Verbesserung heißt
+  const P = S.p;
+  P.ziel[p] = z; P.zielSeit[p] = S.tag;
+  P.zielWert[p] = z === Z.JOB ? (P.arbeit[p] >= 0 ? S.g.lohn[P.arbeit[p]] : 0)
+    : z === Z.FAMILIE ? P.kinder[p] : z === Z.FREUNDE ? freundeZahl(S, p) : 0;
 }
 function zielPruefen(S, p) {
   const P = S.p, z = P.ziel[p];
@@ -1174,11 +1247,16 @@ function entscheide(S, p, h) {
   }
 
   if (!bestA) return 0;
+  ausfuehren(S, p, bestA);
+  return bestA;
+}
+function ausfuehren(S, p, a) {
+  const P = S.p;
   let ok = false;
-  switch (bestA) {
+  switch (a) {
     case A.WOHNUNG: ok = aktWohnung(S, p); break;
     case A.JOB: ok = aktJob(S, p, 0); break;
-    case A.WECHSEL: ok = aktJob(S, p, g.lohn[arb] + 3); break;
+    case A.WECHSEL: ok = aktJob(S, p, S.g.lohn[P.arbeit[p]] + 3); break;
     case A.KUENDIGEN: ok = aktKuendigen(S, p); break;
     case A.FREI: P.frei[p] = 1; ok = true; break;
     case A.FREUNDE: ok = aktFreunde(S, p); break;
@@ -1189,9 +1267,9 @@ function entscheide(S, p, h) {
     case A.GRUENDEN: ok = aktGruenden(S, p); break;
     case A.WEGZIEHEN: ok = aktWegziehen(S, p); break;
   }
-  S.stat.gewaehlt[bestA]++;
-  if (ok) S.stat.ausgefuehrt[bestA]++;
-  return bestA;
+  S.stat.gewaehlt[a]++;
+  if (ok) S.stat.ausgefuehrt[a]++;
+  return ok;
 }
 
 // ─── Die Aktionen ────────────────────────────────────────────────────────────────────
@@ -1477,6 +1555,182 @@ function aktWegziehen(S, p) {
   return true;
 }
 
+// ─── Hauptfiguren: Entscheidungen von außen (Sprachmodell), Tagebuch ─────────────────
+// Die Simulation wartet nie. Eine Hauptfigur stellt an ihrem Entscheidungszeitpunkt eine Anfrage und
+// macht bis zur Antwort weiter wie bisher. Nach R.KI_FRIST Spielstunden ohne gültige Antwort entscheidet
+// das normale Gehirn. Die Oberfläche beantwortet Anfragen nur über kiEntscheidung und kiVerwerfen.
+const schluessel = (S, p) => p + '/' + S.p.gen[p];
+function istHaupt(S, p) {
+  const L = S.ki.haupt, gen = S.p.gen[p];
+  for (let i = 0; i < L.length; i++) if (L[i].id === p && L[i].gen === gen) return true;
+  return false;
+}
+// Welche Aktionen gerade möglich sind: dieselben Voraussetzungen wie in entscheide(), ohne Punktwertung
+// und ohne Zufall. Wer entscheide() ändert, zieht hier mit (simtest --ki prüft, dass das Gehirn nie
+// etwas wählt, das hier fehlt). Zwei Gedächtnis-Wirkungen gelten hier als Voraussetzung, weil sie im
+// Gehirn praktisch sperren: Kind in den letzten 30 Tagen (−60) und Trennen nur, wenn beide lange unzufrieden sind.
+function erlaubteAktionen(S, p, h) {
+  const P = S.p, tag = S.tag, alter = (tag - P.geb[p]) / R.JAHR;
+  const arb = P.arbeit[p], istBesitzer = P.besitz[p] >= 0, pa = P.partner[p];
+  const erwerb = alter >= R.ERWACHSEN && alter < R.RENTE;
+  const L = [];
+  if ((P.wohnung[p] < 0 || P.bWohnen[p] < 40) && !P.suchPause[p] && !(P.sucht[p] && S.freieWohnungen <= 0)
+      && (arb >= 0 || P.geld[p] >= 10 * R.MIETE[1] || alter >= R.RENTE)) L.push(A.WOHNUNG);
+  if (erwerb && arb < 0 && !istBesitzer && S.freieStellen > 0) L.push(A.JOB);
+  if (arb >= 0 && !istBesitzer && besterFreierLohn(S) > S.g.lohn[arb] + 3) L.push(A.WECHSEL);
+  if (arb >= 0 && !istBesitzer && P.geld[p] >= 20 * tageskosten(S, p)) L.push(A.KUENDIGEN);
+  if (arb >= 0 && h <= 7 && !P.frei[p]) L.push(A.FREI);
+  if (h >= 17) L.push(A.FREUNDE);
+  if (pa < 0 && alter < 70 && !innerhalb(S, P.getrenntTag[p], 30)) L.push(A.PARTNER);
+  if (pa >= 0) {
+    const zusammen = P.hh[p] >= 0 && P.hh[p] === P.hh[pa];
+    if (!zusammen) L.push(A.ZUSAMMEN);
+    if (P.unzuf[p] >= R.UNZUF_TAGE && P.unzuf[pa] >= R.UNZUF_TAGE) L.push(A.TRENNEN);
+    if (zusammen && P.wohnung[p] >= 0 && P.zuf[p] > 60 && P.zuf[pa] > 60 && alter < 45 && (tag - P.geb[pa]) / R.JAHR < 45
+        && !innerhalb(S, P.kindTag[p], 30)) L.push(A.KIND);
+  }
+  if (!istBesitzer && alter < 60 && P.sperreBis[p] <= tag && (ladenFehlt(S, P.wohnung[p]) || werkstattLohnt(S)) && kannGruenden(S, p)) L.push(A.GRUENDEN);
+  if (P.elend[p] >= R.ELEND_TAGE) L.push(A.WEGZIEHEN);
+  return L;
+}
+// Ein Satz Erklärung je erlaubter Aktion, aus der Sicht der Figur (für die Anweisung ans Sprachmodell)
+function kiAktionen(S, p, namen) {
+  const P = S.p, pa = P.partner[p], arb = P.arbeit[p], pn = pa >= 0 ? name(S, pa) : '', geld = Math.round(P.geld[p]);
+  return namen.map((n) => {
+    let satz = '';
+    switch (AKTIONSNAMEN.indexOf(n)) {
+      case A.WOHNUNG: satz = P.wohnung[p] < 0 ? 'Du suchst dir eine Wohnung, du hast gerade keine.' : 'Du suchst dir eine andere Wohnung, die jetzige passt nicht gut.'; break;
+      case A.JOB: satz = `Du suchst dir Arbeit. In der Stadt ${S.freieStellen === 1 ? 'ist 1 Stelle' : `sind ${S.freieStellen} Stellen`} frei.`; break;
+      case A.WECHSEL: satz = `Du wechselst die Stelle. Anderswo zahlt man ${besterFreierLohn(S)} Taler am Tag, du bekommst ${S.g.lohn[arb]}.`; break;
+      case A.KUENDIGEN: satz = `Du kündigst und lebst eine Weile von deinem Ersparten (${geld} Taler).`; break;
+      case A.FREI: satz = 'Du nimmst dir heute frei und ruhst dich aus. Der Lohn für heute fällt weg.'; break;
+      case A.FREUNDE: satz = 'Du triffst heute Abend Freunde oder lernst neue Leute kennen.'; break;
+      case A.PARTNER: satz = 'Du suchst jemanden, mit dem du zusammen sein willst.'; break;
+      case A.ZUSAMMEN: satz = `Du ziehst mit ${pn} zusammen.`; break;
+      case A.TRENNEN: satz = `Du trennst dich von ${pn}. Ihr seid beide seit über zwei Wochen unzufrieden.`; break;
+      case A.KIND: satz = `Du bekommst mit ${pn} ein Kind.`; break;
+      case A.GRUENDEN: {
+        const t = gruendungsTyp(S, p), kosten = gruendungsKosten(t, S.leerTyp[t] > 0 && P.geld[p] >= gruendungsKosten(t, true));
+        satz = `Du gründest ${t === LADEN ? 'einen eigenen Laden' : 'eine eigene Werkstatt'}. Das kostet ${kosten} Taler, du hast ${geld}.`;
+        break;
+      }
+      case A.WEGZIEHEN: satz = 'Du verlässt die Stadt für immer.'; break;
+    }
+    return { name: n, satz };
+  });
+}
+// Entscheidungszeitpunkt einer Figur. true = die Figur wartet auf eine Antwort (kein normales Entscheiden)
+function kiFragen(S, p, h) {
+  const K = S.ki;
+  if (!istHaupt(S, p)) return false;
+  for (const a of K.anfragen) if (a.id === p) return true;     // wartet noch: macht weiter wie bisher
+  if (!K.an) return false;
+  const k = schluessel(S, p);
+  if ((K.heute[k] || 0) >= R.KI_PRO_TAG) return false;
+  const erlaubt = erlaubteAktionen(S, p, h);
+  if (!erlaubt.length) return false;
+  K.heute[k] = (K.heute[k] || 0) + 1;
+  K.anfragen.push({ nr: ++K.nr, id: p, gen: S.p.gen[p], tag: S.tag, stunde: h, frist: S.tag * 24 + h + R.KI_FRIST,
+    erlaubt: erlaubt.map(a => AKTIONSNAMEN[a]) });
+  return true;
+}
+// Zu Beginn jeder Stunde: Anfragen ohne Antwort nach der Frist → normales Gehirn (mit der Stunde der Anfrage)
+function kiFristen(S) {
+  const K = S.ki, jetzt = S.tag * 24 + S.stunde, fertig = [];
+  for (let i = K.anfragen.length - 1; i >= 0; i--) {
+    const a = K.anfragen[i];
+    if (a.frist > jetzt) continue;
+    K.anfragen.splice(i, 1);
+    K.abgelaufen++;
+    if (S.p.lebt[a.id] && S.p.gen[a.id] === a.gen) { entscheide(S, a.id, a.stunde); S.p.jetzt[a.id] = 0; fertig.push(a.id); }
+  }
+  return fertig;
+}
+function anfrageRaus(S, id, gen) {
+  const L = S.ki.anfragen;
+  for (let i = 0; i < L.length; i++) if (L[i].id === id && L[i].gen === gen) return L.splice(i, 1)[0];
+  return null;
+}
+function tagebuchEintrag(S, p, e, tag, stunde) {
+  const T = S.ki.tagebuch, k = schluessel(S, p);
+  const L = T[k] || (T[k] = []);
+  L.push(Object.assign({ tag: tag === undefined ? S.tag : tag, stunde: stunde === undefined ? S.stunde : stunde }, e));
+  if (L.length > R.TAGEBUCH) L.splice(0, L.length - R.TAGEBUCH);
+}
+const lebtNoch = (S, id, gen) => id >= 0 && id < S.pMax && S.p.lebt[id] && S.p.gen[id] === gen;
+// Gültige Antwort des Sprachmodells anwenden. Die Oberfläche hat schon geprüft; hier noch einmal gegen die Sim.
+// Hat sich die Lage seit der Anfrage geändert und die Aktion geht nicht mehr, entscheidet das normale Gehirn.
+function kiEntscheidung(S, id, gen, aktion, ziel, gedanke) {
+  const K = S.ki, P = S.p;
+  const a = anfrageRaus(S, id, gen);
+  if (!a || !lebtNoch(S, id, gen)) return { ok: false, grund: 'keine offene Anfrage (Frist abgelaufen)' };
+  const code = AKTIONSNAMEN.indexOf(aktion), z = ziel ? ZIELNAMEN.indexOf(ziel) : 0;
+  if (code <= 0 || !a.erlaubt.includes(aktion) || z < 0) { entscheide(S, id, a.stunde); P.jetzt[id] = 0; return { ok: false, grund: 'ungültig' }; }
+  if (z > 0 && z !== P.ziel[id]) zielSetzen(S, id, z);
+  tagebuchEintrag(S, id, { art: 'gedanke', text: String(gedanke), aktion, ziel: z > 0 ? ziel : null }, a.tag, a.stunde);
+  let ausgefuehrt = false;
+  if (erlaubteAktionen(S, id, a.stunde).includes(code)) ausgefuehrt = ausfuehren(S, id, code);
+  else entscheide(S, id, a.stunde);
+  if (S.p.lebt[id]) S.p.jetzt[id] = 0;
+  K.angewandt++;
+  return { ok: true, ausgefuehrt };
+}
+// Ungültige Antwort, Fehler oder Tempo 20×: das normale Gehirn entscheidet sofort
+function kiVerwerfen(S, id, gen) {
+  const a = anfrageRaus(S, id, gen);
+  if (!a || !lebtNoch(S, id, gen)) return false;
+  entscheide(S, id, a.stunde);
+  if (S.p.lebt[id]) S.p.jetzt[id] = 0;
+  return true;
+}
+// Gespräch mit Noah: wird eine Erinnerung, ein neues Ziel gilt ab sofort. Mehr kann ein Gespräch nicht ändern.
+function kiGespraech(S, id, gen, noah, antwort, ziel) {
+  if (!lebtNoch(S, id, gen)) return false;
+  const z = ziel ? ZIELNAMEN.indexOf(ziel) : 0;
+  if (z > 0 && z !== S.p.ziel[id]) zielSetzen(S, id, z);
+  erinnere(S, id, M.NOAH, -1);
+  tagebuchEintrag(S, id, { art: 'gespraech', noah: String(noah), text: String(antwort), ziel: z > 0 ? ziel : null });
+  return true;
+}
+function kiTagebuch(S, id, gen, text, art) {
+  if (!lebtNoch(S, id, gen)) return false;
+  tagebuchEintrag(S, id, { art: art || 'eintrag', text: String(text) });
+  return true;
+}
+// Noah macht jemanden zur Hauptfigur oder nimmt es zurück (nur Erwachsene, höchstens R.HAUPT_MAX)
+function hauptSetzen(S, id, gen, an) {
+  const K = S.ki;
+  if (!lebtNoch(S, id, gen)) return false;
+  if (!an) {
+    K.haupt = K.haupt.filter(h => !(h.id === id && h.gen === gen));
+    anfrageRaus(S, id, gen);
+    return true;
+  }
+  if (istHaupt(S, id) || K.haupt.length >= R.HAUPT_MAX || !erwachsen(S, id)) return false;
+  K.haupt.push({ id, gen });
+  return true;
+}
+// Eine Hauptfigur stirbt oder geht: merken, wer übernehmen könnte (Partner, erwachsene Kinder).
+// Die Oberfläche fragt Noah und ruft danach verlustErledigt.
+function hauptVerloren(S, q, grund) {
+  const P = S.p, K = S.ki, gq = P.gen[q], k = schluessel(S, q);
+  K.haupt = K.haupt.filter(h => !(h.id === q && h.gen === gq));
+  anfrageRaus(S, q, gq);
+  delete K.tagebuch[k]; delete K.heute[k];
+  const vor = [];
+  const pa = P.partner[q];
+  if (pa >= 0 && P.lebt[pa] && erwachsen(S, pa)) vor.push({ id: pa, gen: P.gen[pa], name: name(S, pa), rolle: 'partner' });
+  if (P.kinder[q] > 0) {
+    for (let i = 0; i < S.pMax; i++) {
+      if (P.lebt[i] && erwachsen(S, i) && ((P.elternA[i] === q && P.elternAGen[i] === gq) || (P.elternB[i] === q && P.elternBGen[i] === gq))) {
+        vor.push({ id: i, gen: P.gen[i], name: name(S, i), rolle: 'kind' });
+      }
+    }
+  }
+  K.verlust.push({ id: q, gen: gq, name: name(S, q), weib: !!P.weib[q], grund, tag: S.tag, vorschlaege: vor });
+}
+function verlustErledigt(S) { return S.ki.verlust.shift() || null; }
+
 // ─── Stündlich ───────────────────────────────────────────────────────────────────────
 function stunde(S) {
   const h = S.stunde, g = S.g;
@@ -1487,6 +1741,8 @@ function stunde(S) {
   const entscheidStunde = h === 7 || h === 18;
   const zufSchritt = R.ZUF_MAX_TAG / 24;
   const neuZiel = h % 6 === 0;
+  const K = S.ki;
+  const schon = K.anfragen.length ? kiFristen(S) : null;     // Frist abgelaufen: das normale Gehirn hat schon entschieden
   let P = S.p;
   const n = S.pMax;
   for (let p = 0; p < n; p++) {
@@ -1513,7 +1769,10 @@ function stunde(S) {
     const z = P.zufZiel[p], a = P.zuf[p];
     P.zuf[p] = a + klemme(z - a, -zufSchritt, zufSchritt);
     if (entscheidStunde || P.jetzt[p]) {
-      entscheide(S, p, h);
+      if (schon === null || !schon.includes(p)) {
+        // Hauptfigur: fragt das Sprachmodell (oder wartet noch auf die Antwort) und macht solange weiter wie bisher
+        if (!((K.an || K.anfragen.length) && K.haupt.length && kiFragen(S, p, h))) entscheide(S, p, h);
+      }
       P = S.p;                                               // Arrays können durch eine Geburt gewachsen sein
       P.jetzt[p] = 0;                                        // eigene Folgen lösen keine zweite Entscheidung aus
     }
@@ -1550,6 +1809,7 @@ function tagesabschluss(S) {
   zuzug(S);
   bauamt(S);
   S.reihe.push(S.einwohner);
+  S.ki.heute = {};
   S.tag++;
 }
 
@@ -1874,6 +2134,8 @@ function leererZustand(seed) {
     vZufSumme: new Float64Array(VN * VN), vZufN: new Uint32Array(VN * VN), vParks: new Uint16Array(VN * VN),
     ladenDirty: true, parkDirty: true,
     buch: [], buchNr: 0, reihe: [],
+    // Hauptfiguren: an = die Oberfläche beantwortet Anfragen gerade (Ollama bereit, nicht 20×, kein Aufholen)
+    ki: { an: false, haupt: [], anfragen: [], nr: 0, heute: {}, tagebuch: {}, verlust: [], abgelaufen: 0, angewandt: 0 },
     stat: {
       gruendungen: 0, uebernahmen: 0, pleiten: 0, pleitenLaden: 0, pleiteAlter: 0, geburten: 0, tode: 0, zuzuege: 0,
       wegzuege: 0, wegzuegePersonen: 0, hochzeiten: 0, trennungen: 0, paare: 0, freundschaften: 0,
@@ -1912,6 +2174,7 @@ function neueStadt(seed) {
     P.jetzt[p] = 1;
     erwachsenZaehlen(S, p);
   }
+  for (let p = 0; p < R.HAUPT_START; p++) S.ki.haupt.push({ id: p, gen: S.p.gen[p] });   // 5 der ersten Bewohner
   ladenZuordnen(S); parksZuordnen(S); haushalteZaehlen(S); kennzahlenRechnen(S);
   buch(S, 'start', 'Zehn Leute kommen auf eine leere Wiese an der Hauptstraße. Es gibt zwei Wohnhäuser, eine Werkstatt der Stadt und einen Laden.');
   return S;
@@ -1923,6 +2186,7 @@ function neueStadt(seed) {
 // Steht die Uhr nicht auf Mitternacht, wird zuerst stündlich bis Mitternacht gerechnet.
 function tagSchritt(S) {
   if (S.stunde !== 0) { while (S.stunde !== 0) stunde(S); return; }
+  S.ki.anfragen.length = 0;                                  // beim Aufholen entscheiden alle mit dem normalen Gehirn
   const g = S.g, erwGrenze = S.tag - R.ERWACHSEN * R.JAHR, halb = R.ZUF_MAX_TAG / 2;
   const block = (abends) => {
     const P = S.p;
@@ -2104,6 +2368,8 @@ function personInfo(S, p, gen) {
     gedaechtnis: mem,
     partner: ref(S, P.partner[p]), eltern, kinder: kinder.map(k => ref(S, k)), enkel: enkel.map(e => ref(S, e)),
     freunde: freunde.filter(Boolean),
+    haupt: istHaupt(S, p), ueberlegt: S.ki.anfragen.some(a => a.id === p),
+    tagebuch: (S.ki.tagebuch[schluessel(S, p)] || []).slice(),
   };
 }
 // Hauskarte: wer wohnt oder arbeitet hier
@@ -2159,6 +2425,10 @@ G.StadtSim = {
   VERSION, R, KARTE, VK, VN, RASTER, RAND, LEER, STRASSE, WOHNHAUS, WERKSTATT, LADEN, PARK, BAUSTELLE,
   M, Z, ZIELNAMEN, AKTIONSNAMEN,
   neueStadt, stunde, tagSchritt, exportZustand, importZustand, kennzahlen, name, strName, klartext, personInfo, gebaeudeInfo, ZIELTEXT,
+  // Hauptfiguren und Sprachmodell (Phase 4)
+  istHaupt, hauptSetzen, verlustErledigt, kiAktionen, kiEntscheidung, kiVerwerfen, kiGespraech, kiTagebuch,
+  erlaubteAktionen: (S, p, h) => erlaubteAktionen(S, p, h).map(a => AKTIONSNAMEN[a]),
+  entscheide,                                                // nur für tools/simtest.mjs (Abgleich mit erlaubteAktionen)
 };
 })(globalThis);
 </script>
@@ -2202,7 +2472,7 @@ function spielstandLesen(text) {
   if (Array.isArray(d.arrays)) d.arrays = d.arrays.map(a => ({ name: a.name, typ: a.typ, daten: b64ein(a.b64, a.typ) }));
   return { S: Sim.importZustand(d), zuletztGelaufen: Number(d.zuletztGelaufen) || Date.now(), tempo: d.tempo, ui: d.ui || {} };
 }
-function uiZustand() { return {}; }                       // wird von späteren Teilen erweitert (Hauptfiguren, Ollama)
+function uiZustand() { return { kiModell: ki.modell }; }  // das in den Einstellungen gewählte Ollama-Modell
 
 let speichernErlaubt = true;
 let alterSpielstand = null;                               // Text eines Spielstands anderer Version (für „Export behalten“)
@@ -2467,7 +2737,8 @@ function baueGrafik(THREE, OrbitControls) {
   // ─── Figuren: höchstens 300 zufällige Erwachsene, dazu alle Hauptfiguren (mit Markierung) ──
   const FIG_MAX = 300, HAUPT_MAX = 10, FIG_GES = FIG_MAX + HAUPT_MAX, GEHTEMPO = 22;   // Felder pro Spielstunde
   const figMesh = inst(new THREE.CapsuleGeometry(0.055, 0.13, 2, 6).translate(0, 0.12, 0), lambert('#ffffff'), FIG_GES);
-  const markMesh = inst(new THREE.OctahedronGeometry(0.065), new THREE.MeshBasicMaterial({ color: '#ffc864' }), HAUPT_MAX);
+  const markMesh = inst(new THREE.OctahedronGeometry(0.065), new THREE.MeshBasicMaterial({ color: '#ffffff' }), HAUPT_MAX);
+  const MARK_GOLD = new THREE.Color('#ffc864'), MARK_DENKT = new THREE.Color('#a9cdf0');   // überlegt = hellblau
   const NULL = new THREE.Matrix4().makeScale(0, 0, 0);
   const FIGFARBEN = ['#e6d3bd', '#c2d3e6', '#e6c2bd', '#c6e0c2', '#e6dcb8', '#b8d8d8', '#d8c2b0', '#aebfd8'].map(c => new THREE.Color(c));
   const figuren = [];                                     // { p, gen, route, start, dauer, versatz, ox, oz, haupt }
@@ -2591,6 +2862,9 @@ function baueGrafik(THREE, OrbitControls) {
       if (f.haupt) {
         dummy.position.set(x, 0.46 + (REDUZIERT ? 0 : Math.sin(jetzt * 40 + i) * 0.03), z); dummy.rotation.set(0, 0, 0);
         dummy.updateMatrix();
+        let denkt = false;
+        for (const a of S.ki.anfragen) if (a.id === f.p) denkt = true;
+        markMesh.setColorAt(nm, denkt ? MARK_DENKT : MARK_GOLD);
         markMesh.setMatrixAt(nm++, dummy.matrix);
       }
     }
@@ -2599,6 +2873,7 @@ function baueGrafik(THREE, OrbitControls) {
     figMesh.boundingSphere = null;
     markMesh.count = nm;
     markMesh.instanceMatrix.needsUpdate = true;
+    if (markMesh.instanceColor) markMesh.instanceColor.needsUpdate = true;
   }
 
   // ─── Klicken: Figur (in Bildschirmnähe) oder Gebäude ───
@@ -2708,6 +2983,7 @@ const TEMPO_KNOEPFE = [...document.querySelectorAll('#tempo button')];
 function setzeTempo(t) {
   tempo = t;
   for (const k of TEMPO_KNOEPFE) k.setAttribute('aria-pressed', String(Number(k.dataset.tempo) === t));
+  hauptAnzeigen();                                        // „KI pausiert bei 20×“ sofort zeigen
 }
 for (const k of TEMPO_KNOEPFE) k.addEventListener('click', () => setzeTempo(Number(k.dataset.tempo)));
 let tempoVorPause = 1;
@@ -2787,7 +3063,18 @@ function karteRendern(fokus) {
   $('karte-zurueck').hidden = verlauf.length < 2;
   const ziel = $('karte-inhalt');
   const scroll = $('karte').scrollTop;
+  // Beim stündlichen Auffrischen nichts verlieren: Text im Eingabefeld, Fokus, Stelle im Tagebuch
+  const feld = fokus ? null : $('sagen-text'), tb = fokus ? null : ziel.querySelector('.tagebuch');
+  const merk = feld ? { wert: feld.value, fokus: document.activeElement === feld, a: feld.selectionStart, b: feld.selectionEnd } : null;
+  const tbScroll = tb ? { oben: tb.scrollTop, unten: tb.scrollHeight - tb.scrollTop - tb.clientHeight < 8 } : null;
   ziel.innerHTML = k.art === 'p' ? personHtml(k.id, k.gen) : gebaeudeHtml(k.id);
+  const tbNeu = ziel.querySelector('.tagebuch');
+  if (tbNeu) tbNeu.scrollTop = tbScroll && !tbScroll.unten ? tbScroll.oben : tbNeu.scrollHeight;
+  const feldNeu = $('sagen-text');
+  if (merk && feldNeu && !feldNeu.disabled) {
+    if (merk.wert) feldNeu.value = merk.wert;
+    if (merk.fokus) { feldNeu.focus({ preventScroll: true }); try { feldNeu.setSelectionRange(merk.a, merk.b); } catch { /* egal */ } }
+  }
   if (fokus) { $('karte').scrollTop = 0; const h = ziel.querySelector('h2'); if (h) h.focus({ preventScroll: true }); }
   else $('karte').scrollTop = scroll;
 }
@@ -2799,6 +3086,8 @@ function personHtml(p, gen) {
     <p>${buchHtml(i.arbeit)}${i.arbeitsort >= 0 ? ' · ' + hausKnopf(i.arbeitsort, 'Betrieb ansehen') : ''}</p>
     <p>${i.wohnung >= 0 ? hausKnopf(i.wohnung, esc(i.wohnen)) : esc(i.wohnen)}</p>`;
   if (!i.kind) h += `<p class="leise">${zahl(i.geld)} Taler${i.ziel ? ` · Ziel: <span style="color:var(--text)">${esc(i.ziel.text)}</span> (noch ${i.ziel.rest} ${i.ziel.rest === 1 ? 'Tag' : 'Tage'})` : ''}</p>`;
+  h += hauptKnopfHtml(i);
+  if (i.haupt) h += tagebuchHtml(i);
   h += `<h3>Charakter</h3><div class="werte">${ZUEGE.map(([k, n]) => `<span>${n}</span>${balken(i.charakter[k])}<span class="zahl">${i.charakter[k]}</span>`).join('')}</div>`;
   if (i.beduerfnisse) {
     h += `<h3>Befinden · zufrieden ${Math.round(i.zufriedenheit)}</h3><div class="werte">${BEDARF.map(([k, n]) => `<span>${n}</span>${balken(i.beduerfnisse[k], true)}<span class="zahl">${Math.round(i.beduerfnisse[k])}</span>`).join('')}</div>`;
@@ -2830,6 +3119,389 @@ function gebaeudeHtml(b) {
   return h + '</ul>';
 }
 
+// ─── Hauptfiguren und Sprachmodell (Ollama) ──────────────────────────────────────────
+// Aus der Ollama-Doku (docs/api.md, docs/faq.md) und dem Quellcode (server/routes.go, envconfig/config.go):
+// GET /api/tags → { models: [{ name }] }. POST /api/chat mit model, messages [{ role, content }], stream: false,
+// format: "json" (erzwingt gültiges JSON; die Doku rät, JSON zusätzlich im Text zu verlangen), keep_alive,
+// think (nur Denk-Modelle; false = sofort antworten). Antworttext in message.content, Fehler als { error }.
+// CORS: Ollama erlaubt ohne Einstellung http://localhost:* und http://127.0.0.1:*, sonst OLLAMA_ORIGINS.
+// Ein JSON-Schema statt "json" in format wäre strenger (Aufzählung der Aktionen), ist aber nicht getestet.
+const OLLAMA = 'http://localhost:11434';                   // Standardadresse laut Doku
+const KI_TIMEOUT = 30000;                                  // ms je Aufruf, dann AbortController
+const STADTNAME = 'Neustadt';                              // ANNAHME: Die Stadt hat noch keinen Namen (README)
+const ki = {
+  status: 'suche',                                         // suche | bereit | nicht_erreichbar | kein_modell
+  modell: null, modelle: [], fehlerText: '', geprueft: -1e9,
+  laeuft: null,                                            // { art, id } des einen laufenden Aufrufs
+  ohneThink: false,                                        // Modell lehnt das Feld think ab → weglassen
+  gesendet: new Set(),                                     // Nummern der Anfragen, die schon rausgingen
+  gespraech: null,                                         // { id, gen, text, fehler } — ein Gespräch zur Zeit
+  aufholen: [],                                            // Tagebuch nach dem Aufholen: [{ id, gen, abTag, tage }]
+  stat: { aufrufe: 0, gueltig: 0, ungueltig: 0, fehler: 0, ms: 0, msMax: 0, verworfen20: 0, zuSpaet: 0 },
+  letzterFehler: '',
+};
+if (geladen && geladen.ui && typeof geladen.ui.kiModell === 'string') ki.modell = geladen.ui.kiModell;
+
+async function kiPruefen() {
+  ki.geprueft = performance.now();
+  const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 5000);
+  try {
+    const r = await fetch(OLLAMA + '/api/tags', { signal: ctrl.signal });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    ki.modelle = Array.isArray(d && d.models) ? d.models.map(m => m && m.name).filter(n => typeof n === 'string') : [];
+    if (!ki.modelle.includes(ki.modell)) ki.modell = ki.modelle[0] || null;
+    ki.status = ki.modell ? 'bereit' : 'kein_modell';
+    ki.fehlerText = '';
+  } catch (e) {
+    ki.status = 'nicht_erreichbar';
+    ki.fehlerText = e.name === 'AbortError' ? 'keine Antwort in 5 Sekunden' : e.message;
+  } finally { clearTimeout(timer); }
+  kiEinstAnzeigen();
+  hauptAnzeigen();
+}
+
+// Ein Aufruf an /api/chat. Wirft bei Netzfehler, Zeitüberschreitung oder Fehlerantwort.
+async function ollamaChat(system, frage) {
+  const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), KI_TIMEOUT), t0 = performance.now();
+  ki.stat.aufrufe++;
+  try {
+    for (let versuch = 0; versuch < 2; versuch++) {
+      const body = { model: ki.modell, stream: false, format: 'json', keep_alive: '30m',
+        messages: [{ role: 'system', content: system }, { role: 'user', content: frage }] };
+      if (!ki.ohneThink) body.think = false;
+      const r = await fetch(OLLAMA + '/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body), signal: ctrl.signal });
+      let d = null;
+      try { d = await r.json(); } catch { d = null; }
+      if (r.ok) {
+        const ms = performance.now() - t0;
+        ki.stat.ms += ms; ki.stat.msMax = Math.max(ki.stat.msMax, ms);
+        return d && d.message && typeof d.message.content === 'string' ? d.message.content : '';
+      }
+      const text = d && typeof d.error === 'string' ? d.error : 'HTTP ' + r.status;
+      if (r.status === 400 && /think/i.test(text) && !ki.ohneThink) { ki.ohneThink = true; continue; }   // einmal ohne think
+      if (r.status === 404) { ki.status = 'kein_modell'; ki.geprueft = -1e9; }   // Modell weg: Liste neu holen
+      throw new Error(text);
+    }
+    throw new Error('Ollama lehnt die Anfrage ab');
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error(`keine Antwort in ${KI_TIMEOUT / 1000} Sekunden`);
+    if (e instanceof TypeError) { ki.status = 'nicht_erreichbar'; ki.fehlerText = e.message; }   // fetch scheitert: aus oder CORS
+    throw e;
+  } finally { clearTimeout(timer); }
+}
+
+// ─── Anweisungen auf Deutsch (Wortlaut aus der Spec, Platzhalter aus der Personenkarte) ───
+const ZUG_WORT = [['fleiss', 'fleißig'], ['ehrgeiz', 'ehrgeizig'], ['spar', 'sparsam'], ['gesellig', 'gesellig'], ['heimat', 'heimatverbunden']];
+const stufe = (v) => (v >= 80 ? 'sehr ' : v >= 60 ? 'eher ' : v >= 40 ? 'durchschnittlich ' : v >= 20 ? 'wenig ' : 'gar nicht ');
+const ZIELLISTE = Sim.ZIELNAMEN.slice(1).map(z => `"${z}"`).join(', ');
+const zielText = (z) => Sim.ZIELTEXT[Sim.ZIELNAMEN.indexOf(z)] || z;
+function lageSatz(i) {
+  const a = Sim.klartext(i.arbeit);
+  const arbeit = a.startsWith('arbeitet') ? 'Du arbeitest' + a.slice(8) : a.startsWith('besitzt') ? 'Du besitzt' + a.slice(7)
+    : a === 'in Rente' ? 'Du bist in Rente' : 'Du hast keine Arbeit';
+  const partner = i.partner ? `Du bist mit ${i.partner.name} zusammen` : 'Du hast keinen Partner';
+  const kinder = i.kinder.length ? ` und ${i.partner ? 'hast ' : ''}${i.kinder.length === 1 ? 'ein Kind' : i.kinder.length + ' Kinder'}` : '';
+  const freunde = i.freunde.length ? `${i.freunde.length === 1 ? 'einen Freund' : i.freunde.length + ' Freunde'}` : 'keine Freunde';
+  return `${arbeit}. ${partner}${kinder}. Du hast ${freunde} in der Stadt.`;
+}
+function befindenWorte(i) {
+  const b = i.beduerfnisse;
+  const geld = b.geld >= 70 ? 'das Geld reicht gut' : b.geld >= 40 ? 'das Geld reicht gerade so' : b.geld >= 20 ? 'das Geld ist knapp' : 'das Geld ist fast weg';
+  const wohnen = i.wohnung < 0 ? 'du hast keine Wohnung' : b.wohnen >= 70 ? 'du wohnst gut' : b.wohnen >= 40 ? 'die Wohnung geht so' : 'die Wohnung passt nicht';
+  const kontakt = b.kontakt >= 70 ? 'du hast genug Menschen um dich' : b.kontakt >= 40 ? 'du könntest mehr unter Leute' : b.kontakt >= 20 ? 'du fühlst dich einsam' : 'du bist sehr einsam';
+  const frei = b.freizeit >= 70 ? 'du bist ausgeruht' : b.freizeit >= 40 ? 'du bist etwas müde' : b.freizeit >= 20 ? 'du bist erschöpft' : 'du bist völlig erschöpft';
+  const zuf = i.zufriedenheit >= 70 ? 'Insgesamt bist du zufrieden' : i.zufriedenheit >= 40 ? 'Insgesamt geht es so' : 'Insgesamt bist du unglücklich';
+  return `${geld} (${zahl(i.geld)} Taler), ${wohnen}, ${kontakt}, ${frei}. ${zuf}. ${lageSatz(i)}`;
+}
+function erlebtSaetze(i, abTag) {
+  const L = i.gedaechtnis.filter(m => abTag === undefined || m.tag >= abTag);
+  if (!L.length) return abTag === undefined ? 'Nichts Besonderes.' : 'In der Zeit ist dir nichts Besonderes passiert.';
+  const gespraeche = i.tagebuch.filter(e => e.art === 'gespraech');
+  return L.map((m) => {
+    const vor = S.tag - m.tag;
+    let t = `${vor <= 0 ? 'Heute' : vor === 1 ? 'Gestern' : `Vor ${vor} Tagen`}: ${Sim.klartext(m.text)}`;
+    if (m.text === 'mit Noah geredet') {
+      const g = gespraeche.filter(e => e.tag === m.tag).pop();
+      if (g) t += ` (Noah sagte: „${g.noah}“, du hast geantwortet: „${g.text}“)`;
+    }
+    return t + '.';
+  }).join(' ');
+}
+function beschreibung(i, abTag) {
+  return `Du bist ${i.name}, ${i.alter} Jahre alt, und lebst in ${STADTNAME}. `
+    + `Dein Charakter: ${ZUG_WORT.map(([k, w]) => stufe(i.charakter[k]) + w).join(', ')}. `
+    + `Dein Ziel: ${i.ziel ? i.ziel.text : 'noch keins'}. `
+    + `Was du zuletzt erlebt hast: ${erlebtSaetze(i, abTag)} `
+    + `Wie es dir geht: ${befindenWorte(i)}`;
+}
+function entscheidungsAnweisung(i, erlaubt) {
+  return beschreibung(i) + '\n\nWähle genau eine dieser Aktionen:\n'
+    + Sim.kiAktionen(S, i.id, erlaubt).map(a => `- ${a.name}: ${a.satz}`).join('\n')
+    + `\n\nAntworte nur mit JSON: {"aktion": "…", "gedanke": "ein Satz in Ich-Form", "neues_ziel": null oder eins aus [${ZIELLISTE}]}.`;
+}
+function gespraechsAnweisung(i) {
+  return beschreibung(i) + '\n\nNoah spricht mit dir. Antworte in 1–3 Sätzen, so wie du bist. Du kennst nur dein eigenes Leben, '
+    + 'keine Stadtstatistik. Du musst Noahs Rat nicht befolgen.'
+    + `\n\nAntworte nur mit JSON: {"antwort": "…", "neues_ziel": null oder eins aus [${ZIELLISTE}]}.`;
+}
+function aufholAnweisung(i, abTag, tage) {
+  return beschreibung(i, abTag) + `\n\nNoah war weg. In der Zeit sind ${tage} ${tage === 1 ? 'Tag' : 'Tage'} vergangen. `
+    + 'Schreib einen kurzen Tagebucheintrag (2–3 Sätze, Ich-Form) darüber, was du in dieser Zeit erlebt hast. Du kennst nur dein eigenes Leben.'
+    + '\n\nAntworte nur mit JSON: {"eintrag": "…"}.';
+}
+
+// ─── Antworten prüfen: gültiges JSON, aktion aus der erlaubten Liste, neues_ziel aus der Zielliste ───
+function jsonObjekt(text) {
+  try { const o = JSON.parse(text); return o && typeof o === 'object' && !Array.isArray(o) ? o : null; } catch { return null; }
+}
+// null, fehlend, "" und "null" gelten als „kein neues Ziel“ (kleine Modelle schreiben das oft so)
+const zielOk = (z) => z === null || z === undefined || z === '' || z === 'null' || (typeof z === 'string' && Sim.ZIELNAMEN.indexOf(z) > 0);
+const zielWert = (z) => (typeof z === 'string' && Sim.ZIELNAMEN.indexOf(z) > 0 ? z : null);
+const satzAus = (v, max) => (typeof v === 'string' && v.trim() ? v.trim().replace(/\s+/g, ' ').slice(0, max) : null);
+function pruefeEntscheidung(text, erlaubt) {
+  const o = jsonObjekt(text);
+  if (!o) return null;
+  const gedanke = satzAus(o.gedanke, 300);
+  if (typeof o.aktion !== 'string' || !erlaubt.includes(o.aktion) || !gedanke || !zielOk(o.neues_ziel)) return null;
+  return { aktion: o.aktion, gedanke, ziel: zielWert(o.neues_ziel) };
+}
+
+// ─── Der KI-Takt: immer nur ein Aufruf gleichzeitig. Reihenfolge: Gespräch, Entscheidungen, Tagebuch ───
+let kiBusy = false;
+async function kiTakt() {
+  if (kiBusy || aufholenLaeuft) return;
+  kiBusy = true;
+  try { nachfolgePruefen(); await kiSchritt(); }
+  catch (e) { ki.letzterFehler = e.message; }             // nie ein Absturz
+  finally { kiBusy = false; }
+}
+async function kiAufruf(art, id, system, frage) {
+  ki.laeuft = { art, id };
+  hauptAnzeigen();
+  try { return await ollamaChat(system, frage); }
+  finally { ki.laeuft = null; }
+}
+function nachKi() { buchAnzeigen(); kennzahlenAnzeigen(); karteAktualisieren(); hauptAnzeigen(); }
+async function kiSchritt() {
+  if (ki.status === 'bereit' && performance.now() - ki.geprueft > 60000) await kiPruefen();   // läuft Ollama noch?
+  if (ki.status !== 'bereit') {
+    if (performance.now() - ki.geprueft > 30000) await kiPruefen();
+    if (ki.status !== 'bereit') {
+      if (ki.gespraech && !ki.gespraech.fehler) { ki.gespraech.fehler = 'KI nicht erreichbar.'; karteAktualisieren(); }
+      ki.aufholen.length = 0;                             // Ollama aus → Tagebuch nach dem Aufholen überspringen
+      if (S.ki.anfragen.length) {                         // Ollama aus → Hauptfiguren entscheiden sofort normal
+        for (const a of S.ki.anfragen.slice()) Sim.kiVerwerfen(S, a.id, a.gen);
+        nachKi();
+      }
+      return;
+    }
+  }
+  const stadt = S;
+  // 1. Gespräch mit Noah (geht auch bei 20×)
+  const g = ki.gespraech;
+  if (g && !g.fehler) {
+    const i = Sim.personInfo(S, g.id, g.gen);
+    if (!i) { ki.gespraech = null; return; }
+    try {
+      const text = await kiAufruf('gespraech', g.id, gespraechsAnweisung(i), g.text);
+      if (S !== stadt || ki.gespraech !== g) return;
+      const o = jsonObjekt(text), antwort = o && satzAus(o.antwort, 500);
+      if (!antwort || !zielOk(o.neues_ziel)) {
+        ki.stat.ungueltig++; ki.letzterFehler = 'Gespräch, ungültig: ' + String(text).slice(0, 160);
+        g.fehler = 'Die Antwort war nicht zu verstehen. Versuch es noch einmal.';
+      } else {
+        ki.stat.gueltig++;
+        Sim.kiGespraech(S, g.id, g.gen, g.text, antwort, zielWert(o.neues_ziel));
+        ki.gespraech = null;
+      }
+    } catch (e) {
+      ki.stat.fehler++; ki.letzterFehler = e.message;
+      if (ki.gespraech === g) g.fehler = `Keine Antwort: ${e.message}.`;
+    }
+    nachKi();
+    return;
+  }
+  // 2. Offene Entscheidungen (nicht bei 20×; dann läuft die Frist ab und das normale Gehirn entscheidet)
+  if (tempo < 20) {
+    const a = S.ki.anfragen.find(x => !ki.gesendet.has(x.nr));
+    if (a) {
+      ki.gesendet.add(a.nr);
+      const i = Sim.personInfo(S, a.id, a.gen);
+      if (!i) return;
+      let text;
+      try {
+        text = await kiAufruf('entscheidung', a.id, entscheidungsAnweisung(i, a.erlaubt), `Es ist Tag ${a.tag}, ${a.stunde} Uhr. Was tust du?`);
+      } catch (e) {
+        ki.stat.fehler++; ki.letzterFehler = e.message;
+        if (S === stadt) Sim.kiVerwerfen(S, a.id, a.gen);
+        nachKi();
+        return;
+      }
+      if (S !== stadt) return;
+      const e = pruefeEntscheidung(text, a.erlaubt);
+      if (!e) { ki.stat.ungueltig++; ki.letzterFehler = 'ungültig: ' + String(text).slice(0, 160); Sim.kiVerwerfen(S, a.id, a.gen); }
+      else if (tempo >= 20) { ki.stat.verworfen20++; Sim.kiVerwerfen(S, a.id, a.gen); }
+      else { ki.stat.gueltig++; if (!Sim.kiEntscheidung(S, a.id, a.gen, e.aktion, e.ziel, e.gedanke).ok) ki.stat.zuSpaet++; }
+      nachKi();
+      return;
+    }
+  }
+  // 3. Tagebuch nach dem Aufholen: nacheinander, ein Aufruf pro Figur, die Stadt läuft weiter
+  const h = ki.aufholen.shift();
+  if (h) {
+    const i = Sim.personInfo(S, h.id, h.gen);
+    if (!i) return;
+    try {
+      const text = await kiAufruf('tagebuch', h.id, aufholAnweisung(i, h.abTag, h.tage), 'Schreib jetzt deinen Tagebucheintrag.');
+      if (S !== stadt) return;
+      const o = jsonObjekt(text), eintrag = o && satzAus(o.eintrag, 600);
+      if (eintrag) { ki.stat.gueltig++; Sim.kiTagebuch(S, h.id, h.gen, eintrag, 'aufholen'); }
+      else { ki.stat.ungueltig++; ki.letzterFehler = 'Tagebuch, ungültig: ' + String(text).slice(0, 160); }
+    } catch (e) { ki.stat.fehler++; ki.letzterFehler = e.message; }
+    nachKi();
+  }
+}
+setInterval(kiTakt, 400);
+
+// ─── Leiste oben rechts: Initialen im Kreis, Name, letzter Gedanke ───
+function kiStatus() {
+  if (ki.status === 'bereit') {
+    if (tempo >= 20) return { text: 'KI pausiert bei 20×', aus: false, titel: 'Bei 20× entscheiden die Hauptfiguren mit dem normalen Gehirn. Gespräche gehen trotzdem.' };
+    return { text: 'KI: ' + ki.modell, aus: false, titel: 'Ollama läuft. Modell ändern in den Einstellungen.' };
+  }
+  if (ki.status === 'suche') return { text: 'KI wird gesucht …', aus: false, titel: '' };
+  if (ki.status === 'kein_modell') return { text: 'KI: kein Modell', aus: true, titel: 'Ollama läuft, aber es ist kein Modell installiert.' };
+  return { text: 'KI nicht erreichbar', aus: true, titel: `Ollama antwortet nicht unter ${OLLAMA}. Die Hauptfiguren entscheiden mit dem normalen Gehirn.` };
+}
+const initialen = (n) => n.split(' ').map(w => w[0] || '').join('').slice(0, 2).toUpperCase();
+let hauptSchluessel = '';
+function hauptAnzeigen() {
+  const K = S.ki, offen = new Set(K.anfragen.map(a => a.id));
+  const zeilen = [];
+  for (const h of K.haupt) {
+    const i = Sim.personInfo(S, h.id, h.gen);
+    if (!i) continue;
+    const letzt = i.tagebuch[i.tagebuch.length - 1];
+    zeilen.push({ id: h.id, gen: h.gen, name: i.name, gedanke: letzt ? letzt.text : '',
+      denkt: offen.has(h.id) || !!(ki.laeuft && ki.laeuft.id === h.id) || !!(ki.gespraech && ki.gespraech.id === h.id && !ki.gespraech.fehler) });
+  }
+  const st = kiStatus();
+  const key = JSON.stringify([zeilen, st.text, K.haupt.length]);
+  if (G) G.setzeHauptfiguren(zeilen.map(z => z.id));
+  if (key === hauptSchluessel) return;
+  hauptSchluessel = key;
+  const s = $('ki-status');
+  s.textContent = st.text; s.title = st.titel; s.classList.toggle('aus', st.aus);
+  $('haupt-liste').innerHTML = zeilen.length ? zeilen.map(z => `<li><button type="button" class="haupt-zeile${z.denkt ? ' ueberlegt' : ''}" data-p="${z.id}" data-g="${z.gen}">
+      <span class="kreis" aria-hidden="true">${esc(initialen(z.name))}</span>
+      <span class="n">${esc(z.name)}${z.denkt ? '<span class="ueberlegt-text">überlegt …</span>' : ''}</span>
+      <span class="gedanke">${z.gedanke ? '„' + esc(z.gedanke) + '“' : 'noch kein Gedanke'}</span></button></li>`).join('')
+    : '<li class="leer">Keine Hauptfigur. Auf jeder Personenkarte: „Zur Hauptfigur machen“.</li>';
+}
+document.addEventListener('click', (e) => {
+  const z = e.target.closest('.haupt-zeile');
+  if (z) { zeigePerson(z.dataset.p, z.dataset.g); return; }
+  const k = e.target.closest('[data-haupt]');
+  if (k) {
+    const an = k.dataset.haupt === 'an';
+    if (Sim.hauptSetzen(S, Number(k.dataset.p), Number(k.dataset.g), an)) { hauptAnzeigen(); karteRendern(false); }
+  }
+});
+
+// ─── Auf der Personenkarte: Tagebuch oben, Eingabefeld darunter ───
+const AKTION_TEXT = { wohnung_suchen: 'sucht eine Wohnung', job_suchen: 'sucht Arbeit', job_wechseln: 'wechselt die Stelle',
+  kuendigen: 'kündigt', freinehmen: 'nimmt frei', freunde_treffen: 'trifft Freunde', partner_suchen: 'sucht jemanden',
+  zusammenziehen: 'zieht zusammen', trennen: 'trennt sich', kind_bekommen: 'will ein Kind', laden_gruenden: 'gründet',
+  wegziehen: 'zieht weg' };
+function hauptKnopfHtml(i) {
+  if (i.kind) return '';
+  if (i.haupt) return `<div class="karte-knoepfe"><button type="button" class="knopf klein" data-haupt="aus" data-p="${i.id}" data-g="${i.gen}">Keine Hauptfigur mehr</button></div>`;
+  const voll = S.ki.haupt.length >= Sim.R.HAUPT_MAX;
+  return `<div class="karte-knoepfe"><button type="button" class="knopf klein" data-haupt="an" data-p="${i.id}" data-g="${i.gen}"${voll ? ' disabled' : ''}>Zur Hauptfigur machen</button>`
+    + (voll ? `<span class="leise">Höchstens ${Sim.R.HAUPT_MAX} Hauptfiguren.</span>` : '') + '</div>';
+}
+function tagebuchHtml(i) {
+  const g = ki.gespraech && ki.gespraech.id === i.id && ki.gespraech.gen === i.gen ? ki.gespraech : null;
+  const vorname = i.name.split(' ')[0];
+  let h = `<h3>Tagebuch${i.ueberlegt ? ' <span class="ueberlegt-text">überlegt …</span>' : ''}</h3>`;
+  if (!i.tagebuch.length && !g) {
+    h += '<p class="leise">Noch leer. Hier steht, was die Figur denkt, wenn die KI für sie entscheidet, und was ihr beide redet.</p>';
+  } else {
+    h += '<ol class="tagebuch">' + i.tagebuch.map((e) => {
+      const wann = `Tag ${e.tag}, ${e.stunde} Uhr`, ziel = e.ziel ? ` · neues Ziel: ${esc(zielText(e.ziel))}` : '';
+      if (e.art === 'gespraech') return `<li><span class="meta">${wann} · Gespräch${ziel}</span><p class="noah">${esc(e.noah)}</p><p>${esc(e.text)}</p></li>`;
+      if (e.art === 'aufholen') return `<li><span class="meta">${wann} · während du weg warst</span><p>${esc(e.text)}</p></li>`;
+      return `<li><span class="meta">${wann} · ${esc(AKTION_TEXT[e.aktion] || e.aktion || '')}${ziel}</span><p>„${esc(e.text)}“</p></li>`;
+    }).join('');
+    if (g && !g.fehler) h += `<li><p class="noah">${esc(g.text)}</p><p class="leise">${esc(vorname)} denkt nach …</p></li>`;
+    h += '</ol>';
+  }
+  const bereit = ki.status === 'bereit', wartet = !!(g && !g.fehler), an = bereit && !wartet;
+  h += `<form class="sagen" data-p="${i.id}" data-g="${i.gen}">
+      <input type="text" id="sagen-text" maxlength="300" autocomplete="off" aria-label="Was du ${esc(vorname)} sagen willst"
+        placeholder="${bereit ? `Sag ${esc(vorname)} etwas …` : 'KI nicht erreichbar'}" value="${g && g.fehler ? esc(g.text) : ''}"${an ? '' : ' disabled'}>
+      <button type="submit" class="knopf"${an ? '' : ' disabled'}>Sagen</button>
+    </form>`;
+  if (g && g.fehler) h += `<p class="fehlertext">${esc(g.fehler)}</p>`;
+  else if (!bereit) h += `<p class="leise">Ollama läuft nicht oder hat kein Modell. Siehe Einstellungen.</p>`;
+  return h;
+}
+document.addEventListener('submit', (e) => {
+  const f = e.target.closest('form.sagen');
+  if (!f) return;
+  e.preventDefault();
+  const feld = f.querySelector('input'), text = feld.value.trim().slice(0, 300);
+  if (!text || ki.status !== 'bereit' || (ki.gespraech && !ki.gespraech.fehler)) return;
+  ki.gespraech = { id: Number(f.dataset.p), gen: Number(f.dataset.g), text, fehler: null };
+  feld.value = '';
+  karteRendern(false); hauptAnzeigen();
+  kiTakt();
+});
+
+// ─── Stirbt oder geht eine Hauptfigur: wer übernimmt? ───
+function nachfolgePruefen() {
+  if (!S.ki.verlust.length || aufholenLaeuft || document.querySelector('dialog[open]')) return;
+  const v = S.ki.verlust[0];
+  const vor = v.vorschlaege.map(x => Sim.personInfo(S, x.id, x.gen) && Object.assign({}, x, { info: Sim.personInfo(S, x.id, x.gen) }))
+    .filter(x => x && !x.info.haupt && S.ki.haupt.length < Sim.R.HAUPT_MAX);
+  const sein = v.weib ? 'ihr' : 'sein';
+  const rolle = (x) => `${sein}${x.info.weib ? 'e' : ''} ${x.rolle === 'partner' ? (x.info.weib ? 'Partnerin' : 'Partner') : (x.info.weib ? 'Tochter' : 'Sohn')}`;
+  $('nachfolge-titel').textContent = `${v.name} ${v.grund === 'tod' ? 'ist gestorben' : 'hat die Stadt verlassen'}`;
+  $('nachfolge-text').textContent = vor.length ? 'Wer übernimmt als Hauptfigur?'
+    : 'Es gibt keinen Partner und kein erwachsenes Kind in der Stadt, das übernehmen könnte. Du kannst auf jeder Personenkarte eine neue Hauptfigur wählen.';
+  $('nachfolge-knoepfe').innerHTML = vor.map((x, n) => `<button type="button" class="knopf${n === 0 ? ' haupt' : ''}" data-nachfolge="${x.id}/${x.gen}">${esc(x.name)} (${rolle(x)})</button>`).join('')
+    + `<button type="button" class="knopf" data-nachfolge="">${vor.length ? 'Niemand' : 'Verstanden'}</button>`;
+  $('nachfolge-dialog').showModal();
+}
+$('nachfolge-knoepfe').addEventListener('click', (e) => {
+  const k = e.target.closest('[data-nachfolge]');
+  if (!k) return;
+  if (k.dataset.nachfolge) { const [id, gen] = k.dataset.nachfolge.split('/').map(Number); Sim.hauptSetzen(S, id, gen, true); }
+  Sim.verlustErledigt(S);
+  $('nachfolge-dialog').close();
+  hauptAnzeigen(); karteAktualisieren();
+});
+$('nachfolge-dialog').addEventListener('cancel', () => { Sim.verlustErledigt(S); });   // Escape = niemand
+
+// ─── Einstellungen: Modell aus der Liste, die Ollama selbst liefert (kein Modellname aus dem Gedächtnis) ───
+function kiEinstAnzeigen() {
+  const sel = $('ki-modell');
+  sel.innerHTML = ki.modelle.length ? ki.modelle.map(m => `<option${m === ki.modell ? ' selected' : ''}>${esc(m)}</option>`).join('') : '<option value="">–</option>';
+  sel.disabled = !ki.modelle.length;
+  const st = kiStatus(), n = ki.stat.gueltig + ki.stat.ungueltig;
+  $('ki-einst-status').textContent = st.text + (ki.status === 'nicht_erreichbar' && ki.fehlerText ? ` (${ki.fehlerText})` : '')
+    + (n ? ` · ${ki.stat.gueltig} von ${n} Antworten gültig, im Schnitt ${(ki.stat.ms / n / 1000).toFixed(1)} s` : '');
+}
+$('ki-modell').addEventListener('change', (e) => {
+  if (!ki.modelle.includes(e.target.value)) return;
+  ki.modell = e.target.value; ki.status = 'bereit'; ki.ohneThink = false;
+  hauptSchluessel = ''; hauptAnzeigen(); kiEinstAnzeigen(); speichern();
+});
+$('ki-suchen').addEventListener('click', () => { kiPruefen(); });
+$('einst-knopf').addEventListener('click', () => { kiEinstAnzeigen(); kiPruefen(); });
+
 // ─── Takt ────────────────────────────────────────────────────────────────────────────
 function schritt() {
   const t0 = performance.now();
@@ -2839,10 +3511,13 @@ function schritt() {
 function nachSchritten() {
   kennzahlenAnzeigen();
   buchAnzeigen();
+  hauptAnzeigen();
   if (G) { G.stadt(S.stunde); G.figurenPlanen(); }
   karteAktualisieren();
+  nachfolgePruefen();
 }
 function simTakt(dt) {
+  S.ki.an = ki.status === 'bereit' && tempo < 20 && !aufholenLaeuft;   // nur dann stellen Hauptfiguren Anfragen
   if (!tempo || aufholenLaeuft) return;
   akku += dt * tempo;
   let n = 0;
@@ -2852,6 +3527,11 @@ function simTakt(dt) {
 }
 
 // Debug-Ecke: gemessen, nicht geschätzt
+function kiDebugZeile() {
+  const k = ki.stat, n = k.gueltig + k.ungueltig;
+  return `KI ${ki.status}${ki.laeuft ? ' (läuft)' : ''}   Aufrufe ${k.aufrufe}   gültig ${n ? Math.round(100 * k.gueltig / n) : '–'} % von ${n}\n`
+    + `KI Ø ${n ? (k.ms / n / 1000).toFixed(1) : '–'} s  max ${(k.msMax / 1000).toFixed(1)} s   Fehler ${k.fehler}   zu spät ${k.zuSpaet}`;
+}
 const dbg = { frames: 0, summe: 0, max: 0, letzte: performance.now(), calls: 0, dreiecke: 0 };
 if (DEBUG) { $('debug').hidden = false; document.body.classList.add('debug'); }
 function debugAnzeigen(frameMs, info) {
@@ -2863,8 +3543,10 @@ function debugAnzeigen(frameMs, info) {
   $('debug').textContent =
     `fps ${fps.toFixed(0)}   Frame Ø ${mittel.toFixed(1)} ms  max ${dbg.max.toFixed(1)} ms\n`
     + `Draw Calls ${dbg.calls}   Dreiecke ${zahl(dbg.dreiecke)}   Instanzen ${G ? zahl(G.instanzen()) : '–'}\n`
-    + `Sim-Schritt ${simMs.toFixed(1)} ms   Einwohner ${zahl(S.einwohner)}   Tempo ${tempo}×`;
-  globalThis.__stadtDebug = { fps, frameMs: mittel, frameMax: dbg.max, calls: dbg.calls, dreiecke: dbg.dreiecke, simMs, einwohner: S.einwohner, tag: S.tag };
+    + `Sim-Schritt ${simMs.toFixed(1)} ms   Einwohner ${zahl(S.einwohner)}   Tempo ${tempo}×\n`
+    + kiDebugZeile();
+  globalThis.__stadtDebug = { fps, frameMs: mittel, frameMax: dbg.max, calls: dbg.calls, dreiecke: dbg.dreiecke, simMs, einwohner: S.einwohner, tag: S.tag,
+    ki: Object.assign({ status: ki.status, modell: ki.modell, letzterFehler: ki.letzterFehler, offen: S.ki.anfragen.length }, ki.stat) };
   dbg.frames = 0; dbg.summe = 0; dbg.max = 0; dbg.letzte = jetzt;
 }
 
@@ -2895,6 +3577,7 @@ async function aufholen(msWeg) {
   const vorher = schnappschuss(), zielTag = S.tag + Math.floor((S.stunde + stundenGesamt) / 24), zielStunde = (S.stunde + stundenGesamt) % 24;
   const tage = Math.floor(stundenGesamt / 24);
   aufholenLaeuft = true;
+  S.ki.an = false;                                        // beim Aufholen entscheiden alle mit dem normalen Gehirn
   const zeigen = tage >= 1;
   if (zeigen) {
     $('aufholen-text').textContent = `Deine Stadt holt ${tage} ${tage === 1 ? 'Tag' : 'Tage'} auf …`;
@@ -2917,6 +3600,8 @@ async function aufholen(msWeg) {
     $('aufholen').hidden = true;
   }
   akku = 0;
+  // Danach schreibt jede Hauptfigur einen Tagebucheintrag über die Zeit (nacheinander, Ollama aus → übersprungen)
+  if (tage >= 1) ki.aufholen = S.ki.haupt.map(h => ({ id: h.id, gen: h.gen, abTag: vorher.tag, tage }));
   nachSchritten();
   speichern();
   return { vorher, nachher: schnappschuss(), tage };
@@ -2974,6 +3659,7 @@ $('import-datei').addEventListener('change', async (e) => {
   try {
     const l = spielstandLesen(await datei.text());
     S = l.S; akku = 0; buchNeu(); if (G) { G.neueStadt(); }
+    ki.gesendet.clear(); ki.gespraech = null; ki.aufholen.length = 0; hauptSchluessel = '';
     speichernErlaubt = true; speichern(); nachSchritten();
     $('einst-dialog').close();
     meldung(`Spielstand geladen: Tag ${S.tag}, ${zahl(S.einwohner)} Einwohner.`);
@@ -3021,7 +3707,7 @@ if (DEBUG) {
   });
 }
 
-if (DEBUG) globalThis.__stadt = { S: () => S, Sim, G, setzeTempo, schritt, nachSchritten, speichern, aufholen };   // nur für Tests
+if (DEBUG) globalThis.__stadt = { S: () => S, Sim, G, setzeTempo, schritt, nachSchritten, speichern, aufholen, ki, kiTakt };   // nur für Tests
 setzeTempo(tempo);
 nachSchritten();
 requestAnimationFrame(frame);

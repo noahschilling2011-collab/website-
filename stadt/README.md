@@ -2,33 +2,72 @@
 
 Eine Stadt, in der jeder Mensch selbst entscheidet. Projektname vorläufig.
 
-**Stand: Phase 0.** Die Simulation läuft ohne Grafik und wird in Node getestet. Grafik folgt in Phase 1.
+**Stand: Phase 4.** Simulation (Phase 0), 3D-Karte mit Tag und Nacht (1), Speichern und Aufholen (2), laufende Figuren
+und Personenkarten (3), Hauptfiguren mit Ollama (4). Phase 4 ist nur gegen einen nachgebauten Ollama-Server getestet,
+nicht gegen ein echtes Sprachmodell (siehe „Bekannte Schwächen“).
 
 ## Starten
 
 ```bash
 cd stadt
+python3 -m http.server 8000
+```
+
+Dann `http://localhost:8000/stadt.html` öffnen. **Immer Port 8000 und `localhost`**: Der Spielstand hängt an der Adresse,
+und Ollama erlaubt ohne Einstellung nur Seiten von `localhost` und `127.0.0.1`. Per Doppelklick (`file://`) lädt Three.js nicht.
+
+Schalter in der Adresse (alle optional):
+
+| Schalter | Wirkung |
+|---|---|
+| `?neu` | Neue Stadt statt den Spielstand zu laden (der alte wird beim nächsten Speichern überschrieben) |
+| `?seed=7` | Seed für eine neue Stadt (sonst zufällig) |
+| `?debug` | Debug-Ecke unten links: fps, Frame-Zeit, Draw Calls, Dreiecke, KI-Aufrufe (gültig in %, Dauer, Fehler) und Knöpfe „Zeit vorspulen“ |
+| `?debug&tage=400` | Neue Stadt vorab 400 Tage rechnen |
+| `?debug&umland=200000` | Größere Stadt (etwa 5.000 Einwohner an Tag 600) für den Leistungstest. Dieser Stand wird nicht gespeichert |
+
+## Ollama für die Hauptfiguren (Phase 4)
+
+Ohne Ollama läuft alles, die Hauptfiguren entscheiden dann mit dem normalen Gehirn, oben rechts steht „KI nicht erreichbar“.
+
+1. Ollama installieren und starten (App oder `ollama serve`).
+2. `ollama list` zeigt die installierten Modelle. Ist die Liste leer: `ollama pull <modell>`. Welches Modell, entscheidest du;
+   die App schreibt keinen Modellnamen fest.
+3. Seite über `http://localhost:8000/stadt.html` öffnen. Die App fragt `http://localhost:11434/api/tags` und nimmt das erste
+   Modell aus der Liste. Ändern: Zahnrad unten rechts → „KI für die Hauptfiguren“ → Modell.
+4. Nur falls die Seite von einer anderen Adresse kommt (z. B. über das Netzwerk): Ollama mit der Umgebungsvariable
+   `OLLAMA_ORIGINS` starten, etwa `OLLAMA_ORIGINS=http://192.168.1.20:8000 ollama serve`. Für `localhost` ist das laut
+   Ollama-Quellcode nicht nötig.
+
+Was passiert: Um 7 und 18 Uhr und nach Ereignissen fragt eine Hauptfigur das Modell (höchstens 3-mal pro Spieltag). Die
+Stadt wartet nicht. Kommt in 2 Spielstunden keine gültige Antwort, entscheidet das normale Gehirn. Bei 20× gibt es keine
+KI-Entscheidungen, Gespräche gehen trotzdem. Jeder Gedanke landet im Tagebuch der Figur (die letzten 30).
+
+## Aufbau
+
+- `stadt.html` enthält den Block `<script id="sim">`: reine Simulation, kein DOM, kein `window`, kein `fetch`,
+  kein `Math.random`, keine Uhrzeit. Er legt `globalThis.StadtSim` an. Alle Personendaten liegen als typisierte Arrays
+  (eine pro Feld, Index = Personen-ID) in `S.p`, die Gebäude in `S.g`, die Hauptfiguren in `S.ki`.
+  Alle Stellschrauben stehen gesammelt im Objekt `R` am Anfang des Blocks.
+- Der `<script type="module">`-Block macht Darstellung, Oberfläche, Speichern und die Ollama-Aufrufe. Er ändert den
+  Sim-Zustand nur über Funktionen aus `StadtSim` (`stunde`, `tagSchritt`, `hauptSetzen`, `kiEntscheidung`, `kiVerwerfen`,
+  `kiGespraech`, `kiTagebuch`, `verlustErledigt`, `importZustand`).
+- `tools/simtest.mjs` zieht den sim-Block aus der HTML-Datei und prüft ihn zuerst statisch auf verbotene Namen
+  (`window`, `document`, `fetch`, `THREE`, `Math.random`, `Date`, `Intl`, `performance`, `console` …). Danach führt es ihn in
+  einem leeren `vm`-Kontext aus, in dem `Math.random`, `Date` und `Intl` gesperrt sind.
+
+```bash
 node tools/simtest.mjs --seed 1 --tage 365     # Tabelle alle 30 Tage, am Ende Charakter-Auswertung
 node tools/simtest.mjs --gate                  # Phase-0-Gate: Seeds 1, 2, 3, je 730 Tage
 node tools/simtest.mjs --gate --seeds 4,5,6    # dasselbe mit anderen Seeds
+node tools/simtest.mjs --speichertest          # Speichern/Laden mitten am Tag: läuft danach bitgleich weiter?
+node tools/simtest.mjs --aufholtest            # 90 Tage stündlich gegen 90 Tagesschritte
+node tools/simtest.mjs --kitest                # Hauptfiguren: erlaubte Aktionen, Anfragen, Fristen, Tagebuch, Nachfolge
 ```
 
 Weitere Schalter für `--seed`: `--alle 60` (Zeilenabstand), `--fluss` (Zu-/Wegzüge, Geburten, Tode je Zeile),
 `--diag` (Zufriedenheit und Bedürfnisse), `--aktionen` (wie oft jede Aktion gewählt wurde), `--buch 20`
 (die letzten Stadtbuch-Einträge).
-
-Ab Phase 1 im Browser: `python3 -m http.server 8000` **im Ordner `stadt/`**, dann
-`http://localhost:8000/stadt.html`. Immer Port 8000, weil der Spielstand daran hängt.
-
-## Aufbau
-
-- `stadt.html` enthält den Block `<script id="sim">`: reine Simulation, kein DOM, kein `window`, kein `fetch`,
-  kein `Math.random`, keine Uhrzeit. Er legt `globalThis.StadtSim` an: `neueStadt(seed)`, `stunde(S)`, `kennzahlen(S)`.
-  Alle Personendaten liegen als typisierte Arrays (eine pro Feld, Index = Personen-ID) in `S.p`, die Gebäude in `S.g`.
-  Alle Stellschrauben stehen gesammelt im Objekt `R` am Anfang des Blocks.
-- `tools/simtest.mjs` zieht diesen Block aus der HTML-Datei und prüft ihn zuerst statisch auf verbotene Namen
-  (`window`, `document`, `fetch`, `THREE`, `Math.random`, `Date`, `Intl`, `performance`, `console` …). Danach führt es ihn in
-  einem leeren `vm`-Kontext aus, in dem `Math.random`, `Date` und `Intl` gesperrt sind.
 
 ## Annahmen — Stellen, an denen die Spec nichts festlegt
 
@@ -61,6 +100,23 @@ Ab Phase 1 im Browser: `python3 -m http.server 8000` **im Ordner `stadt/`**, dan
 | 25 | Stadtbuch: Die Zuzüge eines Tages stehen in einer Zeile (mit Grund), alles andere einzeln | Sonst füllen Zuzüge die 500 Zeilen allein |
 | 26 | Gate 6 und 7 vergleichen mit **allen, die je als Erwachsene in der Stadt lebten**. Beim Wegzug zählt nur die Person, die entschieden hat, nicht ihre Familie | Die heutigen Erwachsenen sind schon gefiltert (die Heimatlosen sind weg), das würde den Unterschied schönen |
 | 27 | Gate 4: „pendelt sich ein“ = die Einwohnerzahl bleibt in den letzten 180 Tagen (Tag 551–730) in einem Band von Faktor 1,15 (max/min). „Unterhalb der Kartengrenze“ = keine Straße hat die äußerste erlaubte Rasterlinie erreicht | Die Spec gibt keine Zahl |
+| 28 | Die Stadt hat noch keinen Namen. In der Anweisung ans Modell steht „Neustadt“ (Konstante `STADTNAME`) | Die Spec nennt `{Stadtname}`, aber keinen |
+| 29 | Kein Modellname im Code. Die App nimmt das erste Modell aus Ollamas eigener Liste (`/api/tags`), Noah kann in den Einstellungen wechseln | Spec: „Kein Modellname aus dem Gedächtnis“. Noah konnte ich heute Nacht nicht fragen |
+| 30 | Anfrage mit `format: "json"` (erzwingt gültiges JSON), `stream: false`, `think: false`, `keep_alive: "30m"`. Kein JSON-Schema | Alles laut Ollama-Doku. Ein Schema mit Aufzählung der Aktionen wäre strenger, ist aber ungetestet. `keep_alive` 30 Minuten, weil zwischen 7 und 18 Uhr bei 1× gut 11 Minuten liegen (Standard 5 Minuten → Modell würde jedes Mal neu geladen) |
+| 31 | `neues_ziel`: `null`, fehlend, `""` und `"null"` gelten als „kein neues Ziel“ | Kleine Modelle schreiben das oft so; es ist eindeutig gemeint |
+| 32 | Hauptfigur werden nur Erwachsene | Kinder haben keine Aktionen |
+| 33 | Eine KI-Figur wählt immer eine der erlaubten Aktionen. „Nichts tun“ gibt es nicht | Die Spec hat keine solche Aktion, und neue Aktionen sind verboten. Folge: Hauptfiguren handeln öfter als das normale Gehirn (das unter der Schwelle nichts tut) |
+| 34 | „Erlaubte Aktionen“ = Voraussetzungen wie im Gehirn. Zwei Gedächtnis-Wirkungen gelten dabei als Voraussetzung: kein zweites Kind innerhalb von 30 Tagen, Trennen nur, wenn beide seit 14 Tagen unzufrieden sind (ohne den 3-%-Zufall) | Im Gehirn sperren sie praktisch; sonst könnte ein Modell täglich ein Kind wählen. `simtest --kitest` prüft, dass das Gehirn nie etwas wählt, das in der Liste fehlt |
+| 35 | Im Gespräch bekommt das Modell dieselbe Beschreibung der Person (Name, Charakter, Ziel, Erlebtes, Befinden), aber nicht die Aktionsliste und nicht deren JSON-Format, sondern das Gesprächsformat | Beide Formate zusammen widersprechen sich |
+| 36 | „Wie es dir geht“ enthält außer den Bedürfnissen einen Satz zur Lage: Arbeit, Partner, Kinder, Zahl der Freunde | Ohne das kann das Modell „job_wechseln“ oder „zusammenziehen“ nicht sinnvoll wählen |
+| 37 | Ein Gespräch ist ein Ereignis: Die Figur entscheidet in der nächsten Stunde neu (mit der Erinnerung „mit Noah geredet“ und dem, was Noah sagte) | Spec: Entscheiden „direkt nach einem Ereignis“ |
+| 38 | Ist Ollama nicht erreichbar, entscheiden wartende Hauptfiguren sofort normal, nicht erst nach 2 Spielstunden | Spec: „Ollama aus: Hauptfiguren entscheiden normal“ |
+| 39 | Die Anweisung für den Tagebucheintrag nach dem Aufholen habe ich formuliert (Beschreibung wie oben, Erlebtes nur aus der Zeit der Abwesenheit, Antwort `{"eintrag": "…"}`) | Die Spec gibt keinen Wortlaut |
+| 40 | Stirbt oder geht eine Hauptfigur, verschwindet ihr Tagebuch mit ihr. Vorschläge für die Nachfolge: Partner und erwachsene Kinder, die noch in der Stadt leben | Die Spec sagt „schlägt ein Kind oder den Partner vor“ |
+| 41 | Spielstand-Version 2. Stände aus Phase 1–3 (Version 1) lösen den Versionsdialog aus | Neue Felder für Hauptfiguren und Tagebuch |
+| 42 | Bei 1× ist eine echte Minute eine Spielstunde | Folgt aus der Spec: 90 Spieltage entsprechen 36 Stunden Abwesenheit |
+| 43 | Beim Aufholen (Tagesschritte) entscheiden alle nur um 7 und 18 Uhr; Ereignisse lösen keine zusätzliche Entscheidung aus | Sonst wäre der Tagesschritt nicht schneller. Abweichung gegen stündlich: im Mittel −2,5 % Einwohner nach 90 Tagen (10 Seeds) |
+| 44 | Figuren laufen um 8 zur Arbeit und um 17 zurück, um 19 zu Freunden (wer abends „freunde_treffen“ gewählt hat) und um 22 heim, wer frei hat um 10 zum Einkaufen und um 11 zurück. Zu sehen sind bis zu 300 zufällige Erwachsene plus alle Hauptfiguren (mit Markierung, hellblau solange sie „überlegen“) | Die Spec sagt „morgens zur Arbeit, abends heim oder zu Freunden“ |
 
 ## Bekannte Schwächen
 
@@ -74,3 +130,13 @@ erst Arbeitskräfte (neuer Zuzug), danach Kundschaft (Pleiten). Getestet und ver
 **Das Budget ist nie knapp.** Ab etwa Tag 60 übersteigen Steuern und Mieten alle Ausgaben um ein Vielfaches. Die
 Budgetgrenzen des Bauamts greifen deshalb praktisch nie. Gate 3 hält, weil jede Ausgabe vorher geprüft wird, nicht weil
 das Budget eng wäre.
+
+**Phase 4 ist nicht mit einem echten Sprachmodell getestet.** Im Container gibt es kein Ollama und keinen Download dafür.
+Getestet ist gegen einen nachgebauten Server mit dem Request- und Antwortformat aus der Ollama-Doku: Anfragen, Fristen,
+ungültige und kaputte Antworten, Zeitüberschreitung, Ollama aus, 20×, Gespräche, Tagebuch nach dem Aufholen. Offen sind
+genau die Gate-Punkte, die ein echtes Modell brauchen: Anteil gültiger Antworten über 7 Spieltage, Dauer pro Antwort
+(entscheidet, ob mehr als 5 Hauptfiguren gehen), und ob zwei verschiedene Charaktere erkennbar anders handeln.
+
+**60 Bilder pro Sekunde sind nicht gemessen.** Im Container rendert Chromium ohne Grafikkarte (SwiftShader) mit etwa
+10 fps. Gemessen sind Draw Calls (10–13, auch bei 5.000 Einwohnern), Dreiecke (unter 51.000) und die Rechenzeit pro
+Bild in JavaScript (5–10 ms).

@@ -9,6 +9,7 @@
 //   node tools/simtest.mjs --gate                   Phase-0-Gate mit Seeds 1, 2, 3 (je 730 Tage)
 //   node tools/simtest.mjs --speichertest           Speichern/Laden mitten am Tag: läuft danach bitgleich weiter?
 //   node tools/simtest.mjs --aufholtest             90 Tage stündlich gegen 90 Tagesschritte
+//   node tools/simtest.mjs --kitest                 Hauptfiguren: erlaubte Aktionen, Anfragen, Fristen, Tagebuch (ohne echtes Modell)
 //   Optionen: --alle 30 (Zeilenabstand), --buch 20 (letzte Stadtbuch-Zeilen), --aktionen
 
 import { readFileSync } from 'node:fs';
@@ -121,7 +122,7 @@ function fingerabdruck(Sim, S) {
   const h = createHash('sha256');
   const arrays = Sim.exportZustand(S).arrays.sort((x, y) => (x.name < y.name ? -1 : 1));   // Schlüsselreihenfolge egal
   for (const a of arrays) { h.update(a.name); h.update(Buffer.from(a.daten.buffer, a.daten.byteOffset, a.daten.byteLength)); }
-  h.update(JSON.stringify(S.buch)); h.update(JSON.stringify(S.stat)); h.update(String(S.budget) + '/' + S.rs + '/' + S.tag + '/' + S.stunde);
+  h.update(JSON.stringify(S.buch)); h.update(JSON.stringify(S.stat)); h.update(JSON.stringify(S.ki)); h.update(String(S.budget) + '/' + S.rs + '/' + S.tag + '/' + S.stunde);
   return h.digest('hex').slice(0, 16);
 }
 
@@ -137,6 +138,81 @@ if (flag('speichertest')) {
   const fa = fingerabdruck(Sim, A), fb = fingerabdruck(Sim, B);
   console.log(`  60 Tage weiter: ununterbrochen ${fa} (${A.einwohner} Einw.), geladen ${fb} (${B.einwohner} Einw.) → ${fa === fb ? 'bitgleich' : 'UNTERSCHIEDLICH'}`);
   process.exit(fa === fb ? 0 : 1);
+}
+if (flag('kitest')) {
+  // Ohne Sprachmodell: ein Test-Beantworter mit eigenem Zufall antwortet gültig, ungültig oder gar nicht.
+  let fehler = 0;
+  const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
+  let t = 12345;
+  const tz = () => { t = (t + 0x6D2B79F5) | 0; let x = Math.imul(t ^ (t >>> 15), 1 | t); x ^= x + Math.imul(x ^ (x >>> 7), 61 | x); return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  for (const seed of [1, 2, 3]) {
+    console.log(`Seed ${seed}`);
+    const S = Sim.neueStadt(seed);
+    pruef(S.ki.haupt.length === Sim.R.HAUPT_START, `${S.ki.haupt.length} Hauptfiguren beim Start`);
+    // 1. Das normale Gehirn wählt nie etwas, das erlaubteAktionen nicht kennt
+    let geprueft = 0, abweichend = 0;
+    while (S.tag < 200) {
+      if (S.stunde === 7 || S.stunde === 18) {
+        for (let p = 0; p < S.pMax; p += 3) {
+          if (!S.p.lebt[p] || S.tag - S.p.geb[p] < Sim.R.ERWACHSEN * Sim.R.JAHR) continue;
+          const erlaubt = Sim.erlaubteAktionen(S, p, S.stunde);
+          const a = Sim.entscheide(S, p, S.stunde);
+          geprueft++;
+          if (a && !erlaubt.includes(Sim.AKTIONSNAMEN[a])) { abweichend++; if (abweichend < 4) console.log(`    Gehirn wählt ${Sim.AKTIONSNAMEN[a]}, erlaubt: ${erlaubt.join(', ')}`); }
+        }
+      }
+      Sim.stunde(S);
+    }
+    pruef(abweichend === 0, `Gehirn ⊆ erlaubte Aktionen (${geprueft} Entscheidungen geprüft, ${abweichend} abweichend)`);
+    // 2. 60 Tage mit Test-Beantworter
+    S.ki.an = true;
+    let anfragen = 0, gueltig = 0, ungueltig = 0, ohne = 0, maxProTag = 0, zuSpaet = 0;
+    const gesehen = new Set(), proTag = {};
+    while (S.tag < 260) {
+      for (const a of S.ki.anfragen.slice()) {
+        if (gesehen.has(a.nr)) continue;
+        gesehen.add(a.nr); anfragen++;
+        const k = a.id + '/' + a.gen + '/' + a.tag;
+        proTag[k] = (proTag[k] || 0) + 1; maxProTag = Math.max(maxProTag, proTag[k]);
+        const r = tz();
+        if (r < 0.7) {
+          const aktion = a.erlaubt[(tz() * a.erlaubt.length) | 0];
+          const ziel = tz() < 0.2 ? Sim.ZIELNAMEN[1 + ((tz() * 6) | 0)] : null;
+          const e = Sim.kiEntscheidung(S, a.id, a.gen, aktion, ziel, 'Ich nehme ' + aktion + '.');
+          if (e.ok) gueltig++; else zuSpaet++;
+        } else if (r < 0.8) { Sim.kiVerwerfen(S, a.id, a.gen); ungueltig++; }
+        else ohne++;                                          // keine Antwort: Frist läuft ab
+      }
+      Sim.stunde(S);
+    }
+    S.ki.an = false;
+    pruef(anfragen > 50, `${anfragen} Anfragen in 60 Tagen (gültig ${gueltig}, ungültig ${ungueltig}, ohne Antwort ${ohne}, abgelaufen ${S.ki.abgelaufen})`);
+    pruef(maxProTag <= Sim.R.KI_PRO_TAG, `höchstens ${maxProTag} Anfragen je Figur und Tag`);
+    pruef(zuSpaet === 0, `keine Antwort auf eine nicht mehr offene Anfrage (${zuSpaet})`);
+    const buecher = Object.values(S.ki.tagebuch);
+    pruef(buecher.every(b => b.length <= Sim.R.TAGEBUCH), `Tagebücher höchstens ${Sim.R.TAGEBUCH} Einträge (${buecher.map(b => b.length).join(', ')})`);
+    // 3. Hauptfiguren setzen und Grenzen
+    const erw = []; for (let p = 0; p < S.pMax && erw.length < 20; p++) if (S.p.lebt[p] && S.tag - S.p.geb[p] >= 18 * Sim.R.JAHR && !Sim.istHaupt(S, p)) erw.push(p);
+    for (const p of erw) if (S.ki.haupt.length < Sim.R.HAUPT_MAX) Sim.hauptSetzen(S, p, S.p.gen[p], true);
+    const elf = erw.find(p => !Sim.istHaupt(S, p));
+    pruef(!Sim.hauptSetzen(S, elf, S.p.gen[elf], true) && S.ki.haupt.length === Sim.R.HAUPT_MAX, `11. Hauptfigur wird abgelehnt (${S.ki.haupt.length} Hauptfiguren)`);
+    // 4. Gespräch: Erinnerung, neues Ziel, Tagebuch
+    const h = S.ki.haupt[0];
+    const zielVor = S.p.ziel[h.id];
+    const neuZiel = Sim.ZIELNAMEN[zielVor === 6 ? 5 : 6];
+    Sim.kiGespraech(S, h.id, h.gen, 'Wie geht es dir?', 'Gut, danke.', neuZiel);
+    const info = Sim.personInfo(S, h.id, h.gen);
+    pruef(Sim.ZIELNAMEN[S.p.ziel[h.id]] === neuZiel && info.gedaechtnis.at(-1).text === 'mit Noah geredet' && info.tagebuch.at(-1).art === 'gespraech',
+      `Gespräch: Ziel ${Sim.ZIELNAMEN[zielVor]} → ${neuZiel}, Erinnerung „${info.gedaechtnis.at(-1).text}“, Tagebuch „${info.tagebuch.at(-1).noah}“`);
+    // 5. Tod einer Hauptfigur: Verlust mit Vorschlägen; Speichern und Laden behält alles
+    while (S.tag < 900 && S.ki.verlust.length === 0) Sim.stunde(S);
+    const v = S.ki.verlust[0];
+    pruef(!!v, v ? `Verlust gemeldet: ${v.name} (${v.grund}), Vorschläge: ${v.vorschlaege.map(x => x.name + ' (' + x.rolle + ')').join(', ') || 'keine'}` : 'kein Verlust bis Tag 900');
+    const B = ladenAusText(Sim, speichernAlsText(Sim, S));
+    pruef(JSON.stringify(B.ki) === JSON.stringify(S.ki) && fingerabdruck(Sim, B) === fingerabdruck(Sim, S), 'Speichern/Laden behält Hauptfiguren, Tagebücher, Anfragen');
+  }
+  console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle KI-Prüfungen bestanden');
+  process.exit(fehler ? 1 : 0);
 }
 if (flag('aufholtest')) {
   const seed = Number(arg('seed', '1')), start = Number(arg('tage', '200')), n = Number(arg('aufholen', '90'));
