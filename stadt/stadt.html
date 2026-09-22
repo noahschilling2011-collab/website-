@@ -251,10 +251,14 @@ function suche(liste, x, y, kosten) {
 
 function listeRaus(L, v) { const i = L.indexOf(v); if (i >= 0) L.splice(i, 1); }
 
-function buch(S, text) {
-  S.buch.push({ tag: S.tag, text });
+// Stadtbuch: eine Zeile mit Art (für „die auffälligsten Einträge“) und fortlaufender Nummer.
+// Namen stehen als Marke \u0001ID/GEN/Name\u0002 im Text, damit die Anzeige sie anklickbar machen kann.
+function buch(S, art, text) {
+  S.buch.push({ nr: ++S.buchNr, tag: S.tag, art, text });
   if (S.buch.length > R.BUCH_MAX) S.buch.shift();
 }
+function nr(S, p) { return '\u0001' + p + '/' + S.p.gen[p] + '/' + name(S, p) + '\u0002'; }
+function klartext(text) { return text.replace(/\u0001\d+\/\d+\/([^\u0002]*)\u0002/g, '$1'); }
 
 // ─── Personen anlegen und entfernen ──────────────────────────────────────────────────
 function kapazitaet(S, min) {
@@ -343,7 +347,7 @@ function entferne(S, q) {
   if (P.besitz[q] >= 0) {
     const b = P.besitz[q];
     const n = schliessen(S, b, false);
-    buch(S, `${S.g.typ[b] === LADEN ? 'Der Laden' : 'Die Werkstatt'} von ${name(S, q)} ${gebOrt(S, b)} schließt, ${S.p.weib[q] ? 'sie' : 'er'} ist nicht mehr da.` +
+    buch(S, 'schliessung', `${S.g.typ[b] === LADEN ? 'Der Laden' : 'Die Werkstatt'} von ${nr(S, q)} ${gebOrt(S, b)} schließt, ${S.p.weib[q] ? 'sie' : 'er'} ist nicht mehr da.` +
       (n ? ` ${n} ${n === 1 ? 'Person verliert' : 'Leute verlieren'} die Arbeit.` : ''));
   }
   austreten(S, q);
@@ -379,7 +383,7 @@ function mieterWechsel(S, alt, w) {
   belegen(S, w, -1);
   const kinder = L.filter(m => P.hh[m] === alt);
   if (kinder.length) {
-    buch(S, `${kinder.length === 1 ? name(S, kinder[0]) + ' kommt' : 'Die Kinder ' + kinder.map(k => vorname(S, k)).join(', ') + ' kommen'} zu Verwandten außerhalb.`);
+    buch(S, 'kinder_weg', `${kinder.length === 1 ? nr(S, kinder[0]) + ' kommt' : 'Die Kinder ' + kinder.map(k => vorname(S, k)).join(', ') + ' kommen'} zu Verwandten außerhalb.`);
     for (const k of kinder) { P.hh[k] = -1; entferne(S, k); S.stat.wegzuegePersonen++; }
   }
 }
@@ -398,7 +402,7 @@ function sterben(S, q) {
     }
   }
   for (const n of nah) { if (erwachsen(S, n)) { erinnere(S, n, M.GESTORBEN, q); P.jetzt[n] = 1; } }
-  buch(S, `${name(S, q)} stirbt mit ${Math.floor(alterTage(S, q) / R.JAHR)} Jahren.`);
+  buch(S, 'tod', `${nr(S, q)} stirbt mit ${Math.floor(alterTage(S, q) / R.JAHR)} Jahren.`);
   S.stat.tode++;
   entferne(S, q);
 }
@@ -1041,7 +1045,7 @@ function aktZusammen(S, p) {
   erinnere(S, p, M.EINGEZOGEN, w); erinnere(S, q, M.EINGEZOGEN, w);
   S.stat.hochzeiten++;
   const seit = paarSeit(S, p, q);
-  buch(S, `Hochzeit: ${name(S, p)} und ${name(S, q)} ziehen zusammen ${gebOrt(S, w)}.`
+  buch(S, 'hochzeit', `Hochzeit: ${nr(S, p)} und ${nr(S, q)} ziehen zusammen ${gebOrt(S, w)}.`
     + (seit >= 0 ? ` ${seit === 0 ? 'Sie sind erst seit heute ein Paar' : `Sie sind seit ${seit} ${seit === 1 ? 'Tag' : 'Tagen'} ein Paar`}.` : '')
     + (P.ziel[p] === Z.FAMILIE || P.ziel[q] === Z.FAMILIE ? ' Sie wollen eine Familie.' : ''));
   return true;
@@ -1054,7 +1058,7 @@ function aktTrennen(S, p) {
   erinnere(S, p, M.GETRENNT, q); erinnere(S, q, M.GETRENNT, p);
   P.jetzt[p] = 1; P.jetzt[q] = 1;
   S.stat.trennungen++;
-  buch(S, `${name(S, p)} und ${name(S, q)} trennen sich. Beide waren seit über ${R.UNZUF_TAGE} Tagen unzufrieden.`);
+  buch(S, 'trennung', `${nr(S, p)} und ${nr(S, q)} trennen sich. Beide waren seit über ${R.UNZUF_TAGE} Tagen unzufrieden.`);
   return true;
 }
 function aktKind(S, p) {
@@ -1075,9 +1079,9 @@ function aktKind(S, p) {
   P.kinder[p]++; P.kinder[q]++;
   erinnere(S, p, M.KIND, k); erinnere(S, q, M.KIND, k);
   S.stat.geburten++;
-  const nr = Math.max(P.kinder[p], P.kinder[q]);
-  buch(S, `${name(S, p)} und ${name(S, q)} bekommen ${P.weib[k] ? 'eine Tochter' : 'einen Sohn'}: ${vorname(S, k)}. `
-    + (nr === 1 ? 'Ihr erstes Kind' : `Kind Nummer ${nr}`)
+  const nummer = Math.max(P.kinder[p], P.kinder[q]);
+  buch(S, 'geburt', `${nr(S, p)} und ${nr(S, q)} bekommen ${P.weib[k] ? 'eine Tochter' : 'einen Sohn'}: ${vorname(S, k)}. `
+    + (nummer === 1 ? 'Ihr erstes Kind' : `Kind Nummer ${nummer}`)
     + (P.ziel[p] === Z.FAMILIE || P.ziel[q] === Z.FAMILIE ? ', sie wollten eine Familie.' : '.'));
   return true;
 }
@@ -1169,10 +1173,10 @@ function aktGruenden(S, p) {
   S.stat.gruendungen++; S.stat.gruenderEhrgeiz += P.ehrgeiz[p];
   S.letzteGruendung = S.tag;
   const wort = typ === LADEN ? 'einen Laden' : 'eine Werkstatt';
-  buch(S, leer >= 0
-    ? `${name(S, p)} übernimmt ${wort === 'einen Laden' ? 'den leeren Laden' : 'die leere Werkstatt'} ${gebOrt(S, b)}.`
+  buch(S, 'gruendung', leer >= 0
+    ? `${nr(S, p)} übernimmt ${wort === 'einen Laden' ? 'den leeren Laden' : 'die leere Werkstatt'} ${gebOrt(S, b)}.`
       + ` ${P.weib[p] ? 'Sie' : 'Er'} hat ${gespart} Tage dafür gespart.`
-    : `${name(S, p)} gründet ${wort} ${gebOrt(S, b)}. ${P.weib[p] ? 'Sie' : 'Er'} hat ${gespart} Tage dafür gespart.`);
+    : `${nr(S, p)} gründet ${wort} ${gebOrt(S, b)}. ${P.weib[p] ? 'Sie' : 'Er'} hat ${gespart} Tage dafür gespart.`);
   return true;
 }
 function wegzugGrund(S, p) {
@@ -1194,7 +1198,7 @@ function aktWegziehen(S, p) {
   }
   S.stat.wegzuege++; S.stat.wegzugHeimat += P.heimat[p];
   S.stat.wegzuegePersonen += geht.length;
-  buch(S, `${name(S, p)} zieht weg${geht.length > 1 ? ` (mit ${geht.length - 1} ${geht.length === 2 ? 'Angehörigem' : 'Angehörigen'})` : ''}. ${wegzugGrund(S, p)}`);
+  buch(S, 'wegzug', `${nr(S, p)} zieht weg${geht.length > 1 ? ` (mit ${geht.length - 1} ${geht.length === 2 ? 'Angehörigem' : 'Angehörigen'})` : ''}. ${wegzugGrund(S, p)}`);
   geht.sort((a, b) => (P.hh[a] === a ? 1 : 0) - (P.hh[b] === b ? 1 : 0));   // Mieter zuletzt
   for (const x of geht) if (P.lebt[x]) entferne(S, x);
   return true;
@@ -1381,7 +1385,7 @@ function pleite(S, b) {
   S.stat.pleiten++;
   if (laden) S.stat.pleitenLaden++;
   S.stat.pleiteAlter += S.tag - g.seit[b];
-  buch(S, `${laden ? 'Der Laden' : 'Die Werkstatt'} von ${name(S, o)} ${gebOrt(S, b)} ist nach ${R.MINUS_TAGE} Tagen im Minus pleite. ${grund}`
+  buch(S, 'pleite', `${laden ? 'Der Laden' : 'Die Werkstatt'} von ${nr(S, o)} ${gebOrt(S, b)} ist nach ${R.MINUS_TAGE} Tagen im Minus pleite. ${grund}`
     + (n ? ` ${n} ${n === 1 ? 'Person verliert' : 'Leute verlieren'} die Arbeit.` : ''));
 }
 
@@ -1494,8 +1498,8 @@ function zuzug(S) {
   }
   // Zuzüge eines Tages stehen in einer Zeile, sonst würden sie das Stadtbuch (500 Zeilen) allein füllen.
   const grund = ` Es gibt ${fs} freie ${fs === 1 ? 'Stelle' : 'Stellen'} und ${fw} freie ${fw === 1 ? 'Wohnung' : 'Wohnungen'}, die Stimmung liegt bei ${Math.round(S.zufMittel)}.`;
-  if (neu.length === 1) buch(S, `${name(S, neu[0])} zieht zu, ${gebOrt(S, S.p.wohnung[neu[0]])}.` + grund);
-  else if (neu.length > 1) buch(S, `${neu.length} Leute ziehen zu, darunter ${name(S, neu[0])} und ${name(S, neu[1])}.` + grund);
+  if (neu.length === 1) buch(S, 'zuzug', `${nr(S, neu[0])} zieht zu, ${gebOrt(S, S.p.wohnung[neu[0]])}.` + grund);
+  else if (neu.length > 1) buch(S, 'zuzug', `${neu.length} Leute ziehen zu, darunter ${nr(S, neu[0])} und ${nr(S, neu[1])}.` + grund);
 }
 
 // ─── Das Bauamt ──────────────────────────────────────────────────────────────────────
@@ -1514,7 +1518,7 @@ function aufstocken(S, b, grund) {
   const mehr = R.WOHNUNGEN[ziel] - R.WOHNUNGEN[g.stufe[b]];
   S.wohnungenImBau += mehr;
   S.stat.bauamt.aufstockungen++;
-  buch(S, `Das Bauamt stockt das Wohnhaus ${gebOrt(S, b)} auf Stufe ${ziel} auf. ${grund}`);
+  buch(S, 'bauamt', `Das Bauamt stockt das Wohnhaus ${gebOrt(S, b)} auf Stufe ${ziel} auf. ${grund}`);
   return mehr;
 }
 function bauamt(S) {
@@ -1534,14 +1538,14 @@ function bauamt(S) {
     S.budget -= R.K_HAUS;
     const b = neuesGebaeude(S, WOHNHAUS, c % KARTE, (c / KARTE) | 0, R.D_HAUS, -1);
     geplant += R.WOHNUNGEN[1]; bauten++; st.haeuser++;
-    buch(S, `Das Bauamt baut ein Wohnhaus ${gebOrt(S, b)}. ${grund}`);
+    buch(S, 'bauamt', `Das Bauamt baut ein Wohnhaus ${gebOrt(S, b)}. ${grund}`);
   }
   // 2. Kein freies Feld an einer Straße → Straße verlängern
   if (S.bauplaetze === 0 && S.budget >= RASTER * R.K_STRASSE) {
     const r = strasseVerlaengern(S);
     if (r) {
       S.budget -= r.neu * R.K_STRASSE; st.strassen++;
-      buch(S, r.abzweig
+      buch(S, 'bauamt', r.abzweig
         ? `Das Bauamt legt ${strAkk(r.str)} an, Richtung ${RICHTUNG(r.dx, r.dy)}. Es gab keinen freien Bauplatz mehr.`
         : `Das Bauamt verlängert ${strAkk(r.str)} nach ${RICHTUNG(r.dx, r.dy)}. Es gab keinen freien Bauplatz mehr.`);
     }
@@ -1561,7 +1565,7 @@ function bauamt(S) {
         S.budget -= R.K_PARK;
         const b = neuesGebaeude(S, PARK, c % KARTE, (c / KARTE) | 0, R.D_PARK, -1);
         S.vParks[schlecht]++; st.parks++;
-        buch(S, `Das Bauamt legt einen Park ${gebOrt(S, b)} an. Im Viertel lag die Zufriedenheit bei ${Math.round(schlechtZ)}.`);
+        buch(S, 'bauamt', `Das Bauamt legt einen Park ${gebOrt(S, b)} an. Im Viertel lag die Zufriedenheit bei ${Math.round(schlechtZ)}.`);
       }
     }
   }
@@ -1576,7 +1580,7 @@ function bauamt(S) {
       S.budget -= R.K_WERKSTATT;
       const b = neuesGebaeude(S, WERKSTATT, c % KARTE, (c / KARTE) | 0, R.D_WERKSTATT, -1);
       S.letzteNotbremse = S.tag; st.notwerkstaetten++;
-      buch(S, `Notbremse: Die Stadt baut eine Werkstatt ${gebOrt(S, b)}. Seit ${S.tag - S.letzteGruendung} Tagen hat niemand gegründet, ${Math.round(S.arbeitslosenquote * 100)} % sind ohne Arbeit.`);
+      buch(S, 'notbremse', `Notbremse: Die Stadt baut eine Werkstatt ${gebOrt(S, b)}. Seit ${S.tag - S.letzteGruendung} Tagen hat niemand gegründet, ${Math.round(S.arbeitslosenquote * 100)} % sind ohne Arbeit.`);
     }
   }
 }
@@ -1596,7 +1600,7 @@ function neueStadt(seed) {
     wohnungSuchende: 0, anfragen: 0, unversorgtQuote: 0, werkstattPlaetze: 0, letzteGruendung: 0, letzteNotbremse: -999,
     vZufSumme: new Float64Array(VN * VN), vZufN: new Uint32Array(VN * VN), vParks: new Uint16Array(VN * VN),
     ladenDirty: true, parkDirty: true,
-    buch: [], reihe: [],
+    buch: [], buchNr: 0, reihe: [],
     stat: {
       gruendungen: 0, uebernahmen: 0, pleiten: 0, pleitenLaden: 0, pleiteAlter: 0, geburten: 0, tode: 0, zuzuege: 0,
       wegzuege: 0, wegzuegePersonen: 0, hochzeiten: 0, trennungen: 0, paare: 0, freundschaften: 0,
@@ -1631,7 +1635,7 @@ function neueStadt(seed) {
     erwachsenZaehlen(S, p);
   }
   ladenZuordnen(S); parksZuordnen(S); haushalteZaehlen(S); kennzahlenRechnen(S);
-  buch(S, 'Zehn Leute kommen auf eine leere Wiese an der Hauptstraße. Es gibt zwei Wohnhäuser, eine Werkstatt der Stadt und einen Laden.');
+  buch(S, 'start', 'Zehn Leute kommen auf eine leere Wiese an der Hauptstraße. Es gibt zwei Wohnhäuser, eine Werkstatt der Stadt und einen Laden.');
   return S;
 }
 
@@ -1663,7 +1667,7 @@ function kennzahlen(S) {
 G.StadtSim = {
   VERSION, R, KARTE, VK, VN, RASTER, RAND, LEER, STRASSE, WOHNHAUS, WERKSTATT, LADEN, PARK, BAUSTELLE,
   M, Z, ZIELNAMEN, AKTIONSNAMEN,
-  neueStadt, stunde, kennzahlen, name, strName,
+  neueStadt, stunde, kennzahlen, name, strName, klartext,
 };
 })(globalThis);
 </script>
