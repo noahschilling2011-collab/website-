@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Entwicklungswerkzeug, nicht Teil des Produkts.
 // Zieht den <script id="sim">-Block aus stadt.html, führt ihn in einem leeren Kontext aus
-// (kein window, kein document, kein fetch, kein THREE, Math.random und Date gesperrt)
+// (kein window, kein document, kein fetch, kein THREE; Math.random, Date und Intl gesperrt;
+// vorher eine statische Suche nach verbotenen Namen)
 // und simuliert N Spieltage. Nur Node-Standardbibliothek.
 //
 //   node tools/simtest.mjs --seed 1 --tage 365      Tabelle alle 30 Tage + Charakter-Auswertung
@@ -20,11 +21,24 @@ const treffer = html.match(/<script id="sim">([\s\S]*?)<\/script>/);
 if (!treffer) { console.error('Kein <script id="sim"> in stadt.html gefunden.'); process.exit(2); }
 const SIM_CODE = treffer[1];
 
+// Statische Prüfung: Kommentare entfernen, dann nach Namen suchen, die im sim-Block nichts zu suchen haben.
+// Fängt auch Zugriffe, die im Lauf nie ausgeführt würden (z. B. hinter einem typeof-Test).
+const VERBOTEN = /\b(window|document|fetch|THREE|localStorage|sessionStorage|indexedDB|performance|requestAnimationFrame|setTimeout|setInterval|XMLHttpRequest|Intl|Date|crypto|navigator|location|console)\b|Math\.random/;
+function statischPruefen(code) {
+  const ohneKommentare = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+  const zeilen = ohneKommentare.split('\n');
+  const treffer = [];
+  zeilen.forEach((z, i) => { const m = z.match(VERBOTEN); if (m) treffer.push(`  Zeile ${i + 1} im sim-Block: ${m[0]} → ${z.trim().slice(0, 100)}`); });
+  if (treffer.length) { console.error('Der sim-Block benutzt Verbotenes:\n' + treffer.join('\n')); process.exit(3); }
+}
+statischPruefen(SIM_CODE);
+
 function ladeSim() {
   const ctx = vm.createContext({});
   vm.runInContext(`
     Math.random = function () { throw new Error('Math.random ist in der Simulation verboten'); };
     globalThis.Date = undefined;
+    globalThis.Intl = undefined;
   `, ctx);
   vm.runInContext(SIM_CODE, ctx, { filename: 'stadt.html#sim' });
   if (!ctx.StadtSim) throw new Error('Der sim-Block hat kein StadtSim angelegt.');
@@ -114,22 +128,25 @@ if (flag('gate')) {
       if (drop > schlimmsterEinbruch) { schlimmsterEinbruch = drop; einbruchTag = d + 1; }
     }
     const minBudget = Math.min(...budgets);
-    const p640 = reihe[639], p730 = reihe[729];
-    const drift = Math.abs(p730 - p640) / p640;
-    // Ausdehnung der bebauten Fläche
+    // Gate 4 „pendelt sich ein“: Schwankungsband der Einwohner über die letzten 180 Tage (Tag 551–730).
+    const band = reihe.slice(550, 730), bandMax = Math.max(...band), bandMin = Math.min(...band);
+    const bandFaktor = bandMax / bandMin;
+    // „unterhalb der Kartengrenze“: Straßen dürfen bis zur äußersten Rasterlinie im Rand. Hat eine sie erreicht,
+    // stößt die Stadt an die Karte. Abstand = Felder zwischen äußerster Straße und dieser Grenze.
+    const G0 = Math.ceil(Sim.RAND / Sim.RASTER) * Sim.RASTER, G1 = Math.floor((Sim.KARTE - 1 - Sim.RAND) / Sim.RASTER) * Sim.RASTER;
     let x0 = 99, y0 = 99, x1 = -1, y1 = -1;
     for (let c = 0; c < Sim.KARTE * Sim.KARTE; c++) {
-      if (S.feld[c] === Sim.LEER) continue;
+      if (S.feld[c] !== Sim.STRASSE) continue;
       const x = c % Sim.KARTE, y = (c / Sim.KARTE) | 0;
       x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
     }
-    const randAbstand = Math.min(x0, y0, Sim.KARTE - 1 - x1, Sim.KARTE - 1 - y1);
+    const grenzAbstand = Math.min(x0 - G0, y0 - G0, G1 - x1, G1 - y1);
     const c730 = charakter(S);
     const g = [
       [k365.einwohner >= 300, `1  Einwohner an Tag 365: ${k365.einwohner} (≥ 300)`],
       [minPop > 0 && schlimmsterEinbruch <= 0.3, `2  Minimum ${minPop}, schlimmster 30-Tage-Einbruch ${(schlimmsterEinbruch * 100).toFixed(1)} % (Tag ${einbruchTag}) (nie 0, ≤ 30 %)`],
       [minBudget >= 0, `3  kleinstes Budget ${f0(minBudget)} (≥ 0)`],
-      [drift <= 0.10 && randAbstand >= 2, `4  läuft 730 Tage; Einwohner Tag 640 → 730: ${p640} → ${p730} (${(drift * 100).toFixed(1)} %, ≤ 10 %); bebaut x ${x0}–${x1}, y ${y0}–${y1}, Randabstand ${randAbstand} (≥ 2)`],
+      [bandFaktor <= 1.15 && grenzAbstand > 0, `4  läuft 730 Tage; Einwohner Tag 551–730 zwischen ${bandMin} und ${bandMax} (Faktor ${bandFaktor.toFixed(2)}, ≤ 1,15); Straßen x ${x0}–${x1}, y ${y0}–${y1}, Abstand zur Baugrenze ${grenzAbstand} (> 0)`],
       [c365.grN >= 5, `5  Gründungen durch Bewohner bis Tag 365: ${c365.grN} (≥ 5)`],
       [c365.grE - c365.erwE >= 15, `6  Gründer-Ehrgeiz ${c365.grE.toFixed(1)} vs. alle ${c365.erwE.toFixed(1)}: ${(c365.grE - c365.erwE).toFixed(1)} (≥ +15)`],
       [c365.erwH - c365.wzH >= 15, `7  Wegzieher-Heimatliebe ${c365.wzH.toFixed(1)} vs. alle ${c365.erwH.toFixed(1)}: −${(c365.erwH - c365.wzH).toFixed(1)} (n=${c365.wzN}) (≥ 15 weniger)`],
