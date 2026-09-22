@@ -55,30 +55,35 @@ const R = {
 
   // Geld in Talern pro Spieltag
   LOHN_WERKSTATT: 100, LOHN_LADEN: 90, LOHN_STADT: 95,
-  STEUER: 0.15,                 // fester Anteil vom Lohn → Budget des Bauamts
-  MIETE: [0, 20, 22, 24],       // pro Wohnung nach Hausstufe → Budget (die Stadt besitzt die Wohnhäuser)
+  STEUER: 0.10,                 // fester Anteil vom Lohn → Budget des Bauamts
+  MIETE: [0, 12, 14, 16],       // pro Wohnung nach Hausstufe → Budget (die Stadt besitzt die Wohnhäuser)
   EINKAUF: 30,                  // pro Erwachsenem; Sparsame kaufen bis 40 % weniger
+  EINKAUF_VERMOEGEN: 0.01,      // wer Erspartes hat, gibt täglich bis 1 % davon zusätzlich aus (Sparsame weniger)
+  EINKAUF_EXTRA_MAX: 15,
   EINKAUF_KIND: 15,             // zahlt der Haushalt
   RENTE_BETRAG: 50,             // ab 67, aus dem Budget, nur solange das Budget reicht
   FIX_WERKSTATT: 40, FIX_LADEN: 30,
-  UMLAND: 110000,               // so viel kauft das Umland pro Tag bei allen Werkstätten zusammen
+  UMLAND: 50000,                // so viel kauft das Umland pro Tag bei allen Werkstätten zusammen
   EXPORT_MAX: 140,              // Höchsterlös je Arbeitstag in einer Werkstatt
   KASSE_START: 300, POLSTER: 400,
 
   // Kapazitäten
   WOHNUNGEN: [0, 6, 14, 26],    // Wohnungen je Hausstufe
   WOHNGROESSE: [0, 5, 4, 3],    // so viele Personen passen bequem in eine Wohnung
-  STELLEN_WERKSTATT: 8, STELLEN_LADEN: 4, STELLEN_STADT: 10,
+  STELLEN_WERKSTATT: 8, STELLEN_LADEN: 6, STELLEN_STADT: 10,
+  KUNDEN_PRO_KRAFT: 2.5,        // Kundschaft pro Tag je Stelle (Besitzer zählt mit): ein Laden bedient 2,5 × 7 = 17
 
   // Bauen: Kosten und Dauer in Spieltagen
   K_HAUS: 2400, K_AUF: [0, 0, 2800, 5000], K_PARK: 900, K_STRASSE: 50,
   K_LADEN: 1200, K_WERKSTATT: 1600, UEBERNAHME: 0.4,
   D_HAUS: 3, D_AUF: 3, D_PARK: 2, D_LADEN: 3, D_WERKSTATT: 4,
   REICH_LADEN: 12, REICH_PARK: 5,          // Reichweiten in Feldern (Manhattan)
-  GRUEND_SCHWELLE: 1700,
+  LADEN_WAHL: 40,                          // so viele Läden in Reichweite probiert man der Nähe nach durch
+  GRUEND_SCHWELLE: 1500,
+  MANGEL_GRUENDUNG: 10,                    // ab so vielen Leuten ohne Einkauf in Reichweite lohnt ein Laden
 
   // Stündliche Bedürfnisse
-  KONTAKT_ZERFALL: 1.0, KONTAKT_ARBEIT: 0.7, KONTAKT_ZUHAUSE: 0.8,
+  KONTAKT_ZERFALL: 1.3, KONTAKT_ARBEIT: 0.7, KONTAKT_ZUHAUSE: 0.8,
   FREIZEIT_ARBEIT: 1.6, FREIZEIT_ERHOLUNG: 1.0, FREIZEIT_FREI: 2.0,
   FREIZEIT_PARK: 0.3, FREIZEIT_OHNE_LADEN: 0.4,
   ZUF_MAX_TAG: 5,                          // Zufriedenheit gleitet höchstens ±5 pro Tag
@@ -141,7 +146,7 @@ const PF = [
   ['fleiss', Uint8Array, 1], ['gesellig', Uint8Array, 1], ['ehrgeiz', Uint8Array, 1],
   ['spar', Uint8Array, 1], ['heimat', Uint8Array, 1],
   ['bGeld', Float32Array, 1], ['bWohnen', Float32Array, 1], ['bKontakt', Float32Array, 1], ['bFreizeit', Float32Array, 1],
-  ['zuf', Float32Array, 1],
+  ['zuf', Float32Array, 1], ['zufZiel', Float32Array, 1],          // Zufriedenheit und ihr Zielwert (alle 3 h neu)
   ['geld', Int32Array, 1],
   ['wohnung', Int32Array, 1],                               // Gebäude, in dem die Person wohnt, -1 = keins
   ['hh', Int32Array, 1],                                    // Haushalt = ID des Mieters, -1 = keiner
@@ -156,6 +161,7 @@ const PF = [
   ['frei', Uint8Array, 1],                                  // hat sich heute freigenommen
   ['elend', Uint8Array, 1], ['unzuf', Uint8Array, 1],       // Tage in Folge unter 20 bzw. unter 40
   ['trauer', Uint8Array, 1], ['ohneLaden', Uint8Array, 1],
+  ['stammladen', Int32Array, 1],                            // hier kauft die Person ein, solange er offen, nah und nicht voll ist
   ['sperreBis', Int32Array, 1],                             // keine Gründung bis zu diesem Tag (nach Pleite)
   ['jetzt', Uint8Array, 1],                                 // Entscheidung fällig (nach einem Ereignis)
   ['sucht', Uint8Array, 1],                                 // hat erfolglos eine Wohnung gesucht
@@ -166,7 +172,11 @@ const GF = [
   ['typ', Uint8Array], ['stufe', Uint8Array], ['auf', Uint8Array], ['x', Uint8Array], ['y', Uint8Array],
   ['besitzer', Int32Array], ['kasse', Int32Array], ['minus', Uint16Array], ['bauBis', Int32Array],
   ['lohn', Uint16Array], ['belegt', Uint16Array], ['leer', Uint8Array], ['seit', Int32Array],
-  ['str', Int16Array], ['umsatz', Int32Array], ['laden', Int32Array], ['parkNah', Uint8Array],
+  ['str', Int16Array], ['umsatz', Int32Array], ['parkNah', Uint8Array],
+  ['laden', Int32Array],                                                   // Wohnhaus: nächster Laden in Reichweite (-1 = keiner)
+  ['knapp', Uint8Array],                                                   // Wohnhaus: so viele gingen gestern beim Einkauf leer aus
+  ['mangel', Uint16Array],                                                 // Wohnhaus: so viele gingen gestern in Ladenreichweite leer aus
+  ['kapaz', Int32Array], ['bedient', Int32Array],                          // Laden: Kundschaft heute möglich / bedient
 ];
 
 // ─── Zufall: mulberry32, Zustand liegt in S (speicherbar) ────────────────────────────
@@ -261,6 +271,7 @@ function neuePerson(S) {
   }
   P.gen[id] = (P.gen[id] + 1) & 0xffff;
   P.wohnung[id] = P.hh[id] = P.arbeit[id] = P.besitz[id] = P.partner[id] = P.elternA[id] = P.elternB[id] = -1;
+  P.stammladen[id] = -1;
   for (let j = 0; j < 5; j++) P.freunde[id * 5 + j] = -1;
   for (let j = 0; j < R.MEM; j++) P.memRef[id * R.MEM + j] = -1;
   P.lebt[id] = 1;
@@ -281,7 +292,7 @@ function zufallsName(S, p) {
 }
 function bedarfStart(S, p) {
   const P = S.p;
-  P.bKontakt[p] = 55; P.bFreizeit[p] = 70; P.bGeld[p] = 50; P.bWohnen[p] = 60; P.zuf[p] = 60;
+  P.bKontakt[p] = 55; P.bFreizeit[p] = 70; P.bGeld[p] = 50; P.bWohnen[p] = 60; P.zuf[p] = 60; P.zufZiel[p] = 60;
 }
 function erwachsenZaehlen(S, p) {
   const P = S.p, st = S.stat;
@@ -341,7 +352,7 @@ function mieterWechsel(S, alt, w) {
     if (a > bestAlter) { bestAlter = a; neu = m; }
   }
   if (neu >= 0) { for (const m of L) if (P.hh[m] === alt) P.hh[m] = neu; return; }
-  S.g.belegt[w]--;
+  belegen(S, w, -1);
   const kinder = L.filter(m => P.hh[m] === alt);
   if (kinder.length) {
     buch(S, `${kinder.length === 1 ? name(S, kinder[0]) + ' kommt' : 'Die Kinder ' + kinder.map(k => vorname(S, k)).join(', ') + ' kommen'} zu Verwandten außerhalb.`);
@@ -537,12 +548,13 @@ function neuesGebaeude(S, typ, x, y, bauTage, besitzer) {
   platzWeg(S, c);
   g.typ[b] = typ; g.stufe[b] = 1; g.auf[b] = 0; g.x[b] = x; g.y[b] = y; g.besitzer[b] = besitzer;
   g.kasse[b] = 0; g.minus[b] = 0; g.leer[b] = 0; g.seit[b] = S.tag; g.belegt[b] = 0; g.umsatz[b] = 0;
-  g.laden[b] = -1; g.parkNah[b] = 0; g.str[b] = strasseAn(S, x, y);
+  g.laden[b] = -1; g.knapp[b] = 0; g.mangel[b] = 0; g.parkNah[b] = 0; g.str[b] = strasseAn(S, x, y);
   g.lohn[b] = typ === WERKSTATT ? (besitzer < 0 ? R.LOHN_STADT : lohnVon(S, besitzer, R.LOHN_WERKSTATT))
     : typ === LADEN ? (besitzer < 0 ? R.LOHN_LADEN : lohnVon(S, besitzer, R.LOHN_LADEN)) : 0;
   S.feldGeb[c] = b;
   S.bewohner.push([]); S.belegschaft.push([]);
-  S.vGeb[viertel(x, y)].push(b);
+  const v = viertel(x, y);
+  (typ === WOHNHAUS ? S.vHaus : typ === PARK ? S.vPark : S.vBetrieb)[v].push(b);
   if (bauTage > 0) {
     S.feld[c] = BAUSTELLE; g.bauBis[b] = S.tag + bauTage; S.baustellen.push(b);
     if (typ === WOHNHAUS) S.wohnungenImBau += R.WOHNUNGEN[1];
@@ -578,15 +590,35 @@ function eroeffnen(S, b) {
   const P = S.p, o = S.g.besitzer[b];
   if (P.arbeit[o] >= 0 && P.arbeit[o] !== b) austreten(S, o);
   P.arbeit[o] = b;
+  stellenBuchen(S, b, 1);
   if (S.g.typ[b] === LADEN) S.ladenDirty = true;
 }
 
-function anstellen(S, p, b) { S.p.arbeit[p] = b; S.belegschaft[b].push(p); }
+// Freie Stellen laufen live mit (Summe und je Lohnhöhe), täglich exakt neu gezählt.
+function stellenBuchen(S, b, d) {
+  const n = d * (stellen(S, b) - S.belegschaft[b].length);
+  S.freieStellen += n; S.freiLohn[S.g.lohn[b]] += n;
+}
+function anstellen(S, p, b) {
+  S.p.arbeit[p] = b; S.belegschaft[b].push(p);
+  if (offen(S, b)) { S.freieStellen--; S.freiLohn[S.g.lohn[b]]--; }
+}
 function austreten(S, p) {
   const P = S.p, b = P.arbeit[p];
   if (b < 0) return;
-  if (P.besitz[p] !== b) listeRaus(S.belegschaft[b], p);
+  if (P.besitz[p] !== b) {
+    listeRaus(S.belegschaft[b], p);
+    if (offen(S, b)) { S.freieStellen++; S.freiLohn[S.g.lohn[b]]++; }
+  }
   P.arbeit[p] = -1;
+}
+function besterFreierLohn(S) {
+  for (let l = S.freiLohn.length - 1; l > 0; l--) if (S.freiLohn[l] > 0) return l;
+  return 0;
+}
+// Eine vollständige Suche fand nichts über mindestLohn: die Zähler waren veraltet → auf 0 setzen.
+function stellenNichtDa(S, mindestLohn) {
+  for (let l = mindestLohn + 1; l < S.freiLohn.length; l++) { S.freieStellen -= S.freiLohn[l]; S.freiLohn[l] = 0; }
 }
 // Betrieb schließt (Pleite oder Besitzer weg). Gebäude wird frei (leerstehend, übernehmbar).
 function schliessen(S, b, pleite) {
@@ -594,6 +626,7 @@ function schliessen(S, b, pleite) {
   const L = S.belegschaft[b];
   for (const w of L) { P.arbeit[w] = -1; erinnere(S, w, M.JOB_WEG, b); P.jetzt[w] = 1; }
   const n = L.length;
+  if (offen(S, b)) stellenBuchen(S, b, -1);
   S.belegschaft[b] = [];
   if (o >= 0) {
     P.besitz[o] = -1;
@@ -605,17 +638,29 @@ function schliessen(S, b, pleite) {
   return n;
 }
 
-// Nächster offener Laden je Wohnhaus (Cache, neu berechnet wenn sich Läden oder Häuser ändern)
+// Die nächsten offenen Läden in Reichweite je Wohnhaus (Cache, neu berechnet wenn sich Läden oder Häuser ändern).
+// Durchsucht nur die Viertel im Umkreis der Reichweite.
 function ladenZuordnen(S) {
-  const g = S.g;
+  const g = S.g, rv = Math.ceil(R.REICH_LADEN / VK);
+  const kand = [];
   for (let b = 0; b < S.gAnzahl; b++) {
     if (g.typ[b] !== WOHNHAUS) continue;
-    const x = g.x[b], y = g.y[b];
-    g.laden[b] = suche(S.vGeb, x, y, l => {
-      if (g.typ[l] !== LADEN || !offen(S, l)) return -1;
-      const d = Math.abs(g.x[l] - x) + Math.abs(g.y[l] - y);
-      return d <= R.REICH_LADEN ? d : -1;
-    });
+    const x = g.x[b], y = g.y[b], vx = (x / VK) | 0, vy = (y / VK) | 0;
+    kand.length = 0;
+    for (let yy = Math.max(0, vy - rv); yy <= Math.min(VN - 1, vy + rv); yy++) {
+      for (let xx = Math.max(0, vx - rv); xx <= Math.min(VN - 1, vx + rv); xx++) {
+        for (const l of S.vBetrieb[yy * VN + xx]) {
+          if (g.typ[l] !== LADEN || !offen(S, l)) continue;
+          const d = Math.abs(g.x[l] - x) + Math.abs(g.y[l] - y);
+          if (d <= R.REICH_LADEN) kand.push(d * 65536 + l);   // Distanz, bei Gleichstand die kleinere ID
+        }
+      }
+    }
+    kand.sort((u, v) => u - v);
+    const L = S.ladenWahl[b] || (S.ladenWahl[b] = []);
+    L.length = 0;
+    for (let i = 0; i < kand.length && i < R.LADEN_WAHL; i++) L.push(kand[i] % 65536);
+    g.laden[b] = L.length ? L[0] : -1;
   }
   S.ladenDirty = false;
 }
@@ -624,7 +669,7 @@ function parksZuordnen(S) {
   for (let b = 0; b < S.gAnzahl; b++) {
     if (g.typ[b] !== WOHNHAUS) continue;
     const x = g.x[b], y = g.y[b];
-    g.parkNah[b] = suche(S.vGeb, x, y, q => {
+    g.parkNah[b] = suche(S.vPark, x, y, q => {
       if (g.typ[q] !== PARK || S.feld[gebZelle(S, q)] !== PARK) return -1;
       const d = Math.abs(g.x[q] - x) + Math.abs(g.y[q] - y);
       return d <= R.REICH_PARK ? d : -1;
@@ -635,7 +680,7 @@ function parksZuordnen(S) {
 
 function freieWohnungNahe(S, x, y, ausser, groesse) {
   const g = S.g;
-  return suche(S.vGeb, x, y, b => {
+  return suche(S.vHaus, x, y, b => {
     if (b === ausser || g.typ[b] !== WOHNHAUS || S.feld[gebZelle(S, b)] !== WOHNHAUS) return -1;
     if (g.belegt[b] >= R.WOHNUNGEN[g.stufe[b]]) return -1;
     return Math.abs(g.x[b] - x) + Math.abs(g.y[b] - y) + 6 * Math.max(0, groesse - R.WOHNGROESSE[g.stufe[b]]);
@@ -643,6 +688,11 @@ function freieWohnungNahe(S, x, y, ausser, groesse) {
 }
 
 // ─── Wohnen: Haushalte ───────────────────────────────────────────────────────────────
+// Belegte Wohnungen ändern; S.freieWohnungen läuft live mit (täglich exakt neu gezählt).
+function belegen(S, b, d) {
+  S.g.belegt[b] += d;
+  if (S.feld[gebZelle(S, b)] === WOHNHAUS) S.freieWohnungen -= d;
+}
 function wohnortSetzen(S, p, b) {
   const P = S.p;
   if (P.wohnung[p] >= 0) listeRaus(S.bewohner[P.wohnung[p]], p);
@@ -659,15 +709,15 @@ function haushaltUmziehen(S, kopf, b) {
   const P = S.p, alt = P.wohnung[kopf];
   const L = haushaltMitglieder(S, kopf);
   for (const m of L) wohnortSetzen(S, m, b);
-  if (alt >= 0) S.g.belegt[alt]--;
-  S.g.belegt[b]++;
+  if (alt >= 0) belegen(S, alt, -1);
+  belegen(S, b, 1);
   P.hh[kopf] = kopf;
 }
 // p zieht allein in eine eigene Wohnung (aus dem Elternhaus, aus der Obdachlosigkeit)
 function eigenerHaushalt(S, p, b) {
   const P = S.p;
   if (P.hh[p] === p) { haushaltUmziehen(S, p, b); return; }
-  wohnortSetzen(S, p, b); P.hh[p] = p; S.g.belegt[b]++;
+  wohnortSetzen(S, p, b); P.hh[p] = p; belegen(S, b, 1);
 }
 // p verlässt den Haushalt ohne neue Wohnung
 function ausziehen(S, p) {
@@ -682,7 +732,7 @@ function einzelnZu(S, p, kopf) {
   if (P.hh[p] === p) {                           // p hatte eine eigene Wohnung: ganzer Haushalt kommt mit
     const alt = P.wohnung[p];
     for (const m of haushaltMitglieder(S, p)) { wohnortSetzen(S, m, P.wohnung[kopf]); P.hh[m] = kopf; }
-    if (alt >= 0) S.g.belegt[alt]--;
+    if (alt >= 0) belegen(S, alt, -1);
     return;
   }
   wohnortSetzen(S, p, P.wohnung[kopf]); P.hh[p] = kopf;
@@ -722,7 +772,7 @@ function zielWaehlen(S, p) {
   w[Z.JOB] = alter >= R.RENTE || P.besitz[p] >= 0 ? -99 : P.arbeit[p] < 0 ? 45 + 20 * F : 40 * E;
   w[Z.FAMILIE] = alter >= 20 && alter < 45
     ? (P.partner[p] < 0 ? 15 + 35 * Gs : P.kinder[p] === 0 ? 40 : 20 - 8 * P.kinder[p]) : -99;
-  w[Z.LADEN] = P.besitz[p] < 0 && alter < 60 ? 55 * E + 15 * (1 - Sp) - 10 + (P.geld[p] > 1000 ? 10 : 0) : -99;
+  w[Z.LADEN] = P.besitz[p] < 0 && alter < 60 ? 80 * (E - 0.3) + 10 * (1 - Sp) - 5 + (P.geld[p] > 1000 ? 10 : 0) : -99;
   w[Z.FREUNDE] = 40 * Gs + (freundeZahl(S, p) < 2 ? 20 : 0);
   w[Z.RUHE] = 35 * (1 - F) + (alter > 55 ? 25 : 0);
   let best = Z.RUHE, bestW = -Infinity;
@@ -747,7 +797,7 @@ function zielPruefen(S, p) {
 // ─── Das Gehirn: Entscheiden per Punktwertung ────────────────────────────────────────
 function entscheide(S, p, h) {
   const P = S.p, g = S.g, tag = S.tag, zg = P.ziel[p];
-  const at = tag - P.geb[p], alter = at / R.JAHR;
+  const alter = (tag - P.geb[p]) / R.JAHR;
   const F = P.fleiss[p] / 100, Gs = P.gesellig[p] / 100, E = P.ehrgeiz[p] / 100;
   const Sp = P.spar[p] / 100, H = P.heimat[p] / 100;
   // Gedächtnis wirkt: Job verloren in den letzten 30 Tagen → Geld zählt 1,5-fach
@@ -755,62 +805,77 @@ function entscheide(S, p, h) {
   const uWohnen = 100 - P.bWohnen[p], uKontakt = 100 - P.bKontakt[p], uFrei = 100 - P.bFreizeit[p];
   const arb = P.arbeit[p], istBesitzer = P.besitz[p] >= 0, pa = P.partner[p];
   const erwerb = alter >= R.ERWACHSEN && alter < R.RENTE;
+  const ZF = R.ZUFALL;
 
-  let best = R.SCHWELLE, bestA = 0;
-  const erwaege = (a, v) => { v += (zufall(S) * 2 - 1) * R.ZUFALL; if (v > best) { best = v; bestA = a; } };
+  // Wert = Dringlichkeit × Gewicht aus Charakter + Zielbonus + Gedächtnis + Zufall ±5.
+  // Höchster Wert gewinnt; liegt keiner über der Schwelle, bleibt alles wie es ist.
+  let best = R.SCHWELLE, bestA = 0, v;
 
-  // wohnung_suchen: keine Wohnung oder Wohnen unter 40; Miete muss bezahlbar sein
-  if ((P.wohnung[p] < 0 || P.bWohnen[p] < 40) && !(P.sucht[p] && S.freieWohnungen === 0)
+  // wohnung_suchen: keine Wohnung oder Wohnen unter 40; die Miete muss bezahlbar sein
+  if ((P.wohnung[p] < 0 || P.bWohnen[p] < 40) && !(P.sucht[p] && S.freieWohnungen <= 0)
       && (arb >= 0 || P.geld[p] >= 10 * R.MIETE[1] || alter >= R.RENTE)) {
-    erwaege(A.WOHNUNG, uWohnen * (P.wohnung[p] < 0 ? 1.3 : 0.4 + 0.8 * (1 - H)) + (zg === Z.WOHNUNG ? 25 : 0));
+    v = uWohnen * (P.wohnung[p] < 0 ? 1.3 : 0.4 + 0.8 * (1 - H)) + (zg === Z.WOHNUNG ? 25 : 0);
+    v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.WOHNUNG; }
   }
-  // job_suchen
+  // job_suchen: 18–67, ohne Job
   if (erwerb && arb < 0 && !istBesitzer && S.freieStellen > 0) {
-    erwaege(A.JOB, uGeld * (0.5 + 0.9 * F) + 15 + (zg === Z.JOB ? 20 : 0));
+    v = uGeld * (0.5 + 0.9 * F) + 15 + (zg === Z.JOB ? 20 : 0);
+    v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.JOB; }
   }
-  // job_wechseln
-  if (arb >= 0 && !istBesitzer && S.besterFreierLohn > g.lohn[arb] + 3) {
-    erwaege(A.WECHSEL, 45 * E + 0.3 * uGeld + (zg === Z.JOB ? 30 : 0) - 5);
+  // job_wechseln: eine besser bezahlte Stelle ist frei
+  if (arb >= 0 && !istBesitzer && besterFreierLohn(S) > g.lohn[arb] + 3) {
+    v = 45 * E + 0.3 * uGeld + (zg === Z.JOB ? 30 : 0) - 5;
+    v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.WECHSEL; }
   }
-  // kuendigen
+  // kuendigen: Geld für 20 Tage
   if (arb >= 0 && !istBesitzer && P.geld[p] >= 20 * tageskosten(S, p)) {
-    erwaege(A.KUENDIGEN, (1 - F) * (100 - P.zuf[p]) * 0.8 + (zg === Z.RUHE ? 15 : 0) - 15);
+    v = (1 - F) * (100 - P.zuf[p]) * 0.8 + (zg === Z.RUHE ? 15 : 0) - 15;
+    v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.KUENDIGEN; }
   }
   // freinehmen (nur morgens)
   if (arb >= 0 && h <= 7 && !P.frei[p]) {
-    erwaege(A.FREI, uFrei * (1.3 - F) + (zg === Z.RUHE ? 15 : 0) - 10);
+    v = uFrei * (1.3 - F) + (zg === Z.RUHE ? 15 : 0) - 10;
+    v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.FREI; }
   }
   // freunde_treffen (abends)
   if (h >= 17) {
-    erwaege(A.FREUNDE, uKontakt * (0.3 + 1.0 * Gs) + (zg === Z.FREUNDE ? 25 : 0));
+    v = uKontakt * (0.3 + 1.0 * Gs) + (zg === Z.FREUNDE ? 25 : 0);
+    v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.FREUNDE; }
   }
   // partner_suchen — Gedächtnis: getrennt in den letzten 30 Tagen → keine Partnersuche
   if (pa < 0 && alter < 70 && !erinnertSeit(S, p, M.GETRENNT, 30)) {
-    erwaege(A.PARTNER, 30 * Gs + 0.25 * uKontakt + (zg === Z.FAMILIE ? 30 : 0) - (alter > 50 ? 10 : 0));
+    v = 30 * Gs + 0.25 * uKontakt + (zg === Z.FAMILIE ? 30 : 0) - (alter > 50 ? 10 : 0);
+    v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.PARTNER; }
   }
   if (pa >= 0) {
     const zusammen = P.hh[p] >= 0 && P.hh[p] === P.hh[pa];
     // zusammenziehen
-    if (!zusammen) erwaege(A.ZUSAMMEN, 35 + 10 * Gs + (zg === Z.FAMILIE ? 30 : 0) + (zg === Z.WOHNUNG ? 10 : 0));
+    if (!zusammen) {
+      v = 35 + 10 * Gs + (zg === Z.FAMILIE ? 30 : 0) + (zg === Z.WOHNUNG ? 10 : 0);
+      v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.ZUSAMMEN; }
+    }
     // trennen: selten, per Zufall, nur wenn beide 14 Tage unzufrieden
-    if (P.unzuf[p] >= R.UNZUF_TAGE && P.unzuf[pa] >= R.UNZUF_TAGE && zufall(S) < 0.1) erwaege(A.TRENNEN, 60);
+    if (P.unzuf[p] >= R.UNZUF_TAGE && P.unzuf[pa] >= R.UNZUF_TAGE && zufall(S) < 0.03) {
+      v = 60 + (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.TRENNEN; }
+    }
     // kind_bekommen — Gedächtnis: Kind in den letzten 30 Tagen → erst mal nicht
     if (zusammen && P.wohnung[p] >= 0 && P.zuf[p] > 60 && alter < 45 && (tag - P.geb[pa]) / R.JAHR < 45) {
-      erwaege(A.KIND, (zg === Z.FAMILIE ? 45 : 0) + 15 * Gs + 10 - 18 * P.kinder[p]
-        - (erinnertSeit(S, p, M.KIND, 30) ? 60 : 0));
+      v = (zg === Z.FAMILIE ? 45 : 0) + 15 * Gs + 10 - 22 * P.kinder[p] - 0.4 * uWohnen - (erinnertSeit(S, p, M.KIND, 30) ? 60 : 0);
+      v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.KIND; }
     }
   }
-  // laden_gruenden — Gedächtnis: Pleite → 180 Tage Sperre
+  // laden_gruenden — Ehrgeiz treibt, Sparsamkeit bremst; Gedächtnis: Pleite → 180 Tage Sperre
   if (!istBesitzer && alter < 60 && P.geld[p] >= R.GRUEND_SCHWELLE && P.sperreBis[p] <= tag
       && !erinnertSeit(S, p, M.PLEITE, R.PLEITE_SPERRE) && (S.bauplaetze > 0 || S.leerstand > 0)) {
     const w = P.wohnung[p];
-    const aussicht = (w >= 0 && g.laden[w] < 0) || S.exportPreis >= R.LOHN_WERKSTATT + 8 || S.kundenProLaden > 25;
-    erwaege(A.GRUENDEN, 60 * E + 25 * (1 - Sp) + (zg === Z.LADEN ? 35 : 0) - 30 - (aussicht ? 0 : 40 * Sp));
+    const aussicht = ladenFehlt(S, w) || werkstattLohnt(S);
+    v = 90 * (E - 0.5) + 20 * (1 - Sp) + (zg === Z.LADEN ? 30 : 0) - (aussicht ? 0 : 25 + 40 * Sp);
+    v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.GRUENDEN; }
   }
-  // wegziehen — Gedächtnis: jemand Nahes gestorben → Heimatliebe zählt stärker
+  // wegziehen — Heimatliebe hält; Gedächtnis: jemand Nahes gestorben → Heimatliebe zählt stärker
   if (P.elend[p] >= R.ELEND_TAGE) {
-    const hm = P.trauer[p] ? 1.5 : 1;
-    erwaege(A.WEGZIEHEN, 100 * (1 - Math.min(1, H * hm)) + 5);
+    v = 150 * (0.5 - H * (P.trauer[p] ? 1.5 : 1)) + R.SCHWELLE;
+    v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.WEGZIEHEN; }
   }
 
   if (!bestA) return 0;
@@ -844,7 +909,7 @@ function aktWohnung(S, p) {
   const x = ref >= 0 ? g.x[ref] : MITTE, y = ref >= 0 ? g.y[ref] : MITTE;
   const groesse = kopf >= 0 ? S.hhGroesse[kopf] : 1;
   const b = freieWohnungNahe(S, x, y, kopf >= 0 ? P.wohnung[p] : -1, groesse);
-  if (b < 0) { P.sucht[p] = 1; return false; }
+  if (b < 0) { P.sucht[p] = 1; if (kopf < 0) S.freieWohnungen = 0; return false; }
   if (kopf >= 0) haushaltUmziehen(S, kopf, b); else eigenerHaushalt(S, p, b);
   P.sucht[p] = 0;
   erinnere(S, p, M.EINGEZOGEN, b);
@@ -854,12 +919,12 @@ function aktJob(S, p, mindestLohn) {
   const P = S.p, g = S.g;
   const ref = P.wohnung[p];
   const x = ref >= 0 ? g.x[ref] : MITTE, y = ref >= 0 ? g.y[ref] : MITTE;
-  const b = suche(S.vGeb, x, y, q => {
+  const b = suche(S.vBetrieb, x, y, q => {
     if (!istBetrieb(g.typ[q]) || !offen(S, q) || q === P.arbeit[p]) return -1;
     if (S.belegschaft[q].length >= stellen(S, q) || g.lohn[q] <= mindestLohn) return -1;
     return Math.abs(g.x[q] - x) + Math.abs(g.y[q] - y);
   });
-  if (b < 0) return false;
+  if (b < 0) { stellenNichtDa(S, mindestLohn); return false; }
   austreten(S, p);
   anstellen(S, p, b);
   erinnere(S, p, M.JOB, b);
@@ -967,15 +1032,45 @@ function aktKind(S, p) {
   buch(S, `${name(S, p)} und ${name(S, q)} bekommen ${P.weib[k] ? 'eine Tochter' : 'einen Sohn'}: ${vorname(S, k)}.`);
   return true;
 }
+// Was ein Gründer über den Markt weiß: Fehlt in seiner Straße ein Laden? Lohnt eine Werkstatt noch,
+// wenn man die schon geplanten Werkstattstellen mitzählt?
+function ladenFehlt(S, w) { return w >= 0 && (S.g.laden[w] < 0 || S.g.mangel[w] >= R.MANGEL_GRUENDUNG); }
+function werkstattLohnt(S) {
+  return R.UMLAND / (S.werkstattPlaetze + R.STELLEN_WERKSTATT) >= R.LOHN_WERKSTATT + 8;
+}
+// Mangel je Wohnhaus = alle, die in Ladenreichweite gestern leer ausgingen (Signal für Ladengründer)
+function mangelRechnen(S) {
+  const g = S.g, rv = Math.ceil(R.REICH_LADEN / VK);
+  for (let b = 0; b < S.gAnzahl; b++) if (g.typ[b] === WOHNHAUS) g.mangel[b] = 0;
+  for (let b = 0; b < S.gAnzahl; b++) {
+    if (g.typ[b] !== WOHNHAUS || !g.knapp[b]) continue;
+    const x = g.x[b], y = g.y[b], vx = (x / VK) | 0, vy = (y / VK) | 0;
+    for (let yy = Math.max(0, vy - rv); yy <= Math.min(VN - 1, vy + rv); yy++) {
+      for (let xx = Math.max(0, vx - rv); xx <= Math.min(VN - 1, vx + rv); xx++) {
+        for (const h of S.vHaus[yy * VN + xx]) {
+          if (Math.abs(g.x[h] - x) + Math.abs(g.y[h] - y) <= R.REICH_LADEN) g.mangel[h] = Math.min(65535, g.mangel[h] + g.knapp[b]);
+        }
+      }
+    }
+  }
+}
+function knappLoeschen(S, b) {   // ein neuer Laden versorgt die Häuser in Reichweite
+  const g = S.g, x = g.x[b], y = g.y[b], rv = Math.ceil(R.REICH_LADEN / VK), vx = (x / VK) | 0, vy = (y / VK) | 0;
+  for (let yy = Math.max(0, vy - rv); yy <= Math.min(VN - 1, vy + rv); yy++) {
+    for (let xx = Math.max(0, vx - rv); xx <= Math.min(VN - 1, vx + rv); xx++) {
+      for (const h of S.vHaus[yy * VN + xx]) if (Math.abs(g.x[h] - x) + Math.abs(g.y[h] - y) <= R.REICH_LADEN) { g.knapp[h] = 0; g.mangel[h] = 0; }
+    }
+  }
+}
 function aktGruenden(S, p) {
   const P = S.p, g = S.g;
   const w = P.wohnung[p];
   const x = w >= 0 ? g.x[w] : MITTE, y = w >= 0 ? g.y[w] : MITTE;
   // Was? Ohne Laden in der Nähe: Laden. Sonst Werkstatt, wenn das Umland gut zahlt, sonst Laden.
-  const typ = (w >= 0 && g.laden[w] < 0) ? LADEN : S.exportPreis >= R.LOHN_WERKSTATT + 8 ? WERKSTATT : LADEN;
+  const typ = ladenFehlt(S, w) ? LADEN : werkstattLohnt(S) ? WERKSTATT : LADEN;
   const bau = typ === LADEN ? R.K_LADEN : R.K_WERKSTATT;
   // Wo? Leerstehenden Betrieb in der Nähe übernehmen, sonst auf freiem Bauplatz bauen.
-  const leer = S.leerstand > 0 ? suche(S.vGeb, x, y, b => {
+  const leer = S.leerstand > 0 ? suche(S.vBetrieb, x, y, b => {
     if (g.typ[b] !== typ || !g.leer[b] || S.feld[gebZelle(S, b)] !== typ) return -1;
     const d = Math.abs(g.x[b] - x) + Math.abs(g.y[b] - y);
     return d <= 20 ? d : -1;
@@ -996,6 +1091,7 @@ function aktGruenden(S, p) {
   P.geld[p] -= kosten;
   g.kasse[b] = R.KASSE_START;
   P.besitz[p] = b;
+  if (typ === LADEN) knappLoeschen(S, b); else S.werkstattPlaetze += stellen(S, b);
   if (leer >= 0) eroeffnen(S, b);
   erinnere(S, p, M.GEGRUENDET, b);
   const gespart = S.tag - P.sparSeit[p];
@@ -1042,6 +1138,7 @@ function stunde(S) {
   const abends = h >= 18 && h <= 22;
   const entscheidStunde = h === 7 || h === 18;
   const zufSchritt = R.ZUF_MAX_TAG / 24;
+  const neuZiel = h % 3 === 0;
   let P = S.p;
   const n = S.pMax;
   for (let p = 0; p < n; p++) {
@@ -1063,8 +1160,9 @@ function stunde(S) {
     }
     P.bKontakt[p] = klemme(k, 0, 100);
     P.bFreizeit[p] = klemme(f, 0, 100);
-    // Zufriedenheit gleitet zum Zielwert, höchstens 5 pro Tag
-    const z = zufZiel(S, p), a = P.zuf[p];
+    // Zufriedenheit gleitet zum Zielwert, höchstens 5 pro Tag. Den Zielwert alle 3 Stunden neu rechnen.
+    if (neuZiel) P.zufZiel[p] = zufZiel(S, p);
+    const z = P.zufZiel[p], a = P.zuf[p];
     P.zuf[p] = a + klemme(z - a, -zufSchritt, zufSchritt);
     if (entscheidStunde || P.jetzt[p]) {
       P.jetzt[p] = 0;
@@ -1076,7 +1174,7 @@ function stunde(S) {
   if (S.stunde === 24) { tagesabschluss(S); S.stunde = 0; }
 }
 
-// Zielwert der Zufriedenheit: gewichtete quadratische Mitte der Dringlichkeiten.
+// Zielwert der Zufriedenheit: gewichtetes Mittel 4. Grades der Dringlichkeiten.
 // Das schlimmste Bedürfnis zählt überproportional. Gewichte aus dem Charakter:
 // gesellig → Kontakt zählt mehr; fleißig → Geld/Arbeit zählt mehr, Freizeit weniger.
 function zufZiel(S, p) {
@@ -1084,7 +1182,8 @@ function zufZiel(S, p) {
   const F = P.fleiss[p] / 100, Gs = P.gesellig[p] / 100;
   const uG = 100 - P.bGeld[p], uW = 100 - P.bWohnen[p], uK = 100 - P.bKontakt[p], uF = 100 - P.bFreizeit[p];
   const wG = 1 + 0.8 * F, wW = 1, wK = 0.4 + 1.2 * Gs, wF = 1.3 - 0.7 * F;
-  const d = Math.sqrt((wG * uG * uG + wW * uW * uW + wK * uK * uK + wF * uF * uF) / (wG + wW + wK + wF));
+  const g2 = uG * uG, w2 = uW * uW, k2 = uK * uK, f2 = uF * uF;
+  const d = Math.sqrt(Math.sqrt((wG * g2 * g2 + wW * w2 * w2 + wK * k2 * k2 + wF * f2 * f2) / (wG + wW + wK + wF)));
   let z = 100 - d;
   if (P.ohneLaden[p]) z -= 10;
   if (P.trauer[p]) z -= 15;                                  // jemand Nahes gestorben
@@ -1120,24 +1219,51 @@ function haushalteZaehlen(S) {
 function wirtschaft(S) {
   const P = S.p, g = S.g, n = S.pMax;
   const erw = S.tag - R.ERWACHSEN * R.JAHR, rente = S.tag - R.RENTE * R.JAHR;
+  // Wie viele Leute kann jeder Laden heute bedienen? Hängt an seiner Größe (Stellen plus Besitzer).
+  for (let b = 0; b < S.gAnzahl; b++) {
+    if (g.typ[b] === WOHNHAUS) g.knapp[b] = 0;
+    if (g.typ[b] !== LADEN) continue;
+    g.bedient[b] = 0;
+    g.kapaz[b] = offen(S, b) ? Math.floor(R.KUNDEN_PRO_KRAFT * (stellen(S, b) + 1)) : 0;
+  }
+  let unbedient = 0, einkaeufer = 0;
   for (let p = 0; p < n; p++) {
-    if (!P.lebt[p]) continue;
-    const w = P.wohnung[p], laden = w >= 0 ? g.laden[w] : -1;
-    if (P.geb[p] > erw) {                                    // Kind: der Haushalt kauft mit ein
-      const k = P.hh[p];
-      if (laden >= 0 && k >= 0) { P.geld[k] -= R.EINKAUF_KIND; g.umsatz[laden] += R.EINKAUF_KIND; }
-      continue;
+    if (!P.lebt[p] || P.geb[p] > erw) continue;             // Kinder kaufen über den Haushalt ein
+    const w = P.wohnung[p];
+    // Einkauf: im Stammladen, solange er offen, in Reichweite und nicht voll ist.
+    // Sonst beim nächsten Laden in Reichweite, der noch Platz hat — der wird der neue Stammladen.
+    let laden = -1;
+    if (w >= 0 && g.laden[w] >= 0) {
+      const st = P.stammladen[p];
+      if (st >= 0 && g.kapaz[st] > 0 && g.bedient[st] < g.kapaz[st]
+          && Math.abs(g.x[st] - g.x[w]) + Math.abs(g.y[st] - g.y[w]) <= R.REICH_LADEN) laden = st;
+      else {
+        const L = S.ladenWahl[w];
+        for (let i = 0; i < L.length; i++) if (g.bedient[L[i]] < g.kapaz[L[i]]) { laden = L[i]; break; }
+      }
     }
-    let betrag = einkauf(S, p);
-    if (P.geld[p] <= 0) betrag >>= 1;
-    if (laden >= 0) { P.geld[p] -= betrag; g.umsatz[laden] += betrag; P.ohneLaden[p] = 0; }
-    else P.ohneLaden[p] = 1;
+    P.stammladen[p] = laden;
+    einkaeufer++;
+    if (laden >= 0) {
+      let betrag = einkauf(S, p);
+      if (P.geld[p] <= 0) betrag >>= 1;
+      else betrag += Math.min(R.EINKAUF_EXTRA_MAX, Math.round(P.geld[p] * R.EINKAUF_VERMOEGEN * (1 - P.spar[p] / 100)));
+      if (P.hh[p] === p) betrag += S.hhKinder[p] * R.EINKAUF_KIND;
+      P.geld[p] -= betrag; g.umsatz[laden] += betrag; g.bedient[laden]++;
+      P.ohneLaden[p] = 0;
+    } else {
+      P.ohneLaden[p] = 1;                                    // kein Laden in Reichweite oder alle voll
+      unbedient++;
+      if (w >= 0 && g.knapp[w] < 255) g.knapp[w]++;
+    }
     if (P.hh[p] === p && w >= 0) { const m = R.MIETE[g.stufe[w]]; P.geld[p] -= m; S.budget += m; }
     if (P.geb[p] <= rente && P.arbeit[p] < 0) {
       const r = Math.min(R.RENTE_BETRAG, S.budget);
       if (r > 0) { S.budget -= r; P.geld[p] += r; }
     }
   }
+  S.unversorgtQuote = einkaeufer ? unbedient / einkaeufer : 0;
+  mangelRechnen(S);
   // Umland-Preis: je mehr in Werkstätten gearbeitet wird, desto weniger bringt ein Arbeitstag
   let exportArbeiter = 0;
   for (let b = 0; b < S.gAnzahl; b++) {
@@ -1178,6 +1304,8 @@ function pleite(S, b) {
   const wort = betriebWort(S, b);
   const n = schliessen(S, b, true);
   S.stat.pleiten++;
+  if (S.g.typ[b] === LADEN) S.stat.pleitenLaden++;
+  S.stat.pleiteAlter += S.tag - S.g.seit[b];
   buch(S, `${wort === 'Laden' ? 'Der Laden' : 'Die Werkstatt'} von ${name(S, o)} ${gebOrt(S, b)} ist pleite.`
     + (n ? ` ${n} ${n === 1 ? 'Person verliert' : 'Leute verlieren'} die Arbeit.` : ''));
 }
@@ -1223,22 +1351,23 @@ function menschenTag(S) {
 
 function kennzahlenRechnen(S) {
   const P = S.p, g = S.g, erw = S.tag - R.ERWACHSEN * R.JAHR, rente = S.tag - R.RENTE * R.JAHR;
-  let fw = 0, fs = 0, bl = 0, leer = 0, laeden = 0;
-  S.vParks.fill(0);
+  let fw = 0, fs = 0, leer = 0, laeden = 0, wp = 0;
+  S.vParks.fill(0); S.freiLohn.fill(0);
   for (let b = 0; b < S.gAnzahl; b++) {
     const t = g.typ[b], f = S.feld[gebZelle(S, b)];
     if (t === WOHNHAUS && f === WOHNHAUS) fw += R.WOHNUNGEN[g.stufe[b]] - g.belegt[b];
     else if (istBetrieb(t)) {
+      if (t === WERKSTATT && !g.leer[b]) wp += stellen(S, b);
       if (g.leer[b] && f === t) leer++;
       else if (offen(S, b)) {
         const frei = stellen(S, b) - S.belegschaft[b].length;
-        if (frei > 0) { fs += frei; if (g.lohn[b] > bl) bl = g.lohn[b]; }
+        if (frei > 0) { fs += frei; S.freiLohn[g.lohn[b]] += frei; }
         if (t === LADEN) laeden++;
       }
     } else if (t === PARK) S.vParks[viertel(g.x[b], g.y[b])]++;
   }
-  S.freieWohnungen = fw; S.freieStellen = fs; S.besterFreierLohn = bl; S.leerstand = leer;
-  let zs = 0, zn = 0, erwerb = 0, los = 0, suchende = 0, mitLaden = 0;
+  S.freieWohnungen = fw; S.freieStellen = fs; S.leerstand = leer; S.werkstattPlaetze = wp;
+  let zs = 0, zn = 0, erwerb = 0, los = 0, suchende = 0;
   S.vZufSumme.fill(0); S.vZufN.fill(0);
   for (let p = 0; p < S.pMax; p++) {
     if (!P.lebt[p] || P.geb[p] > erw) continue;
@@ -1249,7 +1378,6 @@ function kennzahlenRechnen(S) {
     if (w >= 0) {
       const v = viertel(g.x[w], g.y[w]);
       S.vZufSumme[v] += P.zuf[p]; S.vZufN[v]++;
-      if (g.laden[w] >= 0) mitLaden++;
     }
   }
   S.zufMittel = zn ? zs / zn : 0;
@@ -1257,14 +1385,14 @@ function kennzahlenRechnen(S) {
   S.arbeitslose = los;
   S.arbeitslosenquote = erwerb ? los / erwerb : 0;
   S.wohnungSuchende = suchende;
-  S.kundenProLaden = laeden ? mitLaden / laeden : 99;
 }
 
 // Zuzug: Attraktivität = freie Wohnungen × freie Stellen × mittlere Zufriedenheit, normiert.
 function zuzug(S) {
-  const fw = S.freieWohnungen, fs = S.freieStellen;
+  // Normierung: Als frei zählen nur Stellen, die nicht schon Arbeitslose der Stadt besetzen könnten.
+  const fw = S.freieWohnungen, fs = Math.max(0, S.freieStellen - S.arbeitslose);
   const zf = klemme((S.zufMittel - 25) / 50, 0, 1);
-  const basis = 1.5 + S.einwohner * 0.03;
+  const basis = 2 + S.einwohner * 0.02;
   const attraktiv = (fw / (fw + 3)) * (fs / (fs + 3)) * zf;
   let n = Math.min(fw, Math.floor(attraktiv * basis + zufall(S)));
   // Wer kommen würde, aber keine Wohnung findet, zählt beim Bauamt als wohnungssuchend
@@ -1277,14 +1405,13 @@ function zuzug(S) {
     const P = S.p;
     zufallsName(S, p); zufallsCharakter(S, p);
     P.geb[p] = S.tag - (18 + zInt(S, 28)) * R.JAHR - zInt(S, R.JAHR);
-    P.geld[p] = 200 + zInt(S, 1001);
+    P.geld[p] = 300 + zInt(S, 1201);
     bedarfStart(S, p);
     eigenerHaushalt(S, p, b);
     P.einzug[p] = S.tag; P.sparSeit[p] = S.tag;
     erinnere(S, p, M.EINGEZOGEN, b);
     zielWaehlen(S, p);
     P.jetzt[p] = 1;
-    S.freieWohnungen--;
     S.stat.zuzuege++; erwachsenZaehlen(S, p);
     neu.push(p);
   }
@@ -1295,7 +1422,7 @@ function zuzug(S) {
 // ─── Das Bauamt ──────────────────────────────────────────────────────────────────────
 function vollesHaus(S) {
   const g = S.g;
-  return suche(S.vGeb, MITTE, MITTE, b => {
+  return suche(S.vHaus, MITTE, MITTE, b => {
     if (g.typ[b] !== WOHNHAUS || S.feld[gebZelle(S, b)] !== WOHNHAUS || g.auf[b] || g.stufe[b] >= 3) return -1;
     if (g.belegt[b] < R.WOHNUNGEN[g.stufe[b]]) return -1;
     return Math.abs(g.x[b] - MITTE) + Math.abs(g.y[b] - MITTE);
@@ -1382,17 +1509,17 @@ function neueStadt(seed) {
     tag: 0, stunde: 6, budget: R.START_BUDGET,
     feld: new Uint8Array(FELDER), feldGeb: new Int32Array(FELDER).fill(-1),
     feldStr: new Int16Array(FELDER).fill(-1), platz: new Uint8Array(FELDER),
-    vGeb: [], vPlatz: [], bauplaetze: 0, enden: [], kreuzungen: [], strNaechste: 0,
-    g: {}, gAnzahl: 0, bewohner: [], belegschaft: [], baustellen: [],
+    vHaus: [], vBetrieb: [], vPark: [], vPlatz: [], bauplaetze: 0, enden: [], kreuzungen: [], strNaechste: 0,
+    g: {}, gAnzahl: 0, bewohner: [], belegschaft: [], baustellen: [], ladenWahl: [],
     p: {}, pKap: 0, pMax: 0, frei: [], einwohner: 0, hhGroesse: null, hhKinder: null,
-    freieWohnungen: 0, wohnungenImBau: 0, freieStellen: 0, besterFreierLohn: 0, leerstand: 0,
+    freieWohnungen: 0, wohnungenImBau: 0, freieStellen: 0, freiLohn: new Int32Array(128), leerstand: 0,
     exportPreis: R.EXPORT_MAX, zufMittel: 60, erwachseneJetzt: 0, arbeitslose: 0, arbeitslosenquote: 0,
-    wohnungSuchende: 0, anfragen: 0, kundenProLaden: 99, letzteGruendung: 0, letzteNotbremse: -999,
+    wohnungSuchende: 0, anfragen: 0, unversorgtQuote: 0, werkstattPlaetze: 0, letzteGruendung: 0, letzteNotbremse: -999,
     vZufSumme: new Float64Array(VN * VN), vZufN: new Uint32Array(VN * VN), vParks: new Uint16Array(VN * VN),
     ladenDirty: true, parkDirty: true,
     buch: [], reihe: [],
     stat: {
-      gruendungen: 0, uebernahmen: 0, pleiten: 0, geburten: 0, tode: 0, zuzuege: 0,
+      gruendungen: 0, uebernahmen: 0, pleiten: 0, pleitenLaden: 0, pleiteAlter: 0, geburten: 0, tode: 0, zuzuege: 0,
       wegzuege: 0, wegzuegePersonen: 0, hochzeiten: 0, trennungen: 0, paare: 0, freundschaften: 0,
       zieleErreicht: 0, zieleAufgegeben: 0, strassenFelder: 0,
       gruenderEhrgeiz: 0, wegzugHeimat: 0, erwachsene: 0, erwEhrgeiz: 0, erwHeimat: 0,
@@ -1400,7 +1527,7 @@ function neueStadt(seed) {
       gewaehlt: new Array(13).fill(0), ausgefuehrt: new Array(13).fill(0),
     },
   };
-  for (let v = 0; v < VN * VN; v++) { S.vGeb.push([]); S.vPlatz.push([]); }
+  for (let v = 0; v < VN * VN; v++) { S.vHaus.push([]); S.vBetrieb.push([]); S.vPark.push([]); S.vPlatz.push([]); }
   for (const [n, T] of GF) S.g[n] = new T(FELDER);
   kapazitaet(S, 256);
   // Eine Straße, zwei Wohnhäuser, eine Werkstatt der Stadt, ein Laden, zehn Erwachsene
@@ -1450,7 +1577,7 @@ function kennzahlen(S) {
     leerstand: leer, stadtBetriebe,
     freieWohnungen: S.freieWohnungen, freieStellen: S.freieStellen, arbeitslose: S.arbeitslose,
     arbeitslosenquote: S.arbeitslosenquote, zufriedenheit: S.zufMittel, budget: S.budget,
-    exportPreis: S.exportPreis, gruendungen: S.stat.gruendungen, pleiten: S.stat.pleiten,
+    exportPreis: S.exportPreis, unversorgt: S.unversorgtQuote, gruendungen: S.stat.gruendungen, pleiten: S.stat.pleiten,
   };
 }
 
