@@ -372,6 +372,9 @@ const PF = [
   ['elend', Uint8Array, 1], ['unzuf', Uint8Array, 1],       // Tage in Folge unter 20 bzw. unter 40
   ['trauer', Uint8Array, 1], ['ohneLaden', Uint8Array, 1],
   ['stammladen', Int32Array, 1],                            // hier kauft die Person ein, solange er offen, nah und nicht voll ist
+  ['besuch', Int32Array, 1],                                // heute Abend zu Besuch in diesem Gebäude (-1 = nein), für die Figuren
+  ['memName', Uint32Array, 8],                              // Name der Bezugsperson, falls die Person später nicht mehr lebt
+  ['elternNameA', Uint32Array, 1], ['elternNameB', Uint32Array, 1],
   ['sperreBis', Int32Array, 1],                             // keine Gründung bis zu diesem Tag (nach Pleite)
   // Wann zuletzt erlebt (Spieltag). Wird beim Erinnern gesetzt, damit die 30-Tage-Wirkungen nicht verfallen,
   // nur weil der 8er-Ringpuffer inzwischen von neueren Ereignissen überschrieben wurde.
@@ -412,6 +415,9 @@ function alterTage(S, p) { return S.tag - S.p.geb[p]; }
 function erwachsen(S, p) { return S.tag - S.p.geb[p] >= R.ERWACHSEN * R.JAHR; }
 function gebZelle(S, b) { return S.g.y[b] * KARTE + S.g.x[b]; }
 
+// Name als eine Zahl (Geschlecht, Nachname, Vorname), damit er nach Tod oder Wegzug noch lesbar ist
+function namePack(S, p) { const P = S.p; return (P.weib[p] << 16) | (P.nach[p] << 8) | P.vor[p]; }
+function nameAusPack(v) { return ((v >> 16) & 1 ? VORNAMEN_W : VORNAMEN_M)[v & 255] + ' ' + NACHNAMEN[(v >> 8) & 255]; }
 function vorname(S, p) { const P = S.p; return (P.weib[p] ? VORNAMEN_W : VORNAMEN_M)[P.vor[p]]; }
 function name(S, p) { return vorname(S, p) + ' ' + NACHNAMEN[S.p.nach[p]]; }
 function strName(i) {
@@ -498,7 +504,7 @@ function neuePerson(S) {
   }
   P.gen[id] = (P.gen[id] + 1) & 0xffff;
   P.wohnung[id] = P.hh[id] = P.arbeit[id] = P.besitz[id] = P.partner[id] = P.elternA[id] = P.elternB[id] = -1;
-  P.stammladen[id] = -1;
+  P.stammladen[id] = -1; P.besuch[id] = -1;
   P.jobWegTag[id] = P.getrenntTag[id] = P.kindTag[id] = P.trauerTag[id] = -9999;
   S.hhGroesse[id] = 0; S.hhKinder[id] = 0;
   for (let j = 0; j < 5; j++) P.freunde[id * 5 + j] = -1;
@@ -534,6 +540,7 @@ function erinnere(S, p, code, ref) {
   const P = S.p, k = P.memPos[p], i = p * R.MEM + k;
   P.memCode[i] = code; P.memTag[i] = S.tag; P.memRef[i] = ref;
   P.memGen[i] = M_BEZUG[code] === 'p' && ref >= 0 ? P.gen[ref] : 0;
+  P.memName[i] = M_BEZUG[code] === 'p' && ref >= 0 ? namePack(S, ref) : 0;
   P.memPos[p] = (k + 1) % R.MEM;
   if (code === M.JOB_WEG) P.jobWegTag[p] = S.tag;
   else if (code === M.GETRENNT) P.getrenntTag[p] = S.tag;
@@ -1193,6 +1200,7 @@ function aktFreunde(S, p) {
   for (let j = 0; j < 5; j++) if (P.freunde[p * 5 + j] >= 0) fs.push(P.freunde[p * 5 + j]);
   if (fs.length) {
     const f = fs[zInt(S, fs.length)];
+    P.besuch[p] = P.wohnung[f];                              // man trifft sich beim Freund zu Hause
     P.bKontakt[p] = Math.min(100, P.bKontakt[p] + 30);
     P.bKontakt[f] = Math.min(100, P.bKontakt[f] + 15);
     // Der Freund bringt manchmal jemanden mit
@@ -1270,6 +1278,18 @@ function aktTrennen(S, p) {
   buch(S, 'trennung', `${nr(S, p)} und ${nr(S, q)} trennen sich. Beide waren seit über ${R.UNZUF_TAGE} Tagen unzufrieden.`);
   return true;
 }
+// Lebende Großeltern eines neuen Kindes (die Eltern von p und q), für das Stadtbuch
+function grosseltern(S, p, q) {
+  const P = S.p, g = [];
+  for (const e of [p, q]) {
+    for (const [a, ag] of [[P.elternA[e], P.elternAGen[e]], [P.elternB[e], P.elternBGen[e]]]) {
+      if (a >= 0 && P.lebt[a] && P.gen[a] === ag && !g.includes(a)) g.push(a);
+    }
+  }
+  if (!g.length) return '';
+  return g.length === 1 ? ` ${P.weib[g[0]] ? 'Oma' : 'Opa'} ${nr(S, g[0])} freut sich.`
+    : ` Die Großeltern ${g.slice(0, -1).map(x => nr(S, x)).join(', ')} und ${nr(S, g[g.length - 1])} freuen sich.`;
+}
 function aktKind(S, p) {
   const q = S.p.partner[p];
   if (q < 0) return false;
@@ -1283,6 +1303,7 @@ function aktKind(S, p) {
     P[t][k] = klemme(Math.round((P[t][p] + P[t][q]) / 2 + zufall(S) * 30 - 15), 0, 100);
   }
   P.elternA[k] = p; P.elternAGen[k] = P.gen[p]; P.elternB[k] = q; P.elternBGen[k] = P.gen[q];
+  P.elternNameA[k] = namePack(S, p); P.elternNameB[k] = namePack(S, q);
   wohnortSetzen(S, k, P.wohnung[p]); P.hh[k] = P.hh[p];
   P.einzug[k] = S.tag;
   P.kinder[p]++; P.kinder[q]++;
@@ -1291,7 +1312,8 @@ function aktKind(S, p) {
   const nummer = Math.max(P.kinder[p], P.kinder[q]);
   buch(S, 'geburt', `${nr(S, p)} und ${nr(S, q)} bekommen ${P.weib[k] ? 'eine Tochter' : 'einen Sohn'}: ${vorname(S, k)}. `
     + (nummer === 1 ? 'Ihr erstes Kind' : `Kind Nummer ${nummer}`)
-    + (P.ziel[p] === Z.FAMILIE || P.ziel[q] === Z.FAMILIE ? ', sie wollten eine Familie.' : '.'));
+    + (P.ziel[p] === Z.FAMILIE || P.ziel[q] === Z.FAMILIE ? ', sie wollten eine Familie.' : '.')
+    + grosseltern(S, p, q));
   return true;
 }
 // Was ein Gründer über den Markt weiß: Fehlt in seiner Straße ein Laden? Lohnt eine Werkstatt noch,
@@ -1603,7 +1625,7 @@ function menschenTag(S) {
   for (let p = 0; p < S.pMax; p++) {
     const P = S.p;
     if (!P.lebt[p]) continue;
-    P.frei[p] = 0;
+    P.frei[p] = 0; P.besuch[p] = -1;
     const at = tag - P.geb[p];
     if (at >= R.ALT * J) {                                   // ab 80 steigt die Sterbewahrscheinlichkeit
       const jahre = at / J;
@@ -1956,6 +1978,116 @@ function importZustand(d) {
   return S;
 }
 
+// ─── Für die Personenkarte und die Hauskarte (liest nur) ──────────────────────────────
+const ZIELTEXT = ['', 'eigene Wohnung', 'besserer Job', 'Familie', 'eigener Laden', 'Freunde', 'Ruhe'];
+function ref(S, p) { return p >= 0 && S.p.lebt[p] ? { id: p, gen: S.p.gen[p], name: name(S, p), lebt: true } : null; }
+function betriebText(S, b) {
+  const g = S.g, o = g.besitzer[b], wort = g.typ[b] === LADEN ? 'Laden' : 'Werkstatt';
+  if (o < 0) return `${wort === 'Laden' ? 'im Laden' : 'in der Werkstatt'} der Stadt ${gebOrt(S, b)}`;
+  return `${wort === 'Laden' ? 'im Laden' : 'in der Werkstatt'} von ${nr(S, o)} ${gebOrt(S, b)}`;
+}
+function erinnerungText(S, code, bezug, name) {
+  const g = S.g, geb = bezug >= 0 && bezug < S.gAnzahl;
+  const ort = geb ? gebOrt(S, bezug) : '', wort = geb && g.typ[bezug] === LADEN ? 'Laden' : 'Werkstatt';
+  switch (code) {
+    case M.EINGEZOGEN: return `eingezogen ${ort}`;
+    case M.JOB: return `Job bekommen ${geb ? betriebText(S, bezug) : ''}`;
+    case M.JOB_WEG: return `Job verloren ${geb ? `${wort === 'Laden' ? 'im Laden' : 'in der Werkstatt'} ${ort}` : ''}`;
+    case M.GEKUENDIGT: return `gekündigt ${geb ? `${wort === 'Laden' ? 'im Laden' : 'in der Werkstatt'} ${ort}` : ''}`;
+    case M.FREUND: return `neue Freundschaft mit ${name}`;
+    case M.PARTNER: return `mit ${name} zusammengekommen`;
+    case M.GETRENNT: return `von ${name} getrennt`;
+    case M.KIND: return `Kind geboren: ${name}`;
+    case M.GEGRUENDET: return `${wort === 'Laden' ? 'einen Laden' : 'eine Werkstatt'} gegründet ${ort}`;
+    case M.PLEITE: return `${wort === 'Laden' ? 'Laden' : 'Werkstatt'} ${ort} ist pleite gegangen`;
+    case M.ZIEL_ERREICHT: return `Ziel erreicht: ${ZIELTEXT[bezug] || ''}`;
+    case M.ZIEL_AUFGEGEBEN: return `Ziel aufgegeben: ${ZIELTEXT[bezug] || ''}`;
+    case M.GESTORBEN: return `${name} ist gestorben`;
+    case M.NOAH: return 'mit Noah geredet';
+  }
+  return '';
+}
+// Alles, was die Personenkarte zeigt. Namen noch lebender Personen kommen als Marke (anklickbar).
+function personInfo(S, p, gen) {
+  const P = S.p;
+  if (p < 0 || p >= S.pMax || !P.lebt[p] || (gen !== undefined && P.gen[p] !== gen)) return null;
+  const tag = S.tag, alter = Math.floor((tag - P.geb[p]) / R.JAHR), kind = tag - P.geb[p] < R.ERWACHSEN * R.JAHR;
+  const w = P.wohnung[p], arb = P.arbeit[p], bes = P.besitz[p];
+  let arbeit;
+  if (kind) arbeit = 'Kind';
+  else if (bes >= 0) arbeit = `besitzt ${S.g.typ[bes] === LADEN ? 'einen Laden' : 'eine Werkstatt'} ${gebOrt(S, bes)}` + (offen(S, bes) ? '' : ' (noch im Bau)');
+  else if (arb >= 0) arbeit = `arbeitet ${betriebText(S, arb)}`;
+  else if (alter >= R.RENTE) arbeit = 'in Rente';
+  else arbeit = 'ohne Arbeit';
+  // Gedächtnis chronologisch (Ringpuffer ab dem ältesten Platz)
+  const mem = [];
+  for (let j = 0; j < R.MEM; j++) {
+    const i = p * R.MEM + ((P.memPos[p] + j) % R.MEM), code = P.memCode[i];
+    if (!code) continue;
+    const bz = P.memRef[i];
+    let nm = '';
+    if (M_BEZUG[code] === 'p') {
+      const lebend = bz >= 0 && P.lebt[bz] && P.gen[bz] === P.memGen[i];
+      nm = lebend ? nr(S, bz) : P.memName[i] ? nameAusPack(P.memName[i]) : 'jemand';
+    }
+    mem.push({ tag: P.memTag[i], text: erinnerungText(S, code, bz, nm) });
+  }
+  // Familie
+  const eltern = [];
+  for (const [e, eg, en] of [[P.elternA[p], P.elternAGen[p], P.elternNameA[p]], [P.elternB[p], P.elternBGen[p], P.elternNameB[p]]]) {
+    if (e < 0) continue;
+    if (P.lebt[e] && P.gen[e] === eg) eltern.push(ref(S, e));
+    else if (en) eltern.push({ id: -1, gen: 0, name: nameAusPack(en), lebt: false });
+  }
+  const kinderVon = (x) => {
+    const gx = P.gen[x], k = [];
+    for (let i = 0; i < S.pMax; i++) {
+      if (P.lebt[i] && ((P.elternA[i] === x && P.elternAGen[i] === gx) || (P.elternB[i] === x && P.elternBGen[i] === gx))) k.push(i);
+    }
+    return k;
+  };
+  const kinder = P.kinder[p] ? kinderVon(p) : [];
+  const enkel = [];
+  for (const k of kinder) if (P.kinder[k]) for (const e of kinderVon(k)) enkel.push(e);
+  const freunde = [];
+  for (let j = 0; j < 5; j++) { const f = P.freunde[p * 5 + j]; if (f >= 0) freunde.push(ref(S, f)); }
+  return {
+    id: p, gen: P.gen[p], name: name(S, p), weib: !!P.weib[p], alter, kind,
+    wohnen: w >= 0 ? (eigeneWohnung(S, p) ? 'wohnt ' : 'wohnt bei der Familie ') + gebOrt(S, w) : 'hat keine Wohnung', wohnung: w,
+    arbeit, arbeitsort: bes >= 0 ? bes : arb, geld: P.geld[p],
+    charakter: { fleiss: P.fleiss[p], gesellig: P.gesellig[p], ehrgeiz: P.ehrgeiz[p], spar: P.spar[p], heimat: P.heimat[p] },
+    ziel: kind || !P.ziel[p] ? null : { text: ZIELTEXT[P.ziel[p]], seit: tag - P.zielSeit[p], rest: Math.max(0, R.ZIEL_TAGE - (tag - P.zielSeit[p])) },
+    beduerfnisse: kind ? null : { geld: P.bGeld[p], wohnen: P.bWohnen[p], kontakt: P.bKontakt[p], freizeit: P.bFreizeit[p] },
+    zufriedenheit: kind ? null : P.zuf[p],
+    gedaechtnis: mem,
+    partner: ref(S, P.partner[p]), eltern, kinder: kinder.map(k => ref(S, k)), enkel: enkel.map(e => ref(S, e)),
+    freunde: freunde.filter(Boolean),
+  };
+}
+// Hauskarte: wer wohnt oder arbeitet hier
+function gebaeudeInfo(S, b) {
+  if (b < 0 || b >= S.gAnzahl) return null;
+  const g = S.g, P = S.p, t = g.typ[b], bau = S.feld[gebZelle(S, b)] === BAUSTELLE;
+  const info = { id: b, typ: t, ort: gebOrt(S, b), stufe: g.stufe[b], baustelle: bau, leer: !!g.leer[b], personen: [] };
+  if (t === WOHNHAUS) {
+    info.titel = `Wohnhaus ${info.ort}` + (bau ? ' (im Bau)' : `, Stufe ${g.stufe[b]}`);
+    info.zeile = bau ? '' : `${g.belegt[b]} von ${R.WOHNUNGEN[g.stufe[b]]} Wohnungen belegt` + (g.auf[b] ? `, wird auf Stufe ${g.auf[b]} aufgestockt` : '');
+    // nach Haushalten sortiert: erst der Mieter, dann die anderen
+    const L = S.bewohner[b].slice().sort((x, y) => (P.hh[x] - P.hh[y]) || ((P.hh[x] === x ? 0 : 1) - (P.hh[y] === y ? 0 : 1)) || (P.geb[x] - P.geb[y]));
+    for (const x of L) info.personen.push(Object.assign(ref(S, x), { alter: Math.floor((S.tag - P.geb[x]) / R.JAHR), mieter: P.hh[x] === x }));
+  } else if (istBetrieb(t)) {
+    const wort = t === LADEN ? 'Laden' : 'Werkstatt', o = g.besitzer[b];
+    info.titel = `${wort} ${info.ort}` + (bau ? ' (im Bau)' : info.leer ? ' (steht leer)' : '');
+    info.zeile = info.leer ? '' : o < 0 ? `gehört der Stadt, ${S.belegschaft[b].length} von ${stellen(S, b)} Stellen besetzt`
+      : `${S.belegschaft[b].length} von ${stellen(S, b)} Stellen besetzt, Lohn ${g.lohn[b]} Taler am Tag`;
+    if (o >= 0) info.personen.push(Object.assign(ref(S, o), { rolle: 'Besitz' }));
+    for (const x of S.belegschaft[b]) info.personen.push(Object.assign(ref(S, x), { rolle: 'arbeitet hier' }));
+  } else if (t === PARK) {
+    info.titel = `Park ${info.ort}`; info.zeile = bau ? 'wird angelegt' : '';
+  }
+  return info;
+}
+
 // Kennzahlen für Anzeige und Test (liest nur)
 function kennzahlen(S) {
   const g = S.g;
@@ -1984,7 +2116,7 @@ function kennzahlen(S) {
 G.StadtSim = {
   VERSION, R, KARTE, VK, VN, RASTER, RAND, LEER, STRASSE, WOHNHAUS, WERKSTATT, LADEN, PARK, BAUSTELLE,
   M, Z, ZIELNAMEN, AKTIONSNAMEN,
-  neueStadt, stunde, tagSchritt, exportZustand, importZustand, kennzahlen, name, strName, klartext,
+  neueStadt, stunde, tagSchritt, exportZustand, importZustand, kennzahlen, name, strName, klartext, personInfo, gebaeudeInfo, ZIELTEXT,
 };
 })(globalThis);
 </script>
