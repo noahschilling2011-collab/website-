@@ -20,6 +20,10 @@
     --gut: #8fd4a8;
     --schlecht: #f2998a;
     --glas: rgba(14, 16, 22, 0.62);
+    --karte: #181b24;                                      /* Personen- und Hauskarte, deckend */
+    --debug: rgba(10, 12, 16, 0.85);
+    --grund-verlauf: #1a2236;
+    --denkt: rgba(244, 244, 247, 0.85);                    /* „überlegt“: neutral, kein zweiter Akzent */
     --r: 14px;
     --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
     --klein: clamp(0.78rem, 0.76rem + 0.1vw, 0.86rem);
@@ -36,7 +40,7 @@
 
   #szene { position: fixed; inset: 0; display: block; width: 100vw; height: 100svh; }
   body.ohne-3d #szene { display: none; }
-  body.ohne-3d { background: radial-gradient(120% 90% at 30% 20%, #1a2236 0%, var(--grund) 60%); }
+  body.ohne-3d { background: radial-gradient(120% 90% at 30% 20%, var(--grund-verlauf) 0%, var(--grund) 60%); }
 
   .glas {
     background: var(--glas);
@@ -88,9 +92,9 @@
     font-weight: 500; letter-spacing: 0.02em; color: var(--akzent); border: 1.5px solid rgba(255, 200, 100, 0.55); background: var(--akzent-leise); }
   .haupt-zeile .n { color: var(--text-stark); display: flex; gap: var(--s2); align-items: baseline; min-width: 0; line-height: 1.3; }
   .haupt-zeile .gedanke { color: var(--text-leise); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.35; }
-  .ueberlegt-text { color: #a9cdf0; font-size: 0.9em; font-weight: 400; text-transform: none; letter-spacing: 0; }
-  .ueberlegt .kreis { border-color: rgba(169, 205, 240, 0.8); color: #a9cdf0; background: rgba(169, 205, 240, 0.12); animation: puls 1.8s ease-in-out infinite; }
-  @keyframes puls { 0%, 100% { box-shadow: 0 0 0 0 rgba(169, 205, 240, 0); } 50% { box-shadow: 0 0 0 4px rgba(169, 205, 240, 0.28); } }
+  .ueberlegt-text { color: var(--text-leise); font-size: 0.9em; font-weight: 400; font-style: italic; text-transform: none; letter-spacing: 0; }
+  .ueberlegt .kreis { border-color: var(--denkt); color: var(--text-stark); background: rgba(255, 255, 255, 0.08); animation: puls 1.8s ease-in-out infinite; }
+  @keyframes puls { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); } 50% { box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.18); } }
   #buch-knopf { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: var(--s3) var(--s4);
     background: transparent; border: 0; cursor: pointer; font-weight: 500; color: var(--text-stark); text-align: left; }
   #buch-knopf .pfeil { transition: transform 200ms cubic-bezier(.2,.8,.2,1); color: var(--text-leise); }
@@ -114,13 +118,13 @@
   .hinweis strong { color: var(--text-stark); }
 
   /* Debug-Ecke (nur mit ?debug) */
-  #debug { position: fixed; left: var(--s4); bottom: var(--s4); padding: var(--s2) var(--s3); background: rgba(10, 12, 16, 0.85);
+  #debug { position: fixed; left: var(--s4); bottom: var(--s4); padding: var(--s2) var(--s3); background: var(--debug);
     border: 1px solid var(--linie); border-radius: 10px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
     color: var(--text-leise); white-space: pre; font-variant-numeric: tabular-nums; }
 
   /* Personen- und Hauskarte links */
   #karte { position: fixed; left: var(--s4); top: 232px; bottom: 96px; width: min(380px, calc(100vw - 2 * var(--s4)));
-    overflow-y: auto; background: #181b24; border: 1px solid var(--linie); border-radius: var(--r);
+    overflow-y: auto; background: var(--karte); border: 1px solid var(--linie); border-radius: var(--r);
     padding: var(--s3) var(--s4) var(--s5); font-size: var(--klein); }
   #karte .kopf { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--s2); min-height: 28px; }
   #karte .kopf button { background: none; border: 0; color: var(--text-leise); cursor: pointer; padding: 4px 6px; border-radius: 6px; }
@@ -1730,6 +1734,8 @@ function hauptVerloren(S, q, grund) {
   K.verlust.push({ id: q, gen: gq, name: name(S, q), weib: !!P.weib[q], grund, tag: S.tag, vorschlaege: vor });
 }
 function verlustErledigt(S) { return S.ki.verlust.shift() || null; }
+// Die Oberfläche meldet, ob sie Anfragen gerade beantworten kann (Ollama bereit, nicht 20×, kein Aufholen)
+function kiSchalten(S, an) { S.ki.an = !!an; }
 
 // ─── Stündlich ───────────────────────────────────────────────────────────────────────
 function stunde(S) {
@@ -2426,7 +2432,7 @@ G.StadtSim = {
   M, Z, ZIELNAMEN, AKTIONSNAMEN,
   neueStadt, stunde, tagSchritt, exportZustand, importZustand, kennzahlen, name, strName, klartext, personInfo, gebaeudeInfo, ZIELTEXT,
   // Hauptfiguren und Sprachmodell (Phase 4)
-  istHaupt, hauptSetzen, verlustErledigt, kiAktionen, kiEntscheidung, kiVerwerfen, kiGespraech, kiTagebuch,
+  istHaupt, hauptSetzen, verlustErledigt, kiSchalten, kiAktionen, kiEntscheidung, kiVerwerfen, kiGespraech, kiTagebuch,
   erlaubteAktionen: (S, p, h) => erlaubteAktionen(S, p, h).map(a => AKTIONSNAMEN[a]),
   entscheide,                                                // nur für tools/simtest.mjs (Abgleich mit erlaubteAktionen)
 };
@@ -2659,8 +2665,10 @@ function baueGrafik(THREE, OrbitControls) {
     const h = hash(b + 7);
     const an = 18 + h * 1.5, aus = 22.5 + h * 2.5;           // jedes Haus hat seine eigene Uhrzeit
     if (stunde >= an && stunde < aus) return 1;
-    if (stunde >= aus || stunde < 5.5) return h < 0.2 ? 0.34 : 0;   // ein paar Nachteulen
-    if (stunde >= 5.5 && stunde < 7 + h) return h < 0.6 ? 0.5 : 0;  // Frühaufsteher
+    // Spät in der Nacht weniger Geschosse hell, aber jedes bewohnte Haus bleibt erleuchtet (aufgerundet ≥ 1 Geschoss):
+    // Spec „Nachts leuchten Fenster bewohnter Häuser“ — man sieht, wo Leben ist
+    if (stunde >= aus || stunde < 5.5) return 0.34;
+    if (stunde >= 5.5 && stunde < 7 + h) return 0.5;               // Aufstehen, je Haus zu einer anderen Zeit
     return 0;
   }
 
@@ -2738,7 +2746,7 @@ function baueGrafik(THREE, OrbitControls) {
   const FIG_MAX = 300, HAUPT_MAX = 10, FIG_GES = FIG_MAX + HAUPT_MAX, GEHTEMPO = 22;   // Felder pro Spielstunde
   const figMesh = inst(new THREE.CapsuleGeometry(0.055, 0.13, 2, 6).translate(0, 0.12, 0), lambert('#ffffff'), FIG_GES);
   const markMesh = inst(new THREE.OctahedronGeometry(0.065), new THREE.MeshBasicMaterial({ color: '#ffffff' }), HAUPT_MAX);
-  const MARK_GOLD = new THREE.Color('#ffc864'), MARK_DENKT = new THREE.Color('#a9cdf0');   // überlegt = hellblau
+  const MARK_GOLD = new THREE.Color('#ffc864'), MARK_DENKT = new THREE.Color('#f4f4f7');   // überlegt = weiß
   const NULL = new THREE.Matrix4().makeScale(0, 0, 0);
   const FIGFARBEN = ['#e6d3bd', '#c2d3e6', '#e6c2bd', '#c6e0c2', '#e6dcb8', '#b8d8d8', '#d8c2b0', '#aebfd8'].map(c => new THREE.Color(c));
   const figuren = [];                                     // { p, gen, route, start, dauer, versatz, ox, oz, haupt }
@@ -2789,7 +2797,7 @@ function baueGrafik(THREE, OrbitControls) {
     return r;
   }
   function neueFigur(f, p, haupt) {
-    f.p = p; f.gen = S.p.gen[p]; f.route = null; f.haupt = haupt;
+    f.p = p; f.gen = S.p.gen[p]; f.route = null; f.haupt = haupt; f.steht = false;
     f.versatz = Math.random() * 0.15; f.ox = (Math.random() - 0.5) * 0.4; f.oz = (Math.random() - 0.5) * 0.4;
   }
   // Nach jedem Simulationsschritt: wer läuft in dieser Stunde wohin? (Folgt den Entscheidungen der Leute)
@@ -2835,6 +2843,18 @@ function baueGrafik(THREE, OrbitControls) {
         f.start = jetzt + f.versatz;
         f.dauer = Math.max(0.2, Math.min(0.85, f.route.len / GEHTEMPO));
       }
+      // Hauptfiguren sind immer zu sehen (Spec: „plus immer alle Hauptfiguren“): wenn sie nicht laufen,
+      // stehen sie auf der Straße vor dem Gebäude, in dem sie gerade sind
+      if (f.haupt) {
+        const ort = arbeitet && H >= 8 && H < 17 ? arb : bes >= 0 && bes !== w && H >= 19 && H < 22 ? bes
+          : !arbeitet && st >= 0 && H === 10 ? st : w;
+        f.steht = ort >= 0;
+        if (f.steht) {
+          const c = strassenNachbar(ort), bx = wx(S.g.x[ort]), bz = wx(S.g.y[ort]);
+          const sx = c >= 0 ? wx(c % Sim.KARTE) : bx, sz = c >= 0 ? wx((c / Sim.KARTE) | 0) : bz;
+          f.sx = bx + (sx - bx) * 0.62 + f.ox * 0.5; f.sz = bz + (sz - bz) * 0.62 + f.oz * 0.5;
+        }
+      }
     }
     for (let i = 0; i < figuren.length; i++) {
       const f = figuren[i];
@@ -2848,14 +2868,18 @@ function baueGrafik(THREE, OrbitControls) {
     for (let i = 0; i < figuren.length; i++) {
       const f = figuren[i], r = f.route;
       figIds[i] = -1;
-      if (f.p < 0 || !r || jetzt < f.start || jetzt >= f.start + f.dauer || r.len === 0) { figMesh.setMatrixAt(i, NULL); continue; }
-      const d = ((jetzt - f.start) / f.dauer) * r.len, cum = r.cum;
-      let lo = 0, hi = cum.length - 1;
-      while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (cum[mid] <= d) lo = mid; else hi = mid; }
-      const seg = cum[hi] - cum[lo], k = seg > 0 ? (d - cum[lo]) / seg : 0;
-      const x0 = r.pts[2 * lo], z0 = r.pts[2 * lo + 1], x1 = r.pts[2 * hi], z1 = r.pts[2 * hi + 1];
-      const x = x0 + (x1 - x0) * k + f.ox, z = z0 + (z1 - z0) * k + f.oz;
-      dummy.position.set(x, 0.02, z); dummy.scale.set(1, 1, 1); dummy.rotation.set(0, Math.atan2(x1 - x0, z1 - z0), 0);
+      const laeuft = f.p >= 0 && r && jetzt >= f.start && jetzt < f.start + f.dauer && r.len > 0;
+      if (!laeuft && !(f.p >= 0 && f.haupt && f.steht)) { figMesh.setMatrixAt(i, NULL); continue; }
+      let x, z, dreh = 0;
+      if (laeuft) {
+        const d = ((jetzt - f.start) / f.dauer) * r.len, cum = r.cum;
+        let lo = 0, hi = cum.length - 1;
+        while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (cum[mid] <= d) lo = mid; else hi = mid; }
+        const seg = cum[hi] - cum[lo], k = seg > 0 ? (d - cum[lo]) / seg : 0;
+        const x0 = r.pts[2 * lo], z0 = r.pts[2 * lo + 1], x1 = r.pts[2 * hi], z1 = r.pts[2 * hi + 1];
+        x = x0 + (x1 - x0) * k + f.ox; z = z0 + (z1 - z0) * k + f.oz; dreh = Math.atan2(x1 - x0, z1 - z0);
+      } else { x = f.sx; z = f.sz; }                      // Hauptfigur steht vor dem Gebäude
+      dummy.position.set(x, 0.02, z); dummy.scale.set(1, 1, 1); dummy.rotation.set(0, dreh, 0);
       dummy.updateMatrix();
       figMesh.setMatrixAt(i, dummy.matrix);
       figIds[i] = f.p;
@@ -3383,7 +3407,7 @@ function hauptAnzeigen() {
   for (const h of K.haupt) {
     const i = Sim.personInfo(S, h.id, h.gen);
     if (!i) continue;
-    const letzt = i.tagebuch[i.tagebuch.length - 1];
+    const gedanken = i.tagebuch.filter(e => e.art === 'gedanke'), letzt = gedanken[gedanken.length - 1] || i.tagebuch[i.tagebuch.length - 1];
     zeilen.push({ id: h.id, gen: h.gen, name: i.name, gedanke: letzt ? letzt.text : '',
       denkt: offen.has(h.id) || !!(ki.laeuft && ki.laeuft.id === h.id) || !!(ki.gespraech && ki.gespraech.id === h.id && !ki.gespraech.fehler) });
   }
@@ -3517,7 +3541,7 @@ function nachSchritten() {
   nachfolgePruefen();
 }
 function simTakt(dt) {
-  S.ki.an = ki.status === 'bereit' && tempo < 20 && !aufholenLaeuft;   // nur dann stellen Hauptfiguren Anfragen
+  Sim.kiSchalten(S, ki.status === 'bereit' && tempo < 20 && !aufholenLaeuft);   // nur dann stellen Hauptfiguren Anfragen
   if (!tempo || aufholenLaeuft) return;
   akku += dt * tempo;
   let n = 0;
@@ -3530,7 +3554,7 @@ function simTakt(dt) {
 function kiDebugZeile() {
   const k = ki.stat, n = k.gueltig + k.ungueltig;
   return `KI ${ki.status}${ki.laeuft ? ' (läuft)' : ''}   Aufrufe ${k.aufrufe}   gültig ${n ? Math.round(100 * k.gueltig / n) : '–'} % von ${n}\n`
-    + `KI Ø ${n ? (k.ms / n / 1000).toFixed(1) : '–'} s  max ${(k.msMax / 1000).toFixed(1)} s   Fehler ${k.fehler}   zu spät ${k.zuSpaet}`;
+    + `KI Ø ${n ? (k.ms / n / 1000).toFixed(1) : '–'} s  max ${(k.msMax / 1000).toFixed(1)} s   ungültig ${k.ungueltig}   Fehler ${k.fehler}   zu spät ${k.zuSpaet}`;
 }
 const dbg = { frames: 0, summe: 0, max: 0, letzte: performance.now(), calls: 0, dreiecke: 0 };
 if (DEBUG) { $('debug').hidden = false; document.body.classList.add('debug'); }
@@ -3577,7 +3601,7 @@ async function aufholen(msWeg) {
   const vorher = schnappschuss(), zielTag = S.tag + Math.floor((S.stunde + stundenGesamt) / 24), zielStunde = (S.stunde + stundenGesamt) % 24;
   const tage = Math.floor(stundenGesamt / 24);
   aufholenLaeuft = true;
-  S.ki.an = false;                                        // beim Aufholen entscheiden alle mit dem normalen Gehirn
+  Sim.kiSchalten(S, false);                               // beim Aufholen entscheiden alle mit dem normalen Gehirn
   const zeigen = tage >= 1;
   if (zeigen) {
     $('aufholen-text').textContent = `Deine Stadt holt ${tage} ${tage === 1 ? 'Tag' : 'Tage'} auf …`;
