@@ -98,6 +98,49 @@
     border: 1px solid var(--linie); border-radius: 10px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
     color: var(--text-leise); white-space: pre; font-variant-numeric: tabular-nums; }
 
+  /* Knopf für Einstellungen unten rechts */
+  #einst-knopf { position: fixed; right: var(--s4); bottom: var(--s4); width: 44px; height: 44px; display: grid; place-items: center;
+    cursor: pointer; color: var(--text-leise); padding: 0; }
+  #einst-knopf:hover { color: var(--akzent); }
+
+  /* Dialoge: solide Ebene 2, kein Glas */
+  dialog { background: var(--ebene2); color: var(--text); border: 1px solid var(--linie); border-radius: var(--r);
+    padding: var(--s5); max-width: min(520px, calc(100vw - 32px)); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); }
+  dialog::backdrop { background: rgba(5, 7, 10, 0.6); }
+  dialog[open] { animation: rein 350ms cubic-bezier(.2,.8,.2,1); }
+  dialog h2 { margin: 0 0 var(--s3); font-size: var(--gross); font-weight: 500; color: var(--text-stark); letter-spacing: -0.01em; }
+  dialog p { margin: 0 0 var(--s3); color: var(--text); max-width: 60ch; }
+  dialog .leise { color: var(--text-leise); font-size: var(--klein); }
+  .knoepfe { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s4); }
+  .knopf { padding: var(--s2) var(--s4); border-radius: 10px; border: 1px solid var(--linie); background: var(--ebene3);
+    color: var(--text); cursor: pointer; transition: background-color 150ms ease-out, border-color 150ms ease-out; }
+  .knopf:hover { border-color: rgba(255, 255, 255, 0.2); }
+  .knopf.haupt { background: var(--akzent-leise); border-color: rgba(255, 200, 100, 0.5); color: var(--akzent); }
+  .zahlen { display: grid; grid-template-columns: 1fr auto; gap: 4px var(--s5); margin: var(--s3) 0; font-variant-numeric: tabular-nums; }
+  .zahlen dt { color: var(--text-leise); }
+  .zahlen dd { margin: 0; text-align: right; color: var(--text-stark); }
+  .auffaellig { list-style: none; margin: var(--s2) 0 0; padding: 0; font-size: var(--klein); }
+  .auffaellig li { padding: var(--s2) 0; border-top: 1px solid var(--linie); }
+  .auffaellig .tag { display: block; color: var(--text-leise); }
+
+  /* Aufholen: Fortschritt über der Szene */
+  #aufholen { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); width: min(420px, calc(100vw - 32px));
+    padding: var(--s5); text-align: center; }
+  #aufholen p { margin: 0 0 var(--s3); color: var(--text-stark); font-size: var(--gross); }
+  #aufholen progress { width: 100%; height: 6px; appearance: none; border: 0; border-radius: 3px; background: var(--ebene3); overflow: hidden; }
+  #aufholen progress::-webkit-progress-bar { background: var(--ebene3); }
+  #aufholen progress::-webkit-progress-value { background: var(--akzent); }
+  #aufholen progress::-moz-progress-bar { background: var(--akzent); }
+
+  /* Meldungen (Speicherfehler, Warnungen) */
+  #meldung { position: fixed; left: 50%; top: var(--s4); transform: translateX(-50%); max-width: min(560px, calc(100vw - 32px));
+    padding: var(--s3) var(--s4); background: var(--ebene2); border: 1px solid var(--linie); border-radius: 10px; font-size: var(--klein);
+    z-index: 10; }
+  #meldung.fehler { border-color: rgba(242, 153, 138, 0.6); color: var(--schlecht); }
+  #meldung.warnung { border-color: rgba(255, 200, 100, 0.55); color: var(--akzent); }
+  #debug-knoepfe { position: fixed; left: var(--s4); bottom: 92px; display: flex; gap: var(--s1); font-size: 12px; }
+  #debug-knoepfe .knopf { padding: 4px 8px; font-size: 12px; }
+
   @media (max-width: 720px) {
     #stadtbuch { top: auto; bottom: 76px; max-height: 38svh; }
     #kennzahlen { min-width: 0; }
@@ -147,6 +190,49 @@
 </aside>
 
 <div id="debug" hidden></div>
+<div id="debug-knoepfe" hidden>
+  <span style="align-self:center;color:var(--text-leise)">Zeit vorspulen:</span>
+  <button type="button" class="knopf" data-vorspulen="12">12 h</button>
+  <button type="button" class="knopf" data-vorspulen="36">36 h</button>
+  <button type="button" class="knopf" data-vorspulen="120">5 Tage</button>
+</div>
+
+<button type="button" id="einst-knopf" class="glas" aria-label="Einstellungen" aria-haspopup="dialog">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+</button>
+
+<div id="aufholen" class="glas" role="status" aria-live="polite" hidden>
+  <p id="aufholen-text">Deine Stadt holt auf …</p>
+  <progress id="aufholen-balken" max="1" value="0"></progress>
+</div>
+<div id="meldung" role="alert" hidden></div>
+
+<dialog id="weg-dialog" aria-labelledby="weg-titel">
+  <h2 id="weg-titel">Während du weg warst</h2>
+  <div id="weg-inhalt"></div>
+  <div class="knoepfe"><button type="button" class="knopf haupt" data-schliessen autofocus>Weiter</button></div>
+</dialog>
+
+<dialog id="version-dialog" aria-labelledby="version-titel">
+  <h2 id="version-titel">Spielstand ist von einer älteren Version</h2>
+  <p id="version-text">Dieser Spielstand passt nicht zu dieser Version von STADT und kann nicht geladen werden.</p>
+  <p class="leise">Mit „Export behalten“ lädst du ihn als Datei herunter, damit er nicht verloren geht. Erst „Neu anfangen“ überschreibt ihn.</p>
+  <div class="knoepfe">
+    <button type="button" class="knopf" id="version-export">Export behalten</button>
+    <button type="button" class="knopf haupt" id="version-neu">Neu anfangen</button>
+  </div>
+</dialog>
+
+<dialog id="einst-dialog" aria-labelledby="einst-titel">
+  <h2 id="einst-titel">Einstellungen</h2>
+  <p class="leise" id="einst-stand">Gespeichert wird automatisch alle 30 Sekunden und beim Schließen.</p>
+  <div class="knoepfe">
+    <button type="button" class="knopf" id="export-knopf">Export (stadt-save.json)</button>
+    <button type="button" class="knopf" id="import-knopf">Import …</button>
+    <input type="file" id="import-datei" accept="application/json,.json" hidden>
+  </div>
+  <div class="knoepfe"><button type="button" class="knopf haupt" data-schliessen autofocus>Schließen</button></div>
+</dialog>
 
 
 <script id="sim">
@@ -1709,7 +1795,7 @@ function bauamt(S) {
 }
 
 // ─── Start ───────────────────────────────────────────────────────────────────────────
-function neueStadt(seed) {
+function leererZustand(seed) {
   const S = {
     version: VERSION, seed: seed >>> 0, rs: seed >>> 0,
     tag: 0, stunde: 6, budget: R.START_BUDGET,
@@ -1736,6 +1822,11 @@ function neueStadt(seed) {
   for (let v = 0; v < VN * VN; v++) { S.vHaus.push([]); S.vBetrieb.push([]); S.vPark.push([]); S.vPlatz.push([]); }
   for (const [n, T] of GF) S.g[n] = new T(FELDER);
   kapazitaet(S, 256);
+  return S;
+}
+
+function neueStadt(seed) {
+  const S = leererZustand(seed);
   // Eine Straße, zwei Wohnhäuser, eine Werkstatt der Stadt, ein Laden, zehn Erwachsene
   const str = S.strNaechste++;
   for (let x = 40; x <= 56; x++) strasseSetzen(S, x, MITTE, str);
@@ -1759,6 +1850,109 @@ function neueStadt(seed) {
   }
   ladenZuordnen(S); parksZuordnen(S); haushalteZaehlen(S); kennzahlenRechnen(S);
   buch(S, 'start', 'Zehn Leute kommen auf eine leere Wiese an der Hauptstraße. Es gibt zwei Wohnhäuser, eine Werkstatt der Stadt und einen Laden.');
+  return S;
+}
+
+// ─── Aufholen: ein ganzer Tag in einem Schritt ───────────────────────────────────────
+// Dieselben Regeln wie stündlich, nur zusammengefasst: Entscheidung um 7, die Stunden 7–17 als Block,
+// Entscheidung um 18, die Stunden 18–22 als Block, dann der Tagesabschluss. Etwa 5× schneller.
+// Steht die Uhr nicht auf Mitternacht, wird zuerst stündlich bis Mitternacht gerechnet.
+function tagSchritt(S) {
+  if (S.stunde !== 0) { while (S.stunde !== 0) stunde(S); return; }
+  const g = S.g, erwGrenze = S.tag - R.ERWACHSEN * R.JAHR, halb = R.ZUF_MAX_TAG / 2;
+  const block = (abends) => {
+    const P = S.p;
+    for (let p = 0; p < S.pMax; p++) {
+      if (!P.lebt[p] || P.geb[p] >= erwGrenze) continue;
+      let k = P.bKontakt[p], f = P.bFreizeit[p];
+      const arb = P.arbeit[p];
+      if (!abends) {                                         // 7–17 Uhr: 11 Stunden wach, davon 9 Arbeitszeit
+        k -= 11 * R.KONTAKT_ZERFALL;
+        f += 2 * R.FREIZEIT_ERHOLUNG;
+        if (arb >= 0 && !P.frei[p]) {
+          f -= 9 * R.FREIZEIT_ARBEIT;
+          if (S.belegschaft[arb].length + (g.besitzer[arb] >= 0 ? 1 : 0) >= 2) k += 9 * R.KONTAKT_ARBEIT;
+        } else f += 9 * (P.frei[p] ? R.FREIZEIT_FREI : R.FREIZEIT_ERHOLUNG);
+      } else {                                               // 18–22 Uhr: 5 Stunden Abend
+        const w = P.wohnung[p];
+        k -= 5 * R.KONTAKT_ZERFALL;
+        f += 5 * R.FREIZEIT_ERHOLUNG;
+        if (P.hh[p] >= 0 && S.hhGroesse[P.hh[p]] >= 2) k += 5 * R.KONTAKT_ZUHAUSE;
+        if (w >= 0 && g.parkNah[w]) f += 5 * R.FREIZEIT_PARK;
+        if (P.ohneLaden[p]) f -= 5 * R.FREIZEIT_OHNE_LADEN;
+      }
+      P.bKontakt[p] = klemme(k, 0, 100);
+      P.bFreizeit[p] = klemme(f, 0, 100);
+      const z = zufZiel(S, p);
+      P.zufZiel[p] = z;
+      P.zuf[p] += klemme(z - P.zuf[p], -halb, halb);
+    }
+  };
+  const entscheidenAlle = (h) => {
+    S.stunde = h;
+    for (let p = 0; p < S.pMax; p++) {
+      const P = S.p;
+      if (!P.lebt[p] || P.geb[p] >= erwGrenze) continue;
+      entscheide(S, p, h);
+      S.p.jetzt[p] = 0;
+    }
+  };
+  entscheidenAlle(7);
+  block(false);
+  entscheidenAlle(18);
+  block(true);
+  S.stunde = 0;
+  tagesabschluss(S);
+}
+
+// ─── Speichern: Zustand als Daten ────────────────────────────────────────────────────
+// Typisierte Arrays bleiben typisierte Arrays (die Oberfläche macht Base64 daraus), Listen und
+// Zahlen gehen als JSON. Gespeichert wird alles, auch die Reihenfolge der internen Listen,
+// damit eine geladene Stadt exakt so weiterläuft wie eine, die nie gespeichert wurde.
+function exportZustand(S) {
+  const werte = {}, json = {}, arrays = [];
+  for (const k of Object.keys(S)) {
+    const v = S[k];
+    if (k === 'p') { for (const [n, T, f] of PF) arrays.push({ name: 'p.' + n, typ: T.name, daten: S.p[n].subarray(0, S.pMax * f) }); }
+    else if (k === 'g') { for (const [n, T] of GF) arrays.push({ name: 'g.' + n, typ: T.name, daten: S.g[n].subarray(0, S.gAnzahl) }); }
+    else if (k === 'hhGroesse' || k === 'hhKinder') arrays.push({ name: k, typ: 'Uint16Array', daten: v.subarray(0, S.pMax) });
+    else if (ArrayBuffer.isView(v)) arrays.push({ name: k, typ: v.constructor.name, daten: v });
+    else if (v === null || typeof v !== 'object') werte[k] = v;
+    else json[k] = v;
+  }
+  return { format: 'stadt', version: VERSION, werte, json, arrays };
+}
+function importZustand(d) {
+  if (!d || d.format !== 'stadt' || !d.werte || !d.json || !Array.isArray(d.arrays)) throw new Error('Das ist kein STADT-Spielstand.');
+  if (d.version !== VERSION) {
+    const e = new Error(`Spielstand ist von Version ${d.version}, diese Datei ist Version ${VERSION}.`);
+    e.andereVersion = true;
+    throw e;
+  }
+  const S = {};
+  Object.assign(S, d.werte);
+  for (const k of Object.keys(d.json)) S[k] = d.json[k];
+  let cap = 256;
+  while (cap < S.pMax) cap *= 2;
+  S.p = {}; S.g = {};
+  for (const [n, T, f] of PF) S.p[n] = new T(cap * f);
+  for (const [n, T] of GF) S.g[n] = new T(FELDER);
+  S.pKap = cap;
+  S.hhGroesse = new Uint16Array(cap); S.hhKinder = new Uint16Array(cap);
+  const typen = {};
+  for (const [n, T] of PF) typen['p.' + n] = T.name;
+  for (const [n, T] of GF) typen['g.' + n] = T.name;
+  for (const a of d.arrays) {
+    const [kopf, feld] = a.name.split('.');
+    const soll = typen[a.name] || (kopf === 'hhGroesse' || kopf === 'hhKinder' ? 'Uint16Array' : S[kopf] === undefined ? a.typ : null);
+    if (!a.daten || a.daten.constructor.name !== a.typ || (soll && soll !== a.typ)) throw new Error('Spielstand beschädigt: ' + a.name);
+    if (feld !== undefined) S[kopf][feld].set(a.daten);
+    else if (kopf === 'hhGroesse' || kopf === 'hhKinder') S[kopf].set(a.daten);
+    else S[kopf] = a.daten;
+  }
+  for (const k of ['feld', 'feldGeb', 'feldStr', 'platz', 'freiLohn', 'leerTyp', 'vZufSumme', 'vZufN', 'vParks']) {
+    if (!ArrayBuffer.isView(S[k])) throw new Error('Spielstand unvollständig: ' + k);
+  }
   return S;
 }
 
@@ -1790,7 +1984,7 @@ function kennzahlen(S) {
 G.StadtSim = {
   VERSION, R, KARTE, VK, VN, RASTER, RAND, LEER, STRASSE, WOHNHAUS, WERKSTATT, LADEN, PARK, BAUSTELLE,
   M, Z, ZIELNAMEN, AKTIONSNAMEN,
-  neueStadt, stunde, kennzahlen, name, strName, klartext,
+  neueStadt, stunde, tagSchritt, exportZustand, importZustand, kennzahlen, name, strName, klartext,
 };
 })(globalThis);
 </script>
@@ -1807,15 +2001,92 @@ const SEK_PRO_STUNDE = 60;                 // bei 1× ist eine echte Minute eine
 const $ = (id) => document.getElementById(id);
 const zahl = (v) => Math.round(v).toLocaleString('de-DE');
 
-// ─── Zustand ─────────────────────────────────────────────────────────────────────────
-let S = Sim.neueStadt(Number(URLP.get('seed')) || 1);
-if (DEBUG && URLP.get('tage')) {                          // Testhilfe: Stadt vorab N Tage laufen lassen
-  const ziel = Math.min(3000, Number(URLP.get('tage')) || 0);
-  while (S.tag < ziel) Sim.stunde(S);
+// ─── Speichern und Laden ─────────────────────────────────────────────────────────────
+const SCHLUESSEL = 'stadt-save-v1';
+const MAX_AUFHOLEN_TAGE = 90;
+const TYPEN = { Uint8Array, Uint16Array, Int16Array, Int32Array, Uint32Array, Float32Array, Float64Array };
+function b64aus(ta) {
+  const u8 = new Uint8Array(ta.buffer, ta.byteOffset, ta.byteLength);
+  let s = '';
+  for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+  return btoa(s);
 }
+function b64ein(b64, typ) {
+  const T = TYPEN[typ];
+  if (!T) throw new Error('Unbekannter Array-Typ im Spielstand: ' + typ);
+  const s = atob(b64), u8 = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) u8[i] = s.charCodeAt(i);
+  return new T(u8.buffer);
+}
+function spielstandText() {
+  const d = Sim.exportZustand(S);
+  return JSON.stringify({ ...d, arrays: d.arrays.map(a => ({ name: a.name, typ: a.typ, b64: b64aus(a.daten) })),
+    zuletztGelaufen: Date.now(), tempo: tempo || 0, ui: uiZustand() });
+}
+function spielstandLesen(text) {
+  const d = JSON.parse(text);
+  if (Array.isArray(d.arrays)) d.arrays = d.arrays.map(a => ({ name: a.name, typ: a.typ, daten: b64ein(a.b64, a.typ) }));
+  return { S: Sim.importZustand(d), zuletztGelaufen: Number(d.zuletztGelaufen) || Date.now(), tempo: d.tempo, ui: d.ui || {} };
+}
+function uiZustand() { return {}; }                       // wird von späteren Teilen erweitert (Hauptfiguren, Ollama)
+
+let speichernErlaubt = true;
+let alterSpielstand = null;                               // Text eines Spielstands anderer Version (für „Export behalten“)
+function speichern() {
+  if (!speichernErlaubt || !S) return false;
+  try {
+    const text = spielstandText();
+    const mb = text.length / 1e6;                         // Base64 und JSON: 1 Zeichen ≈ 1 Byte
+    if (mb > 4) meldung(`Achtung: Der Spielstand ist ${mb.toFixed(1)} MB groß. Der Browser speichert pro Seite nur etwa 5 MB. Mach vorsichtshalber einen Export.`, 'warnung');
+    localStorage.setItem(SCHLUESSEL, text);
+    return true;
+  } catch (e) {
+    meldung(`Speichern hat nicht geklappt: ${e.name}: ${e.message}. Ein Export in den Einstellungen sichert die Stadt als Datei.`, 'fehler');
+    return false;
+  }
+}
+
+let meldungTimer = 0;
+function meldung(text, art) {
+  const m = $('meldung');
+  m.textContent = text; m.className = art || ''; m.hidden = false;
+  clearTimeout(meldungTimer);
+  meldungTimer = setTimeout(() => { m.hidden = true; }, art === 'fehler' ? 15000 : 8000);
+}
+
+function zufallsSeed() { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] || 1; }
+
+// ─── Zustand ─────────────────────────────────────────────────────────────────────────
+let S = null;
 let tempo = 1;
 let akku = 0;                                             // Spielsekunden seit dem letzten Stundenschritt
 let simMs = 0;                                            // Dauer des letzten Simulationsschritts
+let aufholenLaeuft = false;
+let geladen = null;                                       // { zuletztGelaufen, tempo } eines geladenen Spielstands
+let versionFehler = null;
+{
+  let text = null;
+  try { text = localStorage.getItem(SCHLUESSEL); }
+  catch (e) { versionFehler = null; setTimeout(() => meldung(`Der Browser erlaubt keinen Speicher (${e.name}). Die Stadt läuft, wird aber nicht gespeichert. Export geht trotzdem.`, 'fehler'), 0); }
+  if (text && !URLP.has('neu')) {
+    try {
+      const l = spielstandLesen(text);
+      S = l.S; geladen = l;
+      if (typeof l.tempo === 'number') tempo = l.tempo;
+    } catch (e) {
+      alterSpielstand = text;
+      versionFehler = e;
+      speichernErlaubt = false;                           // den alten Stand nicht überschreiben, bevor Noah entscheidet
+    }
+  }
+  if (!S) {
+    S = Sim.neueStadt(Number(URLP.get('seed')) || zufallsSeed());
+    if (DEBUG && URLP.get('tage')) {                      // Testhilfe: Stadt vorab N Tage laufen lassen
+      const ziel = Math.min(3000, Number(URLP.get('tage')) || 0);
+      while (S.tag < ziel) Sim.stunde(S);
+    }
+  }
+}
 
 // ─── Hinweis, wenn etwas fehlt ───────────────────────────────────────────────────────
 function hinweis(html) { const h = $('hinweis'); h.innerHTML = html; h.hidden = false; }
@@ -2063,6 +2334,7 @@ function baueGrafik(THREE, OrbitControls) {
 
   return {
     stadt, licht, ausrichten,
+    neueStadt() { strassenStand = -1; ausrichten(); stadt(S.stunde); },   // nach einem Import
     render() { controls.update(); renderer.render(scene, camera); return renderer.info.render; },
     instanzen() { return Object.values(M).reduce((s, m) => s + m.count, 0); },
     THREE, renderer, scene, camera, controls, M,
@@ -2110,7 +2382,7 @@ function buchHtml(text) {
     (m, id, gen, n) => `<button type="button" class="name" data-p="${id}" data-g="${gen}">${n}</button>`);
 }
 let buchGesehen = 0;
-const BUCH_ANZEIGE = 200;
+const BUCH_ANZEIGE = Sim.R.BUCH_MAX;                     // alle Einträge, damit „Während du weg warst“ immer im Buch zu finden ist
 function buchAnzeigen() {
   if (S.buchNr === buchGesehen) return;
   const liste = $('buch-liste'), neu = S.buch.filter(e => e.nr > buchGesehen);
@@ -2138,7 +2410,7 @@ function nachSchritten() {
   if (G) G.stadt(S.stunde);
 }
 function simTakt(dt) {
-  if (!tempo) return;
+  if (!tempo || aufholenLaeuft) return;
   akku += dt * tempo;
   let n = 0;
   while (akku >= SEK_PRO_STUNDE && n < 3) { schritt(); akku -= SEK_PRO_STUNDE; n++; }
@@ -2175,9 +2447,164 @@ function frame(jetzt) {
   if (DEBUG) debugAnzeigen(performance.now() - jetzt, info);
   requestAnimationFrame(frame);
 }
-if (DEBUG) globalThis.__stadt = { S: () => S, Sim, G, setzeTempo, schritt, nachSchritten };   // nur für Tests
+// ─── Aufholen ────────────────────────────────────────────────────────────────────────
+// Verpasste Echtzeit → Spielzeit bei 1× (eine Minute = eine Spielstunde), höchstens 90 Spieltage.
+// Bis Mitternacht stündlich, dann Tagesschritte in Blöcken zu 5 Tagen mit Pause, Rest stündlich.
+const warteKurz = () => new Promise(r => setTimeout(r, 0));
+function schnappschuss() {
+  const k = Sim.kennzahlen(S);
+  return { tag: S.tag, einwohner: S.einwohner, gebaeude: k.gebaeude, gruendungen: S.stat.gruendungen, geburten: S.stat.geburten,
+    wegzuege: S.stat.wegzuegePersonen, tode: S.stat.tode, pleiten: S.stat.pleiten, buchNr: S.buchNr };
+}
+async function aufholen(msWeg) {
+  const stundenGesamt = Math.min(MAX_AUFHOLEN_TAGE * 24, Math.floor(msWeg / (SEK_PRO_STUNDE * 1000)));
+  if (stundenGesamt <= 0) return null;
+  const vorher = schnappschuss(), zielTag = S.tag + Math.floor((S.stunde + stundenGesamt) / 24), zielStunde = (S.stunde + stundenGesamt) % 24;
+  const tage = Math.floor(stundenGesamt / 24);
+  aufholenLaeuft = true;
+  const zeigen = tage >= 1;
+  if (zeigen) {
+    $('aufholen-text').textContent = `Deine Stadt holt ${tage} ${tage === 1 ? 'Tag' : 'Tage'} auf …`;
+    $('aufholen-balken').value = 0;
+    $('aufholen').hidden = false;
+  }
+  try {
+    const bisZiel = () => S.tag < zielTag;
+    // bis Mitternacht stündlich (nur wenn noch ein Tageswechsel ansteht)
+    if (bisZiel()) { while (S.stunde !== 0) Sim.stunde(S); }
+    let erledigt = 0;
+    while (bisZiel()) {
+      for (let i = 0; i < 5 && bisZiel(); i++) { Sim.tagSchritt(S); erledigt++; }
+      if (zeigen) $('aufholen-balken').value = Math.min(1, (S.tag - vorher.tag) / Math.max(1, zielTag - vorher.tag));
+      await warteKurz();                                  // der Browser darf zwischendurch zeichnen
+    }
+    while (S.stunde < zielStunde) Sim.stunde(S);
+  } finally {
+    aufholenLaeuft = false;
+    $('aufholen').hidden = true;
+  }
+  akku = 0;
+  nachSchritten();
+  speichern();
+  return { vorher, nachher: schnappschuss(), tage };
+}
+
+// Die drei auffälligsten Einträge: nach Gewicht der Art, höchstens einer je Art, bei Gleichstand der neueste
+const GEWICHT = { notbremse: 9, pleite: 8, gruendung: 7, tod: 6, wegzug: 5, schliessung: 5, kinder_weg: 5, trennung: 4,
+  hochzeit: 4, geburt: 3, bauamt: 2, zuzug: 1, start: 0 };
+function auffaelligste(abNr, n) {
+  const kand = S.buch.filter(e => e.nr > abNr).sort((a, b) => (GEWICHT[b.art] || 0) - (GEWICHT[a.art] || 0) || b.nr - a.nr);
+  const wahl = [], arten = new Set();
+  for (const e of kand) { if (wahl.length < n && !arten.has(e.art)) { wahl.push(e); arten.add(e.art); } }
+  for (const e of kand) { if (wahl.length < n && !wahl.includes(e)) wahl.push(e); }
+  return wahl.sort((a, b) => a.nr - b.nr);
+}
+function wegKarte(erg) {
+  const { vorher: v, nachher: n } = erg, d = (a, b) => (b - a >= 0 ? '+' : '−') + zahl(Math.abs(b - a));
+  const eintraege = n.buchNr - v.buchNr, abgeschnitten = eintraege > S.buch.length;
+  $('weg-inhalt').innerHTML = `
+    <p class="leise">Tag ${v.tag} bis Tag ${n.tag}, ${erg.tage} ${erg.tage === 1 ? 'Spieltag' : 'Spieltage'} nachgerechnet.</p>
+    <dl class="zahlen">
+      <dt>Einwohner</dt><dd>${zahl(v.einwohner)} → ${zahl(n.einwohner)}</dd>
+      <dt>Neue Gebäude</dt><dd>${d(v.gebaeude, n.gebaeude)}</dd>
+      <dt>Gründungen</dt><dd>${zahl(n.gruendungen - v.gruendungen)}</dd>
+      <dt>Pleiten</dt><dd>${zahl(n.pleiten - v.pleiten)}</dd>
+      <dt>Geburten</dt><dd>${zahl(n.geburten - v.geburten)}</dd>
+      <dt>Weggezogen</dt><dd>${zahl(n.wegzuege - v.wegzuege)}</dd>
+      <dt>Gestorben</dt><dd>${zahl(n.tode - v.tode)}</dd>
+    </dl>
+    <p class="leise">Das Auffälligste aus dem Stadtbuch${abgeschnitten ? ` (es hält nur die letzten ${S.buch.length} von ${zahl(eintraege)} neuen Einträgen)` : ''}:</p>
+    <ol class="auffaellig">${auffaelligste(v.buchNr, 3).map(e => `<li><span class="tag">Tag ${e.tag}</span>${buchHtml(e.text)}</li>`).join('')}</ol>`;
+  $('weg-dialog').showModal();
+}
+for (const d of document.querySelectorAll('dialog')) {
+  d.addEventListener('click', (e) => { if (e.target.closest('[data-schliessen]')) d.close(); });
+}
+
+// ─── Export, Import, Version ─────────────────────────────────────────────────────────
+function herunterladen(text, datei) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: datei });
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+$('einst-knopf').addEventListener('click', () => $('einst-dialog').showModal());
+$('export-knopf').addEventListener('click', () => {
+  try { herunterladen(spielstandText(), 'stadt-save.json'); }
+  catch (e) { meldung(`Export hat nicht geklappt: ${e.message}`, 'fehler'); }
+});
+$('import-knopf').addEventListener('click', () => $('import-datei').click());
+$('import-datei').addEventListener('change', async (e) => {
+  const datei = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!datei) return;
+  try {
+    const l = spielstandLesen(await datei.text());
+    S = l.S; akku = 0; buchNeu(); if (G) { G.neueStadt(); }
+    speichernErlaubt = true; speichern(); nachSchritten();
+    $('einst-dialog').close();
+    meldung(`Spielstand geladen: Tag ${S.tag}, ${zahl(S.einwohner)} Einwohner.`);
+  } catch (err) {
+    meldung(`Import hat nicht geklappt: ${err.message}`, 'fehler');
+  }
+});
+$('version-export').addEventListener('click', () => { if (alterSpielstand) herunterladen(alterSpielstand, 'stadt-save.json'); });
+$('version-neu').addEventListener('click', () => {
+  alterSpielstand = null; speichernErlaubt = true;
+  speichern();
+  $('version-dialog').close();
+});
+function buchNeu() { buchGesehen = 0; $('buch-liste').replaceChildren(); }
+
+// Speichern alle 30 Sekunden und beim Verlassen; beim Zurückkommen die verpasste Zeit aufholen
+setInterval(() => { if (!aufholenLaeuft) speichern(); }, 30000);
+addEventListener('pagehide', () => speichern());
+let verstecktSeit = 0;
+document.addEventListener('visibilitychange', async () => {
+  if (document.hidden) { speichern(); verstecktSeit = Date.now(); return; }
+  const weg = verstecktSeit ? Date.now() - verstecktSeit : 0;
+  verstecktSeit = 0;
+  if (tempo > 0 && weg >= 60000 && !aufholenLaeuft) {
+    const erg = await aufholen(weg);
+    if (erg && erg.tage >= 1) wegKarte(erg);
+  }
+});
+
+// Debug: Zeit vorspulen (setzt „zuletzt gelaufen“ zurück und lädt neu)
+if (DEBUG) {
+  $('debug-knoepfe').hidden = false;
+  $('debug-knoepfe').addEventListener('click', (e) => {
+    const k = e.target.closest('[data-vorspulen]');
+    if (!k) return;
+    if (!speichern()) return;
+    try {
+      const d = JSON.parse(localStorage.getItem(SCHLUESSEL));
+      d.zuletztGelaufen -= Number(k.dataset.vorspulen) * 3600 * 1000;
+      if (!d.tempo) d.tempo = 1;
+      localStorage.setItem(SCHLUESSEL, JSON.stringify(d));
+      speichernErlaubt = false;                           // sonst überschreibt pagehide den Zeitstempel
+      location.reload();
+    } catch (err) { meldung('Vorspulen hat nicht geklappt: ' + err.message, 'fehler'); }
+  });
+}
+
+if (DEBUG) globalThis.__stadt = { S: () => S, Sim, G, setzeTempo, schritt, nachSchritten, speichern, aufholen };   // nur für Tests
+setzeTempo(tempo);
 nachSchritten();
 requestAnimationFrame(frame);
+
+if (versionFehler) {
+  $('version-text').textContent = versionFehler.andereVersion ? versionFehler.message
+    : `Der gespeicherte Stand lässt sich nicht lesen: ${versionFehler.message}`;
+  if (!versionFehler.andereVersion) $('version-titel').textContent = 'Spielstand lässt sich nicht laden';
+  $('version-dialog').showModal();
+} else if (geladen) {
+  const weg = Date.now() - geladen.zuletztGelaufen;
+  if (tempo > 0 && weg >= 60000) {
+    const erg = await aufholen(weg);
+    if (erg && erg.tage >= 1) wegKarte(erg);
+  }
+}
 </script>
 </body>
 </html>

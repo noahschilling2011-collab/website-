@@ -7,6 +7,8 @@
 //
 //   node tools/simtest.mjs --seed 1 --tage 365      Tabelle alle 30 Tage + Charakter-Auswertung
 //   node tools/simtest.mjs --gate                   Phase-0-Gate mit Seeds 1, 2, 3 (je 730 Tage)
+//   node tools/simtest.mjs --speichertest           Speichern/Laden mitten am Tag: läuft danach bitgleich weiter?
+//   node tools/simtest.mjs --aufholtest             90 Tage stündlich gegen 90 Tagesschritte
 //   Optionen: --alle 30 (Zeilenabstand), --buch 20 (letzte Stadtbuch-Zeilen), --aktionen
 
 import { readFileSync } from 'node:fs';
@@ -14,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import vm from 'node:vm';
+import { createHash } from 'node:crypto';
 
 const hier = dirname(fileURLToPath(import.meta.url));
 const html = readFileSync(join(hier, '..', 'stadt.html'), 'utf8');
@@ -100,6 +103,55 @@ function charakterText(c) {
 }
 
 const Sim = ladeSim();
+
+// Wie der Browser speichert: typisierte Arrays als Base64 in JSON (hier mit Buffer statt btoa/atob)
+function speichernAlsText(Sim, S) {
+  const d = Sim.exportZustand(S);
+  return JSON.stringify({ ...d, arrays: d.arrays.map(a => ({ name: a.name, typ: a.typ,
+    b64: Buffer.from(a.daten.buffer, a.daten.byteOffset, a.daten.byteLength).toString('base64') })) });
+}
+const TYPEN = { Uint8Array, Uint16Array, Int16Array, Int32Array, Uint32Array, Float32Array, Float64Array };
+function ladenAusText(Sim, text) {
+  const d = JSON.parse(text);
+  d.arrays = d.arrays.map(a => { const u8 = Buffer.from(a.b64, 'base64'); const buf = u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);
+    return { name: a.name, typ: a.typ, daten: new TYPEN[a.typ](buf) }; });
+  return Sim.importZustand(d);
+}
+function fingerabdruck(Sim, S) {
+  const h = createHash('sha256');
+  const arrays = Sim.exportZustand(S).arrays.sort((x, y) => (x.name < y.name ? -1 : 1));   // Schlüsselreihenfolge egal
+  for (const a of arrays) { h.update(a.name); h.update(Buffer.from(a.daten.buffer, a.daten.byteOffset, a.daten.byteLength)); }
+  h.update(JSON.stringify(S.buch)); h.update(JSON.stringify(S.stat)); h.update(String(S.budget) + '/' + S.rs + '/' + S.tag + '/' + S.stunde);
+  return h.digest('hex').slice(0, 16);
+}
+
+if (flag('speichertest')) {
+  const seed = Number(arg('seed', '1')), tage = Number(arg('tage', '150'));
+  const bis = (S, tag, stunde) => { while (S.tag < tag || (S.tag === tag && S.stunde < stunde)) Sim.stunde(S); };
+  const A = Sim.neueStadt(seed); bis(A, tage, 13);
+  const text = speichernAlsText(Sim, A);
+  const B = ladenAusText(Sim, text);
+  console.log(`Seed ${seed}: gespeichert an Tag ${A.tag}, ${A.stunde} Uhr; Spielstand ${(text.length / 1e6).toFixed(2)} MB (${A.einwohner} Einwohner)`);
+  console.log(`  direkt nach dem Laden gleich: ${fingerabdruck(Sim, A) === fingerabdruck(Sim, B) ? 'ja' : 'NEIN'}`);
+  bis(A, tage + 60, 13); bis(B, tage + 60, 13);
+  const fa = fingerabdruck(Sim, A), fb = fingerabdruck(Sim, B);
+  console.log(`  60 Tage weiter: ununterbrochen ${fa} (${A.einwohner} Einw.), geladen ${fb} (${B.einwohner} Einw.) → ${fa === fb ? 'bitgleich' : 'UNTERSCHIEDLICH'}`);
+  process.exit(fa === fb ? 0 : 1);
+}
+if (flag('aufholtest')) {
+  const seed = Number(arg('seed', '1')), start = Number(arg('tage', '200')), n = Number(arg('aufholen', '90'));
+  const S0 = Sim.neueStadt(seed); while (S0.tag < start) Sim.stunde(S0);
+  const text = speichernAlsText(Sim, S0);
+  const A = ladenAusText(Sim, text), B = ladenAusText(Sim, text);
+  let t0 = performance.now(); while (A.tag < start + n) Sim.stunde(A); const msStd = performance.now() - t0;
+  t0 = performance.now(); while (B.tag < start + n) Sim.tagSchritt(B); const msTag = performance.now() - t0;
+  const ka = Sim.kennzahlen(A), kb = Sim.kennzahlen(B);
+  console.log(`Seed ${seed}, Tag ${start} → ${start + n}:   stündlich ${f0(msStd)} ms   in Tagesschritten ${f0(msTag)} ms (${(msStd / msTag).toFixed(1)}× schneller)`);
+  for (const k of ['einwohner', 'gebaeude', 'gruendungen', 'pleiten', 'freieStellen', 'zufriedenheit', 'arbeitslosenquote']) {
+    console.log(`  ${k.padEnd(18)} stündlich ${pad(typeof ka[k] === 'number' && ka[k] % 1 ? ka[k].toFixed(2) : ka[k], 9)}   Tagesschritte ${pad(typeof kb[k] === 'number' && kb[k] % 1 ? kb[k].toFixed(2) : kb[k], 9)}`);
+  }
+  process.exit(0);
+}
 
 if (flag('gate')) {
   const seeds = arg('seeds', '1,2,3').split(',').map(Number);
