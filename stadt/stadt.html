@@ -2973,14 +2973,16 @@ function baueGrafik(THREE, OrbitControls) {
     markise: inst(box(0.84, 0.05, 0.22), lambert('#ffffff'), 3000),
     park: inst(box(0.96, 0.04, 0.96), lambert('#3e6b45'), 2000),
     baum: inst(new THREE.ConeGeometry(0.17, 0.5, 6).translate(0, 0.25, 0), lambert('#2f5a3a'), 6000),
-    bau: inst(box(0.8, 1, 0.8), lambert('#e0a040', { transparent: true, opacity: 0.42, depthWrite: false }), 3000),
+    bau: inst(box(0.8, 1, 0.8), lambert('#ffffff', { transparent: true, opacity: 0.42, depthWrite: false }), 3000),   // Gerüst
+    kiste: inst(box(0.13, 0.11, 0.13), lambert('#ffffff'), 4000),   // Kistenstapel, Auslagen, getragene Kisten
   };
 
   const dummy = new THREE.Object3D();
   const farbe = new THREE.Color();
   // Zu jeder Instanz das Gebäude merken (für Klicks)
   const IDS = { haus: new Int32Array(4000), dach: new Int32Array(4000), fenster: new Int32Array(40000),
-    werkstatt: new Int32Array(3000), schlot: new Int32Array(3000), laden: new Int32Array(3000), markise: new Int32Array(3000) };
+    werkstatt: new Int32Array(3000), schlot: new Int32Array(3000), laden: new Int32Array(3000), markise: new Int32Array(3000),
+    bau: new Int32Array(3000) };
   const H = Sim.KARTE / 2;
   const wx = (x) => x - H + 0.5;
   function setze(m, i, x, y, z, sx, sy, sz, rotY) {
@@ -3003,6 +3005,21 @@ function baueGrafik(THREE, OrbitControls) {
   const WERKSTATT = new THREE.Color('#7d8894');
   const LICHT = new THREE.Color('#ffc864'), GLAS_NACHT = new THREE.Color('#1b222c'), GLAS_TAG = new THREE.Color('#7f93a6');
   const GESCHOSS = 0.42, GESCHOSSE = [0, 2, 4, 7];
+  const ROHBAU = new THREE.Color('#9b9da2'), GERUEST = new THREE.Color('#e0a040'), THEKE = new THREE.Color('#8a6646');
+  const KISTE_STADT = new THREE.Color('#9a6a3c'), KISTE_AUSSEN = new THREE.Color('#8c9096');
+  const TRAG_MAX = 120;                                   // so viele Kisten können gleichzeitig getragen werden (hinten im Kisten-Mesh)
+  let kisteStatisch = 0, kisteVoll = false, getragenVorher = 0;
+  const fortschritt = (b) => { const ges = Sim.bauGesamt(S, b); return ges ? (ges - S.g.bauRest[b]) / ges : 1; };
+  // Gerüst: bei Stillstand dunkler (je Tag ohne Bauarbeiter etwas mehr)
+  function geruest(b, px, pz, sxz, hoehe, n) {
+    if (!setze(M.bau, n, px, 0, pz, sxz, hoehe, sxz)) return n;
+    const still = S.g.still[b];
+    M.bau.setColorAt(n, farbe.copy(GERUEST).multiplyScalar(still ? Math.max(0.3, 0.85 - 0.1 * still) : 1));
+    IDS.bau[n] = b;
+    return n + 1;
+  }
+  // Richtung zur Straße als Einheitsvektor [dx, dz] und quer dazu
+  function strassenSeite(x, y) { const [dx, dy] = RICHT[zurStrasse(x, y)]; return [dx, dy, -dy, dx]; }
 
   // Blickrichtung zur Straße (für Markisen): erste Nachbarzelle, die Straße ist
   const RICHT = [[0, 1], [1, 0], [0, -1], [-1, 0]];
@@ -3031,19 +3048,24 @@ function baueGrafik(THREE, OrbitControls) {
     const g = S.g, K = Sim.KARTE;
     // Straßen nur neu, wenn welche dazugekommen sind
     if (S.stat.strassenFelder !== strassenStand) {
-      wege.clear();                                       // neue Straßen: Wege neu suchen (kürzere möglich)
+      wege.clear(); rundwege.clear();                     // neue Straßen: Wege neu suchen (kürzere möglich)
       let n = 0;
       for (let c = 0; c < F; c++) if (S.feld[c] === Sim.STRASSE) setze(M.strasse, n++, wx(c % K), 0.005, wx((c / K) | 0), 1, 1, 1);
       fertig(M.strasse, n);
       strassenStand = S.stat.strassenFelder;
     }
     const nacht = tageszeit < 6.5 || tageszeit >= 18.5;
-    let nh = 0, nd = 0, nf = 0, nw = 0, ns = 0, nl = 0, nm = 0, np = 0, nb = 0, nbau = 0;
+    let nh = 0, nd = 0, nf = 0, nw = 0, ns = 0, nl = 0, nm = 0, np = 0, nb = 0, nbau = 0, nk = 0;
+    const kisteMax = M.kiste.userData.kap - TRAG_MAX;
     for (let b = 0; b < S.gAnzahl; b++) {
       const x = g.x[b], y = g.y[b], px = wx(x), pz = wx(y), t = g.typ[b], f = S.feld[y * K + x];
-      if (f === Sim.BAUSTELLE) {                          // Baustelle: halbdurchsichtiger Kasten in Zielhöhe
-        const hoehe = t === Sim.WOHNHAUS ? GESCHOSSE[1] * GESCHOSS : t === Sim.PARK ? 0.12 : 0.6;
-        setze(M.bau, nbau++, px, 0, pz, 1, hoehe, 1);
+      if (f === Sim.BAUSTELLE) {                          // Baustelle: grauer Rohbau wächst mit den Arbeitstagen, Gerüst in Zielhöhe
+        const hoehe = t === Sim.WOHNHAUS ? GESCHOSSE[1] * GESCHOSS : t === Sim.PARK ? 0.12 : t === Sim.LADEN ? 0.55 : 0.7;
+        const k = Math.max(0.05, fortschritt(b));
+        if (t === Sim.WOHNHAUS && setze(M.haus, nh, px, 0, pz, 1, hoehe * k, 1)) { IDS.haus[nh] = b; M.haus.setColorAt(nh++, ROHBAU); }
+        else if (t === Sim.LADEN && setze(M.laden, nl, px, 0, pz, 1, k, 1)) { IDS.laden[nl] = b; M.laden.setColorAt(nl++, ROHBAU); }
+        else if (t === Sim.WERKSTATT && setze(M.werkstatt, nw, px, 0, pz, 1, k, 1)) { IDS.werkstatt[nw] = b; M.werkstatt.setColorAt(nw++, ROHBAU); }
+        nbau = geruest(b, px, pz, 1.14, hoehe + 0.04, nbau);
         continue;
       }
       if (t === Sim.WOHNHAUS) {
@@ -3051,9 +3073,11 @@ function baueGrafik(THREE, OrbitControls) {
         if (!setze(M.haus, nh, px, 0, pz, 1, hoehe, 1)) continue;
         IDS.haus[nh] = b;
         M.haus.setColorAt(nh++, HAUSFARBEN[(hash(b) * HAUSFARBEN.length) | 0]);
-        if (stufe < 3 && setze(M.dach, nd, px, hoehe, pz, 1, 1, 1)) IDS.dach[nd++] = b;
-        if (g.auf[b]) {                                   // Aufstockung: Gerüst bis zur neuen Höhe
-          setze(M.bau, nbau++, px, 0, pz, 1.08, GESCHOSSE[g.auf[b]] * GESCHOSS + 0.05, 1.08);
+        if (stufe < 3 && !g.auf[b] && setze(M.dach, nd, px, hoehe, pz, 1, 1, 1)) IDS.dach[nd++] = b;
+        if (g.auf[b]) {                                   // Aufstockung: Rohbau obendrauf wächst, Gerüst bis zur neuen Höhe
+          const oben = (GESCHOSSE[g.auf[b]] - geschosse) * GESCHOSS * Math.max(0.05, fortschritt(b));
+          if (setze(M.haus, nh, px, hoehe, pz, 1, oben, 1)) { IDS.haus[nh] = b; M.haus.setColorAt(nh++, ROHBAU); }
+          nbau = geruest(b, px, pz, 1.12, GESCHOSSE[g.auf[b]] * GESCHOSS + 0.05, nbau);
         }
         // Fensterbänder je Stockwerk
         const cap = Sim.R.WOHNUNGEN[stufe], belegt = g.belegt[b];
@@ -3071,6 +3095,13 @@ function baueGrafik(THREE, OrbitControls) {
         M.werkstatt.setColorAt(nw++, farbe);
         if (setze(M.schlot, ns, px + 0.26, 0.7, pz - 0.26, 1, 0.55, 1)) IDS.schlot[ns++] = b;
         if (!leer && !nacht && setze(M.fenster, nf, px, 0.28, pz, 1.1, 0.12, 1.1)) { IDS.fenster[nf] = b; M.fenster.setColorAt(nf++, GLAS_TAG); }
+        // Kistenstapel neben der Werkstatt: eine Kiste je 12 gemachte (gestern), höchstens 6
+        const n = leer ? 0 : Math.min(6, Math.ceil(g.kisten[b] / 12)), [dx, dz, qx, qz] = strassenSeite(x, y);
+        for (let i = 0; i < n && nk < kisteMax; i++) {
+          const c = i % 2, l = (i / 2) | 0;
+          setze(M.kiste, nk, px + dx * 0.52 + qx * (0.3 + c * 0.15), l * 0.11, pz + dz * 0.52 + qz * (0.3 + c * 0.15), 1, 1, 1);
+          M.kiste.setColorAt(nk++, KISTE_STADT);
+        }
       } else if (t === Sim.LADEN) {
         const leer = g.leer[b], offen = !leer;
         farbe.copy(LADENFARBEN[(hash(b) * LADENFARBEN.length) | 0]).multiplyScalar(leer ? 0.5 : 1);
@@ -3082,6 +3113,17 @@ function baueGrafik(THREE, OrbitControls) {
         IDS.markise[nm] = b;
         farbe.copy(MARKISEN[(hash(b + 3) * MARKISEN.length) | 0]).multiplyScalar(leer ? 0.45 : 1);
         M.markise.setColorAt(nm++, farbe);
+        // Theke vor dem Laden, solange jemand dort steht (8–17 Uhr); Auslage: braun = Kisten aus der Stadt, grau = von außen
+        if (offen && tageszeit >= 8 && tageszeit < 17 && Sim.theke(S, b) >= 0) {
+          setze(M.markise, nm, px + dx * 0.6, 0, pz + dy * 0.6, 0.55, 5, 1, dx !== 0 ? Math.PI / 2 : 0);
+          IDS.markise[nm] = b; M.markise.setColorAt(nm++, THEKE);
+        }
+        const ks = g.kistenStadt[b], ka = g.kistenAussen[b], n = offen ? Math.min(4, Math.ceil((ks + ka) / 10)) : 0;
+        const braun = ks + ka ? Math.round(n * ks / (ks + ka)) : 0;
+        for (let i = 0; i < n && nk < kisteMax; i++) {
+          setze(M.kiste, nk, px + dx * 0.6 - dy * (0.3 + ((i / 2) | 0) * 0.14) * (i % 2 ? -1 : 1), 0, pz + dy * 0.6 + dx * (0.3 + ((i / 2) | 0) * 0.14) * (i % 2 ? -1 : 1), 1, 1, 1);
+          M.kiste.setColorAt(nk++, i < braun ? KISTE_STADT : KISTE_AUSSEN);
+        }
         // Schaufenster: abends beleuchtet, solange der Laden offen ist
         const lichtLaden = offen && tageszeit >= 17 && tageszeit < 22;
         if (setze(M.fenster, nf, px, 0.12, pz, 1.03, 0.16, 1.03)) { IDS.fenster[nf] = b; M.fenster.setColorAt(nf++, lichtLaden ? LICHT : nacht ? GLAS_NACHT : GLAS_TAG); }
@@ -3095,19 +3137,27 @@ function baueGrafik(THREE, OrbitControls) {
     }
     fertig(M.haus, nh); fertig(M.dach, nd); fertig(M.fenster, nf); fertig(M.werkstatt, nw); fertig(M.schlot, ns);
     fertig(M.laden, nl); fertig(M.markise, nm); fertig(M.park, np); fertig(M.baum, nb); fertig(M.bau, nbau);
+    // Kisten: der hintere Teil gehört den Trägern (figurenBewegen); Farben dort einmal braun setzen
+    for (let i = nk; i < nk + TRAG_MAX; i++) M.kiste.setColorAt(i, KISTE_STADT);
+    kisteStatisch = nk; kisteVoll = true;
+    M.kiste.count = nk; if (M.kiste.instanceColor) M.kiste.instanceColor.needsUpdate = true;
   }
 
-  // ─── Figuren: höchstens 300 zufällige Erwachsene, dazu alle Hauptfiguren (mit Markierung) ──
-  const FIG_MAX = 300, HAUPT_MAX = 10, FIG_GES = FIG_MAX + HAUPT_MAX, GEHTEMPO = 22;   // Felder pro Spielstunde
+  // ─── Figuren: höchstens 300, davon bis zu 120 Leute bei der Arbeit, dazu alle Hauptfiguren (mit Markierung) ──
+  // Grundregel: Eine Figur steht oder geht nur dort, wo die Simulation die Person in dieser Stunde hat.
+  const FIG_MAX = 300, WERK_MAX = 120, HAUPT_MAX = 10, FIG_GES = FIG_MAX + HAUPT_MAX, GEHTEMPO = 22;   // Felder pro Spielstunde
   const figMesh = inst(new THREE.CapsuleGeometry(0.055, 0.13, 2, 6).translate(0, 0.12, 0), lambert('#ffffff'), FIG_GES);
   const markMesh = inst(new THREE.OctahedronGeometry(0.065), new THREE.MeshBasicMaterial({ color: '#ffffff' }), HAUPT_MAX);
   const MARK_GOLD = new THREE.Color('#ffc864'), MARK_DENKT = new THREE.Color('#f4f4f7');   // überlegt = weiß
+  const WESTE = new THREE.Color('#e8792c'), BLAUMANN = new THREE.Color('#4f7fc0');       // Bauarbeiter, Handwerker
   const NULL = new THREE.Matrix4().makeScale(0, 0, 0);
   const FIGFARBEN = ['#e6d3bd', '#c2d3e6', '#e6c2bd', '#c6e0c2', '#e6dcb8', '#b8d8d8', '#d8c2b0', '#aebfd8'].map(c => new THREE.Color(c));
-  const figuren = [];                                     // { p, gen, route, start, dauer, versatz, ox, oz, haupt }
+  const ECKEN = [[-1, -1], [1, 1], [1, -1], [-1, 1]];
+  const QUER = [-0.3, 0.3, -0.15, 0.15, -0.45, 0.45, 0];
+  const figuren = [];                                     // { p, gen, ort, route, start, dauer, versatz, ox, oz, haupt, werk, steht, sx, sz, traeger, hin }
   const figIds = new Int32Array(FIG_GES).fill(-1);
-  let hauptIds = [];
-  const wege = new Map();
+  let hauptIds = [], werkTag = -1;
+  const wege = new Map(), rundwege = new Map();
   const bfsVon = new Int32Array(F), bfsMarke = new Uint32Array(F), bfsQ = new Int32Array(F);
   let bfsLauf = 0;
   function strassenNachbar(b) {
@@ -3144,27 +3194,97 @@ function baueGrafik(THREE, OrbitControls) {
       }
     }
     pts.push(wx(S.g.x[b]), wx(S.g.y[b]));
-    const n = pts.length / 2, cum = new Float32Array(n);
-    for (let i = 1; i < n; i++) cum[i] = cum[i - 1] + Math.hypot(pts[2 * i] - pts[2 * i - 2], pts[2 * i + 1] - pts[2 * i - 1]);
-    r = { pts: Float32Array.from(pts), cum, len: cum[n - 1] };
+    r = strecke(pts);
     if (wege.size > 4000) wege.clear();
     wege.set(key, r);
     return r;
   }
-  function neueFigur(f, p, haupt) {
-    f.p = p; f.gen = S.p.gen[p]; f.route = null; f.haupt = haupt; f.steht = false;
+  function strecke(pts) {
+    const n = pts.length / 2, cum = new Float32Array(n);
+    for (let i = 1; i < n; i++) cum[i] = cum[i - 1] + Math.hypot(pts[2 * i] - pts[2 * i - 2], pts[2 * i + 1] - pts[2 * i - 1]);
+    return { pts: Float32Array.from(pts), cum, len: cum[n - 1] };
+  }
+  // Träger: Werkstatt → Laden → Werkstatt in einem Gang; hin = Länge bis zum Laden (so lange trägt er die Kiste)
+  function hinUndZurueck(a, b) {
+    const key = a * 65536 + b;
+    let r = rundwege.get(key);
+    if (r) return r;
+    const h = weg(a, b), z = weg(b, a);
+    r = strecke([...h.pts, ...z.pts.subarray(2)]);
+    r.hin = h.len;
+    if (rundwege.size > 2000) rundwege.clear();
+    rundwege.set(key, r);
+    return r;
+  }
+  function neueFigur(f, p, haupt, werk) {
+    f.p = p; f.gen = S.p.gen[p]; f.route = null; f.haupt = haupt; f.werk = !!werk; f.steht = false; f.traeger = false;
     f.versatz = Math.random() * 0.15; f.ox = (Math.random() - 0.5) * 0.4; f.oz = (Math.random() - 0.5) * 0.4;
   }
-  // Nach jedem Simulationsschritt: wer läuft in dieser Stunde wohin? (Folgt den Entscheidungen der Leute)
+  // Wo die Simulation die Person in der laufenden Stunde H hat (Arbeitszeit 8–16 Uhr wie in Sim.stunde)
+  function simOrt(p, H) {
+    const P = S.p, w = P.wohnung[p], arb = P.arbeit[p], bes = P.besuch[p], st = P.stammladen[p];
+    const arbeitet = arb >= 0 && !P.frei[p];
+    if (arbeitet && H >= 8 && H < 17) return P.einsatz[p] ? P.einsatz[p] - 1 : arb;   // Bauarbeiter: auf der Baustelle
+    if (bes >= 0 && bes !== w && H >= 19 && H < 22) return bes;
+    if (!arbeitet && st >= 0 && H === 10) return st;                                // wer frei hat, geht einkaufen
+    return w;
+  }
+  function beiDerArbeit(p, H, ort) {
+    const P = S.p;
+    return P.arbeit[p] >= 0 && !P.frei[p] && H >= 8 && H < 17 && ort === (P.einsatz[p] ? P.einsatz[p] - 1 : P.arbeit[p]);
+  }
+  // Einmal am Tag (8 Uhr, sonst beim ersten Planen in der Arbeitszeit): Arbeitsplätze nach Nähe zur Kamera vergeben
+  function arbeiterWaehlen(H) {
+    const P = S.p, erw = S.tag - Sim.R.ERWACHSEN * Sim.R.JAHR, tx = controls.target.x, tz = controls.target.z;
+    const haupt = new Set(hauptIds), kand = [];
+    for (let p = 0; p < S.pMax; p++) {
+      if (!P.lebt[p] || P.geb[p] >= erw || haupt.has(p) || P.arbeit[p] < 0 || P.frei[p]) continue;
+      const o = simOrt(p, H);
+      if (o < 0) continue;
+      kand.push({ p, d: (wx(S.g.x[o]) - tx) ** 2 + (wx(S.g.y[o]) - tz) ** 2 });
+    }
+    kand.sort((a, b) => a.d - b.d);
+    const gewaehlt = new Set();
+    for (let i = 0; i < WERK_MAX; i++) {
+      const f = figuren[i], k = kand[i];
+      if (!k) { if (f.werk) f.p = -1; f.werk = false; continue; }
+      gewaehlt.add(k.p);
+      if (f.p !== k.p || f.gen !== P.gen[k.p] || !f.werk) { neueFigur(f, k.p, false, true); f.ort = simOrt(k.p, H - 1); }
+    }
+    for (let i = 0; i < FIG_MAX; i++) if (!figuren[i].werk && gewaehlt.has(figuren[i].p)) figuren[i].p = -1;   // nie doppelt
+    werkTag = S.tag;
+  }
+  function traegerKarte() {                               // Person → Laden, zu dem sie heute die Kisten trägt
+    const m = new Map(), g = S.g;
+    for (let l = 0; l < S.gAnzahl; l++) {
+      if (g.typ[l] !== Sim.LADEN || g.leer[l] || S.feld[g.y[l] * Sim.KARTE + g.x[l]] !== Sim.LADEN) continue;
+      const t = Sim.traeger(S, l);
+      if (t >= 0 && !m.has(t)) m.set(t, l);
+    }
+    return m;
+  }
+  // Standplatz vor dem Gebäude: Bauarbeiter an den Ecken der Baustelle, sonst auf der Straßenseite nebeneinander,
+  // wer an der Theke steht, mittig hinter der Theke
+  function standplatz(f, ort, k, bau) {
+    const g = S.g, bx = wx(g.x[ort]), bz = wx(g.y[ort]);
+    if (bau) { const e = ECKEN[k % 4]; f.sx = bx + e[0] * 0.5; f.sz = bz + e[1] * 0.5; return; }
+    const [dx, dz, qx, qz] = strassenSeite(g.x[ort], g.y[ort]);
+    const theke = g.typ[ort] === Sim.LADEN && beiDerArbeit(f.p, S.stunde, ort) && Sim.theke(S, ort) === f.p;
+    const vor = theke ? 0.47 : 0.68, quer = theke ? 0 : f.haupt && !beiDerArbeit(f.p, S.stunde, ort) ? f.ox * 0.5 : QUER[k % QUER.length];
+    f.sx = bx + dx * vor + qx * quer; f.sz = bz + dz * vor + qz * quer;
+  }
+  // Nach jedem Simulationsschritt: wer geht in dieser Stunde wohin, wer steht wo?
   function figurenPlanen() {
-    const P = S.p, erw = S.tag - Sim.R.ERWACHSEN * Sim.R.JAHR;
+    const P = S.p, erw = S.tag - Sim.R.ERWACHSEN * Sim.R.JAHR, H = S.stunde, jetzt = S.tag * 24 + H;
+    while (figuren.length < FIG_GES) figuren.push({ p: -1, gen: 0, ort: -1, route: null, start: 0, dauer: 0, versatz: 0, ox: 0, oz: 0,
+      haupt: false, werk: false, steht: false, sx: 0, sz: 0, px: 0, pz: 0, vorher: false, traeger: false, hin: 0 });
     // Hauptfiguren in die letzten Plätze
-    while (figuren.length < FIG_GES) figuren.push({ p: -1, gen: 0, route: null, start: 0, dauer: 0, versatz: 0, ox: 0, oz: 0, haupt: false });
     for (let i = 0; i < HAUPT_MAX; i++) {
       const f = figuren[FIG_MAX + i], h = hauptIds[i];
       if (h === undefined || !P.lebt[h]) { f.p = -1; continue; }
-      if (f.p !== h || f.gen !== P.gen[h]) neueFigur(f, h, true);
+      if (f.p !== h || f.gen !== P.gen[h]) { neueFigur(f, h, true); f.ort = simOrt(h, H); }
     }
+    if (werkTag !== S.tag && H >= 8 && H < 17) arbeiterWaehlen(H);
     // Freie Plätze mit zufälligen Erwachsenen füllen (nie doppelt, nie Hauptfiguren)
     const belegt = new Set();
     for (const f of figuren) if (f.p >= 0 && P.lebt[f.p] && P.gen[f.p] === f.gen) belegt.add(f.p);
@@ -3173,58 +3293,55 @@ function baueGrafik(THREE, OrbitControls) {
       const f = figuren[i];
       if (f.p >= 0 && P.lebt[f.p] && P.gen[f.p] === f.gen && P.geb[f.p] < erw) continue;
       f.p = -1;
+      if (f.werk && werkTag === S.tag && H < 17) continue;          // Arbeitsplatz frei geworden: bleibt heute leer
+      f.werk = false;
       if (!kandidaten) { kandidaten = []; for (let p = 0; p < S.pMax; p++) if (P.lebt[p] && P.geb[p] < erw && !belegt.has(p)) kandidaten.push(p); }
       while (kandidaten.length) {
         const j = (Math.random() * kandidaten.length) | 0, p = kandidaten[j];
         kandidaten[j] = kandidaten[kandidaten.length - 1]; kandidaten.pop();
-        if (!belegt.has(p)) { neueFigur(f, p, false); belegt.add(p); break; }
+        if (!belegt.has(p)) { neueFigur(f, p, false); f.ort = simOrt(p, H); belegt.add(p); break; }
       }
     }
-    const H = S.stunde, jetzt = S.tag * 24 + H;
+    const trag = H === 9 || H === 13 ? traegerKarte() : null;
+    const stehen = new Map();
     for (let i = 0; i < figuren.length; i++) {
       const f = figuren[i];
       if (f.p < 0) continue;
-      const p = f.p, w = P.wohnung[p], arb = P.arbeit[p], frei = P.frei[p], bes = P.besuch[p], st = P.stammladen[p];
-      const arbeitet = arb >= 0 && !frei;
-      let von = -1, nach = -1;
-      if (H === 8 && arbeitet) { von = w; nach = arb; }                 // nach der Entscheidung um 7: zur Arbeit
-      else if (H === 17 && arbeitet) { von = arb; nach = w; }           // Feierabend
-      else if (H === 19 && bes >= 0 && bes !== w) { von = w; nach = bes; }   // nach der Entscheidung um 18: zu Freunden
-      else if (H === 22 && bes >= 0 && bes !== w) { von = bes; nach = w; }
-      else if (H === 10 && !arbeitet && st >= 0) { von = w; nach = st; }     // wer frei hat, geht einkaufen
-      else if (H === 11 && !arbeitet && st >= 0) { von = st; nach = w; }
-      if (von >= 0 && nach >= 0 && von !== nach) {
-        f.route = weg(von, nach);
+      const p = f.p, ort = simOrt(p, H), arbeit = beiDerArbeit(p, H, ort), bau = arbeit && P.einsatz[p] > 0;
+      f.vorher = f.steht; f.px = f.sx; f.pz = f.sz;          // falls gleich ein Weg beginnt: bis dahin am alten Platz
+      f.traeger = false;
+      if (ort >= 0 && f.ort >= 0 && ort !== f.ort) {         // Ortswechsel in der Simulation → Weg dorthin
+        f.route = weg(f.ort, ort);
         f.start = jetzt + f.versatz;
         f.dauer = Math.max(0.2, Math.min(0.85, f.route.len / GEHTEMPO));
+      } else if (trag && arbeit && trag.has(p) && ort === P.arbeit[p]) {   // Träger: Kisten zum Laden und zurück
+        f.route = hinUndZurueck(ort, trag.get(p));
+        f.start = jetzt + f.versatz; f.dauer = Math.max(0.3, Math.min(0.85, f.route.len / GEHTEMPO));
+        f.traeger = true; f.hin = f.route.hin;
       }
-      // Hauptfiguren sind immer zu sehen (Spec: „plus immer alle Hauptfiguren“): wenn sie nicht laufen,
-      // stehen sie auf der Straße vor dem Gebäude, in dem sie gerade sind
-      if (f.haupt) {
-        const ort = arbeitet && H >= 8 && H < 17 ? arb : bes >= 0 && bes !== w && H >= 19 && H < 22 ? bes
-          : !arbeitet && st >= 0 && H === 10 ? st : w;
-        f.steht = ort >= 0;
-        if (f.steht) {
-          const c = strassenNachbar(ort), bx = wx(S.g.x[ort]), bz = wx(S.g.y[ort]);
-          const sx = c >= 0 ? wx(c % Sim.KARTE) : bx, sz = c >= 0 ? wx((c / Sim.KARTE) | 0) : bz;
-          f.sx = bx + (sx - bx) * 0.62 + f.ox * 0.5; f.sz = bz + (sz - bz) * 0.62 + f.oz * 0.5;
-        }
+      f.ort = ort;
+      // Stehen: Hauptfiguren immer (Spec: „plus immer alle Hauptfiguren“), Arbeitsplätze während der Arbeit
+      f.steht = ort >= 0 && (f.haupt || (f.werk && arbeit));
+      if (f.steht) {
+        const key = ort * 2 + (bau ? 1 : 0), k = stehen.get(key) || 0;
+        stehen.set(key, k + 1);
+        standplatz(f, ort, k, bau);
       }
-    }
-    for (let i = 0; i < figuren.length; i++) {
-      const f = figuren[i];
-      if (f.p >= 0) figMesh.setColorAt(i, f.haupt ? LICHT : FIGFARBEN[f.p % FIGFARBEN.length]);
+      const arb = P.arbeit[p];
+      figMesh.setColorAt(i, f.haupt ? LICHT : arb >= 0 && arb === S.bauhof ? WESTE
+        : arb >= 0 && S.g.typ[arb] === Sim.WERKSTATT ? BLAUMANN : FIGFARBEN[p % FIGFARBEN.length]);
     }
     if (figMesh.instanceColor) figMesh.instanceColor.needsUpdate = true;
   }
   // Jedes Bild: Figuren entlang ihres Weges schieben (ohne neue Objekte)
   function figurenBewegen(jetzt) {
-    let nm = 0;
+    let nm = 0, nt = 0;
     for (let i = 0; i < figuren.length; i++) {
       const f = figuren[i], r = f.route;
       figIds[i] = -1;
-      const laeuft = f.p >= 0 && r && jetzt >= f.start && jetzt < f.start + f.dauer && r.len > 0;
-      if (!laeuft && !(f.p >= 0 && f.haupt && f.steht)) { figMesh.setMatrixAt(i, NULL); continue; }
+      if (f.p < 0) { figMesh.setMatrixAt(i, NULL); continue; }
+      const laeuft = r && jetzt >= f.start && jetzt < f.start + f.dauer && r.len > 0;
+      const wartet = r && jetzt < f.start && f.start - jetzt < 1;          // Weg beginnt gleich
       let x, z, dreh = 0;
       if (laeuft) {
         const d = ((jetzt - f.start) / f.dauer) * r.len, cum = r.cum;
@@ -3233,7 +3350,10 @@ function baueGrafik(THREE, OrbitControls) {
         const seg = cum[hi] - cum[lo], k = seg > 0 ? (d - cum[lo]) / seg : 0;
         const x0 = r.pts[2 * lo], z0 = r.pts[2 * lo + 1], x1 = r.pts[2 * hi], z1 = r.pts[2 * hi + 1];
         x = x0 + (x1 - x0) * k + f.ox; z = z0 + (z1 - z0) * k + f.oz; dreh = Math.atan2(x1 - x0, z1 - z0);
-      } else { x = f.sx; z = f.sz; }                      // Hauptfigur steht vor dem Gebäude
+        if (f.traeger && d < f.hin && nt < TRAG_MAX && setze(M.kiste, kisteStatisch + nt, x, 0.2, z, 1, 1, 1, dreh)) nt++;
+      } else if (wartet && f.vorher) { x = f.px; z = f.pz; }            // steht noch am alten Platz
+      else if (f.steht && !wartet) { x = f.sx; z = f.sz; }               // steht vor dem Gebäude, auf der Baustelle, an der Theke
+      else { figMesh.setMatrixAt(i, NULL); continue; }
       dummy.position.set(x, 0.02, z); dummy.scale.set(1, 1, 1); dummy.rotation.set(0, dreh, 0);
       dummy.updateMatrix();
       figMesh.setMatrixAt(i, dummy.matrix);
@@ -3253,12 +3373,17 @@ function baueGrafik(THREE, OrbitControls) {
     markMesh.count = nm;
     markMesh.instanceMatrix.needsUpdate = true;
     if (markMesh.instanceColor) markMesh.instanceColor.needsUpdate = true;
+    // Kisten: nach einem Neuaufbau alles hochladen, sonst nur die getragenen (addUpdateRange, Einheit: Zahlen)
+    M.kiste.count = kisteStatisch + nt;
+    if (kisteVoll) { M.kiste.instanceMatrix.clearUpdateRanges(); M.kiste.instanceMatrix.needsUpdate = true; kisteVoll = false; }
+    else if (nt || getragenVorher) { M.kiste.instanceMatrix.addUpdateRange(kisteStatisch * 16, Math.max(nt, 1) * 16); M.kiste.instanceMatrix.needsUpdate = true; }
+    getragenVorher = nt;
   }
 
   // ─── Klicken: Figur (in Bildschirmnähe) oder Gebäude ───
   const ray = new THREE.Raycaster(), zeiger = new THREE.Vector2(), treffer = [], v3 = new THREE.Vector3(), m4 = new THREE.Matrix4();
-  const KLICKBAR = [M.haus, M.dach, M.fenster, M.werkstatt, M.schlot, M.laden, M.markise];
-  const KLICK_IDS = [IDS.haus, IDS.dach, IDS.fenster, IDS.werkstatt, IDS.schlot, IDS.laden, IDS.markise];
+  const KLICKBAR = [M.haus, M.dach, M.fenster, M.werkstatt, M.schlot, M.laden, M.markise, M.bau];
+  const KLICK_IDS = [IDS.haus, IDS.dach, IDS.fenster, IDS.werkstatt, IDS.schlot, IDS.laden, IDS.markise, IDS.bau];
   function waehle(cx, cy) {
     const r = canvas.getBoundingClientRect();
     // Figuren sind klein: nimm die nächste sichtbare Figur im Umkreis von 16 Pixeln
@@ -3348,12 +3473,13 @@ function baueGrafik(THREE, OrbitControls) {
 
   return {
     stadt, licht, ausrichten,
-    neueStadt() { strassenStand = -1; wege.clear(); for (const f of figuren) f.p = -1; ausrichten(); stadt(S.stunde); },   // nach einem Import
+    neueStadt() { strassenStand = -1; wege.clear(); rundwege.clear(); werkTag = -1; for (const f of figuren) { f.p = -1; f.werk = false; } ausrichten(); stadt(S.stunde); },   // nach einem Import
     figurenPlanen, figurenBewegen,
     setzeHauptfiguren(ids) { hauptIds = ids.slice(0, HAUPT_MAX); },
     render() { controls.update(); renderer.render(scene, camera); return renderer.info.render; },
     instanzen() { return Object.values(M).reduce((s, m) => s + m.count, 0); },
     THREE, renderer, scene, camera, controls, M, figMesh,
+    test: { figuren, figIds, simOrt, beiDerArbeit, WERK_MAX, FIG_MAX },   // nur für die Figuren-Prüfung (Playwright)
   };
 }
 
