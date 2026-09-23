@@ -242,4 +242,5 @@ Unterschied ist im Messrauschen nicht zu sehen; das Bildtempo begrenzt hier die 
 
 **60 Bilder pro Sekunde sind nicht gemessen.** Im Container rendert Chromium ohne Grafikkarte (SwiftShader) mit etwa
 10 fps. Gemessen sind Draw Calls (10–13 vor der Arbeit-Erweiterung, jetzt bis 15: Kisten-Mesh und Gerüst), Dreiecke
-(unter 51.000) und die Rechenzeit pro Bild in JavaScript (5–11 ms). Mit 5.000 Einwohnern ist der neue Stand nicht nachgemessen.
+(unter 51.000) und die Rechenzeit pro Bild in JavaScript (5–11 ms). Mit Tech-Firmen und 5.624 Einwohnern (`?debug&umland=200000&tage=600&seed=2`):
+13 Draw Calls, 77.390 Dreiecke, 12 ms JavaScript pro Bild, Konsole leer.
