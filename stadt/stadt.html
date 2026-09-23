@@ -368,7 +368,7 @@
 // =====================================================================================
 (function (G) {
 
-const VERSION = 2;                    // 2: Hauptfiguren, Tagebuch, KI-Anfragen (Phase 4)
+const VERSION = 3;                    // 2: Hauptfiguren, Tagebuch, KI-Anfragen (Phase 4); 3: Bauhof, Baustellen in Arbeitstagen, Kisten
 
 // ─── Karte ───────────────────────────────────────────────────────────────────────────
 const KARTE = 96, FELDER = KARTE * KARTE;
@@ -404,12 +404,21 @@ const R = {
   WOHNGROESSE: [0, 5, 4, 3],    // so viele Personen passen bequem in eine Wohnung
   STELLEN_WERKSTATT: 8, STELLEN_LADEN: 6, STELLEN_STADT: 10,
   KUNDEN_PRO_KRAFT: 5,          // Kundschaft pro Tag je Stelle (Besitzer zählt mit): ein Laden bedient 5 × 7 = 35
-  WARENEINSATZ: 0.5,            // so viel vom Ladenumsatz geht an Lieferanten außerhalb der Stadt
 
-  // Bauen: Kosten und Dauer in Spieltagen
+  // Kisten: Werkstätten machen sie, Läden brauchen sie
+  KISTEN_PRO_TAG: 8,            // je Arbeitstag in einer Werkstatt; eine Kiste kostet ein Achtel des Umlandpreises
+  KISTE_UMSATZ: 38,             // ein Laden braucht eine Kiste je 38 Taler Umsatz
+  KISTE_AUSSEN: 19,             // so viel kostet eine Kiste von außerhalb (= die Hälfte von 38, wie früher der Wareneinsatz)
+  REICH_LIEFER: 20,             // so weit (Felder, Manhattan) holt ein Laden Kisten aus einer Werkstatt der Stadt
+
+  // Bauen: Kosten in Talern, Arbeit in Arbeitstagen. Gebaut wird nur, wenn Bauarbeiter vom Bauhof auf der Baustelle sind.
   K_HAUS: 2400, K_AUF: [0, 0, 2800, 5000], K_PARK: 900, K_STRASSE: 50,
   K_LADEN: 1200, K_WERKSTATT: 1600, UEBERNAHME: 0.4,
-  D_HAUS: 3, D_AUF: 3, D_PARK: 2, D_LADEN: 3, D_WERKSTATT: 4,
+  BAU_HAUS: 12, BAU_AUF: [0, 0, 12, 18], BAU_PARK: 4, BAU_LADEN: 9, BAU_WERKSTATT: 12,
+  BAU_PRO_STELLE: 4,            // höchstens so viele Bauarbeiter je Baustelle und Tag
+  BAU_ZIEL: 4,                  // Stellen im Bauhof: 10 + eine je 4 offene Arbeitstage …
+  BAU_MAX: 40,                  // … höchstens 40
+  BAU_LOHN_AUF: 2, BAU_LOHN_AB: 1, BAU_LOHN_MAX: 120,   // Lohn im Bauhof: +2 am Tag, solange Leute fehlen, sonst −1 (nicht unter LOHN_STADT)
   REICH_LADEN: 12, REICH_PARK: 5,          // Reichweiten in Feldern (Manhattan)
   LADEN_WAHL: 40,                          // so viele Läden in Reichweite probiert man der Nähe nach durch
   MANGEL_GRUENDUNG: 20,                    // ab so vielen Leuten ohne Einkauf in Reichweite lohnt ein Laden
@@ -512,6 +521,7 @@ const PF = [
   ['jetzt', Uint8Array, 1],                                 // Entscheidung fällig (nach einem Ereignis)
   ['sucht', Uint8Array, 1],                                 // hat erfolglos eine Wohnung gesucht
   ['einzug', Int32Array, 1], ['sparSeit', Int32Array, 1],
+  ['einsatz', Int32Array, 1],                               // Bauarbeiter: heute auf dieser Baustelle (Gebäude-ID + 1, 0 = keine), ab 7 Uhr
 ];
 // Gebäude: höchstens eins pro Feld, daher feste Größe FELDER.
 const GF = [
@@ -524,7 +534,14 @@ const GF = [
   ['mangel', Uint16Array],                                                 // Wohnhaus: so viele gingen gestern in Ladenreichweite leer aus
   ['versorgtBis', Int32Array],                                             // Wohnhaus: ein Laden in Reichweite ist bis zu diesem Tag im Bau
   ['kapaz', Int32Array], ['bedient', Int32Array],                          // Laden: Kundschaft heute möglich / bedient
-  ['offeneStellen', Int16Array],                                           // Betrieb: freie Stellen, solange er offen ist (live)
+  ['offeneStellen', Int16Array],                                           // Betrieb: freie Stellen, solange er offen ist (live; beim Bauhof auch negativ)
+  ['bauRest', Uint16Array],                                                // Baustelle: so viele Arbeitstage fehlen noch
+  ['bauLeute', Uint8Array],                                                // Baustelle: so viele Bauarbeiter sind heute eingeteilt
+  ['still', Uint8Array],                                                   // Baustelle: so viele Tage in Folge ohne Bauarbeiter
+  ['kisten', Uint16Array],                                                 // Werkstatt: gestern gemacht
+  ['kistenStadt', Uint16Array],                                            // Werkstatt: davon an Läden der Stadt / Laden: aus der Stadt bekommen
+  ['kistenAussen', Uint16Array],                                           // Laden: gestern von außerhalb gekauft
+  ['lieferant', Int32Array],                                               // Laden: Werkstatt, die gestern die meisten Kisten brachte (ID + 1, 0 = keine)
 ];
 
 // ─── Zufall: mulberry32, Zustand liegt in S (speicherbar) ────────────────────────────
@@ -910,6 +927,7 @@ function offen(S, b) {   // Betrieb arbeitet: fertig gebaut und nicht leerstehen
 function stellen(S, b) {
   const g = S.g;
   // Betriebe bleiben bisher auf Stufe 1 (die Spec sagt nicht, wer sie aufstuft); die Formel gilt schon für 2 und 3.
+  if (b === S.bauhof) return R.STELLEN_STADT + S.bauZuschlag;
   if (g.typ[b] === WERKSTATT) return (g.besitzer[b] < 0 ? R.STELLEN_STADT : R.STELLEN_WERKSTATT) * g.stufe[b];
   if (g.typ[b] === LADEN) return R.STELLEN_LADEN * g.stufe[b];
   return 0;
@@ -919,7 +937,8 @@ function lohnVon(S, besitzer, basis) {  // großzügige (wenig sparsame) Besitze
   return Math.round(basis * (0.9 + 0.2 * (1 - S.p.spar[besitzer] / 100)));
 }
 
-function neuesGebaeude(S, typ, x, y, bauTage, besitzer) {
+// arbeit = Arbeitstage bis fertig (0 = steht sofort)
+function neuesGebaeude(S, typ, x, y, arbeit, besitzer) {
   const b = S.gAnzahl++, g = S.g, c = zelle(x, y);
   platzWeg(S, c);
   g.typ[b] = typ; g.stufe[b] = 1; g.auf[b] = 0; g.x[b] = x; g.y[b] = y; g.besitzer[b] = besitzer;
@@ -931,11 +950,12 @@ function neuesGebaeude(S, typ, x, y, bauTage, besitzer) {
   S.bewohner.push([]); S.belegschaft.push([]);
   const v = viertel(x, y);
   (typ === WOHNHAUS ? S.vHaus : typ === PARK ? S.vPark : S.vBetrieb)[v].push(b);
-  if (bauTage > 0) {
-    S.feld[c] = BAUSTELLE; g.bauBis[b] = S.tag + bauTage; S.baustellen.push(b);
+  if (arbeit > 0) {
+    S.feld[c] = BAUSTELLE; S.baustellen.push(b);
+    baustelleAnlegen(S, b, arbeit);
     if (typ === WOHNHAUS) S.wohnungenImBau += R.WOHNUNGEN[1];
   } else {
-    S.feld[c] = typ; g.bauBis[b] = 0;
+    S.feld[c] = typ; g.bauBis[b] = 0; g.bauRest[b] = 0;
   }
   if (typ === LADEN) S.ladenDirty = true;
   if (typ === PARK || typ === WOHNHAUS) S.parkDirty = true;
@@ -943,13 +963,19 @@ function neuesGebaeude(S, typ, x, y, bauTage, besitzer) {
   return b;
 }
 
+function baustelleAnlegen(S, b, arbeit) {
+  const g = S.g;
+  g.bauRest[b] = arbeit; g.bauLeute[b] = 0; g.still[b] = 0;
+  g.bauBis[b] = S.tag + Math.ceil(arbeit / R.BAU_PRO_STELLE);   // frühestens fertig, wenn jeden Tag 4 Leute kommen
+}
 function baustellenFertig(S) {
   const g = S.g;
   for (let i = 0; i < S.baustellen.length; i++) {
     const b = S.baustellen[i];
-    if (g.bauBis[b] > S.tag) continue;
+    if (g.bauRest[b] > 0) continue;
     S.baustellen.splice(i--, 1);
-    g.bauBis[b] = 0;
+    g.bauBis[b] = 0; g.bauLeute[b] = 0; g.still[b] = 0;
+    S.stat.bau.fertig++;
     if (g.auf[b]) {                                      // Aufstockung fertig
       S.wohnungenImBau -= R.WOHNUNGEN[g.auf[b]] - R.WOHNUNGEN[g.stufe[b]];
       g.stufe[b] = g.auf[b]; g.auf[b] = 0;
@@ -984,9 +1010,10 @@ function austreten(S, p) {
   if (b < 0) return;
   if (P.besitz[p] !== b) {
     listeRaus(S.belegschaft[b], p);
-    if (offen(S, b)) { S.freieStellen++; S.freiLohn[S.g.lohn[b]]++; S.g.offeneStellen[b]++; }
+    // Beim Bauhof können die Stellen schrumpfen; wer dann geht, macht keine Stelle frei, solange er überzählig war.
+    if (offen(S, b) && S.g.offeneStellen[b]++ >= 0) { S.freieStellen++; S.freiLohn[S.g.lohn[b]]++; }
   }
-  P.arbeit[p] = -1;
+  P.arbeit[p] = -1; P.einsatz[p] = 0;
 }
 function besterFreierLohn(S) {
   for (let l = S.freiLohn.length - 1; l > 0; l--) if (S.freiLohn[l] > 0) return l;
@@ -1000,7 +1027,7 @@ function stellenNichtDa(S, mindestLohn) {
 function schliessen(S, b, pleite) {
   const P = S.p, g = S.g, o = g.besitzer[b];
   const L = S.belegschaft[b];
-  for (const w of L) { P.arbeit[w] = -1; erinnere(S, w, M.JOB_WEG, b); P.jetzt[w] = 1; }
+  for (const w of L) { P.arbeit[w] = -1; P.einsatz[w] = 0; erinnere(S, w, M.JOB_WEG, b); P.jetzt[w] = 1; }
   const n = L.length;
   if (offen(S, b)) stellenBuchen(S, b, -1);
   S.belegschaft[b] = [];
@@ -1539,9 +1566,10 @@ function aktGruenden(S, p) {
   } else {
     const c = bauplatzNahe(S, x, y);
     if (c < 0) return false;
-    b = neuesGebaeude(S, typ, c % KARTE, (c / KARTE) | 0, typ === LADEN ? R.D_LADEN : R.D_WERKSTATT, p);
+    b = neuesGebaeude(S, typ, c % KARTE, (c / KARTE) | 0, typ === LADEN ? R.BAU_LADEN : R.BAU_WERKSTATT, p);
   }
   P.geld[p] -= kosten;
+  S.budget += kosten - R.KASSE_START;                      // Bau oder Übernahme bezahlt die Stadt, die Bauarbeiter kommen vom Bauhof
   g.kasse[b] = R.KASSE_START;
   P.besitz[p] = b;
   if (typ === LADEN) knappLoeschen(S, b); else S.werkstattPlaetze += stellen(S, b);
@@ -1822,6 +1850,7 @@ function stunde(S) {
       P.jetzt[p] = 0;                                        // eigene Folgen lösen keine zweite Entscheidung aus
     }
   }
+  if (h === 7) bauEinteilen(S);
   S.stunde = h + 1;
   if (S.stunde === 24) { tagesabschluss(S); S.stunde = 0; }
 }
@@ -1844,18 +1873,68 @@ function zufZiel(S, p) {
 
 // ─── Täglich ─────────────────────────────────────────────────────────────────────────
 function tagesabschluss(S) {
+  bauFortschritt(S);
   baustellenFertig(S);
   if (S.ladenDirty) ladenZuordnen(S);
   if (S.parkDirty) parksZuordnen(S);
   haushalteZaehlen(S);
   wirtschaft(S);
   menschenTag(S);
+  bauhofRegeln(S);
   kennzahlenRechnen(S);
   zuzug(S);
   bauamt(S);
   S.reihe.push(S.einwohner);
   S.ki.heute = {};
   S.tag++;
+}
+
+// ─── Bauhof ──────────────────────────────────────────────────────────────────────────
+// 7 Uhr: die Leute im Bauhof auf die Baustellen verteilen, älteste Baustelle zuerst, höchstens 4 je Baustelle.
+// Wer übrig bleibt oder sich freigenommen hat, baut heute nicht (die Übrigen machen Kisten wie in jeder Werkstatt).
+function bauEinteilen(S) {
+  const P = S.p, g = S.g, B = S.bauhof;
+  for (const b of S.baustellen) g.bauLeute[b] = 0;
+  S.bauFehlt = 0;
+  if (B < 0) return;
+  const L = S.belegschaft[B];
+  for (const p of L) P.einsatz[p] = 0;
+  let i = 0, bedarf = 0, da = 0;
+  for (const b of S.baustellen) {
+    const soll = Math.min(R.BAU_PRO_STELLE, g.bauRest[b]);
+    bedarf += soll;
+    while (g.bauLeute[b] < soll && i < L.length) {
+      const p = L[i++];
+      if (P.frei[p]) continue;
+      P.einsatz[p] = b + 1; g.bauLeute[b]++; da++;
+    }
+  }
+  S.bauFehlt = bedarf - da;
+}
+// Mitternacht: jede eingeteilte Person, die noch im Bauhof ist und sich nicht freigenommen hat, bringt einen Arbeitstag.
+function bauFortschritt(S) {
+  const P = S.p, g = S.g, B = S.bauhof, st = S.stat.bau;
+  for (const b of S.baustellen) g.bauLeute[b] = 0;
+  if (B >= 0) for (const p of S.belegschaft[B]) { const e = P.einsatz[p]; if (e > 0 && !P.frei[p]) g.bauLeute[e - 1]++; }
+  for (const b of S.baustellen) {
+    const n = g.bauLeute[b];
+    st.tage++;
+    if (n > 0) { g.bauRest[b] = Math.max(0, g.bauRest[b] - n); g.still[b] = 0; }
+    else { if (g.still[b] < 255) g.still[b]++; st.still++; }
+    g.bauBis[b] = S.tag + Math.ceil(g.bauRest[b] / R.BAU_PRO_STELLE);
+    if (g.bauRest[b] > 0 && g.typ[b] === LADEN && !g.auf[b]) knappLoeschen(S, b);   // der Laden kommt noch, nur später
+  }
+}
+// Stellen im Bauhof nach der offenen Arbeit, Lohn nach dem Mangel an Leuten (95–120 Taler).
+function bauhofRegeln(S) {
+  const g = S.g, B = S.bauhof;
+  let rest = 0;
+  for (const b of S.baustellen) rest += g.bauRest[b];
+  S.bauRueckstand = rest;
+  S.bauZuschlag = Math.min(R.BAU_MAX - R.STELLEN_STADT, Math.ceil(rest / R.BAU_ZIEL));
+  if (B < 0) return;
+  g.lohn[B] = klemme(g.lohn[B] + (S.bauFehlt > 0 && rest > 0 ? R.BAU_LOHN_AUF : -R.BAU_LOHN_AB), R.LOHN_STADT, R.BAU_LOHN_MAX);
+  S.stat.bau.lohnSumme += g.lohn[B];
 }
 
 function haushalteZaehlen(S) {
@@ -1921,16 +2000,20 @@ function wirtschaft(S) {
   let exportArbeiter = 0;
   for (let b = 0; b < S.gAnzahl; b++) {
     if (g.typ[b] !== WERKSTATT || !offen(S, b)) continue;
-    for (const w of S.belegschaft[b]) if (!P.frei[w]) exportArbeiter++;
+    for (const w of S.belegschaft[b]) if (!P.frei[w] && !P.einsatz[w]) exportArbeiter++;   // Bauarbeiter auf der Baustelle machen keine Kisten
   }
   S.exportPreis = Math.min(R.EXPORT_MAX, R.UMLAND / Math.max(1, exportArbeiter));
+  kistenVerteilen(S);
   for (let b = 0; b < S.gAnzahl; b++) {
     const t = g.typ[b];
     if (!istBetrieb(t) || !offen(S, b)) { g.umsatz[b] = 0; continue; }
     const L = S.belegschaft[b];
     let da = 0;
-    for (const w of L) if (!P.frei[w]) da++;
-    const einnahmen = t === WERKSTATT ? Math.round(da * S.exportPreis) : Math.round(g.umsatz[b] * (1 - R.WARENEINSATZ));
+    for (const w of L) if (!P.frei[w] && !P.einsatz[w]) da++;
+    // Werkstatt: jede Kiste bringt ein Achtel des Umlandpreises, egal ob sie ein Laden der Stadt oder das Umland nimmt.
+    // Laden: Umsatz minus Kisten (aus der Stadt zum Umlandpreis, von außerhalb zu 19 Taler).
+    const einnahmen = t === WERKSTATT ? Math.round(da * S.exportPreis)
+      : Math.round(g.umsatz[b] - g.kistenStadt[b] * S.kistenpreis - g.kistenAussen[b] * R.KISTE_AUSSEN);
     g.umsatz[b] = 0;
     const fix = t === WERKSTATT ? R.FIX_WERKSTATT : R.FIX_LADEN;
     const lohn = g.lohn[b], netto = Math.round(lohn * (1 - R.STEUER));
@@ -1951,6 +2034,45 @@ function wirtschaft(S) {
       else g.minus[b] = 0;
     }
   }
+}
+// Kisten: jede anwesende Kraft in einer Werkstatt macht 8 (Bauarbeiter auf einer Baustelle nicht). Jeder Laden braucht eine
+// je 38 Taler Umsatz und holt sie bei der nächsten Werkstatt der Stadt, die noch welche hat (bis 20 Felder). Was dann noch
+// fehlt, kauft er teurer von außerhalb; was die Werkstätten übrig haben, nimmt das Umland.
+function kistenVerteilen(S) {
+  const P = S.p, g = S.g, werk = [];
+  S.kistenpreis = S.exportPreis / R.KISTEN_PRO_TAG;
+  let gemacht = 0, stadt = 0, aussen = 0;
+  for (let b = 0; b < S.gAnzahl; b++) {
+    const t = g.typ[b];
+    if (t === LADEN) { g.kistenStadt[b] = 0; g.kistenAussen[b] = 0; g.lieferant[b] = 0; continue; }
+    if (t !== WERKSTATT) continue;
+    g.kisten[b] = 0; g.kistenStadt[b] = 0;
+    if (!offen(S, b)) continue;
+    let da = 0;
+    for (const w of S.belegschaft[b]) if (!P.frei[w] && !P.einsatz[w]) da++;
+    g.kisten[b] = Math.min(65535, da * R.KISTEN_PRO_TAG);
+    gemacht += g.kisten[b];
+    if (da) werk.push(b);
+  }
+  for (let b = 0; b < S.gAnzahl; b++) {
+    if (g.typ[b] !== LADEN || !offen(S, b)) continue;
+    let bedarf = Math.round(g.umsatz[b] / R.KISTE_UMSATZ), meiste = 0;
+    while (bedarf > 0) {
+      let w = -1, wd = R.REICH_LIEFER + 1;
+      for (const q of werk) {
+        if (g.kistenStadt[q] >= g.kisten[q]) continue;
+        const d = Math.abs(g.x[q] - g.x[b]) + Math.abs(g.y[q] - g.y[b]);
+        if (d < wd) { wd = d; w = q; }
+      }
+      if (w < 0) break;
+      const n = Math.min(bedarf, g.kisten[w] - g.kistenStadt[w]);
+      g.kistenStadt[w] += n; g.kistenStadt[b] += n; bedarf -= n; stadt += n;
+      if (n > meiste) { meiste = n; g.lieferant[b] = w + 1; }
+    }
+    g.kistenAussen[b] = bedarf; aussen += bedarf;
+  }
+  const st = S.stat.kisten;
+  st.gemacht += gemacht; st.stadt += stadt; st.aussen += aussen;
 }
 function pleite(S, b) {
   const g = S.g, o = g.besitzer[b], laden = g.typ[b] === LADEN;
@@ -1974,7 +2096,7 @@ function menschenTag(S) {
   for (let p = 0; p < S.pMax; p++) {
     const P = S.p;
     if (!P.lebt[p]) continue;
-    P.frei[p] = 0; P.besuch[p] = -1;
+    P.frei[p] = 0; P.besuch[p] = -1; P.einsatz[p] = 0;
     const at = tag - P.geb[p];
     if (at >= R.ALT * J) {                                   // ab 80 steigt die Sterbewahrscheinlichkeit
       const jahre = at / J;
@@ -2016,7 +2138,8 @@ function kennzahlenRechnen(S) {
     const t = g.typ[b], f = S.feld[gebZelle(S, b)];
     if (t === WOHNHAUS && f === WOHNHAUS) fw += R.WOHNUNGEN[g.stufe[b]] - g.belegt[b];
     else if (istBetrieb(t)) {
-      if (t === WERKSTATT && !g.leer[b]) wp += stellen(S, b);
+      // Der Bauhof zählt für Gründer nur mit seinen 10 festen Stellen (sonst würde jede Baustelle Werkstätten verhindern)
+      if (t === WERKSTATT && !g.leer[b]) wp += b === S.bauhof ? R.STELLEN_STADT : stellen(S, b);
       if (g.leer[b] && f === t) { leer++; S.leerTyp[t]++; }
       g.offeneStellen[b] = 0;
       if (offen(S, b)) {
@@ -2051,7 +2174,9 @@ function kennzahlenRechnen(S) {
 // Zuzug: Attraktivität = freie Wohnungen × freie Stellen × mittlere Zufriedenheit, normiert.
 function zuzug(S) {
   // Normierung: Als frei zählen nur Stellen, die nicht schon Arbeitslose der Stadt besetzen könnten.
-  const fw = S.freieWohnungen, fs = Math.max(0, S.freieStellen - S.arbeitslose);
+  // Die Stellen im Bauhof locken niemanden an: sie gehen mit den Baustellen auf und ab (siehe README, Annahme 58).
+  const bh = S.bauhof >= 0 ? Math.max(0, S.g.offeneStellen[S.bauhof]) : 0;
+  const fw = S.freieWohnungen, fs = Math.max(0, S.freieStellen - bh - S.arbeitslose);
   const zf = klemme((S.zufMittel - 25) / 50, 0, 1);
   const basis = 2 + S.einwohner * 0.02;
   const attraktiv = (fw / (fw + 3)) * (fs / (fs + 3)) * zf;
@@ -2094,7 +2219,7 @@ function vollesHaus(S) {
 function aufstocken(S, b, grund) {
   const g = S.g, ziel = g.stufe[b] + 1;
   S.budget -= R.K_AUF[ziel];
-  g.auf[b] = ziel; g.bauBis[b] = S.tag + R.D_AUF; S.baustellen.push(b);
+  g.auf[b] = ziel; baustelleAnlegen(S, b, R.BAU_AUF[ziel]); S.baustellen.push(b);
   const mehr = R.WOHNUNGEN[ziel] - R.WOHNUNGEN[g.stufe[b]];
   S.wohnungenImBau += mehr;
   S.stat.bauamt.aufstockungen++;
@@ -2117,7 +2242,7 @@ function bauamt(S) {
     const c = bauplatzNahe(S, MITTE, MITTE);
     if (c < 0) break;
     S.budget -= R.K_HAUS;
-    const b = neuesGebaeude(S, WOHNHAUS, c % KARTE, (c / KARTE) | 0, R.D_HAUS, -1);
+    const b = neuesGebaeude(S, WOHNHAUS, c % KARTE, (c / KARTE) | 0, R.BAU_HAUS, -1);
     geplant += R.WOHNUNGEN[1]; bauten++; st.haeuser++;
     buch(S, 'bauamt', `Das Bauamt baut ein Wohnhaus ${gebOrt(S, b)}. ${grund}`);
   }
@@ -2144,7 +2269,7 @@ function bauamt(S) {
       const c = bauplatzNahe(S, cx, cy);
       if (c >= 0 && viertel(c % KARTE, (c / KARTE) | 0) === schlecht) {
         S.budget -= R.K_PARK;
-        const b = neuesGebaeude(S, PARK, c % KARTE, (c / KARTE) | 0, R.D_PARK, -1);
+        const b = neuesGebaeude(S, PARK, c % KARTE, (c / KARTE) | 0, R.BAU_PARK, -1);
         S.vParks[schlecht]++; st.parks++;
         buch(S, 'bauamt', `Das Bauamt legt einen Park ${gebOrt(S, b)} an. Im Viertel lag die Zufriedenheit bei ${Math.round(schlechtZ)}.`);
       }
@@ -2159,7 +2284,7 @@ function bauamt(S) {
     const c = bauplatzNahe(S, MITTE, MITTE);
     if (c >= 0) {
       S.budget -= R.K_WERKSTATT;
-      const b = neuesGebaeude(S, WERKSTATT, c % KARTE, (c / KARTE) | 0, R.D_WERKSTATT, -1);
+      const b = neuesGebaeude(S, WERKSTATT, c % KARTE, (c / KARTE) | 0, R.BAU_WERKSTATT, -1);
       S.letzteNotbremse = S.tag; st.notwerkstaetten++;
       buch(S, 'notbremse', `Notbremse: Die Stadt baut eine Werkstatt ${gebOrt(S, b)}. Seit ${S.tag - S.letzteGruendung} Tagen hat niemand gegründet, ${Math.round(S.arbeitslosenquote * 100)} % sind ohne Arbeit.`);
     }
@@ -2181,6 +2306,7 @@ function leererZustand(seed) {
     wohnungSuchende: 0, anfragen: 0, unversorgtQuote: 0, werkstattPlaetze: 0, letzteGruendung: 0, letzteNotbremse: -999,
     vZufSumme: new Float64Array(VN * VN), vZufN: new Uint32Array(VN * VN), vParks: new Uint16Array(VN * VN),
     ladenDirty: true, parkDirty: true,
+    bauhof: -1, bauZuschlag: 0, bauRueckstand: 0, bauFehlt: 0, kistenpreis: 0,
     buch: [], buchNr: 0, reihe: [],
     // Hauptfiguren: an = die Oberfläche beantwortet Anfragen gerade (Ollama bereit, nicht 20×, kein Aufholen)
     ki: { an: false, haupt: [], anfragen: [], nr: 0, heute: {}, tagebuch: {}, verlust: [], abgelaufen: 0, angewandt: 0 },
@@ -2190,6 +2316,8 @@ function leererZustand(seed) {
       zieleErreicht: 0, zieleAufgegeben: 0, strassenFelder: 0,
       gruenderEhrgeiz: 0, wegzugHeimat: 0, erwachsene: 0, erwEhrgeiz: 0, erwHeimat: 0,
       bauamt: { haeuser: 0, aufstockungen: 0, parks: 0, strassen: 0, notwerkstaetten: 0 },
+      bau: { fertig: 0, tage: 0, still: 0, lohnSumme: 0 },      // Baustellentage gesamt / davon ohne Bauarbeiter
+      kisten: { gemacht: 0, stadt: 0, aussen: 0 },              // an Läden der Stadt / von außerhalb gekauft
       gewaehlt: new Array(13).fill(0), ausgefuehrt: new Array(13).fill(0),
     },
   };
@@ -2207,7 +2335,7 @@ function neueStadt(seed) {
   S.enden.push({ x: 40, y: MITTE, dx: -1, dy: 0, str }, { x: 56, y: MITTE, dx: 1, dy: 0, str });
   const h1 = neuesGebaeude(S, WOHNHAUS, 47, 47, 0, -1);
   const h2 = neuesGebaeude(S, WOHNHAUS, 49, 47, 0, -1);
-  neuesGebaeude(S, WERKSTATT, 47, 49, 0, -1);
+  S.bauhof = neuesGebaeude(S, WERKSTATT, 47, 49, 0, -1);   // die Werkstatt der Stadt ist der Bauhof
   neuesGebaeude(S, LADEN, 49, 49, 0, -1);
   for (let i = 0; i < 10; i++) {
     const p = neuePerson(S);
@@ -2274,6 +2402,7 @@ function tagSchritt(S) {
     }
   };
   entscheidenAlle(7);
+  bauEinteilen(S);
   block(false);
   entscheidenAlle(18);
   block(true);

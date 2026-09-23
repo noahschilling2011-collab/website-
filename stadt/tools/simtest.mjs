@@ -10,6 +10,8 @@
 //   node tools/simtest.mjs --speichertest           Speichern/Laden mitten am Tag: läuft danach bitgleich weiter?
 //   node tools/simtest.mjs --aufholtest             90 Tage stündlich gegen 90 Tagesschritte
 //   node tools/simtest.mjs --kitest                 Hauptfiguren: erlaubte Aktionen, Anfragen, Fristen, Tagebuch (ohne echtes Modell)
+//   node tools/simtest.mjs --bau                    Bauhof: Einteilung, Fortschritt je Person, jede Baustelle wird fertig (Seeds 1–3)
+//   node tools/simtest.mjs --waren                  Kisten: geliefert ≤ gemacht, Werkstatt-Einnahmen wie vorher (Seeds 1–3)
 //   Optionen: --alle 30 (Zeilenabstand), --buch 20 (letzte Stadtbuch-Zeilen), --aktionen
 
 import { readFileSync } from 'node:fs';
@@ -235,6 +237,133 @@ if (flag('kitest')) {
     pruef(JSON.stringify(B.ki) === JSON.stringify(S.ki) && fingerabdruck(Sim, B) === fingerabdruck(Sim, S), 'Speichern/Laden behält Hauptfiguren, Tagebücher, Anfragen');
   }
   console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle KI-Prüfungen bestanden');
+  process.exit(fehler ? 1 : 0);
+}
+if (flag('bau')) {
+  let fehler = 0;
+  const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
+  const R = Sim.R;
+  for (const seed of arg('seeds', '1,2,3').split(',').map(Number)) {
+    console.log(`Seed ${seed}`);
+    const S = Sim.neueStadt(seed), P = () => S.p, B = S.bauhof;
+    const start = new Map(), dauer = [];
+    let einteilFehl = 0, fortschrittFehl = 0, fertigFehl = 0, stillFehl = 0, geprueft = 0, uebersprungen = 0;
+    let maxStellen = 0, maxLeute = 0, lohnMin = 999, lohnMax = 0;
+    while (S.tag < 365) {
+      for (const b of S.baustellen) if (!start.has(b)) start.set(b, S.tag);
+      if (S.stunde === 8) {                                     // Einteilung von 7 Uhr
+        const je = new Map();
+        for (let p = 0; p < S.pMax; p++) {
+          const e = P().einsatz[p];
+          if (!P().lebt[p] || !e) continue;
+          if (P().arbeit[p] !== B || !S.baustellen.includes(e - 1)) einteilFehl++;
+          je.set(e - 1, (je.get(e - 1) || 0) + 1);
+        }
+        for (const [b, n] of je) if (n > R.BAU_PRO_STELLE || n > S.g.bauRest[b]) einteilFehl++;
+        // niemand bleibt im Bauhof übrig, solange eine Baustelle noch Leute braucht
+        const frei = S.belegschaft[B].filter(p => !P().einsatz[p] && !P().frei[p]).length;
+        const braucht = S.baustellen.some(b => (je.get(b) || 0) < Math.min(R.BAU_PRO_STELLE, S.g.bauRest[b]));
+        if (frei > 0 && braucht) einteilFehl++;
+      }
+      if (S.stunde === 23) {                                    // Fortschritt um Mitternacht = Leute, die heute da waren
+        const vor = new Map(), erwartet = new Map(), stillVor = new Map(), aufVor = new Map();
+        for (const b of S.baustellen) { vor.set(b, S.g.bauRest[b]); erwartet.set(b, 0); stillVor.set(b, S.g.still[b]); aufVor.set(b, S.g.auf[b]); }
+        for (const p of S.belegschaft[B]) { const e = P().einsatz[p]; if (e && !P().frei[p]) erwartet.set(e - 1, erwartet.get(e - 1) + 1); }
+        const beleg = S.belegschaft[B].slice();
+        const tag = S.tag;
+        Sim.stunde(S);
+        // Nur vergleichen, wenn sich im Bauhof in der letzten Stunde nichts geändert hat (Kündigung, Tod, Freinehmen)
+        const gleich = beleg.length === S.belegschaft[B].length && beleg.every((p, i) => S.belegschaft[B][i] === p);
+        if (!gleich) { uebersprungen++; continue; }
+        for (const [b, r] of vor) {
+          geprueft++;
+          const n = erwartet.get(b);
+          // Noch dieselbe Baustelle? (Ein gerade fertiges Haus kann in derselben Nacht gleich wieder aufgestockt werden.)
+          if (S.baustellen.includes(b) && S.g.auf[b] === aufVor.get(b)) {
+            if (S.g.bauRest[b] !== r - n) { fortschrittFehl++; if (flag("v")) console.log("   Fortschritt", tag, b, r, n, S.g.bauRest[b], S.g.typ[b], S.g.auf[b], S.g.bauLeute[b]); }
+            if (n === 0 && S.g.still[b] !== Math.min(255, stillVor.get(b) + 1)) { stillFehl++; if (flag("v")) console.log("   still", tag, b); }
+          } else {
+            if (r > n) { fertigFehl++; if (flag("v")) console.log("   fertig", tag, b, r, n); }
+            dauer.push(tag + 1 - start.get(b));
+            if (S.baustellen.includes(b)) start.set(b, tag + 1);
+          }
+        }
+        maxStellen = Math.max(maxStellen, R.STELLEN_STADT + S.bauZuschlag);
+        maxLeute = Math.max(maxLeute, S.belegschaft[B].length);
+        lohnMin = Math.min(lohnMin, S.g.lohn[B]); lohnMax = Math.max(lohnMax, S.g.lohn[B]);
+        continue;
+      }
+      Sim.stunde(S);
+    }
+    const alt = [...start].filter(([b, t]) => t <= 300 && S.baustellen.includes(b));
+    const st = S.stat.bau;
+    pruef(einteilFehl === 0, `Einteilung um 7 Uhr: nur Leute aus dem Bauhof, höchstens ${R.BAU_PRO_STELLE} je Baustelle, keiner übrig wenn Bedarf (${einteilFehl} Fehler)`);
+    pruef(fortschrittFehl === 0 && stillFehl === 0 && fertigFehl === 0, `Fortschritt = Leute, die da waren: ${geprueft} Baustellentage geprüft (${uebersprungen} Nächte mit Wechsel im Bauhof übersprungen), ${fortschrittFehl + stillFehl + fertigFehl} Fehler`);
+    pruef(alt.length === 0, `jede Baustelle bis Tag 300 ist an Tag 365 fertig (${st.fertig} fertig, offen seit ≤ Tag 300: ${alt.length})`);
+    pruef(maxStellen <= R.BAU_MAX && maxLeute <= R.BAU_MAX, `Bauhof höchstens ${R.BAU_MAX}: Stellen bis ${maxStellen}, Leute bis ${maxLeute}`);
+    pruef(lohnMin >= R.LOHN_STADT && lohnMax <= R.BAU_LOHN_MAX, `Lohn ${lohnMin}–${lohnMax} (Ø ${(st.lohnSumme / S.tag).toFixed(1)})`);
+    dauer.sort((a, b) => a - b);
+    console.log(`       Bauzeit Ø ${(dauer.reduce((a, b) => a + b, 0) / dauer.length).toFixed(1)} Tage, Median ${dauer[dauer.length >> 1]}, längste ${dauer.at(-1)}; ohne Bauarbeiter ${(st.still / st.tage * 100).toFixed(1)} % der Baustellentage`);
+  }
+  console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle Bau-Prüfungen bestanden');
+  process.exit(fehler ? 1 : 0);
+}
+if (flag('waren')) {
+  let fehler = 0;
+  const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
+  const R = Sim.R;
+  for (const seed of arg('seeds', '1,2,3').split(',').map(Number)) {
+    console.log(`Seed ${seed}`);
+    const S = Sim.neueStadt(seed), g = S.g;
+    while (S.tag < 100) Sim.stunde(S);
+    let mehrAlsGemacht = 0, summeFehl = 0, weitFehl = 0, aussenFehl = 0, kistenFehl = 0, einnahmenFehl = 0, einnahmenGeprueft = 0, tage = 0;
+    let gemacht = 0, anLaeden = 0, ladenStadt = 0, ladenAussen = 0;
+    while (S.tag < 300) {
+      if (S.stunde !== 23) { Sim.stunde(S); continue; }
+      const P = S.p, vor = [];
+      for (let b = 0; b < S.gAnzahl; b++) {
+        if (g.typ[b] !== Sim.WERKSTATT || S.feld[g.y[b] * Sim.KARTE + g.x[b]] !== Sim.WERKSTATT || g.leer[b]) continue;
+        const L = S.belegschaft[b];
+        vor.push({ b, o: g.besitzer[b], kasse: g.kasse[b], lohn: g.lohn[b], L: L.slice(),
+          n: L.filter(w => !P.frei[w]).length, da: L.filter(w => !P.frei[w] && !P.einsatz[w]).length });
+      }
+      Sim.stunde(S);
+      tage++;
+      let sw = 0, sl = 0;
+      for (let b = 0; b < S.gAnzahl; b++) {
+        if (g.typ[b] === Sim.WERKSTATT) {
+          if (g.kistenStadt[b] > g.kisten[b]) mehrAlsGemacht++;
+          sw += g.kistenStadt[b]; gemacht += g.kisten[b]; anLaeden += g.kistenStadt[b];
+        } else if (g.typ[b] === Sim.LADEN) {
+          sl += g.kistenStadt[b]; ladenStadt += g.kistenStadt[b]; ladenAussen += g.kistenAussen[b];
+          const l = g.lieferant[b] - 1;
+          if (l >= 0 && Math.abs(g.x[l] - g.x[b]) + Math.abs(g.y[l] - g.y[b]) > R.REICH_LIEFER) weitFehl++;
+          // Von außerhalb nur, wenn keine Werkstatt in Reichweite noch Kisten übrig hatte
+          if (g.kistenAussen[b] > 0) for (let w = 0; w < S.gAnzahl; w++) {
+            if (g.typ[w] === Sim.WERKSTATT && g.kisten[w] > g.kistenStadt[w] && Math.abs(g.x[w] - g.x[b]) + Math.abs(g.y[w] - g.y[b]) <= R.REICH_LIEFER) { aussenFehl++; break; }
+          }
+        }
+      }
+      if (sw !== sl) summeFehl++;
+      for (const v of vor) {
+        const L = S.belegschaft[v.b];
+        if (L.length !== v.L.length || !L.every((w, i) => w === v.L[i])) continue;   // Wechsel in der letzten Stunde
+        if (g.kisten[v.b] !== Math.min(65535, v.da * R.KISTEN_PRO_TAG)) kistenFehl++;
+        // Einnahmen wie vor den Kisten: Arbeitstage × Umlandpreis. Nachrechnen über die Kasse, solange nichts ausgezahlt wurde.
+        if (v.o < 0 || g.besitzer[v.b] !== v.o || g.kasse[v.b] >= R.POLSTER || g.leer[v.b]) continue;
+        const einnahmen = g.kasse[v.b] - v.kasse + R.FIX_WERKSTATT + v.lohn * v.n;
+        einnahmenGeprueft++;
+        if (einnahmen !== Math.round(v.da * S.exportPreis)) einnahmenFehl++;
+      }
+    }
+    pruef(mehrAlsGemacht === 0, `keine Werkstatt liefert mehr Kisten, als sie gemacht hat (${tage} Tage)`);
+    pruef(summeFehl === 0, `geliefert = bekommen (Werkstätten und Läden, ${summeFehl} Abweichungen)`);
+    pruef(weitFehl === 0 && aussenFehl === 0, `Lieferant höchstens ${R.REICH_LIEFER} Felder weit; von außen nur, wenn in Reichweite nichts übrig war (${weitFehl + aussenFehl} Fehler)`);
+    pruef(kistenFehl === 0, `je anwesender Kraft ${R.KISTEN_PRO_TAG} Kisten, Bauarbeiter auf der Baustelle nicht (${kistenFehl} Fehler)`);
+    pruef(einnahmenGeprueft > 100 && einnahmenFehl === 0, `Werkstatt-Einnahmen = Arbeitstage × Umlandpreis wie vorher (${einnahmenGeprueft} Werkstatt-Tage nachgerechnet, ${einnahmenFehl} Fehler)`);
+    console.log(`       Tag 100–300: ${(anLaeden / gemacht * 100).toFixed(0)} % der Kisten gehen an Läden der Stadt, Läden bekommen ${(ladenStadt / (ladenStadt + ladenAussen) * 100).toFixed(0)} % aus der Stadt`);
+  }
+  console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle Kisten-Prüfungen bestanden');
   process.exit(fehler ? 1 : 0);
 }
 if (flag('aufholtest')) {
