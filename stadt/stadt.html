@@ -328,7 +328,7 @@
 
 <dialog id="version-dialog" aria-labelledby="version-titel">
   <h2 id="version-titel">Spielstand ist von einer älteren Version</h2>
-  <p id="version-text">Dieser Spielstand passt nicht zu dieser Version von STADT und kann nicht geladen werden.</p>
+  <p id="version-text" aria-live="assertive">Dieser Spielstand passt nicht zu dieser Version von STADT und kann nicht geladen werden.</p>
   <p class="leise" id="version-hinweis">Mit „Export behalten“ lädst du ihn als Datei herunter, damit er nicht verloren geht. Erst „Neu anfangen“ überschreibt ihn.</p>
   <div class="knoepfe">
     <button type="button" class="knopf" id="version-export">Export behalten</button>
@@ -977,7 +977,7 @@ function baustellenFertig(S) {
     S.baustellen.splice(i--, 1);
     g.bauBis[b] = 0; g.bauLeute[b] = 0; g.still[b] = 0;
     S.stat.bau.fertig++;
-    fertig.push(bauName(S, b, true));
+    fertig.push(bauName(S, b, true, true));
     if (g.auf[b]) {                                      // Aufstockung fertig
       S.wohnungenImBau -= R.WOHNUNGEN[g.auf[b]] - R.WOHNUNGEN[g.stufe[b]];
       g.stufe[b] = g.auf[b]; g.auf[b] = 0;
@@ -991,15 +991,15 @@ function baustellenFertig(S) {
   }
   if (fertig.length) buch(S, 'fertig', `Der Bauhof hat fertig gebaut: ${aufzaehlen(fertig)}.`);
 }
-// „das Wohnhaus am Birkenweg“, „der Laden von Anna Weber an der Hauptstraße“ (fertig: mit dem, was es jetzt ist)
-function bauName(S, b, fertig) {
-  const g = S.g, o = g.besitzer[b], ort = gebOrt(S, b);
+// „das Wohnhaus am Birkenweg“, „den Laden von Anna Weber an der Hauptstraße“ (akk: Akkusativ; fertig: mit dem, was es jetzt ist)
+function bauName(S, b, fertig, akk) {
+  const g = S.g, o = g.besitzer[b], ort = gebOrt(S, b), der = akk ? 'den' : 'der';
   switch (g.typ[b]) {
     case WOHNHAUS: return g.auf[b] ? (fertig ? `die Aufstockung ${ort} (jetzt ${R.WOHNUNGEN[g.auf[b]]} Wohnungen)` : `die Aufstockung ${ort}`)
       : `das Wohnhaus ${ort}` + (fertig ? ` mit ${R.WOHNUNGEN[1]} Wohnungen` : '');
-    case PARK: return `der Park ${ort}`;
-    case LADEN: return o >= 0 ? `der Laden von ${nr(S, o)} ${ort}` : `der Laden ${ort}`;
-    default: return o >= 0 ? `die Werkstatt von ${nr(S, o)} ${ort}` : `die Werkstatt der Stadt ${ort}`;
+    case PARK: return `${der} Park ${ort}`;
+    case LADEN: return o >= 0 ? `${der} Laden von ${nr(S, o)} ${ort}` : `${der} Laden ${ort}`;
+    default: return o >= 0 ? `die Werkstatt von ${nr(S, o)} ${ort}` : g.leer[b] ? `die Werkstatt ${ort}` : `die Werkstatt der Stadt ${ort}`;
   }
 }
 function aufzaehlen(L) { return L.length < 2 ? L.join('') : L.slice(0, -1).join(', ') + ' und ' + L[L.length - 1]; }
@@ -1327,7 +1327,7 @@ function ausfuehren(S, p, a) {
     case A.JOB: ok = aktJob(S, p, 0); break;
     case A.WECHSEL: ok = aktJob(S, p, S.g.lohn[P.arbeit[p]] + 3); break;
     case A.KUENDIGEN: ok = aktKuendigen(S, p); break;
-    case A.FREI: P.frei[p] = 1; ok = true; break;
+    case A.FREI: P.frei[p] = 1; P.einsatz[p] = 0; ok = true; break;   // späte KI-Antwort nach 7 Uhr: Platz auf der Baustelle frei
     case A.FREUNDE: ok = aktFreunde(S, p); break;
     case A.PARTNER: ok = aktPartner(S, p); break;
     case A.ZUSAMMEN: ok = aktZusammen(S, p); break;
@@ -1588,6 +1588,7 @@ function aktGruenden(S, p) {
   g.kasse[b] = R.KASSE_START;
   P.besitz[p] = b;
   if (typ === LADEN) knappLoeschen(S, b); else S.werkstattPlaetze += stellen(S, b);
+  if (leer < 0) bauhofStellen(S);                          // neue Baustelle: der Bauhof stellt gleich dafür ein
   if (leer >= 0) eroeffnen(S, b);
   erinnere(S, p, M.GEGRUENDET, b);
   const gespart = S.tag - P.sparSeit[p];
@@ -1899,6 +1900,7 @@ function tagesabschluss(S) {
   kennzahlenRechnen(S);
   zuzug(S);
   bauamt(S);
+  bauhofStellen(S);                                        // Baustellen der Nacht zählen schon für den Bauhof
   S.reihe.push(S.einwohner);
   S.ki.heute = {};
   S.tag++;
@@ -1942,17 +1944,32 @@ function bauFortschritt(S) {
   }
   if (liegen.length) {
     const leute = B >= 0 ? S.belegschaft[B].length : 0, n = S.baustellen.length;
-    buch(S, 'stillstand', `Seit 5 Tagen arbeitet niemand an ${liegen.length === 1 ? 'der Baustelle' : 'den Baustellen'}: ${aufzaehlen(liegen.map(b => bauName(S, b, false)))}.`
+    buch(S, 'stillstand', `Seit 5 Tagen kommt niemand vom Bauhof ${liegen.length === 1 ? 'zur Baustelle' : 'zu den Baustellen'} für ${aufzaehlen(liegen.map(b => bauName(S, b, false, true)))}.`
       + ` Der Bauhof hat ${leute} ${leute === 1 ? 'Person' : 'Leute'} für ${n} ${n === 1 ? 'Baustelle' : 'Baustellen'} und zahlt ${B >= 0 ? g.lohn[B] : 0} Taler am Tag.`);
   }
 }
-// Stellen im Bauhof nach der offenen Arbeit, Lohn nach dem Mangel an Leuten (95–120 Taler).
-function bauhofRegeln(S) {
+// Stellen im Bauhof nach der offenen Arbeit (10 + eine je 4 Arbeitstage, höchstens 40). Läuft um Mitternacht vor den
+// Kennzahlen und immer, wenn eine Baustelle dazukommt; bucht die freien Stellen dann gleich um.
+function bauhofStellen(S) {
   const g = S.g, B = S.bauhof;
   let rest = 0;
   for (const b of S.baustellen) rest += g.bauRest[b];
   S.bauRueckstand = rest;
-  S.bauZuschlag = Math.min(R.BAU_MAX - R.STELLEN_STADT, Math.ceil(rest / R.BAU_ZIEL));
+  const zu = Math.min(R.BAU_MAX - R.STELLEN_STADT, Math.ceil(rest / R.BAU_ZIEL));
+  if (zu === S.bauZuschlag) return;
+  S.bauZuschlag = zu;
+  if (B < 0 || !offen(S, B)) return;
+  const vorher = Math.max(0, g.offeneStellen[B]);
+  g.offeneStellen[B] = stellen(S, B) - S.belegschaft[B].length;
+  const d = Math.max(0, g.offeneStellen[B]) - vorher;
+  S.freieStellen += d; S.freiLohn[g.lohn[B]] += d;
+}
+// Lohn nach dem Mangel an Leuten (95–120 Taler), dann die Stellen
+function bauhofRegeln(S) {
+  const g = S.g, B = S.bauhof;
+  let rest = 0;
+  for (const b of S.baustellen) rest += g.bauRest[b];
+  bauhofStellen(S);
   if (B < 0) return;
   const alt = g.lohn[B];
   g.lohn[B] = klemme(alt + (S.bauFehlt > 0 && rest > 0 ? R.BAU_LOHN_AUF : -R.BAU_LOHN_AB), R.LOHN_STADT, R.BAU_LOHN_MAX);
@@ -2500,12 +2517,14 @@ function migriereV2(S) {
     if (g.typ[b] === WERKSTATT && g.besitzer[b] < 0 && !g.leer[b] && S.feld[gebZelle(S, b)] === WERKSTATT) { S.bauhof = b; break; }
   }
   S.bauZuschlag = 0; S.bauRueckstand = 0; S.bauFehlt = 0; S.kistenpreis = S.exportPreis / R.KISTEN_PRO_TAG;
+  if (S.bauhof >= 0) S.g.offeneStellen[S.bauhof] = stellen(S, S.bauhof) - S.belegschaft[S.bauhof].length;
   S.stat.bau = { fertig: 0, tage: 0, still: 0, lohnSumme: 0 };
   S.stat.kisten = { gemacht: 0, stadt: 0, aussen: 0 };
   for (const b of S.baustellen) {
     const rest = Math.max(1, g.bauBis[b] - S.tag + 1);          // alte Regel: fertig am Ende von Tag bauBis
     baustelleAnlegen(S, b, Math.min(bauGesamt(S, b), rest * R.BAU_PRO_STELLE));
   }
+  bauhofStellen(S);
   if (S.stunde >= 8) bauEinteilen(S);                        // 7 Uhr ist heute schon vorbei
   buch(S, 'bauhof', `Ab heute baut der Bauhof ${gebOrt(S, S.bauhof)}: Baustellen brauchen jetzt Leute, Werkstätten machen Kisten für die Läden.`
     + (S.baustellen.length ? ` ${S.baustellen.length} ${S.baustellen.length === 1 ? 'Baustelle läuft' : 'Baustellen laufen'} weiter.` : ''));
@@ -2630,9 +2649,8 @@ function bauGesamt(S, b) {
   if (g.auf[b]) return R.BAU_AUF[g.auf[b]];
   return g.typ[b] === WOHNHAUS ? R.BAU_HAUS : g.typ[b] === LADEN ? R.BAU_LADEN : g.typ[b] === WERKSTATT ? R.BAU_WERKSTATT : R.BAU_PARK;
 }
-function werkstattAus(S, w) {
-  const o = S.g.besitzer[w], ort = gebOrt(S, w);
-  return w === S.bauhof ? `aus dem Bauhof ${ort}` : o >= 0 ? `aus der Werkstatt von ${nr(S, o)} ${ort}` : `aus der Werkstatt der Stadt ${ort}`;
+function werkstattName(S, w) {                              // Nominativ, für „Hauptlieferant ist …“
+  return w === S.bauhof ? `der Bauhof ${gebOrt(S, w)}` : bauName(S, w, false) + (S.g.leer[w] ? ' (steht inzwischen leer)' : '');
 }
 function bauArt(S, b) {
   const t = S.g.typ[b];
@@ -2669,7 +2687,7 @@ function heuteText(S, p) {
   if (arb === S.bauhof) {
     const e = P.einsatz[p] - 1;
     if (e >= 0) return `Heute: Baustelle ${gebOrt(S, e)} (${bauArt(S, e)}), ${bauGesamt(S, e) - g.bauRest[e]} von ${bauGesamt(S, e)} Arbeitstagen geschafft.`;
-    if (S.stunde < 7) return 'Heute: um 7 Uhr teilt der Bauhof die Baustellen ein.';
+    if (S.stunde < 8) return 'Heute: um 7 Uhr teilt der Bauhof die Baustellen ein.';   // die Einteilung kommt am Ende der Stunde 7
     return S.baustellen.length ? 'Heute: keine Baustelle frei, macht Kisten im Bauhof.' : 'Heute: keine Baustelle, macht Kisten im Bauhof.';
   }
   if (g.typ[arb] === LADEN) return theke(S, arb) === p ? 'Heute: steht an der Theke.' : '';
@@ -2684,8 +2702,8 @@ function gebaeudeInfo(S, b) {
   const info = { id: b, typ: t, ort: gebOrt(S, b), stufe: g.stufe[b], baustelle: bau, leer: !!g.leer[b], personen: [], mehr: [] };
   if (S.baustellen.includes(b)) {                           // auch eine Aufstockung: das Haus steht, oben wird gebaut
     const gesamt = bauGesamt(S, b), heute = [];
-    for (const x of S.belegschaft[S.bauhof] || []) if (P.einsatz[x] === b + 1) heute.push(ref(S, x));
-    info.bau = { was: bauName(S, b, false), geschafft: gesamt - g.bauRest[b], gesamt, still: g.still[b], heute, eingeteilt: S.stunde >= 7 };
+    for (const x of S.belegschaft[S.bauhof] || []) if (P.einsatz[x] === b + 1 && !P.frei[x]) heute.push(ref(S, x));
+    info.bau = { was: bauName(S, b, false), geschafft: gesamt - g.bauRest[b], gesamt, still: g.still[b], heute, eingeteilt: S.stunde >= 8 };
   }
   if (t === WOHNHAUS) {
     info.titel = `Wohnhaus ${info.ort}` + (bau ? ' (im Bau)' : `, Stufe ${g.stufe[b]}`);
@@ -2713,19 +2731,25 @@ function gebaeudeInfo(S, b) {
     for (const x of S.belegschaft[b]) info.personen.push(Object.assign(ref(S, x), { rolle: rolle(x) }));
     if (b === S.bauhof) {
       const n = S.baustellen.length;
-      info.mehr.push(n ? `${n} ${n === 1 ? 'Baustelle' : 'Baustellen'} mit noch ${S.bauRueckstand} Arbeitstagen. Wer keine Baustelle hat, macht Kisten.`
+      let rest = 0;
+      for (const x of S.baustellen) rest += g.bauRest[x];
+      info.mehr.push(n ? `${n} ${n === 1 ? 'Baustelle' : 'Baustellen'} mit noch ${rest} ${rest === 1 ? 'Arbeitstag' : 'Arbeitstagen'}. Wer keine Baustelle hat, macht Kisten.`
         : 'Gerade gibt es keine Baustelle, alle machen Kisten.');
     }
     if (!info.leer && !bau && t === WERKSTATT) {
-      info.mehr.push(`Gestern ${g.kisten[b]} Kisten gemacht` + (g.kistenStadt[b] ? `, davon ${g.kistenStadt[b]} für Läden der Stadt, den Rest nimmt das Umland.` : ', alle gingen ans Umland.'));
+      const k = g.kisten[b], ks = g.kistenStadt[b];
+      info.mehr.push(k === 0 ? 'Gestern keine Kisten gemacht.'
+        : `Gestern ${k} ${k === 1 ? 'Kiste' : 'Kisten'} gemacht` + (ks === k ? ', alle für Läden der Stadt.' : ks ? `, davon ${ks} für Läden der Stadt, den Rest nimmt das Umland.` : ', alle gingen ans Umland.'));
     }
     if (!info.leer && !bau && t === LADEN) {
       const l = g.lieferant[b] - 1, k = g.kistenStadt[b] + g.kistenAussen[b];
       info.mehr.push(k === 0 ? 'Gestern brauchte der Laden keine Kisten.'
-        : `Gestern ${k} Kisten Ware` + (g.kistenStadt[b] ? `, ${g.kistenStadt[b]} aus der Stadt (die meisten ${werkstattAus(S, l)})` : '')
-          + (g.kistenAussen[b] ? `, ${g.kistenAussen[b]} teurer von außerhalb` : '') + '.');
+        : `Gestern ${k} ${k === 1 ? 'Kiste' : 'Kisten'} Ware` + (g.kistenStadt[b] ? `, ${g.kistenStadt[b]} aus der Stadt` : '')
+          + (g.kistenAussen[b] ? `, ${g.kistenAussen[b]} teurer von außerhalb` : '') + '.'
+          + (l >= 0 ? ` Hauptlieferant ist ${werkstattName(S, l)}.` : ''));
+      // Wer mehrere Läden beliefern müsste, geht nur zum ersten (wie die Figuren); dann steht hier niemand
       const tp = traeger(S, b);
-      if (tp >= 0) info.mehr.push(`Heute bringt ${nr(S, tp)} um 9 und 13 Uhr die Kisten.`);
+      if (tp >= 0 && traegerVon(S, l).get(tp) === b) info.mehr.push(`Heute bringt ${nr(S, tp)} um 9 und 13 Uhr die Kisten.`);
     }
   } else if (t === PARK) {
     info.titel = `Park ${info.ort}`; info.zeile = bau ? 'wird angelegt' : '';
@@ -3270,7 +3294,8 @@ function baueGrafik(THREE, OrbitControls) {
     if (bau) { const e = ECKEN[k % 4]; f.sx = bx + e[0] * 0.5; f.sz = bz + e[1] * 0.5; return; }
     const [dx, dz, qx, qz] = strassenSeite(g.x[ort], g.y[ort]);
     const theke = g.typ[ort] === Sim.LADEN && beiDerArbeit(f.p, S.stunde, ort) && Sim.theke(S, ort) === f.p;
-    const vor = theke ? 0.47 : 0.68, quer = theke ? 0 : f.haupt && !beiDerArbeit(f.p, S.stunde, ort) ? f.ox * 0.5 : QUER[k % QUER.length];
+    const reihe = Math.floor(k / QUER.length);                 // ab dem 8. eine Reihe weiter zur Straße
+    const vor = theke ? 0.47 : 0.68 + 0.16 * reihe, quer = theke ? 0 : f.haupt && !beiDerArbeit(f.p, S.stunde, ort) ? f.ox * 0.5 : QUER[k % QUER.length];
     f.sx = bx + dx * vor + qx * quer; f.sz = bz + dz * vor + qz * quer;
   }
   // Nach jedem Simulationsschritt: wer geht in dieser Stunde wohin, wer steht wo?
@@ -3286,12 +3311,12 @@ function baueGrafik(THREE, OrbitControls) {
     }
     if (werkTag !== S.tag && H >= 8 && H < 17) arbeiterWaehlen(H);
     // Freie Plätze mit zufälligen Erwachsenen füllen (nie doppelt, nie Hauptfiguren)
-    const belegt = new Set();
+    const hs = new Set(hauptIds), belegt = new Set();
     for (const f of figuren) if (f.p >= 0 && P.lebt[f.p] && P.gen[f.p] === f.gen) belegt.add(f.p);
     let kandidaten = null;
     for (let i = 0; i < FIG_MAX; i++) {
       const f = figuren[i];
-      if (f.p >= 0 && P.lebt[f.p] && P.gen[f.p] === f.gen && P.geb[f.p] < erw) continue;
+      if (f.p >= 0 && P.lebt[f.p] && P.gen[f.p] === f.gen && P.geb[f.p] < erw && !hs.has(f.p)) continue;   // wer Hauptfigur wurde, hat seinen eigenen Platz
       f.p = -1;
       if (f.werk && werkTag === S.tag && H < 17) continue;          // Arbeitsplatz frei geworden: bleibt heute leer
       f.werk = false;
@@ -4234,6 +4259,7 @@ $('version-neu').addEventListener('click', () => {
 // Abweichung von der Spec (dort nur Export oder Neu): Ein Stand von Version 2 lässt sich umrechnen (README, Annahme 60)
 $('version-uebernehmen').addEventListener('click', async () => {
   const altS = S;
+  let uebernommen = null;
   try {
     const l = spielstandLesen(alterSpielstand, true);
     S = l.S; akku = 0; buchNeu(); if (G) G.neueStadt();
@@ -4244,14 +4270,17 @@ $('version-uebernehmen').addEventListener('click', async () => {
     $('version-dialog').close();
     setzeTempo(tempo);
     meldung(`Deine Stadt ist übernommen: Tag ${S.tag}, ${zahl(S.einwohner)} Einwohner. Ab jetzt baut der Bauhof.`);
-    const weg = Date.now() - l.zuletztGelaufen;
-    if (tempo > 0 && weg >= 60000) {
-      const erg = await aufholen(weg);
-      if (erg && erg.tage >= 1) wegKarte(erg);
-    }
+    uebernommen = l;
   } catch (err) {
     if (S !== altS) { S = altS; buchNeu(); if (G) G.neueStadt(); hauptSchluessel = ''; try { nachSchritten(); } catch { /* alte Stadt lief ja */ } }
     $('version-text').textContent = `Übernehmen hat nicht geklappt: ${err.message}. Der alte Stand ist unverändert, „Export behalten“ sichert ihn.`;
+    return;
+  }
+  // Erst jetzt aufholen: die übernommene Stadt ist gespeichert; ein Fehler dabei darf sie nicht durch die leere ersetzen
+  const weg = Date.now() - uebernommen.zuletztGelaufen;
+  if (tempo > 0 && weg >= 60000) {
+    const erg = await aufholen(weg);
+    if (erg && erg.tage >= 1) wegKarte(erg);
   }
 });
 function buchNeu() { buchGesehen = 0; $('buch-liste').replaceChildren(); }

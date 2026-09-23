@@ -303,6 +303,7 @@ if (flag('bau')) {
     let einteilFehl = 0, fortschrittFehl = 0, fertigFehl = 0, stillFehl = 0, geprueft = 0, uebersprungen = 0;
     let maxStellen = 0, maxLeute = 0, lohnMin = 999, lohnMax = 0;
     while (S.tag < 365) {
+      for (const b of start.keys()) if (!S.baustellen.includes(b)) start.delete(b);   // fertig (auch in übersprungenen Nächten)
       for (const b of S.baustellen) if (!start.has(b)) start.set(b, S.tag);
       if (S.stunde === 8) {                                     // Einteilung von 7 Uhr
         const je = new Map();
@@ -338,7 +339,7 @@ if (flag('bau')) {
           } else {
             if (r > n) { fertigFehl++; if (flag("v")) console.log("   fertig", tag, b, r, n); }
             dauer.push(tag + 1 - start.get(b));
-            if (S.baustellen.includes(b)) start.set(b, tag + 1);
+            if (S.baustellen.includes(b)) start.set(b, tag + 1);   // gleich wieder aufgestockt: neue Baustelle
           }
         }
         maxStellen = Math.max(maxStellen, R.STELLEN_STADT + S.bauZuschlag);
