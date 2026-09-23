@@ -166,6 +166,17 @@ if (flag('kitest')) {
       Sim.stunde(S);
     }
     pruef(abweichend === 0, `Gehirn ⊆ erlaubte Aktionen (${geprueft} Entscheidungen geprüft, ${abweichend} abweichend)`);
+    // 1b. Der Lagesatz fürs Sprachmodell erkennt Arbeit nur an „arbeitet …“ / „besitzt …“ am Anfang
+    {
+      let n = 0, falsch = 0, bau = 0, bauFalsch = 0;
+      for (let p = 0; p < S.pMax; p++) {
+        if (!S.p.lebt[p] || S.tag - S.p.geb[p] < Sim.R.ERWACHSEN * Sim.R.JAHR || (S.p.arbeit[p] < 0 && S.p.besitz[p] < 0)) continue;
+        const i = Sim.personInfo(S, p);
+        n++; if (!/^(arbeitet als |besitzt )/.test(i.arbeit)) { falsch++; if (falsch < 3) console.log('    ' + i.arbeit); }
+        if (S.p.arbeit[p] === S.bauhof) { bau++; if (!/^arbeitet als Bauarbeiter(in)? beim Bauhof /.test(i.arbeit)) bauFalsch++; }
+      }
+      pruef(n > 50 && falsch === 0 && bau > 0 && bauFalsch === 0, `Arbeitstext beginnt mit „arbeitet als“ oder „besitzt“ (${n} Leute mit Arbeit, davon ${bau} im Bauhof, ${falsch + bauFalsch} falsch)`);
+    }
     // 2. 60 Tage mit Test-Beantworter
     S.ki.an = true;
     let anfragen = 0, gueltig = 0, ungueltig = 0, ohne = 0, maxProTag = 0, zuSpaet = 0;
@@ -431,6 +442,7 @@ if (flag('gate')) {
       [c365.grE - c365.erwE >= 15, `6  Gründer-Ehrgeiz ${c365.grE.toFixed(1)} vs. alle ${c365.erwE.toFixed(1)}: ${(c365.grE - c365.erwE).toFixed(1)} (≥ +15)`],
       [c365.erwH - c365.wzH >= 15, `7  Wegzieher-Heimatliebe ${c365.wzH.toFixed(1)} vs. alle ${c365.erwH.toFixed(1)}: −${(c365.erwH - c365.wzH).toFixed(1)} (n=${c365.wzN}) (≥ 15 weniger)`],
       [ms365 < 5000, `T  365 Tage in ${f0(ms365)} ms (< 5000)`],
+      [S.buchNr / S.tag <= 6.5, `B  Stadtbuch ${(S.buchNr / S.tag).toFixed(2)} Zeilen am Tag (≤ 6,5, kein Spec-Gate)`],
     ];
     for (const [ok, t] of g) { console.log(`  ${ok ? '✓' : '✗'} ${t}`); if (!ok) alleOk = false; }
     console.log('  Tag 730:\n' + charakterText(c730));

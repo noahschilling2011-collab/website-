@@ -969,13 +969,14 @@ function baustelleAnlegen(S, b, arbeit) {
   g.bauBis[b] = S.tag + Math.ceil(arbeit / R.BAU_PRO_STELLE);   // frühestens fertig, wenn jeden Tag 4 Leute kommen
 }
 function baustellenFertig(S) {
-  const g = S.g;
+  const g = S.g, fertig = [];
   for (let i = 0; i < S.baustellen.length; i++) {
     const b = S.baustellen[i];
     if (g.bauRest[b] > 0) continue;
     S.baustellen.splice(i--, 1);
     g.bauBis[b] = 0; g.bauLeute[b] = 0; g.still[b] = 0;
     S.stat.bau.fertig++;
+    fertig.push(bauName(S, b, true));
     if (g.auf[b]) {                                      // Aufstockung fertig
       S.wohnungenImBau -= R.WOHNUNGEN[g.auf[b]] - R.WOHNUNGEN[g.stufe[b]];
       g.stufe[b] = g.auf[b]; g.auf[b] = 0;
@@ -987,7 +988,20 @@ function baustellenFertig(S) {
     if (g.typ[b] === PARK || g.typ[b] === WOHNHAUS) S.parkDirty = true;
     if (istBetrieb(g.typ[b]) && g.besitzer[b] >= 0 && !g.leer[b]) eroeffnen(S, b);
   }
+  if (fertig.length) buch(S, 'fertig', `Der Bauhof hat fertig gebaut: ${aufzaehlen(fertig)}.`);
 }
+// „das Wohnhaus am Birkenweg“, „der Laden von Anna Weber an der Hauptstraße“ (fertig: mit dem, was es jetzt ist)
+function bauName(S, b, fertig) {
+  const g = S.g, o = g.besitzer[b], ort = gebOrt(S, b);
+  switch (g.typ[b]) {
+    case WOHNHAUS: return g.auf[b] ? (fertig ? `die Aufstockung ${ort} (jetzt ${R.WOHNUNGEN[g.auf[b]]} Wohnungen)` : `die Aufstockung ${ort}`)
+      : `das Wohnhaus ${ort}` + (fertig ? ` mit ${R.WOHNUNGEN[1]} Wohnungen` : '');
+    case PARK: return `der Park ${ort}`;
+    case LADEN: return o >= 0 ? `der Laden von ${nr(S, o)} ${ort}` : `der Laden ${ort}`;
+    default: return o >= 0 ? `die Werkstatt von ${nr(S, o)} ${ort}` : `die Werkstatt der Stadt ${ort}`;
+  }
+}
+function aufzaehlen(L) { return L.length < 2 ? L.join('') : L.slice(0, -1).join(', ') + ' und ' + L[L.length - 1]; }
 function eroeffnen(S, b) {
   const P = S.p, o = S.g.besitzer[b];
   if (P.arbeit[o] >= 0 && P.arbeit[o] !== b) austreten(S, o);
@@ -1916,13 +1930,19 @@ function bauFortschritt(S) {
   const P = S.p, g = S.g, B = S.bauhof, st = S.stat.bau;
   for (const b of S.baustellen) g.bauLeute[b] = 0;
   if (B >= 0) for (const p of S.belegschaft[B]) { const e = P.einsatz[p]; if (e > 0 && !P.frei[p]) g.bauLeute[e - 1]++; }
+  const liegen = [];
   for (const b of S.baustellen) {
     const n = g.bauLeute[b];
     st.tage++;
     if (n > 0) { g.bauRest[b] = Math.max(0, g.bauRest[b] - n); g.still[b] = 0; }
-    else { if (g.still[b] < 255) g.still[b]++; st.still++; }
+    else { if (g.still[b] < 255) g.still[b]++; st.still++; if (g.still[b] === 5) liegen.push(b); }
     g.bauBis[b] = S.tag + Math.ceil(g.bauRest[b] / R.BAU_PRO_STELLE);
     if (g.bauRest[b] > 0 && g.typ[b] === LADEN && !g.auf[b]) knappLoeschen(S, b);   // der Laden kommt noch, nur später
+  }
+  if (liegen.length) {
+    const leute = B >= 0 ? S.belegschaft[B].length : 0, n = S.baustellen.length;
+    buch(S, 'stillstand', `Seit 5 Tagen arbeitet niemand an ${liegen.length === 1 ? 'der Baustelle' : 'den Baustellen'}: ${aufzaehlen(liegen.map(b => bauName(S, b, false)))}.`
+      + ` Der Bauhof hat ${leute} ${leute === 1 ? 'Person' : 'Leute'} für ${n} ${n === 1 ? 'Baustelle' : 'Baustellen'} und zahlt ${B >= 0 ? g.lohn[B] : 0} Taler am Tag.`);
   }
 }
 // Stellen im Bauhof nach der offenen Arbeit, Lohn nach dem Mangel an Leuten (95–120 Taler).
@@ -1933,8 +1953,12 @@ function bauhofRegeln(S) {
   S.bauRueckstand = rest;
   S.bauZuschlag = Math.min(R.BAU_MAX - R.STELLEN_STADT, Math.ceil(rest / R.BAU_ZIEL));
   if (B < 0) return;
-  g.lohn[B] = klemme(g.lohn[B] + (S.bauFehlt > 0 && rest > 0 ? R.BAU_LOHN_AUF : -R.BAU_LOHN_AB), R.LOHN_STADT, R.BAU_LOHN_MAX);
+  const alt = g.lohn[B];
+  g.lohn[B] = klemme(alt + (S.bauFehlt > 0 && rest > 0 ? R.BAU_LOHN_AUF : -R.BAU_LOHN_AB), R.LOHN_STADT, R.BAU_LOHN_MAX);
   S.stat.bau.lohnSumme += g.lohn[B];
+  if (Math.floor(g.lohn[B] / 10) > Math.floor(alt / 10)) {   // über 100, 110, 120: eine Zeile
+    buch(S, 'bauhof', `Der Bauhof zahlt jetzt ${g.lohn[B]} Taler am Tag. Heute früh ${S.bauFehlt === 1 ? 'fehlte 1 Person' : `fehlten ${S.bauFehlt} Leute`} auf den Baustellen.`);
+  }
 }
 
 function haushalteZaehlen(S) {
@@ -2352,7 +2376,7 @@ function neueStadt(seed) {
   }
   for (let p = 0; p < R.HAUPT_START; p++) S.ki.haupt.push({ id: p, gen: S.p.gen[p] });   // 5 der ersten Bewohner
   ladenZuordnen(S); parksZuordnen(S); haushalteZaehlen(S); kennzahlenRechnen(S);
-  buch(S, 'start', 'Zehn Leute kommen auf eine leere Wiese an der Hauptstraße. Es gibt zwei Wohnhäuser, eine Werkstatt der Stadt und einen Laden.');
+  buch(S, 'start', 'Zehn Leute kommen auf eine leere Wiese an der Hauptstraße. Es gibt zwei Wohnhäuser, einen Laden und den Bauhof der Stadt, der baut und Kisten macht.');
   return S;
 }
 
@@ -2485,6 +2509,7 @@ const ZIELTEXT = ['', 'eigene Wohnung', 'besserer Job', 'Familie', 'eigener Lade
 function ref(S, p) { return p >= 0 && S.p.lebt[p] ? { id: p, gen: S.p.gen[p], name: name(S, p), lebt: true } : null; }
 function betriebText(S, b) {
   const g = S.g, o = g.besitzer[b], wort = g.typ[b] === LADEN ? 'Laden' : 'Werkstatt';
+  if (b === S.bauhof) return `beim Bauhof ${gebOrt(S, b)}`;
   if (o < 0) return `${wort === 'Laden' ? 'im Laden' : 'in der Werkstatt'} der Stadt ${gebOrt(S, b)}`;
   return `${wort === 'Laden' ? 'im Laden' : 'in der Werkstatt'} von ${nr(S, o)} ${gebOrt(S, b)}`;
 }
@@ -2494,8 +2519,8 @@ function erinnerungText(S, code, bezug, name) {
   switch (code) {
     case M.EINGEZOGEN: return `eingezogen ${ort}`;
     case M.JOB: return `Job bekommen ${geb ? betriebText(S, bezug) : ''}`;
-    case M.JOB_WEG: return `Job verloren ${geb ? `${wort === 'Laden' ? 'im Laden' : 'in der Werkstatt'} ${ort}` : ''}`;
-    case M.GEKUENDIGT: return `gekündigt ${geb ? `${wort === 'Laden' ? 'im Laden' : 'in der Werkstatt'} ${ort}` : ''}`;
+    case M.JOB_WEG: return `Job verloren ${geb ? `${bezug === S.bauhof ? 'beim Bauhof' : wort === 'Laden' ? 'im Laden' : 'in der Werkstatt'} ${ort}` : ''}`;
+    case M.GEKUENDIGT: return `gekündigt ${geb ? `${bezug === S.bauhof ? 'beim Bauhof' : wort === 'Laden' ? 'im Laden' : 'in der Werkstatt'} ${ort}` : ''}`;
     case M.FREUND: return `neue Freundschaft mit ${name}`;
     case M.PARTNER: return `mit ${name} zusammengekommen`;
     case M.GETRENNT: return `von ${name} getrennt`;
@@ -2518,7 +2543,7 @@ function personInfo(S, p, gen) {
   let arbeit;
   if (kind) arbeit = 'Kind';
   else if (bes >= 0) arbeit = `besitzt ${S.g.typ[bes] === LADEN ? 'einen Laden' : 'eine Werkstatt'} ${gebOrt(S, bes)}` + (offen(S, bes) ? '' : ' (noch im Bau)');
-  else if (arb >= 0) arbeit = `arbeitet ${betriebText(S, arb)}`;
+  else if (arb >= 0) arbeit = `arbeitet als ${berufWort(S, p, arb)} ${betriebText(S, arb)}`;
   else if (alter >= R.RENTE) arbeit = 'in Rente';
   else arbeit = 'ohne Arbeit';
   // Gedächtnis chronologisch (Ringpuffer ab dem ältesten Platz)
@@ -2556,7 +2581,7 @@ function personInfo(S, p, gen) {
   return {
     id: p, gen: P.gen[p], name: name(S, p), weib: !!P.weib[p], alter, kind,
     wohnen: w >= 0 ? (eigeneWohnung(S, p) ? 'wohnt ' : 'wohnt bei der Familie ') + gebOrt(S, w) : 'hat keine Wohnung', wohnung: w,
-    arbeit, arbeitsort: bes >= 0 ? bes : arb, geld: P.geld[p],
+    arbeit, arbeitsort: bes >= 0 ? bes : arb, heute: kind ? '' : heuteText(S, p), geld: P.geld[p],
     charakter: { fleiss: P.fleiss[p], gesellig: P.gesellig[p], ehrgeiz: P.ehrgeiz[p], spar: P.spar[p], heimat: P.heimat[p] },
     ziel: kind || !P.ziel[p] ? null : { text: ZIELTEXT[P.ziel[p]], seit: tag - P.zielSeit[p], rest: Math.max(0, R.ZIEL_TAGE - (tag - P.zielSeit[p])) },
     beduerfnisse: kind ? null : { geld: P.bGeld[p], wohnen: P.bWohnen[p], kontakt: P.bKontakt[p], freizeit: P.bFreizeit[p] },
@@ -2568,11 +2593,75 @@ function personInfo(S, p, gen) {
     tagebuch: (S.ki.tagebuch[schluessel(S, p)] || []).slice(),
   };
 }
+// ─── Berufe: ergeben sich aus dem Arbeitsplatz. Theke und Träger sind nur zum Anschauen (keine Wirkung). ──
+function berufWort(S, p, b) {
+  const w = S.p.weib[p];
+  if (b === S.bauhof) return w ? 'Bauarbeiterin' : 'Bauarbeiter';
+  if (S.g.typ[b] === LADEN) return w ? 'Verkäuferin' : 'Verkäufer';
+  return w ? 'Handwerkerin' : 'Handwerker';
+}
+function bauGesamt(S, b) {
+  const g = S.g;
+  if (g.auf[b]) return R.BAU_AUF[g.auf[b]];
+  return g.typ[b] === WOHNHAUS ? R.BAU_HAUS : g.typ[b] === LADEN ? R.BAU_LADEN : g.typ[b] === WERKSTATT ? R.BAU_WERKSTATT : R.BAU_PARK;
+}
+function werkstattAus(S, w) {
+  const o = S.g.besitzer[w], ort = gebOrt(S, w);
+  return w === S.bauhof ? `aus dem Bauhof ${ort}` : o >= 0 ? `aus der Werkstatt von ${nr(S, o)} ${ort}` : `aus der Werkstatt der Stadt ${ort}`;
+}
+function bauArt(S, b) {
+  const t = S.g.typ[b];
+  return S.g.auf[b] ? 'Aufstockung' : t === WOHNHAUS ? 'Wohnhaus' : t === LADEN ? 'Laden' : t === WERKSTATT ? 'Werkstatt' : 'Park';
+}
+function daHeute(S, p) { return !S.p.frei[p] && !S.p.einsatz[p]; }
+// An der Theke: der Besitzer, wenn er heute da ist, sonst die erste anwesende Kraft
+function theke(S, l) {
+  const o = S.g.besitzer[l];
+  if (o >= 0 && S.p.arbeit[o] === l && !S.p.frei[o]) return o;
+  for (const x of S.belegschaft[l]) if (daHeute(S, x)) return x;
+  return -1;
+}
+// Wer heute die Kisten zum Laden trägt: reihum eine anwesende Kraft der Werkstatt, die gestern die meisten brachte
+function traeger(S, l) {
+  const w = S.g.lieferant[l] - 1;
+  if (w < 0 || !offen(S, w)) return -1;
+  const L = S.belegschaft[w].filter(x => daHeute(S, x));
+  return L.length ? L[(S.tag + l) % L.length] : -1;
+}
+function traegerVon(S, w) {                                   // Werkstatt → Map(Person → Laden)
+  const m = new Map(), g = S.g;
+  for (let l = 0; l < S.gAnzahl; l++) {
+    if (g.typ[l] !== LADEN || g.lieferant[l] - 1 !== w || !offen(S, l)) continue;
+    const x = traeger(S, l);
+    if (x >= 0 && !m.has(x)) m.set(x, l);
+  }
+  return m;
+}
+function heuteText(S, p) {
+  const P = S.p, g = S.g, arb = P.besitz[p] >= 0 ? P.besitz[p] : P.arbeit[p];
+  if (arb < 0 || !offen(S, arb)) return '';
+  if (P.frei[p]) return 'Heute: hat sich freigenommen.';
+  if (arb === S.bauhof) {
+    const e = P.einsatz[p] - 1;
+    if (e >= 0) return `Heute: Baustelle ${gebOrt(S, e)} (${bauArt(S, e)}), ${bauGesamt(S, e) - g.bauRest[e]} von ${bauGesamt(S, e)} Arbeitstagen geschafft.`;
+    if (S.stunde < 7) return 'Heute: um 7 Uhr teilt der Bauhof die Baustellen ein.';
+    return S.baustellen.length ? 'Heute: keine Baustelle frei, macht Kisten im Bauhof.' : 'Heute: keine Baustelle, macht Kisten im Bauhof.';
+  }
+  if (g.typ[arb] === LADEN) return theke(S, arb) === p ? 'Heute: steht an der Theke.' : '';
+  const l = traegerVon(S, arb).get(p);
+  return l !== undefined ? `Heute: bringt um 9 und 13 Uhr Kisten zum Laden ${gebOrt(S, l)}.` : '';
+}
+
 // Hauskarte: wer wohnt oder arbeitet hier
 function gebaeudeInfo(S, b) {
   if (b < 0 || b >= S.gAnzahl) return null;
   const g = S.g, P = S.p, t = g.typ[b], bau = S.feld[gebZelle(S, b)] === BAUSTELLE;
-  const info = { id: b, typ: t, ort: gebOrt(S, b), stufe: g.stufe[b], baustelle: bau, leer: !!g.leer[b], personen: [] };
+  const info = { id: b, typ: t, ort: gebOrt(S, b), stufe: g.stufe[b], baustelle: bau, leer: !!g.leer[b], personen: [], mehr: [] };
+  if (S.baustellen.includes(b)) {                           // auch eine Aufstockung: das Haus steht, oben wird gebaut
+    const gesamt = bauGesamt(S, b), heute = [];
+    for (const x of S.belegschaft[S.bauhof] || []) if (P.einsatz[x] === b + 1) heute.push(ref(S, x));
+    info.bau = { was: bauName(S, b, false), geschafft: gesamt - g.bauRest[b], gesamt, still: g.still[b], heute, eingeteilt: S.stunde >= 7 };
+  }
   if (t === WOHNHAUS) {
     info.titel = `Wohnhaus ${info.ort}` + (bau ? ' (im Bau)' : `, Stufe ${g.stufe[b]}`);
     info.zeile = bau ? '' : `${g.belegt[b]} von ${R.WOHNUNGEN[g.stufe[b]]} Wohnungen belegt` + (g.auf[b] ? `, wird auf Stufe ${g.auf[b]} aufgestockt` : '');
@@ -2580,12 +2669,39 @@ function gebaeudeInfo(S, b) {
     const L = S.bewohner[b].slice().sort((x, y) => (P.hh[x] - P.hh[y]) || ((P.hh[x] === x ? 0 : 1) - (P.hh[y] === y ? 0 : 1)) || (P.geb[x] - P.geb[y]));
     for (const x of L) info.personen.push(Object.assign(ref(S, x), { alter: Math.floor((S.tag - P.geb[x]) / R.JAHR), mieter: P.hh[x] === x }));
   } else if (istBetrieb(t)) {
-    const wort = t === LADEN ? 'Laden' : 'Werkstatt', o = g.besitzer[b];
+    const wort = b === S.bauhof ? 'Bauhof' : t === LADEN ? 'Laden' : 'Werkstatt', o = g.besitzer[b];
     info.titel = `${wort} ${info.ort}` + (bau ? ' (im Bau)' : info.leer ? ' (steht leer)' : '');
-    info.zeile = info.leer ? '' : o < 0 ? `gehört der Stadt, ${S.belegschaft[b].length} von ${stellen(S, b)} Stellen besetzt`
-      : `${S.belegschaft[b].length} von ${stellen(S, b)} Stellen besetzt, Lohn ${g.lohn[b]} Taler am Tag`;
-    if (o >= 0) info.personen.push(Object.assign(ref(S, o), { rolle: 'Besitz' }));
-    for (const x of S.belegschaft[b]) info.personen.push(Object.assign(ref(S, x), { rolle: 'arbeitet hier' }));
+    const n = S.belegschaft[b].length, st = stellen(S, b);
+    info.zeile = info.leer ? '' : b === S.bauhof ? `gehört der Stadt, ${n} ${n === 1 ? 'Person' : 'Leute'} bei ${st} Stellen`
+        + (n > st ? ' (gerade gibt es wenig zu bauen, niemand wird eingestellt)' : '') + `, Lohn ${g.lohn[b]} Taler am Tag`
+      : o < 0 ? `gehört der Stadt, ${n} von ${st} Stellen besetzt, Lohn ${g.lohn[b]} Taler am Tag`
+      : `${n} von ${st} Stellen besetzt, Lohn ${g.lohn[b]} Taler am Tag`;
+    const th = t === LADEN ? theke(S, b) : -1, tr = t === WERKSTATT ? traegerVon(S, b) : null;
+    const rolle = (x) => {
+      if (P.frei[x] && S.stunde >= 7) return 'hat heute frei';
+      if (x === th) return 'an der Theke';
+      if (b === S.bauhof && P.einsatz[x]) return 'baut ' + gebOrt(S, P.einsatz[x] - 1);
+      if (tr && tr.has(x)) return 'trägt Kisten zum Laden ' + gebOrt(S, tr.get(x));
+      return berufWort(S, x, b);
+    };
+    if (o >= 0) info.personen.push(Object.assign(ref(S, o), { rolle: o === th ? 'Besitz, an der Theke' : 'Besitz' }));
+    for (const x of S.belegschaft[b]) info.personen.push(Object.assign(ref(S, x), { rolle: rolle(x) }));
+    if (b === S.bauhof) {
+      const n = S.baustellen.length;
+      info.mehr.push(n ? `${n} ${n === 1 ? 'Baustelle' : 'Baustellen'} mit noch ${S.bauRueckstand} Arbeitstagen. Wer keine Baustelle hat, macht Kisten.`
+        : 'Gerade gibt es keine Baustelle, alle machen Kisten.');
+    }
+    if (!info.leer && !bau && t === WERKSTATT) {
+      info.mehr.push(`Gestern ${g.kisten[b]} Kisten gemacht` + (g.kistenStadt[b] ? `, davon ${g.kistenStadt[b]} für Läden der Stadt, den Rest nimmt das Umland.` : ', alle gingen ans Umland.'));
+    }
+    if (!info.leer && !bau && t === LADEN) {
+      const l = g.lieferant[b] - 1, k = g.kistenStadt[b] + g.kistenAussen[b];
+      info.mehr.push(k === 0 ? 'Gestern brauchte der Laden keine Kisten.'
+        : `Gestern ${k} Kisten Ware` + (g.kistenStadt[b] ? `, ${g.kistenStadt[b]} aus der Stadt (die meisten ${werkstattAus(S, l)})` : '')
+          + (g.kistenAussen[b] ? `, ${g.kistenAussen[b]} teurer von außerhalb` : '') + '.');
+      const tp = traeger(S, b);
+      if (tp >= 0) info.mehr.push(`Heute bringt ${nr(S, tp)} um 9 und 13 Uhr die Kisten.`);
+    }
   } else if (t === PARK) {
     info.titel = `Park ${info.ort}`; info.zeile = bau ? 'wird angelegt' : '';
   }
@@ -2621,6 +2737,8 @@ G.StadtSim = {
   VERSION, R, KARTE, VK, VN, RASTER, RAND, LEER, STRASSE, WOHNHAUS, WERKSTATT, LADEN, PARK, BAUSTELLE,
   M, Z, ZIELNAMEN, AKTIONSNAMEN,
   neueStadt, stunde, tagSchritt, exportZustand, importZustand, kennzahlen, name, strName, klartext, personInfo, gebaeudeInfo, ZIELTEXT,
+  // Berufe (für Figuren und Karten, lesen nur)
+  theke, traeger, bauGesamt,
   // Hauptfiguren und Sprachmodell (Phase 4)
   istHaupt, hauptSetzen, verlustErledigt, kiSchalten, kiAktionen, kiErlaubtJetzt, kiEntscheidung, kiVerwerfen, kiGespraech, kiTagebuch,
   erlaubteAktionen: (S, p, h) => erlaubteAktionen(S, p, h).map(a => AKTIONSNAMEN[a]),
@@ -3323,6 +3441,7 @@ function personHtml(p, gen, name) {
   let h = `<h2 tabindex="-1">${esc(i.name)}</h2>
     <p class="leise">${i.alter} Jahre${i.kind ? ', Kind' : ''}</p>
     <p>${buchHtml(i.arbeit)}${i.arbeitsort >= 0 ? ' · ' + hausKnopf(i.arbeitsort, 'Betrieb ansehen') : ''}</p>
+    ${i.heute ? `<p class="leise">${esc(i.heute)}</p>` : ''}
     <p>${i.wohnung >= 0 ? hausKnopf(i.wohnung, esc(i.wohnen)) : esc(i.wohnen)}</p>`;
   if (!i.kind) h += `<p class="leise">${zahl(i.geld)} Taler${i.ziel ? ` · Ziel: <span style="color:var(--text)">${esc(i.ziel.text)}</span> (noch ${i.ziel.rest} ${i.ziel.rest === 1 ? 'Tag' : 'Tage'})` : ''}</p>`;
   h += hauptKnopfHtml(i);
@@ -3347,7 +3466,14 @@ function gebaeudeHtml(b) {
   const g = Sim.gebaeudeInfo(S, b);
   if (!g) return '<h2 tabindex="-1">Unbekanntes Gebäude</h2>';
   let h = `<h2 tabindex="-1">${esc(g.titel)}</h2>${g.zeile ? `<p class="leise">${esc(g.zeile)}</p>` : ''}`;
-  if (!g.personen.length) return h + (g.typ === Sim.PARK ? '' : '<p class="leise">Hier ist gerade niemand.</p>');
+  for (const z of g.mehr) h += `<p class="leise">${buchHtml(z)}</p>`;
+  if (g.bau) {
+    const b = g.bau;
+    h += `<h3>Baustelle</h3><p>${b.geschafft} von ${b.gesamt} Arbeitstagen geschafft${b.still ? `, seit ${b.still} ${b.still === 1 ? 'Tag' : 'Tagen'} kam niemand vom Bauhof` : ''}.</p>`
+      + `<p class="leise">${b.heute.length ? 'Heute bauen hier: ' + b.heute.map(nameKnopf).join(', ')
+        : b.eingeteilt ? 'Heute ist niemand vom Bauhof hier.' : 'Der Bauhof teilt um 7 Uhr ein, wer wo baut.'}</p>`;
+  }
+  if (!g.personen.length) return h + (g.typ === Sim.PARK || g.bau ? '' : '<p class="leise">Hier ist gerade niemand.</p>');
   h += `<h3>${g.typ === Sim.WOHNHAUS ? 'Hier wohnen' : 'Hier arbeiten'} (${g.personen.length})</h3><ul class="personenliste">`;
   let vorher = null;
   for (const x of g.personen) {
@@ -3882,7 +4008,7 @@ async function aufholen(msWeg) {
 
 // Die drei auffälligsten Einträge: nach Gewicht der Art, höchstens einer je Art, bei Gleichstand der neueste
 const GEWICHT = { notbremse: 9, pleite: 8, gruendung: 7, tod: 6, wegzug: 5, schliessung: 5, kinder_weg: 5, trennung: 4,
-  hochzeit: 4, geburt: 3, bauamt: 2, zuzug: 1, start: 0 };
+  hochzeit: 4, geburt: 3, stillstand: 3, bauamt: 2, fertig: 2, bauhof: 2, zuzug: 1, start: 0 };
 function auffaelligste(abNr, n) {
   const kand = S.buch.filter(e => e.nr > abNr).sort((a, b) => (GEWICHT[b.art] || 0) - (GEWICHT[a.art] || 0) || b.nr - a.nr);
   const wahl = [], arten = new Set();
