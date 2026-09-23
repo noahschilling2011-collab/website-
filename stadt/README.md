@@ -26,7 +26,7 @@ Schalter in der Adresse (alle optional):
 | `?seed=7` | Seed für eine neue Stadt (sonst zufällig) |
 | `?debug` | Debug-Ecke unten links: fps, Frame-Zeit, Draw Calls, Dreiecke, KI-Aufrufe (gültig in %, Dauer, Fehler) und Knöpfe „Zeit vorspulen“ |
 | `?debug&tage=400` | Neue Stadt vorab 400 Tage rechnen |
-| `?debug&umland=200000` | Größere Stadt (etwa 5.000 Einwohner an Tag 600) für den Leistungstest. Dieser Stand wird nicht gespeichert |
+| `?debug&umland=300000&tage=750` | Größere Stadt für den Leistungstest (Seed 2: etwa 5.900 Einwohner). Dieser Stand wird nicht gespeichert |
 
 ## Ollama für die Hauptfiguren (Phase 4)
 
@@ -57,7 +57,8 @@ Es gibt kein Feld „Beruf“ und keine neue Aktion. Der Beruf ergibt sich aus d
   Laden 9, eine Werkstatt 12, ein Park 4. Ohne Bauarbeiter bleibt die Baustelle liegen. Wer keine Baustelle hat, macht Kisten.
 - **Handwerker/in** in einer Werkstatt: 8 Kisten je Arbeitstag. Die Kisten gehen an die Läden der Stadt, der Rest ans Umland.
 - **Verkäufer/in** im Laden: 5 Kunden je Kraft wie bisher. Ein Laden braucht eine Kiste je 38 Taler Umsatz und holt sie bei
-  der nächsten Werkstatt der Stadt, die noch welche hat (bis 20 Felder weit), sonst teurer von außerhalb.
+  der nächsten Werkstatt der Stadt, die noch welche hat (bis 20 Felder weit), sonst teurer von außerhalb. Wer zuzieht,
+  fängt in einer Werkstatt oder Tech-Firma an; Läden finden ihre Leute nur in der Stadt (Annahme 11).
 - **Programmierer/in** in einer Tech-Firma: Jede anwesende Person (auch der Besitzer) bringt um Mitternacht einen Arbeitstag an
   der nächsten Version. Eine Version braucht bei Software 40, beim Handy 60, beim Computer 50 Arbeitstage, danach erscheint sie
   („Nova 3“). Die Firma verkauft ans Umland (derselbe Topf wie die Werkstätten) und über die Läden an die Leute in der Stadt.
@@ -127,7 +128,7 @@ Weitere Schalter für `--seed`: `--alle 60` (Zeilenabstand), `--fluss` (Zu-/Wegz
 | 8 | Wer Erspartes hat, gibt täglich bis 1 % davon (höchstens 15) zusätzlich aus, Sparsame weniger | Sonst sammelt sich das Geld bei den Leuten, und die Läden bekommen nichts ab |
 | 9 | Besitzer zahlen Lohn nach Charakter: wenig sparsam = großzügiger (90–110 % vom Grundlohn) | Gibt `job_wechseln` einen Grund |
 | 10 | Pleite-Betriebe stehen leer und können übernommen werden (40 % der Baukosten). Eine Übernahme zählt als Gründung | Die Spec sagt „Gebäude wird frei“ |
-| 11 | Zuzug: freie Stellen zählen nur, soweit sie nicht schon Arbeitslose der Stadt besetzen könnten. Höchstens 1 + 1 % der Einwohner pro Tag | Sonst ziehen Leute für Stellen zu, die Einheimische ohnehin gleich nehmen, und Wellen schaukeln sich auf |
+| 11 | Zuzug: Als „freie Stellen“ zählen nur freie Stellen in Werkstätten und Tech-Firmen (nicht im Bauhof, nicht in Läden), abzüglich der Arbeitslosen der Stadt. Wer zuzieht, tritt sofort die nächste solche Stelle an; ist keine mehr frei, kommt an diesem Tag niemand mehr. Zuzügler sind 18–60 Jahre alt (bis zur Gate-4-Änderung 18–45). Höchstens 1 + 1 % der Einwohner pro Tag | **Weicht vom Wortlaut der Spec ab** („freie Stellen“); Noahs Entscheidung für Gate 4. Zählten Ladenstellen, holte jeder neue Laden Leute von außen, die wieder neue Läden brauchen: Ladenboom, danach Pleitewelle. Läden stellen deshalb nur Leute aus der Stadt ein. Mit 18–45 ging die erste Generation fast gleichzeitig in Rente. Arbeitslose abziehen: sonst ziehen Leute für Stellen zu, die Einheimische ohnehin gleich nehmen |
 | 12 | „Wohnungssuchende“ fürs Bauamt = Leute ohne Wohnung oder mit erfolgloser Suche **plus** Anfragen von außen (Leute, die wegen freier Stellen kämen, aber keine Wohnung finden) | Sonst baut das Bauamt nie vorausschauend, und der Zuzug stockt |
 | 13 | Zufriedenheit = 100 − gewichtetes Mittel 4. Grades der Dringlichkeiten. Das schlimmste Bedürfnis zählt am stärksten. Trauer −15, kein Einkauf −10. Der Zielwert wird alle 6 Spielstunden neu berechnet, die Zufriedenheit gleitet stündlich hin | Mit dem normalen Mittel fällt kaum jemand unter 20, dann zieht niemand weg |
 | 14 | Wohnen = Enge der Wohnung (Haushaltsgröße gegen Wohnungsgröße der Hausstufe) plus Park in der Nähe. Umziehen nur, wenn die neue Wohnung spürbar besser ist. Nach einer erfolglosen Suche 5 Tage Pause | Vorher zogen Haushalte zweimal am Tag hin und her, weil ein Umzug das Problem nicht löste |
@@ -159,7 +160,7 @@ Weitere Schalter für `--seed`: `--alle 60` (Zeilenabstand), `--fluss` (Zu-/Wegz
 | 40 | Stirbt oder geht eine Hauptfigur, verschwindet ihr Tagebuch mit ihr. Vorschläge für die Nachfolge: Partner und erwachsene Kinder, die noch in der Stadt leben | Die Spec sagt „schlägt ein Kind oder den Partner vor“ |
 | 41 | Spielstand-Version 4 (2: Hauptfiguren und Tagebuch, 3: Bauhof und Kisten, 4: Tech-Firmen). Stände anderer Versionen lösen den Versionsdialog aus; Version 2 und 3 lassen sich übernehmen (Annahme 60) | Neue Felder |
 | 42 | Bei 1× ist eine echte Minute eine Spielstunde | Folgt aus der Spec: 90 Spieltage entsprechen 36 Stunden Abwesenheit |
-| 43 | Beim Aufholen (Tagesschritte) entscheiden alle nur um 7 und 18 Uhr; Ereignisse lösen keine zusätzliche Entscheidung aus. Der Bauhof teilt direkt nach der 7-Uhr-Entscheidung ein, wie stündlich | Sonst wäre der Tagesschritt nicht schneller. Abweichung gegen stündlich nach 90 Tagen (Seeds 1–10, Tag 200–290): im Mittel −1,7 % Einwohner, einzeln −8,6 % bis +8,1 % |
+| 43 | Beim Aufholen (Tagesschritte) entscheiden alle nur um 7 und 18 Uhr; Ereignisse lösen keine zusätzliche Entscheidung aus. Der Bauhof teilt direkt nach der 7-Uhr-Entscheidung ein, wie stündlich | Sonst wäre der Tagesschritt nicht schneller. Abweichung gegen stündlich nach 90 Tagen (Seeds 1–10, Tag 200–290): im Mittel +0,7 % Einwohner, einzeln −5,8 % bis +10,8 % (vor der Zuzug-Regel −1,7 %, einzeln −8,6 % bis +8,1 %) |
 | 44 | Grundregel: Eine Figur steht oder geht nur dort, wo die Simulation die Person in dieser Stunde hat. Arbeit 8–17 Uhr (Bauarbeiter auf ihrer Baustelle), abends bei Freunden 19–22 Uhr (wer „freunde_treffen“ gewählt hat), wer frei hat um 10 Uhr einkaufen, sonst zu Hause. Ändert sich der Ort, geht die Figur dorthin. Von den 300 Figuren sind bis zu 120 Leute bei der Arbeit (Annahme 62), die übrigen zufällige Erwachsene, die nur unterwegs zu sehen sind. Hauptfiguren sind immer zu sehen: wenn sie nicht laufen, stehen sie vor dem Gebäude, in dem sie gerade sind. Ihre Markierung ist gelb, weiß solange sie „überlegen“. Jede sichtbare Figur ist anklickbar | Die Spec sagt „morgens zur Arbeit, abends heim oder zu Freunden“ und „plus immer alle Hauptfiguren“ |
 | 45 | Fenster: Abends (ab 18–19:30 Uhr, je Haus verschieden) sind so viele Geschosse hell, wie das Haus belegt ist; spät in der Nacht etwa ein Drittel davon, aber jedes bewohnte Haus mindestens eins; morgens von 5:30 bis etwa 7 Uhr die Hälfte. Leere Häuser bleiben dunkel. Die Fenster sind unbeleuchtetes Material (`MeshBasicMaterial`) mit Lichtfarbe, das wirkt wie „emissive“ | Ein Haus, in dem um 2 Uhr alles an ist, sah unecht aus |
 | 46 | Ist der Spielstand pausiert gespeichert, holt die Stadt beim Öffnen nichts auf | Pause heißt, dass die Stadt nicht weiterläuft |
@@ -189,42 +190,64 @@ Weitere Schalter für `--seed`: `--alle 60` (Zeilenabstand), `--fluss` (Zu-/Wegz
 
 ## Bekannte Schwächen
 
-**Gate 4 hält nur auf einem Teil der Seeds, und die Messung rauscht stark.** Mit Tech-Firmen liegen die offiziellen Seeds 1, 2
-und 3 bei Faktor 1,30, 1,23 und 1,18: keiner besteht. Deshalb gemessen über 80 Seeds (simtest --gate je Seed, Band Tag 551–730):
+**Gate 4 hält jetzt fast immer, dafür wächst die Stadt langsamer an.** Seit der Zuzug-Regel (Annahme 11) liegen die offiziellen
+Seeds 1, 2 und 3 bei Faktor 1,09, 1,10 und 1,09 (vorher 1,30, 1,23 und 1,18: keiner bestand). Gemessen über 80 Seeds
+(simtest --gate je Seed, Band Tag 551–730):
 
 | Stand | Gate 4 besteht | Band im Mittel | Median | Seeds über 1,5 | schlimmster |
 |---|---|---|---|---|---|
 | vor Bauhof und Kisten | 21 von 80 | 1,286 | 1,22 | 10 | 2,20 |
 | mit Bauhof und Kisten | 26 von 80 | 1,255 | 1,21 | 5 | 2,15 |
-| dazu Tech-Firmen (heute) | 24 von 80 | 1,275 | 1,20 | 13 | 2,02 |
+| dazu Tech-Firmen | 24 von 80 | 1,275 | 1,20 | 13 | 2,02 |
 | Placebo: Bauhof und Kisten plus eine Zufallszahl am Tag, sonst nichts | 22 von 80 | 1,303 | 1,25 | 12 | 2,28 |
+| **dazu Zuzug nur für Werkstatt- und Tech-Stellen (heute)** | **76 von 80** | **1,076** | **1,07** | **0** | **1,21** |
+| Placebo dazu: heute plus eine Zufallszahl am Tag | 77 von 80 | 1,070 | 1,06 | 0 | 1,17 |
+| heute auf frischen Seeds 81–160 | 79 von 80 | 1,074 | 1,06 | 0 | 1,15 |
+| Tech-Firmen ohne Zuzug-Regel auf den Seeds 81–160 | 22 von 80 | 1,308 | 1,23 | 11 | 2,62 |
 
-Das Placebo ändert keine Regel und ist trotzdem schlechter als jeder andere Stand. Unterschiede in dieser Größe sind also
-Rauschen: Gate 4 hängt davon ab, wann zufällig ein Ladenboom mit Pleitewelle einsetzt (Beispiel Seed 15 ohne Tech: die Läden
-steigen von Tag 600 bis 720 von 69 auf 184, die Stadt von 1.181 auf 2.414 Einwohner, danach stehen 103 Betriebe leer). Auch die
-ersten 40 Seeds allein täuschen: mit Bauhof und Kisten bestehen dort 18 von 40, auf den Seeds 41–80 nur 8. Nach Noahs Maßstab
-„nicht schlechter als vorher“ liegen die Tech-Firmen gleichauf mit dem Stand vor Bauhof und Kisten und innerhalb des Rauschens.
-Ganz am Anfang, vor Wareneinsatz, gedrosseltem Zuzug und Gründen nur mit Aussicht,
-verdoppelte sich die Stadt im zweiten Jahr (Faktor 1,9–2,2). Was bleibt, ist ein Echo der ersten
-Generation: Die große Zuzugswelle aus Jahr 1 geht fast gleichzeitig in Rente und stirbt fast gleichzeitig. Dann fehlen
-erst Arbeitskräfte (neuer Zuzug), danach Kundschaft (Pleiten). Getestet und verworfen: Zuzug halb so schnell, Zuzügler
-18–60 statt 18–45, Zuzug über etwa 10 Tage geglättet (jeweils nicht besser auf 6 Seeds).
+Vorher war Gate 4 Glückssache: Unterschiede zwischen den Ständen waren kleiner als das Placebo, das keine Regel ändert. Gate 4
+hing davon ab, wann zufällig ein Ladenboom mit Pleitewelle einsetzte (Beispiel Seed 15 ohne Tech: die Läden stiegen von Tag 600
+bis 720 von 69 auf 184, die Stadt von 1.181 auf 2.414 Einwohner, danach standen 103 Betriebe leer). Die Ursache: Jede freie
+Ladenstelle lockte Zuzug an, die Zuzügler brauchten neue Läden, deren Stellen lockten wieder Zuzug an. Dazu kam ein Echo der
+ersten Generation: Die große Zuzugswelle aus Jahr 1 ging fast gleichzeitig in Rente. Die drei Teile der Regel wirken nur
+zusammen; die Zuzügler 18–60 statt 18–45 allein waren früher auf 6 Seeds nicht besser, mit den beiden anderen Teilen bestehen
+auf den Seeds 1–20 mit 18–60 19 von 20, mit 18–45 nur 12. Getestet und verworfen: Zuzug halb so schnell, Zuzug über etwa
+10 Tage geglättet.
+
+**Die Stadt wächst langsamer und bleibt kleiner.** Über die Seeds 1–80 hat sie im Mittel an Tag 180 177 statt 276 Einwohner,
+an Tag 365 840 statt 1.141 (kleinster Wert 526 statt 959), an Tag 730 1.045 statt 1.551. Gate 1 (mindestens 300 an Tag 365)
+hält trotzdem auf allen 160 Seeds. Dafür gibt es kaum noch Arbeitslose: an Tag 365 im Mittel 0,6 % statt 10,2 %, an Tag 730
+3,8 % statt 11,3 %.
+
+**Das Panel zeigt mehr freie Stellen, als Zuzug anlocken.** Die Zahl „freie Stellen“ im Panel zählt alle freien Stellen, auch
+Läden und Bauhof. Für den Zuzug zählen nur Werkstätten und Tech-Firmen (Annahme 11). An Tag 730 zeigt das Panel im Median
+121 freie Stellen (vorher 5), davon sind nur 12 in Werkstätten und Tech-Firmen. Wer das Panel liest, erwartet Zuzug, der nicht
+kommt. Die Anzeige ist unverändert.
+
+**Läden sind meist unterbesetzt.** An Tag 365 und 730 sind im Mittel 32 % und 33 % der Ladenstellen besetzt (vorher 99 %
+und 95 %), weil Zuzügler nur in Werkstätten und Tech-Firmen anfangen. Ein Laden bedient trotzdem seine volle Kundschaft, denn
+die Kapazität hängt an den Stellen, nicht an den Leuten (Annahme 6). Er spart nur Löhne. Das ist unrealistisch: Ein Laden mit
+zwei von sechs Kräften bedient so viele Leute wie ein voller.
+
+**Gate 7 ist knapp.** Es zählt nur die Leute, die bis Tag 730 wegziehen (auf Seed 1 sind es 19). Mit der Zuzug-Regel fiel
+Gate 7 im Placebo auf 5 von 160 Seeds durch, ohne sie in den Seeds 81–160 auf 2 von 80. Auf den Seeds 1–160 ohne Placebo
+fällt es nicht durch.
 
 **Die Kisten machen nichts knapp.** Die Werkstätten machen etwa fünfmal so viele Kisten, wie die Läden brauchen: Auf den
 Seeds 1–3 gingen von Tag 100 bis 300 je 21–22 % der Kisten an Läden der Stadt, die Läden bekamen 100 % ihrer Kisten aus der
 Stadt, der Rest ging ans Umland. Eine Werkstatt nimmt dasselbe ein, ob ein Laden ihre Kisten nimmt oder nicht. Im Ergebnis
-zahlen Läden etwa 42–43 statt 50 % ihres Umsatzes für Ware (Kistenpreis Tag 100–730 im Schnitt 15,8–16,2 Taler, Seeds 1–3). Echte Knappheit (Umland kauft weniger) war im Entwurf getestet und
+zahlen Läden etwa 42–43 statt 50 % ihres Umsatzes für Ware (Kistenpreis Tag 100–730 im Schnitt 16,0–16,4 Taler, Seeds 1–3). Echte Knappheit (Umland kauft weniger) war im Entwurf getestet und
 ist verworfen (Annahme 59).
 
 **Tech-Firmen kommen in einer ausgewachsenen Stadt nur langsam.** Sie teilen sich das Umland mit den Werkstätten und werden
 nur gegründet, wenn dort Platz ist. Im Entwurf gab es nach dem Übernehmen einer Stadt von Tag 300 bzw. 400 in den 60 Tagen
-danach keine Gründung, bei Tag 150 drei. In einer neuen Stadt entstehen auf den Seeds 1–3 in 730 Tagen 15–20 Tech-Firmen.
+danach keine Gründung, bei Tag 150 drei. In einer neuen Stadt entstehen auf den Seeds 1–3 in 730 Tagen 17–26 Tech-Firmen.
 
 **Die echten Code-Stücke sind nur mit einem nachgebauten Ollama getestet.** Ob ein kleines Modell zuverlässig gültiges JSON mit
 Code liefert (oder Code-Zäune und Erklärungen dazuschreibt), ist nicht gemessen. Ungültige Antworten zählen als ungültig und
 landen nicht im Tagebuch.
 
-**Viele Handys.** Im Entwurf hatten an Tag 730 91 % der Erwachsenen ein Gerät; unterwegs leuchten deshalb bis zu 80 Handys.
+**Viele Handys.** Auf den Seeds 1–3 haben an Tag 730 93–94 % der Erwachsenen ein Gerät; unterwegs leuchten deshalb bis zu 80 Handys.
 
 **Das Budget ist nie knapp.** Ab etwa Tag 60 übersteigen Steuern und Mieten alle Ausgaben um ein Vielfaches. Die
 Budgetgrenzen des Bauamts greifen deshalb praktisch nie. Gate 3 hält, weil jede Ausgabe vorher geprüft wird, nicht weil
@@ -242,5 +265,5 @@ Unterschied ist im Messrauschen nicht zu sehen; das Bildtempo begrenzt hier die 
 
 **60 Bilder pro Sekunde sind nicht gemessen.** Im Container rendert Chromium ohne Grafikkarte (SwiftShader) mit etwa
 10 fps. Gemessen sind Draw Calls (10–13 vor der Arbeit-Erweiterung, jetzt bis 15: Kisten-Mesh und Gerüst), Dreiecke
-(unter 51.000) und die Rechenzeit pro Bild in JavaScript (5–11 ms). Mit Tech-Firmen und 5.624 Einwohnern (`?debug&umland=200000&tage=600&seed=2`):
-13 Draw Calls, 77.390 Dreiecke, 12 ms JavaScript pro Bild, Konsole leer.
+(unter 51.000) und die Rechenzeit pro Bild in JavaScript (5–11 ms). Große Stadt nach der Zuzug-Regel mit 5.895 Einwohnern
+(`?debug&umland=300000&tage=750&seed=2`): 15 Draw Calls, 102.742 Dreiecke, 9,3 ms JavaScript pro Bild, Konsole leer.

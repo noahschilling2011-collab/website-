@@ -2455,8 +2455,13 @@ function kennzahlenRechnen(S) {
 function zuzug(S) {
   // Normierung: Als frei zählen nur Stellen, die nicht schon Arbeitslose der Stadt besetzen könnten.
   // Die Stellen im Bauhof locken niemanden an: sie gehen mit den Baustellen auf und ab (siehe README, Annahme 58).
-  const bh = S.bauhof >= 0 ? Math.max(0, S.g.offeneStellen[S.bauhof]) : 0;
-  const fw = S.freieWohnungen, fs = Math.max(0, S.freieStellen - bh - S.arbeitslose);
+  // Ladenstellen locken auch niemanden an (Gate 4): Ein Laden bedient 35 Leute, ob seine Stellen besetzt sind oder nicht
+  // (Annahme 6). Zählten sie, holte jeder neue Laden Leute von außen, die wieder neue Läden brauchen (Ladenboom).
+  // Läden stellen deshalb nur Leute aus der Stadt ein. Es zählen also die Stellen in Werkstätten und Tech-Firmen.
+  const g = S.g, bh = S.bauhof >= 0 ? Math.max(0, g.offeneStellen[S.bauhof]) : 0;
+  let laden = 0;
+  for (let b = 0; b < S.gAnzahl; b++) if (g.typ[b] === LADEN && offen(S, b)) laden += Math.max(0, g.offeneStellen[b]);
+  const fw = S.freieWohnungen, fs = Math.max(0, S.freieStellen - bh - laden - S.arbeitslose);
   const zf = klemme((S.zufMittel - 25) / 50, 0, 1);
   const basis = 2 + S.einwohner * 0.02;
   const attraktiv = (fw / (fw + 3)) * (fs / (fs + 3)) * zf;
@@ -2467,22 +2472,32 @@ function zuzug(S) {
   for (let i = 0; i < n; i++) {
     const b = freieWohnungNahe(S, MITTE, MITTE, -1, 1);
     if (b < 0) break;
+    // Wer zuzieht, tritt gleich die Stelle an, für die er kommt: die nächste freie in einer Werkstatt oder Tech-Firma.
+    // Ist keine mehr frei, kommt heute niemand mehr. Sonst nähmen Zuzügler Ladenstellen, und die Werkstattstellen,
+    // die sie angelockt haben, lockten am nächsten Tag die nächsten an (Gate 4).
+    const stelle = suche(S.vBetrieb, g.x[b], g.y[b], q => (q !== S.bauhof && (g.typ[q] === WERKSTATT || g.typ[q] === TECH)
+      && g.offeneStellen[q] > 0 && offen(S, q)) ? Math.abs(g.x[q] - g.x[b]) + Math.abs(g.y[q] - g.y[b]) : -1);
+    if (stelle < 0) break;
     const p = neuePerson(S);
     const P = S.p;
     zufallsName(S, p); zufallsCharakter(S, p);
-    P.geb[p] = S.tag - (18 + zInt(S, 28)) * R.JAHR - zInt(S, R.JAHR);
+    // 18 bis 60 Jahre (vorher 18–45): Die erste Generation geht dann nicht fast gleichzeitig in Rente, das Echo
+    // im zweiten Jahr wird flacher (Gate 4). Allein war das früher auf 6 Seeds nicht besser; mit den beiden Regeln oben
+    // bestehen Gate 4 auf den Seeds 1–20 mit 18–60 19 von 20, mit 18–45 nur 12.
+    P.geb[p] = S.tag - (18 + zInt(S, 43)) * R.JAHR - zInt(S, R.JAHR);
     P.geld[p] = 300 + zInt(S, 1201);
     bedarfStart(S, p);
     eigenerHaushalt(S, p, b);
     P.einzug[p] = S.tag; P.sparSeit[p] = S.tag;
     erinnere(S, p, M.EINGEZOGEN, b);
+    anstellen(S, p, stelle); erinnere(S, p, M.JOB, stelle);
     zielWaehlen(S, p);
     P.jetzt[p] = 1;
     S.stat.zuzuege++; erwachsenZaehlen(S, p);
     neu.push(p);
   }
   // Zuzüge eines Tages stehen in einer Zeile, sonst würden sie das Stadtbuch (500 Zeilen) allein füllen.
-  const grund = ` Es gibt ${fs} freie ${fs === 1 ? 'Stelle' : 'Stellen'} und ${fw} freie ${fw === 1 ? 'Wohnung' : 'Wohnungen'}, die Stimmung liegt bei ${Math.round(S.zufMittel)}.`;
+  const grund = ` Es gibt ${fs} freie ${fs === 1 ? 'Stelle' : 'Stellen'} in Werkstätten und Tech-Firmen und ${fw} freie ${fw === 1 ? 'Wohnung' : 'Wohnungen'}, die Stimmung liegt bei ${Math.round(S.zufMittel)}.`;
   if (neu.length === 1) buch(S, 'zuzug', `${nr(S, neu[0])} zieht zu, ${gebOrt(S, S.p.wohnung[neu[0]])}.` + grund);
   else if (neu.length > 1) buch(S, 'zuzug', `${neu.length} Leute ziehen zu, darunter ${nr(S, neu[0])} und ${nr(S, neu[1])}.` + grund);
 }
