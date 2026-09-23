@@ -443,6 +443,7 @@ const R = {
   KAUF_CHANCE: 0.04,                       // Grundchance am Tag für einen Kauf (weniger Sparsame öfter, neue Versionen doppelt)
   KAUF_RESERVE: 600,                       // so viel Geld bleibt nach einem Kauf mindestens übrig
   KAUF_PAUSE: 20,                          // Tage zwischen zwei Käufen
+  COMPUTER_FLEISS: 60,                     // ab so viel Fleiß will man als Gerät einen Computer statt eines Handys
   GERAET_ALT: 120,                         // nach so vielen Tagen will man ein neues Handy oder einen neuen Computer
   APP_ALT: 40,                             // nach so vielen Tagen neue Software
   NEU_TAGE: 15,                            // so lange gilt eine Version als neu
@@ -2113,9 +2114,15 @@ function techArbeit(S) {
     if (stand < soll) { g.projekt[b] = stand; continue; }
     g.version[b]++; g.projekt[b] = Math.min(stand - soll, soll - 1); g.neuTag[b] = S.tag;
     S.stat.tech.versionen++;
-    neu.push(`${produktName(S, b, g.version[b])} von ${firmenName(S, b)}` + (o >= 0 ? ` (${nr(S, o)})` : ''));
+    neu.push(b);
   }
-  if (neu.length) buch(S, 'version', `Neu in den Läden: ${aufzaehlen(neu)}.`);
+  if (!neu.length) return;
+  // Je Produkt liegt nur die neueste Version im Regal; erscheinen zwei am selben Tag, bleibt es bei der ersten Firma
+  angebotRechnen(S);
+  const text = (b) => `${produktName(S, b, g.version[b])} von ${firmenName(S, b)}` + (g.besitzer[b] >= 0 ? ` (${nr(S, g.besitzer[b])})` : '');
+  const regal = neu.filter(b => S.angebot[g.produkt[b]] === b), daneben = neu.filter(b => S.angebot[g.produkt[b]] !== b);
+  buch(S, 'version', (regal.length ? `Neu in den Läden: ${aufzaehlen(regal.map(text))}.` : '')
+    + (daneben.length ? `${regal.length ? ' ' : ''}Am selben Tag fertig, aber nicht im Regal: ${aufzaehlen(daneben.map(text))}.` : ''));
 }
 // Was die Läden heute anbieten: je Produkt die neueste Version einer offenen Firma der Stadt (-1 = nichts)
 function angebotRechnen(S) {
@@ -2128,13 +2135,14 @@ function angebotRechnen(S) {
   }
   A[0] = A[SOFTWARE] >= 0 || A[HANDY] >= 0 || A[COMPUTER] >= 0 ? 1 : -1;   // gibt es überhaupt etwas?
 }
-// Was jemand kaufen würde: zuerst ein Gerät (Handy, sonst Computer; nach 120 Tagen ein neues), mit Gerät auch Software.
+// Was jemand kaufen würde: zuerst ein Gerät (nach 120 Tagen ein neues), mit Gerät auch Software. Fleißige (ab 60) wollen einen
+// Computer, alle anderen ein Handy; gibt es das Gewünschte nicht, nehmen sie das andere.
 function kaufWunsch(S, p) {
   const P = S.p, A = S.angebot;
   const letzter = Math.max(P.geraet[p] ? P.geraetTag[p] : -1e6, P.app[p] ? P.appTag[p] : -1e6);
   if (S.tag - letzter < R.KAUF_PAUSE) return 0;
   if (!P.geraet[p] || S.tag - P.geraetTag[p] >= R.GERAET_ALT) {
-    const erst = P.geraet[p] === COMPUTER ? COMPUTER : HANDY, zweit = erst === HANDY ? COMPUTER : HANDY;
+    const erst = P.fleiss[p] >= R.COMPUTER_FLEISS ? COMPUTER : HANDY, zweit = erst === HANDY ? COMPUTER : HANDY;
     if (A[erst] >= 0) return erst;
     if (A[zweit] >= 0) return zweit;
   }
@@ -2787,7 +2795,8 @@ function jsonPruefen(S) {
   for (const L of Object.values(K.tagebuch)) {
     if (!Array.isArray(L) || !L.every(e => e && zahl(e.tag) && zahl(e.stunde) && text(e.art) && text(e.text) && (e.noah === undefined || text(e.noah))
         && (e.aktion === undefined || text(e.aktion)) && (e.ziel === undefined || e.ziel === null || text(e.ziel))
-        && (e.code === undefined || text(e.code)) && (e.titel === undefined || text(e.titel)) && (e.sprache === undefined || text(e.sprache)))) kaputt('Tagebuch');
+        && (e.code === undefined || text(e.code)) && (e.titel === undefined || text(e.titel)) && (e.sprache === undefined || text(e.sprache))
+        && (e.art !== 'code' || (text(e.code) && text(e.titel))))) kaputt('Tagebuch');
   }
   if (!K.verlust.every(v => v && zahl(v.id) && zahl(v.gen) && text(v.name) && text(v.grund) && Array.isArray(v.vorschlaege)
       && v.vorschlaege.every(x => x && zahl(x.id) && zahl(x.gen) && text(x.name) && text(x.rolle)))) kaputt('Nachfolge');
@@ -2969,8 +2978,9 @@ function techMehr(S, b, mehr) {
   if (g.version[b]) {
     const a = S.angebot[g.produkt[b]], neu = S.tag - g.neuTag[b] <= R.NEU_TAGE;
     mehr.push(`Zuletzt erschienen: ${produktName(S, b, g.version[b])} an Tag ${g.neuTag[b]}${neu ? ', gerade neu' : ''}.`
-      + (a === b ? ` Die Läden der Stadt verkaufen es, gestern ${g.verkauft[b] === 1 ? '1 Stück' : g.verkauft[b] + ' Stück'}.`
-        : a >= 0 ? ` In den Läden liegt gerade ${produktName(S, a, g.version[a])} von ${firmenName(S, a)}, das ist neuer.` : ''));
+      + (a === b ? ` Die Läden der Stadt verkaufen ${['', 'sie', 'es', 'ihn'][g.produkt[b]]}, gestern ${g.verkauft[b] === 1 ? '1 Stück' : g.verkauft[b] + ' Stück'}.`
+        : a >= 0 ? ` In den Läden liegt gerade ${produktName(S, a, g.version[a])} von ${firmenName(S, a)}`
+          + (g.neuTag[a] > g.neuTag[b] ? ', das ist neuer.' : ', erschienen am selben Tag.') : ''));
   } else mehr.push('Noch ist keine Version fertig, bis dahin kauft nur das Umland.');
   mehr.push(`Das Umland zahlt ${Math.round(S.exportPreis)} Taler je Arbeitstag.`);
   if (g.auf[b]) return;
@@ -2978,7 +2988,8 @@ function techMehr(S, b, mehr) {
   const kosten = R.K_ANBAU[g.stufe[b] + 1];
   if (anbauWillig(S, b)) mehr.push(g.ruecklage[b] < kosten ? `Will wachsen: ${g.ruecklage[b]} von ${kosten} Talern für einen Anbau auf Stufe ${g.stufe[b] + 1} liegen in der Rücklage.`
     : !anbauMarkt(S) ? `Der Anbau auf Stufe ${g.stufe[b] + 1} ist bezahlt. Den Auftrag gibt die Firma, sobald das Umland wieder mehr abnimmt (wenn irgendwo Stellen wegfallen).`
-    : `Der Anbau auf Stufe ${g.stufe[b] + 1} ist bezahlt. Den Auftrag gibt die Firma, sobald mindestens ${R.STELLEN_TECH} Leute in der Stadt Arbeit suchen (gerade ${S.arbeitslose}).`);
+    : S.arbeitslose < R.STELLEN_TECH ? `Der Anbau auf Stufe ${g.stufe[b] + 1} ist bezahlt. Den Auftrag gibt die Firma, sobald mindestens ${R.STELLEN_TECH} Leute in der Stadt Arbeit suchen (gerade ${S.arbeitslose}).`
+    : `Der Anbau auf Stufe ${g.stufe[b] + 1} ist bezahlt. Den Auftrag gibt die Firma heute Nacht, wenn das Umland dann noch Platz hat.`);
   else mehr.push(`Ein Anbau auf Stufe ${g.stufe[b] + 1} (${kosten} Taler) kommt, wenn alle Stellen besetzt sind und ${R.ANBAU_GUT} Tage in Folge Gewinn bleibt`
     + ` (gerade ${g.gut[b]}).` + (g.ruecklage[b] ? ` Rücklage: ${g.ruecklage[b]} Taler.` : ''));
 }
@@ -3411,7 +3422,9 @@ function baueGrafik(THREE, OrbitControls) {
           nbau = geruest(b, px, pz, 1.12, TECH_GESCHOSSE[g.auf[b]] * GESCHOSS + 0.05, nbau);
         }
         // Geschosse als Fensterbänder: tagsüber so viele Bildschirme hell, wie Leute heute programmieren; nachts oben der Serverraum
-        const da = leer ? 0 : Math.min(geschosse, Math.ceil(geschosse * g.dran[b] / Math.max(1, Sim.R.STELLEN_TECH * g.stufe[b])));
+        let heute = 0;                                    // wer heute da ist (wie in techArbeit), nicht die Zahl von gestern
+        if (!leer) { for (const w of S.belegschaft[b]) if (!S.p.frei[w]) heute++; const o = g.besitzer[b]; if (o >= 0 && S.p.arbeit[o] === b && !S.p.frei[o]) heute++; }
+        const da = Math.min(geschosse, Math.ceil(geschosse * heute / Math.max(1, Sim.R.STELLEN_TECH * g.stufe[b])));
         for (let s = 0; s < geschosse && nf < fensterMax; s++) {
           if (!setze(M.fenster, nf, px, s * GESCHOSS + 0.1, pz, 1.1, 0.22, 1.1)) break;
           IDS.fenster[nf] = b;
@@ -3515,7 +3528,8 @@ function baueGrafik(THREE, OrbitControls) {
   const NULL = new THREE.Matrix4().makeScale(0, 0, 0);
   const FIGFARBEN = ['#e6d3bd', '#c2d3e6', '#e6c2bd', '#c6e0c2', '#e6dcb8', '#b8d8d8', '#d8c2b0', '#aebfd8'].map(c => new THREE.Color(c));
   const ECKEN = [[-1, -1], [1, 1], [1, -1], [-1, 1]];
-  const QUER = [-0.3, 0.3, -0.15, 0.15, -0.45, 0.45, 0];
+  const QUER = [-0.3, 0.3, -0.15, 0.15, -0.45, 0.45, 0], QUER2 = [-0.3, 0.3, -0.2, 0.2, -0.1, 0.1, 0];
+  const STEHEN_MAX = QUER.length + QUER2.length;            // mehr Leute stehen nicht vor einem Gebäude, der Rest ist drinnen
   const figuren = [];                                     // { p, gen, ort, route, start, dauer, versatz, ox, oz, haupt, werk, steht, sx, sz, traeger, hin }
   const figIds = new Int32Array(FIG_GES).fill(-1);
   let hauptIds = [], werkTag = -1;
@@ -3632,8 +3646,9 @@ function baueGrafik(THREE, OrbitControls) {
     if (bau) { const e = ECKEN[k % 4]; f.sx = bx + e[0] * 0.5; f.sz = bz + e[1] * 0.5; return; }
     const [dx, dz, qx, qz] = strassenSeite(g.x[ort], g.y[ort]);
     const theke = g.typ[ort] === Sim.LADEN && beiDerArbeit(f.p, S.stunde, ort) && Sim.theke(S, ort) === f.p;
-    const reihe = Math.floor(k / QUER.length);                 // ab dem 8. eine Reihe weiter zur Straße
-    const vor = theke ? 0.47 : 0.68 + 0.16 * reihe, quer = theke ? 0 : f.haupt && !beiDerArbeit(f.p, S.stunde, ort) ? f.ox * 0.5 : QUER[k % QUER.length];
+    const reihe = k >= QUER.length ? 1 : 0;                   // ab dem 8. eine zweite, schmalere Reihe weiter zur Straße
+    const vor = theke ? 0.47 : 0.68 + 0.16 * reihe, quer = theke ? 0 : f.haupt && !beiDerArbeit(f.p, S.stunde, ort) ? f.ox * 0.5
+      : reihe ? QUER2[(k - QUER.length) % QUER2.length] : QUER[k];
     f.sx = bx + dx * vor + qx * quer; f.sz = bz + dz * vor + qz * quer;
   }
   // Nach jedem Simulationsschritt: wer geht in dieser Stunde wohin, wer steht wo?
@@ -3689,13 +3704,14 @@ function baueGrafik(THREE, OrbitControls) {
       if (f.steht) {
         const key = ort * 2 + (bau ? 1 : 0), k = stehen.get(key) || 0;
         stehen.set(key, k + 1);
-        standplatz(f, ort, k, bau);
+        if (k >= STEHEN_MAX && !f.haupt) f.steht = false;       // vor dem Gebäude ist kein Platz mehr: drinnen
+        else standplatz(f, ort, k, bau);
       }
       const arb = P.arbeit[p];
       figMesh.setColorAt(i, f.haupt ? LICHT : arb >= 0 && arb === S.bauhof ? WESTE
         : arb >= 0 && S.g.typ[arb] === Sim.WERKSTATT ? BLAUMANN : arb >= 0 && S.g.typ[arb] === Sim.TECH ? PROGRAMMIER : FIGFARBEN[p % FIGFARBEN.length]);
       // Wer in einer Tech-Firma bei der Arbeit steht, hat einen leuchtenden Bildschirm vor sich (zwischen Figur und Gebäude)
-      f.schirm = f.steht && arbeit && S.g.typ[ort] === Sim.TECH;
+      f.schirm = f.steht && arbeit && !bau && S.g.typ[ort] === Sim.TECH;   // Bauarbeiter am Anbau programmieren nicht
       f.arbeit = arbeit;                                    // wer arbeitet, hat kein Handy in der Hand
       if (f.schirm && schirme < SCHIRM_MAX) {
         const [dx, dz] = strassenSeite(S.g.x[ort], S.g.y[ort]);
@@ -3705,6 +3721,14 @@ function baueGrafik(THREE, OrbitControls) {
       }
     }
     if (figMesh.instanceColor) figMesh.instanceColor.needsUpdate = true;
+    // Handys fest je Stunde vergeben (Hauptfiguren zuerst), damit keins mitten im Weg auftaucht oder verschwindet:
+    // wer eins hat und in dieser Stunde losgeht oder als Hauptfigur draußen steht, höchstens HANDY_MAX
+    let handys = 0;
+    for (const f of figuren) f.handy = false;
+    for (const zuerstHaupt of [true, false]) for (const f of figuren) {
+      if (f.haupt !== zuerstHaupt || f.p < 0 || S.p.geraet[f.p] !== Sim.HANDY || handys >= HANDY_MAX) continue;
+      if ((f.route && f.start >= jetzt) || (f.haupt && f.steht && !f.arbeit)) { f.handy = true; handys++; }
+    }
     // Handy-Plätze hinter den Bildschirmen einmal einfärben; Bildschirme und Farben gehen mit dem nächsten Bild hoch
     for (let i = fensterStatisch + schirme; i < Math.min(M.fenster.userData.kap, fensterStatisch + schirme + HANDY_MAX); i++) M.fenster.setColorAt(i, HANDY_FARBE);
     M.fenster.count = Math.min(M.fenster.userData.kap, fensterStatisch + schirme);
@@ -3738,7 +3762,7 @@ function baueGrafik(THREE, OrbitControls) {
       figMesh.setMatrixAt(i, dummy.matrix);
       figIds[i] = f.p;
       // Handy in der Hand: wer eins gekauft hat und gerade nicht arbeitet (unterwegs, oder als Hauptfigur draußen)
-      if (S.p.geraet[f.p] === Sim.HANDY && (laeuft || !f.arbeit) && nh < HANDY_MAX
+      if (f.handy && (laeuft || !f.arbeit) && nh < HANDY_MAX
           && setze(M.fenster, handyBasis + nh, x + Math.sin(dreh) * 0.06, 0.13, z + Math.cos(dreh) * 0.06, 0.06, 0.055, 0.012, dreh)) nh++;
       if (f.haupt) {
         dummy.position.set(x, 0.46 + (REDUZIERT ? 0 : Math.sin(jetzt * 40 + i) * 0.03), z); dummy.rotation.set(0, 0, 0);
@@ -3964,8 +3988,16 @@ function karteRendern(fokus) {
   const feld = fokus ? null : $('sagen-text'), tb = fokus ? null : ziel.querySelector('.tagebuch');
   const merk = feld ? { wert: feld.value, fokus: document.activeElement === feld, a: feld.selectionStart, b: feld.selectionEnd } : null;
   const tbScroll = tb ? { oben: tb.scrollTop, unten: tb.scrollHeight - tb.scrollTop - tb.clientHeight < 8 } : null;
+  // Code-Blöcke im Tagebuch: eigene Scrollstelle und Tastaturfokus behalten (nach Reihenfolge)
+  const codes = fokus ? [] : [...ziel.querySelectorAll('pre.code')].map(c => ({ oben: c.scrollTop, links: c.scrollLeft, fokus: document.activeElement === c }));
   ziel.innerHTML = k.art === 'p' ? personHtml(k.id, k.gen, k.name) : gebaeudeHtml(k.id);
   const tbNeu = ziel.querySelector('.tagebuch');
+  ziel.querySelectorAll('pre.code').forEach((c, i) => {
+    const m = codes[i];
+    if (!m) return;
+    c.scrollTop = m.oben; c.scrollLeft = m.links;
+    if (m.fokus) c.focus({ preventScroll: true });
+  });
   if (tbNeu) tbNeu.scrollTop = tbScroll && !tbScroll.unten ? tbScroll.oben : tbNeu.scrollHeight;
   const feldNeu = $('sagen-text');
   if (merk && feldNeu && !feldNeu.disabled) {
@@ -4075,7 +4107,7 @@ async function kiPruefen() {
 }
 
 // Ein Aufruf an /api/chat. Wirft bei Netzfehler, Zeitüberschreitung oder Fehlerantwort.
-async function ollamaChat(system, frage) {
+async function ollamaChat(system, frage, messen) {
   const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), KI_TIMEOUT), t0 = performance.now();
   ki.stat.aufrufe++;
   try {
@@ -4090,7 +4122,7 @@ async function ollamaChat(system, frage) {
       if (r.ok) {
         const ms = performance.now() - t0;
         ki.stat.ms += ms; ki.stat.msMax = Math.max(ki.stat.msMax, ms);
-        ki.messung.n++; ki.messung.ms += ms;
+        if (messen) { ki.messung.n++; ki.messung.ms += ms; }   // Spec: die Grenze hängt an der Dauer einer Entscheidung
         return d && d.message && typeof d.message.content === 'string' ? d.message.content : '';
       }
       const text = d && typeof d.error === 'string' ? d.error : 'HTTP ' + r.status;
@@ -4217,7 +4249,7 @@ async function kiTakt() {
 async function kiAufruf(art, id, system, frage) {
   ki.laeuft = { art, id };
   hauptAnzeigen();
-  try { return await ollamaChat(system, frage); }
+  try { return await ollamaChat(system, frage, art === 'entscheidung'); }
   finally { ki.laeuft = null; hauptAnzeigen(); }
 }
 function nachKi() { buchAnzeigen(); kennzahlenAnzeigen(); karteAktualisieren(); hauptAnzeigen(); }
@@ -4353,7 +4385,7 @@ function hauptAnzeigen() {
     const i = Sim.personInfo(S, h.id, h.gen);
     if (!i) continue;
     const gedanken = i.tagebuch.filter(e => e.art === 'gedanke' || e.art === 'code'), letzt = gedanken[gedanken.length - 1] || i.tagebuch[i.tagebuch.length - 1];
-    zeilen.push({ id: h.id, gen: h.gen, name: i.name, gedanke: !letzt ? '' : letzt.art === 'code' ? 'schreibt Code: ' + letzt.titel : letzt.text,
+    zeilen.push({ id: h.id, gen: h.gen, name: i.name, gedanke: !letzt ? '' : letzt.art === 'code' ? 'schreibt Code: ' + (letzt.titel || 'ohne Titel') : letzt.text,
       code: !!(ki.laeuft && ki.laeuft.id === h.id && ki.laeuft.art === 'code'),
       denkt: offen.has(h.id) || !!(ki.laeuft && ki.laeuft.id === h.id) || !!(ki.gespraech && ki.gespraech.id === h.id && !ki.gespraech.fehler) });
   }
