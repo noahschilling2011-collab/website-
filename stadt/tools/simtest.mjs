@@ -12,7 +12,8 @@
 //   node tools/simtest.mjs --kitest                 Hauptfiguren: erlaubte Aktionen, Anfragen, Fristen, Tagebuch (ohne echtes Modell)
 //   node tools/simtest.mjs --bau                    Bauhof: Einteilung, Fortschritt je Person, jede Baustelle wird fertig (Seeds 1–3)
 //   node tools/simtest.mjs --waren                  Kisten: geliefert ≤ gemacht, Werkstatt-Einnahmen wie vorher (Seeds 1–3)
-//   node tools/simtest.mjs --migrationstest         Spielstand von Version 2 übernehmen (alte stadt.html aus git 39c405b
+//   node tools/simtest.mjs --tech                   Tech-Firmen: Arbeitstage an der Version, Käufe im Laden, Anbau (Seeds 1–3, 730 Tage)
+//   node tools/simtest.mjs --migrationstest         Spielstand von Version 2 oder 3 übernehmen (alte stadt.html aus git 39c405b
 //                                                   oder --alt pfad/zur/alten/stadt.html), 60 Tage weiter, keine NaN
 //   Optionen: --alle 30 (Zeilenabstand), --buch 20 (letzte Stadtbuch-Zeilen), --aktionen
 
@@ -171,14 +172,16 @@ if (flag('kitest')) {
     pruef(abweichend === 0, `Gehirn ⊆ erlaubte Aktionen (${geprueft} Entscheidungen geprüft, ${abweichend} abweichend)`);
     // 1b. Der Lagesatz fürs Sprachmodell erkennt Arbeit nur an „arbeitet …“ / „besitzt …“ am Anfang
     {
-      let n = 0, falsch = 0, bau = 0, bauFalsch = 0;
+      let n = 0, falsch = 0, bau = 0, bauFalsch = 0, tech = 0, techFalsch = 0;
       for (let p = 0; p < S.pMax; p++) {
         if (!S.p.lebt[p] || S.tag - S.p.geb[p] < Sim.R.ERWACHSEN * Sim.R.JAHR || (S.p.arbeit[p] < 0 && S.p.besitz[p] < 0)) continue;
         const i = Sim.personInfo(S, p);
         n++; if (!/^(arbeitet als |besitzt )/.test(i.arbeit)) { falsch++; if (falsch < 3) console.log('    ' + i.arbeit); }
-        if (S.p.arbeit[p] === S.bauhof) { bau++; if (!/^arbeitet als Bauarbeiter(in)? beim Bauhof /.test(i.arbeit)) bauFalsch++; }
+        // Wer schon einen eigenen Betrieb hat, der noch gebaut wird, arbeitet bis dahin weiter im Bauhof: Text „besitzt …“
+        if (S.p.arbeit[p] === S.bauhof && S.p.besitz[p] < 0) { bau++; if (!/^arbeitet als Bauarbeiter(in)? beim Bauhof /.test(i.arbeit)) bauFalsch++; }
+        if (S.p.arbeit[p] >= 0 && S.g.typ[S.p.arbeit[p]] === Sim.TECH && S.p.besitz[p] < 0) { tech++; if (!/^arbeitet als Programmierer(in)? bei /.test(i.arbeit)) techFalsch++; }
       }
-      pruef(n > 50 && falsch === 0 && bau > 0 && bauFalsch === 0, `Arbeitstext beginnt mit „arbeitet als“ oder „besitzt“ (${n} Leute mit Arbeit, davon ${bau} im Bauhof, ${falsch + bauFalsch} falsch)`);
+      pruef(n > 50 && falsch === 0 && bau > 0 && bauFalsch === 0 && techFalsch === 0, `Arbeitstext beginnt mit „arbeitet als“ oder „besitzt“ (${n} Leute mit Arbeit, davon ${bau} im Bauhof, ${tech} in Tech-Firmen, ${falsch + bauFalsch + techFalsch} falsch)`);
     }
     // 2. 60 Tage mit Test-Beantworter
     S.ki.an = true;
@@ -243,6 +246,23 @@ if (flag('kitest')) {
       Sim.kiGespraech(S, erreicht, S.p.gen[erreicht], 'Ruh dich aus.', 'Mach ich doch schon.', 'ruhe');
       pruef(S.p.ziel[erreicht] === zv, `schon erreichtes Ziel „ruhe“ abgelehnt (Ziel bleibt ${Sim.ZIELNAMEN[zv]})`);
     }
+    // 4c. Code ins Tagebuch: nur wer in einer Tech-Firma arbeitet oder eine besitzt; bleibt nach Speichern/Laden erhalten
+    {
+      let prog = -1, anders = -1;
+      for (let p = 0; p < S.pMax; p++) {
+        if (!S.p.lebt[p] || S.tag - S.p.geb[p] < 18 * Sim.R.JAHR) continue;
+        if (prog < 0 && Sim.techFirmaVon(S, p) >= 0) prog = p;
+        if (anders < 0 && Sim.techFirmaVon(S, p) < 0) anders = p;
+      }
+      if (prog >= 0) {
+        const nein = Sim.kiCode(S, anders, S.p.gen[anders], 'Test', 'JavaScript', 'let a = 1;', 'Ich teste.');
+        const ja = Sim.kiCode(S, prog, S.p.gen[prog], 'Warenkorb zählen', 'JavaScript', 'const summe = preise.reduce((a, b) => a + b, 0);\nconsole.log(summe);', 'Das klappt.');
+        const e = (S.ki.tagebuch[prog + '/' + S.p.gen[prog]] || []).at(-1);
+        const B2 = ladenAusText(Sim, speichernAlsText(Sim, S));
+        const e2 = (B2.ki.tagebuch[prog + '/' + B2.p.gen[prog]] || []).at(-1);
+        pruef(!nein && ja && e.art === 'code' && e.code.includes('reduce') && e2 && e2.code === e.code, `Code nur für Programmierende (${Sim.name(S, prog)}), bleibt nach Speichern/Laden`);
+      } else pruef(false, 'niemand arbeitet in einer Tech-Firma');
+    }
     // 5. Tod einer Hauptfigur: Verlust mit Vorschlägen; Speichern und Laden behält alles
     while (S.tag < 900 && S.ki.verlust.length === 0) Sim.stunde(S);
     const v = S.ki.verlust[0];
@@ -261,7 +281,7 @@ if (flag('migrationstest')) {
   const ctx = vm.createContext({});
   vm.runInContext(altHtml.match(/<script id="sim">([\s\S]*?)<\/script>/)[1], ctx);
   const Alt = ctx.StadtSim;
-  pruef(Alt.VERSION === 2, `alte Simulation hat Version ${Alt.VERSION}`);
+  pruef((Alt.VERSION === 2 || Alt.VERSION === 3) && Alt.VERSION < Sim.VERSION, `alte Simulation hat Version ${Alt.VERSION}, neue ${Sim.VERSION}`);
   for (const [seed, tage, stunde] of [[1, 150, 13], [2, 300, 5], [3, 400, 20]]) {
     const A = Alt.neueStadt(seed);
     while (A.tag < tage || A.stunde < stunde || !A.baustellen.length) Alt.stunde(A);   // ein Moment mit laufenden Baustellen
@@ -285,9 +305,10 @@ if (flag('migrationstest')) {
     const k = Sim.kennzahlen(S);
     pruef(nan === 0 && Object.values(k).every(v => typeof v !== 'number' || Number.isFinite(v)), `60 Tage weiter (Tag ${S.tag}, ${S.einwohner} Einw.): keine NaN/Infinity`);
     pruef([...offen].every(b => !S.baustellen.includes(b) || S.g.auf[b]), `alle übernommenen Baustellen fertig (${offen.size})`);
+    if (S.stat.tech) pruef(S.version === Sim.VERSION && Array.isArray(S.angebot), `Version ${S.version}, Tech-Firmen danach: ${S.stat.tech.gruendungen} gegründet, ${S.stat.tech.kaeufe.reduce((a, b) => a + b, 0)} Käufe`);
     const L = ladenAusText(Sim, speichernAlsText(Sim, S));
     const z = S.tag + 20; while (S.tag < z) Sim.stunde(S); while (L.tag < z) Sim.stunde(L);
-    pruef(fingerabdruck(Sim, S) === fingerabdruck(Sim, L), 'danach als Version 3 gespeichert und geladen: läuft bitgleich weiter');
+    pruef(fingerabdruck(Sim, S) === fingerabdruck(Sim, L), `danach als Version ${Sim.VERSION} gespeichert und geladen: läuft bitgleich weiter`);
   }
   console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle Migrations-Prüfungen bestanden');
   process.exit(fehler ? 1 : 0);
@@ -420,6 +441,99 @@ if (flag('waren')) {
   console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle Kisten-Prüfungen bestanden');
   process.exit(fehler ? 1 : 0);
 }
+if (flag('tech')) {
+  // Tech-Firmen: Arbeitstage an der Version, Käufe im Laden, Anbau über den Bauhof (Seeds 1–3, 730 Tage)
+  let fehler = 0;
+  const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
+  const R = Sim.R, T = Sim.TECH;
+  for (const seed of arg('seeds', '1,2,3').split(',').map(Number)) {
+    console.log(`Seed ${seed}`);
+    const S = Sim.neueStadt(seed), g = S.g;
+    const offenT = (b) => g.typ[b] === T && !g.leer[b] && S.feld[g.y[b] * Sim.KARTE + g.x[b]] === T;
+    let arbeitGeprueft = 0, arbeitFehl = 0, uebersprungen = 0, versionen = 0, produktFehl = 0;
+    let kaufTage = 0, kaufFehl = 0, angebotFehl = 0, reserveFehl = 0, umsatzFehl = 0, kaeufe = 0;
+    let anbauBestellt = 0, anbauFehl = 0, anbauFertig = 0, stellenFehl = 0, rueckFehl = 0, anbauOhneSuchende = 0;
+    const zaehl = () => S.stat.tech.kaeufe.reduce((a, b) => a + b, 0);
+    while (S.tag < 730) {
+      if (S.stunde !== 23) { Sim.stunde(S); continue; }
+      // vor Mitternacht: wer ist heute in welcher Tech-Firma da (Belegschaft ohne frei, Besitzer wenn er dort arbeitet)?
+      const P = S.p, vor = [];
+      for (let b = 0; b < S.gAnzahl; b++) {
+        if (!offenT(b)) continue;
+        const o = g.besitzer[b];
+        const n = S.belegschaft[b].filter(w => !P.frei[w]).length + (o >= 0 && P.arbeit[o] === b && !P.frei[o] ? 1 : 0);
+        vor.push({ b, n, projekt: g.projekt[b], version: g.version[b], L: S.belegschaft[b].slice(), stufe: g.stufe[b], auf: g.auf[b], rueck: g.ruecklage[b] });
+      }
+      const k0 = zaehl(), u0 = S.stat.tech.umsatz, arbl = S.arbeitslose, weg0 = S.stat.tode + S.stat.wegzuegePersonen;
+      const geldVor = new Map();
+      for (let p = 0; p < S.pMax; p++) if (P.lebt[p]) geldVor.set(p, P.geld[p]);
+      Sim.stunde(S);                                         // Mitternacht: Tagesabschluss
+      const tag = S.tag - 1;                                 // der Tag, der gerade abgeschlossen wurde
+      for (const v of vor) {
+        const b = v.b;
+        if (!offenT(b) || S.belegschaft[b].length !== v.L.length || !S.belegschaft[b].every((w, i) => w === v.L[i])) { uebersprungen++; continue; }
+        arbeitGeprueft++;
+        const soll = R.VERSION_TAGE[g.produkt[b]];
+        const erwartet = v.projekt + v.n;
+        const ok = erwartet < soll ? g.projekt[b] === erwartet && g.version[b] === v.version
+          : g.version[b] === v.version + 1 && g.projekt[b] === Math.min(erwartet - soll, soll - 1) && g.neuTag[b] === tag;
+        if (!ok) { arbeitFehl++; if (flag('v')) console.log('   Arbeit', tag, b, v, g.projekt[b], g.version[b]); }
+        if (g.version[b] > v.version) versionen++;
+        if (!(g.produkt[b] >= 1 && g.produkt[b] <= 3)) produktFehl++;
+        if (g.ruecklage[b] < 0) rueckFehl++;
+        if (g.besitzer[b] >= 0 && g.kasse[b] > R.POLSTER) rueckFehl++;
+        // Anbau bestellt: Stufe + 1 als Baustelle, Rücklage bezahlt, genug Leute suchten Arbeit
+        if (!v.auf && g.auf[b]) {
+          anbauBestellt++;
+          if (g.auf[b] !== v.stufe + 1 || !S.baustellen.includes(b) || g.bauRest[b] !== R.BAU_ANBAU[g.auf[b]]) anbauFehl++;
+          if (arbl < R.STELLEN_TECH) anbauOhneSuchende++;
+        }
+        if (v.auf && !g.auf[b]) {                            // Anbau fertig: mehr Stufe, mehr Stellen, freie Stellen stimmen
+          anbauFertig++;
+          if (g.stufe[b] !== v.auf) anbauFehl++;
+        }
+        if (g.offeneStellen[b] !== R.STELLEN_TECH * g.stufe[b] - S.belegschaft[b].length) stellenFehl++;
+      }
+      // Käufe: nur, was angeboten wurde (neueste Version je Produkt); niemand unter der Reserve; Geld = Umsatz der Firmen + Läden
+      const neu = zaehl() - k0;
+      kaeufe += neu; kaufTage++;
+      let verkauftLaden = 0, verkauftFirma = 0;
+      for (let b = 0; b < S.gAnzahl; b++) { if (g.typ[b] === Sim.LADEN) verkauftLaden += g.verkauft[b]; if (g.typ[b] === T) verkauftFirma += g.verkauft[b]; }
+      if (verkauftLaden !== neu || verkauftFirma !== neu) { kaufFehl++; if (flag("v")) console.log("   verkauft", tag, neu, verkauftLaden, verkauftFirma); }
+      let summe = 0;
+      for (let p = 0; p < S.pMax; p++) {
+        if (!S.p.lebt[p]) continue;
+        for (const [art, tagF, marke, ver] of [['g', 'geraetTag', 'geraetMarke', 'geraetVersion'], ['a', 'appTag', 'appMarke', 'appVersion']]) {
+          const hat = art === 'g' ? S.p.geraet[p] : S.p.app[p];
+          if (!hat || S.p[tagF][p] !== tag) continue;
+          const was = art === 'g' ? S.p.geraet[p] : Sim.SOFTWARE, f = S.angebot[was];
+          summe += R.PREIS[was];
+          if (f < 0 || g.marke[f] !== S.p[marke][p] || g.version[f] !== S.p[ver][p]) angebotFehl++;
+          if (geldVor.has(p) && geldVor.get(p) - R.PREIS[was] < R.KAUF_RESERVE) reserveFehl++;   // gekauft wird nach dem Einkauf: vorher war mindestens Preis + Reserve da
+        }
+      }
+      // Wer in derselben Nacht stirbt oder wegzieht, ist danach nicht mehr zu sehen: dann nur „nicht mehr als bezahlt“
+      const wegHeute = S.stat.tode + S.stat.wegzuegePersonen > weg0;
+      if (wegHeute ? summe > S.stat.tech.umsatz - u0 : summe !== S.stat.tech.umsatz - u0) { umsatzFehl++; if (flag("v")) console.log("   Umsatz", tag, summe, S.stat.tech.umsatz - u0); }
+    }
+    const t = S.stat.tech;
+    pruef(t.gruendungen > 0 && produktFehl === 0, `${t.gruendungen} Tech-Firmen gegründet, jede macht Software, Handys oder Computer (${produktFehl} Fehler)`);
+    pruef(arbeitGeprueft > 1000 && arbeitFehl === 0, `Arbeitstage = Leute, die da waren (Besitzer zählt mit): ${arbeitGeprueft} Firmentage geprüft (${uebersprungen} mit Wechsel übersprungen), ${versionen} Versionen erschienen, ${arbeitFehl} Fehler`);
+    pruef(kaeufe > 0 && kaufFehl === 0 && umsatzFehl === 0, `Käufe: ${kaeufe} in ${kaufTage} Tagen (${(kaeufe / kaufTage).toFixed(1)} am Tag), verkauft in Läden = verkauft von Firmen = Käufe, bezahlt = Preise (${kaufFehl + umsatzFehl} Fehler)`);
+    pruef(angebotFehl === 0 && reserveFehl === 0, `gekauft wird nur die neueste Version im Angebot, niemand zahlt sich unter die Reserve (${angebotFehl + reserveFehl} Fehler)`);
+    pruef(anbauFehl === 0 && stellenFehl === 0 && rueckFehl === 0 && anbauOhneSuchende === 0,
+      `Anbau: ${anbauBestellt} bestellt, ${anbauFertig} fertig; Stufe und freie Stellen stimmen, Rücklage ≥ 0, Kasse ≤ Polster, nur wenn ≥ ${R.STELLEN_TECH} Leute Arbeit suchten (${anbauFehl + stellenFehl + rueckFehl + anbauOhneSuchende} Fehler)`);
+  }
+  // Speichern und Laden mit Tech-Firmen: bitgleich (Seed 1, Tag 500)
+  {
+    const A = Sim.neueStadt(1); while (A.tag < 500 || A.stunde !== 11) Sim.stunde(A);
+    const B = ladenAusText(Sim, speichernAlsText(Sim, A));
+    for (let i = 0; i < 24 * 30; i++) { Sim.stunde(A); Sim.stunde(B); }
+    pruef(fingerabdruck(Sim, A) === fingerabdruck(Sim, B) && A.stat.tech.gruendungen > 0, `Speichern/Laden an Tag 500, 11 Uhr, mit ${A.stat.tech.gruendungen} Tech-Gründungen: 30 Tage weiter bitgleich`);
+  }
+  console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle Tech-Prüfungen bestanden');
+  process.exit(fehler ? 1 : 0);
+}
 if (flag('aufholtest')) {
   const seed = Number(arg('seed', '1')), start = Number(arg('tage', '200')), n = Number(arg('aufholen', '90'));
   const S0 = Sim.neueStadt(seed); while (S0.tag < start) Sim.stunde(S0);
@@ -440,15 +554,16 @@ if (flag('gate')) {
   let alleOk = true;
   for (const seed of seeds) {
     const reihe = [], budgets = [];
-    let ms365 = 0, c365 = null, k365 = null, fehler = null, S = null, buchNr = 0, arbeitZeilen = 0;
+    let ms365 = 0, c365 = null, k365 = null, fehler = null, S = null, buchNr = 0, arbeitZeilen = 0, kauf365 = 0, techZeilen = 0;
     const zeilen = [];
     try {
       S = lauf(Sim, seed, 730, (S, k, ms) => {
         reihe.push(k.einwohner); budgets.push(k.budget);
         for (const e of S.buch) if (e.nr > buchNr && (e.art === 'fertig' || e.art === 'stillstand' || e.art === 'bauhof')) arbeitZeilen++;
+        for (const e of S.buch) if (e.nr > buchNr && (e.art === 'version' || e.art === 'auftrag')) techZeilen++;
         buchNr = S.buchNr;
         if (k.tag % 30 === 0 || k.tag === 365 || k.tag === 730) zeilen.push(tabelleZeile(k, ms));
-        if (k.tag === 365) { ms365 = ms; c365 = charakter(S); k365 = k; }
+        if (k.tag === 365) { ms365 = ms; c365 = charakter(S); k365 = k; kauf365 = S.stat.tech ? S.stat.tech.kaeufe.reduce((a, b) => a + b, 0) : 0; }
       });
     } catch (e) { fehler = e; }
     console.log(`\n═══ Seed ${seed} ═══`);
@@ -490,6 +605,15 @@ if (flag('gate')) {
       [arbeitZeilen / S.tag <= 0.5, `B  Stadtbuch ${(S.buchNr / S.tag).toFixed(2)} Zeilen am Tag, davon Bauhof ${(arbeitZeilen / S.tag).toFixed(2)} (≤ 0,5; kein Spec-Gate)`],
     ];
     for (const [ok, t] of g) { console.log(`  ${ok ? '✓' : '✗'} ${t}`); if (!ok) alleOk = false; }
+    if (S.stat.tech) {                                        // Tech-Firmen (kein Gate): wie viele, wie groß, was die Leute kaufen
+      const t = S.stat.tech, st = [0, 0, 0, 0];
+      let erw = 0, mitGeraet = 0;
+      for (let b = 0; b < S.gAnzahl; b++) if (S.g.typ[b] === Sim.TECH && !S.g.leer[b] && S.feld[S.g.y[b] * Sim.KARTE + S.g.x[b]] === Sim.TECH) st[S.g.stufe[b]]++;
+      for (let p = 0; p < S.pMax; p++) if (S.p.lebt[p] && S.tag - S.p.geb[p] >= 18 * Sim.R.JAHR) { erw++; if (S.p.geraet[p]) mitGeraet++; }
+      const kaeufe = t.kaeufe.reduce((a, b) => a + b, 0);
+      console.log(`  Tech: gegründet ${t.gruendungen}, offen an Tag 730 ${st[1] + st[2] + st[3]} (Stufe 2: ${st[2]}, Stufe 3: ${st[3]}), Anteil an den Umland-Stellen ${(S.techPlaetze / Math.max(1, S.werkstattPlaetze) * 100).toFixed(1)} %,`
+        + ` Versionen ${t.versionen}, Käufe je Tag ${((kaeufe - kauf365) / 365).toFixed(1)} (Tag 366–730), Anbauten ${t.anbauten}, Tech-Pleiten ${t.pleiten}, Erwachsene mit Gerät ${(mitGeraet / Math.max(1, erw) * 100).toFixed(0)} %, Tech-Zeilen im Stadtbuch ${(techZeilen / S.tag).toFixed(2)} am Tag`);
+    }
     console.log('  Tag 730:\n' + charakterText(c730));
   }
   console.log(`\nGate Phase 0: ${alleOk ? 'BESTANDEN' : 'NICHT BESTANDEN'}`);

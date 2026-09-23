@@ -38,6 +38,7 @@
     --debug: rgba(10, 12, 16, 0.85);
     --grund-verlauf: #1a2236;
     --denkt: rgba(244, 244, 247, 0.85);                    /* „überlegt“: neutral, kein zweiter Akzent */
+    --code: #cfe8f2;                                       /* Code im Tagebuch: kühles Weiß, 13:1 auf --ebene1 */
     --r: 14px;
     --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
     --klein: clamp(0.78rem, 0.76rem + 0.1vw, 0.86rem);
@@ -174,6 +175,11 @@
   .tagebuch li:last-child { border-bottom: 0; }
   .tagebuch .meta { display: block; color: var(--text-leise); font-size: 0.92em; margin-bottom: 2px; }
   .tagebuch p { margin: 0; }
+  /* Code einer Hauptfigur: nur Text, wird nie ausgeführt */
+  .tagebuch pre.code { margin: 4px 0 0; padding: 6px 8px; max-height: 180px; overflow: auto; border-radius: 8px; background: var(--ebene1);
+    border: 1px solid var(--linie); font: 11.5px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--code);
+    white-space: pre; tab-size: 2; }
+  .gekauft { color: var(--text); }
   .tagebuch .noah { width: fit-content; max-width: 88%; margin: 2px 0 6px auto; padding: 5px 10px; border-radius: 10px;
     background: var(--akzent-leise); color: var(--text-stark); }
   .sagen { display: flex; gap: var(--s2); margin-top: var(--s3); }
@@ -369,7 +375,8 @@
 // =====================================================================================
 (function (G) {
 
-const VERSION = 3;                    // 2: Hauptfiguren, Tagebuch, KI-Anfragen (Phase 4); 3: Bauhof, Baustellen in Arbeitstagen, Kisten
+const VERSION = 4;                    // 2: Hauptfiguren, Tagebuch, KI-Anfragen (Phase 4); 3: Bauhof, Baustellen in Arbeitstagen, Kisten;
+                                      // 4: Tech-Firmen (Software, Handys, Computer), Käufe der Bewohner, Anbau über den Bauhof
 
 // ─── Karte ───────────────────────────────────────────────────────────────────────────
 const KARTE = 96, FELDER = KARTE * KARTE;
@@ -378,7 +385,9 @@ const RASTER = 4;                     // Straßen liegen nur auf jeder 4. Linie 
 const RAND = 2;                       // Straßen halten 2 Felder Abstand zum Kartenrand
 const MITTE = 48;
 
-const LEER = 0, STRASSE = 1, WOHNHAUS = 2, WERKSTATT = 3, LADEN = 4, PARK = 5, BAUSTELLE = 6;
+const LEER = 0, STRASSE = 1, WOHNHAUS = 2, WERKSTATT = 3, LADEN = 4, PARK = 5, BAUSTELLE = 6, TECH = 7;
+// Was eine Tech-Firma macht (je Firma eins)
+const SOFTWARE = 1, HANDY = 2, COMPUTER = 3;
 
 // ─── Regeln und Zahlen (alle Stellschrauben an einem Ort) ────────────────────────────
 const R = {
@@ -420,6 +429,26 @@ const R = {
   BAU_ZIEL: 4,                  // Stellen im Bauhof: 10 + eine je 4 offene Arbeitstage …
   BAU_MAX: 40,                  // … höchstens 40
   BAU_LOHN_AUF: 2, BAU_LOHN_AB: 1, BAU_LOHN_MAX: 120,   // Lohn im Bauhof: +2 am Tag, solange Leute fehlen, sonst −1 (nicht unter LOHN_STADT)
+  // Tech-Firmen: Software, Handys oder Computer. Sie verkaufen ans Umland (derselbe Topf wie die Werkstätten, R.UMLAND)
+  // und über die Läden an die Leute in der Stadt. Wer dort arbeitet, programmiert: jede anwesende Person (auch der
+  // Besitzer) bringt einen Arbeitstag an der nächsten Version.
+  LOHN_TECH: 105, FIX_TECH: 45, STELLEN_TECH: 4,           // Stellen je Stufe: 4, 8, 12
+  K_TECH: 2000, BAU_TECH: 12,
+  TECH_TUEFTLER: 120,                      // Fleiß + Ehrgeiz ab 120: so jemand gründet lieber eine Tech-Firma als eine Werkstatt …
+  TECH_ANTEIL: 0.4,                        // … solange Tech-Firmen höchstens 40 % der Stellen haben, die fürs Umland arbeiten
+  VERSION_TAGE: [0, 40, 60, 50],           // Arbeitstage je Version: Software, Handy, Computer
+  PREIS: [0, 60, 180, 320],                // so viel zahlt ein Bewohner im Laden
+  KAUF_FREIZEIT: [0, 6, 12, 15],           // so viel Freizeit bringt der Kauf sofort
+  LADEN_ANTEIL: 0.2,                       // so viel vom Preis behält der Laden, der Rest geht an die Firma
+  KAUF_CHANCE: 0.04,                       // Grundchance am Tag für einen Kauf (weniger Sparsame öfter, neue Versionen doppelt)
+  KAUF_RESERVE: 600,                       // so viel Geld bleibt nach einem Kauf mindestens übrig
+  KAUF_PAUSE: 20,                          // Tage zwischen zwei Käufen
+  GERAET_ALT: 120,                         // nach so vielen Tagen will man ein neues Handy oder einen neuen Computer
+  APP_ALT: 40,                             // nach so vielen Tagen neue Software
+  NEU_TAGE: 15,                            // so lange gilt eine Version als neu
+  K_ANBAU: [0, 0, 1800, 3000], BAU_ANBAU: [0, 0, 12, 16],   // Anbau auf Stufe 2 bzw. 3: Kosten und Arbeitstage für den Bauhof
+  ANBAU_GUT: 20,                           // so viele Tage in Folge Gewinn (und alle Stellen besetzt), dann will die Firma wachsen
+  ANBAU_SPAR: 0.5,                         // so viel vom Gewinn über dem Polster geht dann in die Rücklage statt an den Besitzer
   REICH_LADEN: 12, REICH_PARK: 5,          // Reichweiten in Feldern (Manhattan)
   LADEN_WAHL: 40,                          // so viele Läden in Reichweite probiert man der Nähe nach durch
   MANGEL_GRUENDUNG: 20,                    // ab so vielen Leuten ohne Einkauf in Reichweite lohnt ein Laden
@@ -485,6 +514,14 @@ const STRASSEN = ['Hauptstraße', 'Lindenstraße', 'Nordstraße', 'Bahnhofstraß
   'Ulmenweg', 'Blumenstraße', 'Hafenstraße', 'Poststraße', 'Heckenweg', 'Heideweg', 'Lerchenweg', 'Finkenweg',
   'Amselweg', 'Drosselgasse', 'Querstraße', 'Ringstraße'];
 const STRASSEN_VOR = ['', 'Neue ', 'Obere ', 'Untere ', 'Äußere ', 'Kleine '];
+// Tech-Firmen: Marke + Produkt („Nova Handys“), Versionen heißen Marke + Nummer („Nova 3“)
+const MARKEN = ['Nova', 'Kolibri', 'Falke', 'Blitz', 'Pixel', 'Orbit', 'Delta', 'Lumen', 'Kiwi', 'Zebra', 'Quark', 'Echo',
+  'Atlas', 'Funke', 'Welle', 'Luchs', 'Komet', 'Nebel', 'Iris', 'Polar', 'Tukan', 'Otter', 'Libelle', 'Prisma', 'Vega',
+  'Möwe', 'Kranich', 'Bernstein', 'Wolke', 'Sirius'];
+const PRODUKT = ['', 'Software', 'Handy', 'Computer'];
+const PRODUKT_FIRMA = ['', 'Software', 'Handys', 'Computer'];            // Firmenname: „Kolibri Software“, „Nova Handys“
+const PRODUKT_AKK = ['', 'die Software', 'das Handy', 'den Computer'];   // „schreibt Code für das Handy Nova 3“
+const PRODUKT_AN = ['', 'an der Software', 'am Handy', 'am Computer'];    // „arbeitet am Handy Nova 3“
 
 // ─── Speicherlayout: Struct-of-Arrays ────────────────────────────────────────────────
 // Personen: eine typisierte Array pro Feld, Index = Personen-ID. [Name, Typ, Plätze pro Person]
@@ -523,6 +560,9 @@ const PF = [
   ['sucht', Uint8Array, 1],                                 // hat erfolglos eine Wohnung gesucht
   ['einzug', Int32Array, 1], ['sparSeit', Int32Array, 1],
   ['einsatz', Int32Array, 1],                               // Bauarbeiter: heute auf dieser Baustelle (Gebäude-ID + 1, 0 = keine), ab 7 Uhr
+  // Gekauft (Version 4): Gerät (0 = keins, HANDY, COMPUTER) und zuletzt gekaufte Software. Marke und Version zum Anzeigen.
+  ['geraet', Uint8Array, 1], ['geraetTag', Int32Array, 1], ['geraetMarke', Uint8Array, 1], ['geraetVersion', Uint16Array, 1],
+  ['app', Uint8Array, 1], ['appTag', Int32Array, 1], ['appMarke', Uint8Array, 1], ['appVersion', Uint16Array, 1],
 ];
 // Gebäude: höchstens eins pro Feld, daher feste Größe FELDER.
 const GF = [
@@ -543,6 +583,15 @@ const GF = [
   ['kistenStadt', Uint16Array],                                            // Werkstatt: davon an Läden der Stadt / Laden: aus der Stadt bekommen
   ['kistenAussen', Uint16Array],                                           // Laden: gestern von außerhalb gekauft
   ['lieferant', Int32Array],                                               // Laden: Werkstatt, die gestern die meisten Kisten brachte (ID + 1, 0 = keine)
+  // Tech-Firma (Version 4)
+  ['produkt', Uint8Array], ['marke', Uint8Array],                          // SOFTWARE, HANDY oder COMPUTER; Index in MARKEN
+  ['version', Uint16Array],                                                // so viele Versionen sind erschienen
+  ['projekt', Uint16Array],                                                // Arbeitstage an der nächsten Version
+  ['neuTag', Int32Array],                                                  // Tag, an dem die letzte Version erschien
+  ['dran', Uint8Array],                                                    // so viele haben gestern daran programmiert
+  ['ruecklage', Int32Array],                                               // Geld für den Anbau (nicht in der Kasse)
+  ['gut', Uint16Array],                                                    // Tage in Folge mit Gewinn
+  ['verkauft', Uint16Array],                                               // Tech-Firma: gestern in der Stadt verkauft / Laden: gestern Geräte und Software verkauft
 ];
 
 // ─── Zufall: mulberry32, Zustand liegt in S (speicherbar) ────────────────────────────
@@ -712,7 +761,7 @@ function entferne(S, q, grund) {
   if (P.besitz[q] >= 0) {
     const b = P.besitz[q];
     const n = schliessen(S, b, false);
-    buch(S, 'schliessung', `${S.g.typ[b] === LADEN ? 'Der Laden' : 'Die Werkstatt'} von ${nr(S, q)} ${gebOrt(S, b)} schließt, ${S.p.weib[q] ? 'sie' : 'er'} ist nicht mehr da.` +
+    buch(S, 'schliessung', `${S.g.typ[b] === LADEN ? 'Der Laden' : S.g.typ[b] === TECH ? `Die Tech-Firma ${firmenName(S, b)}` : 'Die Werkstatt'} von ${nr(S, q)} ${gebOrt(S, b)} schließt, ${S.p.weib[q] ? 'sie' : 'er'} ist nicht mehr da.` +
       (n ? ` ${n} ${n === 1 ? 'Person verliert' : 'Leute verlieren'} die Arbeit.` : ''));
   }
   austreten(S, q);
@@ -921,19 +970,27 @@ function strasseVerlaengern(S) {
 }
 
 // ─── Gebäude ─────────────────────────────────────────────────────────────────────────
-function istBetrieb(t) { return t === WERKSTATT || t === LADEN; }
+function istBetrieb(t) { return t === WERKSTATT || t === LADEN || t === TECH; }
 function offen(S, b) {   // Betrieb arbeitet: fertig gebaut und nicht leerstehend
   return S.feld[gebZelle(S, b)] === S.g.typ[b] && !S.g.leer[b];
 }
 function stellen(S, b) {
   const g = S.g;
-  // Betriebe bleiben bisher auf Stufe 1 (die Spec sagt nicht, wer sie aufstuft); die Formel gilt schon für 2 und 3.
+  // Werkstätten und Läden bleiben auf Stufe 1. Tech-Firmen wachsen: ein Anbau über den Bauhof bringt Stufe 2 und 3.
   if (b === S.bauhof) return R.STELLEN_STADT + S.bauZuschlag;
   if (g.typ[b] === WERKSTATT) return (g.besitzer[b] < 0 ? R.STELLEN_STADT : R.STELLEN_WERKSTATT) * g.stufe[b];
   if (g.typ[b] === LADEN) return R.STELLEN_LADEN * g.stufe[b];
+  if (g.typ[b] === TECH) return R.STELLEN_TECH * g.stufe[b];
   return 0;
 }
-function betriebWort(S, b) { return S.g.typ[b] === LADEN ? 'Laden' : 'Werkstatt'; }
+function betriebWort(S, b) { return S.g.typ[b] === LADEN ? 'Laden' : S.g.typ[b] === TECH ? 'Tech-Firma' : 'Werkstatt'; }
+// „Nova Handys“; „die Tech-Firma“, solange noch nichts feststeht
+function firmenName(S, b) { const g = S.g; return g.produkt[b] ? MARKEN[g.marke[b]] + ' ' + PRODUKT_FIRMA[g.produkt[b]] : 'die Tech-Firma'; }
+// „Handy Nova 3“ (Nummer: die gerade entstehende Version, wenn keine angegeben ist); mit Artikel: fall = PRODUKT_AKK oder PRODUKT_AN
+function produktName(S, b, nummer, fall) {
+  const g = S.g;
+  return `${(fall || PRODUKT)[g.produkt[b]]} ${MARKEN[g.marke[b]]} ${nummer === undefined ? g.version[b] + 1 : nummer}`;
+}
 function lohnVon(S, besitzer, basis) {  // großzügige (wenig sparsame) Besitzer zahlen mehr
   return Math.round(basis * (0.9 + 0.2 * (1 - S.p.spar[besitzer] / 100)));
 }
@@ -946,7 +1003,8 @@ function neuesGebaeude(S, typ, x, y, arbeit, besitzer) {
   g.kasse[b] = 0; g.minus[b] = 0; g.leer[b] = 0; g.seit[b] = S.tag; g.belegt[b] = 0; g.umsatz[b] = 0;
   g.laden[b] = -1; g.knapp[b] = 0; g.mangel[b] = 0; g.parkNah[b] = 0; g.str[b] = strasseAn(S, x, y);
   g.lohn[b] = typ === WERKSTATT ? (besitzer < 0 ? R.LOHN_STADT : lohnVon(S, besitzer, R.LOHN_WERKSTATT))
-    : typ === LADEN ? (besitzer < 0 ? R.LOHN_LADEN : lohnVon(S, besitzer, R.LOHN_LADEN)) : 0;
+    : typ === LADEN ? (besitzer < 0 ? R.LOHN_LADEN : lohnVon(S, besitzer, R.LOHN_LADEN))
+    : typ === TECH ? lohnVon(S, besitzer, R.LOHN_TECH) : 0;
   S.feldGeb[c] = b;
   S.bewohner.push([]); S.belegschaft.push([]);
   const v = viertel(x, y);
@@ -978,9 +1036,12 @@ function baustellenFertig(S) {
     g.bauBis[b] = 0; g.bauLeute[b] = 0; g.still[b] = 0;
     S.stat.bau.fertig++;
     fertig.push(bauName(S, b, true, true));
-    if (g.auf[b]) {                                      // Aufstockung fertig
-      S.wohnungenImBau -= R.WOHNUNGEN[g.auf[b]] - R.WOHNUNGEN[g.stufe[b]];
+    if (g.auf[b]) {                                      // Aufstockung (Wohnhaus) oder Anbau (Tech-Firma) fertig
+      if (g.typ[b] === WOHNHAUS) S.wohnungenImBau -= R.WOHNUNGEN[g.auf[b]] - R.WOHNUNGEN[g.stufe[b]];
+      const mitStellen = istBetrieb(g.typ[b]) && offen(S, b);   // mehr Stufe = mehr Stellen: die freien Stellen neu buchen
+      if (mitStellen) stellenBuchen(S, b, -1);
       g.stufe[b] = g.auf[b]; g.auf[b] = 0;
+      if (mitStellen) stellenBuchen(S, b, 1);
       continue;
     }
     S.feld[gebZelle(S, b)] = g.typ[b];
@@ -999,6 +1060,8 @@ function bauName(S, b, fertig, akk) {
       : `das Wohnhaus ${ort}` + (fertig ? ` mit ${R.WOHNUNGEN[1]} Wohnungen` : '');
     case PARK: return `${der} Park ${ort}`;
     case LADEN: return o >= 0 ? `${der} Laden von ${nr(S, o)} ${ort}` : `${der} Laden ${ort}`;
+    case TECH: return g.auf[b] ? `${der} Anbau von ${firmenName(S, b)} ${ort}` + (fertig ? ` (jetzt ${R.STELLEN_TECH * g.auf[b]} Stellen)` : '')
+      : o >= 0 ? `die Tech-Firma von ${nr(S, o)} ${ort}` : `die Tech-Firma ${ort}`;
     default: return o >= 0 ? `die Werkstatt von ${nr(S, o)} ${ort}` : g.leer[b] ? `die Werkstatt ${ort}` : `die Werkstatt der Stadt ${ort}`;
   }
 }
@@ -1050,8 +1113,9 @@ function schliessen(S, b, pleite) {
     P.besitz[o] = -1;
     if (P.arbeit[o] === b) P.arbeit[o] = -1;
     if (pleite) { erinnere(S, o, M.PLEITE, b); P.sperreBis[o] = S.tag + R.PLEITE_SPERRE; P.jetzt[o] = 1; }
+    P.geld[o] += g.ruecklage[b];                        // die Rücklage für den Anbau gehört dem Besitzer
   }
-  g.besitzer[b] = -1; g.leer[b] = 1; g.kasse[b] = 0; g.minus[b] = 0;
+  g.besitzer[b] = -1; g.leer[b] = 1; g.kasse[b] = 0; g.minus[b] = 0; g.ruecklage[b] = 0; g.gut[b] = 0;
   if (g.typ[b] === LADEN) S.ladenDirty = true;
   return n;
 }
@@ -1544,14 +1608,42 @@ function knappLoeschen(S, b) {
     }
   }
 }
-// Was würde diese Person gründen? Fehlt in der Nähe ein Laden (oder gehen viele leer aus): Laden, sonst Werkstatt.
-// Gegründet wird nur mit Aussicht (siehe entscheide), die Werkstatt lohnt sich dann laut Umlandpreis.
+// Was würde diese Person gründen? Fehlt in der Nähe ein Laden (oder gehen viele leer aus): Laden.
+// Sonst eine Tech-Firma, wenn sie eine Tüftlerin ist (Fleiß + Ehrgeiz), das Geld reicht und Tech-Firmen noch nicht
+// 40 % der Umland-Stellen haben; sonst eine Werkstatt. Gegründet wird nur mit Aussicht (siehe entscheide):
+// Werkstatt und Tech-Firma verkaufen ans selbe Umland, beide lohnen sich laut werkstattLohnt.
 function gruendungsTyp(S, p) {
-  return ladenFehlt(S, S.p.wohnung[p]) ? LADEN : WERKSTATT;
+  const P = S.p;
+  if (ladenFehlt(S, P.wohnung[p])) return LADEN;
+  if (P.fleiss[p] + P.ehrgeiz[p] >= R.TECH_TUEFTLER && S.techPlaetze + R.STELLEN_TECH <= R.TECH_ANTEIL * (S.werkstattPlaetze + R.STELLEN_TECH)
+      && P.geld[p] >= gruendungsKosten(TECH, S.leerTyp[TECH] > 0)) return TECH;
+  return WERKSTATT;
 }
 function gruendungsKosten(typ, uebernahme) {
-  const bau = typ === LADEN ? R.K_LADEN : R.K_WERKSTATT;
+  const bau = typ === LADEN ? R.K_LADEN : typ === TECH ? R.K_TECH : R.K_WERKSTATT;
   return (uebernahme ? Math.round(bau * R.UEBERNAHME) : bau) + R.KASSE_START;
+}
+// Was eine neue Tech-Firma macht: das, was in der Stadt am seltensten gemacht wird (bei Gleichstand Handy, Computer, Software)
+function techProdukt(S) {
+  const g = S.g, n = [0, 0, 0, 0];
+  for (let b = 0; b < S.gAnzahl; b++) if (g.typ[b] === TECH && !g.leer[b] && g.besitzer[b] >= 0) n[g.produkt[b]]++;
+  let best = HANDY;
+  for (const x of [COMPUTER, SOFTWARE]) if (n[x] < n[best]) best = x;
+  return best;
+}
+// Eine Tech-Firma fängt an (neu gebaut oder übernommen): Produkt, Marke (möglichst noch nicht vergeben), noch keine Version
+function techStart(S, b) {
+  const g = S.g;
+  g.produkt[b] = 0;                                        // bei einer Übernahme: das alte Produkt zählt nicht mit
+  g.produkt[b] = techProdukt(S);
+  let m = zInt(S, MARKEN.length);
+  for (let t = 0; t < MARKEN.length; t++) {
+    let frei = true;
+    for (let q = 0; q < S.gAnzahl && frei; q++) if (q !== b && g.typ[q] === TECH && !g.leer[q] && g.marke[q] === m && g.produkt[q]) frei = false;
+    if (frei) break;
+    m = (m + 1) % MARKEN.length;
+  }
+  g.marke[b] = m; g.version[b] = 0; g.projekt[b] = 0; g.neuTag[b] = 0; g.dran[b] = 0; g.ruecklage[b] = 0; g.gut[b] = 0; g.verkauft[b] = 0;
 }
 function kannGruenden(S, p) {
   const typ = gruendungsTyp(S, p), geld = S.p.geld[p];
@@ -1576,17 +1668,18 @@ function aktGruenden(S, p) {
     b = leer;
     S.leerstand--; S.leerTyp[typ]--;
     g.leer[b] = 0; g.besitzer[b] = p; g.minus[b] = 0; g.seit[b] = S.tag;
-    g.lohn[b] = lohnVon(S, p, typ === LADEN ? R.LOHN_LADEN : R.LOHN_WERKSTATT);
+    g.lohn[b] = lohnVon(S, p, typ === LADEN ? R.LOHN_LADEN : typ === TECH ? R.LOHN_TECH : R.LOHN_WERKSTATT);
     S.stat.uebernahmen++;
   } else {
     const c = bauplatzNahe(S, x, y);
     if (c < 0) return false;
-    b = neuesGebaeude(S, typ, c % KARTE, (c / KARTE) | 0, typ === LADEN ? R.BAU_LADEN : R.BAU_WERKSTATT, p);
+    b = neuesGebaeude(S, typ, c % KARTE, (c / KARTE) | 0, typ === LADEN ? R.BAU_LADEN : typ === TECH ? R.BAU_TECH : R.BAU_WERKSTATT, p);
   }
   P.geld[p] -= kosten;
   S.budget += kosten - R.KASSE_START;                      // Bau oder Übernahme bezahlt die Stadt, die Bauarbeiter kommen vom Bauhof
   g.kasse[b] = R.KASSE_START;
   P.besitz[p] = b;
+  if (typ === TECH) { techStart(S, b); S.techPlaetze += stellen(S, b); S.stat.tech.gruendungen++; }
   if (typ === LADEN) knappLoeschen(S, b); else S.werkstattPlaetze += stellen(S, b);
   if (leer < 0) bauhofStellen(S);                          // neue Baustelle: der Bauhof stellt gleich dafür ein
   if (leer >= 0) eroeffnen(S, b);
@@ -1594,11 +1687,19 @@ function aktGruenden(S, p) {
   const gespart = S.tag - P.sparSeit[p];
   S.stat.gruendungen++; S.stat.gruenderEhrgeiz += P.ehrgeiz[p];
   S.letzteGruendung = S.tag;
+  const sie = P.weib[p] ? 'Sie' : 'Er';
+  if (typ === TECH) {
+    const vor = ['', 'Software schreiben', 'Handys bauen', 'Computer bauen'][g.produkt[b]];
+    buch(S, 'gruendung', (leer >= 0 ? `${nr(S, p)} übernimmt die leere Tech-Firma ${gebOrt(S, b)} und nennt sie ${firmenName(S, b)}.`
+        : `${nr(S, p)} gründet eine Tech-Firma ${gebOrt(S, b)}: ${firmenName(S, b)}.`)
+      + ` ${sie} will ${vor} und tüftelt gern (Fleiß ${P.fleiss[p]}, Ehrgeiz ${P.ehrgeiz[p]}). ${sie} hat ${gespart} Tage dafür gespart.`);
+    return true;
+  }
   const wort = typ === LADEN ? 'einen Laden' : 'eine Werkstatt';
   buch(S, 'gruendung', leer >= 0
     ? `${nr(S, p)} übernimmt ${wort === 'einen Laden' ? 'den leeren Laden' : 'die leere Werkstatt'} ${gebOrt(S, b)}.`
-      + ` ${P.weib[p] ? 'Sie' : 'Er'} hat ${gespart} Tage dafür gespart.`
-    : `${nr(S, p)} gründet ${wort} ${gebOrt(S, b)}. ${P.weib[p] ? 'Sie' : 'Er'} hat ${gespart} Tage dafür gespart.`);
+      + ` ${sie} hat ${gespart} Tage dafür gespart.`
+    : `${nr(S, p)} gründet ${wort} ${gebOrt(S, b)}. ${sie} hat ${gespart} Tage dafür gespart.`);
   return true;
 }
 function wegzugGrund(S, p) {
@@ -1683,7 +1784,7 @@ function kiAktionen(S, p, namen) {
       case A.KIND: satz = `Du bekommst mit ${pn || 'deinem Partner'} ein Kind.`; break;
       case A.GRUENDEN: {
         const t = gruendungsTyp(S, p), kosten = gruendungsKosten(t, S.leerTyp[t] > 0 && P.geld[p] >= gruendungsKosten(t, true));
-        satz = `Du gründest ${t === LADEN ? 'einen eigenen Laden' : 'eine eigene Werkstatt'} für ${kosten} Taler (du hast ${geld}).`;
+        satz = `Du gründest ${t === LADEN ? 'einen eigenen Laden' : t === TECH ? `eine eigene Tech-Firma, die ${PRODUKT_FIRMA[techProdukt(S)]} macht,` : 'eine eigene Werkstatt'} für ${kosten} Taler (du hast ${geld}).`;
         break;
       }
       case A.WEGZIEHEN: satz = 'Du verlässt die Stadt für immer.'; break;
@@ -1782,6 +1883,18 @@ function kiTagebuch(S, id, gen, text, art) {
   if (!lebtNoch(S, id, gen)) return false;
   tagebuchEintrag(S, id, { art: art || 'eintrag', text: String(text) });
   return true;
+}
+// Eine Hauptfigur, die programmiert, hat ein Stück Code geschrieben (Sprachmodell). Es steht nur im Tagebuch,
+// die Stadt führt es nie aus und es ändert nichts an der Simulation.
+function kiCode(S, id, gen, titel, sprache, code, gedanke) {
+  if (!lebtNoch(S, id, gen) || techFirmaVon(S, id) < 0) return false;
+  tagebuchEintrag(S, id, { art: 'code', text: String(gedanke || titel), titel: String(titel), sprache: String(sprache), code: String(code) });
+  return true;
+}
+// Tech-Firma, in der p arbeitet oder die p gehört (-1 = keine)
+function techFirmaVon(S, p) {
+  const P = S.p, b = P.besitz[p] >= 0 ? P.besitz[p] : P.arbeit[p];
+  return b >= 0 && S.g.typ[b] === TECH && S.g.produkt[b] ? b : -1;
 }
 // Noah macht jemanden zur Hauptfigur oder nimmt es zurück (nur Erwachsene, höchstens R.HAUPT_MAX)
 function hauptSetzen(S, id, gen, an, grenze) {
@@ -1894,7 +2007,9 @@ function tagesabschluss(S) {
   if (S.ladenDirty) ladenZuordnen(S);
   if (S.parkDirty) parksZuordnen(S);
   haushalteZaehlen(S);
+  techArbeit(S);
   wirtschaft(S);
+  anbauAuftraege(S);
   menschenTag(S);
   bauhofRegeln(S);
   kennzahlenRechnen(S);
@@ -1979,6 +2094,102 @@ function bauhofRegeln(S) {
   }
 }
 
+// ─── Tech-Firmen ─────────────────────────────────────────────────────────────────────
+// Mitternacht: jede Person, die heute in einer Tech-Firma war (auch der Besitzer), bringt einen Arbeitstag an der nächsten
+// Version. Ist sie fertig, erscheint sie und gilt 15 Tage als neu (die Leute kaufen sie dann doppelt so gern).
+// Alle Versionen eines Tages stehen in einer Zeile im Stadtbuch.
+function techArbeit(S) {
+  const P = S.p, g = S.g, neu = [];
+  for (let b = 0; b < S.gAnzahl; b++) {
+    if (g.typ[b] !== TECH) continue;
+    g.dran[b] = 0;
+    if (!offen(S, b) || !g.produkt[b]) continue;
+    let n = 0;
+    for (const w of S.belegschaft[b]) if (!P.frei[w]) n++;
+    const o = g.besitzer[b];
+    if (o >= 0 && P.arbeit[o] === b && !P.frei[o]) n++;
+    g.dran[b] = n;
+    const soll = R.VERSION_TAGE[g.produkt[b]], stand = g.projekt[b] + n;
+    if (stand < soll) { g.projekt[b] = stand; continue; }
+    g.version[b]++; g.projekt[b] = Math.min(stand - soll, soll - 1); g.neuTag[b] = S.tag;
+    S.stat.tech.versionen++;
+    neu.push(`${produktName(S, b, g.version[b])} von ${firmenName(S, b)}` + (o >= 0 ? ` (${nr(S, o)})` : ''));
+  }
+  if (neu.length) buch(S, 'version', `Neu in den Läden: ${aufzaehlen(neu)}.`);
+}
+// Was die Läden heute anbieten: je Produkt die neueste Version einer offenen Firma der Stadt (-1 = nichts)
+function angebotRechnen(S) {
+  const g = S.g, A = S.angebot;
+  A[0] = A[SOFTWARE] = A[HANDY] = A[COMPUTER] = -1;
+  for (let b = 0; b < S.gAnzahl; b++) {
+    if (g.typ[b] !== TECH || !g.version[b] || !offen(S, b)) continue;
+    const a = A[g.produkt[b]];
+    if (a < 0 || g.neuTag[b] > g.neuTag[a]) A[g.produkt[b]] = b;
+  }
+  A[0] = A[SOFTWARE] >= 0 || A[HANDY] >= 0 || A[COMPUTER] >= 0 ? 1 : -1;   // gibt es überhaupt etwas?
+}
+// Was jemand kaufen würde: zuerst ein Gerät (Handy, sonst Computer; nach 120 Tagen ein neues), mit Gerät auch Software.
+function kaufWunsch(S, p) {
+  const P = S.p, A = S.angebot;
+  const letzter = Math.max(P.geraet[p] ? P.geraetTag[p] : -1e6, P.app[p] ? P.appTag[p] : -1e6);
+  if (S.tag - letzter < R.KAUF_PAUSE) return 0;
+  if (!P.geraet[p] || S.tag - P.geraetTag[p] >= R.GERAET_ALT) {
+    const erst = P.geraet[p] === COMPUTER ? COMPUTER : HANDY, zweit = erst === HANDY ? COMPUTER : HANDY;
+    if (A[erst] >= 0) return erst;
+    if (A[zweit] >= 0) return zweit;
+  }
+  if (P.geraet[p] && A[SOFTWARE] >= 0 && (!P.app[p] || S.tag - P.appTag[p] >= R.APP_ALT)) return SOFTWARE;
+  return 0;
+}
+// Keine neue Aktion, eine Regel beim täglichen Einkauf: wer im Laden ist und genug Geld hat, kauft manchmal etwas Technisches.
+// Chance am Tag 4 % × (1,3 − Sparsamkeit), bei einer neuen Version doppelt. Es kostet Geld und bringt sofort Freizeit
+// (einmal, keine Dauerwirkung: die hob in der Messung die Zufriedenheit und damit den Zuzug). Der Laden behält 20 %, der Rest geht an die Firma.
+function techKauf(S, p, laden) {
+  const P = S.p, g = S.g, was = kaufWunsch(S, p);
+  if (!was) return;
+  const preis = R.PREIS[was];
+  if (P.geld[p] - preis < R.KAUF_RESERVE) return;
+  const f = S.angebot[was], neu = S.tag - g.neuTag[f] <= R.NEU_TAGE;
+  if (zufall(S) >= R.KAUF_CHANCE * (1.3 - P.spar[p] / 100) * (neu ? 2 : 1)) return;
+  const anteil = Math.round(preis * R.LADEN_ANTEIL);
+  P.geld[p] -= preis;
+  g.umsatz[f] += preis - anteil;
+  if (g.besitzer[laden] >= 0) g.kasse[laden] += anteil; else S.budget += anteil;
+  if (g.verkauft[laden] < 65535) g.verkauft[laden]++;
+  if (g.verkauft[f] < 65535) g.verkauft[f]++;
+  P.bFreizeit[p] = Math.min(100, P.bFreizeit[p] + R.KAUF_FREIZEIT[was]);
+  if (was === SOFTWARE) { P.app[p] = 1; P.appTag[p] = S.tag; P.appMarke[p] = g.marke[f]; P.appVersion[p] = g.version[f]; }
+  else { P.geraet[p] = was; P.geraetTag[p] = S.tag; P.geraetMarke[p] = g.marke[f]; P.geraetVersion[p] = g.version[f]; }
+  const st = S.stat.tech; st.kaeufe[was]++; st.umsatz += preis;
+}
+// Läuft eine Tech-Firma gut (alle Stellen besetzt, 20 Tage in Folge Gewinn), will sie wachsen: die Hälfte vom Gewinn über dem
+// Polster geht in die Rücklage, bis der Anbau bezahlt ist. Den Auftrag gibt sie nur, wenn das Umland noch Platz hat (dieselbe
+// Grenze wie für eine neue Werkstatt, werkstattLohnt) und in der Stadt mindestens so viele Leute Arbeit suchen, wie der Anbau
+// Stellen bringt. Gemessen: ohne die Umland-Grenze schafft jeder Anbau Stellen über das Gleichgewicht hinaus, das lockt späten
+// Zuzug an und verschlechtert Gate 4. Den Anbau zahlt die Firma an die Stadtkasse, der Bauhof baut ihn wie jede Baustelle.
+function anbauWillig(S, b) {
+  const g = S.g;
+  return g.typ[b] === TECH && g.besitzer[b] >= 0 && offen(S, b) && g.stufe[b] < 3 && !g.auf[b] && S.bauhof >= 0
+    && S.belegschaft[b].length >= stellen(S, b) && g.gut[b] >= R.ANBAU_GUT;
+}
+// Platz im Umland für die Stellen eines Anbaus (wie werkstattLohnt, nur mit den 4 Stellen des Anbaus)
+function anbauMarkt(S) { return R.UMLAND / (S.werkstattPlaetze + R.STELLEN_TECH) >= R.LOHN_WERKSTATT + 8; }
+function anbauAuftraege(S) {
+  const g = S.g;
+  for (let b = 0; b < S.gAnzahl; b++) {
+    if (g.typ[b] !== TECH || !anbauWillig(S, b)) continue;
+    const ziel = g.stufe[b] + 1, kosten = R.K_ANBAU[ziel];
+    if (g.ruecklage[b] < kosten || S.arbeitslose < R.STELLEN_TECH || !anbauMarkt(S)) continue;
+    g.ruecklage[b] -= kosten; S.budget += kosten;
+    g.auf[b] = ziel; baustelleAnlegen(S, b, R.BAU_ANBAU[ziel]); S.baustellen.push(b);
+    const mehr = R.STELLEN_TECH * (ziel - g.stufe[b]);
+    S.werkstattPlaetze += mehr; S.techPlaetze += mehr;
+    S.stat.tech.anbauten++;
+    buch(S, 'auftrag', `${firmenName(S, b)} von ${nr(S, g.besitzer[b])} gibt dem Bauhof einen Auftrag: einen Anbau ${gebOrt(S, b)} auf Stufe ${ziel}`
+      + ` für ${kosten} Taler aus der Rücklage. Alle ${stellen(S, b)} Stellen sind besetzt, seit ${g.gut[b]} Tagen bleibt Gewinn. Danach gibt es ${R.STELLEN_TECH * ziel} Stellen.`);
+  }
+}
+
 function haushalteZaehlen(S) {
   const P = S.p, hg = S.hhGroesse, hk = S.hhKinder, n = S.pMax, erw = S.tag - R.ERWACHSEN * R.JAHR;
   hg.fill(0, 0, n); hk.fill(0, 0, n);
@@ -1996,10 +2207,13 @@ function wirtschaft(S) {
   // Wie viele Leute kann jeder Laden heute bedienen? Hängt an seiner Größe (Stellen plus Besitzer).
   for (let b = 0; b < S.gAnzahl; b++) {
     if (g.typ[b] === WOHNHAUS) g.knapp[b] = 0;
+    if (g.typ[b] === TECH) g.verkauft[b] = 0;
     if (g.typ[b] !== LADEN) continue;
-    g.bedient[b] = 0;
+    g.bedient[b] = 0; g.verkauft[b] = 0;
     g.kapaz[b] = offen(S, b) ? Math.floor(R.KUNDEN_PRO_KRAFT * (stellen(S, b) + 1)) : 0;
   }
+  angebotRechnen(S);
+  const technik = S.angebot[0] > 0;
   let unbedient = 0, einkaeufer = 0;
   for (let p = 0; p < n; p++) {
     if (!P.lebt[p] || P.geb[p] > erw) continue;             // Kinder kaufen über den Haushalt ein
@@ -2025,6 +2239,7 @@ function wirtschaft(S) {
       if (P.hh[p] === p) betrag += S.hhKinder[p] * R.EINKAUF_KIND;
       P.geld[p] -= betrag; g.umsatz[laden] += betrag; g.bedient[laden]++;
       P.ohneLaden[p] = 0;
+      if (technik && P.geld[p] > R.KAUF_RESERVE) techKauf(S, p, laden);
     } else {
       P.ohneLaden[p] = 1;                                    // kein Laden in Reichweite oder alle voll
       unbedient++;
@@ -2041,7 +2256,7 @@ function wirtschaft(S) {
   // Umland-Preis: je mehr in Werkstätten gearbeitet wird, desto weniger bringt ein Arbeitstag
   let exportArbeiter = 0;
   for (let b = 0; b < S.gAnzahl; b++) {
-    if (g.typ[b] !== WERKSTATT || !offen(S, b)) continue;
+    if ((g.typ[b] !== WERKSTATT && g.typ[b] !== TECH) || !offen(S, b)) continue;   // Tech-Firmen verkaufen ans selbe Umland
     for (const w of S.belegschaft[b]) if (!P.frei[w] && !P.einsatz[w]) exportArbeiter++;   // Bauarbeiter auf der Baustelle machen keine Kisten
   }
   S.exportPreis = Math.min(R.EXPORT_MAX, R.UMLAND / Math.max(1, exportArbeiter));
@@ -2054,10 +2269,12 @@ function wirtschaft(S) {
     for (const w of L) if (!P.frei[w] && !P.einsatz[w]) da++;
     // Werkstatt: jede Kiste bringt ein Achtel des Umlandpreises, egal ob sie ein Laden der Stadt oder das Umland nimmt.
     // Laden: Umsatz minus Kisten (aus der Stadt zum Umlandpreis, von außerhalb zu 19 Taler).
+    // Tech-Firma: Arbeitstage × Umlandpreis wie eine Werkstatt, dazu was Leute der Stadt heute gekauft haben (ohne Ladenanteil).
     const einnahmen = t === WERKSTATT ? Math.round(da * S.exportPreis)
+      : t === TECH ? Math.round(da * S.exportPreis) + g.umsatz[b]
       : Math.round(g.umsatz[b] - g.kistenStadt[b] * S.kistenpreis - g.kistenAussen[b] * R.KISTE_AUSSEN);
     g.umsatz[b] = 0;
-    const fix = t === WERKSTATT ? R.FIX_WERKSTATT : R.FIX_LADEN;
+    const fix = t === WERKSTATT ? R.FIX_WERKSTATT : t === TECH ? R.FIX_TECH : R.FIX_LADEN;
     const lohn = g.lohn[b], netto = Math.round(lohn * (1 - R.STEUER));
     const o = g.besitzer[b];
     if (o < 0) {                                             // Betrieb der Stadt: rechnet über das Budget ab
@@ -2068,8 +2285,16 @@ function wirtschaft(S) {
         S.budget -= zn; P.geld[w] += zn;
       }
     } else {                                                 // Besitzer bekommt Umsatz minus Löhne
-      let k = g.kasse[b] + einnahmen - fix;
-      for (const w of L) { if (P.frei[w]) continue; k -= lohn; P.geld[w] += netto; S.budget += lohn - netto; }
+      let k = g.kasse[b] + einnahmen - fix, loehne = 0;
+      for (const w of L) { if (P.frei[w]) continue; k -= lohn; loehne += lohn; P.geld[w] += netto; S.budget += lohn - netto; }
+      if (t === TECH) {                                      // Tech-Firma: Gewinntage zählen, Rücklage für den Anbau
+        if (einnahmen - fix - loehne > 0) { if (g.gut[b] < 65535) g.gut[b]++; } else g.gut[b] = 0;
+        if (k < 0 && g.ruecklage[b] > 0) { const d = Math.min(-k, g.ruecklage[b]); g.ruecklage[b] -= d; k += d; }
+        if (k > R.POLSTER && anbauWillig(S, b)) {
+          const r = Math.min(Math.round((k - R.POLSTER) * R.ANBAU_SPAR), Math.max(0, R.K_ANBAU[g.stufe[b] + 1] - g.ruecklage[b]));
+          g.ruecklage[b] += r; k -= r;
+        }
+      }
       if (k > R.POLSTER) { P.geld[o] += k - R.POLSTER; k = R.POLSTER; }
       g.kasse[b] = k;
       if (k < 0) { if (++g.minus[b] >= R.MINUS_TAGE) pleite(S, b); }
@@ -2124,12 +2349,15 @@ function pleite(S, b) {
       ? `Er war voll (${g.bedient[b]} von ${g.kapaz[b]} Leuten), trotzdem blieb nach Wareneinkauf, Löhnen und laufenden Kosten nichts übrig.`
       : `Zuletzt kamen nur ${g.bedient[b]} von ${g.kapaz[b]} möglichen Leuten.`)
     : besetzt * 2 < platz ? `Nur ${besetzt} von ${platz} Stellen waren besetzt.`
-    : `Das Umland zahlte nur ${Math.round(S.exportPreis)} Taler je Arbeitstag.`;
+    : `Das Umland zahlte nur ${Math.round(S.exportPreis)} Taler je Arbeitstag.`
+      + (g.typ[b] === TECH ? (g.version[b] ? ` In der Stadt ${g.verkauft[b] === 1 ? 'wurde gestern 1 Stück' : `wurden gestern ${g.verkauft[b]} Stück`} verkauft.` : ' Eine erste Version gab es noch nicht.') : '');
+  const wer = laden ? 'Der Laden' : g.typ[b] === TECH ? `Die Tech-Firma ${firmenName(S, b)}` : 'Die Werkstatt';
+  if (g.typ[b] === TECH) S.stat.tech.pleiten++;
   const n = schliessen(S, b, true);
   S.stat.pleiten++;
   if (laden) S.stat.pleitenLaden++;
   S.stat.pleiteAlter += S.tag - g.seit[b];
-  buch(S, 'pleite', `${laden ? 'Der Laden' : 'Die Werkstatt'} von ${nr(S, o)} ${gebOrt(S, b)} ist nach ${R.MINUS_TAGE} Tagen im Minus pleite. ${grund}`
+  buch(S, 'pleite', `${wer} von ${nr(S, o)} ${gebOrt(S, b)} ist nach ${R.MINUS_TAGE} Tagen im Minus pleite. ${grund}`
     + (n ? ` ${n} ${n === 1 ? 'Person verliert' : 'Leute verlieren'} die Arbeit.` : ''));
 }
 
@@ -2174,7 +2402,7 @@ function menschenTag(S) {
 
 function kennzahlenRechnen(S) {
   const P = S.p, g = S.g, erw = S.tag - R.ERWACHSEN * R.JAHR, rente = S.tag - R.RENTE * R.JAHR;
-  let fw = 0, fs = 0, leer = 0, laeden = 0, wp = 0;
+  let fw = 0, fs = 0, leer = 0, laeden = 0, wp = 0, tp = 0;
   S.vParks.fill(0); S.freiLohn.fill(0); S.leerTyp.fill(0);
   for (let b = 0; b < S.gAnzahl; b++) {
     const t = g.typ[b], f = S.feld[gebZelle(S, b)];
@@ -2182,6 +2410,8 @@ function kennzahlenRechnen(S) {
     else if (istBetrieb(t)) {
       // Der Bauhof zählt für Gründer nur mit seinen 10 festen Stellen (sonst würde jede Baustelle Werkstätten verhindern)
       if (t === WERKSTATT && !g.leer[b]) wp += b === S.bauhof ? R.STELLEN_STADT : stellen(S, b);
+      // Tech-Firmen verkaufen ans selbe Umland: sie zählen mit, ein bestellter Anbau schon mit den Stellen danach
+      if (t === TECH && !g.leer[b]) { const n = R.STELLEN_TECH * (g.auf[b] || g.stufe[b]); wp += n; tp += n; }
       if (g.leer[b] && f === t) { leer++; S.leerTyp[t]++; }
       g.offeneStellen[b] = 0;
       if (offen(S, b)) {
@@ -2192,7 +2422,7 @@ function kennzahlenRechnen(S) {
       }
     } else if (t === PARK) S.vParks[viertel(g.x[b], g.y[b])]++;
   }
-  S.freieWohnungen = fw; S.freieStellen = fs; S.leerstand = leer; S.werkstattPlaetze = wp;
+  S.freieWohnungen = fw; S.freieStellen = fs; S.leerstand = leer; S.werkstattPlaetze = wp; S.techPlaetze = tp;
   let zs = 0, zn = 0, erwerb = 0, los = 0, suchende = 0;
   S.vZufSumme.fill(0); S.vZufN.fill(0);
   for (let p = 0; p < S.pMax; p++) {
@@ -2334,6 +2564,7 @@ function bauamt(S) {
 }
 
 // ─── Start ───────────────────────────────────────────────────────────────────────────
+function techStatLeer() { return { gruendungen: 0, versionen: 0, anbauten: 0, pleiten: 0, kaeufe: [0, 0, 0, 0], umsatz: 0 }; }
 function leererZustand(seed) {
   const S = {
     version: VERSION, seed: seed >>> 0, rs: seed >>> 0,
@@ -2349,6 +2580,7 @@ function leererZustand(seed) {
     vZufSumme: new Float64Array(VN * VN), vZufN: new Uint32Array(VN * VN), vParks: new Uint16Array(VN * VN),
     ladenDirty: true, parkDirty: true,
     bauhof: -1, bauZuschlag: 0, bauRueckstand: 0, bauFehlt: 0, kistenpreis: 0,
+    techPlaetze: 0, angebot: [-1, -1, -1, -1],               // Stellen in Tech-Firmen; was die Läden heute anbieten (Firma je Produkt)
     buch: [], buchNr: 0, reihe: [],
     // Hauptfiguren: an = die Oberfläche beantwortet Anfragen gerade (Ollama bereit, nicht 20×, kein Aufholen)
     ki: { an: false, haupt: [], anfragen: [], nr: 0, heute: {}, tagebuch: {}, verlust: [], abgelaufen: 0, angewandt: 0 },
@@ -2360,6 +2592,7 @@ function leererZustand(seed) {
       bauamt: { haeuser: 0, aufstockungen: 0, parks: 0, strassen: 0, notwerkstaetten: 0 },
       bau: { fertig: 0, tage: 0, still: 0, lohnSumme: 0 },      // Baustellentage gesamt / davon ohne Bauarbeiter
       kisten: { gemacht: 0, stadt: 0, aussen: 0 },              // an Läden der Stadt / von außerhalb gekauft
+      tech: techStatLeer(),
       gewaehlt: new Array(13).fill(0), ausgefuehrt: new Array(13).fill(0),
     },
   };
@@ -2469,14 +2702,15 @@ function exportZustand(S) {
   }
   return { format: 'stadt', version: VERSION, werte, json, arrays };
 }
-// migrieren: einen Spielstand von Version 2 (vor dem Bauhof) übernehmen, siehe migriereV2
+// migrieren: einen Spielstand von Version 2 (vor dem Bauhof) oder 3 (vor den Tech-Firmen) übernehmen, siehe migriereV2 und migriereV3
 function importZustand(d, migrieren) {
   if (!d || d.format !== 'stadt' || !d.werte || !d.json || !Array.isArray(d.arrays)) throw new Error('Das ist kein STADT-Spielstand.');
-  const alt = d.version === 2 && migrieren;
+  const alt = (d.version === 2 || d.version === 3) && migrieren;
   if (d.version !== VERSION && !alt) {
     const e = new Error(`Spielstand ist von Version ${d.version}, diese Datei ist Version ${VERSION}.`);
     e.andereVersion = true;
-    e.migrierbar = d.version === 2;
+    e.migrierbar = d.version === 2 || d.version === 3;
+    e.vonVersion = d.version;
     throw e;
   }
   const S = {};
@@ -2504,8 +2738,16 @@ function importZustand(d, migrieren) {
     if (!ArrayBuffer.isView(S[k])) throw new Error('Spielstand unvollständig: ' + k);
   }
   jsonPruefen(S);
-  if (alt) migriereV2(S);
+  if (alt) { if (d.version === 2) migriereV2(S); migriereV3(S, d.version === 3); }
   return S;
+}
+// Version 3 → 4: Tech-Firmen gibt es noch keine; die neuen Felder (Personen: Geräte, Gebäude: Produkt, Version …) stehen
+// auf 0, weil sie im alten Stand fehlen. Eine Zeile im Stadtbuch (bei Version 2 steht schon die Zeile vom Bauhof da).
+function migriereV3(S, zeile) {
+  S.version = VERSION;
+  S.techPlaetze = 0; S.angebot = [-1, -1, -1, -1];
+  S.stat.tech = techStatLeer();
+  if (zeile) buch(S, 'tech', 'Ab heute können Leute Tech-Firmen gründen: Software, Handys oder Computer. Die Läden verkaufen, was dort entsteht.');
 }
 // Version 2 → 3: Neue Felder stehen schon auf 0 (fehlen im alten Stand). Bauhof ist die Werkstatt der Stadt vom Start
 // (Gebäude 2). Laufende Baustellen bekommen die fehlenden Arbeitstage: je Resttag 4, höchstens so viele wie der ganze Bau.
@@ -2534,6 +2776,8 @@ function jsonPruefen(S) {
   const zahl = (v) => typeof v === 'number' && Number.isFinite(v), text = (v) => typeof v === 'string';
   const kaputt = (was) => { throw new Error('Spielstand beschädigt: ' + was); };
   if (!Array.isArray(S.buch) || !S.buch.every(e => e && zahl(e.nr) && zahl(e.tag) && text(e.art) && text(e.text))) kaputt('Stadtbuch');
+  if (S.angebot !== undefined && !(Array.isArray(S.angebot) && S.angebot.length === 4 && S.angebot.every(v => Number.isInteger(v) && v >= -1 && v < FELDER))) kaputt('Angebot');
+  if (S.stat && S.stat.tech !== undefined && !(S.stat.tech && Array.isArray(S.stat.tech.kaeufe) && S.stat.tech.kaeufe.length === 4)) kaputt('Tech-Statistik');
   const K = S.ki;
   if (!K || typeof K !== 'object' || !Array.isArray(K.haupt) || !Array.isArray(K.anfragen) || !Array.isArray(K.verlust)
       || !K.tagebuch || typeof K.tagebuch !== 'object' || !K.heute || typeof K.heute !== 'object') kaputt('Hauptfiguren');
@@ -2542,7 +2786,8 @@ function jsonPruefen(S) {
       && Array.isArray(a.erlaubt) && a.erlaubt.every(n => AKTIONSNAMEN.indexOf(n) > 0))) kaputt('KI-Anfragen');
   for (const L of Object.values(K.tagebuch)) {
     if (!Array.isArray(L) || !L.every(e => e && zahl(e.tag) && zahl(e.stunde) && text(e.art) && text(e.text) && (e.noah === undefined || text(e.noah))
-        && (e.aktion === undefined || text(e.aktion)) && (e.ziel === undefined || e.ziel === null || text(e.ziel)))) kaputt('Tagebuch');
+        && (e.aktion === undefined || text(e.aktion)) && (e.ziel === undefined || e.ziel === null || text(e.ziel))
+        && (e.code === undefined || text(e.code)) && (e.titel === undefined || text(e.titel)) && (e.sprache === undefined || text(e.sprache)))) kaputt('Tagebuch');
   }
   if (!K.verlust.every(v => v && zahl(v.id) && zahl(v.gen) && text(v.name) && text(v.grund) && Array.isArray(v.vorschlaege)
       && v.vorschlaege.every(x => x && zahl(x.id) && zahl(x.gen) && text(x.name) && text(x.rolle)))) kaputt('Nachfolge');
@@ -2554,23 +2799,26 @@ function ref(S, p) { return p >= 0 && S.p.lebt[p] ? { id: p, gen: S.p.gen[p], na
 function betriebText(S, b) {
   const g = S.g, o = g.besitzer[b], wort = g.typ[b] === LADEN ? 'Laden' : 'Werkstatt';
   if (b === S.bauhof) return `beim Bauhof ${gebOrt(S, b)}`;
+  if (g.typ[b] === TECH) return g.produkt[b] ? `bei ${firmenName(S, b)} ${gebOrt(S, b)}` : `in der Tech-Firma ${gebOrt(S, b)}`;
   if (o < 0) return `${wort === 'Laden' ? 'im Laden' : 'in der Werkstatt'} der Stadt ${gebOrt(S, b)}`;
   return `${wort === 'Laden' ? 'im Laden' : 'in der Werkstatt'} von ${nr(S, o)} ${gebOrt(S, b)}`;
 }
 function erinnerungText(S, code, bezug, name) {
   const g = S.g, geb = bezug >= 0 && bezug < S.gAnzahl;
-  const ort = geb ? gebOrt(S, bezug) : '', wort = geb && g.typ[bezug] === LADEN ? 'Laden' : 'Werkstatt';
+  const tech = geb && g.typ[bezug] === TECH;
+  const ort = geb ? gebOrt(S, bezug) : '', wort = geb && g.typ[bezug] === LADEN ? 'Laden' : tech ? 'Tech-Firma' : 'Werkstatt';
+  const wo = bezug === S.bauhof ? 'beim Bauhof' : wort === 'Laden' ? 'im Laden' : tech ? 'in der Tech-Firma' : 'in der Werkstatt';
   switch (code) {
     case M.EINGEZOGEN: return `eingezogen ${ort}`;
     case M.JOB: return `Job bekommen ${geb ? betriebText(S, bezug) : ''}`;
-    case M.JOB_WEG: return `Job verloren ${geb ? `${bezug === S.bauhof ? 'beim Bauhof' : wort === 'Laden' ? 'im Laden' : 'in der Werkstatt'} ${ort}` : ''}`;
-    case M.GEKUENDIGT: return `gekündigt ${geb ? `${bezug === S.bauhof ? 'beim Bauhof' : wort === 'Laden' ? 'im Laden' : 'in der Werkstatt'} ${ort}` : ''}`;
+    case M.JOB_WEG: return `Job verloren ${geb ? `${wo} ${ort}` : ''}`;
+    case M.GEKUENDIGT: return `gekündigt ${geb ? `${wo} ${ort}` : ''}`;
     case M.FREUND: return `neue Freundschaft mit ${name}`;
     case M.PARTNER: return `mit ${name} zusammengekommen`;
     case M.GETRENNT: return `von ${name} getrennt`;
     case M.KIND: return `Kind geboren: ${name}`;
-    case M.GEGRUENDET: return `${wort === 'Laden' ? 'einen Laden' : 'eine Werkstatt'} gegründet ${ort}`;
-    case M.PLEITE: return `${wort === 'Laden' ? 'Laden' : 'Werkstatt'} ${ort} ist pleite gegangen`;
+    case M.GEGRUENDET: return `${wort === 'Laden' ? 'einen Laden' : tech ? 'eine Tech-Firma' : 'eine Werkstatt'} gegründet ${ort}`;
+    case M.PLEITE: return `${wort} ${ort} ist pleite gegangen`;
     case M.ZIEL_ERREICHT: return `Ziel erreicht: ${ZIELTEXT[bezug] || ''}`;
     case M.ZIEL_AUFGEGEBEN: return `Ziel aufgegeben: ${ZIELTEXT[bezug] || ''}`;
     case M.GESTORBEN: return `${name} ist gestorben`;
@@ -2586,7 +2834,7 @@ function personInfo(S, p, gen) {
   const w = P.wohnung[p], arb = P.arbeit[p], bes = P.besitz[p];
   let arbeit;
   if (kind) arbeit = 'Kind';
-  else if (bes >= 0) arbeit = `besitzt ${S.g.typ[bes] === LADEN ? 'einen Laden' : 'eine Werkstatt'} ${gebOrt(S, bes)}` + (offen(S, bes) ? '' : ' (noch im Bau)');
+  else if (bes >= 0) arbeit = `besitzt ${S.g.typ[bes] === LADEN ? 'einen Laden' : S.g.typ[bes] === TECH ? `die Tech-Firma ${firmenName(S, bes)}` : 'eine Werkstatt'} ${gebOrt(S, bes)}` + (offen(S, bes) ? '' : ' (noch im Bau)');
   else if (arb >= 0) arbeit = `arbeitet als ${berufWort(S, p, arb)} ${betriebText(S, arb)}`;
   else if (alter >= R.RENTE) arbeit = 'in Rente';
   else arbeit = 'ohne Arbeit';
@@ -2622,6 +2870,15 @@ function personInfo(S, p, gen) {
   for (const k of kinder) if (P.kinder[k]) for (const e of kinderVon(k)) enkel.push(e);
   const freunde = [];
   for (let j = 0; j < 5; j++) { const f = P.freunde[p * 5 + j]; if (f >= 0) freunde.push(ref(S, f)); }
+  // Gekauft: Gerät und Software (Marke und Version zum Zeitpunkt des Kaufs)
+  const technik = [];
+  if (P.geraet[p]) technik.push({ was: PRODUKT[P.geraet[p]], name: `${MARKEN[P.geraetMarke[p]]} ${P.geraetVersion[p]}`, tag: P.geraetTag[p], preis: R.PREIS[P.geraet[p]] });
+  if (P.app[p]) technik.push({ was: 'Software', name: `${MARKEN[P.appMarke[p]]} ${P.appVersion[p]}`, tag: P.appTag[p], preis: R.PREIS[SOFTWARE] });
+  // Wer in einer Tech-Firma arbeitet: woran gerade programmiert wird (für Karte und Sprachmodell)
+  const tf = kind ? -1 : techFirmaVon(S, p), g = S.g;
+  const tech = tf < 0 ? null : { firma: firmenName(S, tf), ort: gebOrt(S, tf), produkt: PRODUKT[g.produkt[tf]], marke: MARKEN[g.marke[tf]],
+    naechste: produktName(S, tf), geschafft: g.projekt[tf], soll: R.VERSION_TAGE[g.produkt[tf]], version: g.version[tf], besitz: bes === tf,
+    offen: offen(S, tf), beruf: berufWort(S, p, tf) };
   return {
     id: p, gen: P.gen[p], name: name(S, p), weib: !!P.weib[p], alter, kind,
     wohnen: w >= 0 ? (eigeneWohnung(S, p) ? 'wohnt ' : 'wohnt bei der Familie ') + gebOrt(S, w) : 'hat keine Wohnung', wohnung: w,
@@ -2635,6 +2892,7 @@ function personInfo(S, p, gen) {
     freunde: freunde.filter(Boolean),
     haupt: istHaupt(S, p), ueberlegt: S.ki.anfragen.some(a => a.id === p),
     tagebuch: (S.ki.tagebuch[schluessel(S, p)] || []).slice(),
+    technik, tech,
   };
 }
 // ─── Berufe: ergeben sich aus dem Arbeitsplatz. Theke und Träger sind nur zum Anschauen (keine Wirkung). ──
@@ -2642,19 +2900,22 @@ function berufWort(S, p, b) {
   const w = S.p.weib[p];
   if (b === S.bauhof) return w ? 'Bauarbeiterin' : 'Bauarbeiter';
   if (S.g.typ[b] === LADEN) return w ? 'Verkäuferin' : 'Verkäufer';
+  if (S.g.typ[b] === TECH) return w ? 'Programmiererin' : 'Programmierer';
   return w ? 'Handwerkerin' : 'Handwerker';
 }
 function bauGesamt(S, b) {
   const g = S.g;
-  if (g.auf[b]) return R.BAU_AUF[g.auf[b]];
-  return g.typ[b] === WOHNHAUS ? R.BAU_HAUS : g.typ[b] === LADEN ? R.BAU_LADEN : g.typ[b] === WERKSTATT ? R.BAU_WERKSTATT : R.BAU_PARK;
+  if (g.auf[b]) return g.typ[b] === TECH ? R.BAU_ANBAU[g.auf[b]] : R.BAU_AUF[g.auf[b]];
+  return g.typ[b] === WOHNHAUS ? R.BAU_HAUS : g.typ[b] === LADEN ? R.BAU_LADEN : g.typ[b] === WERKSTATT ? R.BAU_WERKSTATT
+    : g.typ[b] === TECH ? R.BAU_TECH : R.BAU_PARK;
 }
 function werkstattName(S, w) {                              // Nominativ, für „Hauptlieferant ist …“
   return w === S.bauhof ? `der Bauhof ${gebOrt(S, w)}` : bauName(S, w, false) + (S.g.leer[w] ? ' (steht inzwischen leer)' : '');
 }
 function bauArt(S, b) {
   const t = S.g.typ[b];
-  return S.g.auf[b] ? 'Aufstockung' : t === WOHNHAUS ? 'Wohnhaus' : t === LADEN ? 'Laden' : t === WERKSTATT ? 'Werkstatt' : 'Park';
+  return S.g.auf[b] ? (t === TECH ? 'Anbau' : 'Aufstockung') : t === WOHNHAUS ? 'Wohnhaus' : t === LADEN ? 'Laden' : t === WERKSTATT ? 'Werkstatt'
+    : t === TECH ? 'Tech-Firma' : 'Park';
 }
 function daHeute(S, p) { return !S.p.frei[p] && !S.p.einsatz[p]; }
 // An der Theke: der Besitzer, wenn er heute da ist, sonst die erste anwesende Kraft
@@ -2691,10 +2952,36 @@ function heuteText(S, p) {
     return S.baustellen.length ? 'Heute: keine Baustelle frei, macht Kisten im Bauhof.' : 'Heute: keine Baustelle, macht Kisten im Bauhof.';
   }
   if (g.typ[arb] === LADEN) return theke(S, arb) === p ? 'Heute: steht an der Theke.' : '';
+  if (g.typ[arb] === TECH) {
+    if (!g.produkt[arb]) return '';
+    const soll = R.VERSION_TAGE[g.produkt[arb]];
+    return `Heute: schreibt Code für ${produktName(S, arb, undefined, PRODUKT_AKK)}, ${g.projekt[arb]} von ${soll} Arbeitstagen geschafft.`;
+  }
   const l = traegerVon(S, arb).get(p);
   return l !== undefined ? `Heute: bringt um 9 und 13 Uhr Kisten zum Laden ${gebOrt(S, l)}.` : '';
 }
 
+// Hauskarte einer Tech-Firma: woran sie arbeitet, was erschienen ist, was sie verkauft, ob sie wachsen will
+function techMehr(S, b, mehr) {
+  const g = S.g, soll = R.VERSION_TAGE[g.produkt[b]], d = g.dran[b];
+  mehr.push(`Arbeitet ${produktName(S, b, undefined, PRODUKT_AN)}: ${g.projekt[b]} von ${soll} Arbeitstagen geschafft`
+    + (d ? `, gestern ${d === 1 ? 'hat 1 Person' : `haben ${d} Leute`} daran programmiert.` : '.'));
+  if (g.version[b]) {
+    const a = S.angebot[g.produkt[b]], neu = S.tag - g.neuTag[b] <= R.NEU_TAGE;
+    mehr.push(`Zuletzt erschienen: ${produktName(S, b, g.version[b])} an Tag ${g.neuTag[b]}${neu ? ', gerade neu' : ''}.`
+      + (a === b ? ` Die Läden der Stadt verkaufen es, gestern ${g.verkauft[b] === 1 ? '1 Stück' : g.verkauft[b] + ' Stück'}.`
+        : a >= 0 ? ` In den Läden liegt gerade ${produktName(S, a, g.version[a])} von ${firmenName(S, a)}, das ist neuer.` : ''));
+  } else mehr.push('Noch ist keine Version fertig, bis dahin kauft nur das Umland.');
+  mehr.push(`Das Umland zahlt ${Math.round(S.exportPreis)} Taler je Arbeitstag.`);
+  if (g.auf[b]) return;
+  if (g.stufe[b] >= 3) { mehr.push('Größer als Stufe 3 wird sie nicht.'); return; }
+  const kosten = R.K_ANBAU[g.stufe[b] + 1];
+  if (anbauWillig(S, b)) mehr.push(g.ruecklage[b] < kosten ? `Will wachsen: ${g.ruecklage[b]} von ${kosten} Talern für einen Anbau auf Stufe ${g.stufe[b] + 1} liegen in der Rücklage.`
+    : !anbauMarkt(S) ? `Der Anbau auf Stufe ${g.stufe[b] + 1} ist bezahlt. Den Auftrag gibt die Firma, sobald das Umland wieder mehr abnimmt (wenn irgendwo Stellen wegfallen).`
+    : `Der Anbau auf Stufe ${g.stufe[b] + 1} ist bezahlt. Den Auftrag gibt die Firma, sobald mindestens ${R.STELLEN_TECH} Leute in der Stadt Arbeit suchen (gerade ${S.arbeitslose}).`);
+  else mehr.push(`Ein Anbau auf Stufe ${g.stufe[b] + 1} (${kosten} Taler) kommt, wenn alle Stellen besetzt sind und ${R.ANBAU_GUT} Tage in Folge Gewinn bleibt`
+    + ` (gerade ${g.gut[b]}).` + (g.ruecklage[b] ? ` Rücklage: ${g.ruecklage[b]} Taler.` : ''));
+}
 // Hauskarte: wer wohnt oder arbeitet hier
 function gebaeudeInfo(S, b) {
   if (b < 0 || b >= S.gAnzahl) return null;
@@ -2712,13 +2999,16 @@ function gebaeudeInfo(S, b) {
     const L = S.bewohner[b].slice().sort((x, y) => (P.hh[x] - P.hh[y]) || ((P.hh[x] === x ? 0 : 1) - (P.hh[y] === y ? 0 : 1)) || (P.geb[x] - P.geb[y]));
     for (const x of L) info.personen.push(Object.assign(ref(S, x), { alter: Math.floor((S.tag - P.geb[x]) / R.JAHR), mieter: P.hh[x] === x }));
   } else if (istBetrieb(t)) {
-    const wort = b === S.bauhof ? 'Bauhof' : t === LADEN ? 'Laden' : 'Werkstatt', o = g.besitzer[b];
+    const tech = t === TECH;
+    const wort = b === S.bauhof ? 'Bauhof' : t === LADEN ? 'Laden' : tech ? 'Tech-Firma' + (g.produkt[b] ? ' ' + firmenName(S, b) : '') : 'Werkstatt', o = g.besitzer[b];
     info.titel = `${wort} ${info.ort}` + (bau ? ' (im Bau)' : info.leer ? ' (steht leer)' : '');
+    info.produkt = tech ? g.produkt[b] : 0;
     const n = S.belegschaft[b].length, st = stellen(S, b);
-    info.zeile = info.leer ? '' : b === S.bauhof ? `gehört der Stadt, ${n} ${n === 1 ? 'Person' : 'Leute'} bei ${st} Stellen`
+    info.zeile = info.leer ? (tech ? `Stufe ${g.stufe[b]}, ${R.STELLEN_TECH * g.stufe[b]} Stellen, wenn jemand sie übernimmt` : '')
+      : b === S.bauhof ? `gehört der Stadt, ${n} ${n === 1 ? 'Person' : 'Leute'} bei ${st} Stellen`
         + (n > st ? ' (gerade gibt es wenig zu bauen, niemand wird eingestellt)' : '') + `, Lohn ${g.lohn[b]} Taler am Tag`
       : o < 0 ? `gehört der Stadt, ${n} von ${st} Stellen besetzt, Lohn ${g.lohn[b]} Taler am Tag`
-      : `${n} von ${st} Stellen besetzt, Lohn ${g.lohn[b]} Taler am Tag`;
+      : (tech ? `Stufe ${g.stufe[b]}, ` : '') + `${n} von ${st} Stellen besetzt, Lohn ${g.lohn[b]} Taler am Tag`;
     const th = t === LADEN ? theke(S, b) : -1, tr = t === WERKSTATT ? traegerVon(S, b) : null;
     const rolle = (x) => {
       if (P.frei[x] && S.stunde >= 7) return 'hat heute frei';
@@ -2727,7 +3017,9 @@ function gebaeudeInfo(S, b) {
       if (tr && tr.has(x)) return 'trägt Kisten zum Laden ' + gebOrt(S, tr.get(x));
       return berufWort(S, x, b);
     };
-    if (o >= 0) info.personen.push(Object.assign(ref(S, o), { rolle: o === th ? 'Besitz, an der Theke' : 'Besitz' }));
+    const besitzRolle = o < 0 ? '' : o === th ? 'Besitz, an der Theke'
+      : tech && P.arbeit[o] === b && !(P.frei[o] && S.stunde >= 7) ? 'Besitz, programmiert mit' : 'Besitz';
+    if (o >= 0) info.personen.push(Object.assign(ref(S, o), { rolle: besitzRolle }));
     for (const x of S.belegschaft[b]) info.personen.push(Object.assign(ref(S, x), { rolle: rolle(x) }));
     if (b === S.bauhof) {
       const n = S.baustellen.length;
@@ -2750,7 +3042,11 @@ function gebaeudeInfo(S, b) {
       // Wer mehrere Läden beliefern müsste, geht nur zum ersten (wie die Figuren); dann steht hier niemand
       const tp = traeger(S, b);
       if (tp >= 0 && traegerVon(S, l).get(tp) === b) info.mehr.push(`Heute bringt ${nr(S, tp)} um 9 und 13 Uhr die Kisten.`);
+      const im = [SOFTWARE, HANDY, COMPUTER].filter(x => S.angebot[x] >= 0).map(x => `${produktName(S, S.angebot[x], g.version[S.angebot[x]])} von ${firmenName(S, S.angebot[x])}`);
+      if (im.length || g.verkauft[b]) info.mehr.push((im.length ? `Im Regal: ${aufzaehlen(im)}.` : '')
+        + (g.verkauft[b] ? ` Gestern ${g.verkauft[b] === 1 ? 'einmal' : g.verkauft[b] + '-mal'} davon verkauft.` : ''));
     }
+    if (!info.leer && !bau && tech && g.produkt[b]) techMehr(S, b, info.mehr);
   } else if (t === PARK) {
     info.titel = `Park ${info.ort}`; info.zeile = bau ? 'wird angelegt' : '';
   }
@@ -2760,7 +3056,7 @@ function gebaeudeInfo(S, b) {
 // Kennzahlen für Anzeige und Test (liest nur)
 function kennzahlen(S) {
   const g = S.g;
-  let haeuser = 0, werkstaetten = 0, laeden = 0, parks = 0, leer = 0, stadtBetriebe = 0;
+  let haeuser = 0, werkstaetten = 0, laeden = 0, parks = 0, leer = 0, stadtBetriebe = 0, techfirmen = 0;
   for (let b = 0; b < S.gAnzahl; b++) {
     const f = S.feld[gebZelle(S, b)];
     if (f === BAUSTELLE) continue;
@@ -2768,13 +3064,13 @@ function kennzahlen(S) {
     if (t === WOHNHAUS) haeuser++;
     else if (t === PARK) parks++;
     else {
-      if (t === WERKSTATT) werkstaetten++; else laeden++;
+      if (t === WERKSTATT) werkstaetten++; else if (t === TECH) techfirmen++; else laeden++;
       if (g.leer[b]) leer++; else if (g.besitzer[b] < 0) stadtBetriebe++;
     }
   }
   return {
     tag: S.tag, stunde: S.stunde, einwohner: S.einwohner, erwachsene: S.erwachseneJetzt,
-    gebaeude: haeuser + werkstaetten + laeden + parks, haeuser, werkstaetten, laeden, parks,
+    gebaeude: haeuser + werkstaetten + laeden + parks + techfirmen, haeuser, werkstaetten, laeden, parks, techfirmen,
     baustellen: S.baustellen.length, leerstand: leer, stadtBetriebe,
     freieWohnungen: S.freieWohnungen, freieStellen: S.freieStellen, arbeitslose: S.arbeitslose,
     arbeitslosenquote: S.arbeitslosenquote, zufriedenheit: S.zufMittel, budget: S.budget,
@@ -2783,13 +3079,13 @@ function kennzahlen(S) {
 }
 
 G.StadtSim = {
-  VERSION, R, KARTE, VK, VN, RASTER, RAND, LEER, STRASSE, WOHNHAUS, WERKSTATT, LADEN, PARK, BAUSTELLE,
+  VERSION, R, KARTE, VK, VN, RASTER, RAND, LEER, STRASSE, WOHNHAUS, WERKSTATT, LADEN, PARK, BAUSTELLE, TECH, SOFTWARE, HANDY, COMPUTER,
   M, Z, ZIELNAMEN, AKTIONSNAMEN,
   neueStadt, stunde, tagSchritt, exportZustand, importZustand, kennzahlen, name, strName, klartext, personInfo, gebaeudeInfo, ZIELTEXT,
   // Berufe (für Figuren und Karten, lesen nur)
-  theke, traeger, bauGesamt,
+  theke, traeger, bauGesamt, techFirmaVon,
   // Hauptfiguren und Sprachmodell (Phase 4)
-  istHaupt, hauptSetzen, verlustErledigt, kiSchalten, kiAktionen, kiErlaubtJetzt, kiEntscheidung, kiVerwerfen, kiGespraech, kiTagebuch,
+  istHaupt, hauptSetzen, verlustErledigt, kiSchalten, kiAktionen, kiErlaubtJetzt, kiEntscheidung, kiVerwerfen, kiGespraech, kiTagebuch, kiCode,
   erlaubteAktionen: (S, p, h) => erlaubteAktionen(S, p, h).map(a => AKTIONSNAMEN[a]),
   entscheide,                                                // nur für tools/simtest.mjs (Abgleich mit erlaubteAktionen)
 };
@@ -2999,6 +3295,7 @@ function baueGrafik(THREE, OrbitControls) {
     baum: inst(new THREE.ConeGeometry(0.17, 0.5, 6).translate(0, 0.25, 0), lambert('#2f5a3a'), 6000),
     bau: inst(box(0.8, 1, 0.8), lambert('#ffffff', { transparent: true, opacity: 0.42, depthWrite: false }), 3000),   // Gerüst
     kiste: inst(box(0.13, 0.11, 0.13), lambert('#ffffff'), 4000),   // Kistenstapel, Auslagen, getragene Kisten
+    tech: inst(box(0.84, 1, 0.84), lambert('#ffffff'), 2000),     // Tech-Firma: Glasbau (Bildschirme und Handys liegen im Fenster-Mesh)
   };
 
   const dummy = new THREE.Object3D();
@@ -3006,7 +3303,7 @@ function baueGrafik(THREE, OrbitControls) {
   // Zu jeder Instanz das Gebäude merken (für Klicks)
   const IDS = { haus: new Int32Array(4000), dach: new Int32Array(4000), fenster: new Int32Array(40000),
     werkstatt: new Int32Array(3000), schlot: new Int32Array(3000), laden: new Int32Array(3000), markise: new Int32Array(3000),
-    bau: new Int32Array(3000) };
+    bau: new Int32Array(3000), tech: new Int32Array(2000) };
   const H = Sim.KARTE / 2;
   const wx = (x) => x - H + 0.5;
   function setze(m, i, x, y, z, sx, sy, sz, rotY) {
@@ -3033,6 +3330,14 @@ function baueGrafik(THREE, OrbitControls) {
   const KISTE_STADT = new THREE.Color('#9a6a3c'), KISTE_AUSSEN = new THREE.Color('#8c9096');
   const TRAG_MAX = 120;                                   // so viele Kisten können gleichzeitig getragen werden (hinten im Kisten-Mesh)
   let kisteStatisch = 0, kisteVoll = false, getragenVorher = 0;
+  // Tech-Firma je Produkt (Software, Handy, Computer): Glas, leuchtende Bildschirme, Firmenschild. Geschosse je Stufe.
+  const TECH_GLAS = [null, '#565c86', '#3f6a82', '#4a5d76'].map(c => c && new THREE.Color(c));
+  const SCHIRM = [null, '#b9a2ff', '#6fdcff', '#9df0b4'].map(c => c && new THREE.Color(c));
+  const SCHILD = [null, '#9a7bff', '#3cc8f0', '#ffa04a'].map(c => c && new THREE.Color(c));   // Leuchtschild (Fenster-Mesh, leuchtet auch nachts)
+  const TECH_GESCHOSSE = [0, 2, 3, 5], SERVER = new THREE.Color('#2f7f9c');
+  const HANDY_FARBE = new THREE.Color('#8fe6ff');
+  const SCHIRM_MAX = 120, HANDY_MAX = 80;                 // hinten im Fenster-Mesh: Bildschirme (je Stunde), Handys (je Bild)
+  let fensterStatisch = 0, schirme = 0, fensterVoll = false, handysVorher = 0;
   const fortschritt = (b) => { const ges = Sim.bauGesamt(S, b); return ges ? (ges - S.g.bauRest[b]) / ges : 1; };
   // Gerüst: bei Stillstand dunkler (je Tag ohne Bauarbeiter etwas mehr)
   function geruest(b, px, pz, sxz, hoehe, n) {
@@ -3079,17 +3384,46 @@ function baueGrafik(THREE, OrbitControls) {
       strassenStand = S.stat.strassenFelder;
     }
     const nacht = tageszeit < 6.5 || tageszeit >= 18.5;
-    let nh = 0, nd = 0, nf = 0, nw = 0, ns = 0, nl = 0, nm = 0, np = 0, nb = 0, nbau = 0, nk = 0;
-    const kisteMax = M.kiste.userData.kap - TRAG_MAX;
+    let nh = 0, nd = 0, nf = 0, nw = 0, ns = 0, nl = 0, nm = 0, np = 0, nb = 0, nbau = 0, nk = 0, nt = 0;
+    const kisteMax = M.kiste.userData.kap - TRAG_MAX, fensterMax = M.fenster.userData.kap - SCHIRM_MAX - HANDY_MAX;
+    const arbeitszeit = tageszeit >= 8 && tageszeit < 17;
     for (let b = 0; b < S.gAnzahl; b++) {
       const x = g.x[b], y = g.y[b], px = wx(x), pz = wx(y), t = g.typ[b], f = S.feld[y * K + x];
       if (f === Sim.BAUSTELLE) {                          // Baustelle: grauer Rohbau wächst mit den Arbeitstagen, Gerüst in Zielhöhe
-        const hoehe = t === Sim.WOHNHAUS ? GESCHOSSE[1] * GESCHOSS : t === Sim.PARK ? 0.12 : t === Sim.LADEN ? 0.55 : 0.7;
+        const hoehe = t === Sim.WOHNHAUS ? GESCHOSSE[1] * GESCHOSS : t === Sim.PARK ? 0.12 : t === Sim.LADEN ? 0.55
+          : t === Sim.TECH ? TECH_GESCHOSSE[1] * GESCHOSS : 0.7;
         const k = Math.max(0.05, fortschritt(b));
         if (t === Sim.WOHNHAUS && setze(M.haus, nh, px, 0, pz, 1, hoehe * k, 1)) { IDS.haus[nh] = b; M.haus.setColorAt(nh++, ROHBAU); }
         else if (t === Sim.LADEN && setze(M.laden, nl, px, 0, pz, 1, k, 1)) { IDS.laden[nl] = b; M.laden.setColorAt(nl++, ROHBAU); }
         else if (t === Sim.WERKSTATT && setze(M.werkstatt, nw, px, 0, pz, 1, k, 1)) { IDS.werkstatt[nw] = b; M.werkstatt.setColorAt(nw++, ROHBAU); }
+        else if (t === Sim.TECH && setze(M.tech, nt, px, 0, pz, 1, hoehe * k, 1)) { IDS.tech[nt] = b; M.tech.setColorAt(nt++, ROHBAU); }
         nbau = geruest(b, px, pz, 1.14, hoehe + 0.04, nbau);
+        continue;
+      }
+      if (t === Sim.TECH) {                               // Glasbau: Geschosse je Stufe, Bildschirme leuchten, solange programmiert wird
+        const leer = g.leer[b], pr = g.produkt[b] || 2, geschosse = TECH_GESCHOSSE[g.stufe[b]], hoehe = geschosse * GESCHOSS;
+        if (!setze(M.tech, nt, px, 0, pz, 1, hoehe, 1)) continue;
+        IDS.tech[nt] = b;
+        M.tech.setColorAt(nt++, farbe.copy(TECH_GLAS[pr]).multiplyScalar(leer ? 0.5 : 1));
+        if (g.auf[b]) {                                   // Anbau: Rohbau obendrauf wächst, Gerüst bis zur neuen Höhe
+          const oben = (TECH_GESCHOSSE[g.auf[b]] - geschosse) * GESCHOSS * Math.max(0.05, fortschritt(b));
+          if (setze(M.tech, nt, px, hoehe, pz, 1, oben, 1)) { IDS.tech[nt] = b; M.tech.setColorAt(nt++, ROHBAU); }
+          nbau = geruest(b, px, pz, 1.12, TECH_GESCHOSSE[g.auf[b]] * GESCHOSS + 0.05, nbau);
+        }
+        // Geschosse als Fensterbänder: tagsüber so viele Bildschirme hell, wie Leute heute programmieren; nachts oben der Serverraum
+        const da = leer ? 0 : Math.min(geschosse, Math.ceil(geschosse * g.dran[b] / Math.max(1, Sim.R.STELLEN_TECH * g.stufe[b])));
+        for (let s = 0; s < geschosse && nf < fensterMax; s++) {
+          if (!setze(M.fenster, nf, px, s * GESCHOSS + 0.1, pz, 1.1, 0.22, 1.1)) break;
+          IDS.fenster[nf] = b;
+          const hell = !leer && arbeitszeit && s < da, server = !leer && nacht && s === geschosse - 1;
+          M.fenster.setColorAt(nf++, hell ? SCHIRM[pr] : server ? SERVER : nacht ? GLAS_NACHT : GLAS_TAG);
+        }
+        // Leuchtschild zur Straße (Farbe = Produkt; leer: dunkel) und Antenne auf dem Dach
+        const [dx, dz, qx, qz] = strassenSeite(x, y);
+        if (nf < fensterMax && setze(M.fenster, nf, px + dx * 0.45, hoehe - 0.2, pz + dz * 0.45, 0.75, 0.15, 0.064, dx !== 0 ? Math.PI / 2 : 0)) {
+          IDS.fenster[nf] = b; M.fenster.setColorAt(nf++, leer ? GLAS_NACHT : SCHILD[pr]);
+        }
+        if (setze(M.schlot, ns, px - qx * 0.25 - dx * 0.2, hoehe, pz - qz * 0.25 - dz * 0.2, 0.35, 0.45 + 0.1 * g.stufe[b], 0.35)) IDS.schlot[ns++] = b;
         continue;
       }
       if (t === Sim.WOHNHAUS) {
@@ -3160,7 +3494,10 @@ function baueGrafik(THREE, OrbitControls) {
       }
     }
     fertig(M.haus, nh); fertig(M.dach, nd); fertig(M.fenster, nf); fertig(M.werkstatt, nw); fertig(M.schlot, ns);
-    fertig(M.laden, nl); fertig(M.markise, nm); fertig(M.park, np); fertig(M.baum, nb); fertig(M.bau, nbau);
+    fertig(M.laden, nl); fertig(M.markise, nm); fertig(M.park, np); fertig(M.baum, nb); fertig(M.bau, nbau); fertig(M.tech, nt);
+    // Fenster: dahinter kommen Bildschirme (figurenPlanen) und Handys (figurenBewegen); Klicks darauf treffen kein Gebäude
+    fensterStatisch = nf; schirme = 0; fensterVoll = true;
+    for (let i = nf; i < Math.min(M.fenster.userData.kap, nf + SCHIRM_MAX + HANDY_MAX); i++) IDS.fenster[i] = -1;
     // Kisten: der hintere Teil gehört den Trägern (figurenBewegen); Farben dort einmal braun setzen
     for (let i = nk; i < nk + TRAG_MAX; i++) M.kiste.setColorAt(i, KISTE_STADT);
     kisteStatisch = nk; kisteVoll = true;
@@ -3174,6 +3511,7 @@ function baueGrafik(THREE, OrbitControls) {
   const markMesh = inst(new THREE.OctahedronGeometry(0.065), new THREE.MeshBasicMaterial({ color: '#ffffff' }), HAUPT_MAX);
   const MARK_GOLD = new THREE.Color('#ffc864'), MARK_DENKT = new THREE.Color('#f4f4f7');   // überlegt = weiß
   const WESTE = new THREE.Color('#e8792c'), BLAUMANN = new THREE.Color('#4f7fc0');       // Bauarbeiter, Handwerker
+  const PROGRAMMIER = new THREE.Color('#a78cf2');                                         // Programmiererinnen und Programmierer
   const NULL = new THREE.Matrix4().makeScale(0, 0, 0);
   const FIGFARBEN = ['#e6d3bd', '#c2d3e6', '#e6c2bd', '#c6e0c2', '#e6dcb8', '#b8d8d8', '#d8c2b0', '#aebfd8'].map(c => new THREE.Color(c));
   const ECKEN = [[-1, -1], [1, 1], [1, -1], [-1, 1]];
@@ -3301,6 +3639,7 @@ function baueGrafik(THREE, OrbitControls) {
   // Nach jedem Simulationsschritt: wer geht in dieser Stunde wohin, wer steht wo?
   function figurenPlanen() {
     const P = S.p, erw = S.tag - Sim.R.ERWACHSEN * Sim.R.JAHR, H = S.stunde, jetzt = S.tag * 24 + H;
+    schirme = 0;
     while (figuren.length < FIG_GES) figuren.push({ p: -1, gen: 0, ort: -1, route: null, start: 0, dauer: 0, versatz: 0, ox: 0, oz: 0,
       haupt: false, werk: false, steht: false, sx: 0, sz: 0, px: 0, pz: 0, vorher: false, traeger: false, hin: 0 });
     // Hauptfiguren in die letzten Plätze
@@ -3354,13 +3693,28 @@ function baueGrafik(THREE, OrbitControls) {
       }
       const arb = P.arbeit[p];
       figMesh.setColorAt(i, f.haupt ? LICHT : arb >= 0 && arb === S.bauhof ? WESTE
-        : arb >= 0 && S.g.typ[arb] === Sim.WERKSTATT ? BLAUMANN : FIGFARBEN[p % FIGFARBEN.length]);
+        : arb >= 0 && S.g.typ[arb] === Sim.WERKSTATT ? BLAUMANN : arb >= 0 && S.g.typ[arb] === Sim.TECH ? PROGRAMMIER : FIGFARBEN[p % FIGFARBEN.length]);
+      // Wer in einer Tech-Firma bei der Arbeit steht, hat einen leuchtenden Bildschirm vor sich (zwischen Figur und Gebäude)
+      f.schirm = f.steht && arbeit && S.g.typ[ort] === Sim.TECH;
+      f.arbeit = arbeit;                                    // wer arbeitet, hat kein Handy in der Hand
+      if (f.schirm && schirme < SCHIRM_MAX) {
+        const [dx, dz] = strassenSeite(S.g.x[ort], S.g.y[ort]);
+        if (setze(M.fenster, fensterStatisch + schirme, f.sx - dx * 0.09, 0.12, f.sz - dz * 0.09, 0.13, 0.075, 0.016, dx !== 0 ? Math.PI / 2 : 0)) {
+          M.fenster.setColorAt(fensterStatisch + schirme, SCHIRM[S.g.produkt[ort] || 2]); schirme++;
+        }
+      }
     }
     if (figMesh.instanceColor) figMesh.instanceColor.needsUpdate = true;
+    // Handy-Plätze hinter den Bildschirmen einmal einfärben; Bildschirme und Farben gehen mit dem nächsten Bild hoch
+    for (let i = fensterStatisch + schirme; i < Math.min(M.fenster.userData.kap, fensterStatisch + schirme + HANDY_MAX); i++) M.fenster.setColorAt(i, HANDY_FARBE);
+    M.fenster.count = Math.min(M.fenster.userData.kap, fensterStatisch + schirme);
+    if (M.fenster.instanceColor) M.fenster.instanceColor.needsUpdate = true;
+    fensterVoll = true;
   }
   // Jedes Bild: Figuren entlang ihres Weges schieben (ohne neue Objekte)
   function figurenBewegen(jetzt) {
-    let nm = 0, nt = 0;
+    let nm = 0, nt = 0, nh = 0;
+    const handyBasis = fensterStatisch + schirme;
     for (let i = 0; i < figuren.length; i++) {
       const f = figuren[i], r = f.route;
       figIds[i] = -1;
@@ -3383,6 +3737,9 @@ function baueGrafik(THREE, OrbitControls) {
       dummy.updateMatrix();
       figMesh.setMatrixAt(i, dummy.matrix);
       figIds[i] = f.p;
+      // Handy in der Hand: wer eins gekauft hat und gerade nicht arbeitet (unterwegs, oder als Hauptfigur draußen)
+      if (S.p.geraet[f.p] === Sim.HANDY && (laeuft || !f.arbeit) && nh < HANDY_MAX
+          && setze(M.fenster, handyBasis + nh, x + Math.sin(dreh) * 0.06, 0.13, z + Math.cos(dreh) * 0.06, 0.06, 0.055, 0.012, dreh)) nh++;
       if (f.haupt) {
         dummy.position.set(x, 0.46 + (REDUZIERT ? 0 : Math.sin(jetzt * 40 + i) * 0.03), z); dummy.rotation.set(0, 0, 0);
         dummy.updateMatrix();
@@ -3400,15 +3757,21 @@ function baueGrafik(THREE, OrbitControls) {
     if (markMesh.instanceColor) markMesh.instanceColor.needsUpdate = true;
     // Kisten: nach einem Neuaufbau alles hochladen, sonst nur die getragenen (addUpdateRange, Einheit: Zahlen)
     M.kiste.count = kisteStatisch + nt;
-    if (kisteVoll) { M.kiste.instanceMatrix.clearUpdateRanges(); M.kiste.instanceMatrix.needsUpdate = true; kisteVoll = false; }
+    // Die Flags „alles hochladen“ setzt erst render() zurück: sonst schränkt ein zweiter Aufruf vor dem Zeichnen den Upload wieder ein
+    if (kisteVoll) { M.kiste.instanceMatrix.clearUpdateRanges(); M.kiste.instanceMatrix.needsUpdate = true; }
     else if (nt || getragenVorher) { M.kiste.instanceMatrix.addUpdateRange(kisteStatisch * 16, Math.max(nt, 1) * 16); M.kiste.instanceMatrix.needsUpdate = true; }
     getragenVorher = nt;
+    // Fenster: nach einem Neuaufbau alles hochladen, sonst nur die Handys
+    M.fenster.count = Math.min(M.fenster.userData.kap, handyBasis + nh);
+    if (fensterVoll) { M.fenster.instanceMatrix.clearUpdateRanges(); M.fenster.instanceMatrix.needsUpdate = true; }
+    else if (nh || handysVorher) { M.fenster.instanceMatrix.addUpdateRange(handyBasis * 16, Math.max(nh, 1) * 16); M.fenster.instanceMatrix.needsUpdate = true; }
+    handysVorher = nh;
   }
 
   // ─── Klicken: Figur (in Bildschirmnähe) oder Gebäude ───
   const ray = new THREE.Raycaster(), zeiger = new THREE.Vector2(), treffer = [], v3 = new THREE.Vector3(), m4 = new THREE.Matrix4();
-  const KLICKBAR = [M.haus, M.dach, M.fenster, M.werkstatt, M.schlot, M.laden, M.markise, M.bau];
-  const KLICK_IDS = [IDS.haus, IDS.dach, IDS.fenster, IDS.werkstatt, IDS.schlot, IDS.laden, IDS.markise, IDS.bau];
+  const KLICKBAR = [M.haus, M.dach, M.fenster, M.werkstatt, M.schlot, M.laden, M.markise, M.bau, M.tech];
+  const KLICK_IDS = [IDS.haus, IDS.dach, IDS.fenster, IDS.werkstatt, IDS.schlot, IDS.laden, IDS.markise, IDS.bau, IDS.tech];
   function waehle(cx, cy) {
     const r = canvas.getBoundingClientRect();
     // Figuren sind klein: nimm die nächste sichtbare Figur im Umkreis von 16 Pixeln
@@ -3428,7 +3791,7 @@ function baueGrafik(THREE, OrbitControls) {
     ray.intersectObjects(KLICKBAR, false, treffer);
     for (const t of treffer) {
       const k = KLICKBAR.indexOf(t.object);
-      if (k >= 0 && t.instanceId !== undefined && t.instanceId < t.object.count) return { gebaeude: KLICK_IDS[k][t.instanceId] };
+      if (k >= 0 && t.instanceId !== undefined && t.instanceId < t.object.count && KLICK_IDS[k][t.instanceId] >= 0) return { gebaeude: KLICK_IDS[k][t.instanceId] };
     }
     return null;
   }
@@ -3501,10 +3864,11 @@ function baueGrafik(THREE, OrbitControls) {
     neueStadt() { strassenStand = -1; wege.clear(); rundwege.clear(); werkTag = -1; for (const f of figuren) { f.p = -1; f.werk = false; } ausrichten(); stadt(S.stunde); },   // nach einem Import
     figurenPlanen, figurenBewegen,
     setzeHauptfiguren(ids) { hauptIds = ids.slice(0, HAUPT_MAX); },
-    render() { controls.update(); renderer.render(scene, camera); return renderer.info.render; },
+    render() { controls.update(); renderer.render(scene, camera); kisteVoll = false; fensterVoll = false; return renderer.info.render; },
     instanzen() { return Object.values(M).reduce((s, m) => s + m.count, 0); },
     THREE, renderer, scene, camera, controls, M, figMesh,
-    test: { figuren, figIds, simOrt, beiDerArbeit, WERK_MAX, FIG_MAX },   // nur für die Figuren-Prüfung (Playwright)
+    test: { figuren, figIds, simOrt, beiDerArbeit, WERK_MAX, FIG_MAX,   // nur für die Figuren-Prüfung (Playwright)
+      fenster: () => ({ statisch: fensterStatisch, schirme, count: M.fenster.count }) },
   };
 }
 
@@ -3620,6 +3984,7 @@ function personHtml(p, gen, name) {
     ${i.heute ? `<p class="leise">${esc(i.heute)}</p>` : ''}
     <p>${i.wohnung >= 0 ? hausKnopf(i.wohnung, esc(i.wohnen)) : esc(i.wohnen)}</p>`;
   if (!i.kind) h += `<p class="leise">${zahl(i.geld)} Taler${i.ziel ? ` · Ziel: <span style="color:var(--text)">${esc(i.ziel.text)}</span> (noch ${i.ziel.rest} ${i.ziel.rest === 1 ? 'Tag' : 'Tage'})` : ''}</p>`;
+  if (i.technik && i.technik.length) h += `<p class="leise">Gekauft: ${i.technik.map(t => `<span class="gekauft">${esc(t.was)} ${esc(t.name)}</span> (Tag ${t.tag}, ${t.preis} Taler)`).join(' · ')}</p>`;
   h += hauptKnopfHtml(i);
   if (i.haupt) h += tagebuchHtml(i);
   h += `<h3>Charakter</h3><div class="werte">${ZUEGE.map(([k, n]) => `<span>${n}</span>${balken(i.charakter[k])}<span class="zahl">${i.charakter[k]}</span>`).join('')}</div>`;
@@ -3678,8 +4043,9 @@ const ki = {
   gesendet: new Set(),                                     // Nummern der Anfragen, die schon rausgingen
   gespraech: null,                                         // { id, gen, text, fehler } — ein Gespräch zur Zeit
   aufholen: [],                                            // Tagebuch nach dem Aufholen: [{ id, gen, abTag, tage }]
-  stat: { aufrufe: 0, gueltig: 0, ungueltig: 0, fehler: 0, ms: 0, msMax: 0, verworfen20: 0, zuSpaet: 0 },
+  stat: { aufrufe: 0, gueltig: 0, ungueltig: 0, fehler: 0, ms: 0, msMax: 0, verworfen20: 0, zuSpaet: 0, code: 0 },
   letzterFehler: '',
+  codeTag: new Map(),                                      // „id/gen“ → Spieltag, an dem die Figur zuletzt Code geschrieben hat
 };
 if (geladen && geladen.ui && typeof geladen.ui.kiModell === 'string') ki.modell = geladen.ui.kiModell;
 // Spec: „5 als Standard, bis 10 nur, wenn eine Entscheidung unter 5 Sekunden braucht.“ Gemessen über alle Antworten
@@ -3800,6 +4166,16 @@ function aufholAnweisung(i, abTag, tage) {
     + '\n\nAntworte nur mit JSON: {"eintrag": "…"}.';
 }
 
+// Hauptfiguren, die programmieren: ein kleines Stück Code für die Arbeit von heute (nur fürs Tagebuch, wird nie ausgeführt)
+function codeAnweisung(i) {
+  const t = i.tech;
+  return beschreibung(i) + `\n\nDu arbeitest gerade als ${t.beruf} bei ${t.firma}${t.besitz ? ' (die Firma gehört dir)' : ''}. `
+    + `Ihr baut an der nächsten Version, ${t.naechste}: ${t.geschafft} von ${t.soll} Arbeitstagen sind geschafft. `
+    + 'Schreib ein kleines, echtes Stück Code (höchstens 12 Zeilen), das zu deiner Arbeit heute passt, in einer Programmiersprache, die du magst. '
+    + 'Nur Code, keine Erklärung darin.'
+    + '\n\nAntworte nur mit JSON: {"titel": "wofür der Code ist, ein paar Wörter", "sprache": "…", "code": "…", "gedanke": "ein Satz in Ich-Form"}.';
+}
+
 // ─── Antworten prüfen: gültiges JSON, aktion aus der erlaubten Liste, neues_ziel aus der Zielliste ───
 function jsonObjekt(text) {
   try { const o = JSON.parse(text); return o && typeof o === 'object' && !Array.isArray(o) ? o : null; } catch { return null; }
@@ -3808,6 +4184,17 @@ function jsonObjekt(text) {
 const zielOk = (z) => z === null || z === undefined || z === '' || z === 'null' || (typeof z === 'string' && Sim.ZIELNAMEN.indexOf(z) > 0);
 const zielWert = (z) => (typeof z === 'string' && Sim.ZIELNAMEN.indexOf(z) > 0 ? z : null);
 const satzAus = (v, max) => (typeof v === 'string' && v.trim() ? v.trim().replace(/\s+/g, ' ').slice(0, max) : null);
+// Code: Text bleibt Text (höchstens 20 Zeilen à 100 Zeichen, 1500 Zeichen), Steuerzeichen raus. Angezeigt wird er mit esc() in <pre>.
+function pruefeCode(text) {
+  const o = jsonObjekt(text);
+  if (!o || typeof o.code !== 'string') return null;
+  const zeilen = o.code.replace(/\r\n?/g, '\n').replace(/\t/g, '  ').replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, '').split('\n');
+  while (zeilen.length && !zeilen[zeilen.length - 1].trim()) zeilen.pop();
+  while (zeilen.length && !zeilen[0].trim()) zeilen.shift();
+  if (!zeilen.length) return null;
+  const code = zeilen.slice(0, 20).map(z => z.slice(0, 100)).join('\n').slice(0, 1500);
+  return { titel: satzAus(o.titel, 80) || 'ohne Titel', sprache: satzAus(o.sprache, 24) || 'Code', code, gedanke: satzAus(o.gedanke, 300) || '' };
+}
 function pruefeEntscheidung(text, erlaubt) {
   const o = jsonObjekt(text);
   if (!o) return null;
@@ -3916,7 +4303,34 @@ async function kiSchritt() {
       else { ki.stat.ungueltig++; ki.letzterFehler = 'Tagebuch, ungültig: ' + String(text).slice(0, 160); }
     } catch (e) { ki.stat.fehler++; ki.letzterFehler = e.message; }
     nachKi();
+    return;
   }
+  // 4. Code: eine Hauptfigur, die gerade in ihrer Tech-Firma programmiert, schreibt einmal am Spieltag ein kleines Stück Code
+  //    ins Tagebuch. Nicht bei 20× (wie die Entscheidungen). Die Simulation wartet nicht darauf und ändert sich dadurch nicht.
+  if (tempo >= 20) return;
+  const c = codeFaellig();
+  if (!c) return;
+  ki.codeTag.set(c.id + '/' + c.gen, S.tag);
+  const i = Sim.personInfo(S, c.id, c.gen);
+  if (!i || !i.tech) return;
+  try {
+    const text = await kiAufruf('code', c.id, codeAnweisung(i), `Es ist Tag ${S.tag}, ${S.stunde} Uhr. Woran schreibst du gerade?`);
+    if (S !== stadt) return;
+    const e = pruefeCode(text);
+    if (e && Sim.kiCode(S, c.id, c.gen, e.titel, e.sprache, e.code, e.gedanke)) { ki.stat.gueltig++; ki.stat.code++; }
+    else { ki.stat.ungueltig++; ki.letzterFehler = 'Code, ungültig: ' + String(text).slice(0, 160); }
+  } catch (err) { ki.stat.fehler++; ki.letzterFehler = err.message; }
+  nachKi();
+}
+// Wer ist dran? Eine Hauptfigur, die heute (9–16 Uhr) in ihrer Tech-Firma arbeitet und heute noch keinen Code geschrieben hat
+function codeFaellig() {
+  if (S.stunde < 9 || S.stunde > 16) return null;
+  for (const h of S.ki.haupt) {
+    if (ki.codeTag.get(h.id + '/' + h.gen) === S.tag || !S.p.lebt[h.id] || S.p.gen[h.id] !== h.gen || S.p.frei[h.id]) continue;
+    const b = Sim.techFirmaVon(S, h.id);
+    if (b >= 0 && S.p.arbeit[h.id] === b && !S.g.leer[b] && S.feld[S.g.y[b] * Sim.KARTE + S.g.x[b]] === Sim.TECH) return h;
+  }
+  return null;
 }
 setInterval(kiTakt, 400);
 
@@ -3938,8 +4352,9 @@ function hauptAnzeigen() {
   for (const h of K.haupt) {
     const i = Sim.personInfo(S, h.id, h.gen);
     if (!i) continue;
-    const gedanken = i.tagebuch.filter(e => e.art === 'gedanke'), letzt = gedanken[gedanken.length - 1] || i.tagebuch[i.tagebuch.length - 1];
-    zeilen.push({ id: h.id, gen: h.gen, name: i.name, gedanke: letzt ? letzt.text : '',
+    const gedanken = i.tagebuch.filter(e => e.art === 'gedanke' || e.art === 'code'), letzt = gedanken[gedanken.length - 1] || i.tagebuch[i.tagebuch.length - 1];
+    zeilen.push({ id: h.id, gen: h.gen, name: i.name, gedanke: !letzt ? '' : letzt.art === 'code' ? 'schreibt Code: ' + letzt.titel : letzt.text,
+      code: !!(ki.laeuft && ki.laeuft.id === h.id && ki.laeuft.art === 'code'),
       denkt: offen.has(h.id) || !!(ki.laeuft && ki.laeuft.id === h.id) || !!(ki.gespraech && ki.gespraech.id === h.id && !ki.gespraech.fehler) });
   }
   const st = kiStatus();
@@ -3951,8 +4366,8 @@ function hauptAnzeigen() {
   s.textContent = st.text; s.title = st.titel; s.classList.toggle('aus', st.aus);
   $('haupt-liste').innerHTML = zeilen.length ? zeilen.map(z => `<li><button type="button" class="haupt-zeile${z.denkt ? ' ueberlegt' : ''}" data-p="${z.id}" data-g="${z.gen}">
       <span class="kreis" aria-hidden="true">${esc(initialen(z.name))}</span>
-      <span class="n">${esc(z.name)}${z.denkt ? '<span class="ueberlegt-text">überlegt …</span>' : ''}</span>
-      <span class="gedanke">${z.gedanke ? '„' + esc(z.gedanke) + '“' : 'noch kein Gedanke'}</span></button></li>`).join('')
+      <span class="n">${esc(z.name)}${z.denkt ? `<span class="ueberlegt-text">${z.code ? 'schreibt Code …' : 'überlegt …'}</span>` : ''}</span>
+      <span class="gedanke">${z.gedanke ? (z.gedanke.startsWith('schreibt Code: ') ? esc(z.gedanke) : '„' + esc(z.gedanke) + '“') : 'noch kein Gedanke'}</span></button></li>`).join('')
     : '<li class="leer">Keine Hauptfigur. Auf jeder Personenkarte: „Zur Hauptfigur machen“.</li>';
 }
 document.addEventListener('click', (e) => {
@@ -3990,6 +4405,8 @@ function tagebuchHtml(i) {
       const wann = `Tag ${Number(e.tag)}, ${Number(e.stunde)} Uhr`, ziel = e.ziel ? ` · neues Ziel: ${esc(zielText(e.ziel))}` : '';
       if (e.art === 'gespraech') return `<li><span class="meta">${wann} · Gespräch${ziel}</span><p class="noah">${esc(e.noah)}</p><p>${esc(e.text)}</p></li>`;
       if (e.art === 'aufholen') return `<li><span class="meta">${wann} · während du weg warst</span><p>${esc(e.text)}</p></li>`;
+      if (e.art === 'code') return `<li><span class="meta">${wann} · schreibt Code: ${esc(e.titel || '')}${e.sprache ? ` (${esc(e.sprache)})` : ''}</span>`
+        + `${e.text && e.text !== e.titel ? `<p>„${esc(e.text)}“</p>` : ''}<pre class="code" tabindex="0" aria-label="Code von ${esc(vorname)}"><code>${esc(e.code || '')}</code></pre></li>`;
       const klappte = e.geklappt === false ? ' (klappte nicht)' : '';
       return `<li><span class="meta">${wann} · ${esc(AKTION_TEXT[e.aktion] || e.aktion || '')}${klappte}${ziel}</span><p>„${esc(e.text)}“</p></li>`;
     }).join('');
@@ -4098,7 +4515,7 @@ function simTakt(dt) {
 function kiDebugZeile() {
   const k = ki.stat, n = k.gueltig + k.ungueltig;
   return `KI ${ki.status}${ki.laeuft ? ' (läuft)' : ''}   Aufrufe ${k.aufrufe}   gültig ${n ? Math.round(100 * k.gueltig / n) : '–'} % von ${n}\n`
-    + `KI Ø ${n ? (k.ms / n / 1000).toFixed(1) : '–'} s  max ${(k.msMax / 1000).toFixed(1)} s   ungültig ${k.ungueltig}   Fehler ${k.fehler}   zu spät ${k.zuSpaet}`;
+    + `KI Ø ${n ? (k.ms / n / 1000).toFixed(1) : '–'} s  max ${(k.msMax / 1000).toFixed(1)} s   ungültig ${k.ungueltig}   Fehler ${k.fehler}   zu spät ${k.zuSpaet}   Code ${k.code}`;
 }
 const dbg = { frames: 0, summe: 0, max: 0, letzte: performance.now(), calls: 0, dreiecke: 0 };
 if (DEBUG) { $('debug').hidden = false; document.body.classList.add('debug'); }
@@ -4184,7 +4601,7 @@ async function aufholen(msWeg) {
 
 // Die drei auffälligsten Einträge: nach Gewicht der Art, höchstens einer je Art, bei Gleichstand der neueste
 const GEWICHT = { notbremse: 9, pleite: 8, gruendung: 7, tod: 6, wegzug: 5, schliessung: 5, kinder_weg: 5, trennung: 4,
-  hochzeit: 4, geburt: 3, stillstand: 3, bauamt: 2, fertig: 2, bauhof: 2, zuzug: 1, start: 0 };
+  hochzeit: 4, auftrag: 4, geburt: 3, version: 3, stillstand: 3, bauamt: 2, fertig: 2, bauhof: 2, tech: 2, zuzug: 1, start: 0 };
 function auffaelligste(abNr, n) {
   const kand = S.buch.filter(e => e.nr > abNr).sort((a, b) => (GEWICHT[b.art] || 0) - (GEWICHT[a.art] || 0) || b.nr - a.nr);
   const wahl = [], arten = new Set();
@@ -4236,14 +4653,14 @@ $('import-datei').addEventListener('change', async (e) => {
     const text = await datei.text();
     let l, migriert = false;
     try { l = spielstandLesen(text); }
-    catch (err) { if (!err.migrierbar) throw err; l = spielstandLesen(text, true); migriert = true; }   // Version 2: übernehmen
+    catch (err) { if (!err.migrierbar) throw err; l = spielstandLesen(text, true); migriert = err.vonVersion; }   // Version 2 oder 3: übernehmen
     karteZu();
     S = l.S; akku = 0; buchNeu(); if (G) { G.neueStadt(); }
     ki.gesendet.clear(); ki.gespraech = null; ki.aufholen.length = 0; hauptSchluessel = '';
     nachSchritten();                                      // erst zeichnen: wirft es, bleibt die alte Stadt
     speichernErlaubt = true; speichern();
     $('einst-dialog').close();
-    meldung(migriert ? `Spielstand von Version 2 übernommen: Tag ${S.tag}, ${zahl(S.einwohner)} Einwohner. Ab jetzt baut der Bauhof.`
+    meldung(migriert ? `Spielstand von Version ${migriert} übernommen: Tag ${S.tag}, ${zahl(S.einwohner)} Einwohner. ${NEU_SEIT(migriert)}`
       : `Spielstand geladen: Tag ${S.tag}, ${zahl(S.einwohner)} Einwohner.`);
   } catch (err) {
     if (S !== altS) { S = altS; buchNeu(); if (G) G.neueStadt(); hauptSchluessel = ''; try { nachSchritten(); } catch { /* alte Stadt lief ja */ } }
@@ -4256,9 +4673,11 @@ $('version-neu').addEventListener('click', () => {
   speichern();
   $('version-dialog').close();
 });
-// Abweichung von der Spec (dort nur Export oder Neu): Ein Stand von Version 2 lässt sich umrechnen (README, Annahme 60)
+// Abweichung von der Spec (dort nur Export oder Neu): Ein Stand von Version 2 oder 3 lässt sich umrechnen (README, Annahme 60)
+// Was seit der alten Version neu ist (für Dialog und Meldung)
+const NEU_SEIT = (v) => (v === 2 ? 'Ab jetzt baut der Bauhof, und Bewohner können Tech-Firmen gründen.' : 'Ab jetzt können Bewohner Tech-Firmen gründen.');
 $('version-uebernehmen').addEventListener('click', async () => {
-  const altS = S;
+  const altS = S, vonVersion = versionFehler && versionFehler.vonVersion;
   let uebernommen = null;
   try {
     const l = spielstandLesen(alterSpielstand, true);
@@ -4269,7 +4688,7 @@ $('version-uebernehmen').addEventListener('click', async () => {
     alterSpielstand = null; speichernErlaubt = true; speichern();
     $('version-dialog').close();
     setzeTempo(tempo);
-    meldung(`Deine Stadt ist übernommen: Tag ${S.tag}, ${zahl(S.einwohner)} Einwohner. Ab jetzt baut der Bauhof.`);
+    meldung(`Deine Stadt ist übernommen: Tag ${S.tag}, ${zahl(S.einwohner)} Einwohner. ${NEU_SEIT(vonVersion)}`);
     uebernommen = l;
   } catch (err) {
     if (S !== altS) { S = altS; buchNeu(); if (G) G.neueStadt(); hauptSchluessel = ''; try { nachSchritten(); } catch { /* alte Stadt lief ja */ } }
@@ -4326,8 +4745,13 @@ if (versionFehler) {
     : `Der gespeicherte Stand lässt sich nicht lesen: ${versionFehler.message}`;
   if (!versionFehler.andereVersion) $('version-titel').textContent = 'Spielstand lässt sich nicht laden';
   if (versionFehler.migrierbar) {
-    $('version-text').textContent = 'Dein Spielstand ist von Version 2. Seit Version 3 bauen Leute vom Bauhof die Häuser, und Werkstätten machen Kisten für die Läden.';
-    $('version-hinweis').textContent = '„Stadt übernehmen“ rechnet deine Stadt um: Laufende Baustellen bekommen die fehlenden Arbeitstage, alle Leute, Häuser und das Stadtbuch bleiben. Vorher „Export behalten“, wenn du den alten Stand sichern willst.';
+    const v = versionFehler.vonVersion;
+    $('version-text').textContent = v === 2
+      ? 'Dein Spielstand ist von Version 2. Seitdem bauen Leute vom Bauhof die Häuser, Werkstätten machen Kisten für die Läden, und Bewohner können Tech-Firmen gründen (Software, Handys, Computer).'
+      : 'Dein Spielstand ist von Version 3. Seit Version 4 können Bewohner Tech-Firmen gründen: Software, Handys oder Computer. Die Läden verkaufen, was dort entsteht.';
+    $('version-hinweis').textContent = v === 2
+      ? '„Stadt übernehmen“ rechnet deine Stadt um: Laufende Baustellen bekommen die fehlenden Arbeitstage, alle Leute, Häuser und das Stadtbuch bleiben. Vorher „Export behalten“, wenn du den alten Stand sichern willst.'
+      : '„Stadt übernehmen“ behält alle Leute, Häuser, Baustellen und das Stadtbuch; Tech-Firmen entstehen danach von selbst. Vorher „Export behalten“, wenn du den alten Stand sichern willst.';
     $('version-uebernehmen').hidden = false;
     $('version-neu').classList.remove('haupt');
   } else $('version-neu').classList.add('haupt');
