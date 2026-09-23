@@ -2,9 +2,10 @@
 
 Eine Stadt, in der jeder Mensch selbst entscheidet. Projektname vorläufig.
 
-**Stand: Phase 4.** Simulation (Phase 0), 3D-Karte mit Tag und Nacht (1), Speichern und Aufholen (2), laufende Figuren
-und Personenkarten (3), Hauptfiguren mit Ollama (4). Phase 4 ist nur gegen einen nachgebauten Ollama-Server getestet,
-nicht gegen ein echtes Sprachmodell (siehe „Bekannte Schwächen“).
+**Stand: Phase 4 plus „richtige Arbeit“.** Simulation (Phase 0), 3D-Karte mit Tag und Nacht (1), Speichern und Aufholen (2),
+laufende Figuren und Personenkarten (3), Hauptfiguren mit Ollama (4). Danach auf Noahs Wunsch: Bauarbeiter vom Bauhof
+bauen die Häuser, Werkstätten machen Kisten für die Läden, und man sieht die Leute bei der Arbeit. Phase 4 ist nur gegen
+einen nachgebauten Ollama-Server getestet, nicht gegen ein echtes Sprachmodell (siehe „Bekannte Schwächen“).
 
 ## Starten
 
@@ -43,6 +44,25 @@ Was passiert: Um 7 und 18 Uhr und nach Ereignissen fragt eine Hauptfigur das Mod
 Stadt wartet nicht. Kommt in 2 Spielstunden keine gültige Antwort, entscheidet das normale Gehirn. Bei 20× gibt es keine
 KI-Entscheidungen, Gespräche gehen trotzdem. Jeder Gedanke landet im Tagebuch der Figur (die letzten 30).
 
+## Was die Leute arbeiten
+
+Es gibt kein Feld „Beruf“ und keine neue Aktion. Der Beruf ergibt sich aus dem Arbeitsplatz:
+
+- **Bauarbeiter/in** beim Bauhof (die Werkstatt der Stadt vom Start). Um 7 Uhr teilt der Bauhof seine Leute auf die
+  Baustellen ein, älteste zuerst, höchstens 4 je Baustelle. Um Mitternacht bringt jede eingeteilte Person, die noch beim
+  Bauhof ist und nicht frei hat, einen Arbeitstag. Ein Wohnhaus braucht 12 Arbeitstage, eine Aufstockung 12 bzw. 18, ein
+  Laden 9, eine Werkstatt 12, ein Park 4. Ohne Bauarbeiter bleibt die Baustelle liegen. Wer keine Baustelle hat, macht Kisten.
+- **Handwerker/in** in einer Werkstatt: 8 Kisten je Arbeitstag. Die Kisten gehen an die Läden der Stadt, der Rest ans Umland.
+- **Verkäufer/in** im Laden: 5 Kunden je Kraft wie bisher. Ein Laden braucht eine Kiste je 38 Taler Umsatz und holt sie bei
+  der nächsten Werkstatt der Stadt, die noch welche hat (bis 20 Felder weit), sonst teurer von außerhalb.
+- **Theke** (Besitzer/in, sonst die erste anwesende Kraft) und **Träger/in** (reihum aus der Werkstatt, die liefert, um 9
+  und 13 Uhr) sind nur zum Anschauen und wirken nicht auf die Simulation.
+
+In der 3D-Ansicht wächst auf jeder Baustelle ein grauer Rohbau mit den geschafften Arbeitstagen. Das Gerüst wird dunkler,
+solange niemand kommt, und lässt sich anklicken. Bauarbeiter (orange) stehen an den Ecken ihrer Baustelle, Handwerker
+(blau) vor der Werkstatt. An Werkstätten stehen Kistenstapel, vor Läden eine Theke und eine Auslage (braun: Kisten aus der
+Stadt, grau: von außerhalb). Personenkarten sagen „arbeitet als Bauarbeiterin beim Bauhof …“ und was die Person heute tut.
+
 ## Aufbau
 
 - `stadt.html` enthält den Block `<script id="sim">`: reine Simulation, kein DOM, kein `window`, kein `fetch`,
@@ -51,7 +71,7 @@ KI-Entscheidungen, Gespräche gehen trotzdem. Jeder Gedanke landet im Tagebuch d
   Alle Stellschrauben stehen gesammelt im Objekt `R` am Anfang des Blocks.
 - Der `<script type="module">`-Block macht Darstellung, Oberfläche, Speichern und die Ollama-Aufrufe. Er ändert den
   Sim-Zustand nur über Funktionen aus `StadtSim` (`stunde`, `tagSchritt`, `hauptSetzen`, `kiSchalten`, `kiEntscheidung`,
-  `kiVerwerfen`, `kiGespraech`, `kiTagebuch`, `verlustErledigt`, `importZustand`). Einzige Ausnahme ist die Testhilfe
+  `kiVerwerfen`, `kiGespraech`, `kiTagebuch`, `verlustErledigt`, `importZustand`). `theke`, `traeger` und `bauGesamt` lesen nur. Einzige Ausnahme ist die Testhilfe
   `?debug&umland=…`, die `R.UMLAND` vor dem Start umstellt (solche Stände werden nicht gespeichert).
 - `tools/simtest.mjs` zieht den sim-Block aus der HTML-Datei und prüft ihn zuerst statisch auf verbotene Namen
   (`window`, `document`, `fetch`, `THREE`, `Math.random`, `Date`, `Intl`, `performance`, `console` …). Danach führt es ihn in
@@ -64,6 +84,9 @@ node tools/simtest.mjs --gate --seeds 4,5,6    # dasselbe mit anderen Seeds
 node tools/simtest.mjs --speichertest          # Speichern/Laden mitten am Tag: läuft danach bitgleich weiter?
 node tools/simtest.mjs --aufholtest            # 90 Tage stündlich gegen 90 Tagesschritte
 node tools/simtest.mjs --kitest                # Hauptfiguren: erlaubte Aktionen, Anfragen, Fristen, Tagebuch, Nachfolge
+node tools/simtest.mjs --bau                   # Bauhof: Einteilung um 7, Fortschritt je Person, jede Baustelle wird fertig
+node tools/simtest.mjs --waren                 # Kisten: geliefert ≤ gemacht, Werkstatt-Einnahmen wie vorher
+node tools/simtest.mjs --migrationstest        # Spielstand von Version 2 übernehmen (alte Datei aus git 39c405b), 60 Tage weiter
 ```
 
 Weitere Schalter für `--seed`: `--alle 60` (Zeilenabstand), `--fluss` (Zu-/Wegzüge, Geburten, Tode je Zeile),
@@ -79,7 +102,7 @@ Weitere Schalter für `--seed`: `--alle 60` (Zeilenabstand), `--fluss` (Zu-/Wegz
 | 3 | Mit 67 endet die Anstellung, Rente 50/Tag aus dem Budget, solange es reicht | Die Spec nennt nur „job_suchen: 18–67“. Ohne feste Grenze wurde die Bevölkerungswelle getestet größer |
 | 4 | Die Stadt besitzt die Wohnhäuser, Miete geht ins Budget. Budget = 10 % Steuer vom Lohn + Miete | Die Spec sagt „Miete raus“, aber nicht wohin |
 | 5 | Werkstätten verkaufen ans Umland. Erlös je Arbeitstag = min(140, 50.000 / alle Werkstatt-Arbeitenden) | Einzige Geldquelle von außen und als Wachstumsgrenze gedacht (siehe „Bekannte Schwächen“) |
-| 6 | Läden haben eine Kapazität: 5 Leute je Stelle (Besitzer zählt mit), also 35 pro Laden. Ist der Laden voll, geht man zum nächsten mit Platz in Reichweite. Die Hälfte des Ladenumsatzes geht an Lieferanten außerhalb der Stadt (Wareneinsatz) | Sonst schluckt ein Laden in der Mitte die ganze Stadt. Ohne Wareneinsatz entsteht pro Kopf eine halbe Ladenstelle, und die Stadt schaukelt sich auf (siehe Schwächen) |
+| 6 | Läden haben eine Kapazität: 5 Leute je Stelle (Besitzer zählt mit), also 35 pro Laden. Ist der Laden voll, geht man zum nächsten mit Platz in Reichweite. Der Laden kauft Ware ein: eine Kiste je 38 Taler Umsatz (Annahme 59; bis zur Arbeit-Erweiterung pauschal die Hälfte des Umsatzes nach außen) | Sonst schluckt ein Laden in der Mitte die ganze Stadt. Ohne Wareneinsatz entsteht pro Kopf eine halbe Ladenstelle, und die Stadt schaukelt sich auf (siehe Schwächen) |
 | 7 | Stammladen: Man bleibt beim Laden, solange er offen, in Reichweite und nicht voll ist. Den nächstgelegenen sucht man beim ersten Einkauf oder wenn der eigene wegfällt | Weicht vom Wortlaut „Einkauf beim nächsten Laden“ ab. Ohne das nimmt jeder neue Laden dem Nachbarn sofort die Kundschaft weg |
 | 8 | Wer Erspartes hat, gibt täglich bis 1 % davon (höchstens 15) zusätzlich aus, Sparsame weniger | Sonst sammelt sich das Geld bei den Leuten, und die Läden bekommen nichts ab |
 | 9 | Besitzer zahlen Lohn nach Charakter: wenig sparsam = großzügiger (90–110 % vom Grundlohn) | Gibt `job_wechseln` einen Grund |
@@ -95,7 +118,7 @@ Weitere Schalter für `--seed`: `--alle 60` (Zeilenabstand), `--fluss` (Zu-/Wegz
 | 19 | Die vier Gedächtnis-Wirkungen (Job verloren, Pleite, getrennt, Trauer) laufen über „zuletzt erlebt am Tag X“. Das wird beim Eintrag ins Gedächtnis gesetzt | Sonst verfallen sie früher als nach 30 bzw. 180 Tagen, wenn der 8er-Ring überschrieben wird |
 | 20 | Nach einem Ereignis entscheiden die Betroffenen in der nächsten Stunde (auch Partner, Freund, Eltern). Wer das Ereignis selbst ausgelöst hat, hat gerade entschieden | Spec: „direkt nach einem Ereignis“ |
 | 21 | `freunde_treffen` nur abends (ab 17 Uhr), `partner_suchen` nur unter 70, `laden_gruenden` nur unter 60, `freinehmen` nur morgens | Die Spec nennt keine Uhrzeiten und Altersgrenzen |
-| 22 | Straßen auf einem 4er-Raster (Blöcke 3×3). Bauplätze sind Felder neben einer Straße, die nicht auf dem Raster liegen. Das Bauamt verlängert meist ein Ende geradeaus, biegt an Kreuzungen manchmal ab und legt in 30 % der Fälle eine Abzweigung an. **Straßen sind sofort fertig** (keine Baustelle), Häuser, Betriebe und Parks brauchen 2–4 Tage. Eine Aufstockung läuft 3 Tage (`g.auf`), das Haus bleibt dabei bewohnt | Neue Straßen werden nie von Häusern blockiert |
+| 22 | Straßen auf einem 4er-Raster (Blöcke 3×3). Bauplätze sind Felder neben einer Straße, die nicht auf dem Raster liegen. Das Bauamt verlängert meist ein Ende geradeaus, biegt an Kreuzungen manchmal ab und legt in 30 % der Fälle eine Abzweigung an. **Straßen sind sofort fertig** (keine Baustelle). Häuser, Betriebe, Parks und Aufstockungen brauchen Arbeitstage vom Bauhof (Annahme 58); bei einer Aufstockung (`g.auf`) bleibt das Haus bewohnt | Neue Straßen werden nie von Häusern blockiert |
 | 23 | Bauamt: Regel 1 baut höchstens 1 + Einwohner/300 Häuser pro Tag. Park nur in Vierteln mit ≥ 8 Bewohnern und weniger als 1 + Bewohner/60 Parks. Notbremse höchstens alle 14 Tage | Die Spec sagt „einmal pro Spieltag“, aber nicht wie viel |
 | 24 | Betriebe bleiben auf Stufe 1. Die Formel „Stufe × Stellen“ ist vorbereitet | Die Spec sagt nicht, wer Betriebe aufstuft. Das Bauamt stuft laut Regel 4 nur Wohnhäuser auf |
 | 25 | Stadtbuch: Die Zuzüge eines Tages stehen in einer Zeile (mit Grund), alles andere einzeln | Sonst füllen Zuzüge die 500 Zeilen allein |
@@ -114,10 +137,10 @@ Weitere Schalter für `--seed`: `--alle 60` (Zeilenabstand), `--fluss` (Zu-/Wegz
 | 38 | Ist Ollama nicht erreichbar, entscheiden wartende Hauptfiguren sofort normal, nicht erst nach 2 Spielstunden. Kommt eine Antwort später als in der Stunde nach der Anfrage, wird sie gegen die aktuelle Uhrzeit geprüft (kein „freinehmen“ mehr um 9 Uhr). Geht die gewählte Aktion nicht mehr, entscheidet das normale Gehirn; im Tagebuch steht dann „(klappte nicht)“ | Spec: „Ollama aus: Hauptfiguren entscheiden normal“. Ein Tag frei ab 9 Uhr kostete den ganzen Tageslohn |
 | 39 | Die Anweisung für den Tagebucheintrag nach dem Aufholen habe ich formuliert (Beschreibung wie oben, Erlebtes nur aus der Zeit der Abwesenheit, Antwort `{"eintrag": "…"}`) | Die Spec gibt keinen Wortlaut |
 | 40 | Stirbt oder geht eine Hauptfigur, verschwindet ihr Tagebuch mit ihr. Vorschläge für die Nachfolge: Partner und erwachsene Kinder, die noch in der Stadt leben | Die Spec sagt „schlägt ein Kind oder den Partner vor“ |
-| 41 | Spielstand-Version 2. Stände aus Phase 1–3 (Version 1) lösen den Versionsdialog aus | Neue Felder für Hauptfiguren und Tagebuch |
+| 41 | Spielstand-Version 3 (2: Hauptfiguren und Tagebuch, 3: Bauhof und Kisten). Stände anderer Versionen lösen den Versionsdialog aus; Version 2 lässt sich übernehmen (Annahme 60) | Neue Felder |
 | 42 | Bei 1× ist eine echte Minute eine Spielstunde | Folgt aus der Spec: 90 Spieltage entsprechen 36 Stunden Abwesenheit |
-| 43 | Beim Aufholen (Tagesschritte) entscheiden alle nur um 7 und 18 Uhr; Ereignisse lösen keine zusätzliche Entscheidung aus | Sonst wäre der Tagesschritt nicht schneller. Abweichung gegen stündlich: im Mittel −2,5 % Einwohner nach 90 Tagen (10 Seeds) |
-| 44 | Figuren laufen um 8 zur Arbeit und um 17 zurück, um 19 zu Freunden (wer abends „freunde_treffen“ gewählt hat) und um 22 heim, wer frei hat um 10 zum Einkaufen und um 11 zurück. Zufällige Figuren (bis 300) sind nur unterwegs zu sehen. Hauptfiguren sind immer zu sehen: wenn sie nicht laufen, stehen sie auf der Straße vor dem Gebäude, in dem sie gerade sind. Ihre Markierung ist gelb, weiß solange sie „überlegen“. Jede sichtbare Figur ist anklickbar | Die Spec sagt „morgens zur Arbeit, abends heim oder zu Freunden“ und „plus immer alle Hauptfiguren“ |
+| 43 | Beim Aufholen (Tagesschritte) entscheiden alle nur um 7 und 18 Uhr; Ereignisse lösen keine zusätzliche Entscheidung aus. Der Bauhof teilt direkt nach der 7-Uhr-Entscheidung ein, wie stündlich | Sonst wäre der Tagesschritt nicht schneller. Abweichung gegen stündlich nach 90 Tagen (Seeds 1–10, Tag 200–290): im Mittel 0,0 % Einwohner, einzeln −6,0 % bis +4,0 % |
+| 44 | Grundregel: Eine Figur steht oder geht nur dort, wo die Simulation die Person in dieser Stunde hat. Arbeit 8–17 Uhr (Bauarbeiter auf ihrer Baustelle), abends bei Freunden 19–22 Uhr (wer „freunde_treffen“ gewählt hat), wer frei hat um 10 Uhr einkaufen, sonst zu Hause. Ändert sich der Ort, geht die Figur dorthin. Von den 300 Figuren sind bis zu 120 Leute bei der Arbeit (Annahme 62), die übrigen zufällige Erwachsene, die nur unterwegs zu sehen sind. Hauptfiguren sind immer zu sehen: wenn sie nicht laufen, stehen sie vor dem Gebäude, in dem sie gerade sind. Ihre Markierung ist gelb, weiß solange sie „überlegen“. Jede sichtbare Figur ist anklickbar | Die Spec sagt „morgens zur Arbeit, abends heim oder zu Freunden“ und „plus immer alle Hauptfiguren“ |
 | 45 | Fenster: Abends (ab 18–19:30 Uhr, je Haus verschieden) sind so viele Geschosse hell, wie das Haus belegt ist; spät in der Nacht etwa ein Drittel davon, aber jedes bewohnte Haus mindestens eins; morgens von 5:30 bis etwa 7 Uhr die Hälfte. Leere Häuser bleiben dunkel. Die Fenster sind unbeleuchtetes Material (`MeshBasicMaterial`) mit Lichtfarbe, das wirkt wie „emissive“ | Ein Haus, in dem um 2 Uhr alles an ist, sah unecht aus |
 | 46 | Ist der Spielstand pausiert gespeichert, holt die Stadt beim Öffnen nichts auf | Pause heißt, dass die Stadt nicht weiterläuft |
 | 47 | Aufgeholt wird auch, wenn ein Tab mindestens eine Minute versteckt war und wieder sichtbar wird. Die Karte „Während du weg warst“ und die Tagebucheinträge danach gibt es erst ab einem ganzen verpassten Spieltag | Browser halten die Animation in versteckten Tabs an; ohne Aufholen stünde die Stadt dann still |
@@ -131,15 +154,32 @@ Weitere Schalter für `--seed`: `--alle 60` (Zeilenabstand), `--fluss` (Zu-/Wegz
 | 55 | Mehr als 5 Hauptfiguren erlaubt die App erst, wenn mindestens 5 KI-Antworten im Schnitt unter 5 Sekunden kamen. Die Messung wird mitgespeichert und beginnt bei einem Modellwechsel neu | Spec: „5 als Standard, bis 10 nur, wenn eine Entscheidung unter 5 Sekunden braucht“ |
 | 56 | `zuletztGelaufen` ist der Moment, in dem die Stadt zuletzt lief: in einem versteckten Tab der Moment des Versteckens, mitten im Aufholen „jetzt minus die noch fehlenden Stunden“ | Sonst ginge die Zeit verloren, wenn der Browser mit dem Tab im Hintergrund geschlossen wird |
 | 57 | Namen von Leuten, die nicht mehr in der Stadt sind (gestorben oder weggezogen), sind anklickbar und öffnen eine kurze Karte „nicht mehr in der Stadt“. Ob jemand starb oder wegzog, weiß die Karte nicht mehr, deshalb kein † | Spec: „Jeder Name auf der Personenkarte ist wieder anklickbar“; die Daten der Person sind nach dem Weggang frei |
+| 58 | Bauhof: 10 Stellen plus eine je 4 offene Arbeitstage, höchstens 40. Lohn 95–120 Taler: +2 am Tag, wenn um 7 Uhr Leute fehlten, sonst −1. Schrumpfen die Stellen, bleibt niemand ohne Arbeit, es wird nur nicht nachbesetzt. Freie Stellen im Bauhof locken keinen Zuzug an, und Gründer rechnen den Bauhof mit seinen 10 festen Stellen | Die Stellen gehen mit den Baustellen auf und ab. Zählten sie beim Zuzug oder bei „Werkstatt lohnt sich“, würde jede Baustelle Leute in die Stadt holen bzw. Werkstätten verhindern (im Entwurf gemessen: die Stadt schaukelt sich auf). Mit festem Lohn lief der Bauhof leer |
+| 59 | Kisten: Kistenpreis = Umlandpreis je Arbeitstag / 8 (etwa 15–17 Taler), von außerhalb 19 Taler. Die Werkstatt nimmt je Arbeitstag dasselbe ein wie vorher, egal ob ein Laden oder das Umland die Kisten nimmt. Gründer zahlen Bau oder Übernahme an die Stadtkasse, die Stadt zahlt dafür die Bauarbeiter | Noahs Entscheidung A: Kisten als Preisvorteil für Läden, keine echte Knappheit (siehe Schwächen). Mit „Umland kauft nur die Hälfte“ hatte die Stadt im Entwurf an Tag 365 im Schnitt 891 statt 1.170 Einwohner, ohne dass Gate 4 besser wurde |
+| 60 | Ein Spielstand von Version 2 lässt sich im Versionsdialog mit „Stadt übernehmen“ umrechnen: Bauhof = Werkstatt der Stadt vom Start, laufende Baustellen bekommen 4 Arbeitstage je Resttag (höchstens so viele wie der ganze Bau), alles andere bleibt. Ein Import einer v2-Datei rechnet ohne Nachfrage um | **Abweichung von der Spec** (dort nur Export oder Neu), Noahs Entscheidung B: sonst wäre seine Stadt weg |
+| 61 | Theke und Träger sind nur zum Anschauen. Wer heute trägt, ergibt sich aus Tag und Laden (reihum), nicht aus Zufall. Der Lieferant ist die Werkstatt, die gestern die meisten Kisten brachte | Die Kisten werden um Mitternacht in einem Schritt verteilt; die Träger zeigen das tagsüber |
+| 62 | Die 120 Arbeitsplätze unter den Figuren werden um 8 Uhr nach Nähe zur Kamera vergeben (beim Öffnen mitten am Tag sofort) und bleiben bis zum nächsten Morgen | Alle Arbeitenden wären bei 5.000 Einwohnern über 2.000 Figuren. Fest statt kameraabhängig, damit keine Figur beim Drehen springt |
+| 63 | Stadtbuch: fertige Bauten eines Abends in einer Zeile („Der Bauhof hat fertig gebaut: …“), Stillstand, wenn auf einer Baustelle 5 Tage niemand war, und wenn der Bauhof-Lohn über 100, 110 oder 120 steigt | Gemessen 0,2–0,3 Zeilen mehr am Tag (Seeds 1–3: 3,7–4,9 Zeilen am Tag) |
 
 ## Bekannte Schwächen
 
-**Gate 4 hält nur auf einem Teil der Seeds.** Mit Wareneinsatz, gedrosseltem Zuzug und Gründen nur mit Aussicht bleibt die
-Einwohnerzahl bei Seed 3 im Band (Faktor 1,06). Seed 1 und 2 schwingen noch mit 1,37 und 1,23. Auf den Seeds 1–6 bestehen
-3 von 6. Vorher verdoppelte sich die Stadt im zweiten Jahr (Faktor 1,9–2,2). Was bleibt, ist ein Echo der ersten
+**Gate 4 hält nur auf einem Teil der Seeds.** Seit Bauhof und Kisten liegen Seed 1, 2 und 3 bei Faktor 1,23, 1,25 und 1,19
+(vorher 1,37, 1,23 und 1,06): Seed 3 besteht nicht mehr, damit besteht keiner der drei offiziellen Seeds alle 7 Punkte.
+Auf 40 Seeds (Noahs Entscheidung C, Maßstab „nicht schlechter als vorher“): Gate 4 bei 12 von 40 statt 9 von 40, Band im
+Mittel 1,279 statt 1,285, Median beide 1,22. Seeds über 1,5: vier vorher, vier jetzt. Der schlimmste Seed ist schlechter:
+2,36 (Seed 19) statt 1,96. Bei Seed 19 und 34 gibt es erst einen Ladenboom (37 → 177 bzw. 46 → 307 Läden in gut 100
+Tagen: neue Läden bringen Stellen, Stellen bringen Zuzug), dann eine Pleitewelle. Läden verdienen mit den Kisten mehr,
+deshalb gehen weniger früh pleite. Ganz am Anfang, vor Wareneinsatz, gedrosseltem Zuzug und Gründen nur mit Aussicht,
+verdoppelte sich die Stadt im zweiten Jahr (Faktor 1,9–2,2). Was bleibt, ist ein Echo der ersten
 Generation: Die große Zuzugswelle aus Jahr 1 geht fast gleichzeitig in Rente und stirbt fast gleichzeitig. Dann fehlen
 erst Arbeitskräfte (neuer Zuzug), danach Kundschaft (Pleiten). Getestet und verworfen: Zuzug halb so schnell, Zuzügler
 18–60 statt 18–45, Zuzug über etwa 10 Tage geglättet (jeweils nicht besser auf 6 Seeds).
+
+**Die Kisten machen nichts knapp.** Die Werkstätten machen etwa fünfmal so viele Kisten, wie die Läden brauchen: Auf den
+Seeds 1–3 gingen von Tag 100 bis 300 je 21 % der Kisten an Läden der Stadt, die Läden bekamen 100 % ihrer Kisten aus der
+Stadt, der Rest ging ans Umland. Eine Werkstatt nimmt dasselbe ein, ob ein Laden ihre Kisten nimmt oder nicht. Im Ergebnis
+zahlen Läden etwa 42–43 statt 50 % ihres Umsatzes für Ware (Kistenpreis Tag 100–730 im Schnitt 16,1–16,3 Taler, Seeds 1–3). Echte Knappheit (Umland kauft weniger) war im Entwurf getestet und
+ist verworfen (Annahme 59).
 
 **Das Budget ist nie knapp.** Ab etwa Tag 60 übersteigen Steuern und Mieten alle Ausgaben um ein Vielfaches. Die
 Budgetgrenzen des Bauamts greifen deshalb praktisch nie. Gate 3 hält, weil jede Ausgabe vorher geprüft wird, nicht weil
@@ -151,9 +191,10 @@ ungültige und kaputte Antworten, Zeitüberschreitung, Ollama aus, 20×, Gesprä
 genau die Gate-Punkte, die ein echtes Modell brauchen: Anteil gültiger Antworten über 7 Spieltage, Dauer pro Antwort
 (entscheidet, ob mehr als 5 Hauptfiguren gehen), und ob zwei verschiedene Charaktere erkennbar anders handeln.
 
-**Frame-Zeit mit und ohne KI** (gegen den nachgebauten Server, im Wechsel gemessen, 3 Runden): JavaScript pro Bild 5,7–9,1 ms mit
-KI und 7,8–9,2 ms ohne. Ein Unterschied ist im Messrauschen nicht zu sehen; das Bildtempo begrenzt hier die Software-Grafik.
+**Frame-Zeit mit und ohne KI** (gegen den nachgebauten Server, im Wechsel gemessen, 3 Runden, mit Bauhof, Kisten und
+Figuren bei der Arbeit): JavaScript pro Bild 7,5–11,1 ms mit KI und 7,5–8,9 ms ohne (vorher 5,7–9,1 und 7,8–9,2). Ein
+Unterschied ist im Messrauschen nicht zu sehen; das Bildtempo begrenzt hier die Software-Grafik.
 
 **60 Bilder pro Sekunde sind nicht gemessen.** Im Container rendert Chromium ohne Grafikkarte (SwiftShader) mit etwa
-10 fps. Gemessen sind Draw Calls (10–13, auch bei 5.000 Einwohnern), Dreiecke (unter 51.000) und die Rechenzeit pro
-Bild in JavaScript (5–10 ms).
+10 fps. Gemessen sind Draw Calls (10–13 vor der Arbeit-Erweiterung, jetzt bis 15: Kisten-Mesh und Gerüst), Dreiecke
+(unter 51.000) und die Rechenzeit pro Bild in JavaScript (5–11 ms). Mit 5.000 Einwohnern ist der neue Stand nicht nachgemessen.

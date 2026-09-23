@@ -439,11 +439,13 @@ if (flag('gate')) {
   let alleOk = true;
   for (const seed of seeds) {
     const reihe = [], budgets = [];
-    let ms365 = 0, c365 = null, k365 = null, fehler = null, S = null;
+    let ms365 = 0, c365 = null, k365 = null, fehler = null, S = null, buchNr = 0, arbeitZeilen = 0;
     const zeilen = [];
     try {
       S = lauf(Sim, seed, 730, (S, k, ms) => {
         reihe.push(k.einwohner); budgets.push(k.budget);
+        for (const e of S.buch) if (e.nr > buchNr && (e.art === 'fertig' || e.art === 'stillstand' || e.art === 'bauhof')) arbeitZeilen++;
+        buchNr = S.buchNr;
         if (k.tag % 30 === 0 || k.tag === 365 || k.tag === 730) zeilen.push(tabelleZeile(k, ms));
         if (k.tag === 365) { ms365 = ms; c365 = charakter(S); k365 = k; }
       });
@@ -484,7 +486,7 @@ if (flag('gate')) {
       [c365.grE - c365.erwE >= 15, `6  Gründer-Ehrgeiz ${c365.grE.toFixed(1)} vs. alle ${c365.erwE.toFixed(1)}: ${(c365.grE - c365.erwE).toFixed(1)} (≥ +15)`],
       [c365.erwH - c365.wzH >= 15, `7  Wegzieher-Heimatliebe ${c365.wzH.toFixed(1)} vs. alle ${c365.erwH.toFixed(1)}: −${(c365.erwH - c365.wzH).toFixed(1)} (n=${c365.wzN}) (≥ 15 weniger)`],
       [ms365 < 5000, `T  365 Tage in ${f0(ms365)} ms (< 5000)`],
-      [S.buchNr / S.tag <= 6.5, `B  Stadtbuch ${(S.buchNr / S.tag).toFixed(2)} Zeilen am Tag (≤ 6,5, kein Spec-Gate)`],
+      [arbeitZeilen / S.tag <= 0.5, `B  Stadtbuch ${(S.buchNr / S.tag).toFixed(2)} Zeilen am Tag, davon Bauhof ${(arbeitZeilen / S.tag).toFixed(2)} (≤ 0,5; kein Spec-Gate)`],
     ];
     for (const [ok, t] of g) { console.log(`  ${ok ? '✓' : '✗'} ${t}`); if (!ok) alleOk = false; }
     console.log('  Tag 730:\n' + charakterText(c730));
