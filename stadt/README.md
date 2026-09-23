@@ -2,9 +2,10 @@
 
 Eine Stadt, in der jeder Mensch selbst entscheidet. Projektname vorläufig.
 
-**Stand: Phase 4 plus „richtige Arbeit“.** Simulation (Phase 0), 3D-Karte mit Tag und Nacht (1), Speichern und Aufholen (2),
-laufende Figuren und Personenkarten (3), Hauptfiguren mit Ollama (4). Danach auf Noahs Wunsch: Bauarbeiter vom Bauhof
-bauen die Häuser, Werkstätten machen Kisten für die Läden, und man sieht die Leute bei der Arbeit. Phase 4 ist nur gegen
+**Stand: Phase 4 plus „richtige Arbeit“ und Tech-Firmen.** Simulation (Phase 0), 3D-Karte mit Tag und Nacht (1), Speichern
+und Aufholen (2), laufende Figuren und Personenkarten (3), Hauptfiguren mit Ollama (4). Danach auf Noahs Wunsch: Bauarbeiter
+vom Bauhof bauen die Häuser, Werkstätten machen Kisten für die Läden, man sieht die Leute bei der Arbeit, und Bewohner gründen
+Tech-Firmen für Software, Handys oder Computer; Hauptfiguren, die dort programmieren, schreiben über Ollama echten Code. Phase 4 ist nur gegen
 einen nachgebauten Ollama-Server getestet, nicht gegen ein echtes Sprachmodell (siehe „Bekannte Schwächen“).
 
 ## Starten
@@ -43,6 +44,8 @@ Ohne Ollama läuft alles, die Hauptfiguren entscheiden dann mit dem normalen Geh
 Was passiert: Um 7 und 18 Uhr und nach Ereignissen fragt eine Hauptfigur das Modell (höchstens 3-mal pro Spieltag). Die
 Stadt wartet nicht. Kommt in 2 Spielstunden keine gültige Antwort, entscheidet das normale Gehirn. Bei 20× gibt es keine
 KI-Entscheidungen, Gespräche gehen trotzdem. Jeder Gedanke landet im Tagebuch der Figur (die letzten 30).
+Hauptfiguren, die in einer Tech-Firma programmieren, bitten das Modell außerdem einmal am Spieltag um ein kleines Stück Code
+für ihre Arbeit. Es steht dann im Tagebuch und wird nie ausgeführt.
 
 ## Was die Leute arbeiten
 
@@ -55,13 +58,27 @@ Es gibt kein Feld „Beruf“ und keine neue Aktion. Der Beruf ergibt sich aus d
 - **Handwerker/in** in einer Werkstatt: 8 Kisten je Arbeitstag. Die Kisten gehen an die Läden der Stadt, der Rest ans Umland.
 - **Verkäufer/in** im Laden: 5 Kunden je Kraft wie bisher. Ein Laden braucht eine Kiste je 38 Taler Umsatz und holt sie bei
   der nächsten Werkstatt der Stadt, die noch welche hat (bis 20 Felder weit), sonst teurer von außerhalb.
+- **Programmierer/in** in einer Tech-Firma: Jede anwesende Person (auch der Besitzer) bringt um Mitternacht einen Arbeitstag an
+  der nächsten Version. Eine Version braucht bei Software 40, beim Handy 60, beim Computer 50 Arbeitstage, danach erscheint sie
+  („Nova 3“). Die Firma verkauft ans Umland (derselbe Topf wie die Werkstätten) und über die Läden an die Leute in der Stadt.
 - **Theke** (Besitzer/in, sonst die erste anwesende Kraft) und **Träger/in** (reihum aus der Werkstatt, die liefert, um 9
   und 13 Uhr) sind nur zum Anschauen und wirken nicht auf die Simulation.
+
+**Tech-Firmen.** Wer fleißig und ehrgeizig ist, gründet über dieselbe Aktion wie bisher (`laden_gruenden`) statt einer
+Werkstatt eine Tech-Firma, solange Tech-Firmen weniger als 40 % der Stellen haben, die fürs Umland arbeiten. Sie macht das, was
+in der Stadt am seltensten gemacht wird: Software, Handys oder Computer. Die Leute kaufen beim täglichen Einkauf im Laden die
+neueste Version, wenn danach genug Geld übrig bleibt: erst ein Gerät, dann ab und zu Software. Ein Kauf hebt die Freizeit. Läuft
+eine Firma gut (alle Stellen besetzt, 20 Tage in Folge Gewinn), spart sie für einen Anbau und gibt dem Bauhof den Auftrag, sobald
+das Umland Platz hat und genug Leute Arbeit suchen. Hauptfiguren, die in einer Tech-Firma programmieren, schreiben einmal am
+Spieltag über Ollama ein echtes kleines Stück Code in ihr Tagebuch. Es wird nur angezeigt und nie ausgeführt.
 
 In der 3D-Ansicht wächst auf jeder Baustelle ein grauer Rohbau mit den geschafften Arbeitstagen. Das Gerüst wird dunkler,
 solange niemand kommt, und lässt sich anklicken. Bauarbeiter (orange) stehen an den Ecken ihrer Baustelle, Handwerker
 (blau) vor der Werkstatt. An Werkstätten stehen Kistenstapel, vor Läden eine Theke und eine Auslage (braun: Kisten aus der
-Stadt, grau: von außerhalb). Personenkarten sagen „arbeitet als Bauarbeiterin beim Bauhof …“ und was die Person heute tut.
+Stadt, grau: von außerhalb). Tech-Firmen sind Glasbauten in der Farbe ihres Produkts; tagsüber leuchten so viele Fenster wie
+Leute programmieren, nachts der Serverraum. Programmierer (lila) stehen mit einem leuchtenden Bildschirm vor der Firma, wer ein
+Handy hat, trägt es unterwegs in der Hand (höchstens 80 gleichzeitig). Personenkarten sagen „arbeitet als Bauarbeiterin beim
+Bauhof …“ bzw. „arbeitet als Programmiererin bei Nova Handys …“, was die Person heute tut und was sie gekauft hat.
 
 ## Aufbau
 
@@ -86,7 +103,9 @@ node tools/simtest.mjs --aufholtest            # 90 Tage stündlich gegen 90 Tag
 node tools/simtest.mjs --kitest                # Hauptfiguren: erlaubte Aktionen, Anfragen, Fristen, Tagebuch, Nachfolge
 node tools/simtest.mjs --bau                   # Bauhof: Einteilung um 7, Fortschritt je Person, jede Baustelle wird fertig
 node tools/simtest.mjs --waren                 # Kisten: geliefert ≤ gemacht, Werkstatt-Einnahmen wie vorher
+node tools/simtest.mjs --tech                  # Tech-Firmen: Arbeitstage je Version, Käufe im Laden, Anbau (Seeds 1–3, 730 Tage)
 node tools/simtest.mjs --migrationstest        # Spielstand von Version 2 übernehmen (alte Datei aus git 39c405b), 60 Tage weiter
+node tools/simtest.mjs --migrationstest --alt <stadt.html von Version 3>   # dasselbe für Version 3
 ```
 
 Weitere Schalter für `--seed`: `--alle 60` (Zeilenabstand), `--fluss` (Zu-/Wegzüge, Geburten, Tode je Zeile),
@@ -137,7 +156,7 @@ Weitere Schalter für `--seed`: `--alle 60` (Zeilenabstand), `--fluss` (Zu-/Wegz
 | 38 | Ist Ollama nicht erreichbar, entscheiden wartende Hauptfiguren sofort normal, nicht erst nach 2 Spielstunden. Kommt eine Antwort später als in der Stunde nach der Anfrage, wird sie gegen die aktuelle Uhrzeit geprüft (kein „freinehmen“ mehr um 9 Uhr). Geht die gewählte Aktion nicht mehr, entscheidet das normale Gehirn; im Tagebuch steht dann „(klappte nicht)“ | Spec: „Ollama aus: Hauptfiguren entscheiden normal“. Ein Tag frei ab 9 Uhr kostete den ganzen Tageslohn |
 | 39 | Die Anweisung für den Tagebucheintrag nach dem Aufholen habe ich formuliert (Beschreibung wie oben, Erlebtes nur aus der Zeit der Abwesenheit, Antwort `{"eintrag": "…"}`) | Die Spec gibt keinen Wortlaut |
 | 40 | Stirbt oder geht eine Hauptfigur, verschwindet ihr Tagebuch mit ihr. Vorschläge für die Nachfolge: Partner und erwachsene Kinder, die noch in der Stadt leben | Die Spec sagt „schlägt ein Kind oder den Partner vor“ |
-| 41 | Spielstand-Version 3 (2: Hauptfiguren und Tagebuch, 3: Bauhof und Kisten). Stände anderer Versionen lösen den Versionsdialog aus; Version 2 lässt sich übernehmen (Annahme 60) | Neue Felder |
+| 41 | Spielstand-Version 4 (2: Hauptfiguren und Tagebuch, 3: Bauhof und Kisten, 4: Tech-Firmen). Stände anderer Versionen lösen den Versionsdialog aus; Version 2 und 3 lassen sich übernehmen (Annahme 60) | Neue Felder |
 | 42 | Bei 1× ist eine echte Minute eine Spielstunde | Folgt aus der Spec: 90 Spieltage entsprechen 36 Stunden Abwesenheit |
 | 43 | Beim Aufholen (Tagesschritte) entscheiden alle nur um 7 und 18 Uhr; Ereignisse lösen keine zusätzliche Entscheidung aus. Der Bauhof teilt direkt nach der 7-Uhr-Entscheidung ein, wie stündlich | Sonst wäre der Tagesschritt nicht schneller. Abweichung gegen stündlich nach 90 Tagen (Seeds 1–10, Tag 200–290): im Mittel −1,7 % Einwohner, einzeln −8,6 % bis +8,1 % |
 | 44 | Grundregel: Eine Figur steht oder geht nur dort, wo die Simulation die Person in dieser Stunde hat. Arbeit 8–17 Uhr (Bauarbeiter auf ihrer Baustelle), abends bei Freunden 19–22 Uhr (wer „freunde_treffen“ gewählt hat), wer frei hat um 10 Uhr einkaufen, sonst zu Hause. Ändert sich der Ort, geht die Figur dorthin. Von den 300 Figuren sind bis zu 120 Leute bei der Arbeit (Annahme 62), die übrigen zufällige Erwachsene, die nur unterwegs zu sehen sind. Hauptfiguren sind immer zu sehen: wenn sie nicht laufen, stehen sie vor dem Gebäude, in dem sie gerade sind. Ihre Markierung ist gelb, weiß solange sie „überlegen“. Jede sichtbare Figur ist anklickbar | Die Spec sagt „morgens zur Arbeit, abends heim oder zu Freunden“ und „plus immer alle Hauptfiguren“ |
@@ -156,21 +175,35 @@ Weitere Schalter für `--seed`: `--alle 60` (Zeilenabstand), `--fluss` (Zu-/Wegz
 | 57 | Namen von Leuten, die nicht mehr in der Stadt sind (gestorben oder weggezogen), sind anklickbar und öffnen eine kurze Karte „nicht mehr in der Stadt“. Ob jemand starb oder wegzog, weiß die Karte nicht mehr, deshalb kein † | Spec: „Jeder Name auf der Personenkarte ist wieder anklickbar“; die Daten der Person sind nach dem Weggang frei |
 | 58 | Bauhof: 10 Stellen plus eine je 4 offene Arbeitstage, höchstens 40; neu gerechnet, sobald eine Baustelle dazukommt (Gründung, Bauamt) und jede Nacht. Lohn 95–120 Taler: +2 am Tag, wenn um 7 Uhr Leute fehlten, sonst −1. Schrumpfen die Stellen, bleibt niemand ohne Arbeit, es wird nur nicht nachbesetzt. Freie Stellen im Bauhof locken keinen Zuzug an, und Gründer rechnen den Bauhof mit seinen 10 festen Stellen | Die Stellen gehen mit den Baustellen auf und ab. Zählten sie beim Zuzug oder bei „Werkstatt lohnt sich“, würde jede Baustelle Leute in die Stadt holen bzw. Werkstätten verhindern (im Entwurf gemessen: die Stadt schaukelt sich auf). Mit festem Lohn lief der Bauhof leer |
 | 59 | Kisten: Kistenpreis = Umlandpreis je Arbeitstag / 8 (etwa 15–17 Taler), von außerhalb 19 Taler. Die Werkstatt nimmt je Arbeitstag dasselbe ein wie vorher, egal ob ein Laden oder das Umland die Kisten nimmt. Gründer zahlen Bau oder Übernahme an die Stadtkasse, die Stadt zahlt dafür die Bauarbeiter | Noahs Entscheidung A: Kisten als Preisvorteil für Läden, keine echte Knappheit (siehe Schwächen). Mit „Umland kauft nur die Hälfte“ hatte die Stadt im Entwurf an Tag 365 im Schnitt 891 statt 1.170 Einwohner, ohne dass Gate 4 besser wurde |
-| 60 | Ein Spielstand von Version 2 lässt sich im Versionsdialog mit „Stadt übernehmen“ umrechnen: Bauhof = Werkstatt der Stadt vom Start, laufende Baustellen bekommen 4 Arbeitstage je Resttag (höchstens so viele wie der ganze Bau), alles andere bleibt. Ein Import einer v2-Datei rechnet ohne Nachfrage um | **Abweichung von der Spec** (dort nur Export oder Neu), Noahs Entscheidung B: sonst wäre seine Stadt weg |
+| 60 | Ein Spielstand von Version 2 oder 3 lässt sich im Versionsdialog mit „Stadt übernehmen“ umrechnen. Von 2: Bauhof = Werkstatt der Stadt vom Start, laufende Baustellen bekommen 4 Arbeitstage je Resttag (höchstens so viele wie der ganze Bau). Von 3: Tech-Firmen entstehen danach von selbst, niemand hat schon ein Gerät. Alles andere bleibt. Ein Import einer alten Datei rechnet ohne Nachfrage um | **Abweichung von der Spec** (dort nur Export oder Neu), Noahs Entscheidung B: sonst wäre seine Stadt weg |
 | 61 | Theke und Träger sind nur zum Anschauen. Wer heute trägt, ergibt sich aus Tag und Laden (reihum), nicht aus Zufall. Der Lieferant ist die Werkstatt, die gestern die meisten Kisten brachte | Die Kisten werden um Mitternacht in einem Schritt verteilt; die Träger zeigen das tagsüber |
 | 62 | Die 120 Arbeitsplätze unter den Figuren werden um 8 Uhr nach Nähe zur Kamera vergeben (beim Öffnen mitten am Tag sofort) und bleiben bis zum nächsten Morgen | Alle Arbeitenden wären bei 5.000 Einwohnern über 2.000 Figuren. Fest statt kameraabhängig, damit keine Figur beim Drehen springt |
-| 63 | Stadtbuch: fertige Bauten eines Abends in einer Zeile („Der Bauhof hat fertig gebaut: …“), Stillstand, wenn auf einer Baustelle 5 Tage niemand war, und wenn der Bauhof-Lohn über 100, 110 oder 120 steigt | Auf 40 Seeds (730 Tage) im Schnitt 0,26 neue Zeilen am Tag. Insgesamt 5,25 statt 4,86 Zeilen am Tag. **Die Plan-Grenze von 6,5 Zeilen am Tag hält nicht überall:** 5 von 40 Seeds liegen darüber (vorher 5), darunter der offizielle Seed 1 mit 6,79 (vorher 4,94). Ohne die neuen Zeilen wären es bei Seed 1 immer noch 6,50; der Rest kommt daher, dass die Stadt sich anders entwickelt (mehr Hochzeiten und Trennungen) |
+| 63 | Stadtbuch: fertige Bauten eines Abends in einer Zeile („Der Bauhof hat fertig gebaut: …“), Stillstand, wenn auf einer Baustelle 5 Tage niemand war, und wenn der Bauhof-Lohn über 100, 110 oder 120 steigt | Mit Tech-Firmen kommen die neuen Versionen dazu (im Schnitt 0,48 Zeilen am Tag): auf 40 Seeds 5,50 Zeilen am Tag, 7 Seeds über 6,5, höchstens 8,60. Ohne Tech-Firmen: auf 40 Seeds (730 Tage) im Schnitt 0,26 neue Zeilen am Tag. Insgesamt 5,25 statt 4,86 Zeilen am Tag. **Die Plan-Grenze von 6,5 Zeilen am Tag hält nicht überall:** 5 von 40 Seeds liegen darüber (vorher 5), darunter der offizielle Seed 1 mit 6,79 (vorher 4,94). Ohne die neuen Zeilen wären es bei Seed 1 immer noch 6,50; der Rest kommt daher, dass die Stadt sich anders entwickelt (mehr Hochzeiten und Trennungen) |
+| 64 | Tech-Firma statt Werkstatt gründet, wer Fleiß + Ehrgeiz ≥ 120 hat, solange die Tech-Stellen danach höchstens 40 % der Umland-Stellen sind (Werkstätten plus Tech) und das Geld reicht (Bau 2.000 + Startkasse 300, leere Tech-Firma übernehmen 1.100). Fehlt ein Laden, wird wie bisher ein Laden gegründet. Ob es sich lohnt, prüft wie bei der Werkstatt der Umlandpreis; die Tech-Stellen zählen dort mit. Produkt: das in der Stadt seltenste. Firmenname aus 30 Marken (Seed-Zufall), Versionen heißen „Marke Nummer“ | Noahs Entscheidung: eine Betriebsart über die vorhandene Aktion, keine neue Aktion. Ohne Obergrenze würden Tech-Firmen die Werkstätten verdrängen (beide teilen sich das Umland) |
+| 65 | Tech-Firma: 4 Stellen je Stufe, Lohn 105 (90–110 % je nach Sparsamkeit des Besitzers), laufende Kosten 45 am Tag. Einnahmen: anwesende Angestellte × Umlandpreis (derselbe Topf von 50.000 wie bei den Werkstätten) plus 80 % der Verkäufe in der Stadt | Das Umland als gemeinsame Grenze hält das Wachstum im Rahmen |
+| 66 | Käufe beim täglichen Einkauf: nur wer heute eingekauft hat und danach über 600 Taler hat. Erst ein Gerät (Handy, sonst Computer; nach 120 Tagen ein neues), mit Gerät alle 40 Tage Software, dazwischen mindestens 20 Tage. Preise 180 (Handy), 320 (Computer), 60 (Software). Chance am Tag 4 % × (1,3 − Sparsamkeit/100), doppelt so hoch, wenn die Version höchstens 15 Tage alt ist. 20 % behält der Laden, 80 % bekommt die Firma. Freizeit sofort +12 / +15 / +6, keine Dauerwirkung | Noahs Entscheidung „auch die Leute in der Stadt kaufen“, ohne neue Aktion. Im Entwurf hob eine Dauerwirkung am Abend die Zufriedenheit und damit den Zuzug; sie ist wieder raus |
+| 67 | Anbau: Läuft eine Tech-Firma gut (alle Stellen besetzt, 20 Tage in Folge Gewinn), gehen 50 % des Gewinns über dem Polster in eine Rücklage, bis der Anbau bezahlt ist (Stufe 2: 1.800, Stufe 3: 3.000). Den Auftrag an den Bauhof gibt sie erst, wenn das Umland Platz hat (dieselbe Grenze wie für eine neue Werkstatt) und mindestens 4 Leute Arbeit suchen. Der Bauhof baut 12 bzw. 16 Arbeitstage, danach 8 bzw. 12 Stellen. Schließt die Firma, bekommt der Besitzer die Rücklage | Noahs Entscheidung „Bauauftrag an den Bauhof“. Ohne die Umland-Grenze schuf jeder Anbau Stellen über das Gleichgewicht hinaus |
+| 68 | Echte Code-Stücke: eine Hauptfigur, die gerade (9–16 Uhr) in ihrer Tech-Firma arbeitet, schreibt höchstens einmal je Spieltag. Nicht bei 20×, nicht ohne Ollama, immer nur ein Aufruf gleichzeitig; die Stadt wartet nicht. Antwort `{"titel", "sprache", "code", "gedanke"}`; der Code wird gekürzt (höchstens 20 Zeilen zu 100 Zeichen, 1.500 Zeichen), nur als Text angezeigt und nie ausgeführt. Wer heute schon Code geschrieben hat, merkt sich die Seite nur bis zum Neuladen | Noahs Entscheidung „beides“. Der Code ist Ausdruck der Figur, er wirkt nicht auf die Simulation |
+| 69 | Stadtbuch: Gründung einer Tech-Firma (mit Fleiß und Ehrgeiz), alle neuen Versionen eines Tages in einer Zeile, Bauaufträge für Anbauten, fertige Anbauten in der Fertig-Zeile des Bauhofs | Sonst füllten die Versionen das Stadtbuch |
 
 ## Bekannte Schwächen
 
-**Gate 4 hält nur auf einem Teil der Seeds.** Seit Bauhof und Kisten liegen Seed 1, 2 und 3 bei Faktor 1,12, 1,26 und 1,26
-(vorher 1,37, 1,23 und 1,06): Seed 1 besteht jetzt, Seed 3 nicht mehr. Auf 40 Seeds (Noahs Entscheidung C, Maßstab „nicht
-schlechter als vorher“): Gate 4 bei 18 von 40 statt 9 von 40, Band im Mittel 1,227 statt 1,285, Median 1,15 statt 1,22,
-schlimmster Seed 2,15 (Seed 15) statt 1,96, Seeds über 1,5: drei statt vier. Die Ausreißer sind ein Ladenboom mit
-Pleitewelle: Bei Seed 15 steigen die Läden von Tag 600 bis 720 von 69 auf 184 (neue Läden bringen Stellen, Stellen bringen
-Zuzug), die Stadt von 1.181 auf 2.414 Einwohner, danach stehen 103 Betriebe leer und 30 % sind ohne Arbeit. Einzelne Seeds
-springen bei kleinen Regeländerungen stark (Seed 3: 1,06 → 1,19 → 1,26 über drei Stände), deshalb zählt die Messung über
-40 Seeds mehr als die drei offiziellen. Ganz am Anfang, vor Wareneinsatz, gedrosseltem Zuzug und Gründen nur mit Aussicht,
+**Gate 4 hält nur auf einem Teil der Seeds, und die Messung rauscht stark.** Mit Tech-Firmen liegen die offiziellen Seeds 1, 2
+und 3 bei Faktor 1,25, 1,21 und 1,17: keiner besteht. Deshalb gemessen über 80 Seeds (simtest --gate je Seed, Band Tag 551–730):
+
+| Stand | Gate 4 besteht | Band im Mittel | Median | Seeds über 1,5 | schlimmster |
+|---|---|---|---|---|---|
+| vor Bauhof und Kisten | 21 von 80 | 1,286 | 1,22 | 10 | 2,20 |
+| mit Bauhof und Kisten | 26 von 80 | 1,255 | 1,21 | 5 | 2,15 |
+| dazu Tech-Firmen (heute) | 23 von 80 | 1,279 | 1,23 | 10 | 1,90 |
+| Placebo: Bauhof und Kisten plus eine Zufallszahl am Tag, sonst nichts | 22 von 80 | 1,303 | 1,25 | 12 | 2,28 |
+
+Das Placebo ändert keine Regel und ist trotzdem schlechter als jeder andere Stand. Unterschiede in dieser Größe sind also
+Rauschen: Gate 4 hängt davon ab, wann zufällig ein Ladenboom mit Pleitewelle einsetzt (Beispiel Seed 15 ohne Tech: die Läden
+steigen von Tag 600 bis 720 von 69 auf 184, die Stadt von 1.181 auf 2.414 Einwohner, danach stehen 103 Betriebe leer). Auch die
+ersten 40 Seeds allein täuschen: mit Bauhof und Kisten bestehen dort 18 von 40, auf den Seeds 41–80 nur 8. Nach Noahs Maßstab
+„nicht schlechter als vorher“ liegen die Tech-Firmen gleichauf mit dem Stand vor Bauhof und Kisten und innerhalb des Rauschens.
+Ganz am Anfang, vor Wareneinsatz, gedrosseltem Zuzug und Gründen nur mit Aussicht,
 verdoppelte sich die Stadt im zweiten Jahr (Faktor 1,9–2,2). Was bleibt, ist ein Echo der ersten
 Generation: Die große Zuzugswelle aus Jahr 1 geht fast gleichzeitig in Rente und stirbt fast gleichzeitig. Dann fehlen
 erst Arbeitskräfte (neuer Zuzug), danach Kundschaft (Pleiten). Getestet und verworfen: Zuzug halb so schnell, Zuzügler
@@ -181,6 +214,16 @@ Seeds 1–3 gingen von Tag 100 bis 300 je 21–22 % der Kisten an Läden der Sta
 Stadt, der Rest ging ans Umland. Eine Werkstatt nimmt dasselbe ein, ob ein Laden ihre Kisten nimmt oder nicht. Im Ergebnis
 zahlen Läden etwa 42–43 statt 50 % ihres Umsatzes für Ware (Kistenpreis Tag 100–730 im Schnitt 15,8–16,2 Taler, Seeds 1–3). Echte Knappheit (Umland kauft weniger) war im Entwurf getestet und
 ist verworfen (Annahme 59).
+
+**Tech-Firmen kommen in einer ausgewachsenen Stadt nur langsam.** Sie teilen sich das Umland mit den Werkstätten und werden
+nur gegründet, wenn dort Platz ist. Im Entwurf gab es nach dem Übernehmen einer Stadt von Tag 300 bzw. 400 in den 60 Tagen
+danach keine Gründung, bei Tag 150 drei. In einer neuen Stadt entstehen auf den Seeds 1–3 in 730 Tagen 15–20 Tech-Firmen.
+
+**Die echten Code-Stücke sind nur mit einem nachgebauten Ollama getestet.** Ob ein kleines Modell zuverlässig gültiges JSON mit
+Code liefert (oder Code-Zäune und Erklärungen dazuschreibt), ist nicht gemessen. Ungültige Antworten zählen als ungültig und
+landen nicht im Tagebuch.
+
+**Viele Handys.** Im Entwurf hatten an Tag 730 91 % der Erwachsenen ein Gerät; unterwegs leuchten deshalb bis zu 80 Handys.
 
 **Das Budget ist nie knapp.** Ab etwa Tag 60 übersteigen Steuern und Mieten alle Ausgaben um ein Vielfaches. Die
 Budgetgrenzen des Bauamts greifen deshalb praktisch nie. Gate 3 hält, weil jede Ausgabe vorher geprüft wird, nicht weil
