@@ -12,6 +12,8 @@
 //   node tools/simtest.mjs --kitest                 Hauptfiguren: erlaubte Aktionen, Anfragen, Fristen, Tagebuch (ohne echtes Modell)
 //   node tools/simtest.mjs --bau                    Bauhof: Einteilung, Fortschritt je Person, jede Baustelle wird fertig (Seeds 1–3)
 //   node tools/simtest.mjs --waren                  Kisten: geliefert ≤ gemacht, Werkstatt-Einnahmen wie vorher (Seeds 1–3)
+//   node tools/simtest.mjs --migrationstest         Spielstand von Version 2 übernehmen (alte stadt.html aus git 39c405b
+//                                                   oder --alt pfad/zur/alten/stadt.html), 60 Tage weiter, keine NaN
 //   Optionen: --alle 30 (Zeilenabstand), --buch 20 (letzte Stadtbuch-Zeilen), --aktionen
 
 import { readFileSync } from 'node:fs';
@@ -20,6 +22,7 @@ import { dirname, join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import vm from 'node:vm';
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 
 const hier = dirname(fileURLToPath(import.meta.url));
 const html = readFileSync(join(hier, '..', 'stadt.html'), 'utf8');
@@ -248,6 +251,45 @@ if (flag('kitest')) {
     pruef(JSON.stringify(B.ki) === JSON.stringify(S.ki) && fingerabdruck(Sim, B) === fingerabdruck(Sim, S), 'Speichern/Laden behält Hauptfiguren, Tagebücher, Anfragen');
   }
   console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle KI-Prüfungen bestanden');
+  process.exit(fehler ? 1 : 0);
+}
+if (flag('migrationstest')) {
+  let fehler = 0;
+  const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
+  const altHtml = arg('alt') ? readFileSync(arg('alt'), 'utf8')
+    : execFileSync('git', ['show', '39c405b:stadt/stadt.html'], { cwd: hier, encoding: 'utf8', maxBuffer: 1 << 26 });
+  const ctx = vm.createContext({});
+  vm.runInContext(altHtml.match(/<script id="sim">([\s\S]*?)<\/script>/)[1], ctx);
+  const Alt = ctx.StadtSim;
+  pruef(Alt.VERSION === 2, `alte Simulation hat Version ${Alt.VERSION}`);
+  for (const [seed, tage, stunde] of [[1, 150, 13], [2, 300, 5], [3, 400, 20]]) {
+    const A = Alt.neueStadt(seed);
+    while (A.tag < tage || A.stunde < stunde || !A.baustellen.length) Alt.stunde(A);   // ein Moment mit laufenden Baustellen
+    const text = speichernAlsText(Alt, A);
+    let abgelehnt = null;
+    try { ladenAusText(Sim, text); } catch (e) { abgelehnt = e; }
+    pruef(abgelehnt && abgelehnt.andereVersion && abgelehnt.migrierbar, `Seed ${seed}, Tag ${A.tag} ${A.stunde} Uhr (${A.einwohner} Einw., ${A.baustellen.length} Baustellen): ohne Übernehmen abgelehnt, als übernehmbar markiert`);
+    const d = JSON.parse(text);
+    d.arrays = d.arrays.map(a => { const u8 = Buffer.from(a.b64, 'base64'); return { name: a.name, typ: a.typ, daten: new TYPEN[a.typ](u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength)) }; });
+    const S = Sim.importZustand(d, true);
+    const B = S.bauhof, g = S.g;
+    pruef(B === 2 && g.typ[B] === Sim.WERKSTATT && g.besitzer[B] < 0, `Bauhof = Gebäude ${B} (die Werkstatt der Stadt vom Start)`);
+    pruef(S.baustellen.every(b => g.bauRest[b] > 0 && g.bauRest[b] <= Sim.bauGesamt(S, b)), `Baustellen mit Arbeitstagen: ${S.baustellen.map(b => g.bauRest[b] + '/' + Sim.bauGesamt(S, b)).join(', ') || 'keine'}`);
+    pruef(S.einwohner === A.einwohner && S.buchNr === A.buchNr + 1, `Einwohner (${S.einwohner}) und Stadtbuch bleiben, eine Zeile dazu: „${Sim.klartext(S.buch.at(-1).text)}“`);
+    const offen = new Set(S.baustellen);
+    const ziel = S.tag + 60;
+    while (S.tag < ziel) Sim.stunde(S);
+    let nan = 0;
+    for (const [n, a] of Object.entries(S.p)) if (a instanceof Float32Array || a instanceof Float64Array) for (let i = 0; i < S.pMax; i++) if (!Number.isFinite(a[i])) nan++;
+    for (const k of ['budget', 'exportPreis', 'kistenpreis', 'zufMittel']) if (!Number.isFinite(S[k])) nan++;
+    const k = Sim.kennzahlen(S);
+    pruef(nan === 0 && Object.values(k).every(v => typeof v !== 'number' || Number.isFinite(v)), `60 Tage weiter (Tag ${S.tag}, ${S.einwohner} Einw.): keine NaN/Infinity`);
+    pruef([...offen].every(b => !S.baustellen.includes(b) || S.g.auf[b]), `alle übernommenen Baustellen fertig (${offen.size})`);
+    const L = ladenAusText(Sim, speichernAlsText(Sim, S));
+    const z = S.tag + 20; while (S.tag < z) Sim.stunde(S); while (L.tag < z) Sim.stunde(L);
+    pruef(fingerabdruck(Sim, S) === fingerabdruck(Sim, L), 'danach als Version 3 gespeichert und geladen: läuft bitgleich weiter');
+  }
+  console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle Migrations-Prüfungen bestanden');
   process.exit(fehler ? 1 : 0);
 }
 if (flag('bau')) {

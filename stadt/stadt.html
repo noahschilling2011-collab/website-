@@ -329,10 +329,11 @@
 <dialog id="version-dialog" aria-labelledby="version-titel">
   <h2 id="version-titel">Spielstand ist von einer älteren Version</h2>
   <p id="version-text">Dieser Spielstand passt nicht zu dieser Version von STADT und kann nicht geladen werden.</p>
-  <p class="leise">Mit „Export behalten“ lädst du ihn als Datei herunter, damit er nicht verloren geht. Erst „Neu anfangen“ überschreibt ihn.</p>
+  <p class="leise" id="version-hinweis">Mit „Export behalten“ lädst du ihn als Datei herunter, damit er nicht verloren geht. Erst „Neu anfangen“ überschreibt ihn.</p>
   <div class="knoepfe">
     <button type="button" class="knopf" id="version-export">Export behalten</button>
-    <button type="button" class="knopf haupt" id="version-neu">Neu anfangen</button>
+    <button type="button" class="knopf" id="version-neu">Neu anfangen</button>
+    <button type="button" class="knopf haupt" id="version-uebernehmen" hidden>Stadt übernehmen</button>
   </div>
 </dialog>
 
@@ -2451,11 +2452,14 @@ function exportZustand(S) {
   }
   return { format: 'stadt', version: VERSION, werte, json, arrays };
 }
-function importZustand(d) {
+// migrieren: einen Spielstand von Version 2 (vor dem Bauhof) übernehmen, siehe migriereV2
+function importZustand(d, migrieren) {
   if (!d || d.format !== 'stadt' || !d.werte || !d.json || !Array.isArray(d.arrays)) throw new Error('Das ist kein STADT-Spielstand.');
-  if (d.version !== VERSION) {
+  const alt = d.version === 2 && migrieren;
+  if (d.version !== VERSION && !alt) {
     const e = new Error(`Spielstand ist von Version ${d.version}, diese Datei ist Version ${VERSION}.`);
     e.andereVersion = true;
+    e.migrierbar = d.version === 2;
     throw e;
   }
   const S = {};
@@ -2483,7 +2487,28 @@ function importZustand(d) {
     if (!ArrayBuffer.isView(S[k])) throw new Error('Spielstand unvollständig: ' + k);
   }
   jsonPruefen(S);
+  if (alt) migriereV2(S);
   return S;
+}
+// Version 2 → 3: Neue Felder stehen schon auf 0 (fehlen im alten Stand). Bauhof ist die Werkstatt der Stadt vom Start
+// (Gebäude 2). Laufende Baustellen bekommen die fehlenden Arbeitstage: je Resttag 4, höchstens so viele wie der ganze Bau.
+function migriereV2(S) {
+  const g = S.g;
+  S.version = VERSION;
+  S.bauhof = -1;
+  for (let b = 0; b < S.gAnzahl; b++) {
+    if (g.typ[b] === WERKSTATT && g.besitzer[b] < 0 && !g.leer[b] && S.feld[gebZelle(S, b)] === WERKSTATT) { S.bauhof = b; break; }
+  }
+  S.bauZuschlag = 0; S.bauRueckstand = 0; S.bauFehlt = 0; S.kistenpreis = S.exportPreis / R.KISTEN_PRO_TAG;
+  S.stat.bau = { fertig: 0, tage: 0, still: 0, lohnSumme: 0 };
+  S.stat.kisten = { gemacht: 0, stadt: 0, aussen: 0 };
+  for (const b of S.baustellen) {
+    const rest = Math.max(1, g.bauBis[b] - S.tag + 1);          // alte Regel: fertig am Ende von Tag bauBis
+    baustelleAnlegen(S, b, Math.min(bauGesamt(S, b), rest * R.BAU_PRO_STELLE));
+  }
+  if (S.stunde >= 8) bauEinteilen(S);                        // 7 Uhr ist heute schon vorbei
+  buch(S, 'bauhof', `Ab heute baut der Bauhof ${gebOrt(S, S.bauhof)}: Baustellen brauchen jetzt Leute, Werkstätten machen Kisten für die Läden.`
+    + (S.baustellen.length ? ` ${S.baustellen.length} ${S.baustellen.length === 1 ? 'Baustelle läuft' : 'Baustellen laufen'} weiter.` : ''));
 }
 // Was aus dem JSON-Teil in die Oberfläche geht, muss die erwarteten Typen haben (sonst Absturz oder eingeschleustes HTML)
 function jsonPruefen(S) {
@@ -2794,10 +2819,10 @@ function spielstandText() {
   return JSON.stringify({ ...d, arrays: d.arrays.map(a => ({ name: a.name, typ: a.typ, b64: b64aus(a.daten) })),
     zuletztGelaufen: zuletztGelaufen(), tempo: tempo || 0, ui: uiZustand() });
 }
-function spielstandLesen(text) {
+function spielstandLesen(text, migrieren) {
   const d = JSON.parse(text);
   if (Array.isArray(d.arrays)) d.arrays = d.arrays.map(a => ({ name: a.name, typ: a.typ, daten: b64ein(a.b64, a.typ) }));
-  return { S: Sim.importZustand(d), zuletztGelaufen: Number(d.zuletztGelaufen) || Date.now(), tempo: d.tempo, ui: d.ui || {} };
+  return { S: Sim.importZustand(d, migrieren), zuletztGelaufen: Number(d.zuletztGelaufen) || Date.now(), tempo: d.tempo, ui: d.ui || {} };
 }
 function uiZustand() { return { kiModell: ki.modell, kiMessung: ki.messung }; }   // Modell und gemessene Antwortzeit
 // Spec: „Die Datei merkt sich, wann sie zuletzt lief.“ In einem versteckten Tab steht die Stadt (kein Bild, kein Takt):
@@ -4057,14 +4082,18 @@ $('import-datei').addEventListener('change', async (e) => {
   if (!datei) return;
   const altS = S;
   try {
-    const l = spielstandLesen(await datei.text());
+    const text = await datei.text();
+    let l, migriert = false;
+    try { l = spielstandLesen(text); }
+    catch (err) { if (!err.migrierbar) throw err; l = spielstandLesen(text, true); migriert = true; }   // Version 2: übernehmen
     karteZu();
     S = l.S; akku = 0; buchNeu(); if (G) { G.neueStadt(); }
     ki.gesendet.clear(); ki.gespraech = null; ki.aufholen.length = 0; hauptSchluessel = '';
     nachSchritten();                                      // erst zeichnen: wirft es, bleibt die alte Stadt
     speichernErlaubt = true; speichern();
     $('einst-dialog').close();
-    meldung(`Spielstand geladen: Tag ${S.tag}, ${zahl(S.einwohner)} Einwohner.`);
+    meldung(migriert ? `Spielstand von Version 2 übernommen: Tag ${S.tag}, ${zahl(S.einwohner)} Einwohner. Ab jetzt baut der Bauhof.`
+      : `Spielstand geladen: Tag ${S.tag}, ${zahl(S.einwohner)} Einwohner.`);
   } catch (err) {
     if (S !== altS) { S = altS; buchNeu(); if (G) G.neueStadt(); hauptSchluessel = ''; try { nachSchritten(); } catch { /* alte Stadt lief ja */ } }
     meldung(`Import hat nicht geklappt: ${err.message}`, 'fehler');
@@ -4075,6 +4104,29 @@ $('version-neu').addEventListener('click', () => {
   alterSpielstand = null; speichernErlaubt = true;
   speichern();
   $('version-dialog').close();
+});
+// Abweichung von der Spec (dort nur Export oder Neu): Ein Stand von Version 2 lässt sich umrechnen (README, Annahme 60)
+$('version-uebernehmen').addEventListener('click', async () => {
+  const altS = S;
+  try {
+    const l = spielstandLesen(alterSpielstand, true);
+    S = l.S; akku = 0; buchNeu(); if (G) G.neueStadt();
+    ki.gesendet.clear(); ki.gespraech = null; ki.aufholen.length = 0; hauptSchluessel = '';
+    if (typeof l.tempo === 'number') tempo = l.tempo;
+    nachSchritten();
+    alterSpielstand = null; speichernErlaubt = true; speichern();
+    $('version-dialog').close();
+    setzeTempo(tempo);
+    meldung(`Deine Stadt ist übernommen: Tag ${S.tag}, ${zahl(S.einwohner)} Einwohner. Ab jetzt baut der Bauhof.`);
+    const weg = Date.now() - l.zuletztGelaufen;
+    if (tempo > 0 && weg >= 60000) {
+      const erg = await aufholen(weg);
+      if (erg && erg.tage >= 1) wegKarte(erg);
+    }
+  } catch (err) {
+    if (S !== altS) { S = altS; buchNeu(); if (G) G.neueStadt(); hauptSchluessel = ''; try { nachSchritten(); } catch { /* alte Stadt lief ja */ } }
+    $('version-text').textContent = `Übernehmen hat nicht geklappt: ${err.message}. Der alte Stand ist unverändert, „Export behalten“ sichert ihn.`;
+  }
 });
 function buchNeu() { buchGesehen = 0; $('buch-liste').replaceChildren(); }
 
@@ -4118,6 +4170,12 @@ if (versionFehler) {
   $('version-text').textContent = versionFehler.andereVersion ? versionFehler.message
     : `Der gespeicherte Stand lässt sich nicht lesen: ${versionFehler.message}`;
   if (!versionFehler.andereVersion) $('version-titel').textContent = 'Spielstand lässt sich nicht laden';
+  if (versionFehler.migrierbar) {
+    $('version-text').textContent = 'Dein Spielstand ist von Version 2. Seit Version 3 bauen Leute vom Bauhof die Häuser, und Werkstätten machen Kisten für die Läden.';
+    $('version-hinweis').textContent = '„Stadt übernehmen“ rechnet deine Stadt um: Laufende Baustellen bekommen die fehlenden Arbeitstage, alle Leute, Häuser und das Stadtbuch bleiben. Vorher „Export behalten“, wenn du den alten Stand sichern willst.';
+    $('version-uebernehmen').hidden = false;
+    $('version-neu').classList.remove('haupt');
+  } else $('version-neu').classList.add('haupt');
   $('version-dialog').showModal();
 } else if (geladen) {
   const weg = Date.now() - geladen.zuletztGelaufen;
