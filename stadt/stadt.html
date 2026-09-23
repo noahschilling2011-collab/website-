@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>STADT</title>
 <style>
-  /* Farben und Maße an einem Ort. Dunkler Grund, ein Akzent: warmes Fensterlicht. */
+  /* Farben und Maße an einem Ort. Dunkler Grund, ein Akzent: warmes Fensterlicht.
+     CSS-Namen, die nicht in der Spec stehen, auf MDN nachgeschlagen (23.09.2026): backdrop-filter mit blur() und
+     saturate(), svh, clamp(), width: fit-content, overflow-wrap: anywhere. */
   :root {
     --grund: #0b0d12;
     --ebene1: #12151c;
@@ -19,7 +21,19 @@
     --akzent-leise: rgba(255, 200, 100, 0.16);
     --gut: #8fd4a8;
     --schlecht: #f2998a;
-    --glas: rgba(14, 16, 22, 0.62);
+    --glas: rgba(14, 16, 22, 0.78);                        /* 0,78: leiser Text bleibt auch vor hellem Taghimmel ≥ 4,5:1 */
+    --glas-fallback: rgba(18, 21, 28, 0.94);
+    --akzent-rand: rgba(255, 200, 100, 0.5);
+    --akzent-linie: rgba(255, 200, 100, 0.45);
+    --schlecht-rand: rgba(242, 153, 138, 0.6);
+    --hell-1: rgba(255, 255, 255, 0.05);                   /* Trennlinien */
+    --hell-2: rgba(255, 255, 255, 0.06);                   /* Hover, Lichtkante */
+    --hell-3: rgba(255, 255, 255, 0.08);
+    --hell-4: rgba(255, 255, 255, 0.18);
+    --hell-5: rgba(255, 255, 255, 0.2);
+    --hell-6: rgba(255, 255, 255, 0.25);
+    --schatten: rgba(0, 0, 0, 0.5);
+    --abdunkeln: rgba(5, 7, 10, 0.6);
     --karte: #181b24;                                      /* Personen- und Hauskarte, deckend */
     --debug: rgba(10, 12, 16, 0.85);
     --grund-verlauf: #1a2236;
@@ -45,12 +59,12 @@
   .glas {
     background: var(--glas);
     backdrop-filter: blur(18px) saturate(150%);
-    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);   /* ungeprüft: Präfix steht nicht auf der MDN-Seite zu backdrop-filter; nur Rückfall für ältere Safari */
     border: 1px solid var(--linie);
     border-radius: var(--r);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 1px 0 var(--hell-2);
   }
-  @supports not (backdrop-filter: blur(1px)) { .glas { background: rgba(18, 21, 28, 0.94); } }
+  @supports not (backdrop-filter: blur(1px)) { .glas { background: var(--glas-fallback); } }
 
   /* Kennzahlen oben links */
   #kennzahlen { position: fixed; top: var(--s4); left: var(--s4); padding: var(--s3) var(--s4); min-width: 220px;
@@ -69,8 +83,8 @@
   #tempo button { min-width: 64px; padding: var(--s2) var(--s3); background: transparent; border: 1px solid transparent;
     border-radius: 10px; cursor: pointer; color: var(--text-leise); font-variant-numeric: tabular-nums;
     transition: background-color 150ms ease-out, color 150ms ease-out, border-color 150ms ease-out; }
-  #tempo button:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); }
-  #tempo button[aria-pressed="true"] { background: var(--akzent-leise); border-color: rgba(255, 200, 100, 0.5);
+  #tempo button:hover { background: var(--hell-2); color: var(--text); }
+  #tempo button[aria-pressed="true"] { background: var(--akzent-leise); border-color: var(--akzent-rand);
     color: var(--akzent); font-weight: 500; }
 
   /* Rechte Spalte: Hauptfiguren oben, darunter das Stadtbuch (einklappbar) */
@@ -87,29 +101,30 @@
   .haupt-zeile { display: grid; grid-template-columns: 30px minmax(0, 1fr); column-gap: var(--s3); align-items: center; width: 100%;
     padding: 5px var(--s4); background: none; border: 0; cursor: pointer; text-align: left; color: var(--text); font-size: var(--klein);
     transition: background-color 150ms ease-out; }
-  .haupt-zeile:hover { background: rgba(255, 255, 255, 0.05); }
+  .haupt-zeile:hover { background: var(--hell-1); }
   .kreis { grid-row: span 2; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 0.74rem;
-    font-weight: 500; letter-spacing: 0.02em; color: var(--akzent); border: 1.5px solid rgba(255, 200, 100, 0.55); background: var(--akzent-leise); }
+    font-weight: 500; letter-spacing: 0.02em; color: var(--akzent); border: 1.5px solid var(--akzent-rand); background: var(--akzent-leise); }
   .haupt-zeile .n { color: var(--text-stark); display: flex; gap: var(--s2); align-items: baseline; min-width: 0; line-height: 1.3; }
   .haupt-zeile .gedanke { color: var(--text-leise); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.35; }
   .ueberlegt-text { color: var(--text-leise); font-size: 0.9em; font-weight: 400; font-style: italic; text-transform: none; letter-spacing: 0; }
-  .ueberlegt .kreis { border-color: var(--denkt); color: var(--text-stark); background: rgba(255, 255, 255, 0.08); animation: puls 1.8s ease-in-out infinite; }
-  @keyframes puls { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); } 50% { box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.18); } }
+  .ueberlegt .kreis { border-color: var(--denkt); color: var(--text-stark); background: var(--hell-3); animation: puls 1.8s ease-in-out infinite; }
+  @keyframes puls { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 0 4px var(--hell-4); } }
   #buch-knopf { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: var(--s3) var(--s4);
     background: transparent; border: 0; cursor: pointer; font-weight: 500; color: var(--text-stark); text-align: left; }
   #buch-knopf .pfeil { transition: transform 200ms cubic-bezier(.2,.8,.2,1); color: var(--text-leise); }
   #buch-knopf[aria-expanded="false"] .pfeil { transform: rotate(-90deg); }
   #buch-liste { list-style: none; margin: 0; padding: 0 var(--s4) var(--s3); overflow-y: auto; font-size: var(--klein);
     border-top: 1px solid var(--linie); }
-  #buch-liste li { padding: var(--s2) 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); line-height: 1.45; }
+  #buch-liste li { padding: var(--s2) 0; border-bottom: 1px solid var(--hell-1); line-height: 1.45; }
   #buch-liste li:last-child { border-bottom: 0; }
   #buch-liste .tag { display: block; color: var(--text-leise); font-variant-numeric: tabular-nums; font-size: 0.92em; }
   #buch-liste li.neu { animation: rein 400ms cubic-bezier(.2,.8,.2,1); }
   @keyframes rein { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
   .name { color: var(--text-stark); }
   button.name { background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline;
-    text-decoration-color: rgba(255, 200, 100, 0.45); text-underline-offset: 2px; }
+    text-decoration-color: var(--akzent-linie); text-underline-offset: 2px; }
   button.name:hover { color: var(--akzent); }
+  button.name.weg { color: var(--text-leise); text-decoration-style: dotted; }
 
   /* Hinweis, wenn 3D fehlt */
   .hinweis { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: min(46ch, calc(100vw - 32px)); padding: var(--s5);
@@ -128,7 +143,7 @@
     padding: var(--s3) var(--s4) var(--s5); font-size: var(--klein); }
   #karte .kopf { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--s2); min-height: 28px; }
   #karte .kopf button { background: none; border: 0; color: var(--text-leise); cursor: pointer; padding: 4px 6px; border-radius: 6px; }
-  #karte .kopf button:hover { color: var(--text); background: rgba(255, 255, 255, 0.06); }
+  #karte .kopf button:hover { color: var(--text); background: var(--hell-2); }
   #karte h2 { margin: 0 0 2px; font-size: var(--gross); font-weight: 500; color: var(--text-stark); letter-spacing: -0.01em; outline: none; }
   #karte h3 { margin: var(--s4) 0 var(--s2); font-size: 0.78rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase;
     color: var(--text-leise); }
@@ -146,16 +161,16 @@
   .familie dt { color: var(--text-leise); }
   .familie dd { margin: 0; }
   .personenliste { list-style: none; margin: 0; padding: 0; }
-  .personenliste li { display: flex; justify-content: space-between; gap: var(--s2); padding: 4px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+  .personenliste li { display: flex; justify-content: space-between; gap: var(--s2); padding: 4px 0; border-bottom: 1px solid var(--hell-1); }
   .personenliste li.neuer-haushalt { border-top: 1px solid var(--linie); }
   button.haus { background: none; border: 0; padding: 0; cursor: pointer; color: inherit; text-decoration: underline;
-    text-decoration-color: rgba(255, 255, 255, 0.25); text-underline-offset: 2px; font: inherit; }
+    text-decoration-color: var(--hell-6); text-underline-offset: 2px; font: inherit; }
   button.haus:hover { color: var(--akzent); }
   .karte-knoepfe { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); margin-top: var(--s3); }
   .knopf.klein { padding: 4px 10px; font-size: var(--klein); }
   .knopf:disabled { opacity: 0.5; cursor: default; }
   .tagebuch { list-style: none; margin: 0; padding: 0 var(--s1) 0 0; max-height: 260px; overflow-y: auto; }
-  .tagebuch li { padding: var(--s2) 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+  .tagebuch li { padding: var(--s2) 0; border-bottom: 1px solid var(--hell-1); }
   .tagebuch li:last-child { border-bottom: 0; }
   .tagebuch .meta { display: block; color: var(--text-leise); font-size: 0.92em; margin-bottom: 2px; }
   .tagebuch p { margin: 0; }
@@ -176,8 +191,8 @@
 
   /* Dialoge: solide Ebene 2, kein Glas */
   dialog { background: var(--ebene2); color: var(--text); border: 1px solid var(--linie); border-radius: var(--r);
-    padding: var(--s5); max-width: min(520px, calc(100vw - 32px)); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); }
-  dialog::backdrop { background: rgba(5, 7, 10, 0.6); }
+    padding: var(--s5); max-width: min(520px, calc(100vw - 32px)); box-shadow: 0 20px 60px var(--schatten); }
+  dialog::backdrop { background: var(--abdunkeln); }
   dialog[open] { animation: rein 350ms cubic-bezier(.2,.8,.2,1); }
   dialog h2 { margin: 0 0 var(--s3); font-size: var(--gross); font-weight: 500; color: var(--text-stark); letter-spacing: -0.01em; }
   dialog p { margin: 0 0 var(--s3); color: var(--text); max-width: 60ch; }
@@ -185,8 +200,8 @@
   .knoepfe { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s4); }
   .knopf { padding: var(--s2) var(--s4); border-radius: 10px; border: 1px solid var(--linie); background: var(--ebene3);
     color: var(--text); cursor: pointer; transition: background-color 150ms ease-out, border-color 150ms ease-out; }
-  .knopf:hover { border-color: rgba(255, 255, 255, 0.2); }
-  .knopf.haupt { background: var(--akzent-leise); border-color: rgba(255, 200, 100, 0.5); color: var(--akzent); }
+  .knopf:hover { border-color: var(--hell-5); }
+  .knopf.haupt { background: var(--akzent-leise); border-color: var(--akzent-rand); color: var(--akzent); }
   .zahlen { display: grid; grid-template-columns: 1fr auto; gap: 4px var(--s5); margin: var(--s3) 0; font-variant-numeric: tabular-nums; }
   .zahlen dt { color: var(--text-leise); }
   .zahlen dd { margin: 0; text-align: right; color: var(--text-stark); }
@@ -207,8 +222,8 @@
   #meldung { position: fixed; left: 50%; top: var(--s4); transform: translateX(-50%); max-width: min(560px, calc(100vw - 32px));
     padding: var(--s3) var(--s4); background: var(--ebene2); border: 1px solid var(--linie); border-radius: 10px; font-size: var(--klein);
     z-index: 10; }
-  #meldung.fehler { border-color: rgba(242, 153, 138, 0.6); color: var(--schlecht); }
-  #meldung.warnung { border-color: rgba(255, 200, 100, 0.55); color: var(--akzent); }
+  #meldung.fehler { border-color: var(--schlecht-rand); color: var(--schlecht); }
+  #meldung.warnung { border-color: var(--akzent-rand); color: var(--akzent); }
   body.debug #karte { bottom: 152px; }                    /* nicht über den Debug-Knöpfen */
   #debug-knoepfe { position: fixed; left: var(--s4); bottom: 112px; display: flex; gap: var(--s1); font-size: 12px; }
   #debug-knoepfe .knopf { padding: 4px 8px; font-size: 12px; }
@@ -1444,7 +1459,7 @@ function aktKind(S, p) {
   const nummer = Math.max(P.kinder[p], P.kinder[q]);
   buch(S, 'geburt', `${nr(S, p)} und ${nr(S, q)} bekommen ${P.weib[k] ? 'eine Tochter' : 'einen Sohn'}: ${vorname(S, k)}. `
     + (nummer === 1 ? 'Ihr erstes Kind' : `Kind Nummer ${nummer}`)
-    + (P.ziel[p] === Z.FAMILIE || P.ziel[q] === Z.FAMILIE ? ', sie wollten eine Familie.' : '.')
+    + (P.ziel[p] === Z.FAMILIE || P.ziel[q] === Z.FAMILIE ? ', sie wollten eine Familie.' : ', beiden geht es gut miteinander.')
     + grosseltern(S, p, q));
   return true;
 }
@@ -1613,18 +1628,18 @@ function kiAktionen(S, p, namen) {
     let satz = '';
     switch (AKTIONSNAMEN.indexOf(n)) {
       case A.WOHNUNG: satz = P.wohnung[p] < 0 ? 'Du suchst dir eine Wohnung, du hast gerade keine.' : 'Du suchst dir eine andere Wohnung, die jetzige passt nicht gut.'; break;
-      case A.JOB: satz = `Du suchst dir Arbeit. In der Stadt ${S.freieStellen === 1 ? 'ist 1 Stelle' : `sind ${S.freieStellen} Stellen`} frei.`; break;
-      case A.WECHSEL: satz = `Du wechselst die Stelle. Anderswo zahlt man ${besterFreierLohn(S)} Taler am Tag` + (arb >= 0 ? `, du bekommst ${S.g.lohn[arb]}.` : '.'); break;
+      case A.JOB: satz = `Du suchst dir Arbeit, in der Stadt ${S.freieStellen === 1 ? 'ist 1 Stelle' : `sind ${S.freieStellen} Stellen`} frei.`; break;
+      case A.WECHSEL: satz = `Du wechselst auf eine Stelle mit ${besterFreierLohn(S)} Taler Lohn am Tag` + (arb >= 0 ? ` statt ${S.g.lohn[arb]}.` : '.'); break;
       case A.KUENDIGEN: satz = `Du kündigst und lebst eine Weile von deinem Ersparten (${geld} Taler).`; break;
-      case A.FREI: satz = 'Du nimmst dir heute frei und ruhst dich aus. Der Lohn für heute fällt weg.'; break;
+      case A.FREI: satz = 'Du nimmst dir heute frei, ruhst dich aus und verzichtest auf den Tageslohn.'; break;
       case A.FREUNDE: satz = 'Du triffst heute Abend Freunde oder lernst neue Leute kennen.'; break;
       case A.PARTNER: satz = 'Du suchst jemanden, mit dem du zusammen sein willst.'; break;
       case A.ZUSAMMEN: satz = `Du ziehst mit ${pn || 'deinem Partner'} zusammen.`; break;
-      case A.TRENNEN: satz = `Du trennst dich von ${pn || 'deinem Partner'}. Ihr seid beide seit über zwei Wochen unzufrieden.`; break;
+      case A.TRENNEN: satz = `Du trennst dich von ${pn || 'deinem Partner'}, weil ihr beide seit über zwei Wochen unzufrieden seid.`; break;
       case A.KIND: satz = `Du bekommst mit ${pn || 'deinem Partner'} ein Kind.`; break;
       case A.GRUENDEN: {
         const t = gruendungsTyp(S, p), kosten = gruendungsKosten(t, S.leerTyp[t] > 0 && P.geld[p] >= gruendungsKosten(t, true));
-        satz = `Du gründest ${t === LADEN ? 'einen eigenen Laden' : 'eine eigene Werkstatt'}. Das kostet ${kosten} Taler, du hast ${geld}.`;
+        satz = `Du gründest ${t === LADEN ? 'einen eigenen Laden' : 'eine eigene Werkstatt'} für ${kosten} Taler (du hast ${geld}).`;
         break;
       }
       case A.WEGZIEHEN: satz = 'Du verlässt die Stadt für immer.'; break;
@@ -1725,7 +1740,7 @@ function kiTagebuch(S, id, gen, text, art) {
   return true;
 }
 // Noah macht jemanden zur Hauptfigur oder nimmt es zurück (nur Erwachsene, höchstens R.HAUPT_MAX)
-function hauptSetzen(S, id, gen, an) {
+function hauptSetzen(S, id, gen, an, grenze) {
   const K = S.ki;
   if (!lebtNoch(S, id, gen)) return false;
   if (!an) {
@@ -1733,7 +1748,7 @@ function hauptSetzen(S, id, gen, an) {
     if (anfrageRaus(S, id, gen)) S.p.jetzt[id] = 1;         // wartete noch: entscheidet in der nächsten Stunde normal
     return true;
   }
-  if (istHaupt(S, id) || K.haupt.length >= R.HAUPT_MAX || !erwachsen(S, id)) return false;
+  if (istHaupt(S, id) || K.haupt.length >= Math.min(R.HAUPT_MAX, grenze || R.HAUPT_MAX) || !erwachsen(S, id)) return false;
   K.haupt.push({ id, gen });
   return true;
 }
@@ -1941,7 +1956,9 @@ function pleite(S, b) {
   const g = S.g, o = g.besitzer[b], laden = g.typ[b] === LADEN;
   // Grund: beim Laden die Kundschaft von heute, bei der Werkstatt Belegschaft oder Umlandpreis
   const besetzt = S.belegschaft[b].length, platz = stellen(S, b);
-  const grund = laden ? `Zuletzt kamen nur ${g.bedient[b]} von ${g.kapaz[b]} möglichen Leuten.`
+  const grund = laden ? (g.bedient[b] * 10 >= g.kapaz[b] * 9
+      ? `Er war voll (${g.bedient[b]} von ${g.kapaz[b]} Leuten), trotzdem blieb nach Wareneinkauf, Löhnen und laufenden Kosten nichts übrig.`
+      : `Zuletzt kamen nur ${g.bedient[b]} von ${g.kapaz[b]} möglichen Leuten.`)
     : besetzt * 2 < platz ? `Nur ${besetzt} von ${platz} Stellen waren besetzt.`
     : `Das Umland zahlte nur ${Math.round(S.exportPreis)} Taler je Arbeitstag.`;
   const n = schliessen(S, b, true);
@@ -2084,6 +2101,7 @@ function aufstocken(S, b, grund) {
   buch(S, 'bauamt', `Das Bauamt stockt das Wohnhaus ${gebOrt(S, b)} auf Stufe ${ziel} auf. ${grund}`);
   return mehr;
 }
+// später: ein Bürgermeister unter den Hauptfiguren, der die Prioritäten des Bauamts setzt
 function bauamt(S) {
   const g = S.g, st = S.stat.bauamt;
   const suchende = S.wohnungSuchende + S.anfragen;
@@ -2383,7 +2401,7 @@ function personInfo(S, p, gen) {
     let nm = '';
     if (M_BEZUG[code] === 'p') {
       const lebend = bz >= 0 && P.lebt[bz] && P.gen[bz] === P.memGen[i];
-      nm = lebend ? nr(S, bz) : P.memName[i] ? nameAusPack(P.memName[i]) : 'jemand';
+      nm = lebend ? nr(S, bz) : P.memName[i] ? '\u0001' + bz + '/' + P.memGen[i] + '/' + nameAusPack(P.memName[i]) + '\u0002' : 'jemand';
     }
     mem.push({ tag: P.memTag[i], text: erinnerungText(S, code, bz, nm) });
   }
@@ -2392,7 +2410,7 @@ function personInfo(S, p, gen) {
   for (const [e, eg, en] of [[P.elternA[p], P.elternAGen[p], P.elternNameA[p]], [P.elternB[p], P.elternBGen[p], P.elternNameB[p]]]) {
     if (e < 0) continue;
     if (P.lebt[e] && P.gen[e] === eg) eltern.push(ref(S, e));
-    else if (en) eltern.push({ id: -1, gen: 0, name: nameAusPack(en), lebt: false });
+    else if (en) eltern.push({ id: e, gen: eg, name: nameAusPack(en), lebt: false });
   }
   const kinderVon = (x) => {
     const gx = P.gen[x], k = [];
@@ -2486,6 +2504,19 @@ G.StadtSim = {
 // =====================================================================================
 // STADT — Darstellung, Oberfläche, Takt. Liest den Sim-Zustand S, ändert ihn nur über StadtSim.
 // =====================================================================================
+// Woher die Namen stammen (Spec: „Regel über allem“):
+// - Three.js: Quellcode three@0.186.0 (npm-Paket, src/ und examples/jsm/controls/OrbitControls.js).
+// - Ollama: docs/api.md, docs/faq.md, server/routes.go, envconfig/config.go (siehe Abschnitt Ollama unten).
+// - Browser, auf MDN nachgeschlagen (developer.mozilla.org, 23.09.2026): fetch mit method/headers/body/signal,
+//   Response.ok/status/json, AbortController (abort, signal, AbortError), TypeError bei Netzfehler, Storage.getItem/setItem,
+//   Crypto.getRandomValues, ResizeObserver, matchMedia, btoa/atob, URL.createObjectURL/revokeObjectURL, Blob, Blob.text,
+//   HTMLInputElement (files, setSelectionRange, selectionStart/End, select, readOnly, disabled), HTMLDialogElement
+//   (showModal, close, Ereignis cancel), HTMLElement (focus mit preventScroll, dataset, hidden, click), Element (closest,
+//   replaceChildren, prepend, getBoundingClientRect, scrollTop, scrollHeight, clientHeight, clientWidth, lastElementChild),
+//   Document (createDocumentFragment, activeElement, hidden, visibilitychange), pagehide, pointerdown/pointerup mit
+//   clientX/clientY, requestAnimationFrame, performance.now, devicePixelRatio, URLSearchParams (get, has), Location (search,
+//   reload), HTMLAnchorElement.download, KeyboardEvent (code, key), DOMTokenList.toggle, submit, Number.toLocaleString,
+//   setInterval/setTimeout/clearTimeout.
 const Sim = globalThis.StadtSim;
 const URLP = new URLSearchParams(location.search);
 const DEBUG = URLP.has('debug');
@@ -2514,14 +2545,22 @@ function b64ein(b64, typ) {
 function spielstandText() {
   const d = Sim.exportZustand(S);
   return JSON.stringify({ ...d, arrays: d.arrays.map(a => ({ name: a.name, typ: a.typ, b64: b64aus(a.daten) })),
-    zuletztGelaufen: Date.now(), tempo: tempo || 0, ui: uiZustand() });
+    zuletztGelaufen: zuletztGelaufen(), tempo: tempo || 0, ui: uiZustand() });
 }
 function spielstandLesen(text) {
   const d = JSON.parse(text);
   if (Array.isArray(d.arrays)) d.arrays = d.arrays.map(a => ({ name: a.name, typ: a.typ, daten: b64ein(a.b64, a.typ) }));
   return { S: Sim.importZustand(d), zuletztGelaufen: Number(d.zuletztGelaufen) || Date.now(), tempo: d.tempo, ui: d.ui || {} };
 }
-function uiZustand() { return { kiModell: ki.modell }; }  // das in den Einstellungen gewählte Ollama-Modell
+function uiZustand() { return { kiModell: ki.modell, kiMessung: ki.messung }; }   // Modell und gemessene Antwortzeit
+// Spec: „Die Datei merkt sich, wann sie zuletzt lief.“ In einem versteckten Tab steht die Stadt (kein Bild, kein Takt):
+// dann zählt der Moment des Versteckens. Mitten im Aufholen gelten die noch fehlenden Stunden als nicht gelaufen.
+let verstecktSeit = 0, aufholZiel = -1;
+function zuletztGelaufen() {
+  const basis = document.hidden && verstecktSeit ? verstecktSeit : Date.now();
+  const rest = aufholenLaeuft && aufholZiel >= 0 ? Math.max(0, aufholZiel - (S.tag * 24 + S.stunde)) : 0;
+  return basis - rest * SEK_PRO_STUNDE * 1000;
+}
 
 let speichernErlaubt = true;
 let alterSpielstand = null;                               // Text eines Spielstands anderer Version (für „Export behalten“)
@@ -3085,7 +3124,7 @@ function uhrAnzeigen(t) {
 const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function buchHtml(text) {
   return esc(text).replace(/\u0001(\d+)\/(\d+)\/([^\u0002]*)\u0002/g,
-    (m, id, gen, n) => `<button type="button" class="name" data-p="${id}" data-g="${gen}">${n}</button>`);
+    (m, id, gen, n) => `<button type="button" class="name" data-p="${id}" data-g="${gen}" data-n="${n}">${n}</button>`);
 }
 let buchGesehen = 0;
 const BUCH_ANZEIGE = Sim.R.BUCH_MAX;                     // alle Einträge, damit „Während du weg warst“ immer im Buch zu finden ist
@@ -3108,10 +3147,13 @@ function buchAnzeigen() {
 const verlauf = [];                                       // besuchte Karten, für „zurück“
 const ZUEGE = [['fleiss', 'Fleiß'], ['gesellig', 'Geselligkeit'], ['ehrgeiz', 'Ehrgeiz'], ['spar', 'Sparsamkeit'], ['heimat', 'Heimatliebe']];
 const BEDARF = [['geld', 'Geld'], ['wohnen', 'Wohnen'], ['kontakt', 'Kontakt'], ['freizeit', 'Freizeit']];
-const nameKnopf = (r) => r ? (r.lebt ? `<button type="button" class="name" data-p="${r.id}" data-g="${r.gen}">${esc(r.name)}</button>` : `<span class="leise">${esc(r.name)} †</span>`) : '–';
+// Jeder Name ist anklickbar; wer nicht mehr in der Stadt ist (gestorben oder weggezogen), öffnet eine kurze Karte dazu
+const nameKnopf = (r) => !r ? '–' : r.id >= 0
+  ? `<button type="button" class="name${r.lebt ? '' : ' weg'}" data-p="${r.id}" data-g="${r.gen}" data-n="${esc(r.name)}">${esc(r.name)}</button>`
+  : `<span class="leise">${esc(r.name)}</span>`;
 const hausKnopf = (b, text) => b >= 0 ? `<button type="button" class="haus" data-b="${b}">${text}</button>` : text;
 const balken = (wert, gruen) => `<div class="balken${gruen ? ' gruen' : ''}" role="img" aria-label="${Math.round(wert)} von 100"><span style="width:${Math.max(0, Math.min(100, wert))}%"></span></div>`;
-function zeigePerson(p, gen) { verlauf.push({ art: 'p', id: Number(p), gen: Number(gen) }); if (verlauf.length > 50) verlauf.shift(); karteRendern(true); }
+function zeigePerson(p, gen, name) { verlauf.push({ art: 'p', id: Number(p), gen: Number(gen), name: name || '' }); if (verlauf.length > 50) verlauf.shift(); karteRendern(true); }
 function zeigeGebaeude(b) { verlauf.push({ art: 'g', id: Number(b) }); if (verlauf.length > 50) verlauf.shift(); karteRendern(true); }
 function karteZu() { verlauf.length = 0; $('karte').hidden = true; }
 $('karte-zu').addEventListener('click', karteZu);
@@ -3119,7 +3161,7 @@ $('karte-zurueck').addEventListener('click', () => { verlauf.pop(); karteRendern
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('karte').hidden && !document.querySelector('dialog[open]')) karteZu(); });
 document.addEventListener('click', (e) => {
   const n = e.target.closest('button.name');
-  if (n) { zeigePerson(n.dataset.p, n.dataset.g); return; }
+  if (n) { zeigePerson(n.dataset.p, n.dataset.g, n.dataset.n); return; }
   const h = e.target.closest('button.haus');
   if (h) zeigeGebaeude(h.dataset.b);
 });
@@ -3135,7 +3177,7 @@ function karteRendern(fokus) {
   const feld = fokus ? null : $('sagen-text'), tb = fokus ? null : ziel.querySelector('.tagebuch');
   const merk = feld ? { wert: feld.value, fokus: document.activeElement === feld, a: feld.selectionStart, b: feld.selectionEnd } : null;
   const tbScroll = tb ? { oben: tb.scrollTop, unten: tb.scrollHeight - tb.scrollTop - tb.clientHeight < 8 } : null;
-  ziel.innerHTML = k.art === 'p' ? personHtml(k.id, k.gen) : gebaeudeHtml(k.id);
+  ziel.innerHTML = k.art === 'p' ? personHtml(k.id, k.gen, k.name) : gebaeudeHtml(k.id);
   const tbNeu = ziel.querySelector('.tagebuch');
   if (tbNeu) tbNeu.scrollTop = tbScroll && !tbScroll.unten ? tbScroll.oben : tbNeu.scrollHeight;
   const feldNeu = $('sagen-text');
@@ -3146,9 +3188,9 @@ function karteRendern(fokus) {
   if (fokus) { $('karte').scrollTop = 0; const h = ziel.querySelector('h2'); if (h) h.focus({ preventScroll: true }); }
   else $('karte').scrollTop = scroll;
 }
-function personHtml(p, gen) {
+function personHtml(p, gen, name) {
   const i = Sim.personInfo(S, p, gen);
-  if (!i) return `<h2 tabindex="-1">Nicht mehr in der Stadt</h2><p class="leise">Diese Person ist gestorben oder weggezogen.</p>`;
+  if (!i) return `<h2 tabindex="-1">${name ? esc(name) : 'Nicht mehr in der Stadt'}</h2><p class="leise">${name ? 'Nicht mehr in der Stadt: gestorben oder weggezogen.' : 'Diese Person ist gestorben oder weggezogen.'}</p>`;
   let h = `<h2 tabindex="-1">${esc(i.name)}</h2>
     <p class="leise">${i.alter} Jahre${i.kind ? ', Kind' : ''}</p>
     <p>${buchHtml(i.arbeit)}${i.arbeitsort >= 0 ? ' · ' + hausKnopf(i.arbeitsort, 'Betrieb ansehen') : ''}</p>
@@ -3209,6 +3251,12 @@ const ki = {
   letzterFehler: '',
 };
 if (geladen && geladen.ui && typeof geladen.ui.kiModell === 'string') ki.modell = geladen.ui.kiModell;
+// Spec: „5 als Standard, bis 10 nur, wenn eine Entscheidung unter 5 Sekunden braucht.“ Gemessen über alle Antworten
+// dieses Modells; die Messung wird mitgespeichert und beginnt beim Modellwechsel neu.
+ki.messung = { n: 0, ms: 0 };
+{ const m = geladen && geladen.ui && geladen.ui.kiMessung;
+  if (m && Number.isFinite(m.n) && Number.isFinite(m.ms) && m.n >= 0 && m.ms >= 0) ki.messung = { n: m.n, ms: m.ms }; }
+function hauptGrenze() { const m = ki.messung; return m.n >= 5 && m.ms / m.n < 5000 ? Sim.R.HAUPT_MAX : Sim.R.HAUPT_START; }
 
 async function kiPruefen() {
   ki.geprueft = performance.now();
@@ -3245,6 +3293,7 @@ async function ollamaChat(system, frage) {
       if (r.ok) {
         const ms = performance.now() - t0;
         ki.stat.ms += ms; ki.stat.msMax = Math.max(ki.stat.msMax, ms);
+        ki.messung.n++; ki.messung.ms += ms;
         return d && d.message && typeof d.message.content === 'string' ? d.message.content : '';
       }
       const text = d && typeof d.error === 'string' ? d.error : 'HTTP ' + r.status;
@@ -3481,7 +3530,7 @@ document.addEventListener('click', (e) => {
   const k = e.target.closest('[data-haupt]');
   if (k) {
     const an = k.dataset.haupt === 'an';
-    if (Sim.hauptSetzen(S, Number(k.dataset.p), Number(k.dataset.g), an)) { hauptAnzeigen(); karteRendern(false); }
+    if (Sim.hauptSetzen(S, Number(k.dataset.p), Number(k.dataset.g), an, hauptGrenze())) { hauptAnzeigen(); karteRendern(false); }
   }
 });
 
@@ -3493,9 +3542,11 @@ const AKTION_TEXT = { wohnung_suchen: 'sucht eine Wohnung', job_suchen: 'sucht A
 function hauptKnopfHtml(i) {
   if (i.kind) return '';
   if (i.haupt) return `<div class="karte-knoepfe"><button type="button" class="knopf klein" data-haupt="aus" data-p="${i.id}" data-g="${i.gen}">Keine Hauptfigur mehr</button></div>`;
-  const voll = S.ki.haupt.length >= Sim.R.HAUPT_MAX;
+  const grenze = hauptGrenze(), voll = S.ki.haupt.length >= grenze, m = ki.messung;
   return `<div class="karte-knoepfe"><button type="button" class="knopf klein" data-haupt="an" data-p="${i.id}" data-g="${i.gen}"${voll ? ' disabled' : ''}>Zur Hauptfigur machen</button>`
-    + (voll ? `<span class="leise">Höchstens ${Sim.R.HAUPT_MAX} Hauptfiguren.</span>` : '') + '</div>';
+    + (!voll ? '' : grenze < Sim.R.HAUPT_MAX
+      ? `<span class="leise">Mehr als ${grenze} Hauptfiguren erst, wenn die KI im Schnitt unter 5 Sekunden antwortet (${m.n >= 5 ? `bisher ${(m.ms / m.n / 1000).toFixed(1).replace('.', ',')} s` : 'noch nicht gemessen'}).</span>`
+      : `<span class="leise">Höchstens ${Sim.R.HAUPT_MAX} Hauptfiguren.</span>`) + '</div>';
 }
 function tagebuchHtml(i) {
   const g = ki.gespraech && ki.gespraech.id === i.id && ki.gespraech.gen === i.gen ? ki.gespraech : null;
@@ -3546,7 +3597,7 @@ function nachfolgePruefen() {
   if (!S.ki.verlust.length || aufholenLaeuft || document.querySelector('dialog[open]')) return;
   const v = S.ki.verlust[0];
   const vor = v.vorschlaege.map(x => Sim.personInfo(S, x.id, x.gen) && Object.assign({}, x, { info: Sim.personInfo(S, x.id, x.gen) }))
-    .filter(x => x && !x.info.haupt && S.ki.haupt.length < Sim.R.HAUPT_MAX);
+    .filter(x => x && !x.info.haupt && S.ki.haupt.length < hauptGrenze());
   const sein = v.weib ? 'ihr' : 'sein';
   const rolle = (x) => `${sein}${x.info.weib ? 'e' : ''} ${x.rolle === 'partner' ? (x.info.weib ? 'Partnerin' : 'Partner') : (x.info.weib ? 'Tochter' : 'Sohn')}`;
   $('nachfolge-titel').textContent = `${v.name} ${v.grund === 'tod' ? 'ist gestorben' : 'hat die Stadt verlassen'}`;
@@ -3560,7 +3611,7 @@ function nachfolgePruefen() {
 $('nachfolge-knoepfe').addEventListener('click', (e) => {
   const k = e.target.closest('[data-nachfolge]');
   if (!k) return;
-  if (k.dataset.nachfolge) { const [id, gen] = k.dataset.nachfolge.split('/').map(Number); Sim.hauptSetzen(S, id, gen, true); }
+  if (k.dataset.nachfolge) { const [id, gen] = k.dataset.nachfolge.split('/').map(Number); Sim.hauptSetzen(S, id, gen, true, hauptGrenze()); }
   Sim.verlustErledigt(S);
   $('nachfolge-dialog').close();
   hauptAnzeigen(); karteAktualisieren();
@@ -3583,7 +3634,7 @@ function kiEinstAnzeigen() {
 }
 $('ki-modell').addEventListener('change', (e) => {
   if (!ki.modelle.includes(e.target.value)) return;
-  ki.modell = e.target.value; ki.status = 'bereit'; ki.ohneThink = false;
+  ki.modell = e.target.value; ki.status = 'bereit'; ki.ohneThink = false; ki.messung = { n: 0, ms: 0 };
   hauptSchluessel = ''; hauptAnzeigen(); kiEinstAnzeigen(); speichern();
 });
 $('ki-suchen').addEventListener('click', () => { kiPruefen(); });
@@ -3669,6 +3720,7 @@ async function aufholen(msWeg) {
   const vorher = schnappschuss(), zielTag = S.tag + Math.floor((S.stunde + stundenGesamt) / 24), zielStunde = (S.stunde + stundenGesamt) % 24;
   const tage = Math.floor(stundenGesamt / 24);
   aufholenLaeuft = true;
+  aufholZiel = zielTag * 24 + zielStunde;
   Sim.kiSchalten(S, false);                               // beim Aufholen entscheiden alle mit dem normalen Gehirn
   const zeigen = tage >= 1;
   if (zeigen) {
@@ -3774,9 +3826,8 @@ function buchNeu() { buchGesehen = 0; $('buch-liste').replaceChildren(); }
 // Speichern alle 30 Sekunden und beim Verlassen; beim Zurückkommen die verpasste Zeit aufholen
 setInterval(() => { if (!aufholenLaeuft) speichern(); }, 30000);
 addEventListener('pagehide', () => speichern());
-let verstecktSeit = 0;
 document.addEventListener('visibilitychange', async () => {
-  if (document.hidden) { speichern(); verstecktSeit = Date.now(); return; }
+  if (document.hidden) { verstecktSeit = Date.now(); speichern(); return; }
   const weg = verstecktSeit ? Date.now() - verstecktSeit : 0;
   verstecktSeit = 0;
   if (tempo > 0 && weg >= 60000 && !aufholenLaeuft) {

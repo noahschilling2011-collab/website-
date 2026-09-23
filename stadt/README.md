@@ -124,6 +124,13 @@ Weitere Schalter für `--seed`: `--alle 60` (Zeilenabstand), `--fluss` (Zu-/Wegz
 | 48 | „Hochzeit“ im Stadtbuch heißt: ein Paar zieht zusammen | Die Aktionsliste der Spec kennt kein Heiraten, nur `zusammenziehen` |
 | 49 | Unter 720 px Breite stehen Hauptfiguren und Stadtbuch unten; die Leiste zeigt dann nur die Initialen (Tippen öffnet die Karte mit Name und Tagebuch) | Auf dem Handy ist oben rechts kein Platz für zwei Panels |
 | 50 | Die Personenkarte zeigt außer Charakter, Ziel, Gedächtnis, Familie und Freunden auch Befinden, Geld, Arbeit und Wohnung; Häuser, Läden und Werkstätten haben eine Karte mit Bewohnern bzw. Belegschaft. Leertaste = Pause | Die Spec verlangt Hausklick → Bewohner; der Rest macht die Karten erklärbar (Phase-3-Gate: „warum hat die eine einen Laden und die andere nicht“) |
+| 51 | Geld und Wohnen ändern sich einmal am Tag (mit Lohn, Miete und Einkauf um Mitternacht), Kontakt und Freizeit stündlich. Nach einem Umzug am Morgen gilt die neue Wohnung also erst ab Mitternacht | Spec: alle vier „verändern sich stündlich“. Geld fließt nur täglich; die Umstellung hätte die getesteten Gate-Zahlen verändert. **Frage an Noah**, ob Wohnen stündlich nachziehen soll |
+| 52 | Vier Aktionen addieren Dringlichkeit und Charakter statt sie zu multiplizieren: job_wechseln (45·Ehrgeiz + 0,3·Geldnot), partner_suchen, zusammenziehen, kind_bekommen | So beim Abstimmen der Gate-Werte in Phase 0 entstanden. Die Spec-Formel ist bei diesen vier nicht eingehalten; eine Umstellung verändert die Gate-Zahlen und ist nicht getestet |
+| 53 | Betriebe haben laufende Kosten (Laden 30, Werkstatt 40 Taler am Tag), und der Besitzer lässt 400 Taler als Polster in der Kasse, erst darüber bekommt er etwas | Die Spec sagt nur „Besitzer bekommt Umsatz minus Löhne“. Kosten und Polster kamen beim Abstimmen der Wirtschaft in Phase 0 dazu. Seit Phase 4 nennt das Stadtbuch bei vollen Läden die Kosten als Pleitegrund |
+| 54 | „Jemand Nahes gestorben → Heimatliebe zählt stärker“ wirkt beim Wegziehen (Heimatliebe × 1,5), nicht beim Umziehen innerhalb der Stadt | Die Spec knüpft Heimatliebe an „zieht schnell weg oder um“. Beim Umziehen fehlt die Trauer-Wirkung, das ist eine Lücke, keine bewusste Entscheidung |
+| 55 | Mehr als 5 Hauptfiguren erlaubt die App erst, wenn mindestens 5 KI-Antworten im Schnitt unter 5 Sekunden kamen. Die Messung wird mitgespeichert und beginnt bei einem Modellwechsel neu | Spec: „5 als Standard, bis 10 nur, wenn eine Entscheidung unter 5 Sekunden braucht“ |
+| 56 | `zuletztGelaufen` ist der Moment, in dem die Stadt zuletzt lief: in einem versteckten Tab der Moment des Versteckens, mitten im Aufholen „jetzt minus die noch fehlenden Stunden“ | Sonst ginge die Zeit verloren, wenn der Browser mit dem Tab im Hintergrund geschlossen wird |
+| 57 | Namen von Leuten, die nicht mehr in der Stadt sind (gestorben oder weggezogen), sind anklickbar und öffnen eine kurze Karte „nicht mehr in der Stadt“. Ob jemand starb oder wegzog, weiß die Karte nicht mehr, deshalb kein † | Spec: „Jeder Name auf der Personenkarte ist wieder anklickbar“; die Daten der Person sind nach dem Weggang frei |
 
 ## Bekannte Schwächen
 
@@ -143,6 +150,9 @@ Getestet ist gegen einen nachgebauten Server mit dem Request- und Antwortformat 
 ungültige und kaputte Antworten, Zeitüberschreitung, Ollama aus, 20×, Gespräche, Tagebuch nach dem Aufholen. Offen sind
 genau die Gate-Punkte, die ein echtes Modell brauchen: Anteil gültiger Antworten über 7 Spieltage, Dauer pro Antwort
 (entscheidet, ob mehr als 5 Hauptfiguren gehen), und ob zwei verschiedene Charaktere erkennbar anders handeln.
+
+**Frame-Zeit mit und ohne KI** (gegen den nachgebauten Server, im Wechsel gemessen, 3 Runden): JavaScript pro Bild 5,7–9,1 ms mit
+KI und 7,8–9,2 ms ohne. Ein Unterschied ist im Messrauschen nicht zu sehen; das Bildtempo begrenzt hier die Software-Grafik.
 
 **60 Bilder pro Sekunde sind nicht gemessen.** Im Container rendert Chromium ohne Grafikkarte (SwiftShader) mit etwa
 10 fps. Gemessen sind Draw Calls (10–13, auch bei 5.000 Einwohnern), Dreiecke (unter 51.000) und die Rechenzeit pro
