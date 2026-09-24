@@ -48,6 +48,8 @@
     --grund-verlauf: #1a2236;
     --denkt: rgba(244, 244, 247, 0.85);                    /* „überlegt“: neutral, kein zweiter Akzent */
     --code: #cfe8f2;                                       /* Code im Tagebuch: kühles Weiß, 13:1 auf --ebene1 */
+    --schild: rgba(12, 14, 20, 0.84);                      /* Straßennamen: dunkles Schild; --text darauf gerechnet ≥ 10:1, auch vor Weiß */
+    --schild-rand: rgba(255, 255, 255, 0.12);
     --r: 14px;
     --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
     --klein: clamp(0.78rem, 0.76rem + 0.1vw, 0.86rem);
@@ -72,6 +74,13 @@
   #szene { position: fixed; inset: 0; display: block; width: 100vw; height: 100svh; }
   body.ohne-3d #szene { display: none; }
   body.ohne-3d { background: radial-gradient(120% 90% at 30% 20%, var(--grund-verlauf) 0%, var(--grund) 60%); }
+  /* Straßennamen beim Heranzoomen: Ebene über der Leinwand und unter allen Panels (steht im Dokument vor ihnen), nicht klickbar.
+     Das Skript setzt nur transform und die Klasse „an“; ein- und ausgeblendet über opacity (reduziert: ohne Übergang, Regel unten) */
+  #strassen-namen { position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
+  .str-name { position: absolute; left: 0; top: 0; padding: 1px 7px 2px; border-radius: 6px; background: var(--schild);
+    border: 1px solid var(--schild-rand); color: var(--text); font-size: 0.75rem; font-weight: 500; line-height: 1.35;
+    letter-spacing: 0.01em; white-space: nowrap; opacity: 0; transition: opacity 250ms ease-out; }
+  .str-name.an { opacity: 1; }
 
   .glas {
     background: var(--glas);
@@ -409,6 +418,7 @@
 </head>
 <body>
 <canvas id="szene" aria-label="3D-Ansicht der Stadt"></canvas>
+<div id="strassen-namen" aria-hidden="true"></div>
 <!-- Symbole (24er-Raster, Strich in Textfarbe): Kennzahlen, Uhr, Tempo, Stadtbuch, Karten -->
 <svg class="sprite" aria-hidden="true" focusable="false">
   <symbol id="s-leute" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5c.4-3.2 2.7-5.3 5.5-5.3s5.1 2.1 5.5 5.3"/><path d="M15.5 5.2a3 3 0 0 1 0 5.6"/><path d="M17.5 14.6c1.7.7 2.8 2.5 3 4.9"/></symbol>
@@ -3324,6 +3334,15 @@ G.StadtSim = {
 //   clientX/clientY, requestAnimationFrame, performance.now, devicePixelRatio, URLSearchParams (get, has), Location (search,
 //   reload), HTMLAnchorElement.download, KeyboardEvent (code, key), DOMTokenList.toggle, submit, Number.toLocaleString,
 //   setInterval/setTimeout/clearTimeout.
+// - Neu mit Auswahl und Orientierung. Three.js im Quellcode 0.186.0 nachgesehen: RingGeometry (src/geometries/RingGeometry.js),
+//   Material.depthTest (src/materials/Material.js), Camera.updateMatrixWorld (src/cameras/Camera.js), Ereignis change und
+//   getDistance (examples/jsm/controls/OrbitControls.js). Nachbesserung: Vector3.unproject (src/math/Vector3.js), Color(r, g, b)
+//   ohne Umrechnung (setRGB im Arbeitsfarbraum, src/math/Color.js), depthTest wird je Zeichnen gesetzt, ohne neues Programm
+//   (WebGLState.setMaterial, src/renderers/webgl/WebGLState.js), renderer.compile übersetzt auch Unsichtbares (scene.traverse,
+//   src/renderers/WebGLRenderer.js). Browser, verbreitet, nicht nachgeschlagen: matchMedia mit (pointer: fine),
+//   PointerEvent (pointerType, buttons), pointerleave, wheel mit passive, offsetWidth/offsetHeight, classList.add/remove,
+//   style.transform, getComputedStyle (visibility), Canvas 2D shadowColor/shadowBlur/lineJoin; ResizeObserver jetzt auch für die Panels
+//   (für die Leinwand schon vorher in der Datei).
 const Sim = globalThis.StadtSim;
 const URLP = new URLSearchParams(location.search);
 const DEBUG = URLP.has('debug');
@@ -4063,6 +4082,25 @@ function baueGrafik(THREE, OrbitControls) {
   // keine Figuren, Laternen, Kisten oder Gehwege, und Bauarbeiter an der Ecke einer Nachbar-Baustelle ragen nur 0,015 herein ───
   const RASEN = new THREE.Color('#3e6b45'), WEG = new THREE.Color('#8d8674'), PLATZ = new THREE.Color('#978f7b');
   const STEIN = new THREE.Color('#7f817e'), WASSER = new THREE.Color('#3a5864'), HOLZ = new THREE.Color('#5e4633');
+  // Teich und Brunnen nachts (20 bis 5 Uhr) dunkel wie der See, der dann fast die Horizontfarbe hat: Das Tageswasser leuchtete
+  // im Mondlicht etwa doppelt so hell wie der Rasen daneben. In der Dämmerung (19 und 6 Uhr) spiegelt der See den hellen Himmel,
+  // dort bleibt das Tageswasser
+  const WASSER_NACHT = new THREE.Color('#0e2e40');
+  let wasser = WASSER;                                    // stadt() wählt stündlich
+  // Wasser zeigt keinen Lichtfleck: Der Fleck einer Laterne liegt auf Höhe des Teichs (0,043) und gewinnt mit dem stärkeren
+  // Tiefenversatz (−2 statt −1), nachts wurde der Teich darunter braungrau wie Erde. Für den Tiefentest rückt der Teich darum ein
+  // Stück zur Kamera (derselbe Bildpunkt): 0,0028 × Kotangens des Blickwinkels zum Boden, das sind zwei Pixel Tiefengefälle bei
+  // 600 px Bildhöhe, bei größeren Bildern mehr. Der Fleck hellt nur den Rasen ringsum auf. Kennung im Belag: Höhe NASS (die
+  // flache Form hat keine Höhe, die Normale bleibt senkrecht). Das Brunnenwasser liegt 0,034 höher und braucht das nicht
+  const NASS = 2;
+  M.belag.material.onBeforeCompile = (s) => {
+    wolkenSchatten(s);
+    s.vertexShader = s.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+      if ( instanceMatrix[ 1 ].y > ${NASS - 0.5} ) {
+        float sinB = max( abs( dot( normalize( mvPosition.xyz ), ( viewMatrix * vec4( 0.0, 1.0, 0.0, 0.0 ) ).xyz ) ), 0.1 );
+        gl_Position = projectionMatrix * vec4( mvPosition.xyz * ( 1.0 - 0.0028 * sqrt( 1.0 - sinB * sinB ) / sinB ), 1.0 );
+      }`);
+  };
   const HECKE = new THREE.Color('#31503a');                // oben etwa wie die Wiese: von fern keine hellen Rahmen
   const BEETE = ['#835663', '#734351', '#8e6570', '#80545a'].map(c => new THREE.Color(c));   // Blüten gedämpft: Rosé, Weinrot, Altrosa, Rostrosa
   const BEET_ERDE = new THREE.Color('#3a3128');
@@ -4126,7 +4164,7 @@ function baueGrafik(THREE, OrbitControls) {
       stueck(M.belag, 0, WY + 0.002, 0, 0.27, 1, 0.27, 0, PLATZ);
       if (zellHash(x, y, 111) < 0.5) {                     // Brunnen: Becken mit rundem Wasser, Säule und Schale
         stueck(M.park, 0, Y, 0, 0.16, 0.035, 0.16, 0, STEIN);
-        stueck(M.belag, 0, Y + 0.037, 0, 0.13, 1, 0.13, 0, WASSER);
+        stueck(M.belag, 0, Y + 0.037, 0, 0.13, 1, 0.13, 0, wasser);
         stueck(M.park, 0, Y, 0, 0.03, 0.09, 0.03, 0, STEIN);
         stueck(M.park, 0, Y + 0.078, 0, 0.07, 0.012, 0.07, Math.PI / 4, STEIN);
       } else {                                            // Blumenrondell: Steinrand über Eck, darin Blüten
@@ -4149,7 +4187,7 @@ function baueGrafik(THREE, OrbitControls) {
         stueck(M.park, (x0 + x1) / 2, Y, (z0 + z1) / 2, 0.09, 0.004, Math.hypot(x1 - x0, z1 - z0) + 0.025, Math.atan2(x1 - x0, z1 - z0), WEG);
       }
       if (zellHash(x, y, 111) < 0.6) {                     // Teich im Bogen: zwei gegeneinander gedrehte Achtecke, Schilf und ein Stein am Rand
-        for (let i = 0; i < 2; i++) stueck(M.belag, i * 0.02, WY, 0.27 - i * 0.03, 0.24 - i * 0.04, 1, 0.2 + i * 0.05, i * 0.4, WASSER);
+        for (let i = 0; i < 2; i++) stueck(M.belag, i * 0.02, WY, 0.27 - i * 0.03, 0.24 - i * 0.04, NASS, 0.2 + i * 0.05, i * 0.4, wasser);
         stueck(M.gras, 0.12, Y, 0.34, 0.12, 0.13, 0.12, 0.5, HALME[3]);
         stueck(M.gras, 0.14, Y, 0.23, 0.1, 0.1, 0.1, 2, HALME[3]);
         stueck(M.busch, -0.12, Y - 0.01, 0.18, 0.08, 0.04, 0.06, 1, STEIN);
@@ -4318,6 +4356,7 @@ function baueGrafik(THREE, OrbitControls) {
       nl++;
     }
     laternen = nl;
+    namenKandidaten();                                    // Straßennamen: neue Blockmitten
   }
 
   // Welche Stockwerke leuchten? Nachts bewohnte, je nach Belegung; spät in der Nacht nur noch wenige.
@@ -4342,6 +4381,7 @@ function baueGrafik(THREE, OrbitControls) {
       strassenStand = S.stat.strassenFelder;
     }
     const nacht = tageszeit < 6.5 || tageszeit >= 18.5;
+    wasser = tageszeit >= 20 || tageszeit < 6 ? WASSER_NACHT : WASSER;
     // Laternen: nachts warmer Kopf und Lichtfleck auf dem Boden, aber nur, wo in der Nähe an der Straße etwas gebaut ist
     // (Licht zeigt Leben, leere Stichstraßen am Rand bleiben dunkel); tagsüber dunkler Kopf und kein Fleck
     let nfl = 0;
@@ -4541,6 +4581,8 @@ function baueGrafik(THREE, OrbitControls) {
     // Beim ersten Aufbau alle Shader übersetzen, auch die von Himmelskuppel und Sternen: sie sind im Blick von oben unsichtbar,
     // und der erste flache Blick würde sonst ruckeln. compile() nimmt alle Materialien der Szene, auch unsichtbare (scene.traverse)
     if (!vorkompiliert) { vorkompiliert = true; renderer.compile(scene, camera); }
+    hoehenMerken();
+    nachNeuaufbau(nacht);                                 // Auswahl und Zeiger neu tönen (die Farben sind frisch gesetzt)
   }
   let vorkompiliert = false;
 
@@ -4552,6 +4594,7 @@ function baueGrafik(THREE, OrbitControls) {
   // Teil je Ecke: 0 Kleidung (Vertex-Farbe × Instanzfarbe), 1 Haut, 2 Haar, 3 Scheitel (Haar oder Helm), 4 Krempe (nur mit Helm).
   // Haut, Haar und Helm färbt figurShader aus eigenen Instanz-Attributen, die Kleiderfarbe färbt sie also nicht mit.
   const KOPF_OBEN = 0.214, HELM_UNTEN = 0.203;            // Oberkante des Gesichts, darüber der Scheitel; Unterkante des Helms
+  const HELM_RING = 0.219, HELM_OBEN = 0.234;             // mit Helm: Oberkante der Seiten und Scheitelpunkt (flache Kuppel)
   const figGeo = (() => {
     const pos = [], col = [], teil = [];
     const ring = (n, r, rz, y, w0, x0) => {               // n Ecken, Radius quer (x) und längs (z)
@@ -4583,8 +4626,9 @@ function baueGrafik(THREE, OrbitControls) {
     const oben = ring(5, 0.035, 0.035, KOPF_OBEN, -Math.PI / 5, 0);
     band(ring(5, 0.027, 0.027, 0.176, -Math.PI / 5, 0), oben, [0, 0.2, 0], 1, [1, 1, 2, 2, 1]);
     faecher(oben, [0, 0.24, 0], [0, 0.2, 0], 1, 3);
-    // Helmkrempe: flaches Fünfeck an der Unterkante des Helms, vorn weiter vor (Schirm). Ohne Helm fällt sie im Shader auf einen Punkt
-    faecher(ring(5, 0.048, 0.048, HELM_UNTEN, -Math.PI / 5, 0).map(e => [e[0], e[1], e[2] + 0.006]), [0, HELM_UNTEN, 0.006], [0, 0.1, 0], 0.85, 4);
+    // Helmkrempe: schmales flaches Fünfeck an der Unterkante des Helms, ringsum mindestens 0,003 über der Kuppel (auch hinten
+    // sichtbar), vorn gut 0,01 (Schirm). Ohne Helm fällt sie im Shader auf einen Punkt
+    faecher(ring(5, 0.046, 0.046, HELM_UNTEN, -Math.PI / 5, 0).map(e => [e[0], e[1], e[2] + 0.004]), [0, HELM_UNTEN, 0.004], [0, 0.1, 0], 0.85, 4);
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
@@ -4601,17 +4645,22 @@ function baueGrafik(THREE, OrbitControls) {
     // statt color_vertex: nur die Kleidung nimmt die Instanzfarbe
     s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute float figTeil;\nattribute vec3 figHaar;\nattribute vec2 figArt;\nvarying float vFigHelm, vFigY;')
       .replace('#include <color_vertex>', `vColor = vec4( color, 1.0 );
-        vFigY = position.y; vFigHelm = figTeil > 0.5 && figTeil < 2.5 ? figArt.y : 0.0;
+        vFigHelm = figTeil > 0.5 && figTeil < 2.5 ? figArt.y : 0.0;
         if ( figTeil > 2.5 && figArt.y > 0.5 ) vColor.rgb *= ${glsl(HELM)};
         else if ( figTeil > 1.5 ) vColor.rgb *= figHaar;
         else if ( figTeil > 0.5 ) vColor.rgb *= mix( ${glsl(HAUT_HELL)}, ${glsl(HAUT_DUNKEL)}, figArt.x );
         else vColor.rgb *= instanceColor.rgb;`)
-      // Helm: Kuppel mit weichen Normalen (rund statt spitz schattiert), etwas weiter als der Scheitel; darunter die Krempe
+      // Helm: flache Kuppel. Oberkante des Kopfes und Scheitelring rücken etwas weiter und höher (steile Seiten), der
+      // Scheitelpunkt tiefer (flaches Dach statt Spitze); weiche Normalen über Seiten und Dach (rund statt kantig schattiert)
       .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
-        if ( figTeil > 2.5 && figTeil < 3.5 && figArt.y > 0.5 ) objectNormal = normalize( vec3( position.x, position.y - 0.2, position.z ) );`)
+        if ( figArt.y > 0.5 && figTeil > 0.5 && figTeil < 3.5 && position.y > ${(KOPF_OBEN - 0.001).toFixed(3)} ) objectNormal = normalize( vec3( position.x, position.y - 0.2, position.z ) );`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
         if ( figTeil > 3.5 ) { if ( figArt.y < 0.5 ) transformed = vec3( 0.0, ${KOPF_OBEN}, 0.0 ); }
-        else if ( figTeil > 2.5 && figArt.y > 0.5 ) transformed.xz *= 1.08;`);
+        else if ( figArt.y > 0.5 && figTeil > 0.5 && position.y > ${(KOPF_OBEN - 0.001).toFixed(3)} ) {
+          if ( position.y > ${(KOPF_OBEN + 0.001).toFixed(3)} ) transformed.y = ${HELM_OBEN};
+          else transformed = vec3( position.x * 1.08, ${HELM_RING}, position.z * 1.08 );
+        }
+        vFigY = transformed.y;`);                         // Höhe nach der Verformung: Gelb beginnt genau an der Krempe
     // Mit Helm ist der Kopf oberhalb der Krempe gelb (Seiten der Helmschale)
     s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vFigHelm, vFigY;')
       .replace('#include <color_fragment>', `#include <color_fragment>
@@ -4620,28 +4669,34 @@ function baueGrafik(THREE, OrbitControls) {
   const figMat = lambert('#ffffff', { vertexColors: true });
   figMat.onBeforeCompile = (s) => { wolkenSchatten(s); figurShader(s); };
   const figMesh = inst(figGeo, figMat, FIG_GES);
-  // Hauptfiguren: Raute mit sanftem Schein, immer zur Kamera gedreht (zwei Dreiecke); Farbe je Instanz
+  // Hauptfiguren: Raute mit dunklem Rand, immer zur Kamera gedreht (zwei Dreiecke); Farbe je Instanz
   function markeMaterial() {
     const c = document.createElement('canvas');
     c.width = c.height = 128;                             // gezeichnet in 64er-Maßen, doppelt aufgelöst: glatter Rand aus der Nähe
     const g = c.getContext('2d');
     g.scale(2, 2);
-    const v = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-    v.addColorStop(0, 'rgba(255,255,255,0.65)'); v.addColorStop(0.35, 'rgba(255,255,255,0.3)'); v.addColorStop(1, 'rgba(255,255,255,0)');
-    g.fillStyle = v; g.fillRect(0, 0, 64, 64);
-    // Dunkler Rand (hebt die Raute vor hellen Fenstern ab), darin vier Facetten: oben heller als unten, links heller als rechts.
-    // Die Raute füllt die Fläche fast aus (aus der Ferne bleibt sie so erkennbar), der Schein liegt an ihren Seiten
-    g.beginPath(); g.moveTo(32, 6); g.lineTo(48, 32); g.lineTo(32, 58); g.lineTo(16, 32); g.closePath();
-    g.lineWidth = 3; g.strokeStyle = 'rgba(46,34,22,0.85)'; g.stroke();
-    for (const [x, y, f] of [[17.5, 8.5, '#ffffff'], [46.5, 8.5, '#d9d9d9'], [17.5, 55.5, '#c4c4c4'], [46.5, 55.5, '#9c9c9c']]) {
+    // Raute 30 × 48 (Spitze unten zeigt auf die Figur), dahinter ein weicher dunkler Schein, darauf ein dunkler Rand: hebt sie
+    // nachts vom Fensterlicht (gleicher Goldton) und tagsüber vom hellen Boden ab. Innen vier Facetten: oben heller als unten,
+    // links heller als rechts. shadowBlur zählt in Leinwand-Pixeln (nicht skaliert)
+    const raute = () => { g.beginPath(); g.moveTo(32, 8); g.lineTo(47, 32); g.lineTo(32, 56); g.lineTo(17, 32); g.closePath(); };
+    g.shadowColor = 'rgba(6,5,4,0.95)'; g.shadowBlur = 12;
+    raute(); g.fillStyle = 'rgba(24,18,12,0.9)'; g.fill();
+    g.shadowColor = 'rgba(0,0,0,0)'; g.shadowBlur = 0;
+    for (const [x, y, f] of [[17, 8, '#ffffff'], [47, 8, '#d9d9d9'], [17, 56, '#c4c4c4'], [47, 56, '#9c9c9c']]) {
       g.beginPath(); g.moveTo(32, 32); g.lineTo(32, y); g.lineTo(x, 32); g.closePath(); g.fillStyle = f; g.fill();
     }
+    raute(); g.lineWidth = 5; g.lineJoin = 'round'; g.strokeStyle = 'rgba(30,22,14,0.95)'; g.stroke();
     const t = new THREE.CanvasTexture(c);
     t.colorSpace = THREE.SRGBColorSpace;                  // Canvas-Farben sind sRGB: sonst wirken Rand und Facetten zu hell
+    // Aus der Ferne ohne Tiefentest (figurenBewegen schaltet um): auch hinter einem Hochhaus zu finden. In der Nähe verdecken
+    // Häuser sie wie die Figur darunter, sonst klebt sie auf der Fassade davor
     return new THREE.MeshBasicMaterial({ color: '#ffffff', map: t, transparent: true, depthWrite: false });
   }
   const markMesh = inst(new THREE.PlaneGeometry(0.2, 0.2), markeMaterial(), HAUPT_MAX);
+  markMesh.renderOrder = 2;                               // nach Himmel (1) und allem Durchsichtigen
   const MARK_GOLD = new THREE.Color('#ffc864'), MARK_DENKT = new THREE.Color('#f4f4f7');   // überlegt = weiß
+  const MARK_ABSTAND = 16;                                // ab diesem Kameraabstand wächst die Raute mit (figurenBewegen)
+  const MARK_DURCH = 25;                                  // ab diesem Kameraabstand ist die Raute auch hinter Häusern zu sehen
   figMesh.setColorAt(0, LICHT); markMesh.setColorAt(0, MARK_GOLD); M.bau.setColorAt(0, GERUEST);   // Farbpuffer gleich anlegen: dann passt der vorab übersetzte Shader
   const WESTE = new THREE.Color('#e8792c'), BLAUMANN = new THREE.Color('#4f7fc0');       // Bauarbeiter, Handwerker
   const PROGRAMMIER = new THREE.Color('#a78cf2');                                         // Programmiererinnen und Programmierer
@@ -4881,6 +4936,7 @@ function baueGrafik(THREE, OrbitControls) {
   function figurenBewegen(jetzt) {
     let nm = 0, nt = 0, nh = 0;
     const handyBasis = fensterStatisch + schirme, sek = REDUZIERT ? 0 : performance.now() / 1000;
+    markMesh.material.depthTest = controls.getDistance() <= MARK_DURCH;   // nur ein Zustand beim Zeichnen, kein neues Programm
     for (let i = 0; i < figuren.length; i++) {
       const f = figuren[i], r = f.route;
       figIds[i] = -1;
@@ -4913,8 +4969,10 @@ function baueGrafik(THREE, OrbitControls) {
       if (f.handy && (laeuft || !f.arbeit) && !traegt && nh < HANDY_MAX
           && setze(M.fenster, handyBasis + nh, x + Math.sin(dreh) * 0.05, y + 0.125, z + Math.cos(dreh) * 0.05, 0.036, 0.048, 0.008, dreh)) nh++;
       if (f.haupt) {                                      // Raute über dem Kopf, schwebt langsam (echte Zeit, bei jedem Tempo gleich ruhig)
-        // Maßstab zurücksetzen: Handy oder Kiste davor haben ihn über setze() verstellt
-        dummy.position.set(x, y + 0.37 + Math.sin(sek * 1.7 + i) * 0.012, z); dummy.scale.set(1, 1, 1); dummy.quaternion.copy(camera.quaternion);
+        // Ab MARK_ABSTAND wächst sie mit dem Abstand zur Kamera, bleibt auf dem Bildschirm also gleich groß (bei 800 px Bildhöhe
+        // gut 9 px hoch); die Spitze bleibt 0,05 über dem Kopf. Maßstab immer setzen: Handy oder Kiste haben ihn über setze() verstellt
+        const cp = camera.position, s = Math.max(1, Math.sqrt((x - cp.x) ** 2 + (y - cp.y) ** 2 + (z - cp.z) ** 2) / MARK_ABSTAND);
+        dummy.position.set(x, y + 0.29 + 0.075 * s + Math.sin(sek * 1.7 + i) * 0.012 * s, z); dummy.scale.set(s, s, s); dummy.quaternion.copy(camera.quaternion);
         dummy.updateMatrix();
         let denkt = false;
         for (let k = 0; k < S.ki.anfragen.length; k++) if (S.ki.anfragen[k].id === f.p) denkt = true;
@@ -4945,28 +5003,35 @@ function baueGrafik(THREE, OrbitControls) {
   const ray = new THREE.Raycaster(), zeiger = new THREE.Vector2(), treffer = [], v3 = new THREE.Vector3(), m4 = new THREE.Matrix4();
   const KLICKBAR = [M.haus, M.dach, M.fenster, M.scheiben, M.werkstatt, M.schlot, M.laden, M.ladenGlas, M.teil, M.bau, M.tech];
   const KLICK_IDS = [IDS.haus, IDS.dach, IDS.fenster, IDS.scheiben, IDS.werkstatt, IDS.schlot, IDS.laden, IDS.ladenGlas, IDS.teil, IDS.bau, IDS.tech];
-  function waehle(cx, cy) {
-    const r = canvas.getBoundingClientRect();
+  // Lage der Leinwand (fest über das ganze Fenster; groesse() misst nach): der Zeiger fragt bis zu zehnmal je Sekunde
+  let leinL = 0, leinT = 0, leinW = 1, leinH = 1;
+  // Was liegt unter (cx, cy)? 1: Figur (wahlP, wahlGen), 2: Gebäude (wahlB), 0: nichts. Legt selbst nichts an
+  let wahlP = -1, wahlGen = 0, wahlB = -1;
+  function treffen(cx, cy) {
     // Figuren sind klein: nimm die nächste sichtbare Figur im Umkreis von 16 Pixeln
     let bestP = -1, bestD = 16 * 16;
     for (let i = 0; i < figuren.length; i++) {
       if (figIds[i] < 0) continue;
       figMesh.getMatrixAt(i, m4);
       v3.setFromMatrixPosition(m4); v3.y += 0.15; v3.project(camera);
-      const sx = (v3.x + 1) / 2 * r.width + r.left, sy = (1 - v3.y) / 2 * r.height + r.top;
+      const sx = (v3.x + 1) / 2 * leinW + leinL, sy = (1 - v3.y) / 2 * leinH + leinT;
       const d = (sx - cx) ** 2 + (sy - cy) ** 2;
       if (d < bestD && v3.z < 1) { bestD = d; bestP = figIds[i]; }
     }
-    if (bestP >= 0) return { person: bestP, gen: S.p.gen[bestP] };
-    zeiger.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
+    if (bestP >= 0) { wahlP = bestP; wahlGen = S.p.gen[bestP]; return 1; }
+    zeiger.set(((cx - leinL) / leinW) * 2 - 1, -((cy - leinT) / leinH) * 2 + 1);
     ray.setFromCamera(zeiger, camera);
     treffer.length = 0;
     ray.intersectObjects(KLICKBAR, false, treffer);
-    for (const t of treffer) {
-      const k = KLICKBAR.indexOf(t.object);
-      if (k >= 0 && t.instanceId !== undefined && t.instanceId < t.object.count && KLICK_IDS[k][t.instanceId] >= 0) return { gebaeude: KLICK_IDS[k][t.instanceId] };
+    for (let j = 0; j < treffer.length; j++) {
+      const t = treffer[j], k = KLICKBAR.indexOf(t.object);
+      if (k >= 0 && t.instanceId !== undefined && t.instanceId < t.object.count && KLICK_IDS[k][t.instanceId] >= 0) { wahlB = KLICK_IDS[k][t.instanceId]; return 2; }
     }
-    return null;
+    return 0;
+  }
+  function waehle(cx, cy) {
+    const t = treffen(cx, cy);
+    return t === 1 ? { person: wahlP, gen: wahlGen } : t === 2 ? { gebaeude: wahlB } : null;
   }
   let runter = null;
   canvas.addEventListener('pointerdown', (e) => { runter = { x: e.clientX, y: e.clientY }; });
@@ -4977,6 +5042,345 @@ function baueGrafik(THREE, OrbitControls) {
     if (w && w.person !== undefined) zeigePerson(w.person, w.gen);
     else if (w && w.gebaeude !== undefined) zeigeGebaeude(w.gebaeude);
   });
+
+  // ─── Auswahl und Zeiger: Das Gebäude der offenen Hauskarte ist etwas heller und wärmer und hat einen Rahmen am Boden, das
+  // Gebäude unter dem Mauszeiger ist leicht heller. Getönt wird durch Malnehmen (nicht Mischen mit dem Akzent): der Farbton
+  // bleibt, ein dunkelblauer Glasbau bleibt dunkelblau. Nur Lambert-Teile: Fenster und Glas bleiben, sonst sähe dunkles Glas
+  // nachts erleuchtet aus. Arbeit nur beim Wechsel und nach dem stündlichen Neuaufbau (stadt() färbt alles neu) ───
+  const TOENBAR = [M.haus, M.dach, M.werkstatt, M.schlot, M.laden, M.teil, M.bau, M.tech];
+  const TOEN_IDS = [IDS.haus, IDS.dach, IDS.werkstatt, IDS.schlot, IDS.laden, IDS.teil, IDS.bau, IDS.tech];
+  const TOEN_MAX = 256;                                   // Teile je Gebäude höchstens (ein Wohnturm hat gut 20)
+  // Liste 0: Auswahl, 1: Zeiger. Je getöntem Teil: Mesh, Instanz, Farbe vorher
+  const toenM = new Uint8Array(2 * TOEN_MAX), toenI = new Int32Array(2 * TOEN_MAX), toenF = new Float32Array(6 * TOEN_MAX), toenN = new Int32Array(2);
+  // Faktoren je Kanal (linear). Nachts (wie in stadt(): vor 6:30, ab 18:30) kräftiger, auf dunklen Wänden wirkt Malnehmen sonst kaum
+  const AUSWAHL_TON = new THREE.Color(1.3, 1.2, 1.04), ZEIGER_TON = new THREE.Color(1.15, 1.15, 1.15);
+  const AUSWAHL_NACHT = new THREE.Color(1.6, 1.45, 1.15), ZEIGER_NACHT = new THREE.Color(1.35, 1.35, 1.35);
+  let auswahlB = -1, zeigerB = -1, toenNacht = false;
+  // Alle Teile von Gebäude b in Liste l merken und ihre Farbe mit c malnehmen
+  function toenen(l, b, c) {
+    let n = l * TOEN_MAX;
+    const ende = n + TOEN_MAX;
+    for (let j = 0; j < TOENBAR.length; j++) {
+      const m = TOENBAR[j], ids = TOEN_IDS[j], a = m.instanceColor ? m.instanceColor.array : null, n0 = n;
+      if (!a) continue;
+      for (let i = 0; i < m.count && n < ende; i++) {
+        if (ids[i] !== b) continue;
+        const o = 3 * i;
+        toenM[n] = j; toenI[n] = i; toenF[3 * n] = a[o]; toenF[3 * n + 1] = a[o + 1]; toenF[3 * n + 2] = a[o + 2];
+        a[o] *= c.r; a[o + 1] *= c.g; a[o + 2] *= c.b;
+        n++;
+      }
+      if (n > n0) m.instanceColor.needsUpdate = true;
+    }
+    toenN[l] = n - l * TOEN_MAX;
+  }
+  function entfaerben(l) {                                // gemerkte Farben zurück
+    for (let n = l * TOEN_MAX, e = n + toenN[l]; n < e; n++) {
+      const m = TOENBAR[toenM[n]], a = m.instanceColor.array, o = 3 * toenI[n];
+      a[o] = toenF[3 * n]; a[o + 1] = toenF[3 * n + 1]; a[o + 2] = toenF[3 * n + 2];
+      m.instanceColor.needsUpdate = true;
+    }
+    toenN[l] = 0;
+  }
+  // Rahmen im Akzent, unbeleuchtet (auch nachts zu sehen): am Boden ums Grundstück (0,39 bis 0,50 von der Mitte) und bei
+  // Flachdächern als Umriss auf der Dachkante (aus der Ferne sieht man eher das Dach als den Boden). Quadrat aus einem Ring mit
+  // 4 Ecken, 8 Dreiecke je Rahmen, beide in einem Draw Call. Ohne Auswahl unsichtbar, also kein Draw Call
+  const wahlRahmen = inst(new THREE.RingGeometry(0.39 * Math.SQRT2, 0.5 * Math.SQRT2, 4, 1, Math.PI / 4).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ color: '#ffc864', transparent: true, opacity: 0.9, depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }), 2);
+  wahlRahmen.visible = false;
+  // Tönung und Rahmen nach auswahlB und zeigerB (die Listen sind leer)
+  function toenenAlle() {
+    const b = auswahlB >= 0 && auswahlB < S.gAnzahl ? auswahlB : -1;
+    wahlRahmen.visible = b >= 0;
+    if (b >= 0) {
+      toenen(0, b, toenNacht ? AUSWAHL_NACHT : AUSWAHL_TON);
+      const x = S.g.x[b], y = S.g.y[b], f = S.feld[y * Sim.KARTE + x], t = S.g.typ[b], st = S.g.stufe[b];
+      let n = 0;
+      if (setze(wahlRahmen, n, wx(x), f === Sim.PARK ? 0.046 : 0.008, wx(y), 1, 1, 1)) n++;   // Park: über dem Rasen (Oberkante 0,04)
+      // Oben ein zweiter Rahmen, so bleibt die Auswahl zu sehen, wenn ein Hochhaus davor den Boden verdeckt (nicht auf Baustelle
+      // und Aufstockung). Flachdach: auf der Dachkante, Außenkante 0,01 über die Wand hinaus (halb: Wohnhaus 0,38, Glasbau 0,42,
+      // Laden 0,4). Sheddach und Satteldach: an der Traufe so groß wie der Bodenrahmen, außen 0,07 breiter als die Wand, innen
+      // unter dem Dach verborgen (Satteldach: knapp unter der Dachkante, die 0,05 übersteht)
+      const dach = f === Sim.BAUSTELLE || S.g.auf[b] ? 0 : t === Sim.WOHNHAUS ? GESCHOSSE[st] * GESCHOSS * (1 + ATTIKA) - (st === 1 ? 0.04 : 0)
+        : t === Sim.TECH ? TECH_GESCHOSSE[st] * GESCHOSS : t === Sim.LADEN ? 0.55 : t === Sim.WERKSTATT ? 0.46 : 0;
+      const k = t === Sim.WERKSTATT || (t === Sim.WOHNHAUS && st === 1) ? 1
+        : ((t === Sim.TECH ? 0.42 : t === Sim.LADEN ? 0.4 : A_HAUS) + 0.01) / 0.5;
+      if (dach > 0 && setze(wahlRahmen, n, wx(x), dach + 0.004, wx(y), k, 1, k)) n++;
+      fertig(wahlRahmen, n);
+    }
+    if (zeigerB >= 0 && zeigerB !== auswahlB && zeigerB < S.gAnzahl) toenen(1, zeigerB, toenNacht ? ZEIGER_NACHT : ZEIGER_TON);
+  }
+  function nachNeuaufbau(nacht) {                         // Ende von stadt()
+    toenNacht = nacht;
+    toenN[0] = toenN[1] = 0; toenenAlle();
+    if (hand) zeigerMerken(zeigerX, zeigerY);             // unter dem Zeiger kann jetzt ein anderes Gebäude stehen
+  }
+  // b: Gebäude der offenen Hauskarte, −1: keins (auch bei einer Personenkarte); offen: ist eine Karte zu sehen?
+  let karteOffen = false;
+  function auswahl(b, offen) {
+    // Straßennamen weichen der Karte aus (auch einer anders hohen neuen) und dem ausgewählten Gebäude
+    if (offen || offen !== karteOffen) { karteOffen = offen; panelZeit = -1e9; namenFaellig = true; }
+    if (b === auswahlB) return;
+    entfaerben(1); entfaerben(0);
+    auswahlB = b; namenFaellig = true;
+    toenenAlle();
+  }
+
+  // Zeiger (nur Maus): über Gebäuden und Figuren die Hand, das Gebäude darunter leicht heller. Höchstens alle 100 ms ein
+  // Raycast, nur nach einer Bewegung ohne gedrückte Taste. Auf Touch nichts
+  let zeigerX = 0, zeigerY = 0, zeigerNeu = false, zeigerZeit = -1e9, zeigerUhr = 0, hand = false;
+  function zeigerSetzen(b, klickbar) {
+    if (klickbar !== hand) { hand = klickbar; canvas.style.cursor = klickbar ? 'pointer' : ''; }
+    if (b === zeigerB) return;
+    entfaerben(1);
+    zeigerB = b;
+    if (b >= 0 && b !== auswahlB) toenen(1, b, toenNacht ? ZEIGER_NACHT : ZEIGER_TON);
+  }
+  function zeigerPruefen() {
+    zeigerUhr = 0;
+    if (!zeigerNeu) return;
+    zeigerNeu = false; zeigerZeit = performance.now();
+    const t = treffen(zeigerX, zeigerY);
+    zeigerSetzen(t === 2 ? wahlB : -1, t > 0);
+  }
+  function zeigerMerken(x, y) {
+    zeigerX = x; zeigerY = y; zeigerNeu = true;
+    if (!zeigerUhr) zeigerUhr = setTimeout(zeigerPruefen, Math.max(0, 100 - (performance.now() - zeigerZeit)));
+  }
+  if (matchMedia('(pointer: fine)').matches) {
+    canvas.addEventListener('pointermove', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      if (e.buttons) { zeigerNeu = false; zeigerSetzen(-1, false); return; }   // beim Drehen und Schieben nicht
+      zeigerMerken(e.clientX, e.clientY);
+    });
+    canvas.addEventListener('wheel', (e) => { zeigerMerken(e.clientX, e.clientY); }, { passive: true });   // Zoom: anderes Gebäude unter dem Zeiger
+    canvas.addEventListener('pointerleave', () => { zeigerNeu = false; zeigerSetzen(-1, false); });
+  }
+
+  // ─── Straßennamen beim Heranzoomen (Kameraabstand unter 35): höchstens 12 (am Handy weniger), je Straße einer, auf einem
+  // geraden Stück, am liebsten in der Mitte eines Blocks (zwischen zwei Kreuzungen), und zwar auf dem, das der Mitte des Blicks
+  // am nächsten liegt (andere Felder zählen anderthalbmal so weit). Nur Straßen in der Nähe (nicht die ferne Stadt bei flachem
+  // Blick). Ein gezeigter Name bleibt an seinem Platz, solange kein anderer mehr als doppelt so nah an der Mitte liegt; wechselt
+  // er den Platz, blendet er dort aus und am neuen Platz ein. Nicht hinter Gebäuden, das Schild nicht über Hochhäusern oder dem
+  // ausgewählten Gebäude, nicht unter Panels und mit Abstand zueinander.
+  // HTML-Ebene (feste Schilder, nur transform und Klasse ändern sich); neu gesetzt nur, wenn sich die Kamera bewegt, Straßen
+  // dazukommen, stündlich (neue Häuser), eine Karte auf- oder zugeht oder die Größe sich ändert ───
+  const NAMEN_MAX = 12, NAMEN_SLOTS = 20, NAMEN_NAH = 35, NAMEN_AUS = REDUZIERT ? 0 : 350;   // ms: so lange blendet ein Schild aus
+  const NAMEN_WEIT = 1.3, NAMEN_FLAECHE = 70000;          // Straßen bis 1,3 × Kameraabstand; ein Schild je 70.000 px² Bild
+  const LUECKE_X = 24, LUECKE_Y = 18;                     // px Abstand zwischen zwei Schildern (untereinander: Mitten ≥ 40 px)
+  const namenEbene = $('strassen-namen'), slotEl = [];
+  const slotStr = new Int32Array(NAMEN_SLOTS).fill(-1), slotAn = new Uint8Array(NAMEN_SLOTS), slotAus = new Float64Array(NAMEN_SLOTS);
+  const slotB = new Float32Array(NAMEN_SLOTS), slotH = new Float32Array(NAMEN_SLOTS), slotX = new Int32Array(NAMEN_SLOTS), slotY = new Int32Array(NAMEN_SLOTS);
+  const slotWX = new Float32Array(NAMEN_SLOTS), slotWZ = new Float32Array(NAMEN_SLOTS);   // Platz des Schilds in der Welt
+  for (let j = 0; j < NAMEN_SLOTS; j++) { const e = document.createElement('div'); e.className = 'str-name'; namenEbene.appendChild(e); slotEl.push(e); }
+  // Plätze (gerade Straßenfelder) mit Straße, Weltlage und ob Blockmitte; je Straße: Name, halbe Breite (geschätzt, nach dem
+  // Zeigen gemessen), eigenes Schild, zuletzt gezeigter Platz, und je Durchlauf bester Platz, Abstand zur Mitte, Bildlage, gewählt
+  let kandN = 0, kandStr = new Int32Array(0), kandX = new Float32Array(0), kandZ = new Float32Array(0), kandMitte = new Uint8Array(0);
+  let strZahl = 0, strNamen = [], strHB = new Float32Array(0), strSlot = new Int32Array(0), strAX = new Float32Array(0), strAZ = new Float32Array(0);
+  let strBest = new Int32Array(0), strD = new Float32Array(0), strSX = new Float32Array(0), strSY = new Float32Array(0), strWahl = new Uint8Array(0);
+  const wahlR = new Float32Array(4 * NAMEN_MAX), namenPunkt = new THREE.Vector3(), namenStrahl = new THREE.Vector3();
+  let namenFaellig = true, namenAn = false, panelZeit = -1e9, panelN = 0, namenUhr = 0;
+  // Alles über der Leinwand (buch-liste: am Handy quer eine eigene Fläche). Ändert eins bei ruhender Kamera seine Größe (Stadtbuch
+  // auf- oder zugeklappt, Meldung erscheint), setzt ResizeObserver die Schilder neu; auch hidden → sichtbar ist eine Größenänderung
+  const NAMEN_PANELS = ['kennzahlen', 'rechts', 'buch-liste', 'tempo', 'einst-knopf', 'karte', 'meldung', 'hinweis', 'aufholen', 'debug',
+    'debug-knoepfe'].map($), panelR = new Float32Array(4 * NAMEN_PANELS.length);
+  const sperrR = new Float32Array(4);                     // Bildfläche des ausgewählten Gebäudes (mit Rand)
+  let sperrAn = false;
+  controls.addEventListener('change', () => { namenFaellig = true; });
+  const panelBeobachter = new ResizeObserver(() => { panelZeit = -1e9; namenFaellig = true; });
+  for (const e of NAMEN_PANELS) if (e) panelBeobachter.observe(e);
+  function namenNachholen() { namenUhr = 0; namenFaellig = true; }   // nach dem Ausblenden sind wieder Schilder frei
+  // Nach neuen Straßen (strassenraum): Plätze und Namen neu; Slots und gezeigte Plätze bleiben (die Nummer einer Straße ändert sich nie)
+  function namenKandidaten() {
+    const K = Sim.KARTE, R = Sim.RASTER, mitte = R >> 1;
+    let n = 0, zahl = 0;
+    for (let c = 0; c < F; c++) if (S.feldStr[c] >= 0 && gerade(c % K, (c / K) | 0)) { n++; zahl = Math.max(zahl, S.feldStr[c] + 1); }
+    if (kandStr.length < n) { kandStr = new Int32Array(n); kandX = new Float32Array(n); kandZ = new Float32Array(n); kandMitte = new Uint8Array(n); }
+    kandN = 0;
+    for (let c = 0; c < F; c++) {
+      const x = c % K, y = (c / K) | 0, g = S.feldStr[c] >= 0 ? gerade(x, y) : 0;
+      if (!g) continue;
+      kandStr[kandN] = S.feldStr[c]; kandX[kandN] = wx(x); kandZ[kandN] = wx(y); kandMitte[kandN] = (g === 1 ? x : y) % R === mitte ? 1 : 0; kandN++;
+    }
+    if (zahl > strZahl) {
+      const alt = strZahl, slot = strSlot, ax = strAX, az = strAZ;
+      strZahl = zahl; strHB = new Float32Array(zahl); strSlot = new Int32Array(zahl).fill(-1); strAX = new Float32Array(zahl).fill(NaN); strAZ = new Float32Array(zahl).fill(NaN);
+      strBest = new Int32Array(zahl); strD = new Float32Array(zahl); strSX = new Float32Array(zahl); strSY = new Float32Array(zahl); strWahl = new Uint8Array(zahl);
+      strSlot.set(slot.subarray(0, alt)); strAX.set(ax.subarray(0, alt)); strAZ.set(az.subarray(0, alt));
+      // Sim.strName gibt „Neue Mühlenweg“: im Werfall braucht ein „-weg“ die männliche Endung (nur hier steht der Name allein;
+      // die Sätze der Simulation beugen ihn selbst richtig: „am Neuen Mühlenweg“)
+      for (let s = alt; s < zahl; s++) strNamen[s] = Sim.strName(s).replace(/^(Neue|Obere|Untere|Äußere|Kleine) (?=\S+weg$)/, '$1r ');
+    }
+    for (let s = 0; s < strZahl; s++) strHB[s] = strSlot[s] >= 0 ? slotB[strSlot[s]] / 2 : strNamen[s].length * 3.4 + 9;
+    namenFaellig = true;
+  }
+  function panelsMessen(jetzt) {                          // höchstens alle 250 ms (liest Layout)
+    panelZeit = jetzt; panelN = 0;
+    for (let i = 0; i < NAMEN_PANELS.length; i++) {
+      const e = NAMEN_PANELS[i];
+      if (!e || e.hidden || getComputedStyle(e).visibility === 'hidden') continue;   // Handy: Spalte unter offener Karte
+      const q = e.getBoundingClientRect();
+      if (!q.width || !q.height) continue;
+      panelR[4 * panelN] = q.left - 6; panelR[4 * panelN + 1] = q.top - 6; panelR[4 * panelN + 2] = q.right + 6; panelR[4 * panelN + 3] = q.bottom + 6;
+      panelN++;
+    }
+  }
+  // Überdeckt das Rechteck (Mitte x, y; halbe Breite hb, halbe Höhe hh) ein Panel, das ausgewählte Gebäude oder (mit Abstand)
+  // ein schon gewähltes Schild?
+  function namenFrei(x, y, hb, hh, gewaehlt) {
+    for (let i = 0; i < panelN; i++) if (x + hb > panelR[4 * i] && x - hb < panelR[4 * i + 2] && y + hh > panelR[4 * i + 1] && y - hh < panelR[4 * i + 3]) return false;
+    if (sperrAn && x + hb > sperrR[0] && x - hb < sperrR[2] && y + hh > sperrR[1] && y - hh < sperrR[3]) return false;
+    for (let i = 0; i < gewaehlt; i++) if (x + hb + LUECKE_X > wahlR[4 * i] && x - hb - LUECKE_X < wahlR[4 * i + 2]
+      && y + hh + LUECKE_Y > wahlR[4 * i + 1] && y - hh - LUECKE_Y < wahlR[4 * i + 3]) return false;
+    return true;
+  }
+  function slotLage(j, x, y) {                            // ganze Pixel: scharfe Schrift, und nur schreiben, wenn sich etwas ändert
+    const px = Math.round(x - slotB[j] / 2), py = Math.round(y - slotH[j] / 2);
+    if (px === slotX[j] && py === slotY[j]) return;
+    slotX[j] = px; slotY[j] = py;
+    slotEl[j].style.transform = `translate(${px}px, ${py}px)`;
+  }
+  // Oberkante je Feld (stündlich nach stadt()): Straßennamen nicht dort, wo ein Gebäude die Fahrbahn verdeckt
+  const feldHoehe = new Float32Array(F), HOEHE_MAX = 3.4;   // höchstes Gebäude: Wohnturm gut 3,0
+  function hoehenMerken() {
+    const g = S.g, K = Sim.KARTE;
+    feldHoehe.fill(0);
+    for (let b = 0; b < S.gAnzahl; b++) {
+      const c = g.y[b] * K + g.x[b], t = g.typ[b], st = Math.max(g.stufe[b], g.auf[b]);
+      let h = 0;
+      if (S.feld[c] === Sim.BAUSTELLE) h = t === Sim.WOHNHAUS ? GESCHOSSE[1] * GESCHOSS : t === Sim.TECH ? TECH_GESCHOSSE[1] * GESCHOSS : t === Sim.PARK ? 0 : 0.7;
+      else if (t === Sim.WOHNHAUS) h = GESCHOSSE[st] * GESCHOSS * (1 + ATTIKA) + (st === 1 ? 0.3 : 0);   // Satteldach
+      else if (t === Sim.TECH) h = TECH_GESCHOSSE[st] * GESCHOSS;
+      else if (t === Sim.WERKSTATT) h = 0.61;
+      else if (t === Sim.LADEN) h = 0.55;
+      if (h > feldHoehe[c]) feldHoehe[c] = h;
+    }
+    namenFaellig = true;                                  // ein neues Haus kann eine Straße verdecken
+  }
+  // Liegt vor dem Punkt (x, y0, z), von der Kamera aus gesehen, ein Gebäude? Vom Punkt zur Kamera in Schritten von 0,25 über die
+  // Felder (das eigene Feld mit), bis der Strahl über allen Dächern ist
+  const SCHILD_Y = 0.3, SCHILD_OBEN = 0.9;
+  function verdeckt(x, y0, z) {
+    const cp = camera.position, dx = cp.x - x, dz = cp.z - z, l = Math.hypot(dx, dz), steig = (cp.y - y0) / l;
+    if (!(steig > 0)) return false;
+    const K = Sim.KARTE, weit = Math.min(l, (HOEHE_MAX - y0) / steig), ux = dx / l, uz = dz / l;
+    for (let t = 0; t < weit; t += 0.25) {
+      const ix = Math.floor(x + ux * t + H), iz = Math.floor(z + uz * t + H);
+      if (ix < 0 || iz < 0 || ix >= K || iz >= K) return false;
+      if (feldHoehe[iz * K + ix] > y0 + steig * t) return true;
+    }
+    return false;
+  }
+  // Zeigt das Bild an der Stelle (px, py) ein Gebäude oberhalb von SCHILD_OBEN? (Strahl durchs Pixel bis zur Höhe SCHILD_OBEN,
+  // von dort wie verdeckt()). Niedrige Häuser, Läden und Werkstätten darf ein Schild überdecken, Hochhäuser nicht
+  function ueberHaus(px, py) {
+    const cp = camera.position;
+    namenStrahl.set((px - leinL) / leinW * 2 - 1, -((py - leinT) / leinH) * 2 + 1, 0.5).unproject(camera);
+    const ry = namenStrahl.y - cp.y;
+    if (!(ry < 0) || cp.y <= SCHILD_OBEN) return false;   // Strahl steigt: dort ist Himmel
+    const t = (SCHILD_OBEN - cp.y) / ry;
+    return verdeckt(cp.x + (namenStrahl.x - cp.x) * t, SCHILD_OBEN, cp.z + (namenStrahl.z - cp.z) * t);
+  }
+  function namenBild(x, z) {                              // Weltpunkt auf der Fahrbahn → Bildlage in namenPunkt (z > 1: nicht davor)
+    namenPunkt.set(x, FAHRBAHN, z).project(camera);
+    namenPunkt.x = (namenPunkt.x + 1) / 2 * leinW + leinL; namenPunkt.y = (1 - namenPunkt.y) / 2 * leinH + leinT;
+  }
+  // Bildfläche des ausgewählten Gebäudes: Quader aus Grundstück und Höhe, projiziert (acht Ecken)
+  function sperrMessen() {
+    const b = auswahlB;
+    sperrAn = b >= 0 && b < S.gAnzahl;
+    if (!sperrAn) return;
+    const K = Sim.KARTE, x = wx(S.g.x[b]), z = wx(S.g.y[b]), h = Math.max(0.3, feldHoehe[S.g.y[b] * K + S.g.x[b]]);
+    sperrR[0] = sperrR[1] = Infinity; sperrR[2] = sperrR[3] = -Infinity;
+    for (let e = 0; e < 8; e++) {
+      namenPunkt.set(x + (e & 1 ? 0.5 : -0.5), e & 2 ? h : 0, z + (e & 4 ? 0.5 : -0.5)).project(camera);
+      const px = (namenPunkt.x + 1) / 2 * leinW + leinL, py = (1 - namenPunkt.y) / 2 * leinH + leinT;
+      sperrR[0] = Math.min(sperrR[0], px - 4); sperrR[1] = Math.min(sperrR[1], py - 4); sperrR[2] = Math.max(sperrR[2], px + 4); sperrR[3] = Math.max(sperrR[3], py + 4);
+    }
+  }
+  function strassenNamen() {
+    namenFaellig = false;
+    const jetzt = performance.now();
+    namenAn = kandN > 0 && controls.getDistance() < (namenAn ? NAMEN_NAH + 2 : NAMEN_NAH);   // 2 Einheiten Spielraum: kein Flackern an der Grenze
+    camera.updateMatrixWorld();
+    for (let s = 0; s < strZahl; s++) strWahl[s] = 0;
+    if (namenAn) {
+      if (jetzt - panelZeit > 250) panelsMessen(jetzt);
+      sperrMessen();
+      namenPunkt.copy(controls.target).project(camera);
+      const mx = (namenPunkt.x + 1) / 2 * leinW + leinL, my = (1 - namenPunkt.y) / 2 * leinH + leinT;
+      const cp = camera.position, weit2 = (NAMEN_WEIT * controls.getDistance()) ** 2, weitGezeigt2 = weit2 * 1.44;   // gezeigter Platz: 1,2-mal so weit
+      for (let s = 0; s < strZahl; s++) strD[s] = Infinity;
+      for (let k = 0; k < kandN; k++) {
+        const s = kandStr[k], gezeigt = kandX[k] === strAX[s] && kandZ[k] === strAZ[s];
+        if ((kandX[k] - cp.x) ** 2 + cp.y ** 2 + (kandZ[k] - cp.z) ** 2 > (gezeigt ? weitGezeigt2 : weit2)) continue;   // zu weit weg
+        namenBild(kandX[k], kandZ[k]);
+        const x = namenPunkt.x, y = namenPunkt.y, hb = strHB[s];
+        if (namenPunkt.z > 1 || x - hb - 6 < leinL || x + hb + 6 > leinL + leinW || y < leinT + 17 || y > leinT + leinH - 17 || !namenFrei(x, y, hb, 11, 0)) continue;   // ganz im Bild, 6 px Rand
+        let d = (x - mx) ** 2 + (y - my) ** 2;
+        if (!kandMitte[k]) d *= 2.25;                     // keine Blockmitte: anderthalbfacher Abstand
+        if (gezeigt) d *= 0.25;                           // gezeigter Platz: halber Abstand zählt
+        if (d >= strD[s]) continue;                       // nicht besser: die teuren Prüfungen sparen
+        // Straße sichtbar, und das Schild (Ecken und Mitte oben und unten, 3 px nach innen) nicht über einem Hochhaus. Der
+        // gezeigte Platz hat etwas Spielraum (Ecken weiter innen), sonst springen die Schilder beim Drehen hin und her
+        const ix = gezeigt ? 0.5 * hb : 3, iy = gezeigt ? 3 : 8;
+        if (verdeckt(kandX[k], SCHILD_Y, kandZ[k]) || ueberHaus(x - hb + ix, y - iy) || ueberHaus(x + hb - ix, y - iy) || ueberHaus(x, y - iy)
+          || ueberHaus(x - hb + ix, y + iy) || ueberHaus(x + hb - ix, y + iy) || ueberHaus(x, y + iy)) continue;
+        strD[s] = d; strBest[s] = k; strSX[s] = x; strSY[s] = y;
+      }
+      // Erst die schon gezeigten Schilder, dann neue; jeweils die nahe der Mitte zuerst. Wer einem schon gewählten Schild zu
+      // nahe käme, fällt weg (ein neues verdrängt also kein gezeigtes: weniger Wechsel beim Drehen)
+      const nMax = Math.min(NAMEN_MAX, Math.max(4, Math.round(leinW * leinH / NAMEN_FLAECHE)));
+      for (let s = 0; s < strZahl; s++) if (strD[s] < Infinity && !(strSlot[s] >= 0 && slotAn[strSlot[s]])) strD[s] += 1e9;
+      let n = 0;
+      while (n < nMax) {
+        let s = -1;
+        for (let t = 0; t < strZahl; t++) if (strD[t] < Infinity && (s < 0 || strD[t] < strD[s])) s = t;
+        if (s < 0) break;
+        strD[s] = Infinity;
+        const hb = strHB[s], x = strSX[s], y = strSY[s];
+        if (!namenFrei(x, y, hb, 11, n)) continue;
+        wahlR[4 * n] = x - hb; wahlR[4 * n + 1] = y - 11; wahlR[4 * n + 2] = x + hb; wahlR[4 * n + 3] = y + 11;
+        strWahl[s] = 1; n++;
+      }
+    }
+    // Schilder, deren Straße nicht mehr gewählt ist oder die den Platz wechseln, blenden aus (und folgen dabei ihrem Platz).
+    // Reduziert: gleich weg, und ein Platzwechsel ist ein Sprung
+    for (let j = 0; j < NAMEN_SLOTS; j++) {
+      const s = slotStr[j];
+      if (s < 0) continue;
+      const eigen = strSlot[s] === j;
+      if (eigen && strWahl[s] && (!NAMEN_AUS || (slotWX[j] === kandX[strBest[s]] && slotWZ[j] === kandZ[strBest[s]]))) continue;
+      if (eigen && strWahl[s]) strSlot[s] = -1;         // neuer Platz: dort blendet ein anderes Schild ein
+      if (slotAn[j]) { slotAn[j] = 0; slotEl[j].classList.remove('an'); slotAus[j] = jetzt; }
+      if (jetzt - slotAus[j] < NAMEN_AUS) { namenBild(slotWX[j], slotWZ[j]); if (namenPunkt.z <= 1) slotLage(j, namenPunkt.x, namenPunkt.y); }
+    }
+    // Gewählte Straßen: eigenes Schild behalten, sonst ein freies nehmen (ausgeblendet, Übergang vorbei, keinem Gewählten gehörend)
+    let fehlt = false;
+    for (let s = 0; s < strZahl; s++) {
+      if (!strWahl[s]) continue;
+      let j = strSlot[s];
+      if (j < 0) {
+        for (let i = 0; i < NAMEN_SLOTS && j < 0; i++) {
+          const a = slotStr[i];
+          if (!slotAn[i] && (a < 0 || (jetzt - slotAus[i] >= NAMEN_AUS && !(strSlot[a] === i && strWahl[a])))) j = i;
+        }
+        if (j < 0) { fehlt = true; continue; }            // alle belegt: nachholen, wenn welche ausgeblendet sind
+        if (slotStr[j] >= 0 && strSlot[slotStr[j]] === j) strSlot[slotStr[j]] = -1;
+        slotStr[j] = s; strSlot[s] = j;
+        if (slotEl[j].textContent !== strNamen[s]) {
+          slotEl[j].textContent = strNamen[s];
+          slotB[j] = slotEl[j].offsetWidth; slotH[j] = slotEl[j].offsetHeight;
+        }
+        strHB[s] = slotB[j] / 2;
+      }
+      slotWX[j] = strAX[s] = kandX[strBest[s]]; slotWZ[j] = strAZ[s] = kandZ[strBest[s]];
+      slotLage(j, strSX[s], strSY[s]);
+      if (!slotAn[j]) { slotAn[j] = 1; slotEl[j].classList.add('an'); }
+    }
+    if (fehlt && !namenUhr) namenUhr = setTimeout(namenNachholen, NAMEN_AUS + 30);
+  }
 
   // Tag und Nacht aus der Spielzeit: Stützstellen, dazwischen weich überblenden
   // Spalten: Stunde, Himmel am Horizont (= Nebel), Himmel oben, Licht, Sonne, Himmelslicht, Sterne und Mond
@@ -5079,16 +5483,19 @@ function baueGrafik(THREE, OrbitControls) {
     }
     // Sonst rückt die Stadt in der freien Fläche von der Karte weg (Spalte: zur Seite, Blatt unten: nach oben), bis sie frei liegt,
     // höchstens bis an den Rand der Fläche; nur wenn dann mindestens die Hälfte frei bleibt (Handy: das Blatt ist dafür zu hoch).
-    // s × b: Höhe und Breite der Stadt samt Rand im Bild, wie ausrichten() den Abstand wählt
-    const s = stadtBedarf * h / Math.min(stadtWeit, Math.max(1, stadtBedarf * h / ohne.m)), b = s * stadtSeiten;
+    // Ist die Stadt größer als die Fläche, bleibt sie in deren Mitte: der Überstand verteilt sich auf beide Seiten, statt ganz
+    // hinter die Karte zu gehen. s × b: Höhe und Breite der Stadt samt Rand im Bild, wie ausrichten() den Abstand wählt; der
+    // Rand (8 %) hier mindestens 2 × 12 px, sonst klebt eine kleine Stadt am Panel
+    const s0 = stadtBedarf * h / Math.min(stadtWeit, Math.max(1, stadtBedarf * h / ohne.m)), b0 = s0 * stadtSeiten;
+    const s = Math.max(s0, 0.92 * s0 + 24), b = Math.max(b0, 0.92 * b0 + 24);
     if (links) {
-      const mx = Math.min(ohne.r - b / 2, Math.max(ohne.mx, kq.right + b / 2));
+      const mx = Math.max(ohne.mx, Math.min(ohne.r - b / 2, kq.right + b / 2));
       if (mx + b / 2 - kq.right >= b / 2) ohne.mx = mx;
     } else if (ueberSpalte) {
-      const mx = Math.max(ohne.l + b / 2, Math.min(ohne.mx, kq.left - b / 2));
+      const mx = Math.min(ohne.mx, Math.max(ohne.l + b / 2, kq.left - b / 2));
       if (kq.left - (mx - b / 2) >= b / 2) ohne.mx = mx;
     } else if (kq.width > w / 2 && kq.bottom > h / 2) {
-      const my = Math.max(ohne.o + s / 2, Math.min(ohne.my, kq.top - s / 2));
+      const my = Math.min(ohne.my, Math.max(ohne.o + s / 2, kq.top - s / 2));
       if (kq.top - (my - s / 2) >= s / 2) ohne.my = my;
     }
     return ohne;
@@ -5099,14 +5506,24 @@ function baueGrafik(THREE, OrbitControls) {
     return f;
   }
 
-  // Ausdehnung der Bebauung im Bild (Bildkoordinaten −1 … 1): jedes Gebäude am Boden und in 2 Einheiten Höhe (knapp fünf Geschosse)
+  // Oberkante eines Gebäudes samt Dach (Satteldach, Treppenhaus); Baustelle und Anbau: das Gerüst in Zielhöhe. Schlote und
+  // Antennen nicht (dünn), Parks bis in die Baumkronen
+  function gebHoehe(b) {
+    const g = S.g, t = g.typ[b], ziel = Math.max(1, g.stufe[b], g.auf[b]), bau = S.feld[g.y[b] * Sim.KARTE + g.x[b]] === Sim.BAUSTELLE;
+    if (t === Sim.WOHNHAUS) return GESCHOSSE[ziel] * GESCHOSS * (1 + ATTIKA) + (bau || g.auf[b] ? 0.05 : ziel === 1 ? 0.31 : 0.2);
+    if (t === Sim.TECH) return TECH_GESCHOSSE[ziel] * GESCHOSS + 0.05;
+    return t === Sim.PARK ? 0.6 : 0.7;                    // Laden 0,55, Werkstatt mit Sheddach 0,61, Gerüst etwas höher
+  }
+  // Ausdehnung der Bebauung im Bild (Bildkoordinaten −1 … 1): die Hülle jedes Gebäudes, das ganze Feld (±0,5 um die Mitte) vom
+  // Boden bis zur Oberkante. Nur die Mitten lagen ein halbes Feld und die Dächer zu weit innen: der Rand fehlte im Bild
   const bildPunkt = new THREE.Vector3(), bild = { a0: 0, a1: 0, b0: 0, b1: 0 };
   function ausdehnung() {
     camera.updateMatrixWorld();
     bild.a0 = bild.b0 = 1e9; bild.a1 = bild.b1 = -1e9;
     for (let b = 0; b < S.gAnzahl; b++) {
-      for (let y = 0; y <= 2; y += 2) {
-        bildPunkt.set(wx(S.g.x[b]), y, wx(S.g.y[b])).project(camera);
+      const x = wx(S.g.x[b]), z = wx(S.g.y[b]), h = gebHoehe(b);
+      for (let k = 0; k < 8; k++) {                       // die acht Ecken der Hülle
+        bildPunkt.set(x + (k & 1 ? 0.5 : -0.5), k & 2 ? h : 0, z + (k & 4 ? 0.5 : -0.5)).project(camera);
         bild.a0 = Math.min(bild.a0, bildPunkt.x); bild.a1 = Math.max(bild.a1, bildPunkt.x);
         bild.b0 = Math.min(bild.b0, bildPunkt.y); bild.b1 = Math.max(bild.b1, bildPunkt.y);
       }
@@ -5153,17 +5570,21 @@ function baueGrafik(THREE, OrbitControls) {
     if (!w || !h) return;
     renderer.setSize(w, h, false);
     versatz(w, h);                                         // Panels liegen nach einem Größenwechsel anders
+    const r = canvas.getBoundingClientRect();
+    leinL = r.left; leinT = r.top; leinW = r.width || w; leinH = r.height || h;
+    panelZeit = -1e9; namenFaellig = true;
   }
   new ResizeObserver(groesse).observe(canvas);
   groesse();                                              // den Startblick setzt das Skript unten, wenn die Panels stehen
 
   return {
     stadt, licht, ausrichten,
-    neueStadt() { strassenStand = -1; wege.clear(); rundwege.clear(); werkTag = -1; for (const f of figuren) { f.p = -1; f.werk = false; } ausrichten(); stadt(S.stunde); },   // nach einem Import
-    figurenPlanen, figurenBewegen,
+    neueStadt() { strassenStand = -1; zeigerB = -1; wege.clear(); rundwege.clear(); werkTag = -1; for (const f of figuren) { f.p = -1; f.werk = false; } ausrichten(); stadt(S.stunde); },   // nach einem Import
+    figurenPlanen, figurenBewegen, auswahl,
     setzeHauptfiguren(ids) { hauptIds = ids.slice(0, HAUPT_MAX); },
     render() {
       controls.update();
+      if (namenFaellig) strassenNamen();                  // nur nach Kamerabewegung, neuen Straßen, Karte auf/zu, Größe
       // Wolken und Rauch laufen in echter Zeit (auch in der Pause, bei jedem Tempo gleich ruhig); reduziert: alles steht
       const sek = REDUZIERT ? 0 : performance.now() / 1000;
       wolkeU.wolkeVersatz.value = (sek * WIND_TEMPO * WOLKE_SKALA) % 1;
@@ -5291,7 +5712,12 @@ const hausKnopf = (b, text) => b >= 0 ? `<button type="button" class="haus" data
 const balken = (wert, gruen) => `<div class="balken${gruen ? ' gruen' : ''}" role="img" aria-label="${Math.round(wert)} von 100"><span style="width:${Math.max(0, Math.min(100, wert))}%"></span></div>`;
 function zeigePerson(p, gen, name) { verlauf.push({ art: 'p', id: Number(p), gen: Number(gen), name: name || '' }); if (verlauf.length > 50) verlauf.shift(); karteRendern(true); }
 function zeigeGebaeude(b) { verlauf.push({ art: 'g', id: Number(b) }); if (verlauf.length > 50) verlauf.shift(); karteRendern(true); }
-function karteZu() { verlauf.length = 0; $('karte').hidden = true; document.body.classList.remove('karte-offen'); hauptMarkieren(); }
+function karteZu() { verlauf.length = 0; $('karte').hidden = true; document.body.classList.remove('karte-offen'); hauptMarkieren(); auswahlZeigen(); }
+// Das Gebäude der offenen Hauskarte ist in der Stadt hervorgehoben; eine Personenkarte markiert nichts
+function auswahlZeigen() {
+  const k = !$('karte').hidden && verlauf[verlauf.length - 1];
+  if (G) G.auswahl(k && k.art === 'g' ? k.id : -1, !!k);
+}
 $('karte-zu').addEventListener('click', karteZu);
 $('karte-zurueck').addEventListener('click', () => { verlauf.pop(); karteRendern(true); });
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('karte').hidden && !document.querySelector('dialog[open]')) karteZu(); });
@@ -5333,6 +5759,7 @@ function karteRendern(fokus) {
   if (fokus) { $('karte').scrollTop = 0; const h = ziel.querySelector('h2'); if (h) h.focus({ preventScroll: true }); }
   else $('karte').scrollTop = scroll;
   hauptMarkieren();
+  auswahlZeigen();
 }
 // Kopf jeder Karte: Marke (Initialen oder Gebäudesymbol), Name groß, darunter eine Zeile
 function kopfHtml(marke, titel, unter, kicker) {

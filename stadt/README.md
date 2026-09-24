@@ -90,7 +90,12 @@ Einträge neu sind. Bei reduzierter Bewegung steht der Rauch still, und es gibt 
 
 **Design-Runde 3.**
 - Parks haben helle Wege, entweder als Kreuz mit Platz oder als Bogen, dazu Bänke und Beete. Manche haben einen Brunnen oder
-  einen Teich mit Schilf.
+  einen Teich mit Schilf. Nachts ist ihr Wasser dunkel wie der See, auch neben einer Laterne: Ihr Lichtfleck hellt nur den
+  Rasen auf.
+- Parks bleiben leer. Die Simulation schickt niemanden in einen Park: Er wirkt nur über Wohnhäuser in der Nähe (`g.parkNah`).
+  Deren Bewohner haben abends mehr Freizeit (`R.FREIZEIT_PARK`), und die Wohnungen zählen beim Umziehen als besser (Annahme 14).
+  Es gilt die Grundregel der Spec: Eine Figur steht nur dort, wo die Simulation die Person hat. Nur solange ein Park gebaut
+  wird, stehen dort Bauarbeiter.
 - Gärten sind mit niedrigen Hecken eingefasst.
 - Leere Felder zwischen Häusern bekommen Büsche und hohes Gras.
 - Die Leute sind kleine Figuren mit Beinen, Rumpf und Kopf statt Kapseln. Beim Gehen wippen sie leicht, bei reduzierter
@@ -101,6 +106,20 @@ Einträge neu sind. Bei reduzierter Bewegung steht der Rauch still, und es gibt 
 - Das aktive Tempo ist getönt statt voll gelb.
 - Das Stadtbuch zeigt das Symbol in der Tageszeile, dadurch hat der Text die volle Breite.
 - Auf Tablets und quergehaltenen Handys liegen Karten und Spalten so, dass die Kennzahlen frei bleiben.
+
+**Auswahl und Orientierung.**
+- Solange eine Hauskarte offen ist, ist das Gebäude leicht goldgetönt (nachts etwas stärker) und hat einen goldenen Rahmen am
+  Boden und einen zweiten oben: auf der Dachkante oder an der Traufe (auch nachts zu sehen). So bleibt die Auswahl auch zu
+  erkennen, wenn ein Hochhaus davor den Boden verdeckt. Eine Personenkarte markiert nichts. Schließen oder Escape nimmt die
+  Markierung weg.
+- Mit der Maus wird der Zeiger über Gebäuden und Figuren zur Hand, das Gebäude darunter wird etwas heller (nachts etwas mehr).
+  Auf Touch nicht.
+- Nah herangezoomt (Kameraabstand unter 35) stehen Straßennamen auf dunklen Schildern, höchstens 12, je Straße einer, in der
+  Mitte eines Blocks. Namen hinter hohen Häusern, unter Panels oder übereinander werden weggelassen, auch wenn ein Panel bei
+  ruhender Kamera größer wird (Stadtbuch aufgeklappt, Meldung). Sie blenden weich ein und aus, bei reduzierter Bewegung ohne
+  Übergang.
+- Die goldene Raute über Hauptfiguren ist im Startblick etwa 9 px hoch (sie wächst mit dem Abstand), hat einen dunklen Rand
+  und ist aus der Ferne (Kameraabstand über 25) auch hinter Hochhäusern zu sehen.
 
 In der 3D-Ansicht wächst auf jeder Baustelle ein grauer Rohbau mit den geschafften Arbeitstagen. Das Gerüst wird dunkler,
 solange niemand kommt, und lässt sich anklicken. Bauarbeiter (orange) stehen an den Ecken ihrer Baustelle, Handwerker
