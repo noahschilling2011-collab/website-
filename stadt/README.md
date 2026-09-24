@@ -81,6 +81,13 @@ daneben gebaut ist. Leere Stichstraßen bleiben dunkel. Um die Karte liegen Feld
 Nebel verschwindet. Parks und Gärten neben Wohnhäusern haben Laubbäume. Bei flachem Blick sieht man einen Himmel mit
 Farbverlauf, nachts mit Sternen und Mond. Alles ist Deko ohne Wirkung auf die Simulation.
 
+**Design-Runde 2.** Aus den Schloten arbeitender Werkstätten steigt tagsüber Rauch (8–17 Uhr, nur wenn heute jemand da ist).
+Weiche Wolkenschatten ziehen langsam über Boden, Häuser und Bäume (tagsüber, höchstens etwa 20 % dunkler). Links hinter der
+Stadt liegt ein See mit Schilf und Steinen im Feldring. Wohntürme haben Balkone zur Straße, und nachts leuchten die Fenster je
+Haus leicht verschieden warm. Die Oberfläche hat Symbole im Kennzahlen-Panel, Sonne oder Mond an der Uhr und ein Symbol je
+Stadtbuch-Eintrag. Die Karten haben einen klareren Kopf. Auf dem Handy ist das Stadtbuch eingeklappt und zeigt, wie viele
+Einträge neu sind. Bei reduzierter Bewegung stehen Rauch und Wolken still.
+
 In der 3D-Ansicht wächst auf jeder Baustelle ein grauer Rohbau mit den geschafften Arbeitstagen. Das Gerüst wird dunkler,
 solange niemand kommt, und lässt sich anklicken. Bauarbeiter (orange) stehen an den Ecken ihrer Baustelle, Handwerker
 (blau) vor der Werkstatt. An Werkstätten stehen Kistenstapel, vor Läden eine Theke und eine Auslage (braun: Kisten aus der
@@ -272,8 +279,14 @@ Figuren bei der Arbeit): JavaScript pro Bild 7,5–11,1 ms mit KI und 7,5–8,9 
 Unterschied ist im Messrauschen nicht zu sehen; das Bildtempo begrenzt hier die Software-Grafik.
 
 **60 Bilder pro Sekunde sind nicht gemessen.** Im Container rendert Chromium ohne Grafikkarte (SwiftShader) mit etwa
-10 fps. Gemessen sind Draw Calls, Dreiecke und die Rechenzeit pro Bild in JavaScript. Nach der Design-Runde 1: Teststadt
-(Seed 2, Tag 400) 17–20 Draw Calls, 47.000–49.000 Dreiecke; große Stadt (`?debug&umland=300000&tage=750&seed=2`, 5.894
-Einwohner) 18–21 Draw Calls, 165.000–172.000 Dreiecke (vorher 15 und 102.742), 5–12 ms JavaScript pro Bild, Konsole leer.
-Die Spec verlangt unter 100 Draw Calls; für die Dreiecke gibt sie keine Grenze. Meine eigene Richtgrenze von 150.000 ist in der
-großen Stadt überschritten. Die meisten Dreiecke kosten die Fensterreihen (24 je Geschoss) und die Kleinteile.
+10 fps. Gemessen sind Draw Calls, Dreiecke und die Rechenzeit pro Bild in JavaScript. Nach der Design-Runde 2: Teststadt
+(Seed 2, Tag 400) 19–21 Draw Calls, etwa 40.000 Dreiecke; große Stadt (`?debug&umland=300000&tage=750&seed=2`, 5.894
+Einwohner) 20–22 Draw Calls, etwa 130.000 Dreiecke (nach Runde 1: 165.000–172.000, davor 102.742), 3–12 ms JavaScript pro
+Bild, Konsole leer. Die Spec verlangt unter 100 Draw Calls; für Dreiecke gibt sie keine Grenze.
+
+**Fensterreihen mit Alpha-to-Coverage sind auf echter Grafikhardware ungeprüft.** Seit Runde 2 ist jede Fensterreihe ein
+Rechteck je Seite mit einer Textur, die Zwischenräume sind durchsichtig. Mit Kantenglättung (Multisampling) glättet
+Alpha-to-Coverage die Kanten; ohne greift ein Alpha-Test. Manche Treiber zeigen Alpha-to-Coverage als feines Punktraster.
+Im Container (SwiftShader) sieht es sauber aus.
+
+**Der See liegt im Startblick der kleinen Teststadt außerhalb des Bildes.** In größeren Städten sieht man ihn links hinten.

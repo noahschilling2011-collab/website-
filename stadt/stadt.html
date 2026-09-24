@@ -7,7 +7,9 @@
 <style>
   /* Farben und Maße an einem Ort. Dunkler Grund, ein Akzent: warmes Fensterlicht.
      CSS-Namen, die nicht in der Spec stehen, auf MDN nachgeschlagen (23.09.2026): backdrop-filter mit blur() und
-     saturate(), svh, clamp(), width: fit-content, overflow-wrap: anywhere. */
+     saturate(), svh, clamp(), width: fit-content, overflow-wrap: anywhere.
+     Neu in der Design-Runde 2 (verbreitet, nicht erneut nachgeschlagen): position: sticky, clip-path: inset(), SVG <symbol> mit <use href>,
+     scroll-padding, SVG <title> als Hinweis beim Überfahren. */
   :root {
     --grund: #0b0d12;
     --ebene1: #12151c;
@@ -19,8 +21,10 @@
     --text-leise: #a3a3ae;
     --akzent: #ffc864;
     --akzent-leise: rgba(255, 200, 100, 0.16);
+    --akzent-auf: #1d1606;                                 /* Text auf vollem Akzent (aktives Tempo): 11,7:1 */
     --gut: #8fd4a8;
     --schlecht: #f2998a;
+    --schlecht-leise: rgba(242, 153, 138, 0.14);
     --glas: rgba(14, 16, 22, 0.78);                        /* 0,78: leiser Text bleibt auch vor hellem Taghimmel ≥ 4,5:1 */
     --glas-fallback: rgba(18, 21, 28, 0.94);
     --akzent-rand: rgba(255, 200, 100, 0.5);
@@ -44,6 +48,8 @@
     --klein: clamp(0.78rem, 0.76rem + 0.1vw, 0.86rem);
     --normal: clamp(0.9rem, 0.87rem + 0.15vw, 1rem);
     --gross: clamp(1.15rem, 1.05rem + 0.4vw, 1.4rem);
+    --dauer: 150ms;                                        /* Hover und Zustandswechsel: ruhig */
+    --karte-oben: 222px;                                   /* Personenkarte unter den Kennzahlen */
     --schrift: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   }
   *, *::before, *::after { box-sizing: border-box; }
@@ -52,6 +58,9 @@
   body { font: var(--normal)/1.5 var(--schrift); letter-spacing: 0.005em; }
   button { font: inherit; color: inherit; }
   :focus-visible { outline: 2px solid var(--akzent); outline-offset: 2px; }
+  .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+  /* Symbole: 24er-Raster, Strich in Textfarbe */
+  .sym { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
   #szene { position: fixed; inset: 0; display: block; width: 100vw; height: 100svh; }
   body.ohne-3d #szene { display: none; }
@@ -67,63 +76,84 @@
   }
   @supports not (backdrop-filter: blur(1px)) { .glas { background: var(--glas-fallback); } }
 
-  /* Kennzahlen oben links */
-  #kennzahlen { position: fixed; top: var(--s4); left: var(--s4); padding: var(--s3) var(--s4); min-width: 220px;
+  /* Kennzahlen oben links: Tag und Uhr groß, darunter die Zahlen mit Symbol */
+  #kennzahlen { position: fixed; top: var(--s4); left: var(--s4); padding: var(--s3) var(--s4); min-width: 236px;
     font-variant-numeric: tabular-nums; }
-  #kennzahlen .zeit { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s4);
-    font-size: var(--gross); font-weight: 500; color: var(--text-stark); margin-bottom: var(--s2); }
-  #k-uhr { color: var(--akzent); }
-  #kennzahlen dl { margin: 0; display: grid; gap: 2px; font-size: var(--klein); }
-  #kennzahlen dl div { display: flex; justify-content: space-between; gap: var(--s4); }
-  #kennzahlen dt { color: var(--text-leise); }
-  #kennzahlen dd { margin: 0; color: var(--text); }
+  #kennzahlen .zeit { display: flex; align-items: center; justify-content: space-between; gap: var(--s4);
+    padding-bottom: var(--s2); margin-bottom: var(--s2); border-bottom: 1px solid var(--hell-3); line-height: 1.25; }
+  .tag-anzeige { font-size: var(--gross); font-weight: 600; color: var(--text-stark); letter-spacing: -0.01em; white-space: nowrap; }
+  .tag-wort { font-size: 0.72rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-leise); margin-right: 0.35em; }
+  .uhr { display: inline-flex; align-items: center; gap: 6px; font-size: var(--gross); font-weight: 500; color: var(--akzent); }
+  .uhr .sym { width: 18px; height: 18px; }
+  #kennzahlen dl { margin: 0; display: grid; gap: 3px; font-size: var(--klein); }
+  #kennzahlen dl div { display: flex; justify-content: space-between; align-items: center; gap: var(--s4); }
+  #kennzahlen dt { display: flex; align-items: center; gap: var(--s2); color: var(--text-leise); }
+  #kennzahlen dt .sym { width: 15px; height: 15px; }
+  #kennzahlen dd { margin: 0; color: var(--text-stark); font-weight: 500; }
+  #kennzahlen .einheit { color: var(--text-leise); font-weight: 400; }
 
-  /* Tempo unten mittig */
-  #tempo { position: fixed; left: 50%; bottom: var(--s4); transform: translateX(-50%); display: flex; gap: var(--s1);
-    padding: var(--s1); }
-  #tempo button { min-width: 64px; padding: var(--s2) var(--s3); background: transparent; border: 1px solid transparent;
-    border-radius: 10px; cursor: pointer; color: var(--text-leise); font-variant-numeric: tabular-nums;
-    transition: background-color 150ms ease-out, color 150ms ease-out, border-color 150ms ease-out; }
-  #tempo button:hover { background: var(--hell-2); color: var(--text); }
-  #tempo button[aria-pressed="true"] { background: var(--akzent-leise); border-color: var(--akzent-rand);
-    color: var(--akzent); font-weight: 500; }
+  /* Tempo unten mittig: aktives Tempo voll im Akzent. Schriftstärke in jedem Zustand gleich (500), sonst springt die Leiste */
+  #tempo { position: fixed; left: 50%; bottom: var(--s4); transform: translateX(-50%); display: flex; gap: 2px; padding: var(--s1); }
+  #tempo button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 60px; height: 38px; padding: 0 var(--s3);
+    background: transparent; border: 0; border-radius: 10px; cursor: pointer; color: var(--text-leise); font-weight: 500;
+    font-variant-numeric: tabular-nums; transition: background-color var(--dauer) ease-out, color var(--dauer) ease-out; }
+  #tempo button .sym { width: 14px; height: 14px; stroke-width: 2.6; }
+  #tempo button:hover { background: var(--hell-3); color: var(--text-stark); }
+  #tempo button[aria-pressed="true"] { background: var(--akzent); color: var(--akzent-auf); }
 
   /* Rechte Spalte: Hauptfiguren oben, darunter das Stadtbuch (einklappbar) */
   #rechts { position: fixed; top: var(--s4); right: var(--s4); width: min(360px, calc(100vw - 2 * var(--s4)));
     max-height: calc(100svh - 120px); display: flex; flex-direction: column; gap: var(--s2); }
   #stadtbuch { min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
   #haupt { flex: none; padding: var(--s2) 0; }
-  #haupt .kopfzeile { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s3); padding: var(--s1) var(--s4) var(--s1); }
-  #haupt .kopfzeile strong { font-weight: 500; color: var(--text-stark); }
+  #haupt .kopfzeile { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s3); padding: var(--s1) var(--s4) 6px; }
+  #haupt .kopfzeile strong { font-weight: 600; color: var(--text-stark); }
   .ki-status { font-size: var(--klein); color: var(--text-leise); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .ki-status.aus { color: var(--schlecht); }
-  #haupt-liste { list-style: none; margin: 0; padding: 0; max-height: 34svh; overflow-y: auto; }
-  #haupt-liste .leer { padding: var(--s1) var(--s4) var(--s2); font-size: var(--klein); color: var(--text-leise); }
-  .haupt-zeile { display: grid; grid-template-columns: 30px minmax(0, 1fr); column-gap: var(--s3); align-items: center; width: 100%;
-    padding: 5px var(--s4); background: none; border: 0; cursor: pointer; text-align: left; color: var(--text); font-size: var(--klein);
-    transition: background-color 150ms ease-out; }
-  .haupt-zeile:hover { background: var(--hell-1); }
-  .kreis { grid-row: span 2; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 0.74rem;
-    font-weight: 500; letter-spacing: 0.02em; color: var(--akzent); border: 1.5px solid var(--akzent-rand); background: var(--akzent-leise); }
-  .haupt-zeile .n { color: var(--text-stark); display: flex; gap: var(--s2); align-items: baseline; min-width: 0; line-height: 1.3; }
+  #haupt-liste { list-style: none; margin: 0; padding: 0 6px; max-height: 34svh; overflow-y: auto; }
+  #haupt-liste .leer { padding: var(--s1) 10px var(--s2); font-size: var(--klein); color: var(--text-leise); }
+  .haupt-zeile { display: grid; grid-template-columns: 32px minmax(0, 1fr); column-gap: var(--s3); align-items: center; width: 100%;
+    padding: 6px 10px; background: none; border: 0; border-radius: 10px; cursor: pointer; text-align: left; color: var(--text);
+    font-size: var(--klein); transition: background-color var(--dauer) ease-out; }
+  .haupt-zeile:hover { background: var(--hell-2); }
+  .haupt-zeile:focus-visible { outline-offset: -2px; }    /* in der scrollenden Liste sonst abgeschnitten */
+  .haupt-zeile[aria-current="true"] { background: var(--akzent-leise); }
+  /* heller Grund (Hover, markiert): leiser Text wäre dort unter 4,5:1 */
+  .haupt-zeile:hover .gedanke, .haupt-zeile[aria-current="true"] .gedanke,
+  .haupt-zeile:hover .ueberlegt-text, .haupt-zeile[aria-current="true"] .ueberlegt-text { color: var(--text); }
+  .kreis { grid-row: span 2; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 0.74rem;
+    font-weight: 600; letter-spacing: 0.02em; color: var(--akzent); border: 1.5px solid var(--akzent-rand); background: var(--akzent-leise);
+    transition: background-color var(--dauer) ease-out, color var(--dauer) ease-out; }
+  .haupt-zeile[aria-current="true"] .kreis { background: var(--akzent); border-color: var(--akzent); color: var(--akzent-auf); }
+  .haupt-zeile .n { color: var(--text-stark); font-weight: 500; display: flex; gap: var(--s2); align-items: baseline; min-width: 0; line-height: 1.3; }
   .haupt-zeile .gedanke { color: var(--text-leise); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.35; }
   .ueberlegt-text { color: var(--text-leise); font-size: 0.9em; font-weight: 400; font-style: italic; text-transform: none; letter-spacing: 0; }
   .ueberlegt .kreis { border-color: var(--denkt); color: var(--text-stark); background: var(--hell-3); animation: puls 1.8s ease-in-out infinite; }
   @keyframes puls { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 0 4px var(--hell-4); } }
-  #buch-knopf { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: var(--s3) var(--s4);
-    background: transparent; border: 0; cursor: pointer; font-weight: 500; color: var(--text-stark); text-align: left; }
-  #buch-knopf .pfeil { transition: transform 200ms cubic-bezier(.2,.8,.2,1); color: var(--text-leise); }
+  #buch-knopf { display: flex; align-items: center; gap: var(--s2); width: 100%; padding: var(--s3) var(--s4); background: transparent; border: 0;
+    border-radius: calc(var(--r) - 1px); cursor: pointer; font-weight: 600; color: var(--text-stark); text-align: left;
+    transition: background-color var(--dauer) ease-out; }
+  #buch-knopf:hover { background: var(--hell-2); }
+  #buch-knopf:focus-visible { outline-offset: -2px; }     /* das Stadtbuch schneidet über den Rand Hinausragendes ab */
+  #buch-knopf .pfeil { margin-left: auto; transition: transform 200ms cubic-bezier(.2,.8,.2,1); color: var(--text-leise); }
   #buch-knopf[aria-expanded="false"] .pfeil { transform: rotate(-90deg); }
-  #buch-liste { list-style: none; margin: 0; padding: 0 var(--s4) var(--s3); overflow-y: auto; font-size: var(--klein);
-    border-top: 1px solid var(--linie); }
+  .neu-zahl { padding: 0 var(--s2); border-radius: 999px; background: var(--akzent-leise); color: var(--akzent); font-size: 0.78rem;
+    font-weight: 500; line-height: 1.6; font-variant-numeric: tabular-nums; }
+  #buch-liste { list-style: none; margin: 0; padding: 0 var(--s4) var(--s1); overflow-y: auto; font-size: var(--klein);
+    border-top: 1px solid var(--linie); scroll-padding: 6px 0; }   /* beim Tabben scrollt die Liste so weit, dass der Fokusring ganz zu sehen ist */
+  /* Einträge im Stadtbuch und in „Während du weg warst“: Symbol nach Art, daneben Tag und Text */
+  .eintrag { display: grid; grid-template-columns: 20px minmax(0, 1fr); column-gap: 10px; align-items: start; }
   #buch-liste li { padding: var(--s2) 0; border-bottom: 1px solid var(--hell-1); line-height: 1.45; }
   #buch-liste li:last-child { border-bottom: 0; }
-  #buch-liste .tag { display: block; color: var(--text-leise); font-variant-numeric: tabular-nums; font-size: 0.92em; }
+  .art-sym { width: 20px; height: 20px; padding: 3px; border-radius: 6px; stroke-width: 2; background: var(--hell-3); color: var(--text-leise); }
+  .eintrag.wichtig .art-sym { background: var(--akzent-leise); color: var(--akzent); }
+  .eintrag.verlust .art-sym { background: var(--schlecht-leise); color: var(--schlecht); }
+  .eintrag .tag { display: block; color: var(--text-leise); font-variant-numeric: tabular-nums; font-size: 0.92em; }
   #buch-liste li.neu { animation: rein 400ms cubic-bezier(.2,.8,.2,1); }
   @keyframes rein { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
   .name { color: var(--text-stark); }
-  button.name { background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline;
-    text-decoration-color: var(--akzent-linie); text-underline-offset: 2px; }
+  button.name { background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; border-radius: 3px; text-align: left;
+    text-decoration-color: var(--akzent-linie); text-underline-offset: 2px; transition: color var(--dauer) ease-out; }
   button.name:hover { color: var(--akzent); }
   button.name.weg { color: var(--text-leise); text-decoration-style: dotted; }
 
@@ -135,42 +165,72 @@
 
   /* Debug-Ecke (nur mit ?debug) */
   #debug { position: fixed; left: var(--s4); bottom: var(--s4); padding: var(--s2) var(--s3); background: var(--debug);
-    border: 1px solid var(--linie); border-radius: 10px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+    border: 1px solid var(--linie); border-radius: 10px; font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;   /* 11 px: endet links vom Tempo */
     color: var(--text-leise); white-space: pre; font-variant-numeric: tabular-nums; }
 
   /* Personen- und Hauskarte links */
-  #karte { position: fixed; left: var(--s4); top: 232px; bottom: 96px; width: min(380px, calc(100vw - 2 * var(--s4)));
+  /* so hoch wie der Inhalt, höchstens bis über das Tempo: verdeckt nicht mehr Stadt als nötig */
+  /* Breite: nie über #rechts (360 px), auch auf schmalen Tablets */
+  #karte { position: fixed; left: var(--s4); top: var(--karte-oben); max-height: calc(100svh - var(--karte-oben) - 96px); width: min(380px, calc(100vw - 360px - 3 * var(--s4)));
     overflow-y: auto; background: var(--karte); border: 1px solid var(--linie); border-radius: var(--r);
-    padding: var(--s3) var(--s4) var(--s5); font-size: var(--klein); }
-  #karte .kopf { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--s2); min-height: 28px; }
-  #karte .kopf button { background: none; border: 0; color: var(--text-leise); cursor: pointer; padding: 4px 6px; border-radius: 6px; }
-  #karte .kopf button:hover { color: var(--text); background: var(--hell-2); }
-  #karte h2 { margin: 0 0 2px; font-size: var(--gross); font-weight: 500; color: var(--text-stark); letter-spacing: -0.01em; outline: none; }
-  #karte h3 { margin: var(--s4) 0 var(--s2); font-size: 0.78rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase;
-    color: var(--text-leise); }
+    padding: 0 var(--s4) var(--s5); font-size: var(--klein); box-shadow: 0 16px 40px var(--schatten);
+    scroll-padding: 48px 0 8px; }                           /* Fokus nie unter der Kopfleiste (40 px) oder am Rand abgeschnitten */
+  /* Kopfleiste bleibt beim Scrollen stehen: Zurück und Schließen immer erreichbar */
+  #karte .kopf { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; align-items: center; min-height: 40px;
+    margin: 0 calc(-1 * var(--s4)); padding: var(--s1) var(--s2) 0; background: var(--karte); }
+  #karte .kopf button { background: none; border: 0; color: var(--text-leise); cursor: pointer; padding: 5px 8px; border-radius: 8px;
+    transition: background-color var(--dauer) ease-out, color var(--dauer) ease-out; }
+  #karte .kopf button:hover { color: var(--text-stark); background: var(--hell-3); }
+  #karte .kopf #karte-zu { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; }
+  .karte-kopf { display: flex; align-items: center; gap: var(--s3); margin: 0 0 var(--s3); }
+  .karte-kopf .titel { min-width: 0; }
+  .kicker { display: block; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; color: var(--akzent); line-height: 1.3; }
+  #karte h2 { margin: 0; font-size: var(--gross); font-weight: 600; line-height: 1.25; color: var(--text-stark); letter-spacing: -0.01em;
+    outline: none; overflow-wrap: anywhere; }
+  #karte .unter { margin: 3px 0 0; color: var(--text-leise); line-height: 1.4; }
+  #karte .kreis.gross { grid-row: auto; flex: none; width: 44px; height: 44px; font-size: 0.92rem; }
+  .kreis.neutral { color: var(--text-stark); border-color: var(--hell-6); background: var(--hell-3); }
+  .kreis.weg { color: var(--text-leise); border: 1.5px dashed var(--hell-6); background: none; }
+  .typ-marke { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 12px; color: var(--text);
+    background: var(--hell-3); border: 1px solid var(--hell-4); }
+  .typ-marke .sym { width: 22px; height: 22px; }
+  .fakten { list-style: none; margin: 0 0 var(--s1); padding: 0; display: grid; gap: 6px; }
+  .fakten li { display: grid; grid-template-columns: 16px minmax(0, 1fr); column-gap: 10px; align-items: start; line-height: 1.45; }
+  .fakten .sym { margin-top: 2px; color: var(--text-leise); }
+  .fakten strong { font-weight: 500; color: var(--text-stark); }
+  #karte h3 { margin: var(--s4) 0 var(--s3); padding-top: var(--s3); border-top: 1px solid var(--hell-3); font-size: 0.75rem; font-weight: 600;
+    letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-leise); }
   #karte p { margin: 0 0 4px; }
   #karte .leise { color: var(--text-leise); }
-  .werte { display: grid; grid-template-columns: 7.5em 1fr 2.2em; gap: 6px var(--s2); align-items: center; font-variant-numeric: tabular-nums; }
+  .mehr p { color: var(--text); }
+  .werte { display: grid; grid-template-columns: 7.5em 1fr 2.2em; gap: 8px var(--s3); align-items: center; font-variant-numeric: tabular-nums; }
   .werte .zahl { text-align: right; color: var(--text-leise); }
-  .balken { height: 6px; background: var(--ebene3); border-radius: 3px; overflow: hidden; }
+  .balken { height: 6px; background: var(--hell-3); border-radius: 3px; overflow: hidden; }
   .balken > span { display: block; height: 100%; background: var(--akzent); border-radius: 3px; }
   .balken.gruen > span { background: var(--gut); }
-  .lebenslauf { list-style: none; margin: 0; padding: 0; }
-  .lebenslauf li { padding: 3px 0; display: grid; grid-template-columns: 4.2em 1fr; gap: var(--s2); }
+  /* Lebenslauf als Zeitleiste */
+  .lebenslauf { list-style: none; margin: 0 0 0 3px; padding: 0; border-left: 1px solid var(--hell-4); }
+  .lebenslauf li { position: relative; padding: 3px 0 3px 14px; display: grid; grid-template-columns: 4.4em 1fr; gap: var(--s2); }
+  .lebenslauf li::before { content: ""; position: absolute; left: -4px; top: calc(3px + 0.725em - 3.5px); width: 7px; height: 7px; border-radius: 50%;
+    background: var(--karte); border: 1.5px solid var(--text-leise); }
+  .lebenslauf li:last-child::before { background: var(--text-leise); }   /* das Neueste */
   .lebenslauf .tag { color: var(--text-leise); font-variant-numeric: tabular-nums; }
-  .familie { display: grid; grid-template-columns: 5.5em 1fr; gap: 4px var(--s2); }
+  .familie { display: grid; grid-template-columns: 5.5em 1fr; gap: 6px var(--s2); margin: 0; }
   .familie dt { color: var(--text-leise); }
   .familie dd { margin: 0; }
   .personenliste { list-style: none; margin: 0; padding: 0; }
-  .personenliste li { display: flex; justify-content: space-between; gap: var(--s2); padding: 4px 0; border-bottom: 1px solid var(--hell-1); }
-  .personenliste li.neuer-haushalt { border-top: 1px solid var(--linie); }
-  button.haus { background: none; border: 0; padding: 0; cursor: pointer; color: inherit; text-decoration: underline;
-    text-decoration-color: var(--hell-6); text-underline-offset: 2px; font: inherit; }
+  .personenliste li { display: flex; justify-content: space-between; gap: var(--s2); padding: 6px 0; border-bottom: 1px solid var(--hell-1); }
+  .personenliste li:last-child { border-bottom: 0; }
+  .personenliste li > span:first-child { flex-shrink: 0; max-width: 62%; }   /* Name bricht nicht um, die Rolle schon */
+  .personenliste li > .leise { text-align: right; }
+  .personenliste li.neuer-haushalt { border-top: 1px solid var(--hell-4); }
+  button.haus { background: none; border: 0; padding: 0; cursor: pointer; color: inherit; text-decoration: underline; border-radius: 3px;
+    text-decoration-color: var(--hell-6); text-underline-offset: 2px; font: inherit; text-align: left; transition: color var(--dauer) ease-out; }
   button.haus:hover { color: var(--akzent); }
   .karte-knoepfe { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); margin-top: var(--s3); }
   .knopf.klein { padding: 4px 10px; font-size: var(--klein); }
   .knopf:disabled { opacity: 0.5; cursor: default; }
-  .tagebuch { list-style: none; margin: 0; padding: 0 var(--s1) 0 0; max-height: 260px; overflow-y: auto; }
+  .tagebuch { list-style: none; margin: 0; padding: 0 var(--s1) 0 0; max-height: 260px; overflow-y: auto; scroll-padding: 6px 0; }
   .tagebuch li { padding: var(--s2) 0; border-bottom: 1px solid var(--hell-1); }
   .tagebuch li:last-child { border-bottom: 0; }
   .tagebuch .meta { display: block; color: var(--text-leise); font-size: 0.92em; margin-bottom: 2px; }
@@ -179,6 +239,7 @@
   .tagebuch pre.code { margin: 4px 0 0; padding: 6px 8px; max-height: 180px; overflow: auto; border-radius: 8px; background: var(--ebene1);
     border: 1px solid var(--linie); font: 11.5px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--code);
     white-space: pre; tab-size: 2; }
+  .tagebuch pre.code:focus-visible { outline-offset: -2px; }
   .gekauft { color: var(--text); }
   .tagebuch .noah { width: fit-content; max-width: 88%; margin: 2px 0 6px auto; padding: 5px 10px; border-radius: 10px;
     background: var(--akzent-leise); color: var(--text-stark); }
@@ -192,7 +253,7 @@
 
   /* Knopf für Einstellungen unten rechts */
   #einst-knopf { position: fixed; right: var(--s4); bottom: var(--s4); width: 44px; height: 44px; display: grid; place-items: center;
-    cursor: pointer; color: var(--text-leise); padding: 0; }
+    cursor: pointer; color: var(--text-leise); padding: 0; transition: color var(--dauer) ease-out; }
   #einst-knopf:hover { color: var(--akzent); }
 
   /* Dialoge: solide Ebene 2, kein Glas */
@@ -200,12 +261,12 @@
     padding: var(--s5); max-width: min(520px, calc(100vw - 32px)); box-shadow: 0 20px 60px var(--schatten); }
   dialog::backdrop { background: var(--abdunkeln); }
   dialog[open] { animation: rein 350ms cubic-bezier(.2,.8,.2,1); }
-  dialog h2 { margin: 0 0 var(--s3); font-size: var(--gross); font-weight: 500; color: var(--text-stark); letter-spacing: -0.01em; }
+  dialog h2 { margin: 0 0 var(--s3); font-size: var(--gross); font-weight: 600; color: var(--text-stark); letter-spacing: -0.01em; }
   dialog p { margin: 0 0 var(--s3); color: var(--text); max-width: 60ch; }
   dialog .leise { color: var(--text-leise); font-size: var(--klein); }
   .knoepfe { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s4); }
   .knopf { padding: var(--s2) var(--s4); border-radius: 10px; border: 1px solid var(--linie); background: var(--ebene3);
-    color: var(--text); cursor: pointer; transition: background-color 150ms ease-out, border-color 150ms ease-out; }
+    color: var(--text); cursor: pointer; transition: background-color var(--dauer) ease-out, border-color var(--dauer) ease-out; }
   .knopf:hover { border-color: var(--hell-5); }
   .knopf.haupt { background: var(--akzent-leise); border-color: var(--akzent-rand); color: var(--akzent); }
   .zahlen { display: grid; grid-template-columns: 1fr auto; gap: 4px var(--s5); margin: var(--s3) 0; font-variant-numeric: tabular-nums; }
@@ -213,7 +274,6 @@
   .zahlen dd { margin: 0; text-align: right; color: var(--text-stark); }
   .auffaellig { list-style: none; margin: var(--s2) 0 0; padding: 0; font-size: var(--klein); }
   .auffaellig li { padding: var(--s2) 0; border-top: 1px solid var(--linie); }
-  .auffaellig .tag { display: block; color: var(--text-leise); }
 
   /* Aufholen: Fortschritt über der Szene */
   #aufholen { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); width: min(420px, calc(100vw - 32px));
@@ -230,17 +290,36 @@
     z-index: 10; }
   #meldung.fehler { border-color: var(--schlecht-rand); color: var(--schlecht); }
   #meldung.warnung { border-color: var(--akzent-rand); color: var(--akzent); }
-  body.debug #karte { bottom: 152px; }                    /* nicht über den Debug-Knöpfen */
+  body.debug #karte { max-height: calc(100svh - var(--karte-oben) - 152px); }   /* nicht über den Debug-Knöpfen */
   #debug-knoepfe { position: fixed; left: var(--s4); bottom: 112px; display: flex; gap: var(--s1); font-size: 12px; }
   #debug-knoepfe .knopf { padding: 4px 8px; font-size: 12px; }
 
+  /* Schmal (Handy): Zahlen kompakt oben links, Einstellungen oben rechts, unten Hauptfiguren und eingeklapptes Stadtbuch über dem Tempo */
   @media (max-width: 720px) {
-    #rechts { top: auto; bottom: 76px; max-height: 42svh; }
-    #haupt-liste { display: flex; gap: var(--s1); overflow-x: auto; padding: 0 var(--s3); }
-    .haupt-zeile { grid-template-columns: 30px; padding: 4px; }
-    .haupt-zeile .n, .haupt-zeile .gedanke { display: none; }
-    #kennzahlen { min-width: 0; }
-    #karte { top: auto; left: var(--s2); right: var(--s2); width: auto; bottom: 76px; max-height: 55svh; z-index: 5; }
+    #kennzahlen { top: var(--s3); left: var(--s3); min-width: 0; padding: var(--s2) var(--s3); }
+    #kennzahlen .zeit { padding-bottom: 6px; margin-bottom: 6px; gap: var(--s3); }
+    .tag-anzeige, .uhr { font-size: 1.05rem; }
+    .uhr .sym { width: 16px; height: 16px; }
+    #kennzahlen dl { gap: 1px; }
+    #kennzahlen dl div { gap: var(--s3); }
+    #kennzahlen .einheit { display: none; }                 /* „Taler“ macht die Zahlen hier am breitesten; auf den Karten steht es */
+    #einst-knopf { top: var(--s3); right: var(--s3); bottom: auto; }
+    #tempo { bottom: var(--s3); }
+    #rechts { top: auto; right: var(--s3); bottom: 70px; width: calc(100vw - 2 * var(--s3)); max-height: 46svh; }
+    #haupt { padding: var(--s1) 0 6px; }
+    #haupt .kopfzeile { padding: var(--s1) var(--s3) 2px; }
+    #haupt-liste { display: flex; gap: var(--s1); overflow-x: auto; padding: 2px var(--s2); }
+    .haupt-zeile { grid-template-columns: 32px; width: auto; padding: 4px; border-radius: 50%; }
+    .haupt-zeile .n { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }   /* Name bleibt für Screenreader */
+    .haupt-zeile .gedanke { display: none; }
+    #buch-knopf { padding: 10px var(--s3); }
+    #buch-liste { padding: 0 var(--s3) var(--s1); }
+    #karte { top: auto; left: var(--s2); right: var(--s2); width: auto; bottom: 70px; max-height: 60svh; z-index: 5; }
+    body.karte-offen #rechts { visibility: hidden; }        /* liegt unter der Karte: sonst landet der Tab-Fokus unsichtbar dort */
+    body.debug #karte { max-height: 60svh; }
+    #karte .kopf { margin: 0 calc(-1 * var(--s4)); }
+    #debug { top: 172px; bottom: auto; left: var(--s3); right: var(--s3); font-size: 9px; overflow: hidden; }
+    #debug-knoepfe { top: 256px; bottom: auto; left: var(--s3); }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important;
@@ -258,22 +337,60 @@
 </head>
 <body>
 <canvas id="szene" aria-label="3D-Ansicht der Stadt"></canvas>
+<!-- Symbole (24er-Raster, Strich in Textfarbe): Kennzahlen, Uhr, Tempo, Stadtbuch, Karten -->
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="s-leute" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5c.4-3.2 2.7-5.3 5.5-5.3s5.1 2.1 5.5 5.3"/><path d="M15.5 5.2a3 3 0 0 1 0 5.6"/><path d="M17.5 14.6c1.7.7 2.8 2.5 3 4.9"/></symbol>
+  <symbol id="s-haus" viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5"/><path d="M6 9v10.5h12V9"/><path d="M10 19.5v-5h4v5"/></symbol>
+  <symbol id="s-koffer" viewBox="0 0 24 24"><rect x="3.5" y="7.5" width="17" height="12" rx="2"/><path d="M9 7.5V5.8c0-.7.6-1.3 1.3-1.3h3.4c.7 0 1.3.6 1.3 1.3v1.7"/><path d="M3.5 12.5h17"/></symbol>
+  <symbol id="s-laecheln" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 14.2c.9 1.3 2.1 1.9 3.5 1.9s2.6-.6 3.5-1.9"/><path d="M9.2 9.6h.01M14.8 9.6h.01"/></symbol>
+  <symbol id="s-muenzen" viewBox="0 0 24 24"><ellipse cx="12" cy="6.5" rx="7" ry="2.8"/><path d="M5 6.5v5.2c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V6.5"/><path d="M5 11.8V17c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8v-5.2"/></symbol>
+  <symbol id="s-sonne" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.8V5M12 19v2.2M2.8 12H5M19 12h2.2M5.5 5.5l1.6 1.6M16.9 16.9l1.6 1.6M5.5 18.5l1.6-1.6M16.9 7.1l1.6-1.6"/></symbol>
+  <symbol id="s-daemmerung" viewBox="0 0 24 24"><path d="M7 16.5a5 5 0 0 1 10 0"/><path d="M3 20h18"/><path d="M12 5.5v3M5.2 9.6l1.7 1.5M18.8 9.6l-1.7 1.5M2.8 16.5h2M19.2 16.5h2"/></symbol>
+  <symbol id="s-mond" viewBox="0 0 24 24"><path d="M19.5 14.6A8 8 0 0 1 9.4 4.5a8 8 0 1 0 10.1 10.1z"/></symbol>
+  <symbol id="s-pause" viewBox="0 0 24 24"><path d="M8 4.5v15M16 4.5v15"/></symbol>
+  <symbol id="s-rein" viewBox="0 0 24 24"><path d="M14 4.5h4a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5h-4"/><path d="M4.5 12h10"/><path d="m11 8.5 3.5 3.5-3.5 3.5"/></symbol>
+  <symbol id="s-raus" viewBox="0 0 24 24"><path d="M10 4.5H6A1.5 1.5 0 0 0 4.5 6v12A1.5 1.5 0 0 0 6 19.5h4"/><path d="M9.5 12h10"/><path d="m16 8.5 3.5 3.5-3.5 3.5"/></symbol>
+  <symbol id="s-spross" viewBox="0 0 24 24"><path d="M12 20.5V12"/><path d="M12 12c0-3.6-2.5-6-6.5-6 0 3.6 2.5 6 6.5 6z"/><path d="M12 14.5c0-3.1 2.2-5.5 6.5-5.5 0 3.1-2.2 5.5-6.5 5.5z"/></symbol>
+  <symbol id="s-kerze" viewBox="0 0 24 24"><path d="M12 3.5c1.6 1.7 1.6 3.4 0 4.8-1.6-1.4-1.6-3.1 0-4.8z"/><rect x="9" y="11" width="6" height="9.5" rx="1"/></symbol>
+  <symbol id="s-ringe" viewBox="0 0 24 24"><circle cx="9" cy="13" r="5.5"/><circle cx="15" cy="13" r="5.5"/></symbol>
+  <symbol id="s-bruch" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20z"/><path d="m12 7.2-1.6 4 2.8 1.6-1.2 3.6"/></symbol>
+  <symbol id="s-laden" viewBox="0 0 24 24"><path d="M4 9.5 5.5 4.5h13L20 9.5"/><path d="M4 9.5c0 1.4 1.1 2.5 2.7 2.5s2.6-1.1 2.6-2.5c0 1.4 1.2 2.5 2.7 2.5s2.7-1.1 2.7-2.5c0 1.4 1 2.5 2.6 2.5S20 10.9 20 9.5"/><path d="M5.5 12v7.5h13V12"/><path d="M10 19.5v-4.5h4v4.5"/></symbol>
+  <symbol id="s-abwaerts" viewBox="0 0 24 24"><path d="M3.5 7 9 12.5l3.5-3.5 8 8"/><path d="M14.5 17h6v-6"/></symbol>
+  <symbol id="s-schloss" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></symbol>
+  <symbol id="s-amt" viewBox="0 0 24 24"><path d="M3 9.5 12 4l9 5.5"/><path d="M5.5 10.5v8M10 10.5v8M14 10.5v8M18.5 10.5v8"/><path d="M3 20h18"/></symbol>
+  <symbol id="s-kran" viewBox="0 0 24 24"><path d="M7 20.5V3.5"/><path d="M3.5 7.5H20.5"/><path d="M7 3.5l-3.5 4M7 3.5l7 4"/><path d="M18 7.5v4.5"/><path d="M16.5 12h3v2.5h-3z"/><path d="M4 20.5h6"/></symbol>
+  <symbol id="s-kegel" viewBox="0 0 24 24"><path d="M9.8 4.5h4.4L18 18.5H6z"/><path d="M8.3 10h7.4M7.3 14.2h9.4"/><path d="M4 20.5h16"/></symbol>
+  <symbol id="s-fertig" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="m8.3 12.3 2.5 2.5 5-5.3"/></symbol>
+  <symbol id="s-auftrag" viewBox="0 0 24 24"><rect x="5.5" y="5" width="13" height="15.5" rx="2"/><path d="M9.5 3.5h5V6h-5z"/><path d="M9 11h6M9 14.5h6"/></symbol>
+  <symbol id="s-sanduhr" viewBox="0 0 24 24"><path d="M7 3.5h10M7 20.5h10"/><path d="M8 3.5c0 4 4 5.5 4 8.5s-4 4.5-4 8.5M16 3.5c0 4-4 5.5-4 8.5s4 4.5 4 8.5"/></symbol>
+  <symbol id="s-chip" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/><path d="M9.5 3.5v3M14.5 3.5v3M9.5 17.5v3M14.5 17.5v3M3.5 9.5h3M3.5 14.5h3M17.5 9.5h3M17.5 14.5h3"/></symbol>
+  <symbol id="s-paket" viewBox="0 0 24 24"><path d="M12 3.5 19.5 7.5v9L12 20.5 4.5 16.5v-9z"/><path d="M4.5 7.5 12 11.5l7.5-4M12 11.5v9"/></symbol>
+  <symbol id="s-fahne" viewBox="0 0 24 24"><path d="M5.5 21V4"/><path d="M5.5 4.5h11l-2 3.5 2 3.5h-11"/></symbol>
+  <symbol id="s-warnung" viewBox="0 0 24 24"><path d="M12 4 21 19.5H3z"/><path d="M12 10v4.5M12 17.2h.01"/></symbol>
+  <symbol id="s-werkstatt" viewBox="0 0 24 24"><path d="M3.5 20V11l5 3.2V11l5 3.2V5h4v15"/><path d="M2.5 20h19"/></symbol>
+  <symbol id="s-baum" viewBox="0 0 24 24"><path d="M12 20.5v-4"/><path d="M12 3.5 6.5 11h3L6 16.5h12L14.5 11h3z"/></symbol>
+  <symbol id="s-ziel" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12h.01"/></symbol>
+  <symbol id="s-geraet" viewBox="0 0 24 24"><rect x="7" y="3.5" width="10" height="17" rx="2"/><path d="M11 17.5h2"/></symbol>
+</svg>
 <noscript><div class="hinweis">Für STADT wird JavaScript benötigt.</div></noscript>
 <div id="hinweis" class="hinweis" role="status" hidden></div>
 
 <section id="kennzahlen" class="glas" aria-label="Die Stadt in Zahlen">
-  <div class="zeit"><span id="k-tag">Tag 0</span><span id="k-uhr">06:00</span></div>
+  <div class="zeit">
+    <span class="tag-anzeige"><span class="tag-wort">Tag</span><span id="k-tag">0</span></span>
+    <span class="uhr"><svg class="sym" id="k-phase" aria-hidden="true"><use href="#s-sonne"/></svg><span id="k-uhr">06:00</span></span>
+  </div>
   <dl>
-    <div><dt>Einwohner</dt><dd id="k-einw">0</dd></div>
-    <div><dt>Freie Wohnungen</dt><dd id="k-fw">0</dd></div>
-    <div><dt>Freie Stellen</dt><dd id="k-fs">0</dd></div>
-    <div><dt>Zufriedenheit</dt><dd id="k-zuf">0</dd></div>
-    <div><dt>Budget</dt><dd id="k-budget">0</dd></div>
+    <div><dt><svg class="sym" aria-hidden="true"><use href="#s-leute"/></svg>Einwohner</dt><dd id="k-einw">0</dd></div>
+    <div><dt><svg class="sym" aria-hidden="true"><use href="#s-haus"/></svg>Freie Wohnungen</dt><dd id="k-fw">0</dd></div>
+    <div><dt><svg class="sym" aria-hidden="true"><use href="#s-koffer"/></svg>Freie Stellen</dt><dd id="k-fs">0</dd></div>
+    <div><dt><svg class="sym" aria-hidden="true"><use href="#s-laecheln"/></svg>Zufriedenheit</dt><dd id="k-zuf">0</dd></div>
+    <div><dt><svg class="sym" aria-hidden="true"><use href="#s-muenzen"/></svg>Budget</dt><dd><span id="k-budget">0</span> <span class="einheit">Taler</span></dd></div>
   </dl>
 </section>
 
 <nav id="tempo" class="glas" aria-label="Tempo">
-  <button type="button" data-tempo="0" aria-pressed="false">Pause</button>
+  <button type="button" data-tempo="0" aria-pressed="false" title="Pause (Leertaste)"><svg class="sym" aria-hidden="true"><use href="#s-pause"/></svg>Pause</button>
   <button type="button" data-tempo="1" aria-pressed="true">1×</button>
   <button type="button" data-tempo="5" aria-pressed="false">5×</button>
   <button type="button" data-tempo="20" aria-pressed="false">20×</button>
@@ -286,7 +403,7 @@
 </section>
 <aside id="stadtbuch" class="glas" aria-label="Stadtbuch">
   <button type="button" id="buch-knopf" aria-expanded="true" aria-controls="buch-liste">
-    <span>Stadtbuch</span><svg class="pfeil" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+    <span>Stadtbuch</span><span class="neu-zahl" id="buch-neu" hidden></span><svg class="pfeil" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
   </button>
   <ol id="buch-liste" reversed></ol>
 </aside>
@@ -3299,6 +3416,49 @@ function baueGrafik(THREE, OrbitControls) {
   const welle = (x, z) => (Math.sin(x * 0.071 + Math.sin(z * 0.053) * 1.7) + Math.sin(z * 0.067 - x * 0.031 + 2.1)
     + Math.sin((x + z) * 0.043 + 0.6)) / 6 + 0.5;         // glattes Rauschen, 0 … 1
   const randAbst = (x, z) => Math.max(Math.abs(x), Math.abs(z));   // Abstand zur Mitte, quadratisch wie die Karte
+  // See im Feldring links hinter der Stadt: Mitte, Halbachsen; seeAbst 1 = Ufer (ohne Buchten). Im Startblick liegt er ab gut
+  // 36 Einheiten Stadtbreite ganz im Bild, rechts neben dem Zahlen-Kasten; unter 26 sieht man ihn nicht (der Blick reicht
+  // dann kaum in den Feldring, er wäre nur ein Streifen am oberen Rand).
+  const SEE_X = -61, SEE_Z = -36, SEE_RX = 6.8, SEE_RZ = 9.5, SEE_Y = 0.04;
+  const seeAbst = (x, z) => Math.hypot((x - SEE_X) / SEE_RX, (z - SEE_Z) / SEE_RZ);
+  const seeUfer = (w) => 1 + 0.1 * Math.sin(3 * w + 1) + 0.06 * Math.sin(5 * w + 2);   // Buchten: Uferradius je Winkel
+
+  // Wolkenschatten: weiche Flecken aus Wertrauschen über Welt-x/z ziehen mit dem Wind und dämpfen nur das direkte Licht
+  // (Sonne, Gegenlicht), nicht das Himmelslicht. Für alle Lambert-Materialien (auch InstancedMesh). Das Muster (drei Oktaven,
+  // einzelne Wolken 10–40 Einheiten, gut ein Fünftel des Bodens im Schatten) ist periodisch und liegt als kleine Textur vor:
+  // je Pixel ein Abruf. Sie kachelt nach 250 Einheiten; der Versatz in Windrichtung läuft um.
+  const WIND = [0.95, 0.31], WOLKE_SKALA = 1 / 250, WIND_TEMPO = 0.4, WOLKE_STAERKE = 0.25, WOLKE_N = 256;   // Tempo: Einheiten je Sekunde
+  const wolkeDaten = new Uint8Array(WOLKE_N * WOLKE_N);
+  const wolkeRausch = (u, v, gu, gv, k) => {              // Wertrauschen, periodisch nach gu × gv Zellen
+    const i = Math.floor(u), j = Math.floor(v), fu = glatt(0, 1, u - i), fv = glatt(0, 1, v - j);
+    const w = (a, b) => zellHash(a % gu, b % gv, k);
+    const a = w(i, j), b = w(i + 1, j), c = w(i, j + 1), d = w(i + 1, j + 1);
+    return a + (b - a) * fu + (c - a) * fv + (a - b - c + d) * fu * fv;
+  };
+  for (let j = 0; j < WOLKE_N; j++) for (let i = 0; i < WOLKE_N; i++) {
+    const u = i / WOLKE_N, v = j / WOLKE_N;                // u längs zum Wind (weniger Zellen: Wolken etwas gestreckt), v quer
+    const n = (wolkeRausch(u * 10, v * 14, 10, 14, 61) + 0.5 * wolkeRausch(u * 20, v * 28, 20, 28, 62)
+      + 0.15 * wolkeRausch(u * 40, v * 56, 40, 56, 63)) / 1.65;
+    wolkeDaten[j * WOLKE_N + i] = Math.round(255 * glatt(0.5, 0.72, n));   // Schatten 0 … 1, weicher Rand
+  }
+  const wolkeKarte = new THREE.DataTexture(wolkeDaten, WOLKE_N, WOLKE_N, THREE.RedFormat, THREE.UnsignedByteType, undefined,
+    THREE.RepeatWrapping, THREE.RepeatWrapping, THREE.LinearFilter, THREE.LinearFilter);
+  wolkeKarte.needsUpdate = true;
+  const wolkeU = { wolkeKarte: { value: wolkeKarte }, wolkeVersatz: { value: 0 }, wolkeStaerke: { value: 0 } };
+  function wolkenSchatten(s) {
+    Object.assign(s.uniforms, wolkeU);
+    s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vWolke;')
+      .replace('#include <project_vertex>', `#include <project_vertex>
+        vec4 wolkeWelt = vec4( transformed, 1.0 );
+        #ifdef USE_INSTANCING
+          wolkeWelt = instanceMatrix * wolkeWelt;
+        #endif
+        wolkeWelt = modelMatrix * wolkeWelt;
+        vWolke = vec2( dot( wolkeWelt.xz, vec2( ${WIND[0]}, ${WIND[1]} ) ), dot( wolkeWelt.xz, vec2( ${-WIND[1]}, ${WIND[0]} ) ) ) * ${WOLKE_SKALA};`);
+    s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D wolkeKarte;\nuniform float wolkeVersatz, wolkeStaerke;\nvarying vec2 vWolke;')
+      .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+        if ( wolkeStaerke > 0.0 ) reflectedLight.directDiffuse *= 1.0 - wolkeStaerke * texture2D( wolkeKarte, vec2( vWolke.x - wolkeVersatz, vWolke.y ) ).r;`);
+  }
 
   // Himmel: Halbkugel um die Kamera, reicht 5° unter den Horizont (darunter: Hintergrund in derselben Farbe). Farben aus TAG,
   // am Horizont genau die Nebelfarbe, daher nahtlos. Die Kamera sieht höchstens gut 1° über den Horizont (Polarwinkel ≤ 1,2,
@@ -3353,6 +3513,8 @@ function baueGrafik(THREE, OrbitControls) {
   for (let j = 0; j < NA; j++) for (let i = 0; i < NA; i++) {
     const x = ACHSE[i], z = ACHSE[j], d = randAbst(x, z);
     HOEHE[j * NA + i] = d < 54 ? 0 : (glatt(54, 100, d) * 5 + glatt(90, 250, d) * 16) * welle(x * 1.3 + 40, z * 1.3 - 17);
+    // Mulde für den See: jedes Viereck, das ihn berührt, liegt ganz eben (das Gitter ist dort 5–8 breit)
+    if (Math.abs(x - SEE_X) < SEE_RX * 1.2 + 8 && Math.abs(z - SEE_Z) < SEE_RZ * 1.2 + 8) HOEHE[j * NA + i] = 0;
   }
   // Höhe genau auf der Dreiecksfläche (für die Bäume): Viereck suchen, dann im passenden Dreieck mitteln
   function bodenHoehe(x, z) {
@@ -3367,7 +3529,7 @@ function baueGrafik(THREE, OrbitControls) {
   const FELDFARBEN = ['#35523b', '#3a573c', '#2f4b36', '#55573a', '#484232', '#415a37', '#2d4834'].map(c => new THREE.Color(c));
   // Wiese auf der Karte: im Mittel etwas dunkler als die frühere einfarbige Ebene, damit die Fenster nachts vorn bleiben
   const WIESE = new THREE.Color('#33513a'), WIESE_HELL = new THREE.Color('#39573b'), WIESE_DUNKEL = new THREE.Color('#29422f');
-  const WALDBODEN = new THREE.Color('#22372a'), FERNE = new THREE.Color('#2c4437');
+  const WALDBODEN = new THREE.Color('#22372a'), FERNE = new THREE.Color('#2c4437'), UFER = new THREE.Color('#2a4632');
   const waldMaske = (x, z) => welle(x * 0.9 - 30, z * 0.9 + 12);
   const waldKante = (x, z) => 49.6 + 8 * welle(x * 3.3 + 11, z * 3.3 - 5);   // Waldrand springt vor und zurück statt dem Kartenrand zu folgen
   // Farbe einer Ecke: Wiese mit Flecken, außen weich in die Farbe des Feldes (ab 53), Waldboden hinter dem Waldrand, weit weg Fernfarbe.
@@ -3377,12 +3539,14 @@ function baueGrafik(THREE, OrbitControls) {
     c.copy(WIESE).lerp(WIESE_HELL, glatt(0.45, 0.85, welle(x * 1.7 + 5, z * 1.7 - 9)))
       .lerp(WIESE_DUNKEL, glatt(0.55, 0.85, welle(x * 3.1 - 21, z * 3.1 + 7)));
     if (feld) c.lerp(feld, glatt(53, 61, d));
-    return c.lerp(WALDBODEN, glatt(0.5, 0.6, waldMaske(x, z)) * glatt(wk - 2, wk + 1, d)).lerp(FERNE, glatt(110, 260, d));
+    c.lerp(WALDBODEN, glatt(0.5, 0.6, waldMaske(x, z)) * glatt(wk - 2, wk + 1, d) * glatt(1.6, 2.6, seeAbst(x, z)));
+    return c.lerp(UFER, 0.7 * glatt(2.4, 1.2, seeAbst(x, z))).lerp(FERNE, glatt(110, 260, d));   // am See feuchte Wiese
   }
   const bodenPos = [], bodenFarbe = [], ecke = new THREE.Color(), feldFarbe = new THREE.Color();
   for (let j = 0; j < NA - 1; j++) for (let i = 0; i < NA - 1; i++) {
     const x0 = ACHSE[i], x1 = ACHSE[i + 1], z0 = ACHSE[j], z1 = ACHSE[j + 1];
-    const innen = randAbst((x0 + x1) / 2, (z0 + z1) / 2) < 53;      // Karte und erster Streifen: Wiese ohne Feldfarbe
+    const innen = randAbst((x0 + x1) / 2, (z0 + z1) / 2) < 53       // Karte und erster Streifen: Wiese ohne Feldfarbe,
+      || seeAbst((x0 + x1) / 2, (z0 + z1) / 2) < 2.2;                // ebenso rund um den See
     feldFarbe.copy(FELDFARBEN[(zellHash(i, j, 3) * FELDFARBEN.length) | 0]);
     for (const [a, b] of [[0, 0], [0, 1], [1, 0], [1, 1], [1, 0], [0, 1]]) {   // zwei Dreiecke, Vorderseite oben
       const x = a ? x1 : x0, z = b ? z1 : z0;
@@ -3417,6 +3581,7 @@ function baueGrafik(THREE, OrbitControls) {
     for (let iz = -N; iz <= N; iz++) for (let ix = -N; ix <= N; ix++) {
       const x = ix * A + (zellHash(ix, iz, 1) - 0.5) * A * 0.8, z = iz * A + (zellHash(ix, iz, 2) - 0.5) * A * 0.8, d = randAbst(x, z);
       if (d < 49.6 || d > 80) continue;                   // nicht auf der Karte; weiter draußen verschluckt ihn der Nebel
+      if (seeAbst(x, z) < 1.5) continue;                  // Lichtung um den See
       const kante = waldKante(x, z);
       const p = Math.max(waldMaske(x, z) > 0.6 ? 0.85 * glatt(kante, kante + 2.5, d) : 0, d < kante + 4 ? 0.07 : 0.004)
         * (d > 62 ? Math.max(0.25, 1 - (d - 62) / 45) : 1);
@@ -3433,12 +3598,66 @@ function baueGrafik(THREE, OrbitControls) {
       }
     }
   }
+  // Ufer des Sees: flache Steine und Schilfbüschel an einigen der 16 Uferpunkte, ebenfalls in den Boden gebacken
+  const SEE_N = 16, seePunkt = (k, f) => {                 // Punkt k auf dem Ring f (1 = Ufer, mit Buchten)
+    const w = (k % SEE_N) / SEE_N * Math.PI * 2, r = f * seeUfer(w);
+    return [SEE_X + Math.cos(w) * SEE_RX * r, SEE_Z + Math.sin(w) * SEE_RZ * r];
+  };
+  {
+    const STEIN_GEO = new THREE.IcosahedronGeometry(1, 0), SCHILF_GEO = new THREE.ConeGeometry(0.05, 1, 3, 1, true).translate(0, 0.5, 0).toNonIndexed();
+    const STEIN = new THREE.Color('#474b48'), SCHILF = new THREE.Color('#5d6639'), ton = new THREE.Color();   // Stein nur wenig heller als die Wiese
+    const backe = (geo, x, y, z, sx, sy, sz, w, c) => {    // gedreht um y, skaliert, verschoben, in einer Farbe
+      const p = geo.getAttribute('position'), cw = Math.cos(w), sw = Math.sin(w);
+      for (let i = 0; i < p.count; i++) {
+        const px = p.getX(i) * sx, pz = p.getZ(i) * sz;
+        bodenPos.push(x + px * cw + pz * sw, y + p.getY(i) * sy, z - px * sw + pz * cw);
+        bodenFarbe.push(c.r, c.g, c.b);
+      }
+    };
+    for (let k = 0; k < SEE_N; k++) {
+      const h = zellHash(k, 5, 40), [ux, uz] = seePunkt(k, 1.04);
+      if (h < 0.5) for (let j = 0; j < (h < 0.2 ? 2 : 1); j++) {   // ein oder zwei Steine, halb im Boden
+        const s = 0.45 + 0.45 * zellHash(k, j, 41);
+        backe(STEIN_GEO, ux + (j ? 0.8 : 0) * Math.cos(h * 40), -0.1, uz + (j ? 0.8 : 0) * Math.sin(h * 40), s * (0.9 + 0.4 * zellHash(k, j, 42)), s * 0.45,
+          s * (0.8 + 0.3 * zellHash(k, j, 43)), zellHash(k, j, 44) * 6.3, ton.copy(STEIN).multiplyScalar(0.8 + 0.35 * zellHash(k, j, 45)));
+      } else if (h > 0.72) for (let j = 0; j < 11; j++) {   // Schilf: Halme rund um den Uferpunkt, zur Hälfte im Wasser
+        const w = zellHash(k, j, 46) * 6.3, r = 0.75 * Math.sqrt(zellHash(k, j, 47));
+        backe(SCHILF_GEO, ux + Math.cos(w) * r, 0, uz + Math.sin(w) * r, 1, 0.75 + 0.6 * zellHash(k, j, 48), 1, w,
+          ton.copy(SCHILF).multiplyScalar(0.8 + 0.4 * zellHash(k, j, 49)));
+      }
+    }
+  }
   const bodenGeo = new THREE.BufferGeometry();
   bodenGeo.setAttribute('position', new THREE.Float32BufferAttribute(bodenPos, 3));
   bodenGeo.setAttribute('color', new THREE.Float32BufferAttribute(bodenFarbe, 3));
   bodenGeo.computeVertexNormals();                        // ohne Index: jedes Dreieck flach (Low-Poly-Hügel und -Bäume)
   const boden = new THREE.Mesh(bodenGeo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+  boden.material.onBeforeCompile = wolkenSchatten;
   scene.add(boden);
+
+  // See: flache Wasserfläche aus Mitte, Innenring und Uferring (48 Dreiecke), jede Fläche etwas anders hell; zur fernen
+  // Seite heller, weil sich dort der Himmel flacher spiegelt (dezenter Glanz). licht() färbt ihn nach dem Himmel.
+  const see = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ vertexColors: true })), SEE_TIEFE = new THREE.Color('#173230');
+  {
+    const pos = [], farb = [];
+    const flaeche = (a, b, c, k) => {                      // Dreieck mit Vorderseite nach oben, Helligkeit nach Lage
+      if ((b[1] - a[1]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[1] - a[1]) < 0) [b, c] = [c, b];
+      pos.push(a[0], 0, a[1], b[0], 0, b[1], c[0], 0, c[1]);
+      const u = ((a[0] + b[0] + c[0]) / 3 - SEE_X) / SEE_RX, v = ((a[1] + b[1] + c[1]) / 3 - SEE_Z) / SEE_RZ;
+      const hell = 0.8 + 0.34 * glatt(-0.3, 1.1, -0.57 * u - 0.82 * v) + 0.12 * (zellHash(k, 3, 50) - 0.5);
+      for (let i = 0; i < 3; i++) farb.push(hell, hell, hell);
+    };
+    const mitte = [SEE_X, SEE_Z];
+    for (let k = 0; k < SEE_N; k++) {
+      flaeche(mitte, seePunkt(k, 0.55), seePunkt(k + 1, 0.55), k);
+      flaeche(seePunkt(k, 0.55), seePunkt(k, 1), seePunkt(k + 1, 1), k + 20);
+      flaeche(seePunkt(k, 0.55), seePunkt(k + 1, 1), seePunkt(k + 1, 0.55), k + 40);
+    }
+    see.geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    see.geometry.setAttribute('color', new THREE.Float32BufferAttribute(farb, 3));
+    see.position.y = SEE_Y;
+    scene.add(see);
+  }
 
   // Laubbaum für Parks und Gärten: Stamm und Krone (Farbe je Baum als Ton darüber)
   const STAMM = new THREE.Color('#4a3829'), KRONE = new THREE.Color('#557f49');
@@ -3446,8 +3665,11 @@ function baueGrafik(THREE, OrbitControls) {
     [new THREE.IcosahedronGeometry(0.19, 0).translate(0, 0.33, 0), KRONE]]);
 
   // Instanzierte Meshes: ein Mesh (= ein Draw Call) pro Bauteil
-  const box = (w, h, d) => new THREE.BoxGeometry(w, h, d).translate(0, h / 2, 0);
-  const lambert = (farbe, extra) => new THREE.MeshLambertMaterial(Object.assign({ color: farbe }, extra));
+  const lambert = (farbe, extra) => {                    // mit Wolkenschatten
+    const m = new THREE.MeshLambertMaterial(Object.assign({ color: farbe }, extra));
+    m.onBeforeCompile = wolkenSchatten;
+    return m;
+  };
   function inst(geo, mat, kap) {
     const m = new THREE.InstancedMesh(geo, mat, kap);
     m.count = 0;
@@ -3534,15 +3756,42 @@ function baueGrafik(THREE, OrbitControls) {
     wand(0, -0.32, 0.12, 0.07, 0.34, d, f);
     for (let k = 1; k < 4; k++) { wand(k, -0.29, -0.09, 0.1, 0.34, d, f); wand(k, 0.09, 0.29, 0.1, 0.34, d, f); }
   });
-  // Fensterreihe eines Geschosses: je Seite drei Scheiben knapp vor der Wand, leicht verschieden hell (nicht zu dunkel, damit sie nachts leuchten)
+  // Fensterreihe eines Geschosses: je Seite drei Scheiben knapp vor der Wand, leicht verschieden hell (nicht zu dunkel, damit sie nachts leuchten).
+  // Ein Rechteck je Seite (8 statt 24 Dreiecke); Scheiben und Helligkeit stehen in einer Textur, 256 Texel je Seite (0,0025 je Texel,
+  // so bleibt die Kante auch im nächsten Blick unter einem Pixel), Zwischenräume durchsichtig. Kanten über Alpha-to-Coverage geglättet
+  // wie Geometrie mit Kantenglättung, in der Ferne gemittelt; ohne Multisampling Alpha-Test
   const HELL = [1, 0.92, 0.97, 0.94, 1, 0.9, 0.96, 1, 0.92, 0.98, 0.91, 1];
-  const scheibenForm = form((flaeche, wand) => {
-    for (let k = 0; k < 4; k++) for (let j = -1; j <= 1; j++) wand(k, j * 0.23 - 0.08, j * 0.23 + 0.08, 0, 1, A_HAUS + 0.008, grau(HELL[k * 3 + j + 1]));
-  });
-  // Kleines Bauteil: Einheitsquader ohne Boden (der ist nie zu sehen)
+  const scheibenForm = form((flaeche, wand) => { for (let k = 0; k < 4; k++) wand(k, -0.32, 0.32, 0, 1, A_HAUS + 0.008, grau(1)); });
+  {
+    const p = scheibenForm.getAttribute('position'), uv = [];
+    for (let i = 0; i < p.count; i++) {                   // je Seite 6 Ecken; quer u = x·cos − z·sin (Umkehrung von auf())
+      const k = (i / 6) | 0, [c, s] = SEITE[k];
+      uv.push((k + (p.getX(i) * c - p.getZ(i) * s + 0.32) / 0.64) / 4, p.getY(i));
+    }
+    scheibenForm.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  }
+  const scheibenTexel = new Uint8Array(1024 * 4);
+  for (let k = 0; k < 4; k++) for (let i = 0; i < 256; i++) {
+    const u = (i + 0.5) / 400 - 0.32, j = Math.max(-1, Math.min(1, Math.round(u / 0.23))), o = 4 * (k * 256 + i);
+    scheibenTexel[o] = scheibenTexel[o + 1] = scheibenTexel[o + 2] = Math.round(255 * HELL[k * 3 + j + 1]);   // auch im Zwischenraum: kein dunkler Rand
+    scheibenTexel[o + 3] = Math.abs(u - j * 0.23) < 0.08 ? 255 : 0;
+  }
+  const scheibenTextur = new THREE.DataTexture(scheibenTexel, 1024, 1);
+  scheibenTextur.magFilter = THREE.LinearFilter; scheibenTextur.minFilter = THREE.LinearMipmapLinearFilter;
+  scheibenTextur.generateMipmaps = true; scheibenTextur.needsUpdate = true;
+  const gl = renderer.getContext(), MSAA = gl.getParameter(gl.SAMPLES) > 0;
+  // Kleines Bauteil: Einheitsquader ohne Boden (der ist nie zu sehen: die Kamera bleibt über allen Dächern)
   const teilForm = form((flaeche, wand) => {
     for (let k = 0; k < 4; k++) wand(k, -0.5, 0.5, 0, 1, 0.5, grau(1));
     flaeche([[-0.5, 1, 0.5], [0.5, 1, 0.5], [0.5, 1, -0.5], [-0.5, 1, -0.5]], grau(1));
+  });
+  const box = (w, h, d) => teilForm.clone().scale(w, h, d);   // Quader ohne Boden, unten auf y = 0 (10 Dreiecke)
+  // Schlot, Antenne, Laternenmast: fünfeckig, oben zu, ohne Boden (13 Dreiecke statt 24)
+  const schlotForm = form((flaeche) => {
+    const ecke = (r, y, i) => [r * Math.sin(i * Math.PI * 0.4), y, r * Math.cos(i * Math.PI * 0.4)];
+    for (let i = 0; i < 5; i++) flaeche([ecke(0.042, 0, i), ecke(0.042, 0, i + 1), ecke(0.03, 1, i + 1), ecke(0.03, 1, i)], grau(1));
+    flaeche([ecke(0.03, 1, 0), ecke(0.03, 1, 1), ecke(0.03, 1, 2), ecke(0.03, 1, 3)], grau(1));
+    flaeche([ecke(0.03, 1, 0), ecke(0.03, 1, 3), ecke(0.03, 1, 4)], grau(1));
   });
   const F = Sim.KARTE * Sim.KARTE;
   // Gehwegstreifen: Oberseite, Bordsteinkante zur Fahrbahn und Rückseite zum Feld bis zum Boden (6 Dreiecke; ohne Rückseite
@@ -3572,25 +3821,73 @@ function baueGrafik(THREE, OrbitControls) {
     return m;
   }
   const M = {
-    strasse: inst(box(1, 0.02, 1), lambert('#3a3e46'), F),
+    // Fahrbahn: eine Fläche je Straßenfeld, dahinter die Markierung (Farbe je Instanz; Deko, nicht klickbar)
+    strasse: inst(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), lambert('#ffffff'), F + 16000),
     haus: inst(hausForm, lambert('#ffffff', { vertexColors: true }), 4000),
     dach: inst(dachForm, lambert('#ffffff', { vertexColors: true }), 4000),
     fenster: inst(box(0.785, 1, 0.785), new THREE.MeshBasicMaterial({ color: '#ffffff' }), 40000 + LAT_MAX),   // vorne die Laternenköpfe, dann Bänder, Schilder, Bildschirme, Handys
-    scheiben: inst(scheibenForm, new THREE.MeshBasicMaterial({ color: '#ffffff', vertexColors: true }), 20000),   // Fensterreihen je Geschoss
+    scheiben: inst(scheibenForm, new THREE.MeshBasicMaterial({ color: '#ffffff', map: scheibenTextur, alphaToCoverage: MSAA, alphaTest: MSAA ? 0 : 0.5 }), 20000),   // Fensterreihen je Geschoss
     werkstatt: inst(werkstattForm, lambert('#ffffff', { vertexColors: true }), 3000),
-    schlot: inst(new THREE.CylinderGeometry(0.03, 0.042, 1, 6).translate(0, 0.5, 0), lambert('#ffffff'), 3000 + LAT_MAX),   // vorne die Laternenmasten
+    schlot: inst(schlotForm, lambert('#ffffff'), 3000 + LAT_MAX),   // vorne die Laternenmasten
     laden: inst(ladenForm, lambert('#ffffff', { vertexColors: true }), 3000),
     ladenGlas: inst(ladenGlasForm, new THREE.MeshBasicMaterial({ color: '#ffffff' }), 3000),   // Schaufenster und Fenster der Läden
-    teil: inst(teilForm, lambert('#ffffff'), 12000),   // kleine Bauteile: Markisen, Theken, Türen, Dachaufbauten, Sprossen
+    teil: inst(teilForm, lambert('#ffffff'), 12000),   // kleine Bauteile: Markisen, Theken, Türen, Dachaufbauten, Sprossen, Balkone
     park: inst(box(0.96, 0.04, 0.96), lambert('#3e6b45'), 2000),
     baum: inst(BAUM_GEO, lambert('#ffffff', { vertexColors: true }), 6000),   // Parks und Gärten
     bau: inst(box(0.8, 1, 0.8), lambert('#ffffff', { transparent: true, opacity: 0.42, depthWrite: false }), 3000),   // Gerüst
     kiste: inst(box(0.13, 0.11, 0.13), lambert('#ffffff'), 4000),   // Kistenstapel, Auslagen, getragene Kisten
-    tech: inst(box(0.84, 1, 0.84), lambert('#ffffff'), 2000),     // Tech-Firma: Glasbau (Bildschirme und Handys liegen im Fenster-Mesh)
-    // Straßenraum (Deko, nicht klickbar): Gehwege und Markierung (Farbe je Instanz), Lichtflecken (nur nachts)
+    tech: inst(box(0.84, 1, 0.84), lambert('#ffffff'), 2000),     // Tech-Firma: Glasbau; Rohbau aller Baustellen außer Wohnhaus (Bildschirme und Handys liegen im Fenster-Mesh)
+    // Straßenraum (Deko, nicht klickbar): Gehwege (Farbe je Instanz), Lichtflecken (nur nachts)
     gehweg: inst(streifen, lambert('#ffffff'), 16000),
     fleck: inst(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), fleckMaterial(), LAT_MAX),
   };
+
+  // Rauch aus Werkstatt-Schloten (Deko, nicht klickbar): je Schlot vier weiche Scheiben, zur Kamera gedreht, die steigen,
+  // wachsen, mit dem Wind abdriften und verblassen. stadt() sammelt stündlich die Schlote, rauchBewegen() setzt jedes Bild
+  // Matrizen und Deckkraft (eigenes Instanz-Attribut, im Shader mal Alpha) ohne neue Objekte. Mehr als 500 Schlote: Rest ohne Rauch.
+  const SCHLOT_MAX = 500, RAUCH_BALLEN = 4, RAUCH_ZYKLUS = 10;   // Sekunden, bis ein Ballen verweht ist
+  const rauchOrt = new Float32Array(SCHLOT_MAX * 4);       // je Schlot: x, Oberkante, z, Phase
+  let rauchSchlote = 0, rauchSicht = 0, rauchVorher = -1;   // rauchSicht: 0 … 1 nach Uhrzeit (licht)
+  function rauchMaterial() {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d'), v = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    // weich wie eine Glocke, ohne festen Kern (sonst wirken nahe Ballen wie Wattebäusche)
+    v.addColorStop(0, 'rgba(255,255,255,1)'); v.addColorStop(0.25, 'rgba(255,255,255,0.8)'); v.addColorStop(0.5, 'rgba(255,255,255,0.45)');
+    v.addColorStop(0.75, 'rgba(255,255,255,0.15)'); v.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = v; g.fillRect(0, 0, 64, 64);
+    const m = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false });
+    m.onBeforeCompile = (s) => {
+      s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute float rauchAlpha;\nvarying float vRauchAlpha;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRauchAlpha = rauchAlpha;');
+      s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vRauchAlpha;')
+        .replace('#include <map_fragment>', '#include <map_fragment>\ndiffuseColor.a *= vRauchAlpha;');
+    };
+    return m;
+  }
+  const rauch = inst(new THREE.PlaneGeometry(1, 1), rauchMaterial(), SCHLOT_MAX * RAUCH_BALLEN);
+  const rauchAlpha = new THREE.InstancedBufferAttribute(new Float32Array(SCHLOT_MAX * RAUCH_BALLEN), 1).setUsage(THREE.DynamicDrawUsage);
+  rauch.geometry.setAttribute('rauchAlpha', rauchAlpha);
+  const rauchDummy = new THREE.Object3D(), RAUCH_F = new THREE.Color('#c9ccd0');
+  function rauchBewegen(sek) {
+    const n = rauchSicht > 0 ? rauchSchlote * RAUCH_BALLEN : 0, a = rauchAlpha.array;
+    if (!n && !rauchVorher) return;
+    rauchDummy.quaternion.copy(camera.quaternion);
+    for (let i = 0; i < rauchSchlote && n; i++) {
+      const x = rauchOrt[4 * i], y = rauchOrt[4 * i + 1], z = rauchOrt[4 * i + 2], ph = rauchOrt[4 * i + 3];
+      for (let k = 0; k < RAUCH_BALLEN; k++) {
+        const t = (sek / RAUCH_ZYKLUS + ph + k / RAUCH_BALLEN) % 1, j = i * RAUCH_BALLEN + k;   // Alter des Ballens, 0 … 1
+        const weg = 0.6 * t * t, s = 0.16 + 0.6 * t;                  // Fahne biegt mit dem Wind ab
+        rauchDummy.position.set(x + WIND[0] * weg, y + 0.06 + 1.2 * t, z + WIND[1] * weg);
+        rauchDummy.scale.set(s, s, s);
+        rauchDummy.updateMatrix();
+        rauch.setMatrixAt(j, rauchDummy.matrix);
+        a[j] = rauchSicht * 0.75 * glatt(0, 0.3, t) * (1 - t) ** 1.5;   // am Schlot langsam einblenden (höchstens 0,45), dann verblassen
+      }
+    }
+    rauch.count = n; rauchVorher = n;
+    rauch.instanceMatrix.needsUpdate = true; rauchAlpha.needsUpdate = true;
+  }
 
   const dummy = new THREE.Object3D();
   const farbe = new THREE.Color();
@@ -3621,6 +3918,7 @@ function baueGrafik(THREE, OrbitControls) {
   const TUER = new THREE.Color('#4a3c33'), LUEFTER = new THREE.Color('#7b8087'), KAMIN = new THREE.Color('#6e5549');
   const SCHLOT = new THREE.Color('#7a665b'), ANTENNE = new THREE.Color('#59616c');
   const LICHT = new THREE.Color('#ffc864'), GLAS_NACHT = new THREE.Color('#1b222c'), GLAS_TAG = new THREE.Color('#7f93a6');
+  const LICHT_WEISS = new THREE.Color('#ffd694'), LICHT_ORANGE = new THREE.Color('#ffae48'), lichtHaus = new THREE.Color();   // Wohnungslicht je Haus
   const GESCHOSS = 0.42, GESCHOSSE = [0, 2, 4, 7];
   const ROHBAU = new THREE.Color('#9b9da2'), GERUEST = new THREE.Color('#e0a040'), THEKE = new THREE.Color('#8a6646');
   const KISTE_STADT = new THREE.Color('#9a6a3c'), KISTE_AUSSEN = new THREE.Color('#8c9096');
@@ -3675,8 +3973,10 @@ function baueGrafik(THREE, OrbitControls) {
 
   // ─── Straßenraum: Gehwege mit Bordstein, Mittellinie, Zebrastreifen, Laternen. Nur neu, wenn Straßen dazukommen ───
   const GEHWEG_F = new THREE.Color('#6f7279'), MARKE_F = new THREE.Color('#d6d1bd'), KOPF_TAG = new THREE.Color('#3b4048'), MAST_F = new THREE.Color('#59616c');
+  const FAHRBAHN_F = new THREE.Color('#3a3e46');
   let laternen = 0;
   const lampOrt = new Float32Array(LAT_MAX * 2), lampNachbar = new Int32Array(LAT_MAX * 8);   // Fleck-Mitte; Felder beiderseits der Straße
+  const lampMast = new Float32Array(LAT_MAX * 2), lampFeld = new Int32Array(F * 2);   // Mastachse; je Straßenfeld die (höchstens zwei) Laternen an seinen Grenzen
   const istStrasse = (x, y) => x >= 0 && y >= 0 && x < Sim.KARTE && y < Sim.KARTE && S.feld[y * Sim.KARTE + x] === Sim.STRASSE;
   // Gerades Stück: längs geht die Straße weiter, seitlich nicht. 1 = in x-Richtung, 2 = in z-Richtung, 0 = Kreuzung, Ecke, Ende
   function gerade(x, y) {
@@ -3686,15 +3986,35 @@ function baueGrafik(THREE, OrbitControls) {
     if (lz && !istStrasse(x + 1, y) && !istStrasse(x - 1, y)) return 2;
     return 0;
   }
-  // Flache Markierung, mittig bei x/z, längs der x- oder z-Achse
+  // Flache Markierung im Straßen-Mesh (eine Fläche, 2 Dreiecke), um die Farbschicht über der Fahrbahn, mittig bei x/z, längs der x- oder z-Achse
   function marke(n, x, z, laenge, breite, inX) {
-    const ok = inX ? setze(M.gehweg, n, x, FAHRBAHN, z - breite / 2, laenge, MARKE, breite, 0)
-      : setze(M.gehweg, n, x + breite / 2, FAHRBAHN, z, laenge, MARKE, breite, -Math.PI / 2);
-    if (ok) M.gehweg.setColorAt(n++, MARKE_F);
+    if (setze(M.strasse, n, x, FAHRBAHN + MARKE, z, inX ? laenge : breite, 1, inX ? breite : laenge)) M.strasse.setColorAt(n++, MARKE_F);
     return n;
   }
+  // Höhe, auf der eine Figur an dieser Stelle steht: Gehweg (auch die Ecke an Kreuzungen, siehe strassenraum), Fahrbahn oder Boden
+  function standHoehe(x, z) {
+    const ix = Math.floor(x + H), iz = Math.floor(z + H);
+    if (!istStrasse(ix, iz)) return 0;
+    const r = 0.5 - GEHWEG, u = x - wx(ix), v = z - wx(iz), su = u > r ? 1 : u < -r ? -1 : 0, sv = v > r ? 1 : v < -r ? -1 : 0;
+    const gehweg = (su && !istStrasse(ix + su, iz)) || (sv && !istStrasse(ix, iz + sv)) || (su && sv && !istStrasse(ix + su, iz + sv));
+    return gehweg ? FAHRBAHN + BORD : FAHRBAHN;
+  }
+  // Steht an dieser Stelle schon ein Laternenmast (Abstand zur Mastachse unter 0,15)?
+  function laterneNah(x, z) {
+    const ix = Math.floor(x + H), iz = Math.floor(z + H), c = iz * Sim.KARTE + ix;
+    if (ix < 0 || iz < 0 || ix >= Sim.KARTE || iz >= Sim.KARTE) return false;
+    for (let j = 2 * c; j < 2 * c + 2; j++) {
+      const l = lampFeld[j];
+      if (l >= 0 && Math.hypot(lampMast[2 * l] - x, lampMast[2 * l + 1] - z) < 0.15) return true;
+    }
+    return false;
+  }
+  const lampeMerken = (c, l) => { if (lampFeld[2 * c] < 0) lampFeld[2 * c] = l; else if (lampFeld[2 * c + 1] < 0) lampFeld[2 * c + 1] = l; };
   function strassenraum() {
     const K = Sim.KARTE;
+    // Fahrbahn: eine Fläche je Straßenfeld; ihre Kanten verdeckt die Rückseite der Gehwegstreifen
+    let ns = 0;
+    for (let c = 0; c < F; c++) if (S.feld[c] === Sim.STRASSE && setze(M.strasse, ns, wx(c % K), FAHRBAHN, wx((c / K) | 0), 1, 1, 1)) M.strasse.setColorAt(ns++, FAHRBAHN_F);
     let n = 0;
     // Gehwege: je Seite durchgehende Streifen am Rand der Straßenfelder, wo daneben keine Straße liegt;
     // an Kreuzungen um die Gehwegbreite in die Ecke verlängert, damit der Gehweg um den Block herumläuft
@@ -3713,23 +4033,25 @@ function baueGrafik(THREE, OrbitControls) {
         }
       }
     }
+    fertig(M.gehweg, n);
     // Mittellinie: ein Strich je geradem Feld (nicht auf Kreuzungen); vor jeder Kreuzung ein Zebrastreifen auf jedem Arm
     for (let y = 0; y < K; y++) for (let x = 0; x < K; x++) {
       const g = gerade(x, y);
-      if (g) n = marke(n, wx(x), wx(y), 0.34, 0.03, g === 1);
+      if (g) ns = marke(ns, wx(x), wx(y), 0.34, 0.03, g === 1);
       if (!istStrasse(x, y) || istStrasse(x + 1, y) + istStrasse(x - 1, y) + istStrasse(x, y + 1) + istStrasse(x, y - 1) < 3) continue;
       for (const [dx, dy] of RICHT) {
         if (!gerade(x + dx, y + dy)) continue;
         const inX = dx !== 0, mx = wx(x + dx) - dx * 0.35, mz = wx(y + dy) - dy * 0.35;
-        for (let k = -1.5; k <= 1.5; k++) n = marke(n, inX ? mx : mx + k * 0.13, inX ? mz + k * 0.13 : mz, 0.16, 0.07, inX);
+        for (let k = -1.5; k <= 1.5; k++) ns = marke(ns, inX ? mx : mx + k * 0.13, inX ? mz + k * 0.13 : mz, 0.16, 0.07, inX);
       }
     }
-    fertig(M.gehweg, n);
+    fertig(M.strasse, ns);
     // Laternen: an jeder zweiten Feldgrenze gerader Straßen, abwechselnd links und rechts an der Bordsteinkante,
-    // 0,3 neben der Straßenmitte. Abstand Mastachse zu Figuren: Wege (Mitte ±0,2) mindestens 0,1, Standplätze vor
-    // Gebäuden (0,32 neben der Mitte, QUER bis ±0,42) mindestens 0,082. Mast vorne im Schlot-, Kopf vorne im
+    // 0,3 neben der Straßenmitte. Abstand Mastachse zu Figuren: Wege (Mitte ±0,2) mindestens 0,1; die äußeren Standplätze
+    // vor Gebäuden (QUER ±0,42) lägen 0,082 daneben und bleiben dort frei (laterneNah). Mast vorne im Schlot-, Kopf vorne im
     // Fenster-Mesh (kein eigener Draw Call, nicht klickbar); stadt() fängt dort erst hinter den Laternen an
     const feld = (a, c) => a >= 0 && c >= 0 && a < K && c < K ? c * K + a : -1;
+    lampFeld.fill(-1);
     let nl = 0;
     for (let y = 0; y < K && nl < LAT_MAX; y++) for (let x = 0; x < K && nl < LAT_MAX; x++) {
       const g = gerade(x, y), t = g === 1 ? x : y, l = g === 1 ? y : x;
@@ -3743,6 +4065,8 @@ function baueGrafik(THREE, OrbitControls) {
         (kx ? 0.13 : 0.06) / 0.785, 0.03, (kz ? 0.13 : 0.06) / 0.785);
       IDS.schlot[nl] = IDS.fenster[nl] = -1;
       lampOrt[2 * nl] = px + kx * 0.06; lampOrt[2 * nl + 1] = pz + kz * 0.06;
+      lampMast[2 * nl] = px; lampMast[2 * nl + 1] = pz;
+      lampeMerken(y * K + x, nl); lampeMerken(g === 1 ? y * K + x + 1 : (y + 1) * K + x, nl);   // beide Felder an dieser Grenze
       for (let k = 0; k < 8; k++) {                        // beiderseits der Straße, längs von t-1 bis t+2
         const a = (k >> 1) - 1, q = k & 1 ? 1 : -1;
         lampNachbar[8 * nl + k] = g === 1 ? feld(x + a, y + q) : feld(x + q, y + a);
@@ -3770,9 +4094,6 @@ function baueGrafik(THREE, OrbitControls) {
     // Straßen nur neu, wenn welche dazugekommen sind
     if (S.stat.strassenFelder !== strassenStand) {
       wege.clear(); rundwege.clear();                     // neue Straßen: Wege neu suchen (kürzere möglich)
-      let n = 0;
-      for (let c = 0; c < F; c++) if (S.feld[c] === Sim.STRASSE) setze(M.strasse, n++, wx(c % K), 0.005, wx((c / K) | 0), 1, 1, 1);
-      fertig(M.strasse, n);
       strassenraum();
       strassenStand = S.stat.strassenFelder;
     }
@@ -3790,16 +4111,18 @@ function baueGrafik(THREE, OrbitControls) {
     let nh = 0, nd = 0, nf = laternen, nw = 0, ns = laternen, nl = 0, nte = 0, np = 0, nb = 0, nbau = 0, nk = 0, nt = 0, nsch = 0, nlg = 0;
     const kisteMax = M.kiste.userData.kap - TRAG_MAX, fensterMax = M.fenster.userData.kap - SCHIRM_MAX - HANDY_MAX;
     const arbeitszeit = tageszeit >= 8 && tageszeit < 17;
+    let nrauch = 0;                                       // Schlote mit Rauch
     for (let b = 0; b < S.gAnzahl; b++) {
       const x = g.x[b], y = g.y[b], px = wx(x), pz = wx(y), t = g.typ[b], f = S.feld[y * K + x];
       if (f === Sim.BAUSTELLE) {                          // Baustelle: grauer Rohbau wächst mit den Arbeitstagen, Gerüst in Zielhöhe
         const hoehe = t === Sim.WOHNHAUS ? GESCHOSSE[1] * GESCHOSS : t === Sim.PARK ? 0.12 : t === Sim.LADEN ? 0.55
           : t === Sim.TECH ? TECH_GESCHOSSE[1] * GESCHOSS : 0.7;
-        const k = Math.max(0.05, fortschritt(b)), [dx, dz] = RICHT[zurStrasse(x, y)], w = Math.atan2(dx, dz);
+        const k = Math.max(0.05, fortschritt(b));
+        // Rohbau: Wohnhaus mit Sockel und Attika; sonst ein schlichter Quader im Tech-Mesh (noch ohne Tür und Tor),
+        // so hoch wie das fertige Gebäude (Werkstatt mit Sheddach 0,61), der Laden so breit wie der Laden
+        const rh = t === Sim.WERKSTATT ? 0.61 : hoehe, rb = t === Sim.LADEN ? 0.8 / 0.84 : 1;
         if (t === Sim.WOHNHAUS && setze(M.haus, nh, px, 0, pz, 1, hoehe * k, 1)) { IDS.haus[nh] = b; M.haus.setColorAt(nh++, ROHBAU); }
-        else if (t === Sim.LADEN && setze(M.laden, nl, px, 0, pz, 1, k, 1, w)) { IDS.laden[nl] = b; M.laden.setColorAt(nl++, ROHBAU); }
-        else if (t === Sim.WERKSTATT && setze(M.werkstatt, nw, px, 0, pz, 1, k, 1, w)) { IDS.werkstatt[nw] = b; M.werkstatt.setColorAt(nw++, ROHBAU); }
-        else if (t === Sim.TECH && setze(M.tech, nt, px, 0, pz, 1, hoehe * k, 1)) { IDS.tech[nt] = b; M.tech.setColorAt(nt++, ROHBAU); }
+        else if (t !== Sim.WOHNHAUS && t !== Sim.PARK && setze(M.tech, nt, px, 0, pz, rb, rh * k, rb)) { IDS.tech[nt] = b; M.tech.setColorAt(nt++, ROHBAU); }
         nbau = geruest(b, px, pz, 1.14, hoehe * (t === Sim.WOHNHAUS ? 1 + ATTIKA : 1) + 0.04, nbau);
         continue;
       }
@@ -3856,18 +4179,25 @@ function baueGrafik(THREE, OrbitControls) {
           nte = bauteil(nte, b, px, pz, dx, dz, -ex * 0.16, hoehe, -ez * 0.14, 0.11, 0.12, 0.11, LUEFTER);
           if (stufe === 3 && hash(b + 17) < 0.6) nte = bauteil(nte, b, px, pz, dx, dz, -ex * 0.16, hoehe, ez * 0.13, 0.11, 0.12, 0.11, LUEFTER);
         }
+        if (stufe === 3) {                                // Wohnturm: Balkone zur Straße, übereinander vor einer äußeren Scheibe, ab dem 1. Obergeschoss;
+          const bx = hash(b + 19) < 0.5 ? -0.23 : 0.23;   // Brüstung deckt den unteren Rand der Scheibe
+          farbe.copy(hf).multiplyScalar(0.9);
+          for (let s = 1; s < geschosse; s++) nte = bauteil(nte, b, px, pz, dx, dz, bx, s * GESCHOSS + 0.07, A_HAUS + 0.05, 0.26, 0.09, 0.1, farbe);
+        }
         if (g.auf[b]) {                                   // Aufstockung: Rohbau auf der Attika wächst, Gerüst bis zur neuen Höhe
           const oben = (GESCHOSSE[g.auf[b]] - geschosse) * GESCHOSS * Math.max(0.05, fortschritt(b));
           if (setze(M.haus, nh, px, oberkante, pz, 0.97, oben, 0.97)) { IDS.haus[nh] = b; M.haus.setColorAt(nh++, ROHBAU); }
           nbau = geruest(b, px, pz, 1.12, GESCHOSSE[g.auf[b]] * GESCHOSS * (1 + ATTIKA) + 0.05, nbau);
         }
-        // Fensterreihe je Stockwerk (jede Reihe etwas gedreht, damit die Helligkeit der Scheiben wechselt)
+        // Fensterreihe je Stockwerk (jede Reihe etwas gedreht, damit die Helligkeit der Scheiben wechselt); Licht je Haus fest
+        // zwischen warmweiß und warmorange
         const cap = Sim.R.WOHNUNGEN[stufe], belegt = g.belegt[b];
         const lit = nacht || tageszeit < 7.5 ? Math.ceil(geschosse * (belegt / cap) * lichtAnteil(tageszeit, b)) : 0;
+        lichtHaus.copy(LICHT_WEISS).lerp(LICHT_ORANGE, hash(b + 29));
         for (let s = 0; s < geschosse; s++) {
           if (!setze(M.scheiben, nsch, px, s * GESCHOSS + 0.1, pz, 1, 0.24, 1, ((hash(b * 8 + s) * 4) | 0) * Math.PI / 2)) break;
           IDS.scheiben[nsch] = b;
-          M.scheiben.setColorAt(nsch++, s < lit ? LICHT : nacht ? GLAS_NACHT : GLAS_TAG);
+          M.scheiben.setColorAt(nsch++, s < lit ? lichtHaus : nacht ? GLAS_NACHT : GLAS_TAG);
         }
       } else if (t === Sim.WERKSTATT) {
         const leer = g.leer[b], [dx, dz, qx, qz] = strassenSeite(x, y), w = Math.atan2(dx, dz);
@@ -3877,6 +4207,14 @@ function baueGrafik(THREE, OrbitControls) {
         M.werkstatt.setColorAt(nw++, farbe);
         // schlanker Schlot hinten in der Ecke, kommt aus dem Sheddach
         if (setze(M.schlot, ns, px - dx * 0.27 - qx * 0.28, 0.3, pz - dz * 0.27 - qz * 0.28, 1, 0.62, 1)) { IDS.schlot[ns] = b; M.schlot.setColorAt(ns++, SCHLOT); }
+        // Rauch, solange hier heute gearbeitet wird (wie die Kisten in der Simulation: da, nicht frei, nicht auf dem Bau).
+        // Ort und Oberkante aus der Matrix des Schlots (Einheitszylinder, nur um y gedreht: Element 5 ist seine Höhe)
+        if (!leer && arbeitszeit && nrauch < SCHLOT_MAX && ns > laternen && IDS.schlot[ns - 1] === b) {
+          let da = 0;
+          for (const p of S.belegschaft[b]) if (!S.p.frei[p] && !S.p.einsatz[p]) da++;
+          const e = M.schlot.instanceMatrix.array, o = (ns - 1) * 16;
+          if (da) { rauchOrt.set([e[o + 12], e[o + 13] + e[o + 5], e[o + 14], hash(b + 19)], 4 * nrauch); nrauch++; }
+        }
         if (!leer && !nacht && setze(M.scheiben, nsch, px, 0.31, pz, 1.13, 0.1, 1.13, w)) { IDS.scheiben[nsch] = b; M.scheiben.setColorAt(nsch++, GLAS_TAG); }
         // Kistenstapel neben der Werkstatt: eine Kiste je 12 gemachte (gestern), höchstens 6
         const n = leer ? 0 : Math.min(6, Math.ceil(g.kisten[b] / 12));
@@ -3936,24 +4274,39 @@ function baueGrafik(THREE, OrbitControls) {
     // Kisten: der hintere Teil gehört den Trägern (figurenBewegen); Farben dort einmal braun setzen
     for (let i = nk; i < nk + TRAG_MAX; i++) M.kiste.setColorAt(i, KISTE_STADT);
     kisteStatisch = nk; kisteVoll = true;
+    rauchSchlote = nrauch;
     M.kiste.count = nk; if (M.kiste.instanceColor) M.kiste.instanceColor.needsUpdate = true;
+    // Beim ersten Aufbau alle Shader übersetzen, auch die von Himmelskuppel und Sternen: sie sind im Blick von oben unsichtbar,
+    // und der erste flache Blick würde sonst ruckeln. compile() nimmt alle Materialien der Szene, auch unsichtbare (scene.traverse)
+    if (!vorkompiliert) { vorkompiliert = true; renderer.compile(scene, camera); }
   }
+  let vorkompiliert = false;
 
   // ─── Figuren: höchstens 300, davon bis zu 120 Leute bei der Arbeit, dazu alle Hauptfiguren (mit Markierung) ──
   // Grundregel: Eine Figur steht oder geht nur dort, wo die Simulation die Person in dieser Stunde hat.
   const FIG_MAX = 300, WERK_MAX = 120, HAUPT_MAX = 10, FIG_GES = FIG_MAX + HAUPT_MAX, GEHTEMPO = 22;   // Felder pro Spielstunde
-  const figMesh = inst(new THREE.CapsuleGeometry(0.055, 0.13, 2, 6).translate(0, 0.12, 0), lambert('#ffffff'), FIG_GES);
+  // Kapsel ohne die leeren Dreiecke an den Polen (je Pol eine Reihe mit zwei gleichen Ecken): 48 statt 60 Dreiecke, gleiche Form
+  const figGeo = new THREE.CapsuleGeometry(0.055, 0.13, 2, 6).translate(0, 0.12, 0);
+  {
+    const p = figGeo.getAttribute('position'), idx = figGeo.index.array, rest = [];
+    const gleich = (a, b) => Math.abs(p.getX(a) - p.getX(b)) + Math.abs(p.getY(a) - p.getY(b)) + Math.abs(p.getZ(a) - p.getZ(b)) < 1e-6;
+    for (let i = 0; i < idx.length; i += 3) if (!gleich(idx[i], idx[i + 1]) && !gleich(idx[i + 1], idx[i + 2]) && !gleich(idx[i], idx[i + 2])) rest.push(idx[i], idx[i + 1], idx[i + 2]);
+    figGeo.setIndex(rest);
+  }
+  const figMesh = inst(figGeo, lambert('#ffffff'), FIG_GES);
   const markMesh = inst(new THREE.OctahedronGeometry(0.065), new THREE.MeshBasicMaterial({ color: '#ffffff' }), HAUPT_MAX);
   const MARK_GOLD = new THREE.Color('#ffc864'), MARK_DENKT = new THREE.Color('#f4f4f7');   // überlegt = weiß
+  figMesh.setColorAt(0, LICHT); markMesh.setColorAt(0, MARK_GOLD);   // Farbpuffer gleich anlegen: dann passt der vorab übersetzte Shader
   const WESTE = new THREE.Color('#e8792c'), BLAUMANN = new THREE.Color('#4f7fc0');       // Bauarbeiter, Handwerker
   const PROGRAMMIER = new THREE.Color('#a78cf2');                                         // Programmiererinnen und Programmierer
   const NULL = new THREE.Matrix4().makeScale(0, 0, 0);
   const FIGFARBEN = ['#e6d3bd', '#c2d3e6', '#e6c2bd', '#c6e0c2', '#e6dcb8', '#b8d8d8', '#d8c2b0', '#aebfd8'].map(c => new THREE.Color(c));
   const ECKEN = [[-1, -1], [1, 1], [1, -1], [-1, 1]];
-  // Außen ±0,42 statt ±0,45: an der Feldgrenze steht vielleicht eine Laterne (Abstand zur Mastachse dann 0,082)
+  // Außen ±0,42: steht an dieser Feldgrenze eine Laterne (Mastachse dann 0,082 daneben), bleibt der Platz frei (laterneNah)
   const QUER = [-0.3, 0.3, -0.15, 0.15, -0.42, 0.42, 0], QUER2 = [-0.3, 0.3, -0.2, 0.2, -0.1, 0.1, 0];
   const STEHEN_MAX = QUER.length + QUER2.length;            // mehr Leute stehen nicht vor einem Gebäude, der Rest ist drinnen
-  const figuren = [];                                     // { p, gen, ort, route, start, dauer, versatz, ox, oz, haupt, werk, steht, sx, sz, traeger, hin }
+  const BAU_ECKE = 0.46;                                  // Bauarbeiter knapp innerhalb der Grundstücksecken (auf dem Boden, nicht halb im Gehweg)
+  const figuren = [];                                     // { p, gen, ort, route, start, dauer, versatz, ox, oz, haupt, werk, steht, sx, sy, sz, traeger, hin }
   const figIds = new Int32Array(FIG_GES).fill(-1);
   let hauptIds = [], werkTag = -1;
   const wege = new Map(), rundwege = new Map();
@@ -4063,10 +4416,10 @@ function baueGrafik(THREE, OrbitControls) {
     return m;
   }
   // Standplatz vor dem Gebäude: Bauarbeiter an den Ecken der Baustelle, sonst auf der Straßenseite nebeneinander,
-  // wer an der Theke steht, mittig hinter der Theke
+  // wer an der Theke steht, mittig hinter der Theke. Die Höhe (f.sy) setzt figurenPlanen
   function standplatz(f, ort, k, bau) {
     const g = S.g, bx = wx(g.x[ort]), bz = wx(g.y[ort]);
-    if (bau) { const e = ECKEN[k % 4]; f.sx = bx + e[0] * 0.5; f.sz = bz + e[1] * 0.5; return; }
+    if (bau) { const e = ECKEN[k % 4]; f.sx = bx + e[0] * BAU_ECKE; f.sz = bz + e[1] * BAU_ECKE; return; }
     const [dx, dz, qx, qz] = strassenSeite(g.x[ort], g.y[ort]);
     const theke = g.typ[ort] === Sim.LADEN && beiDerArbeit(f.p, S.stunde, ort) && Sim.theke(S, ort) === f.p;
     const reihe = k >= QUER.length ? 1 : 0;                   // ab dem 8. eine zweite, schmalere Reihe weiter zur Straße
@@ -4079,7 +4432,7 @@ function baueGrafik(THREE, OrbitControls) {
     const P = S.p, erw = S.tag - Sim.R.ERWACHSEN * Sim.R.JAHR, H = S.stunde, jetzt = S.tag * 24 + H;
     schirme = 0;
     while (figuren.length < FIG_GES) figuren.push({ p: -1, gen: 0, ort: -1, route: null, start: 0, dauer: 0, versatz: 0, ox: 0, oz: 0,
-      haupt: false, werk: false, steht: false, sx: 0, sz: 0, px: 0, pz: 0, vorher: false, traeger: false, hin: 0 });
+      haupt: false, werk: false, steht: false, sx: 0, sy: 0, sz: 0, px: 0, py: 0, pz: 0, vorher: false, traeger: false, hin: 0 });
     // Hauptfiguren in die letzten Plätze
     for (let i = 0; i < HAUPT_MAX; i++) {
       const f = figuren[FIG_MAX + i], h = hauptIds[i];
@@ -4110,7 +4463,7 @@ function baueGrafik(THREE, OrbitControls) {
       const f = figuren[i];
       if (f.p < 0) continue;
       const p = f.p, ort = simOrt(p, H), arbeit = beiDerArbeit(p, H, ort), bau = arbeit && P.einsatz[p] > 0;
-      f.vorher = f.steht; f.px = f.sx; f.pz = f.sz;          // falls gleich ein Weg beginnt: bis dahin am alten Platz
+      f.vorher = f.steht; f.px = f.sx; f.py = f.sy; f.pz = f.sz;   // falls gleich ein Weg beginnt: bis dahin am alten Platz
       f.traeger = false;
       if (ort >= 0 && f.ort >= 0 && ort !== f.ort) {         // Ortswechsel in der Simulation → Weg dorthin
         f.route = weg(f.ort, ort);
@@ -4125,10 +4478,13 @@ function baueGrafik(THREE, OrbitControls) {
       // Stehen: Hauptfiguren immer (Spec: „plus immer alle Hauptfiguren“), Arbeitsplätze während der Arbeit
       f.steht = ort >= 0 && (f.haupt || (f.werk && arbeit));
       if (f.steht) {
-        const key = ort * 2 + (bau ? 1 : 0), k = stehen.get(key) || 0;
+        const key = ort * 2 + (bau ? 1 : 0);
+        let k = stehen.get(key) || 0;
+        standplatz(f, ort, k, bau);
+        while (k < STEHEN_MAX && laterneNah(f.sx, f.sz)) standplatz(f, ort, ++k, bau);   // Platz am Laternenmast überspringen
         stehen.set(key, k + 1);
         if (k >= STEHEN_MAX && !f.haupt) f.steht = false;       // vor dem Gebäude ist kein Platz mehr: drinnen
-        else standplatz(f, ort, k, bau);
+        f.sy = standHoehe(f.sx, f.sz);                          // Gehweg, Fahrbahn (zweite Reihe) oder Boden (Baustelle, Theke)
       }
       const arb = P.arbeit[p];
       figMesh.setColorAt(i, f.haupt ? LICHT : arb >= 0 && arb === S.bauhof ? WESTE
@@ -4138,7 +4494,7 @@ function baueGrafik(THREE, OrbitControls) {
       f.arbeit = arbeit;                                    // wer arbeitet, hat kein Handy in der Hand
       if (f.schirm && schirme < SCHIRM_MAX) {
         const [dx, dz] = strassenSeite(S.g.x[ort], S.g.y[ort]);
-        if (setze(M.fenster, fensterStatisch + schirme, f.sx - dx * 0.09, 0.12, f.sz - dz * 0.09, 0.13, 0.075, 0.016, dx !== 0 ? Math.PI / 2 : 0)) {
+        if (setze(M.fenster, fensterStatisch + schirme, f.sx - dx * 0.09, f.sy + 0.1, f.sz - dz * 0.09, 0.13, 0.075, 0.016, dx !== 0 ? Math.PI / 2 : 0)) {
           M.fenster.setColorAt(fensterStatisch + schirme, SCHIRM[S.g.produkt[ort] || 2]); schirme++;
         }
       }
@@ -4168,7 +4524,7 @@ function baueGrafik(THREE, OrbitControls) {
       if (f.p < 0) { figMesh.setMatrixAt(i, NULL); continue; }
       const laeuft = r && jetzt >= f.start && jetzt < f.start + f.dauer && r.len > 0;
       const wartet = r && jetzt < f.start && f.start - jetzt < 1;          // Weg beginnt gleich
-      let x, z, dreh = 0;
+      let x, z, y = FAHRBAHN, dreh = 0;                  // wer geht, geht auf der Fahrbahn
       if (laeuft) {
         const d = ((jetzt - f.start) / f.dauer) * r.len, cum = r.cum;
         let lo = 0, hi = cum.length - 1;
@@ -4176,19 +4532,19 @@ function baueGrafik(THREE, OrbitControls) {
         const seg = cum[hi] - cum[lo], k = seg > 0 ? (d - cum[lo]) / seg : 0;
         const x0 = r.pts[2 * lo], z0 = r.pts[2 * lo + 1], x1 = r.pts[2 * hi], z1 = r.pts[2 * hi + 1];
         x = x0 + (x1 - x0) * k + f.ox; z = z0 + (z1 - z0) * k + f.oz; dreh = Math.atan2(x1 - x0, z1 - z0);
-        if (f.traeger && d < f.hin && nt < TRAG_MAX && setze(M.kiste, kisteStatisch + nt, x, 0.2, z, 1, 1, 1, dreh)) nt++;
-      } else if (wartet && f.vorher) { x = f.px; z = f.pz; }            // steht noch am alten Platz
-      else if (f.steht && !wartet) { x = f.sx; z = f.sz; }               // steht vor dem Gebäude, auf der Baustelle, an der Theke
+        if (f.traeger && d < f.hin && nt < TRAG_MAX && setze(M.kiste, kisteStatisch + nt, x, y + 0.18, z, 1, 1, 1, dreh)) nt++;
+      } else if (wartet && f.vorher) { x = f.px; y = f.py; z = f.pz; }   // steht noch am alten Platz
+      else if (f.steht && !wartet) { x = f.sx; y = f.sy; z = f.sz; }      // steht vor dem Gebäude, auf der Baustelle, an der Theke
       else { figMesh.setMatrixAt(i, NULL); continue; }
-      dummy.position.set(x, 0.02, z); dummy.scale.set(1, 1, 1); dummy.rotation.set(0, dreh, 0);
+      dummy.position.set(x, y, z); dummy.scale.set(1, 1, 1); dummy.rotation.set(0, dreh, 0);
       dummy.updateMatrix();
       figMesh.setMatrixAt(i, dummy.matrix);
       figIds[i] = f.p;
       // Handy in der Hand: wer eins gekauft hat und gerade nicht arbeitet (unterwegs, oder als Hauptfigur draußen)
       if (f.handy && (laeuft || !f.arbeit) && nh < HANDY_MAX
-          && setze(M.fenster, handyBasis + nh, x + Math.sin(dreh) * 0.06, 0.13, z + Math.cos(dreh) * 0.06, 0.06, 0.055, 0.012, dreh)) nh++;
+          && setze(M.fenster, handyBasis + nh, x + Math.sin(dreh) * 0.06, y + 0.11, z + Math.cos(dreh) * 0.06, 0.06, 0.055, 0.012, dreh)) nh++;
       if (f.haupt) {
-        dummy.position.set(x, 0.46 + (REDUZIERT ? 0 : Math.sin(jetzt * 40 + i) * 0.03), z); dummy.rotation.set(0, 0, 0);
+        dummy.position.set(x, y + 0.44 + (REDUZIERT ? 0 : Math.sin(jetzt * 40 + i) * 0.03), z); dummy.rotation.set(0, 0, 0);
         dummy.updateMatrix();
         let denkt = false;
         for (const a of S.ki.anfragen) if (a.id === f.p) denkt = true;
@@ -4291,6 +4647,14 @@ function baueGrafik(THREE, OrbitControls) {
     himmelU.mondRicht.value.set(sp.x, Math.hypot(sp.x, sp.z) * 0.0131, sp.z).normalize();
     sterne.material.opacity = st * st;                   // erst richtig dunkel, dann Sterne
     sterneAn = st > 0.1;
+    // Wolkenschatten nur bei Sonne (nachts aus); der See spiegelt den Himmel, dunkler als der Horizont (den Wasserton gibt es
+    // nur bei Tageslicht, nachts wäre er heller als der Himmel); Rauch hellgrau, morgens und gegen 17 Uhr leicht in der
+    // Himmelsfarbe, um 8 und 17 Uhr weich ein- und ausgeblendet
+    wolkeU.wolkeStaerke.value = REDUZIERT ? 0 : WOLKE_STAERKE * glatt(1.3, 2.4, sonne.intensity);
+    see.material.color.copy(himmelU.zenit.value).lerp(cA, 0.25).multiplyScalar(0.38)
+      .lerp(SEE_TIEFE, 0.3 * glatt(0.95, 2.4, sonne.intensity));   // Spiegelung und Wasser
+    rauch.material.color.copy(RAUCH_F).lerp(cA, 0.05 + 0.25 * (1 - glatt(9, 10.5, t) * (1 - glatt(15, 16.5, t))));
+    rauchSicht = glatt(8, 8.4, t) * (1 - glatt(16.6, 17, t));
   }
 
   // Startblick: Mitte und Ausdehnung der Bebauung (einmalig, keine Kamerafahrt)
@@ -4325,6 +4689,10 @@ function baueGrafik(THREE, OrbitControls) {
     setzeHauptfiguren(ids) { hauptIds = ids.slice(0, HAUPT_MAX); },
     render() {
       controls.update();
+      // Wolken und Rauch laufen in echter Zeit (auch in der Pause, bei jedem Tempo gleich ruhig); reduziert: alles steht
+      const sek = REDUZIERT ? 0 : performance.now() / 1000;
+      wolkeU.wolkeVersatz.value = (sek * WIND_TEMPO * WOLKE_SKALA) % 1;
+      rauchBewegen(sek);
       // Himmel nur, wenn der obere Bildrand über die Unterkante der Kuppel reicht (im üblichen Blick von oben: nie)
       const himmelDa = controls.getPolarAngle() + camera.fov * Math.PI / 360 > Math.PI / 2 - HIMMEL_UNTER - 0.02;
       kuppel.visible = himmelDa; sterne.visible = himmelDa && sterneAn;
@@ -4353,11 +4721,20 @@ addEventListener('keydown', (e) => {
   if (tempo) { tempoVorPause = tempo; setzeTempo(0); } else setzeTempo(tempoVorPause);
 });
 
-$('buch-knopf').addEventListener('click', () => {
-  const k = $('buch-knopf'), auf = k.getAttribute('aria-expanded') !== 'true';
-  k.setAttribute('aria-expanded', String(auf));
+// Stadtbuch ein- und ausklappen. Eingeklappt zählt eine Marke die neuen Einträge; schmal (Handy) startet es eingeklappt
+let buchUngelesen = 0;
+function buchNeuZahl() {
+  const z = $('buch-neu');
+  z.hidden = !buchUngelesen;
+  z.textContent = (buchUngelesen > 99 ? '99+' : buchUngelesen) + ' neu';
+}
+function buchKlappen(auf) {
+  $('buch-knopf').setAttribute('aria-expanded', String(auf));
   $('buch-liste').hidden = !auf;
-});
+  if (auf) { buchUngelesen = 0; buchNeuZahl(); }
+}
+$('buch-knopf').addEventListener('click', () => buchKlappen($('buch-knopf').getAttribute('aria-expanded') !== 'true'));
+if (matchMedia('(max-width: 720px)').matches) buchKlappen(false);
 
 function kennzahlenAnzeigen() {
   const k = Sim.kennzahlen(S);
@@ -4365,12 +4742,20 @@ function kennzahlenAnzeigen() {
   $('k-fw').textContent = zahl(k.freieWohnungen);
   $('k-fs').textContent = zahl(k.freieStellen);
   $('k-zuf').textContent = zahl(k.zufriedenheit);
-  $('k-budget').textContent = zahl(k.budget) + ' T';
+  $('k-budget').textContent = zahl(k.budget);
 }
+// Läuft jedes Bild: schreibt ins DOM nur, wenn sich Tag, Minute oder Tageszeit ändern
+const UHR = $('k-uhr'), TAG_ZAHL = $('k-tag'), UHR_SYMBOL = document.querySelector('#k-phase use');
+let uhrMinute = -1, uhrTag = -1, uhrPhase = '';
 function uhrAnzeigen(t) {
+  if (S.tag !== uhrTag) { uhrTag = S.tag; TAG_ZAHL.textContent = S.tag; }
   const h = Math.floor(t), min = Math.floor((t - h) * 60);
-  $('k-tag').textContent = 'Tag ' + S.tag;
-  $('k-uhr').textContent = String(h).padStart(2, '0') + ':' + String(min).padStart(2, '0');
+  if (h * 60 + min === uhrMinute) return;
+  uhrMinute = h * 60 + min;
+  UHR.textContent = String(h).padStart(2, '0') + ':' + String(min).padStart(2, '0');
+  // Sonne, Dämmerung (5–7 und 18–20 Uhr, grob wie die Lichttabelle) oder Mond
+  const phase = t < 5 || t >= 20 ? '#s-mond' : t < 7 || t >= 18 ? '#s-daemmerung' : '#s-sonne';
+  if (phase !== uhrPhase) { uhrPhase = phase; UHR_SYMBOL.setAttribute('href', phase); }
 }
 
 // Stadtbuch: Namen als Marke \u0001ID/GEN/Name\u0002 → anklickbarer Name (Personenkarte ab Phase 3)
@@ -4378,6 +4763,22 @@ const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>'
 function buchHtml(text) {
   return esc(text).replace(/\u0001(\d+)\/(\d+)\/([^\u0002]*)\u0002/g,
     (m, id, gen, n) => `<button type="button" class="name" data-p="${id}" data-g="${gen}" data-n="${n}">${n}</button>`);
+}
+// Symbol und Wort je Art. Ruhig: meist grau, Akzent nur für Wichtiges, gedämpftes Rot für Verluste.
+// Das Wort steht nur als Hinweis am Symbol (Überfahren): der Eintrag selbst sagt schon, was passiert ist
+const ART = {
+  zuzug: ['s-rein', 'Zuzug'], wegzug: ['s-raus', 'Wegzug'], kinder_weg: ['s-raus', 'Zu Verwandten'],
+  geburt: ['s-spross', 'Geburt'], tod: ['s-kerze', 'Todesfall'], hochzeit: ['s-ringe', 'Hochzeit'], trennung: ['s-bruch', 'Trennung'],
+  gruendung: ['s-laden', 'Gründung', 'wichtig'], pleite: ['s-abwaerts', 'Pleite', 'verlust'], schliessung: ['s-schloss', 'Schließung'],
+  bauamt: ['s-amt', 'Bauamt'], bauhof: ['s-kran', 'Bauhof'], fertig: ['s-fertig', 'Fertig gebaut'], auftrag: ['s-auftrag', 'Auftrag'],
+  stillstand: ['s-sanduhr', 'Stillstand', 'verlust'], tech: ['s-chip', 'Tech-Firmen', 'wichtig'], version: ['s-paket', 'Neu im Laden'],
+  start: ['s-fahne', 'Start', 'wichtig'], notbremse: ['s-warnung', 'Notbremse', 'wichtig'],
+};
+const eintragKlasse = (e) => 'eintrag' + (ART[e.art] && ART[e.art][2] ? ' ' + ART[e.art][2] : '');
+function eintragHtml(e) {
+  const a = ART[e.art] || ['s-fahne', ''];
+  return `<svg class="sym art-sym" aria-hidden="true">${a[1] ? `<title>${a[1]}</title>` : ''}<use href="#${a[0]}"/></svg>`
+    + `<div><span class="tag">Tag ${Number(e.tag)}</span>${buchHtml(String(e.text))}</div>`;
 }
 let buchGesehen = 0;
 const BUCH_ANZEIGE = Sim.R.BUCH_MAX;                     // alle Einträge, damit „Während du weg warst“ immer im Buch zu finden ist
@@ -4387,12 +4788,13 @@ function buchAnzeigen() {
   const frag = document.createDocumentFragment();
   for (let i = neu.length - 1; i >= 0; i--) {
     const e = neu[i], li = document.createElement('li');
-    if (buchGesehen) li.className = 'neu';
-    li.innerHTML = `<span class="tag">Tag ${Number(e.tag)}</span>${buchHtml(String(e.text))}`;
+    li.className = eintragKlasse(e) + (buchGesehen ? ' neu' : '');
+    li.innerHTML = eintragHtml(e);
     frag.appendChild(li);
   }
   liste.prepend(frag);
   while (liste.children.length > BUCH_ANZEIGE) liste.lastElementChild.remove();
+  if (buchGesehen && liste.hidden) { buchUngelesen += neu.length; buchNeuZahl(); }
   buchGesehen = S.buchNr;
 }
 
@@ -4401,14 +4803,14 @@ const verlauf = [];                                       // besuchte Karten, f�
 const ZUEGE = [['fleiss', 'Fleiß'], ['gesellig', 'Geselligkeit'], ['ehrgeiz', 'Ehrgeiz'], ['spar', 'Sparsamkeit'], ['heimat', 'Heimatliebe']];
 const BEDARF = [['geld', 'Geld'], ['wohnen', 'Wohnen'], ['kontakt', 'Kontakt'], ['freizeit', 'Freizeit']];
 // Jeder Name ist anklickbar; wer nicht mehr in der Stadt ist (gestorben oder weggezogen), öffnet eine kurze Karte dazu
-const nameKnopf = (r) => !r ? '–' : r.id >= 0
+const nameKnopf = (r) => !r ? '<span class="leise">–</span>' : r.id >= 0
   ? `<button type="button" class="name${r.lebt ? '' : ' weg'}" data-p="${r.id}" data-g="${r.gen}" data-n="${esc(r.name)}">${esc(r.name)}</button>`
   : `<span class="leise">${esc(r.name)}</span>`;
 const hausKnopf = (b, text) => b >= 0 ? `<button type="button" class="haus" data-b="${b}">${text}</button>` : text;
 const balken = (wert, gruen) => `<div class="balken${gruen ? ' gruen' : ''}" role="img" aria-label="${Math.round(wert)} von 100"><span style="width:${Math.max(0, Math.min(100, wert))}%"></span></div>`;
 function zeigePerson(p, gen, name) { verlauf.push({ art: 'p', id: Number(p), gen: Number(gen), name: name || '' }); if (verlauf.length > 50) verlauf.shift(); karteRendern(true); }
 function zeigeGebaeude(b) { verlauf.push({ art: 'g', id: Number(b) }); if (verlauf.length > 50) verlauf.shift(); karteRendern(true); }
-function karteZu() { verlauf.length = 0; $('karte').hidden = true; }
+function karteZu() { verlauf.length = 0; $('karte').hidden = true; document.body.classList.remove('karte-offen'); hauptMarkieren(); }
 $('karte-zu').addEventListener('click', karteZu);
 $('karte-zurueck').addEventListener('click', () => { verlauf.pop(); karteRendern(true); });
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('karte').hidden && !document.querySelector('dialog[open]')) karteZu(); });
@@ -4423,6 +4825,7 @@ function karteRendern(fokus) {
   const k = verlauf[verlauf.length - 1];
   if (!k) { karteZu(); return; }
   $('karte').hidden = false;
+  document.body.classList.add('karte-offen');             // schmal: #rechts liegt dann unter der Karte (CSS blendet es aus)
   $('karte-zurueck').hidden = verlauf.length < 2;
   const ziel = $('karte-inhalt');
   const scroll = $('karte').scrollTop;
@@ -4448,17 +4851,30 @@ function karteRendern(fokus) {
   }
   if (fokus) { $('karte').scrollTop = 0; const h = ziel.querySelector('h2'); if (h) h.focus({ preventScroll: true }); }
   else $('karte').scrollTop = scroll;
+  hauptMarkieren();
 }
+// Kopf jeder Karte: Marke (Initialen oder Gebäudesymbol), Name groß, darunter eine Zeile
+function kopfHtml(marke, titel, unter, kicker) {
+  return `<div class="karte-kopf">${marke}<div class="titel">${kicker ? `<span class="kicker">${kicker}</span>` : ''}`
+    + `<h2 tabindex="-1">${titel}</h2>${unter ? `<p class="unter">${unter}</p>` : ''}</div></div>`;
+}
+const symbol = (id) => `<svg class="sym" aria-hidden="true"><use href="#${id}"/></svg>`;
+const fakt = (id, inhalt) => `<li>${symbol(id)}<span>${inhalt}</span></li>`;
 function personHtml(p, gen, name) {
   const i = Sim.personInfo(S, p, gen);
-  if (!i) return `<h2 tabindex="-1">${name ? esc(name) : 'Nicht mehr in der Stadt'}</h2><p class="leise">${name ? 'Nicht mehr in der Stadt: gestorben oder weggezogen.' : 'Diese Person ist gestorben oder weggezogen.'}</p>`;
-  let h = `<h2 tabindex="-1">${esc(i.name)}</h2>
-    <p class="leise">${i.alter} Jahre${i.kind ? ', Kind' : ''}</p>
-    <p>${buchHtml(i.arbeit)}${i.arbeitsort >= 0 ? ' · ' + hausKnopf(i.arbeitsort, 'Betrieb ansehen') : ''}</p>
-    ${i.heute ? `<p class="leise">${esc(i.heute)}</p>` : ''}
-    <p>${i.wohnung >= 0 ? hausKnopf(i.wohnung, esc(i.wohnen)) : esc(i.wohnen)}</p>`;
-  if (!i.kind) h += `<p class="leise">${zahl(i.geld)} Taler${i.ziel ? ` · Ziel: <span style="color:var(--text)">${esc(i.ziel.text)}</span> (noch ${i.ziel.rest} ${i.ziel.rest === 1 ? 'Tag' : 'Tage'})` : ''}</p>`;
-  if (i.technik && i.technik.length) h += `<p class="leise">Gekauft: ${i.technik.map(t => `<span class="gekauft">${esc(t.was)} ${esc(t.name)}</span> (Tag ${t.tag}, ${t.preis} Taler)`).join(' · ')}</p>`;
+  if (!i) return kopfHtml(name ? `<span class="kreis gross weg" aria-hidden="true">${esc(initialen(name))}</span>` : `<span class="typ-marke" aria-hidden="true">${symbol('s-leute')}</span>`,
+    name ? esc(name) : 'Nicht mehr in der Stadt', name ? 'Nicht mehr in der Stadt: gestorben oder weggezogen.' : 'Diese Person ist gestorben oder weggezogen.');
+  // Kopf: Name, darunter Alter und Beruf; Hauptfiguren mit Akzent wie in der Leiste
+  let h = kopfHtml(`<span class="kreis gross${i.haupt ? '' : ' neutral'}" aria-hidden="true">${esc(initialen(i.name))}</span>`, esc(i.name),
+    `${i.alter} Jahre · ${buchHtml(i.arbeit)}`, i.haupt ? 'Hauptfigur' : '');
+  // Heute, Wohnung, Geld, Ziel, Gekauftes: je eine Zeile mit Symbol (die Wohnung bleibt der letzte Hausknopf)
+  let f = '';
+  if (i.heute || i.arbeitsort >= 0) f += fakt('s-koffer', (i.heute ? esc(i.heute) : '') + (i.arbeitsort >= 0 ? (i.heute ? ' · ' : '') + hausKnopf(i.arbeitsort, 'Betrieb ansehen') : ''));
+  f += fakt('s-haus', i.wohnung >= 0 ? hausKnopf(i.wohnung, esc(i.wohnen)) : esc(i.wohnen));
+  if (!i.kind) f += fakt('s-muenzen', `${zahl(i.geld)} Taler`);
+  if (i.ziel) f += fakt('s-ziel', `Ziel: <strong>${esc(i.ziel.text)}</strong> <span class="leise">(noch ${i.ziel.rest} ${i.ziel.rest === 1 ? 'Tag' : 'Tage'})</span>`);
+  if (i.technik && i.technik.length) f += fakt('s-geraet', `<span class="leise">Gekauft:</span> ${i.technik.map(t => `<span class="gekauft">${esc(t.was)} ${esc(t.name)}</span> <span class="leise">(Tag ${t.tag}, ${t.preis} Taler)</span>`).join(' · ')}`);
+  h += `<ul class="fakten">${f}</ul>`;
   h += hauptKnopfHtml(i);
   if (i.haupt) h += tagebuchHtml(i);
   h += `<h3>Charakter</h3><div class="werte">${ZUEGE.map(([k, n]) => `<span>${n}</span>${balken(i.charakter[k])}<span class="zahl">${i.charakter[k]}</span>`).join('')}</div>`;
@@ -4468,7 +4884,7 @@ function personHtml(p, gen, name) {
   h += `<h3>Lebenslauf</h3>` + (i.gedaechtnis.length
     ? `<ol class="lebenslauf">${i.gedaechtnis.map(m => `<li><span class="tag">Tag ${m.tag}</span><span>${buchHtml(m.text)}</span></li>`).join('')}</ol>`
     : '<p class="leise">Noch nichts erlebt.</p>');
-  const liste = (a) => a.length ? a.map(nameKnopf).join(', ') : '–';
+  const liste = (a) => a.length ? a.map(nameKnopf).join(', ') : '<span class="leise">–</span>';
   h += `<h3>Familie</h3><dl class="familie">
     <dt>Partner</dt><dd>${nameKnopf(i.partner)}</dd>
     <dt>Eltern</dt><dd>${liste(i.eltern)}</dd>
@@ -4477,11 +4893,14 @@ function personHtml(p, gen, name) {
   h += `<h3>Freunde</h3><p>${liste(i.freunde)}</p>`;
   return h;
 }
+const TYP_SYMBOL = { [Sim.WOHNHAUS]: 's-haus', [Sim.LADEN]: 's-laden', [Sim.WERKSTATT]: 's-werkstatt', [Sim.TECH]: 's-chip', [Sim.PARK]: 's-baum' };
 function gebaeudeHtml(b) {
   const g = Sim.gebaeudeInfo(S, b);
   if (!g) return '<h2 tabindex="-1">Unbekanntes Gebäude</h2>';
-  let h = `<h2 tabindex="-1">${esc(g.titel)}</h2>${g.zeile ? `<p class="leise">${esc(g.zeile)}</p>` : ''}`;
-  for (const z of g.mehr) h += `<p class="leise">${buchHtml(z)}</p>`;
+  // Typ-Marke: Symbol nach Gebäudeart; Baustellen (auch Aufstockungen) mit Leitkegel
+  const marke = g.bau || g.baustelle ? 's-kegel' : b === S.bauhof ? 's-kran' : TYP_SYMBOL[g.typ] || 's-haus';
+  let h = kopfHtml(`<span class="typ-marke" aria-hidden="true">${symbol(marke)}</span>`, esc(g.titel), g.zeile ? esc(g.zeile) : '');
+  if (g.mehr.length) h += `<div class="mehr">${g.mehr.map(z => `<p>${buchHtml(z)}</p>`).join('')}</div>`;
   if (g.bau) {
     const b = g.bau;
     h += `<h3>Baustelle</h3><p>${b.geschafft} von ${b.gesamt} Arbeitstagen geschafft${b.still ? `, seit ${b.still} ${b.still === 1 ? 'Tag' : 'Tagen'} kam niemand vom Bauhof` : ''}.</p>`
@@ -4838,11 +5257,20 @@ function hauptAnzeigen() {
   hauptSchluessel = key;
   const s = $('ki-status');
   s.textContent = st.text; s.title = st.titel; s.classList.toggle('aus', st.aus);
-  $('haupt-liste').innerHTML = zeilen.length ? zeilen.map(z => `<li><button type="button" class="haupt-zeile${z.denkt ? ' ueberlegt' : ''}" data-p="${z.id}" data-g="${z.gen}">
+  $('haupt-liste').innerHTML = zeilen.length ? zeilen.map(z => `<li><button type="button" class="haupt-zeile${z.denkt ? ' ueberlegt' : ''}" data-p="${z.id}" data-g="${z.gen}" title="${esc(z.name)}">
       <span class="kreis" aria-hidden="true">${esc(initialen(z.name))}</span>
       <span class="n">${esc(z.name)}${z.denkt ? `<span class="ueberlegt-text">${z.code ? 'schreibt Code …' : 'überlegt …'}</span>` : ''}</span>
       <span class="gedanke">${z.gedanke ? (z.gedanke.startsWith('schreibt Code: ') ? esc(z.gedanke) : '„' + esc(z.gedanke) + '“') : 'noch kein Gedanke'}</span></button></li>`).join('')
     : '<li class="leer">Keine Hauptfigur. Auf jeder Personenkarte: „Zur Hauptfigur machen“.</li>';
+  hauptMarkieren();
+}
+// Wessen Karte offen ist, ist in der Leiste markiert (aria-current)
+function hauptMarkieren() {
+  const k = !$('karte').hidden && verlauf[verlauf.length - 1];
+  for (const z of $('haupt-liste').querySelectorAll('.haupt-zeile')) {
+    if (k && k.art === 'p' && Number(z.dataset.p) === k.id && Number(z.dataset.g) === k.gen) z.setAttribute('aria-current', 'true');
+    else z.removeAttribute('aria-current');
+  }
 }
 document.addEventListener('click', (e) => {
   const z = e.target.closest('.haupt-zeile');
@@ -5098,7 +5526,7 @@ function wegKarte(erg) {
       <dt>Gestorben</dt><dd>${zahl(n.tode - v.tode)}</dd>
     </dl>
     <p class="leise">Das Auffälligste aus dem Stadtbuch${abgeschnitten ? ` (es hält nur die letzten ${S.buch.length} von ${zahl(eintraege)} neuen Einträgen)` : ''}:</p>
-    <ol class="auffaellig">${auffaelligste(v.buchNr, 3).map(e => `<li><span class="tag">Tag ${Number(e.tag)}</span>${buchHtml(String(e.text))}</li>`).join('')}</ol>`;
+    <ol class="auffaellig">${auffaelligste(v.buchNr, 3).map(e => `<li class="${eintragKlasse(e)}">${eintragHtml(e)}</li>`).join('')}</ol>`;
   $('weg-dialog').showModal();
 }
 for (const d of document.querySelectorAll('dialog')) {
@@ -5176,7 +5604,7 @@ $('version-uebernehmen').addEventListener('click', async () => {
     if (erg && erg.tage >= 1) wegKarte(erg);
   }
 });
-function buchNeu() { buchGesehen = 0; $('buch-liste').replaceChildren(); }
+function buchNeu() { buchGesehen = 0; buchUngelesen = 0; buchNeuZahl(); $('buch-liste').replaceChildren(); }
 
 // Speichern alle 30 Sekunden und beim Verlassen; beim Zurückkommen die verpasste Zeit aufholen
 setInterval(() => { if (!aufholenLaeuft) speichern(); }, 30000);
