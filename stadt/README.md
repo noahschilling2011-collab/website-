@@ -73,6 +73,14 @@ eine Firma gut (alle Stellen besetzt, 20 Tage in Folge Gewinn), spart sie für e
 das Umland Platz hat und genug Leute Arbeit suchen. Hauptfiguren, die in einer Tech-Firma programmieren, schreiben einmal am
 Spieltag über Ollama ein echtes kleines Stück Code in ihr Tagebuch. Es wird nur angezeigt und nie ausgeführt.
 
+**Aussehen (Design-Runde 1).** Häuser haben einzelne Fenster je Geschoss, Haustür und Sockel. Kleine Häuser (Stufe 1)
+tragen ein Satteldach, größere ein Flachdach mit Attika, Treppenhaus und Lüftern. Werkstätten sind Hallen mit Sägezahndach und
+Tor, Läden zeigen Schaufenster und Tür zur Straße. Straßen haben Gehwege mit Bordstein, Mittellinie und Zebrastreifen vor
+Kreuzungen. Straßenlaternen stehen an geraden Straßen; nachts leuchten sie mit einem warmen Lichtfleck, aber nur dort, wo
+daneben gebaut ist. Leere Stichstraßen bleiben dunkel. Um die Karte liegen Felder, flache Hügel und ein Waldrand, der im
+Nebel verschwindet. Parks und Gärten neben Wohnhäusern haben Laubbäume. Bei flachem Blick sieht man einen Himmel mit
+Farbverlauf, nachts mit Sternen und Mond. Alles ist Deko ohne Wirkung auf die Simulation.
+
 In der 3D-Ansicht wächst auf jeder Baustelle ein grauer Rohbau mit den geschafften Arbeitstagen. Das Gerüst wird dunkler,
 solange niemand kommt, und lässt sich anklicken. Bauarbeiter (orange) stehen an den Ecken ihrer Baustelle, Handwerker
 (blau) vor der Werkstatt. An Werkstätten stehen Kistenstapel, vor Läden eine Theke und eine Auslage (braun: Kisten aus der
@@ -264,6 +272,8 @@ Figuren bei der Arbeit): JavaScript pro Bild 7,5–11,1 ms mit KI und 7,5–8,9 
 Unterschied ist im Messrauschen nicht zu sehen; das Bildtempo begrenzt hier die Software-Grafik.
 
 **60 Bilder pro Sekunde sind nicht gemessen.** Im Container rendert Chromium ohne Grafikkarte (SwiftShader) mit etwa
-10 fps. Gemessen sind Draw Calls (10–13 vor der Arbeit-Erweiterung, jetzt bis 15: Kisten-Mesh und Gerüst), Dreiecke
-(unter 51.000) und die Rechenzeit pro Bild in JavaScript (5–11 ms). Große Stadt nach der Zuzug-Regel mit 5.895 Einwohnern
-(`?debug&umland=300000&tage=750&seed=2`): 15 Draw Calls, 102.742 Dreiecke, 9,3 ms JavaScript pro Bild, Konsole leer.
+10 fps. Gemessen sind Draw Calls, Dreiecke und die Rechenzeit pro Bild in JavaScript. Nach der Design-Runde 1: Teststadt
+(Seed 2, Tag 400) 17–20 Draw Calls, 47.000–49.000 Dreiecke; große Stadt (`?debug&umland=300000&tage=750&seed=2`, 5.894
+Einwohner) 18–21 Draw Calls, 165.000–172.000 Dreiecke (vorher 15 und 102.742), 5–12 ms JavaScript pro Bild, Konsole leer.
+Die Spec verlangt unter 100 Draw Calls; für die Dreiecke gibt sie keine Grenze. Meine eigene Richtgrenze von 150.000 ist in der
+großen Stadt überschritten. Die meisten Dreiecke kosten die Fensterreihen (24 je Geschoss) und die Kleinteile.

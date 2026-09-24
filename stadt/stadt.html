@@ -3289,11 +3289,161 @@ function baueGrafik(THREE, OrbitControls) {
   const gegen = new THREE.DirectionalLight('#7f93c8', 0.35);
   scene.add(himmel, sonne, gegen, sonne.target, gegen.target);
 
-  // Boden
-  const boden = new THREE.Mesh(new THREE.PlaneGeometry(900, 900),   // Rand liegt weit hinter dem Nebel
-    new THREE.MeshLambertMaterial({ color: '#35523b' }));
-  boden.rotation.x = -Math.PI / 2;
+  // Feste „Zufallszahl“ je Zelle (a, b) und Sorte k, gut gemischt (nur Optik)
+  function zellHash(a, b, k) {
+    let h = (Math.imul(a, 374761393) + Math.imul(b, 668265263) + Math.imul(k, 2246822519)) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+  const glatt = (a, b, v) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
+  const welle = (x, z) => (Math.sin(x * 0.071 + Math.sin(z * 0.053) * 1.7) + Math.sin(z * 0.067 - x * 0.031 + 2.1)
+    + Math.sin((x + z) * 0.043 + 0.6)) / 6 + 0.5;         // glattes Rauschen, 0 … 1
+  const randAbst = (x, z) => Math.max(Math.abs(x), Math.abs(z));   // Abstand zur Mitte, quadratisch wie die Karte
+
+  // Himmel: Halbkugel um die Kamera, reicht 5° unter den Horizont (darunter: Hintergrund in derselben Farbe). Farben aus TAG,
+  // am Horizont genau die Nebelfarbe, daher nahtlos. Die Kamera sieht höchstens gut 1° über den Horizont (Polarwinkel ≤ 1,2,
+  // 45° Blickwinkel): Verlauf, Glanz um die Sonne und der Mond liegen deshalb alle in diesem Streifen. Gezeichnet nach allem
+  // Undurchsichtigen (renderOrder 1) mit Tiefentest: verdeckte Pixel fallen früh weg. render() blendet sie aus, wenn sie nicht im Bild ist.
+  const HIMMEL_UNTER = 0.09;                              // Unterkante der Kuppel unter dem Horizont (Bogenmaß)
+  const himmelU = { horizont: { value: new THREE.Color() }, zenit: { value: new THREE.Color() }, richt: { value: new THREE.Vector3(0, 1, 0) },
+    mondRicht: { value: new THREE.Vector3(1, 0, 0) }, glanzFarbe: { value: new THREE.Color() }, glanz: { value: 0 }, mond: { value: 0 } };
+  const kuppel = new THREE.Mesh(new THREE.SphereGeometry(500, 16, 5, 0, Math.PI * 2, 0, Math.PI / 2 + HIMMEL_UNTER),   // Radius < Kamera-far (600)
+    new THREE.ShaderMaterial({ uniforms: himmelU, side: THREE.BackSide, depthWrite: false,
+      vertexShader: 'varying vec3 vRicht;\nvoid main() { vRicht = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: `uniform vec3 horizont, zenit, richt, mondRicht, glanzFarbe; uniform float glanz, mond; varying vec3 vRicht;
+        void main() {
+          vec3 d = normalize(vRicht);
+          float oben = smoothstep(0.0, 0.035, d.y);         // 0 am Horizont, gut 0,6 am oberen Bildrand
+          vec3 f = mix(horizont, zenit, oben);
+          f += glanzFarbe * glanz * pow(max(dot(d, richt), 0.0), 10.0) * oben;
+          float m = length(cross(d, mondRicht));           // Sinus des Winkels zum Mond (genau auch bei kleinen Winkeln)
+          f = mix(f, vec3(0.62, 0.65, 0.7), mond * step(0.0, dot(d, mondRicht)) * (1.0 - smoothstep(0.0064, 0.0078, m)));   // Mondscheibe, Radius 0,4°
+          gl_FragColor = vec4(f, 1.0);
+          #include <colorspace_fragment>
+        }` }));
+  kuppel.renderOrder = 1; kuppel.frustumCulled = false;
+  scene.add(kuppel);
+
+  // Sterne: feste Punkte auf der oberen Halbkugel (feste Zahlenfolge), dichter zum Horizont hin, weil man nur dort Himmel sieht
+  const sternPos = [], sternFarbe = [];
+  let folge = 7;
+  const naechste = () => (folge = (Math.imul(folge, 1664525) + 1013904223) >>> 0) / 4294967296;
+  while (sternPos.length < 900 * 3) {
+    const y = 0.003 + 0.997 * naechste() ** 2, w = naechste() * Math.PI * 2, hell = naechste(), ton = naechste(), r = Math.sqrt(1 - y * y);
+    const x = r * Math.cos(w), z = r * Math.sin(w);
+    const b = (0.3 + 0.7 * hell ** 3) * glatt(0.002, 0.012, y);
+    sternPos.push(x * 450, y * 450, z * 450);
+    sternFarbe.push(b * (0.92 + 0.1 * ton), b * 0.96, b * (1.04 - 0.1 * ton));
+  }
+  const sternGeo = new THREE.BufferGeometry();
+  sternGeo.setAttribute('position', new THREE.Float32BufferAttribute(sternPos, 3));
+  sternGeo.setAttribute('color', new THREE.Float32BufferAttribute(sternFarbe, 3));
+  const sterne = new THREE.Points(sternGeo, new THREE.PointsMaterial({ size: 1.6, sizeAttenuation: false, vertexColors: true,
+    transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false }));
+  sterne.frustumCulled = false; sterne.visible = false;
+  scene.add(sterne);
+  let sterneAn = false;                                   // licht(): dunkel genug für Sterne
+
+  // Boden: unterteilte Ebene mit Farben je Ecke. Innen (Karte 96×96) ruhige Wiese, außen Felder, Weiden und Waldboden
+  // (jedes Viereck eine Farbe, also Felder mit Kante), ab 54 Einheiten flache Hügel, die im Nebel verschwinden
+  const ACHSE = [];
+  for (let v = -48; v <= 48; v += 8) ACHSE.push(v);
+  for (const v of [53, 59, 66, 74, 84, 96, 111, 130, 160, 210, 300, 450]) { ACHSE.push(v); ACHSE.unshift(-v); }
+  const NA = ACHSE.length, HOEHE = new Float32Array(NA * NA);
+  for (let j = 0; j < NA; j++) for (let i = 0; i < NA; i++) {
+    const x = ACHSE[i], z = ACHSE[j], d = randAbst(x, z);
+    HOEHE[j * NA + i] = d < 54 ? 0 : (glatt(54, 100, d) * 5 + glatt(90, 250, d) * 16) * welle(x * 1.3 + 40, z * 1.3 - 17);
+  }
+  // Höhe genau auf der Dreiecksfläche (für die Bäume): Viereck suchen, dann im passenden Dreieck mitteln
+  function bodenHoehe(x, z) {
+    let i = 0, j = 0;
+    while (i < NA - 2 && ACHSE[i + 1] <= x) i++;
+    while (j < NA - 2 && ACHSE[j + 1] <= z) j++;
+    const u = (x - ACHSE[i]) / (ACHSE[i + 1] - ACHSE[i]), v = (z - ACHSE[j]) / (ACHSE[j + 1] - ACHSE[j]);
+    const h00 = HOEHE[j * NA + i], h10 = HOEHE[j * NA + i + 1], h01 = HOEHE[(j + 1) * NA + i], h11 = HOEHE[(j + 1) * NA + i + 1];
+    return u + v <= 1 ? h00 + u * (h10 - h00) + v * (h01 - h00) : h11 + (1 - u) * (h01 - h11) + (1 - v) * (h10 - h11);
+  }
+  // Wiese, Weide, Feld reif, Acker, Feld jung, Wiese dunkel
+  const FELDFARBEN = ['#35523b', '#3a573c', '#2f4b36', '#55573a', '#484232', '#415a37', '#2d4834'].map(c => new THREE.Color(c));
+  // Wiese auf der Karte: im Mittel etwas dunkler als die frühere einfarbige Ebene, damit die Fenster nachts vorn bleiben
+  const WIESE = new THREE.Color('#33513a'), WIESE_HELL = new THREE.Color('#39573b'), WIESE_DUNKEL = new THREE.Color('#29422f');
+  const WALDBODEN = new THREE.Color('#22372a'), FERNE = new THREE.Color('#2c4437');
+  const waldMaske = (x, z) => welle(x * 0.9 - 30, z * 0.9 + 12);
+  const waldKante = (x, z) => 49.6 + 8 * welle(x * 3.3 + 11, z * 3.3 - 5);   // Waldrand springt vor und zurück statt dem Kartenrand zu folgen
+  // Farbe einer Ecke: Wiese mit Flecken, außen weich in die Farbe des Feldes (ab 53), Waldboden hinter dem Waldrand, weit weg Fernfarbe.
+  // Innen und außen rechnen dieselbe Formel, deshalb gibt es an der Grenze keine Kante.
+  function bodenFarbeAn(c, x, z, feld) {
+    const d = randAbst(x, z), wk = waldKante(x, z);
+    c.copy(WIESE).lerp(WIESE_HELL, glatt(0.45, 0.85, welle(x * 1.7 + 5, z * 1.7 - 9)))
+      .lerp(WIESE_DUNKEL, glatt(0.55, 0.85, welle(x * 3.1 - 21, z * 3.1 + 7)));
+    if (feld) c.lerp(feld, glatt(53, 61, d));
+    return c.lerp(WALDBODEN, glatt(0.5, 0.6, waldMaske(x, z)) * glatt(wk - 2, wk + 1, d)).lerp(FERNE, glatt(110, 260, d));
+  }
+  const bodenPos = [], bodenFarbe = [], ecke = new THREE.Color(), feldFarbe = new THREE.Color();
+  for (let j = 0; j < NA - 1; j++) for (let i = 0; i < NA - 1; i++) {
+    const x0 = ACHSE[i], x1 = ACHSE[i + 1], z0 = ACHSE[j], z1 = ACHSE[j + 1];
+    const innen = randAbst((x0 + x1) / 2, (z0 + z1) / 2) < 53;      // Karte und erster Streifen: Wiese ohne Feldfarbe
+    feldFarbe.copy(FELDFARBEN[(zellHash(i, j, 3) * FELDFARBEN.length) | 0]);
+    for (const [a, b] of [[0, 0], [0, 1], [1, 0], [1, 1], [1, 0], [0, 1]]) {   // zwei Dreiecke, Vorderseite oben
+      const x = a ? x1 : x0, z = b ? z1 : z0;
+      bodenPos.push(x, HOEHE[(j + b) * NA + i + a], z);
+      bodenFarbeAn(ecke, x, z, innen ? null : feldFarbe);
+      bodenFarbe.push(ecke.r, ecke.g, ecke.b);
+    }
+  }
+
+  // Mehrere Geometrien zu einer, mit Vertex-Farbe je Teil; jedes Dreieck flach schattiert
+  function verbinde(teile) {
+    const pos = [], farb = [];
+    for (const [geo, c] of teile) {
+      const p = (geo.index ? geo.toNonIndexed() : geo).getAttribute('position');
+      for (let i = 0; i < p.count; i++) { pos.push(p.getX(i), p.getY(i), p.getZ(i)); farb.push(c.r, c.g, c.b); }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(farb, 3));
+    g.computeVertexNormals();
+    return g;
+  }
+  // Wald am Kartenrand: Nadelbäume aus zwei Kegeln, in Gruppen nach waldMaske, davor einzelne; nach außen größer und lockerer.
+  // Er steht fest und wird deshalb in die Bodengeometrie gebacken (ein Draw Call weniger). Wo die Kamera hinkommt
+  // (Blickpunkt höchstens 60 von der Mitte, Polarwinkel ≤ 1,2, also mindestens 3,6 hoch), bleiben die Wipfel unter ihr.
+  const TANNE_GEO = verbinde([[new THREE.ConeGeometry(0.42, 0.72, 5, 1, true).translate(0, 0.36, 0), new THREE.Color(0.8, 0.8, 0.8)],
+    [new THREE.ConeGeometry(0.3, 0.6, 5, 1, true).translate(0, 0.72, 0), new THREE.Color(1, 1, 1)]]);
+  const WALDFARBEN = ['#2b4a33', '#325236', '#27433a', '#3a5633', '#2d4b40', '#40603a'].map(c => new THREE.Color(c));
+  {
+    const tp = TANNE_GEO.getAttribute('position'), tf = TANNE_GEO.getAttribute('color'), ton = new THREE.Color();
+    const A = 2.2, N = Math.round(80 / A);
+    for (let iz = -N; iz <= N; iz++) for (let ix = -N; ix <= N; ix++) {
+      const x = ix * A + (zellHash(ix, iz, 1) - 0.5) * A * 0.8, z = iz * A + (zellHash(ix, iz, 2) - 0.5) * A * 0.8, d = randAbst(x, z);
+      if (d < 49.6 || d > 80) continue;                   // nicht auf der Karte; weiter draußen verschluckt ihn der Nebel
+      const kante = waldKante(x, z);
+      const p = Math.max(waldMaske(x, z) > 0.6 ? 0.85 * glatt(kante, kante + 2.5, d) : 0, d < kante + 4 ? 0.07 : 0.004)
+        * (d > 62 ? Math.max(0.25, 1 - (d - 62) / 45) : 1);
+      if (zellHash(ix, iz, 3) > p) continue;
+      const y = bodenHoehe(x, z) - 0.05, decke = Math.max(3.62, 0.388 * (d - 61.5)) - 0.35;   // tiefste Kamerahöhe hier, mit Abstand
+      let s = (1.35 + (d - 50) / 30) * (0.75 + 0.5 * zellHash(ix, iz, 4)), sy = s * (0.85 + 0.4 * zellHash(ix, iz, 5));
+      if (y + sy * 1.02 > decke) { const k = (decke - y) / (sy * 1.02); s *= k; sy *= k; }
+      const w = zellHash(ix, iz, 6) * 6.3, cw = Math.cos(w), sw = Math.sin(w);
+      ton.copy(WALDFARBEN[(zellHash(ix, iz, 7) * WALDFARBEN.length) | 0]).multiplyScalar(0.85 + 0.3 * zellHash(ix, iz, 8));
+      for (let i = 0; i < tp.count; i++) {                 // gedreht um y, skaliert, verschoben; Farbe = Kegelfarbe × Ton
+        const px = tp.getX(i) * s, pz = tp.getZ(i) * s;
+        bodenPos.push(x + px * cw + pz * sw, y + tp.getY(i) * sy, z - px * sw + pz * cw);
+        bodenFarbe.push(tf.getX(i) * ton.r, tf.getY(i) * ton.g, tf.getZ(i) * ton.b);
+      }
+    }
+  }
+  const bodenGeo = new THREE.BufferGeometry();
+  bodenGeo.setAttribute('position', new THREE.Float32BufferAttribute(bodenPos, 3));
+  bodenGeo.setAttribute('color', new THREE.Float32BufferAttribute(bodenFarbe, 3));
+  bodenGeo.computeVertexNormals();                        // ohne Index: jedes Dreieck flach (Low-Poly-Hügel und -Bäume)
+  const boden = new THREE.Mesh(bodenGeo, new THREE.MeshLambertMaterial({ vertexColors: true }));
   scene.add(boden);
+
+  // Laubbaum für Parks und Gärten: Stamm und Krone (Farbe je Baum als Ton darüber)
+  const STAMM = new THREE.Color('#4a3829'), KRONE = new THREE.Color('#557f49');
+  const BAUM_GEO = verbinde([[new THREE.CylinderGeometry(0.028, 0.042, 0.2, 5, 1, true).translate(0, 0.1, 0), STAMM],
+    [new THREE.IcosahedronGeometry(0.19, 0).translate(0, 0.33, 0), KRONE]]);
 
   // Instanzierte Meshes: ein Mesh (= ein Draw Call) pro Bauteil
   const box = (w, h, d) => new THREE.BoxGeometry(w, h, d).translate(0, h / 2, 0);
@@ -3307,28 +3457,143 @@ function baueGrafik(THREE, OrbitControls) {
     scene.add(m);
     return m;
   }
+  // Eigene Low-Poly-Formen aus Flächen: Farbe je Fläche (Vertex-Farbe) mal Instanzfarbe, flach schattiert.
+  // Gedrehte Gebäude zeigen mit lokal +z zur Straße.
+  const SEITE = [[1, 0], [0, 1], [-1, 0], [0, -1]];       // cos/sin der vier Seiten: +z, +x, −z, −x
+  function form(bauen) {
+    const pos = [], col = [];
+    const dreieck = (a, b, c, f) => { pos.push(...a, ...b, ...c); col.push(...f, ...f, ...f); };
+    // Drei oder vier Ecken, von der Sichtseite aus gegen den Uhrzeigersinn
+    const flaeche = (p, f) => { dreieck(p[0], p[1], p[2], f); if (p[3]) dreieck(p[0], p[2], p[3], f); };
+    const auf = (k, u, y, d) => [u * SEITE[k][0] + d * SEITE[k][1], y, d * SEITE[k][0] - u * SEITE[k][1]];   // Seite k: u quer, d Abstand zur Mitte
+    // Rechteck auf Seite k, Normale nach außen (oder mit innen = true zur Mitte)
+    const wand = (k, u0, u1, y0, y1, d, f, innen) => flaeche(innen
+      ? [auf(k, u1, y0, d), auf(k, u0, y0, d), auf(k, u0, y1, d), auf(k, u1, y1, d)]
+      : [auf(k, u0, y0, d), auf(k, u1, y0, d), auf(k, u1, y1, d), auf(k, u0, y1, d)], f);
+    bauen(flaeche, wand, auf);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    g.computeVertexNormals();                             // ohne Index: jede Fläche ihre eigene Normale
+    return g;
+  }
+  const grau = (v) => [v, v, v];
+  const A_HAUS = 0.38, SOCKEL = 0.035, ATTIKA = 0.035;   // Sockel und Attika als Anteil der Haushöhe
+  // Wohnhaus: dunkler Sockel, Wand bis Oberkante Attika, Abdeckung, dunkle Dachhaut (beim Satteldach verdeckt)
+  const hausForm = form((flaeche, wand, auf) => {
+    const a = A_HAUS, i = a - 0.03, o = 1 + ATTIKA;
+    for (let k = 0; k < 4; k++) {
+      wand(k, -a, a, 0, SOCKEL, a, grau(0.5));
+      wand(k, -a, a, SOCKEL, o, a, grau(1));
+      flaeche([auf(k, -a, o, a), auf(k, a, o, a), auf(k, i, o, i), auf(k, -i, o, i)], grau(0.86));
+      wand(k, -i, i, 1, o, i, grau(0.62), true);
+    }
+    flaeche([[-i, 1, i], [i, 1, i], [i, 1, -i], [-i, 1, -i]], grau(0.3));
+  });
+  // Satteldach, First entlang z; Giebeldreiecke in Hausfarbe (Instanzfarbe = Hausfarbe), Ziegel gedämpft rotbraun
+  const DACH_ZIEGEL = [0.3, 0.13, 0.1], DACH_UNTEN = [0.17, 0.085, 0.07];
+  const dachForm = form((flaeche) => {
+    const a = A_HAUS, e = a + 0.05, g = a + 0.04, h = 0.3, t = 0.03, ye = h * (1 - e / a);
+    const z = a + 0.004;                                  // Giebel knapp vor der Wand, sonst Naht an der Attika-Kante
+    flaeche([[0, h, -g], [0, h, g], [e, ye, g], [e, ye, -g]], DACH_ZIEGEL);
+    flaeche([[0, h, g], [0, h, -g], [-e, ye, -g], [-e, ye, g]], DACH_ZIEGEL);
+    flaeche([[e, ye - t, -g], [e, ye - t, g], [0, h - t, g], [0, h - t, -g]], DACH_UNTEN);
+    flaeche([[-e, ye - t, g], [-e, ye - t, -g], [0, h - t, -g], [0, h - t, g]], DACH_UNTEN);
+    flaeche([[-a, 0, z], [a, 0, z], [0, h - t, z]], grau(1));
+    flaeche([[a, 0, -z], [-a, 0, -z], [0, h - t, -z]], grau(1));
+    flaeche([[-a, -0.012, z], [a, -0.012, z], [a, 0, z], [-a, 0, z]], grau(1));   // Streifen bis zur Attika (Dach sitzt 0,01 höher)
+    flaeche([[a, -0.012, -z], [-a, -0.012, -z], [-a, 0, -z], [a, 0, -z]], grau(1));
+    flaeche([[0, h - t, g], [e, ye - t, g], [e, ye, g], [0, h, g]], DACH_UNTEN);   // Stirnkanten
+    flaeche([[-e, ye - t, g], [0, h - t, g], [0, h, g], [-e, ye, g]], DACH_UNTEN);
+    flaeche([[0, h, -g], [e, ye, -g], [e, ye - t, -g], [0, h - t, -g]], DACH_UNTEN);
+    flaeche([[-e, ye, -g], [0, h, -g], [0, h - t, -g], [-e, ye - t, -g]], DACH_UNTEN);
+  });
+  // Werkstatt: Halle mit Sheddach (drei Zähne, Oberlichter zur Straße) und dunklem Tor
+  const werkstattForm = form((flaeche, wand) => {
+    const a = 0.43, hw = 0.46, h = 0.15, d = 2 * a / 3;
+    for (let k = 0; k < 4; k++) wand(k, -a, a, 0, hw, a, grau(1));
+    for (let i = 0; i < 3; i++) {
+      const zs = -a + i * d, ze = zs + d;
+      flaeche([[a, hw, zs], [-a, hw, zs], [-a, hw + h, ze], [a, hw + h, ze]], grau(0.62));
+      wand(0, -a, a, hw, hw + h, ze, [0.66, 0.78, 0.94]);   // Oberlicht: bläuliches Glas, heller als das Dach
+      flaeche([[a, hw, ze], [a, hw, zs], [a, hw + h, ze]], grau(1));
+      flaeche([[-a, hw, zs], [-a, hw, ze], [-a, hw + h, ze]], grau(1));
+    }
+    wand(0, -0.15, 0.15, 0, 0.3, a + 0.008, grau(0.36));
+  });
+  // Laden: Wand, dunklere Blende oben, Dachhaut, Tür rechts neben dem Schaufenster (Fenster: ladenGlasForm)
+  const ladenForm = form((flaeche, wand) => {
+    const a = 0.4, h = 0.55, b = 0.47;
+    for (let k = 0; k < 4; k++) { wand(k, -a, a, 0, b, a, grau(1)); wand(k, -a, a, b, h, a, grau(0.72)); }
+    flaeche([[-a, h, a], [a, h, a], [a, h, -a], [-a, h, -a]], grau(0.4));
+    wand(0, 0.15, 0.31, 0, 0.3, a + 0.008, [0.34, 0.26, 0.21]);
+  });
+  // Glas des Ladens: Schaufenster links neben der Tür, an den Seiten und hinten je zwei Fenster (alle wie das Schaufenster beleuchtet)
+  const ladenGlasForm = form((flaeche, wand) => {
+    const d = 0.408, f = grau(1);
+    wand(0, -0.32, 0.12, 0.07, 0.34, d, f);
+    for (let k = 1; k < 4; k++) { wand(k, -0.29, -0.09, 0.1, 0.34, d, f); wand(k, 0.09, 0.29, 0.1, 0.34, d, f); }
+  });
+  // Fensterreihe eines Geschosses: je Seite drei Scheiben knapp vor der Wand, leicht verschieden hell (nicht zu dunkel, damit sie nachts leuchten)
+  const HELL = [1, 0.92, 0.97, 0.94, 1, 0.9, 0.96, 1, 0.92, 0.98, 0.91, 1];
+  const scheibenForm = form((flaeche, wand) => {
+    for (let k = 0; k < 4; k++) for (let j = -1; j <= 1; j++) wand(k, j * 0.23 - 0.08, j * 0.23 + 0.08, 0, 1, A_HAUS + 0.008, grau(HELL[k * 3 + j + 1]));
+  });
+  // Kleines Bauteil: Einheitsquader ohne Boden (der ist nie zu sehen)
+  const teilForm = form((flaeche, wand) => {
+    for (let k = 0; k < 4; k++) wand(k, -0.5, 0.5, 0, 1, 0.5, grau(1));
+    flaeche([[-0.5, 1, 0.5], [0.5, 1, 0.5], [0.5, 1, -0.5], [-0.5, 1, -0.5]], grau(1));
+  });
   const F = Sim.KARTE * Sim.KARTE;
+  // Gehwegstreifen: nur Oberseite und Bordsteinkante zur Fahrbahn (4 Dreiecke). Lokal: x längs, z von 0 (Feldrand) bis 1 (Fahrbahn)
+  const streifen = new THREE.BufferGeometry();
+  streifen.setAttribute('position', new THREE.Float32BufferAttribute([
+    -0.5, 1, 0, -0.5, 1, 1, 0.5, 1, 1, 0.5, 1, 0,          // oben
+    -0.5, 0, 1, 0.5, 0, 1, 0.5, 1, 1, -0.5, 1, 1], 3));    // Kante
+  streifen.setAttribute('normal', new THREE.Float32BufferAttribute([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1], 3));
+  streifen.setIndex([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7]);
+  const GEHWEG = 0.2, BORD = 0.017, FAHRBAHN = 0.025, MARKE = 0.008;   // Gehwegbreite, Bordsteinhöhe, Oberkante Fahrbahn, Farbschicht
+  const MAST_H = 0.62, FLECK = 1.9, LAT_MAX = 1500;        // Laternenhöhe, Durchmesser des Lichtflecks, höchstens so viele Laternen
+  // Lichtfleck unter Laternen: kleine Textur mit radialem Verlauf (weiß, nach außen durchsichtig), additiv.
+  // Im Nebel blendet er nach Schwarz aus (addiert dann nichts mehr), statt die Nebelfarbe auf den Boden zu addieren
+  function fleckMaterial() {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d'), v = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    v.addColorStop(0, 'rgba(255,255,255,1)'); v.addColorStop(0.4, 'rgba(255,255,255,0.6)'); v.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = v; g.fillRect(0, 0, 64, 64);
+    // Farbe orange statt LICHT: additiv auf dem bläulichen Mondlicht wirkt sie sonst weißlich
+    const m = new THREE.MeshBasicMaterial({ color: '#ff9a40', map: new THREE.CanvasTexture(c), transparent: true, opacity: 0.6,
+      blending: THREE.AdditiveBlending, depthWrite: false });
+    m.onBeforeCompile = (s) => { s.fragmentShader = s.fragmentShader.replace('#include <fog_fragment>', THREE.ShaderChunk.fog_fragment.replace('fogColor', 'vec3( 0.0 )')); };
+    return m;
+  }
   const M = {
     strasse: inst(box(1, 0.02, 1), lambert('#3a3e46'), F),
-    haus: inst(box(0.76, 1, 0.76), lambert('#ffffff'), 4000),
-    dach: inst(new THREE.ConeGeometry(0.58, 0.38, 4).rotateY(Math.PI / 4).translate(0, 0.19, 0), lambert('#8a4f3d'), 4000),
-    fenster: inst(box(0.785, 1, 0.785), new THREE.MeshBasicMaterial({ color: '#ffffff' }), 40000),
-    werkstatt: inst(box(0.86, 0.7, 0.86), lambert('#ffffff'), 3000),
-    schlot: inst(new THREE.CylinderGeometry(0.06, 0.08, 1, 6).translate(0, 0.5, 0), lambert('#59616c'), 3000),
-    laden: inst(box(0.8, 0.55, 0.8), lambert('#ffffff'), 3000),
-    markise: inst(box(0.84, 0.05, 0.22), lambert('#ffffff'), 3000),
+    haus: inst(hausForm, lambert('#ffffff', { vertexColors: true }), 4000),
+    dach: inst(dachForm, lambert('#ffffff', { vertexColors: true }), 4000),
+    fenster: inst(box(0.785, 1, 0.785), new THREE.MeshBasicMaterial({ color: '#ffffff' }), 40000 + LAT_MAX),   // vorne die Laternenköpfe, dann Bänder, Schilder, Bildschirme, Handys
+    scheiben: inst(scheibenForm, new THREE.MeshBasicMaterial({ color: '#ffffff', vertexColors: true }), 20000),   // Fensterreihen je Geschoss
+    werkstatt: inst(werkstattForm, lambert('#ffffff', { vertexColors: true }), 3000),
+    schlot: inst(new THREE.CylinderGeometry(0.03, 0.042, 1, 6).translate(0, 0.5, 0), lambert('#ffffff'), 3000 + LAT_MAX),   // vorne die Laternenmasten
+    laden: inst(ladenForm, lambert('#ffffff', { vertexColors: true }), 3000),
+    ladenGlas: inst(ladenGlasForm, new THREE.MeshBasicMaterial({ color: '#ffffff' }), 3000),   // Schaufenster und Fenster der Läden
+    teil: inst(teilForm, lambert('#ffffff'), 12000),   // kleine Bauteile: Markisen, Theken, Türen, Dachaufbauten, Sprossen
     park: inst(box(0.96, 0.04, 0.96), lambert('#3e6b45'), 2000),
-    baum: inst(new THREE.ConeGeometry(0.17, 0.5, 6).translate(0, 0.25, 0), lambert('#2f5a3a'), 6000),
+    baum: inst(BAUM_GEO, lambert('#ffffff', { vertexColors: true }), 6000),   // Parks und Gärten
     bau: inst(box(0.8, 1, 0.8), lambert('#ffffff', { transparent: true, opacity: 0.42, depthWrite: false }), 3000),   // Gerüst
     kiste: inst(box(0.13, 0.11, 0.13), lambert('#ffffff'), 4000),   // Kistenstapel, Auslagen, getragene Kisten
     tech: inst(box(0.84, 1, 0.84), lambert('#ffffff'), 2000),     // Tech-Firma: Glasbau (Bildschirme und Handys liegen im Fenster-Mesh)
+    // Straßenraum (Deko, nicht klickbar): Gehwege und Markierung (Farbe je Instanz), Lichtflecken (nur nachts)
+    gehweg: inst(streifen, lambert('#ffffff'), 16000),
+    fleck: inst(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), fleckMaterial(), LAT_MAX),
   };
 
   const dummy = new THREE.Object3D();
   const farbe = new THREE.Color();
   // Zu jeder Instanz das Gebäude merken (für Klicks)
-  const IDS = { haus: new Int32Array(4000), dach: new Int32Array(4000), fenster: new Int32Array(40000),
-    werkstatt: new Int32Array(3000), schlot: new Int32Array(3000), laden: new Int32Array(3000), markise: new Int32Array(3000),
+  const IDS = { haus: new Int32Array(4000), dach: new Int32Array(4000), fenster: new Int32Array(40000 + LAT_MAX), scheiben: new Int32Array(20000),
+    werkstatt: new Int32Array(3000), schlot: new Int32Array(3000 + LAT_MAX), laden: new Int32Array(3000), ladenGlas: new Int32Array(3000), teil: new Int32Array(12000),
     bau: new Int32Array(3000), tech: new Int32Array(2000) };
   const H = Sim.KARTE / 2;
   const wx = (x) => x - H + 0.5;
@@ -3349,7 +3614,9 @@ function baueGrafik(THREE, OrbitControls) {
   const HAUSFARBEN = ['#d9cbb3', '#cfc2ae', '#e0d6c4', '#c9b8a0', '#d6c7b8', '#cbbfae'].map(c => new THREE.Color(c));
   const LADENFARBEN = ['#caa27a', '#9fb8ad', '#d1b48c', '#b5c4a8', '#c9a98f'].map(c => new THREE.Color(c));
   const MARKISEN = ['#c0584a', '#3f7f86', '#c89a3c', '#6f8f4e'].map(c => new THREE.Color(c));
-  const WERKSTATT = new THREE.Color('#7d8894');
+  const WERKSTATT = ['#7d8894', '#857b72', '#737d78'].map(c => new THREE.Color(c));   // Grau, graubraun, graugrün
+  const TUER = new THREE.Color('#4a3c33'), LUEFTER = new THREE.Color('#7b8087'), KAMIN = new THREE.Color('#6e5549');
+  const SCHLOT = new THREE.Color('#7a665b'), ANTENNE = new THREE.Color('#59616c');
   const LICHT = new THREE.Color('#ffc864'), GLAS_NACHT = new THREE.Color('#1b222c'), GLAS_TAG = new THREE.Color('#7f93a6');
   const GESCHOSS = 0.42, GESCHOSSE = [0, 2, 4, 7];
   const ROHBAU = new THREE.Color('#9b9da2'), GERUEST = new THREE.Color('#e0a040'), THEKE = new THREE.Color('#8a6646');
@@ -3364,6 +3631,16 @@ function baueGrafik(THREE, OrbitControls) {
   const HANDY_FARBE = new THREE.Color('#8fe6ff');
   const SCHIRM_MAX = 120, HANDY_MAX = 80;                 // hinten im Fenster-Mesh: Bildschirme (je Stunde), Handys (je Bild)
   let fensterStatisch = 0, schirme = 0, fensterVoll = false, handysVorher = 0;
+
+  // Bäume in der Stadt: Ton je Baum (über Stamm und Krone), Wuchs rund oder schlank; Plätze im Park
+  const PARK_PLATZ = [[-0.25, -0.2], [0.23, 0.04], [-0.06, 0.27], [0.2, -0.26]];
+  const BAUM_TON = [[1, 1, 1], [0.84, 0.97, 0.82], [1.12, 1.05, 0.76], [0.76, 0.85, 0.8], [1.02, 0.92, 0.7]].map(([r, g, b]) => new THREE.Color(r, g, b));
+  function baum(n, x, y, z, s, wuchs, ton) {
+    const schlank = wuchs < 0.25, sxz = schlank ? s * 0.72 : s;
+    if (!setze(M.baum, n, x, y, z, sxz, schlank ? s * 1.5 : s * (0.9 + 0.3 * wuchs), sxz, wuchs * 40)) return n;
+    M.baum.setColorAt(n, BAUM_TON[(ton * BAUM_TON.length) | 0]);
+    return n + 1;
+  }
   const fortschritt = (b) => { const ges = Sim.bauGesamt(S, b); return ges ? (ges - S.g.bauRest[b]) / ges : 1; };
   // Gerüst: bei Stillstand dunkler (je Tag ohne Bauarbeiter etwas mehr)
   function geruest(b, px, pz, sxz, hoehe, n) {
@@ -3375,6 +3652,13 @@ function baueGrafik(THREE, OrbitControls) {
   }
   // Richtung zur Straße als Einheitsvektor [dx, dz] und quer dazu
   function strassenSeite(x, y) { const [dx, dy] = RICHT[zurStrasse(x, y)]; return [dx, dy, -dy, dx]; }
+  // Kleines Bauteil an einem zur Straße (dx, dz) gedrehten Gebäude: lx quer, lz zur Straße hin
+  function bauteil(n, b, px, pz, dx, dz, lx, y, lz, sx, sy, sz, f) {
+    if (!setze(M.teil, n, px + lx * dz + lz * dx, y, pz - lx * dx + lz * dz, sx, sy, sz, Math.atan2(dx, dz))) return n;
+    M.teil.setColorAt(n, f);
+    IDS.teil[n] = b;
+    return n + 1;
+  }
 
   // Blickrichtung zur Straße (für Markisen): erste Nachbarzelle, die Straße ist
   const RICHT = [[0, 1], [1, 0], [0, -1], [-1, 0]];
@@ -3384,6 +3668,85 @@ function baueGrafik(THREE, OrbitControls) {
       if (S.feld[(y + dy) * Sim.KARTE + (x + dx)] === Sim.STRASSE) return i;
     }
     return 0;
+  }
+
+  // ─── Straßenraum: Gehwege mit Bordstein, Mittellinie, Zebrastreifen, Laternen. Nur neu, wenn Straßen dazukommen ───
+  const GEHWEG_F = new THREE.Color('#6f7279'), MARKE_F = new THREE.Color('#d6d1bd'), KOPF_TAG = new THREE.Color('#3b4048'), MAST_F = new THREE.Color('#59616c');
+  let laternen = 0;
+  const lampOrt = new Float32Array(LAT_MAX * 2), lampNachbar = new Int32Array(LAT_MAX * 8);   // Fleck-Mitte; Felder beiderseits der Straße
+  const istStrasse = (x, y) => x >= 0 && y >= 0 && x < Sim.KARTE && y < Sim.KARTE && S.feld[y * Sim.KARTE + x] === Sim.STRASSE;
+  // Gerades Stück: längs geht die Straße weiter, seitlich nicht. 1 = in x-Richtung, 2 = in z-Richtung, 0 = Kreuzung, Ecke, Ende
+  function gerade(x, y) {
+    if (!istStrasse(x, y)) return 0;
+    const lx = istStrasse(x + 1, y) && istStrasse(x - 1, y), lz = istStrasse(x, y + 1) && istStrasse(x, y - 1);
+    if (lx && !istStrasse(x, y + 1) && !istStrasse(x, y - 1)) return 1;
+    if (lz && !istStrasse(x + 1, y) && !istStrasse(x - 1, y)) return 2;
+    return 0;
+  }
+  // Flache Markierung, mittig bei x/z, längs der x- oder z-Achse
+  function marke(n, x, z, laenge, breite, inX) {
+    const ok = inX ? setze(M.gehweg, n, x, FAHRBAHN, z - breite / 2, laenge, MARKE, breite, 0)
+      : setze(M.gehweg, n, x + breite / 2, FAHRBAHN, z, laenge, MARKE, breite, -Math.PI / 2);
+    if (ok) M.gehweg.setColorAt(n++, MARKE_F);
+    return n;
+  }
+  function strassenraum() {
+    const K = Sim.KARTE;
+    let n = 0;
+    // Gehwege: je Seite durchgehende Streifen am Rand der Straßenfelder, wo daneben keine Straße liegt;
+    // an Kreuzungen um die Gehwegbreite in die Ecke verlängert, damit der Gehweg um den Block herumläuft
+    for (const [dx, dy] of RICHT) {
+      const inX = dy !== 0, rot = Math.atan2(-dx, -dy);      // lokal +z zeigt vom Rand zur Fahrbahnmitte
+      for (let l = 0; l < K; l++) {
+        let t0 = -1;
+        for (let t = 0; t <= K; t++) {
+          const x = inX ? t : l, y = inX ? l : t;
+          if (t < K && istStrasse(x, y) && !istStrasse(x + dx, y + dy)) { if (t0 < 0) t0 = t; continue; }
+          if (t0 < 0) continue;
+          const a = wx(t0) - 0.5 - (istStrasse(inX ? t0 - 1 : l, inX ? l : t0 - 1) ? GEHWEG : 0);
+          const b = wx(t) - 0.5 + (istStrasse(x, y) ? GEHWEG : 0), kante = wx(l) + (inX ? dy : dx) * 0.5;
+          if (setze(M.gehweg, n, inX ? (a + b) / 2 : kante, FAHRBAHN, inX ? kante : (a + b) / 2, b - a, BORD, GEHWEG, rot)) M.gehweg.setColorAt(n++, GEHWEG_F);
+          t0 = -1;
+        }
+      }
+    }
+    // Mittellinie: ein Strich je geradem Feld (nicht auf Kreuzungen); vor jeder Kreuzung ein Zebrastreifen auf jedem Arm
+    for (let y = 0; y < K; y++) for (let x = 0; x < K; x++) {
+      const g = gerade(x, y);
+      if (g) n = marke(n, wx(x), wx(y), 0.34, 0.03, g === 1);
+      if (!istStrasse(x, y) || istStrasse(x + 1, y) + istStrasse(x - 1, y) + istStrasse(x, y + 1) + istStrasse(x, y - 1) < 3) continue;
+      for (const [dx, dy] of RICHT) {
+        if (!gerade(x + dx, y + dy)) continue;
+        const inX = dx !== 0, mx = wx(x + dx) - dx * 0.35, mz = wx(y + dy) - dy * 0.35;
+        for (let k = -1.5; k <= 1.5; k++) n = marke(n, inX ? mx : mx + k * 0.13, inX ? mz + k * 0.13 : mz, 0.16, 0.07, inX);
+      }
+    }
+    fertig(M.gehweg, n);
+    // Laternen: an jeder zweiten Feldgrenze gerader Straßen, abwechselnd links und rechts an der Bordsteinkante,
+    // 0,3 neben der Straßenmitte. Abstand Mastachse zu Figuren: Wege (Mitte ±0,2) mindestens 0,1, Standplätze vor
+    // Gebäuden (0,32 neben der Mitte, QUER bis ±0,42) mindestens 0,082. Mast vorne im Schlot-, Kopf vorne im
+    // Fenster-Mesh (kein eigener Draw Call, nicht klickbar); stadt() fängt dort erst hinter den Laternen an
+    const feld = (a, c) => a >= 0 && c >= 0 && a < K && c < K ? c * K + a : -1;
+    let nl = 0;
+    for (let y = 0; y < K && nl < LAT_MAX; y++) for (let x = 0; x < K && nl < LAT_MAX; x++) {
+      const g = gerade(x, y), t = g === 1 ? x : y, l = g === 1 ? y : x;
+      if (!g || !(t & 1) || !(g === 1 ? istStrasse(x + 1, y) : istStrasse(x, y + 1))) continue;
+      const s = ((t >> 1) + (l >> 2)) & 1 ? 1 : -1;
+      const px = g === 1 ? wx(x) + 0.5 : wx(x) + s * 0.3, pz = g === 1 ? wx(y) + s * 0.3 : wx(y) + 0.5;
+      const kx = g === 1 ? 0 : -s, kz = g === 1 ? -s : 0;   // zur Fahrbahnmitte
+      setze(M.schlot, nl, px, FAHRBAHN + BORD, pz, 0.5, MAST_H, 0.5);   // Radius 0,015 bis 0,021
+      M.schlot.setColorAt(nl, MAST_F);
+      setze(M.fenster, nl, px + kx * 0.05, FAHRBAHN + BORD + MAST_H - 0.01, pz + kz * 0.05,   // Kopf 0,13 zur Fahrbahn, 0,06 längs
+        (kx ? 0.13 : 0.06) / 0.785, 0.03, (kz ? 0.13 : 0.06) / 0.785);
+      IDS.schlot[nl] = IDS.fenster[nl] = -1;
+      lampOrt[2 * nl] = px + kx * 0.06; lampOrt[2 * nl + 1] = pz + kz * 0.06;
+      for (let k = 0; k < 8; k++) {                        // beiderseits der Straße, längs von t-1 bis t+2
+        const a = (k >> 1) - 1, q = k & 1 ? 1 : -1;
+        lampNachbar[8 * nl + k] = g === 1 ? feld(x + a, y + q) : feld(x + q, y + a);
+      }
+      nl++;
+    }
+    laternen = nl;
   }
 
   // Welche Stockwerke leuchten? Nachts bewohnte, je nach Belegung; spät in der Nacht nur noch wenige.
@@ -3407,10 +3770,21 @@ function baueGrafik(THREE, OrbitControls) {
       let n = 0;
       for (let c = 0; c < F; c++) if (S.feld[c] === Sim.STRASSE) setze(M.strasse, n++, wx(c % K), 0.005, wx((c / K) | 0), 1, 1, 1);
       fertig(M.strasse, n);
+      strassenraum();
       strassenStand = S.stat.strassenFelder;
     }
     const nacht = tageszeit < 6.5 || tageszeit >= 18.5;
-    let nh = 0, nd = 0, nf = 0, nw = 0, ns = 0, nl = 0, nm = 0, np = 0, nb = 0, nbau = 0, nk = 0, nt = 0;
+    // Laternen: nachts warmer Kopf und Lichtfleck auf dem Boden, aber nur, wo in der Nähe an der Straße etwas gebaut ist
+    // (Licht zeigt Leben, leere Stichstraßen am Rand bleiben dunkel); tagsüber dunkler Kopf und kein Fleck
+    let nfl = 0;
+    for (let i = 0; i < laternen; i++) {
+      let an = false;
+      for (let k = 8 * i; nacht && !an && k < 8 * i + 8; k++) { const c = lampNachbar[k]; an = c >= 0 && S.feld[c] !== Sim.LEER && S.feld[c] !== Sim.STRASSE; }
+      M.fenster.setColorAt(i, an ? LICHT : KOPF_TAG);
+      if (an) setze(M.fleck, nfl++, lampOrt[2 * i], 0.05, lampOrt[2 * i + 1], FLECK, 1, FLECK);
+    }
+    fertig(M.fleck, nfl);
+    let nh = 0, nd = 0, nf = laternen, nw = 0, ns = laternen, nl = 0, nte = 0, np = 0, nb = 0, nbau = 0, nk = 0, nt = 0, nsch = 0, nlg = 0;
     const kisteMax = M.kiste.userData.kap - TRAG_MAX, fensterMax = M.fenster.userData.kap - SCHIRM_MAX - HANDY_MAX;
     const arbeitszeit = tageszeit >= 8 && tageszeit < 17;
     for (let b = 0; b < S.gAnzahl; b++) {
@@ -3418,12 +3792,12 @@ function baueGrafik(THREE, OrbitControls) {
       if (f === Sim.BAUSTELLE) {                          // Baustelle: grauer Rohbau wächst mit den Arbeitstagen, Gerüst in Zielhöhe
         const hoehe = t === Sim.WOHNHAUS ? GESCHOSSE[1] * GESCHOSS : t === Sim.PARK ? 0.12 : t === Sim.LADEN ? 0.55
           : t === Sim.TECH ? TECH_GESCHOSSE[1] * GESCHOSS : 0.7;
-        const k = Math.max(0.05, fortschritt(b));
+        const k = Math.max(0.05, fortschritt(b)), [dx, dz] = RICHT[zurStrasse(x, y)], w = Math.atan2(dx, dz);
         if (t === Sim.WOHNHAUS && setze(M.haus, nh, px, 0, pz, 1, hoehe * k, 1)) { IDS.haus[nh] = b; M.haus.setColorAt(nh++, ROHBAU); }
-        else if (t === Sim.LADEN && setze(M.laden, nl, px, 0, pz, 1, k, 1)) { IDS.laden[nl] = b; M.laden.setColorAt(nl++, ROHBAU); }
-        else if (t === Sim.WERKSTATT && setze(M.werkstatt, nw, px, 0, pz, 1, k, 1)) { IDS.werkstatt[nw] = b; M.werkstatt.setColorAt(nw++, ROHBAU); }
+        else if (t === Sim.LADEN && setze(M.laden, nl, px, 0, pz, 1, k, 1, w)) { IDS.laden[nl] = b; M.laden.setColorAt(nl++, ROHBAU); }
+        else if (t === Sim.WERKSTATT && setze(M.werkstatt, nw, px, 0, pz, 1, k, 1, w)) { IDS.werkstatt[nw] = b; M.werkstatt.setColorAt(nw++, ROHBAU); }
         else if (t === Sim.TECH && setze(M.tech, nt, px, 0, pz, 1, hoehe * k, 1)) { IDS.tech[nt] = b; M.tech.setColorAt(nt++, ROHBAU); }
-        nbau = geruest(b, px, pz, 1.14, hoehe + 0.04, nbau);
+        nbau = geruest(b, px, pz, 1.14, hoehe * (t === Sim.WOHNHAUS ? 1 + ATTIKA : 1) + 0.04, nbau);
         continue;
       }
       if (t === Sim.TECH) {                               // Glasbau: Geschosse je Stufe, Bildschirme leuchten, solange programmiert wird
@@ -3451,38 +3825,58 @@ function baueGrafik(THREE, OrbitControls) {
         if (nf < fensterMax && setze(M.fenster, nf, px + dx * 0.45, hoehe - 0.2, pz + dz * 0.45, 0.75, 0.15, 0.064, dx !== 0 ? Math.PI / 2 : 0)) {
           IDS.fenster[nf] = b; M.fenster.setColorAt(nf++, leer ? GLAS_NACHT : SCHILD[pr]);
         }
-        if (setze(M.schlot, ns, px - qx * 0.25 - dx * 0.2, hoehe, pz - qz * 0.25 - dz * 0.2, 0.35, 0.45 + 0.1 * g.stufe[b], 0.35)) IDS.schlot[ns++] = b;
+        if (setze(M.schlot, ns, px - qx * 0.25 - dx * 0.2, hoehe, pz - qz * 0.25 - dz * 0.2, 0.55, 0.45 + 0.1 * g.stufe[b], 0.55)) { IDS.schlot[ns] = b; M.schlot.setColorAt(ns++, ANTENNE); }
+        // Sprossen: dünne Stäbe quer durch den Glasbau, knapp vor den Bändern, vom untersten bis zum obersten Band.
+        // In Wandfarbe: vor der Wand verschwinden sie, im Glas teilen sie das Band in Scheiben.
+        farbe.copy(TECH_GLAS[pr]).multiplyScalar(leer ? 0.5 : 1);
+        for (const o of [-0.14, 0.14]) {
+          nte = bauteil(nte, b, px, pz, 0, 1, o, 0.1, 0, 0.016, hoehe - 0.2, 0.874, farbe);
+          nte = bauteil(nte, b, px, pz, 0, 1, 0, 0.1, o, 0.874, hoehe - 0.2, 0.016, farbe);
+        }
         continue;
       }
       if (t === Sim.WOHNHAUS) {
-        const stufe = g.stufe[b], geschosse = GESCHOSSE[stufe], hoehe = geschosse * GESCHOSS;
+        const stufe = g.stufe[b], geschosse = GESCHOSSE[stufe], hoehe = geschosse * GESCHOSS, oberkante = hoehe * (1 + ATTIKA);
         if (!setze(M.haus, nh, px, 0, pz, 1, hoehe, 1)) continue;
         IDS.haus[nh] = b;
-        M.haus.setColorAt(nh++, HAUSFARBEN[(hash(b) * HAUSFARBEN.length) | 0]);
-        if (stufe < 3 && !g.auf[b] && setze(M.dach, nd, px, hoehe, pz, 1, 1, 1)) IDS.dach[nd++] = b;
-        if (g.auf[b]) {                                   // Aufstockung: Rohbau obendrauf wächst, Gerüst bis zur neuen Höhe
-          const oben = (GESCHOSSE[g.auf[b]] - geschosse) * GESCHOSS * Math.max(0.05, fortschritt(b));
-          if (setze(M.haus, nh, px, hoehe, pz, 1, oben, 1)) { IDS.haus[nh] = b; M.haus.setColorAt(nh++, ROHBAU); }
-          nbau = geruest(b, px, pz, 1.12, GESCHOSSE[g.auf[b]] * GESCHOSS + 0.05, nbau);
+        const hf = HAUSFARBEN[(hash(b) * HAUSFARBEN.length) | 0];
+        M.haus.setColorAt(nh++, hf);
+        const [dx, dz] = RICHT[zurStrasse(x, y)];
+        nte = bauteil(nte, b, px, pz, dx, dz, 0, 0, A_HAUS + 0.01, 0.17, 0.25, 0.02, TUER);   // Haustür zur Straße, darüber die mittlere Scheibe als Oberlicht
+        if (!g.auf[b] && stufe === 1) {                   // Satteldach: meist Giebel zur Straße, manchmal die Traufe
+          const traufe = hash(b + 5) < 0.3;
+          if (setze(M.dach, nd, px, oberkante + 0.01, pz, 1, 1, 1, Math.atan2(dx, dz) + (traufe ? Math.PI / 2 : 0))) { IDS.dach[nd] = b; M.dach.setColorAt(nd++, hf); }
+          if (hash(b + 9) < 0.6) nte = bauteil(nte, b, px, pz, dx, dz, traufe ? 0.12 : 0.14, oberkante + 0.08, traufe ? -0.14 : -0.12, 0.06, 0.2, 0.06, KAMIN);
+        } else if (!g.auf[b]) {                           // Flachdach hinter der Attika: Treppenhaus in einer Ecke, Lüfter gegenüber
+          const ex = hash(b + 11) < 0.5 ? 1 : -1, ez = hash(b + 13) < 0.5 ? 1 : -1;
+          nte = bauteil(nte, b, px, pz, dx, dz, ex * 0.12, hoehe, ez * 0.1, 0.22, 0.2, 0.26, farbe.copy(hf).multiplyScalar(0.8));
+          nte = bauteil(nte, b, px, pz, dx, dz, -ex * 0.16, hoehe, -ez * 0.14, 0.11, 0.12, 0.11, LUEFTER);
+          if (stufe === 3 && hash(b + 17) < 0.6) nte = bauteil(nte, b, px, pz, dx, dz, -ex * 0.16, hoehe, ez * 0.13, 0.11, 0.12, 0.11, LUEFTER);
         }
-        // Fensterbänder je Stockwerk
+        if (g.auf[b]) {                                   // Aufstockung: Rohbau auf der Attika wächst, Gerüst bis zur neuen Höhe
+          const oben = (GESCHOSSE[g.auf[b]] - geschosse) * GESCHOSS * Math.max(0.05, fortschritt(b));
+          if (setze(M.haus, nh, px, oberkante, pz, 0.97, oben, 0.97)) { IDS.haus[nh] = b; M.haus.setColorAt(nh++, ROHBAU); }
+          nbau = geruest(b, px, pz, 1.12, GESCHOSSE[g.auf[b]] * GESCHOSS * (1 + ATTIKA) + 0.05, nbau);
+        }
+        // Fensterreihe je Stockwerk (jede Reihe etwas gedreht, damit die Helligkeit der Scheiben wechselt)
         const cap = Sim.R.WOHNUNGEN[stufe], belegt = g.belegt[b];
         const lit = nacht || tageszeit < 7.5 ? Math.ceil(geschosse * (belegt / cap) * lichtAnteil(tageszeit, b)) : 0;
         for (let s = 0; s < geschosse; s++) {
-          if (!setze(M.fenster, nf, px, s * GESCHOSS + 0.16, pz, 1, 0.13, 1)) break;
-          IDS.fenster[nf] = b;
-          M.fenster.setColorAt(nf++, s < lit ? LICHT : nacht ? GLAS_NACHT : GLAS_TAG);
+          if (!setze(M.scheiben, nsch, px, s * GESCHOSS + 0.1, pz, 1, 0.24, 1, ((hash(b * 8 + s) * 4) | 0) * Math.PI / 2)) break;
+          IDS.scheiben[nsch] = b;
+          M.scheiben.setColorAt(nsch++, s < lit ? LICHT : nacht ? GLAS_NACHT : GLAS_TAG);
         }
       } else if (t === Sim.WERKSTATT) {
-        const leer = g.leer[b];
-        farbe.copy(WERKSTATT).multiplyScalar(leer ? 0.55 : 1);
-        if (!setze(M.werkstatt, nw, px, 0, pz, 1, 1, 1)) continue;
+        const leer = g.leer[b], [dx, dz, qx, qz] = strassenSeite(x, y), w = Math.atan2(dx, dz);
+        farbe.copy(WERKSTATT[(hash(b) * WERKSTATT.length) | 0]).multiplyScalar(leer ? 0.55 : 1);
+        if (!setze(M.werkstatt, nw, px, 0, pz, 1, 1, 1, w)) continue;
         IDS.werkstatt[nw] = b;
         M.werkstatt.setColorAt(nw++, farbe);
-        if (setze(M.schlot, ns, px + 0.26, 0.7, pz - 0.26, 1, 0.55, 1)) IDS.schlot[ns++] = b;
-        if (!leer && !nacht && setze(M.fenster, nf, px, 0.28, pz, 1.1, 0.12, 1.1)) { IDS.fenster[nf] = b; M.fenster.setColorAt(nf++, GLAS_TAG); }
+        // schlanker Schlot hinten in der Ecke, kommt aus dem Sheddach
+        if (setze(M.schlot, ns, px - dx * 0.27 - qx * 0.28, 0.3, pz - dz * 0.27 - qz * 0.28, 1, 0.62, 1)) { IDS.schlot[ns] = b; M.schlot.setColorAt(ns++, SCHLOT); }
+        if (!leer && !nacht && setze(M.scheiben, nsch, px, 0.31, pz, 1.13, 0.1, 1.13, w)) { IDS.scheiben[nsch] = b; M.scheiben.setColorAt(nsch++, GLAS_TAG); }
         // Kistenstapel neben der Werkstatt: eine Kiste je 12 gemachte (gestern), höchstens 6
-        const n = leer ? 0 : Math.min(6, Math.ceil(g.kisten[b] / 12)), [dx, dz, qx, qz] = strassenSeite(x, y);
+        const n = leer ? 0 : Math.min(6, Math.ceil(g.kisten[b] / 12));
         for (let i = 0; i < n && nk < kisteMax; i++) {
           const c = i % 2, l = (i / 2) | 0;
           setze(M.kiste, nk, px + dx * 0.52 + qx * (0.3 + c * 0.15), l * 0.11, pz + dz * 0.52 + qz * (0.3 + c * 0.15), 1, 1, 1);
@@ -3490,39 +3884,49 @@ function baueGrafik(THREE, OrbitControls) {
         }
       } else if (t === Sim.LADEN) {
         const leer = g.leer[b], offen = !leer;
+        const r = zurStrasse(x, y), [dx, dy] = RICHT[r], w = Math.atan2(dx, dy);
         farbe.copy(LADENFARBEN[(hash(b) * LADENFARBEN.length) | 0]).multiplyScalar(leer ? 0.5 : 1);
-        if (!setze(M.laden, nl, px, 0, pz, 1, 1, 1)) continue;
+        if (!setze(M.laden, nl, px, 0, pz, 1, 1, 1, w)) continue;   // Tür zur Straße
         IDS.laden[nl] = b;
         M.laden.setColorAt(nl++, farbe);
-        const r = zurStrasse(x, y), [dx, dy] = RICHT[r];
-        setze(M.markise, nm, px + dx * 0.44, 0.42, pz + dy * 0.44, 1, 1, 1, dx !== 0 ? Math.PI / 2 : 0);
-        IDS.markise[nm] = b;
-        farbe.copy(MARKISEN[(hash(b + 3) * MARKISEN.length) | 0]).multiplyScalar(leer ? 0.45 : 1);
-        M.markise.setColorAt(nm++, farbe);
+        nte = bauteil(nte, b, px, pz, dx, dy, 0, 0.42, 0.44, 0.84, 0.05, 0.22, farbe.copy(MARKISEN[(hash(b + 3) * MARKISEN.length) | 0]).multiplyScalar(leer ? 0.45 : 1));
         // Theke vor dem Laden, solange jemand dort steht (8–17 Uhr); Auslage: braun = Kisten aus der Stadt, grau = von außen
-        if (offen && tageszeit >= 8 && tageszeit < 17 && Sim.theke(S, b) >= 0) {
-          setze(M.markise, nm, px + dx * 0.6, 0, pz + dy * 0.6, 0.55, 5, 1, dx !== 0 ? Math.PI / 2 : 0);
-          IDS.markise[nm] = b; M.markise.setColorAt(nm++, THEKE);
-        }
+        if (offen && tageszeit >= 8 && tageszeit < 17 && Sim.theke(S, b) >= 0) nte = bauteil(nte, b, px, pz, dx, dy, 0, 0, 0.6, 0.46, 0.25, 0.22, THEKE);
         const ks = g.kistenStadt[b], ka = g.kistenAussen[b], n = offen ? Math.min(4, Math.ceil((ks + ka) / 10)) : 0;
         const braun = ks + ka ? Math.round(n * ks / (ks + ka)) : 0;
-        for (let i = 0; i < n && nk < kisteMax; i++) {
-          setze(M.kiste, nk, px + dx * 0.6 - dy * (0.3 + ((i / 2) | 0) * 0.14) * (i % 2 ? -1 : 1), 0, pz + dy * 0.6 + dx * (0.3 + ((i / 2) | 0) * 0.14) * (i % 2 ? -1 : 1), 1, 1, 1);
+        for (let i = 0; i < n && nk < kisteMax; i++) {   // die Auslage steht ganz auf dem Gehweg
+          setze(M.kiste, nk, px + dx * 0.6 - dy * (0.3 + ((i / 2) | 0) * 0.14) * (i % 2 ? -1 : 1), FAHRBAHN + BORD, pz + dy * 0.6 + dx * (0.3 + ((i / 2) | 0) * 0.14) * (i % 2 ? -1 : 1), 1, 1, 1);
           M.kiste.setColorAt(nk++, i < braun ? KISTE_STADT : KISTE_AUSSEN);
         }
-        // Schaufenster: abends beleuchtet, solange der Laden offen ist
+        // Schaufenster zur Straße und Fenster rundum: abends beleuchtet, solange der Laden offen ist
         const lichtLaden = offen && tageszeit >= 17 && tageszeit < 22;
-        if (setze(M.fenster, nf, px, 0.12, pz, 1.03, 0.16, 1.03)) { IDS.fenster[nf] = b; M.fenster.setColorAt(nf++, lichtLaden ? LICHT : nacht ? GLAS_NACHT : GLAS_TAG); }
+        if (setze(M.ladenGlas, nlg, px, 0, pz, 1, 1, 1, w)) { IDS.ladenGlas[nlg] = b; M.ladenGlas.setColorAt(nlg++, lichtLaden ? LICHT : nacht ? GLAS_NACHT : GLAS_TAG); }
       } else if (t === Sim.PARK) {
         setze(M.park, np++, px, 0, pz, 1, 1, 1);
-        const h = hash(b);
-        setze(M.baum, nb++, px - 0.25, 0.04, pz - 0.2, 1, 0.9 + h * 0.4, 1);
-        setze(M.baum, nb++, px + 0.22, 0.04, pz + 0.05, 1, 1.1 - h * 0.3, 1);
-        setze(M.baum, nb++, px - 0.05, 0.04, pz + 0.27, 0.8, 0.8 + h * 0.3, 0.8);
+        // drei oder vier Bäume auf festen Plätzen, Wuchs und Ton je Park verschieden
+        const n = hash(b + 5) < 0.5 ? 4 : 3, dreh = (hash(b) * 4) | 0;
+        for (let i = 0; i < n; i++) {
+          const [ox, oz] = PARK_PLATZ[(i + dreh) % 4];
+          nb = baum(nb, px + ox, 0.04, pz + oz, 0.85 + 0.35 * zellHash(b, i, 11), zellHash(b, i, 12), zellHash(b, i, 13));
+        }
       }
     }
-    fertig(M.haus, nh); fertig(M.dach, nd); fertig(M.fenster, nf); fertig(M.werkstatt, nw); fertig(M.schlot, ns);
-    fertig(M.laden, nl); fertig(M.markise, nm); fertig(M.park, np); fertig(M.baum, nb); fertig(M.bau, nbau); fertig(M.tech, nt);
+    // Gärten: leere Felder neben Wohnhäusern bekommen nach Zellen-Hash einen oder zwei Bäume (stündlich neu, weil Felder bebaut werden)
+    const feld = S.feld, W = Sim.WOHNHAUS;
+    for (let c = 0; c < F; c++) {
+      if (feld[c] !== Sim.LEER) continue;
+      const x = c % K, y = (c / K) | 0;
+      if (!((x > 0 && feld[c - 1] === W) || (x < K - 1 && feld[c + 1] === W) || (y > 0 && feld[c - K] === W) || (y < K - 1 && feld[c + K] === W))) continue;
+      const h = zellHash(x, y, 21);
+      if (h > 0.6) continue;
+      const px = wx(x), pz = wx(y), sx = zellHash(x, y, 22) < 0.5 ? -1 : 1, sz = zellHash(x, y, 23) < 0.5 ? -1 : 1;
+      if (h < 0.2) {                                      // zwei Bäume über Eck
+        nb = baum(nb, px + sx * 0.2, 0, pz + sz * 0.2, 0.8 + 0.3 * zellHash(x, y, 24), zellHash(x, y, 25), zellHash(x, y, 26));
+        nb = baum(nb, px - sx * 0.2, 0, pz - sz * 0.18, 0.65 + 0.25 * zellHash(x, y, 27), zellHash(x, y, 28), zellHash(x, y, 29));
+      } else nb = baum(nb, px + sx * 0.22 * zellHash(x, y, 30), 0, pz + sz * 0.22 * zellHash(x, y, 31), 0.8 + 0.35 * zellHash(x, y, 24), zellHash(x, y, 25), zellHash(x, y, 26));
+    }
+    fertig(M.haus, nh); fertig(M.dach, nd); fertig(M.fenster, nf); fertig(M.scheiben, nsch); fertig(M.werkstatt, nw); fertig(M.schlot, ns);
+    fertig(M.laden, nl); fertig(M.ladenGlas, nlg); fertig(M.teil, nte); fertig(M.park, np); fertig(M.baum, nb); fertig(M.bau, nbau); fertig(M.tech, nt);
     // Fenster: dahinter kommen Bildschirme (figurenPlanen) und Handys (figurenBewegen); Klicks darauf treffen kein Gebäude
     fensterStatisch = nf; schirme = 0; fensterVoll = true;
     for (let i = nf; i < Math.min(M.fenster.userData.kap, nf + SCHIRM_MAX + HANDY_MAX); i++) IDS.fenster[i] = -1;
@@ -3543,7 +3947,8 @@ function baueGrafik(THREE, OrbitControls) {
   const NULL = new THREE.Matrix4().makeScale(0, 0, 0);
   const FIGFARBEN = ['#e6d3bd', '#c2d3e6', '#e6c2bd', '#c6e0c2', '#e6dcb8', '#b8d8d8', '#d8c2b0', '#aebfd8'].map(c => new THREE.Color(c));
   const ECKEN = [[-1, -1], [1, 1], [1, -1], [-1, 1]];
-  const QUER = [-0.3, 0.3, -0.15, 0.15, -0.45, 0.45, 0], QUER2 = [-0.3, 0.3, -0.2, 0.2, -0.1, 0.1, 0];
+  // Außen ±0,42 statt ±0,45: an der Feldgrenze steht vielleicht eine Laterne (Abstand zur Mastachse dann 0,082)
+  const QUER = [-0.3, 0.3, -0.15, 0.15, -0.42, 0.42, 0], QUER2 = [-0.3, 0.3, -0.2, 0.2, -0.1, 0.1, 0];
   const STEHEN_MAX = QUER.length + QUER2.length;            // mehr Leute stehen nicht vor einem Gebäude, der Rest ist drinnen
   const figuren = [];                                     // { p, gen, ort, route, start, dauer, versatz, ox, oz, haupt, werk, steht, sx, sz, traeger, hin }
   const figIds = new Int32Array(FIG_GES).fill(-1);
@@ -3809,8 +4214,8 @@ function baueGrafik(THREE, OrbitControls) {
 
   // ─── Klicken: Figur (in Bildschirmnähe) oder Gebäude ───
   const ray = new THREE.Raycaster(), zeiger = new THREE.Vector2(), treffer = [], v3 = new THREE.Vector3(), m4 = new THREE.Matrix4();
-  const KLICKBAR = [M.haus, M.dach, M.fenster, M.werkstatt, M.schlot, M.laden, M.markise, M.bau, M.tech];
-  const KLICK_IDS = [IDS.haus, IDS.dach, IDS.fenster, IDS.werkstatt, IDS.schlot, IDS.laden, IDS.markise, IDS.bau, IDS.tech];
+  const KLICKBAR = [M.haus, M.dach, M.fenster, M.scheiben, M.werkstatt, M.schlot, M.laden, M.ladenGlas, M.teil, M.bau, M.tech];
+  const KLICK_IDS = [IDS.haus, IDS.dach, IDS.fenster, IDS.scheiben, IDS.werkstatt, IDS.schlot, IDS.laden, IDS.ladenGlas, IDS.teil, IDS.bau, IDS.tech];
   function waehle(cx, cy) {
     const r = canvas.getBoundingClientRect();
     // Figuren sind klein: nimm die nächste sichtbare Figur im Umkreis von 16 Pixeln
@@ -3845,32 +4250,44 @@ function baueGrafik(THREE, OrbitControls) {
   });
 
   // Tag und Nacht aus der Spielzeit: Stützstellen, dazwischen weich überblenden
+  // Spalten: Stunde, Himmel am Horizont (= Nebel), Himmel oben, Licht, Sonne, Himmelslicht, Sterne und Mond
   const TAG = [
-    [0, '#0c1224', '#9db2e0', 0.9, 1.5],
-    [5, '#131a33', '#9db2e0', 0.85, 1.4],
-    [6.5, '#d7916b', '#ffb070', 1.3, 0.55],
-    [8.5, '#8fb7de', '#fff2dc', 2.4, 1.0],
-    [16.5, '#8fb7de', '#fff2dc', 2.4, 1.0],
-    [18.5, '#d98a62', '#ff9a5c', 1.3, 0.55],
-    [20, '#182040', '#9db2e0', 0.95, 1.5],
-    [24, '#0c1224', '#9db2e0', 0.9, 1.5],
-  ].map(([h, himmelF, lichtF, s, u]) => [h, new THREE.Color(himmelF), new THREE.Color(lichtF), s, u]);
+    [0, '#0c1224', '#04060d', '#9db2e0', 0.9, 1.5, 1],
+    [5, '#131a33', '#070a17', '#9db2e0', 0.85, 1.4, 0.8],
+    [6.5, '#d7916b', '#39497a', '#ffb070', 1.3, 0.55, 0],
+    [8.5, '#8fb7de', '#3d6aa6', '#fff2dc', 2.4, 1.0, 0],
+    [16.5, '#8fb7de', '#3d6aa6', '#fff2dc', 2.4, 1.0, 0],
+    [18.5, '#d98a62', '#33406d', '#ff9a5c', 1.3, 0.55, 0],
+    [20, '#182040', '#080b19', '#9db2e0', 0.95, 1.5, 0.75],
+    [24, '#0c1224', '#04060d', '#9db2e0', 0.9, 1.5, 1],
+  ].map(([h, himmelF, zenitF, lichtF, s, u, st]) => [h, new THREE.Color(himmelF), new THREE.Color(zenitF), new THREE.Color(lichtF), s, u, st]);
   const cA = new THREE.Color(), cB = new THREE.Color();
   function licht(t) {
     let i = 0;
     while (i < TAG.length - 2 && TAG[i + 1][0] <= t) i++;
     const a = TAG[i], b = TAG[i + 1], k = (t - a[0]) / (b[0] - a[0]);
     cA.lerpColors(a[1], b[1], k);
-    scene.background.copy(cA); scene.fog.color.copy(cA);
-    cB.lerpColors(a[2], b[2], k);
+    scene.background.copy(cA); scene.fog.color.copy(cA); himmelU.horizont.value.copy(cA);
+    himmelU.zenit.value.lerpColors(a[2], b[2], k);
+    cB.lerpColors(a[3], b[3], k);
     sonne.color.copy(cB);
-    sonne.intensity = a[3] + (b[3] - a[3]) * k;
-    himmel.intensity = a[4] + (b[4] - a[4]) * k;
+    sonne.intensity = a[4] + (b[4] - a[4]) * k;
+    himmel.intensity = a[5] + (b[5] - a[5]) * k;
     // Sonne zieht von Ost nach West; nachts steht der Mond gegenüber
     const tag = t >= 6 && t <= 18;
     const w = tag ? ((t - 6) / 12) * Math.PI : (((t + 6) % 24) / 12) * Math.PI;
     sonne.position.set(Math.cos(w) * 70, Math.max(12, Math.sin(w) * 80), 35);
     gegen.position.set(-sonne.position.x, 40, -sonne.position.z);
+    // Himmel: Glanz in Richtung Sonne bzw. Mond, nachts Mondscheibe und Sterne (unsichtbar = kein Draw Call)
+    const st = a[6] + (b[6] - a[6]) * k, sp = sonne.position;
+    himmelU.richt.value.copy(sp).normalize();
+    himmelU.glanzFarbe.value.copy(cB);
+    himmelU.glanz.value = 0.16 - 0.1 * st;
+    himmelU.mond.value = st;
+    // Mond in der Richtung des Lichts, aber knapp über dem Horizont (Mitte 0,75°): höher sieht ihn die Kamera nie
+    himmelU.mondRicht.value.set(sp.x, Math.hypot(sp.x, sp.z) * 0.0131, sp.z).normalize();
+    sterne.material.opacity = st * st;                   // erst richtig dunkel, dann Sterne
+    sterneAn = st > 0.1;
   }
 
   // Startblick: Mitte und Ausdehnung der Bebauung (einmalig, keine Kamerafahrt)
@@ -3903,7 +4320,14 @@ function baueGrafik(THREE, OrbitControls) {
     neueStadt() { strassenStand = -1; wege.clear(); rundwege.clear(); werkTag = -1; for (const f of figuren) { f.p = -1; f.werk = false; } ausrichten(); stadt(S.stunde); },   // nach einem Import
     figurenPlanen, figurenBewegen,
     setzeHauptfiguren(ids) { hauptIds = ids.slice(0, HAUPT_MAX); },
-    render() { controls.update(); renderer.render(scene, camera); kisteVoll = false; fensterVoll = false; return renderer.info.render; },
+    render() {
+      controls.update();
+      // Himmel nur, wenn der obere Bildrand über die Unterkante der Kuppel reicht (im üblichen Blick von oben: nie)
+      const himmelDa = controls.getPolarAngle() + camera.fov * Math.PI / 360 > Math.PI / 2 - HIMMEL_UNTER - 0.02;
+      kuppel.visible = himmelDa; sterne.visible = himmelDa && sterneAn;
+      kuppel.position.copy(camera.position); sterne.position.copy(camera.position);
+      renderer.render(scene, camera); kisteVoll = false; fensterVoll = false; return renderer.info.render;
+    },
     instanzen() { return Object.values(M).reduce((s, m) => s + m.count, 0); },
     THREE, renderer, scene, camera, controls, M, figMesh,
     test: { figuren, figIds, simOrt, beiDerArbeit, WERK_MAX, FIG_MAX,   // nur für die Figuren-Prüfung (Playwright)
