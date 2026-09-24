@@ -88,6 +88,20 @@ Haus leicht verschieden warm. Die Oberfläche hat Symbole im Kennzahlen-Panel, S
 Stadtbuch-Eintrag. Die Karten haben einen klareren Kopf. Auf dem Handy ist das Stadtbuch eingeklappt und zeigt, wie viele
 Einträge neu sind. Bei reduzierter Bewegung steht der Rauch still, und es gibt keine Wolkenschatten.
 
+**Design-Runde 3.**
+- Parks haben helle Wege, entweder als Kreuz mit Platz oder als Bogen, dazu Bänke und Beete. Manche haben einen Brunnen oder
+  einen Teich mit Schilf.
+- Gärten sind mit niedrigen Hecken eingefasst.
+- Leere Felder zwischen Häusern bekommen Büsche und hohes Gras.
+- Die Leute sind kleine Figuren mit Beinen, Rumpf und Kopf statt Kapseln. Beim Gehen wippen sie leicht, bei reduzierter
+  Bewegung nicht.
+- Bauarbeiter tragen einen Helm.
+- Hauptfiguren haben eine ruhigere goldene Raute.
+- Der Startblick berücksichtigt die Panels, auf dem Handy liegt die Stadt zwischen ihnen.
+- Das aktive Tempo ist getönt statt voll gelb.
+- Das Stadtbuch zeigt das Symbol in der Tageszeile, dadurch hat der Text die volle Breite.
+- Auf Tablets und quergehaltenen Handys liegen Karten und Spalten so, dass die Kennzahlen frei bleiben.
+
 In der 3D-Ansicht wächst auf jeder Baustelle ein grauer Rohbau mit den geschafften Arbeitstagen. Das Gerüst wird dunkler,
 solange niemand kommt, und lässt sich anklicken. Bauarbeiter (orange) stehen an den Ecken ihrer Baustelle, Handwerker
 (blau) vor der Werkstatt. An Werkstätten stehen Kistenstapel, vor Läden eine Theke und eine Auslage (braun: Kisten aus der
@@ -279,9 +293,9 @@ Figuren bei der Arbeit): JavaScript pro Bild 7,5–11,1 ms mit KI und 7,5–8,9 
 Unterschied ist im Messrauschen nicht zu sehen; das Bildtempo begrenzt hier die Software-Grafik.
 
 **60 Bilder pro Sekunde sind nicht gemessen.** Im Container rendert Chromium ohne Grafikkarte (SwiftShader) mit etwa
-10 fps. Gemessen sind Draw Calls, Dreiecke und die Rechenzeit pro Bild in JavaScript. Nach der Design-Runde 2: Teststadt
-(Seed 2, Tag 400) 19–21 Draw Calls, etwa 40.000 Dreiecke; große Stadt (`?debug&umland=300000&tage=750&seed=2`, 5.894
-Einwohner) 20–22 Draw Calls, etwa 130.000 Dreiecke (nach Runde 1: 165.000–172.000, davor 102.742), 3–12 ms JavaScript pro
+10 fps. Gemessen sind Draw Calls, Dreiecke und die Rechenzeit pro Bild in JavaScript. Nach der Design-Runde 3: Teststadt
+(Seed 2, Tag 400) 22–24 Draw Calls, etwa 42.000 Dreiecke; große Stadt (`?debug&umland=300000&tage=750&seed=2`, 5.894
+Einwohner) 23–25 Draw Calls, etwa 137.000 Dreiecke (nach Runde 1: 165.000–172.000, davor 102.742), 5–12 ms JavaScript pro
 Bild, Konsole leer. Die Spec verlangt unter 100 Draw Calls; für Dreiecke gibt sie keine Grenze.
 
 **Fensterreihen mit Alpha-to-Coverage sind auf echter Grafikhardware ungeprüft.** Seit Runde 2 ist jede Fensterreihe ein

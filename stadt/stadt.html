@@ -9,7 +9,10 @@
      CSS-Namen, die nicht in der Spec stehen, auf MDN nachgeschlagen (23.09.2026): backdrop-filter mit blur() und
      saturate(), svh, clamp(), width: fit-content, overflow-wrap: anywhere.
      Neu in der Design-Runde 2 (verbreitet, nicht erneut nachgeschlagen): position: sticky, clip-path: inset(), SVG <symbol> mit <use href>,
-     scroll-padding, SVG <title> als Hinweis beim Überfahren. */
+     scroll-padding, SVG <title> als Hinweis beim Überfahren.
+     Neu in Oberfläche 2 (verbreitet, nicht nachgeschlagen): @media mit orientation und Listen (Komma = oder), min() in max-height,
+     margin: 0 auto zum Mitteln eines festen Elements mit left: 0 und right: 0; im Skript RegExp \p{L} mit u-Flag.
+     Nachbesserung (ebenso): orientation: portrait, outline-color, @supports innerhalb von @media, style.height im Skript. */
   :root {
     --grund: #0b0d12;
     --ebene1: #12151c;
@@ -21,7 +24,9 @@
     --text-leise: #a3a3ae;
     --akzent: #ffc864;
     --akzent-leise: rgba(255, 200, 100, 0.16);
-    --akzent-auf: #1d1606;                                 /* Text auf vollem Akzent (aktives Tempo): 11,7:1 */
+    --akzent-flaeche: rgba(255, 200, 100, 0.12);           /* aktives Tempo: Akzent-Text darauf ≥ 4,5:1 auch mit Weiß hinter dem Glas
+                                                              (mit --akzent-leise nicht mehr: gerechnet 4,45:1) */
+    --akzent-auf: #1d1606;                                 /* Text auf vollem Akzent (markierte Hauptfigur): 11,7:1 */
     --gut: #8fd4a8;
     --schlecht: #f2998a;
     --schlecht-leise: rgba(242, 153, 138, 0.14);
@@ -50,6 +55,8 @@
     --gross: clamp(1.15rem, 1.05rem + 0.4vw, 1.4rem);
     --dauer: 150ms;                                        /* Hover und Zustandswechsel: ruhig */
     --karte-oben: 222px;                                   /* Personenkarte unter den Kennzahlen */
+    --rechts-breite: 360px;                                /* rechte Spalte; mittlere Breite: auch die Karte darüber */
+    --rechts-hoehe: calc(100svh - 84px);                   /* endet 8 px über dem Einstellungs-Knopf */
     --schrift: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   }
   *, *::before, *::after { box-sizing: border-box; }
@@ -92,18 +99,20 @@
   #kennzahlen dd { margin: 0; color: var(--text-stark); font-weight: 500; }
   #kennzahlen .einheit { color: var(--text-leise); font-weight: 400; }
 
-  /* Tempo unten mittig: aktives Tempo voll im Akzent. Schriftstärke in jedem Zustand gleich (500), sonst springt die Leiste */
+  /* Tempo unten mittig: aktives Tempo getönt mit Akzent-Rand und Akzent-Text (keine volle Fläche: nachts sonst das Hellste im Bild).
+     Schriftstärke in jedem Zustand gleich (500), sonst springt die Leiste */
   #tempo { position: fixed; left: 50%; bottom: var(--s4); transform: translateX(-50%); display: flex; gap: 4px; padding: var(--s1); }
   #tempo button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 60px; height: 38px; padding: 0 var(--s3);
     background: transparent; border: 0; border-radius: 10px; cursor: pointer; color: var(--text-leise); font-weight: 500;
-    font-variant-numeric: tabular-nums; transition: background-color var(--dauer) ease-out, color var(--dauer) ease-out; }
+    font-variant-numeric: tabular-nums; transition: background-color var(--dauer) ease-out, color var(--dauer) ease-out, box-shadow var(--dauer) ease-out; }
   #tempo button .sym { width: 14px; height: 14px; stroke-width: 2.6; }
   #tempo button:hover { background: var(--hell-3); color: var(--text-stark); }
-  #tempo button[aria-pressed="true"] { background: var(--akzent); color: var(--akzent-auf); }
+  #tempo button[aria-pressed="true"] { background: var(--akzent-flaeche); color: var(--akzent); box-shadow: inset 0 0 0 1.5px var(--akzent); }
+  #tempo button:focus-visible { outline-color: var(--text-leise); }   /* Fokus neutral und leiser: ein Ring im Akzent sähe aus wie das aktive Tempo */
 
   /* Rechte Spalte: Hauptfiguren oben, darunter das Stadtbuch (einklappbar) */
-  #rechts { position: fixed; top: var(--s4); right: var(--s4); width: min(360px, calc(100vw - 2 * var(--s4)));
-    max-height: calc(100svh - 120px); display: flex; flex-direction: column; gap: var(--s2); }
+  #rechts { position: fixed; top: var(--s4); right: var(--s4); width: min(var(--rechts-breite), calc(100vw - 2 * var(--s4)));
+    max-height: var(--rechts-hoehe); display: flex; flex-direction: column; gap: var(--s2); }
   #stadtbuch { min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
   #haupt { flex: none; padding: var(--s2) 0; }
   #haupt .kopfzeile { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s3); padding: var(--s1) var(--s4) 6px; }
@@ -141,14 +150,14 @@
     font-weight: 500; line-height: 1.6; font-variant-numeric: tabular-nums; }
   #buch-liste { list-style: none; margin: 0; padding: 0 var(--s4) var(--s1); overflow-y: auto; font-size: var(--klein);
     border-top: 1px solid var(--linie); scroll-padding: 6px 0; }   /* beim Tabben scrollt die Liste so weit, dass der Fokusring ganz zu sehen ist */
-  /* Einträge im Stadtbuch und in „Während du weg warst“: Symbol nach Art, daneben Tag und Text */
-  .eintrag { display: grid; grid-template-columns: 20px minmax(0, 1fr); column-gap: 10px; align-items: start; }
+  /* Einträge im Stadtbuch und in „Während du weg warst“: oben eine Zeile mit Symbol, Tag und Art, darunter der Text in voller Breite */
   #buch-liste li { padding: var(--s2) 0; border-bottom: 1px solid var(--hell-1); line-height: 1.45; }
   #buch-liste li:last-child { border-bottom: 0; }
-  .art-sym { width: 20px; height: 20px; padding: 3px; border-radius: 6px; stroke-width: 2; background: var(--hell-3); color: var(--text-leise); }
+  .art-sym { width: 18px; height: 18px; padding: 2px; border-radius: 5px; stroke-width: 2; background: var(--hell-3); color: var(--text-leise); }
   .eintrag.wichtig .art-sym { background: var(--akzent-leise); color: var(--akzent); }
   .eintrag.verlust .art-sym { background: var(--schlecht-leise); color: var(--schlecht); }
-  .eintrag .tag { display: block; color: var(--text-leise); font-variant-numeric: tabular-nums; font-size: 0.92em; }
+  .eintrag .tag { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; color: var(--text-leise); font-variant-numeric: tabular-nums;
+    font-size: 0.92em; line-height: 1.3; }
   #buch-liste li.neu { animation: rein 400ms cubic-bezier(.2,.8,.2,1); }
   @keyframes rein { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
   .name { color: var(--text-stark); }
@@ -156,6 +165,7 @@
     text-decoration-color: var(--akzent-linie); text-underline-offset: 2px; transition: color var(--dauer) ease-out; }
   button.name:hover { color: var(--akzent); }
   button.name.weg { color: var(--text-leise); text-decoration-style: dotted; }
+  .zusammen { white-space: nowrap; }                      /* Name und Satzzeichen dahinter: kein Umbruch vor dem Komma */
 
   /* Hinweis, wenn 3D fehlt */
   .hinweis { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: min(46ch, calc(100vw - 32px)); padding: var(--s5);
@@ -291,11 +301,13 @@
   #meldung.fehler { border-color: var(--schlecht-rand); color: var(--schlecht); }
   #meldung.warnung { border-color: var(--akzent-rand); color: var(--akzent); }
   body.debug #karte { max-height: calc(100svh - var(--karte-oben) - 152px); }   /* nicht über den Debug-Knöpfen */
-  #debug-knoepfe { position: fixed; left: var(--s4); bottom: 112px; display: flex; gap: var(--s1); font-size: 12px; }
+  #debug-knoepfe { position: fixed; left: var(--s4); bottom: 112px; display: flex; align-items: center; gap: var(--s1); font-size: 12px;
+    padding: var(--s1) var(--s1) var(--s1) var(--s2); background: var(--debug); border: 1px solid var(--linie); border-radius: 10px; }
   #debug-knoepfe .knopf { padding: 4px 8px; font-size: 12px; }
+  .debug-titel { color: var(--text-leise); }
 
-  /* Schmal (Handy): Zahlen kompakt oben links, Einstellungen oben rechts, unten Hauptfiguren und eingeklapptes Stadtbuch über dem Tempo */
-  @media (max-width: 720px) {
+  /* Klein (Handy hochkant und quer): Zahlen kompakt, Hauptfiguren nur als Kreise */
+  @media (max-width: 720px), (max-height: 500px) and (orientation: landscape) {
     #kennzahlen { top: var(--s3); left: var(--s3); min-width: 0; padding: var(--s2) var(--s3); }
     #kennzahlen .zeit { padding-bottom: 6px; margin-bottom: 6px; gap: var(--s3); }
     .tag-anzeige, .uhr { font-size: 1.05rem; }
@@ -303,9 +315,7 @@
     #kennzahlen dl { gap: 1px; }
     #kennzahlen dl div { gap: var(--s3); }
     #kennzahlen .einheit { display: none; }                 /* „Taler“ macht die Zahlen hier am breitesten; auf den Karten steht es */
-    #einst-knopf { top: var(--s3); right: var(--s3); bottom: auto; }
     #tempo { bottom: var(--s3); }
-    #rechts { top: auto; right: var(--s3); bottom: 70px; width: calc(100vw - 2 * var(--s3)); max-height: 46svh; }
     #haupt { padding: var(--s1) 0 6px; }
     #haupt .kopfzeile { padding: var(--s1) var(--s3) 2px; }
     #haupt-liste { display: flex; gap: var(--s1); overflow-x: auto; padding: 2px var(--s2); }
@@ -314,12 +324,74 @@
     .haupt-zeile .gedanke { display: none; }
     #buch-knopf { padding: 10px var(--s3); }
     #buch-liste { padding: 0 var(--s3) var(--s1); }
-    #karte { top: auto; left: var(--s2); right: var(--s2); width: auto; bottom: 70px; max-height: 60svh; z-index: 5; }
+  }
+  /* Schmal (Handy hochkant): Einstellungen oben rechts, unten Hauptfiguren und eingeklapptes Stadtbuch über dem Tempo.
+     Karten liegen unten über dem Tempo, höchstens bis unter die Zahlen, und scrollen in sich */
+  @media (max-width: 720px) {
+    :root { --karte-oben: 172px; }                          /* Zahlen enden hier bei gut 160 px */
+    #einst-knopf { top: var(--s3); right: var(--s3); bottom: auto; }
+    #rechts { top: auto; right: var(--s3); bottom: 70px; width: calc(100vw - 2 * var(--s3)); max-height: 46svh; }
+    #karte { top: auto; left: var(--s2); right: var(--s2); width: auto; bottom: 70px; z-index: 5; }
+    #karte, body.debug #karte { max-height: min(60svh, calc(100svh - 70px - var(--karte-oben))); }
     body.karte-offen #rechts { visibility: hidden; }        /* liegt unter der Karte: sonst landet der Tab-Fokus unsichtbar dort */
-    body.debug #karte { max-height: 60svh; }
     #karte .kopf { margin: 0 calc(-1 * var(--s4)); }
     #debug { top: 172px; bottom: auto; left: var(--s3); right: var(--s3); font-size: 9px; overflow: hidden; }
     #debug-knoepfe { top: 256px; bottom: auto; left: var(--s3); }
+    body.karte-offen #debug, body.karte-offen #debug-knoepfe { visibility: hidden; }   /* unter der Karte: kein Tab-Fokus dorthin */
+  }
+  /* Bis gut 1040 px reicht das Tempo waagrecht unter die rechte Spalte: dort endet die Spalte über dem Tempo */
+  @media (min-width: 721px) and (max-width: 1060px) { :root { --rechts-hoehe: calc(100svh - 120px); } }
+  /* Tablet: rechte Spalte schmaler, Stadtbuch startet eingeklappt (Skript) */
+  @media (min-width: 721px) and (max-width: 900px) { :root { --rechts-breite: 320px; } }
+  /* Tablet hochkant: Karten als Blatt unten über dem Tempo, gut ein Drittel hoch. Der Startblick rückt die Stadt dafür nach
+     oben (freiFlaeche im Skript): so bleibt bei offener Karte der größere Teil der Stadt frei */
+  @media (min-width: 721px) and (max-width: 900px) and (orientation: portrait) {
+    :root { --blatt: min(36svh, calc(100svh - 356px)); }   /* oben frühestens bei 280 px, unter Zahlen und Hauptfiguren */
+    #karte { top: auto; left: 0; right: 0; bottom: 76px; margin: 0 auto; width: min(640px, calc(100vw - 2 * var(--s4))); z-index: 5; }
+    #karte, body.debug #karte { max-height: var(--blatt); }
+    body.karte-offen #rechts { max-height: calc(100svh - 76px - var(--blatt) - 2 * var(--s4)); }   /* aufgeklapptes Stadtbuch endet über dem Blatt */
+    body.karte-offen #debug, body.karte-offen #debug-knoepfe { visibility: hidden; }
+  }
+  /* Mittlere Breite (Tablet quer, kleine Laptops, große Tablets hochkant): Karten liegen rechts über Hauptfiguren und Stadtbuch.
+     Für eine dritte Spalte zwischen Zahlen und Spalte fehlt hier der Platz; so bleibt die Stadt bei offener Karte frei */
+  @media (min-width: 721px) and (max-width: 1279px) and (orientation: landscape) and (min-height: 501px),
+         (min-width: 901px) and (max-width: 1279px) and (orientation: portrait) {
+    #karte, body.debug #karte { top: var(--s4); left: auto; right: var(--s4); width: var(--rechts-breite); max-height: var(--rechts-hoehe); }
+    body.karte-offen #rechts { visibility: hidden; }        /* liegt unter der Karte: kein Tab-Fokus dorthin */
+  }
+  /* Debug (nur mit ?debug): bis gut 1240 px reichte die Anzeige unten links unter das Tempo, hier steht sie darüber */
+  @media (min-width: 721px) and (max-width: 1247px) { #debug { bottom: 72px; } #debug-knoepfe { bottom: 178px; } }
+  /* Quer und niedrig (Handy quer): links eine Spalte mit den Zahlen oben und Hauptfiguren samt Stadtbuch unten, daneben die Stadt,
+     Tempo mittig zwischen Spalte und Einstellungs-Knopf. Die Liste des aufgeklappten Stadtbuchs und Karten liegen rechts über der
+     Stadt (unter den Zahlen ist dafür kein Platz); der Kopf des Stadtbuchs bleibt links an seinem Platz */
+  @media (max-height: 500px) and (orientation: landscape) {
+    :root { --spalte: 200px; --rechts-unten: 72px; }      /* über dem Tempo */
+    #tempo { left: calc(50% + (var(--spalte) - 44px) / 2); }   /* 44 px: Einstellungs-Knopf */
+    #tempo button { min-width: 52px; }
+    #einst-knopf { top: auto; right: var(--s3); bottom: var(--s3); }
+    #rechts { top: auto; left: var(--s3); right: auto; bottom: var(--s3); width: var(--spalte); max-height: calc(100svh - 2 * var(--s3)); }
+    #haupt .kopfzeile { flex-wrap: wrap; row-gap: 0; }
+    body.buch-offen #stadtbuch { backdrop-filter: none; -webkit-backdrop-filter: none; }   /* sonst Bezugsrahmen der festen Liste */
+    body.buch-offen #buch-liste { position: fixed; top: var(--s3); right: var(--s3); bottom: var(--rechts-unten);
+      width: min(360px, calc(100vw - var(--spalte) - 3 * var(--s3))); padding: var(--s1) var(--s3);
+      background: var(--glas); backdrop-filter: blur(18px) saturate(150%); -webkit-backdrop-filter: blur(18px) saturate(150%);
+      border: 1px solid var(--linie); border-radius: var(--r); box-shadow: inset 0 1px 0 var(--hell-2); }
+    @supports not (backdrop-filter: blur(1px)) { body.buch-offen #buch-liste { background: var(--glas-fallback); } }
+    #karte { top: auto; left: auto; right: var(--s3); bottom: var(--rechts-unten); margin: 0; width: min(380px, calc(100vw - var(--spalte) - 3 * var(--s3))); }
+    #karte, body.debug #karte { max-height: calc(100svh - var(--rechts-unten) - var(--s3)); }
+    body.karte-offen #rechts { visibility: visible; max-height: calc(100svh - 2 * var(--s3)); }   /* die Karte liegt rechts, die Spalte bleibt */
+    body.karte-offen #buch-liste { visibility: hidden; }    /* liegt unter der Karte */
+    #debug { top: var(--s3); bottom: auto; left: calc(var(--spalte) + 2 * var(--s3)); right: var(--s3); font-size: 9px; overflow: hidden; }
+    #debug-knoepfe { top: 92px; bottom: auto; left: calc(var(--spalte) + 2 * var(--s3)); }
+    body.karte-offen #debug, body.karte-offen #debug-knoepfe, body.buch-offen #debug, body.buch-offen #debug-knoepfe { visibility: hidden; }
+  }
+  /* Sehr klein (568 × 320): Tempo schmaler; Zahlen, Hauptfiguren und Stadtbuch-Kopf enger, damit der KI-Status ganz in eine
+     zweite Zeile passt (einzeilig wäre er abgeschnitten) */
+  @media (max-height: 340px) and (orientation: landscape) {
+    #tempo button { min-width: 44px; padding: 0 10px; }
+    #kennzahlen dl { line-height: 1.35; }
+    #haupt { padding: 2px 0 4px; }
+    #buch-knopf { padding: 6px var(--s3); }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important;
@@ -421,7 +493,7 @@
 
 <div id="debug" hidden></div>
 <div id="debug-knoepfe" hidden>
-  <span style="align-self:center;color:var(--text-leise)">Zeit vorspulen:</span>
+  <span class="debug-titel">Zeit vorspulen:</span>
   <button type="button" class="knopf" data-vorspulen="12">12 h</button>
   <button type="button" class="knopf" data-vorspulen="36">36 h</button>
   <button type="button" class="knopf" data-vorspulen="120">5 Tage</button>
@@ -3793,6 +3865,46 @@ function baueGrafik(THREE, OrbitControls) {
     flaeche([ecke(0.03, 1, 0), ecke(0.03, 1, 1), ecke(0.03, 1, 2), ecke(0.03, 1, 3)], grau(1));
     flaeche([ecke(0.03, 1, 0), ecke(0.03, 1, 3), ecke(0.03, 1, 4)], grau(1));
   });
+  // Busch: fünfeckige Kuppel ohne Boden (15 Dreiecke), Radius 0,5, Höhe 1; der untere Ring etwas dunkler
+  const buschForm = form((flaeche) => {
+    const ring = (r, y, i) => [r * Math.sin(i * Math.PI * 0.4), y, r * Math.cos(i * Math.PI * 0.4)];
+    for (let i = 0; i < 5; i++) {
+      flaeche([ring(0.5, 0, i), ring(0.5, 0, i + 1), ring(0.42, 0.55, i + 0.5)], grau(0.78));
+      flaeche([ring(0.42, 0.55, i - 0.5), ring(0.5, 0, i), ring(0.42, 0.55, i + 0.5)], grau(0.88));
+      flaeche([ring(0.42, 0.55, i - 0.5), ring(0.42, 0.55, i + 0.5), [0, 1, 0]], grau(1));
+    }
+  });
+  // Grasbüschel: vier Halme, schräg nach außen (Spitzen bei Radius 0,5, Höhe bis 1), je zwei Dreiecke Rücken an Rücken
+  // (8 Dreiecke); unten dunkel, zur Spitze hell. Normalen halb nach oben: beide Seiten etwa so hell wie der Boden
+  const grasForm = new THREE.BufferGeometry();
+  {
+    const pos = [], col = [], nor = [], HALM = [1, 0.7, 0.88, 0.62];
+    for (let i = 0; i < 4; i++) {
+      const w = i * Math.PI / 2 + 0.4 * Math.sin(i * 2.3), s = Math.sin(w), c = Math.cos(w);
+      const a = [0.12 * s - 0.1 * c, 0, 0.12 * c + 0.1 * s], b = [0.12 * s + 0.1 * c, 0, 0.12 * c - 0.1 * s], t = [0.5 * s, HALM[i], 0.5 * c];
+      const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = t[0] - a[0], vy = t[1] - a[1], vz = t[2] - a[2];
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, l = Math.hypot(nx, ny, nz) * 2;
+      for (const k of [1, -1]) {                          // Vorder- und Rückseite
+        pos.push(...a, ...(k > 0 ? b : t), ...(k > 0 ? t : b));
+        const mx = k * nx / l, my = k * ny / l + 1, mz = k * nz / l, ml = Math.hypot(mx, my, mz);
+        for (let j = 0; j < 3; j++) nor.push(mx / ml, my / ml, mz / ml);
+        col.push(0.55, 0.55, 0.55, ...(k > 0 ? [0.55, 0.55, 0.55, 1, 1, 1] : [1, 1, 1, 0.55, 0.55, 0.55]));
+      }
+    }
+    grasForm.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    grasForm.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    grasForm.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  }
+  // Belag: flaches Achteck mit geraden Seiten bei ±0,5 (6 Dreiecke, Oberseite nach oben): Platz, Teich, Brunnenwasser oder
+  // Fleck. Wege nicht: lang gezogen liefe es spitz aus
+  const belagForm = new THREE.BufferGeometry();
+  {
+    const e = [], r = 0.5 / Math.cos(Math.PI / 8), pos = [];
+    for (let i = 0; i < 8; i++) { const w = (i + 0.5) * Math.PI / 4; e.push([Math.cos(w) * r, 0, -Math.sin(w) * r]); }
+    for (let i = 1; i < 7; i++) pos.push(...e[0], ...e[i], ...e[i + 1]);
+    belagForm.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    belagForm.computeVertexNormals();
+  }
   const F = Sim.KARTE * Sim.KARTE;
   // Gehwegstreifen: Oberseite, Bordsteinkante zur Fahrbahn und Rückseite zum Feld bis zum Boden (6 Dreiecke; ohne Rückseite
   // sähe man vom Grundstück aus eine dunkle Fuge). Lokal: x längs, z von 0 (Feldrand) bis 1 (Fahrbahn)
@@ -3832,7 +3944,7 @@ function baueGrafik(THREE, OrbitControls) {
     laden: inst(ladenForm, lambert('#ffffff', { vertexColors: true }), 3000),
     ladenGlas: inst(ladenGlasForm, new THREE.MeshBasicMaterial({ color: '#ffffff' }), 3000),   // Schaufenster und Fenster der Läden
     teil: inst(teilForm, lambert('#ffffff'), 12000),   // kleine Bauteile: Markisen, Theken, Türen, Dachaufbauten, Sprossen, Balkone
-    park: inst(box(0.96, 0.04, 0.96), lambert('#3e6b45'), 2000),
+    park: inst(box(1, 1, 1), lambert('#ffffff'), 1500),   // Grün (Deko, nicht klickbar): Parkrasen, Wege, Hecken, Bänke, Brunnen, Beete
     baum: inst(BAUM_GEO, lambert('#ffffff', { vertexColors: true }), 6000),   // Parks und Gärten
     bau: inst(box(0.8, 1, 0.8), lambert('#ffffff', { transparent: true, opacity: 0.42, depthWrite: false }), 3000),   // Gerüst
     kiste: inst(box(0.13, 0.11, 0.13), lambert('#ffffff'), 4000),   // Kistenstapel, Auslagen, getragene Kisten
@@ -3840,6 +3952,11 @@ function baueGrafik(THREE, OrbitControls) {
     // Straßenraum (Deko, nicht klickbar): Gehwege (Farbe je Instanz), Lichtflecken (nur nachts)
     gehweg: inst(streifen, lambert('#ffffff'), 16000),
     fleck: inst(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), fleckMaterial(), LAT_MAX),
+    // Grün (Deko, nicht klickbar): flache Beläge (Plätze, Wasser, dunkle Flecken auf Brachen), Büsche und Blüten, Grasbüschel.
+    // Kapazitäten fast das Fünffache der großen Stadt (fertig() lädt jedes Mal den ganzen Puffer hoch)
+    belag: inst(belagForm, lambert('#ffffff', { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }), 600),
+    busch: inst(buschForm, lambert('#ffffff', { vertexColors: true }), 400),
+    gras: inst(grasForm, lambert('#ffffff', { vertexColors: true }), 500),
   };
 
   // Rauch aus Werkstatt-Schloten (Deko, nicht klickbar): je Schlot vier weiche Scheiben, zur Kamera gedreht, die steigen,
@@ -3933,14 +4050,141 @@ function baueGrafik(THREE, OrbitControls) {
   const SCHIRM_MAX = 120, HANDY_MAX = 80;                 // hinten im Fenster-Mesh: Bildschirme (je Stunde), Handys (je Bild)
   let fensterStatisch = 0, schirme = 0, fensterVoll = false, handysVorher = 0;
 
-  // Bäume in der Stadt: Ton je Baum (über Stamm und Krone), Wuchs rund oder schlank; Plätze im Park
-  const PARK_PLATZ = [[-0.25, -0.2], [0.23, 0.04], [-0.06, 0.27], [0.2, -0.26]];
+  // Bäume in der Stadt: Ton je Baum (über Stamm und Krone), Wuchs rund oder schlank
   const BAUM_TON = [[1, 1, 1], [0.84, 0.97, 0.82], [1.12, 1.05, 0.76], [0.76, 0.85, 0.8], [1.02, 0.92, 0.7]].map(([r, g, b]) => new THREE.Color(r, g, b));
   function baum(n, x, y, z, s, wuchs, ton) {
     const schlank = wuchs < 0.25, sxz = schlank ? s * 0.72 : s;
     if (!setze(M.baum, n, x, y, z, sxz, schlank ? s * 1.5 : s * (0.9 + 0.3 * wuchs), sxz, wuchs * 40)) return n;
     M.baum.setColorAt(n, BAUM_TON[(ton * BAUM_TON.length) | 0]);
     return n + 1;
+  }
+
+  // ─── Grün: Parks, Gartenhecken, Brachen (Deko, nicht klickbar). Alles bleibt mindestens 0,02 im eigenen Feld: dort stehen
+  // keine Figuren, Laternen, Kisten oder Gehwege, und Bauarbeiter an der Ecke einer Nachbar-Baustelle ragen nur 0,015 herein ───
+  const RASEN = new THREE.Color('#3e6b45'), WEG = new THREE.Color('#8d8674'), PLATZ = new THREE.Color('#978f7b');
+  const STEIN = new THREE.Color('#7f817e'), WASSER = new THREE.Color('#3a5864'), HOLZ = new THREE.Color('#5e4633');
+  const HECKE = new THREE.Color('#31503a');                // oben etwa wie die Wiese: von fern keine hellen Rahmen
+  const BEETE = ['#835663', '#734351', '#8e6570', '#80545a'].map(c => new THREE.Color(c));   // Blüten gedämpft: Rosé, Weinrot, Altrosa, Rostrosa
+  const BEET_ERDE = new THREE.Color('#3a3128');
+  const BUESCHE = ['#41683f', '#4a6f44', '#3f6546', '#51703f'].map(c => new THREE.Color(c));
+  const HALME = ['#6a6841', '#5d6640', '#747049', '#566a44'].map(c => new THREE.Color(c));   // hohes, trockenes Gras
+  const FLECK_DUNKEL = new THREE.Color('#2e4934'), ERDE = new THREE.Color('#40452f');   // wenig dunkler als die Wiese, Erde olivgrau
+  const GRUEN = [M.park, M.belag, M.busch, M.gras];
+  M.park.setColorAt(0, RASEN); M.belag.setColorAt(0, WEG); M.busch.setColorAt(0, BUESCHE[0]); M.gras.setColorAt(0, HALME[0]);   // Farbpuffer vor dem Übersetzen
+  // Rahmen eines Feldes: Mitte rX/rZ, lz zeigt nach rDx/rDz (meist zur Straße), lx quer (wie bei bauteil)
+  let rX = 0, rZ = 0, rDx = 0, rDz = 1;
+  const rahmen = (px, pz, dx, dz) => { rX = px; rZ = pz; rDx = dx; rDz = dz; };
+  const rahmenX = (lx, lz) => rX + lx * rDz + lz * rDx, rahmenZ = (lx, lz) => rZ - lx * rDx + lz * rDz;
+  // Ein Stück im Rahmen, w dreht zusätzlich um y; die laufende Nummer steht in m.userData.n (stadt() setzt sie zurück)
+  function stueck(m, lx, y, lz, sx, sy, sz, w, f) {
+    const n = m.userData.n;
+    if (!setze(m, n, rahmenX(lx, lz), y, rahmenZ(lx, lz), sx, sy, sz, Math.atan2(rDx, rDz) + w)) return;
+    m.setColorAt(n, f);
+    m.userData.n = n + 1;
+  }
+  // Bank auf dem Rasen: Sitz längs der lokalen z-Achse (nach w gedreht), Lehne auf der lokalen +x-Seite
+  function bank(lx, lz, w) {
+    stueck(M.park, lx, 0.04, lz, 0.045, 0.035, 0.15, w, HOLZ);
+    stueck(M.park, lx + 0.029 * Math.cos(w), 0.04, lz - 0.029 * Math.sin(w), 0.012, 0.075, 0.15, w, HOLZ);
+  }
+  // Strauch im Park, höchstens 0,11 breit: die Hülle (gedreht) reicht 0,076 um die Mitte, bei 0,4 bleibt er 0,02 im Feld
+  function parkBusch(x, y, i, lx, lz) {
+    const k = 135 + 6 * i;
+    stueck(M.busch, lx, 0.04, lz, 0.09 + 0.02 * zellHash(x, y, k), 0.08 + 0.04 * zellHash(x, y, k + 1), 0.09 + 0.02 * zellHash(x, y, k + 2),
+      zellHash(x, y, k + 3) * 6.3, farbe.copy(BUESCHE[(zellHash(x, y, k + 4) * BUESCHE.length) | 0]).multiplyScalar(0.9 + 0.2 * zellHash(x, y, k + 5)));
+  }
+  const bluete = (x, y, k) => farbe.copy(BEETE[(zellHash(x, y, k) * BEETE.length) | 0]).multiplyScalar(0.9 + 0.2 * zellHash(x, y, k + 1));
+  // Beet: dunkle Erde, darin ein flacher Blütenhügel
+  function beet(x, y, k, lx, lz, sx, sz) {
+    stueck(M.park, lx, 0.04, lz, sx, 0.014, sz, 0, BEET_ERDE);
+    stueck(M.busch, lx, 0.05, lz, sx - 0.03, 0.03, sz - 0.03, 0, bluete(x, y, k));
+  }
+  // Parkbaum Nummer i, Größe s0 … s1. Die Hülle der Krone (gedrehter Quader) reicht 0,229 × Größe um den Stamm:
+  // bei 0,23 von der Mitte bleibt ein Baum bis Größe 1,08 mindestens 0,02 im Feld
+  const parkBaum = (nb, x, y, i, lx, lz, s0, s1) => baum(nb, rahmenX(lx, lz), 0.04, rahmenZ(lx, lz), s0 + (s1 - s0) * zellHash(x, y, 120 + i),
+    zellHash(x, y, 125 + i), zellHash(x, y, 130 + i));
+  // Park: Rasen (Oberkante 0,04) mit hellen Wegen, entweder als Kreuz zu einem Platz (mit Brunnen oder Blumenrondell) oder als
+  // Bogen hinein und wieder hinaus (mit Teich, sonst Baum und Beeten darin); Bänke, drei oder vier Bäume. Alles fest je Zelle
+  // (zellHash, gut gemischt): so weiß ein Kreuz-Park auch, ob sein Nachbarpark einer ist. Gerade Wege sind flache Quader im
+  // Park-Mesh (gerade Enden am Feldrand), Platz und Wasser Achtecke im Belag-Mesh
+  const kreuzPark = (x, y) => zellHash(x, y, 110) < 0.5;
+  function park(x, y, px, pz, nb) {
+    const K = Sim.KARTE, vorn = zurStrasse(x, y), [dx, dz] = RICHT[vorn], Y = 0.04, WY = Y + 0.003;
+    rahmen(px, pz, dx, dz);
+    stueck(M.park, 0, 0, 0, 0.96, Y, 0.96, 0, RASEN);
+    if (kreuzPark(x, y)) {
+      // Wege von der Mitte zur Straße vorn, zu weiteren Straßen und zu Nachbarparks mit Kreuz (die Wege treffen sich an der
+      // Grenze); zur Wiese oder zu Gebäuden keiner
+      for (let j = 0; j < 4; j++) {
+        const [ex, ez] = RICHT[j], nx = x + ex, ny = y + ez;
+        const f = nx < 0 || ny < 0 || nx >= K || ny >= K ? Sim.LEER : S.feld[ny * K + nx];
+        if (j !== vorn && f !== Sim.STRASSE && !(f === Sim.PARK && kreuzPark(nx, ny))) continue;
+        rahmen(px, pz, ex, ez);
+        stueck(M.park, 0, Y, 0.24, 0.09, 0.004, 0.48, 0, WEG);
+      }
+      rahmen(px, pz, dx, dz);
+      stueck(M.belag, 0, WY + 0.002, 0, 0.27, 1, 0.27, 0, PLATZ);
+      if (zellHash(x, y, 111) < 0.5) {                     // Brunnen: Becken mit rundem Wasser, Säule und Schale
+        stueck(M.park, 0, Y, 0, 0.16, 0.035, 0.16, 0, STEIN);
+        stueck(M.belag, 0, Y + 0.037, 0, 0.13, 1, 0.13, 0, WASSER);
+        stueck(M.park, 0, Y, 0, 0.03, 0.09, 0.03, 0, STEIN);
+        stueck(M.park, 0, Y + 0.078, 0, 0.07, 0.012, 0.07, Math.PI / 4, STEIN);
+      } else {                                            // Blumenrondell: Steinrand über Eck, darin Blüten
+        stueck(M.park, 0, Y, 0, 0.15, 0.022, 0.15, Math.PI / 4, STEIN);
+        stueck(M.busch, 0, Y + 0.018, 0, 0.12, 0.04, 0.12, 0, bluete(x, y, 114));
+      }
+      // Bäume in den Vierteln; in etwa jedem vierten Park bleibt ein vorderes Viertel frei für ein Beet
+      const frei = zellHash(x, y, 112) < 0.25 ? (zellHash(x, y, 113) < 0.5 ? 2 : 3) : -1;
+      for (let i = 0; i < 4; i++) {
+        const lx = i & 1 ? 0.23 : -0.23, lz = i & 2 ? 0.23 : -0.23;
+        if (i === frei) beet(x, y, 116, lx * 1.13, lz * 1.13, 0.16, 0.16);
+        else nb = parkBaum(nb, x, y, i, lx, lz, 0.9, 1.08);
+      }
+      bank(0.165, -0.165, Math.PI / 4); bank(-0.165, -0.165, 3 * Math.PI / 4);   // hinten schräg am Platz, Blick zum Platz
+      for (let i = 0; i < 2; i++) if (frei !== 2 + i) parkBusch(x, y, i, i ? 0.13 : -0.13, 0.4);   // Sträucher am Eingang
+    } else {                                              // Bogen: halbe Ellipse von der Straße bis 0,16 vor die Rückseite und zurück
+      for (let i = 0; i < 6; i++) {                       // sechs flache Quader, etwas länger: keine Lücke außen im Knick
+        const a0 = Math.PI * (1 + i / 6), a1 = Math.PI * (1 + (i + 1) / 6);
+        const x0 = 0.3 * Math.cos(a0), z0 = 0.46 + 0.58 * Math.sin(a0), x1 = 0.3 * Math.cos(a1), z1 = 0.46 + 0.58 * Math.sin(a1);
+        stueck(M.park, (x0 + x1) / 2, Y, (z0 + z1) / 2, 0.09, 0.004, Math.hypot(x1 - x0, z1 - z0) + 0.025, Math.atan2(x1 - x0, z1 - z0), WEG);
+      }
+      if (zellHash(x, y, 111) < 0.6) {                     // Teich im Bogen: zwei gegeneinander gedrehte Achtecke, Schilf und ein Stein am Rand
+        for (let i = 0; i < 2; i++) stueck(M.belag, i * 0.02, WY, 0.27 - i * 0.03, 0.24 - i * 0.04, 1, 0.2 + i * 0.05, i * 0.4, WASSER);
+        stueck(M.gras, 0.12, Y, 0.34, 0.12, 0.13, 0.12, 0.5, HALME[3]);
+        stueck(M.gras, 0.14, Y, 0.23, 0.1, 0.1, 0.1, 2, HALME[3]);
+        stueck(M.busch, -0.12, Y - 0.01, 0.18, 0.08, 0.04, 0.06, 1, STEIN);
+      } else {                                            // sonst ein Baum im Bogen, davor zwei schmale Beete neben der Bank
+        nb = parkBaum(nb, x, y, 3, 0, 0.25, 0.9, 1);
+        beet(x, y, 114, -0.115, 0.14, 0.07, 0.12); beet(x, y, 116, 0.115, 0.14, 0.07, 0.12);
+      }
+      nb = parkBaum(nb, x, y, 0, -0.23, -0.2, 0.9, 1.08);   // drei Bäume hinter dem Bogen
+      nb = parkBaum(nb, x, y, 1, 0.23, -0.2, 0.9, 1.08);
+      nb = parkBaum(nb, x, y, 2, 0, -0.25, 0.85, 1);
+      bank(0, 0.025, Math.PI / 2);                        // im Bogen vor dem Scheitel, Blick zur Straße
+      for (let i = 0; i < 4; i++) if (i < 2 || zellHash(x, y, 116 + i) < 0.5) parkBusch(x, y, i, i & 1 ? 0.4 : -0.4, i < 2 ? 0.12 : 0.33);   // Sträucher an den Seiten
+    }
+    return nb;
+  }
+  // Brache: leeres Feld mitten in der Stadt. Ein dunklerer Fleck aus zwei gleichfarbigen, versetzt gedrehten Achtecken
+  // (unregelmäßiger Umriss), auf fünf Plätzen bis zu zwei Büsche und ein bis drei Büschel hohen Grases, fest je Zelle;
+  // alles bleibt 0,08 im Feld
+  const BRACHE_PLATZ = [[-0.22, -0.2], [0.2, -0.22], [0.22, 0.2], [-0.2, 0.22], [0, 0]];
+  function brache(x, y) {
+    rahmen(wx(x), wx(y), 0, 1);
+    const fx = (zellHash(x, y, 60) - 0.5) * 0.16, fz = (zellHash(x, y, 61) - 0.5) * 0.16, fw = zellHash(x, y, 64) * 3.2, a = zellHash(x, y, 66) * 6.3;
+    farbe.copy(FLECK_DUNKEL).lerp(ERDE, 0.35 * zellHash(x, y, 65));
+    stueck(M.belag, fx, 0.004, fz, 0.3 + 0.16 * zellHash(x, y, 62), 1, 0.26 + 0.14 * zellHash(x, y, 63), fw, farbe);
+    stueck(M.belag, fx + 0.11 * Math.cos(a), 0.004, fz + 0.11 * Math.sin(a), 0.2 + 0.08 * zellHash(x, y, 69), 1, 0.18 + 0.08 * zellHash(x, y, 70), fw + 0.39, farbe);
+    const h = zellHash(x, y, 72), buesche = h < 0.3 ? 0 : h < 0.8 ? 1 : 2, start = (zellHash(x, y, 73) * 5) | 0;
+    const hg = zellHash(x, y, 83), halme = buesche + (hg < 0.3 ? 1 : hg < 0.85 ? 2 : 3);
+    for (let i = 0; i < 5; i++) {
+      const [ox, oz] = BRACHE_PLATZ[(start + i) % 5], lx = ox + (zellHash(x, y, 74 + i) - 0.5) * 0.1, lz = oz + (zellHash(x, y, 79 + i) - 0.5) * 0.1;
+      const g = zellHash(x, y, 84 + i), w = g * 40;
+      if (i < buesche) stueck(M.busch, lx, 0, lz, 0.13 + 0.07 * g, 0.09 + 0.06 * zellHash(x, y, 89 + i), (0.13 + 0.07 * g) * (0.8 + 0.3 * zellHash(x, y, 94 + i)), w,
+        farbe.copy(BUESCHE[(zellHash(x, y, 99 + i) * BUESCHE.length) | 0]).multiplyScalar(0.85 + 0.3 * g));
+      else if (i < halme) stueck(M.gras, lx, 0, lz, 0.12 + 0.05 * g, 0.08 + 0.07 * zellHash(x, y, 89 + i), 0.12 + 0.05 * g, w,
+        farbe.copy(HALME[(zellHash(x, y, 99 + i) * HALME.length) | 0]).multiplyScalar(0.85 + 0.3 * zellHash(x, y, 94 + i)));
+    }
   }
   const fortschritt = (b) => { const ges = Sim.bauGesamt(S, b); return ges ? (ges - S.g.bauRest[b]) / ges : 1; };
   // Gerüst: bei Stillstand dunkler (je Tag ohne Bauarbeiter etwas mehr)
@@ -4108,7 +4352,8 @@ function baueGrafik(THREE, OrbitControls) {
       if (an) setze(M.fleck, nfl++, lampOrt[2 * i], FAHRBAHN + BORD + 0.001, lampOrt[2 * i + 1], FLECK, 1, FLECK);   // knapp über dem Gehweg
     }
     fertig(M.fleck, nfl);
-    let nh = 0, nd = 0, nf = laternen, nw = 0, ns = laternen, nl = 0, nte = 0, np = 0, nb = 0, nbau = 0, nk = 0, nt = 0, nsch = 0, nlg = 0;
+    let nh = 0, nd = 0, nf = laternen, nw = 0, ns = laternen, nl = 0, nte = 0, nb = 0, nbau = 0, nk = 0, nt = 0, nsch = 0, nlg = 0;
+    for (const m of GRUEN) m.userData.n = 0;             // Grün zählt in m.userData.n (stueck)
     const kisteMax = M.kiste.userData.kap - TRAG_MAX, fensterMax = M.fenster.userData.kap - SCHIRM_MAX - HANDY_MAX;
     const arbeitszeit = tageszeit >= 8 && tageszeit < 17;
     let nrauch = 0;                                       // Schlote mit Rauch
@@ -4243,32 +4488,48 @@ function baueGrafik(THREE, OrbitControls) {
         // Schaufenster zur Straße und Fenster rundum: abends beleuchtet, solange der Laden offen ist
         const lichtLaden = offen && tageszeit >= 17 && tageszeit < 22;
         if (setze(M.ladenGlas, nlg, px, 0, pz, 1, 1, 1, w)) { IDS.ladenGlas[nlg] = b; M.ladenGlas.setColorAt(nlg++, lichtLaden ? LICHT : nacht ? GLAS_NACHT : GLAS_TAG); }
-      } else if (t === Sim.PARK) {
-        setze(M.park, np++, px, 0, pz, 1, 1, 1);
-        // drei oder vier Bäume auf festen Plätzen, Wuchs und Ton je Park verschieden
-        const n = hash(b + 5) < 0.5 ? 4 : 3, dreh = (hash(b) * 4) | 0;
-        for (let i = 0; i < n; i++) {
-          const [ox, oz] = PARK_PLATZ[(i + dreh) % 4];
-          nb = baum(nb, px + ox, 0.04, pz + oz, 0.85 + 0.35 * zellHash(b, i, 11), zellHash(b, i, 12), zellHash(b, i, 13));
+      } else if (t === Sim.PARK) nb = park(x, y, px, pz, nb);   // Wege, Bänke, Beete, Bäume, manchmal Brunnen oder Teich
+    }
+    // Gärten: leere Felder neben Wohnhäusern bekommen nach Zellen-Hash einen oder zwei Bäume und niedrige Hecken an den
+    // Feldgrenzen (nicht zum Haus hin; zwischen zwei Gärten nur eine). Brachen: andere leere Felder, an die mindestens drei
+    // Straßen, Gebäude oder Baustellen grenzen und die rundum (mit den Ecken) mindestens sechs bebaute Nachbarn haben: eine
+    // Lücke am Stadtrand mit offener Wiese dahinter hat nur fünf. Stündlich neu, weil Felder bebaut werden
+    const feld = S.feld, W = Sim.WOHNHAUS, LEER = Sim.LEER;
+    const an = (x, y) => x < 0 || y < 0 || x >= K || y >= K ? LEER : feld[y * K + x];   // außerhalb der Karte: leer
+    const garten = (x, y) => an(x, y) === LEER && zellHash(x, y, 21) <= 0.6
+      && (an(x - 1, y) === W || an(x + 1, y) === W || an(x, y - 1) === W || an(x, y + 1) === W);
+    for (let c = 0; c < F; c++) {
+      if (feld[c] !== LEER) continue;
+      const x = c % K, y = (c / K) | 0;
+      if (!garten(x, y)) {
+        const seiten = (an(x - 1, y) !== LEER) + (an(x + 1, y) !== LEER) + (an(x, y - 1) !== LEER) + (an(x, y + 1) !== LEER);
+        if (seiten >= 3 && seiten + (an(x - 1, y - 1) !== LEER) + (an(x + 1, y - 1) !== LEER) + (an(x - 1, y + 1) !== LEER) + (an(x + 1, y + 1) !== LEER) >= 6) brache(x, y);
+        continue;
+      }
+      const h = zellHash(x, y, 21);
+      const px = wx(x), pz = wx(y), sx = zellHash(x, y, 22) < 0.5 ? -1 : 1, sz = zellHash(x, y, 23) < 0.5 ? -1 : 1;
+      // Hecke 0,03 bis 0,1 innerhalb der Feldgrenze (der Gehweg liegt jenseits auf dem Straßenfeld), leicht verschieden hoch.
+      // Die Hecken an den z-Seiten laufen durch, die an den x-Seiten enden an ihnen: in den Ecken keine Flächen in einer Ebene
+      let hecken = 0;
+      for (let i = 0; i < 4; i++) { const [dx, dy] = RICHT[i]; if (an(x + dx, y + dy) !== W && !(i >= 2 && garten(x + dx, y + dy))) hecken |= 1 << i; }
+      rahmen(px, pz, 0, 1);
+      for (let i = 0; i < 4; i++) {
+        if (!(hecken & (1 << i))) continue;
+        const [dx, dy] = RICHT[i], hoch = 0.055 + 0.02 * zellHash(x, y, 50 + i), f = farbe.copy(HECKE).multiplyScalar(0.9 + 0.2 * zellHash(x, y, 54 + i));
+        if (dy) stueck(M.park, 0, 0, dy * 0.435, 0.94, hoch, 0.07, 0, f);
+        else {
+          const z0 = hecken & 4 ? -0.4 : -0.47, z1 = hecken & 1 ? 0.4 : 0.47;
+          stueck(M.park, dx * 0.435, 0, (z0 + z1) / 2, 0.07, hoch, z1 - z0, 0, f);
         }
       }
-    }
-    // Gärten: leere Felder neben Wohnhäusern bekommen nach Zellen-Hash einen oder zwei Bäume (stündlich neu, weil Felder bebaut werden)
-    const feld = S.feld, W = Sim.WOHNHAUS;
-    for (let c = 0; c < F; c++) {
-      if (feld[c] !== Sim.LEER) continue;
-      const x = c % K, y = (c / K) | 0;
-      if (!((x > 0 && feld[c - 1] === W) || (x < K - 1 && feld[c + 1] === W) || (y > 0 && feld[c - K] === W) || (y < K - 1 && feld[c + K] === W))) continue;
-      const h = zellHash(x, y, 21);
-      if (h > 0.6) continue;
-      const px = wx(x), pz = wx(y), sx = zellHash(x, y, 22) < 0.5 ? -1 : 1, sz = zellHash(x, y, 23) < 0.5 ? -1 : 1;
       if (h < 0.2) {                                      // zwei Bäume über Eck
         nb = baum(nb, px + sx * 0.2, 0, pz + sz * 0.2, 0.8 + 0.3 * zellHash(x, y, 24), zellHash(x, y, 25), zellHash(x, y, 26));
         nb = baum(nb, px - sx * 0.2, 0, pz - sz * 0.18, 0.65 + 0.25 * zellHash(x, y, 27), zellHash(x, y, 28), zellHash(x, y, 29));
       } else nb = baum(nb, px + sx * 0.22 * zellHash(x, y, 30), 0, pz + sz * 0.22 * zellHash(x, y, 31), 0.8 + 0.35 * zellHash(x, y, 24), zellHash(x, y, 25), zellHash(x, y, 26));
     }
     fertig(M.haus, nh); fertig(M.dach, nd); fertig(M.fenster, nf); fertig(M.scheiben, nsch); fertig(M.werkstatt, nw); fertig(M.schlot, ns);
-    fertig(M.laden, nl); fertig(M.ladenGlas, nlg); fertig(M.teil, nte); fertig(M.park, np); fertig(M.baum, nb); fertig(M.bau, nbau); fertig(M.tech, nt);
+    fertig(M.laden, nl); fertig(M.ladenGlas, nlg); fertig(M.teil, nte); fertig(M.baum, nb); fertig(M.bau, nbau); fertig(M.tech, nt);
+    for (const m of GRUEN) fertig(m, m.userData.n);
     // Fenster: dahinter kommen Bildschirme (figurenPlanen) und Handys (figurenBewegen); Klicks darauf treffen kein Gebäude
     fensterStatisch = nf; schirme = 0; fensterVoll = true;
     for (let i = nf; i < Math.min(M.fenster.userData.kap, nf + SCHIRM_MAX + HANDY_MAX); i++) IDS.fenster[i] = -1;
@@ -4286,16 +4547,100 @@ function baueGrafik(THREE, OrbitControls) {
   // ─── Figuren: höchstens 300, davon bis zu 120 Leute bei der Arbeit, dazu alle Hauptfiguren (mit Markierung) ──
   // Grundregel: Eine Figur steht oder geht nur dort, wo die Simulation die Person in dieser Stunde hat.
   const FIG_MAX = 300, WERK_MAX = 120, HAUPT_MAX = 10, FIG_GES = FIG_MAX + HAUPT_MAX, GEHTEMPO = 22;   // Felder pro Spielstunde
-  // Kapsel ohne die leeren Dreiecke an den Polen (je Pol eine Reihe mit zwei gleichen Ecken): 48 statt 60 Dreiecke, gleiche Form
-  const figGeo = new THREE.CapsuleGeometry(0.055, 0.13, 2, 6).translate(0, 0.12, 0);
-  {
-    const p = figGeo.getAttribute('position'), idx = figGeo.index.array, rest = [];
-    const gleich = (a, b) => Math.abs(p.getX(a) - p.getX(b)) + Math.abs(p.getY(a) - p.getY(b)) + Math.abs(p.getZ(a) - p.getZ(b)) < 1e-6;
-    for (let i = 0; i < idx.length; i += 3) if (!gleich(idx[i], idx[i + 1]) && !gleich(idx[i + 1], idx[i + 2]) && !gleich(idx[i], idx[i + 2])) rest.push(idx[i], idx[i + 1], idx[i + 2]);
-    figGeo.setIndex(rest);
+  // Figur: zwei Beine, sechseckiger Rumpf (breiter als tief), Schultern, fünfeckiger Kopf mit Scheitel, Helmkrempe. 50 Dreiecke,
+  // 0,24 hoch, Standfläche wie die frühere Kapsel (Radius 0,055), Blick nach +z. Ohne Böden: die Kamera bleibt über der Figur.
+  // Teil je Ecke: 0 Kleidung (Vertex-Farbe × Instanzfarbe), 1 Haut, 2 Haar, 3 Scheitel (Haar oder Helm), 4 Krempe (nur mit Helm).
+  // Haut, Haar und Helm färbt figurShader aus eigenen Instanz-Attributen, die Kleiderfarbe färbt sie also nicht mit.
+  const KOPF_OBEN = 0.214, HELM_UNTEN = 0.203;            // Oberkante des Gesichts, darüber der Scheitel; Unterkante des Helms
+  const figGeo = (() => {
+    const pos = [], col = [], teil = [];
+    const ring = (n, r, rz, y, w0, x0) => {               // n Ecken, Radius quer (x) und längs (z)
+      const e = [];
+      for (let i = 0; i <= n; i++) { const w = w0 + i * 2 * Math.PI / n; e.push([x0 + r * Math.sin(w), y, rz * Math.cos(w)]); }
+      return e;                                            // letzte Ecke = erste (geschlossen)
+    };
+    // Dreieck, Vorderseite von m (Punkt innen) weg
+    const dreieck = (a, b, c, m, f, t) => {
+      const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      if (nx * (a[0] + b[0] + c[0] - 3 * m[0]) + ny * (a[1] + b[1] + c[1] - 3 * m[1]) + nz * (a[2] + b[2] + c[2] - 3 * m[2]) < 0) [b, c] = [c, b];
+      pos.push(...a, ...b, ...c);
+      for (let k = 0; k < 3; k++) { col.push(f, f, f); teil.push(t); }
+    };
+    // Mantel zwischen zwei Ringen; t als Zahl für alle Seiten oder als Liste je Seite (null: diese Seite weglassen)
+    const band = (u, o, m, f, t) => { for (let i = 0; i < u.length - 1; i++) {
+      const ti = typeof t === 'number' ? t : t[i];
+      if (ti !== null) { dreieck(u[i], u[i + 1], o[i + 1], m, f, ti); dreieck(u[i], o[i + 1], o[i], m, f, ti); }
+    } };
+    const faecher = (r, spitze, m, f, t) => { for (let i = 0; i < r.length - 1; i++) dreieck(r[i], r[i + 1], spitze, m, f, t); };
+    // Beine: Hose dunkler als das Oberteil; die Innenseiten (höchstens 0,011 auseinander) sieht man nicht
+    for (const s of [-1, 1]) band(ring(4, 0.018, 0.018, 0, Math.PI / 4, s * 0.018), ring(4, 0.022, 0.022, 0.1, Math.PI / 4, s * 0.018),
+      [s * 0.018, 0.05, 0], 0.6, s < 0 ? [null, 0, 0, 0] : [0, 0, null, 0]);
+    const schulter = ring(6, 0.053, 0.031, 0.162, Math.PI / 6, 0);
+    band(ring(6, 0.04, 0.027, 0.088, Math.PI / 6, 0), schulter, [0, 0.12, 0], 1, 0);   // Rumpf, flache Brust vorn
+    faecher(schulter, [0, 0.188, 0], [0, 0.12, 0], 0.92, 0);
+    // Kopf: vorn und seitlich Gesicht, die beiden hinteren Seiten Haar; oben der Scheitel
+    const oben = ring(5, 0.035, 0.035, KOPF_OBEN, -Math.PI / 5, 0);
+    band(ring(5, 0.027, 0.027, 0.176, -Math.PI / 5, 0), oben, [0, 0.2, 0], 1, [1, 1, 2, 2, 1]);
+    faecher(oben, [0, 0.24, 0], [0, 0.2, 0], 1, 3);
+    // Helmkrempe: flaches Fünfeck an der Unterkante des Helms, vorn weiter vor (Schirm). Ohne Helm fällt sie im Shader auf einen Punkt
+    faecher(ring(5, 0.048, 0.048, HELM_UNTEN, -Math.PI / 5, 0).map(e => [e[0], e[1], e[2] + 0.006]), [0, HELM_UNTEN, 0.006], [0, 0.1, 0], 0.85, 4);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    g.setAttribute('figTeil', new THREE.Float32BufferAttribute(teil, 1));
+    g.computeVertexNormals();
+    return g;
+  })();
+  // Je Figur (stündlich gesetzt): Haarfarbe; Hautton 0 … 1 und Helm 0/1
+  const figHaar = new THREE.InstancedBufferAttribute(new Float32Array(FIG_GES * 3), 3), figArt = new THREE.InstancedBufferAttribute(new Float32Array(FIG_GES * 2), 2);
+  figGeo.setAttribute('figHaar', figHaar); figGeo.setAttribute('figArt', figArt);
+  const HAUT_HELL = new THREE.Color('#e7c09c'), HAUT_DUNKEL = new THREE.Color('#6b442c'), HELM = new THREE.Color('#f2c230');
+  const glsl = (c) => `vec3( ${c.r.toFixed(4)}, ${c.g.toFixed(4)}, ${c.b.toFixed(4)} )`;
+  function figurShader(s) {
+    // statt color_vertex: nur die Kleidung nimmt die Instanzfarbe
+    s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute float figTeil;\nattribute vec3 figHaar;\nattribute vec2 figArt;\nvarying float vFigHelm, vFigY;')
+      .replace('#include <color_vertex>', `vColor = vec4( color, 1.0 );
+        vFigY = position.y; vFigHelm = figTeil > 0.5 && figTeil < 2.5 ? figArt.y : 0.0;
+        if ( figTeil > 2.5 && figArt.y > 0.5 ) vColor.rgb *= ${glsl(HELM)};
+        else if ( figTeil > 1.5 ) vColor.rgb *= figHaar;
+        else if ( figTeil > 0.5 ) vColor.rgb *= mix( ${glsl(HAUT_HELL)}, ${glsl(HAUT_DUNKEL)}, figArt.x );
+        else vColor.rgb *= instanceColor.rgb;`)
+      // Helm: Kuppel mit weichen Normalen (rund statt spitz schattiert), etwas weiter als der Scheitel; darunter die Krempe
+      .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
+        if ( figTeil > 2.5 && figTeil < 3.5 && figArt.y > 0.5 ) objectNormal = normalize( vec3( position.x, position.y - 0.2, position.z ) );`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        if ( figTeil > 3.5 ) { if ( figArt.y < 0.5 ) transformed = vec3( 0.0, ${KOPF_OBEN}, 0.0 ); }
+        else if ( figTeil > 2.5 && figArt.y > 0.5 ) transformed.xz *= 1.08;`);
+    // Mit Helm ist der Kopf oberhalb der Krempe gelb (Seiten der Helmschale)
+    s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vFigHelm, vFigY;')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        if ( vFigHelm > 0.5 && vFigY > ${HELM_UNTEN} ) diffuseColor.rgb = ${glsl(HELM)};`);
   }
-  const figMesh = inst(figGeo, lambert('#ffffff'), FIG_GES);
-  const markMesh = inst(new THREE.OctahedronGeometry(0.065), new THREE.MeshBasicMaterial({ color: '#ffffff' }), HAUPT_MAX);
+  const figMat = lambert('#ffffff', { vertexColors: true });
+  figMat.onBeforeCompile = (s) => { wolkenSchatten(s); figurShader(s); };
+  const figMesh = inst(figGeo, figMat, FIG_GES);
+  // Hauptfiguren: Raute mit sanftem Schein, immer zur Kamera gedreht (zwei Dreiecke); Farbe je Instanz
+  function markeMaterial() {
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;                             // gezeichnet in 64er-Maßen, doppelt aufgelöst: glatter Rand aus der Nähe
+    const g = c.getContext('2d');
+    g.scale(2, 2);
+    const v = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    v.addColorStop(0, 'rgba(255,255,255,0.65)'); v.addColorStop(0.35, 'rgba(255,255,255,0.3)'); v.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = v; g.fillRect(0, 0, 64, 64);
+    // Dunkler Rand (hebt die Raute vor hellen Fenstern ab), darin vier Facetten: oben heller als unten, links heller als rechts.
+    // Die Raute füllt die Fläche fast aus (aus der Ferne bleibt sie so erkennbar), der Schein liegt an ihren Seiten
+    g.beginPath(); g.moveTo(32, 6); g.lineTo(48, 32); g.lineTo(32, 58); g.lineTo(16, 32); g.closePath();
+    g.lineWidth = 3; g.strokeStyle = 'rgba(46,34,22,0.85)'; g.stroke();
+    for (const [x, y, f] of [[17.5, 8.5, '#ffffff'], [46.5, 8.5, '#d9d9d9'], [17.5, 55.5, '#c4c4c4'], [46.5, 55.5, '#9c9c9c']]) {
+      g.beginPath(); g.moveTo(32, 32); g.lineTo(32, y); g.lineTo(x, 32); g.closePath(); g.fillStyle = f; g.fill();
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;                  // Canvas-Farben sind sRGB: sonst wirken Rand und Facetten zu hell
+    return new THREE.MeshBasicMaterial({ color: '#ffffff', map: t, transparent: true, depthWrite: false });
+  }
+  const markMesh = inst(new THREE.PlaneGeometry(0.2, 0.2), markeMaterial(), HAUPT_MAX);
   const MARK_GOLD = new THREE.Color('#ffc864'), MARK_DENKT = new THREE.Color('#f4f4f7');   // überlegt = weiß
   figMesh.setColorAt(0, LICHT); markMesh.setColorAt(0, MARK_GOLD); M.bau.setColorAt(0, GERUEST);   // Farbpuffer gleich anlegen: dann passt der vorab übersetzte Shader
   const WESTE = new THREE.Color('#e8792c'), BLAUMANN = new THREE.Color('#4f7fc0');       // Bauarbeiter, Handwerker
@@ -4306,6 +4651,7 @@ function baueGrafik(THREE, OrbitControls) {
   // Außen ±0,42: steht an dieser Feldgrenze eine Laterne (Mastachse dann 0,082 daneben), bleibt der Platz frei (laterneNah)
   const QUER = [-0.3, 0.3, -0.15, 0.15, -0.42, 0.42, 0], QUER2 = [-0.3, 0.3, -0.2, 0.2, -0.1, 0.1, 0];
   const STEHEN_MAX = QUER.length + QUER2.length;            // mehr Leute stehen nicht vor einem Gebäude, der Rest ist drinnen
+  const HAUPT_QUER = [-0.07, 0.07, -0.21, 0.21, -0.35, 0.35];   // Hauptfiguren außerhalb der Arbeit: nah beieinander, Rauten nicht ineinander
   const BAU_ECKE = 0.46;                                  // Bauarbeiter knapp innerhalb der Grundstücksecken (auf dem Boden, nicht halb im Gehweg)
   const figuren = [];                                     // { p, gen, ort, route, start, dauer, versatz, ox, oz, haupt, werk, steht, sx, sy, sz, traeger, hin }
   const figIds = new Int32Array(FIG_GES).fill(-1);
@@ -4417,23 +4763,34 @@ function baueGrafik(THREE, OrbitControls) {
     return m;
   }
   // Standplatz vor dem Gebäude: Bauarbeiter an den Ecken der Baustelle, sonst auf der Straßenseite nebeneinander,
-  // wer an der Theke steht, mittig hinter der Theke. Die Höhe (f.sy) setzt figurenPlanen
+  // wer an der Theke steht, mittig hinter der Theke. Die Höhe (f.sy) setzt figurenPlanen.
+  // Blickrichtung (f.sdreh): Bauarbeiter zur Baustelle, sonst zur Straße, leicht verschieden (Bildschirm: figurenPlanen)
   function standplatz(f, ort, k, bau) {
     const g = S.g, bx = wx(g.x[ort]), bz = wx(g.y[ort]);
-    if (bau) { const e = ECKEN[k % 4]; f.sx = bx + e[0] * BAU_ECKE; f.sz = bz + e[1] * BAU_ECKE; return; }
+    if (bau) { const e = ECKEN[k % 4]; f.sx = bx + e[0] * BAU_ECKE; f.sz = bz + e[1] * BAU_ECKE; f.sdreh = Math.atan2(-e[0], -e[1]); return; }
     const [dx, dz, qx, qz] = strassenSeite(g.x[ort], g.y[ort]);
     const theke = g.typ[ort] === Sim.LADEN && beiDerArbeit(f.p, S.stunde, ort) && Sim.theke(S, ort) === f.p;
     const reihe = k >= QUER.length ? 1 : 0;                   // ab dem 8. eine zweite, schmalere Reihe weiter zur Straße
-    const vor = theke ? 0.47 : 0.68 + 0.16 * reihe, quer = theke ? 0 : f.haupt && !beiDerArbeit(f.p, S.stunde, ort) ? f.ox * 0.5
+    const vor = theke ? 0.47 : 0.68 + 0.16 * reihe, quer = theke ? 0 : f.haupt && !beiDerArbeit(f.p, S.stunde, ort) ? HAUPT_QUER[k % HAUPT_QUER.length] + f.ox * 0.05
       : reihe ? QUER2[(k - QUER.length) % QUER2.length] : QUER[k];
     f.sx = bx + dx * vor + qx * quer; f.sz = bz + dz * vor + qz * quer;
+    f.sdreh = Math.atan2(dx, dz) + (theke ? 0 : f.oz * 2);
+  }
+  // Haarfarbe und Hautton fest je Person; das Haar ergraut mit dem Alter (ab gut 50 langsam, mit 85 weiß)
+  const HAARE = ['#2b2420', '#3f2c20', '#5c3f28', '#7a5634', '#a8844f', '#c7a567', '#7c3f24'].map(c => new THREE.Color(c));
+  const GRAU = new THREE.Color('#8a8a8a'), WEISS = new THREE.Color('#cfcfcf'), TOENE = [0, 0.08, 0.16, 0.26, 0.4, 0.62, 0.9], haarF = new THREE.Color();
+  function figurAussehen(i, f, helm) {
+    const p = f.p, alter = (S.tag - S.p.geb[p]) / Sim.R.JAHR, ton = TOENE[(zellHash(p, f.gen, 92) * TOENE.length) | 0];
+    haarF.copy(HAARE[(zellHash(p, f.gen, 91) * (ton > 0.5 ? 2 : HAARE.length)) | 0])   // dunkle Haut: dunkles Haar
+      .lerp(GRAU, 0.85 * glatt(52, 75, alter)).lerp(WEISS, glatt(72, 88, alter));
+    figHaar.setXYZ(i, haarF.r, haarF.g, haarF.b); figArt.setXY(i, ton, helm ? 1 : 0);
   }
   // Nach jedem Simulationsschritt: wer geht in dieser Stunde wohin, wer steht wo?
   function figurenPlanen() {
     const P = S.p, erw = S.tag - Sim.R.ERWACHSEN * Sim.R.JAHR, H = S.stunde, jetzt = S.tag * 24 + H;
     schirme = 0;
     while (figuren.length < FIG_GES) figuren.push({ p: -1, gen: 0, ort: -1, route: null, start: 0, dauer: 0, versatz: 0, ox: 0, oz: 0,
-      haupt: false, werk: false, steht: false, sx: 0, sy: 0, sz: 0, px: 0, py: 0, pz: 0, vorher: false, traeger: false, hin: 0 });
+      haupt: false, werk: false, steht: false, sx: 0, sy: 0, sz: 0, sdreh: 0, px: 0, py: 0, pz: 0, pdreh: 0, vorher: false, traeger: false, hin: 0 });
     // Hauptfiguren in die letzten Plätze
     for (let i = 0; i < HAUPT_MAX; i++) {
       const f = figuren[FIG_MAX + i], h = hauptIds[i];
@@ -4464,7 +4821,7 @@ function baueGrafik(THREE, OrbitControls) {
       const f = figuren[i];
       if (f.p < 0) continue;
       const p = f.p, ort = simOrt(p, H), arbeit = beiDerArbeit(p, H, ort), bau = arbeit && P.einsatz[p] > 0;
-      f.vorher = f.steht; f.px = f.sx; f.py = f.sy; f.pz = f.sz;   // falls gleich ein Weg beginnt: bis dahin am alten Platz
+      f.vorher = f.steht; f.px = f.sx; f.py = f.sy; f.pz = f.sz; f.pdreh = f.sdreh;   // falls gleich ein Weg beginnt: bis dahin am alten Platz
       f.traeger = false;
       if (ort >= 0 && f.ort >= 0 && ort !== f.ort) {         // Ortswechsel in der Simulation → Weg dorthin
         f.route = weg(f.ort, ort);
@@ -4487,20 +4844,23 @@ function baueGrafik(THREE, OrbitControls) {
         if (k >= STEHEN_MAX && !f.haupt) f.steht = false;       // vor dem Gebäude ist kein Platz mehr: drinnen
         f.sy = standHoehe(f.sx, f.sz);                          // Gehweg, Fahrbahn (zweite Reihe) oder Boden (Baustelle, Theke)
       }
-      const arb = P.arbeit[p];
-      figMesh.setColorAt(i, f.haupt ? LICHT : arb >= 0 && arb === S.bauhof ? WESTE
+      const arb = P.arbeit[p], bauhof = arb >= 0 && arb === S.bauhof;
+      figMesh.setColorAt(i, f.haupt ? LICHT : bauhof ? WESTE
         : arb >= 0 && S.g.typ[arb] === Sim.WERKSTATT ? BLAUMANN : arb >= 0 && S.g.typ[arb] === Sim.TECH ? PROGRAMMIER : FIGFARBEN[p % FIGFARBEN.length]);
+      figurAussehen(i, f, bauhof);                          // Bauarbeiter tragen Helm (auch als Hauptfigur)
       // Wer in einer Tech-Firma bei der Arbeit steht, hat einen leuchtenden Bildschirm vor sich (zwischen Figur und Gebäude)
       f.schirm = f.steht && arbeit && !bau && S.g.typ[ort] === Sim.TECH;   // Bauarbeiter am Anbau programmieren nicht
       f.arbeit = arbeit;                                    // wer arbeitet, hat kein Handy in der Hand
       if (f.schirm && schirme < SCHIRM_MAX) {
         const [dx, dz] = strassenSeite(S.g.x[ort], S.g.y[ort]);
+        f.sdreh = Math.atan2(-dx, -dz);                     // Blick auf den Bildschirm
         if (setze(M.fenster, fensterStatisch + schirme, f.sx - dx * 0.09, f.sy + 0.1, f.sz - dz * 0.09, 0.13, 0.075, 0.016, dx !== 0 ? Math.PI / 2 : 0)) {
           M.fenster.setColorAt(fensterStatisch + schirme, SCHIRM[S.g.produkt[ort] || 2]); schirme++;
         }
       }
     }
     if (figMesh.instanceColor) figMesh.instanceColor.needsUpdate = true;
+    figHaar.needsUpdate = true; figArt.needsUpdate = true;
     // Handys fest je Stunde vergeben (Hauptfiguren zuerst), damit keins mitten im Weg auftaucht oder verschwindet:
     // wer eins hat und in dieser Stunde losgeht oder als Hauptfigur draußen steht, höchstens HANDY_MAX
     let handys = 0;
@@ -4515,17 +4875,19 @@ function baueGrafik(THREE, OrbitControls) {
     if (M.fenster.instanceColor) M.fenster.instanceColor.needsUpdate = true;
     fensterVoll = true;
   }
-  // Jedes Bild: Figuren entlang ihres Weges schieben (ohne neue Objekte)
+  // Jedes Bild: Figuren entlang ihres Weges schieben (ohne neue Objekte). Wer geht, wippt leicht (Takt aus der Weglänge:
+  // ein Hub je Schritt); wird der Takt zu schnell (Tempo 5×, 20×), ebbt das Wippen ab, sonst flimmert es. Stehende stehen still
+  const SCHRITT = 0.19, WIPPEN = 0.01;
   function figurenBewegen(jetzt) {
     let nm = 0, nt = 0, nh = 0;
-    const handyBasis = fensterStatisch + schirme;
+    const handyBasis = fensterStatisch + schirme, sek = REDUZIERT ? 0 : performance.now() / 1000;
     for (let i = 0; i < figuren.length; i++) {
       const f = figuren[i], r = f.route;
       figIds[i] = -1;
       if (f.p < 0) { figMesh.setMatrixAt(i, NULL); continue; }
       const laeuft = r && jetzt >= f.start && jetzt < f.start + f.dauer && r.len > 0;
       const wartet = r && jetzt < f.start && f.start - jetzt < 1;          // Weg beginnt gleich
-      let x, z, y = FAHRBAHN, dreh = 0;                  // wer geht, geht auf der Fahrbahn
+      let x, z, y = FAHRBAHN, dreh = 0, traegt = false;  // wer geht, geht auf der Fahrbahn
       if (laeuft) {
         const d = ((jetzt - f.start) / f.dauer) * r.len, cum = r.cum;
         let lo = 0, hi = cum.length - 1;
@@ -4533,22 +4895,29 @@ function baueGrafik(THREE, OrbitControls) {
         const seg = cum[hi] - cum[lo], k = seg > 0 ? (d - cum[lo]) / seg : 0;
         const x0 = r.pts[2 * lo], z0 = r.pts[2 * lo + 1], x1 = r.pts[2 * hi], z1 = r.pts[2 * hi + 1];
         x = x0 + (x1 - x0) * k + f.ox; z = z0 + (z1 - z0) * k + f.oz; dreh = Math.atan2(x1 - x0, z1 - z0);
-        if (f.traeger && d < f.hin && nt < TRAG_MAX && setze(M.kiste, kisteStatisch + nt, x, y + 0.18, z, 1, 1, 1, dreh)) nt++;
-      } else if (wartet && f.vorher) { x = f.px; y = f.py; z = f.pz; }   // steht noch am alten Platz
-      else if (f.steht && !wartet) { x = f.sx; y = f.sy; z = f.sz; }      // steht vor dem Gebäude, auf der Baustelle, an der Theke
+        // ganze Zahl von Schritten je Weg: das Wippen endet am Ziel bei 0, die Figur springt beim Ankommen nicht
+        const schritte = Math.max(1, Math.round(r.len / SCHRITT)), takt = schritte / f.dauer * tempo / SEK_PRO_STUNDE;   // Schritte je echte Sekunde
+        if (!REDUZIERT) y += WIPPEN * (1 - glatt(3, 5, takt)) * (1 - Math.cos(d / r.len * schritte * 2 * Math.PI));
+        // Kiste vor dem Bauch, mit beiden Armen getragen (dann kein Handy in der Hand)
+        traegt = f.traeger && d < f.hin;
+        if (traegt && nt < TRAG_MAX
+            && setze(M.kiste, kisteStatisch + nt, x + Math.sin(dreh) * 0.07, y + 0.07, z + Math.cos(dreh) * 0.07, 0.85, 0.85, 0.85, dreh)) nt++;
+      } else if (wartet && f.vorher) { x = f.px; y = f.py; z = f.pz; dreh = f.pdreh; }   // steht noch am alten Platz
+      else if (f.steht && !wartet) { x = f.sx; y = f.sy; z = f.sz; dreh = f.sdreh; }      // steht vor dem Gebäude, auf der Baustelle, an der Theke
       else { figMesh.setMatrixAt(i, NULL); continue; }
       dummy.position.set(x, y, z); dummy.scale.set(1, 1, 1); dummy.rotation.set(0, dreh, 0);
       dummy.updateMatrix();
       figMesh.setMatrixAt(i, dummy.matrix);
       figIds[i] = f.p;
-      // Handy in der Hand: wer eins gekauft hat und gerade nicht arbeitet (unterwegs, oder als Hauptfigur draußen)
-      if (f.handy && (laeuft || !f.arbeit) && nh < HANDY_MAX
-          && setze(M.fenster, handyBasis + nh, x + Math.sin(dreh) * 0.06, y + 0.11, z + Math.cos(dreh) * 0.06, 0.06, 0.055, 0.012, dreh)) nh++;
-      if (f.haupt) {
-        dummy.position.set(x, y + 0.44 + (REDUZIERT ? 0 : Math.sin(jetzt * 40 + i) * 0.03), z); dummy.rotation.set(0, 0, 0);
+      // Handy in der Hand vor der Brust: wer eins gekauft hat und gerade nicht arbeitet (unterwegs, oder als Hauptfigur draußen)
+      if (f.handy && (laeuft || !f.arbeit) && !traegt && nh < HANDY_MAX
+          && setze(M.fenster, handyBasis + nh, x + Math.sin(dreh) * 0.05, y + 0.125, z + Math.cos(dreh) * 0.05, 0.036, 0.048, 0.008, dreh)) nh++;
+      if (f.haupt) {                                      // Raute über dem Kopf, schwebt langsam (echte Zeit, bei jedem Tempo gleich ruhig)
+        // Maßstab zurücksetzen: Handy oder Kiste davor haben ihn über setze() verstellt
+        dummy.position.set(x, y + 0.37 + Math.sin(sek * 1.7 + i) * 0.012, z); dummy.scale.set(1, 1, 1); dummy.quaternion.copy(camera.quaternion);
         dummy.updateMatrix();
         let denkt = false;
-        for (const a of S.ki.anfragen) if (a.id === f.p) denkt = true;
+        for (let k = 0; k < S.ki.anfragen.length; k++) if (S.ki.anfragen[k].id === f.p) denkt = true;
         markMesh.setColorAt(nm, denkt ? MARK_DENKT : MARK_GOLD);
         markMesh.setMatrixAt(nm++, dummy.matrix);
       }
@@ -4658,7 +5027,95 @@ function baueGrafik(THREE, OrbitControls) {
     rauchSicht = glatt(8, 8.4, t) * (1 - glatt(16.6, 17, t));
   }
 
-  // Startblick: Mitte und Ausdehnung der Bebauung (einmalig, keine Kamerafahrt)
+  // Freie Fläche zwischen den Panels: Dorthin zielt der Blick. Der Bildausschnitt wird verschoben (setViewOffset), der Drehpunkt
+  // bleibt die Stadtmitte und liegt in der Mitte der freien Fläche. Jedes Panel schneidet eine Seite ab (oben, unten, links oder
+  // rechts); alle Kombinationen werden probiert, es gilt die, in der die Stadt (Seitenverhältnis stadtSeiten) am größten Platz hat.
+  // Ergebnis: Mitte mx, my und m = Höhe in Pixeln, die die Stadt dort haben darf. Die Mitte liegt höchstens 10 % der Bildhöhe
+  // unter der Bildmitte: render() prüft den Himmel mit dem halben Blickwinkel, oben kommen so höchstens gut 4° dazu (die Kuppel
+  // reicht 5° unter den Horizont).
+  const PANELS = ['kennzahlen', 'rechts', 'tempo', 'einst-knopf'];
+  let stadtSeiten = 1.6, stadtBedarf = 0.5, stadtWeit = 1;   // aus dem letzten Startblick: Breite : Höhe der Bebauung im Bild, ihre
+                                                          // Höhe samt Rand im Startabstand als Anteil der Bildhöhe, und wie viel
+                                                          // weiter weg die Kamera höchstens darf (Nebel)
+  function besteFlaeche(p, w, h) {
+    let best = { m: 0, mx: w / 2, my: h / 2, l: 0, r: w, o: 0 };
+    for (let k = 0; k < 4 ** p.length; k++) {
+      let l = 0, r = w, o = 0, u = h;
+      for (let i = 0, c = k; i < p.length; i++, c >>= 2) {
+        const q = p[i], seite = c & 3;
+        if (seite === 0) o = Math.max(o, q.bottom); else if (seite === 1) u = Math.min(u, q.top);
+        else if (seite === 2) l = Math.max(l, q.right); else r = Math.min(r, q.left);
+      }
+      const mx = (l + r) / 2, my = Math.min(h * 0.6, (o + u) / 2);
+      const m = Math.min(2 * Math.min(mx - l, r - mx) / stadtSeiten, 2 * Math.min(my - o, u - my));
+      if (m > best.m) best = { m, mx, my, l, r, o };
+    }
+    if (!best.m) best.m = Math.min(w / stadtSeiten, h);     // alles verdeckt: ganze Leinwand
+    return best;
+  }
+  function freiFlaeche(w, h) {
+    const p = [];
+    for (const id of PANELS) {
+      const e = document.getElementById(id), q = e && !e.hidden ? e.getBoundingClientRect() : null;
+      if (q && q.width && q.height) p.push(q);
+    }
+    const ohne = besteFlaeche(p, w, h);
+    // Die Karte wird zum Messen kurz eingeblendet, so hoch sie höchstens wird (dazwischen wird nichts gezeichnet)
+    const karte = document.getElementById('karte'), zu = karte.hidden;
+    karte.hidden = false; karte.style.height = '100vh';     // max-height begrenzt
+    const kq = karte.getBoundingClientRect();
+    karte.hidden = zu; karte.style.height = '';
+    if (!kq.width) return ohne;
+    // Karte als Spalte links (breit: unter den Zahlen) oder rechts über der Spalte mit Hauptfiguren und Stadtbuch (mittlere
+    // Breite): zählt mit, damit die Stadt auch bei offener Karte frei bleibt, solange die Kamera dafür höchstens ein Drittel weiter
+    // weg muss (und darf). Quer liegt die Karte rechts über der Stadt (die Spalte steht links): dort nicht, die Stadt würde winzig
+    const rechtsLinks = document.getElementById('rechts').getBoundingClientRect().left;
+    const links = kq.top < h / 2 && kq.right < w / 2, ueberSpalte = kq.top < h / 2 && kq.left > w / 2 && rechtsLinks > w / 2;
+    if (links || ueberSpalte) {
+      p.push({ left: kq.left, right: kq.right, top: 0, bottom: h });   // als Spalte über die ganze Höhe
+      const mit = besteFlaeche(p, w, h);
+      if (mit.m >= 0.75 * Math.min(ohne.m, stadtBedarf * h) && mit.m * stadtWeit >= stadtBedarf * h) return mit;
+    }
+    // Sonst rückt die Stadt in der freien Fläche von der Karte weg (Spalte: zur Seite, Blatt unten: nach oben), bis sie frei liegt,
+    // höchstens bis an den Rand der Fläche; nur wenn dann mindestens die Hälfte frei bleibt (Handy: das Blatt ist dafür zu hoch).
+    // s × b: Höhe und Breite der Stadt samt Rand im Bild, wie ausrichten() den Abstand wählt
+    const s = stadtBedarf * h / Math.min(stadtWeit, Math.max(1, stadtBedarf * h / ohne.m)), b = s * stadtSeiten;
+    if (links) {
+      const mx = Math.min(ohne.r - b / 2, Math.max(ohne.mx, kq.right + b / 2));
+      if (mx + b / 2 - kq.right >= b / 2) ohne.mx = mx;
+    } else if (ueberSpalte) {
+      const mx = Math.max(ohne.l + b / 2, Math.min(ohne.mx, kq.left - b / 2));
+      if (kq.left - (mx - b / 2) >= b / 2) ohne.mx = mx;
+    } else if (kq.width > w / 2 && kq.bottom > h / 2) {
+      const my = Math.max(ohne.o + s / 2, Math.min(ohne.my, kq.top - s / 2));
+      if (kq.top - (my - s / 2) >= s / 2) ohne.my = my;
+    }
+    return ohne;
+  }
+  function versatz(w, h) {                                 // setzt auch aspect und die Projektionsmatrix
+    const f = freiFlaeche(w, h);
+    camera.setViewOffset(w, h, w / 2 - f.mx, h / 2 - f.my, w, h);
+    return f;
+  }
+
+  // Ausdehnung der Bebauung im Bild (Bildkoordinaten −1 … 1): jedes Gebäude am Boden und in 2 Einheiten Höhe (knapp fünf Geschosse)
+  const bildPunkt = new THREE.Vector3(), bild = { a0: 0, a1: 0, b0: 0, b1: 0 };
+  function ausdehnung() {
+    camera.updateMatrixWorld();
+    bild.a0 = bild.b0 = 1e9; bild.a1 = bild.b1 = -1e9;
+    for (let b = 0; b < S.gAnzahl; b++) {
+      for (let y = 0; y <= 2; y += 2) {
+        bildPunkt.set(wx(S.g.x[b]), y, wx(S.g.y[b])).project(camera);
+        bild.a0 = Math.min(bild.a0, bildPunkt.x); bild.a1 = Math.max(bild.a1, bildPunkt.x);
+        bild.b0 = Math.min(bild.b0, bildPunkt.y); bild.b1 = Math.max(bild.b1, bildPunkt.y);
+      }
+    }
+    return bild;
+  }
+
+  // Startblick: Mitte und Ausdehnung der Bebauung (einmalig, keine Kamerafahrt). Abstand wie bisher; weiter weg nur, wenn die
+  // Bebauung sonst nicht in die freie Fläche passt (Rand 8 %), und dann höchstens bis kurz hinter den Nebelanfang: weiter
+  // hinten verschwimmt die Stadt (große Stadt auf dem Handy). Was dann nicht passt, ragt an den Seiten hinaus
   function ausrichten() {
     let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
     for (let b = 0; b < S.gAnzahl; b++) {
@@ -4670,18 +5127,34 @@ function baueGrafik(THREE, OrbitControls) {
     const d = Math.min(controls.maxDistance, 14 + r * 2.1);
     camera.position.set(cx + d * 0.45, d * 0.62, cz + d * 0.65);
     controls.update();
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (!w || !h) return;
+    let e = ausdehnung();
+    const bw = (e.a1 - e.a0) / 2 * w, bh = Math.max(1, (e.b1 - e.b0) / 2 * h);
+    stadtSeiten = Math.min(4, Math.max(0.5, bw / bh)); stadtBedarf = bh / 0.92 / h; stadtWeit = Math.max(1, (scene.fog.near + 10) / d);
+    const d2 = Math.min(controls.maxDistance, d * Math.min(stadtWeit, Math.max(1, stadtBedarf * h / versatz(w, h).m)));
+    camera.position.set(cx + d2 * 0.45, d2 * 0.62, cz + d2 * 0.65);
+    controls.update();
+    // Feinausgleich: Die Mitte der Ausdehnung im Bild (nicht die Mitte im Grundriss) soll im Blickpunkt liegen. Blickpunkt und
+    // Kamera rücken dazu auf dem Boden um den Unterschied; Richtung und Abstand bleiben
+    e = ausdehnung();
+    bildPunkt.set((e.a0 + e.a1) / 2, (e.b0 + e.b1) / 2, 0.5).unproject(camera).sub(camera.position);
+    if (bildPunkt.y < -1e-6) {
+      const t = -camera.position.y / bildPunkt.y;           // dort trifft der Strahl den Boden
+      const dx = camera.position.x + bildPunkt.x * t - controls.target.x, dz = camera.position.z + bildPunkt.z * t - controls.target.z;
+      controls.target.x += dx; controls.target.z += dz; camera.position.x += dx; camera.position.z += dz;
+      controls.update();
+    }
   }
-  ausrichten();
 
   function groesse() {
     const w = canvas.clientWidth, h = canvas.clientHeight;
     if (!w || !h) return;
     renderer.setSize(w, h, false);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
+    versatz(w, h);                                         // Panels liegen nach einem Größenwechsel anders
   }
   new ResizeObserver(groesse).observe(canvas);
-  groesse();
+  groesse();                                              // den Startblick setzt das Skript unten, wenn die Panels stehen
 
   return {
     stadt, licht, ausrichten,
@@ -4722,7 +5195,7 @@ addEventListener('keydown', (e) => {
   if (tempo) { tempoVorPause = tempo; setzeTempo(0); } else setzeTempo(tempoVorPause);
 });
 
-// Stadtbuch ein- und ausklappen. Eingeklappt zählt eine Marke die neuen Einträge; schmal (Handy) startet es eingeklappt
+// Stadtbuch ein- und ausklappen. Eingeklappt zählt eine Marke die neuen Einträge; auf Handy und Tablet startet es eingeklappt
 let buchUngelesen = 0;
 function buchNeuZahl() {
   const z = $('buch-neu');
@@ -4732,10 +5205,11 @@ function buchNeuZahl() {
 function buchKlappen(auf) {
   $('buch-knopf').setAttribute('aria-expanded', String(auf));
   $('buch-liste').hidden = !auf;
+  document.body.classList.toggle('buch-offen', auf);      // quer: aufgeklappt liegt die Liste rechts über der Stadt (CSS)
   if (auf) { buchUngelesen = 0; buchNeuZahl(); }
 }
 $('buch-knopf').addEventListener('click', () => buchKlappen($('buch-knopf').getAttribute('aria-expanded') !== 'true'));
-if (matchMedia('(max-width: 720px)').matches) buchKlappen(false);
+buchKlappen(!matchMedia('(max-width: 900px), (max-height: 500px) and (orientation: landscape)').matches);
 
 function kennzahlenAnzeigen() {
   const k = Sim.kennzahlen(S);
@@ -4762,11 +5236,13 @@ function uhrAnzeigen(t) {
 // Stadtbuch: Namen als Marke \u0001ID/GEN/Name\u0002 → anklickbarer Name (Personenkarte ab Phase 3)
 const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function buchHtml(text) {
-  return esc(text).replace(/\u0001(\d+)\/(\d+)\/([^\u0002]*)\u0002/g,
-    (m, id, gen, n) => `<button type="button" class="name" data-p="${id}" data-g="${gen}" data-n="${n}">${n}</button>`);
+  return esc(text).replace(/\u0001(\d+)\/(\d+)\/([^\u0002]*)\u0002([,.;:!?]?)/g, (m, id, gen, n, z) => {
+    const k = `<button type="button" class="name" data-p="${id}" data-g="${gen}" data-n="${n}">${n}</button>`;
+    return z ? `<span class="zusammen">${k}${z}</span>` : k;    // Satzzeichen bleibt am Namen
+  });
 }
 // Symbol und Wort je Art. Ruhig: meist grau, Akzent nur für Wichtiges, gedämpftes Rot für Verluste.
-// Das Wort steht nur als Hinweis am Symbol (Überfahren): der Eintrag selbst sagt schon, was passiert ist
+// Symbol und Wort stehen in der Tageszeile über dem Text; das Wort fällt weg, wenn der Text schon damit anfängt
 const ART = {
   zuzug: ['s-rein', 'Zuzug'], wegzug: ['s-raus', 'Wegzug'], kinder_weg: ['s-raus', 'Zu Verwandten'],
   geburt: ['s-spross', 'Geburt'], tod: ['s-kerze', 'Todesfall'], hochzeit: ['s-ringe', 'Hochzeit'], trennung: ['s-bruch', 'Trennung'],
@@ -4776,10 +5252,12 @@ const ART = {
   start: ['s-fahne', 'Start', 'wichtig'], notbremse: ['s-warnung', 'Notbremse', 'wichtig'],
 };
 const eintragKlasse = (e) => 'eintrag' + (ART[e.art] && ART[e.art][2] ? ' ' + ART[e.art][2] : '');
+// Erstes Wort, ohne Artikel davor („Das Bauamt baut …“ → bauamt, „Hochzeit: …“ → hochzeit)
+const erstesWort = (s) => ((/^(?:(?:der|die|das)\s+)?([\p{L}-]+)/iu.exec(s) || [])[1] || '').toLowerCase();
 function eintragHtml(e) {
-  const a = ART[e.art] || ['s-fahne', ''];
-  return `<svg class="sym art-sym" aria-hidden="true">${a[1] ? `<title>${a[1]}</title>` : ''}<use href="#${a[0]}"/></svg>`
-    + `<div><span class="tag">Tag ${Number(e.tag)}</span>${buchHtml(String(e.text))}</div>`;
+  const a = ART[e.art] || ['s-fahne', ''], text = String(e.text);
+  const wort = a[1] && erstesWort(text) !== erstesWort(a[1]) ? ` · ${a[1]}` : '';
+  return `<span class="tag"><svg class="sym art-sym" aria-hidden="true"><use href="#${a[0]}"/></svg>Tag ${Number(e.tag)}${wort}</span>${buchHtml(text)}`;
 }
 let buchGesehen = 0;
 const BUCH_ANZEIGE = Sim.R.BUCH_MAX;                     // alle Einträge, damit „Während du weg warst“ immer im Buch zu finden ist
@@ -4807,6 +5285,7 @@ const BEDARF = [['geld', 'Geld'], ['wohnen', 'Wohnen'], ['kontakt', 'Kontakt'], 
 const nameKnopf = (r) => !r ? '<span class="leise">–</span>' : r.id >= 0
   ? `<button type="button" class="name${r.lebt ? '' : ' weg'}" data-p="${r.id}" data-g="${r.gen}" data-n="${esc(r.name)}">${esc(r.name)}</button>`
   : `<span class="leise">${esc(r.name)}</span>`;
+const namenListe = (a) => a.map((r, i) => i < a.length - 1 ? `<span class="zusammen">${nameKnopf(r)},</span>` : nameKnopf(r)).join(' ');
 const hausKnopf = (b, text) => b >= 0 ? `<button type="button" class="haus" data-b="${b}">${text}</button>` : text;
 const balken = (wert, gruen) => `<div class="balken${gruen ? ' gruen' : ''}" role="img" aria-label="${Math.round(wert)} von 100"><span style="width:${Math.max(0, Math.min(100, wert))}%"></span></div>`;
 function zeigePerson(p, gen, name) { verlauf.push({ art: 'p', id: Number(p), gen: Number(gen), name: name || '' }); if (verlauf.length > 50) verlauf.shift(); karteRendern(true); }
@@ -4885,7 +5364,7 @@ function personHtml(p, gen, name) {
   h += `<h3>Lebenslauf</h3>` + (i.gedaechtnis.length
     ? `<ol class="lebenslauf">${i.gedaechtnis.map(m => `<li><span class="tag">Tag ${m.tag}</span><span>${buchHtml(m.text)}</span></li>`).join('')}</ol>`
     : '<p class="leise">Noch nichts erlebt.</p>');
-  const liste = (a) => a.length ? a.map(nameKnopf).join(', ') : '<span class="leise">–</span>';
+  const liste = (a) => a.length ? namenListe(a) : '<span class="leise">–</span>';
   h += `<h3>Familie</h3><dl class="familie">
     <dt>Partner</dt><dd>${nameKnopf(i.partner)}</dd>
     <dt>Eltern</dt><dd>${liste(i.eltern)}</dd>
@@ -4905,7 +5384,7 @@ function gebaeudeHtml(b) {
   if (g.bau) {
     const b = g.bau;
     h += `<h3>Baustelle</h3><p>${b.geschafft} von ${b.gesamt} Arbeitstagen geschafft${b.still ? `, seit ${b.still} ${b.still === 1 ? 'Tag' : 'Tagen'} kam niemand vom Bauhof` : ''}.</p>`
-      + `<p class="leise">${b.heute.length ? 'Heute bauen hier: ' + b.heute.map(nameKnopf).join(', ')
+      + `<p class="leise">${b.heute.length ? 'Heute bauen hier: ' + namenListe(b.heute)
         : b.eingeteilt ? 'Heute ist niemand vom Bauhof hier.' : 'Der Bauhof teilt um 7 Uhr ein, wer wo baut.'}</p>`;
   }
   if (!g.personen.length) return h + (g.typ === Sim.PARK || g.bau ? '' : '<p class="leise">Hier ist gerade niemand.</p>');
@@ -5641,6 +6120,7 @@ if (DEBUG) {
 if (DEBUG) globalThis.__stadt = { S: () => S, Sim, G, setzeTempo, schritt, nachSchritten, speichern, aufholen, ki, kiTakt };   // nur für Tests
 setzeTempo(tempo);
 nachSchritten();
+if (G) G.ausrichten();                                   // Startblick erst jetzt: Panels haben ihren Anfangszustand (Stadtbuch, Hauptfiguren)
 requestAnimationFrame(frame);
 
 if (versionFehler) {
