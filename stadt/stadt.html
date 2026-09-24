@@ -4696,6 +4696,7 @@ function baueGrafik(THREE, OrbitControls) {
   markMesh.renderOrder = 2;                               // nach Himmel (1) und allem Durchsichtigen
   const MARK_GOLD = new THREE.Color('#ffc864'), MARK_DENKT = new THREE.Color('#f4f4f7');   // überlegt = weiß
   const MARK_ABSTAND = 16;                                // ab diesem Kameraabstand wächst die Raute mit (figurenBewegen)
+  const markIds = new Int32Array(HAUPT_MAX);              // Person je Raute (für treffen)
   const MARK_DURCH = 25;                                  // ab diesem Kameraabstand ist die Raute auch hinter Häusern zu sehen
   figMesh.setColorAt(0, LICHT); markMesh.setColorAt(0, MARK_GOLD); M.bau.setColorAt(0, GERUEST);   // Farbpuffer gleich anlegen: dann passt der vorab übersetzte Shader
   const WESTE = new THREE.Color('#e8792c'), BLAUMANN = new THREE.Color('#4f7fc0');       // Bauarbeiter, Handwerker
@@ -4977,6 +4978,7 @@ function baueGrafik(THREE, OrbitControls) {
         let denkt = false;
         for (let k = 0; k < S.ki.anfragen.length; k++) if (S.ki.anfragen[k].id === f.p) denkt = true;
         markMesh.setColorAt(nm, denkt ? MARK_DENKT : MARK_GOLD);
+        markIds[nm] = f.p;
         markMesh.setMatrixAt(nm++, dummy.matrix);
       }
     }
@@ -5000,7 +5002,7 @@ function baueGrafik(THREE, OrbitControls) {
   }
 
   // ─── Klicken: Figur (in Bildschirmnähe) oder Gebäude ───
-  const ray = new THREE.Raycaster(), zeiger = new THREE.Vector2(), treffer = [], v3 = new THREE.Vector3(), m4 = new THREE.Matrix4();
+  const ray = new THREE.Raycaster(), zeiger = new THREE.Vector2(), treffer = [], v3 = new THREE.Vector3(), m4 = new THREE.Matrix4(), figPos = new THREE.Vector3();
   const KLICKBAR = [M.haus, M.dach, M.fenster, M.scheiben, M.werkstatt, M.schlot, M.laden, M.ladenGlas, M.teil, M.bau, M.tech];
   const KLICK_IDS = [IDS.haus, IDS.dach, IDS.fenster, IDS.scheiben, IDS.werkstatt, IDS.schlot, IDS.laden, IDS.ladenGlas, IDS.teil, IDS.bau, IDS.tech];
   // Lage der Leinwand (fest über das ganze Fenster; groesse() misst nach): der Zeiger fragt bis zu zehnmal je Sekunde
@@ -5008,25 +5010,44 @@ function baueGrafik(THREE, OrbitControls) {
   // Was liegt unter (cx, cy)? 1: Figur (wahlP, wahlGen), 2: Gebäude (wahlB), 0: nichts. Legt selbst nichts an
   let wahlP = -1, wahlGen = 0, wahlB = -1;
   function treffen(cx, cy) {
+    // Zuerst die Rauten der Hauptfiguren: sie schweben über dem Kopf, ein Klick darauf gilt ihrer Figur
+    let bestP = -1, bestD = 14 * 14;
+    for (let k = 0; k < markMesh.count; k++) {
+      markMesh.getMatrixAt(k, m4);
+      v3.setFromMatrixPosition(m4).project(camera);
+      if (v3.z >= 1) continue;
+      const sx = (v3.x + 1) / 2 * leinW + leinL, sy = (1 - v3.y) / 2 * leinH + leinT, d = (sx - cx) ** 2 + (sy - cy) ** 2;
+      if (d < bestD) { bestD = d; bestP = markIds[k]; }
+    }
+    if (bestP >= 0) { wahlP = bestP; wahlGen = S.p.gen[bestP]; return 1; }
     // Figuren sind klein: nimm die nächste sichtbare Figur im Umkreis von 16 Pixeln
-    let bestP = -1, bestD = 16 * 16;
+    let bestI = -1;
+    bestD = 16 * 16;
     for (let i = 0; i < figuren.length; i++) {
       if (figIds[i] < 0) continue;
       figMesh.getMatrixAt(i, m4);
       v3.setFromMatrixPosition(m4); v3.y += 0.15; v3.project(camera);
       const sx = (v3.x + 1) / 2 * leinW + leinL, sy = (1 - v3.y) / 2 * leinH + leinT;
       const d = (sx - cx) ** 2 + (sy - cy) ** 2;
-      if (d < bestD && v3.z < 1) { bestD = d; bestP = figIds[i]; }
+      if (d < bestD && v3.z < 1) { bestD = d; bestI = i; }
     }
-    if (bestP >= 0) { wahlP = bestP; wahlGen = S.p.gen[bestP]; return 1; }
+    // Gebäude unter dem Zeiger (Treffer sind nach Abstand sortiert)
     zeiger.set(((cx - leinL) / leinW) * 2 - 1, -((cy - leinT) / leinH) * 2 + 1);
     ray.setFromCamera(zeiger, camera);
     treffer.length = 0;
     ray.intersectObjects(KLICKBAR, false, treffer);
+    let gebB = -1, gebD = Infinity;
     for (let j = 0; j < treffer.length; j++) {
       const t = treffer[j], k = KLICKBAR.indexOf(t.object);
-      if (k >= 0 && t.instanceId !== undefined && t.instanceId < t.object.count && KLICK_IDS[k][t.instanceId] >= 0) { wahlB = KLICK_IDS[k][t.instanceId]; return 2; }
+      if (k >= 0 && t.instanceId !== undefined && t.instanceId < t.object.count && KLICK_IDS[k][t.instanceId] >= 0) { gebB = KLICK_IDS[k][t.instanceId]; gebD = t.distance; break; }
     }
+    // Die Figur gilt nur, wenn keine Wand deutlich näher davor liegt (sonst gewinnen verdeckte Figuren Klick und Zeiger)
+    if (bestI >= 0) {
+      figMesh.getMatrixAt(bestI, m4);
+      figPos.setFromMatrixPosition(m4); figPos.y += 0.15;
+      if (gebB < 0 || gebD > camera.position.distanceTo(figPos) - 0.2) { wahlP = figIds[bestI]; wahlGen = S.p.gen[wahlP]; return 1; }
+    }
+    if (gebB >= 0) { wahlB = gebB; return 2; }
     return 0;
   }
   function waehle(cx, cy) {
@@ -5295,9 +5316,11 @@ function baueGrafik(THREE, OrbitControls) {
     sperrR[0] = sperrR[1] = Infinity; sperrR[2] = sperrR[3] = -Infinity;
     for (let e = 0; e < 8; e++) {
       namenPunkt.set(x + (e & 1 ? 0.5 : -0.5), e & 2 ? h : 0, z + (e & 4 ? 0.5 : -0.5)).project(camera);
+      if (namenPunkt.z > 1) continue;                     // hinter der Kamera: Bildlage gespiegelt, unbrauchbar
       const px = (namenPunkt.x + 1) / 2 * leinW + leinL, py = (1 - namenPunkt.y) / 2 * leinH + leinT;
       sperrR[0] = Math.min(sperrR[0], px - 4); sperrR[1] = Math.min(sperrR[1], py - 4); sperrR[2] = Math.max(sperrR[2], px + 4); sperrR[3] = Math.max(sperrR[3], py + 4);
     }
+    sperrAn = sperrR[0] < Infinity;                       // keine Ecke vor der Kamera: nichts sperren
   }
   function strassenNamen() {
     namenFaellig = false;

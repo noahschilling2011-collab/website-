@@ -108,6 +108,10 @@ Einträge neu sind. Bei reduzierter Bewegung steht der Rauch still, und es gibt 
 - Auf Tablets und quergehaltenen Handys liegen Karten und Spalten so, dass die Kennzahlen frei bleiben.
 
 **Auswahl und Orientierung.**
+- Klicks: Eine Figur zählt nur, wenn keine Wand deutlich näher davor liegt; ein Klick auf die Raute einer Hauptfigur öffnet diese
+  Hauptfigur.
+- Der Startblick misst jedes Gebäude als ganzes Feld bis zur Dachkante (vorher nur die Feldmitte). Die Stadt hält dadurch
+  mindestens 12 px Abstand zu den Panels; öffnet sich eine Karte, rückt sie nur von ihr weg.
 - Solange eine Hauskarte offen ist, ist das Gebäude leicht goldgetönt (nachts etwas stärker) und hat einen goldenen Rahmen am
   Boden und einen zweiten oben: auf der Dachkante oder an der Traufe (auch nachts zu sehen). So bleibt die Auswahl auch zu
   erkennen, wenn ein Hochhaus davor den Boden verdeckt. Eine Personenkarte markiert nichts. Schließen oder Escape nimmt die
