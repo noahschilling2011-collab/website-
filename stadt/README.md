@@ -86,7 +86,7 @@ Weiche Wolkenschatten ziehen langsam über Boden, Häuser und Bäume (tagsüber,
 Stadt liegt ein See mit Schilf und Steinen im Feldring. Wohntürme haben Balkone zur Straße, und nachts leuchten die Fenster je
 Haus leicht verschieden warm. Die Oberfläche hat Symbole im Kennzahlen-Panel, Sonne oder Mond an der Uhr und ein Symbol je
 Stadtbuch-Eintrag. Die Karten haben einen klareren Kopf. Auf dem Handy ist das Stadtbuch eingeklappt und zeigt, wie viele
-Einträge neu sind. Bei reduzierter Bewegung stehen Rauch und Wolken still.
+Einträge neu sind. Bei reduzierter Bewegung steht der Rauch still, und es gibt keine Wolkenschatten.
 
 In der 3D-Ansicht wächst auf jeder Baustelle ein grauer Rohbau mit den geschafften Arbeitstagen. Das Gerüst wird dunkler,
 solange niemand kommt, und lässt sich anklicken. Bauarbeiter (orange) stehen an den Ecken ihrer Baustelle, Handwerker

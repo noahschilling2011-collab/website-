@@ -93,7 +93,7 @@
   #kennzahlen .einheit { color: var(--text-leise); font-weight: 400; }
 
   /* Tempo unten mittig: aktives Tempo voll im Akzent. Schriftstärke in jedem Zustand gleich (500), sonst springt die Leiste */
-  #tempo { position: fixed; left: 50%; bottom: var(--s4); transform: translateX(-50%); display: flex; gap: 2px; padding: var(--s1); }
+  #tempo { position: fixed; left: 50%; bottom: var(--s4); transform: translateX(-50%); display: flex; gap: 4px; padding: var(--s1); }
   #tempo button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 60px; height: 38px; padding: 0 var(--s3);
     background: transparent; border: 0; border-radius: 10px; cursor: pointer; color: var(--text-leise); font-weight: 500;
     font-variant-numeric: tabular-nums; transition: background-color var(--dauer) ease-out, color var(--dauer) ease-out; }
@@ -377,7 +377,7 @@
 
 <section id="kennzahlen" class="glas" aria-label="Die Stadt in Zahlen">
   <div class="zeit">
-    <span class="tag-anzeige"><span class="tag-wort">Tag</span><span id="k-tag">0</span></span>
+    <span class="tag-anzeige"><span class="tag-wort">Tag</span> <span id="k-tag">0</span></span>
     <span class="uhr"><svg class="sym" id="k-phase" aria-hidden="true"><use href="#s-sonne"/></svg><span id="k-uhr">06:00</span></span>
   </div>
   <dl>
@@ -3882,7 +3882,7 @@ function baueGrafik(THREE, OrbitControls) {
         rauchDummy.scale.set(s, s, s);
         rauchDummy.updateMatrix();
         rauch.setMatrixAt(j, rauchDummy.matrix);
-        a[j] = rauchSicht * 0.75 * glatt(0, 0.3, t) * (1 - t) ** 1.5;   // am Schlot langsam einblenden (höchstens 0,45), dann verblassen
+        a[j] = rauchSicht * 0.75 * glatt(0, 0.1, t) * (1 - t) ** 1.5;   // direkt am Schlot einblenden (höchstens 0,6), dann verblassen
       }
     }
     rauch.count = n; rauchVorher = n;
@@ -4151,7 +4151,8 @@ function baueGrafik(THREE, OrbitControls) {
         if (nf < fensterMax && setze(M.fenster, nf, px + dx * 0.45, hoehe - 0.2, pz + dz * 0.45, 0.75, 0.15, 0.064, dx !== 0 ? Math.PI / 2 : 0)) {
           IDS.fenster[nf] = b; M.fenster.setColorAt(nf++, leer ? GLAS_NACHT : SCHILD[pr]);
         }
-        if (setze(M.schlot, ns, px - qx * 0.25 - dx * 0.2, hoehe, pz - qz * 0.25 - dz * 0.2, 0.55, 0.45 + 0.1 * g.stufe[b], 0.55)) { IDS.schlot[ns] = b; M.schlot.setColorAt(ns++, ANTENNE); }
+        // Antenne auf dem Dach; während eines Anbaus nicht (sie stäke sonst im wachsenden Rohbau)
+        if (!g.auf[b] && setze(M.schlot, ns, px - qx * 0.25 - dx * 0.2, hoehe, pz - qz * 0.25 - dz * 0.2, 0.55, 0.45 + 0.1 * g.stufe[b], 0.55)) { IDS.schlot[ns] = b; M.schlot.setColorAt(ns++, ANTENNE); }
         // Sprossen: dünne Stäbe quer durch den Glasbau, knapp vor den Bändern, vom untersten bis zum obersten Band.
         // In Wandfarbe: vor der Wand verschwinden sie, im Glas teilen sie das Band in Scheiben.
         farbe.copy(TECH_GLAS[pr]).multiplyScalar(leer ? 0.5 : 1);
@@ -4208,7 +4209,7 @@ function baueGrafik(THREE, OrbitControls) {
         // schlanker Schlot hinten in der Ecke, kommt aus dem Sheddach
         if (setze(M.schlot, ns, px - dx * 0.27 - qx * 0.28, 0.3, pz - dz * 0.27 - qz * 0.28, 1, 0.62, 1)) { IDS.schlot[ns] = b; M.schlot.setColorAt(ns++, SCHLOT); }
         // Rauch, solange hier heute gearbeitet wird (wie die Kisten in der Simulation: da, nicht frei, nicht auf dem Bau).
-        // Ort und Oberkante aus der Matrix des Schlots (Einheitszylinder, nur um y gedreht: Element 5 ist seine Höhe)
+        // Ort und Oberkante aus der Matrix des Schlots (schlotForm mit Höhe 1, nur um y gedreht: Element 5 ist seine Höhe)
         if (!leer && arbeitszeit && nrauch < SCHLOT_MAX && ns > laternen && IDS.schlot[ns - 1] === b) {
           let da = 0;
           for (const p of S.belegschaft[b]) if (!S.p.frei[p] && !S.p.einsatz[p]) da++;
@@ -4296,7 +4297,7 @@ function baueGrafik(THREE, OrbitControls) {
   const figMesh = inst(figGeo, lambert('#ffffff'), FIG_GES);
   const markMesh = inst(new THREE.OctahedronGeometry(0.065), new THREE.MeshBasicMaterial({ color: '#ffffff' }), HAUPT_MAX);
   const MARK_GOLD = new THREE.Color('#ffc864'), MARK_DENKT = new THREE.Color('#f4f4f7');   // überlegt = weiß
-  figMesh.setColorAt(0, LICHT); markMesh.setColorAt(0, MARK_GOLD);   // Farbpuffer gleich anlegen: dann passt der vorab übersetzte Shader
+  figMesh.setColorAt(0, LICHT); markMesh.setColorAt(0, MARK_GOLD); M.bau.setColorAt(0, GERUEST);   // Farbpuffer gleich anlegen: dann passt der vorab übersetzte Shader
   const WESTE = new THREE.Color('#e8792c'), BLAUMANN = new THREE.Color('#4f7fc0');       // Bauarbeiter, Handwerker
   const PROGRAMMIER = new THREE.Color('#a78cf2');                                         // Programmiererinnen und Programmierer
   const NULL = new THREE.Matrix4().makeScale(0, 0, 0);
