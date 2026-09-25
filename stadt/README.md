@@ -133,7 +133,7 @@ Einträge neu sind. Bei reduzierter Bewegung steht der Rauch still, und es gibt 
   Steht die Kamera, wird nichts nachgerechnet; ein Zeitgeber holt Wartende einmal nach.
 - Die Schilder sind durchsichtiger, Figuren dahinter scheinen durch. Der Text hat vor reinem Weiß noch 5,1:1 Kontrast
   (gemessen hinter allen Schildern bei Tag, Abend und Nacht: mindestens 5,2:1).
-- Der goldene Rahmen der Auswahl wird ab Kameraabstand 18 mit dem Abstand breiter (höchstens 2,6-fach) und satter gold. Im
+- Der goldene Rahmen der Auswahl wird ab etwa 18 Einheiten Abstand zwischen Kamera und Gebäude mit dem Abstand breiter (höchstens 2,6-fach) und satter gold. Im
   Startblick ist das ausgewählte Hochhaus nachts auch zwischen erleuchteten Türmen zu finden. Nah bleibt er wie bisher.
 - Liegt das ausgewählte Gebäude unter der Hauskarte, und auf dem Handy immer, gibt es oben in der Karte den Knopf „Zeigen“.
   Er rückt Blickpunkt und Kamera gleich weit, bis das Gebäude mitten in der freien Fläche neben oder über der Karte liegt. Die
@@ -149,11 +149,12 @@ Schließung meldet, sieht man auch am Gebäude: Um das Grundstück zieht ein fla
 verblasst (gut 2,5 Sekunden echte Zeit). Fertig gebaut (auch Aufstockung und Anbau) und eröffnet im Akzent. Pleite und
 Schließung gedämpft rot, und der Ring zieht sich dabei zusammen statt weit: So unterscheiden sich beide auch nachts, wenn fast
 alle Pleiten und Fertigstellungen (0 Uhr) fallen und die Farben sich angleichen. Aus der Ferne (große Stadt) wird der Ring im
-Bild nicht kleiner als etwa 20 px Radius und rückt auf dem Sehstrahl zur Kamera: Im Bild liegt er an derselben Stelle, wird
-aber nicht mehr von den Nachbarhäusern verdeckt. Nah (Kameraabstand unter 45) bleibt er am Boden. Die Simulation meldet
+Bild etwa 20 px Radius groß (Pleite und Schließung ziehen sich auf etwa 10 px zusammen, bei reduzierter Bewegung etwa
+16 px; auf niedrigen Bildschirmen wie dem Handy quer wird er von fern etwas kleiner) und rückt auf dem Sehstrahl zur Kamera: Im Bild liegt er an derselben Stelle, wird
+aber nicht mehr von den Nachbarhäusern verdeckt. Nah (Ring weniger als 45 Einheiten von der Kamera) bleibt er am Boden. Die Simulation meldet
 dafür nichts: Die Karte vergleicht stündlich jedes Gebäude mit der Stunde davor (Baustelle → fertig, Stufe, leer/offen). Eine
 Gründung auf freiem Bauplatz zeigt sich also erst, wenn der Bau fertig ist. Höchstens 12 Ringe zugleich, mehrere leicht
-nacheinander, bei 20× höchstens 3 je Stunde; keine beim Start, nach Import oder Aufholen und nach Sprüngen über mehr als 3
+nacheinander, bei 20× höchstens 3 je Stunde (das Gebäude der offenen Karte zuerst); keine beim Start, nach Import oder Aufholen und nach Sprüngen über mehr als 3
 Stunden. Bei reduzierter Bewegung steht der Ring still und ist nach 3 Sekunden ohne Übergang weg. Nicht klickbar; solange ein
 Ring läuft, 1 Draw Call und 2 Dreiecke je Ring mehr, sonst nichts (ein Shader-Programm mehr, schon beim Start übersetzt).
 Im Browser geprüft (Lage, Farbe, Draw Calls, Drosselung, reduzierte Bewegung).

@@ -205,6 +205,7 @@
   /* „Zeigen“ (Hauskarte, schmal oder wenn die Karte das Gebäude verdeckt): links neben dem Schließen, so hoch wie dieses und mit
      8 px Abstand (am Handy kein Fehltipp aufs X); --text auf --karte gerechnet 14:1, beim Überfahren --text-stark auf --hell-3 12,5:1 */
   #karte .kopf #karte-zeigen { margin: 0 var(--s2) 0 auto; min-height: 32px; display: inline-flex; align-items: center; gap: 6px; color: var(--text); }
+  #karte .kopf #karte-zeigen:hover { color: var(--text-stark); }
   #karte .kopf #karte-zeigen .sym { width: 15px; height: 15px; color: var(--akzent); }
   .karte-kopf { display: flex; align-items: center; gap: var(--s3); margin: 0 0 var(--s3); }
   .karte-kopf .titel { min-width: 0; }
@@ -4090,25 +4091,32 @@ function baueGrafik(THREE, OrbitControls) {
   zeichen.setColorAt(0, ZEICHEN_F[0]);                    // Farbpuffer vor dem Übersetzen (compile übersetzt auch Unsichtbares)
   zeichen.visible = false;
   // Einmal je Stunde am Anfang von stadt(): vergleichen (nur nach 1 bis 3 Stunden Takt in derselben Stadt), dann den Stand merken
+  // Art des Ereignisses an Gebäude b seit der Vorstunde (0 fertig, 1 eröffnet, 2 Pleite/Schließung, −1 keins)
+  function zeichenArt(b, K) {
+    const g = S.g, t = g.typ[b], f = S.feld[g.y[b] * K + g.x[b]], leer = g.leer[b];
+    const steht = (t === Sim.WERKSTATT || t === Sim.LADEN || t === Sim.TECH) && f === t && vorFeld[b] === t;   // fertiger Betrieb
+    return (vorFeld[b] === Sim.BAUSTELLE && f !== Sim.BAUSTELLE) || g.stufe[b] > vorStufe[b] ? 0
+      : steht && vorLeer[b] && !leer ? 1 : steht && !vorLeer[b] && leer ? 2 : -1;
+  }
+  function zeichenSetzen(b, art, start) {
+    let k = 0;                                            // freier Platz (−1) oder das älteste Zeichen
+    for (let i = 1; i < ZEICHEN_MAX; i++) if (zStart[i] < zStart[k]) k = i;
+    zStart[k] = start; zX[k] = wx(S.g.x[b]); zZ[k] = wx(S.g.y[b]); zArt[k] = art;
+  }
   function ereignisse() {
     const g = S.g, K = Sim.KARTE, n = Math.min(S.gAnzahl, F), stunde = S.tag * 24 + S.stunde;
     const vergleichen = vorS === S && stunde > vorStunde && stunde - vorStunde <= 3;
     const grenze = tempo >= 20 ? ZEICHEN_20 : ZEICHEN_MAX, jetzt = performance.now() / 1000;
+    // Das Gebäude der offenen Karte zuerst (bei 20× ginge es sonst hinter kleineren Nummern leer aus)
+    const wahl = vergleichen && auswahlB >= 0 && auswahlB < n && auswahlB < vorAnzahl ? auswahlB : -1;
     let neu = 0;
+    if (wahl >= 0) { const art = zeichenArt(wahl, K); if (art >= 0) zeichenSetzen(wahl, art, jetzt + neu++ * ZEICHEN_VERSATZ); }
     for (let b = 0; b < n; b++) {
-      const t = g.typ[b], f = S.feld[g.y[b] * K + g.x[b]], leer = g.leer[b], stufe = g.stufe[b];
-      if (vergleichen && b < vorAnzahl && neu < grenze) {
-        const steht = (t === Sim.WERKSTATT || t === Sim.LADEN || t === Sim.TECH) && f === t && vorFeld[b] === t;   // fertiger Betrieb
-        const art = (vorFeld[b] === Sim.BAUSTELLE && f !== Sim.BAUSTELLE) || stufe > vorStufe[b] ? 0
-          : steht && vorLeer[b] && !leer ? 1 : steht && !vorLeer[b] && leer ? 2 : -1;
-        if (art >= 0) {
-          let k = 0;                                      // freier Platz (−1) oder das älteste Zeichen
-          for (let i = 1; i < ZEICHEN_MAX; i++) if (zStart[i] < zStart[k]) k = i;
-          zStart[k] = jetzt + neu * ZEICHEN_VERSATZ; zX[k] = wx(g.x[b]); zZ[k] = wx(g.y[b]); zArt[k] = art;
-          neu++;
-        }
+      if (vergleichen && b < vorAnzahl && neu < grenze && b !== wahl) {
+        const art = zeichenArt(b, K);
+        if (art >= 0) zeichenSetzen(b, art, jetzt + neu++ * ZEICHEN_VERSATZ);
       }
-      vorFeld[b] = f; vorLeer[b] = leer; vorStufe[b] = stufe;
+      vorFeld[b] = S.feld[g.y[b] * K + g.x[b]]; vorLeer[b] = g.leer[b]; vorStufe[b] = g.stufe[b];
     }
     vorAnzahl = n; vorStunde = stunde; vorS = S;
   }
@@ -5986,12 +5994,12 @@ function auswahlZeigen() {
 }
 // „Zeigen“ in der Hauskarte: schmal (Handy) immer, sonst nur, wenn die Karte das Gebäude verdeckt. Geprüft beim Zeichnen der Karte,
 // nach dem Drehen oder Zoomen (controls 'end'), 250 ms nach der letzten Kamerabewegung (die Dämpfung lässt sie nach 'end' noch
-// gleiten; ein Zeitgeber, kein Rechnen pro Bild) und bei Größenwechsel; mit dem Fokus darauf verschwindet der Knopf nicht
+// gleiten; ein Zeitgeber, kein Rechnen pro Bild) und bei Größenwechsel; mit Tastatur-Fokus darauf verschwindet der Knopf nicht
 const SCHMAL = matchMedia('(max-width: 720px), (max-height: 500px) and (orientation: landscape)');
 function zeigenKnopf() {
   const k = !$('karte').hidden && verlauf[verlauf.length - 1], knopf = $('karte-zeigen');
   const an = !!(G && k && k.art === 'g' && (SCHMAL.matches || G.unterKarte(k.id)));
-  if (an === knopf.hidden && (an || document.activeElement !== knopf)) knopf.hidden = !an;
+  if (an === knopf.hidden && (an || !knopf.matches(':focus-visible'))) knopf.hidden = !an;   // Tastatur-Fokus hält ihn, ein Mausklick nicht
 }
 $('karte-zeigen').addEventListener('click', () => { const k = verlauf[verlauf.length - 1]; if (G && k && k.art === 'g') G.zeigen(k.id); });
 let knopfUhr = 0, knopfZeit = 0;                         // Zeitgeber, letzte Kamerabewegung (performance.now)
@@ -6004,7 +6012,9 @@ if (G) {
   G.controls.addEventListener('end', zeigenKnopf);
   G.controls.addEventListener('change', () => { if ($('karte').hidden) return; knopfZeit = performance.now(); if (!knopfUhr) knopfUhr = setTimeout(knopfSpaeter, 250); });
 }
-addEventListener('resize', zeigenKnopf);
+// Nach groesse() prüfen (neue Leinwand und Projektion): der Beobachter der Leinwand in baueGrafik ist früher angelegt, kommt also
+// zuerst; das Fenster-Ereignis resize käme davor und rechnete mit der alten Projektion
+if (G) new ResizeObserver(() => zeigenKnopf()).observe(G.renderer.domElement);
 $('karte-zu').addEventListener('click', karteZu);
 $('karte-zurueck').addEventListener('click', () => { verlauf.pop(); karteRendern(true); });
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('karte').hidden && !document.querySelector('dialog[open]')) karteZu(); });
