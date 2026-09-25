@@ -125,6 +125,39 @@ Einträge neu sind. Bei reduzierter Bewegung steht der Rauch still, und es gibt 
 - Die goldene Raute über Hauptfiguren ist im Startblick etwa 9 px hoch (sie wächst mit dem Abstand), hat einen dunklen Rand
   und ist aus der Ferne (Kameraabstand über 25) auch hinter Hochhäusern zu sehen.
 
+**Feinschliff 2.**
+- Straßennamen blitzen beim schnellen Drehen und beim Pinch nicht mehr kurz auf: Ein neues Schild erscheint erst, wenn seine
+  Straße etwa 150 ms lang gewählt bleibt, und ein gezeigtes Schild wechselt erst dann an einen neuen Platz. Fällt die Wahl
+  vorher weg, ändert sich nichts. Am alten Platz wartet ein Schild nur, solange er noch taugt (ganz im Bild, nicht unter
+  Panels oder dem ausgewählten Gebäude, nicht verdeckt), und hält ihn so lange für sich frei; sonst blendet es dort gleich aus.
+  Steht die Kamera, wird nichts nachgerechnet; ein Zeitgeber holt Wartende einmal nach.
+- Die Schilder sind durchsichtiger, Figuren dahinter scheinen durch. Der Text hat vor reinem Weiß noch 5,1:1 Kontrast
+  (gemessen hinter allen Schildern bei Tag, Abend und Nacht: mindestens 5,2:1).
+- Der goldene Rahmen der Auswahl wird ab Kameraabstand 18 mit dem Abstand breiter (höchstens 2,6-fach) und satter gold. Im
+  Startblick ist das ausgewählte Hochhaus nachts auch zwischen erleuchteten Türmen zu finden. Nah bleibt er wie bisher.
+- Liegt das ausgewählte Gebäude unter der Hauskarte, und auf dem Handy immer, gibt es oben in der Karte den Knopf „Zeigen“.
+  Er rückt Blickpunkt und Kamera gleich weit, bis das Gebäude mitten in der freien Fläche neben oder über der Karte liegt. Die
+  Fahrt dauert etwa 400 ms, bei reduzierter Bewegung springt die Kamera. Dreht oder zoomt man dabei selbst, bricht die Fahrt
+  ab. Von selbst bewegt sich die Kamera weiterhin nie. Ob der Knopf gebraucht wird, prüft die Seite auch, wenn die Kamera nach
+  dem Loslassen ausgeglitten ist. Er ist so hoch wie das Schließen daneben und hat 8 px Abstand dazu.
+- Nach einem Import ist nichts mehr ausgewählt (Tönung und Rahmen weg). Der Datei-Import schließt die Karte wie bisher
+  selbst, beim Übernehmen eines alten Stands bleibt sie, wie sie war. Nach dem stündlichen Neuaufbau prüft der Mauszeiger immer
+  neu, was unter ihm liegt, auch wenn er vorher über leerem Boden stand oder gerade ein Drehen beendet hat.
+
+**Ereignisse auf der Karte.** Was das Stadtbuch als fertig gebaut, Gründung (Übernahme eines leeren Betriebs), Pleite oder
+Schließung meldet, sieht man auch am Gebäude: Um das Grundstück zieht ein flacher, weicher Ring am Boden einmal weit und
+verblasst (gut 2,5 Sekunden echte Zeit). Fertig gebaut (auch Aufstockung und Anbau) und eröffnet im Akzent. Pleite und
+Schließung gedämpft rot, und der Ring zieht sich dabei zusammen statt weit: So unterscheiden sich beide auch nachts, wenn fast
+alle Pleiten und Fertigstellungen (0 Uhr) fallen und die Farben sich angleichen. Aus der Ferne (große Stadt) wird der Ring im
+Bild nicht kleiner als etwa 20 px Radius und rückt auf dem Sehstrahl zur Kamera: Im Bild liegt er an derselben Stelle, wird
+aber nicht mehr von den Nachbarhäusern verdeckt. Nah (Kameraabstand unter 45) bleibt er am Boden. Die Simulation meldet
+dafür nichts: Die Karte vergleicht stündlich jedes Gebäude mit der Stunde davor (Baustelle → fertig, Stufe, leer/offen). Eine
+Gründung auf freiem Bauplatz zeigt sich also erst, wenn der Bau fertig ist. Höchstens 12 Ringe zugleich, mehrere leicht
+nacheinander, bei 20× höchstens 3 je Stunde; keine beim Start, nach Import oder Aufholen und nach Sprüngen über mehr als 3
+Stunden. Bei reduzierter Bewegung steht der Ring still und ist nach 3 Sekunden ohne Übergang weg. Nicht klickbar; solange ein
+Ring läuft, 1 Draw Call und 2 Dreiecke je Ring mehr, sonst nichts (ein Shader-Programm mehr, schon beim Start übersetzt).
+Im Browser geprüft (Lage, Farbe, Draw Calls, Drosselung, reduzierte Bewegung).
+
 In der 3D-Ansicht wächst auf jeder Baustelle ein grauer Rohbau mit den geschafften Arbeitstagen. Das Gerüst wird dunkler,
 solange niemand kommt, und lässt sich anklicken. Bauarbeiter (orange) stehen an den Ecken ihrer Baustelle, Handwerker
 (blau) vor der Werkstatt. An Werkstätten stehen Kistenstapel, vor Läden eine Theke und eine Auslage (braun: Kisten aus der
