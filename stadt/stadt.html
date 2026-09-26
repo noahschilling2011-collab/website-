@@ -72,7 +72,8 @@
     --normal: clamp(0.9rem, 0.87rem + 0.15vw, 1rem);
     --gross: clamp(1.15rem, 1.05rem + 0.4vw, 1.4rem);
     --dauer: 150ms;                                        /* Hover und Zustandswechsel: ruhig */
-    --karte-oben: 222px;                                   /* Personenkarte unter den Kennzahlen */
+    --karte-oben: 275px;                                   /* Personenkarte unter den Kennzahlen (mit „Von außen“ und dem Knopf
+                                                              der Stadtregierung enden sie bei gut 252 px; vorher 222) */
     --rechts-breite: 360px;                                /* rechte Spalte; mittlere Breite: auch die Karte darüber */
     --rechts-hoehe: calc(100svh - 84px);                   /* endet 8 px über dem Einstellungs-Knopf */
     --schrift: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -169,10 +170,10 @@
     transition: background-color var(--dauer) ease-out; }
   #buch-knopf:hover { background: var(--hell-2); }
   #buch-knopf:focus-visible { outline-offset: -2px; }     /* das Stadtbuch schneidet über den Rand Hinausragendes ab */
-  #buch-knopf .pfeil { margin-left: auto; transition: transform 200ms cubic-bezier(.2,.8,.2,1); color: var(--text-leise); }
+  #buch-knopf .pfeil { flex: none; margin-left: auto; transition: transform 200ms cubic-bezier(.2,.8,.2,1); color: var(--text-leise); }
   #buch-knopf[aria-expanded="false"] .pfeil { transform: rotate(-90deg); }
   .neu-zahl { padding: 0 var(--s2); border-radius: 999px; background: var(--akzent-leise); color: var(--akzent); font-size: 0.78rem;
-    font-weight: 500; line-height: 1.6; font-variant-numeric: tabular-nums; }
+    font-weight: 500; line-height: 1.6; font-variant-numeric: tabular-nums; white-space: nowrap; }   /* zweizeilig schob sie quer die Spalte in die Zahlen */
   #buch-liste { list-style: none; margin: 0; padding: 0 var(--s4) var(--s1); overflow-y: auto; font-size: var(--klein);
     border-top: 1px solid var(--linie); scroll-padding: 6px 0; }   /* beim Tabben scrollt die Liste so weit, dass der Fokusring ganz zu sehen ist */
   /* Einträge im Stadtbuch und in „Während du weg warst“: oben eine Zeile mit Symbol, Tag und Art, darunter der Text in voller Breite */
@@ -337,6 +338,59 @@
   .m-schrift { fill: none; stroke: var(--text); stroke-width: 1.6; stroke-linecap: round; }
   #hilfe-titel { outline: none; }                          /* bekommt beim Öffnen den Fokus (Lesebeginn), Tab geht weiter zu den Knöpfen */
 
+  /* Stadtregierung: Knopf unter den Zahlen und Fenster wie die Hilfe. Ruhig und ohne Wertung: keine Parteifarben, ein Stil für
+     jeden Status; Zitate mit Rand links. Alle Farben aus diesem Block (Kontrast README) */
+  .regierung-knopf { display: flex; align-items: center; gap: var(--s2); width: 100%; margin: 5px 0 0; padding: 4px 0 0;
+    background: none; border: 0; border-top: 1px solid var(--hell-3); color: var(--text); font-size: var(--klein); line-height: 1.5;
+    text-align: left; white-space: nowrap; cursor: pointer; transition: color var(--dauer) ease-out; }
+  .regierung-knopf .sym { width: 15px; height: 15px; color: var(--text-leise); }
+  .regierung-knopf:hover, .regierung-knopf:hover .sym { color: var(--akzent); }
+  .regierung-knopf .pfeil-rechts { margin-left: auto; padding-left: var(--s2); color: var(--text-leise); font-size: 1.15em; line-height: 1; }
+  #regierung-dialog { width: min(760px, calc(100vw - 32px)); max-width: min(760px, calc(100vw - 32px)); padding-top: 0; }
+  #regierung-titel { margin: 0; outline: none; }
+  .reg-kopf { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: var(--s3);
+    margin: 0 calc(-1 * var(--s5)) var(--s1); padding: var(--s4) var(--s5) var(--s2); background: var(--ebene2); border-bottom: 1px solid var(--hell-1); }
+  .reg-zu { flex: none; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; background: none; border: 0; border-radius: 8px;
+    color: var(--text-leise); cursor: pointer; transition: background-color var(--dauer) ease-out, color var(--dauer) ease-out; }
+  .reg-zu:hover { color: var(--text-stark); background: var(--hell-3); }
+  #regierung-inhalt p { max-width: 72ch; }
+  .reg-unter { margin: 0 0 var(--s3); color: var(--text-leise); }
+  .reg-hinweis { margin: var(--s3) 0; padding: var(--s3) var(--s4); border: 1px solid var(--hell-4); border-radius: 12px; background: var(--hell-1); }
+  .reg-hinweis p { margin: 0 0 6px; font-size: var(--klein); }
+  .reg-hinweis p:last-child { margin-bottom: 0; }
+  .reg-gruppe { margin: var(--s4) 0 var(--s2); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-leise); }
+  .reg-karte { margin: 0 0 var(--s2); padding: var(--s3) var(--s4); background: var(--ebene3); border: 1px solid var(--linie); border-radius: 12px; }
+  .reg-karte h4 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--s2); margin: 0 0 var(--s2); font-size: var(--normal);
+    font-weight: 600; line-height: 1.35; color: var(--text-stark); }
+  .reg-status { padding: 0 var(--s2); border: 1px solid var(--hell-6); border-radius: 999px; font-size: 0.75rem; font-weight: 500;
+    line-height: 1.6; letter-spacing: 0.01em; color: var(--text); white-space: nowrap; }
+  #regierung-inhalt .reg-karte p, #regierung-inhalt .reg-hinweis p, .reg-zitat { max-width: none; margin: 0 0 6px; font-size: var(--klein); line-height: 1.5; }
+  #regierung-inhalt .reg-karte .reg-live { margin-top: var(--s2); padding-top: 6px; border-top: 1px solid var(--hell-3); color: var(--text-stark); }
+  #regierung-inhalt .reg-karte p:last-child { margin-bottom: 0; }
+  .reg-zitat { padding: 1px 0 1px var(--s3); border-left: 2px solid var(--hell-6); color: var(--text); }
+  .reg-zitat cite { font-style: normal; color: var(--text-leise); white-space: nowrap; }
+  .reg-was { font-weight: 600; color: var(--text-stark); }
+  #regierung-inhalt .reg-leise { color: var(--text-leise); }
+  .reg-live { font-variant-numeric: tabular-nums; }
+  #regierung-inhalt .zahlen { margin: var(--s2) 0; font-size: var(--klein); grid-template-columns: minmax(0, 1fr) auto; }
+  #regierung-inhalt .zahlen dd { white-space: nowrap; }
+  .reg-liste { list-style: none; margin: var(--s2) 0 0; padding: 0; font-size: var(--klein); }
+  .reg-liste li { padding: 6px 0; border-top: 1px solid var(--hell-1); line-height: 1.5; }
+  .reg-liste cite { font-style: normal; }                   /* Seiten wie in den Karten aufrecht */
+  #regierung-inhalt .reg-auf p { font-size: var(--klein); } /* Einleitung so groß wie die Einträge */
+  .reg-auf { margin: 0 0 var(--s2); border: 1px solid var(--linie); border-radius: 12px; background: var(--ebene3); }
+  .reg-auf summary { padding: var(--s2) var(--s4); cursor: pointer; font-weight: 500; color: var(--text-stark); border-radius: 12px; }
+  .reg-auf summary:focus-visible { outline-offset: -2px; }
+  .reg-auf > :not(summary) { margin-left: var(--s4); margin-right: var(--s4); }
+  .reg-auf > :last-child { margin-bottom: var(--s3); }
+  /* Handy: das Fenster füllt die Breite und die Höhe; der Kopf mit dem Schließen bleibt oben stehen */
+  @media (max-width: 720px) {
+    #regierung-dialog { width: 100vw; max-width: 100vw; height: 100svh; max-height: 100svh; margin: 0; border: 0; border-radius: 0;
+      padding: 0 var(--s4) var(--s4); }
+    .reg-kopf { margin: 0 calc(-1 * var(--s4)) var(--s1); padding: var(--s3) var(--s4) var(--s2); }
+    .reg-karte { padding: var(--s3); }
+  }
+
   /* Dialoge: solide Ebene 2, kein Glas */
   dialog { background: var(--ebene2); color: var(--text); border: 1px solid var(--linie); border-radius: var(--r);
     padding: var(--s5); max-width: min(520px, calc(100vw - 32px)); box-shadow: 0 20px 60px var(--schatten); }
@@ -366,7 +420,9 @@
   #aufholen progress::-moz-progress-bar { background: var(--akzent); }
 
   /* Meldungen (Speicherfehler, Warnungen) */
-  #meldung { position: fixed; left: 50%; top: var(--s4); transform: translateX(-50%); max-width: min(560px, calc(100vw - 32px));
+  /* Mittig ohne left: 50% (das halbierte die Breite beim Schrumpfen auf den Inhalt: am Handy 180 px, 270 px hoch über dem Knopf
+     „Stadtregierung“) */
+  #meldung { position: fixed; left: var(--s4); right: var(--s4); margin-inline: auto; width: fit-content; top: var(--s4); max-width: min(560px, calc(100vw - 32px));
     padding: var(--s3) var(--s4); background: var(--ebene2); border: 1px solid var(--linie); border-radius: 10px; font-size: var(--klein);
     z-index: 10; }
   #meldung.fehler { border-color: var(--schlecht-rand); color: var(--schlecht); }
@@ -386,6 +442,7 @@
     #kennzahlen dl { gap: 1px; }
     #kennzahlen dl div { gap: var(--s3); }
     #kennzahlen .einheit { display: none; }                 /* „Taler“ macht die Zahlen hier am breitesten; auf den Karten steht es */
+    #kennzahlen .nur-breit { display: none; }               /* Stadtregierung: „, gestern“ und „seit Tag …“ stehen im Fenster */
     #tempo { bottom: var(--s3); }
     #haupt { padding: var(--s1) 0 6px; }
     #haupt .kopfzeile { padding: var(--s1) var(--s3) 2px; }
@@ -406,7 +463,7 @@
   /* Schmal (Handy hochkant): Einstellungen oben rechts, unten Hauptfiguren und eingeklapptes Stadtbuch über dem Tempo.
      Karten liegen unten über dem Tempo, höchstens bis unter die Zahlen, und scrollen in sich */
   @media (max-width: 720px) {
-    :root { --karte-oben: 172px; }                          /* Zahlen enden hier bei gut 160 px */
+    :root { --karte-oben: 221px; }                          /* Zahlen enden hier bei gut 211 px (mit der Stadtregierung; vorher 172) */
     #einst-knopf, #hilfe-knopf { top: var(--s3); right: var(--s3); bottom: auto; }
     #hilfe-knopf { right: calc(var(--s3) + 44px + var(--s2)); }
     #rechts { top: auto; right: var(--s3); bottom: 70px; width: calc(100vw - 2 * var(--s3)); max-height: 46svh; }
@@ -414,8 +471,8 @@
     #karte, body.debug #karte { max-height: min(60svh, calc(100svh - 70px - var(--karte-oben))); }
     body.karte-offen #rechts { visibility: hidden; }        /* liegt unter der Karte: sonst landet der Tab-Fokus unsichtbar dort */
     #karte .kopf { margin: 0 calc(-1 * var(--s4)); }
-    #debug { top: 172px; bottom: auto; left: var(--s3); right: var(--s3); font-size: 9px; overflow: hidden; }
-    #debug-knoepfe { top: 256px; bottom: auto; left: var(--s3); }
+    #debug { top: 221px; bottom: auto; left: var(--s3); right: var(--s3); font-size: 9px; overflow: hidden; }
+    #debug-knoepfe { top: 305px; bottom: auto; left: var(--s3); }
     body.karte-offen #debug, body.karte-offen #debug-knoepfe { visibility: hidden; }   /* unter der Karte: kein Tab-Fokus dorthin */
   }
   /* Bis gut 1040 px reicht das Tempo waagrecht unter die rechte Spalte: dort endet die Spalte über dem Tempo */
@@ -451,6 +508,9 @@
     #hilfe-knopf { right: calc(var(--s3) + 44px + var(--s2)); }
     #rechts { top: auto; left: var(--s3); right: auto; bottom: var(--s3); width: var(--spalte); max-height: calc(100svh - 2 * var(--s3)); }
     #haupt .kopfzeile { flex-wrap: wrap; row-gap: 0; }
+    /* Stadtbuch-Kopf in der 200 px breiten Spalte: „Stadtbuch 99+ neu“ passt nicht in eine Zeile (gemessen 185 von 174 px), zwei
+       Zeilen schoben die Spalte in die Zahlen. Die Marke zeigt nur die Zahl, „neu“ bleibt für Screenreader */
+    .neu-zahl .neu-wort { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     body.buch-offen #stadtbuch { backdrop-filter: none; -webkit-backdrop-filter: none; }   /* sonst Bezugsrahmen der festen Liste */
     body.buch-offen #buch-liste { position: fixed; top: var(--s3); right: var(--s3); bottom: var(--rechts-unten);
       width: min(360px, calc(100vw - var(--spalte) - 3 * var(--s3))); padding: var(--s1) var(--s3);
@@ -465,11 +525,21 @@
     #debug-knoepfe { top: 92px; bottom: auto; left: calc(var(--spalte) + 2 * var(--s3)); }
     body.karte-offen #debug, body.karte-offen #debug-knoepfe, body.buch-offen #debug, body.buch-offen #debug-knoepfe { visibility: hidden; }
   }
-  /* Sehr klein (568 × 320): Tempo schmaler; Zahlen, Hauptfiguren und Stadtbuch-Kopf enger, damit der KI-Status ganz in eine
-     zweite Zeile passt (einzeilig wäre er abgeschnitten) */
+  /* Handy quer (bis 420 px hoch): Mit der Zeile „Von außen“ und dem Knopf „Stadtregierung“ reichten die Zahlen sonst in die Spalte
+     darunter (gemessen bis 37 px bei 680 × 345, der Knopf ließ sich dort nicht antippen). Der Knopf steht als Symbol neben Tag und
+     Uhr (Name im aria-label, 32 px für den Finger), die Zeilen sind etwas enger */
+  @media (max-height: 420px) and (orientation: landscape) {
+    #kennzahlen { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--s2); padding-top: 6px; padding-bottom: 6px; }
+    #kennzahlen .zeit { grid-row: 1; grid-column: 1; border-bottom: 0; padding-bottom: 0; margin-bottom: 0; }
+    #kennzahlen dl { grid-row: 2; grid-column: 1 / -1; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--hell-3); line-height: 1.2; }
+    .regierung-knopf { grid-row: 1; grid-column: 2; width: 32px; height: 32px; margin: -4px 0; padding: 0; border: 0; border-radius: 8px; justify-content: center; }   /* ragt je 4 px über die Zeile: Zeile bleibt so hoch wie Tag und Uhr */
+    .regierung-knopf .sym { width: 18px; height: 18px; }
+    .regierung-knopf .knopf-text, .regierung-knopf .pfeil-rechts { display: none; }
+  }
+  /* Sehr klein (568 × 320): Tempo schmaler; Hauptfiguren und Stadtbuch-Kopf enger, damit der KI-Status ganz in eine zweite Zeile
+     passt (einzeilig wäre er abgeschnitten) */
   @media (max-height: 340px) and (orientation: landscape) {
     #tempo button { min-width: 40px; padding: 0 8px; }     /* 40 statt 44: neben Spalte und Hilfe-Knopf je 10 px Luft (gemessen) */
-    #kennzahlen dl { line-height: 1.35; }
     #haupt { padding: 2px 0 4px; }
     #buch-knopf { padding: 6px var(--s3); }
   }
@@ -528,6 +598,8 @@
   <symbol id="s-baum" viewBox="0 0 24 24"><path d="M12 20.5v-4"/><path d="M12 3.5 6.5 11h3L6 16.5h12L14.5 11h3z"/></symbol>
   <symbol id="s-ziel" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12h.01"/></symbol>
   <symbol id="s-geraet" viewBox="0 0 24 24"><rect x="7" y="3.5" width="10" height="17" rx="2"/><path d="M11 17.5h2"/></symbol>
+  <symbol id="s-zufluss" viewBox="0 0 24 24"><path d="M12 3.5v10"/><path d="m7.5 9 4.5 4.5 4.5-4.5"/><path d="M4.5 14.5v4a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-4"/></symbol>
+  <symbol id="s-rathaus" viewBox="0 0 24 24"><path d="M3.5 20.5h17"/><path d="M5.5 20.5V11h13v9.5"/><path d="M3.5 11 12 6.5l8.5 4.5"/><path d="M12 6.5v-3h3"/><path d="M10 20.5v-4.5h4v4.5"/></symbol>
 </svg>
 <noscript><div class="hinweis">Für STADT wird JavaScript benötigt.</div></noscript>
 <div id="hinweis" class="hinweis" role="status" hidden></div>
@@ -543,7 +615,9 @@
     <div><dt><svg class="sym" aria-hidden="true"><use href="#s-koffer"/></svg>Freie Stellen</dt><dd id="k-fs">0</dd></div>
     <div><dt><svg class="sym" aria-hidden="true"><use href="#s-laecheln"/></svg>Zufriedenheit</dt><dd id="k-zuf">0</dd></div>
     <div><dt><svg class="sym" aria-hidden="true"><use href="#s-muenzen"/></svg>Budget</dt><dd><span id="k-budget">0</span> <span class="einheit">Taler</span></dd></div>
+    <div title="Gestern von außen in die Stadt: Renten aus der Rentenkasse, Prämien, Betreuungsgehalt und Grundsicherung vom Bund"><dt><svg class="sym" aria-hidden="true"><use href="#s-zufluss"/></svg><span>Von außen<span class="nur-breit">, gestern</span></span></dt><dd><span id="k-aussen">–</span> <span class="einheit">Taler</span></dd></div>
   </dl>
+  <button type="button" id="regierung-knopf" class="regierung-knopf" aria-haspopup="dialog" aria-label="Stadtregierung: AfD · seit Tag 0"><svg class="sym" aria-hidden="true"><use href="#s-rathaus"/></svg><span class="knopf-text">Stadtregierung: AfD<span class="nur-breit"> · seit Tag <span id="k-regierung-tag">0</span></span></span><span class="pfeil-rechts" aria-hidden="true">›</span></button>
 </section>
 
 <p id="erster-hinweis" hidden></p>
@@ -561,7 +635,7 @@
 </section>
 <aside id="stadtbuch" class="glas" aria-label="Stadtbuch">
   <button type="button" id="buch-knopf" aria-expanded="true" aria-controls="buch-liste">
-    <span>Stadtbuch</span><span class="neu-zahl" id="buch-neu" hidden></span><svg class="pfeil" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+    <span>Stadtbuch</span><span class="neu-zahl" id="buch-neu" hidden><span id="buch-neu-zahl"></span><span class="neu-wort"> neu</span></span><svg class="pfeil" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
   </button>
   <ol id="buch-liste" reversed></ol>
 </aside>
@@ -698,6 +772,19 @@
   <div class="knoepfe"><button type="button" class="knopf haupt" data-schliessen>Schließen</button></div>
 </dialog>
 
+<!-- Stadtregierung: Regeln aus dem Programm mit Zitat und Seite, Geld von außen, was nicht übernommen ist. Inhalt baut das Skript
+     aus der festen Liste REGIERUNG (nur textContent), die Zahlen aus StadtSim.regierungInfo -->
+<dialog id="regierung-dialog" aria-labelledby="regierung-titel">
+  <div class="reg-kopf">
+    <h2 id="regierung-titel" tabindex="-1" autofocus>Stadtregierung</h2>
+    <button type="button" class="reg-zu" data-schliessen aria-label="Schließen">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div id="regierung-inhalt"></div>
+  <div class="knoepfe"><button type="button" class="knopf haupt" data-schliessen>Schließen</button></div>
+</dialog>
+
 
 <script id="sim">
 'use strict';
@@ -709,8 +796,9 @@
 // =====================================================================================
 (function (G) {
 
-const VERSION = 4;                    // 2: Hauptfiguren, Tagebuch, KI-Anfragen (Phase 4); 3: Bauhof, Baustellen in Arbeitstagen, Kisten;
-                                      // 4: Tech-Firmen (Software, Handys, Computer), Käufe der Bewohner, Anbau über den Bauhof
+const VERSION = 5;                    // 2: Hauptfiguren, Tagebuch, KI-Anfragen (Phase 4); 3: Bauhof, Baustellen in Arbeitstagen, Kisten;
+                                      // 4: Tech-Firmen (Software, Handys, Computer), Käufe der Bewohner, Anbau über den Bauhof;
+                                      // 5: Stadtregierung (Grundsicherung und gemeinnützige Arbeit je Person, Summen in S.stat.regierung)
 
 // ─── Karte ───────────────────────────────────────────────────────────────────────────
 const KARTE = 96, FELDER = KARTE * KARTE;
@@ -731,13 +819,12 @@ const R = {
 
   // Geld in Talern pro Spieltag
   LOHN_WERKSTATT: 100, LOHN_LADEN: 90, LOHN_STADT: 95,
-  STEUER: 0.10,                 // fester Anteil vom Lohn → Budget des Bauamts
+  STEUER: 0.10,                 // Lohnsteuer auf den Bruttolohn über dem Freibetrag (Stadtregierung) → Budget des Bauamts
   MIETE: [0, 12, 14, 16],       // pro Wohnung nach Hausstufe → Budget (die Stadt besitzt die Wohnhäuser)
   EINKAUF: 30,                  // pro Erwachsenem; Sparsame kaufen bis 40 % weniger
   EINKAUF_VERMOEGEN: 0.01,      // wer Erspartes hat, gibt täglich bis 1 % davon zusätzlich aus (Sparsame weniger)
   EINKAUF_EXTRA_MAX: 15,
   EINKAUF_KIND: 15,             // zahlt der Haushalt
-  RENTE_BETRAG: 50,             // ab 67, aus dem Budget, nur solange das Budget reicht
   FIX_WERKSTATT: 40, FIX_LADEN: 30,
   UMLAND: 50000,                // so viel kauft das Umland pro Tag bei allen Werkstätten zusammen
   EXPORT_MAX: 140,              // Höchsterlös je Arbeitstag in einer Werkstatt
@@ -804,6 +891,18 @@ const R = {
 
   BUCH_MAX: 500,
   START_BUDGET: 6000,
+
+  // Stadtregierung: Von Anfang an regiert die AfD nach ihrem Programm zur Bundestagswahl 2025, soweit es sich übertragen lässt.
+  // Quellen, Umrechnung und Annahmen: README, Abschnitt „Stadtregierung“. Die Stadt kennt keine Herkunft und bekommt keine.
+  FREIBETRAG: 29,               // R01: so viele Taler am Tag je Familienmitglied steuerfrei (15.000 € im Jahr, Umrechnung U1)
+  RENTE_STUFEN: [55, 60, 66],   // R04: Rente am Tag ab 67, von außen aus der Rentenkasse; eine Stufe je …
+  RENTE_STUFE_TAGE: 40,         // … 40 Spieltage (eine Wahlperiode, Annahme); 66 sind gut 70 % von NETTO_STANDARD
+  NETTO_STANDARD: 93,           // Nettolohn einer Standardstelle (100 Taler brutto, 7 Lohnsteuer): Maß für Rente und Betreuungsgehalt
+  PRAEMIE: 383,                 // R05: Willkommensprämie je Geburt vom Bund (20.000 €, Umrechnung U1), halb an jeden Elternteil
+  BETREUUNG_ALTER: 30,          // R06: Betreuungsgehalt bis zum 3. Geburtstag des Kindes (30 Spieltage), NETTO_STANDARD am Tag vom Bund
+  BETREUUNG_WUNSCH: 20,         // R06: so viel mehr zählt „kündigen“, wenn man dafür beim Kind bleiben kann (Annahme, nicht aus dem Programm)
+  GS_SCHON: 10,                 // R07: Grundsicherung nur, wer weniger Geld hat als 10 Tagesbedarfe (Annahme)
+  GS_PFLICHT: 5,                // R07: nach 5 Spieltagen (6 Monaten) Grundsicherung gemeinnützige Arbeit im Bauhof
 
   // Hauptfiguren (Phase 4)
   HAUPT_START: 5, HAUPT_MAX: 10,
@@ -898,6 +997,8 @@ const PF = [
   // Gekauft (Version 4): Gerät (0 = keins, HANDY, COMPUTER) und zuletzt gekaufte Software. Marke und Version zum Anzeigen.
   ['geraet', Uint8Array, 1], ['geraetTag', Int32Array, 1], ['geraetMarke', Uint8Array, 1], ['geraetVersion', Uint16Array, 1],
   ['app', Uint8Array, 1], ['appTag', Int32Array, 1], ['appMarke', Uint8Array, 1], ['appVersion', Uint16Array, 1],
+  // Stadtregierung (Version 5): Tage in Folge mit Grundsicherung; 1 = leistet gemeinnützige Arbeit im Bauhof (ohne Lohn, keine Stelle)
+  ['gsTage', Uint16Array, 1], ['gemein', Uint8Array, 1],
 ];
 // Gebäude: höchstens eins pro Feld, daher feste Größe FELDER.
 const GF = [
@@ -1312,7 +1413,8 @@ function offen(S, b) {   // Betrieb arbeitet: fertig gebaut und nicht leerstehen
 function stellen(S, b) {
   const g = S.g;
   // Werkstätten und Läden bleiben auf Stufe 1. Tech-Firmen wachsen: ein Anbau über den Bauhof bringt Stufe 2 und 3.
-  if (b === S.bauhof) return R.STELLEN_STADT + S.bauZuschlag;
+  // Bauhof: wer dort gemeinnützige Arbeit leistet (R07), zählt zu den Stellen dazu, nimmt also niemandem eine Stelle weg.
+  if (b === S.bauhof) return R.STELLEN_STADT + S.bauZuschlag + gemeinZahl(S);
   if (g.typ[b] === WERKSTATT) return (g.besitzer[b] < 0 ? R.STELLEN_STADT : R.STELLEN_WERKSTATT) * g.stufe[b];
   if (g.typ[b] === LADEN) return R.STELLEN_LADEN * g.stufe[b];
   if (g.typ[b] === TECH) return R.STELLEN_TECH * g.stufe[b];
@@ -1421,7 +1523,9 @@ function anstellen(S, p, b) {
 function austreten(S, p) {
   const P = S.p, b = P.arbeit[p];
   if (b < 0) return;
-  if (P.besitz[p] !== b) {
+  if (P.gemein[p]) {                                         // gemeinnützige Arbeit endet: sie war keine Stelle, es wird keine frei
+    listeRaus(S.belegschaft[b], p); P.gemein[p] = 0;
+  } else if (P.besitz[p] !== b) {
     listeRaus(S.belegschaft[b], p);
     // Beim Bauhof können die Stellen schrumpfen; wer dann geht, macht keine Stelle frei, solange er überzählig war.
     if (offen(S, b) && S.g.offeneStellen[b]++ >= 0) { S.freieStellen++; S.freiLohn[S.g.lohn[b]]++; }
@@ -1577,7 +1681,7 @@ function zielErreicht(S, p, z) {
   const P = S.p;
   switch (z) {
     case Z.WOHNUNG: return eigeneWohnung(S, p) && P.bWohnen[p] >= 55;
-    case Z.JOB: return P.arbeit[p] >= 0 && (P.besitz[p] >= 0 || S.g.lohn[P.arbeit[p]] > P.zielWert[p]);
+    case Z.JOB: return P.arbeit[p] >= 0 && !P.gemein[p] && (P.besitz[p] >= 0 || S.g.lohn[P.arbeit[p]] > P.zielWert[p]);   // gemeinnützige Arbeit ist keine Stelle
     case Z.FAMILIE: return P.partner[p] >= 0 && P.kinder[p] > P.zielWert[p];
     case Z.LADEN: return P.besitz[p] >= 0 && offen(S, P.besitz[p]);
     case Z.FREUNDE: { const n = freundeZahl(S, p); return n >= 3 && n > P.zielWert[p]; }
@@ -1591,7 +1695,7 @@ function zielWaehlen(S, p) {
   const alter = alterTage(S, p) / R.JAHR;
   const w = [0, 0, 0, 0, 0, 0, 0];
   w[Z.WOHNUNG] = !eigeneWohnung(S, p) ? 60 : P.bWohnen[p] < 50 ? 30 : 0;
-  w[Z.JOB] = alter >= R.RENTE || P.besitz[p] >= 0 ? -99 : P.arbeit[p] < 0 ? 45 + 20 * F : 40 * E;
+  w[Z.JOB] = alter >= R.RENTE || P.besitz[p] >= 0 ? -99 : P.arbeit[p] < 0 || P.gemein[p] ? 45 + 20 * F : 40 * E;
   w[Z.FAMILIE] = alter >= 20 && alter < 45
     ? (P.partner[p] < 0 ? 15 + 35 * Gs : P.kinder[p] === 0 ? 40 : 20 - 8 * P.kinder[p]) : -99;
   w[Z.LADEN] = P.besitz[p] < 0 && alter < 60 ? 80 * (E - 0.3) + 10 * (1 - Sp) - 5 + (P.geld[p] > 1000 ? 10 : 0) : -99;
@@ -1617,7 +1721,7 @@ function zielVonAussen(S, p, z) {
 function zielSetzen(S, p, z) {   // Ausgangswert merken, damit „erreicht“ eine Verbesserung heißt
   const P = S.p;
   P.ziel[p] = z; P.zielSeit[p] = S.tag;
-  P.zielWert[p] = z === Z.JOB ? (P.arbeit[p] >= 0 ? S.g.lohn[P.arbeit[p]] : 0)
+  P.zielWert[p] = z === Z.JOB ? (P.arbeit[p] >= 0 && !P.gemein[p] ? S.g.lohn[P.arbeit[p]] : 0)
     : z === Z.FAMILIE ? P.kinder[p] : z === Z.FREUNDE ? freundeZahl(S, p) : 0;
 }
 function zielPruefen(S, p) {
@@ -1638,6 +1742,7 @@ function entscheide(S, p, h) {
   const uWohnen = 100 - P.bWohnen[p], uKontakt = 100 - P.bKontakt[p], uFrei = 100 - P.bFreizeit[p];
   const arb = P.arbeit[p], istBesitzer = P.besitz[p] >= 0, pa = P.partner[p];
   const erwerb = alter >= R.ERWACHSEN && alter < R.RENTE;
+  const gem = P.gemein[p];                                   // gemeinnützige Arbeit (R07): keine Stelle, nur eine richtige suchen
   const ZF = R.ZUFALL;
 
   // Wert = Dringlichkeit × Gewicht aus Charakter + Zielbonus + Gedächtnis + Zufall ±5.
@@ -1652,23 +1757,24 @@ function entscheide(S, p, h) {
     v = uWohnen * (P.wohnung[p] < 0 ? 1.3 : 0.4 + 0.8 * (1 - H)) + (zg === Z.WOHNUNG ? 25 : 0);
     if (v + ZF > best) { v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.WOHNUNG; } }
   }
-  // job_suchen: 18–67, ohne Job
-  if (erwerb && arb < 0 && !istBesitzer && S.freieStellen > 0) {
+  // job_suchen: 18–67, ohne Job (auch aus der gemeinnützigen Arbeit heraus: eine richtige Stelle geht vor)
+  if (erwerb && (arb < 0 || gem) && !istBesitzer && S.freieStellen > 0) {
     v = uGeld * (0.5 + 0.9 * F) + 15 + (zg === Z.JOB ? 20 : 0);
     if (v + ZF > best) { v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.JOB; } }
   }
   // job_wechseln: eine besser bezahlte Stelle ist frei
-  if (arb >= 0 && !istBesitzer && besterFreierLohn(S) > g.lohn[arb] + 3) {
+  if (arb >= 0 && !gem && !istBesitzer && besterFreierLohn(S) > g.lohn[arb] + 3) {
     v = 45 * E + 0.3 * uGeld + (zg === Z.JOB ? 30 : 0) - 5;
     if (v + ZF > best) { v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.WECHSEL; } }
   }
-  // kuendigen: Geld für 20 Tage
-  if (arb >= 0 && !istBesitzer && P.geld[p] >= 20 * tageskosten(S, p)) {
+  // kuendigen: Geld für 20 Tage. Stadtregierung (R06): lieber, wenn man dafür beim kleinen Kind bleiben kann (Betreuungsgehalt)
+  if (arb >= 0 && !gem && !istBesitzer && P.geld[p] >= 20 * tageskosten(S, p)) {
     v = (1 - F) * (100 - P.zuf[p]) * 0.8 + (zg === Z.RUHE ? 15 : 0) - 15;
+    if (elternzeitMoeglich(S, p)) v += R.BETREUUNG_WUNSCH;
     if (v + ZF > best) { v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.KUENDIGEN; } }
   }
   // freinehmen (nur morgens)
-  if (arb >= 0 && h <= 7 && !P.frei[p]) {
+  if (arb >= 0 && !gem && h <= 7 && !P.frei[p]) {
     v = uFrei * (1.3 - F) + (zg === Z.RUHE ? 15 : 0) - 10;
     if (v + ZF > best) { v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.FREI; } }
   }
@@ -1897,11 +2003,14 @@ function aktKind(S, p) {
   P.kinder[p]++; P.kinder[q]++;
   erinnere(S, p, M.KIND, k); erinnere(S, q, M.KIND, k);
   S.stat.geburten++;
+  // Stadtregierung (R05): Willkommensprämie vom Bund (R03), halb an jeden Elternteil
+  const halb = Math.floor(R.PRAEMIE / 2), rs = S.stat.regierung;
+  P.geld[p] += halb; P.geld[q] += R.PRAEMIE - halb; rs.praemie += R.PRAEMIE; rs.praemien++;
   const nummer = Math.max(P.kinder[p], P.kinder[q]);
   buch(S, 'geburt', `${nr(S, p)} und ${nr(S, q)} bekommen ${P.weib[k] ? 'eine Tochter' : 'einen Sohn'}: ${vorname(S, k)}. `
     + (nummer === 1 ? 'Ihr erstes Kind' : `Kind Nummer ${nummer}`)
     + (P.ziel[p] === Z.FAMILIE || P.ziel[q] === Z.FAMILIE ? ', sie wollten eine Familie.' : ', beiden geht es gut miteinander.')
-    + grosseltern(S, p, q));
+    + grosseltern(S, p, q) + ` Willkommensprämie: ${R.PRAEMIE} Taler.`);
   return true;
 }
 // Was ein Gründer über den Markt weiß: Fehlt in seiner Straße ein Laden? Lohnt eine Werkstatt noch,
@@ -2040,7 +2149,7 @@ function aktGruenden(S, p) {
 function wegzugGrund(S, p) {
   const P = S.p;
   const b = [[P.bGeld[p], 'g'], [P.bWohnen[p], 'w'], [P.bKontakt[p], 'k'], [P.bFreizeit[p], 'f']].sort((a, c) => a[0] - c[0]);
-  const t = { g: P.arbeit[p] < 0 ? 'Keine Arbeit, das Geld ist aufgebraucht.' : 'Das Geld reicht nicht.',
+  const t = { g: P.gemein[p] ? 'Keine bezahlte Arbeit, das Geld ist aufgebraucht.' : P.arbeit[p] < 0 ? 'Keine Arbeit, das Geld ist aufgebraucht.' : 'Das Geld reicht nicht.',
     w: P.wohnung[p] < 0 ? 'Keine Wohnung gefunden.' : 'Die Wohnung passt nicht mehr.',
     k: 'Kaum Freunde hier.', f: 'Nur Arbeit, keine Zeit für sich.' };
   return t[b[0][1]] + (b[1][0] < 25 ? ' ' + t[b[1][1]] : '');
@@ -2084,10 +2193,11 @@ function erlaubteAktionen(S, p, h) {
   const L = [];
   if ((P.wohnung[p] < 0 || P.bWohnen[p] < 40) && !P.suchPause[p] && !(P.sucht[p] && S.freieWohnungen <= 0)
       && (arb >= 0 || P.geld[p] >= 10 * R.MIETE[1] || alter >= R.RENTE)) L.push(A.WOHNUNG);
-  if (erwerb && arb < 0 && !istBesitzer && S.freieStellen > 0) L.push(A.JOB);
-  if (arb >= 0 && !istBesitzer && besterFreierLohn(S) > S.g.lohn[arb] + 3) L.push(A.WECHSEL);
-  if (arb >= 0 && !istBesitzer && P.geld[p] >= 20 * tageskosten(S, p)) L.push(A.KUENDIGEN);
-  if (arb >= 0 && h <= 7 && !P.frei[p]) L.push(A.FREI);
+  const gem = P.gemein[p];                                   // gemeinnützige Arbeit: nur job_suchen, kein Kündigen, Freinehmen, Wechseln
+  if (erwerb && (arb < 0 || gem) && !istBesitzer && S.freieStellen > 0) L.push(A.JOB);
+  if (arb >= 0 && !gem && !istBesitzer && besterFreierLohn(S) > S.g.lohn[arb] + 3) L.push(A.WECHSEL);
+  if (arb >= 0 && !gem && !istBesitzer && P.geld[p] >= 20 * tageskosten(S, p)) L.push(A.KUENDIGEN);
+  if (arb >= 0 && !gem && h <= 7 && !P.frei[p]) L.push(A.FREI);
   if (h >= 17) L.push(A.FREUNDE);
   if (pa < 0 && alter < 70 && !innerhalb(S, P.getrenntTag[p], 30)) L.push(A.PARTNER);
   if (pa >= 0) {
@@ -2110,7 +2220,9 @@ function kiAktionen(S, p, namen) {
       case A.WOHNUNG: satz = P.wohnung[p] < 0 ? 'Du suchst dir eine Wohnung, du hast gerade keine.' : 'Du suchst dir eine andere Wohnung, die jetzige passt nicht gut.'; break;
       case A.JOB: satz = `Du suchst dir Arbeit, in der Stadt ${S.freieStellen === 1 ? 'ist 1 Stelle' : `sind ${S.freieStellen} Stellen`} frei.`; break;
       case A.WECHSEL: satz = `Du wechselst auf eine Stelle mit ${besterFreierLohn(S)} Taler Lohn am Tag` + (arb >= 0 ? ` statt ${S.g.lohn[arb]}.` : '.'); break;
-      case A.KUENDIGEN: satz = `Du kündigst und lebst eine Weile von deinem Ersparten (${geld} Taler).`; break;
+      case A.KUENDIGEN: satz = elternzeitMoeglich(S, p)
+        ? `Du bleibst beim Kind zu Hause und bekommst Betreuungsgehalt, bis es 3 Jahre alt ist (${R.NETTO_STANDARD} Taler am Tag).`
+        : `Du kündigst und lebst eine Weile von deinem Ersparten (${geld} Taler).`; break;
       case A.FREI: satz = 'Du nimmst dir heute frei, ruhst dich aus und verzichtest auf den Tageslohn.'; break;
       case A.FREUNDE: satz = 'Du triffst heute Abend Freunde oder lernst neue Leute kennen.'; break;
       case A.PARTNER: satz = 'Du suchst jemanden, mit dem du zusammen sein willst.'; break;
@@ -2351,6 +2463,8 @@ function tagesabschluss(S) {
   zuzug(S);
   bauamt(S);
   bauhofStellen(S);                                        // Baustellen der Nacht zählen schon für den Bauhof
+  renteStufeMelden(S);
+  regierungTag(S);
   S.reihe.push(S.einwohner);
   S.ki.heute = {};
   S.tag++;
@@ -2405,7 +2519,7 @@ function bauhofStellen(S) {
   let rest = 0;
   for (const b of S.baustellen) rest += g.bauRest[b];
   S.bauRueckstand = rest;
-  const zu = Math.min(R.BAU_MAX - R.STELLEN_STADT, Math.ceil(rest / R.BAU_ZIEL));
+  const zu = Math.min(R.BAU_MAX - R.STELLEN_STADT - gemeinZahl(S), Math.ceil(rest / R.BAU_ZIEL));   // gemeinnützig Arbeitende zählen zu den 40
   if (zu === S.bauZuschlag) return;
   S.bauZuschlag = zu;
   if (B < 0 || !offen(S, B)) return;
@@ -2542,10 +2656,11 @@ function haushalteZaehlen(S) {
   }
 }
 
-// Täglich für alle: Einkauf beim nächsten Laden, Miete, Rente, Löhne, Betriebe.
+// Täglich für alle: Einkauf beim nächsten Laden, Miete, Rente, Löhne, Betriebe, danach Lohnsteuer und Geld vom Bund.
 function wirtschaft(S) {
   const P = S.p, g = S.g, n = S.pMax;
   const erw = S.tag - R.ERWACHSEN * R.JAHR, rente = S.tag - R.RENTE * R.JAHR;
+  const rs = S.stat.regierung, brutto = new Float64Array(n);   // Bruttolohn je Person heute (nur hier, nicht im Zustand)
   // Wie viele Leute kann jeder Laden heute bedienen? Hängt an seiner Größe (Stellen plus Besitzer).
   for (let b = 0; b < S.gAnzahl; b++) {
     if (g.typ[b] === WOHNHAUS) g.knapp[b] = 0;
@@ -2588,9 +2703,9 @@ function wirtschaft(S) {
       if (w >= 0 && g.knapp[w] < 255) g.knapp[w]++;
     }
     if (P.hh[p] === p && w >= 0) { const m = R.MIETE[g.stufe[w]]; P.geld[p] -= m; S.budget += m; }
-    if (P.geb[p] <= rente && P.arbeit[p] < 0) {
-      const r = Math.min(R.RENTE_BETRAG, S.budget);
-      if (r > 0) { S.budget -= r; P.geld[p] += r; }
+    if (P.geb[p] <= rente && P.arbeit[p] < 0) {             // Rente (R04) von außen aus der Rentenkasse, immer voll (Annahme 3)
+      const r = renteBetrag(S);
+      P.geld[p] += r; rs.rentenkasse += r;
     }
   }
   S.unversorgtQuote = einkaeufer ? unbedient / einkaeufer : 0;
@@ -2619,16 +2734,24 @@ function wirtschaft(S) {
     const fix = t === WERKSTATT ? R.FIX_WERKSTATT : t === TECH ? R.FIX_TECH : R.FIX_LADEN;
     const lohn = g.lohn[b], netto = Math.round(lohn * (1 - R.STEUER));
     const o = g.besitzer[b];
+    // Alle zahlen den Bruttolohn aus; die Lohnsteuer zieht lohnsteuer() danach ab. lohnsteuerAlt: was die alte Regel
+    // (10 % ohne Freibetrag, je Zahlung gerundet) gebracht hätte, für das Fenster „Stadtregierung“.
     if (o < 0) {                                             // Betrieb der Stadt: rechnet über das Budget ab
+      // Brutto aus dem Budget; die Lohnsteuer kommt erst in lohnsteuer() zurück. Bei knappem Budget träfe das zuerst den Bauhof
+      // (gemessen Seeds 1–80: Budget nie unter 6.432, keine Lohnzahlung gekürzt)
       S.budget = Math.max(0, S.budget + einnahmen - fix);
       for (const w of L) {
-        if (P.frei[w]) continue;
-        const z = Math.min(lohn, S.budget), zn = Math.round(z * (1 - R.STEUER));
-        S.budget -= zn; P.geld[w] += zn;
+        if (P.frei[w] || P.gemein[w]) continue;              // gemeinnützige Arbeit (R07): ohne Lohn
+        const z = Math.min(lohn, S.budget);
+        S.budget -= z; P.geld[w] += z; brutto[w] += z;
+        rs.lohnsteuerAlt += z - Math.round(z * (1 - R.STEUER));
       }
     } else {                                                 // Besitzer bekommt Umsatz minus Löhne
       let k = g.kasse[b] + einnahmen - fix, loehne = 0;
-      for (const w of L) { if (P.frei[w]) continue; k -= lohn; loehne += lohn; P.geld[w] += netto; S.budget += lohn - netto; }
+      for (const w of L) {
+        if (P.frei[w]) continue;
+        k -= lohn; loehne += lohn; P.geld[w] += lohn; brutto[w] += lohn; rs.lohnsteuerAlt += lohn - netto;
+      }
       if (t === TECH) {                                      // Tech-Firma: Gewinntage zählen, Rücklage für den Anbau
         if (einnahmen - fix - loehne > 0) { if (g.gut[b] < 65535) g.gut[b]++; } else g.gut[b] = 0;
         if (k < 0 && g.ruecklage[b] > 0) { const d = Math.min(-k, g.ruecklage[b]); g.ruecklage[b] -= d; k += d; }
@@ -2643,6 +2766,8 @@ function wirtschaft(S) {
       else g.minus[b] = 0;
     }
   }
+  lohnsteuer(S, brutto);
+  bundesGeld(S);
 }
 // Kisten: jede anwesende Kraft in einer Werkstatt macht 8 (Bauarbeiter auf einer Baustelle nicht). Jeder Laden braucht eine
 // je 38 Taler Umsatz und holt sie bei der nächsten Werkstatt der Stadt, die noch welche hat (bis 20 Felder). Was dann noch
@@ -2703,6 +2828,149 @@ function pleite(S, b) {
     + (n ? ` ${n} ${n === 1 ? 'Person verliert' : 'Leute verlieren'} die Arbeit.` : ''));
 }
 
+// ─── Stadtregierung ──────────────────────────────────────────────────────────────────
+// Von Anfang an regiert die AfD. Umgesetzt ist, was sich aus ihrem Programm zur Bundestagswahl 2025 auf die Stadt übertragen
+// lässt (R01–R10; Zitate, Umrechnung und Annahmen im README und im Fenster „Stadtregierung“). Keine Regel liest Namen,
+// Herkunft oder wer wann zugezogen ist: Die Stadt kennt nichts davon. Regeln zum Zuzug (R09, R10) sitzen in zuzug(),
+// bevor jemand Bewohner ist. Rente, Prämie, Betreuungsgehalt und Grundsicherung kommen von außen (Rentenkasse, Bund) und
+// werden in S.stat.regierung gezählt; die Stadt zahlt sie nicht aus ihrem Budget.
+function regStatLeer() {
+  return { lohnsteuer: 0, lohnsteuerAlt: 0, rentenkasse: 0, praemie: 0, praemien: 0, betreuung: 0, betreuungTage: 0,
+    gs: 0, gsTage: 0, gemeinnuetzig: 0, gemeinTage: 0, vorbehalten: 0, vorbehaltTage: 0 };
+}
+// Tageswerte (Fenster und Zahlen: „gestern“): am Ende jedes Tagesabschlusses Summen minus Summen vom Ende des Vortags.
+// Im Zustand gespeichert, also gleich nach Laden oder Import da; nach einer Übernahme zählt der erste Tag ab dem Übernahmezeitpunkt
+function regierungTag(S) {
+  const r = S.regierung, st = S.stat.regierung, gestern = regStatLeer();
+  for (const k of Object.keys(gestern)) gestern[k] = st[k] - r.tagStart[k];
+  r.gestern = gestern;
+  r.tagStart = Object.assign(regStatLeer(), st);
+}
+function rentner(S, p) { return S.tag - S.p.geb[p] >= R.RENTE * R.JAHR; }
+// R04: Stufe der Rente (0, 1, 2), eine je 40 Tage seit dem Start der Stadtregierung
+function renteStufe(S) { return Math.min(R.RENTE_STUFEN.length - 1, Math.floor((S.tag - S.regierung.start) / R.RENTE_STUFE_TAGE)); }
+function renteBetrag(S) { return R.RENTE_STUFEN[renteStufe(S)]; }
+// Am Ende des letzten Tags einer Stufe eine Zeile im Stadtbuch; die neue Stufe gilt ab dem nächsten Tag
+function renteStufeMelden(S) {
+  const d = S.tag + 1 - S.regierung.start;
+  if (d <= 0 || d % R.RENTE_STUFE_TAGE) return;
+  const i = d / R.RENTE_STUFE_TAGE;
+  if (i >= R.RENTE_STUFEN.length) return;
+  buch(S, 'regierung', `Ab morgen zahlt die Rentenkasse ${R.RENTE_STUFEN[i]} statt ${R.RENTE_STUFEN[i - 1]} Taler Rente am Tag (Stufe ${i + 1} von ${R.RENTE_STUFEN.length}).`);
+}
+// R06: Lebt im Haushalt von kopf ein Kind unter 3 Jahren (30 Spieltage)?
+function kleinkind(S, kopf) {
+  const P = S.p, w = P.wohnung[kopf];
+  if (w < 0 || !S.hhKinder[kopf]) return false;
+  const t = S.tag - R.BETREUUNG_ALTER;
+  for (const m of S.bewohner[w]) if (P.hh[m] === kopf && P.geb[m] > t) return true;
+  return false;
+}
+// Kann p Betreuungsgehalt bekommen? 18 bis 66, ohne Stelle, ohne eigenen Betrieb. Gemeinnützige Arbeit ist keine Stelle: Wer sie
+// leistet, bekommt nach einer Geburt Betreuungsgehalt, und grundsicherung() beendet sie in derselben Nacht
+function kannBetreuen(S, p) {
+  const P = S.p, a = S.tag - P.geb[p];
+  return a >= R.ERWACHSEN * R.JAHR && a < R.RENTE * R.JAHR && (P.arbeit[p] < 0 || P.gemein[p]) && P.besitz[p] < 0;
+}
+// Wer im Haushalt kopf Betreuungsgehalt bekommt: eine Person je Haushalt mit Kleinkind, der Vorstand, sonst sein Partner.
+// Gemessen ist das immer ein Elternteil: Eltern mit Kleinkind haben in der Stadt einen eigenen Haushalt (README). -1 = niemand
+function betreuer(S, kopf) {
+  const P = S.p;
+  if (kopf < 0 || P.hh[kopf] !== kopf || !kleinkind(S, kopf)) return -1;
+  if (kannBetreuen(S, kopf)) return kopf;
+  const pa = P.partner[kopf];
+  return pa >= 0 && P.hh[pa] === kopf && kannBetreuen(S, pa) ? pa : -1;
+}
+// Elternzeit: p könnte im eigenen Haushalt betreuen, und dort bekommt noch niemand Betreuungsgehalt (dann lieber kündigen)
+function elternzeitMoeglich(S, p) {
+  const P = S.p, k = P.hh[p];
+  if (k < 0 || !(k === p || k === P.partner[p]) || rentner(S, p)) return false;
+  return kleinkind(S, k) && betreuer(S, k) < 0;
+}
+// So viele leisten gemeinnützige Arbeit im Bauhof (R07)
+function gemeinZahl(S) {
+  const P = S.p;
+  let n = 0;
+  if (S.bauhof >= 0) for (const w of S.belegschaft[S.bauhof]) if (P.gemein[w]) n++;
+  return n;
+}
+// R02 Familiensplitting: Steuerhaushalt = der Vorstand und sein Partner im selben Haushalt, mit den Kindern unter 18 dort.
+// Alle anderen Erwachsenen im Haushalt (auch erwachsene Kinder) zahlen allein. Liest nur Haushalt, Partner und Betrieb.
+function steuerKopf(S, w) {
+  const P = S.p, k = P.hh[w];
+  return k >= 0 && (k === w || k === P.partner[w]) ? k : w;
+}
+// Familienmitglieder mit Freibetrag: Vorstand und Partner (ohne wen, der einen offenen Betrieb hat: dessen Gewinn ist steuerfrei,
+// Annahme 4) und jedes Kind unter 18 im Haushalt
+function koepfe(S, k) {
+  const P = S.p;
+  if (P.hh[k] !== k) return 1;
+  const mit = (x) => (P.besitz[x] >= 0 && offen(S, P.besitz[x]) ? 0 : 1), pa = P.partner[k];
+  return mit(k) + (pa >= 0 && P.hh[pa] === k ? mit(pa) : 0) + S.hhKinder[k];
+}
+// R01 und R02: Steuer je Steuerhaushalt = 10 % von (Summe der Bruttolöhne − 29 × Köpfe), nach Lohn auf die Verdienenden verteilt
+function lohnsteuer(S, brutto) {
+  const P = S.p, n = S.pMax, rs = S.stat.regierung, E = new Float64Array(n);
+  for (let w = 0; w < n; w++) if (brutto[w] > 0) E[steuerKopf(S, w)] += brutto[w];
+  for (let w = 0; w < n; w++) {
+    if (!(brutto[w] > 0)) continue;
+    const k = steuerKopf(S, w), K = Math.max(1, koepfe(S, k));
+    const t = Math.round(R.STEUER * Math.max(0, E[k] - R.FREIBETRAG * K) * brutto[w] / E[k]);
+    P.geld[w] -= t; S.budget += t; rs.lohnsteuer += t;
+  }
+}
+// Geld vom Bund (R03): Betreuungsgehalt (R06) je Haushalt mit Kleinkind, danach die Grundsicherung (R07)
+function bundesGeld(S) {
+  const P = S.p, n = S.pMax, rs = S.stat.regierung;
+  for (let k = 0; k < n; k++) {
+    if (!P.lebt[k] || P.hh[k] !== k || !S.hhKinder[k]) continue;
+    const m = betreuer(S, k);
+    if (m >= 0) { P.geld[m] += R.NETTO_STANDARD; rs.betreuung += R.NETTO_STANDARD; rs.betreuungTage++; }
+  }
+  grundsicherung(S);
+}
+// Bedarfsgemeinschaft = Haushalt (Annahme): Hat jemand anderes im Haushalt Einkommen (Lohn, Betrieb, Rente, Betreuungsgehalt)?
+function verdientImHaushalt(S, p) {
+  const P = S.p, k = P.hh[p], w = P.wohnung[p];
+  if (k < 0 || w < 0) return false;
+  const erw = S.tag - R.ERWACHSEN * R.JAHR, bt = betreuer(S, k);
+  for (const m of S.bewohner[w]) {
+    if (m === p || P.hh[m] !== k || P.geb[m] > erw) continue;
+    if ((P.arbeit[m] >= 0 && !P.gemein[m]) || P.besitz[m] >= 0 || rentner(S, m) || bt === m) return true;
+  }
+  return false;
+}
+// R07: Grundsicherung = der Tagesbedarf (Einkauf, beim Vorstand Miete und Kinder) für 18- bis 66-Jährige ohne Stelle und ohne
+// eigenen Betrieb, die kein Betreuungsgehalt bekommen, in deren Haushalt niemand sonst Einkommen hat und die weniger als
+// 10 Tagesbedarfe haben. Wer sie 5 Spieltage (6 Monate) in Folge bezieht, wird zu gemeinnütziger Arbeit im Bauhof
+// herangezogen (Annahme: volle Arbeitszeit, ohne Lohn), solange der Bauhof unter 40 Leuten ist. Sie endet mit einer Stelle,
+// wenn die Grundsicherung endet, oder mit 67.
+function grundsicherung(S) {
+  const P = S.p, n = S.pMax, rs = S.stat.regierung, erw = S.tag - R.ERWACHSEN * R.JAHR, B = S.bauhof, neu = [];
+  for (let p = 0; p < n; p++) {
+    if (!P.lebt[p] || P.geb[p] > erw) continue;
+    let bezieht = false;
+    if ((P.arbeit[p] < 0 || P.gemein[p]) && P.besitz[p] < 0 && !rentner(S, p) && betreuer(S, P.hh[p]) !== p && !verdientImHaushalt(S, p)) {
+      const bedarf = tageskosten(S, p);
+      if (P.geld[p] < R.GS_SCHON * bedarf) { P.geld[p] += bedarf; rs.gs += bedarf; rs.gsTage++; bezieht = true; }
+    }
+    if (!bezieht) {
+      P.gsTage[p] = 0;
+      if (P.gemein[p]) austreten(S, p);
+      continue;
+    }
+    if (P.gsTage[p] < 65535) P.gsTage[p]++;
+    if (P.gemein[p]) { rs.gemeinTage++; continue; }
+    if (P.gsTage[p] >= R.GS_PFLICHT && P.arbeit[p] < 0 && B >= 0 && offen(S, B)
+        && stellen(S, B) < R.BAU_MAX && S.belegschaft[B].length < R.BAU_MAX) {
+      P.arbeit[p] = B; S.belegschaft[B].push(p); P.gemein[p] = 1; rs.gemeinnuetzig++; neu.push(p);
+    }
+  }
+  if (neu.length) buch(S, 'regierung', neu.length === 1
+    ? `${nr(S, neu[0])} bezieht seit 6 Monaten Grundsicherung und wird ab morgen zu gemeinnütziger Arbeit im Bauhof herangezogen.`
+    : `${neu.length} Leute beziehen seit 6 Monaten Grundsicherung und werden ab morgen zu gemeinnütziger Arbeit im Bauhof herangezogen, darunter ${nr(S, neu[0])}.`);
+}
+
 function menschenTag(S) {
   const g = S.g, tag = S.tag, J = R.JAHR;
   for (let p = 0; p < S.pMax; p++) {
@@ -2718,12 +2986,13 @@ function menschenTag(S) {
     if (at === R.ERWACHSEN * J) {                            // erwachsen geworden
       bedarfStart(S, p); P.jetzt[p] = 1; P.sparSeit[p] = tag; erwachsenZaehlen(S, p);
     }
-    // ANNAHME: Mit 67 endet die Anstellung (Rente aus dem Budget). Die Spec sagt nur „job_suchen: 18–67“.
+    // ANNAHME: Mit 67 endet die Anstellung (Rente von außen aus der Rentenkasse, Stadtregierung). Die Spec sagt nur „job_suchen: 18–67“.
     // Getestet: freiwilliger Ruhestand statt fester Grenze macht die Bevölkerungswelle größer, nicht kleiner.
     if (at === R.RENTE * J && P.arbeit[p] >= 0 && P.besitz[p] < 0) austreten(S, p);
-    // Geld: Rücklage in Tagen; ohne Arbeit im Erwerbsalter drückt es zusätzlich
+    // Geld: Rücklage in Tagen; ohne Arbeit im Erwerbsalter drückt es zusätzlich (nicht mit Betreuungsgehalt: sonst suchte man
+    // am nächsten Morgen wieder Arbeit; gemeinnützige Arbeit zählt als ohne Arbeit)
     let gz = P.geld[p] / Math.max(20, tageskosten(S, p)) * 2.5;
-    if (at < R.RENTE * J && P.arbeit[p] < 0) gz *= 0.6;
+    if (at < R.RENTE * J && (P.arbeit[p] < 0 || P.gemein[p]) && betreuer(S, P.hh[p]) !== p) gz *= 0.6;
     P.bGeld[p] = klemme(gz, 0, 100);
     // Wohnen
     const w = P.wohnung[p], kopf = P.hh[p];
@@ -2770,7 +3039,8 @@ function kennzahlenRechnen(S) {
   for (let p = 0; p < S.pMax; p++) {
     if (!P.lebt[p] || P.geb[p] > erw) continue;
     zs += P.zuf[p]; zn++;
-    if (P.geb[p] > rente && P.besitz[p] < 0) { erwerb++; if (P.arbeit[p] < 0) los++; }
+    // Elternzeit mit Betreuungsgehalt zählt weder als erwerbsfähig noch als arbeitslos, gemeinnützige Arbeit als arbeitslos
+    if (P.geb[p] > rente && P.besitz[p] < 0 && betreuer(S, P.hh[p]) !== p) { erwerb++; if (P.arbeit[p] < 0 || P.gemein[p]) los++; }
     if (P.wohnung[p] < 0 || P.sucht[p]) suchende++;
     const w = P.wohnung[p];
     if (w >= 0) {
@@ -2792,10 +3062,15 @@ function zuzug(S) {
   // Ladenstellen locken auch niemanden an (Gate 4): Ein Laden bedient 35 Leute, ob seine Stellen besetzt sind oder nicht
   // (Annahme 6). Zählten sie, holte jeder neue Laden Leute von außen, die wieder neue Läden brauchen (Ladenboom).
   // Läden stellen deshalb nur Leute aus der Stadt ein. Es zählen also die Stellen in Werkstätten und Tech-Firmen.
+  // Stadtregierung: Das galt schon und bleibt (R10, „heimische Potenziale“ zuerst). Neu (R09, Einheimischen-Modell): Suchen Leute,
+  // die schon hier wohnen, eine Wohnung, bleiben so viele freie Wohnungen für sie frei. „Einheimisch“ heißt nur „wohnt heute in
+  // der Stadt“: gezählt wird wohnungSuchende (ohne Wohnung oder mit erfolgloser Suche), keine Herkunft, keine Wohndauer.
   const g = S.g, bh = S.bauhof >= 0 ? Math.max(0, g.offeneStellen[S.bauhof]) : 0;
   let laden = 0;
   for (let b = 0; b < S.gAnzahl; b++) if (g.typ[b] === LADEN && offen(S, b)) laden += Math.max(0, g.offeneStellen[b]);
-  const fw = S.freieWohnungen, fs = Math.max(0, S.freieStellen - bh - laden - S.arbeitslose);
+  const vorbehalt = Math.min(S.freieWohnungen, S.wohnungSuchende), rs = S.stat.regierung;
+  const fw = S.freieWohnungen - vorbehalt, fs = Math.max(0, S.freieStellen - bh - laden - S.arbeitslose);
+  if (vorbehalt) { rs.vorbehaltTage++; rs.vorbehalten += vorbehalt; }
   const zf = klemme((S.zufMittel - 25) / 50, 0, 1);
   const basis = 2 + S.einwohner * 0.02;
   const attraktiv = (fw / (fw + 3)) * (fs / (fs + 3)) * zf;
@@ -2831,7 +3106,10 @@ function zuzug(S) {
     neu.push(p);
   }
   // Zuzüge eines Tages stehen in einer Zeile, sonst würden sie das Stadtbuch (500 Zeilen) allein füllen.
-  const grund = ` Es gibt ${fs} freie ${fs === 1 ? 'Stelle' : 'Stellen'} in Werkstätten und Tech-Firmen und ${fw} freie ${fw === 1 ? 'Wohnung' : 'Wohnungen'}, die Stimmung liegt bei ${Math.round(S.zufMittel)}.`;
+  const fwAlle = fw + vorbehalt;
+  const grund = ` Es gibt ${fs} freie ${fs === 1 ? 'Stelle' : 'Stellen'} in Werkstätten und Tech-Firmen und ${fwAlle} freie ${fwAlle === 1 ? 'Wohnung' : 'Wohnungen'}`
+    + (vorbehalt ? `, davon ${vorbehalt === 1 ? 'bleibt eine' : 'bleiben ' + vorbehalt} für Wohnungssuchende aus der Stadt frei` : '')
+    + `, die Stimmung liegt bei ${Math.round(S.zufMittel)}.`;
   if (neu.length === 1) buch(S, 'zuzug', `${nr(S, neu[0])} zieht zu, ${gebOrt(S, S.p.wohnung[neu[0]])}.` + grund);
   else if (neu.length > 1) buch(S, 'zuzug', `${neu.length} Leute ziehen zu, darunter ${nr(S, neu[0])} und ${nr(S, neu[1])}.` + grund);
 }
@@ -2907,17 +3185,9 @@ function bauamt(S) {
   // 4. Vorhandenes Wohnhaus voll und Budget übrig → aufstocken
   const auf = vollesHaus(S);
   if (auf >= 0 && S.budget >= 2 * R.K_AUF[g.stufe[auf] + 1]) aufstocken(S, auf, 'Es war voll, und im Budget war Geld übrig.');
-  // 5. Notbremse: 14 Tage keine Gründung und über 20 % ohne Arbeit → Werkstatt der Stadt
-  if (S.tag - S.letzteGruendung >= 14 && S.tag - S.letzteNotbremse >= 14 && S.arbeitslosenquote > 0.2
-      && S.budget >= R.K_WERKSTATT) {
-    const c = bauplatzNahe(S, MITTE, MITTE);
-    if (c >= 0) {
-      S.budget -= R.K_WERKSTATT;
-      const b = neuesGebaeude(S, WERKSTATT, c % KARTE, (c / KARTE) | 0, R.BAU_WERKSTATT, -1);
-      S.letzteNotbremse = S.tag; st.notwerkstaetten++;
-      buch(S, 'notbremse', `Notbremse: Die Stadt baut eine Werkstatt ${gebOrt(S, b)}. Seit ${S.tag - S.letzteGruendung} Tagen hat niemand gegründet, ${Math.round(S.arbeitslosenquote * 100)} % sind ohne Arbeit.`);
-    }
-  }
+  // 5. Die Notbremse der Spec (14 Tage keine Gründung und über 20 % ohne Arbeit → Werkstatt der Stadt) entfällt seit der
+  // Stadtregierung (R08, Auslegung von „Staatliche Eingriffe in den Markt werden wir auf ein Minimum reduzieren.“, S. 13).
+  // Weicht vom Wortlaut der Spec ab, Entscheidung des Nutzers (README, Annahme 23). letzteNotbremse bleibt im Zustand, ungenutzt.
 }
 
 // ─── Start ───────────────────────────────────────────────────────────────────────────
@@ -2938,6 +3208,9 @@ function leererZustand(seed) {
     ladenDirty: true, parkDirty: true,
     bauhof: -1, bauZuschlag: 0, bauRueckstand: 0, bauFehlt: 0, kistenpreis: 0,
     techPlaetze: 0, angebot: [-1, -1, -1, -1],               // Stellen in Tech-Firmen; was die Läden heute anbieten (Firma je Produkt)
+    // Stadtregierung seit Tag start (übernommene Stände: Übernahmetag); gestern = Summen des letzten Tags (null bis zur ersten
+    // Nacht), tagStart = Summen am Ende des letzten Tagesabschlusses (regierungTag)
+    regierung: { start: 0, gestern: null, tagStart: regStatLeer() },
     buch: [], buchNr: 0, reihe: [],
     // Hauptfiguren: an = die Oberfläche beantwortet Anfragen gerade (Ollama bereit, nicht 20×, kein Aufholen)
     ki: { an: false, haupt: [], anfragen: [], nr: 0, heute: {}, tagebuch: {}, verlust: [], abgelaufen: 0, angewandt: 0 },
@@ -2950,6 +3223,7 @@ function leererZustand(seed) {
       bau: { fertig: 0, tage: 0, still: 0, lohnSumme: 0 },      // Baustellentage gesamt / davon ohne Bauarbeiter
       kisten: { gemacht: 0, stadt: 0, aussen: 0 },              // an Läden der Stadt / von außerhalb gekauft
       tech: techStatLeer(),
+      regierung: regStatLeer(),                                // Summen seit dem Start der Stadtregierung (Taler bzw. Anzahl)
       gewaehlt: new Array(13).fill(0), ausgefuehrt: new Array(13).fill(0),
     },
   };
@@ -2985,6 +3259,12 @@ function neueStadt(seed) {
   for (let p = 0; p < R.HAUPT_START; p++) S.ki.haupt.push({ id: p, gen: S.p.gen[p] });   // 5 der ersten Bewohner
   ladenZuordnen(S); parksZuordnen(S); haushalteZaehlen(S); kennzahlenRechnen(S);
   buch(S, 'start', 'Zehn Leute kommen auf eine leere Wiese an der Hauptstraße. Es gibt zwei Wohnhäuser, einen Laden und den Bauhof der Stadt, der baut und Kisten macht.');
+  buch(S, 'regierung', 'Von Anfang an regiert die AfD. Es gilt ihr Programm zur Bundestagswahl 2025 („Zeit für Deutschland“), soweit es sich auf die Stadt übertragen lässt:'
+    + ` ${R.FREIBETRAG} Taler am Tag steuerfrei je Familienmitglied, Familiensplitting, Rente ${R.RENTE_STUFEN[0]} Taler am Tag und in zwei Schritten ${R.RENTE_STUFEN[R.RENTE_STUFEN.length - 1]},`
+    + ' Willkommensprämie und Betreuungsgehalt vom Bund, Grundsicherung mit gemeinnütziger Arbeit nach 6 Monaten.'
+    + ' Freie Wohnungen gehen zuerst an Wohnungssuchende aus der Stadt; wer zuzieht, kommt nur für eine freie Stelle. Renten zahlt die Rentenkasse, nicht die Stadt.'
+    + ' Die Notbremse-Werkstatt der Stadt entfällt (Auslegung).'
+    + ' Die Stadt kennt keine Herkunft; Programmpunkte, die nach Herkunft, Staatsangehörigkeit, Status, Religion oder Sprache unterscheiden, gelten hier nicht. Mehr unter „Stadtregierung“.');
   return S;
 }
 
@@ -3059,14 +3339,16 @@ function exportZustand(S) {
   }
   return { format: 'stadt', version: VERSION, werte, json, arrays };
 }
-// migrieren: einen Spielstand von Version 2 (vor dem Bauhof) oder 3 (vor den Tech-Firmen) übernehmen, siehe migriereV2 und migriereV3
+// migrieren: einen Spielstand von Version 2 (vor dem Bauhof), 3 (vor den Tech-Firmen) oder 4 (vor der Stadtregierung)
+// übernehmen, siehe migriereV2, migriereV3 und migriereV4
+const MIGRIERBAR = [2, 3, 4];
 function importZustand(d, migrieren) {
   if (!d || d.format !== 'stadt' || !d.werte || !d.json || !Array.isArray(d.arrays)) throw new Error('Das ist kein STADT-Spielstand.');
-  const alt = (d.version === 2 || d.version === 3) && migrieren;
+  const alt = MIGRIERBAR.includes(d.version) && migrieren;
   if (d.version !== VERSION && !alt) {
     const e = new Error(`Spielstand ist von Version ${d.version}, diese Datei ist Version ${VERSION}.`);
     e.andereVersion = true;
-    e.migrierbar = d.version === 2 || d.version === 3;
+    e.migrierbar = MIGRIERBAR.includes(d.version);
     e.vonVersion = d.version;
     throw e;
   }
@@ -3095,8 +3377,30 @@ function importZustand(d, migrieren) {
     if (!ArrayBuffer.isView(S[k])) throw new Error('Spielstand unvollständig: ' + k);
   }
   jsonPruefen(S);
-  if (alt) { if (d.version === 2) migriereV2(S); migriereV3(S, d.version === 3); }
+  if (alt) {
+    if (d.version === 2) migriereV2(S);
+    if (d.version <= 3) migriereV3(S, d.version === 3);
+    migriereV4(S);
+  }
+  regierungPruefen(S);                                       // nach dem Übernehmen: jeder Stand der Version 5 muss sie haben
   return S;
+}
+// Version 4 → 5: Ab heute regiert die Stadtregierung (Rentenstufen ab dem Übernahmetag). Die neuen Personenfelder stehen auf 0:
+// niemand bezieht schon Grundsicherung. Eine Zeile im Stadtbuch.
+function migriereV4(S) {
+  S.version = VERSION;
+  S.regierung = { start: S.tag, gestern: null, tagStart: regStatLeer() };
+  S.stat.regierung = regStatLeer();
+  buch(S, 'regierung', 'Ab heute regiert die AfD. Es gilt ihr Programm zur Bundestagswahl 2025 („Zeit für Deutschland“), soweit es sich auf die Stadt übertragen lässt. Mehr unter „Stadtregierung“.');
+}
+// Stadtregierung: Start als ganzer Tag, alle Summen (auch die vom Tagesende und die von gestern) als endliche Zahlen. Fehlt etwas,
+// stürzte die Stadt sonst um Mitternacht ab (Rente, Prämie) oder die Summen würden NaN und der nächste Stand ließe sich nicht mehr laden.
+function regierungPruefen(S) {
+  const r = S.regierung, st = S.stat && S.stat.regierung;
+  const summen = (o) => !!o && typeof o === 'object' && Object.keys(regStatLeer()).every(k => typeof o[k] === 'number' && Number.isFinite(o[k]));
+  if (!r || typeof r !== 'object' || !Number.isInteger(r.start) || r.start < 0 || r.start > S.tag
+      || !summen(r.tagStart) || !(r.gestern === null || summen(r.gestern))) throw new Error('Spielstand beschädigt: Stadtregierung');
+  if (!summen(st)) throw new Error('Spielstand beschädigt: Regierungs-Statistik');
 }
 // Version 3 → 4: Tech-Firmen gibt es noch keine; die neuen Felder (Personen: Geräte, Gebäude: Produkt, Version …) stehen
 // auf 0, weil sie im alten Stand fehlen. Eine Zeile im Stadtbuch (bei Version 2 steht schon die Zeile vom Bauhof da).
@@ -3190,11 +3494,16 @@ function personInfo(S, p, gen) {
   if (p < 0 || p >= S.pMax || !P.lebt[p] || (gen !== undefined && P.gen[p] !== gen)) return null;
   const tag = S.tag, alter = Math.floor((tag - P.geb[p]) / R.JAHR), kind = tag - P.geb[p] < R.ERWACHSEN * R.JAHR;
   const w = P.wohnung[p], arb = P.arbeit[p], bes = P.besitz[p];
+  // Leistungen der Stadtregierung, die diese Person gerade bekommt (für Karte und Sprachmodell: nur Tatsachen der Person)
+  const leistung = kind ? null : betreuer(S, P.hh[p]) === p ? { art: 'betreuung', betrag: R.NETTO_STANDARD }
+    : P.gsTage[p] ? { art: 'grundsicherung', betrag: tageskosten(S, p), gemein: !!P.gemein[p] } : null;
   let arbeit;
   if (kind) arbeit = 'Kind';
   else if (bes >= 0) arbeit = `besitzt ${S.g.typ[bes] === LADEN ? 'einen Laden' : S.g.typ[bes] === TECH ? `die Tech-Firma ${firmenName(S, bes)}` : 'eine Werkstatt'} ${gebOrt(S, bes)}` + (offen(S, bes) ? '' : ' (noch im Bau)');
+  else if (arb >= 0 && P.gemein[p]) arbeit = `leistet gemeinnützige Arbeit ${betriebText(S, arb)} (ohne Lohn)`;
   else if (arb >= 0) arbeit = `arbeitet als ${berufWort(S, p, arb)} ${betriebText(S, arb)}`;
   else if (alter >= R.RENTE) arbeit = 'in Rente';
+  else if (leistung && leistung.art === 'betreuung') arbeit = 'bleibt beim Kind zu Hause';
   else arbeit = 'ohne Arbeit';
   // Gedächtnis chronologisch (Ringpuffer ab dem ältesten Platz)
   const mem = [];
@@ -3240,7 +3549,7 @@ function personInfo(S, p, gen) {
   return {
     id: p, gen: P.gen[p], name: name(S, p), weib: !!P.weib[p], alter, kind,
     wohnen: w >= 0 ? (eigeneWohnung(S, p) ? 'wohnt ' : 'wohnt bei der Familie ') + gebOrt(S, w) : 'hat keine Wohnung', wohnung: w,
-    arbeit, arbeitsort: bes >= 0 ? bes : arb, heute: kind ? '' : heuteText(S, p), geld: P.geld[p],
+    arbeit, arbeitsort: bes >= 0 ? bes : arb, heute: kind ? '' : heuteText(S, p), geld: P.geld[p], leistung,
     charakter: { fleiss: P.fleiss[p], gesellig: P.gesellig[p], ehrgeiz: P.ehrgeiz[p], spar: P.spar[p], heimat: P.heimat[p] },
     ziel: kind || !P.ziel[p] ? null : { text: ZIELTEXT[P.ziel[p]], seit: tag - P.zielSeit[p], rest: Math.max(0, R.ZIEL_TAGE - (tag - P.zielSeit[p])) },
     beduerfnisse: kind ? null : { geld: P.bGeld[p], wohnen: P.bWohnen[p], kontakt: P.bKontakt[p], freizeit: P.bFreizeit[p] },
@@ -3301,13 +3610,19 @@ function traegerVon(S, w) {                                   // Werkstatt → M
 }
 function heuteText(S, p) {
   const P = S.p, g = S.g, arb = P.besitz[p] >= 0 ? P.besitz[p] : P.arbeit[p];
+  // Stadtregierung: Betreuungsgehalt und Grundsicherung (ohne Stelle), gemeinnützige Arbeit (Bauhof, unten)
+  if (arb < 0 && S.tag - P.geb[p] < R.RENTE * R.JAHR) {
+    if (betreuer(S, P.hh[p]) === p) return `Heute: bekommt Betreuungsgehalt (${R.NETTO_STANDARD} Taler am Tag), bis das Kind 3 Jahre alt ist.`;
+    if (P.gsTage[p]) return `Heute: bezieht Grundsicherung (${tageskosten(S, p)} Taler am Tag).`;
+  }
   if (arb < 0 || !offen(S, arb)) return '';
+  const gem = P.gemein[p] ? ` Bezieht Grundsicherung (${tageskosten(S, p)} Taler am Tag).` : '';
   if (P.frei[p]) return 'Heute: hat sich freigenommen.';
   if (arb === S.bauhof) {
     const e = P.einsatz[p] - 1;
-    if (e >= 0) return `Heute: Baustelle ${gebOrt(S, e)} (${bauArt(S, e)}), ${bauGesamt(S, e) - g.bauRest[e]} von ${bauGesamt(S, e)} Arbeitstagen geschafft.`;
-    if (S.stunde < 8) return 'Heute: um 7 Uhr teilt der Bauhof die Baustellen ein.';   // die Einteilung kommt am Ende der Stunde 7
-    return S.baustellen.length ? 'Heute: keine Baustelle frei, macht Kisten im Bauhof.' : 'Heute: keine Baustelle, macht Kisten im Bauhof.';
+    if (e >= 0) return `Heute: Baustelle ${gebOrt(S, e)} (${bauArt(S, e)}), ${bauGesamt(S, e) - g.bauRest[e]} von ${bauGesamt(S, e)} Arbeitstagen geschafft.` + gem;
+    if (S.stunde < 8) return 'Heute: um 7 Uhr teilt der Bauhof die Baustellen ein.' + gem;   // die Einteilung kommt am Ende der Stunde 7
+    return (S.baustellen.length ? 'Heute: keine Baustelle frei, macht Kisten im Bauhof.' : 'Heute: keine Baustelle, macht Kisten im Bauhof.') + gem;
   }
   if (g.typ[arb] === LADEN) return theke(S, arb) === p ? 'Heute: steht an der Theke.' : '';
   if (g.typ[arb] === TECH) {
@@ -3367,15 +3682,17 @@ function gebaeudeInfo(S, b) {
     info.zeile = info.leer ? (tech ? `Stufe ${g.stufe[b]}, ${R.STELLEN_TECH * g.stufe[b]} Stellen, wenn jemand sie übernimmt` : '')
       : b === S.bauhof ? `gehört der Stadt, ${n} ${n === 1 ? 'Person' : 'Leute'} bei ${st} Stellen`
         + (n > st ? ' (gerade gibt es wenig zu bauen, niemand wird eingestellt)' : '') + `, Lohn ${g.lohn[b]} Taler am Tag`
+        + (gemeinZahl(S) ? `; ${gemeinZahl(S)} davon leisten gemeinnützige Arbeit ohne Lohn` : '')
       : o < 0 ? `gehört der Stadt, ${n} von ${st} Stellen besetzt, Lohn ${g.lohn[b]} Taler am Tag`
       : (tech ? `Stufe ${g.stufe[b]}, ` : '') + `${n} von ${st} Stellen besetzt, Lohn ${g.lohn[b]} Taler am Tag`;
     const th = t === LADEN ? theke(S, b) : -1, tr = t === WERKSTATT ? traegerVon(S, b) : null;
     const rolle = (x) => {
       if (P.frei[x] && S.stunde >= 7) return 'hat heute frei';
       if (x === th) return 'an der Theke';
-      if (b === S.bauhof && P.einsatz[x]) return 'baut ' + gebOrt(S, P.einsatz[x] - 1);
-      if (tr && tr.has(x)) return 'trägt Kisten zum Laden ' + gebOrt(S, tr.get(x));
-      return berufWort(S, x, b);
+      const gem = P.gemein[x] ? ' (gemeinnützig)' : '';
+      if (b === S.bauhof && P.einsatz[x]) return 'baut ' + gebOrt(S, P.einsatz[x] - 1) + gem;
+      if (tr && tr.has(x)) return 'trägt Kisten zum Laden ' + gebOrt(S, tr.get(x)) + gem;
+      return berufWort(S, x, b) + gem;
     };
     const besitzRolle = o < 0 ? '' : o === th ? 'Besitz, an der Theke'
       : tech && P.arbeit[o] === b && !(P.frei[o] && S.stunde >= 7) ? 'Besitz, programmiert mit' : 'Besitz';
@@ -3413,6 +3730,28 @@ function gebaeudeInfo(S, b) {
   return info;
 }
 
+// Für das Fenster „Stadtregierung“ (liest nur): Start, Rentenstufe, Beträge aus R, Summen seit dem Start und von gestern (null bis
+// zur ersten Nacht), heute gezählte Leute.
+function regierungInfo(S) {
+  const P = S.p, erw = S.tag - R.ERWACHSEN * R.JAHR, rente = S.tag - R.RENTE * R.JAHR, i = renteStufe(S), start = S.regierung.start;
+  let rentner = 0, betreuung = 0, gs = 0, gemein = 0;
+  for (let p = 0; p < S.pMax; p++) {
+    if (!P.lebt[p] || P.geb[p] > erw) continue;
+    if (P.geb[p] <= rente && P.arbeit[p] < 0) rentner++;
+    if (P.gsTage[p]) gs++;
+    if (P.gemein[p]) gemein++;
+    if (P.hh[p] === p && S.hhKinder[p] && betreuer(S, p) >= 0) betreuung++;
+  }
+  const naechste = i + 1 < R.RENTE_STUFEN.length ? { tag: start + (i + 1) * R.RENTE_STUFE_TAGE, betrag: R.RENTE_STUFEN[i + 1] } : null;
+  return {
+    start, stufe: i + 1, stufen: R.RENTE_STUFEN.length, rente: R.RENTE_STUFEN[i], renteStufen: R.RENTE_STUFEN.slice(), naechste,
+    stufeTage: R.RENTE_STUFE_TAGE, nettoStandard: R.NETTO_STANDARD, freibetrag: R.FREIBETRAG, steuer: R.STEUER, praemie: R.PRAEMIE,
+    betreuungTage: R.BETREUUNG_ALTER, gsSchon: R.GS_SCHON, gsPflicht: R.GS_PFLICHT, bauMax: R.BAU_MAX,
+    summen: Object.assign(regStatLeer(), S.stat.regierung), gestern: S.regierung.gestern && Object.assign(regStatLeer(), S.regierung.gestern),
+    budget: S.budget,
+    rentner, betreuung, gs, gemein,
+  };
+}
 // Kennzahlen für Anzeige und Test (liest nur)
 function kennzahlen(S) {
   const g = S.g;
@@ -3444,6 +3783,8 @@ G.StadtSim = {
   neueStadt, stunde, tagSchritt, exportZustand, importZustand, kennzahlen, name, strName, klartext, personInfo, gebaeudeInfo, ZIELTEXT,
   // Berufe (für Figuren und Karten, lesen nur)
   theke, traeger, bauGesamt, techFirmaVon,
+  // Stadtregierung (Fenster „Stadtregierung“, liest nur); stellen und betreuer nur für tools/simtest.mjs
+  regierungInfo, stellen, betreuer,
   // Hauptfiguren und Sprachmodell (Phase 4)
   istHaupt, hauptSetzen, verlustErledigt, kiSchalten, kiAktionen, kiErlaubtJetzt, kiEntscheidung, kiVerwerfen, kiGespraech, kiTagebuch, kiCode,
   erlaubteAktionen: (S, p, h) => erlaubteAktionen(S, p, h).map(a => AKTIONSNAMEN[a]),
@@ -6385,9 +6726,8 @@ addEventListener('keydown', (e) => {
 // Stadtbuch ein- und ausklappen. Eingeklappt zählt eine Marke die neuen Einträge; auf Handy und Tablet startet es eingeklappt
 let buchUngelesen = 0;
 function buchNeuZahl() {
-  const z = $('buch-neu');
-  z.hidden = !buchUngelesen;
-  z.textContent = (buchUngelesen > 99 ? '99+' : buchUngelesen) + ' neu';
+  $('buch-neu').hidden = !buchUngelesen;
+  $('buch-neu-zahl').textContent = buchUngelesen > 99 ? '99+' : buchUngelesen;   // dahinter „ neu“ (quer nur für Screenreader)
 }
 function buchKlappen(auf) {
   $('buch-knopf').setAttribute('aria-expanded', String(auf));
@@ -6405,7 +6745,18 @@ function kennzahlenAnzeigen() {
   $('k-fs').textContent = zahl(k.freieStellen);
   $('k-zuf').textContent = zahl(k.zufriedenheit);
   $('k-budget').textContent = zahl(k.budget);
+  // Stadtregierung: Geld von außen (gestern, aus dem Zustand: S.regierung.gestern) direkt unter dem Budget. Nur bei einem neuen
+  // Tag oder einer anderen Stadt (Laden, Import, Übernahme); offenes Fenster nachführen
+  if (S !== regAnzeige.S || S.tag !== regAnzeige.tag) {
+    regAnzeige.S = S; regAnzeige.tag = S.tag;
+    const g = S.regierung.gestern;
+    $('k-aussen').textContent = g ? zahl(g.rentenkasse + g.praemie + g.betreuung + g.gs) : '–';
+    $('k-regierung-tag').textContent = S.regierung.start;
+    $('regierung-knopf').setAttribute('aria-label', `Stadtregierung: AfD · seit Tag ${S.regierung.start}`);
+    if ($('regierung-dialog').open) regierungZahlen();
+  }
 }
+const regAnzeige = { S: null, tag: -1 };                    // zuletzt angezeigt (kennzahlenAnzeigen)
 // Läuft jedes Bild: schreibt ins DOM nur, wenn sich Tag, Minute oder Tageszeit ändern
 const UHR = $('k-uhr'), TAG_ZAHL = $('k-tag'), UHR_SYMBOL = document.querySelector('#k-phase use');
 let uhrMinute = -1, uhrTag = -1, uhrPhase = '';
@@ -6436,7 +6787,7 @@ const ART = {
   gruendung: ['s-laden', 'Gründung', 'wichtig'], pleite: ['s-abwaerts', 'Pleite', 'verlust'], schliessung: ['s-schloss', 'Schließung'],
   bauamt: ['s-amt', 'Bauamt'], bauhof: ['s-kran', 'Bauhof'], fertig: ['s-fertig', 'Fertig gebaut'], auftrag: ['s-auftrag', 'Auftrag'],
   stillstand: ['s-sanduhr', 'Stillstand', 'verlust'], tech: ['s-chip', 'Tech-Firmen', 'wichtig'], version: ['s-paket', 'Neu im Laden'],
-  start: ['s-fahne', 'Start', 'wichtig'], notbremse: ['s-warnung', 'Notbremse', 'wichtig'],
+  start: ['s-fahne', 'Start', 'wichtig'], notbremse: ['s-warnung', 'Notbremse', 'wichtig'], regierung: ['s-rathaus', 'Stadtregierung', 'wichtig'],
 };
 const eintragKlasse = (e) => 'eintrag' + (ART[e.art] && ART[e.art][2] ? ' ' + ART[e.art][2] : '');
 // Erstes Wort, ohne Artikel davor („Das Bauamt baut …“ → bauamt, „Hochzeit: …“ → hochzeit)
@@ -6740,9 +7091,13 @@ const stufe = (v) => (v >= 80 ? 'sehr ' : v >= 60 ? 'eher ' : v >= 40 ? 'durchsc
 const ZIELLISTE = Sim.ZIELNAMEN.slice(1).map(z => `"${z}"`).join(', ');
 const zielText = (z) => Sim.ZIELTEXT[Sim.ZIELNAMEN.indexOf(z)] || z;
 function lageSatz(i) {
-  const a = Sim.klartext(i.arbeit);
-  const arbeit = a.startsWith('arbeitet') ? 'Du arbeitest' + a.slice(8) : a.startsWith('besitzt') ? 'Du besitzt' + a.slice(7)
-    : a === 'in Rente' ? 'Du bist in Rente' : 'Du hast keine Arbeit';
+  // Leistungen nennt die Anweisung nur als Tatsachen der Figur („Du bekommst Betreuungsgehalt“), nie die Stadtregierung
+  const a = Sim.klartext(i.arbeit), l = i.leistung;
+  const arbeit = l && l.art === 'grundsicherung' && l.gemein ? `Du bekommst Grundsicherung (${l.betrag} Taler am Tag) und musst ohne Lohn gemeinnützige Arbeit im Bauhof leisten`
+    : a.startsWith('arbeitet') ? 'Du arbeitest' + a.slice(8) : a.startsWith('besitzt') ? 'Du besitzt' + a.slice(7)
+    : a === 'in Rente' ? 'Du bist in Rente'
+    : l && l.art === 'betreuung' ? `Du bleibst beim Kind zu Hause und bekommst Betreuungsgehalt (${l.betrag} Taler am Tag), bis es 3 Jahre alt ist`
+    : l && l.art === 'grundsicherung' ? `Du hast keine Arbeit und bekommst Grundsicherung (${l.betrag} Taler am Tag)` : 'Du hast keine Arbeit';
   const partner = i.partner ? `Du bist mit ${i.partner.name} zusammen` : 'Du hast keinen Partner';
   const kinder = i.kinder.length ? ` und ${i.partner ? 'hast ' : ''}${i.kinder.length === 1 ? 'ein Kind' : i.kinder.length + ' Kinder'}` : '';
   const freunde = i.freunde.length ? `${i.freunde.length === 1 ? 'einen Freund' : i.freunde.length + ' Freunde'}` : 'keine Freunde';
@@ -7239,7 +7594,7 @@ async function aufholen(msWeg) {
 
 // Die drei auffälligsten Einträge: nach Gewicht der Art, höchstens einer je Art, bei Gleichstand der neueste
 const GEWICHT = { notbremse: 9, pleite: 8, gruendung: 7, tod: 6, wegzug: 5, schliessung: 5, kinder_weg: 5, trennung: 4,
-  hochzeit: 4, auftrag: 4, geburt: 3, version: 3, stillstand: 3, bauamt: 2, fertig: 2, bauhof: 2, tech: 2, zuzug: 1, start: 0 };
+  hochzeit: 4, auftrag: 4, geburt: 3, version: 3, stillstand: 3, regierung: 3, bauamt: 2, fertig: 2, bauhof: 2, tech: 2, zuzug: 1, start: 0 };
 function auffaelligste(abNr, n) {
   const kand = S.buch.filter(e => e.nr > abNr).sort((a, b) => (GEWICHT[b.art] || 0) - (GEWICHT[a.art] || 0) || b.nr - a.nr);
   const wahl = [], arten = new Set();
@@ -7265,8 +7620,16 @@ function wegKarte(erg) {
     <ol class="auffaellig">${auffaelligste(v.buchNr, 3).map(e => `<li class="${eintragKlasse(e)}">${eintragHtml(e)}</li>`).join('')}</ol>`;
   $('weg-dialog').showModal();
 }
+// Schließen per Klick: close() gibt den Fokus sofort an den Knopf zurück, das close-Ereignis kommt erst später (gemessen 10–118 ms).
+// Ohne sichtbaren Ring (Maus, Finger) den Fokus gleich wieder weg, sonst löste eine schnelle Leertaste dazwischen den Knopf aus und
+// öffnete das Fenster wieder, statt zu pausieren. Nach Tastatur bleibt er mit Ring auf dem Knopf
+function dialogZu(d) {
+  d.close();
+  const a = document.activeElement;
+  if (a && a !== document.body && !a.matches(':focus-visible')) a.blur();
+}
 for (const d of document.querySelectorAll('dialog')) {
-  d.addEventListener('click', (e) => { if (e.target.closest('[data-schliessen]')) d.close(); });
+  d.addEventListener('click', (e) => { if (e.target.closest('[data-schliessen]')) dialogZu(d); });
 }
 
 // ─── Export, Import, Version ─────────────────────────────────────────────────────────
@@ -7281,12 +7644,347 @@ $('einst-knopf').addEventListener('click', () => $('einst-dialog').showModal());
 // nach Tastatur-Bedienung (sichtbarer Ring) wieder auf dem Knopf; nach Maus oder Finger nicht, sonst löste die Leertaste den
 // Knopf aus und öffnete den Dialog wieder, statt zu pausieren. Dasselbe beim Zahnrad
 $('hilfe-knopf').addEventListener('click', () => $('hilfe-dialog').showModal());
-for (const [d, k] of [['hilfe-dialog', 'hilfe-knopf'], ['einst-dialog', 'einst-knopf']]) {
+// Die Stadtregierung (Knopf unter den Zahlen) schließt wie die Hilfe; am Handy füllt sie das Bild, dort schließt das X oben
+for (const [d, k] of [['hilfe-dialog', 'hilfe-knopf'], ['einst-dialog', 'einst-knopf'], ['regierung-dialog', 'regierung-knopf']]) {
   $(d).addEventListener('close', () => { const kn = $(k); kn.focus({ preventScroll: true }); if (!kn.matches(':focus-visible')) kn.blur(); });
 }
-$('hilfe-dialog').addEventListener('click', (e) => {    // Tipp auf den abgedunkelten Rand (am Handy steht „Schließen“ erst unten)
-  const r = e.currentTarget.getBoundingClientRect();
-  if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) e.currentTarget.close();
+for (const d of ['hilfe-dialog', 'regierung-dialog']) {
+  $(d).addEventListener('click', (e) => {                 // Tipp auf den abgedunkelten Rand (am Handy steht „Schließen“ erst unten)
+    if (e.target !== e.currentTarget) return;             // Klick von innen; per Tastatur (Enter auf einer Liste) hat er die Lage 0,0
+    const r = e.currentTarget.getBoundingClientRect();
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) dialogZu(e.currentTarget);
+  });
+}
+
+// ─── Stadtregierung: Fenster ─────────────────────────────────────────────────────────
+// Feste Texte. Zitate wörtlich aus dem Programm (gedruckte Seiten; nur Trennstriche am Zeilenende zusammengezogen, Anführungszeichen
+// im Zitat einfach, Auslassungen mit […]), jedes gegen den Programmtext je Seite geprüft (README, Abschnitt Stadtregierung). Alles wird mit textContent
+// gesetzt, nie als HTML. Ein Zitat ist [Text, Seite]; live nennt die Zeile mit Zahlen aus regLive.
+const REGIERUNG = {
+  grundlage: 'Grundlage ist das Programm der AfD zur Bundestagswahl 2025 „Zeit für Deutschland“. Seitenzahlen sind gedruckte Seiten; '
+    + 'die Zitate stehen so da wie im Programm, nur Trennstriche am Zeilenende sind zusammengezogen, Anführungszeichen im Zitat einfach '
+    + 'gesetzt und Auslassungen mit […] markiert. Die Stadt setzt um, was sich auf '
+    + 'sie übertragen lässt. Zahlen, die nicht im Programm stehen, sind als Annahme markiert.',
+  umrechnung: '1 Lebensjahr = 10 Spieltage. 100 Taler Lohn am Tag entsprechen dem mittleren '
+    + 'Bruttojahresverdienst in Vollzeit 2024 von 52.159 € (Statistisches Bundesamt, Pressemitteilung Nr. 134/2025). So werden 15.000 € '
+    + 'im Jahr zu 29 Talern am Tag und 20.000 € einmalig zu 383 Talern. Leistungen mit einer Dauer (6 Monate, 3 Jahre) sind deshalb kurz.',
+  grenze: 'Die Stadt kennt keine Herkunft, keine Staatsangehörigkeit, keinen Aufenthaltsstatus, keine Religion und keine Sprache, '
+    + 'und sie bekommt sie nicht. Wer hier lebt, wird nie danach behandelt, eingestuft oder aus der Stadt entfernt. Regeln zum Zuzug '
+    + 'gelten nur für Leute, die noch nicht hier wohnen.',
+  aussen: {
+    satz: 'Die Verbesserungen in der Stadt beruhen zu einem großen Teil auf Geld von außen, dessen Finanzierung die Stadt nicht abbildet '
+      + '(keine Rentenbeiträge, keine Bundessteuern); das Programm selbst rechnet mit steigenden Rentenbeiträgen (S. 19).',
+    zitate: [['die anstehenden Rentenbeitragsanhebungen durch Steuersenkungen für Beschäftigte und Unternehmen ausgleichen', 19]],
+    zusatz: 'Woher Rentenkasse und Bund das Geld nehmen, zeigt die Stadt nicht.',
+  },
+  gruppen: [
+    ['Steuern', [
+      { titel: 'Grundfreibetrag: 29 Taler am Tag steuerfrei', status: 'wirkt',
+        zitate: [['Der einkommensteuerliche Grundfreibetrag soll auf 15.000 Euro erhöht werden, von der bisherigen Anlehnung an sozialhilferechtliche Regelungen wird Abstand genommen.', 58]],
+        stadt: 'Die ersten 29 Taler eines Tageslohns sind steuerfrei, je Familienmitglied; vom Rest gehen wie bisher 10 % an die Stadt. '
+          + 'Bei 100 Talern Lohn sind das 7 statt 10 Taler.',
+        annahme: 'Umrechnung der 15.000 € (oben). Das Programm will auch die Steuersätze senken, nennt aber keinen Satz; die 10 % bleiben. '
+          + 'Die Lohnsteuer der Stadt hatte vorher gar keinen Freibetrag (in Deutschland galt 2025 schon einer von 12.096 €, nicht aus dem '
+          + 'Programm), die Entlastung ist hier deshalb größer als der Schritt, den das Programm vorsieht. In Deutschland regelt der Bund '
+          + 'die Einkommensteuer, ihr Aufkommen teilen sich Bund, Länder und Gemeinden; in der Stadt geht die ganze Lohnsteuer an die '
+          + 'Stadt, deshalb trifft sie der höhere Freibetrag voll.',
+        live: 'lohnsteuer' },
+      { titel: 'Familiensplitting', status: 'wirkt',
+        zitate: [['Als eine der wichtigsten Maßnahmen in Anlehnung an den Wortlaut des Grundgesetzes fordern wir eine Ausweitung des Ehegattensplittings auf das Familiensplitting. Dies hätte zur Folge, dass die Summe der erzielten Einkünfte aller Familienmitglieder durch die Zahl der Familienmitglieder geteilt wird.', 59]],
+        stadt: 'Die Löhne eines Paares im selben Haushalt zählen zusammen, und jedes Kind unter 18 im Haushalt bringt einen weiteren '
+          + 'Freibetrag. Beispiel: Paar, beide 100 Taler Lohn, zwei Kinder: 8 statt 20 Taler Steuer am Tag.',
+        annahme: 'Familie ist das Paar im selben Haushalt mit den Kindern unter 18 dort; erwachsene Kinder zahlen allein. Wer einen '
+          + 'offenen Betrieb hat, zählt nicht mit, weil sein Gewinn in der Stadt steuerfrei ist. Das Geschlecht spielt keine Rolle.' },
+    ]],
+    ['Rente', [
+      { titel: 'Rente in drei Stufen auf gut 70 % des Nettolohns', status: 'wirkt',
+        zitate: [['Wir halten es dabei für zwingend erforderlich, auch unseren derzeitigen Senioren, die in einem langen Arbeitsleben unser Land und unseren Wohlstand aufgebaut haben, einen Lebensabend in Würde zu ermöglichen. Dazu gehört vor allem eine signifikante Erhöhung ihrer Renten. Unser ferneres Ziel ist es, in mehreren Schritten das durchschnittliche Rentenniveau der westeuropäischen Länder zu erreichen, das nach Rechnung der EU (Eurostat) derzeit bei gut 70 Prozent des letzten Nettoeinkommens und damit deutlich höher liegt als das deutsche.', 17],
+          ['Das deutsche Rentenniveau ist mit nur 53 % des letzten Nettogehalts nach Eurostat eines der niedrigsten in Westeuropa.', 18]],
+        stadt: 'Rente ab 67, für alle Rentner gleich: in den ersten 40 Tagen der Stadtregierung 55 Taler am Tag, in den 40 Tagen danach '
+          + '60, dann 66. 66 sind gut 70 % eines Nettolohns von 93 Talern (100 Lohn, 7 Steuer); die alten 50 wären 54 % davon.',
+        annahme: 'Das Programm nennt die 70 % ein „ferneres Ziel“ (S. 17) und nennt weder die Höhe noch das Tempo der Schritte. Drei Stufen, '
+          + 'eine je Wahlperiode (4 Jahre = 40 Spieltage), sind eine Annahme der Stadt; dass das Ziel so nach 8 Sim-Jahren erreicht ist, ebenso.',
+        live: 'rente' },
+      { titel: 'Rente aus der Rentenkasse', status: 'Modellkorrektur',
+        zitate: [['Während die Sozialversicherungen (Renten-, Kranken-, Pflege-, Arbeitslosenversicherung) durch Beiträge von Arbeitnehmern finanziert werden, sind Sozialleistungen eine durch Steuern finanzierte Unterstützungsleistung.', 17]],
+        stadt: 'Die Renten kommen immer in voller Höhe von außen aus der Rentenkasse. Vorher zahlte die Stadt sie aus ihrem Budget, '
+          + 'solange es reichte; das war eine Vereinfachung des Spiels, in Wirklichkeit zahlt keine Stadt Renten.',
+        hinweis: 'Keine Programmforderung, sondern eine Korrektur des Modells. Die Stadt führt dafür keine Rentenbeiträge ab.',
+        live: 'rentenkasse' },
+    ]],
+    ['Familie und Bund', [
+      { titel: 'Bundesleistungen zahlt der Bund', status: 'wirkt',
+        zitate: [['Das Konnexitätsprinzip wird im Artikel 104a des Grundgesetzes geregelt. Es besagt, dass diejenige staatliche Ebene, die eine Ausgabe veranlasst, auch die damit verbundene Finanzierung zu leisten hat (‚Wer bestellt, bezahlt‘).', 55],
+          ['Versicherungsfremde Leistungen sind daher nicht aus den Beiträgen zu den Sozialversicherungen, sondern aus dem Bundeshaushalt zu finanzieren.', 17]],
+        stadt: 'Willkommensprämie, Betreuungsgehalt und Grundsicherung regelt der Bund, also zahlt er sie auch. Die Stadt ist eine '
+          + 'Kommune und zahlt nichts davon aus ihrem Budget.',
+        live: 'bund' },
+      { titel: 'Willkommensprämie: 383 Taler je Geburt', status: 'wirkt',
+        zitate: [['eine Willkommensprämie von 20.000 € für neugeborene Babys, sofern bereits Rentenbeiträge in derselben Höhe eingezahlt worden sind, andernfalls eine Gutschrift auf zukünftige Rentenbeiträge in dieser Höhe (die Prämie wird aus Steuermitteln finanziert und reduziert die Rente nicht)', 20]],
+        stadt: 'Bei jeder Geburt kommen 383 Taler vom Bund, halb an jeden Elternteil.',
+        annahme: 'Umrechnung der 20.000 € (oben). Im Programm ist die Prämie eine Rückzahlung von Rentenbeiträgen oder eine Gutschrift '
+          + 'auf künftige (S. 20, S. 147). Die Stadt kennt keine Beiträge und zahlt deshalb immer bar aus. Wer das Geld bekommt, sagt '
+          + 'das Programm nicht.',
+        live: 'praemie' },
+      { titel: 'Betreuungsgehalt bis zum 3. Geburtstag', status: 'wirkt',
+        zitate: [['Mit einem Betreuungsgehalt bis zum 3. Geburtstag sollen Eltern echte Wahlfreiheit zwischen Fremd- und Selbstbetreuung […]', 147],
+          ['Das Betreuungsgehalt für Eltern bzw. Großeltern soll etwa dem durchschnittlichen Nettolohn vor Geburt des ersten Kindes entsprechen.', 148]],
+        stadt: 'Wer zu Hause bleibt, bis das Kind 3 Jahre alt ist (30 Spieltage), bekommt vom Bund 93 Taler am Tag, so viel wie ein '
+          + 'Nettolohn. Eltern können dafür ihre Stelle aufgeben; sie zählen dann nicht als arbeitslos. Je Haushalt bekommt es eine '
+          + 'Person: die, auf die der Haushalt läuft, oder ihr Partner. In der Stadt sind das die Eltern, denn Eltern mit Kleinkind haben '
+          + 'hier einen eigenen Haushalt; Großeltern kamen dafür in den Messungen nie in Frage.',
+        annahme: 'S. 148 kann den eigenen früheren Nettolohn meinen; die Stadt nimmt den durchschnittlichen, weil sie keinen früheren '
+          + 'Lohn speichert. Wie gern Eltern dafür zu Hause bleiben, legt das Spiel fest, nicht das Programm. Teilzeit gibt es in der '
+          + 'Stadt nicht.',
+        live: 'betreuung' },
+    ]],
+    ['Arbeit und Wirtschaft', [
+      { titel: 'Grundsicherung, nach 6 Monaten gemeinnützige Arbeit', status: 'wirkt',
+        zitate: [['Dabei gehen wir vom Grundsatz aus, dass jeder, der arbeiten kann, auch arbeiten soll, anstatt der Gesellschaft zur Last zu fallen.', 25],
+          ['erwerbsfähige Bürgergeldempfänger, die nach 6 Monaten noch immer im Leistungsbezug sind, zu gemeinnütziger Arbeit heranziehen', 25]],
+        stadt: 'Wer ohne Arbeit ist, weniger als 10 Tagesbedarfe hat und in dessen Haushalt niemand verdient, bekommt vom Bund den '
+          + 'Tagesbedarf (Einkauf, Miete, Kinder). Wer nach 6 Monaten (5 Spieltagen) noch Grundsicherung bezieht, wird zu gemeinnütziger '
+          + 'Arbeit im Bauhof herangezogen (Annahme: volle Arbeitszeit, ohne Lohn), bis er eine Stelle findet. Vorher gab es in der Stadt '
+          + 'keine Grundsicherung.',
+        annahme: 'Die Grundsicherung selbst setzt das Programm voraus („Für eine funktionierende Grundsicherung für Arbeitssuchende“, '
+          + 'S. 25); die Stadt führt sie ein, weil es sie vorher nicht gab. Zugleich will das Programm „Reduzierung von Fachkräftemangel '
+          + 'durch höhere Erwerbsanreize, indem Einkommensteuern gesenkt werden und das Bürgergeld unattraktiver gemacht wird“ (S. 20); '
+          + 'eine Höhe nennt es nicht. Die Höhe ist, was die Stadt als Tageskosten rechnet. Die Grenze von 10 Tagesbedarfen und der '
+          + 'Haushalt als Bedarfsgemeinschaft sind ebenfalls Annahmen. Wer einen eigenen Betrieb hat, auch solange er gebaut wird, '
+          + 'bekommt keine Grundsicherung, und niemand in seinem Haushalt (Annahme: das Geld steckt im Betrieb).',
+        live: 'grundsicherung' },
+      { titel: 'Keine Werkstatt der Stadt als Notbremse', status: 'Auslegung',
+        zitate: [['Staatliche Eingriffe in den Markt werden wir auf ein Minimum reduzieren.', 13]],
+        stadt: 'Früher baute die Stadt eine eigene Werkstatt, wenn 14 Tage niemand gegründet hatte und über 20 % ohne Arbeit waren. '
+          + 'Das entfällt; es bleiben Grundsicherung und gemeinnützige Arbeit.',
+        hinweis: 'Auslegung: Das Programm nennt die Notbremse nicht, und ein Minimum ist nicht null. Den Bauhof und den Laden der Stadt '
+          + 'vom Start gibt es weiter; ob der Laden der Stadt bleiben soll, ist eine offene Frage. In den Messungen (Seeds 1–160) hat '
+          + 'die Notbremse auch vorher nie ausgelöst.' },
+    ]],
+    ['Wohnen und Zuzug', [
+      { titel: 'Freie Wohnungen zuerst für Wohnungssuchende aus der Stadt', status: 'wirkt',
+        zitate: [['Bei der Vergabe von Wohnbaugrundstücken und Wohnraum sind Einheimische nach dem Einheimischen-Modell zu bevorzugen.', 37]],
+        stadt: 'Suchen Leute, die schon hier wohnen, eine Wohnung, bleiben so viele freie Wohnungen für sie frei; wer zuziehen will, '
+          + 'bekommt nur, was übrig ist.',
+        hinweis: 'Die Stadt liest „einheimisch“ bewusst nur so: wer heute in der Stadt wohnt, egal ob hier geboren oder zugezogen und '
+          + 'egal wie lange, weil sie keine Herkunft kennt. An anderen Stellen stellt das Programm „einheimisch“ und „ausländisch“ '
+          + 'gegenüber (S. 112: „qualifizierte Fachkräfte, ob einheimisch oder ausländisch“); was die Partei beim Einheimischen-Modell '
+          + 'genau meint, lässt S. 37 offen.',
+        live: 'vorbehalt' },
+      { titel: 'Zuzug nur für eine freie Stelle, Arbeitsuchende der Stadt zuerst', status: 'galt schon',
+        zitate: [['Vor jeglicher weiterer außereuropäischer Fachkräfteeinwanderung werden wir zunächst die heimischen Potenziale ausschöpfen.', 113],
+          ['Bei ungelernten Personen sind in erster Linie Erwerbsfähige zu qualifizieren, die bereits heute legal in Deutschland leben.', 113],
+          ['Begrenzung der Zuwanderung auf qualifizierte Arbeitskräfte, damit diese am Ende ihres Erwerbslebens nicht auf deutsche Sozialleistungen angewiesen sind.', 20]],
+        stadt: 'Wer zuzieht, kommt nur für eine freie Stelle in einer Werkstatt oder Tech-Firma, die niemand aus der Stadt nehmen kann, '
+          + 'und fängt am ersten Tag an; höchstens 1 + 1 % der Einwohner am Tag. Das galt schon vorher.',
+        hinweis: 'Die „heimischen Potenziale“ (S. 113) sind für die Stadt alle, die hier wohnen, denn sie kennt keinen Aufenthaltsstatus. Ob '
+          + 'jemand qualifiziert ist, kann sie nicht prüfen, sie kennt keine Ausbildung. Eine Zahl für eine niedrigere Obergrenze nennt das Programm nicht.' },
+    ]],
+  ],
+  uebertragung: { text: 'Übertragung der Zuzugsregel: Dort meint das Programm Einwanderung nach Deutschland, vor allem von außerhalb '
+      + 'Europas (S. 113); die Freizügigkeit in der EU soll unberührt bleiben (S. 100). Wer in diese Stadt zieht, kann auch aus dem '
+      + 'Nachbarort kommen. Die Stadt wendet die Regel auf jeden Zuzug an: für Umzüge im Inland strenger als das Programm, für '
+      + 'Einwanderung von außerhalb Europas lockerer (kein Punktesystem, keine Sprachprüfung).',
+    zitate: [['Geeignete außereuropäische Arbeitskräfte werden wir danach bedarfsgerecht nach strikten Kriterien auswählen.', 113],
+      ['Die Freizügigkeitsregelungen innerhalb der EU bleiben davon unberührt.', 100]] },
+  wohnen: { text: 'Das Wohnkapitel zielt vor allem auf Wohneigentum (S. 36–37): Mieter sollen ihre Wohnungen kaufen können, und statt '
+      + 'sozialem Wohnungsbau soll es mehr Wohngeld geben. Das bildet die Stadt noch nicht ab, sie ist hier einzige Bauherrin und '
+      + 'Vermieterin. Der Mieterkauf folgt in einem zweiten Schritt.',
+    zitate: [['WIR WOLLEN EIN VOLK VON EIGENTÜMERN WERDEN', 36], ['Mieter zu Eigentümern machen', 37], ['Mehr Wohngeld statt sozialem Wohnungsbau', 37]] },
+  giltSchon: [
+    ['So sind die Grunderwerbsteuer für Selbstnutzer, die Grundsteuer und der Rundfunkbeitrag (GEZ) aufzuheben', 36, 'Gibt es in der Stadt nicht.'],
+    ['Senkung der Unternehmenssteuern auf ein international konkurrenzfähiges Niveau', 14, 'Die Stadt besteuert keine Gewinne.'],
+    ['Abschaffung des Solidaritätszuschlags für alle', 14, 'Die Stadt erhebt keinen Solidaritätszuschlag.'],
+    ['den gewöhnlichen Aufenthalt im Bundesgebiet als Voraussetzung für den Grundsicherungsbezug wieder einführen und kontrollieren', 25, 'Grundsicherung bekommt nur, wer in der Stadt wohnt.'],
+    ['Die AfD will die derzeit zur Erhebung ausgesetzte Vermögensteuer sowie die Erbschaftssteuer abschaffen.', 60, 'Gibt es in der Stadt nicht.'],
+    ['Deshalb lehnen wir jede Form der gesonderten Lebensmittelbesteuerung ab', 74, 'Die Stadt kennt keine Verbrauchsteuer.'],
+    ['Abschaffung der CO₂-Abgabe', 13, 'Die Stadt erhebt keine Klimaabgabe.'],
+    ['Die AfD lehnt daher jede Politik und jede Steuer ab, die sich auf angeblichen Klimaschutz beruft', 79, 'Keine Klimasteuer und keine Klimaausgaben in der Stadt.'],
+    ['Deshalb lehnen wir den weiteren Ausbau der Windenergie ab.', 80, 'Keine Windräder in der Stadt.'],
+    ['In diesem Zusammenhang lehnen wir die Einführung weiterer Steuern und Abgaben für Wasserentnahmen ab.', 83, 'Kein Wasserwerk, keine Abgabe.'],
+    ['Die AfD lehnt jedwede Aufweichung der Schuldenbremse entschieden ab.', 54, 'Das Budget kann nicht unter 0 fallen, die Stadt nimmt keine Kredite.'],
+    ['Zum Schutz von Eigentum und Bestand vor veränderten Bauvorschriften muss immer das Baurecht aus dem Erstellungszeitraum anwendbar bleiben.', 37, 'Kein Haus muss nachgerüstet werden.'],
+    ['Die Freibeträge sollen indexiert werden, um auch zukünftig heimliche Steuererhöhungen auszuschließen.', 58, 'Preise und Grundlöhne steigen in der Stadt nicht, der Freibetrag bleibt gleich.'],
+    ['Öffentliche Ämter, Beamten- und Richterstellen sind ausschließlich nach ‚Eignung, Befähigung und fachlicher Leistung‘ zu vergeben (Art. 33 Abs. 2 GG), Quotenregelungen sind abzulehnen.', 136, 'Die Stadt vergibt ihre Stellen ohne Quoten.'],
+    ['Wir wenden uns gegen die zunehmend aggressiven Versuche einer ideologisch geprägten, moralisierenden Umdeutung der Geschichte, die sich an der Schleifung von Denkmälern und Umbenennung von Straßen festmacht.', 171, 'Die Stadt reißt nichts ab und benennt keine Straßen um.'],
+    ['Wir stellen uns gegen eine flächendeckende Videoüberwachung', 124, 'Keine Überwachung in der Stadt.'],
+    ['Die AfD lehnt Subvention von Techniken ab.', 164, 'Die Stadt bezuschusst keine Firmen.'],
+  ],
+  nicht: [
+    { titel: 'Grenze der Stadt', text: 'Punkte, die Menschen nach Staatsangehörigkeit, Aufenthaltsstatus, Herkunft, Religion, Sprache '
+        + 'oder Abstammung unterschiedlich behandeln. Die Stadt kennt nichts davon und bekommt es nicht; es gibt keine Funktion, die '
+        + 'Bewohner gegen ihren Willen aus der Stadt nimmt. Wegziehen bleibt die eigene Entscheidung.',
+      punkte: [
+        ['Für jedes neugeborene Kind mit deutscher Staatsangehörigkeit und dauerhaftem Aufenthalt in Deutschland wird ein individuelles Altersvorsorge-Depot eingerichtet.', 19, 'Junior-Spardepot: knüpft an die Staatsangehörigkeit.'],
+        ['das Fremdrentenrecht in Anbetracht der systematischen Benachteiligung von Spätaussiedlern reformieren', 18, 'Spätaussiedler: knüpft an Herkunft und Abstammung; die Stadt kennt keine Rentenzeiten anderswo.'],
+        ['eine sozialversicherungspflichtige Erwerbstätigkeit ohne ‚aufstockende‘ Sozialleistungen von mindestens zehn Jahren in Deutschland zur Voraussetzung für den Bürgergeld-Bezug ausländischer Staatsangehöriger machen', 25, 'Bürgergeld nach Staatsangehörigkeit.'],
+        ['Geflüchteten den Aufenthaltsstatus bei Reisen ins Heimatland entziehen', 25, 'Schutzstatus und Herkunft.'],
+        ['ukrainische Kriegsflüchtlinge unter Beibehaltung ihrer Arbeitsmöglichkeiten aus dem Bürgergeld wieder ausgliedern', 25, 'Herkunft und Status.'],
+        ['Wer kein Bleiberecht besitzt und sich illegal in Deutschland aufhält, wird abgeschoben.', 100, 'Aufenthaltsstatus von Menschen, die schon da sind.'],
+        ['Unser Maßnahmenkatalog zur Umkehr dieses migrationspolitischen Staatsversagens heißt Remigration', 101, 'Richtet sich nach dem Aufenthaltsstatus an Menschen, die schon da sind. Auch ein allgemeines Wegzugsprogramm wird daraus nicht gemacht.'],
+        ['Abschaffung aller Bleiberechtsregelungen für ausreisepflichtige Personen, insbesondere auch der Ausbildungs- und Beschäftigungsduldung und des Chancenaufenthaltsrechts', 107, 'Aufenthaltsstatus.'],
+        ['Einleitung der Rückführung von Straftätern, Gefährdern sowie aller nicht mehr schutzberechtigten syrischen Staatsbürger', 108, 'Ausdrücklich nach Staatsangehörigkeit.'],
+        ['Deutliche Ausweitung der Zahl sicherer Herkunftsstaaten', 104, 'Herkunftsland; Asyl gibt es in der Stadt nicht.'],
+        ['Wegfall des grundsätzlichen Nachzugsanspruches für Familienangehörige subsidiär Schutzberechtigter', 104, 'Schutzstatus; Familiennachzug gibt es in der Stadt nicht.'],
+        ['Keine Arbeitserlaubnis außerhalb verpflichtender gemeinnütziger Arbeitsgelegenheiten mehr für Asylantragsteller und abgelehnte Asylbewerber', 104, 'Aufenthaltsstatus.'],
+        ['Sozialleistungen für Asylbewerber sind nach Möglichkeit als Sachleistungen zu erbringen', 105, 'Leistungen nach Status.'],
+        ['Dazu gehört der angemessene Spracherwerb, mindestens auf B2-Niveau, in angemessener Zeit', 109, 'Die Stadt kennt keine Sprache; auch als Filter für den Zuzug nicht umgedeutet.'],
+        ['Einbürgerungen sollten bei bester Integrationsleistung frühestens nach 10 Jahren möglich sein.', 110, 'Staatsangehörigkeit.'],
+        ['ist die Zuweisung von Wohnungen an Asylberechtigte und erst recht an Asylbewerber in diese Wohnquartiere maximal zu begrenzen.', 110, 'Knüpft an den Asylstatus. Den Vorrang für Einheimische bei Wohnraum (S. 37) setzt die Stadt oben um, als: wohnt heute hier.'],
+        ['Gegengesellschaften von über 25 % Nicht-EU-Migranten', 111, 'Verlangt, die Bewohner eines Viertels nach Herkunft zu zählen.'],
+        ['sowie die Grunderwerbssteuer für ausländische Käufer mit Hauptwohnsitz außerhalb der EU auf 20 % zu erhöhen', 36, 'Wohnsitz außerhalb der EU; in der Stadt kauft ohnehin niemand Wohnungen.'],
+        ['Wahre Kosten der Asylpolitik freilegen', 55, 'Die Kosten der Zuwanderung sollen im Bundeshaushalt eine eigene Position werden: Das ordnet Ausgaben Menschen nach Herkunft zu; zudem Bundeshaushalt.'],
+        ['Um Loyalitätskonflikte zu vermeiden, soll der Dienst in den Streitkräften ausschließlich deutschen Staatsbürgern vorbehalten bleiben.', 88, 'Die Wehrpflicht (ebenfalls S. 88) knüpft den Dienst an die Staatsangehörigkeit; zudem Bund, die Stadt hat keine Bundeswehr.'],
+        ['Deutschland muss als Arbeitsstandort wieder so attraktiv werden, dass ausgewanderte deutsche Fachkräfte zurück in die Heimat wollen.', 113, 'Staatsangehörigkeit; wer wegzieht, geht in der Stadt für immer.'],
+        ['damit der Rechtsstaat in den sogenannten No-go-Areas wieder durchgesetzt werden kann.', 122, 'Das Programm beschreibt diese Viertel über die Religion der Bewohner; die Stadt hat zudem keine Polizei.'],
+        ['Die Finanzierung des Baus und Betriebs von Moscheen sowie Organisationen in Deutschland durch ausländische Staaten wollen wir gesetzlich verbieten.', 123, 'Religion.'],
+        ['Der Bau von Minaretten und der Muezzinruf sind zu untersagen.', 124, 'Religion.'],
+        ['Wir fordern ein Kopftuchverbot in öffentlichen Einrichtungen und insbesondere in Schulen', 125, 'Religion; die Stadt kennt weder Kleidung noch Religion.'],
+        ['Den Islamunterricht lehnt die AfD ab.', 162, 'Religion; keine Schulen in der Stadt.'],
+        ['Zur besseren Integration von Kindern mit Migrationshintergrund muss Deutsch als verpflichtende Sprache in Kitas durchgesetzt werden.', 152, 'Herkunft und Sprache; keine Kitas in der Stadt.'],
+        ['Für internationale Studenten aus Ländern, die nicht Teil des Abkommens über den Europäischen Wirtschaftsraum sind, sollen angemessene Studiengebühren erhoben werden.', 163, 'Herkunftsland; keine Hochschule in der Stadt.'],
+        ['Wir heißen unsere Landsleute ausdrücklich willkommen.', 171, 'Spätaussiedler: knüpft an die Abstammung; eine Willkommensaussage, keine Regel.'],
+      ] },
+    { titel: 'Kein Gegenstück in der Stadt', text: 'Einreise und Asyl, Energie, Verkehr, Gesundheit, Kitas und Schulen, Umsatzsteuer, '
+        + 'Abstimmungen: Das gibt es in der Stadt nicht.',
+      punkte: [
+        ['Die AfD wird eine deutliche Kehrtwende in der bisherigen Migrationspolitik einleiten und die Staatsgrenzen wieder kontrollieren.', 100, 'Einreise nach Deutschland; die Stadt hat keine Grenze und keinen Einreisekanal.'],
+        ['Wir werden uns dafür einsetzen, dass Asylverfahren und Anträge auf subsidiären Schutz zukünftig außerhalb Deutschlands gestellt und bearbeitet werden', 103, 'Kein Asyl in der Stadt; Zuzug gibt es nur mit Stelle.'],
+        ['Verlängerung der Laufzeiten der Kohlekraftwerke', 13, 'Keine Energie, keine Heizung, keine Energiepreise in der Stadt.'],
+        ['Aufhebung des Verbrennerverbots und der unerreichbaren Flottengrenzwerte', 14, 'Keine Fahrzeuge.'],
+        ['Gleichzeitig fordert die AfD den Erhalt und Ausbau von innerstädtischen Fahrspuren und Parkraum', 42, 'Keine Fahrzeuge und Parkplätze; Straßen werden nie zurückgebaut.'],
+        ['Wiedereinführung des ermäßigten Umsatzsteuersatzes in der Gastronomie', 14, 'Keine Umsatzsteuer, keine Gaststätten.'],
+        ['Die Mehrwertsteuer für Artikel des Kinderbedarfs soll auf 7 % reduziert werden.', 148, 'Keine Umsatzsteuer.'],
+        ['die Zuverdienste von Witwen und Witwern nicht auf die Hinterbliebenenrente anrechnen', 19, 'Keine Hinterbliebenenrente: Rente bekommt in der Stadt jeder ab 67 selbst.'],
+        ['In Deutschland sind die Beiträge für die Kranken- und Pflegeversicherung mit insgesamt 21,1 bis 21,7 % etwa doppelt so hoch wie in Österreich oder der Schweiz', 21, 'Keine Kranken- und Pflegeversicherung.'],
+        ['Bereitstellung von ausreichend Kindergarten- und Kitaplätzen in Wohnraumnähe mit Vorrang für Familien, in denen beide Eltern arbeiten, sowie für arbeitende Alleinerziehende', 20, 'Keine Kinderbetreuung; Kinder hindern in der Stadt niemanden an der Arbeit.'],
+        ['An allen Schulformen sollen die Klassenstärken verringert werden.', 158, 'Keine Schulen.'],
+        ['Zudem sollen Arbeitnehmer über 50 Jahre bereits zum Zeitpunkt der Kündigung durch den Arbeitgeber Anspruch auf einen Berechtigungsschein für eine private Arbeitsvermittlung erhalten.', 21, 'Keine Arbeitsvermittlung: Wer Arbeit sucht, findet sofort die nächste freie Stelle.'],
+        ['Darüber hinaus wären zwei Drittel der Teilzeitkräfte bereit, ihre Arbeitszeit aufzustocken – wenn sich die Bedingungen verbessern.', 112, 'Keine Teilzeit in der Stadt.'],
+        ['Länder und Kommunen sollen angeregt werden, Mehrgenerationenkonzepte zu fördern.', 147, 'Keine Form der Förderung genannt, keine Betreuung in der Stadt.'],
+        ['Wohnungsbaugenossenschaften sollen bei der Vergabe von öffentlichen Grundstücken bevorzugt werden.', 37, 'Keine Genossenschaften; das Bauamt baut selbst.'],
+        ['Die AfD steht für ein ausgewogenes Mietrecht und lehnt staatliche Überregulierungen sowie Investitionshemmnisse wie die Mietpreisbremse oder den Mietendeckel ab.', 38, 'Trifft nicht zu: Die Stadt ist einzige Vermieterin und setzt jede Miete selbst fest, einen Mietmarkt gibt es nicht.'],
+        ['Wir fordern Volksentscheide nach Schweizer Vorbild auch für Deutschland.', 130, 'Keine Abstimmungen in der Stadt.'],
+      ] },
+    { titel: 'Keine Zahl, keine Mechanik oder kein Fall', text: 'Das Programm nennt keine Zahl, oder die Stadt hätte dafür keinen Fall.',
+      punkte: [
+        ['Die Steuersätze werden wir senken', 56, 'Keine Zahl; der Satz bleibt 10 %, gesenkt wird über den Freibetrag.'],
+        ['ein flexibles Renteneintrittsalter, abschlagsfrei nach 45 beitragsberechtigten Arbeitsjahren, ermöglichen', 18, 'Braucht Beitragsjahre, die die Stadt bei Zugezogenen nicht kennt, und eine Regel, wann jemand von selbst aufhört.'],
+        ['Schaffung von Arbeitsanreizen für Rentner durch einen zusätzlichen Steuergrundfreibetrag in Höhe von 12.000 €', 20, 'Ab 67 ist in der Stadt niemand mehr angestellt; der Freibetrag hätte keinen Fall.'],
+        ['die Elternschaft bei der Rente höher vergüten.', 19, 'Keine Höhe genannt.'],
+        ['Einen Anspruch auf Leistungen aus der Arbeitslosenversicherung soll nur haben, wer die Arbeitslosigkeit nicht selbst herbeigeführt hat.', 21, 'Die Stadt hat keine Arbeitslosenversicherung, und das Programm nennt keine Höhe; die Absicherung übernimmt die Grundsicherung.'],
+        ['die tatsächlich nicht erwerbsfähigen Bürgergeld-Bezieher aus den Jobcentern in die personengerechte Betreuung durch die Sozialämter überstellen', 25, 'In der Stadt gelten alle 18- bis 66-Jährigen als erwerbsfähig.'],
+        ['die Regelbedarfssätze an die tatsächliche Inflationsentwicklung des Bürgergeld-Warenkorbs anpassen.', 26, 'Keine Inflation in der Stadt.'],
+        ['Mit jedem Kind wird ein Teil des Kredits erlassen.', 148, 'Ehe-Start-Kredit für junge Paare: Höhe und Voraussetzungen fehlen; keine Kredite in der Stadt.'],
+        ['Zur Förderung der Eigentumsbildung werden wir einen Rahmen schaffen, in dem Mieter ihre Wohnungen von öffentlichen Wohnungsbauunternehmen zu vergünstigten Bedingungen erwerben können.', 37, 'Passt zur Stadt, die alle Wohnungen besitzt, aber Preis und Nachlass nennt das Programm nicht. Folgt in einem zweiten Schritt.'],
+        ['Es ist besser, einkommensschwache Mieter vermehrt mit Wohngeld zu unterstützen', 37, 'In der Stadt reicht fast jeder Lohn für Einkauf und Miete, und wer kein Einkommen hat, bekommt die Miete über die Grundsicherung; ein Wohngeld hätte kaum einen Fall.'],
+        ['Wir werden den Wohnungsbau von diesen Fesseln befreien, damit sich in Zukunft jeder Bürger eine Wohnung oder ein Haus leisten kann.', 36, 'Keine Zahl; die Stadt kennt keine Genehmigungen, und ihr Geld für Bauten ist nie knapp.'],
+        ['Förderung von Selbständigkeit und Unternehmensgründungen unter anderem durch Abbau von Vorschriften auf das notwendige Minimum', 16, 'Keine Zahl; Gründungen hängen in der Stadt am Umland, nicht an Vorschriften.'],
+        ['Die Integrationsfähigkeit ist durch eine strikte Begrenzung des Zuzugsgeschehens wieder herzustellen', 109, 'Keine Zahl; es bleibt bei höchstens 1 + 1 % der Einwohner am Tag, nur mit Stelle.'],
+        ['Im Rahmen eines Auswahlverfahrens werden wir ein Punktesystem mit klaren Auswahlkriterien, wie z. B. Berufserfahrung, bereits bestehende Arbeitsverhältnisse bzw. vorhandene -verträge, ausreichende Sprachkenntnisse etc. einführen', 113, 'Gilt im Programm für außereuropäische Fachkräfte; Berufserfahrung und Sprache kennt die Stadt nicht, der Arbeitsvertrag gilt schon (oben).'],
+      ] },
+  ],
+  vollstaendig: 'Zur Vollständigkeit: Übernommen sind vor allem Steuer-, Renten- und Familienleistungen. Die einschränkenden Teile zu '
+    + 'Migration und Bürgergeld fehlen überwiegend, weil sie nach Staatsangehörigkeit, Status oder Herkunft unterscheiden oder weil die '
+    + 'Stadt keine Einreise kennt. Die Stadt zeigt deshalb nur einen Teil des Programms.',
+  quelle: 'Quelle: afd.de, „Zeit für Deutschland“, Programm der AfD zur Bundestagswahl 2025. Seitenzahlen = gedruckte Seiten.',
+};
+// Ende REGIERUNG (tools: Zitate prüfen)
+
+// Zeilen mit Zahlen (i = StadtSim.regierungInfo, g = i.gestern: Tageswerte von gestern oder null bis zur ersten Nacht)
+// Anzahl mit Wort in Einzahl oder Mehrzahl: anz(1, 'Personentag', 'Personentage') = „1 Personentag“
+const taler = (v) => `${zahl(v)} Taler`, anz = (n, eins, mehr) => `${zahl(n)} ${n === 1 ? eins : mehr}`;
+const regLive = {
+  lohnsteuer: (i, g) => (g ? `Gestern ${taler(g.lohnsteuer)} Lohnsteuer; nach der alten Regel (10 % ohne Freibetrag) wären es ${taler(g.lohnsteuerAlt)}. ` : '')
+    + `Seit Tag ${i.start} zusammen ${taler(i.summen.lohnsteuer)} statt ${taler(i.summen.lohnsteuerAlt)}.`,
+  rente: (i) => `Heute Stufe ${i.stufe} von ${i.stufen}: ${i.rente} Taler am Tag` + (i.naechste ? `, ab Tag ${i.naechste.tag}: ${taler(i.naechste.betrag)}.` : '.'),
+  rentenkasse: (i, g) => (!i.rentner ? 'Niemand ist in Rente. ' : `${anz(i.rentner, 'Person ist', 'Leute sind')} in Rente. `)
+    + (g ? `Gestern zahlte die Rentenkasse ${taler(g.rentenkasse)}, seit` : 'Seit') + ` Tag ${i.start} zusammen ${taler(i.summen.rentenkasse)}.`,
+  bund: (i, g) => (g ? `Gestern zahlte der Bund ${taler(g.praemie + g.betreuung + g.gs)}, seit` : 'Seit')
+    + ` Tag ${i.start} zusammen ${taler(i.summen.praemie + i.summen.betreuung + i.summen.gs)}.`,
+  praemie: (i) => i.summen.praemien ? `Bisher ${anz(i.summen.praemien, 'Prämie', 'Prämien')}, zusammen ${taler(i.summen.praemie)}.` : 'Bisher keine Geburt.',
+  betreuung: (i) => `Heute ${!i.betreuung ? 'bekommt kein Haushalt' : i.betreuung === 1 ? 'bekommt 1 Haushalt' : `bekommen ${zahl(i.betreuung)} Haushalte`} Betreuungsgehalt`
+    + (i.summen.betreuungTage ? `; bisher ${anz(i.summen.betreuungTage, 'Haushaltstag', 'Haushaltstage')}, zusammen ${taler(i.summen.betreuung)}.` : ', bisher noch nie.'),
+  grundsicherung: (i) => !i.summen.gsTage ? 'Bisher war das nie nötig: Niemand hat Grundsicherung bekommen.'
+    : (!i.gs ? 'Heute bezieht niemand Grundsicherung. ' : `Heute ${i.gs === 1 ? 'bezieht 1 Person' : `beziehen ${zahl(i.gs)} Leute`} Grundsicherung`
+        + (i.gemein ? `, davon ${i.gemein} mit gemeinnütziger Arbeit. ` : '. '))
+      + `Bisher ${anz(i.summen.gsTage, 'Personentag', 'Personentage')} Grundsicherung (${taler(i.summen.gs)}); gemeinnützige Arbeit `
+      + (i.summen.gemeinnuetzig ? `${zahl(i.summen.gemeinnuetzig)}-mal, zusammen ${anz(i.summen.gemeinTage, 'Personentag', 'Personentage')}.` : 'war bisher nie nötig.'),
+  vorbehalt: (i) => i.summen.vorbehaltTage ? `Bisher an ${anz(i.summen.vorbehaltTage, 'Tag', 'Tagen')} Wohnungen zurückgehalten, zusammen ${anz(i.summen.vorbehalten, 'Wohnungstag', 'Wohnungstage')}.`
+    : 'Bisher musste keine Wohnung zurückgehalten werden.',
+};
+const regEl = (tag, klasse, text) => { const e = document.createElement(tag); if (klasse) e.className = klasse; if (text !== undefined) e.textContent = text; return e; };
+const regZitat = ([text, seite]) => { const q = regEl('blockquote', 'reg-zitat'); q.append(`„${text}“ `, regEl('cite', '', `S. ${seite}`)); return q; };
+const regAbsatz = (was, text, klasse) => { const p = regEl('p', klasse); if (was) p.append(regEl('span', 'reg-was', was + ' ')); p.append(text); return p; };
+const regFelder = new Map();                                 // live-Name → Element; dazu Kopf und die Zahlen „Geld von außen“
+// Baut den Inhalt einmal (beim ersten Öffnen); danach ändern sich nur die Zahlen (regierungZahlen)
+function regierungBauen() {
+  const R = REGIERUNG, box = $('regierung-inhalt'), f = document.createDocumentFragment();
+  const kopf = regEl('p', 'reg-unter');
+  regFelder.set('kopf', kopf);
+  f.append(kopf, regEl('p', '', R.grundlage));
+  const grenze = regEl('div', 'reg-hinweis');
+  grenze.append(regAbsatz('Grenze:', R.grenze), regAbsatz('Umrechnung (Annahme, nicht aus dem Programm):', R.umrechnung, 'reg-leise'));
+  f.append(grenze);
+  // Geld von außen: Summen je Quelle, gestern und seit dem Start
+  f.append(regEl('h3', 'einst-h', 'Geld von außen'));
+  const dl = regEl('dl', 'zahlen');
+  for (const [k, t] of [['rkG', 'Rentenkasse, gestern'], ['bundG', 'Bund, gestern (Prämien, Betreuungsgehalt, Grundsicherung)'],
+    ['rkS', 'Rentenkasse seit dem Start'], ['bundS', 'Bund seit dem Start'], ['budget', 'Budget der Stadt heute']]) {
+    const dd = regEl('dd', 'reg-live');
+    regFelder.set(k, dd);
+    dl.append(regEl('dt', '', t), dd);
+  }
+  f.append(dl, regEl('p', '', R.aussen.satz), ...R.aussen.zitate.map(regZitat), regEl('p', 'reg-leise', R.aussen.zusatz));
+  // Was in der Stadt gilt: je Regel eine Karte
+  f.append(regEl('h3', 'einst-h', 'Was in der Stadt gilt'));
+  for (const [gruppe, regeln] of R.gruppen) {
+    f.append(regEl('p', 'reg-gruppe', gruppe));
+    for (const r of regeln) {
+      const k = regEl('section', 'reg-karte'), h = regEl('h4');
+      h.append(regEl('span', '', r.titel), regEl('span', 'reg-status', r.status));
+      k.append(h, ...r.zitate.map(regZitat), regAbsatz('In der Stadt:', r.stadt));
+      if (r.annahme) k.append(regAbsatz('Annahme:', r.annahme, 'reg-leise'));
+      if (r.hinweis) k.append(regAbsatz('', r.hinweis, 'reg-leise'));
+      if (r.live) { const p = regEl('p', 'reg-live'); regFelder.set(r.live, p); k.append(p); }
+      f.append(k);
+    }
+  }
+  for (const n of [R.uebertragung, R.wohnen]) {
+    const d = regEl('div', 'reg-hinweis');
+    d.append(regEl('p', '', n.text), ...n.zitate.map(regZitat));
+    f.append(d);
+  }
+  // Gilt schon und Nicht übernommen: aufklappbar
+  f.append(regEl('h3', 'einst-h', 'Was sich nicht ändert oder fehlt'));
+  const liste = (punkte, mitGrund) => {
+    const ul = regEl('ul', 'reg-liste');
+    for (const [z, s, grund] of punkte) { const li = regEl('li'); li.append(`„${z}“ `, regEl('cite', 'reg-leise', `(S. ${s})`), ` ${mitGrund}${grund}`); ul.append(li); }
+    return ul;
+  };
+  const auf = (titel, text, ul) => { const d = regEl('details', 'reg-auf'); d.append(regEl('summary', '', titel)); if (text) d.append(regEl('p', 'reg-leise', text)); d.append(ul); return d; };
+  for (const g of R.nicht) f.append(auf(`Nicht übernommen – ${g.titel} (${g.punkte.length})`, g.text, liste(g.punkte, '– ')));
+  f.append(auf(`Gilt in der Stadt schon, ändert nichts (${R.giltSchon.length})`, '', liste(R.giltSchon, '– ')));
+  f.append(regEl('p', '', R.vollstaendig), regEl('p', 'reg-leise', R.quelle));
+  box.replaceChildren(f);
+}
+// Zahlen und Kopf nachführen (beim Öffnen und an jedem neuen Tag, solange das Fenster offen ist)
+function regierungZahlen() {
+  if (!regFelder.size) regierungBauen();
+  const i = Sim.regierungInfo(S), g = i.gestern, F = (k) => regFelder.get(k);
+  F('kopf').textContent = `AfD · seit Tag ${i.start}${i.start > 0 ? ', Spielstand übernommen' : ''} · Programm zur Bundestagswahl 2025`;
+  F('rkG').textContent = g ? taler(g.rentenkasse) : 'ab morgen';
+  F('bundG').textContent = g ? taler(g.praemie + g.betreuung + g.gs) : 'ab morgen';
+  F('rkS').textContent = taler(i.summen.rentenkasse);
+  F('bundS').textContent = taler(i.summen.praemie + i.summen.betreuung + i.summen.gs);
+  F('budget').textContent = taler(i.budget);
+  for (const [k, fn] of Object.entries(regLive)) F(k).textContent = fn(i, g);
+}
+$('regierung-knopf').addEventListener('click', () => {
+  regierungZahlen();
+  const d = $('regierung-dialog');
+  d.showModal();
+  d.scrollTop = 0;
 });
 $('export-knopf').addEventListener('click', () => {
   try { herunterladen(spielstandText(), 'stadt-save.json'); }
@@ -7302,7 +8000,7 @@ $('import-datei').addEventListener('change', async (e) => {
     const text = await datei.text();
     let l, migriert = false;
     try { l = spielstandLesen(text); }
-    catch (err) { if (!err.migrierbar) throw err; l = spielstandLesen(text, true); migriert = err.vonVersion; }   // Version 2 oder 3: übernehmen
+    catch (err) { if (!err.migrierbar) throw err; l = spielstandLesen(text, true); migriert = err.vonVersion; }   // Version 2, 3 oder 4: übernehmen
     karteZu();
     S = l.S; akku = 0; buchNeu(); if (G) { G.neueStadt(); }
     ki.gesendet.clear(); ki.gespraech = null; ki.aufholen.length = 0; hauptSchluessel = '';
@@ -7323,9 +8021,11 @@ $('version-neu').addEventListener('click', () => {
   $('version-dialog').close();
   ersterHinweis();                                        // es geht mit der neuen Stadt weiter
 });
-// Abweichung von der Spec (dort nur Export oder Neu): Ein Stand von Version 2 oder 3 lässt sich umrechnen (README, Annahme 60)
-// Was seit der alten Version neu ist (für Dialog und Meldung)
-const NEU_SEIT = (v) => (v === 2 ? 'Ab jetzt baut der Bauhof, und Bewohner können Tech-Firmen gründen.' : 'Ab jetzt können Bewohner Tech-Firmen gründen.');
+// Abweichung von der Spec (dort nur Export oder Neu): Ein Stand von Version 2, 3 oder 4 lässt sich umrechnen (README, Annahme 60)
+// Was seit der alten Version neu ist (für die Meldung danach)
+const REGIERUNG_NEU = 'Neu: Ab heute regiert in der Stadt die AfD nach ihrem Programm zur Bundestagswahl 2025 (Fenster „Stadtregierung“).';
+const NEU_SEIT = (v) => (v === 2 ? 'Ab jetzt baut der Bauhof, und Bewohner können Tech-Firmen gründen. ' + REGIERUNG_NEU
+  : v === 3 ? 'Ab jetzt können Bewohner Tech-Firmen gründen. ' + REGIERUNG_NEU : REGIERUNG_NEU);
 $('version-uebernehmen').addEventListener('click', async () => {
   const altS = S, vonVersion = versionFehler && versionFehler.vonVersion;
   let uebernommen = null;
@@ -7447,12 +8147,19 @@ if (versionFehler) {
   if (!versionFehler.andereVersion) $('version-titel').textContent = 'Spielstand lässt sich nicht laden';
   if (versionFehler.migrierbar) {
     const v = versionFehler.vonVersion;
+    // Je Version: was seitdem neu ist. Seit Version 5 regiert in jeder Stadt die Stadtregierung (übernommen: ab dem Übernahmetag)
+    const regierung = 'Seit Version 5 regiert in der Stadt die AfD nach ihrem Programm zur Bundestagswahl 2025 (Fenster „Stadtregierung“).';
     $('version-text').textContent = v === 2
-      ? 'Dein Spielstand ist von Version 2. Seitdem bauen Leute vom Bauhof die Häuser, Werkstätten machen Kisten für die Läden, und Bewohner können Tech-Firmen gründen (Software, Handys, Computer).'
-      : 'Dein Spielstand ist von Version 3. Seit Version 4 können Bewohner Tech-Firmen gründen: Software, Handys oder Computer. Die Läden verkaufen, was dort entsteht.';
-    $('version-hinweis').textContent = v === 2
-      ? '„Stadt übernehmen“ rechnet deine Stadt um: Laufende Baustellen bekommen die fehlenden Arbeitstage, alle Leute, Häuser und das Stadtbuch bleiben. Vorher „Export behalten“, wenn du den alten Stand sichern willst.'
-      : '„Stadt übernehmen“ behält alle Leute, Häuser, Baustellen und das Stadtbuch; Tech-Firmen entstehen danach von selbst. Vorher „Export behalten“, wenn du den alten Stand sichern willst.';
+      ? 'Dein Spielstand ist von Version 2. Seitdem bauen Leute vom Bauhof die Häuser, Werkstätten machen Kisten für die Läden, und Bewohner können Tech-Firmen gründen (Software, Handys, Computer). ' + regierung
+      : v === 3 ? 'Dein Spielstand ist von Version 3. Seit Version 4 können Bewohner Tech-Firmen gründen: Software, Handys oder Computer. Die Läden verkaufen, was dort entsteht. ' + regierung
+      : 'Dein Spielstand ist von Version 4. ' + regierung + ' Lohnsteuer mit Freibetrag und Familiensplitting, höhere Renten aus der Rentenkasse, '
+        + 'Willkommensprämie, Betreuungsgehalt und Grundsicherung vom Bund, Wohnungen zuerst für Wohnungssuchende aus der Stadt.';
+    const abHeute = ' Die Stadtregierung gilt ab dem Übernahmetag, die Renten steigen von da an in Stufen.';
+    $('version-hinweis').textContent = (v === 2
+      ? '„Stadt übernehmen“ rechnet deine Stadt um: Laufende Baustellen bekommen die fehlenden Arbeitstage, alle Leute, Häuser und das Stadtbuch bleiben.'
+      : v === 3 ? '„Stadt übernehmen“ behält alle Leute, Häuser, Baustellen und das Stadtbuch; Tech-Firmen entstehen danach von selbst.'
+      : '„Stadt übernehmen“ behält alle Leute, Häuser, Baustellen, Tech-Firmen und das Stadtbuch.')
+      + abHeute + ' Vorher „Export behalten“, wenn du den alten Stand sichern willst.';
     $('version-uebernehmen').hidden = false;
     $('version-neu').classList.remove('haupt');
   } else $('version-neu').classList.add('haupt');

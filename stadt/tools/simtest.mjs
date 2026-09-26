@@ -13,8 +13,12 @@
 //   node tools/simtest.mjs --bau                    Bauhof: Einteilung, Fortschritt je Person, jede Baustelle wird fertig (Seeds 1–3)
 //   node tools/simtest.mjs --waren                  Kisten: geliefert ≤ gemacht, Werkstatt-Einnahmen wie vorher (Seeds 1–3)
 //   node tools/simtest.mjs --tech                   Tech-Firmen: Arbeitstage an der Version, Käufe im Laden, Anbau (Seeds 1–3, 730 Tage)
-//   node tools/simtest.mjs --migrationstest         Spielstand von Version 2 oder 3 übernehmen (alte stadt.html aus git 39c405b
-//                                                   oder --alt pfad/zur/alten/stadt.html), 60 Tage weiter, keine NaN
+//   node tools/simtest.mjs --regierung              Stadtregierung: Lohnsteuer (Freibetrag, Familiensplitting), Rentenkasse, Betreuungsgehalt,
+//                                                   Grundsicherung und gemeinnützige Arbeit (erzwungen, auch Bauhof voll), Prämie,
+//                                                   Wohnungsvorbehalt beim Zuzug, Tageswerte „gestern“, Speicherformat (Seeds 1–3)
+//   node tools/simtest.mjs --migrationstest         Spielstände von Version 2, 3 und 4 übernehmen (alte stadt.html aus git 39c405b, 2b821c2 und 1c8d40b,
+//                                                   --git ordner für ein anderes Repository, oder nur --alt pfad/zur/alten/stadt.html),
+//                                                   60 Tage weiter, keine NaN
 //   Optionen: --alle 30 (Zeilenabstand), --buch 20 (letzte Stadtbuch-Zeilen), --aktionen
 
 import { readFileSync } from 'node:fs';
@@ -43,16 +47,23 @@ function statischPruefen(code) {
 }
 statischPruefen(SIM_CODE);
 
-function ladeSim() {
+function ladeSim() { return ladeSimMit([]).Sim; }
+// Für Messungen: dieselbe Simulation mit eingefügten Zeilen, die in globalThis mitschreiben ([alt, neu], alt genau einmal im Code)
+function ladeSimMit(ersetzen) {
+  let code = SIM_CODE;
+  for (const [alt, neu] of ersetzen) {
+    if (code.split(alt).length !== 2) throw new Error('Stelle für die Messung nicht eindeutig: ' + alt.slice(0, 60));
+    code = code.replace(alt, () => neu);
+  }
   const ctx = vm.createContext({});
   vm.runInContext(`
     Math.random = function () { throw new Error('Math.random ist in der Simulation verboten'); };
     globalThis.Date = undefined;
     globalThis.Intl = undefined;
   `, ctx);
-  vm.runInContext(SIM_CODE, ctx, { filename: 'stadt.html#sim' });
+  vm.runInContext(code, ctx, { filename: 'stadt.html#sim' });
   if (!ctx.StadtSim) throw new Error('Der sim-Block hat kein StadtSim angelegt.');
-  return ctx.StadtSim;
+  return { Sim: ctx.StadtSim, ctx };
 }
 
 // ─── Argumente ───
@@ -129,6 +140,7 @@ function fingerabdruck(Sim, S) {
   const arrays = Sim.exportZustand(S).arrays.sort((x, y) => (x.name < y.name ? -1 : 1));   // Schlüsselreihenfolge egal
   for (const a of arrays) { h.update(a.name); h.update(Buffer.from(a.daten.buffer, a.daten.byteOffset, a.daten.byteLength)); }
   h.update(JSON.stringify(S.buch)); h.update(JSON.stringify(S.stat)); h.update(JSON.stringify(S.ki)); h.update(String(S.budget) + '/' + S.rs + '/' + S.tag + '/' + S.stunde);
+  if (S.regierung) h.update(JSON.stringify(S.regierung));  // Stadtregierung: Start und Tageswerte (gestern, Summen am Tagesende)
   return h.digest('hex').slice(0, 16);
 }
 
@@ -170,15 +182,19 @@ if (flag('kitest')) {
       Sim.stunde(S);
     }
     pruef(abweichend === 0, `Gehirn ⊆ erlaubte Aktionen (${geprueft} Entscheidungen geprüft, ${abweichend} abweichend)`);
-    // 1b. Der Lagesatz fürs Sprachmodell erkennt Arbeit nur an „arbeitet …“ / „besitzt …“ am Anfang
+    // 1b. Der Lagesatz fürs Sprachmodell erkennt Arbeit nur an „arbeitet …“ / „besitzt …“ / „leistet gemeinnützige Arbeit …“ am Anfang
     {
       let n = 0, falsch = 0, bau = 0, bauFalsch = 0, tech = 0, techFalsch = 0;
       for (let p = 0; p < S.pMax; p++) {
         if (!S.p.lebt[p] || S.tag - S.p.geb[p] < Sim.R.ERWACHSEN * Sim.R.JAHR || (S.p.arbeit[p] < 0 && S.p.besitz[p] < 0)) continue;
         const i = Sim.personInfo(S, p);
-        n++; if (!/^(arbeitet als |besitzt )/.test(i.arbeit)) { falsch++; if (falsch < 3) console.log('    ' + i.arbeit); }
-        // Wer schon einen eigenen Betrieb hat, der noch gebaut wird, arbeitet bis dahin weiter im Bauhof: Text „besitzt …“
-        if (S.p.arbeit[p] === S.bauhof && S.p.besitz[p] < 0) { bau++; if (!/^arbeitet als Bauarbeiter(in)? beim Bauhof /.test(i.arbeit)) bauFalsch++; }
+        n++; if (!/^(arbeitet als |besitzt |leistet gemeinnützige Arbeit )/.test(i.arbeit)) { falsch++; if (falsch < 3) console.log('    ' + i.arbeit); }
+        // Wer schon einen eigenen Betrieb hat, der noch gebaut wird, arbeitet bis dahin weiter im Bauhof: Text „besitzt …“.
+        // Gemeinnützige Arbeit (Stadtregierung) steht als „leistet gemeinnützige Arbeit beim Bauhof …“ da (prüft --regierung).
+        if (S.p.arbeit[p] === S.bauhof && S.p.besitz[p] < 0) {
+          bau++;
+          if (!(S.p.gemein[p] ? /^leistet gemeinnützige Arbeit beim Bauhof / : /^arbeitet als Bauarbeiter(in)? beim Bauhof /).test(i.arbeit)) bauFalsch++;
+        }
         if (S.p.arbeit[p] >= 0 && S.g.typ[S.p.arbeit[p]] === Sim.TECH && S.p.besitz[p] < 0) { tech++; if (!/^arbeitet als Programmierer(in)? bei /.test(i.arbeit)) techFalsch++; }
       }
       pruef(n > 50 && falsch === 0 && bau > 0 && bauFalsch === 0 && techFalsch === 0, `Arbeitstext beginnt mit „arbeitet als“ oder „besitzt“ (${n} Leute mit Arbeit, davon ${bau} im Bauhof, ${tech} in Tech-Firmen, ${falsch + bauFalsch + techFalsch} falsch)`);
@@ -276,41 +292,355 @@ if (flag('kitest')) {
 if (flag('migrationstest')) {
   let fehler = 0;
   const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
-  const altHtml = arg('alt') ? readFileSync(arg('alt'), 'utf8')
-    : execFileSync('git', ['show', '39c405b:stadt/stadt.html'], { cwd: hier, encoding: 'utf8', maxBuffer: 1 << 26 });
-  const ctx = vm.createContext({});
-  vm.runInContext(altHtml.match(/<script id="sim">([\s\S]*?)<\/script>/)[1], ctx);
-  const Alt = ctx.StadtSim;
-  pruef((Alt.VERSION === 2 || Alt.VERSION === 3) && Alt.VERSION < Sim.VERSION, `alte Simulation hat Version ${Alt.VERSION}, neue ${Sim.VERSION}`);
-  for (const [seed, tage, stunde] of [[1, 150, 13], [2, 300, 5], [3, 400, 20]]) {
-    const A = Alt.neueStadt(seed);
-    while (A.tag < tage || A.stunde < stunde || !A.baustellen.length) Alt.stunde(A);   // ein Moment mit laufenden Baustellen
-    const text = speichernAlsText(Alt, A);
-    let abgelehnt = null;
-    try { ladenAusText(Sim, text); } catch (e) { abgelehnt = e; }
-    pruef(abgelehnt && abgelehnt.andereVersion && abgelehnt.migrierbar, `Seed ${seed}, Tag ${A.tag} ${A.stunde} Uhr (${A.einwohner} Einw., ${A.baustellen.length} Baustellen): ohne Übernehmen abgelehnt, als übernehmbar markiert`);
-    const d = JSON.parse(text);
-    d.arrays = d.arrays.map(a => { const u8 = Buffer.from(a.b64, 'base64'); return { name: a.name, typ: a.typ, daten: new TYPEN[a.typ](u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength)) }; });
-    const S = Sim.importZustand(d, true);
-    const B = S.bauhof, g = S.g;
-    pruef(B === 2 && g.typ[B] === Sim.WERKSTATT && g.besitzer[B] < 0, `Bauhof = Gebäude ${B} (die Werkstatt der Stadt vom Start)`);
-    pruef(S.baustellen.every(b => g.bauRest[b] > 0 && g.bauRest[b] <= Sim.bauGesamt(S, b)), `Baustellen mit Arbeitstagen: ${S.baustellen.map(b => g.bauRest[b] + '/' + Sim.bauGesamt(S, b)).join(', ') || 'keine'}`);
-    pruef(S.einwohner === A.einwohner && S.buchNr === A.buchNr + 1, `Einwohner (${S.einwohner}) und Stadtbuch bleiben, eine Zeile dazu: „${Sim.klartext(S.buch.at(-1).text)}“`);
-    const offen = new Set(S.baustellen);
-    const ziel = S.tag + 60;
-    while (S.tag < ziel) Sim.stunde(S);
-    let nan = 0;
-    for (const [n, a] of Object.entries(S.p)) if (a instanceof Float32Array || a instanceof Float64Array) for (let i = 0; i < S.pMax; i++) if (!Number.isFinite(a[i])) nan++;
-    for (const k of ['budget', 'exportPreis', 'kistenpreis', 'zufMittel']) if (!Number.isFinite(S[k])) nan++;
-    const k = Sim.kennzahlen(S);
-    pruef(nan === 0 && Object.values(k).every(v => typeof v !== 'number' || Number.isFinite(v)), `60 Tage weiter (Tag ${S.tag}, ${S.einwohner} Einw.): keine NaN/Infinity`);
-    pruef([...offen].every(b => !S.baustellen.includes(b) || S.g.auf[b]), `alle übernommenen Baustellen fertig (${offen.size})`);
-    if (S.stat.tech) pruef(S.version === Sim.VERSION && Array.isArray(S.angebot), `Version ${S.version}, Tech-Firmen danach: ${S.stat.tech.gruendungen} gegründet, ${S.stat.tech.kaeufe.reduce((a, b) => a + b, 0)} Käufe`);
-    const L = ladenAusText(Sim, speichernAlsText(Sim, S));
-    const z = S.tag + 20; while (S.tag < z) Sim.stunde(S); while (L.tag < z) Sim.stunde(L);
-    pruef(fingerabdruck(Sim, S) === fingerabdruck(Sim, L), `danach als Version ${Sim.VERSION} gespeichert und geladen: läuft bitgleich weiter`);
+  // Alte Fassungen: mit --alt genau diese Datei, sonst aus git 39c405b (Version 2), 2b821c2 (Version 3) und 1c8d40b (Version 4,
+  // der häufigste echte Fall). --git <ordner>: Repository für git show (Standard: der Ordner dieses Werkzeugs)
+  const quellen = arg('alt') ? [[arg('alt'), readFileSync(arg('alt'), 'utf8')]]
+    : ['39c405b', '2b821c2', '1c8d40b'].map(c => [`git ${c}`, execFileSync('git', ['show', c + ':stadt/stadt.html'], { cwd: arg('git', hier), encoding: 'utf8', maxBuffer: 1 << 26 })]);
+  const NEU_ZEILEN = { 2: 2, 3: 2, 4: 1 };                 // Bauhof bzw. Tech-Firmen, dazu je eine Zeile der Stadtregierung
+  for (const [herkunft, altHtml] of quellen) {
+    const ctx = vm.createContext({});
+    vm.runInContext(altHtml.match(/<script id="sim">([\s\S]*?)<\/script>/)[1], ctx);
+    const Alt = ctx.StadtSim;
+    console.log(`Alte Fassung: ${herkunft}`);
+    pruef([2, 3, 4].includes(Alt.VERSION) && Alt.VERSION < Sim.VERSION, `alte Simulation hat Version ${Alt.VERSION}, neue ${Sim.VERSION}`);
+    for (const [seed, tage, stunde] of [[1, 150, 13], [2, 300, 5], [3, 400, 20]]) {
+      const A = Alt.neueStadt(seed);
+      while (A.tag < tage || A.stunde < stunde || !A.baustellen.length) Alt.stunde(A);   // ein Moment mit laufenden Baustellen
+      const text = speichernAlsText(Alt, A);
+      let abgelehnt = null;
+      try { ladenAusText(Sim, text); } catch (e) { abgelehnt = e; }
+      pruef(abgelehnt && abgelehnt.andereVersion && abgelehnt.migrierbar, `Seed ${seed}, Tag ${A.tag} ${A.stunde} Uhr (${A.einwohner} Einw., ${A.baustellen.length} Baustellen): ohne Übernehmen abgelehnt, als übernehmbar markiert`);
+      const d = JSON.parse(text);
+      d.arrays = d.arrays.map(a => { const u8 = Buffer.from(a.b64, 'base64'); return { name: a.name, typ: a.typ, daten: new TYPEN[a.typ](u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength)) }; });
+      const S = Sim.importZustand(d, true);
+      const B = S.bauhof, g = S.g;
+      pruef(B === 2 && g.typ[B] === Sim.WERKSTATT && g.besitzer[B] < 0, `Bauhof = Gebäude ${B} (die Werkstatt der Stadt vom Start)`);
+      pruef(S.baustellen.every(b => g.bauRest[b] > 0 && g.bauRest[b] <= Sim.bauGesamt(S, b)), `Baustellen mit Arbeitstagen: ${S.baustellen.map(b => g.bauRest[b] + '/' + Sim.bauGesamt(S, b)).join(', ') || 'keine'}`);
+      const dazu = NEU_ZEILEN[Alt.VERSION];
+      pruef(S.einwohner === A.einwohner && S.buchNr === A.buchNr + dazu, `Einwohner (${S.einwohner}) und Stadtbuch bleiben, ${dazu} ${dazu === 1 ? 'Zeile' : 'Zeilen'} dazu: `
+        + S.buch.slice(-dazu).map(e => `„${Sim.klartext(e.text).slice(0, 70)}…“`).join(' '));
+      pruef(S.version === Sim.VERSION && S.regierung.start === A.tag && Object.values(S.stat.regierung).every(v => v === 0) && S.buch.at(-1).art === 'regierung'
+        && S.p.gsTage.every(v => v === 0) && S.p.gemein.every(v => v === 0) && S.regierung.gestern === null && Object.values(S.regierung.tagStart).every(v => v === 0),
+        `Stadtregierung ab dem Übernahmetag ${S.regierung.start}, Summen 0, niemand in Grundsicherung, noch kein „gestern“`);
+      const offen = new Set(S.baustellen);
+      const ziel = S.tag + 60;
+      while (S.tag < ziel) Sim.stunde(S);
+      let nan = 0;
+      for (const [n, a] of Object.entries(S.p)) if (a instanceof Float32Array || a instanceof Float64Array) for (let i = 0; i < S.pMax; i++) if (!Number.isFinite(a[i])) nan++;
+      for (const k of ['budget', 'exportPreis', 'kistenpreis', 'zufMittel']) if (!Number.isFinite(S[k])) nan++;
+      for (const v of Object.values(S.stat.regierung)) if (!Number.isFinite(v)) nan++;
+      const k = Sim.kennzahlen(S);
+      pruef(nan === 0 && Object.values(k).every(v => typeof v !== 'number' || Number.isFinite(v)), `60 Tage weiter (Tag ${S.tag}, ${S.einwohner} Einw.): keine NaN/Infinity`);
+      pruef([...offen].every(b => !S.baustellen.includes(b) || S.g.auf[b]), `alle übernommenen Baustellen fertig (${offen.size})`);
+      const gs = S.regierung.gestern;
+      pruef(!!gs && Object.entries(gs).every(([k, v]) => Number.isFinite(v) && v >= 0 && v <= S.stat.regierung[k]),
+        `„gestern“ nach 60 Tagen: Rentenkasse ${gs ? gs.rentenkasse : '–'}, Bund ${gs ? gs.praemie + gs.betreuung + gs.gs : '–'} Taler`);
+      const ri = Sim.regierungInfo(S), stufe2 = S.buch.find(e => e.art === 'regierung' && e.tag === S.regierung.start + Sim.R.RENTE_STUFE_TAGE - 1 && e.text.includes('Rentenkasse'));
+      pruef(ri.stufe === 2 && ri.rente === Sim.R.RENTE_STUFEN[1] && (S.stat.regierung.rentenkasse > 0 || ri.rentner === 0) && !!stufe2,
+        `Rente nach 60 Tagen auf Stufe ${ri.stufe} (${ri.rente} Taler), Rentenkasse bisher ${S.stat.regierung.rentenkasse} Taler (${ri.rentner} in Rente); Stadtbuch Tag ${stufe2 ? stufe2.tag : '–'}: „${stufe2 ? Sim.klartext(stufe2.text) : ''}“`);
+      if (S.stat.tech) pruef(S.version === Sim.VERSION && Array.isArray(S.angebot), `Version ${S.version}, Tech-Firmen danach: ${S.stat.tech.gruendungen} gegründet, ${S.stat.tech.kaeufe.reduce((a, b) => a + b, 0)} Käufe`);
+      const L = ladenAusText(Sim, speichernAlsText(Sim, S));
+      const z = S.tag + 20; while (S.tag < z) Sim.stunde(S); while (L.tag < z) Sim.stunde(L);
+      pruef(fingerabdruck(Sim, S) === fingerabdruck(Sim, L), `danach als Version ${Sim.VERSION} gespeichert und geladen: läuft bitgleich weiter`);
+    }
   }
   console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle Migrations-Prüfungen bestanden');
+  process.exit(fehler ? 1 : 0);
+}
+if (flag('regierung')) {
+  // Stadtregierung: Lohnsteuer mit Freibetrag und Familiensplitting, Rente aus der Rentenkasse, Betreuungsgehalt, Grundsicherung
+  // und gemeinnützige Arbeit (kommt im normalen Spiel fast nie vor, deshalb hier erzwungen), Speicherformat
+  let fehler = 0;
+  const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
+  const R = Sim.R, J = R.JAHR;
+  const offenB = (S, b) => S.feld[S.g.y[b] * Sim.KARTE + S.g.x[b]] === S.g.typ[b] && !S.g.leer[b];
+  // Die Regeln R01/R02 hier noch einmal unabhängig nachgerechnet: Steuer eines Steuerhaushalts mit Löhnen L und K Köpfen
+  const steuer = (L, K) => { const E = L.reduce((a, b) => a + b, 0); return L.map(b => Math.round(R.STEUER * Math.max(0, E - R.FREIBETRAG * K) * b / E)); };
+  const summe = (a) => a.reduce((x, y) => x + y, 0);
+  // Beispiele aus dem README und dem Fenster „Stadtregierung“ (alte Regel: 10 % je Lohn)
+  for (const [was, L, K, soll, alt] of [['allein, 100 Taler', [100], 1, 7, 10], ['Paar, beide 100, zwei Kinder', [100, 100], 4, 8, 20],
+    ['ein Verdienst 100, Partner, zwei Kinder', [100], 4, 0, 10], ['alleinerziehend 100, ein Kind', [100], 2, 4, 10], ['Paar ohne Kinder, beide 100', [100, 100], 2, 14, 20]]) {
+    pruef(summe(steuer(L, K)) === soll && summe(L.map(b => b - Math.round(b * (1 - R.STEUER)))) === alt, `Lohnsteuer ${was}: ${summe(steuer(L, K))} statt ${alt} Taler am Tag`);
+  }
+  // Was um Mitternacht passieren muss, aus dem Stand um 23 Uhr (Entscheidungen der letzten Stunde vorher ausgeschaltet)
+  function erwartet(S) {
+    const P = S.p, g = S.g, erw = S.tag - R.ERWACHSEN * J, hk = new Map(), brutto = new Map();
+    for (let p = 0; p < S.pMax; p++) if (P.lebt[p] && P.hh[p] >= 0 && P.geb[p] > erw) hk.set(P.hh[p], (hk.get(P.hh[p]) || 0) + 1);
+    for (let b = 0; b < S.gAnzahl; b++) {
+      const t = g.typ[b];
+      if ((t !== Sim.WERKSTATT && t !== Sim.LADEN && t !== Sim.TECH) || !offenB(S, b)) continue;
+      for (const w of S.belegschaft[b]) if (!P.frei[w] && !P.gemein[w]) brutto.set(w, g.lohn[b]);
+    }
+    const kopf = (w) => { const k = P.hh[w]; return k >= 0 && (k === w || k === P.partner[w]) ? k : w; };
+    const mit = (x) => (P.besitz[x] >= 0 && offenB(S, P.besitz[x]) ? 0 : 1);
+    const koepfe = (k) => { if (P.hh[k] !== k) return 1; const pa = P.partner[k]; return mit(k) + (pa >= 0 && P.hh[pa] === k ? mit(pa) : 0) + (hk.get(k) || 0); };
+    const haushalte = new Map();
+    for (const [w, b] of brutto) { const k = kopf(w); if (!haushalte.has(k)) haushalte.set(k, []); haushalte.get(k).push(b); }
+    let lohnsteuer = 0, alt = 0, rentner = 0, betreuung = 0, lohnsumme = 0;
+    for (const [k, L] of haushalte) lohnsteuer += summe(steuer(L, Math.max(1, koepfe(k))));
+    for (const b of brutto.values()) { alt += b - Math.round(b * (1 - R.STEUER)); lohnsumme += b; }
+    for (let p = 0; p < S.pMax; p++) if (P.lebt[p] && S.tag - P.geb[p] >= R.RENTE * J && P.arbeit[p] < 0) rentner++;
+    // Betreuungsgehalt: je Haushalt mit Kind unter 3 der Vorstand, sonst sein Partner, wenn 18–66, ohne Stelle, ohne Betrieb
+    const kann = (p) => { const a = S.tag - P.geb[p]; return a >= R.ERWACHSEN * J && a < R.RENTE * J && P.arbeit[p] < 0 && P.besitz[p] < 0; };
+    for (let k = 0; k < S.pMax; k++) {
+      if (!P.lebt[k] || P.hh[k] !== k || !hk.get(k) || P.wohnung[k] < 0) continue;
+      if (!S.bewohner[P.wohnung[k]].some(m => P.hh[m] === k && P.geb[m] > S.tag - R.BETREUUNG_ALTER)) continue;
+      const pa = P.partner[k];
+      if (kann(k) || (pa >= 0 && P.hh[pa] === k && kann(pa))) betreuung++;
+    }
+    return { lohnsteuer, alt, rentner, betreuung, lohnsumme };
+  }
+  const bisStunde = (S, tag, h) => { while (S.tag < tag || (S.tag === tag && S.stunde < h)) Sim.stunde(S); };
+  for (const seed of arg('seeds', '1,2,3').split(',').map(Number)) {
+    console.log(`Seed ${seed}`);
+    const S = Sim.neueStadt(seed), P = () => S.p;
+    // 1. Summen an 60 Abenden (Tag 300–359): Lohnsteuer, alte Regel, Rentenkasse, Betreuungsgehalt; Rente ohne Budget
+    let naechte = 0, fehlSteuer = 0, fehlAlt = 0, fehlRente = 0, fehlBetr = 0, uebersprungen = 0, mitKind = 0, steuerSumme = 0, altSumme = 0;
+    bisStunde(S, 300, 23);
+    for (let i = 0; i < 60; i++) {
+      bisStunde(S, 300 + i, 23);
+      for (let p = 0; p < S.pMax; p++) S.p.jetzt[p] = 0;          // keine Entscheidung mehr bis Mitternacht
+      const e = erwartet(S), st = { ...S.stat.regierung }, fertig = S.stat.bau.fertig, pleiten = S.stat.pleiten, stufe = Sim.regierungInfo(S).rente;
+      Sim.stunde(S);
+      // Übersprungen: Ein fertiger Betrieb stellt seinen Besitzer um (Lohn anders); nach einer Pleite in der Nacht hat der Besitzer
+      // keinen Betrieb mehr (Freibetrag) und die Leute keine Stelle (Betreuungsgehalt schon in derselben Nacht)
+      if (S.stat.bau.fertig !== fertig || S.stat.pleiten !== pleiten) { uebersprungen++; continue; }
+      naechte++;
+      const d = (k) => S.stat.regierung[k] - st[k];
+      if (d('lohnsteuer') !== e.lohnsteuer) fehlSteuer++;
+      if (d('lohnsteuerAlt') !== e.alt) fehlAlt++;
+      if (d('rentenkasse') !== e.rentner * stufe) fehlRente++;
+      if (d('betreuungTage') !== e.betreuung || d('betreuung') !== e.betreuung * R.NETTO_STANDARD) fehlBetr++;
+      if (e.betreuung) mitKind++;
+      steuerSumme += d('lohnsteuer'); altSumme += d('lohnsteuerAlt');
+    }
+    pruef(naechte >= 20 && !fehlSteuer && !fehlAlt, `Lohnsteuer = Summe über alle Steuerhaushalte (${naechte} Nächte, ${uebersprungen} übersprungen): ${steuerSumme} Taler, nach der alten Regel ${altSumme} (${fehlSteuer + fehlAlt} Fehler)`);
+    pruef(!fehlRente, `Rentenkasse = Rentnerinnen und Rentner × Stufe (${fehlRente} Fehler)`);
+    pruef(!fehlBetr && mitKind > 0, `Betreuungsgehalt je Haushalt mit Kleinkind (${mitKind} Nächte mit Betreuungsgehalt, ${fehlBetr} Fehler)`);
+    {                                                          // Rente kommt auch bei leerem Budget voll (nicht aus dem Budget)
+      bisStunde(S, S.tag, 23);
+      const rentner = []; for (let p = 0; p < S.pMax; p++) if (P().lebt[p] && S.tag - P().geb[p] >= R.RENTE * J && P().arbeit[p] < 0 && P().geb[p] > S.tag - R.ALT * J) rentner.push(p);
+      const vor = rentner.map(p => P().geld[p]), rk = S.stat.regierung.rentenkasse, stufe = Sim.regierungInfo(S).rente;
+      S.budget = 0;
+      for (let p = 0; p < S.pMax; p++) S.p.jetzt[p] = 0;
+      Sim.stunde(S);
+      // Geld danach = vorher + Rente − Einkauf − Miete (+ nichts sonst): die Rente kam, obwohl das Budget leer war
+      const bekommen = S.stat.regierung.rentenkasse - rk;
+      pruef(rentner.length > 0 && bekommen >= rentner.length * stufe, `leeres Budget: ${rentner.length} Rentnerinnen und Rentner unter 80 bekommen trotzdem ${stufe} Taler (Rentenkasse +${bekommen})`);
+    }
+    // 2. Gemeinnützige Arbeit, erzwungen: eine allein lebende Person ohne Stelle, ohne Geld, seit 4 Tagen in Grundsicherung
+    bisStunde(S, 400, 20);
+    const B = S.bauhof;
+    let c = -1;
+    for (let p = 0; p < S.pMax; p++) {
+      const a = S.tag - P().geb[p];
+      if (!P().lebt[p] || a < 200 || a >= 600 || P().besitz[p] >= 0 || P().hh[p] !== p || S.hhGroesse[p] !== 1 || P().partner[p] >= 0 || P().arbeit[p] === B) continue;
+      c = p; break;
+    }
+    pruef(c >= 0, `Person gefunden: ${c >= 0 ? Sim.name(S, c) : '–'}`);
+    if (c < 0) continue;
+    const alt = P().arbeit[c];
+    if (alt >= 0) { const L = S.belegschaft[alt]; L.splice(L.indexOf(c), 1); P().arbeit[c] = -1; P().einsatz[c] = 0; }   // Stelle weg (zählt um Mitternacht neu)
+    P().geld[c] = 0; P().gsTage[c] = R.GS_PFLICHT - 1; P().jetzt[c] = 0;
+    P().ziel[c] = Sim.Z.JOB; P().zielSeit[c] = S.tag; P().zielWert[c] = 0;   // Ziel „besserer Job“ (ohne Stelle: Ausgangswert 0)
+    // Fester Stellenmarkt bis zum Test von job_suchen: niemand findet eine Stelle (freieStellen je Stunde auf 0)
+    const fest = (tag, h) => { while (S.tag < tag || (S.tag === tag && S.stunde < h)) { S.freieStellen = 0; Sim.stunde(S); } };
+    fest(400, 23);
+    const gemVor = S.stat.regierung.gemeinnuetzig;
+    fest(401, 0);
+    const gem = () => S.belegschaft[B].filter(w => P().gemein[w]).length;
+    const stellenB = Sim.stellen(S, B), bel = S.belegschaft[B].length;
+    pruef(P().gemein[c] === 1 && P().arbeit[c] === B && S.belegschaft[B].includes(c) && P().gsTage[c] === R.GS_PFLICHT && S.stat.regierung.gemeinnuetzig === gemVor + 1,
+      `nach ${R.GS_PFLICHT} Tagen Grundsicherung gemeinnützige Arbeit im Bauhof: gemein ${P().gemein[c]}, gsTage ${P().gsTage[c]}`);
+    pruef(stellenB <= R.BAU_MAX && bel <= R.BAU_MAX && stellenB === R.STELLEN_STADT + S.bauZuschlag + gem() && S.g.offeneStellen[B] === stellenB - bel,
+      `Bauhof: ${bel} Leute, davon ${gem()} gemeinnützig, ${stellenB} Stellen (≤ ${R.BAU_MAX}); freie Stellen ${S.g.offeneStellen[B]} wie ohne sie`);
+    const zeile = S.buch.filter(e => e.tag === 400 && e.art === 'regierung').at(-1);
+    pruef(!!zeile && zeile.text.includes(`\u0001${c}/`) && /gemeinnütziger Arbeit im Bauhof herangezogen/.test(zeile.text), `Stadtbuch: „${zeile ? Sim.klartext(zeile.text) : '–'}“`);
+    const info = Sim.personInfo(S, c);
+    // Gemeinnützige Arbeit ist keine Stelle: kein „Ziel erreicht: besserer Job“ (Lebenslauf, Sprachmodell, Statistik)
+    const zielFalsch = info.gedaechtnis.filter(m => m.tag >= 400 && m.text.includes('Ziel erreicht: ' + Sim.ZIELTEXT[Sim.Z.JOB]));
+    pruef(!zielFalsch.length && P().ziel[c] === Sim.Z.JOB, `gemeinnützige Arbeit erfüllt das Ziel „${Sim.ZIELTEXT[Sim.Z.JOB]}“ nicht (Ziel jetzt ${Sim.ZIELTEXT[P().ziel[c]] || '–'})`);
+    pruef(/^leistet gemeinnützige Arbeit beim Bauhof /.test(info.arbeit) && info.leistung && info.leistung.art === 'grundsicherung' && info.leistung.gemein,
+      `Personenkarte: „${Sim.klartext(info.arbeit)}“, Leistung ${JSON.stringify(info.leistung)}`);
+    fest(401, 7);
+    const erl = Sim.erlaubteAktionen(S, c, 7);
+    pruef(!erl.includes('kuendigen') && !erl.includes('freinehmen') && !erl.includes('job_wechseln') && !erl.includes('job_suchen'), `erlaubt um 7 Uhr ohne freie Stellen: ${erl.join(', ')}`);
+    S.freieStellen = 1;
+    const erl2 = Sim.erlaubteAktionen(S, c, 7);
+    pruef(erl2.includes('job_suchen') && !erl2.includes('kuendigen'), `mit freier Stelle erlaubt: ${erl2.join(', ')}`);
+    fest(401, 23);
+    const g0 = P().geld[c], gs0 = S.stat.regierung.gemeinTage, tage0 = P().gsTage[c], bedarf = Sim.personInfo(S, c).leistung.betrag;
+    fest(402, 0);
+    pruef(P().gemein[c] === 1 && S.stat.regierung.gemeinTage === gs0 + 1 && P().gsTage[c] === tage0 + 1,
+      `am nächsten Abend noch gemeinnützig, Grundsicherung läuft weiter (gsTage ${P().gsTage[c]})`);
+    pruef(P().geld[c] - g0 <= bedarf && P().geld[c] - g0 < R.LOHN_STADT / 2, `kein Lohn: Geld ${g0} → ${P().geld[c]} (nur Grundsicherung ${bedarf} minus Einkauf und Miete)`);
+    // Speichern und Laden mit gemeinnütziger Arbeit: bitgleich
+    {
+      const L = ladenAusText(Sim, speichernAlsText(Sim, S));
+      const A2 = ladenAusText(Sim, speichernAlsText(Sim, S));
+      for (let i = 0; i < 24 * 3; i++) { Sim.stunde(L); Sim.stunde(A2); }
+      pruef(L.p.gemein[c] === A2.p.gemein[c] && fingerabdruck(Sim, L) === fingerabdruck(Sim, A2), 'Speichern/Laden mit gemeinnütziger Arbeit: läuft bitgleich weiter');
+    }
+    // job_suchen: eine richtige Stelle geht vor, die gemeinnützige Arbeit endet
+    P().jetzt[c] = 1;
+    let h = 0; while (P().gemein[c] && P().lebt[c] && h < 72) { Sim.stunde(S); h++; }
+    pruef(!P().gemein[c] && P().arbeit[c] >= 0 && P().arbeit[c] !== B, `nach ${h} Stunden eine richtige Stelle: ${P().arbeit[c] >= 0 ? Sim.klartext(Sim.personInfo(S, c).arbeit) : '–'}`);
+    bisStunde(S, S.tag + 1, 0);
+    pruef(Sim.stellen(S, B) === R.STELLEN_STADT + S.bauZuschlag + gem() && S.g.offeneStellen[B] === Sim.stellen(S, B) - S.belegschaft[B].length, 'danach stimmen die Stellen im Bauhof');
+    // 3. Elternzeit zählt nicht als arbeitslos, gemeinnützige Arbeit schon (Quote für den Zuzug)
+    {
+      let los = 0;
+      S.tag--;                                                  // Stand von kennzahlenRechnen: vor dem Tageswechsel
+      const erw = S.tag - R.ERWACHSEN * J, rente = S.tag - R.RENTE * J;
+      for (let p = 0; p < S.pMax; p++) {
+        if (!P().lebt[p] || P().geb[p] > erw || P().geb[p] <= rente || P().besitz[p] >= 0) continue;
+        if (Sim.betreuer(S, P().hh[p]) === p) continue;
+        if (P().arbeit[p] < 0 || P().gemein[p]) los++;
+      }
+      S.tag++;
+      pruef(los === S.arbeitslose, `Arbeitslose ohne Eltern mit Betreuungsgehalt: ${los} = ${S.arbeitslose}`);
+    }
+  }
+  // 4. Speicherformat: ein Stand der Version 5 ohne Stadtregierung wird abgelehnt (sonst Absturz um Mitternacht)
+  {
+    const S = Sim.neueStadt(1); while (S.tag < 50) Sim.stunde(S);
+    const faelle = [['ohne regierung', j => { delete j.regierung; }], ['ohne stat.regierung', j => { delete j.stat.regierung; }],
+      ['stat.regierung leer', j => { j.stat.regierung = {}; }], ['Summe null', j => { j.stat.regierung.rentenkasse = null; }],
+      ['Start nach heute', j => { j.regierung.start = S.tag + 1; }], ['ohne tagStart', j => { delete j.regierung.tagStart; }],
+      ['gestern als Text', j => { j.regierung.gestern = 'viel'; }], ['gestern ohne Summe', j => { delete j.regierung.gestern.gs; }]];
+    for (const [was, kaputt] of faelle) {
+      const d = JSON.parse(speichernAlsText(Sim, S)); kaputt(d.json);
+      let meldung = null;
+      try { ladenAusText(Sim, JSON.stringify(d)); } catch (e) { meldung = e.message; }
+      pruef(meldung && /Stadtregierung|Regierungs-Statistik/.test(meldung), `${was}: abgelehnt („${meldung}“)`);
+    }
+    const heil = ladenAusText(Sim, speichernAlsText(Sim, S));
+    pruef(fingerabdruck(Sim, heil) === fingerabdruck(Sim, S) && JSON.stringify(heil.regierung.gestern) === JSON.stringify(S.regierung.gestern)
+      && heil.regierung.gestern !== null, 'unveränderter Stand lädt, „gestern“ ist gleich nach dem Laden da');
+  }
+  // 5. Tageswerte „gestern“, Willkommensprämie und Wohnungsvorbehalt beim Zuzug (je Stunde bzw. Nacht bis Tag 150), danach
+  //    Grundsicherung erzwungen (10 Nächte), Bauhof voll und Betreuungsgehalt aus der gemeinnützigen Arbeit heraus. Der Zuzug wird
+  //    mit einer Kopie der Simulation gemessen, die in zuzug() mitschreibt (sonst gleich)
+  const { Sim: SimZ, ctx } = ladeSimMit([
+    ['  if (vorbehalt) { rs.vorbehaltTage++; rs.vorbehalten += vorbehalt; }\n',
+      '  if (vorbehalt) { rs.vorbehaltTage++; rs.vorbehalten += vorbehalt; }\n  globalThis.__zuzug = { frei: S.freieWohnungen, such: S.wohnungSuchende, vorbehalt, fw, n: -1 };\n'],
+    ['  S.anfragen = Math.max(0,', '  globalThis.__zuzug.n = n;\n  S.anfragen = Math.max(0,'],
+  ]);
+  for (const seed of arg('seeds', '1,2,3').split(',').map(Number)) {
+    console.log(`Seed ${seed}: gestern, Prämie, Vorbehalt, Grundsicherung erzwungen`);
+    const S = SimZ.neueStadt(seed), P = () => S.p;
+    let geburten = 0, praemFehl = 0, zuTage = 0, zuVorb = 0, zuFehl = 0, gestFehl = 0, naechte = 0, aussen = 0;
+    let ende = { ...S.stat.regierung };                        // Summen am Ende des letzten Tagesabschlusses
+    pruef(S.regierung.gestern === null, 'neue Stadt: noch kein „gestern“ (Anzeige „–“)');
+    while (S.tag < 150) {
+      const g0 = S.stat.geburten, pr0 = S.stat.regierung.praemie, n0 = S.stat.regierung.praemien, tag0 = S.tag, zu0 = S.stat.zuzuege;
+      ctx.__zuzug = null;
+      SimZ.stunde(S);
+      const d = S.stat.geburten - g0;
+      if (d) { geburten += d; if (S.stat.regierung.praemie - pr0 !== d * R.PRAEMIE || S.stat.regierung.praemien - n0 !== d) praemFehl++; }
+      if (S.tag === tag0) continue;
+      naechte++;                                               // Tagesabschluss: gestern = Summen jetzt − Summen am Ende des Vortags
+      const st = S.stat.regierung, gs = S.regierung.gestern;
+      if (!gs || Object.keys(st).some(k => gs[k] !== st[k] - ende[k])) gestFehl++;
+      else aussen += gs.rentenkasse + gs.praemie + gs.betreuung + gs.gs;
+      ende = { ...st };
+      const z = ctx.__zuzug;                                   // Zuzug höchstens freie Wohnungen minus Vorbehalt
+      if (z) {
+        zuTage++; if (z.vorbehalt) zuVorb++;
+        if (z.vorbehalt !== Math.min(z.frei, z.such) || z.fw !== z.frei - z.vorbehalt || z.n > z.fw || S.stat.zuzuege - zu0 > Math.max(0, z.n)) zuFehl++;
+      }
+    }
+    pruef(!gestFehl && naechte === 150, `„gestern“ = Summen minus Summen am Ende des Vortags (${naechte} Nächte, ${gestFehl} Fehler); von außen im Mittel ${Math.round(aussen / naechte)} Taler am Tag`);
+    pruef(!praemFehl && geburten > 0, `Willkommensprämie: ${geburten} Geburten, je ${R.PRAEMIE} Taler (${praemFehl} Fehler)`);
+    pruef(!zuFehl && zuTage === naechte, `Zuzug: ${zuTage} Nächte, ${zuVorb} mit Vorbehalt; Zuzüge ≤ freie Wohnungen − Vorbehalt, Vorbehalt = min(frei, suchend) (${zuFehl} Fehler)`);
+    // Grundsicherung erzwungen: um 23 Uhr bei jeder 7. erwachsenen Person ohne Betrieb Stelle weg und Geld 0. Erwartung unabhängig
+    // aus dem Stand um 23 Uhr: 18–66, ohne Stelle, ohne Betrieb, kein Betreuungsgehalt, niemand sonst im Haushalt mit Einkommen
+    let faelle = 0, bezogen = 0, abw = 0, betragFehl = 0, betragNaechte = 0;
+    for (let runde = 0; runde < 10; runde++) {
+      while (S.stunde !== 23) SimZ.stunde(S);
+      const T = S.tag, p0 = P(), erz = [];
+      for (let p = 0; p < S.pMax; p++) p0.jetzt[p] = 0;       // keine Entscheidung mehr bis Mitternacht
+      let i = 0;
+      for (let p = 0; p < S.pMax; p++) {
+        if (!p0.lebt[p] || T - p0.geb[p] < R.ERWACHSEN * J || p0.besitz[p] >= 0 || p0.gemein[p] || (i++ + runde) % 7) continue;
+        const b = p0.arbeit[p];
+        if (b >= 0) { const L = S.belegschaft[b]; L.splice(L.indexOf(p), 1); p0.arbeit[p] = -1; p0.einsatz[p] = 0; }   // Stelle weg (zählt um Mitternacht neu)
+        p0.geld[p] = 0; erz.push(p);
+      }
+      const alter = (x) => T - p0.geb[x];
+      const kann = (x) => alter(x) >= R.ERWACHSEN * J && alter(x) < R.RENTE * J && (p0.arbeit[x] < 0 || p0.gemein[x]) && p0.besitz[x] < 0;
+      const klein = (k) => { const w = p0.wohnung[k]; return w >= 0 && S.bewohner[w].some(m => p0.lebt[m] && p0.hh[m] === k && p0.geb[m] > T - R.BETREUUNG_ALTER); };
+      const betr = (k) => { if (k < 0 || p0.hh[k] !== k || !klein(k)) return -1; if (kann(k)) return k; const pa = p0.partner[k]; return pa >= 0 && p0.hh[pa] === k && kann(pa) ? pa : -1; };
+      const verdient = (p) => { const k = p0.hh[p], w = p0.wohnung[p]; if (k < 0 || w < 0) return false; const bt = betr(k);
+        return S.bewohner[w].some(m => m !== p && p0.hh[m] === k && alter(m) >= R.ERWACHSEN * J
+          && ((p0.arbeit[m] >= 0 && !p0.gemein[m]) || p0.besitz[m] >= 0 || alter(m) >= R.RENTE * J || bt === m)); };
+      const soll = new Map(erz.map(p => [p, alter(p) < R.RENTE * J && betr(p0.hh[p]) !== p && !verdient(p)]));
+      const f0 = S.stat.bau.fertig, pl0 = S.stat.pleiten, t0 = S.stat.tode, gs0 = S.stat.regierung.gs;
+      SimZ.stunde(S);
+      if (S.stat.bau.fertig !== f0 || S.stat.pleiten !== pl0 || S.stat.tode !== t0) continue;   // Stelle, Betrieb oder Haushalt anders
+      let summe = 0, nurErz = true;
+      for (let p = 0; p < S.pMax; p++) if (P().lebt[p] && P().gsTage[p] && !soll.has(p)) nurErz = false;
+      for (const [p, e] of soll) {
+        faelle++;
+        const ist = P().gsTage[p] > 0;
+        if (ist) { bezogen++; summe += SimZ.personInfo(S, p).leistung.betrag; }
+        if (ist !== e) { abw++; if (abw < 4) console.log(`    Tag ${T}: ${SimZ.name(S, p)} erwartet ${e}, bekommt ${ist}`); }
+      }
+      if (nurErz) { betragNaechte++; if (S.stat.regierung.gs - gs0 !== summe) betragFehl++; }
+    }
+    pruef(faelle > 0 && bezogen > 0 && !abw, `Grundsicherung erzwungen: ${faelle} Fälle, ${bezogen} bekommen sie, ${faelle - bezogen} nicht (Betreuungsgehalt, Rente, Einkommen im Haushalt); ${abw} Abweichungen`);
+    pruef(betragNaechte > 0 && !betragFehl, `Betrag = Tagesbedarf (Einkauf, beim Vorstand Miete und Kinder): ${betragNaechte} Nächte nachgerechnet, ${betragFehl} falsch`);
+    // Bauhof voll: nach 5 Tagen Grundsicherung keine gemeinnützige Arbeit, die Grundsicherung läuft weiter; mit Platz in der Nacht danach
+    {
+      while (S.stunde !== 23) SimZ.stunde(S);
+      const B = S.bauhof;
+      let c = -1;
+      for (let p = 0; p < S.pMax; p++) {
+        const a = S.tag - P().geb[p];
+        if (P().lebt[p] && a >= 200 && a < 600 && P().besitz[p] < 0 && P().hh[p] === p && S.hhGroesse[p] === 1 && P().partner[p] < 0 && P().arbeit[p] !== B && !P().gsTage[p]) { c = p; break; }
+      }
+      if (c < 0) pruef(false, 'Bauhof voll: keine allein lebende Person gefunden');
+      else {
+        for (let p = 0; p < S.pMax; p++) P().jetzt[p] = 0;
+        const alt = P().arbeit[c];
+        if (alt >= 0) { const L = S.belegschaft[alt]; L.splice(L.indexOf(c), 1); P().arbeit[c] = -1; P().einsatz[c] = 0; }
+        P().geld[c] = 0; P().gsTage[c] = R.GS_PFLICHT - 1;
+        const zuschlag = S.bauZuschlag, gem0 = S.stat.regierung.gemeinnuetzig;
+        S.bauZuschlag = R.BAU_MAX - R.STELLEN_STADT;           // 40 Stellen: der Bauhof ist voll (bauhofStellen rechnet es in der Nacht neu)
+        SimZ.stunde(S);
+        pruef(!P().gemein[c] && P().arbeit[c] < 0 && P().gsTage[c] === R.GS_PFLICHT && S.stat.regierung.gemeinnuetzig === gem0,
+          `Bauhof voll (Zuschlag ${zuschlag} → ${R.BAU_MAX - R.STELLEN_STADT}): ${SimZ.name(S, c)} bezieht Grundsicherung seit ${P().gsTage[c]} Tagen, keine gemeinnützige Arbeit`);
+        while (S.stunde !== 0 || P().gsTage[c] === R.GS_PFLICHT) { S.freieStellen = 0; P().jetzt[c] = 0; SimZ.stunde(S); }
+        pruef(P().gemein[c] === 1 && P().arbeit[c] === B && S.stat.regierung.gemeinnuetzig === gem0 + 1,
+          `mit Platz im Bauhof (${SimZ.stellen(S, B)} Stellen) in der Nacht danach herangezogen (gsTage ${P().gsTage[c]})`);
+      }
+    }
+    // Betreuungsgehalt aus der gemeinnützigen Arbeit heraus: Wer sie leistet und ein Kind unter 3 im Haushalt hat, bekommt
+    // Betreuungsgehalt; die gemeinnützige Arbeit endet in derselben Nacht
+    {
+      const B = S.bauhof, bis = S.tag + 200;
+      let m = -1;
+      while (m < 0 && S.tag < bis) {                           // nächster Abend mit Betreuungsgehalt (Kind noch mindestens 2 Tage unter 3)
+        SimZ.stunde(S);
+        if (S.stunde !== 23) continue;
+        for (let k = 0; k < S.pMax && m < 0; k++) {
+          if (!P().lebt[k] || P().hh[k] !== k || !S.hhKinder[k] || SimZ.betreuer(S, k) < 0) continue;
+          if (S.bewohner[P().wohnung[k]].some(x => P().hh[x] === k && P().geb[x] > S.tag + 2 - R.BETREUUNG_ALTER)) m = SimZ.betreuer(S, k);
+        }
+      }
+      if (m < 0) pruef(false, 'Betreuungsgehalt aus gemeinnütziger Arbeit: kein Haushalt mit Kleinkind gefunden');
+      else {
+        for (let p = 0; p < S.pMax; p++) P().jetzt[p] = 0;
+        P().arbeit[m] = B; S.belegschaft[B].push(m); P().gemein[m] = 1; P().gsTage[m] = R.GS_PFLICHT + 2;   // wie herangezogen
+        const k = P().hh[m], wer = SimZ.betreuer(S, k), bt0 = S.stat.regierung.betreuung, g0 = P().geld[m];
+        SimZ.stunde(S);
+        pruef(wer === m && !P().gemein[m] && P().arbeit[m] < 0 && !P().gsTage[m] && !S.belegschaft[B].includes(m) && S.stat.regierung.betreuung - bt0 >= R.NETTO_STANDARD
+          && SimZ.personInfo(S, m).leistung.art === 'betreuung',
+          `${SimZ.name(S, m)}: mit Kleinkind Betreuungsgehalt statt gemeinnütziger Arbeit (betreuer ${wer === m ? 'ja' : 'nein'}, Geld ${Math.round(g0)} → ${Math.round(P().geld[m])})`);
+      }
+    }
+  }
+  console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle Prüfungen der Stadtregierung bestanden');
   process.exit(fehler ? 1 : 0);
 }
 if (flag('bau')) {
@@ -363,7 +693,7 @@ if (flag('bau')) {
             if (S.baustellen.includes(b)) start.set(b, tag + 1);   // gleich wieder aufgestockt: neue Baustelle
           }
         }
-        maxStellen = Math.max(maxStellen, R.STELLEN_STADT + S.bauZuschlag);
+        maxStellen = Math.max(maxStellen, Sim.stellen(S, B));   // mit gemeinnützig Arbeitenden (Stadtregierung)
         maxLeute = Math.max(maxLeute, S.belegschaft[B].length);
         lohnMin = Math.min(lohnMin, S.g.lohn[B]); lohnMax = Math.max(lohnMax, S.g.lohn[B]);
         continue;
@@ -554,7 +884,7 @@ if (flag('gate')) {
   let alleOk = true;
   for (const seed of seeds) {
     const reihe = [], budgets = [];
-    let ms365 = 0, c365 = null, k365 = null, fehler = null, S = null, buchNr = 0, arbeitZeilen = 0, kauf365 = 0, techZeilen = 0;
+    let ms365 = 0, c365 = null, k365 = null, fehler = null, S = null, buchNr = 0, arbeitZeilen = 0, kauf365 = 0, techZeilen = 0, reg700 = null, budget700 = 0;
     const zeilen = [];
     try {
       S = lauf(Sim, seed, 730, (S, k, ms) => {
@@ -564,6 +894,7 @@ if (flag('gate')) {
         buchNr = S.buchNr;
         if (k.tag % 30 === 0 || k.tag === 365 || k.tag === 730) zeilen.push(tabelleZeile(k, ms));
         if (k.tag === 365) { ms365 = ms; c365 = charakter(S); k365 = k; kauf365 = S.stat.tech ? S.stat.tech.kaeufe.reduce((a, b) => a + b, 0) : 0; }
+        if (k.tag === 700) { reg700 = { ...S.stat.regierung }; budget700 = S.budget; }
       });
     } catch (e) { fehler = e; }
     console.log(`\n═══ Seed ${seed} ═══`);
@@ -613,6 +944,13 @@ if (flag('gate')) {
       const kaeufe = t.kaeufe.reduce((a, b) => a + b, 0);
       console.log(`  Tech: gegründet ${t.gruendungen}, offen an Tag 730 ${st[1] + st[2] + st[3]} (Stufe 2: ${st[2]}, Stufe 3: ${st[3]}), Anteil an den Umland-Stellen ${(S.techPlaetze / Math.max(1, S.werkstattPlaetze) * 100).toFixed(1)} %,`
         + ` Versionen ${t.versionen}, Käufe je Tag ${((kaeufe - kauf365) / 365).toFixed(1)} (Tag 366–730), Anbauten ${t.anbauten}, Tech-Pleiten ${t.pleiten}, Erwachsene mit Gerät ${(mitGeraet / Math.max(1, erw) * 100).toFixed(0)} %, Tech-Zeilen im Stadtbuch ${(techZeilen / S.tag).toFixed(2)} am Tag`);
+    }
+    if (S.stat.regierung) {                                   // Stadtregierung (kein Gate): Tageswerte an Tag 700–730, Summen seit Tag 0
+      const r = S.stat.regierung, d = (k) => Math.round((r[k] - reg700[k]) / 30);
+      console.log(`  Stadtregierung, am Tag (Tag 700–730): Lohnsteuer ${d('lohnsteuer')} (alte Regel ${d('lohnsteuerAlt')}), Budget ${Math.round((S.budget - budget700) / 30) >= 0 ? '+' : ''}${Math.round((S.budget - budget700) / 30)};`
+        + ` von außen: Rentenkasse ${d('rentenkasse')}, Bund ${d('praemie') + d('betreuung') + d('gs')} (Prämien ${d('praemie')}, Betreuungsgehalt ${d('betreuung')}, Grundsicherung ${d('gs')})`);
+      console.log(`  bis Tag 730: ${r.praemien} Prämien, ${r.betreuungTage} Tage Betreuungsgehalt, ${r.gsTage} Tage Grundsicherung, gemeinnützige Arbeit ${r.gemeinnuetzig}-mal,`
+        + ` ${r.vorbehaltTage} Tage mit Wohnungsvorbehalt (${r.vorbehalten} Wohnungstage), Budget ${Math.round(S.budget)}, Notwerkstätten ${S.stat.bauamt.notwerkstaetten}`);
     }
     console.log('  Tag 730:\n' + charakterText(c730));
   }

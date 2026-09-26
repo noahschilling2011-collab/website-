@@ -2,11 +2,13 @@
 
 Eine Stadt, in der jeder Mensch selbst entscheidet. Projektname vorläufig.
 
-**Stand: Phase 4 plus „richtige Arbeit“ und Tech-Firmen.** Simulation (Phase 0), 3D-Karte mit Tag und Nacht (1), Speichern
+**Stand: Phase 4 plus „richtige Arbeit“, Tech-Firmen und Stadtregierung.** Simulation (Phase 0), 3D-Karte mit Tag und Nacht (1), Speichern
 und Aufholen (2), laufende Figuren und Personenkarten (3), Hauptfiguren mit Ollama (4). Danach auf Noahs Wunsch: Bauarbeiter
 vom Bauhof bauen die Häuser, Werkstätten machen Kisten für die Läden, man sieht die Leute bei der Arbeit, und Bewohner gründen
-Tech-Firmen für Software, Handys oder Computer; Hauptfiguren, die dort programmieren, schreiben über Ollama echten Code. Phase 4 ist nur gegen
-einen nachgebauten Ollama-Server getestet, nicht gegen ein echtes Sprachmodell (siehe „Bekannte Schwächen“).
+Tech-Firmen für Software, Handys oder Computer; Hauptfiguren, die dort programmieren, schreiben über Ollama echten Code. Von Anfang
+an regiert die AfD nach ihrem Programm zur Bundestagswahl 2025, soweit es sich auf die Stadt übertragen lässt (Abschnitt
+„Stadtregierung“). Phase 4 ist nur gegen einen nachgebauten Ollama-Server getestet, nicht gegen ein echtes Sprachmodell (siehe
+„Bekannte Schwächen“).
 
 ## Starten
 
@@ -192,8 +194,8 @@ Auf echter Grafikhardware ungeprüft.
   bzw. 5,4 % des Bildes. Dort stehen dann der Titel, „Zeigen“ und das Schließen; der Inhalt ist verborgen, auch für Tab und
   Screenreader. Höhe und Inhalt gleiten 250 ms, bei reduzierter Bewegung ohne Übergang. Eine neue Karte öffnet aufgeklappt.
 - „Zeigen“ klappt die Karte am Handy erst ein und rückt das Gebäude dann in die frei gewordene Fläche. Gemessen bei 400 × 820:
-  von (171, 420) unter der Karte nach (199, 432), mitten zwischen Kennzahlen (Unterkante 162) und Kopfleiste (Oberkante 704);
-  bei 360 × 740 nach (180, 392). `zeigen()` misst die Karte schon in ihrer Endgröße. Das Einklappen allein bewegt die Kamera
+  von (198, 419) unter der Karte nach (204, 450), mitten zwischen Kennzahlen (Unterkante 211; vor der Zeile „Von außen“ und dem
+  Knopf „Stadtregierung“ 162) und Kopfleiste (Oberkante 704); bei 360 × 740 von (178, 378) nach (183, 410). `zeigen()` misst die Karte schon in ihrer Endgröße. Das Einklappen allein bewegt die Kamera
   nicht. Bei reduzierter Bewegung ließ die allgemeine Regel (0,01 ms Übergang für jede Eigenschaft) die Karte beim Messen noch
   groß erscheinen, das Gebäude landete bei (295, 156) am oberen Rand; die Karte hat dort jetzt keinen Übergang.
 - Neben dem Einstellungs-Knopf öffnet „?“ den Dialog „So liest du die Stadt“: Bedienung mit Maus, Touch und Tasten, die Farben
@@ -235,6 +237,188 @@ Handy hat, trägt es unterwegs in der Hand (höchstens 80 gleichzeitig, fest je 
 in zwei Reihen, wer mehr ist, ist drinnen. Personenkarten sagen „arbeitet als Bauarbeiterin beim
 Bauhof …“ bzw. „arbeitet als Programmiererin bei Nova Handys …“, was die Person heute tut und was sie gekauft hat.
 
+## Stadtregierung
+
+Auf Noahs Wunsch regiert in der Stadt von Anfang an die AfD: Was in ihrem Programm zur Bundestagswahl 2025 („Zeit für
+Deutschland“, afd.de, gedruckte Seitenzahlen) steht und sich auf die Stadt übertragen lässt, gilt hier. In den Zahlen oben links
+steht unter dem Budget die Zeile „Von außen, gestern“ (Renten aus der Rentenkasse und Geld vom Bund, am Handy nur „Von außen“),
+darunter der Knopf „Stadtregierung: AfD · seit Tag 0 ›“ (am Handy quer als Symbol neben Tag und Uhr). Er öffnet ein Fenster wie die Hilfe: jede Regel als Karte mit Status
+(wirkt, galt schon, Auslegung, Modellkorrektur), wörtlichem Zitat mit Seite, Umsetzung in der Stadt und Zahlen; das Geld von
+außen mit Summen je Quelle; aufklappbar, was nicht übernommen ist (die Gruppe „Grenze der Stadt“ zuerst) und was schon galt.
+Im Stadtbuch steht an Tag 0 eine Zeile „Von Anfang an regiert die AfD …“ (Art „Stadtregierung“), dazu die beiden Rentenstufen.
+
+**Grenze.** Die Stadt kennt keine Herkunft, keine Staatsangehörigkeit, keinen Aufenthaltsstatus, keine Religion und keine
+Sprache und bekommt sie nicht. Niemand, der in der Stadt lebt, wird danach behandelt, eingestuft oder entfernt; eine Funktion,
+die Leute gegen ihren Willen aus der Stadt nimmt, gibt es nicht. Keine neue Regel liest Namen, den Einzugstag, die Eltern oder
+das Gedächtnis „eingezogen“, also auch nicht, ob jemand hier geboren oder zugezogen ist. Migration kommt nur als Regel für den
+Zuzug neuer Leute vor (in `zuzug()`, bevor jemand Bewohner ist). Gelesen werden Alter, Haushalt, Partner, Stelle, eigener
+Betrieb, Geld und die Wohnungssuche.
+
+| Regel | Status | Quelle | In der Stadt |
+|---|---|---|---|
+| R01 Grundfreibetrag | wirkt | S. 58 | Die ersten 29 Taler Tageslohn je Familienmitglied sind steuerfrei, vom Rest gehen wie bisher 10 % an die Stadt (100 Taler: 7 statt 10) |
+| R02 Familiensplitting | wirkt | S. 59 | Steuerhaushalt = Vorstand und Partner im selben Haushalt mit den Kindern unter 18 dort; Steuer = 10 % von (Löhne − 29 × Köpfe) (Paar, beide 100, zwei Kinder: 8 statt 20) |
+| R03 Bundesleistungen zahlt der Bund | wirkt | S. 55, dazu S. 17 und S. 20 | Willkommensprämie, Betreuungsgehalt und Grundsicherung kommen von außen, nicht aus dem Budget |
+| Rente aus der Rentenkasse | Modellkorrektur, keine Programmforderung | (S. 17) | Renten kommen immer voll von außen. Vorher zahlte die Stadt sie aus dem Budget (Annahme 3), in Wirklichkeit zahlt keine Stadt Renten |
+| R04 Rente in Stufen | wirkt | S. 17, S. 18 | Für alle Rentner gleich: 55 Taler, ab Tag 40 der Stadtregierung 60, ab Tag 80 66 (gut 70 % eines Nettolohns von 93); vorher 50 |
+| R05 Willkommensprämie | wirkt | S. 20 (S. 147) | 383 Taler je Geburt vom Bund, halb an jeden Elternteil |
+| R06 Betreuungsgehalt | wirkt | S. 147, S. 148 | 93 Taler am Tag vom Bund, bis das Kind 3 ist (30 Spieltage), für die Person, auf die der Haushalt läuft, oder ihren Partner, wenn sie ohne Stelle ist (gemeinnützige Arbeit ist keine Stelle) |
+| R07 Grundsicherung, gemeinnützige Arbeit | wirkt | S. 25 | Tagesbedarf vom Bund; nach 5 Spieltagen (6 Monaten) gemeinnützige Arbeit im Bauhof, ohne Lohn |
+| R08 Keine Werkstatt der Stadt als Notbremse | Auslegung | S. 13 | Regel 5 des Bauamts entfällt |
+| R09 Einheimischen-Modell | wirkt | S. 37 (S. 112) | Suchen Leute, die schon hier wohnen, eine Wohnung, bleiben so viele freie Wohnungen für sie frei |
+| R10 Zuzug nur für eine freie Stelle | galt schon | S. 113 (S. 20, S. 100) | Unverändert (Annahme 11); die „heimischen Potenziale“ sind alle, die in der Stadt wohnen |
+
+Die Zitate stehen im Fenster. Geprüft: alle 110 Zitate des Fensters und die Zitate dieses Abschnitts mit dem Zitatprüfer gegen den
+Programmtext je gedruckter Seite (alle „ok“), zusätzlich genau auf der angegebenen Seite. Zitierweise: Trennstriche am Zeilenende
+zusammengezogen, Anführungszeichen im Zitat einfach, Auslassungen mit […]. Bei der gemeinnützigen Arbeit (S. 25) stehen der
+Grundsatz und der Listenpunkt als zwei Zitate, weil dazwischen nur ein Aufzählungszeichen steht. Drei Stellen sind so gekürzt, dass der
+Prüfer sie findet: Beim Betreuungsgehalt endet das Zitat vor dem letzten Wort (erhalten), das über den Seitenwechsel von S. 147 auf S. 148 getrennt ist; beim Ehe-Start-Kredit steht
+der zweite Satz („Mit jedem Kind wird ein Teil des Kredits erlassen.“, S. 148), bei den Kosten der Zuwanderung die Überschrift
+(„Wahre Kosten der Asylpolitik freilegen“, S. 55); im Text des PDF sind dort Trennstriche und Leerzeichen verschoben.
+
+**Umrechnung U1 (Annahme, nicht aus dem Programm).** 1 Lebensjahr = 10 Spieltage (Annahme 2). 100 Taler Tageslohn (Werkstatt,
+gemessener Durchschnittslohn 100–103) entsprechen dem mittleren Bruttojahresverdienst in Vollzeit 2024 von 52.159 € (Statistisches
+Bundesamt, Pressemitteilung Nr. 134 vom April 2025,
+https://www.destatis.de/DE/Presse/Pressemitteilungen/2025/04/PD25_134_621.html). Daraus: Freibetrag 15.000 € / 52.159 € × 100 =
+28,8 → 29 Taler am Tag; Prämie 20.000 € / 52.159 € = 0,383 Jahreslöhne = 0,383 × 10 Spieltage × 100 Taler = 383 Taler.
+Nettolohn einer Standardstelle: 100 − 7 Lohnsteuer = 93 Taler (Maß für Rente und Betreuungsgehalt).
+
+**Geld von außen.** Rentenkasse und Bund zahlen, was in Deutschland sie und nicht eine Stadt zahlen würden, in der Höhe, die das
+Programm vorsieht bzw. die die Stadt annimmt; Willkommensprämie und Betreuungsgehalt gibt es in Wirklichkeit nicht, und Renten von
+gut 70 % des Nettolohns sind ein Ziel des Programms. Die Stadt bildet aber nicht ab, woher
+das Geld kommt: Sie führt keine Rentenbeiträge und keine Bundessteuern ab, und die Finanzierungswege des Programms (mehr
+Beitragszahler, Bundesmittel) gibt es hier nicht. Das Fenster sagt deshalb fest: „Die Verbesserungen in der Stadt beruhen zu einem
+großen Teil auf Geld von außen, dessen Finanzierung die Stadt nicht abbildet (keine Rentenbeiträge, keine Bundessteuern); das
+Programm selbst rechnet mit steigenden Rentenbeiträgen (S. 19).“ Beleg auf S. 19: „die anstehenden Rentenbeitragsanhebungen durch
+Steuersenkungen für Beschäftigte und Unternehmen ausgleichen“. Gemessen (Seeds 1–80, 730 Tage, Mittel je Tag): Rentenkasse
+8.316 Taler, Bund 775 (Prämien 272, Betreuungsgehalt 500, Grundsicherung 3); die Lohnsteuer bringt der Stadt 1.859 Taler statt
+3.160 nach der alten Regel. **Die Unterschiede zu vorher (Gates, Budget, Erspartes, Zufriedenheit, Zuzug) sind kein Urteil über
+das Programm:** Die Stadt zahlt die Leistungen nicht selbst, und von den einschränkenden Teilen fehlen die meisten wegen der Grenze.
+
+**Annahmen der Stadtregierung** (alle Zahlen in `R`, Abschnitt Stadtregierung):
+- Steuer, einfache Variante: Der Satz bleibt 10 %, dazu 29 Taler Freibetrag je Kopf im Familiensplitting; je Person auf ganze
+  Taler gerundet und nach Lohnanteil verteilt. Die Lohnsteuer der Stadt hatte vorher gar keinen Freibetrag (in Deutschland galt 2025
+  schon einer von 12.096 €, nicht aus dem Programm), die Entlastung ist hier größer als der Schritt, den das Programm vorsieht.
+  In Deutschland regelt der Bund die Einkommensteuer, ihr Aufkommen teilen sich Bund, Länder und Gemeinden; in der Stadt geht die
+  ganze Lohnsteuer an die Stadt, deshalb trifft sie der höhere Freibetrag voll. **Weicht vom Wortlaut der Spec ab** („Budget aus Steuern (fester Anteil vom Lohn)“): Die Steuer ist kein fester Anteil vom Lohn
+  mehr. Entscheidung des Nutzers.
+- Familie = Paar im selben Haushalt mit den Kindern unter 18 dort; erwachsene Kinder und andere Erwachsene zahlen allein. Wer einen
+  offenen Betrieb hat, zählt nicht mit (sein Gewinn ist steuerfrei, Annahme 4); solange sein Betrieb gebaut wird und er im Bauhof
+  gegen Lohn arbeitet, zählt er mit. Das Geschlecht spielt keine Rolle (Annahme 15).
+- Rente: drei Stufen, 55, 60 und 66 Taler, je 40 Spieltage (eine Wahlperiode) ab dem Start, bei übernommenen Ständen ab dem
+  Übernahmetag, für alle Rentner gleich (nicht je Person ab dem 67. Geburtstag). Das Programm nennt die 70 % ein „ferneres Ziel“ (S. 17) und nennt weder Höhe noch Tempo der Schritte.
+- Willkommensprämie: Im Programm ist sie eine Rückzahlung von Rentenbeiträgen oder eine Gutschrift auf künftige (S. 20, S. 147).
+  Die Stadt kennt keine Beiträge und zahlt deshalb immer bar aus, halb an jeden Elternteil. Die bestehende Geburtszeile im Stadtbuch nennt sie.
+- Betreuungsgehalt: S. 148 („dem durchschnittlichen Nettolohn vor Geburt des ersten Kindes“) kann den eigenen früheren Nettolohn
+  meinen; die Stadt nimmt den durchschnittlichen (93), weil sie keinen früheren Lohn speichert. Je Haushalt eine Person, der
+  Vorstand, sonst sein Partner, 18 bis 66, ohne Stelle und ohne Betrieb. Gemeinnützige Arbeit ist keine Stelle: Wer sie leistet
+  und ein Kind unter 3 im Haushalt hat, bekommt Betreuungsgehalt, und die gemeinnützige Arbeit endet in derselben Nacht (in
+  übernommenen Städten gemessen nie vorgekommen, `--regierung` prüft es erzwungen). Wunsch-Bonus 20 auf „kündigen“, wenn man dafür beim Kind bleiben kann
+  (Verhaltensannahme, sonst hätte die Wahlfreiheit keine Wirkung: ohne ihn im Mittel 0,6 Haushalte am Tag). Wer Betreuungsgehalt
+  bekommt, zählt nicht als erwerbsfähig und nicht als arbeitslos (Quote und Zuzug) und hat nicht den Geldnot-Faktor „ohne Arbeit“.
+  Großeltern (S. 148: „Eltern bzw. Großeltern“) gemessen: Auf 40 Seeds je 730 Tage (594.050 Haushaltstage mit Kleinkind) lebten
+  Eltern mit Kleinkind nie im Haushalt anderer, und das Betreuungsgehalt bekam immer ein Elternteil. Möglich wäre der Fall nur,
+  wenn zwei nicht verwandte Erwachsene, deren Eltern zusammengezogen sind, ein Paar werden. `betreuer()` bleibt deshalb bei Vorstand
+  und Partner.
+- Grundsicherung: Höhe = was die Stadt als Tageskosten rechnet (Einkauf, beim Vorstand Miete und 15 je Kind); nur mit weniger als
+  10 Tagesbedarfen Geld; Bedarfsgemeinschaft = Haushalt (niemand sonst dort hat Lohn, Betrieb, Rente oder Betreuungsgehalt). Wer sie
+  5 Spieltage in Folge bezieht, wird zu gemeinnütziger Arbeit im Bauhof herangezogen (Annahme: volle Arbeitszeit, ohne Lohn), solange
+  der Bauhof unter 40 Leuten ist. Wer das tut, zählt zu den Stellen des Bauhofs dazu (nimmt also niemandem eine Stelle), zählt als
+  arbeitslos, darf nur eine richtige Stelle suchen (nicht kündigen, freinehmen oder wechseln; in `entscheide()` und
+  `erlaubteAktionen()` gleich) und hört auf mit einer Stelle, dem Ende der Grundsicherung oder mit 67. Sie ist keine Stelle: Sie
+  erfüllt nicht das Ziel „besserer Job“ (der Ausgangswert bleibt 0, und das Ziel „besserer Job“ wiegt wie ohne Arbeit), und wer
+  daraus wegzieht, hat „Keine bezahlte Arbeit“. Wer einen eigenen Betrieb hat, auch solange er gebaut wird, bekommt keine
+  Grundsicherung, und niemand in seinem Haushalt (Annahme: das Geld steckt im Betrieb; die Lohnsteuer zählt dagegen nur offene
+  Betriebe, weil nur sie Gewinn bringen; betrifft auf den Seeds 4–80 etwa 8 Personentage je Stadt, gemessen in der Gegenprüfung). Vorher gab es in der Stadt
+  keine Grundsicherung; Geld konnte ins Minus fallen. Das Programm setzt die Grundsicherung voraus („Für eine funktionierende
+  Grundsicherung für Arbeitssuchende“, S. 25) und will das Bürgergeld „unattraktiver“ machen (S. 20); eine Höhe nennt es nicht.
+- Keine Notbremse: **Weicht vom Wortlaut der Spec ab** (Bauamt, Regel 5: 14 Tage keine Gründung und über 20 % ohne Arbeit → Werkstatt
+  der Stadt). Entscheidung des Nutzers, Auslegung von S. 13; ein Minimum ist nicht null. Den Laden der Stadt vom Start gibt es
+  weiter (offene Frage). Auf den Seeds 1–160 hat die Notbremse auch vorher nie ausgelöst (gemessen, 0 Werkstätten).
+- Einheimisch = wohnt heute in der Stadt: Vorbehalten werden so viele freie Wohnungen, wie Erwachsene in der Stadt keine Wohnung
+  haben oder erfolglos suchen (`wohnungSuchende`), keine Wohndauer. An anderen Stellen stellt das Programm „einheimisch“ und
+  „ausländisch“ gegenüber (S. 112); die Lesart der Stadt ist bewusst enger.
+- Zuzug (R10): Das Programm meint Einwanderung nach Deutschland, vor allem von außerhalb Europas (S. 113: „Geeignete
+  außereuropäische Arbeitskräfte werden wir danach bedarfsgerecht nach strikten Kriterien auswählen.“); die Freizügigkeit in der
+  EU soll unberührt bleiben (S. 100: „Die Freizügigkeitsregelungen innerhalb der EU bleiben davon unberührt.“). Wer in die Stadt
+  zieht, kann auch aus dem Nachbarort kommen. Die Stadt wendet die Regel auf jeden Zuzug an: für Umzüge im Inland strenger als
+  das Programm, für Einwanderung von außerhalb Europas lockerer (kein Punktesystem, keine Sprachprüfung). Keine Altersgrenze (das Programm nennt keine), die Grenze von 1 + 1 % der Einwohner
+  am Tag bleibt (S. 109 nennt keine Zahl).
+- Nicht übernommen, unter anderem: Junior-Spardepot (nur für Kinder mit deutscher Staatsangehörigkeit, S. 19), alles zu
+  Abschiebung, Status, Sprache und Religion, flexibler Renteneintritt, Arbeitslosengeld, Wohngeld, Ehe-Start-Kredit, Kitas. Der
+  Mieterkauf (S. 37) folgt in einem zweiten Schritt. Die Liste mit Gründen steht im Fenster.
+- Hauptfiguren: Die Anweisung ans Sprachmodell nennt nur Tatsachen der Figur („Du bleibst beim Kind zu Hause und bekommst
+  Betreuungsgehalt …“, „Du bekommst Grundsicherung …“, bei „kündigen“ das Betreuungsgehalt), nie die Stadtregierung.
+- „Gestern“ im Fenster und in der Zeile „Von außen“ führt die Simulation selbst: Am Ende jedes Tagesabschlusses ist
+  `S.regierung.gestern` = Summen in `S.stat.regierung` minus die Summen am Ende des Vortags (`S.regierung.tagStart`). Beides wird
+  gespeichert, die Zeile hat also gleich nach Laden, Import oder Aufholen ihre Zahl. Nur in einer neuen Stadt und nach einer
+  Übernahme steht bis zur ersten Nacht „–“ (im Fenster „ab morgen“); der erste Tag einer übernommenen Stadt zählt ab dem
+  Übernahmezeitpunkt. Vorher rechnete die Oberfläche die Werte nur im Speicher aus, nach jedem Laden fehlten sie bis zu 35
+  Spielstunden. Das Fenster ändert den Zustand nie.
+
+**Gemessen** (je 730 Tage stündlich, Gates wie `--gate` ohne T; `vorher` = Stand vor der Stadtregierung):
+
+| Seeds | Stand | alle Gates | Gate 4 | Band Ø / Median / höchstens | Gate 7: kleinster Abstand | Einwohner Tag 365 Ø (kleinster) |
+|---|---|---|---|---|---|---|
+| 1–80 | vorher | 76 von 80 | 76 (fällt: 19, 27, 37, 65) | 1,076 / 1,068 / 1,209 | 15,4 | 840 (526, Seed 65) |
+| 1–80 | Stadtregierung | 77 von 80 | 77 (fällt: 19, 27, 44) | 1,077 / 1,069 / 1,201 | 15,7 | 875 (562, Seed 62) |
+| 81–160 | vorher | 79 von 80 | 79 (fällt: 87) | 1,074 / 1,065 / 1,154 | 15,9 | 852 (711) |
+| 81–160 | Stadtregierung | 75 von 80 | 76 (fällt: 92, 103, 118, 134) | 1,076 / 1,067 / 1,187 | 10,0 (Seed 81 fällt) | 874 (762) |
+
+Weitere Werte (Seeds 1–80, Mittel, vorher in Klammern): Einwohner an Tag 730 1.068 (1.045), Geburten 519 (489), Zuzüge 1.000
+(985), Wegzüge 41 (42), ohne Arbeit an Tag 730 5,1 % (3,8 %), Budget an Tag 730 5,75 Mio. (2,15 Mio.), Erspartes je Erwachsenem
+11.902 (10.525), Zufriedenheit 70,3 (68,8). An im Mittel 51 von 730 Tagen bleiben Wohnungen für Leute aus der Stadt frei,
+zusammen 62 Wohnungstage. Grundsicherung bezogen im Mittel 0,07 Leute am Tag, höchstens 12 zugleich; gemeinnützige Arbeit kam auf
+den Seeds 1–160 nie vor (in übernommenen Städten der Version 2 schon, siehe `--migrationstest`), deshalb der erzwungene Test
+`--regierung`. Seed 65, vorher der langsamste (526 Einwohner an Tag 365, Gate 4 Band 1,154), hat mit der Stadtregierung 768 und
+besteht Gate 4 (1,053). Gate 4 bleibt im Rauschen der Zuzug-Regel (Placebo 77 von 80, siehe „Bekannte Schwächen“), einzelne
+Seeds kippen in beide Richtungen. Gate 7 bleibt das knappste Gate: Auf Seed 81 ziehen bis Tag 365 11 Leute weg, mit nur 10 Punkten
+weniger Heimatliebe als alle (vorher 21,6, im Prototyp 25,4).
+
+`--gate` (Seeds 1, 2, 3, je 730 Tage) besteht wie vorher; in Klammern der Stand vor der Stadtregierung:
+
+| Gate | Seed 1 | Seed 2 | Seed 3 |
+|---|---|---|---|
+| 1 Einwohner an Tag 365 | 861 (864) | 902 (882) | 919 (899) |
+| 2 schlimmster 30-Tage-Einbruch | 2,9 % (3,4 %) | 4,7 % (6,7 %) | 3,6 % (4,0 %) |
+| 3 kleinstes Budget | 6.731 (6.751) | 6.743 (6.763) | 6.538 (6.557) |
+| 4 Band Tag 551–730, Abstand zur Baugrenze | 1,05, 28 (1,09, 28) | 1,04, 24 (1,10, 28) | 1,07, 28 (1,09, 24) |
+| 5 Gründungen bis Tag 365 | 194 (189) | 193 (167) | 201 (223) |
+| 6 Gründer-Ehrgeiz | +18,0 (+19,3) | +17,7 (+20,6) | +22,4 (+18,7) |
+| 7 Wegzieher-Heimatliebe | −29,1, n = 17 (−25,8, n = 15) | −17,1, n = 11 (−18,5, n = 12) | −33,0, n = 13 (−27,6, n = 19) |
+| T 365 Tage | 1,4 s (1,3 s) | 1,6 s (1,1 s) | 1,5 s (1,2 s) |
+| B Stadtbuch, Zeilen am Tag (davon Bauhof) | 4,12 (0,23) | 4,38 (0,25) | 4,26 (0,24) |
+| Lohnsteuer am Tag, Tag 700–730 (nach der alten Regel) | 2.364 (4.303) | 2.602 (4.591) | 2.574 (4.559) |
+| von außen am Tag, Tag 700–730: Rentenkasse, Bund | 17.382, 1.089 | 17.186, 904 | 18.069, 1.411 |
+
+Vorher B: 4,13 (0,25), 4,12 (0,24), 4,28 (0,25). T schwankt mit der Last der Maschine.
+
+Speicherformat 5: `--speichertest` (Seed 1, gespeichert an Tag 150 um 13 Uhr, 60 Tage weiter 265 Einwohner) läuft bitgleich
+weiter, Fingerabdruck `c549d3c8fbb35f2e` (vorher `0c277c92552696a9`, die Stadt läuft seit der Stadtregierung anders; seit der
+Gegenprüfung zählen `S.regierung` mit „gestern“ und die Summen am Tagesende zum Fingerabdruck, ohne sie wäre er weiter
+`21afa786ba10a5df`: Der Verlauf ist gleich geblieben, alle 160 Seeds der Messtabelle liefern dieselben Werte). Die
+Browser-Tests mit festen Momenten der Teststadt (Seed 2) sind an den neuen Verlauf angepasst: `tests/ereignis.cjs` (Pleiten an
+Tag 499, Übernahmen an Tag 609, Aufholen bis Tag 682, Fernblick an Tag 703) und `tests/p8tech.cjs` (öffnet die erste Person der
+Liste, die heute programmiert; die zweite hatte frei).
+
+Fenster, geprüft im Browser (1280 × 800, 400 × 820, 844 × 390, 568 × 320, Tastatur, reduzierte Bewegung): Kontrast aller Texte
+mindestens 5,81:1 (leiser Text im Hinweis), am Handy füllt es das Bild, der Kopf mit dem X bleibt beim Scrollen oben. Ein Klick
+schließt das Fenster nur, wenn er auf den abgedunkelten Rand geht: Enter auf einer aufklappbaren Liste löst einen Klick bei 0,0 aus
+und schloss das Fenster sonst mit (gilt genauso für die Hilfe).
+
+Befunde der Gegenprüfung, behoben und nachgemessen:
+- Gemeinnützige Arbeit erfüllte das Ziel „besserer Job“ (Lebenslauf, Anweisung ans Sprachmodell, Statistik). In übernommenen
+  Städten der Version 2 (39c405b, 60 Tage) vorher bei 41 von 61 (Seed 2) und 22 von 39 (Seed 3) Herangezogenen, jetzt bei 0 von 56
+  und 0 von 26. Ohne gemeinnützige Arbeit (alle neuen Städte) ändert sich nichts.
+- „Von außen“ nach dem Laden sofort da (Browser: Stand gespeichert, neu geladen, gleiche Zahl), nach einer Übernahme ab der ersten
+  Nacht.
+- Nach dem Schließen per Finger oder Maus (X, „Schließen“, daneben) und sofort Leertaste: pausiert, das Fenster bleibt zu, in 33
+  von 33 Fällen (360 × 740, 768 × 1024 Finger, 1280 × 800 Maus; Leertaste nach 0, 40 und 300 ms; Stadtregierung und Hilfe). Nach
+  Escape oder „Schließen“ per Tastatur steht der Fokus mit Ring auf dem Knopf (2 von 2). Die Fassung vor der Korrektur fiel in
+  derselben Prüfung bei 25 der 35 Fälle durch.
+- Meldung nach „Stadt übernehmen“: 360 × 740 jetzt 328 × 120 px (vorher 180 × 270), der Knopf „Stadtregierung“ darunter lässt
+  sich antippen; 1280 × 800 560 px breit, mittig.
+
 ## Aufbau
 
 - `stadt.html` enthält den Block `<script id="sim">`: reine Simulation, kein DOM, kein `window`, kein `fetch`,
@@ -243,7 +427,7 @@ Bauhof …“ bzw. „arbeitet als Programmiererin bei Nova Handys …“, was d
   Alle Stellschrauben stehen gesammelt im Objekt `R` am Anfang des Blocks.
 - Der `<script type="module">`-Block macht Darstellung, Oberfläche, Speichern und die Ollama-Aufrufe. Er ändert den
   Sim-Zustand nur über Funktionen aus `StadtSim` (`stunde`, `tagSchritt`, `hauptSetzen`, `kiSchalten`, `kiEntscheidung`,
-  `kiVerwerfen`, `kiGespraech`, `kiTagebuch`, `verlustErledigt`, `importZustand`). `theke`, `traeger` und `bauGesamt` lesen nur. Einzige Ausnahme ist die Testhilfe
+  `kiVerwerfen`, `kiGespraech`, `kiTagebuch`, `verlustErledigt`, `importZustand`). `theke`, `traeger`, `bauGesamt` und `regierungInfo` lesen nur. Einzige Ausnahme ist die Testhilfe
   `?debug&umland=…`, die `R.UMLAND` vor dem Start umstellt (solche Stände werden nicht gespeichert).
 - `tools/simtest.mjs` zieht den sim-Block aus der HTML-Datei und prüft ihn zuerst statisch auf verbotene Namen
   (`window`, `document`, `fetch`, `THREE`, `Math.random`, `Date`, `Intl`, `performance`, `console` …). Danach führt es ihn in
@@ -259,8 +443,12 @@ node tools/simtest.mjs --kitest                # Hauptfiguren: erlaubte Aktionen
 node tools/simtest.mjs --bau                   # Bauhof: Einteilung um 7, Fortschritt je Person, jede Baustelle wird fertig
 node tools/simtest.mjs --waren                 # Kisten: geliefert ≤ gemacht, Werkstatt-Einnahmen wie vorher
 node tools/simtest.mjs --tech                  # Tech-Firmen: Arbeitstage je Version, Käufe im Laden, Anbau (Seeds 1–3, 730 Tage)
-node tools/simtest.mjs --migrationstest        # Spielstand von Version 2 übernehmen (alte Datei aus git 39c405b), 60 Tage weiter
-node tools/simtest.mjs --migrationstest --alt <stadt.html von Version 3>   # dasselbe für Version 3
+node tools/simtest.mjs --regierung             # Stadtregierung: Lohnsteuer, Rentenkasse, Betreuungsgehalt, Grundsicherung und
+                                               #   gemeinnützige Arbeit (erzwungen, auch Bauhof voll und mit Kleinkind), Prämie,
+                                               #   Wohnungsvorbehalt, „gestern“, Speicherformat (Seeds 1–3)
+node tools/simtest.mjs --migrationstest        # Spielstände von Version 2, 3 und 4 übernehmen (alte Dateien aus git 39c405b,
+                                               #   2b821c2 und 1c8d40b), 60 Tage weiter; --git <ordner>: anderes Repository
+node tools/simtest.mjs --migrationstest --alt <alte stadt.html>   # nur diese alte Datei
 ```
 
 Weitere Schalter für `--seed`: `--alle 60` (Zeilenabstand), `--fluss` (Zu-/Wegzüge, Geburten, Tode je Zeile),
@@ -273,15 +461,15 @@ Weitere Schalter für `--seed`: `--alle 60` (Zeilenabstand), `--fluss` (Zu-/Wegz
 |---|---|---|
 | 1 | Alles liegt in `stadt/`, nicht im Repo-Wurzelordner | Das Repo enthält schon das Blitzer-Projekt |
 | 2 | 1 Lebensjahr = 10 Spieltage | Ohne Raffung würde in zwei Spieljahren niemand erwachsen, es gäbe keine Enkel (Phase-3-Gate) |
-| 3 | Mit 67 endet die Anstellung, Rente 50/Tag aus dem Budget, solange es reicht | Die Spec nennt nur „job_suchen: 18–67“. Ohne feste Grenze wurde die Bevölkerungswelle getestet größer |
-| 4 | Die Stadt besitzt die Wohnhäuser, Miete geht ins Budget. Budget = 10 % Steuer vom Lohn + Miete | Die Spec sagt „Miete raus“, aber nicht wohin |
+| 3 | Mit 67 endet die Anstellung. Rente seit der Stadtregierung von außen aus der Rentenkasse, immer voll: 55 Taler am Tag, in zwei Stufen 66 (vorher 50/Tag aus dem Budget, solange es reichte) | Die Spec nennt nur „job_suchen: 18–67“. Ohne feste Grenze wurde die Bevölkerungswelle getestet größer. Die Rentenkasse ist eine Modellkorrektur, keine Forderung des Programms (Abschnitt Stadtregierung) |
+| 4 | Die Stadt besitzt die Wohnhäuser, Miete geht ins Budget. Budget = Lohnsteuer + Miete. Lohnsteuer seit der Stadtregierung: 10 % vom Lohn über 29 Taler Freibetrag je Familienmitglied (Familiensplitting); Gewinne der Besitzer bleiben steuerfrei. Renten, Prämien, Betreuungsgehalt und Grundsicherung zahlt nicht das Budget | Die Spec sagt „Miete raus“, aber nicht wohin. **Weicht vom Wortlaut der Spec ab** („fester Anteil vom Lohn“): Entscheidung des Nutzers, Abschnitt Stadtregierung |
 | 5 | Werkstätten verkaufen ans Umland. Erlös je Arbeitstag = min(140, 50.000 / alle Werkstatt-Arbeitenden) | Einzige Geldquelle von außen und als Wachstumsgrenze gedacht (siehe „Bekannte Schwächen“) |
 | 6 | Läden haben eine Kapazität: 5 Leute je Stelle (Besitzer zählt mit), also 35 pro Laden. Ist der Laden voll, geht man zum nächsten mit Platz in Reichweite. Der Laden kauft Ware ein: eine Kiste je 38 Taler Umsatz (Annahme 59; bis zur Arbeit-Erweiterung pauschal die Hälfte des Umsatzes nach außen) | Sonst schluckt ein Laden in der Mitte die ganze Stadt. Ohne Wareneinsatz entsteht pro Kopf eine halbe Ladenstelle, und die Stadt schaukelt sich auf (siehe Schwächen) |
 | 7 | Stammladen: Man bleibt beim Laden, solange er offen, in Reichweite und nicht voll ist. Den nächstgelegenen sucht man beim ersten Einkauf oder wenn der eigene wegfällt | Weicht vom Wortlaut „Einkauf beim nächsten Laden“ ab. Ohne das nimmt jeder neue Laden dem Nachbarn sofort die Kundschaft weg |
 | 8 | Wer Erspartes hat, gibt täglich bis 1 % davon (höchstens 15) zusätzlich aus, Sparsame weniger | Sonst sammelt sich das Geld bei den Leuten, und die Läden bekommen nichts ab |
 | 9 | Besitzer zahlen Lohn nach Charakter: wenig sparsam = großzügiger (90–110 % vom Grundlohn) | Gibt `job_wechseln` einen Grund |
 | 10 | Pleite-Betriebe stehen leer und können übernommen werden (40 % der Baukosten). Eine Übernahme zählt als Gründung | Die Spec sagt „Gebäude wird frei“ |
-| 11 | Zuzug: Als „freie Stellen“ zählen nur freie Stellen in Werkstätten und Tech-Firmen (nicht im Bauhof, nicht in Läden), abzüglich der Arbeitslosen der Stadt. Wer zuzieht, tritt sofort die nächste solche Stelle an; ist keine mehr frei, kommt an diesem Tag niemand mehr. Zuzügler sind 18–60 Jahre alt (bis zur Gate-4-Änderung 18–45). Höchstens 1 + 1 % der Einwohner pro Tag | **Weicht vom Wortlaut der Spec ab** („freie Stellen“); Noahs Entscheidung für Gate 4. Zählten Ladenstellen, holte jeder neue Laden Leute von außen, die wieder neue Läden brauchen: Ladenboom, danach Pleitewelle. Läden stellen deshalb nur Leute aus der Stadt ein. Mit 18–45 ging die erste Generation fast gleichzeitig in Rente. Arbeitslose abziehen: sonst ziehen Leute für Stellen zu, die Einheimische ohnehin gleich nehmen |
+| 11 | Zuzug: Als „freie Stellen“ zählen nur freie Stellen in Werkstätten und Tech-Firmen (nicht im Bauhof, nicht in Läden), abzüglich der Arbeitslosen der Stadt. Wer zuzieht, tritt sofort die nächste solche Stelle an; ist keine mehr frei, kommt an diesem Tag niemand mehr. Zuzügler sind 18–60 Jahre alt (bis zur Gate-4-Änderung 18–45). Höchstens 1 + 1 % der Einwohner pro Tag | **Weicht vom Wortlaut der Spec ab** („freie Stellen“); Noahs Entscheidung für Gate 4. Zählten Ladenstellen, holte jeder neue Laden Leute von außen, die wieder neue Läden brauchen: Ladenboom, danach Pleitewelle. Läden stellen deshalb nur Leute aus der Stadt ein. Mit 18–45 ging die erste Generation fast gleichzeitig in Rente. Arbeitslose abziehen: sonst ziehen Leute für Stellen zu, die Einheimische ohnehin gleich nehmen. Seit der Stadtregierung zählen Leute in gemeinnütziger Arbeit als arbeitslos, Eltern mit Betreuungsgehalt nicht; die Stadtregierung weist die Regel als R10 aus (galt schon), dazu R09 |
 | 12 | „Wohnungssuchende“ fürs Bauamt = Leute ohne Wohnung oder mit erfolgloser Suche **plus** Anfragen von außen (Leute, die wegen freier Stellen kämen, aber keine Wohnung finden) | Sonst baut das Bauamt nie vorausschauend, und der Zuzug stockt |
 | 13 | Zufriedenheit = 100 − gewichtetes Mittel 4. Grades der Dringlichkeiten. Das schlimmste Bedürfnis zählt am stärksten. Trauer −15, kein Einkauf −10. Der Zielwert wird alle 6 Spielstunden neu berechnet, die Zufriedenheit gleitet stündlich hin | Mit dem normalen Mittel fällt kaum jemand unter 20, dann zieht niemand weg |
 | 14 | Wohnen = Enge der Wohnung (Haushaltsgröße gegen Wohnungsgröße der Hausstufe) plus Park in der Nähe. Umziehen nur, wenn die neue Wohnung spürbar besser ist. Nach einer erfolglosen Suche 5 Tage Pause | Vorher zogen Haushalte zweimal am Tag hin und her, weil ein Umzug das Problem nicht löste |
@@ -293,7 +481,7 @@ Weitere Schalter für `--seed`: `--alle 60` (Zeilenabstand), `--fluss` (Zu-/Wegz
 | 20 | Nach einem Ereignis entscheiden die Betroffenen in der nächsten Stunde (auch Partner, Freund, Eltern). Wer das Ereignis selbst ausgelöst hat, hat gerade entschieden | Spec: „direkt nach einem Ereignis“ |
 | 21 | `freunde_treffen` nur abends (ab 17 Uhr), `partner_suchen` nur unter 70, `laden_gruenden` nur unter 60, `freinehmen` nur morgens | Die Spec nennt keine Uhrzeiten und Altersgrenzen |
 | 22 | Straßen auf einem 4er-Raster (Blöcke 3×3). Bauplätze sind Felder neben einer Straße, die nicht auf dem Raster liegen. Das Bauamt verlängert meist ein Ende geradeaus, biegt an Kreuzungen manchmal ab und legt in 30 % der Fälle eine Abzweigung an. **Straßen sind sofort fertig** (keine Baustelle). Häuser, Betriebe, Parks und Aufstockungen brauchen Arbeitstage vom Bauhof (Annahme 58); bei einer Aufstockung (`g.auf`) bleibt das Haus bewohnt | Neue Straßen werden nie von Häusern blockiert |
-| 23 | Bauamt: Regel 1 baut höchstens 1 + Einwohner/300 Häuser pro Tag. Park nur in Vierteln mit ≥ 8 Bewohnern und weniger als 1 + Bewohner/60 Parks. Notbremse höchstens alle 14 Tage | Die Spec sagt „einmal pro Spieltag“, aber nicht wie viel |
+| 23 | Bauamt: Regel 1 baut höchstens 1 + Einwohner/300 Häuser pro Tag. Park nur in Vierteln mit ≥ 8 Bewohnern und weniger als 1 + Bewohner/60 Parks. Die Notbremse (Regel 5, vorher höchstens alle 14 Tage) entfällt seit der Stadtregierung | Die Spec sagt „einmal pro Spieltag“, aber nicht wie viel. **Weicht vom Wortlaut der Spec ab** (Regel 5): Entscheidung des Nutzers, Auslegung von S. 13 des Programms (R08). Auf den Seeds 1–160 hat die Notbremse auch vorher nie ausgelöst |
 | 24 | Betriebe bleiben auf Stufe 1. Die Formel „Stufe × Stellen“ ist vorbereitet | Die Spec sagt nicht, wer Betriebe aufstuft. Das Bauamt stuft laut Regel 4 nur Wohnhäuser auf |
 | 25 | Stadtbuch: Die Zuzüge eines Tages stehen in einer Zeile (mit Grund), alles andere einzeln | Sonst füllen Zuzüge die 500 Zeilen allein |
 | 26 | Gate 6 und 7 vergleichen mit **allen, die je als Erwachsene in der Stadt lebten**. Beim Wegzug zählt nur die Person, die entschieden hat, nicht ihre Familie | Die heutigen Erwachsenen sind schon gefiltert (die Heimatlosen sind weg), das würde den Unterschied schönen |
@@ -311,9 +499,9 @@ Weitere Schalter für `--seed`: `--alle 60` (Zeilenabstand), `--fluss` (Zu-/Wegz
 | 38 | Ist Ollama nicht erreichbar, entscheiden wartende Hauptfiguren sofort normal, nicht erst nach 2 Spielstunden. Kommt eine Antwort später als in der Stunde nach der Anfrage, wird sie gegen die aktuelle Uhrzeit geprüft (kein „freinehmen“ mehr um 9 Uhr). Geht die gewählte Aktion nicht mehr, entscheidet das normale Gehirn; im Tagebuch steht dann „(klappte nicht)“ | Spec: „Ollama aus: Hauptfiguren entscheiden normal“. Ein Tag frei ab 9 Uhr kostete den ganzen Tageslohn |
 | 39 | Die Anweisung für den Tagebucheintrag nach dem Aufholen habe ich formuliert (Beschreibung wie oben, Erlebtes nur aus der Zeit der Abwesenheit, Antwort `{"eintrag": "…"}`) | Die Spec gibt keinen Wortlaut |
 | 40 | Stirbt oder geht eine Hauptfigur, verschwindet ihr Tagebuch mit ihr. Vorschläge für die Nachfolge: Partner und erwachsene Kinder, die noch in der Stadt leben | Die Spec sagt „schlägt ein Kind oder den Partner vor“ |
-| 41 | Spielstand-Version 4 (2: Hauptfiguren und Tagebuch, 3: Bauhof und Kisten, 4: Tech-Firmen). Stände anderer Versionen lösen den Versionsdialog aus; Version 2 und 3 lassen sich übernehmen (Annahme 60) | Neue Felder |
+| 41 | Spielstand-Version 5 (2: Hauptfiguren und Tagebuch, 3: Bauhof und Kisten, 4: Tech-Firmen, 5: Stadtregierung mit den Personenfeldern `gsTage` und `gemein`, `S.regierung` mit Start und Tageswerten `gestern`/`tagStart`, und `S.stat.regierung`). Stände anderer Versionen lösen den Versionsdialog aus; Version 2, 3 und 4 lassen sich übernehmen (Annahme 60). Ein Stand der Version 5 ohne gültige Stadtregierung (Start als ganzer Tag, alle Summen, die vom Tagesende und die von gestern als Zahlen, gestern auch leer) wird abgelehnt | Neue Felder. Ein Stand der Version 4 liefe sonst still unter den neuen Regeln weiter; ohne die Prüfung stürzte ein beschädigter Stand um Mitternacht ab |
 | 42 | Bei 1× ist eine echte Minute eine Spielstunde | Folgt aus der Spec: 90 Spieltage entsprechen 36 Stunden Abwesenheit |
-| 43 | Beim Aufholen (Tagesschritte) entscheiden alle nur um 7 und 18 Uhr; Ereignisse lösen keine zusätzliche Entscheidung aus. Der Bauhof teilt direkt nach der 7-Uhr-Entscheidung ein, wie stündlich | Sonst wäre der Tagesschritt nicht schneller. Abweichung gegen stündlich nach 90 Tagen (Seeds 1–10, Tag 200–290): im Mittel +0,7 % Einwohner, einzeln −5,8 % bis +10,8 % (vor der Zuzug-Regel −1,7 %, einzeln −8,6 % bis +8,1 %) |
+| 43 | Beim Aufholen (Tagesschritte) entscheiden alle nur um 7 und 18 Uhr; Ereignisse lösen keine zusätzliche Entscheidung aus. Der Bauhof teilt direkt nach der 7-Uhr-Entscheidung ein, wie stündlich | Sonst wäre der Tagesschritt nicht schneller. Abweichung gegen stündlich nach 90 Tagen (Tag 200–290) mit der Stadtregierung: Seeds 1–10 im Mittel −0,3 % Einwohner, einzeln −17,2 % bis +10,7 %; Seeds 1–20 im Mittel +0,2 %, 10 von 20 höher. Vorher auf den Seeds 1–10 +0,7 %, einzeln −5,8 % bis +10,8 % (vor der Zuzug-Regel −1,7 %, einzeln −8,6 % bis +8,1 %). Der Ausreißer Seed 10 wächst in diesen Tagen stark (stündlich 246 → 623 Einwohner); in Tagesschritten kamen weniger Geburten (90 statt 120) und weniger Zuzüge, der Unterschied wächst von Tag zu Tag. Nicht einseitig: Vorher lag derselbe Seed 10,8 % darüber |
 | 44 | Grundregel: Eine Figur steht oder geht nur dort, wo die Simulation die Person in dieser Stunde hat. Arbeit 8–17 Uhr (Bauarbeiter auf ihrer Baustelle), abends bei Freunden 19–22 Uhr (wer „freunde_treffen“ gewählt hat), wer frei hat um 10 Uhr einkaufen, sonst zu Hause. Ändert sich der Ort, geht die Figur dorthin. Von den 300 Figuren sind bis zu 120 Leute bei der Arbeit (Annahme 62), die übrigen zufällige Erwachsene, die nur unterwegs zu sehen sind. Hauptfiguren sind immer zu sehen: wenn sie nicht laufen, stehen sie vor dem Gebäude, in dem sie gerade sind. Ihre Markierung ist gelb, weiß solange sie „überlegen“. Jede sichtbare Figur ist anklickbar | Die Spec sagt „morgens zur Arbeit, abends heim oder zu Freunden“ und „plus immer alle Hauptfiguren“ |
 | 45 | Fenster: Abends (ab 18–19:30 Uhr, je Haus verschieden) sind so viele Geschosse hell, wie das Haus belegt ist; spät in der Nacht etwa ein Drittel davon, aber jedes bewohnte Haus mindestens eins; morgens von 5:30 bis etwa 7 Uhr die Hälfte. Leere Häuser bleiben dunkel. Die Fenster sind unbeleuchtetes Material (`MeshBasicMaterial`) mit Lichtfarbe, das wirkt wie „emissive“ | Ein Haus, in dem um 2 Uhr alles an ist, sah unecht aus |
 | 46 | Ist der Spielstand pausiert gespeichert, holt die Stadt beim Öffnen nichts auf | Pause heißt, dass die Stadt nicht weiterläuft |
@@ -330,11 +518,11 @@ Weitere Schalter für `--seed`: `--alle 60` (Zeilenabstand), `--fluss` (Zu-/Wegz
 | 57 | Namen von Leuten, die nicht mehr in der Stadt sind (gestorben oder weggezogen), sind anklickbar und öffnen eine kurze Karte „nicht mehr in der Stadt“. Ob jemand starb oder wegzog, weiß die Karte nicht mehr, deshalb kein † | Spec: „Jeder Name auf der Personenkarte ist wieder anklickbar“; die Daten der Person sind nach dem Weggang frei |
 | 58 | Bauhof: 10 Stellen plus eine je 4 offene Arbeitstage, höchstens 40; neu gerechnet, sobald eine Baustelle dazukommt (Gründung, Bauamt) und jede Nacht. Lohn 95–120 Taler: +2 am Tag, wenn um 7 Uhr Leute fehlten, sonst −1. Schrumpfen die Stellen, bleibt niemand ohne Arbeit, es wird nur nicht nachbesetzt. Freie Stellen im Bauhof locken keinen Zuzug an, und Gründer rechnen den Bauhof mit seinen 10 festen Stellen | Die Stellen gehen mit den Baustellen auf und ab. Zählten sie beim Zuzug oder bei „Werkstatt lohnt sich“, würde jede Baustelle Leute in die Stadt holen bzw. Werkstätten verhindern (im Entwurf gemessen: die Stadt schaukelt sich auf). Mit festem Lohn lief der Bauhof leer |
 | 59 | Kisten: Kistenpreis = Umlandpreis je Arbeitstag / 8 (etwa 15–17 Taler), von außerhalb 19 Taler. Die Werkstatt nimmt je Arbeitstag dasselbe ein wie vorher, egal ob ein Laden oder das Umland die Kisten nimmt. Gründer zahlen Bau oder Übernahme an die Stadtkasse, die Stadt zahlt dafür die Bauarbeiter | Noahs Entscheidung A: Kisten als Preisvorteil für Läden, keine echte Knappheit (siehe Schwächen). Mit „Umland kauft nur die Hälfte“ hatte die Stadt im Entwurf an Tag 365 im Schnitt 891 statt 1.170 Einwohner, ohne dass Gate 4 besser wurde |
-| 60 | Ein Spielstand von Version 2 oder 3 lässt sich im Versionsdialog mit „Stadt übernehmen“ umrechnen. Von 2: Bauhof = Werkstatt der Stadt vom Start, laufende Baustellen bekommen 4 Arbeitstage je Resttag (höchstens so viele wie der ganze Bau). Von 3: Tech-Firmen entstehen danach von selbst, niemand hat schon ein Gerät. Alles andere bleibt. Ein Import einer alten Datei rechnet ohne Nachfrage um | **Abweichung von der Spec** (dort nur Export oder Neu), Noahs Entscheidung B: sonst wäre seine Stadt weg |
+| 60 | Ein Spielstand von Version 2, 3 oder 4 lässt sich im Versionsdialog mit „Stadt übernehmen“ umrechnen (Text je Version). Von 2: Bauhof = Werkstatt der Stadt vom Start, laufende Baustellen bekommen 4 Arbeitstage je Resttag (höchstens so viele wie der ganze Bau). Von 3: Tech-Firmen entstehen danach von selbst, niemand hat schon ein Gerät. Von 2, 3 und 4: Die Stadtregierung gilt ab dem Übernahmetag (Rentenstufen von da an, Stadtbuch „Ab heute regiert die AfD …“, im Fenster „seit Tag X, Spielstand übernommen“), niemand bezieht schon Grundsicherung. Alles andere bleibt. Ein Import einer alten Datei rechnet ohne Nachfrage um | **Abweichung von der Spec** (dort nur Export oder Neu), Noahs Entscheidung B: sonst wäre seine Stadt weg |
 | 61 | Theke und Träger sind nur zum Anschauen. Wer heute trägt, ergibt sich aus Tag und Laden (reihum), nicht aus Zufall. Der Lieferant ist die Werkstatt, die gestern die meisten Kisten brachte | Die Kisten werden um Mitternacht in einem Schritt verteilt; die Träger zeigen das tagsüber |
 | 62 | Die 120 Arbeitsplätze unter den Figuren werden um 8 Uhr nach Nähe zur Kamera vergeben (beim Öffnen mitten am Tag sofort) und bleiben bis zum nächsten Morgen | Alle Arbeitenden wären bei 5.000 Einwohnern über 2.000 Figuren. Fest statt kameraabhängig, damit keine Figur beim Drehen springt |
-| 63 | Stadtbuch: fertige Bauten eines Abends in einer Zeile („Der Bauhof hat fertig gebaut: …“), Stillstand, wenn auf einer Baustelle 5 Tage niemand war, und wenn der Bauhof-Lohn über 100, 110 oder 120 steigt | Mit Tech-Firmen kommen die neuen Versionen dazu (im Schnitt 0,48 Zeilen am Tag): auf 40 Seeds 5,50 Zeilen am Tag, 7 Seeds über 6,5, höchstens 8,60. Ohne Tech-Firmen: auf 40 Seeds (730 Tage) im Schnitt 0,26 neue Zeilen am Tag. Insgesamt 5,25 statt 4,86 Zeilen am Tag. **Die Plan-Grenze von 6,5 Zeilen am Tag hält nicht überall:** 5 von 40 Seeds liegen darüber (vorher 5), darunter der offizielle Seed 1 mit 6,79 (vorher 4,94). Ohne die neuen Zeilen wären es bei Seed 1 immer noch 6,50; der Rest kommt daher, dass die Stadt sich anders entwickelt (mehr Hochzeiten und Trennungen) |
-| 64 | Tech-Firma statt Werkstatt gründet, wer Fleiß + Ehrgeiz ≥ 120 hat, solange die Tech-Stellen danach höchstens 40 % der Umland-Stellen sind (Werkstätten plus Tech) und das Geld reicht (Bau 2.000 + Startkasse 300, leere Tech-Firma übernehmen 1.100). Fehlt ein Laden, wird wie bisher ein Laden gegründet. Ob es sich lohnt, prüft wie bei der Werkstatt der Umlandpreis; die Tech-Stellen zählen dort mit. Produkt: das in der Stadt seltenste. Firmenname aus 30 Marken (Seed-Zufall), Versionen heißen „Marke Nummer“ | Noahs Entscheidung: eine Betriebsart über die vorhandene Aktion, keine neue Aktion. Ohne Obergrenze würden Tech-Firmen die Werkstätten verdrängen (beide teilen sich das Umland) |
+| 63 | Stadtbuch: fertige Bauten eines Abends in einer Zeile („Der Bauhof hat fertig gebaut: …“), Stillstand, wenn auf einer Baustelle 5 Tage niemand war, und wenn der Bauhof-Lohn über 100, 110 oder 120 steigt | Mit Tech-Firmen kamen die neuen Versionen dazu (damals im Schnitt 0,48 Zeilen am Tag: auf 40 Seeds 5,50 Zeilen am Tag, 7 Seeds über 6,5, höchstens 8,60; das war vor der Zuzug-Regel). Heute gemessen (Seeds 1–80, 730 Tage): vor der Stadtregierung 4,11 Zeilen am Tag (höchstens 5,47), davon Bauhof 0,24 und Tech 0,50; mit der Stadtregierung 4,31 (höchstens 5,80), Bauhof 0,25, Tech 0,55. Die Stadtregierung schreibt selbst 3 Zeilen je Stadt (Tag 0 und die beiden Rentenstufen), den Rest macht die größere Stadt. Die Plan-Grenze von 6,5 Zeilen am Tag hält auf allen 160 Seeds |
+| 64 | Tech-Firma statt Werkstatt gründet, wer Fleiß + Ehrgeiz ≥ 120 hat, solange die Tech-Stellen danach höchstens 40 % der Umland-Stellen sind (Werkstätten plus Tech) und das Geld reicht (Bau 2.000 + Startkasse 300, leere Tech-Firma übernehmen 1.100). Fehlt ein Laden, wird wie bisher ein Laden gegründet. Ob es sich lohnt, prüft wie bei der Werkstatt der Umlandpreis; die Tech-Stellen zählen dort mit. Produkt: das in der Stadt seltenste. Firmenname aus 30 Marken (Seed-Zufall), Versionen heißen „Marke Nummer“ | Noahs Entscheidung: eine Betriebsart über die vorhandene Aktion, keine neue Aktion. Ohne Obergrenze würden Tech-Firmen die Werkstätten verdrängen (beide teilen sich das Umland). Gemessen (Seeds 1–80, Tag 730): vor der Stadtregierung 23,9 Gründungen je Stadt, Anteil an den Umland-Stellen im Mittel 25,0 % (höchstens 39 %); mit der Stadtregierung 27,4 und 29,3 % (höchstens 39,6 %), weil mehr Leute genug Erspartes haben. Seeds 1/2/3 (`--gate`): 29/46/21 gegründet, Anteil 33,8/33,8/23,4 % (vorher 17/26/26 und 21,6/27,5/25,1 %) |
 | 65 | Tech-Firma: 4 Stellen je Stufe, Lohn 105 (90–110 % je nach Sparsamkeit des Besitzers), laufende Kosten 45 am Tag. Einnahmen: anwesende Angestellte × Umlandpreis (derselbe Topf von 50.000 wie bei den Werkstätten) plus 80 % der Verkäufe in der Stadt | Das Umland als gemeinsame Grenze hält das Wachstum im Rahmen |
 | 66 | Käufe beim täglichen Einkauf: nur wer heute eingekauft hat und danach über 600 Taler hat. Erst ein Gerät (Fleißige ab 60 wollen einen Computer, alle anderen ein Handy; gibt es das nicht, das andere; nach 120 Tagen ein neues), mit Gerät alle 40 Tage Software, dazwischen mindestens 20 Tage. Preise 180 (Handy), 320 (Computer), 60 (Software). Chance am Tag 4 % × (1,3 − Sparsamkeit/100), doppelt so hoch, wenn die Version höchstens 15 Tage alt ist. 20 % behält der Laden, 80 % bekommt die Firma. Freizeit sofort +12 / +15 / +6, keine Dauerwirkung | Noahs Entscheidung „auch die Leute in der Stadt kaufen“, ohne neue Aktion. Im Entwurf hob eine Dauerwirkung am Abend die Zufriedenheit und damit den Zuzug; sie ist wieder raus |
 | 67 | Anbau: Läuft eine Tech-Firma gut (alle Stellen besetzt, 20 Tage in Folge Gewinn), gehen 50 % des Gewinns über dem Polster in eine Rücklage, bis der Anbau bezahlt ist (Stufe 2: 1.800, Stufe 3: 3.000). Den Auftrag an den Bauhof gibt sie erst, wenn das Umland Platz hat (dieselbe Grenze wie für eine neue Werkstatt) und mindestens 4 Leute Arbeit suchen. Der Bauhof baut 12 bzw. 16 Arbeitstage, danach 8 bzw. 12 Stellen. Schließt die Firma, bekommt der Besitzer die Rücklage | Noahs Entscheidung „Bauauftrag an den Bauhof“. Ohne die Umland-Grenze schuf jeder Anbau Stellen über das Gleichgewicht hinaus |
@@ -353,10 +541,16 @@ Seeds 1, 2 und 3 bei Faktor 1,09, 1,10 und 1,09 (vorher 1,30, 1,23 und 1,18: kei
 | mit Bauhof und Kisten | 26 von 80 | 1,255 | 1,21 | 5 | 2,15 |
 | dazu Tech-Firmen | 24 von 80 | 1,275 | 1,20 | 13 | 2,02 |
 | Placebo: Bauhof und Kisten plus eine Zufallszahl am Tag, sonst nichts | 22 von 80 | 1,303 | 1,25 | 12 | 2,28 |
-| **dazu Zuzug nur für Werkstatt- und Tech-Stellen (heute)** | **76 von 80** | **1,076** | **1,07** | **0** | **1,21** |
-| Placebo dazu: heute plus eine Zufallszahl am Tag | 77 von 80 | 1,070 | 1,06 | 0 | 1,17 |
-| heute auf frischen Seeds 81–160 | 79 von 80 | 1,074 | 1,06 | 0 | 1,15 |
+| dazu Zuzug nur für Werkstatt- und Tech-Stellen (bis zur Stadtregierung) | 76 von 80 | 1,076 | 1,07 | 0 | 1,21 |
+| Placebo dazu: plus eine Zufallszahl am Tag | 77 von 80 | 1,070 | 1,06 | 0 | 1,17 |
+| dasselbe auf frischen Seeds 81–160 | 79 von 80 | 1,074 | 1,06 | 0 | 1,15 |
 | Tech-Firmen ohne Zuzug-Regel auf den Seeds 81–160 | 22 von 80 | 1,308 | 1,23 | 11 | 2,62 |
+| **dazu Stadtregierung (heute)** | **77 von 80** | **1,077** | **1,07** | **0** | **1,20** |
+| Stadtregierung auf den Seeds 81–160 | 76 von 80 | 1,076 | 1,07 | 0 | 1,19 |
+
+Mit der Stadtregierung fällt Gate 4 auf den Seeds 1–80 auf 19, 27 und 44 durch (vorher 19, 27, 37, 65), auf den Seeds 81–160
+auf 92, 103, 118 und 134 (vorher 87). Das liegt im Rauschen der Zuzug-Regel (das Placebo ändert 1 von 80): Jede Änderung an
+Geld und Entscheidungen verschiebt, welche Seeds zufällig kippen. Kein Urteil über das Programm (Abschnitt Stadtregierung).
 
 Vorher war Gate 4 Glückssache: Unterschiede zwischen den Ständen waren kleiner als das Placebo, das keine Regel ändert. Gate 4
 hing davon ab, wann zufällig ein Ladenboom mit Pleitewelle einsetzte (Beispiel Seed 15 ohne Tech: die Läden stiegen von Tag 600
@@ -382,9 +576,10 @@ und 95 %), weil Zuzügler nur in Werkstätten und Tech-Firmen anfangen. Ein Lade
 die Kapazität hängt an den Stellen, nicht an den Leuten (Annahme 6). Er spart nur Löhne. Das ist unrealistisch: Ein Laden mit
 zwei von sechs Kräften bedient so viele Leute wie ein voller.
 
-**Gate 7 ist knapp.** Es zählt nur die Leute, die bis Tag 730 wegziehen (auf Seed 1 sind es 19). Mit der Zuzug-Regel fiel
+**Gate 7 ist knapp.** Es zählt nur die Leute, die bis Tag 365 wegziehen (auf Seed 1 sind es 17). Mit der Zuzug-Regel fiel
 Gate 7 im Placebo auf 5 von 160 Seeds durch, ohne sie in den Seeds 81–160 auf 2 von 80. Auf den Seeds 1–160 ohne Placebo
-fällt es nicht durch.
+fiel es vor der Stadtregierung nicht durch; mit ihr fällt es auf Seed 81 durch (11 Wegzüge, nur 10 Punkte weniger Heimatliebe
+als alle; vorher 21,6), sonst ist der kleinste Abstand 15,7.
 
 **Die Kisten machen nichts knapp.** Die Werkstätten machen etwa fünfmal so viele Kisten, wie die Läden brauchen: Auf den
 Seeds 1–3 gingen von Tag 100 bis 300 je 21–22 % der Kisten an Läden der Stadt, die Läden bekamen 100 % ihrer Kisten aus der
@@ -394,7 +589,8 @@ ist verworfen (Annahme 59).
 
 **Tech-Firmen kommen in einer ausgewachsenen Stadt nur langsam.** Sie teilen sich das Umland mit den Werkstätten und werden
 nur gegründet, wenn dort Platz ist. Im Entwurf gab es nach dem Übernehmen einer Stadt von Tag 300 bzw. 400 in den 60 Tagen
-danach keine Gründung, bei Tag 150 drei. In einer neuen Stadt entstehen auf den Seeds 1–3 in 730 Tagen 17–26 Tech-Firmen.
+danach keine Gründung, bei Tag 150 drei. In einer neuen Stadt entstehen auf den Seeds 1–3 in 730 Tagen 21–46 Tech-Firmen (vor
+der Stadtregierung 17–26: mit mehr Erspartem gründen mehr Leute).
 
 **Die echten Code-Stücke sind nur mit einem nachgebauten Ollama getestet.** Ob ein kleines Modell zuverlässig gültiges JSON mit
 Code liefert (oder Code-Zäune und Erklärungen dazuschreibt), ist nicht gemessen. Ungültige Antworten zählen als ungültig und
@@ -404,7 +600,32 @@ landen nicht im Tagebuch.
 
 **Das Budget ist nie knapp.** Ab etwa Tag 60 übersteigen Steuern und Mieten alle Ausgaben um ein Vielfaches. Die
 Budgetgrenzen des Bauamts greifen deshalb praktisch nie. Gate 3 hält, weil jede Ausgabe vorher geprüft wird, nicht weil
-das Budget eng wäre.
+das Budget eng wäre. Seit der Stadtregierung zahlt die Stadt keine Renten mehr (sie kommen aus der Rentenkasse), bekommt aber
+weniger Lohnsteuer: An Tag 730 hat sie im Mittel 5,75 statt 2,15 Mio. Taler (Seeds 1–80). Das zeigt nur, wer zahlt, nicht was
+die Stadt sich leisten kann.
+
+**Geld von außen ohne Gegenfinanzierung.** Rentenkasse und Bund zahlen im Mittel gut 9.000 Taler am Tag in die Stadt
+(Seeds 1–80: Rentenkasse 8.316, Bund 775), die Stadt zahlt dafür keine Beiträge und keine Bundessteuern. Mehr Erspartes (11.902
+statt 10.525 je Erwachsenem), höhere Zufriedenheit (70,3 statt 68,8) und mehr Tech-Gründungen kommen zum großen Teil daher. Das
+Fenster „Stadtregierung“ und die Zeile „Von außen“ sagen das; die Stadt bildet die Kostenseite des Programms (etwa steigende
+Rentenbeiträge, S. 19) nicht ab.
+
+**Mehr Leute ohne Arbeit.** An Tag 730 sind im Mittel 5,1 % ohne Arbeit (vorher 3,8 %). Eltern in Elternzeit zählen nicht mit;
+der Zuzug besetzt ihre Stellen, und wenn das Kind 3 ist, suchen sie neu.
+
+**Gemeinnützige Arbeit kommt fast nie vor.** Auf den Seeds 1–160 hat nie jemand 5 Tage in Folge Grundsicherung bezogen: Läden
+suchen fast immer Leute, und wer Arbeit sucht, findet sofort eine. Grundsicherung gab es im Mittel für 0,07 Leute am Tag. Nur
+in übernommenen Städten der Version 2 mit vielen Arbeitslosen kam gemeinnützige Arbeit vor (`--migrationstest`). Deshalb prüft
+`--regierung` sie erzwungen.
+
+**Handy quer (bis 420 px hoch): Stadtregierung nur als Symbol.** Mit der Zeile „Von außen“ und dem Knopf reichten die Zahlen
+sonst in die Spalte darunter (gemessen bis 37 px bei 680 × 345; dort ließ sich der Knopf nicht antippen). Bis 420 px Höhe steht
+der Knopf deshalb als Symbol (Rathaus, 32 × 32 px) neben Tag und Uhr, sein Name steht im aria-label, und die Zeilen sind etwas
+enger. Die Marke am Stadtbuch zeigt in der schmalen Spalte nur die Zahl („99+“, „neu“ nur für Screenreader), zweizeilig schob sie
+die Spalte in die Zahlen. Gemessen (Luft zwischen Zahlen und Spalte, mit der Marke „99+“): 568 × 320 9 px, 700 × 330 17 px,
+680 × 345 21 px, 740 × 360 35 px, 844 × 390 63 px, 926 × 428 (volle Zeilen) 42 px; der Tipp auf die Mitte des Knopfs öffnet das
+Fenster in allen 13 gemessenen Größen. Am Handy hochkant heißen Zeile und Knopf kürzer („Von außen“, „Stadtregierung: AfD“);
+„gestern“ und „seit Tag …“ stehen im Fenster.
 
 **Phase 4 ist nicht mit einem echten Sprachmodell getestet.** Im Container gibt es kein Ollama und keinen Download dafür.
 Getestet ist gegen einen nachgebauten Server mit dem Request- und Antwortformat aus der Ollama-Doku: Anfragen, Fristen,
