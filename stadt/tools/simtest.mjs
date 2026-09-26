@@ -13,12 +13,20 @@
 //   node tools/simtest.mjs --bau                    Bauhof: Einteilung, Fortschritt je Person, jede Baustelle wird fertig (Seeds 1–3)
 //   node tools/simtest.mjs --waren                  Kisten: geliefert ≤ gemacht, Werkstatt-Einnahmen wie vorher (Seeds 1–3)
 //   node tools/simtest.mjs --tech                   Tech-Firmen: Arbeitstage an der Version, Käufe im Laden, Anbau (Seeds 1–3, 730 Tage)
-//   node tools/simtest.mjs --regierung              Stadtregierung: Lohnsteuer (Freibetrag, Familiensplitting), Rentenkasse, Betreuungsgehalt,
-//                                                   Grundsicherung und gemeinnützige Arbeit (erzwungen, auch Bauhof voll), Prämie,
-//                                                   Wohnungsvorbehalt beim Zuzug, Tageswerte „gestern“, Speicherformat (Seeds 1–3)
-//   node tools/simtest.mjs --migrationstest         Spielstände von Version 2, 3 und 4 übernehmen (alte stadt.html aus git 39c405b, 2b821c2 und 1c8d40b,
-//                                                   --git ordner für ein anderes Repository, oder nur --alt pfad/zur/alten/stadt.html),
-//                                                   60 Tage weiter, keine NaN
+//   node tools/simtest.mjs --regierung              Stadtregierung: Lohnsteuer (Freibetrag, Familiensplitting, Rentner-Freibetrag), Rentenkasse,
+//                                                   Betreuungsgehalt, Grundsicherung und gemeinnützige Arbeit (erzwungen, auch Bauhof voll), Prämie,
+//                                                   Wohnungsvorbehalt beim Zuzug, Tageswerte „gestern“, Speicherformat; Schritt 2: Beitragstage,
+//                                                   Renteneintritt vor 67 und mit 67 (erzwungen), Mieterkauf (Rate, Erbe, Auflösung, Umzug,
+//                                                   Zusammenziehen, Wegzug, Invariante, Budgetbuchungen); Betreuungsgehalt nur ohne Kita-Platz (Seeds 1–3)
+//   node tools/simtest.mjs --kita                   Kitas (Schritt 2): Invarianten nach jeder Nacht, auch am Ende der Nacht (Plätze, Bestand, Personal,
+//                                                   Lohn, Vorrang, Betreuungspflicht, Betreuungsgehalt nur ohne Platz, gebunden → keine Stellensuche),
+//                                                   erzwungen: Kitas ohne Personal verlangen nichts, Personalabgang (höchstens 8 Einheiten je Nacht weg),
+//                                                   Elternteil verliert die Stelle (Krippenplatz weg, dann Betreuungsgehalt), Besitzer-Haushalt bei vollen
+//                                                   Kitas (Seeds 1–3)
+//   node tools/simtest.mjs --migrationstest         Spielstände von Version 2, 3, 4 und 5 übernehmen (alte stadt.html aus git 39c405b, 2b821c2, 1c8d40b
+//                                                   und 414ebab, --git ordner für ein anderes Repository, oder nur --alt pfad/zur/alten/stadt.html),
+//                                                   erste Nacht (Käufe), Kita-Frist und die Nächte danach (Schwelle), 60 Tage weiter, keine NaN;
+//                                                   beschädigte Stände der Version 5 werden abgelehnt
 //   Optionen: --alle 30 (Zeilenabstand), --buch 20 (letzte Stadtbuch-Zeilen), --aktionen
 
 import { readFileSync } from 'node:fs';
@@ -285,6 +293,45 @@ if (flag('kitest')) {
     pruef(!!v, v ? `Verlust gemeldet: ${v.name} (${v.grund}), Vorschläge: ${v.vorschlaege.map(x => x.name + ' (' + x.rolle + ')').join(', ') || 'keine'}` : 'kein Verlust bis Tag 900');
     const B = ladenAusText(Sim, speichernAlsText(Sim, S));
     pruef(JSON.stringify(B.ki) === JSON.stringify(S.ki) && fingerabdruck(Sim, B) === fingerabdruck(Sim, S), 'Speichern/Laden behält Hauptfiguren, Tagebücher, Anfragen');
+    // 6. Kitas (Schritt 2), erzwungen: Eine Hauptfigur hat ein Kind unter 6 im Haushalt und keine Stelle, der Partner arbeitet, sonst ist
+    //    niemand da; das Kind hat keinen Platz und die Kitas in der Nähe sind voll (gebunden). Dann fehlen job_suchen und laden_gruenden in den erlaubten Aktionen und in der Anfrage ans
+    //    Sprachmodell; die Personenkarte nennt den Grund. Ist in der Nähe ein Platz frei, ist job_suchen wieder dabei
+    {
+      const P = S.p, R = Sim.R, erw = S.tag - R.ERWACHSEN * R.JAHR, dist = (a, b) => Math.abs(S.g.x[a] - S.g.x[b]) + Math.abs(S.g.y[a] - S.g.y[b]);
+      const offenK = (b) => S.g.typ[b] === Sim.KITA && S.feld[S.g.y[b] * Sim.KARTE + S.g.x[b]] === Sim.KITA;
+      while (S.stunde !== 6) Sim.stunde(S);
+      let p = -1, kind = -1;
+      for (let k = 0; k < S.pMax && p < 0; k++) {
+        if (!P.lebt[k] || !P.kita[k] || S.tag - P.geb[k] < R.KRIPPE_BIS || S.tag + 1 - P.geb[k] >= R.KITA_ENDE) continue;
+        const v = P.hh[k], pa = v >= 0 ? P.partner[v] : -1;
+        if (v < 0 || pa < 0 || P.hh[pa] !== v || P.arbeit[v] < 0) continue;                        // Vorstand arbeitet, Partner im Haushalt
+        if (P.besitz[pa] >= 0 || P.gemein[pa] || Sim.anspruch(S, pa) || S.tag - P.geb[pa] >= 60 * R.JAHR) continue;
+        if (S.bewohner[P.wohnung[k]].some(m => m !== v && m !== pa && P.hh[m] === v && P.geb[m] <= erw)) continue;   // sonst niemand Erwachsenes
+        p = pa; kind = k;
+      }
+      if (p < 0) pruef(false, 'Kita: kein Kind mit Platz bei einem Paar ohne weitere Erwachsene gefunden');
+      else {
+        if (P.arbeit[p] >= 0) { const L = S.belegschaft[P.arbeit[p]]; L.splice(L.indexOf(p), 1); P.arbeit[p] = -1; P.einsatz[p] = 0; }
+        P.kita[kind] = 0;
+        const nah = [];
+        for (let b = 0; b < S.gAnzahl; b++) if (offenK(b) && dist(b, P.wohnung[p]) <= R.REICH_KITA) { nah.push(b); S.g.bedient[b] = S.g.kapaz[b]; }   // voll
+        if (!Sim.istHaupt(S, p)) { if (S.ki.haupt.length >= R.HAUPT_MAX) S.ki.haupt.pop(); Sim.hauptSetzen(S, p, P.gen[p], true); }
+        S.freieStellen = Math.max(1, S.freieStellen);
+        const erl = Sim.erlaubteAktionen(S, p, 7), info = Sim.personInfo(S, p);
+        S.ki.an = true; S.ki.anfragen.length = 0; S.ki.heute = {}; P.jetzt[p] = 1;
+        Sim.stunde(S);                                         // 6 Uhr: Ereignis → Anfrage
+        const a = S.ki.anfragen.find(x => x.id === p);
+        S.ki.an = false;
+        if (a) Sim.kiVerwerfen(S, a.id, a.gen, a.nr);
+        const frei = nah.length ? nah[0] : -1;
+        if (frei >= 0) S.g.bedient[frei] = Math.max(0, S.g.kapaz[frei] - 1);   // ein Platz frei (das Kind ist über 3: eine Einheit)
+        S.freieStellen = Math.max(1, S.freieStellen);
+        const erl2 = Sim.erlaubteAktionen(S, p, 7);
+        pruef(Sim.istHaupt(S, p) && nah.length > 0 && !erl.includes('job_suchen') && !erl.includes('laden_gruenden') && (a ? !a.erlaubt.includes('job_suchen') : !erl.length)
+          && info.gebunden && info.gebunden.id === kind && /kein Kita-Platz frei/.test(Sim.klartext(info.arbeit)) && erl2.includes('job_suchen'),
+          `Hauptfigur ${Sim.name(S, p)} ohne Kita-Platz für ${Sim.name(S, kind)}: erlaubt ${erl.join(', ') || 'nichts'}; Anfrage ${a ? a.erlaubt.join(', ') : 'keine (nichts erlaubt)'}; „${Sim.klartext(info.arbeit)}“; mit freiem Platz: ${erl2.includes('job_suchen') ? 'job_suchen wieder erlaubt' : 'kein job_suchen'}`);
+      }
+    }
   }
   console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle KI-Prüfungen bestanden');
   process.exit(fehler ? 1 : 0);
@@ -292,17 +339,19 @@ if (flag('kitest')) {
 if (flag('migrationstest')) {
   let fehler = 0;
   const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
-  // Alte Fassungen: mit --alt genau diese Datei, sonst aus git 39c405b (Version 2), 2b821c2 (Version 3) und 1c8d40b (Version 4,
-  // der häufigste echte Fall). --git <ordner>: Repository für git show (Standard: der Ordner dieses Werkzeugs)
+  // Alte Fassungen: mit --alt genau diese Datei, sonst aus git 39c405b (Version 2), 2b821c2 (Version 3), 1c8d40b (Version 4) und 414ebab
+  // (Version 5, Stadtregierung ohne Schritt 2). --git <ordner>: Repository für git show (Standard: der Ordner dieses Werkzeugs)
   const quellen = arg('alt') ? [[arg('alt'), readFileSync(arg('alt'), 'utf8')]]
-    : ['39c405b', '2b821c2', '1c8d40b'].map(c => [`git ${c}`, execFileSync('git', ['show', c + ':stadt/stadt.html'], { cwd: arg('git', hier), encoding: 'utf8', maxBuffer: 1 << 26 })]);
-  const NEU_ZEILEN = { 2: 2, 3: 2, 4: 1 };                 // Bauhof bzw. Tech-Firmen, dazu je eine Zeile der Stadtregierung
+    : ['39c405b', '2b821c2', '1c8d40b', '414ebab'].map(c => [`git ${c}`, execFileSync('git', ['show', c + ':stadt/stadt.html'], { cwd: arg('git', hier), encoding: 'utf8', maxBuffer: 1 << 26 })]);
+  // Neue Zeilen im Stadtbuch: Bauhof bzw. Tech-Firmen, dazu je eine Zeile der Stadtregierung; von Version 5 eine Zeile zu Schritt 2
+  const NEU_ZEILEN = { 2: 2, 3: 2, 4: 1, 5: 1 };
   for (const [herkunft, altHtml] of quellen) {
     const ctx = vm.createContext({});
     vm.runInContext(altHtml.match(/<script id="sim">([\s\S]*?)<\/script>/)[1], ctx);
     const Alt = ctx.StadtSim;
     console.log(`Alte Fassung: ${herkunft}`);
-    pruef([2, 3, 4].includes(Alt.VERSION) && Alt.VERSION < Sim.VERSION, `alte Simulation hat Version ${Alt.VERSION}, neue ${Sim.VERSION}`);
+    pruef([2, 3, 4, 5].includes(Alt.VERSION) && Alt.VERSION < Sim.VERSION, `alte Simulation hat Version ${Alt.VERSION}, neue ${Sim.VERSION}`);
+    const v5 = Alt.VERSION === 5;
     for (const [seed, tage, stunde] of [[1, 150, 13], [2, 300, 5], [3, 400, 20]]) {
       const A = Alt.neueStadt(seed);
       while (A.tag < tage || A.stunde < stunde || !A.baustellen.length) Alt.stunde(A);   // ein Moment mit laufenden Baustellen
@@ -310,8 +359,20 @@ if (flag('migrationstest')) {
       let abgelehnt = null;
       try { ladenAusText(Sim, text); } catch (e) { abgelehnt = e; }
       pruef(abgelehnt && abgelehnt.andereVersion && abgelehnt.migrierbar, `Seed ${seed}, Tag ${A.tag} ${A.stunde} Uhr (${A.einwohner} Einw., ${A.baustellen.length} Baustellen): ohne Übernehmen abgelehnt, als übernehmbar markiert`);
-      const d = JSON.parse(text);
-      d.arrays = d.arrays.map(a => { const u8 = Buffer.from(a.b64, 'base64'); return { name: a.name, typ: a.typ, daten: new TYPEN[a.typ](u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength)) }; });
+      const roh = (t) => { const d = JSON.parse(t); d.arrays = d.arrays.map(a => { const u8 = Buffer.from(a.b64, 'base64'); return { name: a.name, typ: a.typ, daten: new TYPEN[a.typ](u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength)) }; }); return d; };
+      // Version 5 mit fehlender Summe des Kerns: abgelehnt wie in Version 5 selbst, nicht still mit 0 ergänzt
+      if (v5) {
+        const meld = [];
+        for (const [was, weg] of [['stat.regierung.gs', d => { delete d.json.stat.regierung.gs; }], ['regierung.tagStart.lohnsteuer', d => { delete d.json.regierung.tagStart.lohnsteuer; }],
+          ['stat.regierung.rentenkasse als Text', d => { d.json.stat.regierung.rentenkasse = '5'; }]]) {
+          const d = roh(text); weg(d);
+          let e = null; try { Sim.importZustand(d, true); } catch (x) { e = x; }
+          meld.push(`${was}: ${e ? e.message : 'angenommen'}`);
+          if (!e || !/^Spielstand beschädigt: (Regierungs-Statistik|Stadtregierung)$/.test(e.message)) fehler++;
+        }
+        console.log((meld.every(m => /beschädigt/.test(m)) ? '  ok   ' : '  FEHL ') + 'beschädigte Stände der Version 5 abgelehnt: ' + meld.join('; '));
+      }
+      const d = roh(text);
       const S = Sim.importZustand(d, true);
       const B = S.bauhof, g = S.g;
       pruef(B === 2 && g.typ[B] === Sim.WERKSTATT && g.besitzer[B] < 0, `Bauhof = Gebäude ${B} (die Werkstatt der Stadt vom Start)`);
@@ -319,11 +380,39 @@ if (flag('migrationstest')) {
       const dazu = NEU_ZEILEN[Alt.VERSION];
       pruef(S.einwohner === A.einwohner && S.buchNr === A.buchNr + dazu, `Einwohner (${S.einwohner}) und Stadtbuch bleiben, ${dazu} ${dazu === 1 ? 'Zeile' : 'Zeilen'} dazu: `
         + S.buch.slice(-dazu).map(e => `„${Sim.klartext(e.text).slice(0, 70)}…“`).join(' '));
-      pruef(S.version === Sim.VERSION && S.regierung.start === A.tag && Object.values(S.stat.regierung).every(v => v === 0) && S.buch.at(-1).art === 'regierung'
+      if (!v5) pruef(S.version === Sim.VERSION && S.regierung.start === A.tag && S.regierung.schritt2 === A.tag && Object.values(S.stat.regierung).every(v => v === 0) && S.buch.at(-1).art === 'regierung'
         && S.p.gsTage.every(v => v === 0) && S.p.gemein.every(v => v === 0) && S.regierung.gestern === null && Object.values(S.regierung.tagStart).every(v => v === 0),
-        `Stadtregierung ab dem Übernahmetag ${S.regierung.start}, Summen 0, niemand in Grundsicherung, noch kein „gestern“`);
+        `Stadtregierung und Schritt 2 ab dem Übernahmetag ${S.regierung.start}, Summen 0, niemand in Grundsicherung, noch kein „gestern“`);
+      // Version 5 → 6: die Stadtregierung läuft weiter (Start, Summen, gestern bleiben), Schritt 2 ab dem Übernahmetag, neue Summen 0
+      else pruef(S.version === Sim.VERSION && S.regierung.start === A.regierung.start && S.regierung.schritt2 === A.tag
+        && Object.entries(A.stat.regierung).every(([k, v]) => S.stat.regierung[k] === v) && ['kaeufe', 'ruhestand', 'rentnerEntlastung', 'miete', 'kitaPlatzTage', 'kitaLuecke', 'kitaKosten'].every(k => S.stat.regierung[k] === 0)
+        && JSON.stringify(Object.fromEntries(Object.keys(A.regierung.gestern || {}).map(k => [k, S.regierung.gestern[k]]))) === JSON.stringify(A.regierung.gestern || {})
+        && S.buch.at(-1).art === 'regierung' && /^Ab heute können Mieter ihre Wohnung/.test(S.buch.at(-1).text) && /Die Stadt baut Kitas; bis kein Kind mehr auf einen Platz wartet \(mindestens bis Tag \d+, höchstens bis Tag \d+\), muss niemand/.test(S.buch.at(-1).text),
+        `Stadtregierung läuft weiter (seit Tag ${S.regierung.start}, Summen und „gestern“ wie vorher), Schritt 2 ab Tag ${S.regierung.schritt2}, neue Summen 0`);
+      // Schritt 2 für alle gleich: niemand besitzt schon eine Wohnung, Beitragsjahre nur aus dem Alter
+      let bfehl = 0;
+      for (let p = 0; p < S.pMax; p++) if (S.p.lebt[p] && S.p.beitrag[p] !== Math.round(Sim.R.BEITRAG_START * Math.max(0, S.tag - S.p.geb[p] - Sim.R.ERWACHSEN * Sim.R.JAHR))) bfehl++;
+      pruef(!bfehl && S.p.eigen.every(v => v === 0), `Beitragsjahre aus dem Alter (${bfehl} Fehler), noch niemand im Eigentum`);
+      // Kitas: noch keine, niemand hat einen Platz, das Bauamt hat keine gebaut; Übergangsfrist bis Tag Übernahme + KITA_FRIST
+      pruef(S.p.kita.every(v => v === 0) && S.stat.bauamt.kitas === 0 && Sim.kitaFrist(S) && S.regierung.schritt2 === S.tag && S.regierung.kitaAb === -1,
+        `Kitas: noch kein Platz, ${S.stat.bauamt.kitas} gebaut, Übergangsfrist läuft (mindestens bis Tag ${S.regierung.schritt2 + Sim.R.KITA_FRIST}, höchstens bis Tag ${S.regierung.schritt2 + Sim.R.KITA_FRIST_MAX})`);
+      { const t = S.tag, k0 = S.stat.regierung.kaeufe; while (S.tag === t) Sim.stunde(S);
+        const z = S.buch.filter(e => e.tag === t && e.art === 'regierung').map(e => Sim.klartext(e.text)).find(x => x.startsWith('In der ersten Nacht nach der Übernahme'));
+        pruef(S.stat.regierung.kaeufe > k0 && !!z, `erste Nacht: ${S.stat.regierung.kaeufe - k0} Käufe; „${z ? z.slice(0, 90) + '…' : '–'}“`); }
       const offen = new Set(S.baustellen);
-      const ziel = S.tag + 60;
+      const ziel = S.tag + 59;                                 // mit der ersten Nacht oben 60 Tage
+      // In der Übergangsfrist (mindestens 30 Tage und bis kein Kind wartet, höchstens 90) gibt niemand wegen eines fehlenden Platzes die
+      // Stelle auf; danach gilt die Regel (Zeile im Stadtbuch am letzten Tag der Frist)
+      const s2 = S.regierung.schritt2;
+      while (Sim.kitaFrist(S) && S.tag <= s2 + Sim.R.KITA_FRIST_MAX) Sim.stunde(S);
+      const ab = S.regierung.kitaAb, lueckeFrist = S.stat.regierung.kitaLuecke, gebautFrist = S.stat.bauamt.kitas;
+      const fristZeile = S.buch.find(e => e.art === 'kita' && /^Die Übergangsfrist für die Kitas endet/.test(e.text));
+      pruef(lueckeFrist === 0 && gebautFrist > 0 && !!fristZeile && fristZeile.tag === ab - 1 && ab >= s2 + Sim.R.KITA_FRIST && ab <= s2 + Sim.R.KITA_FRIST_MAX,
+        `Übergangsfrist ${ab - s2} Tage (${Sim.R.KITA_FRIST} bis ${Sim.R.KITA_FRIST_MAX}): niemand gab die Stelle auf, ${gebautFrist} Kitas gebaut; Stadtbuch Tag ${fristZeile ? fristZeile.tag : '–'}: „${fristZeile ? Sim.klartext(fristZeile.text).slice(0, 110) + '…' : '–'}“`);
+      // Kein Kündigungsschock nach der Frist: in der ersten Nacht höchstens 2, in den 10 Nächten danach höchstens 4 je Nacht (Schwelle)
+      { const je = [];
+        for (let n = 0; n < 11; n++) { const t = S.tag, l0 = S.stat.regierung.kitaLuecke; while (S.tag === t) Sim.stunde(S); je.push(S.stat.regierung.kitaLuecke - l0); }
+        pruef(je[0] <= 2 && Math.max(...je.slice(1)) <= 4, `nach der Frist: erste Nacht ${je[0]}, Nächte 2–11 höchstens ${Math.max(...je.slice(1))} Stellenaufgaben (Schwelle 2 und 4): ${je.join(' ')}`); }
       while (S.tag < ziel) Sim.stunde(S);
       let nan = 0;
       for (const [n, a] of Object.entries(S.p)) if (a instanceof Float32Array || a instanceof Float64Array) for (let i = 0; i < S.pMax; i++) if (!Number.isFinite(a[i])) nan++;
@@ -336,8 +425,16 @@ if (flag('migrationstest')) {
       pruef(!!gs && Object.entries(gs).every(([k, v]) => Number.isFinite(v) && v >= 0 && v <= S.stat.regierung[k]),
         `„gestern“ nach 60 Tagen: Rentenkasse ${gs ? gs.rentenkasse : '–'}, Bund ${gs ? gs.praemie + gs.betreuung + gs.gs : '–'} Taler`);
       const ri = Sim.regierungInfo(S), stufe2 = S.buch.find(e => e.art === 'regierung' && e.tag === S.regierung.start + Sim.R.RENTE_STUFE_TAGE - 1 && e.text.includes('Rentenkasse'));
-      pruef(ri.stufe === 2 && ri.rente === Sim.R.RENTE_STUFEN[1] && (S.stat.regierung.rentenkasse > 0 || ri.rentner === 0) && !!stufe2,
-        `Rente nach 60 Tagen auf Stufe ${ri.stufe} (${ri.rente} Taler), Rentenkasse bisher ${S.stat.regierung.rentenkasse} Taler (${ri.rentner} in Rente); Stadtbuch Tag ${stufe2 ? stufe2.tag : '–'}: „${stufe2 ? Sim.klartext(stufe2.text) : ''}“`);
+      // Stufe nach den Tagen seit der Übernahme (60, mit einer langen Kita-Frist bis 101)
+      const stufeSoll = Math.min(Sim.R.RENTE_STUFEN.length, 1 + Math.floor((S.tag - S.regierung.start) / Sim.R.RENTE_STUFE_TAGE));
+      if (!v5) pruef(ri.stufe === stufeSoll && ri.rente === Sim.R.RENTE_STUFEN[stufeSoll - 1] && (S.stat.regierung.rentenkasse > 0 || ri.rentner === 0) && !!stufe2,
+        `Rente nach ${S.tag - S.regierung.start} Tagen auf Stufe ${ri.stufe} (${ri.rente} Taler), Rentenkasse bisher ${S.stat.regierung.rentenkasse} Taler (${ri.rentner} bekommen Rente); Stadtbuch Tag ${stufe2 ? stufe2.tag : '–'}: „${stufe2 ? Sim.klartext(stufe2.text) : ''}“`);
+      else pruef(ri.stufe === Math.min(3, 1 + Math.floor((S.tag - S.regierung.start) / Sim.R.RENTE_STUFE_TAGE)) && S.stat.regierung.rentenkasse > A.stat.regierung.rentenkasse,
+        `Rente weiter auf Stufe ${ri.stufe} (${ri.rente} Taler), Rentenkasse seit Tag ${S.regierung.start} ${S.stat.regierung.rentenkasse} Taler`);
+      pruef(ri.kita.offen > 0 && ri.kita.kinder > 0,
+        `Kitas nach 60 Tagen: ${ri.kita.offen} offen, ${ri.kita.kinder} Kinder mit Platz, ${ri.kita.warten} warten, ${S.stat.regierung.kitaLuecke}-mal Stelle aufgegeben (nach der Frist), ${ri.kita.gebunden} gebunden`);
+      pruef(ri.eigentuemer > 0 && S.stat.regierung.kaeufe > 0,
+        `Schritt 2 nach 60 Tagen: ${ri.eigentuemer} von ${ri.haushalte} Haushalten im Eigentum, ${S.stat.regierung.ruhestand} Renteneintritte (davon ${S.stat.regierung.fruehRuhestand} vor 67), ${ri.vor67} heute vor 67 in Rente`);
       if (S.stat.tech) pruef(S.version === Sim.VERSION && Array.isArray(S.angebot), `Version ${S.version}, Tech-Firmen danach: ${S.stat.tech.gruendungen} gegründet, ${S.stat.tech.kaeufe.reduce((a, b) => a + b, 0)} Käufe`);
       const L = ladenAusText(Sim, speichernAlsText(Sim, S));
       const z = S.tag + 20; while (S.tag < z) Sim.stunde(S); while (L.tag < z) Sim.stunde(L);
@@ -349,18 +446,36 @@ if (flag('migrationstest')) {
 }
 if (flag('regierung')) {
   // Stadtregierung: Lohnsteuer mit Freibetrag und Familiensplitting, Rente aus der Rentenkasse, Betreuungsgehalt, Grundsicherung
-  // und gemeinnützige Arbeit (kommt im normalen Spiel fast nie vor, deshalb hier erzwungen), Speicherformat
+  // und gemeinnützige Arbeit (kommt im normalen Spiel fast nie vor, deshalb hier erzwungen), Speicherformat; Schritt 2: Beitragstage,
+  // Renteneintritt, Rentner-Freibetrag, Mieterkauf (Erbe, Rückkauf, Buchungen), Übernahme eines Stands der Version 5.
+  // Eine Kopie der Simulation mit Testhilfen: globalThis.__ohneJob sucht keine Stelle (Seit Schritt 2 gehen um 7 Uhr oft Leute in
+  // Rente und machen in derselben Stunde eine Stelle frei; ein fester Stellenmarkt je Stunde reicht dann nicht), __buchung zählt jede
+  // Budgetbuchung des Mieterkaufs mit. Sonst gleich.
+  const { Sim, ctx: ctxR } = ladeSimMit([
+    ['  if (erwerb && (arb < 0 || gem) && !istBesitzer && S.freieStellen > 0 && !rentner(S, p) && !gebunden(S, p)) {\n',
+      '  if (erwerb && (arb < 0 || gem) && !istBesitzer && S.freieStellen > 0 && !rentner(S, p) && !gebunden(S, p) && p !== globalThis.__ohneJob) {\n'],
+    ['    S.budget += a;\n', '    S.budget += a; globalThis.__buchung += a;\n'],
+    ['        if (r > 0) { P.geld[p] -= r; S.budget += r;', '        if (r > 0) { P.geld[p] -= r; S.budget += r; globalThis.__buchung += r;'],
+    ['  S.budget -= z; P.geld[x] += z;\n', '  S.budget -= z; P.geld[x] += z; globalThis.__buchung -= z;\n'],
+  ]);
+  ctxR.__ohneJob = -1; ctxR.__buchung = 0;
   let fehler = 0;
   const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
   const R = Sim.R, J = R.JAHR;
   const offenB = (S, b) => S.feld[S.g.y[b] * Sim.KARTE + S.g.x[b]] === S.g.typ[b] && !S.g.leer[b];
-  // Die Regeln R01/R02 hier noch einmal unabhängig nachgerechnet: Steuer eines Steuerhaushalts mit Löhnen L und K Köpfen
-  const steuer = (L, K) => { const E = L.reduce((a, b) => a + b, 0); return L.map(b => Math.round(R.STEUER * Math.max(0, E - R.FREIBETRAG * K) * b / E)); };
+  // Schritt 2 unabhängig nachgebaut: Rente bekommt, wer 67 ist oder ohne Arbeitsplatz und Betrieb 45 Beitragsjahre hat
+  const bekommtRente = (S, p) => S.tag - S.p.geb[p] >= R.RENTE * J || (S.p.arbeit[p] < 0 && S.p.besitz[p] < 0 && S.p.beitrag[p] >= 45 * J);
+  // Die Regeln R01/R02 hier noch einmal unabhängig nachgerechnet: Steuer eines Steuerhaushalts mit Löhnen L, K Köpfen und
+  // Rentner-Freibeträgen X (Schritt 2: je Rentner mit Lohn höchstens 23, höchstens der eigene Lohn)
+  const steuer = (L, K, X = 0) => { const E = L.reduce((a, b) => a + b, 0); return L.map(b => Math.round(R.STEUER * Math.max(0, E - R.FREIBETRAG * K - X) * b / E)); };
   const summe = (a) => a.reduce((x, y) => x + y, 0);
-  // Beispiele aus dem README und dem Fenster „Stadtregierung“ (alte Regel: 10 % je Lohn)
-  for (const [was, L, K, soll, alt] of [['allein, 100 Taler', [100], 1, 7, 10], ['Paar, beide 100, zwei Kinder', [100, 100], 4, 8, 20],
-    ['ein Verdienst 100, Partner, zwei Kinder', [100], 4, 0, 10], ['alleinerziehend 100, ein Kind', [100], 2, 4, 10], ['Paar ohne Kinder, beide 100', [100, 100], 2, 14, 20]]) {
-    pruef(summe(steuer(L, K)) === soll && summe(L.map(b => b - Math.round(b * (1 - R.STEUER)))) === alt, `Lohnsteuer ${was}: ${summe(steuer(L, K))} statt ${alt} Taler am Tag`);
+  pruef(R.KAUF_RESERVE === 600 && R.EIGEN_RESERVE === 40 && R.RENTNER_FREIBETRAG === 23 && R.BEITRAG_JAHRE === 45,
+    `Reserve beim Gerätekauf weiter ${R.KAUF_RESERVE} Taler, Rücklage beim Wohnungskauf ${R.EIGEN_RESERVE} Tageskosten (eigene Namen)`);
+  // Beispiele aus dem README und dem Fenster „Stadtregierung“ (alte Regel: 10 % je Lohn); die letzten beiden mit Rentner-Freibetrag
+  for (const [was, L, K, soll, alt, X] of [['allein, 100 Taler', [100], 1, 7, 10], ['Paar, beide 100, zwei Kinder', [100, 100], 4, 8, 20],
+    ['ein Verdienst 100, Partner, zwei Kinder', [100], 4, 0, 10], ['alleinerziehend 100, ein Kind', [100], 2, 4, 10], ['Paar ohne Kinder, beide 100', [100, 100], 2, 14, 20],
+    ['Rentnerin allein, 100 Taler Lohn', [100], 1, 5, 10, 23], ['Paar ohne Kinder, 114 und 109, einer ist Rentner', [114, 109], 2, 14, 22, 23]]) {
+    pruef(summe(steuer(L, K, X)) === soll && summe(L.map(b => b - Math.round(b * (1 - R.STEUER)))) === alt, `Lohnsteuer ${was}: ${summe(steuer(L, K, X))} statt ${alt} Taler am Tag`);
   }
   // Was um Mitternacht passieren muss, aus dem Stand um 23 Uhr (Entscheidungen der letzten Stunde vorher ausgeschaltet)
   function erwartet(S) {
@@ -368,36 +483,41 @@ if (flag('regierung')) {
     for (let p = 0; p < S.pMax; p++) if (P.lebt[p] && P.hh[p] >= 0 && P.geb[p] > erw) hk.set(P.hh[p], (hk.get(P.hh[p]) || 0) + 1);
     for (let b = 0; b < S.gAnzahl; b++) {
       const t = g.typ[b];
-      if ((t !== Sim.WERKSTATT && t !== Sim.LADEN && t !== Sim.TECH) || !offenB(S, b)) continue;
+      if ((t !== Sim.WERKSTATT && t !== Sim.LADEN && t !== Sim.TECH && t !== Sim.KITA) || !offenB(S, b)) continue;   // Kita (Schritt 2): Lohn aus dem Budget
       for (const w of S.belegschaft[b]) if (!P.frei[w] && !P.gemein[w]) brutto.set(w, g.lohn[b]);
     }
     const kopf = (w) => { const k = P.hh[w]; return k >= 0 && (k === w || k === P.partner[w]) ? k : w; };
     const mit = (x) => (P.besitz[x] >= 0 && offenB(S, P.besitz[x]) ? 0 : 1);
     const koepfe = (k) => { if (P.hh[k] !== k) return 1; const pa = P.partner[k]; return mit(k) + (pa >= 0 && P.hh[pa] === k ? mit(pa) : 0) + (hk.get(k) || 0); };
-    const haushalte = new Map();
-    for (const [w, b] of brutto) { const k = kopf(w); if (!haushalte.has(k)) haushalte.set(k, []); haushalte.get(k).push(b); }
-    let lohnsteuer = 0, alt = 0, rentner = 0, betreuung = 0, lohnsumme = 0;
-    for (const [k, L] of haushalte) lohnsteuer += summe(steuer(L, Math.max(1, koepfe(k))));
-    for (const b of brutto.values()) { alt += b - Math.round(b * (1 - R.STEUER)); lohnsumme += b; }
-    for (let p = 0; p < S.pMax; p++) if (P.lebt[p] && S.tag - P.geb[p] >= R.RENTE * J && P.arbeit[p] < 0) rentner++;
-    // Betreuungsgehalt: je Haushalt mit Kind unter 3 der Vorstand, sonst sein Partner, wenn 18–66, ohne Stelle, ohne Betrieb
-    const kann = (p) => { const a = S.tag - P.geb[p]; return a >= R.ERWACHSEN * J && a < R.RENTE * J && P.arbeit[p] < 0 && P.besitz[p] < 0; };
+    const haushalte = new Map(), frei = new Map();
+    for (const [w, b] of brutto) {
+      const k = kopf(w); if (!haushalte.has(k)) { haushalte.set(k, []); frei.set(k, 0); } haushalte.get(k).push(b);
+      if (bekommtRente(S, w)) frei.set(k, frei.get(k) + Math.min(b, R.RENTNER_FREIBETRAG));   // Schritt 2: Rentner mit Lohn
+    }
+    let lohnsteuer = 0, alt = 0, rentner = 0, betreuung = 0, lohnsumme = 0, rentnerLohn = 0, krippe = 0;
+    for (const [k, L] of haushalte) lohnsteuer += summe(steuer(L, Math.max(1, koepfe(k)), frei.get(k)));
+    for (const [w, b] of brutto) { alt += b - Math.round(b * (1 - R.STEUER)); lohnsumme += b; if (bekommtRente(S, w)) rentnerLohn++; }
+    for (let p = 0; p < S.pMax; p++) if (P.lebt[p] && P.geb[p] <= erw && bekommtRente(S, p)) rentner++;
+    // Betreuungsgehalt: je Haushalt mit Kind unter 3 ohne Kita-Platz (Schritt 2) der Vorstand, sonst sein Partner, wenn 18–66, ohne Stelle,
+    // ohne Betrieb, ohne Rente
+    const kann = (p) => { const a = S.tag - P.geb[p]; return a >= R.ERWACHSEN * J && a < R.RENTE * J && P.arbeit[p] < 0 && P.besitz[p] < 0 && !bekommtRente(S, p); };
     for (let k = 0; k < S.pMax; k++) {
       if (!P.lebt[k] || P.hh[k] !== k || !hk.get(k) || P.wohnung[k] < 0) continue;
-      if (!S.bewohner[P.wohnung[k]].some(m => P.hh[m] === k && P.geb[m] > S.tag - R.BETREUUNG_ALTER)) continue;
-      const pa = P.partner[k];
-      if (kann(k) || (pa >= 0 && P.hh[pa] === k && kann(pa))) betreuung++;
+      const pa = P.partner[k], klein = S.bewohner[P.wohnung[k]].filter(m => P.hh[m] === k && P.geb[m] > S.tag - R.BETREUUNG_ALTER);
+      if (!klein.length || !(kann(k) || (pa >= 0 && P.hh[pa] === k && kann(pa)))) continue;
+      if (klein.some(m => !P.kita[m])) betreuung++; else krippe++;   // alle Kinder unter 3 mit Kita-Platz: kein Betreuungsgehalt
     }
-    return { lohnsteuer, alt, rentner, betreuung, lohnsumme };
+    return { lohnsteuer, alt, rentner, betreuung, lohnsumme, rentnerLohn, krippe };
   }
   const bisStunde = (S, tag, h) => { while (S.tag < tag || (S.tag === tag && S.stunde < h)) Sim.stunde(S); };
   for (const seed of arg('seeds', '1,2,3').split(',').map(Number)) {
     console.log(`Seed ${seed}`);
     const S = Sim.neueStadt(seed), P = () => S.p;
-    // 1. Summen an 60 Abenden (Tag 300–359): Lohnsteuer, alte Regel, Rentenkasse, Betreuungsgehalt; Rente ohne Budget
-    let naechte = 0, fehlSteuer = 0, fehlAlt = 0, fehlRente = 0, fehlBetr = 0, uebersprungen = 0, mitKind = 0, steuerSumme = 0, altSumme = 0;
+    // 1. Summen an 60 Abenden (ab Tag 300, bis 30 Nächte ohne Wechsel dabei sind): Lohnsteuer, alte Regel, Rentenkasse, Betreuungsgehalt;
+    //    Rente ohne Budget
+    let naechte = 0, fehlSteuer = 0, fehlAlt = 0, fehlRente = 0, fehlBetr = 0, uebersprungen = 0, mitKind = 0, steuerSumme = 0, altSumme = 0, rlTage = 0, krippe = 0;
     bisStunde(S, 300, 23);
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 150 && (i < 60 || naechte < 30); i++) {         // bis mindestens 30 Nächte ohne Wechsel nachgerechnet sind
       bisStunde(S, 300 + i, 23);
       for (let p = 0; p < S.pMax; p++) S.p.jetzt[p] = 0;          // keine Entscheidung mehr bis Mitternacht
       const e = erwartet(S), st = { ...S.stat.regierung }, fertig = S.stat.bau.fertig, pleiten = S.stat.pleiten, stufe = Sim.regierungInfo(S).rente;
@@ -411,15 +531,19 @@ if (flag('regierung')) {
       if (d('lohnsteuerAlt') !== e.alt) fehlAlt++;
       if (d('rentenkasse') !== e.rentner * stufe) fehlRente++;
       if (d('betreuungTage') !== e.betreuung || d('betreuung') !== e.betreuung * R.NETTO_STANDARD) fehlBetr++;
+      if (d('rentnerLohnTage') !== e.rentnerLohn) fehlSteuer++;
       if (e.betreuung) mitKind++;
+      krippe += e.krippe;
+      rlTage += e.rentnerLohn;
       steuerSumme += d('lohnsteuer'); altSumme += d('lohnsteuerAlt');
     }
-    pruef(naechte >= 20 && !fehlSteuer && !fehlAlt, `Lohnsteuer = Summe über alle Steuerhaushalte (${naechte} Nächte, ${uebersprungen} übersprungen): ${steuerSumme} Taler, nach der alten Regel ${altSumme} (${fehlSteuer + fehlAlt} Fehler)`);
-    pruef(!fehlRente, `Rentenkasse = Rentnerinnen und Rentner × Stufe (${fehlRente} Fehler)`);
-    pruef(!fehlBetr && mitKind > 0, `Betreuungsgehalt je Haushalt mit Kleinkind (${mitKind} Nächte mit Betreuungsgehalt, ${fehlBetr} Fehler)`);
+    pruef(naechte >= 20 && !fehlSteuer && !fehlAlt, `Lohnsteuer = Summe über alle Steuerhaushalte, mit Rentner-Freibetrag (${naechte} Nächte, ${uebersprungen} übersprungen, ${rlTage} Lohntage von Rentnern): ${steuerSumme} Taler, nach der alten Regel ${altSumme} (${fehlSteuer + fehlAlt} Fehler)`);
+    pruef(!fehlRente, `Rentenkasse = alle, die Rente bekommen (ab 67, auch mit Arbeit oder Betrieb; vor 67 mit 45 Beitragsjahren ohne Arbeitsplatz) × Stufe (${fehlRente} Fehler)`);
+    pruef(!fehlBetr && mitKind > 0, `Betreuungsgehalt je Haushalt mit Kleinkind ohne Kita-Platz (${mitKind} Nächte mit Betreuungsgehalt, ${krippe} Haushaltsnächte mit `
+      + `Krippenplatz und jemandem, der es bekommen könnte, ohne Betreuungsgehalt; ${fehlBetr} Fehler)`);
     {                                                          // Rente kommt auch bei leerem Budget voll (nicht aus dem Budget)
       bisStunde(S, S.tag, 23);
-      const rentner = []; for (let p = 0; p < S.pMax; p++) if (P().lebt[p] && S.tag - P().geb[p] >= R.RENTE * J && P().arbeit[p] < 0 && P().geb[p] > S.tag - R.ALT * J) rentner.push(p);
+      const rentner = []; for (let p = 0; p < S.pMax; p++) if (P().lebt[p] && S.tag - P().geb[p] >= R.RENTE * J && P().arbeit[p] < 0 && P().geb[p] > S.tag - R.ALT * J) rentner.push(p);   // ohne Lohn
       const vor = rentner.map(p => P().geld[p]), rk = S.stat.regierung.rentenkasse, stufe = Sim.regierungInfo(S).rente;
       S.budget = 0;
       for (let p = 0; p < S.pMax; p++) S.p.jetzt[p] = 0;
@@ -443,7 +567,9 @@ if (flag('regierung')) {
     if (alt >= 0) { const L = S.belegschaft[alt]; L.splice(L.indexOf(c), 1); P().arbeit[c] = -1; P().einsatz[c] = 0; }   // Stelle weg (zählt um Mitternacht neu)
     P().geld[c] = 0; P().gsTage[c] = R.GS_PFLICHT - 1; P().jetzt[c] = 0;
     P().ziel[c] = Sim.Z.JOB; P().zielSeit[c] = S.tag; P().zielWert[c] = 0;   // Ziel „besserer Job“ (ohne Stelle: Ausgangswert 0)
-    // Fester Stellenmarkt bis zum Test von job_suchen: niemand findet eine Stelle (freieStellen je Stunde auf 0)
+    P().getrenntTag[c] = S.tag;   // 30 Tage keine Partnersuche, niemand wählt c (sonst endet die Grundsicherung mit dem Einkommen des Partners)
+    // Fester Stellenmarkt bis zum Test von job_suchen: niemand findet eine Stelle (freieStellen je Stunde auf 0, und c sucht nicht)
+    ctxR.__ohneJob = c;
     const fest = (tag, h) => { while (S.tag < tag || (S.tag === tag && S.stunde < h)) { S.freieStellen = 0; Sim.stunde(S); } };
     fest(400, 23);
     const gemVor = S.stat.regierung.gemeinnuetzig;
@@ -482,6 +608,7 @@ if (flag('regierung')) {
       pruef(L.p.gemein[c] === A2.p.gemein[c] && fingerabdruck(Sim, L) === fingerabdruck(Sim, A2), 'Speichern/Laden mit gemeinnütziger Arbeit: läuft bitgleich weiter');
     }
     // job_suchen: eine richtige Stelle geht vor, die gemeinnützige Arbeit endet
+    ctxR.__ohneJob = -1;
     P().jetzt[c] = 1;
     let h = 0; while (P().gemein[c] && P().lebt[c] && h < 72) { Sim.stunde(S); h++; }
     pruef(!P().gemein[c] && P().arbeit[c] >= 0 && P().arbeit[c] !== B, `nach ${h} Stunden eine richtige Stelle: ${P().arbeit[c] >= 0 ? Sim.klartext(Sim.personInfo(S, c).arbeit) : '–'}`);
@@ -494,25 +621,47 @@ if (flag('regierung')) {
       const erw = S.tag - R.ERWACHSEN * J, rente = S.tag - R.RENTE * J;
       for (let p = 0; p < S.pMax; p++) {
         if (!P().lebt[p] || P().geb[p] > erw || P().geb[p] <= rente || P().besitz[p] >= 0) continue;
-        if (Sim.betreuer(S, P().hh[p]) === p) continue;
+        if (Sim.betreuer(S, P().hh[p]) === p || bekommtRente(S, p) || Sim.gebunden(S, p)) continue;     // Elternzeit, Rente vor 67, ohne Kita-Platz (Schritt 2)
         if (P().arbeit[p] < 0 || P().gemein[p]) los++;
       }
       S.tag++;
-      pruef(los === S.arbeitslose, `Arbeitslose ohne Eltern mit Betreuungsgehalt: ${los} = ${S.arbeitslose}`);
+      pruef(los === S.arbeitslose, `Arbeitslose ohne Eltern mit Betreuungsgehalt, ohne Rente vor 67 und ohne Eltern, die ohne Kita-Platz nicht arbeiten können: ${los} = ${S.arbeitslose}`);
     }
   }
-  // 4. Speicherformat: ein Stand der Version 5 ohne Stadtregierung wird abgelehnt (sonst Absturz um Mitternacht)
+  // 4. Speicherformat: ein Stand der Version 6 ohne gültige Stadtregierung wird abgelehnt (sonst Absturz um Mitternacht); seit Schritt 2
+  //    auch ohne Tag von Schritt 2, ohne die neuen Summen, ohne die neuen Personenfelder oder mit Wohneigentum, das es so nicht gibt
   {
     const S = Sim.neueStadt(1); while (S.tag < 50) Sim.stunde(S);
     const faelle = [['ohne regierung', j => { delete j.regierung; }], ['ohne stat.regierung', j => { delete j.stat.regierung; }],
       ['stat.regierung leer', j => { j.stat.regierung = {}; }], ['Summe null', j => { j.stat.regierung.rentenkasse = null; }],
       ['Start nach heute', j => { j.regierung.start = S.tag + 1; }], ['ohne tagStart', j => { delete j.regierung.tagStart; }],
-      ['gestern als Text', j => { j.regierung.gestern = 'viel'; }], ['gestern ohne Summe', j => { delete j.regierung.gestern.gs; }]];
+      ['gestern als Text', j => { j.regierung.gestern = 'viel'; }], ['gestern ohne Summe', j => { delete j.regierung.gestern.gs; }],
+      ['ohne schritt2', j => { delete j.regierung.schritt2; }], ['schritt2 vor dem Start', j => { j.regierung.start = 3; j.regierung.schritt2 = 2; }],
+      ['schritt2 als Text', j => { j.regierung.schritt2 = '0'; }], ['ohne Summe der Käufe', j => { delete j.stat.regierung.kaeufe; }],
+      ['Summe der Renteneintritte als Text', j => { j.stat.regierung.ruhestand = '1'; }], ['gestern ohne Raten', j => { delete j.regierung.gestern.tilgung; }],
+      ['ohne kitaAb (Ende der Kita-Frist)', j => { delete j.regierung.kitaAb; }], ['kitaAb nach heute', j => { j.regierung.kitaAb = S.tag + 5; }],
+      ['kitaAb als Text', j => { j.regierung.kitaAb = '0'; }]];
     for (const [was, kaputt] of faelle) {
       const d = JSON.parse(speichernAlsText(Sim, S)); kaputt(d.json);
       let meldung = null;
       try { ladenAusText(Sim, JSON.stringify(d)); } catch (e) { meldung = e.message; }
       pruef(meldung && /Stadtregierung|Regierungs-Statistik/.test(meldung), `${was}: abgelehnt („${meldung}“)`);
+    }
+    // Personenfelder von Schritt 2: fehlen sie in einem Stand der Version 6, ist er unvollständig; Wohneigentum nur beim Vorstand, der dort wohnt
+    const feld = (d, name, f) => { const a = d.arrays.find(x => x.name === name), u8 = Buffer.from(a.b64, 'base64');
+      const w = new Uint16Array(u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength)); f(w); a.b64 = Buffer.from(w.buffer).toString('base64'); };
+    let kind = -1, mieter = -1;                              // mieter: jemand, auf den ein Haushalt läuft (gekauft oder nicht)
+    for (let p = 0; p < S.pMax; p++) if (S.p.lebt[p]) { if (kind < 0 && S.p.hh[p] >= 0 && S.p.hh[p] !== p) kind = p; if (mieter < 0 && S.p.hh[p] === p && S.p.wohnung[p] >= 0) mieter = p; }
+    const arrFaelle = [['ohne p.beitrag', d => { d.arrays = d.arrays.filter(a => a.name !== 'p.beitrag'); }, /unvollständig: p\.beitrag/],
+      ['ohne p.eigen', d => { d.arrays = d.arrays.filter(a => a.name !== 'p.eigen'); }, /unvollständig: p\.eigen/],
+      ['Eigentum bei jemandem, auf den der Haushalt nicht läuft', d => feld(d, 'p.eigen', w => { w[kind] = S.p.wohnung[kind] + 1; }), /Wohneigentum/],
+      ['Eigentum an einer anderen Wohnung', d => { feld(d, 'p.eigen', w => { w[mieter] = S.bauhof + 1; }); feld(d, 'p.kaufPreis', w => { w[mieter] = 2400; }); }, /Wohneigentum/],
+      ['Rest größer als der Kaufpreis', d => { feld(d, 'p.eigen', w => { w[mieter] = S.p.wohnung[mieter] + 1; }); feld(d, 'p.kaufPreis', w => { w[mieter] = 2400; }); feld(d, 'p.schuld', w => { w[mieter] = 2401; }); }, /Wohneigentum/]];
+    for (const [was, kaputt, soll] of arrFaelle) {
+      const d = JSON.parse(speichernAlsText(Sim, S)); kaputt(d);
+      let meldung = null;
+      try { ladenAusText(Sim, JSON.stringify(d)); } catch (e) { meldung = e.message; }
+      pruef(kind >= 0 && mieter >= 0 && meldung && soll.test(meldung), `${was}: abgelehnt („${meldung}“)`);
     }
     const heil = ladenAusText(Sim, speichernAlsText(Sim, S));
     pruef(fingerabdruck(Sim, heil) === fingerabdruck(Sim, S) && JSON.stringify(heil.regierung.gestern) === JSON.stringify(S.regierung.gestern)
@@ -525,11 +674,16 @@ if (flag('regierung')) {
     ['  if (vorbehalt) { rs.vorbehaltTage++; rs.vorbehalten += vorbehalt; }\n',
       '  if (vorbehalt) { rs.vorbehaltTage++; rs.vorbehalten += vorbehalt; }\n  globalThis.__zuzug = { frei: S.freieWohnungen, such: S.wohnungSuchende, vorbehalt, fw, n: -1 };\n'],
     ['  S.anfragen = Math.max(0,', '  globalThis.__zuzug.n = n;\n  S.anfragen = Math.max(0,'],
+    ['  if (erwerb && (arb < 0 || gem) && !istBesitzer && S.freieStellen > 0 && !rentner(S, p) && !gebunden(S, p)) {\n',
+      '  if (erwerb && (arb < 0 || gem) && !istBesitzer && S.freieStellen > 0 && !rentner(S, p) && !gebunden(S, p) && p !== globalThis.__ohneJob) {\n'],
   ]);
+  ctx.__ohneJob = -1;
   for (const seed of arg('seeds', '1,2,3').split(',').map(Number)) {
     console.log(`Seed ${seed}: gestern, Prämie, Vorbehalt, Grundsicherung erzwungen`);
     const S = SimZ.neueStadt(seed), P = () => S.p;
-    let geburten = 0, praemFehl = 0, zuTage = 0, zuVorb = 0, zuFehl = 0, gestFehl = 0, naechte = 0, aussen = 0;
+    let geburten = 0, praemFehl = 0, zuTage = 0, zuVorb = 0, zuFehl = 0, gestFehl = 0, naechte = 0, aussen = 0, ankunft = 0, ankunftFehl = 0;
+    // Schritt 2: Beitragsjahre der Startbevölkerung nur aus dem Alter (95 % der Tage seit dem 18. Geburtstag)
+    const startFehl = [...Array(S.pMax).keys()].filter(p => S.p.lebt[p] && S.p.beitrag[p] !== Math.round(R.BEITRAG_START * Math.max(0, S.tag - S.p.geb[p] - R.ERWACHSEN * J))).length;
     let ende = { ...S.stat.regierung };                        // Summen am Ende des letzten Tagesabschlusses
     pruef(S.regierung.gestern === null, 'neue Stadt: noch kein „gestern“ (Anzeige „–“)');
     while (S.tag < 150) {
@@ -544,6 +698,12 @@ if (flag('regierung')) {
       if (!gs || Object.keys(st).some(k => gs[k] !== st[k] - ende[k])) gestFehl++;
       else aussen += gs.rentenkasse + gs.praemie + gs.betreuung + gs.gs;
       ende = { ...st };
+      // Wer letzte Nacht zugezogen ist, hat Beitragsjahre nur aus dem Alter (am Ankunftstag gab es noch keinen Beitragstag)
+      for (let p = 0; p < S.pMax; p++) {
+        if (S.tag === 1 || !P().lebt[p] || P().einzug[p] !== S.tag - 1 || S.tag - 1 - P().geb[p] < R.ERWACHSEN * J || P().elternA[p] >= 0) continue;   // Tag 1: Startbevölkerung (einzug 0)
+        ankunft++;
+        if (P().beitrag[p] !== Math.round(R.BEITRAG_START * (S.tag - 1 - P().geb[p] - R.ERWACHSEN * J))) ankunftFehl++;
+      }
       const z = ctx.__zuzug;                                   // Zuzug höchstens freie Wohnungen minus Vorbehalt
       if (z) {
         zuTage++; if (z.vorbehalt) zuVorb++;
@@ -553,10 +713,12 @@ if (flag('regierung')) {
     pruef(!gestFehl && naechte === 150, `„gestern“ = Summen minus Summen am Ende des Vortags (${naechte} Nächte, ${gestFehl} Fehler); von außen im Mittel ${Math.round(aussen / naechte)} Taler am Tag`);
     pruef(!praemFehl && geburten > 0, `Willkommensprämie: ${geburten} Geburten, je ${R.PRAEMIE} Taler (${praemFehl} Fehler)`);
     pruef(!zuFehl && zuTage === naechte, `Zuzug: ${zuTage} Nächte, ${zuVorb} mit Vorbehalt; Zuzüge ≤ freie Wohnungen − Vorbehalt, Vorbehalt = min(frei, suchend) (${zuFehl} Fehler)`);
+    pruef(!startFehl && ankunft > 20 && !ankunftFehl, `Beitragsjahre von außen nur aus dem Alter: Start 10 Leute, ${ankunft} Zuzügler am Ankunftstag (${startFehl + ankunftFehl} Fehler)`);
     // Grundsicherung erzwungen: um 23 Uhr bei jeder 7. erwachsenen Person ohne Betrieb Stelle weg und Geld 0. Erwartung unabhängig
     // aus dem Stand um 23 Uhr: 18–66, ohne Stelle, ohne Betrieb, kein Betreuungsgehalt, niemand sonst im Haushalt mit Einkommen
-    let faelle = 0, bezogen = 0, abw = 0, betragFehl = 0, betragNaechte = 0;
-    for (let runde = 0; runde < 10; runde++) {
+    // Nächte mit fertigem Bau, Pleite oder Todesfall zählen nicht; es wird weitergemacht, bis 10 Nächte gezählt sind (höchstens 40)
+    let faelle = 0, bezogen = 0, abw = 0, betragFehl = 0, betragNaechte = 0, gezaehlt = 0;
+    for (let runde = 0; runde < 40 && gezaehlt < 10; runde++) {
       while (S.stunde !== 23) SimZ.stunde(S);
       const T = S.tag, p0 = P(), erz = [];
       for (let p = 0; p < S.pMax; p++) p0.jetzt[p] = 0;       // keine Entscheidung mehr bis Mitternacht
@@ -568,39 +730,45 @@ if (flag('regierung')) {
         p0.geld[p] = 0; erz.push(p);
       }
       const alter = (x) => T - p0.geb[x];
-      const kann = (x) => alter(x) >= R.ERWACHSEN * J && alter(x) < R.RENTE * J && (p0.arbeit[x] < 0 || p0.gemein[x]) && p0.besitz[x] < 0;
-      const klein = (k) => { const w = p0.wohnung[k]; return w >= 0 && S.bewohner[w].some(m => p0.lebt[m] && p0.hh[m] === k && p0.geb[m] > T - R.BETREUUNG_ALTER); };
+      const rente = (x) => alter(x) >= R.RENTE * J || (p0.arbeit[x] < 0 && p0.besitz[x] < 0 && p0.beitrag[x] >= R.BEITRAG_JAHRE * J);   // Schritt 2
+      const kann = (x) => alter(x) >= R.ERWACHSEN * J && alter(x) < R.RENTE * J && (p0.arbeit[x] < 0 || p0.gemein[x]) && p0.besitz[x] < 0 && !rente(x);
+      const klein = (k) => { const w = p0.wohnung[k]; return w >= 0 && S.bewohner[w].some(m => p0.lebt[m] && p0.hh[m] === k && p0.geb[m] > T - R.BETREUUNG_ALTER && !p0.kita[m]); };
       const betr = (k) => { if (k < 0 || p0.hh[k] !== k || !klein(k)) return -1; if (kann(k)) return k; const pa = p0.partner[k]; return pa >= 0 && p0.hh[pa] === k && kann(pa) ? pa : -1; };
       const verdient = (p) => { const k = p0.hh[p], w = p0.wohnung[p]; if (k < 0 || w < 0) return false; const bt = betr(k);
         return S.bewohner[w].some(m => m !== p && p0.hh[m] === k && alter(m) >= R.ERWACHSEN * J
-          && ((p0.arbeit[m] >= 0 && !p0.gemein[m]) || p0.besitz[m] >= 0 || alter(m) >= R.RENTE * J || bt === m)); };
-      const soll = new Map(erz.map(p => [p, alter(p) < R.RENTE * J && betr(p0.hh[p]) !== p && !verdient(p)]));
+          && ((p0.arbeit[m] >= 0 && !p0.gemein[m]) || p0.besitz[m] >= 0 || rente(m) || bt === m)); };
+      const soll = new Map(erz.map(p => [p, !rente(p) && betr(p0.hh[p]) !== p && !verdient(p)]));
+      const bedarf23 = new Map(erz.map(p => [p, SimZ.tageskosten(S, p)]));   // Tagesbedarf, wie er um Mitternacht gezahlt wird
       const f0 = S.stat.bau.fertig, pl0 = S.stat.pleiten, t0 = S.stat.tode, gs0 = S.stat.regierung.gs;
       SimZ.stunde(S);
       if (S.stat.bau.fertig !== f0 || S.stat.pleiten !== pl0 || S.stat.tode !== t0) continue;   // Stelle, Betrieb oder Haushalt anders
+      gezaehlt++;
       let summe = 0, nurErz = true;
       for (let p = 0; p < S.pMax; p++) if (P().lebt[p] && P().gsTage[p] && !soll.has(p)) nurErz = false;
       for (const [p, e] of soll) {
         faelle++;
         const ist = P().gsTage[p] > 0;
-        if (ist) { bezogen++; summe += SimZ.personInfo(S, p).leistung.betrag; }
+        if (ist) { bezogen++; summe += bedarf23.get(p); }
         if (ist !== e) { abw++; if (abw < 4) console.log(`    Tag ${T}: ${SimZ.name(S, p)} erwartet ${e}, bekommt ${ist}`); }
       }
       if (nurErz) { betragNaechte++; if (S.stat.regierung.gs - gs0 !== summe) betragFehl++; }
     }
     pruef(faelle > 0 && bezogen > 0 && !abw, `Grundsicherung erzwungen: ${faelle} Fälle, ${bezogen} bekommen sie, ${faelle - bezogen} nicht (Betreuungsgehalt, Rente, Einkommen im Haushalt); ${abw} Abweichungen`);
     pruef(betragNaechte > 0 && !betragFehl, `Betrag = Tagesbedarf (Einkauf, beim Vorstand Miete und Kinder): ${betragNaechte} Nächte nachgerechnet, ${betragFehl} falsch`);
-    // Bauhof voll: nach 5 Tagen Grundsicherung keine gemeinnützige Arbeit, die Grundsicherung läuft weiter; mit Platz in der Nacht danach
+    // Bauhof voll: nach 5 Tagen Grundsicherung keine gemeinnützige Arbeit, die Grundsicherung läuft weiter; mit Platz in der Nacht danach.
+    // Zieht die Person im Tag dazwischen mit jemandem zusammen (dann verdient jemand im Haushalt), gilt der Fall nicht: nächste Person
     {
-      while (S.stunde !== 23) SimZ.stunde(S);
-      const B = S.bauhof;
-      let c = -1;
-      for (let p = 0; p < S.pMax; p++) {
-        const a = S.tag - P().geb[p];
-        if (P().lebt[p] && a >= 200 && a < 600 && P().besitz[p] < 0 && P().hh[p] === p && S.hhGroesse[p] === 1 && P().partner[p] < 0 && P().arbeit[p] !== B && !P().gsTage[p]) { c = p; break; }
-      }
-      if (c < 0) pruef(false, 'Bauhof voll: keine allein lebende Person gefunden');
-      else {
+      const B = S.bauhof, probiert = new Set(), allein = (c) => P().lebt[c] && P().hh[c] === c && P().partner[c] < 0 && S.hhGroesse[c] === 1;
+      let fertig = false;
+      for (let versuch = 0; versuch < 5 && !fertig; versuch++) {
+        while (S.stunde !== 23) SimZ.stunde(S);
+        let c = -1;
+        for (let p = 0; p < S.pMax; p++) {
+          const a = S.tag - P().geb[p];
+          if (P().lebt[p] && !probiert.has(p) && a >= 200 && a < 600 && P().besitz[p] < 0 && P().hh[p] === p && S.hhGroesse[p] === 1 && P().partner[p] < 0 && P().arbeit[p] !== B && !P().gsTage[p]) { c = p; break; }
+        }
+        if (c < 0) { pruef(false, 'Bauhof voll: keine allein lebende Person gefunden'); break; }
+        probiert.add(c);
         for (let p = 0; p < S.pMax; p++) P().jetzt[p] = 0;
         const alt = P().arbeit[c];
         if (alt >= 0) { const L = S.belegschaft[alt]; L.splice(L.indexOf(c), 1); P().arbeit[c] = -1; P().einsatz[c] = 0; }
@@ -610,10 +778,16 @@ if (flag('regierung')) {
         SimZ.stunde(S);
         pruef(!P().gemein[c] && P().arbeit[c] < 0 && P().gsTage[c] === R.GS_PFLICHT && S.stat.regierung.gemeinnuetzig === gem0,
           `Bauhof voll (Zuschlag ${zuschlag} → ${R.BAU_MAX - R.STELLEN_STADT}): ${SimZ.name(S, c)} bezieht Grundsicherung seit ${P().gsTage[c]} Tagen, keine gemeinnützige Arbeit`);
-        while (S.stunde !== 0 || P().gsTage[c] === R.GS_PFLICHT) { S.freieStellen = 0; P().jetzt[c] = 0; SimZ.stunde(S); }
+        ctx.__ohneJob = c;
+        while (S.stunde !== 0 || P().gsTage[c] === R.GS_PFLICHT) { S.freieStellen = 0; P().jetzt[c] = 0; SimZ.stunde(S); if (allein(c)) continue; break; }
+        ctx.__ohneJob = -1;
+        if (!allein(c)) { console.log(`       (${SimZ.name(S, c)} lebt nicht mehr allein, nächster Versuch)`); continue; }
+        while (S.stunde !== 0) SimZ.stunde(S);
         pruef(P().gemein[c] === 1 && P().arbeit[c] === B && S.stat.regierung.gemeinnuetzig === gem0 + 1,
           `mit Platz im Bauhof (${SimZ.stellen(S, B)} Stellen) in der Nacht danach herangezogen (gsTage ${P().gsTage[c]})`);
+        fertig = true;
       }
+      if (!fertig && probiert.size >= 5) pruef(false, 'Bauhof voll: in 5 Versuchen kein Fall, der allein blieb');
     }
     // Betreuungsgehalt aus der gemeinnützigen Arbeit heraus: Wer sie leistet und ein Kind unter 3 im Haushalt hat, bekommt
     // Betreuungsgehalt; die gemeinnützige Arbeit endet in derselben Nacht
@@ -640,7 +814,502 @@ if (flag('regierung')) {
       }
     }
   }
+  // 6. Schritt 2, Renteneintritt: Beitragstage über Mitternacht, Anspruch mit 45 Beitragsjahren, Renteneintritt vor 67 (erzwungen),
+  //    67 mit Stelle (Rente und Rentner-Freibetrag). Andere arbeitende Rentner haben an dem Tag frei, damit die Zähler genau prüfbar sind
+  const arbeitslosZaehlen = (S) => {                          // wie in Abschnitt 3: Stand von kennzahlenRechnen vor dem Tageswechsel
+    let los = 0; const P = S.p;
+    S.tag--;
+    const erw = S.tag - R.ERWACHSEN * J, rente = S.tag - R.RENTE * J;
+    for (let p = 0; p < S.pMax; p++) {
+      if (!P.lebt[p] || P.geb[p] > erw || P.geb[p] <= rente || P.besitz[p] >= 0) continue;
+      if (Sim.betreuer(S, P.hh[p]) === p || bekommtRente(S, p) || Sim.gebunden(S, p)) continue;
+      if (P.arbeit[p] < 0 || P.gemein[p]) los++;
+    }
+    S.tag++;
+    return los;
+  };
+  for (const seed of arg('seeds', '1,2,3').split(',').map(Number)) {
+    console.log(`Seed ${seed}: Schritt 2, Renteneintritt`);
+    const S = Sim.neueStadt(seed), P = () => S.p;
+    const ruhig = () => { for (let p = 0; p < S.pMax; p++) S.p.jetzt[p] = 0; };
+    bisStunde(S, 250, 23);
+    {                                                          // a) Beitragstage über Mitternacht
+      let n = 0, mitArbeit = 0, betr = 0, ohne = 0, fehl = 0;
+      for (let v = 0; v < 8; v++) {
+        bisStunde(S, S.tag, 23); ruhig();
+        const vor = [], P0 = P(), stellen = (p) => { const k = P0.hh[p], pa = k >= 0 ? P0.partner[k] : -1; return k < 0 ? '' : P0.arbeit[k] + '/' + (pa >= 0 ? P0.arbeit[pa] : '') + '/' + P0.hh[p]; };
+        for (let p = 0; p < S.pMax; p++) if (P0.lebt[p] && S.tag - P0.geb[p] >= R.ERWACHSEN * J)
+          vor.push([p, P0.gen[p], P0.beitrag[p], P0.arbeit[p], P0.gemein[p], Sim.betreuer(S, P0.hh[p]) === p, stellen(p)]);
+        Sim.stunde(S);
+        n++;
+        for (const [p, gen, b, arb, gem, bt, st] of vor) {
+          if (!P().lebt[p] || P().gen[p] !== gen || P().arbeit[p] !== arb || P().gemein[p] !== gem) continue;   // weg oder Stelle anders
+          const k = P().hh[p], pa = k >= 0 ? P().partner[k] : -1;
+          if (k < 0 ? st !== '' : P().arbeit[k] + '/' + (pa >= 0 ? P().arbeit[pa] : '') + '/' + k !== st) continue;   // im Haushalt Stelle weg (Pleite): anderer Betreuer
+          if (arb >= 0 && !gem) mitArbeit++; else if (bt) betr++; else ohne++;
+          if (P().beitrag[p] !== Math.min(65535, b + ((arb >= 0 && !gem) || bt ? 1 : 0))) fehl++;
+        }
+      }
+      pruef(n === 8 && mitArbeit > 0 && betr > 0 && ohne > 0 && !fehl,
+        `Beitragstage über ${n} Mitternächte: ${mitArbeit}-mal mit Arbeitsplatz +1, ${betr}-mal mit Betreuungsgehalt +1, ${ohne}-mal ohne beides +0 (${fehl} Fehler)`);
+    }
+    // b) 64 Jahre, angestellt, kein Erspartes: mit 449 Beitragstagen kein „kündigen“, mit 450 schon; das Gehirn wählt es und geht in Rente
+    bisStunde(S, S.tag, 7);
+    let c = -1;
+    for (let p = 0; p < S.pMax; p++) {
+      const a = S.tag - P().geb[p];
+      if (P().lebt[p] && a >= 300 && a < 600 && P().arbeit[p] >= 0 && P().besitz[p] < 0 && !P().gemein[p] && !Sim.istHaupt(S, p)) { c = p; break; }
+    }
+    if (c < 0) pruef(false, 'Renteneintritt: keine angestellte Person gefunden');
+    else {
+      P().geb[c] = S.tag - 64 * J; P().geld[c] = 0;
+      P().beitrag[c] = R.BEITRAG_JAHRE * J - 1;
+      const e449 = Sim.erlaubteAktionen(S, c, 7);
+      P().beitrag[c] = R.BEITRAG_JAHRE * J;
+      const e450 = Sim.erlaubteAktionen(S, c, 7), satz = Sim.kiAktionen(S, c, ['kuendigen'])[0].satz;
+      pruef(!e449.includes('kuendigen') && e450.includes('kuendigen') && /ohne Abschlag/.test(satz),
+        `64 Jahre, kein Erspartes: mit 449 Beitragstagen kein „kündigen“, mit 450 schon („${satz}“)`);
+      // Seit drei Jahren Anspruch (Ruhestandswunsch 40), Fleiß und Ehrgeiz 0, unzufrieden, sonst alles gut: das Gehirn wählt „kündigen“
+      P().beitrag[c] = R.BEITRAG_JAHRE * J + 3 * J;
+      P().fleiss[c] = 0; P().ehrgeiz[c] = 0; P().zuf[c] = 5; P().bFreizeit[c] = 100; P().bKontakt[c] = 100; P().bWohnen[c] = 100; P().elend[c] = 0;
+      P().ziel[c] = Sim.Z.RUHE; P().zielSeit[c] = S.tag;
+      const st0 = { ...S.stat.regierung }, a = Sim.entscheide(S, c, 7), info = Sim.personInfo(S, c);
+      S.freieStellen = Math.max(1, S.freieStellen);
+      const nachher = Sim.erlaubteAktionen(S, c, 7);
+      pruef(Sim.AKTIONSNAMEN[a] === 'kuendigen' && P().arbeit[c] < 0 && S.stat.regierung.ruhestand === st0.ruhestand + 1
+        && S.stat.regierung.fruehRuhestand === st0.fruehRuhestand + 1 && S.stat.regierung.fruehAlter === st0.fruehAlter + 64 * J
+        && info.arbeit === 'in Rente' && info.rente.bezieht && info.gedaechtnis.at(-1).text.startsWith('in Rente gegangen') && !nachher.includes('job_suchen'),
+        `Gehirn wählt „${Sim.AKTIONSNAMEN[a]}“: ${Sim.name(S, c)} ist mit 64 in Rente („${Sim.klartext(info.gedaechtnis.at(-1).text)}“), sucht keine Stelle (erlaubt: ${nachher.join(', ')})`);
+      bisStunde(S, S.tag, 23); ruhig();
+      const e = erwartet(S), rk0 = S.stat.regierung.rentenkasse, stufe = Sim.regierungInfo(S).rente, drin = bekommtRente(S, c);
+      Sim.stunde(S);
+      pruef(drin && S.stat.regierung.rentenkasse - rk0 === e.rentner * stufe && arbeitslosZaehlen(S) === S.arbeitslose,
+        `um Mitternacht Rente aus der Rentenkasse (${e.rentner} Leute × ${stufe}), zählt nicht als arbeitslos (${S.arbeitslose} ohne Arbeit)`);
+    }
+    // c) 67 mit Stelle: bleibt angestellt, bekommt Rente, Rentner-Freibetrag auf den eigenen Lohn
+    bisStunde(S, S.tag, 23);
+    let d = -1;
+    for (let p = 0; p < S.pMax; p++) {
+      const a = S.tag - P().geb[p];
+      if (P().lebt[p] && a >= 300 && a < 600 && P().arbeit[p] >= 0 && P().besitz[p] < 0 && !P().gemein[p] && !P().frei[p] && P().hh[p] === p
+          && S.hhGroesse[p] === 1 && P().partner[p] < 0 && !Sim.istHaupt(S, p) && P().arbeit[p] !== S.bauhof) { d = p; break; }
+    }
+    if (d < 0) pruef(false, '67 mit Stelle: keine allein lebende angestellte Person gefunden');
+    else {
+      ruhig();
+      P().geb[d] = S.tag - R.RENTE * J;                        // heute 67
+      for (let p = 0; p < S.pMax; p++) if (p !== d && P().lebt[p] && S.tag - P().geb[p] >= R.RENTE * J && P().arbeit[p] >= 0) P().frei[p] = 1;
+      const b = P().arbeit[d], L = S.g.lohn[b], st0 = { ...S.stat.regierung }, e = erwartet(S), stufe = Sim.regierungInfo(S).rente;
+      Sim.stunde(S);
+      const dd = (k) => S.stat.regierung[k] - st0[k];
+      const ohneF = Math.round(R.STEUER * Math.max(0, L - R.FREIBETRAG)), mitF = Math.round(R.STEUER * Math.max(0, L - R.FREIBETRAG - R.RENTNER_FREIBETRAG));
+      // Eine Pleite anderswo in derselben Nacht ändert an d nichts (Löhne sind vorher gezahlt); ging d's Betrieb pleite, fehlt arbeit
+      pruef(P().arbeit[d] === b && dd('rentnerLohnTage') === 1 && dd('rentnerEntlastung') === ohneF - mitF
+        && dd('rentenkasse') === e.rentner * stufe && Sim.personInfo(S, d).rente.bezieht && Sim.erlaubteAktionen(S, d, 7).includes('kuendigen'),
+        `67 mit Stelle (${Sim.name(S, d)}, Lohn ${L}): bleibt angestellt, bekommt ${stufe} Taler Rente, zahlt ${mitF} statt ${ohneF} Taler Steuer (Entlastung ${dd('rentnerEntlastung')}), darf aufhören`);
+    }
+  }
+  // 7. Schritt 2, Mieterkauf (Seeds wie oben, bis Tag 250): Käufe mit Anzahlung, Invariante jede Nacht, Rate, Erbe, Auflösung, Umzug,
+  //    Zusammenziehen, Wegzug der Eltern mit erwachsenem Kind, 60 Tage weiter, Buchungen im Budget
+  for (const seed of arg('seeds', '1,2,3').split(',').map(Number)) {
+    console.log(`Seed ${seed}: Schritt 2, Mieterkauf`);
+    ctxR.__buchung = 0;
+    const S = Sim.neueStadt(seed), P = () => S.p, rs = () => S.stat.regierung;
+    const inv = () => { let f = 0; for (let x = 0; x < S.pMax; x++) { const e = P().eigen[x]; if (!e) continue;
+      if (!P().lebt[x] || P().hh[x] !== x || P().wohnung[x] !== e - 1 || P().schuld[x] > P().kaufPreis[x] || S.g.typ[e - 1] !== Sim.WOHNHAUS) f++; } return f; };
+    let invFehl = 0, anFehl = 0, neu = 0, erste = null, jahre = 0;
+    while (S.tag < 250) {
+      const t = S.tag, vor = Uint8Array.from({ length: S.pMax }, (_, x) => (P().eigen[x] ? 1 : 0));
+      while (S.tag === t) Sim.stunde(S);
+      invFehl += inv();
+      for (let x = 0; x < S.pMax; x++) if (!(x < vor.length && vor[x]) && P().eigen[x]) {
+        neu++; if (P().kaufPreis[x] - P().schuld[x] < Math.ceil(R.EIGEN_ANZAHLUNG * P().kaufPreis[x])) anFehl++;
+      }
+      const zeilen = S.buch.filter(e => e.tag === t && e.art === 'regierung').map(e => Sim.klartext(e.text));
+      if (!erste && rs().kaeufe) erste = zeilen.find(z => /^Als erste(r Haushalt kauft| Haushalte kaufen)/.test(z)) || '–';
+      if (zeilen.some(z => z.startsWith('Im letzten Jahr')) && (t + 1) % J === 0) jahre++;
+    }
+    const eig = []; for (let x = 0; x < S.pMax; x++) if (P().lebt[x] && Sim.eigentuemer(S, x)) eig.push(x);
+    pruef(neu > 0 && eig.length > 0 && !invFehl && !anFehl && erste !== '–' && jahre > 0,
+      `bis Tag 250: ${rs().kaeufe} Käufe, ${eig.length} Eigentümer; jede Nacht Eigentum nur beim Vorstand in seiner Wohnung (${invFehl} Verstöße), `
+      + `Anzahlung ≥ ${R.EIGEN_ANZAHLUNG * 100} % (${anFehl} Fehler); Stadtbuch „${erste}“, ${jahre} Jahreszeilen`);
+    const frei = (x) => P().lebt[x] && !Sim.istHaupt(S, x) && P().besitz[x] < 0;
+    const alleinE = eig.filter(x => frei(x) && S.hhGroesse[x] === 1 && P().partner[x] < 0);
+    // Rate = Kaufpreis / 200 bis zur Tilgung, danach 0
+    {
+      const m = eig.find(x => P().schuld[x] > 0), s0 = P().schuld[m], rate = Math.min(s0, Math.round(P().kaufPreis[m] / 200));
+      const r1 = Sim.miete(S, m), tk1 = Sim.tageskosten(S, m);
+      P().schuld[m] = 0; const r2 = Sim.miete(S, m), tk2 = Sim.tageskosten(S, m); P().schuld[m] = s0;
+      pruef(m !== undefined && r1 === rate && r2 === 0 && tk1 - tk2 === rate, `Rate ${r1} Taler (Kaufpreis ${P().kaufPreis[m]} / 200), nach der Tilgung 0; Tageskosten ${tk1} → ${tk2}`);
+    }
+    // Erbe: Der Vorstand stirbt, der Partner übernimmt Wohnung, Rest und Rate; das Budget bleibt gleich
+    {
+      const k = eig.find(x => frei(x) && P().partner[x] >= 0 && P().hh[P().partner[x]] === x && frei(P().partner[x]));
+      if (k === undefined) pruef(false, 'Erbe: kein Eigentümer-Paar gefunden');
+      else {
+        const pa = P().partner[k], e0 = [P().eigen[k], P().kaufPreis[k], P().schuld[k]], b0 = S.budget, ef0 = rs().erbfaelle;
+        Sim._pruef.sterben(S, k);
+        pruef(P().eigen[pa] === e0[0] && P().kaufPreis[pa] === e0[1] && P().schuld[pa] === e0[2] && Sim.eigentuemer(S, pa) && S.budget === b0
+          && rs().erbfaelle === ef0 + 1 && !P().eigen[k], `Erbe: ${Sim.name(S, pa)} übernimmt die Wohnung (${e0[1]} Taler, Rest ${e0[2]}), Budget unverändert`);
+      }
+    }
+    // Auflösung: ein allein lebender Eigentümer stirbt; die Stadt kauft zum bezahlten Betrag zurück, die Wohnung ist wieder frei
+    {
+      const k = alleinE[0];
+      if (k === undefined) pruef(false, 'Auflösung: kein allein lebender Eigentümer gefunden');
+      else {
+        const w = P().wohnung[k], bez = P().kaufPreis[k] - P().schuld[k], b0 = S.budget, bel0 = S.g.belegt[w], fw0 = S.freieWohnungen, ra0 = rs().rkAufgeloest, su0 = rs().rueckkaufSumme;
+        Sim._pruef.sterben(S, k);
+        pruef(S.budget === b0 - bez && S.g.belegt[w] === bel0 - 1 && S.freieWohnungen === fw0 + 1 && rs().rkAufgeloest === ra0 + 1 && rs().rueckkaufSumme === su0 + bez,
+          `Auflösung: Rückkauf für ${bez} Taler aus dem Budget, die Wohnung ist wieder frei (belegt ${bel0} → ${S.g.belegt[w]})`);
+      }
+    }
+    // Umzug: der Haushalt eines Eigentümers zieht um; das Geld kommt zurück, die neue Wohnung ist gemietet
+    {
+      // der erste allein lebende Eigentümer, für den es in der Nähe eine freie Wohnung gibt
+      const frei = (x) => { const w = P().wohnung[x]; return Sim._pruef.freieWohnungNahe(S, S.g.x[w], S.g.y[w], w, 1); };
+      const k = alleinE.find(x => P().lebt[x] && Sim.eigentuemer(S, x) && frei(x) >= 0);
+      const b = k === undefined ? -1 : frei(k);
+      if (b < 0) pruef(false, 'Umzug: kein Eigentümer mit freier Wohnung in der Nähe');
+      else {
+        const bez = P().kaufPreis[k] - P().schuld[k], g0 = P().geld[k], ru0 = rs().rkUmzug;
+        Sim._pruef.haushaltUmziehen(S, k, b);
+        pruef(P().geld[k] === g0 + bez && rs().rkUmzug === ru0 + 1 && !P().eigen[k] && P().wohnung[k] === b && Sim.miete(S, k) === R.MIETE[S.g.stufe[b]],
+          `Umzug: ${bez} Taler zurück, neue Wohnung zur Miete (${Sim.miete(S, k)} Taler)`);
+      }
+    }
+    // Zusammenziehen: zwei Eigentümer – wer zieht, behält seine Wohnung, die andere kauft die Stadt zurück; gehört nur einem eine, zieht
+    // das Paar dorthin (kein Rückkauf)
+    {
+      const L = alleinE.filter(x => P().lebt[x] && Sim.eigentuemer(S, x) && P().partner[x] < 0);
+      if (L.length < 3) pruef(false, `Zusammenziehen: zu wenige allein lebende Eigentümer (${L.length})`);
+      else {
+        const [p, q] = L, bq = P().kaufPreis[q] - P().schuld[q], gq = P().geld[q], rz0 = rs().rkZusammen, ep = P().eigen[p];
+        P().partner[p] = q; P().partner[q] = p;
+        Sim._pruef.aktZusammen(S, p);
+        const ok1 = P().eigen[p] === ep && Sim.eigentuemer(S, p) && !P().eigen[q] && P().geld[q] === gq + bq && rs().rkZusammen === rz0 + 1
+          && P().wohnung[q] === P().wohnung[p] && P().hh[q] === p;
+        let m = -1;
+        for (let x = 0; x < S.pMax; x++) if (frei(x) && P().hh[x] === x && S.hhGroesse[x] === 1 && P().partner[x] < 0 && !P().eigen[x] && S.tag - P().geb[x] >= R.ERWACHSEN * J) { m = x; break; }
+        const q2 = L[2], wq = P().wohnung[q2];
+        P().partner[m] = q2; P().partner[q2] = m;
+        Sim._pruef.aktZusammen(S, m);
+        const ok2 = m >= 0 && P().hh[m] === q2 && P().wohnung[m] === wq && Sim.eigentuemer(S, q2) && rs().rkZusammen === rz0 + 1;
+        pruef(ok1 && ok2, `Zusammenziehen: zwei Eigentümer → ${Sim.name(S, q)} bekommt ${bq} Taler zurück; Mieter zu Eigentümer → ${m >= 0 ? Sim.name(S, m) : '–'} zieht in die gekaufte Wohnung`);
+      }
+    }
+    // Wegzug der Eltern mit erwachsenem Kind im Haushalt: das Kind übernimmt die Wohnung (sonst gezielt hergestellt)
+    {
+      let k = -1, m = -1, gestellt = false;
+      for (const x of eig) {
+        if (!P().lebt[x] || !Sim.eigentuemer(S, x) || !frei(x)) continue;
+        const kind = S.bewohner[P().wohnung[x]].find(y => P().hh[y] === x && y !== x && y !== P().partner[x] && S.tag - P().geb[y] >= R.ERWACHSEN * J);
+        if (kind !== undefined) { k = x; m = kind; break; }
+      }
+      if (k < 0) {
+        k = eig.find(x => P().lebt[x] && Sim.eigentuemer(S, x) && frei(x) && P().partner[x] >= 0 && P().hh[P().partner[x]] === x) ?? -1;
+        for (let x = 0; x < S.pMax && k >= 0; x++) if (frei(x) && P().hh[x] === x && S.hhGroesse[x] === 1 && P().partner[x] < 0 && !P().eigen[x] && S.tag - P().geb[x] >= R.ERWACHSEN * J) { m = x; break; }
+        if (k >= 0 && m >= 0) { Sim._pruef.einzelnZu(S, m, k); gestellt = true; }
+      }
+      if (k < 0 || m < 0) pruef(false, 'Wegzug mit erwachsenem Kind: kein Fall');
+      else {
+        const e0 = [P().eigen[k], P().kaufPreis[k], P().schuld[k]], b0 = S.budget, ef0 = rs().erbfaelle;
+        Sim._pruef.aktWegziehen(S, k);
+        pruef(!P().lebt[k] && P().eigen[m] === e0[0] && P().kaufPreis[m] === e0[1] && P().schuld[m] === e0[2] && Sim.eigentuemer(S, m) && S.budget === b0 && rs().erbfaelle === ef0 + 1,
+          `Wegzug der Eltern: ${Sim.name(S, m)} bleibt und übernimmt die Wohnung${gestellt ? ' (Fall gezielt hergestellt: erwachsene Person im Haushalt)' : ' (erwachsenes Kind)'}`);
+      }
+    }
+    // 60 Tage weiter: Invariante jede Nacht, keine NaN, Rückkauf nie gekürzt, jede Budgetbuchung des Mieterkaufs gezählt
+    {
+      const ziel = S.tag + 60;
+      let f = 0;
+      while (S.tag < ziel) { const t = S.tag; while (S.tag === t) Sim.stunde(S); f += inv(); }
+      const nan = !Number.isFinite(S.budget) || Object.values(S.stat.regierung).some(v => !Number.isFinite(v));
+      const soll = rs().anzahlung + rs().tilgung - rs().rueckkaufSumme;
+      pruef(!f && !nan && rs().rueckkaufFehlt === 0 && ctxR.__buchung === soll,
+        `60 Tage weiter (Tag ${S.tag}): Invariante ${f} Verstöße, keine NaN, Rückkauf nie gekürzt; Budget: Anzahlungen ${rs().anzahlung} + Raten ${rs().tilgung} − Rückkäufe ${rs().rueckkaufSumme} = ${soll} = gebucht ${ctxR.__buchung}`);
+    }
+  }
   console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle Prüfungen der Stadtregierung bestanden');
+  process.exit(fehler ? 1 : 0);
+}
+if (flag('kita')) {
+  // Kitas (Schritt 2). Eine Kopie der Simulation mit Testhilfen, die nur mitlesen: __kitaVergabe (nach der Vergabe, vor den
+  // Betreuungslücken), __kitaEnde (am Ende von kitaTag), __betr (jeder Haushalt, der in bundesGeld Betreuungsgehalt bekommt), dazu
+  // __ohneJob (diese Person sucht keine Stelle, für den erzwungenen Fall g). Sonst gleich.
+  const { Sim, ctx } = ladeSimMit([
+    ['  // Betreuungslücke (Annahme der Stadt)', '  if (globalThis.__kitaVergabe) globalThis.__kitaVergabe(S, L, rang, warten, frist);\n  // Betreuungslücke (Annahme der Stadt)'],
+    ['  return { warten, bedarf };', '  if (globalThis.__kitaEnde) globalThis.__kitaEnde(S, neu, bedarf, frist);\n  return { warten, bedarf };'],
+    ['      P.geld[m] += R.NETTO_STANDARD; rs.betreuung += R.NETTO_STANDARD; rs.betreuungTage++;\n',
+      '      P.geld[m] += R.NETTO_STANDARD; rs.betreuung += R.NETTO_STANDARD; rs.betreuungTage++; if (globalThis.__betr) globalThis.__betr(S, k);\n'],
+    ['  if (erwerb && (arb < 0 || gem) && !istBesitzer && S.freieStellen > 0 && !rentner(S, p) && !gebunden(S, p)) {\n',
+      '  if (erwerb && (arb < 0 || gem) && !istBesitzer && S.freieStellen > 0 && !rentner(S, p) && !gebunden(S, p) && p !== globalThis.__ohneJob) {\n'],
+  ]);
+  ctx.__ohneJob = -1;
+  let fehler = 0;
+  const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
+  const R = Sim.R, J = R.JAHR, KITA = Sim.KITA;
+  const dist = (S, a, b) => Math.abs(S.g.x[a] - S.g.x[b]) + Math.abs(S.g.y[a] - S.g.y[b]);
+  const einh = (S, k) => (S.tag - S.p.geb[k] < R.KRIPPE_BIS ? 2 : 1);
+  const offenK = (S, b) => S.g.typ[b] === KITA && S.feld[S.g.y[b] * Sim.KARTE + S.g.x[b]] === KITA;
+  const tagWeiter = (S) => { const t = S.tag; while (S.tag === t) Sim.stunde(S); };
+  // Personal einer Kita entfernen (wie eine Kündigung aller, die Stellen zählen nachts neu)
+  const personalWeg = (S, b) => { for (const w of S.belegschaft[b]) { S.p.arbeit[w] = -1; S.p.einsatz[w] = 0; } const n = S.belegschaft[b].length; S.belegschaft[b] = []; return n; };
+  let summeOhne = 0, summeKitaOhne = 0;
+  for (const seed of arg('seeds', '1,2,3').split(',').map(Number)) {
+    console.log(`Seed ${seed}`);
+    const S = Sim.neueStadt(seed);
+    let vor = new Uint16Array(0), vorB = new Uint8Array(0);  // Kita-Plätze und belegte Einheiten vor der Nacht (Kopie um 23 Uhr)
+    const z = { naechte: 0, plaetze: 0, altersFehl: 0, weitFehl: 0, summeFehl: 0, kapFehl: 0, personalFehl: 0, lohnFehl: 0, vorrangFehl: 0, vorrang: 0,
+      luecke: 0, lueckeFehl: 0, ohne: 0, fern: 0, betr: 0, betrFehl: 0, gebunden: 0, gebundenFehl: 0, zeilenFehl: 0, maxKitas: 0, maxWarten: 0,
+      halten: 0, endeFehl: 0, weniger: 0 };
+    // Bestand (Annahme): belegt ≤ halt = max(möglich, belegt gestern − 8), solange die Kita Personal hat, sonst 0
+    const halt = (S, b) => S.g.kapaz[b] > 0 ? Math.max(S.g.kapaz[b], (vorB[b] || 0) - R.KITA_JE_KRAFT) : 0;
+    let personalStart = new Map();
+    ctx.__kitaVergabe = (S, L, rang, warten) => {
+      const P = S.p, g = S.g, summe = new Map();
+      personalStart = new Map();
+      // (a) Plätze nur im Kita-Alter, in einer Kita höchstens 12 Felder von der Wohnung; Summe der Einheiten = belegt ≤ halt,
+      //     möglich ≤ min(40, 8 × Personal); mehr belegt als möglich nur im Bestand, wenn Personal ging
+      for (let k = 0; k < S.pMax; k++) {
+        if (!P.lebt[k] || !P.kita[k]) continue;
+        const b = P.kita[k] - 1;
+        z.plaetze++;
+        if (S.tag - P.geb[k] >= R.KITA_ENDE) z.altersFehl++;
+        if (g.typ[b] !== KITA || dist(S, b, P.wohnung[k]) > R.REICH_KITA) z.weitFehl++;
+        summe.set(b, (summe.get(b) || 0) + einh(S, k));
+      }
+      let kitas = 0;
+      for (let b = 0; b < S.gAnzahl; b++) {
+        if (g.typ[b] !== KITA) continue;
+        if (offenK(S, b)) kitas++;
+        personalStart.set(b, S.belegschaft[b].length);
+        if ((summe.get(b) || 0) !== g.bedient[b]) z.summeFehl++;
+        if (g.bedient[b] > halt(S, b) || g.kapaz[b] > Math.min(R.KITA_PLAETZE, R.KITA_JE_KRAFT * S.belegschaft[b].length)) z.kapFehl++;
+        if (g.bedient[b] > g.kapaz[b]) z.halten++;
+        if (S.belegschaft[b].length > R.KITA_STELLEN || g.soll[b] > R.KITA_STELLEN) z.personalFehl++;
+        if (offenK(S, b) && (g.lohn[b] < R.LOHN_STADT || g.lohn[b] > R.BAU_LOHN_MAX)) z.lohnFehl++;
+      }
+      z.maxKitas = Math.max(z.maxKitas, kitas); z.maxWarten = Math.max(z.maxWarten, warten.length);
+      // (e) Vorrang: Kein Kind der Stufe 2 bekommt heute einen neuen Platz in Kita b, während ein Kind der Stufe 1 in Reichweite von b
+      // wartet, das dort ohne die neuen Kinder der Stufe 2 Platz gehabt hätte
+      const neu2 = new Map();
+      for (const k of L) if (rang.get(k) === 2 && P.kita[k] && P.kita[k] !== (vor[k] || 0)) neu2.set(P.kita[k] - 1, (neu2.get(P.kita[k] - 1) || 0) + einh(S, k));
+      for (const k of warten) {
+        if (rang.get(k) !== 1) continue;
+        z.vorrang++;
+        for (const [b, e] of neu2) if (dist(S, b, P.wohnung[k]) <= R.REICH_KITA && g.kapaz[b] - g.bedient[b] + e >= einh(S, k)) z.vorrangFehl++;
+      }
+    };
+    ctx.__kitaEnde = (S, neu, bedarf, frist) => {
+      // (c) Nach der Nacht hat jedes Kind unter 6 ohne Platz einen Erwachsenen des Haushalts ohne Stelle zu Hause; sonst arbeiten von
+      // Vorstand und Partner nur Besitzer oder gemeinnützig, oder in der Nähe ist gar keine Kita offen (beides nur gezählt). In der
+      // Übergangsfrist nach einer Übernahme gilt das nicht
+      const P = S.p, erw = S.tag - R.ERWACHSEN * J, gesehen = new Set(), g = S.g;
+      // (a) auch am Ende der Nacht: Wer unten aufhört und in einer Kita arbeitet, fehlt ihr erst ab der nächsten Nacht (Plätze der Nacht bleiben)
+      for (let b = 0; b < S.gAnzahl; b++) {
+        if (g.typ[b] !== KITA) continue;
+        const n0 = personalStart.get(b) || 0;
+        if (g.bedient[b] > halt(S, b) || g.kapaz[b] > Math.min(R.KITA_PLAETZE, R.KITA_JE_KRAFT * n0)) z.endeFehl++;
+        if (S.belegschaft[b].length < n0) z.weniger++;
+      }
+      for (let k = 0; k < S.pMax; k++) {
+        if (!P.lebt[k] || P.kita[k] || S.tag - P.geb[k] >= R.KITA_ENDE || P.hh[k] < 0 || P.wohnung[k] < 0) continue;
+        const kopf = P.hh[k];
+        if (gesehen.has(kopf)) continue;
+        gesehen.add(kopf);
+        let heim = false, angestellt = false;
+        for (const m of S.bewohner[P.wohnung[k]]) {
+          if (P.hh[m] !== kopf || P.geb[m] > erw) continue;
+          if (P.arbeit[m] < 0) heim = true;
+          else if ((m === kopf || m === P.partner[kopf]) && P.besitz[m] < 0 && !P.gemein[m]) angestellt = true;
+        }
+        z.luecke++;
+        if (heim) continue;
+        let nah = false;                                     // wie in kitaTag: erst „keine Kita mit Plätzen in der Nähe“, dann „nur Besitzer“
+        for (let b = 0; b < S.gAnzahl && !nah; b++) if (offenK(S, b) && S.g.kapaz[b] > 0 && dist(S, b, P.wohnung[k]) <= R.REICH_KITA) nah = true;
+        if (!nah) { if (!frist) z.fern++; continue; }
+        if (!angestellt) { if (!frist) z.ohne++; continue; }
+        if (!frist) z.lueckeFehl++;
+      }
+    };
+    // (b) Betreuungsgehalt nur, wenn im Haushalt ein Kind unter 3 ohne Kita-Platz lebt (Stand in bundesGeld, vor der Vergabe der Nacht)
+    let bezahlt = new Set();
+    ctx.__betr = (S, k) => {
+      const P = S.p; z.betr++; bezahlt.add(k);
+      if (!S.bewohner[P.wohnung[k]].some(m => P.hh[m] === k && S.tag - P.geb[m] < R.BETREUUNG_ALTER && !P.kita[m])) z.betrFehl++;
+    };
+    while (S.tag < 400) {
+      if (S.stunde === 7 || S.stunde === 18) {                // (d) wer gebunden ist, bekommt kein job_suchen und kein laden_gruenden
+        for (let p = 0; p < S.pMax; p++) {
+          if (!S.p.lebt[p] || !Sim.gebunden(S, p)) continue;
+          z.gebunden++;
+          const L = Sim.erlaubteAktionen(S, p, S.stunde);
+          if (L.includes('job_suchen') || L.includes('laden_gruenden')) z.gebundenFehl++;
+        }
+      }
+      if (S.stunde === 23) { vor = S.p.kita.slice(0, S.pMax); vorB = S.g.bedient.slice(0, S.gAnzahl); bezahlt = new Set(); }
+      const t = S.tag, nr0 = S.buchNr;
+      Sim.stunde(S);
+      if (S.tag !== t) { z.naechte++; if (S.buch.filter(e => e.nr > nr0 && e.art === 'kita').length > 1) z.zeilenFehl++; }
+    }
+    const rs = S.stat.regierung;
+    pruef(z.naechte === 400 && z.plaetze > 0 && !z.altersFehl && !z.weitFehl, `(a) ${z.plaetze} Kindnächte mit Platz: nur unter ${R.KITA_ENDE / J} Jahren, höchstens ${R.REICH_KITA} Felder (${z.altersFehl + z.weitFehl} Fehler)`);
+    pruef(!z.summeFehl && !z.kapFehl && !z.personalFehl && !z.lohnFehl && z.maxKitas > 0,
+      `(a) je Kita: Einheiten = belegt ≤ max(möglich, belegt gestern − ${R.KITA_JE_KRAFT}), möglich ≤ min(${R.KITA_PLAETZE}, ${R.KITA_JE_KRAFT} × Personal), Personal und Stellen ≤ ${R.KITA_STELLEN}, Lohn ${R.LOHN_STADT}–${R.BAU_LOHN_MAX} `
+      + `(bis ${z.maxKitas} Kitas offen, ${S.stat.bauamt.kitas} gebaut; ${z.halten} Kita-Nächte mit mehr belegt als möglich; ${z.summeFehl + z.kapFehl + z.personalFehl + z.lohnFehl} Fehler)`);
+    pruef(!z.endeFehl, `(a) dasselbe am Ende der Nacht, nach den Stellenaufgaben (${z.weniger}-mal hatte eine Kita danach weniger Personal; ${z.endeFehl} Fehler)`);
+    pruef(z.betr > 0 && !z.betrFehl, `(b) Betreuungsgehalt nur mit Kind unter 3 ohne Platz: ${z.betr} Haushaltstage (${z.betrFehl} Fehler)`);
+    pruef(z.luecke > 0 && !z.lueckeFehl && z.fern === rs.kitaFern, `(c) nach jeder Nacht: ${z.luecke} Haushaltsnächte mit Kind ohne Platz, alle mit jemandem zu Hause, nur Besitzern `
+      + `(${z.ohne}, gezählt ${rs.kitaOhne}) oder ohne Kita mit Plätzen (offen, mit Personal) in der Nähe (${z.fern}, gezählt ${rs.kitaFern}); ${rs.kitaLuecke}-mal gab ein Elternteil die Stelle auf (${z.lueckeFehl} Fehler)`);
+    pruef(!z.gebundenFehl, `(d) ${z.gebunden}-mal gebunden um 7 oder 18 Uhr, nie job_suchen oder laden_gruenden erlaubt (${z.gebundenFehl} Fehler)`);
+    pruef(z.vorrang > 0 && !z.vorrangFehl, `(e) Vorrang: ${z.vorrang} wartende Kinder der Stufe 1 geprüft, keins hinter einem neuen Platz der Stufe 2 (${z.vorrangFehl} Fehler; bis ${z.maxWarten} Kinder warteten)`);
+    pruef(!z.zeilenFehl, `Stadtbuch: höchstens eine Zeile „Kita“ je Nacht (${S.buch.filter(e => e.art === 'kita').length} im Buch, ${z.zeilenFehl} Fehler)`);
+    summeOhne += z.ohne; summeKitaOhne += rs.kitaOhne;
+    // Speichern und Laden mit Kitas: bitgleich
+    {
+      const L = ladenAusText(Sim, speichernAlsText(Sim, S)), A2 = ladenAusText(Sim, speichernAlsText(Sim, S));
+      for (let i = 0; i < 24 * 20; i++) { Sim.stunde(L); Sim.stunde(A2); }
+      pruef(fingerabdruck(Sim, L) === fingerabdruck(Sim, A2) && L.p.kita.some(v => v > 0), 'Speichern/Laden mit Kita-Plätzen: 20 Tage weiter bitgleich');
+    }
+    ctx.__kitaVergabe = null; ctx.__kitaEnde = null; ctx.__betr = null;
+    // (g) Erzwungen: Ein Elternteil eines Kindes unter 3 mit Krippenplatz verliert um 23 Uhr die Stelle (niemand sonst zu Hause). In der Nacht
+    //     verliert das Kind den Platz, Betreuungsgehalt gibt es erst in der Nacht danach (bundesGeld kommt vor der Vergabe)
+    {
+      while (S.stunde !== 23) Sim.stunde(S);
+      const P = S.p, erw = S.tag - R.ERWACHSEN * J;
+      let fall = null;
+      for (let k = 0; k < S.pMax && !fall; k++) {
+        if (!P.lebt[k] || !P.kita[k] || S.tag + 2 - P.geb[k] >= R.KRIPPE_BIS || P.hh[k] < 0) continue;
+        const kopf = P.hh[k], pa = P.partner[kopf], ms = S.bewohner[P.wohnung[k]].filter(m => P.hh[m] === kopf && P.geb[m] <= erw);
+        if (ms.some(m => P.arbeit[m] < 0) || P.besitz[kopf] >= 0 || P.gemein[kopf] || Sim.anspruch(S, kopf)) continue;
+        const m = pa >= 0 && P.hh[pa] === kopf ? pa : kopf;
+        if (P.besitz[m] >= 0 || P.gemein[m] || Sim.anspruch(S, m) || Sim.istHaupt(S, m)) continue;
+        fall = { k, kopf, m };
+      }
+      if (!fall) pruef(false, '(g) kein Kind unter 3 mit Krippenplatz, dessen Eltern beide arbeiten');
+      else {
+        const { k, kopf, m } = fall, b = P.arbeit[m];
+        for (let p = 0; p < S.pMax; p++) P.jetzt[p] = 0;
+        S.belegschaft[b].splice(S.belegschaft[b].indexOf(m), 1); P.arbeit[m] = -1; P.einsatz[m] = 0;
+        ctx.__ohneJob = m;
+        const betr1 = new Set(); ctx.__betr = (S, h) => betr1.add(h);
+        Sim.stunde(S);                                         // Nacht 1
+        const nacht1 = { platz: S.p.kita[k], bezahlt: betr1.has(kopf) };
+        const betr2 = new Set(); ctx.__betr = (S, h) => betr2.add(h);
+        tagWeiter(S);                                          // Tag danach und Nacht 2
+        ctx.__betr = null; ctx.__ohneJob = -1;
+        const ok = nacht1.platz === 0 && !nacht1.bezahlt && S.p.lebt[k] && S.p.kita[k] === 0 && betr2.has(kopf) && Sim.betreuer(S, kopf) >= 0;
+        pruef(ok || (S.p.arbeit[m] >= 0), `(g) ${Sim.name(S, m)} ohne Stelle: Nacht 1 Platz ${nacht1.platz ? 'noch da' : 'weg'}, Betreuungsgehalt ${nacht1.bezahlt ? 'ja' : 'nein'}; `
+          + `Nacht 2 Betreuungsgehalt ${betr2.has(kopf) ? 'ja' : 'nein'} (an ${Sim.betreuer(S, kopf) >= 0 ? Sim.name(S, Sim.betreuer(S, kopf)) : '–'})${S.p.arbeit[m] >= 0 ? ', hat inzwischen wieder Arbeit' : ''}`);
+      }
+    }
+    // (f1) Erzwungen: Alle Leute einer Kita und der Kitas bis 24 Felder weiter sind um 23 Uhr weg (die Kitas bleiben offen). In der Nacht hat
+    //      dort niemand mehr einen Platz, und weil in der Nähe keine Kita mehr Plätze anbietet, muss deshalb niemand aufhören (nur gezählt)
+    {
+      while (S.stunde !== 23) Sim.stunde(S);
+      let kb = -1;
+      for (let b = 0; b < S.gAnzahl; b++) if (offenK(S, b) && S.belegschaft[b].length && S.g.bedient[b] > 0) { kb = b; break; }
+      if (kb < 0) pruef(false, '(f1) keine Kita mit Personal und Kindern');
+      else {
+        const kinder = []; for (let k = 0; k < S.pMax; k++) if (S.p.lebt[k] && S.p.kita[k] === kb + 1) kinder.push(k);
+        for (let p = 0; p < S.pMax; p++) S.p.jetzt[p] = 0;
+        let n = 0;
+        for (let b = 0; b < S.gAnzahl; b++) if (offenK(S, b) && dist(S, b, kb) <= 2 * R.REICH_KITA) n += personalWeg(S, b);
+        const f0 = S.stat.regierung.kitaFern;
+        let aufgegeben = [];
+        ctx.__kitaEnde = (S, neu) => { aufgegeben = neu.map(([, k]) => k); };
+        Sim.stunde(S);
+        ctx.__kitaEnde = null;
+        const P = S.p, erw = S.tag - R.ERWACHSEN * J, set = new Set(kinder);
+        let heim = 0, fern = 0, gross = 0, falsch = 0;
+        for (const k of kinder) {
+          if (!P.lebt[k] || P.hh[k] < 0) continue;
+          if (S.tag - 1 - P.geb[k] >= R.KITA_ENDE) { gross++; continue; }   // in dieser Nacht 6 geworden
+          if (P.kita[k]) { falsch++; continue; }
+          const ms = S.bewohner[P.wohnung[k]].filter(m => P.hh[m] === P.hh[k] && P.geb[m] <= erw);
+          if (ms.some(m => P.arbeit[m] < 0)) heim++; else fern++;
+        }
+        const wegen = aufgegeben.filter(k => set.has(k)).length;
+        pruef(!falsch && !wegen && S.stat.regierung.kitaFern - f0 >= fern, `(f1) Kita ${kb} und Kitas in der Nähe ohne ihre ${n} Leute: ${kinder.length} Kinder hatten dort Platz, jetzt keins mehr; `
+          + `${heim} mit jemandem zu Hause, ${fern} ohne Kita-Angebot in der Nähe (gezählt ${S.stat.regierung.kitaFern - f0})${gross ? `, ${gross} jetzt 6 Jahre alt` : ''}; wegen dieser Kinder gab niemand die Stelle auf (${falsch + wegen} Fehler)`);
+      }
+    }
+    // (f2) Erzwungen (auf einer Kopie): Eine Kita mit mindestens 17 belegten Einheiten verliert um 23 Uhr alle Fachkräfte bis auf eine. In der
+    //      Nacht fallen höchstens 8 belegte Einheiten weg (Bestand, Annahme wie eine Kündigungsfrist), kein Kind bekommt dort neu einen
+    //      Platz, die Kita schreibt Stellen aus; in der Nacht danach wieder höchstens 8 weniger
+    {
+      let kb = -1;
+      for (let versuch = 0; versuch < 60 && kb < 0; versuch++) {
+        while (S.stunde !== 23) Sim.stunde(S);
+        for (let b = 0; b < S.gAnzahl; b++) if (offenK(S, b) && S.belegschaft[b].length >= 3 && S.g.bedient[b] >= 17) { kb = b; break; }
+        if (kb < 0) Sim.stunde(S);
+      }
+      if (kb < 0) pruef(false, '(f2) keine Kita mit mindestens 3 Fachkräften und 17 belegten Einheiten');
+      else {
+        const S2 = ladenAusText(Sim, speichernAlsText(Sim, S)), P = S2.p, g = S2.g, b0 = g.bedient[kb];
+        for (let p = 0; p < S2.pMax; p++) P.jetzt[p] = 0;
+        const L = S2.belegschaft[kb];
+        while (L.length > 1) { const w = L.pop(); P.arbeit[w] = -1; P.einsatz[w] = 0; }
+        const vorher = new Set(); for (let k = 0; k < S2.pMax; k++) if (P.lebt[k] && P.kita[k] === kb + 1) vorher.add(k);
+        Sim.stunde(S2);
+        let verloren = 0, neuDa = 0;
+        for (let k = 0; k < S2.pMax; k++) {
+          if (!P.lebt[k]) continue;
+          if (P.kita[k] === kb + 1 && !vorher.has(k)) neuDa++;
+          if (vorher.has(k) && P.kita[k] !== kb + 1 && S2.tag - 1 - P.geb[k] < R.KITA_ENDE) verloren += S2.tag - 1 - P.geb[k] < R.KRIPPE_BIS ? 2 : 1;
+        }
+        const b1 = g.bedient[kb], cap1 = g.kapaz[kb], soll1 = g.soll[kb];
+        let b2 = -1, ok2 = true;
+        if (S2.belegschaft[kb].length) { const t = S2.tag; while (S2.tag === t) Sim.stunde(S2); b2 = g.bedient[kb]; ok2 = b2 <= Math.max(g.kapaz[kb], b1 - R.KITA_JE_KRAFT); }
+        pruef(cap1 === R.KITA_JE_KRAFT && b1 <= Math.max(cap1, b0 - R.KITA_JE_KRAFT) && verloren <= R.KITA_JE_KRAFT + 1 && b1 > cap1 && !neuDa && soll1 > 1 && ok2,
+          `(f2) Kita ${kb}: ${b0} Einheiten belegt, alle Fachkräfte bis auf eine weg → Nacht 1: ${b1} belegt bei ${cap1} möglich (${verloren} Einheiten verloren, ${neuDa} Kinder neu), `
+          + `${soll1} Stellen; Nacht 2: ${b2 < 0 ? 'keine Fachkraft mehr' : `${b2} belegt`}`);
+      }
+    }
+    // (h) Erzwungen (auf Kopien): Ein Kind unter 6 zieht zu jemandem, der nur seinen eigenen Betrieb hat (kein Partner, sonst niemand); die
+    //     Kitas in der Nähe mit mindestens 17 belegten Einheiten behalten eine Fachkraft (dann voll), die übrigen verlieren alle. Niemand gibt
+    //     etwas auf, es wird nur gezählt (kitaOhne). Besitzer und Kind werden der Reihe nach probiert, bis ein Fall passt
+    {
+      while (S.stunde !== 23) Sim.stunde(S);
+      const P0 = S.p, text0 = speichernAlsText(Sim, S), besitzer = [], kinder = [];
+      for (let p = 0; p < S.pMax; p++) {
+        const b = P0.besitz[p];
+        if (P0.lebt[p] && b >= 0 && P0.arbeit[p] === b && P0.hh[p] === p && S.hhGroesse[p] === 1 && P0.partner[p] < 0 && P0.wohnung[p] >= 0 && !Sim.istHaupt(S, p)) besitzer.push(p);
+      }
+      for (let x = 0; x < S.pMax; x++) if (P0.lebt[x] && S.tag - P0.geb[x] >= R.KRIPPE_BIS && S.tag + 1 - P0.geb[x] < R.KITA_ENDE && P0.hh[x] >= 0 && P0.hh[x] !== x) kinder.push(x);
+      let fall = null, versuche = 0;
+      for (const o of besitzer) {
+        if (fall || versuche >= 40) break;
+        const w = P0.wohnung[o];
+        let nah = 0;
+        for (let b = 0; b < S.gAnzahl; b++) if (offenK(S, b) && dist(S, b, w) <= R.REICH_KITA && S.belegschaft[b].length && S.g.bedient[b] >= 17) nah++;
+        if (!nah) continue;
+        for (const k of kinder.filter(x => !P0.kita[x] || dist(S, P0.kita[x] - 1, w) > R.REICH_KITA).slice(0, 3)) {
+          versuche++;
+          const T = ladenAusText(Sim, text0), P = T.p;
+          Sim._pruef.einzelnZu(T, k, o);
+          for (let b = 0; b < T.gAnzahl; b++) if (offenK(T, b) && dist(T, b, w) <= R.REICH_KITA) {
+            const L = T.belegschaft[b], bleiben = T.g.bedient[b] >= 17 ? 1 : 0;
+            while (L.length > bleiben) { const m = L.pop(); P.arbeit[m] = -1; P.einsatz[m] = 0; }
+          }
+          for (let p = 0; p < T.pMax; p++) P.jetzt[p] = 0;
+          const oh0 = T.stat.regierung.kitaOhne, b0 = P.besitz[o];
+          Sim.stunde(T);
+          if (T.p.kita[k] === 0 && T.stat.regierung.kitaOhne > oh0) { fall = { T, o, k, b0, oh0 }; break; }
+        }
+      }
+      if (!fall) pruef(false, `(h) kein Fall gefunden (${besitzer.length} Besitzer allein, ${versuche} Versuche)`);
+      else {
+        const { T, o, k, b0, oh0 } = fall;
+        pruef(T.p.besitz[o] === b0 && T.p.arbeit[o] === b0 && !Sim.gebunden(T, o),
+          `(h) ${Sim.name(T, o)} hat nur den eigenen Betrieb, ${Sim.name(T, k)} (${Math.floor((T.tag - T.p.geb[k]) / J)} Jahre) hat keinen Platz, die Kitas in der Nähe sind voll: `
+          + `Betrieb bleibt, gezählt ${T.stat.regierung.kitaOhne - oh0} (nach ${versuche} ${versuche === 1 ? 'Versuch' : 'Versuchen'})`);
+      }
+    }
+  }
+  pruef(summeOhne === summeKitaOhne, `ohne Platz nur mit Besitzern: Test zählt ${summeOhne}, die Stadt ${summeKitaOhne} Haushaltsnächte (Seeds zusammen, bis Tag 400)`);
+  console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle Kita-Prüfungen bestanden');
   process.exit(fehler ? 1 : 0);
 }
 if (flag('bau')) {
@@ -951,6 +1620,18 @@ if (flag('gate')) {
         + ` von außen: Rentenkasse ${d('rentenkasse')}, Bund ${d('praemie') + d('betreuung') + d('gs')} (Prämien ${d('praemie')}, Betreuungsgehalt ${d('betreuung')}, Grundsicherung ${d('gs')})`);
       console.log(`  bis Tag 730: ${r.praemien} Prämien, ${r.betreuungTage} Tage Betreuungsgehalt, ${r.gsTage} Tage Grundsicherung, gemeinnützige Arbeit ${r.gemeinnuetzig}-mal,`
         + ` ${r.vorbehaltTage} Tage mit Wohnungsvorbehalt (${r.vorbehalten} Wohnungstage), Budget ${Math.round(S.budget)}, Notwerkstätten ${S.stat.bauamt.notwerkstaetten}`);
+      if (r.kaeufe !== undefined) {                          // Schritt 2 (kein Gate): Mieterkauf und Renteneintritt bis Tag 730
+        const ri = Sim.regierungInfo(S);
+        console.log(`  Schritt 2 bis Tag 730: ${ri.eigentuemer} von ${ri.haushalte} Haushalten im Eigentum (${ri.abbezahlt} abbezahlt), ${r.kaeufe} Käufe, ${r.rueckkaeufe} Rückkäufe,`
+          + ` ${r.erbfaelle} Erbfälle; ${r.ruhestand} Renteneintritte durch Kündigung, davon ${r.fruehRuhestand} vor 67 (Ø ${r.fruehRuhestand ? (r.fruehAlter / r.fruehRuhestand / Sim.R.JAHR).toFixed(1) : '–'} Jahre),`
+          + ` ${r.fruehSchluss} vor 67 durch Schließung; ${r.rentnerLohnTage} Lohntage von Rentnern, Freibetrag ${r.rentnerEntlastung} Taler`);
+      }
+      if (r.kitaPlatzTage !== undefined) {                   // Schritt 2, Kitas (kein Gate)
+        const k = Sim.regierungInfo(S).kita;
+        console.log(`  Kitas an Tag 730: ${k.offen} offen (${S.stat.bauamt.kitas} gebaut), ${k.personal} Fachkräfte (Bedarf ${k.stellen}), Lohn ${k.lohn}, ${k.kinder} Kinder mit Platz (${k.krippe} unter 3), ${k.warten} warten`
+          + ` (${k.fern} ohne Kita-Angebot in der Nähe), ${k.zuhause} unter 3 zu Hause betreut, ${k.gebunden} gebunden; bis Tag 730: ${r.kitaLuecke}-mal Stelle aufgegeben,`
+          + ` ${r.kitaOhne} Haushaltsnächte nur mit Besitzern, ${r.kitaFern} ohne Kita-Angebot in der Nähe, Kosten ${Math.round(r.kitaKosten / 730)} Taler am Tag`);
+      }
     }
     console.log('  Tag 730:\n' + charakterText(c730));
   }
@@ -974,7 +1655,8 @@ if (flag('gate')) {
   });
   const k = Sim.kennzahlen(S), st = S.stat;
   console.log(`\nCharakter-Auswertung (Tag ${S.tag}):\n` + charakterText(charakter(S)));
-  console.log(`\nStadt an Tag ${S.tag}: ${k.haeuser} Wohnhäuser, ${k.werkstaetten} Werkstätten, ${k.laeden} Läden (davon ${k.leerstand} leer, ${k.stadtBetriebe} städtisch), ${k.parks} Parks, ${k.baustellen} Baustellen`);
+  console.log(`\nStadt an Tag ${S.tag}: ${k.haeuser} Wohnhäuser, ${k.werkstaetten} Werkstätten, ${k.laeden} Läden, ${k.techfirmen} Tech-Firmen, ${k.kitas} Kitas`
+    + ` (Betriebe: ${k.leerstand} leer, ${k.stadtBetriebe} städtisch, mit Kitas), ${k.parks} Parks, ${k.baustellen} Baustellen`);
   console.log(`  Arbeitslos ${k.arbeitslose} (${(k.arbeitslosenquote * 100).toFixed(1)} %), Umlandpreis ${k.exportPreis.toFixed(1)}, ohne Einkauf ${(k.unversorgt * 100).toFixed(1)} %`);
   console.log(`  Zuzüge ${st.zuzuege}, Wegzüge ${st.wegzuege} (Personen ${st.wegzuegePersonen}), Geburten ${st.geburten}, Tode ${st.tode}`);
   console.log(`  Paare ${st.paare}, Hochzeiten ${st.hochzeiten}, Trennungen ${st.trennungen}, Freundschaften ${st.freundschaften}`);
