@@ -182,8 +182,9 @@ Dreiecke um 11 Uhr in der Teststadt 44.186–44.236 statt 42.568–42.598, in de
 JS-Zeit pro Bild streut in beiden Fassungen (Teststadt neu 10,3–37,5 ms, vorher 10,6–34,7 ms; große Stadt neu 9,8–54,3 ms,
 vorher 8,7–22,5 ms), ein Unterschied ist darin nicht sicher zu sehen. Die Software-Grafik (SwiftShader) schafft in 9 von 10
 Messpaaren etwas weniger Bilder je Sekunde, im Mittel 8 % (Teststadt 1,2–2,9 statt 1,5–2,5, große Stadt 1,1–1,3 statt
-1,2–1,5); der Boden rechnet für die Felder je Bildpunkt einen Texturabruf und, nur auf Feldern, etwas mehr. Auf echter
-Grafikhardware ungeprüft.
+1,2–1,5); der Boden rechnet für die Felder je Bildpunkt einen Texturabruf und etwas mehr, auch wo gerade keine Felder im Bild sind
+(nur der Boden gemessen: etwa 11–13 ms mehr je Bild bei 1280 × 800 in SwiftShader; ein früherer Ausstieg brachte dort nichts).
+Auf echter Grafikhardware ungeprüft.
 
 **Handy-Karte und Hilfe.**
 - Auf dem Handy (bis 720 px breit, quer bis 500 px hoch) deckte eine offene Hauskarte 57 % (360 × 740) bzw. 58 % (400 × 820)
@@ -214,9 +215,16 @@ Grafikhardware ungeprüft.
   sitzt mittig. Eine neue Karte während des Einklappens bricht den Übergang ab (vorher liefen drei Animationen weiter). Breit ist
   die Karte immer aufgeklappt, auch zurück am Handy. Die Spalten der Hilfe sind bei 320 px 238 statt 260 px breit und ragen nicht
   mehr in den Rand.
-- Alles davon ist HTML und CSS: Im selben Zustand zeichnen Original und neue Datei gleich viel (Teststadt 22 Draw Calls, 41.428
-  Dreiecke, Startblick und Instanzzahlen gleich). JavaScript je Bild im Wechsel mit dem Original gemessen (je 3 Läufe, Last 3–4):
+- Alles davon ist HTML und CSS: Im selben Zustand zeichnen Original und neue Datei gleich viel (gemessen am Stand vor dem
+  Stadtrand: Teststadt 22 Draw Calls, 41.428 Dreiecke, Startblick und Instanzzahlen gleich). JavaScript je Bild im Wechsel mit dem Original gemessen (je 3 Läufe, Last 3–4):
   1280 × 800 neu 7,7–10,2 ms, Original 8,6–9,7 ms; 400 × 820 neu 7,8–9,1 ms, Original 7,7–9,3 ms.
+- Nach der Gegenprüfung: Ein Tippen auf ein Haus öffnet die Karte erst mit dem Klick danach. Vorher traf dieser Klick den Knopf
+  der gerade geöffneten Karte (Pfeil, „Zeigen“, X oder einen Namen), und die Kamera konnte ohne Druck auf „Zeigen“ losfahren.
+  Nach dem Schließen von Hilfe oder Einstellungen mit Maus oder Finger bleibt kein Fokus auf dem Knopf, die Leertaste pausiert
+  also wieder. Die Hilfe schließt auch mit einem Tipp daneben, eingeklappt klappt ein Tipp auf den Titel die Karte auf, und
+  „Zeigen“ ist dort nur noch das Symbol (mehr Platz für den Titel). Der erste Hinweis verschwindet auch bei Tasten und hält
+  Straßennamen frei. Die Legende sagt jetzt, dass auch Bauhof-Leute Kisten tragen, nennt das blaue Serverlicht und dass draußen
+  niemand wohnt.
 
 In der 3D-Ansicht wächst auf jeder Baustelle ein grauer Rohbau mit den geschafften Arbeitstagen. Das Gerüst wird dunkler,
 solange niemand kommt, und lässt sich anklicken. Bauarbeiter (orange) stehen an den Ecken ihrer Baustelle, Handwerker

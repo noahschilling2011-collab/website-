@@ -317,7 +317,7 @@
   @keyframes auf { from { opacity: 0; } }
 
   /* Hilfe: Bedienung und Legende. Muster (20 px) neben dem Text, Farben aus dem Variablenblock */
-  #hilfe-dialog { max-width: min(760px, calc(100vw - 32px)); }   /* breit: Figuren und Zeichen nebeneinander, passt ohne Scrollen */
+  #hilfe-dialog { max-width: min(840px, calc(100vw - 32px)); }   /* breit: Figuren und Zeichen nebeneinander, passt ohne Scrollen */
   .hilfe-spalten { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); column-gap: var(--s5); }
   .bedienung { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px var(--s3); margin: 0 0 var(--s2); font-size: var(--klein); }
   .bedienung dt { color: var(--text-leise); }
@@ -399,7 +399,8 @@
     #karte .kopf #karte-klappen { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; margin-right: var(--s2); }
     #karte.eingeklappt, body.debug #karte.eingeklappt { max-height: var(--karte-kopf); overflow: hidden; }
     #karte.eingeklappt #karte-inhalt { visibility: hidden; }   /* auch kein Tab-Fokus, nichts für Screenreader */
-    #karte.eingeklappt .kopf-titel { visibility: visible; }
+    #karte.eingeklappt .kopf-titel { visibility: visible; cursor: pointer; }
+    #karte.eingeklappt #karte-zeigen .zeigen-text { display: none; }   /* eingeklappt nur das Symbol, der Titel bekommt den Platz */
     #karte.eingeklappt #karte-zurueck { display: none; }       /* Platz für den Titel; aufgeklappt ist Zurück wieder da */
   }
   /* Schmal (Handy hochkant): Einstellungen oben rechts, unten Hauptfiguren und eingeklapptes Stadtbuch über dem Tempo.
@@ -569,7 +570,7 @@
 <aside id="karte" aria-label="Karte" hidden>
   <div class="kopf">
     <button type="button" id="karte-zurueck" hidden>‹ zurück</button><span class="kopf-titel" id="karte-kopf-titel"></span>
-    <button type="button" id="karte-zeigen" title="Gebäude in den freien Bildbereich rücken" hidden><svg class="sym" aria-hidden="true"><use href="#s-ziel"/></svg>Zeigen</button>
+    <button type="button" id="karte-zeigen" aria-label="Zeigen" title="Gebäude in den freien Bildbereich rücken" hidden><svg class="sym" aria-hidden="true"><use href="#s-ziel"/></svg><span class="zeigen-text">Zeigen</span></button>
     <button type="button" id="karte-klappen" aria-label="Karteninhalt" aria-expanded="true" aria-controls="karte-inhalt" title="Einklappen">
       <svg class="pfeil" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
     </button>
@@ -650,11 +651,11 @@
 <dialog id="hilfe-dialog" aria-labelledby="hilfe-titel">
   <h2 id="hilfe-titel" tabindex="-1" autofocus>So liest du die Stadt</h2>
   <dl class="bedienung">
-    <dt>Maus</dt><dd>Ziehen dreht, rechts ziehen (oder mit Umschalt) verschiebt, das Rad zoomt. Klick auf ein Gebäude oder eine Figur öffnet ihre Karte.</dd>
+    <dt>Maus</dt><dd>Ziehen dreht, rechts ziehen (oder mit Umschalt, Strg oder ⌘) verschiebt, Rad oder mittlere Taste zoomt. Klick auf ein Gebäude oder eine Figur öffnet ihre Karte.</dd>
     <dt>Touch</dt><dd>Ein Finger dreht, zwei Finger zoomen und verschieben, Tippen öffnet die Karte.</dd>
     <dt>Tasten</dt><dd>Leertaste: Pause und weiter. Escape: Karte schließen.</dd>
   </dl>
-  <p class="leise">Die Kamera bewegt sich nur durch dich oder „Zeigen“ in einer Hauskarte. Am Handy klappt der Pfeil im Kartenkopf die Karte ein und auf, „Zeigen“ klappt sie ebenfalls ein.</p>
+  <p class="leise">Die Kamera bewegt sich nur durch dich oder „Zeigen“ in einer Hauskarte. Am Handy klappt der Pfeil im Kartenkopf die Karte ein und auf.</p>
   <div class="hilfe-spalten">
     <section aria-labelledby="hilfe-figuren">
       <h3 class="einst-h" id="hilfe-figuren">Figuren</h3>
@@ -662,9 +663,9 @@
       <li><svg class="muster" viewBox="0 0 20 20" aria-hidden="true"><path class="m-gold" d="M10 0l2.5 3L10 6 7.5 3z"/><circle class="m-kopf" cx="10" cy="9" r="2.4"/><path class="m-gold" d="M5.6 19.8v-3.2c0-2.3 2-4 4.4-4s4.4 1.7 4.4 4v3.2z"/></svg>
         <span><strong>Gold mit Raute darüber:</strong> eine Hauptfigur. Ist die Raute weiß, überlegt sie gerade.</span></li>
       <li><svg class="muster" viewBox="0 0 20 20" aria-hidden="true"><circle class="m-kopf" cx="10" cy="9" r="2.4"/><path class="m-helm" d="M7.3 8.8a2.7 2.7 0 0 1 5.4 0z"/><path class="m-bau" d="M5.6 19.8v-3.2c0-2.3 2-4 4.4-4s4.4 1.7 4.4 4v3.2z"/></svg>
-        <span><strong>Orange mit gelbem Helm:</strong> Bauhof, baut die Häuser.</span></li>
+        <span><strong>Orange mit gelbem Helm:</strong> Bauhof, baut die Häuser. Wer keine Baustelle hat, macht dort Kisten.</span></li>
       <li><svg class="muster" viewBox="0 0 20 20" aria-hidden="true"><circle class="m-kopf" cx="10" cy="9" r="2.4"/><path class="m-werk" d="M5.6 19.8v-3.2c0-2.3 2-4 4.4-4s4.4 1.7 4.4 4v3.2z"/></svg>
-        <span><strong>Kräftiges Blau:</strong> Werkstatt. Mit Kiste in der Hand auf dem Weg zu einem Laden.</span></li>
+        <span><strong>Kräftiges Blau:</strong> Werkstatt, macht Kisten. Wer um 9 und 13 Uhr eine Kiste vor dem Bauch trägt, bringt sie aus einer Werkstatt oder dem Bauhof zu einem Laden.</span></li>
       <li><svg class="muster" viewBox="0 0 20 20" aria-hidden="true"><circle class="m-kopf" cx="10" cy="9" r="2.4"/><path class="m-tech" d="M5.6 19.8v-3.2c0-2.3 2-4 4.4-4s4.4 1.7 4.4 4v3.2z"/></svg>
         <span><strong>Lila:</strong> Tech-Firma.</span></li>
       <li><svg class="muster" viewBox="0 0 20 20" aria-hidden="true"><circle class="m-kopf" cx="6.2" cy="10.4" r="2"/><path class="m-andere" d="M2.7 19.8v-2.6c0-1.9 1.6-3.3 3.5-3.3s3.5 1.4 3.5 3.3v2.6z"/><circle class="m-kopf" cx="13.8" cy="10.4" r="2"/><path class="m-andere-2" d="M10.3 19.8v-2.6c0-1.9 1.6-3.3 3.5-3.3s3.5 1.4 3.5 3.3v2.6z"/></svg>
@@ -683,16 +684,17 @@
       <li><svg class="muster" viewBox="0 0 20 20" aria-hidden="true"><rect class="m-rohbau" x="5" y="9" width="10" height="10.5"/><path class="m-geruest" d="M3.5 19.5v-16M16.5 19.5v-16M3.5 4h13M3.5 9h13M3.5 14h13"/></svg>
         <span><strong>Grauer Rohbau, oranges Gerüst:</strong> Baustelle, wächst mit jedem Arbeitstag. Oben auf einem Gebäude: Aufstockung oder Anbau.</span></li>
       <li><svg class="muster" viewBox="0 0 20 20" aria-hidden="true"><path class="m-kopf" d="M2 19.5v-7l4.5 2.8v-2.8l4.5 2.8v4.2z"/><rect class="m-kopf" x="12.2" y="8.5" width="2.8" height="11"/><circle class="m-rauch" cx="13.6" cy="5.4" r="2"/><circle class="m-rauch" cx="11" cy="2.6" r="1.6" opacity=".7"/><circle class="m-rauch" cx="8" cy="1.4" r="1.1" opacity=".45"/></svg>
-        <span><strong>Rauch aus dem Schlot:</strong> Die Werkstatt arbeitet gerade (8 bis 17 Uhr).</span></li>
+        <span><strong>Rauch:</strong> Die Werkstatt arbeitet gerade (8 bis 17 Uhr).</span></li>
       <li><svg class="muster" viewBox="0 0 20 20" aria-hidden="true"><rect class="m-kopf" x="1.5" y="7" width="7.5" height="12.5" rx=".5"/><rect class="m-kopf" x="11" y="7" width="7.5" height="12.5" rx=".5" opacity=".4"/></svg>
         <span><strong>Betrieb dunkler als sonst:</strong> steht leer.</span></li>
       <li><svg class="muster" viewBox="0 0 20 20" aria-hidden="true"><rect class="m-fassade" x="4" y="1.5" width="12" height="18" rx=".5"/><rect class="m-gold" x="6.2" y="4" width="3" height="2.4"/><rect class="m-gold" x="10.8" y="4" width="3" height="2.4"/><rect class="m-gold" x="6.2" y="9" width="3" height="2.4"/></svg>
-        <span><strong>Licht in Wohnhäusern</strong> (abends bis früh morgens): Dort wohnen Leute. Offene Läden leuchten von 17 bis 22 Uhr.</span></li>
+        <span><strong>Licht in Wohnhäusern</strong> (abends bis früh): Dort wohnen Leute. Offene Läden leuchten von 17 bis 22 Uhr, Tech-Firmen nachts oben blau.</span></li>
       <li><svg class="muster" viewBox="0 0 20 20" aria-hidden="true"><rect class="m-schild" x="1" y="6" width="18" height="8" rx="3"/><path class="m-schrift" d="M4.5 10h11"/></svg>
-        <span><strong>Straßennamen</strong> erscheinen, wenn du nah heranzoomst.</span></li>
+        <span><strong>Straßennamen</strong> erscheinen nah herangezoomt.</span></li>
       </ul>
     </section>
   </div>
+  <p class="leise">Landstraßen, Felder und Höfe draußen sind Landschaft, dort wohnt niemand aus der Stadt.</p>
   <div class="knoepfe"><button type="button" class="knopf haupt" data-schliessen>Schließen</button></div>
 </dialog>
 
@@ -5654,12 +5656,19 @@ function baueGrafik(THREE, OrbitControls) {
     const t = treffen(cx, cy);
     return t === 1 ? { person: wahlP, gen: wahlGen } : t === 2 ? { gebaeude: wahlB } : null;
   }
-  let runter = null;
-  canvas.addEventListener('pointerdown', (e) => { runter = { x: e.clientX, y: e.clientY }; });
+  // Ob es ein Tippen war (höchstens 5 px bewegt), entscheidet pointerup; geöffnet wird erst im click der Leinwand. Öffnete die
+  // Karte schon im pointerup, träfe der Klick, den der Browser nach touchend schickt, den Knopf der gerade geöffneten Karte
+  // (Pfeil, „Zeigen“, X, ein Name) – dann führe etwa die Kamera ohne Druck auf „Zeigen“ los
+  let runter = null, los = null;
+  canvas.addEventListener('pointerdown', (e) => { runter = { x: e.clientX, y: e.clientY }; los = null; });
   canvas.addEventListener('pointerup', (e) => {
     if (!runter || Math.hypot(e.clientX - runter.x, e.clientY - runter.y) > 5) return;
-    runter = null;
-    const w = waehle(e.clientX, e.clientY);
+    runter = null; los = { x: e.clientX, y: e.clientY };
+  });
+  canvas.addEventListener('click', () => {
+    if (!los) return;
+    const w = waehle(los.x, los.y);
+    los = null;
     if (w && w.person !== undefined) zeigePerson(w.person, w.gen);
     else if (w && w.gebaeude !== undefined) zeigeGebaeude(w.gebaeude);
   });
@@ -5844,7 +5853,7 @@ function baueGrafik(THREE, OrbitControls) {
   let namenFaellig = true, namenAn = false, panelZeit = -1e9, panelN = 0, namenUhr = 0, ruheUhr = 0, ruheBis = 0;
   // Alles über der Leinwand (buch-liste: am Handy quer eine eigene Fläche). Ändert eins bei ruhender Kamera seine Größe (Stadtbuch
   // auf- oder zugeklappt, Meldung erscheint), setzt ResizeObserver die Schilder neu; auch hidden → sichtbar ist eine Größenänderung
-  const NAMEN_PANELS = ['kennzahlen', 'rechts', 'buch-liste', 'tempo', 'einst-knopf', 'hilfe-knopf', 'karte', 'meldung', 'hinweis', 'aufholen', 'debug',
+  const NAMEN_PANELS = ['kennzahlen', 'rechts', 'buch-liste', 'tempo', 'einst-knopf', 'hilfe-knopf', 'karte', 'meldung', 'hinweis', 'erster-hinweis', 'aufholen', 'debug',
     'debug-knoepfe'].map($), panelR = new Float32Array(4 * NAMEN_PANELS.length);
   const sperrR = new Float32Array(4);                     // Bildfläche des ausgewählten Gebäudes (mit Rand)
   let sperrAn = false;
@@ -6517,6 +6526,7 @@ function karteKlappen(zu, danach) {
   if (zu) klappLaeufe.push($('karte-kopf-titel').animate({ opacity: [0, 1] }, KLAPP_WEISE));   // der Titel oben erscheint, während der unten vergeht
 }
 $('karte-klappen').addEventListener('click', () => karteKlappen($('karte-klappen').getAttribute('aria-expanded') === 'true'));
+$('karte-kopf-titel').addEventListener('click', () => { if ($('karte').classList.contains('eingeklappt')) karteKlappen(false); });   // eingeklappt: Tipp auf den Titel klappt auf (Tastatur: Pfeil)
 // Breit gibt es kein Einklappen: dort aufgeklappt, damit der Stand eindeutig ist (zurück am Handy ist die Karte offen)
 SCHMAL.addEventListener('change', () => { if (!SCHMAL.matches) klappStand(false); });
 let knopfUhr = 0, knopfZeit = 0;                         // Zeitgeber, letzte Kamerabewegung (performance.now)
@@ -7267,9 +7277,17 @@ function herunterladen(text, datei) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 $('einst-knopf').addEventListener('click', () => $('einst-dialog').showModal());
-// Hilfe: schließt mit Escape oder „Schließen“ (data-schliessen oben); danach steht der Fokus wieder auf dem Knopf
+// Hilfe: schließt mit Escape, „Schließen“ (data-schliessen oben) oder einem Tipp neben den Dialog. Danach steht der Fokus nur
+// nach Tastatur-Bedienung (sichtbarer Ring) wieder auf dem Knopf; nach Maus oder Finger nicht, sonst löste die Leertaste den
+// Knopf aus und öffnete den Dialog wieder, statt zu pausieren. Dasselbe beim Zahnrad
 $('hilfe-knopf').addEventListener('click', () => $('hilfe-dialog').showModal());
-$('hilfe-dialog').addEventListener('close', () => $('hilfe-knopf').focus({ preventScroll: true }));
+for (const [d, k] of [['hilfe-dialog', 'hilfe-knopf'], ['einst-dialog', 'einst-knopf']]) {
+  $(d).addEventListener('close', () => { const kn = $(k); kn.focus({ preventScroll: true }); if (!kn.matches(':focus-visible')) kn.blur(); });
+}
+$('hilfe-dialog').addEventListener('click', (e) => {    // Tipp auf den abgedunkelten Rand (am Handy steht „Schließen“ erst unten)
+  const r = e.currentTarget.getBoundingClientRect();
+  if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) e.currentTarget.close();
+});
 $('export-knopf').addEventListener('click', () => {
   try { herunterladen(spielstandText(), 'stadt-save.json'); }
   catch (e) { meldung(`Export hat nicht geklappt: ${e.message}`, 'fehler'); }
@@ -7403,6 +7421,7 @@ function ersterHinweis() {
     clearTimeout(uhr);
     G.controls.removeEventListener('start', weg);
     document.removeEventListener('pointerdown', weg, true);
+    document.removeEventListener('keydown', weg, true);
     removeEventListener('resize', hinweisLegen);
     h.classList.add('weg');                               // blendet aus (reduziert: sofort)
     setTimeout(() => { h.hidden = true; }, REDUZIERT ? 0 : 400);
@@ -7410,6 +7429,7 @@ function ersterHinweis() {
   uhr = setTimeout(weg, HINWEIS_MS);
   G.controls.addEventListener('start', weg);
   document.addEventListener('pointerdown', weg, true);
+  document.addEventListener('keydown', weg, true);         // auch Tasten sind eine erste Eingabe (Leertaste, Tab)
   addEventListener('resize', hinweisLegen);
 }
 
