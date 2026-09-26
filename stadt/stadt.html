@@ -12,7 +12,9 @@
      scroll-padding, SVG <title> als Hinweis beim Überfahren.
      Neu in Oberfläche 2 (verbreitet, nicht nachgeschlagen): @media mit orientation und Listen (Komma = oder), min() in max-height,
      margin: 0 auto zum Mitteln eines festen Elements mit left: 0 und right: 0; im Skript RegExp \p{L} mit u-Flag.
-     Nachbesserung (ebenso): orientation: portrait, outline-color, @supports innerhalb von @media, style.height im Skript. */
+     Nachbesserung (ebenso): orientation: portrait, outline-color, @supports innerhalb von @media, style.height im Skript.
+     Neu mit Handy-Karte und Hilfe (verbreitet, nicht nachgeschlagen): width: max-content, SVG-Klassen für fill und stroke,
+     min() in minmax() einer Grid-Spur. */
   :root {
     --grund: #0b0d12;
     --ebene1: #12151c;
@@ -51,6 +53,19 @@
     --schild: rgba(12, 14, 20, 0.66);                      /* Straßennamen: dunkles Schild, Figuren dahinter scheinen durch; --text darauf
                                                               gerechnet 5,1:1 vor reinem Weiß (dem ungünstigsten Grund), 16:1 vor Schwarz */
     --schild-rand: rgba(255, 255, 255, 0.12);
+    /* Legende („So liest du die Stadt“): dieselben Farben wie in der Szene (Namen im Skript in Klammern). Nur Muster neben Text */
+    --fig-bau: #e8792c;                                    /* Bauarbeiter: Warnweste (WESTE) */
+    --fig-helm: #f2c230;                                   /* … und Helm (HELM) */
+    --fig-werk: #4f7fc0;                                   /* Werkstatt (BLAUMANN) */
+    --fig-tech: #a78cf2;                                   /* Tech-Firma (PROGRAMMIER) */
+    --fig-andere: #e6d3bd;                                 /* alle anderen: blasse Töne (erster Ton aus FIGFARBEN) */
+    --fig-andere-2: #c2d3e6;                               /* … zweiter Ton, blassblau: nicht mit dem kräftigen Blau der Werkstatt verwechseln */
+    --ring-verlust: #a65f5a;                               /* Ring bei Pleite oder Schließung (ZEICHEN_F) */
+    --rohbau: #9b9da2;                                     /* ROHBAU */
+    --geruest: #e0a040;                                    /* GERUEST */
+    --rauch: #c9ccd0;                                      /* RAUCH_F */
+    --karte-kopf: 46px;                                    /* eingeklappte Karte: Kopfleiste (40 px), 4 px für den Fokusring der Knöpfe
+                                                              (Knopf dann mittig, je 6 px Luft), samt Rand */
     --r: 14px;
     --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
     --klein: clamp(0.78rem, 0.76rem + 0.1vw, 0.86rem);
@@ -207,6 +222,13 @@
   #karte .kopf #karte-zeigen { margin: 0 var(--s2) 0 auto; min-height: 32px; display: inline-flex; align-items: center; gap: 6px; color: var(--text); }
   #karte .kopf #karte-zeigen:hover { color: var(--text-stark); }
   #karte .kopf #karte-zeigen .sym { width: 15px; height: 15px; color: var(--akzent); }
+  /* Einklappen gibt es nur klein (Block „Klein“). Der Titel in der Kopfleiste ist nur eingeklappt zu sehen; sonst hält er wie
+     vorher der leere Platzhalter die Knöpfe rechts */
+  #karte .kopf #karte-klappen { display: none; }
+  #karte-klappen .pfeil { transition: transform 200ms cubic-bezier(.2,.8,.2,1); }
+  #karte-klappen[aria-expanded="false"] .pfeil { transform: rotate(180deg); }
+  .kopf-titel { flex: 1 1 0; min-width: 0; padding: 0 var(--s2); overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    font-size: var(--normal); font-weight: 600; color: var(--text-stark); visibility: hidden; }
   .karte-kopf { display: flex; align-items: center; gap: var(--s3); margin: 0 0 var(--s3); }
   .karte-kopf .titel { min-width: 0; }
   .kicker { display: block; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; color: var(--akzent); line-height: 1.3; }
@@ -276,10 +298,44 @@
   .einst-h { margin: var(--s5) 0 var(--s2); font-size: 0.78rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-leise); }
   select { font: inherit; color: var(--text); background: var(--ebene3); border: 1px solid var(--linie); border-radius: 10px; padding: 6px 10px; max-width: 100%; }
 
-  /* Knopf für Einstellungen unten rechts */
-  #einst-knopf { position: fixed; right: var(--s4); bottom: var(--s4); width: 44px; height: 44px; display: grid; place-items: center;
+  /* Knopf für Einstellungen unten rechts, links daneben (8 px Abstand) die Hilfe */
+  #einst-knopf, #hilfe-knopf { position: fixed; right: var(--s4); bottom: var(--s4); width: 44px; height: 44px; display: grid; place-items: center;
     cursor: pointer; color: var(--text-leise); padding: 0; transition: color var(--dauer) ease-out; }
-  #einst-knopf:hover { color: var(--akzent); }
+  #hilfe-knopf { right: calc(var(--s4) + 44px + var(--s2)); }
+  #einst-knopf:hover, #hilfe-knopf:hover { color: var(--akzent); }
+
+  /* Erster Hinweis (nur neue Stadt): leise Zeile über dem Tempo; Lage setzt das Skript (top/left, Mitte über dem Tempo).
+     width: max-content, sonst bricht er schon an der Bildmitte um (left). Nicht klickbar: Klicks gehen an die Stadt.
+     Blendet ein und aus (reduziert: ohne Übergang, Regel unten). Ohne Glas-Unschärfe (kein weiteres Weichzeichnen der
+     bewegten Szene), dafür fast deckend: der leise Text bleibt vor jeder Szene lesbar (Kontrast gemessen, README) */
+  #erster-hinweis { position: fixed; left: 0; top: 0; transform: translate(-50%, -100%); margin: 0; padding: 5px var(--s3);
+    background: var(--glas-fallback); border: 1px solid var(--linie); box-shadow: inset 0 1px 0 var(--hell-2);
+    width: max-content; max-width: calc(100vw - 2 * var(--s3)); border-radius: 12px; font-size: var(--klein); line-height: 1.4;
+    text-align: center; color: var(--text-leise); pointer-events: none; animation: auf 400ms ease-out; transition: opacity 400ms ease-out; }
+  #erster-hinweis span { white-space: nowrap; }
+  #erster-hinweis.weg { opacity: 0; }
+  @keyframes auf { from { opacity: 0; } }
+
+  /* Hilfe: Bedienung und Legende. Muster (20 px) neben dem Text, Farben aus dem Variablenblock */
+  #hilfe-dialog { max-width: min(760px, calc(100vw - 32px)); }   /* breit: Figuren und Zeichen nebeneinander, passt ohne Scrollen */
+  .hilfe-spalten { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); column-gap: var(--s5); }
+  .bedienung { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px var(--s3); margin: 0 0 var(--s2); font-size: var(--klein); }
+  .bedienung dt { color: var(--text-leise); }
+  .bedienung dd { margin: 0; }
+  .legende { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: var(--klein); }
+  .legende li { display: grid; grid-template-columns: 20px minmax(0, 1fr); column-gap: 10px; align-items: start; line-height: 1.45; }
+  .legende strong { font-weight: 500; color: var(--text-stark); }
+  .muster { width: 20px; height: 20px; }
+  .muster .m-kopf { fill: var(--text-leise); }
+  .m-gold { fill: var(--akzent); } .m-bau { fill: var(--fig-bau); } .m-helm { fill: var(--fig-helm); } .m-werk { fill: var(--fig-werk); }
+  .m-tech { fill: var(--fig-tech); } .m-andere { fill: var(--fig-andere); } .m-andere-2 { fill: var(--fig-andere-2); } .m-rohbau { fill: var(--rohbau); } .m-rauch { fill: var(--rauch); }
+  .m-rahmen, .m-ring { fill: none; stroke: var(--akzent); stroke-width: 2; }
+  .m-ring.verlust { stroke: var(--ring-verlust); }
+  .m-geruest { fill: none; stroke: var(--geruest); stroke-width: 1.4; stroke-linecap: round; }
+  .m-fassade { fill: var(--ebene1); stroke: var(--text-leise); stroke-width: 1; }
+  .m-schild { fill: var(--ebene1); stroke: var(--text-leise); stroke-width: 1; }
+  .m-schrift { fill: none; stroke: var(--text); stroke-width: 1.6; stroke-linecap: round; }
+  #hilfe-titel { outline: none; }                          /* bekommt beim Öffnen den Fokus (Lesebeginn), Tab geht weiter zu den Knöpfen */
 
   /* Dialoge: solide Ebene 2, kein Glas */
   dialog { background: var(--ebene2); color: var(--text); border: 1px solid var(--linie); border-radius: var(--r);
@@ -339,12 +395,19 @@
     .haupt-zeile .gedanke { display: none; }
     #buch-knopf { padding: 10px var(--s3); }
     #buch-liste { padding: 0 var(--s3) var(--s1); }
+    /* Karte einklappbar: nur die Kopfleiste bleibt (Titel, Zeigen, Schließen), die Stadt ist frei. Übergang im Skript */
+    #karte .kopf #karte-klappen { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; margin-right: var(--s2); }
+    #karte.eingeklappt, body.debug #karte.eingeklappt { max-height: var(--karte-kopf); overflow: hidden; }
+    #karte.eingeklappt #karte-inhalt { visibility: hidden; }   /* auch kein Tab-Fokus, nichts für Screenreader */
+    #karte.eingeklappt .kopf-titel { visibility: visible; }
+    #karte.eingeklappt #karte-zurueck { display: none; }       /* Platz für den Titel; aufgeklappt ist Zurück wieder da */
   }
   /* Schmal (Handy hochkant): Einstellungen oben rechts, unten Hauptfiguren und eingeklapptes Stadtbuch über dem Tempo.
      Karten liegen unten über dem Tempo, höchstens bis unter die Zahlen, und scrollen in sich */
   @media (max-width: 720px) {
     :root { --karte-oben: 172px; }                          /* Zahlen enden hier bei gut 160 px */
-    #einst-knopf { top: var(--s3); right: var(--s3); bottom: auto; }
+    #einst-knopf, #hilfe-knopf { top: var(--s3); right: var(--s3); bottom: auto; }
+    #hilfe-knopf { right: calc(var(--s3) + 44px + var(--s2)); }
     #rechts { top: auto; right: var(--s3); bottom: 70px; width: calc(100vw - 2 * var(--s3)); max-height: 46svh; }
     #karte { top: auto; left: var(--s2); right: var(--s2); width: auto; bottom: 70px; z-index: 5; }
     #karte, body.debug #karte { max-height: min(60svh, calc(100svh - 70px - var(--karte-oben))); }
@@ -381,9 +444,10 @@
      Stadt (unter den Zahlen ist dafür kein Platz); der Kopf des Stadtbuchs bleibt links an seinem Platz */
   @media (max-height: 500px) and (orientation: landscape) {
     :root { --spalte: 200px; --rechts-unten: 72px; }      /* über dem Tempo */
-    #tempo { left: calc(50% + (var(--spalte) - 44px) / 2); }   /* 44 px: Einstellungs-Knopf */
+    #tempo { left: calc(50% + (var(--spalte) - 96px) / 2); }   /* 96 px: Einstellungs- und Hilfe-Knopf mit 8 px Abstand */
     #tempo button { min-width: 52px; }
-    #einst-knopf { top: auto; right: var(--s3); bottom: var(--s3); }
+    #einst-knopf, #hilfe-knopf { top: auto; right: var(--s3); bottom: var(--s3); }
+    #hilfe-knopf { right: calc(var(--s3) + 44px + var(--s2)); }
     #rechts { top: auto; left: var(--s3); right: auto; bottom: var(--s3); width: var(--spalte); max-height: calc(100svh - 2 * var(--s3)); }
     #haupt .kopfzeile { flex-wrap: wrap; row-gap: 0; }
     body.buch-offen #stadtbuch { backdrop-filter: none; -webkit-backdrop-filter: none; }   /* sonst Bezugsrahmen der festen Liste */
@@ -403,7 +467,7 @@
   /* Sehr klein (568 × 320): Tempo schmaler; Zahlen, Hauptfiguren und Stadtbuch-Kopf enger, damit der KI-Status ganz in eine
      zweite Zeile passt (einzeilig wäre er abgeschnitten) */
   @media (max-height: 340px) and (orientation: landscape) {
-    #tempo button { min-width: 44px; padding: 0 10px; }
+    #tempo button { min-width: 40px; padding: 0 8px; }     /* 40 statt 44: neben Spalte und Hilfe-Knopf je 10 px Luft (gemessen) */
     #kennzahlen dl { line-height: 1.35; }
     #haupt { padding: 2px 0 4px; }
     #buch-knopf { padding: 6px var(--s3); }
@@ -411,6 +475,10 @@
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important; }
+    /* Die Regel oben lässt jede Eigenschaft 0,01 ms gleiten (transition-property ist „all“): Die Karte wäre beim Messen direkt nach
+       dem Einklappen noch groß, „Zeigen“ rechnete mit der alten Höhe (gemessen). Hier also gar kein Übergang */
+    #karte { transition-duration: 0s !important; }
+    .nur-bewegt { display: none; }                        /* Hilfe: die Ringe stehen still (zeichenBewegen), nur die Farbe unterscheidet */
   }
 </style>
 <script type="importmap">
@@ -477,6 +545,7 @@
   </dl>
 </section>
 
+<p id="erster-hinweis" hidden></p>
 <nav id="tempo" class="glas" aria-label="Tempo">
   <button type="button" data-tempo="0" aria-pressed="false" title="Pause (Leertaste)"><svg class="sym" aria-hidden="true"><use href="#s-pause"/></svg>Pause</button>
   <button type="button" data-tempo="1" aria-pressed="true">1×</button>
@@ -499,8 +568,11 @@
 
 <aside id="karte" aria-label="Karte" hidden>
   <div class="kopf">
-    <button type="button" id="karte-zurueck" hidden>‹ zurück</button><span></span>
+    <button type="button" id="karte-zurueck" hidden>‹ zurück</button><span class="kopf-titel" id="karte-kopf-titel"></span>
     <button type="button" id="karte-zeigen" title="Gebäude in den freien Bildbereich rücken" hidden><svg class="sym" aria-hidden="true"><use href="#s-ziel"/></svg>Zeigen</button>
+    <button type="button" id="karte-klappen" aria-label="Karteninhalt" aria-expanded="true" aria-controls="karte-inhalt" title="Einklappen">
+      <svg class="pfeil" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
     <button type="button" id="karte-zu" aria-label="Karte schließen">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
     </button>
@@ -516,6 +588,9 @@
   <button type="button" class="knopf" data-vorspulen="120">5 Tage</button>
 </div>
 
+<button type="button" id="hilfe-knopf" class="glas" aria-label="Hilfe" aria-haspopup="dialog">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.9.6c0 1.7-2.5 2.2-2.5 4"/><path d="M12 17.3h.01"/></svg>
+</button>
 <button type="button" id="einst-knopf" class="glas" aria-label="Einstellungen" aria-haspopup="dialog">
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
 </button>
@@ -568,6 +643,57 @@
     (<code>ollama list</code>). Die Seite über <code>http://localhost:8000</code> öffnen, dann erlaubt Ollama den Zugriff ohne weitere Einstellung.
     Läuft Ollama nicht, entscheiden die Hauptfiguren mit dem normalen Gehirn.</p>
   <div class="knoepfe"><button type="button" class="knopf haupt" data-schliessen autofocus>Schließen</button></div>
+</dialog>
+
+<!-- Hilfe: jede Aussage aus dem Skript (Farben aus figurenPlanen, Zeichen aus ereignisse(), Rahmen aus toenenAlle, Rauch aus stadt(),
+     Schilder aus strassenNamen, Tasten aus den keydown-Handlern, Maus und Touch aus OrbitControls 0.186.0) -->
+<dialog id="hilfe-dialog" aria-labelledby="hilfe-titel">
+  <h2 id="hilfe-titel" tabindex="-1" autofocus>So liest du die Stadt</h2>
+  <dl class="bedienung">
+    <dt>Maus</dt><dd>Ziehen dreht, rechts ziehen (oder mit Umschalt) verschiebt, das Rad zoomt. Klick auf ein Gebäude oder eine Figur öffnet ihre Karte.</dd>
+    <dt>Touch</dt><dd>Ein Finger dreht, zwei Finger zoomen und verschieben, Tippen öffnet die Karte.</dd>
+    <dt>Tasten</dt><dd>Leertaste: Pause und weiter. Escape: Karte schließen.</dd>
+  </dl>
+  <p class="leise">Die Kamera bewegt sich nur durch dich oder „Zeigen“ in einer Hauskarte. Am Handy klappt der Pfeil im Kartenkopf die Karte ein und auf, „Zeigen“ klappt sie ebenfalls ein.</p>
+  <div class="hilfe-spalten">
+    <section aria-labelledby="hilfe-figuren">
+      <h3 class="einst-h" id="hilfe-figuren">Figuren</h3>
+      <ul class="legende">
+      <li><svg class="muster" viewBox="0 0 20 20" aria-hidden="true"><path class="m-gold" d="M10 0l2.5 3L10 6 7.5 3z"/><circle class="m-kopf" cx="10" cy="9" r="2.4"/><path class="m-gold" d="M5.6 19.8v-3.2c0-2.3 2-4 4.4-4s4.4 1.7 4.4 4v3.2z"/></svg>
+        <span><strong>Gold mit Raute darüber:</strong> eine Hauptfigur. Ist die Raute weiß, überlegt sie gerade.</span></li>
+      <li><svg class="muster" viewBox="0 0 20 20" aria-hidden="true"><circle class="m-kopf" cx="10" cy="9" r="2.4"/><path class="m-helm" d="M7.3 8.8a2.7 2.7 0 0 1 5.4 0z"/><path class="m-bau" d="M5.6 19.8v-3.2c0-2.3 2-4 4.4-4s4.4 1.7 4.4 4v3.2z"/></svg>
+        <span><strong>Orange mit gelbem Helm:</strong> Bauhof, baut die Häuser.</span></li>
+      <li><svg class="muster" viewBox="0 0 20 20" aria-hidden="true"><circle class="m-kopf" cx="10" cy="9" r="2.4"/><path class="m-werk" d="M5.6 19.8v-3.2c0-2.3 2-4 4.4-4s4.4 1.7 4.4 4v3.2z"/></svg>
+        <span><strong>Kräftiges Blau:</strong> Werkstatt. Mit Kiste in der Hand auf dem Weg zu einem Laden.</span></li>
+      <li><svg class="muster" viewBox="0 0 20 20" aria-hidden="true"><circle class="m-kopf" cx="10" cy="9" r="2.4"/><path class="m-tech" d="M5.6 19.8v-3.2c0-2.3 2-4 4.4-4s4.4 1.7 4.4 4v3.2z"/></svg>
+        <span><strong>Lila:</strong> Tech-Firma.</span></li>
+      <li><svg class="muster" viewBox="0 0 20 20" aria-hidden="true"><circle class="m-kopf" cx="6.2" cy="10.4" r="2"/><path class="m-andere" d="M2.7 19.8v-2.6c0-1.9 1.6-3.3 3.5-3.3s3.5 1.4 3.5 3.3v2.6z"/><circle class="m-kopf" cx="13.8" cy="10.4" r="2"/><path class="m-andere-2" d="M10.3 19.8v-2.6c0-1.9 1.6-3.3 3.5-3.3s3.5 1.4 3.5 3.3v2.6z"/></svg>
+        <span><strong>Blasse Töne</strong> (beige, rosé, grünlich, bläulich): alle anderen.</span></li>
+      </ul>
+    </section>
+    <section aria-labelledby="hilfe-zeichen">
+      <h3 class="einst-h" id="hilfe-zeichen">Zeichen in der Stadt</h3>
+      <ul class="legende">
+      <li><svg class="muster" viewBox="0 0 20 20" aria-hidden="true"><rect class="m-rahmen" x="2.5" y="2.5" width="15" height="15" rx="1"/><rect class="m-kopf" x="6.5" y="6.5" width="7" height="7" rx=".5"/></svg>
+        <span><strong>Goldener Rahmen,</strong> das Gebäude heller: ausgewählt, seine Karte ist offen.</span></li>
+      <li><svg class="muster" viewBox="0 0 20 20" aria-hidden="true"><circle class="m-ring" cx="10" cy="10" r="8.2"/><rect class="m-kopf" x="7" y="7" width="6" height="6" rx=".5"/></svg>
+        <span><strong>Goldener Ring<span class="nur-bewegt">, der weiter wird</span>:</strong> fertig gebaut, aufgestockt, eröffnet oder übernommen.</span></li>
+      <li><svg class="muster" viewBox="0 0 20 20" aria-hidden="true"><circle class="m-ring verlust" cx="10" cy="10" r="8.2"/><rect class="m-kopf" x="7" y="7" width="6" height="6" rx=".5"/></svg>
+        <span><strong>Rötlicher Ring<span class="nur-bewegt">, der sich zusammenzieht</span>:</strong> Pleite oder Schließung.</span></li>
+      <li><svg class="muster" viewBox="0 0 20 20" aria-hidden="true"><rect class="m-rohbau" x="5" y="9" width="10" height="10.5"/><path class="m-geruest" d="M3.5 19.5v-16M16.5 19.5v-16M3.5 4h13M3.5 9h13M3.5 14h13"/></svg>
+        <span><strong>Grauer Rohbau, oranges Gerüst:</strong> Baustelle, wächst mit jedem Arbeitstag. Oben auf einem Gebäude: Aufstockung oder Anbau.</span></li>
+      <li><svg class="muster" viewBox="0 0 20 20" aria-hidden="true"><path class="m-kopf" d="M2 19.5v-7l4.5 2.8v-2.8l4.5 2.8v4.2z"/><rect class="m-kopf" x="12.2" y="8.5" width="2.8" height="11"/><circle class="m-rauch" cx="13.6" cy="5.4" r="2"/><circle class="m-rauch" cx="11" cy="2.6" r="1.6" opacity=".7"/><circle class="m-rauch" cx="8" cy="1.4" r="1.1" opacity=".45"/></svg>
+        <span><strong>Rauch aus dem Schlot:</strong> Die Werkstatt arbeitet gerade (8 bis 17 Uhr).</span></li>
+      <li><svg class="muster" viewBox="0 0 20 20" aria-hidden="true"><rect class="m-kopf" x="1.5" y="7" width="7.5" height="12.5" rx=".5"/><rect class="m-kopf" x="11" y="7" width="7.5" height="12.5" rx=".5" opacity=".4"/></svg>
+        <span><strong>Betrieb dunkler als sonst:</strong> steht leer.</span></li>
+      <li><svg class="muster" viewBox="0 0 20 20" aria-hidden="true"><rect class="m-fassade" x="4" y="1.5" width="12" height="18" rx=".5"/><rect class="m-gold" x="6.2" y="4" width="3" height="2.4"/><rect class="m-gold" x="10.8" y="4" width="3" height="2.4"/><rect class="m-gold" x="6.2" y="9" width="3" height="2.4"/></svg>
+        <span><strong>Licht in Wohnhäusern</strong> (abends bis früh morgens): Dort wohnen Leute. Offene Läden leuchten von 17 bis 22 Uhr.</span></li>
+      <li><svg class="muster" viewBox="0 0 20 20" aria-hidden="true"><rect class="m-schild" x="1" y="6" width="18" height="8" rx="3"/><path class="m-schrift" d="M4.5 10h11"/></svg>
+        <span><strong>Straßennamen</strong> erscheinen, wenn du nah heranzoomst.</span></li>
+      </ul>
+    </section>
+  </div>
+  <div class="knoepfe"><button type="button" class="knopf haupt" data-schliessen>Schließen</button></div>
 </dialog>
 
 
@@ -3364,6 +3490,23 @@ G.StadtSim = {
 //   übersetzt trotzdem, src/renderers/WebGLRenderer.js), projectionMatrix.elements[5] = 2·near/(top − bottom), mit setViewOffset
 //   in voller Größe also 1/tan(fov/2) (updateProjectionMatrix in src/cameras/PerspectiveCamera.js, makePerspective in
 //   src/math/Matrix4.js).
+// - Neu mit Stadtrand und Umland, im Quellcode 0.186.0 nachgesehen: BufferGeometry.setDrawRange und drawRange
+//   (src/core/BufferGeometry.js), BufferAttribute.setXYZ und setUsage (src/core/BufferAttribute.js), Points
+//   (src/objects/Points.js), PointsMaterial mit size, sizeAttenuation, map (src/materials/PointsMaterial.js; size wird mit dem
+//   Pixelverhältnis multipliziert: src/renderers/webgl/WebGLMaterials.js; ohne uv-Attribut nimmt die Textur gl_PointCoord:
+//   ShaderChunk/map_particle_fragment.glsl.js; fog_fragment im Punkte-Shader: ShaderLib/points.glsl.js), ClampToEdgeWrapping,
+//   NearestFilter (src/constants.js), DataTexture setzt generateMipmaps false und unpackAlignment 1 (src/textures/DataTexture.js).
+//   Im Lambert-Shader (ShaderLib/meshlambert.glsl.js) stehen begin_vertex und color_fragment; das Attribut normal ist im
+//   Vertex-Shader immer deklariert, und alle eingebauten Materialien werden als GLSL ES 3.00 übersetzt (#version 300 es,
+//   src/renderers/webgl/WebGLProgram.js): fwidth und textureLod sind dort eingebaut (texture2D wird dort zu texture).
+// - Neu mit Handy-Karte und Hilfe. Auf MDN nachgeschlagen (25.09.2026): Element.animate (Keyframes als Objekt mit Listen, Optionen
+//   duration und easing; Baseline seit 2020), Animationstyp von visibility und overflow (diskret; visibility bleibt zwischen zwei
+//   visible sichtbar), HTMLDialogElement Ereignis close (auch nach Escape), Animation.cancel (nimmt die Wirkung weg, wirft nicht;
+//   Baseline seit 2020), MediaQueryList Ereignis change (Baseline seit 2020). Verbreitet, nicht nachgeschlagen: aria-expanded und
+//   aria-controls, removeEventListener mit capture, document.documentElement.clientWidth. Three.js im Quellcode 0.186.0:
+//   EventDispatcher.removeEventListener (src/core/EventDispatcher.js, Basis von Controls); Bedienung für die Hilfe aus
+//   examples/jsm/controls/OrbitControls.js (mouseButtons LEFT drehen, MIDDLE zoomen, RIGHT verschieben, links mit Strg, Meta oder
+//   Umschalt verschiebt; touches ONE drehen, TWO zoomen und verschieben; ohne listenToKeyEvents keine Pfeiltasten).
 const Sim = globalThis.StadtSim;
 const URLP = new URLSearchParams(location.search);
 const DEBUG = URLP.has('debug');
@@ -3681,6 +3824,51 @@ function baueGrafik(THREE, OrbitControls) {
     g.computeVertexNormals();
     return g;
   }
+  // Landstraßen ins Umland, fester Teil: vier Ausfahrten am Kartenrand, je auf einer Rasterlinie (reicht dort eine Stadtstraße bis
+  // an den Rand, geht sie gerade weiter). Von jeder führt eine Straße bis 400 hinaus: Schritt für Schritt leicht gedreht, dorthin,
+  // wo der Boden vorn tiefer liegt (Täler), um den See herum, nie mehr als 50° von der Ausfahrtrichtung weg, auf ebenem Boden in
+  // weiten Bögen. Danach zweimal geglättet. Der Wald lässt dafür eine Schneise. Das Stück vom Straßenende der Stadt bis zur
+  // Ausfahrt legt umland() neu, wenn Straßen dazukommen
+  const LAND_RAND = 49;                                   // Ausfahrten knapp vor dem Wald (Bäume erst ab 49,6)
+  const AUSFAHRT = [[-LAND_RAND, -15.5, -1, 0], [12.5, -LAND_RAND, 0, -1], [LAND_RAND, 16.5, 1, 0], [-19.5, LAND_RAND, 0, 1]];   // x, z, Richtung
+  const landFern = AUSFAHRT.map(([x0, z0, dx, dz], k) => {
+    let x = x0, z = z0, w = 0, weg = 0;                   // w: Drehung gegen die Ausfahrtrichtung, weg: Länge bisher
+    let p = [x0, z0];
+    while (randAbst(x, z) < 400) {
+      const lang = randAbst(x, z) < 80 ? 1.5 : 3;
+      const ziel = 0.3 * Math.sin(weg * 0.021 + k * 2.3); // Bögen auch auf ebenem Boden
+      let best = w, bestK = Infinity;
+      for (let i = -2; i <= 2; i++) {
+        const v = Math.max(-0.87, Math.min(0.87, w + i * 0.025)), c = Math.cos(v), s = Math.sin(v);
+        let kosten = 2 * (v - ziel) ** 2;
+        for (let j = 1; j <= 4; j++) {                    // vorausschauen: 8, 16, 24, 32
+          const qx = x + (dx * c - dz * s) * 8 * j, qz = z + (dx * s + dz * c) * 8 * j;
+          kosten += 0.08 * bodenHoehe(qx, qz) + 3 * glatt(2.6, 1.7, seeAbst(qx, qz));
+        }
+        if (kosten < bestK) { bestK = kosten; best = v; }
+      }
+      w = best; weg += lang;
+      x += (dx * Math.cos(w) - dz * Math.sin(w)) * lang; z += (dx * Math.sin(w) + dz * Math.cos(w)) * lang;
+      p.push(x, z);
+    }
+    for (let r = 0; r < 2; r++) {                          // glätten: jeder innere Punkt zur Mitte seiner Nachbarn
+      const q = p.slice();
+      for (let i = 2; i < p.length - 2; i++) q[i] = (p[i - 2] + 2 * p[i] + p[i + 2]) / 4;
+      p = q;
+    }
+    return new Float32Array(p);
+  });
+  // Abstand zur nächsten Landstraße draußen (Mittellinie); nur Punkte in der Nähe zählen
+  function landFernAbst(x, z) {
+    let d = 1e9;
+    for (const p of landFern) for (let i = 0; i < p.length - 2; i += 2) {
+      const ax = p[i], az = p[i + 1];
+      if (Math.abs(ax - x) > 8 || Math.abs(az - z) > 8) continue;
+      const ux = p[i + 2] - ax, uz = p[i + 3] - az, t = Math.max(0, Math.min(1, ((x - ax) * ux + (z - az) * uz) / (ux * ux + uz * uz)));
+      d = Math.min(d, Math.hypot(x - ax - ux * t, z - az - uz * t));
+    }
+    return d;
+  }
   // Wald am Kartenrand: Nadelbäume aus zwei Kegeln, in Gruppen nach waldMaske, davor einzelne; nach außen größer und lockerer.
   // Er steht fest und wird deshalb in die Bodengeometrie gebacken (ein Draw Call weniger). Wo die Kamera hinkommt
   // (Blickpunkt höchstens 60 von der Mitte, Polarwinkel ≤ 1,2, also mindestens 3,6 hoch), bleiben die Wipfel unter ihr.
@@ -3701,6 +3889,7 @@ function baueGrafik(THREE, OrbitControls) {
       const y = bodenHoehe(x, z) - 0.05, decke = Math.max(3.62, 0.388 * (d - 61.5)) - 0.35;   // tiefste Kamerahöhe hier, mit Abstand
       let s = (1.35 + (d - 50) / 30) * (0.75 + 0.5 * zellHash(ix, iz, 4)), sy = s * (0.85 + 0.4 * zellHash(ix, iz, 5));
       if (y + sy * 1.02 > decke) { const k = (decke - y) / (sy * 1.02); s *= k; sy *= k; }
+      if (landFernAbst(x, z) < 0.45 + 0.42 * s) continue;  // Schneise: Krone (Radius 0,42 × s) bleibt neben der Landstraße
       const w = zellHash(ix, iz, 6) * 6.3, cw = Math.cos(w), sw = Math.sin(w);
       ton.copy(WALDFARBEN[(zellHash(ix, iz, 7) * WALDFARBEN.length) | 0]).multiplyScalar(0.85 + 0.3 * zellHash(ix, iz, 8));
       for (let i = 0; i < tp.count; i++) {                 // gedreht um y, skaliert, verschoben; Farbe = Kegelfarbe × Ton
@@ -3743,8 +3932,66 @@ function baueGrafik(THREE, OrbitControls) {
   bodenGeo.setAttribute('position', new THREE.Float32BufferAttribute(bodenPos, 3));
   bodenGeo.setAttribute('color', new THREE.Float32BufferAttribute(bodenFarbe, 3));
   bodenGeo.computeVertexNormals();                        // ohne Index: jedes Dreieck flach (Low-Poly-Hügel und -Bäume)
+  // Felder im Gürtel zwischen Stadt und Wald: kein eigenes Mesh, der Boden färbt sie im Shader (nachts also so dunkel wie er).
+  // Parzellen 12 × 12, ihre Grenzen liegen auf jeder dritten Rasterlinie; je Parzelle ein bis drei Stücke, je Stück Wiese (bleibt,
+  // wie sie ist), Acker, reifes, junges oder dunkles Feld mit Reihen längs, dazwischen ein schmaler Rain aus Wiese. Nur leicht gegen
+  // die Wiese abgesetzt (Anteil ACKER_MIX). Reihen und Rain werden zur Ferne hin weich statt zu flimmern (fwidth). ackerKarte sagt
+  // je Block (4 × 4, genau die Blöcke zwischen den Rasterlinien), ob dort Feld sein darf: fest nicht im Wald, am See, hinter 57
+  // (ganze Parzellen); umland() nimmt die Blöcke weg, in denen oder direkt daneben Straße, Bauplatz oder Gebäude ist. An solchen
+  // Blöcken endet das Feld mit einem breiteren Rain. Bäume, Steine und Schilf (Normale nicht senkrecht) bleiben, wie sie sind
+  const ACKER_N = 11, ACKER_P = 12, ACKER_0 = -63.5, ACKER_MIX = 0.4;   // Parzellen je Achse, Seitenlänge, linke Kante, Anteil
+  const ACKER_BN = 32, ACKER_B = 4;                       // Blöcke je Achse, Seitenlänge
+  const ackerFest = new Uint8Array(ACKER_N * ACKER_N), ackerFrei = new Uint8Array(ACKER_BN * ACKER_BN), ackerDaten = new Uint8Array(ACKER_BN * ACKER_BN);
+  for (let j = 0; j < ACKER_N; j++) for (let i = 0; i < ACKER_N; i++) {
+    let frei = true;
+    for (let v = 0; v <= 4 && frei; v++) for (let u = 0; u <= 4 && frei; u++) {
+      const x = ACKER_0 + (i + u / 4) * ACKER_P, z = ACKER_0 + (j + v / 4) * ACKER_P, d = randAbst(x, z), wk = waldKante(x, z);
+      frei = d <= 57 && seeAbst(x, z) > 2.6 && glatt(0.5, 0.6, waldMaske(x, z)) * glatt(wk - 2, wk + 1, d) < 0.15;
+    }
+    ackerFest[j * ACKER_N + i] = frei ? 255 : 0;
+  }
+  const ackerKarte = new THREE.DataTexture(ackerDaten, ACKER_BN, ACKER_BN, THREE.RedFormat, THREE.UnsignedByteType, undefined,
+    THREE.ClampToEdgeWrapping, THREE.ClampToEdgeWrapping, THREE.NearestFilter, THREE.NearestFilter);
+  ackerKarte.needsUpdate = true;
+  const ACKER_TON = ['#4a4a35', '#55573b', '#3b5838', '#2f4934'].map(c => new THREE.Color(c));   // Acker, reif, jung, dunkel
+  const glslFarbe = (c) => `vec3( ${c.r.toFixed(4)}, ${c.g.toFixed(4)}, ${c.b.toFixed(4)} )`;
+  function ackerShader(s) {
+    s.uniforms.ackerKarte = { value: ackerKarte };
+    s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vAcker;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvAcker = vec3( position.x, position.z, normal.y );');   // Boden: Welt = Modell
+    s.fragmentShader = s.fragmentShader.replace('#include <common>', `#include <common>
+      uniform sampler2D ackerKarte;
+      varying vec3 vAcker;
+      float ackerHash( vec2 p ) { vec3 p3 = fract( p.xyx * 0.1031 ); p3 += dot( p3, p3.yzx + 33.33 ); return fract( ( p3.x + p3.y ) * p3.z ); }`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+      {
+        vec2 p = vAcker.xy, w = fwidth( p );                 // Welteinheiten je Pixel (Ableitungen vor jeder Verzweigung)
+        vec2 qb = ( p + ${(-ACKER_0).toFixed(1)} ) / ${ACKER_B.toFixed(1)}, bl = floor( qb );
+        int v = int( texture2D( ackerKarte, ( bl + 0.5 ) / ${ACKER_BN.toFixed(1)} ).r * 255.0 + 0.5 );   // Bits: Feld, Nachbarn −x +x −z +z
+        if ( ( v & 1 ) == 1 && vAcker.z > 0.9 ) {           // sonst (Stadt, Wald, Ferne, Bäume) bleibt der Boden, wie er ist
+          vec2 q = ( p + ${(-ACKER_0).toFixed(1)} ) / ${ACKER_P.toFixed(1)}, id = floor( q ), f = q - id;
+          float h = ackerHash( id ), n = h < 0.35 ? 1.0 : h < 0.8 ? 2.0 : 3.0;
+          bool inX = fract( h * 7.13 ) < 0.5;               // Stücke schmal in x, Reihen längs z (sonst umgekehrt)
+          float a = inX ? f.x : f.y, b = inX ? f.y : f.x, k = floor( a * n ), g = a * n - k;
+          float art = ackerHash( id * 1.7 + vec2( k * 3.1, 0.4 ) );
+          if ( art >= 0.3 ) {                                // Wiese-Stücke (art < 0,3) bleiben
+            // Abstand zur nächsten Kante eines Nachbarblocks ohne Feld (je Achse der nähere Nachbar)
+            vec2 fb = qb - bl, eb = min( fb, 1.0 - fb ) * ${ACKER_B.toFixed(1)};
+            bool nx = ( v & ( fb.x < 0.5 ? 2 : 4 ) ) != 0, nz = ( v & ( fb.y < 0.5 ? 8 : 16 ) ) != 0;
+            float schnitt = min( nx ? 99.0 : eb.x, nz ? 99.0 : eb.y );
+            float rand = min( min( g, 1.0 - g ) / n, min( b, 1.0 - b ) ) * ${ACKER_P.toFixed(1)};   // Abstand zum Rand des Stücks
+            float px = w.x + w.y, r = ( inX ? p.x : p.y ) / 0.4, fr = ( inX ? w.x : w.y ) / 0.4;   // Reihen, Reihen je Pixel
+            float reihe = abs( fract( r ) - 0.5 ) * 2.0 * ( 1.0 - smoothstep( 0.25, 0.5, fr ) );
+            vec3 ton = art < 0.5 ? ${glslFarbe(ACKER_TON[0])} : art < 0.66 ? ${glslFarbe(ACKER_TON[1])} : art < 0.84 ? ${glslFarbe(ACKER_TON[2])} : ${glslFarbe(ACKER_TON[3])};
+            float feld = smoothstep( 0.1, 0.1 + px, rand ) * smoothstep( 0.35, 0.35 + px, schnitt );   // Rain zwischen den Stücken, breiter zur Stadt
+            vec3 c = mix( diffuseColor.rgb, ton, ${ACKER_MIX} ) * ( 0.96 + 0.08 * fract( art * 13.7 ) ) * ( 1.0 - 0.1 * reihe );
+            diffuseColor.rgb = mix( diffuseColor.rgb, c, feld );
+          }
+        }
+      }`);
+  }
   const boden = new THREE.Mesh(bodenGeo, new THREE.MeshLambertMaterial({ vertexColors: true }));
-  boden.material.onBeforeCompile = wolkenSchatten;
+  boden.material.onBeforeCompile = (s) => { wolkenSchatten(s); ackerShader(s); };
   scene.add(boden);
 
   // See: flache Wasserfläche aus Mitte, Innenring und Uferring (48 Dreiecke), jede Fläche etwas anders hell; zur fernen
@@ -4481,6 +4728,233 @@ function baueGrafik(THREE, OrbitControls) {
     }
     laternen = nl;
     namenKandidaten();                                    // Straßennamen: neue Blockmitten
+    umland();                                             // Landstraßen und Felder folgen dem Straßennetz
+  }
+
+  // ─── Umland: Landstraßen von Straßenenden der Stadt über die Ausfahrten hinaus, Felder, Höfe. Deko: nicht klickbar, ohne Wirkung
+  // auf die Simulation, keine Figuren oder Fahrzeuge darauf. Nur neu, wenn Straßen dazukommen (aus strassenraum) ───
+  const LAND_F = new THREE.Color('#35383a'), LAND_B = 0.42, LAND_MAX = 12000, LAND_PKT = 1000;   // Farbe, Breite, Ecken, Punkte je Stück
+  const landPos = new Float32Array(LAND_MAX * 3), landNor = new Float32Array(LAND_MAX * 3);
+  const landGeo = new THREE.BufferGeometry();
+  landGeo.setAttribute('position', new THREE.BufferAttribute(landPos, 3).setUsage(THREE.DynamicDrawUsage));
+  landGeo.setAttribute('normal', new THREE.BufferAttribute(landNor, 3).setUsage(THREE.DynamicDrawUsage));
+  landGeo.setDrawRange(0, 0);
+  // Schmal, dunkler als die Fahrbahn, ohne Gehweg und Laternen; knapp über dem Boden, dazu Tiefenversatz gegen Flimmern
+  const landstrassen = new THREE.Mesh(landGeo, lambert(LAND_F, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }));
+  landstrassen.frustumCulled = false; landstrassen.visible = false;
+  scene.add(landstrassen);
+  const bandRand = new Float32Array(LAND_PKT * 12);       // je Punkt: linker Rand x, y, z, rechter Rand x, y, z, dann ihre Normalen
+  // Innerhalb von ±53 ist der Boden eben (alle Ecken der Vierecke dort liegen auf 0)
+  const landHoehe = (x, z) => randAbst(x, z) <= 53 ? 0 : bodenHoehe(x, z);
+  // Normale aus dem Gefälle des Bodens (wie die Fläche darunter beleuchtet), nach r ab o
+  function landNormale(r, o, x, z) {
+    const e = 0.25, gx = (landHoehe(x + e, z) - landHoehe(x - e, z)) / (2 * e), gz = (landHoehe(x, z + e) - landHoehe(x, z - e)) / (2 * e);
+    const l = Math.hypot(gx, 1, gz);
+    r[o] = -gx / l; r[o + 1] = 1 / l; r[o + 2] = -gz / l;
+  }
+  function landEcke(n, o) {                               // o: Rand im Punkt (Normale 6 dahinter)
+    const r = bandRand;
+    landPos[3 * n] = r[o]; landPos[3 * n + 1] = r[o + 1]; landPos[3 * n + 2] = r[o + 2];
+    landNor[3 * n] = r[o + 6]; landNor[3 * n + 1] = r[o + 7]; landNor[3 * n + 2] = r[o + 8];
+    return n + 1;
+  }
+  // Band entlang der Mittellinie p (x, z im Wechsel, np Punkte) ab Ecke n; gibt die neue Eckenzahl. Beide Ränder liegen auf dem
+  // Boden; liegt die Mitte eines Stücks tiefer als der Boden (Knick im Gelände), heben sich beide Enden um den Unterschied
+  function band(p, np, n) {
+    const r = bandRand, b = LAND_B / 2;
+    np = Math.min(np, LAND_PKT);
+    for (let i = 0; i < np; i++) {
+      const i0 = Math.max(0, i - 1), i1 = Math.min(np - 1, i + 1), x = p[2 * i], z = p[2 * i + 1];
+      let tx = p[2 * i1] - p[2 * i0], tz = p[2 * i1 + 1] - p[2 * i0 + 1];
+      const l = Math.hypot(tx, tz) || 1, hoch = randAbst(x, z) < 54 ? 0.014 : 0.03;   // draußen etwas höher (Hügel, Ferne)
+      tx /= l; tz /= l;
+      const o = 12 * i;
+      r[o] = x - tz * b; r[o + 2] = z + tx * b; r[o + 1] = landHoehe(r[o], r[o + 2]) + hoch;
+      r[o + 3] = x + tz * b; r[o + 5] = z - tx * b; r[o + 4] = landHoehe(r[o + 3], r[o + 5]) + hoch;
+      landNormale(r, o + 6, r[o], r[o + 2]); landNormale(r, o + 9, r[o + 3], r[o + 5]);
+    }
+    for (let i = 0; i + 1 < np; i++) for (let s = 0; s < 6; s += 3) {
+      const a = 12 * i + s, c = a + 12;
+      const m = landHoehe((r[a] + r[c]) / 2, (r[a + 2] + r[c + 2]) / 2) + 0.014 - (r[a + 1] + r[c + 1]) / 2;
+      if (m > 0) { r[a + 1] += m; r[c + 1] += m; }
+    }
+    for (let i = 0; i + 1 < np && n + 6 <= LAND_MAX; i++) {   // je Stück zwei Dreiecke, Vorderseite oben
+      const a = 12 * i, c = a + 12;
+      n = landEcke(n, a + 3); n = landEcke(n, a); n = landEcke(n, c + 3);
+      n = landEcke(n, a); n = landEcke(n, c); n = landEcke(n, c + 3);
+    }
+    return n;
+  }
+  // Der feste Teil draußen ändert sich nie: einmal bauen und je Ausfahrt merken
+  const fernPos = [], fernNor = [];
+  for (const p of landFern) {
+    const n = band(p, p.length / 2, 0);
+    fernPos.push(landPos.slice(0, 3 * n)); fernNor.push(landNor.slice(0, 3 * n));
+  }
+
+  // Höfe im Umland: nachts schwache, warme Lichtpunkte neben den Landstraßen, 60 bis 170 von der Mitte: je Straße drei Höfe mit
+  // ein bis drei Lichtern (im Wald oder am See keiner), an den beiden Straßen im Startblick weit draußen ein Dorf. Fest je Straße,
+  // gezeigt nur an verbundenen. Additiv, im Nebel nach Schwarz wie der Lichtfleck; licht() blendet mit der Dämmerung ein und aus,
+  // nichts blinkt. Nicht klickbar
+  const HOF_MAX = 64, HOF_F = new THREE.Color('#ffb060');
+  const hofOrte = landFern.map((p, k) => {
+    const o = [];
+    const setzen = (s0, anzahl, streu, key) => {           // an der Stelle s0 (Weglänge ab der Ausfahrt) neben der Straße
+      let s = 0;
+      for (let i = 0; i + 3 < p.length; i += 2) {
+        const ux = p[i + 2] - p[i], uz = p[i + 3] - p[i + 1], l = Math.hypot(ux, uz);
+        if (s + l < s0) { s += l; continue; }
+        const seite = zellHash(k, key, 150) < 0.5 ? 1 : -1, ab = 2.4 + 2 * zellHash(k, key, 151);
+        const mx = p[i] - uz / l * seite * ab, mz = p[i + 1] + ux / l * seite * ab;
+        for (let j = 0; j < anzahl; j++) {
+          const x = mx + (zellHash(k, key * 8 + j, 152) - 0.5) * streu, z = mz + (zellHash(k, key * 8 + j, 153) - 0.5) * streu, d = randAbst(x, z);
+          if (seeAbst(x, z) < 2.6 || (d < 82 && waldMaske(x, z) > 0.55) || landFernAbst(x, z) < 0.8) continue;
+          o.push(x, bodenHoehe(x, z) + 0.3, z, 0.55 + 0.4 * zellHash(k, key * 8 + j, 154));
+        }
+        return;
+      }
+    };
+    for (let h = 0; h < 3; h++) setzen(8 + 36 * h + 16 * zellHash(k, h, 155), 1 + ((zellHash(k, h, 156) * 3) | 0), 1.6, h);
+    if (k < 2) setzen(105 + 20 * zellHash(k, 9, 155), 6, 4.5, 9);
+    return new Float32Array(o);
+  });
+  const hofGeo = new THREE.BufferGeometry();
+  hofGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(HOF_MAX * 3), 3));
+  hofGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(HOF_MAX * 3), 3));
+  hofGeo.setDrawRange(0, 0);
+  const hoefe = new THREE.Points(hofGeo, new THREE.PointsMaterial({ size: 6, sizeAttenuation: false, map: M.fleck.material.map,
+    vertexColors: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+  hoefe.material.onBeforeCompile = (s) => { s.fragmentShader = s.fragmentShader.replace('#include <fog_fragment>', THREE.ShaderChunk.fog_fragment.replace('fogColor', 'vec3( 0.0 )')); };
+  hoefe.frustumCulled = false; hoefe.visible = false;
+  scene.add(hoefe);
+  let hofAnzahl = 0;
+
+  // Ist die Stelle x, z für eine Landstraße frei, bis die nächste Straße kommt? Außerhalb der Karte immer, auf der Karte ein leeres
+  // Feld ohne Bauplatz: Gebäude stehen nur auf Bauplätzen, und die entstehen nur mit neuen Straßen. Felder unter einer Landstraße
+  // merkt landFeld; dort legt stadt() weder Garten noch Brache an
+  const landFeld = new Uint8Array(F);
+  function landFrei(x, z) {
+    const ix = Math.floor(x + H), iz = Math.floor(z + H);
+    return ix < 0 || iz < 0 || ix >= Sim.KARTE || iz >= Sim.KARTE || (S.feld[iz * Sim.KARTE + ix] === Sim.LEER && !S.platz[iz * Sim.KARTE + ix]);
+  }
+  const landMerken = (x, z) => { const ix = Math.floor(x + H), iz = Math.floor(z + H); if (ix >= 0 && iz >= 0 && ix < Sim.KARTE && iz < Sim.KARTE) landFeld[iz * Sim.KARTE + ix] = 1; };
+  // Stück von einem Ansatz (Rand des Straßenfelds px, pz, Richtung dx, dz) zur Ausfahrt k: 1 gerade weiter, dann ein kubischer
+  // Bogen, der in Ausfahrtrichtung ankommt. Punkte nach out; gibt die Kosten (Länge, Drehung) oder −1, wenn der Weg durch die
+  // Stadt ginge, enger als Radius 3 dreht oder vom Ende weg nach hinten zeigt
+  function landStueck(px, pz, dx, dz, k, out) {
+    const [ex, ez, tx, tz] = AUSFAHRT[k], x1 = px + dx, z1 = pz + dz;
+    const vx = ex - x1, vz = ez - z1, L = Math.hypot(vx, vz);
+    if (L < 0.5 || (dx * vx + dz * vz) / L < 0.25) return -1;
+    if (!landFrei(px + 0.5 * dx, pz + 0.5 * dz)) return -1;
+    // Geprüft wird alle 0,25 die Mitte und beide Ränder (quer, 0,24 von der Mitte); gemerkt wird jeder zweite Punkt
+    const a = 0.42 * L, n = 2 * Math.ceil(L / 0.5);
+    out[0] = px; out[1] = pz;
+    let np = 1, w0 = 0, qx = dx, qz = dz, lx = px, lz = pz;
+    for (let i = 0; i <= n && np < LAND_PKT; i++) {
+      const t = i / n, u = 1 - t, b0 = u * u * u, b1 = 3 * u * u * t, b2 = 3 * u * t * t, b3 = t * t * t;
+      const x = b0 * x1 + b1 * (x1 + dx * a) + b2 * (ex - tx * a) + b3 * ex, z = b0 * z1 + b1 * (z1 + dz * a) + b2 * (ez - tz * a) + b3 * ez;
+      if (i) { const l = Math.hypot(x - lx, z - lz) || 1; qx = (x - lx) / l; qz = (z - lz) / l; }
+      lx = x; lz = z;
+      if (!landFrei(x, z) || !landFrei(x - qz * 0.24, z + qx * 0.24) || !landFrei(x + qz * 0.24, z - qx * 0.24)) return -1;
+      if (i & 1 && i < n) continue;
+      const sx = x - out[2 * np - 2], sz = z - out[2 * np - 1], sl = Math.hypot(sx, sz), w = Math.atan2(sz, sx);
+      if (np > 1) {                                       // Radius = Stücklänge / Drehwinkel
+        let dw = Math.abs(w - w0); if (dw > Math.PI) dw = 2 * Math.PI - dw;
+        if (dw > 1e-4 && sl / dw < 3) return -1;
+      }
+      w0 = w; out[2 * np] = x; out[2 * np + 1] = z; np++;
+    }
+    return { np, kosten: L * (1 + 0.8 * (1 - (dx * vx + dz * vz) / L)) + 4 * (1 - (vx * tx + vz * tz) / L) };
+  }
+  const landWeg = AUSFAHRT.map(() => new Float32Array(LAND_PKT * 2)), landWegN = new Int32Array(AUSFAHRT.length);
+  function umland() {
+    const K = Sim.KARTE;
+    // Ansätze: vom Straßenfeld zu einem leeren Nachbarn ohne Bauplatz. Das sind Straßenenden (genau ein Nachbar aus Straße,
+    // Richtung vom Nachbarn weg) und Abzweige an Rasterpunkten (nur dort ist der Nachbar quer zur Straße kein Bauplatz, dort zweigt
+    // auch die Simulation ab); Abzweige kosten mehr. Der Weg geradeaus läuft auf der Rasterlinie, dort gibt es keine Bauplätze
+    const enden = [];
+    for (let c = 0; c < F; c++) {
+      if (S.feld[c] !== Sim.STRASSE) continue;
+      const x = c % K, y = (c / K) | 0;
+      let nb = -1, zahl = 0;
+      for (let i = 0; i < 4; i++) if (istStrasse(x + RICHT[i][0], y + RICHT[i][1])) { nb = i; zahl++; }
+      for (let i = 0; i < 4; i++) {
+        const [dx, dy] = RICHT[i], nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= K || ny >= K || S.feld[ny * K + nx] !== Sim.LEER || S.platz[ny * K + nx]) continue;
+        const ende = zahl === 1 && i === (nb + 2) % 4;
+        if (zahl === 1 && !ende) continue;               // am Straßenende nur geradeaus
+        enden.push([wx(x) + dx * 0.5, wx(y) + dy * 0.5, dx, dy, ende ? 0 : 8]);
+      }
+    }
+    // Je Ausfahrt die Ansätze nach Luftlinie (plus Aufschlag) prüfen, das ist eine Untergrenze der Kosten: aufhören, wenn sechs
+    // gültige gefunden sind und keiner mehr günstiger sein kann. Dann die günstigsten zuerst: jeder Ansatz und jede Ausfahrt
+    // höchstens einmal, und zwei Landstraßen bleiben mindestens 3 auseinander
+    const wahl = [], punkte = new Float32Array(LAND_PKT * 2);
+    for (let k = 0; k < AUSFAHRT.length; k++) {
+      const [ex, ez] = AUSFAHRT[k], gut = [];
+      const reihe = enden.map((a, e) => [Math.hypot(ex - a[0] - a[2], ez - a[1] - a[3]) + a[4], e]).sort((a, b) => a[0] - b[0]);
+      for (const [schranke, e] of reihe) {
+        if (gut.length >= 6 && schranke > gut[5]) break;
+        const [px, pz, dx, dz, mehr] = enden[e], r = landStueck(px, pz, dx, dz, k, punkte);
+        if (r === -1) continue;
+        wahl.push({ e, k, kosten: r.kosten + mehr, p: punkte.slice(0, 2 * r.np) });
+        gut.push(r.kosten + mehr); gut.sort((a, b) => a - b);
+      }
+    }
+    wahl.sort((a, b) => a.kosten - b.kosten);
+    landWegN.fill(0);
+    const endeFrei = new Uint8Array(enden.length).fill(1), gewaehlt = [];
+    for (const w of wahl) {
+      if (landWegN[w.k] || !endeFrei[w.e]) continue;
+      let nah = false;
+      for (const g of gewaehlt) for (let i = 0; i < w.p.length && !nah; i += 2) for (let j = 0; j < g.length && !nah; j += 2)
+        nah = Math.abs(w.p[i] - g[j]) < 3 && Math.abs(w.p[i + 1] - g[j + 1]) < 3;
+      if (nah) continue;
+      landWeg[w.k].set(w.p); landWegN[w.k] = w.p.length / 2; endeFrei[w.e] = 0; gewaehlt.push(w.p);
+    }
+    // Felder unter den gewählten Stücken merken (alle 0,25 die Mitte und beide Ränder, wie geprüft)
+    landFeld.fill(0);
+    for (const p of gewaehlt) for (let i = 0; i + 3 < p.length; i += 2) {
+      const ux = p[i + 2] - p[i], uz = p[i + 3] - p[i + 1], l = Math.hypot(ux, uz) || 1, m = Math.ceil(l / 0.25);
+      for (let j = 0; j <= m; j++) {
+        const x = p[i] + ux * j / m, z = p[i + 1] + uz * j / m;
+        landMerken(x, z); landMerken(x - uz / l * 0.24, z + ux / l * 0.24); landMerken(x + uz / l * 0.24, z - ux / l * 0.24);
+      }
+    }
+    // Band: Stadtstück neu, der feste Teil draußen aus dem Merker; Höfe nur an verbundenen Straßen
+    let n = 0, nh = 0;
+    const hp = hofGeo.getAttribute('position'), hf = hofGeo.getAttribute('color');
+    for (let k = 0; k < AUSFAHRT.length; k++) {
+      if (!landWegN[k]) continue;
+      n = band(landWeg[k], landWegN[k], n);
+      const m = Math.min(fernPos[k].length, 3 * LAND_MAX - 3 * n);
+      landPos.set(fernPos[k].subarray(0, m), 3 * n); landNor.set(fernNor[k].subarray(0, m), 3 * n); n += m / 3;
+      const o = hofOrte[k];
+      for (let i = 0; i < o.length && nh < HOF_MAX; i += 4, nh++) {
+        hp.setXYZ(nh, o[i], o[i + 1], o[i + 2]); hf.setXYZ(nh, HOF_F.r * o[i + 3], HOF_F.g * o[i + 3], HOF_F.b * o[i + 3]);
+      }
+    }
+    landGeo.setDrawRange(0, n); landstrassen.visible = n > 0;
+    landGeo.getAttribute('position').needsUpdate = true; landGeo.getAttribute('normal').needsUpdate = true;
+    hofGeo.setDrawRange(0, nh); hofAnzahl = nh; hp.needsUpdate = true; hf.needsUpdate = true;
+    // Felder: ein Block bleibt, wenn seine Parzelle Feld haben darf und in ihm und ein Feld um ihn herum nichts gebaut, keine
+    // Straße und kein Bauplatz ist. In die Karte kommt je Block ein Bitfeld: Bit 0 Feld, Bit 1 bis 4 Nachbar −x, +x, −z, +z hat
+    // Feld (der Shader braucht so nur einen Abruf)
+    const je = ACKER_P / ACKER_B;
+    for (let j = 0; j < ACKER_BN; j++) for (let i = 0; i < ACKER_BN; i++) {
+      let frei = ackerFest[((j / je) | 0) * ACKER_N + ((i / je) | 0)] > 0;
+      // Welt-x liegt in Zelle floor(x + H); die Blockgrenzen laufen durch Zellmitten (Rasterlinien), dazu ein Feld Rand
+      const x0 = Math.floor(ACKER_0 + ACKER_B * i + H) - 1, x1 = Math.floor(ACKER_0 + ACKER_B * (i + 1) + H) + 1;
+      const y0 = Math.floor(ACKER_0 + ACKER_B * j + H) - 1, y1 = Math.floor(ACKER_0 + ACKER_B * (j + 1) + H) + 1;
+      for (let y = Math.max(0, y0); frei && y <= Math.min(K - 1, y1); y++)
+        for (let x = Math.max(0, x0); frei && x <= Math.min(K - 1, x1); x++)
+          frei = S.feld[y * K + x] === Sim.LEER && !S.platz[y * K + x];
+      ackerFrei[j * ACKER_BN + i] = frei ? 1 : 0;
+    }
+    const an = (i, j) => i >= 0 && j >= 0 && i < ACKER_BN && j < ACKER_BN ? ackerFrei[j * ACKER_BN + i] : 0;
+    for (let j = 0; j < ACKER_BN; j++) for (let i = 0; i < ACKER_BN; i++)
+      ackerDaten[j * ACKER_BN + i] = an(i, j) ? 1 + 2 * an(i - 1, j) + 4 * an(i + 1, j) + 8 * an(i, j - 1) + 16 * an(i, j + 1) : 0;
+    ackerKarte.needsUpdate = true;
   }
 
   // Welche Stockwerke leuchten? Nachts bewohnte, je nach Belegung; spät in der Nacht nur noch wenige.
@@ -4658,13 +5132,14 @@ function baueGrafik(THREE, OrbitControls) {
     // Gärten: leere Felder neben Wohnhäusern bekommen nach Zellen-Hash einen oder zwei Bäume und niedrige Hecken an den
     // Feldgrenzen (nicht zum Haus hin; zwischen zwei Gärten nur eine). Brachen: andere leere Felder, an die mindestens drei
     // Straßen, Gebäude oder Baustellen grenzen und die rundum (mit den Ecken) mindestens sechs bebaute Nachbarn haben: eine
-    // Lücke am Stadtrand mit offener Wiese dahinter hat nur fünf. Stündlich neu, weil Felder bebaut werden
+    // Lücke am Stadtrand mit offener Wiese dahinter hat nur fünf. Stündlich neu, weil Felder bebaut werden. Felder unter einer
+    // Landstraße (landFeld) bleiben frei
     const feld = S.feld, W = Sim.WOHNHAUS, LEER = Sim.LEER;
     const an = (x, y) => x < 0 || y < 0 || x >= K || y >= K ? LEER : feld[y * K + x];   // außerhalb der Karte: leer
-    const garten = (x, y) => an(x, y) === LEER && zellHash(x, y, 21) <= 0.6
+    const garten = (x, y) => an(x, y) === LEER && zellHash(x, y, 21) <= 0.6 && !(x >= 0 && y >= 0 && x < K && y < K && landFeld[y * K + x])
       && (an(x - 1, y) === W || an(x + 1, y) === W || an(x, y - 1) === W || an(x, y + 1) === W);
     for (let c = 0; c < F; c++) {
-      if (feld[c] !== LEER) continue;
+      if (feld[c] !== LEER || landFeld[c]) continue;
       const x = c % K, y = (c / K) | 0;
       if (!garten(x, y)) {
         const seiten = (an(x - 1, y) !== LEER) + (an(x + 1, y) !== LEER) + (an(x, y - 1) !== LEER) + (an(x, y + 1) !== LEER);
@@ -5369,7 +5844,7 @@ function baueGrafik(THREE, OrbitControls) {
   let namenFaellig = true, namenAn = false, panelZeit = -1e9, panelN = 0, namenUhr = 0, ruheUhr = 0, ruheBis = 0;
   // Alles über der Leinwand (buch-liste: am Handy quer eine eigene Fläche). Ändert eins bei ruhender Kamera seine Größe (Stadtbuch
   // auf- oder zugeklappt, Meldung erscheint), setzt ResizeObserver die Schilder neu; auch hidden → sichtbar ist eine Größenänderung
-  const NAMEN_PANELS = ['kennzahlen', 'rechts', 'buch-liste', 'tempo', 'einst-knopf', 'karte', 'meldung', 'hinweis', 'aufholen', 'debug',
+  const NAMEN_PANELS = ['kennzahlen', 'rechts', 'buch-liste', 'tempo', 'einst-knopf', 'hilfe-knopf', 'karte', 'meldung', 'hinweis', 'aufholen', 'debug',
     'debug-knoepfe'].map($), panelR = new Float32Array(4 * NAMEN_PANELS.length);
   const sperrR = new Float32Array(4);                     // Bildfläche des ausgewählten Gebäudes (mit Rand)
   let sperrAn = false;
@@ -5651,6 +6126,9 @@ function baueGrafik(THREE, OrbitControls) {
       .lerp(cA, 0.85 * st * st);                          // nachts nahe am Horizont (etwas dunkler), sonst ein schwarzes Loch im Startblick
     rauch.material.color.copy(RAUCH_F).lerp(cA, 0.05 + 0.25 * (1 - glatt(9, 10.5, t) * (1 - glatt(15, 16.5, t))));
     rauchSicht = glatt(8, 8.4, t) * (1 - glatt(16.6, 17, t));
+    // Höfe im Umland: mit der Dämmerung an, im Morgengrauen aus (unsichtbar = kein Draw Call)
+    const hof = 1 - glatt(1, 1.6, sonne.intensity);
+    hoefe.material.opacity = 0.85 * hof; hoefe.visible = hof > 0.02 && hofAnzahl > 0;
   }
 
   // Freie Fläche zwischen den Panels: Dorthin zielt der Blick. Der Bildausschnitt wird verschoben (setViewOffset), der Drehpunkt
@@ -5659,7 +6137,7 @@ function baueGrafik(THREE, OrbitControls) {
   // Ergebnis: Mitte mx, my und m = Höhe in Pixeln, die die Stadt dort haben darf. Die Mitte liegt höchstens 10 % der Bildhöhe
   // unter der Bildmitte: render() prüft den Himmel mit dem halben Blickwinkel, oben kommen so höchstens gut 4° dazu (die Kuppel
   // reicht 5° unter den Horizont).
-  const PANELS = ['kennzahlen', 'rechts', 'tempo', 'einst-knopf'];
+  const PANELS = ['kennzahlen', 'rechts', 'tempo', 'einst-knopf', 'hilfe-knopf'];
   let stadtSeiten = 1.6, stadtBedarf = 0.5, stadtWeit = 1;   // aus dem letzten Startblick: Breite : Höhe der Bebauung im Bild, ihre
                                                           // Höhe samt Rand im Startabstand als Anteil der Bildhöhe, und wie viel
                                                           // weiter weg die Kamera höchstens darf (Nebel)
@@ -5686,11 +6164,12 @@ function baueGrafik(THREE, OrbitControls) {
       if (q && q.width && q.height) p.push(q);
     }
     const ohne = besteFlaeche(p, w, h);
-    // Die Karte wird zum Messen kurz eingeblendet, so hoch sie höchstens wird (dazwischen wird nichts gezeichnet)
-    const karte = document.getElementById('karte'), zu = karte.hidden;
-    karte.hidden = false; karte.style.height = '100vh';     // max-height begrenzt
+    // Die Karte wird zum Messen kurz eingeblendet, so hoch sie höchstens wird (dazwischen wird nichts gezeichnet); eingeklappt
+    // (Handy) zählt sie aufgeklappt, sonst hinge der Bildausschnitt am Klappen
+    const karte = document.getElementById('karte'), zu = karte.hidden, ein = karte.classList.contains('eingeklappt');
+    karte.hidden = false; karte.classList.remove('eingeklappt'); karte.style.height = '100vh';   // max-height begrenzt
     const kq = karte.getBoundingClientRect();
-    karte.hidden = zu; karte.style.height = '';
+    karte.hidden = zu; karte.classList.toggle('eingeklappt', ein); karte.style.height = '';
     if (!kq.width) return ohne;
     // Karte als Spalte links (breit: unter den Zahlen) oder rechts über der Spalte mit Hauptfiguren und Stadtbuch (mittlere
     // Breite): zählt mit, damit die Stadt auch bei offener Karte frei bleibt, solange die Kamera dafür höchstens ein Drittel weiter
@@ -5801,7 +6280,7 @@ function baueGrafik(THREE, OrbitControls) {
   // ─── „Zeigen“ (Knopf in der Hauskarte): Blickpunkt und Kamera rücken gleich weit (nur verschieben, Richtung und Abstand bleiben),
   // bis Gebäude b in der Mitte der freien Fläche neben der Karte liegt. Nur auf Knopfdruck, nie von selbst; weich über FAHRT_MS
   // (reduziert: sofort). Dreht oder zoomt jemand selbst (controls 'start'), bricht die Fahrt ab ───
-  const FAHRT_MS = 400, ZEIGEN_PANELS = ['kennzahlen', 'rechts', 'buch-liste', 'tempo', 'einst-knopf', 'karte'].map($);
+  const FAHRT_MS = 400, ZEIGEN_PANELS = ['kennzahlen', 'rechts', 'buch-liste', 'tempo', 'einst-knopf', 'hilfe-knopf', 'karte'].map($);
   const fahrtWeg = new THREE.Vector3(), gebR = new Float32Array(4);
   let fahrtStart = -1, fahrtStand = 0;                    // Beginn (performance.now, −1: keine Fahrt), zurückgelegter Anteil
   controls.addEventListener('start', () => { fahrtStart = -1; });
@@ -5872,7 +6351,10 @@ function baueGrafik(THREE, OrbitControls) {
     instanzen() { return Object.values(M).reduce((s, m) => s + m.count, 0); },
     THREE, renderer, scene, camera, controls, M, figMesh,
     test: { figuren, figIds, simOrt, beiDerArbeit, WERK_MAX, FIG_MAX,   // nur für die Figuren-Prüfung (Playwright)
-      fenster: () => ({ statisch: fensterStatisch, schirme, count: M.fenster.count }), zeichen },
+      fenster: () => ({ statisch: fensterStatisch, schirme, count: M.fenster.count }), zeichen,
+      umland: () => ({ strassen: [...landWegN].filter(Boolean).length, stadtPunkte: [...landWegN], ecken: landGeo.drawRange.count,
+        hoefe: hofAnzahl, felder: ackerDaten.reduce((s, v) => s + (v > 0), 0), felderFest: ackerFest.reduce((s, v) => s + (v > 0), 0) }),
+      landstrassen, hoefe, umlandZeit: () => { const t = performance.now(); umland(); return performance.now() - t; } },
   };
 }
 
@@ -5886,7 +6368,7 @@ function setzeTempo(t) {
 for (const k of TEMPO_KNOEPFE) k.addEventListener('click', () => setzeTempo(Number(k.dataset.tempo)));
 let tempoVorPause = 1;
 addEventListener('keydown', (e) => {
-  if (e.code !== 'Space' || e.target.closest('input, textarea, button, select')) return;
+  if (e.code !== 'Space' || e.target.closest('input, textarea, button, select, dialog')) return;   // im Dialog (Hilfe: Fokus auf der Überschrift) scrollt die Leertaste
   e.preventDefault();
   if (tempo) { tempoVorPause = tempo; setzeTempo(0); } else setzeTempo(tempoVorPause);
 });
@@ -5986,7 +6468,7 @@ const hausKnopf = (b, text) => b >= 0 ? `<button type="button" class="haus" data
 const balken = (wert, gruen) => `<div class="balken${gruen ? ' gruen' : ''}" role="img" aria-label="${Math.round(wert)} von 100"><span style="width:${Math.max(0, Math.min(100, wert))}%"></span></div>`;
 function zeigePerson(p, gen, name) { verlauf.push({ art: 'p', id: Number(p), gen: Number(gen), name: name || '' }); if (verlauf.length > 50) verlauf.shift(); karteRendern(true); }
 function zeigeGebaeude(b) { verlauf.push({ art: 'g', id: Number(b) }); if (verlauf.length > 50) verlauf.shift(); karteRendern(true); }
-function karteZu() { verlauf.length = 0; $('karte').hidden = true; document.body.classList.remove('karte-offen'); hauptMarkieren(); auswahlZeigen(); }
+function karteZu() { verlauf.length = 0; $('karte').hidden = true; klappStand(false); document.body.classList.remove('karte-offen'); hauptMarkieren(); auswahlZeigen(); }
 // Das Gebäude der offenen Hauskarte ist in der Stadt hervorgehoben; eine Personenkarte markiert nichts
 function auswahlZeigen() {
   const k = !$('karte').hidden && verlauf[verlauf.length - 1];
@@ -6001,7 +6483,42 @@ function zeigenKnopf() {
   const an = !!(G && k && k.art === 'g' && (SCHMAL.matches || G.unterKarte(k.id)));
   if (an === knopf.hidden && (an || !knopf.matches(':focus-visible'))) knopf.hidden = !an;   // Tastatur-Fokus hält ihn, ein Mausklick nicht
 }
-$('karte-zeigen').addEventListener('click', () => { const k = verlauf[verlauf.length - 1]; if (G && k && k.art === 'g') G.zeigen(k.id); });
+// Handy: „Zeigen“ klappt die Karte erst ein und rückt das Gebäude dann in die frei gewordene Fläche (zeigen() misst die Karte
+// in ihrer Endgröße, bevor der Übergang beginnt)
+$('karte-zeigen').addEventListener('click', () => {
+  const k = verlauf[verlauf.length - 1];
+  if (!G || !k || k.art !== 'g') return;
+  if (SCHMAL.matches) karteKlappen(true, () => G.zeigen(k.id)); else G.zeigen(k.id);
+});
+// Karte einklappen (klein, CSS-Block „Klein“): nur die Kopfleiste bleibt, die Stadt ist frei. Die Endgröße gilt sofort im Layout;
+// danach() rechnet mit ihr, erst dann gleiten Höhe und Inhalt 250 ms per Web Animations (Element.animate, auf MDN nachgeschlagen)
+// von der alten Größe dorthin. Reduziert: ohne Übergang. Eine neue Karte öffnet aufgeklappt (karteRendern)
+const KLAPP_MS = 250, KLAPP_WEISE = { duration: KLAPP_MS, easing: 'cubic-bezier(.4,0,.2,1)' };   // sanft an und aus
+const klappLaeufe = [];                                  // laufende Übergänge (höchstens 3)
+function klappStand(zu) {
+  // Ein neuer Stand bricht laufende Übergänge ab: sonst schrumpfte eine gerade geöffnete Karte noch zu Ende und spränge dann auf
+  for (const a of klappLaeufe) a.cancel();
+  klappLaeufe.length = 0;
+  const knopf = $('karte-klappen');
+  $('karte').classList.toggle('eingeklappt', zu);
+  knopf.setAttribute('aria-expanded', String(!zu));
+  knopf.title = zu ? 'Aufklappen' : 'Einklappen';
+}
+function karteKlappen(zu, danach) {
+  const k = $('karte');
+  if (k.classList.contains('eingeklappt') === zu) { if (danach) danach(); return; }
+  const von = k.offsetHeight;
+  klappStand(zu);
+  const nach = k.offsetHeight;                             // Endgröße (liest das Layout)
+  if (danach) danach();
+  if (REDUZIERT || k.hidden || !k.animate || von === nach) return;
+  klappLaeufe.push(k.animate({ maxHeight: [von + 'px', nach + 'px'], overflow: ['hidden', 'hidden'] }, KLAPP_WEISE),
+    $('karte-inhalt').animate(zu ? { opacity: [1, 0], visibility: ['visible', 'visible'] } : { opacity: [0, 1] }, KLAPP_WEISE));
+  if (zu) klappLaeufe.push($('karte-kopf-titel').animate({ opacity: [0, 1] }, KLAPP_WEISE));   // der Titel oben erscheint, während der unten vergeht
+}
+$('karte-klappen').addEventListener('click', () => karteKlappen($('karte-klappen').getAttribute('aria-expanded') === 'true'));
+// Breit gibt es kein Einklappen: dort aufgeklappt, damit der Stand eindeutig ist (zurück am Handy ist die Karte offen)
+SCHMAL.addEventListener('change', () => { if (!SCHMAL.matches) klappStand(false); });
 let knopfUhr = 0, knopfZeit = 0;                         // Zeitgeber, letzte Kamerabewegung (performance.now)
 function knopfSpaeter() {
   const rest = knopfZeit + 250 - performance.now();
@@ -6029,6 +6546,7 @@ function karteRendern(fokus) {
   const k = verlauf[verlauf.length - 1];
   if (!k) { karteZu(); return; }
   $('karte').hidden = false;
+  if (fokus) klappStand(false);                            // eine neue Karte ist aufgeklappt; das stündliche Auffrischen lässt es
   document.body.classList.add('karte-offen');             // schmal: #rechts liegt dann unter der Karte (CSS blendet es aus)
   $('karte-zurueck').hidden = verlauf.length < 2;
   const ziel = $('karte-inhalt');
@@ -6040,6 +6558,7 @@ function karteRendern(fokus) {
   // Code-Blöcke im Tagebuch: eigene Scrollstelle und Tastaturfokus behalten (nach Reihenfolge)
   const codes = fokus ? [] : [...ziel.querySelectorAll('pre.code')].map(c => ({ oben: c.scrollTop, links: c.scrollLeft, fokus: document.activeElement === c }));
   ziel.innerHTML = k.art === 'p' ? personHtml(k.id, k.gen, k.name) : gebaeudeHtml(k.id);
+  $('karte-kopf-titel').textContent = (ziel.querySelector('h2') || {}).textContent || '';   // eingeklappt steht er in der Kopfleiste
   const tbNeu = ziel.querySelector('.tagebuch');
   ziel.querySelectorAll('pre.code').forEach((c, i) => {
     const m = codes[i];
@@ -6748,6 +7267,9 @@ function herunterladen(text, datei) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 $('einst-knopf').addEventListener('click', () => $('einst-dialog').showModal());
+// Hilfe: schließt mit Escape oder „Schließen“ (data-schliessen oben); danach steht der Fokus wieder auf dem Knopf
+$('hilfe-knopf').addEventListener('click', () => $('hilfe-dialog').showModal());
+$('hilfe-dialog').addEventListener('close', () => $('hilfe-knopf').focus({ preventScroll: true }));
 $('export-knopf').addEventListener('click', () => {
   try { herunterladen(spielstandText(), 'stadt-save.json'); }
   catch (e) { meldung(`Export hat nicht geklappt: ${e.message}`, 'fehler'); }
@@ -6781,6 +7303,7 @@ $('version-neu').addEventListener('click', () => {
   alterSpielstand = null; speichernErlaubt = true;
   speichern();
   $('version-dialog').close();
+  ersterHinweis();                                        // es geht mit der neuen Stadt weiter
 });
 // Abweichung von der Spec (dort nur Export oder Neu): Ein Stand von Version 2 oder 3 lässt sich umrechnen (README, Annahme 60)
 // Was seit der alten Version neu ist (für Dialog und Meldung)
@@ -6844,12 +7367,59 @@ if (DEBUG) {
   });
 }
 
+// ─── Erster Hinweis, nur bei einer neuen Stadt (nicht nach dem Laden): eine leise Zeile über dem Tempo, wie man bedient.
+// Weg beim ersten Drehen, Zoomen oder Verschieben (controls 'start': Maus, Touch, Rad), beim ersten Klick oder Tippen irgendwo
+// oder nach 12 s. Nichts wird gespeichert ───
+const HINWEIS_MS = 12000;
+// Lage: 8 px über der Mitte des Tempos. Am Handy hochkant liegt dort die Spalte mit Hauptfiguren und Stadtbuch, dann darüber.
+// Seitlich höchstens bis 8 px an das, was auf dieser Höhe liegt (quer: links die Spalte, rechts die Knöpfe), sonst 12 px Rand;
+// ist der Platz schmaler als der Text, bricht er nach einem Punkt um
+const HINWEIS_NEBEN = ['rechts', 'kennzahlen', 'hilfe-knopf', 'einst-knopf'];
+function hinweisLegen() {
+  const h = $('erster-hinweis'), t = $('tempo').getBoundingClientRect(), r = $('rechts').getBoundingClientRect();
+  const ueber = r.width && getComputedStyle($('rechts')).visibility !== 'hidden' && r.left <= t.left && r.right >= t.right && r.bottom <= t.top + 1 ? r.top : t.top;
+  const unten = ueber - 8, mitte = t.left + t.width / 2;
+  let l = 12, re = document.documentElement.clientWidth - 12;
+  for (const id of HINWEIS_NEBEN) {
+    const q = $(id).getBoundingClientRect();
+    if (!q.width || q.top >= unten || q.bottom <= unten - 60) continue;   // nicht auf der Höhe des Hinweises (höchstens 60 px hoch)
+    if (q.right <= mitte) l = Math.max(l, q.right + 8); else if (q.left >= mitte) re = Math.min(re, q.left - 8);
+  }
+  h.style.maxWidth = (re - l) + 'px';
+  const b = h.offsetWidth;
+  h.style.left = Math.min(re - b / 2, Math.max(l + b / 2, mitte)) + 'px';
+  h.style.top = unten + 'px';
+}
+function ersterHinweis() {
+  const h = $('erster-hinweis');
+  if (!G || !h.hidden) return;
+  const teile = matchMedia('(pointer: fine)').matches ? ['Ziehen dreht', 'Rad zoomt', 'Klick öffnet'] : ['Wischen dreht', 'Zwei Finger zoomen', 'Tippen öffnet'];
+  // Umbruch nur nach einem Punkt: jeder Teil am Stück, vor dem Punkt ein festes Leerzeichen
+  h.replaceChildren(...teile.flatMap((t, i) => [Object.assign(document.createElement('span'), { textContent: t }), i < teile.length - 1 ? '\u00a0· ' : '']));
+  h.classList.remove('weg'); h.hidden = false;
+  hinweisLegen();
+  let uhr = 0;
+  const weg = () => {
+    clearTimeout(uhr);
+    G.controls.removeEventListener('start', weg);
+    document.removeEventListener('pointerdown', weg, true);
+    removeEventListener('resize', hinweisLegen);
+    h.classList.add('weg');                               // blendet aus (reduziert: sofort)
+    setTimeout(() => { h.hidden = true; }, REDUZIERT ? 0 : 400);
+  };
+  uhr = setTimeout(weg, HINWEIS_MS);
+  G.controls.addEventListener('start', weg);
+  document.addEventListener('pointerdown', weg, true);
+  addEventListener('resize', hinweisLegen);
+}
+
 if (DEBUG) globalThis.__stadt = { S: () => S, Sim, G, setzeTempo, schritt, nachSchritten, speichern, aufholen, ki, kiTakt };   // nur für Tests
 setzeTempo(tempo);
 if (G) G.ausrichten();                                   // Blickpunkt schon für die erste Figurenplanung (Arbeiter nahe der Stadtmitte)
 nachSchritten();
 if (G) G.ausrichten();                                   // Startblick erst jetzt: Panels haben ihren Anfangszustand (Stadtbuch, Hauptfiguren)
 requestAnimationFrame(frame);
+if (!geladen && !versionFehler) ersterHinweis();
 
 if (versionFehler) {
   $('version-text').textContent = versionFehler.andereVersion ? versionFehler.message

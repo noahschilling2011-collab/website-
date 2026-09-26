@@ -159,6 +159,65 @@ Stunden. Bei reduzierter Bewegung steht der Ring still und ist nach 3 Sekunden o
 Ring läuft, 1 Draw Call und 2 Dreiecke je Ring mehr, sonst nichts (ein Shader-Programm mehr, schon beim Start übersetzt).
 Im Browser geprüft (Lage, Farbe, Draw Calls, Drosselung, reduzierte Bewegung).
 
+**Stadtrand und Umland.** Aus der Stadt führen vier Landstraßen ins Umland: schmaler als die Stadtstraßen (0,42 statt 0,6
+Fahrbahn), etwas dunkler, ohne Gehweg und Laternen. Draußen liegen sie fest: Von vier Ausfahrten am Kartenrand, je auf einer
+Rasterlinie, laufen sie in weiten Bögen bis 400 hinaus, drehen sich zu tieferem Gelände hin, liegen auf den Hügeln auf und
+führen südlich um den See herum. Im Wald haben sie eine Schneise (7 Bäume, meist geht es durch lichten Wald). Das Stück in der
+Stadt legt die Karte nur neu, wenn Straßen dazukommen: Es beginnt an einem Straßenende, das zur Ausfahrt zeigt, oder an einem
+Rasterpunkt am Rand, wo auch die Simulation abzweigen würde (das kostet bei der Wahl mehr), geht ein Feld geradeaus und dann in
+einem Bogen (Radius mindestens 3) zur Ausfahrt. Es führt nur über leere Felder ohne Bauplatz, und dort legt die Karte keinen
+Garten und keine Brache an; Gebäude entstehen nur auf Bauplätzen und Bauplätze nur mit neuen Straßen, so bleibt der Weg frei.
+Wächst die Stadt, rückt der Anfang mit, und das Stück kann an ein anderes Ende springen. In einer jungen Stadt mit einer
+Straße wird daraus ein Dorf an einer Kreuzung. Auf den Seeds 1 bis 8 sind an den Tagen 2, 30, 60, 120, 200, 300, 400, 600 und
+750 immer alle vier Ausfahrten verbunden; neu legen dauert dort 0,7 bis 7,1 ms (je Stand der schnellste von 6 Läufen).
+Zwischen Stadt und Wald liegen Felder: Parzellen von 12 × 12 in ein bis drei Stücken, Acker, reifes, junges und dunkles Feld
+mit Reihen, dazwischen Wiese und schmale Raine, nur leicht gegen die Wiese abgesetzt. Sie sind kein eigenes Mesh, der Boden färbt sie im Shader und ist nachts so dunkel wie
+sonst. Die Stadt verdrängt sie blockweise (4 × 4 zwischen den Rasterlinien): kein Feld auf oder direkt neben Straße, Bauplatz
+oder Gebäude. In der Teststadt sind 520 von 558 möglichen Blöcken Feld, in der großen Stadt 352. Nachts leuchten an den
+Landstraßen 32 schwache warme Lichtpunkte von Höfen und zwei Dörfern, 60 bis 173 von der Mitte, ohne Blinken, mit der
+Dämmerung ein- und ausgeblendet. Keine Figuren oder Fahrzeuge auf den Landstraßen; nichts davon ist klickbar oder wirkt auf
+die Simulation. Kosten: 1 Draw Call mehr, nachts 2 (Teststadt 23 bzw. 24 statt 22, große Stadt 24 bzw. 25 statt 23);
+Dreiecke um 11 Uhr in der Teststadt 44.186–44.236 statt 42.568–42.598, in der großen Stadt 143.297–143.347 statt
+142.063–142.093. Gemessen im Startblick um 11 und 23 Uhr, alte und neue Fassung im Wechsel, auf einer geteilten Maschine: Die
+JS-Zeit pro Bild streut in beiden Fassungen (Teststadt neu 10,3–37,5 ms, vorher 10,6–34,7 ms; große Stadt neu 9,8–54,3 ms,
+vorher 8,7–22,5 ms), ein Unterschied ist darin nicht sicher zu sehen. Die Software-Grafik (SwiftShader) schafft in 9 von 10
+Messpaaren etwas weniger Bilder je Sekunde, im Mittel 8 % (Teststadt 1,2–2,9 statt 1,5–2,5, große Stadt 1,1–1,3 statt
+1,2–1,5); der Boden rechnet für die Felder je Bildpunkt einen Texturabruf und, nur auf Feldern, etwas mehr. Auf echter
+Grafikhardware ungeprüft.
+
+**Handy-Karte und Hilfe.**
+- Auf dem Handy (bis 720 px breit, quer bis 500 px hoch) deckte eine offene Hauskarte 57 % (360 × 740) bzw. 58 % (400 × 820)
+  des Bildes. Ein Pfeil im Kartenkopf (32 × 32 px, `aria-expanded`) klappt sie auf ihre Kopfleiste zusammen: 46 px hoch, 5,9 %
+  bzw. 5,4 % des Bildes. Dort stehen dann der Titel, „Zeigen“ und das Schließen; der Inhalt ist verborgen, auch für Tab und
+  Screenreader. Höhe und Inhalt gleiten 250 ms, bei reduzierter Bewegung ohne Übergang. Eine neue Karte öffnet aufgeklappt.
+- „Zeigen“ klappt die Karte am Handy erst ein und rückt das Gebäude dann in die frei gewordene Fläche. Gemessen bei 400 × 820:
+  von (171, 420) unter der Karte nach (199, 432), mitten zwischen Kennzahlen (Unterkante 162) und Kopfleiste (Oberkante 704);
+  bei 360 × 740 nach (180, 392). `zeigen()` misst die Karte schon in ihrer Endgröße. Das Einklappen allein bewegt die Kamera
+  nicht. Bei reduzierter Bewegung ließ die allgemeine Regel (0,01 ms Übergang für jede Eigenschaft) die Karte beim Messen noch
+  groß erscheinen, das Gebäude landete bei (295, 156) am oberen Rand; die Karte hat dort jetzt keinen Übergang.
+- Neben dem Einstellungs-Knopf öffnet „?“ den Dialog „So liest du die Stadt“: Bedienung mit Maus, Touch und Tasten, die Farben
+  der Figuren und die Zeichen in der Stadt (Auswahlrahmen, die beiden Ringe, Baustelle, Rauch, leere Betriebe, Licht in
+  Wohnhäusern und offenen Läden, Straßennamen). Jede Aussage ist aus dem Code abgeleitet, die Muster nutzen dieselben Farben wie
+  die Szene. Breit stehen Figuren und Zeichen nebeneinander (1280 × 800: 746 px hoch, ohne Scrollen), am Handy scrollt er.
+  Escape oder „Schließen“, danach steht der Fokus wieder auf „?“. Die Leertaste pausiert in Dialogen nicht mehr.
+- Nur bei einer neuen Stadt, nicht nach dem Laden, steht über dem Tempo leise „Ziehen dreht · Rad zoomt · Klick öffnet“ (Touch:
+  „Wischen dreht · Zwei Finger zoomen · Tippen öffnet“). Die Zeile verschwindet beim ersten Drehen, Zoomen oder Verschieben,
+  beim ersten Klick oder nach 12 s (im Container nach 13,4 bis 28,2 s, je nach Last: lange Bilder halten den Zeitgeber auf).
+  Nichts wird gespeichert. Kontrast vor der Szene um 6, 11, 19 und 23 Uhr (1280 × 800, 400 × 820, 844 × 390) mindestens
+  7,15:1, gerechnet vor reinem Weiß 6,3:1.
+- Quer liegt das Tempo zwischen Spalte und den beiden Knöpfen. Bei 568 × 320 sind die Tempo-Knöpfe dafür 40 statt 44 px breit:
+  je 10 px Luft. Kein seitliches Überlaufen bei 360, 400, 568, 640, 768, 844 und 1280 px Breite.
+- Nach der Prüfung nachgebessert: Die Legende sagte „Licht in den Fenstern: Dort wohnen Leute“. Offene Läden leuchten aber auch
+  (`stadt()`: 17 bis 22 Uhr), das steht jetzt dabei. Bei reduzierter Bewegung stehen die Ringe still; dort nennt die Hilfe nur
+  ihre Farbe. Das Muster für „alle anderen“ zeigt Beige und Blassblau, die Werkstatt heißt „kräftiges Blau“. Eingeklappt ist die
+  Karte 46 statt 42 px hoch: Der Fokusring der Knöpfe reichte bis 751, die Karte innen bis 749; jetzt 747 zu 749, der Knopf
+  sitzt mittig. Eine neue Karte während des Einklappens bricht den Übergang ab (vorher liefen drei Animationen weiter). Breit ist
+  die Karte immer aufgeklappt, auch zurück am Handy. Die Spalten der Hilfe sind bei 320 px 238 statt 260 px breit und ragen nicht
+  mehr in den Rand.
+- Alles davon ist HTML und CSS: Im selben Zustand zeichnen Original und neue Datei gleich viel (Teststadt 22 Draw Calls, 41.428
+  Dreiecke, Startblick und Instanzzahlen gleich). JavaScript je Bild im Wechsel mit dem Original gemessen (je 3 Läufe, Last 3–4):
+  1280 × 800 neu 7,7–10,2 ms, Original 8,6–9,7 ms; 400 × 820 neu 7,8–9,1 ms, Original 7,7–9,3 ms.
+
 In der 3D-Ansicht wächst auf jeder Baustelle ein grauer Rohbau mit den geschafften Arbeitstagen. Das Gerüst wird dunkler,
 solange niemand kommt, und lässt sich anklicken. Bauarbeiter (orange) stehen an den Ecken ihrer Baustelle, Handwerker
 (blau) vor der Werkstatt. An Werkstätten stehen Kistenstapel, vor Läden eine Theke und eine Auslage (braun: Kisten aus der
@@ -361,3 +420,12 @@ Alpha-to-Coverage die Kanten; ohne greift ein Alpha-Test. Manche Treiber zeigen 
 Im Container (SwiftShader) sieht es sauber aus.
 
 **Der See liegt im Startblick der kleinen Teststadt außerhalb des Bildes.** In größeren Städten sieht man ihn links hinten.
+
+**Landstraßen beginnen hinter dem Bordstein.** Am Straßenende oder Abzweig läuft der Gehweg der Stadtstraße quer davor; die
+Landstraße setzt direkt dahinter an. Die Höfe im Umland liegen meist im Nebel oder hinter den Panels: Im Startblick um 23 Uhr
+sieht man in der Teststadt einen, in der großen Stadt zwei.
+
+**Beim Übernehmen sehr alter Stände fehlt ein Stadtbuch-Eintrag.** Das Stadtbuch hält höchstens 500 Einträge (sim-Block).
+Holt eine übernommene Stadt sehr viel auf (gemessen: ein Stand von Version 2 mit 221 Einwohnern, 90 Tage aufgeholt), fällt
+der Eintrag „Ab heute baut der Bauhof …“ vom Übernahmetag heraus. Die Meldung nach dem Übernehmen sagt dasselbe, sie bleibt.
+Bemerkt, weil der Test dafür einen festen Zeitstempel hatte und mit jedem echten Tag mehr aufholte.
