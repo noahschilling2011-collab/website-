@@ -23,10 +23,28 @@
 //                                                   erzwungen: Kitas ohne Personal verlangen nichts, Personalabgang (höchstens 8 Einheiten je Nacht weg),
 //                                                   Elternteil verliert die Stelle (Krippenplatz weg, dann Betreuungsgehalt), Besitzer-Haushalt bei vollen
 //                                                   Kitas (Seeds 1–3)
-//   node tools/simtest.mjs --migrationstest         Spielstände von Version 2, 3, 4 und 5 übernehmen (alte stadt.html aus git 39c405b, 2b821c2, 1c8d40b
-//                                                   und 414ebab, --git ordner für ein anderes Repository, oder nur --alt pfad/zur/alten/stadt.html),
+//   node tools/simtest.mjs --migrationstest         Spielstände von Version 2, 3, 4, 5 und 6 übernehmen (alte stadt.html aus git 39c405b, 2b821c2,
+//                                                   1c8d40b, 414ebab und bc7247a, --git ordner für ein anderes Repository, oder nur --alt pfad/zur/alten/stadt.html),
 //                                                   erste Nacht (Käufe), Kita-Frist und die Nächte danach (Schwelle), 60 Tage weiter, keine NaN;
-//                                                   beschädigte Stände der Version 5 werden abgelehnt
+//                                                   beschädigte Stände der Version 5 werden abgelehnt; jede Version bekommt „Stadt erweitern“ (Stufe,
+//                                                   Stadtteile, Karte); aus Version 6 läuft die Stadt danach 60 Tage lang genau wie in Version 6
+//   node tools/simtest.mjs --erweiterung            Stadt erweitern (Version 7): statisch (kein Zufall, von Personen nur lebt und wohnung, Stadtteile
+//                                                   nur zum Benennen und Anzeigen); Seeds 1–3 je 730 Tage jeden Tag wie Version 6 (git bc7247a oder
+//                                                   --v6 datei), die Grenze hält nie eine Straße auf, Vorlauf, Wachsen, Stufe am ersten Tag über der
+//                                                   Schwelle, Stadtteile, Zähler; Speichern und Laden über ein Wachsen hinweg bitgleich; beschädigte
+//                                                   Stände abgelehnt; Übernahme von Version 6 (Dorf, Seeds 1–3); Gelände; mit --gross die große Stadt
+//   node tools/simtest.mjs --sicherheit             Sicherheit (Version 7): statisch (Zufall, gelesene Personenfelder je Regel, Landeslöhne nicht aus dem
+//                                                   Budget), Namenstausch bitgleich; Invarianten nach jeder Nacht (Haft, U-Haft, Plätze, Hofzeiten, Obhut,
+//                                                   Wache ab Kleinstadt, Anstalt ab Stadt, Stadtbuch ohne Namen); erzwungene Urteile (Ersatzfreiheitsstrafe,
+//                                                   Anrechnung, Tilgung, Widerruf, Randfall U-Haft), volle Anstalt, Obhut, Grundsicherung, Arbeitsentgelt;
+//                                                   Speichern mit Haft; beschädigte Stände; Messung gegen die PKS 2024 und nach Gruppen (nur gemessen)
+//   node tools/simtest.mjs --militaer               Bund (Version 7, Teil 3): statisch (kein Zufall, gelesene Personenfelder je Regel, keine Namen, kein
+//                                                   Geschlecht, Löhne und Sold nicht aus dem Budget, Ersatzdienst ohne Kisten, Grenze: die Dienststelle
+//                                                   liest niemanden), Namenstausch bitgleich; Invarianten nach jeder Nacht (Kaserne ab Stadt, Dienststelle
+//                                                   ab Großstadt auf eigenem Gelände, Rollen, Stellen, Obergrenzen, Einberufung mit 18 erst ab dem Tag nach
+//                                                   der Eröffnung und vollständig, genau 5 Diensttage, Bindung der Soldaten auf Zeit, Geld vom Bund,
+//                                                   Stadtbuch ohne Namen); erzwungen: Tod, Haft, Wegzug im Dienst, Bindung, Gehirn, Einberufung, Bauhof voll,
+//                                                   leeres Budget, ausgeschaltet; Speichern und Laden; beschädigte Stände; Messung (nur gemessen)
 //   Optionen: --alle 30 (Zeilenabstand), --buch 20 (letzte Stadtbuch-Zeilen), --aktionen
 
 import { readFileSync } from 'node:fs';
@@ -149,7 +167,36 @@ function fingerabdruck(Sim, S) {
   for (const a of arrays) { h.update(a.name); h.update(Buffer.from(a.daten.buffer, a.daten.byteOffset, a.daten.byteLength)); }
   h.update(JSON.stringify(S.buch)); h.update(JSON.stringify(S.stat)); h.update(JSON.stringify(S.ki)); h.update(String(S.budget) + '/' + S.rs + '/' + S.tag + '/' + S.stunde);
   if (S.regierung) h.update(JSON.stringify(S.regierung));  // Stadtregierung: Start und Tageswerte (gestern, Summen am Tagesende)
+  // Stadt erweitern (Version 7): Kartengröße, Mitte, Viertel, alle anderen Einzelwerte, Stufe, Stadtteile, Gelände, Wachsen, Straßenenden
+  if (S.erweiterung) { h.update(JSON.stringify(Sim.exportZustand(S).werte)); h.update(JSON.stringify(S.erweiterung)); h.update(JSON.stringify(S.enden)); h.update(JSON.stringify(S.kreuzungen)); }
+  if (S.sicherheit) h.update(JSON.stringify(S.sicherheit));  // Sicherheit (Version 7): Wache, Anstalt, Stellen, Verfahren, Tatorte, Jahreswerte (rsSich steht in werte)
+  if (S.bund) h.update(JSON.stringify(S.bund));              // Bund (Version 7, Teil 3): Kaserne, Dienststelle, Eröffnung, Einberufungen im Jahr, Geld von gestern
   return h.digest('hex').slice(0, 16);
+}
+
+// Stadt erweitern (Version 7): eine Stadt ohne ihre Lage auf der Karte (Kennzahlen, Zufall, Zähler, Felder und Gebäude relativ zur Mitte,
+// dazu alle Personenfelder, alle Gebäudefelder außer der Lage, Statistik, Hauptfiguren und Stadtregierung), zum Vergleich derselben Stadt
+// auf der festen Karte (bis Version 6: 96 × 96, Mitte 48) und auf der wachsenden Karte. Sicherheit (Version 7): Ihre Personenfelder und
+// Summen gibt es in Version 6 nicht; sie bleiben außen vor. Verglichen wird dann mit ausgeschalteter Sicherheit (sicherheitAus). Bund (Teil 3):
+// ebenso (Personenfelder bund, dienstBis; Summen S.stat.bund); sicherheitAus schaltet auch den Bund aus
+const OHNE_SICH = new Set([...Sim.PF_SICHERHEIT, ...(Sim.PF_BUND || [])]);
+// Sicherheit und Bund ausschalten (keine Taten, Land und Bund bauen nicht, keine Wehrpflicht): für den Vergleich mit Version 6; gibt eine
+// Funktion zurück, die alles wieder einschaltet
+const sicherheitAus = (X) => { const R = X.R, alt = [R.KRIM_BASIS, R.LAND_BAUT, R.BUND_BAUT, R.WEHRPFLICHT];
+  R.KRIM_BASIS = 0; R.LAND_BAUT = 0; R.BUND_BAUT = 0; R.WEHRPFLICHT = 0;
+  return () => { [R.KRIM_BASIS, R.LAND_BAUT, R.BUND_BAUT, R.WEHRPFLICHT] = alt; }; };
+function spurRelativ(Sim, S) {
+  const k = Sim.kennzahlen(S), K = S.karte || 96, M = S.mitte || 48;
+  let h = 0, gb = 0;
+  for (let c = 0; c < K * K; c++) if (S.feld[c] !== 0) h = (Math.imul(h, 31) + ((c % K) - M) * 1000 + (((c / K) | 0) - M) * 7 + S.feld[c]) | 0;
+  for (let b = 0; b < S.gAnzahl; b++) gb = (Math.imul(gb, 17) + (S.g.x[b] - M) * 131 + (S.g.y[b] - M) + S.g.typ[b] * 7919) | 0;
+  // Personen und Gebäude hängen nicht an Feldern (nur g.x und g.y): Byte für Byte, soweit belegt
+  const hp = createHash('sha256'), teil = (a, n, kap) => { const w = kap > 0 ? a.length / kap : 1, u = a.subarray(0, n * w); hp.update(Buffer.from(u.buffer, u.byteOffset, u.byteLength)); };
+  for (const n of Object.keys(S.p).sort()) if (ArrayBuffer.isView(S.p[n]) && !OHNE_SICH.has(n)) { hp.update(n); teil(S.p[n], S.pMax, S.pKap); }
+  for (const n of Object.keys(S.g).sort()) if (n !== 'x' && n !== 'y' && ArrayBuffer.isView(S.g[n])) { hp.update(n); teil(S.g[n], S.gAnzahl, 0); }
+  hp.update(JSON.stringify({ ...S.stat, sicherheit: undefined, bund: undefined })); hp.update(JSON.stringify(S.ki)); hp.update(JSON.stringify(S.regierung || null));
+  return JSON.stringify([k.tag, k.stunde, k.einwohner, k.gebaeude, k.budget, k.gruendungen, k.pleiten, k.freieWohnungen, k.freieStellen, k.zufriedenheit,
+    k.arbeitslose, S.rs, h, gb, S.gAnzahl, S.stat.zuzuege, S.stat.geburten, S.stat.tode, S.stat.strassenFelder, S.bauplaetze, hp.digest('hex').slice(0, 16)]);
 }
 
 if (flag('speichertest')) {
@@ -163,7 +210,52 @@ if (flag('speichertest')) {
   bis(A, tage + 60, 13); bis(B, tage + 60, 13);
   const fa = fingerabdruck(Sim, A), fb = fingerabdruck(Sim, B);
   console.log(`  60 Tage weiter: ununterbrochen ${fa} (${A.einwohner} Einw.), geladen ${fb} (${B.einwohner} Einw.) → ${fa === fb ? 'bitgleich' : 'UNTERSCHIEDLICH'}`);
-  process.exit(fa === fb ? 0 : 1);
+  // Sicherheit (Version 7): ein Stand mit Untersuchungshaft, offenen Verfahren, Gefangenen in der Anstalt in der Stadt und einem Kind in Obhut.
+  // Gesucht wird ein Tag, an dem jemand in U-Haft sitzt (13 Uhr, ab Tag 250); die Anstalt belegt der Test zusätzlich mit einer Strafhaft, das
+  // Kind kommt in Obhut, wenn der einzige Erwachsene seines Haushalts in Haft geht. Vergleich auch über sortierte Schlüssel (JSON-Reihenfolge egal)
+  const kanon = (o) => JSON.stringify(o, (k, v) => (v && typeof v === 'object' && !Array.isArray(v) && !ArrayBuffer.isView(v) ? Object.fromEntries(Object.keys(v).sort().map(x => [x, v[x]])) : v));
+  const sortiert = (S) => { const d = Sim.exportZustand(S), h = createHash('sha256');
+    for (const a of d.arrays.sort((x, y) => (x.name < y.name ? -1 : 1))) { h.update(a.name); h.update(Buffer.from(a.daten.buffer, a.daten.byteOffset, a.daten.byteLength)); }
+    h.update(kanon(d.werte)); h.update(kanon(d.json)); return h.digest('hex').slice(0, 16); };
+  const C = Sim.neueStadt(seed);
+  bis(C, 250, 13);
+  const uhaft = (S) => { for (let p = 0; p < S.pMax; p++) if (S.p.lebt[p] && S.p.haftBis[p] && S.p.haftArt[p] === Sim.HAFT_U) return p; return -1; };
+  // alle Erwachsenen eines Haushalts mit Kind, ohne Betrieb, gehen in Strafhaft (gesucht wird ein Tag, an dem es auch so einen Haushalt gibt;
+  // seit Teil 3 gibt es an Seed 1 am ersten Tag mit U-Haft keinen)
+  const elternVon = (C) => { const P = C.p, erw = C.tag - Sim.R.ERWACHSEN * Sim.R.JAHR;
+    for (let k = 0; k < C.pMax; k++) {
+      if (!P.lebt[k] || P.hh[k] !== k || !C.hhKinder[k] || P.wohnung[k] < 0) continue;
+      const e = C.bewohner[P.wohnung[k]].filter(m => P.hh[m] === k && P.geb[m] <= erw);
+      const kind = C.bewohner[P.wohnung[k]].some(m => P.hh[m] === k && P.geb[m] > erw);   // hhKinder zählt von der letzten Nacht (wer heute 18 ist, noch mit)
+      if (e.length && kind && e.every(m => P.besitz[m] < 0 && !P.haftBis[m])) return e;   // mindestens ein Erwachsener und ein Kind
+    }
+    return null; };
+  while (C.tag < 700 && (uhaft(C) < 0 || !C.sicherheit.verfahren.length || !Sim.sicherheitInfo(C).jvaOffen || !elternVon(C))) bis(C, C.tag + 1, 13);
+  const eltern = elternVon(C);
+  if (eltern) { for (const m of eltern) Sim._sich.haftAntritt(C, m, 8, Sim.HAFT_STRAF); Sim._sich.obhutPruefen(C); }
+  const iC = Sim.sicherheitInfo(C), textC = speichernAlsText(Sim, C), D = ladenAusText(Sim, textC);
+  const gleich0 = fingerabdruck(Sim, C) === fingerabdruck(Sim, D) && sortiert(C) === sortiert(D);
+  console.log(`Sicherheit: gespeichert an Tag ${C.tag}, ${C.stunde} Uhr: ${iC.uhaft} in U-Haft, ${iC.hier} in der Anstalt in der Stadt, ${iC.haft} in Haft, ${iC.verfahren} offene Verfahren, `
+    + `${iC.obhut} Kind(er) in Obhut; direkt nach dem Laden gleich: ${gleich0 ? 'ja' : 'NEIN'}`);
+  bis(C, C.tag + 60, 13); bis(D, D.tag + 60, 13);
+  const fc = fingerabdruck(Sim, C), fd = fingerabdruck(Sim, D), sc = sortiert(C), sd = sortiert(D);
+  const ok2 = gleich0 && iC.uhaft > 0 && iC.hier > 0 && iC.verfahren > 0 && iC.obhut > 0 && fc === fd && sc === sd;
+  console.log(`  60 Tage weiter: ${fc} / ${fd}, sortiert ${sc} / ${sd} → ${fc === fd && sc === sd ? 'bitgleich' : 'UNTERSCHIEDLICH'}${ok2 ? '' : ' (FEHL: Fall nicht vollständig oder verschieden)'}`);
+  // Bund (Version 7, Teil 3): ein Stand mit Wehr- und Ersatzdienst, verpflichteten Soldaten und offener Dienststelle (13 Uhr, ab Tag 400;
+  // an Tag 150 gibt es noch keine Kaserne, Befund 1 der Gegenprüfung „militaer“)
+  const E = Sim.neueStadt(seed);
+  const bundDa = (S) => { const i = Sim.bundInfo(S); return i.wehr >= 1 && i.ersatz >= 1 && i.verpflichtet >= 1 && i.dienstOffen && i.nachrichtendienst >= 1; };
+  bis(E, 400, 13);
+  while (E.tag < 700 && !bundDa(E)) bis(E, E.tag + 1, 13);
+  const iE = Sim.bundInfo(E), F = ladenAusText(Sim, speichernAlsText(Sim, E));
+  const gleich3 = fingerabdruck(Sim, E) === fingerabdruck(Sim, F) && sortiert(E) === sortiert(F);
+  console.log(`Bund: gespeichert an Tag ${E.tag}, ${E.stunde} Uhr: ${iE.soldaten} Soldaten (${iE.verpflichtet} verpflichtet), ${iE.zivil} Zivil, ${iE.wehr} im Wehr-, ${iE.ersatz} im Ersatzdienst, `
+    + `${iE.nachrichtendienst} im Nachrichtendienst; direkt nach dem Laden gleich: ${gleich3 ? 'ja' : 'NEIN'}`);
+  bis(E, E.tag + 60, 13); bis(F, F.tag + 60, 13);
+  const fe = fingerabdruck(Sim, E), ff = fingerabdruck(Sim, F), se = sortiert(E), sf = sortiert(F);
+  const ok3 = gleich3 && iE.wehr > 0 && iE.ersatz > 0 && iE.verpflichtet > 0 && fe === ff && se === sf;
+  console.log(`  60 Tage weiter: ${fe} / ${ff}, sortiert ${se} / ${sf} → ${fe === ff && se === sf ? 'bitgleich' : 'UNTERSCHIEDLICH'}${ok3 ? '' : ' (FEHL: Fall nicht vollständig oder verschieden)'}`);
+  process.exit(fa === fb && ok2 && ok3 ? 0 : 1);
 }
 if (flag('kitest')) {
   // Ohne Sprachmodell: ein Test-Beantworter mit eigenem Zufall antwortet gültig, ungültig oder gar nicht.
@@ -190,22 +282,25 @@ if (flag('kitest')) {
       Sim.stunde(S);
     }
     pruef(abweichend === 0, `Gehirn ⊆ erlaubte Aktionen (${geprueft} Entscheidungen geprüft, ${abweichend} abweichend)`);
-    // 1b. Der Lagesatz fürs Sprachmodell erkennt Arbeit nur an „arbeitet …“ / „besitzt …“ / „leistet gemeinnützige Arbeit …“ am Anfang
+    // 1b. Der Lagesatz fürs Sprachmodell erkennt Arbeit nur an „arbeitet …“ / „besitzt …“ / „leistet gemeinnützige Arbeit …“ am Anfang;
+    //     Bund (Teil 3): „leistet Wehrdienst …“ / „leistet Ersatzdienst …“ (der Lagesatz macht daraus „Du leistest …“)
     {
-      let n = 0, falsch = 0, bau = 0, bauFalsch = 0, tech = 0, techFalsch = 0;
+      let n = 0, falsch = 0, bau = 0, bauFalsch = 0, tech = 0, techFalsch = 0, dienst = 0;
       for (let p = 0; p < S.pMax; p++) {
         if (!S.p.lebt[p] || S.tag - S.p.geb[p] < Sim.R.ERWACHSEN * Sim.R.JAHR || (S.p.arbeit[p] < 0 && S.p.besitz[p] < 0)) continue;
         const i = Sim.personInfo(S, p);
-        n++; if (!/^(arbeitet als |besitzt |leistet gemeinnützige Arbeit )/.test(i.arbeit)) { falsch++; if (falsch < 3) console.log('    ' + i.arbeit); }
+        n++; if (!/^(arbeitet als |besitzt |leistet gemeinnützige Arbeit |leistet (Wehrdienst|Ersatzdienst) )/.test(i.arbeit)) { falsch++; if (falsch < 3) console.log('    ' + i.arbeit); }
+        if (S.p.bund[p] >= Sim.WEHRDIENST) { dienst++; if (!i.bund || !new RegExp('^leistet ' + (S.p.bund[p] === Sim.WEHRDIENST ? 'Wehrdienst in der Kaserne ' : 'Ersatzdienst beim Bauhof ')).test(i.arbeit)) falsch++; }
         // Wer schon einen eigenen Betrieb hat, der noch gebaut wird, arbeitet bis dahin weiter im Bauhof: Text „besitzt …“.
         // Gemeinnützige Arbeit (Stadtregierung) steht als „leistet gemeinnützige Arbeit beim Bauhof …“ da (prüft --regierung).
         if (S.p.arbeit[p] === S.bauhof && S.p.besitz[p] < 0) {
           bau++;
-          if (!(S.p.gemein[p] ? /^leistet gemeinnützige Arbeit beim Bauhof / : /^arbeitet als Bauarbeiter(in)? beim Bauhof /).test(i.arbeit)) bauFalsch++;
+          if (!(S.p.gemein[p] ? /^leistet gemeinnützige Arbeit beim Bauhof / : S.p.bund[p] === Sim.ERSATZDIENST ? /^leistet Ersatzdienst beim Bauhof /
+            : /^arbeitet als Bauarbeiter(in)? beim Bauhof /).test(i.arbeit)) bauFalsch++;
         }
         if (S.p.arbeit[p] >= 0 && S.g.typ[S.p.arbeit[p]] === Sim.TECH && S.p.besitz[p] < 0) { tech++; if (!/^arbeitet als Programmierer(in)? bei /.test(i.arbeit)) techFalsch++; }
       }
-      pruef(n > 50 && falsch === 0 && bau > 0 && bauFalsch === 0 && techFalsch === 0, `Arbeitstext beginnt mit „arbeitet als“ oder „besitzt“ (${n} Leute mit Arbeit, davon ${bau} im Bauhof, ${tech} in Tech-Firmen, ${falsch + bauFalsch + techFalsch} falsch)`);
+      pruef(n > 50 && falsch === 0 && bau > 0 && bauFalsch === 0 && techFalsch === 0, `Arbeitstext beginnt mit „arbeitet als“ oder „besitzt“ (${n} Leute mit Arbeit, davon ${bau} im Bauhof, ${tech} in Tech-Firmen, ${dienst} im Wehr- oder Ersatzdienst, ${falsch + bauFalsch + techFalsch} falsch)`);
     }
     // 2. 60 Tage mit Test-Beantworter
     S.ki.an = true;
@@ -298,7 +393,7 @@ if (flag('kitest')) {
     //    Sprachmodell; die Personenkarte nennt den Grund. Ist in der Nähe ein Platz frei, ist job_suchen wieder dabei
     {
       const P = S.p, R = Sim.R, erw = S.tag - R.ERWACHSEN * R.JAHR, dist = (a, b) => Math.abs(S.g.x[a] - S.g.x[b]) + Math.abs(S.g.y[a] - S.g.y[b]);
-      const offenK = (b) => S.g.typ[b] === Sim.KITA && S.feld[S.g.y[b] * Sim.KARTE + S.g.x[b]] === Sim.KITA;
+      const offenK = (b) => S.g.typ[b] === Sim.KITA && S.feld[S.g.y[b] * S.karte + S.g.x[b]] === Sim.KITA;
       while (S.stunde !== 6) Sim.stunde(S);
       let p = -1, kind = -1;
       for (let k = 0; k < S.pMax && p < 0; k++) {
@@ -333,25 +428,155 @@ if (flag('kitest')) {
       }
     }
   }
+  // Sicherheit (Version 7): die Anweisungen ans Sprachmodell (Code aus dem module-Block von stadt.html, Abschnitt „Anweisungen auf Deutsch“,
+  // mit der echten Simulation ausgeführt). Nur Tatsachen der Figur (Haft, Verfahren); ein Opfer weiß nicht, wer es war, und verdächtigt
+  // niemanden; jede Figur beurteilt andere nur nach dem, was sie mit ihnen erlebt hat (keine Aufzählung von Merkmalen, die sie erst darauf
+  // bringt). Der Name des Täters steht nie in der Anweisung des Opfers, keine Anweisung nennt die Stadtregierung. Dazu die Prüfung der
+  // Antworten (Abschnitt „Antworten prüfen“): Verdacht gegen einen Namen oder nach Herkunft wird verworfen
+  {
+    const m = html.match(/<script type="module">([\s\S]*?)<\/script>/)[1];
+    const a = m.indexOf('// ─── Anweisungen auf Deutsch'), e = m.indexOf('// ─── Der KI-Takt');
+    const S = Sim.neueStadt(2); while (S.tag < 300 || S.stunde < 13) Sim.stunde(S);
+    const zahl = (v) => Math.round(v).toLocaleString('de-DE');
+    const A = new Function('Sim', 'S', 'zahl', 'STADTNAME', m.slice(a, e) + '\nreturn { beschreibung, gespraechsAnweisung, aufholAnweisung, lageSatz, verdachtFrei, pruefeEntscheidung, obhutGrund };')(Sim, S, zahl, 'Neustadt');
+    const R = Sim.R, P = S.p, erw = S.tag - R.ERWACHSEN * R.JAHR;
+    const frei = []; for (let p = 0; p < S.pMax; p++) if (P.lebt[p] && P.geb[p] <= erw && !P.haftBis[p] && P.besitz[p] < 0 && !S.sicherheit.verfahren.some(v => v.id === p)) frei.push(p);
+    const t = frei[0];
+    for (let i = 0; i < 400 && !S.sicherheit.verfahren.some(v => v.id === t); i++) { P.geld[t] = 0; Sim._sich.tatBegehen(S, t, Sim.DIEBSTAHL); }
+    const opfer = []; for (let p = 0; p < S.pMax; p++) if (P.lebt[p] && P.opferTag[p] === S.tag) opfer.push(p);
+    const verwandt = (i, x) => [i.partner, ...i.eltern, ...i.kinder, ...i.freunde].some(r => r && r.id === x);
+    const OPFER_SATZ = 'weißt du nicht, und du verdächtigst niemanden', ALLE_SATZ = 'beurteilst andere nur nach dem, was du mit ihnen erlebt hast';
+    let geprueft = 0, nameDrin = 0, satzFehlt = 0;
+    for (const o of opfer) {
+      const i = Sim.personInfo(S, o);
+      for (const text of [A.gespraechsAnweisung(i), A.aufholAnweisung(i, S.tag - 3, 3)]) {
+        geprueft++;
+        if (!text.includes(OPFER_SATZ) || !text.includes(ALLE_SATZ)) satzFehlt++;
+        if (!verwandt(i, t) && text.includes(Sim.name(S, t))) nameDrin++;
+      }
+    }
+    const it = Sim.personInfo(S, t), tv = A.gespraechsAnweisung(it);
+    Sim._sich.haftAntritt(S, t, R.VERFAHREN, Sim.HAFT_U);
+    const tu = A.gespraechsAnweisung(Sim.personInfo(S, t));
+    const s2 = frei[5]; Sim._sich.haftAntritt(S, s2, 8, Sim.HAFT_STRAF);
+    const ts = A.gespraechsAnweisung(Sim.personInfo(S, s2));
+    const nie = frei.find(p => p !== t && p !== s2 && !Sim.personInfo(S, p).opfer);   // nie Opfer gewesen (im Gedächtnis)
+    const normal = A.gespraechsAnweisung(Sim.personInfo(S, nie));
+    const alle = [tv, tu, ts, normal];
+    pruef(opfer.length > 0 && geprueft > 0 && !satzFehlt && !nameDrin && /Strafverfahren wegen Diebstahls; das Urteil kommt an Tag \d+/.test(tv)
+      && /Du bist in Untersuchungshaft in (der Justizvollzugsanstalt in der Stadt|einer Anstalt des Landes außerhalb der Stadt), bis das Gericht urteilt/.test(tu)
+      && alle.every(x => !/Herkunft|Religion|Sprache/.test(x))
+      && /Du bist in Strafhaft .*noch bis Tag \d+; du arbeitest dort/.test(ts) && alle.every(x => x.includes(ALLE_SATZ)) && !normal.includes(OPFER_SATZ) && alle.every(x => !/Stadtregierung|AfD/.test(x)),
+      `Anweisungen ans Sprachmodell (Sicherheit): ${opfer.length} Opfer, ${geprueft} Anweisungen mit „…${OPFER_SATZ}“ (${satzFehlt} ohne), Name des Täters ${nameDrin}-mal darin; `
+      + `Täter: „${tv.match(/Gegen dich[^.]*\./)?.[0] || '–'}“, U-Haft: „${tu.match(/Du bist in Untersuchungshaft[^.]*\./)?.[0] || '–'}“, Strafhaft: „${ts.match(/Du bist in Strafhaft[^.]*\./)?.[0] || '–'}“`);
+    // Antworten prüfen (Befund der Gegenprüfung): Ein Opfer, dessen Antwort einen anderen Namen der Stadt mit einem Verdacht verbindet, wird
+    // verworfen, ebenso jede Antwort, die einen Verdacht mit Herkunft, Religion oder Sprache verbindet, und bei jeder Figur ein Name mit einem
+    // Wort einer Tat (Nachprüfung: auch Wortformen wie Einbrecher, klaut, stahl, stiehlt; „fremd“; „<Name> ist ein Dieb“). Erlaubt bleibt, was
+    // nichts unterstellt, auch Nachnamen, die gewöhnliche Wörter sind („Klein war der Schaden nicht“, „der Richter“)
+    const io = Sim.personInfo(S, opfer[0]), inormal = Sim.personInfo(S, nie), eigen = io.name.split(' '), beide = eigen.concat(inormal.name.split(' '));
+    const anderer = Sim.name(S, frei.find(p => p !== opfer[0] && !Sim.name(S, p).split(' ').some(w => eigen.includes(w))));
+    const vorn = (w) => Sim.VORNAMEN_M.concat(Sim.VORNAMEN_W).filter(n => !beide.includes(n) && n !== 'Klaus').sort((x, y) => (x === w ? -1 : y === w ? 1 : 0));
+    const nachn = (w) => Sim.NACHNAMEN.filter(n => !beide.includes(n)).sort((x, y) => (x === w ? -1 : y === w ? 1 : 0));
+    const [fremdVor, vor2, vor3] = vorn('Mehmet'), [fremdNach, nach2, nach3] = nachn('Koch');
+    const faelle = [
+      [io, `Ich glaube, ${fremdVor} ${fremdNach} hat mich bestohlen.`, false], [io, `Bestimmt war es ${anderer}, der hat mich doch betrogen!`, false],
+      [io, `Herr ${fremdNach} ist verdächtig.`, false], [io, 'Das waren sicher Ausländer, die bei mir eingebrochen haben.', false],
+      [inormal, 'Die Zugezogenen sind schuld an den Diebstählen.', false], [inormal, 'Ich glaube, Muslime klauen, das war es.', false],
+      [io, `Der Einbrecher war bestimmt ${vor2} ${nach2}.`, false], [io, `${vor2} ${nach2} stahl meine Uhr.`, false],
+      [io, `${vor3} ${nach3} klaut bestimmt, das weiß ich.`, false], [io, `Ich vermute, dass ${vor3} ${nach3} mein Geld genommen hat.`, false],
+      [io, `Sicher steckt ${vor2} ${nach2} dahinter.`, false], [io, `Es war ${anderer}, der mich bestohlen hat.`, false],
+      [inormal, `Ich glaube, ${fremdVor} ${fremdNach} ist ein Dieb.`, false], [inormal, `${vor2} ${nach2} stiehlt.`, false],
+      [inormal, 'Die Fremden hier sind alle Diebe.', false], [inormal, 'Leute mit ausländischen Namen stehlen.', false],
+      [inormal, 'Leute mit komischen Namen klauen.', false], [inormal, 'Wer kein Deutsch spricht, stiehlt eher.', false],
+      [io, 'Ich weiß nicht, wer mich bestohlen hat, und ich verdächtige niemanden.', true], [io, `Ich wurde bestohlen. ${anderer} hat mir geholfen.`, true],
+      [io, `Ich, ${io.name}, wurde bestohlen und bin wütend.`, true], [inormal, `${anderer} hat mich beim Kartenspiel betrogen, aber wir sind Freunde.`, true],
+      [inormal, 'Heute gehe ich arbeiten und spare Geld.', true], [io, 'Klein war der Schaden nicht, bestohlen zu werden tut weh.', true],
+      [io, `Ich habe mir frei genommen und treffe ${anderer}.`, true], [inormal, 'Der Richter hat mich wegen Diebstahls verurteilt.', true],
+      [inormal, `Mit ${anderer} war es heute lustig.`, true], [inormal, 'Er ist fremdgegangen und hat mich betrogen.', true],
+      [inormal, 'Klaus hilft mir heute beim Umzug.', true]];
+    const falsch = faelle.filter(([i, t, soll]) => A.verdachtFrei(t, i) !== soll).map(([, t]) => t);
+    const erl = ['job_suchen'], jz = (g) => JSON.stringify({ aktion: 'job_suchen', gedanke: g, neues_ziel: null });
+    const ent = [A.pruefeEntscheidung(jz(`${fremdVor} ${fremdNach} hat mich bestohlen.`), erl, io), A.pruefeEntscheidung(jz('Ich suche mir Arbeit.'), erl, io)];
+    const og = [A.obhutGrund([{ weib: true, haushalt: 7, erwachsene: 1 }]), A.obhutGrund([{ weib: false, haushalt: 7, erwachsene: 2 }, { weib: true, haushalt: 7, erwachsene: 2 }])];
+    pruef(!falsch.length && ent[0] === null && ent[1] && ent[1].gedanke === 'Ich suche mir Arbeit.' && io.opfer && !inormal.opfer
+      && og[0].wer === 'der einzige Erwachsene in ihrem Haushalt' && og[0].ist === 'ist' && og[1].wer === 'alle Erwachsenen in ihrem Haushalt' && og[1].ist === 'sind',
+      `Antworten ans Sprachmodell: ${faelle.length} Fälle (Opfer ${io.name}), ${falsch.length} falsch beurteilt${falsch.length ? ': ' + falsch.join(' | ') : ''}; „${fremdVor} ${fremdNach} hat mich bestohlen“ als Entscheidung verworfen: ${ent[0] === null}; `
+      + `Obhut: „${og[0].wer} ${og[0].ist} in Haft“, „${og[1].wer} ${og[1].ist} in Haft“`);
+  }
   console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle KI-Prüfungen bestanden');
   process.exit(fehler ? 1 : 0);
 }
 if (flag('migrationstest')) {
   let fehler = 0;
   const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
-  // Alte Fassungen: mit --alt genau diese Datei, sonst aus git 39c405b (Version 2), 2b821c2 (Version 3), 1c8d40b (Version 4) und 414ebab
-  // (Version 5, Stadtregierung ohne Schritt 2). --git <ordner>: Repository für git show (Standard: der Ordner dieses Werkzeugs)
+  // Stadt erweitern (jede Version → 7): Stufe aus den Einwohnern am Übernahmetag, alle bebauten Stadtteile ab Kleinstadt mit verschiedenen
+  // Namen, Karte mindestens 96 und mit Vorlauf, die neue Zeile („sie ist eine …“) als letzte
+  const erweiterungUebernommen = (S, A) => {
+    const e = S.erweiterung, soll = Sim.R.STUFE_AB.filter(v => A.einwohner >= v).length - 1, z = S.buch.at(-1), info = Sim.erweiterungInfo(S);
+    const bebaut = new Set(); for (let b = 0; b < S.gAnzahl; b++) bebaut.add(Sim.teilVon(S, S.g.x[b], S.g.y[b]));
+    const namen = e.teile.map(([t]) => Sim.teilName(S, t));
+    pruef(S.version === Sim.VERSION && e.stufe === soll && e.stufenTage.length === soll + 1 && e.stufenTage.every(t => t === A.tag)
+      && (soll === 0 ? e.teile.length === 0 : e.teile.length === bebaut.size && [...bebaut].every(t => Sim.teilName(S, t))) && new Set(namen).size === namen.length
+      && S.karte >= 96 && info.rand >= Sim.RAND + Sim.R.KARTE_VORLAUF && e.wachsen.length === (S.karte > 96 ? 1 : 0)
+      && z.art === 'stufe' && z.tag === A.tag && z.text.includes(`sie ist ${['ein Dorf', 'eine Kleinstadt', 'eine Stadt', 'eine Großstadt'][soll]}.`),
+      `Stadt erweitern: ${A.einwohner} Einwohner → ${Sim.STUFEN[e.stufe]}, ${e.teile.length} Stadtteile, Karte ${S.karte} × ${S.karte} (Rand ${info.rand} Felder); „${Sim.klartext(z.text).slice(0, 120)}…“`);
+  };
+  // Sicherheit (jede Version → 7): ab dem Übernahmetag, noch keine Wache und keine Anstalt, niemand in Haft, vorbestraft, Opfer oder in Obhut,
+  // alle Summen 0, eigener Zufallsstrom; die Zeile „Ab heute gibt es in der Stadt Diebstahl …“ steht vor „Bund“ und „Stadt erweitern“
+  const sicherheitUebernommen = (S, A) => {
+    const Si = S.sicherheit, st = S.stat.sicherheit, z = S.buch.at(-3), P = S.p;
+    const soll = (n) => (n === 'opferTag' || n === 'entlassenTag' ? -9999 : n === 'obhutBei' ? -1 : 0);
+    const falsch = Sim.PF_SICHERHEIT.filter(n => { for (let p = 0; p < S.pMax; p++) if (P[n][p] !== soll(n)) return true; return false; });
+    pruef(Si && Si.start === A.tag && Si.wache === -1 && Si.jva === -1 && !Si.verfahren.length && Si.landGestern === null && Number.isInteger(S.rsSich)
+      && st && Object.values(st).every(v => (Array.isArray(v) ? v.every(x => x === 0) : v === 0)) && !falsch.length
+      && z.art === 'sicherheit' && z.tag === A.tag && /^Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug/.test(z.text),
+      `Sicherheit ab Tag ${Si && Si.start}: noch keine Wache und Anstalt, Summen 0, Personenfelder leer (falsch: ${falsch.join(', ') || 'keine'}); „${Sim.klartext(z.text).slice(0, 90)}…“`);
+  };
+  // Bund (jede Version → 7, Teil 3): ab dem Übernahmetag, noch keine Kaserne und keine Dienststelle, niemand im Dienst oder Soldat, alle Summen 0;
+  // die Zeile „Ab heute baut der Bund …“ ist die vorletzte (vor „Stadt erweitern“)
+  const bundUebernommen = (S, A) => {
+    const B = S.bund, st = S.stat.bund, z = S.buch.at(-2), P = S.p;
+    const falsch = Sim.PF_BUND.filter(n => { for (let p = 0; p < S.pMax; p++) if (P[n][p] !== 0) return true; return false; });
+    pruef(B && B.start === A.tag && B.kaserne === -1 && B.dienst === -1 && !B.kOffen && !B.dOffen && B.jahr.join() === '0,0' && B.gestern === null
+      && st && Object.values(st).every(v => v === 0) && !falsch.length && z.art === 'bund' && z.tag === A.tag && /^Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr/.test(z.text),
+      `Bund ab Tag ${B && B.start}: noch keine Kaserne und Dienststelle, Summen 0, Personenfelder leer (falsch: ${falsch.join(', ') || 'keine'}); „${Sim.klartext(z.text).slice(0, 90)}…“`);
+  };
+  // Version 6 → 7: Alles andere bleibt (Stadtregierung, Schritt 2, Summen, Stadtbuch bis auf die neuen Zeilen, Zufall), und die Stadt läuft
+  // 60 Tage lang genau wie in Version 6 weiter (spurRelativ: Kennzahlen, Zufall, Felder und Gebäude relativ zur Mitte, alle Personen- und
+  // Gebäudefelder, jeden Tag; dafür ist die Sicherheit ausgeschaltet: keine Taten, das Land baut nicht); danach bitgleich, mit Sicherheit
+  const v6Weiter = (Alt, A, S) => {
+    const ohneNeu = S.buch.slice(0, -3), altBuch = A.buch.slice(A.buch.length - ohneNeu.length);
+    pruef(S.einwohner === A.einwohner && S.buchNr === A.buchNr + 3 && JSON.stringify(ohneNeu) === JSON.stringify(altBuch) && JSON.stringify(S.regierung) === JSON.stringify(A.regierung)
+      && JSON.stringify({ ...S.stat, sicherheit: undefined, bund: undefined }) === JSON.stringify(A.stat) && S.rs === A.rs && JSON.stringify(S.ki) === JSON.stringify(A.ki),
+      'Version 6 → 7: Stadtregierung, Schritt 2, Summen, Hauptfiguren, Stadtbuch und Zufall bleiben, drei Zeilen dazu (Sicherheit, Bund, Stadt erweitern)');
+    let erst = -1;
+    const an = sicherheitAus(Sim);
+    for (let t = 0; t < 60; t++) {
+      const z = A.tag + 1; while (A.tag < z) Alt.stunde(A); while (S.tag < z) Sim.stunde(S);
+      if (erst < 0 && spurRelativ(Alt, A) !== spurRelativ(Sim, S)) erst = A.tag;
+    }
+    an();
+    pruef(erst < 0, `60 Tage weiter ohne Sicherheit (Tag ${S.tag}, ${S.einwohner} Einw., Karte ${S.karte}): Kennzahlen, Zufall, Felder und Gebäude ${erst < 0 ? 'jeden Tag wie in Version 6' : 'VERSCHIEDEN ab Tag ' + erst}`);
+    const L = ladenAusText(Sim, speichernAlsText(Sim, S));
+    const z = S.tag + 20; while (S.tag < z) Sim.stunde(S); while (L.tag < z) Sim.stunde(L);
+    pruef(fingerabdruck(Sim, S) === fingerabdruck(Sim, L), `danach als Version ${Sim.VERSION} gespeichert und geladen: läuft bitgleich weiter`);
+  };
+  // Alte Fassungen: mit --alt genau diese Datei, sonst aus git 39c405b (Version 2), 2b821c2 (Version 3), 1c8d40b (Version 4), 414ebab
+  // (Version 5, Stadtregierung ohne Schritt 2) und bc7247a (Version 6, Schritt 2, feste Karte 96 × 96). --git <ordner>: Repository für
+  // git show (Standard: der Ordner dieses Werkzeugs)
   const quellen = arg('alt') ? [[arg('alt'), readFileSync(arg('alt'), 'utf8')]]
-    : ['39c405b', '2b821c2', '1c8d40b', '414ebab'].map(c => [`git ${c}`, execFileSync('git', ['show', c + ':stadt/stadt.html'], { cwd: arg('git', hier), encoding: 'utf8', maxBuffer: 1 << 26 })]);
-  // Neue Zeilen im Stadtbuch: Bauhof bzw. Tech-Firmen, dazu je eine Zeile der Stadtregierung; von Version 5 eine Zeile zu Schritt 2
-  const NEU_ZEILEN = { 2: 2, 3: 2, 4: 1, 5: 1 };
+    : ['39c405b', '2b821c2', '1c8d40b', '414ebab', 'bc7247a'].map(c => [`git ${c}`, execFileSync('git', ['show', c + ':stadt/stadt.html'], { cwd: arg('git', hier), encoding: 'utf8', maxBuffer: 1 << 26 })]);
+  // Neue Zeilen im Stadtbuch: Bauhof bzw. Tech-Firmen, dazu je eine Zeile der Stadtregierung; von Version 5 eine Zeile zu Schritt 2;
+  // aus jeder Version eine Zeile „Stadt erweitern“ (Größe, Stufe, Stadtteile, Karte; Art „stufe“, immer die letzte) und davor je eine Zeile
+  // „Sicherheit“ und „Bund“ (Version 7)
+  const NEU_ZEILEN = { 2: 5, 3: 5, 4: 4, 5: 4, 6: 3 };
   for (const [herkunft, altHtml] of quellen) {
     const ctx = vm.createContext({});
     vm.runInContext(altHtml.match(/<script id="sim">([\s\S]*?)<\/script>/)[1], ctx);
     const Alt = ctx.StadtSim;
     console.log(`Alte Fassung: ${herkunft}`);
-    pruef([2, 3, 4, 5].includes(Alt.VERSION) && Alt.VERSION < Sim.VERSION, `alte Simulation hat Version ${Alt.VERSION}, neue ${Sim.VERSION}`);
-    const v5 = Alt.VERSION === 5;
+    pruef([2, 3, 4, 5, 6].includes(Alt.VERSION) && Alt.VERSION < Sim.VERSION, `alte Simulation hat Version ${Alt.VERSION}, neue ${Sim.VERSION}`);
+    const v5 = Alt.VERSION === 5, v6 = Alt.VERSION === 6;
     for (const [seed, tage, stunde] of [[1, 150, 13], [2, 300, 5], [3, 400, 20]]) {
       const A = Alt.neueStadt(seed);
       while (A.tag < tage || A.stunde < stunde || !A.baustellen.length) Alt.stunde(A);   // ein Moment mit laufenden Baustellen
@@ -375,19 +600,24 @@ if (flag('migrationstest')) {
       const d = roh(text);
       const S = Sim.importZustand(d, true);
       const B = S.bauhof, g = S.g;
+      erweiterungUebernommen(S, A);                          // Stadt erweitern: Stufe, Stadtteile, Karte, letzte Zeile
+      sicherheitUebernommen(S, A);                           // Sicherheit: leer ab dem Übernahmetag, drittletzte Zeile
+      bundUebernommen(S, A);                                 // Bund: leer ab dem Übernahmetag, vorletzte Zeile
+      if (v6) { v6Weiter(Alt, A, S, text); continue; }      // Version 6 → 7: nur „Stadt erweitern“ neu, sonst läuft alles weiter
       pruef(B === 2 && g.typ[B] === Sim.WERKSTATT && g.besitzer[B] < 0, `Bauhof = Gebäude ${B} (die Werkstatt der Stadt vom Start)`);
       pruef(S.baustellen.every(b => g.bauRest[b] > 0 && g.bauRest[b] <= Sim.bauGesamt(S, b)), `Baustellen mit Arbeitstagen: ${S.baustellen.map(b => g.bauRest[b] + '/' + Sim.bauGesamt(S, b)).join(', ') || 'keine'}`);
       const dazu = NEU_ZEILEN[Alt.VERSION];
       pruef(S.einwohner === A.einwohner && S.buchNr === A.buchNr + dazu, `Einwohner (${S.einwohner}) und Stadtbuch bleiben, ${dazu} ${dazu === 1 ? 'Zeile' : 'Zeilen'} dazu: `
         + S.buch.slice(-dazu).map(e => `„${Sim.klartext(e.text).slice(0, 70)}…“`).join(' '));
-      if (!v5) pruef(S.version === Sim.VERSION && S.regierung.start === A.tag && S.regierung.schritt2 === A.tag && Object.values(S.stat.regierung).every(v => v === 0) && S.buch.at(-1).art === 'regierung'
+      const regZeile = S.buch.filter(e => e.art === 'regierung').at(-1);
+      if (!v5) pruef(S.version === Sim.VERSION && S.regierung.start === A.tag && S.regierung.schritt2 === A.tag && Object.values(S.stat.regierung).every(v => v === 0) && regZeile && regZeile.tag === A.tag && S.buch.at(-4) === regZeile
         && S.p.gsTage.every(v => v === 0) && S.p.gemein.every(v => v === 0) && S.regierung.gestern === null && Object.values(S.regierung.tagStart).every(v => v === 0),
         `Stadtregierung und Schritt 2 ab dem Übernahmetag ${S.regierung.start}, Summen 0, niemand in Grundsicherung, noch kein „gestern“`);
       // Version 5 → 6: die Stadtregierung läuft weiter (Start, Summen, gestern bleiben), Schritt 2 ab dem Übernahmetag, neue Summen 0
       else pruef(S.version === Sim.VERSION && S.regierung.start === A.regierung.start && S.regierung.schritt2 === A.tag
         && Object.entries(A.stat.regierung).every(([k, v]) => S.stat.regierung[k] === v) && ['kaeufe', 'ruhestand', 'rentnerEntlastung', 'miete', 'kitaPlatzTage', 'kitaLuecke', 'kitaKosten'].every(k => S.stat.regierung[k] === 0)
         && JSON.stringify(Object.fromEntries(Object.keys(A.regierung.gestern || {}).map(k => [k, S.regierung.gestern[k]]))) === JSON.stringify(A.regierung.gestern || {})
-        && S.buch.at(-1).art === 'regierung' && /^Ab heute können Mieter ihre Wohnung/.test(S.buch.at(-1).text) && /Die Stadt baut Kitas; bis kein Kind mehr auf einen Platz wartet \(mindestens bis Tag \d+, höchstens bis Tag \d+\), muss niemand/.test(S.buch.at(-1).text),
+        && S.buch.at(-4) === regZeile && /^Ab heute können Mieter ihre Wohnung/.test(regZeile.text) && /Die Stadt baut Kitas; bis kein Kind mehr auf einen Platz wartet \(mindestens bis Tag \d+, höchstens bis Tag \d+\), muss niemand/.test(regZeile.text),
         `Stadtregierung läuft weiter (seit Tag ${S.regierung.start}, Summen und „gestern“ wie vorher), Schritt 2 ab Tag ${S.regierung.schritt2}, neue Summen 0`);
       // Schritt 2 für alle gleich: niemand besitzt schon eine Wohnung, Beitragsjahre nur aus dem Alter
       let bfehl = 0;
@@ -435,6 +665,11 @@ if (flag('migrationstest')) {
         `Kitas nach 60 Tagen: ${ri.kita.offen} offen, ${ri.kita.kinder} Kinder mit Platz, ${ri.kita.warten} warten, ${S.stat.regierung.kitaLuecke}-mal Stelle aufgegeben (nach der Frist), ${ri.kita.gebunden} gebunden`);
       pruef(ri.eigentuemer > 0 && S.stat.regierung.kaeufe > 0,
         `Schritt 2 nach 60 Tagen: ${ri.eigentuemer} von ${ri.haushalte} Haushalten im Eigentum, ${S.stat.regierung.ruhestand} Renteneintritte (davon ${S.stat.regierung.fruehRuhestand} vor 67), ${ri.vor67} heute vor 67 in Rente`);
+      // Bund nach 60 Tagen: ab der Stufe Stadt steht die Kaserne (oder es gibt kein Gelände), sonst noch nicht
+      { const e = S.erweiterung, K = S.bund.kaserne, i = Sim.bundInfo(S);
+        const ohneGelaende = !Sim.gelaendeSuchen(S, 3, 2, true) && !Sim.gelaendeSuchen(S, 2, 3, true);
+        pruef(e.stufe >= Sim.R.KASERNE_STUFE ? K >= 0 || ohneGelaende : K < 0,
+          `Bund nach 60 Tagen (${Sim.STUFEN[e.stufe]}): ${K >= 0 ? `Kaserne ${i.kaserneOffen ? `offen seit Tag ${i.kOffen}, ${S.stat.bund.wehrdienst + S.stat.bund.ersatzdienst} Einberufungen` : 'im Bau'}` : 'keine Kaserne' + (ohneGelaende ? ' (kein Gelände)' : '')}`); }
       if (S.stat.tech) pruef(S.version === Sim.VERSION && Array.isArray(S.angebot), `Version ${S.version}, Tech-Firmen danach: ${S.stat.tech.gruendungen} gegründet, ${S.stat.tech.kaeufe.reduce((a, b) => a + b, 0)} Käufe`);
       const L = ladenAusText(Sim, speichernAlsText(Sim, S));
       const z = S.tag + 20; while (S.tag < z) Sim.stunde(S); while (L.tag < z) Sim.stunde(L);
@@ -450,19 +685,21 @@ if (flag('regierung')) {
   // Renteneintritt, Rentner-Freibetrag, Mieterkauf (Erbe, Rückkauf, Buchungen), Übernahme eines Stands der Version 5.
   // Eine Kopie der Simulation mit Testhilfen: globalThis.__ohneJob sucht keine Stelle (Seit Schritt 2 gehen um 7 Uhr oft Leute in
   // Rente und machen in derselben Stunde eine Stelle frei; ein fester Stellenmarkt je Stunde reicht dann nicht), __buchung zählt jede
-  // Budgetbuchung des Mieterkaufs mit. Sonst gleich.
+  // Budgetbuchung des Mieterkaufs mit; __ohneTat begeht keine Tat (Sicherheit: ohne Geld steigt die Tatneigung, eine Haft beendete den
+  // erzwungenen Fall der gemeinnützigen Arbeit vorzeitig). Sonst gleich.
   const { Sim, ctx: ctxR } = ladeSimMit([
     ['  if (erwerb && (arb < 0 || gem) && !istBesitzer && S.freieStellen > 0 && !rentner(S, p) && !gebunden(S, p)) {\n',
       '  if (erwerb && (arb < 0 || gem) && !istBesitzer && S.freieStellen > 0 && !rentner(S, p) && !gebunden(S, p) && p !== globalThis.__ohneJob) {\n'],
+    ['    if (zufallSich(S) >= tatRisiko(S, p)) continue;\n', '    if (zufallSich(S) >= tatRisiko(S, p) || p === globalThis.__ohneTat) continue;\n'],
     ['    S.budget += a;\n', '    S.budget += a; globalThis.__buchung += a;\n'],
     ['        if (r > 0) { P.geld[p] -= r; S.budget += r;', '        if (r > 0) { P.geld[p] -= r; S.budget += r; globalThis.__buchung += r;'],
     ['  S.budget -= z; P.geld[x] += z;\n', '  S.budget -= z; P.geld[x] += z; globalThis.__buchung -= z;\n'],
   ]);
-  ctxR.__ohneJob = -1; ctxR.__buchung = 0;
+  ctxR.__ohneJob = -1; ctxR.__buchung = 0; ctxR.__ohneTat = -1;
   let fehler = 0;
   const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
   const R = Sim.R, J = R.JAHR;
-  const offenB = (S, b) => S.feld[S.g.y[b] * Sim.KARTE + S.g.x[b]] === S.g.typ[b] && !S.g.leer[b];
+  const offenB = (S, b) => S.feld[S.g.y[b] * S.karte + S.g.x[b]] === S.g.typ[b] && !S.g.leer[b];
   // Schritt 2 unabhängig nachgebaut: Rente bekommt, wer 67 ist oder ohne Arbeitsplatz und Betrieb 45 Beitragsjahre hat
   const bekommtRente = (S, p) => S.tag - S.p.geb[p] >= R.RENTE * J || (S.p.arbeit[p] < 0 && S.p.besitz[p] < 0 && S.p.beitrag[p] >= 45 * J);
   // Die Regeln R01/R02 hier noch einmal unabhängig nachgerechnet: Steuer eines Steuerhaushalts mit Löhnen L, K Köpfen und
@@ -483,8 +720,10 @@ if (flag('regierung')) {
     for (let p = 0; p < S.pMax; p++) if (P.lebt[p] && P.hh[p] >= 0 && P.geb[p] > erw) hk.set(P.hh[p], (hk.get(P.hh[p]) || 0) + 1);
     for (let b = 0; b < S.gAnzahl; b++) {
       const t = g.typ[b];
-      if ((t !== Sim.WERKSTATT && t !== Sim.LADEN && t !== Sim.TECH && t !== Sim.KITA) || !offenB(S, b)) continue;   // Kita (Schritt 2): Lohn aus dem Budget
-      for (const w of S.belegschaft[b]) if (!P.frei[w] && !P.gemein[w]) brutto.set(w, g.lohn[b]);
+      if ((t !== Sim.WERKSTATT && t !== Sim.LADEN && t !== Sim.TECH && t !== Sim.KITA && t !== Sim.WACHE && t !== Sim.JVA && t !== Sim.KASERNE && t !== Sim.DIENSTSTELLE)
+        || !offenB(S, b)) continue;   // Kita (Schritt 2): Lohn aus dem Budget; Wache und Anstalt: Lohn vom Land; Kaserne und Dienststelle: Lohn vom Bund; Lohnsteuer wie jeder Lohn
+      // Bund (Teil 3): Wehrdienst (Kaserne) und Ersatzdienst (Bauhof) bekommen den Sold brutto, Lohnsteuer wie jeder Lohn (B7)
+      for (const w of S.belegschaft[b]) if (!P.frei[w] && !P.gemein[w]) brutto.set(w, P.bund[w] >= Sim.WEHRDIENST ? R.SOLD : g.lohn[b]);
     }
     const kopf = (w) => { const k = P.hh[w]; return k >= 0 && (k === w || k === P.partner[w]) ? k : w; };
     const mit = (x) => (P.besitz[x] >= 0 && offenB(S, P.besitz[x]) ? 0 : 1);
@@ -553,12 +792,15 @@ if (flag('regierung')) {
       pruef(rentner.length > 0 && bekommen >= rentner.length * stufe, `leeres Budget: ${rentner.length} Rentnerinnen und Rentner unter 80 bekommen trotzdem ${stufe} Taler (Rentenkasse +${bekommen})`);
     }
     // 2. Gemeinnützige Arbeit, erzwungen: eine allein lebende Person ohne Stelle, ohne Geld, seit 4 Tagen in Grundsicherung
-    bisStunde(S, 400, 20);
+    // Tag des Falls: 400, oder der nächste Tag, wenn Abschnitt 1 (bis 30 Nächte ohne Wechsel) schon weiter gelaufen ist (Teil 3: Seed 2)
+    const T0 = Math.max(400, S.tag + 1);
+    bisStunde(S, T0, 20);
     const B = S.bauhof;
     let c = -1;
     for (let p = 0; p < S.pMax; p++) {
       const a = S.tag - P().geb[p];
       if (!P().lebt[p] || a < 200 || a >= 600 || P().besitz[p] >= 0 || P().hh[p] !== p || S.hhGroesse[p] !== 1 || P().partner[p] >= 0 || P().arbeit[p] === B) continue;
+      if (P().bund[p] || P().haftBis[p]) continue;             // Bund: nicht aus Kaserne oder Dienst (das Austragen unten kennt die Rolle nicht); nicht in Haft
       c = p; break;
     }
     pruef(c >= 0, `Person gefunden: ${c >= 0 ? Sim.name(S, c) : '–'}`);
@@ -569,34 +811,35 @@ if (flag('regierung')) {
     P().ziel[c] = Sim.Z.JOB; P().zielSeit[c] = S.tag; P().zielWert[c] = 0;   // Ziel „besserer Job“ (ohne Stelle: Ausgangswert 0)
     P().getrenntTag[c] = S.tag;   // 30 Tage keine Partnersuche, niemand wählt c (sonst endet die Grundsicherung mit dem Einkommen des Partners)
     // Fester Stellenmarkt bis zum Test von job_suchen: niemand findet eine Stelle (freieStellen je Stunde auf 0, und c sucht nicht)
-    ctxR.__ohneJob = c;
+    ctxR.__ohneJob = c; ctxR.__ohneTat = c;
     const fest = (tag, h) => { while (S.tag < tag || (S.tag === tag && S.stunde < h)) { S.freieStellen = 0; Sim.stunde(S); } };
-    fest(400, 23);
+    fest(T0, 23);
     const gemVor = S.stat.regierung.gemeinnuetzig;
-    fest(401, 0);
+    fest(T0 + 1, 0);
     const gem = () => S.belegschaft[B].filter(w => P().gemein[w]).length;
-    const stellenB = Sim.stellen(S, B), bel = S.belegschaft[B].length;
+    const dienst = () => S.belegschaft[B].filter(w => P().bund[w] === Sim.ERSATZDIENST).length;   // Bund: Ersatzdienst, außerhalb der Obergrenze
+    const stellenB = Sim.stellen(S, B), bel = S.belegschaft[B].length, ed = dienst();
     pruef(P().gemein[c] === 1 && P().arbeit[c] === B && S.belegschaft[B].includes(c) && P().gsTage[c] === R.GS_PFLICHT && S.stat.regierung.gemeinnuetzig === gemVor + 1,
       `nach ${R.GS_PFLICHT} Tagen Grundsicherung gemeinnützige Arbeit im Bauhof: gemein ${P().gemein[c]}, gsTage ${P().gsTage[c]}`);
-    pruef(stellenB <= R.BAU_MAX && bel <= R.BAU_MAX && stellenB === R.STELLEN_STADT + S.bauZuschlag + gem() && S.g.offeneStellen[B] === stellenB - bel,
-      `Bauhof: ${bel} Leute, davon ${gem()} gemeinnützig, ${stellenB} Stellen (≤ ${R.BAU_MAX}); freie Stellen ${S.g.offeneStellen[B]} wie ohne sie`);
-    const zeile = S.buch.filter(e => e.tag === 400 && e.art === 'regierung').at(-1);
+    pruef(stellenB - ed <= R.BAU_MAX && bel - ed <= R.BAU_MAX && stellenB === R.STELLEN_STADT + S.bauZuschlag + gem() + ed && S.g.offeneStellen[B] === stellenB - bel,
+      `Bauhof: ${bel} Leute, davon ${gem()} gemeinnützig und ${ed} im Ersatzdienst, ${stellenB} Stellen (ohne Ersatzdienst ≤ ${R.BAU_MAX}); freie Stellen ${S.g.offeneStellen[B]} wie ohne sie`);
+    const zeile = S.buch.filter(e => e.tag === T0 && e.art === 'regierung').at(-1);
     pruef(!!zeile && zeile.text.includes(`\u0001${c}/`) && /gemeinnütziger Arbeit im Bauhof herangezogen/.test(zeile.text), `Stadtbuch: „${zeile ? Sim.klartext(zeile.text) : '–'}“`);
     const info = Sim.personInfo(S, c);
     // Gemeinnützige Arbeit ist keine Stelle: kein „Ziel erreicht: besserer Job“ (Lebenslauf, Sprachmodell, Statistik)
-    const zielFalsch = info.gedaechtnis.filter(m => m.tag >= 400 && m.text.includes('Ziel erreicht: ' + Sim.ZIELTEXT[Sim.Z.JOB]));
+    const zielFalsch = info.gedaechtnis.filter(m => m.tag >= T0 && m.text.includes('Ziel erreicht: ' + Sim.ZIELTEXT[Sim.Z.JOB]));
     pruef(!zielFalsch.length && P().ziel[c] === Sim.Z.JOB, `gemeinnützige Arbeit erfüllt das Ziel „${Sim.ZIELTEXT[Sim.Z.JOB]}“ nicht (Ziel jetzt ${Sim.ZIELTEXT[P().ziel[c]] || '–'})`);
     pruef(/^leistet gemeinnützige Arbeit beim Bauhof /.test(info.arbeit) && info.leistung && info.leistung.art === 'grundsicherung' && info.leistung.gemein,
       `Personenkarte: „${Sim.klartext(info.arbeit)}“, Leistung ${JSON.stringify(info.leistung)}`);
-    fest(401, 7);
+    fest(T0 + 1, 7);
     const erl = Sim.erlaubteAktionen(S, c, 7);
     pruef(!erl.includes('kuendigen') && !erl.includes('freinehmen') && !erl.includes('job_wechseln') && !erl.includes('job_suchen'), `erlaubt um 7 Uhr ohne freie Stellen: ${erl.join(', ')}`);
     S.freieStellen = 1;
     const erl2 = Sim.erlaubteAktionen(S, c, 7);
     pruef(erl2.includes('job_suchen') && !erl2.includes('kuendigen'), `mit freier Stelle erlaubt: ${erl2.join(', ')}`);
-    fest(401, 23);
+    fest(T0 + 1, 23);
     const g0 = P().geld[c], gs0 = S.stat.regierung.gemeinTage, tage0 = P().gsTage[c], bedarf = Sim.personInfo(S, c).leistung.betrag;
-    fest(402, 0);
+    fest(T0 + 2, 0);
     pruef(P().gemein[c] === 1 && S.stat.regierung.gemeinTage === gs0 + 1 && P().gsTage[c] === tage0 + 1,
       `am nächsten Abend noch gemeinnützig, Grundsicherung läuft weiter (gsTage ${P().gsTage[c]})`);
     pruef(P().geld[c] - g0 <= bedarf && P().geld[c] - g0 < R.LOHN_STADT / 2, `kein Lohn: Geld ${g0} → ${P().geld[c]} (nur Grundsicherung ${bedarf} minus Einkauf und Miete)`);
@@ -613,7 +856,8 @@ if (flag('regierung')) {
     let h = 0; while (P().gemein[c] && P().lebt[c] && h < 72) { Sim.stunde(S); h++; }
     pruef(!P().gemein[c] && P().arbeit[c] >= 0 && P().arbeit[c] !== B, `nach ${h} Stunden eine richtige Stelle: ${P().arbeit[c] >= 0 ? Sim.klartext(Sim.personInfo(S, c).arbeit) : '–'}`);
     bisStunde(S, S.tag + 1, 0);
-    pruef(Sim.stellen(S, B) === R.STELLEN_STADT + S.bauZuschlag + gem() && S.g.offeneStellen[B] === Sim.stellen(S, B) - S.belegschaft[B].length, 'danach stimmen die Stellen im Bauhof');
+    pruef(Sim.stellen(S, B) === R.STELLEN_STADT + S.bauZuschlag + gem() + dienst() && S.g.offeneStellen[B] === Sim.stellen(S, B) - S.belegschaft[B].length, 'danach stimmen die Stellen im Bauhof');
+    ctxR.__ohneTat = -1;
     // 3. Elternzeit zählt nicht als arbeitslos, gemeinnützige Arbeit schon (Quote für den Zuzug)
     {
       let los = 0;
@@ -622,6 +866,7 @@ if (flag('regierung')) {
       for (let p = 0; p < S.pMax; p++) {
         if (!P().lebt[p] || P().geb[p] > erw || P().geb[p] <= rente || P().besitz[p] >= 0) continue;
         if (Sim.betreuer(S, P().hh[p]) === p || bekommtRente(S, p) || Sim.gebunden(S, p)) continue;     // Elternzeit, Rente vor 67, ohne Kita-Platz (Schritt 2)
+        if (P().haftBis[p]) continue;                          // Sicherheit: in Haft nicht verfügbar, zählt nicht als arbeitslos (wie in Abschnitt 6)
         if (P().arbeit[p] < 0 || P().gemein[p]) los++;
       }
       S.tag++;
@@ -717,7 +962,7 @@ if (flag('regierung')) {
     // Grundsicherung erzwungen: um 23 Uhr bei jeder 7. erwachsenen Person ohne Betrieb Stelle weg und Geld 0. Erwartung unabhängig
     // aus dem Stand um 23 Uhr: 18–66, ohne Stelle, ohne Betrieb, kein Betreuungsgehalt, niemand sonst im Haushalt mit Einkommen
     // Nächte mit fertigem Bau, Pleite oder Todesfall zählen nicht; es wird weitergemacht, bis 10 Nächte gezählt sind (höchstens 40)
-    let faelle = 0, bezogen = 0, abw = 0, betragFehl = 0, betragNaechte = 0, gezaehlt = 0;
+    let faelle = 0, bezogen = 0, abw = 0, betragFehl = 0, betragNaechte = 0, gezaehlt = 0, haftFaelle = 0, haftNaechte = 0;
     for (let runde = 0; runde < 40 && gezaehlt < 10; runde++) {
       while (S.stunde !== 23) SimZ.stunde(S);
       const T = S.tag, p0 = P(), erz = [];
@@ -737,11 +982,16 @@ if (flag('regierung')) {
       const verdient = (p) => { const k = p0.hh[p], w = p0.wohnung[p]; if (k < 0 || w < 0) return false; const bt = betr(k);
         return S.bewohner[w].some(m => m !== p && p0.hh[m] === k && alter(m) >= R.ERWACHSEN * J
           && ((p0.arbeit[m] >= 0 && !p0.gemein[m]) || p0.besitz[m] >= 0 || rente(m) || bt === m)); };
-      const soll = new Map(erz.map(p => [p, !rente(p) && betr(p0.hh[p]) !== p && !verdient(p)]));
+      // Sicherheit: in Haft keine Grundsicherung (§ 7 Abs. 4 SGB II), der Stand um 23 Uhr entscheidet (Haft beginnt und endet erst danach)
+      const soll = new Map(erz.map(p => [p, !p0.haftBis[p] && !rente(p) && betr(p0.hh[p]) !== p && !verdient(p)]));
+      const inHaft = new Set(erz.filter(p => p0.haftBis[p])); haftFaelle += inHaft.size;   // Stand um 23 Uhr (p0 ist dasselbe Feld wie danach)
       const bedarf23 = new Map(erz.map(p => [p, SimZ.tageskosten(S, p)]));   // Tagesbedarf, wie er um Mitternacht gezahlt wird
       const f0 = S.stat.bau.fertig, pl0 = S.stat.pleiten, t0 = S.stat.tode, gs0 = S.stat.regierung.gs;
       SimZ.stunde(S);
       if (S.stat.bau.fertig !== f0 || S.stat.pleiten !== pl0 || S.stat.tode !== t0) continue;   // Stelle, Betrieb oder Haushalt anders
+      // Sicherheit: Wer in dieser Nacht in Haft kommt (nach der Zahlung, z. B. nach einer Tat ohne Geld), dessen Grundsicherung endet
+      // gleich wieder (gsTage 0); diese Nächte zählen nicht (das Ende der Grundsicherung prüft --sicherheit)
+      if (erz.some(p => !inHaft.has(p) && P().haftBis[p])) { haftNaechte++; continue; }
       gezaehlt++;
       let summe = 0, nurErz = true;
       for (let p = 0; p < S.pMax; p++) if (P().lebt[p] && P().gsTage[p] && !soll.has(p)) nurErz = false;
@@ -753,7 +1003,7 @@ if (flag('regierung')) {
       }
       if (nurErz) { betragNaechte++; if (S.stat.regierung.gs - gs0 !== summe) betragFehl++; }
     }
-    pruef(faelle > 0 && bezogen > 0 && !abw, `Grundsicherung erzwungen: ${faelle} Fälle, ${bezogen} bekommen sie, ${faelle - bezogen} nicht (Betreuungsgehalt, Rente, Einkommen im Haushalt); ${abw} Abweichungen`);
+    pruef(faelle > 0 && bezogen > 0 && !abw, `Grundsicherung erzwungen: ${faelle} Fälle, ${bezogen} bekommen sie, ${faelle - bezogen} nicht (Betreuungsgehalt, Rente, Einkommen im Haushalt, ${haftFaelle} in Haft; ${haftNaechte} Nächte mit Haftantritt nicht gezählt); ${abw} Abweichungen`);
     pruef(betragNaechte > 0 && !betragFehl, `Betrag = Tagesbedarf (Einkauf, beim Vorstand Miete und Kinder): ${betragNaechte} Nächte nachgerechnet, ${betragFehl} falsch`);
     // Bauhof voll: nach 5 Tagen Grundsicherung keine gemeinnützige Arbeit, die Grundsicherung läuft weiter; mit Platz in der Nacht danach.
     // Zieht die Person im Tag dazwischen mit jemandem zusammen (dann verdient jemand im Haushalt), gilt der Fall nicht: nächste Person
@@ -776,6 +1026,8 @@ if (flag('regierung')) {
         const zuschlag = S.bauZuschlag, gem0 = S.stat.regierung.gemeinnuetzig;
         S.bauZuschlag = R.BAU_MAX - R.STELLEN_STADT;           // 40 Stellen: der Bauhof ist voll (bauhofStellen rechnet es in der Nacht neu)
         SimZ.stunde(S);
+        // Sicherheit: ohne Geld steigt die Tatneigung; kommt die Person in dieser Nacht in Haft, endet die Grundsicherung (nächster Versuch)
+        if (P().haftBis[c]) { console.log(`       (${SimZ.name(S, c)} ist in Haft gekommen, nächster Versuch)`); continue; }
         pruef(!P().gemein[c] && P().arbeit[c] < 0 && P().gsTage[c] === R.GS_PFLICHT && S.stat.regierung.gemeinnuetzig === gem0,
           `Bauhof voll (Zuschlag ${zuschlag} → ${R.BAU_MAX - R.STELLEN_STADT}): ${SimZ.name(S, c)} bezieht Grundsicherung seit ${P().gsTage[c]} Tagen, keine gemeinnützige Arbeit`);
         ctx.__ohneJob = c;
@@ -783,6 +1035,7 @@ if (flag('regierung')) {
         ctx.__ohneJob = -1;
         if (!allein(c)) { console.log(`       (${SimZ.name(S, c)} lebt nicht mehr allein, nächster Versuch)`); continue; }
         while (S.stunde !== 0) SimZ.stunde(S);
+        if (P().haftBis[c]) { console.log(`       (${SimZ.name(S, c)} ist in Haft gekommen, nächster Versuch)`); continue; }
         pruef(P().gemein[c] === 1 && P().arbeit[c] === B && S.stat.regierung.gemeinnuetzig === gem0 + 1,
           `mit Platz im Bauhof (${SimZ.stellen(S, B)} Stellen) in der Nacht danach herangezogen (gsTage ${P().gsTage[c]})`);
         fertig = true;
@@ -823,6 +1076,7 @@ if (flag('regierung')) {
     for (let p = 0; p < S.pMax; p++) {
       if (!P.lebt[p] || P.geb[p] > erw || P.geb[p] <= rente || P.besitz[p] >= 0) continue;
       if (Sim.betreuer(S, P.hh[p]) === p || bekommtRente(S, p) || Sim.gebunden(S, p)) continue;
+      if (P.haftBis[p]) continue;                              // Sicherheit: in Haft nicht verfügbar, zählt nicht als arbeitslos
       if (P.arbeit[p] < 0 || P.gemein[p]) los++;
     }
     S.tag++;
@@ -1051,7 +1305,7 @@ if (flag('kita')) {
   const R = Sim.R, J = R.JAHR, KITA = Sim.KITA;
   const dist = (S, a, b) => Math.abs(S.g.x[a] - S.g.x[b]) + Math.abs(S.g.y[a] - S.g.y[b]);
   const einh = (S, k) => (S.tag - S.p.geb[k] < R.KRIPPE_BIS ? 2 : 1);
-  const offenK = (S, b) => S.g.typ[b] === KITA && S.feld[S.g.y[b] * Sim.KARTE + S.g.x[b]] === KITA;
+  const offenK = (S, b) => S.g.typ[b] === KITA && S.feld[S.g.y[b] * S.karte + S.g.x[b]] === KITA;
   const tagWeiter = (S) => { const t = S.tag; while (S.tag === t) Sim.stunde(S); };
   // Personal einer Kita entfernen (wie eine Kündigung aller, die Stellen zählen nachts neu)
   const personalWeg = (S, b) => { for (const w of S.belegschaft[b]) { S.p.arbeit[w] = -1; S.p.einsatz[w] = 0; } const n = S.belegschaft[b].length; S.belegschaft[b] = []; return n; };
@@ -1062,7 +1316,7 @@ if (flag('kita')) {
     let vor = new Uint16Array(0), vorB = new Uint8Array(0);  // Kita-Plätze und belegte Einheiten vor der Nacht (Kopie um 23 Uhr)
     const z = { naechte: 0, plaetze: 0, altersFehl: 0, weitFehl: 0, summeFehl: 0, kapFehl: 0, personalFehl: 0, lohnFehl: 0, vorrangFehl: 0, vorrang: 0,
       luecke: 0, lueckeFehl: 0, ohne: 0, fern: 0, betr: 0, betrFehl: 0, gebunden: 0, gebundenFehl: 0, zeilenFehl: 0, maxKitas: 0, maxWarten: 0,
-      halten: 0, endeFehl: 0, weniger: 0 };
+      halten: 0, endeFehl: 0, weniger: 0, obhut: 0 };
     // Bestand (Annahme): belegt ≤ halt = max(möglich, belegt gestern − 8), solange die Kita Personal hat, sonst 0
     const halt = (S, b) => S.g.kapaz[b] > 0 ? Math.max(S.g.kapaz[b], (vorB[b] || 0) - R.KITA_JE_KRAFT) : 0;
     let personalStart = new Map();
@@ -1115,13 +1369,14 @@ if (flag('kita')) {
       }
       for (let k = 0; k < S.pMax; k++) {
         if (!P.lebt[k] || P.kita[k] || S.tag - P.geb[k] >= R.KITA_ENDE || P.hh[k] < 0 || P.wohnung[k] < 0) continue;
+        if (P.obhut[k]) { z.obhut++; continue; }              // Sicherheit: in Obhut (Angehörige oder Jugendamt), der Haushalt ist in Haft
         const kopf = P.hh[k];
         if (gesehen.has(kopf)) continue;
         gesehen.add(kopf);
         let heim = false, angestellt = false;
         for (const m of S.bewohner[P.wohnung[k]]) {
           if (P.hh[m] !== kopf || P.geb[m] > erw) continue;
-          if (P.arbeit[m] < 0) heim = true;
+          if (P.arbeit[m] < 0 && !P.haftBis[m]) heim = true;   // Sicherheit: in Haft ist niemand zu Hause
           else if ((m === kopf || m === P.partner[kopf]) && P.besitz[m] < 0 && !P.gemein[m]) angestellt = true;
         }
         z.luecke++;
@@ -1161,7 +1416,7 @@ if (flag('kita')) {
     pruef(!z.endeFehl, `(a) dasselbe am Ende der Nacht, nach den Stellenaufgaben (${z.weniger}-mal hatte eine Kita danach weniger Personal; ${z.endeFehl} Fehler)`);
     pruef(z.betr > 0 && !z.betrFehl, `(b) Betreuungsgehalt nur mit Kind unter 3 ohne Platz: ${z.betr} Haushaltstage (${z.betrFehl} Fehler)`);
     pruef(z.luecke > 0 && !z.lueckeFehl && z.fern === rs.kitaFern, `(c) nach jeder Nacht: ${z.luecke} Haushaltsnächte mit Kind ohne Platz, alle mit jemandem zu Hause, nur Besitzern `
-      + `(${z.ohne}, gezählt ${rs.kitaOhne}) oder ohne Kita mit Plätzen (offen, mit Personal) in der Nähe (${z.fern}, gezählt ${rs.kitaFern}); ${rs.kitaLuecke}-mal gab ein Elternteil die Stelle auf (${z.lueckeFehl} Fehler)`);
+      + `(${z.ohne}, gezählt ${rs.kitaOhne}) oder ohne Kita mit Plätzen (offen, mit Personal) in der Nähe (${z.fern}, gezählt ${rs.kitaFern}); ${rs.kitaLuecke}-mal gab ein Elternteil die Stelle auf; ${z.obhut} Kindnächte in Obhut (${z.lueckeFehl} Fehler)`);
     pruef(!z.gebundenFehl, `(d) ${z.gebunden}-mal gebunden um 7 oder 18 Uhr, nie job_suchen oder laden_gruenden erlaubt (${z.gebundenFehl} Fehler)`);
     pruef(z.vorrang > 0 && !z.vorrangFehl, `(e) Vorrang: ${z.vorrang} wartende Kinder der Stufe 1 geprüft, keins hinter einem neuen Platz der Stufe 2 (${z.vorrangFehl} Fehler; bis ${z.maxWarten} Kinder warteten)`);
     pruef(!z.zeilenFehl, `Stadtbuch: höchstens eine Zeile „Kita“ je Nacht (${S.buch.filter(e => e.art === 'kita').length} im Buch, ${z.zeilenFehl} Fehler)`);
@@ -1391,15 +1646,16 @@ if (flag('waren')) {
     const S = Sim.neueStadt(seed), g = S.g;
     while (S.tag < 100) Sim.stunde(S);
     let mehrAlsGemacht = 0, summeFehl = 0, weitFehl = 0, aussenFehl = 0, kistenFehl = 0, einnahmenFehl = 0, einnahmenGeprueft = 0, tage = 0;
-    let gemacht = 0, anLaeden = 0, ladenStadt = 0, ladenAussen = 0;
+    let gemacht = 0, anLaeden = 0, ladenStadt = 0, ladenAussen = 0, ersatzTage = 0;
     while (S.tag < 300) {
       if (S.stunde !== 23) { Sim.stunde(S); continue; }
       const P = S.p, vor = [];
       for (let b = 0; b < S.gAnzahl; b++) {
-        if (g.typ[b] !== Sim.WERKSTATT || S.feld[g.y[b] * Sim.KARTE + g.x[b]] !== Sim.WERKSTATT || g.leer[b]) continue;
+        if (g.typ[b] !== Sim.WERKSTATT || S.feld[g.y[b] * S.karte + g.x[b]] !== Sim.WERKSTATT || g.leer[b]) continue;
         const L = S.belegschaft[b];
         vor.push({ b, o: g.besitzer[b], kasse: g.kasse[b], lohn: g.lohn[b], L: L.slice(),
-          n: L.filter(w => !P.frei[w]).length, da: L.filter(w => !P.frei[w] && !P.einsatz[w]).length });
+          n: L.filter(w => !P.frei[w]).length, da: L.filter(w => !P.frei[w] && !P.einsatz[w] && P.bund[w] !== Sim.ERSATZDIENST).length,
+          ed: L.filter(w => !P.frei[w] && !P.einsatz[w] && P.bund[w] === Sim.ERSATZDIENST).length });   // Bund: Ersatzdienst macht keine Kisten
       }
       Sim.stunde(S);
       tage++;
@@ -1423,6 +1679,7 @@ if (flag('waren')) {
         const L = S.belegschaft[v.b];
         if (L.length !== v.L.length || !L.every((w, i) => w === v.L[i])) continue;   // Wechsel in der letzten Stunde
         if (g.kisten[v.b] !== Math.min(65535, v.da * R.KISTEN_PRO_TAG)) kistenFehl++;
+        ersatzTage += v.ed;
         // Einnahmen wie vor den Kisten: Arbeitstage × Umlandpreis. Nachrechnen über die Kasse, solange nichts ausgezahlt wurde.
         if (v.o < 0 || g.besitzer[v.b] !== v.o || g.kasse[v.b] >= R.POLSTER || g.leer[v.b]) continue;
         const einnahmen = g.kasse[v.b] - v.kasse + R.FIX_WERKSTATT + v.lohn * v.n;
@@ -1433,7 +1690,7 @@ if (flag('waren')) {
     pruef(mehrAlsGemacht === 0, `keine Werkstatt liefert mehr Kisten, als sie gemacht hat (${tage} Tage)`);
     pruef(summeFehl === 0, `geliefert = bekommen (Werkstätten und Läden, ${summeFehl} Abweichungen)`);
     pruef(weitFehl === 0 && aussenFehl === 0, `Lieferant höchstens ${R.REICH_LIEFER} Felder weit; von außen nur, wenn in Reichweite nichts übrig war (${weitFehl + aussenFehl} Fehler)`);
-    pruef(kistenFehl === 0, `je anwesender Kraft ${R.KISTEN_PRO_TAG} Kisten, Bauarbeiter auf der Baustelle nicht (${kistenFehl} Fehler)`);
+    pruef(kistenFehl === 0, `je anwesender Kraft ${R.KISTEN_PRO_TAG} Kisten, Bauarbeiter auf der Baustelle nicht, Ersatzdienst nicht (${ersatzTage} Tage im Ersatzdienst ohne Baustelle; ${kistenFehl} Fehler)`);
     pruef(einnahmenGeprueft > 100 && einnahmenFehl === 0, `Werkstatt-Einnahmen = Arbeitstage × Umlandpreis wie vorher (${einnahmenGeprueft} Werkstatt-Tage nachgerechnet, ${einnahmenFehl} Fehler)`);
     console.log(`       Tag 100–300: ${(anLaeden / gemacht * 100).toFixed(0)} % der Kisten gehen an Läden der Stadt, Läden bekommen ${(ladenStadt / (ladenStadt + ladenAussen) * 100).toFixed(0)} % aus der Stadt`);
   }
@@ -1448,7 +1705,7 @@ if (flag('tech')) {
   for (const seed of arg('seeds', '1,2,3').split(',').map(Number)) {
     console.log(`Seed ${seed}`);
     const S = Sim.neueStadt(seed), g = S.g;
-    const offenT = (b) => g.typ[b] === T && !g.leer[b] && S.feld[g.y[b] * Sim.KARTE + g.x[b]] === T;
+    const offenT = (b) => g.typ[b] === T && !g.leer[b] && S.feld[g.y[b] * S.karte + g.x[b]] === T;
     let arbeitGeprueft = 0, arbeitFehl = 0, uebersprungen = 0, versionen = 0, produktFehl = 0;
     let kaufTage = 0, kaufFehl = 0, angebotFehl = 0, reserveFehl = 0, umsatzFehl = 0, kaeufe = 0;
     let anbauBestellt = 0, anbauFehl = 0, anbauFertig = 0, stellenFehl = 0, rueckFehl = 0, anbauOhneSuchende = 0;
@@ -1548,6 +1805,980 @@ if (flag('aufholtest')) {
   process.exit(0);
 }
 
+if (flag('erweiterung')) {
+  // Stadt erweitern (Version 7): die Karte wächst in Ringen, Stufen, Stadtteile, Gelände. Alte Fassung (Version 6, feste Karte 96 × 96)
+  // zum Vergleich: --v6 <datei> oder git bc7247a (--git <ordner>). Mit --gross zusätzlich die große Stadt (UMLAND 300000, Seed 2, 750 Tage).
+  let fehler = 0;
+  const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
+  const v6Html = arg('v6') ? readFileSync(arg('v6'), 'utf8')
+    : execFileSync('git', ['show', 'bc7247a:stadt/stadt.html'], { cwd: arg('git', hier), encoding: 'utf8', maxBuffer: 1 << 26 });
+  const ladeAlt = () => { const ctx = vm.createContext({}); vm.runInContext(v6Html.match(/<script id="sim">([\s\S]*?)<\/script>/)[1], ctx); return ctx.StadtSim; };
+  const Alt = ladeAlt();
+  pruef(Alt.VERSION === 6 && Sim.VERSION === 7, `alte Fassung Version ${Alt.VERSION}, neue ${Sim.VERSION}`);
+
+  // 1. Statisch: Der Abschnitt „Stadt erweitern“ würfelt nicht und liest von Personen nur lebt und wohnung (auch nicht über Namen, Einzug,
+  //    Eltern oder Gedächtnis); Stadtteile (teilVon, teilName, stadtteilZaehlen, erweiterungInfo) nutzt außerhalb des Abschnitts nur, was
+  //    anzeigt oder benennt (neuesGebaeude: Name beim ersten Gebäude; personInfo, gebaeudeInfo: Anzeige), nie eine Regel, die Personen wählt
+  {
+    const code = SIM_CODE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+    const roh = SIM_CODE, a = roh.indexOf('// ─── Stadt erweitern (Version 7)'), e = roh.indexOf('// Ende Stadt erweitern');
+    const teil = roh.slice(a, e).replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+    const zufall = teil.match(/\b(zufall|zInt)\s*\(/g) || [];
+    const personen = [...teil.matchAll(/\bS\.p\b(\.\w+|\[[^\]]*\])?/g)].map(m => m[0]).filter(x => x !== 'S.p.lebt' && x !== 'S.p.wohnung');
+    const aliasP = teil.match(/\bP\b/g) || [];
+    const namen = teil.match(/\b(name|vorname|nr|namePack|nameAusPack|personInfo|ref)\s*\(/g) || [];
+    pruef(a > 0 && e > a && !zufall.length && !personen.length && !aliasP.length && !namen.length,
+      `Abschnitt „Stadt erweitern“ (${teil.split('\n').length} Zeilen): kein Zufall (${zufall.length}), von Personen nur lebt und wohnung (anderes: ${personen.join(', ') || 'nichts'}; P: ${aliasP.length}), keine Namen (${namen.join(', ') || 'keine'})`);
+    // Funktion, in der eine Stelle steht (oberste Ebene: Zeile „function x(“ davor)
+    const ausserhalb = code.slice(0, code.indexOf('function karteMasse(')) + code.slice(code.indexOf('function migriereV6('));
+    const funktionen = [...ausserhalb.matchAll(/^function (\w+)\(/gm)];
+    const in_ = (i) => { let f = '(oben)'; for (const m of funktionen) { if (m.index > i) break; f = m[1]; } return f; };
+    const erlaubt = new Set(['neuesGebaeude', 'personInfo', 'gebaeudeInfo', 'migriereV6']);
+    const nutzer = [...ausserhalb.matchAll(/\b(teilVon|teilName|teilIndex|stadtteilZaehlen|erweiterungInfo)\s*\(/g)].map(m => in_(m.index) + ':' + m[1]);
+    pruef(nutzer.every(n => erlaubt.has(n.split(':')[0])), `Stadtteile außerhalb des Abschnitts nur zum Benennen und Anzeigen: ${[...new Set(nutzer)].join(', ')}`);
+  }
+
+  // 2. Seeds 1–3 je 730 Tage neben der alten Fassung: jeden Tag dieselben Kennzahlen, derselbe Zufall, dieselben Felder und Gebäude
+  //    relativ zur Mitte. Eine Kopie der Simulation zählt, wie oft die Grenze der Karte eine Straße aufhielte (endeVerlaengern und
+  //    abzweigen); soll 0 sein. Täglich geprüft: Vorlauf, Ausdehnung = Straßen, Wachsen je eine Zeile, Stufe genau am ersten Tag mit genug
+  //    Einwohnern (nie zurück, je Aufstieg eine Zeile), Stadtteile (Dorf ohne, ab Kleinstadt alle bebauten, Namen verschieden, Reihenfolge
+  //    des ersten Gebäudes), Zähler je Stadtteil
+  const { Sim: Z, ctx: zc } = ladeSimMit([
+    ["    if (!imRand(S, nx, ny) || S.feld[zelle(S, nx, ny)] !== LEER) { S.enden.splice(i, 1); break; }",
+     "    if (!imRand(S, nx, ny)) globalThis.__grenze++;\n    if (!imRand(S, nx, ny) || S.feld[zelle(S, nx, ny)] !== LEER) { S.enden.splice(i, 1); break; }"],
+    ["    if (imRand(S, e.x + ndx, e.y + ndy) && S.feld[zelle(S, e.x + ndx, e.y + ndy)] === LEER) { e.dx = ndx; e.dy = ndy; }",
+     "    if (!imRand(S, e.x + ndx, e.y + ndy)) globalThis.__grenze++;\n    if (imRand(S, e.x + ndx, e.y + ndy) && S.feld[zelle(S, e.x + ndx, e.y + ndy)] === LEER) { e.dx = ndx; e.dy = ndy; }"],
+    ["      if (!imRand(S, x + dx, y + dy) || S.feld[zelle(S, x + dx, y + dy)] !== LEER) continue;",
+     "      if (!imRand(S, x + dx, y + dy)) globalThis.__grenze++;\n      if (!imRand(S, x + dx, y + dy) || S.feld[zelle(S, x + dx, y + dy)] !== LEER) continue;"],
+  ]);
+  zc.__grenze = 0;
+  const R = Sim.R, VOR = Sim.RAND + R.KARTE_VORLAUF;
+  const tagesPruefung = (S, fehl) => {
+    const e = S.erweiterung, K = S.karte, a = e.ausdehnung;
+    let x0 = 1e9, x1 = -1, y0 = 1e9, y1 = -1;
+    for (let c = 0; c < K * K; c++) if (S.feld[c] === Sim.STRASSE) { const x = c % K, y = (c / K) | 0; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    for (const r of e.gelaende) { x0 = Math.min(x0, r[0]); y0 = Math.min(y0, r[1]); x1 = Math.max(x1, r[2]); y1 = Math.max(y1, r[3]); }
+    if (a[0] !== x0 || a[1] !== x1 || a[2] !== y0 || a[3] !== y1) fehl.ausdehnung++;
+    if (!(K >= R.KARTE_MAX || (x0 >= VOR && y0 >= VOR && K - 1 - x1 >= VOR && K - 1 - y1 >= VOR))) fehl.vorlauf++;
+    if (S.mitte !== K / 2 || S.feld.length !== K * K || S.vHaus.length !== S.vn * S.vn) fehl.masse++;
+    // Stufe: genau so viele Schwellen wie die höchste Einwohnerzahl am Tagesende bisher, Tag des Aufstiegs = erster Tag darüber
+    let soll = 0; const tage = [0];
+    for (let n = 1; n < R.STUFE_AB.length; n++) { const t = S.reihe.findIndex(v => v >= R.STUFE_AB[n]); if (t < 0) break; soll = n; tage.push(t); }
+    if (e.stufe !== soll || JSON.stringify(e.stufenTage) !== JSON.stringify(tage)) fehl.stufe++;
+    // Stadtteile: ab Kleinstadt alle bebauten benannt, in der Reihenfolge ihres ersten Gebäudes, verschiedene Namen
+    const erst = new Map(); for (let b = 0; b < S.gAnzahl; b++) { const t = Sim.teilVon(S, S.g.x[b], S.g.y[b]); if (!erst.has(t)) erst.set(t, b); }
+    const namen = e.teile.map(([t]) => Sim.teilName(S, t));
+    const reihe = e.teile.map(([t]) => erst.get(t));
+    if (e.stufe === 0 ? e.teile.length !== 0 : (e.teile.length !== erst.size || reihe.some((b, i) => b === undefined || (i && b < reihe[i - 1])) || new Set(namen).size !== namen.length)) fehl.teile++;
+  };
+  const ergebnis = {};
+  const zAn = sicherheitAus(Z);                              // Sicherheit (Version 7) aus: Vergleich mit Version 6 (Abschnitte 3 und 5 mit)
+  for (const seed of [1, 2, 3]) {
+    const A = Alt.neueStadt(seed), S = Z.neueStadt(seed), fehl = { ausdehnung: 0, vorlauf: 0, masse: 0, stufe: 0, teile: 0 };
+    let erst = -1, buchNr = 0, zeilenKarte = 0, zeilenStufe = 0, kMin = S.karte, zaehlerFehl = 0, infoFehl = 0;
+    const karteZeilen = new Map();                            // Tag → Text der Zeile „Bauland“ (eine je Nacht, auch bei mehrmaligem Wachsen)
+    const grenze0 = zc.__grenze;
+    for (let d = 0; d < 730; d++) {
+      const z = A.tag + 1; while (A.tag < z) Alt.stunde(A); while (S.tag < z) Z.stunde(S);
+      if (erst < 0 && spurRelativ(Alt, A) !== spurRelativ(Z, S)) erst = A.tag;
+      tagesPruefung(S, fehl);
+      for (const e of S.buch) if (e.nr > buchNr) { if (e.art === 'karte') { zeilenKarte++; karteZeilen.set(e.tag, (karteZeilen.has(e.tag) ? '<doppelt> ' : '') + e.text); } if (e.art === 'stufe') zeilenStufe++; }
+      buchNr = S.buchNr;
+      if (S.karte < kMin) kMin = -1; kMin = Math.max(kMin, S.karte);
+      if (S.tag % 73 === 0 && S.erweiterung.stufe >= 1) {       // Zähler und Karten
+        const z = Z.stadtteilZaehlen(S), k = Z.kennzahlen(S);
+        let mitWohnung = 0; for (let p = 0; p < S.pMax; p++) if (S.p.lebt[p] && S.p.wohnung[p] >= 0) mitWohnung++;
+        if (z.reduce((s, t) => s + t.einwohner, 0) !== mitWohnung || z.reduce((s, t) => s + t.wohnhaeuser, 0) !== k.haeuser) zaehlerFehl++;
+        const b = S.gAnzahl - 1, p = S.p.wohnung.findIndex((w, i) => i < S.pMax && S.p.lebt[i] && w >= 0);
+        const gi = Z.gebaeudeInfo(S, b), pi = Z.personInfo(S, p);
+        if (gi.stadtteil !== Z.teilName(S, Z.teilVon(S, S.g.x[b], S.g.y[b])) || !gi.stadtteil || !pi.stadtteil) infoFehl++;
+      }
+    }
+    const e = S.erweiterung, w = e.wachsen;
+    ergebnis[seed] = { karte: S.karte, wachsen: w.length, tage: w.map(x => x[0]) };
+    pruef(erst < 0, `Seed ${seed}: 730 Tage jeden Tag wie die alte Fassung (Kennzahlen, Zufall, Felder und Gebäude relativ zur Mitte, alle Personen- und Gebäudefelder, Statistik, Hauptfiguren)${erst < 0 ? '' : ', VERSCHIEDEN ab Tag ' + erst}; ${S.einwohner} Einwohner`);
+    pruef(zc.__grenze === grenze0 && !fehl.vorlauf && !fehl.ausdehnung && !fehl.masse, `Seed ${seed}: Grenze hielt ${zc.__grenze - grenze0}-mal eine Straße auf; Vorlauf ${VOR} Felder an ${730 - fehl.vorlauf} von 730 Tagen, Ausdehnung = Straßen (${fehl.ausdehnung} Fehler), Maße (${fehl.masse})`);
+    // Je Nacht mit Wachsen genau eine Zeile: von der Größe vor dem ersten bis nach dem letzten Wachsen der Nacht, Abstand bis zum Rand der
+    // Karte unter RAND + KARTE_VORLAUF (so steht die Regel im Fenster)
+    const naechte = [...new Set(w.map(x => x[0]))], zeileFalsch = naechte.filter(t => { const i0 = w.findIndex(x => x[0] === t), i1 = w.map(x => x[0]).lastIndexOf(t);
+      const vor = i0 ? w[i0 - 1][1] : R.KARTE_START, z = karteZeilen.get(t) || '', ab = [...z.matchAll(/bis (\d+) Felder/g)].map(m => +m[1]);
+      return !z.includes(`von ${vor} × ${vor} auf ${w[i1][1]} × ${w[i1][1]} Felder`) || ab.length !== i1 - i0 + 1 || ab.some(a => a >= VOR); });
+    pruef(w.length >= 2 && zeilenKarte === naechte.length && !zeileFalsch.length && kMin > 0 && w.every((x, i) => (x[1] - (i ? w[i - 1][1] : R.KARTE_START)) % (2 * R.KARTE_RING) === 0 && x[1] > (i ? w[i - 1][1] : R.KARTE_START)),
+      `Seed ${seed}: Karte ${R.KARTE_START} → ${S.karte}, ${w.length}-mal gewachsen (Tag ${w.map(x => x[0] + ': ' + x[1]).join(', ')}), ${zeilenKarte} Zeilen im Stadtbuch (eine je Nacht, Größen und Abstand passen${zeileFalsch.length ? ', FALSCH an Tag ' + zeileFalsch.join(', ') : ''})`);
+    pruef(!fehl.stufe && zeilenStufe === e.stufe && e.stufe === 3, `Seed ${seed}: Stufe jeden Tag richtig (${fehl.stufe} Fehler), Aufstieg genau am ersten Tag über der Schwelle (Tag ${e.stufenTage.slice(1).join(', ')}), ${zeilenStufe} Zeilen`);
+    pruef(!fehl.teile && !zaehlerFehl && !infoFehl, `Seed ${seed}: Stadtteile jeden Tag richtig benannt (${e.teile.length}: ${e.teile.map(([t]) => Z.teilName(S, t)).join(', ')}); Zähler ${zaehlerFehl}, Karten ${infoFehl} Fehler`);
+  }
+  zAn();
+  // Stadtbuch: „Neu:“ nennt nur, was STUFE_NEU enthält; im Dorf keine Stadtteilzeile, Stadtteilzeile ohne Personennamen. Sicherheit
+  // (Version 7): Kleinstadt „Stadtteile mit Namen und eine Polizeiwache des Landes“, Stadt „eine Justizvollzugsanstalt des Landes für die Region“;
+  // Bund (Teil 3): Stadt dazu „eine Kaserne der Bundeswehr mit Wehrpflicht“, Großstadt „eine Dienststelle des Bundesnachrichtendienstes“
+  {
+    const S = Sim.neueStadt(2);
+    while (S.tag < 200) Sim.stunde(S);
+    const st = S.buch.filter(e => e.art === 'stufe'), tz = S.buch.filter(e => e.art === 'stadtteil'), neu = Sim.erweiterungInfo(S).neu;
+    const aufz = (l) => (l.length < 2 ? l.join('') : l.slice(0, -1).join(', ') + ' und ' + l.at(-1));
+    pruef(st.length === 2 && neu[1][0] === 'Stadtteile mit Namen' && st[0].text.endsWith(` Neu: ${aufz(neu[1])}.`) && st[1].text.endsWith(` Neu: ${aufz(neu[2])}.`)
+      && neu[2].includes('eine Kaserne der Bundeswehr mit Wehrpflicht') && neu[3].join() === 'eine Dienststelle des Bundesnachrichtendienstes' && tz.length >= 1 && tz.every(e => !/\u0001/.test(e.text)) && tz.every(e => e.tag >= st[0].tag),
+      `Stadtbuch: Stufen „${Sim.klartext(st[0].text).slice(-40)}“ / „…${Sim.klartext(st[1].text).slice(-50)}“, ${tz.length} Stadtteilzeilen ohne Personennamen, keine vor der Kleinstadt`);
+  }
+
+  // 3. Speichern und Laden mitten am Tag vor einem Wachsen: beide wachsen am selben Tag und laufen bitgleich weiter
+  {
+    // Tag des ersten Wachsens mit Sicherheit (in Abschnitt 2 war sie aus; Taten und Haft verschieben den Zuzug)
+    const V = Sim.neueStadt(2); while (!V.erweiterung.wachsen.length && V.tag < 730) Sim.stunde(V);
+    const t = V.erweiterung.wachsen.length ? V.erweiterung.wachsen[0][0] : ergebnis[2].tage[0], A = Sim.neueStadt(2);
+    {                                                         // Seed 2 wächst in dieser Nacht zweimal (Anstalt, dann Kaserne am Rand): eine Zeile
+      const wt = V.erweiterung.wachsen.filter(x => x[0] === t), zt = V.buch.filter(e => e.tag === t && e.art === 'karte'), z = zt.length ? Sim.klartext(zt[0].text) : '';
+      pruef(wt.length === 2 && zt.length === 1 && z.includes(`zweimal nah an den Rand der Karte`) && z.includes(`von ${R.KARTE_START} × ${R.KARTE_START} auf ${wt[1][1]} × ${wt[1][1]} Felder`),
+        `Seed 2, Tag ${t}: ${wt.length}-mal gewachsen in einer Nacht (${wt.map(x => x[1]).join(', ')}), ${zt.length} Zeile im Stadtbuch: „${z}“`);
+    }
+    while (A.tag < t - 1 || A.stunde < 13) Sim.stunde(A);
+    const text = speichernAlsText(Sim, A), B = ladenAusText(Sim, text), k0 = A.karte;
+    while (A.tag < t + 30) Sim.stunde(A); while (B.tag < t + 30) Sim.stunde(B);
+    pruef(A.karte > k0 && B.karte === A.karte && JSON.stringify(A.erweiterung.wachsen) === JSON.stringify(B.erweiterung.wachsen) && fingerabdruck(Sim, A) === fingerabdruck(Sim, B),
+      `Speichern an Tag ${t - 1}, 13 Uhr (Karte ${k0}), geladen und weiter: beide wachsen an denselben Tagen (${B.erweiterung.wachsen.map(x => x[0] + ': ' + x[1]).join(', ')}), 30 Tage später bitgleich (${fingerabdruck(Sim, A)})`);
+    // Beschädigte Stände der Version 7 werden abgelehnt
+    const roh = () => { const d = JSON.parse(text); d.arrays = d.arrays.map(a => { const u8 = Buffer.from(a.b64, 'base64'); return { name: a.name, typ: a.typ, daten: new TYPEN[a.typ](u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength)) }; }); return d; };
+    const meld = [];
+    for (const [was, kaputt, soll] of [['Karte 100', d => { d.werte.karte = 100; }], ['Mitte falsch', d => { d.werte.mitte++; }], ['Karte zu groß', d => { d.werte.karte = 512; }],
+      ['Stufe 7', d => { d.json.erweiterung.stufe = 7; }], ['Stadtteil doppelt', d => { d.json.erweiterung.teile.push(d.json.erweiterung.teile[0]); }],
+      ['Stadtteil als Text', d => { d.json.erweiterung.teile[0][0] = '<b>'; }], ['Ausdehnung außerhalb', d => { d.json.erweiterung.ausdehnung[1] = d.werte.karte; }],
+      ['Gelände ohne Gebäude', d => { d.json.erweiterung.gelaende.push([4, 4, 6, 6, 99999]); }], ['Viertel fehlt', d => { d.json.vHaus.pop(); }],
+      ['Feld zu kurz', d => { const a = d.arrays.find(x => x.name === 'feld'); a.daten = a.daten.subarray(0, 100); }], ['ohne erweiterung', d => { delete d.json.erweiterung; }],
+      // Lage der Gebäude und Gelände (Befund der Gegenprüfung: vorher angenommen, die Stadt lief weiter)
+      ['Gebäude außerhalb der Karte', d => { d.arrays.find(x => x.name === 'g.x').daten[0] = d.werte.karte + 3; }, 'Lage der Gebäude'],
+      ['Feld zeigt auf ein anderes Gebäude', d => { const K = d.werte.karte, g = (n) => d.arrays.find(x => x.name === n).daten; g('feldGeb')[g('g.y')[0] * K + g('g.x')[0]] = 1; }, 'Lage der Gebäude'],
+      ['Gelände-Feld leer', d => { const K = d.werte.karte, r = d.json.erweiterung.gelaende[0], f = d.arrays.find(x => x.name === 'feld').daten; f[r[1] * K + r[0]] = 0; f[r[3] * K + r[2]] = 0; }, 'Gelände'],
+      ['Gelände-Feld ohne Gebäude', d => { const K = d.werte.karte, r = d.json.erweiterung.gelaende[0], f = d.arrays.find(x => x.name === 'feldGeb').daten; f[r[1] * K + r[0]] = -1; f[r[3] * K + r[2]] = -1; }, 'Gelände']]) {
+      const d = roh(); kaputt(d);
+      let e = null; try { Sim.importZustand(d); } catch (x) { e = x; }
+      meld.push(`${was}: ${e ? e.message : 'ANGENOMMEN'}`);
+      if (!e || !/^Spielstand beschädigt/.test(e.message) || (soll && !e.message.includes(soll))) fehler++;
+    }
+    pruef(meld.every(m => /beschädigt/.test(m)) && meld.length === 15 && JSON.parse(text).json.erweiterung.gelaende.length > 0, 'beschädigte Stände der Version 7 abgelehnt: ' + meld.join('; '));
+  }
+
+  // 4. Übernahme von Version 6 (alte Fassung): Dorf (unter 40 Einwohnern), Seed 1/2/3 an Tag 150/300/400 (Seed 2 kommt an die alte
+  //    Grenze: die Karte wächst beim Übernehmen). Danach 60 Tage jeden Tag wie in Version 6
+  const simAn = sicherheitAus(Sim);                          // Sicherheit aus: 60 Tage wie Version 6 (die Übernahme selbst prüft --migrationstest)
+  for (const [seed, tag] of [[1, 15], [1, 150], [2, 300], [3, 400]]) {
+    const A = Alt.neueStadt(seed);
+    while (A.tag < tag || A.stunde < 13) Alt.stunde(A);
+    const text = speichernAlsText(Alt, A);
+    let S = null, fehlerText = '';
+    try { ladenAusText(Sim, text); fehlerText = 'ohne Übernehmen angenommen'; } catch (e) { if (!e.migrierbar) fehlerText = e.message; }
+    const d = JSON.parse(text); d.arrays = d.arrays.map(a => { const u8 = Buffer.from(a.b64, 'base64'); return { name: a.name, typ: a.typ, daten: new TYPEN[a.typ](u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength)) }; });
+    S = Sim.importZustand(d, true);
+    const e = S.erweiterung, z = S.buch.at(-1), soll = R.STUFE_AB.filter(v => A.einwohner >= v).length - 1;
+    const kopf = `Übernahme Version 6, Seed ${seed}, Tag ${tag} (${A.einwohner} Einw.)`;
+    pruef(!fehlerText && e.stufe === soll && z.art === 'stufe' && z.text.includes(`sie ist ${Sim.STUFEN[soll] === 'Dorf' ? 'ein Dorf' : 'eine ' + Sim.STUFEN[soll]}.`) && (soll > 0 || !/Stadtteile/.test(z.text)),
+      `${kopf}: ${Sim.STUFEN[e.stufe]}, Karte ${S.karte}, ${e.teile.length} Stadtteile; „${Sim.klartext(z.text).slice(0, 150)}…“${fehlerText ? ' ' + fehlerText : ''}`);
+    let erst = -1;
+    for (let t = 0; t < 60; t++) { const q = A.tag + 1; while (A.tag < q) Alt.stunde(A); while (S.tag < q) Sim.stunde(S); if (erst < 0 && spurRelativ(Alt, A) !== spurRelativ(Sim, S)) erst = A.tag; }
+    pruef(erst < 0, `${kopf}: 60 Tage jeden Tag wie Version 6${erst < 0 ? '' : ', VERSCHIEDEN ab Tag ' + erst} (Karte jetzt ${S.karte}, Stufe ${Sim.STUFEN[S.erweiterung.stufe]})`);
+  }
+  simAn();
+
+  // 5. Gelände (Schnittstelle für andere Bausteine): 3 × 2 Blöcke am Stadtrand und 1 Block nah an der Mitte; Test mit einem großen Park
+  //    (PARK, sofort fertig), damit die Stadt danach normal weiterlaufen kann. Danach: alle Felder belegt, keine Bauplätze darin, Vorlauf
+  //    gilt (die Karte wächst, wenn nötig), 60 Tage weiter ohne Grenzstopp, Speichern und Laden bitgleich
+  {
+    zc.__grenze = 0;
+    const S = Z.neueStadt(2);
+    while (S.tag < 300) Z.stunde(S);
+    // Ein ganzer freier Block an einer Straße ist in der Stadt selten (die Häuser säumen die Straßen): Findet sich keiner, verlängert ein
+    // Baustein erst eine Straße. Hier: weiterlaufen, bis das Bauamt eine Straße verlängert hat und nah ein Block frei ist
+    let nah = Z.gelaendeSuchen(S, 1, 1, false), tage = 0;
+    while (!nah && tage < 60) { const q = S.tag + 1; while (S.tag < q) Z.stunde(S); tage++; nah = Z.gelaendeSuchen(S, 1, 1, false); }
+    const k0 = S.karte, rand = Z.gelaendeSuchen(S, 3, 2, true);
+    const dM = (r) => Math.hypot((r.x0 + r.x1) / 2 - S.mitte, (r.y0 + r.y1) / 2 - S.mitte);
+    let frei = true, anStrasse = false;
+    for (let y = rand.y0; y <= rand.y1; y++) for (let x = rand.x0; x <= rand.x1; x++) frei = frei && S.feld[y * S.karte + x] === Sim.LEER;
+    const [dx, dy] = [[-1, 0], [1, 0], [0, -1], [0, 1]][rand.seite];
+    anStrasse = S.feld[(rand.torY + dy) * S.karte + rand.torX + dx] === Sim.STRASSE;
+    pruef(rand && nah && frei && anStrasse && rand.x1 - rand.x0 + 1 === 11 && rand.y1 - rand.y0 + 1 === 7 && dM(rand) > dM(nah),
+      `Gelände gesucht (Tag ${S.tag}, ${tage} Tage gewartet): 3 × 2 Blöcke am Rand (${rand.x0}–${rand.x1}, ${rand.y0}–${rand.y1}, Tor ${rand.torX}/${rand.torY} zur Straße im ${['Westen', 'Osten', 'Norden', 'Süden'][rand.seite]}, ${dM(rand).toFixed(1)} von der Mitte), 1 Block nah an der Mitte (${dM(nah).toFixed(1)})`);
+    const b = Z.gelaendeBauen(S, rand, Sim.PARK, 0, -1), off = (S.karte - k0) / 2, g = S.erweiterung.gelaende.at(-1);
+    let belegt = true, plaetze = 0;
+    for (let y = g[1]; y <= g[3]; y++) for (let x = g[0]; x <= g[2]; x++) { const c = y * S.karte + x; belegt = belegt && S.feld[c] === Sim.PARK && S.feldGeb[c] === b; plaetze += S.platz[c]; }
+    const fehl = { ausdehnung: 0, vorlauf: 0, masse: 0, stufe: 0, teile: 0 };
+    tagesPruefung(S, fehl);
+    pruef(belegt && !plaetze && g[0] === rand.x0 + off && !fehl.vorlauf && !fehl.ausdehnung, `Gelände gebaut (Gebäude ${b}): alle ${(g[2] - g[0] + 1) * (g[3] - g[1] + 1)} Felder belegt, ${plaetze} Bauplätze darin, Karte ${k0} → ${S.karte}, Vorlauf und Ausdehnung stimmen`);
+    const text = speichernAlsText(Z, S), L = ladenAusText(Z, text);
+    for (let t = 0; t < 60; t++) { const q = S.tag + 1; while (S.tag < q) Z.stunde(S); while (L.tag < q) Z.stunde(L); tagesPruefung(S, fehl); }
+    pruef(zc.__grenze === 0 && !fehl.vorlauf && !fehl.ausdehnung && fingerabdruck(Z, S) === fingerabdruck(Z, L),
+      `60 Tage weiter mit Gelände: Grenze hielt ${zc.__grenze}-mal eine Straße auf, Vorlauf ${fehl.vorlauf} Fehler, gespeichert und geladen bitgleich; Karte ${S.karte}`);
+  }
+
+  // 6. Große Stadt (nur mit --gross): UMLAND 300000, Seed 2, 750 Tage; die Karte wächst deutlich über 96, nie eine Straße am Rand
+  if (flag('gross')) {
+    zc.__grenze = 0;
+    const alt = Z.R.UMLAND; Z.R.UMLAND = 300000; Alt.R.UMLAND = 300000;
+    const an = sicherheitAus(Z);
+    const A = Alt.neueStadt(2), S = Z.neueStadt(2), fehl = { ausdehnung: 0, vorlauf: 0, masse: 0, stufe: 0, teile: 0 };
+    let erst = -1;
+    for (let d = 0; d < 750; d++) { const z = A.tag + 1; while (A.tag < z) Alt.stunde(A); while (S.tag < z) Z.stunde(S); tagesPruefung(S, fehl); if (erst < 0 && spurRelativ(Alt, A) !== spurRelativ(Z, S)) erst = A.tag; }
+    Z.R.UMLAND = alt; Alt.R.UMLAND = alt; an();
+    const w = S.erweiterung.wachsen;
+    pruef(S.karte >= 112 && zc.__grenze === 0 && !fehl.vorlauf && !fehl.stufe && !fehl.teile && erst < 0,
+      `große Stadt (UMLAND 300000, Seed 2, 750 Tage): ${S.einwohner} Einwohner, Karte ${S.karte} × ${S.karte} (${w.length}-mal gewachsen: ${w.map(x => x[0] + ': ' + x[1]).join(', ')}), Grenzstopp ${zc.__grenze}, ${erst < 0 ? 'jeden Tag wie die alte Fassung' : 'VERSCHIEDEN ab Tag ' + erst}`);
+  }
+  console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle Prüfungen zu „Stadt erweitern“ bestanden');
+  process.exit(fehler ? 1 : 0);
+}
+
+if (flag('sicherheit')) {
+  // Sicherheit (Version 7): Kriminalität, Polizei, Gericht, Gefängnis, Obhut. 1. statisch: Zufall, gelesene Personenfelder je Regel, Löhne des
+  // Landes nicht aus dem Budget; Namenstausch (andere Namenslisten, sonst gleich: die Stadt läuft bitgleich). 2. Invarianten nach jeder Nacht
+  // (Seeds 1–3, 730 Tage). 3. Erzwungene Fälle (Urteile, Ersatzfreiheitsstrafe, Anrechnung, Tilgung, Widerruf, Randfall U-Haft, volle
+  // Anstalt, Obhut, Grundsicherung, Arbeitsentgelt). 4. Speichern und Laden mit Haft, Verfahren und Obhut; beschädigte Stände.
+  // 5. Messung: Taten je 1.000 Einwohner und Jahr gegen die PKS 2024; Gruppen (nur gemessen, keine Regel liest sie). Seeds mit --seeds
+  let fehler = 0;
+  const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
+  const R = Sim.R, J = R.JAHR, X = Sim._sich;
+  const erwachsen = (S, p) => S.tag - S.p.geb[p] >= R.ERWACHSEN * J;
+  const lebtNoch = (S, id, gen) => id >= 0 && S.p.lebt[id] && S.p.gen[id] === gen;
+  // Kopie der Simulation mit Messpunkten (liest nur mit): jede Tat mit Opfer, jedes Urteil, Budget im Zweig der Landeslöhne
+  const { Sim: M, ctx: mc } = ladeSimMit([
+    ['function tatBegehen(S, p, typ) {\n  const P = S.p, Si = S.sicherheit, st = S.stat.sicherheit;\n  const o = opferWaehlen(S, p, typ);\n',
+      'function tatBegehen(S, p, typ) {\n  const P = S.p, Si = S.sicherheit, st = S.stat.sicherheit;\n  const o = opferWaehlen(S, p, typ);\n  if (globalThis.__tat) globalThis.__tat(S, p, typ, o);\n'],
+    ['function urteilen(S, v) {\n', 'function urteilen(S, v) {\n  if (globalThis.__urteil) globalThis.__urteil(S, v);\n'],
+    ['    if (istLand(t)) {                                        // Sicherheit: Polizei und Justizvollzug, Löhne zahlt das Land (von außen)\n',
+      '    if (istLand(t)) {                                        // Sicherheit: Polizei und Justizvollzug, Löhne zahlt das Land (von außen)\n      const __b0 = S.budget;\n'],
+    ['      g.umsatz[b] = 0;\n      continue;\n    }\n    if (istBund(t)) {', '      g.umsatz[b] = 0;\n      if (S.budget !== __b0) globalThis.__landBudget++;\n      continue;\n    }\n    if (istBund(t)) {'],
+  ]);
+  mc.__landBudget = 0;
+
+  // 1. Statisch
+  {
+    const roh = SIM_CODE, a = roh.indexOf('// ─── Sicherheit (Version 7)'), e = roh.indexOf('// Ende Sicherheit');
+    const teil = roh.slice(a, e).replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+    const fremd = teil.match(/\b(zufall|zInt)\s*\(/g) || [];
+    pruef(a > 0 && e > a && !fremd.length && /zufallSich\(S\)/.test(teil), `Abschnitt „Sicherheit“ (${teil.split('\n').length} Zeilen): Zufall nur aus dem eigenen Strom (zufallSich), sonst ${fremd.length}`);
+    // Körper einer Funktion (oberste Ebene) aus dem ganzen sim-Block, ohne Kommentare
+    const code = SIM_CODE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+    const koerper = (f) => {                                  // bis zur passenden schließenden Klammer (auch einzeilig)
+      const i = code.search(new RegExp('^function ' + f + '\\(', 'm')); if (i < 0) return null;
+      let t = 0, j = code.indexOf('{', i);
+      for (; j < code.length; j++) { if (code[j] === '{') t++; else if (code[j] === '}' && --t === 0) break; }
+      return code.slice(i, j + 1); };
+    const felder = (k) => [...new Set([...k.matchAll(/\bP\.(\w+)/g)].map(m => m[1]))].sort();
+    // Je Regel, die über Menschen entscheidet: welche Personenfelder sie lesen darf. Nie: Namen (vor, nach, Eltern-Namen), Einzugstag,
+    // Gedächtnis, Heimatliebe; das Geschlecht nur für die Grammatik (alterWort, Pronomen im Urteil)
+    const ERLAUBT = {
+      tatTeile: ['ehrgeiz', 'geld', 'zuf'], erwerbslos: ['arbeit', 'besitz', 'gemein', 'geb', 'hh'], tatRisiko: [], polizeiFaktor: [], aufklaerung: [],
+      opferWaehlen: ['geb', 'haftBis', 'hh', 'lebt', 'wohnung'], haushaltErwachsene: ['geb', 'hh', 'wohnung'],
+      tatBegehen: ['gen', 'geld', 'haftBis', 'opferArt', 'opferTag', 'tilgungBis', 'vorstrafen', 'wohnung'],
+      urteilen: ['bewaehrungBis', 'bewaehrungRest', 'entlassenTag', 'freiheitReg', 'geld', 'haftArt', 'haftBis', 'haftNach', 'tilgungBis', 'vorstrafen', 'weib'],
+      einkommenTag: ['arbeit', 'besitz', 'bund', 'gemein'], haftAntritt: ['arbeit', 'besitz', 'bund', 'gemein', 'gsTage', 'haftArt', 'haftBis', 'haftNach', 'haftOrt'],
+      obhutKandidat: ['geb', 'haftBis', 'hh', 'lebt', 'wohnung'], obhutSuchen: ['elternA', 'elternAGen', 'elternB', 'elternBGen', 'gen', 'lebt'],
+      landStellen: [], landStelleFrei: [], insassen: ['haftBis', 'haftOrt', 'lebt'],
+    };
+    const zuViel = [];
+    for (const [f, ok] of Object.entries(ERLAUBT)) {
+      const k = koerper(f);
+      if (!k) { zuViel.push(f + ': fehlt'); continue; }
+      for (const x of felder(k)) if (!ok.includes(x)) zuViel.push(`${f}: P.${x}`);
+      if (/\b(name|vorname|nr|namePack|nameAusPack|ref|personInfo)\s*\(/.test(k)) zuViel.push(`${f}: Name`);
+    }
+    // Geschlecht im Urteil nur für das Pronomen (sie/er), nie in einer Bedingung
+    const u = koerper('urteilen'), weibZeilen = u.split('\n').filter(z => /P\.weib/.test(z));
+    const nurPronomen = weibZeilen.every(z => /sie = P\.weib\[p\] \? 'sie' : 'er'/.test(z));
+    pruef(!zuViel.length && nurPronomen, `Regeln lesen nur ihre Personenfelder (${Object.keys(ERLAUBT).length} Funktionen), keine Namen; Geschlecht nur fürs Pronomen im Urteil`
+      + (zuViel.length ? ': ' + zuViel.join(', ') : ''));
+    const w = code.slice(code.indexOf('    if (istLand(t)) {'), code.indexOf('    if (istBund(t)) {', code.indexOf('    if (istLand(t)) {')));
+    pruef(w.length > 0 && !/S\.budget/.test(w), 'wirtschaft: der Zweig der Landeslöhne berührt das Budget der Stadt nicht (Löhne von außen)');
+    // Namenstausch: andere Namen (Listen umgedreht), sonst gleich. Keine Regel liest Namen, also läuft die Stadt bitgleich (Felder, Summen,
+    // Zufall, Budget; das Stadtbuch nur in der Art der Zeilen)
+    const { Sim: T } = ladeSimMit([['const STRASSEN = [', 'NACHNAMEN.reverse(); VORNAMEN_W.reverse(); VORNAMEN_M.reverse();\nconst STRASSEN = [']]);
+    const A = Sim.neueStadt(1), B = T.neueStadt(1);
+    while (A.tag < 365) Sim.stunde(A); while (B.tag < 365) T.stunde(B);
+    const spur = (S) => { const h = createHash('sha256'); for (const n of Object.keys(S.p).sort()) if (ArrayBuffer.isView(S.p[n])) { const a = S.p[n], w = a.length / S.pKap; h.update(n); h.update(Buffer.from(a.buffer, a.byteOffset, S.pMax * w * a.BYTES_PER_ELEMENT)); }
+      for (const n of Object.keys(S.g).sort()) if (ArrayBuffer.isView(S.g[n])) { const a = S.g[n]; h.update(n); h.update(Buffer.from(a.buffer, a.byteOffset, a.byteLength)); }
+      h.update(JSON.stringify(S.stat)); h.update(JSON.stringify(S.sicherheit)); h.update(String(S.rs) + '/' + S.rsSich + '/' + S.budget); h.update(S.buch.map(e => e.art).join()); return h.digest('hex').slice(0, 16); };
+    const nA = Sim.name(A, 5), nB = T.name(B, 5);
+    pruef(nA !== nB && spur(A) === spur(B), `Namenstausch (Seed 1, 365 Tage): „${nA}“ heißt dort „${nB}“, die Stadt läuft trotzdem bitgleich (${spur(A)})`);
+  }
+
+  // 2. Invarianten nach jeder Nacht
+  const ueber = { taten: 0, opfer: 0, urteile: 0 };
+  const seeds = arg('seeds', '1,2,3').split(',').map(Number);
+  for (const seed of seeds) {
+    const S = M.neueStadt(seed), P = S.p, fehl = {};
+    const f = (k) => { fehl[k] = (fehl[k] || 0) + 1; };
+    let naechte = 0, tatFehl = 0, opferFehl = 0, haftNaechte = 0, hofFehl = 0, kinderObhut = 0, zeilen = 0, stufeWache = -1, stufeJva = -1;
+    mc.__tat = (S, p, typ, o) => { ueber.taten++; if (!erwachsen(S, p) || S.p.haftBis[p]) tatFehl++;
+      if (o >= 0) { ueber.opfer++; if (o === p || !erwachsen(S, o) || S.p.haftBis[o] || (S.p.hh[p] >= 0 && S.p.hh[o] === S.p.hh[p])) opferFehl++; } };
+    mc.__urteil = () => { ueber.urteile++; };
+    const lb0 = mc.__landBudget;
+    let buchNr = S.buchNr;
+    while (S.tag < 730) {
+      const t = S.tag;
+      M.stunde(S);
+      // Hofzeiten: nur Gefangene in der Anstalt in der Stadt, nur zu den Zeiten ihrer Abteilung, Abteilungen nie zugleich
+      const H = S.stunde;
+      const imHof = [0, 0, 0];
+      for (let p = 0; p < S.pMax; p++) if (P.lebt[p] && M.imHof(S, p, H)) {
+        const a = M.abteilung(S, p); imHof[a]++;
+        if (!P.haftBis[p] || P.haftOrt[p] !== 1 || !M.HOFZEITEN[a].includes(H) || (P.haftArt[p] === M.HAFT_U) !== (a === 2)) hofFehl++;
+      }
+      if (imHof.filter(Boolean).length > 1) hofFehl++;
+      if (S.tag === t) continue;
+      naechte++;
+      const Si = S.sicherheit, e = S.erweiterung, erwTag = S.tag - R.ERWACHSEN * J;
+      // Wache ab der Kleinstadt, Anstalt ab der Stadt, beide auf eigenem Gelände (1 Block; 2 Blöcke), vom Land bezahlt
+      if (Si.wache >= 0 && stufeWache < 0) stufeWache = e.stufe;
+      if (Si.jva >= 0 && stufeJva < 0) stufeJva = e.stufe;
+      for (const [b, typ, fl] of [[Si.wache, M.WACHE, [9]], [Si.jva, M.JVA, [21]]]) {
+        if (b < 0) continue;
+        const r = e.gelaende.find(x => x[4] === b);
+        if (!r || S.g.typ[b] !== typ || !fl.includes((r[2] - r[0] + 1) * (r[3] - r[1] + 1))) f('gelaende');
+      }
+      if (e.stufe >= R.WACHE_STUFE + 0 && Si.wache < 0 && S.tag - e.stufenTage[R.WACHE_STUFE] > 30) f('wacheFehlt');
+      if (e.stufe >= R.JVA_STUFE && Si.jva < 0 && S.tag - e.stufenTage[R.JVA_STUFE] > 30) f('jvaFehlt');
+      // Haft: Art, Ort, keine Stelle, in keiner Belegschaft, keine Grundsicherung; U-Haft hat ein offenes Verfahren; Plätze reichen
+      const inBeleg = new Set(); for (let b = 0; b < S.gAnzahl; b++) for (const w of S.belegschaft[b]) inBeleg.add(w);
+      let hier = 0;
+      for (let p = 0; p < S.pMax; p++) {
+        if (!P.lebt[p]) continue;
+        if (P.haftBis[p]) {
+          haftNaechte++;
+          if (!(P.haftArt[p] >= 1 && P.haftArt[p] <= 3) || !(P.haftOrt[p] === 1 || P.haftOrt[p] === 2) || P.arbeit[p] >= 0 || inBeleg.has(p) || P.gsTage[p]) f('haft');
+          if (P.haftOrt[p] === 1) { hier++; if (Si.jva < 0) f('ortOhneAnstalt'); }
+          if (P.haftArt[p] === M.HAFT_U && !Si.verfahren.some(v => v.id === p && v.gen === P.gen[p] && v.uhaft >= 0)) f('uhaftOhneVerfahren');
+          if (P.haftArt[p] !== M.HAFT_U && P.haftBis[p] <= S.tag - 1) f('nichtEntlassen');
+        } else if (P.haftArt[p] || P.haftOrt[p] || P.haftNach[p]) f('haftReste');
+      }
+      if (hier > R.JVA_PLAETZE || Si.aussen < 0 || hier + Si.aussen > R.JVA_PLAETZE) f('plaetze');
+      // Kinder: Ist kein Erwachsener ihres Haushalts frei, leben sie in Obhut (Angehörige oder Jugendamt), sonst nicht
+      const frei = new Set(); for (let p = 0; p < S.pMax; p++) if (P.lebt[p] && P.hh[p] >= 0 && P.geb[p] <= erwTag && !P.haftBis[p]) frei.add(P.hh[p]);
+      for (let k = 0; k < S.pMax; k++) {
+        if (!P.lebt[k] || P.geb[k] <= erwTag || P.hh[k] < 0) continue;
+        const allein = !frei.has(P.hh[k]);
+        if (allein !== (P.obhut[k] > 0)) f('obhut');
+        if (P.obhut[k]) kinderObhut++;
+        const q = P.obhutBei[k];
+        if (P.obhut[k] === 1 && !(q >= 0 && P.lebt[q] && !P.haftBis[q] && erwachsen(S, q) && P.hh[q] !== P.hh[k] && P.gen[q] === P.obhutGen[k])) f('obhutBei');
+      }
+      // Stadtbuch: Zeilen zur Sicherheit ohne Namen
+      for (const z of S.buch) if (z.nr > buchNr && z.art === 'sicherheit') { zeilen++; if (/\u0001/.test(z.text)) f('buchName'); }
+      buchNr = S.buchNr;
+    }
+    const st = S.stat.sicherheit;
+    pruef(!Object.keys(fehl).length && !tatFehl && !opferFehl && !hofFehl && mc.__landBudget === lb0,
+      `Seed ${seed}, ${naechte} Nächte: ${haftNaechte} Haftnächte, ${kinderObhut} Kindernächte in Obhut, ${zeilen} Zeilen im Stadtbuch ohne Namen; Wache ab ${M.STUFEN[stufeWache] || '–'}, `
+      + `Anstalt ab ${M.STUFEN[stufeJva] || '–'} auf eigenem Gelände; Täter erwachsen und frei, Opfer aus einem anderen Haushalt (${tatFehl + opferFehl} Fehler); Hof nur zur eigenen Zeit (${hofFehl}); `
+      + `Landeslöhne nie aus dem Budget (${mc.__landBudget - lb0}); weitere Fehler: ${JSON.stringify(fehl)}`);
+    pruef(stufeWache >= R.WACHE_STUFE && stufeJva >= R.JVA_STUFE && st.haftAntritte > 0 && st.urteile > 0,
+      `Seed ${seed}: ${st.taten.slice(1).join('/')} Taten, ${st.urteile} Urteile, ${st.haftAntritte} Haftantritte (${st.haftAussen} außerhalb), ${st.obhutFamilie}+${st.obhutJugendamt} Obhut, ${st.getilgt} getilgt`);
+  }
+  mc.__tat = null; mc.__urteil = null;
+
+  // 3. Erzwungene Fälle an einer Kopie der Stadt (Seed 2, Tag 300, 13 Uhr)
+  {
+    const basis = (() => { const S = Sim.neueStadt(2); while (S.tag < 300 || S.stunde < 13) Sim.stunde(S); return speichernAlsText(Sim, S); })();
+    const neu = () => ladenAusText(Sim, basis);
+    // Erwachsene ohne Haft, Betrieb, Verfahren, Bewährung; gut bei Kasse oder pleite
+    const kandidat = (S, n = 0) => { let k = 0; for (let p = 0; p < S.pMax; p++) {
+      const P = S.p; if (!P.lebt[p] || !erwachsen(S, p) || S.tag - P.geb[p] >= R.RENTE * J || P.haftBis[p] || P.besitz[p] >= 0 || P.vorstrafen[p] || P.bewaehrungBis[p] > S.tag
+        || S.sicherheit.verfahren.some(v => v.id === p)) continue;
+      if (k++ === n) return p; } return -1; };
+    const opfer = (S, p) => { for (let q = 0; q < S.pMax; q++) if (q !== p && S.p.lebt[q] && erwachsen(S, q) && S.p.hh[q] !== S.p.hh[p]) return q; return -1; };
+    const verf = (S, p, typ, uhaft) => ({ id: p, gen: S.p.gen[p], typ, beute: 0, opfer: opfer(S, p), opferGen: S.p.gen[opfer(S, p)], urteil: S.tag, uhaft });
+    const letzte = (S) => S.buch.filter(e => e.art === 'sicherheit').at(-1);
+    const ET = 365 / J;
+    // a) Geldstrafe nicht bezahlbar: Ersatzfreiheitsstrafe, 2 Tagessätze = 1 Tag, auf Spieltage aufgerundet
+    for (const [n, ts] of [[0, 30], [1, 90]]) {
+      const S = neu(), p = kandidat(S), st = S.stat.sicherheit, e0 = st.ersatz, b0 = S.buchNr;
+      if (n) { S.p.vorstrafen[p] = 1; S.p.tilgungBis[p] = S.tag + 50; }
+      S.p.geld[p] = 0;
+      X.urteilen(S, verf(S, p, Sim.DIEBSTAHL, -1));
+      const echt = Math.ceil(ts / 2), spiel = Math.max(1, Math.ceil(echt / ET)), z = letzte(S);
+      pruef(st.ersatz === e0 + 1 && S.p.haftBis[p] === S.tag + spiel && S.p.haftArt[p] === Sim.HAFT_KURZ && S.buchNr > b0 && z.text.includes(`${ts} Tagessätzen`) && z.text.includes(`${echt} Tage Ersatzfreiheitsstrafe`)
+        && !/\u0001/.test(z.text), `${ts} Tagessätze, kein Geld: ${echt} Tage Ersatzfreiheitsstrafe (§ 43 StGB: 2 Tagessätze = 1 Tag), ${spiel} Spieltag(e), kurze Haft; „${Sim.klartext(z.text).slice(0, 150)}…“`);
+    }
+    // b) teilweise bezahlt: nur der Rest wird Ersatzfreiheitsstrafe; ganz bezahlt: keine Haft, Tilgung nach 5 Jahren
+    {
+      const S = neu(), p = kandidat(S), q = kandidat(S, 1), st = S.stat.sicherheit;
+      S.p.geld[q] = 1e6; const g0 = st.geldSumme, gq = S.p.geld[q];
+      X.urteilen(S, verf(S, q, Sim.BETRUG, -1));
+      const bez = st.geldSumme - g0;
+      pruef(!S.p.haftBis[q] && bez > 0 && S.p.geld[q] === gq - bez && S.p.tilgungBis[q] === S.tag + R.TILGUNG[0] && S.p.vorstrafen[q] === 1,
+        `Geldstrafe bezahlt (${bez} Taler an das Land): keine Haft, im Register bis Tag ${S.p.tilgungBis[q]} (5 Jahre, § 46 Abs. 1 Nr. 1a BZRG)`);
+      const T = neu(), p2 = kandidat(T);
+      // Betrag = 30 Tagessätze zu je Tagesnetto / 36,5; mit der Hälfte davon bleiben 15 Tagessätze offen
+      const satz = Math.max(0.1, (T.p.arbeit[p2] >= 0 && !T.p.gemein[p2] ? T.g.lohn[T.p.arbeit[p2]] * (1 - R.STEUER) : Sim.tageskosten(T, p2)) / ET);
+      const voll = Math.max(1, Math.round(30 * satz)); T.p.geld[p2] = Math.floor(voll / 2);
+      X.urteilen(T, verf(T, p2, Sim.BETRUG, -1));
+      const offen = Math.ceil(30 * (voll - Math.floor(voll / 2)) / voll);
+      pruef(T.p.haftBis[p2] === T.tag + Math.max(1, Math.ceil(Math.ceil(offen / 2) / ET)) && letzte(T).text.includes(`${offen} davon nicht`),
+        `halb bezahlt: ${offen} von 30 Tagessätzen offen → ${Math.ceil(offen / 2)} Tage Ersatzfreiheitsstrafe („${Sim.klartext(letzte(T).text).slice(0, 120)}…“)`);
+    }
+    // c) Wohnungseinbruch, erste Freiheitsstrafe, 3 Tage U-Haft: die Hälfte (5 Tage) absitzen, 3 angerechnet, Rest 5 Tage zur Bewährung
+    {
+      const S = neu(), p = kandidat(S), st = S.stat.sicherheit;
+      X.haftAntritt(S, p, R.VERFAHREN, Sim.HAFT_U);
+      const v = verf(S, p, Sim.EINBRUCH, S.tag - 3);
+      X.urteilen(S, v);
+      pruef(S.p.haftBis[p] === S.tag + 2 && S.p.haftArt[p] === Sim.HAFT_KURZ && S.p.bewaehrungRest[p] === 5 && S.p.bewaehrungBis[p] === S.tag + 2 + R.BEWAEHRUNG
+        && S.p.tilgungBis[p] === S.tag + R.TILGUNG[1] && S.p.freiheitReg[p] === 1 && st.freiheit >= 1 && /1 Jahr Freiheitsstrafe; (er|sie) sitzt die Hälfte ab/.test(letzte(S).text) && /; 110 Tage Untersuchungshaft \(in der Stadt 3 Spieltage\) werden angerechnet/.test(letzte(S).text),
+        `Wohnungseinbruch, erstes Mal, 3 Tage U-Haft: noch 2 Tage Haft, 5 Tage Rest auf Bewährung bis Tag ${S.p.bewaehrungBis[p]}, Tilgung nach 10 Jahren (§ 46 Abs. 1 Nr. 2b BZRG)`);
+      // d) Widerruf: in der Bewährungszeit wieder verurteilt (Diebstahl, jetzt 2 Vorstrafen: Mehrfachtäter, 6 Monate) → zwei Drittel + Rest
+      X.haftEnde(S, p); S.tag += 3;                           // drei Tage später (nur die Kopie)
+      S.p.geld[p] = 1e6; S.p.vorstrafen[p] = 2;               // mit zwei Einträgen: Mehrfachtäter
+      const w0 = st.widerrufe;
+      X.urteilen(S, verf(S, p, Sim.DIEBSTAHL, -1));
+      pruef(st.widerrufe === w0 + 1 && S.p.haftBis[p] === S.tag + Math.ceil(5 * 2 / 3) + 5 && S.p.haftArt[p] === Sim.HAFT_STRAF && S.p.tilgungBis[p] === S.tag + R.TILGUNG[2] + 5,
+        `Widerruf: zweite Freiheitsstrafe (6 Monate, zwei Drittel = 4 Tage) und der Rest der ersten (5 Tage): ${S.p.haftBis[p] - S.tag} Tage Strafhaft, Tilgung nach 15 Jahren plus Dauer`);
+    }
+    // e) Tilgung: Einträge älter als die Frist sind beim nächsten Urteil weg (dann wieder erste Geldstrafe, 30 Tagessätze)
+    {
+      const S = neu(), p = kandidat(S), st = S.stat.sicherheit, t0 = st.getilgt;
+      S.p.vorstrafen[p] = 2; S.p.freiheitReg[p] = 1; S.p.tilgungBis[p] = S.tag; S.p.geld[p] = 1e6;
+      X.urteilen(S, verf(S, p, Sim.DIEBSTAHL, -1));
+      pruef(st.getilgt === t0 + 1 && S.p.vorstrafen[p] === 1 && !S.p.haftBis[p] && S.p.tilgungBis[p] === S.tag + R.TILGUNG[0], 'Tilgung: zwei getilgte Einträge zählen nicht mehr, wieder eine Geldstrafe (kein Mehrfachtäter)');
+    }
+    // f) Anrechnung bei Geldstrafe (§ 51 Abs. 4 StGB: 1 Tag U-Haft = 1 Tagessatz): 1 Spieltag U-Haft = 37 echte Tage > 30 Tagessätze → keine Geldstrafe
+    {
+      const S = neu(), p = kandidat(S), st = S.stat.sicherheit, g0 = st.geldSumme;
+      X.haftAntritt(S, p, 1, Sim.HAFT_U);
+      X.urteilen(S, verf(S, p, Sim.DIEBSTAHL, S.tag - 1));
+      const S2 = neu(), p2 = kandidat(S2); S2.p.vorstrafen[p2] = 1; S2.p.tilgungBis[p2] = S2.tag + 50; S2.p.geld[p2] = 0;
+      X.haftAntritt(S2, p2, 1, Sim.HAFT_U);
+      X.urteilen(S2, verf(S2, p2, Sim.DIEBSTAHL, S2.tag - 1));
+      const rest = 90 - Math.round(ET), echt = Math.ceil(rest / 2);
+      pruef(st.geldSumme === g0 && !S.p.haftBis[p] && S2.p.haftBis[p2] === S2.tag + Math.ceil(echt / ET) && letzte(S2).text.includes(`${rest} Tagessätzen`),
+        `Anrechnung: 1 Spieltag U-Haft gleicht 30 Tagessätze aus (frei); bei 90 bleiben ${rest}, kein Geld → ${echt} Tage Ersatzfreiheitsstrafe`);
+    }
+    // g) Randfall: in U-Haft (Verfahren B) eine Ersatzfreiheitsstrafe aus Verfahren A: bleibt U-Haft bis zum Urteil B, danach folgt A
+    {
+      const S = neu(), p = kandidat(S);
+      X.haftAntritt(S, p, R.VERFAHREN, Sim.HAFT_U);
+      const vB = verf(S, p, Sim.EINBRUCH, S.tag); vB.urteil = S.tag + R.VERFAHREN; S.sicherheit.verfahren.push(vB);
+      const bis0 = S.p.haftBis[p], t0 = S.tag;
+      X.haftAntritt(S, p, 1, Sim.HAFT_KURZ);                   // Ersatzfreiheitsstrafe aus A
+      const u = S.p.haftArt[p] === Sim.HAFT_U && S.p.haftBis[p] === bis0 && S.p.haftNach[p] === 1;
+      let frei = false;
+      while (S.sicherheit.verfahren.some(v => v.id === p)) { Sim.stunde(S); if (!S.p.haftBis[p]) frei = true; }
+      // Urteil in der Nacht von Tag t0 + 3: 1 Jahr, die Hälfte (5) minus 3 Tage U-Haft = 2, dazu 1 Tag aus A → bis Tag t0 + 3 + 3, kurze Haft
+      pruef(u && !frei && S.p.haftBis[p] === t0 + R.VERFAHREN + 3 && S.p.haftArt[p] === Sim.HAFT_KURZ && !S.p.haftNach[p],
+        `Randfall: Ersatzfreiheitsstrafe während U-Haft ändert die U-Haft nicht (haftNach 1), niemand kommt vor dem Urteil frei; danach Strafe und Anschluss bis Tag ${S.p.haftBis[p]}`);
+    }
+    // h) Volle Anstalt: 12 Plätze, der 13. Gefangene kommt nach außerhalb; Strafe während Strafhaft wird angehängt
+    {
+      const S = neu();
+      if (!Sim.sicherheitInfo(S).jvaOffen) { const T = S; while (!Sim.sicherheitInfo(T).jvaOffen && T.tag < 700) Sim.stunde(T); }
+      const L = []; for (let n = 0; L.length < R.JVA_PLAETZE + 1 && n < 500; n++) { const p = kandidat(S, n); if (p >= 0 && !L.includes(p)) L.push(p); }
+      for (const p of L) if (!S.p.haftBis[p]) X.haftAntritt(S, p, 10, Sim.HAFT_STRAF);
+      const orte = L.map(p => S.p.haftOrt[p]), hier = X.insassen(S);
+      const bis0 = S.p.haftBis[L[0]]; X.haftAntritt(S, L[0], 4, Sim.HAFT_KURZ);
+      pruef(Sim.sicherheitInfo(S).jvaOffen && hier === R.JVA_PLAETZE && orte.filter(o => o === 2).length >= 1 && S.p.haftBis[L[0]] === bis0 + 4 && S.p.haftArt[L[0]] === Sim.HAFT_STRAF,
+        `volle Anstalt (Tag ${S.tag}): ${hier} von ${R.JVA_PLAETZE} Plätzen, der nächste sitzt außerhalb; eine neue Strafe in Strafhaft wird angehängt`);
+      Sim.stunde(S); while (S.stunde) Sim.stunde(S);
+      const i = Sim.sicherheitInfo(S);
+      pruef(i.aussen === 0 && i.jvaStellen === Math.ceil(R.JVA_JE_GEFANGENEM * R.JVA_PLAETZE), `volle Anstalt: keine Gefangenen von außerhalb mehr (${i.aussen}), ${i.jvaStellen} Stellen (0,65 je Gefangenem)`);
+    }
+    // i) Obhut: einziger Erwachsener mit Kind kommt in Haft → Angehörige oder Jugendamt; nach der Entlassung wieder zu Hause.
+    //    Gibt es an Tag 300 keinen solchen Haushalt (seit Teil 3: Seed 2), läuft die Kopie Tag für Tag weiter (13 Uhr), höchstens bis Tag 500
+    {
+      const S = neu(), P = S.p;
+      let kopf = -1, erwT = 0;
+      while (kopf < 0 && S.tag <= 500) {
+        erwT = S.tag - R.ERWACHSEN * J;
+        for (let k = 0; k < S.pMax && kopf < 0; k++) {
+          if (!P.lebt[k] || P.hh[k] !== k || !S.hhKinder[k] || P.besitz[k] >= 0) continue;
+          const erw = S.bewohner[P.wohnung[k]].filter(m => P.hh[m] === k && P.geb[m] <= erwT);
+          if (erw.length === 1) kopf = k;
+        }
+        if (kopf < 0) { const z = S.tag + 1; while (S.tag < z || S.stunde < 13) Sim.stunde(S); }
+      }
+      if (kopf < 0) pruef(false, 'Obhut: bis Tag 500 kein Haushalt mit nur einem Erwachsenen und Kindern gefunden');
+      else {
+        const kinder = S.bewohner[P.wohnung[kopf]].filter(m => P.hh[m] === kopf && P.geb[m] > erwT), st = S.stat.sicherheit, b0 = S.buchNr;
+        const stand = speichernAlsText(Sim, S);                // derselbe Stand für den Fall ohne Angehörige
+        X.haftAntritt(S, kopf, 5, Sim.HAFT_STRAF); X.obhutPruefen(S);
+        const arten = kinder.map(k => P.obhut[k]), zeile = S.buch.filter(e => e.nr > b0 && e.art === 'sicherheit').at(-1);
+        const karte = Sim.gebaeudeInfo(S, P.wohnung[kopf]).personen.filter(x => kinder.includes(x.id)).map(x => x.weg);
+        const pk = Sim.personInfo(S, kinder[0]);
+        pruef(arten.every(a => a > 0) && zeile && !/\u0001/.test(zeile.text) && karte.every(w => /bei Angehörigen|beim Jugendamt/.test(w)) && pk.obhut && pk.gedaechtnis.length,
+          `Obhut: ${kinder.length} Kind(er) von ${Sim.name(S, kopf)} ${arten[0] === 1 ? 'bei Angehörigen' : 'beim Jugendamt'} („${Sim.klartext(zeile ? zeile.text : '').slice(0, 110)}“); Hauskarte „${karte[0]}“`);
+        // Ohne Angehörige (Eltern-Verweise weg): Jugendamt, der Kita-Platz wird frei
+        const T = ladenAusText(Sim, stand), Q = T.p, k0 = kinder[0];
+        for (const k of kinder) { Q.elternA[k] = -1; Q.elternB[k] = -1; }
+        X.haftAntritt(T, kopf, 5, Sim.HAFT_STRAF); X.obhutPruefen(T);
+        pruef(kinder.every(k => Q.obhut[k] === 2 && !Q.kita[k]) && T.stat.sicherheit.obhutJugendamt === kinder.length && /Jugendamt/.test(T.buch.filter(e => e.art === 'sicherheit').at(-1).text),
+          `Obhut ohne Angehörige: das Jugendamt nimmt die Kinder in Obhut (§ 42 SGB VIII), Pflegefamilie außerhalb, Kita-Platz frei`);
+        X.haftEnde(T, kopf); X.obhutPruefen(T);
+        pruef(kinder.every(k => !Q.obhut[k] && Q.obhutBei[k] === -1) && Q.hh[k0] === kopf, 'nach der Entlassung: die Kinder sind wieder zu Hause, Obhut beendet');
+      }
+    }
+    // j) Grundsicherung endet mit der Haft, Arbeitsentgelt nur in Strafhaft (nicht in U-Haft), Rente läuft weiter
+    {
+      const S = neu(), p = kandidat(S), q = kandidat(S, 3);
+      S.p.gsTage[p] = 3;
+      X.haftAntritt(S, p, 5, Sim.HAFT_STRAF); X.haftAntritt(S, q, 5, Sim.HAFT_U);
+      while (S.stunde !== 23) Sim.stunde(S);
+      let straf = 0; for (let x = 0; x < S.pMax; x++) if (S.p.lebt[x] && S.p.haftBis[x] && S.p.haftArt[x] !== Sim.HAFT_U) straf++;
+      const h0 = S.stat.sicherheit.haftLohn;
+      Sim.stunde(S);
+      const lohn = S.stat.sicherheit.haftLohn - h0;
+      pruef(S.p.gsTage[p] === 0 && S.p.gsTage[q] === 0 && lohn === straf * R.HAFT_LOHN && straf >= 1,
+        `in Haft keine Grundsicherung (§ 7 Abs. 4 SGB II); Arbeitsentgelt nur in Strafhaft und kurzer Haft: ${straf} Gefangene × ${R.HAFT_LOHN} = ${lohn} Taler, U-Haft nichts`);
+    }
+    // k) Speichern und Laden mit Gefangenen (Strafhaft, kurze Haft, U-Haft mit Anschluss), offenen Verfahren, Bewährung, Obhut: bitgleich
+    {
+      const S = neu(), a = kandidat(S), b = kandidat(S, 1), c = kandidat(S, 2);
+      X.haftAntritt(S, a, 8, Sim.HAFT_STRAF); X.haftAntritt(S, b, 2, Sim.HAFT_KURZ);
+      X.haftAntritt(S, c, R.VERFAHREN, Sim.HAFT_U); const v = verf(S, c, Sim.EINBRUCH, S.tag); v.urteil = S.tag + 2; S.sicherheit.verfahren.push(v); X.haftAntritt(S, c, 1, Sim.HAFT_KURZ);
+      const d = kandidat(S, 4); S.p.bewaehrungBis[d] = S.tag + 20; S.p.bewaehrungRest[d] = 3; S.p.vorstrafen[d] = 1; S.p.tilgungBis[d] = S.tag + 100; S.p.freiheitReg[d] = 1;
+      const L = ladenAusText(Sim, speichernAlsText(Sim, S));
+      const f0 = fingerabdruck(Sim, S) === fingerabdruck(Sim, L);
+      const z = S.tag + 30; while (S.tag < z) Sim.stunde(S); while (L.tag < z) Sim.stunde(L);
+      pruef(f0 && fingerabdruck(Sim, S) === fingerabdruck(Sim, L) && S.stat.sicherheit.urteile > 0,
+        `Speichern mit Strafhaft, kurzer Haft, U-Haft mit Anschluss, offenem Verfahren und Bewährung: geladen gleich, 30 Tage später bitgleich (${fingerabdruck(Sim, S)})`);
+    }
+    // l) Beschädigte Stände der Version 7 werden abgelehnt
+    {
+      const S = neu(), p = kandidat(S); X.haftAntritt(S, p, 5, Sim.HAFT_STRAF);
+      const text = speichernAlsText(Sim, S);
+      const roh = () => { const d = JSON.parse(text); d.arrays = d.arrays.map(a => { const u8 = Buffer.from(a.b64, 'base64'); return { name: a.name, typ: a.typ, daten: new TYPEN[a.typ](u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength)) }; }); return d; };
+      const feld = (d, n) => d.arrays.find(a => a.name === 'p.' + n).daten;
+      const meld = [];
+      for (const [was, kaputt] of [['Haftart 5', d => { feld(d, 'haftArt')[p] = 5; }], ['Haftort 3', d => { feld(d, 'haftOrt')[p] = 3; }],
+        ['Obhut 3', d => { feld(d, 'obhut')[kandidat(S, 1)] = 3; }], ['Verfahren Tatart 9', d => { d.json.sicherheit.verfahren.push({ id: 1, gen: 0, typ: 9, beute: 0, opfer: 2, opferGen: 0, urteil: 5, uhaft: -1 }); }],
+        ['ohne sicherheit', d => { delete d.json.sicherheit; }], ['Summe Taten zu kurz', d => { d.json.stat.sicherheit.taten.pop(); }],
+        ['Wache zeigt auf ein Wohnhaus', d => { d.json.sicherheit.wache = 0; }], ['Zufall negativ', d => { d.werte.rsSich = -1; }],
+        ['Geld vom Land als Text', d => { d.json.sicherheit.landGestern = 'x'; }], ['13 von außerhalb', d => { d.json.sicherheit.aussen = 13; }],
+        ['Personenfeld fehlt', d => { d.arrays = d.arrays.filter(a => a.name !== 'p.tilgungBis'); }]]) {
+        const d = roh(); kaputt(d);
+        let e = null; try { Sim.importZustand(d); } catch (x) { e = x; }
+        meld.push(`${was}: ${e ? e.message : 'ANGENOMMEN'}`);
+        if (!e || !/^Spielstand (beschädigt|unvollständig)/.test(e.message)) fehler++;
+      }
+      console.log((meld.every(m => /: Spielstand (beschädigt|unvollständig)/.test(m)) ? '  ok   ' : '  FEHL ') + 'beschädigte Stände abgelehnt: ' + meld.join('; '));
+    }
+  }
+
+  // 4. Messung: Taten gegen die PKS 2024 (Seeds wie oben, Tag 366–730); nach Gruppen (Seeds 1–6, Tag 200–730), nur gemessen
+  {
+    const ziel = [0, 22.3, 0.94, 8.9];
+    const sum = [0, 0, 0, 0], auf = [0, 0, 0, 0];
+    let ewTage = 0;
+    for (const seed of seeds) {
+      const S = Sim.neueStadt(seed);
+      while (S.tag < 366) Sim.stunde(S);
+      const t0 = S.stat.sicherheit.taten.slice(), a0 = S.stat.sicherheit.aufgeklaert.slice();
+      while (S.tag < 730) { const t = S.tag; Sim.stunde(S); if (S.tag !== t) ewTage += S.einwohner; }
+      for (let k = 1; k <= 3; k++) { sum[k] += S.stat.sicherheit.taten[k] - t0[k]; auf[k] += S.stat.sicherheit.aufgeklaert[k] - a0[k]; }
+    }
+    const je = (k) => sum[k] / (ewTage / J) * 1000, alle = je(1) + je(2) + je(3);
+    pruef(alle > 24 && alle < 40, `Taten je 1.000 Einwohner und Jahr (Seeds ${seeds.join(', ')}, Tag 366–730): Diebstahl ${je(1).toFixed(1)}, Wohnungseinbruch ${je(2).toFixed(2)}, `
+      + `Betrug ${je(3).toFixed(1)}, zusammen ${alle.toFixed(1)} (PKS 2024: ${ziel[1]} / ${ziel[2]} / ${ziel[3]}, zusammen 32,1); aufgeklärt ${[1, 2, 3].map(k => Math.round(100 * auf[k] / Math.max(1, sum[k])) + ' %').join(' / ')} (PKS 31,4 / 15,3 / 58)`);
+    // Gruppen: je Gruppe Erwachsenen-Nächte, Verurteilungen, Opfer; Verhältnis zur Rate aller. Keine Regel liest diese Merkmale
+    const G = new Map(); const g = (n) => { if (!G.has(n)) G.set(n, { n: 0, urt: 0, opf: 0 }); return G.get(n); };
+    const gruppen = (S, p) => { const P = S.p, a = (S.tag - P.geb[p]) / J;
+      return ['alle', P.elternA[p] >= 0 ? 'in der Stadt geboren' : 'zugezogen oder vom Start', P.nach[p] >= 30 && P.nach[p] <= 36 ? 'Nachnamen Kaya bis Kowalski (Liste 31–37)' : 'übrige Nachnamen',
+        P.weib[p] ? 'Frauen' : 'Männer', a < 25 ? 'Alter 18–24' : a < 45 ? 'Alter 25–44' : a < 67 ? 'Alter 45–66' : 'Alter 67+']; };
+    mc.__urteil = (S, v) => { if (S.tag >= 200 && lebtNoch(S, v.id, v.gen)) for (const n of gruppen(S, v.id)) g(n).urt++; };
+    mc.__tat = (S, p, typ, o) => { if (S.tag >= 200 && o >= 0) for (const n of gruppen(S, o)) g(n).opf++; };
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const S = M.neueStadt(seed), P = S.p;
+      while (S.tag < 730) { const t = S.tag; M.stunde(S);
+        if (S.tag !== t && S.tag >= 200) for (let p = 0; p < S.pMax; p++) if (P.lebt[p] && erwachsen(S, p)) for (const n of gruppen(S, p)) g(n).n++; }
+    }
+    mc.__urteil = null; mc.__tat = null;
+    const b = G.get('alle');
+    console.log('  Messung nach Gruppen (Seeds 1–6, Tag 200–730; relativ zu allen, nur gemessen):');
+    const REIHE = ['alle', 'in der Stadt geboren', 'zugezogen oder vom Start', 'Nachnamen Kaya bis Kowalski (Liste 31–37)', 'übrige Nachnamen', 'Frauen', 'Männer',
+      'Alter 18–24', 'Alter 25–44', 'Alter 45–66', 'Alter 67+'];
+    for (const [n, x] of REIHE.filter(n => G.has(n)).map(n => [n, G.get(n)])) console.log(`       ${n.padEnd(44)} ${String(x.n).padStart(8)} Erwachsenen-Nächte  verurteilt ${(x.urt / x.n / (b.urt / b.n)).toFixed(2)} (${x.urt})  Opfer ${(x.opf / x.n / (b.opf / b.n)).toFixed(2)} (${x.opf})`);
+  }
+  console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle Prüfungen zur Sicherheit bestanden');
+  process.exit(fehler ? 1 : 0);
+}
+
+if (flag('militaer')) {
+  // Bund (Version 7, Teil 3): Kaserne der Bundeswehr, Wehrpflicht mit Ersatzdienst, Dienststelle des Bundesnachrichtendienstes.
+  // 1. statisch: kein Zufall im Abschnitt „Bund“, gelesene Personenfelder je Regel (nie Namen, Geschlecht, Herkunft, Einzugstag, Eltern,
+  //    Gedächtnis, Heimatliebe), Löhne und Sold nicht aus dem Budget, Ersatzdienst macht keine Kisten, die Dienststelle liest nirgends
+  //    Personen (Grenze); Namenstausch. 2. Invarianten nach jeder Nacht (Seeds 1–3, 730 Tage). 3. Erzwungene Fälle (Tod, Haft, Wegzug im
+  //    Dienst; Bindung; Einberufung erst ab der Eröffnung; Bauhof voll; leeres Budget; ausgeschaltet). 4. Speichern und Laden, beschädigte
+  //    Stände. 5. Messung (nur gemessen, keine Regel liest es): Einberufungen nach Geschlecht und Herkunft, Besetzung. Seeds mit --seeds
+  let fehler = 0;
+  const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
+  const R = Sim.R, J = R.JAHR, X = Sim._bund;
+  const offenB = (S, b) => b >= 0 && S.feld[S.g.y[b] * S.karte + S.g.x[b]] === S.g.typ[b] && !S.g.leer[b];
+  const tausender = (v) => String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const bisStunde = (S, tag, h) => { while (S.tag < tag || (S.tag === tag && S.stunde < h)) Sim.stunde(S); };
+  // Kopie mit Messpunkten (liest nur mit): Budget im Zweig der Bundeslöhne, jede Einberufung (Alter, Tag), jedes Dienstende
+  const { Sim: M, ctx: mc } = ladeSimMit([
+    ['    if (istBund(t)) {                                        // Bund: Kaserne und Dienststelle, Löhne und Wehrsold zahlt der Bund (von außen)\n',
+      '    if (istBund(t)) {                                        // Bund: Kaserne und Dienststelle, Löhne und Wehrsold zahlt der Bund (von außen)\n      const __b1 = S.budget;\n'],
+    ['      g.umsatz[b] = 0;\n      continue;\n    }\n    let da = 0;', '      g.umsatz[b] = 0;\n      if (S.budget !== __b1) globalThis.__bundBudget++;\n      continue;\n    }\n    let da = 0;'],
+    ['  if (ersatz) { S.stat.bund.ersatzdienst++; B.jahr[1]++; } else { S.stat.bund.wehrdienst++; B.jahr[0]++; }\n',
+      '  if (ersatz) { S.stat.bund.ersatzdienst++; B.jahr[1]++; } else { S.stat.bund.wehrdienst++; B.jahr[0]++; }\n  if (globalThis.__einb) globalThis.__einb(S, p);\n'],
+  ]);
+  mc.__bundBudget = 0;
+  const code = SIM_CODE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+  const koerper = (f) => {                                    // Körper einer Funktion (oberste Ebene), ohne Kommentare
+    const i = code.search(new RegExp('^function ' + f + '\\(', 'm')); if (i < 0) return null;
+    let t = 0, j = code.indexOf('{', i);
+    for (; j < code.length; j++) { if (code[j] === '{') t++; else if (code[j] === '}' && --t === 0) break; }
+    return code.slice(i, j + 1); };
+  const felder = (k) => [...new Set([...k.matchAll(/\b(?:P|S\.p)\.(\w+)/g)].map(m => m[1]))].sort();
+
+  // 1. Statisch
+  {
+    const a = SIM_CODE.indexOf('// ─── Bund (Version 7, Teil 3)'), e = SIM_CODE.indexOf('// Ende Bund');
+    const teil = SIM_CODE.slice(a, e).replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+    const zuf = teil.match(/\b(zufall|zInt|zufallSich|zufallsCharakter|zufallsName)\s*\(/g) || [];
+    pruef(a > 0 && e > a && !zuf.length, `Abschnitt „Bund“ (${teil.split('\n').length} Zeilen): kein Zufall (${zuf.length}); Wehr- oder Ersatzdienst aus einem festen Wert je Person (dienstWahl)`);
+    // Je Regel, die über Menschen entscheidet: welche Personenfelder sie lesen darf. Nie: Namen, Geschlecht, Einzugstag, Eltern, Gedächtnis, Heimatliebe
+    const ERLAUBT = {
+      verpflichtet: ['bund', 'dienstBis'], dienstZahl: ['bund'], dienstWahl: ['geb', 'gen'],
+      einberufen: ['arbeit', 'besitz', 'bund', 'dienstBis', 'haftBis'], dienstEnde: ['dienstBis', 'jetzt'], bundStelleFrei: [], bundTag: ['bund'],
+      anstellen: ['arbeit', 'bund', 'dienstBis'], austreten: ['arbeit', 'besitz', 'bund', 'dienstBis', 'einsatz', 'gemein'],
+    };
+    const zuViel = [];
+    for (const [f, ok] of Object.entries(ERLAUBT)) {
+      const k = koerper(f);
+      if (!k) { zuViel.push(f + ': fehlt'); continue; }
+      for (const x of felder(k)) if (!ok.includes(x)) zuViel.push(`${f}: P.${x}`);
+      if (/\b(name|vorname|nr|namePack|nameAusPack|ref|personInfo|zufallsName)\s*\(/.test(k)) zuViel.push(`${f}: Name`);
+    }
+    // In entscheide und erlaubteAktionen: die Zeilen des Bundes lesen nur die Rolle (imDienst) und verpflichtet
+    for (const f of ['entscheide', 'erlaubteAktionen']) {
+      const z = (koerper(f) || '').split('\n').filter(l => /imDienst|verpflichtet\(/.test(l) && /const imDienst/.test(l));
+      for (const l of z) for (const x of felder(l)) if (x !== 'bund') zuViel.push(`${f}: P.${x}`);
+      if (z.length !== 1) zuViel.push(`${f}: Zeile imDienst ${z.length}-mal`);
+    }
+    const w = koerper('wirtschaft') || '', wb = w.slice(w.indexOf('    if (istBund(t)) {'), w.indexOf('    let da = 0;'));
+    const ers = w.slice(w.indexOf('if (P.bund[w] === ERSATZDIENST) {'), w.indexOf('continue;', w.indexOf('if (P.bund[w] === ERSATZDIENST) {')));
+    const kisten = (SIM_CODE.match(/if \(!P\.frei\[w\] && !P\.einsatz\[w\] && P\.bund\[w\] !== ERSATZDIENST\) (exportArbeiter|da)\+\+;/g) || []).length;
+    pruef(!zuViel.length, `Regeln lesen nur ihre Personenfelder (${Object.keys(ERLAUBT).length} Funktionen und die Bund-Zeilen in entscheide und erlaubteAktionen), keine Namen, kein Geschlecht`
+      + (zuViel.length ? ': ' + zuViel.join(', ') : ''));
+    pruef(wb.length > 100 && !/S\.budget/.test(wb) && ers.length > 20 && !/S\.budget/.test(ers) && kisten === 3,
+      `wirtschaft: Löhne und Sold des Bundes (Kaserne, Dienststelle, Ersatzdienst im Bauhof) berühren das Budget nicht; Ersatzdienst zählt an ${kisten} von 3 Stellen nicht als Kisten-Arbeiter (Umlandpreis, Werkstatt, Kisten)`);
+    // Grenze: Die Dienststelle beobachtet niemanden. Nur diese Funktionen nennen sie (Bau, Stellen, Texte, Prüfung); wer eine dazunimmt, prüft die Grenze neu
+    const NENNEN = ['istBetrieb', 'istBund', 'stellen', 'betriebWort', 'bauName', 'bundLeer', 'bundStelleFrei', 'bundTag', 'bundInfo', 'bundPruefen', 'betriebText',
+      'erinnerungText', 'berufWort', 'bauGesamt', 'bauArt', 'heuteText'];
+    const alle = [...code.matchAll(/^function (\w+)\(/gm)].map(m => m[1]).filter(f => /\bDIENSTSTELLE\b|\bB\.dienst\b|\bbund\.dienst\b|\bdOffen\b/.test(koerper(f)));
+    const neuN = alle.filter(f => !NENNEN.includes(f)), wegN = NENNEN.filter(f => !alle.includes(f));
+    const ueber = /function (\w*([Üü]berwach|[Uu]eberwach|[Bb]eobacht|[Vv]erdacht|[Dd]ossier)\w*|\w*Akten?)\(/.test(code) || Sim.PF_BUND.join() !== 'bund,dienstBis';
+    pruef(!neuN.length && !wegN.length && !ueber && Sim.bundInfo(Sim.neueStadt(1)).ueberwacht === 0,
+      `Grenze: die Dienststelle nennen nur ${alle.length} Funktionen (Bau, Stellen, Texte, Prüfung), keine liest Personen für sie; keine Funktion und kein Personenfeld zum Überwachen`
+      + (neuN.length || wegN.length ? `; neu: ${neuN.join(', ')}; weg: ${wegN.join(', ')}` : ''));
+    // Namenstausch (andere Namen, sonst gleich; Seed 2, 400 Tage, Kaserne offen): keine Regel liest Namen, also läuft die Stadt bitgleich
+    const { Sim: T } = ladeSimMit([['const STRASSEN = [', 'NACHNAMEN.reverse(); VORNAMEN_W.reverse(); VORNAMEN_M.reverse();\nconst STRASSEN = [']]);
+    const A = Sim.neueStadt(2), B = T.neueStadt(2);
+    while (A.tag < 400) Sim.stunde(A); while (B.tag < 400) T.stunde(B);
+    const spur = (S) => { const h = createHash('sha256'); for (const n of Object.keys(S.p).sort()) if (ArrayBuffer.isView(S.p[n])) { const a = S.p[n], w = a.length / S.pKap; h.update(n); h.update(Buffer.from(a.buffer, a.byteOffset, S.pMax * w * a.BYTES_PER_ELEMENT)); }
+      for (const n of Object.keys(S.g).sort()) if (ArrayBuffer.isView(S.g[n])) { const a = S.g[n]; h.update(n); h.update(Buffer.from(a.buffer, a.byteOffset, a.byteLength)); }
+      h.update(JSON.stringify(S.stat)); h.update(JSON.stringify(S.bund)); h.update(String(S.rs) + '/' + S.rsSich + '/' + S.budget); h.update(S.buch.map(e => e.art).join()); return h.digest('hex').slice(0, 16); };
+    const iA = Sim.bundInfo(A), nA = Sim.name(A, 5), nB = T.name(B, 5);
+    pruef(nA !== nB && spur(A) === spur(B) && iA.kaserneOffen && A.stat.bund.wehrdienst + A.stat.bund.ersatzdienst > 0,
+      `Namenstausch (Seed 2, 400 Tage, ${A.stat.bund.wehrdienst} + ${A.stat.bund.ersatzdienst} Einberufungen): „${nA}“ heißt dort „${nB}“, die Stadt läuft trotzdem bitgleich (${spur(A)})`);
+  }
+
+  // 2. Invarianten nach jeder Nacht
+  const seeds = arg('seeds', '1,2,3').split(',').map(Number);
+  const mess = { wehr: [0, 0], ersatz: [0, 0], einb: 0, tageSoldat: 0, tageZivil: 0, tageDienst: 0, naechte: 0, kOffen: [], dOffen: [] };
+  for (const seed of seeds) {
+    const S = M.neueStadt(seed), P = S.p, fehl = {};
+    const f = (k) => { fehl[k] = (fehl[k] || 0) + 1; };
+    const dienst = new Map();                                  // p → { gen, start, bis, art, wohnung }
+    const gebunden = new Map();                                // verpflichtete Soldaten der letzten Nacht: p → gen
+    let naechte = 0, einbHook = 0, buchNr = S.buchNr, zeilen = 0, summeVor = 0, stufeK = -1, stufeD = -1, gezaehlt = 0, verpasst = 0, vorOeffnung = 0, wartenK = 0, wartenD = 0;
+    let vorher = new Set();                                    // wer vor dieser Nacht schon da war (Zuzug in der Nacht wurde nicht hier 18)
+    const bb0 = mc.__bundBudget;
+    mc.__einb = (S, p) => { einbHook++; const P = S.p;
+      if (S.tag - P.geb[p] !== R.ERWACHSEN * J || S.tag < S.bund.kOffen || !S.bund.kOffen) f('einbAlter');
+      mess[P.bund[p] === M.WEHRDIENST ? 'wehr' : 'ersatz'][P.weib[p] ? 1 : 0]++;   // nur gemessen
+      mess.einb++; };
+    let freiFehl = 0, aktFehl = 0, aktGeprueft = 0;
+    while (S.tag < 730) {
+      const t = S.tag;
+      M.stunde(S);
+      // Tagsüber: niemand im Dienst hat frei; erlaubte Aktionen um 7 und 18 Uhr (im Dienst: kein Wechsel, keine Kündigung, kein freier Tag,
+      // keine Gründung, kein Wegzug; verpflichtet: kein Wechsel, keine Kündigung, keine Gründung). entscheide zieht Zufall und prüft Fall 3 d
+      if (S.tag === t && (S.stunde === 7 || S.stunde === 18)) {
+        for (let p = 0; p < S.pMax; p++) {
+          if (!P.lebt[p] || !P.bund[p]) continue;
+          const im = P.bund[p] >= M.WEHRDIENST, vp = M.verpflichtet(S, p);
+          if (im && P.frei[p]) freiFehl++;
+          if (!im && !vp) continue;
+          aktGeprueft++;
+          const erl = M.erlaubteAktionen(S, p, S.stunde);
+          const verb = im ? ['job_wechseln', 'kuendigen', 'freinehmen', 'laden_gruenden', 'wegziehen', 'job_suchen'] : ['job_wechseln', 'kuendigen', 'laden_gruenden'];
+          if (erl.some(x => verb.includes(x))) aktFehl++;
+        }
+      }
+      if (S.tag === t) continue;
+      naechte++;
+      const B = S.bund, e = S.erweiterung, K = B.kaserne, D = B.dienst, g = S.g, nacht = S.tag - 1;
+      if (K >= 0 && stufeK < 0) stufeK = e.stufe;
+      if (D >= 0 && stufeD < 0) stufeD = e.stufe;
+      // Kaserne ab der Stadt, Dienststelle ab der Großstadt, auf eigenem Gelände (3 × 2 Blöcke = 11 × 7 Felder; 1 Block = 3 × 3). Der Bund
+      // wartet nur, solange es kein Gelände gibt (Teil 1: ganz freie Blöcke an einer Straße; gesucht nach dem Bauamt, danach wächst höchstens
+      // die Karte): war die Stufe schon vor dieser Nacht erreicht und steht noch nichts, findet gelaendeSuchen auch jetzt nichts
+      if (e.stufe >= R.KASERNE_STUFE && K < 0 && e.stufenTage[R.KASERNE_STUFE] < nacht) {
+        wartenK++; if (M.gelaendeSuchen(S, R.KASERNE_BLOECKE[0], R.KASERNE_BLOECKE[1], true) || M.gelaendeSuchen(S, R.KASERNE_BLOECKE[1], R.KASERNE_BLOECKE[0], true)) f('kaserneTrotzGelaende'); }
+      if (e.stufe >= R.DIENST_STUFE && D < 0 && e.stufenTage[R.DIENST_STUFE] < nacht) {
+        wartenD++; if (M.gelaendeSuchen(S, R.DIENST_BLOECKE[0], R.DIENST_BLOECKE[1], true)) f('dienstTrotzGelaende'); }
+      for (const [b, typ, fl] of [[K, M.KASERNE, 77], [D, M.DIENSTSTELLE, 9]]) {
+        if (b < 0) continue;
+        const r = e.gelaende.find(x => x[4] === b);
+        if (!r || g.typ[b] !== typ || (r[2] - r[0] + 1) * (r[3] - r[1] + 1) !== fl || g.besitzer[b] !== -1) f('gelaende');
+      }
+      if (offenB(S, K) && (!B.kOffen || B.kOffen > S.tag)) f('kOffen');
+      if (offenB(S, D) && (!B.dOffen || B.dOffen > S.tag)) f('dOffen');
+      // Rollen, Stellen, Obergrenzen
+      let soldaten = 0, zivil = 0, wehr = 0, ersatz = 0;
+      for (let p = 0; p < S.pMax; p++) {
+        if (!P.lebt[p]) continue;
+        const r = P.bund[p], a = P.arbeit[p];
+        if (r === M.SOLDAT) soldaten++; else if (r === M.ZIVIL) zivil++; else if (r === M.WEHRDIENST) wehr++; else if (r === M.ERSATZDIENST) ersatz++;
+        if (r >= 1 && r <= 3 && a !== K) f('rolleOrt');
+        if (r === 4 && a !== S.bauhof) f('rolleOrt');
+        if (a >= 0 && a === K && !(r >= 1 && r <= 3)) f('ohneRolle');
+        if (a >= 0 && a === D && r) f('dienstRolle');
+        if (r >= 3 && (P.gemein[p] || P.dienstBis[p] < S.tag || P.dienstBis[p] > nacht + R.DIENST_TAGE)) f('dienstBis');
+        if (r === M.SOLDAT && !P.dienstBis[p]) f('soldatBis');
+        if ((r === 0 || r === M.ZIVIL) && P.dienstBis[p]) f('restBis');
+        if (r >= 3 && P.haftBis[p]) f('dienstHaft');
+      }
+      if (soldaten > R.STELLEN_SOLDAT || zivil > R.STELLEN_ZIVIL || (D >= 0 && S.belegschaft[D].length > R.STELLEN_DIENST)) f('obergrenze');
+      for (const b of [K, D, S.bauhof]) if (offenB(S, b) && g.offeneStellen[b] !== M.stellen(S, b) - S.belegschaft[b].length) f('offeneStellen');
+      if (K >= 0 && M.stellen(S, K) !== R.STELLEN_SOLDAT + R.STELLEN_ZIVIL + wehr) f('stellenK');
+      const ed = X.dienstZahl(S, S.bauhof);
+      if (ed !== ersatz || M.stellen(S, S.bauhof) - ed > R.BAU_MAX || S.belegschaft[S.bauhof].length - ed > R.BAU_MAX) f('bauhofGrenze');
+      // Dienst: neu (einberufen, in dieser Nacht mit 18, ab dem Tag nach der Eröffnung, wohnt weiter wo vorher), vorbei (genau 5 Tage,
+      // sonst abgebrochen: Tod, Haft oder Wegzug mit dem Haushalt)
+      for (let p = 0; p < S.pMax; p++) {
+        if (!P.lebt[p] || P.bund[p] < M.WEHRDIENST) continue;
+        const d = dienst.get(p);
+        if (d && d.gen === P.gen[p]) continue;
+        if (nacht < B.kOffen || !B.kOffen) vorOeffnung++;
+        if (nacht - P.geb[p] !== R.ERWACHSEN * J || P.dienstBis[p] !== nacht + R.DIENST_TAGE) f('neu');
+        dienst.set(p, { gen: P.gen[p], start: nacht, bis: P.dienstBis[p], art: P.bund[p] });
+      }
+      for (const [p, d] of [...dienst]) {
+        const noch = P.lebt[p] && P.gen[p] === d.gen && P.bund[p] === d.art;
+        if (noch) continue;
+        dienst.delete(p);
+        if (P.lebt[p] && P.gen[p] === d.gen && !P.haftBis[p]) {       // normal zu Ende: in der Nacht des letzten Tages, genau 5 Diensttage
+          if (nacht !== d.bis || nacht - d.start !== R.DIENST_TAGE) f('dauer');
+          gezaehlt += R.DIENST_TAGE;
+        } else if (P.lebt[p] && P.gen[p] === d.gen) gezaehlt += nacht - d.start;   // Haft in dieser Nacht (nach dem Diensttag)
+        else gezaehlt += nacht - 1 - d.start;                       // Wegzug mit dem Haushalt (tagsüber) oder Tod: bis zur letzten Nacht
+      }
+      // Einberufung vollständig: wer in dieser Nacht 18 wurde, ab dem Tag nach der Eröffnung, ohne Haft und Betrieb, ist im Dienst
+      for (let p = 0; p < S.pMax; p++) {
+        if (!P.lebt[p] || nacht - P.geb[p] !== R.ERWACHSEN * J || !vorher.has(p + '/' + P.gen[p])) continue;
+        if (B.kOffen && nacht >= B.kOffen && offenB(S, K) && P.bund[p] < M.WEHRDIENST && !P.haftBis[p] && P.besitz[p] < 0) verpasst++;
+        if ((!B.kOffen || nacht < B.kOffen) && P.bund[p]) vorOeffnung++;
+      }
+      // Soldaten auf Zeit bleiben, solange sie verpflichtet sind (außer Tod, Haft, Wegzug, Rente)
+      for (const [p, gen] of gebunden) if (P.lebt[p] && P.gen[p] === gen && !P.haftBis[p] && P.bund[p] !== M.SOLDAT && !M.anspruch(S, p)) f('gebunden');
+      gebunden.clear();
+      vorher = new Set(); for (let p = 0; p < S.pMax; p++) if (P.lebt[p]) vorher.add(p + '/' + P.gen[p]);
+      if (S.stat.bund.wehrdienst + S.stat.bund.ersatzdienst !== S.stat.bund.beendet + S.stat.bund.abgebrochen + wehr + ersatz) f('bilanz');
+      for (let p = 0; p < S.pMax; p++) if (P.lebt[p] && M.verpflichtet(S, p)) gebunden.set(p, P.gen[p]);
+      // Geld vom Bund: gestern = Zuwachs der Summen in dieser Nacht; Budget nie berührt
+      const st = S.stat.bund, summe = st.lohnKaserne + st.lohnDienst + st.sold + st.soldErsatz + st.bau;
+      if (B.gestern !== summe - summeVor) f('gestern');
+      summeVor = summe;
+      // Stadtbuch: Zeilen des Bundes ohne Namen
+      for (const z of S.buch) if (z.nr > buchNr && z.art === 'bund') { zeilen++; if (/\u0001/.test(z.text)) f('buchName'); }
+      buchNr = S.buchNr;
+      if (nacht >= 365) { mess.tageSoldat += soldaten; mess.tageZivil += zivil; mess.tageDienst += D >= 0 ? S.belegschaft[D].length : 0; mess.naechte++; }
+    }
+    mc.__einb = null;
+    for (const d of dienst.values()) gezaehlt += S.tag - 1 - d.start;   // noch im Dienst
+    const st = S.stat.bund, i = M.bundInfo(S);
+    mess.kOffen.push(S.bund.kOffen); mess.dOffen.push(S.bund.dOffen);
+    pruef(!Object.keys(fehl).length && !verpasst && !vorOeffnung && !freiFehl && !aktFehl && einbHook === st.wehrdienst + st.ersatzdienst && mc.__bundBudget === bb0
+      && gezaehlt === st.dienstTage,
+      `Seed ${seed}, ${naechte} Nächte: Kaserne ab ${M.STUFEN[stufeK] || '–'} (offen ab Tag ${S.bund.kOffen}, ${wartenK} Nächte ohne Gelände gewartet), Dienststelle ab ${M.STUFEN[stufeD] || '–'} `
+      + `(offen ab Tag ${S.bund.dOffen || '–'}, ${wartenD} Nächte ohne Gelände gewartet), je auf eigenem Gelände; Einberufene = beendet + abgebrochen + im Dienst; ${st.wehrdienst} Wehr- und ${st.ersatzdienst} Ersatzdienste, alle mit 18 in der Nacht des Geburtstags ab dem Tag nach der Eröffnung `
+      + `(${verpasst} verpasst, ${vorOeffnung} vorher), ${st.dienstTage} Diensttage = nachgezählt ${gezaehlt}, ${st.beendet} beendet, ${st.abgebrochen} abgebrochen; `
+      + `${aktGeprueft} Entscheidungen im Dienst oder verpflichtet ohne Verbotenes (${aktFehl + freiFehl}); ${zeilen} Zeilen im Stadtbuch ohne Namen; `
+      + `Löhne und Sold nie aus dem Budget (${mc.__bundBudget - bb0}); weitere Fehler: ${JSON.stringify(fehl)}`);
+    pruef(S.bund.kaserne >= 0 && i.kaserneOffen && st.wehrdienst > 0 && st.ersatzdienst > 0 && st.beendet > 0 && st.lohnKaserne > 0 && st.sold > 0 && st.soldErsatz > 0 && st.bau >= R.K_KASERNE,
+      `Seed ${seed}: heute ${i.soldaten} Soldaten (${i.verpflichtet} verpflichtet), ${i.zivil} Zivil, ${i.wehr} im Wehr-, ${i.ersatz} im Ersatzdienst, ${i.nachrichtendienst} im Nachrichtendienst; `
+      + `vom Bund bis Tag 730: Löhne ${tausender(st.lohnKaserne + st.lohnDienst)}, Sold ${tausender(st.sold + st.soldErsatz)}, Bau ${tausender(st.bau)} Taler`);
+  }
+  const wehrN = mess.wehr[0] + mess.wehr[1], ersN = mess.ersatz[0] + mess.ersatz[1], anteil = ersN / Math.max(1, wehrN + ersN);
+  pruef(wehrN + ersN > 100 && anteil > 0.6 && anteil < 0.8, `Ersatzdienst-Anteil ${(100 * anteil).toFixed(1)} % (${ersN} von ${wehrN + ersN}; Annahme ${Math.round(100 * R.ERSATZ_ANTEIL)} %, Spanne 60–80 %)`);
+
+  // 3. Erzwungene Fälle an einer Kopie der Stadt (Seed 2, erster Tag ab 300 um 13 Uhr mit Wehr- und Ersatzdienst und verpflichteten Soldaten)
+  let basis = null;
+  {
+    const S = Sim.neueStadt(2);
+    bisStunde(S, 300, 13);
+    const da = (S) => { const i = Sim.bundInfo(S); return i.wehr >= 1 && i.ersatz >= 2 && i.verpflichtet >= 1; };
+    while (!da(S) && S.tag < 700) bisStunde(S, S.tag + 1, 13);
+    basis = speichernAlsText(Sim, S);
+  }
+  const neu = () => ladenAusText(Sim, basis);
+  const wer = (S, rolle, n = 0) => { let k = 0; for (let p = 0; p < S.pMax; p++) if (S.p.lebt[p] && S.p.bund[p] === rolle && (rolle !== Sim.SOLDAT || Sim.verpflichtet(S, p)) && k++ === n) return p; return -1; };
+  {
+    const S = neu();
+    pruef(Sim.bundInfo(S).wehr >= 1, `Stand für die Fälle: Tag ${S.tag}, ${Sim.bundInfo(S).wehr} im Wehr-, ${Sim.bundInfo(S).ersatz} im Ersatzdienst, ${Sim.bundInfo(S).verpflichtet} verpflichtete Soldaten`);
+  }
+  // a) Tod im Wehrdienst: Rolle weg, keine Stelle frei, abgebrochen
+  {
+    const S = neu(), p = wer(S, Sim.WEHRDIENST), K = S.bund.kaserne, st = S.stat.bund, ab = st.abgebrochen, of = S.g.offeneStellen[K], sk = Sim.stellen(S, K), fs = S.freieStellen;
+    Sim._pruef.sterben(S, p);
+    pruef(p >= 0 && !S.p.lebt[p] && !S.belegschaft[K].includes(p) && st.abgebrochen === ab + 1 && S.g.offeneStellen[K] === of && Sim.stellen(S, K) === sk - 1 && S.freieStellen === fs,
+      `Tod im Wehrdienst: nicht mehr in der Kaserne, abgebrochen ${ab} → ${st.abgebrochen}, keine Stelle frei (${of} offen, Stellen ${sk} → ${Sim.stellen(S, K)})`);
+  }
+  // b) Haft im Ersatzdienst: Dienst endet (vereinfacht), keine Stelle frei, keine Erinnerung „Stelle verloren“
+  {
+    const S = neu(), p = wer(S, Sim.ERSATZDIENST), B = S.bauhof, st = S.stat.bund, ab = st.abgebrochen, of = S.g.offeneStellen[B];
+    const m0 = Sim.personInfo(S, p).gedaechtnis.length;
+    Sim._sich.haftAntritt(S, p, 5, Sim.HAFT_STRAF);
+    const info = Sim.personInfo(S, p);
+    pruef(p >= 0 && S.p.haftBis[p] && !S.p.bund[p] && !S.p.dienstBis[p] && S.p.arbeit[p] < 0 && !S.belegschaft[B].includes(p) && st.abgebrochen === ab + 1 && S.g.offeneStellen[B] === of
+      && !info.gedaechtnis.slice(0, info.gedaechtnis.length - m0 + 1).some(m => /Stelle verloren|verliert/.test(m.text)),
+      `Haft im Ersatzdienst: Dienst endet, Rolle 0, nicht mehr im Bauhof, abgebrochen ${ab} → ${st.abgebrochen}, keine Stelle frei`);
+  }
+  // c) Wegzug im Dienst: nur mit dem Haushalt (selbst nicht erlaubt); abgebrochen
+  {
+    const S = neu(), P = S.p;
+    let kind = -1;
+    for (let p = 0; p < S.pMax && kind < 0; p++) if (P.lebt[p] && P.bund[p] >= Sim.WEHRDIENST && P.hh[p] >= 0 && P.hh[p] !== p) kind = p;
+    if (kind < 0) pruef(true, 'Wegzug im Dienst: niemand im Dienst lebt noch im Haushalt der Eltern (Fall entfällt)');
+    else {
+      const kopf = P.hh[kind], gen = P.gen[kind], ab = S.stat.bund.abgebrochen, erl = Sim.erlaubteAktionen(S, kind, 7);
+      // wer 18 ist, geht nicht mit (nur Kinder unter 18): der Dienst läuft weiter
+      Sim._pruef.aktWegziehen(S, kopf);
+      const bleibt = P.lebt[kind] && P.gen[kind] === gen;
+      pruef(!erl.includes('wegziehen') && (bleibt ? P.bund[kind] >= Sim.WEHRDIENST && S.stat.bund.abgebrochen === ab : S.stat.bund.abgebrochen === ab + 1),
+        `Wegzug: im Dienst selbst nicht erlaubt; zieht der Haushalt weg, ${bleibt ? 'bleibt die erwachsene Person und dient weiter' : 'endet der Dienst (abgebrochen)'}`);
+    }
+  }
+  // d) Bindung: verpflichtete Soldaten dürfen nicht wechseln, kündigen oder gründen; mit Rentenanspruch oder nach dem Ende der Verpflichtung schon
+  {
+    const S = neu(), P = S.p, p = wer(S, Sim.SOLDAT);
+    S.freieStellen = 5; P.geld[p] = 1e6;
+    const vor = Sim.erlaubteAktionen(S, p, 7), text = Sim.klartext(Sim.personInfo(S, p).arbeit);
+    const bis = P.dienstBis[p]; P.dienstBis[p] = S.tag;
+    const nach = Sim.erlaubteAktionen(S, p, 7);
+    P.dienstBis[p] = bis; const b0 = P.beitrag[p]; P.beitrag[p] = 45 * J + 1;
+    const rente = Sim.verpflichtet(S, p); P.beitrag[p] = b0;
+    pruef(p >= 0 && !vor.includes('kuendigen') && !vor.includes('job_wechseln') && !vor.includes('laden_gruenden') && nach.includes('kuendigen') && !rente
+      && new RegExp(`verpflichtet bis Tag ${bis}`).test(text) && bis - S.tag <= R.VERPFLICHTUNG,
+      `Soldat auf Zeit („${text}“): erlaubt ${vor.join(', ') || 'nichts'}; nach dem Ende der Verpflichtung auch kündigen (${nach.join(', ')}); mit Rentenanspruch nicht mehr verpflichtet`);
+  }
+  // d2) Das normale Gehirn wählt im Dienst oder verpflichtet nichts Verbotenes (48 Stunden an der Kopie, jede Stunde)
+  {
+    const S = neu(), P = S.p;
+    let n = 0, falsch = 0;
+    for (let h = 0; h < 48; h++) {
+      for (let p = 0; p < S.pMax; p++) {
+        if (!P.lebt[p] || !P.bund[p] || S.tag - P.geb[p] < R.ERWACHSEN * J) continue;
+        const im = P.bund[p] >= Sim.WEHRDIENST;
+        if (!im && !Sim.verpflichtet(S, p)) continue;
+        const verb = im ? ['job_wechseln', 'kuendigen', 'freinehmen', 'laden_gruenden', 'wegziehen', 'job_suchen'] : ['job_wechseln', 'kuendigen', 'laden_gruenden'];
+        const a = Sim.entscheide(S, p, S.stunde); n++;
+        if (a && verb.includes(Sim.AKTIONSNAMEN[a])) falsch++;
+      }
+      Sim.stunde(S);
+    }
+    pruef(n > 100 && !falsch, `Gehirn: ${n} Entscheidungen im Dienst oder verpflichtet, ${falsch} verboten (Wechsel, Kündigung, Gründung; im Dienst auch frei, Wegzug, Stellensuche)`);
+  }
+  // e) Kita-Lücke: Wer im Dienst ist oder verpflichtet, hört dafür nicht auf (B10); statisch in kitaTag
+  {
+    const k = koerper('kitaTag') || '';
+    pruef(/P\.bund\[c\] < WEHRDIENST && !verpflichtet\(S, c\)/.test(k), 'Betreuungslücke (Kita): wer im Dienst oder als Soldat verpflichtet ist, hört dafür nicht auf');
+  }
+  // f) Einberufung erst ab dem Tag nach der Eröffnung; nicht mit Haft, Betrieb oder Stelle; ausgeschaltet nie
+  {
+    const S = neu(), P = S.p, B = S.bund;
+    let q = -1; for (let p = 0; p < S.pMax && q < 0; p++) if (P.lebt[p] && !P.bund[p] && P.arbeit[p] < 0 && P.besitz[p] < 0 && !P.haftBis[p] && S.tag - P.geb[p] < R.ERWACHSEN * J) q = p;
+    const ok = [];
+    const k0 = B.kOffen; B.kOffen = S.tag + 1; X.einberufen(S, q); ok.push(!P.bund[q]); B.kOffen = k0;   // Eröffnung erst morgen
+    R.WEHRPFLICHT = 0; X.einberufen(S, q); ok.push(!P.bund[q]); R.WEHRPFLICHT = 1;
+    P.haftBis[q] = S.tag + 3; X.einberufen(S, q); ok.push(!P.bund[q]); P.haftBis[q] = 0;
+    const ed0 = X.dienstZahl(S, S.bauhof), zu0 = S.bauZuschlag; S.bauZuschlag = R.BAU_MAX - R.STELLEN_STADT;   // Bauhof voll: Ersatzdienst trotzdem
+    X.einberufen(S, q); ok.push(P.bund[q] >= Sim.WEHRDIENST && P.dienstBis[q] === S.tag + R.DIENST_TAGE);
+    const ersatz = P.bund[q] === Sim.ERSATZDIENST, ort = P.arbeit[q];
+    ok.push(ersatz === (Sim.dienstWahl(S, q) < R.ERSATZ_ANTEIL) && ort === (ersatz ? S.bauhof : B.kaserne));
+    if (ersatz) ok.push(X.dienstZahl(S, S.bauhof) === ed0 + 1 && Sim.stellen(S, S.bauhof) - X.dienstZahl(S, S.bauhof) <= R.BAU_MAX);
+    S.bauZuschlag = zu0;
+    pruef(q >= 0 && ok.every(Boolean), `Einberufung: nicht vor dem Tag nach der Eröffnung, nicht ohne Wehrpflicht, nicht in Haft; ${ersatz ? 'Ersatzdienst auch bei vollem Bauhof (außerhalb der 40)' : 'Wehrdienst'}; `
+      + `Wehr oder Ersatz nur nach dienstWahl (${Sim.dienstWahl(S, q).toFixed(3)}) (${ok.map(x => (x ? '1' : '0')).join('')})`);
+  }
+  // g) Leeres Budget: Ersatzdienst bekommt den Sold trotzdem (vom Bund), Wehrdienst auch; Löhne der Kaserne auch
+  {
+    const S = neu(); bisStunde(S, S.tag, 23);
+    for (let p = 0; p < S.pMax; p++) S.p.jetzt[p] = 0;
+    const P = S.p, K = S.bund.kaserne, D = S.bund.dienst, st = S.stat.bund, v = { ...st };
+    let soll = { lohnKaserne: 0, lohnDienst: 0, sold: 0, soldErsatz: 0 };
+    for (const b of [K, D]) if (offenB(S, b)) for (const w of S.belegschaft[b]) if (!P.frei[w]) {
+      if (P.bund[w] === Sim.WEHRDIENST) soll.sold += R.SOLD; else if (b === K) soll.lohnKaserne += S.g.lohn[b]; else soll.lohnDienst += S.g.lohn[b]; }
+    for (const w of S.belegschaft[S.bauhof]) if (!P.frei[w] && !P.gemein[w] && P.bund[w] === Sim.ERSATZDIENST) soll.soldErsatz += R.SOLD;
+    S.budget = 0;
+    Sim.stunde(S);
+    const ist = Object.fromEntries(Object.keys(soll).map(k => [k, st[k] - v[k]]));
+    pruef(JSON.stringify(ist) === JSON.stringify(soll) && soll.soldErsatz > 0 && soll.lohnKaserne > 0,
+      `leeres Budget: der Bund zahlt trotzdem, wie nachgerechnet: ${JSON.stringify(ist)}`);
+  }
+  // h) Ausgeschaltet (BUND_BAUT = 0): keine Kaserne, keine Dienststelle, niemand dient
+  {
+    const alt = R.BUND_BAUT; R.BUND_BAUT = 0;
+    const S = Sim.neueStadt(2); while (S.tag < 400) Sim.stunde(S);
+    R.BUND_BAUT = alt;
+    let r = 0; for (let p = 0; p < S.pMax; p++) if (S.p.lebt[p] && S.p.bund[p]) r++;
+    pruef(S.bund.kaserne < 0 && S.bund.dienst < 0 && !r && !S.stat.bund.wehrdienst && S.erweiterung.stufe >= R.KASERNE_STUFE,
+      `ohne Bund (BUND_BAUT = 0, Seed 2, 400 Tage, Stufe ${Sim.STUFEN[S.erweiterung.stufe]}): keine Kaserne, keine Dienststelle, niemand dient`);
+  }
+
+  // 4. Speichern und Laden mit Wehr- und Ersatzdienst, verpflichteten Soldaten, offener Dienststelle; beschädigte Stände
+  {
+    const S = Sim.neueStadt(2);
+    bisStunde(S, 400, 13);
+    const da = (S) => { const i = Sim.bundInfo(S); return i.wehr >= 1 && i.ersatz >= 1 && i.verpflichtet >= 1 && i.dienstOffen && i.nachrichtendienst >= 1; };
+    while (!da(S) && S.tag < 700) bisStunde(S, S.tag + 1, 13);
+    const i = Sim.bundInfo(S), text = speichernAlsText(Sim, S), L = ladenAusText(Sim, text);
+    const kanon = (o) => JSON.stringify(o, (k, v) => (v && typeof v === 'object' && !Array.isArray(v) && !ArrayBuffer.isView(v) ? Object.fromEntries(Object.keys(v).sort().map(x => [x, v[x]])) : v));
+    const gleich0 = fingerabdruck(Sim, S) === fingerabdruck(Sim, L) && kanon(S.bund) === kanon(L.bund) && kanon(S.stat.bund) === kanon(L.stat.bund);
+    const z = S.tag + 60; while (S.tag < z) Sim.stunde(S); while (L.tag < z) Sim.stunde(L);
+    pruef(da(ladenAusText(Sim, text)) && gleich0 && fingerabdruck(Sim, S) === fingerabdruck(Sim, L),
+      `Speichern an Tag ${z - 60} mit ${i.wehr} im Wehr-, ${i.ersatz} im Ersatzdienst, ${i.verpflichtet} verpflichteten Soldaten, ${i.nachrichtendienst} im Nachrichtendienst: geladen gleich, 60 Tage später bitgleich (${fingerabdruck(Sim, S)})`);
+    const roh = () => { const d = JSON.parse(text); d.arrays = d.arrays.map(a => { const u8 = Buffer.from(a.b64, 'base64'); return { name: a.name, typ: a.typ, daten: new TYPEN[a.typ](u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength)) }; }); return d; };
+    const T = ladenAusText(Sim, text), feld = (d, n) => d.arrays.find(a => a.name === 'p.' + n).daten;
+    let wohnhaus = -1; for (let b = 0; b < T.gAnzahl && wohnhaus < 0; b++) if (T.g.typ[b] === Sim.WOHNHAUS) wohnhaus = b;
+    let frei = -1, w = -1; for (let p = 0; p < T.pMax; p++) if (T.p.lebt[p]) { if (frei < 0 && !T.p.bund[p] && T.p.arbeit[p] !== T.bund.kaserne) frei = p; if (w < 0 && T.p.bund[p] === Sim.WEHRDIENST) w = p; }
+    const meld = [];
+    for (const [was, kaputt] of [['ohne bund', d => { delete d.json.bund; }], ['ohne stat.bund', d => { delete d.json.stat.bund; }], ['Summe Sold als Text', d => { d.json.stat.bund.sold = 'viel'; }],
+      ['Kaserne zeigt auf ein Wohnhaus', d => { d.json.bund.kaserne = wohnhaus; }], ['Eröffnung nach morgen', d => { d.json.bund.kOffen = T.tag + 5; }],
+      ['Einberufungen im Jahr zu kurz', d => { d.json.bund.jahr = [0]; }], ['Geld vom Bund als Text', d => { d.json.bund.gestern = 'x'; }],
+      ['Start nach heute', d => { d.json.bund.start = T.tag + 1; }], ['Dienststelle offen ohne Dienststelle', d => { d.json.bund.dienst = -1; }],
+      ['Rolle 5', d => { feld(d, 'bund')[frei] = 5; }], ['Wehrdienst ohne Kaserne als Arbeit', d => { feld(d, 'bund')[frei] = Sim.WEHRDIENST; }],
+      ['Wehrdienst und gemeinnützig', d => { feld(d, 'gemein')[w] = 1; }], ['Wehrdienst bis gestern', d => { feld(d, 'dienstBis')[w] = T.tag - 1; }],
+      ['Zivil mit Verpflichtung', d => { let z = -1; for (let p = 0; p < T.pMax && z < 0; p++) if (T.p.lebt[p] && T.p.bund[p] === Sim.ZIVIL) z = p; feld(d, 'dienstBis')[z] = T.tag + 3; }],
+      ['Personenfeld bund fehlt', d => { d.arrays = d.arrays.filter(a => a.name !== 'p.bund'); }], ['Personenfeld dienstBis fehlt', d => { d.arrays = d.arrays.filter(a => a.name !== 'p.dienstBis'); }]]) {
+      const d = roh(); kaputt(d);
+      let e = null; try { Sim.importZustand(d); } catch (x) { e = x; }
+      meld.push(`${was}: ${e ? e.message : 'ANGENOMMEN'}`);
+      if (!e || !/^Spielstand (beschädigt|unvollständig)/.test(e.message)) fehler++;
+    }
+    console.log((meld.every(m => /: Spielstand (beschädigt|unvollständig)/.test(m)) && wohnhaus >= 0 && frei >= 0 && w >= 0 ? '  ok   ' : '  FEHL ') + 'beschädigte Stände abgelehnt: ' + meld.join('; '));
+  }
+
+  // 5. Messung (Seeds wie oben): Einberufungen nach Geschlecht (keine Regel liest es), Besetzung Tag 366–730, Eröffnung
+  {
+    const q = (a) => (100 * a[1] / Math.max(1, a[0] + a[1])).toFixed(1);
+    console.log(`  Messung: Einberufungen ${mess.einb}: Wehrdienst ${mess.wehr[0]} Männer / ${mess.wehr[1]} Frauen (${q(mess.wehr)} % Frauen), Ersatzdienst ${mess.ersatz[0]} / ${mess.ersatz[1]} (${q(mess.ersatz)} % Frauen)`);
+    console.log(`  Messung: Besetzung Tag 366–730 Ø Soldaten ${(mess.tageSoldat / mess.naechte).toFixed(2)} von ${R.STELLEN_SOLDAT}, Zivil ${(mess.tageZivil / mess.naechte).toFixed(2)} von ${R.STELLEN_ZIVIL}, `
+      + `Nachrichtendienst ${(mess.tageDienst / mess.naechte).toFixed(2)} von ${R.STELLEN_DIENST}; Kaserne offen ab Tag ${mess.kOffen.join(', ')}, Dienststelle ab ${mess.dOffen.join(', ')}`);
+  }
+  console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle Prüfungen zum Bund bestanden');
+  process.exit(fehler ? 1 : 0);
+}
+
 if (flag('gate')) {
   const seeds = arg('seeds', '1,2,3').split(',').map(Number);
   let alleOk = true;
@@ -1584,20 +2815,24 @@ if (flag('gate')) {
     const bandFaktor = bandMax / bandMin;
     // „unterhalb der Kartengrenze“: Straßen dürfen bis zur äußersten Rasterlinie im Rand. Hat eine sie erreicht,
     // stößt die Stadt an die Karte. Abstand = Felder zwischen äußerster Straße und dieser Grenze.
-    const G0 = Math.ceil(Sim.RAND / Sim.RASTER) * Sim.RASTER, G1 = Math.floor((Sim.KARTE - 1 - Sim.RAND) / Sim.RASTER) * Sim.RASTER;
-    let x0 = 99, y0 = 99, x1 = -1, y1 = -1;
-    for (let c = 0; c < Sim.KARTE * Sim.KARTE; c++) {
+    // Seit „Stadt erweitern“ (Version 7) wächst die Karte mit (S.karte): Straßen stehen zum Vergleich wie auf der alten Karte 96 × 96
+    // (relativ zur Mitte, + 48), dazu der Abstand zur alten Baugrenze und zur Baugrenze der heutigen Karte (entscheidet das Gate).
+    const K = S.karte, alt = 48 - S.mitte, G = (k) => [Math.ceil(Sim.RAND / Sim.RASTER) * Sim.RASTER, Math.floor((k - 1 - Sim.RAND) / Sim.RASTER) * Sim.RASTER];
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (let c = 0; c < K * K; c++) {
       if (S.feld[c] !== Sim.STRASSE) continue;
-      const x = c % Sim.KARTE, y = (c / Sim.KARTE) | 0;
+      const x = c % K, y = (c / K) | 0;
       x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
     }
+    const [G0, G1] = G(K), [A0, A1] = G(96);
     const grenzAbstand = Math.min(x0 - G0, y0 - G0, G1 - x1, G1 - y1);
+    const altAbstand = Math.min(x0 + alt - A0, y0 + alt - A0, A1 - x1 - alt, A1 - y1 - alt);
     const c730 = charakter(S);
     const g = [
       [k365.einwohner >= 300, `1  Einwohner an Tag 365: ${k365.einwohner} (≥ 300)`],
       [minPop > 0 && schlimmsterEinbruch <= 0.3, `2  Minimum ${minPop}, schlimmster 30-Tage-Einbruch ${(schlimmsterEinbruch * 100).toFixed(1)} % (Tag ${einbruchTag}) (nie 0, ≤ 30 %)`],
       [minBudget >= 0, `3  kleinstes Budget ${f0(minBudget)} (≥ 0)`],
-      [bandFaktor <= 1.15 && grenzAbstand > 0, `4  läuft 730 Tage; Einwohner Tag 551–730 zwischen ${bandMin} und ${bandMax} (Faktor ${bandFaktor.toFixed(2)}, ≤ 1,15); Straßen x ${x0}–${x1}, y ${y0}–${y1}, Abstand zur Baugrenze ${grenzAbstand} (> 0)`],
+      [bandFaktor <= 1.15 && grenzAbstand > 0, `4  läuft 730 Tage; Einwohner Tag 551–730 zwischen ${bandMin} und ${bandMax} (Faktor ${bandFaktor.toFixed(2)}, ≤ 1,15); Straßen wie auf der Karte 96 x ${x0 + alt}–${x1 + alt}, y ${y0 + alt}–${y1 + alt}, Abstand zur alten Baugrenze ${altAbstand}; Karte ${K} × ${K} (${S.erweiterung.wachsen.length}-mal gewachsen), Abstand zur Baugrenze ${grenzAbstand} (> 0)`],
       [c365.grN >= 5, `5  Gründungen durch Bewohner bis Tag 365: ${c365.grN} (≥ 5)`],
       [c365.grE - c365.erwE >= 15, `6  Gründer-Ehrgeiz ${c365.grE.toFixed(1)} vs. alle ${c365.erwE.toFixed(1)}: ${(c365.grE - c365.erwE).toFixed(1)} (≥ +15)`],
       [c365.erwH - c365.wzH >= 15, `7  Wegzieher-Heimatliebe ${c365.wzH.toFixed(1)} vs. alle ${c365.erwH.toFixed(1)}: −${(c365.erwH - c365.wzH).toFixed(1)} (n=${c365.wzN}) (≥ 15 weniger)`],
@@ -1608,7 +2843,7 @@ if (flag('gate')) {
     if (S.stat.tech) {                                        // Tech-Firmen (kein Gate): wie viele, wie groß, was die Leute kaufen
       const t = S.stat.tech, st = [0, 0, 0, 0];
       let erw = 0, mitGeraet = 0;
-      for (let b = 0; b < S.gAnzahl; b++) if (S.g.typ[b] === Sim.TECH && !S.g.leer[b] && S.feld[S.g.y[b] * Sim.KARTE + S.g.x[b]] === Sim.TECH) st[S.g.stufe[b]]++;
+      for (let b = 0; b < S.gAnzahl; b++) if (S.g.typ[b] === Sim.TECH && !S.g.leer[b] && S.feld[S.g.y[b] * S.karte + S.g.x[b]] === Sim.TECH) st[S.g.stufe[b]]++;
       for (let p = 0; p < S.pMax; p++) if (S.p.lebt[p] && S.tag - S.p.geb[p] >= 18 * Sim.R.JAHR) { erw++; if (S.p.geraet[p]) mitGeraet++; }
       const kaeufe = t.kaeufe.reduce((a, b) => a + b, 0);
       console.log(`  Tech: gegründet ${t.gruendungen}, offen an Tag 730 ${st[1] + st[2] + st[3]} (Stufe 2: ${st[2]}, Stufe 3: ${st[3]}), Anteil an den Umland-Stellen ${(S.techPlaetze / Math.max(1, S.werkstattPlaetze) * 100).toFixed(1)} %,`
@@ -1632,6 +2867,20 @@ if (flag('gate')) {
           + ` (${k.fern} ohne Kita-Angebot in der Nähe), ${k.zuhause} unter 3 zu Hause betreut, ${k.gebunden} gebunden; bis Tag 730: ${r.kitaLuecke}-mal Stelle aufgegeben,`
           + ` ${r.kitaOhne} Haushaltsnächte nur mit Besitzern, ${r.kitaFern} ohne Kita-Angebot in der Nähe, Kosten ${Math.round(r.kitaKosten / 730)} Taler am Tag`);
       }
+    }
+    if (S.stat.sicherheit) {                                  // Sicherheit (Version 7, kein Gate)
+      const s = S.stat.sicherheit, i = Sim.sicherheitInfo(S), t = s.taten[1] + s.taten[2] + s.taten[3], a = s.aufgeklaert[1] + s.aufgeklaert[2] + s.aufgeklaert[3];
+      console.log(`  Sicherheit bis Tag 730: ${t} Taten (Diebstahl ${s.taten[1]}, Einbruch ${s.taten[2]}, Betrug ${s.taten[3]}), aufgeklärt ${a} (${(100 * a / Math.max(1, t)).toFixed(0)} %),`
+        + ` ${s.urteile} Urteile (Geldstrafe ${s.geldstrafen}, Ersatzfreiheitsstrafe ${s.ersatz}, Freiheitsstrafe ${s.freiheit}), U-Haft ${s.uHaft}, Haftantritte ${s.haftAntritte}, Widerrufe ${s.widerrufe},`
+        + ` Obhut ${s.obhutFamilie} Familie / ${s.obhutJugendamt} Jugendamt; an Tag 730 in Haft ${i.haft} (Anstalt in der Stadt ${i.hier}, von außerhalb ${i.aussen}), Polizei ${i.polizei}/${i.wacheStellen},`
+        + ` Vollzug ${i.vollzug}/${i.jvaStellen}; Wache ${i.wache >= 0 ? 'ja' : 'nein'}, Anstalt ${i.jva >= 0 ? 'ja' : 'nein'}; vom Land ${Math.round((s.landLohn + s.haftLohn) / 730)} Taler am Tag, Bauten ${s.landBau}`);
+    }
+    if (S.stat.bund) {                                        // Bund (Version 7, Teil 3, kein Gate)
+      const s = S.stat.bund, i = Sim.bundInfo(S), n = s.wehrdienst + s.ersatzdienst;
+      console.log(`  Bund bis Tag 730: Kaserne offen ab Tag ${i.kOffen || '–'}, Dienststelle ab Tag ${i.dOffen || '–'}; ${n} einberufen (Wehrdienst ${s.wehrdienst}, Ersatzdienst ${s.ersatzdienst},`
+        + ` ${Math.round(100 * s.ersatzdienst / Math.max(1, n))} %), ${s.dienstTage} Diensttage, ${s.beendet} beendet, ${s.abgebrochen} abgebrochen; an Tag 730 ${i.soldaten}/${i.stellen.soldat} Soldaten`
+        + ` (${i.verpflichtet} verpflichtet), ${i.zivil}/${i.stellen.zivil} Zivil, ${i.nachrichtendienst}/${i.stellen.dienst} Nachrichtendienst, ${i.wehr} im Wehr-, ${i.ersatz} im Ersatzdienst;`
+        + ` vom Bund ${Math.round((s.lohnKaserne + s.lohnDienst + s.sold + s.soldErsatz) / 730)} Taler am Tag (Sold ${Math.round((s.sold + s.soldErsatz) / 730)}), Bauten ${s.bau}`);
     }
     console.log('  Tag 730:\n' + charakterText(c730));
   }

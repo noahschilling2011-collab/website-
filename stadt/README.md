@@ -2,13 +2,23 @@
 
 Eine Stadt, in der jeder Mensch selbst entscheidet. Projektname vorläufig.
 
-**Stand: Phase 4 plus „richtige Arbeit“, Tech-Firmen und Stadtregierung.** Simulation (Phase 0), 3D-Karte mit Tag und Nacht (1), Speichern
+**Stand: Phase 4 plus „richtige Arbeit“, Tech-Firmen, Stadtregierung und „Stadt erweitern“ Teil 1 bis 3 (Spielstand-Version 7).** Simulation (Phase 0), 3D-Karte mit Tag und Nacht (1), Speichern
 und Aufholen (2), laufende Figuren und Personenkarten (3), Hauptfiguren mit Ollama (4). Danach auf Noahs Wunsch: Bauarbeiter
 vom Bauhof bauen die Häuser, Werkstätten machen Kisten für die Läden, man sieht die Leute bei der Arbeit, und Bewohner gründen
 Tech-Firmen für Software, Handys oder Computer; Hauptfiguren, die dort programmieren, schreiben über Ollama echten Code. Von Anfang
 an regiert die AfD nach ihrem Programm zur Bundestagswahl 2025, soweit es sich auf die Stadt übertragen lässt (Abschnitt
-„Stadtregierung“); in einem zweiten Schritt kamen der Mieterkauf, der flexible Renteneintritt mit Rentner-Freibetrag und Kitas in Wohnraumnähe dazu. Phase 4 ist nur gegen einen nachgebauten Ollama-Server getestet, nicht gegen ein echtes Sprachmodell (siehe
-„Bekannte Schwächen“).
+„Stadtregierung“); in einem zweiten Schritt kamen der Mieterkauf, der flexible Renteneintritt mit Rentner-Freibetrag und Kitas in Wohnraumnähe dazu.
+Seit Version 7 wächst die Karte mit der Stadt: Sie beginnt mit 56 × 56 Feldern und wächst ringsum, bevor eine Straße an den Rand
+kommt, die Landschaft rückt mit. Die Stadt hat eine Stufe (Dorf, Kleinstadt, Stadt, Großstadt) und ab der Kleinstadt Stadtteile
+mit Namen (Abschnitt „Stadt erweitern“). In Teil 2 kamen Kriminalität, Polizei, Gericht und Gefängnis dazu: Erwachsene können
+nachts Diebstahl, Wohnungseinbruch oder Betrug begehen (eine Regel der Stadt, eingestellt auf die Kriminalstatistik 2024); das Land
+baut ab der Kleinstadt eine Polizeiwache und ab der Stadt eine Justizvollzugsanstalt für die Region und zahlt die Löhne (Abschnitt
+„Sicherheit“). In Teil 3 kamen Militär und Nachrichtendienst dazu, als Einrichtungen des Bundes: ab der Stadt eine Kaserne der
+Bundeswehr am Stadtrand mit Soldaten, Zivilbeschäftigten und Wehrpflicht für alle, die 18 werden (Wehr- oder Ersatzdienst), ab der
+Großstadt eine Dienststelle des Bundesnachrichtendienstes, die niemanden in der Stadt überwacht (Abschnitt „Bund“). Danach sind die Befunde
+der Schlussprüfung (Technik, Texte, Bedienung) und der Nachprüfung umgesetzt (Abschnitte „Befunde der Schlussprüfung“ und „Befunde der
+Nachprüfung“). Phase 4 ist nur gegen einen nachgebauten
+Ollama-Server getestet, nicht gegen ein echtes Sprachmodell (siehe „Bekannte Schwächen“).
 
 ## Starten
 
@@ -28,7 +38,7 @@ Schalter in der Adresse (alle optional):
 | `?seed=7` | Seed für eine neue Stadt (sonst zufällig) |
 | `?debug` | Debug-Ecke unten links: fps, Frame-Zeit, Draw Calls, Dreiecke, KI-Aufrufe (gültig in %, Dauer, Fehler) und Knöpfe „Zeit vorspulen“ |
 | `?debug&tage=400` | Neue Stadt vorab 400 Tage rechnen |
-| `?debug&umland=300000&tage=750` | Größere Stadt für den Leistungstest (Seed 2: etwa 6.000 Einwohner). Dieser Stand wird nicht gespeichert |
+| `?debug&umland=300000&tage=750` | Größere Stadt für den Leistungstest (Seed 2: etwa 5.850 Einwohner, Karte 144 × 144). Dieser Stand wird nicht gespeichert |
 
 ## Ollama für die Hauptfiguren (Phase 4)
 
@@ -254,7 +264,10 @@ Zeile „Kein Kita-Platz frei: …“, wenn Eltern deshalb ihre Stelle aufgeben.
 
 **Grenze.** Die Stadt kennt keine Herkunft, keine Staatsangehörigkeit, keinen Aufenthaltsstatus, keine Religion und keine
 Sprache und bekommt sie nicht. Niemand, der in der Stadt lebt, wird danach behandelt, eingestuft oder entfernt; eine Funktion,
-die Leute gegen ihren Willen aus der Stadt nimmt, gibt es nicht. Keine neue Regel liest Namen, den Einzugstag, die Eltern oder
+die Leute gegen ihren Willen aus der Stadt nimmt, gibt es nicht, außer auf Zeit und für alle gleich (seit „Stadt erweitern“ Teil 2):
+Haft in einer Anstalt des Landes außerhalb (solange die Anstalt in der Stadt fehlt oder voll ist) und Kinder, die das Jugendamt in
+einer Pflegefamilie außerhalb unterbringt. Beide bleiben Bewohner, Wohnung und Haushalt bleiben; wegziehen bleibt die eigene
+Entscheidung (wie im Kopftext des Fensters, Befund X3). Keine neue Regel liest Namen, den Einzugstag, die Eltern oder
 das Gedächtnis „eingezogen“, also auch nicht, ob jemand hier geboren oder zugezogen ist. Migration kommt nur als Regel für den
 Zuzug neuer Leute vor (in `zuzug()`, bevor jemand Bewohner ist). Gelesen werden Alter, Haushalt, Partner, Stelle, eigener
 Betrieb, Geld und die Wohnungssuche, seit Schritt 2 auch Wohnung, Wohnen, Hausstufe und Beitragstage; die Kitas lesen Alter,
@@ -994,6 +1007,1335 @@ vor der zweiten Gegenprüfung 994 Einwohner, 24 bis 27 Draw Calls, etwa 49.000 D
 750: 5.928 Einwohner, 24 bis 27 Draw Calls, 140.000 bis 146.000 Dreiecke; vorher 5.986 Einwohner, 134.000 bis 140.000 Dreiecke; vor den
 Kitas 5.694 Einwohner, 24 bis 26 Draw Calls, etwa 124.400 Dreiecke).
 
+## Stadt erweitern (Version 7)
+
+Noahs Auftrag: „Jz machen wir noch das die statd eigen Militär basen hat Waffen und alles kann Geheimdienst und alles wie in Amerika
+so macht und so Gefängnis also kann man die Stadt erweitern“. Auf Rückfrage: Erweitern heißt alles, ausdrücklich „Karte wächst
+wirklich“, dazu Stufen und Stadtteile. Das hier ist Teil 1 von 3: Karte, Stufen, Stadtteile und eine Schnittstelle für große
+Gelände. Kriminalität, Gefängnis, Kaserne und Wehrdienst kommen in Teil 2 und 3. Bis dahin meldet das Stadtbuch nur die Stufe, das
+Wachsen der Karte und die Stadtteile, keine Einrichtung, die es noch nicht gibt.
+
+Alles hier ist eine **Spielregel der Stadt, keine Forderung des Programms**. Keine Stadt hat eigenes Militär oder einen Nachrichtendienst
+als eigene Behörde (große US-Stadtpolizeien haben eigene Aufklärungsabteilungen, Abschnitt „Bund“); das gilt für Teil 2 und 3.
+
+### Die Karte wächst
+
+- **Start 56 × 56 Felder** (bis Version 6 fest 96 × 96). Kommt eine Straße oder ein Gelände näher als **16 Felder** an den erlaubten
+  Rand (2 Felder vor der Kante, `RAND`), also näher als **18 Felder an den Rand der Karte** (so sagen es Fenster und Stadtbuch), bekommt
+  die Karte ringsum **4 Felder** (einen Block) dazu. Das wiederholt sich, bis wieder 16 Felder Platz sind. Mehrere Ringe auf einmal und
+  mehrmaliges Wachsen in einer Nacht (etwa mit Anstalt und Kaserne) ergeben eine Zeile im Stadtbuch. Die größte Karte hat **256 × 256** Felder,
+  denn Gebäude speichern ihre Lage als `Uint8`. Ab dort hält der Rand die Stadt wie früher auf. Die große Stadt (`umland=300000`, Seed 2, 750 Tage) kommt bis 120 × 120.
+- **Stadtbuch** (Art „Bauland“, Symbol Karte): „Im Osten reicht die Stadt bis 15 Felder an den Rand der Karte. Die Stadt weist
+  ringsum neues Bauland aus: Die Karte wächst von 56 × 56 auf 64 × 64 Felder.“ Der Abstand zählt bis zum Rand der Karte. Wächst sie in
+  einer Nacht mehrmals, steht das in derselben Zeile: „Die Stadt reicht in dieser Nacht zweimal nah an den Rand der Karte: zuerst im
+  Norden bis 17 Felder, dann im Osten bis 12 Felder. … Die Karte wächst von 56 × 56 auf 80 × 80 Felder.“ (Seed 2, Tag 197). Die
+  Startzeile nennt die Größe („Die Karte ist 56 × 56 Felder groß und wächst mit der Stadt.“).
+- **Umrechnung** (`karteWachsen`, nach dem Vorbild von `erweiterung/mess/umbau.mjs`): Alle Felder (`feld`, `feldGeb`, `feldStr`,
+  `platz`) wandern in das größere Raster, jede Gebäudelage, Kreuzung und jedes Straßenende rückt um 4 Felder. Die Viertel (12 × 12
+  Felder, fürs Bauamt, Parks und Läden) liegen fest um die Mitte: Eine Viertelgrenze läuft durch die Mitte, weitere je 12 Felder daneben
+  (`S.vo` ist der Versatz). Ihre Listen und Zahlen wandern mit. Personen, Wege und Hauptfiguren hängen an Gebäudenummern, sie
+  ändern sich nicht. Alle Regeln rechnen relativ zur Mitte (`S.mitte`). Deshalb geht die Stadt **Tag für Tag genau so weiter wie
+  mit der festen Karte**, mit denselben Zufallszahlen (gemessen, unten).
+- **Die Grenze hält nichts auf.** Neue Straßen entstehen nach dem Start nur in `strasseVerlaengern` (Regel 2 des Bauamts; die
+  anderen Regeln rufen sie auf). Dort wächst die Karte zuerst, falls nötig (`karteRand`), und reicht danach mindestens 16 Felder
+  über jede Straße hinaus. Eine Verlängerung geht höchstens 4 Felder (ein Block) weiter, Abbiegen und Abzweigen prüfen ein Feld daneben.
+  Also stößt keine Straße an den Rand. Bauplätze liegen neben Straßen, Baustellen und Gründungen auf Bauplätzen, also stoßen auch sie
+  nie an. `karteRand` läuft außerdem nach dem Bauamt, nach jedem Gelände (unten) und am Ende jedes Tages. Gemessen mit einem Zähler, der
+  jede vom Rand verhinderte Verlängerung, Abbiegung oder Abzweigung zählt: 0 auf den Seeds 1–3 (730 Tage), 0 in der großen Stadt
+  (750 Tage), 0 in 60 Tagen nach einem großen Gelände am Rand (`simtest --erweiterung`).
+- **Darstellung.** Weltkoordinate = Feld − Mitte + 0,5: Beim Wachsen bleibt die Stadt, wo sie ist, und die Kamera bewegt sich nicht.
+  Die Landschaft liegt relativ zum Kartenrand. `V = H − 48` (H = halbe Kartengröße) ist der Versatz gegenüber der alten Karte 96. Boden,
+  Wald, Ufer, See (Mitte bei x = −(H + 13), z = −(H − 12)), Felderraster, Landstraßen, Höfe und Umland rücken um V nach außen. Bei H = 48
+  ist alles wie in Version 6. `landschaft()`, `umlandFest()` und `kameraGrenzen()` laufen beim Start und je Wachsen einmal
+  (`karteNeu`), nie je Bild. Grenzen: Blickpunkt höchstens H + 12 von der Mitte, Kamera-Abstand bis 160 + 2V, Nebel 70 + V bis
+  190 + 2V, Sichtweite 600 + 2V, Himmelskuppel 500 + 2V (bei 96 wie vorher 60, 160, 70–190, 600, 500). Auf der Startkarte 56 heißt
+  das: Abstand bis 120, Nebel 50–150. Beim Wachsen werden die Grenzen nur weiter.
+  Neue Meshes gibt es nicht. Das Straßen-Mesh bekommt mehr Platz, wenn die Karte ihn braucht: ein neues `InstancedMesh`, das alte wird
+  mit `dispose()` freigegeben. Verzierungen je Feld (Parkmuster, Büsche, Laternenseite) hängen an der Lage zur Mitte (`feldHash`),
+  sonst sähe ein Park nach dem Wachsen anders aus. Das fiel im eigenen Test auf: Draw Calls 25 → 27 über ein Wachsen hinweg.
+  Three.js 0.186.0 im Quellcode nachgesehen: `BufferGeometry.dispose`, `Texture.dispose`, `InstancedMesh.dispose` (gibt die
+  Instanzpuffer über `WebGLObjects` frei), `Object3D.remove`, `Vector3.setScalar`, `PerspectiveCamera.far` mit
+  `updateProjectionMatrix` (behält `setViewOffset`), `Fog.near`/`far`, `OrbitControls.maxDistance`/`maxTargetRadius`.
+
+### Stufen
+
+| Stufe | ab Einwohnern | BBSR (Deutschland) | geteilt durch 125 |
+|---|---|---|---|
+| Dorf | 0 | Landgemeinde: unter 5.000 | – |
+| Kleinstadt | 40 | Kleinstadt: 5.000 bis unter 20.000 | 40 |
+| Stadt | 160 | Mittelstadt: 20.000 bis unter 100.000 | 160 |
+| Großstadt | 800 | Großstadt: 100.000 und mehr | 800 |
+
+Quelle der Schwellen: BBSR, „Stadt- und Gemeindetypen in Deutschland“
+(https://www.bbsr.bund.de/BBSR/DE/forschung/raumbeobachtung/Raumabgrenzungen/deutschland/gemeinden/StadtGemeindetyp/StadtGemeindetyp.html,
+abgerufen im September 2026). Maßgeblich sind dort die Einwohnerzahl **und** die zentralörtliche Funktion: „Gemeinden mit oberzentraler
+Funktion werden bereits ab 9.000 Einwohnern als Mittelstadt eingeordnet.“ Als Stadt gilt eine Gemeinde auch unter 5.000 Einwohnern,
+wenn sie mindestens eine grundzentrale Funktion erfüllt (Wortlaut der Seite beim Abruf am 26.09.2026 nachgelesen).
+Die Stadt nimmt nur die Einwohnerzahl (alle Menschen, auch Kinder) und nennt die Mittelstadt kurz „Stadt“.
+
+- **Maßstab 125:** Die Städte haben an Tag 730 im Mittel 1.110 Einwohner (Seeds 1–80). Mit 125 erreichen alle drei Stufen ihren
+  Aufstieg innerhalb von 400 Tagen, und jeder Aufstieg ist ein eigener Moment im Spiel (Seeds 1–80: Kleinstadt an Tag 53–113, Stadt
+  139–222, Großstadt 294–385). Das ist ein Spielmaßstab, keine Aussage über echte Größen.
+- **Kein Abstieg:** Eine erreichte Stufe bleibt. Die Einwohnerzahl schwankt um bis zu 15 % (Gate 4), und Einrichtungen aus Teil 2
+  und 3 sollen nicht verschwinden und wiederkommen.
+- **Stadtbuch** (Art „Stufe“): „Die Stadt hat jetzt 40 Einwohner und ist eine Kleinstadt. Als Kleinstädte zählt das BBSR in
+  Deutschland Gemeinden mit 5.000 bis unter 20.000 Einwohnern; die Stadt zählt jeden Menschen hier für 125. Neu: Stadtteile mit
+  Namen.“ „Neu:“ nennt nur, was der Code auf dieser Stufe wirklich freischaltet (`STUFE_NEU`). Heute ist das bei der Kleinstadt
+  „Stadtteile mit Namen“, bei Stadt und Großstadt nichts. Teil 2 und 3 tragen ihre Einrichtungen selbst dort ein (seit Teil 3: Kleinstadt
+  dazu die Polizeiwache, Stadt die Justizvollzugsanstalt und die Kaserne mit Wehrpflicht, Großstadt die Dienststelle). Die Reihenfolge
+  wird dann als Spielregel begründet (Größe der Einrichtung zur Stadt, Zeitpunkt), nicht mit Realismus.
+- **Anzeige:** In den Zahlen oben links steht die Zeile „Stufe“. Ihr Hinweis nennt die nächste Schwelle („Stadt ab 160 Einwohnern
+  (die Stadt zählt jeden Menschen für 125)“). Die Zahlen werden dadurch eine Zeile höher (400 × 820: Unterkante 231 statt 211 px).
+  Am Handy quer (bis 500 px hoch) fehlt dafür der Platz. Dort gibt es keine eigene Zeile, und die Stufe steht nur für Screenreader hinter
+  „Einwohner“. Sichtbar machte sie die Zahlen 10 px breiter, und daneben liegen Karten und die Stadtbuch-Liste. Die Zahlen sind dort so
+  hoch und breit wie in Version 6 (`tests/kennzahlen_hoehe.cjs`: 156, 156, 157, 158 und 216 px bei 568 × 320 bis 926 × 428).
+
+### Stadtteile
+
+- **Nur aus der Lage.** Ringe aus Vierteln um die Mitte (je 12 Felder breit) mal vier Himmelsrichtungen (NW, NO, SW, SO). Ring 0 sind
+  die vier Viertel an der Mitte. Die Grenzen liegen auf Viertelgrenzen, also auf Rasterlinien, wo nie ein Gebäude steht. Bis zu 44
+  Stadtteile auf der größten Karte, dafür 44 Namen aus einer festen Liste von Orts- und Flurnamen (Altstadt, Marktviertel,
+  Lindenhof, Birkenfeld, Mühlenviertel, Eichholz, Rosenau, Wiesengrund, Buchenried …). Sie werden in der Reihenfolge des ersten
+  Gebäudes vergeben.
+- **Ab der Kleinstadt.** Beim Aufstieg bekommen alle bebauten Stadtteile ihren Namen („Die Stadt hat jetzt Stadtteile: Altstadt (im
+  Nordwesten), Marktviertel (im Nordosten), Lindenhof (im Südwesten) und Birkenfeld (im Südosten). Ihre Grenzen laufen an Straßen
+  entlang; ein neuer Stadtteil bekommt seinen Namen mit dem ersten Gebäude.“). Danach bekommt jeder neue seinen Namen mit dem ersten Gebäude,
+  ohne Personennamen: „Ein neuer Stadtteil entsteht im Nordosten: Mühlenviertel. Das erste Gebäude dort: ein Wohnhaus an der
+  Hauptstraße.“
+- **Zu sehen:** Hauskarte (über dem Titel), Personenkarte („… an der Hauptstraße · Altstadt“), Fenster „Stadtregierung“ (Live-Zeile)
+  und die Karte. Die Namen stehen dort nur weit herausgezoomt: ab Kameraabstand 35, mit derselben Grenze und demselben Spielraum wie
+  die Straßennamen. Sie erscheinen erst, wenn kein Straßenname mehr zu sehen ist oder ausblendet, **also nie beide zugleich**. Je
+  Stadtteil steht der Name über der Mitte seiner Gebäude, höchstens 12, nicht unter Panels und nicht übereinander. Es sind feste
+  Schilder in der Ebene der Straßennamen, die nur mit den Straßennamen neu gesetzt werden (Kamera bewegt, stündlich). Das kostet
+  keine Draw Calls und keine Allokation je Bild. Bei reduzierter Bewegung erscheinen sie ohne Übergang.
+- **Harte Grenze.** Stadtteile kennen nur ihre Lage. `stadtteilZaehlen` zählt je Stadtteil Einwohner (nach Wohnung), Wohnhäuser,
+  Wohnungen, Betriebe und Parks. Keine Taten, keine Herkunft, keine Namen, keine Rangliste, keine Einstufung, und keine Regel wählt
+  Personen nach ihrem Stadtteil aus. `simtest --erweiterung` prüft das statisch. Der ganze Abschnitt liest von Personen nur `lebt` und
+  `wohnung` (auch in der Form `S.p.…`), hat keinen Zufall und liest keine Namen. `teilVon`/`teilName` stehen außerhalb nur beim Benennen
+  (`neuesGebaeude`) und in den Karten (`personInfo`, `gebaeudeInfo`).
+
+### Schnittstelle für Teil 2 und 3: Gelände aus mehreren Blöcken
+
+- `gelaendeSuchen(S, bw, bh, amRand)`: ein freies Rechteck aus bw × bh Blöcken (4·bw − 1 × 4·bh − 1 Felder, die Rasterlinien dazwischen
+  gehören dazu). Alle Felder sind leer (Bauplätze darf es überdecken), und an einer Seite liegt eine Straße. Das Tor ist das Feld an der
+  Straße, das der Mitte dieser Seite am nächsten liegt; die Seite zur Stadtmitte geht vor. Mit `amRand` nimmt es das Rechteck, dessen
+  Mitte am weitesten von der Stadtmitte liegt, sonst das nächste. Liest nur. Findet es nichts, kommt `null`. Das passiert, wenn an keiner
+  Straße ein ganzer freier Block liegt (Seed 2, Tag 300, 1 × 1). Der Aufrufer wartet dann, bis das Bauamt eine Straße verlängert.
+  Im Test dauerte das 10 Tage (er wartet höchstens 60).
+- **Ein Block** (Wache, Dienststelle; Befund B1 der Schlussprüfung): Endet eine Straße an der Rasterlinie zwischen zwei freien Blöcken
+  (sie liefe auf dieser Linie weiter), liegt an keinem der beiden eine Straße, und `gelaendeSuchen(S, 1, 1, …)` fand vorher nichts,
+  während größere Gelände genau dort Platz fanden. Jetzt sucht es dann im Rahmen von zwei Blöcken (`gelaendeRechteck(S, 2, 1)` bzw.
+  `(1, 2)`); das Tor liegt auf der Rasterlinie an der Straßenspitze, belegt werden nur 3 × 3 Felder um das Tor (die Linie und je eine
+  Reihe der beiden Blöcke daneben). Findet die Suche einen ganzen Block an einer Straße, bleibt alles wie vorher (Seed 2 Tag für Tag
+  gleich). Nach einer Übernahme kann die Wache so eine Stelle nehmen, die sonst Anstalt oder Kaserne bekämen; dann wartet die Kaserne
+  (Annahme 78, „Bekannte Schwächen“).
+- `gelaendeBauen(S, r, typ, arbeit, besitzer)`: Das Gebäude kommt aufs Tor (Baustelle mit `arbeit` Arbeitstagen, `neuesGebaeude`). Die
+  übrigen Felder werden belegt (`feld = typ`, `feldGeb = Gebäude`): Straßen wachsen nicht hinein, Bauamt und Gründer finden dort
+  keinen Bauplatz. Danach wächst die Karte, falls das Gelände dem Rand zu nahe kommt. Weil die Karte immer 16 Felder über die
+  äußerste Straße reicht, passen Gelände bis 4 Blöcke tief auch vor der äußersten Straße.
+- Gespeichert in `S.erweiterung.gelaende` ([x0, y0, x1, y1, Gebäude]). `STUFE_NEU` nimmt die Einrichtungen je Stufe auf,
+  `erweiterungInfo` gibt alles für Karten und Fenster.
+- Getestet: ein Park als Gelände 3 × 2 Blöcke am Rand (Seed 2, Tag 310, 77 Felder, Tor zur Straße im Westen). Die Karte wächst
+  dafür von 104 auf 128. Danach 60 Tage ohne Grenzstopp, Speichern und Laden bitgleich. Dazu 1 × 1 nah an der Mitte.
+
+### Fenster „Stadtregierung“
+
+Neue Gruppe „Stadt erweitern (Spielregel, nicht aus dem Programm)“ mit der Karte „Die Stadt wächst: Bauland, Stufen, Stadtteile“
+im Stil der anderen: Status „Spielregel“, kein Zitat, „In der Stadt“, „Annahme“, Live-Zeile („Heute eine Stadt mit 620 Einwohnern,
+Großstadt ab 800. Erreicht: …, Karte 104 × 104 Felder, 1-mal gewachsen …“). Aufklappbar: Stadtteile, Wirklichkeit, Rand. Wirklichkeit:
+In Deutschland weist eine Gemeinde neues Bauland mit einem Bebauungsplan aus, den sie als Satzung beschließt (§ 10 Abs. 1 BauGB,
+„Die Gemeinde beschließt den Bebauungsplan als Satzung.“, nachgelesen auf dejure.org/gesetze/BauGB/10.html; gesetze-im-internet.de
+war beim Abruf nicht erreichbar). Die Karte zeigt, wo gebaut werden darf, nicht die Grenze der Gemeinde; wie weit deren Gebiet reicht,
+rechnet die Stadt nicht. Dass die Karte ringsum wächst, auch wo die Stadt nicht an den Rand kommt, ist eine Vereinfachung. Eine
+Aussage darüber, ob ein Bebauungsplan das Gemeindegebiet ändert, steht bewusst nicht im Fenster (nicht nachgeprüft).
+
+Nicht übernommen, neu oder mit neuem Grund (alle Zitate mit `zitatpruef.py` und `zitate_genau.py` geprüft):
+
+- S. 122, zwei Sätze: „Nicht nur in deutschen Großstädten sind mittlerweile muslimisch geprägte Stadtteile mit entsprechenden
+  Parallelgesellschaften entstanden […]“ und „Es sind weiter die erforderlichen Mittel bereitzustellen und Maßnahmen (wie z. B. Razzien
+  und Kontrollstellen) durchzuführen, damit der Rechtsstaat in den sogenannten No-go-Areas wieder durchgesetzt werden kann.“ Grund: Das
+  Programm beschreibt diese Stadtteile über die Religion ihrer Bewohner (harte Grenze). Die Stadtteile der Stadt entstehen nur aus der
+  Lage. Es gibt keine Razzien und keine Kontrollstellen nach Stadtteilen und keine Liste von Stadtteilen nach Taten oder Bewohnern.
+  (Die kürzere Fassung des zweiten Satzes stand schon in Version 6 in der Liste; ihr Grund „die Stadt hat zudem keine Polizei“ ist
+  entfallen, weil Teil 2 eine Polizei bringen kann.)
+- S. 109: „Angesichts der massiven Entfremdung in unseren Städten und gewachsenen Parallelgesellschaften muss die Integrationsfähigkeit
+  unseres Landes erst wiederhergestellt werden.“ Grund: setzt Herkunft voraus.
+- S. 111 („Gegengesellschaften von über 25 % Nicht-EU-Migranten“): Grund ergänzt, die Stadtteile kennen nur ihre Lage.
+- S. 39, zwei Sätze zum Bauen im Außenbereich (neu in der Gruppe „Kein Gegenstück“): Die Stadt baut nur an ihren Straßen und kennt
+  keine Baugenehmigungen.
+- S. 74, der ganze Satz: „Flankierend dazu stellen wir uns gegen die Abnahme der landwirtschaftlichen Nutzfläche und werden
+  außerlandwirtschaftlichen Investoren den Zugang zum Bodenmarkt erschweren.“ Die Stadt wächst auf Felder, das widerspricht der
+  Richtung des Satzes. Die Felder sind aber nur Landschaft, und das Programm nennt für Gemeinden kein Mittel.
+- S. 36 („Wir werden den Wohnungsbau von diesen Fesseln befreien …“): Grund ergänzt. Gemeint sind Vorschriften, nicht Bauland.
+- Gilt schon, S. 171 (Umbenennung von Straßen): „Die Stadt reißt nichts ab und benennt keine Straßen und keine Stadtteile um.“
+
+### Gemessen
+
+Seeds 1–3 (`simtest --gate`, 730 Tage stündlich): Alle Kennzahlen und Gates sind **zahlengleich mit bc7247a**. Nur die
+Stadtbuch-Zeilen je Tag steigen durch die neuen Zeilen: 4,26 / 4,35 / 4,80 statt 4,25 / 4,33 / 4,78. `--erweiterung` vergleicht
+jeden Tag mit der alten Fassung: Kennzahlen, Zufallszustand, Felder und Gebäude relativ zur Mitte, alle Personenfelder, alle
+Gebäudefelder außer der Lage, Statistik, Hauptfiguren und Stadtregierung. Gleich an allen 730 Tagen.
+
+| Seed | Einwohner Tag 730 | Karte | gewachsen an Tag | Kleinstadt / Stadt / Großstadt an Tag | Stadtteile | Abstand zur Baugrenze (auf der alten Karte 96) |
+|---|---|---|---|---|---|---|
+| 1 | 1.065 | 56 → 80 (3-mal) | 168, 204, 309 | 78 / 173 / 325 | 8 | 16 (24) |
+| 2 (Teststadt) | 1.122 | 56 → 104 (6-mal) | 108, 128, 168, 211, 235, 251 | 72 / 166 / 327 | 9 | 16 (12) |
+| 3 | 1.082 | 56 → 80 (3-mal) | 98, 131, 221 | 64 / 161 / 311 | 8 | 16 (24) |
+| 2, `umland=300000`, 750 Tage | 5.920 | 56 → 120 (8-mal) | 108, 128, 168, 211, 235, 572, 645, 688 | Großstadt | 16 | nicht gemessen, Grenzstopp 0 |
+
+Seeds 1–80 (730 Tage stündlich, `mess/mess7.mjs` über `mess/lauf80.sh`, Vergleich `mess/vergleich80.py` gegen dieselbe Messung auf
+bc7247a): **0 Abweichungen** in allen Kennzahlen außer den neuen Feldern und den Stadtbuch-Zeilen. Gates bestehen auf **77 von 80**
+(bc7247a: 77 von 80), Gate 4 fällt auf denselben Seeds 11, 23 und 45 wegen des Bandes (Faktor über 1,15). Band im Mittel 1,077, Median
+1,073, schlimmster 1,155, wie vorher. Die Karte wächst 1- bis 6-mal (Median 3) auf 64 bis 104 Felder (Median 80; 38 Städte bei 80,
+27 bei 72). Der kleinste Abstand zum Rand ist 16 Felder, auf der alten Karte 96 wären es mindestens 12. Stadtteile 4 bis 11
+(Median 8). Stufen: Kleinstadt an Tag 53–113 (Median 67), Stadt an Tag 139–222 (168), Großstadt an Tag 294–385 (327), alle 80
+Städte erreichen alle drei. Stadtbuch: im Mittel 4,468 statt 4,454 Zeilen am Tag (höchstens +0,03 je Stadt, schlimmste Stadt
+6,18 statt 6,17). Spielstand an Tag 150 (Seed 1): 0,15 MB statt 0,21 MB, weil die Karte dort erst 56 × 56 groß ist.
+
+**Wahl von Start, Ring und Vorlauf** (`mess/ausdehnung.mjs`, `mess/wahl.py`): Die Straßen der Städte reichen bis Tag 730 von der Mitte
+aus 12 bis 40 Felder weit (Entwurf); eine Karte, die erst am alten Rand 96 wächst, würde fast nie wachsen. Gerechnet über die
+Ausdehnung je Tag auf den Seeds 1–80 und der großen Stadt. Start 56 ist die kleinste Größe in Achterschritten, in der die Startstraße
+(8 Felder zu jeder Seite der Mitte) mit 16 Feldern Vorlauf und 2 Feldern Rand Platz hat; bei 48 müsste die Karte schon beim Start
+wachsen. Ring 4 ist ein Block, so wächst die Karte in kleinen Schritten und oft. Vorlauf 16 ist mehr als eine Verlängerung (4) plus ein
+Feld und lässt Platz für Gelände bis 4 Blöcke tief. Damit wächst die Karte auf den Seeds 1–3 3-, 6- und 3-mal und in der großen Stadt
+auf 120.
+
+### Speicherformat 7
+
+Neu: `S.karte` (Kartengröße, Vielfaches von 8, 24 bis 256), `S.mitte`, `S.vn`, `S.vo` (Maße der Viertel) und `S.erweiterung` mit
+`stufe`, `stufenTage` (Tag je erreichter Stufe), `ausdehnung` ([x0, x1, y0, y1] aller Straßen und Gelände), `teile` ([Stadtteil, Tag]
+in der Reihenfolge der Namen), `gelaende` und `wachsen` ([Tag, neue Größe]). Die Felder sind so lang wie die Karte. Alles ist Pflicht
+und wird beim Laden nach `jsonPruefen` in `erweiterungPruefen` geprüft, für jeden Stand, auch nach einer Übernahme:
+Kartengröße falsch → „Spielstand beschädigt: Kartengröße“, Maße → „… Kartenmaße“, Längen der Felder oder Viertel → „… Karte (feld)“
+bzw. „… Viertel (…)“, Kreuzungen und Straßenenden außerhalb → „… Kreuzungen“/„… Straßenenden“, alles in `S.erweiterung` (Stufe
+0–3, so viele Tage wie Stufen, aufsteigend, nicht nach heute; Ausdehnung in der Karte; Stadtteile erst ab der Kleinstadt, jeder
+höchstens einmal, höchstens 44; Gelände in der Karte mit gültigem Gebäude; Wachsen nicht größer als die Karte) → „… Stadt
+erweitern“. Seit der Schlussprüfung (Befund T1) dazu die Lage jedes Gebäudes (auf der Karte, das Feld zeigt auf das Gebäude → „… Lage
+der Gebäude“) und jedes Gelände (Gebäude im Rechteck, jedes Feld zeigt auf das Gebäude und trägt seinen Typ oder ist Baustelle →
+„… Gelände“). `simtest --erweiterung` prüft 15 beschädigte Stände.
+
+**Übernahme.** Ein Stand der Version 6 zeigt den Versionsdialog: „Dein Spielstand ist von Version 6. Seit Version 7 wächst die Karte
+mit der Stadt: Kommt die Stadt an ihren Rand, weist sie neues Bauland aus. Die Stadt hat eine Stufe (Dorf, Kleinstadt, Stadt,
+Großstadt) und ab der Kleinstadt Stadtteile mit Namen.“ „Stadt übernehmen“ behält alles. Die Karte bleibt 96 × 96 (wächst gleich,
+wenn eine Straße näher als 16 Felder am erlaubten Rand liegt), die Ausdehnung kommt aus den Straßen, die Stufe aus den heutigen Einwohnern
+(ohne Zeilen für übersprungene Stufen), die Stadtteile bekommen ab der Kleinstadt ihre Namen in der Reihenfolge ihres ersten Gebäudes.
+Im Stadtbuch steht „Ab heute zählt die Stadt ihre Größe: 620 Einwohner, sie ist eine Stadt. Ihre Stadtteile heißen … Die Karte ist
+von 96 × 96 auf 104 × 104 Felder gewachsen und wächst weiter, wenn die Stadt näher als 18 Felder an ihren Rand kommt.“ (bis zur
+Schlussprüfung stand hier 16, gemeint war der erlaubte Rand; jetzt zählt die Zeile wie Fenster und Stadtbuch bis zum Rand der Karte). Danach läuft
+die Stadt genau so weiter wie in Version 6, solange dort keine Straße am alten Rand endete (gemessen: Seeds 1/Tag 15, 1/150, 2/300,
+3/400, je 60 Tage Tag für Tag gleich). Versionen 2 bis 5 laufen über die Kette (`MIGRIERBAR = [2, 3, 4, 5, 6]`) und bekommen einen
+Satz dazu („Seit Version 7 wächst die Karte …“). `--speichertest` läuft bitgleich; **Fingerabdruck `d918da4702073bbb`** (Seed 1,
+gespeichert an Tag 150 um 13 Uhr, 60 Tage weiter; vorher `a23e00a5306658b3`). Er ist neu, weil der Fingerabdruck jetzt auch Kartengröße,
+Stadt erweitern, Straßenenden und Kreuzungen enthält; die Stadt selbst läuft gleich. `--erweiterung` speichert an Tag 107 um 13 Uhr (Karte 56), lädt und
+rechnet weiter: Beide wachsen an denselben Tagen (108 auf 64, 128 auf 72) und sind 30 Tage später bitgleich.
+Teststand für `tests/t1_xss.cjs`: `tests/basis_v7.json` (aus `tests/basis_v6.json` über „Stadt übernehmen“, Tag 420, 2.186
+Einwohner, Karte 96, Großstadt; `tests/basis_v7.cjs`), `tests/hilfe.cjs` zeigt darauf; das Original bleibt.
+
+### Tests
+
+- `simtest --erweiterung` (neu): statische Prüfung des Abschnitts (oben). Seeds 1–3 je 730 Tage gegen die alte Fassung, Tag für Tag
+  gleich (wie oben unter „Gemessen“). Grenzstopp-Zähler 0. Vorlauf jeden Tag mindestens 16 Felder, Ausdehnung = Straßen, Maße stimmen. Wachsen mit Tag und Größe und
+  je Nacht eine Zeile (Größe vor dem ersten und nach dem letzten Wachsen der Nacht, Abstand unter 18; seit der Schlussprüfung). Stufe jeden Tag richtig **und genau am ersten Tag über der Schwelle** (Befund 14). Stadtteile jeden Tag richtig benannt,
+  Zähler gegen eine eigene Zählung, Karten. Stadtbuch ohne Personennamen, keine Stadtteilzeile vor der Kleinstadt. Speichern und Laden
+  über ein Wachsen hinweg bitgleich. 15 beschädigte Stände abgelehnt (seit der Schlussprüfung auch Gebäude außerhalb der Karte und
+  falsche Gelände-Felder). Seed 2 wächst an Tag 197 zweimal: eine Zeile. Übernahme von Version 6 an vier Ständen, darunter einer unter 40
+  Einwohnern („ein Dorf“, Befund 7), je 60 Tage gleich wie Version 6. Gelände 3 × 2 am Rand und 1 × 1 an der Mitte. Mit `--gross`
+  die große Stadt.
+- `simtest --migrationstest --git /home/user/website-`: Versionen 2–6 (bc7247a als Version 6), 60 Tage weiter, Zeilen, Stufe, Karte.
+- Browser: `tests/erweiterung.cjs` (neu, in `tests/alle.sh`), normal und mit reduzierter Bewegung. Teststadt bis Tag 108, 23 Uhr, dann
+  das Wachsen in der Nacht (56 → 64): Kamera, Blickpunkt und Gebäude bleiben, See, Boden und Grenzen rücken nach außen, Objekte in der
+  Szene gleich, Draw Calls nicht mehr. Dazu die Stadtbuch-Zeile, die Zeile „Stufe“ mit Hinweis, der Stadtteil in Haus- und
+  Personenkarte, Namen nah (Straßen) und fern (Stadtteile), nie beide zugleich. Wachsen mitten am Tag: jede Instanz jedes Meshes
+  gleich. Konsole leer. `tests/p6migration.cjs` hat einen neuen Fall Version 6 → 7 (bc7247a per Route aus `afd/stadt_v6.html`,
+  Version 5 jetzt aus `afd/stadt_v5.html`). `tests/befunde_s2.cjs` prüft den Versionsdialog am Handy jetzt für Version 5 (per Route) und 6
+  und zählt vier aufklappbare Karten im Fenster statt drei (neu: „Die Stadt wächst“). `tests/pruef_v5.cjs` erzeugt den Stand der
+  Version 5 per Route aus `afd/stadt_v5.html`, erwartet nach der Übernahme Version 7 und prüft dazu Karte, Stufe und Stadtteile.
+  `tests/p8tech.cjs`, `tests/raute_klick.cjs` und `tests/otest/h.cjs` rechnen Weltkoordinaten mit der Mitte der Stadt statt mit 47,5.
+  Keine Prüfung ist schwächer geworden.
+- **Ergebnis** auf dem Endstand (Server auf 8713, `tests/alle.sh`, KI-Nachbau auf 11434): p3test 12, p5neu 10, p6migration 24 (vorher
+  18), p7figuren 6, p8tech 14, raute_klick 10 von 10 Klicks, ereignis 21, t1_xss 5, p4test 25, s2karten 22, kita 22, befunde_s2 27
+  (vorher 22), erweiterung 20 (je 10 normal und mit reduzierter Bewegung), alle ohne Fehler. `tests/otest`: befunde 21, handy 11, breit 12,
+  tastatur 4, breiten 20, hilfehoehe ohne Überlauf (Hilfe bei 1280 × 800 745 von 745 px), alle ohne Fehler. Konsole leer, außer den
+  absichtlichen Verbindungsfehlern zum KI-Nachbau in p4test und den abgebrochenen KI-Anfragen in `blick.cjs`. Dazu `tests/pruef_v5.cjs`
+  17 ohne Fehler und `tests/kennzahlen_hoehe.cjs` (oben). Alle `simtest`-Modi auf dem Endstand ohne Fehler: `--gate` (Seeds 1–3 alle
+  Gates), `--speichertest`, `--aufholtest` (Werte wie bc7247a), `--kitest` 45, `--bau` 15, `--waren` 15, `--tech` 16, `--regierung` 155,
+  `--kita` 40, `--migrationstest --git /home/user/website-` 251, `--erweiterung --gross` 33 Prüfungen. Zitate: 133 im Fenster,
+  `zitatpruef.py` 133 gefunden, `zitate_genau.py` 133 auf der genannten Seite, 0 Fehler.
+- **Bilder** (`tests/blick.cjs`, Endstand, selbst angesehen): `nachher/` (Teststadt Seed 2, Tag 400: 935 Einwohner, Großstadt, Karte
+  104 × 104, 25 bis 28 Draw Calls, 44.400 bis 45.500 Dreiecke; bc7247a: 25 bis 28, 44.400 bis 45.400). Herausgezoomt stehen die
+  Stadtteile (Altstadt, Birkenfeld, Rosenau, Mühlenviertel, Wiesengrund), nah nur Straßennamen. `gross/` (`&umland=300000`, Seed 2, Tag
+  750: 5.928 Einwohner, Karte 120 × 120, 24 bis 27 Draw Calls, 140.000 bis 146.600 Dreiecke; bc7247a: 24 bis 27, 140.000 bis 146.000).
+  Der See liegt links hinten, Wald, Felder und Landstraßen reichen bis in den Nebel. Neue Draw Calls: keine.
+
+### Befunde der Gegenprüfung „erweiterung“
+
+Befund 1 (Karte bleibt 96) ist durch Noahs Entscheidung „Karte wächst wirklich“ ersetzt. Umgesetzt:
+
+2. S. 122 (beide Sätze) und S. 109 mit Zitat unter „Nicht übernommen“. Keine Kriminalitätszahlen, Razzien, Kontrollstellen oder
+   Auswahl je Stadtteil. Statischer Test, dass Stadtteile außerhalb nur benannt und angezeigt werden.
+3. Nichts dem Programm zugeschrieben. Die einzige Rechtsaussage (§ 10 Abs. 1 BauGB) ist nachgelesen, die Stufen haben die
+   BBSR-Quelle. Zuständigkeiten für Polizei, Justizvollzug, Bundeswehr und Nachrichtendienste kommen erst mit Teil 2 und 3 ins Fenster;
+   dort gilt der Befund weiter.
+4. Die USA-Hinweise gehören zu Teil 2 und 3 (Polizei, Jails, Nachrichtendienst). In Teil 1 steht kein Satz dazu.
+5. Die Grenze gilt für jede Straße, nicht nur für Regel 2. `karteRand` läuft vor jeder Verlängerung, nach dem Bauamt, nach jedem
+   Gelände und am Tagesende. Geprüft über den Zähler und nach einem Gelände.
+6. „Neu:“ nennt nur, was wirklich kommt (`STUFE_NEU`, heute nur „Stadtteile mit Namen“).
+7. Artikel je Stufe (`STUFE_MIT`: „ein Dorf“ … „eine Großstadt“), getestet mit einem Stand unter 40 Einwohnern.
+8. Die Stadtteilnamen rechnen mit der aktuellen Kameramatrix (`camera.updateMatrixWorld()` am Anfang von `strassenNamen`, das sie setzt).
+9. Nie beide zugleich: Die Stadtteile hängen an `namenAn` (dieselbe Grenze und derselbe Spielraum) und warten, bis kein Straßenname
+   mehr ausblendet. Im Browser gemessen: 0-mal beide zugleich.
+10. „Die Stadt weist neues Bauland aus“ statt Stadtgebiet oder Stadtgrenze; Hinweis auf den Bebauungsplan (§ 10 BauGB).
+11. Keine Realismus-Begründung für eine Reihenfolge von Einrichtungen. Die Stufen sind als Spielmaßstab begründet. Die JVA-Aussage des
+    Entwurfs ist nicht übernommen.
+12. S. 74 mit dem ganzen Satz. Der Teil zu S. 138 gehört zu Teil 3.
+13. Keine Reste des Prototyps (kein `GEBIET_MODUS`, kein Zähler `gebietStopp` im Produktcode; der Zähler steckt nur im Test).
+    README-Abschnitt und Fenster sind da.
+14. Der Test ist schärfer: Aufstieg genau am ersten Tag über der Schwelle, statischer Test auch für `S.p.…`, Stadtbuch-Zeile ohne
+    Personennamen.
+
+Eigene Befunde beim Bauen und Prüfen, alle behoben:
+
+- In `neueStadt` hieß die Mitte `M`. Damit war die Liste der Gedächtnis-Arten (`M.EINGEZOGEN`) verdeckt, und die zehn ersten Bewohner
+  hatten kein „eingezogen“ im Gedächtnis. Die Kennzahlen merkten das nicht, der Tagesvergleich damals auch nicht. Er vergleicht jetzt
+  zusätzlich alle Personenfelder, alle Gebäudefelder außer der Lage, Statistik, Hauptfiguren und Stadtregierung. Mit dem alten Fehler
+  schlägt er an Tag 1 an, nach der Korrektur ist er auf den Seeds 1–3 an allen 730 Tagen gleich.
+- Die Zeile „Stufe“ sollte am Handy quer fehlen. `#kennzahlen dl div` gewann aber gegen `#k-stufe-zeile`, und die Zahlen reichten
+  bei 568 × 320 7 px in die Spalte darunter (`tests/kennzahlen_hoehe.cjs`: 172 statt 156 px). Jetzt steht der Selektor genauer da.
+- Die Hilfe war bei 1280 × 800 mit den neuen Sätzen 25 px zu hoch und musste scrollen (`tests/otest/befunde.cjs`). Die Sätze sind
+  jetzt kürzer: „Straßennamen nah, Stadtteile weit herausgezoomt.“ und „Wächst die Karte, rückt die Landschaft mit.“ Die Hilfe ist
+  wieder genau so hoch wie in Version 6 (745 px).
+- Parks, Büsche und Laternen richteten sich nach der Lage auf der Karte. Nach dem Wachsen sah ein Park anders aus (Draw Calls 25 → 27).
+  Jetzt hängen sie an der Lage zur Mitte (`feldHash`).
+- Die Browser-Tests `p8tech`, `raute_klick` und `otest/h.cjs` rechneten Weltkoordinaten mit der festen Mitte 47,5. Jetzt nehmen sie die
+  Mitte der Stadt (`S.mitte`). Vorher fand `p8tech` keine Programmierer am richtigen Ort.
+
+## Sicherheit: Kriminalität, Polizei, Gericht, Gefängnis (Version 7, Teil 2)
+
+Teil 2 von „Stadt erweitern“. Noahs Entscheidungen: **Kriminalität ist eine Regel der Stadt**, keine Aussage des Programms; die
+**Justizvollzugsanstalt ist eine Anstalt für die Region**: Sie hat mehr Plätze, als die Stadt braucht, die übrigen belegt das Land
+mit Gefangenen von außerhalb. Diese gibt es nur als Zahl (sie werden nicht simuliert und nicht gezeigt), nach ihnen richten sich
+aber das Personal und die Stellen. Hauskarte und Fenster sagen das. Polizei, Gerichte und Gefängnisse gehören dem **Land**; keine
+Stadt in Deutschland hat eine eigene Vollzugspolizei oder ein eigenes Gefängnis. Die Löhne zahlt das Land, sichtbar als Geld „von außen“.
+
+Umgesetzt im sim-Block im Abschnitt „Sicherheit (Version 7)“ (bis „Ende Sicherheit“), jede Nacht nach `menschenTag` in `sicherheit(S)`:
+Entlassungen → Urteile → Taten → Obhut für Kinder → Bauten des Landes → Stellen des Landes → Jahreszeile → Geld vom Land für „gestern“.
+Zufall nur aus einem eigenen Strom `S.rsSich`; mit `R.KRIM_BASIS = 0` und `R.LAND_BAUT = 0` läuft die Stadt genau wie ohne (so vergleichen
+`--erweiterung` und `--migrationstest` mit Version 6). Grundlage war der Prototyp in `scratchpad/erweiterung/sicherheit/` (auf 414ebab);
+die Logik ist auf den Stand nach Teil 1 übertragen, nicht die Patches.
+
+### Regeln
+
+- **Taten.** Jede erwachsene Person, die nicht in Haft ist, begeht nachts mit der Wahrscheinlichkeit
+  q = 0,0032 × (1 + 8 · Not · (0,5 + Ehrgeiz/100) + 2 · erwerbslos + 3 · Unzufriedenheit) eine Tat (`tatTeile`, `tatRisiko`).
+  Not = 1 − Geld / (5 × Tageskosten), Unzufriedenheit = (50 − Zufriedenheit) / 30, beide auf 0 … 1 begrenzt; erwerbslos wie in der
+  Arbeitslosenzahl. Die Tatneigung liest **nur Geld, Tageskosten, Stelle, Zufriedenheit und Ehrgeiz**; die eigenen Vorstrafen liest sie
+  nicht (erst das Gericht), Rückfälle entstehen über die Folgen der Haft. Art: Diebstahl 69,4 %, Wohnungseinbruch 2,9 %, Betrug 27,7 %;
+  keine Gewalt.
+- **Opfer** zufällig unter allen Erwachsenen außerhalb des eigenen Haushalts, nicht in Haft (liest Alter, Haushalt, Wohnung, Haft); beim
+  Einbruch alle Erwachsenen des Haushalts. Beute höchstens 10 / 60 / 20 Taler und was das Opfer hat. Folgen: Gedächtnis („wurde
+  bestohlen“ …, danach eine Entscheidung wie nach jedem Ereignis), eine Weile weniger Zufriedenheit, nach einem Einbruch Wohnen −20 für
+  20 Tage.
+- **Anzeige und Aufklärung.** Jede Tat wird angezeigt. Aufgeklärt mit min(0,9; Quote × Faktor): Diebstahl 31,4 %, Wohnungseinbruch
+  15,3 %, Betrug 58 %. Faktor = 2d/(d + 1) mit d = max(1, 1,2 × besetzt / Stellen): voll besetzt 1,09, fehlen Leute, nie unter 1 (ohne
+  Wache 1, Polizei aus dem Nachbarort). Die Wache ist für einen Bezirk zuständig, in der kleinen Stadt auch für das Umland: Ihre
+  Mindeststellen erhöhen die Aufklärung nicht (Befund 7). Die Polizei findet dann immer die richtige Person.
+  Einbrüche stehen im Stadtbuch mit Straße, ohne Namen; am nächsten Tag um 10 Uhr nimmt je Anzeige eine Kraft der Wache sie vor Ort
+  auf (`polizeiEinsatz`, nur für Figuren und Karten).
+- **Verfahren.** Urteil 3 Tage nach der Aufklärung. Untersuchungshaft bis zum Urteil (S4, S6) bei Wohnungseinbruch oder mit 2 nicht
+  getilgten Verurteilungen. Stirbt die Person oder zieht weg, wird das Verfahren eingestellt.
+- **Urteil** (Amtsgericht des Landes, `urteilen`): Tilgung abgelaufener Einträge, Einziehung der Beute an das Opfer (S3, § 73 StGB,
+  § 459h StPO), Widerruf einer laufenden Bewährung. Diebstahl und Betrug: 30 Tagessätze, beim zweiten Mal 90; ein Tagessatz ist das
+  Nettoeinkommen eines echten Tages (Tagesnetto / 36,5, § 40 StGB). Nicht bezahlbar: **Ersatzfreiheitsstrafe, 2 Tagessätze = 1 Tag**
+  (§ 43 StGB in der Fassung seit 1. 2. 2024), auf ganze Spieltage aufgerundet, mindestens 1 (Befund 2). Ab 2 Vorstrafen 6 Monate,
+  Wohnungseinbruch 1 Jahr Freiheitsstrafe (Mindeststrafe, § 244 Abs. 4 StGB). Keine Aussetzung schon im Urteil (S5): beim ersten Mal
+  die Hälfte absitzen, wenn das mindestens 6 Monate sind, sonst zwei Drittel; der Rest ist 30 Tage (3 Jahre) zur Bewährung ausgesetzt
+  (§ 57 StGB als Mindestverbüßung, § 56a StGB). Untersuchungshaft wird angerechnet (§ 51 StGB; bei einer Geldstrafe 1 Tag =
+  1 Tagessatz, Abs. 4). Stadtbuch ohne Namen, mit Alter.
+- **Register** (Tilgung nach § 46 BZRG, vereinfacht, Befund 6): 5 Jahre für eine Geldstrafe bis 90 Tagessätze, wenn keine
+  Freiheitsstrafe eingetragen ist (Abs. 1 Nr. 1a); 10 Jahre für eine Geldstrafe neben einer eingetragenen Freiheitsstrafe (Nr. 2a) und
+  für eine erste Freiheitsstrafe bis 1 Jahr mit Bewährung (Nr. 2b); 15 Jahre für alle anderen plus die Dauer der Freiheitsstrafe
+  (Nr. 4, Abs. 3); getilgt erst, wenn alle Einträge tilgbar sind (§ 47 Abs. 3).
+- **Haft** (`haftAntritt`): Die Stelle ist weg (ein eigener Betrieb läuft weiter), Grundsicherung endet (§ 7 Abs. 4 SGB II). Platz in der
+  Anstalt in der Stadt (sie gehört dem Land), sonst in einer Anstalt des Landes außerhalb. Wohnung, Haushalt, Partner und Miete bleiben. Keine Entscheidungen,
+  keine Anfragen ans Sprachmodell, kein Einkauf, Wohnen 30, Zufriedenheit −20; in Strafhaft und kurzer Haft 7 Taler Arbeitsentgelt am
+  Tag vom Land, in Untersuchungshaft nicht. Rente läuft weiter, Beitragstage (Schritt 2) sammelt in Haft niemand. Zählt nicht als
+  erwerbsfähig oder arbeitslos, begeht keine Taten, wird nicht Opfer, wird nicht neuer Partner; zieht der Partner weg, bleibt die Person
+  in Haft. Kommt eine Strafe dazu, wird sie angehängt; kommt während der Untersuchungshaft eine Ersatzfreiheitsstrafe aus einem anderen
+  Verfahren, bleibt die Untersuchungshaft bis zum Urteil, die Strafe folgt danach (`haftNach`, Befund 9).
+- **Entlassung** am Ende der Strafe: Gedächtnis „aus der Haft entlassen“, der eigene Betrieb ist wieder da. Rückfall wird nur gezählt
+  (neue Verurteilung binnen 3 Jahren).
+- **Kinder** (Befund 3, `obhutPruefen`): Hat ein Haushalt keinen Erwachsenen mehr, der nicht in Haft ist, leben die Kinder bis zur
+  Entlassung beim anderen Elternteil, bei den Großeltern oder bei erwachsenen Geschwistern in der Stadt (Familie vor Pflegefamilie nach
+  S. 155 des Programms; die Reihenfolge innerhalb der Familie ist eine Annahme der Stadt, das Programm nennt nur „zum Beispiel die
+  Großeltern“); gibt es niemanden, nimmt das Jugendamt sie in Obhut und bringt sie in einer Pflegefamilie außerhalb der Stadt unter (§ 42
+  SGB VIII, eine vorläufige Unterbringung; für längere Zeit in einer anderen Familie sieht das Gesetz die Vollzeitpflege vor, § 33 SGB VIII,
+  die Stadt unterscheidet das nicht; der Kita-Platz wird frei). Das Stadtbuch sagt „einziger Erwachsener“ nur, wenn es einer war, sonst
+  „alle 2 Erwachsenen“. Das liest nur die Eltern-Verweise, keine Namen. Stadtbuch ohne Namen, Personen- und Hauskarte
+  zeigen, wo das Kind ist. Kein Kind bleibt allein (`--sicherheit` prüft jede Nacht).
+- **Land.** Die **Polizeiwache** baut das Land ab der Stufe Kleinstadt auf einem Block nah an der Mitte, die **Justizvollzugsanstalt** ab
+  der Stufe Stadt auf zwei Blöcken am Stadtrand, beide über die Gelände-Schnittstelle aus Teil 1 (`gelaendeSuchen`, `gelaendeBauen`).
+  Das Land zahlt den Bau an die Stadtkasse (1.500 und 8.000 Taler), der Bauhof baut (10 und 40 Arbeitstage). Findet sich kein freier
+  Block, versucht es das Land in der nächsten Nacht wieder. Stellen der Wache: 3,2 je 1.000 Einwohner mal 1,2 (S1), mindestens 2; Lohn
+  100 + 5 Zulage (S2). Anstalt: 12 Plätze; die Plätze, die die Stadt nicht braucht, belegt das Land bis zur mittleren Auslastung in
+  Deutschland (82 %) mit Gefangenen von außerhalb; Stellen 0,65 je Gefangenem (auch je Gefangenem von außerhalb), Lohn 100. Offene
+  Stellen des Landes nehmen Arbeitsuchende der Stadt; ziehen Leute für Arbeit zu, besetzt das Land seine offenen Stellen zuerst
+  (Versetzung, S-A19). Die Löhne zahlt das Land (Zweig `istLand` in `wirtschaft`, nie aus dem Budget); die Lohnsteuer geht wie jede
+  Lohnsteuer an die Stadt.
+- **Grenze der Stadt.** Keine Regel liest Namen, Geschlecht (außer für die Grammatik), Herkunft, Einzugstag, Eltern (außer der Suche nach
+  Angehörigen für ein Kind), Gedächtnis oder Stadtteil; Staatsangehörigkeit, Religion und Sprache kennt die Stadt nicht. `--sicherheit`
+  prüft das je Funktion statisch (erlaubte Personenfelder), und mit getauschten Namen läuft die Stadt bitgleich. Die Polizei ermittelt
+  nur angezeigte Taten, ohne Kameras und Überwachung, und kontrolliert keinen Stadtteil. Frauen und Männer sitzen in derselben
+  Abteilung (in Wirklichkeit getrennt, § 140 Abs. 2 StVollzG); die Stadt trennt nicht, weil keine Regel das Geschlecht liest.
+
+### Programmpunkte (Fenster „Stadtregierung“, Gruppe „Innere Sicherheit (Einrichtungen des Landes)“)
+
+Elf Karten im Stil der übrigen (Titel, Status, wörtliche Zitate mit Seite, „In der Stadt“, Annahme, aufklappbarer Teil, Zahlen):
+„Taten, Anzeige und Aufklärung“ (Spielregel), **S1** „Mehr Polizei: 20 % über der üblichen Dichte“ (S. 117, 118; steht im Abschnitt über
+Clan- und Bandenkriminalität, übernommen ist nur die Personalstärke), **S2** „Gefährdungszulage“ (S. 119; eine Zulage gibt es schon, BBesG
+Anlage I Vorbemerkung Nr. 9), **S3** „Beute wird eingezogen“ (galt schon, S. 117, § 73 StGB, § 459h StPO; Abschnitt organisierte und
+Clan-Kriminalität), **S4/S6** „Mehrfachtäter und Wohnungseinbruch: gleich in Untersuchungshaft“ (S. 118, 119; S4 steht unter
+Jugendstrafrecht, die Stadt überträgt es auf Erwachsene, Deutung der Stadt; vorher §§ 112, 112a StPO), „Jugendstrafrecht nur bis 18“ (wirkt;
+heute § 105 JGG für Heranwachsende; nicht mehr unter „gilt schon“, Befund 6), **S5** „Bewährung erst nach Mindestverbüßung“ (S. 119, §§ 56,
+56a, 57 StGB), **S7** „Kurze Haft, Ersatzfreiheitsstrafe und Untersuchungshaft getrennt“ (S. 119; drei Abteilungen, U-Haft mit eigenem Hof,
+§ 3 Abs. 1 UVollzG NRW, Befund 5; Frauen und Männer nicht getrennt, § 140 Abs. 2 StVollzG, als Vereinfachung genannt), „Gericht, Strafen und
+Register“ (Spielregel, geltendes Recht vereinfacht), „Justizvollzugsanstalt für die Region“ (Annahme der Stadt; Auslastung, Personal, USA),
+„Kinder, deren Erwachsene alle in Haft sind“ (Annahme der Stadt, S. 155; bis zur Schlussprüfung „Kinder, deren einziger Erwachsener in Haft ist“). Sechs Karten haben eine Zeile mit Zahlen (`regLive`: taten,
+polizei, haft, gericht, jva, obhut), fünf einen aufklappbaren Teil.
+
+**Wirklichkeit** (Befund 6, Befunde 2 und 3 von „erweiterung“, Befund X7 der Schlussprüfung): Die Polizei (außer Bundespolizei und
+Bundeskriminalamt), Gerichte und Gefängnisse sind Sache der Länder (Art. 30 und 92 GG; den Strafvollzug regeln die Länder seit der
+Föderalismusreform 2006, Art. 74 Abs. 1 Nr. 1 GG nennt ihn nicht mehr). Städte haben Ordnungsämter, in Hessen auch Ordnungspolizei:
+Hilfspolizeibeamte der Gemeinden, die im Rahmen ihrer Aufgaben die Befugnisse von Polizeivollzugsbeamten haben (§ 99 HSOG, auf anwalt24.de
+und gesetze.co nachgelesen); manche nennen sie Stadtpolizei. (Bis zur Schlussprüfung stand hier „keine eigene Vollzugspolizei“ ohne diese
+Befugnisse.) In den USA haben Städte eine eigene Polizei; Jails gehören meist Counties oder
+Städten und nehmen Untersuchungshaft und Strafen bis etwa 1 Jahr auf, Prisons gehören den Bundesstaaten oder dem Bund (Bureau of Justice
+Statistics). Das Fenster sagt das an der Wache und an der Anstalt.
+
+Hinweiskasten (Befund 8): Die Polizei ermittelt ohne Kameras und Überwachung, eine Grenze der Stadt, die S. 124 stützt; für den Grenzschutz
+fordert das Programm dagegen „elektronischer Überwachungssysteme“ (S. 125), für „No-go-Areas“ „Razzien und Kontrollstellen“ (S. 122), beides
+nicht übernommen. „Geld von außen“ hat zwei Zeilen „Land, gestern“ und „Land seit dem Start“, „Von außen, gestern“ oben links enthält das Land.
+
+Nicht übernommen (Befund 1, vollständig für das Kapitel Innere Sicherheit S. 116–125 und die Stellen S. 101, 107, 134, 138; Abdeckung aller
+Sätze des Kapitels mit `mess/abdeckung.py` geprüft; übrig sind nur Beschreibungen und Erläuterungen zu gelisteten Punkten, `mess/abdeckung.txt`): „Grenze der Stadt“ +32 (Ausländerkriminalität und ausländerrechtliche Mittel,
+Aufenthaltsrecht, Ausweisung, Präventivhaft, Einbürgerung, Subkulturen nach Herkunft und „Erscheinungsformen … sind zu zerschlagen“,
+Abschiebung, Migrationshintergrund, Strafvollzug in Drittstaaten, politischer Islam, Kalifat und Abschiebung der Teilnehmer, Koranschulen,
+Friedensrichter und ihre Rechtsfolgen, S. 123 Körperschaftsstatus, Moscheegemeinden, Moscheefinanzierung, Islamkritik, „Jüdisches Leben …“,
+Imame mit Zertifikat C1 (Sprache), Lehrstühle, Minarette, S. 124 Personenstandsregister, Eheverträge nach deutschem Recht, Ehen von Muslimen
+(„Sie sind zu annullieren.“), Unterdrückung muslimischer Frauen, S. 125 Burka, Vermummungsverbot und Kopftuchverbot, S. 101 und 107);
+„Kein Gegenstück“ +24 (Grenzkontrolle, Unterwanderung, Steueranteil der Justiz, Dienst- und Disziplinarrecht, Prozessordnung, Waffenrecht
+(S. 120, beide Sätze), Linksextremismus, Antifa, Klimaextremisten, Extremisten-Vereine, Al-Quds-Tage, Bundespolizei mit Besoldung, Ruhestand
+mit 60, Überwachungssysteme und § 71 AufenthG, politische Beamte S. 134, Staatsanwaltschaft S. 138); „Keine Zahl, keine Mechanik oder kein
+Fall“ +6 (Strafmündigkeit 12, Altersfeststellung, Justizpersonal, Befugnisse, Nachweispflicht für Familienmitglieder, antisemitische Angriffe
+und Beleidigungen: kein Fall). Geänderte Gründe: „No-go-Areas“ (die Polizei des Landes ermittelt nur angezeigte Taten, in jedem Stadtteil
+gleich) und „Videoüberwachung“ unter „Gilt schon“. Der Satz „Zur Vollständigkeit“ nennt jetzt auch die innere Sicherheit.
+Alle Zitate im Fenster: **209**, `zitatpruef.py` 209 gefunden, `zitate_genau.py` 209 auf der genannten Seite, 0 Fehler (gesammelt mit
+`mess/zitate_sammeln.mjs`, jetzt mit dem Hinweiskasten zur Sicherheit; Teil 1: 133).
+
+### Annahmen (S-A1 … S-A28)
+
+| # | Annahme | Wert | Begründung, Quelle |
+|---|---|---|---|
+| S-A1 | Grundneigung | 0,0032 je Erwachsenem und Nacht | Eingestellt auf die PKS 2024 des BKA: Diebstahl „etwas mehr als 1,94 Millionen“ Fälle, darin 78.436 Wohnungseinbrüche, Betrug 743.472 (Inland). Bei rund 83,6 Mio. Einwohnern (Annahme) je 1.000 und Jahr 22,3 / 0,94 / 8,9, zusammen 32,1. Gemessen (unten): Seeds 1–80 22,35 / 0,95 / 8,92 = 32,2 |
+| S-A2 | Treiber der Tatneigung | Geldnot bis ×8·(0,5 + Ehrgeiz), ohne Stelle +2, Unzufriedenheit +3 | Die Stadt kennt Geld, Arbeit, Zufriedenheit und Charakter; Ehrgeiz verstärkt nur die Not (Anomie- bzw. Strain-Theorie). Heimatliebe bewusst nicht. Vorstrafen nicht (Befund 10: Beschreibung und Code stimmen überein) |
+| S-A3 | Art der Tat | 69,4 / 2,9 / 27,7 % | Anteile der drei Delikte an den angezeigten Fällen der PKS 2024 |
+| S-A4 | Beute | 10 / 60 / 20 Taler | Größenordnung (etwa 520 / 3.100 / 1.000 € nach U1), nicht nachgeschlagen |
+| S-A5 | Aufklärungsquoten | 31,4 / 15,3 / 58 % | PKS 2024 (BKA-Meldung vom 23. 4. 2025: Diebstahl 31,4 %, alle Straftaten 58 %; BKA-Factsheet Wohnungseinbruch 15,3 %); für Betrug die Quote aller Straftaten, eine eigene Betrugsquote ist nicht nachgeschlagen |
+| S-A6 | Polizeidichte und Wirkung | 320 je 100.000 (0,0032); Faktor 2d/(d + 1), Bezirk | Eurostat `crim_just_job`, Deutschland 2024: 320,38 Polizeibeamte je 100.000. Der Nutzen nimmt ab; die Wache einer kleinen Stadt ist auch für das Umland da (Befund 7). Eurostat zählt alle Polizeibeamten, auch Bundespolizei und Bundeskriminalamt; die Wache ist Landespolizei und nimmt die ganze Dichte (vereinfacht, im Fenster gesagt, Befund X7 der Schlussprüfung) |
+| S-A7 | „Erhebliche Aufstockung“ (S1) | +20 % | Das Programm nennt keine Zahl |
+| S-A8 | Löhne | Polizei 100 + 5 Zulage, Vollzug 100 | Standardstelle; die heutige Zulage steckt in den 100 (BBesG Anlage I Vorbemerkung Nr. 9), die 5 sind die Gefährdungszulage (S2, Höhe nicht im Programm) |
+| S-A9 | Polizeiwache | ab Kleinstadt, 1 Block nah an der Mitte, mindestens 2 Stellen, 1.500 Taler, 10 Arbeitstage | Damit man sie sieht; kleine Orte teilen sich in Wirklichkeit eine Wache (Fenster sagt das). Die Stufe ist ein Spielmaßstab, keine Aussage darüber, wo Wachen stehen. Bau durch den Bauhof ist eine Vereinfachung: In Wirklichkeit baut das Land über seine Bauverwaltung, Firmen bauen nach Ausschreibung (Wissen, nicht einzeln nachgeschlagen); im Fenster als Hinweis (Befund X14) |
+| S-A10 | Justizvollzugsanstalt | ab Stadt, 2 Blöcke am Rand, 12 Plätze, Auslastung 82 %, 0,65 Bedienstete je Gefangenem, 8.000 Taler, 40 Arbeitstage | Noahs Entscheidung „Anstalt für die Region“. 58.798 Gefangene auf 72.096 Plätzen am 30. 11. 2024 (Destatis, nach REITOX-Bericht 2025, Workbook Gefängnis; Eurostat `crim_pris_cap` gleich); Personal 37.557 in Anstalten für Erwachsene, 57.465 Gefangene (Eurostat 2022). Größe und Stufe sind Spielmaßstab. Bau durch den Bauhof: Vereinfachung wie bei S-A9, im Fenster als Hinweis |
+| S-A11 | Arbeitsentgelt in Haft | 7 Taler am Tag vom Land (nicht in U-Haft) | Arbeitspflicht § 41 StVollzG, Entgelt § 43 mit Eckvergütung 9 % der Bezugsgröße (§ 200); Bezugsgröße 2024 42.420 € (§ 1 SvBezGrV 2024) → 3.817,80 € im Jahr ≈ 7 Taler je Spieltag nach U1. Bundesrecht; die Landesgesetze nicht einzeln geprüft. Das Fenster sagt: nach dem Strafvollzugsgesetz des Bundes; heute regeln das die Strafvollzugsgesetze der Länder, teils anders (nicht einzeln geprüft; Befund X9) |
+| S-A12 | Verfahrensdauer | 3 Spieltage (etwa 4 Monate) | Nicht nachgeschlagen |
+| S-A13 | Mehrfachtäter (S4) | ab 2 nicht getilgten eigenen Verurteilungen | Das Programm definiert den Begriff nicht |
+| S-A14 | Strafmaß | 30 / 90 Tagessätze, 6 Monate, 1 Jahr (Einbruch); Tagessatz = Tagesnetto / 36,5; EFS 2 TS = 1 Tag | Wie üblich zuerst Geldstrafe; § 40, § 43, § 244 Abs. 4 StGB nachgelesen |
+| S-A15 | Mindestverbüßung (S5) und Bewährung | Hälfte (erstes Mal, ≥ 6 Monate) sonst zwei Drittel; Bewährung 3 Jahre | § 57 StGB als Mindestverbüßung, § 56a StGB (2–5 Jahre). Vorher-Modus (`R.S5_MINDEST = 0`): erste Freiheitsstrafe bis 1 Jahr ganz zur Bewährung (§ 56) |
+| S-A16 | Kurze Haft (S7) | bis 3 Spieltage | Das Programm bestimmt „Kurzzeithäftling“ nicht |
+| S-A17 | Leben in Haft | Wohnen 30, Zufriedenheit −20, keine Entscheidungen, kein Einkauf; Miete und Rente laufen | Freiheitsentzug ohne Gewalt; Rente läuft (ihre-vorsorge.de, nicht amtlich), keine Rentenbeiträge aus Gefangenenarbeit (§ 198 Abs. 3 StVollzG: die Vorschriften §§ 190–193 sind nie in Kraft gesetzt) |
+| S-A18 | Folgen für Opfer | Zufriedenheit −5 / −10 / −5 für 10 / 20 / 10 Tage; Einbruch Wohnen −20 für 20 Tage | Ein Einbruch trifft das Sicherheitsgefühl zu Hause am stärksten. Gemessen: Opfer ziehen öfter weg (unten) |
+| S-A19 | Stellen des Landes | zuerst aus der Stadt, sonst Zuzug („das Land versetzt Beamte“) | Ohne Zuzug blieben Wache und Anstalt oft 200 Tage unbesetzt |
+| S-A20 | Haftantritt | Stelle weg, Betrieb bleibt, Partner in Haft wird beim Wegzug nicht mitgenommen | Einfachste konsistente Lösung |
+| S-A21 | Tilgung | 5 / 10 / 15 Jahre (+ Dauer) | § 46, § 47 Abs. 3 BZRG nachgelesen, vereinfacht (Befund 6) |
+| S-A22 | Kein Dunkelfeld | alle Taten angezeigt | Einfach und ehrlich benannt (Fenster) |
+| S-A23 | Keine Falschverdächtigung, kein Freispruch | aufgeklärt = richtige Person | Justizirrtümer sind nicht abgebildet (Schwächen) |
+| S-A24 | Eigener Zufallsstrom | `S.rsSich` = seed ^ 0x9E3779B9 (Übernahme: ^ Tag) | Deterministisch und speicherbar; die übrige Stadt zieht dieselben Zahlen |
+| S-A25 | Stadtbuch ohne Namen | Alter und „Einwohner/Einwohnerin“ | Wie in Berichten über Strafverfahren; die Personenkarte zeigt die eigene Lage |
+| S-A26 | Hofzeiten | Strafhaft 10 und 15, kurze Haft und EFS 11 und 16, U-Haft 9 und 14 Uhr | Getrennte Abteilungen (S7, § 3 Abs. 1 UVollzG NRW); nur dann sind Gefangene zu sehen |
+| S-A27 | Steuer | Landeslöhne voll lohnsteuerpflichtig (an die Stadt), Arbeitsentgelt in Haft steuerfrei | Die Lohnsteuer geht in der Stadt schon ganz an die Stadt (Stadtregierung) |
+| S-A28 | Kinder, deren Erwachsene alle in Haft sind | Angehörige in der Stadt (anderer Elternteil, Großeltern, erwachsene Geschwister), sonst Jugendamt (Pflegefamilie außerhalb) | Familie vor Pflegefamilie nach S. 155 des Programms; die Reihenfolge innerhalb der Familie ist eine Annahme der Stadt (Befund X5 der Schlussprüfung). § 42 SGB VIII (vorläufig); Vollzeitpflege (§ 33 SGB VIII) im Fenster genannt, nicht abgebildet; Aufschub (§ 456 StPO, höchstens 4 Monate) nicht abgebildet |
+
+**Quellen** (abgerufen September 2026; Kopien in `scratchpad/erw7/recht/`): Gesetze auf gesetze-im-internet.de (StGB §§ 40, 42, 43, 51, 56,
+56a, 56f, 57, 73, 244; EGStGB Art. 293; StPO §§ 112, 112a, 456, 459h; BZRG §§ 36, 46, 47; JGG § 105; SGB II § 7; SGB VIII § 42; StVollzG
+§§ 41, 43, 140, 198, 200; SvBezGrV 2024 § 1; BBesG Anlage I; GG Art. 30, 74, 92), UVollzG NRW § 3 (recht.nrw.de, PDF Stand 1. 4. 2026),
+§ 99 HSOG (gesetze.co und Wikipedia „Ordnungspolizei (Hessen)“), Gesetz zur Überarbeitung des Sanktionenrechts (BMJ-Pressemitteilung, LTO),
+BKA-Kurzmeldungen vom 23. 4. und 25. 4. 2025 zur PKS 2024 (Diebstahl, Betrug; am 27. 9. 2026 noch einmal gelesen), BKA-Factsheet PKS 2024
+Wohnungseinbruchdiebstahl, Eurostat `crim_just_job` und `crim_pris_cap` (API), REITOX-Bericht 2025 Workbook Gefängnis (dhs.de), berlin.de
+Justizvollzug „Zahlen und Fakten“ (Gefangenenrate 69 nach World Prison Brief), Bureau of Justice Statistics „Correctional Institutions“ und
+„Local Police Departments: Personnel, 2020“ (bjs.ojp.gov), DRV-Meldung vom 19. 7. 2022, ihre-vorsorge.de (Rente in Haft).
+Die Föderalismusreform 2006 als Zeitpunkt ist Wissen; geprüft ist nur, dass Art. 74 Abs. 1 Nr. 1 GG heute den Strafvollzug nicht nennt.
+Neu mit der Schlussprüfung (27. 9. 2026): § 33 SGB VIII (Vollzeitpflege) auf gesetze-im-internet.de (per curl, Kopie
+`scratchpad/erw7/recht/sgb_8___33.html`; WebFetch bekam dort 503), § 99 HSOG noch einmal auf anwalt24.de (Befugnisse der
+Hilfspolizeibeamten, in Gemeinden „Ordnungspolizeibeamte“). Dass die Länder den Bau über ihre Bauverwaltungen vergeben, ist Wissen, nicht
+nachgeschlagen.
+
+### Darstellung
+
+Keine neuen Meshes: Wache und Anstalt liegen in `teil`, `tech`, `fenster`, `schlot`, `bau` und `baum` (Helfer `teilUV`, `techUV`,
+`fensterUV`, `mastUV` in einem Rahmen je Gelände; `gelaendeRahmen`, `jvaPlan`). **Wache** (ein Block): gepflasterter Hof, zwei Geschosse
+hellgrau mit blauem Band, Fensterbänder (nachts unten Licht), leuchtendes blaues Schild, Tür mit Lampe, Funkantenne, Parkplatz mit bis zu
+zwei stillstehenden Streifenwagen, ein Baum. **Anstalt** (zwei Blöcke): dunkle Grundfläche, Mauer mit Krone, Pforte am Tor (nachts Licht),
+Hafthaus mit drei Geschossen, schmalen Fensterbändern und Gittern (abends 18–22 Uhr gedämpftes Zellenlicht), Verwaltung mit Werkstätten,
+drei Höfe mit Zäunen und je einem Lichtmast, zwei Türme. Liegt die Straße an der Längsseite, steht die Verwaltung hinter der Pforte und die
+Höfe liegen links und rechts, sonst an der Schmalseite. Im Bau wachsen Rohbau (und Mauer) mit Gerüst. Klick irgendwo aufs Gelände öffnet
+die Hauskarte; Auswahlrahmen, „Zeigen“, Bildausschnitt, Straßennamen und Ereignis-Ring nehmen das ganze Gelände (`gelaendeVon`, `gebFlaeche`).
+**Figuren:** Polizei dunkelblau (`POLIZEI_F` #2c4c86), Justizvollzug graugrün (`VOLLZUG_F` #5a6d56), als Arbeitende vor ihrem Gebäude; um
+10 Uhr geht, wer eine Anzeige aufnimmt, zum Tatort und zurück (wie die Kistenträger; die Simulation nennt die Anzeige). Gefangene sieht man
+**nur zu ihrer Hofzeit im Hof ihrer Abteilung** (`simOrt` liefert sonst −1), auf freien Figurenplätzen, fester Platz je Person. Hilfe: eine
+Zeile „Dunkelblau: Polizei … Graugrün: Justizvollzug. Gefangene sieht man nur zu ihrer Hofzeit im Hof der Anstalt.“ (Hilfe bei
+1280 × 800 weiter ohne Überlauf, 745 von 745 px). Stadtbuch: Art „Sicherheit“ mit Schild-Symbol. Hauskarte: Symbole Schild und Gitter,
+im Wohnhaus „in Haft“, „zur Zeit bei Angehörigen“, „zur Zeit beim Jugendamt“. Personenkarte: Haft (Art, bis, Anstalt als Knopf,
+Hofgang), Strafverfahren, Register und Bewährung, bei wem Kinder in Obhut leben. Keine Allokation je Bild (alles stündlich in `stadt()`
+und `figurenPlanen`), reduzierte Bewegung ohne Neues, die Kamera bewegt sich nicht von selbst.
+
+**Sprachmodell** (Befund 4): Die Anweisung nennt nur Tatsachen der Figur (Haft mit Ort und Ende, Strafverfahren mit Urteilstag,
+Bewährung, Kinder in Obhut). Wer Opfer war, bekommt „Wer dich bestohlen, betrogen oder bei dir eingebrochen hat, weißt du nicht, und du
+verdächtigst niemanden.“, jede Figur „Du weißt nur, was du selbst erlebt hast, und beurteilst niemanden nach Name, Herkunft, Sprache oder
+Religion.“ `--kitest` führt den Code der Anweisungen mit der echten Simulation aus und prüft das, auch dass der Name des Täters nie in der
+Anweisung des Opfers steht und keine Anweisung die Stadtregierung nennt.
+
+### Gemessen
+
+**Seeds 1–3** (`simtest --gate`, 730 Tage stündlich, alle Gates bestanden; in Klammern bc7247a):
+
+| Seed | Einwohner Tag 365 / 730 | Band Gate 4 | Gate 6 / Gate 7 | Stadtbuch je Tag | Taten (D / E / B) | aufgeklärt | Urteile (Geldstrafe / EFS / Freiheitsstrafe) | Haftantritte (außerhalb) | Wache / Anstalt ab Tag |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 802 / 1.146 (886 / 1.065) | 1,09 (1,06) | +18,5 / −23,1 (+20,8 / −29,3) | 4,78 (4,25) | 1.237 / 63 / 467 | 41 % | 707 (670 / 104 / 37) | 142 (31) | 79 / 190 |
+| 2 (Teststadt) | 753 / 1.157 (858 / 1.122) | 1,13 (1,08) | +20,4 / −23,0 (+20,0 / −22,9) | 5,08 (4,33) | 1.196 / 55 / 471 | 43 % | 728 (709 / 114 / 19) | 131 (40) | 71 / 198 |
+| 3 | 905 / 1.118 (944 / 1.082) | 1,05 (1,11) | +17,7 / −23,3 (+20,0 / −29,1) | 4,54 (4,78) | 1.223 / 44 / 476 | 43 % | 738 (722 / 87 / 16) | 104 (29) | 64 / 167 |
+
+Mit dem Baustein läuft die Stadt anders (Taten verschieben Geld, Stellen und Entscheidungen), deshalb sind einzelne Seeds nicht vergleichbar.
+Verglichen wird über viele Seeds, mit derselben Messung (`mess/mess8.mjs` über `mess/lauf80_8.sh` und `mess/lauf160_8.sh`, Auswertung
+`mess/vergleich_sich.py` und `mess/vergleich_sich160.py`, Ausgabe `mess/vergleich_sich160.txt`), 730 Tage stündlich, **gegen bc7247a**:
+
+| Seeds | Stand | alle Gates | fällt | Band Ø / Median / schlimmster | Gate 7 kleinster Abstand | Einwohner Tag 365 / 730 | Wegzüge (Personen) | Zuzüge |
+|---|---|---|---|---|---|---|---|---|
+| 1–80 | bc7247a | 77 von 80 | G4: 11, 23, 45 | 1,077 / 1,073 / 1,155 | 16,5 | 896 / 1.110 | 40,2 | 1.028 |
+| 1–80 | Teil 2 | 76 von 80 | G4: 22, 34, 57, 71 | 1,082 / 1,078 / 1,210 | 18,1 | 892 / 1.138 | 62,9 | 1.066 |
+| 81–160 | bc7247a | 76 von 80 | G7: 108; G4: 112, 130, 140 | 1,075 / 1,065 / 1,185 | 13,9 | 891 / 1.110 | 40,0 | 1.028 |
+| 81–160 | Teil 2 | 78 von 80 | G4: 153, 155 | 1,073 / 1,067 / 1,168 | 15,5 | 896 / 1.136 | 61,2 | 1.067 |
+
+Zusammen 154 von 160 gegen 153 von 160: **kein Unterschied über das Rauschen hinaus** (Befund 11; ein „besser“ gibt es nicht). Teil 1
+lag auf den Seeds 1–80 zahlengleich mit bc7247a. Die Karte wächst im Median weiter auf 80 × 80 (64 bis 112).
+
+- **Taten** je 1.000 Einwohner und Jahr (Tag 366–730): Seeds 1–80 Diebstahl 22,35, Wohnungseinbruch 0,95, Betrug 8,92, zusammen 32,2
+  (kleinste Stadt 28,9, größte 41,2); Seeds 81–160 zusammen 32,1; PKS 2024: 22,3 / 0,94 / 8,9 = 32,1. Aufgeklärt 34 % / 17 % / 63 %
+  (PKS 31,4 / 15,3 / 58; mehr wegen S1).
+- **Haft:** im Mittel 0,24 Leute aus der Stadt in Haft (höchstens 6 zugleich), 24 je 100.000 Einwohner; Deutschland 69 (World Prison
+  Brief, nach berlin.de), dort mit allen Delikten. Je Stadt und 730 Tage: 730 Urteile, 103 Ersatzfreiheitsstrafen, 23 Freiheitsstrafen,
+  23 Untersuchungshaften, 127 Haftantritte (26 außerhalb, meist bevor es die Anstalt gab), 2,9 Widerrufe, 32 Verurteilungen binnen 3 Jahren nach
+  einer Entlassung. Die Anstalt ist durch die Gefangenen von außerhalb meist mit 10 von 12 Plätzen belegt.
+- **Kinder:** In 65 von 80 Städten kam mindestens einmal ein Kind in Obhut, im Mittel 2,2-mal bei Angehörigen und 0,2-mal beim Jugendamt
+  (11 Städte), zusammen 4,6 Kindertage je Stadt. Kein Kind war je allein (`--sicherheit`, jede Nacht).
+- **Land:** Wache im Mittel ab Tag 73 (58–115), Anstalt ab Tag 176 (148–225), etwa 5 bzw. 3 Tage nach der Stufe; das Land zahlt im Mittel
+  719 Taler am Tag Löhne und Arbeitsentgelt, dazu 9.500 Taler für die Bauten.
+- **Wegzüge** (neu gemessen, `mess/dbg/wegzug_mess.mjs`, Seeds 1–6): Mit dem Baustein ziehen etwa doppelt so viele Erwachsene weg (312 gegen
+  159 mit abgeschalteter Sicherheit), fast alle im ersten Jahr (274 gegen 137). 82 davon waren in den 20 Tagen davor Opfer, 66 in den
+  30 Tagen davor aus der Haft entlassen; der Grund im Stadtbuch ist fast immer „Das Geld reicht nicht“. In der jungen Stadt haben viele wenig
+  Erspartes: Beute, Geldstrafe und eine verlorene Stelle treffen sie, und das Ereignis löst eine Entscheidung aus. Gate 7 hält (Abstand
+  eher größer), die Zuzüge gleichen es aus (Einwohner an Tag 730 sogar höher, auch durch die Stellen des Landes). Das steht unter
+  „Bekannte Schwächen“.
+- **Nach Gruppen** (`simtest --sicherheit`, Seeds 1–6, Tag 200–730, verurteilt bzw. Opfer je Erwachsenen-Nacht relativ zu allen, nur
+  gemessen): in der Stadt geboren 1,13 / 0,95, zugezogen oder vom Start 0,98 / 1,01, Nachnamen Kaya bis Kowalski (Namensliste 31–37)
+  1,01 / 1,06, übrige Nachnamen 1,00 / 0,99, Frauen 1,03 / 1,00, Männer 0,97 / 1,00, 18–24 Jahre 1,40 / 1,04, 67+ 0,80 / 0,92. Die
+  Unterschiede kommen aus Alter und Geld (mit 18 ohne Erspartes und Stelle), nicht aus Namen oder Herkunft; mit getauschten Namen läuft die
+  Stadt bitgleich.
+- **Sonst** (Seeds 1–80, gegen bc7247a): Zufriedenheit im Mittel 70,58 statt 70,95, Arbeitslose an Tag 730 4,97 statt 4,67 %, Stadtbuch
+  4,93 statt 4,45 Zeilen am Tag (Einbrüche, Urteile mit Freiheitsstrafe, Obhut, Jahreszeile, Aufträge des Landes), schlimmster
+  30-Tage-Einbruch 12,5 statt 18,8 %, kleinstes Budget gleich.
+- **Leistung:** `--gate` Zeit-Check T 1,3–1,9 s für 365 Tage (< 5 s; zwei Läufe, im zweiten liefen die Browser-Tests gleichzeitig). Draw Calls im Browser 22–27 (Teststadt, Tag 400; bc7247a 25 bis 28),
+  große Stadt 23–26 (bc7247a 24 bis 27). Neue Draw Calls: keine.
+- **Große Stadt** (`&umland=300000`, Seed 2, Tag 750): 5.703 Einwohner (Teil 1: 5.928), Karte 104 × 104 (Teil 1: 120), Dreiecke
+  129.500 bis 134.800.
+
+### Speicherformat 7 (Sicherheit)
+
+Neu je Person (`PF_SICHERHEIT`, Pflicht in jedem Stand der Version 7): `haftBis`, `haftArt` (1 Strafhaft, 2 kurze Haft oder EFS, 3 U-Haft),
+`haftOrt` (1 Anstalt in der Stadt, 2 außerhalb), `haftNach`, `vorstrafen`, `tilgungBis`, `freiheitReg`, `bewaehrungBis`, `bewaehrungRest`,
+`opferTag`, `opferArt`, `entlassenTag`, `obhut` (1 Angehörige, 2 Jugendamt), `obhutBei`, `obhutGen`. Dazu `S.rsSich` (Zahl), `S.sicherheit`
+(Start, Wache, Anstalt, Stellen, von außerhalb, Verfahren, Tatorte, Jahreszahlen, Geld vom Land) und `S.stat.sicherheit` (Summen).
+Gedächtnis-Codes OPFER 17 … OBHUT 21, Gebäudetypen WACHE 9 und JVA 10. `sicherheitPruefen` lehnt beschädigte Stände ab („Spielstand
+beschädigt: Sicherheit (…)“; `--sicherheit` prüft 11 Fälle), ein fehlendes Personenfeld lehnt `jsonPruefen` ab („Spielstand unvollständig:
+p.…“). **Übernahme** aus Version 2–6 (`migriereSicherheit`, vor „Stadt erweitern“): eigener Zufallsstrom, niemand vorbestraft, in Haft oder
+Opfer, Summen 0, Stadtbuch „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug …“ (vorletzte Zeile, vor der Zeile „Stadt
+erweitern“); Wache und Anstalt bestellt das Land in den folgenden Nächten. Versionsdialog und Meldung nach der Übernahme sagen es. Mit
+abgeschalteter Sicherheit läuft ein übernommener Stand der Version 6 60 Tage lang Tag für Tag wie in Version 6 (`--migrationstest`);
+mit eingeschalteter Sicherheit beginnen ab dem Übernahmetag die Taten. `--speichertest`: **Fingerabdruck `cb0ce3e6a26986c7`** (Seed 1, Tag 150, 13 Uhr,
+60 Tage weiter; Teil 1 `d918da4702073bbb`), neu, weil die Stadt jetzt Taten hat und der Fingerabdruck `S.sicherheit` enthält; dazu ein Stand
+mit U-Haft, Gefangenen in der Anstalt, offenen Verfahren und einem Kind in Obhut (Tag 257): 60 Tage bitgleich, auch über sortierte Schlüssel
+(`c26760c7c7d427ce`, sortiert `ecd31d017e4093a4`). Teststand `tests/basis_v7.json` neu aus `tests/basis_v6.json` über „Stadt übernehmen“
+(`tests/basis_v7.cjs`; Tag 420, 2.186 Einwohner), jetzt mit den Feldern der Sicherheit; das Original bleibt.
+
+### Tests
+
+- `simtest --sicherheit` (neu, 28 Prüfungen): statisch (der Abschnitt zieht Zufall nur aus dem eigenen Strom; je Regel nur die erlaubten
+  Personenfelder, keine Namen, Geschlecht nur fürs Pronomen im Urteil; der Zweig der Landeslöhne berührt das Budget nicht), Namenstausch
+  (365 Tage bitgleich mit anderen Namen), Seeds 1–3 je 730 Nächte mit Invarianten nach jeder Nacht (Täter erwachsen und frei, Opfer aus
+  einem anderen Haushalt, U-Haft nur mit offenem Verfahren, Plätze der Anstalt, Hof nur zur eigenen Zeit, kein Kind allein, Wache ab
+  Kleinstadt und Anstalt ab Stadt auf eigenem Gelände, Stadtbuch ohne Namen, Landeslöhne nie aus dem Budget), erzwungene Urteile
+  (30 und 90 Tagessätze ohne Geld, bezahlt, halb bezahlt, Einbruch mit U-Haft, Widerruf, Tilgung, Anrechnung, Randfall U-Haft mit
+  Ersatzfreiheitsstrafe), volle Anstalt, Obhut (Angehörige, Jugendamt, Ende), Grundsicherung und Arbeitsentgelt in Haft, Speichern mit
+  Haft, 11 beschädigte Stände, Messung gegen die PKS 2024 und nach Gruppen.
+- `simtest --kitest` prüft dazu die Anweisungen ans Sprachmodell (Befund 4), `--speichertest` einen Stand mit Haft (Befund 11),
+  `--migrationstest` und `--erweiterung` vergleichen mit Version 6 bei abgeschalteter Sicherheit, `--regierung` rechnet Haft und
+  Landeslöhne mit.
+- Browser: `tests/sicherheit.cjs` (neu, in `tests/alle.sh`): Wache und Anstalt auf eigenem Gelände, Gefangene nur zur Hofzeit im Hof ihrer
+  Abteilung (jede Stunde 8–17 Uhr: sichtbar = im Hof, nie woanders), Polizei um 10 Uhr zum Tatort und zurück, Klick aufs Gelände öffnet die
+  Hauskarte (Anstalt „nur als Zahl“, drei Abteilungen; Wache „Lohn 105 Taler am Tag vom Land“), Personenkarten für Strafhaft, U-Haft und ein
+  Kind in Obhut, Hauskarte „in Haft“, Fenster (11 Karten, 6 mit Zahlen, Geld vom Land, Hinweis mit S. 125 und S. 122), Hilfe, Draw Calls
+  ≤ 30, Konsole leer. `tests/p6migration.cjs` prüft die Sicherheit nach der Übernahme von Version 5 und 6 und dass das Land danach Anstalt
+  und Wache baut; `tests/p7figuren.cjs` lässt Figuren auf dem ganzen Gelände von Wache und Anstalt zu (Grundregel sonst unverändert).
+- **Angepasst an den neuen Verlauf der Teststadt** (feste Momente haben sich verschoben; keine Prüfung ist schwächer): `tests/ereignis.cjs`
+  Momente neu gesucht (`mess/momente7.mjs`, mit wachsender Karte): Tag 572 (elf Übernahmen), 612 (sieben Schließungen), 617, 683; bei
+  sieben Schließungen beginnt das siebte Zeichen erst bei 1,2 s, gezählt wird deshalb bei 1,3 s statt 1,1 s. `tests/erweiterung.cjs`: Die
+  Teststadt wächst zuerst an Tag 198, in derselben Stunde bestellt das Land am Rand die Anstalt (neue Baustelle, ein Draw Call); geprüft
+  wird jetzt das zweite Wachsen an Tag 230 (64 → 72, allein in seiner Stunde), die Stufe ist dort „Stadt“ (Hinweis „Großstadt ab 800 …“,
+  jetzt der ganze Text), und vor beiden Messungen vergehen die Ereignis-Zeichen. `tests/kita.cjs`: Die Kamera steht auf der Kita, bevor die
+  Figuren der Stunde geplant werden (die 120 Arbeitsplätze gehen nach Nähe zur Kamera; vom Startblick lag die Kita bei 1280 × 800 knapp
+  dahinter), und die Personenkarte nimmt das erste Kind, das nicht gerade seinen letzten Kita-Tag hat (den prüft `befunde_s2`).
+  `tests/befunde_s2.cjs` erwartet neun aufklappbare Karten mit Titel (vier bisher, fünf der inneren Sicherheit) statt vier.
+- **Ergebnis** auf dem Endstand (`stadt.html` md5 `6affd7fb3de135433fa5da5ab064ac3e`, Server auf 8713, `tests/alle.sh`, KI-Nachbau auf
+  11434): p3test 12, p5neu 10, p6migration 25, p7figuren 6, p8tech 14, raute_klick 8 von 8 Klicks, ereignis 21, t1_xss 5, p4test 25,
+  s2karten 22, kita 22, befunde_s2 27, erweiterung 20, sicherheit 12, alle ohne Fehler. `tests/otest`: befunde 21, handy 11, breit 12,
+  tastatur 4, breiten 20, hilfehoehe ohne Überlauf (745 von 745 px). Dazu `tests/pruef_v5.cjs` 17 und `tests/kennzahlen_hoehe.cjs` ohne
+  Fehler. Konsole leer, außer den absichtlichen Verbindungsfehlern zum KI-Nachbau in p4test und den abgebrochenen KI-Anfragen in
+  `blick.cjs`. Alle `simtest`-Modi auf dem Endstand ohne Fehler (`mess/s3_*.txt`): `--gate` (Seeds 1–3 alle Gates), `--speichertest`
+  (bitgleich, beide Stände), `--aufholtest` (Vergleich, keine Prüfung), `--kitest` 46, `--bau` 15, `--waren` 15, `--tech` 16,
+  `--regierung` 154 (Teil 1: 155; eine Person weniger im Fall „Bauhof voll“, keine Prüfung entfernt), `--kita` 40, `--sicherheit` 28,
+  `--migrationstest --git /home/user/website-` 266, `--erweiterung --gross --git /home/user/website-` 33. Der sim-Block ist seit dem
+  ersten Lauf der Suite unverändert (`mess/s2_*.txt` und `mess/s3_*.txt` gleich bis auf die Laufzeiten).
+- **Bilder** (Endstand, selbst angesehen): `nachher/` (`tests/blick.cjs`, Teststadt Seed 2, Tag 400: 918 Einwohner, Großstadt, Karte
+  80 × 80, 25 bis 27 Draw Calls, 44.800 bis 45.300 Dreiecke) und `nachher/sicherheit/` (`sich/sicht.cjs` und `mess/dbg/hof_bild.cjs`:
+  Wache am Tag und in der Nacht, Anstalt am Tag, zur Hofzeit und in der Nacht, von oben um 10 Uhr mit vier Gefangenen im Hof der Strafhaft
+  und dem Personal vor der Pforte, Hauskarten, Fenster). `gross/` (`&umland=300000`, Seed 2, Tag 750: 5.703 Einwohner, Karte 104 × 104,
+  23 bis 26 Draw Calls). Die Bilder aus Teil 1 liegen in `scratchpad/erw7/sich/bilder_teil1/`.
+
+### Befunde der Gegenprüfung „sicherheit“
+
+Alle umgesetzt:
+
+0. Zusammenhang: S4 steht unter Jugendstrafrecht („die Stadt überträgt sie auf alle Erwachsenen, … Deutung der Stadt“), S3 und S1 im
+   Abschnitt Clan- und Bandenkriminalität; die Karten sagen es.
+1. „Nicht übernommen“ vollständig (oben), mit S. 123, S. 124 Eheverträge, S. 125 § 71 AufenthG, S. 121 Kalifat-Abschiebung, S. 120 Waffenrecht;
+   beim Nachprüfen aller Sätze des Kapitels kamen S. 116 („sämtliche ausländerrechtlichen Möglichkeiten“) und S. 117 („Erscheinungsformen …
+   zu zerschlagen“) dazu.
+2. Ersatzfreiheitsstrafe nach § 43 StGB (2 Tagessätze = 1 Tag); `--sicherheit` rechnet 30 und 90 Tagessätze und eine halb bezahlte Strafe nach.
+   Das Aufrunden auf Spieltage steht in der Annahme („in der Stadt deshalb eher länger“).
+3. Kinder bleiben nicht allein: Angehörige oder Jugendamt (oben), jede Nacht geprüft, im Stadtbuch und auf Personen- und Hauskarte.
+4. Das Sprachmodell erfindet keine Verdächtigen: Sätze in der Anweisung, `--kitest` prüft sie.
+5. Untersuchungshaft hat eine eigene Abteilung mit eigenem Hof (9 und 14 Uhr), nach § 3 Abs. 1 UVollzG NRW.
+6. Tilgung nach § 46 BZRG (5/10/15 Jahre), Jugendstrafrecht als wirkende Regel mit § 105 JGG, Polizeizulage gibt es schon (BBesG), Städte haben
+   Ordnungsdienste (§ 99 HSOG, Stadtpolizei), USA (Städte mit Polizei, Counties mit Jails, Staaten mit Prisons; BJS). Alle Rechtsnormen
+   nachgelesen (Quellen oben).
+7. Polizeidichte in kleinen Städten: Bezirk (Aufklärung nie über das Übliche mal der Aufstockung), Fenster sagt, dass kleine Orte sich eine Wache teilen.
+8. „Keine Überwachung“ nicht einseitig: Hinweiskasten mit S. 125 und S. 122; die Grenze ist eine Regel der Stadt, S. 124 stützt sie.
+9. Randfall `haftAntritt`: U-Haft bleibt bis zum Urteil, die Ersatzfreiheitsstrafe folgt danach (`haftNach`), in `--sicherheit` erzwungen.
+10. Beschreibung und Code stimmen: Die Tatneigung liest keine Vorstrafen (Kommentar an `R`, Fenster, README); README-Abschnitt und Hilfe sind da.
+11. Testwerkzeuge fertig: `--regierung` grün (Haft und Landeslöhne in den unabhängigen Erwartungen, Nächte mit Haftantritt einer erzwungenen
+    Person zählen nicht, Bauhof-Fall überspringt Haft), `--speichertest` mit Haft (oben), „40/40“ gibt es nicht mehr: Die Gates werden neutral
+    gegen bc7247a gezählt (oben, kein Unterschied über das Rauschen hinaus).
+
+Aus der Gegenprüfung „erweiterung“ galten für Teil 2 weiter: Befund 2 (Zuständigkeiten als eigene Sachaussage mit Quelle, Art. 30 und 92 GG,
+nicht dem Programm zugeschrieben), Befund 3 (USA-Hinweise zu Polizei und Jails) und Befund 10 (Stufen als Spielmaßstab, nicht als
+Realismus-Aussage). Umgesetzt.
+
+**Weitergeführt nach dem Abbruch** (Teil 2 lief zweimal; der erste Lauf endete am Sitzungslimit, nachdem die simtest-Suite gelaufen war):
+Die Suite stimmte mit dem Stand überein (Prüfsumme). Neu danach nur Texte im Fenster (`sich/patch_fenster2.py`: zwei Sätze S. 116 und 117,
+§ 46 Abs. 1 Nr. 2a BZRG richtig wiedergegeben, § 140 StVollzG, Zuständigkeit mit Art. 30 und 92 GG), der sim-Block ist unverändert.
+Vier Browser-Tests hingen an festen Momenten der Teststadt, die sich mit der Sicherheit verschoben haben (unten).
+
+### Für Teil 3
+
+Gebäudetypen 11 und 12 sind frei, Gedächtnis-Codes ab 22. Gelände: Die Anstalt nutzt `gelaendeSuchen(S, 2, 1, true) || (1, 2, true)`,
+die Wache `(1, 1, false)`. `STUFE_NEU` nennt Wache (Kleinstadt) und Anstalt (Stadt). Zeichen-Helfer für Gelände (`gelaendeRahmen`, `teilUV`
+usw.) liegen in der Darstellung und lassen sich für Kaserne und Dienstgebäude nutzen. Wehrdienst gibt 18-Jährigen eine Stelle und trifft
+damit die Gruppe mit der höchsten Tatneigung (18–24: 1,40); danach die Kalibrierung (S-A1) neu messen. Die Grenze „keine Überwachung von
+Bewohnern“ gilt auch für den Nachrichtendienst. (Umgesetzt in Teil 3, Abschnitt „Bund“: Gebäudetypen 11 und 12, Gedächtnis-Code 22; die
+Tatneigung der 18- bis 24-Jährigen sank nicht, gemessen 1,51; die Taten liegen bei 32,8 statt 32,2 je 1.000, nicht neu kalibriert.)
+
+## Bund: Kaserne, Wehrpflicht, Nachrichtendienst (Version 7, Teil 3)
+
+Teil 3 von „Stadt erweitern“. Noahs Wunsch: „Jz machen wir noch das die statd eigen Militär basen hat Waffen und alles kann Geheimdienst
+und alles wie in Amerika so macht und so Gefängnis also kann man die Stadt erweitern“. Das Gefängnis kam in Teil 2. Hier kommen Militär und
+Nachrichtendienst dazu, mit Noahs Entscheidungen: **Militär heißt alles**: eine Kaserne als Arbeitgeber, Wehrdienst und eine sichtbare Anlage.
+Die **Wehrpflicht gilt für alle, die 18 werden**. Zwei Abweichungen sind im Fenster markiert: die Beschränkung auf Deutsche, die das Programm
+(S. 88) und das geltende Recht kennen (§ 1 Abs. 1 WPflG: „alle Männer …, die Deutsche im Sinne des Grundgesetzes sind“; für Soldaten auf Zeit
+§ 37 Abs. 1 Nr. 1 SG), und das Geschlecht im Gesetz (Art. 12a Abs. 1 GG, § 1 WPflG). Bis zur Schlussprüfung nannte das Fenster die
+Beschränkung auf Deutsche nur als Forderung des Programms (Befund X1, blockierend, behoben).
+
+**Wirklichkeit:** Keine Stadt hat eigenes Militär, weder in Deutschland noch in den USA, und keine hat einen Nachrichtendienst als eigene
+Behörde. Große US-Stadtpolizeien haben aber eigene Aufklärungsabteilungen: Zum Intelligence Bureau der New Yorker Polizei gehörte die
+„Demographics Unit“ (Befund X8 der Schlussprüfung; en.wikipedia.org „New York City Police Department Intelligence Bureau“, CNN 15. 4. 2014). Streitkräfte
+stellt der Bund auf (Art. 87a Abs. 1 GG). Die Verteidigung ist seine ausschließliche Gesetzgebung (Art. 73 Abs. 1 Nr. 1 GG). In den USA
+stellt der Kongress die Armeen auf (Verfassung Art. I Abschn. 8). Ein Bundesstaat darf in Friedenszeiten ohne Zustimmung des Kongresses keine
+Truppen halten (Art. I Abschn. 10). Seine National Guard untersteht im Dienst für den Staat dem Gouverneur (National Guard Bureau).
+Deshalb sind Kaserne und Dienststelle in der Stadt **Einrichtungen des Bundes**: Er baut sie und zahlt Bau, Löhne und Sold. Im Spiel ist
+das Geld „von außen“. „Wie in Amerika“ ist nur das Aussehen: ein großes Gelände mit Zaun, Wachtürmen, Hangar und Hubschrauberplatz.
+
+Umgesetzt im sim-Block im Abschnitt „Bund (Version 7, Teil 3)“ (bis „Ende Bund“). `bundTag(S)` läuft jede Nacht nach dem Bauamt: Bau →
+Eröffnung → Besetzung zählen → Jahreszeile → Geld vom Bund für „gestern“. Diensttage, Dienstende und Einberufung laufen in `menschenTag`. Löhne
+und Sold zahlt ein eigener Zweig `istBund` in `wirtschaft`, den Sold im Ersatzdienst der Zweig des Bauhofs. Der Abschnitt zieht **keinen
+Zufall**. Mit `R.BUND_BAUT = 0` und `R.WEHRPFLICHT = 0` läuft die Stadt genau wie ohne den Bund (nachgeprüft gegen den Stand von Teil 2 mit
+`mil/mess/ohne_bund.mjs`: Seeds 1–3 je 730 Tage, jeden Tag gleich). So vergleichen `--erweiterung` und
+`--migrationstest` mit Version 6 (`sicherheitAus` schaltet jetzt auch den Bund aus). Grundlage war der Entwurf `scratchpad/erw7/mil_entwurf.txt`
+(Prototyp auf 414ebab) mit der Gegenprüfung `mil_pruefung.txt`. Übertragen ist die Logik auf den Stand nach Teil 2, nicht die Patches.
+
+### Regeln
+
+- **Kaserne.** Ab der Stufe Stadt (160 Einwohner) lässt der Bund eine Kaserne auf einem Gelände von 3 × 2 Blöcken (11 × 7 Felder) am
+  Stadtrand bauen. Das Gelände kommt aus der Schnittstelle von Teil 1: `gelaendeSuchen(S, 3, 2, true) || (2, 3, true)`, `gelaendeBauen`. Er
+  zahlt 9.600 Taler an die Stadtkasse, der Bauhof baut 48 Arbeitstage. Das ist als Vereinfachung markiert: In Wirklichkeit planen die
+  Bauverwaltungen von Bund und Ländern, und Firmen bauen. Findet sich kein Gelände (ganz freie Blöcke an einer Straße), sucht der Bund in der
+  nächsten Nacht wieder. Eine Zufahrt legt er nicht an. Offen ist die Kaserne ab dem Tag nach der Fertigstellung (`S.bund.kOffen`). Das
+  Stadtbuch meldet Auftrag und Eröffnung ohne Namen.
+- **Stellen der Kaserne:** 8 für Soldatinnen und Soldaten, 4 für Zivilbeschäftigte, 92 Taler Lohn am Tag vom Bund, darauf die Lohnsteuer wie
+  bei jedem Lohn. Ob jemand Soldat oder Zivil wird, entscheidet **nur die freie Stelle**: Solange weniger als 8 Soldaten da sind, wird man
+  Soldat (`anstellen`). Die Funktion liest nichts von der Person. **Soldaten auf Zeit sind 4 Jahre (40 Spieltage) gebunden** (`verpflichtet`):
+  Sie wechseln die Stelle nicht, kündigen nicht und gründen nichts. Sie hören auch nicht wegen eines fehlenden Kita-Platzes auf (Befund 6,
+  siehe unten). Freinehmen und wegziehen dürfen sie. Mit Rentenanspruch endet die Bindung. Sind Stellen des Bundes frei, besetzt sie der
+  Zuzug nach den Stellen des Landes (Versetzung, B11; Kaserne vor Dienststelle).
+- **Wehrpflicht** (`einberufen`, W1). Wer 18 wird, wird in der Nacht seines Geburtstags einberufen. Das gilt ab dem **Tag nach der
+  Eröffnung** der Kaserne, vorher nicht und auch nicht nachträglich (Befund 9). Die Regel gilt für alle: Die Stadt kennt keine
+  Staatsangehörigkeit, und das Geschlecht spielt keine Rolle. Nicht einberufen wird, wer in Haft ist oder schon Stelle oder Betrieb hat (mit 18
+  kommt das nicht vor). **Wehr- oder Ersatzdienst** legt ein fester Wert je Person fest (`dienstWahl`, B8): ein Hash aus Seed, Personennummer,
+  Generation des Speicherplatzes und Geburtstag, kein Zug aus dem Zufallsstrom. Liegt er unter 0,7, wird es Ersatzdienst. Die
+  Gewissensentscheidung (Art. 4 Abs. 3 GG) bildet die Stadt nicht ab.
+- **Dienst.** Er dauert 5 Spieltage (6 Monate, B6): Wehrdienst in der Kaserne, Ersatzdienst im Bauhof. **60 Taler Sold** am Tag brutto vom
+  Bund, darauf die Lohnsteuer wie bei jedem Lohn (Befund 5). Betrag und Steuer kommen aus derselben Regelung, dem heutigen Wehrdienst (B7).
+  Der Dienst ist **keine Stelle**: Er kommt zu den Stellen dazu, auch im Bauhof, und nimmt niemandem eine bezahlte Stelle weg. Im Bauhof
+  zählt er **nicht zur Obergrenze von 40** (Befund 2): `stellen = 10 + Zuschlag + gemeinnützig + Ersatzdienst`, der Zuschlag rechnet ohne
+  Ersatzdienst, und bei der Heranziehung zu gemeinnütziger Arbeit zieht `grundsicherung` ihn ab. Im Dienst gibt es keinen Stellenwechsel,
+  keine Kündigung, keinen freien Tag, keine Gründung und keinen Wegzug aus eigenem Antrieb (entscheide und erlaubteAktionen gleich). Die
+  Person wohnt weiter zu Hause (B13). Diensttage zählen ab der Nacht nach der Einberufung (Befund 9). In der Nacht des letzten Tages endet der
+  Dienst (`dienstEnde`, der Sold dieses Tages ist bezahlt), und die Person entscheidet in der nächsten Stunde neu. Früher endet er nur durch
+  Tod, Haft (vereinfacht) oder den Wegzug des Haushalts. Das zählt als „abgebrochen“, auch am letzten Tag. Einmal im Jahr schreibt das
+  Stadtbuch, wie viele einberufen wurden.
+- **Ersatzdienst im Bauhof** (B12): Er arbeitet auf den Baustellen wie alle im Bauhof. Ohne Baustelle macht er **Landschaftspflege für die
+  Stadt und keine Kisten zum Verkauf**. Er zählt nicht beim Umlandpreis (`exportArbeiter`), nicht bei den Kisten der Werkstatt (`da`, in
+  `wirtschaft` und `kistenVerteilen`) und trägt keine Kisten (`traeger`). Zivildienst dient dem Allgemeinwohl (§ 1 ZDG), § 4 Abs. 1 Nr. 1
+  ZDG nennt auch die Landschaftspflege. Den Sold zahlt der Bund, nicht das Budget.
+- **Dienststelle des Bundesnachrichtendienstes.** Ab der Stufe Großstadt (800 Einwohner) lässt der Bund einen Block am Stadtrand bebauen
+  (`gelaendeSuchen(S, 1, 1, true)`, 3.200 Taler, 16 Arbeitstage). Sie hat 4 Stellen mit 92 Taler Lohn vom Bund. Sie ist **nur Arbeitgeber**:
+  Keine Funktion beobachtet Bewohner, stuft sie ein oder legt Akten an. `--militaer` prüft statisch, dass nur 16 festgelegte Funktionen die
+  Dienststelle überhaupt nennen (Bau, Stellen, Texte, Prüfung). Die Begründung ist eine **Grenze der Stadt, keine Aussage des Programms**
+  (Befund 3). Das Programm lehnt den Überwachungsstaat ab (S. 124). Es fordert aber elektronische Überwachung an den Grenzen (S. 125) und
+  weist Terrorabwehr und den Schutz vor Spionage und Sabotage dem BND und den Polizeibehörden zu (S. 138, im Abschnitt zur Reform des
+  Verfassungsschutzes; dass damit Aufgaben im Inland gemeint sind, ist eine Deutung der Stadt, Befund X4). Nach geltendem Recht sammelt der
+  BND Informationen über das Ausland (§ 1 Abs. 2 BNDG). Seit der Schlussprüfung sucht `gelaendeSuchen` einen Block auch im Rahmen von zwei
+  Blöcken (Abschnitt „Stadt erweitern“, Schnittstelle); vorher gab es in einem dichten Stadtkern oft lange keinen Platz, und die Dienststelle wartete,
+  bis das Bauamt eine Straße verlängert (gemessen unten).
+- **Grenze der Stadt.** Keine Regel des Bundes liest Namen, Geschlecht, Herkunft, Einzugstag, Eltern, Gedächtnis oder Heimatliebe.
+  `--militaer` prüft je Funktion die gelesenen Personenfelder (`verpflichtet`, `dienstZahl`, `dienstWahl`, `einberufen`, `dienstEnde`,
+  `bundStelleFrei`, `bundTag`, `anstellen`, `austreten` und die Bund-Zeilen in `entscheide` und `erlaubteAktionen`). Mit getauschten
+  Namenslisten läuft die Stadt bitgleich (Seed 2, 400 Tage, mit Einberufungen). Gemessen, nicht geregelt: Auf den Seeds 1–12 leisten 70,3 %
+  der Männer und 68,7 % der Frauen Ersatzdienst (1.455 von 2.069 und 1.430 von 2.083).
+
+### Programmpunkte (Fenster „Stadtregierung“, Gruppe „Bund in der Stadt (Einrichtungen des Bundes)“)
+
+Drei Karten im Stil der übrigen, jede mit Zitaten, Zahlen (`regLive`) und einem aufklappbaren Teil:
+
+- **„Kaserne der Bundeswehr“** (Annahme der Stadt). Zitate S. 88: „Die deutschen Streitkräfte sind nicht verteidigungsfähig.“, „Es fehlt an
+  Personal und einsatzfähiger Ausrüstung.“ und der Satz zur Ausstattung (Befund 8; das Zitat von S. 86 ist weg). Größe als Spielmaßstab, die
+  Bau-Vereinfachung als Hinweis (Befund 7a), Wirklichkeit mit Art. 87a und 73 GG, USA mit National Guard (Befund 7c). Fahrzeuge: Weitreichende
+  US-Waffensysteme stehen nicht auf dem Gelände, ihre Stationierung lehnt das Programm ab (S. 91). Raketen und Drohnen der Bundeswehr lässt die
+  Darstellung weg. Das ist eine Annahme für den Look, keine Aussage des Programms (Befund 4).
+- **„Wehrpflicht für alle, die 18 werden, mit Ersatzdienst“** (wirkt · Abweichung). Zitate S. 88: „Daher wollen wir die Wehrpflicht wieder
+  einsetzen. Diese beinhaltet gemäß aktueller Gesetzeslage auch den Ersatzdienst.“ und „Um Loyalitätskonflikte zu vermeiden, soll der Dienst in
+  den Streitkräften ausschließlich deutschen Staatsbürgern vorbehalten bleiben.“ Beide Abweichungen sind benannt: Programm (S. 88) und
+  geltendes Recht beschränken den Dienst auf Deutsche (§ 1 Abs. 1 WPflG, § 37 Abs. 1 Nr. 1 SG), das Gesetz verpflichtet zudem nur Männer
+  (Art. 12a Abs. 1 GG); die Stadt kennt keine Staatsangehörigkeit und beruft alle ein. Die Hauskarte der Kaserne sagt es kurz („Programm und
+  Gesetz: nur Deutsche, das Gesetz nur Männer; die Stadt kennt keine Staatsangehörigkeit und beruft alle ein.“). Dauer (§ 5 Abs. 2 WPflG,
+  heute mindestens 6 Monate in der Truppe) und Sold (brutto wie im heutigen Wehrdienst; § 3 Nr. 5 Buchst. a EStG nur als Gegenüberstellung
+  für den Pflichtdienst) stehen in der Karte, ebenso der heutige Stand (§§ 2, 2a WPflG; seit 2026 bekommen alle Deutschen ab Jahrgang 2008
+  nach dem 18. Geburtstag einen Fragebogen, deutsche Männer müssen ihn beantworten und werden gemustert, für Frauen ist er freiwillig;
+  bundeswehr.de „Fragebogen zur Wehrerfassung“ und „Musterung“, bmvg.de, am 27. 9. 2026 gelesen). Vereinfacht sind: keine Musterung, zu Hause
+  wohnen (§ 18 SG), Beginn ab der Eröffnung, Ende durch Haft, Bauhof statt Pflege.
+- **„Dienststelle des Bundesnachrichtendienstes, keine Überwachung der Bewohner“** (Annahme der Stadt). Zitate S. 138 (Verfassungsschutz;
+  Terrorabwehr beim BND) und S. 124 (Überwachungsstaat). Die Annahme sagt, dass „niemand wird überwacht“ die Grenze der Stadt ist, und
+  dass „im Inland“ bei S. 138 eine Deutung der Stadt ist. In den USA hat keine Stadt einen Nachrichtendienst als eigene Behörde, große
+  Stadtpolizeien aber Aufklärungsabteilungen: Zum Intelligence Bureau der New Yorker Polizei gehörte die „Demographics Unit“, die
+  muslimische Viertel kartierte, bis April 2014 (ACLU). Genau das schließt die Grenze aus.
+
+Dazu ein Hinweiskasten zu Kaserne und Nachrichtendienst (S. 91). „Geld von außen“ hat zwei Zeilen „Bund für Kaserne und Nachrichtendienst,
+gestern“ und „… seit dem Start“. „Von außen, gestern“ oben links enthält den Bund. **Nicht übernommen**, ergänzt für die Kapitel
+Außen- und Sicherheitspolitik (S. 86–91) und die Stellen S. 124 und 138: „Grenze der Stadt“ mit Terrorabwehr und Schutz vor Spionage und
+Sabotage durch den BND (S. 138, Befund 3; dass der Satz das Inland meint, ist als Deutung der Stadt gekennzeichnet, Befund X4 der Schlussprüfung). „Kein Gegenstück in der Stadt“ mit 12 Punkten: GASP (S. 86), Bündnisse (S. 87), wehrtechnische Industrie,
+Privatisierungen, Führungsverantwortung (S. 88), Cyber-Fähigkeiten, Korpsgeist, Liedgut, Schutzräume (S. 89), Rüstungskontrolle (S. 90),
+US-Waffensysteme (S. 91) und parlamentarische Kontrolle (S. 138). S. 88 und das Waffenrecht (S. 120) haben neue Begründungen. Alle Zitate im
+Fenster: **234**. `zitatpruef.py` findet 231, `zitate_genau.py` findet dieselben 231 wörtlich auf der genannten Seite, 0 Fehler. Die übrigen
+3 sind keine Programmzitate: Noahs „Wie in Amerika“ (zweimal) und der Name „Demographics Unit“. Gesammelt mit `mil/mess/zitate_sammeln.mjs`,
+jetzt mit dem Hinweis zum Bund. Neu in Teil 3 sind 22 Programmzitate (Teil 2: 209). Stand nach der Schlussprüfung: 235 Zitate, 232 aus
+dem Programm (S. 124 ist geteilt, Abschnitt „Befunde der Schlussprüfung“).
+
+### Annahmen (B1 … B21)
+
+| # | Annahme | Wert | Begründung, Quelle |
+|---|---|---|---|
+| B1 | Wann der Bund baut | Kaserne ab der Stufe Stadt (160), Dienststelle ab der Großstadt (800) | Stufen aus Teil 1 (Spielmaßstab 125); `STUFE_NEU` nennt beides |
+| B2 | Größe des Geländes | Kaserne 3 × 2 Blöcke (11 × 7 Felder), Dienststelle 1 Block | Stilisiert wie die Häuser; echte Kasernen sind viel größer |
+| B3 | Stellen | Kaserne 8 Soldaten + 4 Zivil, Dienststelle 4 | Bundeswehr am 31. 8. 2026: 186.356 in Uniform, 81.751 in Zivil (bundeswehr.de, Personalzahlen), also ein Drittel zivil. 12 Stellen stehen mit dem Maßstab 125 für etwa 1.500 Dienstposten. Für den BND gibt es keine öffentliche Zahl je Dienststelle; 4 sind geschätzt |
+| B4 | Lohn beim Bund | 92 Taler am Tag (Soldaten, Zivil, BND) | Destatis, durchschnittlicher Bruttojahresverdienst Vollzeit 2025: insgesamt 64.441 €, Abschnitt O (Öffentliche Verwaltung, Verteidigung; Sozialversicherung) 59.350 €; 0,921 × 100 |
+| B5 | Bau | Kaserne 9.600 Taler und 48 Arbeitstage, Dienststelle 3.200 und 16 | 200 Taler je Arbeitstag wie beim Wohnhaus. Der Bauhof baut (Vereinfachung, im Fenster markiert) |
+| B6 | Dauer des Dienstes | 6 Monate = 5 Spieltage | § 5 Abs. 2 WPflG (Grundwehrdienst 6 Monate); bundeswehr.de, Neuer Wehrdienst: „Mindestens sechs Monate verbringen die Wehrdienstleistenden in der Truppe.“ Ersatzdienst gleich lang |
+| B7 | Sold | 60 Taler am Tag brutto, Lohnsteuer wie jeder Lohn; Ersatzdienst gleich | bundeswehr.de, Neuer Wehrdienst: „Grundgehalt von etwa 2.600 Euro brutto monatlich“ = 31.200 € im Jahr; nach U1 (100 Taler ≙ 52.159 €) 59,8. Dieser Bezug ist steuerpflichtig. Nur Pflicht-Wehrdienstleistende nach § 4 WPflG wären steuerfrei (§ 3 Nr. 5 Buchst. a EStG); die Stadt nimmt Betrag und Steuer aus derselben Regelung (Befund 5). Zivildienstleistende bekamen dieselben Bezüge (Wikipedia „Zivildienst in Deutschland“) |
+| B8 | Anteil Ersatzdienst | 70 %, fest je Person (Hash aus Seed, Nummer, Generation, Geburtstag) | Im März 2010 leisteten 77.437 Männer Zivildienst und 32.673 Grundwehrdienst (Wikipedia „Zivildienst in Deutschland“; Primärquelle nicht geprüft). Kein Zug aus dem Zufallsstrom, damit die Einberufung die übrige Stadt nicht verschiebt |
+| B9 | Einberufung erst ab der Eröffnung | ab dem Tag nach der Eröffnung, nicht nachträglich | Dienst anderswo müsste die Stadt als Abwesenheit abbilden. Gemessen: Kaserne offen im Mittel ab Tag 191, erster Dienst an Tag 204 |
+| B10 | Soldaten auf Zeit | 4 Jahre gebunden: kein Wechsel, keine Kündigung, keine Gründung, kein Aufhören wegen der Kita; freinehmen und wegziehen erlaubt; endet mit Rentenanspruch | bundeswehr.de: ab 12 Monaten Soldat auf Zeit (etwa 2.700 € brutto). Die 4 Jahre sind eine Annahme. Ohne Bindung wechselten Soldaten sofort in besser bezahlte Werkstätten |
+| B11 | Versetzung beim Zuzug | Freie Stellen des Bundes gehen beim Zuzug nach denen des Landes vor | Soldaten werden an einen Standort versetzt. Ohne das bliebe die Kaserne fast leer (Entwurf: 2,3 Soldaten im Mittel) |
+| B12 | Ersatzdienst im Bauhof | Baustellen, sonst Landschaftspflege, keine Kisten; nicht in der Obergrenze von 40; Sold vom Bund | Art. 12a Abs. 2 GG: Ersatzdienst ohne Bezug zu den Streitkräften. § 1 und § 4 Abs. 1 Nr. 1 ZDG. Mit den Kitas wäre eine soziale Einsatzstelle näher dran (offene Frage) |
+| B13 | Wohnen im Dienst | zu Hause, Wohnen und Kontakt unverändert | § 18 SG erlaubt eine Pflicht zur Gemeinschaftsunterkunft auf Anordnung; die Stadt bildet sie nicht ab. So stimmen Simulation und Figuren überein: tagsüber in der Kaserne, nachts zu Hause |
+| B14 | Geschlecht und Staatsangehörigkeit | spielen keine Rolle | Harte Grenze (Staatsangehörigkeit) und Annahme 15 (Geschlecht). Zwei Abweichungen, im Fenster markiert: Programm (S. 88) und geltendes Recht beschränken den Dienst auf Deutsche (§ 1 Abs. 1 WPflG, § 37 Abs. 1 Nr. 1 SG), das Gesetz verpflichtet nur Männer (Art. 12a Abs. 1 GG) |
+| B15 | Freinehmen | Soldaten und Zivil ja (Tageslohn fällt weg wie überall), im Dienst nicht | Einheitliche Regel der Stadt; in Wirklichkeit ist Urlaub bezahlt |
+| B16 | Rente | Die Bindung endet mit dem Rentenanspruch (Schritt 2) | Berufssoldaten gehen früher in Ruhestand; das bildet die Stadt nicht ab |
+| B17 | Lage | Gelände am Stadtrand (weitester freier Platz an einer Straße); ohne Gelände warten | Schnittstelle aus Teil 1. Eine eigene Zufahrt legt der Bund nicht an; die Dienststelle wartet deshalb in dichten Städten (unten) |
+| B18 | Nachrichtendienst | nur Arbeitgeber, keine Wirkung auf Bewohner | § 1 Abs. 2 BNDG. Grenze der Stadt, keine Aussage des Programms (S. 124, 125, 138) |
+| B19 | Fahrzeuge und Waffen | Kampf- und Schützenpanzer vor der Fahrzeughalle, ein Panzer und drei Lkw am Übungsplatz, ein Hubschrauber; alles steht still. Schießbahn mit Erdwall und drei Scheiben | Nur zum Ansehen. Keine weitreichenden US-Waffensysteme (S. 91); Raketen und Drohnen der Bundeswehr weggelassen als Annahme für den Look |
+| B20 | Maßstab für die Begründung | 1 Bewohner ≙ 125 Menschen | Aus Teil 1 (`STUFE_MASSSTAB`), nur zur Begründung der Stellenzahl |
+| B21 | Alter beim Anstellen | spielt keine Rolle (auch ein 53-Jähriger wird Soldat auf Zeit, Seed 2, Tag 460) | `anstellen` liest bewusst nichts von der Person. Die Bundeswehr hat Altersgrenzen (nicht nachgeschlagen); im Fenster als Vereinfachung genannt (Befund X18 der Schlussprüfung) |
+
+**Quellen** (abgerufen September 2026; Kopien der Gesetze in `scratchpad/erw7/mil/recht/`): gesetze-im-internet.de: GG Art. 4, 12a, 73,
+87a; WPflG §§ 1, 2, 2a, 4, 5; ZDG §§ 1, 4, 35; SG §§ 18, 37; EStG § 3; BNDG § 1. bundeswehr.de: „Personalzahlen der Bundeswehr“ (Stand
+31. 8. 2026) und „Neuer Wehrdienst“ (Grundgehalt, mindestens sechs Monate, Wehrerfassung ab Jahrgang 2008, Wohnen in der Kaserne).
+destatis.de: „Durchschnittliche Bruttojahresverdienste von Vollzeitbeschäftigten im Jahr 2025“. Wikipedia „Zivildienst in Deutschland“
+(Zahlen März 2010, gleiche Bezüge). ACLU-Pressemitteilung „NYPD Shuts Unit That Mapped Muslim Communities“ (April 2014). US-Verfassung
+(archives.gov, Art. I Abschn. 8 und 10). National Guard Bureau, Fact Sheet „National Guard Duty Statuses“ (Gouverneur, Title 32). Das
+Programm „Zeit für Deutschland“ S. 86–91, 124, 125 und 138 selbst gelesen. Neu mit der Schlussprüfung (27. 9. 2026): § 1 Abs. 1 WPflG und
+§ 37 Abs. 1 Nr. 1 SG aus den Kopien in `mil/recht/` (Deutsche; § 37 Abs. 2 SG erlaubt Ausnahmen), bundeswehr.de „Fragebogen zur
+Wehrerfassung“ („Männer müssen den Fragebogen beantworten, für Frauen ist dieses freiwillig.“) und „Musterung“ (verpflichtend für
+wehrpflichtige Männer ab Jahrgang 2008), bmvg.de „Neuer Wehrdienst tritt ab 1. Januar in Kraft“, en.wikipedia.org „New York City Police
+Department Intelligence Bureau“, CNN vom 15. 4. 2014 zur Auflösung der Demographics- bzw. Zone Assessment Unit.
+
+### Darstellung
+
+**Ein Draw Call mehr** (`bundMesh`, nur solange es Kaserne oder Dienststelle gibt: 25 statt 24 in der Teststadt an Tag 400, gemessen mit
+und ohne das Mesh). Kästen (Unterkünfte, Stabsgebäude, Fahrzeughalle, Wachtürme, Zaun, Tor mit Schranke, Bürobau, Fenster) liegen wie bei
+Wache und Anstalt in `teil`, `tech`, `fenster` und `schlot`. Sie sind klickbar, tönbar und werden stündlich geschrieben. Runde und schräge
+Teile liegen im Bund-Mesh: Rundbogen-Hangar mit Rippen, Hubschrauberplatz mit Ring und „H“, Hubschrauber mit stehendem Rotor, Panzer, Lkw,
+Erdwall mit Scheiben, Fahnenmast mit Bundesflagge, zwei Radome, zwei Schüsseln und ein roter Gittermast. Das Mesh hat 1.656 Dreiecke in festen
+Puffern (höchstens 12.000). Es wird **nur bei neuem Schlüssel** neu geschrieben (Gelände, Tor, Baufortschritt im Viertel, Eröffnung),
+stündlich geprüft: keine Allokation je Bild. **Nichts bewegt sich von selbst.** Nur die **Warnlichter am Mast** leuchten nachts und
+blinken (1 s an, 1 s aus). Das ist eine Uniform je Bild, im Lambert-Shader über `emissivemap_fragment` (three 0.186.0 geprüft). Bei
+reduzierter Bewegung leuchten sie stetig. Im Bau wachsen Rohbau und Gerüst; das Runde erscheint mit der Eröffnung. Klick irgendwo aufs
+Gelände öffnet die Hauskarte (`gelaendeVon`).
+**Figuren:** Soldaten und Wehrdienst in Oliv (`BUNDESWEHR_F` #6f7a45) stehen zur Arbeitszeit in Reihen zu 6 auf dem Antreteplatz, mit
+Blick zum Fahnenmast. Das Gelände ist ihr Arbeitsplatz in der Simulation (Grundregel). Zivilbeschäftigte und Nachrichtendienst tragen die
+Farben aller anderen. Der Ersatzdienst trägt Warnweste wie der Bauhof. Hilfe: „Lila: Tech-Firma. Oliv: Bundeswehr in der Kaserne.“ (eine
+Zeile, bei 1280 × 800 weiter 745 von 745 px ohne Überlauf). Stadtbuch: Art „Bund“ mit Hallen-Symbol. Hauskarte: Stellen, Lohn vom Bund,
+Wehrdienst, „Panzer, Lkw und der Hubschrauber stehen still und sind nur zu sehen“. Bei der Dienststelle: „In der Stadt überwacht niemand
+die Bewohner“. Personenkarte: „leistet Wehrdienst in der Kaserne … bis Tag X (60 Taler Sold am Tag vom Bund)“ bzw. Ersatzdienst, bei
+Soldaten „verpflichtet bis Tag X“. „Heute“ im Ersatzdienst ohne Baustelle: „Landschaftspflege für die Stadt“. Sprachmodell: Der Lagesatz
+sagt „Du leistest Wehrdienst …“ (nur Tatsachen der Figur). `--kitest` prüft, dass der Arbeitstext mit „leistet Wehrdienst“ oder
+„leistet Ersatzdienst“ beginnt.
+
+### Gemessen
+
+**Seeds 1–3** (`simtest --gate`, 730 Tage stündlich, alle Gates bestanden; in Klammern Teil 2):
+
+| Seed | Einwohner Tag 365 / 730 | Band Gate 4 | Gate 6 / Gate 7 | Stadtbuch je Tag | Kaserne / Dienststelle offen ab Tag | Wehr- / Ersatzdienst | Diensttage (beendet / abgebrochen) | Taten (D / E / B) |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 819 / 1.145 (802 / 1.146) | 1,10 (1,09) | +19,5 / −23,0 (+18,5 / −23,1) | 5,64 (4,78) | 206 / 368 | 103 / 227 | 1.620 (319 / 2) | 1.363 / 65 / 522 |
+| 2 (Teststadt) | 792 / 1.169 (753 / 1.157) | 1,08 (1,13) | +21,8 / −23,2 (+20,4 / −23,0) | 5,29 (5,08) | 211 / 371 | 101 / 208 | 1.519 (298 / 3) | 1.299 / 49 / 504 |
+| 3 | 951 / 1.148 (905 / 1.118) | 1,03 (1,05) | +19,7 / −27,1 (+17,7 / −23,3) | 4,82 (4,54) | 184 / 432 | 107 / 272 | 1.866 (369 / 3) | 1.234 / 43 / 455 |
+
+(Stand Teil 3. Seit der Schlussprüfung sucht `gelaendeSuchen` einen Block auch im Rahmen von zwei Blöcken: Auf Seed 3 öffnet die
+Dienststelle an Tag 333 ohne eine Nacht zu warten, auf Seed 1 eine Nacht früher als vorher; Seed 2 ist gleich.) Auf Seed 3 ist die Stadt seit
+Tag 327 eine Großstadt. 99 Nächte lang gab es keinen ganz freien Block an einer Straße: Die Häuser säumen alle
+Straßen, und die freien Blöcke vor den Straßenenden haben keine Straße an einer Seite. Erst nach einer neuen Straße des Bauamts findet der Bund
+Platz. `--militaer` prüft jede dieser Nächte: Der Bund wartet nur, wenn `gelaendeSuchen` wirklich nichts findet.
+
+Über viele Seeds mit derselben Messung (`mil/mess/mess9.mjs` = `mess/mess8.mjs` plus Bund, über `mil/mess/lauf80.sh`, Auswertung
+`mil/mess/vergleich_mil.py` und `vergleich_mil160.py`), 730 Tage stündlich, **gegen bc7247a** und Teil 2. Gemessen mit `mil/mess/stadt_v3.html`;
+der sim-Block des Endstands unterscheidet sich davon nur in einem Feld, das `bundInfo` liest (`stufe`, für das Fenster):
+
+| Seeds | Stand | alle Gates | fällt | Band Ø / Median / schlimmster | Gate 7 kleinster Abstand | Einwohner Tag 365 / 730 | Wegzüge (Personen) | Zuzüge |
+|---|---|---|---|---|---|---|---|---|
+| 1–80 | bc7247a | 77 von 80 | G4: 11, 23, 45 | 1,077 / 1,073 / 1,155 | 16,5 | 896 / 1.110 | 40,2 | 1.028 |
+| 1–80 | Teil 2 | 76 von 80 | G4: 22, 34, 57, 71 | 1,082 / 1,078 / 1,210 | 18,1 | 892 / 1.138 | 62,9 | 1.066 |
+| 1–80 | Teil 3 | 76 von 80 | G4: 44, 73, 77, 79 | 1,086 / 1,080 / 1,213 | 15,2 | 912 / 1.189 | 64,7 | 1.112 |
+| 81–160 | bc7247a | 76 von 80 | G7: 108; G4: 112, 130, 140 | 1,075 / 1,065 / 1,185 | 13,9 | 891 / 1.110 | 40,0 | 1.028 |
+| 81–160 | Teil 2 | 78 von 80 | G4: 153, 155 | 1,073 / 1,067 / 1,168 | 15,5 | 896 / 1.136 | 61,2 | 1.067 |
+| 81–160 | Teil 3 | 76 von 80 | G4: 91, 93, 101, 112 | 1,078 / 1,070 / 1,196 | 15,9 | 916 / 1.186 | 55,0 | 1.109 |
+
+Zusammen 152 von 160, gegen 153 (bc7247a) und 154 (Teil 2): **kein Unterschied über das Rauschen hinaus**, und kein „besser“. Welche Seeds
+an Gate 4 fallen, wechselt mit jeder Änderung. Eine Zwischenfassung ohne die Bindung bei der Kita-Lücke (Befund 6 unten) bestand auf den Seeds
+1–80 78 von 80 (G4: 44, 79). Das Band von Gate 4 liegt nie über 1,22. Gate 6 und 7 halten auf allen 160 Seeds.
+
+- **Bund** (Seeds 1–80; 81–160 fast gleich): Kaserne offen im Mittel ab Tag 191 (162–238), Dienststelle ab Tag 369 (320–584, in allen
+  80 Städten bis Tag 730; Seeds 81–160: 314–685), erster Dienst an Tag 204. Tag 366–730 im Mittel 7,40 von 8 Soldaten, 3,33 von 4 Zivil,
+  3,27 von 4 im Nachrichtendienst; zugleich 1,34 im Wehr- und 3,06 im Ersatzdienst. Bis Tag 730 je Stadt 106 Wehrdienste und
+  243 Ersatzdienste (69,5 %), 3,9 abgebrochen. Der Bund zahlt im Mittel 791 Taler am Tag Löhne und 141 Sold, dazu 12.800 Taler für die
+  Bauten. 18- bis 24-Jährige ohne Arbeit: 5,9 %.
+- **Taten** je 1.000 Einwohner und Jahr (Tag 366–730): Seeds 1–80 22,73 / 0,96 / 9,08 = **32,8**, Seeds 81–160 32,6 (Teil 2: 32,2 und 32,1;
+  PKS 2024: 32,1). Das sind etwa 2 % mehr als das Ziel und mehr als der Unterschied zwischen den Seed-Hälften, also eine Wirkung des Bundes,
+  keine Streuung. Die Tatneigung liest den Dienst nicht; sie steigt über Geld und Stelle (60 Taler Sold statt eines Lohns, danach wieder
+  ohne Stelle). Neu kalibriert ist nichts (S-A1 bleibt 0,0032, offene Frage unten). Nach Gruppen (`--sicherheit`, Seeds 1–6, Tag 200–730,
+  nur gemessen): 18–24 Jahre verurteilt 1,51 (Teil 2: 1,40). Die Vermutung aus Teil 2, Wehrdienst gebe 18-Jährigen Arbeit und senke das,
+  hält nicht. In der Stadt geboren 1,19, Nachnamen Kaya bis Kowalski 0,97, Frauen 0,98, Männer 1,02.
+- **Sonst** (Seeds 1–80, gegen Teil 2): Einwohner an Tag 730 1.189 statt 1.138 (Stellen des Bundes, Zuzug), Arbeitslose an Tag 730
+  5,11 statt 4,97 %, Zufriedenheit 70,55 statt 70,58, Stadtbuch 5,11 statt 4,93 Zeilen am Tag, kleinstes Budget gleich.
+- **Leistung:** `--gate` Zeit-Check T 1,4 bis 1,7 s für 365 Tage (< 5 s; allein gelaufen, im Parallellauf mit sechs anderen Modi bis
+  4,9 s). Draw Calls im Browser 24 bis 29 (Teststadt, Tag 400; Teil 2: 22 bis 27), im Lauf 26; neu ist genau einer (das Bund-Mesh).
+- **Große Stadt** (`&umland=300000`, Seed 2, Tag 750): 5.852 Einwohner (Teil 2: 5.703), Karte 144 × 144 (Teil 2: 104), 25 bis 28 Draw
+  Calls (Teil 2: 23 bis 26), Dreiecke 141.300 bis 146.400 (Teil 2: 129.500 bis 134.800). Die Kaserne stand bei der Bestellung am Rand,
+  die Stadt ist um sie herum gewachsen.
+
+### Speicherformat 7 (Bund)
+
+Neu je Person (`PF_BUND`, Pflicht in jedem Stand der Version 7): `bund` (1 Soldat, 2 Zivil, 3 Wehrdienst, 4 Ersatzdienst, 0 keine) und
+`dienstBis` (letzter Diensttag, bei Soldaten das Ende der Verpflichtung). Dazu `S.bund` (Start, Kaserne, Dienststelle, Eröffnungstage,
+Einberufungen im laufenden Jahr, Geld vom Bund gestern und die Summe dazu) und `S.stat.bund` (13 Summen: Löhne Kaserne und Dienststelle,
+Sold Wehr- und Ersatzdienst, Bau, Einberufungen, Diensttage, beendet, abgebrochen, Personentage je Stellenart). Gedächtnis-Code DIENST 22,
+Gebäudetypen KASERNE 11 und DIENSTSTELLE 12. `bundPruefen` lehnt beschädigte Stände ab („Spielstand beschädigt: Bund (…)“). Geprüft werden
+Zustand, Gebäude und Gelände, Eröffnung, Summen, Rollen (Rolle nur mit der passenden Arbeit, kein Dienst mit gemeinnütziger Arbeit, niemand in
+der Kaserne ohne Rolle) und Dienst (Dienst endet heute oder später, höchstens in 5 Tagen, Soldaten mit Verpflichtung, sonst 0). `--militaer`
+prüft 16 Fälle. **Übernahme** aus Version 2–6 (`migriereBund`, nach der Sicherheit, vor „Stadt erweitern“): Niemand dient, Summen 0, Zeile „Ab
+heute baut der Bund in der Stadt …“ (vorletzte, vor der Zeile „Stadt erweitern“). Die Kaserne bestellt der Bund in der nächsten Nacht, wenn
+die Stadt schon eine Stadt ist. Versionsdialog und Meldung sagen es („Einberufen wird erst ab der Eröffnung der Kaserne.“). Mit
+abgeschaltetem Bund und abgeschalteter Sicherheit läuft ein übernommener Stand der Version 6 60 Tage lang Tag für Tag wie in Version 6
+(`--migrationstest`). `--speichertest`: **Fingerabdruck `5ba8d43e5bd37135`** (Seed 1, Tag 150, 13 Uhr, 60 Tage weiter; Teil 2 `cb0ce3e6a26986c7`).
+Er ist neu, weil die Stadt jetzt den Bund hat und der Fingerabdruck `S.bund` enthält. Dazu kommen der Stand mit Haft und Obhut (jetzt Tag 262,
+`140e8b5469cc51a0`, sortiert `6aa189486bef189a`) und neu ein Stand mit Wehr- und Ersatzdienst, verpflichteten Soldaten und offener Dienststelle (Tag 400, `2a9aac381084e59d`, sortiert
+`23716e6b002bf2b3`), 60 Tage bitgleich (Befund 1). Der Teststand `tests/basis_v7.json` ist neu aus `tests/basis_v6.json` über „Stadt übernehmen“
+entstanden (`tests/basis_v7.cjs`; Tag 420, 2.186 Einwohner, jetzt mit den Feldern des Bundes). Das Original bleibt.
+
+### Tests
+
+- `simtest --militaer` (neu, 24 Prüfungen): statisch (kein Zufall im Abschnitt; je Regel nur die erlaubten Personenfelder, keine
+  Namen, kein Geschlecht; Löhne und Sold nie aus dem Budget; Ersatzdienst an allen drei Stellen ohne Kisten; Grenze der Dienststelle),
+  Namenstausch (bitgleich). Dazu Seeds 1–3 je 730 Nächte mit Invarianten nach jeder Nacht: Gelände 77 und 9 Felder, der Bund wartet nur ohne
+  Gelände, Rollen passen zur Arbeit, Obergrenzen, offene Stellen, Bauhof ohne Ersatzdienst höchstens 40, jede Einberufung mit 18 in der Nacht
+  des Geburtstags ab dem Tag nach der Eröffnung, niemand verpasst, niemand vorher, genau 5 Diensttage, Diensttage nachgezählt, Einberufene =
+  beendet + abgebrochen + im Dienst, verpflichtete Soldaten bleiben, erlaubte Aktionen um 7 und 18 Uhr, im Dienst nie frei, Geld von gestern =
+  Zuwachs der Summen, Stadtbuch ohne Namen. Erzwungen: Tod im Wehrdienst, Haft im Ersatzdienst, Wegzug, Bindung (auch mit Rentenanspruch),
+  Gehirn im Dienst (48 Stunden), Kita-Lücke, Einberufung vor der Eröffnung, ohne Wehrpflicht, in Haft, bei vollem Bauhof, leeres Budget
+  (der Bund zahlt nachgerechnet), abgeschalteter Bund. Speichern und Laden (60 Tage bitgleich), 16 beschädigte Stände. Messung:
+  Ersatzdienst-Anteil 60–80 % (69,4 %), nach Geschlecht, Besetzung.
+- Angepasst (Befund 1; keine Prüfung ist schwächer): `--regierung` rechnet Kaserne, Dienststelle und den Sold im Wehr- und Ersatzdienst in
+  den unabhängigen Erwartungen mit. Die Bauhof-Formel enthält den Ersatzdienst, die Obergrenze gilt ohne ihn. Der erzwungene Fall der
+  gemeinnützigen Arbeit hängt nicht mehr an Tag 400: Abschnitt 1 läuft bis 30 Nächte ohne Wechsel dabei sind, auf Seed 2 jetzt über Tag 400
+  hinaus. Die Person begeht in dem Fall keine Tat (Testhilfe `__ohneTat`, wie `__ohneJob`). Kaserne und Dienst sind als Kandidaten
+  ausgeschlossen, und die Arbeitslosenzahl in Abschnitt 3 zählt Haft nicht mit, wie die Stadt und Abschnitt 6. `--kitest` lässt „leistet
+  Wehrdienst“ und „leistet Ersatzdienst“ zu und prüft den Text. `--sicherheit` misst die Landeslöhne am richtigen Zweig; `haftAntritt` und
+  `einkommenTag` dürfen `bund` lesen. Der Obhut-Fall sucht bei Bedarf einen späteren Tag. `--waren`: Der Ersatzdienst macht keine Kisten.
+  `--speichertest`: Bund-Stand dazu. Der Obhut-Haushalt braucht ein Kind unter 18 und einen Erwachsenen (`hhKinder` zählt von der letzten
+  Nacht). `--migrationstest`: die Bund-Zeile, drei statt zwei neue Zeilen aus Version 6, Kaserne nach 60 Tagen. `--erweiterung`: `STUFE_NEU`
+  nennt Kaserne und Dienststelle. Fingerabdruck, `spurRelativ` und `sicherheitAus` kennen den Bund.
+- Browser: `tests/militaer.cjs` (neu, in `tests/alle.sh`). Kaserne und Dienststelle auf eigenem Gelände. Stunde für Stunde 6–18 Uhr steht auf
+  dem Gelände nur, wer dort arbeitet, Soldaten und Wehrdienst in Oliv, nie in Oliv außerhalb. Klick aufs Gelände öffnet die Hauskarte.
+  Personenkarten für Soldat auf Zeit, Wehrdienst und Ersatzdienst. Fenster mit 3 Karten, Abweichungen, Grenze und S. 138, Vereinfachung, USA,
+  Geld vom Bund. Hilfe. Draw Calls genau +1, Puffer ohne Stundenschritt unverändert. Warnlichter tagsüber aus, nachts im Takt, reduziert stetig
+  an. Konsole leer. `tests/p6migration.cjs` prüft den Bund nach der Übernahme von Version 5 und 6: Zeile, Start, niemand im Dienst, Kaserne in
+  der ersten Nacht, niemand vor der Eröffnung. Nach dem Neuladen gilt die Karte vom Speichern; sie wächst nach der Übernahme mit der Kaserne am
+  Rand noch einmal. `tests/befunde_s2.cjs` erwartet zwölf aufklappbare Karten. `tests/sicherheit.cjs` zählt die Karten seiner Gruppe bis zur
+  nächsten. `tests/p7figuren.cjs`: nur der Kommentar (Gelände galt schon allgemein).
+- **Angepasst an den neuen Verlauf der Teststadt** (keine Prüfung ist schwächer): `tests/ereignis.cjs` mit neuen Momenten (`mess/momente7.mjs`):
+  Tag 599 um 8 Uhr sieben Übernahmen, Tag 639 vier Schließungen, Tag 683 ein Bau fertig, Tag 721 ein Bau fertig und eine Schließung. Gezählt
+  wird 0,1 s nach dem letzten Zeichen, allgemein statt fest. `tests/erweiterung.cjs`: Seed 2 wächst jetzt nur noch einmal, an Tag 198 von 56 auf
+  80, in der Nacht, in der Land und Bund am Rand Anstalt und Kaserne bestellen. Geprüft wird deshalb Seed 5, Tag 314, 88 → 96: allein in
+  seiner Stunde, Stufe Stadt (gesucht mit `mil/mess/wachsen_allein.mjs`).
+- **Ergebnis** auf dem Endstand: `stadt.html` md5 `5390692f24e0cf4665f257bad3fd2940`, Server auf 8713,
+  `tests/alle.sh`, KI-Nachbau auf 11434: p3test 12, p5neu 10, p7figuren 6, p8tech 14, raute_klick 6 von 6 Klicks, t1_xss 5, p4test 25,
+  s2karten 22, kita 22, befunde_s2 27, erweiterung 20, sicherheit 12, militaer 16, alle ohne Fehler. p6migration und ereignis fielen im
+  ersten Lauf an den verschobenen Momenten (oben). Nach der Anpassung liefen sie einzeln auf demselben Stand: p6migration 26, ereignis 21,
+  ohne Fehler. militaer lief nach einer Änderung an seinen Bildnamen noch einmal (16). `tests/otest`: befunde 21, handy 11, breit 12,
+  tastatur 4, breiten 20, hilfehoehe ohne Überlauf (745 von 745 px). Dazu `tests/pruef_v5.cjs` 17 und `tests/kennzahlen_hoehe.cjs`
+  ohne Fehler. Die Konsole ist leer, außer den absichtlichen Verbindungsfehlern zum KI-Nachbau in p4test und den abgebrochenen KI-Anfragen
+  in `blick.cjs`. Alle `simtest`-Modi auf dem Endstand ohne Fehler (`mil/lauf/*.txt`, `tools/simtest.mjs` md5
+  `503719a86816f2aaeacc6f67cbe706a2`): `--gate` (Seeds 1–3 alle Gates), `--speichertest` (bitgleich, alle drei Stände), `--aufholtest`
+  (Vergleich, keine Prüfung), `--kitest` 46, `--bau` 15, `--waren` 15, `--tech` 16, `--regierung` 154, `--kita` 40, `--sicherheit` 28,
+  `--militaer` 24, `--migrationstest --git /home/user/website-` 293 (Teil 2: 266; neu die Bund-Prüfungen), `--erweiterung --gross --git
+  /home/user/website-` 33
+- **Bilder** (Endstand, selbst angesehen): `nachher/` (`tests/blick.cjs`, Teststadt Seed 2, Tag 400: 943 Einwohner,
+  Großstadt, Karte 80 × 80, 27 bis 29 Draw Calls, 52.200 bis 52.700 Dreiecke; die Kaserne liegt rechts unten am Rand) und `nachher/militaer/`
+  (`mil/sicht.cjs`, `mil/bilder_bund.cjs`, `mil/antreten.cjs`, `tests/militaer.cjs`): Kaserne bei Tag und Nacht, von nah und fern; Antreten
+  um 10 Uhr mit acht Figuren in Oliv vor dem Fahnenmast, Wachturm und Schranke; Dienststelle mit Radomen und Mast, nachts mit roten
+  Warnlichtern; Hauskarten von Kaserne (ausgewählt, das ganze Gelände hell) und Dienststelle; Personenkarte im Ersatzdienst; Fenster.
+  `gross/` (`&umland=300000`, Seed 2, Tag 750: 5.852 Einwohner, Karte 144 × 144, 25 bis 28 Draw Calls). Die Bilder aus Teil 2 liegen in
+  `scratchpad/erw7/mil/vor/bilder_teil2/`
+
+### Befunde der Gegenprüfung „militaer“
+
+Alle umgesetzt:
+
+1. Testwerkzeuge im Baustein: `--regierung` und `--kitest` grün (siehe Tests), eigener Modus `--militaer` statt des vorgeschlagenen
+   `--bund`, Fingerabdruck mit `S.bund`. `--speichertest` speichert zusätzlich an einem Tag mit Kaserne, Dienststelle und Leuten im Dienst.
+   Alle Modi stehen mit Ergebnis oben.
+2. Bauhof-Obergrenze: Text und Code stimmen. Der Ersatzdienst zählt nicht zu den 40, der Zuschlag rechnet ohne ihn, und die Heranziehung zu
+   gemeinnütziger Arbeit zieht ihn ab. Ersatzdienst verdrängt keine bezahlte Stelle. `--regierung` und `--militaer` prüfen das.
+3. Dienststelle: „niemand wird überwacht“ ist die Grenze der Stadt, nicht das Programm. Die Karte nennt S. 124, S. 125 und S. 138 und § 1
+   BNDG. Unter „Nicht übernommen / Grenze der Stadt“ steht Terrorabwehr und Spionageschutz durch den BND (S. 138; „im Inland“ ist seit der
+   Schlussprüfung als Deutung der Stadt gekennzeichnet).
+4. S. 91 nur für weitreichende US-Waffensysteme. Raketen und Drohnen der Bundeswehr fehlen als Annahme für den Look (Karte, Kommentar im
+   Modul, B19).
+5. Sold: 60 Taler brutto mit der normalen Lohnsteuer, Betrag und Steuer aus derselben Regelung (heutiger Wehrdienst). § 3 Nr. 5 Buchst. a
+   EStG steht nur als Gegenüberstellung für den Pflichtdienst.
+6. Bindung: Text und Mechanik stimmen. „4 Jahre gebunden: wechselt und kündigt die Stelle nicht (außer in Rente) und gründet nichts;
+   freinehmen und wegziehen darf er“. Im Dienst „zieht nicht selbst weg“. Beim Nachprüfen fand sich eine Lücke: Die Betreuungslücke der Kitas
+   ließ Leute im Dienst und verpflichtete Soldaten aufhören. Jetzt nicht mehr (`kitaTag`, geprüft in `--militaer`; Annahme: der Dienst regelt
+   die Betreuung).
+7. Realismus: Der Bau durch den Bauhof ist als Vereinfachung markiert (Bauverwaltungen von Bund und Ländern). USA mit National Guard und der
+   „Demographics Unit“ der New Yorker Polizei. Die Kita als Ersatzdienst-Ort ist eine offene Frage (unten).
+8. Zitate: S. 88 („nicht verteidigungsfähig“, „Personal und einsatzfähiger Ausrüstung“, Ausstattung) statt S. 86.
+9. Nacht-Reihenfolge: Einberufen wird ab dem Tag nach der Eröffnung (`kOffen = Tag + 1`), Diensttage zählen ab der Nacht nach der
+   Einberufung. `--militaer` prüft beides jede Nacht (niemand vorher, genau 5 Diensttage, nachgezählt).
+
+Dazu beim Umsetzen: Stirbt oder geht jemand am letzten Diensttag, zählte das weder als beendet noch als abgebrochen. Jetzt zählt es als
+abgebrochen (`dienstEnde` löscht `dienstBis` vorher), und `--militaer` prüft die Bilanz jede Nacht. Im Stadtbuch und im Fenster steht,
+dass der Bund auf Gelände wartet.
+
+### Offene Fragen an Noah
+
+- Ersatzdienst in der **Kita** statt im Bauhof (Pflege und Soziales waren früher der Normalfall)?
+- Sollen Wehrdienstleistende in der Kaserne **wohnen** (Gemeinschaftsunterkunft, § 18 SG), nachts auch als Figur dort?
+- Soll der Bund eine **Zufahrt** bauen dürfen, wenn in der dichten Stadt kein Gelände frei ist? Für einen Block ist das seit der
+  Schlussprüfung gelöst (Suche im Rahmen von zwei Blöcken; auf den Seeds 1–80 öffnet die Dienststelle zwischen Tag 313 und 395, vorher
+  320 bis 584). Die Kaserne (3 × 2 Blöcke) wartet nach einer Übernahme manchmal, weil die Wache vorher eine der Stellen nimmt (Seed 2,
+  V6-Stand von Tag 260: 15 Nächte bis zur Bestellung; Abschnitt „Befunde der Nachprüfung“, N1).
+- **Wer zuerst**, wenn nach einer Übernahme nur zwei Stellen an Straßenenden frei sind: die Wache (so ist es, sie gehört zur Stufe
+  Kleinstadt; die Kaserne wartet auf Seed 2 an Tag 200, 230, 260, 330 in dieser Reihenfolge 14, 4, 15 und 67 Nächte) oder die Kaserne (dann
+  wartet die Wache: auf Seed 2 9, 5, 19 und 73 Nächte, auf Seed 8 an Tag 200 8, und in 19 der übrigen 27 Fälle eine Nacht länger, weil
+  das Land vor dem Bund baut; Gegenprobe der Nachprüfung, `nb/mess/b1_warten.mjs`)?
+- **Schutzräume** (S. 89) und Zivilschutz: nicht übernommen, weil es in der Stadt keine Katastrophe gibt.
+- Die Tatneigung ist mit dem Bund 2 % über der PKS. **Neu kalibrieren** (S-A1) oder so lassen?
+
+## Befunde der Schlussprüfung (Technik, Texte, Bedienung)
+
+Nach Teil 3 haben drei Gegenprüfungen den Stand gelesen, nachgerechnet und bedient (`scratchpad/erw7/pruef_technik/`,
+`pruef_bedienung/` und die Textprüfung). Ausgang war `stadt.html` md5 `5390692f24e0cf4665f257bad3fd2940`. Jeder Befund ist hier erst
+nachgeprüft und dann umgesetzt; alle sind erledigt, keiner ist offen geblieben (was dabei offen bleibt, steht unter „Bekannte Schwächen“).
+Die Simulation ändert sich nur in einem Punkt (B1, die Suche nach einem Block); die Teststadt (Seed 2) läuft dadurch Tag für Tag genau wie
+vorher (`befunde/vergleich.mjs`: 730 Tage gleich in Kennzahlen, Zufall, Anlagen und Karte), Seed 1 ab Tag 363 und Seed 3 ab Tag 329 anders,
+weil die Dienststelle früher Platz findet. Alles andere sind Texte, Prüfungen beim Laden, die Prüfung der Antworten des Sprachmodells und die
+Oberfläche. Arbeitsdateien: `scratchpad/erw7/befunde/` (Läufe, Messungen, Bilder, eigene Prüfskripte).
+
+### Technik
+
+- **T1 Lage der Gebäude beim Laden.** Ein Stand mit einem Gebäude außerhalb der Karte wurde angenommen (auch in bc7247a). Jetzt prüft
+  `erweiterungPruefen` jedes Gebäude (`g.x`, `g.y` auf der Karte, `feldGeb` am eigenen Feld → „Spielstand beschädigt: Lage der Gebäude“)
+  und jedes Gelände (Gebäude im Rechteck, jedes Feld zeigt auf das Gebäude und trägt seinen Typ oder ist Baustelle → „… Gelände“).
+  `--erweiterung` hat vier neue beschädigte Stände (Gebäude außerhalb, Feld zeigt auf ein anderes Gebäude, Gelände-Feld leer, Gelände-Feld
+  ohne Gebäude) und prüft die Meldung. `pruef_technik/mess/kaputt2.mjs` meldet jetzt „abgelehnt Spielstand beschädigt: Lage der
+  Gebäude“, `kaputt.mjs` lehnt weiter alle ab.
+- **T2 Auswertung von `tests/alle.sh`.** `tests/raute_klick.cjs` schreibt je Klick eine Zeile mit „OK“ oder „FEHL“ vorn und endet mit
+  exit 1 bei einem Fehlklick, weniger als 4 Klicks oder Fehlern auf der Seite. `tests/otest/hilfehoehe.cjs` prüft `scrollHeight ≤
+  clientHeight` („OK Hilfe bei 1280 × 800 ohne Überlauf …“) und endet sonst mit exit 1.
+- **T3 Bilder der Tests im Arbeitsordner.** p3test, p4test, p5neu, p6migration und p7figuren legen ihre Bilder in `tests/bilder_p3/` …
+  `tests/bilder_p7/`, p8tech in `tests/bilder_p8/`, `tests/otest` in `tests/otest/bilder/` (vorher direkt im scratchpad, in
+  `scratchpad/tech/sichtbar/werk/` und `scratchpad/design/r6/otest/bilder/`). Auch `v2import.json` von p6migration liegt jetzt dort.
+
+### Texte
+
+- **X1 Staatsbürger-Klausel (blockierend).** Das Fenster nannte die Beschränkung auf Deutsche nur als Forderung des Programms, obwohl das
+  geltende Recht sie schon enthält. Jetzt (Karte „Wehrpflicht“, Annahme): „Zwei Abweichungen. Programm (S. 88) und geltendes Recht
+  beschränken den Dienst auf Deutsche: Das Programm will ihn nur für deutsche Staatsbürger, und nach § 1 Abs. 1 WPflG sind alle Männer
+  wehrpflichtig, die Deutsche im Sinne des Grundgesetzes sind (für Soldaten auf Zeit § 37 Abs. 1 Nr. 1 SG). Das Gesetz verpflichtet zudem
+  nur Männer (Art. 12a Abs. 1 GG). Die Stadt kennt keine Staatsangehörigkeit, und das Geschlecht spielt keine Rolle: Sie beruft alle ein.“
+  Hauskarte der Kaserne: „Programm und Gesetz: nur Deutsche, das Gesetz nur Männer; die Stadt kennt keine Staatsangehörigkeit und beruft
+  alle ein.“ „Heute“: „Seit 2026 bekommen alle Deutschen ab dem Jahrgang 2008 nach dem 18. Geburtstag einen Fragebogen: Deutsche Männer
+  müssen ihn beantworten und werden gemustert, für Frauen ist er freiwillig“ (bundeswehr.de, am 27. 9. 2026 gelesen). Der Grund unter
+  „Nicht übernommen“ (S. 88) sagt, dass auch das geltende Recht die Beschränkung kennt. Kommentare an `R` und `einberufen` ebenso.
+  `tests/militaer.cjs` prüft § 1 Abs. 1 WPflG, § 37 Abs. 1 Nr. 1 SG und „Deutsche Männer müssen ihn beantworten“. README Abschnitt „Bund“
+  und B14 angeglichen.
+- **X2 Untersuchungshaft in echten Tagen.** Die Urteilszeile schrieb „3 Tage Untersuchungshaft werden angerechnet“ (Spieltage). Jetzt wie bei
+  der Ersatzfreiheitsstrafe: „110 Tage Untersuchungshaft (in der Stadt 3 Spieltage) werden angerechnet“. `--sicherheit` prüft den Wortlaut.
+- **X3 Kopftext „Grenze der Stadt“.** Ergänzt: „… außer auf Zeit und für alle gleich: Haft in einer Anstalt des Landes außerhalb (solange die
+  Anstalt in der Stadt fehlt oder voll ist) und Kinder, die das Jugendamt in einer Pflegefamilie außerhalb unterbringt. Beide bleiben
+  Bewohner, Wohnung und Haushalt bleiben.“
+- **X4 S. 138.** Das Programm sagt nicht „im Inland“. Karte, Grund unter „Nicht übernommen“ und README sagen jetzt: weist Terrorabwehr und
+  den Schutz vor Spionage und Sabotage dem BND und den Polizeibehörden zu (S. 138, im Abschnitt zur Reform des Verfassungsschutzes; dass
+  damit Aufgaben im Inland gemeint sind, ist eine Deutung der Stadt).
+- **X5 S. 155.** Kommentar in `obhutKandidat`/`obhutSuchen` und README: Familie vor Pflegefamilie nach S. 155; die Reihenfolge innerhalb der
+  Familie ist eine Annahme der Stadt. Die Karte sagt es auch.
+- **X6 Das Sprachmodell verdächtigt niemanden.** Neu im Abschnitt „Antworten prüfen“: `verdachtFrei(text, i)` verwirft (wie ungültiges
+  JSON) jeden Satz, der ein Wort des Verdachts oder einer Tat mit einem Wort zu Herkunft oder Religion verbindet, bei Opfern auch mit einem
+  Vor- oder Nachnamen aus den festen Namenslisten der Stadt außer dem eigenen (Annahme 77). Das gilt für Entscheidungen (`gedanke`),
+  Gespräche (`antwort`), Tagebuch (`eintrag`) und Code (`gedanke`). Der Satz in jeder Anweisung ist neutral: „Du weißt nur, was du selbst
+  erlebt hast, und beurteilst andere nur nach dem, was du mit ihnen erlebt hast.“ (vorher mit der Aufzählung „Name, Herkunft, Sprache oder
+  Religion“). `--kitest` prüft 11 Antworten, darunter „Ich glaube, Mehmet Koch hat mich bestohlen.“ (verworfen, auch als Entscheidung),
+  „Das waren sicher Ausländer, …“ und „Die Zugezogenen sind schuld …“ (verworfen), dagegen „Ich weiß nicht, wer mich bestohlen hat …“,
+  zwei Sätze mit Namen ohne Verdacht und den eigenen Namen (bleiben), und dass keine Anweisung „Herkunft“, „Religion“ oder „Sprache“ nennt.
+  Die Wirkung des neuen Satzes an einem echten Modell ist nicht gemessen (hier gibt es nur den KI-Nachbau). Die Nachprüfung fand
+  Wortformen, die durchgingen (Einbrecher, klaut, stahl, „fremd“, „<Name> ist ein Dieb“); nachgebessert im Abschnitt „Befunde der
+  Nachprüfung“ (N2).
+- **X7 Wache, Wirklichkeit.** § 99 HSOG mit den Befugnissen: „in Hessen auch Ordnungspolizei: Hilfspolizeibeamte der Gemeinden mit den
+  Befugnissen der Polizei für ihre Aufgaben“ (anwalt24.de nachgelesen). Dichte: „alle Polizeibeamten, auch Bundespolizei und
+  Bundeskriminalamt, die Wache ist Landespolizei: vereinfacht“.
+- **X8 Nachrichtendienst in den USA.** „Keine Stadt hat einen Nachrichtendienst als eigene Behörde“; große US-Stadtpolizeien haben eigene
+  Aufklärungsabteilungen, zum Intelligence Bureau der New Yorker Polizei gehörte die „Demographics Unit“ (Karte „Dienststelle“, Hinweis
+  zum Bund, README).
+- **X9 Leben in Haft.** „Das folgt dem Strafvollzugsgesetz des Bundes … Heute regeln das die Strafvollzugsgesetze der Länder, teils anders
+  (nicht einzeln geprüft).“ Ebenso bei § 140 Abs. 2 StVollzG (Karte S7) und in S-A11.
+- **X10 Obhut.** „Die Inobhutnahme ist eine vorläufige Unterbringung; für eine längere Zeit in einer anderen Familie sieht das Gesetz die
+  Vollzeitpflege vor (§ 33 SGB VIII). Die Stadt unterscheidet das nicht.“ § 33 SGB VIII auf gesetze-im-internet.de nachgelesen.
+- **X11 Grammatik.** „Im letzten Jahr wurde 1 Tat angezeigt“; Anweisung: „Zur Zeit lebt Mia bei dir, weil der einzige Erwachsene in ihrem
+  Haushalt in Haft ist.“ (mit mehreren: „alle Erwachsenen in ihrem Haushalt“, mehrere Haushalte „ihren Haushalten“; `obhutGrund`, von
+  `--kitest` geprüft). Die Personenkarte sagt dasselbe statt „ihr Haushalt ist in Haft“.
+- **X12 und B9 Abstand beim Wachsen.** Fenster, Versionsmeldung und Zeile zählen jetzt einheitlich bis zum Rand der Karte: Die Karte wächst,
+  wenn die Stadt „näher als 18 Felder an den Rand der Karte“ kommt (vorher „16“, gemeint war der erlaubte Rand zwei Felder weiter innen).
+  Wächst die Karte in einer Nacht mehrmals, bleibt es eine Zeile („Die Stadt reicht in dieser Nacht zweimal nah an den Rand der Karte:
+  zuerst im Norden bis 17 Felder, dann im Osten bis 12 Felder. … von 56 × 56 auf 80 × 80 Felder.“). `--erweiterung` prüft je Nacht eine
+  Zeile mit beiden Größen und Abständen unter 18, dazu die doppelte Nacht auf Seed 2 (Tag 197).
+- **X13 Zur Vollständigkeit.** „Beim Bund übernommen ist die Wehrpflicht mit Ersatzdienst (für alle, zwei Abweichungen). Kaserne und
+  Dienststelle sind eine Annahme der Stadt (Arbeitgeber des Bundes), keine Forderung des Programms; …“
+- **X14 Bau durch den Bauhof bei Wache und Anstalt.** Beide Karten haben jetzt den Hinweis „Vereinfacht: Das Land zahlt den Bau an die
+  Stadtkasse, und der Bauhof der Stadt baut. In Wirklichkeit baut das Land über seine Bauverwaltung, Firmen bauen nach Ausschreibung.“
+  (S-A9, S-A10.)
+- **X15 Ersatzfreiheitsstrafen neu gemessen.** Seeds 1–80: 8.767 von 59.204 Geldstrafen = 14,8 % (je Stadt 9,5–25,2 %). „Etwa jede siebte“
+  stimmt über 80 Seeds; die 18,1 % der Gegenprüfung kommen von den Seeds 1–6 (Bekannte Schwächen).
+- **X16 Hinweis auf der Karte „Taten“.** „Keine Regel liest Namen, Herkunft, Zuzug oder Stadtteil, das Geschlecht nur für die Grammatik. Den
+  Haushalt liest nur die Wahl des Opfers (nie im eigenen Haushalt; ein Einbruch trifft alle Erwachsenen dort), die Eltern-Verweise nur die
+  Suche nach Angehörigen für Kinder.“
+- **X17 S. 124 geteilt.** „Der Unterdrückung muslimischer Frauen stellt sich die AfD entgegen“ steht unter „Grenze der Stadt“ (Religion),
+  „fordert in allen Bereichen die Gleichberechtigung von Mann und Frau.“ unter „Gilt schon“. Beide Teile mit `zitatpruef.py` und
+  `zitate_genau.py` geprüft.
+- **X18 Alter beim Anstellen.** Als Vereinfachung in der Karte „Kaserne“ („Das Alter spielt beim Anstellen keine Rolle; die Bundeswehr hat
+  Altersgrenzen (nicht nachgeschlagen).“) und als B21.
+
+### Bedienung
+
+- **B1 Ein Block findet keinen Platz vor einem Straßenende (mittel).** Nachgeprüft: Nach der Übernahme der Seeds 1–6 (Version 6, Tag 260)
+  bestellte das Land die Wache auf Seed 3, 4 und 5 erst 6, 11 und 17 Nächte nach Anstalt und Kaserne, auf Seed 2 nicht in 30 Nächten.
+  Jetzt sucht `gelaendeSuchen` für einen Block, wenn kein ganzer Block an einer Straße frei ist, im Rahmen von zwei Blöcken und belegt 3 × 3
+  Felder um das Tor auf der Rasterlinie (Annahme 78, Abschnitt „Stadt erweitern“): Die Wache kommt auf allen sechs in der ersten Nacht
+  (`befunde/wache_mig.mjs`), die Dienststelle öffnet auf Seed 3 an Tag 333 statt 432. Die Zeile im Fenster sagt „kam“ nur für Anlagen, die
+  offen sind; sonst „kam (noch im Bau)“ oder „kommt, sobald ein Platz frei ist“ (`erweiterungInfo().neuStand`). `tests/p6migration.cjs`
+  verlangt die Wache jetzt in der ersten Nacht (vorher bis 60 Tage). Die Invarianten der Technik-Prüfung (`pruef_technik/mess/inv.mjs`,
+  Seeds 1–3 je 730 Tage; `inv_mig.mjs`, Übernahme von drei V6-Ständen an Tag 300 und 200 Tage weiter) laufen ohne Fehler.
+  **Nebenwirkung** (von der Nachprüfung gefunden, hier zuerst nicht genannt): Wo nach einer Übernahme an Straßen nur zwei freie Stellen
+  an Straßenenden liegen, nimmt die Wache jetzt eine davon, und die Kaserne wartet statt der Wache (Seed 2 an Tag 200, 230, 260 und 330:
+  14, 4, 15 und 67 Nächte, vorher je 1; Seed 8 an Tag 200: 7). Zahlen und Entscheidung im Abschnitt „Befunde der Nachprüfung“ (N1).
+- **B2 Kind beim Jugendamt.** Der Lebenslauf sagte „lebt bei jemand“: Das Gedächtnis speichert −1, die Karte setzte „jemand“ ein. Jetzt
+  „in Obhut des Jugendamts, weil zu Hause kein Erwachsener war“; die Wohnzeile sagt „gemeldet an der Hauptstraße, zur Zeit in einer
+  Pflegefamilie außerhalb“ (bei Angehörigen „zur Zeit bei Angehörigen“). Mit echten Klicks nachgesehen (`befunde/bed/e2_obhut.cjs`).
+- **B3 Hauskarte des Bauhofs.** „60 Leute bei 60 Stellen, Lohn 95 Taler am Tag; davon 20 leisten Ersatzdienst mit Sold vom Bund. Diese
+  Plätze kommen zu den 40 bezahlten Stellen dazu“, mit Einzahl („1 leistet“, „Dieser Platz kommt“), ebenso für gemeinnützige Arbeit
+  (`bauhofZeile`).
+- **B4 Einzahl und Resttage.** Fenster „Taten“: „1 Tat angezeigt: 0 Diebstähle, 0 Wohnungseinbrüche, 1 Betrugsfall“ (vorher „1 Betrugsfälle“,
+  jetzt mit `anz`), ebenso „1 Freiheitsstrafe“ und „1 Geldstrafe“ in den Zeilen „Bewährung“ und „Gericht“; Stadtbuch „wurde 1 Tat“;
+  Personenkarte am letzten Diensttag „heute der letzte Diensttag“ statt „noch 0 Tage“.
+- **B5 „Anstalt der Stadt“.** Stadtbuch: „alle in der Justizvollzugsanstalt an der Nordstraße“; Anweisung: „in der Justizvollzugsanstalt in
+  der Stadt“; Grund S. 107: „die Anstalt in der Stadt“. Auch in Kommentaren und in `tools/simtest.mjs`.
+- **B6 „einziger Erwachsener“.** Stadtbuch und Karte sagen „einziger Erwachsener“ nur, wenn es einer war, sonst „in dessen Haushalt alle 2
+  Erwachsenen in Haft sind“; die Karte heißt „Kinder, deren Erwachsene alle in Haft sind“.
+- **B7 Fenster lang.** Die Zeile der Karte „Die Stadt wächst“ ist kurz (Stufe, Karte, Zahl der Stadtteile, was die Stufen bringen); die
+  Liste der Stadtteile steht im aufklappbaren Teil („Stadtteile heute: …“, eigene Live-Zeile). Oben unter „Was in der Stadt gilt“ stehen
+  Sprunglinks zu allen neun Gruppen (Steuern … Bund in der Stadt, „Nicht übernommen“): ohne Übergang, der Fokus geht auf die Überschrift der
+  Gruppe, `scroll-padding-top` (Höhe des festen Kopfes, beim Öffnen gemessen) hält sie unter dem Kopf. Gemessen (`befunde/bed/q_live_gross.cjs`,
+  `f2_laenge.cjs`): Die Zeile hat in der großen Stadt am 360er-Handy 526 Zeichen und 232 px (vorher 1.459 Zeichen, 645 px). Das Fenster ist
+  mit den Textbefunden etwas länger geworden: 25.945 px am 360er-Handy und 15.409 px bei 1280 × 800 (Teil 3: 25.174 und 14.980, bc7247a:
+  13.156 und 7.954), 30 Karten, 16 mit aufklappbarem Teil.
+- **B8 Stadtteilnamen im Nebel und nachts.** Die Deckkraft eines Namens ist 0,62 × (1 − Nebel an seiner Stelle), mit derselben Formel wie
+  der lineare Nebel von three.js 0.186.0 (`smoothstep(near, far, Tiefe)`, `fog_fragment.glsl.js` nachgesehen), in 20 Stufen über eine
+  CSS-Variable (feste Texte, keine Allokation). Ganz im Nebel steht kein Name. Nachts (18 bis 7 Uhr) liegt ein leiser Grund wie bei den
+  Straßennamen darunter (`::before`, ändert die gemessene Größe nicht). Gemessen in der großen Stadt (Tag 750, `befunde/namen_nacht.cjs`): um 11, 19 und 23 Uhr je 10 Namen, Sicht 0,8 bis 1
+  (hinten 0,8); nachts mit Grund (Bild `befunde/bild/namen_gross_23h.png`, Teststadt `nachher/breit_23h_fern.png`).
+- **B10 Vorbestehend.** (1) Nach einem Mausklick auf ein Tempo ist die Leertaste wieder Pause und weiter (der Knopf merkt sich, dass er
+  seinen Fokus von der Maus hat; `:focus-visible` taugt dafür nicht, die Taste schaltet es selbst ein, gemessen). Mit der Tastatur
+  angesteuert drückt die Leertaste den Knopf wie jeden anderen. (2) Umschalt+Tab im Fenster „Stadtregierung“ bei 568 × 320: kein Fokus mehr
+  unter dem festen Kopf (`scroll-padding-top`, 52 Schritte gemessen). (3) Aufholen in 3 × 30 Tagen ergibt eine andere Stadt als 1 × 90: So
+  gebaut (Annahme 43: ganze Tage im Tagesschritt, bis Mitternacht und nach Mitternacht stündlich; drei Stücke haben andere Übergänge), nicht
+  geändert, unter „Bekannte Schwächen“. (4) Versionsdialog quer: Die Knopfleiste reicht bis an den unteren Rand, kein Text läuft sichtbar
+  darunter weiter; bei höchstens 500 px Höhe ist der Dialog breiter und flacher gesetzt (Titel kleiner, Knöpfe in einer Reihe). Gemessen
+  (`befunde/bed/h2_dialog_vergleich.cjs`, Stand der Version 5): bei 568 × 320 sind 199 px Text zu sehen (bc7247a 69 px), zu scrollen 136 px
+  (bc7247a 202 px); bei 844 × 390 267 px Text (bc7247a 135 px). „Stadt übernehmen“ bleibt im Bild (`tests/befunde_s2.cjs`).
+  `befunde/bedien.cjs` prüft (1) und (2).
+
+### Gemessen (Endstand)
+
+**Seeds 1–3** (`simtest --gate`, 730 Tage stündlich, alle Gates bestanden; in Klammern Teil 3):
+
+| Seed | Einwohner Tag 365 / 730 | Band Gate 4 | Gate 6 / Gate 7 | Stadtbuch je Tag | Kaserne / Dienststelle offen ab Tag | Wehr- / Ersatzdienst | Diensttage (beendet / abgebrochen) | Taten (D / E / B) |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 820 / 1.148 (819 / 1.145) | 1,10 (1,10) | +19,4 / −23,1 (+19,5 / −23,0) | 5,55 (5,64) | 206 / 367 (206 / 368) | 101 / 217 | 1.566 (312 / 2) | 1.366 / 70 / 514 |
+| 2 (Teststadt) | 792 / 1.169 (gleich) | 1,08 (gleich) | +21,8 / −23,2 (gleich) | 5,29 (gleich) | 211 / 371 (gleich) | 101 / 208 | 1.519 (298 / 3) | 1.299 / 49 / 504 |
+| 3 | 967 / 1.181 (951 / 1.148) | 1,09 (1,03) | +20,7 / −26,8 (+19,7 / −27,1) | 4,99 (4,82) | 184 / 333 (184 / 432) | 102 / 288 | 1.925 (379 / 6) | 1.316 / 48 / 475 |
+
+Seed 2 ist Tag für Tag dieselbe Stadt wie in Teil 3; auf Seed 1 und 3 öffnet die Dienststelle früher (B1), danach laufen die Städte
+anders. Das Stadtbuch hat auf Seed 1 weniger Zeilen, weil zwei Wachstumszeilen einer Nacht jetzt eine sind.
+
+**Seeds 1–80** (`befunde/mess/mess10.mjs` = `mil/mess/mess9.mjs` plus Zahl der Geldstrafen, `befunde/mess/lauf80.sh`, Auswertung
+`befunde/mess/auswertung.py`, 730 Tage stündlich, gegen dieselbe Messung auf bc7247a und auf Teil 3):
+
+| Stand | alle Gates | fällt | Band Ø / Median / schlimmster | Gate 7 kleinster Abstand | Einwohner Tag 365 / 730 | Wegzüge (Personen) | Zuzüge | Taten je 1.000 und Jahr | Dienststelle offen ab Tag |
+|---|---|---|---|---|---|---|---|---|---|
+| bc7247a | 77 von 80 | G4: 11, 23, 45 | 1,077 / 1,073 / 1,155 | 16,5 | 896 / 1.110 | 40,2 | 1.028 | – | – |
+| Teil 3 | 76 von 80 | G4: 44, 73, 77, 79 | 1,086 / 1,080 / 1,213 | 15,2 | 912 / 1.189 | 64,7 | 1.112 | 32,78 | Ø 369 (320–584) |
+| Endstand | **78 von 80** | G4: 44, 77 | 1,081 / 1,074 / 1,177 | 16,8 | 917 / 1.186 | 63,0 | 1.108 | 32,82 | Ø 342 (313–395) |
+
+Nach der Nachprüfung neu gerechnet: alle 80 Zeilen gleich (die Simulation hat sich nicht geändert), bc7247a ebenso gleich 77 von 80.
+Welche Seeds an Gate 4 fallen, wechselt mit jeder Änderung (Teil 3); 78 gegen 77 ist kein „besser“ über das Rauschen hinaus. Gate 6 und 7
+halten auf allen 80 Seeds, Gate 4 nie über 1,18. Taten 22,76 / 0,959 / 9,10 je 1.000 Einwohner und Jahr (Ziel 32,1). Ersatzfreiheitsstrafen
+8.767 von 59.204 Geldstrafen = 14,8 % (X15). Kaserne offen im Mittel ab Tag 191 (162–238) wie in Teil 3; Tag 366–730 im Mittel 7,43 von 8
+Soldaten, 3,32 von 4 Zivil, 3,48 von 4 im Nachrichtendienst (Teil 3: 3,27, die Dienststelle öffnet früher). Karte 80 bis 120 Felder,
+2- bis 8-mal gewachsen.
+
+**Übernahmen und Invarianten.** `befunde/wache_mig.mjs` (Seeds 1–6, Version 6 an Tag 260 übernommen, 30 Tage): Die Wache kommt in der
+ersten Nacht, vorher auf Seed 2 nicht in 30 Tagen und auf Seed 3, 4, 5 nach 6, 11 und 17 Tagen. `pruef_technik/mess/inv.mjs` (Seeds 1–3,
+730 Tage, Invarianten nach jeder Nacht und stündlich: Feld ↔ Gebäude, Gelände, Bauplätze, Viertel, Kreuzungen, Haft, Obhut, Bund) und
+`inv_mig.mjs` (drei V6-Stände an Tag 300, 200 Tage weiter): 0 Fehler, 7 und 2 Wachsen.
+
+**Browser.** Teststadt (Seed 2, Tag 400, `tests/blick.cjs` nach `nachher/`): 943 bis 944 Einwohner, Großstadt, Karte 80 × 80, 26 bis 29
+Draw Calls, 52.100 bis 53.000 Dreiecke (Teil 3: 27 bis 29, 52.200 bis 52.700). Große Stadt (`&umland=300000`, Seed 2, Tag 750, nach
+`gross/`): 5.850 bis 5.852 Einwohner, Karte 144 × 144, 25 bis 28 Draw Calls, 141.300 bis 146.400 Dreiecke (Teil 3: 5.852, 144, 25 bis 28,
+141.300 bis 146.400). Neue Draw Calls: keine. Bilder selbst angesehen: nachts stehen die Stadtteilnamen auf einem leisen Grund über den
+hellen Fenstern, bei Tag unverändert; in der großen Stadt sind die hinteren Namen (Erlenbruch, Heideland) blasser. In `gross/` fehlen die
+Namen auf den Bildern um 19 und 23 Uhr: `blick.cjs` war vorher nah an der Straße (Straßennamen) und fotografiert, bevor die Stadtteile
+wieder eingeblendet sind; `befunde/namen_nacht.cjs` zählt auf demselben Stand nach 1 s um 11, 19 und 23 Uhr je 10 Namen (auch in Teil 3).
+
+### Speicherformat
+
+Unverändert Version 7, keine neuen Felder. Neu sind nur die Prüfungen beim Laden (T1). `--speichertest`: bitgleich, **Fingerabdruck `6277f264ccaf83c3`** (Seed 1, Tag 150, 13 Uhr, 60 Tage weiter; Teil 3 `5ba8d43e5bd37135`),
+Stand mit Haft und Obhut `32021f94c3f14a09` (sortiert `14257e0eb4f2720c`), Stand mit dem Bund `8561f07316321917` (sortiert
+`d32219e512e09f1d`), je 60 Tage bitgleich. Die Abdrücke sind neu, weil sie das Stadtbuch enthalten (Urteilszeile mit echten Tagen,
+Wachstumszeilen); die Stadt selbst läuft bis Tag 362 gleich (`befunde/vergleich.mjs`). `tests/basis_v7.json` (Teststand für t1_xss)
+besteht auch die neuen Prüfungen beim Laden.
+
+### Tests auf dem Endstand
+
+Endstand `stadt.html` md5 `47d45ed0f50f5e7a7905b2712c802961`, `tools/simtest.mjs` md5 `3e9e135db527a9281fa92b609d0c7648`, KI-Nachbau
+auf 11434. Die simtest-Modi liefen auf `7613e1bc32ee24bd21475388af719317`; danach änderten sich nur drei Live-Zeilen im Fenster (Einzahl in
+„Taten“, „Bewährung“, „Gericht“). sim-Block, der Abschnitt für `--kitest` und `REGIERUNG` sind gleich (verglichen), `--kitest` lief auf dem
+Endstand noch einmal. Die Browser-Tests liefen auf dem Endstand (Server auf 8713, PID 9511, danach beendet; der erste Lauf mit PID 535). Läufe in `scratchpad/erw7/befunde/lauf/` (`fin_*.txt`) und `tests/alle_end.log`.
+
+- `simtest`: `--gate` (Seeds 1–3 alle Gates, T 3,0 bis 3,7 s im Parallellauf), `--speichertest` (bitgleich, drei Stände), `--aufholtest`
+  (Vergleich, keine Prüfung), `--kitest` 47 (neu: Antworten ans Sprachmodell, Obhut-Satz; vorher 46), `--bau` 15, `--waren` 15, `--tech` 16,
+  `--regierung` 154, `--kita` 40, `--sicherheit` 28 (Urteilszeile mit echten Tagen), `--militaer` 24, `--migrationstest --git
+  /home/user/website-` 293 (Version 2–6, bc7247a als 6), `--erweiterung --gross --git /home/user/website-` 34 (neu: doppelte Nacht als eine
+  Zeile, vier beschädigte Stände mehr; vorher 33). Alle ohne Fehler.
+- Browser (`tests/alle.sh`): p3test 12, p5neu 10, p6migration 26 (Wache jetzt in der ersten Nacht verlangt, Stadtteile im aufklappbaren
+  Teil), p7figuren 6, p8tech 14, raute_klick 6 von 6 Klicks (jetzt mit exit-Code), ereignis 21, t1_xss 5, p4test 25, s2karten 22, kita 22,
+  befunde_s2 27, erweiterung 20, sicherheit 12, militaer 16 (Staatsbürger in Programm und Gesetz, § 1 Abs. 1 WPflG, § 37 SG, „Deutsche Männer
+  müssen ihn beantworten“, S. 138 als Deutung, Intelligence Bureau), `otest` befunde 21, handy 11, breit 12, tastatur 4, breiten 20,
+  hilfehoehe 1 (745 von 745 px, jetzt als Prüfung). Alle exit 0. Die Konsole ist leer bis auf die absichtlichen Verbindungsfehler zum
+  KI-Nachbau in p4test und die abgebrochenen KI-Anfragen in `blick.cjs`. Dazu `tests/pruef_v5.cjs` 17 und `tests/kennzahlen_hoehe.cjs`
+  (wie Teil 1: quer 156 bis 216 px wie bc7247a, hochkant 231 statt 211 px).
+- Eigene Prüfungen: `befunde/bedien.cjs` (Leertaste nach Mausklick, Tastatur auf 5×, Umschalt+Tab quer; mit `ALT=1` gegen Teil 3: zwei
+  FEHL, also vorher wirklich kaputt), `befunde/bed/e2_obhut.cjs` (Kind beim Jugendamt, echte Klicks), `befunde/wache_mig.mjs`,
+  `befunde/vergleich.mjs`, `befunde/namen_nacht.cjs`, `pruef_technik/mess/inv.mjs` und `inv_mig.mjs`, `kaputt.mjs` und `kaputt2.mjs`.
+- Zitate: 235 im Fenster, davon 232 aus dem Programm; `zitatpruef.py` findet 232, `zitate_genau.py` findet dieselben 232 wörtlich auf der
+  genannten Seite, 0 Fehler. Die übrigen 3 sind Noahs „Wie in Amerika“ (zweimal) und der Name „Demographics Unit“. Neu sind die zwei Teile
+  von S. 124 (vorher ein Satz); den Zusammenhang von S. 124 und S. 138 habe ich auf den Seiten nachgelesen (Abschnitt „Polygamie,
+  Zwangsheirat und Kinderehen“ bzw. „Verfassungsschutz grundsätzlich reformieren“). § 1 Abs. 1 WPflG steht im Fenster nicht als Zitat,
+  sondern umschrieben, damit die Zitatliste nur Programmzitate enthält.
+- Bilder: `nachher/` (Teststadt) und `gross/` (große Stadt), selbst angesehen (oben); `scratchpad/erw7/befunde/bild/` (Fenster,
+  Versionsdialog, Obhut, Stadtteilnamen).
+
+## Befunde der Nachprüfung
+
+Eine Nachprüfung hat den Endstand der Schlussprüfung (`stadt.html` md5 `47d45ed0f50f5e7a7905b2712c802961`) noch einmal gelesen,
+nachgerechnet und bedient (`scratchpad/erw7/nachpruef/`). X1 bis X5, die Wache aus B1 und B2 waren behoben; offen oder neu waren drei
+Punkte. Jeder ist hier erst nachgeprüft und dann umgesetzt. **Die Simulation ist unverändert** (sim-Block gleich, Fingerabdrücke gleich,
+Seeds 1–80 Zeile für Zeile gleich); geändert sind die Prüfung der Antworten des Sprachmodells (module-Block), `--kitest`,
+`tests/p6migration.cjs` und dieses README. Arbeitsdateien: `scratchpad/erw7/nb/` (`vorher/` = Stand vor der Nachbesserung, `mess/`,
+`lauf/`, `zitate/`).
+
+- **N1 Nebenwirkung von B1: Nach einer Übernahme wartet manchmal die Kaserne (mittel).** Nachgeprüft mit `nb/mess/b1_warten.mjs`:
+  V6-Stände (bc7247a) der Seeds 1–8 an Tag 200, 230, 260 und 330 übernommen, höchstens 100 Nächte weiter; der Endstand gegen die
+  Gegenprobe der Nachprüfung (Rückfall der Wache erst, wenn Anstalt und Kaserne stehen) und gegen den Stand vor B1. Zahlen: Nacht der
+  Bestellung nach der Übernahme (1 = erste Nacht; die Dienststelle ab der Nacht, in der die Stadt Großstadt ist; – = nicht fällig):
+
+  | Übernahme | Endstand: Wache / Anstalt / Kaserne / Dienststelle | Gegenprobe | vor B1 |
+  |---|---|---|---|
+  | Seed 2, Tag 200 | 1 / 1 / **14** / – | 9 / 1 / 1 / – | 33 / 1 / 1 / – |
+  | Seed 2, Tag 230 | 1 / 1 / **4** / – | 5 / 1 / 1 / 1 | 31 / 1 / 1 / über 4 |
+  | Seed 2, Tag 260 | 1 / 1 / **15** / 1 | 19 / 1 / 1 / 1 | 43 / 1 / 1 / über 24 |
+  | Seed 2, Tag 330 | 1 / 1 / **67** / **90** | 73 / 1 / 1 / 13 | 76 / 1 / 1 / 72 |
+  | Seed 8, Tag 200 | 1 / 1 / **7** / – | 8 / 1 / 1 / – | 8 / 1 / 1 / – |
+  | übrige 27 Fälle | Wache, Anstalt, Kaserne 1; Dienststelle 1, wo in 100 Nächten fällig (Seed 5, Tag 330: 2) | Wache in 19 Fällen 2, sonst 1; Dienststelle Seed 5, Tag 330: 71 | Wache 1 bis über 100 |
+
+  Die Nachprüfung nannte Seed 8 unauffällig; an Tag 200 wartet dort die Kaserne 6 Nächte länger als vorher. Ursache (Karte nachgesehen,
+  `nb/mess/b1_karte.mjs`, Seed 2, Tag 260): Die Stadt ist ein schmales L aus zwei Straßen, jeder Block an einer Straße hat schon
+  Häuser. Frei sind nur die beiden Straßenenden. Die Wache nimmt das südliche (Rückfall, 3 × 3 Felder um das Tor), die Anstalt findet
+  dort keine zwei Blöcke mehr und nimmt das östliche (1 × 2), wo vorher die Kaserne stand. Die Kaserne wartet, bis das Bauamt eine
+  Straße verlängert.
+
+  **Entscheidung: Die Wache bleibt zuerst.** (1) Sie gehört zur Stufe Kleinstadt; in einer Stadt, die mit Version 7 wächst, steht sie
+  immer vor Anstalt und Kaserne (Seeds 1–80: Wache im Mittel ab Tag 73, Kaserne offen ab Tag 191). Eine übernommene Stadt sieht danach
+  aus wie eine gewachsene. (2) Taten gibt es ab dem Übernahmetag, die Wache gehört dazu. (3) Die Gegenprobe zeigt: Es fehlt wirklich
+  Platz, die andere Reihenfolge verschiebt nur, wer wartet, und sie ließe die Wache auf den meisten Seeds eine Nacht länger warten, weil
+  das Land vor dem Bund baut. (4) Die geprüfte Simulation bleibt, wie sie ist. Noah kann es anders wollen (offene Frage im Abschnitt
+  „Bund“). Solange die Kaserne wartet, sagt das Fenster ehrlich „Mit der Stufe Stadt kommt, sobald ein Platz frei ist: eine Kaserne der
+  Bundeswehr mit Wehrpflicht.“; einberufen wird erst ab der Eröffnung.
+
+  Nachgetragen: B1 in „Befunde der Schlussprüfung“, Annahme 78, Schnittstelle „Ein Block“, „Bekannte Schwächen“ (Gelände, Wache,
+  Dienststelle), offene Fragen im Abschnitt „Bund“. `tests/p6migration.cjs` hat einen neuen Fall: Version 6 von Seed 2, Tag 260
+  übernehmen; Wache und Anstalt in der ersten Nacht; die Kaserne kommt in Nacht 15 (die Zeile im Test nennt die Wartezeit), solange
+  sie wartet, steht die Zeile oben im Fenster, niemand wird vorher einberufen, und sie muss innerhalb von 60 Nächten kommen (wie früher
+  die Wache). 3 Prüfungen mehr, 29 statt 26.
+- **N2 Wortformen in der Prüfung gegen Verdacht (mittel).** Nachgeprüft mit dem Skript der Nachprüfung (`nachpruef/mess/x6_verdacht.mjs`):
+  Alle sieben Sätze gingen durch, die zwei harmlosen wurden verworfen. Jetzt drei Wortlisten und eine Herkunftsliste (Annahme 77):
+  - TAT, bei jeder Figur zusammen mit einem anderen Namen der Stadt verworfen: verdächtig, Verdacht, gestohlen, bestohlen, stehlen,
+    stiehlt, bestiehlt, stahl, klaut, klauen, geklaut, beklaut, Einbrecher, einbrechen, einbrach, eingebrochen, Einbruch, Dieb, Täter,
+    Raub, geraubt, Räuber, Überfall, kriminell, Kriminalität, Verbrecher, Gauner, Betrüger. „klau“ ist so begrenzt, dass „Klaus“ (ein
+    Vorname der Stadt) nicht zählt.
+  - VERDACHT (beim Opfer mit einem Namen, bei allen mit Herkunft): war es, waren es, betrogen, betrügen, Betrug, abgezockt, schuld,
+    schuldig. OPFER (nur beim Opfer): vermute, vermutlich, steckt dahinter, weggenommen, „mein … genommen“ („Ich habe mir frei
+    genommen“ bleibt).
+  - HERKUNFT neu: fremd (Fremde, Fremden, nicht „fremdgehen“), Ausland, Abstammung, „nicht von hier“, „woanders her“, Einwanderer,
+    zugereist, deutsch, einige Herkunftsbezeichnungen (südländisch, osteuropäisch, orientalisch, afrikanisch, syrisch, afghanisch,
+    albanisch, rumänisch, bulgarisch, polnisch, russisch, kurdisch), Hautfarbe, Rasse, ethnisch, Kultur, Moslem, Christen, Religion,
+    Kopftuch, Sprache, Akzent, „mit … Namen“.
+  - Neu ist auch: Figuren, die kein Opfer sind, dürfen niemanden der Stadt mit einem Wort einer Tat verbinden („Ich glaube, Mehmet Koch
+    ist ein Dieb.“, „Mia Weber stiehlt.“). „X hat mich beim Kartenspiel betrogen, aber wir sind Freunde“ bleibt (kein Wort aus TAT).
+  - Komma: Die Prüfung trennt bewusst nicht am Komma. Mit Trennung gingen „Es war Elias Müller, der mich bestohlen hat.“ und „Das waren
+    sicher Ausländer, die bei mir eingebrochen haben.“ durch. „Ich wurde bestohlen, Lea Lange hat mich getröstet.“ wird deshalb weiter
+    verworfen (bewusste Vorsicht; Kommentar im Code, Annahme 77, „Bekannte Schwächen“).
+  - Nachnamen, die auch gewöhnliche Wörter sind (26, etwa Richter, Koch, Klein, Lange, Winter, Sommer), zählen nur nach einem Vornamen
+    oder „Herr“, „Frau“, „Familie“. So bleiben „Klein war der Schaden nicht, bestohlen zu werden tut weh.“ und „Der Richter hat mich wegen
+    Diebstahls verurteilt.“ (wichtig für Figuren im Verfahren); „Herr Koch ist verdächtig.“ wird weiter verworfen. Grenze: „Koch war es.“
+    mit dem Nachnamen allein geht durch.
+  - `--kitest` prüft jetzt 29 Sätze statt 11: die sieben der Nachprüfung, „Es war …, der mich bestohlen hat“, „… stiehlt“, „Leute mit
+    komischen Namen klauen“, „Wer kein Deutsch spricht, stiehlt eher“ (verworfen), dazu harmlose Sätze: „Klein war der Schaden nicht …“,
+    „Ich habe mir frei genommen und treffe …“, „Der Richter hat mich …“, „Mit … war es heute lustig“, „Er ist fremdgegangen und hat mich
+    betrogen“, „Klaus hilft mir heute beim Umzug“ (bleiben). Die gewählten Namen im Test (etwa Mehmet Koch) trägt weder das Opfer noch die andere Figur.
+    Gegenprobe: dasselbe `--kitest` auf dem Stand vor der Nachbesserung meldet 12 falsch beurteilte Sätze. 44 Sätze in
+    `nb/mess/x6_neu.mjs`, alle wie erwartet (darunter „Die Russen klauen alles.“, „Auf der Terrasse wurde mir das Fahrrad geklaut.“).
+- **N3 README „Grenze“ (klein).** Der Absatz „Grenze“ im Abschnitt „Stadtregierung“ sagt jetzt wie das Fenster: „… außer auf Zeit und
+  für alle gleich …: Haft in einer Anstalt des Landes außerhalb (solange die Anstalt in der Stadt fehlt oder voll ist) und Kinder, die
+  das Jugendamt in einer Pflegefamilie außerhalb unterbringt. Beide bleiben Bewohner …“.
+
+### Geprüft (Nachprüfung)
+
+Endstand `stadt.html` md5 `0db3cba9aabd46364ab9251fc3702ba3`, `tools/simtest.mjs` md5 `3ff93c8f86835d6be45b021952cd9c22`,
+`tests/p6migration.cjs` md5 `574972cce5c24dd0c3a355512ba9aa25`. Alle Läufe auf genau diesem Stand (Logs in `scratchpad/erw7/nb/lauf/`,
+`nb/mess/`, `tests/alle_nb.log`). Server auf 8713 (PID 16845, danach per PID beendet), KI-Nachbau auf 11434 unverändert.
+
+- `simtest`: `--gate` (Seeds 1–3 alle Gates, T 1,4 bis 1,9 s), `--speichertest` bitgleich mit denselben Fingerabdrücken wie vorher
+  (`6277f264ccaf83c3`, Haft `32021f94c3f14a09`, Bund `8561f07316321917`), `--aufholtest` (Vergleich, keine Prüfung), `--kitest` 47 (die
+  Prüfung „Antworten ans Sprachmodell“ hat jetzt 29 Fälle statt 11), `--bau` 15, `--waren` 15, `--tech` 16, `--regierung` 154, `--kita` 40,
+  `--sicherheit` 28, `--militaer` 24, `--migrationstest --git /home/user/website-` 293 (Version 2–6, bc7247a als 6), `--erweiterung --gross
+  --git /home/user/website-` 34. Alle exit 0, kein FEHL.
+- **Seeds 1–80** (`befunde/mess/mess10.mjs` über `nb/mess/lauf80.sh`, 730 Tage stündlich): 78 von 80 (G4 fällt auf 44 und 77), Band Ø 1,081,
+  schlimmster 1,177, Gate 7 kleinster Abstand 16,8; alle 80 Zeilen gleich wie in „Gemessen (Endstand)“ (die Simulation ist unverändert).
+  bc7247a mit demselben Skript neu gerechnet (`nb/mess/lauf80b.sh`): 77 von 80 (G4: 11, 23, 45), Zeile für Zeile gleich wie die
+  gespeicherte Basis.
+- **Browser** (`tests/alle.sh`, Start 13:03): p3test 12, p5neu 10, p6migration 29 (neu: Seed 2, Tag 260, Kaserne in Nacht 15, bis dahin
+  „kommt, sobald ein Platz frei ist“), p7figuren 6, p8tech 14, raute_klick 6 von 6 Klicks, ereignis 21, t1_xss 5, p4test 25, s2karten 22,
+  kita 22, befunde_s2 27, erweiterung 20, sicherheit 12, militaer 16, `otest` befunde 21, handy 11, breit 12, tastatur 4, breiten 20,
+  hilfehoehe 1. Alle exit 0. Dazu `tests/pruef_v5.cjs` 17 und `tests/kennzahlen_hoehe.cjs` (quer 156 bis 216 px wie bc7247a, hochkant
+  231 px wie vorher). Die Konsole ist leer bis auf die absichtlichen Verbindungsfehler zum KI-Nachbau in p4test und die abgebrochenen
+  KI-Anfragen in `blick.cjs`. In p4test stehen „gültig 3, ungültig 1“ statt „4, 0“: Der Nachbau liefert jede 25. Antwort kaputt, sein
+  Zähler läuft über alle Tests; keiner seiner Sätze wird von der neuen Prüfung verworfen (`nb/mess/mock_saetze.mjs`, 34 Prüfungen).
+- **Bilder** (`tests/blick.cjs`, selbst angesehen): Teststadt (Seed 2, Tag 400, `nachher/`) 943 bis 944 Einwohner, Großstadt, Karte
+  80 × 80, Kaserne mit Hangar, Hubschrauberplatz und Übungsplatz am Rand, Stadtteilnamen bei Tag, Straßennamen nah; 26 bis 29 Draw Calls,
+  52.093 bis 53.109 Dreiecke (Debug-Ecke der angesehenen Bilder und `blick.log`). Große Stadt (`&umland=300000`, Seed 2, Tag 750, `gross/`):
+  5.850 bis 5.852 Einwohner, Karte 144 × 144, Stadtteilnamen um 11 und 19 Uhr, 25 bis 28 Draw Calls, 141.303 bis 146.447 Dreiecke. Wie
+  vorher, keine neuen Draw Calls.
+- **Zitate**: 235 im Fenster gesammelt (`mil/mess/zitate_sammeln.mjs`), `zitatpruef.py` findet 232 wörtlich, `zitate_genau.py` dieselben
+  232 auf der genannten Seite, 0 Fehler; die übrigen 3 sind Noahs „Wie in Amerika“ (zweimal) und „Demographics Unit“. Außerhalb von
+  `REGIERUNG` (`nachpruef/zitate/alle_html.py`) wie vorher. `REGIERUNG` ist in dieser Runde nicht geändert.
+- **Speicherformat**: unverändert Version 7, keine neuen Felder (Fingerabdrücke oben).
+- Git in `/home/user/website-` unverändert (`git status` leer).
+
 ## Aufbau
 
 - `stadt.html` enthält den Block `<script id="sim">`: reine Simulation, kein DOM, kein `window`, kein `fetch`,
@@ -1002,7 +2344,15 @@ Kitas 5.694 Einwohner, 24 bis 26 Draw Calls, etwa 124.400 Dreiecke).
   Alle Stellschrauben stehen gesammelt im Objekt `R` am Anfang des Blocks.
 - Der `<script type="module">`-Block macht Darstellung, Oberfläche, Speichern und die Ollama-Aufrufe. Er ändert den
   Sim-Zustand nur über Funktionen aus `StadtSim` (`stunde`, `tagSchritt`, `hauptSetzen`, `kiSchalten`, `kiEntscheidung`,
-  `kiVerwerfen`, `kiGespraech`, `kiTagebuch`, `verlustErledigt`, `importZustand`). `theke`, `traeger`, `bauGesamt` und `regierungInfo` lesen nur.
+  `kiVerwerfen`, `kiGespraech`, `kiTagebuch`, `verlustErledigt`, `importZustand`). `theke`, `traeger`, `bauGesamt`, `regierungInfo`,
+  `erweiterungInfo`, `stadtteilZaehlen`, `teilVon`, `teilName`, `sicherheitInfo`, `polizeiEinsatz`, `imHof`, `hofZeiten`, `abteilung`,
+  `bundInfo`, `dienstWahl` und `verpflichtet` lesen nur.
+  `StadtSim._sich` (Urteil, Haftantritt, Haftende, Tat, Obhut, Stellen des Landes gezielt auslösen) ist nur für `tools/simtest.mjs --sicherheit`
+  und die Browser-Tests da, `StadtSim._bund` (Einberufung, Dienstende, Nacht des Bundes, Prüfung, Anstellen, Austreten) nur für
+  `tools/simtest.mjs --militaer`. `gelaendeSuchen` und `gelaendeBauen` sind die Schnittstelle
+  für Teil 2 und 3 von „Stadt erweitern“, `karteRand` ist nur für Tests da; die Oberfläche benutzt diese drei nicht. Wächst die Karte, baut
+  die Oberfläche beim nächsten stündlichen Neuaufbau der Stadt einmal Landschaft, Umland und Grenzen neu (`karteNeu` am Anfang von
+  `stadt()`).
   `StadtSim._pruef` (Ereignisse gezielt auslösen: sterben, wegziehen, zusammenziehen, kündigen, umziehen) ist nur für
   `tools/simtest.mjs --regierung` da; die Oberfläche benutzt es nicht. Einzige Ausnahme ist die Testhilfe
   `?debug&umland=…`, die `R.UMLAND` vor dem Start umstellt (solche Stände werden nicht gespeichert).
@@ -1029,10 +2379,25 @@ node tools/simtest.mjs --kita                  # Kitas: Plätze (auch am Ende de
                                                #   Betreuungspflicht, Gebundene, Stadtbuch, Speichern; erzwungen: Kitas ohne Personal
                                                #   verlangen nichts, Personalabgang (höchstens 8 Einheiten je Nacht), Elternteil ohne
                                                #   Stelle, Besitzer-Eltern bei vollen Kitas (Seeds 1–3)
-node tools/simtest.mjs --migrationstest        # Spielstände von Version 2, 3, 4 und 5 übernehmen (alte Dateien aus git 39c405b,
-                                               #   2b821c2, 1c8d40b und 414ebab), 60 Tage weiter, Kita-Übergangsfrist und die
-                                               #   Nächte danach (Schwelle), beschädigte Stände der Version 5; --git <ordner>: anderes Repository
+node tools/simtest.mjs --migrationstest        # Spielstände von Version 2, 3, 4, 5 und 6 übernehmen (alte Dateien aus git 39c405b,
+                                               #   2b821c2, 1c8d40b, 414ebab und bc7247a), 60 Tage weiter, Kita-Übergangsfrist und die
+                                               #   Nächte danach (Schwelle), beschädigte Stände der Version 5; aus Version 6 60 Tage genau
+                                               #   wie dort; --git <ordner>: anderes Repository
 node tools/simtest.mjs --migrationstest --alt <alte stadt.html>   # nur diese alte Datei
+node tools/simtest.mjs --erweiterung           # Stadt erweitern (Version 7): statisch, Seeds 1–3 je 730 Tage Tag für Tag wie
+                                               #   Version 6 (git bc7247a), Grenze hält nie eine Straße auf, Wachsen, Stufen,
+                                               #   Stadtteile, Speichern über ein Wachsen, beschädigte Stände, Übernahme von 6,
+                                               #   Gelände; --gross: dazu die große Stadt (umland=300000, 750 Tage)
+node tools/simtest.mjs --sicherheit            # Sicherheit (Version 7): statisch (Zufall, Personenfelder je Regel, Landeslöhne),
+                                               #   Namenstausch bitgleich, Invarianten jede Nacht (Haft, U-Haft, Plätze, Hof, Obhut,
+                                               #   Wache und Anstalt), erzwungene Urteile und Randfälle, Speichern mit Haft,
+                                               #   beschädigte Stände, Messung gegen die PKS 2024 und nach Gruppen (Seeds 1–3)
+node tools/simtest.mjs --militaer              # Bund (Version 7, Teil 3): statisch (kein Zufall, Personenfelder je Regel, keine Namen,
+                                               #   kein Geschlecht, Löhne und Sold nicht aus dem Budget, Ersatzdienst ohne Kisten,
+                                               #   die Dienststelle liest niemanden), Namenstausch bitgleich, Invarianten jede Nacht
+                                               #   (Gelände, Rollen, Stellen, Einberufung mit 18 ab dem Tag nach der Eröffnung, genau
+                                               #   5 Diensttage, Bindung, Geld vom Bund), erzwungene Fälle, Speichern, beschädigte
+                                               #   Stände, Messung nach Geschlecht (Seeds 1–3)
 ```
 
 Weitere Schalter für `--seed`: `--alle 60` (Zeilenabstand), `--fluss` (Zu-/Wegzüge, Geburten, Tode je Zeile),
@@ -1058,7 +2423,7 @@ stehen hier als Bericht, nachprüfbar im Repo ist nur `simtest`.
 | 8 | Wer Erspartes hat, gibt täglich bis 1 % davon (höchstens 15) zusätzlich aus, Sparsame weniger | Sonst sammelt sich das Geld bei den Leuten, und die Läden bekommen nichts ab |
 | 9 | Besitzer zahlen Lohn nach Charakter: wenig sparsam = großzügiger (90–110 % vom Grundlohn) | Gibt `job_wechseln` einen Grund |
 | 10 | Pleite-Betriebe stehen leer und können übernommen werden (40 % der Baukosten). Eine Übernahme zählt als Gründung | Die Spec sagt „Gebäude wird frei“ |
-| 11 | Zuzug: Als „freie Stellen“ zählen nur freie Stellen in Werkstätten und Tech-Firmen (nicht im Bauhof, nicht in Läden, seit Schritt 2 nicht in Kitas), abzüglich der Arbeitslosen der Stadt. Wer zuzieht, tritt sofort die nächste solche Stelle an; ist keine mehr frei, kommt an diesem Tag niemand mehr. Zuzügler sind 18–60 Jahre alt (bis zur Gate-4-Änderung 18–45). Höchstens 1 + 1 % der Einwohner pro Tag | **Weicht vom Wortlaut der Spec ab** („freie Stellen“); Noahs Entscheidung für Gate 4. Zählten Ladenstellen, holte jeder neue Laden Leute von außen, die wieder neue Läden brauchen: Ladenboom, danach Pleitewelle. Läden stellen deshalb nur Leute aus der Stadt ein. Mit 18–45 ging die erste Generation fast gleichzeitig in Rente. Arbeitslose abziehen: sonst ziehen Leute für Stellen zu, die Einheimische ohnehin gleich nehmen. Seit der Stadtregierung zählen Leute in gemeinnütziger Arbeit als arbeitslos, Eltern mit Betreuungsgehalt nicht, seit den Kitas auch Eltern nicht, die ohne Kita-Platz keine Stelle antreten können; die Stadtregierung weist die Regel als R10 aus (galt schon), dazu R09 |
+| 11 | Zuzug: Als „freie Stellen“ zählen nur freie Stellen in Werkstätten und Tech-Firmen (nicht im Bauhof, nicht in Läden, seit Schritt 2 nicht in Kitas), abzüglich der Arbeitslosen der Stadt. Wer zuzieht, tritt sofort die nächste solche Stelle an; ist keine mehr frei, kommt an diesem Tag niemand mehr. Zuzügler sind 18–60 Jahre alt (bis zur Gate-4-Änderung 18–45). Höchstens 1 + 1 % der Einwohner pro Tag | **Weicht vom Wortlaut der Spec ab** („freie Stellen“); Noahs Entscheidung für Gate 4. Zählten Ladenstellen, holte jeder neue Laden Leute von außen, die wieder neue Läden brauchen: Ladenboom, danach Pleitewelle. Läden stellen deshalb nur Leute aus der Stadt ein. Mit 18–45 ging die erste Generation fast gleichzeitig in Rente. Arbeitslose abziehen: sonst ziehen Leute für Stellen zu, die Einheimische ohnehin gleich nehmen. Seit der Stadtregierung zählen Leute in gemeinnütziger Arbeit als arbeitslos, Eltern mit Betreuungsgehalt nicht, seit den Kitas auch Eltern nicht, die ohne Kita-Platz keine Stelle antreten können; die Stadtregierung weist die Regel als R10 aus (galt schon), dazu R09. Seit Teil 2 (Sicherheit) besetzt, wer zuzieht, zuerst offene Stellen des Landes (Wache, Anstalt; S-A19), seit Teil 3 danach die des Bundes (Kaserne, Dienststelle; B11) |
 | 12 | „Wohnungssuchende“ fürs Bauamt = Leute ohne Wohnung oder mit erfolgloser Suche **plus** Anfragen von außen (Leute, die wegen freier Stellen kämen, aber keine Wohnung finden) | Sonst baut das Bauamt nie vorausschauend, und der Zuzug stockt |
 | 13 | Zufriedenheit = 100 − gewichtetes Mittel 4. Grades der Dringlichkeiten. Das schlimmste Bedürfnis zählt am stärksten. Trauer −15, kein Einkauf −10. Der Zielwert wird alle 6 Spielstunden neu berechnet, die Zufriedenheit gleitet stündlich hin | Mit dem normalen Mittel fällt kaum jemand unter 20, dann zieht niemand weg |
 | 14 | Wohnen = Enge der Wohnung (Haushaltsgröße gegen Wohnungsgröße der Hausstufe) plus Park in der Nähe. Umziehen nur, wenn die neue Wohnung spürbar besser ist. Nach einer erfolglosen Suche 5 Tage Pause | Vorher zogen Haushalte zweimal am Tag hin und her, weil ein Umzug das Problem nicht löste |
@@ -1074,7 +2439,7 @@ stehen hier als Bericht, nachprüfbar im Repo ist nur `simtest`.
 | 24 | Betriebe bleiben auf Stufe 1. Die Formel „Stufe × Stellen“ ist vorbereitet | Die Spec sagt nicht, wer Betriebe aufstuft. Das Bauamt stuft laut Regel 4 nur Wohnhäuser auf |
 | 25 | Stadtbuch: Die Zuzüge eines Tages stehen in einer Zeile (mit Grund), alles andere einzeln | Sonst füllen Zuzüge die 500 Zeilen allein |
 | 26 | Gate 6 und 7 vergleichen mit **allen, die je als Erwachsene in der Stadt lebten**. Beim Wegzug zählt nur die Person, die entschieden hat, nicht ihre Familie | Die heutigen Erwachsenen sind schon gefiltert (die Heimatlosen sind weg), das würde den Unterschied schönen |
-| 27 | Gate 4: „pendelt sich ein“ = die Einwohnerzahl bleibt in den letzten 180 Tagen (Tag 551–730) in einem Band von Faktor 1,15 (max/min). „Unterhalb der Kartengrenze“ = keine Straße hat die äußerste erlaubte Rasterlinie erreicht | Die Spec gibt keine Zahl |
+| 27 | Gate 4: „pendelt sich ein“ = die Einwohnerzahl bleibt in den letzten 180 Tagen (Tag 551–730) in einem Band von Faktor 1,15 (max/min). „Unterhalb der Kartengrenze“ = keine Straße hat die äußerste erlaubte Rasterlinie erreicht. Seit Version 7 wächst die Karte vorher (Annahme 70), dieser Teil hält also immer (Abstand zur Baugrenze der heutigen Karte mindestens 16). `--gate` druckt deshalb dazu die Lage auf der alten Karte 96 und den Abstand zur alten Baugrenze (Seeds 1–3: 24, 12, 24; Seeds 1–80 mindestens 12): Keine Stadt hätte die alte Karte gesprengt | Die Spec gibt keine Zahl. Die Spec kennt nur die feste Karte; Noahs Entscheidung „Karte wächst wirklich“ |
 | 28 | Die Stadt hat noch keinen Namen. In der Anweisung ans Modell steht „Neustadt“ (Konstante `STADTNAME`) | Die Spec nennt `{Stadtname}`, aber keinen |
 | 29 | Kein Modellname im Code. Die App nimmt das erste Modell aus Ollamas eigener Liste (`/api/tags`), Noah kann in den Einstellungen wechseln | Spec: „Kein Modellname aus dem Gedächtnis“. Noah konnte ich heute Nacht nicht fragen |
 | 30 | Anfrage mit `format: "json"` (erzwingt gültiges JSON), `stream: false`, `think: false`, `keep_alive: "30m"`. Kein JSON-Schema. Die Anweisung geht als `system`-Nachricht, dazu eine kurze `user`-Nachricht („Es ist Tag 12, 7 Uhr. Was tust du?“ bzw. Noahs Satz). Lehnt ein Modell das Feld `think` mit HTTP 400 ab, wiederholt die App den Aufruf einmal ohne es | Alles laut Ollama-Doku. Ein Schema mit Aufzählung der Aktionen wäre strenger, ist aber ungetestet. `keep_alive` 30 Minuten, weil zwischen 7 und 18 Uhr bei 1× gut 11 Minuten liegen (Standard 5 Minuten → Modell würde jedes Mal neu geladen) |
@@ -1088,7 +2453,7 @@ stehen hier als Bericht, nachprüfbar im Repo ist nur `simtest`.
 | 38 | Ist Ollama nicht erreichbar, entscheiden wartende Hauptfiguren sofort normal, nicht erst nach 2 Spielstunden. Kommt eine Antwort später als in der Stunde nach der Anfrage, wird sie gegen die aktuelle Uhrzeit geprüft (kein „freinehmen“ mehr um 9 Uhr). Geht die gewählte Aktion nicht mehr, entscheidet das normale Gehirn; im Tagebuch steht dann „(klappte nicht)“ | Spec: „Ollama aus: Hauptfiguren entscheiden normal“. Ein Tag frei ab 9 Uhr kostete den ganzen Tageslohn |
 | 39 | Die Anweisung für den Tagebucheintrag nach dem Aufholen habe ich formuliert (Beschreibung wie oben, Erlebtes nur aus der Zeit der Abwesenheit, Antwort `{"eintrag": "…"}`) | Die Spec gibt keinen Wortlaut |
 | 40 | Stirbt oder geht eine Hauptfigur, verschwindet ihr Tagebuch mit ihr. Vorschläge für die Nachfolge: Partner und erwachsene Kinder, die noch in der Stadt leben | Die Spec sagt „schlägt ein Kind oder den Partner vor“ |
-| 41 | Spielstand-Version 6 (2: Hauptfiguren und Tagebuch, 3: Bauhof und Kisten, 4: Tech-Firmen, 5: Stadtregierung mit den Personenfeldern `gsTage` und `gemein`, `S.regierung` mit Start und Tageswerten `gestern`/`tagStart`, und `S.stat.regierung`; 6: Schritt 2 mit den Personenfeldern `eigen`, `kaufPreis`, `schuld`, `beitrag` und `kita`, dem Gebäudefeld `soll`, `S.regierung.schritt2` und `kitaAb` und der Zahl `S.stat.bauamt.kitas`). Stände anderer Versionen lösen den Versionsdialog aus; Version 2 bis 5 lassen sich übernehmen (Annahme 60). Ein Stand der Version 6 ohne die neuen Personen- und Gebäudefelder, ohne gültige Stadtregierung (Start, Schritt 2 und Ende der Kita-Frist als ganze Tage, alle Summen, die vom Tagesende und die von gestern als Zahlen, gestern auch leer), mit Wohneigentum, das es so nicht gibt, oder mit Kita-Plätzen und -Stellen, die es so nicht gibt, wird abgelehnt | Neue Felder. Ein Stand der Version 4 liefe sonst still unter den neuen Regeln weiter; ohne die Prüfung stürzte ein beschädigter Stand um Mitternacht ab |
+| 41 | Spielstand-Version 7 (2: Hauptfiguren und Tagebuch, 3: Bauhof und Kisten, 4: Tech-Firmen, 5: Stadtregierung mit den Personenfeldern `gsTage` und `gemein`, `S.regierung` mit Start und Tageswerten `gestern`/`tagStart`, und `S.stat.regierung`; 6: Schritt 2 mit den Personenfeldern `eigen`, `kaufPreis`, `schuld`, `beitrag` und `kita`, dem Gebäudefeld `soll`, `S.regierung.schritt2` und `kitaAb` und der Zahl `S.stat.bauamt.kitas`; 7: Kartengröße `S.karte` mit `mitte`, `vn`, `vo`, Felder so groß wie die Karte, und `S.erweiterung` mit Stufe, Stufentagen, Ausdehnung, Stadtteilen, Geländen und Wachsen, Abschnitt „Stadt erweitern“; dazu die Personenfelder `PF_SICHERHEIT`, `S.rsSich`, `S.sicherheit` und `S.stat.sicherheit`, Abschnitt „Sicherheit“; dazu die Personenfelder `PF_BUND` (`bund`, `dienstBis`), `S.bund` und `S.stat.bund`, Abschnitt „Bund“). Stände anderer Versionen lösen den Versionsdialog aus; Version 2 bis 6 lassen sich übernehmen (Annahme 60). Ein Stand der Version 7 mit falscher Kartengröße oder falschen Maßen, Feldern anderer Länge, einem unvollständigen `S.erweiterung`, einer unvollständigen oder unmöglichen Sicherheit (Haft, Verfahren, Summen, Wache und Anstalt) oder einem unvollständigen oder unmöglichen Bund (Kaserne, Dienststelle, Eröffnung, Summen, Rollen, Dienst) wird abgelehnt. Ein Stand der Version 6 ohne die neuen Personen- und Gebäudefelder, ohne gültige Stadtregierung (Start, Schritt 2 und Ende der Kita-Frist als ganze Tage, alle Summen, die vom Tagesende und die von gestern als Zahlen, gestern auch leer), mit Wohneigentum, das es so nicht gibt, oder mit Kita-Plätzen und -Stellen, die es so nicht gibt, wird abgelehnt | Neue Felder. Ein Stand der Version 4 liefe sonst still unter den neuen Regeln weiter; ohne die Prüfung stürzte ein beschädigter Stand um Mitternacht ab |
 | 42 | Bei 1× ist eine echte Minute eine Spielstunde | Folgt aus der Spec: 90 Spieltage entsprechen 36 Stunden Abwesenheit |
 | 43 | Beim Aufholen (Tagesschritte) entscheiden alle nur um 7 und 18 Uhr; Ereignisse lösen keine zusätzliche Entscheidung aus. Der Bauhof teilt direkt nach der 7-Uhr-Entscheidung ein, wie stündlich | Sonst wäre der Tagesschritt nicht schneller. Abweichung gegen stündlich nach 90 Tagen (Tag 200–290) mit der Stadtregierung: Seeds 1–10 im Mittel −0,3 % Einwohner, einzeln −17,2 % bis +10,7 %; Seeds 1–20 im Mittel +0,2 %, 10 von 20 höher. Vorher auf den Seeds 1–10 +0,7 %, einzeln −5,8 % bis +10,8 % (vor der Zuzug-Regel −1,7 %, einzeln −8,6 % bis +8,1 %). Der Ausreißer Seed 10 wächst in diesen Tagen stark (stündlich 246 → 623 Einwohner); in Tagesschritten kamen weniger Geburten (90 statt 120) und weniger Zuzüge, der Unterschied wächst von Tag zu Tag. Nicht einseitig: Vorher lag derselbe Seed 10,8 % darüber |
 | 44 | Grundregel: Eine Figur steht oder geht nur dort, wo die Simulation die Person in dieser Stunde hat. Arbeit 8–17 Uhr (Bauarbeiter auf ihrer Baustelle), abends bei Freunden 19–22 Uhr (wer „freunde_treffen“ gewählt hat), wer frei hat um 10 Uhr einkaufen, sonst zu Hause. Ändert sich der Ort, geht die Figur dorthin. Von den 300 Figuren sind bis zu 120 Leute bei der Arbeit (Annahme 62), die übrigen zufällige Erwachsene, die nur unterwegs zu sehen sind. Hauptfiguren sind immer zu sehen: wenn sie nicht laufen, stehen sie vor dem Gebäude, in dem sie gerade sind. Ihre Markierung ist gelb, weiß solange sie „überlegen“. Jede sichtbare Figur ist anklickbar | Die Spec sagt „morgens zur Arbeit, abends heim oder zu Freunden“ und „plus immer alle Hauptfiguren“ |
@@ -1105,9 +2470,9 @@ stehen hier als Bericht, nachprüfbar im Repo ist nur `simtest`.
 | 55 | Mehr als 5 Hauptfiguren erlaubt die App erst, wenn mindestens 5 KI-Entscheidungen im Schnitt unter 5 Sekunden kamen (Gespräche, Tagebucheinträge und Code-Stücke zählen nicht mit). Die Messung wird mitgespeichert und beginnt bei einem Modellwechsel neu | Spec: „5 als Standard, bis 10 nur, wenn eine Entscheidung unter 5 Sekunden braucht“ |
 | 56 | `zuletztGelaufen` ist der Moment, in dem die Stadt zuletzt lief: in einem versteckten Tab der Moment des Versteckens, mitten im Aufholen „jetzt minus die noch fehlenden Stunden“ | Sonst ginge die Zeit verloren, wenn der Browser mit dem Tab im Hintergrund geschlossen wird |
 | 57 | Namen von Leuten, die nicht mehr in der Stadt sind (gestorben oder weggezogen), sind anklickbar und öffnen eine kurze Karte „nicht mehr in der Stadt“. Ob jemand starb oder wegzog, weiß die Karte nicht mehr, deshalb kein † | Spec: „Jeder Name auf der Personenkarte ist wieder anklickbar“; die Daten der Person sind nach dem Weggang frei |
-| 58 | Bauhof: 10 Stellen plus eine je 4 offene Arbeitstage, höchstens 40; neu gerechnet, sobald eine Baustelle dazukommt (Gründung, Bauamt) und jede Nacht. Lohn 95–120 Taler: +2 am Tag, wenn um 7 Uhr Leute fehlten, sonst −1. Schrumpfen die Stellen, bleibt niemand ohne Arbeit, es wird nur nicht nachbesetzt. Freie Stellen im Bauhof locken keinen Zuzug an, und Gründer rechnen den Bauhof mit seinen 10 festen Stellen | Die Stellen gehen mit den Baustellen auf und ab. Zählten sie beim Zuzug oder bei „Werkstatt lohnt sich“, würde jede Baustelle Leute in die Stadt holen bzw. Werkstätten verhindern (im Entwurf gemessen: die Stadt schaukelt sich auf). Mit festem Lohn lief der Bauhof leer |
+| 58 | Bauhof: 10 Stellen plus eine je 4 offene Arbeitstage, höchstens 40 (gemeinnützige Arbeit und, seit Teil 3, Ersatzdienst kommen dazu; der Ersatzdienst zählt nicht zu den 40, B12); neu gerechnet, sobald eine Baustelle dazukommt (Gründung, Bauamt) und jede Nacht. Lohn 95–120 Taler: +2 am Tag, wenn um 7 Uhr Leute fehlten, sonst −1. Schrumpfen die Stellen, bleibt niemand ohne Arbeit, es wird nur nicht nachbesetzt. Freie Stellen im Bauhof locken keinen Zuzug an, und Gründer rechnen den Bauhof mit seinen 10 festen Stellen | Die Stellen gehen mit den Baustellen auf und ab. Zählten sie beim Zuzug oder bei „Werkstatt lohnt sich“, würde jede Baustelle Leute in die Stadt holen bzw. Werkstätten verhindern (im Entwurf gemessen: die Stadt schaukelt sich auf). Mit festem Lohn lief der Bauhof leer |
 | 59 | Kisten: Kistenpreis = Umlandpreis je Arbeitstag / 8 (etwa 15–17 Taler), von außerhalb 19 Taler. Die Werkstatt nimmt je Arbeitstag dasselbe ein wie vorher, egal ob ein Laden oder das Umland die Kisten nimmt. Gründer zahlen Bau oder Übernahme an die Stadtkasse, die Stadt zahlt dafür die Bauarbeiter | Noahs Entscheidung A: Kisten als Preisvorteil für Läden, keine echte Knappheit (siehe Schwächen). Mit „Umland kauft nur die Hälfte“ hatte die Stadt im Entwurf an Tag 365 im Schnitt 891 statt 1.170 Einwohner, ohne dass Gate 4 besser wurde |
-| 60 | Ein Spielstand von Version 2, 3, 4 oder 5 lässt sich im Versionsdialog mit „Stadt übernehmen“ umrechnen (Text je Version). Von 5: Schritt 2 gilt ab dem Übernahmetag, niemand besitzt schon eine Wohnung, Beitragsjahre für alle aus dem Alter, Summen und „gestern“ der Stadtregierung bleiben (fehlt dort eine Summe, wird der Stand abgelehnt), Kitas mit Übergangsfrist. Von 2: Bauhof = Werkstatt der Stadt vom Start, laufende Baustellen bekommen 4 Arbeitstage je Resttag (höchstens so viele wie der ganze Bau). Von 3: Tech-Firmen entstehen danach von selbst, niemand hat schon ein Gerät. Von 2, 3 und 4: Die Stadtregierung mit Schritt 2 gilt ab dem Übernahmetag (Rentenstufen von da an, Stadtbuch „Ab heute regiert die AfD …“ mit Mieterkauf, Rente, Kitas und Frist, im Fenster „seit Tag X, Spielstand übernommen“), niemand bezieht schon Grundsicherung. Alles andere bleibt. Ein Import einer alten Datei rechnet ohne Nachfrage um | **Abweichung von der Spec** (dort nur Export oder Neu), Noahs Entscheidung B: sonst wäre seine Stadt weg |
+| 60 | Ein Spielstand von Version 2, 3, 4, 5 oder 6 lässt sich im Versionsdialog mit „Stadt übernehmen“ umrechnen (Text je Version). Von 6: Die Karte bleibt 96 × 96 und wächst gleich, wenn eine Straße näher als 16 Felder am Rand liegt; Stufe aus den heutigen Einwohnern, Stadtteile ab der Kleinstadt in der Reihenfolge ihres ersten Gebäudes, eine Zeile „Ab heute zählt die Stadt ihre Größe …“; Sicherheit ab dem Übernahmetag (niemand vorbestraft oder in Haft, eine Zeile „Ab heute gibt es in der Stadt Diebstahl …“, Wache und Anstalt bestellt das Land in den folgenden Nächten); Bund ab dem Übernahmetag (niemand dient, eine Zeile „Ab heute baut der Bund …“, die Kaserne bestellt der Bund in der nächsten Nacht, einberufen wird erst ab ihrer Eröffnung). Ohne Sicherheit und Bund liefe die Stadt danach genau wie in Version 6 (so prüft es `--migrationstest`). Alle älteren Versionen bekommen dasselbe über die Kette. Von 5: Schritt 2 gilt ab dem Übernahmetag, niemand besitzt schon eine Wohnung, Beitragsjahre für alle aus dem Alter, Summen und „gestern“ der Stadtregierung bleiben (fehlt dort eine Summe, wird der Stand abgelehnt), Kitas mit Übergangsfrist. Von 2: Bauhof = Werkstatt der Stadt vom Start, laufende Baustellen bekommen 4 Arbeitstage je Resttag (höchstens so viele wie der ganze Bau). Von 3: Tech-Firmen entstehen danach von selbst, niemand hat schon ein Gerät. Von 2, 3 und 4: Die Stadtregierung mit Schritt 2 gilt ab dem Übernahmetag (Rentenstufen von da an, Stadtbuch „Ab heute regiert die AfD …“ mit Mieterkauf, Rente, Kitas und Frist, im Fenster „seit Tag X, Spielstand übernommen“), niemand bezieht schon Grundsicherung. Alles andere bleibt. Ein Import einer alten Datei rechnet ohne Nachfrage um | **Abweichung von der Spec** (dort nur Export oder Neu), Noahs Entscheidung B: sonst wäre seine Stadt weg |
 | 61 | Theke und Träger sind nur zum Anschauen. Wer heute trägt, ergibt sich aus Tag und Laden (reihum), nicht aus Zufall. Der Lieferant ist die Werkstatt, die gestern die meisten Kisten brachte | Die Kisten werden um Mitternacht in einem Schritt verteilt; die Träger zeigen das tagsüber |
 | 62 | Die 120 Arbeitsplätze unter den Figuren werden um 8 Uhr nach Nähe zur Kamera vergeben (beim Öffnen mitten am Tag sofort) und bleiben bis zum nächsten Morgen | Alle Arbeitenden wären bei 5.000 Einwohnern über 2.000 Figuren. Fest statt kameraabhängig, damit keine Figur beim Drehen springt |
 | 63 | Stadtbuch: fertige Bauten eines Abends in einer Zeile („Der Bauhof hat fertig gebaut: …“), Stillstand, wenn auf einer Baustelle 5 Tage niemand war, und wenn der Bauhof-Lohn über 100, 110 oder 120 steigt | Mit Tech-Firmen kamen die neuen Versionen dazu (damals im Schnitt 0,48 Zeilen am Tag: auf 40 Seeds 5,50 Zeilen am Tag, 7 Seeds über 6,5, höchstens 8,60; das war vor der Zuzug-Regel). Heute gemessen (Seeds 1–80, 730 Tage): vor der Stadtregierung 4,11 Zeilen am Tag (höchstens 5,47), davon Bauhof 0,24 und Tech 0,50; mit der Stadtregierung 4,31 (höchstens 5,80), Bauhof 0,25, Tech 0,55. Die Stadtregierung schreibt selbst 3 Zeilen je Stadt (Tag 0 und die beiden Rentenstufen), den Rest macht die größere Stadt. Die Plan-Grenze von 6,5 Zeilen am Tag hält auf allen 160 Seeds |
@@ -1117,6 +2482,15 @@ stehen hier als Bericht, nachprüfbar im Repo ist nur `simtest`.
 | 67 | Anbau: Läuft eine Tech-Firma gut (alle Stellen besetzt, 20 Tage in Folge Gewinn), gehen 50 % des Gewinns über dem Polster in eine Rücklage, bis der Anbau bezahlt ist (Stufe 2: 1.800, Stufe 3: 3.000). Den Auftrag an den Bauhof gibt sie erst, wenn das Umland Platz hat (dieselbe Grenze wie für eine neue Werkstatt) und mindestens 4 Leute Arbeit suchen. Der Bauhof baut 12 bzw. 16 Arbeitstage, danach 8 bzw. 12 Stellen. Schließt die Firma, bekommt der Besitzer die Rücklage | Noahs Entscheidung „Bauauftrag an den Bauhof“. Ohne die Umland-Grenze schuf jeder Anbau Stellen über das Gleichgewicht hinaus |
 | 68 | Echte Code-Stücke: eine Hauptfigur, die gerade (9–16 Uhr) in ihrer Tech-Firma arbeitet, schreibt höchstens einmal je Spieltag. Nicht bei 20×, nicht ohne Ollama, immer nur ein Aufruf gleichzeitig; die Stadt wartet nicht. Antwort `{"titel", "sprache", "code", "gedanke"}`; der Code wird gekürzt (höchstens 20 Zeilen zu 100 Zeichen, 1.500 Zeichen), nur als Text angezeigt und nie ausgeführt. Wer heute schon Code geschrieben hat, merkt sich die Seite nur bis zum Neuladen | Noahs Entscheidung „beides“. Der Code ist Ausdruck der Figur, er wirkt nicht auf die Simulation |
 | 69 | Stadtbuch: Gründung einer Tech-Firma (mit Fleiß und Ehrgeiz), alle neuen Versionen eines Tages in einer Zeile (erscheinen zwei vom selben Produkt am selben Tag, liegt nur die der ersten Firma im Regal; die andere steht als „am selben Tag fertig, aber nicht im Regal“ dabei), Bauaufträge für Anbauten, fertige Anbauten in der Fertig-Zeile des Bauhofs | Sonst füllten die Versionen das Stadtbuch |
+| 70 | Die Karte beginnt mit 56 × 56 Feldern und wächst ringsum um 4 Felder (einen Block), sobald eine Straße oder ein Gelände näher als 16 Felder am erlaubten Rand liegt (18 bis zum Rand der Karte, so nennen es Fenster und Stadtbuch), höchstens bis 256 × 256. Die Prüfung läuft vor jeder Straßenverlängerung, nach dem Bauamt, nach jedem Gelände und am Tagesende | Noahs Entscheidung „Karte wächst wirklich“. Die Werte sind so gewählt, dass man das Wachsen im normalen Spiel sieht (Seeds 1–3: 3-, 6- und 3-mal in 730 Tagen) und die Grenze nie eine Straße aufhält (Abschnitt „Stadt erweitern“). 256: Gebäude speichern ihre Lage als `Uint8` |
+| 71 | Stufen nach allen Einwohnern: Dorf, Kleinstadt ab 40, Stadt ab 160, Großstadt ab 800 = BBSR-Schwellen (5.000, 20.000, 100.000) geteilt durch 125; kein Abstieg | Spielmaßstab: Die Städte erreichen im Mittel gut 1.100 Einwohner, so kommt jede Stufe in den ersten 400 Tagen. Das BBSR zählt auch die zentralörtliche Funktion, die Stadt nicht. Kein Abstieg, weil die Einwohner um bis zu 15 % schwanken (Gate 4) |
+| 72 | Stadtteile: Ringe aus 12 Feldern um die Mitte mal vier Himmelsrichtungen, Namen aus einer festen Liste (44) in der Reihenfolge des ersten Gebäudes, ab der Kleinstadt | Nur aus der Lage, damit niemand nach seinem Stadtteil behandelt wird (Grenze der Stadtregierung). Die Grenzen liegen auf Rasterlinien, also nie mitten durch ein Haus |
+| 73 | Die Landschaft liegt relativ zum Kartenrand: Versatz V = halbe Kartengröße − 48, Kamera-Abstand bis 160 + 2V, Nebel 70 + V bis 190 + 2V, Blickpunkt höchstens halbe Karte + 12 von der Mitte. Auf der Startkarte also enger als in Version 6 (Abstand bis 120, Nebel 50–150) | Bei 96 wie bisher. Die Stadt bleibt beim Wachsen an ihrem Platz, die Grenzen werden nur weiter |
+| 74 | Stadtteilnamen auf der Karte nur weit herausgezoomt (Kameraabstand ab 35, wie die Straßennamen mit 2 Einheiten Spielraum), erst wenn kein Straßenname mehr zu sehen ist, höchstens 12 | Nie beide zugleich (Befund 9 der Gegenprüfung). Mehr als 12 Schilder überdecken die Stadt |
+| 75 | Kriminalität, Polizei, Gericht und Gefängnis: Annahmen S-A1 bis S-A28 im Abschnitt „Sicherheit“ (Tatneigung, Kalibrierung an der PKS 2024, Aufklärung, Strafmaß, Register, Haft, Obhut für Kinder, Wache und Anstalt des Landes, Gefangene von außerhalb nur als Zahl) | Noahs Entscheidungen „Kriminalität als Regel“ und „Anstalt für die Region“; Quellen dort |
+| 76 | Kaserne, Wehrpflicht und Nachrichtendienst: Annahmen B1 bis B20 im Abschnitt „Bund“ (Stufen, Gelände, Stellen, Lohn und Sold vom Bund, Dauer, Anteil Ersatzdienst aus einem festen Wert je Person, Bindung der Soldaten auf Zeit, Ersatzdienst im Bauhof ohne Kisten und außerhalb der 40, Wohnen zu Hause, Nachrichtendienst nur als Arbeitgeber, Aussehen) | Noahs Entscheidungen „Militär = alles“ und „Wehrpflicht für alle 18-Jährigen“ (zwei Abweichungen markiert); Quellen dort |
+| 77 | Antworten des Sprachmodells werden verworfen (wie ungültiges JSON), wenn ein Satz ein Wort einer Tat (TAT: verdächtig, gestohlen, stehlen, stiehlt, stahl, klaut, geklaut, Einbrecher, eingebrochen, Dieb, Täter, Raub, kriminell, Verbrecher, Betrüger …) oder des Verdachts (VERDACHT: war es, betrogen, schuld …; beim Opfer auch OPFER: vermute, steckt dahinter, mein … genommen) mit einem Wort zu Herkunft, Religion oder Sprache verbindet (HERKUNFT, auch „fremd“, „deutsch“, „mit … Namen“), bei Opfern auch mit einem Vor- oder Nachnamen aus den festen Namenslisten der Stadt außer dem eigenen, bei allen anderen Figuren mit einem solchen Namen, wenn der Satz ein Wort aus TAT enthält. Nachnamen, die auch gewöhnliche Wörter sind (Richter, Koch, Winter, Klein …), zählen nur nach einem Vornamen oder „Herr“, „Frau“, „Familie“. Geprüft wird je Satz, nicht je Komma. Die Anweisung sagt „du beurteilst andere nur nach dem, was du mit ihnen erlebt hast“ statt Merkmale aufzuzählen | Befund X6 der Schlussprüfung und N2 der Nachprüfung: Die Anweisung allein hält ein Modell nicht auf. Wortlisten sind grob: Sie verwerfen auch harmlose Sätze („Ich wurde bestohlen, Lea hat mich getröstet“ in einem Satz; bei Figuren, die kein Opfer sind, auch „Mein Freund Elias wurde bestohlen“) und fangen Umschreibungen und einen Nachnamen allein, der auch ein Wort ist („Koch war es“), nicht. Das Komma trennt bewusst nicht: sonst ginge „Es war Elias Müller, der mich bestohlen hat“ durch. Die Listen dienen nur der Prüfung von Texten, keine Regel der Stadt liest sie. Die Wirkung an einem echten Modell ist nicht gemessen |
+| 78 | Ein Block (Wache, Dienststelle) findet auch Platz, wo eine Straße an der Rasterlinie zwischen zwei freien Blöcken endet: Suche im Rahmen von zwei Blöcken, das Tor auf der Rasterlinie an der Straßenspitze, belegt werden 3 × 3 Felder um das Tor. In einer Nacht baut zuerst das Land (Wache, dann Anstalt), dann der Bund (Kaserne, Dienststelle) | Befund B1 der Schlussprüfung. Vorher bestellte das Land nach einer Übernahme die Wache bis 18 Nächte später als Anstalt und Kaserne, auf Seed 3 wartete die Dienststelle 99 Nächte. Die Straße kann auf dieser Linie nicht weiterwachsen (wie bei den großen Geländen). Nebenwirkung (Nachprüfung, N1): Gibt es nach einer Übernahme nur zwei solche Stellen, wartet jetzt die Kaserne statt der Wache (Seed 2: 4 bis 67 Nächte, Seed 8 an Tag 200: 7). So entschieden, weil die Wache zur Stufe Kleinstadt gehört und in einer Stadt, die mit Version 7 wächst, immer vor Anstalt und Kaserne steht (Seeds 1–80: Wache im Mittel ab Tag 73, Kaserne offen ab Tag 191); Taten gibt es ab dem Übernahmetag. Die umgekehrte Reihenfolge verschiebt nur, wer wartet (offene Frage an Noah) |
 
 ## Bekannte Schwächen
 
@@ -1259,3 +2633,114 @@ sieht man in der Teststadt einen, in der großen Stadt zwei.
 Holt eine übernommene Stadt sehr viel auf (gemessen: ein Stand von Version 2 mit 221 Einwohnern, 90 Tage aufgeholt), fällt
 der Eintrag „Ab heute baut der Bauhof …“ vom Übernahmetag heraus. Die Meldung nach dem Übernehmen sagt dasselbe, sie bleibt.
 Bemerkt, weil der Test dafür einen festen Zeitstempel hatte und mit jedem echten Tag mehr aufholte.
+
+**Stadt erweitern: Die Karte wächst ringsum.** Kommt die Stadt nur im Osten an den Rand, wächst die Karte trotzdem auf allen vier
+Seiten (Seed 2 wächst sechsmal, jedes Mal wegen des Ostens). Einfacher und für die Grenze gleichwertig. Die Landschaft rückt dabei
+überall nach außen, und ein Streifen Felder wird ohne Übergang zur Wiese der Karte. Wächst die Karte, während man hinschaut, springen
+die Felder am Rand. Die Stadt selbst, Figuren und Kamera bleiben, wo sie sind (`tests/erweiterung.cjs`, auch mitten am Tag).
+
+**Stadt erweitern: Am Handy quer ist die Stufe nicht zu sehen.** Bis 500 px Höhe fehlt in den Zahlen der Platz. Die Stufe steht dort
+nur für Screenreader hinter „Einwohner“, sichtbar im Stadtbuch und im Fenster „Stadtregierung“. Hochkant und breit sind die Zahlen
+eine Zeile höher als in Version 6.
+
+**Stadt erweitern: Gate 4 prüft die Kartengrenze nur noch auf der alten Karte sinnvoll.** Auf der wachsenden Karte hat die Stadt immer
+mindestens 16 Felder Platz, der Teil hält immer (Annahme 27). Was er früher maß, druckt `--gate` als Abstand zur alten Baugrenze 96.
+
+**Stadt erweitern: Gelände in der Mitte brauchen oft eine neue Straße.** `gelaendeSuchen` findet nur ganz freie Blöcke an einer
+Straße. Häuser säumen die Straßen, deshalb gibt es solche Blöcke erst, wenn das Bauamt eine Straße verlängert. Im Test (Seed 2, Tag 300,
+1 × 1 Block) fand sich 10 Tage lang keiner. Vor der äußersten Straße ist Platz. Seit der Schlussprüfung auch vor einem Straßenende, das
+auf die Rasterlinie zwischen zwei freien Blöcken zuläuft: Ein Block sucht dann im Rahmen von zwei Blöcken (Annahme 78). Damit wartet die
+Dienststelle nicht mehr 99 Nächte (Seed 3, jetzt 0), und nach einer Übernahme bestellt das Land die Wache in der ersten Nacht. Die Kaserne
+(3 × 2 Blöcke) wartet dafür nach manchen Übernahmen: Die Wache nimmt eine der Stellen an einem Straßenende, die Anstalt die andere
+(Nachprüfung, N1). Übernahmen der Seeds 1–8 an Tag 200, 230, 260 und 330 (32 Fälle, `nb/mess/b1_warten.mjs`): Wache und Anstalt werden
+in allen 32 Fällen in der ersten Nacht bestellt, die Kaserne in 27; auf Seed 2 erst in Nacht 14, 4, 15 und 67 (vorher je in Nacht 1), auf
+Seed 8 an Tag 200 in Nacht 7. Auf Seed 2 an Tag 330 kommt dadurch auch die Dienststelle später (Nacht 90 statt 72). `tests/p6migration.cjs` zeigt den Fall
+Seed 2, Tag 260 im Browser (Kaserne in Nacht 15, bis dahin sagt das Fenster „kommt, sobald ein Platz frei ist“).
+
+**Stadt erweitern: Großstadt ab 800 Einwohnern.** Der Maßstab 125 macht aus 800 Leuten eine Großstadt. Das ist ein Spielmaßstab (Annahme
+71); das Stadtbuch nennt ihn bei jedem Aufstieg.
+
+**Stadt erweitern: Stadtteilnamen nur mit Software-Grafik geprüft.** Lage, Abstand zu Panels, nie zugleich mit Straßennamen und
+reduzierte Bewegung sind im Container (SwiftShader) getestet. Seit der Schlussprüfung verblassen die Namen mit dem Nebel an ihrer Stelle
+(ganz im Nebel stehen sie nicht mehr da) und haben nachts (18 bis 7 Uhr) einen leisen Grund wie die Straßennamen. Auf echten Geräten ist die Lesbarkeit über hellen Dächern bei Tag nicht
+angesehen. Die Schilder dürfen über niedrigen Häusern liegen, wie die Straßennamen.
+
+**Stadt erweitern: Größte Karte 256 × 256.** Gebäude speichern ihre Lage als `Uint8`. Wächst eine Stadt so weit, hält der Rand sie wie
+früher auf. Gemessen ist das nicht: Die größte Stadt (`umland=300000`, 750 Tage, 5.920 Einwohner) kommt auf 120 × 120.
+
+**Sicherheit: In der Stadt sitzen wenige in Haft.** Im Mittel 0,24 von gut 1.000 Einwohnern (Seeds 1–80, Tag 366–730), höchstens 6
+zugleich; in Deutschland sind es 0,69 je 1.000. Die Stadt kennt nur Diebstahl, Wohnungseinbruch und Betrug und rechnet Haft in ganzen
+Spieltagen. Die Anstalt ist deshalb vor allem mit Gefangenen von außerhalb belegt, die es nur als Zahl gibt (Noahs Entscheidung).
+
+**Sicherheit: Kein Dunkelfeld, keine Irrtümer.** Jede Tat wird angezeigt, und wer ermittelt wird, war es (S-A22, S-A23). Freisprüche,
+Einstellungen außer bei Tod oder Wegzug, Ratenzahlung und freie Arbeit statt Ersatzfreiheitsstrafe gibt es nicht. Die
+Ersatzfreiheitsstrafe wird auf ganze Spieltage aufgerundet: 15 echte Tage werden 36,5.
+
+**Sicherheit: Die Wache wartete auf einen freien Block** (behoben mit der Schlussprüfung, Befund B1). In einer dichten Stadt fand
+`gelaendeSuchen(S, 1, 1, false)` erst dann einen ganzen Block nah an der Mitte, wenn das Bauamt eine Straße verlängert. Nach einer Übernahme
+von Version 6 dauerte das 1 bis 54 Tage; so lange kam die Polizei aus dem Nachbarort. Jetzt sucht ein Block auch im Rahmen von zwei Blöcken:
+Nach der Übernahme der Seeds 1–6 an Tag 260 bestellt das Land die Wache in der ersten Nacht (vorher auf Seed 3, 4, 5 erst 6, 11 und 17
+Nächte später, auf Seed 2 nicht in 30 Nächten; `befunde/wache_mig.mjs`). In neuen Städten steht die Wache im Mittel an Tag 73 wie vorher.
+Dafür wartet auf Seed 2 (und Seed 8 an Tag 200) die Kaserne (oben, „Gelände in der Mitte“).
+
+**Sicherheit: Gefangene sieht man selten.** Nur zu den Hofzeiten ihrer Abteilung (je zwei Stunden am Tag) und nur die Gefangenen aus
+der Stadt; meist sitzt niemand aus der Stadt in Haft. Die Höfe sind dann leer, obwohl die Anstalt als Zahl voll belegt ist.
+
+**Sicherheit: Die Figuren der Polizei gehen um 10 Uhr zum Tatort, nicht in der Nacht.** Die Tat geschieht nachts ohne Figur; am Morgen
+nimmt die Polizei die Anzeige auf. Wer eine Tat begangen hat, steht nur auf der eigenen Personenkarte (Verfahren, Haft), nie mit Namen
+im Stadtbuch.
+
+**Sicherheit: Mit Kriminalität ziehen mehr Leute weg.** Über 80 Seeds ziehen in 730 Tagen im Mittel 62,9 statt 40,2 Menschen weg (+56 %),
+fast alle im ersten Jahr. Wer gerade Opfer war oder aus der Haft kommt, hat in der jungen Stadt oft zu wenig Geld und entscheidet nach dem
+Ereignis neu (Abschnitt „Sicherheit“, Gemessen). Die Gates halten, Zuzug und Stellen des Landes gleichen es aus; ob Opfer so oft gehen
+sollen, ist eine offene Frage an Noah (dann Folgen für Opfer, S-A18, schwächer machen und neu messen).
+
+**Sicherheit: Frauen und Männer in derselben Abteilung.** In Wirklichkeit sind sie getrennt untergebracht (§ 140 Abs. 2 StVollzG des Bundes,
+heute Landesrecht, nicht einzeln geprüft; § 3 Abs. 1 UVollzG NRW). Die Stadt trennt nicht, weil keine Regel das Geschlecht liest; das Fenster sagt es bei S7.
+
+**Sicherheit: Viele Ersatzfreiheitsstrafen.** Etwa jede siebte Geldstrafe endet als Ersatzfreiheitsstrafe: auf dem Endstand über die Seeds
+1–80 (730 Tage) 8.767 von 59.204 = 14,8 %, je Stadt im Mittel 110 von 740, einzeln 9,5 bis 25,2 % (Median 14,4 %; `befunde/mess/mess10.mjs`,
+Befund X15 der Schlussprüfung). Auf den Seeds 1–6 allein sind es 18,1 % (Gegenprüfung), die Streuung ist groß. In der jungen Stadt mehr, weil
+viele wenig Erspartes haben. Ratenzahlung (§ 42 StGB) und freie Arbeit statt Haft (Art. 293 EGStGB) gibt es
+in der Stadt nicht, obwohl sie in Wirklichkeit viele Ersatzfreiheitsstrafen verhindern.
+
+**Bund: Die Dienststelle wartete in dichten Städten lange** (für einen Block behoben mit der Schlussprüfung). Der Bund baut nur auf ganz
+freien Blöcken an einer Straße und legt keine Zufahrt an (B17). Auf Seed 3 wartete die Dienststelle 99 Nächte (Großstadt ab Tag 327, offen
+ab Tag 432), über 160 Seeds öffnete sie zwischen Tag 314 und 685. Jetzt sucht ein Block auch im Rahmen von zwei Blöcken (Annahme 78): Seed 3
+öffnet an Tag 333, die Seeds 1–80 zwischen Tag 313 und 395 (Mittel 342 statt 369). `--militaer` prüft weiter, dass der Bund nur ohne Gelände
+wartet; Stadtbuch und Fenster sagen, dass er sucht. Die Kaserne kann nach einer Übernahme warten (oben), auf Seed 2 an Tag 330 dann
+auch die Dienststelle (Nacht 90 statt 72).
+
+**Bund: Wehrdienst senkt die Tatneigung der Jungen nicht.** 18- bis 24-Jährige werden 1,51-mal so oft verurteilt wie alle (Teil 2: 1,40).
+Der Dienst dauert 5 Spieltage mit 60 Taler Sold, danach suchen sie Arbeit wie vorher. Die Taten liegen mit dem Bund bei 32,8 je 1.000
+Einwohner und Jahr (Ziel 32,1); neu kalibriert ist nichts (offene Frage im Abschnitt „Bund“).
+
+**Bund: Gerechtigkeit nur vereinfacht.** Keine Musterung, alle gelten als tauglich; die Gewissensentscheidung ersetzt ein fester Wert je
+Person; wer in Haft kommt, beendet den Dienst; Wehrdienstleistende wohnen zu Hause; das Alter spielt beim Anstellen keine Rolle (B21). Frauen und Nicht-Deutsche werden einberufen,
+anders als nach Gesetz und Programm (beides im Fenster als Abweichung markiert).
+
+**Bund: Die Karte springt mit der Kaserne.** Das Gelände von 3 × 2 Blöcken am Rand lässt die Karte in der Nacht der Bestellung oft um
+mehrere Ringe wachsen (Seed 2: 56 → 80, Seed 1: 72 → 96), zusammen mit der Anstalt des Landes. Die Stadt selbst ändert sich dabei nicht
+(Teil 1), die Landschaft rückt aber sichtbar weiter nach außen.
+
+**Bund: Radome, Mast und Fahrzeuge nur mit Software-Grafik angesehen.** Das Bund-Mesh ist beidseitig beleuchtet (DoubleSide dreht die
+Normale); auf echter Grafikhardware ist das Aussehen nicht geprüft.
+
+**Sprachmodell: Die Prüfung gegen Verdacht arbeitet mit Wortlisten** (Annahme 77, Schlussprüfung, Nachprüfung N2). Sie verwirft auch
+harmlose Sätze eines Opfers, wenn im selben Satz ein Name und ein Wort wie „bestohlen“ stehen („Ich wurde bestohlen, aber Lea hat mir
+geholfen.“; das Komma trennt bewusst nicht), bei anderen Figuren einen Namen mit einem Wort einer Tat („Mein Freund Elias wurde
+bestohlen“), und sie fängt Umschreibungen nicht („der Nachbar von gegenüber …“, „Koch war es“ mit dem Nachnamen allein, andere
+Nationalitäten als die in der Liste). Verworfen heißt: Die Figur entscheidet mit dem normalen Gehirn, ein Gespräch
+zeigt „Die Antwort war nicht zu verstehen“. Geprüft ist das nur mit festen Sätzen in `--kitest`; ob ein echtes Modell mit dem neuen,
+neutralen Satz („beurteilst andere nur nach dem, was du mit ihnen erlebt hast“) seltener Verdacht äußert, ist nicht gemessen.
+
+**Aufholen in Stücken ergibt eine andere Stadt.** 3 × 30 Tage aufgeholt ist nicht dieselbe Stadt wie 1 × 90 (Bedienprüfung: 63 statt 54
+Einwohner; in bc7247a 49 statt 47). Das ist so gebaut: Aufholen rechnet ganze Tage im Tagesschritt (Annahme 43) und nur die Stunden bis
+Mitternacht und nach Mitternacht stündlich; drei Stücke haben drei solche Übergänge. Nicht geändert.
+
+**Das Fenster „Stadtregierung“ ist lang.** Mit Teil 1 bis 3 hat es doppelt so viele Karten wie in bc7247a (Bedienprüfung: 30 statt 15,
+am 360er-Handy etwa 25.000 px). Seit der Schlussprüfung führen Sprunglinks oben zu jeder Gruppe; die Gruppen selbst lassen sich nicht
+einklappen, die neuen stehen weiter am Ende.
+
+**Leertaste auf einem Tempo-Knopf.** Nach einem Mausklick (oder Tippen) auf ein Tempo ist die Leertaste Pause und weiter; wer den Knopf
+mit Tab ansteuert, drückt ihn mit der Leertaste. Wer erst klickt und dann ohne Tab die Leertaste als Knopfdruck erwartet, bekommt die Pause.
