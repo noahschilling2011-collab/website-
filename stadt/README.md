@@ -2,7 +2,7 @@
 
 Eine Stadt, in der jeder Mensch selbst entscheidet. Projektname vorläufig.
 
-**Stand: Phase 4 plus „richtige Arbeit“, Tech-Firmen, Stadtregierung und „Stadt erweitern“ Teil 1 bis 3 (Spielstand-Version 7).** Simulation (Phase 0), 3D-Karte mit Tag und Nacht (1), Speichern
+**Stand: Phase 4 plus „richtige Arbeit“, Tech-Firmen, Stadtregierung, „Stadt erweitern“ Teil 1 bis 3 und „Tech-Firmen und Autos“ Teil 1 und 2, Simulation und Darstellung, mit den Befunden der Schlussprüfung (Spielstand-Version 8).** Simulation (Phase 0), 3D-Karte mit Tag und Nacht (1), Speichern
 und Aufholen (2), laufende Figuren und Personenkarten (3), Hauptfiguren mit Ollama (4). Danach auf Noahs Wunsch: Bauarbeiter
 vom Bauhof bauen die Häuser, Werkstätten machen Kisten für die Läden, man sieht die Leute bei der Arbeit, und Bewohner gründen
 Tech-Firmen für Software, Handys oder Computer; Hauptfiguren, die dort programmieren, schreiben über Ollama echten Code. Von Anfang
@@ -17,8 +17,14 @@ baut ab der Kleinstadt eine Polizeiwache und ab der Stadt eine Justizvollzugsans
 Bundeswehr am Stadtrand mit Soldaten, Zivilbeschäftigten und Wehrpflicht für alle, die 18 werden (Wehr- oder Ersatzdienst), ab der
 Großstadt eine Dienststelle des Bundesnachrichtendienstes, die niemanden in der Stadt überwacht (Abschnitt „Bund“). Danach sind die Befunde
 der Schlussprüfung (Technik, Texte, Bedienung) und der Nachprüfung umgesetzt (Abschnitte „Befunde der Schlussprüfung“ und „Befunde der
-Nachprüfung“). Phase 4 ist nur gegen einen nachgebauten
-Ollama-Server getestet, nicht gegen ein echtes Sprachmodell (siehe „Bekannte Schwächen“).
+Nachprüfung“). In Version 8 wachsen Tech-Firmen bis zum Campus und zum Hochhaus, große Handy- und Computerfirmen bauen ab der Stadt ein
+Autowerk am Stadtrand und ziehen um, und Bewohner kaufen Autos, von Anfang an bei einem Autohaus im Umland und dann auch aus den Werken der
+Stadt, und fahren damit zur Arbeit (Abschnitt „Tech-Firmen und Autos (Version 8)“). Im Bild fährt ein Auto rechts, sobald sein Besitzer laut
+Simulation mit ihm den Ort wechselt, sonst steht es vor dem Haus, auf dem Werksparkplatz oder in der Garage; Campus und Glas-Hochhaus tragen
+Leuchtlogos, das Werk hat Hallen, Showroom, Teststrecke und einen Turm mit Neuwagen, und am Abend einer Eröffnung steht ein ruhiger Lichtkegel
+über der Firma. Nach der Schlussprüfung fährt ein Auto im Bild nur noch, wenn sein Besitzer genau diesen Weg damit macht (sonst springt es,
+etwa beim Umzug), die Käufer kommen jeden Tag in gemischter Reihenfolge dran, und Karten und Fenster sind nachgezogen (Abschnitt „Befunde der
+Schlussprüfung (Version 8)“). Phase 4 ist nur gegen einen nachgebauten Ollama-Server getestet, nicht gegen ein echtes Sprachmodell (siehe „Bekannte Schwächen“).
 
 ## Starten
 
@@ -2336,6 +2342,650 @@ Endstand `stadt.html` md5 `0db3cba9aabd46364ab9251fc3702ba3`, `tools/simtest.mjs
 - **Speicherformat**: unverändert Version 7, keine neuen Felder (Fingerabdrücke oben).
 - Git in `/home/user/website-` unverändert (`git status` leer).
 
+## Tech-Firmen und Autos (Version 8)
+
+Noahs Wunsch: „Mach noch das die tech Firmen also wenn die gegründet werden richtig krass sind und auch eigen Autos und alles gebaut
+werden“. Seine Entscheidungen: **echte Autos** (Autofirmen entstehen aus Tech-Firmen, Bewohner kaufen Autos und fahren sichtbar,
+Tech-Firmen wachsen zu Campus und Hochhaus); **Autos auch von außerhalb**: von Anfang an bei einem Autohaus im Umland, mit neutralen
+Typen und gedeckten Farben, dazu die eigene Marke, sobald die Stadt ein Werk hat; **Erbe**: ein Autowerk ist ein Betrieb wie jeder andere
+(es schließt, wenn der Besitz stirbt, das leere Werk kann übernommen werden).
+
+Eingebaut in zwei Teilen: **Teil 1, die Simulation** (Regeln, Geld, Speicherformat), und **Teil 2, die Darstellung** (Autos auf der Straße,
+Campus, Hochhaus, Autowerk, Lichtkegel, Karten, Hilfe; Abschnitt „Darstellung (Teil 2)“ unten). Die Darstellung entscheidet nichts selbst:
+wo ein Auto steht oder hinfährt, ob sein Besitzer fährt, wer den Prototyp fährt, wann eine Firma eröffnet, Marke, Modell und Farbe kommen aus
+der Simulation.
+
+Umgesetzt im sim-Block im Abschnitt „Tech-Firmen wachsen, Autowerke, Autos der Bewohner (Version 8)“ (bis „Ende Autos“), dazu Stellen in
+`stellen`, `stellenBuchen`, `schliessen`, `sterben`, `aktGruenden`, `techArbeit`, `wirtschaft`, `kistenVerteilen`, `kennzahlenRechnen`, in den
+Karten- und Stadtbuchtexten und im Speicherformat. Der Abschnitt zieht Zufall nur aus einem eigenen Strom `S.rsAuto`; keine Regel liest
+Namen, Geschlecht, Herkunft, Einzugstag, Eltern oder das Gedächtnis (`--autos` prüft das statisch je Funktion und mit einem Namenstausch).
+Grundlage waren der Entwurf in `scratchpad/techautos/entwuerfe.json` (Prototyp auf 414ebab/bc7247a) und seine Gegenprüfung „sim“; übertragen
+ist die Logik auf ffa1d88 (Version 7), nicht die Patches. Die Darstellung steht im Modul im Abschnitt „Tech-Firmen und Autos (Version 8,
+Darstellung)“ (vor „Klicken“), dazu Stellen in `stadt()`, `karteNeu`, `figurenPlanen`, `figurenBewegen`, `treffen`, `toenenAlle`, `hoehenMerken`,
+`gebHoehe`, `licht`, `render`, in der Personenkarte und der Hilfe; Grundlage war der Prototyp der Darstellung (`scratchpad/techautos/darstellung/`)
+mit seiner Gegenprüfung „darstellung“, neu geschrieben auf den Stand von Teil 1 (Koordinaten zu `S.mitte`, wachsende Karte, Werk auf dem
+Gelände der Simulation), nicht der Patch.
+
+### Regeln
+
+- **Tech-Firmen wachsen weiter (A1).** Stellen je Stufe 4, 8, 12, 16, 20; Stufe 4 heißt **Campus**, Stufe 5 **Hochhaus** (mit Leuchtlogo in
+  Teil 2). Jeder Schritt wie der Anbau vorher: 20 Tage in Folge Gewinn, alle Stellen besetzt, die Rücklage reicht (Stufe 4: 5.000 Taler,
+  20 Arbeitstage; Stufe 5: 8.000 Taler, 24 Arbeitstage), Platz im Umland und genug Arbeitssuchende, und die **40-%-Grenze** der Tech-Stellen an
+  den Umland-Stellen mit den Stellen danach. Neu: Die Grenze gilt auch bei jeder Übernahme (auch eines großen leeren Hauses) und **nach dem
+  Auftrag**. Steigt der Anteil nachts über 40 % (etwa weil Werkstätten schließen), **ruhen** Stellen in Tech-Firmen, zuerst freie, sonst
+  besetzte (wer eine hat, behält sie; wer geht, wird nicht ersetzt, wie im Bauhof); ist wieder Platz, werden sie wieder Stellen
+  (`techGrenzeHalten`, nach Gebäudenummer, nie nach Personen). `R.TECH_GRENZE_HALTEN = 0` schaltet das für Vergleiche ab.
+- **Eröffnung als Ereignis.** Jede Tech-Firma trägt den Tag und die Art ihrer Eröffnung (`g.eroeffnet`, `g.eroeffnetArt`: Gründung,
+  Übernahme, Autowerk, Campus, Hochhaus), auch nach dem Neuladen (im Spielstand). Für die Darstellung und die Hauskarte.
+- **Autowerk (A2, A3).** Ab der Stufe **Stadt** baut eine Handy- oder Computerfirma ab Stufe 3 mit ehrgeizigem Besitz (Ehrgeiz ab 70) statt
+  des nächsten Ausbaus ein Autowerk, **höchstens 2 Werke** in Betrieb oder im Bau (`AUTO_MAX`, auch bei Übernahmen: eine Gründung übernimmt
+  ein leeres Werk nur unter `AUTO_MAX`, eine Firma zieht nur dann um). Steht ein Werk leer, übernimmt die Firma es für 40 % (8.000 Taler);
+  sonst lässt sie es auf einem freien Block am Stadtrand bauen, über die Gelände-Schnittstelle aus „Stadt erweitern“ (`gelaendeSuchen(S, 1, 1,
+  true)`, `gelaendeBauen`), 20.000 Taler aus Rücklage und eigenem Geld des Besitzes über 2.000 Taler, alles an die Stadtkasse, der Bauhof
+  baut 48 Arbeitstage. Findet sich kein Block, sucht sie in der nächsten Nacht wieder. Ist das Werk fertig, **zieht die Firma um** (Belegschaft,
+  Kasse, Rücklage, Marke); das alte Haus steht leer und kann übernommen werden. Mit weiteren Hallen wächst das Werk bis Stufe 6 (24 Stellen);
+  eine Halle kostet wie die Stufe, auf die sie führt (Stufe 6: 10.000 Taler, 24 Arbeitstage), mit denselben Grenzen. Das Werk kostet 120 Taler am Tag. Stirbt der Besitz, schließt es wie jeder Betrieb.
+- **Fertigung (A5, A6, A16).** Jede anwesende Kraft baut am Tag 0,575 Autos (Rest in Tausendsteln). Das erste Modell hat die Firma vor dem
+  Umzug entwickelt, jedes weitere braucht 480 Arbeitstage (A6). Was die Stadt nicht kauft, geht ins Umland, bezahlt wie jede Tech-Firma je
+  Arbeitstag (A16). Wer im Werk arbeitet, baut Autos und schreibt keinen Code (A17).
+- **Teile (A7).** Je Auto, das in der Stadt verkauft wird, kauft das Werk 24 Kisten, zuerst bei Werkstätten der Stadt (`kistenVerteilen`,
+  `g.kistenWerk`). Die Werkstattkarte sagt, wie viele davon als Teile ins Werk gingen. Einen Kistenträger zum Werk gibt es nicht: Träger
+  laufen nur zu Läden, und nur das sagt der Text (Befund 8).
+- **Autokauf (A4, A10, A18).** Keine neue Aktion, eine Regel wie bei den Geräten: Wer nach dem Kauf noch 600 Taler hat, kauft mit einer
+  Chance von 4 % am Tag × Bedarf × (1,3 − Sparsamkeit). Bedarf: Arbeitsweg / 12 Felder, mindestens 0,35 (Einkauf, Besuche, Rente), × 0,7,
+  wenn im Haushalt schon ein Auto steht. Wer für einen eigenen Betrieb spart (Ziel), kauft vorher keins (`AUTO_ZIEL_BETRIEB`, siehe Gemessen).
+  **Von Anfang an** gibt es Autos bei einem Autohaus im Umland (A18: Kleinwagen, Kompaktwagen, Kombi oder Van, gedeckte Farbe, Marke
+  `AUSSEN = 255`; Farbe nur gedeckt, verteilt wie die Neuzulassungen 2025: A19). Hat ein Werk der Stadt an diesem Tag noch ein Auto, nimmt man
+  das (Annahme A4: gleicher Preis, kürzerer Weg; das Geld bleibt dann in der Stadt; so steht es auch im Fenster), mit Marke, Modell und Version des Werks und einer von 8 Farben (4 gedeckt, 4 der Modellreihe). Preis 636 Taler, aus der Stadt und von außen gleich. **Geldfluss:** Ein Auto aus dem Werk
+  bezahlt das Werk (Löhne, Teile); ein Auto von außen ist Geld, das die Stadt verlässt. **Reihenfolge (A20):** Die Käufer kommen jeden Tag in
+  einer anders gemischten Reihenfolge dran, `p = (a · i + b) mod pMax` mit `a = mischSchritt(pMax, Tag)` teilerfremd zu `pMax` (jede Nummer genau
+  einmal) und `b = mischStart(pMax, Tag)`, ohne Zufallszug. So ist an einem ausverkauften Tag weder immer dieselbe Nummer noch ein Block
+  benachbarter Nummern (oft zusammen Zugezogene) zuerst dran (Befund 9 der Gegenprüfung „sim“; Schlussprüfung Technik 6: vorher nur ein
+  rotierender Start, benachbarte Nummern blieben zusammen). Personennummern hängen am Einzug.
+- **Laufende Kosten, CO₂ (A8, R-A2).** 7,31 Taler am Tag (7,68 mit den CO₂-Abgaben, die in der Stadt nach R-A2 wegfallen). Sie gehen aus der
+  Stadt hinaus. Wer in Haft ist, zahlt nichts, das Auto ruht an der Wohnung (A15).
+- **Verschrotten (A9).** Jedes Auto hält gleichverteilt 50–150 % von 201 Tagen, dann ist es weg (keine Gebrauchtwagen).
+- **Erbe (A13).** Stirbt jemand, erbt der Partner das Auto, wenn er selbst keins hat, mit Marke, Modell, Farbe und Lebensdauer; sonst geht es
+  mit dem Nachlass aus der Stadt.
+- **Geldnot (A14).** Wer 5 Nächte in Folge nach allen Zahlungen im Minus ist, verkauft das Auto an einen Händler außerhalb für die Hälfte des
+  Zeitwerts (linear über die Lebensdauer) und zahlt nichts mehr (Befund 10).
+- **Fahren (A11), die Grundregel.** Die einzige Entscheidung ist `mitAuto(S, p, a, b)`: p hat ein Auto, ist nicht in Haft, und der Weg von
+  Gebäude a nach b ist mindestens 3 Felder lang (wer sparsam ist, erst ab 4 oder 5). `pendeltMitAuto(S, p)` ist dieselbe Entscheidung für den
+  Arbeitsweg heute. Statistik, Personenkarte („Fährt mit dem Nova Pfeil 3 zur Arbeit.“) und die Darstellung rufen sie auf; die Darstellung hat
+  keine eigene Grenze (Befund 2). `ortZurStunde(S, p, H)` (vorher `simOrt` in der Darstellung, jetzt in der Simulation) sagt, wo p in Stunde H
+  ist; `autoOrt(S, p, H)` ist ohne Zustand: das Ziel, wenn p von der Wohnung dorthin mit dem Auto fährt, sonst die Wohnung. Weil alle Wege über
+  die Wohnung führen, fährt ein Auto nur, wenn sein Besitzer in dieser Stunde den Ort wechselt und damit fährt; sonst steht es dort, wo der
+  Besitzer ist, oder zu Hause. Wer zu Fuß zur Arbeit geht (kurzer Weg), lässt es zu Hause (Befund 3: so steht es jetzt ausdrücklich in der
+  Regel). Den Abendbesuch hält die Simulation ab 19 Uhr fest (`besuch`), damit kein Auto abends ohne Ortswechsel springt; auf den Lauf der Stadt
+  wirkt das nicht (`besuch` liest nur `ortZurStunde`; die Gates auf Seeds 1–80 sind mit und ohne das Festhalten Zeile für Zeile gleich).
+  **Fährt das Auto im Bild?** (blockierender Befund der Schlussprüfung) `autoFaehrt(S, p, a, vorher, H)`: nur, wenn der Besitzer diesen Weg
+  selbst macht, also in der Vorstunde dort war, wo das Auto stand (`vorher`, die Darstellung merkt sich `ortZurStunde` je Person), jetzt am
+  Ziel des Autos ist (`autoOrt` = `ortZurStunde`) und `mitAuto` ja sagt. Sonst wechselt das Auto den Ort **ohne Fahrt** (Sprung): beim Umzug in
+  der Stunde, in der der Besitzer zur Arbeit geht (Auto an die neue Wohnung, Besitzer von der alten zur Arbeit), und bei einer neuen Stelle
+  mitten am Tag (Auto von zu Hause zur neuen Stelle, Besitzer von der alten; oder, liegt die neue nah an der Wohnung, Auto von der alten Stelle
+  nach Hause). Vorher entschied die Darstellung nur mit `mitAuto(altOrt, neuOrt)`: Dann fuhr das Auto in diesen Fällen sichtbar allein, und die
+  Figur des Besitzers war währenddessen unsichtbar. Gemessen (Seeds 1–12, je 730 Tage stündlich, `--autos`): 5,4 Mio. Fahrten, alle mit
+  Abfahrt und Ziel beim Besitzer; 32 Sprünge (30 Umzug, 2 neue Stelle). Für Karten gibt es dieselbe Frage ohne Zustand
+  (`autoFaehrtJetzt`, `autoFahrtWohin`: die Vorstunde nach dem heutigen Stand).
+- **Teststrecke** (nur zum Anschauen, blockierender Befund der Gegenprüfung der Darstellung). `testfahrer(S, w)`: eine heute anwesende Kraft
+  des Werks, jeden Tag eine andere (reihum nach dem Tag); `testfahrtStunde(S, w, H)` nennt sie nur um 10 und 14 Uhr. Sie ist in dieser Stunde
+  laut `ortZurStunde` im Werk bei der Arbeit, also nie zugleich an anderer Stelle. Ohne anwesende Kraft fährt niemand. Im Bild fährt der
+  Prototyp nur dann (Teil 2, unten), die Figur dieser Kraft ist in der Stunde nicht zu sehen. **Karten** (Befund der Schlussprüfung,
+  Bedienung): Wer frei nimmt, entscheidet das bis 7 Uhr; deshalb nennen Werks- und Personenkarte den Testfahrer erst ab 8 Uhr
+  (`testStundenRest`: vorher „Wer heute um 10 und 14 Uhr den Prototyp … fährt, steht um 8 Uhr fest.“), danach nur die Teststunden, die heute noch
+  kommen. Vorher nannten die Karten zwischen 0 und 7 Uhr an 79 bis 93 % der Werkstage eine andere Person als die, die um 10 Uhr fuhr.
+- **Stadtbuch.** Aufträge (Campus, Hochhaus, Hallen, Autowerk, Übernahme eines Werks), Umzug ins Werk, das erste Auto der Stadt (aus dem
+  Umland) und das erste aus einem Werk der Stadt, neue Modelle. **Karten:** `personInfo(…).auto` (Name, Marke, von außen, Farbe, Kauftag,
+  Alter, Verschrottung, Preis, Weggrenze, pendelt, Ort, ruht, Kosten), `.werk` (Autowerk, in dem p arbeitet); `gebaeudeInfo` für Tech-Firmen:
+  `werk`, `umzug`, `eroeffnet`, `eroeffnetArt`, `stufeName`, `testfahrer`, `ruht`, Zeile „Stufe 5 (Hochhaus)“ bzw. „4 Hallen“ (Stufe − 1, so viele
+  Hallenteile wie im Bild), im Werk die Rolle „Autobauerin“/„Autobauer“ und „Besitz, baut mit“, „Hauptlieferant ist …“. Personenkarte: „fährt um
+  8 Uhr zur Arbeit“ in der Stunde, in der der Besitzer damit fährt (`auto.faehrt`), sonst „steht zu Hause“ usw.; bei Autos aus dem Umland steht
+  „aus dem Umland“ nur einmal. Das Fenster „Stadtregierung“ bekommt die Live-Zahlen aus `regierungInfo(…).autos`.
+
+### Annahmen und Quellen
+
+Umrechnung wie überall: U1, 1 Taler ≙ 52,159 €.
+
+| | Annahme | Wert im Spiel | Quelle, Rechnung |
+|---|---|---|---|
+| A1 | Tech-Stufen 4 und 5, je 4 Stellen mehr, Werk bis Stufe 6 | 16 / 20 / 24 Stellen | Spielannahme, wie der Anbau bis Stufe 3 |
+| A2 | Wer ein Werk baut | Handy/Computer, Stufe ≥ 3, Ehrgeiz ≥ 70, ab Stufe Stadt, höchstens 2 | Spielannahme |
+| A3 | Werk | 20.000 Taler, 48 Arbeitstage, 120 Taler am Tag | Spielannahme (größter Auftrag der Stadt; Kaserne 9.600) |
+| A4 | Preis, gleich aus Werk und Umland | 636 Taler | DAT-Report 2026: neuer Benziner 2025 im Schnitt 33.150 € / 52,159 (Befund 11: Benziner-Preis passend zu den Benziner-Kosten, nicht der Mittelwert aller Antriebe 44.560 €) |
+| A5 | Autos je Kraft und Tag | 0,575 | VDA: 4,15 Mio. Pkw 2025 in Deutschland; Destatis: 721.400 Beschäftigte der Automobilindustrie Ende September 2025 (Pressemitteilung vom 20. 11. 2025; passt zeitlich zur Produktion 2025, einen neueren Wert fürs 1. Halbjahr 2026 gibt es); 5,75 Pkw je Beschäftigtem und Jahr, ein Spieltag ≙ ein Zehntel Jahr (`R.JAHR` = 10) |
+| A6 | Neues Modell | 480 Arbeitstage | Spielannahme (Handy 60, Computer 50) |
+| A7 | Teile | 24 Kisten je Auto für die Stadt | Spielannahme |
+| A8 | Laufende Kosten | 7,68 Taler am Tag (mit CO₂) | ADAC Autokosten 2026, VW Golf 1.5 TSI: 334 € im Monat ohne Wertverlust, 15.000 km im Jahr; **ein Modell, kein Mittelwert** (Befund 11) |
+| A9 | Lebensdauer | 201 Tage im Mittel, je Auto 50–150 % | KBA: Pkw-Bestand am 1. 1. 2026 im Mittel 10,9 Jahre alt. Rechnung (Befund 12): Bei gleichverteilter Lebensdauer L zwischen 0,5 und 1,5 · M ist das mittlere Alter im Bestand E[L²] / (2 E[L]) = (13/12 · M²) / (2 M) ≈ 0,54 · M; 0,54 × 201 Tage = 109 Tage ≙ 10,9 Jahre. **Gemessen** (Seeds 1–6, Tage 550–700): 91–106 Tage, im Mittel 100 Tage ≙ etwa 10 Jahre, weil Geldnot und Nachlass Autos früher herausnehmen; das Fenster sagt jetzt „rechnerisch … 10,9 Jahre; gemessen etwa 10“ (Schlussprüfung Texte) |
+| A10 | Kaufregel | 4 %/Tag × Bedarf × (1,3 − Sparsamkeit), 600 Taler Rest, Sparer für einen Betrieb warten | Spielannahme; Kaufchance und Bedarf eingestellt auf Pkw-Dichte und Anteil der Haushalte mit Auto (unten), die Regel für Betriebssparer auf Gate 4 |
+| A11 | Ab wann man fährt | 3 Feldern, Sparsame 4–5 | Spielannahme (R-A1: jeder wählt selbst) |
+| A12 | Freizeit beim Kauf | +15 | wie ein Computer |
+| A13 | Erbe | Partner ohne eigenes Auto | Spielannahme |
+| A14 | Geldnot | 5 Nächte im Minus → Verkauf für 50 % des Zeitwerts nach außen | Spielannahme (Befund 10) |
+| A15 | Haft | Auto ruht, keine Kosten | Spielannahme (abgemeldet) |
+| A16 | Export | wie jede Tech-Firma je Arbeitstag | Spielannahme |
+| A17 | Werk ohne Code | Autobauer schreiben keinen Code | Spielannahme |
+| A18 | Autohaus im Umland ab Tag 0 | vier Typen, gedeckte Farben | Noahs Entscheidung; Geld verlässt die Stadt |
+| A20 | Reihenfolge der Käufer | jeden Tag gemischt: `(a · i + b) mod pMax`, a teilerfremd | Spielannahme (neutral: kein Merkmal, keine Nummernfolge; Schlussprüfung Technik 6). Die Konstanten der Mischung sind eine von vier gleich neutralen Varianten (Gemessen) |
+| A19 | Farben der Autos aus dem Umland | Silber 16,2, Dunkelgrau 16,2, Schwarz 26,8, Weiß 18,6 (Gewichte, `R.AUSSEN_FARBEN`) | KBA, Pressemitteilung 01/2026 (6. 1. 2026), Pkw-Neuzulassungen 2025: Grau 32,4 %, Schwarz 26,8 %, Weiß 18,6 %; nur diese drei gedeckten Farben, Grau je zur Hälfte hell (Silber) und dunkel (Annahme). Ein Zug aus dem eigenen Strom wie vorher (vorher gleich verteilt über vier Töne); der Lauf der Stadt bleibt gleich, nur `autoFarbe` ändert sich |
+
+Vergleichswerte. **Eingestellt** (A10: Kaufchance und Bedarf) wurde auf Destatis (22. 7. 2026) 593 Pkw je 1.000 Einwohner und Destatis LWR
+2024: 77,9 % der Haushalte mit Pkw (111,5 Pkw je 100 Haushalte). **Nur gemessen, nicht eingestellt:** Mikrozensus/Pendeln 2024: 65 % der
+Pendler mit dem Auto; VDA 2025: 76 % der Pkw gehen in den Export (Schlussprüfung Texte: vorher hieß es, alle Vergleichswerte seien nur
+gemessen).
+
+### Darstellung (Teil 2)
+
+**Was man sieht.**
+- **Autos:** Low-Poly, 28 Dreiecke (vorher 36: Scheinwerfer und Rücklichter malt jetzt der Shader auf Front und Heck, gleiche Farben und
+  gleiches Licht; Befund der Schlussprüfung, Dreiecke der großen Stadt), alle in einem InstancedMesh (`M.auto`, ein Draw Call). Lack nach der Simulation (`autoFarbe`): Autos aus
+  dem Umland gedeckt (Silber, Dunkelgrau, Schwarz, Weiß; A19), Autos aus der Stadt zur Hälfte gedeckt, zur Hälfte in einer der vier Farben
+  ihrer Modellreihe (fest je Marke und Modell, `lackNr`), je Auto etwas heller oder dunkler. Wer fährt, fährt rechts (Spur 0,12 neben der
+  Straßenmitte), biegt mit abgeschrägten Ecken ab, fährt gleichmäßig an und bremst; nachts leuchten Scheinwerfer und Rücklichter, und vor
+  dem Auto liegt ein warmweißer Lichtfleck (im Lichtfleck-Mesh der Laternen, kein Draw Call). Ein Tipp auf ein Auto öffnet die Karte seines
+  Besitzers.
+- **Campus (Stufe 4):** Riegel mit Dachterrasse (4 Geschosse), zwei Flügel mit Solardach (3), Hof mit Baum, Brücke; zwei Leuchtlogos am
+  Riegel. **Glas-Hochhaus (Stufe 5):** Scheibe mit 14 Geschossen, Krone mit vier Leuchtlogos (Anfangsbuchstabe der Marke), Mast mit rotem
+  Licht, das nachts ruhig leuchtet. Fensterbänder wie beim Glasbau: tagsüber hell nach dem Anteil der Leute, die heute da sind, nachts oben
+  der Serverraum. Anbau zu Stufe 4 oder 5: Der Rohbau der neuen Form wächst mit Gerüst.
+- **Autowerk** auf seinem Gelände (3 × 3 Felder aus `gelaendeSuchen`/`gelaendeBauen`, erkannt an `g.werk`, nicht am Produkt): Zaun mit Tor,
+  Zufahrt, Pförtner, offene Schranke; vorn links die Teststrecke auf Rasen, vorn rechts der Showroom (zwei Geschosse Glas, Leuchtlogo zur
+  Straße, nachts unten hell), dahinter der Werksparkplatz mit 12 Plätzen, hinten die Montagehalle aus Hallenteilen mit Sägezahndach, rechts
+  hinten der Autoturm (offenes Regal mit Leuchtkrone). **Die Stufe ist zu sehen:** Stufe 3 bis 6 hat 2 bis 5 Hallenteile und 3 bis 6
+  Turmebenen; eine neue Halle wächst als Rohbau mit Gerüst. Im Turm stehen die Neuwagen von gestern (eins je Ebene, `g.gebaut`, in den Farben
+  der Modellreihe). Im Bau: Werksboden, Zaun, Rohbau der ersten Hallen mit Gerüst. Leer (nach der Schließung): gedämpft, ohne Logos, Neuwagen
+  und Prototyp. Liegt das Tor neben der Mitte, ist der Plan gespiegelt, und eine Querspur hinter dem Zaun führt zur Zufahrt. Wer im Werk
+  arbeitet, trägt Blaumann (wie in der Werkstatt, ohne Bildschirm) und steht zur Arbeitszeit in zwei Reihen vor der Halle.
+- **Lichtkegel:** Am Abend einer Eröffnung (`g.eroeffnet` der Simulation: Gründung, Übernahme, Umzug ins Autowerk, Campus, Hochhaus; für
+  **jede** Tech-Firma, auch auf Stufe 1 bis 3) steht über dem Gebäude ein ruhiger Lichtkegel in der Farbe des Logos, von 18:30 bis 1 Uhr,
+  weich ein- und ausgeblendet nach Spielzeit. Er bewegt sich nicht, die Fläche dreht sich nur zur Kamera. Weil der Tag im Spielstand steht,
+  ist er nach dem Neuladen am selben Abend wieder da. Leuchtlogos und Kegel liegen in einem Mesh (`M.leucht`, ein Draw Call, additiv, Bild
+  aus einem Canvas); tagsüber sind die Logos gedämpft.
+- **Karten und Hilfe:** Personenkarte mit dem Auto („Lumen Weite 2 in Schwarz (aus der Stadt, gekauft an Tag 700) · steht zu Hause · fährt
+  ab 3 Feldern Weg“; in der Stunde, in der der Besitzer damit fährt, „fährt um 8 Uhr zur Arbeit“), bei der Kraft, die heute den Prototyp fährt,
+  ab 8 Uhr „Testfahrt mit dem Prototyp heute um 10 und 14 Uhr auf der Teststrecke“ (Schlussprüfung: vorher auch vor 8 Uhr, oft mit der falschen Kraft).
+  Hauskarten von Werk, Campus und Hochhaus mit den Texten der Simulation (Klick auf Halle, Turm, Showroom, Logo, Neuwagen). Auswahlrahmen des
+  Werks ums ganze Gelände. Stadtbuch-Einträge der Autos mit eigenem Symbol. Hilfe: Autos und Lichtkegel in der Legende, Werkstatt und Autowerk
+  im Blaumann (gleich hoch wie vorher: zwei Einträge zusammengefasst, bei 1280 × 800 ohne Scrollen).
+
+**Grundregel im Bild.** Jede Stunde fragt die Darstellung für jedes Auto `Sim.autoOrt(S, p, H)`. Steht das Auto dort schon, bleibt es, wo es
+steht (auch wenn der Platz inzwischen nicht mehr erlaubt wäre: kein Umstellen ohne Fahrt). Sonst entscheidet `Sim.autoFaehrt(S, p, alt,
+vorher, H)` mit dem Ort, an dem die Simulation den Besitzer in der Vorstunde hatte (je Person gemerkt, `pVor`): Macht der Besitzer genau
+diesen Weg mit dem Auto, fährt es; sonst springt es ohne Fahrt (Umzug, neue Stelle mitten am Tag; der Besitzer bleibt dabei zu sehen und geht
+seinen Weg, eine Hauptfigur behält ihre Raute über sich). Eine eigene Grenze hat die Darstellung nicht (blockierender Befund der
+Schlussprüfung: vorher `Sim.mitAuto(alt, neu)` allein, dann fuhr das Auto in diesen Fällen allein). Solange das Auto fährt, ist die Figur des
+Fahrers nicht zu sehen; die Raute einer Hauptfigur schwebt über dem Auto. Neue Autos (Kauf, Erbe) und alle nach Laden, Aufholen und Import
+werden nur aufgestellt, dort, wo die Simulation sie hat; wächst die Karte, bleiben sie stehen (Plätze umgerechnet).
+
+**Wer zuerst parkt.** Die Plätze vergibt die Darstellung in einer jede Stunde gemischten Reihenfolge der Personen (`Sim.mischSchritt`, wie
+bei den Käufern), nicht nach Personennummer (Befund der Schlussprüfung, Texte: vorher standen früh Eingezogene eher sichtbar am Bordstein).
+
+**Parken, eine ehrliche Regel (Abweichung).** Ein Auto parkt am Bordstein des Straßenfelds vor dem Gebäude, bei dem es laut Simulation steht,
+oder höchstens ein Straßenfeld weiter (`PARK_WEIT = 1`, also höchstens 2 Felder vom Gebäude; gemessen nie weiter), rechts in Fahrtrichtung,
+oder auf dem Werksparkplatz. Je gerades Straßenfeld gibt es 2 × 2 Plätze; keine vor Läden (Theke und Auslage), vor dem Tor eines Geländes, am
+Zebrastreifen und vor dem Haus einer Hauptfigur, die dort steht (nur für neu parkende Autos). Ist nichts frei, steht das Auto in der Garage des
+Hauses (nicht zu sehen: es fährt an der Grundstückskante hinein und heraus). **Deshalb ist nur ein Teil der Autos sichtbar geparkt:**
+Teststadt (Tag 730) nachts 17 %, tagsüber 29 % und dazu der Werksparkplatz, große Stadt nachts 15 %, tagsüber 33 %; vor einem Wohnturm mit
+30 Bewohnern liegen 4 bis 12 Plätze. Der Prototyp suchte bis zu 5 Straßenfelder weit (Befund: 229 von 581 Autos standen 4 bis 6 Felder weg);
+mehr Stellfläche hätte Bauplätze oder Gärten gekostet. Noahs Wunsch „nachts stehen sie geparkt“ ist damit nur für eine Minderheit zu sehen.
+
+**Sichtbar gefahren oder gesprungen.** Geplant wird jede Stunde: Hauptfiguren zuerst (ihre Fahrt sofort, sie fährt auch ohne Lücke im
+Verkehr), dann nach Nähe zur Kamera, höchstens `FAHR_MAX = 1.500` Fahrten mit Weg, verteilt über die Bilder der Stunde (bis dahin wartet das
+Auto am alten Platz). Das Budget je Bild richtet sich nach der Spielzeit (Befund der Schlussprüfung, Bedienung): 3 ms, aber mehr (höchstens
+10 ms), wenn die Bilder bis 0,85 der Stunde sonst nicht reichen (geschätzt aus dem Spielzeit-Schritt je Bild); bleiben weniger als zwei
+Bilder, springen die übrigen Fahrten gleich (gezählt `spaet`), statt die ganze Stunde zu stehen und am Stundenwechsel versetzt zu werden.
+Ein Auto fährt erst los, wenn es keinem schon geplanten näher kommt als eine Wagenlänge und etwas Luft (0,46 Felder Fahrzeit, Kacheln 0,25 ×
+0,25 mit Zeitschlitzen). Findet es so keine Lücke, fährt es mit dem engen Abstand von 0,34 Feldern (gut eine Wagenlänge, eigenes Bitfeld;
+gezählt `eng`; Befund der Schlussprüfung, Bedienung: große Stadt um 8 und 17 Uhr je gut 50 Fahrten mehr sichtbar, gleich viele Überlappungen
+wie vorher). Findet eine Fahrt auch so keine Lücke, liegt sie über `FAHR_MAX` oder hat sie keinen Weg, **springt** sie: Das Auto steht am
+alten Platz bis zur Abfahrt, ist unterwegs nicht zu sehen (wie sein Fahrer) und steht nach der Ankunftszeit am neuen Platz; es ist dieselbe
+Fahrt des Besitzers, keine ohne Ortswechsel. Ausprobiert und verworfen: Fahrten nahe der Kamera (6 Felder) ohne Lücke trotzdem fahren zu
+lassen; dann fuhren Autos durcheinander (große Stadt: 34 und 90 statt 3 und 9 Paare näher als 0,16 um 8 und 17 Uhr). Deshalb springen auch
+nahe der Kamera noch Fahrten (unten, Gemessen und Bekannte Schwächen). Gemessen: Teststadt um 8 Uhr 257 von 262 Fahrten sichtbar, große Stadt
+1.126 von 1.672 (374 wegen voller Straße, 172 über `FAHR_MAX`); um 22 Uhr 150 von 150 und 628 von 655. Ist bei sehr hohem Tempo die Planung
+einer Stunde nicht fertig, wenn die nächste beginnt, stehen die übrigen Autos danach am Ziel (gezählt als `rest`, gemessen 0).
+
+**Teststrecke (blockierender Befund).** Der Prototyp mit Tarnfolie fährt nur in einer Stunde, für die `Sim.testfahrtStunde` jemanden nennt
+(10 und 14 Uhr: eine Kraft, die laut Simulation in dieser Stunde genau in diesem Werk arbeitet). Deren Figur ist in dieser Stunde nirgends zu
+sehen; ist sie eine Hauptfigur, schwebt ihre Raute über dem Prototyp; ein Tipp auf ihn öffnet ihre Karte. Er fährt über 90 % der Spielstunde,
+Weg `Runden · (τ − sin 2πτ / 2π)`: an der Startlinie weich an und am Ende weich wieder dort, ohne Sprung, auch wenn sich das Tempo in der Stunde
+ändert; die Zahl der Runden legt die Stunde nach dem Tempo fest (eine Runde gut 8 echte Sekunden, höchstens 8, bei reduzierter Bewegung 1).
+Sonst steht er an der Startlinie.
+
+**Reduzierte Bewegung.** Lichtkegel und Leuchtlogos stehen (der Kegel wird nur nach Spielzeit heller und dunkler, das rote Licht blinkt nie);
+Autos und Prototyp fahren weiter, weil die Simulation ihre Besitzer bewegt (Inhalt wie die Figuren).
+
+**Umland.** Kommt ein Gelände dazu (Autowerk am Stadtrand, ebenso Anstalt und Kaserne), werden Landstraßen und Felder neu gelegt. Vorher lief
+eine Landstraße, die vor dem Gelände angelegt war, bis zur nächsten neuen Straße quer darüber (gesehen beim Bau des ersten Werks der
+Teststadt an Tag 229).
+
+**Annahmen der Darstellung.**
+
+| | Annahme | Wert | Warum |
+|---|---|---|---|
+| D1 | Autogröße | 0,32 × 0,14 × 0,14 (Figur 0,24 hoch) | maßstäblich wären es 0,62 × 0,25; dann passten auf die Fahrbahn (0,6) keine zwei Spuren und kein Parken. Verkleinert wie Häuser und Figuren |
+| D2 | Querschnitt einer Straßenseite | Spur 0,05–0,19, geparkt 0,20–0,34 (leicht gekippt, rechte Räder auf dem Bordstein), stehende Figuren 0,6 und 0,5 von der Hausmitte, Fußgänger 0,45 neben der Straßenmitte | nur so überlappt nichts, ohne Gehweg und Fahrbahn zu ändern |
+| D3 | Reisetempo | 120 Felder je Spielstunde (Fußgänger 22) | Verhältnis 5,5, real 30 zu 5 km/h = 6; auch der längste Weg der großen Stadt endet in der Stunde |
+| D4 | Sichtbar gefahren | höchstens 1.500 Fahrten je Stunde, die der Kamera nächsten zuerst; Planung 3 ms je Bild | wie Annahme 62 bei den Figuren (Nähe zur Kamera) |
+| D5 | Abstand | 0,46 Felder Fahrzeit, Kacheln 0,25 | kein Durcheinander auf Kreuzungen |
+| D6 | Parken | 2 × 2 Plätze je gerades Straßenfeld, höchstens ein Straßenfeld weiter, sonst Garage | oben, „Parken“ |
+| D7 | Werksparkplatz | 12 Plätze | passt auf den Block; ein Werk hat bis 24 Stellen |
+| D8 | Lack der Stadt | Farbe 0–3 gedeckt, 4–7 vier Farben der Modellreihe aus 8 (Blau, Petrol, Rot, Grün, Sand, Orange, Bordeaux, Taubenblau), je Auto ±8 % Helligkeit | Modelle erkennt man an der Farbe (Umland: A19) |
+| D9 | Lichtkegel | 18:30 bis 1 Uhr am Abend der Eröffnung, höchstens 16 zugleich | ruhiges Ereignis, steht im Spielstand |
+| D10 | Leuchtlogo | Anfangsbuchstabe der Marke in Kreis, Quadrat oder Sechseck (Markennummer mod 3); Tech in der Farbe des Produkts, Autowerk aus 5 Tönen; tagsüber 55 %, nachts voll | nur aus dem Firmennamen, nichts erfunden; Schrift system-ui (je Gerät etwas anders) |
+| D11 | Hochhaus, Campus | 14 Geschosse (5,9) plus Krone und Mast; Campus 4 und 3 Geschosse; je auf einem Feld | doppelt so hoch wie ein Wohnturm: das Wahrzeichen |
+| D12 | Werk je Stufe | 2 bis 5 Hallen (Stufe − 1; die Hauskarte zählt genauso), 3 bis 6 Turmebenen | die Stufe soll man sehen |
+| D13 | Prototyp | Teststunden der Simulation (10, 14 Uhr), 90 % der Stunde, eine Runde gut 8 echte Sekunden | „gelegentlich“, weich, ohne Sprung |
+| D14 | Fußgänger | auf dem rechten Gehweg, queren am Anfang oder Ende die Straße | die Fahrbahn gehört den Autos; beim Queren kann eine Figur ein Auto berühren (keine Kollisionsprüfung) |
+
+
+### Stadtregierung (Fenster, Gruppe „Verkehr, Tech-Firmen und Autos“)
+
+- **Spielregel „Tech-Firmen wachsen, Autowerke, Autos“** mit Live-Zeile (Autos, von außen, je 1.000 Einwohner, Haushalte, Werke).
+- **R-A1 Freie Wahl des Verkehrsmittels** (Auslegung; S. 42 zweimal): Die Stadt schreibt nichts vor und bevorzugt nichts; jeder entscheidet
+  selbst, ob er ein Auto kauft, und fährt, wenn es sich für ihn lohnt (A11). Die Leute wählen wirklich (Kauf und Weggrenze hängen an
+  Sparsamkeit und Weg); S. 42 begründet also keine feste Regel (Korrektur der Prüfung). Annahme: außer Auto und Fußweg gibt es kein
+  Verkehrsmittel.
+- **R-A2 Keine CO₂-Abgaben aufs Auto** (wirkt; S. 13, S. 57 zweimal): CO₂-Preis im Kraftstoff (ADAC 2026 rund 17 ct/l, 5,4 l/100 km,
+  810 l im Jahr, 138 €) **und** CO₂-Teil der Kfz-Steuer (§ 9 Abs. 1 Nr. 2 Buchst. c KraftStG, 122 g/km: 55,40 € von 85 €) fallen beide weg,
+  weil S. 57 unter „Abschaffung aller CO₂-Abgaben“ die Steuer nach „Emissionspotential“ nennt (Befund 5: einheitlich; das Argument
+  „Bundessteuer“ ist gestrichen). 193 € im Jahr = 0,37 Taler am Tag. S. 13 steht nicht mehr zusätzlich unter „gilt schon“ (Befund 4).
+- **R-A3 Keine Bevorzugung der E-Mobilität, keine Ladesäulen aus Steuergeld** (galt schon; S. 43): „Alle Autos sind gleich und kosten wie ein
+  Benziner (R-A2). E-Autos und Ladesäulen gibt es nicht“ (vorher „Die Stadt kennt keine Antriebe“, das widersprach R-A2; Schlussprüfung
+  Texte).
+- **R-A4 Kein Verbrennerverbot** (galt schon; S. 14, S. 41), mit dem Hinweis, dass Verbot und Flottengrenzwerte EU-Recht sind (Verordnung (EU)
+  2019/631, geändert 2023), mit Stand: Im Dezember 2025 hat die EU-Kommission vorgeschlagen, das Ziel für 2035 von 100 auf 90 % weniger CO₂ zu
+  senken (geprüft: Kommission, „Automotive Package“ vom 16. 12. 2025; ob es beschlossen ist, habe ich nicht geprüft).
+- **R-A5 Keine Subventionen für Techniken** (galt schon; S. 164 zweimal, „S. 164 f.“ über den Seitenwechsel): Tech-Firmen bezahlen Ausbau
+  und Werk selbst; mit dem Zusammenhang (Befund 13): Die Stadt wendet die Ausnahme „strategische Unabhängigkeit“ nicht an (jetzt als
+  Auslegung gekennzeichnet, Schlussprüfung Texte), das Programm zählt die
+  Autoindustrie dort nicht dazu; ihre „strategische Bedeutung“ (S. 43) macht es zur Aufgabe der Bundesregierung. Ein Werk steht an einer
+  vorhandenen Straße, eine eigene baut die Stadt nicht.
+- Nachgezogen: „Kein Gegenstück“ nennt jetzt „Energie, Bahn, Bus und Flugverkehr“ statt „Verkehr“; die Einträge S. 14 (Verbrenner) und
+  S. 42 (Fahrspuren/Parkraum) mit „Keine Fahrzeuge“ sind weg; S. 13 (CO₂) und S. 164 (Subvention) stehen nicht mehr unter „gilt schon“, dafür
+  S. 43 (synthetische Kraftstoffe: „Alle Autos sind gleich und kosten wie ein Benziner …“). Neue Gruppe „nicht“: „Verkehr und Autos“ (10 Punkte von
+  S. 11, 42, 43, 44; die Energiesteuer, S. 13, steht seit der Schlussprüfung unter „Keine Zahl, keine Mechanik oder kein Fall“: „Keine Zahl für
+  die Energiesteuer … nimmt keine Senkung an (Auslegung)“, und der Absatz „Zur Vollständigkeit“ nennt ihre Senkung unter „es fehlen“); u. a. Parkraum: „hat in der
+  Simulation keine Wirkung“, Befund 14). `--regierung` prüft jetzt, dass jedes Programmzitat im Fenster nur an einer Stelle steht (Befund 4;
+  erlaubt sind nur die zwei Sätze, die seit Version 7 in „Grenze der Stadt“ die Bund-Karten wiederholen).
+- Zitate: 254 im Fenster, `zitatpruef.py` und `zitate_genau.py` finden 249 wörtlich auf der genannten Seite. Die übrigen: „S. 164 f.“ über den
+  Seitenwechsel (Seitenfuß dazwischen; selbst gelesen: S. 164 „Technologien, die den Bedürfnissen der Bevölkerung entsprechen,“, S. 165
+  „setzen sich von selbst durch, wie das Internet, Smartphones und der motorisierte Individualverkehr beweisen.“), zwei Zitate im Fließtext
+  ohne Seitenangabe (S. 42 „unterstützt und fördert“, S. 43 „auf nationaler und europäischer Ebene für eine technologieoffene Gesetzgebung zu
+  sorgen“, beide dort gefunden) und aus Version 7 Noahs „Wie in Amerika“ und „Demographics Unit“.
+
+### Gemessen
+
+Alle Zahlen hier sind auf dem Endstand nach der Schlussprüfung gemessen (gemischte Reihenfolge der Käufer, Grundregel mit `autoFaehrt`,
+Autos mit 28 Dreiecken). Die Stadt verläuft dadurch anders als in Teil 1 und 2; deren Zahlen stehen nur noch zum Vergleich in der ersten Tabelle.
+
+**Seeds 1–80** (`v8/mess/mess_v8.mjs` = `mess10.mjs` plus Autos, `lauf80.sh`, `auswert.py`, 730 Tage stündlich, gegen dieselbe Messung
+auf ffa1d88; Logs `v8/mess/v9b_*.txt`):
+
+| Stand | alle Gates | fällt | Band Ø / schlimmster | Einwohner Tag 365 / 730 | Gründungen bis 365 | Gate 6 / 7 Ø | Mieterkäufe | Geld je Erwachsenem Tag 730 |
+|---|---|---|---|---|---|---|---|---|
+| ffa1d88 | 78 von 80 | G4: 44, 77 | 1,081 / 1,177 | 917 / 1.186 | 235 | 19,4 / 25,6 | 776 | 12.609 |
+| Version 8 bis zur Schlussprüfung (rotierender Start) | 79 von 80 | G4: 30 | 1,075 / 1,159 | 914 / 1.176 | 226 | 19,4 / 26,0 | 746 | 11.152 |
+| **Version 8, Endstand** (gemischte Reihenfolge, Variante b) | **78 von 80** | G4: 47, 54 | 1,077 / 1,165 | 917 / 1.187 | 229 | 19,3 / 25,8 | 751 | 11.068 |
+
+**Die Zahl der bestandenen Seeds hängt am Zufall der Reihenfolge.** Die Mischung der Käufer (A20) hat zwei freie Konstanten. Vier gleich
+neutrale Varianten ergaben 76, 78, 78 und 76 von 80 (Band Ø 1,076 bis 1,080; Logs `v9a` bis `v9d`); ausgeliefert ist Variante b
+(`t · 40503 + 12345`, `t · 7919 + 4711`). **Ich habe b nach diesem Ergebnis gewählt**; die Wahl ändert an der Neutralität nichts, und der
+Unterschied zu ffa1d88 (78) liegt in dieser Streuung. Gate 4 fällt nur knapp (Band 1,15 bis 1,17). Der erste Einbau ohne `AUTO_ZIEL_BETRIEB`
+bestand 74 von 80 (A10). Die Mieterkäufe sinken um 3,2 % (Befund 6). Tage Erwachsener im Minus je Stadt 6.521, davon 133 mit Auto (A14).
+
+Autos an Tag 730 (Mittel über 80 Städte): 604 Autos, **509 je 1.000 Einwohner** (468–544; Destatis 593), **76,5 % der Haushalte** (Destatis
+77,9 %), 104,4 je 100 Haushalte (111,5), **42,9 % der Arbeitstage mit dem Auto** (Pendeln 2024: 65 %), davon 156 von außen. Ein Werk bestellt
+oder übernommen in 74 von 80 Städten (Median Tag 493), an Tag 730 in 74 Städten eins oder zwei (Ø 1,56), leere Werke Ø 0,13. Tech-Firmen je
+Stufe an Tag 730 (Ø): Stufe 1 6,9, 2 1,2, 3 1,1, **Campus 0,75, Hochhaus 2,2**. Gebaut bis Tag 730 zusammen 222.679 Autos, **Export 70,4 %**
+(Summe über alle Städte; Mittel je Stadt über die 74 Städte mit Werk 66,8 %; VDA 76 %). Käufe: 65.857 aus Werken der Stadt, 65.703 von außen
+(49,9 %). Je Stadt verschrottet 762, geerbt 42, in Geldnot verkauft 28. Laufende Kosten Ø 2.299 Taler am Tag, CO₂-Abgaben, die entfallen,
+116 Taler am Tag. Größter Tech-Anteil an den Umland-Stellen 40,0 %, ruhende Stellen an Ø 0,1 Nächten (erzwungen geprüft: `--autos`, 3b).
+Alter der Autos im Bestand (Seeds 1–6, Tage 550–700): 91 bis 106 Tage, im Mittel 100 Tage ≙ 10 Jahre (A9).
+
+**Seeds 1–3** (`--autos`, Tag 730):
+
+| Seed | Autos | je 1.000 | Haushalte | je 100 HH | Arbeitstage mit Auto | erstes Auto / erstes Werk | Werke bestellt / übernommen / Umzüge | gebaut, davon Export | von außen gekauft | Stufen 1–5 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 629 | 529 | 80,2 % | 109 | 43,1 % | Tag 19 / 452 | 1 / 0 / 1 | 1.817, 48 % | 727 | 9/1/0/0/2 |
+| 2 (Teststadt) | 618 | 506 | 78,4 % | 107 | 43,5 % | Tag 43 / 271 | 2 / 1 / 2 | 3.281, 57 % | 319 | 12/2/0/2/2 |
+| 3 | 585 | 493 | 76,9 % | 103 | 43,9 % | Tag 44 / 591 | 1 / 1 / 2 | 813, 48 % | 1.253 | 6/3/1/1/3 |
+
+**Grundregel über 12 Seeds** (`--autos`, 2b, je 730 Tage stündlich, wie im Bild mit dem Ort des Autos und des Besitzers aus der Vorstunde):
+5.401.819 Fahrten, alle mit Abfahrt und Ziel beim Besitzer, 164 davon in Umzugsstunden; 32 Sprünge ohne Fahrt (30 Umzug, 2 neue Stelle
+mitten am Tag); 10.582 Testfahrten, nie zugleich mit dem eigenen Auto. Vor der Schlussprüfung wären auf denselben Seeds im alten Verlauf 6
+Fahrten ohne Besitzer am Ziel und 1 Abfahrt ohne Besitzer gewesen (Prüfer Technik); im neuen Verlauf findet `mess2/fall_suche.mjs` auf Seeds
+1–14 fünf solche Stunden (Seed 2 Tag 305, Seed 4 Tag 623, Seed 8 Tag 690, Seed 13 Tag 412, Seed 14 Tag 137), die jetzt alle Sprünge sind.
+
+**Browser, 8 Uhr** (`v8/mess2/leistung2.cjs` und `leistung3.cjs`: laden, bis 8 Uhr, Tempo 1, 4 s warten, dann 5 s bzw. in der großen
+Stadt 20 s lang jedes Bild; Heap per CDP nach einer Speicherbereinigung; SwiftShader ohne Grafikkarte; Logs `mess2/leistung2_end.log`,
+`leistung3_end.log`). Die Spalte „JS-Zeit“ ist `__stadtDebug.frameMs` (Zeit des Skripts je Bild), „Bildabstand“ der Abstand zweier
+`requestAnimationFrame` (das, was man sieht; Befund der Schlussprüfung, Bedienung: vorher hieß die JS-Zeit „Bildzeit“). **Die Zeiten sind
+unsicher:** Während der Endmessung liefen auf demselben Rechner andere Tests (Last 7 bis 9 auf 4 Kernen); Draw Calls, Dreiecke und Heap hängen
+daran nicht.
+
+| Stadt | Stand | Einwohner | Draw Calls | Dreiecke | JS-Zeit (Median) | Bildabstand (Median) | Heap |
+|---|---|---|---|---|---|---|---|
+| Teststadt Tag 400 | ffa1d88 | 943 | 26 | 53.165–53.505 | 9,8 ms | 214 ms | 8,6 MB |
+| | Version 8 | 1.031 | 28 | 61.952–62.122 | 10,5 ms | 317 ms | 9,6 MB |
+| Teststadt Tag 730 | ffa1d88 | 1.169 | 24 | 55.664–55.904 | 6,0 ms | 535 ms | 8,8 MB |
+| | Version 8 | 1.224 | 26 | 69.609–69.729 | 9,7 ms | 411 ms | 10,0 MB |
+| große Stadt Tag 750 (`&umland=300000`, 20 s) | ffa1d88 | 5.850 | 25 | 146.557–147.037 | 13,4 ms | 889 ms | 9,3 MB |
+| | Version 8 | 6.412 | 27 | 228.079–228.249 | 17,6 ms | 930 ms | 10,5 MB |
+
+Eine erste Messung derselben großen Stadt (20 s, vor dem Entfernen der erzwungenen Fahrten, Rechner ruhiger) ergab 471 → 555 ms Bildabstand
+(+18 %) und 9,8 → 11,9 ms JS-Zeit; die Endmessung 889 → 930 ms (+5 %). Mehr als „etwas langsamer“ lässt sich daraus nicht sagen.
+
+**Draw Calls: +2** in allen Szenen, genau `M.auto` und `M.leucht` (Objektliste je Bild, `t2/mess/calls.cjs`: Teststadt Tag 400 26 → 28 um
+8 Uhr, 27 → 29 um 21 Uhr; große Stadt 25 → 27 und 26 → 28). Vom Budget +3 ist also einer frei; in Teil 2 kam in der Teststadt Tag 730 durch den
+anderen Verlauf ein dritter Mesh dazu (`dach`), das ist im neuen Verlauf nicht mehr so. **Dreiecke der großen Stadt:** +81.500 (+56 %), davon
+rund 60.000 Autos zu 28 Dreiecken (2.158 Instanzen um 8 Uhr: 234 stehende, 1.910 Fahrten, Neuwagen und Prototypen), der Rest kommt vom anderen
+Verlauf (562 Einwohner mehr). Mit 36 Dreiecken je Auto wären es 17.000 mehr. Der Bildabstand steigt in SwiftShader um 5 bis 18 % (oben);
+auf einer Grafikkarte nicht gemessen.
+
+Stundenschritt und die ersten Bilder einer Stunde (`v8/mess2/t2m/leistung.cjs`, Kopie von `t2/mess/leistung.cjs` mit den neuen Funktionen:
+zwei Tage aufgewärmt mit je 150 Bildern je Stunde, dann die Stunde und 240 Bilder bei 1×):
+
+| | ffa1d88, 8 Uhr / 17 Uhr | Version 8, 8 Uhr / 17 Uhr |
+|---|---|---|
+| Teststadt: Figuren und Autos planen (stündlich) | 1,4 / 0,3 ms | 5,0 / 3,9 ms |
+| Teststadt: je Bild Median, Max | 0 und 0,3 / 0,1 und 7,2 ms | 0,1 und 3,2 / 0,1 und 3,1 ms |
+| große Stadt: Figuren und Autos planen | 2,3 / 0,3 ms | 17,1 / 12,7 ms |
+| große Stadt: je Bild Median, Max | 0,1 und 0,3 / 0,1 und 0,5 ms | 0,1 und 10,2 / 0,2 und 10,4 ms |
+
+Das Planungsbudget richtet sich jetzt nach der Spielzeit: In der großen Stadt kosten die ersten vier Bilder einer Stunde je 10 ms, wenn die
+Bilder selten sind (hier: aufgewärmt mit 150 Bildern je Spielstunde), danach 3 ms; bei 60 Bildern in der Sekunde bleibt es bei 3 ms.
+**Keine Allokation je Bild:** Heap-Stichprobe (CDP, alle 128 Byte) über diese 240 Bilder: 0,0 bis 0,1 KB (eine Zahl in `fahrtenWeiter`); die
+neuen Funktionen `probenBauen`, `lueckeSuchen` und `belegen` legen nichts an (feste Puffer; das zweite Bitfeld `kachelKern` wächst wie das
+erste nur mit der Karte).
+
+**Verkehr** (`v8/mess2/t2m/kennzahlen.cjs`, nach der ganzen Planung): Teststadt Tag 730, 616 Autos: nachts 105 am Straßenrand (17,0 %), tagsüber
+189 (30,7 %) und 8 auf dem Werksparkplatz; um 8 / 17 / 22 Uhr 304 / 304 / 170 Fahrten, sichtbar gefahren 274 / 287 / 170, gesprungen (Straße
+voll) 30 / 17 / 0. Große Stadt Tag 750, 3.248 Autos: nachts 507 (15,6 %), tagsüber 1.012 (31,2 %) und 24; um 8 / 17 / 22 Uhr 1.926 / 1.926 / 759
+Fahrten, sichtbar 1.013 / 873 / 676, gesprungen wegen voller Straße 487 / 627 / 83, über `FAHR_MAX` 426 / 426 / 0.
+
+**20× bei wenigen Bildern** (`v8/mess2/br/t_rest20.cjs`, Kopie des Prüfskripts): große Stadt bei 1,6 Bildern in der Sekunde um 8 Uhr 1.910
+Fahrten, 597 sichtbar, 1.313 gesprungen, **nicht rechtzeitig geplant (`rest`) 0** (vorher 689 von 1.706: diese Autos standen die ganze Stunde zu
+Hause und dann ohne Fahrt bei der Arbeit); Teststadt bei 2,9 Bildern: 267 Fahrten, 262 sichtbar, `rest` 0.
+
+**Überlappen** (`v8/mess2/br/ueberlapp.cjs`: alles geplant, alle 0,002 Spielstunden die fahrenden Autos in der Mitte ihrer Strecke, Paare
+näher als 0,16; Kamera über der Mitte, Abstand 14): große Stadt um 8 / 17 Uhr 3 / 9 Paare in 108.000 / 120.000 Proben (Version 8 vor der
+Schlussprüfung im alten Verlauf ebenso 3 / 9), Teststadt 1 / 0. Fahrten, die Start oder Ziel höchstens 6 Felder vom Blickpunkt haben: in der
+großen Stadt springen 27 von 253 (8 Uhr) und 92 von 253 (17 Uhr), in der Teststadt 6 und 8 von 136 (Bekannte Schwächen).
+**Live-Beobachter** (`v8/mess2/br/t_gross.cjs` mit `sampler.cjs`, Kopien der Prüfskripte, große Stadt, 16–19 Uhr bei 5×; Log
+`mess2/br/mess/gross_end.log`): 2.668 Fahrten, Grundregel ohne Fehler, Fahrer nie sichtbar, kein Sprung eines sichtbaren Autos, nichts durch
+Häuser oder über Rasen, links 0 / rechts 8.397, 0 Überlappungen in 10.226 Proben, geparkt beim Besitzer 2.252 Proben ohne Fehler, Konsole leer
+(mit den wieder entfernten erzwungenen Fahrten nahe der Kamera war es 1 Überlappung in 10.652 Proben).
+
+Bilder (`tests/blick.cjs`): `scratchpad/v8/nachher/` (Teststadt Tag 400, 1.031 Einwohner) und `scratchpad/v8/gross/` (große Stadt Tag 750,
+6.413 Einwohner), selbst angesehen: Hochhäuser mit Leuchtlogos, Autos am Straßenrand und abends mit Scheinwerfern in der Straßenansicht,
+Stadtteilnamen, Handyansicht; die Nah- und Straßenansichten der großen Stadt zeigen wie vorher die (leere) Kartenmitte, weil die Stadt dort
+ringförmig gewachsen ist. In der Konsole nur die absichtlich abgebrochenen KI-Anfragen.
+
+
+### Speicherformat 8
+
+`VERSION = 8`. Neue Personenfelder (`PF_AUTO`): `auto`, `autoTag`, `autoMarke` (255 = von außen), `autoModell`, `autoVersion`, `autoFarbe`,
+`autoBis`, `autoMinus`. Neue Gebäudefelder (`GF_AUTO`): `werk`, `werkVon`, `umzug`, `modell`, `gebaut`, `fertigRest`, `autosGesamt`,
+`kistenWerk`, `ruht`, `eroeffnet`, `eroeffnetArt`. Dazu `S.rsAuto` und `S.stat.auto`, `S.stat.regierung.co2`. Ein Stand der Version 8 muss
+alle diese Felder haben (sonst „Spielstand beschädigt“); `autoPruefen` prüft Grenzen und Zusammenhänge (Marke, Modell, Werk ↔ Gelände,
+Umzug ↔ Werk, höchstens `AUTO_MAX` Werke, Stufen, ruhende Stellen, Eröffnung; seit der Schlussprüfung auch `g.werk` nur 0 oder 1, weil die
+Darstellung ein Werk an `=== 1` erkennt). **Übernahme:** Version 7 im Versionsdialog (eigener Text:
+„Dein Spielstand ist von Version 7 …“, „Autos gibt es ab dem Übernahmetag; noch hat niemand eins“), Version 2–6 über die Kette
+(`migriereSicherheit`, `migriereBund`, `migriereV6`, dann `migriereV7`). Ab dem Übernahmetag: niemand hat ein Auto, kein Werk, Summen 0,
+eigener Zufallsstrom aus dem Seed; bestehende Tech-Firmen haben keine Eröffnung (`eroeffnet = 0`: nie, sie wurden vorher gegründet); eine
+Zeile im Stadtbuch („Ab heute wachsen Tech-Firmen weiter … Auf Autos fallen in der Stadt keine CO₂-Abgaben an. …“).
+`--speichertest`: bitgleich, **Fingerabdruck `0cdd15796669ff3a`** (Seed 1, Tag 150, 13 Uhr, 60 Tage weiter; Version 7 `6277f264ccaf83c3`),
+Stand mit Haft und Obhut `e4b73877b3e467f7` (sortiert `5d385fd960857369`), Stand mit dem Bund `a3e921eeaffeb5bc` (sortiert
+`8e22519fde0bead2`). Neu nach der Schlussprüfung, weil die Käufer jetzt in gemischter Reihenfolge kaufen (A20) und die Stadt dadurch anders
+verläuft; das Format ist gleich. Frühere Stände: Teil 2 `c46162fb1914a2b5`, `87e58db1c4f91dcc`/`79030e12d3adf918`,
+`8b951d0a34eb730c`/`d451fe9746e09114`; Teil 1 `7b3ad863b7b0f553`, `ab5b0b75c1f1d9c6`/`ee2fba8821b1fb5f`, `6766dae013abe517`/`3b230e197a0069d5`.
+`tests/basis_v8.json` ist `tests/basis_v7.json` über „Stadt übernehmen“ (`tests/basis_v8.cjs`, nach der Schlussprüfung neu erzeugt, weil sich
+die Zeile im Stadtbuch geändert hat), `tests/hilfe.cjs` zeigt darauf.
+
+### Tests
+
+- `node tools/simtest.mjs --autos` (neu): statisch (Zufall nur aus `zufallAuto`, gelesene Personenfelder je Regel für 33 Funktionen, keine
+  Namen, Geschlecht nur fürs Pronomen im Stadtbuch, Namenstausch bitgleich); Seeds 1–3 je 730 Nächte und 17.496 Stunden mit Invarianten
+  nach jeder Nacht und Stunde: Werke auf eigenem Gelände, höchstens `AUTO_MAX`, Stufen und Stellen, 40-%-Grenze nach jeder Nacht, Umzug,
+  Fertigung (je anwesender Kraft genau 0,575 Autos, auf Tausendstel; verkauft ≤ gebaut; Teile = verkaufte Autos × 24 Kisten), jeder Kauf (Reserve, Preis, Werk vor Umland, Marke nur mit freiem Auto, Lebensdauer), Teile, laufende
+  Kosten und CO₂ genau je zahlendem Auto, Verschrotten pünktlich, kein Auto länger als 5 Nächte im Minus, keine Kinder mit Auto, Eröffnung
+  jeder neuen oder übernommenen Tech-Firma am selben Abend; **Grundregel** jede Stunde für jedes Auto (Ortswechsel nur mit
+  Ortswechsel des Besitzers und `mitAuto`, sonst beim Besitzer oder zu Hause; Umzüge gezählt); Testfahrer nur in den Teststunden und im Werk;
+  Autos von außen ab Tag 0, lange vor dem ersten Werk. **Faire Reihenfolge:** Im natürlichen Lauf sind ausverkaufte Tage selten (46 Käufe von
+  außen an Tagen mit Werk, zu wenig für eine Aussage, nur gemessen); deshalb erzwungen (je 150 Tage ab dem ersten Werk, fünffache Kaufchance, ein
+  Viertel der Fertigung), Endstand: Seed 2 mittlere Personennummer aus dem Werk 0,534 (244 Käufe), von außen 0,564 (455); Seed 4 0,605 (352)
+  und 0,586 (315); erlaubt ±0,08. Erzwungen: Erbe, Geldnot, Haft, `AUTO_MAX` bei Übernahme (Gründung und Umzug); Speichern mitten im Werksbau und
+  60 Tage über den Umzug hinweg bitgleich; 11 beschädigte Stände (seit der Schlussprüfung auch `g.werk = 2`).
+- Angepasst (feste Momente verschoben, keine Prüfung schwächer): `--erweiterung` (Seed 2 wächst jetzt an Tag 172 zweimal in einer Nacht, die
+  erste Nacht mit zwei Ringen statt der ersten überhaupt; Stadtbuchzeilen der Stufen beim Entstehen gesammelt, weil 500 Zeilen mit Autos
+  früher voll sind; bei der Übernahme von Version 6 ist die Zeile der Stufe die vorletzte), `--militaer` (der Arbeitstext steht in
+  `heuteArbeit`, `heuteText` hängt die Autofahrt an), `--migrationstest` (Version 7 = ffa1d88 dazu, je eine Zeile „Autos“; siehe unten).
+- **Prüfung in `--migrationstest` („Kein Kündigungsschock nach der Frist“)**: In Teil 1 war sie gelockert (erste Nacht nur Kinder, die vor
+  dem Ende der Frist lebten, Schwelle 2; alle Nächte ≤ 4), weil nach der Übernahme von Version 3 (Seed 3, Tag 400) in der ersten Nacht 3 Eltern
+  aufhörten, zwei davon für Kinder, die am Tag nach der Frist geboren wurden. **Seit der Schlussprüfung gilt wieder die Prüfung von ffa1d88**
+  (erste Nacht ≤ 2, Nächte 2–11 ≤ 4); dazu neu, strenger: Jede Stellenaufgabe der ersten Nacht muss ihr Kind im Gedächtnis haben. Im neuen
+  Verlauf sind es in allen fünf Übernahmen in der ersten Nacht 0.
+- Browser: `tests/autos.cjs` (neu): Hochhaus und Autowerk werden gezeichnet (Klick aufs Dach öffnet die Hauskarte „Stufe 5 (Hochhaus)“ bzw.
+  „Autowerk … 4 Hallen“), alle mit Eröffnung; Grundregel 24 Stunden an der Schnittstelle, die die Darstellung nutzt (577 Autos, 1.142 Fahrten,
+  0 ohne Ortswechsel, 0 ohne `mitAuto`, 0-mal weder beim Besitzer noch zu Hause); Teststrecke (4 Testfahrten um 10 und 14 Uhr, alle mit
+  Testfahrer im Werk); Hauptfigur mit Auto: Raute sichtbar auf dem ganzen Weg; Personenkarte „fährt mit dem Lumen Weite 2 zur Arbeit“; Draw
+  Calls 26 (≤ 32); Konsole leer. Mit Teil 2 angepasst: Die Hauptfigur fährt jetzt im Auto, geprüft wird, dass ihre Figur dann nicht zu sehen
+  ist und die Raute über ihrem Auto steht (vorher: Raute über der gehenden Figur).
+- Browser angepasst: `p6migration` (Version 7 → 8 mit `afd/stadt_v7.html` per Route: Dialog, übernehmen, Karte/Stufe/Stadtteile/Sicherheit/Bund
+  bleiben, erstes Auto aus dem Umland, Fenster, Neuladen), `ereignis` (neue Momente: Tag 405, 446, 466, 478; erst Pleiten, dann 20×),
+  `erweiterung` (Seed 9, Tag 235 → 236, 72 → 80; Stadtteil der Personenkarte = Stadtteil der eigenen Wohnung), `p8tech` (Dachhöhe für Stufe
+  4/5), `befunde_s2` (13 aufklappbare Karten mit der Spielregel der Autos), `hilfe.cjs` (`basis_v8.json`).
+
+**Auf dem Endstand** (`stadt.html` md5 `f2c932a538e9d75bc9a3ef1ad770c7a6`, `tools/simtest.mjs` md5 `a13b9ae6eddbc5669c2f99b7c8db7b64`, Server auf 8714, KI-Nachbau
+auf 11434; Logs in `scratchpad/v8/logs/final_*.log` und `alle_end.log`):
+
+- `simtest`: `--gate` (Seeds 1–3 alle Gates), `--speichertest` (bitgleich, drei Stände), `--aufholtest` (Vergleich), `--kitest` 47, `--bau` 15,
+  `--waren` 15, `--tech` 16, `--regierung` 155, `--kita` 40, `--sicherheit` 28, `--militaer` 24, `--autos` 17, `--migrationstest --git
+  /home/user/website-` 324 (Version 2–7, ffa1d88 als 7), `--erweiterung --git /home/user/website-` 33, dazu `--gross` 34. Alle ohne Fehler.
+- Browser (`tests/alle.sh`): p3test 12, p5neu 10, p6migration 34, p7figuren 6, p8tech 14, raute_klick 9, ereignis 21, t1_xss 5, p4test 25,
+  s2karten 22, kita 22, befunde_s2 27, erweiterung 20, sicherheit 12, militaer 16, autos 9; `otest` befunde 21, handy 11, breit 12,
+  tastatur 4, breiten 20, hilfehoehe 1. Alle exit 0. Dazu `tests/pruef_v5.cjs` 17 (erwartet jetzt Version 8) und `tests/kennzahlen_hoehe.cjs`
+  (Kennzahlen gleich hoch wie ffa1d88: quer 156 bis 216 px, hochkant 231 px).
+
+**Teil 2 (Darstellung), Tests:**
+
+- Browser `tests/autos_bild.cjs` (neu, in `tests/alle.sh`): Teststadt Seed 2, 24 Stunden je 9 Zeitpunkte: **Grundregel im Bild** (1.142 Fahrten,
+  0 ohne Ortswechsel des Besitzers, 0 ohne `Sim.mitAuto`, 0 Umzüge ohne Wohnungswechsel), **kein Sprung** (Weg beginnt am alten Platz und endet
+  am neuen, 0 stehende Autos ohne Fahrt bewegt), stehende Autos höchstens 2 Felder vom Gebäude, das `Sim.autoOrt` nennt, **Fahrer unsichtbar**
+  (0 von 459 Figur-Zeitpunkten), **Rechtsverkehr** (1.065 Proben rechts, 0 links), **Teststrecke nur mit Testfahrer** (Prototyp bewegt sich nur
+  in den Stunden 10 und 14 mit dem Testfahrer der Simulation, der dann laut Simulation im Werk arbeitet; 0-mal zugleich zu Fuß zu sehen; Klick
+  auf den Prototyp öffnet ihn), **Hauptfigur im Auto** (Figur weg, Raute genau über dem Auto bei 20, 50, 80 % der Fahrt), **Tech-Stufen**
+  (Hochhäuser 6,98 hoch, Turmebenen je Stufe des Werks, Campus in Seed 3), Klick auf ein parkendes Auto öffnet den Besitzer mit seinem Auto,
+  **Lichtkegel** an einer echten Eröffnung der Simulation (Tag 734, Übernahme: mittags 0, abends 1, nach dem Neuaufbau wieder 1, um 2 Uhr 0),
+  Draw Calls ≤ 29, Konsole leer.
+- `tests/autos.cjs` (Teil 1) angepasst: Die Hauptfigur fährt jetzt, geprüft wird die Raute über dem Auto und die unsichtbare Figur.
+- Die Hilfe ist gleich hoch wie vorher (745 von 745 px bei 1280 × 800, `otest/hilfehoehe`); `otest/befunde` findet „Offene Läden leuchten von
+  17 bis 22 Uhr“ weiter, `militaer` und `sicherheit` ihre Farben.
+- Nur Messung (nicht in `alle.sh`, `scratchpad/v8/t2/mess/`): `leistung.cjs`, `kennzahlen.cjs`, `calls.cjs`, `bilder.cjs`, `zustaende.cjs`
+  (Werk im Bau, mit neuer Halle, leer; Umbau zum Campus), `karte.cjs`, `reduziert.cjs` (reduzierte Bewegung: Autos fahren weiter 5,2 Felder,
+  Prototyp eine Runde), `wachsen.cjs` (Karte wächst 64 → 88: alle stehenden Autos an derselben Stelle der Welt).
+
+**Auf dem Endstand von Teil 2** (`stadt.html` md5 `211010f8c8ddd8a2baaf13ae41d4f5e6`, `tools/simtest.mjs` unverändert md5 `a13b9ae6eddbc5669c2f99b7c8db7b64`; Server auf 8714, KI-Nachbau auf 11434; Logs in `scratchpad/v8/t2/logs/` und `t2/alle_end.log`):
+
+- `simtest` (Datei unverändert): `--gate` (Seeds 1–3 alle Gates), `--speichertest` (bitgleich, drei Stände, Fingerabdrücke unten), `--aufholtest`,
+  `--kitest` 47, `--bau` 15, `--waren` 15, `--tech` 16, `--regierung` 155, `--kita` 40, `--sicherheit` 28, `--militaer` 24, `--autos` 17,
+  `--migrationstest --git /home/user/website-` 324, `--erweiterung --git /home/user/website-` 33, dazu `--gross` 34. Alle ohne Fehler.
+- Browser (`tests/alle.sh`): p3test 12, p5neu 10, p6migration 34, p7figuren 6, p8tech 14, raute_klick 9, ereignis 21, t1_xss 5, p4test 25,
+  s2karten 22, kita 22, befunde_s2 27, erweiterung 20, sicherheit 12, militaer 16, autos 9, **autos_bild 14**; `otest` befunde 21, handy 11,
+  breit 12, tastatur 4, breiten 20, hilfehoehe 1. Alle exit 0. Dazu `tests/pruef_v5.cjs` 17 und `tests/kennzahlen_hoehe.cjs` (Kennzahlen gleich
+  hoch wie ffa1d88: quer 156 bis 216 px, hochkant 231 px).
+- Zitate im Fenster: dieselben 254 wie in Teil 1 (Teil 2 bringt keine), `zitatpruef.py` 249 ok, 2 auf der Seite im Fließtext gefunden (S. 42,
+  S. 43), 3 nicht als Ganzes: „S. 164 f.“ über den Seitenwechsel (selbst gelesen: S. 164 „Technologien, die den Bedürfnissen der Bevölkerung
+  entsprechen,“, Seitenfuß, S. 165 „setzen sich von selbst durch, wie das Internet, Smartphones und der motorisierte Individualverkehr
+  beweisen.“) und Noahs „Wie in Amerika“ und „Demographics Unit“ aus Version 7 (keine Programmzitate).
+
+
+**Nach der Schlussprüfung, Tests:**
+
+- `--autos` (21 Prüfungen): neu 2b (Grundregel wie im Bild über 12 Seeds, Abfahrt und Ziel beim Besitzer, Sprünge nach Grund, Testfahrer ohne
+  eigenes Auto), 3b (ruhende Stellen erzwungen, mit Speichern), der elfte beschädigte Stand (`g.werk = 2`), die gemischte Reihenfolge statisch
+  (jede Nummer genau einmal; `mischSchritt` in `autosTag`) und erzwungen auf Seeds 2 und 4, Werkskarten (Lieferant, Hallen wie im Bild); die
+  Invarianten-Schleife prüft Fahrten mit `autoFaehrt` (eine eng begrenzte Ausnahme: neue Stelle mitten am Tag nah an der Wohnung, gezählt).
+- `autos_bild.cjs` (20): Abfahrt beim Besitzer, Sprünge nur, wenn der Besitzer den Weg nicht mit dem Auto macht, drei echte Sprung-Fälle (Seed 2
+  Tag 305, Seed 14 Tag 137, Seed 8 Tag 690: Figur die ganze Stunde zu sehen, Raute über ihr), Karten (Testfahrer um 5, 8 und 10 Uhr, Werkskarte,
+  „fährt um 8 Uhr …“), Turmebenen nur für fertige, offene Werke.
+- Angepasst an den neuen Verlauf (keine Prüfung schwächer; Liste oben unter „Befunde der Schlussprüfung“): `--bau`, `--kita`, `--sicherheit`,
+  `ereignis`, `erweiterung`, `p8tech`, `autos`; `raute_klick` setzt den Blick vor dem Messen der Rauten noch einmal (im Endlauf von `alle.sh`
+  lag er einmal woanders, 4 von 8 Klicks trafen Häuser; allein lief der Test vor der Änderung dreimal und danach einmal mit 8 von 8).
+
+**Endstand nach der Schlussprüfung** (`stadt.html` md5 `dbc106d795426d7711a9ab04c4ec21f5`, `tools/simtest.mjs` md5
+`4ad5a052079ff96e940aeb32be895e89`; Server auf 8714, KI-Nachbau auf 11434; Logs in `scratchpad/v8/logs2/final_*.log` und `alle_end.log`):
+
+- `simtest`: `--gate` (Seeds 1–3 alle Gates; im Lauf mit vier Modi gleichzeitig fiel auf Seed 1 nur die Laufzeit T mit 6,5 s, allein 1,9 bis
+  2,3 s), `--speichertest` (bitgleich, drei Stände), `--aufholtest` (Vergleich), `--kitest` 47, `--bau` 15, `--waren` 15, `--tech` 16,
+  `--regierung` 155, `--kita` 40, `--sicherheit` 28, `--militaer` 24, `--autos` 21, `--migrationstest --git /home/user/website-` 324 (Version 2–7,
+  ffa1d88 als 7), `--erweiterung --git /home/user/website-` 33, dazu `--gross` 34. Alle ohne Fehler.
+- Browser (`tests/alle.sh`): p3test 12, p5neu 10, p6migration 34, p7figuren 6, p8tech 14, raute_klick 9 (nach der Änderung oben), ereignis 21,
+  t1_xss 5, p4test 25, s2karten 22, kita 22, befunde_s2 27, erweiterung 20, sicherheit 12, militaer 16, autos 9, autos_bild 20; `otest` befunde 21,
+  handy 11, breit 12, tastatur 4, breiten 20, hilfehoehe 1 (die Hilfe ist mit dem neuen Satz zum Lichtkegel gleich hoch). Dazu
+  `tests/pruef_v5.cjs` 17 und `tests/kennzahlen_hoehe.cjs` (gleich hoch wie ffa1d88: quer 156 bis 216 px, hochkant 231 px).
+- Zitate im Fenster: 254 (`zitate_sammeln.mjs`), `zitatpruef.py` 251 gefunden, `zitate_genau.py` 249 genau auf der Seite; die übrigen wie oben
+  unter „Stadtregierung“ (S. 164 f. über den Seitenwechsel selbst gelesen; S. 42 und S. 43 im Fließtext auf der Seite gefunden; „Wie in Amerika“
+  und „Demographics Unit“ sind keine Programmzitate). Die neuen Texte der Schlussprüfung bringen kein neues Zitat.
+- Im Git-Repo ist nichts geändert, `stadt.orig.html` ist gleich ffa1d88 (per `cmp` geprüft).
+
+### Befunde der Gegenprüfung „sim“
+
+1. `AUTO_MAX` umgangen (Übernahme leerer Werke): `uebernehmbar` und `wachsZiel` prüfen `werkeZahl < AUTO_MAX`; `--autos` zählt jede Nacht
+   und prüft den Fall erzwungen. Leere Werke: Ø 0,08 je Stadt an Tag 730 (bekannte Folge, unten).
+2. Verschiedene Grenzen fürs Fahren: nur noch `Sim.mitAuto`; Autos von außen ab Tag 0 (Noahs Entscheidung), Marke 255.
+3. Grundregel nach Wortlaut: umformuliert und festgehalten (oben, „Fahren“); `autoOrt` ohne Zustand.
+4. Stadtregierung: R-A1–R-A5 im Code, Listen nachgezogen, jedes Zitat an einer Stelle (`--regierung`).
+5. CO₂ einheitlich: beide Teile fallen weg, belegt.
+6. Einbau zusammen und auf Version 7: Notbehelf in der Darstellung (kein Absturz, `tests/autos.cjs`), Migration V2–V7, Mieterkäufe gemessen.
+7. Export nachrechenbar: 72,6 % als Summe, 70,1 % als Mittel je Stadt (oben).
+8. Kistentragen: kein Träger zum Werk, Text nur für Läden; die Werkstattkarte nennt die Teile fürs Werk.
+9. Reihenfolge: zuerst ein rotierender Start je Tag, seit der Schlussprüfung jeden Tag gemischt (A20); `--autos` prüft sie erzwungen (Seeds 2 und 4).
+10. Geldnot: Verkauf nach 5 Nächten im Minus (A14).
+11. Preis und Kosten: beide Benziner, „ein Modell, kein Mittelwert“.
+12. Lebensdauer: Rechnung gezeigt, KBA 10,9 Jahre (1. 1. 2026).
+13. S. 164: Zusammenhang und „S. 164 f.“ einheitlich.
+14. Parkraum „hat in der Simulation keine Wirkung“; 40-%-Grenze auch nach dem Auftrag (ruhende Stellen); `arbeitsOrtHeute` und `ortZurStunde`
+    folgen derselben Regel: die Stelle (`arbeit`) oder die Baustelle, auf die der Bauhof jemanden eingeteilt hat, nie `besitz`.
+
+### Befunde der Gegenprüfung „darstellung“
+
+1. **Prototyp gegen die Grundregel (blockierend):** Er fährt nur mit dem Testfahrer der Simulation (`Sim.testfahrtStunde`: 10 und 14 Uhr, eine
+   Kraft, die in dieser Stunde laut `ortZurStunde` genau in diesem Werk arbeitet); deren Figur ist dann nirgends zu sehen (als Hauptfigur die
+   Raute über dem Prototyp), ein Tipp auf ihn öffnet ihre Karte. Weich an- und ausgefahren über die Stunde, ohne Sprung; sonst steht er an der
+   Startlinie. `tests/autos_bild.cjs` prüft es 24 Stunden lang je Bild.
+2. **Gründung als Ereignis:** Lichtkegel für jede Tech-Firma (auch Stufe 1–3), nach `g.eroeffnet` der Simulation (Abend des Tages, 18:30–1 Uhr,
+   weich), also auch nach dem Neuladen; geprüft mit einer echten Eröffnung der Simulation (Teststadt, Tag 734), nicht mit einer Testhilfe.
+3. **Zuschreibungen ans Programm:** Die Darstellung bringt keine Zitate und keine Regeln ins Fenster; die 3-Felder-Grenze ist keine Regel der
+   Darstellung mehr (sie fragt `Sim.mitAuto`, R-A1 ist dort eine echte Wahl der Leute). Die Liste des Fensters kommt aus Teil 1 (ein Satz je
+   Zitat, `--regierung`).
+4. **Hauptfiguren:** Raute über dem fahrenden Auto (und über dem Prototyp); Annahme 44 nachgezogen.
+5. **Allokation in der Planung:** feste Puffer statt `new Int32Array` je Weg, Ring aus festen Abstandsfeldern statt `new Uint8Array(F)` je Ziel,
+   keine Map je Weg; Heap-Stichprobe in den Bildern nach 8 Uhr gemessen (oben).
+6. **Parken:** höchstens ein Straßenfeld weiter (vorher 5); die Regel und der Anteil sichtbar geparkter Autos stehen oben als Abweichung.
+7. **Springende Autos ohne Fahrt:** Ein stehendes Auto bleibt stehen, bis sein Besitzer fährt; ein Platz, der nicht mehr erlaubt ist, gilt nur
+   für neu parkende Autos. Geprüft: 0 bewegte stehende Autos in 24 Stunden.
+8. **Lücke über `TRIP_MAX`:** Jede Fahrt der Stunde wird geführt (Puffer so groß wie die Personen); über `FAHR_MAX` springt sie mit Ort und
+   Platz am Ziel.
+9. **Schnittstelle:** Werk an `g.werk` erkannt, Stufe sichtbar (Hallen, Turmebenen), Gelände aus der Simulation; die Testhilfe `autoTest` des
+   Prototyps gibt es nicht mehr (nichts in der Darstellung schreibt in `S`).
+10. **Leistung und Doku:** Stundenschritt um 8 und 17 Uhr gemessen und begrenzt (Planung verteilt, 3 ms je Bild), Standreihen und Gehweg in
+    Annahme 44 und D2 beschrieben.
+
+
+### Befunde der Schlussprüfung (Version 8)
+
+Drei Prüfungen (Technik, Texte, Bedienung), 26 Befunde. Jeder ist nachgeprüft und umgesetzt, wo nicht anders gesagt (Rest unter „Bekannte
+Schwächen“). Scratchpad-Skripte: `v8/mess2/`.
+
+**Technik**
+1. **Grundregel beim Umzug um 8 Uhr und bei einer neuen Stelle mitten am Tag (blockierend):** Das Auto fuhr sichtbar ohne seinen Besitzer,
+   dessen Figur währenddessen unsichtbar war. Jetzt entscheidet `Sim.autoFaehrt` (Besitzer in der Vorstunde beim Auto, jetzt an dessen Ziel,
+   `mitAuto`), die Darstellung merkt sich dazu je Person, wo die Simulation den Besitzer in der Vorstunde hatte (`pVor`); sonst springt das
+   Auto ohne Fahrt, der Besitzer bleibt sichtbar. `--autos` prüft das wie im Bild über 12 Seeds (2b) und in der Invarianten-Schleife;
+   `autos_bild.cjs` prüft die Abfahrt beim Besitzer und drei echte Fälle im Browser (Umzug um 8 Uhr, neue Stelle nah und weit).
+2. **Ruhende Stellen ohne Test (mittel):** `--autos` 3b erzwingt sie (Seed 2, Tag 400–460, Grenze 70 % des Anteils der Stadt): Grenze nach
+   jeder Nacht, offene und freie Stellen, niemand in einer ruhenden Stelle, Rückkehr, Speichern bitgleich.
+3. **`--migrationstest` gelockert:** wieder die Prüfung von ffa1d88 (erste Nacht ≤ 2), dazu die Gedächtnis-Prüfung.
+4. **`g.werk = 2` lud ohne Fehler:** `autoPruefen` lehnt es ab; elfter beschädigter Stand in `--autos`.
+5. **Draw-Call-Budget:** gemessen +2 (`M.auto`, `M.leucht`), einer vom Budget +3 ist frei (oben, Gemessen).
+6. **Reihenfolge nur rotiert:** jetzt jeden Tag gemischt (A20), statisch und erzwungen geprüft (Seeds 2 und 4).
+7. **`tests/erweiterung.cjs` unter Last:** wartet jetzt bis zu 15 s, bis die Namen stehen (die Prüfung selbst ist gleich).
+
+**Texte**
+1. **S. 42, „Den motorisierten Individualverkehr schützen“ (blockierend):** Der Punkt sagt jetzt, dass das Programm Mittel nennt
+   (intelligente Technik, stauvermeidende Verkehrsführung, Erhalt und Ausbau von Fahrspuren und Parkraum; gegen Dieselfahrverbote und Tempo 30),
+   aber kein Geld.
+2. **README 7,31/7,68 verdreht (blockierend):** „7,31 Taler am Tag (7,68 mit den CO₂-Abgaben, die … wegfallen)“.
+3. **Antriebe (mittel):** R-A3, R-A4 und „gilt schon“ S. 43: „Alle Autos sind gleich und kosten wie ein Benziner (R-A2) …“; S. 13
+   (Kohlekraftwerke): „Keine Stromerzeugung und keine Heizung …; Energie steckt nur im Sprit der Autos“; S. 79 verweist auf R-A2; die Gruppe
+   „Kein Gegenstück“ nennt „Strom und Heizung“ statt „Energie“.
+4. **„kamen von die Werkstatt …“:** „Hauptlieferant ist …“ (wie in der Werkstattkarte), geprüft in `--autos` und `autos_bild.cjs`.
+5. **Hallen in Karte und Bild:** die Karte zählt jetzt Stufe − 1 Hallen wie das Bild (D12).
+6. **Stadtbuch:** „alles aus eigenem Geld“, Anbau-Aufträge mit Tausenderpunkt, jedes Werk „den größten Auftrag, den eine Firma geben kann“.
+7. **Personenkarte doppelt „aus dem Umland“:** bei Autos von außen nur „(gekauft an Tag …)“.
+8. **10,9 Jahre:** „rechnerisch … 10,9 Jahre; gemessen sind es etwa 10“ (A9 mit der Messung).
+9. **Auslegungen:** R-A5 „Die Stadt wendet die Ausnahme … nicht an (Auslegung)“; R-A2 „sagt der Satz auf S. 13 nicht eindeutig“; der
+   Energiesteuer-Punkt steht unter „Keine Zahl …“ und ist als Auslegung gekennzeichnet; „Zur Vollständigkeit“ nennt die Senkung der
+   Energiesteuer unter „es fehlen“.
+10. **Kleine Ungenauigkeiten:** Hilfe „neu, umgezogen oder jetzt Campus/Hochhaus“ (gleich hoch, `otest/hilfehoehe`); Fahrspuren „In der
+   Simulation haben Straßen keine Spuren …“; „keine Tempolimits“; Lkw-Maut „die in der Stadt auf Autos anfielen“; Stadtbuch der Übernahme „Auf
+   Autos fallen in der Stadt keine CO₂-Abgaben an“.
+11. **Wahl zwischen Werk und Umland ohne Beleg im Fenster:** „Kauf:“ nennt jetzt die Annahme (gleicher Preis, kürzerer Weg, das Geld bleibt in
+   der Stadt).
+12. **README Vergleichswerte, Stände:** was eingestellt und was nur gemessen ist; Destatis „Ende September 2025“ (auch im Fenster); R-A4 mit
+   Stand Dezember 2025 (Vorschlag der EU-Kommission, 90 % statt 100 %).
+13. **Parkplätze nach Personennummer:** die Darstellung vergibt sie in jeder Stunde gemischter Reihenfolge (`Sim.mischSchritt`).
+
+**Bedienung**
+1. **Testfahrer vor 8 Uhr falsch (mittel):** Karten nennen ihn erst ab 8 Uhr (`testStundenRest`), davor „… steht um 8 Uhr fest“, danach nur
+   die Teststunden, die noch kommen; `autos_bild.cjs` prüft um 5, 8 und 10 Uhr.
+2. **20× bei wenigen Bildern:** Planungsbudget nach Spielzeit, `rest` gemessen 0 statt 689; im README steht nicht mehr „gemessen 0“ ohne
+   Bedingung.
+3. **Dreiecke der großen Stadt:** Autos mit 28 statt 36 Dreiecken (Lichter im Shader); die Spalten heißen jetzt „JS-Zeit“ und „Bildabstand“.
+   Eine Begrenzung stehender Autos nach Abstand habe ich nicht gebaut (sie würden beim Schwenken fehlen); dazu unten.
+4. **Autos verschwinden statt zu fahren:** zweite Stufe mit engem Abstand (je Stunde gut 50 Fahrten mehr sichtbar, keine Überlappung mehr als
+   vorher). Nahe der Kamera trotzdem zu fahren, führte zu Überlappungen und ist wieder entfernt; dort springen weiter Fahrten (unten).
+5. **Grammatik der Werkskarte:** wie Texte 4.
+6. **„steht …“ bei einem fahrenden Auto:** „fährt um 8 Uhr zur Arbeit“ (auch „nach Hause“, „zu Besuch“, „zum Einkaufen“) in der Stunde, in
+   der der Besitzer damit fährt (`autoFahrtWohin`, ohne Zustand).
+
+Außerdem nach dem neuen Verlauf angepasst (keine Prüfung schwächer): `--bau` zieht Ersatzdienst von der Obergrenze des Bauhofs ab (so steht es
+in der Regel; im neuen Verlauf hat Seed 1 schon vor Tag 365 Ersatzdienst im Bauhof), `--kita` zählt Eltern im Dienst des Bundes wie die Regel
+(B10) und sucht den erzwungenen Fall (h) bis zu 60 Abende weiter, `--sicherheit` sucht den Obhut-Fall auch in Seed 1 und 3 (Seed 2 hat bis Tag
+730 keinen Haushalt mit nur einem Erwachsenen und Kindern), `--autos` misst die faire Reihenfolge ab dem ersten Werk und auf zwei Seeds;
+im Browser neue Momente in `ereignis.cjs` (Tag 422, 449, 452, 490) und `erweiterung.cjs` (Seed 12, Tag 243 → 244, 80 → 88), in `p8tech.cjs`
+die erste Kraft, die noch keine Hauptfigur ist, in `autos.cjs` das Werk steil von oben (ein Hochhaus stand davor).
+
+### Bekannte Schwächen (Version 8)
+
+- **Weniger Pendler mit dem Auto als in Deutschland:** 43 % der Arbeitstage gegen 65 %. Die Stadt ist klein (Wege von wenigen Feldern), und
+  wer weniger als 3 Felder hat, geht zu Fuß. Eine kürzere Grenze würde auch 1-Feld-Wege fahren.
+- **Gate 4 hängt am Geld der ersten Monate und am Zufall der Reihenfolge.** Ohne die Regel für Betriebssparer fielen 6 von 80 Städten. Mit
+  ihr ergeben vier gleich neutrale Mischungen der Käufer 76 bis 78 von 80 (ausgeliefert 78, nach dem Ergebnis gewählt; ffa1d88 78).
+- **Sprung statt Fahrt bei Umzug und neuer Stelle mitten am Tag:** Das Auto verschwindet am alten Platz und steht am neuen, ohne zu fahren
+  (in 12 Städten × 730 Tagen 32-mal). Liegt eine neue Stelle nah an der Wohnung, steht das Auto ab dann zu Hause, obwohl der Besitzer es an der
+  alten Stelle stehen hatte (`autoOrt` hat keinen Zustand).
+- **Leere Werke:** Schließt ein Werk (Tod des Besitzes), bleibt ein ganzer Block leer, bis eine Tech-Gründung oder eine große Firma es
+  übernimmt (Ø 0,13 je Stadt an Tag 730).
+- **Die meisten Autos stehen unsichtbar in der Garage:** nachts 16 bis 17 % sichtbar am Straßenrand, tagsüber knapp ein Drittel (oben,
+  „Parken“). Mehr sichtbare Stellfläche bräuchte Parkflächen auf Bauplätzen oder in Gärten.
+- **Springende Autos, auch nahe der Kamera:** In der großen Stadt fährt um 8 und 17 Uhr knapp die Hälfte der Fahrten nicht sichtbar (Straße
+  voll oder über `FAHR_MAX`): am alten Platz bis zur Abfahrt, dann erst am Ziel. Von den Fahrten mit Start oder Ziel höchstens 6 Felder vom
+  Blickpunkt springen um 17 Uhr 92 von 253 (Teststadt 8 von 136). Sie trotzdem fahren zu lassen, führte zu Autos, die durcheinander fahren;
+  es bräuchte Stau (Autos, die hintereinander warten) oder mehr Spuren.
+- **Leistung und Dreiecke:** Die große Stadt hat um 8 Uhr 228.000 statt 147.000 Dreiecke (60.000 davon Autos), der Bildabstand steigt in
+  SwiftShader um 5 bis 18 % (zwei Messungen, Rechner geteilt). Die ersten Bilder einer Stunde mit vielen Abfahrten kosten 3 ms mehr, in der großen Stadt bei wenigen Bildern bis 10 ms;
+  der Stundenschritt der großen Stadt 10 bis 15 ms mehr; nur unter SwiftShader gemessen, nicht auf einem Handy. Vom Draw-Call-Budget (+3) ist
+  noch einer frei.
+- **Autos kleiner als maßstäblich** (D1), keine Kollisionsprüfung mit Fußgängern, die die Straße queren; kein Stau, Autos warten nur beim
+  Losfahren. Wenige fahrende Autos kommen sich trotzdem näher als 0,16 (große Stadt 3 bis 9 Paare je Stunde, gleich viele wie vor der
+  Schlussprüfung; die Ursache habe ich nicht untersucht).
+- **Karten ohne Zustand:** „fährt um 8 Uhr zur Arbeit“ steht die ganze Stunde da, auch wenn das Auto schon angekommen ist; der Testfahrer
+  stimmt ab 8 Uhr, nimmt jemand erst später frei (späte KI-Antwort), ab der nächsten Stunde.
+- **Kein Gebrauchtwagenmarkt, keine Unfälle, kein Parkraum als Regel der Stadt;** nur Benziner; Kosten und Preis sind ein Modell.
+
 ## Aufbau
 
 - `stadt.html` enthält den Block `<script id="sim">`: reine Simulation, kein DOM, kein `window`, kein `fetch`,
@@ -2346,7 +2996,11 @@ Endstand `stadt.html` md5 `0db3cba9aabd46364ab9251fc3702ba3`, `tools/simtest.mjs
   Sim-Zustand nur über Funktionen aus `StadtSim` (`stunde`, `tagSchritt`, `hauptSetzen`, `kiSchalten`, `kiEntscheidung`,
   `kiVerwerfen`, `kiGespraech`, `kiTagebuch`, `verlustErledigt`, `importZustand`). `theke`, `traeger`, `bauGesamt`, `regierungInfo`,
   `erweiterungInfo`, `stadtteilZaehlen`, `teilVon`, `teilName`, `sicherheitInfo`, `polizeiEinsatz`, `imHof`, `hofZeiten`, `abteilung`,
-  `bundInfo`, `dienstWahl` und `verpflichtet` lesen nur.
+  `bundInfo`, `dienstWahl` und `verpflichtet` lesen nur. Version 8: `mitAuto`, `pendeltMitAuto`, `ortZurStunde`, `arbeitsOrtHeute`,
+  `autoOrt`, `autoWegMin`, `testfahrer`, `testfahrtStunde`, `autoFirmaVon`, `autoName`, `autoInfo`, `autoKennzahlen`, `techPlaetzeVon` und
+  `werkeZahl` lesen nur; `mitAuto` ist die einzige Entscheidung übers Fahren, auch für die Darstellung (sie fragt `autoOrt`, `mitAuto` und
+  `testfahrtStunde` jede Stunde und merkt sich nur, wo sie jedes Auto gezeichnet hat; im Spielstand steht davon nichts). `StadtSim._auto` (Kauf, Nacht der
+  Autos, Erbe, Geldnot, Werk, Übernahme gezielt auslösen) ist nur für `tools/simtest.mjs --autos` da.
   `StadtSim._sich` (Urteil, Haftantritt, Haftende, Tat, Obhut, Stellen des Landes gezielt auslösen) ist nur für `tools/simtest.mjs --sicherheit`
   und die Browser-Tests da, `StadtSim._bund` (Einberufung, Dienstende, Nacht des Bundes, Prüfung, Anstellen, Austreten) nur für
   `tools/simtest.mjs --militaer`. `gelaendeSuchen` und `gelaendeBauen` sind die Schnittstelle
@@ -2379,8 +3033,8 @@ node tools/simtest.mjs --kita                  # Kitas: Plätze (auch am Ende de
                                                #   Betreuungspflicht, Gebundene, Stadtbuch, Speichern; erzwungen: Kitas ohne Personal
                                                #   verlangen nichts, Personalabgang (höchstens 8 Einheiten je Nacht), Elternteil ohne
                                                #   Stelle, Besitzer-Eltern bei vollen Kitas (Seeds 1–3)
-node tools/simtest.mjs --migrationstest        # Spielstände von Version 2, 3, 4, 5 und 6 übernehmen (alte Dateien aus git 39c405b,
-                                               #   2b821c2, 1c8d40b, 414ebab und bc7247a), 60 Tage weiter, Kita-Übergangsfrist und die
+node tools/simtest.mjs --migrationstest        # Spielstände von Version 2 bis 7 übernehmen (alte Dateien aus git 39c405b, 2b821c2,
+                                               #   1c8d40b, 414ebab, bc7247a und ffa1d88), 60 Tage weiter, Kita-Übergangsfrist und die
                                                #   Nächte danach (Schwelle), beschädigte Stände der Version 5; aus Version 6 60 Tage genau
                                                #   wie dort; --git <ordner>: anderes Repository
 node tools/simtest.mjs --migrationstest --alt <alte stadt.html>   # nur diese alte Datei
@@ -2398,6 +3052,12 @@ node tools/simtest.mjs --militaer              # Bund (Version 7, Teil 3): stati
                                                #   (Gelände, Rollen, Stellen, Einberufung mit 18 ab dem Tag nach der Eröffnung, genau
                                                #   5 Diensttage, Bindung, Geld vom Bund), erzwungene Fälle, Speichern, beschädigte
                                                #   Stände, Messung nach Geschlecht (Seeds 1–3)
+node tools/simtest.mjs --autos                 # Tech-Firmen und Autos (Version 8): statisch (Zufall nur aus S.rsAuto, Personenfelder je
+                                               #   Regel, keine Namen), Namenstausch bitgleich, Invarianten jede Nacht und Stunde (Werke,
+                                               #   AUTO_MAX, 40-%-Grenze, Käufe, Kosten, CO₂, Grundregel, Testfahrt), faire Reihenfolge
+                                               #   (erzwungen ausverkauft), Erbe, Geldnot, Haft, AUTO_MAX bei Übernahme, Speichern mitten
+                                               #   im Werksbau, beschädigte Stände, Messung (Seeds 1–3; --seeds 1,2); Grundregel wie im Bild
+                                               #   über --regelseeds (1–12), faire Reihenfolge über --reiheseeds (2,4), ruhende Stellen
 ```
 
 Weitere Schalter für `--seed`: `--alle 60` (Zeilenabstand), `--fluss` (Zu-/Wegzüge, Geburten, Tode je Zeile),
@@ -2456,7 +3116,7 @@ stehen hier als Bericht, nachprüfbar im Repo ist nur `simtest`.
 | 41 | Spielstand-Version 7 (2: Hauptfiguren und Tagebuch, 3: Bauhof und Kisten, 4: Tech-Firmen, 5: Stadtregierung mit den Personenfeldern `gsTage` und `gemein`, `S.regierung` mit Start und Tageswerten `gestern`/`tagStart`, und `S.stat.regierung`; 6: Schritt 2 mit den Personenfeldern `eigen`, `kaufPreis`, `schuld`, `beitrag` und `kita`, dem Gebäudefeld `soll`, `S.regierung.schritt2` und `kitaAb` und der Zahl `S.stat.bauamt.kitas`; 7: Kartengröße `S.karte` mit `mitte`, `vn`, `vo`, Felder so groß wie die Karte, und `S.erweiterung` mit Stufe, Stufentagen, Ausdehnung, Stadtteilen, Geländen und Wachsen, Abschnitt „Stadt erweitern“; dazu die Personenfelder `PF_SICHERHEIT`, `S.rsSich`, `S.sicherheit` und `S.stat.sicherheit`, Abschnitt „Sicherheit“; dazu die Personenfelder `PF_BUND` (`bund`, `dienstBis`), `S.bund` und `S.stat.bund`, Abschnitt „Bund“). Stände anderer Versionen lösen den Versionsdialog aus; Version 2 bis 6 lassen sich übernehmen (Annahme 60). Ein Stand der Version 7 mit falscher Kartengröße oder falschen Maßen, Feldern anderer Länge, einem unvollständigen `S.erweiterung`, einer unvollständigen oder unmöglichen Sicherheit (Haft, Verfahren, Summen, Wache und Anstalt) oder einem unvollständigen oder unmöglichen Bund (Kaserne, Dienststelle, Eröffnung, Summen, Rollen, Dienst) wird abgelehnt. Ein Stand der Version 6 ohne die neuen Personen- und Gebäudefelder, ohne gültige Stadtregierung (Start, Schritt 2 und Ende der Kita-Frist als ganze Tage, alle Summen, die vom Tagesende und die von gestern als Zahlen, gestern auch leer), mit Wohneigentum, das es so nicht gibt, oder mit Kita-Plätzen und -Stellen, die es so nicht gibt, wird abgelehnt | Neue Felder. Ein Stand der Version 4 liefe sonst still unter den neuen Regeln weiter; ohne die Prüfung stürzte ein beschädigter Stand um Mitternacht ab |
 | 42 | Bei 1× ist eine echte Minute eine Spielstunde | Folgt aus der Spec: 90 Spieltage entsprechen 36 Stunden Abwesenheit |
 | 43 | Beim Aufholen (Tagesschritte) entscheiden alle nur um 7 und 18 Uhr; Ereignisse lösen keine zusätzliche Entscheidung aus. Der Bauhof teilt direkt nach der 7-Uhr-Entscheidung ein, wie stündlich | Sonst wäre der Tagesschritt nicht schneller. Abweichung gegen stündlich nach 90 Tagen (Tag 200–290) mit der Stadtregierung: Seeds 1–10 im Mittel −0,3 % Einwohner, einzeln −17,2 % bis +10,7 %; Seeds 1–20 im Mittel +0,2 %, 10 von 20 höher. Vorher auf den Seeds 1–10 +0,7 %, einzeln −5,8 % bis +10,8 % (vor der Zuzug-Regel −1,7 %, einzeln −8,6 % bis +8,1 %). Der Ausreißer Seed 10 wächst in diesen Tagen stark (stündlich 246 → 623 Einwohner); in Tagesschritten kamen weniger Geburten (90 statt 120) und weniger Zuzüge, der Unterschied wächst von Tag zu Tag. Nicht einseitig: Vorher lag derselbe Seed 10,8 % darüber |
-| 44 | Grundregel: Eine Figur steht oder geht nur dort, wo die Simulation die Person in dieser Stunde hat. Arbeit 8–17 Uhr (Bauarbeiter auf ihrer Baustelle), abends bei Freunden 19–22 Uhr (wer „freunde_treffen“ gewählt hat), wer frei hat um 10 Uhr einkaufen, sonst zu Hause. Ändert sich der Ort, geht die Figur dorthin. Von den 300 Figuren sind bis zu 120 Leute bei der Arbeit (Annahme 62), die übrigen zufällige Erwachsene, die nur unterwegs zu sehen sind. Hauptfiguren sind immer zu sehen: wenn sie nicht laufen, stehen sie vor dem Gebäude, in dem sie gerade sind. Ihre Markierung ist gelb, weiß solange sie „überlegen“. Jede sichtbare Figur ist anklickbar | Die Spec sagt „morgens zur Arbeit, abends heim oder zu Freunden“ und „plus immer alle Hauptfiguren“ |
+| 44 | Grundregel: Eine Figur steht oder geht nur dort, wo die Simulation die Person in dieser Stunde hat. Arbeit 8–17 Uhr (Bauarbeiter auf ihrer Baustelle), abends bei Freunden 19–22 Uhr (wer „freunde_treffen“ gewählt hat), wer frei hat um 10 Uhr einkaufen, sonst zu Hause. Ändert sich der Ort, geht die Figur dorthin. Von den 300 Figuren sind bis zu 120 Leute bei der Arbeit (Annahme 62), die übrigen zufällige Erwachsene, die nur unterwegs zu sehen sind. Hauptfiguren sind immer zu sehen: wenn sie nicht laufen, stehen sie vor dem Gebäude, in dem sie gerade sind. Fährt eine Hauptfigur mit dem Auto (Version 8), ist ihre Figur so lange nicht zu sehen, ihre Raute schwebt über dem Auto (auch über dem Prototyp auf der Teststrecke). Ihre Markierung ist gelb, weiß solange sie „überlegen“. Jede sichtbare Figur ist anklickbar. Seit Version 8 gehen Figuren auf dem rechten Gehweg (die Fahrbahn gehört den Autos) und stehen vor einem Gebäude in Reihen 0,6 und 0,5 von der Hausmitte (vorher 0,68 und 0,84, die zweite Reihe stand auf der Fahrbahn), im Autowerk auf dem Gelände vor der Montagehalle | Die Spec sagt „morgens zur Arbeit, abends heim oder zu Freunden“ und „plus immer alle Hauptfiguren“ |
 | 45 | Fenster: Abends (ab 18–19:30 Uhr, je Haus verschieden) sind so viele Geschosse hell, wie das Haus belegt ist; spät in der Nacht etwa ein Drittel davon, aber jedes bewohnte Haus mindestens eins; morgens von 5:30 bis etwa 7 Uhr die Hälfte. Leere Häuser bleiben dunkel. Die Fenster sind unbeleuchtetes Material (`MeshBasicMaterial`) mit Lichtfarbe, das wirkt wie „emissive“ | Ein Haus, in dem um 2 Uhr alles an ist, sah unecht aus |
 | 46 | Ist der Spielstand pausiert gespeichert, holt die Stadt beim Öffnen nichts auf | Pause heißt, dass die Stadt nicht weiterläuft |
 | 47 | Aufgeholt wird auch, wenn ein Tab mindestens eine Minute versteckt war und wieder sichtbar wird. Die Karte „Während du weg warst“ und die Tagebucheinträge danach gibt es erst ab einem ganzen verpassten Spieltag | Browser halten die Animation in versteckten Tabs an; ohne Aufholen stünde die Stadt dann still |
@@ -2493,6 +3153,10 @@ stehen hier als Bericht, nachprüfbar im Repo ist nur `simtest`.
 | 78 | Ein Block (Wache, Dienststelle) findet auch Platz, wo eine Straße an der Rasterlinie zwischen zwei freien Blöcken endet: Suche im Rahmen von zwei Blöcken, das Tor auf der Rasterlinie an der Straßenspitze, belegt werden 3 × 3 Felder um das Tor. In einer Nacht baut zuerst das Land (Wache, dann Anstalt), dann der Bund (Kaserne, Dienststelle) | Befund B1 der Schlussprüfung. Vorher bestellte das Land nach einer Übernahme die Wache bis 18 Nächte später als Anstalt und Kaserne, auf Seed 3 wartete die Dienststelle 99 Nächte. Die Straße kann auf dieser Linie nicht weiterwachsen (wie bei den großen Geländen). Nebenwirkung (Nachprüfung, N1): Gibt es nach einer Übernahme nur zwei solche Stellen, wartet jetzt die Kaserne statt der Wache (Seed 2: 4 bis 67 Nächte, Seed 8 an Tag 200: 7). So entschieden, weil die Wache zur Stufe Kleinstadt gehört und in einer Stadt, die mit Version 7 wächst, immer vor Anstalt und Kaserne steht (Seeds 1–80: Wache im Mittel ab Tag 73, Kaserne offen ab Tag 191); Taten gibt es ab dem Übernahmetag. Die umgekehrte Reihenfolge verschiebt nur, wer wartet (offene Frage an Noah) |
 
 ## Bekannte Schwächen
+
+**Version 8 (Tech-Firmen und Autos):** siehe „Bekannte Schwächen (Version 8)“ im Abschnitt „Tech-Firmen und Autos“: weniger Pendler mit dem
+Auto als in Deutschland (43 % gegen 65 %), Gate 4 hängt am Geld der ersten Monate (ohne die Regel für Betriebssparer 74 von 80), leere Werke,
+die Autos auf der Straße zeichnet erst Teil 2.
 
 **Gate 4 hält jetzt fast immer, dafür wächst die Stadt langsamer an.** Seit der Zuzug-Regel (Annahme 11) liegen die offiziellen
 Seeds 1, 2 und 3 bei Faktor 1,09, 1,10 und 1,09 (vorher 1,30, 1,23 und 1,18: keiner bestand). Gemessen über 80 Seeds
