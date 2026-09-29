@@ -51,6 +51,36 @@
 //                                                   Käufe mit Reserve, Werk vor Umland, Umland ab Tag 0, Teile, laufende Kosten und CO₂, Verschrotten,
 //                                                   Geldnot, Eröffnung, Grundregel für Autos, Testfahrt, faire Reihenfolge); erzwungen: Erbe, Geldnot,
 //                                                   Haft, AUTO_MAX bei Übernahme; Speichern mitten im Werksbau bitgleich; beschädigte Stände (Seeds 1–3)
+//   node tools/simtest.mjs --rathaus                Rathaus (Version 9): statisch (kein Zufall, keine Personen außer „frei“ für die Anzeige, Budget nur in
+//                                                   rathausBezahlen); Invarianten nach jeder Nacht mit Gegenrechnung der Löhne (Seeds 1–3, 730 Tage);
+//                                                   Speichern im Ausbau bitgleich, Aufholen; Übernahme von Version 8 (stadt.orig.html) und mit --git 7 und 6:
+//                                                   nur Brache und höchstens ein Park; Park weicht dem Rathaus (erzwungen); beschädigte Stände; Namenstausch;
+//                                                   mit R.RATHAUS = 0 Tag für Tag wie Version 8
+//   node tools/simtest.mjs --buergermeister         Bürgermeister (Version 9): statisch (Wahl liest keine Namen, keine Herkunft, keinen Einzugstag, keine
+//                                                   Eltern, kein Geschlecht; Zufall nur wahlZufall), Namenstausch bitgleich; Invarianten nach jeder Nacht;
+//                                                   erzwungen: Tod, Haft, Wegzug im Amt, eigener Platz der Hauptfigur, Abwahl, Wählbarkeit; Rangfolge der
+//                                                   Vorhaben mit Testvorhaben (Anfrage, Antworten, Frist, KI aus, Aufholen, Speichern); beschädigte Stände;
+//                                                   Messung nach Gruppen (nur gemessen)
+//   node tools/simtest.mjs --schule                 Schule (Version 9, Teil 2): statisch (Regeln lesen nur Alter, Wohnung, Obhut, Schulplatz; kein Zufall;
+//                                                   Budget nur für Bau, Computer und Sachaufwand); Invarianten nach jeder Nacht (Plätze, Lehrkräfte, Geld,
+//                                                   Lebenslauf, Bau erst ab einer Klasse, Kita, Dienst, Haft, Autos, Grundregel); Computer für die Schulen
+//                                                   (Schnittstelle zum Haushalt, erzwungen); Speichern, beschädigte Stände; Übernahme von Version 8 und mit
+//                                                   --git 7 bis 2; Namenstausch; ausgeschaltet; Gruppen (nur gemessen)
+//   node tools/simtest.mjs --haushalt               Haushalt (Version 9, Teil 3): statisch (liest keine Personen, kein Zufall; jede Änderung des Budgets
+//                                                   bucht; Lohnsteuer mit dem Satz des Haushalts); jede Stunde Konten = Budget; jede Nacht Vorhaben
+//                                                   (Bedarf, Rücklage, Bauhof, je Vorhaben höchstens eins), Jahresabschluss mit Plan und Lohnsteuer
+//                                                   nachgerechnet; Rangfolge des Bürgermeisters und Vorrang (erzwungen); Lohnsteuer erzwungen; Speichern;
+//                                                   Übernahme von Version 8 (mit --git 7 bis 2); beschädigte Stände; ausgeschaltet; Namenstausch
+//   node tools/simtest.mjs --wachstum               Wachstum, Tempo und KI (Version 9, Teil 4): statisch (Wachstum würfelt nicht, liest keine Person);
+//                                                   ohne Anlauf Tag für Tag wie Version 8 (alle Bausteine von Version 9 aus) und mit --alt datei wie die
+//                                                   Fassung davor; Anlauf je Nacht (Stelle nach der Regel, Grenze, Zählung ohne Kita- und Schulstellen,
+//                                                   Anfragen); Schalter (Stadtbuch, Speichern, Übernahme, beschädigte Stände, „schnell“ wirkt); KI-Frist
+//                                                   (Klemmen, Verlängern, späte Antwort, Rangfolge bis 23 Uhr); Kapazität der Warteschlange (nur gemessen)
+//   node tools/simtest.mjs --techfrueh             Tech-Firmen früher und mehr (Version 9, Teil 5): statisch (würfelt nicht, liest von Personen nur Fleiß,
+//                                                   Ehrgeiz, Geld, Wohnung; Karten passen zu R); ausgeschaltet Tag für Tag wie 31ce452 und mit --alt datei wie
+//                                                   die Fassung davor; je Gründung (Stufe, Bremse, Preis, Markt, Tüftler im Dorf), je Nacht (Zählungen,
+//                                                   Preis und Grenze der Welt, 40 % nur im Umland), Aufgabe ohne je eine Kraft, Computer der Schulen (Laden
+//                                                   oder außerhalb); Speichern, beschädigte Stände, Übernahme von Version 8; Namenstausch; Gruppen (gemessen)
 //   Optionen: --alle 30 (Zeilenabstand), --buch 20 (letzte Stadtbuch-Zeilen), --aktionen
 
 import { readFileSync } from 'node:fs';
@@ -153,6 +183,9 @@ function charakterText(c) {
 }
 
 const Sim = ladeSim();
+// Haushalt (Version 9, Teil 3): Setzt ein erzwungener Fall das Budget von Hand, rückt der Start der Konten mit (sonst stimmten die Konten nicht mehr
+// mit dem Budget überein, und der nächste Stand würde als beschädigt abgelehnt)
+const budgetSetzen = (S, v) => { if (S.haushalt) S.haushalt.kasseStart += v - S.budget; S.budget = v; };
 
 // Wie der Browser speichert: typisierte Arrays als Base64 in JSON (hier mit Buffer statt btoa/atob)
 function speichernAlsText(Sim, S) {
@@ -177,6 +210,10 @@ function fingerabdruck(Sim, S) {
   if (S.erweiterung) { h.update(JSON.stringify(Sim.exportZustand(S).werte)); h.update(JSON.stringify(S.erweiterung)); h.update(JSON.stringify(S.enden)); h.update(JSON.stringify(S.kreuzungen)); }
   if (S.sicherheit) h.update(JSON.stringify(S.sicherheit));  // Sicherheit (Version 7): Wache, Anstalt, Stellen, Verfahren, Tatorte, Jahreswerte (rsSich steht in werte)
   if (S.bund) h.update(JSON.stringify(S.bund));              // Bund (Version 7, Teil 3): Kaserne, Dienststelle, Eröffnung, Einberufungen im Jahr, Geld von gestern
+  if (S.rathaus) h.update(JSON.stringify(S.rathaus));        // Rathaus: Gebäude, Stellen, Budget und Kosten von gestern
+  if (S.buergermeister) h.update(JSON.stringify(S.buergermeister));   // Bürgermeister: Amt, Wahl, Rangfolge, Anfrage
+  if (S.schule) h.update(JSON.stringify(S.schule));          // Schule (Version 9): Schuljahr, Geld von gestern, Computer
+  if (S.haushalt) h.update(JSON.stringify(S.haushalt));      // Haushalt (Version 9, Teil 3): Konten, Plan, Satz, Jahre
   return h.digest('hex').slice(0, 16);
 }
 
@@ -186,20 +223,28 @@ function fingerabdruck(Sim, S) {
 // Summen gibt es in Version 6 nicht; sie bleiben außen vor. Verglichen wird dann mit ausgeschalteter Sicherheit (sicherheitAus). Bund (Teil 3):
 // ebenso (Personenfelder bund, dienstBis; Summen S.stat.bund); sicherheitAus schaltet auch den Bund aus
 // Version 8: dazu besuch (nur für Figuren und Autos: ab 19 Uhr fest, wirkt auf nichts in der Stadt)
-const OHNE_SICH = new Set([...Sim.PF_SICHERHEIT, ...(Sim.PF_BUND || []), ...(Sim.PF_AUTO || []), 'besuch']);
-const OHNE_G = new Set(Sim.GF_AUTO || []);                   // Version 8: Gebäudefelder der Autos und Tech-Firmen (gibt es vorher nicht)
+const OHNE_SICH = new Set([...Sim.PF_SICHERHEIT, ...(Sim.PF_BUND || []), ...(Sim.PF_AUTO || []), 'besuch', ...(Sim.PF_SCHULE || [])]);   // Version 9: Schulplatz (gibt es vorher nicht)
+const OHNE_G = new Set([...(Sim.GF_AUTO || []), ...(Sim.GF_TECH9 || [])]);   // Version 8: Gebäudefelder der Autos und Tech-Firmen; Version 9, Teil 5: Markt, Kraft (gibt es vorher nicht)
 // Sicherheit, Bund und (Version 8) Autos ausschalten (keine Taten, Land und Bund bauen nicht, keine Wehrpflicht; niemand kauft ein Auto, Tech-Firmen
 // bis Stufe 3, keine Autowerke, 40-%-Grenze wie in Version 7): für den Vergleich mit Version 6 und 7; gibt eine Funktion zurück, die alles
 // wieder einschaltet
-const AUS = ['KRIM_BASIS', 'LAND_BAUT', 'BUND_BAUT', 'WEHRPFLICHT', 'AUTO_CHANCE', 'AUTO_MAX', 'TECH_GRENZE_HALTEN'];
+const AUS = ['KRIM_BASIS', 'LAND_BAUT', 'BUND_BAUT', 'WEHRPFLICHT', 'AUTO_CHANCE', 'AUTO_MAX', 'TECH_GRENZE_HALTEN', 'RATHAUS', 'SCHULEN', 'HH_VORHABEN', 'HH_STEUER',
+  'ANLAUF_STUFE', 'TECH_FRUEH', 'WELT', 'ZUZUG_GENAU'];   // Rathaus, Schulen, Vorhaben und Lohnsteuer des Haushalts, Anlauf, Tech früher und Weltmarkt, Zuzug genau nach R10 (Version 9): für Vergleiche mit älteren Versionen aus
 const sicherheitAus = (X, nurAutos) => { const R = X.R, alt = AUS.map(k => R[k]);
   for (const k of nurAutos ? AUS.slice(4) : AUS) if (k in R) R[k] = 0;
   const stufe = R.TECH_STUFE_MAX; if (stufe !== undefined) R.TECH_STUFE_MAX = 3;
   return () => { AUS.forEach((k, i) => { R[k] = alt[i]; }); if (stufe !== undefined) R.TECH_STUFE_MAX = stufe; }; };
 // Version 8: Summen ohne die neuen (Autos; CO₂ in der Stadtregierung), zum Vergleich mit Version 6 und 7
 const ohneCo2 = (o) => (o && typeof o === 'object' ? Object.fromEntries(Object.entries(o).filter(([k]) => k !== 'co2')) : o);
-const statAlt = (st) => ({ ...st, sicherheit: undefined, bund: undefined, auto: undefined, regierung: ohneCo2(st.regierung) });
+// Version 9, Teil 5: ohne die neuen Summen (aufgegeben; welt und aufgegeben der Tech-Firmen)
+// Schlussprüfung von Version 9: nur Wortlaut (zweiter Wahlgang in der Wahlzeile, Stellen im Dorf in der Zuzugszeile); für Vergleiche mit älteren Fassungen
+const textAlt = (t) => t.replace(' im zweiten Wahlgang', '').replace(/im Laden, in Werkstätten und Tech-Firmen(?:,| oder) im Bauhof/, 'in Betrieben und im Bauhof');
+const techAlt = (t) => (t && typeof t === 'object' ? Object.fromEntries(Object.entries(t).filter(([k]) => k !== 'welt' && k !== 'aufgegeben')) : t);
+const statAlt = (st) => ({ ...st, sicherheit: undefined, bund: undefined, auto: undefined, rathaus: undefined, buergermeister: undefined, schule: undefined, regierung: ohneCo2(st.regierung),
+  aufgegeben: undefined, tech: techAlt(st.tech) });   // Version 9: ohne Rathaus, Bürgermeister und Schule; Teil 5: ohne die neuen Summen
 const regierungAlt = (r) => (r ? { ...r, tagStart: ohneCo2(r.tagStart), gestern: ohneCo2(r.gestern) } : null);
+// Version 9, Teil 4: die KI-Frist in Spielstunden gibt es vorher nicht (ohne Oberfläche steht sie fest auf R.KI_FRIST)
+const kiAlt = (k) => (k ? { ...k, fristStunden: undefined } : k);
 function spurRelativ(Sim, S) {
   const k = Sim.kennzahlen(S), K = S.karte || 96, M = S.mitte || 48;
   let h = 0, gb = 0;
@@ -209,7 +254,7 @@ function spurRelativ(Sim, S) {
   const hp = createHash('sha256'), teil = (a, n, kap) => { const w = kap > 0 ? a.length / kap : 1, u = a.subarray(0, n * w); hp.update(Buffer.from(u.buffer, u.byteOffset, u.byteLength)); };
   for (const n of Object.keys(S.p).sort()) if (ArrayBuffer.isView(S.p[n]) && !OHNE_SICH.has(n)) { hp.update(n); teil(S.p[n], S.pMax, S.pKap); }
   for (const n of Object.keys(S.g).sort()) if (n !== 'x' && n !== 'y' && !OHNE_G.has(n) && ArrayBuffer.isView(S.g[n])) { hp.update(n); teil(S.g[n], S.gAnzahl, 0); }
-  hp.update(JSON.stringify(statAlt(S.stat))); hp.update(JSON.stringify(S.ki)); hp.update(JSON.stringify(regierungAlt(S.regierung)));
+  hp.update(JSON.stringify(statAlt(S.stat))); hp.update(JSON.stringify(kiAlt(S.ki))); hp.update(JSON.stringify(regierungAlt(S.regierung)));
   return JSON.stringify([k.tag, k.stunde, k.einwohner, k.gebaeude, k.budget, k.gruendungen, k.pleiten, k.freieWohnungen, k.freieStellen, k.zufriedenheit,
     k.arbeitslose, S.rs, h, gb, S.gAnzahl, S.stat.zuzuege, S.stat.geburten, S.stat.tode, S.stat.strassenFelder, S.bauplaetze, hp.digest('hex').slice(0, 16)]);
 }
@@ -319,7 +364,7 @@ if (flag('kitest')) {
     }
     // 2. 60 Tage mit Test-Beantworter
     S.ki.an = true;
-    let anfragen = 0, gueltig = 0, ungueltig = 0, ohne = 0, maxProTag = 0, zuSpaet = 0;
+    let anfragen = 0, gueltig = 0, ungueltig = 0, ohne = 0, maxProTag = 0, zuSpaet = 0, tbFalsch = 0, tbGeklappt = 0, freiJa = 0;
     const gesehen = new Set(), proTag = {};
     while (S.tag < 260) {
       for (const a of S.ki.anfragen.slice()) {
@@ -333,6 +378,9 @@ if (flag('kitest')) {
           const ziel = tz() < 0.2 ? Sim.ZIELNAMEN[1 + ((tz() * 6) | 0)] : null;
           const e = Sim.kiEntscheidung(S, a.id, a.gen, aktion, ziel, 'Ich nehme ' + aktion + '.');
           if (e.ok) gueltig++; else zuSpaet++;
+          // Befund Bedienung der Schlussprüfung: Das Tagebuch trägt, ob die Aktion geklappt hat (vorher immer „klappte nicht“)
+          const tb = S.p.lebt[a.id] && S.p.gen[a.id] === a.gen ? S.ki.tagebuch[a.id + '/' + a.gen] : null, te = tb && tb[tb.length - 1];
+          if (e.ok && te) { if (te.art !== 'gedanke' || te.geklappt !== e.ausgefuehrt) tbFalsch++; if (te.geklappt) tbGeklappt++; if (aktion === 'freinehmen' && te.geklappt) freiJa++; }
         } else if (r < 0.8) { Sim.kiVerwerfen(S, a.id, a.gen); ungueltig++; }
         else ohne++;                                          // keine Antwort: Frist läuft ab
       }
@@ -342,6 +390,7 @@ if (flag('kitest')) {
     pruef(anfragen > 50, `${anfragen} Anfragen in 60 Tagen (gültig ${gueltig}, ungültig ${ungueltig}, ohne Antwort ${ohne}, abgelaufen ${S.ki.abgelaufen})`);
     pruef(maxProTag <= Sim.R.KI_PRO_TAG, `höchstens ${maxProTag} Anfragen je Figur und Tag`);
     pruef(zuSpaet === 0, `keine Antwort auf eine nicht mehr offene Anfrage (${zuSpaet})`);
+    pruef(tbFalsch === 0 && tbGeklappt > 0 && freiJa > 0, `Tagebuch: „geklappt“ steht im gespeicherten Eintrag (${tbGeklappt} geklappt, davon ${freiJa}× freinehmen; ${tbFalsch} falsch)`);
     const buecher = Object.values(S.ki.tagebuch);
     pruef(buecher.every(b => b.length <= Sim.R.TAGEBUCH), `Tagebücher höchstens ${Sim.R.TAGEBUCH} Einträge (${buecher.map(b => b.length).join(', ')})`);
     // 2b. Eine späte Antwort (Anfrage schon abgelaufen) darf keine neuere Anfrage derselben Figur beantworten
@@ -358,6 +407,19 @@ if (flag('kitest')) {
         pruef(!e.ok && (!neu || S.ki.anfragen.includes(neu)), `späte Antwort auf Anfrage ${alt.nr} verworfen, neue Anfrage ${neu ? neu.nr : '–'} bleibt offen`);
         if (neu) Sim.kiVerwerfen(S, neu.id, neu.gen, neu.nr);
       }
+      S.ki.an = false;
+    }
+    // 2c. Eine Anfrage, die die Oberfläche nicht mehr losschickt (keine Antwort vor der Frist möglich): Das normale Gehirn entscheidet sofort, statt
+    //     bis zur Frist zu warten, und sie zählt als „zu spät“ (Befund Technik der Schlussprüfung)
+    {
+      S.ki.an = true;
+      while (S.stunde !== 7) Sim.stunde(S);
+      Sim.stunde(S);
+      const a = S.ki.anfragen[0], ab0 = S.ki.abgelaufen;
+      const ok = a ? Sim.kiVerwerfen(S, a.id, a.gen, a.nr, true) : false;
+      pruef(!!a && ok && S.ki.abgelaufen === ab0 + 1 && !S.ki.anfragen.includes(a) && !S.ki.anfragen.some(x => x.id === a.id),
+        `nicht gesendete Anfrage ${a ? a.nr : '–'}: sofort normal entschieden, „zu spät“ ${ab0} → ${S.ki.abgelaufen}, keine Anfrage der Figur mehr offen`);
+      for (const x of S.ki.anfragen.slice()) Sim.kiVerwerfen(S, x.id, x.gen, x.nr);
       S.ki.an = false;
     }
     // 3. Hauptfiguren setzen und Grenzen
@@ -453,9 +515,11 @@ if (flag('kitest')) {
     const a = m.indexOf('// ─── Anweisungen auf Deutsch'), e = m.indexOf('// ─── Der KI-Takt');
     const S = Sim.neueStadt(2); while (S.tag < 300 || S.stunde < 13) Sim.stunde(S);
     const zahl = (v) => Math.round(v).toLocaleString('de-DE');
-    const A = new Function('Sim', 'S', 'zahl', 'STADTNAME', m.slice(a, e) + '\nreturn { beschreibung, gespraechsAnweisung, aufholAnweisung, lageSatz, verdachtFrei, pruefeEntscheidung, obhutGrund };')(Sim, S, zahl, 'Neustadt');
+    const A = new Function('Sim', 'S', 'zahl', 'STADTNAME', m.slice(a, e) + '\nreturn { beschreibung, gespraechsAnweisung, aufholAnweisung, lageSatz, verdachtFrei, pruefeEntscheidung, obhutGrund, amtFrei };')(Sim, S, zahl, 'Neustadt');
     const R = Sim.R, P = S.p, erw = S.tag - R.ERWACHSEN * R.JAHR;
-    const frei = []; for (let p = 0; p < S.pMax; p++) if (P.lebt[p] && P.geb[p] <= erw && !P.haftBis[p] && P.besitz[p] < 0 && !S.sicherheit.verfahren.some(v => v.id === p)) frei.push(p);
+    // ohne das Bürgermeisteramt: Seine Anweisung nennt die Stadtregierung mit Absicht („leitet die Verwaltung nach den Regeln der Stadtregierung“, Teil 1);
+    // hier geht es um gewöhnliche Figuren (seit dem Haushalt läuft Seed 2 anders, und der Bürgermeister wäre sonst „nie Opfer gewesen“)
+    const frei = []; for (let p = 0; p < S.pMax; p++) if (P.lebt[p] && P.geb[p] <= erw && !P.haftBis[p] && P.besitz[p] < 0 && !S.sicherheit.verfahren.some(v => v.id === p) && !Sim.istBm(S, p)) frei.push(p);
     const t = frei[0];
     for (let i = 0; i < 400 && !S.sicherheit.verfahren.some(v => v.id === t); i++) { P.geld[t] = 0; Sim._sich.tatBegehen(S, t, Sim.DIEBSTAHL); }
     const opfer = []; for (let p = 0; p < S.pMax; p++) if (P.lebt[p] && P.opferTag[p] === S.tag) opfer.push(p);
@@ -517,12 +581,29 @@ if (flag('kitest')) {
       && og[0].wer === 'der einzige Erwachsene in ihrem Haushalt' && og[0].ist === 'ist' && og[1].wer === 'alle Erwachsenen in ihrem Haushalt' && og[1].ist === 'sind',
       `Antworten ans Sprachmodell: ${faelle.length} Fälle (Opfer ${io.name}), ${falsch.length} falsch beurteilt${falsch.length ? ': ' + falsch.join(' | ') : ''}; „${fremdVor} ${fremdNach} hat mich bestohlen“ als Entscheidung verworfen: ${ent[0] === null}; `
       + `Obhut: „${og[0].wer} ${og[0].ist} in Haft“, „${og[1].wer} ${og[1].ist} in Haft“`);
+    // Bürgermeister (Befund Texte der Schlussprüfung): Jeder Text der Amtsperson ohne Gruppen und ohne Parteien (amtFrei, auch in Gespräch,
+    // Entscheidung, Tagebuch und Code); gewöhnliche Figuren prüft nur verdachtFrei. Die Anweisung sagt es der Amtsperson
+    const ib = Sim.personInfo(S, S.buergermeister.p), bmFaelle = [['Ich wähle die CDU.', false], ['Die Grünen haben recht.', false], ['Parteien interessieren mich nicht.', false],
+      ['Die Zugezogenen machen mir Sorgen.', false], ['Wir brauchen mehr Deutsch in der Schule.', false], ['Ich bin parteilos und leite die Verwaltung.', true],
+      ['Heute gehe ich ins Grüne und ruhe mich aus.', true], ['Ich arbeite im Rathaus und treffe abends Freunde.', true]];
+    const bmFalsch = bmFaelle.filter(([t, soll]) => A.amtFrei(t, ib) !== soll).map(([t]) => t);
+    const entBm = A.pruefeEntscheidung(jz('Ich wähle die CDU.'), erl, ib), entNormal = A.pruefeEntscheidung(jz('Ich wähle die CDU.'), erl, inormal);
+    pruef(!!ib && !!ib.amt && !bmFalsch.length && entBm === null && !!entNormal && A.amtFrei('Ich wähle die CDU.', inormal)
+      && A.beschreibung(ib).includes('sprichst du nicht für oder gegen Parteien oder Gruppen von Bewohnern'),
+      `Bürgermeister: ${bmFaelle.length} Sätze, ${bmFalsch.length} falsch beurteilt${bmFalsch.length ? ': ' + bmFalsch.join(' | ') : ''}; „Ich wähle die CDU.“ als Entscheidung `
+      + `beim Amt verworfen, bei anderen nicht; Anweisung nennt die Neutralität`);
   }
   console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle KI-Prüfungen bestanden');
   process.exit(fehler ? 1 : 0);
 }
 if (flag('migrationstest')) {
   let fehler = 0;
+  Sim.R.RATHAUS = 0;                                         // Rathaus: hier aus (Zeilen und Verlauf wie vorher); die Übernahme mit Rathaus prüft --rathaus (D)
+  Sim.R.SCHULEN = 0;                                         // Schule (Version 9): ebenso; die Übernahme mit Schulen prüft --schule (E)
+  Sim.R.HH_VORHABEN = 0; Sim.R.HH_STEUER = 0;                // Haushalt (Version 9, Teil 3): nur Buchführung (Verlauf und Zeilen wie vorher); die Übernahme mit Haushalt prüft --haushalt (F)
+  Sim.R.ANLAUF_STUFE = 0;                                    // Wachstum (Version 9, Teil 4): kein Anlauf (Verlauf wie vorher); die Übernahme prüft --wachstum
+  Sim.R.TECH_FRUEH = 0; Sim.R.WELT = 0;                      // Tech früher und Weltmarkt (Version 9, Teil 5): aus (Verlauf wie vorher); die Übernahme prüft --techfrueh (D)
+  Sim.R.ZUZUG_GENAU = 0;                                     // Zuzug genau nach R10 (Befund der Schlussprüfung von Version 9): aus (Verlauf wie vorher)
   const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
   // Stadt erweitern (jede Version → 7): Stufe aus den Einwohnern am Übernahmetag, alle bebauten Stadtteile ab Kleinstadt mit verschiedenen
   // Namen, Karte mindestens 96 und mit Vorlauf, die neue Zeile („sie ist eine …“) als letzte
@@ -574,7 +655,7 @@ if (flag('migrationstest')) {
     const ohneNeu = S.buch.slice(0, -1), altBuch = A.buch.slice(A.buch.length - ohneNeu.length);
     pruef(S.einwohner === A.einwohner && S.buchNr === A.buchNr + 1 && JSON.stringify(ohneNeu) === JSON.stringify(altBuch) && JSON.stringify(regierungAlt(S.regierung)) === JSON.stringify(A.regierung)
       && JSON.stringify(statAlt(S.stat)) === JSON.stringify(statAlt(A.stat)) && JSON.stringify(S.stat.sicherheit) === JSON.stringify(A.stat.sicherheit) && JSON.stringify(S.stat.bund) === JSON.stringify(A.stat.bund)
-      && S.rs === A.rs && S.rsSich === A.rsSich && JSON.stringify(S.ki) === JSON.stringify(A.ki) && JSON.stringify(S.erweiterung) === JSON.stringify(A.erweiterung)
+      && S.rs === A.rs && S.rsSich === A.rsSich && JSON.stringify(kiAlt(S.ki)) === JSON.stringify(A.ki) && JSON.stringify(S.erweiterung) === JSON.stringify(A.erweiterung)
       && JSON.stringify(S.sicherheit) === JSON.stringify(A.sicherheit) && JSON.stringify(S.bund) === JSON.stringify(A.bund) && S.karte === A.karte,
       'Version 7 → 8: Stadt erweitern, Sicherheit, Bund, Stadtregierung, Summen, Hauptfiguren, Stadtbuch und Zufall bleiben, eine Zeile dazu (Autos)');
     let erst = -1;
@@ -595,7 +676,7 @@ if (flag('migrationstest')) {
   const v6Weiter = (Alt, A, S) => {
     const ohneNeu = S.buch.slice(0, -4), altBuch = A.buch.slice(A.buch.length - ohneNeu.length);
     pruef(S.einwohner === A.einwohner && S.buchNr === A.buchNr + 4 && JSON.stringify(ohneNeu) === JSON.stringify(altBuch) && JSON.stringify(regierungAlt(S.regierung)) === JSON.stringify(A.regierung)
-      && JSON.stringify(statAlt(S.stat)) === JSON.stringify(A.stat) && S.rs === A.rs && JSON.stringify(S.ki) === JSON.stringify(A.ki),
+      && JSON.stringify(statAlt(S.stat)) === JSON.stringify(A.stat) && S.rs === A.rs && JSON.stringify(kiAlt(S.ki)) === JSON.stringify(A.ki),
       'Version 6 → 8: Stadtregierung, Schritt 2, Summen, Hauptfiguren, Stadtbuch und Zufall bleiben, vier Zeilen dazu (Sicherheit, Bund, Stadt erweitern, Autos)');
     let erst = -1;
     const an = sicherheitAus(Sim);
@@ -752,9 +833,9 @@ if (flag('regierung')) {
     ['  if (erwerb && (arb < 0 || gem) && !istBesitzer && S.freieStellen > 0 && !rentner(S, p) && !gebunden(S, p)) {\n',
       '  if (erwerb && (arb < 0 || gem) && !istBesitzer && S.freieStellen > 0 && !rentner(S, p) && !gebunden(S, p) && p !== globalThis.__ohneJob) {\n'],
     ['    if (zufallSich(S) >= tatRisiko(S, p)) continue;\n', '    if (zufallSich(S) >= tatRisiko(S, p) || p === globalThis.__ohneTat) continue;\n'],
-    ['    S.budget += a;\n', '    S.budget += a; globalThis.__buchung += a;\n'],
+    ['    S.budget += a; hhBuch(S, HK.WOHNUNGSKAUF, a);\n', '    S.budget += a; hhBuch(S, HK.WOHNUNGSKAUF, a); globalThis.__buchung += a;\n'],   // Haushalt (Teil 3): mit Buchung
     ['        if (r > 0) { P.geld[p] -= r; S.budget += r;', '        if (r > 0) { P.geld[p] -= r; S.budget += r; globalThis.__buchung += r;'],
-    ['  S.budget -= z; P.geld[x] += z;\n', '  S.budget -= z; P.geld[x] += z; globalThis.__buchung -= z;\n'],
+    ['  S.budget -= z; hhBuch(S, HK.RUECKKAUF, -z); P.geld[x] += z;\n', '  S.budget -= z; hhBuch(S, HK.RUECKKAUF, -z); P.geld[x] += z; globalThis.__buchung -= z;\n'],
   ]);
   ctxR.__ohneJob = -1; ctxR.__buchung = 0; ctxR.__ohneTat = -1;
   let fehler = 0;
@@ -765,7 +846,8 @@ if (flag('regierung')) {
   const bekommtRente = (S, p) => S.tag - S.p.geb[p] >= R.RENTE * J || (S.p.arbeit[p] < 0 && S.p.besitz[p] < 0 && S.p.beitrag[p] >= 45 * J);
   // Die Regeln R01/R02 hier noch einmal unabhängig nachgerechnet: Steuer eines Steuerhaushalts mit Löhnen L, K Köpfen und
   // Rentner-Freibeträgen X (Schritt 2: je Rentner mit Lohn höchstens 23, höchstens der eigene Lohn)
-  const steuer = (L, K, X = 0) => { const E = L.reduce((a, b) => a + b, 0); return L.map(b => Math.round(R.STEUER * Math.max(0, E - R.FREIBETRAG * K - X) * b / E)); };
+  // Haushalt (Version 9, Teil 3): Satz q (Standard: der Satz vom Start, R.STEUER); in der Stadt der Satz des Haushalts (Sim.steuerSatz)
+  const steuer = (L, K, X = 0, q = R.STEUER) => { const E = L.reduce((a, b) => a + b, 0); return L.map(b => Math.round(q * Math.max(0, E - R.FREIBETRAG * K - X) * b / E)); };
   const summe = (a) => a.reduce((x, y) => x + y, 0);
   pruef(R.KAUF_RESERVE === 600 && R.EIGEN_RESERVE === 40 && R.RENTNER_FREIBETRAG === 23 && R.BEITRAG_JAHRE === 45,
     `Reserve beim Gerätekauf weiter ${R.KAUF_RESERVE} Taler, Rücklage beim Wohnungskauf ${R.EIGEN_RESERVE} Tageskosten (eigene Namen)`);
@@ -781,8 +863,8 @@ if (flag('regierung')) {
     for (let p = 0; p < S.pMax; p++) if (P.lebt[p] && P.hh[p] >= 0 && P.geb[p] > erw) hk.set(P.hh[p], (hk.get(P.hh[p]) || 0) + 1);
     for (let b = 0; b < S.gAnzahl; b++) {
       const t = g.typ[b];
-      if ((t !== Sim.WERKSTATT && t !== Sim.LADEN && t !== Sim.TECH && t !== Sim.KITA && t !== Sim.WACHE && t !== Sim.JVA && t !== Sim.KASERNE && t !== Sim.DIENSTSTELLE)
-        || !offenB(S, b)) continue;   // Kita (Schritt 2): Lohn aus dem Budget; Wache und Anstalt: Lohn vom Land; Kaserne und Dienststelle: Lohn vom Bund; Lohnsteuer wie jeder Lohn
+      if ((t !== Sim.WERKSTATT && t !== Sim.LADEN && t !== Sim.TECH && t !== Sim.KITA && t !== Sim.WACHE && t !== Sim.JVA && t !== Sim.KASERNE && t !== Sim.DIENSTSTELLE && t !== Sim.RATHAUS && t !== Sim.SCHULE)
+        || !offenB(S, b)) continue;   // Kita (Schritt 2): Lohn aus dem Budget; Wache, Anstalt und Schule (Lehrkräfte): Lohn vom Land; Kaserne und Dienststelle: Lohn vom Bund; Lohnsteuer wie jeder Lohn
       // Bund (Teil 3): Wehrdienst (Kaserne) und Ersatzdienst (Bauhof) bekommen den Sold brutto, Lohnsteuer wie jeder Lohn (B7)
       for (const w of S.belegschaft[b]) if (!P.frei[w] && !P.gemein[w]) brutto.set(w, P.bund[w] >= Sim.WEHRDIENST ? R.SOLD : g.lohn[b]);
     }
@@ -795,7 +877,7 @@ if (flag('regierung')) {
       if (bekommtRente(S, w)) frei.set(k, frei.get(k) + Math.min(b, R.RENTNER_FREIBETRAG));   // Schritt 2: Rentner mit Lohn
     }
     let lohnsteuer = 0, alt = 0, rentner = 0, betreuung = 0, lohnsumme = 0, rentnerLohn = 0, krippe = 0;
-    for (const [k, L] of haushalte) lohnsteuer += summe(steuer(L, Math.max(1, koepfe(k)), frei.get(k)));
+    for (const [k, L] of haushalte) lohnsteuer += summe(steuer(L, Math.max(1, koepfe(k)), frei.get(k), Sim.steuerSatz(S)));
     for (const [w, b] of brutto) { alt += b - Math.round(b * (1 - R.STEUER)); lohnsumme += b; if (bekommtRente(S, w)) rentnerLohn++; }
     for (let p = 0; p < S.pMax; p++) if (P.lebt[p] && P.geb[p] <= erw && bekommtRente(S, p)) rentner++;
     // Betreuungsgehalt: je Haushalt mit Kind unter 3 ohne Kita-Platz (Schritt 2) der Vorstand, sonst sein Partner, wenn 18–66, ohne Stelle,
@@ -820,6 +902,9 @@ if (flag('regierung')) {
     for (let i = 0; i < 150 && (i < 60 || naechte < 30); i++) {         // bis mindestens 30 Nächte ohne Wechsel nachgerechnet sind
       bisStunde(S, 300 + i, 23);
       for (let p = 0; p < S.pMax; p++) S.p.jetzt[p] = 0;          // keine Entscheidung mehr bis Mitternacht
+      // Haushalt (Version 9, Teil 3): ab Tag 300 ist der Satz meist 0 %; damit die Formel mit Satz geprüft wird, setzt der Test ihn je Nacht auf
+      // 3 bis 10 % (die Stadt ändert ihn sonst nur am Jahresende)
+      S.haushalt.satz = 3 + (i % 8);
       const e = erwartet(S), st = { ...S.stat.regierung }, fertig = S.stat.bau.fertig, pleiten = S.stat.pleiten, stufe = Sim.regierungInfo(S).rente;
       Sim.stunde(S);
       // Übersprungen: Ein fertiger Betrieb stellt seinen Besitzer um (Lohn anders); nach einer Pleite in der Nacht hat der Besitzer
@@ -845,7 +930,7 @@ if (flag('regierung')) {
       bisStunde(S, S.tag, 23);
       const rentner = []; for (let p = 0; p < S.pMax; p++) if (P().lebt[p] && S.tag - P().geb[p] >= R.RENTE * J && P().arbeit[p] < 0 && P().geb[p] > S.tag - R.ALT * J) rentner.push(p);   // ohne Lohn
       const vor = rentner.map(p => P().geld[p]), rk = S.stat.regierung.rentenkasse, stufe = Sim.regierungInfo(S).rente;
-      S.budget = 0;
+      budgetSetzen(S, 0);
       for (let p = 0; p < S.pMax; p++) S.p.jetzt[p] = 0;
       Sim.stunde(S);
       // Geld danach = vorher + Rente − Einkauf − Miete (+ nichts sonst): die Rente kam, obwohl das Budget leer war
@@ -1217,7 +1302,7 @@ if (flag('regierung')) {
       const b = P().arbeit[d], L = S.g.lohn[b], st0 = { ...S.stat.regierung }, e = erwartet(S), stufe = Sim.regierungInfo(S).rente;
       Sim.stunde(S);
       const dd = (k) => S.stat.regierung[k] - st0[k];
-      const ohneF = Math.round(R.STEUER * Math.max(0, L - R.FREIBETRAG)), mitF = Math.round(R.STEUER * Math.max(0, L - R.FREIBETRAG - R.RENTNER_FREIBETRAG));
+      const q = Sim.steuerSatz(S), ohneF = Math.round(q * Math.max(0, L - R.FREIBETRAG)), mitF = Math.round(q * Math.max(0, L - R.FREIBETRAG - R.RENTNER_FREIBETRAG));   // Haushalt: heutiger Satz
       // Eine Pleite anderswo in derselben Nacht ändert an d nichts (Löhne sind vorher gezahlt); ging d's Betrieb pleite, fehlt arbeit
       pruef(P().arbeit[d] === b && dd('rentnerLohnTage') === 1 && dd('rentnerEntlastung') === ohneF - mitF
         && dd('rentenkasse') === e.rentner * stufe && Sim.personInfo(S, d).rente.bezieht && Sim.erlaubteAktionen(S, d, 7).includes('kuendigen'),
@@ -1457,7 +1542,8 @@ if (flag('kita')) {
           if (P.hh[m] !== kopf || P.geb[m] > erw) continue;
           if (P.arbeit[m] < 0 && !P.haftBis[m]) heim = true;   // Sicherheit: in Haft ist niemand zu Hause
           // Bund (B10): wer Wehr- oder Ersatzdienst leistet oder als Soldat verpflichtet ist, muss nicht aufhören (wie Besitzer, gezählt)
-          else if ((m === kopf || m === P.partner[kopf]) && P.besitz[m] < 0 && !P.gemein[m] && P.bund[m] < Sim.WEHRDIENST && !Sim.verpflichtet(S, m)) angestellt = true;
+          // Bürgermeister (Version 9, Teil 1): im Amt gebunden wie im Dienst des Bundes (kitaTag: !istBm); der Fall kam erst mit Teil 5 in der Teststadt vor
+          else if ((m === kopf || m === P.partner[kopf]) && P.besitz[m] < 0 && !P.gemein[m] && P.bund[m] < Sim.WEHRDIENST && !Sim.verpflichtet(S, m) && !Sim.istBm(S, m)) angestellt = true;
         }
         z.luecke++;
         if (heim) continue;
@@ -1508,6 +1594,7 @@ if (flag('kita')) {
       pruef(fingerabdruck(Sim, L) === fingerabdruck(Sim, A2) && L.p.kita.some(v => v > 0), 'Speichern/Laden mit Kita-Plätzen: 20 Tage weiter bitgleich');
     }
     ctx.__kitaVergabe = null; ctx.__kitaEnde = null; ctx.__betr = null;
+    const kitaStand = speichernAlsText(Sim, S);                // für (h): die Stadt vor den erzwungenen Fällen (g) und (f), die Kitas Personal nehmen
     // (g) Erzwungen: Ein Elternteil eines Kindes unter 3 mit Krippenplatz verliert um 23 Uhr die Stelle (niemand sonst zu Hause). In der Nacht
     //     verliert das Kind den Platz, Betreuungsgehalt gibt es erst in der Nacht danach (bundesGeld kommt vor der Vergabe)
     {
@@ -1605,8 +1692,11 @@ if (flag('kita')) {
     // (h) Erzwungen (auf Kopien): Ein Kind unter 6 zieht zu jemandem, der nur seinen eigenen Betrieb hat (kein Partner, sonst niemand); die
     //     Kitas in der Nähe mit mindestens 17 belegten Einheiten behalten eine Fachkraft (dann voll), die übrigen verlieren alle. Niemand gibt
     //     etwas auf, es wird nur gezählt (kitaOhne). Besitzer und Kind werden der Reihe nach probiert, bis ein Fall passt; gibt es an Tag 400
-    //     keinen Besitzer mit so einer Kita in der Nähe, am nächsten Abend wieder (höchstens 60 Tage; Version 8: anderer Verlauf der Städte)
+    //     keinen Besitzer mit so einer Kita in der Nähe, am nächsten Abend wieder (höchstens 60 Tage; Version 8: anderer Verlauf der Städte).
+    //     Version 9, Teil 3: gesucht wird in der Stadt vor (g) und (f) (kitaStand): Deren erzwungene Fälle nehmen Kitas das Personal, danach fand
+    //     sich in Seed 1 bis Tag 560 kein allein wohnender Besitzer mehr mit einer vollen Kita in der Nähe
     let fall = null, versuche = 0, besitzerN = 0, suchTag = -1;
+    { const S = ladenAusText(Sim, kitaStand);
     for (let tage = 0; !fall && tage < 60 && versuche < 40; tage++) {
       while (S.stunde !== 23) Sim.stunde(S);
       if (tage) { Sim.stunde(S); while (S.stunde !== 23) Sim.stunde(S); }
@@ -1638,6 +1728,7 @@ if (flag('kita')) {
           if (T.p.kita[k] === 0 && T.stat.regierung.kitaOhne > oh0) { fall = { T, o, k, b0, oh0 }; break; }
         }
       }
+    }
     }
     {
       if (!fall) pruef(false, `(h) kein Fall gefunden (${besitzerN} Besitzer allein, ${versuche} Versuche, bis Tag ${suchTag})`);
@@ -1729,11 +1820,18 @@ if (flag('bau')) {
 if (flag('waren')) {
   let fehler = 0;
   const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
+  // Version 9, Teil 3: Wird ein Laden in der Nacht seiner Pleite zur Kita oder Schule umgebaut (kitaUmbau), fallen seine Kisten des Tages mit dem
+  // Umbau weg; die Messkopie merkt sie sich, damit „geliefert = bekommen“ auch in dieser Nacht genau aufgeht (zuerst Seed 3, Tag 233)
+  const { Sim, ctx: wc } = ladeSimMit([['function kitaUmbau(S, b, neuTyp, arbeit) {                  // Schule (Version 9): neuTyp SCHULE mit eigener Bauzeit, sonst Kita\n  const g = S.g, t = g.typ[b], P = S.p;\n',
+    'function kitaUmbau(S, b, neuTyp, arbeit) {                  // Schule (Version 9): neuTyp SCHULE mit eigener Bauzeit, sonst Kita\n  const g = S.g, t = g.typ[b], P = S.p;\n  if (globalThis.__umbau) globalThis.__umbau(S, b);\n']]);
+  let umbauW = 0, umbauL = 0, umbauten = 0;
+  wc.__umbau = (S, b) => { const g = S.g; umbauten++; if (g.typ[b] === Sim.WERKSTATT) umbauW += g.kistenStadt[b]; else if (g.typ[b] === Sim.LADEN || (g.typ[b] === Sim.TECH && g.werk[b])) umbauL += g.kistenStadt[b]; };
   const R = Sim.R;
   for (const seed of arg('seeds', '1,2,3').split(',').map(Number)) {
     console.log(`Seed ${seed}`);
     const S = Sim.neueStadt(seed), g = S.g;
     while (S.tag < 100) Sim.stunde(S);
+    umbauten = 0;
     let mehrAlsGemacht = 0, summeFehl = 0, weitFehl = 0, aussenFehl = 0, kistenFehl = 0, einnahmenFehl = 0, einnahmenGeprueft = 0, tage = 0;
     let gemacht = 0, anLaeden = 0, ladenStadt = 0, ladenAussen = 0, ersatzTage = 0, teileFehl = 0;
     const tageBis = Number(arg('tage', '300'));
@@ -1747,9 +1845,10 @@ if (flag('waren')) {
           n: L.filter(w => !P.frei[w]).length, da: L.filter(w => !P.frei[w] && !P.einsatz[w] && P.bund[w] !== Sim.ERSATZDIENST).length,
           ed: L.filter(w => !P.frei[w] && !P.einsatz[w] && P.bund[w] === Sim.ERSATZDIENST).length });   // Bund: Ersatzdienst macht keine Kisten
       }
+      umbauW = 0; umbauL = 0;
       Sim.stunde(S);
       tage++;
-      let sw = 0, sl = 0;
+      let sw = umbauW, sl = umbauL;
       for (let b = 0; b < S.gAnzahl; b++) {
         if (g.typ[b] === Sim.WERKSTATT) {
           if (g.kistenStadt[b] > g.kisten[b]) mehrAlsGemacht++;
@@ -1779,7 +1878,7 @@ if (flag('waren')) {
       }
     }
     pruef(mehrAlsGemacht === 0, `keine Werkstatt liefert mehr Kisten, als sie gemacht hat (${tage} Tage)`);
-    pruef(summeFehl === 0 && teileFehl === 0, `geliefert = bekommen (Werkstätten, Läden und Autowerke, ${summeFehl} Abweichungen); je Auto aus einem Werk der Stadt ${R.AUTO_KISTEN} Kisten Teile (${teileFehl} Fehler)`);
+    pruef(summeFehl === 0 && teileFehl === 0, `geliefert = bekommen (Werkstätten, Läden und Autowerke, ${summeFehl} Abweichungen; ${umbauten} Umbauten zur Kita oder Schule mitgezählt); je Auto aus einem Werk der Stadt ${R.AUTO_KISTEN} Kisten Teile (${teileFehl} Fehler)`);
     pruef(weitFehl === 0 && aussenFehl === 0, `Lieferant höchstens ${R.REICH_LIEFER} Felder weit; von außen nur, wenn in Reichweite nichts übrig war (${weitFehl + aussenFehl} Fehler)`);
     pruef(kistenFehl === 0, `je anwesender Kraft ${R.KISTEN_PRO_TAG} Kisten, Bauarbeiter auf der Baustelle nicht, Ersatzdienst nicht (${ersatzTage} Tage im Ersatzdienst ohne Baustelle; ${kistenFehl} Fehler)`);
     pruef(einnahmenGeprueft > 100 && einnahmenFehl === 0, `Werkstatt-Einnahmen = Arbeitstage × Umlandpreis wie vorher (${einnahmenGeprueft} Werkstatt-Tage nachgerechnet, ${einnahmenFehl} Fehler)`);
@@ -1792,15 +1891,24 @@ if (flag('tech')) {
   // Tech-Firmen: Arbeitstage an der Version, Käufe im Laden, Anbau über den Bauhof (Seeds 1–3, 730 Tage)
   let fehler = 0;
   const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
+  // Version 9, Teil 4: Wird ein Laden in der Nacht seiner Pleite zur Schule (oder Kita) umgebaut (kitaUmbau), fällt mit dem Umbau auch sein Zähler
+  // „verkauft“ des Tages weg; die Messkopie merkt ihn sich, damit „verkauft in Läden = Käufe“ auch in dieser Nacht genau aufgeht (wie --waren
+  // für die Kisten; mit dem Anlauf zuerst Seed 1, Tag 318 und 373)
+  const { Sim, ctx: tc } = ladeSimMit([['function kitaUmbau(S, b, neuTyp, arbeit) {                  // Schule (Version 9): neuTyp SCHULE mit eigener Bauzeit, sonst Kita\n  const g = S.g, t = g.typ[b], P = S.p;\n',
+    'function kitaUmbau(S, b, neuTyp, arbeit) {                  // Schule (Version 9): neuTyp SCHULE mit eigener Bauzeit, sonst Kita\n  const g = S.g, t = g.typ[b], P = S.p;\n  if (globalThis.__umbau) globalThis.__umbau(S, b);\n']]);
+  let umbauVerkauft = 0, umbauLaeden = 0;
+  tc.__umbau = (S, b) => { if (S.g.typ[b] === Sim.LADEN) { umbauVerkauft += S.g.verkauft[b]; if (S.g.verkauft[b]) umbauLaeden++; } };
   const R = Sim.R, T = Sim.TECH;
   for (const seed of arg('seeds', '1,2,3').split(',').map(Number)) {
     console.log(`Seed ${seed}`);
     const S = Sim.neueStadt(seed), g = S.g;
+    umbauLaeden = 0;
     const offenT = (b) => g.typ[b] === T && !g.leer[b] && S.feld[g.y[b] * S.karte + g.x[b]] === T;
     let arbeitGeprueft = 0, arbeitFehl = 0, uebersprungen = 0, versionen = 0, produktFehl = 0;
     let kaufTage = 0, kaufFehl = 0, angebotFehl = 0, reserveFehl = 0, umsatzFehl = 0, kaeufe = 0;
     let anbauBestellt = 0, anbauFehl = 0, anbauFertig = 0, stellenFehl = 0, rueckFehl = 0, anbauOhneSuchende = 0;
     const stufenBestellt = [0, 0, 0, 0, 0, 0, 0];
+    let schulKaeufe = 0;
     const zaehl = () => S.stat.tech.kaeufe.reduce((a, b) => a + b, 0);
     while (S.tag < 730) {
       if (S.stunde !== 23) { Sim.stunde(S); continue; }
@@ -1813,6 +1921,8 @@ if (flag('tech')) {
         vor.push({ b, n, projekt: g.projekt[b], version: g.version[b], L: S.belegschaft[b].slice(), stufe: g.stufe[b], auf: g.auf[b], rueck: g.ruecklage[b] });
       }
       const k0 = zaehl(), u0 = S.stat.tech.umsatz, arbl = S.arbeitslose, weg0 = S.stat.tode + S.stat.wegzuegePersonen;
+      const sc0 = S.stat.schule.itGeraete - (S.stat.schule.itAussen || 0);   // Teil 5: Computer der Schulen aus einem Laden der Stadt
+      umbauVerkauft = 0;
       const geldVor = new Map();
       for (let p = 0; p < S.pMax; p++) if (P.lebt[p]) geldVor.set(p, P.geld[p]);
       Sim.stunde(S);                                         // Mitternacht: Tagesabschluss
@@ -1847,9 +1957,11 @@ if (flag('tech')) {
       // Käufe: nur, was angeboten wurde (neueste Version je Produkt); niemand unter der Reserve; Geld = Umsatz der Firmen + Läden
       const neu = zaehl() - k0;
       kaeufe += neu; kaufTage++;
-      let verkauftLaden = 0, verkauftFirma = 0;
+      let verkauftLaden = umbauVerkauft, verkauftFirma = 0;       // umgebaute Läden dieser Nacht (siehe oben) mitgezählt
       for (let b = 0; b < S.gAnzahl; b++) { if (g.typ[b] === Sim.LADEN) verkauftLaden += g.verkauft[b]; if (g.typ[b] === T && g.produkt[b] !== Sim.AUTO) verkauftFirma += g.verkauft[b]; }   // Autos zählen nicht zu den Geräten
-      if (verkauftLaden !== neu || verkauftFirma !== neu) { kaufFehl++; if (flag("v")) console.log("   verkauft", tag, neu, verkauftLaden, verkauftFirma); }
+      // Version 9, Teil 5: Die Schulen kaufen ihre Computer im Laden wie die Leute; das zählt als verkauft (Laden und Firma), nicht als Kauf der Leute
+      const schule = S.stat.schule.itGeraete - (S.stat.schule.itAussen || 0) - sc0; schulKaeufe += schule;
+      if (verkauftLaden !== neu + schule || verkauftFirma !== neu + schule) { kaufFehl++; if (flag("v")) console.log("   verkauft", tag, neu, schule, verkauftLaden, verkauftFirma); }
       let summe = 0;
       for (let p = 0; p < S.pMax; p++) {
         if (!S.p.lebt[p]) continue;
@@ -1869,7 +1981,7 @@ if (flag('tech')) {
     const t = S.stat.tech;
     pruef(t.gruendungen > 0 && produktFehl === 0, `${t.gruendungen} Tech-Firmen gegründet, jede macht Software, Handys oder Computer (${produktFehl} Fehler)`);
     pruef(arbeitGeprueft > 1000 && arbeitFehl === 0, `Arbeitstage = Leute, die da waren (Besitzer zählt mit): ${arbeitGeprueft} Firmentage geprüft (${uebersprungen} mit Wechsel übersprungen), ${versionen} Versionen erschienen, ${arbeitFehl} Fehler`);
-    pruef(kaeufe > 0 && kaufFehl === 0 && umsatzFehl === 0, `Käufe: ${kaeufe} in ${kaufTage} Tagen (${(kaeufe / kaufTage).toFixed(1)} am Tag), verkauft in Läden = verkauft von Firmen = Käufe, bezahlt = Preise (${kaufFehl + umsatzFehl} Fehler)`);
+    pruef(kaeufe > 0 && kaufFehl === 0 && umsatzFehl === 0, `Käufe: ${kaeufe} in ${kaufTage} Tagen (${(kaeufe / kaufTage).toFixed(1)} am Tag), verkauft in Läden = verkauft von Firmen = Käufe (dazu ${schulKaeufe} Computer der Schulen aus dem Laden), bezahlt = Preise (${kaufFehl + umsatzFehl} Fehler; ${umbauLaeden} Läden mit Verkäufen in der Nacht ihres Umbaus mitgezählt)`);
     pruef(angebotFehl === 0 && reserveFehl === 0, `gekauft wird nur die neueste Version im Angebot, niemand zahlt sich unter die Reserve (${angebotFehl + reserveFehl} Fehler)`);
     pruef(anbauFehl === 0 && stellenFehl === 0 && rueckFehl === 0 && anbauOhneSuchende === 0,
       `Anbau: ${anbauBestellt} bestellt (auf Stufe 2–6: ${stufenBestellt.slice(2).join('/')}), ${anbauFertig} fertig; Stufe (höchstens 5, im Werk 6) und freie Stellen stimmen, Rücklage ≥ 0, Kasse ≤ Polster, nur wenn so viele Leute Arbeit suchten, wie Stellen dazukommen (${anbauFehl + stellenFehl + rueckFehl + anbauOhneSuchende} Fehler)`);
@@ -1927,7 +2039,7 @@ if (flag('erweiterung')) {
     const ausserhalb = code.slice(0, code.indexOf('function karteMasse(')) + code.slice(code.indexOf('function migriereV6('));
     const funktionen = [...ausserhalb.matchAll(/^function (\w+)\(/gm)];
     const in_ = (i) => { let f = '(oben)'; for (const m of funktionen) { if (m.index > i) break; f = m[1]; } return f; };
-    const erlaubt = new Set(['neuesGebaeude', 'personInfo', 'gebaeudeInfo', 'migriereV6']);
+    const erlaubt = new Set(['neuesGebaeude', 'gebaeudeSetzen', 'personInfo', 'gebaeudeInfo', 'migriereV6']);   // Version 9: gebaeudeSetzen ist der Teil von neuesGebaeude, den auch das Rathaus nutzt
     const nutzer = [...ausserhalb.matchAll(/\b(teilVon|teilName|teilIndex|stadtteilZaehlen|erweiterungInfo)\s*\(/g)].map(m => in_(m.index) + ':' + m[1]);
     pruef(nutzer.every(n => erlaubt.has(n.split(':')[0])), `Stadtteile außerhalb des Abschnitts nur zum Benennen und Anzeigen: ${[...new Set(nutzer)].join(', ')}`);
   }
@@ -2024,12 +2136,18 @@ if (flag('erweiterung')) {
     const t = V.erweiterung.wachsen.length ? V.erweiterung.wachsen[0][0] : ergebnis[2].tage[0], A = Sim.neueStadt(2);
     {                                                         // Wächst Seed 2 in einer Nacht zweimal: eine Zeile („zweimal“). Version 8: mit Autos
       // ist das nicht mehr die erste Nacht (Tag 93 einmal), sondern die erste Nacht mit zwei Ringen; weiterlaufen, bis es eine gibt
-      const zwei = () => { const w = V.erweiterung.wachsen; return w.findIndex((x, i) => i > 0 && w[i - 1][0] === x[0]); };
-      while (zwei() < 0 && V.tag < 730) Sim.stunde(V);
-      const i = zwei(), w = V.erweiterung.wachsen, t2 = i > 0 ? w[i][0] : -1, vor = i > 1 ? w[i - 2][1] : R.KARTE_START;
-      const wt = w.filter(x => x[0] === t2), zt = V.buch.filter(e => e.tag === t2 && e.art === 'karte'), z = zt.length ? Sim.klartext(zt[0].text) : '';
+      // Haushalt (Version 9, Teil 3): Seed 2 wächst jetzt bis Tag 730 nie zweimal in einer Nacht; dann dieselbe Suche in Seed 1, 3, 4, 5 …
+      const zwei = (X) => { const w = X.erweiterung.wachsen; return w.findIndex((x, i) => i > 0 && w[i - 1][0] === x[0]); };
+      let W = V, sd2 = 2;
+      for (const sd of [2, 1, 3, 4, 5, 6, 7, 8]) {
+        W = sd === 2 ? V : Sim.neueStadt(sd); sd2 = sd;
+        while (zwei(W) < 0 && W.tag < 730) Sim.stunde(W);
+        if (zwei(W) >= 0) break;
+      }
+      const i = zwei(W), w = W.erweiterung.wachsen, t2 = i > 0 ? w[i][0] : -1, vor = i > 1 ? w[i - 2][1] : R.KARTE_START;
+      const wt = w.filter(x => x[0] === t2), zt = W.buch.filter(e => e.tag === t2 && e.art === 'karte'), z = zt.length ? Sim.klartext(zt[0].text) : '';
       pruef(wt.length === 2 && zt.length === 1 && z.includes(`zweimal nah an den Rand der Karte`) && z.includes(`von ${vor} × ${vor} auf ${wt[1][1]} × ${wt[1][1]} Felder`),
-        `Seed 2, Tag ${t2}: ${wt.length}-mal gewachsen in einer Nacht (${wt.map(x => x[1]).join(', ')}), ${zt.length} Zeile im Stadtbuch: „${z}“`);
+        `Seed ${sd2}, Tag ${t2}: ${wt.length}-mal gewachsen in einer Nacht (${wt.map(x => x[1]).join(', ')}), ${zt.length} Zeile im Stadtbuch: „${z}“`);
     }
     while (A.tag < t - 1 || A.stunde < 13) Sim.stunde(A);
     const text = speichernAlsText(Sim, A), B = ladenAusText(Sim, text), k0 = A.karte;
@@ -2306,7 +2424,7 @@ if (flag('sicherheit')) {
         `Geldstrafe bezahlt (${bez} Taler an das Land): keine Haft, im Register bis Tag ${S.p.tilgungBis[q]} (5 Jahre, § 46 Abs. 1 Nr. 1a BZRG)`);
       const T = neu(), p2 = kandidat(T);
       // Betrag = 30 Tagessätze zu je Tagesnetto / 36,5; mit der Hälfte davon bleiben 15 Tagessätze offen
-      const satz = Math.max(0.1, (T.p.arbeit[p2] >= 0 && !T.p.gemein[p2] ? T.g.lohn[T.p.arbeit[p2]] * (1 - R.STEUER) : Sim.tageskosten(T, p2)) / ET);
+      const satz = Math.max(0.1, (T.p.arbeit[p2] >= 0 && !T.p.gemein[p2] ? T.g.lohn[T.p.arbeit[p2]] * (1 - Sim.steuerSatz(T)) : Sim.tageskosten(T, p2)) / ET);   // Haushalt: Nettolohn zum heutigen Satz
       const voll = Math.max(1, Math.round(30 * satz)); T.p.geld[p2] = Math.floor(voll / 2);
       X.urteilen(T, verf(T, p2, Sim.BETRUG, -1));
       const offen = Math.ceil(30 * (voll - Math.floor(voll / 2)) / voll);
@@ -2407,11 +2525,11 @@ if (flag('sicherheit')) {
         pruef(arten.every(a => a > 0) && zeile && !/\u0001/.test(zeile.text) && karte.every(w => /bei Angehörigen|beim Jugendamt/.test(w)) && pk.obhut && pk.gedaechtnis.length,
           `Obhut: ${kinder.length} Kind(er) von ${Sim.name(S, kopf)} ${arten[0] === 1 ? 'bei Angehörigen' : 'beim Jugendamt'} („${Sim.klartext(zeile ? zeile.text : '').slice(0, 110)}“); Hauskarte „${karte[0]}“`);
         // Ohne Angehörige (Eltern-Verweise weg): Jugendamt, der Kita-Platz wird frei
-        const T = ladenAusText(Sim, stand), Q = T.p, k0 = kinder[0];
+        const T = ladenAusText(Sim, stand), Q = T.p, k0 = kinder[0], ja0 = T.stat.sicherheit.obhutJugendamt;   // Haushalt (Teil 3): Seed 2 hatte schon einen Fall vorher
         for (const k of kinder) { Q.elternA[k] = -1; Q.elternB[k] = -1; }
         X.haftAntritt(T, kopf, 5, Sim.HAFT_STRAF); X.obhutPruefen(T);
-        pruef(kinder.every(k => Q.obhut[k] === 2 && !Q.kita[k]) && T.stat.sicherheit.obhutJugendamt === kinder.length && /Jugendamt/.test(T.buch.filter(e => e.art === 'sicherheit').at(-1).text),
-          `Obhut ohne Angehörige: das Jugendamt nimmt die Kinder in Obhut (§ 42 SGB VIII), Pflegefamilie außerhalb, Kita-Platz frei`);
+        pruef(kinder.every(k => Q.obhut[k] === 2 && !Q.kita[k]) && T.stat.sicherheit.obhutJugendamt - ja0 === kinder.length && /Jugendamt/.test(T.buch.filter(e => e.art === 'sicherheit').at(-1).text),
+          `Obhut ohne Angehörige: das Jugendamt nimmt die Kinder in Obhut (§ 42 SGB VIII), Pflegefamilie außerhalb, Kita-Platz frei (${T.stat.sicherheit.obhutJugendamt - ja0} neu, ${ja0} vorher)`);
         X.haftEnde(T, kopf); X.obhutPruefen(T);
         pruef(kinder.every(k => !Q.obhut[k] && Q.obhutBei[k] === -1) && Q.hh[k0] === kopf, 'nach der Entlassung: die Kinder sind wieder zu Hause, Obhut beendet');
       }
@@ -2558,7 +2676,8 @@ if (flag('militaer')) {
     }
     const w = koerper('wirtschaft') || '', wb = w.slice(w.indexOf('    if (istBund(t)) {'), w.indexOf('    let da = 0;'));
     const ers = w.slice(w.indexOf('if (P.bund[w] === ERSATZDIENST) {'), w.indexOf('continue;', w.indexOf('if (P.bund[w] === ERSATZDIENST) {')));
-    const kisten = (SIM_CODE.match(/if \(!P\.frei\[w\] && !P\.einsatz\[w\] && P\.bund\[w\] !== ERSATZDIENST\) (exportArbeiter|da)\+\+;/g) || []).length;
+    // Teil 5: der Umlandpreis zählt die Arbeitstage je Betrieb (n) und teilt sie nach dem Markt (Umland oder Welt) auf
+    const kisten = (SIM_CODE.match(/if \(!P\.frei\[w\] && !P\.einsatz\[w\] && P\.bund\[w\] !== ERSATZDIENST\) (exportArbeiter|da|n)\+\+;/g) || []).length;
     pruef(!zuViel.length, `Regeln lesen nur ihre Personenfelder (${Object.keys(ERLAUBT).length} Funktionen und die Bund-Zeilen in entscheide und erlaubteAktionen), keine Namen, kein Geschlecht`
       + (zuViel.length ? ': ' + zuViel.join(', ') : ''));
     pruef(wb.length > 100 && !/S\.budget/.test(wb) && ers.length > 20 && !/S\.budget/.test(ers) && kisten === 3,
@@ -2755,11 +2874,15 @@ if (flag('militaer')) {
     if (kind < 0) pruef(true, 'Wegzug im Dienst: niemand im Dienst lebt noch im Haushalt der Eltern (Fall entfällt)');
     else {
       const kopf = P.hh[kind], gen = P.gen[kind], ab = S.stat.bund.abgebrochen, erl = Sim.erlaubteAktionen(S, kind, 7);
+      // Version 9: Wer vorher im Dienst war (mit Ende), zählt als abgebrochen, wenn er mit weggeht (auch der Partner des Haushaltsvorstands,
+      // wenn beide dienen: in Seed 2 seit dem Rathaus so; vorher war es genau eine Person)
+      const imDienst = []; for (let q = 0; q < S.pMax; q++) if (P.lebt[q] && P.bund[q] >= Sim.WEHRDIENST && P.dienstBis[q]) imDienst.push([q, P.gen[q]]);
       // wer 18 ist, geht nicht mit (nur Kinder unter 18): der Dienst läuft weiter
       Sim._pruef.aktWegziehen(S, kopf);
-      const bleibt = P.lebt[kind] && P.gen[kind] === gen;
-      pruef(!erl.includes('wegziehen') && (bleibt ? P.bund[kind] >= Sim.WEHRDIENST && S.stat.bund.abgebrochen === ab : S.stat.bund.abgebrochen === ab + 1),
-        `Wegzug: im Dienst selbst nicht erlaubt; zieht der Haushalt weg, ${bleibt ? 'bleibt die erwachsene Person und dient weiter' : 'endet der Dienst (abgebrochen)'}`);
+      const bleibt = P.lebt[kind] && P.gen[kind] === gen, weg = imDienst.filter(([q, g]) => !(P.lebt[q] && P.gen[q] === g)).length;
+      pruef(!erl.includes('wegziehen') && (bleibt ? P.bund[kind] >= Sim.WEHRDIENST : weg >= 1) && S.stat.bund.abgebrochen === ab + weg,
+        `Wegzug: im Dienst selbst nicht erlaubt; zieht der Haushalt weg, ${bleibt ? 'bleibt die erwachsene Person und dient weiter' : 'endet der Dienst (abgebrochen)'}; `
+        + `abgebrochen ${ab} → ${S.stat.bund.abgebrochen} (${weg} im Dienst mit weggezogen)`);
     }
   }
   // d) Bindung: verpflichtete Soldaten dürfen nicht wechseln, kündigen oder gründen; mit Rentenanspruch oder nach dem Ende der Verpflichtung schon
@@ -2823,7 +2946,7 @@ if (flag('militaer')) {
     for (const b of [K, D]) if (offenB(S, b)) for (const w of S.belegschaft[b]) if (!P.frei[w]) {
       if (P.bund[w] === Sim.WEHRDIENST) soll.sold += R.SOLD; else if (b === K) soll.lohnKaserne += S.g.lohn[b]; else soll.lohnDienst += S.g.lohn[b]; }
     for (const w of S.belegschaft[S.bauhof]) if (!P.frei[w] && !P.gemein[w] && P.bund[w] === Sim.ERSATZDIENST) soll.soldErsatz += R.SOLD;
-    S.budget = 0;
+    budgetSetzen(S, 0);
     Sim.stunde(S);
     const ist = Object.fromEntries(Object.keys(soll).map(k => [k, st[k] - v[k]]));
     pruef(JSON.stringify(ist) === JSON.stringify(soll) && soll.soldErsatz > 0 && soll.lohnKaserne > 0,
@@ -2934,7 +3057,10 @@ if (flag('autos')) {
       autosTag: ['auto', 'autoBis', 'geb', 'gemein', 'geld', 'haftBis', 'lebt'], autoGeldnot: ['auto', 'autoMinus', 'geld', 'lebt'], autoRestwert: ['autoBis', 'autoTag'],
       autoErbe: ['auto', 'autoBis', 'autoFarbe', 'autoMarke', 'autoMinus', 'autoModell', 'autoTag', 'autoVersion', 'lebt', 'partner'],
       autoWegMin: ['spar'], mitAuto: ['auto', 'haftBis'], pendeltMitAuto: ['wohnung'], arbeitsOrtHeute: ['arbeit', 'einsatz', 'frei', 'haftBis'],
-      ortZurStunde: ['arbeit', 'besuch', 'einsatz', 'frei', 'haftBis', 'stammladen', 'wohnung'], autoOrt: ['auto', 'wohnung'], testfahrer: [],
+      // Version 9 (Schule): ortZurStunde liest dazu das Alter (Kind oder erwachsen, dieselbe Grenze wie stunde()) und den Schulplatz (am 18. Geburtstag
+      // noch Schulkind); wo ein Kind ist, sagt kindOrt: Schule zur Unterrichtszeit, sonst die Wohnung, in Obhut die der Angehörigen, beim Jugendamt nirgends
+      ortZurStunde: ['arbeit', 'besuch', 'einsatz', 'frei', 'geb', 'haftBis', 'schule', 'stammladen', 'wohnung'], autoOrt: ['auto', 'wohnung'], testfahrer: [],
+      kindOrt: [], schulOrt: ['schule'], kindWohnung: ['gen', 'lebt', 'obhut', 'obhutBei', 'obhutGen', 'wohnung'],
       autoWillig: ['ehrgeiz'], wachsZiel: [], werkKapital: ['geld'], werkAuftrag: ['geld'], umzugInsWerk: ['arbeit', 'besitz'], autosBauen: [],
       techGrenzeHalten: [], anbauAuftraege: [], anbauWillig: [], techPlaetzeVon: [], leeresWerk: [], werkeZahl: [],
       autoFaehrt: [], autoFaehrtJetzt: ['auto'], autoFahrtWohin: ['besuch', 'wohnung'], mischSchritt: [], mischStart: [], testStundenRest: [],
@@ -3261,13 +3387,15 @@ if (flag('autos')) {
       let fb = -1;                                          // eine große Handy- oder Computerfirma mit ehrgeizigem Besitz
       for (let b = 0; b < S.gAnzahl; b++) if (g.typ[b] === T && !g.werk[b] && !g.leer[b] && g.besitzer[b] >= 0 && g.stufe[b] >= 3 && (g.produkt[b] === Sim.HANDY || g.produkt[b] === Sim.COMPUTER)) { fb = b; break; }
       if (fb >= 0) P.ehrgeiz[g.besitzer[fb]] = 95;
-      const grenze = S.techPlaetze, platz = S.werkstattPlaetze;
+      const grenze = S.techPlaetze, platz = S.werkstattPlaetze, welt = R.WELT;
       S.techPlaetze = 0;                                    // die 40-%-Grenze soll hier nicht entscheiden
+      R.WELT = 1e9;                                         // der Markt (Umland oder Welt, Teil 5) auch nicht: Seit der Schlussprüfung (Zuzug genau nach R10)
+                                                            // läuft Seed 2 anders, und an diesem Tag nahm weder Umland noch Welt Stellen ab
       R.AUTO_MAX = n;
       const zu = [X.uebernehmbar(S, t, w, T), fb >= 0 ? X.wachsZiel(S, fb) : -1];
       R.AUTO_MAX = n + 1;
       const auf = [X.uebernehmbar(S, t, w, T), fb >= 0 ? X.wachsZiel(S, fb) : -1];
-      R.AUTO_MAX = alt; S.techPlaetze = grenze; S.werkstattPlaetze = platz;
+      R.AUTO_MAX = alt; S.techPlaetze = grenze; S.werkstattPlaetze = platz; R.WELT = welt;
       pruef(!zu[0] && zu[1] !== 9 && auf[0] && (fb < 0 || auf[1] === 9), `AUTO_MAX bei Übernahme: Mit ${n} laufenden Werken und AUTO_MAX = ${n} nimmt weder eine Gründung (${zu[0]}) noch eine Firma`
         + ` das leere Werk (Ziel ${zu[1]}); mit einem Platz mehr ginge beides (${auf[0]}, Ziel ${auf[1]})`);
     } else pruef(false, 'AUTO_MAX bei Übernahme: kein offenes Werk bis Tag 729 (Seed 2)');
@@ -3369,6 +3497,1760 @@ if (flag('autos')) {
   console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle Auto-Prüfungen bestanden');
   process.exit(fehler ? 1 : 0);
 }
+if (flag('rathaus')) {
+  // Rathaus (Version 9). A statisch; B neue Städte, Prüfung nach jeder Nacht (Seeds 1–3, 730 Tage): ein Rathaus an der Mitte, Ausbau zur Stufe,
+  // Stellen, Belegschaft, Lohn, Kosten mit Gegenrechnung der Löhne, Haushalt-Schnittstelle, Stadtbuch ohne Namen; C Speichern und Laden mitten
+  // im Ausbau; D Übernahme älterer Stände (Version 8 = stadt.orig.html, Version 7 aus git ffa1d88, Version 6 aus git bc7247a): nichts außer
+  // Brache und höchstens einem Park wird genommen; E Park weicht dem Rathaus (erzwungen); F beschädigte Stände; G Namenstausch; H mit
+  // R.RATHAUS = 0 Tag für Tag wie Version 8 (stadt.orig.html)
+  let fehler = 0;
+  const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
+  const R = Sim.R, RATHAUS = Sim.RATHAUS;
+  const simCode = (h) => h.match(/<script id="sim">([\s\S]*?)<\/script>/)[1];
+  const lade = (code) => { const ctx = vm.createContext({}); vm.runInContext(`Math.random = () => { throw new Error('Math.random'); };`, ctx); vm.runInContext(code, ctx); return ctx.StadtSim; };
+  const speichern = (X, S) => speichernAlsText(X, S);
+  const roh = (text) => { const d = JSON.parse(text); d.arrays = d.arrays.map(a => { const u8 = Buffer.from(a.b64, 'base64');
+    return { name: a.name, typ: a.typ, daten: new TYPEN[a.typ](u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength)) }; }); return d; };
+  const laden = (X, text, migrieren) => X.importZustand(roh(text), migrieren);
+  const abdruck = (X, S) => { const h = createHash('sha256'), d = X.exportZustand(S);
+    for (const a of d.arrays.sort((x, y) => (x.name < y.name ? -1 : 1))) { h.update(a.name); h.update(Buffer.from(a.daten.buffer, a.daten.byteOffset, a.daten.byteLength)); }
+    h.update(JSON.stringify(d.werte)); h.update(JSON.stringify(d.json)); return h.digest('hex').slice(0, 16); };
+  const bis = (X, S, tag, stunde = 0) => { while (S.tag < tag || (S.tag === tag && S.stunde < stunde)) X.stunde(S); };
+  const klemme = (v, a, b) => (v < a ? a : v > b ? b : v);
+  // Kopie mit Messpunkt: Belegschaft und Lohn des Rathauses unmittelbar vor wirtschaft() (für die Gegenrechnung der Löhne)
+  const { Sim: M, ctx: mc } = ladeSimMit([['function wirtschaft(S) {\n', 'function wirtschaft(S) {\n  if (globalThis.__vorWirtschaft) globalThis.__vorWirtschaft(S);\n']]);
+
+  console.log('A Statisch (Abschnitt „Rathaus“ im sim-Block)');
+  {
+    const a = SIM_CODE.indexOf('// ─── Rathaus (Version 9)'), e = SIM_CODE.indexOf('// Ende Rathaus');
+    const teil = SIM_CODE.slice(a, e).replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+    pruef(a > 0 && e > a && !/\b(zufall|zInt|zufallSich|zufallAuto)\s*\(/.test(teil), 'Abschnitt gefunden, kein Zufall');
+    const felder = new Set([...teil.matchAll(/\b(?:P|S\.p)\.(\w+)/g)].map(m => m[1]));
+    pruef([...felder].every(f => f === 'frei'), `Personenfelder nur zur Anzeige: ${[...felder].join(', ') || 'keine'} (erlaubt: frei)`);
+    const koerper = (n) => { const i = teil.indexOf('function ' + n + '('); const t = teil.slice(i); const j = t.indexOf('\nfunction ', 10); return j > 0 ? t.slice(0, j) : t; };
+    const regeln = ['rathausStellen', 'rathausStart', 'rathausSuchen', 'parkIn', 'rathausNeu', 'rathausTag', 'rathausNacht', 'haushaltKurz', 'migriereRathaus', 'rathausBezahlen'];
+    const lesen = regeln.filter(n => /\bname\(|vorname\(|\bnr\(|\bref\(|belegschaft\[b\]\.(?!length)|\.weib|\.geb\b|\.einzug|\.eltern/.test(koerper(n)));
+    pruef(!lesen.length, `Regeln lesen keine Namen, kein Geschlecht, kein Alter, keinen Einzugstag, keine Eltern, keine einzelnen Personen (${lesen.join(', ') || 'keine Treffer'})`);
+    const geld = [...teil.matchAll(/S\.budget\s*[-+]?=/g)].length;
+    pruef(geld === 1 && /function rathausBezahlen\(S, k\) \{ S\.budget -= k;/.test(teil), `Budget ändert der Abschnitt nur in rathausBezahlen (${geld} Stelle; dort bucht der Haushalt)`);
+  }
+
+  const seeds = arg('seeds', '1,2,3').split(',').map(Number), tage = Number(arg('tage', '730'));
+  console.log(`B Neue Städte (Seeds ${seeds.join(', ')}, je ${tage} Tage stündlich), Prüfung nach jeder Nacht`);
+  for (const seed of seeds) {
+    const S = M.neueStadt(seed), mi0 = S.mitte;
+    const z0 = S.buch.filter(e => e.art === 'rathaus');
+    const b = S.rathaus.b, r0 = S.erweiterung.gelaende.find(r => r[4] === b);
+    pruef(b === 4 && S.g.typ[b] === RATHAUS && r0 && r0[0] === mi0 - 3 && r0[1] === mi0 - 3 && r0[2] === mi0 + 3 && r0[3] === mi0 - 1
+      && S.g.x[b] === mi0 && S.g.y[b] === mi0 - 1 && S.feld[mi0 * S.karte + mi0] === Sim.STRASSE && z0.length === 1 && S.g.stufe[b] === 1,
+      `Seed ${seed}, Tag 0: Rathaus (Gebäude ${b}) auf 7 × 3 Feldern nördlich der Hauptstraße, Tor an der Mitte, ${S.rathaus.stellen} Stelle(n) der Verwaltung, Zeile „${M.klartext(z0[0] ? z0[0].text : '').slice(0, 60)}…“`);
+    let probleme = [], minBudget = Infinity, ausbauTage = [], stufeVor = S.erweiterung.stufe, stufeTag = [], lohnMin = 999, lohnMax = 0, maxUeber = 0;
+    let belegtVor = S.belegschaft[b].length, budgetVor = S.budget, plaetzeVor = M.stellen(S, b), buchNr = S.buchNr, neueZeilen = 0, lohnSoll = 0, lohnIst0 = S.stat.rathaus.lohn, gegen = 0, gegenTage = 0;
+    mc.__vorWirtschaft = (X) => {                               // Gegenrechnung: wer heute da war (nicht frei), bekommt den Lohn des Rathauses (Budget reicht)
+      const L = X.belegschaft[b]; let n = 0;
+      for (const w of L) if (!X.p.frei[w] && !X.p.gemein[w]) n++;
+      lohnSoll = X.budget > 20000 ? n * X.g.lohn[b] : NaN;          // bei knappem Budget kürzt wirtschaft() (Math.min), dann nicht nachrechnen
+      lohnIst0 = X.stat.rathaus.lohn;
+    };
+    for (let d = 1; d <= tage; d++) {
+      bis(M, S, d);
+      const g = S.g, mi = S.mitte, K = S.karte, Ra = S.rathaus, st = g.stufe[b], L = S.belegschaft[b], plaetze = M.stellen(S, b);
+      const p = (ok, was) => { if (!ok && probleme.length < 8) probleme.push(`Tag ${S.tag}: ${was}`); };
+      if (!Number.isNaN(lohnSoll)) { gegenTage++; if (S.stat.rathaus.lohn - lohnIst0 === lohnSoll) gegen++; else p(false, `Löhne ${S.stat.rathaus.lohn - lohnIst0} statt ${lohnSoll}`); }
+      p(Ra.b === b && g.typ[b] === RATHAUS, 'Rathaus-Nummer');
+      let n = 0; for (let x = 0; x < S.gAnzahl; x++) if (g.typ[x] === RATHAUS) n++;
+      p(n === 1, `${n} Rathäuser`);
+      const r = S.erweiterung.gelaende.find(q => q[4] === b);
+      p(r && r[0] - mi === -3 && r[1] - mi === -3 && r[2] - mi === 3 && r[3] - mi === -1, 'Gelände an der Mitte');
+      if (r) for (let y = r[1]; y <= r[3]; y++) for (let x = r[0]; x <= r[2]; x++) p(S.feldGeb[y * K + x] === b && (S.feld[y * K + x] === RATHAUS || S.feld[y * K + x] === Sim.BAUSTELLE), 'Feld des Geländes');
+      p(st >= 1 && st <= S.erweiterung.stufe + 1, `Ausbaustufe ${st} bei Stufe ${S.erweiterung.stufe}`);
+      if (g.auf[b]) p(g.auf[b] === st + 1 && S.baustellen.includes(b), 'Ausbau läuft als Baustelle');
+      p(Ra.stellen === klemme(Math.round(S.einwohner * R.VERWALTUNG_DICHTE), R.RATHAUS_MIN[st], R.RATHAUS_MAX[st]) || Math.abs(Ra.stellen - klemme(Math.round(S.einwohner * R.VERWALTUNG_DICHTE), R.RATHAUS_MIN[st], R.RATHAUS_MAX[st])) <= 1,
+        `Stellen ${Ra.stellen} bei ${S.einwohner} Einwohnern, Stufe ${st}`);
+      p(plaetze === Ra.stellen + (S.buergermeister.p >= 0 ? 1 : 0), `Plätze ${plaetze} = Verwaltung ${Ra.stellen} + Bürgermeisteramt`);
+      p(L.every(x => S.p.lebt[x] && S.p.arbeit[x] === b && !S.p.haftBis[x] && S.tag - S.p.geb[x] >= R.ERWACHSEN * R.JAHR && !S.p.gemein[x] && !S.p.bund[x]), 'Belegschaft (lebt, erwachsen, nicht in Haft, keine gemeinnützige Arbeit, kein Dienst)');
+      if (L.length > plaetze) maxUeber = Math.max(maxUeber, L.length - plaetze);
+      p(L.length <= Math.max(plaetzeVor, belegtVor, plaetze), `${L.length} Leute bei ${plaetzeVor} Plätzen am Tag und ${plaetze} ab heute Nacht (vorher ${belegtVor})`);
+      for (const e of S.buch) if (e.nr > buchNr && e.art === 'rathaus') { neueZeilen++; p(!/\u0001/.test(e.text), 'Name in einer Zeile zum Rathaus'); }
+      buchNr = S.buchNr; plaetzeVor = plaetze;
+      lohnMin = Math.min(lohnMin, g.lohn[b]); lohnMax = Math.max(lohnMax, g.lohn[b]);
+      p(g.lohn[b] >= R.LOHN_STADT && g.lohn[b] <= R.BAU_LOHN_MAX, `Lohn ${g.lohn[b]}`);
+      const hh = M.haushaltKurz(S);
+      p(Ra.gestern && Math.abs(Ra.gestern.saldo - (S.budget - budgetVor)) < 1e-6, 'Saldo von gestern = Budget heute − gestern');
+      // Haushalt (Teil 3): haushaltKurz aus den Konten; die Zeile des Rathauses (Löhne, laufende Kosten, Bau) = Kosten von gestern, Zeilen zusammen = Saldo
+      const rz = hh.zeilen.find(z => /^Rathaus/.test(z[0]));
+      p(hh.stand === 'gestern' && Math.abs(hh.saldo - Ra.gestern.saldo) < 1e-6 && Math.abs(hh.zeilen.reduce((a, z) => a + z[1], 0) - hh.saldo) < 1e-6
+        && (rz ? Math.abs(rz[1] + Ra.gestern.kosten) < 1e-6 : Ra.gestern.kosten === 0) && hh.budget === S.budget && hh.fenster === true,
+        'haushaltKurz: Budget, Saldo und Rathaus-Zeile wie gezählt');
+      minBudget = Math.min(minBudget, S.budget);
+      if (S.erweiterung.stufe > stufeVor) { stufeTag[S.erweiterung.stufe] = S.tag; stufeVor = S.erweiterung.stufe; }
+      if (st > (ausbauTage.length + 1)) ausbauTage.push(S.tag);
+      belegtVor = L.length; budgetVor = S.budget;
+    }
+    mc.__vorWirtschaft = null;
+    const verz = ausbauTage.map((t, i) => t - (stufeTag[i + 1] || 0));
+    pruef(!probleme.length && gegenTage > tage * 0.5, `Seed ${seed}: jede Nacht in Ordnung${probleme.length ? ': ' + probleme.join('; ') : ''}; Löhne nachgerechnet an ${gegen} von ${gegenTage} Tagen gleich;`
+      + ` Ausbaustufe ${S.g.stufe[b]} (${Sim.STUFEN[S.erweiterung.stufe]}), Ausbau fertig an Tag ${ausbauTage.join(', ')} (${verz.join(', ')} Tage nach der Stufe), ${S.rathaus.stellen} Stellen + Amt, ${S.belegschaft[b].length} besetzt,`
+      + ` Lohn ${lohnMin}–${lohnMax}, kleinstes Budget ${Math.round(minBudget)}, ${neueZeilen} Zeilen zum Rathaus nach Tag 0 (ohne Namen), höchstens ${maxUeber} mehr Leute als Plätze`);
+    const rs = S.stat.rathaus;
+    pruef(rs.ausbauten === ausbauTage.length + (S.g.auf[b] ? 1 : 0) && rs.bau === [2, 3, 4].slice(0, rs.ausbauten).reduce((s, z) => s + R.K_RATHAUS[z], 0) && rs.fix === R.FIX_RATHAUS * tage,
+      `Seed ${seed}: ${rs.ausbauten} Ausbauten, Bau ${rs.bau} Taler aus dem Budget, Löhne ${rs.lohn}, laufende Kosten ${rs.fix} (${R.FIX_RATHAUS} je Tag)`);
+  }
+
+  console.log('C Speichern und Laden mitten im Ausbau; Aufholen');
+  {
+    const S = Sim.neueStadt(2);
+    while (!(S.g.auf[S.rathaus.b] && S.stunde === 13)) Sim.stunde(S);
+    const t = S.tag, L = laden(Sim, speichern(Sim, S));
+    pruef(abdruck(Sim, S) === abdruck(Sim, L), `Seed 2, Tag ${t} 13 Uhr (Ausbau auf Stufe ${S.g.auf[S.rathaus.b]}, ${S.g.bauRest[S.rathaus.b]} Arbeitstage offen): direkt nach dem Laden gleich`);
+    bis(Sim, S, t + 30); bis(Sim, L, t + 30);
+    pruef(abdruck(Sim, S) === abdruck(Sim, L), `30 Tage weiter bitgleich (Ausbaustufe ${S.g.stufe[S.rathaus.b]})`);
+    const A = Sim.neueStadt(3), B = Sim.neueStadt(3);
+    bis(Sim, A, 90); while (B.tag < 90) Sim.tagSchritt(B);
+    pruef(A.rathaus.b === B.rathaus.b && B.g.stufe[B.rathaus.b] >= 1 && B.buergermeister.p >= 0,
+      `Aufholen (Seed 3, 90 Tage in Tagesschritten): Ausbaustufe ${B.g.stufe[B.rathaus.b]} (stündlich ${A.g.stufe[A.rathaus.b]}), Stellen ${B.rathaus.stellen} / ${A.rathaus.stellen}, Amt besetzt`);
+  }
+
+  console.log('D Übernahme älterer Stände (nur Brache und höchstens ein Park werden genommen)');
+  // Version 8 und (mit --git) 7 und 6 mit sechs Ständen; 5, 4, 3 und 2 mit zwei (Gegenprüfung: die ganze Kette V2–V7 mit eingeschaltetem Rathaus)
+  const STAENDE = [[1, 150, 13], [2, 300, 5], [3, 400, 20], [4, 30, 9], [2, 700, 11], [7, 700, 12]], KURZ = [[1, 150, 13], [4, 30, 9]];
+  const quellen = [['Version 8 (stadt.orig.html)', readFileSync(join(hier, '..', 'stadt.orig.html'), 'utf8'), STAENDE]];
+  if (arg('git')) for (const [c, v] of [['ffa1d88', 7], ['bc7247a', 6], ['414ebab', 5], ['1c8d40b', 4], ['2b821c2', 3], ['39c405b', 2]])
+    quellen.push([`Version ${v} (git ${c})`, execFileSync('git', ['show', c + ':stadt/stadt.html'], { cwd: arg('git'), encoding: 'utf8', maxBuffer: 1 << 26 }), v >= 6 ? STAENDE : KURZ]);
+  else console.log('  (ohne --git: nur Version 8)');
+  const weiten = [];
+  for (const [herkunft, altHtml, staende] of quellen) {
+    const Alt = lade(simCode(altHtml));
+    console.log(` ${herkunft}`);
+    for (const [seed, tag, stunde] of staende) {
+      const A = Alt.neueStadt(seed);
+      bis(Alt, A, tag, stunde);
+      const text = speichern(Alt, A);
+      let abgelehnt = null; try { laden(Sim, text); } catch (e) { abgelehnt = e; }
+      const S = laden(Sim, text, true), K = S.karte, KA = A.karte || 96, dm = S.mitte - (A.mitte || 48);
+      // Nichts außer einem Park abgerissen: jedes alte Gebäude steht (Typ, Lage zur Mitte, Stufe), jedes alte belegte Feld ist gleich; ein Park,
+      // der dem Rathaus weicht, wird das Rathaus (seine Nummer), sein Feld gehört zum Gelände
+      const b = S.rathaus.b, r = b >= 0 ? S.erweiterung.gelaende.find(q => q[4] === b) : null;
+      let weg = 0, feldAnders = 0, auf = 0, parkWeg = 0;
+      for (let x = 0; x < A.gAnzahl; x++) {
+        if (x === b && A.g.typ[x] === Sim.PARK) { parkWeg++; continue; }
+        if (S.g.typ[x] !== A.g.typ[x] || S.g.x[x] !== A.g.x[x] + dm || S.g.y[x] !== A.g.y[x] + dm || S.g.stufe[x] !== A.g.stufe[x]) weg++;
+      }
+      const imGel = (x, y) => r && x >= r[0] && x <= r[2] && y >= r[1] && y <= r[3];
+      for (let y = 0; y < KA; y++) for (let x = 0; x < KA; x++) {
+        const fa = A.feld[y * KA + x], fs = S.feld[(y + dm) * K + x + dm];
+        if (fa !== 0 && fa !== fs && !(fa === Sim.PARK && imGel(x + dm, y + dm))) feldAnders++;
+      }
+      if (r) for (let y = r[1]; y <= r[3]; y++) for (let x = r[0]; x <= r[2]; x++) { const f = A.feld[(y - dm) * KA + x - dm]; if (f !== 0 && f !== Sim.PARK) auf++; }
+      const weit = r ? Math.round(Math.abs((r[0] + r[2]) / 2 - S.mitte) + Math.abs((r[1] + r[3]) / 2 - S.mitte)) : -1;
+      if (weit >= 0) weiten.push(weit);
+      pruef(abgelehnt && abgelehnt.andereVersion && abgelehnt.migrierbar && S.version === Sim.VERSION && !weg && !feldAnders && !auf && parkWeg <= 1 && S.stat.rathaus.parks === parkWeg
+        && (b < 0 || S.g.stufe[b] === S.erweiterung.stufe + 1) && S.buergermeister.p === -1,
+        `Seed ${seed}, Tag ${A.tag} (${A.einwohner} Einw., ${Sim.STUFEN[S.erweiterung.stufe]}): ohne Übernehmen abgelehnt; ${weg} Gebäude und ${feldAnders} Felder anders,`
+        + ` Rathaus ${b >= 0 ? `${r[2] - r[0] + 1} × ${r[3] - r[1] + 1} Felder, ${weit} Felder von der Mitte, Ausbaustufe ${S.g.stufe[b]}, ${auf} vorher bebaute Felder, ${parkWeg} Park genommen` : 'noch nicht gebaut'};`
+        + ` noch kein Bürgermeister; Budget ${Math.round(A.budget)} → ${Math.round(S.budget)}`);
+      const t0 = S.tag; let offenAb = -1, wahlAm = -1;
+      for (let d = 1; d <= 60; d++) {
+        bis(Sim, S, t0 + d);
+        if (offenAb < 0 && S.rathaus.b >= 0 && S.feld[S.g.y[S.rathaus.b] * S.karte + S.g.x[S.rathaus.b]] === RATHAUS) offenAb = d;
+        if (wahlAm < 0 && S.buergermeister.p >= 0) wahlAm = d;
+      }
+      const L = laden(Sim, speichern(Sim, S)); bis(Sim, S, S.tag + 10); bis(Sim, L, L.tag + 10);
+      pruef(offenAb > 0 && wahlAm >= offenAb && wahlAm <= offenAb + 1 && abdruck(Sim, S) === abdruck(Sim, L),
+        `  60 Tage weiter: Rathaus offen nach ${offenAb} Tagen, gewählt nach ${wahlAm} (in der ersten Nacht mit offenem Rathaus), ${S.belegschaft[S.rathaus.b].length} von ${Sim.stellen(S, S.rathaus.b)} Plätzen besetzt; gespeichert und geladen bitgleich`);
+    }
+  }
+  console.log(`  Abstand des Rathauses zur Mitte bei Übernahmen: ${Math.min(...weiten)} bis ${Math.max(...weiten)} Felder (${weiten.length} Stände)`);
+
+  console.log('E Park weicht dem Rathaus (erzwungen: Stand der Version 8, Park mitten auf dem nächsten freien Gelände)');
+  {
+    // Stand der Version 8 (Seed 2, Tag 200); ins nächste freie Gelände setzt die alte Sim einen fertigen Park (neuesGebaeude, Arbeit 0)
+    const { Sim: AltM } = (() => { const code = simCode(readFileSync(join(hier, '..', 'stadt.orig.html'), 'utf8')).replace('G.StadtSim = {', 'G.StadtSim = { neuesGebaeude,');
+      const ctx = vm.createContext({}); vm.runInContext(code, ctx); return { Sim: ctx.StadtSim }; })();
+    const A2 = AltM.neueStadt(2); bis(AltM, A2, 200, 3);
+    const r2 = AltM.gelaendeSuchen(A2, 2, 1, false) || AltM.gelaendeSuchen(A2, 1, 2, false);
+    const park = AltM.neuesGebaeude(A2, Sim.PARK, r2.x0 + 1, r2.y0 + 1, 0, -1);
+    const S = laden(Sim, speichern(AltM, A2), true), b = S.rathaus.b, g = S.g, dm = S.mitte - A2.mitte;
+    const zeile = S.buch.slice(-2).map(e => Sim.klartext(e.text)).join(' | ');
+    pruef(b === park && g.typ[b] === RATHAUS && S.stat.rathaus.parks === 1 && S.feld[(r2.y0 + 1 + dm) * S.karte + r2.x0 + 1 + dm] === RATHAUS && !S.vPark.some(L => L.includes(b))
+      && /weicht der Park/.test(zeile), `Park (Gebäude ${park}) wird das Rathaus am Tor, sein Feld gehört zum Gelände, aus der Parkliste; „${zeile.slice(0, 160)}…“`);
+    bis(Sim, S, S.tag + 40);
+    const L = laden(Sim, speichern(Sim, S)); bis(Sim, S, S.tag + 5); bis(Sim, L, L.tag + 5);
+    pruef(abdruck(Sim, S) === abdruck(Sim, L) && S.buergermeister.p >= 0, `40 Tage weiter (Rathaus ${Sim.klartext(Sim.gebaeudeInfo(S, b).titel)}, Amt besetzt), gespeichert und geladen bitgleich`);
+  }
+
+  console.log('F Beschädigte Stände');
+  {
+    const S = Sim.neueStadt(1); bis(Sim, S, 120);
+    const text = speichern(Sim, S), b = S.rathaus.b, meld = [];
+    const faelle = [['Rathaus fehlt', d => { delete d.json.rathaus; }], ['Nummer zu groß', d => { d.json.rathaus.b = 99999; }], ['Nummer eines Wohnhauses', d => { d.json.rathaus.b = 0; }],
+      ['Stellen negativ', d => { d.json.rathaus.stellen = -1; }], ['gestern kein Objekt', d => { d.json.rathaus.gestern = 'x'; }], ['Summe fehlt', d => { delete d.json.stat.rathaus.lohn; }],
+      ['Summe Parks fehlt', d => { delete d.json.stat.rathaus.parks; }],
+      // Teil 5: In Seed 1 wird das Rathaus an Tag 120 wirklich ausgebaut (Baustelle); deshalb hier auf der nächsten Stufe und ohne die Baustelle
+      ['Ausbau ohne Baustelle', d => { d.arrays.find(a => a.name === 'g.auf').daten[b] = S.g.stufe[b] + 1; d.json.baustellen = d.json.baustellen.filter(x => x !== b); }], ['Stufe 7', d => { d.arrays.find(a => a.name === 'g.stufe').daten[b] = 7; }],
+      ['zweites Rathaus', d => { const t = d.arrays.find(a => a.name === 'g.typ').daten; t[0] = RATHAUS; }], ['Start in der Zukunft', d => { d.json.rathaus.start = 99999; }],
+      ['Stand der Version 9 ohne Summen des Rathauses', d => { delete d.json.stat.rathaus; }]];
+    for (const [was, kaputt] of faelle) {
+      const d = roh(text); kaputt(d);
+      let e = null; try { Sim.importZustand(d); } catch (x) { e = x; }
+      meld.push(`${was}: ${e ? e.message : 'ANGENOMMEN'}`);
+      if (!e || !/^Spielstand beschädigt/.test(e.message)) fehler++;
+    }
+    console.log((meld.every(m => /beschädigt/.test(m)) ? '  ok   ' : '  FEHL ') + meld.join('; '));
+  }
+
+  console.log('G Namen tauschen (Seed 2, 365 Tage): die Stadt läuft gleich, bis auf Namen und Texte');
+  {
+    const { Sim: T } = ladeSimMit([['const STRASSEN = [', 'NACHNAMEN.reverse(); VORNAMEN_W.reverse(); VORNAMEN_M.reverse();\nconst STRASSEN = [']]);
+    const A = Sim.neueStadt(2), B = T.neueStadt(2);
+    bis(Sim, A, 365); bis(T, B, 365);
+    const h = (S) => { const x = createHash('sha256'); for (const n of Object.keys(S.p).sort()) { const a = S.p[n]; x.update(Buffer.from(a.buffer, a.byteOffset, a.byteLength)); }
+      for (const n of Object.keys(S.g).sort()) { const a = S.g[n]; x.update(Buffer.from(a.buffer, a.byteOffset, a.byteLength)); }
+      x.update(JSON.stringify([S.budget, S.rs, S.rsSich, S.rsAuto, S.rathaus, S.stat, S.einwohner, S.buergermeister.p, S.buergermeister.seit, S.buergermeister.bis]));
+      x.update(S.buch.map(e => e.art).join()); return x.digest('hex').slice(0, 16); };
+    pruef(Sim.name(A, 3) !== T.name(B, 3) && h(A) === h(B), `„${Sim.name(A, 3)}“ heißt dort „${T.name(B, 3)}“; gleich (Tag 365, ${A.einwohner} Einwohner, Rathaus ${A.belegschaft[A.rathaus.b].length} besetzt, ${h(A)})`);
+  }
+
+  console.log('H Ohne Rathaus (R.RATHAUS = 0): Tag für Tag wie Version 8 (stadt.orig.html)');
+  {
+    const V8 = lade(simCode(readFileSync(join(hier, '..', 'stadt.orig.html'), 'utf8')));
+    const spur = (S) => { const x = createHash('sha256');
+      for (const n of Object.keys(S.p).sort()) if (ArrayBuffer.isView(S.p[n]) && n !== 'schule') { const a = S.p[n], w = a.length / S.pKap; x.update(n); x.update(Buffer.from(a.buffer, a.byteOffset, S.pMax * w * a.BYTES_PER_ELEMENT)); }   // Schulplatz: gibt es in Version 8 nicht
+      for (const n of Object.keys(S.g).sort()) { if (n === 'markt' || n === 'kraft') continue; const a = S.g[n]; x.update(n); x.update(Buffer.from(a.buffer, a.byteOffset, S.gAnzahl * a.BYTES_PER_ELEMENT)); }   // Teil 5: neue Felder
+      x.update(Buffer.from(S.feld.buffer)); const st = { ...S.stat, tech: techAlt(S.stat.tech) }; delete st.rathaus; delete st.buergermeister; delete st.schule; delete st.aufgegeben;
+      x.update(JSON.stringify([S.budget, S.rs, S.rsSich, S.rsAuto, S.tag, S.einwohner, st, kiAlt(S.ki), S.regierung, S.sicherheit, S.bund, S.erweiterung])); x.update(JSON.stringify(S.buch));   // Teil 4: ohne KI-Frist
+      return x.digest('hex').slice(0, 16); };
+    const alt = R.RATHAUS, altS = R.SCHULEN, altH = [R.HH_VORHABEN, R.HH_STEUER]; R.RATHAUS = 0; R.SCHULEN = 0;   // Schule (Version 9): für den Vergleich mit Version 8 ebenfalls aus
+    R.HH_VORHABEN = 0; R.HH_STEUER = 0;                      // Haushalt (Teil 3): nur Buchführung (Lohnsteuer 10 %, keine Vorhaben), sonst liefe die Stadt anders
+    const altA = R.ANLAUF_STUFE; R.ANLAUF_STUFE = 0;         // Wachstum (Teil 4): ohne Anlauf, sonst zögen am Anfang mehr Leute zu
+    const altT = [R.TECH_FRUEH, R.WELT, R.ZUZUG_GENAU]; R.TECH_FRUEH = 0; R.WELT = 0; R.ZUZUG_GENAU = 0;   // Teil 5: ohne Tech früher und Weltmarkt; Zuzug wie vorher (Schlussprüfung)
+    for (const seed of arg('gleichSeeds', '1,2').split(',').map(Number)) {
+      const A = V8.neueStadt(seed), B = Sim.neueStadt(seed); let erster = -1, n = 0;
+      const bisTag = Number(arg('gleichTage', '365'));
+      for (let d = 1; d <= bisTag; d++) { bis(V8, A, d); bis(Sim, B, d); n++; if (erster < 0 && spur(A) !== spur(B)) erster = d; }
+      pruef(erster < 0 && B.buergermeister.p === -1, `Seed ${seed}: ${n} Tage verglichen (Personen, Gebäude, Felder, Budget, Zufall, Summen, Hauptfiguren, Stadtbuch), ${erster < 0 ? 'jeden Tag gleich' : 'erster Unterschied an Tag ' + erster}`);
+    }
+    R.RATHAUS = alt; R.SCHULEN = altS; [R.HH_VORHABEN, R.HH_STEUER] = altH; R.ANLAUF_STUFE = altA; [R.TECH_FRUEH, R.WELT, R.ZUZUG_GENAU] = altT;
+  }
+  console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle Prüfungen zum Rathaus bestanden');
+  process.exit(fehler ? 1 : 0);
+}
+
+if (flag('buergermeister')) {
+  // Bürgermeister (Version 9). 1. statisch: Wahl liest nur neutrale Personenfelder (keine Namen, keine Herkunft, kein Einzugstag, keine Eltern,
+  // kein Geschlecht), Zufall nur aus wahlZufall; Namenstausch bitgleich. 2. Invarianten nach jeder Nacht (Seeds 1–3, 730 Tage). 3. Erzwungene
+  // Fälle: Tod, Haft, Wegzug im Amt, Abwahl, Hauptfigur (eigener Platz, Grenze), Gehirn im Amt. 4. Rangfolge der Vorhaben (Schnittstelle zum
+  // Haushalt) mit Testvorhaben: Anfrage, gültige und ungültige Antworten, Frist, Aufholen, KI aus. 5. Speichern und Laden, beschädigte Stände.
+  // 6. Messung nach Gruppen (nur gemessen: keine Regel liest diese Merkmale)
+  let fehler = 0;
+  const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
+  const R = Sim.R, J = R.JAHR, X = Sim._bm;
+  const bis = (Y, S, tag, stunde = 0) => { while (S.tag < tag || (S.tag === tag && S.stunde < stunde)) Y.stunde(S); };
+  const erwachsen = (S, p) => S.tag - S.p.geb[p] >= R.ERWACHSEN * J;
+  const lebtNoch = (S, id, gen) => id >= 0 && S.p.lebt[id] && S.p.gen[id] === gen;
+  // Kopie mit Messpunkt: jede Wahl (Kandidaten, Stimmen, Amtsinhaber vorher)
+  const { Sim: M, ctx: mc } = ladeSimMit([['  const { n, waehler } = bmStimmen(S, K), alt = istBm(S, B.p) ? B.p : -1;\n',
+    '  const { n, waehler } = bmStimmen(S, K), alt = istBm(S, B.p) ? B.p : -1;\n  if (globalThis.__wahl) globalThis.__wahl(S, K, n, waehler, alt);\n']]);
+
+  console.log('1 Statisch');
+  {
+    const code = SIM_CODE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+    const koerper = (f) => { const i = code.search(new RegExp('^function ' + f + '\\(', 'm')); if (i < 0) return null;
+      let t = 0, j = code.indexOf('{', i); for (; j < code.length; j++) { if (code[j] === '{') t++; else if (code[j] === '}' && --t === 0) break; } return code.slice(i, j + 1); };
+    const felder = (k) => [...new Set([...k.matchAll(/\bP\.(\w+)/g)].map(m => m[1]))].sort();
+    const ERLAUBT = { waehlbar: ['besitz', 'bund', 'geb', 'haftBis', 'lebt'], bmKandidaten: [], bmBeste: ['ehrgeiz'], bmStimmen: ['geb', 'lebt', 'partner', 'zuf'], wahlZufall: [],
+      freundeZahl: ['freunde'], sindFreunde: ['freunde'], verpflichtet: ['bund', 'dienstBis'], istBm: [] };
+    const VERBOTEN = ['weib', 'vor', 'nach', 'einzug', 'elternA', 'elternB', 'elternAGen', 'elternBGen', 'elternNameA', 'elternNameB', 'memName', 'memCode', 'heimat'];
+    const zuViel = [];
+    for (const [f, ok] of Object.entries(ERLAUBT)) {
+      const k = koerper(f); if (!k) { zuViel.push(f + ': fehlt'); continue; }
+      for (const x of felder(k)) if (!ok.includes(x)) zuViel.push(`${f}: P.${x}`);
+      if (/\b(name|vorname|nr|namePack|nameAusPack|ref|personInfo|zufall|zInt|zufallSich|zufallAuto)\s*\(/.test(k)) zuViel.push(`${f}: Name oder Zufallsstrom`);
+    }
+    for (const f of ['rentner', 'gebunden', 'anspruch', 'kitaFrei']) { const k = koerper(f) || ''; for (const x of felder(k)) if (VERBOTEN.includes(x)) zuViel.push(`${f}: P.${x}`); }
+    pruef(!zuViel.length, `Wahl: Regeln lesen nur ihre Personenfelder (${Object.keys(ERLAUBT).join(', ')}; dazu rentner, gebunden: nichts aus ${VERBOTEN.join(', ')}); kein Name, kein Zufallsstrom`
+      + (zuViel.length ? ': ' + zuViel.join(', ') : ''));
+    const w = koerper('bmWahl'), weib = w.split('\n').filter(z => /P\.weib/.test(z));
+    pruef(weib.length === 1 && /const wort = P\.weib\[neu\] \? 'zur Bürgermeisterin' : 'zum Bürgermeister';/.test(weib[0]), 'bmWahl liest das Geschlecht nur für das Wort im Stadtbuch (nach der Wahl)');
+    const { Sim: T } = ladeSimMit([['const STRASSEN = [', 'NACHNAMEN.reverse(); VORNAMEN_W.reverse(); VORNAMEN_M.reverse();\nconst STRASSEN = [']]);
+    const A = Sim.neueStadt(3), B = T.neueStadt(3);
+    bis(Sim, A, 500); bis(T, B, 500);
+    const spur = (S) => { const h = createHash('sha256'); for (const n of Object.keys(S.p).sort()) if (ArrayBuffer.isView(S.p[n])) { const a = S.p[n], w = a.length / S.pKap; h.update(n); h.update(Buffer.from(a.buffer, a.byteOffset, S.pMax * w * a.BYTES_PER_ELEMENT)); }
+      const bm = S.buergermeister; h.update(JSON.stringify([bm.p, bm.gen, bm.seit, bm.bis, bm.nr, bm.wahl.kandidaten.map(k => [k.id, k.stimmen]), S.stat.buergermeister, S.budget, S.rs]));
+      h.update(S.buch.map(e => e.art).join()); return h.digest('hex').slice(0, 16); };
+    pruef(Sim.name(A, 0) !== T.name(B, 0) && spur(A) === spur(B), `Namenstausch (Seed 3, 500 Tage, ${A.stat.buergermeister.wahlen} Wahlen): „${Sim.name(A, 0)}“ heißt dort „${T.name(B, 0)}“, Wahlen und Stadt bitgleich (${spur(A)})`);
+  }
+
+  console.log('2 Invarianten nach jeder Nacht');
+  const seeds = arg('seeds', '1,2,3').split(',').map(Number), tage = Number(arg('tage', '730'));
+  for (const seed of seeds) {
+    const S = M.neueStadt(seed), P = S.p, B = S.buergermeister, fehl = {};
+    const f = (k) => { fehl[k] = (fehl[k] || 0) + 1; };
+    let wahlen = [], leerNaechte = 0, amtWechsel = 0, zeilen = S.buch.filter(e => e.art === 'wahl').length, buchNr = S.buchNr;
+    mc.__wahl = (X2, K, n, waehler, alt) => {
+      let erw = 0; for (let p = 0; p < X2.pMax; p++) if (X2.p.lebt[p] && erwachsen(X2, p)) erw++;
+      if (waehler !== erw || n.reduce((a, b) => a + b, 0) !== waehler) f('Stimmen ≠ Wähler');
+      if (K.length > R.BM_KANDIDATEN || new Set(K).size !== K.length) f('Kandidaten');
+      if (!K.every(c => M._bm.waehlbar(X2, c))) f('Kandidat nicht wählbar');
+      if (alt >= 0 && M._bm.waehlbar(X2, alt) && K[0] !== alt) f('Amtsinhaber tritt nicht an');
+      wahlen.push({ tag: X2.tag, K: K.slice(), n: n.slice(), alt });
+    };
+    // Tag 0: vor dem Messpunkt gewählt
+    if (!(B.p >= 0 && B.seit === 0 && B.bis === R.BM_AMTSZEIT && B.nr === 1 && P.arbeit[B.p] === S.rathaus.b && Sim.hauptListe(S)[0].id === B.p && !Sim.inHauptListe(S, B.p) && S.ki.haupt.length === R.HAUPT_START)) f('Tag 0');
+    let vorher = { p: B.p, gen: B.gen, bis: B.bis };
+    for (let d = 1; d <= tage; d++) {
+      bis(M, S, d);
+      const b = S.rathaus.b;
+      if (B.p >= 0) {
+        if (!lebtNoch(S, B.p, B.gen) || P.arbeit[B.p] !== b || !S.belegschaft[b].includes(B.p) || P.haftBis[B.p] || !erwachsen(S, B.p)) f('Amt: lebt, arbeitet im Rathaus, nicht in Haft');
+        if (!Sim.istHaupt(S, B.p) || Sim.hauptListe(S)[0].id !== B.p) f('Hauptfigur auf eigenem Platz');
+        if ((B.bis - B.seit) % R.BM_AMTSZEIT || B.bis - B.seit < R.BM_AMTSZEIT || B.bis <= S.tag) f('Amtszeit');   // seit: erster Amtsantritt, bis: Ende der laufenden Amtszeit
+        if (Sim.stellen(S, b) !== S.rathaus.stellen + 1) f('Stelle des Amts');
+        const erl = Sim.erlaubteAktionen(S, B.p, 7).concat(Sim.erlaubteAktionen(S, B.p, 18));
+        if (erl.some(a => a === 'job_wechseln' || a === 'kuendigen' || a === 'laden_gruenden' || a === 'job_suchen')) f('Gehirn im Amt: wechseln, kündigen, gründen gesperrt');
+      } else { leerNaechte++; if (S.rathaus.b >= 0 && Sim.stellen(S, b) !== S.rathaus.stellen) f('frei: keine Stelle für das Amt'); }
+      if (Sim.hauptZahl(S) > R.HAUPT_MAX || Sim.hauptListe(S).length > R.HAUPT_MAX + 1) f('Grenze der Hauptfiguren');
+      if (Sim.hauptListeZahl(S) !== Sim.hauptListe(S).length) f('hauptListeZahl ≠ Länge von hauptListe');   // Befund Technik: Zahl ohne neue Objekte
+      if (B.p !== vorher.p) amtWechsel++;
+      vorher = { p: B.p, gen: B.gen, bis: B.bis };
+      for (const e of S.buch) if (e.nr > buchNr && e.art === 'wahl') zeilen++;
+      buchNr = S.buchNr;
+    }
+    mc.__wahl = null;
+    const st = S.stat.buergermeister;
+    if (zeilen !== st.wahlen + st.vorzeitig) f(`Stadtbuch: ${zeilen} Zeilen, ${st.wahlen} Wahlen + ${st.vorzeitig} vorzeitig`);
+    if (wahlen.length !== st.wahlen - 1) f('Zahl der Wahlen');
+    for (const w of wahlen) { const m = Math.max(...w.n), s = w.n.indexOf(m); if (s < 0) f('Sieger'); }
+    // Wahltage: alle BM_AMTSZEIT Tage, außer nach einem vorzeitigen Ende (dann in der Nacht danach)
+    const regulaer = wahlen.filter(w => (w.tag + 1) % R.BM_AMTSZEIT === 0).length;
+    pruef(!Object.keys(fehl).length && leerNaechte <= st.vorzeitig,
+      `Seed ${seed}: ${st.wahlen} Wahlen (${regulaer + 1} regulär, ${st.wiederwahlen} Wiederwahlen, ${st.abgewaehlt} abgewählt, ${st.vorzeitig} vorzeitige Enden), ${amtWechsel} Wechsel im Amt,`
+      + ` ${leerNaechte} Nächte ohne Amtsinhaber; zuletzt ${wahlen.length ? `${wahlen[wahlen.length - 1].n.join('/')} Stimmen` : '–'}${Object.keys(fehl).length ? '; FEHLER: ' + JSON.stringify(fehl) : ''}`);
+  }
+
+  console.log('3 Erzwungene Fälle');
+  {
+    // Tod im Amt: Zeile, Neuwahl in der nächsten Nacht, keine Nachfolge-Frage (nicht in Noahs Liste), Stelle fällt weg
+    const S = Sim.neueStadt(2); bis(Sim, S, 30, 10);
+    const B = S.buergermeister, p = B.p, b = S.rathaus.b, frei0 = S.freieStellen, v0 = S.ki.verlust.length;
+    Sim._pruef.sterben(S, p);
+    const zeile = Sim.klartext(S.buch[S.buch.length - 1].text);
+    pruef(B.p === -1 && B.bis === S.tag + 1 && S.freieStellen === frei0 && S.ki.verlust.length === v0 && /ist nicht mehr Bürgermeister/.test(zeile) && /gestorben/.test(zeile),
+      `Tod im Amt: „${zeile.slice(0, 110)}“; keine freie Stelle dazu (${frei0} → ${S.freieStellen}), keine Nachfolge-Frage`);
+    bis(Sim, S, 32);
+    pruef(B.p >= 0 && B.seit === 31 && B.bis === 31 + R.BM_AMTSZEIT && S.p.arbeit[B.p] === b, `Neuwahl in der Nacht danach: Amtsantritt Tag ${B.seit}, bis ${B.bis}`);
+    // Haft im Amt
+    const p2 = B.p; Sim._sich.haftAntritt(S, p2, 5, Sim.HAFT_STRAF);
+    const z2 = Sim.klartext(S.buch[S.buch.length - 1].text);
+    pruef(B.p === -1 && S.p.arbeit[p2] === -1 && /in Haft/.test(z2), `Haft im Amt: Amt endet („${z2.slice(0, 80)}“)`);
+    bis(Sim, S, S.tag + 2);
+    pruef(B.p >= 0 && B.p !== p2, 'Neuwahl nach der Haft; wer in Haft ist, ist nicht wählbar');
+    // Wegzug im Amt (mit dem Haushalt): Amt endet; war er Noahs Hauptfigur, fragt die Stadt nach der Nachfolge
+    const p3 = B.p; Sim.hauptSetzen(S, p3, S.p.gen[p3], true, R.HAUPT_MAX);
+    const inListe = Sim.inHauptListe(S, p3), v1 = S.ki.verlust.length;
+    Sim._pruef.aktWegziehen(S, p3);
+    pruef(inListe && B.p === -1 && S.ki.verlust.length === v1 + 1 && !S.p.lebt[p3], `Wegzug im Amt: Amt endet; als Noahs Hauptfigur kommt die Nachfolge-Frage (${S.ki.verlust.length - v1})`);
+    while (S.ki.verlust.length) Sim.verlustErledigt(S);
+  }
+  {
+    // Eigener Platz: 10 Hauptfiguren und das Amt; das Amt zählt nicht mit; auch Noahs Hauptfigur kann er zusätzlich werden
+    const S = Sim.neueStadt(1); bis(Sim, S, 200);
+    const B = S.buergermeister, erw = [];
+    for (let p = 0; p < S.pMax; p++) if (S.p.lebt[p] && erwachsen(S, p) && p !== B.p && !Sim.inHauptListe(S, p)) erw.push(p);
+    for (const p of erw) if (Sim.hauptZahl(S) < R.HAUPT_MAX) Sim.hauptSetzen(S, p, S.p.gen[p], true, R.HAUPT_MAX);
+    const voll = Sim.hauptZahl(S), liste = Sim.hauptListe(S).length, noch = Sim.hauptSetzen(S, erw[erw.length - 1], S.p.gen[erw[erw.length - 1]], true, R.HAUPT_MAX);
+    // Noah macht das Amt zusätzlich zu seiner Hauptfigur: geht nicht, solange 10 da sind; nach Freimachen eines Platzes schon, und dann belegt es
+    // einen seiner Plätze (Befund Technik der Schlussprüfung: vorher zählte es nicht, und nach dem Amtsende waren es 11 gezählt und 12 in der Leiste)
+    const amtVoll = Sim.hauptSetzen(S, B.p, B.gen, true, R.HAUPT_MAX);
+    const h0 = S.ki.haupt[0]; Sim.hauptSetzen(S, h0.id, h0.gen, false);
+    const ok2 = Sim.hauptSetzen(S, B.p, B.gen, true, R.HAUPT_MAX), z2 = Sim.hauptZahl(S), l2 = Sim.hauptListe(S).length;
+    const weitere = erw.find(p => !Sim.inHauptListe(S, p)), noch2 = Sim.hauptSetzen(S, weitere, S.p.gen[weitere], true, R.HAUPT_MAX);
+    pruef(voll === R.HAUPT_MAX && liste === R.HAUPT_MAX + 1 && !noch && !amtVoll && ok2 && z2 === R.HAUPT_MAX && l2 === R.HAUPT_MAX && !noch2 && Sim.hauptListeZahl(S) === l2,
+      `Eigener Platz: ${voll} Hauptfiguren + Amt = ${liste} in der Leiste, eine elfte geht nicht, das Amt dazu auch nicht; nach Freimachen belegt das Amt als Noahs `
+      + `Hauptfigur einen Platz (${z2} gezählt, ${l2} in der Leiste), danach geht keine weitere`);
+    // Abwahl erzwingen: alle unzufrieden → der Amtsinhaber verliert (Stimmen hängen an der Zufriedenheit)
+    const alt = B.p;
+    for (let p = 0; p < S.pMax; p++) if (S.p.lebt[p]) S.p.zuf[p] = 0;
+    B.bis = S.tag + 1; X.buergermeisterTag(S);
+    const w = B.wahl;
+    pruef(B.p !== alt && S.p.arbeit[alt] === -1 && w.kandidaten[0].id === alt && w.kandidaten[0].amt && Sim.inHauptListe(S, alt) && S.stat.buergermeister.abgewaehlt >= 1
+      && S.p.memCode.some((c, i) => c === Sim.M.AMT_ENDE && ((i / R.MEM) | 0) === alt),
+      `Abwahl bei Unzufriedenheit: ${w.kandidaten.map(k => k.stimmen).join('/')} Stimmen, der alte Amtsinhaber verliert Amt und Stelle, bleibt Noahs Hauptfigur, erinnert sich („Bürgermeisterwahl verloren“)`);
+    // Liste voll, das alte Amt darin, neuer Amtsinhaber auf eigenem Platz: Grenze gehalten (höchstens 10 gezählt, 11 in der Leiste = Plätze der Figuren)
+    const z3 = Sim.hauptZahl(S), l3 = Sim.hauptListe(S).length, neu3 = B.p, frei3 = Sim.hauptSetzen(S, neu3, B.gen, true, R.HAUPT_MAX);
+    pruef(z3 === R.HAUPT_MAX && l3 === R.HAUPT_MAX + 1 && !frei3 && Sim.hauptListeZahl(S) === l3,
+      `Nach dem Amtsende bei voller Liste: ${z3} gezählt (Grenze ${R.HAUPT_MAX}), ${l3} in der Leiste (Plätze der Oberfläche: ${R.HAUPT_MAX + 1}); das neue Amt kann nicht zusätzlich Noahs Hauptfigur werden`);
+    // Wahlgang: Hat der Sieger nicht mehr als die Hälfte der Stimmen, nennt das Stadtbuch den zweiten Wahlgang (§ 44a KomWG Sachsen, vereinfacht)
+    const zw = S.buch.filter(e => e.art === 'wahl').pop(), mehr = 2 * Math.max(...w.kandidaten.map(k => k.stimmen)) > w.waehler;
+    pruef(/im zweiten Wahlgang/.test(zw.text) === !mehr, `Stadtbuch nennt den zweiten Wahlgang genau dann, wenn niemand mehr als die Hälfte hat (${Math.max(...w.kandidaten.map(k => k.stimmen))} von ${w.waehler})`);
+  }
+  {
+    // Wählbar: Alter, Haft, Betrieb, Dienst (erzwungen an einer Person)
+    const S = Sim.neueStadt(4); bis(Sim, S, 120);
+    const P = S.p; let q = -1; for (let p = 0; p < S.pMax; p++) if (P.lebt[p] && erwachsen(S, p) && X.waehlbar(S, p)) { q = p; break; }
+    const g0 = P.geb[q], w0 = X.waehlbar(S, q);
+    P.geb[q] = S.tag - 65 * J; const alt = X.waehlbar(S, q); P.geb[q] = S.tag - 17 * J; const jung = X.waehlbar(S, q); P.geb[q] = g0;
+    P.haftBis[q] = S.tag + 3; const haft = X.waehlbar(S, q); P.haftBis[q] = 0;
+    pruef(w0 && !alt && !jung && !haft, 'Wählbar: 18 bis unter 65, nicht in Haft (erzwungen an einer Person)');
+  }
+
+  console.log('4 Rangfolge der Vorhaben (Schnittstelle zum Haushalt, mit Testvorhaben)');
+  {
+    // Haushalt (Teil 3): Die Liste hat Vorhaben (seit Teil 5 drei: die Computer der Schulen sind Bedarf davor); für diese Prüfungen stehen dort die
+    // drei Testvorhaben, danach wieder die echten
+    const V = Sim.VORHABEN, echt = V.splice(0); V.push({ id: 'a', name: 'Vorhaben A', satz: 'A.' }, { id: 'b', name: 'Vorhaben B', satz: 'B.' }, { id: 'c', name: 'Vorhaben C', satz: 'C.' });
+    try {
+      const S = Sim.neueStadt(2); Sim.kiSchalten(S, true); bis(Sim, S, 9, 7);
+      const B = S.buergermeister;
+      const a0 = B.anfrage; bis(Sim, S, 9, 8);
+      const a = Sim.bmAnfrage(S);
+      pruef(!a0 && a && a.jahr === 1 && a.id === B.p && a.vorhaben.length === 3 && a.von === 10 && a.bis === 19, `Anfrage am letzten Tag des Jahres um 7 Uhr: Jahr ${a && a.jahr}, Tag ${a && a.von}–${a && a.bis}, ${a && a.vorhaben.length} Vorhaben`);
+      const falsch1 = Sim.bmRangfolge(S, a.id, a.gen, a.nr + 1, ['c', 'a', 'b'], 'x');
+      const ok = Sim.bmRangfolge(S, a.id, a.gen, a.nr, ['c', 'a'], 'Ich will zuerst C, dann A.');
+      const tb = S.ki.tagebuch[a.id + '/' + a.gen], e = tb[tb.length - 1];
+      pruef(!falsch1.ok && ok.ok && B.rangfolge.von === 'ki' && B.rangfolge.liste.join() === 'c,a,b' && e.art === 'amt' && e.rangfolge.join() === 'c,a,b' && e.jahr === 1
+        && Sim.vorhabenRangfolge(S, 1).join() === 'c,a,b' && Sim.vorhabenRangfolge(S).join() === 'a,b,c',
+        `gültige Antwort (fehlende hinten): ${B.rangfolge.liste.join(', ')}, Tagebuch „${e.text}“; im Jahr 0 noch die Regel (${Sim.vorhabenRangfolge(S).join(', ')}); falsche Nummer abgelehnt`);
+      bis(Sim, S, 12);
+      pruef(Sim.vorhabenRangfolge(S).join() === 'c,a,b' && S.stat.buergermeister.rangKi === 1, `im Jahr 1 gilt sie (${Sim.vorhabenRangfolge(S).join(', ')})`);
+      // ungültig: unbekanntes Vorhaben, doppelt, leer → Regel
+      bis(Sim, S, 19, 8);
+      const a2 = Sim.bmAnfrage(S), r2 = Sim.bmRangfolge(S, a2.id, a2.gen, a2.nr, ['a', 'a'], 'x');
+      pruef(!r2.ok && B.rangfolge.jahr === 2 && B.rangfolge.von === 'regel' && B.anfrage === null && ['x'].every(() => X.rangfolgeAus(['z']) === null && X.rangfolgeAus([]) === null),
+        'ungültige Antwort (doppelt; auch unbekannt oder leer) → Regel fürs Jahr 2');
+      // Frist: keine Antwort → nach R.KI_FRIST Stunden die Regel
+      bis(Sim, S, 29, 8); const a3 = Sim.bmAnfrage(S); bis(Sim, S, 29, 7 + R.KI_FRIST + 1);
+      pruef(a3 && B.anfrage === null && B.rangfolge.jahr === 3 && B.rangfolge.von === 'regel', `ohne Antwort: nach ${R.KI_FRIST} Spielstunden die Regel`);
+      // KI aus: keine Anfrage, in der letzten Nacht des Jahres die Regel
+      Sim.kiSchalten(S, false); bis(Sim, S, 39, 9);
+      const keine = !S.buergermeister.anfrage; bis(Sim, S, 40);
+      pruef(keine && B.rangfolge.jahr === 4 && B.rangfolge.von === 'regel', 'KI aus: keine Anfrage, die Regel ab der letzten Nacht');
+      // Aufholen (Tagesschritte): keine Anfrage an die KI, in der letzten Nacht die Regel
+      Sim.kiSchalten(S, true); bis(Sim, S, 50); let a5 = false;
+      while (S.tag < 60) { Sim.tagSchritt(S); if (S.buergermeister.anfrage) a5 = true; }
+      pruef(!a5 && B.rangfolge.jahr === 6 && B.rangfolge.von === 'regel', 'Aufholen in Tagesschritten: keine Anfrage an die KI, die Regel fürs Jahr 6');
+      // Speichern und Laden mit offener Anfrage bitgleich
+      bis(Sim, S, 69, 8);
+      const L = ladenAusText(Sim, speichernAlsText(Sim, S)), offen = !!L.buergermeister.anfrage;
+      bis(Sim, S, 75); bis(Sim, L, 75);
+      pruef(offen && fingerabdruck(Sim, S) === fingerabdruck(Sim, L) && JSON.stringify(S.buergermeister) === JSON.stringify(L.buergermeister), 'Speichern und Laden mit offener Anfrage (Tag 69, 8 Uhr): 6 Tage weiter bitgleich');
+    } finally { V.length = 0; }
+    const S0 = Sim.neueStadt(2); Sim.kiSchalten(S0, true); bis(Sim, S0, 12);
+    pruef(!S0.buergermeister.anfrage && S0.buergermeister.rangfolge === null, 'ohne Vorhaben (leere Liste): keine Anfrage, keine Rangfolge');
+    V.push(...echt);
+    const S1 = Sim.neueStadt(2); Sim.kiSchalten(S1, true); bis(Sim, S1, 9, 8);
+    const a1 = Sim.bmAnfrage(S1); bis(Sim, S1, 12);
+    pruef(a1 && a1.vorhaben.map(v => v.id).join() === 'wohnungen,rathaus,parks' && S1.buergermeister.rangfolge && S1.buergermeister.rangfolge.jahr === 1
+      && S1.buergermeister.rangfolge.von === 'regel' && S1.haushalt.plan.rang.join() === S1.buergermeister.rangfolge.liste.join() && !Sim.bmRangfolge(S1, 0, 0, -1, ['computer'], '').ok,
+      `mit den drei Vorhaben des Haushalts (Teil 5: die Computer der Schulen sind Bedarf, nicht in der Rangfolge): Anfrage an Tag 9 um 7 Uhr (${a1 ? a1.vorhaben.map(v => v.name).join(', ') : '–'}); ohne Antwort die Regel, der Plan fürs Jahr 1 folgt ihr`);
+  }
+
+  console.log('5 Speichern, Laden, beschädigte Stände, Übernahme');
+  {
+    const S = Sim.neueStadt(1); bis(Sim, S, 69, 23);                 // kurz vor der Wahl in der Nacht
+    const L = ladenAusText(Sim, speichernAlsText(Sim, S)); bis(Sim, S, 100); bis(Sim, L, 100);
+    pruef(fingerabdruck(Sim, S) === fingerabdruck(Sim, L) && JSON.stringify(S.buergermeister) === JSON.stringify(L.buergermeister), 'Speichern vor der Wahlnacht (Tag 69, 23 Uhr), 31 Tage weiter bitgleich');
+    const text = speichernAlsText(Sim, S), meld = [];
+    const roh = (t) => { const d = JSON.parse(t); d.arrays = d.arrays.map(a => { const u8 = Buffer.from(a.b64, 'base64');
+      return { name: a.name, typ: a.typ, daten: new TYPEN[a.typ](u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength)) }; }); return d; };
+    const faelle = [['Amt fehlt', d => { delete d.json.buergermeister; }], ['Person außerhalb', d => { d.json.buergermeister.p = 999999; }],
+      ['falsche Generation', d => { d.json.buergermeister.gen += 1; }], ['nicht im Rathaus', d => { const a = d.arrays.find(x => x.name === 'p.arbeit').daten; a[d.json.buergermeister.p] = -1; }],
+      ['Wahl ohne Kandidaten-Liste', d => { d.json.buergermeister.wahl.kandidaten = 'x'; }], ['Rangfolge von wem', d => { d.json.buergermeister.rangfolge = { jahr: 1, liste: [], von: 'noah', tag: 1 }; }],
+      ['Anfrage ohne Frist', d => { d.json.buergermeister.anfrage = { nr: 1, id: 0, gen: 1, jahr: 1, tag: 1, stunde: 7, erlaubt: [] }; }],
+      ['Summe fehlt', d => { delete d.json.stat.buergermeister.wahlen; }], ['Summen fehlen', d => { delete d.json.stat.buergermeister; }],
+      ['Tagebuch mit Rangfolge ohne Jahr', d => { const k = Object.keys(d.json.ki.tagebuch)[0] || '0/1'; (d.json.ki.tagebuch[k] = d.json.ki.tagebuch[k] || []).push({ tag: 1, stunde: 7, art: 'amt', text: 'x', rangfolge: ['a'] }); }]];
+    for (const [was, kaputt] of faelle) {
+      const d = roh(text); kaputt(d);
+      let e = null; try { Sim.importZustand(d); } catch (x) { e = x; }
+      meld.push(`${was}: ${e ? e.message : 'ANGENOMMEN'}`);
+      if (!e || !/^Spielstand beschädigt/.test(e.message)) fehler++;
+    }
+    console.log((meld.every(m => /beschädigt/.test(m)) ? '  ok   ' : '  FEHL ') + meld.join('; '));
+  }
+
+  console.log(`6 Messung nach Gruppen (Seeds ${arg('gruppenSeeds') ? arg('gruppenSeeds') : '1–10'}, 730 Tage; nur gemessen, keine Regel liest diese Merkmale)`);
+  {
+    // Anteile je Wahl gemittelt (die Zahl der Wählbaren wächst mit der Stadt; Kinder der Stadt gibt es erst spät): wählbar, Anteil am Losgewicht
+    // (1 + Freundschaften) × (1 + BM_EHRGEIZ × Ehrgeiz / 100) ohne den Amtsinhaber, dann Herausforderer und Gewählte wie gezählt
+    const G = new Map(); const g = (n) => { if (!G.has(n)) G.set(n, { waehlbar: 0, los: 0, kand: 0, sieg: 0, offen: 0, freunde: 0, fn: 0 }); return G.get(n); };
+    const gruppen = (S, p) => { const P = S.p, a = (S.tag - P.geb[p]) / J;
+      return ['alle', P.elternA[p] >= 0 ? 'in der Stadt geboren' : 'zugezogen oder vom Start', P.nach[p] >= 30 && P.nach[p] <= 36 ? 'Nachnamen Kaya bis Kowalski (Liste 31–37)' : 'übrige Nachnamen',
+        P.weib[p] ? 'Frauen' : 'Männer', a < 30 ? 'Alter 18–29' : a < 45 ? 'Alter 30–44' : 'Alter 45–64']; };
+    let wahlen = 0, offeneWahlen = 0;
+    mc.__wahl = (S, K, n, w, alt) => {
+      wahlen++;
+      const zahl = new Map(), los = new Map(); let alleZ = 0, alleL = 0;
+      for (let p = 0; p < S.pMax; p++) if (M._bm.waehlbar(S, p)) { let fz = 0; for (let j = 0; j < 5; j++) if (S.p.freunde[p * 5 + j] >= 0) fz++;
+        const w = p === alt ? 0 : (1 + fz) * (1 + R.BM_EHRGEIZ * S.p.ehrgeiz[p] / 100); alleZ++; alleL += w;
+        for (const x of gruppen(S, p)) { zahl.set(x, (zahl.get(x) || 0) + 1); los.set(x, (los.get(x) || 0) + w); g(x).freunde += fz; g(x).fn++; } }
+      for (const [x, z] of zahl) { g(x).waehlbar += z / alleZ; g(x).los += (los.get(x) || 0) / Math.max(1e-9, alleL); }
+      for (const c of K) if (c !== alt) for (const x of gruppen(S, c)) g(x).kand++;          // Herausforderer (ohne Amtsinhaber)
+      const s = n.indexOf(Math.max(...n)); for (const x of gruppen(S, K[s])) g(x).sieg++;
+      if (!K.includes(alt)) { offeneWahlen++; for (const x of gruppen(S, K[s])) g(x).offen++; }
+    };
+    for (const seed of arg('gruppenSeeds', '1,2,3,4,5,6,7,8,9,10').split(',').map(Number)) { const S = M.neueStadt(seed); bis(M, S, 730); }
+    mc.__wahl = null;
+    const a = G.get('alle');
+    console.log(`       ${wahlen} Wahlen (ohne Tag 0), davon ${offeneWahlen} ohne Amtsinhaber; Anteil an Wählbaren und am Losgewicht (je Wahl gemittelt), an`
+      + ' Herausforderern (ohne Amtsinhaber), Gewählten und Gewählten ohne Amtsinhaber; Freundschaften je Wählbarem:');
+    for (const n of ['alle', 'in der Stadt geboren', 'zugezogen oder vom Start', 'Nachnamen Kaya bis Kowalski (Liste 31–37)', 'übrige Nachnamen', 'Frauen', 'Männer', 'Alter 18–29', 'Alter 30–44', 'Alter 45–64']) {
+      const x = G.get(n); if (!x) continue;
+      const pz = (v, w) => (w ? (100 * v / w).toFixed(1) : '–').padStart(5);
+      console.log(`       ${n.padEnd(44)} wählbar ${pz(x.waehlbar, a.waehlbar)} %  Los ${pz(x.los, a.los)} %  Herausforderer ${pz(x.kand, a.kand)} %  gewählt ${pz(x.sieg, a.sieg)} % (${x.sieg})`
+        + `  ohne Amtsinhaber ${pz(x.offen, a.offen)} % (${x.offen})  Freunde ${(x.freunde / Math.max(1, x.fn)).toFixed(2)}`);
+    }
+  }
+  console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle Prüfungen zum Bürgermeister bestanden');
+  process.exit(fehler ? 1 : 0);
+}
+
+if (flag('schule')) {
+  // Schule (Version 9, Teil 2). A statisch: Regeln lesen nur Alter, Wohnung, Obhut, Schulplatz (Nummer, Generation), keine Namen, keinen
+  // Charakter, keine Eltern, kein Geschlecht; kein Zufall; Budget nur in schuleBezahlen, schulITBestellen und dem Sachaufwand in wirtschaft().
+  // B neue Städte (Seeds 1–3, 730 Tage), nach jeder Nacht: Plätze, Lehrkräfte, Geld, Lebenslauf, Bauamt erst ab einer Klasse, Stadtbuch, Kita,
+  // Wehrdienst, Jugendstrafrecht, Autos, Grundregel (ortZurStunde), Karten. C IT-Ausstattung (Schnittstelle zum Haushalt), erzwungen. D Speichern
+  // und Laden, beschädigte Stände. E Übernahme älterer Stände (Version 8, mit --git 7 bis 2). F Namenstausch. G ausgeschaltet. H Gruppen (nur gemessen)
+  let fehler = 0;
+  const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
+  const R = Sim.R, J = R.JAHR, SCHULE = Sim.SCHULE;
+  const simCode = (h) => h.match(/<script id="sim">([\s\S]*?)<\/script>/)[1];
+  const lade = (code) => { const ctx = vm.createContext({}); vm.runInContext(`Math.random = () => { throw new Error('Math.random'); };`, ctx); vm.runInContext(code, ctx); return ctx.StadtSim; };
+  const roh = (text) => { const d = JSON.parse(text); d.arrays = d.arrays.map(a => { const u8 = Buffer.from(a.b64, 'base64');
+    return { name: a.name, typ: a.typ, daten: new TYPEN[a.typ](u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength)) }; }); return d; };
+  const speichern = (X, S) => speichernAlsText(X, S), laden = (X, text, migrieren) => X.importZustand(roh(text), migrieren);
+  const abdruck = (X, S) => { const h = createHash('sha256'), d = X.exportZustand(S);
+    for (const a of d.arrays.sort((x, y) => (x.name < y.name ? -1 : 1))) { h.update(a.name); h.update(Buffer.from(a.daten.buffer, a.daten.byteOffset, a.daten.byteLength)); }
+    h.update(JSON.stringify(d.werte)); h.update(JSON.stringify(d.json)); return h.digest('hex').slice(0, 16); };
+  const bis = (X, S, tag, stunde = 0) => { while (S.tag < tag || (S.tag === tag && S.stunde < stunde)) X.stunde(S); };
+  const artVon = (a) => (a < R.GRUNDSCHULE_BIS ? Sim.GRUNDSCHULE : Sim.WEITER);   // a: Alter in der Nacht der Vergabe
+  const offenS = (S, b) => S.g.typ[b] === SCHULE && S.feld[S.g.y[b] * S.karte + S.g.x[b]] === SCHULE;
+  const abst = (S, b, c) => Math.abs(S.g.x[b] - S.g.x[c]) + Math.abs(S.g.y[b] - S.g.y[c]);
+
+  console.log('A Statisch (Abschnitt „Schule“ im sim-Block, Bauamt Regel 7, Zweig „Schule“ in wirtschaft, ortZurStunde)');
+  {
+    const code = SIM_CODE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+    const a = SIM_CODE.indexOf('// ─── Schule (Version 9, Teil 2)'), e = SIM_CODE.indexOf('// Ende Schule');
+    const teil = SIM_CODE.slice(a, e).replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+    pruef(a > 0 && e > a && !/\b(zufall|zInt|zufallSich|zufallAuto|wahlZufall)\s*\(/.test(teil), `Abschnitt gefunden (${teil.split('\n').length} Zeilen), kein Zufall`);
+    const koerper = (f) => { const i = code.search(new RegExp('^function ' + f + '\\(', 'm')); if (i < 0) return '';
+      let t = 0, j = code.indexOf('{', i); for (; j < code.length; j++) { if (code[j] === '{') t++; else if (code[j] === '}' && --t === 0) break; } return code.slice(i, j + 1); };
+    const ohneBuch = (k) => { let out = '', i = 0;                 // Zeilen des Stadtbuchs (buch(S, …)) heraus: dort stehen Namen
+      for (;;) { const j = k.indexOf('buch(S,', i); if (j < 0) { out += k.slice(i); break; } out += k.slice(i, j); let t = 0, m = j + 4;
+        for (; m < k.length; m++) { if (k[m] === '(') t++; else if (k[m] === ')' && --t === 0) break; } i = m + 1; } return out; };
+    const ba = koerper('bauamt'), r7a = ba.indexOf('if (sb) for (const art of [GRUNDSCHULE, WEITER])'), r7e = ba.indexOf('Die Notbremse');
+    const zweig = code.slice(code.indexOf('    if (t === SCHULE) {'), code.indexOf('    if (istLand(t)) {'));
+    // Je Regel die Personenfelder, die sie lesen darf (Anzeige ausgenommen: schulKarte, schuleInfo, schulStand lesen nur für Karten)
+    const ERLAUBT = { schulTag: ['geb', 'gen', 'lebt', 'schule'], kindWohnung: ['gen', 'lebt', 'obhut', 'obhutBei', 'obhutGen', 'wohnung'], schulOrt: ['schule'],
+      kindOrt: [], klasseVon: ['geb'], schulStelleFrei: [], schulITSoll: [], schulITBestand: [], itLieferanten: [], schulITBedarf: [], schulITBestellen: [],
+      schuleBezahlen: [], migriereSchule: [], schulStartZeile: [], klasseGroesse: [], kinderJeLehrkraft: [], schulPlaetze: [], schulOffen: [] };
+    const teile = Object.fromEntries(Object.keys(ERLAUBT).map(f => [f, koerper(f)]));
+    teile.regel7 = r7a > 0 ? ba.slice(r7a, r7e) : ''; ERLAUBT.regel7 = [];
+    teile.wirtschaftSchule = zweig; ERLAUBT.wirtschaftSchule = ['frei', 'geld'];   // Lohn an Anwesende (wie jeder Betrieb)
+    const zuViel = [];
+    for (const [f, k0] of Object.entries(teile)) {
+      if (!k0) { zuViel.push(f + ': fehlt'); continue; }
+      const k = ohneBuch(k0);
+      for (const m of k.matchAll(/\b(?:S\.)?P\.(\w+)|\bS\.p\.(\w+)/g)) { const x = m[1] || m[2]; if (!ERLAUBT[f].includes(x)) zuViel.push(`${f}: P.${x}`); }
+      if (/\b(name|vorname|nr|namePack|nameAusPack|ref|personInfo)\s*\(|NACHNAMEN|VORNAMEN|\.weib\b|\.einzug\b|\.eltern|\.ehrgeiz\b|\.heimat\b|\.fleiss\b|\.spar\b|\.gesellig\b|\.mem/.test(k)) zuViel.push(f + ': Name, Charakter, Eltern oder Gedächtnis');
+    }
+    pruef(!zuViel.length, `Regeln lesen nur ihre Personenfelder (${Object.keys(teile).length} Stellen: Alter, Wohnung, Obhut, Schulplatz, Nummer und Generation), keine Namen, keinen Charakter, keine Eltern, kein Geschlecht (Stadtbuch-Zeilen ausgenommen)`
+      + (zuViel.length ? ': ' + [...new Set(zuViel)].join(', ') : ''));
+    const geldTeil = [...teil.matchAll(/S\.budget\s*[-+]?=/g)].length, geldR7 = [...teile.regel7.matchAll(/S\.budget\s*[-+]?=/g)].length, geldZweig = [...zweig.matchAll(/S\.budget\s*[-+]?=/g)].length;
+    // Teil 5: schulITKaufen (wie die Leute aus einem Laden der Stadt): Kauf und der Anteil des Ladens der Stadt, je mit Buchung
+    pruef(geldTeil === 4 && /function schuleBezahlen\(S, k\) \{ S\.budget -= k;/.test(teil) && (teil.match(/S\.budget -= aus\.taler; hhBuch\(S, HK\.COMPUTER, -aus\.taler\);/g) || []).length === 2
+      && /if \(stadtLaden\) \{ S\.budget \+= stadtLaden; hhBuch\(S, HK\.BETRIEBE, stadtLaden\); \}/.test(teil) && geldR7 === 0 && /schuleBezahlen\(S, preis\)/.test(teile.regel7)
+      && geldZweig === 1 && /S\.budget -= sach;/.test(zweig) && !/lohn[^;]*S\.budget|S\.budget[^;]*lohn/.test(zweig),
+      `Budget: im Abschnitt nur schuleBezahlen, schulITBestellen und schulITKaufen (${geldTeil}; der Anteil des Ladens der Stadt kommt zurück), Regel 7 über schuleBezahlen (${geldR7} direkte Stellen), wirtschaft nur der Sachaufwand (${geldZweig}); Löhne der Lehrkräfte vom Land`);
+    const oz = koerper('ortZurStunde');
+    pruef(/if \(P\.schule\[p\] \|\| S\.tag - P\.geb\[p\] < R\.ERWACHSEN \* R\.JAHR\) return kindOrt\(S, p, H\);/.test(oz) && oz.indexOf('kindOrt') > oz.indexOf('haftBis') && oz.indexOf('kindOrt') < oz.indexOf('arbeitet'),
+      'ortZurStunde: Kinder (Alter wie in stunde(), Schulplatz am 18. Geburtstag) über kindOrt, nach der Haft, vor der Arbeit');
+  }
+
+  // Messkopie: Stand direkt vor wirtschaft() (Schüler der letzten Nacht, Löhne der Anwesenden) und vor bauamt() (Kinder ohne Platz)
+  const { Sim: M, ctx: mc } = ladeSimMit([['function wirtschaft(S) {\n', 'function wirtschaft(S) {\n  if (globalThis.__vorW) globalThis.__vorW(S);\n'],
+    ['function bauamt(S, kb, sb) {\n', 'function bauamt(S, kb, sb) {\n  if (globalThis.__vorB) globalThis.__vorB(S, sb);\n'],
+    ['  const sb = R.SCHULEN ? schulTag(S) : null;', '  const sb = R.SCHULEN ? schulTag(S) : null;\n  if (globalThis.__nachS) globalThis.__nachS(S);']]);
+  const seeds = arg('seeds', '1,2,3').split(',').map(Number), tage = Number(arg('tage', '730'));
+  console.log(`B Neue Städte (Seeds ${seeds.join(', ')}, je ${tage} Tage stündlich), Prüfung nach jeder Nacht`);
+  const alleMess = [];
+  for (const seed of seeds) {
+    const S = M.neueStadt(seed), f = {}, F = (k, n = 1) => { f[k] = (f[k] || 0) + n; };
+    let vor = null, fehltVor = null, naechte = 0, karten = 0, jahrZeilen = 0, buchNr = S.buchNr, einOk = 0, abOk = 0, gebautVor = 0, grund = 0, bauZeilen = 0;
+    const erst = { gs: -1, ws: -1 }, stunden = { schule: 0, heim: 0, erw: 0 };
+    mc.__vorW = (X) => { vor = []; for (let b = 0; b < X.gAnzahl; b++) if (X.g.typ[b] === SCHULE && X.feld[X.g.y[b] * X.karte + X.g.x[b]] === SCHULE) {
+      let l = 0; for (const w of X.belegschaft[b]) if (!X.p.frei[w]) l += X.g.lohn[b]; vor.push([b, X.g.bedient[b], l, X.budget]); } };
+    mc.__vorB = (X, sb) => { fehltVor = sb ? [sb.fehlt[1].length, sb.fehlt[2].length] : null; };
+    // Direkt nach schulTag (Plätze gelten ab hier; spätere Schritte der Nacht wie Obhut oder Wegzug ändern Wohnungen, das holt die nächste Nacht nach)
+    mc.__nachS = (X) => {
+      const P = X.p, g = X.g, frei = new Map();
+      for (let b = 0; b < X.gAnzahl; b++) {
+        if (g.typ[b] !== SCHULE || !offenS(X, b)) continue;
+        let n = 0; for (let k = 0; k < X.pMax; k++) if (P.lebt[k] && P.schule[k] === b + 1) n++;
+        if (n !== g.bedient[b]) F('zaehler');
+        if (g.kapaz[b] !== M._schule.schulPlaetze(g.stufe[b]) || n > g.kapaz[b]) F('kapazitaet');
+        if (g.soll[b] !== (n ? Math.ceil(n / M._schule.kinderJeLehrkraft(g.stufe[b]) - 1e-9) : 0)) F('lehrkraefte');
+        frei.set(b, g.kapaz[b] - n);
+      }
+      for (let k = 0; k < X.pMax; k++) {
+        if (!P.lebt[k]) continue;
+        const a = X.tag - P.geb[k], b = P.schule[k] - 1, art = artVon(a), w = M.kindWohnung(X, k);
+        if (b >= 0) {
+          if (a < R.SCHULE_AB || a >= R.SCHULE_BIS) F('alter');
+          if (!offenS(X, b)) F('keineOffeneSchule');
+          if (g.stufe[b] !== art) F('falscheArt');
+          if (w < 0 || abst(X, b, w) > R.REICH_SCHULE[art]) F('reichweite');
+        } else if (a >= R.SCHULE_AB && a < R.SCHULE_BIS && w >= 0) {
+          for (const [s, fr] of frei) if (fr > 0 && g.stufe[s] === art && abst(X, s, w) <= R.REICH_SCHULE[art]) { F('ohnePlatzTrotzFrei'); break; }
+        }
+      }
+    };
+    const altOrt = (X, p, H) => { const P = X.p, w = P.wohnung[p], arb = P.arbeit[p], bes = P.besuch[p], st = P.stammladen[p];   // ortZurStunde ohne Schule (Version 8)
+      if (P.haftBis[p]) return M.imHof(X, p, H) ? X.sicherheit.jva : -1;
+      const arbeitet = arb >= 0 && !P.frei[p];
+      if (arbeitet && H >= 8 && H < 17) return P.einsatz[p] ? P.einsatz[p] - 1 : arb;
+      if (bes >= 0 && bes !== w && H >= 19 && H < 22) return bes;
+      if (!arbeitet && st >= 0 && H === 10) return st;
+      return w; };
+    for (let d = 0; d < tage; d++) {
+      const sach0 = S.stat.schule.sach, lohn0 = S.stat.schule.lohn, P0 = S.p, sechs = [], achtzehn = [];
+      for (let p = 0; p < S.pMax; p++) if (P0.lebt[p]) { const a = S.tag - P0.geb[p]; if (a === R.SCHULE_AB) sechs.push([p, P0.gen[p]]); if (a === R.SCHULE_BIS) achtzehn.push([p, P0.gen[p]]); }
+      // Grundregel (jede Stunde eines Tages im Monat): Schulkinder 8–13 Uhr in ihrer Schule, sonst wo sie wohnen; Erwachsene wie in Version 8
+      const stundlich = d % 30 === 15;
+      while (S.stunde !== 23) {
+        if (stundlich) {
+          const P = S.p, H = S.stunde;
+          for (let p = 0; p < S.pMax; p++) {
+            if (!P.lebt[p]) continue;
+            const a = S.tag - P.geb[p], o = M.ortZurStunde(S, p, H);
+            if (P.schule[p] || a < R.ERWACHSEN * J) {
+              const b = P.schule[p] - 1, soll = b >= 0 && H >= 8 && H < 13 && offenS(S, b) ? b : M.kindWohnung(S, p);
+              if (o !== soll) F('grundregelKind');
+              if (b >= 0 && H >= 8 && H < 13) stunden.schule++; else stunden.heim++;
+              if (P.auto[p] || M.mitAuto(S, p, P.wohnung[p], o)) F('kindImAuto');
+            } else { if (o !== altOrt(S, p, H)) F('grundregelErwachsen'); stunden.erw++; }
+          }
+        }
+        M.stunde(S);
+      }
+      M.stunde(S); naechte++;                                // Mitternacht: Tagesabschluss
+      const P = S.p, g = S.g, st = S.stat.schule;
+      // Geld dieser Nacht: Sachaufwand 2,7 je Schüler der letzten Nacht aus dem Budget (höchstens was da ist), Löhne der Anwesenden vom Land
+      let sachSoll = 0, lohnSoll = 0, knapp = false;
+      for (const [, n, l, bud] of vor || []) { sachSoll += Math.round(R.SACH_JE_SCHUELER * n); lohnSoll += l; if (bud < sachSoll + 1e4) knapp = true; }
+      if (knapp) grund++; else if (st.sach - sach0 !== sachSoll) F('sachaufwand');
+      if (st.lohn - lohn0 !== lohnSoll) F('lohnVomLand');
+      // Plätze, Zähler, Kapazität, Lehrkräfte
+      for (let b = 0; b < S.gAnzahl; b++) {
+        if (g.typ[b] !== SCHULE) continue;
+        const art = g.stufe[b];
+        if (art !== 1 && art !== 2) F('schulart');
+        if (g.besitzer[b] !== -1 || g.leer[b] || g.lohn[b] !== R.LOHN_LEHRKRAFT) F('gebaeude');
+        if (!offenS(S, b)) { if (g.bedient[b] || g.kapaz[b]) F('bauMitPlatz'); continue; }
+        if (art === 1 && erst.gs < 0) erst.gs = S.tag; if (art === 2 && erst.ws < 0) erst.ws = S.tag;
+        for (const w of S.belegschaft[b]) if (P.arbeit[w] !== b || S.tag - P.geb[w] < R.ERWACHSEN * J || P.haftBis[w]) F('belegschaft');
+      }
+      for (let k = 0; k < S.pMax; k++) {
+        if (!P.lebt[k]) continue;
+        const a = S.tag - P.geb[k], b = P.schule[k] - 1;     // a: Alter heute (nach der Nacht); vergeben wurde mit a − 1
+        if (b >= 0) {
+          if (a <= R.SCHULE_AB || a > R.SCHULE_BIS) F('alter');
+          if (!offenS(S, b)) F('keineOffeneSchule');
+          if (P.kita[k]) F('kitaUndSchule');
+          if (P.arbeit[k] >= 0 || P.besitz[k] >= 0 || P.bund[k] || P.haftBis[k] || S.sicherheit.verfahren.some(v => v.id === k && v.gen === P.gen[k])) F('arbeitDienstHaft');
+        }
+        if (a < R.ERWACHSEN * J && (P.auto[k] || P.haftBis[k] || P.bund[k])) F('kindAutoHaftDienst');   // Kinder: kein Auto, keine Haft (Taten nur ab 18), kein Dienst
+      }
+      // Lebenslauf: Einschulung in der Nacht des 6., Abschluss in der Nacht des 18. Geburtstags
+      const hat = (p, code) => { for (let j = 0; j < R.MEM; j++) { const i = p * R.MEM + j; if (P.memCode[i] === code && P.memTag[i] === S.tag - 1) return true; } return false; };
+      for (const [p, gn] of sechs) { if (!P.lebt[p] || P.gen[p] !== gn) continue; if (hat(p, M.M.SCHULE_EIN)) einOk++; else F('einschulung'); }
+      for (const [p, gn] of achtzehn) { if (!P.lebt[p] || P.gen[p] !== gn) continue; if (hat(p, M.M.SCHULE_AB)) abOk++; else F('abschluss'); }
+      // Bauamt Regel 7: gebaut wird nur mit mindestens SCHUL_MIN Kindern ohne Platz in Reichweite des neuen Hauses; je Art eine Baustelle
+      if (st.gebaut > gebautVor) {
+        for (const b of S.baustellen) {
+          if (g.typ[b] !== SCHULE || g.seit[b] !== S.tag - 1) continue;
+          const art = g.stufe[b];
+          let nah = 0;
+          for (let k = 0; k < S.pMax; k++) { if (!P.lebt[k] || P.schule[k]) continue; const a = S.tag - P.geb[k], w = M.kindWohnung(S, k);
+            if (a > R.SCHULE_AB && a <= R.SCHULE_BIS && artVon(a - 1) === art && w >= 0 && abst(S, b, w) <= R.REICH_SCHULE[art]) nah++; }
+          // Haushalt (Teil 3): Schulen baut nur das Bauamt (Noahs Entscheidung: ab einer ganzen Klasse); jede neue Schule hat ihre Zeile im Stadtbuch
+          const ort = M.gebaeudeInfo(S, b).ort, zeile = S.buch.find(e => e.nr > buchNr && e.art === 'bauamt' && /Schule/.test(e.text) && e.text.includes(ort));
+          if (!zeile || /Vorhaben aus dem Haushalt/.test(zeile.text)) F('bauOhneZeile');
+          if (nah < R.SCHUL_MIN[art] || !fehltVor || fehltVor[art - 1] < R.SCHUL_MIN[art]) F('gebautOhneKlasse');
+          if (S.baustellen.filter(x => g.typ[x] === SCHULE && g.stufe[x] === art).length > 1) F('zweiBaustellen');
+        }
+        gebautVor = st.gebaut;
+      }
+      // Stadtbuch: höchstens eine Schulzeile je Schuljahr, am letzten Tag; Bauzeilen nennen eine Zahl ≥ Mindestzahl
+      for (const e of S.buch) if (e.nr > buchNr) {
+        if (e.art === 'schule') { jahrZeilen++; if ((e.tag + 1) % J !== 0) F('zeilenTag'); }
+        if (e.art === 'bauamt' && /Schule/.test(e.text)) { bauZeilen++; const m = /haben (\d+) Kinder keinen Platz/.exec(e.text); if (!m || +m[1] < R.SCHUL_MIN[/Grundschule/.test(e.text) ? 1 : 2]) F('bauZeile'); }
+      }
+      buchNr = S.buchNr;
+      // Computer: Bedarf = Soll − Bestand je offener Schule, Lieferanten = offene Computerfirmen der Stadt
+      if (d % 10 === 0) {
+        const it = M.schulITBedarf(S); let n = 0;
+        for (let b = 0; b < S.gAnzahl; b++) if (offenS(S, b)) n += Math.max(0, Math.ceil(S.belegschaft[b].length * R.IT_JE_LEHRKRAFT + g.bedient[b] * R.IT_JE_SCHUELER[g.stufe[b]] - 1e-9) - M._schule.schulITBestand(S, b));
+        let l = 0; for (let b = 0; b < S.gAnzahl; b++) if (g.typ[b] === M.TECH && g.produkt[b] === M.COMPUTER && !g.werk[b] && g.version[b] > 0 && S.feld[g.y[b] * S.karte + g.x[b]] === M.TECH && !g.leer[b]) l++;
+        if (it.geraete !== n || it.lieferanten !== l || it.taler !== n * R.PREIS[M.COMPUTER]) F('itBedarf');
+      }
+      // Karten ohne Fehler (alle 20 Tage)
+      if (S.tag % 20 === 0) {
+        try {
+          for (let b = 0; b < S.gAnzahl; b++) if (g.typ[b] === SCHULE) { const i = M.gebaeudeInfo(S, b); if (!i.titel || /undefined|NaN/.test(JSON.stringify(i))) F('hauskarte'); karten++; }
+          for (let p = 0; p < S.pMax; p++) if (P.lebt[p] && S.tag - P.geb[p] <= R.SCHULE_BIS) { const i = M.personInfo(S, p); if (/undefined|NaN/.test(i.arbeit + JSON.stringify(i.schule) + JSON.stringify(i.gedaechtnis))) F('personenkarte'); karten++; }
+          if (/NaN|undefined/.test(JSON.stringify(M.regierungInfo(S).schule))) F('fenster');
+        } catch (e) { F('ausnahme: ' + e.message); }
+      }
+    }
+    const s = S.stat.schule, i = M.schuleInfo(S);
+    pruef(!Object.keys(f).length, `Seed ${seed}, ${naechte} Nächte: Plätze direkt nach der Vergabe (Alter, Art, offene Schule, Reichweite, Kapazität, Zähler), ohne Platz nur ohne freien Platz in Reichweite, Lehrkräfte nach Formel, `
+      + `Sachaufwand und Löhne vom Land je Nacht, kein Kind mit Kita und Schule, Stelle, Dienst, Haft, Verfahren oder Auto, Bau nur ab einer Klasse (${bauZeilen} Bauzeilen), `
+      + `Grundregel (${stunden.schule} Schul-, ${stunden.heim} Heim- und ${stunden.erw} Erwachsenenstunden), Computerbedarf`
+      + (grund ? ` (${grund}-mal reichte das Budget nicht ganz, dann zählt der Sachaufwand nicht)` : '') + (Object.keys(f).length ? ': ' + JSON.stringify(f) : ''));
+    pruef(einOk > 0 && abOk > 0 && einOk === s.eingeschult && abOk === s.abschluesse, `Lebenslauf: ${einOk} Einschulungen am 6. und ${abOk} Abschlüsse am 18. Geburtstag (Summen ${s.eingeschult} / ${s.abschluesse})`);
+    pruef(jahrZeilen > 0 && jahrZeilen <= Math.ceil(tage / J) && karten > 0, `Stadtbuch: ${jahrZeilen} Schulzeilen in ${tage} Tagen (je Schuljahr höchstens eine); erste Grundschule offen an Tag ${erst.gs}, `
+      + `erste weiterführende an Tag ${erst.ws}; an Tag ${S.tag} ${i.offen[1]} + ${i.offen[2]} Schulen, ${i.schueler[1]} + ${i.schueler[2]} Schüler, ${i.nachbarort} im Nachbarort, ${i.lehrkraefte} Lehrkräfte (Bedarf ${i.bedarf}); ${karten} Karten ohne Fehler`);
+    alleMess.push({ seed, erst, i, s });
+  }
+  delete mc.__vorW; delete mc.__vorB; delete mc.__nachS;
+
+  console.log('C Computer für die Schulen (Schnittstelle zum Haushalt, erzwungen; seit Teil 5 wie die Leute aus einem Laden der Stadt, sonst von außerhalb)');
+  {
+    // Haushalt (Teil 3): Vorhaben aus, sonst kaufte er die Computer jede Nacht selbst und es bliebe kein Bedarf für die erzwungene Bestellung
+    // (seine Käufe prüft --haushalt)
+    const hhAlt = R.HH_VORHABEN; R.HH_VORHABEN = 0;
+    const S = Sim.neueStadt(1);
+    let t = 300; bis(Sim, S, t, 12);
+    while ((Sim.schulITBedarf(S).geraete < 6 || Sim.schulITBedarf(S).regal < 0) && S.tag < 700) { t += 10; bis(Sim, S, t, 12); }
+    const B0 = Sim.schulITBedarf(S), preis = R.PREIS[Sim.COMPUTER], anteil = Math.round(preis * R.LADEN_ANTEIL), text = speichern(Sim, S), f = B0.regal, g = S.g;
+    const kassen = () => { let k = 0; for (let b = 0; b < S.gAnzahl; b++) if (g.typ[b] === Sim.LADEN) k += g.kasse[b]; return k; };
+    const um0 = g.umsatz[f], bud0 = S.budget, k0 = kassen(), st0 = { ...S.stat.schule };
+    const n0 = Sim.schulITBestellen(S, 0), n1 = Sim.schulITBestellen(S, preis - 1);
+    pruef(B0.geraete >= 6 && f >= 0 && !n0.geraete && !n1.geraete && S.budget === bud0, `Seed 1, Tag ${S.tag}: Bedarf ${B0.geraete} Computer (${B0.taler} Taler), im Regal der neueste von Firma ${f}; für 0 oder weniger als einen Preis wird nichts bestellt`);
+    const r1 = Sim.schulITBestellen(S, 3 * preis + 5), B1 = Sim.schulITBedarf(S), stadt = S.budget - (bud0 - 3 * preis), laeden = kassen() - k0;
+    pruef(r1.geraete === 3 && r1.taler === 3 * preis && !r1.aussen && g.umsatz[f] - um0 === 3 * (preis - anteil) && stadt + laeden === 3 * anteil && stadt >= 0 && laeden >= 0
+      && B1.geraete === B0.geraete - 3 && S.stat.schule.it === st0.it + 3 * preis && S.stat.schule.itGeraete === st0.itGeraete + 3 && S.stat.schule.itAussen === st0.itAussen
+      && r1.firmen.length === 1 && r1.firmen[0][0] === f && r1.firmen[0][1] === 3,
+      `3 Computer für ${r1.taler} Taler im Laden: Budget −${bud0 - S.budget}, Firma +${g.umsatz[f] - um0} (Umsatz), Läden +${laeden}, Laden der Stadt +${stadt} (Anteil ${anteil} je Gerät), Bedarf ${B0.geraete} → ${B1.geraete}, Summen gezählt`);
+    const r2 = Sim.schulITBestellen(S, 1e9), B2 = Sim.schulITBedarf(S), r3 = Sim.schulITBestellen(S, 1e9);
+    pruef(r2.geraete === B1.geraete && B2.geraete === 0 && !r3.geraete, `Rest: ${r2.geraete} Computer, danach Bedarf 0 und keine Bestellung mehr (nie mehr, als die Schulen brauchen)`);
+    const K = laden(Sim, text); budgetSetzen(K, 2.5 * preis);
+    const r4 = Sim.schulITBestellen(K, 1e9);
+    pruef(r4.geraete === 2 && K.budget >= 0.5 * preis && K.budget <= 0.5 * preis + 2 * anteil, `wenig Budget (${2.5 * preis} Taler): ${r4.geraete} Computer, ${K.budget} Taler bleiben (nie unter 0; der Anteil des Ladens der Stadt kommt zurück)`);
+    const K2 = laden(Sim, text); K2.angebot[Sim.COMPUTER] = -1;
+    const b5 = K2.budget, a5 = K2.stat.schule.itAussen, r5 = Sim.schulITBestellen(K2, 3 * preis), um5 = K2.g.umsatz.slice(0, K2.gAnzahl).reduce((x, y) => x + y, 0), um5a = laden(Sim, text).g.umsatz.slice(0, K2.gAnzahl).reduce((x, y) => x + y, 0);
+    pruef(r5.geraete === 3 && r5.aussen === 3 && K2.budget === b5 - 3 * preis && K2.stat.schule.itAussen === a5 + 3 && um5 === um5a && !r5.firmen.length,
+      'ohne Computer einer Firma der Stadt im Regal: von außerhalb (3 Computer, Budget −' + (b5 - K2.budget) + ', kein Umsatz in der Stadt, als „von außerhalb“ gezählt)');
+    const K3 = laden(Sim, text), K4 = laden(Sim, text), r6 = Sim.schulITBestellen(K3, 10 * preis), r7 = Sim.schulITBestellen(K4, 10 * preis);
+    bis(Sim, K3, K3.tag + 1); bis(Sim, K4, K4.tag + 1);
+    pruef(JSON.stringify(r6) === JSON.stringify(r7) && abdruck(Sim, K3) === abdruck(Sim, K4) && K3.g.umsatz[f] === 0, `gleich bestellt, gleich weiter (${abdruck(Sim, K3)}); der Umsatz ist in der Nacht verbucht`);
+    const L2 = laden(Sim, speichern(Sim, S)); bis(Sim, S, S.tag + 10); bis(Sim, L2, L2.tag + 10);
+    pruef(S.schule.it.length > 0 && abdruck(Sim, S) === abdruck(Sim, L2), `gespeichert mit ${S.schule.it.length} Lieferungen: 10 Tage bitgleich`);
+    const tLief = S.tag - 10; bis(Sim, S, tLief + R.IT_ALT + 1);
+    pruef(!S.schule.it.some(([, , t]) => t <= tLief) && Sim.schulITBedarf(S).geraete > 0, `nach ${R.IT_ALT} Tagen ausgemustert: keine Lieferung von Tag ${tLief} mehr, Bedarf wieder ${Sim.schulITBedarf(S).geraete}`);
+    R.HH_VORHABEN = hhAlt;
+  }
+
+  console.log('D Speichern und Laden, beschädigte Stände');
+  {
+    const S = Sim.neueStadt(2);
+    bis(Sim, S, 330, 13);
+    let plaetze = 0; for (let p = 0; p < S.pMax; p++) if (S.p.lebt[p] && S.p.schule[p]) plaetze++;
+    const text = speichern(Sim, S), L = laden(Sim, text), gleich0 = abdruck(Sim, S) === abdruck(Sim, L);
+    bis(Sim, S, 350); bis(Sim, L, 350);
+    pruef(gleich0 && plaetze > 0 && abdruck(Sim, S) === abdruck(Sim, L), `Seed 2, gespeichert an Tag 330 um 13 Uhr mit ${plaetze} Schulplätzen: gleich nach dem Laden, 20 Tage weiter bitgleich (${abdruck(Sim, S)})`);
+    const kaputt = (fn) => { const d = JSON.parse(text); fn(d); try { laden(Sim, JSON.stringify(d)); return 'geladen'; } catch (e) { return e.message; } };
+    const feld = (d, n, T, fn) => { const a = d.arrays.find(x => x.name === n), u8 = Buffer.from(a.b64, 'base64'), u = new T(u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength)); fn(u); a.b64 = Buffer.from(u.buffer).toString('base64'); };
+    const faelle = [
+      ['Schulplatz in einem Wohnhaus', /Schulplatz$/, (d) => { let k = -1; feld(d, 'p.lebt', Uint8Array, (l) => { k = l.findIndex(v => v); }); feld(d, 'p.schule', Uint16Array, (u) => { u[k] = 1; }); }],
+      ['Summe fehlt', /Schul-Statistik$/, (d) => { delete d.json.stat.schule.lohn; }],
+      ['Schuljahr kaputt', /: Schule$/, (d) => { d.json.schule.jahr.ein = 'x'; }],
+      ['Computer an einem Wohnhaus', /Computer der Schulen$/, (d) => { d.json.schule.it.push([0, 3, 100]); }],
+      ['Computer in der Zukunft', /Computer der Schulen$/, (d) => { const b = d.arrays.find(x => x.name === 'g.typ'); const u8 = Buffer.from(b.b64, 'base64'); const s = [...u8].findIndex(v => v === SCHULE); d.json.schule.it.push([s, 3, 99999]); }],
+      ['Schulart 3', /Schulart$/, (d) => { let s = -1; feld(d, 'g.typ', Uint8Array, (u) => { s = u.findIndex(v => v === SCHULE); }); feld(d, 'g.stufe', Uint8Array, (u) => { u[s] = 3; }); }],
+      ['Schule fehlt (Version 9)', /: Schule$/, (d) => { delete d.json.schule; }],
+      ['Schulplätze fehlen (Version 9)', /unvollständig: p\.schule$/, (d) => { d.arrays = d.arrays.filter(a => a.name !== 'p.schule'); }],
+    ];
+    const erg = faelle.map(([n, re, fn]) => [n, kaputt(fn), re]);
+    pruef(erg.every(([, m, re]) => re.test(m)), `${erg.length} beschädigte Stände abgelehnt: ` + erg.map(([n, m]) => `${n}: „${m}“`).join('; '));
+  }
+
+  console.log('E Übernahme älterer Stände (Schulen und Rathaus eingeschaltet)');
+  {
+    const quellen = [['Version 8 (stadt.orig.html)', readFileSync(join(hier, '..', 'stadt.orig.html'), 'utf8'), [[1, 300, 13], [3, 420, 5], [2, 700, 20], [4, 60, 9]]]];
+    if (arg('git')) for (const [c, v] of [['ffa1d88', 7], ['bc7247a', 6], ['414ebab', 5], ['1c8d40b', 4], ['2b821c2', 3], ['39c405b', 2]])
+      quellen.push([`Version ${v} (git ${c})`, execFileSync('git', ['show', c + ':stadt/stadt.html'], { cwd: arg('git'), encoding: 'utf8', maxBuffer: 1 << 26 }), v >= 7 ? [[1, 300, 13], [3, 420, 5]] : [[1, 300, 13]]]);
+    else console.log('  (ohne --git: nur Version 8)');
+    for (const [herkunft, altHtml, staende] of quellen) {
+      const Alt = lade(simCode(altHtml));
+      console.log(` ${herkunft}`);
+      for (const [seed, tag, stunde] of staende) {
+        const A = Alt.neueStadt(seed);
+        bis(Alt, A, tag, stunde);
+        const S = laden(Sim, speichern(Alt, A), true), neu = S.buch.slice(A.buch.length >= R.BUCH_MAX ? 0 : A.buch.length);
+        const iz = S.buch.findIndex(e => e.art === 'schule' && e.tag === tag && /^Ab heute baut die Stadt Schulen/.test(e.text)), ir = S.buch.findIndex(e => e.art === 'rathaus' && e.tag === tag);
+        let kinder = 0; for (let p = 0; p < S.pMax; p++) if (S.p.lebt[p]) { const a = S.tag - S.p.geb[p]; if (a > R.SCHULE_AB && a <= R.SCHULE_BIS) kinder++; }
+        pruef(iz >= 0 && ir > iz && S.buch.filter(e => e.art === 'schule').length === 1 + A.buch.filter(e => e.art === 'schule').length && S.schule.start === tag
+          && Object.values(S.stat.schule).every(v => v === 0) && S.p.schule.every(v => v === 0) && S.schule.gestern === null && S.version === Sim.VERSION,
+          `Seed ${seed}, Tag ${tag} (${A.einwohner} Einw.): Zeile „${Sim.klartext(S.buch[iz] ? S.buch[iz].text : '').slice(0, 44)}…“ vor denen des Rathauses (${neu.length} neue Zeilen), Summen 0, ${kinder} Schulkinder noch ohne Platz`);
+        bis(Sim, S, S.tag + 1);
+        const i1 = Sim.schuleInfo(S);
+        kinder = 0; for (let p = 0; p < S.pMax; p++) if (S.p.lebt[p]) { const a = S.tag - S.p.geb[p]; if (a > R.SCHULE_AB && a <= R.SCHULE_BIS) kinder++; }
+        bis(Sim, S, S.tag + 60);
+        const i = Sim.schuleInfo(S), L = laden(Sim, speichern(Sim, S)), rohT = JSON.stringify([i, Sim.kennzahlen(S)]);
+        bis(Sim, S, S.tag + 5); bis(Sim, L, L.tag + 5);
+        const genug = i1.nachbarort >= R.SCHUL_MIN[1];
+        pruef(i1.nachbarort + i1.aussen === kinder && (!genug || i.offen[1] + i.bau[1] + i.offen[2] + i.bau[2] > 0) && !/NaN/.test(rohT) && abdruck(Sim, L) === abdruck(Sim, S),
+          `erste Nacht ${i1.nachbarort} im Nachbarort; nach 60 Tagen ${i.offen[1]} + ${i.offen[2]} Schulen offen, ${i.bau[1] + i.bau[2]} im Bau, ${i.schueler[1] + i.schueler[2]} Schüler, ${i.nachbarort} im Nachbarort; ohne NaN; gespeichert und geladen gleich`);
+      }
+    }
+  }
+
+  console.log('F Namenstausch');
+  {
+    const { Sim: T } = ladeSimMit([['const STRASSEN = [', 'NACHNAMEN.reverse(); VORNAMEN_W.reverse(); VORNAMEN_M.reverse();\nconst STRASSEN = [']]);
+    const A = Sim.neueStadt(1), B = T.neueStadt(1);
+    bis(Sim, A, 400); bis(T, B, 400);
+    const h = (X, S) => { const x = createHash('sha256');
+      for (const a of X.exportZustand(S).arrays.sort((p, q) => (p.name < q.name ? -1 : 1))) { x.update(a.name); x.update(Buffer.from(a.daten.buffer, a.daten.byteOffset, a.daten.byteLength)); }
+      x.update(JSON.stringify(S.stat)); x.update(JSON.stringify(S.schule)); x.update(String(S.budget) + '/' + S.rs); x.update(S.buch.map(e => e.art).join()); return x.digest('hex').slice(0, 16); };
+    pruef(Sim.name(A, 3) !== T.name(B, 3) && h(Sim, A) === h(T, B) && A.stat.schule.eingeschult > 0,
+      `„${Sim.name(A, 3)}“ heißt dort „${T.name(B, 3)}“; 400 Tage gleich (Felder, Summen, Zufall, Budget, Arten der Zeilen, ${h(Sim, A)}), ${A.stat.schule.eingeschult} Einschulungen`);
+  }
+
+  console.log('G Ausgeschaltet');
+  {
+    const alt = R.SCHULEN; R.SCHULEN = 0;
+    const S = Sim.neueStadt(2); bis(Sim, S, 400);
+    let kind = 0, falsch = 0; for (let p = 0; p < S.pMax; p++) if (S.p.lebt[p] && S.tag - S.p.geb[p] < R.ERWACHSEN * J) { kind++; for (const H of [9, 10, 20]) if (Sim.ortZurStunde(S, p, H) !== Sim.kindWohnung(S, p)) falsch++; }
+    pruef(!Sim.schuleInfo(S).offen[1] && !S.stat.schule.gebaut && S.p.schule.every(v => v === 0) && !S.buch.some(e => e.art === 'schule') && !falsch && kind > 0,
+      `R.SCHULEN = 0 (Seed 2, 400 Tage): keine Schule, kein Schulplatz, keine Zeile; ${kind} Kinder immer dort, wo sie wohnen`);
+    R.SCHULEN = alt;
+    // Mit Schulen und Rathaus aus: Tag für Tag wie Version 8 (wie --rathaus H), hier nur Seed 3 und 200 Tage
+    const V8 = lade(simCode(readFileSync(join(hier, '..', 'stadt.orig.html'), 'utf8')));
+    const altR = R.RATHAUS, altH = [R.HH_VORHABEN, R.HH_STEUER]; R.RATHAUS = 0; R.SCHULEN = 0; R.HH_VORHABEN = 0; R.HH_STEUER = 0;   // Haushalt: nur Buchführung
+    const altA = R.ANLAUF_STUFE; R.ANLAUF_STUFE = 0;         // Wachstum (Teil 4): ohne Anlauf
+    const altT = [R.TECH_FRUEH, R.WELT, R.ZUZUG_GENAU]; R.TECH_FRUEH = 0; R.WELT = 0; R.ZUZUG_GENAU = 0;   // Teil 5: ohne Tech früher und Weltmarkt; Zuzug wie vorher (Schlussprüfung)
+    const A = V8.neueStadt(3), B = Sim.neueStadt(3); let erster = -1;
+    const spur = (X, S) => { const k = X.kennzahlen(S); return JSON.stringify([k.einwohner, k.budget, k.freieStellen, k.zufriedenheit, S.rs, S.buchNr, S.buch.slice(-3).map(e => e.text)]); };
+    for (let d = 1; d <= 200 && erster < 0; d++) { bis(V8, A, d); bis(Sim, B, d); if (spur(V8, A) !== spur(Sim, B)) erster = d; }
+    R.RATHAUS = altR; R.SCHULEN = alt; [R.HH_VORHABEN, R.HH_STEUER] = altH; R.ANLAUF_STUFE = altA; [R.TECH_FRUEH, R.WELT, R.ZUZUG_GENAU] = altT;
+    pruef(erster < 0, `R.SCHULEN = 0 und R.RATHAUS = 0, Haushalt nur Buchführung, ohne Anlauf, ohne Tech früher und Weltmarkt (Seed 3): 200 Tage jeden Tag wie Version 8${erster < 0 ? '' : ', VERSCHIEDEN ab Tag ' + erster}`);
+  }
+
+  console.log('H Gruppen (nur gemessen; keine Regel liest diese Merkmale): Schülertage in der Stadt und im Nachbarort');
+  {
+    const gr = {}, add = (n, platz) => { const x = gr[n] || (gr[n] = { platz: 0, nb: 0 }); if (platz) x.platz++; else x.nb++; };
+    for (const seed of seeds.slice(0, 3)) {
+      const S = Sim.neueStadt(seed);
+      for (let d = 0; d < 730; d++) {
+        bis(Sim, S, S.tag + 1);
+        if (d % 5) continue;
+        const P = S.p;
+        for (let k = 0; k < S.pMax; k++) {
+          if (!P.lebt[k]) continue;
+          const a = S.tag - P.geb[k];
+          if (a <= R.SCHULE_AB || a > R.SCHULE_BIS || Sim.kindWohnung(S, k) < 0) continue;
+          const platz = P.schule[k] > 0;
+          add('alle', platz); add(P.weib[k] ? 'Mädchen' : 'Jungen', platz); add(P.nach[k] >= 30 && P.nach[k] <= 36 ? 'Nachnamen Kaya bis Kowalski (Liste 31–37)' : 'übrige Nachnamen', platz);
+        }
+      }
+    }
+    for (const [n, x] of Object.entries(gr)) console.log(`  ${n.padEnd(44)} ${String(x.platz + x.nb).padStart(7)} Schülertage, im Nachbarort ${(100 * x.nb / Math.max(1, x.platz + x.nb)).toFixed(1).padStart(5)} %`);
+  }
+  console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle Prüfungen zur Schule bestanden');
+  process.exit(fehler ? 1 : 0);
+}
+
+if (flag('haushalt')) {
+  // Haushalt (Version 9, Teil 3). A statisch: der Abschnitt liest keine Personen, keinen Zufall, keine Namen; jede Änderung des Budgets im sim-Block
+  // bucht auf ein Konto; die Lohnsteuer rechnet mit dem Satz des Haushalts. B neue Städte (Seeds 1–3, 730 Tage stündlich): jede Stunde Summe der
+  // Buchungen = Änderung des Budgets; jede Nacht Konten von gestern, Vorhaben (Bedarf, Rücklage, Bauhof, je Vorhaben höchstens eins, Vorrat), am
+  // Jahresende Plan und Lohnsteuer unabhängig nachgerechnet, Jahreszeilen, Stadtbuch. C Rangfolge: Bürgermeister (KI) und Vorrang in der Nacht
+  // (erzwungen). D Lohnsteuer erzwungen (senken, anheben, Grenzen). E Speichern und Laden (mitten am Tag, in der letzten Nacht des Jahres).
+  // F Übernahme älterer Stände (Version 8, mit --git 7 bis 2), beschädigte Stände. G ausgeschaltet. H Namenstausch
+  let fehler = 0;
+  const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
+  const R = Sim.R, HK = Sim.HK, J = R.JAHR;
+  const simCode = (h) => h.match(/<script id="sim">([\s\S]*?)<\/script>/)[1];
+  const lade = (code) => { const ctx = vm.createContext({}); vm.runInContext(`Math.random = () => { throw new Error('Math.random'); };`, ctx); vm.runInContext(code, ctx); return ctx.StadtSim; };
+  const roh = (text) => { const d = JSON.parse(text); d.arrays = d.arrays.map(a => { const u8 = Buffer.from(a.b64, 'base64');
+    return { name: a.name, typ: a.typ, daten: new TYPEN[a.typ](u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength)) }; }); return d; };
+  const speichern = (X, S) => speichernAlsText(X, S), laden = (X, text, migrieren) => X.importZustand(roh(text), migrieren);
+  const abdruck = (X, S) => { const h = createHash('sha256'), d = X.exportZustand(S);
+    for (const a of d.arrays.sort((x, y) => (x.name < y.name ? -1 : 1))) { h.update(a.name); h.update(Buffer.from(a.daten.buffer, a.daten.byteOffset, a.daten.byteLength)); }
+    h.update(JSON.stringify(d.werte)); h.update(JSON.stringify(d.json)); return h.digest('hex').slice(0, 16); };
+  const bis = (X, S, tag, stunde = 0) => { while (S.tag < tag || (S.tag === tag && S.stunde < stunde)) X.stunde(S); };
+  const kontenSumme = (h) => { let s = 0; for (let k = 0; k < Sim.HK_ZAHL; k++) s += h.summe[k] + h.ist[k]; return s; };
+  const summe = (a, ks) => ks.reduce((x, k) => x + a[k], 0);
+
+  console.log('A Statisch (Abschnitt „Haushalt“, alle Änderungen des Budgets, Lohnsteuer)');
+  {
+    const code = SIM_CODE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+    const a = SIM_CODE.indexOf('// ─── Haushalt (Version 9, Teil 3)'), e = SIM_CODE.indexOf('// Ende Haushalt');
+    const teil = SIM_CODE.slice(a, e).replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+    pruef(a > 0 && e > a && !/\b(zufall|zInt|zufallSich|zufallAuto|wahlZufall)\s*\(/.test(teil), `Abschnitt gefunden (${teil.split('\n').length} Zeilen), kein Zufall`);
+    const felder = [...teil.matchAll(/\b(?:P|S\.p)\.(\w+)/g)].map(m => m[1]);
+    pruef(!felder.length && !/\b(name|vorname|nr|namePack|ref|personInfo)\s*\(|NACHNAMEN|VORNAMEN|\.weib\b|\.einzug\b|\.eltern|\.geb\b/.test(teil),
+      `liest keine Personen (keine Personenfelder: ${felder.join(', ') || 'keine'}), keine Namen, kein Geschlecht, kein Alter, keinen Einzugstag, keine Eltern`);
+    // Jede Änderung des Budgets im sim-Block steht mit ihrer Buchung in derselben Zeile; Ausnahme: Betriebe der Stadt (Math.max, gebucht in den Zeilen danach)
+    const zeilen = code.split('\n'), stellen = [], ohne = [];
+    zeilen.forEach((z, i) => { if (/S\.budget\s*[-+]?=[^=]/.test(z)) { stellen.push(i); if (!/hhBuch\(S, [^;]*HK\.[A-Z_]+[^;]*\);/.test(z)) ohne.push(i); } });
+    const max = ohne.length === 1 && /S\.budget = Math\.max\(0, S\.budget \+ einnahmen - fix\);/.test(zeilen[ohne[0]])
+      && /if \(einnahmen\) hhBuch\(S, HK\.BETRIEBE, einnahmen\);/.test(zeilen.slice(ohne[0], ohne[0] + 6).join('\n'))
+      && /hhBuch\(S, t === KITA \? HK\.KITAS : t === RATHAUS \? HK\.RATHAUS : HK\.FIX, S\.budget - vor - einnahmen\);/.test(zeilen.slice(ohne[0], ohne[0] + 6).join('\n'));
+    pruef(stellen.length >= 25 && max, `${stellen.length} Stellen ändern das Budget, jede bucht in derselben Zeile; die eine Ausnahme (Betriebe der Stadt, Math.max) bucht Verkauf und laufende Kosten gleich danach`);
+    const ls = (() => { const i = code.search(/^function lohnsteuer\(/m); return code.slice(i, code.indexOf('\n}\n', i)); })();
+    pruef(/q = steuerSatz\(S\)/.test(ls) && /const t = Math\.round\(q \* Math\.max\(0, E\[k\] - R\.FREIBETRAG \* K - X\[k\]\) \* brutto\[w\] \/ E\[k\]\);/.test(ls)
+      && (ls.match(/R\.STEUER/g) || []).length === 2 && /if \(q < R\.STEUER\) h\.erlassen\[0\] \+=/.test(ls)
+      && /function steuerSatz\(S\) \{ return S\.haushalt\.satz \/ 100; \}/.test(teil), 'Lohnsteuer mit dem Satz des Haushalts (steuerSatz: ein Satz für alle, keine Person); R.STEUER nur noch für „was die Senkung lässt“');
+    const schritt = (() => { const i = code.search(/^function hhSchritt\(/m); return code.slice(i, code.indexOf('\n}\n', i)); })();
+    // Schulen baut nur das Bauamt (Regel 7, ab einer ganzen Klasse: Noahs Entscheidung vom 28.09.); kein Vorhaben baut eine Schule
+    // Teil 5 (Befund der Gegenprüfung „tech“): Computer der Schulen sind Bedarf vor den Vorhaben (hhComputer), nicht in der Rangfolge
+    const vh = (() => { const i = code.search(/^function hhVorhaben\(/m); return code.slice(i, code.indexOf('\n}\n', i)); })();
+    pruef(['wohnungen', 'rathaus', 'parks'].every(id => schritt.includes(`id === '${id}'`)) && Sim.VORHABEN.map(v => v.id).join() === 'wohnungen,rathaus,parks'
+      && vh.indexOf('hhComputer(S, frei, p)') > 0 && vh.indexOf('hhComputer(S, frei, p)') < vh.indexOf('p.rang.length')
+      && !/neuesGebaeude\(S, SCHULE|schuleBezahlen|SCHUL_MIN|kitaUmbau/.test(teil),
+      `drei Vorhaben, jedes mit eigenem Schritt: ${Sim.VORHABEN.map(v => v.name).join(', ')}; die Computer der Schulen davor als Bedarf (hhComputer, nicht in der Rangfolge); keins baut Schulen (das Bauamt ab einer ganzen Klasse)`);
+  }
+
+  // Messkopie: jeder Schritt eines Vorhabens (Budget vorher, Bauhof, Lücke), jede Nacht am Ende, jeder Jahresabschluss (Satz vorher, Änderung, Plan)
+  const { Sim: M, ctx: mc } = ladeSimMit([
+    ['    const id = p.rang[i], r = hhSchritt(S, id, sb, frei, i + 1, p);\n',
+      '    const __b0 = S.budget, __bf = hhBauhofFrei(S), __l = hhWohnungLuecke(S), __n = S.gAnzahl, __it = S.stat.schule.itGeraete;\n    const id = p.rang[i], r = hhSchritt(S, id, sb, frei, i + 1, p);\n'
+      + '    if (globalThis.__schritt) globalThis.__schritt(S, id, r, __b0, __bf, __l, frei, p.ruecklage, sb, __n, __it);\n'],
+    ['    const r = hhComputer(S, frei, p);\n',
+      '    const __b0 = S.budget, __bf = hhBauhofFrei(S), __l = hhWohnungLuecke(S), __n = S.gAnzahl, __it = S.stat.schule.itGeraete, __be = S.haushalt.ist[HK.BETRIEBE];\n    const r = hhComputer(S, frei, p);\n'
+      + '    if (globalThis.__schritt) globalThis.__schritt(S, \'computer\', r, __b0, __bf, __l, frei, p.ruecklage, sb, __n, __it, S.haushalt.ist[HK.BETRIEBE] - __be);\n'],
+    ['function hhNacht(S, sb) {\n', 'function hhNacht(S, sb) {\n  if (globalThis.__nacht) globalThis.__nacht(S, sb);\n'],
+    ['  const alt = h.satz, d = hhSteuer(S), q = h.plan;\n', '  const __vj = h.vorjahr.slice(), __b = S.budget;\n  const alt = h.satz, d = hhSteuer(S), q = h.plan;\n  if (globalThis.__jahr) globalThis.__jahr(S, alt, d, q, __vj, __b, j);\n'],
+    ['function rathausAusbauen(S, b, ziel, zusatz) {\n', 'function rathausAusbauen(S, b, ziel, zusatz) {\n  if (globalThis.__ausbau) globalThis.__ausbau(S, zusatz);\n'],
+  ]);
+  const seeds = arg('seeds', '1,2,3').split(',').map(Number), tage = Number(arg('tage', '730'));
+  console.log(`B Neue Städte (Seeds ${seeds.join(', ')}, je ${tage} Tage stündlich)`);
+  const MX = M.R;
+  for (const seed of seeds) {
+    const S = M.neueStadt(seed), F = {}, f = (k, text) => { if (!F[k]) F[k] = text || true; };
+    const zahl = { stunden: 0, naechte: 0, jahre: 0, schritte: 0, gestartet: 0, gesenkt: 0, angehoben: 0, gehalten: 0, bauamtAusbau: 0, ausbau: 0, zeilen: 0 };
+    const jeNacht = new Map(); let budgetNacht = S.budget, kasseJahr = S.budget, erste0 = -1, satzTag = [];
+    mc.__schritt = (X, id, r, b0, bf, l, frei, rl, sb, n0, it0, laden = 0) => {
+      zahl.schritte++;
+      // Teil 5: Kaufen die Schulen im Laden der Stadt, bekommt die Stadt dessen Anteil zurück (Konto „Bauhof und Laden der Stadt: Verkauf“)
+      if (Math.abs(b0 - X.budget - (r.aus - laden)) > 1e-6 || laden < 0 || (id !== 'computer' && laden)) f('aus', `Tag ${X.tag}: ${id} gab ${b0 - X.budget} aus, gemeldet ${r.aus} (Laden der Stadt ${laden})`);
+      if (r.aus > 0) {
+        zahl.gestartet++;
+        const k = id; jeNacht.set(k, (jeNacht.get(k) || 0) + 1);
+        if (jeNacht.get(k) > 1) f('eins', `Tag ${X.tag}: ${id} zweimal in einer Nacht`);
+        if (X.budget - laden < rl - 1e-6) f('ruecklage', `Tag ${X.tag}: ${id} unter die Rücklage (${Math.round(X.budget)} < ${rl})`);
+        if (r.aus > frei + 1e-6) f('frei', `Tag ${X.tag}: ${id} gab ${r.aus} aus, frei waren ${frei}`);
+        if (id !== 'computer' && !bf) f('bauhof', `Tag ${X.tag}: ${id} ohne freien Bauhof`);
+        if (id === 'wohnungen' && l <= 0) f('luecke', `Tag ${X.tag}: Wohnungen ohne Lücke`);
+        if (id === 'computer' && X.stat.schule.itGeraete - it0 !== r.aus / R.PREIS[Sim.COMPUTER]) f('it', `Tag ${X.tag}: Computer ${r.aus} Taler, ${X.stat.schule.itGeraete - it0} Geräte`);
+        if (X.gAnzahl > n0 && X.g.typ[X.gAnzahl - 1] === Sim.SCHULE) f('schule', `Tag ${X.tag}: ${id} baut eine Schule`);   // Schulen baut nur das Bauamt
+      }
+      if (r.halten > 0) zahl.gehalten++;
+    };
+    mc.__ausbau = (X, zusatz) => { zahl.ausbau++; if (!/Vorhaben aus dem Haushalt/.test(zusatz)) zahl.bauamtAusbau++; };
+    mc.__jahr = (X, alt, d, q, vj, b, j) => {
+      zahl.jahre++;
+      // Plan unabhängig nachgerechnet: Rücklage aus den laufenden Kosten des Vorjahres, Rahmen, Schätzungen in der Rangfolge, nicht verplant
+      const pflicht = Math.max(0, Math.round(-summe(vj, Sim.HK_PFLICHT))), rl = Math.max(R.START_BUDGET, pflicht) + 2 * R.K_HAUS + R.K_SCHULE[2];
+      const rahmen = Math.max(0, Math.floor(b) - rl), sch = Object.values(q.schaetzung).reduce((x, y) => x + y, 0);
+      if (q.ruecklage !== rl || q.pflicht !== pflicht || q.rahmen !== rahmen || sch + q.unverplant !== rahmen || q.jahr !== j + 1) f('plan', `Jahr ${j + 1}: Rücklage ${q.ruecklage}/${rl}, Rahmen ${q.rahmen}/${rahmen}, Schätzung ${sch} + ${q.unverplant}`);
+      if (q.rang.join() !== M.vorhabenRangfolge(X, j + 1).join()) f('rang', `Jahr ${j + 1}: Rangfolge ${q.rang.join()}`);
+      // Lohnsteuer: senken, wenn nicht verplant ≥ Lohnsteuer des Jahres (und Kasse ≥ Rücklage), anheben bei Kasse < Rücklage, sonst gleich
+      const L = vj[HK.STEUER], soll = b < q.ruecklage ? (alt < 10 ? 1 : 0) : (alt > 0 && q.unverplant > 0 && q.unverplant >= L ? -1 : 0);
+      if (d !== soll || X.haushalt.satz !== alt + d) f('steuer', `Jahr ${j + 1}: Satz ${alt} → ${X.haushalt.satz} (${d}), erwartet ${soll}`);
+      if (d < 0) zahl.gesenkt++; if (d > 0) zahl.angehoben++;
+    };
+    mc.__nacht = (X) => { jeNacht.clear(); };
+    let buchNr = S.buchNr, stunde0 = S.budget;
+    for (let d = 1; d <= tage; d++) {
+      while (S.tag < d) {
+        M.stunde(S); zahl.stunden++;
+        const h = S.haushalt;
+        if (Math.abs(kontenSumme(h) - (S.budget - h.kasseStart)) > 1e-6) f('konten', `Tag ${S.tag} ${S.stunde} Uhr: Konten ${kontenSumme(h)} statt ${S.budget - h.kasseStart}`);
+      }
+      zahl.naechte++;
+      const h = S.haushalt;
+      const gs = h.gestern.reduce((x, y) => x + y, 0);
+      if (Math.abs(gs - (S.budget - budgetNacht)) > 1e-6) f('gestern', `Tag ${S.tag}: gestern ${gs}, Budget ${S.budget - budgetNacht}`);
+      budgetNacht = S.budget;
+      if (h.satz < 0 || h.satz > 10 || !Number.isInteger(h.satz)) f('satz', `Satz ${h.satz}`);
+      if (erste0 < 0 && h.satz === 0) erste0 = S.tag;
+      if (S.tag % J === 0) {                                  // nach dem Jahresabschluss: Zeile der Jahre = Änderung der Kasse
+        const r = h.jahre[h.jahre.length - 1];
+        if (!r || r[0] !== S.tag / J - 1 || Math.abs(r[1] - r[2] - (S.budget - kasseJahr)) > 1e-6 || r[4] !== Math.floor(S.budget)) f('jahre', `Jahr ${S.tag / J - 1}: ${JSON.stringify(r)}`);
+        if (h.jahre.length > R.HH_JAHRE) f('jahre10', `${h.jahre.length} Jahre`);
+        kasseJahr = S.budget; satzTag.push(h.satz);
+      }
+      if (M.haushaltKurz(S).saldo !== gs || !M.haushaltKurz(S).fenster) f('kurz', `Tag ${S.tag}: haushaltKurz`);
+      // fest: nicht an Zuzug oder Größe gekoppelt (Teil 3: 6; seit Teil 4, Wachstum: 0)
+      if (M._hh.hhVorrat(S) !== R.HH_VORRAT || R.HH_VORRAT !== 0) f('vorrat', `Vorrat ${M._hh.hhVorrat(S)} bei ${S.einwohner}`);
+      for (const e of S.buch) if (e.nr > buchNr && e.art === 'haushalt') { zahl.zeilen++; if (/\u0001/.test(e.text)) f('name', 'Name in einer Zeile zum Haushalt'); }
+      buchNr = S.buchNr;
+    }
+    const h = S.haushalt, fe = Object.entries(F);
+    pruef(!fe.length && zahl.jahre === Math.floor(tage / J) && zahl.zeilen === zahl.jahre && zahl.bauamtAusbau === 0,
+      `Seed ${seed}: ${zahl.stunden} Stunden Konten = Budget, ${zahl.naechte} Nächte (gestern, Vorhaben, Vorrat, Kurzfassung), ${zahl.jahre} Jahresabschlüsse mit Plan und Lohnsteuer nachgerechnet, ${zahl.zeilen} Jahreszeilen ohne Namen`
+      + (fe.length ? ': ' + fe.map(([k, v]) => `${k}: ${v}`).join('; ') : ''));
+    pruef(zahl.gestartet > 10 && h.satz <= 10 && erste0 > 0 && zahl.ausbau === 3,
+      `Seed ${seed}: ${zahl.schritte} Schritte, ${zahl.gestartet} Vorhaben gestartet (nie zwei gleiche in einer Nacht, nie unter die Rücklage, Bau nur mit freiem Bauhof), ${zahl.gehalten}-mal Geld für ein höheres Vorhaben festgehalten;`
+      + ` Rathaus ${zahl.ausbau}-mal ausgebaut, alle als Vorhaben; Lohnsteuer ${zahl.gesenkt}-mal gesenkt, ${zahl.angehoben}-mal angehoben, 0 % ab Tag ${erste0}, an Tag ${S.tag} ${h.satz} %;`
+      + ` seit dem Start ${Object.entries(h.seit).map(([k, v]) => `${k} ${v}`).join(', ')} Taler; den Leuten gelassen ${Math.round(h.erlassen[0] + h.erlassen[2])} Taler`);
+  }
+  mc.__schritt = mc.__ausbau = mc.__jahr = mc.__nacht = null;
+
+  console.log('C Rangfolge: Bürgermeister (KI) und Vorrang in der Nacht (erzwungen)');
+  {
+    const S = Sim.neueStadt(2); Sim.kiSchalten(S, true); bis(Sim, S, 9, 8);
+    const a = Sim.bmAnfrage(S), liste = ['parks', 'rathaus', 'wohnungen'];
+    const r = a && Sim.bmRangfolge(S, a.id, a.gen, a.nr, liste, 'Zuerst die Parks, dann das Rathaus.');
+    bis(Sim, S, 10);
+    const zl = S.buch.filter(e => e.art === 'haushalt').pop();
+    pruef(a && r.ok && a.vorhaben.length === 3 && S.haushalt.plan.rang.join() === liste.join() && S.haushalt.plan.von === 'ki' && zl && /Bürgermeisteramt festgelegt/.test(zl.text),
+      `Anfrage am letzten Tag des Jahres 0 mit ${a ? a.vorhaben.length : 0} Vorhaben; Antwort gilt fürs Jahr 1: ${S.haushalt.plan.rang.join(', ')} (${S.haushalt.plan.von}); Jahreszeile nennt das Bürgermeisteramt`);
+    // Vorrang (erzwungen): Stand mit freiem Bauhof, Computerfirmen und Schulen ohne Bedarf an Computern; das Rathaus wird eine Stufe zurückgesetzt
+    // (Bedarf beim Rathaus). Das Geld über der Rücklage reicht genau für den Ausbau: Rathaus vorn → Ausbau; Wohnungen vorn mit Bedarf (60 Anfragen)
+    // → ein Wohnhaus, das Rathaus hält den Rest fest. Teil 5: Die Computer der Schulen sind Bedarf vor allen Vorhaben (Lieferungen gestrichen):
+    // Sie kommen zuerst, egal wie die Rangfolge ist, und halten fest, was ihnen fehlt
+    const T = Sim.neueStadt(1);
+    let gefunden = false;
+    while (T.tag < 600 && !gefunden) { bis(Sim, T, T.tag + 1, 1); gefunden = Sim._hh.hhBauhofFrei(T) && T.schule.it.length > 0 && Sim.schulITBedarf(T).lieferanten > 0 && Sim.schulITBedarf(T).geraete === 0 && T.g.stufe[T.rathaus.b] >= 2 && !T.g.auf[T.rathaus.b]; }
+    const probe = (rang, frei, vorher) => { const X = laden(Sim, speichern(Sim, T)), p = X.haushalt.plan;
+      if (vorher) vorher(X);
+      p.rang = rang; budgetSetzen(X, p.ruecklage + frei);   // Kasse auf die Probe gesetzt (Konten nachgezogen)
+      const vor = Object.assign({}, p.verbraucht); Sim._hh.hhVorhaben(X, null);
+      return Object.fromEntries(Object.keys(p.verbraucht).map(k => [k, p.verbraucht[k] - (vor[k] || 0)])); };
+    const rathausBedarf = (X) => { X.g.stufe[X.rathaus.b]--; X.anfragen += 60; };
+    const ziel = T.g.stufe[T.rathaus.b], kr = R.K_RATHAUS[ziel], eins = R.PREIS[Sim.COMPUTER];
+    const x1 = probe(['rathaus', 'wohnungen', 'parks'], kr, rathausBedarf), x2 = probe(['wohnungen', 'rathaus', 'parks'], kr, rathausBedarf);
+    pruef(gefunden && x1.rathaus === kr && !x1.wohnungen && !x1.computer && x2.wohnungen > 0 && !x2.rathaus,
+      `Seed 1, Tag ${T.tag}, ${kr} Taler über der Rücklage, Rathaus eine Stufe zurück, 60 Anfragen: Rathaus vorn → Ausbau ${x1.rathaus || 0}, Wohnungen ${x1.wohnungen || 0}; Wohnungen vorn → Wohnungen ${x2.wohnungen || 0}, Rathaus ${x2.rathaus || 0} (hält fest)`);
+    const bedarf = (X) => { X.schule.it = []; X.g.stufe[X.rathaus.b]--; };
+    const x3 = probe(['rathaus', 'wohnungen', 'parks'], kr, bedarf), x4 = probe(['wohnungen', 'parks', 'rathaus'], eins, (X) => { X.schule.it = []; X.anfragen += 60; });
+    pruef(x3.computer > 0 && x3.computer <= kr && !x3.rathaus && x4.computer === eins && !x4.wohnungen,
+      `Computer gestrichen (Bedarf vor den Vorhaben): mit Rathaus vorn → Computer ${x3.computer || 0}, Rathaus ${x3.rathaus || 0} (hält fest); ${eins} Taler und 60 Anfragen, Wohnungen vorn → Computer ${x4.computer || 0}, Wohnungen ${x4.wohnungen || 0}`);
+    const U = laden(Sim, speichern(Sim, T)); budgetSetzen(U, U.haushalt.plan.ruecklage - 1);
+    const vorU = Object.values(U.haushalt.plan.verbraucht).reduce((a, b) => a + b, 0); Sim._hh.hhVorhaben(U, null);
+    pruef(Object.values(U.haushalt.plan.verbraucht).reduce((a, b) => a + b, 0) === vorU, 'Kasse unter der Rücklage: kein Vorhaben');
+  }
+
+  console.log('D Lohnsteuer erzwungen (Jahresabschluss mit gesetzter Kasse)');
+  {
+    const T = Sim.neueStadt(3); bis(Sim, T, 199, 23);
+    const probe = (satz, kasse) => { const X = laden(Sim, speichern(Sim, T)); X.haushalt.satz = satz; budgetSetzen(X, kasse); bis(Sim, X, 200); return X; };
+    const rl = T.haushalt.plan.ruecklage;
+    const a = probe(5, 10), b = probe(10, 10), c = probe(5, 5e6), d0 = probe(0, 5e6), e = probe(10, 5e6);
+    pruef(a.haushalt.satz === 6 && b.haushalt.satz === 10 && c.haushalt.satz === 4 && d0.haushalt.satz === 0 && e.haushalt.satz === 9,
+      `Tag 199 → 200 (Rücklage etwa ${rl}): Kasse 10 Taler: 5 → ${a.haushalt.satz} %, 10 → ${b.haushalt.satz} % (nicht über 10); 5 Mio.: 5 → ${c.haushalt.satz} %, 0 → ${d0.haushalt.satz} % (nicht unter 0), 10 → ${e.haushalt.satz} %`);
+    // Die Steuer eines Lohns folgt dem Satz (ein Satz für alle): 100 Taler Lohn allein, Freibetrag 29 → 71 × Satz
+    const X = laden(Sim, speichern(Sim, T)), P = X.p;
+    let w = -1; for (let p = 0; p < X.pMax; p++) if (P.lebt[p] && P.arbeit[p] >= 0 && P.besitz[p] < 0 && X.tag - P.geb[p] >= 180 && X.tag - P.geb[p] < 600) { w = p; break; }
+    const br = new Float64Array(X.pMax); br[w] = 100; const vor = P.geld[w], hh = X.haushalt.erlassen[0];
+    X.haushalt.satz = 4; Sim._auto.kennzahlenRechnen(X);
+    const K = Math.max(1, Sim.betreuer ? 1 : 1);
+    const ls = ladeSimMit([['G.StadtSim = {', 'G.StadtSim = { __lohnsteuer: lohnsteuer, __koepfe: koepfe,']]).Sim;
+    const Y = ls.importZustand(roh(speichern(Sim, X))); Y.haushalt.satz = 4;
+    const g0 = Y.p.geld[w], k = ls.__koepfe(Y, w), br2 = new Float64Array(Y.pMax); br2[w] = 100;
+    ls.__lohnsteuer(Y, br2);
+    const t = g0 - Y.p.geld[w], soll = Math.round(0.04 * Math.max(0, 100 - 29 * k)), voll = Math.round(0.1 * Math.max(0, 100 - 29 * k));
+    pruef(Y.p.hh[w] !== w || t === soll, `Lohnsteuer bei 4 %: ${t} Taler auf 100 Taler Lohn (${k} Köpfe, erwartet ${soll}); den Leuten gelassen ${Y.haushalt.erlassen[0] - hh} (erwartet ${voll - soll})`);
+    void vor; void K;
+  }
+
+  console.log('E Speichern und Laden (mitten am Tag, in der letzten Nacht des Jahres)');
+  for (const [seed, tag, st] of [[1, 155, 13], [2, 159, 23], [3, 309, 23]]) {
+    const S = Sim.neueStadt(seed); bis(Sim, S, tag, st);
+    const L = ladenAusText(Sim, speichernAlsText(Sim, S));
+    bis(Sim, S, tag + 60); bis(Sim, L, tag + 60);
+    pruef(abdruck(Sim, S) === abdruck(Sim, L) && JSON.stringify(S.haushalt) === JSON.stringify(L.haushalt), `Seed ${seed}, Tag ${tag} ${st} Uhr: 60 Tage weiter bitgleich (Satz ${S.haushalt.satz} %)`);
+  }
+  {
+    const S = Sim.neueStadt(1); bis(Sim, S, 100); const A = Sim.neueStadt(1); bis(Sim, A, 50); while (A.tag < 100) Sim.tagSchritt(A);
+    pruef(Math.abs(kontenSumme(A.haushalt) - (A.budget - A.haushalt.kasseStart)) < 1e-6 && A.haushalt.jahre.length === 10,
+      `Aufholen (Tag 50–100 in Tagesschritten): Konten = Budget, ${A.haushalt.jahre.length} Jahre, Satz ${A.haushalt.satz} % (stündlich ${S.haushalt.satz} %)`);
+  }
+
+  console.log('F Übernahme älterer Stände, beschädigte Stände');
+  {
+    const quellen = [['Version 8 (stadt.orig.html)', readFileSync(join(hier, '..', 'stadt.orig.html'), 'utf8')]];
+    if (arg('git')) for (const [c, v] of [['ffa1d88', 7], ['bc7247a', 6], ['414ebab', 5], ['1c8d40b', 4], ['2b821c2', 3], ['39c405b', 2]])
+      quellen.push([`Version ${v} (git ${c})`, execFileSync('git', ['show', c + ':stadt/stadt.html'], { cwd: arg('git'), encoding: 'utf8', maxBuffer: 1 << 26 })]);
+    else console.log('  (ohne --git: nur Version 8)');
+    for (const [herkunft, html] of quellen) {
+      const Alt = lade(simCode(html));
+      const A = Alt.neueStadt(4); while (A.tag < 150 || A.stunde < 13) Alt.stunde(A);
+      const text = speichernAlsText(Alt, A);
+      let S = null, grund = '';
+      try { S = laden(Sim, text, true); } catch (e) { grund = e.message; }
+      const h = S && S.haushalt, z = S ? S.buch.filter(e => e.art === 'haushalt') : [];
+      // die Zeile des Haushalts steht vor denen von Schule und Rathaus (deren Zeilen bleiben die letzten der Übernahme; der Bau des Rathauses kann
+      // noch eine Zeile zu Karte oder Stadtteil schreiben)
+      const idx = S ? S.buch.findIndex(e => e.art === 'haushalt') : -1, danach = S ? S.buch.slice(idx + 1).map(e => e.art) : [];
+      let ok = !!h && h.start === 150 && h.satz === 10 && z.length === 1 && /Ab heute führt die Stadt einen Haushalt/.test(z[0].text) && danach[0] === 'schule' && danach.includes('rathaus')
+        && S.buch.slice(idx).every(e => e.tag === 150);
+      if (S) { bis(Sim, S, 190); ok = ok && Math.abs(kontenSumme(S.haushalt) - (S.budget - S.haushalt.kasseStart)) < 1e-6 && S.haushalt.jahre.length === 4; }
+      let gleich = false;
+      if (S) { const L = ladenAusText(Sim, speichernAlsText(Sim, S)); bis(Sim, S, 200); bis(Sim, L, 200); gleich = abdruck(Sim, S) === abdruck(Sim, L); }
+      pruef(ok && gleich, `${herkunft}, Seed 4, Tag 150: Haushalt ab Tag 150, Zeile vor denen von Schule und Rathaus, 40 Tage Konten = Budget, ${S ? S.haushalt.jahre.length : 0} Jahre, danach gespeichert und geladen gleich${grund ? ' – ' + grund : ''}`);
+    }
+    const S = Sim.neueStadt(2); bis(Sim, S, 120, 5);
+    const text = speichernAlsText(Sim, S), meld = [];
+    const faelle = [['Haushalt fehlt', d => { delete d.json.haushalt; }], ['Satz über 10', d => { d.json.haushalt.satz = 11; }], ['Satz keine Zahl', d => { d.json.haushalt.satz = 'x'; }],
+      ['Konten zu kurz', d => { d.json.haushalt.ist.pop(); }], ['Konto NaN', d => { d.json.haushalt.summe[3] = null; }], ['Konten passen nicht zum Budget', d => { d.werte.budget += 1000; }],
+      ['Plan fürs falsche Jahr', d => { d.json.haushalt.plan.jahr += 1; }], ['Plan ohne Rangfolge', d => { d.json.haushalt.plan.rang = 'x'; }],
+      ['Plan von wem', d => { d.json.haushalt.plan.von = 'noah'; }], ['Jahre zu viele', d => { d.json.haushalt.jahre = new Array(11).fill([1, 1, 1, 1, 1, 1]); }],
+      ['Jahr kaputt', d => { d.json.haushalt.jahre = [[1, 2]]; }], ['erlassen negativ', d => { d.json.haushalt.erlassen = [-1, 0, 0]; }],
+      ['Start in der Zukunft', d => { d.json.haushalt.start = 999; }], ['gestern kaputt', d => { d.json.haushalt.gestern = [1]; }]];
+    for (const [was, kaputt] of faelle) {
+      const d = roh(text); kaputt(d);
+      try { Sim.importZustand(d); meld.push(was + ': angenommen'); } catch (e) { if (!/beschädigt|unvollständig/.test(e.message)) meld.push(was + ': ' + e.message); }
+    }
+    pruef(!meld.length, `${faelle.length} beschädigte Stände abgelehnt` + (meld.length ? ': ' + meld.join('; ') : ''));
+  }
+
+  console.log('G Ausgeschaltet (nur Buchführung)');
+  {
+    const alt = [R.HH_VORHABEN, R.HH_STEUER]; R.HH_VORHABEN = 0; R.HH_STEUER = 0;
+    const S = Sim.neueStadt(2); bis(Sim, S, 400);
+    const h = S.haushalt, aus = Object.values(h.seit).reduce((a, b) => a + b, 0), ra = S.buch.filter(e => e.art === 'rathaus' && /baut ihr Rathaus .* aus/.test(e.text));
+    pruef(h.satz === 10 && !aus && !S.buch.some(e => e.art === 'haushalt') && Math.abs(kontenSumme(h) - (S.budget - h.kasseStart)) < 1e-6 && S.g.stufe[S.rathaus.b] === S.erweiterung.stufe + 1 && ra.every(e => !/Haushalt/.test(e.text)),
+      `R.HH_VORHABEN = 0, R.HH_STEUER = 0 (Seed 2, 400 Tage): Satz 10 %, keine Vorhaben, keine Zeile, Konten = Budget; das Rathaus baut nach RA6 aus (Stufe ${S.g.stufe[S.rathaus.b]})`);
+    [R.HH_VORHABEN, R.HH_STEUER] = alt;
+  }
+
+  console.log('H Namenstausch (der Haushalt liest keine Namen)');
+  {
+    const { Sim: T } = ladeSimMit([['const STRASSEN = [', 'NACHNAMEN.reverse(); VORNAMEN_W.reverse(); VORNAMEN_M.reverse();\nconst STRASSEN = [']]);
+    const A = Sim.neueStadt(3), B = T.neueStadt(3); bis(Sim, A, 300); bis(T, B, 300);
+    const ohneText = (S) => JSON.stringify([S.haushalt.ist, S.haushalt.summe, S.haushalt.satz, S.haushalt.seit, S.haushalt.plan.rang, S.budget, S.einwohner]);
+    pruef(ohneText(A) === ohneText(B), `Seed 3, 300 Tage: mit umgedrehten Namenslisten gleiche Konten, gleicher Satz (${A.haushalt.satz} %), gleiche Vorhaben`);
+  }
+  console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle Prüfungen zum Haushalt bestanden');
+  process.exit(fehler ? 1 : 0);
+}
+
+if (flag('wachstum')) {
+  // Wachstum, Tempo und KI (Version 9, Teil 4). A statisch (Abschnitt „Wachstum“ und die Zählung in zuzug() würfeln nicht und lesen keine Person).
+  // B Ohne Anlauf (R.ANLAUF_STUFE = 0) und mit ausgeschalteten Bausteinen von Version 9 Tag für Tag wie Version 8 (stadt.orig.html); mit --alt <datei>
+  // (Fassung vor Teil 4) ohne Anlauf, sonst alles an, Tag für Tag wie diese. C Anlauf je Nacht (Seeds 1–3, 400 Tage): jeder Zuzug mit Stelle
+  // nach der Regel (Laden und Bauhof nur im Dorf, nie Kita, Schule nur mit SCHUL_ZUZUG), höchstens die Grenze des Tages, Zählung der Stellen,
+  // Anfragen fürs Bauamt mit der Grundzahl ohne Anlauf; dasselbe mit SCHUL_ZUZUG = 0. D Schalter: setzen, Stadtbuch, ungültige Werte, Speichern
+  // und Laden bitgleich, Übernahme älterer Stände, beschädigte Stände, „schnell“ wirkt. E KI-Frist: Klemmen, Verlängern, späte Antwort, Rangfolge
+  // bis 23 Uhr. F Kapazität der Warteschlange bei 10 Hauptfiguren und Bürgermeister je Tempo und Antwortzeit (nur gemessen)
+  let fehler = 0;
+  const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
+  const R = Sim.R, J = R.JAHR, X = Sim._wachstum;
+  const simCode = (h) => h.match(/<script id="sim">([\s\S]*?)<\/script>/)[1];
+  const lade = (code) => { const ctx = vm.createContext({}); vm.runInContext(`Math.random = () => { throw new Error('Math.random'); };`, ctx); vm.runInContext(code, ctx); return ctx.StadtSim; };
+  const roh = (text) => { const d = JSON.parse(text); d.arrays = d.arrays.map(a => { const u8 = Buffer.from(a.b64, 'base64');
+    return { name: a.name, typ: a.typ, daten: new TYPEN[a.typ](u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength)) }; }); return d; };
+  const bis = (Y, S, tag, stunde = 0) => { while (S.tag < tag || (S.tag === tag && S.stunde < stunde)) Y.stunde(S); };
+
+  console.log('A Statisch');
+  {
+    const ohneKomm = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+    const a = SIM_CODE.indexOf('// ─── Wachstum (Version 9, Teil 4)'), e = SIM_CODE.indexOf('// Ende Wachstum');
+    const teil = ohneKomm(SIM_CODE.slice(a, e));
+    const zuf = teil.match(/\b(zufall|zInt|zufallSich|zufallAuto|wahlZufall)\s*\(/g) || [], pers = teil.match(/\bS\.p\b|\bP\.|\b(name|vorname|nr|personInfo|bmWort)\s*\(/g) || [];
+    pruef(a > 0 && e > a && !zuf.length && !pers.length, `Abschnitt „Wachstum“: würfelt nicht (${zuf.length}), liest keine Person (${pers.length})`);
+    const z0 = SIM_CODE.indexOf('function zuzug(S)'), z1 = SIM_CODE.indexOf('  const neu = [];', z0);
+    const zaehl = ohneKomm(SIM_CODE.slice(z0, z1));
+    const zp = zaehl.match(/\bS\.p\b|\bP\.|\b(name|vorname|nr|personInfo)\s*\(/g) || [], zz = zaehl.match(/\bzufall\s*\(/g) || [];
+    pruef(z0 > 0 && z1 > z0 && !zp.length && zz.length === 1 && /wachstumJetzt\(S\)/.test(zaehl) && /basis0/.test(zaehl),
+      `zuzug(), Zählung bis zur Suche: liest keine Person (${zp.length}), ein Zufallszug wie vorher (${zz.length}), Anlauf über wachstumJetzt, Anfragen mit der Grundzahl ohne Anlauf`);
+    // Die Oberfläche setzt die Frist nur über kiSchalten; die Simulation kennt kein Tempo
+    pruef(!/\btempo\b/.test(ohneKomm(SIM_CODE)), 'die Simulation kennt kein Tempo (nur die Frist in Spielstunden über kiSchalten)');
+    // Die Karte R10 im Fenster „Stadtregierung“ nennt die Zahlen fest (REGIERUNG ist reiner Text): Sie müssen zu R passen
+    const a0 = html.indexOf('const REGIERUNG = '), b0 = html.indexOf('// Ende REGIERUNG');
+    const REG = new Function(html.slice(a0, b0).replace('const REGIERUNG = ', 'return ').replace(/;\s*$/, ''))();
+    let r10 = null; for (const [, regeln] of REG.gruppen) for (const r of regeln) if (/^Zuzug nur für eine freie Stelle/.test(r.titel)) r10 = r;
+    const P = R.ANLAUF_PLUS.slice(0, R.ANLAUF_STUFE), gleich = P.every(x => x === P[0]);
+    const soll = [`höchstens 1 + ${Math.round(R.ZUZUG_MAX * 100)} % der Einwohner am Tag`, `Bis die Stadt ${R.STUFE_AB[R.ANLAUF_STUFE]} Einwohner hat, dürfen am Tag bis zu ${P[0]} mehr kommen`];
+    pruef(!!r10 && gleich && soll.every(t => r10.stadt.includes(t)) && r10.hinweis.includes(`(bis zu 1 + ${Math.round(R.SCHNELL_ZUZUG_MAX * 100)} % am Tag)`)
+      && r10.hinweis.includes('keine Maßnahme der Stadtregierung') && r10.live === 'wachstum',
+      `Karte R10: Zahlen im Text passen zu R (1 + ${R.ZUZUG_MAX * 100} %, Anlauf bis ${R.STUFE_AB[R.ANLAUF_STUFE]} Einwohner +${P[0]}, schnell 1 + ${R.SCHNELL_ZUZUG_MAX * 100} %), Schalter keine Maßnahme der Stadtregierung, Live-Zeile`);
+  }
+
+  console.log('B Ohne Anlauf wie vorher');
+  {
+    const V8 = lade(simCode(readFileSync(join(hier, '..', 'stadt.orig.html'), 'utf8')));
+    const spur = (S) => { const x = createHash('sha256');
+      for (const n of Object.keys(S.p).sort()) if (ArrayBuffer.isView(S.p[n]) && n !== 'schule') { const a = S.p[n], w = a.length / S.pKap; x.update(n); x.update(Buffer.from(a.buffer, a.byteOffset, S.pMax * w * a.BYTES_PER_ELEMENT)); }
+      for (const n of Object.keys(S.g).sort()) { if (n === 'markt' || n === 'kraft') continue; const a = S.g[n]; x.update(n); x.update(Buffer.from(a.buffer, a.byteOffset, S.gAnzahl * a.BYTES_PER_ELEMENT)); }   // Teil 5: neue Felder
+      x.update(Buffer.from(S.feld.buffer)); const st = { ...S.stat, tech: techAlt(S.stat.tech) }; delete st.rathaus; delete st.buergermeister; delete st.schule; delete st.aufgegeben;
+      x.update(JSON.stringify([S.budget, S.rs, S.rsSich, S.rsAuto, S.tag, S.einwohner, st, kiAlt(S.ki), S.regierung, S.sicherheit, S.bund, S.erweiterung])); x.update(JSON.stringify(S.buch));
+      return x.digest('hex').slice(0, 16); };
+    const alt = AUS.slice(7).map(k => R[k]);                   // Rathaus, Schulen, Vorhaben, Lohnsteuer des Haushalts, Anlauf, Tech früher und Weltmarkt (Teil 5)
+    R.RATHAUS = 0; R.SCHULEN = 0; R.HH_VORHABEN = 0; R.HH_STEUER = 0; R.ANLAUF_STUFE = 0; R.TECH_FRUEH = 0; R.WELT = 0; R.ZUZUG_GENAU = 0;
+    for (const seed of [1, 2, 3]) {
+      const A = V8.neueStadt(seed), B = Sim.neueStadt(seed); let erster = -1;
+      for (let d = 1; d <= 200 && erster < 0; d++) { bis(V8, A, d); bis(Sim, B, d); if (spur(A) !== spur(B)) erster = d; }
+      pruef(erster < 0, `Seed ${seed}, ohne Anlauf und ohne die Bausteine von Version 9: 200 Tage ${erster < 0 ? 'jeden Tag wie Version 8' : 'VERSCHIEDEN ab Tag ' + erster} (${B.einwohner} Einwohner)`);
+    }
+    AUS.slice(7).forEach((k, i) => { R[k] = alt[i]; });
+    if (arg('alt')) {                                         // die Fassung vor Teil 4 (alles an): ohne Anlauf und mit ihrem Vorrat (6) Tag für Tag gleich
+      const V = lade(simCode(readFileSync(arg('alt'), 'utf8')));
+      // Teil 5: ohne die neuen Felder (Markt, Kraft, freie Tech-Stellen, Weltmarkt, neue Summen) und ohne Plan und Rangfolge (die Liste der Vorhaben ist
+      // kürzer, die Computer der Schulen sind Bedarf davor); die Zeilen der Vorhaben nennen ihren Rang, der hier fehlt. Die ersten 200 Tage kaufen die
+      // Schulen noch keine Computer (die erste Schule öffnet ohne Anlauf später), sonst liefe die Stadt ab dort anders
+      const f = (Y, S) => { const d = Y.exportZustand(S), h = createHash('sha256');
+        for (const a of d.arrays.sort((x, y) => (x.name < y.name ? -1 : 1))) { if (a.name === 'g.markt' || a.name === 'g.kraft') continue; h.update(a.name); h.update(Buffer.from(a.daten.buffer, a.daten.byteOffset, a.daten.byteLength)); }
+        const w = { ...d.werte }; delete w.wachstum; delete w.techFrei; delete w.weltPlaetze; delete w.weltPreis; h.update(JSON.stringify(w));
+        const hh = d.json.haushalt, bm = d.json.buergermeister, st = d.json.stat;
+        const j = { ...d.json, ki: kiAlt(d.json.ki), haushalt: hh ? { ...hh, plan: undefined, vorjahrPlan: undefined, seit: undefined } : hh, buergermeister: bm ? { ...bm, rangfolge: undefined, anfrage: undefined } : bm,
+          buch: d.json.buch.map(e => ({ ...e, text: textAlt(e.text.replace(/Vorhaben aus dem Haushalt \(\d\. /, 'Vorhaben aus dem Haushalt (')) })),
+          stat: { ...st, aufgegeben: undefined, tech: techAlt(st.tech), schule: st.schule ? { ...st.schule, itAussen: undefined } : st.schule } };
+        h.update(JSON.stringify(j)); return h.digest('hex').slice(0, 16); };
+      const merk = [R.ANLAUF_STUFE, R.HH_VORRAT, R.TECH_FRUEH, R.WELT, R.ZUZUG_GENAU]; R.ANLAUF_STUFE = 0; R.HH_VORRAT = V.R.HH_VORRAT; R.TECH_FRUEH = 0; R.WELT = 0; R.ZUZUG_GENAU = 0;   // Teil 3: Vorrat 6 (seit Teil 4: 0, W8)
+      for (const seed of [1, 2, 3]) {
+        const A = V.neueStadt(seed), B = Sim.neueStadt(seed); let erster = -1;
+        for (let d = 1; d <= 200 && erster < 0; d++) { bis(V, A, d); bis(Sim, B, d); if (f(V, A) !== f(Sim, B)) erster = d; }
+        pruef(erster < 0 && !B.stat.schule.itGeraete, `Seed ${seed}, ohne Anlauf und mit Vorrat ${R.HH_VORRAT}, ohne Tech früher und Weltmarkt (Teil 5), sonst alles an: 200 Tage ${erster < 0 ? 'jeden Tag wie ' + arg('alt') : 'VERSCHIEDEN ab Tag ' + erster} (${B.einwohner} Einwohner, noch keine Computer der Schulen)`);
+      }
+      [R.ANLAUF_STUFE, R.HH_VORRAT, R.TECH_FRUEH, R.WELT, R.ZUZUG_GENAU] = merk;
+    } else console.log('  (ohne --alt: kein Vergleich mit der Fassung vor Teil 4)');
+  }
+
+  console.log('C Anlauf je Nacht (Seeds 1–3, 400 Tage)');
+  {
+    const { Sim: W, ctx } = ladeSimMit([
+      ['    anstellen(S, p, stelle); erinnere(S, p, M.JOB, stelle);',
+        '    anstellen(S, p, stelle); erinnere(S, p, M.JOB, stelle);\n    globalThis.__zu.push([stelle, g.typ[stelle], stelle === S.bauhof ? 1 : 0, w.dorf ? 1 : 0, w.anlauf ? 1 : 0, w.grenze, S.erweiterung.stufe, S.p.arbeit[p], w.basis]);'],
+      ['  S.anfragen = Math.max(0, Math.round((fs / (fs + 3)) * zf * basis0) - n);',
+        '  S.anfragen = Math.max(0, Math.round((fs / (fs + 3)) * zf * basis0) - n);\n  globalThis.__zaehl(S, { fs, zf, basis0, basis, n, fw, dorf: w.dorf, bh, laden, stadtEigen });'],
+    ]);
+    for (const schulZuzug of [R.SCHUL_ZUZUG, 0]) {
+      const merk = W.R.SCHUL_ZUZUG; W.R.SCHUL_ZUZUG = schulZuzug;
+      let n = 0, anlaufN = 0, dorfN = 0, danach = 0, falsch = 0, ueber = 0, zaehlFalsch = 0, anfrFalsch = 0, tage = 0, dorfTage = 0, schulStellen = 0, fsUeber = 0;
+      const beispiele = [];
+      ctx.__zaehl = (S, z) => {
+        tage++; if (z.dorf) dorfTage++;
+        if (z.n > z.fs) fsUeber++;                             // R10 genau (Befund Technik der Schlussprüfung): nie mehr als freie Stellen ohne Arbeitsuchende der Stadt
+        // Stellen unabhängig gezählt: frei in Kitas und (ohne Zuzug) Schulen locken nie, im Dorf locken Laden und Bauhof
+        const g = S.g; let kita = 0, laden = 0;
+        for (let b = 0; b < S.gAnzahl; b++) {
+          const t = g.typ[b];
+          if (g.offeneStellen[b] <= 0 || g.leer[b] || S.feld[g.y[b] * S.karte + g.x[b]] !== t) continue;   // offen wie offen(): fertig und nicht leer
+          if (t === W.KITA || (t === W.SCHULE && !W.R.SCHUL_ZUZUG)) kita += g.offeneStellen[b];
+          else if (t === W.LADEN) laden += g.offeneStellen[b];
+        }
+        const bh = S.bauhof >= 0 ? Math.max(0, g.offeneStellen[S.bauhof]) : 0;
+        const soll = Math.max(0, S.freieStellen - (z.dorf ? kita : bh + laden + kita) - S.arbeitslose);
+        if (soll !== z.fs) { zaehlFalsch++; if (beispiele.length < 3) beispiele.push(`Tag ${S.tag}: fs ${z.fs} statt ${soll}`); }
+        if (S.anfragen !== Math.max(0, Math.round((z.fs / (z.fs + 3)) * z.zf * z.basis0) - z.n) || z.basis0 !== 2 + S.einwohner * 0.02) anfrFalsch++;
+      };
+      for (const seed of [1, 2, 3]) {
+        const S = W.neueStadt(seed);
+        while (S.tag < 400) {
+          ctx.__zu = [];
+          const z = S.tag + 1; while (S.tag < z) W.stunde(S);
+          const L = ctx.__zu;
+          if (L.length && L.length > L[0][5]) ueber++;
+          for (const [st, typ, bh, dorf, anlauf, grenze, stufe, arbeit, basis] of L) {
+            n++; if (anlauf) anlaufN++; else danach++;
+            if (typ === W.SCHULE) schulStellen++;
+            const regel = (typ === W.WERKSTATT && !bh) || typ === W.TECH || typ === W.RATHAUS || typ === W.WACHE || typ === W.JVA || typ === W.KASERNE
+              || typ === W.DIENSTSTELLE || (typ === W.SCHULE && W.R.SCHUL_ZUZUG);
+            if ((typ === W.LADEN || bh) && dorf) dorfN++;
+            if (arbeit !== st || typ === W.KITA || !(regel || (dorf && (typ === W.LADEN || bh)))) falsch++;
+            if (anlauf !== (stufe < R.ANLAUF_STUFE ? 1 : 0) || dorf !== (stufe === 0 && R.ANLAUF_DORF ? 1 : 0) || basis !== (anlauf ? R.ANLAUF_BASIS[stufe] : 1)
+              || grenze < 1 + (anlauf ? R.ANLAUF_PLUS[stufe] : 0)) falsch++;
+          }
+        }
+      }
+      W.R.SCHUL_ZUZUG = merk;
+      pruef(n > 0 && anlaufN > 0 && dorfN > 0 && danach > 0 && !falsch && !ueber && !fsUeber && (schulZuzug || !schulStellen),
+        `SCHUL_ZUZUG ${schulZuzug}: ${n} Zuzüge (${anlaufN} im Anlauf, davon ${dorfN} für Laden oder Bauhof im Dorf; ${danach} danach; ${schulStellen} für Schulen), alle mit Stelle nach der Regel, nie Kita; falsch ${falsch}, Tage über der Grenze ${ueber}, Tage mit mehr als den freien Stellen ohne Arbeitsuchende der Stadt ${fsUeber}`);
+      pruef(tage > 0 && dorfTage > 0 && !zaehlFalsch && !anfrFalsch,
+        `SCHUL_ZUZUG ${schulZuzug}: ${tage} Nächte (${dorfTage} im Dorf): freie Stellen gezählt wie die Regel (Kitas${schulZuzug ? '' : ' und Schulen'} nie, Laden und Bauhof nur im Dorf; falsch ${zaehlFalsch}${beispiele.length ? ': ' + beispiele.join(', ') : ''}), Anfragen fürs Bauamt mit der Grundzahl ohne Anlauf (falsch ${anfrFalsch})`);
+    }
+    // Wirkung (gemessen): erster Zuzug und Einwohner an Tag 60 und 120, mit und ohne Anlauf (Seeds 1–3)
+    const wirk = (an) => { const merk = R.ANLAUF_STUFE; if (!an) R.ANLAUF_STUFE = 0; const e = [];
+      for (const seed of [1, 2, 3]) { const S = Sim.neueStadt(seed); let erst = -1; const w = [];
+        for (let d = 1; d <= 120; d++) { bis(Sim, S, d); if (erst < 0 && S.stat.zuzuege) erst = d; if (d === 60 || d === 120) w.push(S.einwohner); } e.push(`Seed ${seed}: erster Zuzug Tag ${erst}, Tag 60/120 ${w.join('/')}`); }
+      R.ANLAUF_STUFE = merk; return e.join('; '); };
+    console.log('  gemessen mit Anlauf:  ' + wirk(true));
+    console.log('  gemessen ohne Anlauf: ' + wirk(false));
+  }
+
+  console.log('D Schalter „Wachstum“');
+  {
+    const S = Sim.neueStadt(4);
+    bis(Sim, S, 60);
+    const nr = S.buchNr, a = Sim.wachstumSetzen(S, 1), b = Sim.wachstumSetzen(S, 1);
+    const c = [2, '1', null, undefined, -1, 0.5, true, 'schnell'].map(v => Sim.wachstumSetzen(S, v));
+    const zeile = S.buch.filter(e => e.nr > nr);
+    pruef(a && !b && c.every(x => !x) && S.wachstum === 1 && zeile.length === 1 && zeile[0].art === 'wachstum' && /schneller/.test(zeile[0].text) && !/\u0001/.test(zeile[0].text),
+      `an: ${a}, noch einmal: ${b}, ungültige Werte abgelehnt ${c.filter(x => !x).length} von ${c.length}; eine Zeile im Stadtbuch ohne Namen: „${zeile[0] ? zeile[0].text.slice(0, 80) : '–'} …“`);
+    bis(Sim, S, 61, 13);
+    const text = speichernAlsText(Sim, S), B = ladenAusText(Sim, text);
+    let gleich = B.wachstum === 1 && fingerabdruck(Sim, B) === fingerabdruck(Sim, S);
+    for (let i = 0; i < 30 && gleich; i++) { bis(Sim, S, S.tag + 1, 13); bis(Sim, B, B.tag + 1, 13); gleich = fingerabdruck(Sim, B) === fingerabdruck(Sim, S); }
+    pruef(gleich, `Speichern und Laden mit „schnell“ um 13 Uhr: 30 Tage bitgleich weiter (bis Tag ${S.tag}, ${S.einwohner} Einwohner)`);
+    const zurueck = Sim.wachstumSetzen(S, 0), z2 = S.buch[S.buch.length - 1];
+    pruef(zurueck && S.wachstum === 0 && z2.art === 'wachstum' && /wieder normal/.test(z2.text), `zurück auf normal: eine Zeile „${z2.text.slice(0, 60)} …“`);
+    // Übernahme: Version 8 (stadt.orig.html) → normal, Frist 2 Spielstunden, Zähler bleiben; keine eigene Zeile
+    const V8 = lade(simCode(readFileSync(join(hier, '..', 'stadt.orig.html'), 'utf8')));
+    const A = V8.neueStadt(4); bis(V8, A, 150, 13);
+    const U = Sim.importZustand(roh(speichernAlsText(V8, A)), true);
+    pruef(U.wachstum === 0 && U.ki.fristStunden === R.KI_FRIST && U.ki.abgelaufen === A.ki.abgelaufen && U.ki.angewandt === A.ki.angewandt && !U.buch.some(e => e.art === 'wachstum'),
+      `Version 8 übernommen: Schalter normal, KI-Frist ${U.ki.fristStunden} Spielstunden, Zähler übernommen (${U.ki.abgelaufen} zu spät, ${U.ki.angewandt} angewandt), keine Zeile`);
+    const L = ladenAusText(Sim, speichernAlsText(Sim, U)); bis(Sim, U, 170); bis(Sim, L, 170);
+    pruef(fingerabdruck(Sim, U) === fingerabdruck(Sim, L), 'danach als Version 9 gespeichert und geladen: 20 Tage bitgleich');
+    // Beschädigte Stände (Version 9): jedes neue Feld ist Pflicht
+    const faelle = [['Schalter fehlt', d => { delete d.werte.wachstum; }], ['Schalter 2', d => { d.werte.wachstum = 2; }], ['Schalter Text', d => { d.werte.wachstum = '1'; }],
+      ['Schalter null', d => { d.werte.wachstum = null; }], ['Frist fehlt', d => { delete d.json.ki.fristStunden; }], ['Frist 1', d => { d.json.ki.fristStunden = 1; }],
+      ['Frist über der Obergrenze', d => { d.json.ki.fristStunden = R.KI_FRIST_MAX + 1; }], ['Frist 2,5', d => { d.json.ki.fristStunden = 2.5; }], ['Frist Text', d => { d.json.ki.fristStunden = '7'; }],
+      ['zu spät negativ', d => { d.json.ki.abgelaufen = -1; }], ['zu spät keine ganze Zahl', d => { d.json.ki.abgelaufen = 1.5; }], ['angewandt fehlt', d => { delete d.json.ki.angewandt; }]];
+    const meld = [];
+    for (const [was, kaputt] of faelle) {
+      const d = roh(text); kaputt(d);
+      try { Sim.importZustand(d); meld.push(was + ': angenommen'); } catch (e) { if (!/beschädigt|unvollständig/.test(e.message)) meld.push(was + ': ' + e.message); }
+    }
+    pruef(!meld.length, `${faelle.length} beschädigte Stände abgelehnt` + (meld.length ? ': ' + meld.join('; ') : ''));
+    // „schnell“ wirkt: mehr Einwohner, Grenze 1 + 3 %, Grundzahl und Bauamt doppelt
+    const N = Sim.neueStadt(5), Q = Sim.neueStadt(5);
+    Sim.wachstumSetzen(Q, 1);
+    bis(Sim, N, 150); bis(Sim, Q, 150);
+    const wN = X.wachstumJetzt(N), wQ = X.wachstumJetzt(Q);
+    const plus = (X, w) => (w.anlauf ? R.ANLAUF_PLUS[X.erweiterung.stufe] : 0);
+    pruef(Q.einwohner > N.einwohner && wQ.grenze === 1 + Math.floor(Q.einwohner * R.SCHNELL_ZUZUG_MAX) + plus(Q, wQ)
+      && wN.grenze === 1 + Math.floor(N.einwohner * R.ZUZUG_MAX) + plus(N, wN) && wQ.bauamt === R.SCHNELL_BAUAMT && wN.bauamt === 1
+      && wQ.basis === (wQ.anlauf ? R.ANLAUF_BASIS[Q.erweiterung.stufe] : 1) * R.SCHNELL_BASIS,
+      `schnell (Seed 5, Tag 150): ${Q.einwohner} Einwohner gegen ${N.einwohner} normal; Grenze am Tag ${wQ.grenze} gegen ${wN.grenze}; Grundzahl ×${wQ.basis}, Bauamt ×${wQ.bauamt}`);
+    const I = Sim.wachstumInfo(Q);
+    pruef(I.schnell && I.zuzugMax === R.SCHNELL_ZUZUG_MAX && I.anlaufBis === R.STUFE_AB[R.ANLAUF_STUFE] && I.fristStunden === R.KI_FRIST, `wachstumInfo: schnell, ${I.zuzugMax * 100} %, Anlauf bis ${I.anlaufBis} Einwohner, Frist ${I.fristStunden} h`);
+  }
+
+  console.log('E KI-Frist');
+  {
+    const S = Sim.neueStadt(2);
+    bis(Sim, S, 30);
+    const f = (st) => { Sim.kiSchalten(S, true, st); return S.ki.fristStunden; };
+    const k = [f(0), f(1), f(7), f(34), f(99), f(2.2), f(NaN), f(-5)];
+    Sim.kiSchalten(S, true);
+    pruef(JSON.stringify(k) === JSON.stringify([2, 2, 7, 34, R.KI_FRIST_MAX, 3, 2, 2]) && S.ki.fristStunden === 2 && R.KI_FRIST_MAX === 36,
+      `Frist in Spielstunden aus 0, 1, 7, 34, 99, 2,2, NaN, −5: ${k.join(', ')} (höchstens ${R.KI_FRIST_MAX}); ohne Angabe bleibt ${S.ki.fristStunden}`);
+    const probe = (stunden) => {
+      const T = ladenAusText(Sim, speichernAlsText(Sim, S));
+      Sim.kiSchalten(T, true, stunden);
+      while (T.stunde !== 7) Sim.stunde(T);
+      Sim.stunde(T);                                          // 7 Uhr: Hauptfiguren fragen
+      const a = T.ki.anfragen[0];
+      if (!a) return null;
+      const ab0 = T.ki.abgelaufen;
+      for (let i = 0; i < 10; i++) Sim.stunde(T);
+      const e = Sim.kiEntscheidung(T, a.id, a.gen, a.erlaubt[0], null, 'Test', a.nr);
+      return { ok: e.ok, frist: a.frist - (a.tag * 24 + a.stunde), abgelaufen: T.ki.abgelaufen - ab0 };
+    };
+    const lang = probe(17), kurz = probe(2);
+    pruef(!!lang && !!kurz && lang.ok && lang.frist === 17 && !kurz.ok && kurz.frist === 2 && kurz.abgelaufen > 0,
+      `Antwort nach 10 Spielstunden: Frist 17 → ${lang && lang.ok ? 'gilt' : 'VERWORFEN'}; Frist 2 → ${kurz && !kurz.ok ? `zu spät (${kurz.abgelaufen} als „zu spät“ gezählt)` : 'FALSCH'}`);
+    const T = ladenAusText(Sim, speichernAlsText(Sim, S));
+    Sim.kiSchalten(T, true, 2);
+    while (T.stunde !== 7) Sim.stunde(T);
+    Sim.stunde(T);
+    const rest = () => T.ki.anfragen.map(a => a.frist - a.tag * 24 - a.stunde);
+    const vor = rest(); Sim.kiSchalten(T, true, 34); const hoch = rest(); Sim.kiSchalten(T, true, 2); const runter = rest();
+    pruef(vor.length > 0 && vor.every(x => x === 2) && hoch.every(x => x === 34) && runter.every(x => x === 34) && T.ki.fristStunden === 2,
+      `offene Anfragen (${vor.length}): Frist ${vor[0]} → hochgeschaltet ${hoch[0]} → heruntergeschaltet bleibt ${runter[0]} (neue Anfragen wieder ${T.ki.fristStunden})`);
+    // Rangfolge des Bürgermeisters: am letzten Tag eines Jahres um 7 Uhr; Frist höchstens bis 23 Uhr (danach plant der Haushalt)
+    const rang = (stunden, antwortUm) => {
+      const Q = ladenAusText(Sim, speichernAlsText(Sim, S));
+      Sim.kiSchalten(Q, true, stunden);
+      while (!(Q.tag % J === J - 1 && Q.stunde === 8)) Sim.stunde(Q);   // nach 7 Uhr am letzten Tag des Jahres
+      const r = Q.buergermeister.anfrage;
+      if (!r) return null;
+      const jahr = r.jahr, frist = r.frist - r.tag * 24;
+      while (Q.stunde < antwortUm && Q.tag === r.tag) Sim.stunde(Q);
+      const e = Sim.bmRangfolge(Q, r.id, r.gen, r.nr, ['parks', 'wohnungen'], 'Test');
+      bis(Sim, Q, Q.tag + 1, 1);
+      const rf = Q.buergermeister.rangfolge;
+      return { frist, ok: e.ok, von: rf && rf.jahr === jahr ? rf.von : '–', plan: Q.haushalt.plan.von, rang: Q.haushalt.plan.rang[0] };
+    };
+    const r20 = rang(7, 13), r100 = rang(34, 22), spaet = rang(34, 24), kurzR = rang(2, 13);
+    pruef(r20 && r20.frist === 14 && r20.ok && r20.plan === 'ki' && r20.rang === 'parks', `Rangfolge mit Frist 7 (20×): bis ${r20 && r20.frist} Uhr, Antwort um 13 Uhr gilt (Plan: ${r20 && r20.plan}, zuerst ${r20 && r20.rang})`);
+    pruef(r100 && r100.frist === 23 && r100.ok && r100.plan === 'ki', `Rangfolge mit Frist 34 (100×): höchstens bis ${r100 && r100.frist} Uhr, Antwort um 22 Uhr gilt (Plan: ${r100 && r100.plan})`);
+    pruef(spaet && !spaet.ok && spaet.plan === 'regel' && spaet.von === 'regel', `Antwort nach dem Plan (nach 23 Uhr) wird abgelehnt: Regel (${spaet && spaet.plan}, ${spaet && spaet.von})`);
+    pruef(kurzR && kurzR.frist === 9 && !kurzR.ok && kurzR.plan === 'regel', `Rangfolge mit Frist 2 (1×): bis ${kurzR && kurzR.frist} Uhr, Antwort um 13 Uhr zu spät (Regel)`);
+  }
+
+  console.log('F Kapazität der Warteschlange (nur gemessen): 10 Hauptfiguren und der Bürgermeister, Seed 2 ab Tag 250, 20 Spieltage');
+  {
+    // Nachbau des KI-Takts der Oberfläche (kiSchritt): ein Aufruf zur Zeit, Rangfolge zuerst, dann die Anfragen der Reihe nach; eine Anfrage geht
+    // nicht mehr raus, wenn ihre Restzeit in echter Zeit kürzer ist als min(10 s, Antwortzeit), und wird dann gleich verworfen (Rangfolge: Regel;
+    // Entscheidung: normales Gehirn, zählt als „zu spät“; Befund Technik der Schlussprüfung); Frist aus kiFristStunden (mindestens 20 s, bei
+    // 11 Figuren 11 × Antwortzeit × 1,2, in Spielstunden 2 bis 36). Jede Antwort ist gültig (erste erlaubte Aktion)
+    const B0 = Sim.neueStadt(2); bis(Sim, B0, 250);
+    const P = B0.p; B0.ki.haupt = [];
+    for (let p = 0; p < B0.pMax && B0.ki.haupt.length < R.HAUPT_MAX; p++) if (P.lebt[p] && B0.tag - P.geb[p] >= 20 * J && B0.tag - P.geb[p] < 60 * J && !Sim.istBm(B0, p)) B0.ki.haupt.push({ id: p, gen: P.gen[p] });
+    const basis = speichernAlsText(Sim, B0);
+    const zeilen = [];
+    for (const tempo of [1, 5, 20, 100]) {
+      const z = [];
+      for (const t of [1, 2, 3, 5, 10]) {
+        const S = ladenAusText(Sim, basis), n = Sim.hauptListe(S).length;
+        const fristSek = Math.max(20, n * t * 1.2), stunden = Math.ceil(fristSek * tempo / 60), h = 60 / tempo;   // echte Sekunden je Spielstunde
+        Sim.kiSchalten(S, true, stunden);
+        const gesendet = new Set(); let frei = 0, arbeit = null, uhr = 0, gueltig = 0, zuSpaetAntw = 0, ungesendet = 0;
+        const ab0 = S.ki.abgelaufen, an0 = S.ki.angewandt, ende = S.tag + 20;
+        while (S.tag < ende) {
+          const naechste = uhr + h;
+          while (true) {                                      // alles, was bis zur nächsten Stunde fertig wird oder rausgeht
+            if (arbeit && arbeit.fertig <= naechste) {
+              const a = arbeit; arbeit = null; frei = a.fertig;
+              if (a.rang) { if (Sim.bmRangfolge(S, a.id, a.gen, a.nr, ['wohnungen'], 'Test').ok) gueltig++; else zuSpaetAntw++; }
+              else { const e = Sim.kiErlaubtJetzt(S, a.id, a.gen); if (!e.length) Sim.kiVerwerfen(S, a.id, a.gen, a.nr); else if (Sim.kiEntscheidung(S, a.id, a.gen, e[0], null, 'Test', a.nr).ok) gueltig++; else zuSpaetAntw++; }
+            }
+            if (arbeit) break;
+            const jetzt = Math.max(frei, uhr), jetztH = S.tag * 24 + S.stunde + (jetzt - uhr) / h;
+            const reicht = (x) => (x.frist + 1 - jetztH) * h >= Math.min(10, t);
+            const r = S.buergermeister.anfrage;
+            let q = null;
+            if (r && !gesendet.has(r.nr)) { gesendet.add(r.nr); if (reicht(r)) q = { rang: true, id: r.id, gen: r.gen, nr: r.nr }; else Sim.bmRangfolge(S, r.id, r.gen, r.nr, null, ''); }
+            if (!q) for (const x of S.ki.anfragen.slice()) { if (gesendet.has(x.nr)) continue; gesendet.add(x.nr); if (reicht(x)) { q = { id: x.id, gen: x.gen, nr: x.nr }; break; } Sim.kiVerwerfen(S, x.id, x.gen, x.nr, true); ungesendet++; }
+            if (!q) break;
+            q.fertig = jetzt + t; arbeit = q;
+            if (q.fertig > naechste) break;
+          }
+          Sim.stunde(S); uhr += h; frei = Math.max(frei, 0);
+        }
+        const ki = S.ki.angewandt - an0, spaet = S.ki.abgelaufen - ab0;
+        z.push(`${t} s: ${ki} KI / ${spaet} zu spät, davon ${ungesendet} ungesendet (Frist ${S.ki.fristStunden} h = ${Math.round(S.ki.fristStunden * h)} s)`);
+      }
+      zeilen.push(`  ${String(tempo).padStart(3)}×  ` + z.join(' | '));
+    }
+    console.log(zeilen.join('\n'));
+  }
+  console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle Prüfungen zu „Wachstum, Tempo und KI“ bestanden');
+  process.exit(fehler ? 1 : 0);
+}
+
+if (flag('techfrueh')) {
+  // Tech-Firmen früher und mehr (Version 9, Teil 5). A statisch: die Regeln des Bausteins würfeln nicht und lesen von Personen nur Fleiß, Ehrgeiz,
+  // Geld und Wohnung (gruendungsTyp); die Zahlen der Karten im Fenster „Stadtregierung“ passen zu R. B ausgeschaltet (TECH_FRUEH 0, WELT 0) und ohne
+  // die übrigen Bausteine von Version 9 Tag für Tag wie 31ce452 (stadt.orig.html); mit --alt <Fassung vor Teil 5>: ausgeschaltet und ohne Vorhaben
+  // des Haushalts Tag für Tag wie diese, mit Vorhaben gleich bis zum ersten Computerkauf der Schulen (der ist jetzt Bedarf vor den Vorhaben).
+  // C Seeds 1–3, 730 Tage stündlich: je Gründung (Stufe, Bremse, Preis, Markt, Tüftler im Dorf), je Nacht (freie Tech-Stellen und Stellen in der Welt
+  // unabhängig nachgezählt, Preis der Welt, Grenze der Welt, 40 % nur im Umland, Markt nur bei Tech-Firmen, nichts ruht in der Welt), jede Pleite
+  // (Zeile „gibt auf“ genau dann, wenn der Betrieb nie eine Kraft hatte), jeder Computerkauf der Schulen (Laden der Stadt oder außerhalb, Geld).
+  // D Speichern mit Firmen in der Welt bitgleich; beschädigte Stände; Übernahme von Version 8 (alle im Umland, Bremse gleich gezählt). E Namenstausch.
+  // F Messung und Gruppen (nur gemessen)
+  let fehler = 0;
+  const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
+  const R = Sim.R, T = Sim._tech9, TECH = Sim.TECH, WERKSTATT = Sim.WERKSTATT, LADEN = Sim.LADEN;
+  const simCode = (h) => h.match(/<script id="sim">([\s\S]*?)<\/script>/)[1];
+  const lade = (code) => { const ctx = vm.createContext({}); vm.runInContext(`Math.random = () => { throw new Error('Math.random'); };`, ctx); vm.runInContext(code, ctx); return ctx.StadtSim; };
+  const bis = (Y, S, tag, stunde = 0) => { while (S.tag < tag || (S.tag === tag && S.stunde < stunde)) Y.stunde(S); };
+  const tsd = (v) => String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const kanon = (o) => JSON.stringify(o, (k, v) => (v && typeof v === 'object' && !Array.isArray(v) && !ArrayBuffer.isView(v) ? Object.fromEntries(Object.keys(v).sort().map(x => [x, v[x]])) : v));
+  const drittel = (v) => { const n = Math.round(v * 3), g = Math.floor(n / 3), r = n % 3; return tsd(g) + (r === 1 ? '⅓' : r === 2 ? '⅔' : ''); };
+
+  console.log('A Statisch');
+  {
+    const ohneKomm = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+    const code = ohneKomm(SIM_CODE);
+    const koerper = (f) => {
+      const i = code.search(new RegExp('^function ' + f + '\\(', 'm')); if (i < 0) return null;
+      let t = 0, j = code.indexOf('{', i);
+      for (; j < code.length; j++) { if (code[j] === '{') t++; else if (code[j] === '}' && --t === 0) break; }
+      return code.slice(i, j + 1); };
+    const ohneBuch = (k) => { let out = '', i = 0;
+      for (;;) { const j = k.indexOf('buch(S,', i); if (j < 0) { out += k.slice(i); break; }
+        out += k.slice(i, j); let t = 0, m = j + 4;
+        for (; m < k.length; m++) { if (k[m] === '(') t++; else if (k[m] === ')' && --t === 0) break; }
+        i = m + 1; }
+      return out; };
+    const felder = (k) => [...new Set([...k.matchAll(/\b(?:S\.)?P\.(\w+)|\bS\.p\.(\w+)/g)].map(m => m[1] || m[2]))].sort();
+    // Je Funktion des Bausteins: welche Personenfelder sie lesen darf (Stadtbuch-Zeilen ausgenommen: dort stehen Namen und Pronomen)
+    const ERLAUBT = { gruendungsTyp: ['ehrgeiz', 'fleiss', 'geld', 'wohnung'], techWeltAussicht: ['ehrgeiz', 'fleiss'], gruendungsKosten: [], techGruendungJetzt: [],
+      techMarkt: [], weltPlatzFuer: [], anbauKosten: [], anbauMarkt: [], marktPlaetzeDazu: [], techFreiZaehlen: [], migriereTech9: [],
+      tech9Pruefen: [], schulITKaufen: [], ladenNaechst: [], hhComputer: [], techInfo: [], marktSatz: [], pleite: [], techGrenzeHalten: [] };
+    const zuViel = [];
+    for (const [f, ok] of Object.entries(ERLAUBT)) {
+      const k0 = koerper(f);
+      if (!k0) { zuViel.push(f + ': fehlt'); continue; }
+      const k = ohneBuch(k0);
+      for (const x of felder(k)) if (!ok.includes(x)) zuViel.push(`${f}: P.${x}`);
+      if (/\b(name|vorname|nr|namePack|nameAusPack|ref|personInfo)\s*\(/.test(k)) zuViel.push(`${f}: Name`);
+      if (/\b(zufall|zInt|zufallSich|zufallAuto|zIntAuto|wahlZufall)\s*\(/.test(k)) zuViel.push(`${f}: Zufall`);
+    }
+    pruef(!zuViel.length, `${Object.keys(ERLAUBT).length} Funktionen würfeln nicht und lesen von Personen nur Fleiß, Ehrgeiz, Geld und Wohnung (gruendungsTyp, techWeltAussicht), `
+      + 'keine Namen, kein Geschlecht, keine Herkunft (Stadtbuch-Zeilen ausgenommen)' + (zuViel.length ? ': ' + zuViel.join(', ') : ''));
+    // Die Karten im Fenster „Stadtregierung“ nennen die Zahlen fest (REGIERUNG ist reiner Text): Sie müssen zu R passen
+    const a0 = html.indexOf('const REGIERUNG = '), b0 = html.indexOf('// Ende REGIERUNG');
+    const REG = new Function(html.slice(a0, b0).replace('const REGIERUNG = ', 'return ').replace(/;\s*$/, ''))();
+    const karte = (re) => { for (const [, regeln] of REG.gruppen) for (const r of regeln) if (re.test(r.titel)) return r; return null; };
+    const kt = karte(/^Tech-Firmen wachsen, Autowerke, Autos$/), kw = karte(/^Weltmarkt für Software, Handys und Computer$/), k5 = karte(/^R-A5 /);
+    const preis = (z) => tsd(Math.round(R.BAU_ANBAU[z] * R.TECH_SATZ));
+    const sollT = [`ab ${R.TECH_TUEFTLER})`, `ab der ${['Dorf', 'Kleinstadt', 'Stadt', 'Großstadt'][R.TECH_AB_STUFE]}`, `zusammen ${R.TECH_FREI_MAX} oder mehr Stellen`,
+      `${drittel(R.TECH_SATZ)} Taler je Arbeitstag`, `Gründung (${tsd(Math.round(R.BAU_TECH * R.TECH_SATZ))} Taler)`, `Stufe 2 und 3 ${preis(2)} und ${preis(3)}`,
+      `Campus ${preis(4)}, Hochhaus ${preis(5)} Taler`];
+    const sollW = [`zusammen ${tsd(R.WELT)} Taler am Tag`, `höchstens ${R.EXPORT_MAX} Taler`, `danach noch ${R.LOHN_TECH + 8} Taler bringt (Lohn und 8 Taler`];
+    const sollWA = [`${tsd(R.WELT)} Taler am Tag reichen für rund ${Math.floor(R.WELT / (R.LOHN_TECH + 8))} Stellen`];
+    const sollA5 = [`kostet ${drittel(R.TECH_SATZ)} Taler je Arbeitstag`, `Campus kostet damit ${preis(4)} statt ${tsd(R.K_ANBAU[4])}`, `Hochhaus ${preis(5)} statt ${tsd(R.K_ANBAU[5])}`];
+    // Teil 5: die Preise stehen im aufklappbaren Teil der Karte (mehr), die übrigen Zahlen im Text
+    const ktText = kt ? kt.stadt + ' ' + (kt.mehr || []).map(m => m[1]).join(' ') : '';
+    const fehlt = [...sollT.filter(t => !kt || !ktText.includes(t)), ...sollW.filter(t => !kw || !kw.stadt.includes(t)), ...sollWA.filter(t => !kw || !kw.annahme.includes(t)),
+      ...sollA5.filter(t => !k5 || !k5.hinweis.includes(t))];
+    pruef(!!kt && !!kw && !!k5 && !fehlt.length && kw.status === 'Spielregel' && k5.status === 'Auslegung' && kw.live === 'welt' && kw.zitate.length === 1 && kw.zitate[0][1] === 11,
+      `Karten „Tech-Firmen wachsen …“, „Weltmarkt …“ (Spielregel, Live-Zeile, ein Zitat S. 11) und R-A5 (Auslegung): Zahlen passen zu R` + (fehlt.length ? ` – fehlt: ${fehlt.join(' | ')}` : ''));
+    const s16 = (REG.nicht || []).flatMap(x => x.punkte || []).find(x => Array.isArray(x) && x[1] === 16 && /Unternehmensgründungen/.test(x[0]));
+    pruef(!!s16 && /Spielregeln für Gründer, keine Vorschriften/.test(s16[2]), 'S. 16 unter „nicht“: Kleinstadt und Bremse als Spielregeln für Gründer, keine Vorschriften der Stadt');
+  }
+
+  console.log('B Ausgeschaltet wie vorher');
+  {
+    const spur = (S, ohneG) => { const x = createHash('sha256');
+      for (const n of Object.keys(S.p).sort()) if (ArrayBuffer.isView(S.p[n]) && n !== 'schule') { const a = S.p[n], w = a.length / S.pKap; x.update(n); x.update(Buffer.from(a.buffer, a.byteOffset, S.pMax * w * a.BYTES_PER_ELEMENT)); }
+      for (const n of Object.keys(S.g).sort()) { if (ohneG.has(n)) continue; const a = S.g[n]; x.update(n); x.update(Buffer.from(a.buffer, a.byteOffset, S.gAnzahl * a.BYTES_PER_ELEMENT)); }
+      x.update(Buffer.from(S.feld.buffer)); const st = statAlt(S.stat);
+      x.update(JSON.stringify([S.budget, S.rs, S.rsSich, S.rsAuto, S.tag, S.einwohner, st, kiAlt(S.ki), S.regierung, S.sicherheit, S.bund, S.erweiterung])); x.update(JSON.stringify(S.buch));
+      return x.digest('hex').slice(0, 16); };
+    const V8 = lade(simCode(readFileSync(join(hier, '..', 'stadt.orig.html'), 'utf8')));
+    const V9 = ['RATHAUS', 'SCHULEN', 'HH_VORHABEN', 'HH_STEUER', 'ANLAUF_STUFE', 'TECH_FRUEH', 'WELT', 'ZUZUG_GENAU'], alt = V9.map(k => R[k]);   // alle Bausteine von Version 9 aus
+    for (const k of V9) R[k] = 0;
+    let techGr = 0;                                          // über die drei Seeds muss es Tech-Gründungen geben
+    for (const seed of [1, 2, 3]) {
+      const A = V8.neueStadt(seed), B = Sim.neueStadt(seed); let erster = -1;
+      for (let d = 1; d <= 200 && erster < 0; d++) { bis(V8, A, d); bis(Sim, B, d); if (spur(A, new Set()) !== spur(B, new Set(Sim.GF_TECH9))) erster = d; }
+      techGr += B.stat.tech.gruendungen;
+      pruef(erster < 0 && (seed < 3 || techGr > 0), `Seed ${seed}, TECH_FRUEH 0 und WELT 0, ohne die übrigen Bausteine von Version 9: 200 Tage ${erster < 0 ? 'jeden Tag wie 31ce452' : 'VERSCHIEDEN ab Tag ' + erster}`
+        + ` (${B.einwohner} Einwohner, ${B.stat.tech.gruendungen} Tech-Gründungen)`);
+    }
+    V9.forEach((k, i) => { R[k] = alt[i]; });
+    if (arg('alt')) {                                         // die Fassung vor Teil 5
+      const V = lade(simCode(readFileSync(arg('alt'), 'utf8')));
+      const f = (Y, S, ohneBuch) => { const d = Y.exportZustand(S), h = createHash('sha256');
+        for (const a of d.arrays.sort((x, y) => (x.name < y.name ? -1 : 1))) { if (a.name === 'g.markt' || a.name === 'g.kraft') continue; h.update(a.name); h.update(Buffer.from(a.daten.buffer, a.daten.byteOffset, a.daten.byteLength)); }
+        const w = { ...d.werte }; delete w.techFrei; delete w.weltPlaetze; delete w.weltPreis;
+        // Haushalt und Rangfolge ohne Vergleich: die Liste der Vorhaben ist jetzt kürzer (Computer sind Bedarf); das Budget steht in werte
+        const bm = d.json.buergermeister, j = { ...d.json, haushalt: undefined, buch: ohneBuch ? undefined : d.json.buch.map(e => ({ ...e, text: textAlt(e.text) })), buergermeister: bm ? { ...bm, rangfolge: undefined, anfrage: undefined } : bm,
+          stat: { ...statAlt(d.json.stat), sicherheit: d.json.stat.sicherheit, bund: d.json.stat.bund, auto: d.json.stat.auto, rathaus: d.json.stat.rathaus,
+            buergermeister: d.json.stat.buergermeister, schule: d.json.stat.schule ? { ...d.json.stat.schule, itAussen: undefined } : undefined, regierung: d.json.stat.regierung } };
+        h.update(JSON.stringify(w)); h.update(kanon(j)); return h.digest('hex').slice(0, 16); };
+      const merk = [R.TECH_FRUEH, R.WELT, R.HH_VORHABEN, R.ZUZUG_GENAU], vh = V.R.HH_VORHABEN;
+      R.TECH_FRUEH = 0; R.WELT = 0; R.HH_VORHABEN = 0; V.R.HH_VORHABEN = 0; R.ZUZUG_GENAU = 0;   // Zuzug wie in der Fassung vor Teil 5 (Schlussprüfung)
+      for (const seed of [1, 2, 3]) {
+        const A = V.neueStadt(seed), B = Sim.neueStadt(seed); let erster = -1;
+        for (let d = 1; d <= 200 && erster < 0; d++) { bis(V, A, d); bis(Sim, B, d); if (f(V, A) !== f(Sim, B)) erster = d; }
+        pruef(erster < 0, `Seed ${seed}, TECH_FRUEH 0, WELT 0, Vorhaben aus (in beiden): 200 Tage ${erster < 0 ? 'jeden Tag wie ' + arg('alt') : 'VERSCHIEDEN ab Tag ' + erster} (${B.einwohner} Einwohner)`);
+      }
+      R.HH_VORHABEN = merk[2]; V.R.HH_VORHABEN = vh;
+      // Mit Vorhaben: gleich bis zur ersten Nacht, in der die Schulen Computer kaufen (vorher Vorhaben 3 in der Rangfolge, jetzt Bedarf davor)
+      for (const seed of [2]) {
+        const A = V.neueStadt(seed), B = Sim.neueStadt(seed); let erster = -1, kauf = -1;
+        for (let d = 1; d <= 400 && erster < 0; d++) { bis(V, A, d); bis(Sim, B, d); if (kauf < 0 && (A.stat.schule.itGeraete || B.stat.schule.itGeraete)) kauf = d; if (f(V, A, true) !== f(Sim, B, true)) erster = d; }
+        pruef(kauf > 0 && (erster < 0 || erster >= kauf), `Seed ${seed}, TECH_FRUEH 0, WELT 0, mit Vorhaben: gleich bis Tag ${erster < 0 ? 400 : erster - 1}, der erste Computerkauf der Schulen war an Tag ${kauf}`
+          + ' (ohne Plan, Rangfolge und Stadtbuch verglichen: die Liste der Vorhaben ist jetzt kürzer, die Zeilen nennen den Rang)');
+      }
+      [R.TECH_FRUEH, R.WELT, R.HH_VORHABEN, R.ZUZUG_GENAU] = merk;
+    } else console.log('  (ohne --alt: kein Vergleich mit der Fassung vor Teil 5)');
+  }
+
+  console.log('C Je Gründung, je Nacht, je Pleite, je Computerkauf (Seeds 1–3, 730 Tage stündlich)');
+  const { Sim: M, ctx: mc } = ladeSimMit([
+    ['G.StadtSim = {', 'G.StadtSim = { __offen: offen,'],
+    ['function aktGruenden(S, p) {', 'function aktGruenden(S, p) {\n  const __v = globalThis.__vor ? globalThis.__vor(S, p) : null, __r = __aktGruenden(S, p);\n  if (__v) globalThis.__nach(S, p, __v, __r);\n  return __r;\n}\nfunction __aktGruenden(S, p) {'],
+    ['  S.freieWohnungen = fw; S.freieStellen = fs; S.leerstand = leer; S.werkstattPlaetze = wp; S.techPlaetze = tp; S.weltPlaetze = wt; S.techFrei = tf;',
+      '  S.freieWohnungen = fw; S.freieStellen = fs; S.leerstand = leer; S.werkstattPlaetze = wp; S.techPlaetze = tp; S.weltPlaetze = wt; S.techFrei = tf;\n  if (globalThis.__kz) globalThis.__kz(S);'],
+    ['  S.weltPreis = R.WELT > 0 ? Math.min(R.EXPORT_MAX, R.WELT / Math.max(1, weltArbeiter)) : 0;',
+      '  S.weltPreis = R.WELT > 0 ? Math.min(R.EXPORT_MAX, R.WELT / Math.max(1, weltArbeiter)) : 0;\n  if (globalThis.__preis) globalThis.__preis(S, exportArbeiter, weltArbeiter);'],
+    ['function pleite(S, b) {', 'function pleite(S, b) {\n  if (globalThis.__pleite) globalThis.__pleite(S, b);'],
+    ['  S.p.arbeit[p] = b; S.belegschaft[b].push(p);', '  S.p.arbeit[p] = b; S.belegschaft[b].push(p);\n  if (globalThis.__an) globalThis.__an(S, b);'],
+    ['function schliessen(S, b, pleite) {', 'function schliessen(S, b, pleite) {\n  if (globalThis.__zu) globalThis.__zu(S, b);'],
+    ['function umzugInsWerk(S, alt, w) {', 'function umzugInsWerk(S, alt, w) {\n  if (globalThis.__umzug) globalThis.__umzug(S, alt, w);'],
+    ['function schulITKaufen(S, taler) {', 'function schulITKaufen(S, taler) {\n  const __v = globalThis.__itVor ? globalThis.__itVor(S) : null, __r = __schulITKaufen(S, taler);\n  if (__v) globalThis.__itNach(S, __v, __r);\n  return __r;\n}\nfunction __schulITKaufen(S, taler) {'],
+  ]);
+  const MT = M._tech9;
+  const Z = { gr: 0, tech: 0, welt: 0, uebern: 0, dorfTuef: 0, nachte: 0, aufgabe: 0, pleiteMit: 0, it: 0, itLaden: 0, itAussen: 0, preis: 0, kleinstadtZeile: 0 };
+  const F = new Map(), fehl = (k, t) => { if (!F.has(k)) F.set(k, []); if (F.get(k).length < 3) F.get(k).push(t); F.get(k).n = (F.get(k).n || 0) + 1; };
+  let kraft = new Set();                                     // unabhängig: Betriebe mit Besitz, die seit Gründung oder Übernahme eine Kraft hatten
+  const tuef = (S, p) => S.p.fleiss[p] + S.p.ehrgeiz[p] >= R.TECH_TUEFTLER;
+  mc.__vor = (S, p) => ({ typ: MT.gruendungsTyp(S, p), stufe: S.erweiterung.stufe, frei: S.techFrei, geld: S.p.geld[p], tuef: tuef(S, p), lohnt: R.UMLAND / (S.werkstattPlaetze + R.STELLEN_WERKSTATT) >= R.LOHN_WERKSTATT + 8,
+    wp: S.werkstattPlaetze, tp: S.techPlaetze, wt: S.weltPlaetze, leerTech: S.leerTyp[TECH] });
+  mc.__nach = (S, p, v, ok) => {
+    if (!ok) return;
+    const b = S.p.besitz[p], g = S.g; Z.gr++;
+    if (v.tuef && v.stufe < R.TECH_AB_STUFE && v.typ !== LADEN) fehl('dorf', `Tag ${S.tag}: Tüftler gründet im Dorf (${v.typ})`);
+    if (v.tuef && v.stufe < R.TECH_AB_STUFE) Z.dorfTuef++;
+    kraft.delete(b);
+    if (g.typ[b] !== TECH) return;
+    Z.tech++; const st = Sim.stellen(S, b), neu = S.baustellen.includes(b) && !g.auf[b], werk = !!g.werk[b];
+    if (!neu) Z.uebern++;
+    if (v.stufe < R.TECH_AB_STUFE) fehl('stufe', `Tag ${S.tag}: Tech-Firma im Dorf`);
+    if (v.frei >= R.TECH_FREI_MAX) fehl('bremse', `Tag ${S.tag}: ${v.frei} Stellen frei, trotzdem gegründet`);
+    if (S.techFrei !== v.frei + st) fehl('frei', `Tag ${S.tag}: techFrei ${S.techFrei} statt ${v.frei} + ${st}`);
+    const kosten = MT.gruendungsKosten(TECH, !neu, werk && !neu);
+    if (v.geld - S.p.geld[p] !== kosten) fehl('preis', `Tag ${S.tag}: bezahlt ${v.geld - S.p.geld[p]} statt ${kosten}`);
+    if (neu && kosten !== Math.round(R.BAU_TECH * R.TECH_SATZ) + R.KASSE_START) fehl('preis', `Tag ${S.tag}: Gründung ${kosten}`);
+    // Im Markt belegt die Firma die Stellen des Hauses samt einem offenen Anbau (übernommenes leeres Haus, dessen Anbau noch läuft), wie die
+    // Zählung der Nacht (Befund der Schlussprüfung: vorher nur die Stufe, danach lag der Weltmarkt über seiner Grenze); freie Stellen nach der Stufe
+    const mp = R.TECH_STELLEN[g.auf[b] || g.stufe[b]] - g.ruht[b];
+    if (g.auf[b] && !neu) Z.mitAnbau = (Z.mitAnbau || 0) + 1;
+    const umland = v.lohnt && v.tp + mp <= R.TECH_ANTEIL * (v.wp + mp), welt = R.WELT / (v.wt + mp) >= R.LOHN_TECH + 8;
+    if (g.markt[b] === 0 && !umland) fehl('markt', `Tag ${S.tag}: Umland ohne Platz (wp ${v.wp}, tp ${v.tp}, +${mp})`);
+    if (g.markt[b] === 1 && (umland || !welt)) fehl('markt', `Tag ${S.tag}: Welt, obwohl ${umland ? 'das Umland Platz hatte' : 'die Welt keinen Platz hatte'} (wt ${v.wt}, +${mp})`);
+    if (g.markt[b] === 1) { Z.welt++; if (S.weltPlaetze !== v.wt + mp) fehl('markt', `Tag ${S.tag}: weltPlaetze ${S.weltPlaetze} statt ${v.wt} + ${mp}`); }
+    else if (S.techPlaetze !== v.tp + mp || S.werkstattPlaetze !== v.wp + mp) fehl('markt', `Tag ${S.tag}: Umland-Stellen nicht mitgezählt`);
+  };
+  mc.__an = (S, b) => { const g = S.g; if ((g.typ[b] === WERKSTATT || g.typ[b] === TECH) && g.besitzer[b] >= 0) kraft.add(b); };
+  mc.__zu = (S, b) => { kraft.delete(b); };
+  mc.__umzug = (S, alt, w) => { if (kraft.has(alt)) kraft.add(w); kraft.delete(alt); };
+  let pleiten = [];
+  mc.__pleite = (S, b) => { const g = S.g; pleiten.push({ b, nr: S.buchNr, ohne: (g.typ[b] === WERKSTATT || g.typ[b] === TECH) && !kraft.has(b), typ: g.typ[b], kraft: g.kraft[b] }); };
+  mc.__preis = (S, ea, wa) => {
+    const g = S.g, P = S.p; let e = 0, w = 0;
+    for (let b = 0; b < S.gAnzahl; b++) { const t = g.typ[b]; if ((t !== WERKSTATT && t !== TECH) || g.leer[b] || S.feld[g.y[b] * S.karte + g.x[b]] !== t) continue;
+      let n = 0; for (const q of S.belegschaft[b]) if (!P.frei[q] && !P.einsatz[q] && P.bund[q] !== Sim.ERSATZDIENST) n++;
+      if (t === TECH && g.markt[b]) w += n; else e += n; }
+    Z.preis++;
+    if (e !== ea || w !== wa || S.weltPreis !== (R.WELT > 0 ? Math.min(R.EXPORT_MAX, R.WELT / Math.max(1, w)) : 0)) fehl('weltpreis', `Tag ${S.tag}: Arbeitstage ${ea}/${wa} statt ${e}/${w}, Preis ${S.weltPreis}`);
+  };
+  mc.__kz = (S) => {
+    const g = S.g; let tf = 0, wt = 0, tp = 0, wp = 0;
+    for (let b = 0; b < S.gAnzahl; b++) { const t = g.typ[b];
+      if (t === WERKSTATT && !g.leer[b]) wp += b === S.bauhof ? R.STELLEN_STADT : Sim.stellen(S, b);
+      if (t !== TECH) { if (g.markt[b]) fehl('feld', `Tag ${S.tag}: Markt bei Typ ${t}`); continue; }
+      if (g.markt[b] && g.ruht[b]) fehl('ruht', `Tag ${S.tag}: Firma in der Welt mit ruhenden Stellen`);
+      if (g.leer[b]) continue;
+      const n = Sim.techPlaetzeVon(S, b); if (g.markt[b]) wt += n; else { tp += n; wp += n; }
+      if (g.besitzer[b] >= 0) tf += Math.max(0, R.TECH_STELLEN[g.stufe[b]] - g.ruht[b] - S.belegschaft[b].length); }
+    Z.nachte++;
+    if (tf !== S.techFrei || wt !== S.weltPlaetze || tp !== S.techPlaetze || wp !== S.werkstattPlaetze) fehl('zaehl', `Tag ${S.tag}: frei ${S.techFrei}/${tf}, Welt ${S.weltPlaetze}/${wt}, Tech ${S.techPlaetze}/${tp}, Umland ${S.werkstattPlaetze}/${wp}`);
+    if (wt > 0 && R.WELT / wt < R.LOHN_TECH + 8 - 1e-9) fehl('weltgrenze', `Tag ${S.tag}: ${wt} Stellen in der Welt, ein Arbeitstag ${(R.WELT / wt).toFixed(1)}`);
+  };
+  let it = null;
+  mc.__itVor = (S) => { const g = S.g, f = S.angebot[Sim.COMPUTER] >= 0 && M.__offen(S, S.angebot[Sim.COMPUTER]) ? S.angebot[Sim.COMPUTER] : -1, kassen = new Map();
+    for (let b = 0; b < S.gAnzahl; b++) if (g.typ[b] === LADEN) kassen.set(b, g.kasse[b]);
+    return { f, umsatz: f >= 0 ? g.umsatz[f] : 0, budget: S.budget, kassen, bedarf: M.schulITBedarf(S) }; };
+  mc.__itNach = (S, v, r) => {
+    const g = S.g, anteil = Math.round(R.PREIS[Sim.COMPUTER] * R.LADEN_ANTEIL); Z.it += r.geraete;
+    if (!r.geraete) return;
+    let kasse = 0; for (const [b, k] of v.kassen) kasse += g.kasse[b] - k;
+    const stadtAnteil = S.budget - (v.budget - r.taler);
+    if (r.taler !== r.geraete * R.PREIS[Sim.COMPUTER]) fehl('it', `Tag ${S.tag}: ${r.taler} Taler für ${r.geraete} Computer`);
+    if (v.f < 0) { Z.itAussen += r.geraete; if (r.aussen !== r.geraete || stadtAnteil !== 0 || kasse !== 0) fehl('it', `Tag ${S.tag}: ohne Computer der Stadt im Regal, aber Geld an Läden oder Firmen`); return; }
+    Z.itLaden += r.geraete - r.aussen;
+    const imLaden = r.geraete - r.aussen;
+    if (r.aussen || g.umsatz[v.f] - v.umsatz !== imLaden * (R.PREIS[Sim.COMPUTER] - anteil) || kasse + stadtAnteil !== imLaden * anteil)
+      fehl('it', `Tag ${S.tag}: ${r.geraete} Computer, Firma +${g.umsatz[v.f] - v.umsatz}, Läden +${kasse}, Laden der Stadt +${stadtAnteil}`);
+    for (const [b, n] of v.bedarf.schulen) { void n; const l = MT.ladenNaechst(S, g.x[b], g.y[b]);
+      let best = -1, bd = 1e9; for (let q = 0; q < S.gAnzahl; q++) if (g.typ[q] === LADEN && M.__offen(S, q)) { const d = Math.abs(g.x[q] - g.x[b]) + Math.abs(g.y[q] - g.y[b]); if (d < bd) { bd = d; best = q; } }
+      if (l !== best) fehl('it', `Tag ${S.tag}: Laden ${l} statt ${best}`); }
+  };
+  for (const seed of [1, 2, 3]) {
+    const S = M.neueStadt(seed); kraft = new Set(); let buchNr = 0;
+    while (S.tag < 730) {
+      const t0 = S.tag; M.stunde(S);
+      for (const pl of pleiten) {                            // die Zeile jeder Pleite: „gibt auf“ genau ohne je eine Kraft
+        const e = S.buch.find(x => x.nr > pl.nr && (x.art === 'pleite' || x.art === 'aufgabe'));
+        if (!e) { fehl('aufgabe', `Tag ${S.tag}: keine Zeile zur Pleite`); continue; }
+        if (e.art === 'aufgabe') Z.aufgabe++; else Z.pleiteMit++;
+        if ((e.art === 'aufgabe') !== pl.ohne || (pl.ohne && pl.kraft) || (!pl.ohne && pl.typ !== LADEN && !pl.kraft)) fehl('aufgabe', `Tag ${S.tag}: ${e.art} bei ${pl.ohne ? 'nie' : 'schon'} einer Kraft (Feld ${pl.kraft})`);
+        if (e.art === 'aufgabe' && !/fand keine Leute/.test(e.text)) fehl('aufgabe', 'Text');
+      }
+      pleiten = [];
+      if (S.tag !== t0) {
+        for (const e of S.buch) if (e.nr > buchNr && e.art === 'stufe' && /Kleinstadt/.test(e.text)) { Z.kleinstadtZeile++; if (!/Tech-Firmen, sobald Tüftler sie gründen/.test(e.text)) fehl('stufe', 'Zeile der Kleinstadt ohne Tech-Firmen'); }
+        buchNr = S.buchNr;
+        if (S.techPlaetze > R.TECH_ANTEIL * S.werkstattPlaetze + 1e-9) fehl('grenze', `Tag ${S.tag}: Tech im Umland ${S.techPlaetze} von ${S.werkstattPlaetze}`);
+        try { T.tech9Pruefen(S, true); } catch (e) { fehl('pruefen', `Tag ${S.tag}: ${e.message}`); }
+      }
+    }
+  }
+  for (const k of ['dorf', 'stufe', 'bremse', 'frei', 'preis', 'markt']) pruef(!F.has(k), `Gründungen (${Z.gr}, davon ${Z.tech} Tech-Firmen, ${Z.uebern} Übernahmen, ${Z.mitAnbau || 0} davon mit offenem Anbau, ${Z.welt} in die Welt; Tüftler im Dorf: ${Z.dorfTuef}): ${k}` + (F.has(k) ? ` ${F.get(k).n}× – ${F.get(k).join('; ')}` : ' ok'));
+  pruef(!F.has('zaehl') && !F.has('weltgrenze') && !F.has('feld') && !F.has('ruht') && !F.has('grenze') && !F.has('pruefen'), `${Z.nachte} Nächte: freie Tech-Stellen, Stellen in der Welt, Tech- und Umland-Stellen unabhängig nachgezählt, Grenze der Welt, 40 % nur im Umland, Markt nur bei Tech-Firmen, nichts ruht in der Welt, tech9Pruefen`
+    + ['zaehl', 'weltgrenze', 'feld', 'ruht', 'grenze', 'pruefen'].filter(k => F.has(k)).map(k => ` – ${k}: ${F.get(k).join('; ')}`).join(''));
+  pruef(!F.has('weltpreis') && Z.preis > 0, `${Z.preis} Nächte: Preis je Arbeitstag in der Welt = min(${R.EXPORT_MAX}, ${R.WELT} / Arbeitstage in der Welt), Arbeitstage unabhängig gezählt` + (F.has('weltpreis') ? ' – ' + F.get('weltpreis').join('; ') : ''));
+  pruef(!F.has('aufgabe') && Z.aufgabe > 0 && Z.pleiteMit > 0, `Pleiten: ${Z.aufgabe}-mal „gibt auf, fand keine Leute“ (nie eine Kraft), ${Z.pleiteMit}-mal „pleite“ (mit Kraft oder Laden)` + (F.has('aufgabe') ? ' – ' + F.get('aufgabe').join('; ') : ''));
+  pruef(!F.has('it') && Z.it > 0 && Z.itLaden > 0, `Computer der Schulen: ${Z.it} gekauft, ${Z.itLaden} aus einem Laden der Stadt (nächster Laden, Anteil des Ladens, Rest an die Firma), ${Z.itAussen} von außerhalb (nur ohne Computer der Stadt im Regal)`
+    + (F.has('it') ? ' – ' + F.get('it').join('; ') : ''));
+  pruef(!F.has('stufe') && Z.kleinstadtZeile === 3, `Stadtbuch: die Zeile zur Kleinstadt nennt „Tech-Firmen, sobald Tüftler sie gründen“ (${Z.kleinstadtZeile} von 3)`);
+
+  console.log('D Speichern, beschädigte Stände, Übernahme von Version 8');
+  {
+    const A = Sim.neueStadt(1); bis(Sim, A, 420, 13);
+    const welt = Sim.techInfo(A).weltFirmen, text = speichernAlsText(Sim, A), B = ladenAusText(Sim, text);
+    const g0 = fingerabdruck(Sim, A) === fingerabdruck(Sim, B);
+    bis(Sim, A, 450, 13); bis(Sim, B, 450, 13);
+    pruef(welt > 0 && g0 && fingerabdruck(Sim, A) === fingerabdruck(Sim, B), `Seed 1, gespeichert an Tag 420 um 13 Uhr mit ${welt} Firmen in der Welt: 30 Tage bitgleich (${fingerabdruck(Sim, A)})`);
+    const kaputt = [
+      ['Markt 2', (d) => { const a = d.arrays.find(x => x.name === 'g.markt'); const u = Buffer.from(a.b64, 'base64'); const b = A.g.typ.findIndex((t, i) => i < A.gAnzahl && t === TECH); u[b] = 2; a.b64 = u.toString('base64'); }],
+      ['Markt bei einer Werkstatt', (d) => { const a = d.arrays.find(x => x.name === 'g.markt'); const u = Buffer.from(a.b64, 'base64'); u[A.bauhof] = 1; a.b64 = u.toString('base64'); }],
+      ['Kraft bei einem Laden', (d) => { const a = d.arrays.find(x => x.name === 'g.kraft'); const u = Buffer.from(a.b64, 'base64'); const b = A.g.typ.findIndex((t, i) => i < A.gAnzahl && t === LADEN); u[b] = 1; a.b64 = u.toString('base64'); }],
+      ['techFrei −1', (d) => { d.werte.techFrei = -1; }], ['techFrei 1,5', (d) => { d.werte.techFrei = 1.5; }], ['techFrei fehlt', (d) => { delete d.werte.techFrei; }],
+      ['weltPreis 150', (d) => { d.werte.weltPreis = 150; }], ['weltPreis fehlt', (d) => { delete d.werte.weltPreis; }], ['weltPlaetze fehlt', (d) => { delete d.werte.weltPlaetze; }],
+      ['Summe welt fehlt', (d) => { delete d.json.stat.tech.welt; }], ['aufgegeben mehr als Pleiten', (d) => { d.json.stat.aufgegeben = d.json.stat.pleiten + 1; }],
+      ['Feld g.markt fehlt', (d) => { d.arrays = d.arrays.filter(x => x.name !== 'g.markt'); }], ['Feld g.kraft fehlt', (d) => { d.arrays = d.arrays.filter(x => x.name !== 'g.kraft'); }],
+    ];
+    const meld = [];
+    for (const [was, f] of kaputt) {
+      const d = JSON.parse(text); f(d); let e = null;
+      try { ladenAusText(Sim, JSON.stringify(d)); } catch (x) { e = x; }
+      meld.push(`${was}: ${e ? e.message : 'ANGENOMMEN'}`);
+      if (!e || !/^Spielstand (beschädigt|unvollständig)/.test(e.message)) fehler++;
+    }
+    console.log((meld.every(m => /beschädigt|unvollständig/.test(m)) ? '  ok   ' : '  FEHL ') + `${kaputt.length} beschädigte Stände abgelehnt: ` + meld.join('; '));
+    // Übernahme von Version 8 (stadt.orig.html): alle im Umland, Bremse gleich gezählt, „hatte eine Kraft“ nach heute, Summen 0; gründet am selben Tag
+    const V8 = lade(simCode(readFileSync(join(hier, '..', 'stadt.orig.html'), 'utf8')));
+    const Q = V8.neueStadt(2); bis(V8, Q, 250, 10);
+    const d8 = V8.exportZustand(Q), kopie8 = () => ({ ...d8, werte: JSON.parse(JSON.stringify(d8.werte)), json: JSON.parse(JSON.stringify(d8.json)), arrays: d8.arrays.map(a => ({ ...a, daten: a.daten.slice() })) });
+    const U = Sim.importZustand(kopie8(), true), g = U.g;
+    let tf = 0, markt = 0, kraftFalsch = 0;
+    for (let b = 0; b < U.gAnzahl; b++) { if (g.markt[b]) markt++;
+      const soll = (g.typ[b] === WERKSTATT || g.typ[b] === TECH) && U.belegschaft[b].length > 0 ? 1 : 0; if (g.kraft[b] !== soll) kraftFalsch++;
+      if (g.typ[b] === TECH && !g.leer[b] && g.besitzer[b] >= 0) tf += Math.max(0, Sim.stellen(U, b) - U.belegschaft[b].length); }
+    const vor = U.stat.tech.gruendungen; bis(Sim, U, 280, 10);
+    pruef(markt === 0 && U.techFrei >= 0 && kraftFalsch === 0 && U.stat.aufgegeben >= 0 && Number.isFinite(U.budget) && Number.isFinite(U.weltPreis),
+      `Version 8 (Seed 2, Tag 250) übernommen: alle Tech-Firmen im Umland, Bremse gleich gezählt (${tf}), „hatte eine Kraft“ nach heute; 30 Tage weiter ohne NaN, ${U.stat.tech.gruendungen - vor} Tech-Gründungen`);
+    const U2 = Sim.importZustand(kopie8(), true);
+    pruef(U2.techFrei === tf && typeof T.techGruendungJetzt(U2) === 'boolean', `direkt nach der Übernahme: techFrei ${U2.techFrei} (nachgezählt ${tf}), Gründungen nicht bis Mitternacht gesperrt (Befund der Gegenprüfung)`);
+  }
+
+  console.log('E Namenstausch (Seed 2, 450 Tage)');
+  {
+    const { Sim: N } = ladeSimMit([['const STRASSEN = [', 'NACHNAMEN.reverse(); VORNAMEN_W.reverse(); VORNAMEN_M.reverse();\nconst STRASSEN = [']]);
+    const A = Sim.neueStadt(2), B = N.neueStadt(2); bis(Sim, A, 450); bis(N, B, 450);
+    const spur = (S) => { const h = createHash('sha256'); for (const n of Object.keys(S.p).sort()) if (ArrayBuffer.isView(S.p[n])) { const a = S.p[n], w = a.length / S.pKap; h.update(n); h.update(Buffer.from(a.buffer, a.byteOffset, S.pMax * w * a.BYTES_PER_ELEMENT)); }
+      for (const n of Object.keys(S.g).sort()) if (ArrayBuffer.isView(S.g[n])) { const a = S.g[n]; h.update(n); h.update(Buffer.from(a.buffer, a.byteOffset, a.byteLength)); }
+      h.update(JSON.stringify(S.stat)); h.update(String(S.rs) + '/' + S.rsSich + '/' + S.rsAuto + '/' + S.budget + '/' + S.techFrei + '/' + S.weltPlaetze); h.update(S.buch.map(e => e.art).join()); return h.digest('hex').slice(0, 16); };
+    const i = Sim.techInfo(A);
+    pruef(Sim.name(A, 5) !== N.name(B, 5) && spur(A) === spur(B) && i.weltFirmen > 0, `Namen getauscht („${Sim.name(A, 5)}“ heißt dort „${N.name(B, 5)}“): ${i.umlandFirmen} Tech-Firmen im Umland, ${i.weltFirmen} in der Welt, bitgleich (${spur(A)})`);
+  }
+
+  console.log('F Messung und Gruppen (nur gemessen, keine Regel liest diese Merkmale)');
+  {
+    const seeds = arg('gruppenSeeds', '1,2,3').split(',').map(Number), G = new Map(), g = (n) => { if (!G.has(n)) G.set(n, { erw: 0, gr: 0, tech: 0, welt: 0, techTage: 0, arbTage: 0 }); return G.get(n); };
+    const gruppen = (S, p) => { const P = S.p; return ['alle', P.elternA[p] >= 0 ? 'in der Stadt geboren' : 'zugezogen oder vom Start', P.nach[p] >= 30 && P.nach[p] <= 36 ? 'Nachnamen Kaya bis Kowalski (Liste 31–37)' : 'übrige Nachnamen', P.weib[p] ? 'Frauen' : 'Männer']; };
+    const erste = [];
+    mc.__vor = (S, p) => ({ typ: MT.gruendungsTyp(S, p), g: gruppen(S, p) }); mc.__nach = (S, p, v, ok) => { if (!ok) return; const b = S.p.besitz[p]; for (const x of v.g) { g(x).gr++; if (S.g.typ[b] === TECH) { g(x).tech++; if (S.g.markt[b]) g(x).welt++; } } };
+    for (const k of ['__kz', '__preis', '__pleite', '__an', '__zu', '__umzug', '__itVor', '__itNach']) mc[k] = null;
+    for (const seed of seeds) {
+      const S = M.neueStadt(seed); let e = -1;
+      while (S.tag < 730) { const t0 = S.tag; M.stunde(S); if (S.tag === t0) continue; if (e < 0 && S.stat.tech.gruendungen) e = S.tag;
+        if (S.tag < 200) continue;
+        const P = S.p, erw = S.tag - R.ERWACHSEN * R.JAHR;
+        for (let p = 0; p < S.pMax; p++) { if (!P.lebt[p] || P.geb[p] > erw) continue; const a = P.arbeit[p], t = a >= 0 && S.g.typ[a] === TECH;
+          for (const x of gruppen(S, p)) { const o = g(x); o.erw++; if (a >= 0) { o.arbTage++; if (t) o.techTage++; } } } }
+      erste.push(`Seed ${seed}: erste Tech-Gründung Tag ${e}, ${Sim.techInfo(S).umlandFirmen} + ${Sim.techInfo(S).weltFirmen} Tech-Firmen an Tag 730`);
+    }
+    mc.__vor = null; mc.__nach = null;
+    console.log('       ' + erste.join('; '));
+    const a = G.get('alle');
+    console.log('       Gründungen ab Tag 0, Erwachsenen- und Arbeitstage ab Tag 200: Anteil an Tech-Gründungen (in die Welt) und an Tech-Arbeitstagen, geteilt durch den Anteil an allen Gründungen bzw. Arbeitstagen');
+    for (const n of ['alle', 'in der Stadt geboren', 'zugezogen oder vom Start', 'Nachnamen Kaya bis Kowalski (Liste 31–37)', 'übrige Nachnamen', 'Frauen', 'Männer']) {
+      const x = G.get(n); if (!x) continue;
+      const v = (z, nn, za, na) => (nn && za ? ((z / nn) / (za / na)).toFixed(2) : '–');
+      console.log(`       ${n.padEnd(44)} Gründungen ${String(x.gr).padStart(4)}  Tech ${v(x.tech, x.gr, a.tech, a.gr)} (Welt ${v(x.welt, x.gr, a.welt, a.gr)})  Tech-Arbeitstage ${v(x.techTage, x.arbTage, a.techTage, a.arbTage)}`);
+    }
+  }
+  console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle Prüfungen zu „Tech-Firmen früher und mehr“ bestanden');
+  process.exit(fehler ? 1 : 0);
+}
+
 if (flag('gate')) {
   const seeds = arg('seeds', '1,2,3').split(',').map(Number);
   let alleOk = true;

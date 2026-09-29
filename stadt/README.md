@@ -2,7 +2,7 @@
 
 Eine Stadt, in der jeder Mensch selbst entscheidet. Projektname vorläufig.
 
-**Stand: Phase 4 plus „richtige Arbeit“, Tech-Firmen, Stadtregierung, „Stadt erweitern“ Teil 1 bis 3 und „Tech-Firmen und Autos“ Teil 1 und 2, Simulation und Darstellung, mit den Befunden der Schlussprüfung (Spielstand-Version 8).** Simulation (Phase 0), 3D-Karte mit Tag und Nacht (1), Speichern
+**Stand: Phase 4 plus „richtige Arbeit“, Tech-Firmen, Stadtregierung, „Stadt erweitern“ Teil 1 bis 3, „Tech-Firmen und Autos“ Teil 1 und 2 und von Version 9 Teil 1 „Rathaus und Bürgermeister“, Teil 2 „Schule“, Teil 3 „Haushalt“, Teil 4 „Wachstum, Tempo und KI“ und Teil 5 „Tech-Firmen früher und mehr“ samt den Befunden der Schlussprüfung von Version 9, Simulation und Darstellung (Spielstand-Version 9).** Simulation (Phase 0), 3D-Karte mit Tag und Nacht (1), Speichern
 und Aufholen (2), laufende Figuren und Personenkarten (3), Hauptfiguren mit Ollama (4). Danach auf Noahs Wunsch: Bauarbeiter
 vom Bauhof bauen die Häuser, Werkstätten machen Kisten für die Läden, man sieht die Leute bei der Arbeit, und Bewohner gründen
 Tech-Firmen für Software, Handys oder Computer; Hauptfiguren, die dort programmieren, schreiben über Ollama echten Code. Von Anfang
@@ -24,7 +24,27 @@ Simulation mit ihm den Ort wechselt, sonst steht es vor dem Haus, auf dem Werksp
 Leuchtlogos, das Werk hat Hallen, Showroom, Teststrecke und einen Turm mit Neuwagen, und am Abend einer Eröffnung steht ein ruhiger Lichtkegel
 über der Firma. Nach der Schlussprüfung fährt ein Auto im Bild nur noch, wenn sein Besitzer genau diesen Weg damit macht (sonst springt es,
 etwa beim Umzug), die Käufer kommen jeden Tag in gemischter Reihenfolge dran, und Karten und Fenster sind nachgezogen (Abschnitt „Befunde der
-Schlussprüfung (Version 8)“). Phase 4 ist nur gegen einen nachgebauten Ollama-Server getestet, nicht gegen ein echtes Sprachmodell (siehe „Bekannte Schwächen“).
+Schlussprüfung (Version 8)“). In Version 9 (Teil 1) hat jede Stadt vom ersten Tag an ein Rathaus in der Mitte an der Hauptstraße, das mit
+der Stufe ausgebaut wird, und die Erwachsenen wählen einen parteilosen Bürgermeister oder eine Bürgermeisterin, der als Hauptfigur im
+Rathaus arbeitet (Abschnitt „Rathaus und Bürgermeister (Version 9, Teil 1)“). In Teil 2 kam die Schule dazu: Alle Kinder, die hier wohnen, gehen vom
+6. bis zum 18. Geburtstag zur Schule, erst in eine Grundschule, dann in eine weiterführende Schule für alle; die Stadt baut sie in Wohnnähe,
+sobald dort eine Klasse zusammenkommt (vorher gehen die Kinder im Nachbarort zur Schule), das Land stellt und bezahlt die Lehrkräfte, und die
+Schulen kaufen Computer (seit Teil 5 wie die Leute im Laden der Stadt, sonst von außerhalb; Abschnitt „Schule (Version 9, Teil 2)“). In Teil 3 kam der Haushalt dazu: Jede
+Einnahme und Ausgabe steht auf einem Konto, und je Haushaltsjahr (10 Tage) gibt die Stadt das Geld über einer Rücklage erst für Vorhaben aus
+(Wohnungen auf Vorrat, Rathaus-Ausbau, Parks, die Rangfolge legt der Bürgermeister fest; die Computer der Schulen seit Teil 5 als Bedarf davor), was dann übrig bleibt, gibt
+sie über eine niedrigere Lohnsteuer an die Leute zurück, bis 0 % (Zeile „Budget“ und Fenster „Haushalt“; Abschnitt „Haushalt (Version 9,
+Teil 3)“). In Teil 4 kommen schneller mehr Leute: Bis die Stadt 160 Einwohner hat, hilft jeder Stadt ein Anlauf (mehr Zuzug am Tag, im Dorf auch für
+Stellen im Laden und im Bauhof; wer zuzieht, kommt weiter nur für eine freie Stelle), und in den Einstellungen gibt es Noahs Schalter „Wachstum:
+normal / schnell“; das Tempo geht bis 100×, und die KI der Hauptfiguren und des Bürgermeisters entscheidet bei jedem Tempo mit, mit einer Frist von
+mindestens 20 echten Sekunden und einem Zähler „zu spät“ (Abschnitt „Wachstum, Tempo und KI (Version 9, Teil 4)“). In Teil 5 kommen Tech-Firmen
+früher und es gibt mehr davon: Tüftler gründen sie ab der Kleinstadt und sparen, statt eine Werkstatt zu gründen, eine Personalbremse wartet, bis die
+Tech-Firmen ihre Stellen besetzt haben, jeder Bau einer Tech-Firma kostet 166⅔ Taler je Arbeitstag, und neben dem Umland gibt es einen
+Weltmarkt, in den Tech-Firmen verkaufen, wenn das Umland voll ist; ohne Geld der Stadt (Abschnitt „Tech-Firmen früher und mehr (Version 9,
+Teil 5)“). Danach sind die Befunde der Schlussprüfung von Version 9 (Technik, Texte, Bedienung) umgesetzt: Wer zuzieht, kommt jetzt genau
+nach R10 nur für eine freie Stelle, die niemand aus der Stadt nehmen kann, die Grenze der Hauptfiguren hält auch nach einer Amtszeit, das
+Tagebuch zeigt, was geklappt hat, Noahs Regel „erst ausgeben, dann senken“ ist im Fenster als seine Spielregel gekennzeichnet, und Leiste,
+Tastatur, Meldungen und Texte sind nachgezogen (Abschnitt „Befunde der Schlussprüfung (Version 9)“). Phase 4 ist nur gegen einen
+nachgebauten Ollama-Server getestet, nicht gegen ein echtes Sprachmodell (siehe „Bekannte Schwächen“).
 
 ## Starten
 
@@ -60,10 +80,12 @@ Ohne Ollama läuft alles, die Hauptfiguren entscheiden dann mit dem normalen Geh
    `0.0.0.0` ist das laut Ollama-Quellcode (`envconfig/config.go`) nicht nötig.
 
 Was passiert: Um 7 und 18 Uhr und nach Ereignissen fragt eine Hauptfigur das Modell (höchstens 3-mal pro Spieltag). Die
-Stadt wartet nicht. Kommt in 2 Spielstunden keine gültige Antwort, entscheidet das normale Gehirn. Bei 20× gibt es keine
-KI-Entscheidungen, Gespräche gehen trotzdem. Jeder Gedanke landet im Tagebuch der Figur (die letzten 30).
+Stadt wartet nicht. Kommt in der Frist (mindestens 2 Spielstunden) keine gültige Antwort, entscheidet das normale Gehirn. Seit Version 9, Teil 4 entscheidet die KI
+bei jedem Tempo mit (vorher „KI pausiert bei 20×“; **weicht vom Wortlaut der Spec ab**, Noahs Auftrag): Eine Antwort hat dann mindestens
+20 echte Sekunden, bei 20× also 7, bei 100× 34 Spielstunden, bei vielen Hauptfiguren mehr (höchstens 36). Was später kommt, zählt als „zu spät“
+(Einstellungen, Debug-Ecke). Gespräche gehen bei jedem Tempo. Jeder Gedanke landet im Tagebuch der Figur (die letzten 30).
 Hauptfiguren, die in einer Tech-Firma programmieren, bitten das Modell außerdem einmal am Spieltag um ein kleines Stück Code
-für ihre Arbeit. Es steht dann im Tagebuch und wird nie ausgeführt.
+für ihre Arbeit, wenn keine Entscheidung wartet und die Antwort vor 17 Uhr kommen kann. Es steht dann im Tagebuch und wird nie ausgeführt.
 
 ## Was die Leute arbeiten
 
@@ -175,7 +197,7 @@ Bild etwa 20 px Radius groß (Pleite und Schließung ziehen sich auf etwa 10 px 
 aber nicht mehr von den Nachbarhäusern verdeckt. Nah (Ring weniger als 45 Einheiten von der Kamera) bleibt er am Boden. Die Simulation meldet
 dafür nichts: Die Karte vergleicht stündlich jedes Gebäude mit der Stunde davor (Baustelle → fertig, Stufe, leer/offen). Eine
 Gründung auf freiem Bauplatz zeigt sich also erst, wenn der Bau fertig ist. Höchstens 12 Ringe zugleich, mehrere leicht
-nacheinander, bei 20× höchstens 3 je Stunde (das Gebäude der offenen Karte zuerst); keine beim Start, nach Import oder Aufholen und nach Sprüngen über mehr als 3
+nacheinander, ab 20× (auch bei 100×) höchstens 3 je Stunde (das Gebäude der offenen Karte zuerst); keine beim Start, nach Import oder Aufholen und nach Sprüngen über mehr als 3
 Stunden. Bei reduzierter Bewegung steht der Ring still und ist nach 3 Sekunden ohne Übergang weg. Nicht klickbar; solange ein
 Ring läuft, 1 Draw Call und 2 Dreiecke je Ring mehr, sonst nichts (ein Shader-Programm mehr, schon beim Start übersetzt).
 Im Browser geprüft (Lage, Farbe, Draw Calls, Drosselung, reduzierte Bewegung).
@@ -291,7 +313,7 @@ Haushalt, Partner, Wohnung (Entfernung zur Kita), Stelle und ihren Lohn, eigenen
 | R07 Grundsicherung, gemeinnützige Arbeit | wirkt | S. 25 | Tagesbedarf vom Bund; nach 5 Spieltagen (6 Monaten) gemeinnützige Arbeit im Bauhof, ohne Lohn |
 | R08 Keine Werkstatt der Stadt als Notbremse | Auslegung | S. 13 | Regel 5 des Bauamts entfällt |
 | R09 Einheimischen-Modell | wirkt | S. 37 (S. 112) | Suchen Leute, die schon hier wohnen, eine Wohnung, bleiben so viele freie Wohnungen für sie frei |
-| R10 Zuzug nur für eine freie Stelle | galt schon | S. 113 (S. 20, S. 100) | Unverändert (Annahme 11); die „heimischen Potenziale“ sind alle, die in der Stadt wohnen |
+| R10 Zuzug nur für eine freie Stelle | galt schon | S. 113 (S. 20, S. 100) | Unverändert (Annahme 11); die „heimischen Potenziale“ sind alle, die in der Stadt wohnen. Seit der Schlussprüfung von Version 9 genau: am Tag höchstens so viele, wie Stellen frei sind, die niemand aus der Stadt nehmen kann (vorher kamen an manchen Tagen mehr) |
 | R11 Mieter kaufen ihre Wohnung (Schritt 2) | wirkt | S. 37 (S. 36, S. 60) | Für 20 Jahresmieten (2.400/2.800/3.200 Taler), mindestens 20 % angezahlt, Rest zinslos in Raten so hoch wie die Miete; Rückkauf beim Auszug zum bezahlten Betrag, Erbe im Haushalt |
 | R12 Rente ohne Abschlag nach 45 Beitragsjahren (Schritt 2) | wirkt | S. 18 | Wer mit 45 Beitragsjahren angestellt ist, kann jederzeit mit voller Rente aufhören; wer einen eigenen Betrieb hat, kann ihn nicht aufgeben und bekommt vor 67 Rente nur, wenn der Betrieb schließt; wer mit 45 Beitragsjahren die Stelle verliert, ist damit in Rente; ab 67 Rente für jeden, auch neben Arbeit oder Betrieb. Dass niemand mehr mit 67 aufhören muss, ist eine Modellkorrektur der Stadt |
 | R13 Rentner-Freibetrag (Schritt 2) | wirkt | S. 20 (S. 15) | Rentner mit Lohn haben 23 Taler am Tag zusätzlich steuerfrei (12.000 €), höchstens den eigenen Lohn |
@@ -2986,6 +3008,2201 @@ die erste Kraft, die noch keine Hauptfigur ist, in `autos.cjs` das Werk steil vo
   stimmt ab 8 Uhr, nimmt jemand erst später frei (späte KI-Antwort), ab der nächsten Stunde.
 - **Kein Gebrauchtwagenmarkt, keine Unfälle, kein Parkraum als Regel der Stadt;** nur Benziner; Kosten und Preis sind ein Modell.
 
+## Rathaus und Bürgermeister (Version 9, Teil 1)
+
+Noahs Auftrag für Version 9: „Rathaus ab Tag 0“, dazu seine Wahl „eine KI-Hauptfigur als Bürgermeister“. Rathäuser, Bürgermeister und
+Bürgernähe kommen im Wahlprogramm nicht vor (Textsuche über alle Seiten nach „Rathaus“, „Bürgermeister“, „bürgernah“,
+„Gemeindeverwaltung“, „Stadtverwaltung“ und „öffentlichen Dienst“: 0 Treffer). Beides ist deshalb eine **Spielregel der Stadt**, keine
+Maßnahme der Stadtregierung. Grundlage war der Entwurf „rathaus“ (auf Version 7 gebaut) mit allen Befunden seiner Gegenprüfung; er ist
+hier von Hand auf Version 8 (Git 31ce452) übertragen und um die Bürgermeisterwahl ergänzt. Teil 2 bis 5 von Version 9 (Schule, Haushalt,
+Wachstum, Tempo und KI) bauen darauf auf; die Schnittstellen dafür stehen unten.
+
+### Regeln: Rathaus
+
+- **Ab Tag 0 in der Mitte.** Das Rathaus hat ein eigenes Gelände aus 2 × 1 Blöcken (7 × 3 Felder) nördlich der Hauptstraße, genau an
+  der Mitte; die Rasterlinie durch die Mitte gehört dazu, das Tor liegt an der Hauptstraße. Hinten steht das Haus, davor der
+  Rathausplatz mit Weg, Bäumen, Bänken und dem Fahnenmast der Stadt. Die beiden Start-Wohnhäuser stehen dafür südlich neben Bauhof und
+  Laden. Nördlich der Mitte geht deshalb von der Kreuzung keine Straße ab.
+- **Ausbau mit der Stufe.** Im Dorf ist es ein Gemeindeamt (zwei Geschosse, Dachreiter mit Uhr). Erreicht die Stadt eine neue Stufe,
+  bekommt der Bauhof einen Ausbau: Kleinstadt Turm mit Uhr und Kupferhelm, Stadt drei Geschosse und Brunnen, Großstadt zwei Flügel zum
+  Platz. 16, 24 und 36 Arbeitstage zu 200 Taler, also 3.200, 4.800 und 7.200 Taler aus dem Budget, und nur, wenn danach noch einmal so viel
+  und ein Wohnhaus im Budget bleiben (die Löhne der Stadt gehen vor). Die Verwaltung arbeitet während des Ausbaus weiter.
+- **Verwaltung.** Stellen = Einwohner × 4,7 je 1.000 (gerundet), mindestens 1, 2, 3 und 5, höchstens 3, 6, 12 und 40 je Ausbaustufe.
+  Dazu kommt die Stelle für das Bürgermeisteramt. Den Lohn zahlt die Stadt aus dem Budget nach der Regel von Bauhof und Kita: anfangs
+  95 Taler am Tag, +2 je Nacht, solange Stellen offen sind, −1 mit mehr Leuten als Stellen, höchstens 120. Dazu 30 Taler laufende Kosten am
+  Tag, keine Gebühren. Wer eine Stelle sucht, nimmt sie wie jede andere: die nächste freie oder eine besser bezahlte (Hauskarte und Fenster
+  sagen jetzt beide dasselbe; Befund der Gegenprüfung).
+- **Zuzug.** Freie Stellen im Rathaus locken Zuzug wie die Stellen des Landes (RA7). Das ist eine gewollte Ausnahme von der Regel, dass
+  Stellen, die die Stadt selbst bezahlt (Kitas, Bauhof), niemanden anlocken: Die Stadt schreibt ihre Verwaltung aus (Noahs Wunsch nach
+  schnellerem Zuzug), und einen Boom wie bei den Läden kann es nicht geben, denn es sind nie mehr als 0,47 % der Einwohner (höchstens 40), und
+  mehr werden es nur mit mehr Einwohnern. Die Zuzugszeile im Stadtbuch nennt „im Rathaus“, solange es offen ist; sie ist dafür eine
+  erweiterbare Liste (`wo` in `zuzug()`), an die Teil 2 (Schule) anbauen kann.
+- **Figuren (Grundregel).** Wer in der Verwaltung arbeitet, steht von 8 bis 17 Uhr auf dem Rathausplatz vor dem Eingang, in zwei Reihen
+  zu sechs, die Mitte bleibt frei. Das Gelände ist der Arbeitsplatz der Simulation, wie der Antreteplatz der Kaserne. Abends und nachts
+  steht dort niemand (tests/rathaus.cjs prüft das Stunde für Stunde).
+- **Ältere Spielstände.** Beim Übernehmen baut die Stadt ihr Rathaus so nah an der Mitte, wie ein Gelände (2 × 1 oder 1 × 2 Blöcke, sonst
+  ein Block) an einer Straße frei ist. Dafür darf sie Brache (leere Felder, Bauplätze) und höchstens einen fertigen Park nehmen
+  (Noahs Entscheidung), nie ein Wohnhaus, einen Betrieb oder eine Straße. Ein Park, der weicht, wird selbst das Rathausgebäude (seine
+  Nummer), sein Feld gehört dann zum Gelände. Gebaut wird gleich in der Ausbaustufe der Stadt, mit den Arbeitstagen und Kosten bis dahin
+  (Dorf 12 Tage und 2.400 Taler, Großstadt 88 Tage und 17.600 Taler). Fehlen Platz oder Geld, versucht es die Stadt jede Nacht wieder.
+  Gemessen auf 26 Ständen der Versionen 2 bis 8: 6 bis 26 Felder von der Mitte, offen nach 4 bis 24 Tagen, kein Gebäude und kein belegtes
+  Feld verändert. In der Mitte selbst ist bei alten Ständen fast nie ein ganzer Block frei; einen Park hat die Stadt auf diesen Ständen nie
+  genommen, der Fall ist erzwungen geprüft.
+
+### Regeln: Bürgermeister
+
+- **Direktwahl.** In allen 13 Flächenländern wählen die Bürger ihren Bürgermeister direkt. Die Stadt wählt an Tag 0 (die zehn ersten
+  Erwachsenen) und danach alle 70 Spieltage, früher, wenn das Amt frei wird (Tod, Wegzug, Haft; dann in der nächsten Nacht). Nach einer
+  Übernahme wählt sie in der ersten Nacht, in der das Rathaus steht.
+- **Wählbar** ist, wer erwachsen und unter 65 ist und eine Stelle antreten kann: nicht in Haft, kein eigener Betrieb, nicht im Wehr- oder
+  Ersatzdienst oder als Soldat verpflichtet, nicht in Rente, nicht ohne Kita-Platz ans Kind gebunden.
+- **Kandidaten.** Es treten drei an: wer das Amt hat (wenn wählbar), dazu Wählbare, ausgelost ohne Zurücklegen mit dem Gewicht
+  (1 + Freundschaften) × (1 + Ehrgeiz / 100): Bekanntheit, und wer ehrgeiziger ist, tritt eher an.
+- **Stimmen.** Jeder Erwachsene gibt eine Stimme, für den Kandidaten mit den meisten Punkten: 40 für sich selbst, 25 für den Partner,
+  15 für einen Freund, 2 je Freundschaft des Kandidaten (Bekanntheit), beim Amtsinhaber (Zufriedenheit − 50) × 0,5 (Amtsführung, auch
+  abzüglich) und ein Zufall bis 30 (persönliche Einschätzung). Gewählt ist wie in Sachsen (§ 44a KomWG) im ersten Wahlgang, wer mehr als
+  die Hälfte der Stimmen hat, sonst im zweiten, wer die meisten hat. Vereinfacht (BM4b): Im zweiten Wahlgang treten dieselben an und alle
+  stimmen wie im ersten, deshalb rechnet die Stadt beide in derselben Nacht, und das Stadtbuch nennt den zweiten Wahlgang (Seed 2, Tag 0: „mit
+  5 von 10 Stimmen im zweiten Wahlgang“). Bei Gleichstand gewinnt, wer das Amt hat oder beim Los vorn lag (in Sachsen: das Los). Seit der Schlussprüfung.
+- **Neutral.** Kandidaten und Stimmen lesen nur Alter (erwachsen, unter 65), Haft, Betrieb, Dienst, Rente, Kita-Bindung, Ehrgeiz,
+  Freundschaften, Partner und Zufriedenheit, nie Name, Herkunft, Einzugstag, Eltern oder Geschlecht; eine Staatsangehörigkeit, Sprache oder
+  Religion kennt die Stadt ohnehin nicht (statische Prüfung und Namenstausch in `simtest --buergermeister`). Das Geschlecht liest `bmWahl`
+  nur für das Wort „Bürgermeisterin“ im Stadtbuch, nach der Wahl. Der Zufall ist ein fester Wert je Wahltag und Person (`wahlZufall`), kein
+  Zug aus dem Zufallsstrom der Stadt.
+- **Parteilos.** Niemand in der Stadt hat eine Partei, auch das Bürgermeisteramt nicht. Es leitet die Verwaltung nach den Regeln der
+  Stadtregierung (AfD, keine Person der Stadt) und beschließt nichts für oder gegen Gruppen von Bewohnern (Fenster, Hauskarte und
+  Personenkarte sagen das).
+- **Im Amt** arbeitet der Bürgermeister im Rathaus (eine Stelle zusätzlich zur Verwaltung, Lohn wie sie). Er wechselt nicht, kündigt
+  nicht und gründet nicht, solange das Amt läuft (wie ein Soldat auf Zeit). Wird er abgewählt, verliert er Amt und Stelle und sucht sich
+  eine neue. Stirbt er, zieht weg oder muss in Haft, endet das Amt, die Stelle fällt mit ihm weg, und die Stadt wählt in der nächsten Nacht.
+- **Hauptfigur auf eigenem Platz.** Der Bürgermeister ist Hauptfigur, solange das Amt läuft, zählt nicht gegen die Grenze der anderen
+  Hauptfiguren (höchstens 10), steht zuerst in der Leiste (doppelter Rand, „Bürgermeister“ neben dem Namen) und hat eine Raute über der
+  Figur. Er entscheidet über das Sprachmodell wie jede Hauptfigur (Tagebuch, Gedanken, Gespräch mit Noah); die Prüfungen der Antworten
+  (erlaubte Aktionen, kein Verdacht gegen Namen oder Herkunft) gelten auch für ihn. Die fünf Hauptfiguren einer neuen Stadt sind die
+  ersten Bewohner ohne ihn. Noah kann ihn zusätzlich zu seiner Hauptfigur machen, dann bleibt er es nach der Amtszeit; **seit der
+  Schlussprüfung belegt er dann einen von Noahs Plätzen** (vorher zählte er nicht mit, und nach dem Amtsende waren es 11 von 10 und 12 in der
+  Leiste, für die die Oberfläche keine Figur hatte). Ist Noahs Liste voll, ist „Auch nach der Amtszeit Hauptfigur“ gesperrt, mit Grund.
+- **Jahresentscheidung.** Einmal je Haushaltsjahr (10 Spieltage) legt er die Rangfolge der Vorhaben der Stadt fest, nur aus einer festen
+  Liste von Bauten und Ausgaben für alle. Antwortet das Sprachmodell nicht rechtzeitig (Frist wie bei allen Anfragen) oder ungültig
+  (unbekanntes oder doppeltes Vorhaben, Gedanke mit Verdacht oder mit Herkunft, Religion, Sprache oder Staatsangehörigkeit), gilt die Regel.
+  Seit der Schlussprüfung gilt die Prüfung auf Gruppen für **jeden** Text der Amtsperson (Entscheidung, Gespräch, Tagebuch, Code), dazu keine
+  Partei (`amtFrei`: AfD, CDU, CSU, SPD, FDP, BSW, NPD, MLPD, DKP, „Bündnis 90“, „die Grünen“, „die Linke“, „Partei“, „Wahlkampf“; „parteilos“
+  bleibt erlaubt), und die Anweisung sagt: „Als Bürgermeister sprichst du nicht für oder gegen Parteien oder Gruppen von Bewohnern.“
+  Die Liste füllt Teil 3 (Haushalt); heute ist sie leer, dann gibt es keine Anfrage.
+- **Stadtbuch.** Neue Arten „rathaus“ (Tag 0, Ausbau, Bau nach einer Übernahme) und „wahl“: erste Wahl, Wahl mit Amtsantritt („Amtsantritt
+  morgen (Tag N)“), Wiederwahl, Abwahl, vorzeitiges Ende. Zeilen zum Rathaus nennen keine Namen, Wahlzeilen die Kandidaten.
+
+### Schnittstellen für Teil 2 bis 5
+
+- **Haushalt (Teil 3), Geld:** Das Rathaus ändert das Budget an genau drei Stellen: Bau und Ausbau in `rathausBezahlen(S, k)`, Löhne und
+  laufende Kosten in `wirtschaft()` im Zweig „Betrieb der Stadt“ (`t === RATHAUS`, gezählt in `S.stat.rathaus.lohn` und `.fix`). Dort bucht der
+  Haushalt (eigenes Konto „Rathaus“, Befund der Gegenprüfung). Die Kosten gehören in seine Rücklage, weil das frühe Budget eng ist (unten).
+- **Haushalt, Hauskarte:** `haushaltKurz(S)` liefert `{ budget, stand, zeilen: [[Posten, Taler]], saldo, fenster }`. Heute: Budget,
+  „gestern“, eine Zeile mit den Kosten des Rathauses und die Änderung des Budgets von gestern, `fenster: false`. Teil 3 ersetzt die Funktion
+  durch seine Konten in derselben Form und setzt `fenster: true`; dann zeigt die Hauskarte einen Knopf „Fenster „Haushalt“ ›“, der den Knopf
+  mit der Kennung `haushalt-knopf` drückt (das Fenster baut Teil 3, erreichbar vom Budget-Knopf und vom Rathaus). *Seit Teil 3 so umgesetzt:*
+  acht Zeilen aus den Konten von gestern, `fenster: true`, dazu `satz` (Abschnitt „Haushalt“).
+- **Haushalt, Vorhaben:** `VORHABEN` (Liste von `{ id, name, satz }`, heute leer), `vorhabenRangfolge(S, jahr)` (die Rangfolge für ein
+  Haushaltsjahr: die des Bürgermeisters, sonst die Regel), `vorhabenRegel(S)` (Rückfall: Reihenfolge der Liste; Teil 3 darf eine eigene
+  Regel einsetzen), `haushaltsJahr(S)`. Ablauf: am letzten Tag eines Haushaltsjahres um 7 Uhr eine Anfrage (nur mit KI und mindestens
+  zwei Vorhaben), die Oberfläche fragt das Modell (`rangfolgeAnweisung`, `pruefeRangfolge`) und ruft `bmRangfolge`; ohne gültige Antwort bis
+  zur Frist oder bis zur letzten Nacht des Jahres gilt die Regel (`bmRangfolgeRegel`). Beim Aufholen gibt es keine Anfrage. *Seit Teil 3:*
+  vier Vorhaben (Wohnungen auf Vorrat, Rathaus ausbauen, Computer für die Schulen, Parks in Wohnnähe), der Rathaus-Ausbau ist eins davon. *Seit
+  Teil 5:* drei; die Computer der Schulen sind Bedarf vor den Vorhaben, über den keine Rangfolge entscheidet (Befund 5 der Gegenprüfung „tech“).
+- **Schule (Teil 2, erledigt; Abschnitt „Schule“):** Die Zuzugszeile ist eine Liste `wo`; die Karte „Die Stadt zahlt ihre Verwaltung selbst“ nennt Rathaus, Bauhof und
+  Kitas und muss um die Schule ergänzt werden (Gebäude der Stadt, Lehrkräfte vom Land). `istBetrieb`, `stellen`, `betriebWort`, `berufWort`,
+  `gebOrt`, `kennzahlen` (Zähler `rathaus`) und die Import-Kette haben je einen Zweig für das Rathaus, Schulen kommen daneben.
+- **Wachstum (Teil 4):** Der Bürgermeister kommt an Tag 0 aus den zehn ersten Bewohnern; im Dorf fehlt damit eine Arbeitskraft für Bauhof
+  und Laden. Zählen im Anlauf Laden- und Bauhofstellen für den Zuzug (Entwurf „wachstum“, W3), ist das ausgeglichen. `S.anfragen` rechnet
+  weiter mit der alten Grundzahl.
+- **Tempo und KI:** Die Anfrage für die Rangfolge läuft im selben `kiSchritt` wie die anderen Anfragen, heute nur unter 20× (wie alle; seit Teil 4 bei jedem Tempo).
+
+### Programm (Fenster „Stadtregierung“, neue Gruppe „Rathaus und Verwaltung“)
+
+| Karte | Status | Zitate (wörtlich, gedruckte Seite) |
+|---|---|---|
+| Rathaus von Anfang an, Verwaltung nach Einwohnern | Spielregel | – (kommt im Programm nicht vor) |
+| Bürgermeister: direkt gewählt, ohne Partei | Spielregel | – |
+| Wahl: direkt, eine Stimme je Mensch, ab 18 | Auslegung | „Der Bundespräsident, als höchster Repräsentant des Staates, soll direkt vom Volk gewählt werden.“ (S. 134); „Quotierungen der Wählerschaft nach Geschlecht oder anderen Eigenschaften lehnen wir als Eingriffe in das Prinzip „Ein Mensch, eine Stimme“ ab.“ (S. 134); „Ebenso die Absenkung des Wahlalters unter 18 Jahre.“ (S. 134) |
+| Weniger Bürokratie: keine Stellenzahl im Programm, die Stadt ändert nichts | Auslegung | „Der Staat erhebt Steuern auch mit dem Ziel, durch gezielte öffentliche Investitionen und staatliche Verwaltung die Sicherheit der Menschen zu gewährleisten und die Lebensverhältnisse insgesamt zu verbessern.“ (S. 54); „Weniger Bürokratie, mehr Eigenverantwortung und ein effizienterer Einsatz öffentlicher Mittel sind wichtige Voraussetzungen für ein zukunftsfähiges Deutschland.“ (S. 54) |
+| Verwaltung unabhängig, kein Parteibuch | galt schon | „Niemand darf wegen seiner politischen Anschauungen benachteiligt oder bevorzugt werden (Art. 3 Abs. 3 GG). Die Mitarbeiter der öffentlichen Verwaltung haben unabhängig und loyal ihren Dienst zu verrichten.“ (S. 136); „‚Parteibuchwirtschaft‘ und Ämterpatronage müssen beendet werden.“ (S. 136) |
+| Die Stadt zahlt ihre Verwaltung selbst | galt schon | „In der Praxis wird dieses Prinzip zulasten insbesondere der Kommunen nicht durchgehend eingehalten, was dort zu erheblichen finanziellen Belastungen führt.“ (S. 55); „Wir fordern die strikte Einhaltung des verfassungsrechtlich geregelten Prinzips.“ (S. 55) |
+
+Die Wahl-Karte ist ausdrücklich eine Übertragung: Das Programm sagt das zum Bundespräsidenten und zum Wahlrecht des Bundestags, nicht zu
+Gemeinden (so steht es auf der Karte). Die Bürokratie-Karte hat den neutralen Titel aus der Gegenprüfung: „Bürokratie“ meint das Programm
+sonst bei Vorschriften (S. 13), eine Zahl für Stellen der Verwaltung nennt es nicht, die Stadt ändert nichts.
+
+**Nicht übernommen** (unter „Keine Zahl, keine Mechanik oder kein Fall“ bzw. „Kein Gegenstück“ im Fenster):
+
+- „Vorantreiben der Digitalisierung der Verwaltung“ (S. 14) und die „Anerkennung des Rechts der Bürger auf ein analoges Leben außerhalb
+  der digitalisierten Verwaltungs- und Alltagsabläufe als allgemeines Bürgerrecht“ (S. 47): Die Stadt kennt keine Anträge und keine Behördengänge.
+- „Verbeamtungen nur noch für diejenigen vorsehen, die mit Hoheitsaufgaben betraut sind …“ (S. 18): keine Beamten, keine Rentenbeiträge;
+  im Rathaus arbeiten Verwaltungsangestellte.
+- die „‚politischen Beamten‘ in der Staatsverwaltung“ (S. 134): gemeint ist die Staatsverwaltung; der Grund im Fenster ist angepasst (das
+  Rathaus leitet ein direkt gewähltes Bürgermeisteramt ohne Partei).
+- Volksentscheide (S. 130): Die Stadt stimmt nicht über Sachfragen ab, gewählt wird nur das Bürgermeisteramt.
+- Amtszeitgrenzen für Kanzler und Abgeordnete (S. 137), „Eignung, Befähigung und fachlicher Leistung“ (S. 136), Zuschlag auf die
+  Einkommensteuer für Kommunen (S. 58, gehört zu Teil 3): nicht ins Fenster aufgenommen (kein Gegenstück, keine Eignung in der Stadt).
+- Harte Grenze: Rathausstellen, Zuzug für sie und die Wahl lesen weder Namen noch Herkunft, Staatsangehörigkeit, Sprache, Religion oder
+  eine politische Meinung. Am Rathaus weht die Fahne der Stadt (Rot und Weiß), keine Parteifahne.
+
+Alle neuen Zitate stehen wörtlich auf der genannten gedruckten Seite (`afd/bau/zitate_genau.py`: „genau“). Über alle gesammelten
+Zitate des Fensters (267, vorher 254; `afd/bau/B/mess/zitate_sammeln.mjs`): `zitatpruef.py` 262 ok, 2 „ok, andere Seite“ und 3 „fehlt“,
+`zitate_genau.py` 262 genau; die Abweichungen sind dieselben wie in 31ce452 (zwei Stichworte aus Quellen der USA in „…“, keine
+Programmzitate, und das Zitat „Technologien, die den Bedürfnissen …“ von S. 164 f., das der Prüfer nicht findet, weil die Kopfzeile
+„BILDUNG, WISSENSCHAFT UND TECHNOLOGIEOFFENHEIT“ zwischen den beiden Seiten steht; im Programm steht es wörtlich).
+
+### Annahmen und Quellen
+
+| # | Annahme | Quelle oder Grund |
+|---|---|---|
+| RA1 | Gelände 2 × 1 Blöcke an der Mitte nördlich der Hauptstraße, Tor auf der Rasterlinie; bei Übernahme das nächste freie 2 × 1, 1 × 2 oder ein Block, Brache und höchstens ein Park | Spielregel; Park: Noahs Entscheidung |
+| RA2 | 4,7 Beschäftigte der Verwaltung je 1.000 Einwohner | Statistisches Bundesamt, Beschäftigte des öffentlichen Dienstes nach Aufgabenbereichen, 30. 6. 2024, kommunaler Bereich, „Politische Führung und zentrale Verwaltung“: 394.800 (destatis.de/DE/Themen/Staat/Oeffentlicher-Dienst/Tabellen/beschaeftigte-aufgaben.html, in der Gegenprüfung bestätigt), geteilt durch 83,6 Mio. Einwohner (Annahme wie S-A1). Beschäftigte, keine Vollzeitstellen; gilt direkt je Einwohner der Stadt |
+| RA3 | Mindestens 1/2/3/5, höchstens 3/6/12/40 Stellen je Ausbaustufe | Spielregel (man soll die Verwaltung sehen; so viele Plätze hat das Haus) |
+| RA4 | Lohn wie Bauhof und Kita: 95, +2 je Nacht mit offener Stelle, −1 mit zu vielen, höchstens 120 | Entscheidung dieser Version („steigt, bis besetzt“); mit festen 92 Talern war das Rathaus im Entwurf nur an 36 % der Stellentage besetzt |
+| RA5 | 30 Taler laufende Kosten am Tag, keine Gebühren | wie Kita und Laden der Stadt |
+| RA6 | Ausbau 200 Taler je Arbeitstag, 16/24/36 Arbeitstage; nur mit Reserve (noch einmal so viel und ein Wohnhaus) | wie B5 (Kaserne) |
+| RA7 | Rathausstellen locken Zuzug wie die des Landes | Spielregel, Begründung oben |
+| RA8 | Fahne der Stadt in Rot und Weiß, Uhr auf der vollen Spielstunde | reine Darstellung |
+| BM1 | Amtszeit 7 Jahre = 70 Spieltage (Annahme 2: 1 Jahr = 10 Spieltage) | Median der 13 Flächenländer (5 bis 10 Jahre; Wikipedia „Bürgermeister (Deutschland)“, Tabelle der Länder, abgerufen 28. 9. 2026); so in Sachsen: „Die Amtszeit des Bürgermeisters beträgt sieben Jahre.“ (§ 51 Abs. 3 Satz 1 SächsGemO, revosax.sachsen.de) |
+| BM2 | Wählbar ab 18 und unter 65 | Sachsen: wählbar ab dem vollendeten 18. Lebensjahr; „Nicht wählbar für das Amt eines hauptamtlichen Bürgermeisters ist, wer das 65. Lebensjahr vollendet hat.“ (§ 49 Abs. 1 SächsGemO); dazu die Spielregel „kann eine Stelle antreten“ |
+| BM3 | Drei Kandidaten; Amtsinhaber plus Los mit Gewicht (1 + Freundschaften) × (1 + Ehrgeiz/100) | Spielregel. Erst war es eine Schwelle („Ehrgeiz ab 50“); damit saß oft der ehrgeizigste Gründer der ersten Tage im Amt, und die Stadt wuchs langsamer (Messung unten) |
+| BM4 | Punkte je Stimme 40/25/15/2/0,5/30 (selbst, Partner, Freund, je Freundschaft, je Punkt Zufriedenheit über 50 beim Amtsinhaber, Zufall) | Spielregel |
+| BM4b | Wahlgang wie in Sachsen: im ersten gewählt mit mehr als der Hälfte der Stimmen, sonst im zweiten mit den meisten; vereinfacht stimmen im zweiten alle wie im ersten, dieselben treten an, beide in derselben Nacht; Gleichstand: Amtsinhaber, sonst Los-Reihenfolge | § 44a Abs. 1 und 2 Kommunalwahlgesetz Sachsen (revosax.sachsen.de/vorschrift/3818-Kommunalwahlgesetz, abgerufen 28. 9. 2026): „Gewählt ist, wer mehr als die Hälfte der gültigen Stimmen erhalten hat.“; im zweiten Wahlgang „ist gewählt, wer die höchste Stimmenzahl auf sich vereint; bei Stimmengleichheit entscheidet das Los.“ Die Vereinfachung ist eine Spielregel (Befund der Schlussprüfung) |
+| BM5 | Direktwahl durch alle Erwachsenen, die hier wohnen | In Deutschland wählen in den Gemeinden Deutsche und Bürger anderer EU-Staaten (Art. 28 Abs. 1 Satz 3 GG), in Sachsen dürfen sie auch Bürgermeister werden (§ 49 Abs. 1 SächsGemO). Die Stadt kennt keine Staatsangehörigkeit und lässt alle Erwachsenen wählen (Grenze der Stadt, so im Fenster) |
+| BM6 | Bürgermeister hauptamtlich schon im Dorf, Lohn wie die Verwaltung | Spielregel (Noah: „Hauptfigur als Bürgermeister“, arbeitet im Rathaus). So ist es auch in Sachsen die Regel („Der Bürgermeister ist hauptamtlicher Beamter auf Zeit.“, § 51 Abs. 2 Satz 1 SächsGemO); Gemeinden unter 5.000 Einwohnern, die Mitglied eines Verwaltungsverbandes oder, „ohne erfüllende Gemeinde zu sein, einer Verwaltungsgemeinschaft“ sind, können in der Hauptsatzung ein Ehrenamt vorsehen (Satz 2, Wortlaut in der Schlussprüfung nachgelesen). Das Dorf der Stadt (unter 40 Einwohnern, mit dem Maßstab 125 unter 5.000) hätte diese Wahl; die Stadt nimmt das Hauptamt |
+
+Keine Zahl aus dem Programm; es nennt keine Personalstärke für Gemeinden.
+
+### Darstellung
+
+- Kein neues Mesh. Platz, Weg, Sockel, Wände, Gesimse, Turm, Flügel, Tür, Stufen, Bänke und Brunnen liegen im Teil-Mesh, Fenster,
+  Zifferblätter und Türlampe im Fenster-Mesh, der Fahnenmast im Schlot-Mesh, die Bäume im Baum-Mesh. Walmdächer, Kupferhelm mit goldener
+  Spitze, Zeiger und Fahne liegen im vorhandenen Bund-Mesh (neu gezeichnet nur bei anderer Ausbaustufe, Baustelle oder zur vollen Stunde).
+- **Befund „falscher Zähler der Rathauswände“ (blockierend) ist behoben:** Alle Kästen schreibt `rathausZeichnen` mit dem Zähler des
+  Teil-Meshes (`te`); das Tech-Mesh bleibt unberührt. Geprüft in tests/rathaus.cjs: kein Geister-Würfel (keine Instanz des Tech-Meshes mit
+  der Einheitsmatrix) an Tag 1, 200 und 400, und ein echter Klick (Raycast) auf die Stelle, an der der Würfel stand, öffnet das Rathaus.
+- Draw Calls (Teststadt Seed 2, 11 Uhr, gegen stadt.orig.html): Tag 1 21 statt 20, Tag 200 27 statt 28, Tag 400 27 statt 28 (die übrigen
+  Unterschiede kommen vom anderen Verlauf der Stadt); das Bund-Mesh zeichnet schon ab Tag 0. `tests/blick.cjs` (letztes Bild, 23 Uhr an
+  der Straße): Tag 400 30 statt 31 (Handy 28 statt 29), große Stadt (`umland=300000`, Tag 750) 31 statt 30 (Handy 29 statt 28). Bilder:
+  `v9/bau/nachher/`, `v9/bau/gross/`, zum Vergleich `v9/bau/vorher/` und `v9/bau/gross_vorher/` (selbst angesehen).
+- Nachts sind die Büros dunkel, das Zifferblatt leuchtet warm, über der Tür brennt eine Lampe. Nichts bewegt sich von selbst, die Kamera
+  wird nicht bewegt; die Zeiger springen zur vollen Spielstunde. Keine Allokation je Bild (Neuaufbau stündlich in `stadt()`).
+- Auswahlrahmen, Zeigen, Namen und Ereignis-Ring nehmen das ganze Gelände; vor dem Tor parkt kein Auto.
+- Hauskarte (Klick irgendwo aufs Gelände): Ausbaustufe, besetzte Stellen und Lohn, die Rechnung der Stellen mit Quelle, die
+  Stellenvergabe, Abschnitte „Bürgermeisteramt“ (wer, seit wann, bis wann, letzte Wahl mit Stimmen, Rangfolge der Vorhaben, sobald es welche
+  gibt), „Stadtregierung“ mit Knopf ins Fenster, „Haushalt“ aus `haushaltKurz`, der nächste Ausbau und „Hier arbeiten“ (der Bürgermeister zuerst).
+- Personenkarte des Bürgermeisters: „Bürgermeister · Hauptfigur“, eine Zeile „… seit Tag X, gewählt mit N von M Stimmen, parteilos;
+  Amtszeit bis Tag Y“, Knopf „Auch nach der Amtszeit Hauptfigur“; im Tagebuch Einträge „legt die Rangfolge der Vorhaben fest“.
+- Versionsdialog und Meldung nach dem Übernehmen nennen Rathaus und Wahl (auch für Stände der Versionen 2 bis 7).
+- Die Hilfe ist unverändert (ihre Höhe ist begrenzt); das Rathaus hat keine eigene Figurenfarbe.
+
+### Gemessen
+
+Messskripte (nur Messung, nicht im Repo): `v9/t2/mess/mess9.mjs` (wie `v8/mess/mess_v8.mjs`, Gates wie `simtest --gate` ohne T, 730 Tage
+stündlich, dazu Rathaus, Bürgermeister, Einwohner an Tag 30/60/120 und die CPU-Zeit der ersten 365 Tage) und `v9/t2/mess/fruehe.mjs`
+(die ersten 120 Tage, für Varianten). Vergleich: 31ce452 mit demselben Skript (Logs `v8/mess/v9b_*`, der sim-Block ist gleich; Seed 3
+nachgerechnet, Zeile für Zeile gleich). Der Rechner war geteilt (4 Kerne, Last 3–5).
+
+**Gates, Seeds 1–80:**
+
+| Stand | alle Gates | fällt | Band Gate 4 Ø / Median / max | Einwohner Tag 365 / 730 | kleinstes Budget Ø / min | Gate 6 Ø (min) | Gate 7 Ø (min) |
+|---|---|---|---|---|---|---|---|
+| 31ce452 (Version 8) | 78 von 80 | G4: 47, 54 | 1,077 / 1,072 / 1,165 | 917 / 1.187 | 6.615 / 5.645 | 19,3 (16,4) | 25,8 (18,0) |
+| **Version 9, Teil 1** | **77 von 80** | G4: 43, 46, 74 | 1,077 / 1,072 / 1,184 | 928 / 1.206 | 4.843 / 52 | 19,8 (16,6) | 24,9 (17,6) |
+
+Gate 4 kippt auf anderen Seeds (47 und 54 bestehen jetzt, 43, 46 und 74 nicht); Mittel und Median des Bandes sind gleich. Das liegt im
+Rauschen der Zuzug-Regel (Placebo in „Bekannte Schwächen“: eine Zufallszahl am Tag ändert 1 von 80). Gates 1, 2, 3, 5, 6 und 7 halten auf
+allen 80 Seeds. Gate T (365 Tage unter 5 s): `simtest --gate` auf den Seeds 1–3 bestanden mit 2,5 / 2,3 / 2,0 s (Wanduhr, Last 7 auf 4 Kernen); CPU-Zeit der ersten 365 Tage auf
+den 80 Seeds Ø 1,6 s (Median 1,5 s, höchstens 3,8 s beim ersten Seed eines Prozesses unter Last).
+
+**Wirkung in Zahlen** (Seeds 1–80; Tag 30/60/120 aus `fruehe.mjs`, Tag 365/730 und Kasse aus `mess9.mjs`):
+
+| | 31ce452 | Version 9, Teil 1 |
+|---|---|---|
+| Einwohner Tag 30 / 60 / 120 | 13,2 / 29,8 / 87,8 | 13,8 / 30,0 / 87,2 |
+| Einwohner Tag 365 / 730 | 917 / 1.187 | 928 / 1.206 (mehr auf 43 bzw. 48 von 80 Seeds) |
+| Kasse Tag 730 | 3,29 Mio. | 2,89 Mio. (−12 %) |
+| Ausgaben fürs Rathaus | – | 551 Taler am Tag (Tag 0–730; Löhne, laufende Kosten, Ausbau 15.200 einmal) |
+| Steuersatz | 10 % über dem Freibetrag | unverändert (Teil 3) |
+| Schulen | – | – (Teil 2) |
+| Bürgermeister | – | an Tag 0 gewählt; in 730 Tagen 11 Wahlen, davon 7,3 Wiederwahlen, 0,25 Abwahlen, 0,09 vorzeitige Enden je Stadt |
+
+Das Rathaus allein bringt also keine schnelleren Leute: Bis Tag 120 bleibt es beim Stand von 31ce452 (−0,6 Einwohner), danach +1 bis
++2 % (+11 an Tag 365, +19 an Tag 730). Noahs „schneller mehr Leute“ löst Teil 4 (Wachstum).
+
+**Rathaus (Seeds 1–80):** Ausbau fertig im Mittel 8,5 / 11,5 / 11,5 Tage nach der Stufe (höchstens 14 / 16 / 17). An Tag 730 überall
+das Rathaus einer Großstadt mit 5–6 Stellen der Verwaltung plus Amt, besetzt an 99,7 % der Stellentage, Lohn meist 120 (Ø 114).
+
+**Varianten für die ersten 120 Tage** (Seeds 1–80, `fruehe.mjs`, 31ce452: 13,2 / 29,8 / 87,8 Einwohner, kleinstes Budget 5.645):
+
+| Variante | Einwohner Tag 30 / 60 / 120 (kleinster Wert an Tag 120) | Zuzüge bis Tag 120 | kleinstes Budget bis Tag 120 Ø / min |
+|---|---|---|---|
+| Rathaus ohne Bürgermeister (1 Stelle im Dorf) | 14,2 / 32,2 / 88,7 (58) | 70,2 | 5.115 / 2.199 |
+| Kandidaten mit Schwelle „Ehrgeiz ab 50“ (erster Stand dieses Teils) | 13,7 / 29,1 / 83,8 (24) | 65,1 | 4.307 / 51 |
+| ohne Ehrgeiz beim Los | 13,7 / 30,1 / 86,8 (55) | 67,7 | 4.723 / 115 |
+| **ausgeliefert: Los mit Gewicht (1 + Freundschaften) × (1 + Ehrgeiz/100)** | **13,8 / 30,0 / 87,2 (55)** | **67,8** | **4.651 / 52** |
+| dasselbe, im Dorf keine Stelle für die Verwaltung (nur das Amt) | 13,1 / 28,2 / 83,6 (36) | 63,5 | 5.903 / 3.741 |
+
+Mit der Schwelle war der Bürgermeister oft der ehrgeizigste der zehn ersten Bewohner; im Amt gründet er nicht, und die erste Werkstatt
+(erst sie bringt Zuzug) kam später. Auf zwei Seeds stand die Stadt bis Tag 120 bei 24 und 26 Einwohnern. Mit dem Gewicht ist das weg. Die
+Verwaltungsstelle im Dorf bleibt: Ohne sie spart die Stadt Geld, wächst aber langsamer (für die Stelle zieht an Tag 0 oder 1 jemand zu).
+
+**Gruppenmessung der Wahl** (`simtest --buergermeister`, Seeds 1–10, 730 Tage, nur gemessen; keine Regel liest diese Merkmale):
+
+| Gruppe | wählbar (je Wahl) | Anteil am Losgewicht | Herausforderer | gewählt | gewählt ohne Amtsinhaber |
+|---|---|---|---|---|---|
+| in der Stadt geboren | 15,0 % | 14,2 % | 14,2 % | 10,9 % (12) | 14,7 % (5) |
+| zugezogen oder vom Start | 85,0 % | 85,8 % | 85,8 % | 89,1 % (98) | 85,3 % (29) |
+| Nachnamen Kaya bis Kowalski (Liste 31–37) | 11,8 % | 11,6 % | 11,4 % | 9,1 % (10) | 8,8 % (3) |
+| übrige Nachnamen | 88,2 % | 88,4 % | 88,6 % | 90,9 % (100) | 91,2 % (31) |
+| Frauen | 49,0 % | 48,8 % | 48,0 % | 50,0 % (55) | 50,0 % (17) |
+| Männer | 51,0 % | 51,2 % | 52,0 % | 50,0 % (55) | 50,0 % (17) |
+| Alter 18–29 | 20,0 % | 18,2 % | 16,5 % | 9,1 % (10) | 20,6 % (7) |
+| Alter 45–64 | 44,6 % | 46,2 % | 49,6 % | 65,5 % (72) | 50,0 % (17) |
+
+110 Wahlen nach Tag 0, davon 34 ohne Amtsinhaber. Die Herausforderer entsprechen in jeder Gruppe dem Losgewicht (auf 5 Seeds an
+jedem dritten Tag nachgerechnet: Kinder der Stadt 15,9 % Los und 15,9 % gezogen; Frauen 51,1 % und 50,9 %). Gewählte sind älter und
+seltener Kinder der Stadt, weil Amtsinhaber oft wiedergewählt werden (7 von 11 Wahlen je Stadt) und die ersten Amtsinhaber aus der ersten
+Generation kommen; ohne Amtsinhaber liegen die Anteile bei denen der Herausforderer. In einer früheren Fassung dieser Messung war der Anteil
+„wählbar“ je Person statt je Wahl gezählt; dann schienen Kinder der Stadt (die es erst spät gibt) mit 23 % Wählbaren und 14 % Herausforderern
+benachteiligt. Mit der ersten Regel („Ehrgeiz ab 50“) waren sie es wirklich ein wenig: Ihr ererbter Ehrgeiz ist im Mittel niedriger
+(41,8 gegen 46,5 unter den Wählbaren; wer ehrgeizig ist, hat eher einen eigenen Betrieb und ist nicht wählbar).
+
+**Übernahme alter Stände** (`simtest --rathaus --git`): 26 Stände der Versionen 2 bis 8 (Dorf bis Großstadt): Rathaus 6 bis 26 Felder von
+der Mitte, kein Gebäude und kein belegtes Feld verändert, offen nach 4 bis 24 Tagen, gewählt in der ersten Nacht mit offenem Rathaus,
+danach gespeichert und geladen bitgleich.
+
+### Speicherformat 9
+
+- `VERSION` 9, `MIGRIERBAR` 2 bis 8. Ein Stand der Version 8 wird ohne „Stadt übernehmen“ abgelehnt; mit Übernehmen bekommt jeder ältere
+  Stand am Ende der Kette (V2 → … → V7 → V8) das Rathaus (`migriereRathaus`) und ein leeres Bürgermeisteramt.
+- Neu im Zustand: `S.rathaus = { start, b, stellen, gestern: null | { saldo, kosten }, budgetStart, summeStart }`,
+  `S.buergermeister = { p, gen, seit, bis, nr, wahl: null | { tag, ab, waehler, kandidaten: [{ id, gen, name, stimmen, amt }] },
+  rangfolge: null | { jahr, liste, von: 'ki' | 'regel', tag }, anfrage: null | { nr, id, gen, jahr, tag, stunde, frist, erlaubt } }`,
+  `S.stat.rathaus = { lohn, fix, bau, ausbauten, stellenTage, besetztTage, parks }`, `S.stat.buergermeister = { wahlen, wiederwahlen,
+  abgewaehlt, vorzeitig, rangKi, rangRegel }`; im Tagebuch Einträge `art: 'amt'` mit `rangfolge` und `jahr`. Keine neuen Personen- oder
+  Gebäudefelder (Ausbaustufe in `g.stufe`, Ausbau in `g.auf`, Gelände in `S.erweiterung.gelaende`).
+- `jsonPruefen` verlangt ab Version 9 Rathaus, Bürgermeister und beide Summen; `rathausPruefen` und `bmPruefen` prüfen sie vollständig
+  (Nummern, Typ, genau ein Rathaus, Gelände, Stufe 1–4, Ausbau nur als Baustelle, kein Besitzer, kein Leerstand; Amtsinhaber lebt, gleiche
+  Generation, arbeitet im Rathaus; Wahl, Rangfolge, Anfrage und Summen in Form). Abgelehnt werden 12 beschädigte Rathaus- und 10
+  beschädigte Bürgermeister-Stände (simtest).
+- Nebenbei: `importZustand` prüft die Pflichtfelder der Autos jetzt ab Version 8 (vorher nur bei „gleich der aktuellen Version“), und
+  `migriereV7` läuft nur noch für Stände bis Version 7.
+- `tests/basis_v9.json` entstand per „Stadt übernehmen“ aus `tests/basis_v8.json` (`tests/basis_v9.cjs`); die KI-Code-Tests (`tests/hilfe.cjs`)
+  laden jetzt diesen Stand. `tests/p6migration.cjs` prüft zusätzlich Version 8 → 9 (afd/stadt_v8.html = Git 31ce452 per Route).
+
+### Tests
+
+**simtest, Endstand** (Logs `v9/t2/st/*.txt`): alle 16 Modi bestanden: `--gate` (Seeds 1–3), `--speichertest` (bitgleich),
+`--aufholtest`, `--kitest` (47), `--bau` (15), `--waren` (15), `--tech` (16), `--regierung` (155), `--kita` (40),
+`--erweiterung --git` (33), `--sicherheit` (28), `--militaer` (24), `--autos --git` (21), `--migrationstest --git` (324),
+`--rathaus --git` (74, neu) und `--buergermeister` (25, neu).
+
+- `--rathaus`: A statisch (kein Zufall; Personenfelder nur `frei` für die Anzeige; keine Namen, kein Geschlecht, kein Alter, kein Einzugstag,
+  keine Eltern in den Regeln; Budget nur in `rathausBezahlen`). B Seeds 1–3, 730 Tage, jede Nacht: genau ein Rathaus auf seinem Gelände
+  (21 Felder), Ausbaustufe höchstens Stufe + 1, Ausbau als Baustelle, Stellen nach der Formel, Belegschaft (lebt, erwachsen, nicht in Haft, kein
+  Dienst), Lohn 95–120, **Gegenrechnung der Löhne** (wer in der Nacht im Rathaus arbeitet × Lohn = gebuchte Löhne, an 612 bis 664 Tagen je
+  Seed genau gleich), Saldo gegen die Budgetänderung, `haushaltKurz` wie gezählt, Stadtbuch ohne Namen, Summen. C Speichern mitten im
+  Ausbau, 30 Tage bitgleich; Aufholen. D Übernahme von 26 Ständen der Versionen 8 bis 2 (Rathaus eingeschaltet). E Park weicht (erzwungen).
+  F 12 beschädigte Stände abgelehnt. G Namenstausch bitgleich. H mit `R.RATHAUS = 0` Seeds 1–2, 365 Tage, jeden Tag wie 31ce452.
+- `--buergermeister`: statisch (gelesene Personenfelder je Funktion; nichts aus Name, Herkunft, Einzugstag, Eltern, Gedächtnis; das
+  Geschlecht nur fürs Wort nach der Wahl; kein Zufallsstrom), Namenstausch bitgleich (500 Tage, 8 Wahlen); jede Nacht (Seeds 1–3, 730 Tage):
+  Amtsinhaber lebt, arbeitet im Rathaus, nicht in Haft, Hauptfigur zuerst in der Liste, Amtszeit, Stelle des Amts, Gehirn im Amt ohne
+  Wechsel, Kündigung, Gründung, Jobsuche, Grenze der Hauptfiguren, Stimmen = Wähler, Kandidaten wählbar, Amtsinhaber tritt an, Stadtbuch;
+  erzwungen: Tod, Haft, Wegzug (mit Nachfolge-Frage, wenn Noahs Hauptfigur), eigener Platz (10 + 1), Abwahl bei Unzufriedenheit, Wählbarkeit;
+  Rangfolge der Vorhaben mit drei Testvorhaben (Anfrage am letzten Tag des Jahres um 7 Uhr, gültig mit fehlenden hinten, falsche Nummer,
+  ungültig, Frist, KI aus, Aufholen, Speichern mit offener Anfrage, ohne Vorhaben keine Anfrage); 10 beschädigte Stände; Gruppenmessung.
+- Angepasst, weil sich die Stadt ändert (keine Prüfung abgeschwächt): `statAlt` lässt die neuen Summen aus (Vergleich mit Version 6/7),
+  `AUS` schaltet für diese Vergleiche auch das Rathaus aus; `--erweiterung`: `gebaeudeSetzen` ist der ausgelagerte Teil von `neuesGebaeude`
+  und darf wie dieses den Stadtteil benennen; `--militaer`, Wegzug im Dienst: in Seed 2 dient jetzt auch der Partner des Haushaltsvorstands,
+  deshalb zählt die Prüfung genau, wer im Dienst mit weggezogen ist (vorher fest „+1“); `--migrationstest` läuft wie im Entwurf mit
+  ausgeschaltetem Rathaus (die Übernahme mit Rathaus prüft `--rathaus` D).
+
+**Browser** (Server auf 8715, `tests/alle.sh`, Endstand): 18 Tests und 6 `otest`-Skripte, alle bestanden: p3test 12, p5neu 10,
+p6migration 39, p7figuren 6, p8tech 14, raute_klick 11, ereignis 21, t1_xss 5, p4test 25 (mit dem KI-Nachbau auf 11434), s2karten 22,
+kita 22, befunde_s2 27, erweiterung 20, sicherheit 12, militaer 16, autos 9, autos_bild 20, rathaus 15 (neu); otest befunde 21, handy 11,
+breit 12, tastatur 4, breiten 20, hilfehoehe 1. Ehrlich dazu: Im letzten Gesamtlauf lief `simtest` daneben (Last 5), und in `kita.cjs`
+zeigte die Zahl der Draw Calls nach 700 ms zweimal noch das alte Bild („mit 28, ohne 28“). Die Prüfung zählt jetzt direkt mit
+`G.render()` wie `militaer.cjs` (28 → 27, Handy 27 → 26) und besteht; `p4test` und `raute_klick` sind unter Last ebenfalls einmal an
+Wartezeiten gescheitert (KI noch nicht eingeschaltet, Blick verschoben) und bestehen allein und im Gesamtlauf.
+
+- Neu: `tests/rathaus.cjs` (15 Prüfungen): Rathaus ab Tag 0 an der Mitte, kein Geister-Würfel, echter Klick (Raycast) auf Haus und Platz,
+  Hauskarte, `haushaltKurz`, Knopf ins Fenster (öffnet bei der Gruppe „Rathaus und Verwaltung“, Fokus dort), 6 Karten der Gruppe, Leiste mit
+  dem Bürgermeister zuerst, Personenkarte (Tagebuch und Gesprächsfeld wie jede Hauptfigur), Figuren auf dem Rathausplatz Stunde für Stunde (8–16 Uhr nur Belegschaft, 20, 23 und 3 Uhr
+  niemand), Draw Calls gegen stadt.orig.html an Tag 1, 200 und 400 (höchstens +3), Handy 400 × 820 ohne seitliches Überlaufen, Konsole leer.
+  Bilder: `tests/bilder_befunde/rathaus_*.png` (selbst angesehen: Gemeindeamt mit Dachreiter und Uhr, Großstadt-Rathaus mit Turm, Flügeln
+  und Brunnen, Karte am Handy, Fenster).
+- `tests/p6migration.cjs`: dazu Version 8 → 9 (Dialog, Übernehmen, alte Gebäude gleich, Rathaus, Wahl in der ersten Nacht mit offenem
+  Rathaus, Neuladen). Der Fall „Version 6 an Tag 260“ ist nachgezogen: Das Rathaus nimmt beim Import einen der beiden freien Plätze, dann
+  warten Anstalt und Kaserne (beide kommen innerhalb von 60 Nächten, das Fenster nennt beide).
+- Nachgezogen, weil die Teststadt anders läuft oder der Bürgermeister dazukommt: `tests/hilfe.cjs` lädt `basis_v9.json`; `p4test.cjs`
+  öffnet die erste von Noahs Hauptfiguren (der Bürgermeister steht davor) und erlaubt 10 + 1 Zeilen in der Leiste (genau so viele wie
+  `hauptListe`); `raute_klick.cjs` zählt Klicks auf die Raute des Bürgermeisters mit; `autos.cjs`, `autos_bild.cjs` und `raute_klick.cjs`
+  finden das Rauten-Mesh mit bis zu 11 Rauten; `befunde_s2.cjs` erwartet die zwei neuen aufklappbaren Karten; `ereignis.cjs` nutzt Seed 4 ab
+  Tag 500 (in Seed 2 gibt es keine Stunde mit vier Zeichen mehr); `erweiterung.cjs` das Wachsen von Seed 12 an Tag 308; `autos_bild.cjs`
+  neue feste Momente (Seeds 1, 64, 16) und ein parkendes Auto ohne Figur daneben.
+- `tests/kennzahlen_hoehe.cjs`: Unterkante der Kennzahlen gleich wie stadt.orig.html in allen sechs Größen (400 × 820: 231 px beide).
+
+**Nicht geprüft:** echtes Sprachmodell (auch nicht die Rangfolge der Vorhaben: die Liste ist leer); echte Grafikhardware; Seeds über 80.
+
+### Befunde der Gegenprüfung „rathaus“ (alle umgesetzt)
+
+1. **Wandzähler (blockierend):** behoben, siehe Darstellung; im Browser geprüft (kein Geister-Würfel, Klick aufs Rathaus, Draw Calls).
+2. **Haushalt:** Das Budget ändert der Abschnitt „Rathaus“ nur in `rathausBezahlen`, Löhne und laufende Kosten im Zweig „Betrieb der Stadt“
+   (statisch geprüft); `haushaltKurz` ist die gemeinsame Form mit einem Knopf ins Fenster „Haushalt“ statt einer eigenen Rechnung mit
+   „Übriges“. Konto und Buchungen kommen mit Teil 3. Eine Typprüfung für neue Gebäudetypen gibt es nicht mehr (kein Patch-Skript).
+3. **Zusammenbau mit Schule und Wachstum:** eine Versionsnummer (9) und eine Kette; die Zuzugszeile ist eine Liste; die Schnittstellen stehen oben.
+4. **Wirkung ehrlich:** die absoluten Zahlen stehen unter „Gemessen“, auch dass das Rathaus allein Noahs „schneller mehr Leute“ nicht löst.
+5. **RA7:** begründet (Kommentar in `zuzug()`, Annahme 11, Fenster).
+6. **Bürokratie-Karte:** neutraler Titel, der Satz davor (S. 54) als Zusammenhang.
+7. **Prüfungen:** Die Tautologie „Posten + Rest = Saldo“ ist ersetzt durch eine Gegenrechnung der Löhne (wer in der Nacht im Rathaus
+   arbeitet, mal Lohn = gebuchte Löhne) und den Saldo gegen die Budgetänderung; echter Klick im Browser; Übernahme mit eingeschaltetem
+   Rathaus auch aus den Versionen 2 bis 5; Spanne „6 bis 26 Felder“; Hauskarte und Fenster beschreiben die Stellenvergabe gleich.
+
+### Bekannte Schwächen und offene Fragen (Teil 1)
+
+- **Das frühe Budget wird eng.** Rathaus und Bürgermeister kosten im Dorf zwei Löhne und laufende Kosten, etwa 250 Taler am Tag, bei einem
+  Startbudget von 6.000. Auf den Seeds 1–80 fällt das kleinste Budget im Mittel von 6.615 auf 4.843 Taler, auf Seed 66 an Tag 65 bis auf 52 Taler (sonst mindestens 1.335). Das Budget wird durch die Regeln nie negativ (Löhne werden bei leerem Budget gekürzt), aber
+  Teil 3 muss die Kosten des Rathauses als Pflichtausgabe in seine Rücklage nehmen, bevor er Geld schneller ausgibt.
+- **Der Bürgermeister fehlt im Dorf als Arbeitskraft.** Er kommt aus den zehn ersten Bewohnern; das bremst den Anfang leicht, bis Teil 4
+  (Anlauf: Laden- und Bauhofstellen locken im Dorf) es ausgleicht.
+- **Die Verwaltung ist der bestbezahlte Arbeitgeber** (Lohn meist 118–120) und zieht Leute aus Werkstätten ab; die Gates halten.
+- **Bei alten Ständen liegt das Rathaus 6 bis 26 Felder von der Mitte**, weil nichts abgerissen wird und die Mitte voll ist.
+- **Das Gelände sperrt die Rasterlinie nördlich der Mitte**; der Satz „Grenzen … auf Rasterlinien, wo nie ein Gebäude steht“ stimmt dort nicht ganz.
+- **Die Rangfolge der Vorhaben ist heute leer**; mit echtem Sprachmodell nicht geprüft (nur Testvorhaben in `simtest --buergermeister`).
+- **Offene Frage an Noah (entschieden am 28.09.: so lassen):** Soll der Bürgermeister im Dorf ehrenamtlich sein (in Sachsen dürfen kleine
+  Gemeinden in einem Verwaltungsverband das, § 51 Abs. 2 SächsGemO; er behielte seine Stelle, die Stadt spart einen Lohn), und erst ab der
+  Kleinstadt hauptamtlich im Rathaus arbeiten? Noah: nein, hauptamtlich von Anfang an.
+
+## Schule (Version 9, Teil 2)
+
+Auftrag für Version 9, Teil 2: Schulen für die Kinder der Stadt. Grundlage ist der Entwurf „schule“ (auf Version 7 gebaut) mit allen Befunden seiner
+Gegenprüfung. Er ist hier von Hand auf Version 9, Teil 1 (Git 31ce452 plus Rathaus und Bürgermeister) übertragen; die Stellen, an denen sich
+Schule, Rathaus und Version 8 überschneiden (`zuzug()`, `istBetrieb`, Lohn neuer Gebäude, Import-Kette, Kennzahlen, `ortZurStunde`,
+Figurenplätze), sind zusammengeführt. Entscheidungen zu den offenen Fragen des Entwurfs (Claude, im Auftrag): eine Grundschule und eine
+weiterführende Schule für alle, Wohnnähe 16/32 Felder (weniger, größere Schulen), gebaut erst, wenn genug Schulkinder da sind (vorher
+Nachbarort), Lehrkräfte vom Land dürfen zuziehen, Computer von den Tech-Firmen der Stadt (S. 160), die „Bildungspflicht“ (S. 159) bleibt draußen.
+Schulen sind eine **Spielregel der Stadt** (Kommune als Schulträger, Land für die Lehrkräfte, wie in Deutschland); aus dem Programm wirken die
+kleineren Klassen (S. 158), die Computer für die Schulen (S. 160, seit Teil 3 und 5) und die Grundschule ohne Computer für die Kinder (S. 160;
+das Programm sagt „vorwiegend digitalfreie Räume“, die Stadt gibt Kindern der Grundschule gar keine Computer: eine Vereinfachung, so auch im
+Fenster; Befund der Schlussprüfung).
+
+### Regeln
+
+- **Schulpflicht vom 6. bis zum 18. Geburtstag** für jedes Kind, das in der Stadt wohnt. In der Nacht des 6. Geburtstags endet der Kita-Platz
+  und das Kind wird eingeschult (keine Lücke, kein Tag mit beidem); Klasse 1 bis 4 in einer Grundschule, Klasse 5 bis 12 in einer
+  weiterführenden Schule für alle (Schulformen gibt es nicht: die Stadt kennt keine Noten). Am 18. Geburtstag ist der letzte Schultag, in der
+  Nacht der Abschluss. Warum bis 18 und nicht 9 oder 10 Vollzeitjahre wie in Deutschland: In der Stadt arbeitet vor 18 niemand und niemand
+  entscheidet selbst (Kinder haben keine Aktionen); Klasse 11 und 12 stehen für Oberstufe oder Berufsschule. Die „Bildungspflicht“ des
+  Programms bleibt draußen, weil es keine Regel nennt, wer statt in der Schule wie lernen darf und wer das prüft (Fenster, „Nicht übernommen“).
+- **Plätze.** Jede Nacht nach den Kitas: Wer einen Platz an einer offenen Schule seiner Art hat, die nicht voll ist und höchstens 16
+  (Grundschule) bzw. 32 Felder (weiterführende Schule) von der Wohnung liegt, behält ihn; sonst bekommt das Kind den Platz an der nächsten Schule
+  seiner Art mit freiem Platz in Reichweite. Gibt es keinen, geht es im Nachbarort zur Schule (kostet die Stadt nichts). In Obhut bei Angehörigen
+  zählt deren Wohnung, beim Jugendamt geht das Kind außerhalb zur Schule. Gelesen werden nur Alter, Wohnung (Entfernung), Obhut und der Platz, bei
+  Gleichstand die Personennummer.
+- **Bau erst ab einer Klasse (Befund 1).** Das Bauamt (Regel 7) verteilt die Kinder ohne Platz auf freie Plätze ihrer Art in Reichweite (eine
+  Baustelle zählt voll). Für die übrigen baut es erst, wenn in Reichweite des neuen Hauses mindestens eine Klasse zusammenkommt: 15 Kinder für
+  eine Grundschule, 20 für eine weiterführende Schule (die Untergrenzen je Klasse in Sachsen, alle Jahrgänge zusammen gezählt). Gebaut wird auf
+  dem nächsten Bauplatz in Reichweite, sonst in einem leerstehenden Laden oder einer leerstehenden Werkstatt (Umbau wie bei der Kita), je Art
+  eine Baustelle zur Zeit und nur, wenn danach noch ein Wohnhaus bezahlbar ist. Grundschule 3.200 Taler und 16 Arbeitstage, weiterführende
+  Schule 4.800 Taler und 24 Arbeitstage; der Bauhof baut. Bis dahin gehen die Kinder im Nachbarort zur Schule.
+- **Lehrkräfte vom Land.** Jede Schule braucht eine Lehrkraft je 13,6 Kinder (Grundschule) bzw. je 11,9 (danach), aufgerundet: Klassen
+  10 % kleiner als im Bundesdurchschnitt (19 statt 21 und 21 statt 23 Kinder, S. 158) bei gleich vielen Lehrkräften je Klasse (1,4 und 1,8).
+  Die Stellen besetzt, wer in der Stadt Arbeit sucht (wie jede Stelle: die nächste freie oder eine besser bezahlte); freie Stellen besetzt das
+  Land auch mit Leuten von außerhalb, die dafür zuziehen (SC12, nach Wache und Anstalt, vor dem Bund). Wer da ist, bleibt, auch wenn der Bedarf
+  sinkt. Lohn 103 Taler am Tag vom Land (von außen), Lohnsteuer wie jeder Lohn. Lehrkräfte arbeiten von 8 bis 17 Uhr in der Schule
+  (Unterricht 8 bis 13, danach Vorbereitung).
+- **Geld der Stadt.** Sachaufwand 2,9 Taler je Kind mit Platz und Tag aus dem Budget (in `wirtschaft()`, Zweig „Schule“), Bau aus dem Budget
+  (`schuleBezahlen`), Computer nur über `schulITBestellen` (unten). Keine Gebühren.
+- **Keine Wirkung auf die Familien.** Die Schule ändert weder Geld noch Zufriedenheit noch Entscheidungen der Kinder und Eltern: Kinder
+  entscheiden in der Stadt nicht, und ein Schulkind braucht nach 13 Uhr keine Betreuung (die Betreuungspflicht der Stadt gilt nur unter 6).
+  Kinder gehen zu Fuß; Eltern fahren sie nicht (keine neue Regel nötig: Autos fahren nur mit ihrem Besitzer, `mitAuto`).
+- **Wo ein Kind ist (Grundregel).** `ortZurStunde` hat einen Zweig für Kinder (unter 18, dazu am 18. Geburtstag, wer noch einen Schulplatz
+  hat): von 8 bis 13 Uhr in der Schule, sonst dort, wo es wohnt (`kindOrt`, `kindWohnung`); beim Jugendamt nirgends zu sehen. Für Erwachsene ist
+  `ortZurStunde` unverändert (`simtest --schule` vergleicht es Stunde für Stunde mit der Regel von Version 8).
+- **Kopplungen.** Kita: nie Kita- und Schulplatz zugleich. Wehrdienst: Einberufen wird in der Nacht des 18. Geburtstags, nach dem Abschluss
+  (`schulTag` läuft in der Nacht vor `menschenTag`); kein Schulkind ist im Dienst. Jugendstrafrecht: Taten wählt die Stadt nur unter
+  Erwachsenen, also kein Fall an der Schule (`simtest --schule` prüft jede Nacht: kein Schulkind in Haft, mit Verfahren, Stelle, Betrieb,
+  Dienst oder Auto). Tech-Firmen: Computer (unten).
+- **Stadtbuch.** Je Schuljahr (10 Tage) höchstens eine Zeile „Ein Schuljahr ist um: …“ (nur, wenn jemand eingeschult wurde oder abgeschlossen
+  hat; ein Name: das erste eingeschulte Kind), eine Zeile je Bau („Das Bauamt baut eine Grundschule … In der Nähe haben 17 Kinder keinen
+  Platz …“), bei neuen Städten an Tag 0 eine eigene Zeile „Die Stadt baut Schulen: …“ nach der Wahl (die Zeile der Regierung bleibt unter
+  950 Zeichen, `befunde_s2.cjs`), bei übernommenen Ständen dieselbe Zeile als „Ab heute baut die Stadt Schulen: …“ (`schulStartZeile`).
+- **Harte Grenze.** Die Schulen nehmen jedes Kind nach denselben Regeln: Alter, Wohnung, Obhut, bei Gleichstand die Nummer. Sie lesen nie Namen,
+  Herkunft, Sprache, Religion, Eltern, Geschlecht oder Charakter (statische Prüfung und Namenstausch in `simtest --schule`); Programmpunkte, die
+  an Herkunft, Sprache oder Religion hängen (S. 161, 162, 125, 122), stehen mit Grund unter „Nicht übernommen“.
+
+### Computer für die Schulen (Schnittstelle für Teil 3)
+
+Entscheidung dieser Version (Claude, im Auftrag): Schulen kaufen ihre Computer bei den Tech-Firmen der Stadt; das Geld plant der Haushalt (Teil 3). In Teil 2 gab es nur die
+Schnittstelle; *seit Teil 3 kauft das Vorhaben „Computer für die Schulen“* (Karte im Fenster: Status „wirkt“; Abschnitt „Haushalt“). *Seit Teil 5*
+kaufen die Schulen wie die Leute: den neuesten Computer einer Firma der Stadt im nächsten Laden, sonst von außerhalb (`schulITKaufen`; Abschnitt
+„Tech-Firmen früher und mehr“); der Kauf ist Bedarf vor den Vorhaben, kein Vorhaben mehr.
+
+- **Bedarf.** Jede Schule braucht einen Computer je Lehrkraft; die weiterführende Schule dazu einen je 4 Kinder (in Deutschland teilen sich
+  Achtklässler im Mittel etwa zu viert ein schulisches Gerät, ICILS 2023; das Programm will vor allem Informatik und lehnt Tablets als einziges
+  Mittel ab). In der Grundschule haben die Kinder keine (S. 160: „vorwiegend digitalfreie Räume“). Ein Computer hält 5 Jahre (50 Tage).
+  `schulITBedarf(S)` → `{ geraete, preis, taler, lieferanten, schulen: [[Schule, Geräte] …] }` (liest nur).
+- **Bestellung.** `schulITBestellen(S, taler)` kauft für höchstens `taler` ganze Computer zum Ladenpreis (320 Taler, Annahme 66), nur so viele,
+  wie die Schulen brauchen und das Budget hergibt, nur bei offenen Tech-Firmen der Stadt, die Computer machen (sonst nichts, nichts von
+  außerhalb). Die Firmen kommen reihum dran; das Geld geht aus dem Budget als Umsatz an die Firma (wie ein Verkauf im Laden, ohne Anteil des
+  Ladens), verbucht in der nächsten `wirtschaft()` (deshalb am besten davor aufrufen). Rückgabe `{ geraete, taler, firmen: [[Firma, Geräte] …] }`.
+  Keine Stadtbuch-Zeile (die schreibt der Haushalt), kein Zufall. Die Lieferungen stehen in `S.schule.it` ([Schule, Geräte, Tag]) und fallen
+  nach 50 Tagen heraus.
+- **Größenordnung.** An Tag 730 brauchen die Schulen im Mittel 35 Computer (26 bis 43; 11.300 Taler, alle 50 Tage neu, also rund 226 Taler am
+  Tag); Lieferanten gäbe es in jeder Stadt (im Mittel 3,8 offene Computerfirmen, mindestens 1). Der Ladenpreis ist ein Spielwert: Mit U1
+  wären 320 Taler rund 16.700 €, ein Vielfaches eines Schulcomputers; bezogen aufs Budget der Stadt ist es eine Ausgabe in der Größe des
+  Sachaufwands. Wie viel davon gekauft wird, entscheidet der Haushalt.
+
+### Schnittstellen für Teil 3 bis 5
+
+- **Haushalt (Teil 3), Geld:** Die Schule ändert das Budget an genau drei Stellen: Bau in `schuleBezahlen(S, k)`, Sachaufwand in `wirtschaft()`
+  (Zweig `t === SCHULE`, gezählt in `S.stat.schule.sach`), Computer in `schulITBestellen`. Dort bucht der Haushalt (Konten etwa „Schulen,
+  laufend“, „Schulbau“, „Computer der Schulen“; Befund 2). `simtest --schule` prüft das statisch. Für die Rücklage: Sachaufwand gestern
+  (`S.schule.sachGestern`, auch in `schuleInfo`). Der Schulbau bleibt eine Pflichtaufgabe im Bauamt (Regel 7), vor den Vorhaben des Haushalts;
+  gibt der Haushalt Geld schneller aus, muss er Preis plus Wohnhaus für die nächste Schule stehen lassen.
+- **Haushalt, Vorhaben:** „Computer für die Schulen“ ist ein Kandidat für `VORHABEN` (Rangfolge des Bürgermeisters); `VORHABEN` bleibt
+  in diesem Teil leer, damit es noch keine Anfrage gibt. *Seit Teil 3* ist es eins der vier Vorhaben; Schulen baut weiter nur das Bauamt. *Seit
+  Teil 5* ist es Bedarf vor den Vorhaben (`HH_BEDARF`), nicht mehr in der Rangfolge.
+- **Wachstum (Teil 4):** Lehrerstellen locken Zuzug (`schulStelleFrei`, nach dem Land, vor dem Bund); in der Zählschleife von `zuzug()` fallen
+  Schulen nur mit `SCHUL_ZUZUG 0` weg. Zählt Teil 4 im Dorf Stellen gesondert, gehören Schulen zu denen, die locken.
+- **KI und Tempo (Teil 5):** `personInfo` liefert `schule` (Klasse, Schule, Nachbarort) für Karten und Anweisungen; `--kitest` besteht.
+
+### Programm (Fenster „Stadtregierung“, neue Gruppe „Schule (Gebäude der Stadt, Lehrkräfte vom Land)“)
+
+| Karte | Status | Zitate (wörtlich, gedruckte Seite) |
+|---|---|---|
+| Kleinere Klassen | wirkt | „An allen Schulformen sollen die Klassenstärken verringert werden.“ (S. 158) |
+| Schulpflicht, Schulen in Wohnnähe, Lehrkräfte vom Land | Spielregel | – |
+| Computer für die Schulen, gekauft in der Stadt | wirkt (seit Teil 3 und 5; in Teil 2 „vorbereitet“) | „Grundsätzlich benötigen Schulen eine moderne, zeitgemäße IT-Ausstattung.“ (S. 160); „Eine ausschließliche Verwendung von Tablets im Unterricht stellt eine Einschränkung der Methodenvielfalt dar.“ (S. 160); „Die ersten vier Schuljahre sollten vorwiegend digitalfreie Räume sein“ (S. 160) |
+
+Dazu: Die Karte „Die Stadt zahlt ihre Verwaltung selbst“ (Gruppe „Rathaus und Verwaltung“) nennt jetzt die Schulgebäude (Stadt) und die
+Lehrkräfte (Land); die Zeilen „Lehrkräfte vom Land, gestern / seit dem Start“ stehen bei „Geld von außen“ (nicht mit „Land“ am Anfang:
+so heißen die Zeilen der Sicherheit), und „Von außen, gestern“ in den Kennzahlen zählt sie mit.
+
+**Nicht übernommen** (mit Grund im Fenster):
+
+- Gegliedertes Schulsystem nach Begabung (S. 158), Hochbegabtenförderung (S. 158), Abitur und Abschlussarten (S. 159), Kriterien für den Übergang
+  aufs Gymnasium (S. 159): keine Noten, keine Begabungen; eine Einteilung nach dem Charakter wäre erfunden und hinge über die Vererbung an den Eltern.
+- Bildungspflicht statt Schulpflicht (S. 159): keine Regel genannt (oben). Vorschule nach Bedarf (S. 159): der Bedarf ist mit Entwicklungsständen
+  und Deutschkenntnissen begründet (S. 159), beides kennt die Stadt nicht. Privatschulen (S. 159), Förderschulen (S. 160), Neutralität der
+  Lehrer (S. 160), Disziplinarrechte (S. 161), berufliche Schulen (S. 161), Unterrichtsinhalte (S. 146, 16, 20, 152).
+- Harte Grenze: verpflichtender Deutschunterricht für Kinder mit Migrationshintergrund (S. 161), keine Sonderrechte für muslimische Schüler
+  (S. 162), Islamunterricht (S. 162), Kopftuchverbot an Schulen (S. 125), Koranschulen (S. 122).
+
+Alle neuen Zitate stehen wörtlich auf der genannten gedruckten Seite (`afd/bau/zitate_genau.py`: die 19 neuen im Fenster und die 5 in diesem
+Abschnitt „genau“). Über alle gesammelten Zitate des Fensters (286, vorher 267; `afd/bau/B/mess/zitate_sammeln.mjs`): `zitatpruef.py` 281 ok,
+2 „ok, andere Seite“ und 3 „fehlt“, `zitate_genau.py` 281 genau; die Abweichungen sind dieselben wie in 31ce452 (zwei Stichworte aus Quellen
+der USA, zwei Stichworte im Fließtext ohne Seite, „S. 164 f.“ über zwei Seiten).
+
+### Annahmen und Quellen
+
+| # | Annahme | Quelle oder Grund |
+|---|---|---|
+| SC1 | Einschulung in der Nacht des 6. Geburtstags | „Die allgemeine Schulpflicht in Deutschland beginnt für Kinder in der Regel im Jahr der Vollendung des sechsten Lebensjahres.“ (KMK, kmk.org/bildungsministerkonferenz/vertiefende-bildungsinhalte/allgemeinbildende-schulen/schuelerinnen-und-schueler.html, abgerufen 28. 9. 2026). Geburtstag statt Stichtag: ein Jahr hat hier 10 Tage, so bleibt zwischen Kita und Schule keine Lücke |
+| SC2 | Grundschule Klasse 1–4 | „Sie reicht von der ersten bis zur vierten, in Berlin und Brandenburg bis zur sechsten Jahrgangsstufe.“ (KMK, kmk.org/themen/allgemeinbildende-schulen/bildungswege-und-abschluesse.html) |
+| SC3 | Vollzeit bis zum 18. Geburtstag | Deutschland: „zumeist neun Vollzeitschuljahre (in Berlin, Brandenburg, Bremen und Thüringen zehn Vollzeitschuljahre, in Nordrhein-Westfalen je nach Dauer des Bildungsgangs neun oder zehn Vollzeitschuljahre)“, danach Teilzeitschulpflicht (Berufsschulpflicht) (KMK, ebenda). Abweichung mit Grund: vor 18 arbeitet in der Stadt niemand |
+| SC4 | 21 und 23 Kinder je Klasse, 15 und 13 je Lehrkraft (Primarbereich, Sekundarbereich I, Deutschland 2023) | Statistisches Bundesamt, Internationale Bildungsindikatoren im Ländervergleich, Ausgabe 2025, Abschnitte D2.2 und D2.3 (destatis.de/DE/Themen/Gesellschaft-Umwelt/Bildung-Forschung-Kultur/Bildungsstand/Publikationen/Downloads-Bildungsstand/bildungsindikatoren-1023017257004.pdf; Befund 5: vorher Primarbereich 2021 und Sekundarbereich I 2015 aus zweiter Hand). Lehrkräfte je Klasse = 21/15 = 1,4 und 23/13 = 1,77. In der Schlussprüfung nachgelesen (PDF, S. 108 f.): „In Deutschland waren es 15 Kinder im Primarbereich und 13 Kinder im Sekundarbereich I“ (D2.2); „In den OECD-Staaten wurden 2023 im Durchschnitt im Primarbereich 21 Kinder zusammen in einer Klasse unterrichtet, im Sekundarbereich I waren es 23. In Deutschland entsprach die Klassengröße im Primarbereich und im Sekundarbereich I dem OECD-Durchschnitt.“ (D2.3) |
+| SC5 | 10 % kleinere Klassen | Das Programm nennt keine Zahl (S. 158); Annahme der Stadt |
+| SC6 | Räume: zweizügig, 8 bzw. 16 Klassenräume (152 bzw. 336 Plätze) | Annahme |
+| SC7 | Wohnnähe 16 (Grundschule) und 32 Felder (weiterführende Schule) | Annahme (Entscheidung dieser Version: weniger, größere Schulen; der Entwurf hatte 12/24) |
+| SC8 | Gebaut wird ab 15 (Grundschule) bzw. 20 Kindern (weiterführende Schule) ohne Platz in Reichweite | Untergrenze je Klasse in Sachsen: Grundschule 15, Schularten mit mehreren Bildungsgängen und Gymnasium 20 (KMK, Vorgaben für die Klassenbildung im Schuljahr 2023/2024, kmk.org/fileadmin/Dateien/pdf/Statistik/Dokumentationen/Klassenbildung_2023.pdf). Dort gilt sie je Klasse (die Quelle nennt „Vorgaben für die einzelne Klasse“; Befund der Schlussprüfung, vorher „je Eingangsklasse“); die Stadt zählt alle Jahrgänge zusammen (Annahme) |
+| SC9 | Lohn der Lehrkräfte 103 Taler am Tag vom Land | Bruttojahresverdienst Vollzeit 2025, Erziehung und Unterricht 66.297 € zu 64.441 € für alle (Statistisches Bundesamt, destatis.de/DE/Themen/Arbeit/Verdienste/Verdienste-Branche-Berufe/Tabellen/bruttojahresverdienst.html), × 100 wie B4 |
+| SC10 | Sachaufwand 2,9 Taler je Kind und Tag | „laufenden Sachaufwand (1 500 Euro …)“ je Schüler 2024 (Statistisches Bundesamt, Pressemitteilung Nr. 082 vom 12. 3. 2026, destatis.de/DE/Presse/Pressemitteilungen/2026/03/PD26_082_217.html); 1.500 € ÷ 521,59 € (U1: 1 Taler am Tag ≙ 521,59 € im Jahr) = 2,9. Der Entwurf hatte 2023 (1.400 €, 2,7) |
+| SC11 | Bau 200 Taler je Arbeitstag, 16 bzw. 24 Arbeitstage | wie das Wohnhaus (Annahme) |
+| SC12 | Das Land besetzt freie Lehrerstellen auch mit Leuten, die zuziehen | Spielregel wie S-A19 (Polizei); Entscheidung dieser Version |
+| SC13 | Unterricht 8 bis 13 Uhr, große Pause um 10 | Annahme (Figuren und Karten) |
+| SC14 | Computer: einer je Lehrkraft, in der weiterführenden Schule dazu einer je 4 Kinder, keiner für Kinder der Grundschule; 5 Jahre Nutzung; Ladenpreis | „In Deutschland teilen sich nach wie vor durchschnittlich etwa vier Achtklässlerinnen und Achtklässler ein schulisches Endgerät.“ (Deutsches Schulportal zu ICILS 2023, 12. 11. 2024, deutsches-schulportal.de/bildungsforschung/icils-2023-eickelmann-digitale-kompetenzen-40-prozent-der-jugendlichen-sind-abgehaengt/); je Lehrkraft und 5 Jahre sind Annahmen; Grundschule: S. 160 („vorwiegend digitalfreie Räume“; die Stadt gibt Kindern der Grundschule gar keine Computer, eine Vereinfachung) |
+| SC15 | Gebäude und Sachaufwand zahlt die Kommune, die Lehrkräfte das Land | „Während die Kommunen die Kosten für Investitionen und laufenden Sachaufwand der Schulen sowie in der Regel auch die Kosten für das nicht-lehrende Personal tragen, sind die Kultusministerien der Länder für die Personalkosten der Lehrkräfte zuständig.“ (Eurydice, Finanzierung des Elementar- und Schulbildungsbereichs, eurydice.eacea.ec.europa.eu/de/eurypedia/germany/finanzierung-des-elementar-und-schulbildungsbereichs). Keine Programmforderung |
+
+### Darstellung
+
+- **Schulhaus** (ein neues InstancedMesh `M.schule`, +1 Draw Call): Backstein mit zwei Geschossen hinten auf dem Grundstück, helle Attika,
+  Fensterbänder, Vorbau mit Tür und Vordach, Uhrturm mit Kupferdach; die weiterführende Schule ist dieselbe Form, höher (drei Geschosse).
+  Rohbau in Zielhöhe, kein falsches „fertig“-Zeichen beim Bau (die Stufe ist die Schulart).
+- **Schulhof** ohne eigenen Draw Call (Park-, Teil- und Baum-Mesh): Pflaster, Hüpfkästchen, Tor, Fahrradständer, Bank, Baum.
+- **Figuren.** 60 zusätzliche Plätze im Figuren-Mesh für Schulkinder (kein neuer Draw Call; kleiner nach Alter, kräftige Farben), einmal am Tag
+  gewählt: die Kinder der Schulen, die der Kamera am nächsten liegen, nie eine Hauptfigur (die hat ihren Platz; im Entwurf konnte ein Kind
+  doppelt erscheinen). Sie gehen um 8 zur Schule, stehen um 10 in der Pause auf dem Hof und gehen um 13 heim; dazwischen, nachmittags und
+  nachts sind sie nicht zu sehen. **Pause (Befund 8):** 19 feste Plätze in vier Reihen mit etwas Unordnung, nicht auf der Reihe der Lehrkräfte
+  und nicht an Baum, Bank, Tor und Fahrradständer; wer keinen Platz hat, bleibt drinnen. Lehrkräfte (weinrot) stehen von 8 bis 17 Uhr in einer
+  Reihe auf dem Hof, weitere sind drinnen. Keine Allokation je Bild; die Kamera bewegt sich nie von selbst.
+- **Hauskarte:** „Grundschule am …“, Lehrkräfte vom Land mit Bedarf und Lohn, Kinder und Plätze, „Das Land stellt eine Lehrkraft je 13,6
+  Kinder …“ (Befund 7: keine Klassenzahl mehr, die nicht zur Formel passte), Sachaufwand gestern, Computer (Bestand und Soll), Listen „Hier
+  arbeiten“ und „Schülerinnen und Schüler“ mit Klasse. **Personenkarte:** „Schulkind, Klasse 3“, „Klasse 3 in der Grundschule … (Unterricht 8
+  bis 13 Uhr)“ mit Knopf zur Schule, im Nachbarort oder außerhalb; Lebenslauf (eingeschult, gewechselt, abgeschlossen).
+- Hilfe: die Zeile „Lila … Oliv … Kräftiges Grün …“ nennt jetzt auch „Weinrot: Lehrkraft; Schulkinder klein und bunt“ (vier Figuren im
+  Symbol; eine eigene Zeile hätte die Hilfe bei 1280 × 800 über 760 px gebracht, jetzt 745); Symbol `s-schule`; Stadtbuch-Art „Schule“;
+  Versionsdialog und Meldung nach dem Übernehmen nennen die Schulen.
+
+### Gemessen
+
+Messskripte (nur Messung, nicht im Repo): `v9/t3/mess/mess9s.mjs` (wie `v9/t2/mess/mess9.mjs`, Gates wie `simtest --gate` ohne T, 730 Tage
+stündlich, dazu die Schulen), `v9/t3/mess/sc.py` (Auswertung), `v9/t3/mess/zeit.mjs` (CPU-Zeit, zwei Stände abwechselnd im selben
+Prozess). Vergleich: 31ce452 (`v8/mess/v9b_*`) und Teil 1 (`v9/t2/mess/neu_*`) mit demselben Messteil. Der Rechner war geteilt (4 Kerne).
+
+**Gates, Seeds 1–80:**
+
+| Stand | alle Gates | fällt | Band Gate 4 Ø / Median / max | Einwohner Tag 365 / 730 | kleinstes Budget Ø / min | Gate 6 Ø (min) | Gate 7 Ø (min) |
+|---|---|---|---|---|---|---|---|
+| 31ce452 (Version 8) | 78 von 80 | G4: 47, 54 | 1,077 / 1,071 / 1,165 | 917 / 1.187 | 6.615 / 5.645 | 19,3 (16,4) | 25,8 (18,0) |
+| Version 9, Teil 1 | 77 von 80 | G4: 43, 46, 74 | 1,077 / 1,072 / 1,184 | 928 / 1.206 | 4.843 / 52 | 19,8 (16,6) | 24,9 (17,6) |
+| **Version 9, Teil 2** | **77 von 80** | G4: 27, 48, 71 | 1,074 / 1,070 / 1,192 | 934 / 1.233 | 4.843 / 52 | 19,7 (15,5) | 25,1 (19,0) |
+
+Gate 4 kippt wieder auf anderen Seeds (43, 46 und 74 bestehen jetzt; 27 mit Band 1,192, 48 mit 1,175, 71 mit 1,151 nicht); Mittel und
+Median des Bandes sind etwas besser. Gates 1, 2, 3, 5, 6 und 7 halten auf allen 80 Seeds. Das kleinste Budget ist auf allen 80 Seeds
+dasselbe wie in Teil 1: Es liegt vor der ersten Schule. Gate T (365 Tage unter 5 s): `simtest --gate` auf den Seeds 1–3 bestanden
+mit 1,9 / 1,7 / 1,8 s (allein) und 2,6 / 1,9 / 1,9 s (neben zwei anderen simtest-Modi).
+
+**Wirkung in Zahlen** (Seeds 1–80, Mittel):
+
+| | 31ce452 | Version 9, Teil 1 | **Version 9, Teil 2** |
+|---|---|---|---|
+| Einwohner Tag 30 / 60 / 120 | 13,2 / 29,8 / 87,8 | 13,8 / 30,0 / 87,2 | **13,8 / 30,0 / 87,2** (gleich: vor der ersten Schule ändert die Schule nichts) |
+| Einwohner Tag 365 / 730 | 917 / 1.187 | 928 / 1.206 | **934 / 1.233** (mehr als Teil 1 auf 43 bzw. 54 von 80 Seeds) |
+| Kasse Tag 730 | 3,29 Mio. | 2,89 Mio. | **2,79 Mio.** (−3 % gegen Teil 1) |
+| Ausgaben der Stadt | – | Rathaus 551 Taler am Tag | Rathaus 557 Taler am Tag; **Schule: Sachaufwand 179 Taler am Tag** (Mittel über die 730 Tage; an Tag 730 rund 367 = 126,5 Kinder × 2,9), **Bau 12.880 Taler** (3,45 Schulen je Stadt) |
+| Geld vom Land für die Lehrkräfte | – | – | **568 Taler am Tag** (Mittel über 730 Tage), Lohnsteuer darauf wie auf jeden Lohn |
+| Lohnsteuer (Taler am Tag, Mittel über 730 Tage) | 1.967 | 1.995 | 2.034 |
+| Steuersatz | 10 % über dem Freibetrag | unverändert | unverändert (Teil 3) |
+| Schulen | – | – | **an Tag 730: 2,29 Grundschulen und 1,15 weiterführende Schulen**; die erste Grundschule öffnet im Mittel an Tag 277 (228 bis 338), die erste weiterführende an Tag 305 (250 bis 362) |
+| Bürgermeister | – | 11,0 Wahlen, 7,3 Wiederwahlen | 11,1 Wahlen, 7,3 Wiederwahlen |
+
+Die Schule bringt also keine schnelleren Leute am Anfang (das ist Teil 4), aber mehr Einwohner später (+6 an Tag 365, +27 an Tag 730): Die
+Stellen an den Schulen sind Stellen mehr, ihr Lohn kommt von außen, und Lehrkräfte ziehen dafür zu (ohne diesen Zuzug +3 und +18, Varianten
+unten).
+
+**Schulen an Tag 730** (Seeds 1–80): 126 Schulkinder mit Platz (92 bis 161), 3,3 im Nachbarort (Median 1, höchstens 30: in Seed 57 warten
+25 auf eine Grundschule, die gerade gebaut wird, 5 wohnen 38 bis 40 Felder von der einzigen weiterführenden Schule; `v9/t3/mess/nb_diag.mjs`), über die 730 Tage 10,4 % der
+Schülertage im Nachbarort (4,5 bis 21 %; bis zur ersten Schule gehen alle dorthin). 13,1 Lehrkräfte bei einem Bedarf von 12,0 (wer da ist,
+bleibt); in 730 Tagen fehlten 39 Lehrkraft-Tage, und 99 Schülertage war an der Schule niemand da (meist die ersten Tage einer neuen Schule).
+487 Einschulungen, 353 Abschlüsse. 734 Plätze (die Schulen sind selten voll, siehe Schwächen). Computer: Bedarf 35 (siehe oben).
+
+**Varianten** (Seeds 1–80, `R_WERTE`, nur Messung):
+
+| Variante | alle Gates | Einwohner Tag 120 / 365 / 730 | kleinstes Budget Ø | Band Gate 4 Ø / max | erste Grundschule / weiterführende (Tag) | gebaut (Bau, Taler) | Plätze an Tag 730 | Schülertage im Nachbarort | Schülertage ohne Lehrkraft |
+|---|---|---|---|---|---|---|---|---|---|
+| wie der Entwurf: ab einem Kind, 12/24 Felder | 77 | 85,8 / 927 / 1.239 | 4.433 | 1,090 / 1,207 | 76 / 117 | 7,1 (26.200) | 1.479 | 0,3 % | 171 |
+| ab einem Kind, 16/32 Felder | 74 (dazu G6 auf Seed 49) | 85,9 / 920 / 1.245 | 4.433 | 1,080 / 1,266 | 76 / 117 | 5,0 (18.060) | 1.005 | 0,2 % | 157 |
+| Lehrkräfte nur aus der Stadt (`SCHUL_ZUZUG` 0) | 76 | 87,2 / 931 / 1.224 | 4.843 | 1,080 / 1,262 | 277 / 305 | 3,5 (13.220) | 764 | 10,6 % | 673 (höchstens 3.554) |
+| **ausgeliefert: ab einer Klasse (15/20), 16/32 Felder, Zuzug** | **77** | **87,2 / 934 / 1.233** | **4.843** | **1,074 / 1,192** | **277 / 305** | **3,45 (12.880)** | **734** | **10,4 %** | **99** |
+
+Wie im Entwurf zu bauen, hieße die erste Schule schon an Tag 76 (an Tag 120 hat die Stadt erst 87 Einwohner): Das Geld fehlt dann für
+Wohnhäuser, bis Tag 365 wächst die Stadt langsamer, das kleinste Budget sinkt, das Band von Gate 4 wird breiter, und doppelt so viele halb
+leere Schulen stehen herum.
+Ohne Zuzug von Lehrkräften fehlen sie an neuen Schulen lange (sieben Mal so viele Schülertage ohne Lehrkraft), und die Stadt wächst weniger.
+
+**Gruppenmessung** (`simtest --schule` H, Seeds 1–3, 730 Tage, jeder fünfte Tag; nur gemessen, keine Regel liest diese Merkmale):
+
+| Gruppe | Schülertage | davon im Nachbarort |
+|---|---|---|
+| alle | 31.098 | 10,3 % |
+| Mädchen | 16.221 | 9,6 % |
+| Jungen | 14.877 | 11,1 % |
+| Nachnamen Kaya bis Kowalski (Liste 31–37) | 2.920 | 5,7 % |
+| übrige Nachnamen | 28.178 | 10,8 % |
+
+Ob ein Kind im Nachbarort zur Schule geht, hängt nur daran, wo es wohnt und wann (vor der ersten Schule, am Rand). Die Unterschiede kommen
+aus drei Städten mit wenigen Familien je Gruppe (die Nachnamen erben die Kinder; wenige Familien am Rand oder in der Mitte machen den
+Unterschied); `simtest --schule` A prüft statisch, dass keine Regel der Schule Name, Geschlecht, Herkunft oder Eltern liest, und F, dass
+ein Namenstausch nichts ändert.
+
+**Rechenzeit** (`zeit.mjs`, Seeds 1–10, 365 Tage stündlich, zwei Stände abwechselnd im selben Prozess): Teil 2 braucht 1.750 ms statt
+1.659 ms für Teil 1 (+5,5 %), gegen 31ce452 1.868 statt 1.662 ms (+12 %, Rathaus und Schule zusammen). Die 80 Seeds von `mess9s.mjs`:
+Ø 1,86 s, höchstens 4,1 s (erster Seed eines Prozesses unter Last).
+
+**Bild:** Draw Calls in der Teststadt (Seed 2, Tag 330, 10 Uhr) 29 statt 27 in der Stadtmitte und 28 statt 26 an der Grundschule
+(stadt.orig.html; +1 fürs Schulhaus, der Rest kommt vom anderen Verlauf der Stadt und vom Bund-Mesh, das seit Teil 1 ab Tag 0
+zeichnet); höchstens +3. `tests/blick.cjs` (letztes Bild, 23 Uhr an der Straße): Teststadt Tag 400 32 statt 31 (Handy 30 statt 29),
+große Stadt (`umland=300000`, Tag 750) 32 statt 30 (Handy 30 statt 28). Bilder: `v9/bau/nachher/` und `v9/bau/gross/` (Teil 1:
+`v9/t3/bilder.teil1/`; selbst angesehen: Schulhaus mit Uhrturm in der Stadt, Stadtbuch-Zeile zum Schuljahr, Nacht, Handy).
+
+### Speicherformat 9 (Teil 2)
+
+- Neu: das Personenfeld `p.schule` (Uint16, Gebäude + 1, 0 = kein Platz hier), `S.schule = { start, offen, jahr: { ein, ab, einP, einGen },
+  gestern, lohnStart, sachGestern, sachStart, it: [[Schule, Geräte, Tag] …] }`, `S.stat.schule = { lohn, sach, bau, gebaut, eingeschult,
+  abschluesse, schuelerTage, nachbarortTage, aussenTage, fehlenTage, ohneLehrkraftTage, it, itGeraete }`. Die Schulart steht in `g.stufe`
+  (1 oder 2), belegt, Bedarf und Plätze in `g.bedient`, `g.soll`, `g.kapaz`; keine neuen Gebäudefelder.
+- `p.schule` ist ab Version 9 Pflicht (`importZustand`), `S.schule` und `S.stat.schule` verlangt `jsonPruefen` ab Version 9; `schulePruefen`
+  prüft sie vollständig (Zustand und Summen als Zahlen, Schulart 1 oder 2, jeder Schulplatz eines lebenden Kindes in einer Schule, jede
+  Lieferung von Computern an eine Schule, mit gültigem Tag). Abgelehnt werden 8 beschädigte Stände (simtest). Die Versionsnummer bleibt 9
+  (gemeinsam für alle Teile von Version 9, Befund 2); Stände aus Teil 1 ohne Schule gab es nur in der Entwicklung, `tests/basis_v9.json` ist
+  neu erzeugt.
+- Übernahme: jeder ältere Stand (Version 2 bis 8) bekommt in der Kette `migriereSchule` vor `migriereRathaus` (dessen Zeilen bleiben die
+  letzten): Summen 0, niemand mit Platz, eine Zeile „Ab heute baut die Stadt Schulen …“. In der ersten Nacht gehen die Schulkinder im
+  Nachbarort zur Schule, dann baut das Bauamt.
+
+### Tests
+
+**simtest, Endstand** (Logs `v9/t3/st/*.txt`): alle 17 Modi bestanden: `--gate` (Seeds 1–3), `--speichertest` (bitgleich),
+`--aufholtest`, `--kitest` (47), `--bau` (15), `--waren` (15), `--tech` (16), `--regierung` (155), `--kita` (40),
+`--erweiterung --git` (33), `--sicherheit` (28), `--militaer` (24), `--autos --git` (21), `--migrationstest --git` (324),
+`--rathaus --git` (74), `--buergermeister` (25) und `--schule --git` (48, neu).
+
+- `--schule`: A statisch (kein Zufall im Abschnitt; 20 Stellen lesen nur Alter, Wohnung, Obhut, Schulplatz, Nummer und Generation, keine
+  Namen, keinen Charakter, keine Eltern, kein Geschlecht; das Budget ändern nur `schuleBezahlen`, `schulITBestellen` und der Sachaufwand in
+  `wirtschaft()`; `ortZurStunde` mit dem Zweig für Kinder nach der Haft, vor der Arbeit). B Seeds 1–3, 730 Tage stündlich, nach jeder
+  Nacht: jeder Platz direkt nach der Vergabe (Alter, Art, offene Schule, Reichweite, Kapazität, Zähler), ohne Platz nur ohne freien Platz in
+  Reichweite, Lehrkräfte nach der Formel, Sachaufwand und Löhne vom Land je Nacht gegengerechnet, kein Kind mit Kita und Schule, Stelle,
+  Dienst, Haft, Verfahren oder Auto, Bau nur ab einer Klasse und je Art eine Baustelle, Lebenslauf (Einschulung am 6., Abschluss am 18.
+  Geburtstag), Stadtbuch (je Schuljahr höchstens eine Zeile), Grundregel Stunde für Stunde (Kinder nur in ihrer Schule oder dort, wo sie
+  wohnen), über 3.800 Karten je Seed ohne Fehler. C Computer erzwungen (Bedarf, reihum bei den Computerfirmen, nie mehr als nötig, nie unter
+  0, nichts von außerhalb, Speichern mit Lieferungen, nach 50 Tagen ausgemustert). D Speichern mit 52 Schulplätzen bitgleich, 8 beschädigte
+  Stände abgelehnt. E Übernahme von 4 Ständen der Version 8 und (mit `--git`) 7 Ständen der Versionen 7 bis 2: Zeile vor denen des Rathauses,
+  erste Nacht im Nachbarort, nach 60 Tagen Schulen offen, gespeichert und geladen gleich. F Namenstausch 400 Tage bitgleich. G ausgeschaltet
+  (`R.SCHULEN = 0`: keine Schule, kein Platz, keine Zeile; mit `R.RATHAUS = 0` dazu 200 Tage jeden Tag wie Version 8). H Gruppen (oben).
+- Angepasst, weil sich die Stadt ändert (keine Prüfung abgeschwächt): `OHNE_SICH` und `statAlt` lassen den Schulplatz und die neue Summe aus,
+  `AUS` schaltet für Vergleiche mit älteren Versionen auch die Schulen aus; `--migrationstest` läuft wie beim Rathaus mit ausgeschalteten
+  Schulen (die Übernahme mit Schulen prüft `--schule` E); `--regierung` rechnet die Lohnsteuer auch aus den Löhnen der Lehrkräfte gegen
+  (wie jeder Lohn); `--rathaus` H schaltet auch die Schulen aus und lässt Schulplatz und Summe aus dem Abdruck; `--autos`: `ortZurStunde`
+  darf jetzt `geb` und `schule` lesen, `kindOrt`, `schulOrt` und `kindWohnung` stehen mit ihren Feldern in der Liste (die Grundregel für
+  Autos gilt unverändert: Kinder haben keine Autos, B prüft es jede Nacht).
+
+**Browser** (Server auf 8715, `tests/alle.sh`, Endstand): 19 Tests und 6 `otest`-Skripte, alle bestanden: p3test 12, p5neu 10,
+p6migration 39, p7figuren 6, p8tech 14, raute_klick 11, ereignis 21, t1_xss 5, p4test 25 (mit dem KI-Nachbau auf 11434), s2karten 22,
+kita 22, befunde_s2 27, erweiterung 20, sicherheit 12, militaer 16, autos 9, autos_bild 20, rathaus 15, schule 8 (neu); otest befunde 21,
+handy 11, breit 12, tastatur 4, breiten 20, hilfehoehe 1 (745 von 745 px). `tests/kennzahlen_hoehe.cjs`: Unterkante der Kennzahlen gleich wie
+stadt.orig.html in allen sechs Größen (400 × 820: 231 px beide).
+
+- Neu: `tests/schule.cjs` (8 Prüfungen, Teststadt Seed 2, Tag 330): Grundschule und weiterführende Schule offen; Schulkinder Stunde für
+  Stunde (7, 8, 9, 10, 11, 13, 14, 17, 21 und 3 Uhr: nur um 8 und 13 auf dem Schulweg, um 10 auf festen Plätzen im Hof ihrer Schule ohne
+  Überschneidung und nicht auf den Plätzen der Lehrkräfte, sonst keine); Autos von Lehrkräften parken um 10 nur an ihrer Schule, wenn sie selbst
+  damit hingefahren sind, Kinder haben keine; echter Klick (Raycast) aufs Schulhaus öffnet die Hauskarte; Personenkarte eines Schulkinds
+  (Klasse, Knopf zur Schule, Lebenslauf); Fenster mit der Gruppe „Schule“, drei Karten und den Zeilen „Lehrkräfte vom Land“, ohne NaN;
+  Draw Calls gegen stadt.orig.html (höchstens +3); Handy 400 × 820 ohne seitliches Überlaufen; Konsole leer. Bilder
+  `tests/bilder_befunde/schule_*.png` (selbst angesehen: Pause auf dem Hof, weiterführende Schule, Schulweg um 8, Nacht, Karte am Handy).
+- Nachgezogen, weil die Teststadt anders läuft oder die Schule dazukommt (keine Prüfung abgeschwächt): `befunde_s2.cjs` erwartet die
+  aufklappbare Karte der Schule (16 statt 15); die Zeile der Regierung an Tag 0 bleibt unter 950 Zeichen, weil die Schule eine eigene Zeile
+  bekam. `ereignis.cjs`: Seed 4 ab Tag 400 (Momente an Tag 440, 483, 486, 489; `v9/t3/momente_neu.log`). `autos_bild.cjs`: neue feste
+  Momente (Seeds 1, 69, 80; `v9/t3/faelle/`), und die Hauptfigur mit Auto wird erst nach 7 Uhr gewählt (bis dahin kann jeder freinehmen; die
+  zuerst gewählte Lehrerin nahm frei und fuhr nicht). `p8tech.cjs`: Die größte Tech-Firma der Teststadt ist an Tag 420 ein Campus, der Klick
+  zielt höchstens knapp unter dessen Oberkante (`techHoehe`; die Tabelle zielte über das Dach). `p6migration.cjs`: Version 8 → 9 prüft auch
+  die Schule (Zeile, Summen 0, niemand mit Platz, Meldung „Schulen baut sie …“, nach der ersten Nacht Schüler oder Kinder im Nachbarort), und
+  der Fall „Version 6 an Tag 260“ zählt die Nacht der Kaserne getrennt von der der Anstalt (kam die Kaserne zuerst, zählte die Schleife bis
+  zur Anstalt). `tests/basis_v9.json` ist neu erzeugt (`basis_v9.cjs` verlangt die Schulfelder). `sicherheit.cjs` ist unverändert: Die neuen
+  Zeilen heißen „Lehrkräfte vom Land …“, nicht „Land …“ (die Prüfung zählt die Zeilen der Sicherheit mit „Land“ am Anfang).
+
+**Nicht geprüft:** echtes Sprachmodell; echte Grafikhardware und Safari; Seeds über 80; der Kauf von Computern durch den Haushalt (nur
+erzwungen in `simtest --schule` C: die Oberfläche ruft `schulITBestellen` nicht).
+
+### Befunde der Gegenprüfung „schule“ (alle umgesetzt)
+
+1. **Frühes Wachstum:** gebaut wird erst ab einer Klasse in der Nähe (SC8), mit größerer Reichweite (SC7); Messung oben.
+2. **Zusammenspiel mit Rathaus, Wachstum, Haushalt:** von Hand zusammengeführt (eine Kette, eine Version 9, `wo`-Liste im Zuzug, `istBetrieb`,
+   Lohn, Kennzahlen); Budget nur an drei Stellen (statisch geprüft), Schnittstellen für Haushalt und Wachstum oben.
+3. **Version 8:** `--autos` besteht; `ortZurStunde` darf dort jetzt `geb` und `schule` lesen (Kind oder erwachsen, wie in `stunde()`, und der
+   Schulplatz am 18. Geburtstag), `kindOrt`, `schulOrt` und `kindWohnung` sind mit ihren Feldern eingetragen. Alle simtest-Modi der Version 9
+   laufen mit Schule; `tests/schule.cjs` zählt um 10 Uhr die Autos der Lehrkräfte an ihrer Schule (Teststadt: 2 Lehrkräfte mit Auto, 1
+   parkt dort, weil nur sie damit hingefahren ist). Im Bild `tests/bilder_befunde/schule_autos.png` ist dieses Auto nicht deutlich zu sehen
+   (der Blick zeigt den Hof).
+4. **README-Abschnitt:** dieser, mit Quellen und Adressen.
+5. **Zahlen Sekundarbereich I:** Ausgabe 2025 der Bildungsindikatoren für beide Bereiche (SC4).
+6. **Schulpflicht bis 18:** entschieden (alle bis 18, Grund oben), Nordrhein-Westfalen auf der Karte.
+7. **Hauskarte und Karte „Kleinere Klassen“:** Lehrkraft je 13,6 bzw. 11,9 Kinder aus der Formel, keine Klassenzahl; Räume nur „wenn eine
+   Schule voll ist“.
+8. **Pause:** feste Plätze, siehe Darstellung; `tests/schule.cjs` prüft, dass niemand im anderen steht.
+9. **Testanpassungen des Entwurfs:** Auf Version 9 waren die drei (Ersatzdienst im Bauhof, offenes Verfahren, Suche über Seeds) nicht nötig; `--bau`,
+   `--regierung` und `--erweiterung` bestehen unverändert. Dass der Ersatzdienst nicht zur Obergrenze des Bauhofs zählt, sagt die Simulation
+   selbst (`stellen()`, `bauhofStellen`, B12). Angepasst sind nur Schalter für Vergleiche mit älteren Versionen (siehe „Tests“).
+
+### Bekannte Schwächen (Teil 2)
+
+- **Bis zur ersten Schule gehen die Kinder im Nachbarort zur Schule** (im Mittel bis Tag 277, frühestens 228, spätestens 338), und Kinder
+  am Rand, wo keine Klasse zusammenkommt, bleiben dort: an Tag 730 im Mittel 3,3 Kinder, über die 730 Tage 10,4 % der Schülertage. Das ist
+  die Folge der Entscheidung „erst bauen, wenn genug Kinder da sind“ (Befund 1); wie der Entwurf zu bauen (ab einem Kind, 12/24 Felder)
+  kostet früh Einwohner und Budget (Varianten oben).
+- **Die Schulen sind selten voll**: 734 Plätze für 126 Kinder an Tag 730. Die Räume sind zweizügig (SC6), die Stadt hat aber wenige Kinder
+  je Jahrgang; kleinere Häuser für kleine Schulen gibt es nicht. Das kostet nichts extra (Sachaufwand je Kind, Lehrkräfte nach Kindern),
+  sieht im Bild aber groß aus.
+- **Wer Lehrkraft ist, bleibt**, auch wenn Kinder wegziehen (13,1 Lehrkräfte bei einem Bedarf von 12,0); in den ersten Tagen einer neuen
+  Schule fehlt oft noch jemand (99 Schülertage ohne Lehrkraft in 730 Tagen je Stadt). Der Unterricht fällt dann nicht aus (die Kinder sind
+  trotzdem in der Schule): Die Stadt kennt keinen Lernstand.
+- **Keine Schulformen, keine Noten, kein Ganztag**: Klasse 11 und 12 stehen für Oberstufe oder Berufsschule; nachmittags sind Kinder zu Hause.
+  Im Bild sieht man nur die Kinder der Schulen nah an der Kamera (höchstens 60), und nur um 8, 10 und 13 Uhr.
+- **Computer kauft heute niemand** (Stand Teil 2; *seit Teil 3 kauft das Vorhaben „Computer für die Schulen“*): Die Schnittstelle ist da
+  (`simtest --schule` C). Der Ladenpreis von 320 Taler ist ein Spielwert (Annahme 66), mit U1 rund 16.700 €.
+- **Gate 4 kippt auf anderen Seeds** (27, 48, 71 statt 43, 46, 74; 77 von 80 wie in Teil 1), im Rauschen der Zuzug-Regel.
+- **Rechenzeit:** +5,5 % gegen Teil 1 (`schulTag` jede Nacht über alle Personen, `ortZurStunde` mit dem Zweig für Kinder); Gate T hält (höchstens 2,6 s).
+- **Offene Frage an Noah (entschieden am 28.09.: so lassen):** Sollen Schulen früher kommen, etwa ab halber Klasse (8 bzw. 10 Kinder), wenn
+  der Haushalt (Teil 3) die Rücklage dafür hat? Noah: nein, Schulen erst ab voller Klasse. Der Haushalt baut deshalb keine Schulen; das Bauamt
+  baut sie ab einer ganzen Klasse, die Rücklage hält das Geld dafür bereit.
+
+## Haushalt (Version 9, Teil 3)
+
+Auftrag für Version 9, Teil 3: Noahs Wunsch, „dass Steuergelder schneller ausgegeben werden“. Grundlage ist der Entwurf „haushalt“ (auf Version 7
+gebaut) mit allen acht Befunden seiner Gegenprüfung (unten). Er ist hier von Hand auf Version 9, Teil 2 (Git 31ce452 plus Rathaus, Bürgermeister
+und Schule) übertragen. **Noahs Entscheidung** zur offenen Frage des Entwurfs: Geld, das die Stadt nicht sinnvoll verbauen kann, wird **erst
+ausgegeben** (laufende Kosten, Schulen als Pflichtaufgabe des Bauamts und Vorhaben nach Bedarf: Wohnungen, Rathaus-Ausbau, Computer für die
+Schulen bei den Tech-Firmen der Stadt, Parks), **dann senkt die Stadt die Lohnsteuer**, bis 0 %, sichtbar in der Zeile „Budget“; wird die
+Kasse knapp, hebt sie sie wieder an. Der Bürgermeister (Teil 1) legt einmal im Haushaltsjahr die Rangfolge der Vorhaben fest (über die KI, sonst gilt die Regel). Der Haushalt ist
+eine **Spielregel der Stadt**; aus dem Programm stützen ihn S. 54 (Investitionen, Ausgabendisziplin, keine Schulden) und S. 56 (Steuersätze
+senken), wörtlich im Fenster, ohne dem Programm Zahlen zuzuschreiben. Seit der Schlussprüfung sagt das Fenster auch ausdrücklich: „Die
+Reihenfolge – erst ausgeben, dann die Lohnsteuer senken – ist eine Spielregel (Noahs Entscheidung), keine Forderung des Programms.“
+
+### Regeln
+
+- **Konten.** Jede Änderung des Budgets steht in derselben Zeile auf einem von 20 Konten (`hhBuch`; 26 Stellen im Simulationsblock, eine
+  Ausnahme mit zwei Buchungen gleich danach, statisch geprüft): Einnahmen (Lohnsteuer; Mieten; Wohnungsverkauf an Mieter, Anzahlungen und
+  Raten; Bauaufträge von Gründern, Tech-Firmen und Autowerken; Bauhof und Laden der Stadt: Verkauf; Land und Bund bezahlen ihre Bauten),
+  laufende Kosten und Rückkäufe (Löhne im Bauhof und im Laden der Stadt; deren laufende Kosten; Kitas; Rathaus; Schulen: Sachaufwand; Rückkauf
+  von Wohnungen) und Bauen (Wohnhäuser, Aufstockungen, Parks, Straßen, Kitas, Schulen, Rathaus, Computer für die Schulen). Die Summe aller
+  Buchungen seit dem Start ist in jeder Stunde gleich der Änderung des Budgets (`simtest --haushalt` prüft das Stunde für Stunde). Verkauf und
+  laufende Kosten der Betriebe stehen getrennt (Befund 7), Rathaus und Schulen haben eigene Konten (Befund 3), die Autowerke buchen (Befund 5).
+  Konten sind Geldarten, keine Gruppen von Menschen.
+- **Haushaltsjahr.** 10 Spieltage (Jahr j = Tage 10j bis 10j + 9, wie ein Lebensjahr). Am Ende jeder Nacht werden die Konten des Tages
+  „gestern“ (Hauskarte des Rathauses); am Ende der letzten Nacht eines Jahres der Abschluss (`hhJahr`): Konten des Jahres, Zeile der letzten
+  Jahre (10 bleiben), Plan fürs nächste Jahr, Satz der Lohnsteuer, eine Zeile im Stadtbuch.
+- **Plan** (`hhPlanen`, zu Jahresbeginn). *Rücklage* = laufende Kosten und Rückkäufe des Vorjahres (mindestens das Startbudget von 6.000 Taler)
+  plus eine Reserve für die Bedarfsregeln des Bauamts (zwei Wohnhäuser und eine weiterführende Schule, 9.600 Taler). *Rahmen* = Kasse minus
+  Rücklage: Geplant wird nur mit Geld, das in der Kasse liegt, nie mit erwarteten Einnahmen. *Schätzung* je Vorhaben in der Rangfolge (was es
+  heute bauen oder kaufen würde), bis der Rahmen verbraucht ist; der Rest ist *nicht verplant*. Die Schätzung begrenzt nichts (Befund 7): Ein
+  Vorhaben startet, solange sein Bedarf besteht und die Rücklage bleibt; das Fenster sagt das so.
+- **Vorhaben** (`hhVorhaben`, jede Nacht nach dem Bauamt, vor Bund und Bauhof). In der Rangfolge des Jahres startet je Vorhaben höchstens eins
+  je Nacht, nur mit Geld über der Rücklage, Bauten nur, wenn der Bauhof seine offene Arbeit mit seinen Leuten in 3 Tagen schafft. **Vorrang:**
+  Was ein höheres Vorhaben braucht und noch nicht bezahlen kann, bekommt kein tieferes (es wird festgehalten). Die vier Vorhaben
+  (`VORHABEN`, Namen im Fenster und in der Anfrage an den Bürgermeister):
+  1. **Wohnungen auf Vorrat:** Frei oder im Bau sollen so viele Wohnungen sein, wie Leute suchen (Suchende der Stadt und Anfragen von
+     außen, wie in Regel 1 des Bauamts), und 6 darüber, so viele wie ein Wohnhaus hat (**seit Teil 4 ohne die 6**, W8 im Abschnitt „Wachstum,
+     Tempo und KI“: mit dem Anlauf zusammen fiel sonst Gate 4). Fehlt etwas, stockt die Stadt ein volles Haus auf
+     (wie Regel 4), sonst baut sie ein Wohnhaus auf dem Bauplatz nahe der Mitte (wie Regel 1). Der Vorrat ist fest: nicht an die Zuzüge
+     gekoppelt (Befund 1) und nicht an die Größe der Stadt (Messung unten).
+  2. **Rathaus ausbauen:** Liegt die Ausbaustufe des Rathauses unter der Stufe der Stadt und läuft kein Ausbau, baut der Bauhof aus (3.200,
+     4.800 bzw. 7.200 Taler, RA6).
+  3. **Computer für die Schulen:** Die Schulen kaufen die Computer, die ihnen fehlen (einer je Lehrkraft, in der weiterführenden Schule dazu
+     einer je 4 Kinder, Teil 2), über `schulITBestellen` zum Ladenpreis von 320 Taler, nur bei offenen Tech-Firmen der Stadt, die Computer
+     machen, so viele ganze Computer das Geld über der Rücklage hergibt. Gibt es keine solche Firma, wartet die Schule. *Seit Teil 5* ist das
+     kein Vorhaben mehr, sondern Bedarf vor allen Vorhaben (`hhComputer`), gekauft wie von den Leuten im nächsten Laden, sonst von außerhalb.
+  4. **Parks in Wohnnähe:** Für das bewohnte Wohnhaus ohne Park in 5 Feldern mit den meisten belegten Wohnungen (bei Gleichstand die Nummer)
+     legt die Stadt einen Park auf dem nächsten Bauplatz in 5 Feldern an (900 Taler).
+
+  **Schulen sind kein Vorhaben:** Das Bauamt baut sie als Pflichtaufgabe ab einer ganzen Klasse (Regel 7, vor den Vorhaben), und die Rücklage
+  hält das Geld für eine weiterführende Schule bereit (Noahs Entscheidung vom 28.09.: Schulen erst ab voller Klasse). Ein Vorhaben „Schulen
+  früher bauen“ ab einer halben Klasse war gebaut und gemessen und ist nach dieser Entscheidung wieder draußen; der Sachaufwand der Schulen
+  gehört zu den laufenden Kosten, die die Stadt zuerst zahlt.
+- **Rangfolge.** Am letzten Tag eines Haushaltsjahres um 7 Uhr fragt die Stadt das Bürgermeisteramt (Hauptfigur, KI) nach der Rangfolge fürs
+  nächste Jahr, nur aus dieser Liste (Schnittstelle aus Teil 1: `bmAnfrage`, `rangfolgeAnweisung`, `pruefeRangfolge`, `bmRangfolge`). Eine
+  gültige Antwort gilt im Plan des nächsten Jahres (`plan.von = 'ki'`, die Jahreszeile sagt es, das Tagebuch des Bürgermeisters hat den Gedanken);
+  ohne KI oder ohne gültige Antwort bis zur letzten Nacht gilt die Regel: die Reihenfolge der Liste (Wohnungen, Rathaus, Computer, Parks:
+  erst Wohnraum, dann Verwaltung und Ausstattung, dann Grün). Beim Aufholen gibt es keine Anfrage. Maßnahmen für oder gegen Gruppen
+  von Bewohnern stehen nicht auf der Liste.
+- **Lohnsteuer** (`hhSteuer`, am Jahresende nach dem Plan). Die Lohnsteuer (R01: Satz über dem Freibetrag je Familienmitglied, Familiensplitting,
+  Rentner-Freibetrag) hat jetzt einen Satz im Haushalt, am Start wie bisher 10 %. **Senken:** Ist das nicht Verplante mindestens so groß wie die
+  Lohnsteuer des abgelaufenen Jahres, sinkt der Satz um einen Punkt, bis 0 %. **Anheben:** Liegt die Kasse am Jahresende unter der Rücklage,
+  steigt er um einen Punkt, höchstens bis 10 %. Dazwischen bleibt er. Begründung der Regel: Gesenkt wird nur mit Geld, das nach laufenden Kosten,
+  Rücklage und allen Vorhaben mit Bedarf übrig ist (erst ausgeben, dann senken), und nur, wenn es für ein ganzes Jahr ohne Lohnsteuer reicht:
+  Dann kann die Senkung im nächsten Jahr keine Lücke reißen. Ein Punkt je Jahr macht jeden Schritt im Stadtbuch sichtbar und lässt der Kasse Zeit,
+  sich zu zeigen, bevor der nächste kommt; die Stadt springt nicht hin und her. Angehoben wird nur, wenn die Rücklage angegriffen ist, denn
+  Kredite nimmt die Stadt nicht auf (S. 54: Schuldenbremse; das Budget fällt nie unter 0) und die laufenden Kosten müssen gedeckt bleiben;
+  höchstens bis zum Satz vom Start, weil der schon vor der Stadtregierung galt. Freibeträge und Splitting bleiben; was die Senkung den Leuten
+  lässt (Steuer zum Satz vom Start minus Steuer zum heutigen Satz), zählt der Haushalt mit (`erlassen`).
+- **Rathaus.** Den Ausbau mit der Stufe baut jetzt das Vorhaben „Rathaus ausbauen“ (Befund 3: kein eigener Bedarfsweg daneben); mit
+  ausgeschalteten Vorhaben (`R.HH_VORHABEN = 0`) baut das Rathaus wie in Teil 1 nach RA6 aus.
+- **Stadtbuch.** Je Haushaltsjahr eine Zeile (Art „Haushalt“, Münzen): „Haushaltsjahr 24: 100.260 Taler eingenommen, 53.477 ausgegeben, davon
+  5.160 für Vorhaben (1 Wohnhaus, 3 Computer für die Schulen und 2 Parks). Kasse 337.580 Taler, Rücklage für Jahr 25 49.517, nicht verplant
+  286.263. Die Lohnsteuer bleibt bei 0 %.“ (bei einer Rangfolge der KI: „…; die Rangfolge der Vorhaben hat das Bürgermeisteramt festgelegt.“);
+  jeder Bau eines Vorhabens als Zeile des Bauamts mit Grund und „Vorhaben aus dem Haushalt (1. Wohnungen auf Vorrat).“ Übernommene Stände
+  bekommen „Ab heute führt die Stadt einen Haushalt …“.
+- **Harte Grenze.** Der Abschnitt liest keine Personen (statisch geprüft: kein Personenfeld, keine Namen, kein Geschlecht, kein Alter, kein
+  Einzugstag, keine Eltern), nur Zähler der Stadt und Gebäude. Die Lohnsteuer hat einen Satz für alle (Freibeträge und Splitting wie in R01).
+  Ein Namenstausch ändert nichts (`simtest --haushalt` H).
+
+### Programm (Fenster „Haushalt“, Karten „Was das Programm dazu sagt“; im Fenster „Stadtregierung“ die neue Karte „Lohnsteuer sinkt, wenn Geld übrig bleibt“)
+
+Alle Zitate wörtlich mit gedruckter Seite (`afd/zitatpruef.py` und `afd/bau/zitate_genau.py` über alle Zitate beider Fenster, unten). Das
+Programm nennt für den Haushalt einer Stadt keine Zahl; Schwellen, Schritte und Rangfolge sind Annahmen der Stadt (HH1 bis HH8).
+
+| Karte | Zitat (Seite) | Status | In der Stadt |
+|---|---|---|---|
+| Erst ausgeben: Bauten und Ausstattung nach Bedarf | „Der Staat erhebt Steuern auch mit dem Ziel, durch gezielte öffentliche Investitionen und staatliche Verwaltung die Sicherheit der Menschen zu gewährleisten und die Lebensverhältnisse insgesamt zu verbessern.“ (S. 54); „Trotz gegenwärtig hoher Steuereinnahmen lassen die ständig steigenden konsumtiven Ausgaben zunehmend weniger Raum für notwendige Investitionen.“ (S. 54) | Spielregel (seit der Schlussprüfung; vorher „Auslegung“) | Über der Rücklage baut und kauft die Stadt, was gebraucht wird; neue laufende Leistungen schafft der Haushalt nicht |
+| Dann die Lohnsteuer senken | „Die AfD wird das Steuerrecht durch einen geänderten Einkommensteuertarif mit wenigen Stufen vereinfachen. Die Steuersätze werden wir senken […]“ (S. 56); „Wir setzen uns für eine Abkehr von übermäßiger Besteuerung und im Gegenzug für Ausgabendisziplin ein, um die Privathaushalte und unsere Unternehmen zu stärken sowie die Schuldenbremse einzuhalten und Verschuldung zurückführen.“ (S. 54) | wirkt | Regel oben; die Bedingung „erst ausgeben“ ist Noahs Spielregel. Das Programm senkt die Sätze im Gegenzug zu weniger Abschreibungen für „Steuersparmodelle“ (S. 56), die die Stadt nicht kennt; es meint die bundesweit geregelte Einkommensteuer (Aufkommen bei Bund, Ländern und Gemeinden), in der Stadt geht die ganze Lohnsteuer an die Stadt |
+| Ausgabendisziplin, keine Schulden | „Deshalb fordern wir, Steuerverschwendung zu vermeiden.“ (S. 54); „Die im Grundgesetz festgeschriebene Schuldenbremse ist einzuhalten.“ (S. 54) | wirkt | Nur Geld in der Kasse, Rücklage unangetastet, kein Bau ohne Bedarf; Hinweis: Das Programm spricht vom Bundeshaushalt (Art. 109 Abs. 3 GG gilt für Bund und Länder) |
+| Wer bestellt, bezahlt | „Es besagt, dass diejenige staatliche Ebene, die eine Ausgabe veranlasst, auch die damit verbundene Finanzierung zu leisten hat (‚Wer bestellt, bezahlt‘).“ (S. 55) | galt schon | Land und Bund bezahlen ihre Einrichtungen, die Stadt ihre |
+| Computer für die Schulen, gekauft in der Stadt | „Grundsätzlich benötigen Schulen eine moderne, zeitgemäße IT-Ausstattung.“ (S. 160) | wirkt | Seit Teil 5 Bedarf vor den Vorhaben: Die Schulen kaufen wie die Leute den neuesten Computer einer Firma der Stadt im nächsten Laden, sonst von außerhalb (dann verlässt das Geld die Stadt) |
+| Wohnungen: Spannung zu S. 37 | „Der bisherige soziale Wohnungsbau ist gescheitert, er kann nur einen Bruchteil der Berechtigten erreichen.“ (S. 37); Absatz „Mehr Wohngeld statt sozialem Wohnungsbau“ (S. 37) | Auslegung | Das Bauamt baut, weil sonst niemand baut; ohne Belegungsbindung und Einkommensgrenze, Mieter können kaufen (Befund 8: neutraler Titel, Überschrift des Programms zitiert) |
+
+Fenster „Stadtregierung“: Karte R01 sagt jetzt „vom Rest geht ein Satz an die Stadt, am Anfang wie bisher 10 %“ (Live-Zeile mit dem heutigen
+Satz), die neue Karte „Lohnsteuer sinkt, wenn Geld übrig bleibt“ (mit den Zitaten von S. 56 und S. 54; Status „wirkt“, Live-Zeile mit Satz,
+Senkungen und nicht Verplantem) steht in der Gruppe der Steuern; „Die Steuersätze werden wir senken“ (S. 56) ist aus „Keine Zahl …“
+genommen, weil es jetzt wirkt. Die Karten zu Rathaus, Bürgermeister, Schule und Computern nennen die Vorhaben; die Karte „Computer für die Schulen“ hat den Status „wirkt“.
+
+**Nicht übernommen** (aufklappbar im Fenster, je mit Grund): „Wahre Kosten der Asylpolitik freilegen“ (S. 55: harte Grenze, die Stadt kennt keine
+Herkunft und keinen Status, der Haushalt ordnet keine Ausgabe einer Gruppe von Menschen zu); „Zuwendungen an Nichtregierungsorganisationen
+reduzieren“ (S. 55: gibt es nicht); „Steuerfinanzierte Öffentlichkeitsarbeit der Regierung drastisch kürzen“ (S. 56: gibt es nicht);
+EU-Beiträge (S. 54: Bund); „Klimarettung“-Ausgaben (S. 54: hat die Stadt nicht); „planvolle, kontinuierliche Sanierung von Straßen,
+Schienenwegen und Brücken“ (S. 14: nichts verfällt); „Beschleunigung notwendiger Neuinvestitionen durch Vereinfachung von Planungs- und
+Genehmigungsverfahren“ (S. 14: keine Genehmigungen; „die Bewilligung von Neubauprojekten zu beschleunigen“ auf S. 38 meint Brücken, Befund 8);
+Zuschlag für die Kommunen auf Einkommen- und Körperschaftsteuer (S. 58: galt schon, keine Grundsteuer, die ganze Lohnsteuer geht an die Stadt).
+
+### Annahmen und Quellen (HH1 … HH8)
+
+| # | Annahme | Warum / Quelle |
+|---|---|---|
+| HH1 | Haushaltsjahr = 10 Spieltage, Abschluss am Ende seiner letzten Nacht | wie Annahme 2 (ein Lebensjahr = 10 Tage); Spielregel |
+| HH2 | Rücklage = laufende Kosten und Rückkäufe des Vorjahres × 1, mindestens 6.000 Taler (Startbudget), dazu 2 Wohnhäuser und 1 weiterführende Schule (9.600 Taler) | Die Stadt nimmt keine Kredite: Ein Jahr laufende Kosten muss gedeckt sein, und die Bedarfsregeln des Bauamts (Wohnhaus, Schule ab einer Klasse) sollen nie am Vorhaben scheitern. Die Schuldenbremse des Grundgesetzes gilt für Bund und Länder (Art. 109 Abs. 3 Satz 1 GG: „Die Haushalte von Bund und Ländern sind grundsätzlich ohne Einnahmen aus Krediten auszugleichen.“, https://www.gesetze-im-internet.de/gg/art_109.html, Wortlaut in der Gegenprüfung nachgelesen); Kredite der Gemeinden regeln die Länder in ihrem Kommunalrecht. Der Faktor 1 ist eine Annahme |
+| HH3 | Vorrat an Wohnungen: fest 6 (so viele wie ein Wohnhaus hat) über Suchende und Anfragen hinaus, **seit Teil 4 fest 0** (W8); ein volles Haus wird zuerst aufgestockt | Ein Wohnhaus braucht mit 4 Leuten 3 Tage: So findet, wer zuzieht, gleich eine Wohnung. Fest, weil ein Vorrat nach den Zuzügen des Vorjahres sich selbst verstärkte (Befund 1) und einer mit 1 % der Einwohner dazu (höchstens 24) zusammen mit dem Anlauf aus „Wachstum“ Gate 4 auf 2 von 80 Seeds verfehlte (Messung unten); Spielregel |
+| HH4 | Parks: jedes bewohnte Wohnhaus einen Park in 5 Feldern (bestehende Reichweite `REICH_PARK`); Schätzung ein Park je 3 Häuser ohne Park | Regel der Stadt; das Programm sagt zu Parks nichts |
+| HH5 | Schulen sind kein Vorhaben: Das Bauamt baut sie ab einer ganzen Klasse (15 bzw. 20 Kinder, SC8) vor allen Vorhaben; die Rücklage hält eine weiterführende Schule bereit | Noahs Entscheidung vom 28.09. (Schulen erst ab voller Klasse); ein Vorhaben „Schulen früher“ ab einer halben Klasse ist deshalb wieder entfernt |
+| HH6 | Ein Bau startet nur, wenn der Bauhof seine offene Arbeit mit seinen Leuten in 3 Tagen schafft; je Vorhaben höchstens einer je Nacht | Ein Wohnhaus braucht mit 4 Leuten 3 Tage; so stauen sich keine Baustellen, und die Obergrenze des Bauhofs (40) bleibt |
+| HH7 | Lohnsteuer: ein Punkt je Jahr; senken, wenn das nicht Verplante für ein Jahr ohne Lohnsteuer reicht; anheben, wenn die Kasse unter der Rücklage liegt; zwischen 0 und 10 % | Noahs Entscheidung (erst ausgeben, dann senken, bis 0); Schritt und Schwellen sind Annahmen der Stadt (Begründung oben); 10 % galten schon (R01) |
+| HH8 | Rangfolge nach der Regel: Wohnungen, Rathaus, Computer, Parks | erst Wohnraum (ohne freie Wohnung zieht niemand zu), dann Verwaltung und Ausstattung, dann Grün; der Bürgermeister kann sie jedes Jahr ändern |
+
+### Darstellung
+
+- **Zeile „Budget“ ist ein Knopf** (`#haushalt-knopf`; das Fenster geht über den Budget-Knopf **und** über das Rathaus auf, wie im Auftrag).
+  Breit steht „Budget · Steuer 10 % ›“ (der Satz live, `#k-satz`), am Handy nur „Budget ›“: Schon „· 0 %“ machte die Zahlen dort 25 px breiter.
+  Der Satz steht immer im Namen des Knopfs („Budget: Haushalt der Stadt öffnen, Lohnsteuer 0 %“) und im Fenster. Die ganze Zeile nimmt den Klick
+  (auch auf die Zahl); der Fokusring ist der aller Tab-Halte, am Knopf. Die Zahlen werden nicht höher: Unterkante in allen sechs Größen gleich wie
+  stadt.orig.html (`tests/kennzahlen_hoehe.cjs`: 400 × 820 231 px beide; 568 × 320 bis 926 × 428 156 bis 216 px), am Handy auch nicht breiter
+  (`tests/haushalt.cjs`).
+- **Fenster „Haushalt der Stadt“** (`#haushalt-dialog`, Stil und Verhalten wie „Stadtregierung“, am Handy bildschirmfüllend): Kopf
+  (Haushaltsjahr, Tage), Einleitung; „Heute“: Kasse (jede Spielstunde nachgeführt, Befund 7), Rücklage, geschätzt, nicht verplant und
+  ausgegeben zu Jahresbeginn bzw. dieses Jahr, Lohnsteuer mit Satz vom Start, die Regel in einem Satz, was die Senkung den Leuten ließ;
+  „Vorhaben im Jahr N: Rangfolge vom Bürgermeisteramt / nach der Regel“ (je Vorhaben eine Karte: was es tut, was es heute braucht, geschätzt,
+  ausgegeben, gebaut seit dem Start); eine Zeile zum Bauhof; die Tabelle der 20 Konten (Vorjahr und seit dem Start; dieses Jahr als Satz darüber)
+  mit Einnahmen, Ausgaben, Überschuss; „Wofür das Geld ging“ (Anteile seit dem Start); „Die letzten Jahre“ (10 Jahre: Überschuss, Vorhaben, Kasse, Satz);
+  sechs Programmkarten; aufklappbar „Annahmen der Stadt (8)“ und „Nicht übernommen (8)“. Der feste Teil wird einmal gebaut, die Zahlen beim
+  Öffnen und an jedem neuen Tag (nur solange es offen ist), die Kasse jede Spielstunde: keine Allokation je Bild. Alles über `textContent`.
+- **Hauskarte des Rathauses:** Abschnitt „Haushalt“ mit den Konten von gestern in acht Gruppen (`haushaltKurz`, Schnittstelle aus Teil 1, jetzt mit
+  `fenster: true` und `satz`), „Lohnsteuer X %“ und Knopf „Fenster „Haushalt“ ›“ (drückt `#haushalt-knopf`).
+- **Stadtbuch:** Art „Haushalt“ mit Münzen (Gewicht 2), eine Zeile je Jahr; Bauten der Vorhaben als Zeilen des Bauamts. Im Mittel 5,69 statt
+  5,33 Zeilen am Tag (Teil 2).
+- **Keine neuen 3D-Objekte, keine neuen Three.js- oder Browser-APIs** (`<dialog>`, `getBoundingClientRect` wie bisher); Häuser, Aufstockungen,
+  Parks und Rathaus-Ausbau aus den Vorhaben laufen über die bestehenden Gebäude, Baustellen und Bauarbeiter (Grundregel unverändert).
+  Die Kamera bewegt sich nicht. Draw Calls unten („Gemessen“).
+
+### Schnittstellen für Teil 4 und 5
+
+- **Wachstum (Teil 4):** Der Vorrat (`hhVorrat`) hängt nicht am Zuzug (Befund 1). Mit dem Anlauf des Entwurfs gemessen (unten): Gate 4
+  hält auf allen 80 Seeds, das Band ist aber breiter als mit dem Anlauf allein; ohne Vorrat (`R.HH_VORRAT = 0`: das Vorhaben baut nur für
+  Suchende und Anfragen) wäre es wie beim Anlauf allein. `S.anfragen` geht als Bedarf in die Lücke ein (`hhWohnungLuecke`), wie in Regel 1
+  des Bauamts. Zählt Teil 4 im Anlauf Stellen anders, ändert das nur den Zuzug; der Haushalt liest ihn nicht.
+- **Tempo und KI (seit Teil 4 umgesetzt: bei jedem Tempo, Frist bis 23 Uhr):** Die Anfrage zur Rangfolge läuft im `kiSchritt` wie alle Anfragen,
+  in Teil 3 nur unter 20×; lief die KI bei 20× nicht, galt die Regel (die Jahreszeile nennt dann kein Bürgermeisteramt). Teil 4 lässt sie bei
+  jedem Tempo zu (Abschnitt „Wachstum, Tempo und KI“). `haushaltInfo` liefert alles fürs Fenster und für Anweisungen (liest nur).
+- **Neue Geldflüsse:** Jede neue Stelle, die das Budget ändert, braucht in derselben Zeile ein `hhBuch` (sonst schlägt `simtest --haushalt` A
+  und B an). Neue Konten ändern `HK_ZAHL` und `HH_KONTEN` (Oberfläche); `haushaltPruefen` verlangt heute genau 20 (Befund 6: dann eine
+  Übernahmeregel, die fehlende Konten mit 0 auffüllt).
+
+### Speicherformat 9 (Teil 3)
+
+- Neu: `S.haushalt = { start, kasseStart, satz, tag[20], gestern[20] | null, ist[20], summe[20], vorjahr[20] | null, plan, vorjahrPlan | null,
+  jahre: [[Jahr, eingenommen, ausgegeben, Vorhaben, Kasse, Satz] …] (höchstens 10), seit: { Vorhaben: Taler }, gebaut: { haeuser, aufstockungen,
+  wohnungen, parks, rathaus, computer }, erlassen: [Jahr, Vorjahr, abgeschlossene Jahre], gesenkt, angehoben }`, `plan = { jahr,
+  ruecklage, rahmen, pflicht, rang: [Vorhaben …], von: 'ki' | 'regel', schaetzung, unverplant, satz, verbraucht, gebaut }`. Reines JSON (etwa
+  2 KB), keine neuen Personen- oder Gebäudefelder.
+- `jsonPruefen` verlangt `S.haushalt` ab Version 9; `haushaltPruefen` prüft ihn vollständig (Zustand, 20 Konten als Zahlen, Plan fürs laufende
+  Jahr mit ganzen Zahlen und Satz höchstens 10, Jahre, Summen, und dass die Konten zum Budget passen: Budget − Kasse am Start = Summe aller
+  Buchungen). Abgelehnt werden 14 beschädigte Stände (`simtest --haushalt` F). Die Versionsnummer bleibt 9 (gemeinsam für alle Teile);
+  `tests/basis_v9.json` ist neu erzeugt (`basis_v9.cjs` verlangt den Haushalt ab dem Übernahmetag mit Satz 10 %).
+- Übernahme: jeder ältere Stand (Version 2 bis 8) bekommt in der Kette `migriereHaushalt` vor `migriereSchule` und `migriereRathaus` (deren Bauten
+  buchen schon; ihre Zeilen bleiben die letzten): Haushalt ab heute, Satz 10 %, Plan fürs laufende Jahr, eine Zeile „Ab heute führt die Stadt
+  einen Haushalt …“; die Meldung nach dem Übernehmen nennt ihn. Speichern mitten am Tag und in der letzten Nacht eines Jahres läuft bitgleich
+  weiter (`simtest --haushalt` E).
+
+### Gemessen
+
+Messskripte (nur Messung, nicht im Repo): `v9/t4/mess/mess9h.mjs` (wie `v9/t3/mess/mess9s.mjs`, Gates wie `simtest --gate` ohne T, 730
+Tage stündlich, dazu der Haushalt: Kasse an Tag 30/60/120/365/730, größte Kasse, Satz der Lohnsteuer, Vorhaben, Konten je Abschnitt Tag
+0–120, 121–365, 366–730, erlassene Lohnsteuer; mit `ANLAUF=1` zusätzlich der Anlauf des Entwurfs „wachstum“ in `zuzug()`, nur im Messskript),
+`v9/t4/mess/hh.py` (Auswertung), `v9/t4/mess/null.mjs` (Nullprobe), `v9/t3/mess/zeit.mjs` (CPU-Zeit). Vergleich: 31ce452 (`v8_*`) und
+Teil 2 (`t2_*`) mit demselben Messteil, Seeds 1–80. Der Rechner war geteilt (4 Kerne).
+
+**Gates, Seeds 1–80:**
+
+| Stand | alle Gates | fällt | Band Gate 4 Ø / max | Einwohner Tag 365 / 730 | kleinstes Budget Ø / min | Gate 6 Ø (min) | Gate 7 Ø (min) |
+|---|---|---|---|---|---|---|---|
+| 31ce452 (Version 8) | 78 von 80 | G4: 47, 54 | 1,077 / 1,165 | 917 / 1.187 | 6.615 / 5.645 | 19,3 (16,4) | 25,8 (18,0) |
+| Version 9, Teil 2 | 77 von 80 | G4: 27, 48, 71 | 1,074 / 1,192 | 934 / 1.233 | 4.843 / 52 | 19,7 (15,5) | 25,1 (19,0) |
+| **Version 9, Teil 3** | **77 von 80** | G4: 38, 47, 72 | 1,073 / 1,210 | 1.053 / 1.251 | 4.876 / 52 | 19,7 (16,9) | 25,6 (17,6) |
+
+Gate 4 kippt wieder auf anderen Seeds (27, 48 und 71 bestehen jetzt; 38 mit Band 1,210, 47 mit 1,177, 72 mit 1,168 nicht); über 1,10
+liegen 10 Seeds (Teil 2: 17, 31ce452: 17). Gates 1, 2, 3, 5, 6 und 7 halten auf allen 80 Seeds. Das kleinste Budget ist auf allen 80 Seeds
+dasselbe wie in Teil 2 (Seed 66, 52 Taler an Tag 65: Bis dahin verläuft die Stadt dort wie in Teil 2, die Kasse lag unter der
+Rücklage). Gate T (365 Tage unter 5 s): `simtest --gate` auf den Seeds 1–3 bestanden mit 1,9 / 2,4 / 2,3 s (allein) und 4,2 / 3,2 / 3,0 s
+(neben zwei anderen simtest-Modi).
+
+**Wirkung in Zahlen** (Seeds 1–80, Mittel; „Wunsch nur am Anfang erfüllt“ nachgemessen):
+
+| | 31ce452 | Version 9, Teil 2 | **Version 9, Teil 3** |
+|---|---|---|---|
+| Einwohner Tag 30 / 60 / 120 | 13,2 / 29,8 / 87,8 | 13,8 / 30,0 / 87,2 | **13,8 / 30,0 / 92,8** (bis Tag 30 gleich, Tag 60 fast: vor dem ersten Geld über der Rücklage ändert der Haushalt nichts; mehr als Teil 2 an Tag 120 auf 65 Seeds) |
+| Einwohner Tag 365 / 730 | 917 / 1.187 | 934 / 1.233 | **1.053 / 1.251** (mehr als Teil 2 an Tag 365 auf 78 von 80 Seeds, an Tag 730 auf 44) |
+| Kasse Tag 120 | 95.300 | 56.500 | **52.900** |
+| **Kasse Tag 365 / 730** | **1,25 / 3,29 Mio.** | 1,05 / 2,79 Mio. | **0,83 / 0,83 Mio.** (größte Kasse im Mittel 1,19 Mio. an Tag 511, danach sinkt sie; an Tag 730 auf 40 von 80 Seeds weniger als an Tag 365) |
+| Lohnsteuer (Taler am Tag, Mittel über 730 Tage) | 1.967 | 2.034 | **44** |
+| Satz der Lohnsteuer | 10 % | 10 % | erste Senkung im Mittel an Tag 98 (50 bis 140), **0 % ab Tag 193** (160 bis 230), an Tag 365 und 730 auf allen Seeds 0 %; angehoben im Mittel 0,15-mal (höchstens 2) |
+| den Leuten gelassen (Steuer zu 10 % minus Steuer zum Satz, 730 Tage) | – | – | **1,62 Mio. Taler** (1,48 bis 1,79 Mio.) |
+| Geld je Erwachsenem an Tag 730 / Zufriedenheit Ø | 11.068 / 69,9 | 11.108 / 69,9 | **12.680 / 74,2** |
+| Vorhaben (730 Tage) | – | – | **185.300 Taler**: Wohnungen 54.800 (22,8 Wohnhäuser), Rathaus 15.200 (3 Ausbauten), Computer 107.100 (335 Computer), Parks 8.200 (9,1 Parks) |
+| Rathaus | – | Ausbau im Mittel 8,5 / 11,5 / 11,5 Tage nach der Stufe | Ausbau 21,2 / 14,0 / 11,7 Tage nach der Stufe (höchstens 50 Tage: in der Kleinstadt liegt die Kasse lange unter Rücklage plus Preis); die Stufen kommen früher (Stadt Tag 157 statt 172, Großstadt 289 statt 336), Kosten 604 statt 557 Taler am Tag |
+| Schulen | – | erste Grundschule Tag 277, weiterführende 305; an Tag 730 2,29 + 1,15 Schulen; 10,4 % der Schülertage im Nachbarort | erste Grundschule **Tag 243**, weiterführende **274** (die Stadt wächst schneller, die Rücklage hält das Geld); an Tag 730 2,41 + 1,25 Schulen; **7,8 %** der Schülertage im Nachbarort; Sachaufwand 224 statt 179 Taler am Tag |
+| Bürgermeister | – | 11,1 Wahlen | 11,0 Wahlen; Rangfolge über die KI nur mit laufender KI (die Messung läuft ohne: Regel) |
+| Stadtbuch | 5,04 Zeilen am Tag | 5,33 | 5,69 |
+
+**Wohin das Geld fließt** (Teil 3, Taler am Tag, Mittel der Seeds 1–80 je Abschnitt; Einnahmen: Lohnsteuer, Mieten, Wohnungsverkauf an Mieter,
+Bauhof und Laden: Verkauf, Bauaufträge, Land und Bund; Pflicht: Löhne und laufende Kosten von Bauhof, Laden, Kitas, Rathaus, Sachaufwand der
+Schulen, Rückkäufe):
+
+| Tage | Einnahmen | davon Wohnungsverkauf / Betriebe / Mieten / Lohnsteuer | Pflicht | Bauen und Computer | davon Vorhaben | den Leuten gelassen |
+|---|---|---|---|---|---|---|
+| 0–120 | 1.966 | 272 / 1.023 / 165 / 135 | 1.345 | 231 | 70 | 10 |
+| 121–365 | 8.109 | 3.908 / 1.860 / 1.278 / 66 | 3.940 | 985 | 301 | 1.858 |
+| 366–730 | 7.639 | 4.003 / 2.120 / 1.003 / 0 | 7.204 | 431 | 282 | 3.201 |
+
+Ab Tag 366 gibt die Stadt so viel aus, wie sie einnimmt (7.639 gegen 7.635 Taler am Tag): Die Kasse wächst nicht mehr (31ce452: +5.600 Taler
+am Tag in dieser Zeit). Was an Tag 730 in der Kasse liegt (0,83 Mio.), hat sich bis etwa Tag 500 angesammelt, und zwar aus dem Wohnungsverkauf
+an Mieter (Anzahlungen und Raten, Schritt 2 der Stadtregierung, rund die Hälfte aller Einnahmen), nicht aus Steuern: Die Lohnsteuer ist ab Tag
+193 bei 0 %. Mehr lässt sich über die Lohnsteuer nicht zurückgeben (siehe Schwächen). Die Wirkung auf die Einwohner kommt vor allem aus dem
+Vorrat an Wohnungen und der niedrigeren Steuer (mehr Geld, zufriedener, weniger Wegzüge: 59,8 statt 69,0, mehr Geburten: 654 statt 552).
+
+**Zusammen mit dem Anlauf aus „Wachstum“** (Befund 1; `ANLAUF=1`, Seeds 1–80):
+
+| Stand | alle Gates | fällt | Band Gate 4 Ø / über 1,12 / max | Einwohner Tag 120 / 365 / 730 | Kasse Tag 365 / 730 |
+|---|---|---|---|---|---|
+| Teil 2 mit Anlauf | 80 von 80 | – | 1,070 / 4 / 1,134 | 210 / 1.078 / 1.216 | 1,57 / 2,93 Mio. |
+| Haushalt wie im Entwurf nachgebaut, Vorrat 6 + 1 % der Einwohner (höchstens 24), mit „Schulen früher“ | 76 von 80 | G4: 13, 55; G7: 20, 47 | 1,093 / 13 / 1,172 | 259 / 1.191 / 1.206 | 1,09 / 0,66 Mio. |
+| dasselbe, Vorrat erst ab der Stufe Stadt | 79 von 80 | G4: 45 | 1,088 / 11 / 1,221 | 219 / 1.171 / 1.218 | – / 0,67 Mio. |
+| dasselbe, Vorrat fest 6 | 79 von 80 | G4: 59 | 1,086 / 8 / 1,155 | 256 / 1.177 / 1.210 | 1,06 / 0,65 Mio. |
+| dasselbe, ohne Vorrat | 80 von 80 | – | 1,074 / 5 / 1,148 | 211 / 1.125 / 1.218 | 0,99 / 0,77 Mio. |
+| **ausgeliefert: Vorrat fest 6, ohne „Schulen früher“** | **78 von 80** | **G7: 28, 66** | **1,088 / 12 / 1,139** | **256 / 1.170 / 1.203** | **1,08 / 0,67 Mio.** |
+
+Gate 4 hält damit auf allen 80 Seeds (Bedingung der Gegenprüfung: Seeds 1–20). Das Band ist aber breiter als mit dem Anlauf allein
+(Ø 1,088 statt 1,070): Jeder Vorrat nimmt dem Zuzug die Bremse der fehlenden Wohnungen (Zuzug mal fw/(fw+3)), und eine Gründungswelle zieht
+dann schneller Leute nach, die später wieder fehlen (Seed 45, Vorrat ab der Stadt: Tag 570–630 144 Gründungen, 269 Zuzüge, 1.201 → 1.449
+Einwohner, bis Tag 690 110 Pleiten, an Tag 720 1.367; ohne Vorrat dort 8 Gründungen und 1.222 bis 1.243 Einwohner; `v9/t4/mess/kurve3.mjs`).
+Ohne Vorrat ist das Band wie beim Anlauf allein, dann baut das Vorhaben aber kaum mehr als Regel 1 des Bauamts. Gate 7 fällt auf 28 und 66
+knapp (14,8 und 13,4 statt ≥ 15, bei 22 bzw. 20 Wegzügen): Mit dem Haushalt ziehen weniger Leute weg (58,9 statt 78,3), die Stichprobe
+der Wegzieher wird kleiner. Teil 4 muss beides mit seinem endgültigen Anlauf nachmessen.
+
+**Nullprobe:** Mit `R.HH_VORHABEN = 0` und `R.HH_STEUER = 0` (nur Buchführung) ist die Stadt auf den Seeds 1–3 an jedem der 730 Tage genau
+wie Teil 2 (Abdruck aller Personen- und Gebäudefelder und des übrigen Zustands, ohne `S.haushalt` und ohne die Rangfolge des Bürgermeisters, die es jetzt
+jedes Jahr gibt; `null.mjs`); die Konten ergeben dabei auf
+den Taler die Änderung des Budgets.
+
+**Rechenzeit:** `zeit.mjs` (Seeds 1–10, 365 Tage stündlich, zwei Stände abwechselnd im selben Prozess): Teil 3 braucht 2.261 ms
+statt 1.773 ms für Teil 2 (+27,5 %), gegen 31ce452 2.121 statt 1.466 ms (+45 %). Das kommt von der größeren Stadt (an Tag 365 1.053 statt
+934 Einwohner, und früher groß): Mit ausgeschalteten Vorhaben und Steuer (nur Buchführung, Verlauf wie Teil 2) sind es 1.759 statt 1.844 ms,
+also nichts Messbares für die Konten selbst. Die 80 Seeds von `mess9h.mjs` liefen nur unter Last (Ø 2,85 s, höchstens 5,9 s bei sechs
+Prozessen auf vier Kernen) und zählen nicht für Gate T.
+
+**Bild:** Der Haushalt zeichnet nichts Neues. Draw Calls im selben Blick (`v9/t4/dc.cjs`, von (8, 30, 34) auf die Mitte): Teststadt Seed 2,
+Tag 250, 11 Uhr 29 (Teil 2 29, stadt.orig.html 27); Tag 400, 23 Uhr 30 (30, 29); große Stadt (`umland=300000`, Tag 750, 23 Uhr) 30 (30, 27).
+Der Unterschied zu 31ce452 sind Schulhaus und Rathaus aus Teil 1 und 2 und je nach Stadt ein Dach mehr oder weniger. `tests/haushalt.cjs`
+(Tag 250, 11 Uhr, nach zwei Spielstunden): 30 statt 27. `tests/blick.cjs` (letztes Bild, 23 Uhr an der Straße): Teststadt Tag 400 32 statt 31
+(Handy 30 statt 29; Teil 2 32/30), große Stadt Tag 750 33 statt 30 (Handy 31 statt 28; Teil 2 32/30). Höchstens +3 überall; im Straßenblick
+der großen Stadt ist das die Grenze. Bilder: `v9/bau/nachher/` (Teststadt Tag 400: 1.106 Einwohner, Kasse 968.824 Taler, Satz 0 %) und
+`v9/bau/gross/` (Tag 750: 6.583 Einwohner, Kasse 5,67 Mio. Taler; stadt.orig.html 6.412 und 11,97 Mio.). Selbst angesehen: Zeile „Budget ·
+Steuer 0 % ›“, Stadtbuch-Zeile zum Haushaltsjahr, Rathaus in der Mitte, Nacht, Handy (dort „Budget ›“). Bildzeit (Software-Rendering,
+geteilter Rechner, nur grob): große Stadt 12,0 ms je Bild breit und 18,3 ms am Handy (stadt.orig.html 11,9 und 20,8 ms).
+
+### Tests
+
+**simtest, Endstand** (Logs `v9/t4/st/*.txt`): alle 19 Modi bestanden: `--gate` (Seeds 1–3), `--speichertest` (bitgleich), `--aufholtest`,
+`--kitest` (47), `--bau` (15), `--waren` (15), `--tech` (16), `--regierung` (155), `--kita` (40), `--erweiterung --git` (33), `--sicherheit`
+(28), `--militaer` (24), `--autos --git` (21), `--migrationstest --git` (324), `--rathaus --git` (74), `--buergermeister` (26),
+`--schule --git` (48) und `--haushalt --git` (31, neu).
+
+- `--haushalt`: A statisch (Abschnitt ohne Zufall und ohne Personenfelder, Namen, Geschlecht, Alter, Einzugstag, Eltern; 26 Stellen ändern das
+  Budget, jede bucht in derselben Zeile, die eine Ausnahme gleich danach; Lohnsteuer mit dem Satz des Haushalts, `R.STEUER` nur noch für das
+  Erlassene; vier Vorhaben mit eigenem Schritt, keins baut Schulen). B Seeds 1–3, 730 Tage stündlich: jede Stunde Konten = Budget; jede Nacht
+  Konten von gestern, `haushaltKurz`, Vorrat 6, jeder Schritt (ausgegeben wie gemeldet, nie zwei gleiche Vorhaben in einer Nacht, nie unter die
+  Rücklage, nie mehr als frei, Bauten nur mit freiem Bauhof, Wohnungen nur mit Lücke, Computer = Geräte × Preis, keine Schule); jeder
+  Jahresabschluss unabhängig nachgerechnet (Rücklage, Rahmen, Schätzung in der Rangfolge, nicht verplant, Satz nach der Regel), Jahreszeile
+  ohne Namen. C Rangfolge über die KI (Anfrage an Tag 9 mit vier Vorhaben, Antwort gilt im Plan fürs Jahr 1, Zeile nennt das Bürgermeisteramt)
+  und Vorrang erzwungen (Rathaus vor Computer und umgekehrt; Wohnungen halten das Geld für ein Haus fest; unter der Rücklage nichts).
+  D Lohnsteuer erzwungen (Kasse 10 Taler: +1 bis höchstens 10; 5 Mio.: −1 bis 0; Steuer bei 4 % nachgerechnet). E Speichern mitten am Tag und
+  in der letzten Nacht eines Jahres, 60 Tage bitgleich; Aufholen. F Übernahme von Version 8 (stadt.orig.html) und mit `--git` Version 7 bis 2:
+  Zeile vor denen von Schule und Rathaus, 40 Tage Konten = Budget, gespeichert und geladen gleich; 14 beschädigte Stände abgelehnt.
+  G ausgeschaltet (nur Buchführung: Satz 10 %, keine Vorhaben, keine Zeile, das Rathaus baut nach RA6 aus). H Namenstausch: gleiche Konten,
+  gleicher Satz, gleiche Vorhaben.
+- Angepasst, weil sich die Stadt ändert (keine Prüfung abgeschwächt): Jede Stelle, die in einem Test das Budget setzt, zieht jetzt die Konten
+  mit (`budgetSetzen`, sonst lehnt `haushaltPruefen` den Stand zu Recht ab); der Fingerabdruck enthält Schule und Haushalt; `AUS` schaltet für
+  Vergleiche mit älteren Versionen auch Vorhaben und Steuer aus, `--migrationstest` läuft mit ausgeschalteten Vorhaben (die Übernahme mit
+  Haushalt prüft `--haushalt` F). `--regierung` rechnet die Lohnsteuer mit dem Satz des Haushalts nach (und prüft ihn auf einem Testfenster mit
+  wechselndem Satz 3 bis 10 %); `--sicherheit` rechnet den Tagessatz mit dem Satz des Haushalts und zählt Fälle beim Jugendamt als Zuwachs;
+  `--kitest` nimmt den Bürgermeister aus der Liste der Frei-Prüfung (seine Anweisung nennt die Stadtregierung, gewollt); `--erweiterung`
+  sucht die Nacht mit zweimal Wachsen über mehrere Seeds; `--rathaus` B prüft `haushaltKurz` (Zeile Rathaus = Kosten von gestern, Summe der
+  Zeilen = Saldo, `fenster` true), H mit ausgeschaltetem Haushalt; `--buergermeister` 4 mit den vier Vorhaben; `--schule` prüft zusätzlich, dass
+  jede neue Schule eine Zeile des Bauamts hat und keine aus dem Haushalt, C mit ausgeschalteten Vorhaben (sonst kauft das Vorhaben die
+  Computer vor der erzwungenen Prüfung). `--waren`: Wird ein Laden in der Nacht seiner Pleite zur Kita umgebaut, fallen seine Kisten des Tages
+  mit dem Umbau weg; die Messkopie zählt sie jetzt mit, damit „geliefert = bekommen“ genau aufgeht (in Seed 3, Tag 233 zum ersten Mal: eine
+  Kiste). `--kita` (h) sucht seinen Fall in der Stadt vor den erzwungenen Fällen (g) und (f), die Kitas das Personal nehmen (danach fand sich
+  in Seed 1 bis Tag 560 keiner mehr).
+
+**Browser** (Server auf 8715, `tests/alle.sh`, Endstand, Log `v9/t4/alle_final2.log`): 20 Tests und 6 `otest`-Skripte, alle bestanden:
+p3test 12, p5neu 10, p6migration 39, p7figuren 6, p8tech 14, raute_klick 11, ereignis 21, t1_xss 5, p4test 25 (mit dem KI-Nachbau auf
+11434), s2karten 22, kita 22, befunde_s2 27, erweiterung 20, sicherheit 12, militaer 16, autos 9, autos_bild 20, rathaus 15, schule 8,
+haushalt 18 (neu); otest befunde 21, handy 11, breit 12, tastatur 4, breiten 20, hilfehoehe 1 (745 von 745 px).
+
+- Neu: `tests/haushalt.cjs` (18 Prüfungen, Teststadt Seed 2, Tag 250): Zeile „Budget · Steuer X % ›“ ist ein Knopf im Kasten der Zahlen, alle
+  Zeilen gleich hoch; echter Klick auf die Zahl öffnet das Fenster; Kopf, Kasse, Rücklage, Satz, vier Vorhaben in der Rangfolge, 23 Zeilen der
+  Kontentabelle mit den Werten des Vorjahres, Jahre, sechs Programmkarten, „Annahmen der Stadt (8)“ und „Nicht übernommen (8)“, kein NaN, alles
+  wie `haushaltInfo`; die Kasse geht nach zwei Spielstunden mit; Escape schließt; Tastatur (Enter öffnet mit Fokus auf der Überschrift, Escape
+  schließt, Fokus mit Ring zurück auf dem Knopf); Stadtbuch-Zeilen mit Münzen; echter Klick aufs Rathaus: Konten von gestern, Satz, Knopf ins
+  Fenster; Fenster „Stadtregierung“ (neue Karte mit Live-Zeile, R01, „Keine Zahl“ ohne S. 56); Draw Calls gegen stadt.orig.html; Rangfolge über
+  die KI (Antworten im Test nachgebaut, per Playwright-Route) bis in den Plan und ins Fenster; Handy 400 × 820: Zahlen nicht breiter und nicht
+  höher als stadt.orig.html, Tipp auf die Zeile öffnet das Fenster, kein seitliches Überlaufen; Konsole leer. Bilder
+  `tests/bilder_befunde/haushalt_*.png` (selbst angesehen: Fenster breit, Handy oben und Mitte, Rathauskarte, Rangfolge der KI).
+- Nachgezogen (keine Prüfung abgeschwächt): `rathaus.cjs` erwartet von `haushaltKurz` jetzt `fenster: true`, einen Satz, den Knopf ins
+  Fenster und dass die Zeilen den Saldo ergeben; `p6migration.cjs` prüft bei Version 8 → 9 auch den Haushalt (ab dem Übernahmetag, Satz 10 %,
+  Konten passen zum Budget, Zeile im Stadtbuch, Zeile „Budget“ mit 10 %, Meldung, nach der ersten Nacht `haushaltPruefen` und die Konten von
+  gestern); `tests/basis_v9.json` ist neu erzeugt (`basis_v9.cjs` verlangt den Haushalt); `alle.sh` hat `haushalt` dazu. `ereignis.cjs`:
+  neue Momente in Seed 4 ab Tag 400 (Tag 407, 426, 428, 559; `v9/t4/momente_teil3.log`). `erweiterung.cjs`: Seed 1, Tag 201 → 202, 80 → 88
+  (Seed 12 wächst dort nicht mehr allein; `v9/t4/wachsen_a.log`). `autos_bild.cjs`: neue feste Momente (Seeds 23, 66, 54;
+  `v9/t4/faelle/f_*.log`), der Campus in Seed 1 (Seed 3 hat an Tag 730 keinen mehr), und der Klick aufs parkende Auto sucht sein Auto erst
+  nach zwei Bildern mit dem neuen Blick (die Figuren nah an der Kamera wählt das Bild aus; vorher traf der Klick eine Handwerkerin, die erst
+  mit dem neuen Blick zu sehen war) und ohne Figur, Raute oder anderes Auto im Umkreis. `otest/breit.cjs` fand, dass der Knopf „Budget“
+  seinen Fokusring nur auf `::after` trug (die Prüfung verlangt ihn am Element): Er hat jetzt den Ring aller Tab-Halte, und
+  `tests/haushalt.cjs` prüft das mit (Umriss mindestens 2 px).
+  `tests/kennzahlen_hoehe.cjs`: Unterkante der Zahlen gleich wie stadt.orig.html in allen sechs Größen (400 × 820: 231 px beide).
+
+**Zitate:** alle Programmzitate der Fenster „Haushalt“ und „Stadtregierung“ gesammelt (`v9/t4/zitate_hh.mjs`, `afd/bau/B/mess/zitate_sammeln.mjs`)
+und mit `afd/zitatpruef.py` und `afd/bau/zitate_genau.py` geprüft: im Fenster „Haushalt“ 19 von 19 wörtlich auf der angegebenen gedruckten
+Seite, im Fenster „Stadtregierung“ 282 von 283; das eine („Technologien, die den Bedürfnissen der Bevölkerung entsprechen, setzen sich von
+selbst durch …“, S. 164 f.) steht wörtlich über den Seitenwechsel, zwischen den Seiten liegt der Seitenkopf (von Hand nachgelesen, wie in 31ce452).
+Was die Werkzeuge sonst melden, sind Namen der Oberfläche in „…“ („Stadtregierung“, „Keine Zahl“, „Haushalt“, „Budget“) und eigene Sätze der
+Stadt („ein Jahr ohne Lohnsteuer“), keine Zitate.
+
+**Nicht geprüft:** echtes Sprachmodell (die Rangfolge nur mit nachgebauten Antworten); echte Grafikhardware und Safari; Seeds über 80; der
+Anlauf aus „Wachstum“ nur im Messskript, nicht als Teil 4.
+
+### Befunde der Gegenprüfung „haushalt“ (alle umgesetzt)
+
+1. **Blockiert: Gate 4 mit „Wachstum“ zusammen.** Der Vorrat hängt nicht mehr an den Zuzügen des Vorjahres (er verstärkte sich mit schnellerem
+   Zuzug selbst) und auch nicht an der Größe der Stadt: fest 6 Wohnungen. Das Vorhaben „Schulen früher“ ist draußen (Noahs Entscheidung). Gemessen mit dem Anlauf des Entwurfs „wachstum“ (Seeds 1–80, Tabelle oben): **Gate 4 hält auf allen 80
+   Seeds** (Band höchstens 1,139), 78 von 80 mit allen Gates (Gate 7 knapp auf 28 und 66). Die Varianten zeigen: Jeder Vorrat macht das
+   Band breiter; ohne Vorrat hielte es wie beim Anlauf allein, vom Vorhaben bliebe dann aber fast nichts.
+2. **Wunsch „schneller ausgeben“ nur am Anfang erfüllt.** Entschieden von Noah: erst ausgeben (vier Vorhaben statt zwei; Schulen als
+   Pflichtaufgabe des Bauamts mit Geld aus der Rücklage; Schule und Rathaus mit ihren laufenden Kosten), dann die Lohnsteuer senken, bis 0. Gemessen gegen 31ce452: Kasse an Tag 365 0,83 statt 1,25 Mio.,
+   an Tag 730 0,83 Mio. statt 3,29 Mio.; nach dem ersten Jahr mit Satz 0 wächst sie nicht mehr (Tabellen oben). Was bleibt, stammt aus dem
+   Wohnungsverkauf an Mieter, nicht aus Steuern (Schwächen).
+3. **Schnittstelle zum Rathaus.** `haushaltKurz` liefert die Konten von gestern in derselben Form wie in Teil 1 (Tagesschnappschuss in
+   `hhNacht`), mit `fenster: true`; Rathaus mit eigenen Konten (Löhne und laufende Kosten, Bauen); der Ausbau ist Vorhaben „Rathaus ausbauen“,
+   nicht beides; eine Anzeige: Hauskarte (gestern) mit Knopf ins Fenster (Jahr).
+4. **Gate T.** Gemessen auf Version 9 mit Rathaus, Schule und Haushalt (oben): +27,5 % Rechenzeit gegen Teil 2 und +45 % gegen 31ce452, ganz von der
+   größeren Stadt (die Buchführung allein kostet nichts Messbares); Gate T hält mit höchstens 2,4 s allein und 4,2 s unter Last. Bildzeit der
+   großen Stadt im Browser: 12,0 ms je Bild statt 11,9 ms (Software-Rendering, nur grob; 6.583 statt 6.412 Einwohner). Mit allen vier Bausteinen (Teil 4 fehlt noch) ist Gate T nicht gemessen.
+5. **Version 8.** Das Autowerk bucht („Bauaufträge von Gründern, Tech-Firmen und Autowerken“), der Tech-Anbau über die gebuchte Zeile; die
+   Import-Kette hat ihre eigene Stelle (`haushaltPruefen` nach `schulePruefen`). Statisch geprüft: 26 Stellen, jede bucht.
+6. **Merge-Reihenfolge.** Von Hand zusammengeführt (Rathaus, Schule, Haushalt in einer Kette; Schule mit eigenen Konten; die Oberfläche liest
+   die Kontenlisten aus der Simulation, `HH_KONTEN` nur für die Namen). Neue Konten: siehe Schnittstellen.
+7. **Plan fast nur Anzeige.** Vereinfacht: Rücklage und Bedarf entscheiden, die Schätzung begrenzt nichts und heißt so; keine Ansätze,
+   Nachträge oder Rahmen je Vorhaben. Betriebe: Verkauf und laufende Kosten auf getrennten Konten (Einnahme bzw. Pflicht, damit in der Rücklage).
+   Die Kasse im Fenster geht jede Spielstunde mit; „nicht verplant“ und „geschätzt“ sagen „zu Jahresbeginn“.
+8. **Programmkarten.** „Wohnungen: Spannung zu S. 37“ mit der Überschrift des Programms; „Neubauprojekte schneller“ gestrichen, S. 14 und S. 38
+   stehen unter „Nicht übernommen“ mit Grund.
+
+### Bekannte Schwächen (Teil 3)
+
+- **Die Kasse ist nicht leer.** An Tag 730 liegen im Mittel 0,83 Mio. Taler darin (31ce452: 3,29 Mio.), in der großen Stadt (`umland=300000`,
+  Tag 750) 5,67 Mio. (31ce452: 11,97 Mio.). Sie stammen aus dem Wohnungsverkauf an Mieter (Schritt 2), nicht aus Steuern: Die Lohnsteuer ist ab etwa Tag 193
+  bei 0 %, weniger geht nicht. Ab Tag 366 gibt die Stadt im Mittel so viel aus, wie sie einnimmt, die Kasse wächst also nicht mehr, sie baut
+  sich aber auch kaum ab. **Offene Frage an Noah:** Soll die Stadt mehr zurückgeben, etwa niedrigere Mieten oder Kaufpreise für die Wohnungen,
+  oder mehr Vorhaben (etwa Kitas früher, Straßen auf Vorrat)?
+- **Ab etwa Tag 190 zahlt niemand mehr Lohnsteuer.** Freibetrag (R01), Familiensplitting und Rentner-Freibetrag wirken dann nicht mehr; ihre
+  Karten sagen „Heute 0 %“. Steigen würde der Satz erst, wenn die Kasse unter die Rücklage fällt (im Mittel 0,15-mal in 730 Tagen).
+- **Rathaus-Ausbau in der Kleinstadt später:** im Mittel 21 Tage nach der Stufe (höchstens 50) statt 8,5, weil die Kasse dort lange unter
+  Rücklage plus Preis liegt; die späteren Ausbauten kommen wie vorher, die Stufen selbst früher.
+- **Gate 4 kippt auf anderen Seeds** (38, 47, 72; 77 von 80 wie Teil 2, 31ce452 78), und mit dem Anlauf aus „Wachstum“ ist das Band breiter
+  (Ø 1,088 statt 1,070, höchstens 1,139) und Gate 7 fällt knapp auf zwei Seeds: Teil 4 muss mit seinem Anlauf nachmessen (Schnittstellen).
+- **Rechenzeit +27,5 %** gegen Teil 2 durch die größere Stadt; Gate T hält (höchstens 2,4 s allein, 4,2 s unter Last).
+- **Am Handy steht der Satz nicht in der Zeile** (nur im Namen des Knopfs, im Fenster und in der Hauskarte des Rathauses), weil die Zahlen sonst
+  breiter würden.
+- **Die Rangfolge der KI kam nur unter 20×** (wie alle Anfragen); seit Teil 4 bei jedem Tempo, mit einer Frist höchstens bis 23 Uhr des letzten Tages.
+- Das kleinste Budget (Seed 66, 52 Taler an Tag 65) ist dasselbe wie in Teil 2: Die Rücklage begrenzt nur die Vorhaben, nicht die Bedarfsregeln
+  des Bauamts, und bis dahin verläuft die Stadt dort wie in Teil 2.
+
+## Wachstum, Tempo und KI (Version 9, Teil 4)
+
+Noahs Auftrag, wörtlich: „Mach bei Max 20 die ki auch läuft und das es schneller mehr Leute kommen“, auf Rückfrage „alles“. Seine
+Entscheidungen dazu: **(a)** Wachstum „alles“: freie Stellen schneller besetzen (Anlauf für alle Städte), ein Schalter „Wachstum: normal /
+schnell“, höheres Tempo; **(b)** höchstes Tempo 100×; **(c)** die KI bei jedem Tempo. Grundlage ist der Entwurf „wachstum“ (auf Version 7
+gebaut) mit allen elf Befunden seiner Gegenprüfung (unten). Er ist hier von Hand auf Version 9, Teil 3 übertragen. `zuzug()` hatten schon
+Rathaus (Stellen im Rathaus locken) und Schule (Stellen für Lehrkräfte, Kitas) geändert; der Anlauf sitzt jetzt dazwischen. Mit dem Haushalt
+zusammen fiel Gate 4 (blockierender Befund der Gegenprüfung „haushalt“: die Stadt schießt über und schrumpft); gelöst ist das gemeinsam:
+Der Anlauf ist abgestimmt, und der feste Vorrat an Wohnungen aus Teil 3 fällt weg (Messung unten). Entscheidungen von Claude (im Auftrag):
+„schnell“ ist Noahs Spielschalter, keine Regel der Stadtregierung; der Standard „normal“ muss alle Gates halten; die Frist der KI ist mindestens
+2 Spielstunden und mindestens 20 echte Sekunden, mit einer Obergrenze in Spielstunden, und ein Zähler „zu spät“ zeigt, was nicht rechtzeitig kam.
+
+### Regeln
+
+- **Anlauf für jede Stadt** (`wachstumJetzt`, in `zuzug()`): Solange die Stadt ein Dorf oder eine Kleinstadt ist (unter 160 Einwohnern; Stufen
+  fallen nie), dürfen am Tag bis zu 2 Leute mehr zuziehen als 1 + 1 % der Einwohner, und die Grundzahl der Zuzugsformel (2 + 2 % der Einwohner)
+  zählt im Dorf doppelt, in der Kleinstadt 1,5-fach. Im Dorf zählen außerdem freie Stellen im Laden und im Bauhof, und wer zuzieht, nimmt eine
+  davon, wenn in Werkstatt, Tech-Firma, Rathaus, beim Land, an Schulen oder beim Bund keine frei ist. Stellen in Kitas locken nie, Stellen an
+  Schulen nur mit `SCHUL_ZUZUG` (Befund 1). **R10 bleibt:** Wer zuzieht, kommt nur für eine freie Stelle, die niemand aus der Stadt nehmen kann
+  (Arbeitslose der Stadt zuerst), und tritt sie am ersten Tag an; seit der Schlussprüfung auch in der Zahl genau (`R.ZUZUG_GENAU`: am Tag
+  höchstens so viele, wie solche Stellen frei sind; Abschnitt „Befunde der Schlussprüfung (Version 9)“). Die Anfragen von außen, nach denen das Bauamt baut (`S.anfragen`), rechnen mit
+  der Grundzahl ohne Anlauf (Befund 2: sonst baute das Bauamt schon in den ersten Tagen aus dem Startbudget auf Vorrat). Der Abschnitt würfelt
+  nicht und liest keine Person, nur Stufe, Einwohner, Stellen und Wohnungen (`simtest --wachstum` A).
+- **Warum:** Die Startstadt hat nur den Bauhof und einen Laden, und deren Stellen locken keinen Zuzug (Annahme 11). Ohne Anlauf zog deshalb bis
+  zur ersten Gründung niemand zu (Seeds 1–3: erster Zuzug an Tag 66, 37 und 35), danach höchstens eine Person am Tag, solange die Stadt unter
+  100 Einwohnern war. Mit Anlauf kommt der erste Zuzug an Tag 1.
+- **Kein fester Vorrat an Wohnungen mehr** (Haushalt, HH3 geändert, `R.HH_VORRAT` 0): Das Vorhaben „Wohnungen auf Vorrat“ baut für alle, die
+  suchen, und für die, die für eine freie Stelle zuziehen würden, aber keine Wohnung fänden (`S.anfragen`, wie Regel 1 des Bauamts), also weiter
+  vor dem Zuzug; die 6 Wohnungen darüber hinaus sind weg. Grund, gemessen (Tabelle unten): Jeder feste Vorrat nahm dem Zuzug die Bremse der
+  fehlenden Wohnungen. Nach einer Welle von Gründungen zog die Stadt dann schneller Leute nach, als später Arbeit hatten, und schrumpfte in Tag
+  551–730 (Gate 4); mit Vorrat fiel Gate 4 in jeder Variante des Anlaufs auf 1 bis 5 von 80 Seeds, ohne Vorrat auf keinem.
+- **Schalter „Wachstum: normal / schnell“** (`S.wachstum`, `wachstumSetzen`; Einstellungen): Noahs Spielschalter, keine Maßnahme der
+  Stadtregierung (so steht es in den Einstellungen und auf der Karte R10). „Schnell“: am Tag bis zu 1 + 3 % der Einwohner (dazu der Anlauf), die
+  Grundzahl zählt doppelt, das Bauamt baut in einer Nacht bis zu doppelt so viel. Wer zuzieht, kommt auch dann nur für eine freie Stelle. Gilt ab
+  der nächsten Nacht, eine Zeile im Stadtbuch (Art „Wachstum“), gespeichert mit der Stadt; Standard „normal“.
+- **Tempo bis 100×** (Pause, 1×, 5×, 20×, 100×; Noahs Entscheidung). Eine Spielstunde dauert bei 100× 0,6 Sekunden, ein Spieltag 14,4 Sekunden.
+  Ein Bild rechnet höchstens eine Spielstunde (höchstens 0,25 s je Bild, `simTakt`, unverändert): Bei weniger als 4 Bildern je Sekunde läuft die
+  Spielzeit dann langsamer als 100×. Aufholen rechnet weiter wie 1× (eine echte Minute = eine Spielstunde, höchstens 90 Spieltage). Ein
+  gespeichertes Tempo, das es nicht als Knopf gibt, wird 1× (`tempoAus`).
+- **Figuren und Autos bei 100×** (Grundregel unverändert: Figuren gehen, wo die Simulation sie in dieser Stunde hat, Autos fahren nur über
+  `Sim.autoFaehrt`): Ein Gang dauert höchstens 0,85 Spielstunden, bei 100× also höchstens 0,51 Sekunden. Bei 60 Bildern je Sekunde sind das
+  gut 30 Bilder; auf einem langsamen Rechner (unten: Software-Grafik) **springen die Figuren fast** von Ort zu Ort. Die Autos planen ihre Fahrten
+  über die Bilder der Stunde bis 0,85 der Stunde (höchstens 10 ms je Bild, wie in Version 8); bleiben dafür zu wenige Bilder, springen die übrigen
+  Autos statt zu fahren (gemessen unten).
+- **KI bei jedem Tempo** (vorher „KI pausiert bei 20×“). Die Oberfläche meldet jedes Bild `kiSchalten(S, bereit && !aufholen, stunden)`: Eine
+  Anfrage hat mindestens 20 echte Sekunden (W5), bei vielen Hauptfiguren so viel, dass alle Anfragen eines Entscheidungszeitpunkts (7 und 18 Uhr:
+  alle Hauptfiguren samt Bürgermeister) bei der gemessenen mittleren Antwortzeit mit 20 % Luft drankommen (Hauptfiguren × Ø × 1,2, W6). In
+  Spielstunden: mindestens 2 (Spec), höchstens 36 (`R.KI_FRIST_MAX`, anderthalb Spieltage). Bei 1× sind das 2 Spielstunden = 2 Minuten wie bisher,
+  bei 5× 2 (24 s), bei 20× 7, bei 100× 34 (20,4 s) bis 36 (21,6 s). Wird die Frist länger (Tempo hoch), gilt das auch für offene Anfragen, kürzer
+  wird eine vergebene Frist nie. Die Simulation kennt kein Tempo, nur die Frist in Spielstunden; sie steht im Spielstand.
+- **Warteschlange** (`kiSchritt`): immer nur ein Aufruf (Spec). Zuerst die Rangfolge des Bürgermeisters (einmal im Jahr), dann die Entscheidungen
+  der Reihe nach. Eine Anfrage, deren Restzeit in echter Zeit kürzer ist als eine Antwort im Mittel braucht (höchstens 10 s), geht nicht mehr raus
+  („nicht gesendet“), damit alte Anfragen die Leitung nicht verstopfen; seit der Schlussprüfung entscheidet dann gleich das normale Gehirn
+  (`kiVerwerfen` mit „zu spät“, beim Bürgermeister die Regel), statt die Figur bis zur Frist warten zu lassen. **Code-Stücke** gibt es bei jedem Tempo, aber nur, wenn keine
+  Anfrage wartet und die Antwort vor 17 Uhr fertig ist (geschätzt aus den bisherigen Code-Antworten, vorher doppelt so lang wie eine
+  Entscheidung): Ein langer Code-Aufruf hält die Entscheidungen um 18 Uhr nicht auf (Befund 3). Bei 100× bleiben von 9 Uhr an 4,8 Sekunden
+  dafür; mit einem langsamen Modell gibt es dann keine Code-Stücke.
+- **Rangfolge des Bürgermeisters** (Teil 1 und 3): Die Anfrage am letzten Tag des Haushaltsjahres um 7 Uhr hat dieselbe Frist, höchstens bis
+  23 Uhr (`bmRangfolgeFrist`): In dieser Stunde läuft sie ab, und in derselben Nacht plant der Haushalt das nächste Jahr. Eine Antwort nach der
+  Frist wird abgelehnt, es gilt die Regel. Damit kommt die Rangfolge auch bei 20× und 100× (vorher nur unter 20×).
+- **„Zu spät“** ist `S.ki.abgelaufen`: jede Anfrage, die ohne gültige Antwort ihre Frist erreicht, auch die nicht gesendeten (seit der
+  Schlussprüfung zählen sie, sobald die Oberfläche sie verwirft). Er steht im
+  Spielstand, in den Einstellungen („in dieser Stadt N KI-Entscheidungen, M zu spät“) und in der Debug-Ecke (dazu „ungesendet“: nie
+  gesendet, „danach“: gültige Antwort, die die Simulation nicht mehr annahm, meist nach der Frist, und die Frist in Spielstunden und
+  Sekunden). Der alte Zähler `verworfen20` ist weg (Befund 7).
+- **Harte Grenze:** Anlauf, Schalter und Frist lesen keine Person; wer zuzieht, wird nach nichts ausgewählt als nach der freien Stelle (R10).
+
+### Kapazität der KI (Befund 3, `simtest --wachstum` F, nur gemessen)
+
+Nachbau des KI-Takts der Oberfläche in der Simulation: 10 Hauptfiguren und der Bürgermeister, Seed 2 ab Tag 250, 20 Spieltage, jede Antwort
+gültig und gleich lang. Gezählt: angewandte KI-Entscheidungen und „zu spät“ (Frist abgelaufen). Zum Vergleich: 11 Figuren mit je zwei
+Entscheidungszeitpunkten wären 440 in 20 Tagen (tatsächlich weniger, wenn nichts erlaubt ist oder eine Figur noch wartet).
+
+| Tempo | 1 s je Antwort | 2 s | 3 s | 5 s | 10 s |
+|---|---|---|---|---|---|
+| 1× | 446 / 0 (Frist 2 h = 120 s) | 446 / 0 | 446 / 0 | 446 / 0 | 417 / 0 (3 h = 180 s) |
+| 5× | 446 / 0 (2 h = 24 s) | 417 / 0 (3 h) | 413 / 0 (4 h) | 376 / 0 (6 h) | 319 / 0 (11 h = 132 s) |
+| 20× | 396 / 0 (7 h = 21 s) | 337 / 0 (9 h) | 314 / 0 (14 h) | 115 / 0 (22 h) | 95 / 6 (36 h = 108 s) |
+| 100× | 115 / 0 (34 h = 20 s) | 91 / 5 (36 h = 22 s) | 49 / 48 | 26 / 87 | 10 / 121 |
+
+(KI-Entscheidungen / zu spät in 20 Spieltagen, in Klammern die Frist. Endstand nach der Schlussprüfung: Eine Anfrage, die nicht mehr
+gesendet wird, entscheidet gleich das normale Gehirn; alle „zu spät“ der Tabelle sind solche. Die Stadt von Seed 2 an Tag 250 ist seit dem
+genaueren Zuzug eine andere, die Zahlen sind deshalb nicht Zeile für Zeile mit Teil 4 vergleichbar: vorher bei 100× 139 / 0, 104 / 5, 55 / 42,
+32 / 71, 19 / 90.)
+
+Lesart: Bei 1× und 5× schafft die KI alles. Bei 20× reicht es bis etwa 3 Sekunden je Antwort. **Bei 100× ist ein Spieltag 14,4 Sekunden lang:
+Mehr Antworten, als in diese Zeit passen, gibt es nicht** (bei 1 s je Antwort höchstens 14 am Tag, bei 3 s höchstens 4; gemessen 7 und knapp 3,
+weil nur um 7 und 18 Uhr entschieden wird und eine Figur mit offener Anfrage ihren nächsten Zeitpunkt überspringt); die übrigen Entscheidungen
+trifft das normale Gehirn. Während sie wartet, „macht die Figur weiter wie bisher“ (Spec, Zeile 375); läuft die Frist ab, entscheidet das
+normale Gehirn in der Stunde des Ablaufs, und eine Anfrage, die nicht mehr gesendet wird, entscheidet es sofort (seit der Schlussprüfung).
+Mit einem echten Modell nicht gemessen.
+
+### Abweichungen von der Spec (Noahs Entscheidung)
+
+- **Weicht vom Wortlaut der Spec ab (Zeile 76, „Tempo: Pause, 1×, 5×, 20×“):** dazu 100×. Noahs Auftrag („Max“ schneller, Entscheidung (b)).
+- **Weicht vom Wortlaut der Spec ab (Zeile 381, „Bei Tempo 20× keine KI-Entscheidungen, das Panel zeigt ‚KI pausiert bei 20×‘“):** Die KI
+  entscheidet bei jedem Tempo, das Panel zeigt „KI: Modell“. Noahs Auftrag („bei Max … die ki auch läuft“, Entscheidung (c)).
+- **Weicht vom Wortlaut der Spec ab (Zeile 376–377, „Kommt innerhalb von 2 Spielstunden keine gültige Antwort, entscheidet das normale
+  Gehirn“):** mindestens 2 Spielstunden, bei höherem Tempo mehr (mindestens 20 echte Sekunden, höchstens 36 Spielstunden). Folge von (c): Bei 100×
+  wären 2 Spielstunden 1,2 Sekunden.
+- Gleich geblieben: Die Simulation wartet nie; immer nur ein Aufruf; Timeout 30 Sekunden je Aufruf; höchstens 3 Entscheidungen je Figur und Tag.
+
+### Programm (Fenster „Stadtregierung“)
+
+Das Programm nennt für den Zuzug in eine Stadt keine Zahl; Anlauf und Schalter sind Spielregeln (W1 bis W4), nichts davon wird dem Programm
+zugeschrieben. Alle Zitate wörtlich mit gedruckter Seite (`afd/zitatpruef.py`, `afd/bau/zitate_genau.py`, unten).
+
+- **Karte R10 „Zuzug nur für eine freie Stelle, Arbeitsuchende der Stadt zuerst“** (galt schon): Die Stadt-Zeile nennt jetzt alle Stellen, für die
+  jemand zuzieht (Werkstatt, Tech-Firma, Rathaus, Schule, Land, Bund) und den Anlauf als Spielregel („Bis die Stadt 160 Einwohner hat, dürfen am Tag
+  bis zu 2 mehr kommen, im Dorf auch für freie Stellen im Laden und im Bauhof“, aus `Sim.R` erzeugt). Der Hinweis sagt: Die „strikte Begrenzung des
+  Zuzugsgeschehens“ (S. 109) meint Zuwanderung nach Deutschland; die Stadt kennt keine Herkunft und wendet ihre Grenze auf jeden Zuzug an (Annahme
+  der Stadt, Befund 6). Der Anlauf ist keine Forderung des Programms, der Schalter „schnell“ ist Noahs Spielschalter, keine Maßnahme der
+  Stadtregierung. Neue Live-Zeile: wie viele heute zuziehen dürfen, Anlauf, Schalter, Zuzüge seit dem Start.
+- **Unter „Keine Zahl, keine Mechanik oder kein Fall“:** „Die Integrationsfähigkeit ist durch eine strikte Begrenzung des Zuzugsgeschehens wieder
+  herzustellen“ (S. 109) stand schon da; der Grund nennt jetzt Anlauf, Schalter und die Lesart. Neu: „Auch technologische Lösungen wie Künstliche
+  Intelligenz (KI), Robotik und Digitalisierung oder ökonomische Produktivitätssteigerungen sind zur Bekämpfung eines etwaigen Fachkräftemangels
+  konsequent umzusetzen.“ (S. 113): keine Mechanik; die KI der Hauptfiguren entscheidet für einzelne Menschen und ersetzt keine Stelle.
+- **Unter „Grenze der Stadt“ (nicht übernommen), neu:** „Statt solcher Abwanderungen brauchen wir Rückgewinnungsprogramme für abgewanderte
+  Leistungsträger.“ (S. 113): gemeint sind ausgewanderte deutsche Fachkräfte (Staatsangehörigkeit); die Stadt merkt sich auch nicht, wer weggezogen
+  ist. Die übrigen Punkte, die der Entwurf nannte, standen schon dort (Auswahl „außereuropäischer“ Arbeitskräfte, S. 113, bei der Karte zur
+  Einwanderung; Punktesystem mit Sprachkenntnissen, S. 113; Spracherwerb auf B2-Niveau, S. 109; Qualifizierung derer, „die bereits heute legal in
+  Deutschland leben“, S. 113, als Zitat bei R10).
+
+### Annahmen und Quellen (W1 … W8)
+
+| # | Annahme | Warum / Quelle |
+|---|---|---|
+| W1 | Anlauf bis zur Stufe Stadt (160 Einwohner einmal erreicht) | Die Bremse sitzt am Anfang (erster Zuzug erst nach der ersten Gründung, Tagesgrenze 1 Person unter 100 Einwohnern); Gate 4 misst Tag 551–730, der Anlauf endet im Mittel an Tag 101. Spielregel |
+| W2 | Am Tag bis zu 2 mehr; Grundzahl im Dorf × 2, in der Kleinstadt × 1,5 | gemessen (Tabelle „Varianten“): stärker (+3, × 3) macht das Band von Gate 4 breiter; diese Stufe hielt auf den Seeds 1–80 alle Gates mit dem schmalsten Band. Spielregel |
+| W3 | Im Dorf zählen Laden- und Bauhofstellen und werden besetzt; Kita- und (ohne `SCHUL_ZUZUG`) Schulstellen nie | Am Anfang gibt es keine andere Stelle. Kitas und Schulen stellt die Stadt aus der Stadt ein (Schritt 2, SC12) |
+| W4 | „Schnell“: 1 + 3 % am Tag, Grundzahl × 2, Bauamt × 2 | einfach zu erklären; Noahs Schalter, keine Maßnahme der Stadtregierung |
+| W5 | Frist der KI mindestens 20 echte Sekunden, mindestens 2 und höchstens 36 Spielstunden | 20 s ist eine Annahme, keine Messung mit einem echten Modell; 36 Spielstunden, damit auch bei 100× die 20 s gelten (34 Spielstunden) und keine Figur länger als anderthalb Tage wartet. Timeout je Aufruf bleibt 30 s (Spec) |
+| W6 | Bei vielen Hauptfiguren Frist = Hauptfiguren × Ø Antwortzeit × 1,2; eine Anfrage geht nur mit genug Restzeit raus (Ø Antwortzeit, höchstens 10 s); Code nur ohne wartende Anfrage und vor 17 Uhr | Befund 3: die Warteschlange eines Entscheidungszeitpunkts soll drankommen, ein langer Code-Aufruf soll sie nicht aufhalten |
+| W7 | Höchstes Tempo 100×; ein Bild rechnet höchstens eine Spielstunde (0,25 s je Bild), Aufholen wie 1× | Noahs Entscheidung (b); bis 240× reicht ein Schritt je Bild |
+| W8 | Kein fester Vorrat an Wohnungen im Haushalt (HH3: 6 → 0) | gemessen (Tabelle „Varianten“): mit Vorrat fiel Gate 4, mit Anlauf zusammen, in jeder Variante; blockierender Befund 1 der Gegenprüfung „haushalt“ |
+
+Keine Euro-Beträge, keine neue Rechtsaussage.
+
+### Darstellung und Bedienung
+
+- **Tempo-Leiste:** fünf Knöpfe; „100×“ mit Titel „Eine Spielstunde in 0,6 Sekunden“. Am Handy (bis 720 px breit, und quer bis 500 px hoch) steht
+  „Pause“ nur als Symbol, das Wort bleibt für Screenreader (`.tempo-wort`, wie die Namen der Hauptfiguren); bei 568 × 320 sind die Knöpfe 2 px
+  auseinander und innen 6 px schmaler. Gemessen ohne Überlappung und ohne seitliches Scrollen in acht Größen (Tests, unten). Die Leertaste
+  bleibt Pause.
+- **KI-Status** oben rechts immer „KI: Modell“ (Titel: „Ollama läuft, bei jedem Tempo. Eine Antwort hat mindestens 20 Sekunden (bei 1× zwei
+  Minuten) …“, Befund 5).
+- **Einstellungen:** Der Absatz zur KI sagt, dass sie bei jedem Tempo mitentscheidet, mindestens 20 Sekunden (bei 1× zwei Minuten) und bei vielen
+  Hauptfiguren mehr, sonst „zu spät“; die Statuszeile nennt „in dieser Stadt N KI-Entscheidungen, M zu spät“. Neuer Abschnitt „Wachstum“ mit zwei
+  Knöpfen (Gruppe mit Überschrift, `aria-pressed`, Stil wie „Schließen“ für den gewählten) und einem Satz aus `Sim.wachstumInfo`: was gilt, der
+  Anlauf, „nur für eine freie Stelle“, „Dein Schalter, keine Regel der Stadtregierung; gilt ab der nächsten Nacht und wird mit der Stadt
+  gespeichert“.
+- **Stadtbuch:** Art „Wachstum“ (Symbol Leute, Gewicht 3 in „Während du weg warst“).
+- **Debug-Ecke:** drei kurze KI-Zeilen statt zwei (höchstens etwa 58 Zeichen, damit die Ecke links vom Tempo endet): „KI … offen N“,
+  „KI Ø … Code N“ und „zu spät N (ungesendet N, danach N)  Frist H h = S s“; die Knöpfe „Zeit vorspulen“ darüber sitzen eine Zeile höher.
+- Keine neuen 3D-Objekte, keine Three.js-Aufrufe geändert, keine neuen Browser-APIs; keine Allokation je Bild (`kiFristStunden` rechnet eine Zahl,
+  `kiSchalten` läuft nur über die offenen Anfragen, wenn die Frist länger wird). Die Kamera bewegt sich nicht.
+
+### Gemessen
+
+Messskripte (nur Messung, nicht im Repo): `v9/t5/mess/mess9w.mjs` (Kopie von `v9/t4/mess/mess9h.mjs`, Gate 1 bis 7 wie `simtest --gate`, 730 Tage
+stündlich, dazu T als CPU-Zeit der ersten 365 Tage samt Messcode; dazu erster Zuzug, Stufe Stadt, freie Stellen an Tag 120/180/365, Pleiten ohne
+besetzte Stelle, Zuzüge; `WACHSTUM=1` für „schnell“, `R_WERTE` für Varianten), `lauf80.sh` und `lauf160.sh` (Seeds 1–80 bzw. 81–160 in vier
+Prozessen), `kurz.py` und `ww.py` (Auswertung), `kurve.mjs`, `band.mjs` und `zdbg.mjs` (einzelne Städte: Verlauf, Band, Teile des Zuzugs). Stände:
+31ce452 (`stadt.orig.html`), Teil 3 (Stand vor Teil 4, `v9/t5/vor/stadt.teil3.html`), Teil 4. Der Rechner war geteilt (4 Kerne; nebenher lief ein
+fremder Prozess auf etwa einem Kern).
+
+**Gates, Seeds 1–80** (auf diesen Seeds ist der Anlauf abgestimmt; Gate 1 bis 7 wie `simtest --gate`, Gate T getrennt, weil die Messläufe
+unter Last liefen, siehe „Rechenzeit“):
+
+| Stand | Gate 1–7 | fällt | mit Gate T (unter Last) | Band Gate 4 Ø / Median / über 1,12 / max | Gate 6 min | Gate 7 min | kleinstes Budget Ø / min |
+|---|---|---|---|---|---|---|---|
+| 31ce452 (Version 8) | 78 von 80 | G4: 47, 54 | 78 | 1,077 / 1,071 / 7 / 1,165 | 16,4 | 18,0 | 6.615 / 5.645 |
+| Version 9, Teil 3 | 77 von 80 | G4: 38, 47, 72 | 74 (T: 21, 41, 61) | 1,073 / 1,066 / 7 / 1,210 | 16,9 | 17,6 | 4.876 / 52 |
+| **Version 9, Teil 4, normal** | **80 von 80** | – | 77 (T: 1, 21, 41) | **1,065 / 1,062 / 2 / 1,148** | 16,5 | 20,3 | 2.881 / 1.637 |
+| Version 9, Teil 4, schnell | 80 von 80 | – | 75 (T: 1, 21, 22, 41, 61) | 1,088 / 1,088 / 9 / 1,148 | 16,5 | 17,4 | 2.773 / 1.402 |
+
+**Gegenprobe auf den Seeds 81–160** (nicht abgestimmt):
+
+| Stand | Gate 1–7 | fällt | mit Gate T (unter Last) | Band Gate 4 Ø / Median / über 1,12 / max |
+|---|---|---|---|---|
+| 31ce452 (Version 8) | 73 von 80 | G4: 88, 101, 110, 119, 137, 152; G6: 102 | 73 | 1,082 / 1,073 / 12 / 1,184 |
+| Version 9, Teil 3 | 79 von 80 | G4: 97 | 79 | 1,073 / 1,063 / 5 / 1,317 |
+| **Version 9, Teil 4, normal** | **79 von 80** | G4: 108 (1,155) | 75 (T: 101, 102, 121, 141) | 1,079 / 1,075 / 9 / 1,155 |
+| Version 9, Teil 4, schnell | 79 von 80 | G4: 112 (1,160) | 72 (T: 81, 82, 101, 105, 121, 133, 141) | 1,089 / 1,087 / 10 / 1,160 |
+
+„Normal“ hält Gate 1 bis 7 auf den Seeds 1–80. Das ist zum Teil Abstimmung: Auf den nicht abgestimmten Seeds 81–160 fällt Gate 4 einmal knapp,
+so oft wie in Teil 3 und seltener als in 31ce452. Das Band liegt dort im Mittel etwas höher als in Teil 3 (1,079 statt 1,073). Gate 4 bleibt im
+Rauschen der Zuzugsregel (Placebo, Abschnitt „Bekannte Schwächen“). **„Schnell“ hält Gate 4 auf den Seeds 1–80 ebenfalls, auf den Seeds 81–160
+fällt es einmal (1,160).** Das Band ist breiter (Ø 1,088, 9 bzw. 10 Seeds über 1,12): Die Stadt ist früher groß und schwankt danach stärker. Gate 3
+hält, das kleinste Budget sinkt aber (Anlauf: mehr Bauten und laufende Kosten in den ersten Wochen; Befund 2: ohne die Anfragen mit Anlauf).
+
+**Varianten** (Seeds 1–80; „Vorrat 6“ wie Teil 3, „bis zur Stadt“: Vorrat nur unter 160 Einwohnern, „ohne Vorrat“: 0):
+
+| Anlauf | alle Gates | fällt | Band Ø / über 1,12 / max | Gate 7 min | Einwohner Tag 60 / 120 / 365 |
+|---|---|---|---|---|---|
+| Entwurf: +2, Grundzahl × 2 bis zur Stadt; Vorrat 6 | 78 | G7: 28, 66 | 1,088 / 12 / 1,139 | 13,4 | 81 / 256 / 1.170 |
+| … +1 statt +2 | 78 | G4: 28, 65 | 1,080 / 5 / 1,161 | 18,3 | 75 / 231 / 1.176 |
+| … Grundzahl × 1,5 | 78 | G4: 24, 50 | 1,087 / 11 / 1,154 | 17,3 | 73 / 235 / 1.170 |
+| … +3 | 75 | G4: 10, 17, 40, 44, 77 | 1,098 / 20 / 1,165 | 16,3 | 82 / 260 / 1.199 |
+| … Grundzahl × 3 | 78 | G4: 57, 61 | 1,086 / 7 / 1,168 | 17,1 | 88 / 263 / 1.174 |
+| nur im Dorf (bis 40); Vorrat 6 | 79 | G4: 59 | 1,067 / 3 / 1,166 | 15,9 | 62 / 147 / 1.099 |
+| nur Stellen im Dorf (ohne +, ohne ×); Vorrat 6 | 79 | G4: 56 | 1,071 / 6 / 1,163 | 16,7 | 53 / 130 / 1.095 |
+| Entwurf; Vorrat bis zur Stadt | 78 | G4: 5, 54 | 1,084 / 8 / 1,200 | 19,3 | 81 / 245 / 1.126 |
+| Kleinstadt +1, × 1,5; Vorrat bis zur Stadt | 79 | G4: 28 | 1,075 / 2 / 1,161 | 17,7 | 73 / 220 / 1.116 |
+| Kleinstadt +1, × 1; Vorrat bis zur Stadt | 78 | G4: 52, 78 | 1,071 / 3 / 1,158 | 18,4 | 67 / 191 / 1.093 |
+| nur im Dorf; Vorrat bis zur Stadt | 79 | G4: 67 | 1,070 / 4 / 1,188 | 18,7 | 62 / 147 / 1.061 |
+| nur im Dorf +3, × 3; Vorrat bis zur Stadt | 79 | G4: 36 | 1,070 / 3 / 1,163 | 17,8 | 64 / 148 / 1.063 |
+| Entwurf; ohne Vorrat | 79 | G7: 9 (14,9) | 1,070 / 2 / 1,145 | 14,9 | 79 / 211 / 1.107 |
+| Kleinstadt +1; ohne Vorrat | 79 | G4: 50 | 1,068 / 3 / 1,154 | 19,8 | 75 / 194 / 1.085 |
+| nur im Dorf; ohne Vorrat | 80 | – | 1,068 / 4 / 1,149 | 18,5 | 62 / 129 / 1.040 |
+| **Kleinstadt Grundzahl × 1,5; ohne Vorrat (ausgeliefert)** | **80** | – | **1,065 / 2 / 1,148** | **20,3** | **73 / 198 / 1.103** |
+
+Mit Vorrat fiel Gate 4 in jeder Variante auf 1 bis 5 Seeds, ohne Vorrat in keiner (in einer fiel Gate 7 einmal knapp). Warum, an einem Beispiel
+(Seed 5, Entwurf mit Vorrat bis zur Stadt, `kurve.mjs`, `zdbg.mjs`): Um Tag 400 zieht eine Welle von Gründungen 133 Leute in 30 Tagen nach
+(1.465 Einwohner), danach sind alle Stellen in Werkstätten besetzt, frei sind nur noch Stellen in Läden, Kitas und Schulen (146 bis 179), die
+niemanden anlocken; es sterben mehr, als geboren werden, und die Stadt schrumpft bis Tag 730 auf 1.205 (Band 1,20). Ohne Vorrat bleibt dieselbe
+Stadt zwischen 1.170 und 1.240. Je stärker der Anlauf, desto breiter das Band: Wer früh kommt, ist später gleichzeitig alt.
+
+**Wirkung in Zahlen** (Seeds 1–80, Mittel):
+
+| | 31ce452 | Teil 3 | **Teil 4, normal** | Teil 4, schnell |
+|---|---|---|---|---|
+| erster Zuzug (Tag) | 40,6 | 24,6 | **1,1** | 1,0 |
+| Kleinstadt / Stadt / Großstadt ab Tag | 70,8 / 173,6 / 335 | 71,0 / 157,1 / 289 | **38,5 / 100,1 / 262,5** | 34,9 / 82,3 / 207,8 |
+| Einwohner Tag 30 / 60 / 120 / 180 | 13,2 / 29,8 / 87,8 / 172 | 13,8 / 30,0 / 92,8 / 215 | **31,2 / 73,2 / 198,1 / 365** | 34,5 / 94,6 / 280,1 / 590 |
+| Einwohner Tag 365 / 730 | 917 / 1.187 | 1.053 / 1.251 | **1.103 / 1.218** | 1.189 / 1.223 |
+| Zuzüge bis Tag 120 / 365 / 730 | 67 / 769 / 1.119 | 73 / 845 / 1.147 | **166 / 886 / 1.159** | 238 / 929 / 1.179 |
+| Geburten / Wegzüge (730 Tage) | 540 / 64 | 654 / 60 | 688 / 67 | 754 / 56 |
+| Zufriedenheit, arbeitslos (Tag 730) | 69,9; 4,4 % | 74,2; 4,2 % | 74,3; 5,0 % | 73,8; 5,2 % |
+| Kasse Tag 120 / 365 / 730 | 95.300 / 1,25 / 3,29 Mio. | 52.900 / 0,83 / 0,83 Mio. | **106.200 / 0,97 / 0,78 Mio.** | 128.700 / 1,10 / 0,67 Mio. |
+| größte Kasse (Tag) | 3,29 Mio. (729) | 1,19 Mio. (511) | 1,19 Mio. (481) | 1,18 Mio. (431) |
+| Lohnsteuer (Taler am Tag, Ø 730 Tage) | 1.967 | 44 | 67 | 93 |
+| Satz der Lohnsteuer | 10 % | erste Senkung Tag 98, 0 % ab Tag 193 | **erste Senkung Tag 81, 0 % ab Tag 174** | 82 / 174 |
+| den Leuten gelassen (730 Tage) | – | 1,62 Mio. | 1,71 Mio. | 1,83 Mio. |
+| Vorhaben (730 Tage): Wohnungen / Rathaus / Computer / Parks | – | 54.810 (22,8 Wohnhäuser) / 15.200 / 107.052 (335) / 8.213 (9,1) | **6.330 (2,6) / 15.200 / 114.116 (357) / 8.269 (9,2)** | 8.700 (3,6) / 15.200 / 128.684 (402) / 8.460 (9,4) |
+| Schulen: erste Grundschule / weiterführende (Tag); Nachbarort | – | 243 / 274; 7,8 % der Schülertage | **183 / 211; 7,2 %** | 153 / 189; 5,6 % |
+| Rathaus (Taler am Tag) | – | 604 | 622 | 651 |
+| Bürgermeisterwahlen (730 Tage) | – | 11,0 | 11,1 | 11,0 |
+| Stadtbuch (Zeilen am Tag) | 5,04 | 5,69 | 6,03 | 6,10 |
+
+Ohne den Vorrat baut das Vorhaben „Wohnungen“ kaum noch (2,6 statt 22,8 Wohnhäuser in 730 Tagen); die Stadt hat trotzdem früh genug Wohnungen,
+weil Regel 1 des Bauamts und das Vorhaben nach Suchenden und Anfragen bauen. Das Geld geht stattdessen früher in Computer und über die Lohnsteuer
+an die Leute (0 % ab Tag 174 statt 193, 1,71 statt 1,62 Mio. Taler). In Tag 366–730 gibt die Stadt mehr aus, als sie einnimmt (7.682 gegen 7.166 Taler
+am Tag, Teil 3: 7.635 gegen 7.639); die Kasse sinkt dann von 0,97 auf 0,78 Mio. und bleibt über der Rücklage (angehoben wurde der Satz im Mittel
+0,11-mal).
+
+**Freie Stellen (Befund 9)** (Seeds 1–80, Mittel):
+
+| | 31ce452 | Teil 3 | Teil 4, normal | Teil 4, schnell |
+|---|---|---|---|---|
+| freie Stellen an Tag 120 / 180 / 365 | 152 / 213 / 164 | 157 / 262 / 145 | 344 / 357 / 151 | 398 / 291 / 157 |
+| Werkstatt-Pleiten ohne eine besetzte Stelle, bis Tag 180 / 730 | 23,4 / 78,0 | 21,2 / 66,3 | 48,0 / 82,5 | 44,0 / 50,5 |
+| Gründungen bis Tag 365 | 229 | 237 | 272 | 249 |
+
+Der Anlauf besetzt die ersten Stellen sofort (Laden und Bauhof ab Tag 1, bis Tag 120 166 statt 73 Zuzüge). Weil die Stadt früher wächst, wird
+aber auch früher gegründet: An Tag 120 und 180 sind mehr als doppelt so viele Stellen frei wie vorher, an Tag 365 gleich viele, und Werkstätten,
+die pleitegehen, ohne je eine Stelle besetzt zu haben, gibt es früher und in 730 Tagen etwas mehr (82,5 statt 66,3). Das ändert der Anlauf nicht:
+Gründer bauen mehr Stellen, als Leute kommen dürfen (offene Frage an Noah wie im Entwurf: eine Änderung an der Gründungsregel). Mit „schnell“
+sind es weniger (50,5).
+
+**Rechenzeit und Gate T.** `simtest --gate` (Seeds 1–3, 365 Tage stündlich, Grenze 5.000 ms): Seeds 1, 2 und 3 bestanden, T 3.157, 2.424 und 2.207 ms
+(der Rechner war dabei belastet: Browser-Tests und ein fremder Prozess liefen nebenher; früher in diesem Teil 3.564, 2.793 und 2.605 ms), Gate 4 mit
+Faktor 1,06, 1,04 und 1,07. `v9/t3/mess/zeit.mjs` (CPU-Zeit für 365 Tage stündlich, Seeds 1–10, zwei Stände abwechselnd im selben Prozess, also unter
+gleicher Last): Teil 3 im Mittel 2.340 ms (höchstens 3.071), Teil 4 „normal“ 2.564 ms (höchstens 2.970), **Faktor 1,10**; „schnell“ gegen „normal“
+3.038 gegen 2.582 ms, Faktor 1,18. Die Regeln selbst kosten fast nichts (`wachstumJetzt` einmal je Nacht); teurer ist, dass die Stadt früher mehr
+Menschen hat (Einwohner an Tag 120 im Mittel 198 statt 93). In den Messläufen über 80 Seeds (vier Prozesse nebeneinander auf vier Kernen, dazu ein
+fremder Prozess; T als CPU-Zeit samt Messcode) lag T für „normal“ im Mittel bei 3.089 ms (Teil 3 2.618, 31ce452 1.753). Über 5.000 ms lag T auf den
+Seeds 1–80 nur beim ersten Seed eines Prozesses (Seeds 1, 21, 41 mit 5.244 bis 5.700 ms: Aufwärmen, der erste Lauf eines Prozesses ist langsamer; bei
+Teil 3 genauso, Seeds 21, 41, 61 mit 5.218 bis 5.444 ms), sonst höchstens 4.055 ms (Teil 3 3.926). Auf den Seeds 81–160 einmal auch ohne Aufwärmen
+(Seed 102, 5.997 ms). „Schnell“: im Mittel 3.860 ms, ohne Aufwärmen einmal über 5.000 ms (Seed 22, 5.664 ms). Gate T gilt für `simtest --gate` auf
+einem ruhigen Rechner; die Werte unter Last zeigen die Richtung: etwa 10 % mehr Rechenzeit mit „normal“, 18 % mehr mit „schnell“.
+
+**Im Browser** (Chromium mit SwiftShader, also Software-Grafik ohne GPU, 1280 × 800; `tests/wachstum.cjs leistung`, beide Tempi ab 7 Uhr,
+12 Sekunden, Autos je Spielstunde gezählt; Lauf `v9/t5/leistung3.log`; nur zum Vergleich, auf echter Grafikhardware nicht gemessen):
+
+| | Teststadt Tag 400 (1.112 Einwohner) 20× | 100× | große Stadt (`umland=300000`, Tag 750, 6.654) 20× | 100× |
+|---|---|---|---|---|
+| Bilder je Sekunde | 4,8 | 4,9 | 1,7 | 1,8 |
+| Rechenzeit je Bild Ø / längste | 9,2 / 19 ms | 9,1 / 27 ms | 10,7 / 26 ms | 22,6 / 56 ms |
+| Spielstunden in 12,3 s (Soll) | 4 (4,1) | 20 (20,5) | 2 (4,1) | 9 (20,5) |
+| Bilder je Spielstunde | 14,4 | 3,0 | 5,0 | 1,1 |
+| Autos: Fahrten / sichtbar gefahren / zu spät gesprungen | 559 / 500 / 0 | 519 / 445 / 0 | 2.059 / 1.102 / 0 | 3.725 / 2.084 / 1.058 |
+
+Je Spielstunde samt Oberfläche (in der Pause gemessen): Teststadt im Mittel 7 ms, große Stadt 22 ms. **Die Grenze ist das Zeichnen, nicht das
+Rechnen:** Ein CPU-Profil der Seite bei 100× in der großen Stadt (8 s, `v9/t5/dbg/prof.cjs`) zeigt den Hauptthread zu 92 % untätig (7,4 von 8 s), dazu
+0,6 s `bufferSubData` (die Instanzen nach dem stündlichen Neuaufbau). Mit weniger als 4 Bildern je Sekunde greift die Grenze von 0,25 s je Bild (W7):
+In der großen Stadt läuft die Zeit bei 100× mit etwa 44 % des Solls, bei 20× mit etwa der Hälfte (Grenze und Zeichnen wie in Teil 3). **Figuren
+springen bei 100×:** In der Teststadt kommen auf eine Spielstunde 3 Bilder, ein Gang (höchstens 0,85 Spielstunden) ist also 2 bis 3 Bilder lang; in
+der großen Stadt kommt auf eine Spielstunde etwa 1 Bild. Von den Autofahrten der großen Stadt springen bei 100× 28 % ans Ziel (im Lauf von `alle.sh`,
+unter mehr Last, 35 %), weil die Stunde endet, bevor sie geplant sind (Grundregel gewahrt: sie springen nur zwischen Orten, die die Simulation
+vorgibt, `Sim.autoFaehrt` unverändert); in der Teststadt keine. Vorher gab es 100× nicht; Figuren und Autos zeichnet Teil 4 unverändert, neu ist nur,
+dass 100× sie öfter an diese Grenze bringt.
+
+**Draw Calls** (Grenze: höchstens +3 gegen 31ce452): `v9/t5/dc.cjs` (Blick (8, 30, 34) auf die Mitte, 11 Uhr) Seed 2 Tag 250: 31ce452 27, Teil 3
+29, Teil 4 28; Tag 730: 26, 30, 29 (+3: ein Mesh mehr, Baustelle, Schule; wie in Teil 3). `tests/blick.cjs` (letztes Bild, 23 Uhr an der
+Straße): Teststadt Tag 400 31 (Handy 29), wie 31ce452 (31/29; Teil 3 32/30); große Stadt Tag 750 32 (Handy 30) gegen 30 (28), +2 (Teil 3 +3).
+Neue 3D-Objekte gibt es nicht. **Kennzahlen am Handy** (`tests/kennzahlen_hoehe.cjs`): Unterkante in allen sechs Größen gleich wie
+stadt.orig.html (568 × 320 bis 926 × 428: 156 bis 216 px; 400 × 820: 231 px beide). **Bilder** `v9/bau/nachher/` (Teststadt Tag 400: 1.113
+Einwohner, Kasse 1.052.495 Taler, Satz 0 %) und `v9/bau/gross/` (Tag 750: 6.660 Einwohner, Kasse 5,54 Mio. Taler; stadt.orig.html 6.413 und
+11,97 Mio.), selbst angesehen: fünf Tempo-Knöpfe mit „100×“, am Handy „Pause“ als Symbol und alle fünf in einer Reihe, Debug-Ecke mit drei
+KI-Zeilen („Frist 2 h = 120 s“ in der Pause), Nacht, Straßenblick; die Tempo-Leiste überdeckt nichts. Stadtteil-Namen im nahen Bild der großen
+Stadt sind wie in 31ce452 ein Übergang bei 1 Bild je Sekunde, kein Fehler von Teil 4.
+
+### Speicherformat 9 (Teil 4)
+
+- Neu: `S.wachstum` (0 normal, 1 schnell; bei den Einzelwerten), `S.ki.fristStunden` (ganze Zahl 2 bis 36); `S.ki.abgelaufen` und `S.ki.angewandt` gab
+  es schon, sie werden jetzt geprüft. `jsonPruefen` verlangt alle ab Version 9 (`wachstumPruefen`: Schalter 0 oder 1, Frist ganze Zahl im Bereich,
+  Zähler ganze Zahlen ab 0), `importZustand` prüft sie danach für jeden Stand. Abgelehnt werden 12 beschädigte Stände (`simtest --wachstum` D).
+- Übernahme: jeder ältere Stand (Version 2 bis 8) bekommt in der Kette zuletzt `migriereWachstum`: normal, Frist 2 Spielstunden, Zähler bleiben; keine
+  Zeile im Stadtbuch. Die Versionsnummer bleibt 9; `tests/basis_v9.json` ist neu erzeugt (Übernahme von `basis_v8.json`).
+- Das Tempo steht wie bisher außerhalb des Zustands im Spielstand; ein Wert ohne Knopf wird beim Laden 1×.
+- Speichern mit „schnell“ um 13 Uhr: 30 Tage bitgleich weiter; die Frist gehört zum Zustand (`--speichertest` bitgleich).
+
+### Tests
+
+**simtest, Endstand** (Logs `v9/t5/st2/*.txt`, `--gate` allein: `v9/t5/st2/gate.txt`): alle 19 Modi bestanden: `--gate` (Seeds 1–3, oben),
+`--speichertest` (bitgleich: Seed 1 nach 60 Tagen `aea5176030a07de4`, Sicherheit `f3d9a9fa9873bfb7`, Bund `3e4cff0a41e1ea32`), `--aufholtest`,
+`--kitest` (47), `--bau` (15), `--waren` (15), `--tech` (16), `--regierung` (155), `--kita` (40), `--erweiterung --git` (33), `--sicherheit` (28),
+`--militaer` (24), `--autos --git` (21), `--migrationstest --git` (324), `--rathaus --git` (74), `--buergermeister` (26), `--schule --git` (48),
+`--haushalt --git` (31) und `--wachstum --alt v9/t5/vor/stadt.teil3.html` (29, neu). Jeder alte Modus hat genau so viele Prüfungen wie in Teil 3.
+
+- `--wachstum` (neu, 29 Prüfungen): A statisch (Abschnitt „Wachstum“ und die Zählung in `zuzug()` würfeln nicht und lesen keine Person, ein
+  Zufallszug wie vorher; die Simulation kennt kein Tempo; die Zahlen auf Karte R10 passen zu `Sim.R`). B ohne Anlauf und ohne die Bausteine von
+  Version 9 Seeds 1–3 je 200 Tage jeden Tag wie 31ce452; mit `--alt` (Fassung vor Teil 4) ohne Anlauf und mit Vorrat 6 jeden Tag wie diese.
+  C Anlauf je Nacht (Seeds 1–3, 400 Tage, mit `SCHUL_ZUZUG` 1 und 0): jeder Zuzug mit einer Stelle nach der Regel (Laden und Bauhof nur im
+  Dorf, nie Kita, Schule nur mit `SCHUL_ZUZUG`), nie über der Grenze des Tages, die Zählung der Stellen wie die Regel, Anfragen fürs Bauamt mit
+  der Grundzahl ohne Anlauf. D Schalter: setzen, Stadtbuch ohne Namen, 8 ungültige Werte, Speichern und Laden mit „schnell“ 30 Tage bitgleich,
+  zurück auf normal, Übernahme von Version 8, 12 beschädigte Stände, „schnell“ wirkt (Seed 5, Tag 150: 355 gegen 265 Einwohner). E Frist:
+  Klemmen auf 2 bis 36, späte Antwort, Verlängern offener Anfragen (kürzer nie), Rangfolge bei 20×, 100× (bis 23 Uhr), nach dem Plan
+  abgelehnt, bei 1× zu spät. F Kapazität (nur gemessen, Tabelle oben).
+- Angepasst, weil sich die Stadt ändert (keine Prüfung abgeschwächt): `AUS` schaltet für Vergleiche mit älteren Fassungen auch den Anlauf aus
+  (`ANLAUF_STUFE` 0); Vergleiche des KI-Zustands mit alten Ständen lassen das neue Feld `fristStunden` weg (`kiAlt`); `--migrationstest`,
+  `--rathaus` H und der Vergleich mit Version 8 in `--schule` laufen ohne Anlauf; `--haushalt` prüft den Vorrat 0 (vorher 6). `--tech`: Wird ein
+  Laden in der Nacht seiner Pleite zur Grundschule umgebaut, setzt der Umbau `g.verkauft` zurück; die Messkopie zählt die Verkäufe des Tages
+  davor mit (Hook auf `kitaUmbau` in der Kopie, wie `--waren` in Teil 3), sonst fehlten im neuen Verlauf zwei Verkäufe in der Summe.
+
+**Browser** (Server auf 8715, `tests/alle.sh`, Endstand, Log `v9/t5/alle2.log`): 21 Tests und 6 `otest`-Skripte, alle bestanden:
+p3test 12, p5neu 10, p6migration 39, p7figuren 6, p8tech 15, raute_klick 11, ereignis 21, t1_xss 5, p4test 29 (mit dem KI-Nachbau auf
+11434), s2karten 22, kita 22, befunde_s2 27, erweiterung 20, sicherheit 12, militaer 16, autos 9, autos_bild 20, rathaus 15, schule 8,
+haushalt 18, wachstum 29 (neu); otest befunde 21, handy 11, breit 12, tastatur 4, breiten 20, hilfehoehe 1 (745 von 745 px). Gegen Teil 3
+hat p8tech eine Prüfung mehr (Klickpunkt), p4test vier mehr (Schritt 4), sonst gleich viele.
+
+- Neu: `tests/wachstum.cjs` (29 Prüfungen, Ollama per Playwright-Route mit einstellbarer Antwortzeit): **tempo** fünf Knöpfe mit
+  `aria-pressed`, „100×“ mit Titel, Leertaste Pause/weiter, gespeichertes Tempo ohne Knopf → 1×, acht Größen (1280 × 800 bis 568 × 320, hoch und
+  quer) ohne Überlappung mit anderen Bedienelementen und ohne seitliches Scrollen, „Pause“ am Handy als Symbol mit Namen; **ki** 20× und 100× mit
+  sechs Hauptfiguren samt Bürgermeister: Status „KI: Modell“, Frist 7 und 34 Spielstunden, Entscheidungen angewandt, Tagebücher, Code-Aufrufe nur
+  mit leerer Warteschlange zwischen 9 und 16 Uhr; Antwort nach 25 s bei 100× → „zu spät“ gezählt, die Stadt läuft weiter; Einstellungen und
+  Debug-Ecke (6 Zeilen, höchstens 59 Zeichen); **schalter** normal/schnell (Gruppe mit Überschrift, `aria-pressed`, Stadtbuch, Tastatur,
+  nach dem Neuladen gespeichert, Einstellungen bei 1280 × 800 ohne Scrollen, Handy); **regierung** Karte R10 und „Nicht übernommen“;
+  **leistung** (oben, nur gemessen). Bilder `tests/bilder_befunde/wachstum_*.png` (selbst angesehen: Tempo 1280 × 800, 400 × 820 und 568 × 320,
+  Einstellungen mit Schalter, KI bei 100×, Leistung).
+- Nachgezogen (keine Prüfung abgeschwächt): `p4test.cjs` Schritt 4 prüft jetzt, dass die KI bei 20× entscheidet (Frist 7) und bei 100× (Frist
+  34), „zu spät“ und dass es `verworfen20` nicht mehr gibt; `p6migration.cjs` prüft bei Version 8 → 9 den Schalter (normal, Frist 2,
+  Zähler ganze Zahlen, gespeichert, keine Zeile im Stadtbuch, Knopf „normal“ gedrückt); `tests/basis_v9.json` neu erzeugt (`basis_v9.cjs`
+  verlangt den Schalter); `alle.sh` hat `wachstum` dazu. Neuer Verlauf der Teststädte: `p8tech.cjs` klickt auf den Bildpunkt, dessen Strahl
+  zuerst das Glas der Firma trifft (die größte Firma ist ein Campus mit Hof in der Mitte, der feste Punkt traf daneben), und verlangt jetzt den
+  genauen Namen der Firma in der Karte; `kita.cjs` sucht den Klickpunkt auf der Kita ebenso (vorher traf der Klick eine Tech-Firma davor) und
+  nimmt für „kein Kita-Platz frei“ einen Haushalt ohne Kind unter 3 ohne Platz (sonst bekommt der Elternteil zu Recht Betreuungsgehalt:
+  „bleibt beim Kind zu Hause“); `ereignis.cjs` neue Momente in Seed 5 ab Tag 400 (Tag 425, 446, 455, 456; `v9/t5/momente_teil4.log`,
+  `v9/t5/mom/m*.log`; Seed 4 hätte die letzte Stunde erst an Tag 1066); `erweiterung.cjs` Seed 5, Tag 114 → 115, 96 → 104
+  (`v9/t5/wachsen_teil4.log`); `autos_bild.cjs` neue feste Momente (Seeds 37, 28, 11; `v9/t5/faelle/f_*.log`).
+
+**Zitate:** alle Programmzitate der Fenster „Stadtregierung“ und „Haushalt“ gesammelt (`afd/bau/B/mess/zitate_sammeln.mjs`, `v9/t4/zitate_hh.mjs`)
+und mit `afd/zitatpruef.py` und `afd/bau/zitate_genau.py` geprüft: im Fenster „Stadtregierung“ 285 genau auf der angegebenen gedruckten Seite;
+nicht genau sind nur Namen der Oberfläche in „…“ („Wachstum: schnell“ neben dem Verweis auf S. 113, „Haushalt“, „Budget“, „Rathaus ausbauen“ u. a.)
+und wie bisher der Satz über den Seitenwechsel S. 164 f. (von Hand nachgelesen). Im Fenster „Haushalt“ 19 genau, dazu wie in Teil 3 Namen der
+Oberfläche („Stadtregierung“, „Keine Zahl“) und eigene Sätze der Stadt. Die vier neuen Zitate (S. 109 zweimal, S. 113 zweimal) und alle Zitate
+dieses Abschnitts: genau (`v9/t5/z_neu.json`, `v9/t5/z_readme4.json`).
+
+**Nicht geprüft:** echtes Sprachmodell (nur die Attrappe mit fester Antwortzeit); echte Grafikhardware, Safari und echte Handys (nur
+Chromium mit SwiftShader in Handygröße); Seeds über 160; „schnell“ über 730 Tage hinaus.
+
+### Befunde der Gegenprüfung „wachstum“ (alle umgesetzt)
+
+1. **`zuzug()` mit Rathaus und Schule.** Von Hand zusammengeführt: Die Zählung zieht Kitas und Schulen ohne Zuzug auch im Dorf ab, Laden und Bauhof
+   locken nur im Dorf; `--wachstum` C erlaubt als Stelle Werkstatt, Tech-Firma, Rathaus, Land, Bund und (mit `SCHUL_ZUZUG`) Schule, nie Kita, und
+   prüft die Zählung mit `SCHUL_ZUZUG` 1 und 0.
+2. **Gate 3 und die Anfragen.** `S.anfragen` rechnet mit der Grundzahl ohne Anlauf. Kleinstes Budget auf den Seeds 1–80: im Mittel 2.881 Taler, am
+   kleinsten 1.637 (Teil 3: 4.876 und 52; 31ce452: 6.615 und 5.645); Gate 3 hält auf allen 160 Seeds.
+3. **Kapazität der KI.** Frist nach Warteschlange (W6), Anfragen ohne genug Restzeit gehen nicht raus, Code nur mit leerer Warteschlange und vor 17
+   Uhr; beziffert in der Tabelle „Kapazität“.
+4. **Spec-Abweichungen markiert:** Zeile 76, 376–377 und 381 (oben, im Abschnitt „Ollama für die Hauptfiguren“ und in Annahme 68).
+5. **Text zur Frist:** „mindestens 20 Sekunden (bei 1× zwei Minuten)“ in Einstellungen und Titel.
+6. **R10 im Fenster:** Halbsatz zur Lesart von S. 109 (Zuwanderung nach Deutschland, die Stadt kennt keine Herkunft), auch unter „Keine Zahl“.
+7. **Reste von 20×:** Kommentare nachgezogen, `verworfen20` entfernt; `p4test` prüft jetzt „zu spät“ und dass es den Zähler nicht mehr gibt.
+8. **Autos bei hohem Tempo:** gemessen (oben, „Im Browser“, `tests/wachstum.cjs` leistung): bei 100× springt in der Teststadt keine Fahrt, in der
+   großen Stadt 28 bis 35 %. Die KI prüfen im Browser `p4test` (KI-Nachbau auf 11434), `p8tech` und `wachstum` (Attrappe per Route).
+9. **Freie Stellen:** beziffert (Tabelle „Wirkung“): an Tag 120 / 180 / 365 sind 344 / 357 / 151 Stellen frei (Teil 3: 157 / 262 / 145),
+   Werkstatt-Pleiten ohne besetzte Stelle 82,5 statt 66,3 in 730 Tagen.
+10. **Beweisbild:** `wachstum_einst_schalter.png` wird 400 ms nach dem Klick aufgenommen, nach dem Übergang.
+11. **Gate T:** `simtest --gate` wiederholt (oben, „Rechenzeit und Gate T“): bestanden. Ganz ruhig war der Rechner nie (ein fremder Prozess lief immer
+    mit); gemessen zweimal, 3.564 / 2.793 / 2.605 ms und am Ende 3.157 / 2.424 / 2.207 ms.
+
+### Bekannte Schwächen (Teil 4)
+
+- **Gate 4 ist zum Teil abgestimmt.** Anlauf und Wegfall des Vorrats sind auf den Seeds 1–80 gewählt (80 von 80); auf den Seeds 81–160 fällt
+  Gate 4 einmal (Seed 108, 1,155), das Band liegt dort im Mittel bei 1,079 (Teil 3 1,073). „Schnell“ macht das Band breiter (Ø 1,088, 9 bis 10
+  von 80 Seeds über 1,12) und fällt auf den Seeds 81–160 einmal (Seed 112, 1,160).
+- **Mehr freie Stellen, mehr leere Pleiten.** Die Stadt wächst früher, deshalb wird auch früher gegründet: an Tag 120 und 180 sind im Mittel 344
+  und 357 Stellen frei (Teil 3: 157 und 262), Werkstatt-Pleiten ohne eine besetzte Stelle 82,5 statt 66,3 in 730 Tagen. Der Anlauf ändert die
+  Gründungsregel nicht (offene Frage an Noah).
+- **Die Kasse sinkt im zweiten Jahr.** In Tag 366–730 gibt die Stadt im Mittel mehr aus, als sie einnimmt (7.682 gegen 7.166 Taler am Tag); die
+  Kasse fällt von 0,97 auf 0,78 Mio. und bleibt über der Rücklage. Das kleinste Budget der ersten Wochen ist kleiner (Ø 2.881, kleinstes 1.637
+  Taler; Teil 3 4.876 und 52); Gate 3 hält auf allen 160 Seeds.
+- **Das Vorhaben „Wohnungen auf Vorrat“ baut kaum noch** (2,6 statt 22,8 Wohnhäuser in 730 Tagen): Ohne die festen 6 Wohnungen baut es nur, wenn
+  Suchende oder Anfragen keine Wohnung fänden; das meiste erledigt vorher Regel 1 des Bauamts. Name und Stelle in der Rangfolge sind geblieben.
+- **100× ist auf langsamen Rechnern kein echtes 100×.** Mit Software-Grafik (SwiftShader) läuft die große Stadt mit etwa 44 % des Solls, in der
+  Teststadt kommen auf eine Spielstunde 3 Bilder, die Figuren springen fast, und 28 bis 35 % der Autofahrten der großen Stadt springen ans Ziel. Auf
+  echter Grafikhardware nicht gemessen.
+- **Die KI schafft bei 100× nur wenige Entscheidungen:** ein Spieltag dauert 14,4 Sekunden (gemessen bei 1 s je Antwort 7 am Tag, bei 3 s knapp 3);
+  eine Hauptfigur kann bis zu 36 Spielstunden auf ihre Antwort warten und überspringt so lange ihre Entscheidungszeitpunkte. Code-Stücke gibt es
+  bei 100× nur mit einem schnellen Modell (4,8 s zwischen 9 und 17 Uhr). Die 20 Sekunden sind eine Annahme (W5), mit einem echten Modell nicht
+  gemessen.
+- **Rechenzeit:** etwa 10 % mehr mit „normal“, 18 % mehr mit „schnell“ (größere Stadt früher); unter Last lag T beim ersten Seed eines Prozesses
+  über 5.000 ms (Aufwärmen, bei Teil 3 genauso) und einmal auf den Seeds 81–160 auch ohne (Seed 102, 5.997 ms).
+- **Die Zahlen des Anlaufs sind Spielregeln** (160 Einwohner, +2 am Tag, Grundzahl × 2 im Dorf, × 1,5 in der Kleinstadt; „schnell“ 1 + 3 %,
+  × 2, Bauamt × 2), keine Forderung des Programms und keine Messung aus der Wirklichkeit.
+
+## Tech-Firmen früher und mehr (Version 9, Teil 5)
+
+Noahs Wahl nach dem Entwurf „tech“: **A „früher gründen“** (die erste Tech-Firma etwa um Tag 60 bis 90, Campus, Hochhaus und Autowerk entsprechend
+früher; mit dem Anlauf aus Teil 4 war ihm auch Tag 49 recht) **und C „mehr Tech-Firmen insgesamt“**. Seine Entscheidung vom 28.09. zu C: ein
+**eigener Weltmarkt**. Tech-Firmen verkaufen Software, Handys und Computer nicht nur ans Umland, sondern auch in die Welt, und dauerhaft sollen
+deutlich mehr Tech-Firmen leben als die 12 bis 13 an Tag 730. Grundlage ist der Entwurf „tech“ (Diagnose, Prototyp auf Version 8) mit allen acht
+Befunden seiner Gegenprüfung (unten). Er ist hier von Hand auf Version 9, Teil 4 übertragen. Entscheidungen von Claude (im Auftrag):
+- ein begründeter, einheitlicher Preis je Arbeitstag für alle Bauten einer Tech-Firma, nicht einfach der billigste Satz im Spiel;
+- Firmen, die nie eine Kraft fanden, geben ohne Zeile „Pleite“ auf, zählen aber ehrlich mit;
+- Schulen kaufen Computer wie die Leute im Laden der Stadt, sonst von außerhalb. **Weicht von Noahs Wortlaut (d) ab** („Schulen kaufen ihre
+  Computer bei den Tech-Firmen der Stadt“): Liegt kein Computer einer Firma der Stadt im Regal, kaufen die Schulen von außerhalb. Grund: keine
+  Subvention (S. 164, Karte R-A5; Befund 5 der Gegenprüfung „tech“). Nachgetragen nach der Schlussprüfung.
+
+**Keine Subvention** (S. 164, Karte R-A5): Die Stadt gibt keiner Tech-Firma Geld. Beschleunigt wird über die Gründungsbedingungen (ab der
+Kleinstadt, Tüftler sparen, Personalbremse), über Nachfrage (Weltmarkt, die Computer der Schulen zum Ladenpreis, Autos wie bisher) und über den
+Zuzug für Tech-Stellen, der wie bisher nach R10 läuft: Wer zuzieht, kommt nur für eine freie Stelle, die niemand aus der Stadt nehmen kann. Einen
+Vorrang für Tech-Stellen gibt es nicht (T7). Alles hängt an `R.TECH_FRUEH` und `R.WELT`: Mit beiden auf 0 läuft die Stadt Tag für Tag wie in Teil 4
+(`simtest --techfrueh` B).
+
+### Regeln
+
+- **Wer gründet was** (`gruendungsTyp`, liest Fleiß, Ehrgeiz, Geld und die Wohnung für „fehlt ein Laden“):
+  - Fehlt in der Nähe ein Laden, gründet man einen Laden (wie bisher).
+  - Tüftler (Fleiß und Ehrgeiz zusammen ab 120, wie bisher) gründen **ab der Kleinstadt** eine Tech-Firma (`TECH_AB_STUFE`). Im Dorf gründen sie
+    nichts und sparen weiter (vorher gründeten sie dort eine Werkstatt und blieben für immer deren Besitzer; Diagnose des Entwurfs).
+  - Reicht nur das Geld noch nicht, spart ein Tüftler weiter (`TECH_SPAREN`), statt eine Werkstatt zu gründen. Das war die Bremse Nr. 1 der
+    Diagnose: Vor der ersten Tech-Firma gründeten Tüftler im Mittel 18,9 Werkstätten.
+  - **Personalbremse** (`techGruendungJetzt`): Eine neue Tech-Firma gründet ein Tüftler nicht, solange die Tech-Firmen der Stadt zusammen 12 oder
+    mehr Stellen nicht besetzt bekommen (`S.techFrei`, `TECH_FREI_MAX`). Dann gründet er eine Werkstatt, wenn sie sich lohnt, sonst nichts.
+    `S.techFrei` zählt freie Stellen in Tech-Firmen mit Besitz, auch im Bau, ruhende nicht; gezählt nachts in `kennzahlenRechnen` (vor dem
+    Zuzug) und bei jeder Tech-Gründung gleich erhöht.
+  - Das alles sind Entscheidungen der Gründer, keine Vorschriften der Stadt (Befund 6). Das Stadtbuch nennt bei der Kleinstadt „Tech-Firmen,
+    sobald Tüftler sie gründen“.
+- **Umland oder Welt** (`techMarkt`, je Firma `g.markt`): Eine neue oder übernommene Tech-Firma verkauft **ins Umland, solange es dort Platz
+  hat** (wie bisher: `werkstattLohnt`, und Tech-Firmen haben höchstens 40 % der Stellen fürs Umland), **sonst in die Welt**, solange die Welt
+  noch abnimmt (`weltPlatzFuer`). Geht beides nicht, gründet der Tüftler keine Tech-Firma. Eine Gründung für die Welt ist auch dann eine
+  Aussicht, wenn das Umland voll ist (`techWeltAussicht` in `entscheide` und bei den erlaubten Aktionen der KI). Der Markt bleibt, solange die
+  Firma besteht, und zieht ins Autowerk mit.
+- **Weltmarkt** (`R.WELT` = 12.000 Taler am Tag): Die Welt zahlt für alle Arbeitstage dort zusammen 12.000 Taler, je Arbeitstag höchstens 140 Taler
+  wie das Umland (`S.weltPreis` = min(140, 12.000 / Arbeitstage in der Welt), nachts in `wirtschaft` neben dem Umlandpreis). Je mehr die Stadt
+  dorthin liefert, desto weniger bringt ein Arbeitstag. Gründen, übernehmen und wachsen kann eine Firma dort, solange ein Arbeitstag danach
+  noch 113 Taler bringt (Lohn einer Tech-Stelle und 8 Taler, dieselbe Regel wie im Umland). So hat die Welt Platz für rund 106 Stellen.
+  - Die **40-%-Grenze gilt nur fürs Umland**: Stellen in der Welt zählen weder zu den Tech-Stellen fürs Umland noch zu den Umland-Stellen, und in
+    der Welt ruht nie eine Stelle (`techGrenzeHalten`).
+  - Ein Autowerk verkauft, was die Stadt nicht kauft, in den Markt seiner Firma.
+  - **AUTO_MAX bleibt 2** und das Autowerk bleibt an die Stufe Stadt gebunden.
+- **Preis je Arbeitstag** (`TECH_SATZ`, `anbauKosten`): Jeder Bau einer Tech-Firma kostet 166⅔ Taler je Arbeitstag des Bauhofs, so viel wie ihre
+  Gründung schon immer (2.000 Taler für 12 Arbeitstage):
+  - Gründung 2.000 (gleich), Anbau auf Stufe 2 2.000 (vorher 1.800), Stufe 3 2.667 (3.000), Campus 3.333 (5.000), Hochhaus 4.000 (8.000),
+    Werkshalle 4.000 (10.000).
+  - Das Autowerk bleibt bei 20.000 (A3: ein ganzer Block mit Teststrecke), die Übernahme bei 40 %.
+  - Warum dieser Satz (Befund 1): Die Stadt hat drei Sätze je Arbeitstag. Laden, Werkstatt und Kita zahlen 133⅓, Tech-Firmen 166⅔, Wohnhaus,
+    Schule, Rathaus und die Bauten von Land und Bund 200. Der Entwurf nahm für Tech-Firmen den billigsten; hier behält jede Tech-Firma ihren
+    eigenen Satz, und nur die Ausnahme fällt weg, dass der Ausbau je Arbeitstag teurer war als die Gründung (Campus 250, Hochhaus 333).
+  - Keiner der Sätze liegt unter dem höchsten Lohn des Bauhofs (120 Taler je Arbeitstag): Die Stadt legt nichts drauf. Das Hochhaus hätte
+    besonders teuer bleiben dürfen; einheitlich ist einfacher zu erklären, und teuer hätte es später gebracht (Entwurf, auf 31ce452: erstes
+    Hochhaus etwa an Tag 410 statt 310; hier nicht nachgemessen).
+  - Alle Sätze sind Spielannahmen ohne Quelle; die Karte R-A5 hat deshalb den Status „Auslegung“ (vorher „galt schon“).
+- **Aufgeben ohne je eine Kraft** (`g.kraft`): Eine Werkstatt oder Tech-Firma, die seit Gründung oder Übernahme nie jemanden eingestellt hat,
+  geht wie bisher nach 30 Tagen im Minus zu. Sie bekommt aber die Zeile „… gibt nach 30 Tagen im Minus auf: Sie fand keine Leute, keine der N
+  Stellen war je besetzt.“ (Art „Aufgegeben“, Symbol wie eine Schließung) statt „ist pleite“.
+  - Für den Besitz sind die Folgen dieselben wie bei einer Pleite.
+  - Sie zählt ehrlich mit, in den Pleiten und dazu in `S.stat.aufgegeben` bzw. `S.stat.tech.aufgegeben`.
+  - Läden nicht: Ihre Pleite-Zeile nennt die Kundschaft, und die Entscheidung galt Firmen, die keine Leute finden.
+- **Computer der Schulen** (Befund 5, Entscheidung „wie die Leute“):
+  - Sie sind kein Vorhaben in der Rangfolge des Bürgermeisters mehr, sondern **Bedarf vor allen Vorhaben** (`HH_BEDARF`, `hhComputer`, nur mit
+    Geld über der Rücklage). Über Stadtgeld für Tech-Firmen der Stadt entscheidet so keine Rangfolge, auch nicht die KI.
+  - Liegt der neueste Computer einer Firma der Stadt im Regal (`S.angebot`, wie für die Leute), kauft jede Schule ihn im nächsten Laden
+    (`schulITKaufen`, `ladenNaechst`). Der Laden behält 64 Taler (20 %; beim Laden der Stadt gehen sie ins Budget), die Firma bekommt 256.
+  - Sonst kauft die Schule von außerhalb, und die 320 Taler verlassen die Stadt (`S.stat.schule.itAussen`).
+  - Keine Firma bekommt Geld, weil sie aus der Stadt ist; sie verkauft nur, was jeder im Laden kaufen würde, zum selben Preis.
+  - Mit `TECH_FRUEH` 0 kaufen die Schulen wie in Teil 3 und 4 reihum bei den Computerfirmen der Stadt.
+- **Unverändert:** 40-%-Grenze (jetzt nur fürs Umland), `AUTO_MAX` 2, Tüftler-Schwelle 120, Lohn einer Tech-Stelle 105, Zuzug (R10), Umland 50.000
+  Taler am Tag, Anbau nur mit 20 Gewinntagen in Folge, allen Stellen besetzt und genug Arbeitssuchenden.
+
+### Warum so (Messung der Varianten)
+
+Gemessen mit `v9/t6/mess/tm.mjs` bzw. `tm2.mjs` (Gate 1 bis 7 wie `simtest --gate`, 730 Tage stündlich, dazu Tech-Firmen, Haushalt, Gründungen
+je Typ). Seeds 1–12, auf Zwischenständen dieses Teils mit den R-Werten der Zeile. „Nach Preis“ heißt: Geht beides, verkauft eine neue Firma
+dorthin, wo ein Arbeitstag mehr bringt. „Umland zuerst“ ist die ausgelieferte Regel.
+
+| Variante | Gates (von 12) | Band max | Einwohner 365 / 730 | erste Tech-Firma | Campus | Hochhaus | Werk bestellt | offene Tech-Firmen 365 / 730 (Welt) |
+|---|---|---|---|---|---|---|---|---|
+| ohne Weltmarkt, ohne Sparen | 12 | 1,127 | 1.112 / 1.226 | 76 | 325 | 462 | 361 | 7,2 / 12,1 (0) |
+| Welt 6.000, nach Preis | 12 | 1,086 | 1.189 / 1.371 | 76 | 367 | 480 | 439 | 13,6 / 22,6 (10,3) |
+| Welt 9.000, nach Preis | 12 | 1,123 | 1.232 / 1.438 | 76 | 291 | 487 | 291 | 15,3 / 24,5 (13,2) |
+| Welt 12.000, nach Preis | 12 | 1,123 | 1.285 / 1.503 | 76 | 270 | 437 | 291 | 18,5 / 28,8 (16,4) |
+| Welt 12.000, nach Preis, neue Firmen nur bis 130 Taler | 11 (G4 Seed 8) | 1,151 | 1.253 / 1.473 | 76 | 270 | 302 | 292 | 16,3 / 20,4 (9,0) |
+| ohne Weltmarkt, mit Sparen | 12 | 1,120 | 1.086 / 1.234 | 56 | 252 | 279 | 267 | 9,6 / 13,2 (0) |
+| Welt 9.000, Sparen, nach Preis | 12 | 1,080 | 1.200 / 1.400 | 56 | 266 | 460 | 264 | 16,2 / 23,8 (11,8) |
+| Welt 12.000, Sparen, nach Preis, neue bis 130 | 12 | 1,125 | 1.251 / 1.471 | 56 | 266 | 292 | 264 | 17,9 / 19,2 (8,5) |
+| Welt 12.000, Sparen, Umland zuerst, neue bis 130 | 12 | 1,098 | 1.268 / 1.479 | 56 | 268 | 345 | 294 | 23,0 / 21,2 (9,3) |
+| **Welt 12.000, Sparen, Umland zuerst (ausgeliefert)** | **12** | 1,114 | 1.246 / 1.479 | **56** | 268 | 460 | 294 | **25,2 / 28,6 (17,8)** |
+
+- **Sparen** macht die erste Tech-Firma früher (Median Tag 76 → 56), der Weltmarkt macht die Firmen mehr.
+- **„Nach Preis“** holte die Tüftler schon ab Tag 150 in die Welt; die Firmen im Umland blieben klein, und Hochhäuser kamen später.
+- **„Neue Firmen nur bis 130 Taler“** (Platz in der Welt fürs Wachsen lassen) brachte das Hochhaus früher, aber weniger Firmen. Auf den Seeds
+  1–80 fiel es zweimal durch: Gate 4 auf Seed 44 (Band 1,173), Gate 7 auf Seed 74 (14,3). Die ausgelieferte Regel hält dort alle Gates.
+- **Tüftler gründen im Dorf wieder Werkstätten** (nachgemessen mit `tm2.mjs` auf einer Kopie mit Schalter, Seeds 1–80, sonst wie ausgeliefert):
+  Einwohner Tag 60 / 120 / 180 68,8 / 192,1 / 360 statt 56,8 / 174,6 / 332 (Teil 4: 73,2 / 198,1 / 365), erste Tech-Gründung Median 58 statt 56,
+  Campus 272, Hochhaus 392, Werk 233; aber **Gate 4 fällt auf Seed 13** (Band 1,166; 79 von 80). Deshalb nicht ausgeliefert (offene Frage).
+  Ohne Sparen dazu (Seeds 1–40): erste Tech-Gründung wieder Tag 106 wie in Teil 4. Das Sparen macht die Tech-Firmen früh, das Sparen im Dorf
+  kostet die frühen Einwohner.
+
+### Programm (Fenster „Stadtregierung“ und „Haushalt“)
+
+Keine neue Programmforderung; alles Neue ist Spielregel oder Auslegung, nichts wird dem Programm zugeschrieben. Die Zitate stehen wörtlich mit
+gedruckter Seite (`afd/zitatpruef.py`, `afd/bau/zitate_genau.py`, unten).
+
+- **Neue Karte „Weltmarkt für Software, Handys und Computer“** (Spielregel, Gruppe „Verkehr, Tech-Firmen und Autos“):
+  - Zitat: „Deutsche Unternehmen sollen an der Weltspitze der Exportunternehmen stehen und „Made in Germany“ wieder zu einem Markenzeichen für
+    Exzellenz und Einzigartigkeit machen.“ (S. 11).
+  - Hinweis: kein Programmpunkt (das Programm spricht von deutschen Unternehmen allgemein, nicht vom Markt einer Stadt); kein Geld der Stadt
+    (R-A5); wer für eine Tech-Stelle zuzieht, kommt nur für eine freie Stelle (R10).
+  - Live-Zeile (`Sim.techInfo`): Firmen im Umland und in der Welt, Stellen und Preis je Arbeitstag dort, Tech-Anteil fürs Umland, freie
+    Tech-Stellen (Bremse), Gründungen, Pleiten und davon aufgegeben.
+- **Karte „Tech-Firmen wachsen, Autowerke, Autos“** (Spielregel): nennt Kleinstadt, Sparen und Personalbremse, die Preise im aufklappbaren Teil
+  „Weitere Annahmen und Folgen“ (am Handy wäre die Karte sonst höher als 1.250 px); die Zahlen prüft `simtest --techfrueh` A gegen `Sim.R`. Das
+  Autowerk verkauft dort jetzt „in den Markt der Firma, ins Umland oder in die Welt“.
+- **Karte R-A5 „Keine Subventionen für Techniken“** (jetzt „Auslegung“):
+  - Stadt: Gründung und Ausbau bezahlen die Firmen; der Weltmarkt ist Nachfrage von außen; die Computer der Schulen kauft die Stadt wie alle im
+    Laden.
+  - Hinweis: die drei Sätze je Arbeitstag, Campus 3.333 statt 5.000, Hochhaus 4.000 statt 8.000; „so versteht die Stadt, dass sie keine
+    „Subvention von Techniken“ (S. 164) zahlt“.
+- **Unter „Keine Zahl …“ S. 16** („Förderung von Selbständigkeit und Unternehmensgründungen unter anderem durch Abbau von Vorschriften auf das
+  notwendige Minimum“): Der Grund heißt jetzt „Gründungen hängen in der Stadt an Umland und Weltmarkt, nicht an Vorschriften der Stadt …
+  Spielregeln für Gründer, keine Vorschriften“ (Befund 6).
+- **Karte „Computer für die Schulen“** (Gruppe Schule) und im Fenster „Haushalt“ die Karte „Computer für die Schulen, gekauft in der Stadt“:
+  - Beide nennen den Kauf im Laden und von außerhalb.
+  - Das Fenster „Haushalt“ zeigt den Bedarf als eigene Karte „vor allen Vorhaben“ vor der Rangfolge der drei Vorhaben.
+  - Einleitung und die Karte „Erst ausgeben“ sagen „zuerst Computer für die Schulen, dann …“.
+- **Bürgermeister** (Karte „Bürgermeister: direkt gewählt, ohne Partei“): Die feste Liste hat drei Vorhaben (Wohnungen auf Vorrat, Rathaus
+  ausbauen, Parks in Wohnnähe). Die Computer kauft die Stadt vorher nach Bedarf. Eine Rangfolge mit „computer“ lehnt `bmRangfolge` ab.
+- Nicht übernommen wie im Entwurf: „Wir werden Existenzgründer steuerlich entlasten.“ (S. 74). Der Satz steht bei den Junglandwirten, und eine
+  Steuervergünstigung für eine Technik wäre eine Förderung. „Wir begrüßen die Zuwanderung qualifizierter Fachkräfte, sofern diese zum Erfolg
+  unseres Landes sowie zur Stärkung des Wirtschaftsstandorts Deutschland beitragen können.“ (S. 111) nennt „Handwerk“ und „IT-Berufe“
+  nebeneinander. Deshalb gibt es keinen Vorrang für Tech-Stellen beim Zuzug. Beide sind keine neuen Karten, sie begründen nur die Regeln (T7).
+
+### Annahmen und Quellen (T1 … T9)
+
+| # | Annahme | Warum / Quelle |
+|---|---|---|
+| T1 | 166⅔ Taler je Arbeitstag für jeden Bau einer Tech-Firma | Spielannahme: der Satz ihrer Gründung seit Version 4 (2.000 / 12), keine Quelle; über dem höchsten Bauhof-Lohn (120), also keine Subvention (R-A5, Auslegung). Andere Sätze der Stadt: 133⅓ (Laden, Werkstatt, Kita), 200 (Wohnhaus, Schule, Rathaus, Land, Bund) |
+| T2 | Tech-Firmen ab der Kleinstadt (40 Einwohner) | Spielregel wie Wache und Autowerk; keine Aussage über echte Städte |
+| T3 | Tüftler sparen im Dorf und solange das Geld fehlt | Diagnose des Entwurfs (Bremse Nr. 1); gemessen (Tabelle oben) |
+| T4 | Personalbremse bei 12 freien Tech-Stellen | Entwurf: 4 bremst zu stark, 16 bringt kaum mehr, ohne Bremse 26 Tech-Pleiten (Seeds 1–20) |
+| T5 | Weltmarkt 12.000 Taler am Tag, höchstens 140 je Arbeitstag, neu und wachsen bis 113 | Spielannahme, eingestellt auf Noahs Ziel (deutlich mehr als 12 bis 13 Tech-Firmen an Tag 730) und auf die Gates (Tabelle oben); das Programm nennt keine Zahl. Zum Vergleich, nur Richtung: 76 % der in Deutschland gebauten Pkw gehen in den Export (VDA 2025, schon bei A-Annahmen der Version 8) |
+| T6 | Umland zuerst, dann die Welt | gemessen: „nach Preis“ lässt die Firmen im Umland klein und das Hochhaus später kommen |
+| T7 | Kein Vorrang für Tech-Stellen beim Zuzug | S. 111 nennt Handwerk und IT-Berufe nebeneinander; R10 bleibt |
+| T8 | Aufgeben ohne Pleite-Zeile nur für Werkstatt und Tech-Firma ohne je eine Kraft | Entscheidung (Claude): ehrlicher Text; die Zahlen zählen mit |
+| T9 | Computer der Schulen im nächsten Laden (Manhattan-Abstand, bei Gleichstand die kleinere Nummer), sonst von außerhalb | Entscheidung „wie die Leute“; Ladenanteil 20 % wie bei jedem Verkauf (Annahme 66) |
+
+Keine Euro-Beträge, keine neue Rechtsaussage.
+
+### Darstellung
+
+- Keine neue 3D-Geometrie, kein neues Mesh, keine neue Three.js- oder Browser-API. Sichtbar wird der Teil über die Simulation: Tech-Glasbauten
+  stehen im Median ab Tag 58 statt 109, an Tag 730 stehen im Mittel 29 statt 13 Tech-Firmen, Campus, Hochhaus mit Leuchtlogo und Autowerk kommen im
+  Median früher.
+- **Hauskarte einer Tech-Firma:** „Verkauft in die Welt (Weltmarkt): Die Welt zahlt N Taler je Arbeitstag, weniger, je mehr die Stadt dorthin
+  liefert.“ oder wie bisher „Das Umland zahlt N Taler je Arbeitstag.“; beim Warten auf den Ausbau „sobald die Welt wieder mehr abnimmt“.
+  „Ein Anbau / Ein Campus / Ein Hochhaus (… Taler) kommt, wenn …“ steht jetzt im Nominativ (Nebenbefund des Entwurfs). Autowerk: „…, N ans
+  Umland“ bzw. „in die Welt“.
+- **Stadtbuch:** Gründungszeile „Die Firma verkauft in die Welt (Weltmarkt).“; neue Art „Aufgegeben“ (Gewicht 5 in „Während du weg warst“);
+  Stufenzeilen mit „Tech-Firmen, sobald Tüftler sie gründen“ (Kleinstadt) und „Autowerke, sobald eine große Tech-Firma eins baut“ (Stadt;
+  Nebenbefund des Entwurfs: das Autowerk fehlte in `STUFE_NEU`). Mit `TECH_FRUEH` 0 nennen die Zeilen, was sie vorher nannten
+  (`STUFE_NEU_WENN`).
+- **KI:** Die Entscheidung „gründen“ nennt „… eine eigene Tech-Firma, die Software macht und in die Welt verkauft, für 2.300 Taler“.
+- **Versionsdialog** (Stand der Version 8): „Tech-Firmen gibt es ab der Kleinstadt, und sie verkaufen auch in die Welt.“ Er passt am Handy ohne
+  Scrollen (400 × 820: Unterkante 728 px).
+
+### Gemessen
+
+Messskripte (nur Messung, nicht im Repo): `v9/t6/mess/tm2.mjs` (wie `tm.mjs`: Gate 1 bis 7 wie `simtest --gate`, 730 Tage stündlich, T als
+CPU-Zeit der ersten 365 Tage samt Messcode; dazu Tech-Firmen, Weltmarkt, Pleiten je Art, Gründungen durch Tüftler je Typ, Vorhaben des Haushalts,
+Nächte mit vollem Bauhof, Lohnsteuer, leere Tech-Häuser), `lauf2.sh` (Seeds in drei Prozessen), `aw2.py` (Auswertung, je Seed gegen die anderen
+Stände). Stände: 31ce452 (`stadt.orig.html`), Teil 4 (`v9/t6/vor/stadt.teil4.html`), Teil 5. Rohdaten `v9/t6/mess/erg2/`, Tabelle
+`v9/t6/mess/aw2_fin_t4_v8.txt`. Der Rechner hat 4 Kerne; die Läufe liefen zu dritt, T ist deshalb nur die Richtung (Gate T: unten).
+
+**Gates, Seeds 1–80:**
+
+| Stand | Gate 1–7 | fällt | Band Gate 4 Ø / Median / über 1,12 / max | Gate 6 min | Gate 7 min | kleinstes Budget Ø / min |
+|---|---|---|---|---|---|---|
+| 31ce452 (Version 8) | 78 von 80 | G4: 47, 54 | 1,077 / 1,071 / 7 / 1,165 | 16,4 | 18,0 | 6.615 / 5.645 |
+| Version 9, Teil 4 | 80 von 80 | – | 1,065 / 1,062 / 2 / 1,148 | 16,5 | 20,3 | 2.881 / 1.637 |
+| **Version 9, Teil 5** | **80 von 80** | – | **1,066 / 1,065 / 3 / 1,147** | 16,6 | 17,5 | 2.960 / 1.710 |
+
+**Gegenprobe auf den Seeds 81–160** (nicht abgestimmt; `aw2_81_160.txt`): Teil 5 **80 von 80** (Band Ø 1,065, Median 1,060, 4 über 1,12, höchstens
+1,146; Gate 6 kleinster 16,3, Gate 7 kleinster 20,3), Teil 4 79 von 80 (Gate 4 auf Seed 108, 1,155, wie in Teil 4 berichtet). Tech-Firmen dort wie
+auf 1–80: erste Tech-Gründung im Median Tag 54 statt 109, Campus 276 statt 307, Hochhaus 418 statt 448, Werk bestellt 260 statt 400 (Teil 4: auf 4
+Seeds nie), offene Tech-Firmen an Tag 730 29,1 statt 13,7; Einwohner Tag 60 / 120 / 365 / 730: 56,9 / 172,8 / 1.264 / 1.483 statt 73,1 / 198,1 /
+1.106 / 1.231.
+
+**Mit „Wachstum: schnell“** (Noahs Spielschalter, Seeds 1–80, `WACHSTUM=1`): 79 von 80 (Gate 4 auf Seed 27, Band 1,162; das darf „schnell“,
+Abschnitt „Wachstum, Tempo und KI“), Band Ø 1,077, Gate 7 kleinster Wert 15,3. Einwohner Tag 60 / 120 / 180 / 365 / 730: 67,2 / 227,1 / 491 /
+1.377 / 1.502 (Teil 4, schnell: 94,6 / 280,1 / 590 / 1.189 / 1.223). Erste Tech-Gründung Median Tag 53, Campus 380, Hochhaus 470, Werk bestellt
+241, offene Tech-Firmen an Tag 730 31,9 (davon 19,9 in der Welt). Mit „schnell“ kommen Campus und Hochhaus später als mit „normal“: Die Stadt hat
+früher mehr Stellen frei, und ein Anbau wartet, bis genug Leute Arbeit suchen (vermutlich; nicht einzeln nachgeprüft).
+
+**Tech-Firmen** (Seeds 1–80; Tage als Median mit kleinstem und größtem Wert, „nie“ = bis Tag 730 nicht; sonst Mittel):
+
+| | 31ce452 | Teil 4 | **Teil 5** |
+|---|---|---|---|
+| erste Tech-Gründung (Tag) | 136 (52–284) | 106 (33–266) | **56 (39–99)** |
+| erste offene Tech-Firma | 139 | 109 | **58** |
+| erster Campus | 350 (208–710; nie 1) | 362 (172–642) | **279 (164–592)** |
+| erstes Hochhaus | 470 (251–690; nie 4) | 457 (215–704; nie 1) | **411 (190–693)** |
+| Autowerk bestellt / in Betrieb | 487 / 500 (nie 6) | 405 / 415 (nie 1 / 2) | **256 / 269** (nie 0) |
+| erste Firma in der Welt | – | – | 192 (67–276) |
+| offene Tech-Firmen an Tag 180 / 365 / 730 | 1,5 / 7,4 / 12,2 | 3,7 / 8,4 / 13,2 | **6,9 / 24,6 / 29,2** |
+| davon in der Welt | – | – | 0,5 / 18,3 / 17,8 |
+| offene Tech-Firmen an Tag 730, kleinste / größte Stadt | 7 / 18 | 6 / 18 | 18 / 40 |
+| Tech-Stufen 1 / 2 / 3 / Campus / Hochhaus an Tag 730 | 6,9 / 1,2 / 1,1 / 0,8 / 2,2 | 7,4 / 1,1 / 1,0 / 0,9 / 2,8 | 20,0 / 3,0 / 1,9 / 1,0 / 3,4 |
+| Autowerke an Tag 730 | 1,56 | 1,75 | 1,86 |
+| Tech-Stellen fürs Umland an Tag 365 / 730; in der Welt | 56 / 133 | 63 / 152 | 56 / 138; 97 / 96 |
+| höchster Tech-Anteil fürs Umland (Grenze 40 %) | 30,0 % | 34,6 % | 31,6 % |
+| Tech-Gründungen und Übernahmen (bis Tag 365); davon für die Welt | 24,0 (12,3) | 27,7 (13,4) | 62,8 (37,1); 34,6 |
+| Gründungen durch Tüftler: Werkstatt / Tech-Firma / Laden | 71,8 / 24,0 / 65,7 | 73,9 / 27,7 / 80,8 | 61,0 / 62,8 / 114,5 |
+| Pleiten Tech-Firmen (ohne je eine Kraft; in der Welt) | 3,3 (2,9) | 3,3 (2,5) | 6,9 (5,5; 1,6) |
+| Pleiten Werkstätten (ohne je eine Kraft) / Läden | 86,2 (75,2) / 87,5 | 90,9 (80,0) / 111,0 | 87,6 (76,4) / 169,4 |
+| davon „aufgegeben, fand keine Leute“ (alle / Tech) | – | – | 66,5 / 4,0 |
+| leere Tech-Häuser an Tag 730 | 1,1 | 1,7 | 1,5 |
+| Werkstätten an Tag 730 | 53,4 | 54,1 | 51,9 |
+
+Die 40-%-Grenze wird seltener erreicht als in Teil 4 (höchster Anteil im Mittel 31,6 statt 34,6 %), weil neue Firmen in die Welt gehen, wenn
+das Umland voll ist.
+
+**Je Seed** (`aw2.py`), Teil 5 gegen Teil 4: Die erste Tech-Gründung kommt auf 4 von 80 Seeds später (Seed 21: 33 → 60, 31: 73 → 85, 34: 40 →
+51, 46: 80 → 84), der Campus auf 34, das Hochhaus auf 41 und das Autowerk auf 26 von 80 Seeds (z. B. Seed 14: bestellt Tag 206 → 596, Seed 28:
+262 → 619). Gegen 31ce452: erste Tech-Gründung auf 3 Seeds später (je 1 bis 2 Tage), Campus auf 21, Hochhaus auf 25, Werk auf 12 Seeds.
+**Früher im Median, aber nicht auf jedem Seed** (Befund 2). Weniger Einwohner an Tag 730 als in Teil 4 oder 31ce452: auf keinem Seed; an
+Tag 365 auf 3 Seeds weniger als in Teil 4 (8: 1.205 → 1.193, 13: 1.216 → 1.148, 41: 1.158 → 1.145). Weniger offene Tech-Firmen an Tag 730:
+auf keinem Seed.
+
+**Wirkung in Zahlen** (Seeds 1–80, Mittel):
+
+| | 31ce452 | Teil 4 | **Teil 5** |
+|---|---|---|---|
+| Einwohner Tag 30 / 60 / 120 / 180 | 13,2 / 29,8 / 87,8 / 172 | 31,2 / 73,2 / 198,1 / 365 | **28,6 / 56,8 / 174,6 / 332** |
+| Einwohner Tag 365 / 730 | 917 / 1.187 | 1.103 / 1.218 | **1.262 / 1.489** |
+| Zuzüge / Wegzüge / Geburten (730 Tage) | 1.119 / 64 / 540 | 1.159 / 67 / 688 | 1.391 / 84 / 788 |
+| Zufriedenheit, arbeitslos (Tag 730) | 69,9; 4,4 % | 74,3; 5,0 % | 74,0; 4,7 % |
+| freie Stellen an Tag 180 / 365 / 730 | 213 / 164 / 159 | 357 / 151 / 163 | 362 / 180 / 236 |
+| Kasse Tag 120 / 365 / 730 (Taler) | 95.300 / 1,25 / 3,29 Mio. | 106.200 / 0,97 / 0,78 Mio. | 94.500 / 1,03 / 0,97 Mio. |
+| Lohnsteuer: erste Senkung / 0 % (Median, Tag); Satz Tag 730 | 10 % immer | 80 / 170; 0 % | 80 / 170; 0 % |
+| Vorhaben bis Tag 730: Wohnungen / Rathaus / Parks (Taler) | – | 6.330 / 15.200 / 8.269 | 9.180 / 15.200 / 10.080 |
+| Computer der Schulen (Geräte, Taler; von außerhalb) | – | 357 (114.116) | 406 (129.872; 0,9 Geräte) |
+| erste Ausgabe für Wohnungen / Parks / Computer (Median, Tag) | – | 180 (nie 8) / 71 / 196 | 160 (nie 4) / 71 / 180 |
+| Nächte Tag 60–500 mit vollem Bauhof (Vorhaben warten) | – | 9,9 % | 11,4 % |
+| Schulen an Tag 730; Bürgermeisterwahlen | – | 3,6; 11,1 | 4,4; 11,0 |
+| Stadtbuch (Zeilen am Tag) | 5,04 | 6,03 | 6,99 |
+
+- **Mehr Leute, aber erst ab etwa Tag 250.** An Tag 365 leben im Mittel 14 % mehr Menschen in der Stadt als in Teil 4, an Tag 730 22 %
+  mehr: Der Weltmarkt bringt dauerhaft rund 96 Stellen dazu, und für jede freie Stelle darf jemand zuziehen. **In den ersten Monaten sind es
+  weniger** (Tag 60: 56,8 statt 73,2, Tag 120: 174,6 statt 198,1, Tag 180: 332 statt 365). Tüftler gründen im Dorf keine Werkstatt mehr und
+  sparen in der Kleinstadt, statt eine zu gründen. So entstehen früh weniger Stellen, und der Zuzug hängt an freien Stellen. Gegen 31ce452
+  sind es an Tag 60 weiter fast doppelt so viele. Die gemessene Alternative steht oben: Tüftler gründen im Dorf wieder Werkstätten; Gate 4 fällt
+  dann auf Seed 13. Das ist eine offene Frage an Noah (unten).
+- **Haushalt** (Befund 4): Der Bauhof hat mehr zu tun (früher Tech-Ausbau, billigerer Campus). Nächte, in denen er für die Vorhaben zu voll ist,
+  gibt es 11,4 statt 9,9 % (Tag 60–500). Die Vorhaben starten trotzdem nicht später: Wohnungen im Median an Tag 160 statt 180, Parks an Tag 71
+  wie vorher. Die Stadt gibt mehr für Wohnungen und Parks aus, weil sie größer ist. Einnahmen aus Bauaufträgen sinken je Ausbau (Campus 3.333
+  statt 5.000 Taler), es gibt aber mehr davon. Die Kasse liegt an Tag 730 im Mittel bei 0,97 statt 0,78 Mio. Taler, die Lohnsteuer fällt
+  wie in Teil 4 an Tag 80 zum ersten Mal und ist ab Tag 170 bei 0 %.
+- **Computer der Schulen:** 406 Geräte bis Tag 730; im Mittel 0,9 von außerhalb (wenn gerade kein Computer einer Firma der Stadt im Regal lag).
+- **Mehr Läden, mehr Laden-Pleiten:** Tüftler gründen 114,5 statt 80,8 Läden in 730 Tagen, 169,4 statt 111,0 Läden gehen pleite (vermutlich,
+  weil wer spart, öfter genug Geld hat, wenn in der Nähe ein Laden fehlt; nicht einzeln nachgeprüft). Das Stadtbuch hat dadurch und durch die
+  Tech-Firmen 16 % mehr Zeilen.
+
+### Rechenzeit, Gate T, Draw Calls, Handy
+
+- **Gate T:** `simtest --gate` (Seeds 1–3, 365 Tage stündlich, Grenze 5.000 ms) auf dem ruhigen Rechner: bestanden, T 3.051 / 2.767 / 2.648 ms
+  (Teil 4 unter Last: 3.157 / 2.424 / 2.207). Alle Gates der drei Seeds bestanden (Band 1,04 / 1,08 / 1,11).
+- **CPU-Zeit** (`v9/t6/mess/zeit.mjs`, 365 Tage stündlich, Seeds 1–5, Teil 4 und Teil 5 abwechselnd im selben Prozess): im Mittel 2.833 gegen
+  2.975 ms, **Faktor 1,05**. Die Regeln selbst kosten fast nichts; teurer ist die größere Stadt. In den Messläufen (drei Prozesse, T samt
+  Messcode) lag T im Mittel bei 2.584 ms (Teil 4 2.612). Über 5.000 ms lag es auf den Seeds 1–160 nur beim ersten Seed eines Prozesses oder
+  unter der Last der Browser-Tests (Seeds 1, 28, 81, 108, 135; bis 5.885 ms), wie in Teil 4.
+- **Draw Calls** (Grenze: höchstens +3 gegen 31ce452): Teil 5 bringt kein Mesh dazu.
+  - `tests/blick.cjs` (letztes Bild, 23 Uhr an der Straße): Teststadt Tag 400 31 (Handy 29), wie 31ce452 und Teil 4. Große Stadt
+    (`umland=300000`, Tag 750, 7.239 Einwohner) 32 (Handy 30) gegen 30 (28), +2 wie in Teil 4.
+  - `tests/techfrueh.cjs` (Seed 1, Tag 420, 11 Uhr, Blick von oben): 31 gegen 26. Dieselbe Stunde in Teil 4: 30 (`v9/t6/dc.cjs`: 26 / 30 / 30).
+    Die Szene hat 32 statt 31 Meshes (+1 aus Teil 1 bis 4; Teil 4 hat ebenfalls 32). Mehr gezeichnet wird, weil in der Stadt von 31ce452 an diesem Tag
+    Rathausdach, Schule, Baustelle und Leuchtlogo noch fehlen: Ein Instanz-Mesh ohne Instanz zeichnet nichts. Das Hochhaus mit Leuchtlogo kommt
+    mit Teil 4 und 5 früher.
+  - Für einen Moment liegt das also über +3. Mehr als 32 Draw Calls gab es in keiner Messung.
+- **Kennzahlen am Handy** (`tests/kennzahlen_hoehe.cjs`): Unterkante in allen sechs Größen gleich wie 31ce452 (568 × 320 bis 926 × 428:
+  156 bis 216 px; 400 × 820: 231 px beide).
+- **Bilder** `v9/bau/nachher/` (Teststadt Tag 400: 1.237 Einwohner, Kasse 1.215.190 Taler, Satz 0 %) und `v9/bau/gross/` (Tag 750: 7.239
+  Einwohner; Teil 4: 6.660), selbst angesehen: mehr Glas-Hochhäuser mit Leuchtlogo und kleine Glasbauten in allen Vierteln, Nacht und
+  Straßenblick unverändert, am Handy alle fünf Tempo-Knöpfe in einer Reihe. Dazu `tests/bilder_befunde/techfrueh_*.png` (Hauskarte einer Firma
+  in der Welt, Fenster „Stadtregierung“ bei der Karte „Weltmarkt“, Fenster „Haushalt“ mit dem Bedarf, Stadtbuch mit „Aufgegeben“,
+  Versionsdialog breit und am Handy).
+
+### Speicherformat 9 (Teil 5)
+
+- Neu, je Gebäude: `g.markt` (Uint8Array; 1 = die Tech-Firma verkauft in die Welt, nur bei Tech-Firmen) und `g.kraft` (Uint8Array; 1 = die
+  Werkstatt oder Tech-Firma hatte seit Gründung oder Übernahme eine Kraft; nur bei Werkstätten und Tech-Firmen). Einzelwerte: `S.techFrei` (freie
+  Tech-Stellen, ganze Zahl ab 0), `S.weltPlaetze` (Stellen in der Welt, ganze Zahl ab 0), `S.weltPreis` (0 bis 140). Summen: `S.stat.aufgegeben`,
+  `S.stat.tech.welt`, `S.stat.tech.aufgegeben` (ganze Zahlen; aufgegeben höchstens so viele wie Pleiten), `S.stat.schule.itAussen`.
+- `jsonPruefen` verlangt ab Version 9 die Einzelwerte und Summen (`tech9Pruefen(S, false)`), `importZustand` verlangt die beiden Felder
+  (`GF_TECH9`) und prüft danach für jeden Stand auch die Felder (`tech9Pruefen(S, true)`: 0 oder 1, Markt nur bei Tech-Firmen, Kraft nur bei
+  Werkstätten und Tech-Firmen). `schulePruefen` verlangt `itAussen` über `schulStatLeer`. Abgelehnt werden 13 beschädigte Stände
+  (`simtest --techfrueh` D).
+- Übernahme: Jeder ältere Stand (Version 2 bis 8) bekommt in der Kette zuletzt `migriereTech9`: alle Tech-Firmen im Umland, „hatte eine Kraft“ für
+  jede Werkstatt und Tech-Firma, die heute jemanden hat (was vorher war, steht im alten Stand nicht), `techFrei` gleich nachgezählt (Befund 3:
+  sonst wären Gründungen bis Mitternacht gesperrt), Welt leer, Summen 0; keine Zeile im Stadtbuch. Die Versionsnummer bleibt 9;
+  `tests/basis_v9.json` ist neu erzeugt (Übernahme von `basis_v8.json`, `basis_v9.cjs` verlangt die neuen Felder).
+- Speichern mit 20 Firmen in der Welt um 13 Uhr: 30 Tage bitgleich weiter (`--techfrueh` D); `--speichertest` bitgleich (unten).
+
+### Tests
+
+**simtest, Endstand** (Logs `v9/t6/st2/*.txt`, `--gate` allein auf dem ruhigen Rechner): alle 20 Modi bestanden:
+- `--gate` (Seeds 1–3, oben) und `--speichertest` (bitgleich: Seed 1 nach 60 Tagen `ca60551e5b316d33`, Sicherheit `a7d743951bcc249c`, Bund
+  `3c5f53b58a2fa82d`), `--aufholtest`;
+- `--kitest` (47), `--bau` (15), `--waren` (15), `--tech` (16), `--regierung` (155), `--kita` (40), `--erweiterung --git` (33), `--sicherheit` (28),
+  `--militaer` (24), `--autos --git` (21), `--migrationstest --git` (324);
+- `--rathaus --git` (74), `--buergermeister` (26), `--schule --git` (48), `--haushalt --git` (31), `--wachstum --alt v9/t5/vor/stadt.teil3.html` (29)
+  und **`--techfrueh --git --alt v9/t6/vor/stadt.teil4.html` (26, neu)**.
+
+Jeder alte Modus hat genau so viele Prüfungen wie in Teil 4.
+
+- `--techfrueh` (neu):
+  - **A statisch:** 19 Funktionen des Teils würfeln nicht und lesen von Personen nur Fleiß, Ehrgeiz, Geld und Wohnung (keine Namen, kein
+    Geschlecht, keine Herkunft; Stadtbuch-Zeilen ausgenommen). Die Zahlen der Karten „Tech-Firmen wachsen …“, „Weltmarkt …“ und R-A5 passen zu
+    `Sim.R`. S. 16 steht mit „Spielregeln für Gründer, keine Vorschriften“ unter „Keine Zahl“.
+  - **B ausgeschaltet:** `TECH_FRUEH` 0 und `WELT` 0 ohne die übrigen Bausteine von Version 9, Seeds 1–3 je 200 Tage, jeden Tag wie 31ce452.
+    Mit `--alt` (Fassung vor Teil 5) jeden Tag wie diese, ohne Vorhaben. Mit Vorhaben gleich bis zum ersten Computerkauf der Schulen (Seed 2,
+    400 Tage gleich, der erste Kauf an Tag 192), verglichen ohne Plan und Rangfolge, weil die Liste jetzt kürzer ist.
+  - **C je Gründung, je Nacht, je Pleite, je Computerkauf** (Seeds 1–3, 730 Tage stündlich):
+    - je Gründung: Stufe, Bremse, `techFrei` + Stellen, Preis, Markt (Umland genau, wenn dort Platz war, sonst Welt, dann mit Platz);
+    - je Nacht: freie Tech-Stellen, Stellen in der Welt, Tech- und Umland-Stellen unabhängig nachgezählt, 40 % nur im Umland, Grenze der Welt,
+      Markt nur bei Tech-Firmen, nichts ruht in der Welt, `tech9Pruefen`;
+    - je Nacht der Weltpreis nachgerechnet;
+    - jede Pleite: „gibt auf“ genau ohne je eine Kraft (unabhängig über den Arbeitsantritt verfolgt);
+    - jeder Computerkauf: nächster Laden, Anteil des Ladens, Rest an die Firma, außerhalb nur ohne Computer der Stadt im Regal, Geld;
+    - Stadtbuch der Kleinstadt.
+    - Dort: 1.526 Gründungen, 177 Tech-Firmen, 91 für die Welt; 221-mal aufgegeben, 483-mal pleite; 1.166 Computer, 3 von außerhalb.
+  - **D:** Speichern mit 20 Firmen in der Welt, 30 Tage bitgleich; 13 beschädigte Stände abgelehnt; Übernahme von Version 8 (alle im Umland,
+    `techFrei` gleich nachgezählt, Gründungen nicht gesperrt).
+  - **E:** Namenstausch bitgleich (Seed 2, 450 Tage, 13 Firmen in der Welt).
+  - **F Gruppen** (nur gemessen, keine Regel liest diese Merkmale; Seeds 1–3, Anteil an Tech-Gründungen bzw. Tech-Arbeitstagen geteilt durch
+    den Anteil an allen): Frauen 1,01 / 1,02, Männer 0,99 / 0,98, Nachnamen Kaya bis Kowalski 1,11 / 1,02 (171 Gründungen), in der Stadt
+    geboren 1,01 / 1,18 (Arbeitstage: die Jüngeren; in der Welt 0,73 bei 300 Gründungen), zugezogen oder vom Start 1,00 / 0,94.
+- **Angepasst, weil sich die Stadt ändert (keine Prüfung abgeschwächt):**
+  - Vergleiche mit älteren Fassungen: `AUS`, `--rathaus` H, `--schule` G und `--migrationstest` schalten auch `TECH_FRUEH` und `WELT` aus. Die
+    neuen Felder und Summen fehlen dort (`OHNE_G`, `statAlt`, `techAlt`).
+  - `--wachstum` B vergleicht mit Teil 3 ohne die neuen Felder, ohne Plan und Rangfolge, und verlangt, dass bis Tag 200 noch kein Computer
+    gekauft ist (der Kauf läuft jetzt anders).
+  - Liste der Vorhaben: `--buergermeister` und `--haushalt` prüfen drei Vorhaben, die Computer als Bedarf davor (Messkopie auch in
+    `hhComputer`) und neu, dass eine Rangfolge mit „computer“ abgelehnt wird.
+  - Computerkauf im Laden: `--schule` C prüft den Kauf im Laden und von außerhalb, dazu statisch die Buchungen von `schulITKaufen`; `--tech`
+    zählt die Computer der Schulen bei den Verkäufen von Laden und Firma mit.
+  - `--militaer`: Die Kisten-Arbeiter werden je Betrieb gezählt (Umland oder Welt); geprüft wird dasselbe an drei Stellen.
+  - `--kita`: Die unabhängige Zählung nimmt den Bürgermeister wie die Stadt aus (im Amt gebunden). Den Fall gab es erst im neuen Verlauf.
+  - `--rathaus`: Der beschädigte Stand „Ausbau ohne Baustelle“ setzt jetzt die nächste Stufe und nimmt die Baustelle weg. Seed 1 baut das
+    Rathaus an Tag 120 wirklich aus.
+
+**Browser** (Server auf 8715, `tests/alle.sh`, letzter voller Lauf auf dem Endstand `v9/t6/alle4.log`; die Anpassungen davor in `alle1.log` bis
+`alle3.log`): 22 Tests und 6 `otest`-Skripte, alle bestanden:
+- p3test 12, p5neu 10, p6migration 39, p7figuren 6, p8tech 15, raute_klick 8, ereignis 21, t1_xss 5, p4test 29 (mit dem KI-Nachbau auf 11434),
+  s2karten 22, kita 22, befunde_s2 27, erweiterung 20, sicherheit 12, militaer 16, autos 9, autos_bild 20, rathaus 15, schule 8, haushalt 18,
+  wachstum 29, **techfrueh 17 (neu)**;
+- otest befunde 21, handy 11, breit 12, tastatur 4, breiten 20, hilfehoehe 1.
+- raute_klick hat 8 statt 11 OK-Zeilen: Im Bildausschnitt liegen in der neuen Teststadt weniger Rauten. Die Regel (mindestens 4, keiner
+  daneben) ist gleich.
+
+- **Neu: `tests/techfrueh.cjs`** (17 Prüfungen):
+  - Seed 1, Tag 420: 11 Tech-Firmen im Umland, 20 in der Welt, gezählt wie `Sim.techInfo`.
+  - Hauskarten einer Firma in der Welt und einer im Umland: Markt und Preis je Arbeitstag wie die Simulation, „Ein Anbau … kommt“ im Nominativ
+    auf 13 Karten.
+  - Fenster „Stadtregierung“: Karte „Weltmarkt“ (Spielregel, Zitat S. 11, Live-Zeile wie `techInfo`), R-A5 als Auslegung mit den drei Sätzen,
+    Spielregel-Karte, S. 16, Stufen.
+  - Fenster „Haushalt“: Bedarf „Computer für die Schulen“ vor den drei Vorhaben.
+  - Stadtbuch (Seed 1 ab Tag 140): Zeile „Aufgegeben“ mit Symbol, nicht „Pleite“.
+  - Draw Calls (oben); Handy 400 × 820: Hauskarte und Fenster ohne seitliches Überlaufen.
+  - Übernahme von `basis_v8.json`: Satz im Versionsdialog, breit und am Handy ohne Scrollen (Unterkante 686 bzw. 728 px); danach alle Firmen
+    im Umland, `techFrei` nachgezählt.
+  - Konsole leer.
+- **Nachgezogen** (keine Prüfung abgeschwächt):
+  - `basis_v9.cjs` verlangt die neuen Felder, `tests/basis_v9.json` ist neu erzeugt (Übernahme von `basis_v8.json`).
+  - `haushalt.cjs` und `wachstum.cjs`: drei Vorhaben, Computer als Bedarf.
+  - `alle.sh` hat `techfrueh` dazu.
+- **Neuer Verlauf der Teststädte:**
+  - `ereignis.cjs`: wieder Seed 4 ab Tag 400, Momente an Tag 406, 443, 449 und 457 (`v9/t6/mom/m*.log`; Seed 5 hat die vier Stunden bis Tag 830
+    nicht mehr).
+  - `erweiterung.cjs`: Seed 40, Tag 242 → 243, Karte 72 → 80. Das ist das einzige Wachsen allein in der Stufe Stadt in den Seeds 1–42 bis Tag
+    400 (`v9/t6/wachsen_teil5*.log`).
+  - `autos_bild.cjs`: neue feste Momente, Seed 21 Tag 58, Seed 63 Tag 172 und Seed 16 Tag 72 (`v9/t6/faelle/f_*.log`).
+  - `militaer.cjs`: Der Ortstext folgt `ortVon`. Die Dienststelle der Teststadt steht jetzt „am Mühlenweg“; geprüft wurde vorher nur
+    „an der“.
+- Die Karte „Tech-Firmen wachsen, Autowerke, Autos“ war am Handy 1.267 px hoch (Grenze in `befunde_s2.cjs`: 1.250). Die Preise stehen jetzt im
+  aufklappbaren Teil der Karte; `--techfrueh` A prüft sie dort.
+
+**Zitate:** alle Programmzitate der Fenster „Stadtregierung“ (301 gesammelt) und „Haushalt“ (23) gesammelt (`afd/bau/B/mess/zitate_sammeln.mjs`,
+`v9/t4/zitate_hh.mjs`) und geprüft (`afd/zitatpruef.py`, `afd/bau/zitate_genau.py`; Ergebnisse `v9/t6/zit/`).
+- Im Fenster „Stadtregierung“ stehen 287 genau auf der angegebenen gedruckten Seite (Teil 4: 285), darunter die neuen: S. 11 (Weltmarkt) und
+  „Subvention von Techniken“ (S. 164, R-A5).
+- Nicht genau sind wie bisher nur Namen der Oberfläche in „…“ („Wachstum: schnell“, „Haushalt“, „Weitere Annahmen und Folgen“ u. a.) und der
+  Satz über den Seitenwechsel S. 164 f. (von Hand nachgelesen).
+- Im Fenster „Haushalt“ 19 genau, dazu wie in Teil 3 Namen der Oberfläche und eigene Sätze der Stadt.
+- Zwei Sätze standen so, dass der Prüfer eigene Worte der Stadt als Zitat las („keine Subvention“ neben S. 43; „Stadtregierung“ neben S. 164).
+  Sie sind umformuliert.
+- Die Zitate dieses Abschnitts (S. 11, 16, 74, 111, 164) stehen alle genau auf der gedruckten Seite (`v9/t6/zit/readme5.json`).
+
+**Nicht geprüft:** echtes Sprachmodell (nur Attrappe und KI-Nachbau), echte Grafikhardware, Safari und echte Handys (nur Chromium mit
+SwiftShader in Handygröße), mehr als 730 Tage, Seeds über 160.
+
+### Befunde der Gegenprüfung „tech“ (alle umgesetzt)
+
+1. **„Keine Subvention“ war selektiv (mittel).** Nicht mehr der billigste Satz (133⅓ wie Werkstatt), sondern der eigene der Tech-Firmen (166⅔,
+   Gründung seit Version 4). Die Karte R-A5 nennt alle drei Sätze (133⅓ privat, 166⅔ Tech, 200 öffentlich: Wohnhaus, Schule, Rathaus wie RA6,
+   Land und Bund wie B5) und die alten und neuen Preise. Status „Auslegung“; „Alle Sätze sind Spielannahmen ohne Quelle“ steht jetzt für alle
+   Sätze (Fenster und T1). Es gibt in Version 9 keine Regel „gleiche Arbeit, gleicher Preis“: Jeder Bauherr hat seinen Satz, alle über dem Lohn
+   des Bauhofs.
+2. **Verschlechterungen je Seed.** Beziffert (oben, „Je Seed“), auch in „Bekannte Schwächen“: früher im Median, auf einigen Seeds später;
+   Einwohner an Tag 730 auf keinem Seed weniger; leere Tech-Häuser an Tag 730 1,5 (Teil 4 1,7).
+3. **`techFrei` nach dem Laden.** `migriereTech9` zählt nach; `jsonPruefen` verlangt den Wert für Version 9; `--techfrueh` D prüft „direkt nach der
+   Übernahme: techFrei 4 (nachgezählt 4)“.
+4. **Bauhof und Vorhaben.** Gemessen (oben, „Wirkung“): Nächte mit vollem Bauhof 11,4 statt 9,9 %, die Vorhaben starten nicht später.
+5. **KI-Bürgermeister und Schulcomputer.** Die Computer sind Bedarf vor den Vorhaben, nicht in der Rangfolge, und werden wie von den Leuten im
+   Laden gekauft, sonst von außerhalb.
+6. **S. 16 und „Vorschriften“.** Neuer Grund unter „Keine Zahl …“; Stadtbuch und Stufen sagen „Tech-Firmen, sobald Tüftler sie gründen“; die
+   Karte beschreibt Kleinstadt und Bremse als Entscheidung des Tüftlers.
+7. **C war schwach.** Weltmarkt (Noahs Entscheidung): an Tag 730 29,2 statt 13,2 offene Tech-Firmen. Tüftler gründen weniger Werkstätten (61,0
+   statt 73,9) und mehr Tech-Firmen (62,8 statt 27,7). Die Option „Tüftler, den nur die Stufe sperrt, spart im Dorf“ ist eingebaut und gemessen;
+   den Nachteil (weniger Einwohner in den ersten Monaten) nennt „Bekannte Schwächen“. Tech-Pleiten ohne je eine Kraft stehen jetzt als
+   „aufgegeben“ im Stadtbuch.
+8. **Gate 6 und T.** Alle Teile zusammen auf den Seeds 1–80 (und 81–160) gemessen, Gate 6 je Seed: kleinster Wert 16,6. Gate T auf dem ruhigen
+   Rechner: unten.
+
+Nebenbefunde des Entwurfs, beide erledigt: „Einen Anbau … kommt“ steht jetzt im Nominativ; das Autowerk steht in `STUFE_NEU` bei der Stadt.
+
+### Bekannte Schwächen (Teil 5)
+
+- **In den ersten Monaten weniger Einwohner als in Teil 4.** Tag 60 im Mittel 56,8 statt 73,2, Tag 120 174,6 statt 198,1, Tag 180 332 statt 365
+  (31ce452: 29,8 / 87,8 / 172). Ab etwa Tag 250 sind es mehr (Tag 365 +14 %, Tag 730 +22 %). Grund: Tüftler gründen im Dorf keine Werkstatt
+  mehr und sparen später, statt eine zu gründen; früh gibt es so weniger Stellen, und der Zuzug hängt an freien Stellen. Gemessen ist die
+  Alternative (Tüftler gründen im Dorf wieder Werkstätten, Tabelle „Warum so“): fast so früh viele wie Teil 4, Tech-Firmen gleich früh, aber
+  Gate 4 fällt auf Seed 13; deshalb nicht ausgeliefert (offene Frage unten).
+- **Früher im Median, nicht auf jedem Seed.** Gegen Teil 4 kommt das Hochhaus auf 41 von 80 Seeds später, der Campus auf 34, das Autowerk auf
+  26, die erste Tech-Gründung auf 4 (am meisten Seed 21: Tag 33 → 60). Der Median sinkt trotzdem überall (Campus 362 → 279, Hochhaus 457 → 411,
+  Werk 405 → 256).
+- **Viele kleine Firmen in der Welt.** Die Welt hat Platz für rund 106 Stellen; ist sie voll, wächst dort keine Firma mehr, bis eine schließt.
+  An Tag 730 stehen im Mittel 20 Tech-Firmen auf Stufe 1 (Teil 4: 7,4), die meisten davon in der Welt. Hochhäuser gibt es vor allem im Umland.
+- **Mehr Pleiten.** Tech-Firmen 6,9 statt 3,3 in 730 Tagen, davon 5,5 ohne je eine Kraft (jetzt „aufgegeben“); Läden 169,4 statt 111,0 (Tüftler,
+  die sparen, gründen öfter einen Laden, wenn einer fehlt: 114,5 statt 80,8; der Mechanismus ist nicht einzeln nachgeprüft). Das Stadtbuch hat
+  16 % mehr Zeilen.
+- **Die Zahlen sind Spielannahmen:** Weltmarkt 12.000 Taler am Tag, 166⅔ Taler je Arbeitstag, Kleinstadt, 12 freie Stellen. Keine davon kommt aus
+  der Wirklichkeit oder dem Programm (T1 bis T5); die Welt ist auf Noahs Ziel und die Gates eingestellt (Seeds 1–12 und 1–80).
+- **Gate 4 ist weiter zum Teil abgestimmt:** Die Auswahl zwischen den Varianten hing auch an Seeds 1–80 (die Variante „neue Firmen nur bis 130
+  Taler“ fiel dort zweimal). Gegenprobe auf den Seeds 81–160: oben.
+- **„Schnell“ fällt einmal:** Mit „Wachstum: schnell“ fällt Gate 4 auf Seed 27 (1,162); das darf der Schalter (Noahs Entscheidung). Campus und
+  Hochhaus kommen mit „schnell“ später als mit „normal“ (Median 380 und 470).
+- **Nicht gemessen:** Seeds über 160, mehr als 730 Tage, echte Grafikhardware und echte Handys.
+
+### Offene Fragen an Noah
+
+- **Früh mehr Leute oder früh Tech-Firmen?** Heute sparen Tüftler im Dorf, und die Stadt hat an Tag 60 im Mittel 57 statt 73 Einwohner (Teil 4).
+  Gründen sie im Dorf wieder Werkstätten, sind es 69, die erste Tech-Firma kommt gleich früh (Median Tag 58 statt 56), Hochhaus und Werk etwas
+  früher, aber Gate 4 fällt auf einem von 80 Seeds (Seed 13, Band 1,166). Soll das so bleiben?
+- **Sollen Firmen in der Welt auch wachsen können?** Heute ist die Welt mit rund 106 Stellen schnell voll, und die Firmen dort bleiben klein. Mit
+  „neue Firmen nur, solange ein Arbeitstag noch 130 Taler bringt“ kämen Hochhäuser früher (Median 346 statt 411), es gäbe weniger Firmen (20 statt
+  29), und auf zwei von 80 Seeds fiele ein Gate.
+- **Was passiert mit dem Geld bei 0 % Lohnsteuer?** (Schlussprüfung) Ab etwa Tag 170 zahlt niemand mehr Lohnsteuer, und die Kasse wächst weiter
+  (Tag 730 im Mittel 0,95 Mio. Taler). Das Fenster „Haushalt“ sagt es jetzt; eine weitere Stufe nach 0 % gibt es nicht. Soll es eine geben?
+
+## Befunde der Schlussprüfung (Version 9)
+
+Die Schlussprüfung von Version 9 hat den Endstand von Teil 1 bis 5 (`stadt.html` md5 32cc9e32…) dreifach gegengelesen: Technik, Texte,
+Bedienung. Sie fand keinen blockierenden Befund, vier mittlere und 25 kleine. Jeder ist hier nachgeprüft und umgesetzt; wo die Lösung nur Text
+ist, steht es dabei. Grundlage für Zahlen: Endmessung unten.
+
+### Technik
+
+1. **Grenze der Hauptfiguren nach der Amtszeit (mittel).** Nachgeprüft (Seed 3, Tag 60: Noahs Liste 11, gezählt 10; nach dem Amtsende
+   gezählt 11, Leiste 12, die Oberfläche hat nur 11 Plätze). Jetzt zählt `hauptZahl` Noahs ganze Liste: Ist der Bürgermeister auch Noahs
+   Hauptfigur („Auch nach der Amtszeit Hauptfigur“), belegt er einen der 10 Plätze. Sein eigener Platz gilt nur, solange er nicht Noahs Wahl
+   ist. Ist die Liste voll, ist der Knopf gesperrt, mit Grund. `jsonPruefen` lehnt eine Liste mit mehr als 10 ab. Dasselbe Szenario ergibt
+   jetzt: 10 gezählt, 10 in der Leiste, nach dem Amtsende 10 gezählt und 11 in der Leiste. `simtest --buergermeister` prüft den Fall
+   „Liste voll, Amt zusätzlich, Amtsende“ und in jeder Nacht höchstens 10 gezählt und 11 in der Leiste.
+2. **Allokation je Bild (mittel).** Nachgeprüft: `kiFristSek` rief in jedem Bild `Sim.hauptListe` auf (neue Liste und je Hauptfigur ein
+   Objekt). Jetzt zählt `Sim.hauptListeZahl` ohne neue Objekte (Länge von Noahs Liste plus der Bürgermeister, wenn er nicht darin steht).
+   `tests/befunde_v9.cjs` misst in 3 Sekunden bei 1× zwei Aufrufe von `Sim.hauptListe` (beide beim Tempowechsel für die Leiste, vorher
+   1,1 je Bild); `simtest --buergermeister` prüft jede Nacht `hauptListeZahl` = Länge von `hauptListe`.
+3. **R10 im Code nicht so streng wie im Text (klein).** Nachgeprüft und größer als gemeldet: Über 730 Tage (Seeds 1–10) kamen in 31ce452 18,8 %
+   der Zuzüge über die freien Stellen hinaus, die niemand aus der Stadt nehmen kann, in Version 9 21,1 % („schnell“ 26,0 %); bis Tag 120 keiner.
+   Diese Zuzügler nahmen Stellen, die Arbeitsuchende der Stadt hätten nehmen können. **Behoben im Code** statt nur im Text, weil Karte R10 und
+   Annahme 11 die Regel so beschreiben: `R.ZUZUG_GENAU = 1` begrenzt die Zahl am Tag auf diese Stellen (`n ≤ fs`); der Zufallszug bleibt derselbe.
+   Für Vergleiche mit älteren Fassungen schaltet `simtest` den Schalter mit den anderen Bausteinen von Version 9 aus. Die Karte R10 sagt es jetzt
+   genau („an einem Tag höchstens so viele, wie solche Stellen frei sind“), `simtest --wachstum` C prüft es in jeder Nacht. Wirkung: unten.
+4. **Nicht gesendete Anfrage wartet bis zur Frist (klein).** Nachgeprüft (Code). Schickt die Oberfläche eine Anfrage nicht mehr los, weil keine
+   Antwort vor der Frist käme, entscheidet jetzt gleich das normale Gehirn (`Sim.kiVerwerfen(…, zuSpaet)`, zählt als „zu spät“; beim Bürgermeister
+   gilt für das Jahr die Regel). `simtest --kitest` 2c prüft es, der Nachbau in `simtest --wachstum` F rechnet so (Tabelle „Kapazität der KI“).
+5. **Rechenzeit etwa verdoppelt (klein).** Nachgemessen, unten („Gemessen“): Gate T hält auf dem ruhigen Rechner, der Abstand zu 5 s ist aber
+   kleiner als in 31ce452. Ein Profil (Seed 1, 365 Tage) zeigt keinen einzelnen neuen Brocken: `schulTag` ist nicht unter den 25 teuersten
+   Funktionen; die Zeit steckt wie vorher in Stunde, Zufriedenheit, Wirtschaft und Entscheidungen, und die Stadt ist größer. Deshalb nur
+   dokumentiert (Bekannte Schwächen).
+6. **Draw Calls zeitweise +4 (klein).** Die Regel „höchstens +3 gegenüber 31ce452“ ist so gemeint und so gemessen: **höchstens +3 Meshes in der
+   Szene** (gemessen +2: das Mesh der Schule, und das Bund-Mesh zeichnet seit Version 9 ab Tag 0; das Rathaus zeichnet im Teil-Mesh; `tests/techfrueh.cjs`
+   32 gegen 30) und **absolut höchstens 32 Draw Calls** in allen Messungen. Mehr in derselben Stunde kommt nur daher, dass Bauten, die es schon gab
+   (Dach, Baustelle, Leuchtlogo), früher entstehen: Ein Instanz-Mesh ohne Instanz zeichnet nichts. Kein Code geändert.
+
+### Texte
+
+1. **Noahs Regel „erst ausgeben, dann senken“ nicht als seine gekennzeichnet (mittel).** Fenster „Haushalt“: Die Einleitung sagt jetzt „Die
+   Reihenfolge – erst ausgeben, dann die Lohnsteuer senken – ist eine Spielregel (Noahs Entscheidung), keine Forderung des Programms.“; die Karte
+   „Erst ausgeben“ hat den Status „Spielregel“, die Karte „Dann die Lohnsteuer senken“ sagt, dass die Bedingung Noahs Spielregel ist. Fenster
+   „Stadtregierung“: „Zur Vollständigkeit“ sagt „dazu niedrigere Steuersätze; wann die Stadt senkt (erst ausgeben, dann senken), ist eine
+   Spielregel“, die Karte „Lohnsteuer sinkt, wenn Geld übrig bleibt“ ebenso.
+2. **Gegenleistung auf S. 56 weggeschnitten (klein).** Beide Karten ergänzt: „Das Programm senkt die Sätze im Gegenzug zu weniger Abschreibungen
+   für „Steuersparmodelle“ (S. 56); die Stadt kennt keine Abschreibungen.“ (Wortlaut S. 56 nachgelesen.)
+3. **Gruppen und Parteien nur bei der Rangfolge geprüft (klein).** Jetzt gilt `amtFrei` für jeden Text des Bürgermeisters (Entscheidung, Gespräch,
+   Tagebuch beim Aufholen, Code): keine Wörter zu Herkunft, Religion, Sprache (wie `gruppenFrei`), keine Partei (Liste oben im Abschnitt
+   „Rathaus und Bürgermeister“), „parteilos“ bleibt. Die Anweisung sagt „Als Bürgermeister sprichst du nicht für oder gegen Parteien oder Gruppen
+   von Bewohnern.“ Im Gespräch sagt die Karte, warum eine Antwort verworfen wurde. `simtest --kitest` prüft 8 Sätze und die Anweisung.
+4. **Wahl-Karte: „gewählt werden darf, wer 18 ist“ (klein).** Jetzt: „wählen darf, wer 18 ist, gewählt werden kann, wer 18 bis 64 ist und eine
+   Stelle antreten kann (Karte oben).“
+5. **EU-Bürger als Bürgermeister, Mehrheitsregel (klein).** Karte „Bürgermeister“, Wirklichkeit: „ob sie auch Bürgermeister werden dürfen, regelt
+   das Land (Sachsen: ja, § 49 Abs. 1 SächsGemO)“ (Wortlaut nachgelesen). Die Mehrheitsregel steht im Sächsischen Kommunalwahlgesetz (§ 44a,
+   nachgelesen): absolute Mehrheit im ersten Wahlgang, sonst ein zweiter mit der höchsten Stimmenzahl. Die Stadt macht das jetzt so, vereinfacht
+   (BM4b), und sagt es auf der Karte und im Stadtbuch (siehe Bedienung 2).
+6. **„Das Programm meint die Einkommensteuer des Bundes“ (klein).** In beiden Fenstern und in der Tabelle des Abschnitts „Haushalt“: „die
+   bundesweit geregelte Einkommensteuer (Aufkommen bei Bund, Ländern und Gemeinden)“.
+7. **„-0 Taler“, „; Es fehlt“, Zuzugszeile im Dorf (klein).** `zahl()` macht aus −0 eine 0 (für alle Zahlen der Oberfläche); „es fehlt keine“
+   klein; die Zuzugszeile im Dorf sagt „freie Stellen im Laden, in Werkstätten und Tech-Firmen, im Bauhof oder im Rathaus“.
+8. **Abschnitt „Schule“ veraltet, „vorwiegend“ (klein).** Einleitung und Tabelle nachgezogen (Computer „wirkt“); Karte, SC14 und Einleitung
+   nennen die Vereinfachung (das Programm sagt „vorwiegend“ digitalfrei, die Stadt gibt Kindern der Grundschule gar keine Computer).
+9. **BM6 und SC8 ungenau (klein).** BM6 mit dem Wortlaut von § 51 Abs. 2 Satz 2 SächsGemO (Verwaltungsverband oder, „ohne erfüllende Gemeinde zu
+   sein“, Verwaltungsgemeinschaft; nachgelesen); SC8 „je Klasse“ statt „je Eingangsklasse“ (nach der Gegenprüfung, die die KMK-Quelle gelesen hat).
+10. **Personenkarte des Bürgermeisters (klein).** Die Zeile „Heute“ nennt die Amtszeit nicht mehr (sie steht in der Zeile darüber). Das Ziel
+    „besserer Job“ steht weiter da (die Simulation zählt es weiter), mit dem Zusatz „im Amt kein Stellenwechsel, es zählt nur ein höherer Lohn
+    im Rathaus“: „ruht“ wäre falsch, denn die Frist des Ziels läuft weiter.
+11. **Teil 5 weicht von Noahs Wortlaut (d) ab (klein).** Im Abschnitt „Tech-Firmen früher und mehr“ jetzt als Abweichung markiert, mit Grund
+    (keine Subvention, S. 164).
+12. **Zahlen der Schulen nicht belegt (klein).** Nachgelesen im PDF der Ausgabe 2025 (S. 108 f.): 15 und 13 Kinder je Lehrkraft (D2.2), 21 und 23
+    je Klasse (D2.3: „In Deutschland entsprach die Klassengröße im Primarbereich und im Sekundarbereich I dem OECD-Durchschnitt“ von 21 und 23).
+    Zahlen und Formel bleiben (SC4 mit den Zitaten).
+
+### Bedienung
+
+1. **Tagebuch: immer „klappte nicht“ (mittel).** Nachgeprüft: `tagebuchEintrag` speicherte eine Kopie, `kiEntscheidung` setzte `geklappt` auf
+   das Vorbild (so schon in 31ce452). Jetzt gibt `tagebuchEintrag` den gespeicherten Eintrag zurück. `simtest --kitest` prüft jede Antwort
+   (gespeichert = ausgeführt; Seeds 1–3: 425 bis 517 geklappt, 0 falsch), `tests/befunde_v9.cjs` die Karte nach „freinehmen“.
+2. **Nur ein Wahlgang (klein).** Siehe Texte 5: Hat niemand mehr als die Hälfte, heißt es im Stadtbuch „mit … Stimmen im zweiten Wahlgang“.
+3. **Leiste bei 1280 × 800: 6. Zeile abgeschnitten (klein).** `#haupt-liste` ist jetzt `max-height: clamp(34svh, 292px, 40svh)`: 6 Zeilen passen
+   bei 1280 × 800 und 1366 × 768 ohne Scrollen (gemessen: 286 und 287 px Inhalt), das Stadtbuch darunter bleibt 321 und 287 px hoch.
+4. **Gesperrter Knopf ohne Grund (klein).** „Auch nach der Amtszeit Hauptfigur“ nennt jetzt denselben Grund wie „Zur Hauptfigur machen“.
+5. **Fokus nach dem Fenster „Haushalt“ aus der Rathaus-Karte (klein).** Ein Fenster, das ein Knopf der Hauskarte geöffnet hat, gibt den Fokus beim
+   Schließen an diesen Knopf zurück (gesucht beim Schließen, weil sich die Karte stündlich neu zeichnet); ebenso „Stadtregierung“.
+6. **„; Es fehlt“ (klein).** Wie Texte 7.
+7. **Stadtbuch bricht nach „(“ um (klein).** `buchHtml` hält eine öffnende Klammer vor einem Namen und eine schließende danach mit dem Namen
+   zusammen (`span.zusammen`), für alle Zeilen.
+8. **Meldung nach „Stadt übernehmen“ zu lang (klein).** Die Meldung nennt jetzt nur Stichworte („Deine Stadt ist übernommen: Tag 420, 2.186
+   Einwohner. Neu: Rathaus mit Bürgermeister, Schulen, Haushalt, mehr Tech-Firmen. Mehr im Stadtbuch und im Fenster „Stadtregierung“.“, 173
+   Zeichen; aus Version 2 335), Einzelheiten stehen im Versionsdialog und in den Zeilen der Übernahme im Stadtbuch. Jede Meldung
+   steht jetzt so lange, wie man sie lesen kann: 50 ms je Zeichen, mindestens 8, höchstens 15 Sekunden.
+9. **„Während du weg warst“ ohne die erste Wahl (klein).** Ein Wechsel im Amt (erste Wahl, neue Person, Amtsende) wiegt dort jetzt 8 wie eine
+   Pleite, eine Wiederwahl weiter 6. `tests/befunde_v9.cjs`: Übernahme von `basis_v8.json` nach 40 Tagen Abwesenheit, die Übersicht nennt die Wahl.
+10. **Leertaste auf einem Tempo-Knopf per Tastatur (klein).** Auf einem Tempo-Knopf ist die Leertaste jetzt immer Pause und weiter, wie die Hilfe
+    sagt (vorher nur nach einem Mausklick; so auch in 31ce452); Enter drückt den Knopf. Den Klick, den der Browser beim Loslassen auslöst,
+    verhindert `preventDefault` auf keydown und keyup.
+11. **Frage an Noah: Kasse wächst bei 0 % weiter (klein).** Das Fenster „Haushalt“ sagt bei 0 % jetzt „Die Lohnsteuer ist bei 0 %. Mehr gibt die
+    Stadt nach ihren Regeln nicht zurück; was die Vorhaben nicht brauchen, bleibt in der Kasse.“ Ob es danach eine weitere Stufe geben soll, ist
+    eine offene Frage an Noah (unten).
+
+Dazu gefunden und behoben (neue Fälle durch den genaueren Zuzug): `simtest --techfrueh` C meldete auf Seed 1 den Weltmarkt über seiner Grenze
+(Tag 603: 108 Stellen, ein Arbeitstag 111 Taler statt mindestens 113). Ursache (schon in Teil 5, vorher nur nicht getroffen): Wer ein leeres
+Haus übernimmt, dessen Anbau noch läuft, belegte im Markt nur die Stellen der Stufe, die nächtliche Zählung aber die des Anbaus. Jetzt rechnen
+Prüfung und Buchung mit ihnen (`techPlaetzeNeu`, nur mit `TECH_FRUEH`; mit 0 wie Version 8). Und der erzwungene Fall „AUTO_MAX bei Übernahme“
+in `simtest --autos` hing vom Markt des Tages ab; er stellt den Markt jetzt wie die 40-%-Grenze beiseite (die Prüfung selbst ist gleich).
+
+### Gemessen (Endstand)
+
+Messskript `v9/t6/mess/tm2.mjs` (Gates 1–7 wie `simtest --gate`, 730 Tage stündlich, dazu Wirkung), Auswertung `aw2.py`, Logs in
+`v9/t7/mess/erg/` (`end` = Endstand, `endS` = „schnell“, `orig` = 31ce452, `fin`/`finS` = vor der Schlussprüfung, aus `v9/t6/mess/erg2`).
+
+| Seeds 1–80 | 31ce452 | vor der Schlussprüfung | **Endstand** | vor der Schlussprüfung, „schnell“ | **Endstand, „schnell“** |
+|---|---|---|---|---|---|
+| Gates 1–7 bestanden | 78 von 80 (Gate 4: 47, 54) | 80 von 80 | **79 von 80** (Gate 4: 79) | 79 von 80 (Gate 4: 27) | **80 von 80** |
+| Band Gate 4 Ø / Median / max | 1,077 / 1,071 / 1,165 | 1,066 / 1,065 / 1,147 | 1,063 / 1,058 / 1,176 | 1,077 / 1,074 / 1,162 | 1,077 / 1,075 / 1,144 |
+| Einwohner Tag 30 / 60 / 120 | 13,2 / 29,8 / 87,8 | 28,6 / 56,8 / 174,6 | 28,6 / 56,8 / 174,6 | 30,7 / 67,2 / 227,1 | 30,7 / 67,8 / 227,7 |
+| Einwohner Tag 180 / 365 / 730 | 172 / 917 / 1.187 | 332 / 1.262 / 1.489 | 332 / 1.260 / 1.466 | 491 / 1.377 / 1.502 | 492 / 1.360 / 1.450 |
+| Kasse Tag 120 / 365 / 730 (Taler) | 95.296 / 1.249.776 / 3.289.340 | 94.487 / 1.025.467 / 967.898 | 94.487 / 1.022.118 / 951.061 | 104.895 / 1.173.433 / 792.724 | 105.200 / 1.172.087 / 744.800 |
+| kleinstes Budget Ø / min | 6.615 / 5.645 | 2.960 / 1.710 | 2.960 / 1.710 | 2.827 / 1.576 | 2.843 / 1.576 |
+| Lohnsteuer: erste Senkung / 0 % (Median, Tag); Satz Tag 730 | – (10 %) | 80 / 170; 0 % | 80 / 170; 0 % | 80 / 170; 0 % | 80 / 170; 0 % |
+| Vorhaben bis Tag 730: Wohnungen / Rathaus / Parks; Computer der Schulen (Taler) | – | 9.180 / 15.200 / 10.080; 129.872 | 9.090 / 15.200 / 10.125; 129.020 | 12.390 / 15.200 / 10.001; 145.584 | 11.610 / 15.200 / 9.990; 143.520 |
+| Schulen offen Tag 730; Bürgermeisterwahlen | – | 4,4; 11,0 | 4,2; 11,0 | 4,5; 11,0 | 4,4; 11,0 |
+| Zuzüge / Wegzüge / Geburten | 1.119 / 64 / 540 | 1.391 / 84 / 788 | 1.368 / 81 / 782 | 1.413 / 66 / 865 | 1.369 / 62 / 849 |
+| arbeitslos Tag 730 | 4,4 % | 4,7 % | 4,7 % | 5,1 % | 5,2 % |
+| erste Tech-Gründung / Campus / Hochhaus / Autowerk in Betrieb (Median, Tag) | 136 / 350 / 470 / 500 | 56 / 279 / 411 / 269 | 56 / 279 / 419 / 269 | 53 / 380 / 470 / 253 | 53 / 348 / 461 / 253 |
+
+- **Gate 4 im Endstand auf Seed 79** (Band 1,176): Dort eröffnet zwischen Tag 610 und 640 ein Autowerk (freie Stellen 199 → 509), und die
+  Welle fällt in das Messfenster (Tag 551–730); vorher kam sie an Tag 510 bis 530, also davor. Auf den Seeds 81–160 bestehen beide Stände alle
+  Gates (Endstand: Band Ø 1,065, max 1,131; vorher max 1,146). Zusammen 159 von 160 gegen 160 von 160; mit „schnell“ fällt jetzt keiner mehr.
+  Das liegt im Rauschen der Zuzug-Regel (Placebo ±1 von 80, Tabelle unter „Bekannte Schwächen“); die Stadt schießt nicht über und schrumpft
+  nicht (schlimmster 30-Tage-Einbruch auf den Seeds 1–3: 2,8 / 3,3 / 3,1 %).
+- **R10 genau:** Seeds 1–10, 730 Tage: 13.771 Zuzüge, an keinem Tag mehr als freie Stellen ohne die Arbeitsuchenden der Stadt (vorher
+  13.887, davon 2.936 darüber; 31ce452 11.342, davon 2.135). Bis Tag 180 gleich (der Deckel greift erst in der großen Stadt), an Tag 730 im
+  Mittel 1,5 % weniger Einwohner.
+- **Gate T** (`simtest --gate`, Seeds 1–3, 365 Tage, Grenze 5.000 ms) auf dem ruhigen Rechner: 2.558 / 2.606 / 2.531 ms (zweiter Lauf 2.839 /
+  2.513 / 2.579), 31ce452 direkt danach 1.595 / 1.544 / 1.590 ms: **Faktor 1,6 bis 1,8, Abstand zur Grenze rund 2,2 Sekunden.** CPU-Zeit in
+  den Messläufen (4 Prozesse, mit Messcode): im Mittel 2.619 ms gegen 1.385 ms (31ce452), über 5.000 ms nur beim ersten Seed eines Prozesses
+  (höchstens 5.810 ms). Unter der Last von 4 Prozessen (`st_alle.sh`) lag T in `simtest --gate` auf Seed 1 zweimal über der Grenze (5.493 und
+  5.153 ms) und im letzten Lauf knapp darunter (4.573 / 2.531 / 2.515 ms): Auf einem langsameren oder belasteten Rechner kann Gate T fallen
+  (Bekannte Schwächen).
+- **Wahl nach Gruppen** (`simtest --buergermeister` 6, nur gemessen): Auf den Seeds 1–10 war im Endstand keine der 110 Wahlen (29 ohne
+  Amtsinhaber) für jemanden mit einem Nachnamen Kaya bis Kowalski (12,1 % der Wählbaren, 12,0 % des Losgewichts, 10,0 % der Herausforderer).
+  Keine Regel liest Namen (statische Prüfung, Namenstausch bitgleich); auf den Seeds 11–50 (`--gruppenSeeds`, 440 Wahlen, 131 ohne
+  Amtsinhaber) sind es 12,0 % der Wählbaren, 12,1 % des Losgewichts, 13,8 % der Herausforderer, 13,4 % der Gewählten (59) und 12,2 % der
+  Gewählten ohne Amtsinhaber (16). Die Null auf den Seeds 1–10 ist Zufall bei wenigen offenen Wahlen. Frauen und Männer dort je 50,0 % der
+  Gewählten; in der Stadt Geborene 14,8 % bei 18,4 % der Wählbaren (sie sind jünger: 18–29 Jährige werden seltener gewählt, 10,2 % bei 20,7 %).
+- **Draw Calls, Handy, Bilder:** `tests/blick.cjs` (letztes Bild, 23 Uhr): Teststadt Tag 400 (1.278 Einwohner, Kasse 1.180.181 Taler,
+  Satz 0 %) 31 Draw Calls (Handy 29), wie vorher; große Stadt (`umland=300000`, Tag 750, 7.156 Einwohner) 32 (Handy 30). `tests/rathaus.cjs`:
+  Tag 1 / 200 / 400 22 / 28 / 28 gegen 20 / 28 / 28 in 31ce452; `tests/techfrueh.cjs` (Seed 1, Tag 420, 11 Uhr) 29 gegen 26, 32 gegen 30 Meshes;
+  `tests/schule.cjs` 29 gegen 27. Nie mehr als 32. Kennzahlen am Handy (`tests/kennzahlen_hoehe.cjs`): in allen sechs Größen gleich wie 31ce452
+  (400 × 820: 231 px beide). Bilder `v9/bau/nachher/` und `v9/bau/gross/` neu, selbst angesehen (Tag, Nacht, Straße, Handy: Leiste mit dem
+  Bürgermeister zuerst, Pause gedrückt, alle fünf Tempo-Knöpfe in einer Reihe); dazu `tests/bilder_befunde/v9_*.png` (Leiste bei 1280 × 800 mit
+  6 Zeilen, Karte des Bürgermeisters, Fenster „Haushalt“, „Während du weg warst“ nach einer Übernahme am Handy).
+
+### Speicherformat
+
+Unverändert Version 9, keine neuen Felder. `jsonPruefen` ist strenger: Noahs Liste der Hauptfiguren hat höchstens `R.HAUPT_MAX` (10)
+Einträge (vorher konnte sie mit dem Bürgermeister 11 haben; einen solchen Stand gab es nur in Tests). `R.ZUZUG_GENAU` ist eine Regel, kein
+Feld des Spielstands. Speichern und Laden bleibt bitgleich (`simtest --speichertest`: 60 Tage `ca60551e5b316d33` / `ca60551e5b316d33`), die
+Übernahme von Version 8 und über die Kette von Version 2 bis 7 läuft wie vorher (`simtest --migrationstest`, `--rathaus`, `--schule`,
+`--haushalt`, `--wachstum`, `--techfrueh`; `tests/p6migration.cjs`). `tests/basis_v9.json` ist per Übernahme neu erzeugt (`tests/basis_v9.cjs`)
+und bis auf die Uhrzeit (`zuletztGelaufen`) gleich wie vorher.
+
+### Tests
+
+- **`simtest`, alle 20 Modi** (auf dem Endstand, Logs `v9/t7/st/`): grün (u. a. `--kitest` 54 ok, `--buergermeister` 28, `--rathaus` 74,
+  `--schule` 48, `--haushalt` 31, `--wachstum` 29, `--techfrueh` 26, `--migrationstest` 324, `--regierung` 155, `--autos` 21). Neu oder erweitert: `--kitest` (Tagebuch „geklappt“ im
+  gespeicherten Eintrag; nicht gesendete Anfrage sofort entschieden und „zu spät“; Neutralität der Amtsperson: 8 Sätze, Entscheidung mit Partei
+  verworfen, Anweisung), `--buergermeister` (Grenze der Hauptfiguren samt Amtsende bei voller Liste, `hauptListeZahl` jede Nacht, zweiter
+  Wahlgang im Stadtbuch genau dann, wenn niemand mehr als die Hälfte hat; `--gruppenSeeds` für die Messung), `--wachstum` C (an keinem Tag mehr
+  Zuzüge als freie Stellen ohne die Arbeitsuchenden der Stadt), F (Nachbau mit sofortigem Verwerfen), `--techfrueh` C (Übernahme mit offenem
+  Anbau: Markt mit den Stellen des Anbaus; auf den Seeds 1–3 einmal), `--autos` (erzwungener Fall ohne Markt). Vergleiche mit älteren Fassungen
+  schalten `R.ZUZUG_GENAU` mit den übrigen Bausteinen von Version 9 aus und setzen zwei Wortlaute gleich (zweiter Wahlgang, Zuzugszeile im
+  Dorf; `textAlt`). Keine Prüfung ist abgeschwächt.
+- **`simtest --gate`** (Seeds 1–3, ruhiger Rechner): bestanden, T 2.558 / 2.606 / 2.531 ms. `--speichertest`: bitgleich (`ca60551e5b316d33`).
+- **Browser** (`tests/alle.sh`, Server auf 8715, KI-Nachbau auf 11434): p3test 12, p5neu 10, p6migration 39, p7figuren 6, p8tech 15, raute_klick 8,
+  ereignis 21, t1_xss 5, p4test 29, s2karten 22, kita 22, befunde_s2 27, erweiterung 20, sicherheit 12, militaer 16, autos 9, autos_bild 20,
+  rathaus 15, schule 8, haushalt 18, wachstum 29, techfrueh 17, **befunde_v9 20 (neu)**; otest befunde 21, handy 11, breit 12, tastatur 4,
+  breiten 20, hilfehoehe 1; alle ohne Fehler, Konsole leer (bis auf die gewollten Verbindungsfehler zum KI-Nachbau).
+- **Nachgezogen** (neuer Verlauf, keine Prüfung schwächer): `tests/ereignis.cjs` (Momente der Teststadt neu gesucht: Seed 4, Tag 423, 457, 460,
+  474), `tests/p6migration.cjs` und `tests/befunde_s2.cjs` (die Meldung nach einer Übernahme nennt Stichworte statt ganzer Sätze; geprüft wird
+  jetzt dazu ihre Länge, und die Übergangsfrist der Kitas im Stadtbuch), `tests/alle.sh` (+ befunde_v9).
+- **`tests/befunde_v9.cjs`** (neu): Leiste mit 6 Zeilen ohne Scrollen bei 1280 × 800 und 1366 × 768, Stadtbuch ohne Umbruch nach „(“, Karte des
+  Bürgermeisters (Amtszeit einmal, gesperrter Knopf mit Grund, Ziel im Amt), Tastatur am Tempo (Tab, Enter, Leertaste), keine neue Liste je Bild
+  für die KI-Frist, Fokus zurück in die Rathaus-Karte (Haushalt, Stadtregierung), Texte der Fenster „Haushalt“ und „Stadtregierung“, Tagebuch
+  nach „freinehmen“ ohne „klappte nicht“, Übernahme von Version 8 nach 40 Tagen Abwesenheit am Handy (Meldung 173 Zeichen, „Während du weg
+  warst“ mit der ersten Wahl).
+- **Zitate:** `zitatpruef.py` und `zitate_genau.py` über alle gesammelten Zitate beider Fenster (Stadtregierung 304, Haushalt 23): alle
+  Programmzitate genau auf ihrer Seite; die gemeldeten Abweichungen sind dieselben wie vorher (Stichworte und Namen von Fenstern in „…“ ohne Seite,
+  „Wachstum: schnell“ neben S. 113, „S. 164 f.“ über zwei Seiten, „Stadtregierung“ und „Keine Zahl“ neben S. 37). Neu ist nur „Steuersparmodelle“
+  (S. 56, genau) und „vorwiegend“ (S. 160, genau). Nichts ist dem Programm neu zugeschrieben.
+
+### Bekannte Schwächen und offene Fragen (Schlussprüfung)
+
+- **Rechenzeit:** Gate T hält auf diesem Rechner mit rund 2,2 Sekunden Abstand, braucht aber das 1,6- bis 1,8-Fache von 31ce452 (vor allem die
+  größere Stadt; ein einzelner teurer neuer Baustein ist im Profil nicht zu sehen). Unter Last oder auf einem langsameren Rechner kann Gate T
+  fallen (hier unter der Last von 4 Prozessen einmal 5,2 und 5,5 Sekunden).
+- **Gate 4 fällt im Standard „normal“ auf einem von 80 Seeds** (Seed 79, 1,176; oben). Auf 160 Seeds 159, 31ce452 78 von 80.
+- **Die Wahl ist vereinfacht:** ein Ergebnis für beide Wahlgänge, Gleichstand zugunsten des Amtsinhabers (in Sachsen entscheidet das Los), und
+  wer im ersten Wahlgang mehr als die Hälfte hat, ist gewählt, auch mit wenigen Wählern (Tag 0: 10 Erwachsene).
+- **Gruppenmessung der Wahl:** Auf den Seeds 1–10 wurde niemand mit einem Nachnamen Kaya bis Kowalski gewählt (oben, mit der größeren Messung).
+- **Neutralität der Amtsperson ist eine Wortliste:** `amtFrei` verwirft auch harmlose Sätze („Deutschland“, „Kultur“, „die Grünen“ als Wiese);
+  dann entscheidet das normale Gehirn, im Gespräch steht der Grund. Ein Modell, das Parteien umschreibt, erkennt die Liste nicht.
+- **Offene Frage an Noah (Haushalt):** Bei 0 % Lohnsteuer wächst die Kasse weiter (Tag 730 im Mittel 0,95 Mio. Taler; Seed 2 an Tag 400 1,18 Mio.,
+  davon 1,11 Mio. nicht verplant); die Vorhaben brauchen nur einen Teil (bis Tag 730 zusammen rund 34.000 Taler, dazu 129.000 für Computer der Schulen). Soll es
+  danach eine weitere Stufe geben, etwa mehr Vorhaben oder etwas, das die Stadt den Leuten direkt gibt?
+- **Nicht geprüft:** echte Grafikhardware, echte Handys, ein echtes Sprachmodell (auch nicht für die Neutralität der Amtsperson), Seeds über 160.
+
 ## Aufbau
 
 - `stadt.html` enthält den Block `<script id="sim">`: reine Simulation, kein DOM, kein `window`, kein `fetch`,
@@ -2998,7 +5215,16 @@ die erste Kraft, die noch keine Hauptfigur ist, in `autos.cjs` das Werk steil vo
   `erweiterungInfo`, `stadtteilZaehlen`, `teilVon`, `teilName`, `sicherheitInfo`, `polizeiEinsatz`, `imHof`, `hofZeiten`, `abteilung`,
   `bundInfo`, `dienstWahl` und `verpflichtet` lesen nur. Version 8: `mitAuto`, `pendeltMitAuto`, `ortZurStunde`, `arbeitsOrtHeute`,
   `autoOrt`, `autoWegMin`, `testfahrer`, `testfahrtStunde`, `autoFirmaVon`, `autoName`, `autoInfo`, `autoKennzahlen`, `techPlaetzeVon` und
-  `werkeZahl` lesen nur; `mitAuto` ist die einzige Entscheidung übers Fahren, auch für die Darstellung (sie fragt `autoOrt`, `mitAuto` und
+  `werkeZahl` lesen nur. Version 9: `rathausInfo`, `haushaltKurz`, `bmInfo`, `bmAnfrage`, `istBm`, `hauptListe`, `hauptZahl`, `inHauptListe`,
+  `vorhabenRangfolge`, `vorhabenRegel` und `haushaltsJahr` lesen nur; Teil 2: `schuleInfo`, `schulOrt`, `kindOrt`, `kindWohnung`, `klasseVon` und
+  `schulITBedarf` lesen nur, `schulITBestellen` ist die Schnittstelle zum Haushalt (das Vorhaben „Computer für die Schulen“ ruft sie, die
+  Oberfläche nicht), `StadtSim._schule` ist nur für `tools/simtest.mjs --schule` da; Teil 3: `haushaltInfo` und `steuerSatz` lesen nur, `HK`,
+  `HK_ZAHL`, `HK_EIN`, `HK_PFLICHT` und `HK_BAU` beschreiben die Konten, `StadtSim._hh` ist nur für `tools/simtest.mjs --haushalt` da; Teil 4:
+  `wachstumSetzen` ist Noahs Schalter „Wachstum“ (Einstellungen), `wachstumInfo` liest nur, `kiSchalten(S, an, stunden)` meldet dazu die Frist der
+  KI in Spielstunden, `StadtSim._wachstum` ist nur für `tools/simtest.mjs --wachstum` da; Teil 5: `techInfo` liest nur (Fenster „Stadtregierung“),
+  `GF_TECH9` nennt die neuen Gebäudefelder, `StadtSim._tech9` ist nur für `tools/simtest.mjs --techfrueh` da; `bmRangfolge` nimmt die Antwort des Sprachmodells zur Rangfolge der
+  Vorhaben an (wie `kiEntscheidung`); `StadtSim._rathaus` und `StadtSim._bm` sind nur für `tools/simtest.mjs --rathaus` und
+  `--buergermeister` da. `mitAuto` ist die einzige Entscheidung übers Fahren, auch für die Darstellung (sie fragt `autoOrt`, `mitAuto` und
   `testfahrtStunde` jede Stunde und merkt sich nur, wo sie jedes Auto gezeichnet hat; im Spielstand steht davon nichts). `StadtSim._auto` (Kauf, Nacht der
   Autos, Erbe, Geldnot, Werk, Übernahme gezielt auslösen) ist nur für `tools/simtest.mjs --autos` da.
   `StadtSim._sich` (Urteil, Haftantritt, Haftende, Tat, Obhut, Stellen des Landes gezielt auslösen) ist nur für `tools/simtest.mjs --sicherheit`
@@ -3020,7 +5246,8 @@ node tools/simtest.mjs --gate                  # Phase-0-Gate: Seeds 1, 2, 3, je
 node tools/simtest.mjs --gate --seeds 4,5,6    # dasselbe mit anderen Seeds
 node tools/simtest.mjs --speichertest          # Speichern/Laden mitten am Tag: läuft danach bitgleich weiter?
 node tools/simtest.mjs --aufholtest            # 90 Tage stündlich gegen 90 Tagesschritte
-node tools/simtest.mjs --kitest                # Hauptfiguren: erlaubte Aktionen, Anfragen, Fristen, Tagebuch, Nachfolge
+node tools/simtest.mjs --kitest                # Hauptfiguren: erlaubte Aktionen, Anfragen, Fristen, Tagebuch, Nachfolge; seit der Schlussprüfung
+                                               #   von Version 9 auch „geklappt“ im Tagebuch, nicht gesendete Anfrage, Neutralität der Amtsperson
 node tools/simtest.mjs --bau                   # Bauhof: Einteilung um 7, Fortschritt je Person, jede Baustelle wird fertig
 node tools/simtest.mjs --waren                 # Kisten: geliefert ≤ gemacht, Werkstatt-Einnahmen wie vorher
 node tools/simtest.mjs --tech                  # Tech-Firmen: Arbeitstage je Version, Käufe im Laden, Anbau (Seeds 1–3, 730 Tage)
@@ -3058,6 +5285,37 @@ node tools/simtest.mjs --autos                 # Tech-Firmen und Autos (Version 
                                                #   (erzwungen ausverkauft), Erbe, Geldnot, Haft, AUTO_MAX bei Übernahme, Speichern mitten
                                                #   im Werksbau, beschädigte Stände, Messung (Seeds 1–3; --seeds 1,2); Grundregel wie im Bild
                                                #   über --regelseeds (1–12), faire Reihenfolge über --reiheseeds (2,4), ruhende Stellen
+node tools/simtest.mjs --rathaus --git <repo>  # Rathaus (Version 9): statisch (kein Zufall, keine Personen, Budget nur in rathausBezahlen),
+                                               #   Invarianten jede Nacht mit Gegenrechnung der Löhne (Seeds 1–3, 730 Tage), Speichern im
+                                               #   Ausbau, Aufholen, Übernahme aus Version 8 bis 2 (nur Brache und höchstens ein Park),
+                                               #   Park weicht (erzwungen), beschädigte Stände, Namenstausch, mit R.RATHAUS = 0 wie Version 8
+node tools/simtest.mjs --buergermeister        # Bürgermeister (Version 9): statisch (Wahl liest keine Namen, keine Herkunft, keinen Einzugstag,
+                                               #   keine Eltern, kein Geschlecht), Namenstausch, Invarianten jede Nacht, erzwungen: Tod, Haft,
+                                               #   Wegzug, eigener Platz (auch Amtsende bei voller Liste), Abwahl, Wählbarkeit, zweiter Wahlgang;
+                                               #   Rangfolge der Vorhaben mit Testvorhaben; Speichern, beschädigte Stände; Messung nach Gruppen
+                                               #   (nur gemessen; --gruppenSeeds 11,12,… für andere Seeds)
+node tools/simtest.mjs --schule --git <repo>   # Schule (Version 9, Teil 2): statisch (Regeln lesen nur Alter, Wohnung, Obhut, Schulplatz; kein
+                                               #   Zufall; Budget nur für Bau, Sachaufwand und Computer), Invarianten jede Nacht (Plätze direkt
+                                               #   nach der Vergabe, Lehrkräfte, Geld, Lebenslauf, Bau erst ab einer Klasse, Kita, Dienst, Haft,
+                                               #   Autos, Grundregel Stunde für Stunde), Computer (Schnittstelle, erzwungen), Speichern,
+                                               #   beschädigte Stände, Übernahme aus Version 8 bis 2, Namenstausch, ausgeschaltet, Gruppen
+node tools/simtest.mjs --haushalt --git <repo> # Haushalt (Version 9, Teil 3): statisch (liest keine Personen, kein Zufall; jede Änderung des
+                                               #   Budgets bucht in derselben Zeile; Lohnsteuer mit dem Satz des Haushalts; kein Vorhaben baut
+                                               #   Schulen), jede Stunde Konten = Budget, jede Nacht Vorhaben (Bedarf, Rücklage, Bauhof, Vorrang,
+                                               #   Vorrat), Jahresabschluss mit Plan und Lohnsteuer nachgerechnet; Rangfolge (KI) und Vorrang
+                                               #   erzwungen; Lohnsteuer erzwungen; Speichern; Übernahme aus Version 8 bis 2; beschädigte Stände;
+                                               #   ausgeschaltet; Namenstausch
+node tools/simtest.mjs --wachstum              # Wachstum, Tempo und KI (Version 9, Teil 4): statisch (würfelt nicht, liest keine Person, Karte R10
+                                               #   passt zu R), ohne Anlauf wie Version 8 (mit --alt <datei> wie die Fassung davor), Anlauf je
+                                               #   Nacht (Stelle nach der Regel, Grenze, nie mehr als die freien Stellen ohne Arbeitsuchende der
+                                               #   Stadt, Zählung ohne Kita- und Schulstellen, Anfragen), Schalter
+                                               #   (Stadtbuch, Speichern, Übernahme, beschädigte Stände, „schnell“ wirkt), KI-Frist (Klemmen,
+                                               #   Verlängern, späte Antwort, Rangfolge bis 23 Uhr), Kapazität der Warteschlange (nur gemessen)
+node tools/simtest.mjs --techfrueh --git <repo> # Tech-Firmen früher und mehr (Version 9, Teil 5): statisch (würfelt nicht, liest von Personen
+                                               #   nur Fleiß, Ehrgeiz, Geld, Wohnung; Karten passen zu R), ausgeschaltet wie 31ce452 (mit --alt
+                                               #   <datei> wie die Fassung davor), je Gründung (Stufe, Bremse, Preis, Markt), je Nacht (Zählungen,
+                                               #   Weltpreis, 40 % nur im Umland), Aufgabe ohne je eine Kraft, Computer der Schulen; Speichern,
+                                               #   beschädigte Stände, Übernahme von Version 8; Namenstausch; Gruppen (nur gemessen)
 ```
 
 Weitere Schalter für `--seed`: `--alle 60` (Zeilenabstand), `--fluss` (Zu-/Wegzüge, Geburten, Tode je Zeile),
@@ -3083,7 +5341,7 @@ stehen hier als Bericht, nachprüfbar im Repo ist nur `simtest`.
 | 8 | Wer Erspartes hat, gibt täglich bis 1 % davon (höchstens 15) zusätzlich aus, Sparsame weniger | Sonst sammelt sich das Geld bei den Leuten, und die Läden bekommen nichts ab |
 | 9 | Besitzer zahlen Lohn nach Charakter: wenig sparsam = großzügiger (90–110 % vom Grundlohn) | Gibt `job_wechseln` einen Grund |
 | 10 | Pleite-Betriebe stehen leer und können übernommen werden (40 % der Baukosten). Eine Übernahme zählt als Gründung | Die Spec sagt „Gebäude wird frei“ |
-| 11 | Zuzug: Als „freie Stellen“ zählen nur freie Stellen in Werkstätten und Tech-Firmen (nicht im Bauhof, nicht in Läden, seit Schritt 2 nicht in Kitas), abzüglich der Arbeitslosen der Stadt. Wer zuzieht, tritt sofort die nächste solche Stelle an; ist keine mehr frei, kommt an diesem Tag niemand mehr. Zuzügler sind 18–60 Jahre alt (bis zur Gate-4-Änderung 18–45). Höchstens 1 + 1 % der Einwohner pro Tag | **Weicht vom Wortlaut der Spec ab** („freie Stellen“); Noahs Entscheidung für Gate 4. Zählten Ladenstellen, holte jeder neue Laden Leute von außen, die wieder neue Läden brauchen: Ladenboom, danach Pleitewelle. Läden stellen deshalb nur Leute aus der Stadt ein. Mit 18–45 ging die erste Generation fast gleichzeitig in Rente. Arbeitslose abziehen: sonst ziehen Leute für Stellen zu, die Einheimische ohnehin gleich nehmen. Seit der Stadtregierung zählen Leute in gemeinnütziger Arbeit als arbeitslos, Eltern mit Betreuungsgehalt nicht, seit den Kitas auch Eltern nicht, die ohne Kita-Platz keine Stelle antreten können; die Stadtregierung weist die Regel als R10 aus (galt schon), dazu R09. Seit Teil 2 (Sicherheit) besetzt, wer zuzieht, zuerst offene Stellen des Landes (Wache, Anstalt; S-A19), seit Teil 3 danach die des Bundes (Kaserne, Dienststelle; B11) |
+| 11 | Zuzug: Als „freie Stellen“ zählen nur freie Stellen in Werkstätten und Tech-Firmen (nicht im Bauhof, nicht in Läden, seit Schritt 2 nicht in Kitas), abzüglich der Arbeitslosen der Stadt. Wer zuzieht, tritt sofort die nächste solche Stelle an; ist keine mehr frei, kommt an diesem Tag niemand mehr. Zuzügler sind 18–60 Jahre alt (bis zur Gate-4-Änderung 18–45). Höchstens 1 + 1 % der Einwohner pro Tag | **Weicht vom Wortlaut der Spec ab** („freie Stellen“); Noahs Entscheidung für Gate 4. Zählten Ladenstellen, holte jeder neue Laden Leute von außen, die wieder neue Läden brauchen: Ladenboom, danach Pleitewelle. Läden stellen deshalb nur Leute aus der Stadt ein. Mit 18–45 ging die erste Generation fast gleichzeitig in Rente. Arbeitslose abziehen: sonst ziehen Leute für Stellen zu, die Einheimische ohnehin gleich nehmen. Seit der Stadtregierung zählen Leute in gemeinnütziger Arbeit als arbeitslos, Eltern mit Betreuungsgehalt nicht, seit den Kitas auch Eltern nicht, die ohne Kita-Platz keine Stelle antreten können; die Stadtregierung weist die Regel als R10 aus (galt schon), dazu R09. Seit Teil 2 (Sicherheit) besetzt, wer zuzieht, zuerst offene Stellen des Landes (Wache, Anstalt; S-A19), seit Teil 3 danach die des Bundes (Kaserne, Dienststelle; B11). Seit Version 9 zählen auch freie Stellen im Rathaus, obwohl die Stadt sie selbst bezahlt (RA7: höchstens 0,47 % der Einwohner, kein Boom möglich; Abschnitt „Rathaus und Bürgermeister“), und seit Teil 2 die für Lehrkräfte an Schulen: Das Land besetzt sie nach Wache und Anstalt, vor dem Bund, auch mit Leuten, die dafür zuziehen (SC12, Abschnitt „Schule“). Seit Teil 4 (Wachstum) hilft bis 160 Einwohnern ein Anlauf: am Tag bis zu 2 mehr, die Grundzahl zählt im Dorf doppelt, in der Kleinstadt 1,5-fach, und im Dorf zählen auch freie Stellen im Laden und im Bauhof (W1 bis W3); Noahs Schalter „schnell“ erlaubt 1 + 3 % am Tag (W4). Beides ändert nur, wie viele an einem Tag kommen dürfen; wer zuzieht, kommt weiter nur für eine freie Stelle (Abschnitt „Wachstum, Tempo und KI“). Seit der Schlussprüfung von Version 9 kommen am Tag höchstens so viele, wie freie Stellen ohne die Arbeitslosen der Stadt da sind (`R.ZUZUG_GENAU`); vorher, auch in 31ce452, kamen an manchen Tagen mehr (über 730 Tage etwa jeder fünfte Zuzug) |
 | 12 | „Wohnungssuchende“ fürs Bauamt = Leute ohne Wohnung oder mit erfolgloser Suche **plus** Anfragen von außen (Leute, die wegen freier Stellen kämen, aber keine Wohnung finden) | Sonst baut das Bauamt nie vorausschauend, und der Zuzug stockt |
 | 13 | Zufriedenheit = 100 − gewichtetes Mittel 4. Grades der Dringlichkeiten. Das schlimmste Bedürfnis zählt am stärksten. Trauer −15, kein Einkauf −10. Der Zielwert wird alle 6 Spielstunden neu berechnet, die Zufriedenheit gleitet stündlich hin | Mit dem normalen Mittel fällt kaum jemand unter 20, dann zieht niemand weg |
 | 14 | Wohnen = Enge der Wohnung (Haushaltsgröße gegen Wohnungsgröße der Hausstufe) plus Park in der Nähe. Umziehen nur, wenn die neue Wohnung spürbar besser ist. Nach einer erfolglosen Suche 5 Tage Pause | Vorher zogen Haushalte zweimal am Tag hin und her, weil ein Umzug das Problem nicht löste |
@@ -3136,11 +5394,11 @@ stehen hier als Bericht, nachprüfbar im Repo ist nur `simtest`.
 | 61 | Theke und Träger sind nur zum Anschauen. Wer heute trägt, ergibt sich aus Tag und Laden (reihum), nicht aus Zufall. Der Lieferant ist die Werkstatt, die gestern die meisten Kisten brachte | Die Kisten werden um Mitternacht in einem Schritt verteilt; die Träger zeigen das tagsüber |
 | 62 | Die 120 Arbeitsplätze unter den Figuren werden um 8 Uhr nach Nähe zur Kamera vergeben (beim Öffnen mitten am Tag sofort) und bleiben bis zum nächsten Morgen | Alle Arbeitenden wären bei 5.000 Einwohnern über 2.000 Figuren. Fest statt kameraabhängig, damit keine Figur beim Drehen springt |
 | 63 | Stadtbuch: fertige Bauten eines Abends in einer Zeile („Der Bauhof hat fertig gebaut: …“), Stillstand, wenn auf einer Baustelle 5 Tage niemand war, und wenn der Bauhof-Lohn über 100, 110 oder 120 steigt | Mit Tech-Firmen kamen die neuen Versionen dazu (damals im Schnitt 0,48 Zeilen am Tag: auf 40 Seeds 5,50 Zeilen am Tag, 7 Seeds über 6,5, höchstens 8,60; das war vor der Zuzug-Regel). Heute gemessen (Seeds 1–80, 730 Tage): vor der Stadtregierung 4,11 Zeilen am Tag (höchstens 5,47), davon Bauhof 0,24 und Tech 0,50; mit der Stadtregierung 4,31 (höchstens 5,80), Bauhof 0,25, Tech 0,55. Die Stadtregierung schreibt selbst 3 Zeilen je Stadt (Tag 0 und die beiden Rentenstufen), den Rest macht die größere Stadt. Die Plan-Grenze von 6,5 Zeilen am Tag hält auf allen 160 Seeds |
-| 64 | Tech-Firma statt Werkstatt gründet, wer Fleiß + Ehrgeiz ≥ 120 hat, solange die Tech-Stellen danach höchstens 40 % der Umland-Stellen sind (Werkstätten plus Tech) und das Geld reicht (Bau 2.000 + Startkasse 300, leere Tech-Firma übernehmen 1.100). Fehlt ein Laden, wird wie bisher ein Laden gegründet. Ob es sich lohnt, prüft wie bei der Werkstatt der Umlandpreis; die Tech-Stellen zählen dort mit. Produkt: das in der Stadt seltenste. Firmenname aus 30 Marken (Seed-Zufall), Versionen heißen „Marke Nummer“ | Noahs Entscheidung: eine Betriebsart über die vorhandene Aktion, keine neue Aktion. Ohne Obergrenze würden Tech-Firmen die Werkstätten verdrängen (beide teilen sich das Umland). Gemessen (Seeds 1–80, Tag 730): vor der Stadtregierung 23,9 Gründungen je Stadt, Anteil an den Umland-Stellen im Mittel 25,0 % (höchstens 39 %); mit der Stadtregierung 27,4 und 29,3 % (höchstens 39,6 %), weil mehr Leute genug Erspartes haben. Seeds 1/2/3 (`--gate`): 29/46/21 gegründet, Anteil 33,8/33,8/23,4 % (vorher 17/26/26 und 21,6/27,5/25,1 %) |
+| 64 | Tech-Firma statt Werkstatt gründet, wer Fleiß + Ehrgeiz ≥ 120 hat, solange die Tech-Stellen danach höchstens 40 % der Umland-Stellen sind (Werkstätten plus Tech) und das Geld reicht (Bau 2.000 + Startkasse 300, leere Tech-Firma übernehmen 1.100). Fehlt ein Laden, wird wie bisher ein Laden gegründet. Ob es sich lohnt, prüft wie bei der Werkstatt der Umlandpreis; die Tech-Stellen zählen dort mit. Produkt: das in der Stadt seltenste. Firmenname aus 30 Marken (Seed-Zufall), Versionen heißen „Marke Nummer“ | Noahs Entscheidung: eine Betriebsart über die vorhandene Aktion, keine neue Aktion. Ohne Obergrenze würden Tech-Firmen die Werkstätten verdrängen (beide teilen sich das Umland). Gemessen (Seeds 1–80, Tag 730): vor der Stadtregierung 23,9 Gründungen je Stadt, Anteil an den Umland-Stellen im Mittel 25,0 % (höchstens 39 %); mit der Stadtregierung 27,4 und 29,3 % (höchstens 39,6 %), weil mehr Leute genug Erspartes haben. Seeds 1/2/3 (`--gate`): 29/46/21 gegründet, Anteil 33,8/33,8/23,4 % (vorher 17/26/26 und 21,6/27,5/25,1 %). **Seit Version 9, Teil 5:** Tech-Firmen erst ab der Kleinstadt, Tüftler sparen, statt eine Werkstatt zu gründen, Personalbremse bei 12 freien Tech-Stellen, 166⅔ Taler je Arbeitstag für jeden Bau (Gründung weiter 2.000), und wenn das Umland voll ist, verkauft eine neue Firma in die Welt; die 40 % gelten nur fürs Umland (T1 bis T9 im Abschnitt „Tech-Firmen früher und mehr“) |
 | 65 | Tech-Firma: 4 Stellen je Stufe, Lohn 105 (90–110 % je nach Sparsamkeit des Besitzers), laufende Kosten 45 am Tag. Einnahmen: anwesende Angestellte × Umlandpreis (derselbe Topf von 50.000 wie bei den Werkstätten) plus 80 % der Verkäufe in der Stadt | Das Umland als gemeinsame Grenze hält das Wachstum im Rahmen |
 | 66 | Käufe beim täglichen Einkauf: nur wer heute eingekauft hat und danach über 600 Taler hat. Erst ein Gerät (Fleißige ab 60 wollen einen Computer, alle anderen ein Handy; gibt es das nicht, das andere; nach 120 Tagen ein neues), mit Gerät alle 40 Tage Software, dazwischen mindestens 20 Tage. Preise 180 (Handy), 320 (Computer), 60 (Software). Chance am Tag 4 % × (1,3 − Sparsamkeit/100), doppelt so hoch, wenn die Version höchstens 15 Tage alt ist. 20 % behält der Laden, 80 % bekommt die Firma. Freizeit sofort +12 / +15 / +6, keine Dauerwirkung | Noahs Entscheidung „auch die Leute in der Stadt kaufen“, ohne neue Aktion. Im Entwurf hob eine Dauerwirkung am Abend die Zufriedenheit und damit den Zuzug; sie ist wieder raus |
 | 67 | Anbau: Läuft eine Tech-Firma gut (alle Stellen besetzt, 20 Tage in Folge Gewinn), gehen 50 % des Gewinns über dem Polster in eine Rücklage, bis der Anbau bezahlt ist (Stufe 2: 1.800, Stufe 3: 3.000). Den Auftrag an den Bauhof gibt sie erst, wenn das Umland Platz hat (dieselbe Grenze wie für eine neue Werkstatt) und mindestens 4 Leute Arbeit suchen. Der Bauhof baut 12 bzw. 16 Arbeitstage, danach 8 bzw. 12 Stellen. Schließt die Firma, bekommt der Besitzer die Rücklage | Noahs Entscheidung „Bauauftrag an den Bauhof“. Ohne die Umland-Grenze schuf jeder Anbau Stellen über das Gleichgewicht hinaus |
-| 68 | Echte Code-Stücke: eine Hauptfigur, die gerade (9–16 Uhr) in ihrer Tech-Firma arbeitet, schreibt höchstens einmal je Spieltag. Nicht bei 20×, nicht ohne Ollama, immer nur ein Aufruf gleichzeitig; die Stadt wartet nicht. Antwort `{"titel", "sprache", "code", "gedanke"}`; der Code wird gekürzt (höchstens 20 Zeilen zu 100 Zeichen, 1.500 Zeichen), nur als Text angezeigt und nie ausgeführt. Wer heute schon Code geschrieben hat, merkt sich die Seite nur bis zum Neuladen | Noahs Entscheidung „beides“. Der Code ist Ausdruck der Figur, er wirkt nicht auf die Simulation |
+| 68 | Echte Code-Stücke: eine Hauptfigur, die gerade (9–16 Uhr) in ihrer Tech-Firma arbeitet, schreibt höchstens einmal je Spieltag. Seit Version 9, Teil 4 bei jedem Tempo (vorher nicht bei 20×; **weicht vom Wortlaut der Spec ab**, Zeile 381, Noahs Auftrag), aber nur, wenn keine Anfrage wartet und die Antwort vor 17 Uhr fertig ist; nicht ohne Ollama, immer nur ein Aufruf gleichzeitig; die Stadt wartet nicht. Antwort `{"titel", "sprache", "code", "gedanke"}`; der Code wird gekürzt (höchstens 20 Zeilen zu 100 Zeichen, 1.500 Zeichen), nur als Text angezeigt und nie ausgeführt. Wer heute schon Code geschrieben hat, merkt sich die Seite nur bis zum Neuladen | Noahs Entscheidung „beides“. Der Code ist Ausdruck der Figur, er wirkt nicht auf die Simulation |
 | 69 | Stadtbuch: Gründung einer Tech-Firma (mit Fleiß und Ehrgeiz), alle neuen Versionen eines Tages in einer Zeile (erscheinen zwei vom selben Produkt am selben Tag, liegt nur die der ersten Firma im Regal; die andere steht als „am selben Tag fertig, aber nicht im Regal“ dabei), Bauaufträge für Anbauten, fertige Anbauten in der Fertig-Zeile des Bauhofs | Sonst füllten die Versionen das Stadtbuch |
 | 70 | Die Karte beginnt mit 56 × 56 Feldern und wächst ringsum um 4 Felder (einen Block), sobald eine Straße oder ein Gelände näher als 16 Felder am erlaubten Rand liegt (18 bis zum Rand der Karte, so nennen es Fenster und Stadtbuch), höchstens bis 256 × 256. Die Prüfung läuft vor jeder Straßenverlängerung, nach dem Bauamt, nach jedem Gelände und am Tagesende | Noahs Entscheidung „Karte wächst wirklich“. Die Werte sind so gewählt, dass man das Wachsen im normalen Spiel sieht (Seeds 1–3: 3-, 6- und 3-mal in 730 Tagen) und die Grenze nie eine Straße aufhält (Abschnitt „Stadt erweitern“). 256: Gebäude speichern ihre Lage als `Uint8` |
 | 71 | Stufen nach allen Einwohnern: Dorf, Kleinstadt ab 40, Stadt ab 160, Großstadt ab 800 = BBSR-Schwellen (5.000, 20.000, 100.000) geteilt durch 125; kein Abstieg | Spielmaßstab: Die Städte erreichen im Mittel gut 1.100 Einwohner, so kommt jede Stufe in den ersten 400 Tagen. Das BBSR zählt auch die zentralörtliche Funktion, die Stadt nicht. Kein Abstieg, weil die Einwohner um bis zu 15 % schwanken (Gate 4) |
@@ -3153,6 +5411,33 @@ stehen hier als Bericht, nachprüfbar im Repo ist nur `simtest`.
 | 78 | Ein Block (Wache, Dienststelle) findet auch Platz, wo eine Straße an der Rasterlinie zwischen zwei freien Blöcken endet: Suche im Rahmen von zwei Blöcken, das Tor auf der Rasterlinie an der Straßenspitze, belegt werden 3 × 3 Felder um das Tor. In einer Nacht baut zuerst das Land (Wache, dann Anstalt), dann der Bund (Kaserne, Dienststelle) | Befund B1 der Schlussprüfung. Vorher bestellte das Land nach einer Übernahme die Wache bis 18 Nächte später als Anstalt und Kaserne, auf Seed 3 wartete die Dienststelle 99 Nächte. Die Straße kann auf dieser Linie nicht weiterwachsen (wie bei den großen Geländen). Nebenwirkung (Nachprüfung, N1): Gibt es nach einer Übernahme nur zwei solche Stellen, wartet jetzt die Kaserne statt der Wache (Seed 2: 4 bis 67 Nächte, Seed 8 an Tag 200: 7). So entschieden, weil die Wache zur Stufe Kleinstadt gehört und in einer Stadt, die mit Version 7 wächst, immer vor Anstalt und Kaserne steht (Seeds 1–80: Wache im Mittel ab Tag 73, Kaserne offen ab Tag 191); Taten gibt es ab dem Übernahmetag. Die umgekehrte Reihenfolge verschiebt nur, wer wartet (offene Frage an Noah) |
 
 ## Bekannte Schwächen
+
+**Version 9, Schlussprüfung:** siehe „Bekannte Schwächen und offene Fragen (Schlussprüfung)“ im Abschnitt „Befunde der Schlussprüfung
+(Version 9)“: Gate T braucht das 1,6- bis 1,8-Fache von 31ce452 (hier rund 2,2 Sekunden Abstand zur Grenze), Gate 4 fällt mit dem genaueren
+Zuzug (R10) im Standard auf einem von 80 Seeds (Seed 79; 159 von 160), die Wahl ist vereinfacht (ein Ergebnis für beide Wahlgänge), die
+Neutralität der Amtsperson ist eine Wortliste, bei 0 % Lohnsteuer wächst die Kasse weiter (offene Frage an Noah).
+
+**Version 9, Teil 5 (Tech-Firmen früher und mehr):** siehe „Bekannte Schwächen (Teil 5)“ im Abschnitt „Tech-Firmen früher und mehr“: in den ersten
+Monaten weniger Einwohner als in Teil 4 (Tag 60 im Mittel 57 statt 73), früher im Median, aber nicht auf jedem Seed (Hochhaus auf der Hälfte der
+Seeds später als in Teil 4), mehr Tech-Pleiten und viel mehr Laden-Pleiten, viele kleine Firmen in der Welt, der Weltmarkt ist eine
+Spielannahme ohne Quelle.
+
+**Version 9, Teil 4 (Wachstum, Tempo und KI):** siehe „Bekannte Schwächen (Teil 4)“ im Abschnitt „Wachstum, Tempo und KI“: Gate 4 ist
+auf den Seeds 1–80 zum Teil abgestimmt (auf 81–160 fällt es einmal), früh mehr freie Stellen und mehr Pleiten ohne besetzte Stelle, die Kasse
+sinkt im zweiten Jahr, das Vorhaben „Wohnungen auf Vorrat“ baut kaum noch, 100× ist auf langsamen Rechnern kein echtes 100× (Figuren springen,
+in der großen Stadt springt ein Teil der Autos), die KI schafft bei 100× nur wenige Entscheidungen, die Rechenzeit steigt um etwa 10 %.
+
+**Version 9, Teil 3 (Haushalt):** siehe „Bekannte Schwächen (Teil 3)“ im Abschnitt „Haushalt“: In der Kasse bleibt Geld aus dem
+Wohnungsverkauf (Tag 730 im Mittel 0,83 Mio. Taler), ab etwa Tag 190 zahlt niemand mehr Lohnsteuer, der erste Ausbau des Rathauses kommt
+später, die Rechenzeit steigt um 27,5 % (größere Stadt), mit dem Anlauf aus „Wachstum“ ist das Band von Gate 4 breiter.
+
+**Version 9, Teil 2 (Schule):** siehe „Bekannte Schwächen (Teil 2)“ im Abschnitt „Schule“: bis zur ersten Schule (im Mittel Tag 277) und
+in kleinen Gruppen am Rand gehen Kinder im Nachbarort zur Schule, die Schulen sind selten voll, die Rechenzeit steigt um etwa 5 % (gegen
+Teil 1), Computer kauft erst der Haushalt (Teil 3).
+
+**Version 9, Teil 1 (Rathaus und Bürgermeister):** siehe „Bekannte Schwächen und offene Fragen (Teil 1)“ im Abschnitt „Rathaus und
+Bürgermeister“: enges Budget in den ersten Wochen, der Bürgermeister fehlt im Dorf als Arbeitskraft, alte Stände bekommen das Rathaus bis
+26 Felder von der Mitte.
 
 **Version 8 (Tech-Firmen und Autos):** siehe „Bekannte Schwächen (Version 8)“ im Abschnitt „Tech-Firmen und Autos“: weniger Pendler mit dem
 Auto als in Deutschland (43 % gegen 65 %), Gate 4 hängt am Geld der ersten Monate (ohne die Regel für Betriebssparer 74 von 80), leere Werke,
@@ -3177,8 +5462,23 @@ Seeds 1, 2 und 3 bei Faktor 1,09, 1,10 und 1,09 (vorher 1,30, 1,23 und 1,18: kei
 | dazu Mieterkauf und Renteneintritt (Schritt 2) | 78 von 80 | 1,074 | 1,07 | 0 | 1,19 |
 | dazu Kitas | 77 von 80 | 1,073 | 1,07 | 0 | 1,24 |
 | Kitas auf den Seeds 81–160 | 77 von 80 | 1,073 | 1,07 | 0 | 1,16 |
-| **nach der zweiten Gegenprüfung von Schritt 2 (heute)** | **77 von 80** | **1,077** | **1,07** | **0** | **1,155** |
+| nach der zweiten Gegenprüfung von Schritt 2 | 77 von 80 | 1,077 | 1,07 | 0 | 1,155 |
 | dasselbe auf den Seeds 81–160 | 77 von 80 | 1,075 | 1,07 | 0 | 1,19 |
+| 31ce452 (Version 8, gemessen in Version 9, Teil 4) | 78 von 80 | 1,077 | 1,07 | 0 | 1,165 |
+| Version 9, Teil 3 (Haushalt) | 77 von 80 | 1,073 | 1,07 | 0 | 1,21 |
+| Version 9, Teil 4 (Anlauf, ohne festen Vorrat) | 80 von 80 | 1,065 | 1,06 | 0 | 1,148 |
+| dasselbe auf den Seeds 81–160 | 79 von 80 | 1,079 | 1,075 | 0 | 1,155 |
+| Version 9, Teil 4 mit „Wachstum: schnell“ | 80 von 80 | 1,088 | 1,09 | 0 | 1,148 |
+| Version 9, Teil 5 (Tech-Firmen früher und mehr) | 80 von 80 | 1,066 | 1,065 | 0 | 1,147 |
+| dasselbe auf den Seeds 81–160 | 80 von 80 | 1,065 | 1,060 | 0 | 1,146 |
+| **Version 9 nach der Schlussprüfung (Zuzug genau nach R10; heute)** | **79 von 80** | **1,063** | **1,058** | **0** | **1,176** |
+| dasselbe auf den Seeds 81–160 | 80 von 80 | 1,065 | 1,060 | 0 | 1,131 |
+| dasselbe mit „Wachstum: schnell“ (Seeds 1–80) | 80 von 80 | 1,077 | 1,075 | 0 | 1,144 |
+
+Die Zeilen von „31ce452“ bis „Teil 4 mit schnell“ sind mit `v9/t5/mess/mess9w.mjs` gemessen, die letzten fünf mit `v9/t6/mess/tm2.mjs`
+(dieselben Gates, 730 Tage stündlich; Abschnitte „Wachstum, Tempo und KI“, „Tech-Firmen früher und mehr“ und „Befunde der Schlussprüfung
+(Version 9)“, jeweils „Gemessen“). Im Endstand fällt Gate 4 auf Seed 79, weil eine Werkseröffnung in das Messfenster rückt (Abschnitt
+„Befunde der Schlussprüfung (Version 9)“). Zwischen Schritt 2 und Teil 3 wurde die Tabelle nicht fortgeschrieben (die Messungen stehen in den Abschnitten der Teile).
 
 Mit der Stadtregierung fällt Gate 4 auf den Seeds 1–80 auf 19, 27 und 44 durch (vorher 19, 27, 37, 65), auf den Seeds 81–160
 auf 92, 103, 118 und 134 (vorher 87). Das liegt im Rauschen der Zuzug-Regel (das Placebo ändert 1 von 80): Jede Änderung an
