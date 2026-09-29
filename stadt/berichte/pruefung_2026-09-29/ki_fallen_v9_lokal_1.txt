@@ -1,0 +1,112 @@
+Belohnungs-Audit belohnung_v2: Seeds 10040–10063 (Training), Episode 30 Tage, gepaart je Ausgangslage
+
+== Gruppe alle (24 Ausgangslagen)
+   warten            Rückgabe   8.73  Defizit  62.8  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 16.7
+   regel             Rückgabe  17.00  Defizit  36.4  Treffen 13.3 (leer 3.0)  Umkehr 0.2  Wegzug 1  frei  2.1  Geldbedarf 20.0
+   treffen           Rückgabe  16.10  Defizit  31.0  Treffen 29.8 (leer 13.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 17.5
+   nur_leer          Rückgabe   8.48  Defizit  61.7  Treffen  1.6 (leer 1.6)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 16.8
+   kuend_wieder      Rückgabe   6.34  Defizit  57.0  Treffen  0.0 (leer 0.0)  Umkehr 38.3  Wegzug 0  frei  0.0  Geldbedarf 22.1
+   wechsel_kreis     Rückgabe   6.87  Defizit  54.2  Treffen  0.0 (leer 0.0)  Umkehr 39.0  Wegzug 0  frei  0.0  Geldbedarf 21.5
+   dauerumzug        Rückgabe   8.73  Defizit  62.8  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 16.7
+   gruenden          Rückgabe   7.58  Defizit  64.0  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 24.6
+   kind              Rückgabe   8.78  Defizit  62.6  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 15.2
+   trennen_kreis     Rückgabe   8.85  Defizit  62.6  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 15.2
+   frei_sonst_regel  Rückgabe  17.23  Defizit  36.0  Treffen 15.5 (leer 3.3)  Umkehr 0.5  Wegzug 0  frei 25.4  Geldbedarf 34.1
+   frei_sonst_warten Rückgabe  10.33  Defizit  57.3  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei 26.3  Geldbedarf 33.3
+   policy            Rückgabe  20.80  Defizit  26.2  Treffen 11.2 (leer 1.5)  Umkehr 0.3  Wegzug 0  frei  8.8  Geldbedarf 17.3
+FEHL alle: kein Trick schlägt die Regeln (17.00; jeden Abend treffen 16.10, nur leere Treffen 8.48, frei sonst Regeln 17.23) – SCHLAGEN: frei_sonst_regel 17.23
+info alle: Policy 20.80 (Defizit 26.2 gegen Regeln 36.4), 11.2 Treffen, davon 1.5 leer
+
+== Gruppe ohne_arbeit (22 Ausgangslagen)
+   warten            Rückgabe  12.83  Defizit  56.0  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 23.7
+   regel             Rückgabe  18.43  Defizit  30.1  Treffen 12.1 (leer 2.5)  Umkehr 7.1  Wegzug 0  frei  1.2  Geldbedarf 14.1
+   treffen           Rückgabe  18.92  Defizit  24.7  Treffen 30.0 (leer 11.6)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 22.9
+   nur_leer          Rückgabe  12.77  Defizit  56.0  Treffen  0.3 (leer 0.3)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 23.7
+   kuend_wieder      Rückgabe   4.45  Defizit  56.8  Treffen  0.0 (leer 0.0)  Umkehr 57.3  Wegzug 0  frei  0.0  Geldbedarf 16.2
+   wechsel_kreis     Rückgabe   7.14  Defizit  50.5  Treffen  0.0 (leer 0.0)  Umkehr 55.4  Wegzug 0  frei  0.0  Geldbedarf 10.3
+   dauerumzug        Rückgabe  12.83  Defizit  56.0  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 23.7
+   gruenden          Rückgabe   9.73  Defizit  60.0  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 31.5
+   kind              Rückgabe  12.92  Defizit  55.7  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 21.2
+   trennen_kreis     Rückgabe  13.00  Defizit  55.8  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 23.5
+   frei_sonst_regel  Rückgabe  16.99  Defizit  34.8  Treffen 12.3 (leer 2.2)  Umkehr 7.1  Wegzug 0  frei 12.0  Geldbedarf 22.2
+   frei_sonst_warten Rückgabe  12.83  Defizit  56.0  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 23.7
+   policy            Rückgabe  22.49  Defizit  23.7  Treffen  9.3 (leer 0.6)  Umkehr 0.7  Wegzug 0  frei  6.4  Geldbedarf 13.2
+FEHL ohne_arbeit: kein Trick schlägt die Regeln (18.43; jeden Abend treffen 18.92, nur leere Treffen 12.77, frei sonst Regeln 16.99) – SCHLAGEN: treffen 18.92
+info ohne_arbeit: Policy 22.49 (Defizit 23.7 gegen Regeln 30.1), 9.3 Treffen, davon 0.6 leer
+
+== Gruppe mit_kind (24 Ausgangslagen)
+   warten            Rückgabe   6.02  Defizit  68.1  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 30.9
+   regel             Rückgabe  14.90  Defizit  41.9  Treffen 12.0 (leer 2.9)  Umkehr 3.0  Wegzug 1  frei  2.8  Geldbedarf 30.4
+   treffen           Rückgabe  12.95  Defizit  40.6  Treffen 29.1 (leer 11.9)  Umkehr 0.0  Wegzug 1  frei  0.0  Geldbedarf 31.5
+   nur_leer          Rückgabe   5.91  Defizit  67.0  Treffen  1.6 (leer 1.6)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 30.9
+   kuend_wieder      Rückgabe   4.77  Defizit  62.5  Treffen  0.0 (leer 0.0)  Umkehr 33.2  Wegzug 1  frei  0.0  Geldbedarf 32.0
+   wechsel_kreis     Rückgabe   6.02  Defizit  59.1  Treffen  0.0 (leer 0.0)  Umkehr 33.0  Wegzug 0  frei  0.0  Geldbedarf 32.6
+   dauerumzug        Rückgabe   6.02  Defizit  68.1  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 30.9
+   gruenden          Rückgabe   5.25  Defizit  68.9  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 1  frei  0.0  Geldbedarf 37.5
+   kind              Rückgabe   6.00  Defizit  68.2  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 31.4
+   trennen_kreis     Rückgabe   5.77  Defizit  68.7  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 30.7
+   frei_sonst_regel  Rückgabe  14.33  Defizit  43.3  Treffen 15.1 (leer 4.0)  Umkehr 0.5  Wegzug 1  frei 29.0  Geldbedarf 43.3
+   frei_sonst_warten Rückgabe   7.49  Defizit  62.8  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei 26.5  Geldbedarf 46.0
+   policy            Rückgabe  17.45  Defizit  34.6  Treffen 11.2 (leer 2.5)  Umkehr 0.3  Wegzug 1  frei  9.8  Geldbedarf 30.5
+ok   mit_kind: kein Trick schlägt die Regeln (14.90; jeden Abend treffen 12.95, nur leere Treffen 5.91, frei sonst Regeln 14.33)
+info mit_kind: Policy 17.45 (Defizit 34.6 gegen Regeln 41.9), 11.2 Treffen, davon 2.5 leer
+
+== Gruppe wenig_kontakt (24 Ausgangslagen)
+   warten            Rückgabe   4.33  Defizit  71.0  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 27.2
+   regel             Rückgabe  18.04  Defizit  34.4  Treffen 19.0 (leer 3.3)  Umkehr 0.5  Wegzug 0  frei  1.7  Geldbedarf 24.3
+   treffen           Rückgabe  16.02  Defizit  33.1  Treffen 30.0 (leer 11.8)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 26.2
+   nur_leer          Rückgabe   4.54  Defizit  69.1  Treffen  1.5 (leer 1.2)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 27.5
+   kuend_wieder      Rückgabe   3.16  Defizit  65.7  Treffen  0.0 (leer 0.0)  Umkehr 40.6  Wegzug 0  frei  0.0  Geldbedarf 29.3
+   wechsel_kreis     Rückgabe   2.35  Defizit  66.0  Treffen  0.0 (leer 0.0)  Umkehr 42.6  Wegzug 0  frei  0.0  Geldbedarf 32.9
+   dauerumzug        Rückgabe   4.35  Defizit  70.9  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 27.2
+   gruenden          Rückgabe   1.87  Defizit  73.4  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 42.7
+   kind              Rückgabe   4.87  Defizit  70.1  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 2  frei  0.0  Geldbedarf 28.2
+   trennen_kreis     Rückgabe   4.75  Defizit  70.3  Treffen  0.0 (leer 0.0)  Umkehr 0.2  Wegzug 1  frei  0.0  Geldbedarf 27.6
+   frei_sonst_regel  Rückgabe  11.66  Defizit  54.1  Treffen 20.2 (leer 3.9)  Umkehr 0.5  Wegzug 0  frei 29.5  Geldbedarf 67.8
+   frei_sonst_warten Rückgabe   4.69  Defizit  68.7  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei 27.8  Geldbedarf 65.9
+   policy            Rückgabe  20.02  Defizit  28.2  Treffen 17.0 (leer 3.7)  Umkehr 0.3  Wegzug 0  frei  8.0  Geldbedarf 27.9
+ok   wenig_kontakt: kein Trick schlägt die Regeln (18.04; jeden Abend treffen 16.02, nur leere Treffen 4.54, frei sonst Regeln 11.66)
+info wenig_kontakt: Policy 20.02 (Defizit 28.2 gegen Regeln 34.4), 17.0 Treffen, davon 3.7 leer
+
+== Gruppe gruendungsnah (24 Ausgangslagen)
+   warten            Rückgabe   7.74  Defizit  66.5  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 16.3
+   regel             Rückgabe  17.21  Defizit  38.7  Treffen 11.6 (leer 2.1)  Umkehr 1.3  Wegzug 0  frei  3.3  Geldbedarf 19.5
+   treffen           Rückgabe  16.08  Defizit  33.8  Treffen 30.0 (leer 11.3)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 18.1
+   nur_leer          Rückgabe   8.18  Defizit  64.7  Treffen  2.3 (leer 2.2)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 16.9
+   kuend_wieder      Rückgabe   4.08  Defizit  60.7  Treffen  0.0 (leer 0.0)  Umkehr 45.4  Wegzug 0  frei  0.0  Geldbedarf 26.8
+   wechsel_kreis     Rückgabe   5.28  Defizit  59.0  Treffen  0.0 (leer 0.0)  Umkehr 43.2  Wegzug 0  frei  0.0  Geldbedarf 23.7
+   dauerumzug        Rückgabe   7.74  Defizit  66.5  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 16.3
+   gruenden          Rückgabe   7.66  Defizit  66.6  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 17.2
+   kind              Rückgabe   7.79  Defizit  66.4  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 16.6
+   trennen_kreis     Rückgabe   7.56  Defizit  66.6  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 16.6
+   frei_sonst_regel  Rückgabe  13.04  Defizit  50.0  Treffen 15.2 (leer 2.3)  Umkehr 0.5  Wegzug 0  frei 29.0  Geldbedarf 58.3
+   frei_sonst_warten Rückgabe   4.85  Defizit  68.8  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei 28.8  Geldbedarf 64.3
+   policy            Rückgabe  20.54  Defizit  27.5  Treffen 13.4 (leer 2.3)  Umkehr 0.1  Wegzug 0  frei  7.6  Geldbedarf 21.6
+ok   gruendungsnah: kein Trick schlägt die Regeln (17.21; jeden Abend treffen 16.08, nur leere Treffen 8.18, frei sonst Regeln 13.04)
+info gruendungsnah: Policy 20.54 (Defizit 27.5 gegen Regeln 38.7), 13.4 Treffen, davon 2.3 leer
+
+== Gruppe rentennah (24 Ausgangslagen)
+   warten            Rückgabe   7.30  Defizit  66.0  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 14.6
+   regel             Rückgabe  17.22  Defizit  35.3  Treffen 13.5 (leer 2.8)  Umkehr 0.3  Wegzug 1  frei  1.8  Geldbedarf 15.3
+   treffen           Rückgabe  16.01  Defizit  32.4  Treffen 30.0 (leer 12.1)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 15.1
+   nur_leer          Rückgabe   7.54  Defizit  64.4  Treffen  1.0 (leer 1.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 14.6
+   kuend_wieder      Rückgabe   6.45  Defizit  60.1  Treffen  0.0 (leer 0.0)  Umkehr 27.3  Wegzug 1  frei  0.0  Geldbedarf 20.6
+   wechsel_kreis     Rückgabe   8.57  Defizit  55.0  Treffen  0.0 (leer 0.0)  Umkehr 28.0  Wegzug 0  frei  0.0  Geldbedarf 20.1
+   dauerumzug        Rückgabe   7.30  Defizit  66.0  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 14.6
+   gruenden          Rückgabe   7.30  Defizit  66.0  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 14.6
+   kind              Rückgabe   7.64  Defizit  65.1  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 13.7
+   trennen_kreis     Rückgabe   7.62  Defizit  65.1  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei  0.0  Geldbedarf 13.7
+   frei_sonst_regel  Rückgabe  16.18  Defizit  39.1  Treffen 15.7 (leer 2.2)  Umkehr 0.3  Wegzug 1  frei 22.6  Geldbedarf 36.6
+   frei_sonst_warten Rückgabe   8.16  Defizit  62.4  Treffen  0.0 (leer 0.0)  Umkehr 0.0  Wegzug 0  frei 27.7  Geldbedarf 40.4
+   policy            Rückgabe  20.96  Defizit  27.3  Treffen 11.0 (leer 0.5)  Umkehr 0.4  Wegzug 0  frei  4.1  Geldbedarf 19.1
+ok   rentennah: kein Trick schlägt die Regeln (17.22; jeden Abend treffen 16.01, nur leere Treffen 7.54, frei sonst Regeln 16.18)
+info rentennah: Policy 20.96 (Defizit 27.3 gegen Regeln 35.3), 11.0 Treffen, davon 0.5 leer
+
+Einzelne Treffen gegen warten an derselben Stelle (7 Tage danach dieselbe Strategie, Seeds 10040–10063, Gruppen alle und wenig_kontakt):
+FEHL leere Treffen lohnen nicht – ohne_gegenueber: n 44, Nutzen in der Sim Ø 0.452, Abzug -0.65, netto Ø -0.198, netto > 0 in 9 (20 %)
+ok   leere Treffen lohnen nicht – ohne_bedarf: n 781, Nutzen in der Sim Ø 0.083, Abzug -0.3, netto Ø -0.217, netto > 0 in 24 (3 %)
+info mit_bedarf: n 1369, Nutzen in der Sim Ø 0.118, Abzug 0, netto Ø 0.118, netto > 0 in 1182 (86 %)
+
+3 FEHL (belohnung_v2, 739 s)
+exit 1
+ 06:23:02 up 1 day,  1:24,  0 user,  load average: 1.21, 1.43, 1.50

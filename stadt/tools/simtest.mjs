@@ -81,6 +81,10 @@
 //                                                   die Fassung davor; je Gründung (Stufe, Bremse, Preis, Markt, Tüftler im Dorf), je Nacht (Zählungen,
 //                                                   Preis und Grenze der Welt, 40 % nur im Umland), Aufgabe ohne je eine Kraft, Computer der Schulen (Laden
 //                                                   oder außerhalb); Speichern, beschädigte Stände, Übernahme von Version 8; Namenstausch; Gruppen (gemessen)
+//   node tools/simtest.mjs --kipolicy               KI-Policy (Etappe 1, V9): Policy aus = bitgleich zu --orig (jeden Tag), Beobachtung ohne verbotene
+//                                                   Felder, Maske nie verletzt, Fokus-ID und Generation, Wegzug und Tod, Schnappschuss, beschädigte
+//                                                   Policy-Dateien, Rückfall, Policy für alle deterministisch (--orig <ungepatchte stadt.html>, --tage 730,
+//                                                   --seeds 1,2,3, --policy ki/policy_x.json; ohne --policy: eingebettete oder künstliche Policy)
 //   Optionen: --alle 30 (Zeilenabstand), --buch 20 (letzte Stadtbuch-Zeilen), --aktionen
 
 import { readFileSync } from 'node:fs';
@@ -5251,6 +5255,363 @@ if (flag('techfrueh')) {
   process.exit(fehler ? 1 : 0);
 }
 
+if (flag('kipolicy')) {
+  // KI-Policy (Etappe 1, Version 9): Regression (Policy aus = bitgleich zu --orig, jeden Tag), Beobachtung ohne verbotene Felder (statisch, durch
+  // Verändern und je Personenfeld für die Person selbst und für alle anderen), Namenstausch (Regeln, Policy in neuer und in gewachsener
+  // Stadt), Maske nie verletzt (Zufall, Policy, Regelarm; verbotene Aktion abgelehnt), Fokus-ID und Generation, Wegzug und Tod,
+  // Schnappschuss, beschädigte oder fremde Policy-Dateien (Sim-Version, Inhalts-Hash), Rückfall zur Laufzeit, Policy nur im
+  // Trainingsbereich (ab R.RENTE, Hauptfiguren und Bürgermeister: Regeln), Policy für alle deterministisch.
+  // Policy zum Prüfen: --policy datei (z. B. ki/policy_<lauf>.json; nicht freigegebene sind nicht eingebettet), sonst die eingebettete, sonst künstlich
+  const kern = await import('./simkern.mjs');
+  const { Umgebung, mische, BELOHNUNG } = await import('./kiepisode.mjs');
+  const K = Sim.KI;
+  let fehl = 0;
+  const ok = (b, t) => { console.log((b ? 'ok   ' : 'FEHL ') + t); if (!b) fehl++; };
+  const tage = Number(arg('tage', '730')), seeds = arg('seeds', '1,2,3').split(',').map(Number), t0 = performance.now();
+  // Policy zum Prüfen: die eingebettete, sonst eine künstliche (feste Gewichte aus einem Hash, kein Zufall)
+  const kuenstlich = (skala = 0.5, extra = null, neuHash = false) => {
+    const n = K.MERKMALE.length, na = K.AKTIONEN.length, w = (a, b, k) => ((mische(a * 131 + b, k) / 4294967296) * 2 - 1) * skala;
+    const schicht = (nIn, nOut, akt, k) => ({ gewichte: Array.from({ length: nOut }, (_, j) => Array.from({ length: nIn }, (_, i) => Math.fround(w(j, i, k)))),
+      bias: Array.from({ length: nOut }, (_, j) => Math.fround(w(j, 999, k))), aktivierung: akt });
+    const d = { format: 'stadt-policy', formatVersion: K.FORMAT, name: 'kuenstlich', status: 'test', simVersion: Sim.VERSION, schemaHash: K.schemaHash(),
+      beobachtung: { schemaVersion: K.SCHEMA, laenge: n, merkmale: K.MERKMALE.map(m => m[0]) }, aktionen: { liste: K.AKTIONEN.slice() },
+      normalisierung: { mittel: new Array(n).fill(0.4), streuung: new Array(n).fill(0.3), clip: 5 },
+      netz: { schichten: [schicht(n, 16, 'tanh', 1), schicht(16, na, 'linear', 2)] } };
+    d.hash = K.policyHash(d);                                // Inhalts-Hash wie training/exportiere.py; extra ändert danach (Hash dann alt)
+    if (extra) extra(d);
+    if (neuHash) d.hash = K.policyHash(d);
+    return d;
+  };
+  const polText = arg('policy') ? readFileSync(arg('policy'), 'utf8') : kern.policyTextAusHtml(html);
+  const polD = polText ? JSON.parse(polText) : kuenstlich();
+  const pol = K.policyPruefen(polD);
+  console.log(`Policy zum Prüfen: ${arg('policy') ? 'Datei ' + arg('policy') : polText ? 'eingebettet' : 'künstlich'} „${pol.name}“ (${pol.status}), Stadt-Version ${pol.simVersion}, Hash ${pol.hash}, Schema ${K.schemaHash()}, `
+    + `${K.MERKMALE.length} Merkmale, ${K.AKTIONEN.length} Aktionen`);
+  if (polText) ok(polD.hash === K.policyHash(polD), `Policy-Datei: Inhalts-Hash aus training/exportiere.py (Python) = Sim.KI.policyHash (JS) = ${polD.hash}`);
+
+  // 1. Regression: ohne Policy und ohne Fokus jeden Tag bitgleich zur ungepatchten Fassung; S bekommt keine neuen Schlüssel
+  let origHtml = null;
+  if (arg('orig')) origHtml = readFileSync(arg('orig'), 'utf8');
+  else if (arg('git')) origHtml = execFileSync('git', ['-C', arg('git'), 'show', arg('rev', 'HEAD') + ':stadt/stadt.html'], { encoding: 'utf8', maxBuffer: 1 << 26 });
+  if (!origHtml) ok(false, 'Regression: --orig datei oder --git ordner [--rev] angeben');
+  else {
+    const Orig = kern.ladeSimAusHtml(origHtml).Sim;
+    for (const seed of seeds) {
+      const A = Orig.neueStadt(seed), N = Sim.neueStadt(seed);
+      let ab = -1, d = 0;
+      for (; d < tage && ab < 0; d++) {
+        const z = A.tag + 1;
+        while (A.tag < z) Orig.stunde(A);
+        while (N.tag < z) Sim.stunde(N);
+        if (fingerabdruck(Orig, A) !== fingerabdruck(Sim, N)) ab = A.tag;
+      }
+      const gleicheSchluessel = Object.keys(A).join() === Object.keys(N).join();
+      ok(ab < 0 && gleicheSchluessel, `Regression Seed ${seed}: Policy aus, ${d} Tage, jeden Tag bitgleich zu ${arg('orig') || arg('git') + ' ' + arg('rev', 'HEAD')} `
+        + `(${N.einwohner} Einwohner, Fingerabdruck ${fingerabdruck(Sim, N)})${ab >= 0 ? `, ab Tag ${ab} VERSCHIEDEN` : ''}${gleicheSchluessel ? '' : ', S hat andere Schlüssel'}`);
+    }
+  }
+
+  // 2. Beobachtung: welche Personenfelder liest sie (mit ihren Hilfsfunktionen)? Keine Namen, Herkunft, Einzug, Eltern, Gedächtnisbezüge
+  const quelle = (name) => {
+    const i = SIM_CODE.indexOf('function ' + name + '(');
+    if (i < 0) return '';
+    let j = SIM_CODE.indexOf('{', i), tiefe = 0;
+    for (; j < SIM_CODE.length; j++) { if (SIM_CODE[j] === '{') tiefe++; else if (SIM_CODE[j] === '}' && --tiefe === 0) break; }
+    return SIM_CODE.slice(i, j + 1);
+  };
+  const HILFEN = ['kiEingabe', 'tageskosten', 'einkauf', 'miete', 'eigentuemer', 'kaufRate', 'eigeneWohnung', 'gebunden', 'kitaFrist', 'kitaFrei',
+    'rentner', 'anspruch', 'verpflichtet', 'freundeZahl', 'besterFreierLohn', 'steuerSatz'];
+  const VERBOTEN_P = ['vor', 'nach', 'weib', 'gen', 'elternA', 'elternB', 'elternAGen', 'elternBGen', 'elternNameA', 'elternNameB', 'memRef', 'memGen',
+    'memName', 'einzug', 'sparSeit', 'stammladen', 'besuch', 'obhutBei', 'obhutGen'];
+  const gelesen = new Set(), fehlt = [];
+  for (const h of HILFEN) { const q = quelle(h); if (!q) fehlt.push(h); for (const m of q.matchAll(/(?:\bP|S\.p)\.([A-Za-z]+)\b/g)) gelesen.add(m[1]); }
+  const verboten = [...gelesen].filter(n => VERBOTEN_P.includes(n));
+  ok(!fehlt.length && !verboten.length, `Beobachtung (statisch): liest ${[...gelesen].sort().join(', ')}${verboten.length ? ' – VERBOTEN: ' + verboten.join(', ') : ''}${fehlt.length ? ' – Quelle fehlt: ' + fehlt.join(', ') : ''}`);
+  {
+    const S = Sim.neueStadt(1);
+    while (S.tag < 200) Sim.stunde(S);
+    const P = S.p, J = Sim.R.JAHR, leute = [];
+    for (let p = 0; p < S.pMax && leute.length < 60; p++) if (P.lebt[p] && S.tag - P.geb[p] >= 18 * J) leute.push(p);
+    const beob = () => leute.map(p => [K.beobachtung(S, p, 7, 0), K.beobachtung(S, p, 18, 1)]);
+    const vorher = beob(), sich = {};
+    for (const n of VERBOTEN_P) sich[n] = P[n].slice();
+    for (let p = 0; p < S.pMax; p++) {
+      P.vor[p] = (P.vor[p] + 7) % 30; P.nach[p] = (P.nach[p] + 11) % 50; P.weib[p] ^= 1; P.einzug[p] += 999; P.sparSeit[p] -= 77;
+      P.elternA[p] = -1; P.elternB[p] = -1; P.elternAGen[p] ^= 3; P.elternNameA[p] ^= 0x5555; P.elternNameB[p] ^= 0x2222; P.stammladen[p] = -1; P.besuch[p] = -1;
+      for (let k = 0; k < Sim.R.MEM; k++) { P.memRef[p * Sim.R.MEM + k] = -1; P.memGen[p * Sim.R.MEM + k] ^= 1; P.memName[p * Sim.R.MEM + k] ^= 0xff; }
+    }
+    const nachher = beob();
+    for (const n of VERBOTEN_P) P[n].set(sich[n]);
+    const gleich = vorher.every((v, k) => v.every((x, j) => x.every((w, i) => Object.is(w, nachher[k][j][i]))));
+    ok(gleich && vorher[0][0].length === K.MERKMALE.length && vorher.every(v => v.every(x => x.every(Number.isFinite))),
+      `Beobachtung (verändert): Namen, Geschlecht, Einzug, Sparbeginn, Eltern, Gedächtnisbezüge aller Personen verändert → Beobachtung von ${leute.length} Personen bitgleich, alle Werte endlich`);
+  }
+  // Namenstausch: ganze Stadt mit anderen Namen läuft gleich (Regeln und Policy für alle); verglichen ohne Namensfelder und Stadtbuch
+  {
+    const NAMEN = new Set(['p.vor', 'p.nach', 'p.memName', 'p.elternNameA', 'p.elternNameB']);
+    const ohneNamen = (S) => { const h = createHash('sha256'), d = Sim.exportZustand(S);
+      for (const a of d.arrays.slice().sort((x, y) => (x.name < y.name ? -1 : 1))) if (!NAMEN.has(a.name)) { h.update(a.name); h.update(Buffer.from(a.daten.buffer, a.daten.byteOffset, a.daten.byteLength)); }
+      h.update(JSON.stringify(S.stat)); h.update(String(S.rs)); return h.digest('hex').slice(0, 16); };
+    for (const mitPolicy of [false, true]) {
+      K.policySetzen(mitPolicy ? pol : null);
+      const A = Sim.neueStadt(2), B = Sim.neueStadt(2);
+      for (let p = 0; p < B.pMax; p++) { B.p.vor[p] = (B.p.vor[p] + 13) % 30; B.p.nach[p] = (B.p.nach[p] + 17) % 50; }
+      while (A.tag < 120) Sim.stunde(A);
+      while (B.tag < 120) Sim.stunde(B);
+      const st = K.policyStand();
+      ok(ohneNamen(A) === ohneNamen(B), `Namenstausch ${mitPolicy ? 'mit Policy für alle' : 'mit Regeln'}: 120 Tage, ohne Namensfelder bitgleich (${ohneNamen(A)}, ${A.einwohner} Einwohner`
+        + `${mitPolicy ? `, ${st.entscheidungen} Policy-Entscheidungen` : ''})`);
+    }
+    // gewachsene Stadt: 200 Tage Regeln, dann 60 Tage Policy für alle (die neue Stadt oben wächst mit der Policy kaum)
+    K.policySetzen(null);
+    const A = Sim.neueStadt(2), B = Sim.neueStadt(2);
+    for (let p = 0; p < B.pMax; p++) { B.p.vor[p] = (B.p.vor[p] + 13) % 30; B.p.nach[p] = (B.p.nach[p] + 17) % 50; }
+    while (A.tag < 200) Sim.stunde(A);
+    while (B.tag < 200) Sim.stunde(B);
+    const ew = A.einwohner;
+    K.policySetzen(pol);
+    while (A.tag < 260) Sim.stunde(A);
+    while (B.tag < 260) Sim.stunde(B);
+    const st = K.policyStand();
+    ok(ohneNamen(A) === ohneNamen(B) && st.entscheidungen > 1000, `Namenstausch in gewachsener Stadt: 200 Tage Regeln (${ew} Einwohner), dann 60 Tage Policy für alle, `
+      + `ohne Namensfelder bitgleich (${ohneNamen(A)}, ${A.einwohner} Einwohner, ${st.entscheidungen} Policy-Entscheidungen, ${st.regeln} nach Regeln)`);
+    K.policySetzen(null);
+  }
+  // Jedes Personenfeld einzeln verändert, einmal nur bei der Person selbst, einmal bei allen anderen: Fremdes wirkt nur als Haushaltswissen
+  // (hh, wohnung, eigen), Eigenes nie über verbotene Felder
+  {
+    const S = Sim.neueStadt(1);
+    while (S.tag < 220) Sim.stunde(S);
+    const P = S.p, J = Sim.R.JAHR, ziel = [];
+    for (let p = 0; p < S.pMax && ziel.length < 80; p++) if (P.lebt[p] && S.tag - P.geb[p] >= 18 * J && !P.haftBis[p]) ziel.push(p);
+    const beob = (p) => [K.beobachtung(S, p, 7, 0), K.beobachtung(S, p, 18, 1)];
+    const gleich = (a, b) => a.every((x, j) => x.every((w, i) => Object.is(w, b[j][i])));
+    const felder = Object.keys(P).filter(k => ArrayBuffer.isView(P[k]) && Number.isInteger(P[k].length / S.pKap) && P[k].length >= S.pKap);
+    const eigen = new Set(), fremd = new Set(), ausnahmen = [];
+    const fp0 = fingerabdruck(Sim, S);
+    for (const f of felder) {
+      const arr = P[f], k = arr.length / S.pKap, sich = arr.slice();
+      const stoer = (i) => { const v = arr[i]; arr[i] = (arr instanceof Float32Array || arr instanceof Float64Array) ? v * 1.37 + 3.1 : (v >= 0 ? v + 1 : v - 1); if (arr[i] === v) arr[i] = v ^ 1; };
+      for (const p of ziel) {
+        const vor = beob(p);
+        for (let i = 0; i < arr.length; i++) if (Math.floor(i / k) !== p) stoer(i);
+        try { if (!gleich(vor, beob(p))) fremd.add(f); } catch (e) { ausnahmen.push(f + ' (fremd)'); }
+        arr.set(sich);
+        for (let i = p * k; i < (p + 1) * k; i++) stoer(i);
+        try { if (!gleich(vor, beob(p))) eigen.add(f); } catch (e) { ausnahmen.push(f + ' (eigen)'); }
+        arr.set(sich);
+      }
+    }
+    const fremdErlaubt = ['hh', 'wohnung', 'eigen'], fremdZuviel = [...fremd].filter(f => !fremdErlaubt.includes(f)), eigenVerboten = [...eigen].filter(f => VERBOTEN_P.includes(f));
+    ok(!fremdZuviel.length && !eigenVerboten.length && fingerabdruck(Sim, S) === fp0,
+      `Beobachtung je Personenfeld (${felder.length} Felder, ${ziel.length} Personen, Seed 1 Tag 220): von anderen wirken nur ${[...fremd].sort().join(', ') || '–'} `
+      + `(Haushaltswissen), eigene wirken ${eigen.size}, keines davon verboten${fremdZuviel.length ? ' – FREMD ZU VIEL: ' + fremdZuviel.join(', ') : ''}`
+      + `${eigenVerboten.length ? ' – VERBOTEN: ' + eigenVerboten.join(', ') : ''}${ausnahmen.length ? ` (Ausnahmen bei verstümmelten Werten: ${ausnahmen.length})` : ''}`);
+  }
+
+  // 3. Maske nie verletzt (Trainingsumgebung): Zufall aus der Maske, Policy, Regelarm; verbotene Aktion wird abgelehnt und ändert nichts
+  const U = new Umgebung(Sim);
+  {
+    let entsch = 0, verletzt = 0, regelAusserhalb = 0, ausgef = 0;
+    for (const arm of ['zufall', 'policy', 'regel']) {
+      for (let k = 0; k < 5; k++) {
+        let r = U.reset({ seed: 10000 + k, nr: k, tage: 20 }), z = mische(k, 77);
+        while (!r.beendet && !r.abgeschnitten) {
+          let a;
+          if (arm === 'regel') a = 'regel';
+          else if (arm === 'policy') a = K.policyRechnen(pol, Float32Array.from(r.beob), Uint8Array.from(r.maske)).aktion;
+          else { const L = r.maske.map((v, i) => (v ? i : -1)).filter(i => i >= 0); z = mische(z, 5); a = L[z % L.length]; }
+          if (a !== 'regel' && !r.maske[a]) verletzt++;
+          r = U.step(a); entsch++;
+          if (r.info.wirkung && r.info.wirkung.maskeOk === false) regelAusserhalb++;
+          if (r.info.wirkung && r.info.wirkung.art === 'ausgefuehrt') ausgef++;
+        }
+        verletzt += U.epi.metrik.maskeVerletzt;
+      }
+    }
+    ok(verletzt === 0 && regelAusserhalb === 0 && entsch > 500, `Maske: ${entsch} Entscheidungen (Zufall, Policy, Regelarm je 5 Episoden), ${ausgef} ausgeführt, 0 außerhalb der Maske `
+      + `(gezählt ${verletzt}, Regelarm außerhalb ${regelAusserhalb})`);
+    let r = U.reset({ seed: 10001, nr: 3, tage: 10 });
+    const fa = kern.fingerabdruck(Sim, U.S), schlecht = r.maske.indexOf(0);
+    let code = '';
+    try { U.step(schlecht); } catch (e) { code = e.code; }
+    ok(code === 'maske_verletzt' && kern.fingerabdruck(Sim, U.S) === fa && U.observe().entscheidung && U.epi.metrik.maskeVerletzt === 1,
+      `Maske: verbotene Aktion ${K.AKTIONEN[schlecht]} abgelehnt (${code}), Stadt unverändert, Entscheidung bleibt offen, gezählt`);
+    r = U.step(0, { vorspulen: false });
+    while (r.info.entscheidung && !r.beendet && !r.abgeschnitten) r = U.step(0, { vorspulen: false });
+    code = '';
+    const fb = kern.fingerabdruck(Sim, U.S);
+    try { U.step(1, { vorspulen: false }); } catch (e) { code = e.code; }
+    ok(code === 'maske_verletzt' && kern.fingerabdruck(Sim, U.S) === fb, 'Maske: zwischen Entscheidungszeitpunkten nur warten (Aktion abgelehnt, nichts geändert)');
+  }
+
+  // 4. Fokus-ID und Generation, Wegzug und Tod
+  {
+    let r = U.reset({ seed: 10002, nr: 1, tage: 30 });
+    const S = U.S, id = U.epi.id, gen = U.epi.gen, f = K.fokus();
+    Sim._pruef.aktWegziehen(S, id);                            // erzwungen, wie ein Ereignis zwischen zwei Stunden
+    r = U.step(0);
+    const rest = U.epi.maxStunden - U.epi.stunden, m = r.info.metrik;
+    ok(r.beendet && !r.abgeschnitten && r.grund === 'wegzug' && Math.abs(r.teile.wegzug - rest * BELOHNUNG.wegzugJeStunde) < 1e-9
+      && Math.abs(m.defizitMittel - (m.defizit + 100 * rest) / (m.stunden + rest)) < 1e-9,
+      `Wegzug: echtes Ende (Grund wegzug), ${rest} fehlende Stunden kosten ${r.teile.wegzug.toFixed(3)} und zählen im Defizit mit 100 (Ø ${m.defizitMittel.toFixed(1)})`);
+    ok(BELOHNUNG.wegzugJeStunde <= BELOHNUNG.notstandJeStunde + BELOHNUNG.umkehr / 24 + 1e-15,
+      'Wegzug: jede fehlende Stunde kostet mindestens so viel wie die schlechteste gelebte Stunde (Notstand und Umkehr, höchstens eine je Tag)');
+    // gemessen: erzwungener Wegzug an der 5. Entscheidung gegen Weiterleben nach Regeln, gleiche Ausgangslage
+    let schlechter = 0, n = 0;
+    for (let k = 0; k < 6; k++) {
+      const summe = (weg) => { let r2 = U.reset({ seed: 10010 + k, nr: k, tage: 20 }), s = r2.belohnung, e = 0;
+        while (!r2.beendet && !r2.abgeschnitten) { if (weg && ++e === 5) Sim._pruef.aktWegziehen(U.S, U.epi.id); r2 = U.step('regel'); s += r2.belohnung; } return s; };
+      const a = summe(false), b = summe(true);
+      n++; if (b < a) schlechter++;
+    }
+    ok(schlechter === n, `Wegzug verbessert nie: in ${schlechter} von ${n} Ausgangslagen bringt erzwungener Wegzug weniger als Weiterleben`);
+    // ID wird wieder vergeben: die neue Person (andere Generation) ist nicht die Fokusperson
+    let d = 0;
+    while (!(S.p.lebt[id] && S.p.gen[id] !== gen) && d < 24 * 200) { Sim.stunde(S); d++; }
+    const zahl = f.zahl;
+    const wieder = S.p.lebt[id] && S.p.gen[id] !== gen;
+    if (wieder) { Sim.entscheide(S, id, 7); Sim.entscheide(S, id, 18); for (let h = 0; h < 48; h++) Sim.stunde(S); }
+    ok(wieder && f.zahl === zahl && !f.faellig, `ID ${wieder ? 'nach ' + d + ' Stunden' : 'NICHT'} neu vergeben (Generation ${gen} → ${S.p.gen[id]}): die neue Person entscheidet nach Regeln, der Fokus greift nicht`);
+    r = U.reset({ seed: 10003, nr: 2, tage: 30 });
+    Sim._pruef.sterben(U.S, U.epi.id);
+    r = U.step(0);
+    ok(r.beendet && r.grund === 'tod' && r.teile.wegzug === 0, 'Tod: echtes Ende (Grund tod), ohne Abzug');
+    r = U.reset({ seed: 10003, nr: 2, tage: 2 });
+    while (!r.beendet && !r.abgeschnitten) r = U.step(0);
+    ok(r.abgeschnitten && !r.beendet && r.grund === 'zeitlimit' && U.epi.stunden === 48, 'Zeitlimit: abgeschnitten (nicht beendet) nach genau 48 Stunden');
+    K.fokusLoesen();
+  }
+
+  // 5. Schnappschuss und Wiederherstellen: gleiche Aktionen → gleiche Beobachtungen, Belohnungen und Stadt
+  {
+    let r = U.reset({ seed: 10004, nr: 0, tage: 20 });
+    for (let k = 0; k < 5; k++) r = U.step(K.policyRechnen(pol, Float32Array.from(r.beob), Uint8Array.from(r.maske)).aktion);
+    const snap = U.snapshot();
+    const spur = () => { const L = []; for (let k = 0; k < 25 && !r.beendet && !r.abgeschnitten; k++) {
+      r = U.step(K.policyRechnen(pol, Float32Array.from(r.beob), Uint8Array.from(r.maske)).aktion); L.push([r.beob, r.maske, r.belohnung, r.stunden]); }
+      return JSON.stringify(L) + kern.fingerabdruck(Sim, U.S); };
+    const a = spur();
+    U.restore(snap); r = { ...U.observe(), beendet: false, abgeschnitten: false };
+    const b = spur();
+    ok(a === b, `Schnappschuss: nach dem Wiederherstellen 25 Schritte bitgleich (Beobachtung, Maske, Belohnung, Stadt)`);
+    K.fokusLoesen();
+  }
+
+  // 6. Beschädigte Policy-Dateien werden abgelehnt (mit Grund), nichts wird gesetzt
+  {
+    const faelle = [
+      ['kein Objekt', null], ['Text', 'kaputt'], ['leeres Objekt', {}], ['falsches Format', kuenstlich(0.5, d => { d.format = 'x'; })],
+      ['Formatversion 1 (vor der Prüfung)', kuenstlich(0.5, d => { d.formatVersion = 1; }, true)], ['Formatversion 3', kuenstlich(0.5, d => { d.formatVersion = 3; }, true)],
+      ['Schema-Version ' + (K.SCHEMA - 1) + ' (Version 8)', kuenstlich(0.5, d => { d.beobachtung.schemaVersion = K.SCHEMA - 1; })],
+      ['andere Stadt-Version', kuenstlich(0.5, d => { d.simVersion = Sim.VERSION - 1; }, true)], ['ohne Stadt-Version', kuenstlich(0.5, d => { delete d.simVersion; })],
+      ['Hash einer anderen Policy', kuenstlich(0.5, d => { d.hash = kuenstlich(0.4).hash; })], ['ohne Hash', kuenstlich(0.5, d => { delete d.hash; })],
+      ['ein Gewicht geändert, Hash alt', kuenstlich(0.5, d => { d.netz.schichten[1].gewichte[4][7] = Math.fround(d.netz.schichten[1].gewichte[4][7] + 0.001); })],
+      ['Normalisierung geändert, Hash alt', kuenstlich(0.5, d => { d.normalisierung.mittel[3] += 0.01; })],
+      ['Merkmale vertauscht', kuenstlich(0.5, d => { const m = d.beobachtung.merkmale; [m[0], m[1]] = [m[1], m[0]]; })],
+      ['ein Merkmal fehlt', kuenstlich(0.5, d => { d.beobachtung.merkmale.pop(); })],
+      ['Aktionen vertauscht', kuenstlich(0.5, d => { const a = d.aktionen.liste; [a[1], a[2]] = [a[2], a[1]]; })],
+      ['Schema-Hash falsch', kuenstlich(0.5, d => { d.schemaHash = '00000000'; })],
+      ['NaN-Gewicht (JSON null)', kuenstlich(0.5, d => { d.netz.schichten[0].gewichte[3][4] = null; })],
+      ['Gewicht als Text', kuenstlich(0.5, d => { d.netz.schichten[1].gewichte[0][0] = '0.1'; })],
+      ['unendliches Gewicht', kuenstlich(0.5, d => { d.netz.schichten[0].gewichte[0][0] = Infinity; })],
+      ['NaN-Bias', kuenstlich(0.5, d => { d.netz.schichten[1].bias[2] = NaN; })],
+      ['Streuung 0', kuenstlich(0.5, d => { d.normalisierung.streuung[5] = 0; })], ['Streuung negativ', kuenstlich(0.5, d => { d.normalisierung.streuung[0] = -1; })],
+      ['Mittel NaN', kuenstlich(0.5, d => { d.normalisierung.mittel[0] = NaN; })], ['clip 0', kuenstlich(0.5, d => { d.normalisierung.clip = 0; })],
+      ['Normalisierung zu kurz', kuenstlich(0.5, d => { d.normalisierung.mittel.pop(); })],
+      ['Zeile zu kurz', kuenstlich(0.5, d => { d.netz.schichten[0].gewichte[2].pop(); })], ['Bias zu kurz', kuenstlich(0.5, d => { d.netz.schichten[0].bias.pop(); })],
+      ['Aktivierung sigmoid', kuenstlich(0.5, d => { d.netz.schichten[0].aktivierung = 'sigmoid'; })],
+      ['letzte Schicht tanh', kuenstlich(0.5, d => { d.netz.schichten[1].aktivierung = 'tanh'; })],
+      ['12 statt 13 Ausgaben', kuenstlich(0.5, d => { d.netz.schichten[1].gewichte.pop(); d.netz.schichten[1].bias.pop(); })],
+      ['keine Schichten', kuenstlich(0.5, d => { d.netz.schichten = []; })],
+      ['7 Schichten', kuenstlich(0.5, d => { d.netz.schichten = new Array(7).fill(d.netz.schichten[1]); })],
+      ['600 Einheiten', kuenstlich(0.5, d => { d.netz.schichten[0].gewichte = new Array(600).fill(d.netz.schichten[0].gewichte[0]); d.netz.schichten[0].bias = new Array(600).fill(0); })],
+    ];
+    let abgelehnt = 0;
+    const nicht = [];
+    for (const [was, d] of faelle) {
+      try { K.policyPruefen(d); nicht.push(was); } catch (e) { if (/^Policy ungültig/.test(e.message)) abgelehnt++; else nicht.push(was + ' (' + e.message + ')'); }
+    }
+    let gesetzt = true;
+    try { K.policySetzen({ schichten: [], schemaHash: 'x' }); } catch { gesetzt = false; }
+    ok(abgelehnt === faelle.length && !gesetzt && !K.policyAktiv(), `Beschädigte oder fremde Policy-Dateien: ${abgelehnt} von ${faelle.length} abgelehnt mit Grund${nicht.length ? ' – NICHT: ' + nicht.join(', ') : ''}; `
+      + 'Ungeprüftes lässt sich nicht setzen');
+    // Gegenprobe: mit nachgerechnetem Hash wird dieselbe Änderung angenommen, und der Hash folgt dem Inhalt
+    const geaendert = kuenstlich(0.5, d => { d.netz.schichten[1].gewichte[4][7] = Math.fround(d.netz.schichten[1].gewichte[4][7] + 0.001); }, true);
+    let grund = '';
+    try { K.policyPruefen(geaendert); } catch (e) { grund = e.message; }
+    ok(!grund && geaendert.hash !== kuenstlich(0.5).hash, `Inhalts-Hash folgt dem Inhalt: ein Gewicht geändert → neuer Hash ${geaendert.hash} (vorher ${kuenstlich(0.5).hash}), mit ihm angenommen${grund ? ' – ' + grund : ''}`);
+  }
+
+  // 7. Rückfall zur Laufzeit: eine Policy, deren Logits überlaufen (gültige Datei, Rechnung ergibt keine Zahl) → Regeln; die Stadt läuft
+  // dann genau wie mit Regeln (die erste Entscheidung fällt schon nach Regeln)
+  {
+    const d = kuenstlich(0.5, x => {                          // verdeckte Schicht sättigt (tanh = 1), Ausgabe 1e308 × 16 + 1e308 → unendlich
+      x.netz.schichten[0].gewichte = x.netz.schichten[0].gewichte.map(z => z.map(() => 0)); x.netz.schichten[0].bias = x.netz.schichten[0].bias.map(() => 50);
+      x.netz.schichten[1].gewichte = x.netz.schichten[1].gewichte.map(z => z.map(() => 1e308)); x.netz.schichten[1].bias = x.netz.schichten[1].bias.map(() => 1e308); }, true);
+    K.policySetzen(K.policyPruefen(d));
+    const A = Sim.neueStadt(3);
+    while (A.tag < 40) Sim.stunde(A);
+    const st = K.policyStand();
+    K.policySetzen(null);
+    const B = Sim.neueStadt(3);
+    while (B.tag < 40) Sim.stunde(B);
+    ok(!st.aktiv && st.rueckfall === 1 && /keine Zahl/.test(st.fehler) && fingerabdruck(Sim, A) === fingerabdruck(Sim, B),
+      `Rückfall: überlaufende Logits → Policy aus („${st.fehler}“), 40 Tage bitgleich zu Regeln (${fingerabdruck(Sim, A)})`);
+  }
+
+  // 7b. Policy nur, wofür sie trainiert ist: ab R.RENTE Jahren und Hauptfiguren entscheiden die Regeln (auch wenn die Policy an ist)
+  {
+    const S = Sim.neueStadt(1);
+    while (S.tag < 300) Sim.stunde(S);
+    const P = S.p, J = Sim.R.JAHR;
+    let alt = -1, haupt = -1, jung = -1, bm = -1;
+    for (let p = 0; p < S.pMax; p++) {
+      if (!P.lebt[p] || P.haftBis[p] || S.tag - P.geb[p] < Sim.R.ERWACHSEN * J) continue;
+      if (Sim.istBm(S, p)) bm = p;                               // Version 9: istHaupt zählt den Bürgermeister mit
+      else if (Sim.istHaupt(S, p)) { if (haupt < 0) haupt = p; } else if (S.tag - P.geb[p] >= Sim.R.RENTE * J) { if (alt < 0) alt = p; } else if (jung < 0) jung = p;
+    }
+    // dieselbe Entscheidung (18 Uhr) in zwei Kopien der Stadt: einmal mit Policy für alle, einmal mit Regeln
+    const probe = (p) => { const T = ladenAusText(Sim, speichernAlsText(Sim, S)), R0 = ladenAusText(Sim, speichernAlsText(Sim, S));
+      K.policySetzen(pol); const a = Sim.entscheide(T, p, 18); const st = K.policyStand(); K.policySetzen(null); const b = Sim.entscheide(R0, p, 18);
+      return { st, gleich: a === b && fingerabdruck(Sim, T) === fingerabdruck(Sim, R0) }; };
+    const pa = alt >= 0 ? probe(alt) : null, ph = haupt >= 0 ? probe(haupt) : null, pj = jung >= 0 ? probe(jung) : null, pb = bm >= 0 ? probe(bm) : null;
+    ok(pa && ph && pj && pb && pa.st.entscheidungen === 0 && pa.st.regeln === 1 && pa.gleich && ph.st.entscheidungen === 0 && ph.st.regeln === 1 && ph.gleich
+      && pb.st.entscheidungen === 0 && pb.st.regeln === 1 && pb.gleich && pj.st.entscheidungen === 1 && pj.st.regeln === 0,
+      `Trainingsbereich: Person ab ${Sim.R.RENTE} (ID ${alt}), Hauptfigur (ID ${haupt}) und Bürgermeister (ID ${bm}) entscheiden mit Policy genau wie mit Regeln `
+      + `(0 Policy-Entscheidungen), eine Person unter ${Sim.R.RENTE} (ID ${jung}) nach der Policy`);
+    K.policySetzen(pol);
+    const T = ladenAusText(Sim, speichernAlsText(Sim, S));
+    while (T.tag < 302) Sim.stunde(T);
+    const st = K.policyStand();
+    K.policySetzen(null);
+    ok(st.entscheidungen > 0 && st.regeln > 0, `Trainingsbereich, 2 Tage Policy für alle ab Tag 300 (${T.einwohner} Einwohner): ${st.entscheidungen} Policy-Entscheidungen, `
+      + `${st.regeln} nach Regeln (ab ${Sim.R.RENTE} oder Hauptfigur)`);
+  }
+
+  // 8. Policy für alle: deterministisch, entscheidet wirklich, S ohne neue Schlüssel, Spielstand lädt bitgleich weiter
+  {
+    const lauf = () => { K.policySetzen(pol); const S = Sim.neueStadt(1); while (S.tag < 90) Sim.stunde(S); const st = K.policyStand(); return { S, st }; };
+    const a = lauf(), b = lauf();
+    K.policySetzen(null);
+    const R0 = Sim.neueStadt(1);
+    while (R0.tag < 90) Sim.stunde(R0);
+    ok(fingerabdruck(Sim, a.S) === fingerabdruck(Sim, b.S) && a.st.entscheidungen > 0 && a.st.rueckfall === 0 && fingerabdruck(Sim, a.S) !== fingerabdruck(Sim, R0)
+      && Object.keys(a.S).join() === Object.keys(R0).join(),
+      `Policy für alle: 90 Tage zweimal bitgleich (${fingerabdruck(Sim, a.S)}, ${a.S.einwohner} Einwohner; Regeln: ${R0.einwohner}), ${a.st.entscheidungen} Entscheidungen `
+      + `(${a.st.ausgefuehrt} ausgeführt, ${a.st.fehlgeschlagen} ohne Erfolg, ${a.st.warten}× gewartet), kein Rückfall, keine neuen Schlüssel in S`);
+    K.policySetzen(pol);
+    const S = Sim.neueStadt(1);
+    while (S.tag < 60 || S.stunde !== 13) Sim.stunde(S);
+    const T = ladenAusText(Sim, speichernAlsText(Sim, S));
+    while (S.tag < 90) Sim.stunde(S);
+    while (T.tag < 90) Sim.stunde(T);
+    ok(fingerabdruck(Sim, S) === fingerabdruck(Sim, T), `Policy für alle: Speichern und Laden mitten am Tag (Tag 60, 13 Uhr), 30 Tage weiter bitgleich`);
+    K.policySetzen(null);
+  }
+  console.log(`\n${fehl ? fehl + ' FEHL' : 'Alle KI-Policy-Prüfungen bestanden'} (${((performance.now() - t0) / 1000).toFixed(0)} s)`);
+  process.exit(fehl ? 1 : 0);
+}
 if (flag('gate')) {
   const seeds = arg('seeds', '1,2,3').split(',').map(Number);
   let alleOk = true;

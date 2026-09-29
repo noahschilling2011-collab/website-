@@ -1,0 +1,20 @@
+Nachprüfung des Befunds „Strg+C während --fortsetzen macht Manifest und Herkunft falsch“ mit dem Stand VOR der Korrektur
+(Kopie SP/ml/stufe_vor_fix_stadt): Smoke-Lauf s1 (2.048 Schritte), dann --fortsetzen --zusatz 16384, nach 5 Validierungen SIGINT an die Prozessgruppe (wie Strg+C im Terminal).
+
+  Validierung bei 3072 Schritten: Defizit Ø 71.97, Rückgabe Ø 3.92
+  Validierung bei 4096 Schritten: Defizit Ø 68.03, Rückgabe Ø 4.97  (bester)
+  Validierung bei 5120 Schritten: Defizit Ø 67.26, Rückgabe Ø 8.66  (bester)
+  Validierung bei 6144 Schritten: Defizit Ø 66.98, Rückgabe Ø 9.15  (bester)
+  Validierung bei 7168 Schritten: Defizit Ø 63.29, Rückgabe Ø 10.04  (bester)
+KeyboardInterrupt
+
+Manifest gegen Dateien danach:
+status fertig | schritte 2048 | fortsetzungen [(2048, None, False)]
+letzter: manifest 2048 587c7a8a79874527 | datei 8192 3bb4a0a32d7c933a | ABWEICHUNG
+bester: manifest 1024 32bfb25477606051 | datei 7168 68f7484b081ee03b | ABWEICHUNG | val 68.21
+_zustand bester 1024 abbruch None
+
+Export von bester.zip mit dem alten exportiere.py:
+herkunft.trainingsSchritte 1024 (Datei: 7168), Validierung Defizit 68.21 (zu 1.024 Schritten)
+
+Mit dem neuen exportiere.py auf denselben Lauf: 7168 Schritte, Validierung 63.29 aus validierung.jsonl (Hinweis auf stderr).

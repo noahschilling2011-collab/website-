@@ -1,0 +1,5 @@
+Kalibrieren: Wert eines Treffens gegenüber warten (7 Tage danach dieselbe Strategie; Seeds 10000–10031, Gruppen alle und wenig_kontakt)
+  ohne_gegenueber  n   35  Mittel 0.295  Median 0.247  90 % 0.696  ·  je Strategie: regel 0.228 (n 18), treffen 0.366 (n 17)
+  ohne_bedarf      n  964  Mittel 0.091  Median 0.051  90 % 0.240  ·  je Strategie: regel 0.086 (n 406), treffen 0.094 (n 558)
+  mit_bedarf       n 1945  Mittel 0.121  Median 0.097  90 % 0.285  ·  je Strategie: regel 0.106 (n 1047), treffen 0.139 (n 898)
+exit 0

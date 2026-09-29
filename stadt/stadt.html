@@ -805,6 +805,33 @@
     <button type="button" class="knopf" data-wachstum="1" aria-pressed="false">schnell</button>
   </div>
   <p class="leise" id="wachstum-text" style="margin-top:var(--s3)"></p>
+  <div class="knoepfe"><button type="button" class="knopf" id="ki-knopf" aria-label="Entscheidungen der Bewohner: Regeln. Fenster öffnen">Entscheidungen: Regeln ›</button><button type="button" class="knopf haupt" data-schliessen autofocus>Schließen</button></div>
+</dialog>
+
+<!-- KI-Policy (Etappe 1, Version 9): Entscheidungen der Bewohner, eigenes Fenster (Knopf unten in den Einstellungen; die Einstellungen von
+     Version 9 passen bei 1280 × 800 gerade ohne Scrollen, tests/wachstum.cjs prüft das). Standard: Regeln. Die Policy ist experimentell (kein
+     Qualitätsnachweis) und steckt nicht in dieser Datei: Sie kommt aus dem Ordner ki/ neben der Seite oder als Datei. -->
+<dialog id="ki-dialog" aria-labelledby="ki-dialog-titel">
+  <h2 id="ki-dialog-titel">Entscheidungen der Bewohner</h2>
+  <div class="knoepfe" role="radiogroup" aria-labelledby="ki-dialog-titel" style="margin-top:0">
+    <label class="ki-wahl"><input type="radio" name="ki-entscheid" id="ki-entscheid-regeln" value="regeln" checked> Regeln (Standard)</label>
+    <label class="ki-wahl"><input type="radio" name="ki-entscheid" id="ki-entscheid-policy" value="policy"> Trainierte Policy (experimentell)</label>
+  </div>
+  <p class="leise" id="ki-policy-status" role="status" style="margin-top:var(--s3)">Es entscheiden die Regeln.</p>
+  <div class="knoepfe">
+    <label for="ki-policy-wahl" class="leise" style="align-self:center">Policy</label>
+    <select id="ki-policy-wahl"><option value="">–</option></select>
+    <button type="button" class="knopf" id="ki-policy-laden">Policy-Datei laden …</button>
+    <button type="button" class="knopf" id="ki-policy-vergessen" hidden>Geladene Datei entfernen</button>
+    <input type="file" id="ki-policy-datei" accept="application/json,.json" hidden>
+  </div>
+  <p class="leise" id="ki-policy-auswertung" style="margin-top:var(--s3)" hidden></p>
+  <p class="leise" style="margin-top:var(--s3)">Ein kleines neuronales Netz, in dieser Simulation trainiert. Es wählt an den normalen Entscheidungszeitpunkten
+    aus denselben erlaubten Aktionen wie die Regeln oder wartet, sieht nur die eigene Lage, die Persönlichkeit und öffentliche Zahlen (keine Namen, keine
+    Herkunft) und entscheidet nur für Erwachsene bis zum Rentenalter, nicht für Hauptfiguren und Bürgermeister.</p>
+  <p class="leise">Das Spiel holt sie beim Umschalten aus dem Ordner <code>ki/</code> neben der Seite (nur über einen Server) oder aus
+    einer Policy-Datei. Passt sie nicht, fehlt sie oder rechnet sie fehlerhaft, entscheiden die Regeln, und das
+    Spiel sagt es. Experimentell heißt: nicht freigegeben, Standard bleiben die Regeln. Eine Policy wirkt auf die ganze Stadt (Wachstum, Gründungen, Kinder).</p>
   <div class="knoepfe"><button type="button" class="knopf haupt" data-schliessen autofocus>Schließen</button></div>
 </dialog>
 
@@ -1628,6 +1655,7 @@ function erinnertSeit(S, p, code, tage, ref) {
 
 // Person verlässt die Stadt (Tod oder Wegzug). Räumt alle Verweise auf, gibt den Platz frei.
 function entferne(S, q, grund) {
+  if (KIP.an) kiFokusEnde(S, q, grund);                    // KI-Policy (Etappe 1): Tod oder Wegzug der Fokusperson merken
   const P = S.p;
   if (S.ki.haupt.length && inHauptListe(S, q)) hauptVerloren(S, q, grund || 'weg');
   else {
@@ -2328,6 +2356,7 @@ function zielPruefen(S, p) {
 
 // ─── Das Gehirn: Entscheiden per Punktwertung ────────────────────────────────────────
 function entscheide(S, p, h) {
+  if (KIP.an) { const r = kiHaken(S, p, h); if (r >= 0) return r; }   // KI-Policy (Etappe 1): Fokusperson der Umgebung oder trainierte Policy
   if (S.p.haftBis[p]) return 0;                              // Sicherheit: in Haft keine Entscheidungen (auch nicht nach Fristen und späten KI-Antworten)
   const P = S.p, g = S.g, tag = S.tag, zg = P.ziel[p];
   const alter = (tag - P.geb[p]) / R.JAHR;
@@ -7937,7 +7966,378 @@ function kennzahlen(S) {
   };
 }
 
+// ─── KI-Policy (Etappe 1): Beobachtung, Maske, Fokusperson, trainierte Policy ─────────────────────────────────────────────
+// Eine kleine trainierte Policy (MLP) kann an Stelle der Punktwertung in entscheide() wählen: für alle Bewohner, für die sie trainiert ist
+// (Einstellung im Spiel, experimentell: Erwachsene unter R.RENTE Jahren ohne Hauptfiguren und ohne Bürgermeister, die übrigen nach Regeln),
+// oder nur für eine Fokusperson, deren Aktion die Trainingsumgebung liefert (tools/kiumgebung.mjs).
+// Version 9: Aktionskatalog unverändert (warten + 12 aus AKTIONSNAMEN); Beobachtungsschema 2 (Lohnsteuer des Haushalts, Markt ohne Sättigung).
+// Ohne Fokus und ohne Policy (Standard) greift nichts davon: entscheide() und entferne() prüfen nur KIP.an, S bekommt keine neuen
+// Schlüssel, die Stadt läuft bitgleich wie ohne diesen Abschnitt (simtest --kipolicy prüft das jeden Tag).
+// Grenze: Die Beobachtung enthält keine Namen, keine Personen-ID, keine Generation, kein Geschlecht, keine Herkunfts- oder
+// Einzugsmerkmale (einzug, sparSeit, Eltern, Namen der Eltern), keine Bezüge aus dem Gedächtnis (memRef, memGen, memName), keine
+// Gebäude-IDs, keine Zukunft, keinen Zufallszustand und nichts Privates anderer Personen. Die Maske (erlaubteAktionen) nutzt mehr,
+// als die Person weiß (Marktdaten, Zufriedenheit des Partners); das steht in ki/LIESMICH.md.
+// Version des Beobachtungsschemas: jede Änderung an KI_MERKMALE zählt sie hoch. 2 (Version 9): lohnsteuer neu (der Satz sinkt in V9 von
+// 10 % bis 0 und ändert sich je Jahr = R.JAHR Tage); stellen_frei und wohnungen_frei ohne Sättigung bei 50 (in V9 immer über 50 Stellen,
+// in Schema 1 darum konstant 1)
+const KI_SCHEMA = 2;
+// [Name (nur ASCII, geht in den Schema-Hash), Skala (ASCII, Hash), Bedeutung]. Reihenfolge = Reihenfolge im Vektor
+const KI_MERKMALE = [
+  ['bed_geld', 'bGeld/100', 'Bedürfnis Geld (Rücklage in Tagen, 0 schlecht bis 1 gut)'],
+  ['bed_wohnen', 'bWohnen/100', 'Bedürfnis Wohnen'],
+  ['bed_kontakt', 'bKontakt/100', 'Bedürfnis Kontakt'],
+  ['bed_freizeit', 'bFreizeit/100', 'Bedürfnis Freizeit'],
+  ['zufriedenheit', 'zuf/100', 'Zufriedenheit jetzt'],
+  ['zuf_ziel', 'zufZiel/100', 'Zielwert der Zufriedenheit (aus den eigenen Bedürfnissen)'],
+  ['ruecklage_tage', 'clip(geld/max(20,tageskosten),-30,300)/100', 'Erspartes in Tagen der eigenen Kosten'],
+  ['alter', 'jahre/100', 'Alter in Jahren (R.JAHR Spieltage je Jahr)'],
+  ['fleiss', 'fleiss/100', 'Persönlichkeit: Fleiß'],
+  ['gesellig', 'gesellig/100', 'Persönlichkeit: Geselligkeit'],
+  ['ehrgeiz', 'ehrgeiz/100', 'Persönlichkeit: Ehrgeiz'],
+  ['spar', 'spar/100', 'Persönlichkeit: Sparsamkeit'],
+  ['heimat', 'heimat/100', 'Persönlichkeit: Heimatliebe'],
+  ['hat_arbeit', '0|1', 'hat eine bezahlte Stelle'],
+  ['gemeinnuetzig', '0|1', 'leistet gemeinnützige Arbeit (keine Stelle)'],
+  ['besitzer', '0|1', 'hat einen eigenen Betrieb'],
+  ['lohn', 'lohn/100', 'eigener Tageslohn (0 ohne Stelle)'],
+  ['lohn_vorteil', 'clip((besterFreierLohn-lohn)/50,-1,1)', 'Vorsprung der besten ausgeschriebenen Stelle (öffentlich)'],
+  ['stellen_frei', 'n/(n+200) n=freieStellen', 'ausgeschriebene Stellen in der Stadt (öffentlich; 200 Stellen = 0,5)'],
+  ['wohnungen_frei', 'n/(n+20) n=freieWohnungen', 'freie Wohnungen in der Stadt (öffentlich; 20 Wohnungen = 0,5)'],
+  ['arbeitslosenquote', 'quote', 'Arbeitslosenquote der Stadt (veröffentlichte Zahl von gestern)'],
+  ['lohnsteuer', 'steuerSatz*10', 'Lohnsteuersatz der Stadt heute (Haushalt, öffentlich; 10 % = 1, 0 % = 0)'],
+  ['hat_wohnung', '0|1', 'wohnt irgendwo'],
+  ['eigene_wohnung', '0|1', 'eigener Haushalt (Vorstand oder mit Partner)'],
+  ['eigentum', '0|1', 'der Haushalt besitzt die Wohnung'],
+  ['partner', '0|1', 'hat einen Partner'],
+  ['zusammen', '0|1', 'wohnt mit dem Partner zusammen'],
+  ['kinder', 'min(kinder,4)/4', 'eigene Kinder'],
+  ['kinder_haushalt', 'min(hhKinder,4)/4', 'Kinder im eigenen Haushalt'],
+  ['gebunden', '0|1', 'muss ein Kind ohne Kita-Platz betreuen (Haushaltswissen)'],
+  ['rentner', '0|1', 'bezieht Rente'],
+  ['rentenanspruch', '0|1', 'hat Anspruch auf Rente'],
+  ['im_dienst', '0|1', 'leistet Wehr- oder Ersatzdienst'],
+  ['verpflichtet', '0|1', 'Soldat auf Zeit (gebunden)'],
+  ['freunde', 'freunde/5', 'Zahl der Freunde (höchstens 5)'],
+  ['elend_tage', 'min(elend,30)/30', 'Tage in Folge mit Zufriedenheit unter 20'],
+  ['unzuf_tage', 'min(unzuf,30)/30', 'Tage in Folge mit Zufriedenheit unter 40'],
+  ['trauer', '0|1', 'jemand Nahes ist in den letzten 30 Tagen gestorben'],
+  ['ohne_laden', '0|1', 'kein Laden in Reichweite'],
+  ['frei_heute', '0|1', 'hat sich heute frei genommen'],
+  ['such_pause', '0|1', 'Wohnungssuche pausiert nach erfolgloser Suche'],
+  ['sucht_wohnung', '0|1', 'hat erfolglos eine Wohnung gesucht'],
+  ['job_weg_30', '0|1', 'Stelle in den letzten 30 Tagen verloren (Erinnerung)'],
+  ['getrennt_30', '0|1', 'in den letzten 30 Tagen getrennt (Erinnerung)'],
+  ['kind_30', '0|1', 'Kind in den letzten 30 Tagen bekommen (Erinnerung)'],
+  ['gruendung_gesperrt', '0|1', 'nach einer Pleite noch keine Gründung (Erinnerung)'],
+  ['ziel_wohnung', '0|1', 'Ziel: eigene Wohnung'],
+  ['ziel_job', '0|1', 'Ziel: besserer Job'],
+  ['ziel_familie', '0|1', 'Ziel: Familie'],
+  ['ziel_laden', '0|1', 'Ziel: eigener Laden'],
+  ['ziel_freunde', '0|1', 'Ziel: Freunde'],
+  ['ziel_ruhe', '0|1', 'Ziel: Ruhe'],
+  ['ziel_alter', 'min(tag-zielSeit,ZIEL_TAGE)/ZIEL_TAGE', 'wie lange das Ziel schon gilt'],
+  ['stunde', 'h/24', 'Stunde der Entscheidung'],
+  ['morgens', '0|1', 'Stunde bis 7 Uhr'],
+  ['abends', '0|1', 'Stunde ab 17 Uhr'],
+  ['anlass_ereignis', '0|1', 'Entscheidung nach einem Ereignis (nicht um 7 oder 18 Uhr)'],
+];
+const KI_N = KI_MERKMALE.length;
+const KI_AKTIONEN = ['warten'].concat(AKTIONSNAMEN.slice(1));   // Index = Aktionscode; 0 = warten (bewusst nichts tun)
+// Schema-Hash: FNV-1a (32 Bit) über Version, Namen, Skalen und Aktionen; nur Grundrechenarten und Math.imul, gleich in Python
+function kiSchemaText() {
+  return 'stadt-ki|' + KI_SCHEMA + '|' + KI_MERKMALE.map(m => m[0] + ':' + m[1]).join(',') + '|' + KI_AKTIONEN.join(',');
+}
+function kiSchemaHash() {
+  const t = kiSchemaText();
+  let h = 0x811c9dc5;
+  for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return ('0000000' + h.toString(16)).slice(-8);
+}
+// Beobachtung der Person p zur Stunde h (anlass 1: nach einem Ereignis): die Eingabe der Policy für die eigene Entscheidung. Liest nur die
+// eigenen Felder von p, das eigene Haushaltswissen (gebunden, Kinder im Haushalt) und öffentliche Zahlen der Stadt. Die Liste der gelesenen
+// Personenfelder prüft simtest --kipolicy statisch. Name kiEingabe (nicht kiBeobachtung): simtest --militaer verbietet im sim-Block jede
+// Funktion, deren Name nach Überwachen klingt („Beobacht…“); nach außen heißt sie weiter Sim.KI.beobachtung
+function kiEingabe(S, p, h, anlass) {
+  const P = S.p, x = new Float32Array(KI_N);
+  let i = 0;
+  const s = (v) => { x[i++] = v; };
+  const b = (v) => { x[i++] = v ? 1 : 0; };
+  const arb = P.arbeit[p], gem = P.gemein[p], hh = P.hh[p], pa = P.partner[p];
+  const lohn = arb >= 0 && !gem ? S.g.lohn[arb] : 0;
+  s(P.bGeld[p] / 100); s(P.bWohnen[p] / 100); s(P.bKontakt[p] / 100); s(P.bFreizeit[p] / 100);
+  s(P.zuf[p] / 100); s(P.zufZiel[p] / 100);
+  s(klemme(P.geld[p] / Math.max(20, tageskosten(S, p)), -30, 300) / 100);
+  s((S.tag - P.geb[p]) / R.JAHR / 100);
+  s(P.fleiss[p] / 100); s(P.gesellig[p] / 100); s(P.ehrgeiz[p] / 100); s(P.spar[p] / 100); s(P.heimat[p] / 100);
+  b(arb >= 0 && !gem); b(gem); b(P.besitz[p] >= 0);
+  s(lohn / 100);
+  s(klemme((besterFreierLohn(S) - lohn) / 50, -1, 1));
+  const st = Math.max(S.freieStellen, 0), wo = Math.max(S.freieWohnungen, 0);
+  s(st / (st + 200)); s(wo / (wo + 20));                     // Schema 2: ohne Sättigung (V9 hat in jeder Stadt über 50 Stellen frei)
+  s(S.arbeitslosenquote || 0);
+  s(steuerSatz(S) * 10);                                     // Schema 2: Lohnsteuersatz heute (Haushalt, Version 9)
+  b(P.wohnung[p] >= 0); b(eigeneWohnung(S, p)); b(hh >= 0 && eigentuemer(S, hh));
+  b(pa >= 0); b(pa >= 0 && hh >= 0 && hh === P.hh[pa]);
+  s(Math.min(P.kinder[p], 4) / 4); s(hh >= 0 ? Math.min(S.hhKinder[hh], 4) / 4 : 0);
+  b(gebunden(S, p)); b(rentner(S, p)); b(anspruch(S, p));
+  b(P.bund[p] >= WEHRDIENST); b(verpflichtet(S, p));
+  s(freundeZahl(S, p) / 5);
+  s(Math.min(P.elend[p], 30) / 30); s(Math.min(P.unzuf[p], 30) / 30);
+  b(P.trauer[p]); b(P.ohneLaden[p]); b(P.frei[p]); b(P.suchPause[p]); b(P.sucht[p]);
+  b(innerhalb(S, P.jobWegTag[p], 30)); b(innerhalb(S, P.getrenntTag[p], 30)); b(innerhalb(S, P.kindTag[p], 30));
+  b(P.sperreBis[p] > S.tag);
+  const z = P.ziel[p];
+  for (let k = 1; k <= 6; k++) b(z === k);
+  s(z ? Math.min(Math.max(S.tag - P.zielSeit[p], 0), R.ZIEL_TAGE) / R.ZIEL_TAGE : 0);
+  s(h / 24); b(h <= 7); b(h >= 17); b(anlass);
+  if (i !== KI_N) throw new Error('kiEingabe: ' + i + ' statt ' + KI_N + ' Merkmale');
+  return x;
+}
+// Maske: 1 = erlaubt. warten ist immer erlaubt, sonst genau erlaubteAktionen (dieselben Voraussetzungen wie das Gehirn)
+function kiMaske(S, p, h) {
+  const m = new Uint8Array(KI_AKTIONEN.length);
+  m[0] = 1;
+  for (const a of erlaubteAktionen(S, p, h)) m[a] = 1;
+  return m;
+}
+// tanh nur aus + − × ÷ (Math.tanh und Math.exp sind je Engine nur Näherungen): so rechnet die Policy in jedem Browser bitgleich.
+// e^y = 2^k · e^r mit |r| ≤ ln2/2, e^r als Taylorreihe bis r^16 (Rest < 1e-19), 2^k durch Verdoppeln (exakt)
+const KI_LN2 = 0.6931471805599453;
+function tanhK(x) {
+  if (x !== x) return NaN;
+  const a = x < 0 ? -x : x;
+  if (a > 19) return x < 0 ? -1 : 1;
+  const y = 2 * a, k = Math.round(y / KI_LN2), r = y - k * KI_LN2;
+  let e = 1;
+  for (let n = 16; n >= 1; n--) e = 1 + e * r / n;
+  for (let j = 0; j < k; j++) e *= 2;
+  const t = (e - 1) / (e + 1);
+  return x < 0 ? -t : t;
+}
+// SHA-256 (FIPS 180-4) über Bytes, nur Grundrechenarten und Math.imul-freie Bitoperationen; gleich hashlib.sha256 in Python
+const KI_SHA_K = [0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01,
+  0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f,
+  0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+  0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b, 0xc24b8b70,
+  0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a,
+  0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2];
+function kiSha256(b) {
+  const n = b.length, lang = ((n + 9 + 63) >> 6) << 6, m = new Uint8Array(lang);
+  m.set(b); m[n] = 0x80;
+  const bits = n * 8;                                        // Länge in Bit, big-endian in den letzten 8 Byte
+  for (let i = 0; i < 8; i++) m[lang - 1 - i] = Math.floor(bits / Math.pow(2, 8 * i)) & 0xff;
+  const H = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19], w = new Array(64);
+  const rotr = (x, k) => (x >>> k) | (x << (32 - k));
+  for (let o = 0; o < lang; o += 64) {
+    for (let t = 0; t < 16; t++) w[t] = (m[o + 4 * t] << 24) | (m[o + 4 * t + 1] << 16) | (m[o + 4 * t + 2] << 8) | m[o + 4 * t + 3];
+    for (let t = 16; t < 64; t++) {
+      const s0 = rotr(w[t - 15], 7) ^ rotr(w[t - 15], 18) ^ (w[t - 15] >>> 3), s1 = rotr(w[t - 2], 17) ^ rotr(w[t - 2], 19) ^ (w[t - 2] >>> 10);
+      w[t] = (w[t - 16] + s0 + w[t - 7] + s1) | 0;
+    }
+    let [a, bb, c, d, e, f, g, h] = H;
+    for (let t = 0; t < 64; t++) {
+      const t1 = (h + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + KI_SHA_K[t] + w[t]) | 0;
+      const t2 = ((rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + ((a & bb) ^ (a & c) ^ (bb & c))) | 0;
+      h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = bb; bb = a; a = (t1 + t2) | 0;
+    }
+    H[0] = (H[0] + a) | 0; H[1] = (H[1] + bb) | 0; H[2] = (H[2] + c) | 0; H[3] = (H[3] + d) | 0;
+    H[4] = (H[4] + e) | 0; H[5] = (H[5] + f) | 0; H[6] = (H[6] + g) | 0; H[7] = (H[7] + h) | 0;
+  }
+  return H.map(x => ('0000000' + (x >>> 0).toString(16)).slice(-8)).join('');
+}
+// Inhalts-Hash einer Policy (Feld hash, 16 Hex-Zeichen): SHA-256 über Kopf (ASCII: Format, Sim-Version, Schema-Hash, Merkmale, Aktionen),
+// clip, Mittel und Streuung als float64 (little-endian), je Schicht „|aktivierung:nOutxnIn“ und Gewichte (zeilenweise) und Bias als
+// float32 (little-endian). training/exportiere.py rechnet genau so; wer Gewichte, Normalisierung oder Version ändert, ändert den Hash.
+function kiPolicyHash(d) {
+  const B = [], dv = new DataView(new ArrayBuffer(8));
+  const text = (t) => { for (let i = 0; i < t.length; i++) { const c = t.charCodeAt(i); if (c > 127) throw new Error('Policy ungültig: Text nicht ASCII'); B.push(c); } };
+  const f64 = (v) => { dv.setFloat64(0, v, true); for (let i = 0; i < 8; i++) B.push(dv.getUint8(i)); };
+  const f32 = (v) => { dv.setFloat32(0, v, true); for (let i = 0; i < 4; i++) B.push(dv.getUint8(i)); };
+  const no = d.normalisierung, sch = d.netz.schichten;
+  text('stadt-policy|' + d.formatVersion + '|sim' + d.simVersion + '|' + d.schemaHash + '|' + d.beobachtung.merkmale.join(',') + '|'
+    + d.aktionen.liste.join(',') + '|clip');
+  f64(no.clip);
+  for (const v of no.mittel) f64(v);
+  for (const v of no.streuung) f64(v);
+  for (const q of sch) {
+    text('|' + q.aktivierung + ':' + q.gewichte.length + 'x' + q.gewichte[0].length);
+    for (const zeile of q.gewichte) for (const v of zeile) f32(v);
+    for (const v of q.bias) f32(v);
+  }
+  return kiSha256(Uint8Array.from(B)).slice(0, 16);
+}
+// Eine Policy-Datei (ki/policy_*.json, training/exportiere.py) streng prüfen und zum Rechnen vorbereiten. Wirft mit Grund, wenn etwas
+// nicht passt: Format, Sim-Version (trainiert auf dieser Version der Stadt), Schema (Merkmale und Aktionen genau wie hier), Längen,
+// Zahlen (endlich), Normalisierung, Schichten, Inhalts-Hash (nachgerechnet: der Verweis im Spielstand zeigt immer auf genau diese Gewichte).
+const KI_AKT = { tanh: 1, relu: 2, linear: 3 };
+const KI_FORMAT = 2;                    // 2: Sim-Version und nachgerechneter Inhalts-Hash (1: Etappe 1 bis zur Prüfung, nicht mehr gültig)
+function kiPolicyPruefen(d) {
+  const fehl = (w) => { throw new Error('Policy ungültig: ' + w); };
+  const endlich = (v) => typeof v === 'number' && Number.isFinite(v);
+  if (!d || typeof d !== 'object' || d.format !== 'stadt-policy') fehl('kein Format stadt-policy');
+  if (d.formatVersion !== KI_FORMAT) fehl('Formatversion ' + d.formatVersion + ' (erwartet ' + KI_FORMAT + ')');
+  if (d.simVersion !== VERSION) fehl('trainiert auf Stadt-Version ' + d.simVersion + ', diese Stadt ist Version ' + VERSION + ' (neu trainieren)');
+  const bo = d.beobachtung, ak = d.aktionen;
+  if (!bo || bo.schemaVersion !== KI_SCHEMA) fehl('Beobachtungsschema ' + (bo && bo.schemaVersion) + ' (diese Stadt: ' + KI_SCHEMA + ')');
+  if (!Array.isArray(bo.merkmale) || bo.merkmale.length !== KI_N || bo.merkmale.some((n, i) => n !== KI_MERKMALE[i][0])) fehl('Merkmale passen nicht zum Schema');
+  if (bo.laenge !== KI_N) fehl('Länge ' + bo.laenge + ' statt ' + KI_N);
+  if (!ak || !Array.isArray(ak.liste) || ak.liste.length !== KI_AKTIONEN.length || ak.liste.some((n, i) => n !== KI_AKTIONEN[i])) fehl('Aktionen passen nicht');
+  if (d.schemaHash !== kiSchemaHash()) fehl('Schema-Hash ' + d.schemaHash + ' statt ' + kiSchemaHash());
+  const no = d.normalisierung;
+  if (!no || !Array.isArray(no.mittel) || !Array.isArray(no.streuung) || no.mittel.length !== KI_N || no.streuung.length !== KI_N) fehl('Normalisierung fehlt');
+  if (!no.mittel.every(endlich) || !no.streuung.every(v => endlich(v) && v > 0) || !endlich(no.clip) || no.clip <= 0) fehl('Normalisierung: Zahlen');
+  const sch = d.netz && d.netz.schichten;
+  if (!Array.isArray(sch) || sch.length < 1 || sch.length > 6) fehl('Schichten');
+  let nIn = KI_N;
+  const L = [];
+  for (let k = 0; k < sch.length; k++) {
+    const q = sch[k], W = q && q.gewichte, B = q && q.bias;
+    if (!Array.isArray(W) || !Array.isArray(B) || W.length !== B.length || W.length < 1 || W.length > 512) fehl('Schicht ' + k + ': Form');
+    if (!KI_AKT[q.aktivierung]) fehl('Schicht ' + k + ': Aktivierung ' + q.aktivierung);
+    const nOut = W.length, w = new Float64Array(nOut * nIn), bias = new Float64Array(nOut);
+    for (let j = 0; j < nOut; j++) {
+      const zeile = W[j];
+      if (!Array.isArray(zeile) || zeile.length !== nIn) fehl('Schicht ' + k + ': Zeile ' + j + ' hat nicht ' + nIn + ' Gewichte');
+      for (let i2 = 0; i2 < nIn; i2++) { const v = zeile[i2]; if (!endlich(v)) fehl('Schicht ' + k + ': Zahl'); w[j * nIn + i2] = Math.fround(v); }
+      if (!endlich(B[j])) fehl('Schicht ' + k + ': Bias'); bias[j] = Math.fround(B[j]);
+    }
+    L.push({ w, bias, nIn, nOut, akt: KI_AKT[q.aktivierung] });
+    nIn = nOut;
+  }
+  if (nIn !== KI_AKTIONEN.length) fehl('Ausgabe hat ' + nIn + ' statt ' + KI_AKTIONEN.length + ' Werte');
+  if (L[L.length - 1].akt !== KI_AKT.linear) fehl('letzte Schicht muss linear sein (Logits)');
+  const hash = kiPolicyHash(d);
+  if (d.hash !== hash) fehl('Hash ' + d.hash + ' passt nicht zum Inhalt (' + hash + ')');
+  return { name: String(d.name || ''), status: String(d.status || ''), hash, schemaHash: d.schemaHash, simVersion: d.simVersion,
+    mittel: Float64Array.from(no.mittel), streuung: Float64Array.from(no.streuung), clip: no.clip, schichten: L };
+}
+// Rechnen: Normalisierung (x − Mittel) / Streuung, begrenzt auf ±clip, als float32 wie im Training; dann die Schichten; Auswahl =
+// größter Logit unter den erlaubten Aktionen (bei Gleichstand die kleinste Nummer). Wirft bei NaN oder unendlichen Werten.
+function kiPolicyRechnen(pol, beob, maske) {
+  if (!beob || beob.length !== KI_N || !maske || maske.length !== KI_AKTIONEN.length) throw new Error('Policy: Eingabe hat die falsche Länge');
+  let v = new Float64Array(KI_N);
+  for (let i = 0; i < KI_N; i++) {
+    const x = beob[i];
+    if (!Number.isFinite(x)) throw new Error('Policy: Beobachtung ' + KI_MERKMALE[i][0] + ' ist keine Zahl');
+    const z = (x - pol.mittel[i]) / pol.streuung[i];
+    v[i] = Math.fround(z < -pol.clip ? -pol.clip : z > pol.clip ? pol.clip : z);
+  }
+  for (const L of pol.schichten) {
+    const o = new Float64Array(L.nOut), w = L.w, n = L.nIn;
+    for (let j = 0; j < L.nOut; j++) {
+      let t = L.bias[j];
+      const r = j * n;
+      for (let i = 0; i < n; i++) t += w[r + i] * v[i];
+      o[j] = L.akt === 1 ? tanhK(t) : L.akt === 2 ? (t > 0 ? t : 0) : t;
+    }
+    v = o;
+  }
+  let best = -1;
+  for (let a = 0; a < v.length; a++) {
+    if (!Number.isFinite(v[a])) throw new Error('Policy: Logit ' + KI_AKTIONEN[a] + ' ist keine Zahl');
+    if (maske[a] && (best < 0 || v[a] > v[best])) best = a;
+  }
+  if (best < 0) throw new Error('Policy: keine Aktion erlaubt');
+  return { aktion: best, logits: v };
+}
+// Zustand des Haken (Modul, nicht S): Policy für alle, Fokusperson der Umgebung, Zähler für die Oberfläche
+const KIP = { an: false, policy: null, fokus: null,
+  stand: { entscheidungen: 0, warten: 0, ausgefuehrt: 0, fehlgeschlagen: 0, regeln: 0, rueckfall: 0, fehler: '' } };
+function kiAn() { KIP.an = KIP.policy !== null || KIP.fokus !== null; }
+// Policy für alle Bewohner setzen (null = Regeln). Nimmt nur Geprüftes aus kiPolicyPruefen
+function kiPolicySetzen(pol) {
+  if (pol !== null && !(pol && pol.schichten && pol.schemaHash === kiSchemaHash())) throw new Error('Policy nicht geprüft');
+  KIP.policy = pol;
+  KIP.stand = { entscheidungen: 0, warten: 0, ausgefuehrt: 0, fehlgeschlagen: 0, regeln: 0, rueckfall: 0, fehler: '' };
+  kiAn();
+}
+// Haken am Anfang von entscheide(). −1: weiter nach Regeln; sonst die Rückgabe von entscheide (gewählte Aktion, 0 = nichts)
+function kiHaken(S, p, h) {
+  const f = KIP.fokus;
+  if (f !== null) {
+    if (f.S !== S || p !== f.id || S.p.gen[p] !== f.gen || f.innen) return -1;   // nur die Fokusperson (ID und Generation)
+    // Entscheidungszeitpunkt der Fokusperson: keine Regelentscheidung. Beobachtung und Maske gelten jetzt; die Aktion liefert die
+    // Umgebung nach dieser Stunde (kiFokusAusfuehren), mit erneuter Prüfung, wie eine Antwort des Sprachmodells (kiEntscheidung)
+    if (f.faellig) f.verpasst++;
+    const anlass = S.p.jetzt[p] ? 1 : 0;
+    f.faellig = { tag: S.tag, h, anlass, beob: kiEingabe(S, p, h, anlass), maske: kiMaske(S, p, h) };
+    f.zahl++;
+    return 0;
+  }
+  if (KIP.policy === null || S.p.haftBis[p]) return -1;       // in Haft: Regeln (entscheiden dort nichts)
+  const st = KIP.stand;
+  // Nur wofür die Policy trainiert ist (Fokuspersonen der Umgebung: erwachsen, unter R.RENTE Jahren, keine Hauptfigur); sonst Regeln.
+  // istHaupt zählt in Version 9 den Bürgermeister mit: Er entscheidet nach Regeln (oder mit dem Sprachmodell), nie nach der Policy
+  if (S.tag - S.p.geb[p] >= R.RENTE * R.JAHR || istHaupt(S, p)) { st.regeln++; return -1; }
+  let a;
+  try {
+    a = kiPolicyRechnen(KIP.policy, kiEingabe(S, p, h, S.p.jetzt[p] ? 1 : 0), kiMaske(S, p, h)).aktion;
+  } catch (e) {                                              // Fehler oder NaN: diese und alle weiteren Entscheidungen nach Regeln
+    st.rueckfall++; st.fehler = String((e && e.message) || e); KIP.policy = null; kiAn();
+    return -1;
+  }
+  st.entscheidungen++;
+  if (a === 0) { st.warten++; return 0; }
+  if (ausfuehren(S, p, a)) st.ausgefuehrt++; else st.fehlgeschlagen++;   // a stammt aus der Maske von eben (gleiche Stunde, gleicher Stand)
+  return a;
+}
+// ─── Fokusperson (Trainingsumgebung und Auswertung) ───
+// Genau eine Person (ID + Generation) entscheidet nicht nach Regeln, die Umgebung liefert ihre Aktion. Alles, was die Person bei ihrer
+// Entscheidung an Zufall zieht (Regelarm und Aktionen), kommt aus dem eigenen Strom f.rs: Die übrige Stadt zieht dieselben Zahlen, gleich
+// was die Fokusperson tut; Unterschiede entstehen nur über die Folgen. Der Fokus liegt nicht in S; die Umgebung sichert f selbst.
+function kiFokusSetzen(S, id, gen, rs) {
+  if (!lebtNoch(S, id, gen)) throw new Error('Fokusperson lebt nicht (ID ' + id + ', Generation ' + gen + ')');
+  KIP.fokus = { S, id, gen, rs: (rs >>> 0) || 1, faellig: null, verpasst: 0, zahl: 0, innen: false, ende: '' };
+  kiAn();
+  return KIP.fokus;
+}
+function kiFokusLoesen() { KIP.fokus = null; kiAn(); }
+function mitFokusZufall(S, f, fn) {
+  const alt = S.rs;
+  S.rs = f.rs;
+  try { return fn(); } finally { f.rs = S.rs; S.rs = alt; }
+}
+// Antwort der Umgebung auf die fällige Entscheidung (0 = warten). Nur was die Maske erlaubte; vor dem Ausführen noch einmal gegen
+// erlaubteAktionen zur Stunde der Entscheidung. Rückgabe fürs Protokoll: art = warten | ausgefuehrt | fehlgeschlagen | abgelehnt | maske_verletzt
+function kiFokusAusfuehren(S, a) {
+  const f = KIP.fokus;
+  if (f === null || f.S !== S || !f.faellig) return { art: 'keine_entscheidung', aktion: a };
+  const e = f.faellig, p = f.id;
+  f.faellig = null;
+  if (!Number.isInteger(a) || a < 0 || a >= KI_AKTIONEN.length || !e.maske[a]) return { art: 'maske_verletzt', aktion: a };
+  if (a === 0) return { art: 'warten', aktion: 0 };
+  if (!lebtNoch(S, p, f.gen)) return { art: 'abgelehnt', aktion: a, grund: 'weg' };
+  if (!erlaubteAktionen(S, p, e.h).includes(a)) return { art: 'abgelehnt', aktion: a, grund: 'Lage geändert' };
+  const ok = mitFokusZufall(S, f, () => ausfuehren(S, p, a));
+  if (S.p.lebt[p] && S.p.gen[p] === f.gen) S.p.jetzt[p] = 0;   // eigene Folgen lösen keine zweite Entscheidung aus (wie in stunde)
+  return { art: ok ? 'ausgefuehrt' : 'fehlgeschlagen', aktion: a };
+}
+// Regelarm (Vergleich): an derselben Stelle entscheidet das normale Gehirn, mit dem eigenen Zufallsstrom der Fokusperson
+function kiFokusRegeln(S) {
+  const f = KIP.fokus;
+  if (f === null || f.S !== S || !f.faellig) return { art: 'keine_entscheidung', aktion: 0 };
+  const e = f.faellig, p = f.id, vor = S.stat.ausgefuehrt.slice();
+  f.faellig = null;
+  if (!lebtNoch(S, p, f.gen)) return { art: 'abgelehnt', aktion: 0, grund: 'weg' };
+  let a;
+  f.innen = true;
+  try { a = mitFokusZufall(S, f, () => entscheide(S, p, e.h)); } finally { f.innen = false; }
+  if (S.p.lebt[p] && S.p.gen[p] === f.gen) S.p.jetzt[p] = 0;
+  return { art: a === 0 ? 'warten' : S.stat.ausgefuehrt[a] > vor[a] ? 'ausgefuehrt' : 'fehlgeschlagen', aktion: a, maskeOk: !!e.maske[a] };
+}
+// Haken am Anfang von entferne(): Tod oder Wegzug der Fokusperson merken (Wegzug auch, wenn sie mit dem Partner geht)
+function kiFokusEnde(S, q, grund) {
+  const f = KIP.fokus;
+  if (f !== null && f.S === S && q === f.id && S.p.gen[q] === f.gen && !f.ende) f.ende = grund === 'tod' ? 'tod' : 'wegzug';
+}
+const KI = { SCHEMA: KI_SCHEMA, MERKMALE: KI_MERKMALE, AKTIONEN: KI_AKTIONEN, schemaText: kiSchemaText, schemaHash: kiSchemaHash,
+  beobachtung: kiEingabe, maske: kiMaske, tanh: tanhK, policyPruefen: kiPolicyPruefen, policyRechnen: kiPolicyRechnen,
+  policyHash: kiPolicyHash, sha256: kiSha256, FORMAT: KI_FORMAT,
+  policySetzen: kiPolicySetzen, policyAktiv: () => KIP.policy, policyStand: () => Object.assign({ aktiv: KIP.policy !== null }, KIP.stand),
+  fokusSetzen: kiFokusSetzen, fokusLoesen: kiFokusLoesen, fokus: () => KIP.fokus, fokusAusfuehren: kiFokusAusfuehren, fokusRegeln: kiFokusRegeln };
+
 G.StadtSim = {
+  KI,                                                        // KI-Policy (Etappe 1): Schema, Beobachtung, Maske, Policy, Fokus
   VERSION, R, VK, RASTER, RAND, LEER, STRASSE, WOHNHAUS, WERKSTATT, LADEN, PARK, BAUSTELLE, TECH, KITA, SOFTWARE, HANDY, COMPUTER,
   M, Z, ZIELNAMEN, AKTIONSNAMEN,
   VORNAMEN_W, VORNAMEN_M, NACHNAMEN,                         // nur für die Prüfung der Antworten des Sprachmodells (kein Verdacht gegen Namen)
@@ -8124,7 +8524,7 @@ function spielstandLesen(text, migrieren) {
   if (Array.isArray(d.arrays)) d.arrays = d.arrays.map(a => ({ name: a.name, typ: a.typ, daten: b64ein(a.b64, a.typ) }));
   return { S: Sim.importZustand(d, migrieren), zuletztGelaufen: Number(d.zuletztGelaufen) || Date.now(), tempo: d.tempo, ui: d.ui || {} };
 }
-function uiZustand() { return { kiModell: ki.modell, kiMessung: ki.messung }; }   // Modell und gemessene Antwortzeit
+function uiZustand() { return { kiModell: ki.modell, kiMessung: ki.messung, entscheidungen: kiWahlUi() }; }   // KI-Policy (Etappe 1): Modellwahl, nie Gewichte   // Modell und gemessene Antwortzeit
 // Spec: „Die Datei merkt sich, wann sie zuletzt lief.“ In einem versteckten Tab steht die Stadt (kein Bild, kein Takt):
 // dann zählt der Moment des Versteckens. Mitten im Aufholen gelten die noch fehlenden Stunden als nicht gelaufen.
 let verstecktSeit = 0, aufholZiel = -1;
@@ -13755,6 +14155,216 @@ const ki = {
   codeTag: new Map(),                                      // „id/gen“ → Spieltag, an dem die Figur zuletzt Code geschrieben hat
 };
 if (geladen && geladen.ui && typeof geladen.ui.kiModell === 'string') ki.modell = geladen.ui.kiModell;
+// ─── KI-Policy (Etappe 1, Version 9): Entscheidungen der Bewohner – Regeln (Standard) oder trainierte Policy (experimentell) ───
+// Noahs Regel: Eine Policy, die die Auswertung nicht bestanden hat, steckt nicht in dieser Datei. Sie kommt
+//  - aus dem Ordner ki/ neben der Seite: ki/policies.json nennt die Dateien (tools/ki_liste.mjs). Geholt per fetch mit relativer URL, nur wenn
+//    „Trainierte Policy“ gewählt wird oder der Spielstand eine verlangt. Ohne Server (file://) oder ohne ki/ geht das nicht: Hinweis, Regeln;
+//  - oder als Datei (Einstellungen → „Policy-Datei laden …“; eigener Speicherplatz 'stadt-policy-v1', nicht im Spielstand; „Geladene Datei
+//    entfernen“ löscht ihn wieder);
+//  - eingebettet (<script id="ki-policy">) erst nach bestandener Freigabe (das Patch-Werkzeug ki_patch.mjs --policy aus dem Übertrag nimmt nur
+//    den Status „freigegeben“; es liegt nicht im Ordner stadt/, docs/GRENZEN.md).
+// Jede Datei prüft Sim.KI.policyPruefen streng (Format, Stadt-Version, Schema-Hash, Inhalts-Hash SHA-256, endliche Zahlen; Lücke: „endlich“
+// vor dem Runden auf float32, docs/GRENZEN.md). Im Spielstand steht nur die Wahl (ui.entscheidungen: Art, Name, Hash, Schema), nie Gewichte.
+// Beim Laden zählt der Hash: Fehlt genau diese Policy oder passt sie nicht, entscheiden die Regeln und die Oberfläche sagt es (Rückfall). Nie
+// still eine andere Policy.
+const KI_POLICY_SCHLUESSEL = 'stadt-policy-v1';
+const KI_LISTE = 'ki/policies.json', KI_LISTE_MAX = 12, KI_LADEN_MS = 8000;
+// ordner: offen (noch nicht gefragt) | geladen | fehlt; ordnerTexte: [Text, Herkunft] der Dateien aus ki/; sitzung: geladene Datei, die der
+// Browser nicht speichern durfte (gilt bis zum Neuladen)
+const kiWahl = { quellen: [], fehler: [], hinweis: '', gemeldet: '', ordner: 'offen', ordnerText: '', ordnerTexte: [], ordnerFehler: [], laedt: null, sitzung: null };
+// Grund einer Ablehnung für die Oberfläche: JSON-Fehler des Browsers kommen englisch und technisch, alles andere von policyPruefen
+const kiGrund = (e) => (e instanceof SyntaxError ? 'kein gültiges JSON (Datei abgeschnitten oder beschädigt?)' : String((e && e.message) || e));
+function kiNimm(Q, F, text, herkunft) {
+  try {
+    const d = JSON.parse(text), pol = Sim.KI.policyPruefen(d);
+    if (!Q.some(q => q.pol.hash === pol.hash)) Q.push({ herkunft, pol, d });   // dieselbe Policy aus zwei Quellen nur einmal
+  } catch (e) { F.push(`${herkunft}: ${kiGrund(e)}`); }
+}
+function kiDateiGespeichert() { try { return !!localStorage.getItem(KI_POLICY_SCHLUESSEL); } catch { return false; } }
+function kiPolicyQuellen() {
+  const Q = [], F = [];
+  const el = document.getElementById('ki-policy');
+  if (el && el.textContent.trim()) kiNimm(Q, F, el.textContent, 'in der Datei');
+  for (const [text, herkunft] of kiWahl.ordnerTexte) kiNimm(Q, F, text, herkunft);
+  let t = null;
+  try { t = localStorage.getItem(KI_POLICY_SCHLUESSEL); } catch { /* kein Speicher: nur ki/ und diese Sitzung */ }
+  if (t) kiNimm(Q, F, t, 'geladen');
+  if (kiWahl.sitzung) kiNimm(Q, F, kiWahl.sitzung, 'geladen, nur diese Sitzung');
+  kiWahl.quellen = Q; kiWahl.fehler = F.concat(kiWahl.ordnerFehler);
+}
+// Den Ordner ki/ lesen (Liste, dann jede genannte Datei). Einmal je Seitenaufruf; nochmal nur, wenn Noah „Trainierte Policy“ wählt und er
+// vorher fehlte (nochmal = true). Was nicht klappt, steht danach in kiWahl.ordnerText und kiWahl.fehler (sichtbar in den Einstellungen)
+async function kiOrdnerLaden(nochmal) {
+  if (kiWahl.ordner === 'geladen' || (kiWahl.ordner === 'fehlt' && !nochmal)) return;
+  if (!kiWahl.laedt) kiWahl.laedt = (async () => {
+    const texte = [], fehler = [];
+    if (location.protocol === 'file:') {                   // Browser lesen aus file:// keine Nachbardateien per fetch
+      kiWahl.ordner = 'fehlt';
+      kiWahl.ordnerText = 'Die Seite ist als einzelne Datei geöffnet (file://) und kann den Ordner ki/ nicht lesen: über einen Server öffnen (z. B. '
+        + 'http://localhost:8000) oder „Policy-Datei laden …“.';
+    } else {
+      const holen = async (url) => {
+        const ab = new AbortController(), uhr = setTimeout(() => ab.abort(), KI_LADEN_MS);
+        try {
+          const r = await fetch(url, { cache: 'no-store', signal: ab.signal });
+          if (!r.ok) { await r.text().catch(() => ''); throw new Error(`HTTP ${r.status}`); }   // Antwort zu Ende lesen (sonst bricht der Browser sie ab)
+          return await r.text();
+        } catch (e) { throw new Error(e && e.name === 'AbortError' ? `keine Antwort in ${KI_LADEN_MS / 1000} s` : String((e && e.message) || e)); }
+        finally { clearTimeout(uhr); }
+      };
+      try {
+        const liste = JSON.parse(await holen(KI_LISTE));
+        if (!liste || liste.format !== 'stadt-policy-liste' || liste.version !== 1 || !Array.isArray(liste.policies)) throw new Error('kein Format stadt-policy-liste 1');
+        for (const datei of liste.policies.slice(0, KI_LISTE_MAX)) {
+          if (typeof datei !== 'string' || !/^[A-Za-z0-9_-][A-Za-z0-9_.-]*\.json$/.test(datei)) { fehler.push(`ki/: Dateiname „${String(datei).slice(0, 40)}“ abgelehnt`); continue; }
+          try { texte.push([await holen('ki/' + datei), 'ki/' + datei]); } catch (e) { fehler.push(`ki/${datei}: ${e.message}`); }
+        }
+        kiWahl.ordner = 'geladen';
+        kiWahl.ordnerText = liste.policies.length ? '' : `${KI_LISTE} nennt keine Policy.`;
+      } catch (e) {
+        kiWahl.ordner = 'fehlt';
+        kiWahl.ordnerText = `Der Ordner ki/ neben der Seite ist nicht lesbar (${KI_LISTE}: ${kiGrund(e)}).`;
+      }
+    }
+    kiWahl.ordnerTexte = texte; kiWahl.ordnerFehler = fehler;
+    kiPolicyQuellen();
+  })();
+  try { await kiWahl.laedt; } finally { kiWahl.laedt = null; }
+}
+// Vor dem Umschalten auf einen Spielstand (Start, Import): ki/ nur holen, wenn der Stand eine Policy verlangt, die noch nicht da ist
+async function kiQuellenFuer(ui) {
+  const w = ui && ui.entscheidungen;
+  if (w && w.art === 'policy' && !kiWahl.quellen.some(q => q.pol.hash === w.hash)) await kiOrdnerLaden();
+}
+// Genau die Policy mit diesem Inhalts-Hash (sonst Regeln). Rückgabe: gesetzt?
+function kiWahlSetzen(art, hash) {
+  const q = art === 'policy' && typeof hash === 'string' && hash ? kiWahl.quellen.find(x => x.pol.hash === hash) || null : null;
+  Sim.KI.policySetzen(q ? q.pol : null);
+  kiWahl.gemeldet = '';
+  kiPolicyAnzeigen();
+  return !!q;
+}
+function kiWahlUi() {
+  const p = Sim.KI.policyAktiv();
+  return p ? { v: 1, art: 'policy', name: p.name, hash: p.hash, schema: p.schemaHash } : { v: 1, art: 'regeln' };
+}
+// Wahl aus einem Spielstand (Start, Import). Ein Stand ohne Wahl (09083f5 und älter) läuft mit den Regeln. still: keine eigene Meldung,
+// der Aufrufer hängt kiWahl.hinweis an seine an (Import: sonst überschreibt „Spielstand geladen“ den Rückfall-Hinweis)
+function kiWahlAusUi(ui, still) {
+  const w = ui && ui.entscheidungen;
+  kiWahl.hinweis = '';
+  if (!w || w.art !== 'policy') { kiWahlSetzen('regeln'); return; }
+  if (!kiWahlSetzen('policy', w.hash)) {
+    kiWahl.hinweis = `Die gespeicherte Policy „${String(w.name || '?').slice(0, 60)}“ (Hash ${String(w.hash || 'fehlt').slice(0, 20)}) ist nicht da oder passt nicht zu `
+      + `dieser Stadt.${kiWahl.ordnerText ? ' ' + kiWahl.ordnerText : ''} Es entscheiden die Regeln (Rückfall). Liegt sie wieder in ki/, im Fenster „Entscheidungen der `
+      + 'Bewohner“ neu wählen.';
+    kiPolicyAnzeigen();
+    if (!still) meldung(kiWahl.hinweis, 'warnung');
+  }
+}
+function kiPolicyAnzeigen(nurText) {
+  const p = Sim.KI.policyAktiv(), st = Sim.KI.policyStand(), sel = $('ki-policy-wahl');
+  if (!nurText) {                                          // Auswahl nur bei Änderungen neu aufbauen (sonst klappt sie beim Zeigen zu)
+    $('ki-entscheid-regeln').checked = !p; $('ki-entscheid-policy').checked = !!p;
+    sel.innerHTML = kiWahl.quellen.length
+      ? kiWahl.quellen.map(q => `<option value="${esc(q.pol.hash)}" title="${esc(q.herkunft)}">${esc(q.pol.name || 'ohne Namen')} (${esc(q.pol.status || '?')})</option>`).join('')
+      : `<option value="">${kiWahl.ordner === 'offen' ? 'aus ki/ beim Umschalten' : 'keine gültige Policy'}</option>`;
+    sel.disabled = kiWahl.quellen.length < 2;
+    if (p) sel.value = p.hash;
+    $('ki-policy-vergessen').hidden = !(kiDateiGespeichert() || kiWahl.sitzung);
+  }
+  // Auswertung der Policy, die die Auswahl zeigt (aus der Datei: auswertung.urteil und hinweis; frei, nicht im Hash, nur als Text gezeigt)
+  const qa = kiWahl.quellen.find(x => x.pol.hash === (p ? p.hash : sel.value)) || null;
+  let aw = '';
+  if (qa) {
+    const urteil = qa.d.auswertung && typeof qa.d.auswertung.urteil === 'string' ? qa.d.auswertung.urteil.slice(0, 40) : 'keine angegeben (nicht ausgewertet)';
+    aw = `Auswertung laut Datei: ${urteil}.` + (typeof qa.d.hinweis === 'string' && qa.d.hinweis ? ' ' + qa.d.hinweis.slice(0, 400) : '');
+  }
+  $('ki-policy-auswertung').textContent = aw;
+  $('ki-policy-auswertung').hidden = !aw;
+  let text;
+  if (p) {
+    const q = kiWahl.quellen.find(x => x.pol.hash === p.hash), her = q && q.d.herkunft ? q.d.herkunft : {};   // nach Hash: die Quellen werden neu gebaut
+    text = `Es entscheidet die Policy „${p.name}“ (${p.status}, ${q ? q.herkunft : '?'}${her.trainingsSchritte ? `, ${her.trainingsSchritte} Trainingsschritte` : ''}, `
+      + `Stadt-Version ${p.simVersion}), für alle anderen die Regeln.`
+      + (st.entscheidungen ? ` Bisher ${st.entscheidungen} Entscheidungen: ${st.ausgefuehrt} ausgeführt, ${st.fehlgeschlagen} ohne Erfolg, ${st.warten}× gewartet`
+        + ` (dazu ${st.regeln} nach Regeln).` : '');
+  } else {
+    text = 'Es entscheiden die Regeln.';
+    if (kiWahl.ordner !== 'offen' && !kiWahl.quellen.length) text += ' Keine gültige Policy vorhanden.';
+    if (kiWahl.ordnerText && !kiWahl.hinweis.includes(kiWahl.ordnerText)) text += ' ' + kiWahl.ordnerText;
+    if (kiWahl.fehler.length) text += ` Abgelehnt: ${kiWahl.fehler.join('; ').slice(0, 700)}.`;
+  }
+  if (kiWahl.hinweis) text += ' ' + kiWahl.hinweis;
+  $('ki-policy-status').textContent = text;
+  $('ki-knopf').textContent = `Entscheidungen: ${p ? 'Policy' : 'Regeln'} ›`;   // Stand schon in den Einstellungen sichtbar (kurz: eine Zeile mit „Schließen“)
+  $('ki-knopf').setAttribute('aria-label', `Entscheidungen der Bewohner: ${p ? 'trainierte Policy' : 'Regeln'}. Fenster öffnen`);
+}
+kiPolicyQuellen();
+await kiQuellenFuer(geladen && geladen.ui);               // nur wenn der Spielstand eine Policy verlangt: ki/ lesen, bevor die Stadt läuft
+kiWahlAusUi(geladen && geladen.ui);
+$('ki-entscheid-regeln').addEventListener('change', () => { kiWahl.hinweis = ''; kiWahlSetzen('regeln'); speichern(); });
+$('ki-entscheid-policy').addEventListener('change', async () => {
+  kiWahl.hinweis = '';
+  if (kiWahl.ordner !== 'geladen') { $('ki-policy-status').textContent = 'Policy wird aus dem Ordner ki/ geladen …'; await kiOrdnerLaden(true); }
+  const wahl = $('ki-policy-wahl').value || (kiWahl.quellen[0] ? kiWahl.quellen[0].pol.hash : '');
+  if (!kiWahlSetzen('policy', wahl)) {                     // nichts Gültiges: Regeln bleiben, sichtbar
+    kiWahl.hinweis = 'Umschalten auf die Policy nicht möglich.';
+    kiPolicyAnzeigen();
+    meldung(`${kiWahl.ordnerText || 'Keine gültige Policy in ki/.'} Umschalten nicht möglich, es entscheiden weiter die Regeln.`, 'warnung');
+  }
+  speichern();
+});
+$('ki-policy-wahl').addEventListener('change', (e) => { if (Sim.KI.policyAktiv()) { kiWahlSetzen('policy', e.target.value); speichern(); } });
+$('ki-policy-laden').addEventListener('click', () => $('ki-policy-datei').click());
+// Das Ergebnis steht im Fenster (Status, role=status): Die Meldung unten liegt hinter den beiden offenen Fenstern und verschwindet nach Sekunden
+$('ki-policy-datei').addEventListener('change', async (e) => {
+  const datei = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!datei) return;
+  const dname = String(datei.name || 'Datei').slice(0, 60);
+  try {
+    const text = await datei.text();
+    const pol = Sim.KI.policyPruefen(JSON.parse(text));   // wirft mit Grund; dann bleibt alles, wie es war
+    let nurSitzung = '';
+    try { localStorage.setItem(KI_POLICY_SCHLUESSEL, text); kiWahl.sitzung = null; }
+    catch (err) { kiWahl.sitzung = text; nurSitzung = ` Nicht dauerhaft gespeichert (${err.name}): Sie gilt nur bis zum Neuladen.`; }
+    kiPolicyQuellen();
+    const pa = Sim.KI.policyAktiv();
+    const weiter = pa && pa.hash === pol.hash ? 'Sie ist schon gewählt.' : pa ? 'Unter „Policy“ auswählen.' : 'Zum Einschalten oben „Trainierte Policy (experimentell)“ wählen.';
+    kiWahl.hinweis = `Datei „${dname}“: Policy „${pol.name}“ geprüft und geladen.${nurSitzung} ${weiter}`;
+    kiPolicyAnzeigen();
+    if (!Sim.KI.policyAktiv()) $('ki-policy-wahl').value = pol.hash;   // die neue zeigen (Auswertung darunter), gewählt ist sie noch nicht
+    kiPolicyAnzeigen(true);
+    meldung(kiWahl.hinweis, nurSitzung ? 'warnung' : undefined);
+  } catch (err) {
+    kiWahl.hinweis = `Datei „${dname}“ abgelehnt: ${kiGrund(err)}. Es bleibt, wie es war.`;
+    kiPolicyAnzeigen();
+    meldung(`Policy-Datei abgelehnt: ${kiGrund(err)}`, 'fehler');
+  }
+  $('ki-policy-status').scrollIntoView({ block: 'nearest' });   // am Handy scrollt das Fenster; der Stand steht oben
+});
+// Geladene Datei wieder entfernen (Speicherplatz stadt-policy-v1 und diese Sitzung). War sie aktiv und gibt es sie nicht auch in ki/: Regeln
+$('ki-policy-vergessen').addEventListener('click', () => {
+  try { localStorage.removeItem(KI_POLICY_SCHLUESSEL); } catch { /* kein Speicher: nur die Sitzung */ }
+  kiWahl.sitzung = null;
+  kiPolicyQuellen();
+  const p = Sim.KI.policyAktiv(), bleibt = p && kiWahl.quellen.some(q => q.pol.hash === p.hash);
+  if (p && !bleibt) kiWahlSetzen('regeln');
+  kiWahl.hinweis = p && !bleibt ? 'Geladene Datei entfernt; sie war gewählt.' : 'Geladene Datei entfernt.';
+  kiPolicyAnzeigen();
+  speichern();
+});
+$('ki-knopf').addEventListener('click', () => { kiPolicyAnzeigen(); $('ki-dialog').showModal(); });   // eigenes Fenster über den Einstellungen
+// Rückfall zur Laufzeit (NaN, Fehler in der Policy): Sim.KI hat schon auf Regeln umgeschaltet; hier sichtbar machen und die Wahl speichern
+setInterval(() => {
+  const st = Sim.KI.policyStand();
+  if (!st.aktiv && st.fehler && kiWahl.gemeldet !== st.fehler) {
+    kiWahl.gemeldet = st.fehler;
+    kiWahl.hinweis = `Die Policy hat einen Fehler gemeldet (${st.fehler}). Es entscheiden die Regeln (Rückfall).`;
+    kiPolicyAnzeigen(); meldung(kiWahl.hinweis, 'fehler'); speichern();
+  } else if ($('ki-dialog').open) kiPolicyAnzeigen(true);
+}, 1000);
 // Spec: „5 als Standard, bis 10 nur, wenn eine Entscheidung unter 5 Sekunden braucht.“ Gemessen über alle Antworten
 // dieses Modells; die Messung wird mitgespeichert und beginnt beim Modellwechsel neu.
 ki.messung = { n: 0, ms: 0 };
@@ -14473,7 +15083,7 @@ async function aufholen(msWeg) {
   const tage = Math.floor(stundenGesamt / 24);
   aufholenLaeuft = true;
   aufholZiel = zielTag * 24 + zielStunde;
-  Sim.kiSchalten(S, false);                               // beim Aufholen entscheiden alle mit dem normalen Gehirn
+  Sim.kiSchalten(S, false);                               // beim Aufholen entscheiden alle ohne Sprachmodell: Regeln oder, falls gewählt, die Policy (KI-Policy, Etappe 1)
   const zeigen = tage >= 1;
   if (zeigen) {
     $('aufholen-text').textContent = `Deine Stadt holt ${tage} ${tage === 1 ? 'Tag' : 'Tage'} auf …`;
@@ -16064,14 +16674,17 @@ $('import-datei').addEventListener('change', async (e) => {
     let l, migriert = false;
     try { l = spielstandLesen(text); }
     catch (err) { if (!err.migrierbar) throw err; l = spielstandLesen(text, true); migriert = err.vonVersion; }   // Version 2 bis 7: übernehmen
+    await kiQuellenFuer(l.ui);                            // KI-Policy (Etappe 1): verlangt der Stand eine Policy, ki/ jetzt lesen (vor dem Umschalten)
     karteZu();
     S = l.S; akku = 0; buchNeu(); if (G) { G.neueStadt(); }
     ki.gesendet.clear(); ki.gespraech = null; ki.aufholen.length = 0; hauptSchluessel = '';
     nachSchritten();                                      // erst zeichnen: wirft es, bleibt die alte Stadt
+    kiWahlAusUi(l.ui, true);                              // KI-Policy (Etappe 1): Modellwahl aus dem Spielstand (fehlt sie: Regeln, Hinweis unten)
     speichernErlaubt = true; speichern();
     $('einst-dialog').close();
-    meldung(migriert ? `Spielstand von Version ${migriert} übernommen: Tag ${S.tag}, ${zahl(S.einwohner)} Einwohner. ${NEU_SEIT(migriert)}`
-      : `Spielstand geladen: Tag ${S.tag}, ${zahl(S.einwohner)} Einwohner.`);
+    meldung((migriert ? `Spielstand von Version ${migriert} übernommen: Tag ${S.tag}, ${zahl(S.einwohner)} Einwohner. ${NEU_SEIT(migriert)}`
+      : `Spielstand geladen: Tag ${S.tag}, ${zahl(S.einwohner)} Einwohner.`)
+      + (kiWahl.hinweis ? ' ' + kiWahl.hinweis : ''), kiWahl.hinweis ? 'warnung' : undefined);   // KI-Policy (Etappe 1): Rückfall sichtbar
   } catch (err) {
     if (S !== altS) { S = altS; buchNeu(); if (G) G.neueStadt(); hauptSchluessel = ''; try { nachSchritten(); } catch { /* alte Stadt lief ja */ } }
     meldung(`Import hat nicht geklappt: ${err.message}`, 'fehler');

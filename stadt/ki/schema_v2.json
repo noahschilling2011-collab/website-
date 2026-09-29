@@ -1,0 +1,419 @@
+{
+ "schemaVersion": 2,
+ "schemaHash": "e85eca0c",
+ "hashVerfahren": "FNV-1a 32 Bit über schemaText (UTF-16-Codeeinheiten)",
+ "schemaText": "stadt-ki|2|bed_geld:bGeld/100,bed_wohnen:bWohnen/100,bed_kontakt:bKontakt/100,bed_freizeit:bFreizeit/100,zufriedenheit:zuf/100,zuf_ziel:zufZiel/100,ruecklage_tage:clip(geld/max(20,tageskosten),-30,300)/100,alter:jahre/100,fleiss:fleiss/100,gesellig:gesellig/100,ehrgeiz:ehrgeiz/100,spar:spar/100,heimat:heimat/100,hat_arbeit:0|1,gemeinnuetzig:0|1,besitzer:0|1,lohn:lohn/100,lohn_vorteil:clip((besterFreierLohn-lohn)/50,-1,1),stellen_frei:n/(n+200) n=freieStellen,wohnungen_frei:n/(n+20) n=freieWohnungen,arbeitslosenquote:quote,lohnsteuer:steuerSatz*10,hat_wohnung:0|1,eigene_wohnung:0|1,eigentum:0|1,partner:0|1,zusammen:0|1,kinder:min(kinder,4)/4,kinder_haushalt:min(hhKinder,4)/4,gebunden:0|1,rentner:0|1,rentenanspruch:0|1,im_dienst:0|1,verpflichtet:0|1,freunde:freunde/5,elend_tage:min(elend,30)/30,unzuf_tage:min(unzuf,30)/30,trauer:0|1,ohne_laden:0|1,frei_heute:0|1,such_pause:0|1,sucht_wohnung:0|1,job_weg_30:0|1,getrennt_30:0|1,kind_30:0|1,gruendung_gesperrt:0|1,ziel_wohnung:0|1,ziel_job:0|1,ziel_familie:0|1,ziel_laden:0|1,ziel_freunde:0|1,ziel_ruhe:0|1,ziel_alter:min(tag-zielSeit,ZIEL_TAGE)/ZIEL_TAGE,stunde:h/24,morgens:0|1,abends:0|1,anlass_ereignis:0|1|warten,wohnung_suchen,job_suchen,job_wechseln,kuendigen,freinehmen,freunde_treffen,partner_suchen,zusammenziehen,trennen,kind_bekommen,laden_gruenden,wegziehen",
+ "simHash": "3b1a95e0e5ae9ea5",
+ "laenge": 57,
+ "merkmale": [
+  {
+   "index": 0,
+   "name": "bed_geld",
+   "skala": "bGeld/100",
+   "bedeutung": "Bedürfnis Geld (Rücklage in Tagen, 0 schlecht bis 1 gut)"
+  },
+  {
+   "index": 1,
+   "name": "bed_wohnen",
+   "skala": "bWohnen/100",
+   "bedeutung": "Bedürfnis Wohnen"
+  },
+  {
+   "index": 2,
+   "name": "bed_kontakt",
+   "skala": "bKontakt/100",
+   "bedeutung": "Bedürfnis Kontakt"
+  },
+  {
+   "index": 3,
+   "name": "bed_freizeit",
+   "skala": "bFreizeit/100",
+   "bedeutung": "Bedürfnis Freizeit"
+  },
+  {
+   "index": 4,
+   "name": "zufriedenheit",
+   "skala": "zuf/100",
+   "bedeutung": "Zufriedenheit jetzt"
+  },
+  {
+   "index": 5,
+   "name": "zuf_ziel",
+   "skala": "zufZiel/100",
+   "bedeutung": "Zielwert der Zufriedenheit (aus den eigenen Bedürfnissen)"
+  },
+  {
+   "index": 6,
+   "name": "ruecklage_tage",
+   "skala": "clip(geld/max(20,tageskosten),-30,300)/100",
+   "bedeutung": "Erspartes in Tagen der eigenen Kosten"
+  },
+  {
+   "index": 7,
+   "name": "alter",
+   "skala": "jahre/100",
+   "bedeutung": "Alter in Jahren (R.JAHR Spieltage je Jahr)"
+  },
+  {
+   "index": 8,
+   "name": "fleiss",
+   "skala": "fleiss/100",
+   "bedeutung": "Persönlichkeit: Fleiß"
+  },
+  {
+   "index": 9,
+   "name": "gesellig",
+   "skala": "gesellig/100",
+   "bedeutung": "Persönlichkeit: Geselligkeit"
+  },
+  {
+   "index": 10,
+   "name": "ehrgeiz",
+   "skala": "ehrgeiz/100",
+   "bedeutung": "Persönlichkeit: Ehrgeiz"
+  },
+  {
+   "index": 11,
+   "name": "spar",
+   "skala": "spar/100",
+   "bedeutung": "Persönlichkeit: Sparsamkeit"
+  },
+  {
+   "index": 12,
+   "name": "heimat",
+   "skala": "heimat/100",
+   "bedeutung": "Persönlichkeit: Heimatliebe"
+  },
+  {
+   "index": 13,
+   "name": "hat_arbeit",
+   "skala": "0|1",
+   "bedeutung": "hat eine bezahlte Stelle"
+  },
+  {
+   "index": 14,
+   "name": "gemeinnuetzig",
+   "skala": "0|1",
+   "bedeutung": "leistet gemeinnützige Arbeit (keine Stelle)"
+  },
+  {
+   "index": 15,
+   "name": "besitzer",
+   "skala": "0|1",
+   "bedeutung": "hat einen eigenen Betrieb"
+  },
+  {
+   "index": 16,
+   "name": "lohn",
+   "skala": "lohn/100",
+   "bedeutung": "eigener Tageslohn (0 ohne Stelle)"
+  },
+  {
+   "index": 17,
+   "name": "lohn_vorteil",
+   "skala": "clip((besterFreierLohn-lohn)/50,-1,1)",
+   "bedeutung": "Vorsprung der besten ausgeschriebenen Stelle (öffentlich)"
+  },
+  {
+   "index": 18,
+   "name": "stellen_frei",
+   "skala": "n/(n+200) n=freieStellen",
+   "bedeutung": "ausgeschriebene Stellen in der Stadt (öffentlich; 200 Stellen = 0,5)"
+  },
+  {
+   "index": 19,
+   "name": "wohnungen_frei",
+   "skala": "n/(n+20) n=freieWohnungen",
+   "bedeutung": "freie Wohnungen in der Stadt (öffentlich; 20 Wohnungen = 0,5)"
+  },
+  {
+   "index": 20,
+   "name": "arbeitslosenquote",
+   "skala": "quote",
+   "bedeutung": "Arbeitslosenquote der Stadt (veröffentlichte Zahl von gestern)"
+  },
+  {
+   "index": 21,
+   "name": "lohnsteuer",
+   "skala": "steuerSatz*10",
+   "bedeutung": "Lohnsteuersatz der Stadt heute (Haushalt, öffentlich; 10 % = 1, 0 % = 0)"
+  },
+  {
+   "index": 22,
+   "name": "hat_wohnung",
+   "skala": "0|1",
+   "bedeutung": "wohnt irgendwo"
+  },
+  {
+   "index": 23,
+   "name": "eigene_wohnung",
+   "skala": "0|1",
+   "bedeutung": "eigener Haushalt (Vorstand oder mit Partner)"
+  },
+  {
+   "index": 24,
+   "name": "eigentum",
+   "skala": "0|1",
+   "bedeutung": "der Haushalt besitzt die Wohnung"
+  },
+  {
+   "index": 25,
+   "name": "partner",
+   "skala": "0|1",
+   "bedeutung": "hat einen Partner"
+  },
+  {
+   "index": 26,
+   "name": "zusammen",
+   "skala": "0|1",
+   "bedeutung": "wohnt mit dem Partner zusammen"
+  },
+  {
+   "index": 27,
+   "name": "kinder",
+   "skala": "min(kinder,4)/4",
+   "bedeutung": "eigene Kinder"
+  },
+  {
+   "index": 28,
+   "name": "kinder_haushalt",
+   "skala": "min(hhKinder,4)/4",
+   "bedeutung": "Kinder im eigenen Haushalt"
+  },
+  {
+   "index": 29,
+   "name": "gebunden",
+   "skala": "0|1",
+   "bedeutung": "muss ein Kind ohne Kita-Platz betreuen (Haushaltswissen)"
+  },
+  {
+   "index": 30,
+   "name": "rentner",
+   "skala": "0|1",
+   "bedeutung": "bezieht Rente"
+  },
+  {
+   "index": 31,
+   "name": "rentenanspruch",
+   "skala": "0|1",
+   "bedeutung": "hat Anspruch auf Rente"
+  },
+  {
+   "index": 32,
+   "name": "im_dienst",
+   "skala": "0|1",
+   "bedeutung": "leistet Wehr- oder Ersatzdienst"
+  },
+  {
+   "index": 33,
+   "name": "verpflichtet",
+   "skala": "0|1",
+   "bedeutung": "Soldat auf Zeit (gebunden)"
+  },
+  {
+   "index": 34,
+   "name": "freunde",
+   "skala": "freunde/5",
+   "bedeutung": "Zahl der Freunde (höchstens 5)"
+  },
+  {
+   "index": 35,
+   "name": "elend_tage",
+   "skala": "min(elend,30)/30",
+   "bedeutung": "Tage in Folge mit Zufriedenheit unter 20"
+  },
+  {
+   "index": 36,
+   "name": "unzuf_tage",
+   "skala": "min(unzuf,30)/30",
+   "bedeutung": "Tage in Folge mit Zufriedenheit unter 40"
+  },
+  {
+   "index": 37,
+   "name": "trauer",
+   "skala": "0|1",
+   "bedeutung": "jemand Nahes ist in den letzten 30 Tagen gestorben"
+  },
+  {
+   "index": 38,
+   "name": "ohne_laden",
+   "skala": "0|1",
+   "bedeutung": "kein Laden in Reichweite"
+  },
+  {
+   "index": 39,
+   "name": "frei_heute",
+   "skala": "0|1",
+   "bedeutung": "hat sich heute frei genommen"
+  },
+  {
+   "index": 40,
+   "name": "such_pause",
+   "skala": "0|1",
+   "bedeutung": "Wohnungssuche pausiert nach erfolgloser Suche"
+  },
+  {
+   "index": 41,
+   "name": "sucht_wohnung",
+   "skala": "0|1",
+   "bedeutung": "hat erfolglos eine Wohnung gesucht"
+  },
+  {
+   "index": 42,
+   "name": "job_weg_30",
+   "skala": "0|1",
+   "bedeutung": "Stelle in den letzten 30 Tagen verloren (Erinnerung)"
+  },
+  {
+   "index": 43,
+   "name": "getrennt_30",
+   "skala": "0|1",
+   "bedeutung": "in den letzten 30 Tagen getrennt (Erinnerung)"
+  },
+  {
+   "index": 44,
+   "name": "kind_30",
+   "skala": "0|1",
+   "bedeutung": "Kind in den letzten 30 Tagen bekommen (Erinnerung)"
+  },
+  {
+   "index": 45,
+   "name": "gruendung_gesperrt",
+   "skala": "0|1",
+   "bedeutung": "nach einer Pleite noch keine Gründung (Erinnerung)"
+  },
+  {
+   "index": 46,
+   "name": "ziel_wohnung",
+   "skala": "0|1",
+   "bedeutung": "Ziel: eigene Wohnung"
+  },
+  {
+   "index": 47,
+   "name": "ziel_job",
+   "skala": "0|1",
+   "bedeutung": "Ziel: besserer Job"
+  },
+  {
+   "index": 48,
+   "name": "ziel_familie",
+   "skala": "0|1",
+   "bedeutung": "Ziel: Familie"
+  },
+  {
+   "index": 49,
+   "name": "ziel_laden",
+   "skala": "0|1",
+   "bedeutung": "Ziel: eigener Laden"
+  },
+  {
+   "index": 50,
+   "name": "ziel_freunde",
+   "skala": "0|1",
+   "bedeutung": "Ziel: Freunde"
+  },
+  {
+   "index": 51,
+   "name": "ziel_ruhe",
+   "skala": "0|1",
+   "bedeutung": "Ziel: Ruhe"
+  },
+  {
+   "index": 52,
+   "name": "ziel_alter",
+   "skala": "min(tag-zielSeit,ZIEL_TAGE)/ZIEL_TAGE",
+   "bedeutung": "wie lange das Ziel schon gilt"
+  },
+  {
+   "index": 53,
+   "name": "stunde",
+   "skala": "h/24",
+   "bedeutung": "Stunde der Entscheidung"
+  },
+  {
+   "index": 54,
+   "name": "morgens",
+   "skala": "0|1",
+   "bedeutung": "Stunde bis 7 Uhr"
+  },
+  {
+   "index": 55,
+   "name": "abends",
+   "skala": "0|1",
+   "bedeutung": "Stunde ab 17 Uhr"
+  },
+  {
+   "index": 56,
+   "name": "anlass_ereignis",
+   "skala": "0|1",
+   "bedeutung": "Entscheidung nach einem Ereignis (nicht um 7 oder 18 Uhr)"
+  }
+ ],
+ "aktionen": [
+  {
+   "index": 0,
+   "name": "warten",
+   "hinweis": "warten: bewusst nichts tun (immer erlaubt)"
+  },
+  {
+   "index": 1,
+   "name": "wohnung_suchen",
+   "hinweis": "aus erlaubteAktionen (dieselben Voraussetzungen wie das Gehirn)"
+  },
+  {
+   "index": 2,
+   "name": "job_suchen",
+   "hinweis": "aus erlaubteAktionen (dieselben Voraussetzungen wie das Gehirn)"
+  },
+  {
+   "index": 3,
+   "name": "job_wechseln",
+   "hinweis": "aus erlaubteAktionen (dieselben Voraussetzungen wie das Gehirn)"
+  },
+  {
+   "index": 4,
+   "name": "kuendigen",
+   "hinweis": "aus erlaubteAktionen (dieselben Voraussetzungen wie das Gehirn)"
+  },
+  {
+   "index": 5,
+   "name": "freinehmen",
+   "hinweis": "aus erlaubteAktionen (dieselben Voraussetzungen wie das Gehirn)"
+  },
+  {
+   "index": 6,
+   "name": "freunde_treffen",
+   "hinweis": "aus erlaubteAktionen (dieselben Voraussetzungen wie das Gehirn)"
+  },
+  {
+   "index": 7,
+   "name": "partner_suchen",
+   "hinweis": "aus erlaubteAktionen (dieselben Voraussetzungen wie das Gehirn)"
+  },
+  {
+   "index": 8,
+   "name": "zusammenziehen",
+   "hinweis": "aus erlaubteAktionen (dieselben Voraussetzungen wie das Gehirn)"
+  },
+  {
+   "index": 9,
+   "name": "trennen",
+   "hinweis": "aus erlaubteAktionen (dieselben Voraussetzungen wie das Gehirn)"
+  },
+  {
+   "index": 10,
+   "name": "kind_bekommen",
+   "hinweis": "aus erlaubteAktionen (dieselben Voraussetzungen wie das Gehirn)"
+  },
+  {
+   "index": 11,
+   "name": "laden_gruenden",
+   "hinweis": "aus erlaubteAktionen (dieselben Voraussetzungen wie das Gehirn)"
+  },
+  {
+   "index": 12,
+   "name": "wegziehen",
+   "hinweis": "aus erlaubteAktionen (dieselben Voraussetzungen wie das Gehirn)"
+  }
+ ]
+}

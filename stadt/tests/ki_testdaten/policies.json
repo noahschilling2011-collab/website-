@@ -1,0 +1,10 @@
+{
+ "format": "stadt-policy-liste",
+ "version": 1,
+ "hinweis": "Von tools/ki_liste.mjs geschrieben: Policy-Dateien in diesem Ordner, die die stadt.html daneben annimmt. Das Spiel prüft jede Datei beim Laden noch einmal.",
+ "simVersion": 9,
+ "schemaHash": "e85eca0c",
+ "policies": [
+  "policy_smoke_v9_2_bester.json"
+ ]
+}

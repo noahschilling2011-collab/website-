@@ -1,0 +1,34 @@
+Policy zum Prüfen: Datei ../../ki/policy_smoke_v9_2_bester.json „smoke_v9_2_bester“ (experimentell), Stadt-Version 9, Hash cf2caae866578f0a, Schema e85eca0c, 57 Merkmale, 13 Aktionen
+ok   Policy-Datei: Inhalts-Hash aus training/exportiere.py (Python) = Sim.KI.policyHash (JS) = cf2caae866578f0a
+ok   Regression Seed 1: Policy aus, 120 Tage, jeden Tag bitgleich zu ../../stadt.orig.html (160 Einwohner, Fingerabdruck 90a711b891899e73)
+ok   Regression Seed 2: Policy aus, 120 Tage, jeden Tag bitgleich zu ../../stadt.orig.html (170 Einwohner, Fingerabdruck c8253d2b66397d41)
+ok   Regression Seed 3: Policy aus, 120 Tage, jeden Tag bitgleich zu ../../stadt.orig.html (200 Einwohner, Fingerabdruck 5d0304d789e8aa52)
+ok   Beobachtung (statisch): liest arbeit, bFreizeit, bGeld, bKontakt, bWohnen, beitrag, besitz, bund, dienstBis, ehrgeiz, eigen, elend, fleiss, frei, freunde, geb, geld, gemein, gesellig, getrenntTag, haftBis, heimat, hh, jobWegTag, kaufPreis, kindTag, kinder, kita, ohneLaden, partner, schuld, spar, sperreBis, suchPause, sucht, trauer, unzuf, wohnung, ziel, zielSeit, zuf, zufZiel
+ok   Beobachtung (verändert): Namen, Geschlecht, Einzug, Sparbeginn, Eltern, Gedächtnisbezüge aller Personen verändert → Beobachtung von 60 Personen bitgleich, alle Werte endlich
+ok   Namenstausch mit Regeln: 120 Tage, ohne Namensfelder bitgleich (f631089e432deefe, 170 Einwohner)
+ok   Namenstausch mit Policy für alle: 120 Tage, ohne Namensfelder bitgleich (5622914c7de7bf23, 30 Einwohner, 8056 Policy-Entscheidungen)
+ok   Namenstausch in gewachsener Stadt: 200 Tage Regeln (429 Einwohner), dann 60 Tage Policy für alle, ohne Namensfelder bitgleich (4cb2a60cc3d868ea, 505 Einwohner, 90766 Policy-Entscheidungen, 9098 nach Regeln)
+ok   Beobachtung je Personenfeld (99 Felder, 80 Personen, Seed 1 Tag 220): von anderen wirken nur eigen, hh, wohnung (Haushaltswissen), eigene wirken 31, keines davon verboten
+ok   Maske: 609 Entscheidungen (Zufall, Policy, Regelarm je 5 Episoden), 247 ausgeführt, 0 außerhalb der Maske (gezählt 0, Regelarm außerhalb 0)
+ok   Maske: verbotene Aktion wohnung_suchen abgelehnt (maske_verletzt), Stadt unverändert, Entscheidung bleibt offen, gezählt
+ok   Maske: zwischen Entscheidungszeitpunkten nur warten (Aktion abgelehnt, nichts geändert)
+ok   Wegzug: echtes Ende (Grund wegzug), 718 fehlende Stunden kosten -22.438 und zählen im Defizit mit 100 (Ø 99.8)
+ok   Wegzug: jede fehlende Stunde kostet mindestens so viel wie die schlechteste gelebte Stunde (Notstand und Umkehr, höchstens eine je Tag)
+ok   Wegzug verbessert nie: in 6 von 6 Ausgangslagen bringt erzwungener Wegzug weniger als Weiterleben
+ok   ID nach 11 Stunden neu vergeben (Generation 1 → 2): die neue Person entscheidet nach Regeln, der Fokus greift nicht
+ok   Tod: echtes Ende (Grund tod), ohne Abzug
+ok   Zeitlimit: abgeschnitten (nicht beendet) nach genau 48 Stunden
+ok   Schnappschuss: nach dem Wiederherstellen 25 Schritte bitgleich (Beobachtung, Maske, Belohnung, Stadt)
+ok   Beschädigte oder fremde Policy-Dateien: 34 von 34 abgelehnt mit Grund; Ungeprüftes lässt sich nicht setzen
+ok   Inhalts-Hash folgt dem Inhalt: ein Gewicht geändert → neuer Hash 3ecd70f030a7d194 (vorher a5056361f183633a), mit ihm angenommen
+ok   Rückfall: überlaufende Logits → Policy aus („Policy: Logit warten ist keine Zahl“), 40 Tage bitgleich zu Regeln (4bf74f8af061d3bb)
+ok   Trainingsbereich: Person ab 67 (ID 7), Hauptfigur (ID 0) und Bürgermeister (ID 5) entscheiden mit Policy genau wie mit Regeln (0 Policy-Entscheidungen), eine Person unter 67 (ID 6) nach der Policy
+ok   Trainingsbereich, 2 Tage Policy für alle ab Tag 300 (875 Einwohner): 2686 Policy-Entscheidungen, 345 nach Regeln (ab 67 oder Hauptfigur)
+ok   Policy für alle: 90 Tage zweimal bitgleich (d55112630f5595a1, 23 Einwohner; Regeln: 98), 2610 Entscheidungen (50 ausgeführt, 0 ohne Erfolg, 2560× gewartet), kein Rückfall, keine neuen Schlüssel in S
+ok   Policy für alle: Speichern und Laden mitten am Tag (Tag 60, 13 Uhr), 30 Tage weiter bitgleich
+
+Alle KI-Policy-Prüfungen bestanden (27 s)
+
+real	0m27.548s
+user	0m27.798s
+sys	0m0.563s

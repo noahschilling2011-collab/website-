@@ -1,0 +1,421 @@
+{
+ "policy": "v9_lokal_1_bester",
+ "policyHash": "28385759bed1db02",
+ "status": "experimentell",
+ "simHash": "3b1a95e0e5ae9ea5",
+ "seeds": [
+  30000,
+  30001,
+  30002,
+  30003
+ ],
+ "neuTage": 90,
+ "ab": 200,
+ "tage": 60,
+ "je": [
+  {
+   "seed": 30000,
+   "neu": {
+    "regeln": {
+     "tag": 90,
+     "einwohner": 127,
+     "erwachsene": 104,
+     "zufriedenheit": 62.3,
+     "arbeitslose": 1,
+     "freieStellen": 158,
+     "kasse": 56773,
+     "lohnsteuer": 8,
+     "gruendungen": 29,
+     "pleiten": 0,
+     "geburten": 22,
+     "wegzuege": 0,
+     "zuzuege": 95
+    },
+    "policy": {
+     "tag": 90,
+     "einwohner": 53,
+     "erwachsene": 49,
+     "zufriedenheit": 73.5,
+     "arbeitslose": 0,
+     "freieStellen": 0,
+     "kasse": 33259,
+     "lohnsteuer": 9,
+     "gruendungen": 3,
+     "pleiten": 0,
+     "geburten": 4,
+     "wegzuege": 0,
+     "zuzuege": 39
+    },
+    "stand": {
+     "aktiv": true,
+     "entscheidungen": 4389,
+     "warten": 1601,
+     "ausgefuehrt": 2592,
+     "fehlgeschlagen": 196,
+     "regeln": 1135,
+     "rueckfall": 0,
+     "fehler": ""
+    }
+   },
+   "gewachsen": {
+    "start": {
+     "tag": 200,
+     "einwohner": 503,
+     "kasse": 312408
+    },
+    "regeln": {
+     "tag": 260,
+     "einwohner": 884,
+     "erwachsene": 717,
+     "zufriedenheit": 69.4,
+     "arbeitslose": 6,
+     "freieStellen": 300,
+     "kasse": 502893,
+     "lohnsteuer": 0,
+     "gruendungen": 55,
+     "pleiten": 78,
+     "geburten": 174,
+     "wegzuege": 12,
+     "zuzuege": 723
+    },
+    "policy": {
+     "tag": 260,
+     "einwohner": 668,
+     "erwachsene": 590,
+     "zufriedenheit": 82.7,
+     "arbeitslose": 1,
+     "freieStellen": 70,
+     "kasse": 522931,
+     "lohnsteuer": 0,
+     "gruendungen": 1,
+     "pleiten": 75,
+     "geburten": 94,
+     "wegzuege": 9,
+     "zuzuege": 581
+    },
+    "stand": {
+     "aktiv": true,
+     "entscheidungen": 57250,
+     "warten": 32110,
+     "ausgefuehrt": 24744,
+     "fehlgeschlagen": 396,
+     "regeln": 4939,
+     "rueckfall": 0,
+     "fehler": ""
+    }
+   }
+  },
+  {
+   "seed": 30001,
+   "neu": {
+    "regeln": {
+     "tag": 90,
+     "einwohner": 128,
+     "erwachsene": 108,
+     "zufriedenheit": 59,
+     "arbeitslose": 3,
+     "freieStellen": 204,
+     "kasse": 51608,
+     "lohnsteuer": 7,
+     "gruendungen": 37,
+     "pleiten": 0,
+     "geburten": 16,
+     "wegzuege": 1,
+     "zuzuege": 104
+    },
+    "policy": {
+     "tag": 90,
+     "einwohner": 53,
+     "erwachsene": 51,
+     "zufriedenheit": 71.5,
+     "arbeitslose": 0,
+     "freieStellen": 0,
+     "kasse": 22581,
+     "lohnsteuer": 10,
+     "gruendungen": 4,
+     "pleiten": 0,
+     "geburten": 2,
+     "wegzuege": 0,
+     "zuzuege": 41
+    },
+    "stand": {
+     "aktiv": true,
+     "entscheidungen": 3615,
+     "warten": 1331,
+     "ausgefuehrt": 2063,
+     "fehlgeschlagen": 221,
+     "regeln": 1161,
+     "rueckfall": 0,
+     "fehler": ""
+    }
+   },
+   "gewachsen": {
+    "start": {
+     "tag": 200,
+     "einwohner": 470,
+     "kasse": 308976
+    },
+    "regeln": {
+     "tag": 260,
+     "einwohner": 816,
+     "erwachsene": 688,
+     "zufriedenheit": 69.6,
+     "arbeitslose": 4,
+     "freieStellen": 291,
+     "kasse": 556914,
+     "lohnsteuer": 0,
+     "gruendungen": 63,
+     "pleiten": 102,
+     "geburten": 144,
+     "wegzuege": 30,
+     "zuzuege": 719
+    },
+    "policy": {
+     "tag": 260,
+     "einwohner": 626,
+     "erwachsene": 560,
+     "zufriedenheit": 81.8,
+     "arbeitslose": 2,
+     "freieStellen": 39,
+     "kasse": 573874,
+     "lohnsteuer": 0,
+     "gruendungen": 0,
+     "pleiten": 96,
+     "geburten": 80,
+     "wegzuege": 19,
+     "zuzuege": 573
+    },
+    "stand": {
+     "aktiv": true,
+     "entscheidungen": 56610,
+     "warten": 29756,
+     "ausgefuehrt": 26453,
+     "fehlgeschlagen": 401,
+     "regeln": 5237,
+     "rueckfall": 0,
+     "fehler": ""
+    }
+   }
+  },
+  {
+   "seed": 30002,
+   "neu": {
+    "regeln": {
+     "tag": 90,
+     "einwohner": 107,
+     "erwachsene": 89,
+     "zufriedenheit": 60.1,
+     "arbeitslose": 0,
+     "freieStellen": 46,
+     "kasse": 53447,
+     "lohnsteuer": 8,
+     "gruendungen": 20,
+     "pleiten": 0,
+     "geburten": 17,
+     "wegzuege": 2,
+     "zuzuege": 85
+    },
+    "policy": {
+     "tag": 90,
+     "einwohner": 45,
+     "erwachsene": 39,
+     "zufriedenheit": 70.4,
+     "arbeitslose": 0,
+     "freieStellen": 8,
+     "kasse": 25282,
+     "lohnsteuer": 10,
+     "gruendungen": 3,
+     "pleiten": 0,
+     "geburten": 4,
+     "wegzuege": 0,
+     "zuzuege": 31
+    },
+    "stand": {
+     "aktiv": true,
+     "entscheidungen": 3350,
+     "warten": 1513,
+     "ausgefuehrt": 1693,
+     "fehlgeschlagen": 144,
+     "regeln": 1190,
+     "rueckfall": 0,
+     "fehler": ""
+    }
+   },
+   "gewachsen": {
+    "start": {
+     "tag": 200,
+     "einwohner": 374,
+     "kasse": 258631
+    },
+    "regeln": {
+     "tag": 260,
+     "einwohner": 728,
+     "erwachsene": 589,
+     "zufriedenheit": 70.3,
+     "arbeitslose": 8,
+     "freieStellen": 204,
+     "kasse": 476069,
+     "lohnsteuer": 0,
+     "gruendungen": 51,
+     "pleiten": 89,
+     "geburten": 146,
+     "wegzuege": 20,
+     "zuzuege": 608
+    },
+    "policy": {
+     "tag": 260,
+     "einwohner": 528,
+     "erwachsene": 471,
+     "zufriedenheit": 81.3,
+     "arbeitslose": 0,
+     "freieStellen": 37,
+     "kasse": 472633,
+     "lohnsteuer": 0,
+     "gruendungen": 2,
+     "pleiten": 78,
+     "geburten": 70,
+     "wegzuege": 20,
+     "zuzuege": 484
+    },
+    "stand": {
+     "aktiv": true,
+     "entscheidungen": 44518,
+     "warten": 23797,
+     "ausgefuehrt": 20227,
+     "fehlgeschlagen": 494,
+     "regeln": 4171,
+     "rueckfall": 0,
+     "fehler": ""
+    }
+   }
+  },
+  {
+   "seed": 30003,
+   "neu": {
+    "regeln": {
+     "tag": 90,
+     "einwohner": 109,
+     "erwachsene": 94,
+     "zufriedenheit": 62.7,
+     "arbeitslose": 0,
+     "freieStellen": 79,
+     "kasse": 50222,
+     "lohnsteuer": 7,
+     "gruendungen": 22,
+     "pleiten": 1,
+     "geburten": 15,
+     "wegzuege": 2,
+     "zuzuege": 88
+    },
+    "policy": {
+     "tag": 90,
+     "einwohner": 52,
+     "erwachsene": 48,
+     "zufriedenheit": 78.2,
+     "arbeitslose": 0,
+     "freieStellen": 3,
+     "kasse": 31369,
+     "lohnsteuer": 9,
+     "gruendungen": 4,
+     "pleiten": 0,
+     "geburten": 4,
+     "wegzuege": 0,
+     "zuzuege": 38
+    },
+    "stand": {
+     "aktiv": true,
+     "entscheidungen": 4455,
+     "warten": 1913,
+     "ausgefuehrt": 2367,
+     "fehlgeschlagen": 175,
+     "regeln": 1131,
+     "rueckfall": 0,
+     "fehler": ""
+    }
+   },
+   "gewachsen": {
+    "start": {
+     "tag": 200,
+     "einwohner": 442,
+     "kasse": 271899
+    },
+    "regeln": {
+     "tag": 260,
+     "einwohner": 769,
+     "erwachsene": 624,
+     "zufriedenheit": 69.5,
+     "arbeitslose": 2,
+     "freieStellen": 281,
+     "kasse": 481440,
+     "lohnsteuer": 0,
+     "gruendungen": 55,
+     "pleiten": 101,
+     "geburten": 152,
+     "wegzuege": 25,
+     "zuzuege": 656
+    },
+    "policy": {
+     "tag": 260,
+     "einwohner": 590,
+     "erwachsene": 525,
+     "zufriedenheit": 82.4,
+     "arbeitslose": 1,
+     "freieStellen": 51,
+     "kasse": 490658,
+     "lohnsteuer": 0,
+     "gruendungen": 1,
+     "pleiten": 100,
+     "geburten": 80,
+     "wegzuege": 22,
+     "zuzuege": 543
+    },
+    "stand": {
+     "aktiv": true,
+     "entscheidungen": 51786,
+     "warten": 28767,
+     "ausgefuehrt": 22557,
+     "fehlgeschlagen": 462,
+     "regeln": 5119,
+     "rueckfall": 0,
+     "fehler": ""
+    }
+   }
+  }
+ ],
+ "summen": {
+  "neu": {
+   "regeln": {
+    "einwohner": 471,
+    "kasse": 212050,
+    "gruendungen": 108,
+    "pleiten": 1,
+    "zufriedenheit": 61
+   },
+   "policy": {
+    "einwohner": 203,
+    "kasse": 112491,
+    "gruendungen": 14,
+    "pleiten": 0,
+    "zufriedenheit": 73.4
+   },
+   "rueckfall": 0
+  },
+  "gewachsen": {
+   "regeln": {
+    "einwohner": 3197,
+    "kasse": 2017316,
+    "gruendungen": 224,
+    "pleiten": 370,
+    "zufriedenheit": 69.7
+   },
+   "policy": {
+    "einwohner": 2412,
+    "kasse": 2060096,
+    "gruendungen": 4,
+    "pleiten": 349,
+    "zufriedenheit": 82.1
+   },
+   "rueckfall": 0
+  }
+ }
+}

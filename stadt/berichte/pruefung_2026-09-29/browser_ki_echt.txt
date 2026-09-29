@@ -1,0 +1,51 @@
+Start 2026-09-29T08:24:12Z
+Playwright 1.56.1 (/opt/node22/lib/node_modules/playwright); Chromium /opt/pw-browsers/chromium-1194/chrome-linux/chrome
+Three.js: lokal SP/three/package; Git für alte Fassungen: /home/user/website-; Ausgabe: <stadt>/ausgabe/browser_echt
+Seitenserver: python3 -m http.server 9066 (PID 7453), Wurzel <stadt>
+KI: auf 11434 läuft schon ein KI-Nachbau (test-modell), bleibt unberührt
+Seitenserver PID 7453 beendet
+=== browser_ki
+exit 0, OK 30 (Soll 30), FEHL 0, 36 s → grün
+
+Zusammenfassung (2026-09-29 08:24, PORT 9066, 0 min):
+browser_ki         grün exit 0   OK  30 /  30  FEHL 0     36 s
+ALLES GRÜN
+exit 0
+Ende 2026-09-29T08:24:49Z
+
+== Prüfungen (tests/ausgabe/logs/browser_ki.log)
+stadt.html 1359929 Byte, eingebettete Policy: keine; ki/policy_v9_lokal_1.json „v9_lokal_1“ Hash 28385759bed1db02
+ok   stadt.html enthält keine Policy (nicht freigegeben → nur in ki/)
+Server: python3 -m http.server 9066 (PID 7487), Wurzel <temp>/ki_seite
+ok   Start: Regeln (Standard), keine Anfrage an ki/ (0), Auswahl „aus ki/ beim Umschalten“, 3D mit lokaler Three.js-Kopie
+ok   umgeschaltet: aus ki/ geladen (/ki/policies.json, /ki/policy_v9_lokal_1.json), „Es entscheidet die Policy „v9_lokal_1“ (experimentell, ki/policy_v9_lokal_1.json, 155648 Trainingsschritte, Stadt-Version 9), für alle anderen die Reg“
+ok   Auswertung laut Datei im Fenster: „Auswertung laut Datei: nicht bestanden. Defizit in 5 von 5 Gruppen kleiner, aber nur 16 von 26 Nebenprüfungen in Toleranz (weniger Ziele, Gr“
+ok   Einstellungen bei 1280 × 800 ohne Scrollen (736/736 px, 3. Absatz weiter der Ollama-Text), Knopf „Entscheidungen: Policy ›“, eigenes Fenster 726/726 px, ohne Scrollen und ohne seitliches Überlaufen
+ok   30 Spielstunden mit Policy: 21 Entscheidungen, 16 ausgeführt, 2× gewartet, 31 nach Regeln, kein Rückfall
+ok   Spielstand (Version 9): ui.entscheidungen = {"v":1,"art":"policy","name":"v9_lokal_1","hash":"28385759bed1db02","schema":"e85eca0c"}, keine Gewichte
+ok   neu geladen: Policy „v9_lokal_1“ wieder aktiv, vor dem Start aus ki/ geholt (2 Anfragen)
+ok   ohne ki/: Regeln, Meldung (warnung) „Die gespeicherte Policy „v9_lokal_1“ (Hash 28385759bed1db02) ist nicht da oder passt nicht zu dieser Stadt. Der Ordner ki/ neben der Seite ist nicht lesbar (ki/policies.j“, Stand sagt jetzt regeln
+ok   Rückfall-Text ohne Doppelung (Grund je einmal), mit Hinweis zum neu Wählen: „Es entscheiden die Regeln. Keine gültige Policy vorhanden. Die gespeicherte Policy „v9_lokal_1“ (Hash 28385759bed1db02) ist nicht da oder passt nicht zu dieser Stadt. Der Ordner ki/ neben der Seite ist nicht lesbar (ki/policies.json: HTTP 404). Es entscheiden “
+ok   andere Policy gleichen Namens (Hash 5a816956cc829fd6 statt 28385759bed1db02): Regeln, Rückfall sichtbar, die andere nur wählbar: „Die gespeicherte Policy „v9_lokal_1“ (Hash 28385759bed1db02) ist nicht da oder passt nicht zu dieser Stadt. Es entscheid“
+ok   die andere Policy gilt nur nach ausdrücklicher Wahl, der Spielstand verweist dann auf ihren Hash
+ok   beschädigte Dateien in ki/: alle abgelehnt, Regeln: „Es entscheiden die Regeln. Keine gültige Policy vorhanden. Abgelehnt: ki/policy_geaendert.json: Policy ungültig: Hash 28385759bed1db02 passt nicht zum Inhalt (17af7644216ac759); ki/policy_nan.json: Policy ungültig: Schicht 0: Zahl; ki/policy_v8.json: Policy ungültig: trainiert auf Stadt-Version 8, diese Stadt ist Version 9 (neu “
+ok   beschädigte ki/policies.json: Regeln, „Es entscheiden die Regeln. Keine gültige Policy vorhanden. Der Ordner ki/ neben der Seite ist nicht lesbar (ki/policies.json: kein gültiges JSON (Datei abgeschn“
+ok   Datei-Import beschädigt: „Policy-Datei abgelehnt: Policy ungültig: Hash 28385759bed1db02 passt nicht zum Inhalt (17af7644216ac759)“
+ok   Datei-Import beschädigt: Grund im Fenster sichtbar (nicht nur in der Meldung hinter den Fenstern): „son“ abgelehnt: Policy ungültig: Hash 28385759bed1db02 passt nicht zum Inhalt (17af7644216ac759). Es bleibt, wie es war.“
+ok   Datei-Import Version-8-Policy: „Policy-Datei abgelehnt: Policy ungültig: trainiert auf Stadt-Version 8, diese Stadt ist Version 9 (neu trainieren)“
+ok   Datei-Import gültig: „Datei „policy_v9_lokal_1.json“: Policy „v9_lokal_1“ geprüft und geladen. Zum Einschalten oben „Train“ (noch nicht gewählt)
+ok   Datei-Import gültig: im Fenster sichtbar, alter Hinweis weg, „Geladene Datei entfernen“ da, abgeschnittene Datei ohne englischen JSON-Fehler: „policy_v9_lokal_1.json“: Policy „v9_lokal_1“ geprüft und geladen. Zum Einschalten oben „Trainierte Policy (experimentell)“ wählen.“
+ok   importierte Policy gewählt (ohne ki/): „Es entscheidet die Policy „v9_lokal_1“ (experimentell, geladen, 155648 Trainingsschritte, Stadt-Version 9), für alle and“
+ok   neu geladen ohne ki/: die importierte Policy (Speicherplatz stadt-policy-v1) gilt wieder
+ok   „Geladene Datei entfernen“: Speicherplatz leer, Regeln, Knopf weg: „Es entscheiden die Regeln. Geladene Datei entfernt; sie war gewählt.“
+ok   Import eines Spielstands mit Policy: aus ki/ geholt und aktiv (Spielstand geladen: Tag 0, 10 Einwohner.)
+ok   Import mit fehlender Policy: Regeln, Meldung (warnung) „Spielstand geladen: Tag 0, 10 Einwohner. Die gespeicherte Policy „gibtsnicht“ (Hash 0123456789abcdef) ist nicht da oder passt nicht zu dieser Stadt. E“
+ok   Spielstand ohne ui.entscheidungen (wie 09083f5): Regeln, keine Rückfall-Meldung, keine Anfrage an ki/
+ok   Laufzeitfehler: Regeln, Meldung „Die Policy hat einen Fehler gemeldet (Policy: Logit warten ist keine Zahl). Es entscheiden die Regeln (Rückfall).“
+ok   file://: Regeln, „Es entscheiden die Regeln. Keine gültige Policy vorhanden. Die Seite ist als einzelne Datei geöffnet (file://) und kann den Ordner ki/ nicht lesen: üb“
+ok   file://: jeder Satz einmal: „Es entscheiden die Regeln. Keine gültige Policy vorhanden. Die Seite ist als einzelne Datei geöffnet (file://) und kann den Ordner ki/ nicht lesen: über einen Server öffnen (z. B. http://localhost:8000) oder „Policy-Datei laden …“. Umschalten auf die Policy nicht möglich.“
+ok   Konsole: 25 Meldungen error/warning, davon 22 Ollama (abgebrochen, gewollt), 3 × 404 der Fälle ohne ki/ und fehlende Datei (gewollt), 0 andere
+ok   abgebrochene Anfragen: 22, an localhost:11434; außer Ollama (absichtlich): 0
+Server-Log: 30 Anfragen, davon 404: GET /pruefung/browser/ohne_ki/ki/policies.json HTTP/1.1; GET /pruefung/browser/kaputt/ki/policy_fehlt.json HTTP/1.1; GET /pruefung/browser/ohne_ki/ki/policies.json HTTP/1.1
+Server PID 7487 beendet
+Dauer 35.8 s, alles ok

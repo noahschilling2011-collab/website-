@@ -1,0 +1,3 @@
+  ok  policy_smoke_v9_2_bester.json: „smoke_v9_2_bester“ (experimentell), Stadt-Version 9, Hash cf2caae866578f0a
+  ok  policy_v9_lokal_1.json: „v9_lokal_1“ (experimentell), Stadt-Version 9, Hash 28385759bed1db02
+geschrieben: ki/policies.json (2 Policies, 0 abgelehnt)

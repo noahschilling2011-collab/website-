@@ -46,11 +46,13 @@ Tagebuch zeigt, was geklappt hat, Noahs Regel „erst ausgeben, dann senken“ i
 Tastatur, Meldungen und Texte sind nachgezogen (Abschnitt „Befunde der Schlussprüfung (Version 9)“). Phase 4 ist nur gegen einen
 nachgebauten Ollama-Server getestet, nicht gegen ein echtes Sprachmodell (siehe „Bekannte Schwächen“).
 
+**Neu (Etappe 1 des Master-Prompts):** Eine trainierte Entscheidungs-KI lässt sich zuschalten, experimentell, die Regeln bleiben Standard. Siehe [Trainierte Entscheidungs-KI (experimentell)](#trainierte-entscheidungs-ki-experimentell) und `docs/START.md`.
+
 ## Starten
 
 ```bash
 cd stadt
-python3 -m http.server 8000
+python3 -m http.server 8000 --bind 127.0.0.1      # nur auf diesem Rechner erreichbar (ohne --bind: im ganzen Netz)
 ```
 
 Dann `http://localhost:8000/stadt.html` öffnen. **Immer Port 8000 und `localhost`**: Der Spielstand hängt an der Adresse,
@@ -86,6 +88,24 @@ bei jedem Tempo mit (vorher „KI pausiert bei 20×“; **weicht vom Wortlaut de
 (Einstellungen, Debug-Ecke). Gespräche gehen bei jedem Tempo. Jeder Gedanke landet im Tagebuch der Figur (die letzten 30).
 Hauptfiguren, die in einer Tech-Firma programmieren, bitten das Modell außerdem einmal am Spieltag um ein kleines Stück Code
 für ihre Arbeit, wenn keine Entscheidung wartet und die Antwort vor 17 Uhr kommen kann. Es steht dann im Tagebuch und wird nie ausgeführt.
+
+## Trainierte Entscheidungs-KI (experimentell)
+
+Neben den Regeln (`entscheide`) gibt es eine kleine trainierte Policy: ein neuronales Netz (2 × 64, tanh), in dieser Simulation mit
+MaskablePPO (sb3-contrib) trainiert. Sie wählt an den normalen Entscheidungszeitpunkten aus denselben erlaubten Aktionen wie die Regeln
+oder wartet, sieht nur die eigene Lage, die Persönlichkeit und öffentliche Zahlen (keine Namen, keine Herkunft) und entscheidet nur für
+Erwachsene unter 67, nicht für Hauptfiguren und Bürgermeister. **Standard bleiben die Regeln.** Mit ausgeschalteter Policy läuft die
+Stadt Tag für Tag bitgleich wie Version 9 (09083f5).
+
+- Einschalten: Seite über den Server öffnen (oben), Zahnrad → „Entscheidungen: Regeln ›“ → „Trainierte Policy (experimentell)“. Das Spiel
+  holt die Policy dann aus dem Ordner `ki/` neben der Seite; in `stadt.html` steckt keine. Im Spielstand steht nur ein Verweis (Name,
+  Hash). Fehlt die Policy oder passt sie nicht, entscheiden die Regeln, und das Spiel sagt es.
+- Stand: Lauf `v9_lokal_1` (155.648 Schritte, 25 min auf einem Rechner mit 4 CPU-Kernen, ohne GPU). Auf getrennten Abschlussseeds ist das Bedürfnisdefizit
+  der Bewohner in 5 von 5 Gruppen 16–31 % kleiner als mit den Regeln, aber nur 16 von 26 Nebenprüfungen halten: weniger erreichte Ziele,
+  kaum Gründungen, keine Kinder, „gesellig“ wirkt umgekehrt, und mit der Policy für alle wächst die Stadt deutlich langsamer. Urteil nach
+  den vorab festgelegten Kriterien: **nicht bestanden** (`training/AUSWERTUNG_V9.md`).
+- Mehr: `docs/START.md` (Starten, Policy wählen), `docs/ARCHITEKTUR.md`, `docs/EXPERIMENTE.md` (Training, Auswertung, Export),
+  `docs/GRENZEN.md`, `docs/FORTSCHRITT.md` (Stand aller Etappen), `ki/LIESMICH.md`, `tests/LIESMICH.md` (Browser-Tests).
 
 ## Was die Leute arbeiten
 

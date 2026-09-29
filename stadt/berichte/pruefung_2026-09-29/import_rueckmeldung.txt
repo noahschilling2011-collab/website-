@@ -1,0 +1,12 @@
+Nachprüfung des Befunds „Rückmeldung beim Datei-Import unsichtbar“ (Prüfung Bedienung), stadt.html vor (alt, sha 48732527…) und nach der Korrektur (neu),
+als file:// bei 1280 × 800, Einstellungen und Fenster „Entscheidungen der Bewohner“ offen; Skript SP/ml/fixarbeit/probe_alt_import.cjs.
+elementFromPoint in der Mitte der Meldung trifft in beiden Fassungen das offene Fenster (die Meldung liegt dahinter); neu steht das Ergebnis im Status des Fensters.
+
+alt gewicht_veraendert.json: Meldung „Policy-Datei abgelehnt: Policy ungültig: Hash 28385759bed1db02 passt nicht zum I“, elementFromPoint in der Meldung → dialog#ki-dialog
+    Status im Fenster: „Es entscheiden die Regeln.“
+alt gueltig.json: Meldung „Policy „v9_lokal_1“ geprüft und geladen. Umschalten unter „Entscheidungen der Be“, elementFromPoint in der Meldung → dialog#ki-dialog
+    Status im Fenster: „Es entscheiden die Regeln.“
+neu gewicht_veraendert.json: Meldung „Policy-Datei abgelehnt: Policy ungültig: Hash 28385759bed1db02 passt nicht zum I“, elementFromPoint in der Meldung → dialog#ki-dialog
+    Status im Fenster: „n. Datei „gewicht_veraendert.json“ abgelehnt: Policy ungültig: Hash 28385759bed1db02 passt nicht zum Inhalt (17af7644216ac759). Es bleibt, wie es war.“
+neu gueltig.json: Meldung „Datei „gueltig.json“: Policy „v9_lokal_1“ geprüft und geladen. Zum Einschalten o“, elementFromPoint in der Meldung → dialog#ki-dialog
+    Status im Fenster: „ntscheiden die Regeln. Datei „gueltig.json“: Policy „v9_lokal_1“ geprüft und geladen. Zum Einschalten oben „Trainierte Policy (experimentell)“ wählen.“

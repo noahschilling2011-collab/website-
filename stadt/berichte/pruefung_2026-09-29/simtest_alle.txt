@@ -1,0 +1,33 @@
+simtest aus <temp>: stadt.html 0b453bf1bb62878a, Version 8 = 31ce452, Vergleich --kipolicy = 09083f5, 2 gleichzeitig, Logs in ausgabe/simtest/
+--sicherheit -> exit 0 (148 s, ausgabe/simtest/sicherheit.txt)
+--buergermeister -> exit 0 (146 s, ausgabe/simtest/buergermeister.txt)
+--autos -> exit 0 (312 s, ausgabe/simtest/autos.txt)
+--rathaus -> exit 0 (116 s, ausgabe/simtest/rathaus.txt)
+--schule -> exit 0 (114 s, ausgabe/simtest/schule.txt)
+--kipolicy -> exit 0 (86 s, ausgabe/simtest/kipolicy.txt)
+--techfrueh -> exit 0 (79 s, ausgabe/simtest/techfrueh.txt)
+--erweiterung -> exit 0 (62 s, ausgabe/simtest/erweiterung.txt)
+--militaer -> exit 0 (54 s, ausgabe/simtest/militaer.txt)
+--migrationstest -> exit 0 (42 s, ausgabe/simtest/migrationstest.txt)
+--haushalt -> exit 0 (51 s, ausgabe/simtest/haushalt.txt)
+--tech -> exit 0 (39 s, ausgabe/simtest/tech.txt)
+--wachstum -> exit 0 (33 s, ausgabe/simtest/wachstum.txt)
+--kita -> exit 0 (16 s, ausgabe/simtest/kita.txt)
+--regierung -> exit 0 (24 s, ausgabe/simtest/regierung.txt)
+--speichertest -> exit 0 (10 s, ausgabe/simtest/speichertest.txt)
+--kitest -> exit 0 (12 s, ausgabe/simtest/kitest.txt)
+--bau -> exit 0 (9 s, ausgabe/simtest/bau.txt)
+--aufholtest -> exit 0 (3 s, ausgabe/simtest/aufholtest.txt)
+--waren -> exit 0 (6 s, ausgabe/simtest/waren.txt)
+--kipolicy_datei --policy ki/policy_v9_lokal_1.json -> exit 0 (27 s, ausgabe/simtest/kipolicy_datei_policy_v9_lokal_1.txt)
+--gate -> exit 0 (30 s, ausgabe/simtest/gate.txt)
+Ergebnis: 22 von 22 Läufen mit Exit 0
+
+real	12m17.624s
+user	26m1.095s
+sys	0m14.139s
+exit 0
+
+Vergleich mit zwei früheren Läufen aus frischen Kopien am selben Tag (stadt.html d2663b36… und 0b453bf1…), Zeitangaben ausgeblendet:
+alle 20 Modi und beide --kipolicy-Läufe gleich (--kipolicy 26 ok, mit ki/policy_v9_lokal_1.json 27 ok, 0 FEHL); Speichertest ca60551e5b316d33, Migration 324 ok.
+Gate T allein am Ende: 3.132 / 2.643 / 2.736 ms (Grenze 5.000 ms).
