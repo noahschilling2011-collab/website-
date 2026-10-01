@@ -1,0 +1,107 @@
+Playwright 1.56.1 (/opt/node22/lib/node_modules/playwright); Chromium /opt/pw-browsers/chromium-1194/chrome-linux/chrome
+Three.js: lokal SP/three/package; Git für alte Fassungen: <repo>; Ausgabe: SP/ml/e2bau/mess/fix/frisch/browser
+Seitenserver: python3 -m http.server 9096 (PID 15623), Wurzel SP/ml/e2bau/frisch_fix
+KI: auf 11434 läuft schon ein KI-Nachbau (test-modell), bleibt unberührt
+=== basis (Teststand erzeugen)
+stadt.html: Dialog true, Version 10, Tag 420 8 Uhr, 2186 Einwohner
+Dauer 25 s, Ausgabe SP/ml/e2bau/mess/fix/frisch/browser/basis/
+=== p3test
+exit 0, OK 12 (Soll 12), FEHL 0, 20 s → grün
+=== p5neu
+exit 0, OK 10 (Soll 10), FEHL 0, 23 s → grün
+=== p6migration
+exit 0, OK 44 (Soll 44), FEHL 0, 307 s → grün
+=== p7figuren
+exit 0, OK 6 (Soll 6), FEHL 0, 7 s → grün
+=== p8tech
+exit 0, OK 15 (Soll 15), FEHL 0, 21 s → grün
+=== raute_klick
+exit 0, OK 11 (Soll 11), FEHL 0, 13 s → grün
+=== ereignis
+exit 0, OK 21 (Soll 21), FEHL 0, 21 s → grün
+=== t1_xss
+exit 0, OK 5 (Soll 5), FEHL 0, 19 s → grün
+=== p4test
+exit 0, OK 29 (Soll 29), FEHL 0, 50 s → grün
+=== s2karten
+exit 0, OK 22 (Soll 22), FEHL 0, 53 s → grün
+=== kita
+exit 0, OK 22 (Soll 22), FEHL 0, 35 s → grün
+=== befunde_s2
+exit 0, OK 27 (Soll 27), FEHL 0, 59 s → grün
+=== erweiterung
+exit 0, OK 20 (Soll 20), FEHL 0, 34 s → grün
+=== sicherheit
+exit 0, OK 12 (Soll 12), FEHL 0, 14 s → grün
+=== militaer
+exit 0, OK 16 (Soll 16), FEHL 0, 45 s → grün
+=== autos
+exit 0, OK 9 (Soll 9), FEHL 0, 17 s → grün
+=== autos_bild
+exit 0, OK 20 (Soll 20), FEHL 0, 111 s → grün
+=== rathaus
+exit 0, OK 15 (Soll 15), FEHL 0, 44 s → grün
+=== schule
+exit 0, OK 8 (Soll 8), FEHL 0, 38 s → grün
+=== haushalt
+exit 0, OK 18 (Soll 18), FEHL 0, 33 s → grün
+=== wachstum
+exit 0, OK 29 (Soll 29), FEHL 0, 229 s → grün
+=== techfrueh
+exit 0, OK 17 (Soll 17), FEHL 0, 42 s → grün
+=== befunde_v9
+exit 0, OK 20 (Soll 20), FEHL 0, 32 s → grün
+=== otest/befunde
+exit 0, OK 21 (Soll 21), FEHL 0, 62 s → grün
+=== otest/handy
+exit 0, OK 11 (Soll 11), FEHL 0, 27 s → grün
+=== otest/breit
+exit 0, OK 12 (Soll 12), FEHL 0, 50 s → grün
+=== otest/tastatur
+exit 0, OK 4 (Soll 4), FEHL 0, 10 s → grün
+=== otest/breiten
+exit 0, OK 20 (Soll 20), FEHL 0, 51 s → grün
+=== otest/hilfehoehe
+exit 0, OK 1 (Soll 1), FEHL 0, 6 s → grün
+=== p10speicher
+exit 0, OK 11 (Soll 11), FEHL 0, 69 s → grün
+=== gedaechtnis
+exit 0, OK 17 (Soll 17), FEHL 0, 70 s → grün
+Seitenserver PID 15623 beendet
+=== browser_ki
+exit 0, OK 32 (Soll 32), FEHL 0, 39 s → grün
+
+Zusammenfassung (2026-10-01 03:44, PORT 9096, 27 min):
+p3test             grün exit 0   OK  12 /  12  FEHL 0     20 s
+p5neu              grün exit 0   OK  10 /  10  FEHL 0     23 s
+p6migration        grün exit 0   OK  44 /  44  FEHL 0    307 s
+p7figuren          grün exit 0   OK   6 /   6  FEHL 0      7 s
+p8tech             grün exit 0   OK  15 /  15  FEHL 0     21 s
+raute_klick        grün exit 0   OK  11 /  11  FEHL 0     13 s
+ereignis           grün exit 0   OK  21 /  21  FEHL 0     21 s
+t1_xss             grün exit 0   OK   5 /   5  FEHL 0     19 s
+p4test             grün exit 0   OK  29 /  29  FEHL 0     50 s
+s2karten           grün exit 0   OK  22 /  22  FEHL 0     53 s
+kita               grün exit 0   OK  22 /  22  FEHL 0     35 s
+befunde_s2         grün exit 0   OK  27 /  27  FEHL 0     59 s
+erweiterung        grün exit 0   OK  20 /  20  FEHL 0     34 s
+sicherheit         grün exit 0   OK  12 /  12  FEHL 0     14 s
+militaer           grün exit 0   OK  16 /  16  FEHL 0     45 s
+autos              grün exit 0   OK   9 /   9  FEHL 0     17 s
+autos_bild         grün exit 0   OK  20 /  20  FEHL 0    111 s
+rathaus            grün exit 0   OK  15 /  15  FEHL 0     44 s
+schule             grün exit 0   OK   8 /   8  FEHL 0     38 s
+haushalt           grün exit 0   OK  18 /  18  FEHL 0     33 s
+wachstum           grün exit 0   OK  29 /  29  FEHL 0    229 s
+techfrueh          grün exit 0   OK  17 /  17  FEHL 0     42 s
+befunde_v9         grün exit 0   OK  20 /  20  FEHL 0     32 s
+otest/befunde      grün exit 0   OK  21 /  21  FEHL 0     62 s
+otest/handy        grün exit 0   OK  11 /  11  FEHL 0     27 s
+otest/breit        grün exit 0   OK  12 /  12  FEHL 0     50 s
+otest/tastatur     grün exit 0   OK   4 /   4  FEHL 0     10 s
+otest/breiten      grün exit 0   OK  20 /  20  FEHL 0     51 s
+otest/hilfehoehe   grün exit 0   OK   1 /   1  FEHL 0      6 s
+p10speicher        grün exit 0   OK  11 /  11  FEHL 0     69 s
+gedaechtnis        grün exit 0   OK  17 /  17  FEHL 0     70 s
+browser_ki         grün exit 0   OK  32 /  32  FEHL 0     39 s
+ALLES GRÜN

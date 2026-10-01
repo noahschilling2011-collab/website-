@@ -1,0 +1,6 @@
+Vergleich basis (SP/ml/e2bau/basis_6c1741e.html, sim 3b1a95e0e5ae9ea5, Version 9) gegen neu (sim 1009eec6c4b8d852, Version 10); GED –/0, Stärke –/1.5, OPFER_FREI –/0, HAFT_EROEFFNUNG –/0; Tagesschritte, 730 Tage
+ok   Seed 1: 730 von 730 Tagen gleich (Einwohner 1395 / 1395; Tage mit memName ≠ 0 in der Vergleichsfassung: 730; gelernt –)
+ok   Seed 2: 730 von 730 Tagen gleich (Einwohner 1434 / 1434; Tage mit memName ≠ 0 in der Vergleichsfassung: 730; gelernt –)
+ok   Seed 3: 730 von 730 Tagen gleich (Einwohner 1504 / 1504; Tage mit memName ≠ 0 in der Vergleichsfassung: 730; gelernt –)
+Tag für Tag gleich (bis auf memName und die Version)
+exit 0

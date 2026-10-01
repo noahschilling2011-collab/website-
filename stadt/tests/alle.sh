@@ -58,17 +58,23 @@ aufraeumen() {
 # Prüfung vom 29.09.2026 mit 6 Prüfungen mehr: Import-Rückmeldung im Fenster, Datei entfernen, Auswertung laut Datei, Texte ohne Doppelung)
 soll() {
   case $1 in
-    p3test) echo 12 ;; p5neu) echo 10 ;; p6migration) echo 39 ;; p7figuren) echo 6 ;; p8tech) echo 15 ;; raute_klick) echo 8 ;;
+    p3test) echo 12 ;; p5neu) echo 10 ;; p6migration) echo 44 ;; p7figuren) echo 6 ;; p8tech) echo 15 ;; raute_klick) echo 11 ;;
     ereignis) echo 21 ;; t1_xss) echo 5 ;; p4test) echo 29 ;; s2karten) echo 22 ;; kita) echo 22 ;; befunde_s2) echo 27 ;;
     erweiterung) echo 20 ;; sicherheit) echo 12 ;; militaer) echo 16 ;; autos) echo 9 ;; autos_bild) echo 20 ;; rathaus) echo 15 ;;
     schule) echo 8 ;; haushalt) echo 18 ;; wachstum) echo 29 ;; techfrueh) echo 17 ;; befunde_v9) echo 20 ;;
     otest/befunde) echo 21 ;; otest/handy) echo 11 ;; otest/breit) echo 12 ;; otest/tastatur) echo 4 ;; otest/breiten) echo 20 ;;
-    otest/hilfehoehe) echo 1 ;; browser_ki) echo 30 ;; *) echo "?" ;;
+    otest/hilfehoehe) echo 1 ;; browser_ki) echo 32 ;;
+    p10speicher) echo 11 ;;                    # Version 10 (Etappe 2, Schritt 2): Speicherformat, große Stadt in localStorage, Übernahme von 9 (seit FIX: auch per Import, +1)
+    gedaechtnis) echo 17 ;;                    # Etappe 2, Schritt 3: Personenkarte (Erfahrung, Plan, offene Folge, „Warum?“), Liste „heute anders“, Handy, Tastatur (seit FIX: Warum nachrechenbar, Liste beim Auffrischen, +2)
+    # Version 10 (Etappe 2, Schritt 4): p6migration +5 (Übernahme eines Stands der Version 9 aus 6c1741e mit Größe), browser_ki +2 (Policy aus
+    # Version 9 sichtbar abgelehnt: in ki/ und beim Datei-Import), raute_klick 8 → 11 (die Teststadt läuft anders: 10 statt 7 Rauten im Bild,
+    # dazu die Summenzeile; das Kriterium des Tests bleibt: mindestens 4 Klicks, keiner daneben)
+    *) echo "?" ;;
   esac
 }
 ALLE="p3test p5neu p6migration p7figuren p8tech raute_klick ereignis t1_xss p4test s2karten kita befunde_s2 erweiterung sicherheit militaer
   autos autos_bild rathaus schule haushalt wachstum techfrueh befunde_v9 otest/befunde otest/handy otest/breit otest/tastatur otest/breiten
-  otest/hilfehoehe browser_ki"
+  otest/hilfehoehe p10speicher gedaechtnis browser_ki"
 LISTE=${*:-$ALLE}
 for t in $LISTE; do [ "$(soll "$t")" = "?" ] && { echo "Unbekannter Test: $t (bekannt: $(echo $ALLE))"; exit 2; }; done
 

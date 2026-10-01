@@ -1,0 +1,22 @@
+Seed 1
+  ok   Einteilung um 7 Uhr: nur Leute aus dem Bauhof, höchstens 4 je Baustelle, keiner übrig wenn Bedarf (0 Fehler)
+  ok   Fortschritt = Leute, die da waren: 835 Baustellentage geprüft (94 Nächte mit Wechsel im Bauhof übersprungen), 0 Fehler
+  ok   jede Baustelle bis Tag 300 ist an Tag 365 fertig (271 fertig, offen seit ≤ Tag 300: 0)
+  ok   Bauhof höchstens 40 (ohne Ersatzdienst): Stellen bis 40, Leute bis 39
+  ok   Lohn 95–120 (Ø 101.0)
+       Bauzeit Ø 4.0 Tage, Median 4, längste 13; ohne Bauarbeiter 11.8 % der Baustellentage
+Seed 2
+  ok   Einteilung um 7 Uhr: nur Leute aus dem Bauhof, höchstens 4 je Baustelle, keiner übrig wenn Bedarf (0 Fehler)
+  ok   Fortschritt = Leute, die da waren: 716 Baustellentage geprüft (78 Nächte mit Wechsel im Bauhof übersprungen), 0 Fehler
+  ok   jede Baustelle bis Tag 300 ist an Tag 365 fertig (230 fertig, offen seit ≤ Tag 300: 0)
+  ok   Bauhof höchstens 40 (ohne Ersatzdienst): Stellen bis 40, Leute bis 40
+  ok   Lohn 95–120 (Ø 102.0)
+       Bauzeit Ø 4.0 Tage, Median 4, längste 12; ohne Bauarbeiter 13.6 % der Baustellentage
+Seed 3
+  ok   Einteilung um 7 Uhr: nur Leute aus dem Bauhof, höchstens 4 je Baustelle, keiner übrig wenn Bedarf (0 Fehler)
+  ok   Fortschritt = Leute, die da waren: 655 Baustellentage geprüft (108 Nächte mit Wechsel im Bauhof übersprungen), 0 Fehler
+  ok   jede Baustelle bis Tag 300 ist an Tag 365 fertig (251 fertig, offen seit ≤ Tag 300: 0)
+  ok   Bauhof höchstens 40 (ohne Ersatzdienst): Stellen bis 40, Leute bis 40
+  ok   Lohn 95–119 (Ø 101.6)
+       Bauzeit Ø 4.3 Tage, Median 4, längste 12; ohne Bauarbeiter 17.1 % der Baustellentage
+Alle Bau-Prüfungen bestanden

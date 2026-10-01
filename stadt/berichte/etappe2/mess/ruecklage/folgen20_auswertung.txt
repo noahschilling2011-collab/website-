@@ -1,0 +1,33 @@
+Seeds 1–20 (20), 730 Tage; Spalten: aus | neu r1 | neu r0 | neu r2
+Gründungen (ausgeführt)                  10454 | 9064 | 9145 | 9135
+Personen mit Pleite                      5148 | 4518 | 4473 | 4343
+  danach wieder gegründet                734 (14.3 %) | 124 (2.7 %) | 218 (4.9 %) | 171 (3.9 %)
+Personen mit ≥ 2 Pleiten                 430 | 41 | 129 | 80
+Kündigung = Renteneintritt               17171 | 17738 | 17161 | 17339
+Kündigung für die Elternzeit             39231 | 9018 | 8655 | 9493
+  binnen 1 Tag wieder Arbeit gesucht     35108 (89.5 %) | 6677 (74.0 %) | 6380 (73.7 %) | 6960 (73.3 %)
+  binnen 30 Tagen                        37403 (95.3 %) | 8055 (89.3 %) | 7743 (89.5 %) | 8373 (88.2 %)
+sonstige Kündigung                       10703 | 2074 | 2006 | 2136
+  binnen 1 Tag wieder Arbeit gesucht     9980 (93.2 %) | 1774 (85.5 %) | 1698 (84.6 %) | 1807 (84.6 %)
+  binnen 30 Tagen                        10500 (98.1 %) | 2001 (96.5 %) | 1937 (96.6 %) | 2050 (96.0 %)
+Personen mit ≥ 2 sonstigen Kündigungen   1079 | 318 | 336 | 326
+Wechsel                                  153152 | 127064 | 120919 | 125465
+  Stelle binnen 30 Tagen weg             14102 (9.2 %) | 10702 (8.4 %) | 10236 (8.5 %) | 9930 (7.9 %)
+Zusammengezogen                          16678 | 16503 | 16111 | 16470
+  binnen 60 Tagen getrennt               334 (2.0 %) | 159 (1.0 %) | 171 (1.1 %) | 262 (1.6 %)
+Median Tage Pleite → Wiedergründung      192 | 251 | 234 | 241
+Abstand gruenden (ehrgeiz)               +19.5 (17.3 … 22.7, n 10454) | +20.3 (17.7 … 22.3, n 9064) | +20.4 (16.6 … 22.3, n 9145) | +19.4 (17.6 … 23.1, n 9135)
+Abstand kuendigenSonst (fleiss)          -35.6 (-39.1 … -30.4, n 10703) | -33.3 (-37.2 … -29.5, n 2074) | -33.9 (-38.1 … -30.6, n 2006) | -34.0 (-37.3 … -31.3, n 2136)
+Abstand kuendigenEltern (fleiss)         -26.3 (-28.1 … -24.0, n 39231) | -20.8 (-24.2 … -17.7, n 9018) | -20.9 (-23.1 … -18.7, n 8655) | -20.9 (-22.9 … -19.4, n 9493)
+Abstand wegziehen (heimat)               -26.3 (-30.4 … -22.8, n 951) | -25.3 (-30.7 … -17.1, n 589) | -25.5 (-31.7 … -19.7, n 582) | -25.9 (-30.4 … -19.6, n 808)
+Abstand partner (gesellig)               +10.5 (8.8 … 11.6, n 16807) | +10.2 (9.3 … 11.3, n 16640) | +10.4 (9.6 … 11.2, n 16226) | +10.2 (9.0 … 11.8, n 16592)
+Abstand jobSuchen (fleiss)               -18.3 (-20.6 … -15.7, n 80623) | -7.5 (-9.1 … -4.9, n 41037) | -7.6 (-9.1 … -5.8, n 39808) | -7.8 (-9.1 … -6.5, n 40412)
+Abstand wechsel (ehrgeiz)                +4.6 (2.8 … 5.6, n 153152) | +4.4 (3.1 … 6.2, n 127064) | +4.3 (2.8 … 5.9, n 120919) | +4.4 (2.6 … 6.4, n 125465)
+Einwohner 365                            aus Mittel 1242; neu r1 +41 ± 23 (3.3 %; höher 14 / niedriger 5) | neu r0 +17 ± 18 (1.3 %; höher 11 / niedriger 9) | neu r2 +18 ± 21 (1.5 %; höher 14 / niedriger 6)
+Kasse 365                                aus Mittel 1007375; neu r1 -41797 ± 16413 (-4.1 %; höher 5 / niedriger 15) | neu r0 -82698 ± 19915 (-8.2 %; höher 3 / niedriger 17) | neu r2 -20545 ± 16449 (-2.0 %; höher 9 / niedriger 11)
+Gründungen bis Tag 365                   aus Mittel 313; neu r1 -43 ± 16 (-13.8 %; höher 5 / niedriger 15) | neu r0 -43 ± 15 (-13.8 %; höher 4 / niedriger 16) | neu r2 -9 ± 20 (-2.8 %; höher 11 / niedriger 9)
+Pleiten bis Tag 365                      aus Mittel 153; neu r1 -25 ± 11 (-16.5 %; höher 5 / niedriger 15) | neu r0 -27 ± 9 (-17.9 %; höher 3 / niedriger 16) | neu r2 -4 ± 13 (-2.9 %; höher 11 / niedriger 9)
+Einwohner 730                            aus Mittel 1480; neu r1 +20 ± 19 (1.4 %; höher 12 / niedriger 8) | neu r0 +21 ± 22 (1.4 %; höher 12 / niedriger 8) | neu r2 -5 ± 16 (-0.3 %; höher 10 / niedriger 10)
+Kasse 730                                aus Mittel 990121; neu r1 -188671 ± 47714 (-19.1 %; höher 4 / niedriger 16) | neu r0 -110214 ± 48202 (-11.1 %; höher 5 / niedriger 15) | neu r2 -175888 ± 44891 (-17.8 %; höher 5 / niedriger 15)
+Gründungen bis Tag 730                   aus Mittel 523; neu r1 -70 ± 43 (-13.3 %; höher 8 / niedriger 12) | neu r0 -65 ± 38 (-12.5 %; höher 3 / niedriger 17) | neu r2 -66 ± 40 (-12.6 %; höher 8 / niedriger 12)
+Pleiten bis Tag 730                      aus Mittel 279; neu r1 -51 ± 37 (-18.3 %; höher 8 / niedriger 12) | neu r0 -49 ± 31 (-17.5 %; höher 3 / niedriger 17) | neu r2 -58 ± 36 (-20.7 %; höher 8 / niedriger 12)

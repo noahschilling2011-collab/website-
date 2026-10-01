@@ -27,6 +27,7 @@ const FASSUNGEN = {
   v6: ['bc7247a5d881186d85845db60b84011e0be98426', 'fac39acc344ecdaed9b238ede0663986f37472c6'],  // Schritt 2, feste Karte 96 × 96
   v7: ['ffa1d88b7e91b93f335dd9fcf18c0e2ce69dd68e', '26caf8184c3641a3fe31b9e3ae2f9f7cd822af5d'],  // Karte wächst, Sicherheit, Bund
   v8: ['31ce45210703530551d90e7e76a459f68636c847', '45a9a06d53d914072357efd2e08ec9244a88f4b7'],  // Autos; Vergleichsstand stadt.orig.html
+  v9: ['6c1741ec5e4c80cd1cdaca02ee17e574f6545c1d', 'abe1a2f64446a36c20f318065d8afd90a680b494'],  // Version 9 mit KI-Teil (Etappe 1), letzte Fassung vor Version 10
 };
 
 function playwrightPfad() {

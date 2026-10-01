@@ -175,7 +175,9 @@ const hauskarte = (ev, b) => ev((b) => { const k = Object.assign(document.create
     const u = await A.ev(() => { const S = __stadt.S(), m = document.getElementById('meldung');
       return { weg: document.getElementById('weg-dialog').open ? document.getElementById('weg-inhalt').innerText : '', meldung: m.textContent, tag: S.tag,
         wahl: S.buch.filter(e => e.art === 'wahl').map(e => 'Tag ' + e.tag + ': ' + __stadt.Sim.klartext(e.text).slice(0, 100)), bm: S.buergermeister.p }; });
-    ok(v && u.meldung.startsWith('Deine Stadt ist übernommen') && u.meldung.length <= 200 && /Rathaus mit Bürgermeister, Schulen, Haushalt/.test(u.meldung) && !/Autos/.test(u.meldung),
+    // Version 10 (Etappe 2): die Meldung nennt dazu „Bewohner mit Erfahrung und Plänen“; die Grenze wächst genau um diesen Punkt
+    const NEU10 = '; Bewohner mit Erfahrung und Plänen';
+    ok(v && u.meldung.startsWith('Deine Stadt ist übernommen') && u.meldung.length <= 200 + NEU10.length && u.meldung.includes(NEU10) && /Rathaus mit Bürgermeister, Schulen, Haushalt/.test(u.meldung) && !/Autos/.test(u.meldung),
       `Meldung nach dem Übernehmen (${u.meldung.length} Zeichen): „${u.meldung}“`);
     ok(u.bm >= 0 && u.wahl.length >= 1 && /Bürgermeister/.test(u.weg), `„Während du weg warst“ bis Tag ${u.tag} nennt die erste Wahl (${u.wahl[0] || '–'}): „${u.weg.replace(/\s+/g, ' ').slice(-400)}“`);
     await A.page.screenshot({ path: BILD + 'v9_weg_nach_uebernahme_400.png' });

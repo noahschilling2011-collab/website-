@@ -1,0 +1,168 @@
+  ok   Reserve beim Gerätekauf weiter 600 Taler, Rücklage beim Wohnungskauf 40 Tageskosten (eigene Namen)
+  ok   Lohnsteuer allein, 100 Taler: 7 statt 10 Taler am Tag
+  ok   Lohnsteuer Paar, beide 100, zwei Kinder: 8 statt 20 Taler am Tag
+  ok   Lohnsteuer ein Verdienst 100, Partner, zwei Kinder: 0 statt 10 Taler am Tag
+  ok   Lohnsteuer alleinerziehend 100, ein Kind: 4 statt 10 Taler am Tag
+  ok   Lohnsteuer Paar ohne Kinder, beide 100: 14 statt 20 Taler am Tag
+  ok   Lohnsteuer Rentnerin allein, 100 Taler Lohn: 5 statt 10 Taler am Tag
+  ok   Lohnsteuer Paar ohne Kinder, 114 und 109, einer ist Rentner: 14 statt 22 Taler am Tag
+Seed 1
+  ok   Lohnsteuer = Summe über alle Steuerhaushalte, mit Rentner-Freibetrag (34 Nächte, 26 übersprungen, 85 Lohntage von Rentnern): 87389 Taler, nach der alten Regel 230470 (0 Fehler)
+  ok   Rentenkasse = alle, die Rente bekommen (ab 67, auch mit Arbeit oder Betrieb; vor 67 mit 45 Beitragsjahren ohne Arbeitsplatz) × Stufe (0 Fehler)
+  ok   Betreuungsgehalt je Haushalt mit Kleinkind ohne Kita-Platz (34 Nächte mit Betreuungsgehalt, 15 Haushaltsnächte mit Krippenplatz und jemandem, der es bekommen könnte, ohne Betreuungsgehalt; 0 Fehler)
+  ok   leeres Budget: 146 Rentnerinnen und Rentner unter 80 bekommen trotzdem 66 Taler (Rentenkasse +13794)
+  ok   Person gefunden: Lina Schröder
+  ok   nach 5 Tagen Grundsicherung gemeinnützige Arbeit im Bauhof: gemein 1, gsTage 5
+  ok   Bauhof: 24 Leute, davon 1 gemeinnützig und 10 im Ersatzdienst, 21 Stellen (ohne Ersatzdienst ≤ 40); freie Stellen -3 wie ohne sie
+  ok   Stadtbuch: „Lina Schröder bezieht seit 6 Monaten Grundsicherung und wird ab morgen zu gemeinnütziger Arbeit im Bauhof herangezogen.“
+  ok   gemeinnützige Arbeit erfüllt das Ziel „besserer Job“ nicht (Ziel jetzt besserer Job)
+  ok   Personenkarte: „leistet gemeinnützige Arbeit beim Bauhof an der Hauptstraße (ohne Lohn)“, Leistung {"art":"grundsicherung","betrag":52,"gemein":true}
+  ok   erlaubt um 7 Uhr ohne freie Stellen: 
+  ok   mit freier Stelle erlaubt: job_suchen
+  ok   am nächsten Abend noch gemeinnützig, Grundsicherung läuft weiter (gsTage 6)
+  ok   kein Lohn: Geld 11 → 4 (nur Grundsicherung 52 minus Einkauf und Miete)
+  ok   Speichern/Laden mit gemeinnütziger Arbeit: läuft bitgleich weiter
+  ok   nach 1 Stunden eine richtige Stelle: arbeitet als Verkäuferin im Laden der Stadt an der Hauptstraße
+  ok   danach stimmen die Stellen im Bauhof
+  ok   Arbeitslose ohne Eltern mit Betreuungsgehalt, ohne Rente vor 67 und ohne Eltern, die ohne Kita-Platz nicht arbeiten können: 7 = 7
+Seed 2
+  ok   Lohnsteuer = Summe über alle Steuerhaushalte, mit Rentner-Freibetrag (31 Nächte, 29 übersprungen, 130 Lohntage von Rentnern): 83959 Taler, nach der alten Regel 205442 (0 Fehler)
+  ok   Rentenkasse = alle, die Rente bekommen (ab 67, auch mit Arbeit oder Betrieb; vor 67 mit 45 Beitragsjahren ohne Arbeitsplatz) × Stufe (0 Fehler)
+  ok   Betreuungsgehalt je Haushalt mit Kleinkind ohne Kita-Platz (31 Nächte mit Betreuungsgehalt, 15 Haushaltsnächte mit Krippenplatz und jemandem, der es bekommen könnte, ohne Betreuungsgehalt; 0 Fehler)
+  ok   leeres Budget: 119 Rentnerinnen und Rentner unter 80 bekommen trotzdem 66 Taler (Rentenkasse +11220)
+  ok   Person gefunden: Felix Busch
+  ok   nach 5 Tagen Grundsicherung gemeinnützige Arbeit im Bauhof: gemein 1, gsTage 5
+  ok   Bauhof: 27 Leute, davon 1 gemeinnützig und 5 im Ersatzdienst, 16 Stellen (ohne Ersatzdienst ≤ 40); freie Stellen -11 wie ohne sie
+  ok   Stadtbuch: „Felix Busch bezieht seit 6 Monaten Grundsicherung und wird ab morgen zu gemeinnütziger Arbeit im Bauhof herangezogen.“
+  ok   gemeinnützige Arbeit erfüllt das Ziel „besserer Job“ nicht (Ziel jetzt besserer Job)
+  ok   Personenkarte: „leistet gemeinnützige Arbeit beim Bauhof an der Hauptstraße (ohne Lohn)“, Leistung {"art":"grundsicherung","betrag":31,"gemein":true}
+  ok   erlaubt um 7 Uhr ohne freie Stellen: 
+  ok   mit freier Stelle erlaubt: job_suchen
+  ok   am nächsten Abend noch gemeinnützig, Grundsicherung läuft weiter (gsTage 6)
+  ok   kein Lohn: Geld 16 → 16 (nur Grundsicherung 31 minus Einkauf und Miete)
+  ok   Speichern/Laden mit gemeinnütziger Arbeit: läuft bitgleich weiter
+  ok   nach 1 Stunden eine richtige Stelle: arbeitet als Erzieher in der Kita an der Hauptstraße
+  ok   danach stimmen die Stellen im Bauhof
+  ok   Arbeitslose ohne Eltern mit Betreuungsgehalt, ohne Rente vor 67 und ohne Eltern, die ohne Kita-Platz nicht arbeiten können: 6 = 6
+Seed 3
+  ok   Lohnsteuer = Summe über alle Steuerhaushalte, mit Rentner-Freibetrag (30 Nächte, 30 übersprungen, 98 Lohntage von Rentnern): 84266 Taler, nach der alten Regel 206430 (0 Fehler)
+  ok   Rentenkasse = alle, die Rente bekommen (ab 67, auch mit Arbeit oder Betrieb; vor 67 mit 45 Beitragsjahren ohne Arbeitsplatz) × Stufe (0 Fehler)
+  ok   Betreuungsgehalt je Haushalt mit Kleinkind ohne Kita-Platz (28 Nächte mit Betreuungsgehalt, 16 Haushaltsnächte mit Krippenplatz und jemandem, der es bekommen könnte, ohne Betreuungsgehalt; 0 Fehler)
+  ok   leeres Budget: 156 Rentnerinnen und Rentner unter 80 bekommen trotzdem 66 Taler (Rentenkasse +15048)
+  ok   Person gefunden: Jonas Ernst
+  ok   nach 5 Tagen Grundsicherung gemeinnützige Arbeit im Bauhof: gemein 1, gsTage 5
+  ok   Bauhof: 35 Leute, davon 1 gemeinnützig und 10 im Ersatzdienst, 21 Stellen (ohne Ersatzdienst ≤ 40); freie Stellen -14 wie ohne sie
+  ok   Stadtbuch: „Jonas Ernst bezieht seit 6 Monaten Grundsicherung und wird ab morgen zu gemeinnütziger Arbeit im Bauhof herangezogen.“
+  ok   gemeinnützige Arbeit erfüllt das Ziel „besserer Job“ nicht (Ziel jetzt besserer Job)
+  ok   Personenkarte: „leistet gemeinnützige Arbeit beim Bauhof an der Hauptstraße (ohne Lohn)“, Leistung {"art":"grundsicherung","betrag":43,"gemein":true}
+  ok   erlaubt um 7 Uhr ohne freie Stellen: 
+  ok   mit freier Stelle erlaubt: job_suchen
+  ok   am nächsten Abend noch gemeinnützig, Grundsicherung läuft weiter (gsTage 6)
+  ok   kein Lohn: Geld 7 → 0 (nur Grundsicherung 43 minus Einkauf und Miete)
+  ok   Speichern/Laden mit gemeinnütziger Arbeit: läuft bitgleich weiter
+  ok   nach 1 Stunden eine richtige Stelle: arbeitet als Verkäufer im Laden der Stadt an der Hauptstraße
+  ok   danach stimmen die Stellen im Bauhof
+  ok   Arbeitslose ohne Eltern mit Betreuungsgehalt, ohne Rente vor 67 und ohne Eltern, die ohne Kita-Platz nicht arbeiten können: 13 = 13
+  ok   ohne regierung: abgelehnt („Spielstand beschädigt: Stadtregierung“)
+  ok   ohne stat.regierung: abgelehnt („Spielstand beschädigt: Regierungs-Statistik“)
+  ok   stat.regierung leer: abgelehnt („Spielstand beschädigt: Regierungs-Statistik“)
+  ok   Summe null: abgelehnt („Spielstand beschädigt: Regierungs-Statistik“)
+  ok   Start nach heute: abgelehnt („Spielstand beschädigt: Stadtregierung“)
+  ok   ohne tagStart: abgelehnt („Spielstand beschädigt: Stadtregierung“)
+  ok   gestern als Text: abgelehnt („Spielstand beschädigt: Stadtregierung“)
+  ok   gestern ohne Summe: abgelehnt („Spielstand beschädigt: Stadtregierung“)
+  ok   ohne schritt2: abgelehnt („Spielstand beschädigt: Stadtregierung“)
+  ok   schritt2 vor dem Start: abgelehnt („Spielstand beschädigt: Stadtregierung“)
+  ok   schritt2 als Text: abgelehnt („Spielstand beschädigt: Stadtregierung“)
+  ok   ohne Summe der Käufe: abgelehnt („Spielstand beschädigt: Regierungs-Statistik“)
+  ok   Summe der Renteneintritte als Text: abgelehnt („Spielstand beschädigt: Regierungs-Statistik“)
+  ok   gestern ohne Raten: abgelehnt („Spielstand beschädigt: Stadtregierung“)
+  ok   ohne kitaAb (Ende der Kita-Frist): abgelehnt („Spielstand beschädigt: Stadtregierung“)
+  ok   kitaAb nach heute: abgelehnt („Spielstand beschädigt: Stadtregierung“)
+  ok   kitaAb als Text: abgelehnt („Spielstand beschädigt: Stadtregierung“)
+  ok   ohne p.beitrag: abgelehnt („Spielstand unvollständig: p.beitrag“)
+  ok   ohne p.eigen: abgelehnt („Spielstand unvollständig: p.eigen“)
+  ok   Eigentum bei jemandem, auf den der Haushalt nicht läuft: abgelehnt („Spielstand beschädigt: Wohneigentum“)
+  ok   Eigentum an einer anderen Wohnung: abgelehnt („Spielstand beschädigt: Wohneigentum“)
+  ok   Rest größer als der Kaufpreis: abgelehnt („Spielstand beschädigt: Wohneigentum“)
+  ok   unveränderter Stand lädt, „gestern“ ist gleich nach dem Laden da
+Seed 1: gestern, Prämie, Vorbehalt, Grundsicherung erzwungen
+  ok   neue Stadt: noch kein „gestern“ (Anzeige „–“)
+  ok   „gestern“ = Summen minus Summen am Ende des Vortags (150 Nächte, 0 Fehler); von außen im Mittel 374 Taler am Tag
+  ok   Willkommensprämie: 49 Geburten, je 383 Taler (0 Fehler)
+  ok   Zuzug: 150 Nächte, 2 mit Vorbehalt; Zuzüge ≤ freie Wohnungen − Vorbehalt, Vorbehalt = min(frei, suchend) (0 Fehler)
+  ok   Beitragsjahre von außen nur aus dem Alter: Start 10 Leute, 220 Zuzügler am Ankunftstag (0 Fehler)
+  ok   Grundsicherung erzwungen: 274 Fälle, 81 bekommen sie, 193 nicht (Betreuungsgehalt, Rente, Einkommen im Haushalt, 4 in Haft; 3 Nächte mit Haftantritt nicht gezählt); 0 Abweichungen
+  ok   Betrag = Tagesbedarf (Einkauf, beim Vorstand Miete und Kinder): 10 Nächte nachgerechnet, 0 falsch
+  ok   Bauhof voll (Zuschlag 1 → 30): Emil Nowak bezieht Grundsicherung seit 5 Tagen, keine gemeinnützige Arbeit
+  ok   mit Platz im Bauhof (12 Stellen) in der Nacht danach herangezogen (gsTage 6)
+  ok   Mehmet Demir: mit Kleinkind Betreuungsgehalt statt gemeinnütziger Arbeit (betreuer ja, Geld 1208 → 1277)
+Seed 2: gestern, Prämie, Vorbehalt, Grundsicherung erzwungen
+  ok   neue Stadt: noch kein „gestern“ (Anzeige „–“)
+  ok   „gestern“ = Summen minus Summen am Ende des Vortags (150 Nächte, 0 Fehler); von außen im Mittel 239 Taler am Tag
+  ok   Willkommensprämie: 32 Geburten, je 383 Taler (0 Fehler)
+  ok   Zuzug: 150 Nächte, 1 mit Vorbehalt; Zuzüge ≤ freie Wohnungen − Vorbehalt, Vorbehalt = min(frei, suchend) (0 Fehler)
+  ok   Beitragsjahre von außen nur aus dem Alter: Start 10 Leute, 173 Zuzügler am Ankunftstag (0 Fehler)
+  ok   Grundsicherung erzwungen: 226 Fälle, 54 bekommen sie, 172 nicht (Betreuungsgehalt, Rente, Einkommen im Haushalt, 1 in Haft; 2 Nächte mit Haftantritt nicht gezählt); 0 Abweichungen
+  ok   Betrag = Tagesbedarf (Einkauf, beim Vorstand Miete und Kinder): 9 Nächte nachgerechnet, 0 falsch
+  ok   Bauhof voll (Zuschlag 0 → 30): Felix Busch bezieht Grundsicherung seit 5 Tagen, keine gemeinnützige Arbeit
+  ok   mit Platz im Bauhof (11 Stellen) in der Nacht danach herangezogen (gsTage 6)
+  ok   Lena Wagner: mit Kleinkind Betreuungsgehalt statt gemeinnütziger Arbeit (betreuer ja, Geld 1989 → 2007)
+Seed 3: gestern, Prämie, Vorbehalt, Grundsicherung erzwungen
+  ok   neue Stadt: noch kein „gestern“ (Anzeige „–“)
+  ok   „gestern“ = Summen minus Summen am Ende des Vortags (150 Nächte, 0 Fehler); von außen im Mittel 399 Taler am Tag
+  ok   Willkommensprämie: 63 Geburten, je 383 Taler (0 Fehler)
+  ok   Zuzug: 150 Nächte, 0 mit Vorbehalt; Zuzüge ≤ freie Wohnungen − Vorbehalt, Vorbehalt = min(frei, suchend) (0 Fehler)
+  ok   Beitragsjahre von außen nur aus dem Alter: Start 10 Leute, 266 Zuzügler am Ankunftstag (0 Fehler)
+  ok   Grundsicherung erzwungen: 342 Fälle, 79 bekommen sie, 263 nicht (Betreuungsgehalt, Rente, Einkommen im Haushalt, 3 in Haft; 1 Nächte mit Haftantritt nicht gezählt); 0 Abweichungen
+  ok   Betrag = Tagesbedarf (Einkauf, beim Vorstand Miete und Kinder): 10 Nächte nachgerechnet, 0 falsch
+  ok   Bauhof voll (Zuschlag 4 → 30): Luisa Winter bezieht Grundsicherung seit 5 Tagen, keine gemeinnützige Arbeit
+  ok   mit Platz im Bauhof (17 Stellen) in der Nacht danach herangezogen (gsTage 6)
+  ok   Clara Pohl: mit Kleinkind Betreuungsgehalt statt gemeinnütziger Arbeit (betreuer ja, Geld 1185 → 1244)
+Seed 1: Schritt 2, Renteneintritt
+  ok   Beitragstage über 8 Mitternächte: 5014-mal mit Arbeitsplatz +1, 25-mal mit Betreuungsgehalt +1, 491-mal ohne beides +0 (0 Fehler; 2 ausgelassen: Betreuer-Status über Mitternacht geändert)
+  ok   64 Jahre, kein Erspartes: mit 449 Beitragstagen kein „kündigen“, mit 450 schon („Du gehst in Rente: Du hast 45 Beitragsjahre und bekommst die volle Rente ohne Abschlag (66 Taler am Tag).“)
+  ok   Gehirn wählt „kuendigen“: Lina Vogel ist mit 64 in Rente („in Rente gegangen (vorher in der Kita an der Nordstraße)“), sucht keine Stelle (erlaubt: )
+  ok   um Mitternacht Rente aus der Rentenkasse (66 Leute × 66), zählt nicht als arbeitslos (6 ohne Arbeit)
+  ok   67 mit Stelle (Mats Kowalski, Lohn 114): bleibt angestellt, bekommt 66 Taler Rente, zahlt 0 statt 0 Taler Steuer (Entlastung 0), darf aufhören
+Seed 2: Schritt 2, Renteneintritt
+  ok   Beitragstage über 8 Mitternächte: 4062-mal mit Arbeitsplatz +1, 29-mal mit Betreuungsgehalt +1, 348-mal ohne beides +0 (0 Fehler; 4 ausgelassen: Betreuer-Status über Mitternacht geändert)
+  ok   64 Jahre, kein Erspartes: mit 449 Beitragstagen kein „kündigen“, mit 450 schon („Du gehst in Rente: Du hast 45 Beitragsjahre und bekommst die volle Rente ohne Abschlag (66 Taler am Tag).“)
+  ok   Gehirn wählt „kuendigen“: Lukas Wolf ist mit 64 in Rente („in Rente gegangen (vorher in der Tech-Firma an der Hauptstraße)“), sucht keine Stelle (erlaubt: )
+  ok   um Mitternacht Rente aus der Rentenkasse (50 Leute × 66), zählt nicht als arbeitslos (2 ohne Arbeit)
+  ok   67 mit Stelle (Felix Busch, Lohn 105): bleibt angestellt, bekommt 66 Taler Rente, zahlt 0 statt 0 Taler Steuer (Entlastung 0), darf aufhören
+Seed 3: Schritt 2, Renteneintritt
+  ok   Beitragstage über 8 Mitternächte: 5304-mal mit Arbeitsplatz +1, 51-mal mit Betreuungsgehalt +1, 556-mal ohne beides +0 (0 Fehler; 1 ausgelassen: Betreuer-Status über Mitternacht geändert)
+  ok   64 Jahre, kein Erspartes: mit 449 Beitragstagen kein „kündigen“, mit 450 schon („Du gehst in Rente: Du hast 45 Beitragsjahre und bekommst die volle Rente ohne Abschlag (66 Taler am Tag).“)
+  ok   Gehirn wählt „kuendigen“: Mila Pohl ist mit 64 in Rente („in Rente gegangen (vorher in der Werkstatt an der Lindenstraße)“), sucht keine Stelle (erlaubt: )
+  ok   um Mitternacht Rente aus der Rentenkasse (80 Leute × 66), zählt nicht als arbeitslos (4 ohne Arbeit)
+  ok   67 mit Stelle (Max Şahin, Lohn 92): bleibt angestellt, bekommt 66 Taler Rente, zahlt 0 statt 0 Taler Steuer (Entlastung 0), darf aufhören
+Seed 1: Schritt 2, Mieterkauf
+  ok   bis Tag 250: 294 Käufe, 285 Eigentümer; jede Nacht Eigentum nur beim Vorstand in seiner Wohnung (0 Verstöße), Anzahlung ≥ 20 % (0 Fehler); Stadtbuch „Als erster Haushalt kauft Leon Yılmaz die Wohnung an der Hauptstraße von der Stadt: 2.400 Taler, 490 angezahlt, der Rest in Raten so hoch wie die Miete.“, 23 Jahreszeilen
+  ok   Rate 16 Taler (Kaufpreis 3200 / 200), nach der Tilgung 0; Tageskosten 57 → 41
+  ok   Erbe: Leon König übernimmt die Wohnung (2800 Taler, Rest 0), Budget unverändert
+  ok   Auflösung: Rückkauf für 3200 Taler aus dem Budget, die Wohnung ist wieder frei (belegt 26 → 25)
+  ok   Umzug: 3168 Taler zurück, neue Wohnung zur Miete (16 Taler)
+  ok   Zusammenziehen: zwei Eigentümer → David Walter bekommt 2983 Taler zurück; Mieter zu Eigentümer → Mehmet Vogel zieht in die gekaufte Wohnung
+  ok   Wegzug der Eltern: Mats Kowalski bleibt und übernimmt die Wohnung (Fall gezielt hergestellt: erwachsene Person im Haushalt)
+  ok   60 Tage weiter (Tag 310): Invariante 0 Verstöße, keine NaN, Rückkauf nie gekürzt; Budget: Anzahlungen 352726 + Raten 635444 − Rückkäufe 35883 = 952287 = gebucht 952287
+Seed 2: Schritt 2, Mieterkauf
+  ok   bis Tag 250: 250 Käufe, 238 Eigentümer; jede Nacht Eigentum nur beim Vorstand in seiner Wohnung (0 Verstöße), Anzahlung ≥ 20 % (0 Fehler); Stadtbuch „Als erste Haushalte kaufen Felix Ernst und Jana Frank ihre Wohnung von der Stadt. Sie zahlen im Schnitt 674 von 2.800 Talern an, den Rest in Raten so hoch wie die Miete.“, 23 Jahreszeilen
+  ok   Rate 16 Taler (Kaufpreis 3200 / 200), nach der Tilgung 0; Tageskosten 47 → 31
+  ok   Erbe: Selin König übernimmt die Wohnung (2800 Taler, Rest 0), Budget unverändert
+  ok   Auflösung: Rückkauf für 1932 Taler aus dem Budget, die Wohnung ist wieder frei (belegt 26 → 25)
+  ok   Umzug: 2739 Taler zurück, neue Wohnung zur Miete (16 Taler)
+  ok   Zusammenziehen: zwei Eigentümer → Johanna Kraus bekommt 1601 Taler zurück; Mieter zu Eigentümer → Lina Köhler zieht in die gekaufte Wohnung
+  ok   Wegzug der Eltern: Charlotte Müller bleibt und übernimmt die Wohnung (Fall gezielt hergestellt: erwachsene Person im Haushalt)
+  ok   60 Tage weiter (Tag 310): Invariante 0 Verstöße, keine NaN, Rückkauf nie gekürzt; Budget: Anzahlungen 311866 + Raten 517657 − Rückkäufe 32721 = 796802 = gebucht 796802
+Seed 3: Schritt 2, Mieterkauf
+  ok   bis Tag 250: 335 Käufe, 322 Eigentümer; jede Nacht Eigentum nur beim Vorstand in seiner Wohnung (0 Verstöße), Anzahlung ≥ 20 % (0 Fehler); Stadtbuch „Als erster Haushalt kauft Jakob Busch die Wohnung an der Hauptstraße von der Stadt: 2.400 Taler, 480 angezahlt, der Rest in Raten so hoch wie die Miete.“, 24 Jahreszeilen
+  ok   Rate 16 Taler (Kaufpreis 3200 / 200), nach der Tilgung 0; Tageskosten 44 → 28
+  ok   Erbe: Luisa Şahin übernimmt die Wohnung (2800 Taler, Rest 0), Budget unverändert
+  ok   Auflösung: Rückkauf für 2070 Taler aus dem Budget, die Wohnung ist wieder frei (belegt 26 → 25)
+  ok   Umzug: 2976 Taler zurück, neue Wohnung zur Miete (16 Taler)
+  ok   Zusammenziehen: zwei Eigentümer → Klaus Engel bekommt 3107 Taler zurück; Mieter zu Eigentümer → Jonas Vogel zieht in die gekaufte Wohnung
+  ok   Wegzug der Eltern: Emilia Nowak bleibt und übernimmt die Wohnung (erwachsenes Kind)
+  ok   60 Tage weiter (Tag 310): Invariante 0 Verstöße, keine NaN, Rückkauf nie gekürzt; Budget: Anzahlungen 355641 + Raten 684810 − Rückkäufe 45860 = 994591 = gebucht 994591
+  ok   Fenster: 255 Programmzitate, jedes an einer Stelle (erlaubt doppelt: 2, „Grenze der Stadt“); Autos: Karte R-A2 Keine CO₂-Abgaben aufs Auto; Karte R-A2 Keine CO₂-Abgaben aufs Auto | Karte R-A5 Keine Subventionen für Techniken | Karte R-A4 Kein Verbrennerverbot | Karte R-A5 Keine Subventionen für Techniken; nicht: Verkehr und Autos
+Alle Prüfungen der Stadtregierung bestanden

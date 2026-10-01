@@ -1,0 +1,3 @@
+gate_t_r1: neu [7259, 6482, 6026, 5681] Median 6254; Basis [5343, 4634, 5213, 5486] Median 5278; Median neu/Median Basis 18.5 %; je Runde gepaart Median x1.257; neu über 5000 ms: 4 von 4, Basis: 3 von 4
+gate_t_r0: neu [4937, 5071, 4751, 5457] Median 5004; Basis [5897, 4929, 5634, 5080] Median 5357; Median neu/Median Basis -6.6 %; je Runde gepaart Median x0.936; neu über 5000 ms: 2 von 4, Basis: 3 von 4
+gate_t_r1_ruhig: neu [6681, 6187, 5855, 5778, 5757, 5816, 5877, 5861] Median 5858; Basis [4944, 4574, 4495, 4574, 5027, 4726, 4364, 4697] Median 4635.5; Median neu/Median Basis 26.4 %; je Runde gepaart Median x1.283; neu über 5000 ms: 8 von 8, Basis: 1 von 8

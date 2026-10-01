@@ -1,0 +1,2 @@
+SP/ml/e2bau/frisch_tests (stadt.html ac899293429df032,   ERF_HALB: 180,   GED: 1, GED_STAERKE: 1.5,), Seeds 1–80, 2 Prozesse, Start 01:04:42 uptime:: 2.93, 3.27, 3.60 fremde>20%: 0
+Ende 01:05:58

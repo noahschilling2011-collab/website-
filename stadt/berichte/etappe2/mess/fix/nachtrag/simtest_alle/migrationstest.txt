@@ -1,0 +1,377 @@
+Alte Fassung: git 39c405b
+  ok   alte Simulation hat Version 2, neue 10
+  ok   Seed 1, Tag 150 13 Uhr (221 Einw., 3 Baustellen): ohne Übernehmen abgelehnt, als übernehmbar markiert
+  ok   Version 2 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 1315 Erinnerungen neu verteilt (547 in der Langzeit, 250 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 12 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 12 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   Autos ab Tag 150: niemand hat eins, kein Werk, Summen 0, Felder leer (falsch: keine); „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus mit Leuchtl…“
+  ok   Stadt erweitern: 221 Einwohner → Stadt, 4 Stadtteile, Karte 96 × 96 (Rand 39 Felder); „Ab heute zählt die Stadt ihre Größe: 221 Einwohner, sie ist eine Stadt. Ihre Stadtteile heißen Altstadt, Marktviertel, L…“
+  ok   Sicherheit ab Tag 150: noch keine Wache und Anstalt, Summen 0, Personenfelder leer (falsch: keine); „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (eine Regel der Stadt…“
+  ok   Bund ab Tag 150: noch keine Kaserne und Dienststelle, Summen 0, Personenfelder leer (falsch: keine); „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, sobald sie eine Stadt is…“
+  ok   Bauhof = Gebäude 2 (die Werkstatt der Stadt vom Start)
+  ok   Baustellen mit Arbeitstagen: 4/12, 12/12, 12/12
+  ok   Einwohner (221) und Stadtbuch bleiben, 6 Zeilen dazu: „Ab heute baut der Bauhof an der Hauptstraße: Baustellen brauchen jetzt…“ „Ab heute regiert die AfD. Es gilt ihr Programm zur Bundestagswahl 2025…“ „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (…“ „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, soba…“ „Ab heute zählt die Stadt ihre Größe: 221 Einwohner, sie ist eine Stadt…“ „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus m…“
+  ok   Stadtregierung und Schritt 2 ab dem Übernahmetag 150, Summen 0, niemand in Grundsicherung, noch kein „gestern“
+  ok   Beitragsjahre aus dem Alter (0 Fehler), noch niemand im Eigentum
+  ok   Kitas: noch kein Platz, 0 gebaut, Übergangsfrist läuft (mindestens bis Tag 180, höchstens bis Tag 240)
+  ok   erste Nacht: 52 Käufe; „In der ersten Nacht nach der Übernahme kaufen 52 Haushalte ihre Wohnung von der Stadt, dar…“
+  ok   Übergangsfrist 30 Tage (30 bis 90): niemand gab die Stelle auf, 2 Kitas gebaut; Stadtbuch Tag 179: „Die Übergangsfrist für die Kitas endet, kein Kind wartet mehr auf einen Platz: Ab morgen gibt ein Elternteil d…“
+  ok   nach der Frist: erste Nacht 0 (0 für Kinder, die vor dem Ende der Frist lebten, 0 danach geboren), Nächte 2–11 höchstens 0 Stellenaufgaben (Schwelle 2 und 4): 0 0 0 0 0 0 0 0 0 0 0
+  ok   60 Tage weiter (Tag 210, 413 Einw.): keine NaN/Infinity
+  ok   alle übernommenen Baustellen fertig (6)
+  ok   „gestern“ nach 60 Tagen: Rentenkasse 0, Bund 691 Taler
+  ok   Rente nach 60 Tagen auf Stufe 2 (60 Taler), Rentenkasse bisher 0 Taler (0 bekommen Rente); Stadtbuch Tag 189: „Ab morgen zahlt die Rentenkasse 60 statt 55 Taler Rente am Tag (Stufe 2 von 3).“
+  ok   Kitas nach 60 Tagen: 3 offen, 32 Kinder mit Platz, 0 warten, 0-mal Stelle aufgegeben (nach der Frist), 0 gebunden
+  ok   Schritt 2 nach 60 Tagen: 122 von 202 Haushalten im Eigentum, 0 Renteneintritte (davon 0 vor 67), 0 heute vor 67 in Rente
+  ok   Bund nach 60 Tagen (Stadt): Kaserne offen seit Tag 170, 3 Einberufungen
+  ok   Version 10, Tech-Firmen danach: 5 gegründet, 0 Käufe
+  ok   danach als Version 10 gespeichert und geladen: läuft bitgleich weiter
+  ok   Seed 2, Tag 324 5 Uhr (1090 Einw., 1 Baustellen): ohne Übernehmen abgelehnt, als übernehmbar markiert
+  ok   Version 2 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 6517 Erinnerungen neu verteilt (2860 in der Langzeit, 1202 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 11 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 11 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   Autos ab Tag 324: niemand hat eins, kein Werk, Summen 0, Felder leer (falsch: keine); „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus mit Leuchtl…“
+  ok   Stadt erweitern: 1090 Einwohner → Großstadt, 7 Stadtteile, Karte 96 × 96 (Rand 31 Felder); „Ab heute zählt die Stadt ihre Größe: 1.090 Einwohner, sie ist eine Großstadt. Ihre Stadtteile heißen Altstadt, Marktvier…“
+  ok   Sicherheit ab Tag 324: noch keine Wache und Anstalt, Summen 0, Personenfelder leer (falsch: keine); „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (eine Regel der Stadt…“
+  ok   Bund ab Tag 324: noch keine Kaserne und Dienststelle, Summen 0, Personenfelder leer (falsch: keine); „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, sobald sie eine Stadt is…“
+  ok   Bauhof = Gebäude 2 (die Werkstatt der Stadt vom Start)
+  ok   Baustellen mit Arbeitstagen: 12/12
+  ok   Einwohner (1090) und Stadtbuch bleiben, 6 Zeilen dazu: „Ab heute baut der Bauhof an der Hauptstraße: Baustellen brauchen jetzt…“ „Ab heute regiert die AfD. Es gilt ihr Programm zur Bundestagswahl 2025…“ „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (…“ „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, soba…“ „Ab heute zählt die Stadt ihre Größe: 1.090 Einwohner, sie ist eine Gro…“ „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus m…“
+  ok   Stadtregierung und Schritt 2 ab dem Übernahmetag 324, Summen 0, niemand in Grundsicherung, noch kein „gestern“
+  ok   Beitragsjahre aus dem Alter (0 Fehler), noch niemand im Eigentum
+  ok   Kitas: noch kein Platz, 0 gebaut, Übergangsfrist läuft (mindestens bis Tag 354, höchstens bis Tag 414)
+  ok   erste Nacht: 360 Käufe; „In der ersten Nacht nach der Übernahme kaufen 360 Haushalte ihre Wohnung von der Stadt, da…“
+  ok   Übergangsfrist 30 Tage (30 bis 90): niemand gab die Stelle auf, 6 Kitas gebaut; Stadtbuch Tag 353: „Die Übergangsfrist für die Kitas endet, kein Kind wartet mehr auf einen Platz: Ab morgen gibt ein Elternteil d…“
+  ok   nach der Frist: erste Nacht 0 (0 für Kinder, die vor dem Ende der Frist lebten, 0 danach geboren), Nächte 2–11 höchstens 0 Stellenaufgaben (Schwelle 2 und 4): 0 0 0 0 0 0 0 0 0 0 0
+  ok   60 Tage weiter (Tag 384, 1136 Einw.): keine NaN/Infinity
+  ok   alle übernommenen Baustellen fertig (6)
+  ok   „gestern“ nach 60 Tagen: Rentenkasse 2520, Bund 1479 Taler
+  ok   Rente nach 60 Tagen auf Stufe 2 (60 Taler), Rentenkasse bisher 85425 Taler (43 bekommen Rente); Stadtbuch Tag 363: „Ab morgen zahlt die Rentenkasse 60 statt 55 Taler Rente am Tag (Stufe 2 von 3).“
+  ok   Kitas nach 60 Tagen: 6 offen, 39 Kinder mit Platz, 0 warten, 0-mal Stelle aufgegeben (nach der Frist), 0 gebunden
+  ok   Schritt 2 nach 60 Tagen: 409 von 457 Haushalten im Eigentum, 18 Renteneintritte (davon 6 vor 67), 1 heute vor 67 in Rente
+  ok   Bund nach 60 Tagen (Großstadt): Kaserne offen seit Tag 337, 41 Einberufungen
+  ok   Version 10, Tech-Firmen danach: 0 gegründet, 0 Käufe
+  ok   danach als Version 10 gespeichert und geladen: läuft bitgleich weiter
+  ok   Seed 3, Tag 401 20 Uhr (1033 Einw., 1 Baustellen): ohne Übernehmen abgelehnt, als übernehmbar markiert
+  ok   Version 2 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 6393 Erinnerungen neu verteilt (2820 in der Langzeit, 1135 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 74 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 74 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   Autos ab Tag 401: niemand hat eins, kein Werk, Summen 0, Felder leer (falsch: keine); „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus mit Leuchtl…“
+  ok   Stadt erweitern: 1033 Einwohner → Großstadt, 6 Stadtteile, Karte 96 × 96 (Rand 28 Felder); „Ab heute zählt die Stadt ihre Größe: 1.033 Einwohner, sie ist eine Großstadt. Ihre Stadtteile heißen Altstadt, Marktvier…“
+  ok   Sicherheit ab Tag 401: noch keine Wache und Anstalt, Summen 0, Personenfelder leer (falsch: keine); „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (eine Regel der Stadt…“
+  ok   Bund ab Tag 401: noch keine Kaserne und Dienststelle, Summen 0, Personenfelder leer (falsch: keine); „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, sobald sie eine Stadt is…“
+  ok   Bauhof = Gebäude 2 (die Werkstatt der Stadt vom Start)
+  ok   Baustellen mit Arbeitstagen: 12/12
+  ok   Einwohner (1033) und Stadtbuch bleiben, 6 Zeilen dazu: „Ab heute baut der Bauhof an der Hauptstraße: Baustellen brauchen jetzt…“ „Ab heute regiert die AfD. Es gilt ihr Programm zur Bundestagswahl 2025…“ „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (…“ „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, soba…“ „Ab heute zählt die Stadt ihre Größe: 1.033 Einwohner, sie ist eine Gro…“ „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus m…“
+  ok   Stadtregierung und Schritt 2 ab dem Übernahmetag 401, Summen 0, niemand in Grundsicherung, noch kein „gestern“
+  ok   Beitragsjahre aus dem Alter (0 Fehler), noch niemand im Eigentum
+  ok   Kitas: noch kein Platz, 0 gebaut, Übergangsfrist läuft (mindestens bis Tag 431, höchstens bis Tag 491)
+  ok   erste Nacht: 355 Käufe; „In der ersten Nacht nach der Übernahme kaufen 355 Haushalte ihre Wohnung von der Stadt, da…“
+  ok   Übergangsfrist 30 Tage (30 bis 90): niemand gab die Stelle auf, 3 Kitas gebaut; Stadtbuch Tag 430: „Die Übergangsfrist für die Kitas endet, kein Kind wartet mehr auf einen Platz: Ab morgen gibt ein Elternteil d…“
+  ok   nach der Frist: erste Nacht 0 (0 für Kinder, die vor dem Ende der Frist lebten, 0 danach geboren), Nächte 2–11 höchstens 1 Stellenaufgaben (Schwelle 2 und 4): 0 0 0 0 0 0 0 0 1 0 0
+  ok   60 Tage weiter (Tag 461, 1085 Einw.): keine NaN/Infinity
+  ok   alle übernommenen Baustellen fertig (6)
+  ok   „gestern“ nach 60 Tagen: Rentenkasse 8700, Bund 837 Taler
+  ok   Rente nach 60 Tagen auf Stufe 2 (60 Taler), Rentenkasse bisher 346975 Taler (147 bekommen Rente); Stadtbuch Tag 440: „Ab morgen zahlt die Rentenkasse 60 statt 55 Taler Rente am Tag (Stufe 2 von 3).“
+  ok   Kitas nach 60 Tagen: 5 offen, 49 Kinder mit Platz, 0 warten, 4-mal Stelle aufgegeben (nach der Frist), 0 gebunden
+  ok   Schritt 2 nach 60 Tagen: 409 von 508 Haushalten im Eigentum, 67 Renteneintritte (davon 18 vor 67), 5 heute vor 67 in Rente
+  ok   Bund nach 60 Tagen (Großstadt): Kaserne offen seit Tag 415, 107 Einberufungen
+  ok   Version 10, Tech-Firmen danach: 0 gegründet, 0 Käufe
+  ok   danach als Version 10 gespeichert und geladen: läuft bitgleich weiter
+Alte Fassung: git 2b821c2
+  ok   alte Simulation hat Version 3, neue 10
+  ok   Seed 1, Tag 151 13 Uhr (207 Einw., 1 Baustellen): ohne Übernehmen abgelehnt, als übernehmbar markiert
+  ok   Version 3 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 1336 Erinnerungen neu verteilt (604 in der Langzeit, 219 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 11 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 11 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   Autos ab Tag 151: niemand hat eins, kein Werk, Summen 0, Felder leer (falsch: keine); „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus mit Leuchtl…“
+  ok   Stadt erweitern: 207 Einwohner → Stadt, 4 Stadtteile, Karte 96 × 96 (Rand 35 Felder); „Ab heute zählt die Stadt ihre Größe: 207 Einwohner, sie ist eine Stadt. Ihre Stadtteile heißen Altstadt, Marktviertel, L…“
+  ok   Sicherheit ab Tag 151: noch keine Wache und Anstalt, Summen 0, Personenfelder leer (falsch: keine); „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (eine Regel der Stadt…“
+  ok   Bund ab Tag 151: noch keine Kaserne und Dienststelle, Summen 0, Personenfelder leer (falsch: keine); „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, sobald sie eine Stadt is…“
+  ok   Bauhof = Gebäude 2 (die Werkstatt der Stadt vom Start)
+  ok   Baustellen mit Arbeitstagen: 9/9
+  ok   Einwohner (207) und Stadtbuch bleiben, 6 Zeilen dazu: „Ab heute können Leute Tech-Firmen gründen: Software, Handys oder Compu…“ „Ab heute regiert die AfD. Es gilt ihr Programm zur Bundestagswahl 2025…“ „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (…“ „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, soba…“ „Ab heute zählt die Stadt ihre Größe: 207 Einwohner, sie ist eine Stadt…“ „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus m…“
+  ok   Stadtregierung und Schritt 2 ab dem Übernahmetag 151, Summen 0, niemand in Grundsicherung, noch kein „gestern“
+  ok   Beitragsjahre aus dem Alter (0 Fehler), noch niemand im Eigentum
+  ok   Kitas: noch kein Platz, 0 gebaut, Übergangsfrist läuft (mindestens bis Tag 181, höchstens bis Tag 241)
+  ok   erste Nacht: 48 Käufe; „In der ersten Nacht nach der Übernahme kaufen 48 Haushalte ihre Wohnung von der Stadt, dar…“
+  ok   Übergangsfrist 30 Tage (30 bis 90): niemand gab die Stelle auf, 2 Kitas gebaut; Stadtbuch Tag 180: „Die Übergangsfrist für die Kitas endet, kein Kind wartet mehr auf einen Platz: Ab morgen gibt ein Elternteil d…“
+  ok   nach der Frist: erste Nacht 0 (0 für Kinder, die vor dem Ende der Frist lebten, 0 danach geboren), Nächte 2–11 höchstens 0 Stellenaufgaben (Schwelle 2 und 4): 0 0 0 0 0 0 0 0 0 0 0
+  ok   60 Tage weiter (Tag 211, 395 Einw.): keine NaN/Infinity
+  ok   alle übernommenen Baustellen fertig (6)
+  ok   „gestern“ nach 60 Tagen: Rentenkasse 0, Bund 1904 Taler
+  ok   Rente nach 60 Tagen auf Stufe 2 (60 Taler), Rentenkasse bisher 0 Taler (0 bekommen Rente); Stadtbuch Tag 190: „Ab morgen zahlt die Rentenkasse 60 statt 55 Taler Rente am Tag (Stufe 2 von 3).“
+  ok   Kitas nach 60 Tagen: 2 offen, 38 Kinder mit Platz, 0 warten, 1-mal Stelle aufgegeben (nach der Frist), 3 gebunden
+  ok   Schritt 2 nach 60 Tagen: 112 von 190 Haushalten im Eigentum, 0 Renteneintritte (davon 0 vor 67), 0 heute vor 67 in Rente
+  ok   Bund nach 60 Tagen (Stadt): Kaserne offen seit Tag 169, 5 Einberufungen
+  ok   Version 10, Tech-Firmen danach: 2 gegründet, 0 Käufe
+  ok   danach als Version 10 gespeichert und geladen: läuft bitgleich weiter
+  ok   Seed 2, Tag 300 5 Uhr (894 Einw., 1 Baustellen): ohne Übernehmen abgelehnt, als übernehmbar markiert
+  ok   Version 3 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 5296 Erinnerungen neu verteilt (2283 in der Langzeit, 971 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 28 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 28 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   Autos ab Tag 300: niemand hat eins, kein Werk, Summen 0, Felder leer (falsch: keine); „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus mit Leuchtl…“
+  ok   Stadt erweitern: 894 Einwohner → Großstadt, 4 Stadtteile, Karte 96 × 96 (Rand 39 Felder); „Ab heute zählt die Stadt ihre Größe: 894 Einwohner, sie ist eine Großstadt. Ihre Stadtteile heißen Altstadt, Marktvierte…“
+  ok   Sicherheit ab Tag 300: noch keine Wache und Anstalt, Summen 0, Personenfelder leer (falsch: keine); „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (eine Regel der Stadt…“
+  ok   Bund ab Tag 300: noch keine Kaserne und Dienststelle, Summen 0, Personenfelder leer (falsch: keine); „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, sobald sie eine Stadt is…“
+  ok   Bauhof = Gebäude 2 (die Werkstatt der Stadt vom Start)
+  ok   Baustellen mit Arbeitstagen: 18/18
+  ok   Einwohner (894) und Stadtbuch bleiben, 6 Zeilen dazu: „Ab heute können Leute Tech-Firmen gründen: Software, Handys oder Compu…“ „Ab heute regiert die AfD. Es gilt ihr Programm zur Bundestagswahl 2025…“ „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (…“ „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, soba…“ „Ab heute zählt die Stadt ihre Größe: 894 Einwohner, sie ist eine Großs…“ „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus m…“
+  ok   Stadtregierung und Schritt 2 ab dem Übernahmetag 300, Summen 0, niemand in Grundsicherung, noch kein „gestern“
+  ok   Beitragsjahre aus dem Alter (0 Fehler), noch niemand im Eigentum
+  ok   Kitas: noch kein Platz, 0 gebaut, Übergangsfrist läuft (mindestens bis Tag 330, höchstens bis Tag 390)
+  ok   erste Nacht: 260 Käufe; „In der ersten Nacht nach der Übernahme kaufen 260 Haushalte ihre Wohnung von der Stadt, da…“
+  ok   Übergangsfrist 30 Tage (30 bis 90): niemand gab die Stelle auf, 7 Kitas gebaut; Stadtbuch Tag 329: „Die Übergangsfrist für die Kitas endet, kein Kind wartet mehr auf einen Platz: Ab morgen gibt ein Elternteil d…“
+  ok   nach der Frist: erste Nacht 0 (0 für Kinder, die vor dem Ende der Frist lebten, 0 danach geboren), Nächte 2–11 höchstens 0 Stellenaufgaben (Schwelle 2 und 4): 0 0 0 0 0 0 0 0 0 0 0
+  ok   60 Tage weiter (Tag 360, 1026 Einw.): keine NaN/Infinity
+  ok   alle übernommenen Baustellen fertig (6)
+  ok   „gestern“ nach 60 Tagen: Rentenkasse 1980, Bund 1138 Taler
+  ok   Rente nach 60 Tagen auf Stufe 2 (60 Taler), Rentenkasse bisher 65360 Taler (33 bekommen Rente); Stadtbuch Tag 339: „Ab morgen zahlt die Rentenkasse 60 statt 55 Taler Rente am Tag (Stufe 2 von 3).“
+  ok   Kitas nach 60 Tagen: 7 offen, 74 Kinder mit Platz, 0 warten, 0-mal Stelle aufgegeben (nach der Frist), 0 gebunden
+  ok   Schritt 2 nach 60 Tagen: 369 von 404 Haushalten im Eigentum, 19 Renteneintritte (davon 4 vor 67), 2 heute vor 67 in Rente
+  ok   Bund nach 60 Tagen (Großstadt): Kaserne offen seit Tag 314, 23 Einberufungen
+  ok   Version 10, Tech-Firmen danach: 0 gegründet, 0 Käufe
+  ok   danach als Version 10 gespeichert und geladen: läuft bitgleich weiter
+  ok   Seed 3, Tag 400 20 Uhr (1033 Einw., 1 Baustellen): ohne Übernehmen abgelehnt, als übernehmbar markiert
+  ok   Version 3 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 6223 Erinnerungen neu verteilt (2700 in der Langzeit, 1144 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 34 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 34 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   Autos ab Tag 400: niemand hat eins, kein Werk, Summen 0, Felder leer (falsch: keine); „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus mit Leuchtl…“
+  ok   Stadt erweitern: 1033 Einwohner → Großstadt, 7 Stadtteile, Karte 96 × 96 (Rand 27 Felder); „Ab heute zählt die Stadt ihre Größe: 1.033 Einwohner, sie ist eine Großstadt. Ihre Stadtteile heißen Altstadt, Marktvier…“
+  ok   Sicherheit ab Tag 400: noch keine Wache und Anstalt, Summen 0, Personenfelder leer (falsch: keine); „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (eine Regel der Stadt…“
+  ok   Bund ab Tag 400: noch keine Kaserne und Dienststelle, Summen 0, Personenfelder leer (falsch: keine); „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, sobald sie eine Stadt is…“
+  ok   Bauhof = Gebäude 2 (die Werkstatt der Stadt vom Start)
+  ok   Baustellen mit Arbeitstagen: 2/9
+  ok   Einwohner (1033) und Stadtbuch bleiben, 6 Zeilen dazu: „Ab heute können Leute Tech-Firmen gründen: Software, Handys oder Compu…“ „Ab heute regiert die AfD. Es gilt ihr Programm zur Bundestagswahl 2025…“ „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (…“ „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, soba…“ „Ab heute zählt die Stadt ihre Größe: 1.033 Einwohner, sie ist eine Gro…“ „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus m…“
+  ok   Stadtregierung und Schritt 2 ab dem Übernahmetag 400, Summen 0, niemand in Grundsicherung, noch kein „gestern“
+  ok   Beitragsjahre aus dem Alter (0 Fehler), noch niemand im Eigentum
+  ok   Kitas: noch kein Platz, 0 gebaut, Übergangsfrist läuft (mindestens bis Tag 430, höchstens bis Tag 490)
+  ok   erste Nacht: 359 Käufe; „In der ersten Nacht nach der Übernahme kaufen 359 Haushalte ihre Wohnung von der Stadt, da…“
+  ok   Übergangsfrist 30 Tage (30 bis 90): niemand gab die Stelle auf, 4 Kitas gebaut; Stadtbuch Tag 429: „Die Übergangsfrist für die Kitas endet, kein Kind wartet mehr auf einen Platz: Ab morgen gibt ein Elternteil d…“
+  ok   nach der Frist: erste Nacht 0 (0 für Kinder, die vor dem Ende der Frist lebten, 0 danach geboren), Nächte 2–11 höchstens 0 Stellenaufgaben (Schwelle 2 und 4): 0 0 0 0 0 0 0 0 0 0 0
+  ok   60 Tage weiter (Tag 460, 1104 Einw.): keine NaN/Infinity
+  ok   alle übernommenen Baustellen fertig (4)
+  ok   „gestern“ nach 60 Tagen: Rentenkasse 8460, Bund 762 Taler
+  ok   Rente nach 60 Tagen auf Stufe 2 (60 Taler), Rentenkasse bisher 353130 Taler (144 bekommen Rente); Stadtbuch Tag 439: „Ab morgen zahlt die Rentenkasse 60 statt 55 Taler Rente am Tag (Stufe 2 von 3).“
+  ok   Kitas nach 60 Tagen: 4 offen, 54 Kinder mit Platz, 0 warten, 0-mal Stelle aufgegeben (nach der Frist), 0 gebunden
+  ok   Schritt 2 nach 60 Tagen: 418 von 490 Haushalten im Eigentum, 61 Renteneintritte (davon 15 vor 67), 3 heute vor 67 in Rente
+  ok   Bund nach 60 Tagen (Großstadt): Kaserne offen seit Tag 413, 112 Einberufungen
+  ok   Version 10, Tech-Firmen danach: 2 gegründet, 701 Käufe
+  ok   danach als Version 10 gespeichert und geladen: läuft bitgleich weiter
+Alte Fassung: git 1c8d40b
+  ok   alte Simulation hat Version 4, neue 10
+  ok   Seed 1, Tag 150 13 Uhr (123 Einw., 4 Baustellen): ohne Übernehmen abgelehnt, als übernehmbar markiert
+  ok   Version 4 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 734 Erinnerungen neu verteilt (298 in der Langzeit, 139 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 7 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 7 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   Autos ab Tag 150: niemand hat eins, kein Werk, Summen 0, Felder leer (falsch: keine); „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus mit Leuchtl…“
+  ok   Stadt erweitern: 123 Einwohner → Kleinstadt, 4 Stadtteile, Karte 96 × 96 (Rand 35 Felder); „Ab heute zählt die Stadt ihre Größe: 123 Einwohner, sie ist eine Kleinstadt. Ihre Stadtteile heißen Altstadt, Marktviert…“
+  ok   Sicherheit ab Tag 150: noch keine Wache und Anstalt, Summen 0, Personenfelder leer (falsch: keine); „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (eine Regel der Stadt…“
+  ok   Bund ab Tag 150: noch keine Kaserne und Dienststelle, Summen 0, Personenfelder leer (falsch: keine); „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, sobald sie eine Stadt is…“
+  ok   Bauhof = Gebäude 2 (die Werkstatt der Stadt vom Start)
+  ok   Baustellen mit Arbeitstagen: 6/12, 8/12, 3/4, 4/4
+  ok   Einwohner (123) und Stadtbuch bleiben, 5 Zeilen dazu: „Ab heute regiert die AfD. Es gilt ihr Programm zur Bundestagswahl 2025…“ „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (…“ „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, soba…“ „Ab heute zählt die Stadt ihre Größe: 123 Einwohner, sie ist eine Klein…“ „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus m…“
+  ok   Stadtregierung und Schritt 2 ab dem Übernahmetag 150, Summen 0, niemand in Grundsicherung, noch kein „gestern“
+  ok   Beitragsjahre aus dem Alter (0 Fehler), noch niemand im Eigentum
+  ok   Kitas: noch kein Platz, 0 gebaut, Übergangsfrist läuft (mindestens bis Tag 180, höchstens bis Tag 240)
+  ok   erste Nacht: 26 Käufe; „In der ersten Nacht nach der Übernahme kaufen 26 Haushalte ihre Wohnung von der Stadt, dar…“
+  ok   Übergangsfrist 31 Tage (30 bis 90): niemand gab die Stelle auf, 2 Kitas gebaut; Stadtbuch Tag 180: „Die Übergangsfrist für die Kitas endet, kein Kind wartet mehr auf einen Platz: Ab morgen gibt ein Elternteil d…“
+  ok   nach der Frist: erste Nacht 0 (0 für Kinder, die vor dem Ende der Frist lebten, 0 danach geboren), Nächte 2–11 höchstens 0 Stellenaufgaben (Schwelle 2 und 4): 0 0 0 0 0 0 0 0 0 0 0
+  ok   60 Tage weiter (Tag 210, 248 Einw.): keine NaN/Infinity
+  ok   alle übernommenen Baustellen fertig (5)
+  ok   „gestern“ nach 60 Tagen: Rentenkasse 240, Bund 569 Taler
+  ok   Rente nach 60 Tagen auf Stufe 2 (60 Taler), Rentenkasse bisher 6915 Taler (4 bekommen Rente); Stadtbuch Tag 189: „Ab morgen zahlt die Rentenkasse 60 statt 55 Taler Rente am Tag (Stufe 2 von 3).“
+  ok   Kitas nach 60 Tagen: 2 offen, 18 Kinder mit Platz, 0 warten, 0-mal Stelle aufgegeben (nach der Frist), 0 gebunden
+  ok   Schritt 2 nach 60 Tagen: 66 von 130 Haushalten im Eigentum, 3 Renteneintritte (davon 1 vor 67), 0 heute vor 67 in Rente
+  ok   Bund nach 60 Tagen (Stadt): Kaserne offen seit Tag 182, 3 Einberufungen
+  ok   Version 10, Tech-Firmen danach: 2 gegründet, 101 Käufe
+  ok   danach als Version 10 gespeichert und geladen: läuft bitgleich weiter
+  ok   Seed 2, Tag 301 5 Uhr (706 Einw., 1 Baustellen): ohne Übernehmen abgelehnt, als übernehmbar markiert
+  ok   Version 4 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 4399 Erinnerungen neu verteilt (1846 in der Langzeit, 799 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 9 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 9 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   Autos ab Tag 301: niemand hat eins, kein Werk, Summen 0, Felder leer (falsch: keine); „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus mit Leuchtl…“
+  ok   Stadt erweitern: 706 Einwohner → Stadt, 5 Stadtteile, Karte 96 × 96 (Rand 35 Felder); „Ab heute zählt die Stadt ihre Größe: 706 Einwohner, sie ist eine Stadt. Ihre Stadtteile heißen Altstadt, Marktviertel, L…“
+  ok   Sicherheit ab Tag 301: noch keine Wache und Anstalt, Summen 0, Personenfelder leer (falsch: keine); „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (eine Regel der Stadt…“
+  ok   Bund ab Tag 301: noch keine Kaserne und Dienststelle, Summen 0, Personenfelder leer (falsch: keine); „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, sobald sie eine Stadt is…“
+  ok   Bauhof = Gebäude 2 (die Werkstatt der Stadt vom Start)
+  ok   Baustellen mit Arbeitstagen: 12/12
+  ok   Einwohner (706) und Stadtbuch bleiben, 5 Zeilen dazu: „Ab heute regiert die AfD. Es gilt ihr Programm zur Bundestagswahl 2025…“ „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (…“ „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, soba…“ „Ab heute zählt die Stadt ihre Größe: 706 Einwohner, sie ist eine Stadt…“ „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus m…“
+  ok   Stadtregierung und Schritt 2 ab dem Übernahmetag 301, Summen 0, niemand in Grundsicherung, noch kein „gestern“
+  ok   Beitragsjahre aus dem Alter (0 Fehler), noch niemand im Eigentum
+  ok   Kitas: noch kein Platz, 0 gebaut, Übergangsfrist läuft (mindestens bis Tag 331, höchstens bis Tag 391)
+  ok   erste Nacht: 230 Käufe; „In der ersten Nacht nach der Übernahme kaufen 230 Haushalte ihre Wohnung von der Stadt, da…“
+  ok   Übergangsfrist 30 Tage (30 bis 90): niemand gab die Stelle auf, 4 Kitas gebaut; Stadtbuch Tag 330: „Die Übergangsfrist für die Kitas endet, kein Kind wartet mehr auf einen Platz: Ab morgen gibt ein Elternteil d…“
+  ok   nach der Frist: erste Nacht 0 (0 für Kinder, die vor dem Ende der Frist lebten, 0 danach geboren), Nächte 2–11 höchstens 0 Stellenaufgaben (Schwelle 2 und 4): 0 0 0 0 0 0 0 0 0 0 0
+  ok   60 Tage weiter (Tag 361, 930 Einw.): keine NaN/Infinity
+  ok   alle übernommenen Baustellen fertig (6)
+  ok   „gestern“ nach 60 Tagen: Rentenkasse 6900, Bund 755 Taler
+  ok   Rente nach 60 Tagen auf Stufe 2 (60 Taler), Rentenkasse bisher 302200 Taler (115 bekommen Rente); Stadtbuch Tag 340: „Ab morgen zahlt die Rentenkasse 60 statt 55 Taler Rente am Tag (Stufe 2 von 3).“
+  ok   Kitas nach 60 Tagen: 5 offen, 68 Kinder mit Platz, 0 warten, 0-mal Stelle aufgegeben (nach der Frist), 0 gebunden
+  ok   Schritt 2 nach 60 Tagen: 360 von 451 Haushalten im Eigentum, 48 Renteneintritte (davon 12 vor 67), 2 heute vor 67 in Rente
+  ok   Bund nach 60 Tagen (Großstadt): Kaserne offen seit Tag 314, 17 Einberufungen
+  ok   Version 10, Tech-Firmen danach: 12 gegründet, 1532 Käufe
+  ok   danach als Version 10 gespeichert und geladen: läuft bitgleich weiter
+  ok   Seed 3, Tag 400 20 Uhr (976 Einw., 3 Baustellen): ohne Übernehmen abgelehnt, als übernehmbar markiert
+  ok   Version 4 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 6113 Erinnerungen neu verteilt (2599 in der Langzeit, 1141 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 85 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 85 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   Autos ab Tag 400: niemand hat eins, kein Werk, Summen 0, Felder leer (falsch: keine); „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus mit Leuchtl…“
+  ok   Stadt erweitern: 976 Einwohner → Großstadt, 8 Stadtteile, Karte 96 × 96 (Rand 27 Felder); „Ab heute zählt die Stadt ihre Größe: 976 Einwohner, sie ist eine Großstadt. Ihre Stadtteile heißen Altstadt, Marktvierte…“
+  ok   Sicherheit ab Tag 400: noch keine Wache und Anstalt, Summen 0, Personenfelder leer (falsch: keine); „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (eine Regel der Stadt…“
+  ok   Bund ab Tag 400: noch keine Kaserne und Dienststelle, Summen 0, Personenfelder leer (falsch: keine); „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, sobald sie eine Stadt is…“
+  ok   Bauhof = Gebäude 2 (die Werkstatt der Stadt vom Start)
+  ok   Baustellen mit Arbeitstagen: 4/12, 4/12, 8/12
+  ok   Einwohner (976) und Stadtbuch bleiben, 5 Zeilen dazu: „Ab heute regiert die AfD. Es gilt ihr Programm zur Bundestagswahl 2025…“ „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (…“ „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, soba…“ „Ab heute zählt die Stadt ihre Größe: 976 Einwohner, sie ist eine Großs…“ „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus m…“
+  ok   Stadtregierung und Schritt 2 ab dem Übernahmetag 400, Summen 0, niemand in Grundsicherung, noch kein „gestern“
+  ok   Beitragsjahre aus dem Alter (0 Fehler), noch niemand im Eigentum
+  ok   Kitas: noch kein Platz, 0 gebaut, Übergangsfrist läuft (mindestens bis Tag 430, höchstens bis Tag 490)
+  ok   erste Nacht: 361 Käufe; „In der ersten Nacht nach der Übernahme kaufen 361 Haushalte ihre Wohnung von der Stadt, da…“
+  ok   Übergangsfrist 31 Tage (30 bis 90): niemand gab die Stelle auf, 5 Kitas gebaut; Stadtbuch Tag 430: „Die Übergangsfrist für die Kitas endet, kein Kind wartet mehr auf einen Platz: Ab morgen gibt ein Elternteil d…“
+  ok   nach der Frist: erste Nacht 0 (0 für Kinder, die vor dem Ende der Frist lebten, 0 danach geboren), Nächte 2–11 höchstens 0 Stellenaufgaben (Schwelle 2 und 4): 0 0 0 0 0 0 0 0 0 0 0
+  ok   60 Tage weiter (Tag 460, 1108 Einw.): keine NaN/Infinity
+  ok   alle übernommenen Baustellen fertig (6)
+  ok   „gestern“ nach 60 Tagen: Rentenkasse 14340, Bund 279 Taler
+  ok   Rente nach 60 Tagen auf Stufe 2 (60 Taler), Rentenkasse bisher 665085 Taler (240 bekommen Rente); Stadtbuch Tag 439: „Ab morgen zahlt die Rentenkasse 60 statt 55 Taler Rente am Tag (Stufe 2 von 3).“
+  ok   Kitas nach 60 Tagen: 5 offen, 47 Kinder mit Platz, 1 warten, 0-mal Stelle aufgegeben (nach der Frist), 0 gebunden
+  ok   Schritt 2 nach 60 Tagen: 448 von 549 Haushalten im Eigentum, 89 Renteneintritte (davon 22 vor 67), 4 heute vor 67 in Rente
+  ok   Bund nach 60 Tagen (Großstadt): Kaserne offen seit Tag 416, 46 Einberufungen
+  ok   Version 10, Tech-Firmen danach: 14 gegründet, 3364 Käufe
+  ok   danach als Version 10 gespeichert und geladen: läuft bitgleich weiter
+Alte Fassung: git 414ebab
+  ok   alte Simulation hat Version 5, neue 10
+  ok   Seed 1, Tag 155 13 Uhr (127 Einw., 1 Baustellen): ohne Übernehmen abgelehnt, als übernehmbar markiert
+  ok   beschädigte Stände der Version 5 abgelehnt: stat.regierung.gs: Spielstand beschädigt: Regierungs-Statistik; regierung.tagStart.lohnsteuer: Spielstand beschädigt: Stadtregierung; stat.regierung.rentenkasse als Text: Spielstand beschädigt: Regierungs-Statistik
+  ok   Version 5 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 811 Erinnerungen neu verteilt (345 in der Langzeit, 137 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 10 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 10 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   Autos ab Tag 155: niemand hat eins, kein Werk, Summen 0, Felder leer (falsch: keine); „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus mit Leuchtl…“
+  ok   Stadt erweitern: 127 Einwohner → Kleinstadt, 4 Stadtteile, Karte 96 × 96 (Rand 36 Felder); „Ab heute zählt die Stadt ihre Größe: 127 Einwohner, sie ist eine Kleinstadt. Ihre Stadtteile heißen Altstadt, Marktviert…“
+  ok   Sicherheit ab Tag 155: noch keine Wache und Anstalt, Summen 0, Personenfelder leer (falsch: keine); „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (eine Regel der Stadt…“
+  ok   Bund ab Tag 155: noch keine Kaserne und Dienststelle, Summen 0, Personenfelder leer (falsch: keine); „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, sobald sie eine Stadt is…“
+  ok   Bauhof = Gebäude 2 (die Werkstatt der Stadt vom Start)
+  ok   Baustellen mit Arbeitstagen: 18/18
+  ok   Einwohner (127) und Stadtbuch bleiben, 5 Zeilen dazu: „Ab heute können Mieter ihre Wohnung von der Stadt kaufen, vergünstigt …“ „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (…“ „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, soba…“ „Ab heute zählt die Stadt ihre Größe: 127 Einwohner, sie ist eine Klein…“ „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus m…“
+  ok   Stadtregierung läuft weiter (seit Tag 0, Summen und „gestern“ wie vorher), Schritt 2 ab Tag 155, neue Summen 0
+  ok   Beitragsjahre aus dem Alter (0 Fehler), noch niemand im Eigentum
+  ok   Kitas: noch kein Platz, 0 gebaut, Übergangsfrist läuft (mindestens bis Tag 185, höchstens bis Tag 245)
+  ok   erste Nacht: 32 Käufe; „In der ersten Nacht nach der Übernahme kaufen 32 Haushalte ihre Wohnung von der Stadt, dar…“
+  ok   Übergangsfrist 30 Tage (30 bis 90): niemand gab die Stelle auf, 2 Kitas gebaut; Stadtbuch Tag 184: „Die Übergangsfrist für die Kitas endet, kein Kind wartet mehr auf einen Platz: Ab morgen gibt ein Elternteil d…“
+  ok   nach der Frist: erste Nacht 0 (0 für Kinder, die vor dem Ende der Frist lebten, 0 danach geboren), Nächte 2–11 höchstens 0 Stellenaufgaben (Schwelle 2 und 4): 0 0 0 0 0 0 0 0 0 0 0
+  ok   60 Tage weiter (Tag 215, 249 Einw.): keine NaN/Infinity
+  ok   alle übernommenen Baustellen fertig (3)
+  ok   „gestern“ nach 60 Tagen: Rentenkasse 462, Bund 569 Taler
+  ok   Rente weiter auf Stufe 3 (66 Taler), Rentenkasse seit Tag 0 12936 Taler
+  ok   Kitas nach 60 Tagen: 2 offen, 16 Kinder mit Platz, 0 warten, 0-mal Stelle aufgegeben (nach der Frist), 0 gebunden
+  ok   Schritt 2 nach 60 Tagen: 83 von 131 Haushalten im Eigentum, 6 Renteneintritte (davon 2 vor 67), 0 heute vor 67 in Rente
+  ok   Bund nach 60 Tagen (Stadt): Kaserne offen seit Tag 191, 2 Einberufungen
+  ok   Version 10, Tech-Firmen danach: 7 gegründet, 132 Käufe
+  ok   danach als Version 10 gespeichert und geladen: läuft bitgleich weiter
+  ok   Seed 2, Tag 300 5 Uhr (741 Einw., 1 Baustellen): ohne Übernehmen abgelehnt, als übernehmbar markiert
+  ok   beschädigte Stände der Version 5 abgelehnt: stat.regierung.gs: Spielstand beschädigt: Regierungs-Statistik; regierung.tagStart.lohnsteuer: Spielstand beschädigt: Stadtregierung; stat.regierung.rentenkasse als Text: Spielstand beschädigt: Regierungs-Statistik
+  ok   Version 5 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 4610 Erinnerungen neu verteilt (2018 in der Langzeit, 774 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 23 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 23 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   Autos ab Tag 300: niemand hat eins, kein Werk, Summen 0, Felder leer (falsch: keine); „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus mit Leuchtl…“
+  ok   Stadt erweitern: 741 Einwohner → Stadt, 8 Stadtteile, Karte 96 × 96 (Rand 27 Felder); „Ab heute zählt die Stadt ihre Größe: 741 Einwohner, sie ist eine Stadt. Ihre Stadtteile heißen Altstadt, Marktviertel, L…“
+  ok   Sicherheit ab Tag 300: noch keine Wache und Anstalt, Summen 0, Personenfelder leer (falsch: keine); „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (eine Regel der Stadt…“
+  ok   Bund ab Tag 300: noch keine Kaserne und Dienststelle, Summen 0, Personenfelder leer (falsch: keine); „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, sobald sie eine Stadt is…“
+  ok   Bauhof = Gebäude 2 (die Werkstatt der Stadt vom Start)
+  ok   Baustellen mit Arbeitstagen: 2/18
+  ok   Einwohner (741) und Stadtbuch bleiben, 5 Zeilen dazu: „Ab heute können Mieter ihre Wohnung von der Stadt kaufen, vergünstigt …“ „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (…“ „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, soba…“ „Ab heute zählt die Stadt ihre Größe: 741 Einwohner, sie ist eine Stadt…“ „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus m…“
+  ok   Stadtregierung läuft weiter (seit Tag 0, Summen und „gestern“ wie vorher), Schritt 2 ab Tag 300, neue Summen 0
+  ok   Beitragsjahre aus dem Alter (0 Fehler), noch niemand im Eigentum
+  ok   Kitas: noch kein Platz, 0 gebaut, Übergangsfrist läuft (mindestens bis Tag 330, höchstens bis Tag 390)
+  ok   erste Nacht: 272 Käufe; „In der ersten Nacht nach der Übernahme kaufen 272 Haushalte ihre Wohnung von der Stadt, da…“
+  ok   Übergangsfrist 30 Tage (30 bis 90): niemand gab die Stelle auf, 4 Kitas gebaut; Stadtbuch Tag 329: „Die Übergangsfrist für die Kitas endet, kein Kind wartet mehr auf einen Platz: Ab morgen gibt ein Elternteil d…“
+  ok   nach der Frist: erste Nacht 0 (0 für Kinder, die vor dem Ende der Frist lebten, 0 danach geboren), Nächte 2–11 höchstens 1 Stellenaufgaben (Schwelle 2 und 4): 0 0 0 0 0 0 0 1 0 0 0
+  ok   60 Tage weiter (Tag 360, 1043 Einw.): keine NaN/Infinity
+  ok   alle übernommenen Baustellen fertig (6)
+  ok   „gestern“ nach 60 Tagen: Rentenkasse 8712, Bund 941 Taler
+  ok   Rente weiter auf Stufe 3 (66 Taler), Rentenkasse seit Tag 0 589182 Taler
+  ok   Kitas nach 60 Tagen: 5 offen, 63 Kinder mit Platz, 0 warten, 1-mal Stelle aufgegeben (nach der Frist), 0 gebunden
+  ok   Schritt 2 nach 60 Tagen: 404 von 529 Haushalten im Eigentum, 68 Renteneintritte (davon 20 vor 67), 1 heute vor 67 in Rente
+  ok   Bund nach 60 Tagen (Großstadt): Kaserne offen seit Tag 313, 16 Einberufungen
+  ok   Version 10, Tech-Firmen danach: 30 gegründet, 2139 Käufe
+  ok   danach als Version 10 gespeichert und geladen: läuft bitgleich weiter
+  ok   Seed 3, Tag 403 20 Uhr (1024 Einw., 1 Baustellen): ohne Übernehmen abgelehnt, als übernehmbar markiert
+  ok   beschädigte Stände der Version 5 abgelehnt: stat.regierung.gs: Spielstand beschädigt: Regierungs-Statistik; regierung.tagStart.lohnsteuer: Spielstand beschädigt: Stadtregierung; stat.regierung.rentenkasse als Text: Spielstand beschädigt: Regierungs-Statistik
+  ok   Version 5 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 6408 Erinnerungen neu verteilt (2868 in der Langzeit, 1081 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 118 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 118 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   Autos ab Tag 403: niemand hat eins, kein Werk, Summen 0, Felder leer (falsch: keine); „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus mit Leuchtl…“
+  ok   Stadt erweitern: 1024 Einwohner → Großstadt, 6 Stadtteile, Karte 96 × 96 (Rand 32 Felder); „Ab heute zählt die Stadt ihre Größe: 1.024 Einwohner, sie ist eine Großstadt. Ihre Stadtteile heißen Altstadt, Marktvier…“
+  ok   Sicherheit ab Tag 403: noch keine Wache und Anstalt, Summen 0, Personenfelder leer (falsch: keine); „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (eine Regel der Stadt…“
+  ok   Bund ab Tag 403: noch keine Kaserne und Dienststelle, Summen 0, Personenfelder leer (falsch: keine); „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, sobald sie eine Stadt is…“
+  ok   Bauhof = Gebäude 2 (die Werkstatt der Stadt vom Start)
+  ok   Baustellen mit Arbeitstagen: 9/9
+  ok   Einwohner (1024) und Stadtbuch bleiben, 5 Zeilen dazu: „Ab heute können Mieter ihre Wohnung von der Stadt kaufen, vergünstigt …“ „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (…“ „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, soba…“ „Ab heute zählt die Stadt ihre Größe: 1.024 Einwohner, sie ist eine Gro…“ „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus m…“
+  ok   Stadtregierung läuft weiter (seit Tag 0, Summen und „gestern“ wie vorher), Schritt 2 ab Tag 403, neue Summen 0
+  ok   Beitragsjahre aus dem Alter (0 Fehler), noch niemand im Eigentum
+  ok   Kitas: noch kein Platz, 0 gebaut, Übergangsfrist läuft (mindestens bis Tag 433, höchstens bis Tag 493)
+  ok   erste Nacht: 414 Käufe; „In der ersten Nacht nach der Übernahme kaufen 414 Haushalte ihre Wohnung von der Stadt, da…“
+  ok   Übergangsfrist 30 Tage (30 bis 90): niemand gab die Stelle auf, 5 Kitas gebaut; Stadtbuch Tag 432: „Die Übergangsfrist für die Kitas endet, kein Kind wartet mehr auf einen Platz: Ab morgen gibt ein Elternteil d…“
+  ok   nach der Frist: erste Nacht 0 (0 für Kinder, die vor dem Ende der Frist lebten, 0 danach geboren), Nächte 2–11 höchstens 0 Stellenaufgaben (Schwelle 2 und 4): 0 0 0 0 0 0 0 0 0 0 0
+  ok   60 Tage weiter (Tag 463, 1091 Einw.): keine NaN/Infinity
+  ok   alle übernommenen Baustellen fertig (6)
+  ok   „gestern“ nach 60 Tagen: Rentenkasse 17556, Bund 372 Taler
+  ok   Rente weiter auf Stufe 3 (66 Taler), Rentenkasse seit Tag 0 1787808 Taler
+  ok   Kitas nach 60 Tagen: 5 offen, 40 Kinder mit Platz, 0 warten, 0-mal Stelle aufgegeben (nach der Frist), 0 gebunden
+  ok   Schritt 2 nach 60 Tagen: 450 von 527 Haushalten im Eigentum, 76 Renteneintritte (davon 17 vor 67), 4 heute vor 67 in Rente
+  ok   Bund nach 60 Tagen (Großstadt): Kaserne offen seit Tag 416, 59 Einberufungen
+  ok   Version 10, Tech-Firmen danach: 12 gegründet, 3408 Käufe
+  ok   danach als Version 10 gespeichert und geladen: läuft bitgleich weiter
+Alte Fassung: git bc7247a
+  ok   alte Simulation hat Version 6, neue 10
+  ok   Seed 1, Tag 150 13 Uhr (112 Einw., 2 Baustellen): ohne Übernehmen abgelehnt, als übernehmbar markiert
+  ok   Version 6 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 698 Erinnerungen neu verteilt (290 in der Langzeit, 126 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 9 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 9 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   Autos ab Tag 150: niemand hat eins, kein Werk, Summen 0, Felder leer (falsch: keine); „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus mit Leuchtl…“
+  ok   Stadt erweitern: 112 Einwohner → Kleinstadt, 4 Stadtteile, Karte 96 × 96 (Rand 39 Felder); „Ab heute zählt die Stadt ihre Größe: 112 Einwohner, sie ist eine Kleinstadt. Ihre Stadtteile heißen Altstadt, Marktviert…“
+  ok   Sicherheit ab Tag 150: noch keine Wache und Anstalt, Summen 0, Personenfelder leer (falsch: keine); „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (eine Regel der Stadt…“
+  ok   Bund ab Tag 150: noch keine Kaserne und Dienststelle, Summen 0, Personenfelder leer (falsch: keine); „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, sobald sie eine Stadt is…“
+  ok   Version 6 → 8: Stadtregierung, Schritt 2, Summen, Hauptfiguren, Stadtbuch und Zufall bleiben, vier Zeilen dazu (Sicherheit, Bund, Stadt erweitern, Autos)
+  ok   60 Tage weiter ohne Sicherheit und Autos (Tag 210, 261 Einw., Karte 96): Kennzahlen, Zufall, Felder und Gebäude jeden Tag wie in Version 6
+  ok   danach als Version 10 gespeichert und geladen: läuft bitgleich weiter
+  ok   Seed 2, Tag 300 5 Uhr (621 Einw., 3 Baustellen): ohne Übernehmen abgelehnt, als übernehmbar markiert
+  ok   Version 6 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 4041 Erinnerungen neu verteilt (1794 in der Langzeit, 678 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 36 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 36 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   Autos ab Tag 300: niemand hat eins, kein Werk, Summen 0, Felder leer (falsch: keine); „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus mit Leuchtl…“
+  ok   Stadt erweitern: 621 Einwohner → Stadt, 9 Stadtteile, Karte 104 × 104 (Rand 19 Felder); „Ab heute zählt die Stadt ihre Größe: 621 Einwohner, sie ist eine Stadt. Ihre Stadtteile heißen Altstadt, Marktviertel, L…“
+  ok   Sicherheit ab Tag 300: noch keine Wache und Anstalt, Summen 0, Personenfelder leer (falsch: keine); „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (eine Regel der Stadt…“
+  ok   Bund ab Tag 300: noch keine Kaserne und Dienststelle, Summen 0, Personenfelder leer (falsch: keine); „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, sobald sie eine Stadt is…“
+  ok   Version 6 → 8: Stadtregierung, Schritt 2, Summen, Hauptfiguren, Stadtbuch und Zufall bleiben, vier Zeilen dazu (Sicherheit, Bund, Stadt erweitern, Autos)
+  ok   60 Tage weiter ohne Sicherheit und Autos (Tag 360, 858 Einw., Karte 104): Kennzahlen, Zufall, Felder und Gebäude jeden Tag wie in Version 6
+  ok   danach als Version 10 gespeichert und geladen: läuft bitgleich weiter
+  ok   Seed 3, Tag 443 20 Uhr (1059 Einw., 2 Baustellen): ohne Übernehmen abgelehnt, als übernehmbar markiert
+  ok   Version 6 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 6909 Erinnerungen neu verteilt (3175 in der Langzeit, 1122 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 160 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 160 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   Autos ab Tag 443: niemand hat eins, kein Werk, Summen 0, Felder leer (falsch: keine); „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus mit Leuchtl…“
+  ok   Stadt erweitern: 1059 Einwohner → Großstadt, 8 Stadtteile, Karte 96 × 96 (Rand 27 Felder); „Ab heute zählt die Stadt ihre Größe: 1.059 Einwohner, sie ist eine Großstadt. Ihre Stadtteile heißen Altstadt, Marktvier…“
+  ok   Sicherheit ab Tag 443: noch keine Wache und Anstalt, Summen 0, Personenfelder leer (falsch: keine); „Ab heute gibt es in der Stadt Diebstahl, Wohnungseinbruch und Betrug (eine Regel der Stadt…“
+  ok   Bund ab Tag 443: noch keine Kaserne und Dienststelle, Summen 0, Personenfelder leer (falsch: keine); „Ab heute baut der Bund in der Stadt: eine Kaserne der Bundeswehr, sobald sie eine Stadt is…“
+  ok   Version 6 → 8: Stadtregierung, Schritt 2, Summen, Hauptfiguren, Stadtbuch und Zufall bleiben, vier Zeilen dazu (Sicherheit, Bund, Stadt erweitern, Autos)
+  ok   60 Tage weiter ohne Sicherheit und Autos (Tag 503, 1113 Einw., Karte 96): Kennzahlen, Zufall, Felder und Gebäude jeden Tag wie in Version 6
+  ok   danach als Version 10 gespeichert und geladen: läuft bitgleich weiter
+Alte Fassung: git ffa1d88
+  ok   alte Simulation hat Version 7, neue 10
+  ok   Seed 1, Tag 156 13 Uhr (114 Einw., 2 Baustellen): ohne Übernehmen abgelehnt, als übernehmbar markiert
+  ok   Version 7 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 738 Erinnerungen neu verteilt (337 in der Langzeit, 106 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 10 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 10 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   Autos ab Tag 156: niemand hat eins, kein Werk, Summen 0, Felder leer (falsch: keine); „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus mit Leuchtl…“
+  ok   Version 7 → 8: Stadt erweitern, Sicherheit, Bund, Stadtregierung, Summen, Hauptfiguren, Stadtbuch und Zufall bleiben, eine Zeile dazu (Autos)
+  ok   60 Tage weiter ohne Autos (Tag 216, 201 Einw., Karte 96): Kennzahlen, Zufall, Felder, Gebäude, Sicherheit und Bund jeden Tag wie in Version 7
+  ok   danach mit Autos (31 nach 20 Tagen) als Version 10 gespeichert und geladen: läuft bitgleich weiter
+  ok   Seed 2, Tag 300 5 Uhr (465 Einw., 10 Baustellen): ohne Übernehmen abgelehnt, als übernehmbar markiert
+  ok   Version 7 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 3053 Erinnerungen neu verteilt (1404 in der Langzeit, 469 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 22 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 22 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   Autos ab Tag 300: niemand hat eins, kein Werk, Summen 0, Felder leer (falsch: keine); „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus mit Leuchtl…“
+  ok   Version 7 → 8: Stadt erweitern, Sicherheit, Bund, Stadtregierung, Summen, Hauptfiguren, Stadtbuch und Zufall bleiben, eine Zeile dazu (Autos)
+  ok   60 Tage weiter ohne Autos (Tag 360, 763 Einw., Karte 80): Kennzahlen, Zufall, Felder, Gebäude, Sicherheit und Bund jeden Tag wie in Version 7
+  ok   danach mit Autos (132 nach 20 Tagen) als Version 10 gespeichert und geladen: läuft bitgleich weiter
+  ok   Seed 3, Tag 400 20 Uhr (1026 Einw., 1 Baustellen): ohne Übernehmen abgelehnt, als übernehmbar markiert
+  ok   Version 7 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 6399 Erinnerungen neu verteilt (2977 in der Langzeit, 987 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 96 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 96 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   Autos ab Tag 400: niemand hat eins, kein Werk, Summen 0, Felder leer (falsch: keine); „Ab heute wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus mit Leuchtl…“
+  ok   Version 7 → 8: Stadt erweitern, Sicherheit, Bund, Stadtregierung, Summen, Hauptfiguren, Stadtbuch und Zufall bleiben, eine Zeile dazu (Autos)
+  ok   60 Tage weiter ohne Autos (Tag 460, 1107 Einw., Karte 96): Kennzahlen, Zufall, Felder, Gebäude, Sicherheit und Bund jeden Tag wie in Version 7
+  ok   danach mit Autos (212 nach 20 Tagen) als Version 10 gespeichert und geladen: läuft bitgleich weiter
+Alte Fassung: git 31ce452
+  ok   alte Simulation hat Version 8, neue 10
+  ok   Seed 1, Tag 150 13 Uhr (116 Einw.): ohne Übernehmen abgelehnt („Spielstand ist von Version 8, diese Datei ist Version 10.“), als übernehmbar markiert
+  ok   Version 8 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 724 Erinnerungen neu verteilt (333 in der Langzeit, 112 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 12 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 12 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   mit Gedächtnis 60 Tage weiter (Tag 215, keine NaN: 0), 68 Erfahrungen gelernt; als Version 10 gespeichert und geladen, 20 Tage später bitgleich
+  ok   Seed 2, Tag 300 5 Uhr (759 Einw.): ohne Übernehmen abgelehnt („Spielstand ist von Version 8, diese Datei ist Version 10.“), als übernehmbar markiert
+  ok   Version 8 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 4751 Erinnerungen neu verteilt (2164 in der Langzeit, 726 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 17 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 17 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   mit Gedächtnis 60 Tage weiter (Tag 365, keine NaN: 0), 299 Erfahrungen gelernt; als Version 10 gespeichert und geladen, 20 Tage später bitgleich
+  ok   Seed 3, Tag 400 20 Uhr (977 Einw.): ohne Übernehmen abgelehnt („Spielstand ist von Version 8, diese Datei ist Version 10.“), als übernehmbar markiert
+  ok   Version 8 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 6363 Erinnerungen neu verteilt (2970 in der Langzeit, 990 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 78 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 78 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   mit Gedächtnis 60 Tage weiter (Tag 465, keine NaN: 0), 240 Erfahrungen gelernt; als Version 10 gespeichert und geladen, 20 Tage später bitgleich
+Alte Fassung: git 6c1741e
+  ok   alte Simulation hat Version 9, neue 10
+  ok   Seed 1, Tag 150 13 Uhr (208 Einw.): ohne Übernehmen abgelehnt („Spielstand ist von Version 9, diese Datei ist Version 10.“), als übernehmbar markiert
+  ok   Version 9 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 1404 Erinnerungen neu verteilt (627 in der Langzeit, 219 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 23 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 23 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   mit R.GED = 0 übernommen, 60 Tage weiter (Tag 210, 387 Einw.): jeden Tag wie Version 9 (alle Arrays außer memName, Felder aus PF_GED 0, Einzelwerte außer der Version, JSON-Teile)
+  ok   mit Gedächtnis 60 Tage weiter (Tag 215, keine NaN: 0), 87 Erfahrungen gelernt; als Version 10 gespeichert und geladen, 20 Tage später bitgleich
+  ok   Stand der Version 10 in Version 9: ohne Übernehmen abgelehnt („Spielstand ist von Version 10, diese Datei ist Version 9.“), mit Übernehmen abgelehnt („Spielstand ist von Version 10, diese Datei ist Version 9.“)
+  ok   Seed 2, Tag 300 5 Uhr (1060 Einw.): ohne Übernehmen abgelehnt („Spielstand ist von Version 9, diese Datei ist Version 10.“), als übernehmbar markiert
+  ok   Version 9 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 6783 Erinnerungen neu verteilt (3002 in der Langzeit, 1018 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 37 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 37 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   mit R.GED = 0 übernommen, 60 Tage weiter (Tag 360, 1192 Einw.): jeden Tag wie Version 9 (alle Arrays außer memName, Felder aus PF_GED 0, Einzelwerte außer der Version, JSON-Teile)
+  ok   mit Gedächtnis 60 Tage weiter (Tag 365, keine NaN: 0), 209 Erfahrungen gelernt; als Version 10 gespeichert und geladen, 20 Tage später bitgleich
+  ok   Stand der Version 10 in Version 9: ohne Übernehmen abgelehnt („Spielstand ist von Version 10, diese Datei ist Version 9.“), mit Übernehmen abgelehnt („Spielstand ist von Version 10, diese Datei ist Version 9.“)
+  ok   Seed 3, Tag 400 20 Uhr (1376 Einw.): ohne Übernehmen abgelehnt („Spielstand ist von Version 9, diese Datei ist Version 10.“), als übernehmbar markiert
+  ok   Version 9 → 10 mit Gedächtnis: Version 10, sonst gleich wie ohne (alles); 9042 Erinnerungen neu verteilt (4040 in der Langzeit, 1334 unter der Schwelle vergessen, 0 falsch), neue Felder 0 (ja), Planschritt 0 falsch, Summen leer: ja; 169 Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon 169 noch im Gedächtnis, Name darin: 0; 10 Tage weiter, gespeichert und geladen, 5 Tage später bitgleich
+  ok   mit R.GED = 0 übernommen, 60 Tage weiter (Tag 460, 1461 Einw.): jeden Tag wie Version 9 (alle Arrays außer memName, Felder aus PF_GED 0, Einzelwerte außer der Version, JSON-Teile)
+  ok   mit Gedächtnis 60 Tage weiter (Tag 465, keine NaN: 0), 234 Erfahrungen gelernt; als Version 10 gespeichert und geladen, 20 Tage später bitgleich
+  ok   Stand der Version 10 in Version 9: ohne Übernehmen abgelehnt („Spielstand ist von Version 10, diese Datei ist Version 9.“), mit Übernehmen abgelehnt („Spielstand ist von Version 10, diese Datei ist Version 9.“)
+Alle Migrations-Prüfungen bestanden

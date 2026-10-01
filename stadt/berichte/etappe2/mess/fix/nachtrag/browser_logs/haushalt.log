@@ -1,0 +1,21 @@
+OK   Zeile „Budget · Steuer 0 % ›“ ist ein Knopf (Name „Budget: Haushalt der Stadt öffnen, Lohnsteuer 0 %“), Budget 316.671; alle 7 Zeilen gleich hoch (20 px)
+OK   Klick auf die Zahl „Budget“ öffnet das Fenster „Haushalt“
+OK   Kopf und „Heute“: Kasse 316.671 Taler, Rücklage 47.736 Taler, Lohnsteuer „0 % (Start 10 %)“ (wie Sim.haushaltInfo)
+OK   Vorhaben in der Rangfolge des Jahres (regel): Wohnungen auf Vorrat, Rathaus ausbauen, Parks in Wohnnähe; davor als Bedarf „Computer für die Schulenvor allen Vorhaben“ (Teil 5)
+OK   Konten: 23 Zeilen (20 Konten und 3 Summen), Vorjahr wie Sim: Lohnsteuer 0, Rathaus 4.860, Computer 320
+OK   10 Jahre in der Tabelle, 6 Karten zum Programm (Erst ausgeben: Bauten und Ausstattung nach BedarfSpielregel; Dann die Lohnsteuer senken; Ausgabendisziplin, keine Schulden; Wer bestellt, bezahlt; Computer für die Schulen, gekauft in der Stadt; Wohnungen: Spannung zu S. 37), Annahmen der Stadt (8), Nicht übernommen (8); kein NaN
+OK   nach zwei Spielstunden: Kasse im Fenster 317.311 Taler = Budget 317.311 Taler
+OK   Escape schließt das Fenster
+OK   Tastatur: Enter öffnet (Fokus auf der Überschrift), Escape schließt, Fokus zurück auf dem Knopf mit Ring ({"offen":false,"fokus":"haushalt-knopf","ring":true})
+OK   Stadtbuch: 6 Zeilen zum Haushalt mit Münzen, zuletzt „Tag 249 · Haushalt Haushaltsjahr 24: 81.079 Taler eingenommen, 48.456 ausgegeben, davon 320 für Computer der Schulen (1 Computer für die Schulen). Kasse 316.671…“
+OK   Hauskarte „Rathaus an der Hauptstraße“: 5 Zeilen von gestern (Mieten und Wohnungsverkauf; Bauhof und Laden der Stadt; Rathaus: Löhne, laufende Kosten, Bau; Kitas und Schulen; Bauamt: Wohnhäuser, Parks, Straßen, Kitas, Schulen), Lohnsteuer 0 %, Knopf „Fenster „Haushalt“ ›“
+OK   Knopf in der Hauskarte öffnet das Fenster „Haushalt“
+OK   Fenster „Stadtregierung“: Karte „Lohnsteuer sinkt …“ („Heute 0 % statt 10 %; 10 Senkungen. Nicht verplant zu Beginn dieses Jahres: 268.935 Taler bei einer …“), R01 „Heute 0 % über dem Freibetrag. Gestern 0 Taler Lohnsteuer; n…“
+Konsole (breit): leer
+OK   Draw Calls Tag 250, 11 Uhr: 29 (stadt.orig.html 27, höchstens +3)
+OK   KI: Anfrage an Tag 9 mit 3 Vorhaben, Antwort geprüft und übernommen (ki); Plan fürs Jahr 1: parks, rathaus, wohnungen; Tagebuch „Zuerst Parks für alle, dann das Rathaus.“
+OK   Fenster: „Rangfolge vom Bürgermeisteramt“, Parks vor Wohnungen
+Konsole (KI): leer
+OK   Handy: Zahlen bis 207.5 px breit und 230.7 px hoch (stadt.orig.html 207.5 / 230.7)
+OK   Handy: Tipp auf die Zeile öffnet das Fenster; kein seitliches Überlaufen (Seite 400, Fenster 400/400, Tabellen bis 397 px)
+Konsole (Handy): leer

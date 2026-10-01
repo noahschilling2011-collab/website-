@@ -1,0 +1,43 @@
+  ok   Abschnitt „Sicherheit“ (459 Zeilen): Zufall nur aus dem eigenen Strom (zufallSich), sonst 0
+  ok   Regeln lesen nur ihre Personenfelder (16 Funktionen), keine Namen; Geschlecht nur fürs Pronomen im Urteil
+  ok   wirtschaft: der Zweig der Landeslöhne berührt das Budget der Stadt nicht (Löhne von außen)
+  ok   Namenstausch (Seed 1, 365 Tage): „Greta Becker“ heißt dort „Martha Arnold“, die Stadt läuft trotzdem bitgleich (7c714e1392dd29ea)
+  ok   Seed 1, 730 Nächte: 368 Haftnächte, 4 Kindernächte in Obhut, 370 Zeilen im Stadtbuch ohne Namen; Wache ab Kleinstadt, Anstalt ab Stadt auf eigenem Gelände; Täter erwachsen und frei, Opfer aus einem anderen Haushalt (0 Fehler); Hof nur zur eigenen Zeit (0); Landeslöhne nie aus dem Budget (0); weitere Fehler: {}
+  ok   Seed 1: 1970/90/769 Taten, 1174 Urteile, 203 Haftantritte (6 außerhalb), 4+0 Obhut, 199 getilgt
+  ok   Seed 2, 730 Nächte: 216 Haftnächte, 6 Kindernächte in Obhut, 267 Zeilen im Stadtbuch ohne Namen; Wache ab Kleinstadt, Anstalt ab Stadt auf eigenem Gelände; Täter erwachsen und frei, Opfer aus einem anderen Haushalt (0 Fehler); Hof nur zur eigenen Zeit (0); Landeslöhne nie aus dem Budget (0); weitere Fehler: {}
+  ok   Seed 2: 1573/89/651 Taten, 946 Urteile, 103 Haftantritte (8 außerhalb), 2+0 Obhut, 160 getilgt
+  ok   Seed 3, 730 Nächte: 178 Haftnächte, 0 Kindernächte in Obhut, 231 Zeilen im Stadtbuch ohne Namen; Wache ab Kleinstadt, Anstalt ab Stadt auf eigenem Gelände; Täter erwachsen und frei, Opfer aus einem anderen Haushalt (0 Fehler); Hof nur zur eigenen Zeit (0); Landeslöhne nie aus dem Budget (0); weitere Fehler: {}
+  ok   Seed 3: 1663/63/665 Taten, 1000 Urteile, 93 Haftantritte (6 außerhalb), 0+0 Obhut, 183 getilgt
+  ok   30 Tagessätze, kein Geld: 15 Tage Ersatzfreiheitsstrafe (§ 43 StGB: 2 Tagessätze = 1 Tag), 1 Spieltag(e), kurze Haft; „Das Amtsgericht verurteilt eine 65-jährige Einwohnerin wegen Diebstahls zu 30 Tagessätzen Geldstrafe. Sie kann sie nicht bezahlen und muss dafür 15 Ta…“
+  ok   90 Tagessätze, kein Geld: 45 Tage Ersatzfreiheitsstrafe (§ 43 StGB: 2 Tagessätze = 1 Tag), 2 Spieltag(e), kurze Haft; „Das Amtsgericht verurteilt eine 65-jährige Einwohnerin wegen Diebstahls zu 90 Tagessätzen Geldstrafe. Sie kann sie nicht bezahlen und muss dafür 45 Ta…“
+  ok   Geldstrafe bezahlt (99 Taler an das Land): keine Haft, im Register bis Tag 350 (5 Jahre, § 46 Abs. 1 Nr. 1a BZRG)
+  ok   halb bezahlt: 15 von 30 Tagessätzen offen → 8 Tage Ersatzfreiheitsstrafe, Tagessatz aus Rente („Das Amtsgericht verurteilt eine 65-jährige Einwohnerin wegen Betrugs zu 30 Tagessätzen Geldstrafe. Sie kann 15 davon nic…“)
+  ok   Wohnungseinbruch, erstes Mal, 3 Tage U-Haft: noch 2 Tage Haft, 5 Tage Rest auf Bewährung bis Tag 332, Tilgung nach 10 Jahren (§ 46 Abs. 1 Nr. 2b BZRG)
+  ok   Widerruf: zweite Freiheitsstrafe (6 Monate, zwei Drittel = 4 Tage) und der Rest der ersten (5 Tage): 9 Tage Strafhaft, Tilgung nach 15 Jahren plus Dauer
+  ok   Tilgung: zwei getilgte Einträge zählen nicht mehr, wieder eine Geldstrafe (kein Mehrfachtäter)
+  ok   Anrechnung: 1 Spieltag U-Haft gleicht 30 Tagessätze aus (frei); bei 90 bleiben 53, kein Geld → 27 Tage Ersatzfreiheitsstrafe
+  ok   Randfall: Ersatzfreiheitsstrafe während U-Haft ändert die U-Haft nicht (haftNach 1), niemand kommt vor dem Urteil frei; danach Strafe und Anschluss bis Tag 306
+  ok   volle Anstalt (Tag 300): 12 von 12 Plätzen, der nächste sitzt außerhalb; eine neue Strafe in Strafhaft wird angehängt
+  ok   volle Anstalt: keine Gefangenen von außerhalb mehr (0), 8 Stellen (0,65 je Gefangenem)
+       Obhut: Fall in Seed 2, Tag 426
+  ok   Obhut: 1 Kind(er) von Rosa Lehmann beim Jugendamt („Das Jugendamt nimmt 1 Kind in Obhut, dessen einziger Erwachsener im Haushalt in Haft ist. Bis zur Entlassung l“); Hauskarte „zur Zeit beim Jugendamt“
+  ok   Obhut ohne Angehörige: das Jugendamt nimmt die Kinder in Obhut (§ 42 SGB VIII), Pflegefamilie außerhalb, Kita-Platz frei (1 neu, 0 vorher)
+  ok   nach der Entlassung: die Kinder sind wieder zu Hause, Obhut beendet
+  ok   in Haft keine Grundsicherung (§ 7 Abs. 4 SGB II); Arbeitsentgelt nur in Strafhaft und kurzer Haft: 1 Gefangene × 7 = 7 Taler, U-Haft nichts
+  ok   Speichern mit Strafhaft, kurzer Haft, U-Haft mit Anschluss, offenem Verfahren und Bewährung: geladen gleich, 30 Tage später bitgleich (a307f6a12e10bb39)
+  ok   beschädigte Stände abgelehnt: Haftart 5: Spielstand beschädigt: Sicherheit (Haft); Haftort 3: Spielstand beschädigt: Sicherheit (Haft); Obhut 3: Spielstand beschädigt: Sicherheit (Person); Verfahren Tatart 9: Spielstand beschädigt: Sicherheit (Verfahren); ohne sicherheit: Spielstand beschädigt: Sicherheit (Zustand); Summe Taten zu kurz: Spielstand beschädigt: Sicherheit (Summen); Wache zeigt auf ein Wohnhaus: Spielstand beschädigt: Sicherheit (Gebäude); Zufall negativ: Spielstand beschädigt: Sicherheit (Zustand); Geld vom Land als Text: Spielstand beschädigt: Sicherheit (Geld vom Land); 13 von außerhalb: Spielstand beschädigt: Sicherheit (Zustand); Personenfeld fehlt: Spielstand unvollständig: p.tilgungBis
+  ok   Wohnungseinbruch (R.OPFER_FREI): Vorstand 2 in Strafhaft, ein anderer Erwachsener seines Haushalts frei; 20000 Einbrüche, Vorstand 0-mal Opfer. Gegenprobe R.OPFER_FREI = 0 (wie 6c1741e): Vorstand in Haft Opfer beim 640. Einbruch
+  ok   Taten je 1.000 Einwohner und Jahr (Seeds 1, 2, 3, Tag 366–730): Diebstahl 22.8, Wohnungseinbruch 1.07, Betrug 9.3, zusammen 33.1 (PKS 2024: 22.3 / 0.94 / 8.9, zusammen 32,1); aufgeklärt 34 % / 13 % / 62 % (PKS 31,4 / 15,3 / 58)
+  Messung nach Gruppen (Seeds 1–6, Tag 200–730; relativ zu allen, nur gemessen):
+       alle                                          3531066 Erwachsenen-Nächte  verurteilt 1.00 (5793)  Opfer 1.00 (13931)
+       in der Stadt geboren                           737190 Erwachsenen-Nächte  verurteilt 1.17 (1411)  Opfer 0.99 (2878)
+       zugezogen oder vom Start                      2793876 Erwachsenen-Nächte  verurteilt 0.96 (4382)  Opfer 1.00 (11053)
+       Nachnamen Kaya bis Kowalski (Liste 31–37)      419918 Erwachsenen-Nächte  verurteilt 0.99 (685)  Opfer 0.96 (1597)
+       übrige Nachnamen                              3111148 Erwachsenen-Nächte  verurteilt 1.00 (5108)  Opfer 1.00 (12334)
+       Frauen                                        1776742 Erwachsenen-Nächte  verurteilt 0.98 (2861)  Opfer 1.01 (7047)
+       Männer                                        1754324 Erwachsenen-Nächte  verurteilt 1.02 (2932)  Opfer 0.99 (6884)
+       Alter 18–24                                    257137 Erwachsenen-Nächte  verurteilt 1.50 (631)  Opfer 1.01 (1023)
+       Alter 25–44                                    941284 Erwachsenen-Nächte  verurteilt 1.04 (1612)  Opfer 1.01 (3742)
+       Alter 45–66                                   1367355 Erwachsenen-Nächte  verurteilt 1.01 (2267)  Opfer 1.01 (5446)
+       Alter 67+                                      965290 Erwachsenen-Nächte  verurteilt 0.81 (1283)  Opfer 0.98 (3720)
+Alle Prüfungen zur Sicherheit bestanden

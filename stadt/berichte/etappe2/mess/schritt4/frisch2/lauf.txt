@@ -1,0 +1,2 @@
+simtest_alle Start: 00:59:25 UTC | uptime:: 2.70, 3.62, 3.83 | fremde>20%: 0
+simtest_alle Ende (exit 0): 01:04:37 UTC | uptime:: 3.18, 3.32, 3.62 | fremde>20%: 0

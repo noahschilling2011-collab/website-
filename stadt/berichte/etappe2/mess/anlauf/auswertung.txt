@@ -1,0 +1,25 @@
+Mittel über Seeds 1–12 (Einwohner Tag 60/100/150/300/365; Gründungen bis 365; Kasse 365); schnell>normal = Seeds, in denen schnell an Tag 150 mehr Einwohner hat
+== normal
+aus           Einw [57, 129, 239, 1007, 1240]  min [26, 101, 209, 863, 1166]  Gründ 314  Kasse 1,026,322
+alle          Einw [45, 103, 222, 997, 1274]  min [25, 65, 167, 759, 1202]  Gründ 255  Kasse 914,463
+abKleinstadt  Einw [54, 114, 240, 1042, 1309]  min [26, 83, 191, 782, 1209]  Gründ 287  Kasse 945,463
+abStadt       Einw [56, 134, 255, 1079, 1283]  min [26, 95, 205, 931, 1199]  Gründ 275  Kasse 981,320
+nachPleite    Einw [56, 134, 251, 1060, 1300]  min [26, 95, 206, 902, 1238]  Gründ 307  Kasse 1,012,957
+== schnell
+aus           Einw [62, 164, 334, 1232, 1354]  min [30, 91, 224, 1160, 1239]  Gründ 261  Kasse 1,158,942
+alle          Einw [44, 95, 223, 1103, 1313]  min [27, 32, 53, 604, 1193]  Gründ 264  Kasse 989,919
+abKleinstadt  Einw [53, 126, 289, 1200, 1354]  min [27, 39, 158, 1067, 1213]  Gründ 232  Kasse 1,059,076
+abStadt       Einw [62, 156, 322, 1233, 1352]  min [27, 39, 164, 1077, 1209]  Gründ 252  Kasse 1,142,250
+nachPleite    Einw [62, 155, 321, 1244, 1394]  min [27, 39, 163, 1069, 1298]  Gründ 298  Kasse 1,145,512
+== schnell > normal an Tag 150 / 300
+aus           11/12  12/12
+alle          6/12  7/12
+abKleinstadt  8/12  9/12
+abStadt       9/12  11/12
+nachPleite    9/12  11/12
+== Seed 1 normal Einw je Variante
+aus [47, 106, 209, 863, 1169]
+alle [35, 85, 203, 885, 1219]
+abKleinstadt [59, 100, 234, 928, 1235]
+abStadt [62, 136, 244, 1071, 1287]
+nachPleite [62, 136, 229, 967, 1238]

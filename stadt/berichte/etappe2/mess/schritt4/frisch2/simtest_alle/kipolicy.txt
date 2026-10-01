@@ -1,0 +1,33 @@
+Policy zum Prüfen: künstlich „kuenstlich“ (test), Stadt-Version 10, Hash 671ef97ec9855701, Schema e85eca0c, 57 Merkmale, 13 Aktionen
+ok   Policy mit Stadt-Version 9 (künstlich, Hash passend): „Policy ungültig: trainiert auf Stadt-Version 9, diese Stadt ist Version 10 (neu trainieren)“
+     (ki/policies.json nicht gelesen: ENOENT: no such file or directory, open 'SP/ml/e2bau/tmp/t4/stadt_simtest.ZOMwe0/ki/policies.json')
+     keine Policy-Datei einer älteren Version in ki/policies.json (nur die künstliche geprüft)
+ok   Regression Seed 1: Policy aus, R.GED = 0 und Vorarbeiten aus, 730 Tage, jeden Tag bitgleich zu <repo> 09083f5 (ohne memName, Felder aus PF_GED 0, ohne Versionsnummer; 1449 Einwohner, Fingerabdruck c96954bfab9badbc)
+ok   Regression Seed 2: Policy aus, R.GED = 0 und Vorarbeiten aus, 730 Tage, jeden Tag bitgleich zu <repo> 09083f5 (ohne memName, Felder aus PF_GED 0, ohne Versionsnummer; 1509 Einwohner, Fingerabdruck 3b0a5c107512e796)
+ok   Regression Seed 3: Policy aus, R.GED = 0 und Vorarbeiten aus, 730 Tage, jeden Tag bitgleich zu <repo> 09083f5 (ohne memName, Felder aus PF_GED 0, ohne Versionsnummer; 1515 Einwohner, Fingerabdruck 23d10c3dcbf08416)
+ok   Beobachtung (statisch): liest arbeit, bFreizeit, bGeld, bKontakt, bWohnen, beitrag, besitz, bund, dienstBis, ehrgeiz, eigen, elend, fleiss, frei, freunde, geb, geld, gemein, gesellig, getrenntTag, haftBis, heimat, hh, jobWegTag, kaufPreis, kindTag, kinder, kita, ohneLaden, partner, schuld, spar, sperreBis, suchPause, sucht, trauer, unzuf, wohnung, ziel, zielSeit, zuf, zufZiel
+ok   Beobachtung (verändert): Namen, Geschlecht, Einzug, Sparbeginn, Eltern, Gedächtnisbezüge aller Personen verändert → Beobachtung von 60 Personen bitgleich, alle Werte endlich
+ok   Namenstausch mit Regeln: 120 Tage, ohne Namensfelder bitgleich (aae23211dba42a20, 145 Einwohner)
+ok   Namenstausch mit Policy für alle: 120 Tage, ohne Namensfelder bitgleich (765ff9de234a9fd3, 22 Einwohner, 7844 Policy-Entscheidungen)
+ok   Namenstausch in gewachsener Stadt: 200 Tage Regeln (399 Einwohner), dann 60 Tage Policy für alle, ohne Namensfelder bitgleich (46286e34a0b2395b, 391 Einwohner, 79020 Policy-Entscheidungen, 9110 nach Regeln)
+ok   Beobachtung je Personenfeld (108 Felder, 80 Personen, Seed 1 Tag 220): von anderen wirken nur eigen, hh, wohnung (Haushaltswissen), eigene wirken 30, keines davon verboten
+ok   Maske: 608 Entscheidungen (Zufall, Policy, Regelarm je 5 Episoden), 299 ausgeführt, 0 außerhalb der Maske (gezählt 0, Regelarm außerhalb 0)
+ok   Maske: verbotene Aktion wohnung_suchen abgelehnt (maske_verletzt), Stadt unverändert, Entscheidung bleibt offen, gezählt
+ok   Maske: zwischen Entscheidungszeitpunkten nur warten (Aktion abgelehnt, nichts geändert)
+ok   Wegzug: echtes Ende (Grund wegzug), 718 fehlende Stunden kosten -22.438 und zählen im Defizit mit 100 (Ø 99.9)
+ok   Wegzug: jede fehlende Stunde kostet mindestens so viel wie die schlechteste gelebte Stunde (Notstand und Umkehr, höchstens eine je Tag)
+ok   Wegzug verbessert nie: in 6 von 6 Ausgangslagen bringt erzwungener Wegzug weniger als Weiterleben
+ok   ID nach 16 Stunden neu vergeben (Generation 1 → 2): die neue Person entscheidet nach Regeln, der Fokus greift nicht
+ok   Tod: echtes Ende (Grund tod), ohne Abzug
+ok   Zeitlimit: abgeschnitten (nicht beendet) nach genau 48 Stunden
+ok   Schnappschuss: nach dem Wiederherstellen 25 Schritte bitgleich (Beobachtung, Maske, Belohnung, Stadt)
+ok   Beschädigte oder fremde Policy-Dateien: 34 von 34 abgelehnt mit Grund; Ungeprüftes lässt sich nicht setzen
+ok   Inhalts-Hash folgt dem Inhalt: ein Gewicht geändert → neuer Hash 8a8ce2bc0e7fc036 (vorher 671ef97ec9855701), mit ihm angenommen
+ok   float32: 5 von 5 Dateien mit Zahlen über dem float32-Bereich abgelehnt (Gewicht 1e39, Gewicht −3.4028236e38, Bias 1e39, Gewichte 1e308 (bis Version 9 angenommen), clip 1e39); ±3.4028235e38 (größter float32-Wert) angenommen
+ok   Rückfall: überlaufende Logits (letzte Schicht nach der Prüfung unendlich) → Policy aus („Policy: Logit warten ist keine Zahl“), 40 Tage bitgleich zu Regeln (c3dd4f9fbd62f82e)
+ok   Trainingsbereich: Person ab 67 (ID 7), Hauptfigur (ID 0) und Bürgermeister (ID 5) entscheiden mit Policy genau wie mit Regeln (0 Policy-Entscheidungen), eine Person unter 67 (ID 6) nach der Policy
+ok   Trainingsbereich, 2 Tage Policy für alle ab Tag 300 (1218 Einwohner): 3613 Policy-Entscheidungen, 471 nach Regeln (ab 67 oder Hauptfigur)
+ok   Policy für alle: 90 Tage zweimal bitgleich (cd479c6a206e4568, 29 Einwohner; Regeln: 117), 2662 Entscheidungen (1916 ausgeführt, 2 ohne Erfolg, 744× gewartet), kein Rückfall, keine neuen Schlüssel in S
+ok   Policy für alle: Speichern und Laden mitten am Tag (Tag 60, 13 Uhr), 30 Tage weiter bitgleich
+
+Alle KI-Policy-Prüfungen bestanden (63 s)

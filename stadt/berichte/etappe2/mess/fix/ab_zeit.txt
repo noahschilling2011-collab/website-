@@ -1,0 +1,25 @@
+ 03:07:35 up  4:52,  0 user,  load average: 1.03, 1.76, 1.93
+Runde 1 a: 1174 ms, CPU 3089 ms, Last 1.03, 1307 Einwohner, feb80029ce5293cd
+Runde 1 b: 1221 ms, CPU 3271 ms, Last 1.03, 1307 Einwohner, feb80029ce5293cd
+Runde 2 b: 1242 ms, CPU 3221 ms, Last 1.03, 1307 Einwohner, feb80029ce5293cd
+Runde 2 a: 1222 ms, CPU 3162 ms, Last 1.03, 1307 Einwohner, feb80029ce5293cd
+Runde 3 a: 1304 ms, CPU 3239 ms, Last 1.35, 1307 Einwohner, feb80029ce5293cd
+Runde 3 b: 1332 ms, CPU 3383 ms, Last 1.35, 1307 Einwohner, feb80029ce5293cd
+Runde 4 b: 1214 ms, CPU 3286 ms, Last 1.35, 1307 Einwohner, feb80029ce5293cd
+Runde 4 a: 1311 ms, CPU 3379 ms, Last 1.35, 1307 Einwohner, feb80029ce5293cd
+Runde 5 a: 1195 ms, CPU 3076 ms, Last 1.64, 1307 Einwohner, feb80029ce5293cd
+Runde 5 b: 1216 ms, CPU 3211 ms, Last 1.64, 1307 Einwohner, feb80029ce5293cd
+Runde 6 b: 1336 ms, CPU 3400 ms, Last 1.64, 1307 Einwohner, feb80029ce5293cd
+Runde 6 a: 1408 ms, CPU 3834 ms, Last 1.91, 1307 Einwohner, feb80029ce5293cd
+Runde 7 a: 1205 ms, CPU 3159 ms, Last 1.91, 1307 Einwohner, feb80029ce5293cd
+Runde 7 b: 1162 ms, CPU 3089 ms, Last 1.91, 1307 Einwohner, feb80029ce5293cd
+Runde 8 b: 1212 ms, CPU 3161 ms, Last 1.91, 1307 Einwohner, feb80029ce5293cd
+Runde 8 a: 1166 ms, CPU 3013 ms, Last 2.16, 1307 Einwohner, feb80029ce5293cd
+Runde 9 a: 1202 ms, CPU 3139 ms, Last 2.16, 1307 Einwohner, feb80029ce5293cd
+Runde 9 b: 1176 ms, CPU 3122 ms, Last 2.16, 1307 Einwohner, feb80029ce5293cd
+Runde 10 b: 1200 ms, CPU 3154 ms, Last 2.16, 1307 Einwohner, feb80029ce5293cd
+Runde 10 a: 1212 ms, CPU 3193 ms, Last 2.31, 1307 Einwohner, feb80029ce5293cd
+ms: a Median 1208.5 (1166–1408), b Median 1215 (1162–1336), b/a 1.005 (0.5 %)
+cpuMs: a Median 3160.5 (3013–3834), b Median 3216 (3089–3400), b/a 1.018 (1.8 %)
+Fingerabdruck am Ende in allen Läufen gleich: feb80029ce5293cd
+exit 0

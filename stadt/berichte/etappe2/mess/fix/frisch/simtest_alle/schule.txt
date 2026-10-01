@@ -1,0 +1,69 @@
+A Statisch (Abschnitt „Schule“ im sim-Block, Bauamt Regel 7, Zweig „Schule“ in wirtschaft, ortZurStunde)
+  ok   Abschnitt gefunden (291 Zeilen), kein Zufall
+  ok   Regeln lesen nur ihre Personenfelder (20 Stellen: Alter, Wohnung, Obhut, Schulplatz, Nummer und Generation), keine Namen, keinen Charakter, keine Eltern, kein Geschlecht (Stadtbuch-Zeilen ausgenommen)
+  ok   Budget: im Abschnitt nur schuleBezahlen, schulITBestellen und schulITKaufen (4; der Anteil des Ladens der Stadt kommt zurück), Regel 7 über schuleBezahlen (0 direkte Stellen), wirtschaft nur der Sachaufwand (1); Löhne der Lehrkräfte vom Land
+  ok   ortZurStunde: Kinder (Alter wie in stunde(), Schulplatz am 18. Geburtstag) über kindOrt, nach der Haft, vor der Arbeit
+B Neue Städte (Seeds 1, 2, 3, je 730 Tage stündlich), Prüfung nach jeder Nacht
+  ok   Seed 1, 730 Nächte: Plätze direkt nach der Vergabe (Alter, Art, offene Schule, Reichweite, Kapazität, Zähler), ohne Platz nur ohne freien Platz in Reichweite, Lehrkräfte nach Formel, Sachaufwand und Löhne vom Land je Nacht, kein Kind mit Kita und Schule, Stelle, Dienst, Haft, Verfahren oder Auto, Bau nur ab einer Klasse (4 Bauzeilen), Grundregel (13235 Schul-, 90988 Heim- und 491549 Erwachsenenstunden), Computerbedarf
+  ok   Lebenslauf: 810 Einschulungen am 6. und 627 Abschlüsse am 18. Geburtstag (Summen 810 / 627)
+  ok   Stadtbuch: 64 Schulzeilen in 730 Tagen (je Schuljahr höchstens eine); erste Grundschule offen an Tag 178, erste weiterführende an Tag 217; an Tag 730 2 + 2 Schulen, 54 + 117 Schüler, 1 im Nachbarort, 16 Lehrkräfte (Bedarf 16); 6984 Karten ohne Fehler
+  ok   Seed 2, 730 Nächte: Plätze direkt nach der Vergabe (Alter, Art, offene Schule, Reichweite, Kapazität, Zähler), ohne Platz nur ohne freien Platz in Reichweite, Lehrkräfte nach Formel, Sachaufwand und Löhne vom Land je Nacht, kein Kind mit Kita und Schule, Stelle, Dienst, Haft, Verfahren oder Auto, Bau nur ab einer Klasse (6 Bauzeilen), Grundregel (10945 Schul-, 77648 Heim- und 432285 Erwachsenenstunden), Computerbedarf
+  ok   Lebenslauf: 690 Einschulungen am 6. und 532 Abschlüsse am 18. Geburtstag (Summen 690 / 532)
+  ok   Stadtbuch: 63 Schulzeilen in 730 Tagen (je Schuljahr höchstens eine); erste Grundschule offen an Tag 218, erste weiterführende an Tag 240; an Tag 730 4 + 2 Schulen, 45 + 109 Schüler, 0 im Nachbarort, 19 Lehrkräfte (Bedarf 15); 5980 Karten ohne Fehler
+  ok   Seed 3, 730 Nächte: Plätze direkt nach der Vergabe (Alter, Art, offene Schule, Reichweite, Kapazität, Zähler), ohne Platz nur ohne freien Platz in Reichweite, Lehrkräfte nach Formel, Sachaufwand und Löhne vom Land je Nacht, kein Kind mit Kita und Schule, Stelle, Dienst, Haft, Verfahren oder Auto, Bau nur ab einer Klasse (4 Bauzeilen), Grundregel (12320 Schul-, 83218 Heim- und 464393 Erwachsenenstunden), Computerbedarf
+  ok   Lebenslauf: 753 Einschulungen am 6. und 571 Abschlüsse am 18. Geburtstag (Summen 753 / 571)
+  ok   Stadtbuch: 66 Schulzeilen in 730 Tagen (je Schuljahr höchstens eine); erste Grundschule offen an Tag 136, erste weiterführende an Tag 178; an Tag 730 3 + 1 Schulen, 60 + 118 Schüler, 0 im Nachbarort, 17 Lehrkräfte (Bedarf 15); 6422 Karten ohne Fehler
+C Computer für die Schulen (Schnittstelle zum Haushalt, erzwungen; seit Teil 5 wie die Leute aus einem Laden der Stadt, sonst von außerhalb)
+  ok   Seed 1, Tag 300: Bedarf 18 Computer (5760 Taler), im Regal der neueste von Firma 140; für 0 oder weniger als einen Preis wird nichts bestellt
+  ok   3 Computer für 960 Taler im Laden: Budget −960, Firma +768 (Umsatz), Läden +192, Laden der Stadt +0 (Anteil 64 je Gerät), Bedarf 18 → 15, Summen gezählt
+  ok   Rest: 15 Computer, danach Bedarf 0 und keine Bestellung mehr (nie mehr, als die Schulen brauchen)
+  ok   wenig Budget (800 Taler): 2 Computer, 160 Taler bleiben (nie unter 0; der Anteil des Ladens der Stadt kommt zurück)
+  ok   ohne Computer einer Firma der Stadt im Regal: von außerhalb (3 Computer, Budget −960, kein Umsatz in der Stadt, als „von außerhalb“ gezählt)
+  ok   gleich bestellt, gleich weiter (56d6e2dc89174dcc); der Umsatz ist in der Nacht verbucht
+  ok   gespeichert mit 3 Lieferungen: 10 Tage bitgleich
+  ok   nach 50 Tagen ausgemustert: keine Lieferung von Tag 300 mehr, Bedarf wieder 29
+D Speichern und Laden, beschädigte Stände
+  ok   Seed 2, gespeichert an Tag 330 um 13 Uhr mit 114 Schulplätzen: gleich nach dem Laden, 20 Tage weiter bitgleich (cc07f0f50d450644)
+  ok   8 beschädigte Stände abgelehnt: Schulplatz in einem Wohnhaus: „Spielstand beschädigt: Schulplatz“; Summe fehlt: „Spielstand beschädigt: Schul-Statistik“; Schuljahr kaputt: „Spielstand beschädigt: Schule“; Computer an einem Wohnhaus: „Spielstand beschädigt: Computer der Schulen“; Computer in der Zukunft: „Spielstand beschädigt: Computer der Schulen“; Schulart 3: „Spielstand beschädigt: Schulart“; Schule fehlt (Version 9): „Spielstand beschädigt: Schule“; Schulplätze fehlen (Version 9): „Spielstand unvollständig: p.schule“
+E Übernahme älterer Stände (Schulen und Rathaus eingeschaltet)
+ Version 8 (stadt.orig.html)
+  ok   Seed 1, Tag 300 (526 Einw.): Zeile „Ab heute baut die Stadt Schulen: Grundschule…“ vor denen des Rathauses (500 neue Zeilen), Summen 0, 35 Schulkinder noch ohne Platz
+  ok   erste Nacht 36 im Nachbarort; nach 60 Tagen 1 + 1 Schulen offen, 0 im Bau, 62 Schüler, 7 im Nachbarort; ohne NaN; gespeichert und geladen gleich
+  ok   Seed 3, Tag 420 (989 Einw.): Zeile „Ab heute baut die Stadt Schulen: Grundschule…“ vor denen des Rathauses (500 neue Zeilen), Summen 0, 132 Schulkinder noch ohne Platz
+  ok   erste Nacht 131 im Nachbarort; nach 60 Tagen 1 + 1 Schulen offen, 0 im Bau, 96 Schüler, 14 im Nachbarort; ohne NaN; gespeichert und geladen gleich
+  ok   Seed 2, Tag 700 (1246 Einw.): Zeile „Ab heute baut die Stadt Schulen: Grundschule…“ vor denen des Rathauses (500 neue Zeilen), Summen 0, 143 Schulkinder noch ohne Platz
+  ok   erste Nacht 143 im Nachbarort; nach 60 Tagen 2 + 3 Schulen offen, 0 im Bau, 131 Schüler, 3 im Nachbarort; ohne NaN; gespeichert und geladen gleich
+  ok   Seed 4, Tag 60 (24 Einw.): Zeile „Ab heute baut die Stadt Schulen: Grundschule…“ vor denen des Rathauses (4 neue Zeilen), Summen 0, 0 Schulkinder noch ohne Platz
+  ok   erste Nacht 0 im Nachbarort; nach 60 Tagen 0 + 0 Schulen offen, 0 im Bau, 0 Schüler, 4 im Nachbarort; ohne NaN; gespeichert und geladen gleich
+ Version 7 (git ffa1d88)
+  ok   Seed 1, Tag 300 (464 Einw.): Zeile „Ab heute baut die Stadt Schulen: Grundschule…“ vor denen des Rathauses (500 neue Zeilen), Summen 0, 36 Schulkinder noch ohne Platz
+  ok   erste Nacht 36 im Nachbarort; nach 60 Tagen 1 + 1 Schulen offen, 0 im Bau, 46 Schüler, 18 im Nachbarort; ohne NaN; gespeichert und geladen gleich
+  ok   Seed 3, Tag 420 (1065 Einw.): Zeile „Ab heute baut die Stadt Schulen: Grundschule…“ vor denen des Rathauses (500 neue Zeilen), Summen 0, 154 Schulkinder noch ohne Platz
+  ok   erste Nacht 153 im Nachbarort; nach 60 Tagen 1 + 1 Schulen offen, 0 im Bau, 144 Schüler, 9 im Nachbarort; ohne NaN; gespeichert und geladen gleich
+ Version 6 (git bc7247a)
+  ok   Seed 1, Tag 300 (631 Einw.): Zeile „Ab heute baut die Stadt Schulen: Grundschule…“ vor denen des Rathauses (500 neue Zeilen), Summen 0, 46 Schulkinder noch ohne Platz
+  ok   erste Nacht 47 im Nachbarort; nach 60 Tagen 1 + 1 Schulen offen, 0 im Bau, 75 Schüler, 10 im Nachbarort; ohne NaN; gespeichert und geladen gleich
+ Version 5 (git 414ebab)
+  ok   Seed 1, Tag 300 (658 Einw.): Zeile „Ab heute baut die Stadt Schulen: Grundschule…“ vor denen des Rathauses (500 neue Zeilen), Summen 0, 46 Schulkinder noch ohne Platz
+  ok   erste Nacht 46 im Nachbarort; nach 60 Tagen 1 + 1 Schulen offen, 0 im Bau, 99 Schüler, 0 im Nachbarort; ohne NaN; gespeichert und geladen gleich
+ Version 4 (git 1c8d40b)
+  ok   Seed 1, Tag 300 (648 Einw.): Zeile „Ab heute baut die Stadt Schulen: Grundschule…“ vor denen des Rathauses (500 neue Zeilen), Summen 0, 49 Schulkinder noch ohne Platz
+  ok   erste Nacht 50 im Nachbarort; nach 60 Tagen 1 + 1 Schulen offen, 0 im Bau, 90 Schüler, 6 im Nachbarort; ohne NaN; gespeichert und geladen gleich
+ Version 3 (git 2b821c2)
+  ok   Seed 1, Tag 300 (1135 Einw.): Zeile „Ab heute baut die Stadt Schulen: Grundschule…“ vor denen des Rathauses (500 neue Zeilen), Summen 0, 102 Schulkinder noch ohne Platz
+  ok   erste Nacht 107 im Nachbarort; nach 60 Tagen 2 + 1 Schulen offen, 0 im Bau, 223 Schüler, 0 im Nachbarort; ohne NaN; gespeichert und geladen gleich
+ Version 2 (git 39c405b)
+  ok   Seed 1, Tag 300 (1040 Einw.): Zeile „Ab heute baut die Stadt Schulen: Grundschule…“ vor denen des Rathauses (500 neue Zeilen), Summen 0, 97 Schulkinder noch ohne Platz
+  ok   erste Nacht 98 im Nachbarort; nach 60 Tagen 1 + 1 Schulen offen, 0 im Bau, 181 Schüler, 16 im Nachbarort; ohne NaN; gespeichert und geladen gleich
+F Namenstausch
+  ok   „Lena Schneider“ heißt dort „Julia Graf“; 400 Tage gleich (Felder, Summen, Zufall, Budget, Arten der Zeilen, b202e2f78d31002e), 315 Einschulungen
+G Ausgeschaltet
+  ok   R.SCHULEN = 0 (Seed 2, 400 Tage): keine Schule, kein Schulplatz, keine Zeile; 250 Kinder immer dort, wo sie wohnen
+  ok   R.SCHULEN = 0 und R.RATHAUS = 0, Haushalt nur Buchführung, ohne Anlauf, ohne Tech früher und Weltmarkt, ohne Gedächtnis (R.GED = 0, Vorarbeiten aus) (Seed 3): 200 Tage jeden Tag wie Version 8
+H Gruppen (nur gemessen; keine Regel liest diese Merkmale): Schülertage in der Stadt und im Nachbarort
+  alle                                           47658 Schülertage, im Nachbarort   6.2 %
+  Mädchen                                        23550 Schülertage, im Nachbarort   6.8 %
+  übrige Nachnamen                               42200 Schülertage, im Nachbarort   6.3 %
+  Jungen                                         24108 Schülertage, im Nachbarort   5.6 %
+  Nachnamen Kaya bis Kowalski (Liste 31–37)       5458 Schülertage, im Nachbarort   5.2 %
+Alle Prüfungen zur Schule bestanden

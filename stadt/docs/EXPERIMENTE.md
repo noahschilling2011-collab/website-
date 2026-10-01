@@ -4,6 +4,21 @@ Alle Befehle laufen im Ordner `stadt/`. Jeder hier steht so, wie er in einer fri
 4 Kerne, keine GPU, Node 22.22.2, Python 3.11.15; Zeiten gemessen, der Rechner rechnete nebenher andere Prüfungen). Ein Smoke-Lauf prüft nur
 die Kette, er ist kein Qualitätsbeleg.
 
+**Seit Version 10 (Etappe 2):**
+
+- **Die Policy aus Etappe 1 ist ungültig** (Noahs Entscheidung 5). `ki/policy_v9_lokal_1.json` ist auf Stadt-Version 9 trainiert; Spiel und
+  Werkzeuge lehnen sie ab: „Policy ungültig: trainiert auf Stadt-Version 9, diese Stadt ist Version 10 (neu trainieren)“
+  (`berichte/etappe2/mess/schritt5/ki_v9_ablehnung.txt`, im Browser `berichte/etappe2/SCHRITT4.md` Abschnitt 6.1). Sie bleibt als Beleg in
+  `ki/` und in `ki/policies.json`, damit das Spiel die Ablehnung mit Grund zeigt. Achtung: `node tools/ki_liste.mjs` ohne `--nur-pruefen`
+  schreibt die Liste jetzt leer (`berichte/etappe2/SCHRITT2.md` Abschnitt 8).
+- **Die Befehle dieses Blatts sind auf Version 9 geprüft** (29.09.2026). Auf Version 10 liefen bisher nur `simtest --kipolicy` (Regression
+  mit ausgeschaltetem Gedächtnis gegen 09083f5, eine künstliche Policy, die Ablehnung der Datei aus Etappe 1; `SCHRITT4.md` Abschnitt 3) und
+  `tools/ki_liste.mjs --nur-pruefen`. **Training, Export, Parität, Auswertung und das Belohnungs-Audit sind auf Version 10 nicht ausgeführt.**
+  Ein neuer Lauf trainiert auf dem sim-Block dieser `stadt.html` und schreibt deren Version (10) ins Manifest und in die Policy (aus dem
+  Code gelesen: `tools/kiumgebung.mjs` meldet `Sim.VERSION`, `training/exportiere.py` übernimmt sie; nicht ausgeführt).
+- **Schema 2 sieht weder Erfahrung noch Plan.** Entscheidet eine Policy, wirken beide nicht (die Regeln, in denen sie Summanden sind, laufen
+  dann nicht); gelernt wird aus ihren Handlungen trotzdem. Das neue Schema gehört zu Etappe 3 (Abschnitt 8).
+
 ## 1. Einmal: eigene Python-Umgebung
 
 Das Spiel braucht nichts davon. Fürs Training: Node 18 oder neuer, **Python 3.11 bis 3.14** (nicht 3.14.1), git. Die Grenzen kommen aus den
@@ -143,7 +158,8 @@ eine Smoke-Policy in der Liste steht, ist sie alphabetisch die erste und wird be
 
 - **Im Spiel eine andere Policy:** Datei nach `ki/` legen und `node tools/ki_liste.mjs`; im Fenster „Entscheidungen der Bewohner“ unter
   „Policy“ wählen (mit mehr als einer Datei). Oder „Policy-Datei laden …“. Standard bleiben die Regeln; eine Policy als Standard gibt es erst
-  nach bestandener Auswertung, und der Weg dafür ist noch nicht gebaut.
+  nach bestandener Auswertung, und der Weg dafür ist noch nicht gebaut. Seit Version 10 nimmt das Spiel nur Policies mit Stadt-Version 10
+  an; eine solche gibt es noch nicht (neu trainieren).
 - **Anderes Netz:** in `training/konfig.json` unter `gemeinsam` `"net_arch"` (z. B. `[32]` oder `[128, 128]`) und `"aktivierung"` (`tanh`
   oder `relu`) ändern, neu trainieren, exportieren. Spiel und Parität lesen die Schichten aus der Datei (das Spiel nimmt bis zu 6 Schichten
   mit je höchstens 512 Werten). Hier geprüft mit `[32]` und `relu` in einer eigenen Kopie: Smoke-Lauf, Export (2 Schichten, 31.680 Byte),
@@ -155,15 +171,33 @@ eine Smoke-Policy in der Liste steht, ist sie alphabetisch die erste und wird be
 
 ```bash
 node tools/ki_fallen.mjs --policy ki/policy_v9_lokal_1.json     # Belohnungs-Audit (Tricks gegen Regeln, leere Treffen); Exit 1 = durchgefallen
+                                                                # seit Version 10 bricht es mit dieser Policy beim Laden ab (neu trainieren)
 node tools/ki_durchsatz.mjs --episoden 12 --seeds 10000,10001,10002,10003   # Umgebung im Prozess, Schritte/s
 python training/durchsatz.py --episoden 20                      # über das Protokoll aus Python
 node tools/ki_schema.mjs                                        # ki/schema_v2.json neu schreiben
-bash tools/simtest_alle.sh                                      # 20 simtest-Modi + --kipolicy (Policy aus = bitgleich zu 09083f5)
+bash tools/simtest_alle.sh                                      # 21 simtest-Modi + --kipolicy (Policy und Gedächtnis aus = Tag für Tag wie 09083f5)
 git show 09083f5:stadt/stadt.html > ausgabe/stadt_09083f5.html  # Version 9 ohne KI-Teil (außerhalb einer Git-Kopie: git -C <repo> show …)
 node tools/tagvergleich.mjs --a ausgabe/stadt_09083f5.html --b stadt.html --seeds 1,2,3,4,5,6 --tage 120 --tagschritt 60
+                                                                # bis Version 9 bitgleich; seit Version 10 verschieden (andere Felder, Gedächtnis an)
+node tools/simtest.mjs --gedaechtnis                            # seit Version 10: mit ausgeschaltetem Gedächtnis Tag für Tag wie 6c1741e (Teil B)
 ```
 
 Gemessen (Last 3–7): Audit 624 s, Exit 1 mit denselben 6 bestandenen und 2 durchgefallenen Prüfungen wie in `berichte/v9_uebertrag/ki_fallen.txt`
 (seit dem 29.09.2026 mit dem Trick Dauer-Freinehmen: 5 von 8, 739 s, `berichte/pruefung_2026-09-29/ki_fallen_v9_lokal_1.txt`); Umgebung 270 Schritte/s,
 über das Protokoll 223 Schritte/s; `simtest_alle.sh` 12,5 min mit 2 Läufen gleichzeitig (22 von 22 grün); Tag für Tag Seeds 1–6 bitgleich
-in 4 s.
+in 4 s (alles auf Version 9). Auf Version 10: `simtest_alle.sh` 23 von 23 grün in gut 5 min mit 2 Läufen gleichzeitig (schneller seit der
+Optimierung, Noahs Entscheidung 7; `berichte/etappe2/mess/schritt4/frisch2/simtest_alle.txt` und `lauf.txt` daneben,
+`berichte/etappe2/OPTIMIEREN.md` Abschnitt 6).
+
+## 8. Etappe 3: Beobachtungsschema 3 (geplant, nicht gebaut)
+
+Damit eine Policy Erfahrung und Plan berücksichtigen kann, braucht sie sie als Eingabe. Geplant (`berichte/etappe2/VERGLEICH.md`
+Abschnitt 4, „Danach, in Etappe 3“), nichts davon ist gebaut:
+
+- Schema 3 mit etwa 7 neuen Merkmalen: die 4 Erfahrungswerte der aktuellen Lage (Gründen, Kündigen, Wechseln, Zusammenziehen) × Sicherheit;
+  offene Handlung ja/nein; Planschritt „Rücklage ansparen“; die Lücke zur Rücklage in Tageskosten, begrenzt.
+- Keine Personen-ID, keine Bezüge auf andere Menschen, keine Fakten anderer; keine Namen, kein Geschlecht, keine Herkunft (wie Schema 2).
+  Indirektes Wissen wird dokumentiert: Die Rücklage folgt aus den Gründungskosten am Markt, wie schon in der Maske.
+- Dann neu trainieren, mit den offenen Punkten aus `docs/FORTSCHRITT.md` („Weitermachen“): Belohnung v3, Kriterien vorab, drei
+  Trainingsseeds. Die Fokusperson der Trainingsumgebung lernt dabei selbst aus ihren Handlungen (Quelle „fokus“ in der letzten
+  Entscheidung); die übrige Stadt entscheidet nach den Regeln mit Erfahrung und Plan.

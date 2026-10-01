@@ -183,7 +183,8 @@ const hauskarte = (ev, b) => ev((b) => { const k = document.createElement('butto
       const u = await V.ev(() => { const S = __stadt.S(), g = S.g, i = __stadt.Sim.techInfo(S); let tf = 0, markt = 0;
         for (let b = 0; b < S.gAnzahl; b++) { if (g.markt[b]) markt++; if (g.typ[b] === __stadt.Sim.TECH && !g.leer[b] && g.besitzer[b] >= 0) tf += Math.max(0, __stadt.Sim.stellen(S, b) - S.belegschaft[b].length); }
         return { v: S.version, markt, tf, techFrei: S.techFrei, welt: i.weltFirmen, umland: i.umlandFirmen, weltPlaetze: S.weltPlaetze }; });
-      ok(u.v === 9 && u.markt === 0 && u.welt === 0 && u.weltPlaetze === 0 && u.techFrei === u.tf, `übernommen: Version ${u.v}, ${u.umland} Tech-Firmen im Umland, ${u.welt} in der Welt, freie Tech-Stellen ${u.techFrei} (nachgezählt ${u.tf})`);
+      // Version 10 (Etappe 2): übernommen wird in die Version dieser Datei (bis Version 9 hieß es hier u.v === 9)
+      ok(u.v === 10 && u.markt === 0 && u.welt === 0 && u.weltPlaetze === 0 && u.techFrei === u.tf, `übernommen: Version ${u.v}, ${u.umland} Tech-Firmen im Umland, ${u.welt} in der Welt, freie Tech-Stellen ${u.techFrei} (nachgezählt ${u.tf})`);
     }
     if (V.log.length) { console.log(`Konsole (Übernahme, ${name}):\n  ` + V.log.join('\n  ')); process.exitCode = 1; }
     await V.ctx.close();

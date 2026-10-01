@@ -6,9 +6,12 @@
 // und simuliert N Spieltage. Nur Node-Standardbibliothek.
 //
 //   node tools/simtest.mjs --seed 1 --tage 365      Tabelle alle 30 Tage + Charakter-Auswertung
-//   node tools/simtest.mjs --gate                   Phase-0-Gate mit Seeds 1, 2, 3 (je 730 Tage)
-//   node tools/simtest.mjs --speichertest           Speichern/Laden mitten am Tag: läuft danach bitgleich weiter?
-//   node tools/simtest.mjs --aufholtest             90 Tage stündlich gegen 90 Tagesschritte
+//   node tools/simtest.mjs --gate                   Phase-0-Gate mit Seeds 1, 2, 3 (je 730 Tage); Gate 7 nur mit mindestens G7_MIN_N
+//                                                   Wegziehern bis Tag 365, sonst „nicht gewertet“ (weder rot noch grün, getrennt gezählt)
+//   node tools/simtest.mjs --speichertest           Speichern/Laden mitten am Tag: läuft danach bitgleich weiter? (auch mit Haft, Bund und – Version 10 –
+//                                                   Gedächtnis, Erfahrung, offenen Handlungen, Plänen); beschädigte Stände der Version 10 (gedPruefen)
+//   node tools/simtest.mjs --aufholtest             90 Tage stündlich gegen 90 Tagesschritte (nur gemessen); Aufholen in Stücken 1 × 90 = 3 × 30 bitgleich
+//                                                   (Grenzen um 0 Uhr wie aufholen(), rein stündlich ab 13 Uhr) über Gedächtnis-Ereignisse hinweg
 //   node tools/simtest.mjs --kitest                 Hauptfiguren: erlaubte Aktionen, Anfragen, Fristen, Tagebuch (ohne echtes Modell)
 //   node tools/simtest.mjs --bau                    Bauhof: Einteilung, Fortschritt je Person, jede Baustelle wird fertig (Seeds 1–3)
 //   node tools/simtest.mjs --waren                  Kisten: geliefert ≤ gemacht, Werkstatt-Einnahmen wie vorher (Seeds 1–3)
@@ -27,7 +30,10 @@
 //                                                   1c8d40b, 414ebab und bc7247a, --git ordner für ein anderes Repository, oder nur --alt pfad/zur/alten/stadt.html),
 //                                                   erste Nacht (Käufe), Kita-Frist und die Nächte danach (Schwelle), 60 Tage weiter, keine NaN;
 //                                                   beschädigte Stände der Version 5 werden abgelehnt; jede Version bekommt „Stadt erweitern“ (Stufe,
-//                                                   Stadtteile, Karte); aus Version 6 läuft die Stadt danach 60 Tage lang genau wie in Version 6
+//                                                   Stadtteile, Karte); aus Version 6 läuft die Stadt danach 60 Tage lang genau wie in Version 6;
+//                                                   Version 10: jede Version 2–9 auch mit Gedächtnis (neu verteilt, ohne memName, neue Felder neutral),
+//                                                   dazu Version 8 und 9 (git 31ce452, 6c1741e); aus Version 9 mit R.GED = 0 60 Tage wie Version 9;
+//                                                   ein Stand der Version 10 wird von Version 9 abgelehnt
 //   node tools/simtest.mjs --erweiterung            Stadt erweitern (Version 7): statisch (kein Zufall, von Personen nur lebt und wohnung, Stadtteile
 //                                                   nur zum Benennen und Anzeigen); Seeds 1–3 je 730 Tage jeden Tag wie Version 6 (git bc7247a oder
 //                                                   --v6 datei), die Grenze hält nie eine Straße auf, Vorlauf, Wachsen, Stufe am ersten Tag über der
@@ -81,10 +87,20 @@
 //                                                   die Fassung davor; je Gründung (Stufe, Bremse, Preis, Markt, Tüftler im Dorf), je Nacht (Zählungen,
 //                                                   Preis und Grenze der Welt, 40 % nur im Umland), Aufgabe ohne je eine Kraft, Computer der Schulen (Laden
 //                                                   oder außerhalb); Speichern, beschädigte Stände, Übernahme von Version 8; Namenstausch; Gruppen (gemessen)
-//   node tools/simtest.mjs --kipolicy               KI-Policy (Etappe 1, V9): Policy aus = bitgleich zu --orig (jeden Tag), Beobachtung ohne verbotene
+//   node tools/simtest.mjs --kipolicy               KI-Policy (Etappe 1, V9): Version 10: eine Policy aus Version 9 wird abgelehnt („neu trainieren“, mit
+//                                                   --policy einer solchen Datei: ihre Ablehnung, der Rest mit der künstlichen Policy); Policy aus und R.GED = 0
+//                                                   (Vorarbeiten aus) = bitgleich zu --orig (jeden Tag, ohne memName und PF_GED), Beobachtung ohne verbotene
 //                                                   Felder, Maske nie verletzt, Fokus-ID und Generation, Wegzug und Tod, Schnappschuss, beschädigte
 //                                                   Policy-Dateien, Rückfall, Policy für alle deterministisch (--orig <ungepatchte stadt.html>, --tage 730,
 //                                                   --seeds 1,2,3, --policy ki/policy_x.json; ohne --policy: eingebettete oder künstliche Policy)
+//   node tools/simtest.mjs --gedaechtnis           Gedächtnis, Erfahrung und Plan (Version 10, Etappe 2): Gegenprobe Seeds 1–3 × 365 Tage (echte Wahl =
+//                                                   Probe, ≥ 0,3 % anders, ≥ 85 % direkt, ein Byte stellt ≥ 99 % her, Fingerabdruck gleich), Beobachter =
+//                                                   Gegenprobe, „Warum?“ zu jeder Meldung nachrechenbar, Gedächtnisgrenzen je Nacht und erzwungen; Schalter
+//                                                   aus jeden Tag wie 6c1741e (--git, stündlich
+//                                                   und in Tagesschritten); erzwungener Planabbruch (Alter, Pleite, Ziel von außen, Erfahrung, Rente);
+//                                                   ID-Wiederverwendung mit Generation; Übernahme von Version 9 und beschädigte Stände; Aufholen 1 × 30 =
+//                                                   3 × 10 (auch mit Beobachter); Namenstausch und statische Leseliste (mit Gegenprobe); kiepisode zählt
+//                                                   Ziele ohne Platz
 //   Optionen: --alle 30 (Zeilenabstand), --buch 20 (letzte Stadtbuch-Zeilen), --aktionen
 
 import { readFileSync } from 'node:fs';
@@ -139,6 +155,10 @@ const flag = (n) => args.includes('--' + n);
 
 const f0 = (v) => Math.round(v).toString();
 const pad = (s, n) => String(s).padStart(n);
+// Noahs Entscheidung 8 (30.09.2026): Gate 7 (Heimatliebe der Wegzieher) wird nur gewertet, wenn bis Tag 365 mindestens so viele Menschen
+// weggezogen sind (n wie in der Gate-Zeile: wer selbst den Wegzug entschieden hat); mit weniger streut der Schnitt zu stark. Sonst
+// „nicht gewertet“: zählt weder als rot noch als grün und wird getrennt gezählt. Die Schwelle des Gates (15 Punkte) bleibt.
+const G7_MIN_N = 15;
 
 // Simuliert einen Seed. Ruft proTag(S, k, ms) nach jedem Spieltag auf.
 function lauf(Sim, seed, tage, proTag) {
@@ -221,19 +241,46 @@ function fingerabdruck(Sim, S) {
   return h.digest('hex').slice(0, 16);
 }
 
+// Etappe 2 (Version 10): Fingerabdruck wie oben zum Vergleich mit einer älteren Fassung (Version 9): ohne p.memName (bis Version 9, nur Anzeige)
+// und ohne die Felder aus PF_GED (die gibt es dort nicht; hier müssen sie 0 sein, sonst ist der Abdruck anders), Einzelwerte ohne die Nummer
+// der Version. Alles andere wie fingerabdruck
+function fingerabdruckVergleich(X, S) {
+  const h = createHash('sha256'), d = X.exportZustand(S), ohne = new Set([...OHNE_GED].map(n => 'p.' + n));
+  for (const a of d.arrays.sort((x, y) => (x.name < y.name ? -1 : 1))) if (!ohne.has(a.name)) { h.update(a.name); h.update(Buffer.from(a.daten.buffer, a.daten.byteOffset, a.daten.byteLength)); }
+  h.update(gedNichtNull(S));
+  h.update(JSON.stringify(S.buch)); h.update(JSON.stringify(S.stat)); h.update(JSON.stringify(S.ki)); h.update(String(S.budget) + '/' + S.rs + '/' + S.tag + '/' + S.stunde);
+  if (S.regierung) h.update(JSON.stringify(S.regierung));
+  if (S.erweiterung) { h.update(JSON.stringify({ ...d.werte, version: undefined })); h.update(JSON.stringify(S.erweiterung)); h.update(JSON.stringify(S.enden)); h.update(JSON.stringify(S.kreuzungen)); }
+  for (const k of ['sicherheit', 'bund', 'rathaus', 'buergermeister', 'schule', 'haushalt']) if (S[k]) h.update(JSON.stringify(S[k]));
+  return h.digest('hex').slice(0, 16);
+}
+
 // Stadt erweitern (Version 7): eine Stadt ohne ihre Lage auf der Karte (Kennzahlen, Zufall, Zähler, Felder und Gebäude relativ zur Mitte,
 // dazu alle Personenfelder, alle Gebäudefelder außer der Lage, Statistik, Hauptfiguren und Stadtregierung), zum Vergleich derselben Stadt
 // auf der festen Karte (bis Version 6: 96 × 96, Mitte 48) und auf der wachsenden Karte. Sicherheit (Version 7): Ihre Personenfelder und
 // Summen gibt es in Version 6 nicht; sie bleiben außen vor. Verglichen wird dann mit ausgeschalteter Sicherheit (sicherheitAus). Bund (Teil 3):
 // ebenso (Personenfelder bund, dienstBis; Summen S.stat.bund); sicherheitAus schaltet auch den Bund aus
 // Version 8: dazu besuch (nur für Figuren und Autos: ab 19 Uhr fest, wirkt auf nichts in der Stadt)
-const OHNE_SICH = new Set([...Sim.PF_SICHERHEIT, ...(Sim.PF_BUND || []), ...(Sim.PF_AUTO || []), 'besuch', ...(Sim.PF_SCHULE || [])]);   // Version 9: Schulplatz (gibt es vorher nicht)
+// Version 10 (Etappe 2): die Felder aus PF_GED gibt es vorher nicht (mit R.GED = 0 bleiben sie 0; wer vergleicht, prüft das eigens), memName
+// (Name der Bezugsperson, nur Anzeige) gibt es ab Version 10 nicht mehr
+const OHNE_SICH = new Set([...Sim.PF_SICHERHEIT, ...(Sim.PF_BUND || []), ...(Sim.PF_AUTO || []), 'besuch', ...(Sim.PF_SCHULE || []),   // Version 9: Schulplatz (gibt es vorher nicht)
+  ...(Sim.PF_GED || []), 'memName']);
 const OHNE_G = new Set([...(Sim.GF_AUTO || []), ...(Sim.GF_TECH9 || [])]);   // Version 8: Gebäudefelder der Autos und Tech-Firmen; Version 9, Teil 5: Markt, Kraft (gibt es vorher nicht)
 // Sicherheit, Bund und (Version 8) Autos ausschalten (keine Taten, Land und Bund bauen nicht, keine Wehrpflicht; niemand kauft ein Auto, Tech-Firmen
 // bis Stufe 3, keine Autowerke, 40-%-Grenze wie in Version 7): für den Vergleich mit Version 6 und 7; gibt eine Funktion zurück, die alles
 // wieder einschaltet
+// Etappe 2 (Version 10): Gedächtnis, Erfahrung und Plan (GED) und die Schalter der Vorarbeiten (OPFER_FREI, HAFT_EROEFFNUNG); alle drei auf 0
+// rechnet die Stadt Tag für Tag wie 6c1741e. Für jeden Vergleich mit einer älteren Fassung aus (Noahs Regel: Vergleiche mit alten Fassungen
+// über R.GED = 0); gedAus gibt eine Funktion zurück, die sie wieder setzt
+const GED_AUS = ['GED', 'OPFER_FREI', 'HAFT_EROEFFNUNG'];
+const gedAus = (X) => { const R = X.R, alt = GED_AUS.map(k => R[k]); for (const k of GED_AUS) if (k in R) R[k] = 0; return () => { GED_AUS.forEach((k, i) => { R[k] = alt[i]; }); }; };
+// Vergleich mit älteren Fassungen: memName (bis Version 9, nur Anzeige) und die Felder aus PF_GED (ab Version 10) bleiben aus den Spuren; dafür
+// muss jedes Feld aus PF_GED 0 sein (mit R.GED = 0 schreibt sie niemand), sonst ist die Spur anders (gedNichtNull nennt die Felder)
+const OHNE_GED = new Set([...(Sim.PF_GED || []), 'memName']);
+const gedNichtNull = (S) => (Sim.PF_GED || []).filter(n => S.p[n] && S.p[n].subarray(0, S.pMax * (S.p[n].length / S.pKap)).some(v => v !== 0)).join(',');
 const AUS = ['KRIM_BASIS', 'LAND_BAUT', 'BUND_BAUT', 'WEHRPFLICHT', 'AUTO_CHANCE', 'AUTO_MAX', 'TECH_GRENZE_HALTEN', 'RATHAUS', 'SCHULEN', 'HH_VORHABEN', 'HH_STEUER',
-  'ANLAUF_STUFE', 'TECH_FRUEH', 'WELT', 'ZUZUG_GENAU'];   // Rathaus, Schulen, Vorhaben und Lohnsteuer des Haushalts, Anlauf, Tech früher und Weltmarkt, Zuzug genau nach R10 (Version 9): für Vergleiche mit älteren Versionen aus
+  'ANLAUF_STUFE', 'TECH_FRUEH', 'WELT', 'ZUZUG_GENAU',   // Rathaus, Schulen, Vorhaben und Lohnsteuer des Haushalts, Anlauf, Tech früher und Weltmarkt, Zuzug genau nach R10 (Version 9): für Vergleiche mit älteren Versionen aus
+  ...GED_AUS];                                               // Etappe 2 (Version 10): ebenso
 const sicherheitAus = (X, nurAutos) => { const R = X.R, alt = AUS.map(k => R[k]);
   for (const k of nurAutos ? AUS.slice(4) : AUS) if (k in R) R[k] = 0;
   const stufe = R.TECH_STUFE_MAX; if (stufe !== undefined) R.TECH_STUFE_MAX = 3;
@@ -257,10 +304,63 @@ function spurRelativ(Sim, S) {
   // Personen und Gebäude hängen nicht an Feldern (nur g.x und g.y): Byte für Byte, soweit belegt
   const hp = createHash('sha256'), teil = (a, n, kap) => { const w = kap > 0 ? a.length / kap : 1, u = a.subarray(0, n * w); hp.update(Buffer.from(u.buffer, u.byteOffset, u.byteLength)); };
   for (const n of Object.keys(S.p).sort()) if (ArrayBuffer.isView(S.p[n]) && !OHNE_SICH.has(n)) { hp.update(n); teil(S.p[n], S.pMax, S.pKap); }
+  // Version 10: Felder aus PF_GED, die nicht 0 sind, machen die Spur anders (die ältere Fassung hat sie nicht; mit R.GED = 0 bleiben sie 0)
+  for (const n of (Sim.PF_GED || [])) if (S.p[n] && S.p[n].subarray(0, S.pMax * (S.p[n].length / S.pKap)).some(v => v !== 0)) hp.update('PF_GED nicht 0: ' + n);
   for (const n of Object.keys(S.g).sort()) if (n !== 'x' && n !== 'y' && !OHNE_G.has(n) && ArrayBuffer.isView(S.g[n])) { hp.update(n); teil(S.g[n], S.gAnzahl, 0); }
   hp.update(JSON.stringify(statAlt(S.stat))); hp.update(JSON.stringify(kiAlt(S.ki))); hp.update(JSON.stringify(regierungAlt(S.regierung)));
   return JSON.stringify([k.tag, k.stunde, k.einwohner, k.gebaeude, k.budget, k.gruendungen, k.pleiten, k.freieWohnungen, k.freieStellen, k.zufriedenheit,
     k.arbeitslose, S.rs, h, gb, S.gAnzahl, S.stat.zuzuege, S.stat.geburten, S.stat.tode, S.stat.strassenFelder, S.bauplaetze, hp.digest('hex').slice(0, 16)]);
+}
+
+// Etappe 2 (Version 10): beschädigte Stände der Version 10 (Pflichtfelder, gedPruefen) aus dem gespeicherten Stand textG, verändert an Person q:
+// jeder abgelehnt mit seinem Grund, nichts still korrigiert; der unveränderte Stand wird angenommen, und ein Stand mit Gedächtnis passt nicht in
+// eine Fassung mit R.GED = 0 (anders geordnet). Gemeinsam für --speichertest und --gedaechtnis; gibt { ok, text } zurück
+function gedBeschaedigt(textG, q) {
+  const dG = JSON.parse(textG);
+  const roh = () => { const d = JSON.parse(textG); d.arrays = d.arrays.map(a => { const u8 = Buffer.from(a.b64, 'base64'); return { name: a.name, typ: a.typ, daten: new TYPEN[a.typ](u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength)) }; }); return d; };
+  const f = (d, n) => d.arrays.find(a => a.name === 'p.' + n).daten;
+  const M8 = Sim.R.MEM;
+  const jetzt = dG.werte.tag * 24 + dG.werte.stunde;
+  const faelle = [
+    ['p.erf fehlt', d => { d.arrays = d.arrays.filter(a => a.name !== 'p.erf'); }, 'unvollständig: p.erf'],
+    ['p.entZeit fehlt', d => { d.arrays = d.arrays.filter(a => a.name !== 'p.entZeit'); }, 'unvollständig: p.entZeit'],
+    ['memName in Version 10', d => { d.arrays.push({ name: 'p.memName', typ: 'Uint32Array', daten: new Uint32Array(dG.werte.pMax * M8) }); }, 'beschädigt: p.memName'],
+    ['p.erf als Uint16Array', d => { const a = d.arrays.find(x => x.name === 'p.erf'); a.typ = 'Uint16Array'; a.daten = new Uint16Array(a.daten); }, 'beschädigt: p.erf'],
+    ['Kurzzeit-Platz 3', d => { f(d, 'memPos')[q] = Sim.R.MEM_KURZ; }, 'Gedächtnis (Platz)'],
+    ['unbekannte Erinnerung', d => { f(d, 'memCode')[q * M8] = 99; }, 'Gedächtnis (Erinnerung)'],
+    ['Verweis an leerem Platz', d => { f(d, 'memCode')[q * M8 + 7] = 0; f(d, 'memVon')[q * M8 + 7] = 5; }, 'Gedächtnis (Erinnerung)'],
+    ['Erfahrung −32', d => { f(d, 'erf')[q * 8] = 1; }, 'Erfahrung'],
+    ['Wert ohne Beobachtung', d => { f(d, 'erf')[q * 8 + 1] = 40 << 2; }, 'Erfahrung'],
+    ['offene Handlung 9', d => { f(d, 'offen')[q] = 9; f(d, 'offRest')[q] = 5; }, 'offene Handlung'],
+    ['offen ohne Frist', d => { f(d, 'offen')[q] = 1; f(d, 'offRest')[q] = 0; }, 'offene Handlung'],
+    ['Frist über ERF_FRIST', d => { f(d, 'offen')[q] = 3; f(d, 'offRest')[q] = Sim.R.ERF_FRIST[1] + 1; }, 'offene Handlung'],
+    ['Frist ohne offene Handlung', d => { f(d, 'offen')[q] = 0; f(d, 'offRest')[q] = 7; }, 'offene Handlung'],
+    ['Planschritt jenseits des Ziels', d => { f(d, 'ziel')[q] = Sim.Z.LADEN; f(d, 'planSchritt')[q] = 2; }, 'Plan'],
+    ['letzter Plan mit Grund 9', d => { f(d, 'planGrund')[q] = 1 | 9 << 3; }, 'Plan'],
+    ['letzter Plan ohne Ziel', d => { f(d, 'planGrund')[q] = 2 << 3; }, 'Plan'],
+    ['letzte Entscheidung: Aktion 13', d => { f(d, 'entA')[q] = 13; f(d, 'entArt')[q] = 1; f(d, 'entZeit')[q] = 24; }, 'letzte Entscheidung'],
+    ['letzte Entscheidung: Quelle 5', d => { f(d, 'entA')[q] = 2; f(d, 'entArt')[q] = 5; f(d, 'entZeit')[q] = 24; }, 'letzte Entscheidung'],
+    ['letzte Entscheidung aus der Zukunft', d => { f(d, 'entA')[q] = 2; f(d, 'entArt')[q] = 1; f(d, 'entZeit')[q] = jetzt + 1; }, 'letzte Entscheidung'],
+    ['Zeit ohne Aktion', d => { f(d, 'entA')[q] = 0; f(d, 'entArt')[q] = 0; f(d, 'entZeit')[q] = 100; }, 'letzte Entscheidung'],
+    ['Summen fehlen', d => { delete d.json.stat.ged; }, 'Gedächtnis (Summen)'],
+    ['Summen: schlecht > gelernt', d => { d.json.stat.ged.schlecht[0] = d.json.stat.ged.gelernt[0] + 1; }, 'Gedächtnis (Summen)'],
+    ['Summen als Text', d => { d.json.stat.ged.gelernt[1] = '5'; }, 'Gedächtnis (Summen)'],
+  ];
+  const meld = [];
+  let falsch = 0;
+  for (const [was, kaputt, soll] of faelle) {
+    const d = roh(); kaputt(d);
+    let e = null; try { Sim.importZustand(d); } catch (x) { e = x; }
+    meld.push(`${was}: ${e ? e.message.replace(/^Spielstand /, '') : 'ANGENOMMEN'}`);
+    if (!e || !/^Spielstand (beschädigt|unvollständig): /.test(e.message) || !e.message.includes(soll)) falsch++;
+  }
+  let heil = null; try { heil = Sim.importZustand(roh()); } catch (x) { meld.push('unverändert: ' + x.message); falsch++; }
+  const Aus = ladeSim(); Aus.R.GED = 0;
+  let eAus = null; try { Aus.importZustand(roh()); } catch (x) { eAus = x; }
+  if (!eAus || !eAus.message.includes('Gedächtnis (Summen)')) falsch++;
+  const ok = !falsch && faelle.length >= 10 && !!heil && fingerabdruck(Sim, heil) === fingerabdruck(Sim, ladenAusText(Sim, textG));
+  return { ok, n: faelle.length, falsch, text: `beschädigte Stände der Version 10 abgelehnt (${faelle.length} Fälle, ${falsch} falsch; Person ${q}): ${meld.join('; ')}; `
+    + `unverändert angenommen: ${heil ? 'ja' : 'NEIN'}; mit R.GED = 0 geladen: ${eAus ? eAus.message : 'ANGENOMMEN'}` };
 }
 
 if (flag('speichertest')) {
@@ -319,7 +419,46 @@ if (flag('speichertest')) {
   const fe = fingerabdruck(Sim, E), ff = fingerabdruck(Sim, F), se = sortiert(E), sf = sortiert(F);
   const ok3 = gleich3 && iE.wehr > 0 && iE.ersatz > 0 && iE.verpflichtet > 0 && fe === ff && se === sf;
   console.log(`  60 Tage weiter: ${fe} / ${ff}, sortiert ${se} / ${sf} → ${fe === ff && se === sf ? 'bitgleich' : 'UNTERSCHIEDLICH'}${ok3 ? '' : ' (FEHL: Fall nicht vollständig oder verschieden)'}`);
-  process.exit(fa === fb && ok2 && ok3 ? 0 : 1);
+  // Version 10 (Etappe 2, Schritt 2): ein Stand mit Gedächtnis (Kurz- und Langzeit, Fakt, Verweis), Erfahrung, offenen Handlungen, Plänen und
+  // letzten Entscheidungen, gespeichert mitten am Tag (13 Uhr, ab Tag 300 der erste Tag, an dem eine Gründung und ein Stellenwechsel offen sind,
+  // deren Folge erst nach dem Laden kommt). Der Spielstand hat Version 10, alle Felder aus PF_GED, S.stat.ged und kein memName; direkt nach dem
+  // Laden gleich, 60 Tage später bitgleich, und in diesen 60 Tagen lernen beide gleich viel
+  let ok4 = false, ok5 = false;
+  {
+    const P0 = (S) => S.p, EG = 0, EW = 2;
+    const offenBei = (S, s) => { const P = P0(S); for (let p = 0; p < S.pMax; p++) if (P.lebt[p] && P.offen[p] && (P.offen[p] - 1) >> 1 === s) return p; return -1; };
+    const Gd = Sim.neueStadt(seed);
+    bis(Gd, 300, 13);
+    while (Gd.tag < 700 && (offenBei(Gd, EG) < 0 || offenBei(Gd, EW) < 0)) bis(Gd, Gd.tag + 1, 13);
+    const zaehl = (S) => { const P = P0(S), z = { offen: 0, lang: 0, erf: 0, plan: 0, ent: 0, verweis: 0, fakt: 0 };
+      for (let p = 0; p < S.pMax; p++) {
+        if (!P.lebt[p]) continue;
+        if (P.offen[p]) z.offen++; if (P.planSchritt[p]) z.plan++; if (P.entA[p]) z.ent++;
+        for (let j = 0; j < Sim.R.MEM; j++) { const i = p * Sim.R.MEM + j; if (j >= Sim.R.MEM_KURZ && P.memCode[i]) z.lang++; if (P.memVon[i]) z.verweis++; if (P.memFakt[i]) z.fakt++; }
+        for (let c = p * 8; c < p * 8 + 8; c++) if (P.erf[c] & 3) z.erf++;
+      }
+      return z; };
+    const gel = (S) => S.stat.ged.gelernt.reduce((a, b) => a + b, 0);
+    const z = zaehl(Gd), textG = speichernAlsText(Sim, Gd), dG = JSON.parse(textG), H = ladenAusText(Sim, textG), namen = new Set(dG.arrays.map(a => a.name));
+    const format = dG.version === 10 && Sim.VERSION === 10 && Sim.PF_GED.every(n => namen.has('p.' + n)) && !namen.has('p.memName') && !!dG.json.stat.ged;
+    const gleich0 = fingerabdruck(Sim, Gd) === fingerabdruck(Sim, H) && sortiert(Gd) === sortiert(H);
+    console.log(`Gedächtnis (Version 10): gespeichert an Tag ${Gd.tag}, ${Gd.stunde} Uhr (${(textG.length / 1e6).toFixed(2)} MB): ${z.offen} offene Handlungen (Gründung von ${Sim.name(Gd, offenBei(Gd, EG))}, `
+      + `Wechsel von ${Sim.name(Gd, offenBei(Gd, EW))}), ${z.lang} Erinnerungen in der Langzeit, ${z.fakt} mit Fakt, ${z.verweis} mit Verweis, ${z.erf} Erfahrungen, ${z.plan} Planschritte > 0, `
+      + `${z.ent} letzte Entscheidungen; Format Version ${dG.version}, PF_GED vollständig, kein memName: ${format ? 'ja' : 'NEIN'}; direkt nach dem Laden gleich: ${gleich0 ? 'ja' : 'NEIN'}`);
+    const g0 = gel(Gd);
+    bis(Gd, Gd.tag + 60, 13); bis(H, H.tag + 60, 13);
+    const fg = fingerabdruck(Sim, Gd), fh = fingerabdruck(Sim, H), sg = sortiert(Gd), sh = sortiert(H);
+    ok4 = format && gleich0 && z.offen > 0 && z.lang > 0 && z.erf > 0 && z.plan > 0 && z.ent > 0 && z.verweis > 0 && z.fakt > 0 && fg === fh && sg === sh && gel(Gd) > g0 && gel(Gd) === gel(H);
+    console.log(`  60 Tage weiter: ${fg} / ${fh}, sortiert ${sg} / ${sh} → ${fg === fh && sg === sh ? 'bitgleich' : 'UNTERSCHIEDLICH'}; gelernt seit dem Speichern ${gel(Gd) - g0} / ${gel(H) - g0}`
+      + `${ok4 ? '' : ' (FEHL: Fall nicht vollständig oder verschieden)'}`);
+    // Beschädigte Stände der Version 10 (Pflichtfelder, gedPruefen): jeder abgelehnt mit seinem Grund, nichts still korrigiert; der unveränderte
+    // Stand wird angenommen, und ein Stand mit Gedächtnis passt nicht in eine Fassung mit R.GED = 0 (anders geordnet)
+    let q = -1; for (let p = 0; p < H.pMax && q < 0; p++) if (H.p.lebt[p] && H.tag - H.p.geb[p] >= 18 * Sim.R.JAHR) q = p;
+    const bg = gedBeschaedigt(textG, q);
+    ok5 = bg.ok;
+    console.log(`${ok5 ? '  ok   ' : '  FEHL '}${bg.text}`);
+  }
+  process.exit(fa === fb && ok2 && ok3 && ok4 && ok5 ? 0 : 1);
 }
 if (flag('kitest')) {
   // Ohne Sprachmodell: ein Test-Beantworter mit eigenem Zufall antwortet gültig, ungültig oder gar nicht.
@@ -483,6 +622,10 @@ if (flag('kitest')) {
         if (v < 0 || pa < 0 || P.hh[pa] !== v || P.arbeit[v] < 0) continue;                        // Vorstand arbeitet, Partner im Haushalt
         if (P.besitz[pa] >= 0 || P.gemein[pa] || Sim.anspruch(S, pa) || S.tag - P.geb[pa] >= 60 * R.JAHR) continue;
         if (S.bewohner[P.wohnung[k]].some(m => m !== v && m !== pa && P.hh[m] === v && P.geb[m] <= erw)) continue;   // sonst niemand Erwachsenes
+        // Vorarbeit Etappe 2: Fall strenger, damit er nicht vom Verlauf abhängt. Keine Rolle beim Bund (die Stelle wird unten ohne austreten
+        // genommen: ein Soldat ohne Kaserne wäre ein Stand, den es sonst nie gibt), keine jüngeren (oder gleich alten) Geschwister (ein
+        // Kind unter 3 ohne Platz brächte Betreuungsgehalt, „bleibt beim Kind zu Hause“, statt „kein Kita-Platz frei“)
+        if (P.bund[pa] || S.bewohner[P.wohnung[k]].some(m => m !== k && P.hh[m] === v && P.geb[m] >= P.geb[k])) continue;
         p = pa; kind = k;
       }
       if (p < 0) pruef(false, 'Kita: kein Kind mit Platz bei einem Paar ohne weitere Erwachsene gefunden');
@@ -608,6 +751,9 @@ if (flag('migrationstest')) {
   Sim.R.ANLAUF_STUFE = 0;                                    // Wachstum (Version 9, Teil 4): kein Anlauf (Verlauf wie vorher); die Übernahme prüft --wachstum
   Sim.R.TECH_FRUEH = 0; Sim.R.WELT = 0;                      // Tech früher und Weltmarkt (Version 9, Teil 5): aus (Verlauf wie vorher); die Übernahme prüft --techfrueh (D)
   Sim.R.ZUZUG_GENAU = 0;                                     // Zuzug genau nach R10 (Befund der Schlussprüfung von Version 9): aus (Verlauf wie vorher)
+  // Etappe 2 (Version 10): hier aus (Verlauf wie vorher; ohne R.GED bleibt der Ring des Gedächtnisses beim Übernehmen, wie er ist); die Übernahme
+  // mit Gedächtnis prüft gedUebernommen je Stand, dazu der Teil „Version 8 und 9 → 10“ am Ende
+  Sim.R.GED = 0; Sim.R.OPFER_FREI = 0; Sim.R.HAFT_EROEFFNUNG = 0;
   const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
   // Stadt erweitern (jede Version → 7): Stufe aus den Einwohnern am Übernahmetag, alle bebauten Stadtteile ab Kleinstadt mit verschiedenen
   // Namen, Karte mindestens 96 und mit Vorlauf, die neue Zeile („sie ist eine …“) als letzte
@@ -694,6 +840,72 @@ if (flag('migrationstest')) {
     const z = S.tag + 20; while (S.tag < z) Sim.stunde(S); while (L.tag < z) Sim.stunde(L);
     pruef(fingerabdruck(Sim, S) === fingerabdruck(Sim, L), `danach als Version ${Sim.VERSION} gespeichert und geladen: läuft bitgleich weiter`);
   };
+  // Version 10 (Etappe 2): Übernahme mit Gedächtnis (NeuGed: R.GED = 1, alle anderen Schalter wie im Spiel) gegen dieselbe Übernahme ohne
+  // (NeuAus: R.GED = 0): alles gleich außer Gedächtnis, Planschritt und S.stat.ged (leer). Das Gedächtnis mit R.GED ist das alte, neu verteilt
+  // (unabhängig von migriereGed beschrieben): in der Kurzzeit die (bis zu) MEM_KURZ jüngsten Einträge, im Ring ab memPos der Reihe nach, in der
+  // Langzeit genau die älteren mit Bedeutung ab MEM_SCHWELLE (es sind höchstens 5 ältere, alle passen), der Rest vergessen, leere Plätze wie
+  // neu. Fakt, Verweis, Erfahrung, offene Handlung, letzter Plan und letzte Entscheidung 0, Planschritt wie planSchrittVon. Keine Erinnerung an
+  // jemanden, der nicht mehr in der Stadt lebt, nennt einen Namen (auch nicht den aus memName des alten Stands). Danach 10 Tage weiter, als
+  // Version 10 gespeichert und geladen (gedPruefen), 5 Tage später bitgleich. mindestNamen: so viele Erinnerungen an Verstorbene mit Namen
+  // muss der alte Stand haben (0: nur zählen)
+  const NeuGed = ladeSim(), NeuAus = ladeSim();
+  NeuAus.R.GED = 0; NeuAus.R.OPFER_FREI = 0; NeuAus.R.HAFT_EROEFFNUNG = 0;   // wie 6c1741e (Schalter der Vorarbeiten aus)
+  const GED_MEM = new Set(['p.memCode', 'p.memTag', 'p.memRef', 'p.memGen', 'p.memPos', 'p.planSchritt']);
+  const nameAus = (v) => [NeuGed.VORNAMEN_M, NeuGed.VORNAMEN_W][(v >> 16) & 1][v & 255] + ' ' + NeuGed.NACHNAMEN[(v >> 8) & 255];
+  const ohneMarken = (t) => t.replace(/\u0001[^\u0002]*\u0002/g, '');
+  const gedUebernommen = (was, text, roh, mindestNamen) => {
+    const altD = roh(text), S0 = NeuAus.importZustand(roh(text), true), S1 = NeuGed.importZustand(roh(text), true);
+    const e0 = NeuAus.exportZustand(S0), e1 = NeuGed.exportZustand(S1), n1 = new Map(e1.arrays.map(a => [a.name, a]));
+    const by = (a) => Buffer.from(a.daten.buffer, a.daten.byteOffset, a.daten.byteLength);
+    const anders = e0.arrays.filter(a => !GED_MEM.has(a.name) && (!n1.has(a.name) || Buffer.compare(by(a), by(n1.get(a.name))))).map(a => a.name);
+    if (e1.arrays.length !== e0.arrays.length || n1.has('p.memName')) anders.push('Arrays (Zahl oder memName)');
+    if (JSON.stringify(e0.werte) !== JSON.stringify(e1.werte)) anders.push('Einzelwerte');
+    if (JSON.stringify({ ...e1.json, stat: { ...e1.json.stat, ged: undefined } }) !== JSON.stringify(e0.json)) anders.push('JSON-Teile');
+    const R1 = NeuGed.R, M8 = R1.MEM, K = R1.MEM_KURZ, P0 = S0.p, P1 = S1.p, tup = (P, i) => [P.memCode[i], P.memTag[i], P.memRef[i], P.memGen[i]].join('/');
+    let memFehl = 0, gesamt = 0, lang = 0, vergessen = 0;
+    for (let p = 0; p < S0.pMax; p++) {
+      const o = p * M8, alt = [];
+      for (let j = 0; j < M8; j++) { const i = o + (P0.memPos[p] + j) % M8; if (P0.memCode[i]) alt.push(i); }
+      const kurzSoll = alt.slice(-K).map(i => tup(P0, i)), langSoll = alt.slice(0, Math.max(0, alt.length - K)).filter(i => NeuGed.M_BED[P0.memCode[i]] >= R1.MEM_SCHWELLE).map(i => tup(P0, i)).sort();
+      const kurzIst = [], langIst = [];
+      for (let j = 0; j < K; j++) { const i = o + (P1.memPos[p] + j) % K; if (P1.memCode[i]) kurzIst.push(tup(P1, i)); }
+      for (let j = K; j < M8; j++) if (P1.memCode[o + j]) langIst.push(tup(P1, o + j));
+      langIst.sort();
+      gesamt += alt.length; lang += langIst.length; vergessen += alt.length - kurzSoll.length - langSoll.length;
+      if (P1.memPos[p] >= K || kurzSoll.join() !== kurzIst.join() || langSoll.join() !== langIst.join() || (kurzSoll.length < K && P1.memCode[o + P1.memPos[p]])) memFehl++;
+      for (let i = o; i < o + M8; i++) if (!P1.memCode[i] && (P1.memRef[i] !== -1 || P1.memTag[i] || P1.memGen[i])) memFehl++;
+    }
+    const nichtNull = NeuGed.PF_GED.filter(n => n !== 'planSchritt' && P1[n].some(v => v !== 0));
+    let planFehl = 0;
+    for (let p = 0; p < S1.pMax; p++) if (P1.planSchritt[p] !== (P1.lebt[p] && P1.ziel[p] ? NeuGed._ged.planSchrittVon(S1, p, P1.ziel[p]) : 0)) planFehl++;
+    const statLeer = JSON.stringify(S1.stat.ged) === JSON.stringify(NeuGed._ged.gedStatLeer()) && S0.stat.ged === undefined;
+    // Namen: Erinnerungen an Menschen, die nicht mehr (mit dieser Generation) in der Stadt leben
+    const mn = altD.arrays.find(a => a.name === 'p.memName');
+    let tote = 0, mitName = 0, nameDrin = 0;
+    for (let p = 0; p < S1.pMax; p++) {
+      if (!P1.lebt[p]) continue;
+      const texte = NeuGed.personInfo(S1, p).gedaechtnis.map(g => g.text).join('\n'), frei = ohneMarken(texte);
+      for (let j = 0; j < M8; j++) {
+        const i = p * M8 + j, ref = P0.memRef[i];
+        if (!P0.memCode[i] || !mn || !mn.daten[i] || ref < 0 || (P1.lebt[ref] && P1.gen[ref] === P0.memGen[i])) continue;
+        tote++;
+        const nm = nameAus(mn.daten[i]);
+        if (texte.includes('\u0001' + ref + '/' + P0.memGen[i] + '/') || frei.includes(nm)) nameDrin++;
+        for (let k = p * M8; k < p * M8 + M8; k++) if (P1.memCode[k] && tup(P1, k) === tup(P0, i)) { mitName++; break; }
+      }
+    }
+    for (let h = 0; h < 240; h++) NeuGed.stunde(S1);
+    const L = ladenAusText(NeuGed, speichernAlsText(NeuGed, S1));
+    for (let h = 0; h < 120; h++) { NeuGed.stunde(S1); NeuGed.stunde(L); }
+    const weiter = fingerabdruck(NeuGed, S1) === fingerabdruck(NeuGed, L);
+    pruef(S1.version === NeuGed.VERSION && S0.version === NeuGed.VERSION && !anders.length && !memFehl && gesamt > 0 && !nichtNull.length && !planFehl && statLeer
+      && !nameDrin && tote >= mindestNamen && weiter,
+      `${was} mit Gedächtnis: Version ${S1.version}, sonst gleich wie ohne (${anders.join(', ') || 'alles'}); ${gesamt} Erinnerungen neu verteilt (${lang} in der Langzeit, `
+      + `${vergessen} unter der Schwelle vergessen, ${memFehl} falsch), neue Felder 0 (${nichtNull.join(', ') || 'ja'}), Planschritt ${planFehl} falsch, Summen leer: ${statLeer ? 'ja' : 'NEIN'}; `
+      + `${tote} Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit Namen), davon ${mitName} noch im Gedächtnis, Name darin: ${nameDrin}; `
+      + `10 Tage weiter, gespeichert und geladen, 5 Tage später ${weiter ? 'bitgleich' : 'VERSCHIEDEN'}`);
+    return { S1, altD };
+  };
   // Alte Fassungen: mit --alt genau diese Datei, sonst aus git 39c405b (Version 2), 2b821c2 (Version 3), 1c8d40b (Version 4), 414ebab
   // (Version 5, Stadtregierung ohne Schritt 2) und bc7247a (Version 6, Schritt 2, feste Karte 96 × 96). --git <ordner>: Repository für
   // git show (Standard: der Ordner dieses Werkzeugs)
@@ -730,6 +942,7 @@ if (flag('migrationstest')) {
         }
         console.log((meld.every(m => /beschädigt/.test(m)) ? '  ok   ' : '  FEHL ') + 'beschädigte Stände der Version 5 abgelehnt: ' + meld.join('; '));
       }
+      gedUebernommen(`Version ${Alt.VERSION} → ${Sim.VERSION}`, text, roh, 0);   // Version 10: Übernahme mit Gedächtnis (Etappe 2)
       const d = roh(text);
       const S = Sim.importZustand(d, true);
       const B = S.bauhof, g = S.g;
@@ -820,6 +1033,64 @@ if (flag('migrationstest')) {
       const L = ladenAusText(Sim, speichernAlsText(Sim, S));
       const z = S.tag + 20; while (S.tag < z) Sim.stunde(S); while (L.tag < z) Sim.stunde(L);
       pruef(fingerabdruck(Sim, S) === fingerabdruck(Sim, L), `danach als Version ${Sim.VERSION} gespeichert und geladen: läuft bitgleich weiter`);
+    }
+  }
+  // Version 8 und 9 → 10 (Etappe 2, Schritt 2): Stände aus git 31ce452 (Version 8) und 6c1741e (Version 9, mit KI-Teil aus Etappe 1), je Seed 1/2/3
+  // an Tag 150/300/400. Ohne Übernehmen abgelehnt, als übernehmbar markiert; mit Übernehmen wie gedUebernommen. Aus Version 9 mit R.GED = 0
+  // (Schalter der Vorarbeiten aus) läuft die Stadt danach 60 Tage lang jeden Tag genau wie in Version 9 (alle Arrays außer memName, alle
+  // Einzelwerte außer der Version, alle JSON-Teile; die Felder aus PF_GED bleiben 0). Mit Gedächtnis 60 Tage weiter (keine NaN, es wird gelernt),
+  // als Version 10 gespeichert und geladen: 20 Tage später bitgleich. Ein Stand der Version 10 wird von Version 9 abgelehnt (mit und ohne
+  // Übernehmen, nicht als übernehmbar markiert)
+  {
+    const quellen10 = arg('alt') ? [] : [['31ce452', 8], ['6c1741e', 9]].map(([c, v]) => [`git ${c}`, v,
+      execFileSync('git', ['show', c + ':stadt/stadt.html'], { cwd: arg('git', hier), encoding: 'utf8', maxBuffer: 1 << 26 })]);
+    const by = (a) => Buffer.from(a.daten.buffer, a.daten.byteOffset, a.daten.byteLength);
+    const roh = (t) => { const d = JSON.parse(t); d.arrays = d.arrays.map(a => { const u8 = Buffer.from(a.b64, 'base64'); return { name: a.name, typ: a.typ, daten: new TYPEN[a.typ](u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength)) }; }); return d; };
+    for (const [herkunft, soll, altHtml] of quellen10) {
+      const ctx = vm.createContext({});
+      vm.runInContext(altHtml.match(/<script id="sim">([\s\S]*?)<\/script>/)[1], ctx);
+      const Alt = ctx.StadtSim;
+      console.log(`Alte Fassung: ${herkunft}`);
+      pruef(Alt.VERSION === soll && NeuGed.VERSION === 10, `alte Simulation hat Version ${Alt.VERSION}, neue ${NeuGed.VERSION}`);
+      for (const [seed, tage, stunde] of [[1, 150, 13], [2, 300, 5], [3, 400, 20]]) {
+        const A = Alt.neueStadt(seed);
+        while (A.tag < tage || A.stunde < stunde) Alt.stunde(A);
+        const text = speichernAlsText(Alt, A);
+        let abgelehnt = null;
+        try { ladenAusText(NeuGed, text); } catch (e) { abgelehnt = e; }
+        pruef(abgelehnt && abgelehnt.andereVersion && abgelehnt.migrierbar && abgelehnt.vonVersion === soll && !abgelehnt.neuer,
+          `Seed ${seed}, Tag ${A.tag} ${A.stunde} Uhr (${A.einwohner} Einw.): ohne Übernehmen abgelehnt („${abgelehnt ? abgelehnt.message : 'ANGENOMMEN'}“), als übernehmbar markiert`);
+        const { S1 } = gedUebernommen(`Version ${soll} → 10`, text, roh, soll === 9 ? 1 : 0);
+        if (soll === 9) {                                     // mit R.GED = 0 genau wie Version 9 weiter
+          const S0 = NeuAus.importZustand(roh(text), true);
+          let erst = -1;
+          for (let t = 0; t < 60 && erst < 0; t++) {
+            const z = A.tag + 1; while (A.tag < z) Alt.stunde(A); while (S0.tag < z) NeuAus.stunde(S0);
+            const ea = Alt.exportZustand(A), eb = NeuAus.exportZustand(S0), nb = new Map(eb.arrays.map(x => [x.name, x]));
+            const arr = ea.arrays.every(x => x.name === 'p.memName' || (nb.has(x.name) && !Buffer.compare(by(x), by(nb.get(x.name)))))
+              && eb.arrays.every(y => ea.arrays.some(x => x.name === y.name) || (NeuAus.PF_GED.includes(y.name.slice(2)) && y.daten.every(v => v === 0)));
+            if (!arr || JSON.stringify({ ...ea.werte, version: 0 }) !== JSON.stringify({ ...eb.werte, version: 0 }) || JSON.stringify(ea.json) !== JSON.stringify(eb.json)) erst = A.tag;
+          }
+          pruef(erst < 0, `mit R.GED = 0 übernommen, 60 Tage weiter (Tag ${S0.tag}, ${S0.einwohner} Einw.): ${erst < 0 ? 'jeden Tag wie Version 9' : 'VERSCHIEDEN ab Tag ' + erst}`
+            + ' (alle Arrays außer memName, Felder aus PF_GED 0, Einzelwerte außer der Version, JSON-Teile)');
+        }
+        const t0 = S1.tag, g0 = S1.stat.ged.gelernt.reduce((x, y) => x + y, 0);
+        while (S1.tag < t0 + 50) NeuGed.stunde(S1);              // mit den 10 Tagen aus gedUebernommen 60 Tage
+        let nan = 0;
+        for (const a of Object.values(S1.p)) if (a instanceof Float32Array || a instanceof Float64Array) for (let i = 0; i < S1.pMax; i++) if (!Number.isFinite(a[i])) nan++;
+        const gel = S1.stat.ged.gelernt.reduce((x, y) => x + y, 0) - g0, text10 = speichernAlsText(NeuGed, S1), L = ladenAusText(NeuGed, text10);
+        const z = S1.tag + 20; while (S1.tag < z) NeuGed.stunde(S1); while (L.tag < z) NeuGed.stunde(L);
+        pruef(!nan && gel > 0 && fingerabdruck(NeuGed, S1) === fingerabdruck(NeuGed, L),
+          `mit Gedächtnis 60 Tage weiter (Tag ${t0 + 50}, keine NaN: ${nan}), ${gel} Erfahrungen gelernt; als Version 10 gespeichert und geladen, 20 Tage später bitgleich`);
+        if (soll === 9) {                                     // Version 10 in Version 9
+          const meld = [];
+          for (const mig of [false, true]) {
+            let e = null; try { Alt.importZustand(roh(text10), mig); } catch (x) { e = x; }
+            meld.push(e && e.andereVersion && !e.migrierbar && e.vonVersion === 10 ? `abgelehnt („${e.message}“)` : `FALSCH (${e ? e.message : 'angenommen'})`);
+          }
+          pruef(meld.every(m => m.startsWith('abgelehnt')), `Stand der Version 10 in Version 9: ohne Übernehmen ${meld[0]}, mit Übernehmen ${meld[1]}`);
+        }
+      }
     }
   }
   console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle Migrations-Prüfungen bestanden');
@@ -1238,7 +1509,10 @@ if (flag('regierung')) {
     const ruhig = () => { for (let p = 0; p < S.pMax; p++) S.p.jetzt[p] = 0; };
     bisStunde(S, 250, 23);
     {                                                          // a) Beitragstage über Mitternacht
-      let n = 0, mitArbeit = 0, betr = 0, ohne = 0, fehl = 0;
+      // Ausgelassen (gezählt): wessen Betreuer-Status sich über die Mitternacht ändert. bundesGeld zahlt mit dem Stand mitten in der Nacht
+      // (Kinderzahl aus haushalteZaehlen, Kita-Plätze erst danach); ein am Tag geborenes Kind zählt um 23 Uhr noch nicht (Etappe 2, Seed 3
+      // mit GED_STAERKE 1,5: Person 384 übernimmt so an Tag 250 die Betreuung). Von außen ist dann nicht bestimmbar, was gilt
+      let n = 0, mitArbeit = 0, betr = 0, ohne = 0, fehl = 0, wechsel = 0;
       for (let v = 0; v < 8; v++) {
         bisStunde(S, S.tag, 23); ruhig();
         const vor = [], P0 = P(), stellen = (p) => { const k = P0.hh[p], pa = k >= 0 ? P0.partner[k] : -1; return k < 0 ? '' : P0.arbeit[k] + '/' + (pa >= 0 ? P0.arbeit[pa] : '') + '/' + P0.hh[p]; };
@@ -1250,12 +1524,13 @@ if (flag('regierung')) {
           if (!P().lebt[p] || P().gen[p] !== gen || P().arbeit[p] !== arb || P().gemein[p] !== gem) continue;   // weg oder Stelle anders
           const k = P().hh[p], pa = k >= 0 ? P().partner[k] : -1;
           if (k < 0 ? st !== '' : P().arbeit[k] + '/' + (pa >= 0 ? P().arbeit[pa] : '') + '/' + k !== st) continue;   // im Haushalt Stelle weg (Pleite): anderer Betreuer
+          if ((Sim.betreuer(S, k) === p) !== bt) { wechsel++; continue; }   // Betreuer-Status über Mitternacht geändert (neues Kind, Kita-Platz)
           if (arb >= 0 && !gem) mitArbeit++; else if (bt) betr++; else ohne++;
           if (P().beitrag[p] !== Math.min(65535, b + ((arb >= 0 && !gem) || bt ? 1 : 0))) fehl++;
         }
       }
       pruef(n === 8 && mitArbeit > 0 && betr > 0 && ohne > 0 && !fehl,
-        `Beitragstage über ${n} Mitternächte: ${mitArbeit}-mal mit Arbeitsplatz +1, ${betr}-mal mit Betreuungsgehalt +1, ${ohne}-mal ohne beides +0 (${fehl} Fehler)`);
+        `Beitragstage über ${n} Mitternächte: ${mitArbeit}-mal mit Arbeitsplatz +1, ${betr}-mal mit Betreuungsgehalt +1, ${ohne}-mal ohne beides +0 (${fehl} Fehler; ${wechsel} ausgelassen: Betreuer-Status über Mitternacht geändert)`);
     }
     // b) 64 Jahre, angestellt, kein Erspartes: mit 449 Beitragstagen kein „kündigen“, mit 450 schon; das Gehirn wählt es und geht in Rente
     bisStunde(S, S.tag, 7);
@@ -1611,6 +1886,9 @@ if (flag('kita')) {
         if (ms.some(m => P.arbeit[m] < 0) || P.besitz[kopf] >= 0 || P.gemein[kopf] || Sim.anspruch(S, kopf)) continue;
         const m = pa >= 0 && P.hh[pa] === kopf ? pa : kopf;
         if (P.besitz[m] >= 0 || P.gemein[m] || Sim.anspruch(S, m) || Sim.istHaupt(S, m)) continue;
+        // Vorarbeit Etappe 2: Fall strenger, damit er nicht vom Verlauf abhängt. Keine Rolle beim Bund (die Stelle wird unten ohne austreten
+        // genommen: ein Soldat ohne Kaserne wäre ein beschädigter Stand, „Bund (Rolle)“), keine jüngeren (oder gleich alten) Geschwister
+        if (P.bund[m] || S.bewohner[P.wohnung[k]].some(x => x !== k && P.hh[x] === kopf && P.geb[x] >= P.geb[k])) continue;
         fall = { k, kopf, m };
       }
       if (!fall) pruef(false, '(g) kein Kind unter 3 mit Krippenplatz, dessen Eltern beide arbeiten');
@@ -2012,7 +2290,55 @@ if (flag('aufholtest')) {
   for (const k of ['einwohner', 'gebaeude', 'gruendungen', 'pleiten', 'freieStellen', 'zufriedenheit', 'arbeitslosenquote']) {
     console.log(`  ${k.padEnd(18)} stündlich ${pad(typeof ka[k] === 'number' && ka[k] % 1 ? ka[k].toFixed(2) : ka[k], 9)}   Tagesschritte ${pad(typeof kb[k] === 'number' && kb[k] % 1 ? kb[k].toFixed(2) : kb[k], 9)}`);
   }
-  process.exit(0);
+  // Version 10 (Etappe 2, Schritt 2): Aufholen in Stücken wie aufholen() der Oberfläche (bis Mitternacht stündlich, ganze Tage im Tagesschritt,
+  // dann stündlich bis zur Zielstunde), zwischen den Stücken gespeichert und geladen wie beim Schließen des Tabs. 1 × n gegen 3 × n/3 Tage
+  // bitgleich (Fingerabdruck mit allen Arrays, auch Gedächtnis, Erfahrung, offene Handlung, Plan, und S.stat.ged) in den Fällen, die
+  // docs/GRENZEN.md zusichert: (a) Grenzen um Mitternacht, (b) rein stündlich ab jeder Stunde (hier 13 Uhr). „Über Gedächtnis-Ereignisse
+  // hinweg“: An jeder Grenze sind Handlungen offen (ihre Folge kommt erst im nächsten Stück), und in jedem Stück wird gelernt und enden Pläne.
+  // (c) Stücke ab 13 Uhr mit Tagesschritten sind eine bekannte Näherung (GRENZEN.md, berichte/etappe0/BESTAND.md Abschnitt 5; Entscheidung
+  // über exaktes Aufholen in Etappe 5): nur gemessen, keine Prüfung
+  let fehler = 0;
+  const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
+  const aufholenWie = (S, stunden) => {
+    const zielTag = S.tag + Math.floor((S.stunde + stunden) / 24), zielStunde = (S.stunde + stunden) % 24;
+    if (S.tag < zielTag) { while (S.stunde !== 0) Sim.stunde(S); }
+    while (S.tag < zielTag) Sim.tagSchritt(S);
+    while (S.stunde < zielStunde) Sim.stunde(S);
+  };
+  const stuendlich = (S, stunden) => { for (let h = 0; h < stunden; h++) Sim.stunde(S); };
+  const offene = (S) => { let k = 0; for (let p = 0; p < S.pMax; p++) if (S.p.lebt[p] && S.p.offen[p]) k++; return k; };
+  const summe = (a) => (a ? a.reduce((x, y) => x + y, 0) : 0);
+  const gedStand = (S) => ({ tag: S.tag, stunde: S.stunde, offen: offene(S), gelernt: summe(S.stat.ged && S.stat.ged.gelernt), planEnde: summe(S.stat.ged && S.stat.ged.planEnde) });
+  // k Stücke zu je stunden / k: nach jedem Stück außer dem letzten speichern und laden
+  const stuecke = (text0, stunden, k, schritt) => {
+    let S = ladenAusText(Sim, text0);
+    const staende = [gedStand(S)];
+    for (let i = 0; i < k; i++) {
+      schritt(S, stunden / k);
+      staende.push(gedStand(S));
+      if (i < k - 1) S = ladenAusText(Sim, speichernAlsText(Sim, S));
+    }
+    return { S, staende };
+  };
+  const A13 = ladenAusText(Sim, text); while (A13.stunde < 13) Sim.stunde(A13);
+  const text13 = speichernAlsText(Sim, A13);
+  pruef(Sim.R.GED === 1, `mit Gedächtnis, Erfahrung und Plan (R.GED = ${Sim.R.GED}, Stärke ${Sim.R.GED_STAERKE})`);
+  for (const [name, t0, schritt] of [[`(a) ab Tag ${start} 0 Uhr, Tagesschritte wie aufholen()`, text, aufholenWie], [`(b) ab Tag ${start} 13 Uhr, rein stündlich`, text13, stuendlich]]) {
+    const eins = stuecke(t0, n * 24, 1, schritt), drei = stuecke(t0, n * 24, 3, schritt);
+    const fe = fingerabdruck(Sim, eins.S), fd = fingerabdruck(Sim, drei.S), st = drei.staende;
+    const grenzen = st.slice(1, -1), jeStueck = st.slice(1).map((x, i) => [x.gelernt - st[i].gelernt, x.planEnde - st[i].planEnde]);
+    pruef(fe === fd && grenzen.every(g => g.offen > 0) && jeStueck.every(([g, e]) => g > 0 && e > 0),
+      `${name}: 1 × ${n} gegen 3 × ${n / 3} Tage (Tag ${eins.S.tag} ${eins.S.stunde} Uhr, ${eins.S.einwohner} / ${drei.S.einwohner} Einw.) ${fe === fd ? 'bitgleich' : 'VERSCHIEDEN'} (${fe} / ${fd}); `
+      + `offene Handlungen an den Grenzen ${grenzen.map(g => `Tag ${g.tag} ${g.stunde} Uhr: ${g.offen}`).join(', ')}; je Stück gelernt ${jeStueck.map(x => x[0]).join(' / ')}, Pläne beendet ${jeStueck.map(x => x[1]).join(' / ')}`);
+  }
+  {
+    const eins = stuecke(text13, n * 24, 1, aufholenWie), drei = stuecke(text13, n * 24, 3, aufholenWie);
+    const gl = fingerabdruck(Sim, eins.S) === fingerabdruck(Sim, drei.S);
+    console.log(`  Hinweis (c) ab Tag ${start} 13 Uhr wie aufholen(): 1 × ${n} gegen 3 × ${n / 3} Tage ${gl ? 'bitgleich' : 'nicht bitgleich'} (${eins.S.einwohner} / ${drei.S.einwohner} Einw.; `
+      + 'bekannte Näherung, docs/GRENZEN.md; keine Prüfung)');
+  }
+  console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle Aufhol-Prüfungen bestanden');
+  process.exit(fehler ? 1 : 0);
 }
 
 if (flag('erweiterung')) {
@@ -2426,14 +2752,22 @@ if (flag('sicherheit')) {
       const bez = st.geldSumme - g0;
       pruef(!S.p.haftBis[q] && bez > 0 && S.p.geld[q] === gq - bez && S.p.tilgungBis[q] === S.tag + R.TILGUNG[0] && S.p.vorstrafen[q] === 1,
         `Geldstrafe bezahlt (${bez} Taler an das Land): keine Haft, im Register bis Tag ${S.p.tilgungBis[q]} (5 Jahre, § 46 Abs. 1 Nr. 1a BZRG)`);
-      const T = neu(), p2 = kandidat(T);
-      // Betrag = 30 Tagessätze zu je Tagesnetto / 36,5; mit der Hälfte davon bleiben 15 Tagessätze offen
-      const satz = Math.max(0.1, (T.p.arbeit[p2] >= 0 && !T.p.gemein[p2] ? T.g.lohn[T.p.arbeit[p2]] * (1 - Sim.steuerSatz(T)) : Sim.tageskosten(T, p2)) / ET);   // Haushalt: Nettolohn zum heutigen Satz
+      const T = neu(), p2 = kandidat(T), a2 = T.p.arbeit[p2];
+      // Betrag = 30 Tagessätze zu je Tagesnetto / 36,5; mit der Hälfte davon bleiben 15 Tagessätze offen. Tagesnetto hier selbst gerechnet,
+      // mit denselben Fällen wie § 40 StGB in der Simulation: Stelle zum heutigen Steuersatz (im Wehr- oder Ersatzdienst der Sold), sonst Rente
+      // der heutigen Stufe (ab 67 oder vor 67 ohne Stelle nach 45 Beitragsjahren), sonst Lebenshaltung; Betriebe schließt kandidat aus.
+      // Etappe 2 (Verblassen): Seit ERF_HALB 180 ist die gewählte Person hier eine 65-jährige Rentnerin (vorher 50, mit Stelle); dafür der Rentenzweig
+      const renteT = T.tag - T.p.geb[p2] >= R.RENTE * J || (a2 < 0 && T.p.besitz[p2] < 0 && T.p.beitrag[p2] >= R.BEITRAG_JAHRE * J);
+      const rente = R.RENTE_STUFEN[Math.min(R.RENTE_STUFEN.length - 1, Math.floor((T.tag - T.regierung.start) / R.RENTE_STUFE_TAGE))];
+      const quelle = a2 >= 0 && !T.p.gemein[p2] ? (T.p.bund[p2] >= Sim.WEHRDIENST ? 'Sold' : 'Lohn') : renteT ? 'Rente' : 'Lebenshaltung';
+      const netto = quelle === 'Sold' ? R.SOLD * (1 - Sim.steuerSatz(T)) : quelle === 'Lohn' ? T.g.lohn[a2] * (1 - Sim.steuerSatz(T))
+        : quelle === 'Rente' ? rente : Sim.tageskosten(T, p2);
+      const satz = Math.max(0.1, netto / ET);
       const voll = Math.max(1, Math.round(30 * satz)); T.p.geld[p2] = Math.floor(voll / 2);
       X.urteilen(T, verf(T, p2, Sim.BETRUG, -1));
       const offen = Math.ceil(30 * (voll - Math.floor(voll / 2)) / voll);
       pruef(T.p.haftBis[p2] === T.tag + Math.max(1, Math.ceil(Math.ceil(offen / 2) / ET)) && letzte(T).text.includes(`${offen} davon nicht`),
-        `halb bezahlt: ${offen} von 30 Tagessätzen offen → ${Math.ceil(offen / 2)} Tage Ersatzfreiheitsstrafe („${Sim.klartext(letzte(T).text).slice(0, 120)}…“)`);
+        `halb bezahlt: ${offen} von 30 Tagessätzen offen → ${Math.ceil(offen / 2)} Tage Ersatzfreiheitsstrafe, Tagessatz aus ${quelle} („${Sim.klartext(letzte(T).text).slice(0, 120)}…“)`);
     }
     // c) Wohnungseinbruch, erste Freiheitsstrafe, 3 Tage U-Haft: die Hälfte (5 Tage) absitzen, 3 angerechnet, Rest 5 Tage zur Bewährung
     {
@@ -2582,6 +2916,34 @@ if (flag('sicherheit')) {
         if (!e || !/^Spielstand (beschädigt|unvollständig)/.test(e.message)) fehler++;
       }
       console.log((meld.every(m => /: Spielstand (beschädigt|unvollständig)/.test(m)) ? '  ok   ' : '  FEHL ') + 'beschädigte Stände abgelehnt: ' + meld.join('; '));
+    }
+    // m) Vorarbeit Etappe 2 (R.OPFER_FREI): Ein Haushaltsvorstand in Haft ist kein Einbruchsopfer. Erzwungen wie
+    //    plaene/werkzeug/opfer_haft_basis.mjs: Vorstand in Strafhaft, ein anderer Erwachsener seines Haushalts frei; ein freier Täter aus
+    //    einem anderen Haushalt bricht 20.000-mal ein (nach jeder Tat wieder frei). Gegenprobe mit R.OPFER_FREI = 0 (wie 6c1741e): dort
+    //    trifft es den Vorstand in Haft; mit dem Schalter muss es mindestens zehnmal so viele Einbrüche lang nie passieren
+    {
+      const XM = M._sich;
+      const versuch = (frei) => {
+        const S = ladenAusText(M, basis), P = S.p, erw = S.tag - R.ERWACHSEN * J, alt = M.R.OPFER_FREI;
+        let k = -1, t = -1;
+        for (let x = 0; x < S.pMax && k < 0; x++) {
+          if (!P.lebt[x] || P.hh[x] !== x || P.wohnung[x] < 0 || P.haftBis[x]) continue;
+          if (S.bewohner[P.wohnung[x]].some(y => y !== x && P.hh[y] === x && P.geb[y] <= erw && !P.haftBis[y])) k = x;
+        }
+        if (k < 0) return null;
+        XM.haftAntritt(S, k, 30, M.HAFT_STRAF);
+        for (let x = 0; x < S.pMax && t < 0; x++) if (P.lebt[x] && P.geb[x] <= erw && P.hh[x] !== k && !P.haftBis[x]) t = x;
+        let einbrueche = 0, treffer = 0, erster = -1;
+        mc.__tat = (S2, p, typ, o) => { if (typ === M.EINBRUCH && o >= 0) { einbrueche++; if (o === k) { treffer++; if (erster < 0) erster = einbrueche; } } };
+        M.R.OPFER_FREI = frei;
+        for (let v = 0; v < 20000 && (frei || !treffer); v++) { XM.tatBegehen(S, t, M.EINBRUCH); if (P.haftBis[t]) P.haftBis[t] = 0; }
+        M.R.OPFER_FREI = alt; mc.__tat = null;
+        return { k, t, einbrueche, treffer, erster, haft: P.haftBis[k] > S.tag };
+      };
+      const an = versuch(1), aus = versuch(0);
+      pruef(an && aus && an.k === aus.k && an.haft && !an.treffer && aus.treffer > 0 && an.einbrueche >= 10 * aus.erster,
+        `Wohnungseinbruch (R.OPFER_FREI): Vorstand ${an ? an.k : '–'} in Strafhaft, ein anderer Erwachsener seines Haushalts frei; ${an ? an.einbrueche : 0} Einbrüche, `
+        + `Vorstand ${an ? an.treffer : '–'}-mal Opfer. Gegenprobe R.OPFER_FREI = 0 (wie 6c1741e): Vorstand in Haft Opfer beim ${aus && aus.treffer ? aus.erster + '.' : '– (nie)'} Einbruch`);
     }
   }
 
@@ -2970,7 +3332,9 @@ if (flag('militaer')) {
   {
     const S = Sim.neueStadt(2);
     bisStunde(S, 400, 13);
-    const da = (S) => { const i = Sim.bundInfo(S); return i.wehr >= 1 && i.ersatz >= 1 && i.verpflichtet >= 1 && i.dienstOffen && i.nachrichtendienst >= 1; };
+    // auch zivil ≥ 1: „Zivil mit Verpflichtung“ unten braucht jemanden mit der Rolle ZIVIL (ohne ihn änderte der Fall nichts, und der Stand
+    // würde zu Recht angenommen; Etappe 2: Seed 2 hat an Tag 400 niemanden mit ZIVIL)
+    const da = (S) => { const i = Sim.bundInfo(S); return i.wehr >= 1 && i.ersatz >= 1 && i.verpflichtet >= 1 && i.dienstOffen && i.nachrichtendienst >= 1 && i.zivil >= 1; };
     while (!da(S) && S.tag < 700) bisStunde(S, S.tag + 1, 13);
     const i = Sim.bundInfo(S), text = speichernAlsText(Sim, S), L = ladenAusText(Sim, text);
     const kanon = (o) => JSON.stringify(o, (k, v) => (v && typeof v === 'object' && !Array.isArray(v) && !ArrayBuffer.isView(v) ? Object.fromEntries(Object.keys(v).sort().map(x => [x, v[x]])) : v));
@@ -3719,11 +4083,13 @@ if (flag('rathaus')) {
   {
     const V8 = lade(simCode(readFileSync(join(hier, '..', 'stadt.orig.html'), 'utf8')));
     const spur = (S) => { const x = createHash('sha256');
-      for (const n of Object.keys(S.p).sort()) if (ArrayBuffer.isView(S.p[n]) && n !== 'schule') { const a = S.p[n], w = a.length / S.pKap; x.update(n); x.update(Buffer.from(a.buffer, a.byteOffset, S.pMax * w * a.BYTES_PER_ELEMENT)); }   // Schulplatz: gibt es in Version 8 nicht
+      for (const n of Object.keys(S.p).sort()) if (ArrayBuffer.isView(S.p[n]) && n !== 'schule' && !OHNE_GED.has(n)) { const a = S.p[n], w = a.length / S.pKap; x.update(n); x.update(Buffer.from(a.buffer, a.byteOffset, S.pMax * w * a.BYTES_PER_ELEMENT)); }   // Schulplatz: gibt es in Version 8 nicht; Etappe 2: memName und PF_GED (OHNE_GED)
+      x.update(gedNichtNull(S));                             // Etappe 2: Felder aus PF_GED, die nicht 0 sind, machen die Spur anders
       for (const n of Object.keys(S.g).sort()) { if (n === 'markt' || n === 'kraft') continue; const a = S.g[n]; x.update(n); x.update(Buffer.from(a.buffer, a.byteOffset, S.gAnzahl * a.BYTES_PER_ELEMENT)); }   // Teil 5: neue Felder
       x.update(Buffer.from(S.feld.buffer)); const st = { ...S.stat, tech: techAlt(S.stat.tech) }; delete st.rathaus; delete st.buergermeister; delete st.schule; delete st.aufgegeben;
       x.update(JSON.stringify([S.budget, S.rs, S.rsSich, S.rsAuto, S.tag, S.einwohner, st, kiAlt(S.ki), S.regierung, S.sicherheit, S.bund, S.erweiterung])); x.update(JSON.stringify(S.buch));   // Teil 4: ohne KI-Frist
       return x.digest('hex').slice(0, 16); };
+    const gedAn = gedAus(Sim);                               // Etappe 2 (Version 10): Gedächtnis und Vorarbeiten aus (wie 6c1741e); S.stat.ged gibt es dann nicht
     const alt = R.RATHAUS, altS = R.SCHULEN, altH = [R.HH_VORHABEN, R.HH_STEUER]; R.RATHAUS = 0; R.SCHULEN = 0;   // Schule (Version 9): für den Vergleich mit Version 8 ebenfalls aus
     R.HH_VORHABEN = 0; R.HH_STEUER = 0;                      // Haushalt (Teil 3): nur Buchführung (Lohnsteuer 10 %, keine Vorhaben), sonst liefe die Stadt anders
     const altA = R.ANLAUF_STUFE; R.ANLAUF_STUFE = 0;         // Wachstum (Teil 4): ohne Anlauf, sonst zögen am Anfang mehr Leute zu
@@ -3734,7 +4100,7 @@ if (flag('rathaus')) {
       for (let d = 1; d <= bisTag; d++) { bis(V8, A, d); bis(Sim, B, d); n++; if (erster < 0 && spur(A) !== spur(B)) erster = d; }
       pruef(erster < 0 && B.buergermeister.p === -1, `Seed ${seed}: ${n} Tage verglichen (Personen, Gebäude, Felder, Budget, Zufall, Summen, Hauptfiguren, Stadtbuch), ${erster < 0 ? 'jeden Tag gleich' : 'erster Unterschied an Tag ' + erster}`);
     }
-    R.RATHAUS = alt; R.SCHULEN = altS; [R.HH_VORHABEN, R.HH_STEUER] = altH; R.ANLAUF_STUFE = altA; [R.TECH_FRUEH, R.WELT, R.ZUZUG_GENAU] = altT;
+    R.RATHAUS = alt; R.SCHULEN = altS; [R.HH_VORHABEN, R.HH_STEUER] = altH; R.ANLAUF_STUFE = altA; [R.TECH_FRUEH, R.WELT, R.ZUZUG_GENAU] = altT; gedAn();
   }
   console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen` : 'Alle Prüfungen zum Rathaus bestanden');
   process.exit(fehler ? 1 : 0);
@@ -4335,11 +4701,12 @@ if (flag('schule')) {
     const altR = R.RATHAUS, altH = [R.HH_VORHABEN, R.HH_STEUER]; R.RATHAUS = 0; R.SCHULEN = 0; R.HH_VORHABEN = 0; R.HH_STEUER = 0;   // Haushalt: nur Buchführung
     const altA = R.ANLAUF_STUFE; R.ANLAUF_STUFE = 0;         // Wachstum (Teil 4): ohne Anlauf
     const altT = [R.TECH_FRUEH, R.WELT, R.ZUZUG_GENAU]; R.TECH_FRUEH = 0; R.WELT = 0; R.ZUZUG_GENAU = 0;   // Teil 5: ohne Tech früher und Weltmarkt; Zuzug wie vorher (Schlussprüfung)
+    const gedAn = gedAus(Sim);                               // Etappe 2 (Version 10): Gedächtnis und Vorarbeiten aus (wie 6c1741e)
     const A = V8.neueStadt(3), B = Sim.neueStadt(3); let erster = -1;
     const spur = (X, S) => { const k = X.kennzahlen(S); return JSON.stringify([k.einwohner, k.budget, k.freieStellen, k.zufriedenheit, S.rs, S.buchNr, S.buch.slice(-3).map(e => e.text)]); };
     for (let d = 1; d <= 200 && erster < 0; d++) { bis(V8, A, d); bis(Sim, B, d); if (spur(V8, A) !== spur(Sim, B)) erster = d; }
-    R.RATHAUS = altR; R.SCHULEN = alt; [R.HH_VORHABEN, R.HH_STEUER] = altH; R.ANLAUF_STUFE = altA; [R.TECH_FRUEH, R.WELT, R.ZUZUG_GENAU] = altT;
-    pruef(erster < 0, `R.SCHULEN = 0 und R.RATHAUS = 0, Haushalt nur Buchführung, ohne Anlauf, ohne Tech früher und Weltmarkt (Seed 3): 200 Tage jeden Tag wie Version 8${erster < 0 ? '' : ', VERSCHIEDEN ab Tag ' + erster}`);
+    R.RATHAUS = altR; R.SCHULEN = alt; [R.HH_VORHABEN, R.HH_STEUER] = altH; R.ANLAUF_STUFE = altA; [R.TECH_FRUEH, R.WELT, R.ZUZUG_GENAU] = altT; gedAn();
+    pruef(erster < 0, `R.SCHULEN = 0 und R.RATHAUS = 0, Haushalt nur Buchführung, ohne Anlauf, ohne Tech früher und Weltmarkt, ohne Gedächtnis (R.GED = 0, Vorarbeiten aus) (Seed 3): 200 Tage jeden Tag wie Version 8${erster < 0 ? '' : ', VERSCHIEDEN ab Tag ' + erster}`);
   }
 
   console.log('H Gruppen (nur gemessen; keine Regel liest diese Merkmale): Schülertage in der Stadt und im Nachbarort');
@@ -4681,17 +5048,19 @@ if (flag('wachstum')) {
   {
     const V8 = lade(simCode(readFileSync(join(hier, '..', 'stadt.orig.html'), 'utf8')));
     const spur = (S) => { const x = createHash('sha256');
-      for (const n of Object.keys(S.p).sort()) if (ArrayBuffer.isView(S.p[n]) && n !== 'schule') { const a = S.p[n], w = a.length / S.pKap; x.update(n); x.update(Buffer.from(a.buffer, a.byteOffset, S.pMax * w * a.BYTES_PER_ELEMENT)); }
+      for (const n of Object.keys(S.p).sort()) if (ArrayBuffer.isView(S.p[n]) && n !== 'schule' && !OHNE_GED.has(n)) { const a = S.p[n], w = a.length / S.pKap; x.update(n); x.update(Buffer.from(a.buffer, a.byteOffset, S.pMax * w * a.BYTES_PER_ELEMENT)); }   // Etappe 2: ohne memName und PF_GED
+      x.update(gedNichtNull(S));                             // Etappe 2: Felder aus PF_GED, die nicht 0 sind, machen die Spur anders
       for (const n of Object.keys(S.g).sort()) { if (n === 'markt' || n === 'kraft') continue; const a = S.g[n]; x.update(n); x.update(Buffer.from(a.buffer, a.byteOffset, S.gAnzahl * a.BYTES_PER_ELEMENT)); }   // Teil 5: neue Felder
       x.update(Buffer.from(S.feld.buffer)); const st = { ...S.stat, tech: techAlt(S.stat.tech) }; delete st.rathaus; delete st.buergermeister; delete st.schule; delete st.aufgegeben;
       x.update(JSON.stringify([S.budget, S.rs, S.rsSich, S.rsAuto, S.tag, S.einwohner, st, kiAlt(S.ki), S.regierung, S.sicherheit, S.bund, S.erweiterung])); x.update(JSON.stringify(S.buch));
       return x.digest('hex').slice(0, 16); };
-    const alt = AUS.slice(7).map(k => R[k]);                   // Rathaus, Schulen, Vorhaben, Lohnsteuer des Haushalts, Anlauf, Tech früher und Weltmarkt (Teil 5)
+    const alt = AUS.slice(7).map(k => R[k]);                   // Rathaus, Schulen, Vorhaben, Lohnsteuer des Haushalts, Anlauf, Tech früher und Weltmarkt (Teil 5); Etappe 2: GED, Vorarbeiten
     R.RATHAUS = 0; R.SCHULEN = 0; R.HH_VORHABEN = 0; R.HH_STEUER = 0; R.ANLAUF_STUFE = 0; R.TECH_FRUEH = 0; R.WELT = 0; R.ZUZUG_GENAU = 0;
+    R.GED = 0; R.OPFER_FREI = 0; R.HAFT_EROEFFNUNG = 0;     // Etappe 2 (Version 10): Gedächtnis und Vorarbeiten aus (wie 6c1741e)
     for (const seed of [1, 2, 3]) {
       const A = V8.neueStadt(seed), B = Sim.neueStadt(seed); let erster = -1;
       for (let d = 1; d <= 200 && erster < 0; d++) { bis(V8, A, d); bis(Sim, B, d); if (spur(A) !== spur(B)) erster = d; }
-      pruef(erster < 0, `Seed ${seed}, ohne Anlauf und ohne die Bausteine von Version 9: 200 Tage ${erster < 0 ? 'jeden Tag wie Version 8' : 'VERSCHIEDEN ab Tag ' + erster} (${B.einwohner} Einwohner)`);
+      pruef(erster < 0, `Seed ${seed}, ohne Anlauf und ohne die Bausteine von Version 9 und 10: 200 Tage ${erster < 0 ? 'jeden Tag wie Version 8' : 'VERSCHIEDEN ab Tag ' + erster} (${B.einwohner} Einwohner)`);
     }
     AUS.slice(7).forEach((k, i) => { R[k] = alt[i]; });
     if (arg('alt')) {                                         // die Fassung vor Teil 4 (alles an): ohne Anlauf und mit ihrem Vorrat (6) Tag für Tag gleich
@@ -5008,20 +5377,21 @@ if (flag('techfrueh')) {
   console.log('B Ausgeschaltet wie vorher');
   {
     const spur = (S, ohneG) => { const x = createHash('sha256');
-      for (const n of Object.keys(S.p).sort()) if (ArrayBuffer.isView(S.p[n]) && n !== 'schule') { const a = S.p[n], w = a.length / S.pKap; x.update(n); x.update(Buffer.from(a.buffer, a.byteOffset, S.pMax * w * a.BYTES_PER_ELEMENT)); }
+      for (const n of Object.keys(S.p).sort()) if (ArrayBuffer.isView(S.p[n]) && n !== 'schule' && !OHNE_GED.has(n)) { const a = S.p[n], w = a.length / S.pKap; x.update(n); x.update(Buffer.from(a.buffer, a.byteOffset, S.pMax * w * a.BYTES_PER_ELEMENT)); }   // Etappe 2: ohne memName und PF_GED
+      x.update(gedNichtNull(S));                             // Etappe 2: Felder aus PF_GED, die nicht 0 sind, machen die Spur anders
       for (const n of Object.keys(S.g).sort()) { if (ohneG.has(n)) continue; const a = S.g[n]; x.update(n); x.update(Buffer.from(a.buffer, a.byteOffset, S.gAnzahl * a.BYTES_PER_ELEMENT)); }
       x.update(Buffer.from(S.feld.buffer)); const st = statAlt(S.stat);
       x.update(JSON.stringify([S.budget, S.rs, S.rsSich, S.rsAuto, S.tag, S.einwohner, st, kiAlt(S.ki), S.regierung, S.sicherheit, S.bund, S.erweiterung])); x.update(JSON.stringify(S.buch));
       return x.digest('hex').slice(0, 16); };
     const V8 = lade(simCode(readFileSync(join(hier, '..', 'stadt.orig.html'), 'utf8')));
-    const V9 = ['RATHAUS', 'SCHULEN', 'HH_VORHABEN', 'HH_STEUER', 'ANLAUF_STUFE', 'TECH_FRUEH', 'WELT', 'ZUZUG_GENAU'], alt = V9.map(k => R[k]);   // alle Bausteine von Version 9 aus
+    const V9 = ['RATHAUS', 'SCHULEN', 'HH_VORHABEN', 'HH_STEUER', 'ANLAUF_STUFE', 'TECH_FRUEH', 'WELT', 'ZUZUG_GENAU', ...GED_AUS], alt = V9.map(k => R[k]);   // alle Bausteine von Version 9 aus; Etappe 2 (Version 10): Gedächtnis und Vorarbeiten ebenso
     for (const k of V9) R[k] = 0;
     let techGr = 0;                                          // über die drei Seeds muss es Tech-Gründungen geben
     for (const seed of [1, 2, 3]) {
       const A = V8.neueStadt(seed), B = Sim.neueStadt(seed); let erster = -1;
       for (let d = 1; d <= 200 && erster < 0; d++) { bis(V8, A, d); bis(Sim, B, d); if (spur(A, new Set()) !== spur(B, new Set(Sim.GF_TECH9))) erster = d; }
       techGr += B.stat.tech.gruendungen;
-      pruef(erster < 0 && (seed < 3 || techGr > 0), `Seed ${seed}, TECH_FRUEH 0 und WELT 0, ohne die übrigen Bausteine von Version 9: 200 Tage ${erster < 0 ? 'jeden Tag wie 31ce452' : 'VERSCHIEDEN ab Tag ' + erster}`
+      pruef(erster < 0 && (seed < 3 || techGr > 0), `Seed ${seed}, TECH_FRUEH 0 und WELT 0, ohne die übrigen Bausteine von Version 9 und 10: 200 Tage ${erster < 0 ? 'jeden Tag wie 31ce452' : 'VERSCHIEDEN ab Tag ' + erster}`
         + ` (${B.einwohner} Einwohner, ${B.stat.tech.gruendungen} Tech-Gründungen)`);
     }
     V9.forEach((k, i) => { R[k] = alt[i]; });
@@ -5255,6 +5625,548 @@ if (flag('techfrueh')) {
   process.exit(fehler ? 1 : 0);
 }
 
+if (flag('gedaechtnis')) {
+  // Etappe 2 (Version 10): Gedächtnis, Erfahrung und Plan (VERGLEICH.md Schritt 4). Teile:
+  //  A Gegenprobe (Seeds 1–3, 365 Tage, stündlich wie im Spiel): Vor jeder echten Entscheidung wählt dieselbe Person im selben Zustand mit
+  //    demselben S.rs noch einmal „nur wählen“ (entscheide(S, p, h, probe)): mit allem (= echte Wahl), ohne Erfahrung und Plan (Erfahrungs-Bytes
+  //    gelöscht, Bit 4), und je Unterschied nur das eine Byte der beteiligten Handlung gelöscht. Soll (Punkt 8, Schritt 1): echte Wahl = Probe
+  //    immer; in jedem Seed ≥ 0,3 % der Entscheidungen anders, davon ≥ 85 % direkt (eine beteiligte Handlung ist eine mit Erfahrung oder Plan);
+  //    ein Byte gelöscht stellt in ≥ 99 % die Wahl ohne Erfahrung her. Beobachter (Sim.beobachter) im selben Lauf = Gegenprobe: genau eine
+  //    Meldung je direktem Unterschied, mit denselben Handlungen, sonst keine. Danach Fingerabdruck gleich einem Lauf ohne Probe und Beobachter.
+  //    Jede Nacht Gedächtnisgrenzen im Lauf: gedPruefen, Kurzzeit 3 Plätze, Langzeit nur ab MEM_SCHWELLE, nur mit voller Kurzzeit, älter als sie.
+  //    Seit der Schlussprüfung (Befund Bedienung): Der Beobachter ruft wie die Oberfläche Sim.warum(S, p, stunde, rsVor) auf. warum nennt die
+  //    gemeldete Wahl und „ohne beides“, und jeder Satz „Ohne … hätte …“ der Karte ist aus der Rechnung seines Vergleichs nachrechenbar: dort
+  //    liegt die genannte Handlung mit der höchsten Summe über der Schwelle vorn (bei „nichts“ keine darüber), und die zwei gezeigten Zeilen
+  //    (genannte Handlung, echte Wahl) reichen dafür (Summen auf zwei Stellen wie in der Karte; genau 25 = „knapp über 25“)
+  //  B Schalter aus (R.GED, OPFER_FREI, HAFT_EROEFFNUNG = 0): Seeds 1–3, 365 Tage, stündlich und in Tagesschritten, jeden Tag wie 6c1741e (--git;
+  //    alle Arrays, Einzelwerte, JSON-Teile, Schlüssel von S; nur memName (bis Version 9) und die Nummer der Version ausgenommen, PF_GED bleibt 0)
+  //  C Gedächtnisgrenzen erzwungen: Kurzzeit der Reihe nach, was herausfällt, kommt nur ab MEM_SCHWELLE in die Langzeit, volle Langzeit verdrängt
+  //    nur, was weniger zählt (Gleichstand: der alte bleibt), 1.000 Ereignisse bleiben in den 8 Plätzen der Person
+  //  D Planabbruch erzwungen: Alter, Pleite (echte Pleite des eigenen Betriebs), Ziel von außen, dazu schlechte Erfahrung und Rente
+  //  E ID-Wiederverwendung mit Generation: Person stirbt, ihr Platz wird neu vergeben; die neue Person erbt nichts, Erinnerungen an die alte
+  //    nennen die Beziehung, nie den Namen der neuen
+  //  F Migration von Version 9 (6c1741e) und beschädigte Stände der Version 10
+  //  G Aufholen: 1 × 30 = 3 × 10 Tage bitgleich über offene Handlungen hinweg (0 Uhr in Tagesschritten, 13 Uhr stündlich), auch mit Beobachter
+  //  H harte Grenze: statische Leseliste der neuen Funktionen und Zeilen (mit Gegenprobe), Namenstausch 200 Tage bitgleich
+  //  I kiepisode: Ziele werden ohne Platz gezählt (ein Eintrag, der in die Langzeit rückt, zählt einmal)
+  //   node tools/simtest.mjs --gedaechtnis [--git ordner] [--tage 365] [--seeds 1,2,3]
+  let fehler = 0;
+  const pruef = (ok, text) => { console.log((ok ? '  ok   ' : '  FEHL ') + text); if (!ok) fehler++; };
+  const t00 = performance.now();
+  const tage = Number(arg('tage', '365')), seeds = arg('seeds', '1,2,3').split(',').map(Number);
+  const R = Sim.R, J = R.JAHR, M8 = R.MEM, MK = R.MEM_KURZ;
+  // Prüf-Fassung: dieselbe Simulation mit zwei Haken in entscheide (nur aktiv, wenn gesetzt) und mehr Innereien in _ged (nur zum Erzwingen)
+  const { Sim: G, ctx: gc } = ladeSimMit([
+    ['  if (S.p.haftBis[p]) return 0;                              // Sicherheit: in Haft keine Entscheidungen',
+     '  if (!probe && globalThis.__G) globalThis.__G(S, p, h);\n  if (S.p.haftBis[p]) return 0;                              // Sicherheit: in Haft keine Entscheidungen'],
+    ['  ausfuehren(S, p, bestA, Q.REGELN);\n  return bestA;\n}', '  if (globalThis.__ECHT) globalThis.__ECHT(bestA);\n  ausfuehren(S, p, bestA, Q.REGELN);\n  return bestA;\n}'],
+    ['_ged: { migriereGed, gedPruefen, planSchrittVon, gedStatLeer },',
+     '_ged: { migriereGed, gedPruefen, planSchrittVon, gedStatLeer, erinnere, zielPruefen, zielVonAussen, zielErreicht, PG, EG, erfLage, pleite, M_BEZUG },'],
+  ]);
+  const Gi = G._ged, GM = G.M, PG = Gi.PG;
+  const summe = (a) => (a ? a.reduce((x, y) => x + y, 0) : 0);
+  const bisG = (X, S, tag, stunde = 0) => { while (S.tag < tag || (S.tag === tag && S.stunde < stunde)) X.stunde(S); };
+  const gitOrdner = arg('git', hier);
+  const zeigeGit = (c) => execFileSync('git', ['show', c + ':stadt/stadt.html'], { cwd: gitOrdner, encoding: 'utf8', maxBuffer: 1 << 26 });
+  const ladeAus = (h) => { const ctx = vm.createContext({}); vm.runInContext(`Math.random = () => { throw new Error('Math.random'); };`, ctx);
+    vm.runInContext(h.match(/<script id="sim">([\s\S]*?)<\/script>/)[1], ctx); return ctx.StadtSim; };
+  pruef(R.GED === 1 && G.R.GED === 1, `Standard: R.GED = ${R.GED}, Stärke ${R.GED_STAERKE}, Rücklage ${R.PLAN_RUECKLAGE}, Verblassen ${R.ERF_HALB}; Version ${Sim.VERSION}`);
+
+  // Gedächtnisgrenzen einer Stadt (jede Nacht in A): gedPruefen (Wertebereiche, wie beim Laden) und die Ordnung von Kurz- und Langzeit
+  const grenzenFehl = (X, S) => {
+    const P = S.p, f = { pruefen: 0, lang: 0, voll: 0, alt: 0 };
+    try { X._ged.gedPruefen(S); } catch (e) { f.pruefen++; }
+    for (let p = 0; p < S.pMax; p++) {
+      if (!P.lebt[p]) continue;
+      const o = p * M8;
+      let kurzMin = Infinity, kurzN = 0, langMax = -Infinity, langN = 0;
+      for (let j = 0; j < M8; j++) {
+        const i = o + j; if (!P.memCode[i]) continue;
+        if (j < MK) { kurzN++; kurzMin = Math.min(kurzMin, P.memTag[i]); }
+        else { langN++; langMax = Math.max(langMax, P.memTag[i]); if (X.M_BED[P.memCode[i]] < R.MEM_SCHWELLE) f.lang++; }
+      }
+      if (langN && kurzN < MK) f.voll++;
+      if (langN && langMax > kurzMin) f.alt++;
+    }
+    return f;
+  };
+
+  console.log(`A Gegenprobe, Beobachter und Gedächtnisgrenzen (Seeds ${seeds.join(', ')}, ${tage} Tage, stündlich)`);
+  {
+    const AN = G.AKTIONSNAMEN, EA = G.ERF_AKTION, D = new Set(EA), nm = (a) => AN[a] || 'nichts';
+    for (const seed of seeds) {
+      const z = { ent: 0, echtGleich: 0, echtAnders: 0, anders: 0, direkt: 0, direktP: 0, byteBet: 0, byteGel: 0, byteZur: 0, meld: 0, fehlend: 0, zuviel: 0, ohneErw: 0, andere: 0,
+        paare: {}, grenzen: { pruefen: 0, lang: 0, voll: 0, alt: 0 }, naechte: 0, wGleich: 0, saetze: 0, vorn: 0, gezeigt: 0, knapp: 0, gleich: 0 };
+      // „Warum?“ wie die Karte (warumHtml): Sätze je Vergleich, Rechnung des Vergleichs, gezeigt werden genannte Handlung und echte Wahl
+      const warumPruefen = (w, mitA, ohneA) => {
+        if (!w || w.kind || w.inHaft) return;
+        if (w.wahl === nm(mitA) && w.ohneBeides === nm(ohneA)) z.wGleich++;
+        const saetze = [['erfahrung', w.ohneErfahrung]];
+        if (w.ohnePlan !== w.wahl) saetze.push(['plan', w.ohnePlan]);
+        if (w.ohneBeides !== w.wahl && w.ohneBeides !== w.ohneErfahrung && w.ohneBeides !== w.ohnePlan) saetze.push(['beides', w.ohneBeides]);
+        for (const [k, soll] of saetze) {
+          if (soll === w.wahl) continue;
+          z.saetze++;
+          const L = w.rechnung && w.rechnung[k];
+          if (!L) continue;
+          const maxS = L.length ? Math.max(...L.map(r => r.summe)) : -Infinity, s = (a) => { const r = L.find(q => q.aktion === a); return r ? r.summe : null; };
+          if (soll === 'nichts' ? maxS <= w.schwelle : maxS >= w.schwelle && L.some(r => r.aktion === soll && r.summe === maxS)) z.vorn++;
+          const sSoll = soll === 'nichts' ? null : s(soll), sEcht = w.wahl === 'nichts' ? null : s(w.wahl);
+          if (sSoll === w.schwelle) z.knapp++;
+          if (sSoll !== null && sSoll === sEcht) z.gleich++;                // gerundet gleich: die Karte sagt „knapp vorn“
+          if (soll === 'nichts' ? sEcht === null || sEcht <= w.schwelle : sSoll !== null && sSoll >= w.schwelle && (sEcht === null || sSoll >= sEcht)) z.gezeigt++;
+        }
+      };
+      let S = null;
+      let erwartet = -1, offen = null;
+      const pruefeErwartet = (echt) => { if (erwartet < 0) return; if (echt === erwartet) z.echtGleich++; else z.echtAnders++; erwartet = -1; };
+      const abschliessen = () => { if (!offen) return; if (offen.direkt && offen.gemeldet === 0) z.fehlend++; if (offen.gemeldet > (offen.direkt ? 1 : 0)) z.zuviel++; offen = null; };
+      gc.__ECHT = (a) => pruefeErwartet(a);
+      gc.__G = (S, p, h) => {
+        pruefeErwartet(0); abschliessen();                    // die vorige Entscheidung ohne Ausführung endete mit „nichts“
+        z.ent++;
+        const P = S.p, rs = S.rs, c0 = p * 8;
+        const mit = G.entscheide(S, p, h, 1); S.rs = rs;
+        const ohneP = G.entscheide(S, p, h, 1 | 2 | 4); S.rs = rs;   // ohne Erfahrung und Plan (Parameter, wie der Beobachter rechnet)
+        const alt = P.erf.slice(c0, c0 + 8);
+        let ohne = ohneP, ohneE = mit;
+        if (alt.some(x => x)) {                              // dieselbe Wahl mit gelöschten Bytes statt Parameter
+          P.erf.fill(0, c0, c0 + 8);
+          ohne = G.entscheide(S, p, h, 1 | 4); S.rs = rs;
+          ohneE = G.entscheide(S, p, h, 1); S.rs = rs;
+          P.erf.set(alt, c0);
+        }
+        if (ohne !== mit) {
+          z.anders++;
+          if (D.has(mit) || D.has(ohne)) z.direkt++;
+          const k = nm(ohne) + ' → ' + nm(mit); z.paare[k] = (z.paare[k] || 0) + 1;
+        }
+        if (ohneE !== mit) {                                 // nur das eine Byte der beteiligten Erfahrungs-Handlung (heutige Lage) löschen
+          const s = EA.indexOf(mit) >= 0 ? EA.indexOf(mit) : EA.indexOf(ohneE);
+          if (s >= 0) {
+            z.byteBet++;
+            const c = c0 + 2 * s + Gi.erfLage(P, p), b = P.erf[c];
+            if (b & 3) { P.erf[c] = 0; const r = G.entscheide(S, p, h, 1); S.rs = rs; P.erf[c] = b; z.byteGel++; if (r === ohneE) z.byteZur++; }
+          }
+        }
+        offen = { p, mit, ohne: ohneP, direkt: ohneP !== mit && (D.has(mit) || D.has(ohneP)), gemeldet: 0 };
+        if (offen.direkt) z.direktP++;
+        erwartet = mit;
+      };
+      G.beobachter = (p, gen, tag, stunde, mitA, ohneA, grund, rsVor) => {
+        z.meld++;
+        warumPruefen(G.warum(S, p, stunde, rsVor), mitA, ohneA);   // nur lesend; der Fingerabdruck unten prüft es mit
+        if (!offen || offen.p !== p) { z.ohneErw++; return; }
+        offen.gemeldet++;
+        if (mitA !== offen.mit || ohneA !== offen.ohne) z.andere++;
+      };
+      S = G.neueStadt(seed);
+      for (let d = 1; d <= tage; d++) {
+        while (S.tag < d) G.stunde(S);
+        const f = grenzenFehl(G, S); z.naechte++;
+        for (const k in f) z.grenzen[k] += f[k];
+      }
+      pruefeErwartet(0); abschliessen();
+      gc.__G = gc.__ECHT = null; G.beobachter = null;
+      const fpProbe = fingerabdruck(G, S);
+      const S0 = Sim.neueStadt(seed); while (S0.tag < tage) Sim.stunde(S0);
+      const fp0 = fingerabdruck(Sim, S0), gelernt = summe(S.stat.ged.gelernt);
+      const anteil = 100 * z.anders / z.ent, direkt = z.anders ? 100 * z.direkt / z.anders : 0, zur = z.byteGel ? 100 * z.byteZur / z.byteGel : 0;
+      const top = Object.entries(z.paare).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, n]) => `${k} ${n}`).join(', ');
+      pruef(z.echtAnders === 0 && z.echtGleich === z.ent && fpProbe === fp0,
+        `Seed ${seed}: ${z.ent} Entscheidungen, echte Wahl = Probe in ${z.echtGleich} (anders ${z.echtAnders}); Fingerabdruck mit Probe und Beobachter ${fpProbe}, ohne ${fp0} → ${fpProbe === fp0 ? 'gleich' : 'VERSCHIEDEN'} (${S.einwohner} Einw., ${gelernt} Erfahrungen gelernt)`);
+      pruef(anteil >= 0.3 && direkt >= 85 && z.byteGel > 0 && zur >= 99,
+        `Seed ${seed}: ohne Erfahrung und Plan anders ${z.anders} = ${anteil.toFixed(3)} % (Soll ≥ 0,3 %), davon direkt ${direkt.toFixed(1)} % (Soll ≥ 85 %); `
+        + `ein Byte gelöscht: in ${z.byteZur} von ${z.byteGel} (${zur.toFixed(2)} %, Soll ≥ 99 %) wie ohne Erfahrung; häufigste: ${top}`);
+      pruef(z.meld === z.direktP && z.meld > 0 && z.fehlend === 0 && z.zuviel === 0 && z.ohneErw === 0 && z.andere === 0,
+        `Seed ${seed}: Beobachter = Gegenprobe: ${z.meld} Meldungen, ${z.direktP} direkte Unterschiede (ohne Erfahrung und Plan wie der Beobachter gerechnet, Parameter; mit gelöschten Bytes ${z.direkt}); `
+        + `fehlend ${z.fehlend}, zu viel ${z.zuviel}, ohne Entscheidung ${z.ohneErw}, andere Handlungen ${z.andere}`);
+      pruef(z.meld > 0 && z.wGleich === z.meld && z.saetze > 0 && z.vorn === z.saetze && z.gezeigt === z.saetze,
+        `Seed ${seed}: „Warum?“ zu jeder Meldung: nennt die gemeldete Wahl und „ohne beides“ in ${z.wGleich} von ${z.meld}; ${z.saetze} Sätze „Ohne … hätte …“, `
+        + `in der Rechnung ihres Vergleichs vorn ${z.vorn}, aus den zwei gezeigten Zeilen nachrechenbar ${z.gezeigt} (davon „knapp über“ ${z.knapp}, gerundet gleich mit „knapp vorn“ ${z.gleich})`);
+      const g = z.grenzen;
+      pruef(!g.pruefen && !g.lang && !g.voll && !g.alt,
+        `Seed ${seed}: Gedächtnisgrenzen in ${z.naechte} Nächten: gedPruefen ${g.pruefen} Fehler; Langzeit unter MEM_SCHWELLE ${g.lang}, Langzeit ohne volle Kurzzeit ${g.voll}, Langzeit jünger als Kurzzeit ${g.alt}`);
+    }
+  }
+
+  console.log(`B Schalter aus (R.GED, OPFER_FREI, HAFT_EROEFFNUNG = 0): Tag für Tag wie 6c1741e (git ${gitOrdner})`);
+  {
+    const V9 = ladeAus(zeigeGit('6c1741e')), N = ladeSim();
+    gedAus(N);
+    const neuFelder = new Set(N.PF_GED.map(n => 'p.' + n)), bytes = (a) => Buffer.from(a.daten.buffer, a.daten.byteOffset, a.daten.byteLength);
+    pruef(V9.VERSION === 9 && N.VERSION === 10 && N.R.GED === 0 && N.R.OPFER_FREI === 0 && N.R.HAFT_EROEFFNUNG === 0, `Vergleich Version ${V9.VERSION} (6c1741e) mit Version ${N.VERSION}, Schalter aus`);
+    for (const tagschritt of [false, true]) {
+      for (const seed of seeds) {
+        const a = V9.neueStadt(seed), b = N.neueStadt(seed);
+        let erster = null, gleich = 0, memName = 0;
+        for (let d = 1; d <= tage && !erster; d++) {
+          if (tagschritt) { V9.tagSchritt(a); N.tagSchritt(b); } else { while (a.tag < d) V9.stunde(a); while (b.tag < d) N.stunde(b); }
+          const ea = V9.exportZustand(a), eb = N.exportZustand(b), nb = new Map(eb.arrays.map(x => [x.name, x]));
+          for (const x of ea.arrays) {
+            if (x.name === 'p.memName') { if (x.daten.some(v => v !== 0)) memName++; if (nb.has('p.memName')) { erster = `Tag ${d}: p.memName gibt es noch`; break; } continue; }
+            const y = nb.get(x.name);
+            if (!y || x.typ !== y.typ || Buffer.compare(bytes(x), bytes(y))) { erster = `Tag ${d}: Array ${x.name}`; break; }
+          }
+          for (const y of eb.arrays) if (!erster && !ea.arrays.some(x => x.name === y.name) && (!neuFelder.has(y.name) || y.daten.some(v => v !== 0))) erster = `Tag ${d}: Array ${y.name} ${neuFelder.has(y.name) ? '≠ 0' : 'unbekannt'}`;
+          if (!erster && (ea.werte.version !== 9 || eb.werte.version !== 10)) erster = `Tag ${d}: Version ${ea.werte.version}/${eb.werte.version}`;
+          if (!erster && JSON.stringify({ ...ea.werte, version: 0 }) !== JSON.stringify({ ...eb.werte, version: 0 })) erster = `Tag ${d}: Einzelwerte`;
+          if (!erster && JSON.stringify(ea.json) !== JSON.stringify(eb.json)) erster = `Tag ${d}: JSON-Teile`;
+          if (!erster && Object.keys(a).join() !== Object.keys(b).join()) erster = `Tag ${d}: Schlüssel von S`;
+          if (!erster) gleich++;
+        }
+        pruef(!erster && gleich === tage && memName > 0, `Seed ${seed}, ${tagschritt ? 'Tagesschritte' : 'stündlich'}: ${gleich} von ${tage} Tagen gleich${erster ? ', VERSCHIEDEN ab ' + erster : ''} `
+          + `(${a.einwohner} / ${b.einwohner} Einw.; memName in 6c1741e an ${memName} Tagen ≠ 0, nur Anzeige)`);
+      }
+    }
+  }
+
+  // Stand für C, D: Seed 1, Tag 300, 8 Uhr (Stufe Stadt, Pläne und Erfahrungen da)
+  const S300 = Sim.neueStadt(1); bisG(Sim, S300, 300, 8);
+  const text300 = speichernAlsText(Sim, S300);
+  const neu300 = () => ladenAusText(G, text300);
+  const erwachsen = (S, p) => S.p.lebt[p] && S.tag - S.p.geb[p] >= R.ERWACHSEN * J;
+
+  console.log('C Gedächtnisgrenzen erzwungen (Seed 1, Tag 300)');
+  {
+    const S = neu300(), P = S.p;
+    let p = -1; for (let q = 1; q < S.pMax - 1 && p < 0; q++) if (erwachsen(S, q) && !P.offen[q] && P.lebt[q - 1] && P.lebt[q + 1]) p = q;
+    const nachbarn = () => [p - 1, p + 1].map(q => ['memCode', 'memTag', 'memRef', 'memGen', 'memFakt', 'memVon'].map(n => Array.from(P[n].slice(q * M8, q * M8 + M8)).join(',')).join('|') + '/' + P.memPos[q]).join(' ');
+    const vorher = nachbarn();
+    for (let i = p * M8; i < p * M8 + M8; i++) { P.memCode[i] = 0; P.memTag[i] = 0; P.memRef[i] = -1; P.memGen[i] = 0; P.memFakt[i] = 0; P.memVon[i] = 0; }
+    P.memPos[p] = 0;
+    const codes = G.M_BED.map((b, c) => [c, b]).filter(([c]) => c > 0);
+    const unwichtig = codes.filter(([, b]) => b < R.MEM_SCHWELLE).map(([c]) => c), wichtig = codes.filter(([, b]) => b >= R.MEM_SCHWELLE).sort((a, b) => a[1] - b[1]);
+    const w60 = wichtig.find(([, b]) => b === 60)[0], w85 = wichtig.at(-1)[0], wKlein = wichtig[0][0];
+    const kurz = () => Array.from({ length: MK }, (x, j) => P.memCode[p * M8 + (P.memPos[p] + j) % MK]);
+    const lang = () => Array.from({ length: M8 - MK }, (x, j) => P.memCode[p * M8 + MK + j]).filter(Boolean).sort((a, b) => a - b);
+    const e = (c) => Gi.erinnere(S, p, c, -1);
+    // 1. drei wichtige: Kurzzeit der Reihe nach, Langzeit leer
+    e(w60); e(w85); e(wKlein);
+    const k1 = kurz().join(), l1 = lang().join();
+    // 2. ein unwichtiges: das älteste (w60) fällt heraus und kommt in die Langzeit
+    e(unwichtig[0]);
+    const k2 = kurz().join(), l2 = lang().join();
+    // 3. drei unwichtige: w85, wKlein fallen heraus (Langzeit), dann ein unwichtiges (vergessen)
+    e(unwichtig[0]); e(unwichtig[1] || unwichtig[0]); e(unwichtig[0]);
+    const l3 = lang().join();
+    pruef(k1 === [w60, w85, wKlein].join() && l1 === '' && k2 === [w85, wKlein, unwichtig[0]].join() && l2 === String(w60)
+      && l3 === [w60, wKlein, w85].sort((a, b) => a - b).join() && P.memPos[p] < MK,
+      `Kurzzeit der Reihe nach (${k1}), nach dem 4. Ereignis in der Langzeit nur das älteste (${l2}), unwichtige (Bedeutung < ${R.MEM_SCHWELLE}: Codes ${unwichtig.join(', ')}) nie (Langzeit ${l3})`);
+    // 4. Langzeit voll mit w60 (Bedeutung 60, heute gleich alt): ein weiteres w60 verdrängt nichts (Gleichstand), w85 verdrängt ein w60
+    for (let i = p * M8 + MK; i < p * M8 + M8; i++) { P.memCode[i] = w60; P.memTag[i] = S.tag; P.memRef[i] = -1; P.memGen[i] = 0; P.memFakt[i] = 0; P.memVon[i] = 0; }
+    for (let i = p * M8; i < p * M8 + MK; i++) P.memCode[i] = 0;
+    P.memPos[p] = 0;
+    const tagVor = S.tag;
+    e(w60); e(unwichtig[0]); e(unwichtig[0]); e(unwichtig[0]);   // w60 fällt heraus: Gleichstand, bleibt draußen
+    const l4 = lang().join();
+    e(w85); e(unwichtig[0]); e(unwichtig[0]); e(unwichtig[0]);   // w85 fällt heraus: verdrängt ein w60
+    const l5 = lang().join();
+    // älter heißt weniger: ein w60 von vor 100 Tagen zählt 60 − 10 = 50 und weicht einem heutigen w60
+    const i100 = p * M8 + MK + 1, war60 = P.memCode[i100] === w60;
+    P.memTag[i100] = S.tag - 100;
+    e(w60); e(unwichtig[0]); e(unwichtig[0]); e(unwichtig[0]);
+    const alt100 = war60 && P.memCode[i100] === w60 ? P.memTag[i100] : -1, l6 = lang().join();
+    pruef(l4 === Array(5).fill(w60).join() && l5 === [w60, w60, w60, w60, w85].sort((a, b) => a - b).join() && alt100 === S.tag && l6 === l5 && S.tag === tagVor,
+      `Langzeit voll (5 × Bedeutung ${G.M_BED[w60]}): Gleichstand verdrängt nicht (${l4}), Bedeutung ${G.M_BED[w85]} verdrängt eine (${l5}), eine 100 Tage alte (Wert ${60 - 100 * R.MEM_VERBLASSEN}) weicht einer heutigen`);
+    // 5. 1.000 Ereignisse aller Codes: bleibt in den 8 Plätzen der Person, Nachbarn unverändert, gedPruefen ohne Fehler
+    let posFehl = 0;
+    for (let n = 0; n < 1000; n++) { e(codes[(n * 7) % codes.length][0]); if (P.memPos[p] >= MK) posFehl++; }
+    let pruefFehl = null; try { G._ged.gedPruefen(S); } catch (x) { pruefFehl = x.message; }
+    const langBed = lang().every(c => G.M_BED[c] >= R.MEM_SCHWELLE);
+    pruef(!posFehl && nachbarn() === vorher && !pruefFehl && langBed && lang().length === M8 - MK,
+      `1.000 Ereignisse bei Person ${p}: Kurzzeit-Platz immer < ${MK} (${posFehl} Fehler), Nachbarn ${p - 1} und ${p + 1} unverändert: ${nachbarn() === vorher ? 'ja' : 'NEIN'}, `
+      + `Langzeit ${lang().length} Einträge, alle ab MEM_SCHWELLE: ${langBed ? 'ja' : 'NEIN'}; gedPruefen: ${pruefFehl || 'in Ordnung'}`);
+  }
+
+  console.log('D Planabbruch erzwungen (je auf einer Kopie von Seed 1, Tag 300)');
+  {
+    const Z = G.Z, st = (S) => S.stat.ged.planEnde.slice();
+    // je Fall: Person finden, vorbereiten (z. B. Ziel „eigener Laden“ von außen), dann zählen und tun; Soll: der Plan zu zielSoll endet mit grundSoll,
+    // genau dieser Grund wird einmal gezählt, der Planschritt des neuen Ziels kommt aus dem Zustand; außer bei „anderes Ziel“ steht „Ziel aufgegeben“ im Gedächtnis
+    const fall = (name, finde, vorbereiten, tun, zielSoll, grundSoll) => {
+      const S = neu300(), P = S.p;
+      let p = -1; for (let q = 0; q < S.pMax && p < 0; q++) if (erwachsen(S, q) && !P.haftBis[q] && !S.ki.haupt.some(h => h.id === q) && finde(S, q)) p = q;
+      if (p < 0) { pruef(false, `${name}: keine passende Person gefunden`); return; }
+      const info0 = vorbereiten(S, p) || '';
+      const vor = st(S), ziel0 = P.ziel[p], planGrund0 = P.planGrund[p], info = tun(S, p) || '';
+      const zielAlt = P.planGrund[p] & 7, grund = P.planGrund[p] >> 3, nach = st(S);
+      const letzte = p * M8 + (P.memPos[p] + MK - 1) % MK;
+      const gezaehlt = nach.every((v, i) => v === vor[i] + (i === grundSoll ? 1 : 0));
+      const erinnert = grundSoll === PG.ERSETZT || (P.memCode[letzte] === GM.ZIEL_AUFGEGEBEN && P.memRef[letzte] === zielSoll && P.memTag[letzte] === S.tag);
+      pruef(ziel0 === zielSoll && zielAlt === zielSoll && grund === grundSoll && planGrund0 !== P.planGrund[p] && gezaehlt && erinnert && P.planSchritt[p] === G._ged.planSchrittVon(S, p, P.ziel[p]) && !/FEHL/.test(info0 + info),
+        `${name}: Person ${p}, Plan „${G.ZIELNAMEN[zielAlt]}“ endet mit „${G.PLAN_GRUND[grund]}“ (Soll „${G.ZIELNAMEN[zielSoll]}“, „${G.PLAN_GRUND[grundSoll]}“), nur dieser Grund gezählt: ${gezaehlt ? 'ja' : 'NEIN'}, `
+        + `„Ziel aufgegeben“ im Gedächtnis: ${grundSoll === PG.ERSETZT ? 'nicht verlangt' : erinnert ? 'ja' : 'NEIN'}; neues Ziel „${G.ZIELNAMEN[P.ziel[p]]}“, Planschritt ${P.planSchritt[p]}${info0}${info}`);
+    };
+    // Ziel „eigener Laden“ von außen setzen (heute, damit die Frist nicht zuerst greift); ein voriger Plan endet dabei als „anderes Ziel“ (vor dem Zählen)
+    const laden = (S, p) => { if (S.p.ziel[p] !== Z.LADEN) Gi.zielVonAussen(S, p, Z.LADEN); S.p.zielSeit[p] = S.tag; return S.p.ziel[p] === Z.LADEN ? '' : ' (FEHL: Ziel Laden nicht gesetzt)'; };
+    const jung = (S, q) => S.tag - S.p.geb[q] < 50 * J;
+    const frei = (S, q) => jung(S, q) && S.p.besitz[q] < 0 && S.p.sperreBis[q] <= S.tag;
+    // Alter: mit 60 kein Laden mehr
+    fall('Alter', frei, laden, (S, p) => { S.p.geb[p] = S.tag - 60 * J; Gi.zielPruefen(S, p); }, Z.LADEN, PG.ALTER);
+    // Pleite: echte Pleite des eigenen Betriebs (pleite → Sperre, Erinnerung „pleite“ mit Fakt), dann „eigener Laden“ von außen → Abbruch
+    fall('Pleite', (S, q) => jung(S, q) && S.p.besitz[q] >= 0, (S, p) => {
+      const b = S.p.besitz[p], seit = S.tag - S.g.seit[b];
+      Gi.pleite(S, b);
+      const i = p * M8 + (S.p.memPos[p] + MK - 1) % MK, fakt = S.p.memCode[i] === GM.PLEITE ? S.p.memFakt[i] : null;
+      const ok = S.p.sperreBis[p] > S.tag && S.p.besitz[p] < 0 && fakt === seit;
+      return `; Betrieb ${b} pleite nach ${seit} Tagen, Erinnerung „pleite“ mit Fakt ${fakt}, gesperrt bis Tag ${S.p.sperreBis[p]}${ok ? '' : ' (FEHL: Pleite nicht wie erwartet)'}` + laden(S, p);
+    }, (S, p) => { Gi.zielPruefen(S, p); }, Z.LADEN, PG.PLEITE);
+    // Ziel von außen: der alte Plan endet als „anderes Ziel“, der neue beginnt mit seinem ersten offenen Schritt; dasselbe Ziel noch einmal ändert nichts
+    let zielVorher = 0;
+    fall('Ziel von außen', (S, q) => S.p.ziel[q] === Z.JOB, () => '', (S, p) => {
+      zielVorher = S.p.ziel[p];
+      const ok = Gi.zielVonAussen(S, p, Z.FREUNDE), vorG = S.p.planGrund[p], nochmal = Gi.zielVonAussen(S, p, Z.FREUNDE);
+      return `; von „${G.ZIELNAMEN[zielVorher]}“ zu „${G.ZIELNAMEN[S.p.ziel[p]]}“ angenommen: ${ok}, dasselbe Ziel noch einmal: ${nochmal ? 'ANGENOMMEN' : 'abgelehnt'}`
+        + `${S.p.planGrund[p] === vorG && S.p.zielSeit[p] === S.tag && S.p.ziel[p] === Z.FREUNDE && ok && !nochmal ? '' : ' (FEHL)'}`;
+    }, Z.JOB, PG.ERSETZT);
+    // schlechte Erfahrung mit dem Gründen (mindestens 2 Beobachtungen, Wert ≤ PLAN_ERF_ABBRUCH), in beiden Lagen
+    fall('Erfahrung', frei, laden, (S, p) => {
+      for (const l of [0, 1]) S.p.erf[p * 8 + 2 * Gi.EG + l] = ((R.PLAN_ERF_ABBRUCH + 32) << 2) | 2;
+      Gi.zielPruefen(S, p);
+    }, Z.LADEN, PG.ERFAHRUNG);
+    // Rente: der Plan „besserer Job“ endet, wer in Rente ist (noch nicht erreicht, Frist heute neu)
+    fall('Rente', (S, q) => S.p.ziel[q] === Z.JOB && S.p.besitz[q] < 0 && !Gi.zielErreicht(S, q, Z.JOB), (S, p) => { S.p.zielSeit[p] = S.tag; },
+      (S, p) => { S.p.geb[p] = S.tag - R.RENTE * J - 1; Gi.zielPruefen(S, p); }, Z.JOB, PG.RENTE);
+  }
+
+  console.log('E ID-Wiederverwendung mit Generation (Seed 2, ab Tag 250)');
+  {
+    const S = G.neueStadt(2); bisG(G, S, 250, 8);
+    const P = () => S.p;
+    // q: Erwachsener mit Erfahrung oder letzter Entscheidung, an den sich ein anderer Erwachsener r erinnert (Bezug Person, gleiche Generation)
+    let q = -1, r = -1;
+    for (let x = 0; x < S.pMax && q < 0; x++) {
+      if (!erwachsen(S, x) || !P().entA[x] || S.ki.haupt.some(h => h.id === x)) continue;
+      for (let y = 0; y < S.pMax && r < 0; y++) {
+        if (y === x || !erwachsen(S, y)) continue;
+        for (let i = y * M8; i < y * M8 + M8; i++) if (P().memRef[i] === x && P().memGen[i] === P().gen[x] && G.M_BED[P().memCode[i]] !== undefined && [GM.FREUND, GM.PARTNER, GM.KIND].includes(P().memCode[i])) { r = y; break; }
+      }
+      if (r >= 0) q = x; else r = -1;
+    }
+    if (q < 0) pruef(false, 'kein Paar gefunden');
+    else {
+      const g0 = P().gen[q], nameAlt = G.name(S, q);
+      G._pruef.sterben(S, q);
+      const tot = !P().lebt[q];
+      let stunden = 0, tagNeu = -1;
+      while (!(P().lebt[q] && P().gen[q] !== g0) && stunden < 24 * 200) { tagNeu = S.tag; G.stunde(S); stunden++; }
+      const wieder = P().lebt[q] && P().gen[q] === ((g0 + 1) & 0xffff);
+      const jetzt = S.tag * 24 + S.stunde;
+      // die neue Person erbt nichts: keine Erfahrung, kein letzter Plan, Erinnerungen nur von heute, letzte Entscheidung (falls schon) aus dieser Stunde
+      const Pn = P(), c0 = q * 8;
+      const erbt = [];
+      if (Pn.erf.slice(c0, c0 + 8).some(v => v)) erbt.push('Erfahrung');
+      if (Pn.planGrund[q]) erbt.push('letzter Plan');
+      for (let i = q * M8; i < q * M8 + M8; i++) if (Pn.memCode[i] && Pn.memTag[i] < tagNeu) erbt.push('Erinnerung von Tag ' + Pn.memTag[i]);
+      if (Pn.entA[q] && Pn.entZeit[q] < jetzt - 1) erbt.push('letzte Entscheidung');
+      const info = G.gedInfo(S, q);
+      // r erinnert sich an die alte Person: Bezug bleibt mit der alten Generation, der Text nennt die Beziehung, nie die neue Person
+      const texte = G.personInfo(S, r).gedaechtnis.map(x => x.text).join('\n');
+      const alteBezuege = []; for (let i = r * M8; i < r * M8 + M8; i++) if (Pn.memCode[i] && Gi.M_BEZUG[Pn.memCode[i]] === 'p' && Pn.memRef[i] === q) alteBezuege.push(Pn.memGen[i]);   // Bezug Person (sonst ist memRef ein Gebäude oder Ziel)
+      const neuGenannt = texte.includes('\u0001' + q + '/' + Pn.gen[q] + '/'), altGenannt = texte.includes('\u0001' + q + '/' + g0 + '/');   // Namen stehen nur als Marke (nr)
+      // Gegenprobe: ohne den Vergleich der Generation in personInfo nennte die Karte die neue Person (die Prüfung erkennt das)
+      const { Sim: G2 } = ladeSimMit([['const lebend = bz >= 0 && P.lebt[bz] && P.gen[bz] === P.memGen[i];', 'const lebend = bz >= 0 && P.lebt[bz];']]);
+      const gegen = G2.personInfo(S, r).gedaechtnis.map(x => x.text).join('\n').includes('\u0001' + q + '/' + Pn.gen[q] + '/');
+      pruef(gegen, `Gegenprobe: personInfo ohne Vergleich der Generation nennt die neue Person: ${gegen ? 'ja (erkannt)' : 'NEIN'}`);
+      pruef(tot && wieder && !erbt.length && alteBezuege.length > 0 && alteBezuege.every(g => g === g0) && !neuGenannt && !altGenannt && /gestorben/.test(texte),
+        `Person ${q} (Generation ${g0}) stirbt; Platz nach ${stunden} Stunden neu vergeben (Generation ${Pn.gen[q]}): erbt ${erbt.join(', ') || 'nichts'} `
+        + `(Erfahrungen in der Karte: ${info && info.erfahrung ? info.erfahrung.length : 0}); Person ${r} erinnert sich ${alteBezuege.length}-mal an Generation ${g0}, `
+        + `nennt die neue Person („${G.name(S, q)}“): ${neuGenannt ? 'JA' : 'nein'}, die alte beim Namen („${nameAlt}“): ${altGenannt ? 'JA' : 'nein'} („${G.klartext(texte).split('\n').filter(t => /gestorben|nicht mehr in der Stadt|damaligen/.test(t)).slice(0, 2).join(' | ')}“)`);
+    }
+  }
+
+  console.log('F Migration von Version 9 (6c1741e) und beschädigte Stände');
+  {
+    const V9 = ladeAus(zeigeGit('6c1741e'));
+    const A9 = V9.neueStadt(3); bisG(V9, A9, 400, 13);
+    const text9 = speichernAlsText(V9, A9);
+    const roh = (t) => { const d = JSON.parse(t); d.arrays = d.arrays.map(a => { const u8 = Buffer.from(a.b64, 'base64'); return { name: a.name, typ: a.typ, daten: new TYPEN[a.typ](u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength)) }; }); return d; };
+    let e1 = null; try { G.importZustand(roh(text9)); } catch (e) { e1 = e; }
+    const S = G.importZustand(roh(text9), true), P0 = roh(text9).arrays, alt = (n) => P0.find(a => a.name === 'p.' + n).daten, P = S.p;
+    // neu verteilt, unabhängig nachgerechnet: Kurzzeit = die jüngsten 3 im alten Ring, Langzeit = genau die älteren ab MEM_SCHWELLE
+    const tup = (c, t, r, g) => [c, t, r, g].join('/');
+    let falsch = 0, gesamt = 0, langN = 0;
+    for (let p = 0; p < S.pMax; p++) {
+      const o = p * M8, ring = [];
+      for (let j = 0; j < M8; j++) { const i = o + (alt('memPos')[p] + j) % M8; if (alt('memCode')[i]) ring.push(tup(alt('memCode')[i], alt('memTag')[i], alt('memRef')[i], alt('memGen')[i])); }
+      const kurzSoll = ring.slice(-MK), langSoll = ring.slice(0, Math.max(0, ring.length - MK)).filter(x => G.M_BED[+x.split('/')[0]] >= R.MEM_SCHWELLE).sort();
+      const kurzIst = [], langIst = [];
+      for (let j = 0; j < MK; j++) { const i = o + (P.memPos[p] + j) % MK; if (P.memCode[i]) kurzIst.push(tup(P.memCode[i], P.memTag[i], P.memRef[i], P.memGen[i])); }
+      for (let j = MK; j < M8; j++) if (P.memCode[o + j]) langIst.push(tup(P.memCode[o + j], P.memTag[o + j], P.memRef[o + j], P.memGen[o + j]));
+      gesamt += ring.length; langN += langIst.length;
+      if (kurzSoll.join() !== kurzIst.join() || langSoll.join() !== langIst.sort().join()) falsch++;
+    }
+    const nichtNull = G.PF_GED.filter(n => n !== 'planSchritt' && P[n].some(v => v !== 0));
+    let planFehl = 0; for (let p = 0; p < S.pMax; p++) if (P.planSchritt[p] !== (P.lebt[p] && P.ziel[p] ? G._ged.planSchrittVon(S, p, P.ziel[p]) : 0)) planFehl++;
+    const statLeer = JSON.stringify(S.stat.ged) === JSON.stringify(G._ged.gedStatLeer());
+    // keine Erinnerung an jemanden, der nicht mehr (mit dieser Generation) lebt, nennt einen Namen: weder als Namensmarke noch als Klartext des
+    // alten memName (Text ohne die Marken lebender Personen). Gegenprobe: 6c1741e selbst nennt im selben Stand diese Namen (personInfo der Fassung,
+    // als Namensmarke aus memName)
+    const mn = alt('memName'), nameAus = (v) => [G.VORNAMEN_M, G.VORNAMEN_W][(v >> 16) & 1][v & 255] + ' ' + G.NACHNAMEN[(v >> 8) & 255];
+    const ohneMarken = (t) => t.replace(/\u0001[^\u0002]*\u0002/g, '');
+    let tote = 0, marke = 0, klar = 0, klarAlt = 0;
+    for (let p = 0; p < S.pMax; p++) {
+      if (!P.lebt[p]) continue;
+      const t = G.personInfo(S, p).gedaechtnis.map(x => x.text).join('\n'), frei = ohneMarken(t);
+      const t9 = V9.personInfo(A9, p).gedaechtnis.map(x => x.text).join('\n');
+      for (let i = p * M8; i < p * M8 + M8; i++) {                // die alten Einträge der Person (Ring der Version 9)
+        const ref = alt('memRef')[i], g = alt('memGen')[i], c = alt('memCode')[i];
+        if (!c || Gi.M_BEZUG[c] !== 'p' || ref < 0 || !mn[i] || (P.lebt[ref] && P.gen[ref] === g)) continue;   // nur Bezug Person, nicht mehr in der Stadt
+        tote++;
+        if (t.includes('\u0001' + ref + '/' + g + '/')) marke++;
+        if (frei.includes(nameAus(mn[i]))) klar++;
+        if (t9.includes('\u0001' + ref + '/' + g + '/' + nameAus(mn[i]))) klarAlt++;
+      }
+    }
+    for (let h = 0; h < 240; h++) G.stunde(S);
+    const text10 = speichernAlsText(G, S), L = ladenAusText(G, text10);
+    for (let h = 0; h < 120; h++) { G.stunde(S); G.stunde(L); }
+    const weiter = fingerabdruck(G, S) === fingerabdruck(G, L);
+    let e9 = null, e9u = null; try { V9.importZustand(roh(text10)); } catch (e) { e9 = e; } try { V9.importZustand(roh(text10), true); } catch (e) { e9u = e; }
+    pruef(e1 && e1.andereVersion && e1.migrierbar && /Version 9, diese Datei ist Version 10/.test(e1.message) && S.version === 10 && !P.memName && !falsch && gesamt > 0 && !nichtNull.length && !planFehl && statLeer
+      && !marke && !klar && tote > 0 && klarAlt > 0 && weiter
+      && e9 && e9u && e9.andereVersion && !e9.migrierbar,
+      `Stand der Version 9 (Seed 3, Tag 400, ${A9.einwohner} Einw.): ohne Übernehmen „${e1 && e1.message}“; übernommen: Version ${S.version}, kein memName, ${gesamt} Erinnerungen neu verteilt `
+      + `(${langN} in der Langzeit, ${falsch} Personen falsch), neue Felder 0 (${nichtNull.join(', ') || 'ja'}), Planschritt ${planFehl} falsch, Summen leer ${statLeer ? 'ja' : 'NEIN'}, `
+      + `${tote} Erinnerungen an Menschen, die nicht mehr in der Stadt leben (alter Stand mit memName), mit Namen: ${marke} als Marke, ${klar} im Klartext `
+      + `(Gegenprobe: 6c1741e nennt im selben Stand ${klarAlt} mit Namen); 10 Tage weiter, gespeichert und geladen, 5 Tage später ${weiter ? 'bitgleich' : 'VERSCHIEDEN'}; `
+      + `Version 10 in 6c1741e: „${e9 && e9.message}“ (mit Übernehmen ebenso abgelehnt: ${e9u ? 'ja' : 'NEIN'})`);
+    // beschädigte Stände der Version 10 (gemeinsam mit --speichertest), hier am übernommenen Stand
+    let q = -1; for (let p = 0; p < L.pMax && q < 0; p++) if (erwachsen(L, p)) q = p;
+    const bg = gedBeschaedigt(text10, q);
+    pruef(bg.ok, bg.text);
+  }
+
+  console.log('G Aufholen in Stücken (Seed 2, ab Tag 300): 1 × 30 = 3 × 10 Tage, über offene Handlungen hinweg');
+  {
+    const S0 = Sim.neueStadt(2); bisG(Sim, S0, 300, 0);
+    const text0 = speichernAlsText(Sim, S0); const S13 = ladenAusText(Sim, text0); bisG(Sim, S13, 300, 13);
+    const text13 = speichernAlsText(Sim, S13);
+    const aufholenWie = (X, S, stunden) => {                 // wie aufholen() der Oberfläche
+      const zielTag = S.tag + Math.floor((S.stunde + stunden) / 24), zielStunde = (S.stunde + stunden) % 24;
+      if (S.tag < zielTag) { while (S.stunde !== 0) X.stunde(S); }
+      while (S.tag < zielTag) X.tagSchritt(S);
+      while (S.stunde < zielStunde) X.stunde(S);
+    };
+    const stuendlich = (X, S, stunden) => { for (let h = 0; h < stunden; h++) X.stunde(S); };
+    const offene = (S) => { let k = 0; for (let p = 0; p < S.pMax; p++) if (S.p.lebt[p] && S.p.offen[p]) k++; return k; };
+    const stuecke = (X, t0, k, schritt, beob) => {
+      let S = ladenAusText(X, t0), meld = 0; const grenzen = [], gelernt = [summe(S.stat.ged.gelernt)];
+      X.beobachter = beob ? () => { meld++; } : null;
+      for (let i = 0; i < k; i++) {
+        schritt(X, S, 30 * 24 / k);
+        gelernt.push(summe(S.stat.ged.gelernt));
+        if (i < k - 1) { grenzen.push(offene(S)); S = ladenAusText(X, speichernAlsText(X, S)); }
+      }
+      X.beobachter = null;
+      return { S, grenzen, gelernt: gelernt.slice(1).map((g, i) => g - gelernt[i]), meld };
+    };
+    for (const [name, t0, schritt] of [['(a) ab 0 Uhr in Tagesschritten wie aufholen()', text0, aufholenWie], ['(b) ab 13 Uhr stündlich', text13, stuendlich]]) {
+      const eins = stuecke(G, t0, 1, schritt, false), drei = stuecke(G, t0, 3, schritt, false), dreiB = stuecke(G, t0, 3, schritt, true);
+      const fe = fingerabdruck(G, eins.S), fd = fingerabdruck(G, drei.S), fb = fingerabdruck(G, dreiB.S);
+      pruef(fe === fd && fd === fb && drei.grenzen.every(x => x > 0) && drei.gelernt.every(x => x > 0) && dreiB.meld > 0,
+        `${name}: 1 × 30 und 3 × 10 Tage ${fe === fd ? 'bitgleich' : 'VERSCHIEDEN'} (${eins.S.einwohner} Einw.), 3 × 10 mit Beobachter (${dreiB.meld} Meldungen) ${fb === fd ? 'gleich' : 'VERSCHIEDEN'}; `
+        + `offene Handlungen an den Grenzen ${drei.grenzen.join(' / ')}, je Stück gelernt ${drei.gelernt.join(' / ')}`);
+    }
+  }
+
+  console.log('H Harte Grenze: statische Leseliste und Namenstausch');
+  {
+    const ohneKomm = (t) => t.replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+    const ENTSCHEIDUNG = ['memWert', 'memBehalten', 'memFakt', 'erfN', 'erfW', 'erfPunkte', 'erfLage', 'erfGruendenSchlecht', 'erfLernen', 'erfHandlung', 'erfFolge',
+      'erfTag', 'erfHaft', 'erfVerblassen', 'planZiel', 'pleiteWarteBis', 'ruecklageGilt', 'ruecklageFehlt', 'planSchrittVon', 'planAbbruch', 'planEnde', 'zufallAn', 'spurAn',
+      'spurWert', 'andersMelden', 'warumMerken', 'warum', 'gedStatLeer', 'migriereGed', 'gedPruefen'];
+    const ANZEIGE = ['bezugWort', 'gedInfo'];
+    const NAMEN_FELDER = ['weib', 'vor', 'nach', 'einzug', 'elternA', 'elternB', 'elternAGen', 'elternBGen', 'elternNameA', 'elternNameB', 'memName', 'herkunft'];
+    const BEZUG = ['memRef', 'memGen'], NAMEN_HILFEN = /\b(name|vorname|namePack|nameAusPack|nr|strName)\(/g;
+    const MERK = /erfVerblassen\(|\bvT\b|R\.ERF_HALB|R\.GED|\bged\b|\bdE\b|\bdP\b|\bspur\b|\bmerk\b|erfPunkte\(|erfHandlung\(|erfTag\(|erfFolge\(|planEnde\(|planSchrittVon\(|planAbbruch\(|bezugWort\(|PN\.ent|Q\.(REGELN|POLICY|SPRACHMODELL|FOKUS)/;
+    const felder = (t) => [...new Set([...ohneKomm(t).matchAll(/\b(?:P|PN|S\.p)\.(\w+)/g)].map(m => m[1]))].sort();
+    const hilfen = (t) => [...new Set([...ohneKomm(t).matchAll(NAMEN_HILFEN)].map(m => m[1]))];
+    const leseliste = (code) => {
+      const quelle = (n) => {
+        const i = code.search(new RegExp('\\n(function ' + n + '\\(|const ' + n + ' = )'));
+        if (i < 0) return null;
+        if (code.slice(i + 1, i + 7) === 'const ' && !code.slice(i, i + 200).includes('=> {')) return code.slice(i, code.indexOf(';\n', i) + 2);
+        return code.slice(i, code.indexOf('\n}', i) + 2);
+      };
+      const aus = [], alle = new Set(); let fehl = 0, n = 0;
+      for (const f of ENTSCHEIDUNG.concat(ANZEIGE)) {
+        const q = quelle(f); if (q === null) { fehl++; aus.push(f + ' fehlt'); continue; }
+        n++;
+        const ff = felder(q), h = hilfen(q); ff.forEach(x => alle.add(x));
+        const bezugErlaubt = ANZEIGE.includes(f) || f === 'memBehalten' || f === 'migriereGed';   // kopieren memRef/memGen nur mit bzw. zeigen an
+        const schlecht = ff.filter(x => NAMEN_FELDER.includes(x) || (!bezugErlaubt && BEZUG.includes(x))).concat(h.map(x => x + '()'));
+        if (schlecht.length) { fehl++; aus.push(f + ': ' + schlecht.join(', ')); }
+      }
+      const zeilen = ohneKomm(code).split('\n').filter(z => MERK.test(z));
+      for (const z of zeilen) {
+        const schlecht = felder(z).filter(x => NAMEN_FELDER.includes(x) || BEZUG.includes(x)).concat(hilfen(z).map(x => x + '()'));
+        if (!schlecht.length) continue;
+        if (/const P = S\.p, ged = R\.GED, k = ged \?/.test(z) || /nm = lebend \? nr\(S, bz\) : bezugWort\(S, p, i\);/.test(z)
+          || /const plaetze = R\.GED \?/.test(z) || /\.concat\(Array\.from\(\{ length: R\.MEM_KURZ \}/.test(z)) continue;   // Gedächtnisplatz, Anzeige (Name nur lebender Personen)
+        fehl++; aus.push('Zeile „' + z.trim().slice(0, 80) + '“: ' + schlecht.join(', '));
+      }
+      return { fehl, aus, n, zeilen: zeilen.length, alle };
+    };
+    const l = leseliste(SIM_CODE);
+    pruef(!l.fehl && l.n === ENTSCHEIDUNG.length + ANZEIGE.length,
+      `statisch: ${l.n} Funktionen (${ENTSCHEIDUNG.length} Entscheidung/Lernen, ${ANZEIGE.length} Anzeige) und ${l.zeilen} neue Zeilen lesen keine Namen, kein Geschlecht, keine Herkunft, `
+      + `keine Eltern, keinen Einzugstag; memRef/memGen nur zum Kopieren und Anzeigen${l.fehl ? ' – ' + l.aus.join('; ') : ''}`);
+    // Gegenprobe: dieselbe Prüfung findet einen eingeschmuggelten Lesezugriff auf das Geschlecht und einen auf den Namen
+    const kaputt = SIM_CODE.replace('function erfLernen(S, p, x, iFolge) {\n', 'function erfLernen(S, p, x, iFolge) {\n  if (S.p.weib[p]) x += 0;\n')
+      .replace('function planSchrittVon(S, p, z) {\n', 'function planSchrittVon(S, p, z) {\n  if (name(S, p) === \'\') return 0;\n');
+    const lk = leseliste(kaputt);
+    pruef(kaputt !== SIM_CODE && lk.fehl === 2 && lk.aus.some(x => /^erfLernen: weib/.test(x)) && lk.aus.some(x => /^planSchrittVon: name\(\)/.test(x)),
+      `Gegenprobe: eingeschmuggeltes Geschlecht in erfLernen und Name in planSchrittVon gefunden (${lk.aus.join('; ')})`);
+    // Namenstausch: alle Vor- und Nachnamen um einen Platz verschoben → jeden Tag alle Arrays (auch Gedächtnis, Erfahrung, Plan), Einzelwerte, Summen gleich
+    const { Sim: T } = ladeSimMit([['const STRASSEN = [', 'NACHNAMEN.push(NACHNAMEN.shift()); VORNAMEN_W.push(VORNAMEN_W.shift()); VORNAMEN_M.push(VORNAMEN_M.shift());\nconst STRASSEN = [']]);
+    for (const seed of [1, 2]) {
+      const a = Sim.neueStadt(seed), b = T.neueStadt(seed);
+      let erster = null;
+      for (let d = 1; d <= 200 && !erster; d++) {
+        while (a.tag < d) Sim.stunde(a); while (b.tag < d) T.stunde(b);
+        const ea = Sim.exportZustand(a), eb = T.exportZustand(b);
+        for (let i = 0; i < ea.arrays.length && !erster; i++) {
+          const x = ea.arrays[i], y = eb.arrays[i];
+          if (x.name !== y.name || Buffer.compare(Buffer.from(x.daten.buffer, x.daten.byteOffset, x.daten.byteLength), Buffer.from(y.daten.buffer, y.daten.byteOffset, y.daten.byteLength))) erster = `Tag ${d}: ${x.name}`;
+        }
+        if (!erster && JSON.stringify(a.stat) !== JSON.stringify(b.stat)) erster = `Tag ${d}: Summen`;
+        if (!erster && JSON.stringify(ea.werte) !== JSON.stringify(eb.werte)) erster = `Tag ${d}: Einzelwerte`;
+      }
+      const g = summe(a.stat.ged.gelernt), anders = Sim.name(a, 0) !== T.name(b, 0);
+      pruef(!erster && anders && g > 0, `Namenstausch Seed ${seed}, 200 Tage: ${erster ? 'VERSCHIEDEN ab ' + erster : 'jeden Tag alles gleich'}; ${g} Erfahrungen gelernt; Person 0 heißt „${Sim.name(a, 0)}“ bzw. „${T.name(b, 0)}“`);
+    }
+  }
+
+  console.log('I kiepisode: Ziele ohne Platz im Schlüssel');
+  {
+    const { Umgebung } = await import('./kiepisode.mjs');
+    const S = neu300(), P = S.p;
+    let p = -1; for (let q = 0; q < S.pMax && p < 0; q++) if (erwachsen(S, q) && !P.offen[q]) p = q;
+    const leeren = () => { for (let i = p * M8; i < p * M8 + M8; i++) { P.memCode[i] = 0; P.memTag[i] = 0; P.memRef[i] = -1; P.memGen[i] = 0; P.memFakt[i] = 0; P.memVon[i] = 0; } P.memPos[p] = 0; };
+    // „Ziel aufgegeben“ (Bedeutung ab MEM_SCHWELLE) und „Ziel erreicht“, danach 3 weitere Ereignisse: beide fallen aus der Kurzzeit, das eine
+    // rückt in die Langzeit (anderer Platz). Neu gezählt (zieleZaehlen) nach jedem Ereignis; nachgerechnet mit dem alten Schlüssel (mit Platz)
+    leeren();
+    const epi = { id: p, startTag: S.tag, zieleGesehen: [], metrik: { zieleErreicht: 0, zieleAufgegeben: 0 } };
+    const zaehlen = () => Umgebung.prototype.zieleZaehlen.call({ S, Sim: G, epi });
+    const altGesehen = new Set(), alt = { erreicht: 0, aufgegeben: 0 };
+    const altZaehlen = () => { for (let i = p * M8; i < p * M8 + M8; i++) { const c = P.memCode[i]; if (c !== GM.ZIEL_ERREICHT && c !== GM.ZIEL_AUFGEGEBEN) continue;
+      const k = `${i}:${P.memTag[i]}:${c}:${P.memRef[i]}`; if (!altGesehen.has(k)) { altGesehen.add(k); alt[c === GM.ZIEL_ERREICHT ? 'erreicht' : 'aufgegeben']++; } } };
+    const e = (c, r) => { Gi.erinnere(S, p, c, r); zaehlen(); altZaehlen(); };
+    e(GM.ZIEL_AUFGEGEBEN, G.Z.LADEN); e(GM.ZIEL_ERREICHT, G.Z.FREUNDE);
+    for (let k = 0; k < MK; k++) e(GM.JOB_WEG, -1);
+    let inLang = false; for (let i = p * M8 + MK; i < p * M8 + M8; i++) if (P.memCode[i] === GM.ZIEL_AUFGEGEBEN) inLang = true;
+    const m = epi.metrik;
+    pruef(inLang && m.zieleAufgegeben === 1 && m.zieleErreicht === 1 && alt.aufgegeben === 2 && alt.erreicht === 1,
+      `„Ziel aufgegeben“ (Bedeutung ${G.M_BED[GM.ZIEL_AUFGEGEBEN]}) rückt ${inLang ? 'in die Langzeit' : 'NICHT in die Langzeit'}, „Ziel erreicht“ (${G.M_BED[GM.ZIEL_ERREICHT]}) wird vergessen: `
+      + `gezählt aufgegeben ${m.zieleAufgegeben}, erreicht ${m.zieleErreicht} (mit Platz im Schlüssel wie vorher: ${alt.aufgegeben} und ${alt.erreicht})`);
+  }
+
+  console.log(fehler ? `${fehler} Prüfungen fehlgeschlagen (${((performance.now() - t00) / 1000).toFixed(0)} s)` : `Alle Gedächtnis-Prüfungen bestanden (${((performance.now() - t00) / 1000).toFixed(0)} s)`);
+  process.exit(fehler ? 1 : 0);
+}
+
 if (flag('kipolicy')) {
   // KI-Policy (Etappe 1, Version 9): Regression (Policy aus = bitgleich zu --orig, jeden Tag), Beobachtung ohne verbotene Felder (statisch, durch
   // Verändern und je Personenfeld für die Person selbst und für alle anderen), Namenstausch (Regeln, Policy in neuer und in gewachsener
@@ -5283,19 +6195,56 @@ if (flag('kipolicy')) {
     return d;
   };
   const polText = arg('policy') ? readFileSync(arg('policy'), 'utf8') : kern.policyTextAusHtml(html);
-  const polD = polText ? JSON.parse(polText) : kuenstlich();
+  const polDatei = polText ? JSON.parse(polText) : null;
+  // Etappe 2 (Version 10, Noahs Entscheidung 5): Eine Policy, die auf einer älteren Version der Stadt trainiert ist, wird abgelehnt („neu
+  // trainieren“, Teil 0 unten). Mit so einer Datei prüft dieser Lauf ihre Ablehnung und alles Übrige mit der künstlichen Policy
+  const polAlt = polDatei && polDatei.simVersion < Sim.VERSION ? polDatei : null;
+  const polD = polDatei && !polAlt ? polDatei : kuenstlich();
   const pol = K.policyPruefen(polD);
-  console.log(`Policy zum Prüfen: ${arg('policy') ? 'Datei ' + arg('policy') : polText ? 'eingebettet' : 'künstlich'} „${pol.name}“ (${pol.status}), Stadt-Version ${pol.simVersion}, Hash ${pol.hash}, Schema ${K.schemaHash()}, `
-    + `${K.MERKMALE.length} Merkmale, ${K.AKTIONEN.length} Aktionen`);
-  if (polText) ok(polD.hash === K.policyHash(polD), `Policy-Datei: Inhalts-Hash aus training/exportiere.py (Python) = Sim.KI.policyHash (JS) = ${polD.hash}`);
+  console.log(`Policy zum Prüfen: ${polAlt ? `Datei ${arg('policy') || '(eingebettet)'} ist von Stadt-Version ${polAlt.simVersion} (Ablehnung in Teil 0), sonst künstlich` : arg('policy') ? 'Datei ' + arg('policy') : polText ? 'eingebettet' : 'künstlich'} `
+    + `„${pol.name}“ (${pol.status}), Stadt-Version ${pol.simVersion}, Hash ${pol.hash}, Schema ${K.schemaHash()}, ${K.MERKMALE.length} Merkmale, ${K.AKTIONEN.length} Aktionen`);
+  if (polDatei) ok(polDatei.hash === K.policyHash(polDatei), `Policy-Datei: Inhalts-Hash aus training/exportiere.py (Python) = Sim.KI.policyHash (JS) = ${polDatei.hash}`);
+
+  // 0. Etappe 2 (Version 10, Noahs Entscheidung 5): Eine Policy aus Version 9 (Etappe 1) gilt nicht mehr. Abgelehnt genau mit dem Grund „trainiert
+  //    auf Stadt-Version 9, diese Stadt ist Version 10 (neu trainieren)“: eine künstliche Policy mit Stadt-Version 9 (Hash passend) und jede Datei
+  //    aus ki/policies.json bzw. --policy, die auf einer älteren Version trainiert ist. Gegenprobe: Dieselbe Datei mit Stadt-Version 10 (Hash neu)
+  //    wird angenommen, abgelehnt wird also nur wegen der Version. Eine abgelehnte Policy lässt sich nicht setzen (es entscheiden die Regeln)
+  {
+    const grund = (d) => { try { K.policyPruefen(d); return null; } catch (e) { return e.message; } };
+    const soll = (v) => `Policy ungültig: trainiert auf Stadt-Version ${v}, diese Stadt ist Version ${Sim.VERSION} (neu trainieren)`;
+    const k9 = kuenstlich(0.5, (d) => { d.simVersion = 9; }, true), g9 = grund(k9);
+    ok(Sim.VERSION === 10 && g9 === soll(9), `Policy mit Stadt-Version 9 (künstlich, Hash passend): ${g9 ? '„' + g9 + '“' : 'ANGENOMMEN'}`);
+    const dateien = [];
+    if (polAlt) dateien.push([arg('policy') || 'eingebettet', polAlt]);
+    else if (!arg('policy')) {
+      try {
+        const liste = JSON.parse(readFileSync(join(hier, '..', 'ki', 'policies.json'), 'utf8'));
+        for (const n of liste.policies || []) dateien.push(['ki/' + n, JSON.parse(readFileSync(join(hier, '..', 'ki', n), 'utf8'))]);
+      } catch (e) { console.log(`     (ki/policies.json nicht gelesen: ${e.message})`); }
+    }
+    for (const [name, d] of dateien) {
+      if (d.simVersion === Sim.VERSION) { console.log(`     ${name}: Stadt-Version ${d.simVersion}, gilt (keine Ablehnung zu prüfen)`); continue; }
+      const g = grund(d), neu = JSON.parse(JSON.stringify(d)); neu.simVersion = Sim.VERSION; neu.hash = K.policyHash(neu);
+      const gNeu = grund(neu);
+      let gesetzt = true; try { K.policySetzen(d); } catch (e) { gesetzt = false; }
+      K.policySetzen(null);
+      ok(g === soll(d.simVersion) && gNeu === null && !gesetzt,
+        `${name} (Stadt-Version ${d.simVersion}, „${d.name}“): abgelehnt ${g ? '„' + g + '“' : 'NICHT'}; Gegenprobe mit Stadt-Version ${Sim.VERSION} (Hash neu): ${gNeu ? 'abgelehnt „' + gNeu + '“' : 'angenommen'}; `
+        + `setzen ${gesetzt ? 'MÖGLICH' : 'nicht möglich (es entscheiden die Regeln)'}`);
+    }
+    if (!dateien.length) console.log('     keine Policy-Datei einer älteren Version in ki/policies.json (nur die künstliche geprüft)');
+  }
 
   // 1. Regression: ohne Policy und ohne Fokus jeden Tag bitgleich zur ungepatchten Fassung; S bekommt keine neuen Schlüssel
+  //    Etappe 2 (Version 10): mit R.GED = 0 und den Schaltern der Vorarbeiten aus (Vergleich mit einer älteren Fassung); verglichen ohne memName
+  //    (bis Version 9, nur Anzeige) und ohne die Felder aus PF_GED (müssen 0 sein) und ohne die Nummer der Version (fingerabdruckVergleich)
   let origHtml = null;
   if (arg('orig')) origHtml = readFileSync(arg('orig'), 'utf8');
   else if (arg('git')) origHtml = execFileSync('git', ['-C', arg('git'), 'show', arg('rev', 'HEAD') + ':stadt/stadt.html'], { encoding: 'utf8', maxBuffer: 1 << 26 });
   if (!origHtml) ok(false, 'Regression: --orig datei oder --git ordner [--rev] angeben');
   else {
     const Orig = kern.ladeSimAusHtml(origHtml).Sim;
+    const gedAn = gedAus(Sim);                               // Etappe 2: Gedächtnis und Vorarbeiten aus
     for (const seed of seeds) {
       const A = Orig.neueStadt(seed), N = Sim.neueStadt(seed);
       let ab = -1, d = 0;
@@ -5303,12 +6252,13 @@ if (flag('kipolicy')) {
         const z = A.tag + 1;
         while (A.tag < z) Orig.stunde(A);
         while (N.tag < z) Sim.stunde(N);
-        if (fingerabdruck(Orig, A) !== fingerabdruck(Sim, N)) ab = A.tag;
+        if (fingerabdruckVergleich(Orig, A) !== fingerabdruckVergleich(Sim, N)) ab = A.tag;
       }
       const gleicheSchluessel = Object.keys(A).join() === Object.keys(N).join();
-      ok(ab < 0 && gleicheSchluessel, `Regression Seed ${seed}: Policy aus, ${d} Tage, jeden Tag bitgleich zu ${arg('orig') || arg('git') + ' ' + arg('rev', 'HEAD')} `
-        + `(${N.einwohner} Einwohner, Fingerabdruck ${fingerabdruck(Sim, N)})${ab >= 0 ? `, ab Tag ${ab} VERSCHIEDEN` : ''}${gleicheSchluessel ? '' : ', S hat andere Schlüssel'}`);
+      ok(ab < 0 && gleicheSchluessel, `Regression Seed ${seed}: Policy aus, R.GED = 0 und Vorarbeiten aus, ${d} Tage, jeden Tag bitgleich zu ${arg('orig') || arg('git') + ' ' + arg('rev', 'HEAD')} `
+        + `(ohne memName, Felder aus PF_GED 0, ohne Versionsnummer; ${N.einwohner} Einwohner, Fingerabdruck ${fingerabdruckVergleich(Sim, N)})${ab >= 0 ? `, ab Tag ${ab} VERSCHIEDEN` : ''}${gleicheSchluessel ? '' : ', S hat andere Schlüssel'}`);
     }
+    gedAn();
   }
 
   // 2. Beobachtung: welche Personenfelder liest sie (mit ihren Hilfsfunktionen)? Keine Namen, Herkunft, Einzug, Eltern, Gedächtnisbezüge
@@ -5334,14 +6284,14 @@ if (flag('kipolicy')) {
     for (let p = 0; p < S.pMax && leute.length < 60; p++) if (P.lebt[p] && S.tag - P.geb[p] >= 18 * J) leute.push(p);
     const beob = () => leute.map(p => [K.beobachtung(S, p, 7, 0), K.beobachtung(S, p, 18, 1)]);
     const vorher = beob(), sich = {};
-    for (const n of VERBOTEN_P) sich[n] = P[n].slice();
+    for (const n of VERBOTEN_P) if (P[n]) sich[n] = P[n].slice();   // Version 10: memName gibt es nicht mehr
     for (let p = 0; p < S.pMax; p++) {
       P.vor[p] = (P.vor[p] + 7) % 30; P.nach[p] = (P.nach[p] + 11) % 50; P.weib[p] ^= 1; P.einzug[p] += 999; P.sparSeit[p] -= 77;
       P.elternA[p] = -1; P.elternB[p] = -1; P.elternAGen[p] ^= 3; P.elternNameA[p] ^= 0x5555; P.elternNameB[p] ^= 0x2222; P.stammladen[p] = -1; P.besuch[p] = -1;
-      for (let k = 0; k < Sim.R.MEM; k++) { P.memRef[p * Sim.R.MEM + k] = -1; P.memGen[p * Sim.R.MEM + k] ^= 1; P.memName[p * Sim.R.MEM + k] ^= 0xff; }
+      for (let k = 0; k < Sim.R.MEM; k++) { P.memRef[p * Sim.R.MEM + k] = -1; P.memGen[p * Sim.R.MEM + k] ^= 1; if (P.memName) P.memName[p * Sim.R.MEM + k] ^= 0xff; }
     }
     const nachher = beob();
-    for (const n of VERBOTEN_P) P[n].set(sich[n]);
+    for (const n of VERBOTEN_P) if (sich[n]) P[n].set(sich[n]);
     const gleich = vorher.every((v, k) => v.every((x, j) => x.every((w, i) => Object.is(w, nachher[k][j][i]))));
     ok(gleich && vorher[0][0].length === K.MERKMALE.length && vorher.every(v => v.every(x => x.every(Number.isFinite))),
       `Beobachtung (verändert): Namen, Geschlecht, Einzug, Sparbeginn, Eltern, Gedächtnisbezüge aller Personen verändert → Beobachtung von ${leute.length} Personen bitgleich, alle Werte endlich`);
@@ -5541,15 +6491,31 @@ if (flag('kipolicy')) {
     let grund = '';
     try { K.policyPruefen(geaendert); } catch (e) { grund = e.message; }
     ok(!grund && geaendert.hash !== kuenstlich(0.5).hash, `Inhalts-Hash folgt dem Inhalt: ein Gewicht geändert → neuer Hash ${geaendert.hash} (vorher ${kuenstlich(0.5).hash}), mit ihm angenommen${grund ? ' – ' + grund : ''}`);
+    // float32 (Vorarbeit Etappe 2, docs/GRENZEN.md): Gerechnet wird mit Math.fround; Zahlen, die dabei unendlich werden, lehnt die Prüfung ab
+    // (Hash jeweils nachgerechnet, der Grund muss float32 sein). Grenze: 3.4028235e38 (größter float32-Wert, so schreibt ihn
+    // training/exportiere.py) rundet auf den größten float32-Wert und bleibt gültig, 3.4028236e38 rundet auf unendlich
+    const f32 = [['Gewicht 1e39', d => { d.netz.schichten[0].gewichte[0][0] = 1e39; }], ['Gewicht −3.4028236e38', d => { d.netz.schichten[1].gewichte[2][3] = -3.4028236e38; }],
+      ['Bias 1e39', d => { d.netz.schichten[1].bias[0] = 1e39; }], ['Gewichte 1e308 (bis Version 9 angenommen)', d => { d.netz.schichten[1].gewichte = d.netz.schichten[1].gewichte.map(z => z.map(() => 1e308)); }],
+      ['clip 1e39', d => { d.normalisierung.clip = 1e39; }]];
+    const f32Nicht = [];
+    for (const [was, aendern] of f32) { let g = ''; try { K.policyPruefen(kuenstlich(0.5, aendern, true)); } catch (e) { g = e.message; } if (!/^Policy ungültig: .*float32/.test(g)) f32Nicht.push(`${was} (${g || 'angenommen'})`); }
+    const grenze = kuenstlich(0.5, d => { d.netz.schichten[0].gewichte[0][0] = 3.4028235e38; d.netz.schichten[1].bias[1] = -3.4028235e38; d.normalisierung.clip = 3.4028235e38; }, true);
+    let grenzGrund = ''; try { K.policyPruefen(grenze); } catch (e) { grenzGrund = e.message; }
+    ok(!f32Nicht.length && !grenzGrund, `float32: ${f32.length - f32Nicht.length} von ${f32.length} Dateien mit Zahlen über dem float32-Bereich abgelehnt (${f32.map(f => f[0]).join(', ')})`
+      + `${f32Nicht.length ? ' – NICHT: ' + f32Nicht.join(', ') : ''}; ±3.4028235e38 (größter float32-Wert) angenommen${grenzGrund ? ' – NICHT: ' + grenzGrund : ''}`);
   }
 
-  // 7. Rückfall zur Laufzeit: eine Policy, deren Logits überlaufen (gültige Datei, Rechnung ergibt keine Zahl) → Regeln; die Stadt läuft
-  // dann genau wie mit Regeln (die erste Entscheidung fällt schon nach Regeln)
+  // 7. Rückfall zur Laufzeit: eine Policy, deren Logits überlaufen (Rechnung ergibt keine Zahl) → Regeln; die Stadt läuft dann genau wie mit
+  // Regeln (die erste Entscheidung fällt schon nach Regeln). Seit der float32-Prüfung (Vorarbeit Etappe 2) läuft keine geprüfte Datei mehr
+  // über (gerechnet höchstens etwa 1e285 bei 6 Schichten zu 512); die Datei mit Gewichten 1e308, die das bis Version 9 prüfte, lehnt
+  // policyPruefen ab (Abschnitt 6). Darum hier eine geprüfte Policy, deren letzte Schicht erst danach im Speicher unendlich wird (genau die
+  // Werte, die Math.fround(1e308) vorher ins Netz brachte)
   {
-    const d = kuenstlich(0.5, x => {                          // verdeckte Schicht sättigt (tanh = 1), Ausgabe 1e308 × 16 + 1e308 → unendlich
-      x.netz.schichten[0].gewichte = x.netz.schichten[0].gewichte.map(z => z.map(() => 0)); x.netz.schichten[0].bias = x.netz.schichten[0].bias.map(() => 50);
-      x.netz.schichten[1].gewichte = x.netz.schichten[1].gewichte.map(z => z.map(() => 1e308)); x.netz.schichten[1].bias = x.netz.schichten[1].bias.map(() => 1e308); }, true);
-    K.policySetzen(K.policyPruefen(d));
+    const d = kuenstlich(0.5, x => {                          // verdeckte Schicht sättigt (tanh = 1), Ausgabe ∞ × 16 + ∞ → unendlich
+      x.netz.schichten[0].gewichte = x.netz.schichten[0].gewichte.map(z => z.map(() => 0)); x.netz.schichten[0].bias = x.netz.schichten[0].bias.map(() => 50); }, true);
+    const pol7 = K.policyPruefen(d);
+    pol7.schichten[1].w.fill(Infinity); pol7.schichten[1].bias.fill(Infinity);
+    K.policySetzen(pol7);
     const A = Sim.neueStadt(3);
     while (A.tag < 40) Sim.stunde(A);
     const st = K.policyStand();
@@ -5557,7 +6523,7 @@ if (flag('kipolicy')) {
     const B = Sim.neueStadt(3);
     while (B.tag < 40) Sim.stunde(B);
     ok(!st.aktiv && st.rueckfall === 1 && /keine Zahl/.test(st.fehler) && fingerabdruck(Sim, A) === fingerabdruck(Sim, B),
-      `Rückfall: überlaufende Logits → Policy aus („${st.fehler}“), 40 Tage bitgleich zu Regeln (${fingerabdruck(Sim, A)})`);
+      `Rückfall: überlaufende Logits (letzte Schicht nach der Prüfung unendlich) → Policy aus („${st.fehler}“), 40 Tage bitgleich zu Regeln (${fingerabdruck(Sim, A)})`);
   }
 
   // 7b. Policy nur, wofür sie trainiert ist: ab R.RENTE Jahren und Hauptfiguren entscheiden die Regeln (auch wenn die Policy an ist)
@@ -5615,6 +6581,7 @@ if (flag('kipolicy')) {
 if (flag('gate')) {
   const seeds = arg('seeds', '1,2,3').split(',').map(Number);
   let alleOk = true;
+  const g7offen = [];                                         // Seeds, in denen Gate 7 nicht gewertet wurde (Entscheidung 8)
   for (const seed of seeds) {
     const reihe = [], budgets = [];
     let ms365 = 0, c365 = null, k365 = null, fehler = null, S = null, buchNr = 0, arbeitZeilen = 0, kauf365 = 0, techZeilen = 0, reg700 = null, budget700 = 0;
@@ -5661,6 +6628,12 @@ if (flag('gate')) {
     const grenzAbstand = Math.min(x0 - G0, y0 - G0, G1 - x1, G1 - y1);
     const altAbstand = Math.min(x0 + alt - A0, y0 + alt - A0, A1 - x1 - alt, A1 - y1 - alt);
     const c730 = charakter(S);
+    // Gate 7 (Entscheidung 8): gewertet nur mit mindestens G7_MIN_N Wegziehern bis Tag 365; sonst null = nicht gewertet, Abstand nur gemeldet
+    const g7Text = `Wegzieher-Heimatliebe ${c365.wzH.toFixed(1)} vs. alle ${c365.erwH.toFixed(1)}: −${(c365.erwH - c365.wzH).toFixed(1)}`;
+    const g7 = c365.wzN >= G7_MIN_N
+      ? [c365.erwH - c365.wzH >= 15, `7  ${g7Text} (n=${c365.wzN}) (≥ 15 weniger)`]
+      : [null, `7  nicht gewertet: nur ${c365.wzN} Wegzieher (< ${G7_MIN_N})${c365.wzN ? `; ${g7Text} (nur gemeldet)` : ''}`];
+    if (g7[0] === null) g7offen.push(seed);
     const g = [
       [k365.einwohner >= 300, `1  Einwohner an Tag 365: ${k365.einwohner} (≥ 300)`],
       [minPop > 0 && schlimmsterEinbruch <= 0.3, `2  Minimum ${minPop}, schlimmster 30-Tage-Einbruch ${(schlimmsterEinbruch * 100).toFixed(1)} % (Tag ${einbruchTag}) (nie 0, ≤ 30 %)`],
@@ -5668,11 +6641,11 @@ if (flag('gate')) {
       [bandFaktor <= 1.15 && grenzAbstand > 0, `4  läuft 730 Tage; Einwohner Tag 551–730 zwischen ${bandMin} und ${bandMax} (Faktor ${bandFaktor.toFixed(2)}, ≤ 1,15); Straßen wie auf der Karte 96 x ${x0 + alt}–${x1 + alt}, y ${y0 + alt}–${y1 + alt}, Abstand zur alten Baugrenze ${altAbstand}; Karte ${K} × ${K} (${S.erweiterung.wachsen.length}-mal gewachsen), Abstand zur Baugrenze ${grenzAbstand} (> 0)`],
       [c365.grN >= 5, `5  Gründungen durch Bewohner bis Tag 365: ${c365.grN} (≥ 5)`],
       [c365.grE - c365.erwE >= 15, `6  Gründer-Ehrgeiz ${c365.grE.toFixed(1)} vs. alle ${c365.erwE.toFixed(1)}: ${(c365.grE - c365.erwE).toFixed(1)} (≥ +15)`],
-      [c365.erwH - c365.wzH >= 15, `7  Wegzieher-Heimatliebe ${c365.wzH.toFixed(1)} vs. alle ${c365.erwH.toFixed(1)}: −${(c365.erwH - c365.wzH).toFixed(1)} (n=${c365.wzN}) (≥ 15 weniger)`],
+      g7,
       [ms365 < 5000, `T  365 Tage in ${f0(ms365)} ms (< 5000)`],
       [arbeitZeilen / S.tag <= 0.5, `B  Stadtbuch ${(S.buchNr / S.tag).toFixed(2)} Zeilen am Tag, davon Bauhof ${(arbeitZeilen / S.tag).toFixed(2)} (≤ 0,5; kein Spec-Gate)`],
     ];
-    for (const [ok, t] of g) { console.log(`  ${ok ? '✓' : '✗'} ${t}`); if (!ok) alleOk = false; }
+    for (const [ok, t] of g) { console.log(`  ${ok === null ? '–' : ok ? '✓' : '✗'} ${t}`); if (ok === false) alleOk = false; }
     if (S.stat.tech) {                                        // Tech-Firmen (kein Gate): wie viele, wie groß, was die Leute kaufen
       const t = S.stat.tech, st = [0, 0, 0, 0];
       let erw = 0, mitGeraet = 0;
@@ -5717,7 +6690,9 @@ if (flag('gate')) {
     }
     console.log('  Tag 730:\n' + charakterText(c730));
   }
-  console.log(`\nGate Phase 0: ${alleOk ? 'BESTANDEN' : 'NICHT BESTANDEN'}`);
+  console.log(`\nGate 7 nicht gewertet (weniger als ${G7_MIN_N} Wegzieher bis Tag 365, Entscheidung 8): ${g7offen.length} von ${seeds.length} Seeds`
+    + (g7offen.length ? ` (${g7offen.join(', ')})` : ''));
+  console.log(`Gate Phase 0: ${alleOk ? 'BESTANDEN' : 'NICHT BESTANDEN'}`);
   process.exit(alleOk ? 0 : 1);
 } else {
   const seed = Number(arg('seed', '1')), tage = Number(arg('tage', '365')), alle = Number(arg('alle', '30'));

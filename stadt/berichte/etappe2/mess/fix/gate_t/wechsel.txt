@@ -1,0 +1,103 @@
+neu: SP/ml/e2bau/stadt (stadt.html e8dc1bc1894d52f5)
+vorher: SP/ml/e2bau/sicherung_fix (stadt.html ac899293429df032)
+basis: SP/ml/e2bau/tmp/gate_t.attgtx/stadt (stadt.html 0b453bf1bb62878a)
+Runde 1 neu: 03:04:49 Last: 1.58, 2.16, 2.06 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1264 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 1 vorher: 03:04:52 Last: 1.85, 2.21, 2.08 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1459 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 1 basis: 03:04:55 Last: 1.79, 2.19, 2.07 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 3478 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 2 basis: 03:05:08 Last: 1.66, 2.15, 2.06 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 3440 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 2 vorher: 03:05:21 Last: 1.58, 2.11, 2.05 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1321 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 2 neu: 03:05:24 Last: 1.58, 2.11, 2.05 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1207 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 3 vorher: 03:05:27 Last: 1.54, 2.09, 2.04 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1301 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 3 basis: 03:05:30 Last: 1.65, 2.10, 2.05 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 3425 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 3 neu: 03:05:43 Last: 1.55, 2.07, 2.04 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1336 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 4 neu: 03:05:46 Last: 1.51, 2.05, 2.03 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1307 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 4 basis: 03:05:49 Last: 1.51, 2.05, 2.03 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 3884 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 4 vorher: 03:06:02 Last: 1.46, 2.01, 2.02 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1232 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 5 neu: 03:06:05 Last: 1.51, 2.01, 2.02 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1264 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 5 vorher: 03:06:08 Last: 1.51, 2.01, 2.02 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1252 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 5 basis: 03:06:11 Last: 1.47, 2.00, 2.01 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 3410 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 6 basis: 03:06:23 Last: 1.39, 1.96, 2.00 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 3456 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 6 vorher: 03:06:36 Last: 1.51, 1.96, 2.00 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1185 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 6 neu: 03:06:39 Last: 1.51, 1.96, 2.00 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1197 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 7 vorher: 03:06:42 Last: 1.55, 1.96, 2.00 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1236 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 7 basis: 03:06:45 Last: 1.50, 1.95, 1.99 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 3357 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 7 neu: 03:06:57 Last: 1.43, 1.92, 1.98 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1245 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 8 neu: 03:07:00 Last: 1.39, 1.90, 1.98 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1391 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 8 basis: 03:07:04 Last: 1.39, 1.90, 1.98 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 3525 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 8 vorher: 03:07:16 Last: 1.44, 1.89, 1.97 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1255 ms (< 5000)
+Gate Phase 0: BESTANDEN
+T neu    1264, 1207, 1336, 1307, 1264, 1197, 1245, 1391 ms, Median 1264; unter 5000 ms: 8 von 8
+T vorher 1459, 1321, 1301, 1232, 1252, 1185, 1236, 1255 ms, Median 1253.5
+T basis  3478, 3440, 3425, 3884, 3410, 3456, 3357, 3525 ms, Median 3448
+neu/basis 0.367, vorher/basis 0.364, neu/vorher 1.008 (Mediane)

@@ -2,7 +2,7 @@
 
 Eine Stadt, in der jeder Mensch selbst entscheidet. Projektname vorläufig.
 
-**Stand: Phase 4 plus „richtige Arbeit“, Tech-Firmen, Stadtregierung, „Stadt erweitern“ Teil 1 bis 3, „Tech-Firmen und Autos“ Teil 1 und 2 und von Version 9 Teil 1 „Rathaus und Bürgermeister“, Teil 2 „Schule“, Teil 3 „Haushalt“, Teil 4 „Wachstum, Tempo und KI“ und Teil 5 „Tech-Firmen früher und mehr“ samt den Befunden der Schlussprüfung von Version 9, Simulation und Darstellung (Spielstand-Version 9).** Simulation (Phase 0), 3D-Karte mit Tag und Nacht (1), Speichern
+**Stand: Phase 4 plus „richtige Arbeit“, Tech-Firmen, Stadtregierung, „Stadt erweitern“ Teil 1 bis 3, „Tech-Firmen und Autos“ Teil 1 und 2 und von Version 9 Teil 1 „Rathaus und Bürgermeister“, Teil 2 „Schule“, Teil 3 „Haushalt“, Teil 4 „Wachstum, Tempo und KI“ und Teil 5 „Tech-Firmen früher und mehr“ samt den Befunden der Schlussprüfung von Version 9, Simulation und Darstellung, dazu Etappe 1 (trainierte Entscheidungs-KI, experimentell) und Etappe 2 des Master-Prompts (Gedächtnis, Erfahrung und Pläne der Bewohner; Spielstand-Version 10).** Simulation (Phase 0), 3D-Karte mit Tag und Nacht (1), Speichern
 und Aufholen (2), laufende Figuren und Personenkarten (3), Hauptfiguren mit Ollama (4). Danach auf Noahs Wunsch: Bauarbeiter
 vom Bauhof bauen die Häuser, Werkstätten machen Kisten für die Läden, man sieht die Leute bei der Arbeit, und Bewohner gründen
 Tech-Firmen für Software, Handys oder Computer; Hauptfiguren, die dort programmieren, schreiben über Ollama echten Code. Von Anfang
@@ -46,7 +46,9 @@ Tagebuch zeigt, was geklappt hat, Noahs Regel „erst ausgeben, dann senken“ i
 Tastatur, Meldungen und Texte sind nachgezogen (Abschnitt „Befunde der Schlussprüfung (Version 9)“). Phase 4 ist nur gegen einen
 nachgebauten Ollama-Server getestet, nicht gegen ein echtes Sprachmodell (siehe „Bekannte Schwächen“).
 
-**Neu (Etappe 1 des Master-Prompts):** Eine trainierte Entscheidungs-KI lässt sich zuschalten, experimentell, die Regeln bleiben Standard. Siehe [Trainierte Entscheidungs-KI (experimentell)](#trainierte-entscheidungs-ki-experimentell) und `docs/START.md`.
+**Neu (Etappe 2 des Master-Prompts, Version 10):** Die Bewohner lernen aus den Folgen ihrer Entscheidungen (Gedächtnis mit Kurz- und Langzeit, Erfahrung, Pläne), die Personenkarte erklärt mit „Warum?“, und die Liste „Heute anders entschieden“ zeigt, wo Erfahrung oder Plan eine Wahl geändert haben. Siehe [Gedächtnis, Erfahrung und Pläne (Etappe 2)](#gedächtnis-erfahrung-und-pläne-etappe-2) und `docs/START.md`.
+
+**Etappe 1 des Master-Prompts:** Eine trainierte Entscheidungs-KI lässt sich zuschalten, experimentell, die Regeln bleiben Standard. Die Policy aus Etappe 1 gilt seit Version 10 nicht mehr (neu trainieren). Siehe [Trainierte Entscheidungs-KI (experimentell)](#trainierte-entscheidungs-ki-experimentell).
 
 ## Starten
 
@@ -66,7 +68,7 @@ Schalter in der Adresse (alle optional):
 | `?seed=7` | Seed für eine neue Stadt (sonst zufällig) |
 | `?debug` | Debug-Ecke unten links: fps, Frame-Zeit, Draw Calls, Dreiecke, KI-Aufrufe (gültig in %, Dauer, Fehler) und Knöpfe „Zeit vorspulen“ |
 | `?debug&tage=400` | Neue Stadt vorab 400 Tage rechnen |
-| `?debug&umland=300000&tage=750` | Größere Stadt für den Leistungstest (Seed 2: etwa 5.850 Einwohner, Karte 144 × 144). Dieser Stand wird nicht gespeichert |
+| `?debug&umland=300000&tage=750` | Größere Stadt für den Leistungstest (Seed 2: in Version 10 7.159 Einwohner, Karte 144 × 144; bis Version 8 etwa 5.850; `berichte/etappe2/mess/schritt5/grosse_stadt.txt`). Dieser Stand wird nicht gespeichert |
 
 ## Ollama für die Hauptfiguren (Phase 4)
 
@@ -94,18 +96,113 @@ für ihre Arbeit, wenn keine Entscheidung wartet und die Antwort vor 17 Uhr komm
 Neben den Regeln (`entscheide`) gibt es eine kleine trainierte Policy: ein neuronales Netz (2 × 64, tanh), in dieser Simulation mit
 MaskablePPO (sb3-contrib) trainiert. Sie wählt an den normalen Entscheidungszeitpunkten aus denselben erlaubten Aktionen wie die Regeln
 oder wartet, sieht nur die eigene Lage, die Persönlichkeit und öffentliche Zahlen (keine Namen, keine Herkunft) und entscheidet nur für
-Erwachsene unter 67, nicht für Hauptfiguren und Bürgermeister. **Standard bleiben die Regeln.** Mit ausgeschalteter Policy läuft die
-Stadt Tag für Tag bitgleich wie Version 9 (09083f5).
+Erwachsene unter 67, nicht für Hauptfiguren und Bürgermeister. **Standard bleiben die Regeln.** Ohne Policy und mit ausgeschaltetem
+Gedächtnis aus Etappe 2 (`R.GED = 0`, `R.OPFER_FREI = 0`, `R.HAFT_EROEFFNUNG = 0`) läuft die Stadt Tag für Tag wie Version 9 ohne KI-Teil
+(09083f5), bis auf `memName` und die Versionsnummer (`simtest --kipolicy`, Seeds 1–3 × 730 Tage, `berichte/etappe2/SCHRITT4.md` Abschnitt 3).
+
+**Seit Version 10 (Etappe 2) gilt die Policy aus Etappe 1 nicht mehr:** Sie ist auf Stadt-Version 9 trainiert, das Spiel lehnt sie beim
+Umschalten, beim Laden und beim Datei-Import sichtbar ab („Policy ungültig: trainiert auf Stadt-Version 9, diese Stadt ist Version 10 (neu
+trainieren)“), und es entscheiden die Regeln. Sie bleibt als Beleg in `ki/`. Eine Policy für Version 10 gibt es erst nach neuem Training
+(Etappe 3).
 
 - Einschalten: Seite über den Server öffnen (oben), Zahnrad → „Entscheidungen: Regeln ›“ → „Trainierte Policy (experimentell)“. Das Spiel
   holt die Policy dann aus dem Ordner `ki/` neben der Seite; in `stadt.html` steckt keine. Im Spielstand steht nur ein Verweis (Name,
   Hash). Fehlt die Policy oder passt sie nicht, entscheiden die Regeln, und das Spiel sagt es.
-- Stand: Lauf `v9_lokal_1` (155.648 Schritte, 25 min auf einem Rechner mit 4 CPU-Kernen, ohne GPU). Auf getrennten Abschlussseeds ist das Bedürfnisdefizit
+- Stand (Version 9): Lauf `v9_lokal_1` (155.648 Schritte, 25 min auf einem Rechner mit 4 CPU-Kernen, ohne GPU). Auf getrennten Abschlussseeds ist das Bedürfnisdefizit
   der Bewohner in 5 von 5 Gruppen 16–31 % kleiner als mit den Regeln, aber nur 16 von 26 Nebenprüfungen halten: weniger erreichte Ziele,
   kaum Gründungen, keine Kinder, „gesellig“ wirkt umgekehrt, und mit der Policy für alle wächst die Stadt deutlich langsamer. Urteil nach
   den vorab festgelegten Kriterien: **nicht bestanden** (`training/AUSWERTUNG_V9.md`).
 - Mehr: `docs/START.md` (Starten, Policy wählen), `docs/ARCHITEKTUR.md`, `docs/EXPERIMENTE.md` (Training, Auswertung, Export),
   `docs/GRENZEN.md`, `docs/FORTSCHRITT.md` (Stand aller Etappen), `ki/LIESMICH.md`, `tests/LIESMICH.md` (Browser-Tests).
+
+## Gedächtnis, Erfahrung und Pläne (Etappe 2)
+
+Seit Version 10 lernen die Bewohner aus den Folgen ihrer eigenen Entscheidungen: Wer mit einem Betrieb pleitegegangen ist, zögert beim
+nächsten Mal; wer gekündigt und innerhalb von 30 Tagen wieder Arbeit gesucht hat, kündigt seltener. Entschieden wird weiter nach den Regeln (`entscheide`),
+Erfahrung und Plan kommen dort als zwei Summanden je Handlung dazu. Kein neuer Zufall, keine Arbeit je Person und Stunde. Die Werte unten
+stehen in `R` (sim-Block, Abschnitt „Etappe 2“) und sind Annahmen der Stadt (`docs/GRENZEN.md`). Alle Belege: `berichte/etappe2/`
+(Übersicht in `berichte/etappe2/LIESMICH.md`).
+
+- **Gedächtnis:** weiter 8 Plätze je Person, jetzt 3 für die Kurzzeit (die letzten Ereignisse) und 5 für die Langzeit. Was aus der Kurzzeit
+  fällt und mindestens 30 bedeutet (Bedeutung je Art, `M_BED`), verdrängt dort den Eintrag, der am wenigsten zählt (Bedeutung − 0,1 je Tag).
+  Jede Erinnerung hat einen **Fakt** (Lohn, Tage, die der Betrieb bestand, Rücklage nach der Gründung, Hausstufe, Zahl der Kinder oder
+  Freunde) und, wenn sie die Folge einer eigenen Handlung ist, einen **Verweis** darauf („weil: Gründung vor 39 Tagen“).
+- **Erfahrung:** für vier Handlungen (einen Betrieb gründen, kündigen, die Stelle wechseln, zusammenziehen), je getrennt nach „Geld knapp“
+  und „Geld reicht“. Gelernt wird erst, wenn sich die Folge zeigt: schlecht sofort (Pleite, die neue Stelle wieder weg, Trennung, innerhalb
+  von 30 Tagen nach der Kündigung wieder Arbeit gesucht), gut, wenn das Ergebnis nach der Frist noch besteht (Gründen 180, Kündigen und Wechseln 30,
+  Zusammenziehen 60 Tage). Wert −31 bis +31, Sicherheit nach 1, 2, 3 Beobachtungen 0,5 / 0,75 / 1; der Renteneintritt wird nicht gelernt.
+  **Erfahrung verblasst:** alle 12 Tage einen Punkt zur 0 hin; eine Pleite (−30) zählt nach 180 Tagen halb so viel und ist nach 360 Tagen
+  vergessen (`R.ERF_HALB = 180`).
+- **Plan:** Zum Ziel (eigener Laden, besserer Job, Familie …) steht jede Nacht der erste noch nicht erfüllte Schritt fest, dazu Hindernis und
+  Frist; endet ein Plan, bleibt der Grund (erreicht, Frist, Pleite, zu alt, schlechte Erfahrung, in Rente, anderes Ziel). **Rücklage vor der
+  Gründung:** Ab der Stufe Stadt (160 Einwohner) spart jeder Gründer erst die Kosten der Gründung plus 20 Tageskosten (doppelt nach
+  schlechter Gründungserfahrung), nach einer Pleite wartet er über die Sperre von 180 Tagen hinaus noch 60 bis 180 Tage, Sparsame länger.
+  Fehlt die Rücklage, zählt Gründen 30 weniger, und wer dafür spart, kündigt ungern (15 weniger).
+- **Wie stark:** beide Summanden mal `R.GED_STAERKE = 1,5`. Ohne Erfahrung und Plan wären in den Seeds 1, 2, 3 über 365 Tage 1,174 / 1,034 /
+  0,832 % der Entscheidungen anders, davon 89,3–92,5 % direkt (eine der vier Handlungen ist beteiligt); das eine Erfahrungs-Byte zu löschen
+  stellt in 99,82–99,92 % der Fälle die Wahl ohne Erfahrung her (`simtest --gedaechtnis` A,
+  `berichte/etappe2/mess/schritt4/frisch2/simtest_alle/gedaechtnis.txt`). **Gegen den Entwurf** (Noahs Entscheidung 4 wollte mehr als
+  dessen 0,5–1 %): Über 730 Tage ändern Erfahrung und Plan zusammen 1,332 / 0,886 / 0,654 % (Mittel 0,957 %), Entwurf C 0,58 / 0,53 / 1,03 %
+  (Mittel 0,713 %). Im Mittel wirkt der Endstand also etwa ein Drittel stärker, liegt aber in den Seeds 2 und 3 noch im Bereich 0,5–1 %, in
+  Seed 3 sogar unter Entwurf C; die Erfahrung allein ändert 0,46–0,61 % (Entwurf C 0,34–0,81 %). Das folgt aus Noahs Entscheidungen 9
+  (Stärke 1,5 statt 4; Stufe 4 änderte in derselben Messung vor dem Sim-Fix 2,623 % gegen 0,893 % bei Stufe 1,5) und 10 (Verblassen: 1,088 %
+  → 0,957 %) (`berichte/etappe2/VERGLEICH.md` 1.2, `VERBLASSEN.md` B.3, `KALIBRIERUNG.md` B.1,
+  `berichte/etappe2/mess/verblassen/schluss/probe8_auswertung.txt`).
+- **Was es bewirkt** (Seeds 1–20, gegen dieselben Städte ohne Erfahrung und Plan): Kündigungen für die Elternzeit 8.000 statt 39.231,
+  sonstige Kündigungen 2.059 statt 10.703 in 730 Tagen (`berichte/etappe2/mess/schritt5/folgen_aus_h180.txt`); nach einer Pleite gründen
+  bis Tag 1.460 5,48 % wieder, ohne Erfahrung 16,96 %, ohne Verblassen 2,32 %, Sparsame im Mittel 26,6 Tage später als Verschwender
+  (`berichte/etappe2/VERBLASSEN.md` B.1). Gepaart über die Seeds 1–80: Einwohner an Tag 365 +1,7 %, an Tag 730 −0,0 %, Gründungen bis
+  Tag 730 −11,9 %, Kasse an Tag 730 −17,1 % (`berichte/etappe2/mess/schritt4/gates_1_80/wirtschaft_gegen_ged0.txt`; die Ursache der
+  Kasse ist nicht zerlegt).
+- **Sichtbar:** in der Personenkarte der Abschnitt „Erfahrung und Plan“ mit dem Knopf „Warum?“ und der Lebenslauf getrennt in Langzeit und
+  Kurzzeit; im Kopf des Stadtbuchs der Knopf „… anders“ mit der Liste „Heute anders entschieden“ (Bedienung: `docs/START.md`). „Warum?“
+  nennt hinter jedem Satz „Ohne … hätte …“ die Rechnung dieses Vergleichs (mit seiner eigenen Zufallszahl), damit er sich nachrechnen lässt.
+
+**Noahs Entscheidungen** (`berichte/etappe2/ENTSCHEIDUNGEN_NOAH.md`; wo sie von den Empfehlungen des Entwurfs abweichen, gelten sie):
+
+1. **Kein Name im Gedächtnis:** `memName` ist gestrichen. Erinnerungen an Menschen, die nicht mehr in der Stadt leben, nennen die Beziehung
+   („Der Partner ist gestorben“); dafür hat jede Erinnerung Fakt und Verweis.
+2. **Alle Gründer sparen vorher eine Rücklage** (gegen die Empfehlung „nur nach einer Pleite“), nach seiner Entscheidung 6 erst ab der Stufe
+   Stadt, damit Anlauf und „Wachstum: schnell“ aus Version 9 nicht gebremst werden; die Wartezeit nach einer Pleite hängt zusätzlich an der
+   Sparsamkeit.
+3. **Elternzeit wird gelernt:** Wer für die Elternzeit kündigt und innerhalb von 30 Tagen wieder Arbeit sucht, lernt das wie jede andere
+   Kündigung als schlechte Erfahrung (gegen die Empfehlung „ausnehmen“).
+4. **Beides:** Knopf „Warum?“ in der Personenkarte und Liste „Heute anders entschieden“, dazu eine stärkere Wirkung als im Entwurf (dort
+   0,5–1 % der Entscheidungen). Die Stärke ist gemessen kalibriert, ohne eine Gate-Schwelle zu ändern; danach hat Noah Stufe 1,5 gewählt
+   (Entscheidung 9), weil Gate 7 dort in mehr Städten gewertet wird als bei Stufe 4 (`berichte/etappe2/KALIBRIERUNG.md` Teil F).
+
+Seine weiteren Entscheidungen zu Etappe 2: (5) die Policy aus Etappe 1 gilt in Version 10 nicht mehr; (6) Rücklage erst ab der Stufe Stadt;
+(7) die Simulation bitgleich schneller machen statt der Zeitgrenze (`berichte/etappe2/OPTIMIEREN.md`); (8) Gate 7 wird nur gewertet, wenn bis
+Tag 365 mindestens 15 Menschen weggezogen sind, sonst „nicht gewertet“ und getrennt gezählt – eine bewusste Änderung einer Spec-Regel;
+(9) Stärke 1,5; (10) Erfahrung verblasst (`berichte/etappe2/VERBLASSEN.md`).
+
+**Harte Grenze.** Keine neue Regel und kein neues Feld liest oder speichert Namen, Geschlecht, Herkunft, Eltern oder den Einzugstag; die
+Bezüge einer Erinnerung (`memRef`, `memGen`) werden nur mitkopiert und in der Karte angezeigt. Geprüft statisch (32 Funktionen und 99 neue
+Zeilen, mit Gegenprobe) und mit einem Namenstausch, nach dem die Seeds 1 und 2 200 Tage lang jeden Tag gleich rechnen (`simtest
+--gedaechtnis` H, `berichte/etappe2/mess/schritt4/frisch2/simtest_alle/gedaechtnis.txt`). Die Liste „Heute anders entschieden“ speichert keine Namen und ist nur nach der Uhrzeit geordnet.
+
+**Speicherformat 10.** Je Person 10 neue Felder (`PF_GED`: Fakt und Verweis je Erinnerung, Erfahrung, offene Handlung mit Frist, Planschritt,
+letzter Plan, letzte Entscheidung mit Quelle und Zeit) und `S.stat.ged`; `memName` (32 Byte) fällt weg, zusammen 381 statt 371 Byte je
+Person (`berichte/etappe2/SCHRITT2.md` Abschnitt 6). Die große Stadt (Umland 300.000, Seed 2, Tag 750, 7.159 Einwohner) braucht 4.277.380 Zeichen: unter der in Chromium gemessenen
+Grenze von `localStorage` (5.242.867 Zeichen), wie schon in Version 9 über der eigenen Warnschwelle von 4 MB
+(`berichte/etappe2/mess/schritt4/frisch/browser/logs/p10speicher.log`, `berichte/etappe2/mess/schritt5/groesse_gross_endstand.jsonl`,
+`berichte/etappe2/VERGLEICH.md` 1.4). Stände der Versionen 2 bis 9 lassen sich übernehmen: Das alte Gedächtnis wird neu auf
+Kurz- und Langzeit verteilt, Erfahrung, Plan und letzte Entscheidung beginnen am Übernahmetag. Beschädigte Stände der Version 10 lehnt
+`gedPruefen` mit Grund ab; Version 9 lehnt einen Stand der Version 10 ab.
+
+**Schalter für Vergleiche.** `R.GED = 0` zusammen mit `R.OPFER_FREI = 0` und `R.HAFT_EROEFFNUNG = 0` (zwei Fehler aus Version 9, in
+Etappe 2 behoben) rechnet Tag für Tag wie 6c1741e (Version 9 mit KI-Teil), bis auf `memName` und die Versionsnummer (Seeds 1–3 × 365 Tage,
+stündlich und in Tagesschritten, `simtest --gedaechtnis` B, `berichte/etappe2/mess/schritt4/frisch2/simtest_alle/gedaechtnis.txt`). Nur für Tests gedacht.
+
+**KI-Policy.** Version 10 lehnt die Policy aus Etappe 1 sichtbar ab („Policy ungültig: trainiert auf Stadt-Version 9, diese Stadt ist
+Version 10 (neu trainieren)“), es entscheiden die Regeln. Eine Policy, die auch Erfahrung und Plan sieht (Beobachtungsschema 3), gehört zum
+neuen Training in Etappe 3 (`docs/EXPERIMENTE.md`).
+
+Prüfen: `node tools/simtest.mjs --gedaechtnis` (42 Prüfungen) und `bash tests/alle.sh gedaechtnis` (Browser, 17 Prüfungen), beide auch in
+`tools/simtest_alle.sh` und `tests/alle.sh` (Läufe aus einer frischen Kopie nach den Korrekturen der Schlussprüfung:
+`berichte/etappe2/mess/fix/frisch/simtest_alle/gedaechtnis.txt`, `berichte/etappe2/mess/fix/frisch/browser/logs/gedaechtnis.log`; vorher mit
+39 und 15 Prüfungen `berichte/etappe2/mess/schritt4/`). Grenzen und offene Fragen an Noah: `docs/GRENZEN.md`, Abschnitt „Gedächtnis, Erfahrung und
+Pläne“.
 
 ## Was die Leute arbeiten
 
@@ -1380,7 +1477,8 @@ die Logik ist auf den Stand nach Teil 1 übertragen, nicht die Patches.
   nicht (erst das Gericht), Rückfälle entstehen über die Folgen der Haft. Art: Diebstahl 69,4 %, Wohnungseinbruch 2,9 %, Betrug 27,7 %;
   keine Gewalt.
 - **Opfer** zufällig unter allen Erwachsenen außerhalb des eigenen Haushalts, nicht in Haft (liest Alter, Haushalt, Wohnung, Haft); beim
-  Einbruch alle Erwachsenen des Haushalts. Beute höchstens 10 / 60 / 20 Taler und was das Opfer hat. Folgen: Gedächtnis („wurde
+  Einbruch alle Erwachsenen des Haushalts, dessen Vorstand ebenfalls nicht in Haft sein darf (`R.OPFER_FREI`, Vorarbeit zu Etappe 2;
+  vorher konnte ein Vorstand in Haft Opfer sein, erzwungen nachgewiesen in `simtest --sicherheit`, 3 m). Beute höchstens 10 / 60 / 20 Taler und was das Opfer hat. Folgen: Gedächtnis („wurde
   bestohlen“ …, danach eine Entscheidung wie nach jedem Ereignis), eine Weile weniger Zufriedenheit, nach einem Einbruch Wohnen −20 für
   20 Tage.
 - **Anzeige und Aufklärung.** Jede Tat wird angezeigt. Aufgeklärt mit min(0,9; Quote × Faktor): Diebstahl 31,4 %, Wohnungseinbruch
@@ -5256,6 +5354,11 @@ und bis auf die Uhrzeit (`zuletztGelaufen`) gleich wie vorher.
   `StadtSim._pruef` (Ereignisse gezielt auslösen: sterben, wegziehen, zusammenziehen, kündigen, umziehen) ist nur für
   `tools/simtest.mjs --regierung` da; die Oberfläche benutzt es nicht. Einzige Ausnahme ist die Testhilfe
   `?debug&umland=…`, die `R.UMLAND` vor dem Start umstellt (solche Stände werden nicht gespeichert).
+  Version 10 (Etappe 2): `warum` (Rechnung einer Entscheidung, nur lesend, der Zufallsstand bleibt) und `gedInfo` (Erfahrung, Plan, letzte
+  Entscheidung als Zahlen) lesen nur und dienen Personenkarte und Liste; `beobachter` ist eine Eigenschaft (nicht in `S`, nur im Browser
+  gesetzt), `beobachterFehler` liest nur; `PF_GED`, `M_BED`, `ERF_AKTION`, `PLAN_GRUND`, `PLAN_SCHRITTE` und `QUELLEN` beschreiben die
+  neuen Felder; `StadtSim._ged` (Übernahme, Prüfung beschädigter Stände) ist nur für `tools/simtest.mjs` da. Wo Etappe 2 andockt:
+  `docs/ARCHITEKTUR.md`.
 - `tools/simtest.mjs` zieht den sim-Block aus der HTML-Datei und prüft ihn zuerst statisch auf verbotene Namen
   (`window`, `document`, `fetch`, `THREE`, `Math.random`, `Date`, `Intl`, `performance`, `console` …). Danach führt es ihn in
   einem leeren `vm`-Kontext aus, in dem `Math.random`, `Date` und `Intl` gesperrt sind.
@@ -5336,16 +5439,20 @@ node tools/simtest.mjs --techfrueh --git <repo> # Tech-Firmen früher und mehr (
                                                #   <datei> wie die Fassung davor), je Gründung (Stufe, Bremse, Preis, Markt), je Nacht (Zählungen,
                                                #   Weltpreis, 40 % nur im Umland), Aufgabe ohne je eine Kraft, Computer der Schulen; Speichern,
                                                #   beschädigte Stände, Übernahme von Version 8; Namenstausch; Gruppen (nur gemessen)
+node tools/simtest.mjs --gedaechtnis --git <repo> # Gedächtnis, Erfahrung, Pläne (Version 10, Etappe 2): Gegenprobe zu Punkt 8 (Seeds 1–3, 365 Tage),
+                                               #   Beobachter, Gedächtnisgrenzen; Schalter aus Tag für Tag wie 6c1741e; Planabbruch und
+                                               #   ID-Wiederverwendung erzwungen; Übernahme aus Version 9 und beschädigte Stände; Aufholen;
+                                               #   harte Grenze statisch und mit Namenstausch
 ```
 
 Weitere Schalter für `--seed`: `--alle 60` (Zeilenabstand), `--fluss` (Zu-/Wegzüge, Geburten, Tode je Zeile),
 `--diag` (Zufriedenheit und Bedürfnisse), `--aktionen` (wie oft jede Aktion gewählt wurde), `--buch 20`
 (die letzten Stadtbuch-Einträge).
 
-Nur `tools/simtest.mjs` liegt im Repo. Die Browser-Tests, die diese README nennt (`tests/…`, `tests/otest/…`, Playwright mit
-Chromium), und die Messskripte (`mess/…`) liegen im Arbeitsordner der Sitzung, in der gebaut wurde: Sie hängen an festen Pfaden
-dieser Umgebung (Three.js aus einer lokalen Kopie, KI-Nachbau auf Port 11434) und sind deshalb nicht eingecheckt. Ihre Ergebnisse
-stehen hier als Bericht, nachprüfbar im Repo ist nur `simtest`.
+Bis Version 9 lag nur `tools/simtest.mjs` im Repo; die Messskripte der Abschnitte oben (`mess/…`) lagen im Arbeitsordner der jeweiligen
+Sitzung, ihre Ergebnisse stehen hier als Bericht. Seit Etappe 1 liegen auch die Browser-Tests im Repo (`tests/`, mit relativen Pfaden;
+Voraussetzungen in `tests/LIESMICH.md`), dazu `tools/simtest_alle.sh` (alle simtest-Modi) und die Werkzeuge der KI. Die Belege der
+Etappe 2 liegen in `berichte/etappe2/`, die Werkzeuge, mit denen ihre Zahlen nachgerechnet werden, in `tools/` (`berichte/etappe2/LIESMICH.md`).
 
 ## Annahmen — Stellen, an denen die Spec nichts festlegt
 
@@ -5431,6 +5538,13 @@ stehen hier als Bericht, nachprüfbar im Repo ist nur `simtest`.
 | 78 | Ein Block (Wache, Dienststelle) findet auch Platz, wo eine Straße an der Rasterlinie zwischen zwei freien Blöcken endet: Suche im Rahmen von zwei Blöcken, das Tor auf der Rasterlinie an der Straßenspitze, belegt werden 3 × 3 Felder um das Tor. In einer Nacht baut zuerst das Land (Wache, dann Anstalt), dann der Bund (Kaserne, Dienststelle) | Befund B1 der Schlussprüfung. Vorher bestellte das Land nach einer Übernahme die Wache bis 18 Nächte später als Anstalt und Kaserne, auf Seed 3 wartete die Dienststelle 99 Nächte. Die Straße kann auf dieser Linie nicht weiterwachsen (wie bei den großen Geländen). Nebenwirkung (Nachprüfung, N1): Gibt es nach einer Übernahme nur zwei solche Stellen, wartet jetzt die Kaserne statt der Wache (Seed 2: 4 bis 67 Nächte, Seed 8 an Tag 200: 7). So entschieden, weil die Wache zur Stufe Kleinstadt gehört und in einer Stadt, die mit Version 7 wächst, immer vor Anstalt und Kaserne steht (Seeds 1–80: Wache im Mittel ab Tag 73, Kaserne offen ab Tag 191); Taten gibt es ab dem Übernahmetag. Die umgekehrte Reihenfolge verschiebt nur, wer wartet (offene Frage an Noah) |
 
 ## Bekannte Schwächen
+
+**Version 10 (Etappe 2, Gedächtnis, Erfahrung und Pläne):** siehe `docs/GRENZEN.md`, Abschnitt „Gedächtnis, Erfahrung und Pläne“: Die
+Ergebnisse je Folge, die Fristen und die Stärke sind Annahmen der Stadt; Kündigungen für die Elternzeit werden gelernt (Noahs Entscheidung 3)
+und gehen stark zurück; nach einer Pleite gründen weniger wieder als ohne Erfahrung, auch mit Verblassen (Ziel nicht erreicht, Frage an
+Noah); die Kasse liegt an Tag 730 um 17,1 % niedriger als ohne Erfahrung und Plan, und Gate 7 wird in 25 von 80 Städten nicht gewertet
+(Entscheidung 8; beides `berichte/etappe2/mess/schritt4/gates_1_80/`); Gate T ist eine Wandzeit auf einem Rechner; die Grenze von
+`localStorage` ist nur in Chromium gemessen; die Policy aus Etappe 1 gilt nicht mehr.
 
 **Version 9, Schlussprüfung:** siehe „Bekannte Schwächen und offene Fragen (Schlussprüfung)“ im Abschnitt „Befunde der Schlussprüfung
 (Version 9)“: Gate T braucht das 1,6- bis 1,8-Fache von 31ce452 (hier rund 2,2 Sekunden Abstand zur Grenze), Gate 4 fällt mit dem genaueren

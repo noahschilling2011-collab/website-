@@ -1,0 +1,20 @@
+Seed 1
+  ok   55 Tech-Firmen gegründet, jede macht Software, Handys oder Computer (0 Fehler)
+  ok   Arbeitstage = Leute, die da waren (Besitzer zählt mit): 13051 Firmentage geprüft (179 mit Wechsel übersprungen), 1696 Versionen erschienen, 0 Fehler
+  ok   Käufe: 13696 in 730 Tagen (18.8 am Tag), verkauft in Läden = verkauft von Firmen = Käufe (dazu 474 Computer der Schulen aus dem Laden), bezahlt = Preise (0 Fehler; 0 Läden mit Verkäufen in der Nacht ihres Umbaus mitgezählt)
+  ok   gekauft wird nur die neueste Version im Angebot, niemand zahlt sich unter die Reserve (0 Fehler)
+  ok   Anbau: 33 bestellt (auf Stufe 2–6: 13/8/5/6/1), 25 fertig; Stufe (höchstens 5, im Werk 6) und freie Stellen stimmen, Rücklage ≥ 0, Kasse ≤ Polster, nur wenn so viele Leute Arbeit suchten, wie Stellen dazukommen (0 Fehler)
+Seed 2
+  ok   62 Tech-Firmen gegründet, jede macht Software, Handys oder Computer (0 Fehler)
+  ok   Arbeitstage = Leute, die da waren (Besitzer zählt mit): 15148 Firmentage geprüft (184 mit Wechsel übersprungen), 1761 Versionen erschienen, 0 Fehler
+  ok   Käufe: 12175 in 730 Tagen (16.7 am Tag), verkauft in Läden = verkauft von Firmen = Käufe (dazu 406 Computer der Schulen aus dem Laden), bezahlt = Preise (0 Fehler; 0 Läden mit Verkäufen in der Nacht ihres Umbaus mitgezählt)
+  ok   gekauft wird nur die neueste Version im Angebot, niemand zahlt sich unter die Reserve (0 Fehler)
+  ok   Anbau: 24 bestellt (auf Stufe 2–6: 12/6/4/2/0), 19 fertig; Stufe (höchstens 5, im Werk 6) und freie Stellen stimmen, Rücklage ≥ 0, Kasse ≤ Polster, nur wenn so viele Leute Arbeit suchten, wie Stellen dazukommen (0 Fehler)
+Seed 3
+  ok   51 Tech-Firmen gegründet, jede macht Software, Handys oder Computer (0 Fehler)
+  ok   Arbeitstage = Leute, die da waren (Besitzer zählt mit): 13278 Firmentage geprüft (219 mit Wechsel übersprungen), 1705 Versionen erschienen, 0 Fehler
+  ok   Käufe: 13210 in 730 Tagen (18.1 am Tag), verkauft in Läden = verkauft von Firmen = Käufe (dazu 436 Computer der Schulen aus dem Laden), bezahlt = Preise (0 Fehler; 0 Läden mit Verkäufen in der Nacht ihres Umbaus mitgezählt)
+  ok   gekauft wird nur die neueste Version im Angebot, niemand zahlt sich unter die Reserve (0 Fehler)
+  ok   Anbau: 34 bestellt (auf Stufe 2–6: 13/10/7/4/0), 23 fertig; Stufe (höchstens 5, im Werk 6) und freie Stellen stimmen, Rücklage ≥ 0, Kasse ≤ Polster, nur wenn so viele Leute Arbeit suchten, wie Stellen dazukommen (0 Fehler)
+  ok   Speichern/Laden an Tag 500, 11 Uhr, mit 39 Tech-Gründungen: 30 Tage weiter bitgleich
+Alle Tech-Prüfungen bestanden

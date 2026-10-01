@@ -1,0 +1,13 @@
+  ok   zuzug(), Zählung bis zur Suche: liest keine Person (0), ein Zufallszug wie vorher (1), Anlauf über wachstumJetzt, Anfragen mit der Grundzahl ohne Anlauf
+  FEHL Seed 1, ohne Anlauf und ohne die Bausteine von Version 9 und 10: 200 Tage VERSCHIEDEN ab Tag 1 (10 Einwohner)
+  FEHL Seed 2, ohne Anlauf und ohne die Bausteine von Version 9 und 10: 200 Tage VERSCHIEDEN ab Tag 1 (10 Einwohner)
+  FEHL Seed 3, ohne Anlauf und ohne die Bausteine von Version 9 und 10: 200 Tage VERSCHIEDEN ab Tag 1 (10 Einwohner)
+  ok   SCHUL_ZUZUG 1: 1200 Nächte (136 im Dorf): freie Stellen gezählt wie die Regel (Kitas nie, Laden und Bauhof nur im Dorf; falsch 0), Anfragen fürs Bauamt mit der Grundzahl ohne Anlauf (falsch 
+  ok   SCHUL_ZUZUG 0: 1200 Nächte (136 im Dorf): freie Stellen gezählt wie die Regel (Kitas und Schulen nie, Laden und Bauhof nur im Dorf; falsch 0), Anfragen fürs Bauamt mit der Grundzahl ohne Anl
+  gemessen ohne Anlauf: Seed 1: erster Zuzug Tag 90, Tag 60/120 14/22; Seed 2: erster Zuzug Tag 50, Tag 60/120 18/27; Seed 3: erster Zuzug Tag 46, Tag 60/120 25/64
+  FEHL Seed 1, TECH_FRUEH 0 und WELT 0, ohne die übrigen Bausteine von Version 9 und 10: 200 Tage VERSCHIEDEN ab Tag 1 (10 Einwohner, 0 Tech-Gründungen)
+  FEHL Seed 2, TECH_FRUEH 0 und WELT 0, ohne die übrigen Bausteine von Version 9 und 10: 200 Tage VERSCHIEDEN ab Tag 1 (10 Einwohner, 0 Tech-Gründungen)
+  FEHL Seed 3, TECH_FRUEH 0 und WELT 0, ohne die übrigen Bausteine von Version 9 und 10: 200 Tage VERSCHIEDEN ab Tag 1 (10 Einwohner, 0 Tech-Gründungen)
+FEHL Regression Seed 1: Policy aus, R.GED = 0 und Vorarbeiten aus, 1 Tage, jeden Tag bitgleich zu <repo> 09083f5 (ohne memName, Felder aus PF_GED 0, ohne Versionsnummer; 11 Einwohner, Fin
+FEHL Regression Seed 2: Policy aus, R.GED = 0 und Vorarbeiten aus, 1 Tage, jeden Tag bitgleich zu <repo> 09083f5 (ohne memName, Felder aus PF_GED 0, ohne Versionsnummer; 11 Einwohner, Fin
+FEHL Regression Seed 3: Policy aus, R.GED = 0 und Vorarbeiten aus, 1 Tage, jeden Tag bitgleich zu <repo> 09083f5 (ohne memName, Felder aus PF_GED 0, ohne Versionsnummer; 11 Einwohner, Fin

@@ -1,0 +1,82 @@
+Stufen 1, 1.5, 2, 3, 4; Ordner SP/ml/e2bau/mess/kalibrierung
+R.GED = 0 (Bezug), Seeds 1–80 (80): 1 80, 2 80, 3 80, 4 79, 5 80, 6 80, 7 80, T 71, B 80; rot 4: 79, rot 7: –; F4 max 1.18, Budget min 1710
+
+== Stufe 1 ==
+Z1 anders ohne Erfahrung und Plan: 0.733 % / 0.937 % / 0.620 % (Mittel 0.763 %); davon direkt 90.9 % / 92.1 % / 89.6 %
+Z2 Beobachter je Stadt und Tag: 11.46 / 15.02 / 9.72 (Mittel 12.06); Meldungen 8364 / 10962 / 7094; Entscheidungen 1254672 / 1270595 / 1276712
+   ein Byte: 99.83 % / 99.82 % / 99.82 %; Kontrollen ok; Beobachter = direkt ok; Punkt 8 (≥ 0,3 %, ≥ 85 %, ≥ 99 %) ok; Einwohner Tag 730 1472 / 1618 / 1472
+   Kündigungen Elternzeit/sonst (Seeds 1–3): 437/126 · 483/94 · 488/112; Gründe Seed 1 {"erfahrung":5856,"plan":2148,"erfahrung und plan":350,"zufall":10}
+N1 Gates 1–80 (80): 1 80, 2 80, 3 80, 4 80, 5 80, 6 80, 7 80, T 47, B 80; rot: –; Abstürze 0; F4 max 1.14; Budget min 1741; G6 min 17.4; G7 min 15 → erfüllt
+N2 Gate T: Median 5454 ms (Runden 5567, 5504, 5392, 5404), Basis 4532 ms → +20.3 % (gepaart je Runde ×1.209); über 5000 ms: 4 von 4 → NICHT erfüllt; E1 gegen Stufe 1: +0.0 %
+N4 Abstände (20 Seeds): gruenden +20.3 (aus +19.5), kuendigenSonst -33.3 (aus -35.6), kuendigenEltern -20.8 (aus -26.3), wegziehen -25.3 (aus -26.3), partner +10.2 (aus +10.5), jobSuchen -7.5 (aus -18.3), wechsel +4.4 (aus +4.6) → 7 von 7 gleiches Vorzeichen, erfüllt
+   Muster: Wiedergründung nach Pleite 124/4518 (2.7 %, aus 14.3 %); Elternzeit 9018 (aus 39231, -77 %); sonstige 2074 (aus 10703, -81 %); Rente 17738 (aus 17171); Gründungen 9064 (aus 10454)
+Wirtschaft gegen R.GED = 0 (Seeds 1–80, gepaart): einwohner365 +20 ± 9 (+1.6 %, ↑53/↓26); kasse365 -41317 ± 11732 (-4.0 %, ↑25/↓55); gruendungen365 -36 ± 8 (-11.3 %, ↑23/↓57); einwohner730 +15 ± 9 (+1.0 %, ↑45/↓35); kasse730 -129103 ± 24057 (-13.6 %, ↑24/↓56); gruendungen730 -40 ± 18 (-8.0 %, ↑34/↓46)
+Personentage Seed 1, 365 Tage: 192937 (Basis 154729, +24.7 %); Einwohner Tag 365 1336
+Bestätigung Seeds 81–160 (80): 1 80, 2 80, 3 80, 4 79, 5 80, 6 80, 7 80, T 55, B 80; rot: 4 → 154; Abstürze 0; F4 max 1.17; Budget min 772 → BESTANDEN
+
+== Stufe 1.5 ==
+Z1 anders ohne Erfahrung und Plan: 0.838 % / 1.015 % / 0.825 % (Mittel 0.893 %); davon direkt 92 % / 91.1 % / 90.5 %
+Z2 Beobachter je Stadt und Tag: 13.48 / 15.93 / 13.41 (Mittel 14.27); Meldungen 9842 / 11626 / 9786; Entscheidungen 1276964 / 1257111 / 1311483
+   ein Byte: 99.94 % / 99.85 % / 99.67 %; Kontrollen ok; Beobachter = direkt ok; Punkt 8 (≥ 0,3 %, ≥ 85 %, ≥ 99 %) ok; Einwohner Tag 730 1480 / 1516 / 1455
+   Kündigungen Elternzeit/sonst (Seeds 1–3): 412/81 · 447/125 · 402/82; Gründe Seed 1 {"erfahrung":7269,"plan":2018,"erfahrung und plan":548,"zufall":7}
+N1 Gates 1–80 (80): 1 80, 2 80, 3 80, 4 80, 5 80, 6 80, 7 80, T 56, B 80; rot: –; Abstürze 0; F4 max 1.13; Budget min 1741; G6 min 16.5; G7 min 19.4 → erfüllt
+N2 Gate T: Median 5792 ms (Runden 6173, 5794, 5790, 5492), Basis 4532 ms → +27.8 % (gepaart je Runde ×1.276); über 5000 ms: 4 von 4 → NICHT erfüllt; E1 gegen Stufe 1: +6.2 %
+N4 Abstände (20 Seeds): gruenden +19.6 (aus +19.5), kuendigenSonst -32.3 (aus -35.6), kuendigenEltern -20.2 (aus -26.3), wegziehen -26.5 (aus -26.3), partner +10.3 (aus +10.5), jobSuchen -6.8 (aus -18.3), wechsel +4.2 (aus +4.6) → 7 von 7 gleiches Vorzeichen, erfüllt
+   Muster: Wiedergründung nach Pleite 55/4069 (1.4 %, aus 14.3 %); Elternzeit 7918 (aus 39231, -80 %); sonstige 1837 (aus 10703, -83 %); Rente 17993 (aus 17171); Gründungen 8545 (aus 10454)
+Wirtschaft gegen R.GED = 0 (Seeds 1–80, gepaart): einwohner365 +28 ± 9 (+2.2 %, ↑50/↓30); kasse365 -43749 ± 11330 (-4.3 %, ↑30/↓50); gruendungen365 -54 ± 9 (-17.0 %, ↑22/↓58); einwohner730 +16 ± 9 (+1.1 %, ↑45/↓33); kasse730 -135181 ± 21665 (-14.2 %, ↑19/↓61); gruendungen730 -81 ± 16 (-16.3 %, ↑23/↓57)
+Personentage Seed 1, 365 Tage: 201042 (Basis 154729, +29.9 %); Einwohner Tag 365 1395
+Bestätigung Seeds 81–160 (80): 1 80, 2 80, 3 80, 4 80, 5 80, 6 80, 7 78, T 52, B 80; rot: 7 → 103,154; Abstürze 0; F4 max 1.1; Budget min 772 → NICHT bestanden
+
+== Stufe 2 ==
+Z1 anders ohne Erfahrung und Plan: 1.014 % / 1.099 % / 1.838 % (Mittel 1.317 %); davon direkt 92.7 % / 93 % / 95.7 %
+Z2 Beobachter je Stadt und Tag: 15.93 / 16.30 / 31.91 (Mittel 21.38); Meldungen 11631 / 11900 / 23296; Entscheidungen 1237235 / 1163509 / 1324999
+   ein Byte: 99.70 % / 99.88 % / 99.94 %; Kontrollen ok; Beobachter = direkt ok; Punkt 8 (≥ 0,3 %, ≥ 85 %, ≥ 99 %) ok; Einwohner Tag 730 1445 / 1396 / 1591
+   Kündigungen Elternzeit/sonst (Seeds 1–3): 368/78 · 403/76 · 395/88; Gründe Seed 1 {"erfahrung":7206,"plan":4144,"erfahrung und plan":277,"zufall":4}
+N1 Gates 1–80 (80): 1 80, 2 80, 3 80, 4 80, 5 80, 6 80, 7 80, T 52, B 80; rot: –; Abstürze 0; F4 max 1.14; Budget min 1741; G6 min 17.3; G7 min 18.9 → erfüllt
+N2 Gate T: Median 5497.5 ms (Runden 5800, 5427, 5533, 5462), Basis 4532 ms → +21.3 % (gepaart je Runde ×1.244); über 5000 ms: 4 von 4 → NICHT erfüllt; E1 gegen Stufe 1: +0.8 %
+N4 Abstände (20 Seeds): gruenden +19.5 (aus +19.5), kuendigenSonst -31.3 (aus -35.6), kuendigenEltern -18.7 (aus -26.3), wegziehen -26.3 (aus -26.3), partner +10.4 (aus +10.5), jobSuchen -6.2 (aus -18.3), wechsel +4.3 (aus +4.6) → 7 von 7 gleiches Vorzeichen, erfüllt
+   Muster: Wiedergründung nach Pleite 26/4079 (0.6 %, aus 14.3 %); Elternzeit 7788 (aus 39231, -80 %); sonstige 1667 (aus 10703, -84 %); Rente 17767 (aus 17171); Gründungen 8554 (aus 10454)
+Wirtschaft gegen R.GED = 0 (Seeds 1–80, gepaart): einwohner365 +43 ± 9 (+3.4 %, ↑55/↓25); kasse365 -24861 ± 11783 (-2.4 %, ↑32/↓48); gruendungen365 -72 ± 8 (-22.6 %, ↑13/↓67); einwohner730 +15 ± 8 (+1.0 %, ↑44/↓35); kasse730 -170817 ± 23805 (-18.0 %, ↑17/↓63); gruendungen730 -91 ± 17 (-18.4 %, ↑20/↓60)
+Personentage Seed 1, 365 Tage: 196349 (Basis 154729, +26.9 %); Einwohner Tag 365 1292
+Bestätigung Seeds 81–160 (80): 1 80, 2 80, 3 80, 4 80, 5 80, 6 80, 7 79, T 44, B 80; rot: 7 → 157; Abstürze 0; F4 max 1.14; Budget min 772 → NICHT bestanden
+
+== Stufe 3 ==
+Z1 anders ohne Erfahrung und Plan: 1.957 % / 1.881 % / 2.425 % (Mittel 2.088 %); davon direkt 95.6 % / 95.9 % / 96.3 %
+Z2 Beobachter je Stadt und Tag: 32.35 / 28.55 / 40.55 (Mittel 33.82); Meldungen 23612 / 20841 / 29605; Entscheidungen 1262528 / 1156081 / 1267334
+   ein Byte: 99.89 % / 99.83 % / 99.90 %; Kontrollen ok; Beobachter = direkt ok; Punkt 8 (≥ 0,3 %, ≥ 85 %, ≥ 99 %) ok; Einwohner Tag 730 1515 / 1521 / 1545
+   Kündigungen Elternzeit/sonst (Seeds 1–3): 412/76 · 341/80 · 390/91; Gründe Seed 1 {"erfahrung":16962,"plan":6080,"erfahrung und plan":562,"zufall":8}
+N1 Gates 1–80 (80): 1 80, 2 80, 3 80, 4 80, 5 80, 6 80, 7 79, T 60, B 80; rot: 7 → 35; Abstürze 0; F4 max 1.14; Budget min 1741; G6 min 16.6; G7 min 7.8 → NICHT erfüllt
+N2 Gate T: Median 5568.5 ms (Runden 5480, 5650, 5729, 5487), Basis 4532 ms → +22.9 % (gepaart je Runde ×1.234); über 5000 ms: 4 von 4 → NICHT erfüllt; E1 gegen Stufe 1: +2.1 %
+N4 Abstände (20 Seeds): gruenden +19.2 (aus +19.5), kuendigenSonst -31.8 (aus -35.6), kuendigenEltern -19.1 (aus -26.3), wegziehen -26.1 (aus -26.3), partner +10.6 (aus +10.5), jobSuchen -6.4 (aus -18.3), wechsel +3.7 (aus +4.6) → 7 von 7 gleiches Vorzeichen, erfüllt
+   Muster: Wiedergründung nach Pleite 7/3416 (0.2 %, aus 14.3 %); Elternzeit 7444 (aus 39231, -81 %); sonstige 1736 (aus 10703, -84 %); Rente 17636 (aus 17171); Gründungen 7715 (aus 10454)
+Wirtschaft gegen R.GED = 0 (Seeds 1–80, gepaart): einwohner365 +39 ± 10 (+3.1 %, ↑55/↓23); kasse365 -47833 ± 11421 (-4.7 %, ↑27/↓53); gruendungen365 -76 ± 7 (-23.9 %, ↑9/↓70); einwohner730 +43 ± 9 (+2.9 %, ↑59/↓21); kasse730 -152826 ± 21509 (-16.1 %, ↑19/↓61); gruendungen730 -96 ± 16 (-19.3 %, ↑19/↓61)
+Personentage Seed 1, 365 Tage: 199379 (Basis 154729, +28.9 %); Einwohner Tag 365 1345
+
+== Stufe 4 ==
+Z1 anders ohne Erfahrung und Plan: 2.454 % / 2.140 % / 3.275 % (Mittel 2.623 %); davon direkt 96.6 % / 95.2 % / 97.3 %
+Z2 Beobachter je Stadt und Tag: 40.74 / 35.70 / 56.95 (Mittel 44.46); Meldungen 29739 / 26062 / 41570; Entscheidungen 1254421 / 1279840 / 1304203
+   ein Byte: 99.94 % / 99.91 % / 99.91 %; Kontrollen ok; Beobachter = direkt ok; Punkt 8 (≥ 0,3 %, ≥ 85 %, ≥ 99 %) ok; Einwohner Tag 730 1556 / 1603 / 1625
+   Kündigungen Elternzeit/sonst (Seeds 1–3): 362/74 · 374/96 · 429/93; Gründe Seed 1 {"erfahrung":24127,"zufall":15,"plan":4752,"erfahrung und plan":845}
+N1 Gates 1–80 (80): 1 80, 2 80, 3 80, 4 80, 5 80, 6 80, 7 79, T 68, B 80; rot: 7 → 40; Abstürze 0; F4 max 1.14; Budget min 1741; G6 min 16.2; G7 min 14.5 → NICHT erfüllt
+N2 Gate T: Median 5146.5 ms (Runden 5201, 5065, 5092, 5456), Basis 4532 ms → +13.6 % (gepaart je Runde ×1.136); über 5000 ms: 4 von 4 → NICHT erfüllt; E1 gegen Stufe 1: -5.6 %
+N4 Abstände (20 Seeds): gruenden +18.6 (aus +19.5), kuendigenSonst -31.5 (aus -35.6), kuendigenEltern -18.8 (aus -26.3), wegziehen -25.0 (aus -26.3), partner +10.4 (aus +10.5), jobSuchen -6.2 (aus -18.3), wechsel +3.8 (aus +4.6) → 7 von 7 gleiches Vorzeichen, erfüllt
+   Muster: Wiedergründung nach Pleite 5/4859 (0.1 %, aus 14.3 %); Elternzeit 7556 (aus 39231, -81 %); sonstige 1986 (aus 10703, -81 %); Rente 18151 (aus 17171); Gründungen 9493 (aus 10454)
+Wirtschaft gegen R.GED = 0 (Seeds 1–80, gepaart): einwohner365 +43 ± 9 (+3.4 %, ↑53/↓27); kasse365 -35709 ± 10643 (-3.5 %, ↑31/↓49); gruendungen365 -68 ± 8 (-21.5 %, ↑12/↓68); einwohner730 +61 ± 10 (+4.2 %, ↑62/↓17); kasse730 -127891 ± 20014 (-13.5 %, ↑18/↓62); gruendungen730 -67 ± 16 (-13.5 %, ↑22/↓58)
+Personentage Seed 1, 365 Tage: 179073 (Basis 154729, +15.7 %); Einwohner Tag 365 1237
+
+Je Stufe: Kandidat (Z1 > Stufe 1) / N1 / N2 / N3 / N4 / E1
+  1: nein / ja / nein / ja / ja / ja
+  1.5: ja / ja / nein / ja / ja / ja
+  2: ja / ja / nein / ja / ja / ja
+  3: ja / nein / nein / ja / ja / ja
+  4: ja / nein / nein / ja / ja / ja
+
+Auswahl A.5 (N1–N4): bestanden auf 1–80 (stärkste zuerst): keine
+  → keine Stufe über 1 besteht: Standard bleibt 1
+
+Zusatzauswahl E2 (N1, N3, N4, E1 ≤ +10 %): bestanden auf 1–80 (stärkste zuerst): 2, 1.5
+  Stufe 2: Bestätigung 81–160 NICHT bestanden
+  Stufe 1.5: Bestätigung 81–160 NICHT bestanden
+  → keine Stufe über 1 besteht: Standard bleibt 1
+
+ERGEBNIS: A.5 → Stufe 1; E2 → Stufe 1

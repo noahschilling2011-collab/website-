@@ -1,0 +1,151 @@
+
+═══ Seed 1 ═══
+   Tag  Einw.  Geb.  Gründ.  Pleiten  frW  frSt  Zufr.  Budget   Laufzeit
+    30     34     7       2        0    0     9     65    5028      73 ms
+    60     62    13       9        0    6    23     59   35798     119 ms
+    90    117    25      15        0    0    40     64   55594     186 ms
+   120    194    48      38        2   16   155     66  106609     279 ms
+   150    278    73      65       10    0   274     65  172284     367 ms
+   180    389    95     102       27    1   358     65  239048     452 ms
+   210    539   109     128       45    1   289     69  315411     553 ms
+   240    756   147     174       60    9   402     69  416543     710 ms
+   270   1021   169     207       82    5   291     70  516920     944 ms
+   300   1215   200     240       89   13   341     70  703111    1231 ms
+   330   1243   200     241      120   27   125     72  858693    1374 ms
+   360   1284   202     249      125   14   145     72 1000013    1511 ms
+   365   1307   204     249      125   15   146     73 1015928    1531 ms
+   390   1429   206     285      126    8   323     72 1096080    1642 ms
+   420   1455   208     291      159    8   133     73 1205102    1775 ms
+   450   1533   216     334      166   18   303     72 1246185    1911 ms
+   480   1587   228     361      200   32   203     73 1284517    2068 ms
+   510   1706   265     453      215   10   591     73 1273705    2233 ms
+   540   1726   284     506      275   43   508     72 1287672    2412 ms
+   570   1722   285     547      324   35   412     73 1295611    2591 ms
+   600   1703   286     576      355   56   370     74 1281863    2765 ms
+   630   1681   287     602      382   83   327     74 1196597    2940 ms
+   660   1693   289     641      400   56   386     74 1149153    3117 ms
+   690   1673   291     660      426   60   294     74 1069019    3315 ms
+   720   1636   292     677      443   86   222     75  982437    3507 ms
+   730   1625   293     681      445  100   200     75  942555    3566 ms
+  ✓ 1  Einwohner an Tag 365: 1307 (≥ 300)
+  ✓ 2  Minimum 11, schlimmster 30-Tage-Einbruch 2.8 % (Tag 638) (nie 0, ≤ 30 %)
+  ✓ 3  kleinstes Budget 2986 (≥ 0)
+  ✓ 4  läuft 730 Tage; Einwohner Tag 551–730 zwischen 1625 und 1730 (Faktor 1.06, ≤ 1,15); Straßen wie auf der Karte 96 x 32–76, y 24–72, Abstand zur alten Baugrenze 16; Karte 96 × 96 (5-mal gewachsen), Abstand zur Baugrenze 16 (> 0)
+  ✓ 5  Gründungen durch Bewohner bis Tag 365: 249 (≥ 5)
+  ✓ 6  Gründer-Ehrgeiz 69.6 vs. alle 49.3: 20.3 (≥ +15)
+  – 7  nicht gewertet: nur 13 Wegzieher (< 15); Wegzieher-Heimatliebe 16.3 vs. alle 49.7: −33.3 (nur gemeldet)
+  ✓ T  365 Tage in 1531 ms (< 5000)
+  ✓ B  Stadtbuch 8.06 Zeilen am Tag, davon Bauhof 0.37 (≤ 0,5; kein Spec-Gate)
+  Tech: gegründet 55, offen an Tag 730 26 (Stufe 2: 5, Stufe 3: 4), Anteil an den Umland-Stellen 36.2 %, Versionen 1718, Käufe je Tag 28.2 (Tag 366–730), Anbauten 33, Tech-Pleiten 8, Erwachsene mit Gerät 95 %, Tech-Zeilen im Stadtbuch 0.79 am Tag
+  Stadtregierung, am Tag (Tag 700–730): Lohnsteuer 0 (alte Regel 7141), Budget -3436; von außen: Rentenkasse 35154, Bund 774 (Prämien 562, Betreuungsgehalt 208, Grundsicherung 4)
+  bis Tag 730: 904 Prämien, 2455 Tage Betreuungsgehalt, 78 Tage Grundsicherung, gemeinnützige Arbeit 0-mal, 61 Tage mit Wohnungsvorbehalt (78 Wohnungstage), Budget 942555, Notwerkstätten 0
+  Schritt 2 bis Tag 730: 710 von 770 Haushalten im Eigentum (531 abbezahlt), 1113 Käufe, 403 Rückkäufe, 139 Erbfälle; 971 Renteneintritte durch Kündigung, davon 607 vor 67 (Ø 66.0 Jahre), 35 vor 67 durch Schließung; 2818 Lohntage von Rentnern, Freibetrag 29 Taler
+  Kitas an Tag 730: 10 offen (10 gebaut), 31 Fachkräfte (Bedarf 29), Lohn 97, 83 Kinder mit Platz (40 unter 3), 1 warten (0 ohne Kita-Angebot in der Nähe), 3 unter 3 zu Hause betreut, 0 gebunden; bis Tag 730: 34-mal Stelle aufgegeben, 4 Haushaltsnächte nur mit Besitzern, 350 ohne Kita-Angebot in der Nähe, Kosten 2224 Taler am Tag
+  Sicherheit bis Tag 730: 2829 Taten (Diebstahl 1970, Einbruch 90, Betrug 769), aufgeklärt 1182 (42 %), 1174 Urteile (Geldstrafe 1137, Ersatzfreiheitsstrafe 166, Freiheitsstrafe 37), U-Haft 36, Haftantritte 203, Widerrufe 2, Obhut 4 Familie / 0 Jugendamt; an Tag 730 in Haft 1 (Anstalt in der Stadt 1, von außerhalb 9), Polizei 6/6, Vollzug 7/7; Wache ja, Anstalt ja; vom Land 960 Taler am Tag, Bauten 9500
+  Bund bis Tag 730: Kaserne offen ab Tag 121, Dienststelle ab Tag 252; 627 einberufen (Wehrdienst 179, Ersatzdienst 448, 71 %), 3120 Diensttage, 622 beendet, 2 abgebrochen; an Tag 730 7/8 Soldaten (3 verpflichtet), 4/4 Zivil, 2/4 Nachrichtendienst, 0 im Wehr-, 3 im Ersatzdienst; vom Bund 1271 Taler am Tag (Sold 256), Bauten 12800
+  Tag 730:
+  Gründer:      n=681, Ehrgeiz Ø 64.8  |  alle je Erwachsenen n=2090, Ø 47.2  →  +17.6  (Gate ≥ +15)
+  Weggezogene:  n=45, Heimatliebe Ø 26.7  |  alle je Erwachsenen Ø 50.6  →  -24.0  (Gate ≤ −15)
+  (heutige Erwachsene n=1366: Ehrgeiz Ø 45.4, Heimatliebe Ø 52.2)
+
+═══ Seed 2 ═══
+   Tag  Einw.  Geb.  Gründ.  Pleiten  frW  frSt  Zufr.  Budget   Laufzeit
+    30     30     6       0        0    7     0     62   13516      35 ms
+    60     39     7       1        0   14     0     67   24468      64 ms
+    90     85    26      18        0    7    91     60   40613     108 ms
+   120    145    32      30        3    0    79     63   71206     138 ms
+   150    212    57      52        9    4   190     66  116211     193 ms
+   180    313    70      76       20    4   184     66  162811     229 ms
+   210    448    98     108       22    3   333     68  214664     285 ms
+   240    610   126     145       46    0   330     69  284048     352 ms
+   270    784   139     161       60    0   206     71  379800     428 ms
+   300   1047   153     188       67    0   170     71  496700     534 ms
+   330   1163   164     189       68   12   171     72  703154     636 ms
+   360   1205   167     189       76   16   117     73  841954     742 ms
+   365   1219   171     211       76    0   206     73  866532     760 ms
+   390   1368   231     256       77   17   485     72  939155     864 ms
+   420   1405   236     275      131   23   248     73 1086241     989 ms
+   450   1409   236     294      149   17   237     73 1172131    1113 ms
+   480   1427   236     298      163    6   164     74 1219712    1242 ms
+   510   1447   240     307      165   17   172     75 1214442    1371 ms
+   540   1454   241     313      166   36   174     74 1112050    1501 ms
+   570   1475   241     319      166   41   162     75 1069409    1657 ms
+   600   1482   241     326      167   42   176     76 1021366    1796 ms
+   630   1488   242     335      167   55   180     75  923388    1926 ms
+   660   1472   242     340      167   61   189     74  850200    2055 ms
+   690   1446   242     342      168   77   176     74  722030    2199 ms
+   720   1418   242     355      168  105   201     73  596706    2394 ms
+   730   1402   242     360      168  121   203     73  542942    2436 ms
+  ✓ 1  Einwohner an Tag 365: 1219 (≥ 300)
+  ✓ 2  Minimum 11, schlimmster 30-Tage-Einbruch 3.6 % (Tag 701) (nie 0, ≤ 30 %)
+  ✓ 3  kleinstes Budget 3653 (≥ 0)
+  ✓ 4  läuft 730 Tage; Einwohner Tag 551–730 zwischen 1402 und 1490 (Faktor 1.06, ≤ 1,15); Straßen wie auf der Karte 96 x 24–76, y 28–68, Abstand zur alten Baugrenze 16; Karte 96 × 96 (5-mal gewachsen), Abstand zur Baugrenze 16 (> 0)
+  ✓ 5  Gründungen durch Bewohner bis Tag 365: 211 (≥ 5)
+  ✓ 6  Gründer-Ehrgeiz 69.2 vs. alle 49.4: 19.8 (≥ +15)
+  – 7  nicht gewertet: nur 7 Wegzieher (< 15); Wegzieher-Heimatliebe 30.1 vs. alle 51.1: −20.9 (nur gemeldet)
+  ✓ T  365 Tage in 760 ms (< 5000)
+  ✓ B  Stadtbuch 6.51 Zeilen am Tag, davon Bauhof 0.30 (≤ 0,5; kein Spec-Gate)
+  Tech: gegründet 62, offen an Tag 730 26 (Stufe 2: 5, Stufe 3: 4), Anteil an den Umland-Stellen 26.8 %, Versionen 1773, Käufe je Tag 25.2 (Tag 366–730), Anbauten 24, Tech-Pleiten 7, Erwachsene mit Gerät 94 %, Tech-Zeilen im Stadtbuch 0.78 am Tag
+  Stadtregierung, am Tag (Tag 700–730): Lohnsteuer 0 (alte Regel 6034), Budget -4112; von außen: Rentenkasse 28158, Bund 941 (Prämien 600, Betreuungsgehalt 341, Grundsicherung 0)
+  bis Tag 730: 781 Prämien, 2310 Tage Betreuungsgehalt, 34 Tage Grundsicherung, gemeinnützige Arbeit 0-mal, 53 Tage mit Wohnungsvorbehalt (68 Wohnungstage), Budget 542942, Notwerkstätten 0
+  Schritt 2 bis Tag 730: 617 von 661 Haushalten im Eigentum (445 abbezahlt), 1017 Käufe, 400 Rückkäufe, 120 Erbfälle; 859 Renteneintritte durch Kündigung, davon 551 vor 67 (Ø 65.9 Jahre), 43 vor 67 durch Schließung; 2047 Lohntage von Rentnern, Freibetrag 22 Taler
+  Kitas an Tag 730: 11 offen (11 gebaut), 34 Fachkräfte (Bedarf 32), Lohn 100, 85 Kinder mit Platz (44 unter 3), 0 warten (0 ohne Kita-Angebot in der Nähe), 3 unter 3 zu Hause betreut, 0 gebunden; bis Tag 730: 37-mal Stelle aufgegeben, 1 Haushaltsnächte nur mit Besitzern, 97 ohne Kita-Angebot in der Nähe, Kosten 2104 Taler am Tag
+  Sicherheit bis Tag 730: 2313 Taten (Diebstahl 1573, Einbruch 89, Betrug 651), aufgeklärt 958 (41 %), 946 Urteile (Geldstrafe 918, Ersatzfreiheitsstrafe 75, Freiheitsstrafe 28), U-Haft 27, Haftantritte 103, Widerrufe 3, Obhut 2 Familie / 0 Jugendamt; an Tag 730 in Haft 0 (Anstalt in der Stadt 0, von außerhalb 10), Polizei 5/5, Vollzug 7/7; Wache ja, Anstalt ja; vom Land 869 Taler am Tag, Bauten 9500
+  Bund bis Tag 730: Kaserne offen ab Tag 139, Dienststelle ab Tag 281; 532 einberufen (Wehrdienst 166, Ersatzdienst 366, 69 %), 2618 Diensttage, 518 beendet, 7 abgebrochen; an Tag 730 8/8 Soldaten (5 verpflichtet), 1/4 Zivil, 1/4 Nachrichtendienst, 3 im Wehr-, 4 im Ersatzdienst; vom Bund 1171 Taler am Tag (Sold 215), Bauten 12800
+  Tag 730:
+  Gründer:      n=360, Ehrgeiz Ø 68.1  |  alle je Erwachsenen n=1816, Ø 47.6  →  +20.5  (Gate ≥ +15)
+  Weggezogene:  n=11, Heimatliebe Ø 31.0  |  alle je Erwachsenen Ø 50.2  →  -19.2  (Gate ≤ −15)
+  (heutige Erwachsene n=1161: Ehrgeiz Ø 46.3, Heimatliebe Ø 49.8)
+
+═══ Seed 3 ═══
+   Tag  Einw.  Geb.  Gründ.  Pleiten  frW  frSt  Zufr.  Budget   Laufzeit
+    30     31     7       1        0    2     6     68    9400       5 ms
+    60     88    16      10        0    4    22     64   19444      14 ms
+    90    157    39      31        0    1   155     61   53657      31 ms
+   120    237    59      54        6    0   226     65  102379      61 ms
+   150    329    88      90       14    4   375     66  163179      93 ms
+   180    450   102     130       40    4   377     67  242715     133 ms
+   210    597   113     147       54    3   294     70  341647     188 ms
+   240    782   127     173       72    5   210     71  455130     253 ms
+   270   1044   143     191       79   14   127     71  573430     344 ms
+   300   1119   147     191       80   11   124     73  761573     446 ms
+   330   1178   150     194       80    7   132     73  902221     553 ms
+   360   1252   170     224       81    2   222     73 1015234     669 ms
+   365   1292   189     243       81    1   323     73 1037305     689 ms
+   390   1446   273     304       82   12   744     72 1092483     816 ms
+   420   1480   273     305      168   55   186     74 1200559     969 ms
+   450   1492   272     307      178   41    89     74 1246587    1111 ms
+   480   1487   277     317      181   72   124     75 1217066    1238 ms
+   510   1491   279     324      181   77   147     76 1210906    1416 ms
+   540   1517   280     333      181   75   154     76 1145953    1552 ms
+   570   1493   281     341      181   71   147     75 1058504    1701 ms
+   600   1491   281     355      181   78   187     75 1000908    1847 ms
+   630   1503   281     364      182   90   181     76  907088    1998 ms
+   660   1478   281     366      182  106   174     75  805981    2140 ms
+   690   1474   281     373      182  108   150     75  701205    2272 ms
+   720   1470   281     385      182  116   173     74  556090    2430 ms
+   730   1460   281     386      183  137   158     74  533237    2471 ms
+  ✓ 1  Einwohner an Tag 365: 1292 (≥ 300)
+  ✓ 2  Minimum 11, schlimmster 30-Tage-Einbruch 2.7 % (Tag 665) (nie 0, ≤ 30 %)
+  ✓ 3  kleinstes Budget 2741 (≥ 0)
+  ✓ 4  läuft 730 Tage; Einwohner Tag 551–730 zwischen 1455 und 1509 (Faktor 1.04, ≤ 1,15); Straßen wie auf der Karte 96 x 28–88, y 28–72, Abstand zur alten Baugrenze 4; Karte 120 × 120 (8-mal gewachsen), Abstand zur Baugrenze 16 (> 0)
+  ✓ 5  Gründungen durch Bewohner bis Tag 365: 243 (≥ 5)
+  ✓ 6  Gründer-Ehrgeiz 69.5 vs. alle 49.3: 20.2 (≥ +15)
+  – 7  nicht gewertet: nur 13 Wegzieher (< 15); Wegzieher-Heimatliebe 16.7 vs. alle 49.4: −32.7 (nur gemeldet)
+  ✓ T  365 Tage in 689 ms (< 5000)
+  ✓ B  Stadtbuch 6.86 Zeilen am Tag, davon Bauhof 0.33 (≤ 0,5; kein Spec-Gate)
+  Tech: gegründet 51, offen an Tag 730 20 (Stufe 2: 3, Stufe 3: 3), Anteil an den Umland-Stellen 30.3 %, Versionen 1733, Käufe je Tag 26.5 (Tag 366–730), Anbauten 34, Tech-Pleiten 3, Erwachsene mit Gerät 94 %, Tech-Zeilen im Stadtbuch 0.78 am Tag
+  Stadtregierung, am Tag (Tag 700–730): Lohnsteuer 0 (alte Regel 6454), Budget -4019; von außen: Rentenkasse 28296, Bund 973 (Prämien 536, Betreuungsgehalt 437, Grundsicherung 0)
+  bis Tag 730: 839 Prämien, 2320 Tage Betreuungsgehalt, 32 Tage Grundsicherung, gemeinnützige Arbeit 0-mal, 49 Tage mit Wohnungsvorbehalt (61 Wohnungstage), Budget 533237, Notwerkstätten 0
+  Schritt 2 bis Tag 730: 626 von 695 Haushalten im Eigentum (451 abbezahlt), 1058 Käufe, 432 Rückkäufe, 143 Erbfälle; 926 Renteneintritte durch Kündigung, davon 585 vor 67 (Ø 66.1 Jahre), 39 vor 67 durch Schließung; 2438 Lohntage von Rentnern, Freibetrag 46 Taler
+  Kitas an Tag 730: 9 offen (9 gebaut), 28 Fachkräfte (Bedarf 27), Lohn 99, 79 Kinder mit Platz (36 unter 3), 0 warten (0 ohne Kita-Angebot in der Nähe), 5 unter 3 zu Hause betreut, 0 gebunden; bis Tag 730: 20-mal Stelle aufgegeben, 0 Haushaltsnächte nur mit Besitzern, 130 ohne Kita-Angebot in der Nähe, Kosten 2086 Taler am Tag
+  Sicherheit bis Tag 730: 2391 Taten (Diebstahl 1663, Einbruch 63, Betrug 665), aufgeklärt 1018 (43 %), 1000 Urteile (Geldstrafe 979, Ersatzfreiheitsstrafe 73, Freiheitsstrafe 21), U-Haft 19, Haftantritte 93, Widerrufe 0, Obhut 0 Familie / 0 Jugendamt; an Tag 730 in Haft 0 (Anstalt in der Stadt 0, von außerhalb 10), Polizei 6/6, Vollzug 7/7; Wache ja, Anstalt ja; vom Land 960 Taler am Tag, Bauten 9500
+  Bund bis Tag 730: Kaserne offen ab Tag 104, Dienststelle ab Tag 248; 571 einberufen (Wehrdienst 172, Ersatzdienst 399, 70 %), 2835 Diensttage, 563 beendet, 3 abgebrochen; an Tag 730 8/8 Soldaten (5 verpflichtet), 4/4 Zivil, 4/4 Nachrichtendienst, 3 im Wehr-, 2 im Ersatzdienst; vom Bund 1275 Taler am Tag (Sold 233), Bauten 12800
+  Tag 730:
+  Gründer:      n=386, Ehrgeiz Ø 68.7  |  alle je Erwachsenen n=1935, Ø 47.8  →  +20.9  (Gate ≥ +15)
+  Weggezogene:  n=14, Heimatliebe Ø 19.3  |  alle je Erwachsenen Ø 49.8  →  -30.6  (Gate ≤ −15)
+  (heutige Erwachsene n=1198: Ehrgeiz Ø 46.2, Heimatliebe Ø 49.7)
+
+Gate 7 nicht gewertet (weniger als 15 Wegzieher bis Tag 365, Entscheidung 8): 3 von 3 Seeds (1, 2, 3)
+Gate Phase 0: BESTANDEN
+exit 0

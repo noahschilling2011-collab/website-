@@ -1,0 +1,22 @@
+Seed 1
+  ok   keine Werkstatt liefert mehr Kisten, als sie gemacht hat (200 Tage)
+  ok   geliefert = bekommen (Werkstätten, Läden und Autowerke, 0 Abweichungen; 8 Umbauten zur Kita oder Schule mitgezählt); je Auto aus einem Werk der Stadt 24 Kisten Teile (0 Fehler)
+  ok   Lieferant höchstens 20 Felder weit; von außen nur, wenn in Reichweite nichts übrig war (0 Fehler)
+  ok   je anwesender Kraft 8 Kisten, Bauarbeiter auf der Baustelle nicht, Ersatzdienst nicht (32 Tage im Ersatzdienst ohne Baustelle; 0 Fehler)
+  ok   Werkstatt-Einnahmen = Arbeitstage × Umlandpreis wie vorher (2687 Werkstatt-Tage nachgerechnet, 0 Fehler)
+       Tag 100–300: 34 % der Kisten gehen an Läden und Autowerke der Stadt, sie bekommen 99 % aus der Stadt
+Seed 2
+  ok   keine Werkstatt liefert mehr Kisten, als sie gemacht hat (200 Tage)
+  ok   geliefert = bekommen (Werkstätten, Läden und Autowerke, 0 Abweichungen; 4 Umbauten zur Kita oder Schule mitgezählt); je Auto aus einem Werk der Stadt 24 Kisten Teile (0 Fehler)
+  ok   Lieferant höchstens 20 Felder weit; von außen nur, wenn in Reichweite nichts übrig war (0 Fehler)
+  ok   je anwesender Kraft 8 Kisten, Bauarbeiter auf der Baustelle nicht, Ersatzdienst nicht (15 Tage im Ersatzdienst ohne Baustelle; 0 Fehler)
+  ok   Werkstatt-Einnahmen = Arbeitstage × Umlandpreis wie vorher (2135 Werkstatt-Tage nachgerechnet, 0 Fehler)
+       Tag 100–300: 31 % der Kisten gehen an Läden und Autowerke der Stadt, sie bekommen 100 % aus der Stadt
+Seed 3
+  ok   keine Werkstatt liefert mehr Kisten, als sie gemacht hat (200 Tage)
+  ok   geliefert = bekommen (Werkstätten, Läden und Autowerke, 0 Abweichungen; 2 Umbauten zur Kita oder Schule mitgezählt); je Auto aus einem Werk der Stadt 24 Kisten Teile (0 Fehler)
+  ok   Lieferant höchstens 20 Felder weit; von außen nur, wenn in Reichweite nichts übrig war (0 Fehler)
+  ok   je anwesender Kraft 8 Kisten, Bauarbeiter auf der Baustelle nicht, Ersatzdienst nicht (42 Tage im Ersatzdienst ohne Baustelle; 0 Fehler)
+  ok   Werkstatt-Einnahmen = Arbeitstage × Umlandpreis wie vorher (3154 Werkstatt-Tage nachgerechnet, 0 Fehler)
+       Tag 100–300: 30 % der Kisten gehen an Läden und Autowerke der Stadt, sie bekommen 93 % aus der Stadt
+Alle Kisten-Prüfungen bestanden

@@ -1,0 +1,44 @@
+ 22:20:48 up 5 min,  0 user,  load average: 1.52, 0.91, 0.37
+1 nachher 22:20:51 T  365 Tage in 1238 ms 0
+1 vorher 22:20:54 T  365 Tage in 1265 ms 0
+2 vorher 22:20:57 T  365 Tage in 1257 ms 0
+2 nachher 22:21:00 T  365 Tage in 1308 ms 0
+3 nachher 22:21:03 T  365 Tage in 1222 ms 0
+3 vorher 22:21:06 T  365 Tage in 1142 ms 0
+4 vorher 22:21:09 T  365 Tage in 1204 ms 0
+4 nachher 22:21:12 T  365 Tage in 1210 ms 0
+5 nachher 22:21:15 T  365 Tage in 1294 ms 0
+5 vorher 22:21:18 T  365 Tage in 1216 ms 0
+6 vorher 22:21:21 T  365 Tage in 1250 ms 0
+6 nachher 22:21:24 T  365 Tage in 1318 ms 0
+7 nachher 22:21:27 T  365 Tage in 1184 ms 0
+7 vorher 22:21:30 T  365 Tage in 1175 ms 0
+8 vorher 22:21:33 T  365 Tage in 1185 ms 0
+8 nachher 22:21:36 T  365 Tage in 1237 ms 0
+ 22:21:36 up 6 min,  0 user,  load average: 1.80, 1.08, 0.45
+ 22:22:06 up 6 min,  0 user,  load average: 1.16, 0.99, 0.45
+9 nachher 22:22:09 T  365 Tage in 1222 ms 0
+9 vorher 22:22:12 T  365 Tage in 1169 ms 0
+10 vorher 22:22:15 T  365 Tage in 1194 ms 0
+10 nachher 22:22:18 T  365 Tage in 1171 ms 0
+11 nachher 22:22:21 T  365 Tage in 1235 ms 0
+11 vorher 22:22:24 T  365 Tage in 1215 ms 0
+12 vorher 22:22:27 T  365 Tage in 1177 ms 0
+12 nachher 22:22:30 T  365 Tage in 1166 ms 0
+13 nachher 22:22:33 T  365 Tage in 1180 ms 0
+13 vorher 22:22:36 T  365 Tage in 1180 ms 0
+14 vorher 22:22:39 T  365 Tage in 1243 ms 0
+14 nachher 22:22:42 T  365 Tage in 1201 ms 0
+15 nachher 22:22:45 T  365 Tage in 1170 ms 0
+15 vorher 22:22:48 T  365 Tage in 1146 ms 0
+16 vorher 22:22:51 T  365 Tage in 1257 ms 0
+16 nachher 22:22:54 T  365 Tage in 1228 ms 0
+17 nachher 22:22:57 T  365 Tage in 1157 ms 0
+17 vorher 22:23:00 T  365 Tage in 1188 ms 0
+18 vorher 22:23:03 T  365 Tage in 1191 ms 0
+18 nachher 22:23:06 T  365 Tage in 1146 ms 0
+19 nachher 22:23:09 T  365 Tage in 1225 ms 0
+19 vorher 22:23:12 T  365 Tage in 1187 ms 0
+20 vorher 22:23:15 T  365 Tage in 1163 ms 0
+20 nachher 22:23:18 T  365 Tage in 1162 ms 0
+ 22:23:18 up 8 min,  0 user,  load average: 2.06, 1.31, 0.60

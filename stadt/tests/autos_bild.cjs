@@ -313,17 +313,18 @@ async function oeffne(b, q) {
   if (log.length) process.exitCode = 1;
 
   // Campus (Seed 1 hat an Tag 730 einen; bis Version 9, Teil 2 Seed 3, seit dem Haushalt dort keiner mehr: v9/t4/campus.mjs): gezeichnet mit
-  // zwei Leuchtlogos und Dachterrasse
-  const s3 = await oeffne(b, 'seed=1&tage=730&neu');
+  // zwei Leuchtlogos und Dachterrasse. Version 10 (Etappe 2): Seed 1 hat an Tag 730 keinen Campus mehr; Seed 2 hat einen (Gebäude 10; dasselbe
+  // Skript als ml/e2bau/werkzeug/s4_campus.mjs, Seeds 1–8: Campus in 2, 3, 5, 8; Protokoll ml/e2bau/mess/schritt4/momente/campus_1_8.txt)
+  const s3 = await oeffne(b, 'seed=2&tage=730&neu');
   const campus = await s3.ev(() => { const a = __stadt, S = a.S(), Sim = a.Sim, g = S.g, G = a.G;
     while (S.stunde !== 11) a.schritt(); a.nachSchritten();
     for (let b = 0; b < S.gAnzahl; b++) if (g.typ[b] === Sim.TECH && !g.werk[b] && !g.leer[b] && g.stufe[b] === 4 && S.feld[g.y[b] * S.karte + g.x[b]] === Sim.TECH) {
       const c = G.controls, x = g.x[b] - S.mitte + 0.5, z = g.y[b] - S.mitte + 0.5; c.target.set(x, 0.8, z); G.camera.position.set(x + 2.4, 3.4, z + 3.2); c.update();
       return { b, hoehe: +G.test.techHoehe(b).toFixed(2), name: Sim.gebaeudeInfo(S, b).stufeName }; }
     return null; });
-  ok(!!campus && campus.hoehe > 1.7 && campus.hoehe < 2, `Campus (Seed 1): ${JSON.stringify(campus)}`);
+  ok(!!campus && campus.hoehe > 1.7 && campus.hoehe < 2, `Campus (Seed 2): ${JSON.stringify(campus)}`);
   if (campus) { await s3.zu(); await s3.page.waitForTimeout(600); await s3.page.screenshot({ path: OUT + 'campus.png' }); }
-  if (s3.log.length) { console.log('Konsole (Seed 1):', s3.log.join('\n  ')); process.exitCode = 1; }
+  if (s3.log.length) { console.log('Konsole (Seed 2, Campus):', s3.log.join('\n  ')); process.exitCode = 1; }
   await s3.ctx.close();
 
   // 1b. Sprung statt Fahrt: Umzug um 8 Uhr (das Auto kommt an die neue Wohnung, der Besitzer geht von der alten zur Arbeit) und neue Stelle
@@ -341,7 +342,11 @@ async function oeffne(b, q) {
   // Version 9, Teil 5 (Tech-Firmen früher und mehr): wieder neu gesucht (v9/t6/faelle/f_*.log, Seeds 1–80 bis Tag 400): Umzüge um 8 Uhr
   // 25-mal, genommen Seed 21 (Tag 58, kurz); Stellenwechsel ohne Umzug siebenmal, nah der Wohnung nur Seed 63 (Tag 172), weit weg sechsmal,
   // genommen Seed 16 (Tag 72, der kürzeste) (Teil 4: [37, 35, 8, 4], [28, 113, 9, 191], [11, 268, 9, 892])
-  for (const [seed, tag, H, p, was] of [[21, 58, 8, 32, 'Umzug um 8 Uhr'], [63, 172, 9, 145, 'neue Stelle nah der Wohnung'], [16, 72, 9, 56, 'neue Stelle weit weg']]) {
+  // Version 10 (Etappe 2: Gedächtnis, Erfahrung, Plan): wieder neu gesucht (dasselbe Suchskript v8/mess2/fall_suche.mjs als ml/e2bau/werkzeug/
+  // s4_fall_suche.mjs, Seeds 1–80 bis Tag 400, Protokoll ml/e2bau/mess/schritt4/momente/faelle_1_80.txt): Umzüge um 8 Uhr 23-mal, genommen der
+  // kürzeste, Seed 64 (Tag 93); Stellenwechsel ohne Umzug viermal, nah der Wohnung zweimal (genommen Seed 31, Tag 118), weit weg zweimal
+  // (genommen Seed 19, Tag 242) (Teil 5: [21, 58, 8, 32], [63, 172, 9, 145], [16, 72, 9, 56])
+  for (const [seed, tag, H, p, was] of [[64, 93, 8, 50, 'Umzug um 8 Uhr'], [31, 118, 9, 59, 'neue Stelle nah der Wohnung'], [19, 242, 9, 342, 'neue Stelle weit weg']]) {
     const o = await oeffne(b, `seed=${seed}&tage=${tag}&neu`);
     const r1 = await o.ev(({ H, p }) => {
       const a = __stadt, S = a.S(), Sim = a.Sim, P = S.p, G = a.G, T = G.test, THREE = G.THREE;

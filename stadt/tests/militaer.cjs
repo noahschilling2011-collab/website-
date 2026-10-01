@@ -92,18 +92,25 @@ async function seite(b, reduziert) {
   // Ort wie ortVon: „an der …“, „am …weg“ oder „in der …gasse“ (seit Version 9, Teil 5 steht die Dienststelle der Teststadt am Mühlenweg)
   ok(kd.offen && /Dienststelle des Bundesnachrichtendienstes (an der|am|in der) \S/.test(kd.text) && kd.text.includes('überwacht niemand') && kd.text.includes('Ausland'),
     'Klick auf die Dienststelle: „' + kd.text.split('\n').slice(0, 3).join(' | ') + '…“');
-  // Personenkarten: Soldat mit Verpflichtung, Wehrdienst, Ersatzdienst (erster Tag ab jetzt, an dem es alle drei gibt)
+  // Personenkarten: Soldat mit Verpflichtung, Wehrdienst, Ersatzdienst (erster Tag ab jetzt, an dem es alle drei um 10 Uhr gibt). Version 10
+  // (Etappe 2): Die Teststadt läuft anders; wer am Abend von Tag 400 im Wehrdienst ist, ist am nächsten Morgen fertig (5 Diensttage). Gesucht
+  // wird darum um 10 Uhr, der Stunde der Karten (vorher erst am Abend gesucht, dann bis 10 Uhr weiter; in Node mit ml/e2bau/werkzeug/s4_militaer.mjs:
+  // um 10 Uhr alle drei zuerst wieder an Tag 407)
   const leute = await ev(() => {
     const a = __stadt, S = a.S(), Sim = a.Sim, P = S.p;
     const such = () => { const w = { soldat: -1, wehr: -1, ersatz: -1 };
       for (let p = 0; p < S.pMax; p++) { if (!P.lebt[p] || Sim.istHaupt(S, p)) continue;
         if (w.soldat < 0 && Sim.verpflichtet(S, p)) w.soldat = p; if (w.wehr < 0 && P.bund[p] === Sim.WEHRDIENST) w.wehr = p; if (w.ersatz < 0 && P.bund[p] === Sim.ERSATZDIENST) w.ersatz = p; }
       return w; };
-    let w = such();
-    for (let d = 0; d < 40 && (w.soldat < 0 || w.wehr < 0 || w.ersatz < 0); d++) { const t = S.tag; while (S.tag === t) a.schritt(); w = such(); }
-    while (S.stunde !== 10) a.schritt();
-    a.nachSchritten(); w = such();
-    return w;
+    let w = { soldat: -1, wehr: -1, ersatz: -1 };
+    for (let d = 0; d < 40; d++) {
+      while (S.stunde !== 10) a.schritt();
+      w = such();
+      if (w.soldat >= 0 && w.wehr >= 0 && w.ersatz >= 0) break;
+      a.schritt();
+    }
+    a.nachSchritten();
+    return { ...w, tag: S.tag };
   });
   const karte = (id) => ev((id) => { const S = __stadt.S(), k = document.createElement('button');
     k.className = 'name'; k.dataset.p = id; k.dataset.g = S.p.gen[id]; k.dataset.n = __stadt.Sim.name(S, id);

@@ -1,0 +1,23 @@
+a ../basis_6c1741e.html (sim 3b1a95e0e5ae9ea5), b ../stadt/stadt.html (sim 4aeae2ba112f3d6c, OPFER_FREI 1), Seeds 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20, 730 Tage stündlich
+{"seed":1,"a":{"taten":[0,1631,77,612],"haft":[0,0,0,0],"tage":[]},"b":{"taten":[0,1631,77,612],"haft":[0,0,0,0],"tage":[]},"sprung":0,"ersterVerschieden":-1,"einwohner":[1449,1449]}
+{"seed":2,"a":{"taten":[0,1714,81,702],"haft":[0,0,0,0],"tage":[]},"b":{"taten":[0,1714,81,702],"haft":[0,0,0,0],"tage":[]},"sprung":0,"ersterVerschieden":-1,"einwohner":[1509,1509]}
+{"seed":3,"a":{"taten":[0,1759,65,695],"haft":[0,0,0,0],"tage":[]},"b":{"taten":[0,1759,65,695],"haft":[0,0,0,0],"tage":[]},"sprung":0,"ersterVerschieden":-1,"einwohner":[1515,1515]}
+{"seed":4,"a":{"taten":[0,1849,68,699],"haft":[0,0,0,0],"tage":[]},"b":{"taten":[0,1849,68,699],"haft":[0,0,0,0],"tage":[]},"sprung":0,"ersterVerschieden":-1,"einwohner":[1532,1532]}
+{"seed":5,"a":{"taten":[0,1657,74,669],"haft":[0,0,0,0],"tage":[]},"b":{"taten":[0,1657,74,669],"haft":[0,0,0,0],"tage":[]},"sprung":0,"ersterVerschieden":-1,"einwohner":[1449,1449]}
+{"seed":6,"a":{"taten":[0,1686,66,688],"haft":[0,0,0,0],"tage":[]},"b":{"taten":[0,1686,66,688],"haft":[0,0,0,0],"tage":[]},"sprung":0,"ersterVerschieden":-1,"einwohner":[1434,1434]}
+{"seed":7,"a":{"taten":[0,1782,76,756],"haft":[0,0,0,0],"tage":[]},"b":{"taten":[0,1782,76,756],"haft":[0,0,0,0],"tage":[]},"sprung":0,"ersterVerschieden":-1,"einwohner":[1454,1454]}
+{"seed":8,"a":{"taten":[0,1630,72,668],"haft":[0,0,0,0],"tage":[]},"b":{"taten":[0,1630,72,668],"haft":[0,0,0,0],"tage":[]},"sprung":0,"ersterVerschieden":-1,"einwohner":[1415,1415]}
+{"seed":9,"a":{"taten":[0,1618,70,650],"haft":[0,0,0,0],"tage":[]},"b":{"taten":[0,1618,70,650],"haft":[0,0,0,0],"tage":[]},"sprung":0,"ersterVerschieden":-1,"einwohner":[1420,1420]}
+{"seed":10,"a":{"taten":[0,1751,75,662],"haft":[0,0,0,0],"tage":[]},"b":{"taten":[0,1751,75,662],"haft":[0,0,0,0],"tage":[]},"sprung":0,"ersterVerschieden":-1,"einwohner":[1398,1398]}
+{"seed":11,"a":{"taten":[0,1839,82,746],"haft":[0,0,0,0],"tage":[]},"b":{"taten":[0,1839,82,746],"haft":[0,0,0,0],"tage":[]},"sprung":0,"ersterVerschieden":-1,"einwohner":[1484,1484]}
+{"seed":12,"a":{"taten":[0,1998,100,773],"haft":[0,0,0,0],"tage":[]},"b":{"taten":[0,1998,100,773],"haft":[0,0,0,0],"tage":[]},"sprung":0,"ersterVerschieden":-1,"einwohner":[1591,1591]}
+{"seed":13,"a":{"taten":[0,1603,71,671],"haft":[0,0,0,0],"tage":[]},"b":{"taten":[0,1603,71,671],"haft":[0,0,0,0],"tage":[]},"sprung":0,"ersterVerschieden":-1,"einwohner":[1514,1514]}
+{"seed":14,"a":{"taten":[0,1977,91,802],"haft":[0,0,0,0],"tage":[]},"b":{"taten":[0,1977,91,802],"haft":[0,0,0,0],"tage":[]},"sprung":0,"ersterVerschieden":-1,"einwohner":[1531,1531]}
+{"seed":15,"a":{"taten":[0,1911,67,731],"haft":[0,0,0,0],"tage":[]},"b":{"taten":[0,1911,67,731],"haft":[0,0,0,0],"tage":[]},"sprung":0,"ersterVerschieden":-1,"einwohner":[1548,1548]}
+{"seed":16,"a":{"taten":[0,1666,61,649],"haft":[0,0,0,0],"tage":[]},"b":{"taten":[0,1666,61,649],"haft":[0,0,0,0],"tage":[]},"sprung":0,"ersterVerschieden":-1,"einwohner":[1399,1399]}
+{"seed":17,"a":{"taten":[0,1784,73,744],"haft":[0,0,0,0],"tage":[]},"b":{"taten":[0,1784,73,744],"haft":[0,0,0,0],"tage":[]},"sprung":0,"ersterVerschieden":-1,"einwohner":[1614,1614]}
+{"seed":18,"a":{"taten":[0,1525,62,615],"haft":[0,0,0,0],"tage":[]},"b":{"taten":[0,1525,62,615],"haft":[0,0,0,0],"tage":[]},"sprung":0,"ersterVerschieden":-1,"einwohner":[1404,1404]}
+{"seed":19,"a":{"taten":[0,1600,75,644],"haft":[0,0,0,0],"tage":[]},"b":{"taten":[0,1600,75,644],"haft":[0,0,0,0],"tage":[]},"sprung":0,"ersterVerschieden":-1,"einwohner":[1467,1467]}
+{"seed":20,"a":{"taten":[0,1779,94,718],"haft":[0,0,0,0],"tage":[]},"b":{"taten":[0,1779,94,718],"haft":[0,0,0,0],"tage":[]},"sprung":0,"ersterVerschieden":-1,"einwohner":[1472,1472]}
+SUMME {"einbrueche":1500,"a_haftOpfer":0,"b_haftOpfer":0,"b_sprung":0,"a_haftOpferAndere":0,"seedsMitTreffer":0,"seedsVerschieden":0}
+exit 0 (746 s)

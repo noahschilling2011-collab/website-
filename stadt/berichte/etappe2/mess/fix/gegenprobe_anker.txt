@@ -1,0 +1,12 @@
+Playwright 1.56.1 (/opt/node22/lib/node_modules/playwright); Chromium /opt/pw-browsers/chromium-1194/chrome-linux/chrome
+Three.js: lokal SP/three/package; Git für alte Fassungen: <repo>; Ausgabe: SP/ml/e2bau/mess/fix/gegenprobe_anker
+Seitenserver: python3 -m http.server 9096 (PID 13408), Wurzel SP/ml/e2bau/tmp/fix_gegen/anker/stadt
+KI: auf 11434 läuft schon ein KI-Nachbau (test-modell), bleibt unberührt
+=== gedaechtnis
+exit 1, OK 16 (Soll 17), FEHL 1, 70 s → ROT
+FEHL Liste: „Gezählt erst, seit die Stadt in diesem Fenster läuft (Tag 370, 0 Uhr)“ steht da; gescrollt (1835 px von 3669), Eintrag 24 bei y 187; eine Stunde später neu gesetzt (Zahl 39 → 39) bei y 187; Tag 371, 8 Uhr, unter „Gestern“: y 1058, Scroll 1835 px
+Seitenserver PID 13408 beendet
+
+Zusammenfassung (2026-10-01 03:03, PORT 9096, 1 min):
+gedaechtnis        ROT   exit 1   OK  16 /  17  FEHL 1     70 s
+1 ROT – Logs in SP/ml/e2bau/mess/fix/gegenprobe_anker/logs

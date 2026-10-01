@@ -144,12 +144,15 @@ export class Umgebung {
     }
     return { teile, stunden };
   }
+  // Etappe 2 (Version 10): Ein Eintrag rückt aus der Kurzzeit in die Langzeit (memBehalten kopiert ihn auf einen anderen Platz). Der Schlüssel
+  // enthält darum den Platz nicht, sonst zählte derselbe Eintrag dort ein zweites Mal. Tag, Art und Ziel bestimmen ihn: zielPruefen schreibt je
+  // Person und Nacht höchstens einen dieser Einträge
   zieleZaehlen() {
     const P = this.S.p, e = this.epi, M = this.Sim.M, o = e.id * this.Sim.R.MEM;
     for (let i = o; i < o + this.Sim.R.MEM; i++) {
       const c = P.memCode[i];
       if ((c !== M.ZIEL_ERREICHT && c !== M.ZIEL_AUFGEGEBEN) || P.memTag[i] < e.startTag) continue;
-      const key = `${i}:${P.memTag[i]}:${c}:${P.memRef[i]}`;
+      const key = `${P.memTag[i]}:${c}:${P.memRef[i]}`;
       if (e.zieleGesehen.includes(key)) continue;
       e.zieleGesehen.push(key);
       if (c === M.ZIEL_ERREICHT) e.metrik.zieleErreicht++; else e.metrik.zieleAufgegeben++;

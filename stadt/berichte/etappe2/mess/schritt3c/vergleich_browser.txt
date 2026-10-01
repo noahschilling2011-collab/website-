@@ -1,0 +1,36 @@
+| Test | vorher | nachher | FEHL-Zeilen wörtlich gleich |
+|---|---|---|---|
+| `p3test` | grün, OK 12/12, FEHL 0 | grün, OK 12/12, FEHL 0 | ja |
+| `p5neu` | grün, OK 10/10, FEHL 0 | grün, OK 10/10, FEHL 0 | ja |
+| `p6migration` | ROT, OK 30/39, FEHL 9 | ROT, OK 30/39, FEHL 9 | ja |
+| `p7figuren` | grün, OK 6/6, FEHL 0 | grün, OK 6/6, FEHL 0 | ja |
+| `p8tech` | ROT, OK 3/15, FEHL 3 | ROT, OK 3/15, FEHL 3 | nein |
+| `raute_klick` | ROT, OK 11/8, FEHL 0 | ROT, OK 11/8, FEHL 0 | ja |
+| `ereignis` | ROT, OK 11/21, FEHL 2 | ROT, OK 11/21, FEHL 2 | ja |
+| `t1_xss` | ROT, OK 0/5, FEHL 0 | ROT, OK 0/5, FEHL 0 | ja |
+| `p4test` | grün, OK 29/29, FEHL 0 | grün, OK 29/29, FEHL 0 | ja |
+| `s2karten` | grün, OK 22/22, FEHL 0 | grün, OK 22/22, FEHL 0 | ja |
+| `kita` | grün, OK 22/22, FEHL 0 | grün, OK 22/22, FEHL 0 | ja |
+| `befunde_s2` | grün, OK 27/27, FEHL 0 | grün, OK 27/27, FEHL 0 | ja |
+| `erweiterung` | ROT, OK 10/20, FEHL 10 | ROT, OK 10/20, FEHL 10 | ja |
+| `sicherheit` | grün, OK 12/12, FEHL 0 | grün, OK 12/12, FEHL 0 | ja |
+| `militaer` | ROT, OK 15/16, FEHL 1 | ROT, OK 15/16, FEHL 1 | ja |
+| `autos` | grün, OK 9/9, FEHL 0 | grün, OK 9/9, FEHL 0 | ja |
+| `autos_bild` | ROT, OK 16/20, FEHL 4 | ROT, OK 16/20, FEHL 4 | ja |
+| `rathaus` | grün, OK 15/15, FEHL 0 | grün, OK 15/15, FEHL 0 | ja |
+| `schule` | grün, OK 8/8, FEHL 0 | grün, OK 8/8, FEHL 0 | ja |
+| `haushalt` | grün, OK 18/18, FEHL 0 | grün, OK 18/18, FEHL 0 | ja |
+| `wachstum` | grün, OK 29/29, FEHL 0 | grün, OK 29/29, FEHL 0 | ja |
+| `techfrueh` | ROT, OK 16/17, FEHL 1 | ROT, OK 16/17, FEHL 1 | ja |
+| `befunde_v9` | ROT, OK 19/20, FEHL 1 | ROT, OK 19/20, FEHL 1 | ja |
+| `otest/befunde` | ROT, OK 19/21, FEHL 2 | ROT, OK 19/21, FEHL 2 | ja |
+| `otest/handy` | grün, OK 11/11, FEHL 0 | grün, OK 11/11, FEHL 0 | ja |
+| `otest/breit` | grün, OK 12/12, FEHL 0 | grün, OK 12/12, FEHL 0 | ja |
+| `otest/tastatur` | grün, OK 4/4, FEHL 0 | grün, OK 4/4, FEHL 0 | ja |
+| `otest/breiten` | grün, OK 20/20, FEHL 0 | grün, OK 20/20, FEHL 0 | ja |
+| `otest/hilfehoehe` | grün, OK 1/1, FEHL 0 | grün, OK 1/1, FEHL 0 | ja |
+| `p10speicher` | grün, OK 10/10, FEHL 0 | grün, OK 10/10, FEHL 0 | ja |
+| `gedaechtnis` | – (neu) | grün, OK 15/15, FEHL 0 | – |
+| `browser_ki` | ROT, OK 4/30, FEHL 17 | ROT, OK 4/30, FEHL 17 | ja |
+
+verglichen 31 Tests: Urteil, OK- und FEHL-Zahl gleich in 31 von 31; nur vorher: keiner

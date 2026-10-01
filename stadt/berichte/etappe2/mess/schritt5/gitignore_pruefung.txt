@@ -1,0 +1,23 @@
+Probe 01.10.2026: git init in einer Kopie (Wurzel-.gitignore des Repos + stadt/ der Baukopie + 12 künstliche Dateien, die ignoriert werden sollen), git add -A --dry-run
+Dateien gesamt: 266 (davon .gitignore der Wurzel 1), davon stadt/berichte/etappe2: 119, .log darin: 7
+ignoriert (git status --ignored):
+!! stadt/.venv
+!! stadt/ausgabe/
+!! stadt/berichte/smoke_probe/
+!! stadt/bild.png
+!! stadt/ki/paritaet_probe.json
+!! stadt/ki/policy_smoke_probe.json
+!! stadt/lauf.log
+!! stadt/stadt.orig.html
+!! stadt/tests/ausgabe/
+!! stadt/tools/__pycache__/
+!! stadt/training/laeufe/
+!! stadt/x.zip
+!! stadt/y.npz
+über 1 MB:
+  1433442 stadt/stadt.html
+über 500 KB:
+  685291 stadt/README.md
+  1433442 stadt/stadt.html
+  605652 stadt/tools/simtest.mjs
+Summe stadt/berichte/etappe2: 1062154 Byte, größte Datei dort: 79914 mess/verblassen/kand/wieder_ged0.json

@@ -8,7 +8,7 @@ Simulation rechnet. Sie laufen aus einer frischen Kopie des Repos: nur relative 
 
 ```bash
 cd stadt
-bash tests/alle.sh                      # alle 30 Tests nacheinander, am Ende eine Zusammenfassung
+bash tests/alle.sh                      # alle 32 Tests nacheinander, am Ende eine Zusammenfassung
 bash tests/alle.sh p3test otest/handy   # nur diese (Namen wie in der Liste unten)
 ```
 
@@ -105,13 +105,15 @@ Spielstand-Speicher):
 | v6 | bc7247a | 6 | `p6migration`, `befunde_s2`, `basis.cjs` |
 | v7 | ffa1d88 | 7 | `p6migration`, `basis.cjs` |
 | v8 | 31ce452 | 8 | `p6migration`, `basis.cjs`; Vergleichsstand `stadt.orig.html` in `haushalt`, `rathaus`, `schule`, `techfrueh` |
+| v9 | 6c1741e | 9 | `p6migration`, `basis.cjs` (seit Version 10, Etappe 2) |
 
 Erzeugt statt eingecheckt (die alten Dateien waren 0,26 bis 1,4 MB):
 
 - **Spielstand Version 2** (`U.v2Spielstand()`): Sim-Block der Fassung v2 in Node, Seed 1 bis Tag 150, 13 Uhr, mit Baustelle. Nachgeprüft
   gleich der früheren `v2save.json` bis auf den Zeitstempel `zuletztGelaufen`.
 - **Teststand Seed 2, Tag 420** (`tests/basis.cjs` → `tests/ausgabe/basis/`): Grundstand mit 797107a (Hauptfigur: eine Programmierkraft der
-  größten Tech-Firma), dann „Stadt übernehmen“ mit 414ebab, bc7247a, ffa1d88, 31ce452 und zuletzt der `stadt.html` dieses Ordners.
+  größten Tech-Firma), dann „Stadt übernehmen“ mit 414ebab, bc7247a, ffa1d88, 31ce452, 6c1741e (seit Version 10) und zuletzt der `stadt.html`
+  dieses Ordners (`basis_v10.json`, Teststand von `t1_xss`; bis Version 9 hieß er `basis_v9.json` und kam aus dieser Datei).
   Nachgeprüft (`node tests/basis.cjs --vergleich <ordner>`): Versionen 4, 5 und 6 gleich den früheren Dateien bis auf `zuletztGelaufen`; ab
   Version 7 steht in einer Stadtbuch-Zeile „näher als 18 Felder“ statt „16 Felder“ (die frühere Datei stammte aus einem Bau von Version 7 vor
   dem Commit ffa1d88), in Version 9 kommt `ui.entscheidungen` der KI-Policy dazu. Kein Test prüft diese Zeile.
@@ -125,10 +127,10 @@ Training eines anderen Prozesses; die Last während Lauf 2 ist nicht festgehalte
 |---|---|---|---|
 | `p3test` | 12 | 19 s / 16 s | Hausklick → Bewohner, Personenkarte, Namen durchklicken, Zurück, Enkel über das Stadtbuch |
 | `p5neu` | 10 | 28 s / 24 s | Korrekturen aus dem Spec-Abgleich |
-| `p6migration` | 39 | 275 s / 205 s | Übernahme alter Spielstände der Versionen 2, 4, 5, 6, 7, 8: Dialog, Import, Meldung, Neues ab dem Übernahmetag |
+| `p6migration` | 44 | 275 s / 205 s (Version 10: 300 bis 346 s in grünen Läufen; die frühere Angabe 344 s stammte aus einem roten Lauf vor der Anpassung des Tests) | Übernahme alter Spielstände der Versionen 2, 4, 5, 6, 7, 8, 9: Dialog, Import, Meldung, Neues ab dem Übernahmetag; aus Version 9 (6c1741e) Gedächtnis neu verteilt, kein memName, Größe des Spielstands wie erwartet (+10 Byte je Platz) |
 | `p7figuren` | 6 | 7 s / 7 s | Figuren bei der Arbeit stehen dort, wo die Simulation die Person hat (8–17 Uhr) |
 | `p8tech` | 15 | 23 s / 19 s | Tech-Firmen: Glasbau, Bildschirme, Figuren, Karten, Code-Tagebuch (Ollama-Attrappe per Route), Draw Calls |
-| `raute_klick` | 8 | 12 s / 11 s | Klick auf die Raute einer Hauptfigur öffnet sie |
+| `raute_klick` | 11 | 12 s / 11 s | Klick auf die Raute einer Hauptfigur öffnet sie (Soll = Klicks der Teststadt + Summe; seit Version 10 sind 10 Rauten im Bild, vorher 7) |
 | `ereignis` | 21 | 20 s / 18 s | Ereignis-Zeichen auf der Karte (wann ja, wann nicht, höchstens 3 je Stunde) |
 | `t1_xss` | 5 | 20 s / 19 s | HTML/Script in KI-Antworten nur als Text, Code-Zäune, kaputte Antworten, einmal am Tag (Teststand aus basis.cjs) |
 | `p4test` | 29 | 47 s / 44 s | Hauptfiguren mit dem KI-Nachbau auf 11434: Anfragen, Tagebuch, Gespräch, Hauptfigur an/aus, Fristen bei 20× und 100×, Ausfall |
@@ -152,10 +154,15 @@ Training eines anderen Prozesses; die Last während Lauf 2 ist nicht festgehalte
 | `otest/tastatur` | 4 | 12 s / 10 s | Schmal mit Tastatur |
 | `otest/breiten` | 20 | 52 s / 45 s | Breiten 360, 400, 768, 1280 und quer |
 | `otest/hilfehoehe` | 1 | 5 s / 5 s | Hilfe bei 1280 × 800 ohne Scrollen |
-| `browser_ki` | 30 | 30 s / 29 s | KI-Policy aus ki/, Speichern als Verweis, Rückfall, Import (Ergebnis sichtbar im Fenster), Datei entfernen, Auswertung laut Datei, file:// (eigener Server, siehe unten; bis 28.09. 24 Prüfungen) |
+| `p10speicher` | 11 | 86 s (19:28 UTC, 30.09.2026, allein, mit 10 Prüfungen); 69 s (01.10.2026, allein) | Version 10 (Etappe 2): große Stadt (Umland 300.000, Tag 750) in `localStorage` schreiben und beim nächsten Aufruf wieder lesen (Größe, dieselbe Stadt), Übernahme eines Stands der Version 9 (git 6c1741e) mit der Policy aus Etappe 1 (sichtbar „neu trainieren“, Regeln; seit der Schlussprüfung: die Meldung sagt „stammt aus Version 9 … (neu trainieren)“, nicht mehr „Liegt sie wieder in ki/“), derselbe Stand per Import (seit der Schlussprüfung, +1), „Trainierte Policy“ wählen (abgelehnt), Stand der Version 10 in 6c1741e abgelehnt, „neuere Version“ |
+| `gedaechtnis` | 17 | 67 s (22:18 UTC, 30.09.2026, allein, mit 14 Prüfungen); 71 s (01.10.2026, allein) | Etappe 2, Schritt 3: echter Fall aus einem gespeicherten Stand (Seed 1, in Node gesucht: ohne Erfahrung hätte die Person gegründet), Knopf „heute anders“ im Kopf des Stadtbuchs, Liste „Heute anders entschieden“ (Eintrag, „Warum?“), Klick öffnet die richtige Personenkarte, Erfahrung als Satz mit Zahl, Plan, offene Folge („wird noch … beobachtet“) und Hindernis „spart: … von … Talern“, Lebenslauf in Langzeit und Kurzzeit mit Verweis, kein Name in Erfahrung und Plan, „Warum?“ nennt die Wahl ohne Erfahrung, Beobachter ändert den Spielstand nicht, Handy 390 × 844 ohne seitliches Scrollen, Tastatur, Konsole; seit der Schlussprüfung (+2): der Satz „Ohne diese Erfahrung …“ nennt die Rechnung seines Vergleichs und lässt sich nachrechnen; die Liste nennt, seit wann sie zählt, wird ohne Änderung nicht neu eingesetzt, und der oberste sichtbare Eintrag bleibt an seiner Stelle, wenn neue dazukommen und heute zu gestern wird; seit dem Nachtrag (`FIX.md` 10) gibt Escape den Fokus dem Knopf „anders“ zurück (in der Tastatur-Prüfung, keine neue Prüfung) |
+| `browser_ki` | 32 | 30 s / 29 s | KI-Policy aus ki/, Speichern als Verweis, Rückfall, Import (Ergebnis sichtbar im Fenster), Datei entfernen, Auswertung laut Datei, file:// (eigener Server, siehe unten; bis 28.09. 24 Prüfungen); seit Version 10 die sichtbare Ablehnung der Policy aus Version 9 (ki/ und Datei-Import) |
 
 Dazu `basis.cjs` (Teststand) 20 s. Ganzer Lauf: **25 bzw. 22 min** (30 Tests, damals 493 OK-Prüfungen, beide Läufe alle grün; seit den
-6 neuen Prüfungen in `browser_ki` sind es 499).
+6 neuen Prüfungen in `browser_ki` sind es 499). Mit Version 10 (Etappe 2, 32 Tests): **28 min**, 534 OK-Prüfungen, alle grün, aus einer
+frischen Kopie am 01.10.2026 (`berichte/etappe2/mess/schritt4/frisch/browser.txt`); nach den Korrekturen der Schlussprüfung **27 min**, 537
+OK-Prüfungen (`gedaechtnis` +2, `p10speicher` +1), alle grün, wieder aus einer frischen Kopie (`berichte/etappe2/mess/fix/frisch/browser.txt`;
+`p6migration` 307 s).
 
 Nicht in `alle.sh` (Werkzeuge, alte Stände): `blick.cjs` (Bildschirmfotos Tag/Abend/Nacht nach `tests/ausgabe/blick/`),
 `kennzahlen_hoehe.cjs` (Messung gegen `stadt.orig.html` = Version 8), `pruef_v5.cjs` (veraltet: erwartet Version 8, lief schon in Version 9
@@ -171,3 +178,7 @@ Datei“, Texte ohne Doppelungen, `file://`. `KI_ORDNER=ki bash tests/alle.sh br
 (bis 29.09.2026 ging das nicht: der Test suchte die Version-8-Datei in `KI_ORDNER` und löste den Pfad gegen `tests/` auf). Er baut in einem
 Temp-Ordner eine Seite aus einer Kopie von `stadt.html` und `ki/` aus `tests/ki_testdaten/`: `policy_smoke_v9_2_bester.json` (Smoke-Lauf auf
 Version 9, Status experimentell, **kein Qualitätsbeleg**, nur für den Ablauf) und `v8/policy_lokal_1_bester.json` (Policy für Version 8, muss abgelehnt werden).
+Seit Version 10 (Etappe 2, Noahs Entscheidung 5) gilt eine Policy aus Version 9 nicht mehr: Der Test prüft, dass die Seite die Testdatei aus
+Version 9 sichtbar ablehnt („neu trainieren“, Regeln), in `ki/` und beim Datei-Import. Für die übrigen Prüfungen legt er nur eine Kopie
+mit Stadt-Version 10 in den Temp-Ordner `ki/` (`policy_test_v10.json`: gleiche Gewichte, Name `…_test_v10`, Hinweis „nur Testdaten“,
+Inhalts-Hash neu gerechnet). Das ist kein Training auf Version 10; die Dateien in `tests/ki_testdaten/` bleiben unverändert.

@@ -1,3 +1,8 @@
+// Version 10 (Etappe 2, Noahs Entscheidung 5): Eine Policy aus Version 9 gilt nicht mehr; geprüft wird, dass die Seite sie sichtbar ablehnt („neu
+// trainieren“, Regeln entscheiden), beim Umschalten (Ordner ki/) und beim Datei-Import. Für den Ablauf der übrigen Prüfungen braucht der Test
+// eine Policy dieser Version: Er macht beim Start aus der Testdatei eine Kopie mit Stadt-Version 10 (gleiche Gewichte, Name mit „_test_v10“,
+// Hinweis „nur Testdaten“, Inhalts-Hash neu gerechnet) und legt nur diese Kopie in den Temp-Ordner ki/. Sie ist kein Training auf Version 10
+// und kein Qualitätsbeleg; die Dateien in tests/ki_testdaten/ bleiben unverändert.
 // Browsertest KI-Policy auf Version 9 (Etappe 1, Übertrag): echte Seite über einen eigenen Server mit relativen Pfaden (PORT, Wurzel ist ein
 // Temp-Ordner mit einer Kopie von stadt.html und ki/ aus den Testdaten tests/ki_testdaten/ oder KI_ORDNER). Die Policy steckt nicht in
 // stadt.html; das Spiel holt sie beim Umschalten aus ki/ (policies.json) oder per Datei-Import. Die Testdaten sind nicht freigegebene
@@ -15,6 +20,7 @@ const path = require('path');
 const fs = require('fs');
 const net = require('net');
 const { spawn } = require('child_process');
+const vm = require('vm');
 const { pathToFileURL } = require('url');
 const U = require('./umgebung.cjs');
 const { chromium } = U;
@@ -36,18 +42,34 @@ const warte = (ms) => new Promise(r => setTimeout(r, ms));
   let server = null, b = null, fehler = 0;
   const ok = (bed, text) => { console.log((bed ? 'ok   ' : 'FEHL ') + text); if (!bed) fehler++; };
   try {
-    const polDatei = JSON.parse(fs.readFileSync(path.join(KI, 'policies.json'), 'utf8')).policies[0];
-    const polText = fs.readFileSync(path.join(KI, polDatei), 'utf8'), polJson = JSON.parse(polText);
+    const altDatei = JSON.parse(fs.readFileSync(path.join(KI, 'policies.json'), 'utf8')).policies[0];
+    const altText = fs.readFileSync(path.join(KI, altDatei), 'utf8'), altJson = JSON.parse(altText);
     const html = fs.readFileSync(STADT_HTML, 'utf8');
+    // Version 10: Version und Inhalts-Hash rechnet der sim-Block dieser stadt.html (wie im Spiel); Kopie der Testdatei mit dieser Version (siehe oben)
+    const sctx = vm.createContext({}); vm.runInContext(html.match(/<script id="sim">([\s\S]*?)<\/script>/)[1], sctx);
+    const VERSION = sctx.StadtSim.VERSION;
+    let polDatei = altDatei, polJson = altJson;
+    if (altJson.simVersion !== VERSION) {
+      polDatei = `policy_test_v${VERSION}.json`;
+      polJson = { ...JSON.parse(altText), name: `${altJson.name}_test_v${VERSION}`, status: 'test', simVersion: VERSION,
+        hinweis: `Nur Testdaten für den Ablauf: Gewichte von ${altJson.name} (Stadt-Version ${altJson.simVersion}), Version umgeschrieben, nicht neu trainiert.` };
+      polJson.hash = sctx.StadtSim.KI.policyHash(polJson);
+    }
+    const polText = JSON.stringify(polJson);
     fs.mkdirSync(path.join(BASIS, 'ki'), { recursive: true });
     fs.copyFileSync(STADT_HTML, path.join(BASIS, 'stadt.html'));
-    for (const f of ['policies.json', polDatei]) fs.copyFileSync(path.join(KI, f), path.join(BASIS, 'ki', f));
-    console.log(`stadt.html ${Buffer.byteLength(html)} Byte, eingebettete Policy: ${EINGEBETTET.test(html) ? 'JA' : 'keine'}; ki/${polDatei} „${polJson.name}“ Hash ${polJson.hash}`);
+    fs.writeFileSync(path.join(BASIS, 'ki', polDatei), polText);
+    fs.writeFileSync(path.join(BASIS, 'ki', 'policies.json'), JSON.stringify({ format: 'stadt-policy-liste', version: 1, policies: [polDatei] }));
+    console.log(`stadt.html ${Buffer.byteLength(html)} Byte (Version ${VERSION}), eingebettete Policy: ${EINGEBETTET.test(html) ? 'JA' : 'keine'}; ki/${polDatei} „${polJson.name}“ Hash ${polJson.hash}`
+      + (polJson !== altJson ? ` (Kopie von ${altDatei}, Stadt-Version ${altJson.simVersion}, Hash ${altJson.hash})` : ''));
     ok(!EINGEBETTET.test(html), 'stadt.html enthält keine Policy (nicht freigegeben → nur in ki/)');
     // Testordner (gleiche Herkunft): ohne_ki (nur stadt.html), andere (Policy gleichen Namens mit anderem Hash), kaputt (Dateien), kaputt_liste
     fs.rmSync(TB, { recursive: true, force: true });
-    for (const d of ['ohne_ki', 'andere/ki', 'kaputt/ki', 'kaputt_liste/ki']) fs.mkdirSync(path.join(TB, d), { recursive: true });
-    for (const d of ['ohne_ki', 'andere', 'kaputt', 'kaputt_liste']) fs.copyFileSync(path.join(BASIS, 'stadt.html'), path.join(TB, d, 'stadt.html'));
+    for (const d of ['ohne_ki', 'andere/ki', 'kaputt/ki', 'kaputt_liste/ki', 'alt/ki']) fs.mkdirSync(path.join(TB, d), { recursive: true });
+    for (const d of ['ohne_ki', 'andere', 'kaputt', 'kaputt_liste', 'alt']) fs.copyFileSync(path.join(BASIS, 'stadt.html'), path.join(TB, d, 'stadt.html'));
+    // Version 10: die Testdatei aus Version 9 unverändert in alt/ki/ (Ablehnung beim Umschalten)
+    fs.copyFileSync(path.join(KI, altDatei), path.join(TB, 'alt', 'ki', altDatei));
+    fs.writeFileSync(path.join(TB, 'alt', 'ki', 'policies.json'), JSON.stringify({ format: 'stadt-policy-liste', version: 1, policies: [altDatei] }));
     fs.writeFileSync(path.join(TB, 'kaputt_liste', 'ki', 'policies.json'), '{ "format": "stadt-policy-liste", kaputt');
     fs.writeFileSync(path.join(TB, 'leer.html'), '<!doctype html><meta charset="utf-8"><title>leer</title><link rel="icon" href="data:,">');   // gleiche Herkunft, ohne Stadt
     if (!(await frei(PORT))) throw new Error(`Port ${PORT} ist belegt – nichts gestartet`);
@@ -100,6 +122,19 @@ const warte = (ms) => new Promise(r => setTimeout(r, ms));
     await bereit('/stadt.html?neu&seed=1&debug');
     let s = await stand();
     ok(!s.aktiv && s.regeln && !s.policy && anfragen.length === 0, `Start: Regeln (Standard), keine Anfrage an ki/ (${anfragen.length}), Auswahl „${s.optionen.join(' | ')}“, 3D ${mitThree ? 'mit lokaler Three.js-Kopie' : 'mit Three.js aus dem Netz'}`);
+    // 1b. Version 10 (Entscheidung 5): die Policy aus Version 9 in ki/ wird beim Umschalten sichtbar abgelehnt („neu trainieren“), es entscheiden
+    //     die Regeln (Status im Fenster sichtbar, Warnung); die Version steht im Grund
+    if (altJson.simVersion !== VERSION) {
+      await bereit('/pruefung/browser/alt/stadt.html?neu&seed=7&debug');
+      await meldungLeeren();
+      s = await policyWaehlen();
+      const grundAlt = `${altDatei}: Policy ungültig: trainiert auf Stadt-Version ${altJson.simVersion}, diese Stadt ist Version ${VERSION} (neu trainieren)`;
+      ok(!s.aktiv && s.regeln && !s.policy && s.status.includes(grundAlt) && s.statusSichtbar && /Keine gültige Policy/.test(s.meldung + s.status) && s.meldungArt === 'warnung',
+        `Policy aus Version ${altJson.simVersion} in ki/: abgelehnt und sichtbar, Regeln: „${s.status.slice(0, 220)}“`);
+      await alleZu();
+      anfragen.length = 0;
+      await bereit('/stadt.html?neu&seed=1&debug');
+    } else ok(false, `Testdatei ${altDatei} ist schon von Version ${VERSION}: Ablehnung einer älteren Policy nicht prüfbar`);
     // 2. Umschalten lädt aus ki/ (relative URL) und prüft streng
     s = await policyWaehlen();
     ok(s.aktiv && s.policy && s.hash === polJson.hash && anfragen.includes('/ki/policies.json') && anfragen.includes('/ki/' + polDatei) && /ki\//.test(s.status),
@@ -117,9 +152,9 @@ const warte = (ms) => new Promise(r => setTimeout(r, ms));
     await stunden(30);
     s = await stand();
     ok(s.aktiv && s.st.entscheidungen > 0 && s.st.rueckfall === 0, `30 Spielstunden mit Policy: ${s.st.entscheidungen} Entscheidungen, ${s.st.ausgefuehrt} ausgeführt, ${s.st.warten}× gewartet, ${s.st.regeln} nach Regeln, kein Rückfall`);
-    // 3. Speichern: nur der Verweis (Name + Hash + Schema), keine Gewichte; Spielstand-Version bleibt 9
+    // 3. Speichern: nur der Verweis (Name + Hash + Schema), keine Gewichte; Spielstand-Version wie die Datei (seit Etappe 2: 10)
     let d = await spielstand();
-    ok(d.version === 9 && d.ui && d.ui.entscheidungen && d.ui.entscheidungen.art === 'policy' && d.ui.entscheidungen.hash === polJson.hash
+    ok(d.version === VERSION && d.ui && d.ui.entscheidungen && d.ui.entscheidungen.art === 'policy' && d.ui.entscheidungen.hash === polJson.hash
       && d.ui.entscheidungen.name === polJson.name && !JSON.stringify(d).includes('gewichte'), `Spielstand (Version ${d.version}): ui.entscheidungen = ${JSON.stringify(d.ui.entscheidungen)}, keine Gewichte`);
     // 4. Neu laden: Wahl bleibt, die Policy kommt wieder aus ki/ (nicht aus dem Spielstand)
     anfragen.length = 0;
@@ -187,6 +222,9 @@ const warte = (ms) => new Promise(r => setTimeout(r, ms));
     const englisch = /Unexpected|Expected|position/.test(s.status + s.meldung);
     s = await laden('policy_v8.json', fs.readFileSync(V8, 'utf8'));
     ok(/abgelehnt/.test(s.meldung) && /Stadt-Version 8/.test(s.meldung) && !s.aktiv, `Datei-Import Version-8-Policy: „${s.meldung.slice(0, 120)}“`);
+    s = await laden(altDatei, altText);                      // Version 10: die Policy aus Version 9 (Etappe 1), sichtbar im Fenster
+    ok(/abgelehnt/.test(s.meldung) && new RegExp(`trainiert auf Stadt-Version ${altJson.simVersion}, diese Stadt ist Version ${VERSION} \\(neu trainieren\\)`).test(s.status) && s.statusSichtbar && !s.aktiv && s.regeln,
+      `Datei-Import der Policy aus Version ${altJson.simVersion}: abgelehnt, im Fenster „${s.status.slice(-130)}“`);
     s = await laden(polDatei, polText);
     ok(/geprüft und geladen/.test(s.meldung) && !s.aktiv && s.optionen.some(o => o.includes(polJson.name)), `Datei-Import gültig: „${s.meldung.slice(0, 100)}“ (noch nicht gewählt)`);
     ok(/geprüft und geladen/.test(s.status) && /„Trainierte Policy \(experimentell\)“ wählen/.test(s.status) && s.statusSichtbar && s.vergessen && !englisch
@@ -235,8 +273,10 @@ const warte = (ms) => new Promise(r => setTimeout(r, ms));
     await bereit('/stadt.html?debug');
     s = await stand();
     ok(!s.aktiv && s.regeln && !/Rückfall/.test(s.meldung + s.status) && anfragen.length === 0, 'Spielstand ohne ui.entscheidungen (wie 09083f5): Regeln, keine Rückfall-Meldung, keine Anfrage an ki/');
-    // 12. Rückfall zur Laufzeit: Logits laufen über → Regeln, sichtbar, gespeichert
-    await page.evaluate(() => {
+    // 12. Rückfall zur Laufzeit: Logits laufen über → Regeln, sichtbar, gespeichert. Seit der float32-Prüfung (Vorarbeit Etappe 2) lehnt
+    //     policyPruefen die Datei mit Gewichten 1e308 ab (geprüft), keine geprüfte Datei läuft mehr über; darum wird die letzte Schicht einer
+    //     geprüften Policy erst danach im Speicher unendlich (genau die Werte, die Math.fround(1e308) vorher ins Netz brachte)
+    const grund12 = await page.evaluate(() => {
       const K = __stadt.Sim.KI, n = K.MERKMALE.length, na = K.AKTIONEN.length;
       const d = { format: 'stadt-policy', formatVersion: K.FORMAT, name: 'ueberlauf', status: 'test', simVersion: __stadt.Sim.VERSION, schemaHash: K.schemaHash(),
         beobachtung: { schemaVersion: K.SCHEMA, laenge: n, merkmale: K.MERKMALE.map(m => m[0]) }, aktionen: { liste: K.AKTIONEN.slice() },
@@ -244,13 +284,21 @@ const warte = (ms) => new Promise(r => setTimeout(r, ms));
         netz: { schichten: [{ gewichte: Array.from({ length: 4 }, () => new Array(n).fill(0)), bias: [50, 50, 50, 50], aktivierung: 'tanh' },
           { gewichte: Array.from({ length: na }, () => new Array(4).fill(1e308)), bias: new Array(na).fill(1e308), aktivierung: 'linear' }] } };
       d.hash = K.policyHash(d);
-      K.policySetzen(K.policyPruefen(d));
+      let grund = '';
+      try { K.policyPruefen(d); } catch (e) { grund = e.message; }
+      d.netz.schichten[1].gewichte = Array.from({ length: na }, () => new Array(4).fill(1)); d.netz.schichten[1].bias = new Array(na).fill(1);
+      d.hash = K.policyHash(d);
+      const pol = K.policyPruefen(d);
+      pol.schichten[1].w.fill(Infinity); pol.schichten[1].bias.fill(Infinity);
+      K.policySetzen(pol);
+      return grund;
     });
     await stunden(30);
     await page.waitForTimeout(1500);
     s = await stand();
     d = await spielstand();
-    ok(!s.aktiv && s.regeln && /Rückfall/.test(s.meldung) && s.meldungArt === 'fehler' && d.ui.entscheidungen.art === 'regeln', `Laufzeitfehler: Regeln, Meldung „${s.meldung.slice(0, 120)}“`);
+    ok(/float32/.test(grund12) && !s.aktiv && s.regeln && /Rückfall/.test(s.meldung) && s.meldungArt === 'fehler' && d.ui.entscheidungen.art === 'regeln',
+      `Datei mit Gewichten 1e308 abgelehnt („${grund12}“); Laufzeitfehler: Regeln, Meldung „${s.meldung.slice(0, 120)}“`);
     // 13. Als einzelne Datei (file://, ohne Server): Umschalten zeigt den Grund, Regeln bleiben; keine fetch-Anfrage
     anfragen.length = 0;
     await bereit(pathToFileURL(STADT_HTML).href + '?neu&seed=6&debug');

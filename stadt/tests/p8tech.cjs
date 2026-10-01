@@ -39,8 +39,11 @@ const OUT = U.ordner('bilder_p8');   // Bilder nach tests/ausgabe/ (per .gitigno
     // Die Figuren bei der Arbeit wählt die Oberfläche um 8 Uhr nach Nähe zum Blickpunkt (Annahme 62): Kamera schon um 7 Uhr auf die Firma
     // (seit der zweiten Gegenprüfung von Schritt 2 liegt die größte Firma der Teststadt weiter vom Startblick weg)
     const a = __stadt; while (a.S().stunde !== 7) a.schritt(); a.nachSchritten();
+    // Version 10 (Etappe 2): Die Teststadt läuft anders; die größte Tech-Firma an Tag 420 ist jetzt ein Autowerk (Vega Autos, Stufe 3), dessen
+    // Leute auf dem Werksgelände stehen und dessen Karte „Baut …“ statt „Arbeitet an der Software …“ sagt. Geprüft wird hier, wofür der Test
+    // gebaut ist: die größte Tech-Firma ohne Autowerk (Glasbau, Programmierer, Bildschirme, Handys); Autowerke prüft tests/autos_bild.cjs
     const S = a.S(), Sim = a.Sim; let best = -1;
-    for (let b = 0; b < S.gAnzahl; b++) if (S.g.typ[b] === Sim.TECH && !S.g.leer[b] && S.feld[S.g.y[b] * S.karte + S.g.x[b]] === Sim.TECH && (best < 0 || S.belegschaft[b].length > S.belegschaft[best].length)) best = b;
+    for (let b = 0; b < S.gAnzahl; b++) if (S.g.typ[b] === Sim.TECH && !S.g.werk[b] && !S.g.leer[b] && S.feld[S.g.y[b] * S.karte + S.g.x[b]] === Sim.TECH && (best < 0 || S.belegschaft[b].length > S.belegschaft[best].length)) best = b;
     if (best < 0) return null;
     // Kamera steil von oben (seit den Kitas steht in der Teststadt ein Wohnturm vor der Firma, flach traf der Klick ihn)
     const c = a.G.controls, x = S.g.x[best] - (S.mitte ?? 48) + 0.5, z = S.g.y[best] - (S.mitte ?? 48) + 0.5; c.target.set(x, 0.5, z); a.G.camera.position.set(x + 2.0, 8.5, z + 2.6); c.update();

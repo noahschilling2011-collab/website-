@@ -1,0 +1,34 @@
+  ok   alte Fassung Version 6, neue 10
+  ok   Abschnitt „Stadt erweitern“ (304 Zeilen): kein Zufall (0), von Personen nur lebt und wohnung (anderes: nichts; P: 0), keine Namen (keine)
+  ok   Stadtteile außerhalb des Abschnitts nur zum Benennen und Anzeigen: gebaeudeSetzen:teilVon, personInfo:teilName, personInfo:teilVon, gebaeudeInfo:teilName, gebaeudeInfo:teilVon
+  ok   Seed 1: 730 Tage jeden Tag wie die alte Fassung (Kennzahlen, Zufall, Felder und Gebäude relativ zur Mitte, alle Personen- und Gebäudefelder, Statistik, Hauptfiguren); 1065 Einwohner
+  ok   Seed 1: Grenze hielt 0-mal eine Straße auf; Vorlauf 18 Felder an 730 von 730 Tagen, Ausdehnung = Straßen (0 Fehler), Maße (0)
+  ok   Seed 1: Karte 56 → 80, 3-mal gewachsen (Tag 168: 64, 204: 72, 309: 80), 3 Zeilen im Stadtbuch (eine je Nacht, Größen und Abstand passen)
+  ok   Seed 1: Stufe jeden Tag richtig (0 Fehler), Aufstieg genau am ersten Tag über der Schwelle (Tag 78, 173, 325), 3 Zeilen
+  ok   Seed 1: Stadtteile jeden Tag richtig benannt (8: Altstadt, Marktviertel, Lindenhof, Birkenfeld, Mühlenviertel, Eichholz, Rosenau, Wiesengrund); Zähler 0, Karten 0 Fehler
+  ok   Seed 2: 730 Tage jeden Tag wie die alte Fassung (Kennzahlen, Zufall, Felder und Gebäude relativ zur Mitte, alle Personen- und Gebäudefelder, Statistik, Hauptfiguren); 1122 Einwohner
+  ok   Seed 2: Grenze hielt 0-mal eine Straße auf; Vorlauf 18 Felder an 730 von 730 Tagen, Ausdehnung = Straßen (0 Fehler), Maße (0)
+  ok   Seed 2: Karte 56 → 104, 6-mal gewachsen (Tag 108: 64, 128: 72, 168: 80, 211: 88, 235: 96, 251: 104), 6 Zeilen im Stadtbuch (eine je Nacht, Größen und Abstand passen)
+  ok   Seed 2: Stufe jeden Tag richtig (0 Fehler), Aufstieg genau am ersten Tag über der Schwelle (Tag 72, 166, 327), 3 Zeilen
+  ok   Seed 2: Stadtteile jeden Tag richtig benannt (9: Altstadt, Marktviertel, Lindenhof, Birkenfeld, Mühlenviertel, Eichholz, Rosenau, Wiesengrund, Buchenried); Zähler 0, Karten 0 Fehler
+  ok   Seed 3: 730 Tage jeden Tag wie die alte Fassung (Kennzahlen, Zufall, Felder und Gebäude relativ zur Mitte, alle Personen- und Gebäudefelder, Statistik, Hauptfiguren); 1082 Einwohner
+  ok   Seed 3: Grenze hielt 0-mal eine Straße auf; Vorlauf 18 Felder an 730 von 730 Tagen, Ausdehnung = Straßen (0 Fehler), Maße (0)
+  ok   Seed 3: Karte 56 → 80, 3-mal gewachsen (Tag 98: 64, 131: 72, 221: 80), 3 Zeilen im Stadtbuch (eine je Nacht, Größen und Abstand passen)
+  ok   Seed 3: Stufe jeden Tag richtig (0 Fehler), Aufstieg genau am ersten Tag über der Schwelle (Tag 64, 161, 311), 3 Zeilen
+  ok   Seed 3: Stadtteile jeden Tag richtig benannt (8: Altstadt, Marktviertel, Lindenhof, Birkenfeld, Mühlenviertel, Eichholz, Rosenau, Wiesengrund); Zähler 0, Karten 0 Fehler
+  ok   Stadtbuch: Stufen „Tech-Firmen, sobald Tüftler sie gründen.“ / „…Autowerke, sobald eine große Tech-Firma eins baut.“, 4 Stadtteilzeilen ohne Personennamen, keine vor der Kleinstadt
+  ok   Seed 1, Tag 107: 2-mal gewachsen in einer Nacht (72, 80), 1 Zeile im Stadtbuch: „Die Stadt reicht in dieser Nacht zweimal nah an den Rand der Karte: zuerst im Süden bis 16 Felder, dann im Westen bis 17 Felder. Die Stadt weist ringsum neues Bauland aus: Die Karte wächst von 64 × 64 auf 80 × 80 Felder.“
+  ok   Speichern an Tag 73, 13 Uhr (Karte 56), geladen und weiter: beide wachsen an denselben Tagen (74: 64), 30 Tage später bitgleich (d35f20ce858e9fc3)
+  ok   beschädigte Stände der Version 7 abgelehnt: Karte 100: Spielstand beschädigt: Kartengröße; Mitte falsch: Spielstand beschädigt: Kartenmaße; Karte zu groß: Spielstand beschädigt: Kartengröße; Stufe 7: Spielstand beschädigt: Stadt erweitern; Stadtteil doppelt: Spielstand beschädigt: Stadt erweitern; Stadtteil als Text: Spielstand beschädigt: Stadt erweitern; Ausdehnung außerhalb: Spielstand beschädigt: Stadt erweitern; Gelände ohne Gebäude: Spielstand beschädigt: Stadt erweitern; Viertel fehlt: Spielstand beschädigt: Viertel (vHaus); Feld zu kurz: Spielstand beschädigt: Karte (feld); ohne erweiterung: Spielstand beschädigt: Stadt erweitern; Gebäude außerhalb der Karte: Spielstand beschädigt: Lage der Gebäude; Feld zeigt auf ein anderes Gebäude: Spielstand beschädigt: Lage der Gebäude; Gelände-Feld leer: Spielstand beschädigt: Gelände; Gelände-Feld ohne Gebäude: Spielstand beschädigt: Gelände
+  ok   Übernahme Version 6, Seed 1, Tag 15 (14 Einw.): Dorf, Karte 96, 0 Stadtteile; „Ab heute zählt die Stadt ihre Größe: 14 Einwohner, sie ist ein Dorf. Die Karte ist 96 × 96 Felder groß und wächst weiter, wenn die Stadt näher als 18 …“
+  ok   Übernahme Version 6, Seed 1, Tag 15 (14 Einw.): 60 Tage jeden Tag wie Version 6 (Karte jetzt 96, Stufe Dorf)
+  ok   Übernahme Version 6, Seed 1, Tag 150 (112 Einw.): Kleinstadt, Karte 96, 4 Stadtteile; „Ab heute zählt die Stadt ihre Größe: 112 Einwohner, sie ist eine Kleinstadt. Ihre Stadtteile heißen Altstadt, Marktviertel, Lindenhof und Birkenfeld. …“
+  ok   Übernahme Version 6, Seed 1, Tag 150 (112 Einw.): 60 Tage jeden Tag wie Version 6 (Karte jetzt 96, Stufe Stadt)
+  ok   Übernahme Version 6, Seed 2, Tag 300 (621 Einw.): Stadt, Karte 104, 9 Stadtteile; „Ab heute zählt die Stadt ihre Größe: 621 Einwohner, sie ist eine Stadt. Ihre Stadtteile heißen Altstadt, Marktviertel, Lindenhof, Birkenfeld, Mühlenvi…“
+  ok   Übernahme Version 6, Seed 2, Tag 300 (621 Einw.): 60 Tage jeden Tag wie Version 6 (Karte jetzt 104, Stufe Großstadt)
+  ok   Übernahme Version 6, Seed 3, Tag 400 (1036 Einw.): Großstadt, Karte 96, 8 Stadtteile; „Ab heute zählt die Stadt ihre Größe: 1.036 Einwohner, sie ist eine Großstadt. Ihre Stadtteile heißen Altstadt, Marktviertel, Lindenhof, Birkenfeld, Mü…“
+  ok   Übernahme Version 6, Seed 3, Tag 400 (1036 Einw.): 60 Tage jeden Tag wie Version 6 (Karte jetzt 96, Stufe Großstadt)
+  ok   Gelände gesucht (Tag 300, 0 Tage gewartet): 3 × 2 Blöcke am Rand (17–27, 49–55, Tor 27/52 zur Straße im Osten, 23.4 von der Mitte), 1 Block nah an der Mitte (17.2)
+  ok   Gelände gebaut (Gebäude 164): alle 77 Felder belegt, 0 Bauplätze darin, Karte 88 → 96, Vorlauf und Ausdehnung stimmen
+  ok   60 Tage weiter mit Gelände: Grenze hielt 0-mal eine Straße auf, Vorlauf 0 Fehler, gespeichert und geladen bitgleich; Karte 96
+Alle Prüfungen zu „Stadt erweitern“ bestanden

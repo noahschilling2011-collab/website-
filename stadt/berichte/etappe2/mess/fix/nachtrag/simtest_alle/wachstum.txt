@@ -1,0 +1,40 @@
+A Statisch
+  ok   Abschnitt „Wachstum“: würfelt nicht (0), liest keine Person (0)
+  ok   zuzug(), Zählung bis zur Suche: liest keine Person (0), ein Zufallszug wie vorher (1), Anlauf über wachstumJetzt, Anfragen mit der Grundzahl ohne Anlauf
+  ok   die Simulation kennt kein Tempo (nur die Frist in Spielstunden über kiSchalten)
+  ok   Karte R10: Zahlen im Text passen zu R (1 + 1 %, Anlauf bis 160 Einwohner +2, schnell 1 + 3 %), Schalter keine Maßnahme der Stadtregierung, Live-Zeile
+B Ohne Anlauf wie vorher
+  ok   Seed 1, ohne Anlauf und ohne die Bausteine von Version 9 und 10: 200 Tage jeden Tag wie Version 8 (185 Einwohner)
+  ok   Seed 2, ohne Anlauf und ohne die Bausteine von Version 9 und 10: 200 Tage jeden Tag wie Version 8 (255 Einwohner)
+  ok   Seed 3, ohne Anlauf und ohne die Bausteine von Version 9 und 10: 200 Tage jeden Tag wie Version 8 (246 Einwohner)
+  (ohne --alt: kein Vergleich mit der Fassung vor Teil 4)
+C Anlauf je Nacht (Seeds 1–3, 400 Tage)
+  ok   SCHUL_ZUZUG 1: 3324 Zuzüge (387 im Anlauf, davon 55 für Laden oder Bauhof im Dorf; 2937 danach; 97 für Schulen), alle mit Stelle nach der Regel, nie Kita; falsch 0, Tage über der Grenze 0, Tage mit mehr als den freien Stellen ohne Arbeitsuchende der Stadt 0
+  ok   SCHUL_ZUZUG 1: 1200 Nächte (136 im Dorf): freie Stellen gezählt wie die Regel (Kitas nie, Laden und Bauhof nur im Dorf; falsch 0), Anfragen fürs Bauamt mit der Grundzahl ohne Anlauf (falsch 0)
+  ok   SCHUL_ZUZUG 0: 3246 Zuzüge (387 im Anlauf, davon 55 für Laden oder Bauhof im Dorf; 2859 danach; 0 für Schulen), alle mit Stelle nach der Regel, nie Kita; falsch 0, Tage über der Grenze 0, Tage mit mehr als den freien Stellen ohne Arbeitsuchende der Stadt 0
+  ok   SCHUL_ZUZUG 0: 1200 Nächte (136 im Dorf): freie Stellen gezählt wie die Regel (Kitas und Schulen nie, Laden und Bauhof nur im Dorf; falsch 0), Anfragen fürs Bauamt mit der Grundzahl ohne Anlauf (falsch 0)
+  gemessen mit Anlauf:  Seed 1: erster Zuzug Tag 1, Tag 60/120 62/194; Seed 2: erster Zuzug Tag 1, Tag 60/120 39/145; Seed 3: erster Zuzug Tag 1, Tag 60/120 88/237
+  gemessen ohne Anlauf: Seed 1: erster Zuzug Tag 90, Tag 60/120 14/22; Seed 2: erster Zuzug Tag 50, Tag 60/120 18/27; Seed 3: erster Zuzug Tag 46, Tag 60/120 25/64
+D Schalter „Wachstum“
+  ok   an: true, noch einmal: false, ungültige Werte abgelehnt 8 von 8; eine Zeile im Stadtbuch ohne Namen: „Ab heute wächst die Stadt schneller (Schalter „Wachstum“): Am Tag dürfen bis zu  …“
+  ok   Speichern und Laden mit „schnell“ um 13 Uhr: 30 Tage bitgleich weiter (bis Tag 91, 166 Einwohner)
+  ok   zurück auf normal: eine Zeile „Ab heute wächst die Stadt wieder normal (Schalter „Wachstum“ …“
+  ok   Version 8 übernommen: Schalter normal, KI-Frist 2 Spielstunden, Zähler übernommen (0 zu spät, 0 angewandt), keine Zeile
+  ok   danach als Version 9 gespeichert und geladen: 20 Tage bitgleich
+  ok   12 beschädigte Stände abgelehnt
+  ok   schnell (Seed 5, Tag 150): 258 Einwohner gegen 215 normal; Grenze am Tag 8 gegen 3; Grundzahl ×2, Bauamt ×2
+  ok   wachstumInfo: schnell, 3 %, Anlauf bis 160 Einwohner, Frist 2 h
+E KI-Frist
+  ok   Frist in Spielstunden aus 0, 1, 7, 34, 99, 2,2, NaN, −5: 2, 2, 7, 34, 36, 3, 2, 2 (höchstens 36); ohne Angabe bleibt 2
+  ok   Antwort nach 10 Spielstunden: Frist 17 → gilt; Frist 2 → zu spät (6 als „zu spät“ gezählt)
+  ok   offene Anfragen (6): Frist 2 → hochgeschaltet 34 → heruntergeschaltet bleibt 34 (neue Anfragen wieder 2)
+  ok   Rangfolge mit Frist 7 (20×): bis 14 Uhr, Antwort um 13 Uhr gilt (Plan: ki, zuerst parks)
+  ok   Rangfolge mit Frist 34 (100×): höchstens bis 23 Uhr, Antwort um 22 Uhr gilt (Plan: ki)
+  ok   Antwort nach dem Plan (nach 23 Uhr) wird abgelehnt: Regel (regel, regel)
+  ok   Rangfolge mit Frist 2 (1×): bis 9 Uhr, Antwort um 13 Uhr zu spät (Regel)
+F Kapazität der Warteschlange (nur gemessen): 10 Hauptfiguren und der Bürgermeister, Seed 2 ab Tag 250, 20 Spieltage
+    1×  1 s: 449 KI / 0 zu spät, davon 0 ungesendet (Frist 2 h = 120 s) | 2 s: 449 KI / 0 zu spät, davon 0 ungesendet (Frist 2 h = 120 s) | 3 s: 449 KI / 0 zu spät, davon 0 ungesendet (Frist 2 h = 120 s) | 5 s: 449 KI / 0 zu spät, davon 0 ungesendet (Frist 2 h = 120 s) | 10 s: 435 KI / 0 zu spät, davon 0 ungesendet (Frist 3 h = 180 s)
+    5×  1 s: 449 KI / 0 zu spät, davon 0 ungesendet (Frist 2 h = 24 s) | 2 s: 435 KI / 0 zu spät, davon 0 ungesendet (Frist 3 h = 36 s) | 3 s: 411 KI / 0 zu spät, davon 0 ungesendet (Frist 4 h = 48 s) | 5 s: 373 KI / 0 zu spät, davon 0 ungesendet (Frist 6 h = 72 s) | 10 s: 341 KI / 0 zu spät, davon 0 ungesendet (Frist 11 h = 132 s)
+   20×  1 s: 395 KI / 0 zu spät, davon 0 ungesendet (Frist 7 h = 21 s) | 2 s: 362 KI / 0 zu spät, davon 0 ungesendet (Frist 9 h = 27 s) | 3 s: 338 KI / 0 zu spät, davon 0 ungesendet (Frist 14 h = 42 s) | 5 s: 137 KI / 0 zu spät, davon 0 ungesendet (Frist 22 h = 66 s) | 10 s: 101 KI / 7 zu spät, davon 7 ungesendet (Frist 36 h = 108 s)
+  100×  1 s: 137 KI / 0 zu spät, davon 0 ungesendet (Frist 34 h = 20 s) | 2 s: 98 KI / 6 zu spät, davon 6 ungesendet (Frist 36 h = 22 s) | 3 s: 56 KI / 47 zu spät, davon 47 ungesendet (Frist 36 h = 22 s) | 5 s: 23 KI / 86 zu spät, davon 86 ungesendet (Frist 36 h = 22 s) | 10 s: 20 KI / 122 zu spät, davon 122 ungesendet (Frist 36 h = 22 s)
+Alle Prüfungen zu „Wachstum, Tempo und KI“ bestanden

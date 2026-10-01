@@ -1,0 +1,3 @@
+{"stunden":709,"tag":29,"fehler":"TypeError: Cannot read properties of undefined (reading 'x')","beob":"object","text":"Liste angehalten (interner Fehler der Anzeige). Die Stadt rechnet trotzdem richtig weiter.","title":"TypeError: Cannot read properties of undefined (reading 'x')","knopf":"0 anders entschieden (heute), Liste angehalten (Fehler); Liste öffnen","konsole":[]}
+OK   Beobachter wirft (nach 709 Stunden, Tag 29): abgeschaltet, Liste „Liste angehalten (interner Fehler der Anzeige). Die Stadt rechnet trotzdem richtig weiter.“, title „TypeError: Cannot read properties of undefined (reading 'x')“, Knopf „0 anders entschieden (heute), Liste angehalten (Fehler); Liste öffnen“
+exit 0

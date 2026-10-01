@@ -4,8 +4,9 @@
 // Git bc7247a per git show) → übernehmen, „Stadt erweitern“ ab dem Übernahmetag; dazu Seed 2 an Tag 260 (Wartezeit der Kaserne,
 // Nachprüfung); Spielstand v7 (Stadt erweitern, Sicherheit, Bund; Git ffa1d88 per git show) → übernehmen, Autos und
 // Tech-Stufen ab dem Übernahmetag; Spielstand v8 (Autos; Git 31ce452 per git show) → übernehmen, Rathaus so nah an der Mitte wie
-// frei und Bürgermeisterwahl, sobald es steht. Heute gilt Version 9.
-const NEU = 9;
+// frei und Bürgermeisterwahl, sobald es steht; Spielstand v9 (Git 6c1741e per git show) → übernehmen: Gedächtnis neu verteilt, Erfahrung und
+// Pläne ab dem Übernahmetag, kein memName, Größe des Spielstands wie erwartet (Version 10, Etappe 2). Heute gilt Version 10.
+const NEU = 10;
 const U = require('./umgebung.cjs');
 const { chromium } = U;
 const fs = require('fs');
@@ -399,9 +400,11 @@ const fs = require('fs');
         && document.querySelector('[data-wachstum="0"]').getAttribute('aria-pressed') === 'true' }; });
   // Alte Gebäude bleiben (gleiche Typen); dazu höchstens eins, das Rathaus (oder ein Park, der ihm weicht, wird es)
   const alteGleich = s9.typen.split(',').slice(0, v9a.gAnzahl).map((t, i) => t === v9a.typen.split(',')[i] || (i === s9.rathaus && v9a.typen.split(',')[i] === '5')).every(Boolean);
+  // Version 10 (Etappe 2): Die Meldung nennt dazu „Bewohner mit Erfahrung und Plänen“; die Grenze wächst genau um diesen Punkt (vorher 200)
+  const NEU10 = '; Bewohner mit Erfahrung und Plänen';
   ok(s9.version === NEU && s9.gespeichert === NEU && s9.einw === v9a.einw && s9.autos === v9a.autos && s9.stufe === v9a.stufe && s9.karte >= v9a.karte && alteGleich
     && s9.gAnzahl <= v9a.gAnzahl + 1 && s9.bm === -1 && s9.haupt === v9a.haupt && s9.buch && s9.meldung.includes('Rathaus mit Bürgermeister') && !s9.meldung.includes('Autos')
-    && s9.schule && s9.meldung.includes('Schulen') && s9.haushalt && s9.meldung.includes('Haushalt') && s9.meldung.length <= 200 && s9.wachstum,
+    && s9.schule && s9.meldung.includes('Schulen') && s9.haushalt && s9.meldung.includes('Haushalt') && s9.meldung.length <= 200 + NEU10.length && s9.meldung.includes(NEU10) && s9.wachstum,
     `übernommen: Version ${s9.version}, Tag ${s9.tag}, ${s9.einw} Einwohner, ${s9.autos} Autos, Stufe ${s9.stufe}, Rathaus Gebäude ${s9.rathaus} (alte Gebäude gleich: ${alteGleich}), Schule ab heute (${s9.schule}), Haushalt ab heute (${s9.haushalt}), `
     + `Wachstum normal, KI-Frist 2 Spielstunden (${s9.wachstum}), `
     + `noch kein Bürgermeister; Meldung „${s9.meldung}“`);
@@ -422,6 +425,68 @@ const fs = require('fs');
   const neu9 = await p9.evaluate(() => ({ offen: document.getElementById('version-dialog').open, bm: __stadt.S().buergermeister.p >= 0, v: __stadt.S().version }));
   ok(!neu9.offen && neu9.v === NEU && neu9.bm, 'nach dem Neuladen kein Dialog, der Bürgermeister bleibt im Amt');
   await ctx9.close();
+
+  // 9. Version 10 (Etappe 2): Stand von Version 9 (Git 6c1741e per git show unter stadt.orig.html, Seed 2, Tag 400): Dialog mit dem Text zu
+  //    Version 10, übernehmen; alles bleibt (Einwohner, Gebäude, Bürgermeister, Stadtbuch), Gedächtnis neu verteilt (Kurzzeit 3 Plätze, Langzeit
+  //    nur ab MEM_SCHWELLE), Erfahrung, Plan und letzte Entscheidung leer, Summen leer, kein memName im Spielstand; Größe: Version 10 hat je
+  //    Person 10 Byte mehr (42 neu, 32 memName weg), in Base64 also 13 1/3 Zeichen je Platz (pMax) mehr, dazu höchstens 1.000 Zeichen für die
+  //    Kopfzeilen der Arrays und die Summen (Erwartung aus dem Speicherformat, VERGLEICH.md Abschnitt 3; SCHRITT2.md Abschnitt 6)
+  const ctx10 = await b.newContext({ viewport: { width: 1280, height: 800 } });
+  await U.three(ctx10);
+  await ctx10.route('http://localhost:11434/**', (route) => route.abort());
+  await U.fassungUnter(ctx10, 'v9');
+  const p10 = await ctx10.newPage();
+  p10.on('console', m => { if (['error', 'warning'].includes(m.type()) && !/ERR_FAILED/.test(m.text())) log.push('v9 ' + m.type() + ': ' + m.text()); });
+  p10.on('pageerror', e => log.push('v9 pageerror: ' + e.message));
+  await p10.goto(U.LEER);
+  await p10.evaluate(() => localStorage.clear());
+  await p10.goto(U.HOST + '/stadt.orig.html?debug&seed=2&tage=400&neu');
+  await p10.waitForFunction(() => globalThis.__stadt, null, { timeout: 180000 });
+  const v10a = await p10.evaluate(() => { const a = __stadt; a.setzeTempo(0); a.speichern(); const t = localStorage.getItem('stadt-save-v1'), d = JSON.parse(t), S = a.S();
+    let mem = 0; for (let i = 0; i < S.pMax * 8; i++) if (S.p.memCode[i]) mem++;
+    return { version: d.version, tag: d.werte.tag, einw: d.werte.einwohner, pMax: d.werte.pMax, gAnzahl: S.gAnzahl, bm: S.buergermeister.p, buchNr: S.buchNr, mem, zeichen: t.length,
+      memName: d.arrays.some(x => x.name === 'p.memName') }; });
+  ok(v10a.version === 9 && v10a.memName, `Stand der Version 9 gespeichert: Seed 2, Tag ${v10a.tag}, ${v10a.einw} Einwohner, ${v10a.mem} Erinnerungen, ${v10a.zeichen.toLocaleString('de-DE')} Zeichen (mit memName)`);
+  await p10.evaluate(() => { const d = JSON.parse(localStorage.getItem('stadt-save-v1')); d.zuletztGelaufen = Date.now(); d.tempo = 0; localStorage.setItem('stadt-save-v1', JSON.stringify(d)); });
+  await p10.goto(U.HOST + '/stadt.html?debug');
+  await p10.waitForFunction(() => globalThis.__stadt);
+  await p10.waitForTimeout(500);
+  const d10 = await p10.evaluate(() => ({ offen: document.getElementById('version-dialog').open, text: document.getElementById('version-text').textContent,
+    hinweis: document.getElementById('version-hinweis').textContent, titel: document.querySelector('#version-dialog h2') ? document.querySelector('#version-dialog h2').textContent : '',
+    knoepfe: [...document.querySelectorAll('#version-dialog button')].filter(k => !k.hidden).map(k => k.textContent + (k.classList.contains('haupt') ? '*' : '')) }));
+  ok(d10.offen && d10.knoepfe.join('|') === 'Export behalten|Neu anfangen|Stadt übernehmen*' && d10.text.startsWith('Dein Spielstand ist von Version 9. Seit Version 10 lernen die Bewohner')
+    && d10.hinweis.includes('Erfahrungen und Pläne beginnen am Übernahmetag') && d10.hinweis.includes('Beziehung statt des Namens') && d10.hinweis.includes('neu trainieren'),
+    'Dialog Version 9: ' + d10.knoepfe.join(', ') + ' – „' + d10.text + '“ / „' + d10.hinweis + '“');
+  await p10.screenshot({ path: U.ordner('bilder_p6') + 'p6_dialog_v9.png' });
+  await p10.click('#version-uebernehmen');
+  await p10.waitForFunction(() => !document.getElementById('version-dialog').open, null, { timeout: 30000 });
+  await p10.waitForTimeout(1200);
+  const s10 = await p10.evaluate(() => { const a = __stadt, S = a.S(), Sim = a.Sim, R = Sim.R, P = S.p; a.setzeTempo(0); a.speichern();
+    const t = localStorage.getItem('stadt-save-v1'), d = JSON.parse(t);
+    let mem = 0, lang = 0, langUnter = 0, platz = 0, neuNicht0 = 0;
+    for (let p = 0; p < S.pMax; p++) {
+      if (P.memPos[p] >= R.MEM_KURZ) platz++;
+      for (let j = 0; j < R.MEM; j++) { const c = P.memCode[p * R.MEM + j]; if (!c) continue; mem++; if (j >= R.MEM_KURZ) { lang++; if (Sim.M_BED[c] < R.MEM_SCHWELLE) langUnter++; } }
+    }
+    for (const n of Sim.PF_GED) if (n !== 'planSchritt' && P[n].subarray(0, S.pMax * (P[n].length / S.pKap)).some(v => v !== 0)) neuNicht0++;
+    const st = S.stat.ged, leer = !!st && [...st.gelernt, ...st.schlecht, ...st.planEnde].every(v => v === 0);
+    return { version: S.version, gespeichert: d.version, tag: S.tag, einw: S.einwohner, pMax: d.werte.pMax, gAnzahl: S.gAnzahl, bm: S.buergermeister.p, buchNr: S.buchNr, mem, lang, langUnter, platz,
+      neuNicht0, leer, memName: d.arrays.some(x => x.name === 'p.memName'), ged: Sim.PF_GED.every(n => d.arrays.some(x => x.name === 'p.' + n)), zeichen: t.length,
+      meldung: document.getElementById('meldung').textContent }; });
+  const soll10 = v10a.zeichen + Math.round(v10a.pMax * 40 / 3), diff10 = s10.zeichen - soll10;
+  ok(s10.version === NEU && s10.gespeichert === NEU && s10.tag === v10a.tag && s10.einw === v10a.einw && s10.gAnzahl === v10a.gAnzahl && s10.bm === v10a.bm && s10.buchNr === v10a.buchNr
+    && s10.mem > 0 && s10.mem <= v10a.mem && s10.lang > 0 && !s10.langUnter && !s10.platz && !s10.neuNicht0 && s10.leer && !s10.memName && s10.ged
+    && s10.meldung.includes('Bewohner mit Erfahrung und Plänen') && !s10.meldung.includes('Mehr im Stadtbuch') && s10.meldung.length <= 200,
+    `übernommen: Version ${s10.version}, Tag ${s10.tag}, ${s10.einw} Einwohner, ${s10.gAnzahl} Gebäude, Bürgermeister ${s10.bm >= 0 ? 'bleibt' : 'keiner'}, Stadtbuch gleich (${s10.buchNr}); `
+    + `${s10.mem} von ${v10a.mem} Erinnerungen behalten (${s10.lang} in der Langzeit, unter der Schwelle ${s10.langUnter}), Kurzzeit-Platz falsch ${s10.platz}, neue Felder nicht 0: ${s10.neuNicht0}, `
+    + `Summen leer: ${s10.leer}, memName im Spielstand: ${s10.memName ? 'JA' : 'nein'}; Meldung „${s10.meldung}“`);
+  ok(s10.pMax === v10a.pMax && Math.abs(diff10) <= 1000,
+    `Größe: Version 9 ${v10a.zeichen.toLocaleString('de-DE')} Zeichen, Version 10 ${s10.zeichen.toLocaleString('de-DE')} Zeichen (${s10.zeichen - v10a.zeichen >= 0 ? '+' : ''}${(s10.zeichen - v10a.zeichen).toLocaleString('de-DE')}); `
+    + `erwartet +10 Byte je Platz = +${Math.round(v10a.pMax * 40 / 3).toLocaleString('de-DE')} Zeichen bei ${v10a.pMax} Plätzen, Abweichung ${diff10} (Soll höchstens ±1.000)`);
+  await p10.reload(); await p10.waitForFunction(() => globalThis.__stadt); await p10.waitForTimeout(500);
+  const neu10 = await p10.evaluate(() => ({ offen: document.getElementById('version-dialog').open, v: __stadt.S().version, ged: !!__stadt.S().stat.ged }));
+  ok(!neu10.offen && neu10.v === NEU && neu10.ged, 'nach dem Neuladen kein Dialog, Version 10 mit Gedächtnis');
+  await ctx10.close();
   console.log('Konsole:', log.length ? '\n  ' + log.join('\n  ') : 'leer');
   if (log.length) process.exitCode = 1;
   await b.close();

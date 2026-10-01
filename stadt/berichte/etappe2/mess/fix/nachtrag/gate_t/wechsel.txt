@@ -1,0 +1,55 @@
+neu: E/stadt (stadt.html aad98691cb689361)
+vorher: E/sicherung_fix (stadt.html ac899293429df032)
+basis: E/tmp/gate_t.RR6jd7/stadt (stadt.html 0b453bf1bb62878a)
+Runde 1 neu: 05:11:44 Last: 3.26, 3.58, 3.69 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1401 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 1 vorher: 05:11:48 Last: 3.40, 3.61, 3.70 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1369 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 1 basis: 05:11:51 Last: 3.21, 3.57, 3.68 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 3660 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 2 basis: 05:12:04 Last: 2.87, 3.48, 3.65 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 3785 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 2 vorher: 05:12:17 Last: 2.60, 3.39, 3.62 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1613 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 2 neu: 05:12:21 Last: 2.60, 3.39, 3.62 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1415 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 3 vorher: 05:12:24 Last: 2.47, 3.35, 3.61 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1360 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 3 basis: 05:12:27 Last: 2.36, 3.31, 3.59 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 3528 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 3 neu: 05:12:40 Last: 2.15, 3.23, 3.57 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1300 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 4 neu: 05:12:43 Last: 2.22, 3.23, 3.56 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1257 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 4 basis: 05:12:46 Last: 2.12, 3.19, 3.55 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 3329 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 4 vorher: 05:12:59 Last: 1.95, 3.12, 3.52 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1418 ms (< 5000)
+Gate Phase 0: BESTANDEN
+T neu    1401, 1415, 1300, 1257 ms, Median 1350.5; unter 5000 ms: 4 von 4
+T vorher 1369, 1613, 1360, 1418 ms, Median 1393.5
+T basis  3660, 3785, 3528, 3329 ms, Median 3594
+neu/basis 0.376, vorher/basis 0.388, neu/vorher 0.969 (Mediane)

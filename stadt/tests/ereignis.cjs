@@ -2,7 +2,7 @@
 // Nicht beim Aufbau, nach Sprüngen, beim Aufholen, nach neuer Stadt; bei 20× höchstens 3 je Stunde; reduziert still;
 // Draw Calls +1 nur solange sichtbar, beim Erscheinen kein Programm übersetzt (das eine eigene übersetzt schon der Start).
 // Pleite/Schließung zieht sich zusammen, sonst wächst der Ring. Fernblick: Ring im Bild mindestens 20 px Radius (c am Ende 10) und auf dem
-// Sehstrahl zur Kamera gerückt (Ort im Bild wie am Boden). Uhr angehalten (performance.now fest), Teststadt Seed 4, Tag 400 (Version 9, Teil 4: Seed 5, Tag 400; Teil 2 und 3: Seed 4, Tag 400; Teil 1: Seed 4, Tag 500; bis Version 8: Seed 2, Tag 400)
+// Sehstrahl zur Kamera gerückt (Ort im Bild wie am Boden). Uhr angehalten (performance.now fest), Teststadt Seed 3, Tag 400 (Version 9: Seed 4, Tag 400; Version 9, Teil 4: Seed 5, Tag 400; Teil 2 und 3: Seed 4, Tag 400; Teil 1: Seed 4, Tag 500; bis Version 8: Seed 2, Tag 400)
 const U = require('./umgebung.cjs');
 const { chromium } = U;
 // Momente der Teststadt (Seed 2, Stunde = Tag · 24 + Uhr). Seit den Autos (Version 8) läuft die Stadt wieder anders; nach der Schlussprüfung
@@ -35,7 +35,12 @@ const { chromium } = U;
 // Skript (Seeds 2 bis 5 ab Tag 400, Protokolle v9/t7/mom/m*.log): Seed 4 hat die vier Stunden weiter dicht beieinander: Tag 423, 0 Uhr drei
 // Schließungen allein; Tag 457, 8 Uhr 17 Übernahmen allein (bei 20× höchstens 3 Zeichen); Tag 460, 0 Uhr ein Bau fertig (in den zwei Stunden
 // davor genau einer); Tag 474, 0 Uhr ein Bau fertig und eine Schließung (Teil 5: 406, 443, 449, 457)
-const PLEITE_H = 423 * 24, PLEITEN = 3, UEBER_H = 457 * 24 + 8, UEBERNAHMEN = 17, AUFHOL_H = 460 * 24, AUFHOL_FERTIG = 1, FERN_H = 474 * 24, FERN_N = 2;
+// Version 10 (Etappe 2: Gedächtnis, Erfahrung, Plan): Die Stadt läuft wieder anders; neu gesucht mit demselben Skript (ml/e2bau/werkzeug/
+// s4_momente10.mjs, Seeds 4, 2, 3, 5 ab Tag 400 bis 830, Protokoll ml/e2bau/mess/schritt4/momente/ereignis.txt): In Seed 4 und 2 gibt es nach
+// den Schließungen keine Stunde mit vier Übernahmen mehr; Seed 3 hat alle vier, die Teststadt ist deshalb Seed 3 ab Tag 400: Tag 401, 0 Uhr drei
+// Schließungen allein; Tag 519, 8 Uhr vier Übernahmen allein (bei 20× höchstens 3 Zeichen); Tag 520, 0 Uhr ein Bau fertig (in den zwei Stunden
+// davor genau einer); Tag 549, 0 Uhr ein Bau fertig und eine Schließung (Schlussprüfung von Version 9, Seed 4: 423, 457, 460, 474)
+const PLEITE_H = 401 * 24, PLEITEN = 3, UEBER_H = 519 * 24 + 8, UEBERNAHMEN = 4, AUFHOL_H = 520 * 24, AUFHOL_FERTIG = 1, FERN_H = 549 * 24, FERN_N = 2;
 const ok = (bed, text) => { console.log((bed ? 'OK   ' : 'FEHL ') + text); if (!bed) process.exitCode = 1; };
 async function seite(b, reduziert) {
   const ctx = await b.newContext({ viewport: { width: 1280, height: 800 }, reducedMotion: reduziert ? 'reduce' : 'no-preference' });
@@ -44,7 +49,7 @@ async function seite(b, reduziert) {
   const page = await ctx.newPage(), log = [];
   page.on('pageerror', e => log.push('pageerror: ' + e.message));
   page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) log.push('error: ' + m.text()); });
-  await page.goto(U.HOST + '/stadt.html?debug&seed=4&tage=400&neu', { timeout: 600000 });
+  await page.goto(U.HOST + '/stadt.html?debug&seed=3&tage=400&neu', { timeout: 600000 });
   await page.waitForFunction(() => globalThis.__stadt && globalThis.__stadtDebug, null, { timeout: 600000 });
   await page.evaluate(() => { __stadt.setzeTempo(0); const echt = performance.now.bind(performance);
     globalThis.__fest = null; globalThis.__echt = echt; performance.now = () => globalThis.__fest ?? echt(); });

@@ -1,12 +1,15 @@
 # Ordner ki/ – trainierte Policies für die Bewohner
 
-Hier liegen die Policies, die das Spiel auf Wunsch lädt, und das Schema, auf das sie trainiert sind. Die Regeln (`entscheide` im sim-Block)
+Hier liegen die Policies, die das Spiel auf Wunsch lädt, und das Schema, auf das sie trainiert sind. **Seit Version 10 (Etappe 2) ist keine
+gültige Policy hier:** `policy_v9_lokal_1.json` ist auf Stadt-Version 9 trainiert und wird abgelehnt („Policy ungültig: trainiert auf
+Stadt-Version 9, diese Stadt ist Version 10 (neu trainieren)“, `berichte/etappe2/mess/schritt5/ki_v9_ablehnung.txt`); es entscheiden die
+Regeln. Sie bleibt als Beleg und in `policies.json`, damit das Spiel die Ablehnung mit Grund zeigt. Die Regeln (`entscheide` im sim-Block)
 bleiben Standard. Keine Policy steckt in `stadt.html`, solange keine die Auswertung bestanden hat.
 
 | Datei | Was |
 |---|---|
-| `policies.json` | Liste der Policy-Dateien, die das Spiel anbietet. Schreibt `node tools/ki_liste.mjs` (nimmt nur Dateien auf, die die `stadt.html` daneben annimmt) |
-| `policy_v9_lokal_1.json` | Lauf `v9_lokal_1` (155.648 Schritte, Belohnung v2, Version 9). Status **experimentell**, Auswertung **nicht bestanden** (Feld `auswertung`, Bericht `berichte/v9_lokal_1/abschluss.md`). Das Feld `hinweis` nennt seit dem 29.09.2026 auch die gemessene Stadtwirkung; das Spiel zeigt `auswertung.urteil` und `hinweis` im Fenster |
+| `policies.json` | Liste der Policy-Dateien, die das Spiel anbietet. Schreibt `node tools/ki_liste.mjs` (nimmt nur Dateien auf, die die `stadt.html` daneben annimmt; seit Version 10 schriebe es die Liste deshalb leer, `--nur-pruefen` prüft nur) |
+| `policy_v9_lokal_1.json` | Lauf `v9_lokal_1` (155.648 Schritte, Belohnung v2, Version 9; seit Version 10 abgelehnt). Status **experimentell**, Auswertung **nicht bestanden** (Feld `auswertung`, Bericht `berichte/v9_lokal_1/abschluss.md`). Das Feld `hinweis` nennt seit dem 29.09.2026 auch die gemessene Stadtwirkung; das Spiel zeigt `auswertung.urteil` und `hinweis` im Fenster |
 | `schema_v2.json` | Beobachtungsschema 2 (57 Merkmale) und Aktionen (warten + 12), Hash `e85eca0c`. Schreibt `node tools/ki_schema.mjs` |
 
 ## Wie das Spiel eine Policy lädt
@@ -16,15 +19,16 @@ bleiben Standard. Keine Policy steckt in `stadt.html`, solange keine die Auswert
   --bind 127.0.0.1` im Ordner `stadt/`); als `file://` geht es nicht, dann gibt es einen Hinweis und es entscheiden die Regeln.
 - Andere Datei: im selben Fenster „Policy-Datei laden …“; angenommen oder abgelehnt (mit Grund) steht oben im Fenster. Sie bleibt im
   Browser (`localStorage['stadt-policy-v1']`), nicht im Spielstand; „Geladene Datei entfernen“ löscht sie (war sie gewählt: Regeln).
-- Jede Datei wird streng geprüft (`Sim.KI.policyPruefen`): Format `stadt-policy` 2, `simVersion` = Version der Stadt (9), Schema-Hash,
+- Jede Datei wird streng geprüft (`Sim.KI.policyPruefen`): Format `stadt-policy` 2, `simVersion` = Version der Stadt (seit Etappe 2: 10), Schema-Hash,
   Merkmale, Aktionen, endliche Zahlen, Streuung > 0, Schichten, Inhalts-Hash (SHA-256 über Kopf, Normalisierung, Gewichte, nachgerechnet).
-  Was nicht passt, wird mit Grund abgelehnt. Lücke: „endlich“ wird vor dem Runden auf float32 geprüft; ein Gewicht oder Bias über dem
-  float32-Bereich (z. B. `1e39`) wird angenommen und im Netz zu ±Unendlich. Ergibt das NaN, greift der Rückfall zur Laufzeit; in einer
-  `tanh`-Schicht sättigt es still. Die Maske gilt trotzdem, eine gesperrte Aktion ist nie möglich. Nicht behoben, weil die Prüfung im
-  sim-Block liegt und jede Änderung dort den Sim-Hash ändert, auf den `v9_lokal_1` trainiert ist (`docs/GRENZEN.md`).
+  Was nicht passt, wird mit Grund abgelehnt. Gewichte, Bias und `clip` müssen auch nach dem Runden auf float32 endlich sein (ein Wert wie
+  `1e39` wird abgelehnt; die frühere Lücke ist seit der Vorarbeit zu Etappe 2 geschlossen, `docs/GRENZEN.md`). Die Maske gilt immer, eine
+  gesperrte Aktion ist nie möglich.
 - Im Spielstand steht nur ein Verweis: `ui.entscheidungen = { v: 1, art, name, hash, schema }`. Beim Laden zählt nur der Hash. Fehlt genau
   diese Policy oder passt sie nicht, entscheiden die Regeln, und das Spiel sagt es (Rückfall). Nie still ein anderes Modell. Nach einem
-  Rückfall speichert das Spiel die Regeln als Wahl; liegt die Policy später wieder in `ki/`, im Fenster neu wählen.
+  Rückfall speichert das Spiel die Regeln als Wahl; liegt die Policy später wieder in `ki/`, im Fenster neu wählen. Kommt der Stand aus
+  Version 9 (Übernahme oder Import), sagt die Meldung „stammt aus Version 9 und gilt in Version 10 nicht mehr (neu trainieren)“; neu wählen
+  hilft dann nicht.
 - Die Policy entscheidet nur für Erwachsene unter 67, die keine Hauptfigur und nicht Bürgermeister sind, an deren normalen
   Entscheidungszeitpunkten. Alles andere bleibt bei den Regeln.
 
@@ -54,7 +58,9 @@ Status `experimentell`, bis eine Auswertung nach `training/AUSWERTUNG_V9.md` bes
 57 Zahlen über die eigene Lage: Bedürfnisse, Zufriedenheit, Rücklage in Tagen, Alter, Persönlichkeit, Arbeit, Lohn, öffentliche Zahlen der
 Stadt (freie Stellen `n/(n+200)`, freie Wohnungen `n/(n+20)`, Arbeitslosenquote von gestern, Lohnsteuersatz), Wohnen, Partner, Kinder,
 Freunde, Belastungen und Ereignisse der letzten 30 Tage, Ziel, Tageszeit, Anlass. Die Liste mit Skalen steht in `schema_v2.json`. **Nicht** darin: Namen, Personen-ID, Generation, Geschlecht,
-Herkunfts- oder Einzugsmerkmale (Einzug, Sparbeginn, Eltern), Bezüge aus dem Gedächtnis, Zukunft, Zufallszustand, Privates anderer.
+Herkunfts- oder Einzugsmerkmale (Einzug, Sparbeginn, Eltern), Bezüge aus dem Gedächtnis, Zukunft, Zufallszustand, Privates anderer. Auch
+Erfahrung, offene Handlung und Plan aus Etappe 2 sieht Schema 2 nicht; ein Schema 3 mit diesen Merkmalen ist für Etappe 3 vorgesehen
+(`docs/EXPERIMENTE.md` Abschnitt 8).
 `simtest --kipolicy` prüft das statisch, durch Verändern dieser Felder (Beobachtung bitgleich) und je Personenfeld.
 
 Die Maske ist `erlaubteAktionen` der Regeln. Sie nutzt mehr, als die Person weiß (Marktdaten, Zufriedenheit des Partners, in Version 9

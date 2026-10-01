@@ -1,0 +1,6 @@
+Start 04:37:00 uptime:: 1.23, 2.16, 2.67 sha aad98691cb689361
+A fertig 04:42:26
+B fertig 05:11:44
+C fertig 05:13:02
+diff exit 0
+ALLES FERTIG

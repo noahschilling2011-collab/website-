@@ -1,0 +1,23 @@
+Seeds 1–12 (12); Einwohner Tag 60/100/150/300/365 (Mittel, darunter Kleinstes); Stadt = Tag bis zur Stufe ANLAUF_STUFE (Median, n. e. = nicht erreicht bis 365)
+== normal
+aus  Einw [57, 129, 239, 1007, 1240]  min [26, 101, 209, 863, 1166]  Stadt Tag 113.5  Gründ 314  Pleiten 154  Kasse 1,026,323
+r0   Einw [45, 103, 222, 997, 1274]  min [25, 65, 167, 759, 1202]  Stadt Tag 125.5  Gründ 255  Pleiten 116  Kasse 914,463
+r1   Einw [57, 132, 256, 1107, 1290]  min [26, 86, 209, 961, 1191]  Stadt Tag 113  Gründ 267  Pleiten 120  Kasse 975,635
+r2   Einw [57, 132, 253, 1047, 1278]  min [26, 86, 207, 908, 1181]  Stadt Tag 113  Gründ 312  Pleiten 154  Kasse 981,402
+== schnell
+aus  Einw [62, 164, 334, 1232, 1354]  min [30, 91, 224, 1160, 1239]  Stadt Tag 94.5  Gründ 261  Pleiten 120  Kasse 1,158,942
+r0   Einw [44, 95, 223, 1103, 1313]  min [27, 32, 53, 604, 1193]  Stadt Tag 123  Gründ 264  Pleiten 111  Kasse 989,919
+r1   Einw [66, 167, 331, 1220, 1351]  min [31, 89, 205, 1149, 1284]  Stadt Tag 97.5  Gründ 250  Pleiten 106  Kasse 1,145,804
+r2   Einw [66, 166, 332, 1218, 1400]  min [31, 89, 209, 1154, 1281]  Stadt Tag 97.5  Gründ 277  Pleiten 117  Kasse 1,185,339
+== schnell > normal an Tag 150 / 300; Seed 5 Tag 150 schnell/normal (simtest --wachstum D)
+aus  11/12  12/12  Seed 5: 262 / 218 (grün)
+r0   6/12  7/12  Seed 5: 175 / 182 (ROT)
+r1   11/12  11/12  Seed 5: 262 / 209 (grün)
+r2   11/12  12/12  Seed 5: 267 / 207 (grün)
+== gepaart zu aus: Einwohner Tag 150 / 365 (Mittel der Differenzen), Seeds mit weniger als aus an Tag 150
+normal  r0   Tag 150 -17  Tag 365 34  weniger an Tag 150: 8/12
+normal  r1   Tag 150 17  Tag 365 51  weniger an Tag 150: 5/12
+normal  r2   Tag 150 14  Tag 365 38  weniger an Tag 150: 4/12
+schnell r0   Tag 150 -110  Tag 365 -41  weniger an Tag 150: 12/12
+schnell r1   Tag 150 -3  Tag 365 -3  weniger an Tag 150: 6/12
+schnell r2   Tag 150 -2  Tag 365 46  weniger an Tag 150: 8/12

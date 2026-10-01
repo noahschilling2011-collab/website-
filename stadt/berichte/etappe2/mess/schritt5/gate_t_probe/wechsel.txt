@@ -1,0 +1,24 @@
+neu: SP/ml/e2bau/stadt (stadt.html ac899293429df032), basis: 6c1741e (0b453bf1bb62878a), Seeds 1, 2 Runden
+Runde 1 neu: 01:43:25 Last: 0.03, 0.08, 0.43 fremde>20%: 0
+  exit 0
+═══ Seed 1 ═══
+  ✓ T  365 Tage in 1252 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 1 basis: 01:43:28 Last: 0.10, 0.09, 0.43 fremde>20%: 0
+  exit 0
+═══ Seed 1 ═══
+  ✓ T  365 Tage in 3337 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 2 basis: 01:43:40 Last: 0.39, 0.16, 0.45 fremde>20%: 0
+  exit 0
+═══ Seed 1 ═══
+  ✓ T  365 Tage in 3564 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 2 neu: 01:43:53 Last: 0.59, 0.21, 0.47 fremde>20%: 0
+  exit 0
+═══ Seed 1 ═══
+  ✓ T  365 Tage in 1212 ms (< 5000)
+Gate Phase 0: BESTANDEN
+T neu   1252, 1212 ms, Median 1232; unter 5000 ms: 2 von 2
+T basis 3337, 3564 ms, Median 3450.5
+neu/basis (Mediane) 0.357

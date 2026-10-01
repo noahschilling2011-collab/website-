@@ -13,6 +13,11 @@ async function hausOeffnen(ctx, page, ohne = -1) {
     await page.evaluate(() => { const h = document.querySelector('#karte h2'); if (h) h.__alt = true; });
     await H.tippen(ctx, page, l.x, l.y); await page.waitForTimeout(350);
     if (await page.evaluate(() => { const h = document.querySelector('#karte h2'); return !document.getElementById('karte').hidden && h && !h.__alt && !!document.querySelector('#karte .typ-marke'); })) return l;
+    // Version 10 (Etappe 2): In der Teststadt steht vor dem ersten Gebäude jetzt eine Figur; das Tippen öffnet ihre Personenkarte (richtig so),
+    // und die Karte deckt am Handy die nächsten Ziele zu. Eine Karte, die keine Hauskarte ist, wird darum vor dem nächsten Versuch geschlossen
+    if (await page.evaluate(() => { const k = document.getElementById('karte'); if (k.hidden) return false; document.getElementById('karte-zu').click(); return true; })) {
+      await page.waitForFunction(() => document.getElementById('karte').hidden, null, { timeout: 5000 }).catch(() => {}); await page.waitForTimeout(150);
+    }
   }
   return null;
 }

@@ -1,0 +1,8 @@
+Start 02:51:39  02:51:39 up  4:36,  0 user,  load average: 0.43, 0.64, 1.97
+a sim 386c5ec814feb302, b sim 0b5f143bb948bcbb, GED 1/1, Stärke 1.5/1.5, ERF_HALB 180/180, 730 Tage in Tagesschritten, Seeds 1,2,3
+ok   Seed 1: 730 von 730 Tagen gleich (a ohne Beobachter = a mit = b mit) (Einwohner 1600 / 1600 / 1600); Meldungen 27778, warum gleich 27778, anders 0; Sätze „Ohne …“ 28197, mit Rechnung 28197, genannte Wahl vorn 28197, aus den zwei gezeigten Zeilen nachrechenbar 28197 (davon „knapp über“ 13)
+ok   Seed 2: 730 von 730 Tagen gleich (a ohne Beobachter = a mit = b mit) (Einwohner 1649 / 1649 / 1649); Meldungen 11832, warum gleich 11832, anders 0; Sätze „Ohne …“ 11932, mit Rechnung 11932, genannte Wahl vorn 11932, aus den zwei gezeigten Zeilen nachrechenbar 11932 (davon „knapp über“ 6)
+ok   Seed 3: 730 von 730 Tagen gleich (a ohne Beobachter = a mit = b mit) (Einwohner 1502 / 1502 / 1502); Meldungen 9816, warum gleich 9816, anders 0; Sätze „Ohne …“ 9853, mit Rechnung 9853, genannte Wahl vorn 9853, aus den zwei gezeigten Zeilen nachrechenbar 9853 (davon „knapp über“ 7)
+gesamt: 3 von 3 Seeds Tag für Tag gleich; Meldungen 49426, warum (ohne rechnung) gleich 49426, anders 0; Sätze 49982, mit Rechnung 49982, genannte Wahl in der Rechnung vorn 49982, aus den gezeigten Zeilen nachrechenbar 49982 (davon „knapp über“ 26)
+ALLES GLEICH UND NACHRECHENBAR
+exit 0 Ende 02:52:19

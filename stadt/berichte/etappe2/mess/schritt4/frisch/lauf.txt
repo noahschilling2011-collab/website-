@@ -1,0 +1,4 @@
+simtest_alle Start: 00:25:14 UTC | uptime:: 3.26, 3.92, 3.47 | fremde>20%: 0
+simtest_alle Ende (exit 0): 00:30:19 UTC | uptime:: 3.14, 3.60, 3.46 | fremde>20%: 0
+tests/alle.sh Start: 00:30:19 UTC | uptime:: 3.14, 3.60, 3.46 | fremde>20%: 0
+tests/alle.sh Ende (exit 0): 00:59:04 UTC | uptime:: 3.77, 3.87, 3.91 | fremde>20%: 0

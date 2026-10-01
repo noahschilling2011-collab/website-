@@ -1,4 +1,5 @@
-// Stadt erweitern (Version 7) im Browser: Die Karte wächst mitten im Spiel (seit Version 9, Teil 5 Seed 40, Tag 242 → 243, 72 → 80; seit
+// Stadt erweitern (Version 7) im Browser: Die Karte wächst mitten im Spiel (seit Version 10 Seed 2, Tag 266 → 267, 72 → 80; seit
+// Version 9, Teil 5 Seed 40, Tag 242 → 243, 72 → 80; seit
 // Version 9, Teil 4 Seed 5, Tag 114 → 115, 96 → 104; seit
 // Version 9, Teil 3 Seed 1, Tag 201 → 202, 80 → 88; seit
 // Version 9 Seed 12, Tag 307 → 308, 80 → 88; seit der
@@ -23,7 +24,7 @@ const ok = (bed, text) => { console.log((bed ? 'OK   ' : 'FEHL ') + text); if (!
     const ev = (f, a) => page.evaluate(f, a);
     const bilder = () => ev(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
     const tag = reduziert ? ' (reduziert)' : '';
-    await page.goto(U.HOST + '/stadt.html?debug&seed=40&tage=241&neu', { timeout: 300000 });
+    await page.goto(U.HOST + '/stadt.html?debug&seed=2&tage=265&neu', { timeout: 300000 });
     await page.waitForFunction(() => globalThis.__stadt && globalThis.__stadtDebug, null, { timeout: 300000 });
     await ev(() => { __stadt.setzeTempo(0); for (const d of document.querySelectorAll('dialog[open]')) d.close(); });
     await page.waitForTimeout(1200);
@@ -48,11 +49,14 @@ const ok = (bed, text) => { console.log((bed ? 'OK   ' : 'FEHL ') + text); if (!
     // Seit Teil 5 (Tech-Firmen früher und mehr) wächst in den Seeds 1–18 keine Karte mehr allein in der Stufe Stadt (Seed 6 an Tag 112 in der
     // Nacht, in der die Stadt Stadt wird); in den Seeds 1–42 (bis Tag 400) allein in der Stufe Stadt nur Seed 40, an Tag 243 von 72 auf 80
     // (v9/t2/wachsen_allein9.mjs und v9/t6/wachsen400.mjs; Protokolle v9/t6/wachsen_teil5*.log)
-    await ev(() => { const S = __stadt.S(); let n = 0; while (!(S.tag === 242 && S.stunde === 23) && n++ < 60) { __stadt.schritt(); __stadt.nachSchritten(); } });
+    // Version 10 (Etappe 2: Gedächtnis, Erfahrung, Plan) läuft die Stadt wieder anders; Seed 40 wächst dort nicht mehr allein. In den Seeds 1–30
+    // (bis Tag 400) allein in der Stufe Stadt: Seed 2 an Tag 267 von 72 auf 80, Seed 5 an Tag 236 (120 → 128), Seed 8 an Tag 198 (88 → 96)
+    // (dasselbe Skript als ml/e2bau/werkzeug/s4_wachsen400.mjs; Protokoll ml/e2bau/mess/schritt4/momente/wachsen_1_30.txt)
+    await ev(() => { const S = __stadt.S(); let n = 0; while (!(S.tag === 266 && S.stunde === 23) && n++ < 60) { __stadt.schritt(); __stadt.nachSchritten(); } });
     await page.waitForTimeout(3500);
     await page.waitForFunction(() => !__stadt.G.test.zeichen.visible, null, { timeout: 15000 }); await bilder();
     const vor = await zustand();
-    ok(vor.karte === 72 && vor.tag === 242, `vorher Tag ${vor.tag}, 23 Uhr: Karte ${vor.karte}, ${vor.stufe}, Draw Calls ${vor.calls}, Nebel ${vor.nebel.join('–')}, Kamera-Abstand bis ${vor.maxD}${tag}`);
+    ok(vor.karte === 72 && vor.tag === 266, `vorher Tag ${vor.tag}, 23 Uhr: Karte ${vor.karte}, ${vor.stufe}, Draw Calls ${vor.calls}, Nebel ${vor.nebel.join('–')}, Kamera-Abstand bis ${vor.maxD}${tag}`);
     // Eine Stunde weiter: um Mitternacht wächst die Karte. Ereignis-Zeichen (ein Draw Call, kein neues Objekt) erst vergehen lassen
     await ev(() => { __stadt.schritt(); __stadt.nachSchritten(); });
     await page.waitForTimeout(3500);

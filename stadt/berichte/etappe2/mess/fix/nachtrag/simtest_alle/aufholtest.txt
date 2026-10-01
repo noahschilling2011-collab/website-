@@ -1,0 +1,13 @@
+Seed 1, Tag 200 → 290:   stündlich 965 ms   in Tagesschritten 375 ms (2.6× schneller)
+  einwohner          stündlich      1182   Tagesschritte      1144
+  gebaeude           stündlich       193   Tagesschritte       216
+  gruendungen        stündlich       234   Tagesschritte       250
+  pleiten            stündlich        84   Tagesschritte       110
+  freieStellen       stündlich       353   Tagesschritte       298
+  zufriedenheit      stündlich     69.82   Tagesschritte     70.35
+  arbeitslosenquote  stündlich      0.01   Tagesschritte      0.02
+  ok   mit Gedächtnis, Erfahrung und Plan (R.GED = 1, Stärke 1.5)
+  ok   (a) ab Tag 200 0 Uhr, Tagesschritte wie aufholen(): 1 × 90 gegen 3 × 30 Tage (Tag 290 0 Uhr, 1144 / 1144 Einw.) bitgleich (ce6e2790f0343475 / ce6e2790f0343475); offene Handlungen an den Grenzen Tag 230 0 Uhr: 311, Tag 260 0 Uhr: 354; je Stück gelernt 111 / 190 / 239, Pläne beendet 572 / 690 / 872
+  ok   (b) ab Tag 200 13 Uhr, rein stündlich: 1 × 90 gegen 3 × 30 Tage (Tag 290 13 Uhr, 1185 / 1185 Einw.) bitgleich (7bfdadc127b0e033 / 7bfdadc127b0e033); offene Handlungen an den Grenzen Tag 230 13 Uhr: 322, Tag 260 13 Uhr: 388; je Stück gelernt 121 / 178 / 258, Pläne beendet 571 / 648 / 843
+  Hinweis (c) ab Tag 200 13 Uhr wie aufholen(): 1 × 90 gegen 3 × 30 Tage nicht bitgleich (1116 / 1163 Einw.; bekannte Näherung, docs/GRENZEN.md; keine Prüfung)
+Alle Aufhol-Prüfungen bestanden

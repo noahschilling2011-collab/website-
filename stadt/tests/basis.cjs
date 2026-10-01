@@ -1,10 +1,11 @@
 // Erzeugt den Teststand der KI-Code- und Übernahme-Tests (ersetzt die früher eingecheckten basis_v6…v9.json, je über 1 MB):
 // Seed 2, 420 Tage, 8 Uhr, eine Programmierkraft der größten Tech-Firma als Hauptfigur (wie damals pruef2/kicode/basis.cjs mit der Fassung
 // 797107a, Spielstand-Version 4), dann Schritt für Schritt „Stadt übernehmen“ mit jeder späteren Fassung aus der Git-Geschichte (414ebab → 5,
-// bc7247a → 6, ffa1d88 → 7, 31ce452 → 8) und zuletzt mit stadt.html dieses Ordners (→ 9), wie die früheren tests/basis_v6.cjs … basis_v9.cjs.
+// bc7247a → 6, ffa1d88 → 7, 31ce452 → 8, 6c1741e → 9) und zuletzt mit stadt.html dieses Ordners (→ 10), wie die früheren tests/basis_v6.cjs …
+// basis_v9.cjs. Version 10 (Etappe 2): basis_v9.json kommt seitdem aus der Fassung 6c1741e, basis_v10.json ist der Teststand dieser Datei.
 // Die alten Fassungen kommen per Route unter stadt.orig.html (gleiche Herkunft, derselbe Speicherplatz). Nachgeprüft: bis auf den Zeitstempel
 // zuletztGelaufen gleich den früher eingecheckten Dateien (Vergleich mit --vergleich).
-// Ausgabe: AUSGABE/basis/basis_v4.json … basis_v9.json und basis_info.json (Hauptfigur). Braucht den Seitenserver (tests/alle.sh).
+// Ausgabe: AUSGABE/basis/basis_v4.json … basis_v10.json und basis_info.json (Hauptfigur). Braucht den Seitenserver (tests/alle.sh).
 //   node tests/basis.cjs [--vergleich <ordner mit basis.json, basis_v4.json, basis_v6.json …>]
 const U = require('./umgebung.cjs');
 const fs = require('fs');
@@ -64,8 +65,8 @@ async function uebernehmen(b, text, v) {
   stand('basis_v4.json', text); stand('basis_info.json', JSON.stringify(info));
   console.log(`v4tech (${U.FASSUNGEN.v4tech[0].slice(0, 7)}): Version ${JSON.parse(text).version}, Tag ${JSON.parse(text).werte.tag}, Hauptfigur ${JSON.stringify(info)}`);
   if (JSON.parse(text).version !== 4 || !info.ok) { console.log('FEHL Grundstand'); process.exitCode = 1; }
-  // 2. Übernahmen bis Version 9
-  for (const [v, n] of [['v5', 5], ['v6', 6], ['v7', 7], ['v8', 8], [null, 9]]) {
+  // 2. Übernahmen bis Version 10 (Version 9 aus 6c1741e)
+  for (const [v, n] of [['v5', 5], ['v6', 6], ['v7', 7], ['v8', 8], ['v9', 9], [null, 10]]) {
     const r = await uebernehmen(b, text, v);
     const d = JSON.parse(r.neu);
     console.log(`${v ? v + ' (' + U.FASSUNGEN[v][0].slice(0, 7) + ')' : 'stadt.html'}: Dialog ${r.offen}, Version ${d.version}, Tag ${d.werte.tag} ${d.werte.stunde} Uhr, ${d.werte.einwohner} Einwohner`);

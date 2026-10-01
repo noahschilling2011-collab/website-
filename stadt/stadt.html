@@ -191,6 +191,20 @@
   #buch-knopf:focus-visible { outline-offset: -2px; }     /* das Stadtbuch schneidet über den Rand Hinausragendes ab */
   #buch-knopf .pfeil { flex: none; margin-left: auto; transition: transform 200ms cubic-bezier(.2,.8,.2,1); color: var(--text-leise); }
   #buch-knopf[aria-expanded="false"] .pfeil { transform: rotate(-90deg); }
+  /* Etappe 2 (Schritt 3): im Kopf des Stadtbuchs rechts der Knopf „heute anders“ (Liste als Karte). Er macht die Spalte nicht höher; schmal
+     (Tablet, Handy) nur Symbol und Zahl, der Name steht im aria-label und im title. Handy quer: dort ist der Kopf des Stadtbuchs voll (Befund
+     „Stadtbuch 99+ neu“), der Knopf steht dann in der ersten Zeile der Hauptfiguren (#erf-knopf-quer, eigene Regel unten) */
+  .buch-kopf { display: flex; align-items: center; flex: none; min-width: 0; }
+  .buch-kopf #buch-knopf { flex: 1 1 auto; width: auto; min-width: 0; }
+  .erf-knopf { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 30px; margin: 0 var(--s2) 0 var(--s1); padding: 0 10px;
+    border: 1px solid var(--linie); border-radius: 999px; background: transparent; color: var(--text); font: inherit; font-size: var(--klein);
+    line-height: 1.2; white-space: nowrap; cursor: pointer; transition: background-color var(--dauer) ease-out, border-color var(--dauer) ease-out; }
+  .erf-knopf:hover { background: var(--hell-2); border-color: var(--hell-5); }
+  .erf-knopf .sym { width: 15px; height: 15px; color: var(--akzent); }
+  .erf-knopf .erf-zahl { color: var(--text-stark); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .erf-knopf .erf-wort { color: var(--text-leise); }
+  .erf-knopf:hover .erf-wort { color: var(--text); }
+  #erf-knopf-quer { display: none; }
   .neu-zahl { padding: 0 var(--s2); border-radius: 999px; background: var(--akzent-leise); color: var(--akzent); font-size: 0.78rem;
     font-weight: 500; line-height: 1.6; font-variant-numeric: tabular-nums; white-space: nowrap; }   /* zweizeilig schob sie quer die Spalte in die Zahlen */
   #buch-liste { list-style: none; margin: 0; padding: 0 var(--s4) var(--s1); overflow-y: auto; font-size: var(--klein);
@@ -282,6 +296,42 @@
     background: var(--karte); border: 1.5px solid var(--text-leise); }
   .lebenslauf li:last-child::before { background: var(--text-leise); }   /* das Neueste */
   .lebenslauf .tag { color: var(--text-leise); font-variant-numeric: tabular-nums; }
+  /* Etappe 2 (Schritt 3): Lebenslauf in Langzeit und Kurzzeit, je Erinnerung Fakt und Verweis („weil: …“) */
+  .mem-kopf { margin: var(--s2) 0 4px !important; font-size: var(--klein); color: var(--text-leise); }
+  .lebenslauf.lang li:last-child::before { background: var(--karte); }   /* das Neueste steht in der Kurzzeit */
+  .mem-mehr { display: block; color: var(--text-leise); font-size: var(--klein); line-height: 1.4; }
+  /* Erfahrung und Plan: je Zeile ein Satz mit Zahl; „Warum?“ klappt die Rechnung auf (Summanden je Handlung) */
+  .ged { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; line-height: 1.45; }
+  .ged .was { color: var(--text-leise); }
+  .ged strong { font-weight: 500; color: var(--text-stark); }
+  .unter-liste { list-style: none; margin: 2px 0 0; padding: 0 0 0 var(--s3); display: grid; gap: 3px; border-left: 1px solid var(--hell-4); }
+  #karte .ged-hinweis { margin-top: var(--s2); font-size: var(--klein); line-height: 1.45; }
+  .warum { margin: var(--s2) 0 0; padding: var(--s3); border-radius: 10px; background: var(--ebene1); border: 1px solid var(--linie);
+    font-size: var(--klein); line-height: 1.45; }
+  #karte .warum p { margin: 0 0 6px; }
+  #karte .warum p:last-child { margin-bottom: 0; }
+  .warum strong { font-weight: 600; color: var(--text-stark); }
+  .warum-liste { list-style: none; margin: var(--s2) 0; padding: 0; display: grid; gap: 2px; }
+  .warum-liste li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--s2); padding: 4px 6px; border-radius: 6px; }
+  .warum-liste li.gewaehlt { background: var(--akzent-leise); }
+  .warum-liste .w-summe { text-align: right; font-variant-numeric: tabular-nums; color: var(--text-stark); }
+  .warum-liste .w-teile { grid-column: 1 / -1; color: var(--text-leise); font-variant-numeric: tabular-nums; }
+  .warum-liste li.gewaehlt .w-teile { color: var(--text); }
+  .w-marke { margin-left: 4px; padding: 0 6px; border-radius: 999px; background: var(--hell-3); color: var(--text); font-size: 0.72rem; white-space: nowrap; }
+  .gewaehlt .w-marke { background: var(--akzent); color: var(--akzent-auf); }
+  .w-rechnung { color: var(--text-leise); font-variant-numeric: tabular-nums; }   /* Rechnung eines Vergleichs hinter „Ohne … hätte …“ */
+  /* Liste „Heute anders entschieden“ (Karte): Uhrzeit, Name, Grund, „statt … → …“ */
+  .erf-liste { list-style: none; margin: var(--s2) 0 0; padding: 0; }
+  .erf-liste > li { padding: var(--s2) 0; border-bottom: 1px solid var(--hell-1); }
+  .erf-liste > li:last-child { border-bottom: 0; }
+  .erf-kopf { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--s2); }
+  .erf-kopf .zeit { color: var(--text-leise); font-variant-numeric: tabular-nums; }
+  .erf-grund { padding: 0 var(--s2); border-radius: 999px; background: var(--hell-3); color: var(--text); font-size: 0.75rem; line-height: 1.6; }
+  .erf-grund.betont { background: var(--akzent-leise); color: var(--akzent); }
+  #karte .erf-statt { margin: 2px 0 0; }
+  .erf-fuss { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s2); }
+  .erf-teile { min-width: 0; font-size: var(--klein); line-height: 1.4; }
+  .erf-fuss .knopf { flex: none; }
   .familie { display: grid; grid-template-columns: 5.5em 1fr; gap: 6px var(--s2); margin: 0; }
   .familie dt { color: var(--text-leise); }
   .familie dd { margin: 0; }
@@ -342,6 +392,10 @@
   .bedienung { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px var(--s3); margin: 0 0 var(--s2); font-size: var(--klein); }
   .bedienung dt { color: var(--text-leise); }
   .bedienung dd { margin: 0; }
+  /* Etappe 2: Erklärung des Knopfs „heute anders“ nur dort, wo er nur Symbol und Zahl zeigt (Befund Bedienung der Schlussprüfung: am Handy
+     hilft der title nicht); breit steht „anders“ am Knopf, und die Hilfe muss bei 1280 × 800 ohne Scrollen passen (otest/hilfehoehe) */
+  .bedienung .nur-schmal { display: none; }
+  .bedienung .sym { width: 14px; height: 14px; vertical-align: -2px; color: var(--akzent); }
   .legende { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: var(--klein); }
   .legende li { display: grid; grid-template-columns: 20px minmax(0, 1fr); column-gap: 10px; align-items: start; line-height: 1.45; }
   .legende strong { font-weight: 500; color: var(--text-stark); }
@@ -544,6 +598,17 @@
   @media (min-width: 721px) and (max-width: 1060px) { :root { --rechts-hoehe: calc(100svh - 120px); } }
   /* Tablet: rechte Spalte schmaler, Stadtbuch startet eingeklappt (Skript) */
   @media (min-width: 721px) and (max-width: 900px) { :root { --rechts-breite: 320px; } }
+  @media (max-width: 900px), (max-height: 500px) and (orientation: landscape) {   /* Etappe 2: „heute anders“ nur als Symbol und Zahl */
+    .erf-knopf .erf-wort { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    #erf-knopf { padding: 0 var(--s2); margin-right: 6px; }
+    .bedienung .nur-schmal { display: block; }             /* Hilfe erklärt dann den Knopf */
+  }
+  @media (max-height: 500px) and (orientation: landscape) {   /* Etappe 2: Handy quer in der ersten Zeile der Hauptfiguren, so hoch wie die Zeile */
+    #erf-knopf { display: none; }
+    #haupt .kopfzeile { column-gap: var(--s2); }            /* der KI-Status steht hier ohnehin in der zweiten Zeile */
+    #erf-knopf-quer { display: inline-flex; gap: 3px; min-height: 24px; margin: 0 0 0 auto; padding: 0 5px; }
+    #erf-knopf-quer .sym { width: 12px; height: 12px; }
+  }
   /* Tablet hochkant: Karten als Blatt unten über dem Tempo, gut ein Drittel hoch. Der Startblick rückt die Stadt dafür nach
      oben (freiFlaeche im Skript): so bleibt bei offener Karte der größere Teil der Stadt frei */
   @media (min-width: 721px) and (max-width: 900px) and (orientation: portrait) {
@@ -679,6 +744,8 @@
   <symbol id="s-urne" viewBox="0 0 24 24"><path d="M4 11.5h16v8.5H4z"/><path d="M8 11.5V4h8v7.5"/><path d="m10.3 7.6 1.3 1.3 2.3-2.6"/></symbol>
   <symbol id="s-auto" viewBox="0 0 24 24"><path d="M4 15.5v-3l2.2-4.3c.3-.6.9-.9 1.5-.9h8.6c.6 0 1.2.3 1.5.9L20 12.5v3"/><path d="M3.5 12.5h17v4.5h-17z"/><circle cx="7.5" cy="17.5" r="1.7"/><circle cx="16.5" cy="17.5" r="1.7"/></symbol>
   <symbol id="s-rathaus" viewBox="0 0 24 24"><path d="M3.5 20.5h17"/><path d="M5.5 20.5V11h13v9.5"/><path d="M3.5 11 12 6.5l8.5 4.5"/><path d="M12 6.5v-3h3"/><path d="M10 20.5v-4.5h4v4.5"/></symbol>
+  <!-- Etappe 2 (Schritt 3): Weiche – anders entschieden (ein Weg, zwei Richtungen) -->
+  <symbol id="s-weiche" viewBox="0 0 24 24"><path d="M12 20.5V14"/><path d="M12 14 6.5 8.5M12 14l5.5-5.5"/><path d="M6.5 13V8.5H11M13 8.5h4.5V13"/></symbol>
 </svg>
 <noscript><div class="hinweis">Für STADT wird JavaScript benötigt.</div></noscript>
 <div id="hinweis" class="hinweis" role="status" hidden></div>
@@ -711,13 +778,18 @@
 
 <div id="rechts">
 <section id="haupt" class="glas" aria-label="Hauptfiguren">
-  <div class="kopfzeile"><strong>Hauptfiguren</strong><span id="ki-status" class="ki-status" role="status">KI wird gesucht …</span></div>
+  <div class="kopfzeile"><strong>Hauptfiguren</strong><!-- Etappe 2 (Schritt 3): „heute anders“ am Handy quer hier (im Stadtbuch-Kopf fehlt dort der Platz) -->
+    <button type="button" class="erf-knopf" id="erf-knopf-quer" hidden><svg class="sym" aria-hidden="true"><use href="#s-weiche"/></svg><span class="erf-zahl">0</span></button><span id="ki-status" class="ki-status" role="status">KI wird gesucht …</span></div>
   <ul id="haupt-liste"></ul>
 </section>
 <aside id="stadtbuch" class="glas" aria-label="Stadtbuch">
+  <div class="buch-kopf">
   <button type="button" id="buch-knopf" aria-expanded="true" aria-controls="buch-liste">
     <span>Stadtbuch</span><span class="neu-zahl" id="buch-neu" hidden><span id="buch-neu-zahl"></span><span class="neu-wort"> neu</span></span><svg class="pfeil" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
   </button>
+  <!-- Etappe 2 (Schritt 3): heute anders entschieden wegen Erfahrung oder Plan; öffnet die Liste als Karte (Zahl vom Skript; schmal nur Symbol und Zahl) -->
+  <button type="button" class="erf-knopf" id="erf-knopf" hidden><svg class="sym" aria-hidden="true"><use href="#s-weiche"/></svg><span class="erf-zahl" id="erf-zahl">0</span><span class="erf-wort"> anders</span></button>
+  </div>
   <ol id="buch-liste" reversed></ol>
 </aside>
 </div>
@@ -843,6 +915,7 @@
     <dt>Maus</dt><dd>Ziehen dreht, rechts ziehen (oder mit Umschalt, Strg oder ⌘) verschiebt, Rad oder mittlere Taste zoomt. Klick auf ein Gebäude oder eine Figur öffnet ihre Karte.</dd>
     <dt>Touch</dt><dd>Ein Finger dreht, zwei Finger zoomen und verschieben, Tippen öffnet die Karte.</dd>
     <dt>Tasten</dt><dd>Leertaste: Pause und weiter. Escape: Karte schließen.</dd>
+    <dt class="nur-schmal">Weiche</dt><dd class="nur-schmal"><svg class="sym" aria-hidden="true"><use href="#s-weiche"/></svg> mit Zahl beim Stadtbuch (Handy quer: bei den Hauptfiguren): So oft haben Bewohner heute wegen Erfahrung oder Plan anders entschieden. Tippen öffnet die Liste mit „Warum?“.</dd>
   </dl>
   <p class="leise">Die Kamera bewegt sich nur durch dich oder „Zeigen“ in einer Hauskarte. Am Handy klappt der Pfeil im Kartenkopf die Karte ein und auf.</p>
   <div class="hilfe-spalten">
@@ -928,8 +1001,13 @@
 // Die Darstellung liest den Zustand S und ändert ihn nur über die Funktionen in StadtSim.
 // =====================================================================================
 (function (G) {
+// Eingebaute Objekte als lokale Namen (dieselben Objekte, also dieselben Ergebnisse). In Node läuft dieser Block in einem vm-Kontext
+// (tools/simtest.mjs, Werkzeuge); dort geht jeder Zugriff auf einen globalen Namen wie Math über den Kontext und kostet etwa 0,25 µs
+// (gemessen beim Optimieren, Etappe 2), ein lokaler Name nicht. Im Browser ändert das kaum etwas.
+const { Math, Object, Array, Number, String, Boolean, JSON, Error, Map, Set, Infinity, NaN, ArrayBuffer, DataView,
+  Uint8Array, Uint16Array, Uint32Array, Int16Array, Int32Array, Float32Array, Float64Array } = G;
 
-const VERSION = 9;                    // 2: Hauptfiguren, Tagebuch, KI-Anfragen (Phase 4); 3: Bauhof, Baustellen in Arbeitstagen, Kisten;
+const VERSION = 10;                   // 2: Hauptfiguren, Tagebuch, KI-Anfragen (Phase 4); 3: Bauhof, Baustellen in Arbeitstagen, Kisten;
                                       // 4: Tech-Firmen (Software, Handys, Computer), Käufe der Bewohner, Anbau über den Bauhof;
                                       // 5: Stadtregierung (Grundsicherung und gemeinnützige Arbeit je Person, Summen in S.stat.regierung);
                                       // 6: Schritt 2 der Stadtregierung (Wohneigentum, Beitragstage und Kita-Platz je Person, S.regierung.schritt2,
@@ -939,6 +1017,11 @@ const VERSION = 9;                    // 2: Hauptfiguren, Tagebuch, KI-Anfragen 
                                       //    Bund (Rolle beim Bund und Dienstende je Person, S.bund, S.stat.bund, Kaserne und Dienststelle);
                                       // 8: Tech-Firmen wachsen bis zum Hochhaus, Autowerke auf eigenem Gelände, Autos der Bewohner (auch aus dem
                                       //    Umland), Tag der Eröffnung je Tech-Firma, eigener Zufallsstrom S.rsAuto, S.stat.auto
+                                      // 9: Rathaus und Bürgermeister, Schulen (Schulplatz je Person), Haushalt, Wachstum, Tech-Firmen früher (Markt
+                                      //    und Kraft je Betrieb)
+                                      // 10: Etappe 2: Gedächtnis mit Kurz- und Langzeit in denselben 8 Plätzen, je Erinnerung Fakt und Verweis statt
+                                      //    des Namens (memName entfällt, Noahs Entscheidung 1); Erfahrung, offene Handlung, Plan und letzte Entscheidung
+                                      //    je Person (PF_GED), S.stat.ged. Eine Policy aus Etappe 1 (Version 9) gilt nicht mehr (neu trainieren)
 
 // ─── Karte ───────────────────────────────────────────────────────────────────────────
 // Die Karte wächst (Version 7): S.karte × S.karte Felder, Mitte S.mitte = S.karte / 2. Wächst sie um einen Ring, rücken alle
@@ -1078,6 +1161,30 @@ const R = {
   ELEND: 20, ELEND_TAGE: 7,                // Wegziehen: Zufriedenheit unter 20 seit 7 Tagen
   UNZUF: 40, UNZUF_TAGE: 14,               // Trennen: beide 14 Tage unzufrieden
   FREUNDE_MAX: 5, MEM: 8,
+  // Etappe 2: Gedächtnis, Erfahrung, Plan (Annahmen; VERGLEICH.md Abschnitt 3 mit Noahs Entscheidungen). GED 0 = Tag für Tag wie 6c1741e
+  // (zusammen mit OPFER_FREI 0). GED_STAERKE: Faktor auf die Summanden aus Erfahrung und Plan in entscheide und zielWaehlen (1 = Entwurf C;
+  // Standard 1,5: Noahs Entscheidung 9 – von den stärkeren Stufen (1,5–4, Kandidaten in KALIBRIERUNG.md Teil E), die alle Gates halten, die,
+  // bei der Gate 7 in den meisten Städten gewertet wird (damals 58 von 80 statt 26 bei Stufe 4; mit Verblassen 55 von 80); Noahs Entscheidungen
+  // 4, 8 und 9, KALIBRIERUNG.md Teil F).
+  // Gedächtnis: die ersten MEM_KURZ Plätze sind Kurzzeit (der Reihe nach), die übrigen Langzeit; was aus der Kurzzeit fällt und mindestens
+  // MEM_SCHWELLE bedeutet (M_BED), verdrängt in der Langzeit den Platz mit der kleinsten Bedeutung − Alter × MEM_VERBLASSEN, wenn es mehr zählt.
+  // Erfahrung je ERF_AKTION und Lage (Geld knapp: Bedürfnis Geld unter ERF_KNAPP): Frist in Tagen, Ergebnis ohne und mit schlechter Folge
+  // (−31 … 31 Punkte), Sicherheit nach Zahl der Beobachtungen (höchstens 3). Plan: Rücklage vor jeder Gründung, für die sie gilt
+  // (PLAN_RUECKLAGE; Kosten + PLAN_RESERVE Tageskosten, doppelt nach schlechter Gründungserfahrung; nach einer Pleite zusätzlich
+  // PLEITE_WARTE × (0,5 + Sparsamkeit) Tage nach der Sperre); fehlt sie, zählt Gründen PLAN_BREMSE weniger (mit Ziel „eigener Laden“ genau
+  // der Zielbonus), wer dafür spart, kündigt um PLAN_SPAREN ungern; Abbruch bei so schlechter Gründungserfahrung (PLAN_ERF_ABBRUCH,
+  // mindestens 2 Beobachtungen).
+  // PLAN_RUECKLAGE: für wen die Rücklage (samt Wartezeit) gilt: 0 jeder Gründer immer (Entscheidung 2), 1 jeder Gründer, aber erst ab der Stufe
+  // ANLAUF_STUFE (nach dem Anlauf; Standard, Noahs Entscheidung 6), 2 nur nach eigener Pleite oder schlechter Gründungserfahrung
+  GED: 1, GED_STAERKE: 1.5,
+  MEM_KURZ: 3, MEM_SCHWELLE: 30, MEM_VERBLASSEN: 0.1,
+  ERF_KNAPP: 50, ERF_FRIST: [180, 30, 30, 60], ERF_GUT: [12, 8, 8, 10], ERF_SCHLECHT: [-30, -20, -24, -20], ERF_SICHER: [0, 0.5, 0.75, 1],
+  PLAN_RESERVE: 20, PLAN_BREMSE: 30, PLAN_SPAREN: 15, PLAN_ERF_ABBRUCH: -20, PLEITE_WARTE: 120, PLAN_RUECKLAGE: 1,
+  // ERF_HALB (Noahs Entscheidung 10, VERBLASSEN.md): Erfahrung verblasst. Alle ERF_HALB / 15 Tage (je Person versetzt) verliert jede Erfahrung
+  // einen Punkt zur 0 hin, bei 0 ist sie vergessen: eine Pleite (−30) wirkt nach ERF_HALB Tagen halb so stark und ist nach doppelt so vielen
+  // vergessen. 0 = kein Verblassen (wie vor Entscheidung 10). Standard 180: von den geprüften 180, 360, 540, die alle Bedingungen halten,
+  // der mit den meisten Wiedergründungen nach einer Pleite; keiner erreicht die Hälfte des Werts ohne Erfahrung (VERBLASSEN.md Teil B)
+  ERF_HALB: 180,
 
   BUCH_MAX: 500,
   START_BUDGET: 6000,
@@ -1158,6 +1265,9 @@ const R = {
   KURZ: 3,                      // S7 (S. 119): Haft bis 3 Spieltage (gut 3 Monate) gilt als kurz, eigene Abteilung (S-A16)
   HAFT_WOHNEN: 30, HAFT_ZUF: 20,   // S-A17: in Haft Wohnen 30, Zufriedenheit 20 tiefer
   OPFER_TAGE: [0, 10, 20, 10], OPFER_ZUF: [0, 5, 10, 5], OPFER_WOHNEN: 20,   // S-A18: Opfer: so lange, so viel weniger Zufriedenheit
+  OPFER_FREI: 1,                // Wohnungseinbruch: ein Haushaltsvorstand in Haft ist kein Opfer (wie jedes Opfer); 0 = wie 6c1741e (nur für Vergleiche)
+  HAFT_EROEFFNUNG: 1,           // Etappe 2 (Befund): Eröffnet der Betrieb, während der Besitzer in Haft ist, fängt er erst nach der Entlassung dort an
+                                // (haftEnde, wie beim Haftantritt); 0 = wie 6c1741e (nur für Vergleiche)
   TILGUNG: [50, 100, 150],      // S-A21: Tilgungsfristen 5, 10, 15 Jahre (§ 46 BZRG, vereinfacht)
   RUECKFALL_TAGE: 30,           // nur Messung: neue Verurteilung binnen 3 Jahren nach der Entlassung
   LAND_BAUT: 1,                 // 1: das Land baut Wache und Anstalt (0 und KRIM_BASIS 0: Sicherheit aus, nur für Vergleiche in tools/simtest.mjs)
@@ -1295,6 +1405,8 @@ const M = { EINGEZOGEN: 1, JOB: 2, JOB_WEG: 3, GEKUENDIGT: 4, FREUND: 5, PARTNER
   SCHULE_EIN: 25, SCHULE_WECHSEL: 26, SCHULE_AB: 27 };   // Schule (Version 9): eingeschult, auf die weiterführende Schule, Abschluss (Bezug: Schule, −1: außerhalb)
 // Bezug je Code: 'p' = Person, 'g' = Gebäude, 'z' = Ziel
 const M_BEZUG = ['', 'g', 'g', 'g', 'g', 'p', 'p', 'p', 'p', 'g', 'g', 'z', 'z', 'p', '', 'g', 'p', 't', 't', 'g', '', 'p', 'g', 'g', 'g', 'g', 'g', 'g'];
+// Etappe 2: Bedeutung je Code (0–100, Annahme aus Entwurf C; fest, kein Byte je Person). Nur für die Auswahl, was im Gedächtnis bleibt
+const M_BED = [0, 20, 35, 60, 45, 30, 70, 70, 80, 70, 85, 20, 30, 75, 40, 60, 50, 50, 70, 75, 60, 70, 50, 70, 55, 30, 30, 40];
 
 // Ziele
 const Z = { WOHNUNG: 1, JOB: 2, FAMILIE: 3, LADEN: 4, FREUNDE: 5, RUHE: 6 };
@@ -1305,6 +1417,24 @@ const A = { WOHNUNG: 1, JOB: 2, WECHSEL: 3, KUENDIGEN: 4, FREI: 5, FREUNDE: 6, P
   ZUSAMMEN: 8, TRENNEN: 9, KIND: 10, GRUENDEN: 11, WEGZIEHEN: 12 };
 const AKTIONSNAMEN = ['', 'wohnung_suchen', 'job_suchen', 'job_wechseln', 'kuendigen', 'freinehmen',
   'freunde_treffen', 'partner_suchen', 'zusammenziehen', 'trennen', 'kind_bekommen', 'laden_gruenden', 'wegziehen'];
+// Etappe 2: Erfahrung nur für Handlungen mit eindeutiger späterer Folge (Pleite, wieder Arbeit suchen, Stelle verloren, Trennung), je Lage
+// (0 Geld knapp, 1 Geld reicht). Zelle je Person: 2 · s + Lage in P.erf (Bits 0–1 Beobachtungen 0–3, Bits 2–7 Wert + 32). ERF_VON[a] = s + 1
+// (0: keine Erfahrung)
+const EG = 0, EK = 1, EW = 2, EZ = 3;
+const ERF_AKTION = [A.GRUENDEN, A.KUENDIGEN, A.WECHSEL, A.ZUSAMMEN];
+const ERF_VON = new Uint8Array(13); ERF_AKTION.forEach((a, s) => { ERF_VON[a] = s + 1; });
+// Handlungen, auf die Erfahrung oder Plan in entscheide wirken („direkt“ beteiligt: Gegenprobe, Beobachter)
+const GED_DIREKT = new Uint8Array(13); ERF_AKTION.forEach(a => { GED_DIREKT[a] = 1; });
+// Plan = Ziel (Kopf, ID = Ziel/zielSeit) + Schritt (P.planSchritt) + letzter Plan (P.planGrund: Ziel in Bits 0–2, Grund ab Bit 3). Schritte
+// je Ziel mit ihrer Handlung (0: ansparen bzw. warten, keine Handlung)
+const PG = { ERREICHT: 1, FRIST: 2, PLEITE: 3, ALTER: 4, ERFAHRUNG: 5, RENTE: 6, ERSETZT: 7 };
+const PLAN_GRUND = ['', 'erreicht', 'Frist abgelaufen', 'Pleite, Gründung gesperrt', 'zu alt', 'schlechte Erfahrung', 'in Rente', 'anderes Ziel'];
+const PLAN_SCHRITTE = [[], [['Wohnung suchen', A.WOHNUNG]], [['Stelle finden', A.JOB], ['besser bezahlte Stelle', A.WECHSEL]],
+  [['Partner finden', A.PARTNER], ['zusammenziehen', A.ZUSAMMEN], ['Kind', A.KIND]], [['Rücklage ansparen', 0], ['gründen', A.GRUENDEN]],
+  [['Freunde treffen', A.FREUNDE]], [['erholen', A.FREI]]];
+// Letzte Entscheidung je Person: Quelle (P.entArt Bits 0–2; Bit 3 = geklappt)
+const Q = { REGELN: 1, POLICY: 2, SPRACHMODELL: 3, FOKUS: 4 };
+const QUELLEN = ['', 'regeln', 'policy', 'sprachmodell', 'fokus'];
 
 // ─── Namen ───────────────────────────────────────────────────────────────────────────
 const VORNAMEN_W = ['Mia', 'Emma', 'Hanna', 'Lea', 'Sofia', 'Lina', 'Marie', 'Clara', 'Ella', 'Ida', 'Lena', 'Anna',
@@ -1391,7 +1521,7 @@ const PF = [
   ['trauer', Uint8Array, 1], ['ohneLaden', Uint8Array, 1],
   ['stammladen', Int32Array, 1],                            // hier kauft die Person ein, solange er offen, nah und nicht voll ist
   ['besuch', Int32Array, 1],                                // heute Abend zu Besuch in diesem Gebäude (-1 = nein), für die Figuren
-  ['memName', Uint32Array, 8],                              // Name der Bezugsperson, falls die Person später nicht mehr lebt
+  // (bis Version 9 hier memName: Name der Bezugsperson je Erinnerung; entfällt mit Version 10, Noahs Entscheidung 1, siehe migriereGed)
   ['elternNameA', Uint32Array, 1], ['elternNameB', Uint32Array, 1],
   ['sperreBis', Int32Array, 1],                             // keine Gründung bis zu diesem Tag (nach Pleite)
   // Wann zuletzt erlebt (Spieltag). Wird beim Erinnern gesetzt, damit die 30-Tage-Wirkungen nicht verfallen,
@@ -1427,7 +1557,14 @@ const PF = [
   // Folge im Minus (Geldnot, A14)
   ['auto', Uint8Array, 1], ['autoTag', Int32Array, 1], ['autoMarke', Uint8Array, 1], ['autoModell', Uint8Array, 1],
   ['autoVersion', Uint16Array, 1], ['autoFarbe', Uint8Array, 1], ['autoBis', Int32Array, 1], ['autoMinus', Uint8Array, 1],
+  // Etappe 2 (Gedächtnis, Erfahrung, Plan; nur mit R.GED): je Erinnerung ein Fakt (je Code: Lohn, Tage, Anzahl) und der Verweis auf die
+  // Ursache (Tage bis zu ihr + 1, 0 = keiner); Erfahrung je Handlung und Lage (gepackt, siehe EG); offene Handlung (Zelle + 1, 0 = keine) und
+  // Tage bis zur Frist; Planschritt (Index in PLAN_SCHRITTE) und letzter Plan (Ziel | Grund << 3); letzte Entscheidung: Aktion, Quelle
+  // (Q, Bit 3 = geklappt), Zeit (Tag · 24 + Stunde). Keine Namen, kein Geschlecht, keine Herkunft (memName gibt es seit Version 10 nicht mehr)
+  ['memFakt', Int16Array, 8], ['memVon', Uint8Array, 8], ['erf', Uint8Array, 8], ['offen', Uint8Array, 1], ['offRest', Uint8Array, 1],
+  ['planSchritt', Uint8Array, 1], ['planGrund', Uint8Array, 1], ['entA', Uint8Array, 1], ['entArt', Uint8Array, 1], ['entZeit', Int32Array, 1],
 ];
+const PF_GED = ['memFakt', 'memVon', 'erf', 'offen', 'offRest', 'planSchritt', 'planGrund', 'entA', 'entArt', 'entZeit'];
 // Gebäude: höchstens eins pro Feld, daher so viele Plätze wie Felder (wachsen mit der Karte, karteWachsen).
 const GF = [
   ['typ', Uint8Array], ['stufe', Uint8Array], ['auf', Uint8Array], ['x', Uint8Array], ['y', Uint8Array],
@@ -1473,6 +1610,10 @@ const GF = [
   ['markt', Uint8Array],                                                   // Tech-Firma: 0 verkauft ans Umland, 1 in die Welt (Weltmarkt)
   ['kraft', Uint8Array],                                                   // Werkstatt, Tech-Firma: 1 = hatte seit der Gründung (Übernahme) eine Kraft
 ];
+// Objekt mit allen Feldnamen der Liste (PF bzw. GF, Wert null bis zum Anlegen der Arrays), in derselben Reihenfolge. Einmal fertig angelegt
+// statt Feld für Feld mit berechnetem Namen: V8 stellt ein Objekt, dem viele solche Schlüssel einzeln hinzugefügt werden, auf ein Wörterbuch
+// um, und dann wird jeder Zugriff wie P.lebt[p] langsamer (Optimieren, Etappe 2). Inhalt und Reihenfolge der Schlüssel bleiben gleich.
+function felderObjekt(liste) { return Object.fromEntries(liste.map(f => [f[0], null])); }
 
 // ─── Zufall: mulberry32, Zustand liegt in S (speicherbar) ────────────────────────────
 function zufall(S) {
@@ -1592,7 +1733,8 @@ function neuePerson(S) {
   if (S.frei.length) id = S.frei.pop();
   else { kapazitaet(S, S.pMax + 1); id = S.pMax++; }
   const P = S.p;
-  for (const [n, , k] of PF) {
+  for (let f = 0; f < PF.length; f++) {
+    const n = PF[f][0], k = PF[f][2];
     if (n === 'gen') continue;
     const a = P[n];
     for (let j = id * k; j < id * k + k; j++) a[j] = 0;
@@ -1632,18 +1774,180 @@ function erwachsenZaehlen(S, p) {
 
 // Ein Ereignis ins Gedächtnis schreiben. Jedes Ereignis löst eine Entscheidung in der nächsten Stunde aus
 // („direkt nach einem Ereignis“); wer es selbst ausgelöst hat, hat gerade entschieden (siehe stunde).
+// Etappe 2 (R.GED): die ersten MEM_KURZ Plätze sind die Kurzzeit (Ring, memPos), die übrigen die Langzeit (memBehalten); statt des Namens
+// der Bezugsperson (memName bis Version 9, Entscheidung 1) ein Fakt; ist eine Handlung offen, kann das Ereignis ihre Folge sein (erfFolge)
 function erinnere(S, p, code, ref) {
-  const P = S.p, k = P.memPos[p], i = p * R.MEM + k;
+  const P = S.p, ged = R.GED, k = ged ? P.memPos[p] % R.MEM_KURZ : P.memPos[p], i = p * R.MEM + k;
+  if (ged && P.memCode[i] && M_BED[P.memCode[i]] >= R.MEM_SCHWELLE) memBehalten(S, p, i);
   P.memCode[i] = code; P.memTag[i] = S.tag; P.memRef[i] = ref;
   P.memGen[i] = M_BEZUG[code] === 'p' && ref >= 0 ? P.gen[ref] : 0;
-  P.memName[i] = M_BEZUG[code] === 'p' && ref >= 0 ? namePack(S, ref) : 0;
-  P.memPos[p] = (k + 1) % R.MEM;
+  P.memPos[p] = (k + 1) % (ged ? R.MEM_KURZ : R.MEM);
+  if (ged) {
+    P.memFakt[i] = memFakt(S, p, code, ref); P.memVon[i] = 0;
+    if (P.offen[p]) erfFolge(S, p, code, i);
+  }
   if (code === M.JOB_WEG) P.jobWegTag[p] = S.tag;
   else if (code === M.GETRENNT) P.getrenntTag[p] = S.tag;
   else if (code === M.KIND) P.kindTag[p] = S.tag;
   else if (code === M.GESTORBEN) P.trauerTag[p] = S.tag;
   P.jetzt[p] = 1;
 }
+// ─── Etappe 2: Langzeit-Gedächtnis, Erfahrung, Plan ──────────────────────────────────
+// Alles je Person in festen Plätzen, kein Zufall, keine Arbeit je Stunde: Schreiben nur bei Ereignissen (erinnere) und Handlungen
+// (ausfuehren), Fristen einmal am Tag (menschenTag), Wirkung als Summand je geprüfter Handlung in entscheide. Liest keine Namen, kein
+// Geschlecht, keine Herkunft, keine Eltern, keinen Einzugstag; memRef und memGen nur, um einen Eintrag in die Langzeit mitzukopieren.
+const memWert = (S, P, i) => M_BED[P.memCode[i]] - (S.tag - P.memTag[i]) * R.MEM_VERBLASSEN;
+// Platz i fällt aus der Kurzzeit: in die Langzeit, wenn dort ein Platz frei ist oder einer weniger zählt (Gleichstand: der alte bleibt)
+function memBehalten(S, p, i) {
+  const P = S.p, o = p * R.MEM;
+  let j = -1, min = Infinity;
+  for (let q = o + R.MEM_KURZ; q < o + R.MEM; q++) {
+    if (!P.memCode[q]) { j = q; break; }
+    const w = memWert(S, P, q);
+    if (w < min) { min = w; j = q; }
+  }
+  if (P.memCode[j] && memWert(S, P, i) <= min) return;
+  P.memCode[j] = P.memCode[i]; P.memTag[j] = P.memTag[i]; P.memRef[j] = P.memRef[i]; P.memGen[j] = P.memGen[i];
+  P.memFakt[j] = P.memFakt[i]; P.memVon[j] = P.memVon[i];
+}
+// Fakt zur Erinnerung (nur Zahlen der Person und des Gebäudes, nichts über andere Personen): Lohn der Stelle, Tage, die der Betrieb bestand,
+// Rücklage in Tageskosten nach der Gründung, Hausstufe beim Einzug, Zahl der Kinder bzw. Freunde danach; sonst 0
+function memFakt(S, p, code, ref) {
+  const P = S.p, g = S.g, b = M_BEZUG[code] === 'g' && ref >= 0 && ref < S.gAnzahl ? ref : -1;
+  let f = 0;
+  if ((code === M.JOB || code === M.JOB_WEG || code === M.GEKUENDIGT || code === M.RUHESTAND) && b >= 0) f = g.lohn[b];
+  else if (code === M.PLEITE && b >= 0) f = S.tag - g.seit[b];
+  else if (code === M.GEGRUENDET) f = Math.floor(P.geld[p] / Math.max(20, tageskosten(S, p)));
+  else if (code === M.EINGEZOGEN && b >= 0) f = g.stufe[b];
+  else if (code === M.KIND) f = P.kinder[p];
+  else if (code === M.FREUND) f = freundeZahl(S, p);
+  return f < -32768 ? -32768 : f > 32767 ? 32767 : f;
+}
+// Erfahrung in Zelle c (p · 8 + 2 · s + Lage): Wert −31 … 31 und Beobachtungen 0 … 3 (0: noch keine, der Wert zählt nicht)
+const erfN = (P, c) => P.erf[c] & 3;
+const erfW = (P, c) => (P.erf[c] & 3 ? (P.erf[c] >> 2) - 32 : 0);
+// Punkte in entscheide und zielWaehlen: Wert × Sicherheit (dort noch × GED_STAERKE)
+function erfPunkte(P, c) {
+  const e = P.erf[c];
+  return e & 3 ? ((e >> 2) - 32) * R.ERF_SICHER[e & 3] : 0;
+}
+// Lage der Erfahrung: 0 Geld knapp, 1 Geld reicht (Bedürfnis Geld aus der letzten Nacht)
+const erfLage = (P, p) => (P.bGeld[p] < R.ERF_KNAPP ? 0 : 1);
+const erfGruendenSchlecht = (P, p) => erfW(P, p * 8 + 2 * EG) < 0 || erfW(P, p * 8 + 2 * EG + 1) < 0;
+// Die offene Handlung hat ihre Folge x: lernen (die ersten Beobachtungen gemittelt, danach gleitend mit 1/3). Die Erinnerung an die Folge
+// (Platz iFolge, −1 = keine) bekommt den Verweis auf die Ursache: Tage seit der Handlung + 1 (offRest zählt ab der Frist jede Nacht herunter)
+function erfLernen(S, p, x, iFolge) {
+  const P = S.p, z = P.offen[p] - 1, s = z >> 1, c = p * 8 + z, n = erfN(P, c), m = n < 2 ? n : 2;
+  const w = klemme(Math.round((erfW(P, c) * m + x) / (m + 1)), -31, 31);
+  P.erf[c] = ((w + 32) << 2) | (n < 3 ? n + 1 : 3);
+  if (iFolge >= 0) P.memVon[iFolge] = Math.min(255, R.ERF_FRIST[s] - P.offRest[p] + 1);
+  P.offen[p] = 0; P.offRest[p] = 0;
+  const st = S.stat.ged;
+  if (st) { st.gelernt[s]++; if (x < 0) st.schlecht[s]++; }
+}
+// Nach jeder ausgeführten Handlung (Regeln, Sprachmodell, Policy, Fokus): Umkehr erkennen, neue offene Handlung merken. rente: „kündigen“ war
+// der Renteneintritt (wird nicht gelernt). Eine Kündigung für die Elternzeit lernt wie jede andere (Entscheidung 3)
+function erfHandlung(S, p, a, ok, rente) {
+  const P = S.p;
+  if (P.offen[p] && (P.offen[p] - 1) >> 1 === EK && a === A.JOB) {    // nach der Kündigung doch wieder Arbeit gesucht, auch ohne Erfolg
+    const i = p * R.MEM + (P.memPos[p] + R.MEM_KURZ - 1) % R.MEM_KURZ;   // Folge: die Stelle, wenn eben eine gefunden wurde
+    erfLernen(S, p, R.ERF_SCHLECHT[EK], ok && P.memCode[i] === M.JOB && P.memTag[i] === S.tag ? i : -1);
+  }
+  const s = ERF_VON[a];
+  if (!s || !ok || rente || (P.offen[p] && (P.offen[p] - 1) >> 1 === EG)) return;   // eine offene Gründung bleibt offen, bis sich zeigt, wie sie ausgeht
+  P.offen[p] = 1 + 2 * (s - 1) + erfLage(P, p); P.offRest[p] = R.ERF_FRIST[s - 1];
+}
+// Ein Ereignis (Platz i) ist die schlechte Folge der offenen Handlung: Pleite nach der Gründung, Stelle weg nach dem Wechsel, Trennung nach
+// dem Zusammenziehen
+function erfFolge(S, p, code, i) {
+  const s = (S.p.offen[p] - 1) >> 1;
+  if ((s === EG && code === M.PLEITE) || (s === EW && code === M.JOB_WEG) || (s === EZ && code === M.GETRENNT)) erfLernen(S, p, R.ERF_SCHLECHT[s], i);
+}
+// Haftantritt kostet p die Stelle (haftAntritt, vor der Erinnerung „Job verloren“): Das ist keine Folge eines offenen Wechsels. Ihn verwerfen
+// (keine Erfahrung, kein Verweis „weil …“ auf ihn), wie eine Frist, deren Ergebnis nicht mehr besteht (erfTag)
+function erfHaft(S, p) {
+  const P = S.p;
+  if (P.offen[p] && (P.offen[p] - 1) >> 1 === EW) { P.offen[p] = 0; P.offRest[p] = 0; }
+}
+// Täglich (menschenTag): Frist ohne schlechte Folge abgelaufen → gute Erfahrung, wenn das Ergebnis noch besteht (Betrieb, Stelle, Partner),
+// sonst verworfen
+function erfTag(S, p) {
+  const P = S.p, r = P.offRest[p] - 1;
+  if (r > 0) { P.offRest[p] = r; return; }
+  const s = (P.offen[p] - 1) >> 1;
+  if (s === EG ? P.besitz[p] >= 0 : s === EW ? P.arbeit[p] >= 0 : s === EZ ? P.partner[p] >= 0 : true) erfLernen(S, p, R.ERF_GUT[s], -1);
+  else { P.offen[p] = 0; P.offRest[p] = 0; }
+}
+// Verblassen (Entscheidung 10; menschenTag, alle ERF_HALB / 15 Tage je Person): jede Erfahrung von p (alle Handlungen, beide Lagen) einen
+// Punkt zur 0 hin; bei 0 vergessen (Zelle 0, auch die Beobachtungen). Der gespeicherte Wert selbst verblasst, darum gilt es überall, wo er
+// zählt (entscheide, zielWaehlen, planAbbruch, doppelte Rücklage, Karte). Liest und schreibt nur P.erf
+function erfVerblassen(S, p) {
+  const E = S.p.erf;
+  for (let c = p * 8; c < p * 8 + 8; c++) {
+    const e = E[c];
+    if (!(e & 3)) continue;
+    const w = (e >> 2) - 32;
+    E[c] = w > 1 ? ((w + 31) << 2) | (e & 3) : w < -1 ? ((w + 33) << 2) | (e & 3) : 0;
+  }
+}
+// Plan (Entscheidungen 2 und 6): Rücklage vor jeder Gründung ab der Stufe Stadt (PLAN_RUECKLAGE 1). So viel Geld braucht p: Kosten dessen,
+// was p jetzt gründen würde (sonst eine Werkstatt), und die Rücklage in Tageskosten danach, doppelt nach schlechter Erfahrung mit einer Gründung
+function planZiel(S, p) {
+  const typ = gruendungsTyp(S, p) || WERKSTATT;
+  return gruendungsKosten(typ, S.leerTyp[typ] > 0) + R.PLAN_RESERVE * (erfGruendenSchlecht(S.p, p) ? 2 : 1) * Math.max(20, tageskosten(S, p));
+}
+// Nach einer Pleite wartet p über die Sperre hinaus, Sparsame länger (wie Entwurf B, für die letzte Pleite): bis zu diesem Tag (0: nie pleite)
+function pleiteWarteBis(S, p) {
+  const b = S.p.sperreBis[p];
+  return b > 0 ? b + Math.round(R.PLEITE_WARTE * (0.5 + S.p.spar[p] / 100)) : 0;
+}
+// Gilt die Rücklage (samt Wartezeit nach einer Pleite) für p? R.PLAN_RUECKLAGE: 0 immer, 1 erst ab der Stufe ANLAUF_STUFE, 2 nur nach
+// eigener Pleite (sperreBis bleibt gesetzt) oder schlechter Gründungserfahrung. Liest nur Stufe, Pleite und Erfahrung
+function ruecklageGilt(S, p) {
+  const m = R.PLAN_RUECKLAGE;
+  return !m || (m === 1 ? S.erweiterung.stufe >= R.ANLAUF_STUFE : S.p.sperreBis[p] > 0 || erfGruendenSchlecht(S.p, p));
+}
+// Fehlt p die Rücklage (Zeit oder Geld) für eine Gründung? Erst ob sie gilt, dann die billigste Grenze (Übernahme eines Ladens, spart Zeit).
+// Wirkt überall, wo die Rücklage wirkt: Bremse beim Gründen (entscheide), Planschritt „Rücklage ansparen“ und damit das Sparen beim Kündigen
+function ruecklageFehlt(S, p) {
+  const P = S.p;
+  if (!ruecklageGilt(S, p)) return false;
+  return S.tag < pleiteWarteBis(S, p) || P.geld[p] < gruendungsKosten(LADEN, true) + R.PLAN_RESERVE * 20 || P.geld[p] < planZiel(S, p);
+}
+// Schritt im Plan, jede Nacht aus dem Zustand (zielPruefen): der erste, der noch nicht erfüllt ist
+function planSchrittVon(S, p, z) {
+  const P = S.p;
+  if (z === Z.LADEN) return ruecklageFehlt(S, p) ? 0 : 1;
+  if (z === Z.JOB) return P.arbeit[p] >= 0 && !P.gemein[p] ? 1 : 0;
+  if (z === Z.FAMILIE) return P.partner[p] < 0 ? 0 : P.hh[p] >= 0 && P.hh[p] === P.hh[P.partner[p]] ? 2 : 1;
+  return 0;
+}
+// Warum der Plan nicht mehr geht (0: läuft weiter)
+function planAbbruch(S, p, z) {
+  const P = S.p, alter = (S.tag - P.geb[p]) / R.JAHR;
+  if (z === Z.LADEN) {
+    if (P.sperreBis[p] > S.tag) return PG.PLEITE;
+    if (alter >= 60) return PG.ALTER;
+    for (let c = p * 8 + 2 * EG; c <= p * 8 + 2 * EG + 1; c++) if (erfN(P, c) >= 2 && erfW(P, c) <= R.PLAN_ERF_ABBRUCH) return PG.ERFAHRUNG;
+  } else if (z === Z.FAMILIE) { if (alter >= 45) return PG.ALTER; }
+  else if (z === Z.JOB) { if (rentner(S, p)) return PG.RENTE; }
+  return 0;
+}
+// Der Plan endet (vor dem neuen Ziel): Ziel und Grund merken, zählen
+function planEnde(S, p, grund) {
+  const P = S.p;
+  P.planGrund[p] = P.ziel[p] | grund << 3;
+  if (S.stat.ged) S.stat.ged.planEnde[grund]++;
+}
+// Die k-te Zufallszahl (ab 0), die zufall(S) ab dem Stand rs ziehen würde, ohne S.rs zu ändern (mulberry32 zählt den Stand nur weiter).
+// Für die Spur „ohne Erfahrung und Plan“ in entscheide und für warum
+function zufallAn(rs, k) {
+  let t = (rs + (k + 1) * 0x6D2B79F5) >>> 0;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
 const innerhalb = (S, tagWert, tage) => S.tag - tagWert <= tage;
 function erinnertSeit(S, p, code, tage, ref) {
   const P = S.p, o = p * R.MEM, t = S.tag - tage;
@@ -2037,8 +2341,10 @@ function aufzaehlen(L) { return L.length < 2 ? L.join('') : L.slice(0, -1).join(
 function tausender(v) { return String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
 function eroeffnen(S, b) {
   const P = S.p, o = S.g.besitzer[b];
-  if (P.arbeit[o] >= 0 && P.arbeit[o] !== b) austreten(S, o);
-  P.arbeit[o] = b;
+  if (!(R.HAFT_EROEFFNUNG && P.haftBis[o])) {                // Besitzer in Haft: arbeitet erst nach der Entlassung hier (haftEnde)
+    if (P.arbeit[o] >= 0 && P.arbeit[o] !== b) austreten(S, o);
+    P.arbeit[o] = b;
+  }
   stellenBuchen(S, b, 1);
   if (S.g.typ[b] === LADEN) S.ladenDirty = true;
 }
@@ -2123,7 +2429,9 @@ function ladenZuordnen(S) {
     kand.length = 0;
     for (let yy = Math.max(0, vy - rv); yy <= Math.min(VN - 1, vy + rv); yy++) {
       for (let xx = Math.max(0, vx - rv); xx <= Math.min(VN - 1, vx + rv); xx++) {
-        for (const l of S.vBetrieb[yy * VN + xx]) {
+        const V = S.vBetrieb[yy * VN + xx];
+        for (let j = 0; j < V.length; j++) {
+          const l = V[j];
           if (g.typ[l] !== LADEN || !offen(S, l)) continue;
           const d = Math.abs(g.x[l] - x) + Math.abs(g.y[l] - y);
           if (d <= R.REICH_LADEN) kand.push(d * 65536 + l);   // Distanz, bei Gleichstand die kleinere ID
@@ -2322,6 +2630,8 @@ function zielWaehlen(S, p) {
   w[Z.FAMILIE] = alter >= 20 && alter < 45
     ? (P.partner[p] < 0 ? 15 + 35 * Gs : P.kinder[p] === 0 ? 40 : 20 - 8 * P.kinder[p]) : -99;
   w[Z.LADEN] = P.besitz[p] < 0 && alter < 60 ? 80 * (E - 0.3) + 10 * (1 - Sp) - 5 + (P.geld[p] > 1000 ? 10 : 0) : -99;
+  // Etappe 2: während der Sperre nach einer Pleite kein Plan „Laden“; die Erfahrung mit dem Gründen (heutige Lage) zählt mit
+  if (R.GED && w[Z.LADEN] > -99) w[Z.LADEN] = P.sperreBis[p] > S.tag ? -99 : w[Z.LADEN] + R.GED_STAERKE * erfPunkte(P, p * 8 + 2 * EG + erfLage(P, p));
   w[Z.FREUNDE] = 40 * Gs + (freundeZahl(S, p) < 2 ? 20 : 0);
   w[Z.RUHE] = 35 * (1 - F) + (alter > 55 ? 25 : 0);
   let best = Z.RUHE, bestW = -Infinity;
@@ -2338,6 +2648,7 @@ function zielWaehlen(S, p) {
 function zielVonAussen(S, p, z) {
   if (z <= 0 || z === S.p.ziel[p]) return false;
   if (z !== Z.JOB && z !== Z.FAMILIE && z !== Z.FREUNDE && zielErreicht(S, p, z)) return false;
+  if (R.GED && S.p.ziel[p]) planEnde(S, p, PG.ERSETZT);      // Etappe 2: der alte Plan endet („anderes Ziel“)
   zielSetzen(S, p, z);
   return true;
 }
@@ -2346,17 +2657,25 @@ function zielSetzen(S, p, z) {   // Ausgangswert merken, damit „erreicht“ ei
   P.ziel[p] = z; P.zielSeit[p] = S.tag;
   P.zielWert[p] = z === Z.JOB ? (P.arbeit[p] >= 0 && !P.gemein[p] ? S.g.lohn[P.arbeit[p]] : 0)
     : z === Z.FAMILIE ? P.kinder[p] : z === Z.FREUNDE ? freundeZahl(S, p) : 0;
+  if (R.GED) P.planSchritt[p] = planSchrittVon(S, p, z);     // Etappe 2: Plan zum Ziel, erster noch nicht erfüllter Schritt
 }
 function zielPruefen(S, p) {
   const P = S.p, z = P.ziel[p];
   if (!z) { zielWaehlen(S, p); return; }
-  if (zielErreicht(S, p, z)) { erinnere(S, p, M.ZIEL_ERREICHT, z); S.stat.zieleErreicht++; zielWaehlen(S, p); }
-  else if (S.tag - P.zielSeit[p] >= R.ZIEL_TAGE) { erinnere(S, p, M.ZIEL_AUFGEGEBEN, z); S.stat.zieleAufgegeben++; zielWaehlen(S, p); }
+  if (zielErreicht(S, p, z)) { erinnere(S, p, M.ZIEL_ERREICHT, z); S.stat.zieleErreicht++; if (R.GED) planEnde(S, p, PG.ERREICHT); zielWaehlen(S, p); }
+  else if (S.tag - P.zielSeit[p] >= R.ZIEL_TAGE) { erinnere(S, p, M.ZIEL_AUFGEGEBEN, z); S.stat.zieleAufgegeben++; if (R.GED) planEnde(S, p, PG.FRIST); zielWaehlen(S, p); }
+  else if (R.GED) {                                          // Etappe 2: Plan abbrechen (Pleite, Alter, Rente, schlechte Erfahrung)
+    const grund = planAbbruch(S, p, z);
+    if (grund) { erinnere(S, p, M.ZIEL_AUFGEGEBEN, z); S.stat.zieleAufgegeben++; planEnde(S, p, grund); zielWaehlen(S, p); }
+    else P.planSchritt[p] = planSchrittVon(S, p, z);          // Schritt aus dem Zustand von heute Nacht
+  }
 }
 
 // ─── Das Gehirn: Entscheiden per Punktwertung ────────────────────────────────────────
-function entscheide(S, p, h) {
-  if (KIP.an) { const r = kiHaken(S, p, h); if (r >= 0) return r; }   // KI-Policy (Etappe 1): Fokusperson der Umgebung oder trainierte Policy
+// probe (Etappe 2, nur Prüfung, Werkzeuge und warum; nicht 0 = nur wählen: nichts ausführen, keine Policy): Bit 2 ohne Erfahrung, Bit 4 ohne
+// Plan (Rücklage und Sparen wie Version 9), Bit 8 Summanden je Aktion für warum merken. Zieht Zufall wie sonst: wer probt, sichert S.rs vorher
+function entscheide(S, p, h, probe) {
+  if (KIP.an && !probe) { const r = kiHaken(S, p, h); if (r >= 0) return r; }   // KI-Policy (Etappe 1): Fokusperson der Umgebung oder trainierte Policy
   if (S.p.haftBis[p]) return 0;                              // Sicherheit: in Haft keine Entscheidungen (auch nicht nach Fristen und späten KI-Antworten)
   const P = S.p, g = S.g, tag = S.tag, zg = P.ziel[p];
   const alter = (tag - P.geb[p]) / R.JAHR;
@@ -2373,8 +2692,16 @@ function entscheide(S, p, h) {
   // Bürgermeister (Version 9): im Amt ebenso gebunden (kein Wechsel, keine Kündigung, keine Gründung); das Amt endet mit der Amtszeit
   const imDienst = P.bund[p] >= WEHRDIENST, fest = imDienst || verpflichtet(S, p) || istBm(S, p);
   const ZF = R.ZUFALL;
+  // Etappe 2: Erfahrung (Zellen der heutigen Lage, ez + 2 · s) und Plan wirken je Aktion als Summanden dE und dP, × GED_STAERKE. spur: Mit
+  // Beobachter rechnet dieselbe Schleife die Wahl ohne diese Summanden mit (SPUR). Bis zum ersten Summanden ≠ 0 gleicht die Spur der echten
+  // Wahl und rechnet nichts; ab dort (spurAn) zieht sie ihre Zahlen rechnerisch ab dem Zufallsstand von da an, S.rs bleibt. rsVor: Zufallsstand
+  // vor dieser Entscheidung (für den Beobachter, damit warum genau diese Wahl erklären kann)
+  const ged = R.GED, k = ged ? R.GED_STAERKE : 0, ez = ged && !(probe & 2) ? p * 8 + erfLage(P, p) : -1, mitPlan = ged && !(probe & 4);
+  const spur = ged && BEOB.fn !== null && !probe, merk = probe & 8;
+  if (spur) { SPUR.an = false; SPUR.rsVor = S.rs; }
+  let dE = 0, dP = 0;
 
-  // Wert = Dringlichkeit × Gewicht aus Charakter + Zielbonus + Gedächtnis + Zufall ±5.
+  // Wert = Dringlichkeit × Gewicht aus Charakter + Zielbonus + Gedächtnis (+ Erfahrung + Plan) + Zufall ±5.
   // Höchster Wert gewinnt; liegt keiner über der Schwelle, bleibt alles wie es ist.
   // Den Zufall nur ziehen, wenn er die Reihenfolge ändern kann (spart Rechenzeit, bleibt deterministisch).
   let best = R.SCHWELLE, bestA = 0, v;
@@ -2384,17 +2711,25 @@ function entscheide(S, p, h) {
   if ((P.wohnung[p] < 0 || P.bWohnen[p] < 40) && !P.suchPause[p] && !(P.sucht[p] && S.freieWohnungen <= 0)
       && (arb >= 0 || P.geld[p] >= 10 * R.MIETE[1] || rentner(S, p))) {
     v = uWohnen * (P.wohnung[p] < 0 ? 1.3 : 0.4 + 0.8 * (1 - H)) + (zg === Z.WOHNUNG ? 25 : 0);
+    if (spur && SPUR.an) spurWert(A.WOHNUNG, v, 0, 0);
+    if (merk) warumMerken(S, A.WOHNUNG, v, 0, 0, best);
     if (v + ZF > best) { v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.WOHNUNG; } }
   }
   // job_suchen: 18–67, ohne Job (auch aus der gemeinnützigen Arbeit heraus: eine richtige Stelle geht vor); wer vor 67 in Rente
   // gegangen ist, sucht keine Stelle mehr (wie bisher ab 67); wer ohne Kita-Platz ein Kind betreut (gebunden), auch nicht
   if (erwerb && (arb < 0 || gem) && !istBesitzer && S.freieStellen > 0 && !rentner(S, p) && !gebunden(S, p)) {
     v = uGeld * (0.5 + 0.9 * F) + 15 + (zg === Z.JOB ? 20 : 0);
+    if (spur && SPUR.an) spurWert(A.JOB, v, 0, 0);
+    if (merk) warumMerken(S, A.JOB, v, 0, 0, best);
     if (v + ZF > best) { v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.JOB; } }
   }
   // job_wechseln: eine besser bezahlte Stelle ist frei
   if (arb >= 0 && !gem && !fest && !istBesitzer && besterFreierLohn(S) > g.lohn[arb] + 3) {
     v = 45 * E + 0.3 * uGeld + (zg === Z.JOB ? 30 : 0) - 5;
+    if (ged) { dE = ez >= 0 ? k * erfPunkte(P, ez + 2 * EW) : 0; dP = 0; }   // Etappe 2: Erfahrung mit dem letzten Wechsel
+    if (spur && (SPUR.an || spurAn(S, best, bestA, dE, dP))) spurWert(A.WECHSEL, v, dE, dP);
+    if (merk) warumMerken(S, A.WECHSEL, v, dE, dP, best);
+    v += dE + dP;
     if (v + ZF > best) { v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.WECHSEL; } }
   }
   // kuendigen: Geld für 20 Tage. Stadtregierung (R06): lieber, wenn man dafür beim kleinen Kind bleiben kann (Betreuungsgehalt).
@@ -2405,21 +2740,36 @@ function entscheide(S, p, h) {
     v = (1 - F) * (100 - P.zuf[p]) * 0.8 + (zg === Z.RUHE ? 15 : 0) - 15;
     if (ruhe) v += ruheWunsch(S, p);
     else if (elternzeitMoeglich(S, p)) v += R.BETREUUNG_WUNSCH;
+    // Etappe 2: Erfahrung mit dem Kündigen, auch für die Elternzeit (Entscheidung 3), nicht für den Renteneintritt; wer für den eigenen Laden
+    // spart (Planschritt „Rücklage ansparen“), bleibt lieber
+    if (ged) {
+      dE = ez >= 0 && !ruhe ? k * erfPunkte(P, ez + 2 * EK) : 0;
+      dP = mitPlan && !ruhe && zg === Z.LADEN && !P.planSchritt[p] ? -k * R.PLAN_SPAREN : 0;
+    }
+    if (spur && (SPUR.an || spurAn(S, best, bestA, dE, dP))) spurWert(A.KUENDIGEN, v, dE, dP);
+    if (merk) warumMerken(S, A.KUENDIGEN, v, dE, dP, best);
+    v += dE + dP;
     if (v + ZF > best) { v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.KUENDIGEN; } }
   }
   // freinehmen (nur morgens)
   if (arb >= 0 && !gem && !imDienst && h <= 7 && !P.frei[p]) {
     v = uFrei * (1.3 - F) + (zg === Z.RUHE ? 15 : 0) - 10;
+    if (spur && SPUR.an) spurWert(A.FREI, v, 0, 0);
+    if (merk) warumMerken(S, A.FREI, v, 0, 0, best);
     if (v + ZF > best) { v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.FREI; } }
   }
   // freunde_treffen (abends)
   if (h >= 17) {
     v = uKontakt * (0.3 + 1.0 * Gs) + (zg === Z.FREUNDE ? 25 : 0);
+    if (spur && SPUR.an) spurWert(A.FREUNDE, v, 0, 0);
+    if (merk) warumMerken(S, A.FREUNDE, v, 0, 0, best);
     if (v + ZF > best) { v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.FREUNDE; } }
   }
   // partner_suchen — Gedächtnis: getrennt in den letzten 30 Tagen → keine Partnersuche
   if (pa < 0 && alter < 70 && !innerhalb(S, P.getrenntTag[p], 30)) {
     v = 30 * Gs + 0.25 * uKontakt + (zg === Z.FAMILIE ? 30 : 0) - (alter > 50 ? 10 : 0);
+    if (spur && SPUR.an) spurWert(A.PARTNER, v, 0, 0);
+    if (merk) warumMerken(S, A.PARTNER, v, 0, 0, best);
     if (v + ZF > best) { v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.PARTNER; } }
   }
   if (pa >= 0 && !P.haftBis[pa]) {                          // Sicherheit: mit einem Partner in Haft nichts davon
@@ -2427,15 +2777,27 @@ function entscheide(S, p, h) {
     // zusammenziehen
     if (!zusammen) {
       v = 10 + 20 * Gs + 0.3 * uWohnen + (zg === Z.FAMILIE ? 30 : 0) + (zg === Z.WOHNUNG ? 10 : 0);
+      if (ged) { dE = ez >= 0 ? k * erfPunkte(P, ez + 2 * EZ) : 0; dP = 0; }   // Etappe 2: Erfahrung mit dem letzten Zusammenziehen
+      if (spur && (SPUR.an || spurAn(S, best, bestA, dE, dP))) spurWert(A.ZUSAMMEN, v, dE, dP);
+      if (merk) warumMerken(S, A.ZUSAMMEN, v, dE, dP, best);
+      v += dE + dP;
       if (v + ZF > best) { v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.ZUSAMMEN; } }
     }
-    // trennen: selten, per Zufall, nur wenn beide 14 Tage unzufrieden
-    if (P.unzuf[p] >= R.UNZUF_TAGE && P.unzuf[pa] >= R.UNZUF_TAGE && zufall(S) < 0.03) {
-      v = 60; if (v + ZF > best) { v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.TRENNEN; } }
+    // trennen: selten, per Zufall, nur wenn beide 14 Tage unzufrieden. Die Spur „ohne“ zieht ihre eigene Zahl an derselben Stelle
+    if (P.unzuf[p] >= R.UNZUF_TAGE && P.unzuf[pa] >= R.UNZUF_TAGE) {
+      const tO = spur && SPUR.an && zufallAn(SPUR.rs0, SPUR.k++) < 0.03;
+      if (zufall(S) < 0.03) {
+        v = 60;
+        if (tO) spurWert(A.TRENNEN, v, 0, 0);
+        if (merk) warumMerken(S, A.TRENNEN, v, 0, 0, best);
+        if (v + ZF > best) { v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.TRENNEN; } }
+      } else if (tO) spurWert(A.TRENNEN, 60, 0, 0);
     }
     // kind_bekommen: beide über 60 zufrieden — Gedächtnis: Kind in den letzten 30 Tagen → erst mal nicht
     if (zusammen && P.wohnung[p] >= 0 && P.zuf[p] > 60 && P.zuf[pa] > 60 && alter < 45 && (tag - P.geb[pa]) / R.JAHR < 45) {
       v = (zg === Z.FAMILIE ? 45 : 0) + 15 * Gs + 10 - 22 * P.kinder[p] - 0.4 * uWohnen - (innerhalb(S, P.kindTag[p], 30) ? 60 : 0);
+      if (spur && SPUR.an) spurWert(A.KIND, v, 0, 0);
+      if (merk) warumMerken(S, A.KIND, v, 0, 0, best);
       if (v + ZF > best) { v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.KIND; } }
     }
   }
@@ -2445,6 +2807,12 @@ function entscheide(S, p, h) {
   // Ehrgeiz treibt, Sparsamkeit bremst; Gedächtnis: Pleite → 180 Tage Sperre (sperreBis wird beim Erinnern gesetzt).
   if (!istBesitzer && !fest && alter < 60 && P.sperreBis[p] <= tag && (ladenFehlt(S, P.wohnung[p]) || werkstattLohnt(S) || techWeltAussicht(S, p)) && kannGruenden(S, p) && !gebunden(S, p)) {
     v = 90 * (E - 0.5) + 20 * (1 - Sp) + (zg === Z.LADEN ? 30 : 0);
+    // Etappe 2: Erfahrung mit der letzten Gründung; Plan (Entscheidung 2): Fehlt die Rücklage (nach einer Pleite auch die Wartezeit), zählt
+    // Gründen PLAN_BREMSE weniger, für jeden Gründer, für den sie gilt (R.PLAN_RUECKLAGE; mit Ziel „eigener Laden“ ist das genau der Zielbonus)
+    if (ged) { dE = ez >= 0 ? k * erfPunkte(P, ez + 2 * EG) : 0; dP = mitPlan && ruecklageFehlt(S, p) ? -k * R.PLAN_BREMSE : 0; }
+    if (spur && (SPUR.an || spurAn(S, best, bestA, dE, dP))) spurWert(A.GRUENDEN, v, dE, dP);
+    if (merk) warumMerken(S, A.GRUENDEN, v, dE, dP, best);
+    v += dE + dP;
     if (v + ZF > best) { v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.GRUENDEN; } }
   }
   // wegziehen — Dringlichkeit: wie tief und wie lange schon im Elend; Gewicht: Heimatliebe hält.
@@ -2452,16 +2820,88 @@ function entscheide(S, p, h) {
   // Gedächtnis: jemand Nahes gestorben → Heimatliebe zählt stärker.
   if (P.elend[p] >= R.ELEND_TAGE && !imDienst) {
     v = (30 + R.ELEND - P.zuf[p] + Math.min(P.elend[p] - R.ELEND_TAGE, 30)) * (1.6 - 2.2 * H * (P.trauer[p] ? 1.5 : 1));
+    if (spur && SPUR.an) spurWert(A.WEGZIEHEN, v, 0, 0);
+    if (merk) warumMerken(S, A.WEGZIEHEN, v, 0, 0, best);
     if (v + ZF > best) { v += (zufall(S) * 2 - 1) * ZF; if (v > best) { best = v; bestA = A.WEGZIEHEN; } }
   }
 
-  if (!bestA) return 0;
-  ausfuehren(S, p, bestA);
+  // Etappe 2: Beobachter (außerhalb von S), nur wenn die Wahl ohne Erfahrung und Plan direkt anders wäre (eine beteiligte Aktion ist eine, auf
+  // die Erfahrung oder Plan wirken, GED_DIREKT). Ohne Beobachter geschieht hier nichts
+  if (spur && SPUR.an && SPUR.a !== bestA && (GED_DIREKT[bestA] || GED_DIREKT[SPUR.a])) andersMelden(S, p, h, bestA);
+  if (!bestA || probe) return bestA;
+  ausfuehren(S, p, bestA, Q.REGELN);
   return bestA;
 }
-function ausfuehren(S, p, a) {
+// ─── Etappe 2: Beobachter, Spur „ohne Erfahrung und Plan“, warum ───
+// Beobachter (Modul, nicht S; null = keiner): fn(p, gen, tag, stunde, mit, ohne, grund, rsVor) mit Aktionscodes (0 = nichts) und grund 'erfahrung',
+// 'plan', 'erfahrung und plan' oder 'zufall' (keine der beiden Aktionen hatte einen Summanden: nur der Zufall hat sich verschoben); rsVor: Zufallsstand
+// vor dieser Entscheidung (warum(S, p, stunde, rsVor) im Beobachter erklärt genau sie). Gesetzt über Sim.beobachter; er darf S nicht ändern.
+// Wirft er, wird er abgeschaltet (fehler: der Text, Sim.beobachterFehler) und die Stunde läuft gleich weiter wie ohne ihn
+const BEOB = { fn: null, fehler: null };
+// Spur (nur mit Beobachter): läuft sie (an), Bestwert und Wahl ohne die Summanden, Zufallsstand beim Start der Spur und wie viele Zahlen sie seitdem
+// gezogen hätte (zusammen so viele wie ein zweiter Aufruf mit probe 2 | 4 ab demselben S.rs); Summanden je Aktion für den Grund
+const SPUR = { an: false, best: 0, a: 0, rs0: 0, k: 0, rsVor: 0, dE: new Float64Array(13), dP: new Float64Array(13) };
+// Erster Summand ≠ 0: Bis hierher gleicht die Spur der echten Wahl (gleiche Werte, gleiche Zahlen), sie übernimmt deren Stand. false: noch nicht
+function spurAn(S, best, bestA, dE, dP) {
+  if (!dE && !dP) return false;
+  const W = SPUR;
+  W.an = true; W.best = best; W.a = bestA; W.rs0 = S.rs; W.k = 0; W.dE.fill(0); W.dP.fill(0);
+  return true;
+}
+function spurWert(a, v, dE, dP) {
+  const W = SPUR, ZF = R.ZUFALL;
+  W.dE[a] = dE; W.dP[a] = dP;
+  if (v + ZF > W.best) { v += (zufallAn(W.rs0, W.k++) * 2 - 1) * ZF; if (v > W.best) { W.best = v; W.a = a; } }
+}
+// „heute anders entschieden“ melden (Name ohne „beobacht…“: simtest --militaer verbietet solche Funktionsnamen als Grenze der Dienststelle)
+function andersMelden(S, p, h, mit) {
+  const W = SPUR, ohne = W.a, e = W.dE[mit] || W.dE[ohne], pl = W.dP[mit] || W.dP[ohne];
+  try { BEOB.fn(p, S.p.gen[p], S.tag, h, mit, ohne, e && pl ? 'erfahrung und plan' : e ? 'erfahrung' : pl ? 'plan' : 'zufall', W.rsVor); }
+  catch (err) { BEOB.fn = null; BEOB.fehler = String(err); }   // ein Fehler im Beobachter bricht die Stunde nicht ab
+}
+// warum (probe & 8): je geprüfter Aktion Wert aus Lage und Charakter (wie Version 9, mit Zielbonus), Erfahrung, Plan, Bestwert davor und
+// Zufallsstand davor (daraus die gezogene Zahl)
+const WARUM = { liste: null };
+function warumMerken(S, a, v, dE, dP, best) { if (WARUM.liste) WARUM.liste.push({ a, v, dE, dP, best, rs: S.rs }); }
+// „Warum diese Entscheidung?“ (nur lesend, S.rs gesichert): Was p in Stunde h (sonst jetzt) nach Regeln wählen würde, mit den Summanden je
+// geprüfter Aktion, dazu die Wahl ohne Erfahrung, ohne Plan und ohne beides. art je Vergleich: null (gleich), 'direkt' (eine beteiligte Aktion
+// ist eine, auf die Erfahrung oder Plan wirken) oder 'zufall' (nur der Zufall hat sich verschoben). Ohne rs ist das eine neue Wahl ab dem
+// jetzigen S.rs, nicht die zuletzt getroffene; mit rs (rsVor aus dem Beobachter, dort aufgerufen) genau die gemeldete Entscheidung.
+// rechnung: je Vergleich mit anderer Wahl dessen eigene Rechnung (Zeilen wie aktionen; ab demselben S.rs, aber ohne die Summanden liegen andere
+// Handlungen vorn, darum andere Zufallszahlen), sonst null. Ohne sie ließ sich „Ohne … hätte …“ oft nicht nachrechnen (Schlussprüfung Bedienung)
+// Kinder entscheiden nie (stunde, tagSchritt): nur { kind: true }
+function warum(S, p, h, rs) {
+  const P = S.p;
+  if (p < 0 || p >= S.pMax || !P.lebt[p]) return null;
+  if (h === undefined) h = S.stunde;
+  if (P.geb[p] >= S.tag - R.ERWACHSEN * R.JAHR) return { stunde: h, kind: true };
+  const rsJetzt = S.rs, liste = [], lE = [], lP = [], lB = [];
+  if (rs === undefined) rs = rsJetzt;
+  let wahl, ohneE, ohneP, ohneB;
+  try {
+    WARUM.liste = liste; S.rs = rs; wahl = entscheide(S, p, h, 1 | 8);
+    WARUM.liste = lE; S.rs = rs; ohneE = entscheide(S, p, h, 1 | 2 | 8);
+    WARUM.liste = lP; S.rs = rs; ohneP = entscheide(S, p, h, 1 | 4 | 8);
+    WARUM.liste = lB; S.rs = rs; ohneB = entscheide(S, p, h, 1 | 2 | 4 | 8);
+  } finally { S.rs = rsJetzt; WARUM.liste = null; }
+  const n = (a) => AKTIONSNAMEN[a] || 'nichts', r2 = (x) => Math.round(x * 100) / 100;
+  const art = (o) => (o === wahl ? null : GED_DIREKT[o] || GED_DIREKT[wahl] ? 'direkt' : 'zufall');
+  const zeilen = (L) => L.map(x => {
+    const gezogen = x.v + (x.dE + x.dP) + R.ZUFALL > x.best, zf = gezogen ? (zufallAn(x.rs, 0) * 2 - 1) * R.ZUFALL : 0;
+    return { aktion: n(x.a), lage: r2(x.v), erfahrung: r2(x.dE), plan: r2(x.dP), zufall: gezogen ? r2(zf) : null, summe: r2(x.v + (x.dE + x.dP) + zf) };
+  });
+  return {
+    stunde: h, inHaft: !!P.haftBis[p], schwelle: R.SCHWELLE, staerke: R.GED_STAERKE,
+    wahl: n(wahl), ohneErfahrung: n(ohneE), ohnePlan: n(ohneP), ohneBeides: n(ohneB),
+    art: { erfahrung: art(ohneE), plan: art(ohneP), beides: art(ohneB) },
+    aktionen: zeilen(liste),
+    rechnung: { erfahrung: ohneE !== wahl ? zeilen(lE) : null, plan: ohneP !== wahl ? zeilen(lP) : null, beides: ohneB !== wahl ? zeilen(lB) : null },
+  };
+}
+function ausfuehren(S, p, a, quelle) {
   const P = S.p;
   let ok = false;
+  const rente = R.GED && a === A.KUENDIGEN && anspruch(S, p);   // Etappe 2: der Renteneintritt wird nicht als Erfahrung gelernt
   switch (a) {
     case A.WOHNUNG: ok = aktWohnung(S, p); break;
     case A.JOB: ok = aktJob(S, p, 0); break;
@@ -2478,6 +2918,13 @@ function ausfuehren(S, p, a) {
   }
   S.stat.gewaehlt[a]++;
   if (ok) S.stat.ausgefuehrt[a]++;
+  // Etappe 2 (nach Wegzug nichts mehr): Folge beobachten, letzte Entscheidung mit Quelle (Q) und Zeit. S.p neu holen (eine Geburt kann die
+  // Arrays ersetzt haben)
+  if (R.GED && S.p.lebt[p]) {
+    erfHandlung(S, p, a, ok, rente);
+    const PN = S.p;
+    PN.entA[p] = a; PN.entArt[p] = (quelle || 0) | (ok ? 8 : 0); PN.entZeit[p] = S.tag * 24 + S.stunde;
+  }
   return ok;
 }
 
@@ -2677,7 +3124,9 @@ function mangelRechnen(S) {
     const x = g.x[b], y = g.y[b], vx = vAchse(S, x), vy = vAchse(S, y);
     for (let yy = Math.max(0, vy - rv); yy <= Math.min(VN - 1, vy + rv); yy++) {
       for (let xx = Math.max(0, vx - rv); xx <= Math.min(VN - 1, vx + rv); xx++) {
-        for (const h of S.vHaus[yy * VN + xx]) {
+        const V = S.vHaus[yy * VN + xx];
+        for (let j = 0; j < V.length; j++) {
+          const h = V[j];
           if (Math.abs(g.x[h] - x) + Math.abs(g.y[h] - y) <= R.REICH_LADEN) g.mangel[h] = Math.min(65535, g.mangel[h] + g.knapp[b]);
         }
       }
@@ -3064,7 +3513,7 @@ function kiEntscheidung(S, id, gen, aktion, ziel, gedanke, nr) {
   const h = antwortStunde(S, a);
   // geklappt auf den gespeicherten Eintrag (vorher auf das Vorbild: im Tagebuch stand immer „klappte nicht“; Befund Bedienung der Schlussprüfung)
   const eintrag = tagebuchEintrag(S, id, { art: 'gedanke', text: String(gedanke), aktion, ziel: zielNeu ? ziel : null, geklappt: false }, a.tag, a.stunde);
-  if (erlaubteAktionen(S, id, h).includes(code)) eintrag.geklappt = ausfuehren(S, id, code);
+  if (erlaubteAktionen(S, id, h).includes(code)) eintrag.geklappt = ausfuehren(S, id, code, Q.SPRACHMODELL);
   else entscheide(S, id, h);                              // Lage hat sich geändert: normales Gehirn
   if (S.p.lebt[id]) S.p.jetzt[id] = 0;
   K.angewandt++;
@@ -3087,7 +3536,7 @@ function kiGespraech(S, id, gen, noah, antwort, ziel) {
   const zielNeu = z > 0 && zielVonAussen(S, id, z);
   // Erinnerung „mit Noah geredet“, aber nur eine pro Tag (sonst drängen Gespräche das übrige Gedächtnis hinaus).
   // Ein Gespräch löst keine Entscheidung aus: es wirkt über Erinnerung und Ziel bei der nächsten.
-  const letzte = id * R.MEM + (P.memPos[id] + R.MEM - 1) % R.MEM;
+  const letzte = id * R.MEM + (R.GED ? (P.memPos[id] + R.MEM_KURZ - 1) % R.MEM_KURZ : (P.memPos[id] + R.MEM - 1) % R.MEM);   // Etappe 2: in der Kurzzeit
   if (!(P.memCode[letzte] === M.NOAH && P.memTag[letzte] === S.tag)) { const vorher = P.jetzt[id]; erinnere(S, id, M.NOAH, -1); P.jetzt[id] = vorher; }
   tagebuchEintrag(S, id, { art: 'gespraech', noah: String(noah), text: String(antwort), ziel: zielNeu ? ziel : null });
   return true;
@@ -3685,7 +4134,8 @@ function arbeitsweg(S, p) {
 function hhHatAuto(S, p) {                                    // hat schon jemand anderes im Haushalt ein Auto?
   const P = S.p, w = P.wohnung[p], k = P.hh[p];
   if (w < 0 || k < 0) return false;
-  for (const m of S.bewohner[w]) if (m !== p && P.hh[m] === k && P.auto[m]) return true;
+  const L = S.bewohner[w];
+  for (let i = 0; i < L.length; i++) { const m = L[i]; if (m !== p && P.hh[m] === k && P.auto[m]) return true; }
   return false;
 }
 // Wie sehr braucht p ein Auto (0 … 1)? Liest nur Wohnung, Arbeitsweg und ob im Haushalt schon ein Auto steht (A10)
@@ -4029,7 +4479,8 @@ function wirtschaft(S) {
   for (let b = 0; b < S.gAnzahl; b++) {
     if ((g.typ[b] !== WERKSTATT && g.typ[b] !== TECH) || !offen(S, b)) continue;   // Tech-Firmen verkaufen ans selbe Umland
     let n = 0;
-    for (const w of S.belegschaft[b]) if (!P.frei[w] && !P.einsatz[w] && P.bund[w] !== ERSATZDIENST) n++;   // Bauarbeiter auf der Baustelle
+    const B = S.belegschaft[b];
+    for (let i = 0; i < B.length; i++) { const w = B[i]; if (!P.frei[w] && !P.einsatz[w] && P.bund[w] !== ERSATZDIENST) n++; }   // Bauarbeiter auf der Baustelle
     // machen keine Kisten, Ersatzdienst (Bund) ohne Baustelle auch nicht: Landschaftspflege, nichts für den Verkauf (§ 4 Abs. 1 Nr. 1 ZDG)
     if (g.typ[b] === TECH && g.markt[b]) weltArbeiter += n; else exportArbeiter += n;
   }
@@ -4041,7 +4492,8 @@ function wirtschaft(S) {
     if (!istBetrieb(t) || !offen(S, b)) { g.umsatz[b] = 0; continue; }
     const L = S.belegschaft[b];
     if (t === SCHULE) {                                      // Schule (Version 9): Lehrkräfte bezahlt das Land (von außen), den Sachaufwand die Stadt
-      for (const w of L) {
+      for (let i = 0; i < L.length; i++) {
+        const w = L[i];
         if (P.frei[w]) continue;
         const z = g.lohn[b];
         P.geld[w] += z; brutto[w] += z; S.stat.schule.lohn += z; rs.lohnsteuerAlt += z - Math.round(z * (1 - R.STEUER));
@@ -4052,7 +4504,8 @@ function wirtschaft(S) {
       continue;
     }
     if (istLand(t)) {                                        // Sicherheit: Polizei und Justizvollzug, Löhne zahlt das Land (von außen)
-      for (const w of L) {
+      for (let i = 0; i < L.length; i++) {
+        const w = L[i];
         if (P.frei[w]) continue;
         const z = g.lohn[b];
         P.geld[w] += z; brutto[w] += z; S.stat.sicherheit.landLohn += z; rs.lohnsteuerAlt += z - Math.round(z * (1 - R.STEUER));
@@ -4061,7 +4514,8 @@ function wirtschaft(S) {
       continue;
     }
     if (istBund(t)) {                                        // Bund: Kaserne und Dienststelle, Löhne und Wehrsold zahlt der Bund (von außen)
-      for (const w of L) {
+      for (let i = 0; i < L.length; i++) {
+        const w = L[i];
         if (P.frei[w]) continue;
         const z = P.bund[w] === WEHRDIENST ? R.SOLD : g.lohn[b];   // Sold brutto; Lohnsteuer wie jeder Lohn (B7)
         P.geld[w] += z; brutto[w] += z; rs.lohnsteuerAlt += z - Math.round(z * (1 - R.STEUER));
@@ -4071,7 +4525,7 @@ function wirtschaft(S) {
       continue;
     }
     let da = 0;
-    for (const w of L) if (!P.frei[w] && !P.einsatz[w] && P.bund[w] !== ERSATZDIENST) da++;   // Ersatzdienst: keine Kisten (oben)
+    for (let i = 0; i < L.length; i++) { const w = L[i]; if (!P.frei[w] && !P.einsatz[w] && P.bund[w] !== ERSATZDIENST) da++; }   // Ersatzdienst: keine Kisten (oben)
     // Werkstatt: jede Kiste bringt ein Achtel des Umlandpreises, egal ob sie ein Laden der Stadt oder das Umland nimmt.
     // Laden: Umsatz minus Kisten (aus der Stadt zum Umlandpreis, von außerhalb zu 19 Taler).
     // Tech-Firma: Arbeitstage × Umlandpreis wie eine Werkstatt, dazu was Leute der Stadt heute gekauft haben (ohne Ladenanteil).
@@ -4097,7 +4551,8 @@ function wirtschaft(S) {
       // Haushalt: Verkauf (Bauhof, Laden) als Einnahme, laufende Kosten auf das Konto des Betriebs (bei leerem Budget gekürzt, wie oben)
       if (einnahmen) hhBuch(S, HK.BETRIEBE, einnahmen);
       hhBuch(S, t === KITA ? HK.KITAS : t === RATHAUS ? HK.RATHAUS : HK.FIX, S.budget - vor - einnahmen);
-      for (const w of L) {
+      for (let i = 0; i < L.length; i++) {
+        const w = L[i];
         if (P.frei[w] || P.gemein[w]) continue;              // gemeinnützige Arbeit (R07): ohne Lohn
         if (P.bund[w] === ERSATZDIENST) {                    // Bund: Ersatzdienst im Bauhof bekommt Sold vom Bund, nicht Lohn aus dem Budget
           P.geld[w] += R.SOLD; brutto[w] += R.SOLD; sb.soldErsatz += R.SOLD; rs.lohnsteuerAlt += R.SOLD - Math.round(R.SOLD * (1 - R.STEUER));
@@ -4111,7 +4566,8 @@ function wirtschaft(S) {
       }
     } else {                                                 // Besitzer bekommt Umsatz minus Löhne
       let k = g.kasse[b] + einnahmen - fix, loehne = 0;
-      for (const w of L) {
+      for (let i = 0; i < L.length; i++) {
+        const w = L[i];
         if (P.frei[w]) continue;
         k -= lohn; loehne += lohn; P.geld[w] += lohn; brutto[w] += lohn; rs.lohnsteuerAlt += lohn - netto;
       }
@@ -4150,7 +4606,8 @@ function kistenVerteilen(S) {
     g.kisten[b] = 0; g.kistenStadt[b] = 0; g.kistenWerk[b] = 0;
     if (!offen(S, b)) continue;
     let da = 0;
-    for (const w of S.belegschaft[b]) if (!P.frei[w] && !P.einsatz[w] && P.bund[w] !== ERSATZDIENST) da++;   // Ersatzdienst: keine Kisten
+    const L = S.belegschaft[b];
+    for (let i = 0; i < L.length; i++) { const w = L[i]; if (!P.frei[w] && !P.einsatz[w] && P.bund[w] !== ERSATZDIENST) da++; }   // Ersatzdienst: keine Kisten
     g.kisten[b] = Math.min(65535, da * R.KISTEN_PRO_TAG);
     gemacht += g.kisten[b];
     if (da) werk.push(b);
@@ -4161,7 +4618,8 @@ function kistenVerteilen(S) {
     let bedarf = autowerk ? g.verkauft[b] * R.AUTO_KISTEN : Math.round(g.umsatz[b] / R.KISTE_UMSATZ), meiste = 0;
     while (bedarf > 0) {
       let w = -1, wd = R.REICH_LIEFER + 1;
-      for (const q of werk) {
+      for (let j = 0; j < werk.length; j++) {
+        const q = werk[j];
         if (g.kistenStadt[q] >= g.kisten[q]) continue;
         const d = Math.abs(g.x[q] - g.x[b]) + Math.abs(g.y[q] - g.y[b]);
         if (d < wd) { wd = d; w = q; }
@@ -4284,7 +4742,8 @@ function kleinkind(S, kopf, auchMitPlatz) {
   const P = S.p, w = P.wohnung[kopf];
   if (w < 0 || !S.hhKinder[kopf]) return false;
   const t = S.tag - R.BETREUUNG_ALTER;
-  for (const m of S.bewohner[w]) if (P.hh[m] === kopf && P.geb[m] > t && (auchMitPlatz || !P.kita[m])) return true;
+  const L = S.bewohner[w];
+  for (let i = 0; i < L.length; i++) { const m = L[i]; if (P.hh[m] === kopf && P.geb[m] > t && (auchMitPlatz || !P.kita[m])) return true; }
   return false;
 }
 // Kann p Betreuungsgehalt bekommen? 18 bis 66, ohne Stelle, ohne eigenen Betrieb, nicht in Rente (auch nicht vor 67). Gemeinnützige
@@ -4315,7 +4774,7 @@ function elternzeitMoeglich(S, p) {
 function gemeinZahl(S) {
   const P = S.p;
   let n = 0;
-  if (S.bauhof >= 0) for (const w of S.belegschaft[S.bauhof]) if (P.gemein[w]) n++;
+  if (S.bauhof >= 0) { const L = S.belegschaft[S.bauhof]; for (let i = 0; i < L.length; i++) if (P.gemein[L[i]]) n++; }
   return n;
 }
 // R02 Familiensplitting: Steuerhaushalt = der Vorstand und sein Partner im selben Haushalt, mit den Kindern unter 18 dort.
@@ -4372,7 +4831,9 @@ function verdientImHaushalt(S, p) {
   const P = S.p, k = P.hh[p], w = P.wohnung[p];
   if (k < 0 || w < 0) return false;
   const erw = S.tag - R.ERWACHSEN * R.JAHR, bt = betreuer(S, k);
-  for (const m of S.bewohner[w]) {
+  const L = S.bewohner[w];
+  for (let i = 0; i < L.length; i++) {
+    const m = L[i];
     if (m === p || P.hh[m] !== k || P.geb[m] > erw) continue;
     if ((P.arbeit[m] >= 0 && !P.gemein[m]) || P.besitz[m] >= 0 || rentner(S, m) || bt === m) return true;   // (Rente auch in Haft)
   }
@@ -4440,7 +4901,7 @@ function kitaUmbau(S, b, neuTyp, arbeit) {                  // Schule (Version 9
 function haushaltLage(S, kopf) {
   const P = S.p, w = P.wohnung[kopf], erw = S.tag - R.ERWACHSEN * R.JAHR, pa = P.partner[kopf];
   let heim = false;
-  if (w >= 0) for (const m of S.bewohner[w]) if (P.hh[m] === kopf && P.geb[m] <= erw && P.arbeit[m] < 0 && !P.haftBis[m]) { heim = true; break; }   // in Haft ist niemand zu Hause
+  if (w >= 0) { const L = S.bewohner[w]; for (let i = 0; i < L.length; i++) { const m = L[i]; if (P.hh[m] === kopf && P.geb[m] <= erw && P.arbeit[m] < 0 && !P.haftBis[m]) { heim = true; break; } } }   // in Haft ist niemand zu Hause
   const alle = P.arbeit[kopf] >= 0 && (pa < 0 || P.hh[pa] !== kopf || P.arbeit[pa] >= 0);
   return { heim, alle };
 }
@@ -4462,7 +4923,9 @@ function gebunden(S, p) {
   if (k < 0 || w < 0 || P.arbeit[p] >= 0 || P.besitz[p] >= 0 || !(k === p || k === P.partner[p]) || !S.hhKinder[k] || rentner(S, p) || kitaFrist(S) || P.haftBis[p]) return false;
   const erw = S.tag - R.ERWACHSEN * R.JAHR;
   let fehlt = 0;
-  for (const m of S.bewohner[w]) {
+  const L = S.bewohner[w];
+  for (let i = 0; i < L.length; i++) {
+    const m = L[i];
     if (P.hh[m] !== k || m === p) continue;
     if (P.geb[m] <= erw) { if (P.arbeit[m] < 0 && !P.haftBis[m]) return false; continue; }   // ein anderer Erwachsener ist zu Hause
     const a = S.tag - P.geb[m];
@@ -4893,6 +5356,7 @@ function schulePruefen(S) {
 
 function menschenTag(S) {
   const g = S.g, tag = S.tag, J = R.JAHR;
+  const vT = R.GED && R.ERF_HALB > 0 ? Math.max(1, Math.round(R.ERF_HALB / 15)) : 0;   // Etappe 2: Takt des Verblassens (0: keins)
   for (let p = 0; p < S.pMax; p++) {
     const P = S.p;
     if (!P.lebt[p]) continue;
@@ -4933,6 +5397,8 @@ function menschenTag(S) {
     if (P.geld[p] < 300) P.sparSeit[p] = tag;
     if (P.sucht[p] && eigeneWohnung(S, p) && P.bWohnen[p] >= 40) P.sucht[p] = 0;
     if (P.suchPause[p]) P.suchPause[p]--;
+    if (vT && (tag + p) % vT === 0) erfVerblassen(S, p);     // Etappe 2: Erfahrung verblasst (vor der Frist derselben Nacht)
+    if (R.GED && P.offen[p]) erfTag(S, p);                   // Etappe 2: Frist der offenen Handlung
     zielPruefen(S, p);
   }
 }
@@ -5599,8 +6065,8 @@ function opferWaehlen(S, p, typ) {
     if (q === p || !P.lebt[q] || P.geb[q] > erw || P.haftBis[q]) continue;
     if (P.hh[p] >= 0 && P.hh[q] === P.hh[p]) continue;
     if (typ !== EINBRUCH) return q;
-    const k = P.hh[q];
-    if (k < 0 || P.wohnung[k] < 0 || S.feld[gebZelle(S, P.wohnung[k])] !== WOHNHAUS) continue;
+    const k = P.hh[q];                                        // Opfer ist der Vorstand: auch er nicht in Haft (R.OPFER_FREI)
+    if (k < 0 || (R.OPFER_FREI && P.haftBis[k]) || P.wohnung[k] < 0 || S.feld[gebZelle(S, P.wohnung[k])] !== WOHNHAUS) continue;
     return k;
   }
   return -1;
@@ -5660,7 +6126,11 @@ function haftAntritt(S, p, tage, art) {
   const b = P.arbeit[p];
   if (b >= 0) {
     if (P.besitz[p] === b) P.arbeit[p] = -1;
-    else { const gem = P.gemein[p] || P.bund[p] >= WEHRDIENST; austreten(S, p, 'haft'); if (!gem) erinnere(S, p, M.JOB_WEG, b); }   // Bund: der Dienst endet (vereinfacht); Bürgermeister: das Amt endet
+    else {                                                   // Bund: der Dienst endet (vereinfacht); Bürgermeister: das Amt endet
+      const gem = P.gemein[p] || P.bund[p] >= WEHRDIENST; austreten(S, p, 'haft');
+      if (R.GED) erfHaft(S, p);                              // Etappe 2: die Haft kostet die Stelle, nicht ein offener Wechsel
+      if (!gem) erinnere(S, p, M.JOB_WEG, b);
+    }
   }
   P.gsTage[p] = 0;
   P.haftOrt[p] = jvaOffen(S) && insassen(S) < R.JVA_PLAETZE ? 1 : 2;
@@ -6931,6 +7401,8 @@ function haushaltPruefen(S) {
 // ─── Start ───────────────────────────────────────────────────────────────────────────
 // Version 9, Teil 5: welt (Gründungen und Übernahmen für den Weltmarkt), aufgegeben (Pleiten ohne je eine Kraft, in pleiten mitgezählt)
 function techStatLeer() { return { gruendungen: 0, versionen: 0, anbauten: 0, pleiten: 0, kaeufe: [0, 0, 0, 0], umsatz: 0, welt: 0, aufgegeben: 0 }; }
+// Etappe 2: Summen seit dem Start (S.stat.ged)
+function gedStatLeer() { return { gelernt: [0, 0, 0, 0], schlecht: [0, 0, 0, 0], planEnde: new Array(PLAN_GRUND.length).fill(0) }; }
 function leererZustand(seed) {
   const S = {
     version: VERSION, seed: seed >>> 0, rs: seed >>> 0,
@@ -6938,8 +7410,8 @@ function leererZustand(seed) {
     karte: 0, mitte: 0, vn: 0, vo: 0,                        // Stadt erweitern: Kartengröße, Mitte, Viertel (karteMasse)
     feld: null, feldGeb: null, feldStr: null, platz: null,
     vHaus: [], vBetrieb: [], vPark: [], vPlatz: [], bauplaetze: 0, enden: [], kreuzungen: [], strNaechste: 0,
-    g: {}, gAnzahl: 0, bewohner: [], belegschaft: [], baustellen: [], ladenWahl: [],
-    p: {}, pKap: 0, pMax: 0, frei: [], einwohner: 0, hhGroesse: null, hhKinder: null,
+    g: felderObjekt(GF), gAnzahl: 0, bewohner: [], belegschaft: [], baustellen: [], ladenWahl: [],
+    p: felderObjekt(PF), pKap: 0, pMax: 0, frei: [], einwohner: 0, hhGroesse: null, hhKinder: null,
     freieWohnungen: 0, wohnungenImBau: 0, freieStellen: 0, freiLohn: new Int32Array(128), leerstand: 0, leerTyp: new Int32Array(8),
     exportPreis: R.EXPORT_MAX, zufMittel: 60, erwachseneJetzt: 0, arbeitslose: 0, arbeitslosenquote: 0,
     wohnungSuchende: 0, anfragen: 0, unversorgtQuote: 0, werkstattPlaetze: 0, letzteGruendung: 0, letzteNotbremse: -999,
@@ -6986,6 +7458,7 @@ function leererZustand(seed) {
       gewaehlt: new Array(13).fill(0), ausgefuehrt: new Array(13).fill(0),
     },
   };
+  if (R.GED) S.stat.ged = gedStatLeer();                     // Etappe 2: gelernte Erfahrungen (davon schlechte) je ERF_AKTION, Planenden je Grund
   karteMasse(S, R.KARTE_START);
   const F = S.karte * S.karte, VV = S.vn * S.vn;
   S.feld = new Uint8Array(F); S.feldGeb = new Int32Array(F).fill(-1); S.feldStr = new Int16Array(F).fill(-1); S.platz = new Uint8Array(F);
@@ -7123,9 +7596,9 @@ function exportZustand(S) {
   return { format: 'stadt', version: VERSION, werte, json, arrays };
 }
 // migrieren: einen Spielstand von Version 2 (vor dem Bauhof), 3 (vor den Tech-Firmen), 4 (vor der Stadtregierung), 5 (vor
-// Schritt 2 der Stadtregierung), 6 (vor „Stadt erweitern“) oder 7 (vor den Autos) übernehmen, siehe migriereV2 bis migriereV7 (eine Kette:
-// 2 → … → 6 → 7 → 8)
-const MIGRIERBAR = [2, 3, 4, 5, 6, 7, 8];
+// Schritt 2 der Stadtregierung), 6 (vor „Stadt erweitern“), 7 (vor den Autos), 8 (vor dem Rathaus) oder 9 (vor Etappe 2) übernehmen, siehe
+// migriereV2 bis migriereV7 (eine Kette: 2 → … → 6 → 7 → 8 → 9, nur für Stände bis Version 8) und migriereGed (jeder Stand bis Version 9 → 10)
+const MIGRIERBAR = [2, 3, 4, 5, 6, 7, 8, 9];
 // Personen- und Gebäudefelder, die ein Stand der aktuellen Version haben muss (neu in Version 6; ältere Stände bekommen sie beim Übernehmen)
 const PF_NEU = ['p.eigen', 'p.kaufPreis', 'p.schuld', 'p.beitrag', 'p.kita', 'g.soll'];   // mit dem Gebäudefeld der Kitas
 // Neu in Version 7: alle Personenfelder der Sicherheit (PF_SICHERHEIT, Abschnitt „Sicherheit“) und des Bundes (PF_BUND, Abschnitt „Bund“)
@@ -7142,6 +7615,7 @@ function importZustand(d, migrieren) {
     e.andereVersion = true;
     e.migrierbar = MIGRIERBAR.includes(d.version);
     e.vonVersion = d.version;
+    e.neuer = typeof d.version === 'number' && d.version > VERSION;   // von einer neueren Datei (Version 10: eigener Text im Versionsdialog)
     throw e;
   }
   const S = {};
@@ -7153,7 +7627,7 @@ function importZustand(d, migrieren) {
   if (!Number.isInteger(S.gAnzahl) || S.gAnzahl < 0 || S.gAnzahl > K * K || !Number.isInteger(S.pMax) || S.pMax < 0 || S.pMax > (1 << 24)) throw new Error('Spielstand beschädigt: Anzahl');
   let cap = 256;
   while (cap < S.pMax) cap *= 2;
-  S.p = {}; S.g = {};
+  S.p = felderObjekt(PF); S.g = felderObjekt(GF);
   for (const [n, T, f] of PF) S.p[n] = new T(cap * f);
   for (const [n, T] of GF) S.g[n] = new T(K * K);
   S.pKap = cap;
@@ -7165,6 +7639,7 @@ function importZustand(d, migrieren) {
     const [kopf, feld] = a.name.split('.');
     const soll = typen[a.name] || (kopf === 'hhGroesse' || kopf === 'hhKinder' ? 'Uint16Array' : S[kopf] === undefined ? a.typ : null);
     if (!a.daten || a.daten.constructor.name !== a.typ || (soll && soll !== a.typ)) throw new Error('Spielstand beschädigt: ' + a.name);
+    if (a.name === 'p.memName' && d.version <= 9 && a.typ === 'Uint32Array') continue;   // Name der Bezugsperson (bis Version 9): entfällt (migriereGed)
     if (feld !== undefined && (!S[kopf][feld] || a.daten.length > S[kopf][feld].length)) throw new Error('Spielstand beschädigt: ' + a.name);
     if (feld !== undefined) S[kopf][feld].set(a.daten);
     else if (kopf === 'hhGroesse' || kopf === 'hhKinder') S[kopf].set(a.daten);
@@ -7176,9 +7651,10 @@ function importZustand(d, migrieren) {
   const pflicht = d.version >= 7 ? PF_NEU.concat(PF_SICHERHEIT.map(n => 'p.' + n), PF_BUND.map(n => 'p.' + n)) : [];
   if (d.version >= 8) pflicht.push(...PF_AUTO.map(n => 'p.' + n), ...GF_AUTO.map(n => 'g.' + n));   // neu in Version 8
   if (d.version >= 9) pflicht.push(...PF_SCHULE.map(n => 'p.' + n), ...GF_TECH9.map(n => 'g.' + n));   // neu in Version 9: Schulplatz je Person, Markt und Kraft je Betrieb (Rathaus und Bürgermeister: keine Felder)
+  if (d.version >= 10) pflicht.push(...PF_GED.map(n => 'p.' + n));   // neu in Version 10: Fakt und Verweis je Erinnerung, Erfahrung, offene Handlung, Plan, letzte Entscheidung
   for (const k of pflicht) if (!d.arrays.some(a => a.name === k)) throw new Error('Spielstand unvollständig: ' + k);
   jsonPruefen(S);
-  if (alt) {
+  if (alt && d.version <= 8) {                               // die Kette bis Version 9 (ein Stand der Version 9 hat all das schon)
     if (d.version === 2) migriereV2(S);
     if (d.version <= 3) migriereV3(S, d.version === 3);
     if (d.version <= 4) migriereV4(S);
@@ -7195,6 +7671,8 @@ function importZustand(d, migrieren) {
     migriereWachstum(S);                                     // Wachstum (Version 9, Teil 4): Schalter normal, KI-Frist 2 Spielstunden (keine Zeile)
     migriereTech9(S);                                        // Tech-Firmen früher und mehr (Version 9, Teil 5): alle im Umland, Bremse nachgezählt
   }
+  if (alt) migriereGed(S);                                   // Etappe 2 (Version 10): jeder ältere Stand, nach der Kette
+  gedPruefen(S);                                             // Etappe 2: jeder Stand ab Version 10 (auch übernommen)
   erweiterungPruefen(S);                                     // Stadt erweitern: jeder Stand der Version 7 (auch übernommen)
   sicherheitPruefen(S);                                      // Sicherheit: jeder Stand der Version 7 (auch übernommen)
   bundPruefen(S);                                            // Bund: ebenso
@@ -7208,7 +7686,66 @@ function importZustand(d, migrieren) {
   autoPruefen(S);                                            // Version 8: jeder Stand (auch übernommen)
   wachstumPruefen(S);                                        // Wachstum (Version 9, Teil 4): jeder Stand (auch übernommen)
   tech9Pruefen(S, true);                                     // Tech-Firmen früher und mehr (Version 9, Teil 5): jeder Stand (auch übernommen)
-  return S;
+  // Dieselben Schlüssel in derselben Reihenfolge mit denselben Werten, als neues Objekt: S hat hier seine Schlüssel einzeln mit berechnetem
+  // Namen bekommen und ist in V8 ein Wörterbuch (jeder Zugriff langsamer, siehe felderObjekt); die Kopie nicht (Optimieren, Etappe 2)
+  return { ...S };
+}
+// Version 9 → 10 (Etappe 2), nach der Kette: memName hat importZustand schon weggelassen (Entscheidung 1). Mit R.GED wird das Gedächtnis neu
+// verteilt: Die alten Einträge (8 Plätze im Ring, ab memPos der älteste) laufen in der Reihenfolge des Erlebens noch einmal durch die Kurzzeit,
+// und was herausfällt, behält memBehalten wie im Spiel (Bedeutung ab MEM_SCHWELLE, sonst vergessen); Fakt und Verweis bleiben 0 (der alte Stand
+// kennt sie nicht). Keine Erfahrung, nichts offen, kein letzter Plan, keine letzte Entscheidung (die Felder fehlen im alten Stand und stehen auf
+// 0); der Planschritt kommt wie jede Nacht (zielPruefen) aus dem Zustand. S.stat.ged beginnt bei 0. Keine Zeile im Stadtbuch. Ohne R.GED
+// (Vergleiche mit älteren Fassungen) bleibt der Ring, wie er ist. Liest keine Namen: memRef und memGen werden nur mitkopiert
+function migriereGed(S) {
+  S.version = VERSION;
+  if (!R.GED) return;
+  S.stat.ged = gedStatLeer();
+  const P = S.p, M8 = R.MEM, alt = [];
+  for (let p = 0; p < S.pMax; p++) {
+    const o = p * M8;
+    alt.length = 0;
+    for (let j = 0; j < M8; j++) {
+      const i = o + (P.memPos[p] + j) % M8;
+      if (P.memCode[i]) alt.push(P.memCode[i], P.memTag[i], P.memRef[i], P.memGen[i]);
+    }
+    for (let i = o; i < o + M8; i++) { P.memCode[i] = 0; P.memTag[i] = 0; P.memRef[i] = -1; P.memGen[i] = 0; }
+    P.memPos[p] = 0;
+    for (let n = 0; n < alt.length; n += 4) {                // wie erinnere, ohne Folgen (kein Fakt, kein Lernen, keine Entscheidung)
+      const k = P.memPos[p], i = o + k;
+      if (P.memCode[i] && M_BED[P.memCode[i]] >= R.MEM_SCHWELLE) memBehalten(S, p, i);
+      P.memCode[i] = alt[n]; P.memTag[i] = alt[n + 1]; P.memRef[i] = alt[n + 2]; P.memGen[i] = alt[n + 3];
+      P.memPos[p] = (k + 1) % R.MEM_KURZ;
+    }
+    if (P.lebt[p] && P.ziel[p]) P.planSchritt[p] = planSchrittVon(S, p, P.ziel[p]);
+  }
+}
+// Etappe 2: beschädigte Stände ablehnen (jeder Stand ab Version 10, auch übernommen), nichts still korrigieren. Abgelehnt wird, was die Regeln
+// nie schreiben: Kurzzeit-Platz außerhalb des Rings, unbekannte Erinnerung, Fakt oder Verweis an einem leeren Platz; Erfahrung mit Wert −32 oder
+// ohne Beobachtung mit Wert; offene Handlung, die es nicht gibt, oder Frist außerhalb 1 … ERF_FRIST (ohne offene Handlung 0); Planschritt jenseits
+// der Schritte des Ziels, letzter Plan mit unbekanntem Ziel oder Grund; letzte Entscheidung mit unbekannter Aktion oder Quelle, aus der Zukunft
+// oder ohne Aktion mit Werten; Summen S.stat.ged (mit R.GED Pflicht; ohne R.GED verboten, denn dann ist das Gedächtnis anders geordnet)
+function gedPruefen(S) {
+  const kaputt = (w) => { throw new Error('Spielstand beschädigt: ' + w); };
+  const P = S.p, st = S.stat.ged, jetzt = S.tag * 24 + S.stunde, ring = R.GED ? R.MEM_KURZ : R.MEM;
+  const zahlen = (a, n) => Array.isArray(a) && a.length === n && a.every(v => Number.isInteger(v) && v >= 0);
+  if (R.GED ? !st || typeof st !== 'object' || !zahlen(st.gelernt, ERF_AKTION.length) || !zahlen(st.schlecht, ERF_AKTION.length)
+      || !zahlen(st.planEnde, PLAN_GRUND.length) || st.schlecht.some((v, s) => v > st.gelernt[s]) : st !== undefined) kaputt('Gedächtnis (Summen)');
+  for (let p = 0; p < S.pMax; p++) {
+    if (P.memPos[p] >= ring) kaputt('Gedächtnis (Platz)');
+    for (let i = p * R.MEM; i < (p + 1) * R.MEM; i++) {
+      if (P.memCode[i] >= M_BED.length || (!P.memCode[i] && (P.memFakt[i] || P.memVon[i]))) kaputt('Gedächtnis (Erinnerung)');
+    }
+    for (let c = p * 8; c < p * 8 + 8; c++) { const e = P.erf[c]; if (e & 3 ? e >> 2 === 0 : e) kaputt('Erfahrung'); }
+    const o = P.offen[p];
+    if (o > 2 * ERF_AKTION.length || (o ? P.offRest[p] < 1 || P.offRest[p] > R.ERF_FRIST[(o - 1) >> 1] : P.offRest[p])) kaputt('offene Handlung');
+    const sch = PLAN_SCHRITTE[P.ziel[p]], lz = P.planGrund[p];
+    if (!sch || P.planSchritt[p] >= Math.max(1, sch.length)
+      || (lz && ((lz & 7) < 1 || (lz & 7) >= ZIELNAMEN.length || lz >> 3 < 1 || lz >> 3 >= PLAN_GRUND.length))) kaputt('Plan');
+    const a = P.entA[p], q = P.entArt[p];
+    if (a ? a >= AKTIONSNAMEN.length || q > 15 || (q & 7) < 1 || (q & 7) >= QUELLEN.length || P.entZeit[p] < 0 || P.entZeit[p] > jetzt : q || P.entZeit[p]) {
+      kaputt('letzte Entscheidung');
+    }
+  }
 }
 // Version 4 → 5: Ab heute regiert die Stadtregierung (Rentenstufen ab dem Übernahmetag). Die neuen Personenfelder stehen auf 0:
 // niemand bezieht schon Grundsicherung. Eine Zeile im Stadtbuch, die auch Schritt 2 und die Übergangsfrist der Kitas nennt (migriereV5
@@ -7414,6 +7951,52 @@ function erinnerungText(S, code, bezug, name, tag) {
   }
   return '';
 }
+// Etappe 2 (Entscheidung 1): Wer nicht mehr in der Stadt lebt, wird ohne Namen erinnert, mit der Beziehung aus den eigenen Erinnerungen an
+// dieselbe Person (Partner, Kind, Freund). Nur Anzeige; liest keine Namen, kein Geschlecht, keine Eltern
+function bezugWort(S, p, i) {
+  const P = S.p, code = P.memCode[i], o = p * R.MEM;
+  let rolle = 0;
+  for (let j = o; j < o + R.MEM && !rolle; j++) {
+    const c = P.memCode[j];
+    if (P.memRef[j] === P.memRef[i] && P.memGen[j] === P.memGen[i] && (c === M.PARTNER || c === M.GETRENNT || c === M.KIND || c === M.FREUND)) rolle = c === M.GETRENNT ? M.PARTNER : c;
+  }
+  switch (code) {
+    case M.GESTORBEN: return rolle === M.PARTNER ? 'Der Partner' : rolle === M.KIND ? 'Ein Kind' : rolle === M.FREUND ? 'Ein Freund' : 'Jemand Nahes';
+    case M.PARTNER: case M.GETRENNT: return 'dem damaligen Partner';
+    case M.KIND: return 'ein Kind, das nicht mehr in der Stadt lebt';
+    case M.FREUND: return 'jemandem, der nicht mehr in der Stadt lebt';
+    case M.KITA_FEHLT: return 'das Kind';
+    case M.OBHUT: return 'Angehörigen';
+  }
+  return 'jemand';
+}
+// Etappe 2: Erfahrung, offene Handlung, Plan, letzte Entscheidung und Gedächtnis mit Fakt und Verweis einer Person (nur Zahlen und Codes, keine
+// Namen; für Werkzeuge und Tests, später Karte und Sprachmodell). Liest nur
+function gedInfo(S, p) {
+  const P = S.p;
+  if (p < 0 || p >= S.pMax || !P.lebt[p]) return null;
+  const z = P.ziel[p], sch = PLAN_SCHRITTE[z] || [], s = P.planSchritt[p], lage = erfLage(P, p), o = P.offen[p], lz = P.planGrund[p];
+  const LAGE = ['geld_knapp', 'geld_reicht'], erfahrung = [];
+  ERF_AKTION.forEach((a, e) => {
+    for (let l = 0; l < 2; l++) {
+      const c = p * 8 + 2 * e + l;
+      if (erfN(P, c)) erfahrung.push({ aktion: AKTIONSNAMEN[a], lage: LAGE[l], wert: erfW(P, c), n: erfN(P, c), punkte: R.GED_STAERKE * erfPunkte(P, c), jetzt: l === lage });
+    }
+  });
+  const warte = pleiteWarteBis(S, p);
+  return {
+    lage: LAGE[lage], erfahrung,
+    offen: o ? { aktion: AKTIONSNAMEN[ERF_AKTION[(o - 1) >> 1]], lage: LAGE[(o - 1) & 1], restTage: P.offRest[p], seitTagen: R.ERF_FRIST[(o - 1) >> 1] - P.offRest[p] } : null,
+    plan: z ? { ziel: ZIELNAMEN[z], id: z + '/' + P.zielSeit[p], schritt: s, schrittText: sch[s] ? sch[s][0] : '', aktion: sch[s] && sch[s][1] ? AKTIONSNAMEN[sch[s][1]] : null,
+      seit: P.zielSeit[p], frist: P.zielSeit[p] + R.ZIEL_TAGE,
+      ruecklage: z === Z.LADEN && ruecklageGilt(S, p) ? { ziel: Math.round(planZiel(S, p)), geld: Math.round(P.geld[p]), wartetBis: warte > S.tag ? warte : null } : null } : null,
+    letzterPlan: lz ? { ziel: ZIELNAMEN[lz & 7], grund: PLAN_GRUND[lz >> 3] } : null,
+    letzteEntscheidung: P.entA[p] ? { aktion: AKTIONSNAMEN[P.entA[p]], tag: Math.floor(P.entZeit[p] / 24), stunde: P.entZeit[p] % 24,
+      quelle: QUELLEN[P.entArt[p] & 7], geklappt: !!(P.entArt[p] & 8) } : null,
+    gedaechtnis: Array.from({ length: R.MEM }, (x, j) => p * R.MEM + j).filter(i => P.memCode[i]).map(i => ({ platz: i - p * R.MEM, lang: i - p * R.MEM >= R.MEM_KURZ,
+      code: P.memCode[i], tag: P.memTag[i], bedeutung: M_BED[P.memCode[i]], fakt: P.memFakt[i], ursacheVorTagen: P.memVon[i] ? P.memVon[i] - 1 : null })),
+  };
+}
 // Alles, was die Personenkarte zeigt. Namen noch lebender Personen kommen als Marke (anklickbar).
 function personInfo(S, p, gen) {
   const P = S.p;
@@ -7453,18 +8036,26 @@ function personInfo(S, p, gen) {
   // Sicherheit: in Haft (wer einen Betrieb hat, behält ihn: „besitzt …; in Haft …“)
   if (haft) arbeit = (bes >= 0 ? arbeit + '; ' : '') + `in ${haft.art}` + (haft.ort >= 0 ? ` in der Justizvollzugsanstalt ${gebOrt(S, haft.ort)}` : ' in einer Anstalt des Landes außerhalb')
     + (haft.u ? ', bis das Gericht urteilt' : ` bis Tag ${haft.bis}`);
-  // Gedächtnis chronologisch (Ringpuffer ab dem ältesten Platz)
+  // Gedächtnis chronologisch (Ringpuffer ab dem ältesten Platz). Etappe 2: Langzeit und Kurzzeit nach Tag (die Plätze liegen nicht mehr in der
+  // Reihenfolge des Erlebens); wer nicht mehr lebt, heißt nach der Beziehung (bezugWort), Namen lebender Personen kommen wie bisher aus nr
   const mem = [];
-  for (let j = 0; j < R.MEM; j++) {
-    const i = p * R.MEM + ((P.memPos[p] + j) % R.MEM), code = P.memCode[i];
+  const plaetze = R.GED ? Array.from({ length: R.MEM - R.MEM_KURZ }, (x, j) => R.MEM_KURZ + j)
+      .concat(Array.from({ length: R.MEM_KURZ }, (x, j) => (P.memPos[p] + j) % R.MEM_KURZ)).map(j => p * R.MEM + j)
+      .map((i, n) => [i, n]).sort((a, b) => P.memTag[a[0]] - P.memTag[b[0]] || a[1] - b[1]).map(x => x[0])
+    : Array.from({ length: R.MEM }, (x, j) => p * R.MEM + ((P.memPos[p] + j) % R.MEM));
+  for (const i of plaetze) {
+    const code = P.memCode[i];
     if (!code) continue;
     const bz = P.memRef[i];
     let nm = '';
     if (M_BEZUG[code] === 'p' && !(code === M.OBHUT && bz < 0)) {   // Obhut ohne Person: beim Jugendamt (eigener Text)
       const lebend = bz >= 0 && P.lebt[bz] && P.gen[bz] === P.memGen[i];
-      nm = lebend ? nr(S, bz) : P.memName[i] ? '\u0001' + bz + '/' + P.memGen[i] + '/' + nameAusPack(P.memName[i]) + '\u0002' : 'jemand';
+      nm = lebend ? nr(S, bz) : bezugWort(S, p, i);            // Version 10: kein Name mehr im Gedächtnis (auch mit R.GED = 0)
     }
-    mem.push({ tag: P.memTag[i], text: erinnerungText(S, code, bz, nm, P.memTag[i]) });
+    // Etappe 2 (Karte, Schritt 3): Code, Kurz- oder Langzeit, Fakt und Verweis wie in gedInfo (nur Zahlen; ohne R.GED lang null, kein Fakt)
+    const k = i - p * R.MEM;
+    mem.push({ tag: P.memTag[i], text: erinnerungText(S, code, bz, nm, P.memTag[i]), code, lang: R.GED ? k >= R.MEM_KURZ : null,
+      fakt: R.GED ? P.memFakt[i] : 0, ursacheVorTagen: R.GED && P.memVon[i] ? P.memVon[i] - 1 : null });
   }
   // Familie
   const eltern = [];
@@ -8168,12 +8759,15 @@ function kiPolicyHash(d) {
 }
 // Eine Policy-Datei (ki/policy_*.json, training/exportiere.py) streng prüfen und zum Rechnen vorbereiten. Wirft mit Grund, wenn etwas
 // nicht passt: Format, Sim-Version (trainiert auf dieser Version der Stadt), Schema (Merkmale und Aktionen genau wie hier), Längen,
-// Zahlen (endlich), Normalisierung, Schichten, Inhalts-Hash (nachgerechnet: der Verweis im Spielstand zeigt immer auf genau diese Gewichte).
+// Zahlen (endlich, Gewichte, Bias und clip auch nach dem Runden auf float32), Normalisierung, Schichten, Inhalts-Hash (nachgerechnet: der
+// Verweis im Spielstand zeigt immer auf genau diese Gewichte).
 const KI_AKT = { tanh: 1, relu: 2, linear: 3 };
 const KI_FORMAT = 2;                    // 2: Sim-Version und nachgerechneter Inhalts-Hash (1: Etappe 1 bis zur Prüfung, nicht mehr gültig)
 function kiPolicyPruefen(d) {
   const fehl = (w) => { throw new Error('Policy ungültig: ' + w); };
   const endlich = (v) => typeof v === 'number' && Number.isFinite(v);
+  // float32: gerechnet wird mit Math.fround(v); über dem float32-Bereich wird daraus ±Unendlich (z. B. 1e39), darum erst danach prüfen
+  const endlich32 = (v) => endlich(v) && Number.isFinite(Math.fround(v));
   if (!d || typeof d !== 'object' || d.format !== 'stadt-policy') fehl('kein Format stadt-policy');
   if (d.formatVersion !== KI_FORMAT) fehl('Formatversion ' + d.formatVersion + ' (erwartet ' + KI_FORMAT + ')');
   if (d.simVersion !== VERSION) fehl('trainiert auf Stadt-Version ' + d.simVersion + ', diese Stadt ist Version ' + VERSION + ' (neu trainieren)');
@@ -8186,6 +8780,7 @@ function kiPolicyPruefen(d) {
   const no = d.normalisierung;
   if (!no || !Array.isArray(no.mittel) || !Array.isArray(no.streuung) || no.mittel.length !== KI_N || no.streuung.length !== KI_N) fehl('Normalisierung fehlt');
   if (!no.mittel.every(endlich) || !no.streuung.every(v => endlich(v) && v > 0) || !endlich(no.clip) || no.clip <= 0) fehl('Normalisierung: Zahlen');
+  if (!endlich32(no.clip)) fehl('Normalisierung: clip über dem float32-Bereich');   // die Eingabe wird auf ±clip begrenzt und dann gerundet
   const sch = d.netz && d.netz.schichten;
   if (!Array.isArray(sch) || sch.length < 1 || sch.length > 6) fehl('Schichten');
   let nIn = KI_N;
@@ -8198,8 +8793,12 @@ function kiPolicyPruefen(d) {
     for (let j = 0; j < nOut; j++) {
       const zeile = W[j];
       if (!Array.isArray(zeile) || zeile.length !== nIn) fehl('Schicht ' + k + ': Zeile ' + j + ' hat nicht ' + nIn + ' Gewichte');
-      for (let i2 = 0; i2 < nIn; i2++) { const v = zeile[i2]; if (!endlich(v)) fehl('Schicht ' + k + ': Zahl'); w[j * nIn + i2] = Math.fround(v); }
-      if (!endlich(B[j])) fehl('Schicht ' + k + ': Bias'); bias[j] = Math.fround(B[j]);
+      for (let i2 = 0; i2 < nIn; i2++) {
+        const v = zeile[i2]; if (!endlich(v)) fehl('Schicht ' + k + ': Zahl'); if (!endlich32(v)) fehl('Schicht ' + k + ': Zahl über dem float32-Bereich');
+        w[j * nIn + i2] = Math.fround(v);
+      }
+      if (!endlich(B[j])) fehl('Schicht ' + k + ': Bias'); if (!endlich32(B[j])) fehl('Schicht ' + k + ': Bias über dem float32-Bereich');
+      bias[j] = Math.fround(B[j]);
     }
     L.push({ w, bias, nIn, nOut, akt: KI_AKT[q.aktivierung] });
     nIn = nOut;
@@ -8278,7 +8877,7 @@ function kiHaken(S, p, h) {
   }
   st.entscheidungen++;
   if (a === 0) { st.warten++; return 0; }
-  if (ausfuehren(S, p, a)) st.ausgefuehrt++; else st.fehlgeschlagen++;   // a stammt aus der Maske von eben (gleiche Stunde, gleicher Stand)
+  if (ausfuehren(S, p, a, Q.POLICY)) st.ausgefuehrt++; else st.fehlgeschlagen++;   // a stammt aus der Maske von eben (gleiche Stunde, gleicher Stand)
   return a;
 }
 // ─── Fokusperson (Trainingsumgebung und Auswertung) ───
@@ -8308,7 +8907,7 @@ function kiFokusAusfuehren(S, a) {
   if (a === 0) return { art: 'warten', aktion: 0 };
   if (!lebtNoch(S, p, f.gen)) return { art: 'abgelehnt', aktion: a, grund: 'weg' };
   if (!erlaubteAktionen(S, p, e.h).includes(a)) return { art: 'abgelehnt', aktion: a, grund: 'Lage geändert' };
-  const ok = mitFokusZufall(S, f, () => ausfuehren(S, p, a));
+  const ok = mitFokusZufall(S, f, () => ausfuehren(S, p, a, Q.FOKUS));
   if (S.p.lebt[p] && S.p.gen[p] === f.gen) S.p.jetzt[p] = 0;   // eigene Folgen lösen keine zweite Entscheidung aus (wie in stunde)
   return { art: ok ? 'ausgefuehrt' : 'fehlgeschlagen', aktion: a };
 }
@@ -8395,7 +8994,15 @@ G.StadtSim = {
     techFreiZaehlen, migriereTech9, tech9Pruefen, schulITKaufen, ladenNaechst, hhComputer, pleite, marktSatz },
   _auto: { autoKauf, autosTag, autoGeldnot, autoErbe, autoRestwert, autoBedarf, werkAuftrag, umzugInsWerk, autosBauen, techGrenzeHalten, anbauAuftraege,
     wachsZiel, autoWillig, leeresWerk, autoPruefen, kistenVerteilen, sterben, aktGruenden, kennzahlenRechnen, schliessen, uebernehmbar },
+  // Etappe 2 (Gedächtnis, Erfahrung, Plan): warum und gedInfo lesen nur (Karte, Werkzeuge, Tests); beobachter ist eine Eigenschaft (unten).
+  // PF_GED und die Tabellen für Werkzeuge und Tests; _ged nur für tools/simtest.mjs (Übernahme von Version 9, beschädigte Stände)
+  warum, gedInfo, PF_GED, M_BED, ERF_AKTION, PLAN_GRUND, PLAN_SCHRITTE, QUELLEN,
+  _ged: { migriereGed, gedPruefen, planSchrittVon, gedStatLeer },
 };
+// Etappe 2: Beobachter „heute anders entschieden wegen Erfahrung“ (Sim.beobachter = fn oder null; liegt nicht in S, siehe BEOB)
+Object.defineProperty(G.StadtSim, 'beobachter', { get: () => BEOB.fn, set: (f) => { BEOB.fn = typeof f === 'function' ? f : null; BEOB.fehler = null; }, enumerable: true });
+// Text des Fehlers, mit dem sich der Beobachter abgeschaltet hat (null: keiner); neues Setzen löscht ihn
+Object.defineProperty(G.StadtSim, 'beobachterFehler', { get: () => BEOB.fehler, enumerable: true });
 })(globalThis);
 </script>
 
@@ -13858,7 +14465,15 @@ const hausKnopf = (b, text) => b >= 0 ? `<button type="button" class="haus" data
 const balken = (wert, gruen) => `<div class="balken${gruen ? ' gruen' : ''}" role="img" aria-label="${Math.round(wert)} von 100"><span style="width:${Math.max(0, Math.min(100, wert))}%"></span></div>`;
 function zeigePerson(p, gen, name) { verlauf.push({ art: 'p', id: Number(p), gen: Number(gen), name: name || '' }); if (verlauf.length > 50) verlauf.shift(); karteRendern(true); }
 function zeigeGebaeude(b) { verlauf.push({ art: 'g', id: Number(b) }); if (verlauf.length > 50) verlauf.shift(); karteRendern(true); }
-function karteZu() { verlauf.length = 0; $('karte').hidden = true; klappStand(false); document.body.classList.remove('karte-offen'); hauptMarkieren(); auswahlZeigen(); }
+// Knopf, der die Karte geöffnet hat (Knopf „anders“, ein Name, …): Schließen gibt ihm den Fokus zurück, wenn der Fokus in der Karte oder
+// nirgends stand (Befund Bedienung der Schlussprüfung: sonst landet er auf body, der nächste Tab springt zur Hilfe)
+let karteVon = null;
+function karteZu() {
+  const a = document.activeElement, zurueck = !$('karte').hidden && (!a || a === document.body || $('karte').contains(a)), v = karteVon;
+  karteVon = null;
+  verlauf.length = 0; $('karte').hidden = true; klappStand(false); document.body.classList.remove('karte-offen'); hauptMarkieren(); auswahlZeigen();
+  if (zurueck && v && v.isConnected && v.getClientRects().length) v.focus({ preventScroll: true });
+}
 // Das Gebäude der offenen Hauskarte ist in der Stadt hervorgehoben; eine Personenkarte markiert nichts
 function auswahlZeigen() {
   const k = !$('karte').hidden && verlauf[verlauf.length - 1];
@@ -13946,8 +14561,9 @@ function karteAktualisieren() { if (!$('karte').hidden && verlauf.length) karteR
 function karteRendern(fokus) {
   const k = verlauf[verlauf.length - 1];
   if (!k) { karteZu(); return; }
+  if ($('karte').hidden) { const a = document.activeElement; karteVon = a && a !== document.body && !$('karte').contains(a) ? a : null; }
   $('karte').hidden = false;
-  if (fokus) klappStand(false);                            // eine neue Karte ist aufgeklappt; das stündliche Auffrischen lässt es
+  if (fokus) { klappStand(false); warumOffen.clear(); }    // eine neue Karte ist aufgeklappt, „Warum?“ zu; das stündliche Auffrischen lässt es
   document.body.classList.add('karte-offen');             // schmal: #rechts liegt dann unter der Karte (CSS blendet es aus)
   $('karte-zurueck').hidden = verlauf.length < 2;
   const ziel = $('karte-inhalt');
@@ -13958,7 +14574,20 @@ function karteRendern(fokus) {
   const tbScroll = tb ? { oben: tb.scrollTop, unten: tb.scrollHeight - tb.scrollTop - tb.clientHeight < 8 } : null;
   // Code-Blöcke im Tagebuch: eigene Scrollstelle und Tastaturfokus behalten (nach Reihenfolge)
   const codes = fokus ? [] : [...ziel.querySelectorAll('pre.code')].map(c => ({ oben: c.scrollTop, links: c.scrollLeft, fokus: document.activeElement === c }));
-  ziel.innerHTML = k.art === 'p' ? personHtml(k.id, k.gen, k.name) : gebaeudeHtml(k.id);
+  // Etappe 2 (Schritt 3): Knöpfe mit data-fokus („Warum?“, Liste „heute anders“) behalten beim Auffrischen den Tastatur-Fokus
+  const fokusKnopf = !fokus && ziel.contains(document.activeElement) ? document.activeElement.dataset.fokus : undefined;
+  const html = k.art === 'p' ? personHtml(k.id, k.gen, k.name) : k.art === 'e' ? erfListeHtml() : gebaeudeHtml(k.id);
+  // Liste „heute anders“ (Befund Bedienung der Schlussprüfung Etappe 2): unverändert → nicht neu einsetzen (nichts verschiebt sich unter Maus
+  // und Auge, ein Klick trifft, was beim Drücken darunter lag); sonst bleibt der oberste sichtbare Eintrag an seiner Stelle, auch wenn oben neue
+  // dazukommen oder „heute“ zu „gestern“ wird (ganz oben bleibt die Liste oben: dort erscheinen die neuen)
+  if (!fokus && k.art === 'e' && html === erfListe.html && ziel.firstElementChild) { hauptMarkieren(); auswahlZeigen(); zeigenKnopf(); return; }
+  let anker = null;
+  if (!fokus && k.art === 'e' && erfListe.html && scroll > 0) {
+    const oben = $('karte').getBoundingClientRect().top, li = [...ziel.querySelectorAll('li[data-nr]')].find(x => x.getBoundingClientRect().bottom > oben);
+    if (li) anker = { nr: li.dataset.nr, y: li.getBoundingClientRect().top };
+  }
+  ziel.innerHTML = html;
+  erfListe.html = k.art === 'e' ? html : '';
   $('karte-kopf-titel').textContent = (ziel.querySelector('h2') || {}).textContent || '';   // eingeklappt steht er in der Kopfleiste
   const tbNeu = ziel.querySelector('.tagebuch');
   ziel.querySelectorAll('pre.code').forEach((c, i) => {
@@ -13974,7 +14603,13 @@ function karteRendern(fokus) {
     if (merk.fokus) { feldNeu.focus({ preventScroll: true }); try { feldNeu.setSelectionRange(merk.a, merk.b); } catch { /* egal */ } }
   }
   if (fokus) { $('karte').scrollTop = 0; const h = ziel.querySelector('h2'); if (h) h.focus({ preventScroll: true }); }
-  else $('karte').scrollTop = scroll;
+  else {
+    const f = fokusKnopf && ziel.querySelector(`[data-fokus="${fokusKnopf}"]`);
+    if (f) f.focus({ preventScroll: true });
+    $('karte').scrollTop = scroll;
+    const li = anker && ziel.querySelector(`li[data-nr="${anker.nr}"]`);
+    if (li) $('karte').scrollTop += li.getBoundingClientRect().top - anker.y;
+  }
   hauptMarkieren();
   auswahlZeigen();
   zeigenKnopf();
@@ -13986,6 +14621,277 @@ function kopfHtml(marke, titel, unter, kicker) {
 }
 const symbol = (id) => `<svg class="sym" aria-hidden="true"><use href="#${id}"/></svg>`;
 const fakt = (id, inhalt) => `<li>${symbol(id)}<span>${inhalt}</span></li>`;
+// ─── Etappe 2 (Schritt 3): Erfahrung, Plan, „Warum?“ und „Heute anders entschieden“ ─────────────────────────────
+// Alles hier liest nur (Sim.gedInfo, Sim.warum, personInfo) und zeigt; nichts davon steht in S. Texte über die Person ohne Namen (die Karte
+// nennt ihn oben), in „Warum?“ nur ihr eigener Vorname; Namen anderer kommen wie bisher nur als Marke aus dem Gedächtnis (Verweis + Generation).
+// Punkte mit Vorzeichen und bis zu zwei Stellen (wie Sim.warum rundet): +71 · −9,75 · 0
+const pkt = (v) => { const r = Math.round(v * 100) / 100; return (r > 0 ? '+' : r < 0 ? '−' : '') + Math.abs(r).toLocaleString('de-DE', { maximumFractionDigits: 2 }); };
+const tageText = (n) => (n === 1 ? '1 Tag' : `${zahl(n)} Tage`), nachTagen = (n) => (n === 1 ? 'nach 1 Tag' : `nach ${zahl(n)} Tagen`), vorTagen = (n) => (n <= 0 ? 'am selben Tag' : n === 1 ? 'vor 1 Tag' : `vor ${zahl(n)} Tagen`);
+// Handlungen: Grundform (Liste, „Warum?“) und Perfekt mit Hilfsverb („ohne diese Erfahrung hätte … gegründet“)
+const AKT_INF = { nichts: 'nichts tun', wohnung_suchen: 'eine Wohnung suchen', job_suchen: 'Arbeit suchen', job_wechseln: 'die Stelle wechseln',
+  kuendigen: 'kündigen', freinehmen: 'freinehmen', freunde_treffen: 'Freunde treffen', partner_suchen: 'jemanden suchen', zusammenziehen: 'zusammenziehen',
+  trennen: 'sich trennen', kind_bekommen: 'ein Kind wollen', laden_gruenden: 'einen Betrieb gründen', wegziehen: 'wegziehen' };
+const AKT_PERF = { nichts: ['hätte', 'nichts getan'], wohnung_suchen: ['hätte', 'eine Wohnung gesucht'], job_suchen: ['hätte', 'Arbeit gesucht'],
+  job_wechseln: ['hätte', 'die Stelle gewechselt'], kuendigen: ['hätte', 'gekündigt'], freinehmen: ['hätte', 'freigenommen'], freunde_treffen: ['hätte', 'Freunde getroffen'],
+  partner_suchen: ['hätte', 'jemanden gesucht'], zusammenziehen: ['wäre', 'zusammengezogen'], trennen: ['hätte', 'sich getrennt'], kind_bekommen: ['hätte', 'ein Kind gewollt'],
+  laden_gruenden: ['hätte', 'einen Betrieb gegründet'], wegziehen: ['wäre', 'weggezogen'] };
+const aktInf = (a) => AKT_INF[a] || a, ohneSatz = (wenn, wer, a) => { const [h, t] = AKT_PERF[a] || ['hätte', a]; return `${wenn} ${h} ${esc(wer)} <strong>${t}</strong>`; };
+// Erfahrung je Handlung (Sim.ERF_AKTION): Wort, Folge-Erinnerung mit Verweis (schlechte Folge), Text der schlechten und der guten Folge
+const ERF_TEXT = {
+  laden_gruenden: { mass: 'eine Pleite zählt schlecht', wort: 'Gründen', folge: 'PLEITE', schlecht: (u) => (u === null ? 'Pleite' : `Pleite ${nachTagen(u)}`), gut: (f) => `der Betrieb lief ${tageText(f)} ohne Pleite`, weil: 'Gründung', offen: 'eine Pleite in der Zeit zählt schlecht, sonst gut' },
+  kuendigen: { mass: 'wieder Arbeit suchen zählt schlecht', wort: 'Kündigen', folge: 'JOB', schlecht: (u) => (u === null ? 'danach wieder Arbeit gesucht' : `${nachTagen(u)} wieder Arbeit gesucht`), gut: (f) => `danach ${tageText(f)} ohne Stellensuche`, weil: 'Kündigung', offen: 'wieder Arbeit zu suchen zählt in der Zeit schlecht, sonst gut' },
+  job_wechseln: { mass: 'die Stelle verlieren zählt schlecht', wort: 'Stelle wechseln', folge: 'JOB_WEG', schlecht: (u) => (u === null ? 'die neue Stelle verloren' : `die neue Stelle ${nachTagen(u)} verloren`), gut: (f) => `die neue Stelle ${tageText(f)} behalten`, weil: 'Stellenwechsel', offen: 'die neue Stelle in der Zeit zu verlieren zählt schlecht, sonst gut' },
+  zusammenziehen: { mass: 'eine Trennung zählt schlecht', wort: 'Zusammenziehen', folge: 'GETRENNT', schlecht: (u) => (u === null ? 'Trennung' : `Trennung ${nachTagen(u)}`), gut: (f) => `${tageText(f)} zusammengeblieben`, weil: 'Zusammenziehen', offen: 'eine Trennung in der Zeit zählt schlecht, sonst gut' },
+};
+const QUELLE_WORT = { regeln: 'nach den Regeln', policy: 'von der trainierten Policy', sprachmodell: 'vom Sprachmodell (Hauptfigur)', fokus: 'von der Fokusperson (Training)' };
+const GRUND_WORT = { erfahrung: 'Erfahrung', plan: 'Plan', 'erfahrung und plan': 'Erfahrung und Plan', zufall: 'Zufall' };
+// Planteil je Handlung (entscheide): Gründen ohne Rücklage, Kündigen, solange für den eigenen Laden gespart wird
+const PLAN_WORT = { laden_gruenden: 'Plan (Rücklage fehlt)', kuendigen: 'Plan (spart für den eigenen Laden)' };
+
+// Fakt und Verweis einer Erinnerung (personInfo: code, fakt, ursacheVorTagen; nach der Übernahme aus Version 9 beides 0 bzw. null)
+function memMehr(m) {
+  const M = Sim.M, f = m.fakt, t = [];
+  if (f) {
+    if (m.code === M.JOB || m.code === M.JOB_WEG || m.code === M.GEKUENDIGT || m.code === M.RUHESTAND) t.push(`Lohn ${zahl(f)} Taler am Tag`);
+    else if (m.code === M.PLEITE) t.push(`bestand ${tageText(f)}`);
+    else if (m.code === M.GEGRUENDET) t.push(`Geld danach reichte für ${tageText(f)}`);
+    else if (m.code === M.EINGEZOGEN) t.push(`Haus der Stufe ${f}`);
+    else if (m.code === M.KIND) t.push(f === 1 ? 'das erste Kind' : `danach ${zahl(f)} Kinder`);
+    else if (m.code === M.FREUND) t.push(f === 1 ? 'danach 1 Freund' : `danach ${zahl(f)} Freunde`);
+  }
+  if (m.ursacheVorTagen !== null && m.ursacheVorTagen !== undefined) {
+    const e = Object.values(ERF_TEXT).find(x => M[x.folge] === m.code);
+    if (e) t.push(`weil: ${e.weil} ${vorTagen(m.ursacheVorTagen)}`);
+  }
+  return t.length ? `<span class="mem-mehr">${t.join(' · ')}</span>` : '';
+}
+// Lebenslauf: mit Gedächtnis (lang ≠ null) getrennt in Langzeit (bleibt) und Kurzzeit (die letzten R.MEM_KURZ), je nach Tag; ohne wie bisher
+function lebenslaufHtml(i) {
+  const mem = i.gedaechtnis;                               // nicht G: das ist die 3D-Ansicht
+  if (!mem.length) return '<p class="leise">Noch nichts erlebt.</p>';
+  const li = (m) => `<li><span class="tag">Tag ${m.tag}</span><span>${buchHtml(m.text)}${memMehr(m)}</span></li>`;
+  if (mem.every(m => m.lang === null || m.lang === undefined)) return `<ol class="lebenslauf">${mem.map(li).join('')}</ol>`;
+  const lang = mem.filter(m => m.lang), kurz = mem.filter(m => !m.lang);
+  return (lang.length ? `<p class="mem-kopf">Bleibt im Gedächtnis (Langzeit)</p><ol class="lebenslauf lang">${lang.map(li).join('')}</ol>` : '')
+    + (kurz.length ? `<p class="mem-kopf">Zuletzt erlebt (Kurzzeit, die letzten ${Sim.R.MEM_KURZ})</p><ol class="lebenslauf kurz">${kurz.map(li).join('')}</ol>` : '');
+}
+// Erfahrung als Satz mit Zahl: „Gründen: 1-mal, Pleite nach 39 Tagen → zählt −9,75“ (Zahl = Summand in entscheide: Wert × Sicherheit ×
+// Stärke; gilt nur in der Lage, in der sie gelernt wurde). Die Folge-Erinnerung mit Verweis nennt, woran sich die Person erinnert
+function erfSaetze(g, i) {
+  const R = Sim.R, M = Sim.M, L = [];
+  Sim.ERF_AKTION.forEach((code, s) => {
+    const a = Sim.AKTIONSNAMEN[code], T = ERF_TEXT[a], zellen = g.erfahrung.filter(e => e.aktion === a);
+    if (!zellen.length) return;
+    const erinnert = i.gedaechtnis.filter(m => m.code === M[T.folge] && m.ursacheVorTagen !== null).pop();
+    const satz = (e) => {
+      const n = e.n >= 3 ? '3-mal oder öfter' : `${e.n}-mal`;
+      // gelernte schlechte Folge mit Maßstab (Befund Bedienung: „nach 1 Tag wieder Arbeit gesucht“ wirkte neben „Job bekommen“ wie ein Erfolg)
+      const aus = e.n === 1 ? (e.wert < 0 ? T.schlecht(erinnert ? erinnert.ursacheVorTagen : null) + (erinnert ? ` (Tag ${erinnert.tag}; ${T.mass})` : ` (${T.mass})`) : e.wert > 0 ? T.gut(R.ERF_FRIST[s]) : 'ausgeglichen')
+        : e.wert < 0 ? 'im Schnitt schlecht' + (erinnert ? ` (erinnert: ${T.schlecht(erinnert.ursacheVorTagen)}, Tag ${erinnert.tag})` : '') : e.wert > 0 ? 'im Schnitt gut' : 'im Schnitt ausgeglichen';
+      return `${n}, ${aus} → zählt <strong>${pkt(e.punkte)}</strong> <span class="was">(wenn das Geld ${e.lage === 'geld_knapp' ? 'knapp ist' : 'reicht'}${e.jetzt ? ' – so ist es gerade' : ''})</span>`;
+    };
+    L.push(zellen.length === 1 ? `<li><strong>${T.wort}:</strong> ${satz(zellen[0])}</li>`
+      : `<li><strong>${T.wort}:</strong><ul class="unter-liste">${zellen.map(e => `<li>${satz(e)}</li>`).join('')}</ul></li>`);
+  });
+  return L;
+}
+// Letzte Meldung der Liste „heute anders“ für p (heute, sonst gestern): erklärt genau diese Entscheidung
+function erfLetzter(p, gen) {
+  erfListeTag();
+  for (const a of [erfListe.heute, erfListe.gestern]) for (let k = a.length - 1; k >= 0; k--) if (a[k].p === p && a[k].gen === gen) return a[k];
+  return null;
+}
+const warumOffen = new Set();                            // Personenkarten mit offenem „Warum?“ („id/gen“)
+function gedHtml(i) {
+  const g = Sim.gedInfo(S, i.id), R = Sim.R;
+  if (!g) return '';
+  const Z = [];
+  const pl = g.plan;
+  if (pl) {
+    const z = Sim.ZIELNAMEN.indexOf(pl.ziel), n = (Sim.PLAN_SCHRITTE[z] || []).length, rest = pl.frist - S.tag, r = pl.ruecklage;
+    let t = `<span class="was">Plan:</span> <strong>${esc(Sim.ZIELTEXT[z] || pl.ziel)}</strong> · Schritt ${pl.schritt + 1} von ${n}: ${esc(pl.schrittText)}`;
+    if (r && r.wartetBis) t += ` · <span class="was">Hindernis:</span> wartet nach der Pleite bis Tag ${r.wartetBis}`;
+    if (r && r.geld < r.ziel) t += ` · <span class="was">Hindernis:</span> spart: ${zahl(Math.max(0, r.geld))} von ${zahl(r.ziel)} Talern`;
+    if (!r && z === Sim.Z.LADEN && R.PLAN_RUECKLAGE === 1) t += ` <span class="was">(vor der Stufe Stadt braucht es keine Rücklage)</span>`;
+    Z.push(`<li>${t} · <span class="was">Frist:</span> Tag ${pl.frist} ${rest > 0 ? `(noch ${tageText(rest)})` : '(heute)'}</li>`);
+  } else Z.push('<li><span class="was">Plan:</span> gerade keiner (kein Ziel)</li>');
+  if (g.letzterPlan) Z.push(`<li><span class="was">Letzter Plan:</span> ${esc(Sim.ZIELTEXT[Sim.ZIELNAMEN.indexOf(g.letzterPlan.ziel)] || g.letzterPlan.ziel)} – ${esc(g.letzterPlan.grund)}</li>`);
+  const saetze = erfSaetze(g, i);
+  Z.push(saetze.length ? `<li><span class="was">Erfahrung:</span><ul class="unter-liste">${saetze.join('')}</ul></li>` : '<li><span class="was">Erfahrung:</span> noch keine (gelernt wird erst, wenn sich die Folge zeigt)</li>');
+  if (g.offen) {
+    const T = ERF_TEXT[g.offen.aktion];
+    Z.push(`<li><span class="was">Offene Folge:</span> ${T.wort} ${g.offen.seitTagen <= 0 ? 'heute' : vorTagen(g.offen.seitTagen)} · wird noch ${tageText(g.offen.restTage)} beobachtet `
+      + `<span class="was">(${T.offen})</span></li>`);
+  }
+  const le = g.letzteEntscheidung;
+  // gespeichert wird nur eine ausgeführte Handlung (ausfuehren), nie „nichts tun“; darum „etwas zu tun“ (sonst widerspräche es „Warum?“)
+  if (le) Z.push(`<li><span class="was">Letzte Entscheidung, etwas zu tun:</span> Tag ${le.tag}, ${le.stunde} Uhr: ${aktInf(le.aktion)} · ${QUELLE_WORT[le.quelle] || esc(le.quelle)} · ${le.geklappt ? 'hat geklappt' : 'klappte nicht'}</li>`);
+  let h = `<h3>Erfahrung und Plan</h3><ul class="ged">${Z.join('')}</ul>`;
+  h += `<p class="leise ged-hinweis">Zählt = Wert der Erfahrung (−31 bis +31) × Sicherheit (1-mal ${pkt(R.ERF_SICHER[1]).slice(1)}, 2-mal ${pkt(R.ERF_SICHER[2]).slice(1)}, ab 3-mal ${pkt(R.ERF_SICHER[3]).slice(1)}) × Stärke ${pkt(R.GED_STAERKE).slice(1)}.`
+    + (R.ERF_HALB ? ` Eine Erfahrung verblasst alle ${Math.round(R.ERF_HALB / 15)} Tage um einen Punkt: eine Pleite (−30) zählt nach ${R.ERF_HALB} Tagen halb so viel und ist nach ${2 * R.ERF_HALB} Tagen vergessen.` : '')
+    + ' Das sind Annahmen der Stadt, keine Messung an echten Menschen.</p>';
+  // „Warum?“: die zuletzt gemeldete Entscheidung aus der Liste (genau diese), sonst was die Regeln jetzt rechnen würden
+  const key = `${i.id}/${i.gen}`, offen = warumOffen.has(key), e = erfLetzter(i.id, i.gen), vorname = i.name.split(' ')[0];
+  const wann = e ? `${e.tag === S.tag ? 'heute' : `am Tag ${e.tag}`} um ${e.stunde} Uhr` : '';
+  h += `<div class="karte-knoepfe"><button type="button" class="knopf klein" data-warum="${key}" data-fokus="warum-${i.id}-${i.gen}" aria-expanded="${offen}"${offen ? ` aria-controls="warum-${i.id}"` : ''}>Warum?</button>`
+    + `<span class="leise">${e ? `${wann} anders entschieden als ohne Erfahrung und Plan` : 'was die Regeln jetzt rechnen würden'}</span></div>`;
+  if (offen) {
+    const w = e ? e.w : Sim.warum(S, i.id);
+    const kopf = e ? `So hat ${esc(vorname)} ${wann} entschieden (nach den Regeln der Stadt):`
+      : `Wenn ${esc(vorname)} um ${w && w.stunde} Uhr entscheiden müsste (mit einer neuen Zufallszahl; entschieden wird um 7 und um 18 Uhr und nach einem Ereignis):`;
+    h += `<div class="warum" id="warum-${i.id}">${warumHtml(w, kopf, vorname)}`
+      + (le && le.quelle !== 'regeln' ? `<p class="leise">Die letzte Entscheidung kam ${QUELLE_WORT[le.quelle] || esc(le.quelle)}; hier steht, was die Regeln rechnen.</p>` : '') + '</div>';
+  }
+  return h;
+}
+// Rechnung einer Entscheidung aus Sim.warum: je geprüfter Handlung die Summanden, die Wahl, die Wahl ohne Erfahrung, ohne Plan, ohne beides.
+// art 'zufall': keine beteiligte Handlung hat Erfahrung oder Plan, nur eine andere Zufallszahl (indirekt)
+const warumTeile = (a) => {
+  const teile = [`Lage und Charakter ${pkt(a.lage)}`];
+  if (a.plan) teile.push(`Plan ${pkt(a.plan)}`);
+  if (a.erfahrung) teile.push(`Erfahrung ${pkt(a.erfahrung)}`);
+  teile.push(a.zufall === null ? 'Zufall –' : `Zufall ${pkt(a.zufall)}`);
+  return teile.join(' · ');
+};
+// Summe einer gewählten Handlung: auf zwei Stellen gerundet kann sie genau auf der Schwelle stehen (25,002 → 25), gewählt ist sie trotzdem
+const knapp = (summe, schwelle) => (summe <= schwelle ? ` (knapp über ${zahl(schwelle)})` : '');
+// Rechnung eines Vergleichs (Sim.warum rechnung.*) in Klammern hinter dem Satz „Ohne … hätte …“: die dort gewählte Handlung und die echte Wahl,
+// je mit ihrer Zufallszahl in diesem Vergleich (Befund Bedienung der Schlussprüfung: ohne diese Zahlen ließ sich der Satz oft nicht nachrechnen)
+function vergleichHtml(L, ohne, wahl, schwelle) {
+  if (!L) return '';
+  // Gleichstand: gerundet stehen genannte Handlung und echte Wahl gleich da (Nachprüfung: 13 von 102.230 Sätzen, Seeds 1–10), vorn lag die genannte
+  const echt = L.find(y => y.aktion === wahl), vorn = (x) => (wahl !== 'nichts' && echt && echt.summe === x.summe ? ' (knapp vorn)' : '');
+  const zeile = (a) => { const x = L.find(y => y.aktion === a); return x ? `${aktInf(a)}: ${warumTeile(x)} = <strong>${pkt(x.summe)}</strong>${a === ohne ? knapp(x.summe, schwelle) + vorn(x) : ''}` : ''; };
+  const t = [ohne !== 'nichts' && zeile(ohne), wahl !== 'nichts' && zeile(wahl)].filter(Boolean);
+  return t.length ? ` <span class="w-rechnung">(in dieser Rechnung: ${t.join('; ')})</span>` : '';
+}
+function warumHtml(w, kopf, vorname) {
+  const R = Sim.R;
+  if (!w) return '<p class="leise">Nicht mehr in der Stadt.</p>';
+  if (w.kind) return `<p>${esc(vorname)} ist noch ein Kind und entscheidet noch nicht.</p>`;
+  if (w.inHaft) return `<p>In Haft entscheidet ${esc(vorname)} nichts.</p>`;
+  const L = w.aktionen.slice().sort((a, b) => b.summe - a.summe), rech = w.rechnung || {};
+  let h = `<p>${kopf}</p>`;
+  if (L.length) h += '<ol class="warum-liste">' + L.map(a => {
+    const marke = a.aktion === w.wahl ? ' <span class="w-marke">gewählt</span>'
+      : a.aktion === w.ohneErfahrung ? ' <span class="w-marke">ohne Erfahrung gewählt</span>' : '';
+    return `<li${a.aktion === w.wahl ? ' class="gewaehlt"' : ''}><span>${aktInf(a.aktion)}${marke}</span><span class="w-summe">${pkt(a.summe)}</span>`
+      + `<span class="w-teile">${warumTeile(a)}${a.aktion === w.wahl ? knapp(a.summe, w.schwelle) : ''}</span></li>`;
+  }).join('') + '</ol>';
+  h += !L.length ? '<p>Keine Handlung kommt gerade in Frage: <strong>nichts tun</strong>.</p>'
+    : w.wahl === 'nichts' ? `<p>Keine Handlung liegt über ${zahl(w.schwelle)}: <strong>nichts tun</strong>.</p>` : `<p>Gewählt: <strong>${aktInf(w.wahl)}</strong>.</p>`;
+  const zufall = (art) => (art === 'zufall' ? ' <span class="leise">(Zufall: keine beteiligte Handlung hat Erfahrung oder Plan, nur eine andere Zufallszahl wurde gezogen)</span>' : '');
+  const satz = (wenn, ohne, art, rechnung) => `${ohneSatz(wenn, vorname, ohne)}${vergleichHtml(rechnung, ohne, w.wahl, w.schwelle)}${zufall(art)}`;
+  h += w.ohneErfahrung !== w.wahl ? `<p class="w-ohne">${satz('Ohne diese Erfahrung', w.ohneErfahrung, w.art.erfahrung, rech.erfahrung)}.</p>`
+    : '<p class="w-ohne">Ohne Erfahrung: dieselbe Wahl.</p>';
+  const mehr = [];
+  if (w.ohnePlan !== w.wahl) mehr.push(satz('Ohne Plan', w.ohnePlan, w.art.plan, rech.plan));
+  if (w.ohneBeides !== w.wahl && w.ohneBeides !== w.ohneErfahrung && w.ohneBeides !== w.ohnePlan) mehr.push(satz('Ohne Erfahrung und Plan', w.ohneBeides, w.art.beides, rech.beides));
+  if (mehr.length) h += `<p>${mehr.join('. ')}.</p>`;
+  h += `<p class="leise">Summe = Lage und Charakter (wie dringend es ist, Persönlichkeit, Ziel, Erinnerungen) + Plan + Erfahrung (beide × Stärke ${pkt(w.staerke).slice(1)}) + Zufall ±${R.ZUFALL}. `
+    + `Gewählt wird die höchste Summe über ${zahl(w.schwelle)}. „Zufall –“: nicht gezogen, die Handlung konnte nicht mehr vorne liegen. Ohne Erfahrung oder Plan liegen `
+    + 'andere Handlungen vorn, darum werden dort andere Zufallszahlen gezogen; diese Rechnung steht in Klammern hinter dem Satz. Die Gewichte sind Annahmen der Stadt.</p>';
+  return h;
+}
+
+// Liste „Heute anders entschieden“: Sim.beobachter (nur im Browser, nicht in S) meldet jede Entscheidung, die ohne Erfahrung und Plan direkt
+// anders wäre; sie wird sofort mit Sim.warum(S, p, stunde, rsVor) erklärt (genau diese Entscheidung) und je Spieltag gesammelt, höchstens ERF_MAX
+// (die ältesten fallen raus), dazu der Vortag. Ein Eintrag hat nur Platz, Generation, Zeit, Handlungen, Grund und die Rechnung, keinen Namen,
+// kein Geschlecht, keine Herkunft; der Name kommt erst beim Zeichnen und nur, solange die Person lebt. Reihenfolge: die Uhrzeit, sonst keine
+const ERF_MAX = 50;
+const erfJeLeer = () => ({ erfahrung: 0, plan: 0, 'erfahrung und plan': 0, zufall: 0 });
+// seit: ab wann diese Seite für diese Stadt zählt (Tag, Stunde); die Liste lebt nur im offenen Fenster, nach Neuladen oder Laden beginnt sie leer.
+// html: zuletzt eingesetzter Inhalt der Karte, solange sie die Liste zeigt (sonst ''), damit das stündliche Auffrischen sie nur bei Änderungen neu setzt
+const erfListe = { S: null, stadt: 0, tag: -1, heute: [], zahl: 0, je: erfJeLeer(), gestern: [], tagGestern: -1, zahlGestern: 0, nr: 0, offen: new Set(), angezeigt: '',
+  seit: { tag: 0, stunde: 0 }, html: '' };
+// Auf die Stadt und den Tag von S bringen: andere Stadt (Neu, Laden, Übernahme) → leer; neuer Tag → heute wird gestern (nur der direkte Vortag)
+function erfListeTag() {
+  const L = erfListe;
+  if (L.S !== S) { L.S = S; L.stadt++; L.tag = S.tag; L.heute = []; L.zahl = 0; L.je = erfJeLeer(); L.gestern = []; L.tagGestern = -1; L.zahlGestern = 0; L.offen.clear();
+    L.seit = { tag: S.tag, stunde: S.stunde }; return; }
+  if (L.tag === S.tag) return;
+  const vortag = L.tag === S.tag - 1;
+  L.gestern = vortag ? L.heute : []; L.tagGestern = vortag ? L.tag : -1; L.zahlGestern = vortag ? L.zahl : 0;
+  L.heute = []; L.zahl = 0; L.je = erfJeLeer(); L.tag = S.tag;
+}
+function erfBeobachten(p, gen, tag, stunde, mit, ohne, grund, rsVor) {
+  if (!S || S.tag !== tag || S.p.gen[p] !== gen) return;   // nur die Stadt dieser Seite
+  if (aufholenLaeuft && tag < Math.floor(aufholZiel / 24) - 1) return;   // Aufholen: nur der letzte Tag und der Vortag bleiben in der Liste
+  erfListeTag();
+  const L = erfListe, AN = Sim.AKTIONSNAMEN;
+  L.zahl++; L.je[grund] = (L.je[grund] || 0) + 1;
+  L.heute.push({ nr: ++L.nr, p, gen, tag, stunde, mit: AN[mit] || 'nichts', ohne: AN[ohne] || 'nichts', grund, w: Sim.warum(S, p, stunde, rsVor) });
+  if (L.heute.length > ERF_MAX) L.heute.shift();
+}
+if (Sim.R.GED) Sim.beobachter = erfBeobachten;
+// Knopf im Kopf des Stadtbuchs: Zahl von heute (nachSchritten; schreibt nur bei Änderungen)
+const ERF_KNOEPFE = document.querySelectorAll('.erf-knopf');   // im Stadtbuch-Kopf und (Handy quer) bei den Hauptfiguren
+function erfKnopfAnzeigen() {
+  if (!Sim.R.GED) { for (const k of ERF_KNOEPFE) k.hidden = true; return; }
+  erfListeTag();
+  const L = erfListe, f = Sim.beobachterFehler, stand = `${L.stadt}/${L.tag}/${L.zahl}/${f ? 1 : 0}`;
+  if (stand === L.angezeigt) return;
+  L.angezeigt = stand;
+  const t = f ? `${zahl(L.zahl)} anders entschieden (heute), Liste angehalten (Fehler); Liste öffnen`   // Name beginnt mit dem sichtbaren Text
+    : `${zahl(L.zahl)} anders entschieden (heute) wegen Erfahrung oder Plan; Liste öffnen`;
+  for (const k of ERF_KNOEPFE) { k.hidden = false; k.querySelector('.erf-zahl').textContent = zahl(L.zahl); k.setAttribute('aria-label', t); k.title = t; }
+}
+function zeigeErfListe() {
+  const k = verlauf[verlauf.length - 1];
+  if (!$('karte').hidden && k && k.art === 'e') { karteRendern(true); return; }
+  verlauf.push({ art: 'e' }); if (verlauf.length > 50) verlauf.shift();
+  karteRendern(true);
+}
+for (const k of ERF_KNOEPFE) k.addEventListener('click', zeigeErfListe);
+// Eintrag: Uhrzeit, Name (öffnet die Karte), Grund, „statt X → Y“, die Summanden der beiden Handlungen, „Warum?“ (klappt die Rechnung auf)
+function erfEintragHtml(e) {
+  const lebt = S.p.lebt[e.p] && S.p.gen[e.p] === e.gen, nm = lebt ? Sim.name(S, e.p) : '', vorname = lebt ? nm.split(' ')[0] : 'die Person';
+  const wer = lebt ? `<button type="button" class="name" data-p="${e.p}" data-g="${e.gen}" data-n="${esc(nm)}" data-fokus="erf-n-${e.nr}">${esc(nm)}</button>`
+    : '<span class="leise">nicht mehr in der Stadt</span>';
+  const teile = [];                                       // je beteiligter Handlung: Erfahrung und Plan
+  for (const a of (e.w && e.w.aktionen) || []) {
+    if ((a.aktion !== e.mit && a.aktion !== e.ohne) || (!a.erfahrung && !a.plan)) continue;
+    const t = [];
+    if (a.erfahrung) t.push(`Erfahrung ${pkt(a.erfahrung)}`);
+    if (a.plan) t.push(`${PLAN_WORT[a.aktion] || 'Plan'} ${pkt(a.plan)}`);
+    teile.push(`${ERF_TEXT[a.aktion] ? ERF_TEXT[a.aktion].wort : aktInf(a.aktion)}: ${t.join(', ')}`);
+  }
+  const offen = erfListe.offen.has(e.nr);
+  const teileText = teile.length ? teile.join(' · ') : e.grund === 'zufall' ? 'nur eine andere Zufallszahl (indirekt)' : '';
+  return `<li data-nr="${e.nr}"><div class="erf-kopf"><span class="zeit">${e.stunde} Uhr</span>${wer}<span class="erf-grund${/erfahrung/.test(e.grund) ? ' betont' : ''}">${GRUND_WORT[e.grund] || esc(e.grund)}</span></div>`
+    + `<p class="erf-statt">statt „${aktInf(e.ohne)}“ → „${aktInf(e.mit)}“</p>`
+    + `<div class="erf-fuss"><span class="leise erf-teile">${teileText}</span><button type="button" class="knopf klein" data-erf-warum="${e.nr}" data-fokus="erf-w-${e.nr}" `
+    + `aria-expanded="${offen}"${offen ? ` aria-controls="erf-warum-${e.nr}"` : ''}>Warum?</button></div>`
+    + (offen ? `<div class="warum" id="erf-warum-${e.nr}">${warumHtml(e.w, `So hat ${esc(vorname)} am Tag ${e.tag} um ${e.stunde} Uhr entschieden (nach den Regeln der Stadt):`, vorname)}</div>` : '')
+    + '</li>';
+}
+function erfListeHtml() {
+  erfListeTag();
+  const L = erfListe, f = Sim.beobachterFehler;
+  let h = kopfHtml(`<span class="typ-marke" aria-hidden="true">${symbol('s-weiche')}</span>`, 'Heute anders entschieden',
+    `Tag ${S.tag} · ${L.zahl === 1 ? '1 Entscheidung' : `${zahl(L.zahl)} Entscheidungen`}`, 'wegen Erfahrung oder Plan');
+  // Gezählt wird nur, was die Beobachtung meldet: anders ohne Erfahrung und Plan UND Gründen, Kündigen, Wechseln oder Zusammenziehen beteiligt
+  // (andersMelden, GED_DIREKT; gemessen etwa 9 von 10 solcher Entscheidungen, simtest --gedaechtnis A). Befund Texte der Schlussprüfung
+  const seitHier = L.seit.tag >= S.tag - 1;              // heute oder der gezeigte Vortag beginnen erst mit dieser Seite
+  h += `<p class="leise">Gezählt wird jede Entscheidung, die ohne Erfahrung und ohne Plan anders ausgefallen wäre und an der Gründen, Kündigen, Stelle `
+    + `wechseln oder Zusammenziehen beteiligt ist (etwa 9 von 10 solcher Entscheidungen); die Stadt rechnet das bei jeder Entscheidung mit. `
+    + `Heute: Erfahrung ${zahl(L.je.erfahrung)} · Plan ${zahl(L.je.plan)} · beides ${zahl(L.je['erfahrung und plan'])} · Zufall ${zahl(L.je.zufall)}. `
+    + `Neueste oben, höchstens ${ERF_MAX} je Tag${L.zahl > L.heute.length ? ` (hier die letzten ${L.heute.length} von ${zahl(L.zahl)})` : ''}. Ein Name öffnet die Karte.`
+    + (seitHier ? ` Gezählt erst, seit die Stadt in diesem Fenster läuft (Tag ${L.seit.tag}, ${L.seit.stunde} Uhr); was davor entschieden wurde, steht nicht hier.` : '') + '</p>';
+  // Fehler des Beobachters: für Noah ein deutscher Satz, der Fehlertext (meist englisch) nur im title für die Fehlersuche
+  if (f) h += `<p class="leise" title="${esc(f)}">Liste angehalten (interner Fehler der Anzeige). Die Stadt rechnet trotzdem richtig weiter.</p>`;
+  h += L.heute.length ? `<ol class="erf-liste">${L.heute.slice().reverse().map(erfEintragHtml).join('')}</ol>`
+    : `<p class="leise">${L.seit.tag === S.tag ? `Seit ${L.seit.stunde} Uhr noch keine` : 'Heute noch keine'}. Entschieden wird um 7 und um 18 Uhr und nach einem Ereignis.</p>`;
+  if (L.gestern.length) h += `<h3>Gestern · Tag ${L.tagGestern} · ${zahl(L.zahlGestern)}</h3><ol class="erf-liste">${L.gestern.slice().reverse().map(erfEintragHtml).join('')}</ol>`;
+  return h;
+}
+// „Warum?“ auf- und zuklappen (Personenkarte und Liste); die Karte zeichnet sich neu, der Fokus bleibt auf dem Knopf (data-fokus)
+document.addEventListener('click', (ev) => {
+  const w = ev.target.closest('button[data-warum]');
+  if (w) { const k = w.dataset.warum; if (warumOffen.has(k)) warumOffen.delete(k); else warumOffen.add(k); karteRendern(false); return; }
+  const e = ev.target.closest('button[data-erf-warum]');
+  if (e) { const n = Number(e.dataset.erfWarum), O = erfListe.offen; if (O.has(n)) O.delete(n); else O.add(n); karteRendern(false); }
+});
 function personHtml(p, gen, name) {
   const i = Sim.personInfo(S, p, gen);
   if (!i) return kopfHtml(name ? `<span class="kreis gross weg" aria-hidden="true">${esc(initialen(name))}</span>` : `<span class="typ-marke" aria-hidden="true">${symbol('s-leute')}</span>`,
@@ -14045,9 +14951,8 @@ function personHtml(p, gen, name) {
   if (i.beduerfnisse) {
     h += `<h3>Befinden · zufrieden ${Math.round(i.zufriedenheit)}</h3><div class="werte">${BEDARF.map(([k, n]) => `<span>${n}</span>${balken(i.beduerfnisse[k], true)}<span class="zahl">${Math.round(i.beduerfnisse[k])}</span>`).join('')}</div>`;
   }
-  h += `<h3>Lebenslauf</h3>` + (i.gedaechtnis.length
-    ? `<ol class="lebenslauf">${i.gedaechtnis.map(m => `<li><span class="tag">Tag ${m.tag}</span><span>${buchHtml(m.text)}</span></li>`).join('')}</ol>`
-    : '<p class="leise">Noch nichts erlebt.</p>');
+  if (Sim.R.GED && !i.kind) h += gedHtml(i);                // Etappe 2: Erfahrung, Plan, letzte Entscheidung, „Warum?“
+  h += `<h3>Lebenslauf</h3>` + lebenslaufHtml(i);
   const liste = (a) => a.length ? namenListe(a) : '<span class="leise">–</span>';
   h += `<h3>Familie</h3><dl class="familie">
     <dt>Partner</dt><dd>${nameKnopf(i.partner)}</dd>
@@ -14163,8 +15068,8 @@ if (geladen && geladen.ui && typeof geladen.ui.kiModell === 'string') ki.modell 
 //    entfernen“ löscht ihn wieder);
 //  - eingebettet (<script id="ki-policy">) erst nach bestandener Freigabe (das Patch-Werkzeug ki_patch.mjs --policy aus dem Übertrag nimmt nur
 //    den Status „freigegeben“; es liegt nicht im Ordner stadt/, docs/GRENZEN.md).
-// Jede Datei prüft Sim.KI.policyPruefen streng (Format, Stadt-Version, Schema-Hash, Inhalts-Hash SHA-256, endliche Zahlen; Lücke: „endlich“
-// vor dem Runden auf float32, docs/GRENZEN.md). Im Spielstand steht nur die Wahl (ui.entscheidungen: Art, Name, Hash, Schema), nie Gewichte.
+// Jede Datei prüft Sim.KI.policyPruefen streng (Format, Stadt-Version, Schema-Hash, Inhalts-Hash SHA-256, endliche Zahlen, auch nach dem
+// Runden auf float32). Im Spielstand steht nur die Wahl (ui.entscheidungen: Art, Name, Hash, Schema), nie Gewichte.
 // Beim Laden zählt der Hash: Fehlt genau diese Policy oder passt sie nicht, entscheiden die Regeln und die Oberfläche sagt es (Rückfall). Nie
 // still eine andere Policy.
 const KI_POLICY_SCHLUESSEL = 'stadt-policy-v1';
@@ -14249,15 +15154,20 @@ function kiWahlUi() {
   return p ? { v: 1, art: 'policy', name: p.name, hash: p.hash, schema: p.schemaHash } : { v: 1, art: 'regeln' };
 }
 // Wahl aus einem Spielstand (Start, Import). Ein Stand ohne Wahl (09083f5 und älter) läuft mit den Regeln. still: keine eigene Meldung,
-// der Aufrufer hängt kiWahl.hinweis an seine an (Import: sonst überschreibt „Spielstand geladen“ den Rückfall-Hinweis)
-function kiWahlAusUi(ui, still) {
+// der Aufrufer hängt kiWahl.hinweis an seine an (Import: sonst überschreibt „Spielstand geladen“ den Rückfall-Hinweis). vonVersion: Version eines
+// übernommenen älteren Stands (Import, „Stadt übernehmen“). Seine Policy ist auf diese Version trainiert und gilt nicht mehr: dann „neu trainieren“
+// statt des Rats, sie wieder in ki/ zu legen (Befund Bedienung der Schlussprüfung Etappe 2: sie liegt dort und wird abgelehnt)
+function kiWahlAusUi(ui, still, vonVersion) {
   const w = ui && ui.entscheidungen;
   kiWahl.hinweis = '';
   if (!w || w.art !== 'policy') { kiWahlSetzen('regeln'); return; }
   if (!kiWahlSetzen('policy', w.hash)) {
-    kiWahl.hinweis = `Die gespeicherte Policy „${String(w.name || '?').slice(0, 60)}“ (Hash ${String(w.hash || 'fehlt').slice(0, 20)}) ist nicht da oder passt nicht zu `
-      + `dieser Stadt.${kiWahl.ordnerText ? ' ' + kiWahl.ordnerText : ''} Es entscheiden die Regeln (Rückfall). Liegt sie wieder in ki/, im Fenster „Entscheidungen der `
-      + 'Bewohner“ neu wählen.';
+    const name = String(w.name || '?').slice(0, 60);
+    kiWahl.hinweis = vonVersion && vonVersion < Sim.VERSION
+      ? `Die gespeicherte Policy „${name}“ stammt aus Version ${vonVersion} und gilt in Version ${Sim.VERSION} nicht mehr (neu trainieren). Es entscheiden die Regeln (Rückfall).`
+      : `Die gespeicherte Policy „${name}“ (Hash ${String(w.hash || 'fehlt').slice(0, 20)}) ist nicht da oder passt nicht zu `
+        + `dieser Stadt.${kiWahl.ordnerText ? ' ' + kiWahl.ordnerText : ''} Es entscheiden die Regeln (Rückfall). Liegt sie wieder in ki/, im Fenster „Entscheidungen der `
+        + 'Bewohner“ neu wählen.';
     kiPolicyAnzeigen();
     if (!still) meldung(kiWahl.hinweis, 'warnung');
   }
@@ -14311,7 +15221,9 @@ $('ki-entscheid-policy').addEventListener('change', async () => {
   if (!kiWahlSetzen('policy', wahl)) {                     // nichts Gültiges: Regeln bleiben, sichtbar
     kiWahl.hinweis = 'Umschalten auf die Policy nicht möglich.';
     kiPolicyAnzeigen();
-    meldung(`${kiWahl.ordnerText || 'Keine gültige Policy in ki/.'} Umschalten nicht möglich, es entscheiden weiter die Regeln.`, 'warnung');
+    const alt = kiWahl.fehler.some(f => f.includes('(neu trainieren)'));   // abgelehnt, weil auf eine ältere Stadt-Version trainiert
+    meldung(`${kiWahl.ordnerText || `Keine gültige Policy in ki/${alt ? ' (die vorhandene ist auf eine ältere Stadt-Version trainiert: neu trainieren)' : ''}.`} `
+      + 'Umschalten nicht möglich, es entscheiden weiter die Regeln.', 'warnung');
   }
   speichern();
 });
@@ -15008,6 +15920,7 @@ function schritt() {
 function nachSchritten() {
   kennzahlenAnzeigen();
   buchAnzeigen();
+  erfKnopfAnzeigen();                                      // Etappe 2: „heute anders“ im Kopf des Stadtbuchs
   hauptAnzeigen();
   if (G) { G.stadt(S.stunde); G.figurenPlanen(); }
   karteAktualisieren();
@@ -16673,13 +17586,13 @@ $('import-datei').addEventListener('change', async (e) => {
     const text = await datei.text();
     let l, migriert = false;
     try { l = spielstandLesen(text); }
-    catch (err) { if (!err.migrierbar) throw err; l = spielstandLesen(text, true); migriert = err.vonVersion; }   // Version 2 bis 7: übernehmen
+    catch (err) { if (!err.migrierbar) throw err; l = spielstandLesen(text, true); migriert = err.vonVersion; }   // Version 2 bis 9: übernehmen
     await kiQuellenFuer(l.ui);                            // KI-Policy (Etappe 1): verlangt der Stand eine Policy, ki/ jetzt lesen (vor dem Umschalten)
     karteZu();
     S = l.S; akku = 0; buchNeu(); if (G) { G.neueStadt(); }
     ki.gesendet.clear(); ki.gespraech = null; ki.aufholen.length = 0; hauptSchluessel = '';
     nachSchritten();                                      // erst zeichnen: wirft es, bleibt die alte Stadt
-    kiWahlAusUi(l.ui, true);                              // KI-Policy (Etappe 1): Modellwahl aus dem Spielstand (fehlt sie: Regeln, Hinweis unten)
+    kiWahlAusUi(l.ui, true, migriert);                    // KI-Policy (Etappe 1): Modellwahl aus dem Spielstand (fehlt sie: Regeln, Hinweis unten)
     speichernErlaubt = true; speichern();
     $('einst-dialog').close();
     meldung((migriert ? `Spielstand von Version ${migriert} übernommen: Tag ${S.tag}, ${zahl(S.einwohner)} Einwohner. ${NEU_SEIT(migriert)}`
@@ -16705,21 +17618,24 @@ $('version-neu').addEventListener('click', () => {
 // Übernahme) und in den Fenstern „Stadtregierung“ und „Haushalt“
 const NEU_KURZ = (v) => [v < 3 && 'Bauhof', v < 4 && 'Tech-Firmen', v < 5 && 'Stadtregierung', v < 6 && 'Mieterkauf, Rente ohne Abschlag, Kitas',
   v < 7 && 'wachsende Karte mit Stadtteilen, Kriminalität mit Polizei und Gericht, Kaserne', v < 8 && 'Autos',
-  'Rathaus mit Bürgermeister, Schulen, Haushalt, mehr Tech-Firmen'].filter(Boolean).join('; ');
-const NEU_SEIT = (v) => `Neu: ${NEU_KURZ(v)}. Mehr im Stadtbuch und im Fenster „Stadtregierung“.`;
+  v < 9 && 'Rathaus mit Bürgermeister, Schulen, Haushalt, mehr Tech-Firmen', 'Bewohner mit Erfahrung und Plänen'].filter(Boolean).join('; ');   // Version 10: Etappe 2
+const NEU_SEIT = (v) => `Neu: ${NEU_KURZ(v)}.` + (v < 9 ? ' Mehr im Stadtbuch und im Fenster „Stadtregierung“.' : '');   // aus Version 9 nur Etappe 2 (keine Zeile im Stadtbuch)
 $('version-uebernehmen').addEventListener('click', async () => {
   const altS = S, vonVersion = versionFehler && versionFehler.vonVersion;
   let uebernommen = null;
   try {
     const l = spielstandLesen(alterSpielstand, true);
+    await kiQuellenFuer(l.ui);                            // Version 10: verlangt der Stand eine Policy (aus Version 9), ki/ lesen wie beim Import
     S = l.S; akku = 0; buchNeu(); if (G) G.neueStadt();
     ki.gesendet.clear(); ki.gespraech = null; ki.aufholen.length = 0; hauptSchluessel = '';
     if (typeof l.tempo === 'number') tempo = tempoAus(l.tempo);
     nachSchritten();
+    kiWahlAusUi(l.ui, true, vonVersion);                  // eine Policy aus Version 9 passt nicht mehr (neu trainieren): Regeln, Hinweis in der Meldung
     alterSpielstand = null; speichernErlaubt = true; speichern();
     $('version-dialog').close();
     setzeTempo(tempo);
-    meldung(`Deine Stadt ist übernommen: Tag ${S.tag}, ${zahl(S.einwohner)} Einwohner. ${NEU_SEIT(vonVersion)}`);
+    meldung(`Deine Stadt ist übernommen: Tag ${S.tag}, ${zahl(S.einwohner)} Einwohner. ${NEU_SEIT(vonVersion)}` + (kiWahl.hinweis ? ' ' + kiWahl.hinweis : ''),
+      kiWahl.hinweis ? 'warnung' : undefined);
     uebernommen = l;
   } catch (err) {
     if (S !== altS) { S = altS; buchNeu(); if (G) G.neueStadt(); hauptSchluessel = ''; try { nachSchritten(); } catch { /* alte Stadt lief ja */ } }
@@ -16814,7 +17730,7 @@ function ersterHinweis() {
   addEventListener('resize', hinweisLegen);
 }
 
-if (DEBUG) globalThis.__stadt = { S: () => S, Sim, G, setzeTempo, schritt, nachSchritten, speichern, aufholen, ki, kiTakt };   // nur für Tests
+if (DEBUG) globalThis.__stadt = { S: () => S, Sim, G, setzeTempo, schritt, nachSchritten, speichern, aufholen, ki, kiTakt, spielstandText };   // nur für Tests (spielstandText: Version 10, Test des Speichers)
 setzeTempo(tempo);
 if (G) G.ausrichten();                                   // Blickpunkt schon für die erste Figurenplanung (Arbeiter nahe der Stadtmitte)
 nachSchritten();
@@ -16826,6 +17742,11 @@ if (versionFehler) {
   $('version-text').textContent = versionFehler.andereVersion ? versionFehler.message
     : `Der gespeicherte Stand lässt sich nicht lesen: ${versionFehler.message}`;
   if (!versionFehler.andereVersion) $('version-titel').textContent = 'Spielstand lässt sich nicht laden';
+  if (versionFehler.neuer) {                              // Version 10: ein Stand einer neueren Datei (vorher hieß der Titel immer „älteren Version“)
+    $('version-titel').textContent = 'Spielstand ist von einer neueren Version';
+    $('version-text').textContent = `Dein Spielstand ist von Version ${versionFehler.vonVersion}, diese Datei ist Version ${Sim.VERSION}. `
+      + 'Öffne ihn mit der neueren Datei von STADT; hier lässt er sich nicht laden.';
+  }
   if (versionFehler.migrierbar) {
     const v = versionFehler.vonVersion;
     // Je Version: was seitdem neu ist. Seit Version 5 regiert in jeder Stadt die Stadtregierung (übernommen: ab dem Übernahmetag),
@@ -16834,6 +17755,7 @@ if (versionFehler) {
     // Version 8: kurz (am Handy passt der Dialog sonst nicht); Einzelheiten stehen in der Zeile im Stadtbuch und im Fenster
     const autos = 'Seit Version 8 wachsen Tech-Firmen bis zum Hochhaus, große bauen ein Autowerk, und Bewohner kaufen Autos (auch aus dem Umland).';
     const rathaus = 'Seit Version 9 hat die Stadt ein Rathaus, einen gewählten Bürgermeister, Schulen und einen Haushalt, und Tech-Firmen verkaufen auch in die Welt.';   // Version 9: kurz (Handy)
+    const ged = 'Seit Version 10 lernen die Bewohner aus den Folgen ihrer Entscheidungen, verfolgen Pläne und behalten Wichtiges länger im Gedächtnis.';   // Version 10: kurz (Handy)
     const regierung = 'Seit Version 5 regiert in der Stadt die AfD nach ihrem Programm zur Bundestagswahl 2025 (Fenster „Stadtregierung“).';
     const schritt2 = 'Seit Version 6 können Mieter ihre Wohnung von der Stadt kaufen, und nach 45 Beitragsjahren kann man ohne Abschlag in Rente gehen; '
       + 'niemand muss mehr mit 67 aufhören. Die Stadt baut Kitas, Vorrang haben Familien, in denen beide Eltern arbeiten, und arbeitende Alleinerziehende.';
@@ -16849,17 +17771,23 @@ if (versionFehler) {
         + 'und eine Dienststelle des Nachrichtendienstes.'
       : v === 7 ? 'Dein Spielstand ist von Version 7. Seit Version 8 wachsen Tech-Firmen weiter, bis zum Campus und zum Hochhaus. Große Handy- und Computerfirmen '
         + 'bauen ab der Stufe Stadt ein Autowerk mit eigener Marke. Bewohner kaufen Autos, von Anfang an aus dem Umland, und fahren damit zur Arbeit.'
-      : 'Dein Spielstand ist von Version 8. Seit Version 9 hat die Stadt ein Rathaus in der Mitte, und die Erwachsenen wählen einen Bürgermeister '
+      : v === 8 ? 'Dein Spielstand ist von Version 8. Seit Version 9 hat die Stadt ein Rathaus in der Mitte, und die Erwachsenen wählen einen Bürgermeister '
         + 'oder eine Bürgermeisterin, parteilos und Hauptfigur. Dazu baut die Stadt Schulen für alle Kinder von 6 bis 18 und führt einen Haushalt: '
-        + 'Was sie nicht sinnvoll ausgeben kann, gibt sie über eine niedrigere Lohnsteuer zurück. Tech-Firmen gibt es ab der Kleinstadt, und sie verkaufen auch in die Welt.';
+        + 'Was sie nicht sinnvoll ausgeben kann, gibt sie über eine niedrigere Lohnsteuer zurück. Tech-Firmen gibt es ab der Kleinstadt, und sie verkaufen auch in die Welt.'
+      : 'Dein Spielstand ist von Version 9. Seit Version 10 lernen die Bewohner aus den Folgen ihrer Entscheidungen (gründen, kündigen, Stelle wechseln, '
+        + 'zusammenziehen), verfolgen Pläne, etwa erst eine Rücklage sparen und dann gründen, und behalten Wichtiges länger im Gedächtnis.';
     if (v < 6) $('version-text').textContent += ' ' + erweitern;
     if (v < 7) $('version-text').textContent += ' ' + autos;
     if (v < 8) $('version-text').textContent += ' ' + rathaus;
+    if (v < 9) $('version-text').textContent += ' ' + ged;
     const frist = ` Kitas entstehen danach; mindestens ${Sim.R.KITA_FRIST} Tage lang und bis kein Kind mehr auf einen Platz wartet (höchstens ${Sim.R.KITA_FRIST_MAX} Tage), muss niemand wegen eines fehlenden Platzes zu Hause bleiben.`;
     // Version 9: Das Rathaus kommt so nah an die Mitte, wie Platz frei ist (Brache oder ein Park, nie ein Wohnhaus oder Betrieb)
     const ratAb = ' Das Rathaus kommt so nah an die Mitte, wie Platz frei ist; Wohnhäuser und Betriebe bleiben stehen. Gewählt wird, sobald es steht.';
     const autosAb = ' Autos gibt es ab dem Übernahmetag; noch hat niemand eins.';
-    const abHeute = v === 8 ? ratAb : v === 7 ? autosAb
+    // Version 10 (Etappe 2): was aus Version 9 anders wird (migriereGed; Noahs Entscheidungen 1 und 5)
+    const gedAb = ' Erfahrungen und Pläne beginnen am Übernahmetag. Erinnerungen an Menschen, die nicht mehr in der Stadt leben, nennen die Beziehung statt des Namens.'
+      + ' Eine trainierte Policy aus Version 9 gilt nicht mehr (neu trainieren); es entscheiden die Regeln.';
+    const abHeute = v === 9 ? gedAb : v === 8 ? ratAb : v === 7 ? autosAb
       : v === 6 ? ' Die Stufe zählt ab dem Übernahmetag nach den heutigen Einwohnern; Taten gibt es ab dem Übernahmetag, niemand ist vorbestraft.'
       + ' Einberufen wird erst ab der Eröffnung der Kaserne.' + autosAb
       : (v === 5 ? ' Die neuen Regeln gelten ab dem Übernahmetag; Beitragsjahre rechnet die Stadt für alle gleich aus dem Alter.'
@@ -16871,7 +17799,8 @@ if (versionFehler) {
       : v === 5 ? '„Stadt übernehmen“ behält alle Leute, Häuser, Baustellen, Tech-Firmen, das Stadtbuch und die Summen der Stadtregierung.'
       : v === 6 ? '„Stadt übernehmen“ behält alles: Leute, Häuser, Baustellen, Tech-Firmen, Kitas, Wohneigentum, das Stadtbuch und die Summen der Stadtregierung.'
       : v === 7 ? '„Stadt übernehmen“ behält alles: Leute, Häuser, Baustellen, Tech-Firmen, Kitas, Stadtteile, Wache, Anstalt, Kaserne, das Stadtbuch und alle Summen.'
-      : '„Stadt übernehmen“ behält alles: Leute, Häuser, Baustellen, Firmen, Autowerke und Autos, Kitas, Stadtteile, Wache, Anstalt, Kaserne, das Stadtbuch und alle Summen.')
+      : v === 8 ? '„Stadt übernehmen“ behält alles: Leute, Häuser, Baustellen, Firmen, Autowerke und Autos, Kitas, Stadtteile, Wache, Anstalt, Kaserne, das Stadtbuch und alle Summen.'
+      : '„Stadt übernehmen“ behält alles: Leute, Häuser, Firmen, Rathaus und Bürgermeister, Schulen, Haushalt, das Stadtbuch und alle Summen.')
       + abHeute + ' Vorher „Export behalten“, wenn du den alten Stand sichern willst.';
     $('version-uebernehmen').hidden = false;
     $('version-neu').classList.remove('haupt');

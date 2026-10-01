@@ -1,0 +1,6 @@
+Basis sim 3b1a95e0e5ae9ea5, neu sim 5475aede423a0000 (GED 0, OPFER_FREI 0, HAFT_EROEFFNUNG 0), stündlich, 730 Tage
+ok   Seed 1: 730 von 730 Tagen gleich (Einwohner 1449 / 1449)
+ok   Seed 2: 730 von 730 Tagen gleich (Einwohner 1509 / 1509)
+ok   Seed 3: 730 von 730 Tagen gleich (Einwohner 1515 / 1515)
+Tag für Tag gleich
+exit 0

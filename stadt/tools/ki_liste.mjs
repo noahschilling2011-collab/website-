@@ -2,6 +2,9 @@
 // Schreibt ki/policies.json: die Liste der Policy-Dateien in ki/ (nur die Ebene ki/, nicht ki/v8/), die die aktuelle stadt.html annimmt
 // (Sim.KI.policyPruefen: Format, Stadt-Version, Schema-Hash, Inhalts-Hash, Zahlen). Das Spiel liest diese Liste mit relativer URL, wenn Noah
 // „Trainierte Policy (experimentell)“ wählt (Noahs Regel: nicht freigegebene Policies stecken nicht in stadt.html). Entwicklungswerkzeug.
+// Achtung seit Version 10 (Etappe 2): ki/policies.json nennt absichtlich noch policy_v9_lokal_1.json (Kopf „simVersion“: 9), damit das Spiel die
+// Policy aus Etappe 1 sichtbar ablehnt („neu trainieren“, Noahs Entscheidung 5; tests/browser_ki.cjs, ki/LIESMICH.md). Ein Lauf ohne
+// --nur-pruefen schreibt die Liste leer und nimmt diese Ablehnung weg; erst nach einem Training auf Version 10 neu schreiben.
 //   node tools/ki_liste.mjs [--html stadt.html] [--nur-pruefen]
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';

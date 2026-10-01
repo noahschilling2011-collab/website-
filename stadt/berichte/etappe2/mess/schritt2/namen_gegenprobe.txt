@@ -1,0 +1,5 @@
+Stand Version 9 (6c1741e, Seed 3, Tag 400, 1376 Einwohner); Erinnerungen an Menschen, die nicht mehr in der Stadt leben (mit Namen im alten Stand):
+  (a) vor Schritt 2 (Version 9, ohne Übernahme): 169, mit Namensmarke 169, Name als Klartext 0
+  (b) Baukopie (Version 10, übernommen): 169, mit Namensmarke 0, Name als Klartext 0
+ok   die Prüfung erkennt Namen (a) und findet nach der Übernahme keine (b)
+exit 0

@@ -1,0 +1,46 @@
+1 Statisch
+  ok   Wahl: Regeln lesen nur ihre Personenfelder (waehlbar, bmKandidaten, bmBeste, bmStimmen, wahlZufall, freundeZahl, sindFreunde, verpflichtet, istBm; dazu rentner, gebunden: nichts aus weib, vor, nach, einzug, elternA, elternB, elternAGen, elternBGen, elternNameA, elternNameB, memName, memCode, heimat); kein Name, kein Zufallsstrom
+  ok   bmWahl liest das Geschlecht nur für das Wort im Stadtbuch (nach der Wahl)
+  ok   Namenstausch (Seed 3, 500 Tage, 8 Wahlen): „Paul Herrmann“ heißt dort „Bernd Demir“, Wahlen und Stadt bitgleich (edde105fc061be35)
+2 Invarianten nach jeder Nacht
+  ok   Seed 1: 11 Wahlen (11 regulär, 9 Wiederwahlen, 0 abgewählt, 0 vorzeitige Enden), 1 Wechsel im Amt, 0 Nächte ohne Amtsinhaber; zuletzt 1004/234/168 Stimmen
+  ok   Seed 2: 11 Wahlen (11 regulär, 8 Wiederwahlen, 0 abgewählt, 0 vorzeitige Enden), 2 Wechsel im Amt, 0 Nächte ohne Amtsinhaber; zuletzt 429/336/415 Stimmen
+  ok   Seed 3: 11 Wahlen (11 regulär, 8 Wiederwahlen, 0 abgewählt, 0 vorzeitige Enden), 2 Wechsel im Amt, 0 Nächte ohne Amtsinhaber; zuletzt 840/186/180 Stimmen
+3 Erzwungene Fälle
+  ok   Tod im Amt: „Julia Ernst ist nicht mehr Bürgermeisterin: sie ist gestorben. In der nächsten Nacht wählt die Stadt neu.“; keine freie Stelle dazu (0 → 0), keine Nachfolge-Frage
+  ok   Neuwahl in der Nacht danach: Amtsantritt Tag 31, bis 101
+  ok   Haft im Amt: Amt endet („Anna Müller ist nicht mehr Bürgermeisterin: sie ist in Haft. In der nächsten Nac“)
+  ok   Neuwahl nach der Haft; wer in Haft ist, ist nicht wählbar
+  ok   Wegzug im Amt: Amt endet; als Noahs Hauptfigur kommt die Nachfolge-Frage (1)
+  ok   Eigener Platz: 10 Hauptfiguren + Amt = 11 in der Leiste, eine elfte geht nicht, das Amt dazu auch nicht; nach Freimachen belegt das Amt als Noahs Hauptfigur einen Platz (10 gezählt, 10 in der Leiste), danach geht keine weitere
+  ok   Abwahl bei Unzufriedenheit: 3/193/202 Stimmen, der alte Amtsinhaber verliert Amt und Stelle, bleibt Noahs Hauptfigur, erinnert sich („Bürgermeisterwahl verloren“)
+  ok   Nach dem Amtsende bei voller Liste: 10 gezählt (Grenze 10), 11 in der Leiste (Plätze der Oberfläche: 11); das neue Amt kann nicht zusätzlich Noahs Hauptfigur werden
+  ok   Stadtbuch nennt den zweiten Wahlgang genau dann, wenn niemand mehr als die Hälfte hat (202 von 398)
+  ok   Wählbar: 18 bis unter 65, nicht in Haft (erzwungen an einer Person)
+4 Rangfolge der Vorhaben (Schnittstelle zum Haushalt, mit Testvorhaben)
+  ok   Anfrage am letzten Tag des Jahres um 7 Uhr: Jahr 1, Tag 10–19, 3 Vorhaben
+  ok   gültige Antwort (fehlende hinten): c, a, b, Tagebuch „Ich will zuerst C, dann A.“; im Jahr 0 noch die Regel (a, b, c); falsche Nummer abgelehnt
+  ok   im Jahr 1 gilt sie (c, a, b)
+  ok   ungültige Antwort (doppelt; auch unbekannt oder leer) → Regel fürs Jahr 2
+  ok   ohne Antwort: nach 2 Spielstunden die Regel
+  ok   KI aus: keine Anfrage, die Regel ab der letzten Nacht
+  ok   Aufholen in Tagesschritten: keine Anfrage an die KI, die Regel fürs Jahr 6
+  ok   Speichern und Laden mit offener Anfrage (Tag 69, 8 Uhr): 6 Tage weiter bitgleich
+  ok   ohne Vorhaben (leere Liste): keine Anfrage, keine Rangfolge
+  ok   mit den drei Vorhaben des Haushalts (Teil 5: die Computer der Schulen sind Bedarf, nicht in der Rangfolge): Anfrage an Tag 9 um 7 Uhr (Wohnungen auf Vorrat, Rathaus ausbauen, Parks in Wohnnähe); ohne Antwort die Regel, der Plan fürs Jahr 1 folgt ihr
+5 Speichern, Laden, beschädigte Stände, Übernahme
+  ok   Speichern vor der Wahlnacht (Tag 69, 23 Uhr), 31 Tage weiter bitgleich
+  ok   Amt fehlt: Spielstand beschädigt: Rathaus; Person außerhalb: Spielstand beschädigt: Bürgermeister (Zustand); falsche Generation: Spielstand beschädigt: Bürgermeister (Amt); nicht im Rathaus: Spielstand beschädigt: Bürgermeister (Amt); Wahl ohne Kandidaten-Liste: Spielstand beschädigt: Bürgermeister (Wahl); Rangfolge von wem: Spielstand beschädigt: Bürgermeister (Rangfolge); Anfrage ohne Frist: Spielstand beschädigt: Bürgermeister (Anfrage); Summe fehlt: Spielstand beschädigt: Bürgermeister (Summen); Summen fehlen: Spielstand beschädigt: Rathaus; Tagebuch mit Rangfolge ohne Jahr: Spielstand beschädigt: Tagebuch
+6 Messung nach Gruppen (Seeds 1–10, 730 Tage; nur gemessen, keine Regel liest diese Merkmale)
+       110 Wahlen (ohne Tag 0), davon 36 ohne Amtsinhaber; Anteil an Wählbaren und am Losgewicht (je Wahl gemittelt), an Herausforderern (ohne Amtsinhaber), Gewählten und Gewählten ohne Amtsinhaber; Freundschaften je Wählbarem:
+       alle                                         wählbar 100.0 %  Los 100.0 %  Herausforderer 100.0 %  gewählt 100.0 % (110)  ohne Amtsinhaber 100.0 % (36)  Freunde 4.30
+       in der Stadt geboren                         wählbar  19.8 %  Los  19.1 %  Herausforderer  19.1 %  gewählt   9.1 % (10)  ohne Amtsinhaber  13.9 % (5)  Freunde 4.29
+       zugezogen oder vom Start                     wählbar  80.2 %  Los  80.9 %  Herausforderer  80.9 %  gewählt  90.9 % (100)  ohne Amtsinhaber  86.1 % (31)  Freunde 4.30
+       Nachnamen Kaya bis Kowalski (Liste 31–37)    wählbar  12.1 %  Los  12.2 %  Herausforderer   9.4 %  gewählt   1.8 % (2)  ohne Amtsinhaber   5.6 % (2)  Freunde 4.33
+       übrige Nachnamen                             wählbar  87.9 %  Los  87.8 %  Herausforderer  90.6 %  gewählt  98.2 % (108)  ohne Amtsinhaber  94.4 % (34)  Freunde 4.30
+       Frauen                                       wählbar  49.2 %  Los  49.1 %  Herausforderer  50.8 %  gewählt  50.9 % (56)  ohne Amtsinhaber  47.2 % (17)  Freunde 4.31
+       Männer                                       wählbar  50.8 %  Los  50.9 %  Herausforderer  49.2 %  gewählt  49.1 % (54)  ohne Amtsinhaber  52.8 % (19)  Freunde 4.29
+       Alter 18–29                                  wählbar  21.5 %  Los  19.6 %  Herausforderer  18.8 %  gewählt  10.0 % (11)  ohne Amtsinhaber  22.2 % (8)  Freunde 3.65
+       Alter 30–44                                  wählbar  34.8 %  Los  35.3 %  Herausforderer  38.7 %  gewählt  31.8 % (35)  ohne Amtsinhaber  38.9 % (14)  Freunde 4.41
+       Alter 45–64                                  wählbar  43.7 %  Los  45.1 %  Herausforderer  42.6 %  gewählt  58.2 % (64)  ohne Amtsinhaber  38.9 % (14)  Freunde 4.49
+Alle Prüfungen zum Bürgermeister bestanden

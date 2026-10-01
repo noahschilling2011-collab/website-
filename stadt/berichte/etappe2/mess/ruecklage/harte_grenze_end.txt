@@ -1,0 +1,8 @@
+statisch: 26 Entscheidungs-/Lernfunktionen, 2 Anzeigefunktionen, 89 neue Zeilen in bestehenden Funktionen
+berührte Personenfelder: arbeit, bGeld, besitz, entA, entArt, entZeit, erf, geb, geld, gemein, gen, haftBis, hh, kinder, lebt, memCode, memFakt, memGen, memName, memPos, memRef, memTag, memVon, offRest, offen, partner, planGrund, planSchritt, spar, sperreBis, ziel, zielSeit
+Ausnahmen mit Grund: erinnere: memName unter R.GED = 0 (namePack nur für R.GED = 0); personInfo (Anzeige): Name nur lebender Personen über nr, sonst bezugWort; memBehalten kopiert memRef/memGen mit und setzt memName 0
+ok   statisch: keine Namen, kein Geschlecht, keine Herkunft, keine Eltern, kein Einzugstag; memRef/memGen nur zum Kopieren und in der Anzeige
+Namenstausch mit R.GED_STAERKE = 1, R.PLAN_RUECKLAGE = 1
+ok   Namenstausch Seed 1, 200 Tage: jeden Tag alle Arrays (auch Erfahrung, offene Handlung, Plan, Gedächtnis, letzte Entscheidung), Einzelwerte und Statistik gleich; 258 gelernte Erfahrungen; Person 0 heißt „Leon Yılmaz“ bzw. „Paul Demir“
+ok   Namenstausch Seed 2, 200 Tage: jeden Tag alle Arrays (auch Erfahrung, offene Handlung, Plan, Gedächtnis, letzte Entscheidung), Einzelwerte und Statistik gleich; 234 gelernte Erfahrungen; Person 0 heißt „Jakob Braun“ bzw. „Max Zimmermann“
+exit 0

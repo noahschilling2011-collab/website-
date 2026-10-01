@@ -9,6 +9,7 @@ Checkpoints (`*.zip`), `episoden.jsonl` (1 MB), Paritätsdaten (je Policy gut 1 
 | `v9_uebertrag/` | Übertrag des KI-Teils auf Version 9: Bericht, Regression gegen 09083f5, Belohnungs-Audit, Durchsatz |
 | `pruefung_2026-09-29/` | Korrekturen nach der unabhängigen Prüfung und ihre Nachprüfung aus einer frischen Kopie (Logs) |
 | `etappe0/` | Bestandsaufnahme von Version 8 (Etappe 0) |
+| `etappe2/` | Etappe 2 (Gedächtnis, Erfahrung und Pläne, Version 10): Noahs Entscheidungen, Entwurf, die Berichte aller Schritte und kleine Messtabellen; Übersicht in `etappe2/LIESMICH.md` |
 
 ## v9_lokal_1
 
@@ -54,3 +55,11 @@ Kopie dieses Ordners (`cp -r`, außerhalb des Repos, `STADT_GIT=<repo>`). Pfade:
 
 `BESTAND.md`: Ausgangsstand Version 8 (31ce452) mit Basistests, Architektur, 16 Problemen mit Beleg und dem Plan für Etappe 1–6. Pfade dort
 beziehen sich auf den damaligen Arbeitsordner.
+
+## etappe2
+
+Berichte der Etappe 2 in der Reihenfolge der Arbeit (`ENTSCHEIDUNGEN_NOAH.md`, `VERGLEICH.md`, `SCHRITT0.md` bis `SCHRITT4.md`,
+`KALIBRIERUNG.md`, `OPTIMIEREN.md`, `SIM_FIX.md`, `VERBLASSEN.md`) und unter `mess/` die Messtabellen, auf die README und `docs/` verweisen.
+Bereinigt sind nur Pfade des Arbeitsordners (`SP`) und des Repos (`<repo>`); sha256 der Originale in `etappe2/quellen.sha256`. Rohdaten wie
+Gate-Ausgaben je Seed, Bildschirmfotos und Sicherungen sind nicht hier. Was wo steht und welche Werkzeuge in `tools/` die Zahlen nachrechnen:
+`etappe2/LIESMICH.md`.

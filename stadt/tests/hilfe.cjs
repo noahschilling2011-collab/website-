@@ -1,8 +1,9 @@
 // Gemeinsame Hilfen: Chromium, Three.js per Route, Ollama-Attrappe per Route (Antwort per Funktion steuerbar)
 const U = require('./umgebung.cjs');
 const { chromium } = U;
-// Teststand der KI-Code-Tests in Version 9 und seine Hauptfigur: von tests/basis.cjs erzeugt (Seed 2, Tag 420, über „Stadt übernehmen“ bis 9)
-const BASIS = U.basis('basis_v9.json'), INFO = U.basis('basis_info.json');
+// Teststand der KI-Code-Tests in der Version dieser Datei und seine Hauptfigur: von tests/basis.cjs erzeugt (Seed 2, Tag 420, über „Stadt
+// übernehmen“ bis 10; bis Version 9 hieß er basis_v9.json)
+const BASIS = U.basis('basis_v10.json'), INFO = U.basis('basis_info.json');
 async function starte(opt = {}) {
   const b = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const ctx = await b.newContext({ viewport: opt.viewport || { width: 1280, height: 800 } });

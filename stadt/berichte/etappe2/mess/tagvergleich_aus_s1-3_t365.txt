@@ -1,0 +1,10 @@
+a ../basis_6c1741e.html (sim 3b1a95e0e5ae9ea5, Version 9), b ../mess/stadt_opfer_aus.html (sim 53ff74741e88bed8, Version 9), Policy in b: aus
+ok   stunde, Seed 1: 365 von 365 Tagen bitgleich (Tag 365, 1169 Einwohner, Fingerabdruck 0aef350be3e88ab9)
+ok   stunde, Seed 2: 365 von 365 Tagen bitgleich (Tag 365, 1200 Einwohner, Fingerabdruck 7eb773caeb2123f8)
+ok   stunde, Seed 3: 365 von 365 Tagen bitgleich (Tag 365, 1221 Einwohner, Fingerabdruck 0615fbe95c47e9d8)
+ok   tagSchritt, Seed 1: 60 von 60 Tagen bitgleich (Tag 60, 67 Einwohner, Fingerabdruck 4be8d06dbb42f1c0)
+ok   tagSchritt, Seed 2: 60 von 60 Tagen bitgleich (Tag 60, 62 Einwohner, Fingerabdruck f32ac1d0b61c4f71)
+ok   tagSchritt, Seed 3: 60 von 60 Tagen bitgleich (Tag 60, 86 Einwohner, Fingerabdruck 2920a7e768f9ea42)
+je Tag: ../mess/tagvergleich_aus_s1-3_t365.tsv (1275 Zeilen)
+Tag für Tag bitgleich
+exit 0 (31 s)
